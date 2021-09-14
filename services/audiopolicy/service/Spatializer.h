@@ -19,12 +19,15 @@
 
 #include <android/media/BnEffect.h>
 #include <android/media/BnSpatializer.h>
-#include <android/media/SpatializerHeadTrackingMode.h>
 #include <android/media/SpatializationLevel.h>
-
+#include <android/media/SpatializationMode.h>
+#include <android/media/SpatializerHeadTrackingMode.h>
+#include <android/sensor.h>
+#include <media/audiohal/EffectHalInterface.h>
 #include <media/AudioEffect.h>
 #include <system/audio_effects/effect_spatializer.h>
 
+#include "SpatializerPoseController.h"
 
 namespace android {
 
@@ -80,9 +83,10 @@ public:
  * made to audio policy manager to release and close the spatializer output stream and the
  * spatializer mixer thread is destroyed.
  */
-class Spatializer : public media::BnSpatializer, public IBinder::DeathRecipient {
-public:
-
+class Spatializer : public media::BnSpatializer,
+                    public IBinder::DeathRecipient,
+                    private SpatializerPoseController::Listener {
+  public:
     static sp<Spatializer> create(SpatializerPolicyCallback *callback);
 
            ~Spatializer() override;
@@ -100,6 +104,12 @@ public:
             media::SpatializerHeadTrackingMode* mode) override;
     binder::Status recenterHeadTracker() override;
     binder::Status setGlobalTransform(const std::vector<float>& screenToStage) override;
+    binder::Status setHeadSensor(int sensorHandle) override;
+    binder::Status setScreenSensor(int sensorHandle) override;
+    binder::Status setDisplayOrientation(float physicalToLogicalAngle) override;
+    binder::Status setHingeAngle(float hingeAngle) override;
+    binder::Status getSupportedModes(std::vector<media::SpatializationMode>* modes) override;
+
 
     /** IBinder::DeathRecipient. Listen to the death of the INativeSpatializerCallback. */
     virtual void binderDied(const wp<IBinder>& who);
@@ -109,8 +119,10 @@ public:
      */
     status_t registerCallback(const sp<media::INativeSpatializerCallback>& callback);
 
+    status_t loadEngineConfiguration(sp<EffectHalInterface> effect);
+
     /** Level getter for use by local classes. */
-    media::SpatializationLevel getLevel() const { Mutex::Autolock _l(mLock); return mLevel; }
+    media::SpatializationLevel getLevel() const { std::lock_guard lock(mLock); return mLevel; }
 
     /** Called by audio policy service when the special output mixer dedicated to spatialization
      * is opened and the spatializer engine must be created.
@@ -121,19 +133,10 @@ public:
      */
     audio_io_handle_t detachOutput();
     /** Returns the output stream the spatializer is attached to. */
-    audio_io_handle_t getOutput() const { Mutex::Autolock _l(mLock); return mOutput; }
-
-    /** Sets the channel mask, sampling rate and format for the spatializer input. */
-    void setAudioInConfig(const audio_config_base_t& config) {
-        Mutex::Autolock _l(mLock);
-        mAudioInConfig = config;
-    }
+    audio_io_handle_t getOutput() const { std::lock_guard lock(mLock); return mOutput; }
 
     /** Gets the channel mask, sampling rate and format set for the spatializer input. */
-    audio_config_base_t getAudioInConfig() const {
-        Mutex::Autolock _l(mLock);
-        return mAudioInConfig;
-    }
+    audio_config_base_t getAudioInConfig() const;
 
     /** An implementation of an IEffect interface that can be used to pass advanced parameters to
      * the spatializer engine. All APis are noop (i.e. the interface cannot be used to control
@@ -164,12 +167,89 @@ public:
     };
 
 private:
-
     Spatializer(effect_descriptor_t engineDescriptor,
                      SpatializerPolicyCallback *callback);
 
-
     static void engineCallback(int32_t event, void* user, void *info);
+
+    // From VirtualizerStageController::Listener
+    void onHeadToStagePose(const media::Pose3f& headToStage) override;
+    void onActualModeChange(media::HeadTrackingMode mode) override;
+
+    void calculateHeadPose();
+
+    static ConversionResult<ASensorRef> getSensorFromHandle(int handle);
+
+    static constexpr int kMaxEffectParamValues = 10;
+    /**
+     * Get a parameter from spatializer engine by calling the effect HAL command method directly.
+     * To be used when the engine instance mEngine is not yet created in the effect framework.
+     * When MULTI_VALUES is false, the expected reply is only one value of type T.
+     * When MULTI_VALUES is true, the expected reply is made of a number (of type T) indicating
+     * how many values are returned, followed by this number for values of type T.
+     */
+    template<bool MULTI_VALUES, typename T>
+    status_t getHalParameter(sp<EffectHalInterface> effect, uint32_t type,
+                                          std::vector<T> *values) {
+        static_assert(sizeof(T) <= sizeof(uint32_t), "The size of T must less than 32 bits");
+
+        uint32_t cmd[sizeof(effect_param_t) / sizeof(uint32_t) + 1];
+        uint32_t reply[sizeof(effect_param_t) / sizeof(uint32_t) + 2 + kMaxEffectParamValues];
+
+        effect_param_t *p = (effect_param_t *)cmd;
+        p->psize = sizeof(uint32_t);
+        if (MULTI_VALUES) {
+            p->vsize = (kMaxEffectParamValues + 1) * sizeof(T);
+        } else {
+            p->vsize = sizeof(T);
+        }
+        *(uint32_t *)p->data = type;
+        uint32_t replySize = sizeof(effect_param_t) + p->psize + p->vsize;
+
+        status_t status = effect->command(EFFECT_CMD_GET_PARAM,
+                                          sizeof(effect_param_t) + sizeof(uint32_t), cmd,
+                                          &replySize, reply);
+        if (status != NO_ERROR) {
+            return status;
+        }
+        if (p->status != NO_ERROR) {
+            return p->status;
+        }
+        if (replySize <
+                sizeof(effect_param_t) + sizeof(uint32_t) + (MULTI_VALUES ? 2 : 1) * sizeof(T)) {
+            return BAD_VALUE;
+        }
+
+        T *params = (T *)((uint8_t *)reply + sizeof(effect_param_t) + sizeof(uint32_t));
+        int numParams = 1;
+        if (MULTI_VALUES) {
+            numParams = (int)*params++;
+        }
+        if (numParams > kMaxEffectParamValues) {
+            return BAD_VALUE;
+        }
+        std::copy(&params[0], &params[numParams], back_inserter(*values));
+        return NO_ERROR;
+    }
+
+    /**
+     * Set a parameter to spatializer engine by calling setParameter on mEngine AudioEffect object.
+     * It is possible to pass more than one value of type T according to the parameter type
+     *  according to values vector size.
+     */
+    template<typename T>
+    status_t setEffectParameter_l(uint32_t type, const std::vector<T>& values) REQUIRES(mLock) {
+        static_assert(sizeof(T) <= sizeof(uint32_t), "The size of T must less than 32 bits");
+
+        uint32_t cmd[sizeof(effect_param_t) / sizeof(uint32_t) + 1 + values.size()];
+        effect_param_t *p = (effect_param_t *)cmd;
+        p->psize = sizeof(uint32_t);
+        p->vsize = sizeof(T) * values.size();
+        *(uint32_t *)p->data = type;
+        memcpy((uint32_t *)p->data + 1, values.data(), sizeof(T) * values.size());
+
+        return mEngine->setParameter(p);
+    }
 
     /** Effect engine descriptor */
     const effect_descriptor_t mEngineDescriptor;
@@ -177,28 +257,47 @@ private:
     SpatializerPolicyCallback* mPolicyCallback;
 
     /** Mutex protecting internal state */
-    mutable Mutex mLock;
+    mutable std::mutex mLock;
 
     /** Client AudioEffect for the engine */
     sp<AudioEffect> mEngine GUARDED_BY(mLock);
     /** Output stream the spatializer mixer thread is attached to */
     audio_io_handle_t mOutput GUARDED_BY(mLock) = AUDIO_IO_HANDLE_NONE;
-    /** Virtualizer engine input configuration */
-    audio_config_base_t mAudioInConfig GUARDED_BY(mLock) = AUDIO_CONFIG_BASE_INITIALIZER;
 
     /** Callback interface to the client (AudioService) controlling this`Spatializer */
     sp<media::INativeSpatializerCallback> mSpatializerCallback GUARDED_BY(mLock);
 
     /** Requested spatialization level */
     media::SpatializationLevel mLevel GUARDED_BY(mLock) = media::SpatializationLevel::NONE;
-    /** Requested head tracking mode */
-    media::SpatializerHeadTrackingMode mHeadTrackingMode GUARDED_BY(mLock)
-            = media::SpatializerHeadTrackingMode::DISABLED;
-    /** Configured screen to stage transform */
-    std::vector<float> mScreenToStageTransform GUARDED_BY(mLock);
 
     /** Extended IEffect interface is one has been created */
     sp<EffectClient> mEffectClient GUARDED_BY(mLock);
+
+    /** Control logic for head-tracking, etc. */
+    std::shared_ptr<SpatializerPoseController> mPoseController GUARDED_BY(mLock);
+
+    /** Last requested head tracking mode */
+    media::HeadTrackingMode mDesiredHeadTrackingMode GUARDED_BY(mLock)
+            = media::HeadTrackingMode::STATIC;
+
+    /** Last-reported actual head-tracking mode. */
+    media::SpatializerHeadTrackingMode mActualHeadTrackingMode GUARDED_BY(mLock)
+            = media::SpatializerHeadTrackingMode::DISABLED;
+
+    /** Selected Head pose sensor */
+    ASensorRef mHeadSensor GUARDED_BY(mLock) = nullptr;
+
+    /** Selected Screen pose sensor */
+    ASensorRef mScreenSensor GUARDED_BY(mLock) = nullptr;
+
+    /** Last display orientation received */
+    static constexpr float kDisplayOrientationInvalid = 1000;
+    float mDisplayOrientation GUARDED_BY(mLock) = kDisplayOrientationInvalid;
+
+    std::vector<media::SpatializationLevel> mLevels;
+    std::vector<media::SpatializationMode> mSpatializationModes;
+    std::vector<audio_channel_mask_t> mChannelMasks;
+    bool mSupportsHeadTracking;
 };
 
 
