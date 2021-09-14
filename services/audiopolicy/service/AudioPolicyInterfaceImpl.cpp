@@ -2223,7 +2223,9 @@ Status AudioPolicyService::getSpatializer(
         const sp<media::INativeSpatializerCallback>& callback,
         media::GetSpatializerResponse* _aidl_return) {
     _aidl_return->spatializer = nullptr;
-    LOG_ALWAYS_FATAL_IF(callback == nullptr);
+    if (callback == nullptr) {
+        return binderStatusFromStatusT(BAD_VALUE);
+    }
     if (mSpatializer != nullptr) {
         RETURN_IF_BINDER_ERROR(
                 binderStatusFromStatusT(mSpatializer->registerCallback(callback)));

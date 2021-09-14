@@ -17,7 +17,9 @@
 package android.media;
 
 import android.media.SpatializationLevel;
+import android.media.SpatializationMode;
 import android.media.SpatializerHeadTrackingMode;
+
 
 /**
  * The ISpatializer interface is used to control the native audio service implementation
@@ -64,6 +66,41 @@ interface ISpatializer {
     /** Reset the head tracking algorithm to consider current head pose as neutral */
     void recenterHeadTracker();
 
-    /** Set the screen to stage transform to use by the head tracking algorithm */
+    /** Set the screen to stage transform to use by the head tracking algorithm
+     * The screen to stage transform is conveyed as a vector of 6 elements,
+     * where the first three are a translation vector and
+     * the last three are a rotation vector.
+     */
     void setGlobalTransform(in float[] screenToStage);
+
+    /**
+     * Set the sensor that is to be used for head-tracking.
+     * -1 can be used to disable head-tracking.
+     */
+    void setHeadSensor(int sensorHandle);
+
+    /**
+     * Set the sensor that is to be used for screen-tracking.
+     * -1 can be used to disable screen-tracking.
+     */
+    void setScreenSensor(int sensorHandle);
+
+    /**
+     * Sets the display orientation.
+     * Orientation is expressed in the angle of rotation from the physical "up" side of the screen
+     * to the logical "up" side of the content displayed the screen. Counterclockwise angles, as
+     * viewed while facing the screen are positive.
+     */
+    void setDisplayOrientation(float physicalToLogicalAngle);
+
+    /**
+     * Sets the hinge angle for foldable devices.
+     */
+    void setHingeAngle(float hingeAngle);
+
+    /** Reports the list of supported spatialization modess (see SpatializationMode.aidl).
+     * The list should never be empty if an ISpatializer interface was successfully
+     * retrieved with IAudioPolicyService.getSpatializer().
+     */
+    SpatializationMode[] getSupportedModes();
 }

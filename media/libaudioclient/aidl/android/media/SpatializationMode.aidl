@@ -17,18 +17,14 @@
 package android.media;
 
 /**
- * The spatialization level supported by the spatializer stage effect implementation.
+ * The spatialization mode supported by the spatializer stage effect implementation.
  * Used by methods of the ISpatializer interface.
  * {@hide}
  */
 @Backing(type="byte")
-enum SpatializationLevel {
-    /** Spatialization is disabled. */
-    NONE = 0,
-    /** The spatializer accepts audio with positional multichannel masks (e.g 5.1). */
-    SPATIALIZER_MULTICHANNEL = 1,
-    /** The spatializer accepts audio made of a channel bed of positional multichannels (e.g 5.1)
-     * and audio objects positioned independently via meta data.
-     */
-    SPATIALIZER_MCHAN_BED_PLUS_OBJECTS = 2,
+enum SpatializationMode {
+    /** The spatializer supports binaural mode (over headphones type devices). */
+    SPATIALIZATER_BINAURAL = 0,
+    /** The spatializer supports transaural mode (over speaker type devices). */
+    SPATIALIZATER_TRANSAURAL = 1,
 }

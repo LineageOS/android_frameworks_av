@@ -394,6 +394,7 @@ aidl_interface {
         "aidl/android/media/DeviceRole.aidl",
         "aidl/android/media/SoundTriggerSession.aidl",
         "aidl/android/media/SpatializationLevel.aidl",
+        "aidl/android/media/SpatializationMode.aidl",
         "aidl/android/media/SpatializerHeadTrackingMode.aidl",
     ],
     imports: [
