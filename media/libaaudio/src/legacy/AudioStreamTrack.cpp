@@ -215,7 +215,6 @@ aaudio_result_t AudioStreamTrack::open(const AudioStreamBuilder& builder)
         mBlockAdapter = nullptr;
     }
 
-    setState(AAUDIO_STREAM_STATE_OPEN);
     setDeviceId(mAudioTrack->getRoutedDeviceId());
 
     aaudio_session_id_t actualSessionId =
@@ -248,6 +247,19 @@ aaudio_result_t AudioStreamTrack::open(const AudioStreamBuilder& builder)
              "open() perfMode changed from %d to %d",
              perfMode, actualPerformanceMode);
 
+    if (getState() != AAUDIO_STREAM_STATE_UNINITIALIZED) {
+        ALOGE("%s - Open canceled since state = %d", __func__, getState());
+        if (getState() == AAUDIO_STREAM_STATE_DISCONNECTED)
+        {
+            ALOGE("%s - Opening while state is disconnected", __func__);
+            safeReleaseClose();
+            return AAUDIO_ERROR_DISCONNECTED;
+        }
+        safeReleaseClose();
+        return AAUDIO_ERROR_INVALID_STATE;
+    }
+
+    setState(AAUDIO_STREAM_STATE_OPEN);
     return AAUDIO_OK;
 }
 

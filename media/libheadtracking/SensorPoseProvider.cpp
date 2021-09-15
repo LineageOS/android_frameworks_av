@@ -21,12 +21,13 @@
 #include <inttypes.h>
 
 #include <future>
-#include <iostream>
 #include <map>
 #include <thread>
 
 #include <android/looper.h>
 #include <log/log_main.h>
+
+#include "QuaternionUtil.h"
 
 namespace android {
 namespace media {
@@ -217,6 +218,8 @@ class SensorPoseProviderImpl : public SensorPoseProvider {
             case ASENSOR_TYPE_ROTATION_VECTOR:
             case ASENSOR_TYPE_GAME_ROTATION_VECTOR: {
                 Eigen::Quaternionf quat(event.data[3], event.data[0], event.data[1], event.data[2]);
+                // Adapt to different frame convention.
+                quat *= rotateX(-M_PI_2);
                 return std::make_tuple(Pose3f(quat), std::optional<Twist3f>());
             }
 

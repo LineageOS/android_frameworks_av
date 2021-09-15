@@ -77,7 +77,6 @@ SpatializerPoseController::SpatializerPoseController(Listener* listener,
                                                      std::chrono::microseconds maxUpdatePeriod)
     : mListener(listener),
       mSensorPeriod(sensorPeriod),
-      mPoseProvider(SensorPoseProvider::create("headtracker", this)),
       mProcessor(createHeadTrackingProcessor(HeadTrackingProcessor::Options{
               .maxTranslationalVelocity = kMaxTranslationalVelocity / kTicksPerSecond,
               .maxRotationalVelocity = kMaxRotationalVelocity / kTicksPerSecond,
@@ -86,6 +85,7 @@ SpatializerPoseController::SpatializerPoseController(Listener* listener,
               .freshnessTimeout = Ticks(sensorPeriod * kMaxLostSamples).count(),
               .predictionDuration = Ticks(kPredictionDuration).count(),
       })),
+      mPoseProvider(SensorPoseProvider::create("headtracker", this)),
       mThread([this, maxUpdatePeriod] {
           while (true) {
               Pose3f headToStage;
