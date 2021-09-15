@@ -509,6 +509,29 @@ bool MediaCodecList::codecHandlesFormat(const char *mime, sp<MediaCodecInfo> inf
                 }
             }
         }
+
+        int32_t profile = -1;
+        if (format->findInt32("profile", &profile)) {
+            int32_t level = -1;
+            format->findInt32("level", &level);
+            Vector<MediaCodecInfo::ProfileLevel> profileLevels;
+            capabilities->getSupportedProfileLevels(&profileLevels);
+            auto it = profileLevels.begin();
+            for (; it != profileLevels.end(); ++it) {
+                if (profile != it->mProfile) {
+                    continue;
+                }
+                if (level > -1 && level > it->mLevel) {
+                    continue;
+                }
+                break;
+            }
+
+            if (it == profileLevels.end()) {
+                ALOGV("Codec does not support profile %d with level %d", profile, level);
+                return false;
+            }
+        }
     }
 
     // haven't found a reason to discard this one
