@@ -57,6 +57,7 @@ cc_binary {
         "libheadtracking",
         "libheadtracking-binding",
         "libsensor",
+        "libutils",
     ],
 }
 
