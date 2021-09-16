@@ -24,6 +24,7 @@
 #include <android/media/SpatializerHeadTrackingMode.h>
 #include <android/sensor.h>
 #include <media/audiohal/EffectHalInterface.h>
+#include <media/stagefright/foundation/ALooper.h>
 #include <media/AudioEffect.h>
 #include <system/audio_effects/effect_spatializer.h>
 
@@ -91,6 +92,9 @@ class Spatializer : public media::BnSpatializer,
 
            ~Spatializer() override;
 
+    /** RefBase */
+    void onFirstRef();
+
     /** ISpatializer, see ISpatializer.aidl */
     binder::Status release() override;
     binder::Status getSupportedLevels(std::vector<media::SpatializationLevel>* levels) override;
@@ -138,6 +142,8 @@ class Spatializer : public media::BnSpatializer,
     /** Gets the channel mask, sampling rate and format set for the spatializer input. */
     audio_config_base_t getAudioInConfig() const;
 
+    void calculateHeadPose();
+
     /** An implementation of an IEffect interface that can be used to pass advanced parameters to
      * the spatializer engine. All APis are noop (i.e. the interface cannot be used to control
      * the effect) except for passing parameters via the command() API. */
@@ -176,7 +182,9 @@ private:
     void onHeadToStagePose(const media::Pose3f& headToStage) override;
     void onActualModeChange(media::HeadTrackingMode mode) override;
 
-    void calculateHeadPose();
+    void onHeadToStagePoseMsg(const std::vector<float>& headToStage);
+    void onActualModeChangeMsg(media::HeadTrackingMode mode);
+
 
     static ConversionResult<ASensorRef> getSensorFromHandle(int handle);
 
@@ -251,6 +259,8 @@ private:
         return mEngine->setParameter(p);
     }
 
+    void postFramesProcessedMsg(int frames);
+
     /** Effect engine descriptor */
     const effect_descriptor_t mEngineDescriptor;
     /** Callback interface to parent audio policy service */
@@ -298,6 +308,14 @@ private:
     std::vector<media::SpatializationMode> mSpatializationModes;
     std::vector<audio_channel_mask_t> mChannelMasks;
     bool mSupportsHeadTracking;
+
+    // Looper thread for mEngine callbacks
+    class EngineCallbackHandler;
+
+    sp<ALooper> mLooper;
+    sp<EngineCallbackHandler> mHandler;
+
+    static const std::vector<const char *> sHeadPoseKeys;
 };
 
 

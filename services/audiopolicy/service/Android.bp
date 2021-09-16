@@ -49,6 +49,7 @@ cc_library_shared {
         "libsensorprivacy",
         "libshmemcompat",
         "libutils",
+        "libstagefright_foundation",
         "android.media.audio.common.types-V1-cpp",
         "audioclient-types-aidl-cpp",
         "audioflinger-aidl-cpp",
