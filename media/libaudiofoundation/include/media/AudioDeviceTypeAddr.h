@@ -19,7 +19,7 @@
 #include <string>
 #include <vector>
 
-#include <android/media/AudioDevice.h>
+#include <android/media/audio/common/AudioDevice.h>
 #include <binder/Parcelable.h>
 #include <binder/Parcel.h>
 #include <media/AudioContainers.h>
@@ -88,8 +88,8 @@ std::string dumpAudioDeviceTypeAddrVector(const AudioDeviceTypeAddrVector& devic
 
 // Conversion routines, according to AidlConversion.h conventions.
 ConversionResult<AudioDeviceTypeAddr>
-aidl2legacy_AudioDeviceTypeAddress(const media::AudioDevice& aidl);
-ConversionResult<media::AudioDevice>
+aidl2legacy_AudioDeviceTypeAddress(const media::audio::common::AudioDevice& aidl);
+ConversionResult<media::audio::common::AudioDevice>
 legacy2aidl_AudioDeviceTypeAddress(const AudioDeviceTypeAddr& legacy);
 
 } // namespace android

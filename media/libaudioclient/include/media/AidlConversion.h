@@ -23,7 +23,6 @@
 
 #include <android/media/AudioAttributesInternal.h>
 #include <android/media/AudioClient.h>
-#include <android/media/AudioDeviceDescription.h>
 #include <android/media/AudioDualMonoMode.h>
 #include <android/media/AudioFlag.h>
 #include <android/media/AudioGain.h>
@@ -50,6 +49,7 @@
 #include <android/media/audio/common/AudioConfig.h>
 #include <android/media/audio/common/AudioConfigBase.h>
 #include <android/media/audio/common/AudioContentType.h>
+#include <android/media/audio/common/AudioDeviceDescription.h>
 #include <android/media/audio/common/AudioEncapsulationMetadataType.h>
 #include <android/media/audio/common/AudioEncapsulationMode.h>
 #include <android/media/audio/common/AudioEncapsulationType.h>
@@ -137,14 +137,14 @@ ConversionResult<media::AudioPortType> legacy2aidl_audio_port_type_t_AudioPortTy
         audio_port_type_t legacy);
 
 ConversionResult<audio_channel_mask_t> aidl2legacy_AudioChannelLayout_audio_channel_mask_t(
-        const android::media::audio::common::AudioChannelLayout& aidl, bool isInput);
-ConversionResult<android::media::audio::common::AudioChannelLayout>
+        const media::audio::common::AudioChannelLayout& aidl, bool isInput);
+ConversionResult<media::audio::common::AudioChannelLayout>
 legacy2aidl_audio_channel_mask_t_AudioChannelLayout(audio_channel_mask_t legacy, bool isInput);
 
 ConversionResult<audio_devices_t> aidl2legacy_AudioDeviceDescription_audio_devices_t(
-        const media::AudioDeviceDescription& aidl);
-ConversionResult<media::AudioDeviceDescription> legacy2aidl_audio_devices_t_AudioDeviceDescription(
-        audio_devices_t legacy);
+        const media::audio::common::AudioDeviceDescription& aidl);
+ConversionResult<media::audio::common::AudioDeviceDescription>
+legacy2aidl_audio_devices_t_AudioDeviceDescription(audio_devices_t legacy);
 
 ConversionResult<audio_format_t> aidl2legacy_AudioFormatDescription_audio_format_t(
         const media::audio::common::AudioFormatDescription& aidl);

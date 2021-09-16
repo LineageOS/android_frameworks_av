@@ -38,6 +38,8 @@ using media::audio::common::AudioChannelLayout;
 using media::audio::common::AudioConfig;
 using media::audio::common::AudioConfigBase;
 using media::audio::common::AudioContentType;
+using media::audio::common::AudioDeviceDescription;
+using media::audio::common::AudioDeviceType;
 using media::audio::common::AudioEncapsulationMetadataType;
 using media::audio::common::AudioEncapsulationMode;
 using media::audio::common::AudioEncapsulationType;
@@ -406,7 +408,7 @@ namespace {
 namespace detail {
 using AudioChannelPair = std::pair<audio_channel_mask_t, AudioChannelLayout>;
 using AudioChannelPairs = std::vector<AudioChannelPair>;
-using AudioDevicePair = std::pair<audio_devices_t, media::AudioDeviceDescription>;
+using AudioDevicePair = std::pair<audio_devices_t, AudioDeviceDescription>;
 using AudioDevicePairs = std::vector<AudioDevicePair>;
 using AudioFormatPair = std::pair<audio_format_t, AudioFormatDescription>;
 using AudioFormatPairs = std::vector<AudioFormatPair>;
@@ -494,9 +496,9 @@ const detail::AudioChannelPairs& getVoiceAudioChannelPairs() {
     return pairs;
 }
 
-media::AudioDeviceDescription make_AudioDeviceDescription(media::AudioDeviceType type,
+AudioDeviceDescription make_AudioDeviceDescription(AudioDeviceType type,
         const std::string& connection = "") {
-    media::AudioDeviceDescription result;
+    AudioDeviceDescription result;
     result.type = type;
     result.connection = connection;
     return result;
@@ -504,7 +506,7 @@ media::AudioDeviceDescription make_AudioDeviceDescription(media::AudioDeviceType
 
 void append_AudioDeviceDescription(detail::AudioDevicePairs& pairs,
         audio_devices_t inputType, audio_devices_t outputType,
-        media::AudioDeviceType inType, media::AudioDeviceType outType,
+        AudioDeviceType inType, AudioDeviceType outType,
         const std::string& connection = "") {
     pairs.push_back(std::make_pair(inputType, make_AudioDeviceDescription(inType, connection)));
     pairs.push_back(std::make_pair(outputType, make_AudioDeviceDescription(outType, connection)));
@@ -514,174 +516,174 @@ const detail::AudioDevicePairs& getAudioDevicePairs() {
     static const detail::AudioDevicePairs pairs = []() {
         detail::AudioDevicePairs pairs = {{
             {
-                AUDIO_DEVICE_NONE, media::AudioDeviceDescription{}
+                AUDIO_DEVICE_NONE, AudioDeviceDescription{}
             },
             {
                 AUDIO_DEVICE_OUT_EARPIECE, make_AudioDeviceDescription(
-                        media::AudioDeviceType::OUT_SPEAKER_EARPIECE)
+                        AudioDeviceType::OUT_SPEAKER_EARPIECE)
             },
             {
                 AUDIO_DEVICE_OUT_SPEAKER, make_AudioDeviceDescription(
-                        media::AudioDeviceType::OUT_SPEAKER)
+                        AudioDeviceType::OUT_SPEAKER)
             },
             {
                 AUDIO_DEVICE_OUT_WIRED_HEADPHONE, make_AudioDeviceDescription(
-                        media::AudioDeviceType::OUT_HEADPHONE,
-                        media::AudioDeviceDescription::CONNECTION_ANALOG())
+                        AudioDeviceType::OUT_HEADPHONE,
+                        AudioDeviceDescription::CONNECTION_ANALOG())
             },
             {
                 AUDIO_DEVICE_OUT_BLUETOOTH_SCO, make_AudioDeviceDescription(
-                        media::AudioDeviceType::OUT_DEVICE,
-                        media::AudioDeviceDescription::CONNECTION_BT_SCO())
+                        AudioDeviceType::OUT_DEVICE,
+                        AudioDeviceDescription::CONNECTION_BT_SCO())
             },
             {
                 AUDIO_DEVICE_OUT_BLUETOOTH_SCO_CARKIT, make_AudioDeviceDescription(
-                        media::AudioDeviceType::OUT_CARKIT,
-                        media::AudioDeviceDescription::CONNECTION_BT_SCO())
+                        AudioDeviceType::OUT_CARKIT,
+                        AudioDeviceDescription::CONNECTION_BT_SCO())
             },
             {
                 AUDIO_DEVICE_OUT_BLUETOOTH_A2DP_HEADPHONES, make_AudioDeviceDescription(
-                        media::AudioDeviceType::OUT_HEADPHONE,
-                        media::AudioDeviceDescription::CONNECTION_BT_A2DP())
+                        AudioDeviceType::OUT_HEADPHONE,
+                        AudioDeviceDescription::CONNECTION_BT_A2DP())
             },
             {
                 AUDIO_DEVICE_OUT_BLUETOOTH_A2DP_SPEAKER, make_AudioDeviceDescription(
-                        media::AudioDeviceType::OUT_SPEAKER,
-                        media::AudioDeviceDescription::CONNECTION_BT_A2DP())
+                        AudioDeviceType::OUT_SPEAKER,
+                        AudioDeviceDescription::CONNECTION_BT_A2DP())
             },
             {
                 AUDIO_DEVICE_OUT_TELEPHONY_TX, make_AudioDeviceDescription(
-                        media::AudioDeviceType::OUT_TELEPHONY_TX)
+                        AudioDeviceType::OUT_TELEPHONY_TX)
             },
             {
                 AUDIO_DEVICE_OUT_AUX_LINE, make_AudioDeviceDescription(
-                        media::AudioDeviceType::OUT_LINE_AUX)
+                        AudioDeviceType::OUT_LINE_AUX)
             },
             {
                 AUDIO_DEVICE_OUT_SPEAKER_SAFE, make_AudioDeviceDescription(
-                        media::AudioDeviceType::OUT_SPEAKER_SAFE)
+                        AudioDeviceType::OUT_SPEAKER_SAFE)
             },
             {
                 AUDIO_DEVICE_OUT_HEARING_AID, make_AudioDeviceDescription(
-                        media::AudioDeviceType::OUT_HEARING_AID,
-                        media::AudioDeviceDescription::CONNECTION_WIRELESS())
+                        AudioDeviceType::OUT_HEARING_AID,
+                        AudioDeviceDescription::CONNECTION_WIRELESS())
             },
             {
                 AUDIO_DEVICE_OUT_ECHO_CANCELLER, make_AudioDeviceDescription(
-                        media::AudioDeviceType::OUT_ECHO_CANCELLER)
+                        AudioDeviceType::OUT_ECHO_CANCELLER)
             },
             {
                 AUDIO_DEVICE_OUT_BLE_SPEAKER, make_AudioDeviceDescription(
-                        media::AudioDeviceType::OUT_SPEAKER,
-                        media::AudioDeviceDescription::CONNECTION_BT_LE())
+                        AudioDeviceType::OUT_SPEAKER,
+                        AudioDeviceDescription::CONNECTION_BT_LE())
             },
             // AUDIO_DEVICE_IN_AMBIENT and IN_COMMUNICATION are removed since they were deprecated.
             {
                 AUDIO_DEVICE_IN_BUILTIN_MIC, make_AudioDeviceDescription(
-                        media::AudioDeviceType::IN_MICROPHONE)
+                        AudioDeviceType::IN_MICROPHONE)
             },
             {
                 AUDIO_DEVICE_IN_BACK_MIC, make_AudioDeviceDescription(
-                        media::AudioDeviceType::IN_MICROPHONE_BACK)
+                        AudioDeviceType::IN_MICROPHONE_BACK)
             },
             {
                 AUDIO_DEVICE_IN_TELEPHONY_RX, make_AudioDeviceDescription(
-                        media::AudioDeviceType::IN_TELEPHONY_RX)
+                        AudioDeviceType::IN_TELEPHONY_RX)
             },
             {
                 AUDIO_DEVICE_IN_TV_TUNER, make_AudioDeviceDescription(
-                        media::AudioDeviceType::IN_TV_TUNER)
+                        AudioDeviceType::IN_TV_TUNER)
             },
             {
                 AUDIO_DEVICE_IN_LOOPBACK, make_AudioDeviceDescription(
-                        media::AudioDeviceType::IN_LOOPBACK)
+                        AudioDeviceType::IN_LOOPBACK)
             },
             {
                 AUDIO_DEVICE_IN_BLUETOOTH_BLE, make_AudioDeviceDescription(
-                        media::AudioDeviceType::IN_DEVICE,
-                        media::AudioDeviceDescription::CONNECTION_BT_LE())
+                        AudioDeviceType::IN_DEVICE,
+                        AudioDeviceDescription::CONNECTION_BT_LE())
             },
             {
                 AUDIO_DEVICE_IN_ECHO_REFERENCE, make_AudioDeviceDescription(
-                        media::AudioDeviceType::IN_ECHO_REFERENCE)
+                        AudioDeviceType::IN_ECHO_REFERENCE)
             }
         }};
         append_AudioDeviceDescription(pairs,
                 AUDIO_DEVICE_IN_DEFAULT, AUDIO_DEVICE_OUT_DEFAULT,
-                media::AudioDeviceType::IN_DEFAULT, media::AudioDeviceType::OUT_DEFAULT);
+                AudioDeviceType::IN_DEFAULT, AudioDeviceType::OUT_DEFAULT);
         append_AudioDeviceDescription(pairs,
                 AUDIO_DEVICE_IN_WIRED_HEADSET, AUDIO_DEVICE_OUT_WIRED_HEADSET,
-                media::AudioDeviceType::IN_HEADSET, media::AudioDeviceType::OUT_HEADSET,
-                media::AudioDeviceDescription::CONNECTION_ANALOG());
+                AudioDeviceType::IN_HEADSET, AudioDeviceType::OUT_HEADSET,
+                AudioDeviceDescription::CONNECTION_ANALOG());
         append_AudioDeviceDescription(pairs,
                 AUDIO_DEVICE_IN_BLUETOOTH_SCO_HEADSET, AUDIO_DEVICE_OUT_BLUETOOTH_SCO_HEADSET,
-                media::AudioDeviceType::IN_HEADSET, media::AudioDeviceType::OUT_HEADSET,
-                media::AudioDeviceDescription::CONNECTION_BT_SCO());
+                AudioDeviceType::IN_HEADSET, AudioDeviceType::OUT_HEADSET,
+                AudioDeviceDescription::CONNECTION_BT_SCO());
         append_AudioDeviceDescription(pairs,
                 AUDIO_DEVICE_IN_HDMI, AUDIO_DEVICE_OUT_HDMI,
-                media::AudioDeviceType::IN_DEVICE, media::AudioDeviceType::OUT_DEVICE,
-                media::AudioDeviceDescription::CONNECTION_HDMI());
+                AudioDeviceType::IN_DEVICE, AudioDeviceType::OUT_DEVICE,
+                AudioDeviceDescription::CONNECTION_HDMI());
         append_AudioDeviceDescription(pairs,
                 AUDIO_DEVICE_IN_REMOTE_SUBMIX, AUDIO_DEVICE_OUT_REMOTE_SUBMIX,
-                media::AudioDeviceType::IN_SUBMIX, media::AudioDeviceType::OUT_SUBMIX);
+                AudioDeviceType::IN_SUBMIX, AudioDeviceType::OUT_SUBMIX);
         append_AudioDeviceDescription(pairs,
                 AUDIO_DEVICE_IN_ANLG_DOCK_HEADSET, AUDIO_DEVICE_OUT_ANLG_DOCK_HEADSET,
-                media::AudioDeviceType::IN_HEADSET, media::AudioDeviceType::OUT_HEADSET,
-                media::AudioDeviceDescription::CONNECTION_ANALOG_DOCK());
+                AudioDeviceType::IN_HEADSET, AudioDeviceType::OUT_HEADSET,
+                AudioDeviceDescription::CONNECTION_ANALOG_DOCK());
         append_AudioDeviceDescription(pairs,
                 AUDIO_DEVICE_IN_DGTL_DOCK_HEADSET, AUDIO_DEVICE_OUT_DGTL_DOCK_HEADSET,
-                media::AudioDeviceType::IN_HEADSET, media::AudioDeviceType::OUT_HEADSET,
-                media::AudioDeviceDescription::CONNECTION_DIGITAL_DOCK());
+                AudioDeviceType::IN_HEADSET, AudioDeviceType::OUT_HEADSET,
+                AudioDeviceDescription::CONNECTION_DIGITAL_DOCK());
         append_AudioDeviceDescription(pairs,
                 AUDIO_DEVICE_IN_USB_ACCESSORY, AUDIO_DEVICE_OUT_USB_ACCESSORY,
-                media::AudioDeviceType::IN_ACCESSORY, media::AudioDeviceType::OUT_ACCESSORY,
-                media::AudioDeviceDescription::CONNECTION_USB());
+                AudioDeviceType::IN_ACCESSORY, AudioDeviceType::OUT_ACCESSORY,
+                AudioDeviceDescription::CONNECTION_USB());
         append_AudioDeviceDescription(pairs,
                 AUDIO_DEVICE_IN_USB_DEVICE, AUDIO_DEVICE_OUT_USB_DEVICE,
-                media::AudioDeviceType::IN_DEVICE, media::AudioDeviceType::OUT_DEVICE,
-                media::AudioDeviceDescription::CONNECTION_USB());
+                AudioDeviceType::IN_DEVICE, AudioDeviceType::OUT_DEVICE,
+                AudioDeviceDescription::CONNECTION_USB());
         append_AudioDeviceDescription(pairs,
                 AUDIO_DEVICE_IN_FM_TUNER, AUDIO_DEVICE_OUT_FM,
-                media::AudioDeviceType::IN_FM_TUNER, media::AudioDeviceType::OUT_FM);
+                AudioDeviceType::IN_FM_TUNER, AudioDeviceType::OUT_FM);
         append_AudioDeviceDescription(pairs,
                 AUDIO_DEVICE_IN_LINE, AUDIO_DEVICE_OUT_LINE,
-                media::AudioDeviceType::IN_DEVICE, media::AudioDeviceType::OUT_DEVICE,
-                media::AudioDeviceDescription::CONNECTION_ANALOG());
+                AudioDeviceType::IN_DEVICE, AudioDeviceType::OUT_DEVICE,
+                AudioDeviceDescription::CONNECTION_ANALOG());
         append_AudioDeviceDescription(pairs,
                 AUDIO_DEVICE_IN_SPDIF, AUDIO_DEVICE_OUT_SPDIF,
-                media::AudioDeviceType::IN_DEVICE, media::AudioDeviceType::OUT_DEVICE,
-                media::AudioDeviceDescription::CONNECTION_SPDIF());
+                AudioDeviceType::IN_DEVICE, AudioDeviceType::OUT_DEVICE,
+                AudioDeviceDescription::CONNECTION_SPDIF());
         append_AudioDeviceDescription(pairs,
                 AUDIO_DEVICE_IN_BLUETOOTH_A2DP, AUDIO_DEVICE_OUT_BLUETOOTH_A2DP,
-                media::AudioDeviceType::IN_DEVICE, media::AudioDeviceType::OUT_DEVICE,
-                media::AudioDeviceDescription::CONNECTION_BT_A2DP());
+                AudioDeviceType::IN_DEVICE, AudioDeviceType::OUT_DEVICE,
+                AudioDeviceDescription::CONNECTION_BT_A2DP());
         append_AudioDeviceDescription(pairs,
                 AUDIO_DEVICE_IN_IP, AUDIO_DEVICE_OUT_IP,
-                media::AudioDeviceType::IN_DEVICE, media::AudioDeviceType::OUT_DEVICE,
-                media::AudioDeviceDescription::CONNECTION_IP_V4());
+                AudioDeviceType::IN_DEVICE, AudioDeviceType::OUT_DEVICE,
+                AudioDeviceDescription::CONNECTION_IP_V4());
         append_AudioDeviceDescription(pairs,
                 AUDIO_DEVICE_IN_BUS, AUDIO_DEVICE_OUT_BUS,
-                media::AudioDeviceType::IN_DEVICE, media::AudioDeviceType::OUT_DEVICE,
-                media::AudioDeviceDescription::CONNECTION_BUS());
+                AudioDeviceType::IN_DEVICE, AudioDeviceType::OUT_DEVICE,
+                AudioDeviceDescription::CONNECTION_BUS());
         append_AudioDeviceDescription(pairs,
                 AUDIO_DEVICE_IN_PROXY, AUDIO_DEVICE_OUT_PROXY,
-                media::AudioDeviceType::IN_AFE_PROXY, media::AudioDeviceType::OUT_AFE_PROXY);
+                AudioDeviceType::IN_AFE_PROXY, AudioDeviceType::OUT_AFE_PROXY);
         append_AudioDeviceDescription(pairs,
                 AUDIO_DEVICE_IN_USB_HEADSET, AUDIO_DEVICE_OUT_USB_HEADSET,
-                media::AudioDeviceType::IN_HEADSET, media::AudioDeviceType::OUT_HEADSET,
-                media::AudioDeviceDescription::CONNECTION_USB());
+                AudioDeviceType::IN_HEADSET, AudioDeviceType::OUT_HEADSET,
+                AudioDeviceDescription::CONNECTION_USB());
         append_AudioDeviceDescription(pairs,
                 AUDIO_DEVICE_IN_HDMI_ARC, AUDIO_DEVICE_OUT_HDMI_ARC,
-                media::AudioDeviceType::IN_DEVICE, media::AudioDeviceType::OUT_DEVICE,
-                media::AudioDeviceDescription::CONNECTION_HDMI_ARC());
+                AudioDeviceType::IN_DEVICE, AudioDeviceType::OUT_DEVICE,
+                AudioDeviceDescription::CONNECTION_HDMI_ARC());
         append_AudioDeviceDescription(pairs,
                 AUDIO_DEVICE_IN_HDMI_EARC, AUDIO_DEVICE_OUT_HDMI_EARC,
-                media::AudioDeviceType::IN_DEVICE, media::AudioDeviceType::OUT_DEVICE,
-                media::AudioDeviceDescription::CONNECTION_HDMI_EARC());
+                AudioDeviceType::IN_DEVICE, AudioDeviceType::OUT_DEVICE,
+                AudioDeviceDescription::CONNECTION_HDMI_EARC());
         append_AudioDeviceDescription(pairs,
                 AUDIO_DEVICE_IN_BLE_HEADSET, AUDIO_DEVICE_OUT_BLE_HEADSET,
-                media::AudioDeviceType::IN_HEADSET, media::AudioDeviceType::OUT_HEADSET,
-                media::AudioDeviceDescription::CONNECTION_BT_LE());
+                AudioDeviceType::IN_HEADSET, AudioDeviceType::OUT_HEADSET,
+                AudioDeviceDescription::CONNECTION_BT_LE());
         return pairs;
     }();
     return pairs;
@@ -1135,8 +1137,8 @@ ConversionResult<AudioChannelLayout> legacy2aidl_audio_channel_mask_t_AudioChann
 }
 
 ConversionResult<audio_devices_t> aidl2legacy_AudioDeviceDescription_audio_devices_t(
-        const media::AudioDeviceDescription& aidl) {
-    static const std::unordered_map<media::AudioDeviceDescription, audio_devices_t> m =
+        const AudioDeviceDescription& aidl) {
+    static const std::unordered_map<AudioDeviceDescription, audio_devices_t> m =
             make_ReverseMap(getAudioDevicePairs());
     if (auto it = m.find(aidl); it != m.end()) {
         return it->second;
@@ -1146,9 +1148,9 @@ ConversionResult<audio_devices_t> aidl2legacy_AudioDeviceDescription_audio_devic
     }
 }
 
-ConversionResult<media::AudioDeviceDescription> legacy2aidl_audio_devices_t_AudioDeviceDescription(
+ConversionResult<AudioDeviceDescription> legacy2aidl_audio_devices_t_AudioDeviceDescription(
         audio_devices_t legacy) {
-    static const std::unordered_map<audio_devices_t, media::AudioDeviceDescription> m =
+    static const std::unordered_map<audio_devices_t, AudioDeviceDescription> m =
             make_DirectMap(getAudioDevicePairs());
     if (auto it = m.find(legacy); it != m.end()) {
         return it->second;

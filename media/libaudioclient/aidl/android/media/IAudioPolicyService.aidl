@@ -20,8 +20,6 @@ import android.content.AttributionSourceState;
 
 import android.media.AudioAttributesEx;
 import android.media.AudioAttributesInternal;
-import android.media.AudioDevice;
-import android.media.AudioDeviceDescription;
 import android.media.AudioMix;
 import android.media.AudioOffloadMode;
 import android.media.AudioPatch;
@@ -46,6 +44,8 @@ import android.media.Int;
 import android.media.SoundTriggerSession;
 import android.media.audio.common.AudioConfig;
 import android.media.audio.common.AudioConfigBase;
+import android.media.audio.common.AudioDevice;
+import android.media.audio.common.AudioDeviceDescription;
 import android.media.audio.common.AudioFormatDescription;
 import android.media.audio.common.AudioMode;
 import android.media.audio.common.AudioOffloadInfo;

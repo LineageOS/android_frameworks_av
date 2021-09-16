@@ -16,7 +16,7 @@
 
 package android.media;
 
-import android.media.AudioDeviceDescription;
+import android.media.audio.common.AudioDeviceDescription;
 
 /**
  * {@hide}
