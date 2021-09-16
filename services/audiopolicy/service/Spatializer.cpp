@@ -391,6 +391,9 @@ Status Spatializer::getActualHeadTrackingMode(SpatializerHeadTrackingMode *mode)
 }
 
 Status Spatializer::recenterHeadTracker() {
+    if (!mSupportsHeadTracking) {
+        return binderStatusFromStatusT(INVALID_OPERATION);
+    }
     std::lock_guard lock(mLock);
     if (mPoseController != nullptr) {
         mPoseController->recenter();
@@ -400,6 +403,9 @@ Status Spatializer::recenterHeadTracker() {
 
 Status Spatializer::setGlobalTransform(const std::vector<float>& screenToStage) {
     ALOGV("%s", __func__);
+    if (!mSupportsHeadTracking) {
+        return binderStatusFromStatusT(INVALID_OPERATION);
+    }
     std::optional<Pose3f> maybePose = Pose3f::fromVector(screenToStage);
     if (!maybePose.has_value()) {
         ALOGW("Invalid screenToStage vector.");
@@ -437,6 +443,9 @@ Status Spatializer::release() {
 
 Status Spatializer::setHeadSensor(int sensorHandle) {
     ALOGV("%s sensorHandle %d", __func__, sensorHandle);
+    if (!mSupportsHeadTracking) {
+        return binderStatusFromStatusT(INVALID_OPERATION);
+    }
     std::lock_guard lock(mLock);
     if (sensorHandle == ASENSOR_INVALID) {
         mHeadSensor = nullptr;
@@ -451,6 +460,9 @@ Status Spatializer::setHeadSensor(int sensorHandle) {
 
 Status Spatializer::setScreenSensor(int sensorHandle) {
     ALOGV("%s sensorHandle %d", __func__, sensorHandle);
+    if (!mSupportsHeadTracking) {
+        return binderStatusFromStatusT(INVALID_OPERATION);
+    }
     std::lock_guard lock(mLock);
     if (sensorHandle == ASENSOR_INVALID) {
         mScreenSensor = nullptr;
@@ -465,6 +477,9 @@ Status Spatializer::setScreenSensor(int sensorHandle) {
 
 Status Spatializer::setDisplayOrientation(float physicalToLogicalAngle) {
     ALOGV("%s physicalToLogicalAngle %f", __func__, physicalToLogicalAngle);
+    if (!mSupportsHeadTracking) {
+        return binderStatusFromStatusT(INVALID_OPERATION);
+    }
     std::lock_guard lock(mLock);
     mDisplayOrientation = physicalToLogicalAngle;
     if (mPoseController != nullptr) {
@@ -494,6 +509,9 @@ Status Spatializer::getSupportedModes(std::vector<SpatializationMode> *modes) {
 // SpatializerPoseController::Listener
 void Spatializer::onHeadToStagePose(const Pose3f& headToStage) {
     ALOGV("%s", __func__);
+    LOG_ALWAYS_FATAL_IF(!mSupportsHeadTracking,
+            "onHeadToStagePose() called with no head tracking support!");
+
     auto vec = headToStage.toVector();
     LOG_ALWAYS_FATAL_IF(vec.size() != sHeadPoseKeys.size(),
             "%s invalid head to stage vector size %zu", __func__, vec.size());
@@ -610,18 +628,22 @@ status_t Spatializer::attachOutput(audio_io_handle_t output) {
         mEngine->setEnabled(true);
         mOutput = output;
 
-        mPoseController = std::make_shared<SpatializerPoseController>(
-                static_cast<SpatializerPoseController::Listener*>(this), 10ms, 50ms);
-        LOG_ALWAYS_FATAL_IF(mPoseController == nullptr,
-                            "%s could not allocate pose controller", __func__);
+        if (mSupportsHeadTracking) {
+            mPoseController = std::make_shared<SpatializerPoseController>(
+                    static_cast<SpatializerPoseController::Listener*>(this), 10ms, 50ms);
+            LOG_ALWAYS_FATAL_IF(mPoseController == nullptr,
+                                "%s could not allocate pose controller", __func__);
 
-        mPoseController->setDesiredMode(mDesiredHeadTrackingMode);
-        mPoseController->setHeadSensor(mHeadSensor);
-        mPoseController->setScreenSensor(mScreenSensor);
-        mPoseController->setDisplayOrientation(mDisplayOrientation);
-        poseController = mPoseController;
+            mPoseController->setDesiredMode(mDesiredHeadTrackingMode);
+            mPoseController->setHeadSensor(mHeadSensor);
+            mPoseController->setScreenSensor(mScreenSensor);
+            mPoseController->setDisplayOrientation(mDisplayOrientation);
+            poseController = mPoseController;
+        }
     }
-    poseController->waitUntilCalculated();
+    if (poseController != nullptr) {
+        poseController->waitUntilCalculated();
+    }
     return NO_ERROR;
 }
 
