@@ -50,6 +50,7 @@ cc_defaults {
         "libmedia_helper",
         "libmediautils",
         "libutils",
+        "audioclient-types-aidl-cpp",
     ],
     header_libs: [
         "android.hardware.audio.common.util@all-versions",

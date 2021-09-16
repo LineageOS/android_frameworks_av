@@ -22,6 +22,8 @@
 #include <set>
 #include <vector>
 
+#include <android/media/AudioMMapPolicyInfo.h>
+#include <android/media/AudioMMapPolicyType.h>
 #include <android/media/AudioVibratorInfo.h>
 #include <android/media/BnAudioFlingerClient.h>
 #include <android/media/BnAudioPolicyServiceClient.h>
@@ -613,6 +615,10 @@ public:
     static audio_port_handle_t getDeviceIdForIo(audio_io_handle_t audioIo);
 
     static status_t setVibratorInfos(const std::vector<media::AudioVibratorInfo>& vibratorInfos);
+
+    static status_t getMmapPolicyInfo(
+            media::AudioMMapPolicyType policyType,
+            std::vector<media::AudioMMapPolicyInfo> *policyInfos);
 
 private:
 
