@@ -16,7 +16,7 @@
 
 package android.media;
 
-import android.media.audio.common.AudioDeviceDescription;
+import android.media.audio.common.AudioDevice;
 
 /**
  * {@hide}
@@ -28,9 +28,7 @@ parcelable AudioPortConfigDeviceExt {
      */
     int hwModule;
     /**
-     * Device type.
+     * Audio device instance.
      */
-    AudioDeviceDescription type;
-    /** Device address. "" if N/A. */
-    @utf8InCpp String address;
+    AudioDevice device;
 }

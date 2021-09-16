@@ -32,6 +32,9 @@
        if (!_tmp.ok()) return aidl_utils::binderStatusFromStatusT(_tmp.error()); \
        std::move(_tmp.value()); })
 
+#define RETURN_BINDER_STATUS_IF_ERROR(x) \
+    if (status_t _tmp = (x); _tmp != OK) return aidl_utils::binderStatusFromStatusT(_tmp);
+
 #define RETURN_IF_BINDER_ERROR(x)      \
     {                                  \
         binder::Status _tmp = (x);     \
@@ -47,6 +50,7 @@ using content::AttributionSourceState;
 using media::audio::common::AudioConfig;
 using media::audio::common::AudioConfigBase;
 using media::audio::common::AudioDevice;
+using media::audio::common::AudioDeviceAddress;
 using media::audio::common::AudioDeviceDescription;
 using media::audio::common::AudioFormatDescription;
 using media::audio::common::AudioMode;
@@ -111,8 +115,10 @@ Status AudioPolicyService::setDeviceConnectionState(
         media::AudioPolicyDeviceState stateAidl,
         const std::string& deviceNameAidl,
         const AudioFormatDescription& encodedFormatAidl) {
-    audio_devices_t device = VALUE_OR_RETURN_BINDER_STATUS(
-            aidl2legacy_AudioDeviceDescription_audio_devices_t(deviceAidl.type));
+    audio_devices_t device;
+    std::string address;
+    RETURN_BINDER_STATUS_IF_ERROR(
+            aidl2legacy_AudioDevice_audio_device(deviceAidl, &device, &address));
     audio_policy_dev_state_t state = VALUE_OR_RETURN_BINDER_STATUS(
             aidl2legacy_AudioPolicyDeviceState_audio_policy_dev_state_t(stateAidl));
     audio_format_t encodedFormat = VALUE_OR_RETURN_BINDER_STATUS(
@@ -132,10 +138,8 @@ Status AudioPolicyService::setDeviceConnectionState(
     ALOGV("setDeviceConnectionState()");
     Mutex::Autolock _l(mLock);
     AutoCallerClear acc;
-    status_t status = mAudioPolicyManager->setDeviceConnectionState(device, state,
-                                                          deviceAidl.address.c_str(),
-                                                          deviceNameAidl.c_str(),
-                                                          encodedFormat);
+    status_t status = mAudioPolicyManager->setDeviceConnectionState(
+            device, state, address.c_str(), deviceNameAidl.c_str(), encodedFormat);
     if (status == NO_ERROR) {
         onCheckSpatializer_l();
     }
@@ -144,8 +148,10 @@ Status AudioPolicyService::setDeviceConnectionState(
 
 Status AudioPolicyService::getDeviceConnectionState(const AudioDevice& deviceAidl,
                                                     media::AudioPolicyDeviceState* _aidl_return) {
-    audio_devices_t device = VALUE_OR_RETURN_BINDER_STATUS(
-            aidl2legacy_AudioDeviceDescription_audio_devices_t(deviceAidl.type));
+    audio_devices_t device;
+    std::string address;
+    RETURN_BINDER_STATUS_IF_ERROR(
+            aidl2legacy_AudioDevice_audio_device(deviceAidl, &device, &address));
     if (mAudioPolicyManager == NULL) {
         *_aidl_return = VALUE_OR_RETURN_BINDER_STATUS(
                 legacy2aidl_audio_policy_dev_state_t_AudioPolicyDeviceState(
@@ -155,8 +161,8 @@ Status AudioPolicyService::getDeviceConnectionState(const AudioDevice& deviceAid
     AutoCallerClear acc;
     *_aidl_return = VALUE_OR_RETURN_BINDER_STATUS(
             legacy2aidl_audio_policy_dev_state_t_AudioPolicyDeviceState(
-                    mAudioPolicyManager->getDeviceConnectionState(device,
-                                                                  deviceAidl.address.c_str())));
+                    mAudioPolicyManager->getDeviceConnectionState(
+                            device, address.c_str())));
     return Status::ok();
 }
 
@@ -164,8 +170,10 @@ Status AudioPolicyService::handleDeviceConfigChange(
         const AudioDevice& deviceAidl,
         const std::string& deviceNameAidl,
         const AudioFormatDescription& encodedFormatAidl) {
-    audio_devices_t device = VALUE_OR_RETURN_BINDER_STATUS(
-            aidl2legacy_AudioDeviceDescription_audio_devices_t(deviceAidl.type));
+    audio_devices_t device;
+    std::string address;
+    RETURN_BINDER_STATUS_IF_ERROR(
+            aidl2legacy_AudioDevice_audio_device(deviceAidl, &device, &address));
     audio_format_t encodedFormat = VALUE_OR_RETURN_BINDER_STATUS(
             aidl2legacy_AudioFormatDescription_audio_format_t(encodedFormatAidl));
 
@@ -180,7 +188,7 @@ Status AudioPolicyService::handleDeviceConfigChange(
     Mutex::Autolock _l(mLock);
     AutoCallerClear acc;
     status_t status =  mAudioPolicyManager->handleDeviceConfigChange(
-            device, deviceAidl.address.c_str(), deviceNameAidl.c_str(), encodedFormat);
+            device, address.c_str(), deviceNameAidl.c_str(), encodedFormat);
 
     if (status == NO_ERROR) {
        onCheckSpatializer_l();

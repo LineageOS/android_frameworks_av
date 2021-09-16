@@ -56,6 +56,7 @@ using media::IAudioPolicyService;
 using media::audio::common::AudioConfig;
 using media::audio::common::AudioConfigBase;
 using media::audio::common::AudioDevice;
+using media::audio::common::AudioDeviceAddress;
 using media::audio::common::AudioDeviceDescription;
 using media::audio::common::AudioFormatDescription;
 using media::audio::common::AudioOffloadInfo;
@@ -855,10 +856,8 @@ status_t AudioSystem::setDeviceConnectionState(audio_devices_t device,
         name = device_name;
     }
 
-    AudioDevice deviceAidl;
-    deviceAidl.type = VALUE_OR_RETURN_STATUS(
-            legacy2aidl_audio_devices_t_AudioDeviceDescription(device));
-    deviceAidl.address = address;
+    AudioDevice deviceAidl = VALUE_OR_RETURN_STATUS(
+            legacy2aidl_audio_device_AudioDevice(device, address));
 
     return statusTFromBinderStatus(
             aps->setDeviceConnectionState(
@@ -876,10 +875,8 @@ audio_policy_dev_state_t AudioSystem::getDeviceConnectionState(audio_devices_t d
     if (aps == 0) return AUDIO_POLICY_DEVICE_STATE_UNAVAILABLE;
 
     auto result = [&]() -> ConversionResult<audio_policy_dev_state_t> {
-        AudioDevice deviceAidl;
-        deviceAidl.type = VALUE_OR_RETURN(
-                legacy2aidl_audio_devices_t_AudioDeviceDescription(device));
-        deviceAidl.address = device_address;
+        AudioDevice deviceAidl = VALUE_OR_RETURN(
+                legacy2aidl_audio_device_AudioDevice(device, device_address));
 
         media::AudioPolicyDeviceState result;
         RETURN_IF_ERROR(statusTFromBinderStatus(
@@ -907,10 +904,8 @@ status_t AudioSystem::handleDeviceConfigChange(audio_devices_t device,
         name = device_name;
     }
 
-    AudioDevice deviceAidl;
-    deviceAidl.type = VALUE_OR_RETURN_STATUS(
-            legacy2aidl_audio_devices_t_AudioDeviceDescription(device));
-    deviceAidl.address = address;
+    AudioDevice deviceAidl = VALUE_OR_RETURN_STATUS(
+            legacy2aidl_audio_device_AudioDevice(device, address));
 
     return statusTFromBinderStatus(
             aps->handleDeviceConfigChange(deviceAidl, name, VALUE_OR_RETURN_STATUS(

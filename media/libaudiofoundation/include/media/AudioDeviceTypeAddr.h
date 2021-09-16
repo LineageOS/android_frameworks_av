@@ -32,6 +32,7 @@ namespace android {
 class AudioDeviceTypeAddr : public Parcelable {
 public:
     AudioDeviceTypeAddr() = default;
+    AudioDeviceTypeAddr(const AudioDeviceTypeAddr&) = default;
 
     AudioDeviceTypeAddr(audio_devices_t type, const std::string& address);
 

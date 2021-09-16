@@ -146,6 +146,22 @@ ConversionResult<audio_devices_t> aidl2legacy_AudioDeviceDescription_audio_devic
 ConversionResult<media::audio::common::AudioDeviceDescription>
 legacy2aidl_audio_devices_t_AudioDeviceDescription(audio_devices_t legacy);
 
+status_t aidl2legacy_AudioDevice_audio_device(
+        const media::audio::common::AudioDevice& aidl,
+        audio_devices_t* legacyType, char* legacyAddress);
+status_t aidl2legacy_AudioDevice_audio_device(
+        const media::audio::common::AudioDevice& aidl,
+        audio_devices_t* legacyType, String8* legacyAddress);
+status_t aidl2legacy_AudioDevice_audio_device(
+        const media::audio::common::AudioDevice& aidl,
+        audio_devices_t* legacyType, std::string* legacyAddress);
+ConversionResult<media::audio::common::AudioDevice>
+legacy2aidl_audio_device_AudioDevice(
+        audio_devices_t legacyType, const char* legacyAddress);
+ConversionResult<media::audio::common::AudioDevice>
+legacy2aidl_audio_device_AudioDevice(
+        audio_devices_t legacyType, const String8& legacyAddress);
+
 ConversionResult<audio_format_t> aidl2legacy_AudioFormatDescription_audio_format_t(
         const media::audio::common::AudioFormatDescription& aidl);
 ConversionResult<media::audio::common::AudioFormatDescription>
