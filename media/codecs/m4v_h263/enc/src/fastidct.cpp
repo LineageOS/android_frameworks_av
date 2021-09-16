@@ -76,6 +76,8 @@ void idct_col1(Short *blk)
     return ;
 }
 
+/* Ignoring overflows as idct function expects and uses overflows */
+__attribute__((no_sanitize("signed-integer-overflow")))
 void idct_col2(Short *blk)
 {
     int32 x0, x1, x3, x5, x7;//, x8;
@@ -102,6 +104,8 @@ void idct_col2(Short *blk)
     return ;
 }
 
+/* Ignoring overflows as idct function expects and uses overflows */
+__attribute__((no_sanitize("signed-integer-overflow")))
 void idct_col3(Short *blk)
 {
     int32 x0, x1, x2, x3, x4, x5, x6, x7, x8;
@@ -137,6 +141,8 @@ void idct_col3(Short *blk)
     return ;
 }
 
+/* Ignoring overflows as idct function expects and uses overflows */
+__attribute__((no_sanitize("signed-integer-overflow")))
 void idct_col4(Short *blk)
 {
     int32 x0, x1, x2, x3, x4, x5, x6, x7, x8;
@@ -180,6 +186,8 @@ void idct_col4(Short *blk)
 }
 
 #ifndef SMALL_DCT
+/* Ignoring overflows as idct function expects and uses overflows */
+__attribute__((no_sanitize("signed-integer-overflow")))
 void idct_col0x40(Short *blk)
 {
     int32 x1, x3, x5, x7;//, x8;
@@ -230,6 +238,8 @@ void idct_col0x20(Short *blk)
     return ;
 }
 
+/* Ignoring overflows as idct function expects and uses overflows */
+__attribute__((no_sanitize("signed-integer-overflow")))
 void idct_col0x10(Short *blk)
 {
     int32 x1, x3, x5,  x7;
@@ -256,6 +266,8 @@ void idct_col0x10(Short *blk)
 
 #endif /* SMALL_DCT */
 
+/* Ignoring overflows as idct function expects and uses overflows */
+__attribute__((no_sanitize("signed-integer-overflow")))
 void idct_col(Short *blk)
 {
     int32 x0, x1, x2, x3, x4, x5, x6, x7, x8;
@@ -368,6 +380,8 @@ void idct_row1Inter(Short *blk, UChar *rec, Int lx)
     return;
 }
 
+/* Ignoring overflows as idct function expects and uses overflows */
+__attribute__((no_sanitize("signed-integer-overflow")))
 void idct_row2Inter(Short *blk, UChar *rec, Int lx)
 {
     int32 x0, x1, x2, x4, x5;
@@ -427,6 +441,8 @@ void idct_row2Inter(Short *blk, UChar *rec, Int lx)
     return ;
 }
 
+/* Ignoring overflows as idct function expects and uses overflows */
+__attribute__((no_sanitize("signed-integer-overflow")))
 void idct_row3Inter(Short *blk, UChar *rec, Int lx)
 {
     int32 x0, x1, x2, x3, x4, x5, x6, x7, x8;
@@ -497,6 +513,8 @@ void idct_row3Inter(Short *blk, UChar *rec, Int lx)
     return ;
 }
 
+/* Ignoring overflows as idct function expects and uses overflows */
+__attribute__((no_sanitize("signed-integer-overflow")))
 void idct_row4Inter(Short *blk, UChar *rec, Int lx)
 {
     int32 x0, x1, x2, x3, x4, x5, x6, x7, x8;
@@ -573,6 +591,8 @@ void idct_row4Inter(Short *blk, UChar *rec, Int lx)
 }
 
 #ifndef SMALL_DCT
+/* Ignoring overflows as idct function expects and uses overflows */
+__attribute__((no_sanitize("signed-integer-overflow")))
 void idct_row0x40Inter(Short *blk, UChar *rec, Int lx)
 {
     int32 x1, x2, x4, x5;
@@ -686,6 +706,8 @@ void idct_row0x20Inter(Short *blk, UChar *rec, Int lx)
     return ;
 }
 
+/* Ignoring overflows as idct function expects and uses overflows */
+__attribute__((no_sanitize("signed-integer-overflow")))
 void idct_row0x10Inter(Short *blk, UChar *rec, Int lx)
 {
     int32 x1, x3, x5, x7;
@@ -741,6 +763,8 @@ void idct_row0x10Inter(Short *blk, UChar *rec, Int lx)
 
 #endif /* SMALL_DCT */
 
+/* Ignoring overflows as idct function expects and uses overflows */
+__attribute__((no_sanitize("signed-integer-overflow")))
 void idct_rowInter(Short *blk, UChar *rec, Int lx)
 {
     int32 x0, x1, x2, x3, x4, x5, x6, x7, x8;
@@ -864,6 +888,8 @@ void idct_row1Intra(Short *blk, UChar *rec, Int lx)
     return;
 }
 
+/* Ignoring overflows as idct function expects and uses overflows */
+__attribute__((no_sanitize("signed-integer-overflow")))
 void idct_row2Intra(Short *blk, UChar *rec, Int lx)
 {
     int32 x0, x1, x2, x4, x5;
@@ -919,6 +945,8 @@ void idct_row2Intra(Short *blk, UChar *rec, Int lx)
     return ;
 }
 
+/* Ignoring overflows as idct function expects and uses overflows */
+__attribute__((no_sanitize("signed-integer-overflow")))
 void idct_row3Intra(Short *blk, UChar *rec, Int lx)
 {
     int32 x0, x1, x2, x3, x4, x5, x6, x7, x8;
@@ -985,6 +1013,8 @@ void idct_row3Intra(Short *blk, UChar *rec, Int lx)
     return ;
 }
 
+/* Ignoring overflows as idct function expects and uses overflows */
+__attribute__((no_sanitize("signed-integer-overflow")))
 void idct_row4Intra(Short *blk, UChar *rec, Int lx)
 {
     int32 x0, x1, x2, x3, x4, x5, x6, x7, x8;
@@ -1058,6 +1088,8 @@ void idct_row4Intra(Short *blk, UChar *rec, Int lx)
 }
 
 #ifndef SMALL_DCT
+/* Ignoring overflows as idct function expects and uses overflows */
+__attribute__((no_sanitize("signed-integer-overflow")))
 void idct_row0x40Intra(Short *blk, UChar *rec, Int lx)
 {
     int32  x1, x2, x4, x5;
@@ -1166,6 +1198,8 @@ void idct_row0x20Intra(Short *blk, UChar *rec, Int lx)
     return ;
 }
 
+/* Ignoring overflows as idct function expects and uses overflows */
+__attribute__((no_sanitize("signed-integer-overflow")))
 void idct_row0x10Intra(Short *blk, UChar *rec, Int lx)
 {
     int32 x1, x3, x5, x7;
@@ -1218,6 +1252,8 @@ void idct_row0x10Intra(Short *blk, UChar *rec, Int lx)
 }
 
 #endif /* SMALL_DCT */
+/* Ignoring overflows as idct function expects and uses overflows */
+__attribute__((no_sanitize("signed-integer-overflow")))
 void idct_rowIntra(Short *blk, UChar *rec, Int lx)
 {
     int32 x0, x1, x2, x3, x4, x5, x6, x7, x8;
@@ -1364,6 +1400,8 @@ void idct_row1zmv(Short *blk, UChar *rec, UChar *pred, Int lx)
     return;
 }
 
+/* Ignoring overflows as idct function expects and uses overflows */
+__attribute__((no_sanitize("signed-integer-overflow")))
 void idct_row2zmv(Short *blk, UChar *rec, UChar *pred, Int lx)
 {
     int32 x0, x1, x2, x4, x5;
@@ -1424,6 +1462,8 @@ void idct_row2zmv(Short *blk, UChar *rec, UChar *pred, Int lx)
     return ;
 }
 
+/* Ignoring overflows as idct function expects and uses overflows */
+__attribute__((no_sanitize("signed-integer-overflow")))
 void idct_row3zmv(Short *blk, UChar *rec, UChar *pred, Int lx)
 {
     int32 x0, x1, x2, x3, x4, x5, x6, x7, x8;
@@ -1495,6 +1535,8 @@ void idct_row3zmv(Short *blk, UChar *rec, UChar *pred, Int lx)
     return ;
 }
 
+/* Ignoring overflows as idct function expects and uses overflows */
+__attribute__((no_sanitize("signed-integer-overflow")))
 void idct_row4zmv(Short *blk, UChar *rec, UChar *pred, Int lx)
 {
     int32 x0, x1, x2, x3, x4, x5, x6, x7, x8;
@@ -1572,6 +1614,8 @@ void idct_row4zmv(Short *blk, UChar *rec, UChar *pred, Int lx)
 }
 
 #ifndef SMALL_DCT
+/* Ignoring overflows as idct function expects and uses overflows */
+__attribute__((no_sanitize("signed-integer-overflow")))
 void idct_row0x40zmv(Short *blk, UChar *rec, UChar *pred, Int lx)
 {
     int32 x1, x2, x4, x5;
@@ -1687,6 +1731,8 @@ void idct_row0x20zmv(Short *blk, UChar *rec, UChar *pred, Int lx)
     return ;
 }
 
+/* Ignoring overflows as idct function expects and uses overflows */
+__attribute__((no_sanitize("signed-integer-overflow")))
 void idct_row0x10zmv(Short *blk, UChar *rec, UChar *pred, Int lx)
 {
     int32 x1, x3, x5, x7;
@@ -1743,6 +1789,8 @@ void idct_row0x10zmv(Short *blk, UChar *rec, UChar *pred, Int lx)
 
 #endif /* SMALL_DCT */
 
+/* Ignoring overflows as idct function expects and uses overflows */
+__attribute__((no_sanitize("signed-integer-overflow")))
 void idct_rowzmv(Short *blk, UChar *rec, UChar *pred, Int lx)
 {
     int32 x0, x1, x2, x3, x4, x5, x6, x7, x8;

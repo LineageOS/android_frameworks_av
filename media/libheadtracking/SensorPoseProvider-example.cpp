@@ -19,9 +19,11 @@
 
 #include <android/sensor.h>
 #include <hardware/sensors.h>
+#include <utils/SystemClock.h>
 
 #include <media/SensorPoseProvider.h>
 
+using android::elapsedRealtimeNano;
 using android::media::Pose3f;
 using android::media::SensorPoseProvider;
 using android::media::Twist3f;
@@ -32,7 +34,12 @@ class Listener : public SensorPoseProvider::Listener {
   public:
     void onPose(int64_t timestamp, int32_t handle, const Pose3f& pose,
                 const std::optional<Twist3f>& twist) override {
-        std::cout << "onPose t=" << timestamp << " sensor=" << handle << " pose=" << pose
+        int64_t now = elapsedRealtimeNano();
+
+        std::cout << "onPose t=" << timestamp
+                  << " lag=" << ((now - timestamp) / 1e6) << "[ms]"
+                  << " sensor=" << handle
+                  << " pose=" << pose
                   << " twist=";
         if (twist.has_value()) {
             std::cout << twist.value();
