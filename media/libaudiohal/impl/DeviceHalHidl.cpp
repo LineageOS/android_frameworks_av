@@ -20,6 +20,7 @@
 //#define LOG_NDEBUG 0
 
 #include <cutils/native_handle.h>
+#include <cutils/properties.h>
 #include <hwbinder/IPCThreadState.h>
 #include <media/AudioContainers.h>
 #include <utils/Log.h>

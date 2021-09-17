@@ -41,6 +41,10 @@ class DevicesFactoryHalLocal : public DevicesFactoryHalInterface
                 return INVALID_OPERATION;
             }
 
+            float getHalVersion() const override {
+                return MAJOR_VERSION + (float)MINOR_VERSION / 10;
+            }
+
   private:
     friend class DevicesFactoryHalHybrid;
 

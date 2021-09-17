@@ -119,6 +119,13 @@ class DeviceHalHidl : public DeviceHalInterface, public ConversionHelperHidl
     status_t addDeviceEffect(audio_port_handle_t device, sp<EffectHalInterface> effect) override;
     status_t removeDeviceEffect(audio_port_handle_t device, sp<EffectHalInterface> effect) override;
 
+    status_t getMmapPolicyInfos(
+            media::AudioMMapPolicyType policyType __unused,
+            std::vector<media::AudioMMapPolicyInfo> *policyInfos __unused) override {
+        // TODO: Implement the HAL query when moving to AIDL HAL.
+        return INVALID_OPERATION;
+    }
+
     status_t dump(int fd, const Vector<String16>& args) override;
 
   private:

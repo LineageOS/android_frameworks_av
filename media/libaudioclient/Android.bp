@@ -137,7 +137,6 @@ cc_library {
         "libprocessgroup",
         "libshmemcompat",
         "libutils",
-        "libvibrator",
         "framework-permission-aidl-cpp",
     ],
     export_shared_lib_headers: [
@@ -325,6 +324,9 @@ aidl_interface {
         "aidl/android/media/AudioIoConfigEvent.aidl",
         "aidl/android/media/AudioIoDescriptor.aidl",
         "aidl/android/media/AudioIoFlags.aidl",
+        "aidl/android/media/AudioMMapPolicy.aidl",
+        "aidl/android/media/AudioMMapPolicyInfo.aidl",
+        "aidl/android/media/AudioMMapPolicyType.aidl",
         "aidl/android/media/AudioMixLatencyClass.aidl",
         "aidl/android/media/AudioOutputFlags.aidl",
         "aidl/android/media/AudioPatch.aidl",
