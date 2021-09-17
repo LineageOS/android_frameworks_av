@@ -506,6 +506,17 @@ Status Spatializer::getSupportedModes(std::vector<SpatializationMode> *modes) {
     return Status::ok();
 }
 
+Status Spatializer::registerHeadTrackingCallback(
+        const sp<media::ISpatializerHeadTrackingCallback>& callback) {
+    ALOGV("%s callback %p", __func__, callback.get());
+    std::lock_guard lock(mLock);
+    if (!mSupportsHeadTracking) {
+        return binderStatusFromStatusT(INVALID_OPERATION);
+    }
+    mHeadTrackingCallback = callback;
+    return Status::ok();
+}
+
 // SpatializerPoseController::Listener
 void Spatializer::onHeadToStagePose(const Pose3f& headToStage) {
     ALOGV("%s", __func__);
@@ -526,10 +537,10 @@ void Spatializer::onHeadToStagePose(const Pose3f& headToStage) {
 
 void Spatializer::onHeadToStagePoseMsg(const std::vector<float>& headToStage) {
     ALOGV("%s", __func__);
-    sp<media::INativeSpatializerCallback> callback;
+    sp<media::ISpatializerHeadTrackingCallback> callback;
     {
         std::lock_guard lock(mLock);
-        callback = mSpatializerCallback;
+        callback = mHeadTrackingCallback;
         if (mEngine != nullptr) {
             setEffectParameter_l(SPATIALIZER_PARAM_HEAD_TO_STAGE, headToStage);
         }
@@ -550,7 +561,7 @@ void Spatializer::onActualModeChange(HeadTrackingMode mode) {
 
 void Spatializer::onActualModeChangeMsg(HeadTrackingMode mode) {
     ALOGV("%s(%d)", __func__, (int) mode);
-    sp<media::INativeSpatializerCallback> callback;
+    sp<media::ISpatializerHeadTrackingCallback> callback;
     SpatializerHeadTrackingMode spatializerMode;
     {
         std::lock_guard lock(mLock);
@@ -572,7 +583,7 @@ void Spatializer::onActualModeChangeMsg(HeadTrackingMode mode) {
             }
         }
         mActualHeadTrackingMode = spatializerMode;
-        callback = mSpatializerCallback;
+        callback = mHeadTrackingCallback;
     }
     if (callback != nullptr) {
         callback->onHeadTrackingModeChanged(spatializerMode);

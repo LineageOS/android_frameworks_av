@@ -113,7 +113,8 @@ class Spatializer : public media::BnSpatializer,
     binder::Status setDisplayOrientation(float physicalToLogicalAngle) override;
     binder::Status setHingeAngle(float hingeAngle) override;
     binder::Status getSupportedModes(std::vector<media::SpatializationMode>* modes) override;
-
+    binder::Status registerHeadTrackingCallback(
+        const sp<media::ISpatializerHeadTrackingCallback>& callback) override;
 
     /** IBinder::DeathRecipient. Listen to the death of the INativeSpatializerCallback. */
     virtual void binderDied(const wp<IBinder>& who);
@@ -276,6 +277,9 @@ private:
 
     /** Callback interface to the client (AudioService) controlling this`Spatializer */
     sp<media::INativeSpatializerCallback> mSpatializerCallback GUARDED_BY(mLock);
+
+    /** Callback interface for head tracking */
+    sp<media::ISpatializerHeadTrackingCallback> mHeadTrackingCallback GUARDED_BY(mLock);
 
     /** Requested spatialization level */
     media::SpatializationLevel mLevel GUARDED_BY(mLock) = media::SpatializationLevel::NONE;
