@@ -57,6 +57,7 @@
 
 #include "AudioFlinger.h"
 #include "NBAIO_Tee.h"
+#include "PropertyUtils.h"
 
 #include <media/AudioResamplerPublic.h>
 
@@ -331,6 +332,36 @@ status_t AudioFlinger::updateSecondaryOutputs(
         }
         ALOGW_IF(i >= mPlaybackThreads.size(),
                  "%s cannot find track with id %u", __func__, trackId);
+    }
+    return NO_ERROR;
+}
+
+#define MAX_MMAP_PROPERTY_DEVICE_HAL_VERSION 7.0
+
+status_t AudioFlinger::getMmapPolicyInfos(
+            media::AudioMMapPolicyType policyType,
+            std::vector<media::AudioMMapPolicyInfo> *policyInfos) {
+    if (const auto it = mPolicyInfos.find(policyType); it != mPolicyInfos.end()) {
+        *policyInfos = it->second;
+        return NO_ERROR;
+    }
+    if (mDevicesFactoryHal->getHalVersion() > MAX_MMAP_PROPERTY_DEVICE_HAL_VERSION) {
+        AutoMutex lock(mHardwareLock);
+        for (size_t i = 0; i < mAudioHwDevs.size(); ++i) {
+            AudioHwDevice *dev = mAudioHwDevs.valueAt(i);
+            std::vector<media::AudioMMapPolicyInfo> infos;
+            status_t status = dev->getMmapPolicyInfos(policyType, &infos);
+            if (status != NO_ERROR) {
+                ALOGE("Failed to query mmap policy info of %d, error %d",
+                      mAudioHwDevs.keyAt(i), status);
+                continue;
+            }
+            policyInfos->insert(policyInfos->end(), infos.begin(), infos.end());
+        }
+        mPolicyInfos[policyType] = *policyInfos;
+    } else {
+        getMmapPolicyInfosFromSystemProperty(policyType, policyInfos);
+        mPolicyInfos[policyType] = *policyInfos;
     }
     return NO_ERROR;
 }
