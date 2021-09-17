@@ -100,8 +100,10 @@ class Codec2AudioDecHidlTestBase : public ::testing::Test {
         ASSERT_NE(mLinearPool, nullptr);
 
         std::vector<std::unique_ptr<C2Param>> queried;
-        mComponent->query({}, {C2PortMediaTypeSetting::input::PARAM_TYPE}, C2_DONT_BLOCK, &queried);
-        ASSERT_GT(queried.size(), 0);
+        c2_status_t c2err = mComponent->query({}, {C2PortMediaTypeSetting::input::PARAM_TYPE},
+                                              C2_DONT_BLOCK, &queried);
+        ASSERT_EQ(c2err, C2_OK) << "Query media type failed";
+        ASSERT_EQ(queried.size(), 1) << "Size of the vector returned is invalid";
 
         mMime = ((C2PortMediaTypeSetting::input*)queried[0].get())->m.value;
 
@@ -277,24 +279,20 @@ void getInputChannelInfo(const std::shared_ptr<android::Codec2Client::Component>
     };
     std::vector<std::unique_ptr<C2Param>> inParams;
     c2_status_t status = component->query({}, indices, C2_DONT_BLOCK, &inParams);
-    if (status != C2_OK && inParams.size() == 0) {
-        ALOGE("Query media type failed => %d", status);
-        ASSERT_TRUE(false);
-    } else {
-        size_t offset = sizeof(C2Param);
-        for (size_t i = 0; i < inParams.size(); ++i) {
-            C2Param* param = inParams[i].get();
-            bitStreamInfo[i] = *(int32_t*)((uint8_t*)param + offset);
-        }
-        if (mime.find("3gpp") != std::string::npos) {
-            ASSERT_EQ(bitStreamInfo[0], 8000);
-            ASSERT_EQ(bitStreamInfo[1], 1);
-        } else if (mime.find("amr-wb") != std::string::npos) {
-            ASSERT_EQ(bitStreamInfo[0], 16000);
-            ASSERT_EQ(bitStreamInfo[1], 1);
-        } else if (mime.find("gsm") != std::string::npos) {
-            ASSERT_EQ(bitStreamInfo[0], 8000);
-        }
+    ASSERT_EQ(status, C2_OK) << "Query sample rate and channel count info failed";
+    ASSERT_EQ(inParams.size(), indices.size()) << "Size of the vector returned is invalid";
+
+    bitStreamInfo[0] = C2StreamSampleRateInfo::output::From(inParams[0].get())->value;
+    bitStreamInfo[1] = C2StreamChannelCountInfo::output::From(inParams[1].get())->value;
+    if (mime.find("3gpp") != std::string::npos) {
+        ASSERT_EQ(bitStreamInfo[0], 8000);
+        ASSERT_EQ(bitStreamInfo[1], 1);
+    } else if (mime.find("amr-wb") != std::string::npos) {
+        ASSERT_EQ(bitStreamInfo[0], 16000);
+        ASSERT_EQ(bitStreamInfo[1], 1);
+    } else if (mime.find("gsm") != std::string::npos) {
+        ASSERT_EQ(bitStreamInfo[0], 8000);
+        ASSERT_EQ(bitStreamInfo[1], 1);
     }
 }
 
