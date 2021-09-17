@@ -24,9 +24,9 @@
 
 #include <aaudio/AAudio.h>
 #include <aaudio/AAudioTesting.h>
-#include <android/media/AudioMMapPolicy.h>
-#include <android/media/AudioMMapPolicyInfo.h>
-#include <android/media/AudioMMapPolicyType.h>
+#include <android/media/audio/common/AudioMMapPolicy.h>
+#include <android/media/audio/common/AudioMMapPolicyInfo.h>
+#include <android/media/audio/common/AudioMMapPolicyType.h>
 #include <media/AudioSystem.h>
 
 #include "binding/AAudioBinderClient.h"
@@ -39,6 +39,10 @@
 #include "legacy/AudioStreamTrack.h"
 
 using namespace aaudio;
+
+using android::media::audio::common::AudioMMapPolicy;
+using android::media::audio::common::AudioMMapPolicyInfo;
+using android::media::audio::common::AudioMMapPolicyType;
 
 #define AAUDIO_MMAP_POLICY_DEFAULT             AAUDIO_POLICY_NEVER
 #define AAUDIO_MMAP_EXCLUSIVE_POLICY_DEFAULT   AAUDIO_POLICY_NEVER
@@ -93,15 +97,15 @@ static aaudio_result_t builder_createStream(aaudio_direction_t direction,
 
 namespace {
 
-aaudio_policy_t aidl2legacy_aaudio_policy(android::media::AudioMMapPolicy aidl) {
+aaudio_policy_t aidl2legacy_aaudio_policy(AudioMMapPolicy aidl) {
     switch (aidl) {
-        case android::media::AudioMMapPolicy::NEVER:
+        case AudioMMapPolicy::NEVER:
             return AAUDIO_POLICY_NEVER;
-        case android::media::AudioMMapPolicy::AUTO:
+        case AudioMMapPolicy::AUTO:
             return AAUDIO_POLICY_AUTO;
-        case android::media::AudioMMapPolicy::ALWAYS:
+        case AudioMMapPolicy::ALWAYS:
             return AAUDIO_POLICY_ALWAYS;
-        case android::media::AudioMMapPolicy::UNSPECIFIED:
+        case AudioMMapPolicy::UNSPECIFIED:
         default:
             return AAUDIO_UNSPECIFIED;
     }
@@ -110,7 +114,7 @@ aaudio_policy_t aidl2legacy_aaudio_policy(android::media::AudioMMapPolicy aidl) 
 // The aaudio policy will be ALWAYS, NEVER, UNSPECIFIED only when all policy info are
 // ALWAYS, NEVER or UNSPECIFIED. Otherwise, the aaudio policy will be AUTO.
 aaudio_policy_t getAAudioPolicy(
-        const std::vector<android::media::AudioMMapPolicyInfo>& policyInfos) {
+        const std::vector<AudioMMapPolicyInfo>& policyInfos) {
     if (policyInfos.empty()) return AAUDIO_POLICY_AUTO;
     for (size_t i = 1; i < policyInfos.size(); ++i) {
         if (policyInfos.at(i).mmapPolicy != policyInfos.at(0).mmapPolicy) {
@@ -140,12 +144,12 @@ aaudio_result_t AudioStreamBuilder::build(AudioStream** streamPtr) {
         return result;
     }
 
-    std::vector<android::media::AudioMMapPolicyInfo> policyInfos;
+    std::vector<AudioMMapPolicyInfo> policyInfos;
     // The API setting is the highest priority.
     aaudio_policy_t mmapPolicy = AudioGlobal_getMMapPolicy();
     // If not specified then get from a system property.
     if (mmapPolicy == AAUDIO_UNSPECIFIED && android::AudioSystem::getMmapPolicyInfo(
-                android::media::AudioMMapPolicyType::DEFAULT, &policyInfos) == NO_ERROR) {
+                AudioMMapPolicyType::DEFAULT, &policyInfos) == NO_ERROR) {
         mmapPolicy = getAAudioPolicy(policyInfos);
     }
     // If still not specified then use the default.
@@ -156,7 +160,7 @@ aaudio_result_t AudioStreamBuilder::build(AudioStream** streamPtr) {
     policyInfos.clear();
     aaudio_policy_t mmapExclusivePolicy = AAUDIO_UNSPECIFIED;
     if (android::AudioSystem::getMmapPolicyInfo(
-            android::media::AudioMMapPolicyType::EXCLUSIVE, &policyInfos) == NO_ERROR) {
+            AudioMMapPolicyType::EXCLUSIVE, &policyInfos) == NO_ERROR) {
         mmapExclusivePolicy = getAAudioPolicy(policyInfos);
     }
     if (mmapExclusivePolicy == AAUDIO_UNSPECIFIED) {
