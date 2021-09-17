@@ -64,6 +64,7 @@
 #include <system/audio_effects/effect_ns.h>
 #include <system/audio_effects/effect_aec.h>
 #include <system/audio_effects/effect_hapticgenerator.h>
+#include <system/audio_effects/effect_spatializer.h>
 
 #include <audio_utils/primitives.h>
 
@@ -3742,6 +3743,15 @@ status_t AudioFlinger::createEffect(const media::CreateEffectRequest& request,
                         || sessionId == AUDIO_SESSION_OUTPUT_STAGE)) {
             // haptic-generating effect is only valid when the session id is a general session id
             lStatus = INVALID_OPERATION;
+            goto Exit;
+        }
+
+        // Only audio policy service can create a spatializer effect
+        if ((memcmp(&descOut.type, FX_IID_SPATIALIZER, sizeof(effect_uuid_t)) == 0) &&
+            (callingUid != AID_AUDIOSERVER || currentPid != getpid())) {
+            ALOGW("%s: attempt to create a spatializer effect from uid/pid %d/%d",
+                    __func__, callingUid, currentPid);
+            lStatus = PERMISSION_DENIED;
             goto Exit;
         }
 

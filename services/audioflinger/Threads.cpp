@@ -1336,6 +1336,13 @@ status_t AudioFlinger::PlaybackThread::checkEffectCompatibility_l(
         return BAD_VALUE;
     }
 
+    if (memcmp(&desc->type, FX_IID_SPATIALIZER, sizeof(effect_uuid_t)) == 0
+            && mType != SPATIALIZER) {
+        ALOGW("%s: attempt to create a spatializer effect on a thread of type %d",
+                __func__, mType);
+        return BAD_VALUE;
+    }
+
     switch (mType) {
     case MIXER: {
 #ifndef MULTICHANNEL_EFFECT_CHAIN
