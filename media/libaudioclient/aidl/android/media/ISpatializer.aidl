@@ -111,6 +111,6 @@ interface ISpatializer {
      * The last callback registered wins and passing a nullptr unregisters
      * last registered callback.
      */
-    void registerHeadTrackingCallback(ISpatializerHeadTrackingCallback callback);
+    void registerHeadTrackingCallback(@nullable ISpatializerHeadTrackingCallback callback);
 
 }
