@@ -15,8 +15,8 @@
  */
 package android.media;
 
-import android.media.AudioDevice;
 import android.media.AudioMMapPolicy;
+import android.media.audio.common.AudioDevice;
 
 /**
  * Audio MMAP policy info describes how an aaudio MMAP feature can be

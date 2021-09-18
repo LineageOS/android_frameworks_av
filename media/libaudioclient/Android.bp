@@ -312,9 +312,6 @@ aidl_interface {
     srcs: [
         "aidl/android/media/AudioAttributesInternal.aidl",
         "aidl/android/media/AudioClient.aidl",
-        "aidl/android/media/AudioDevice.aidl",
-        "aidl/android/media/AudioDeviceDescription.aidl",
-        "aidl/android/media/AudioDeviceType.aidl",
         "aidl/android/media/AudioDualMonoMode.aidl",
         "aidl/android/media/AudioFlag.aidl",
         "aidl/android/media/AudioGain.aidl",
