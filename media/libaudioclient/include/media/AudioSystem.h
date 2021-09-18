@@ -620,6 +620,10 @@ public:
             media::audio::common::AudioMMapPolicyType policyType,
             std::vector<media::audio::common::AudioMMapPolicyInfo> *policyInfos);
 
+    static int32_t getAAudioMixerBurstCount();
+
+    static int32_t getAAudioHardwareBurstMinUsec();
+
 private:
 
     class AudioFlingerClient: public IBinder::DeathRecipient, public media::BnAudioFlingerClient

@@ -21,6 +21,7 @@
 #include <assert.h>
 #include <map>
 #include <mutex>
+#include <media/AudioSystem.h>
 #include <utils/Singleton.h>
 
 #include "AAudioEndpointManager.h"
@@ -51,7 +52,7 @@ aaudio_result_t AAudioServiceEndpointPlay::open(const aaudio::AAudioStreamReques
         mMixer.allocate(getStreamInternal()->getSamplesPerFrame(),
                         getStreamInternal()->getFramesPerBurst());
 
-        int32_t burstsPerBuffer = AAudioProperty_getMixerBursts();
+        int32_t burstsPerBuffer = AudioSystem::getAAudioMixerBurstCount();
         if (burstsPerBuffer == 0) {
             mLatencyTuningEnabled = true;
             burstsPerBuffer = BURSTS_PER_BUFFER_DEFAULT;

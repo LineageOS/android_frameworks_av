@@ -119,6 +119,16 @@ class DeviceHalLocal : public DeviceHalInterface
         return INVALID_OPERATION;
     }
 
+    int32_t getAAudioMixerBurstCount() override {
+        // This function will only be available on AIDL HAL.
+        return INVALID_OPERATION;
+    }
+
+    int32_t getAAudioHardwareBurstMinUsec() override {
+        // This function will only be available on AIDL HAL.
+        return INVALID_OPERATION;
+    }
+
     status_t dump(int fd, const Vector<String16>& args) override;
 
     void closeOutputStream(struct audio_stream_out *stream_out);

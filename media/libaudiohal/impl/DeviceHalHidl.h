@@ -126,6 +126,16 @@ class DeviceHalHidl : public DeviceHalInterface, public ConversionHelperHidl
         return INVALID_OPERATION;
     }
 
+    int32_t getAAudioMixerBurstCount() override {
+        // TODO: Implement the HAL query when moving to AIDL HAL.
+        return INVALID_OPERATION;
+    }
+
+    int32_t getAAudioHardwareBurstMinUsec() override {
+        // TODO: Implement the HAL query when moving to AIDL HAL.
+        return INVALID_OPERATION;
+    }
+
     status_t dump(int fd, const Vector<String16>& args) override;
 
   private:
