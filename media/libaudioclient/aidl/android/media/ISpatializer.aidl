@@ -16,6 +16,7 @@
 
 package android.media;
 
+import android.media.ISpatializerHeadTrackingCallback;
 import android.media.SpatializationLevel;
 import android.media.SpatializationMode;
 import android.media.SpatializerHeadTrackingMode;
@@ -103,4 +104,13 @@ interface ISpatializer {
      * retrieved with IAudioPolicyService.getSpatializer().
      */
     SpatializationMode[] getSupportedModes();
+
+    /**
+     * Registers a callback to monitor head tracking functions.
+     * Only one callback can be registered on a Spatializer.
+     * The last callback registered wins and passing a nullptr unregisters
+     * last registered callback.
+     */
+    void registerHeadTrackingCallback(@nullable ISpatializerHeadTrackingCallback callback);
+
 }

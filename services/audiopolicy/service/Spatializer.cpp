@@ -391,6 +391,9 @@ Status Spatializer::getActualHeadTrackingMode(SpatializerHeadTrackingMode *mode)
 }
 
 Status Spatializer::recenterHeadTracker() {
+    if (!mSupportsHeadTracking) {
+        return binderStatusFromStatusT(INVALID_OPERATION);
+    }
     std::lock_guard lock(mLock);
     if (mPoseController != nullptr) {
         mPoseController->recenter();
@@ -400,6 +403,9 @@ Status Spatializer::recenterHeadTracker() {
 
 Status Spatializer::setGlobalTransform(const std::vector<float>& screenToStage) {
     ALOGV("%s", __func__);
+    if (!mSupportsHeadTracking) {
+        return binderStatusFromStatusT(INVALID_OPERATION);
+    }
     std::optional<Pose3f> maybePose = Pose3f::fromVector(screenToStage);
     if (!maybePose.has_value()) {
         ALOGW("Invalid screenToStage vector.");
@@ -437,6 +443,9 @@ Status Spatializer::release() {
 
 Status Spatializer::setHeadSensor(int sensorHandle) {
     ALOGV("%s sensorHandle %d", __func__, sensorHandle);
+    if (!mSupportsHeadTracking) {
+        return binderStatusFromStatusT(INVALID_OPERATION);
+    }
     std::lock_guard lock(mLock);
     if (sensorHandle == ASENSOR_INVALID) {
         mHeadSensor = nullptr;
@@ -451,6 +460,9 @@ Status Spatializer::setHeadSensor(int sensorHandle) {
 
 Status Spatializer::setScreenSensor(int sensorHandle) {
     ALOGV("%s sensorHandle %d", __func__, sensorHandle);
+    if (!mSupportsHeadTracking) {
+        return binderStatusFromStatusT(INVALID_OPERATION);
+    }
     std::lock_guard lock(mLock);
     if (sensorHandle == ASENSOR_INVALID) {
         mScreenSensor = nullptr;
@@ -465,6 +477,9 @@ Status Spatializer::setScreenSensor(int sensorHandle) {
 
 Status Spatializer::setDisplayOrientation(float physicalToLogicalAngle) {
     ALOGV("%s physicalToLogicalAngle %f", __func__, physicalToLogicalAngle);
+    if (!mSupportsHeadTracking) {
+        return binderStatusFromStatusT(INVALID_OPERATION);
+    }
     std::lock_guard lock(mLock);
     mDisplayOrientation = physicalToLogicalAngle;
     if (mPoseController != nullptr) {
@@ -491,9 +506,23 @@ Status Spatializer::getSupportedModes(std::vector<SpatializationMode> *modes) {
     return Status::ok();
 }
 
+Status Spatializer::registerHeadTrackingCallback(
+        const sp<media::ISpatializerHeadTrackingCallback>& callback) {
+    ALOGV("%s callback %p", __func__, callback.get());
+    std::lock_guard lock(mLock);
+    if (!mSupportsHeadTracking) {
+        return binderStatusFromStatusT(INVALID_OPERATION);
+    }
+    mHeadTrackingCallback = callback;
+    return Status::ok();
+}
+
 // SpatializerPoseController::Listener
 void Spatializer::onHeadToStagePose(const Pose3f& headToStage) {
     ALOGV("%s", __func__);
+    LOG_ALWAYS_FATAL_IF(!mSupportsHeadTracking,
+            "onHeadToStagePose() called with no head tracking support!");
+
     auto vec = headToStage.toVector();
     LOG_ALWAYS_FATAL_IF(vec.size() != sHeadPoseKeys.size(),
             "%s invalid head to stage vector size %zu", __func__, vec.size());
@@ -508,10 +537,10 @@ void Spatializer::onHeadToStagePose(const Pose3f& headToStage) {
 
 void Spatializer::onHeadToStagePoseMsg(const std::vector<float>& headToStage) {
     ALOGV("%s", __func__);
-    sp<media::INativeSpatializerCallback> callback;
+    sp<media::ISpatializerHeadTrackingCallback> callback;
     {
         std::lock_guard lock(mLock);
-        callback = mSpatializerCallback;
+        callback = mHeadTrackingCallback;
         if (mEngine != nullptr) {
             setEffectParameter_l(SPATIALIZER_PARAM_HEAD_TO_STAGE, headToStage);
         }
@@ -532,7 +561,7 @@ void Spatializer::onActualModeChange(HeadTrackingMode mode) {
 
 void Spatializer::onActualModeChangeMsg(HeadTrackingMode mode) {
     ALOGV("%s(%d)", __func__, (int) mode);
-    sp<media::INativeSpatializerCallback> callback;
+    sp<media::ISpatializerHeadTrackingCallback> callback;
     SpatializerHeadTrackingMode spatializerMode;
     {
         std::lock_guard lock(mLock);
@@ -554,7 +583,7 @@ void Spatializer::onActualModeChangeMsg(HeadTrackingMode mode) {
             }
         }
         mActualHeadTrackingMode = spatializerMode;
-        callback = mSpatializerCallback;
+        callback = mHeadTrackingCallback;
     }
     if (callback != nullptr) {
         callback->onHeadTrackingModeChanged(spatializerMode);
@@ -610,18 +639,22 @@ status_t Spatializer::attachOutput(audio_io_handle_t output) {
         mEngine->setEnabled(true);
         mOutput = output;
 
-        mPoseController = std::make_shared<SpatializerPoseController>(
-                static_cast<SpatializerPoseController::Listener*>(this), 10ms, 50ms);
-        LOG_ALWAYS_FATAL_IF(mPoseController == nullptr,
-                            "%s could not allocate pose controller", __func__);
+        if (mSupportsHeadTracking) {
+            mPoseController = std::make_shared<SpatializerPoseController>(
+                    static_cast<SpatializerPoseController::Listener*>(this), 10ms, 50ms);
+            LOG_ALWAYS_FATAL_IF(mPoseController == nullptr,
+                                "%s could not allocate pose controller", __func__);
 
-        mPoseController->setDesiredMode(mDesiredHeadTrackingMode);
-        mPoseController->setHeadSensor(mHeadSensor);
-        mPoseController->setScreenSensor(mScreenSensor);
-        mPoseController->setDisplayOrientation(mDisplayOrientation);
-        poseController = mPoseController;
+            mPoseController->setDesiredMode(mDesiredHeadTrackingMode);
+            mPoseController->setHeadSensor(mHeadSensor);
+            mPoseController->setScreenSensor(mScreenSensor);
+            mPoseController->setDisplayOrientation(mDisplayOrientation);
+            poseController = mPoseController;
+        }
     }
-    poseController->waitUntilCalculated();
+    if (poseController != nullptr) {
+        poseController->waitUntilCalculated();
+    }
     return NO_ERROR;
 }
 
@@ -671,77 +704,6 @@ void Spatializer::postFramesProcessedMsg(int frames) {
             new AMessage(EngineCallbackHandler::kWhatOnFramesProcessed, mHandler);
     msg->setInt32(EngineCallbackHandler::kNumFramesKey, frames);
     msg->post();
-}
-
-// ---------------------------------------------------------------------------
-
-Spatializer::EffectClient::EffectClient(const sp<media::IEffectClient>& effectClient,
-             Spatializer& parent)
-             : BnEffect(),
-             mEffectClient(effectClient), mParent(parent) {
-}
-
-Spatializer::EffectClient::~EffectClient() {
-}
-
-// IEffect
-
-#define RETURN(code) \
-  *_aidl_return = (code); \
-  return Status::ok();
-
-// Write a POD value into a vector of bytes (clears the previous buffer
-// content).
-template<typename T>
-void writeToBuffer(const T& value, std::vector<uint8_t>* buffer) {
-    buffer->clear();
-    appendToBuffer(value, buffer);
-}
-
-Status Spatializer::EffectClient::enable(int32_t* _aidl_return) {
-    RETURN(OK);
-}
-
-Status Spatializer::EffectClient::disable(int32_t* _aidl_return) {
-    RETURN(OK);
-}
-
-Status Spatializer::EffectClient::command(int32_t cmdCode,
-                                const std::vector<uint8_t>& cmdData __unused,
-                                int32_t maxResponseSize __unused,
-                                std::vector<uint8_t>* response __unused,
-                                int32_t* _aidl_return) {
-
-    // reject commands reserved for internal use by audio framework if coming from outside
-    // of audioserver
-    switch(cmdCode) {
-        case EFFECT_CMD_ENABLE:
-        case EFFECT_CMD_DISABLE:
-        case EFFECT_CMD_SET_PARAM_DEFERRED:
-        case EFFECT_CMD_SET_PARAM_COMMIT:
-            RETURN(BAD_VALUE);
-        case EFFECT_CMD_SET_PARAM:
-        case EFFECT_CMD_GET_PARAM:
-            break;
-        default:
-            if (cmdCode >= EFFECT_CMD_FIRST_PROPRIETARY) {
-                break;
-            }
-            android_errorWriteLog(0x534e4554, "62019992");
-            RETURN(BAD_VALUE);
-    }
-    (void)mParent;
-    RETURN(OK);
-}
-
-Status Spatializer::EffectClient::disconnect() {
-    mDisconnected = true;
-    return Status::ok();
-}
-
-Status Spatializer::EffectClient::getCblk(media::SharedFileRegion* _aidl_return) {
-    LOG_ALWAYS_FATAL_IF(!convertIMemoryToSharedFileRegion(mCblkMemory, _aidl_return));
-    return Status::ok();
 }
 
 } // namespace android
