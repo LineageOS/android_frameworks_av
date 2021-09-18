@@ -49,6 +49,7 @@ cc_library_shared {
         "libsensorprivacy",
         "libshmemcompat",
         "libutils",
+        "libstagefright_foundation",
         "audioclient-types-aidl-cpp",
         "audioflinger-aidl-cpp",
         "audiopolicy-aidl-cpp",

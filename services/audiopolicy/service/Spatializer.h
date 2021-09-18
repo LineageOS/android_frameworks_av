@@ -24,6 +24,7 @@
 #include <android/media/SpatializerHeadTrackingMode.h>
 #include <android/sensor.h>
 #include <media/audiohal/EffectHalInterface.h>
+#include <media/stagefright/foundation/ALooper.h>
 #include <media/AudioEffect.h>
 #include <system/audio_effects/effect_spatializer.h>
 
@@ -91,6 +92,9 @@ class Spatializer : public media::BnSpatializer,
 
            ~Spatializer() override;
 
+    /** RefBase */
+    void onFirstRef();
+
     /** ISpatializer, see ISpatializer.aidl */
     binder::Status release() override;
     binder::Status getSupportedLevels(std::vector<media::SpatializationLevel>* levels) override;
@@ -109,7 +113,8 @@ class Spatializer : public media::BnSpatializer,
     binder::Status setDisplayOrientation(float physicalToLogicalAngle) override;
     binder::Status setHingeAngle(float hingeAngle) override;
     binder::Status getSupportedModes(std::vector<media::SpatializationMode>* modes) override;
-
+    binder::Status registerHeadTrackingCallback(
+        const sp<media::ISpatializerHeadTrackingCallback>& callback) override;
 
     /** IBinder::DeathRecipient. Listen to the death of the INativeSpatializerCallback. */
     virtual void binderDied(const wp<IBinder>& who);
@@ -138,33 +143,7 @@ class Spatializer : public media::BnSpatializer,
     /** Gets the channel mask, sampling rate and format set for the spatializer input. */
     audio_config_base_t getAudioInConfig() const;
 
-    /** An implementation of an IEffect interface that can be used to pass advanced parameters to
-     * the spatializer engine. All APis are noop (i.e. the interface cannot be used to control
-     * the effect) except for passing parameters via the command() API. */
-    class EffectClient: public android::media::BnEffect {
-    public:
-
-        EffectClient(const sp<media::IEffectClient>& effectClient,
-                     Spatializer& parent);
-        virtual ~EffectClient();
-
-        // IEffect
-        android::binder::Status enable(int32_t* _aidl_return) override;
-        android::binder::Status disable(int32_t* _aidl_return) override;
-        android::binder::Status command(int32_t cmdCode,
-                                        const std::vector<uint8_t>& cmdData,
-                                        int32_t maxResponseSize,
-                                        std::vector<uint8_t>* response,
-                                        int32_t* _aidl_return) override;
-        android::binder::Status disconnect() override;
-        android::binder::Status getCblk(media::SharedFileRegion* _aidl_return) override;
-
-    private:
-        const sp<media::IEffectClient> mEffectClient;
-        sp<IMemory> mCblkMemory;
-        const Spatializer& mParent;
-        bool mDisconnected = false;
-    };
+    void calculateHeadPose();
 
 private:
     Spatializer(effect_descriptor_t engineDescriptor,
@@ -176,7 +155,9 @@ private:
     void onHeadToStagePose(const media::Pose3f& headToStage) override;
     void onActualModeChange(media::HeadTrackingMode mode) override;
 
-    void calculateHeadPose();
+    void onHeadToStagePoseMsg(const std::vector<float>& headToStage);
+    void onActualModeChangeMsg(media::HeadTrackingMode mode);
+
 
     static ConversionResult<ASensorRef> getSensorFromHandle(int handle);
 
@@ -251,6 +232,8 @@ private:
         return mEngine->setParameter(p);
     }
 
+    void postFramesProcessedMsg(int frames);
+
     /** Effect engine descriptor */
     const effect_descriptor_t mEngineDescriptor;
     /** Callback interface to parent audio policy service */
@@ -267,11 +250,11 @@ private:
     /** Callback interface to the client (AudioService) controlling this`Spatializer */
     sp<media::INativeSpatializerCallback> mSpatializerCallback GUARDED_BY(mLock);
 
+    /** Callback interface for head tracking */
+    sp<media::ISpatializerHeadTrackingCallback> mHeadTrackingCallback GUARDED_BY(mLock);
+
     /** Requested spatialization level */
     media::SpatializationLevel mLevel GUARDED_BY(mLock) = media::SpatializationLevel::NONE;
-
-    /** Extended IEffect interface is one has been created */
-    sp<EffectClient> mEffectClient GUARDED_BY(mLock);
 
     /** Control logic for head-tracking, etc. */
     std::shared_ptr<SpatializerPoseController> mPoseController GUARDED_BY(mLock);
@@ -298,6 +281,14 @@ private:
     std::vector<media::SpatializationMode> mSpatializationModes;
     std::vector<audio_channel_mask_t> mChannelMasks;
     bool mSupportsHeadTracking;
+
+    // Looper thread for mEngine callbacks
+    class EngineCallbackHandler;
+
+    sp<ALooper> mLooper;
+    sp<EngineCallbackHandler> mHandler;
+
+    static const std::vector<const char *> sHeadPoseKeys;
 };
 
 
