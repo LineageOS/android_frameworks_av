@@ -19,8 +19,8 @@
 
 #include <functional>
 
-#include <android/media/AudioDeviceDescription.h>
 #include <android/media/audio/common/AudioChannelLayout.h>
+#include <android/media/audio/common/AudioDeviceDescription.h>
 #include <android/media/audio/common/AudioFormatDescription.h>
 #include <binder/Parcelable.h>
 #include <system/audio.h>
@@ -64,11 +64,12 @@ template<> struct hash<android::media::audio::common::AudioChannelLayout>
     }
 };
 
-template<> struct hash<android::media::AudioDeviceDescription>
+template<> struct hash<android::media::audio::common::AudioDeviceDescription>
 {
-    std::size_t operator()(const android::media::AudioDeviceDescription& add) const noexcept {
+    std::size_t operator()(
+            const android::media::audio::common::AudioDeviceDescription& add) const noexcept {
         return hash_combine(
-                std::hash<android::media::AudioDeviceType>{}(add.type),
+                std::hash<android::media::audio::common::AudioDeviceType>{}(add.type),
                 std::hash<std::string>{}(add.connection));
     }
 };

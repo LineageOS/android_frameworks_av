@@ -51,6 +51,8 @@ namespace android {
 using content::AttributionSourceState;
 using media::audio::common::AudioConfig;
 using media::audio::common::AudioConfigBase;
+using media::audio::common::AudioDevice;
+using media::audio::common::AudioDeviceDescription;
 using media::audio::common::AudioFormatDescription;
 using media::audio::common::AudioMode;
 using media::audio::common::AudioSource;
@@ -79,14 +81,14 @@ public:
     //
     binder::Status onNewAudioModulesAvailable() override;
     binder::Status setDeviceConnectionState(
-            const media::AudioDevice& device,
+            const AudioDevice& device,
             media::AudioPolicyDeviceState state,
             const std::string& deviceName,
             const AudioFormatDescription& encodedFormat) override;
-    binder::Status getDeviceConnectionState(const media::AudioDevice& device,
+    binder::Status getDeviceConnectionState(const AudioDevice& device,
                                             media::AudioPolicyDeviceState* _aidl_return) override;
     binder::Status handleDeviceConfigChange(
-            const media::AudioDevice& device,
+            const AudioDevice& device,
             const std::string& deviceName,
             const AudioFormatDescription& encodedFormat) override;
     binder::Status setPhoneState(AudioMode state, int32_t uid) override;
@@ -115,16 +117,16 @@ public:
     binder::Status initStreamVolume(AudioStreamType stream, int32_t indexMin,
                                     int32_t indexMax) override;
     binder::Status setStreamVolumeIndex(AudioStreamType stream,
-                                        const media::AudioDeviceDescription& device,
+                                        const AudioDeviceDescription& device,
                                         int32_t index) override;
     binder::Status getStreamVolumeIndex(AudioStreamType stream,
-                                        const media::AudioDeviceDescription& device,
+                                        const AudioDeviceDescription& device,
                                         int32_t* _aidl_return) override;
     binder::Status setVolumeIndexForAttributes(const media::AudioAttributesInternal& attr,
-                                               const media::AudioDeviceDescription& device,
+                                               const AudioDeviceDescription& device,
                                                int32_t index) override;
     binder::Status getVolumeIndexForAttributes(const media::AudioAttributesInternal& attr,
-                                               const media::AudioDeviceDescription& device,
+                                               const AudioDeviceDescription& device,
                                                int32_t* _aidl_return) override;
     binder::Status getMaxVolumeIndexForAttributes(const media::AudioAttributesInternal& attr,
                                                   int32_t* _aidl_return) override;
@@ -134,9 +136,9 @@ public:
                                         int32_t* _aidl_return) override;
     binder::Status getDevicesForStream(
             AudioStreamType stream,
-            std::vector<media::AudioDeviceDescription>* _aidl_return) override;
+            std::vector<AudioDeviceDescription>* _aidl_return) override;
     binder::Status getDevicesForAttributes(const media::AudioAttributesEx& attr,
-                                           std::vector<media::AudioDevice>* _aidl_return) override;
+                                           std::vector<AudioDevice>* _aidl_return) override;
     binder::Status getOutputForEffect(const media::EffectDescriptor& desc,
                                       int32_t* _aidl_return) override;
     binder::Status registerEffect(const media::EffectDescriptor& desc, int32_t io, int32_t strategy,
@@ -191,11 +193,11 @@ public:
     binder::Status registerPolicyMixes(const std::vector<media::AudioMix>& mixes,
                                        bool registration) override;
     binder::Status setUidDeviceAffinities(int32_t uid,
-                                          const std::vector<media::AudioDevice>& devices) override;
+                                          const std::vector<AudioDevice>& devices) override;
     binder::Status removeUidDeviceAffinities(int32_t uid) override;
     binder::Status setUserIdDeviceAffinities(
             int32_t userId,
-            const std::vector<media::AudioDevice>& devices) override;
+            const std::vector<AudioDevice>& devices) override;
     binder::Status removeUserIdDeviceAffinities(int32_t userId) override;
     binder::Status startAudioSource(const media::AudioPortConfig& source,
                                     const media::AudioAttributesInternal& attributes,
@@ -204,7 +206,7 @@ public:
     binder::Status setMasterMono(bool mono) override;
     binder::Status getMasterMono(bool* _aidl_return) override;
     binder::Status getStreamVolumeDB(AudioStreamType stream, int32_t index,
-                                     const media::AudioDeviceDescription& device,
+                                     const AudioDeviceDescription& device,
                                      float* _aidl_return) override;
     binder::Status getSurroundFormats(media::Int* count,
                                       std::vector<AudioFormatDescription>* formats,
@@ -234,29 +236,29 @@ public:
     binder::Status isCallScreenModeSupported(bool* _aidl_return) override;
     binder::Status setDevicesRoleForStrategy(
             int32_t strategy, media::DeviceRole role,
-            const std::vector<media::AudioDevice>& devices) override;
+            const std::vector<AudioDevice>& devices) override;
     binder::Status removeDevicesRoleForStrategy(int32_t strategy, media::DeviceRole role) override;
     binder::Status getDevicesForRoleAndStrategy(
             int32_t strategy, media::DeviceRole role,
-            std::vector<media::AudioDevice>* _aidl_return) override;
+            std::vector<AudioDevice>* _aidl_return) override;
     binder::Status setDevicesRoleForCapturePreset(
             AudioSource audioSource,
             media::DeviceRole role,
-            const std::vector<media::AudioDevice>& devices) override;
+            const std::vector<AudioDevice>& devices) override;
     binder::Status addDevicesRoleForCapturePreset(
             AudioSource audioSource,
             media::DeviceRole role,
-            const std::vector<media::AudioDevice>& devices) override;
+            const std::vector<AudioDevice>& devices) override;
     binder::Status removeDevicesRoleForCapturePreset(
             AudioSource audioSource,
             media::DeviceRole role,
-            const std::vector<media::AudioDevice>& devices) override;
+            const std::vector<AudioDevice>& devices) override;
     binder::Status clearDevicesRoleForCapturePreset(AudioSource audioSource,
                                                     media::DeviceRole role) override;
     binder::Status getDevicesForRoleAndCapturePreset(
             AudioSource audioSource,
             media::DeviceRole role,
-            std::vector<media::AudioDevice>* _aidl_return) override;
+            std::vector<AudioDevice>* _aidl_return) override;
     binder::Status registerSoundTriggerCaptureStateListener(
             const sp<media::ICaptureStateListener>& listener, bool* _aidl_return) override;
 
@@ -265,7 +267,7 @@ public:
     binder::Status canBeSpatialized(
             const std::optional<media::AudioAttributesInternal>& attr,
             const std::optional<AudioConfig>& config,
-            const std::vector<media::AudioDevice>& devices,
+            const std::vector<AudioDevice>& devices,
             bool* _aidl_return) override;
 
     status_t onTransact(uint32_t code, const Parcel& data, Parcel* reply, uint32_t flags) override;

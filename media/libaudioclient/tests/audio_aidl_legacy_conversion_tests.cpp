@@ -23,6 +23,8 @@ using namespace android;
 using namespace android::aidl_utils;
 
 using media::audio::common::AudioChannelLayout;
+using media::audio::common::AudioDeviceDescription;
+using media::audio::common::AudioDeviceType;
 using media::audio::common::AudioFormatDescription;
 using media::audio::common::AudioFormatType;
 using media::audio::common::PcmType;
@@ -61,34 +63,34 @@ AudioChannelLayout make_ACL_VoiceCall() {
             AudioChannelLayout::VOICE_CALL_MONO);
 }
 
-media::AudioDeviceDescription make_AudioDeviceDescription(media::AudioDeviceType type,
+AudioDeviceDescription make_AudioDeviceDescription(AudioDeviceType type,
         const std::string& connection = "") {
-    media::AudioDeviceDescription result;
+    AudioDeviceDescription result;
     result.type = type;
     result.connection = connection;
     return result;
 }
 
-media::AudioDeviceDescription make_ADD_None() {
-    return media::AudioDeviceDescription{};
+AudioDeviceDescription make_ADD_None() {
+    return AudioDeviceDescription{};
 }
 
-media::AudioDeviceDescription make_ADD_DefaultIn() {
-    return make_AudioDeviceDescription(media::AudioDeviceType::IN_DEFAULT);
+AudioDeviceDescription make_ADD_DefaultIn() {
+    return make_AudioDeviceDescription(AudioDeviceType::IN_DEFAULT);
 }
 
-media::AudioDeviceDescription make_ADD_DefaultOut() {
-    return make_AudioDeviceDescription(media::AudioDeviceType::OUT_DEFAULT);
+AudioDeviceDescription make_ADD_DefaultOut() {
+    return make_AudioDeviceDescription(AudioDeviceType::OUT_DEFAULT);
 }
 
-media::AudioDeviceDescription make_ADD_WiredHeadset() {
-    return make_AudioDeviceDescription(media::AudioDeviceType::OUT_HEADSET,
-            media::AudioDeviceDescription::CONNECTION_ANALOG());
+AudioDeviceDescription make_ADD_WiredHeadset() {
+    return make_AudioDeviceDescription(AudioDeviceType::OUT_HEADSET,
+            AudioDeviceDescription::CONNECTION_ANALOG());
 }
 
-media::AudioDeviceDescription make_ADD_BtScoHeadset() {
-    return make_AudioDeviceDescription(media::AudioDeviceType::OUT_HEADSET,
-            media::AudioDeviceDescription::CONNECTION_BT_SCO());
+AudioDeviceDescription make_ADD_BtScoHeadset() {
+    return make_AudioDeviceDescription(AudioDeviceType::OUT_HEADSET,
+            AudioDeviceDescription::CONNECTION_BT_SCO());
 }
 
 AudioFormatDescription make_AudioFormatDescription(AudioFormatType type) {
@@ -171,7 +173,7 @@ TEST_F(HashIdentityTest, AudioChannelLayoutHashIdentity) {
 }
 
 TEST_F(HashIdentityTest, AudioDeviceDescriptionHashIdentity) {
-    verifyHashIdentity<media::AudioDeviceDescription>({
+    verifyHashIdentity<AudioDeviceDescription>({
             make_ADD_None, make_ADD_DefaultIn, make_ADD_DefaultOut, make_ADD_WiredHeadset,
             make_ADD_BtScoHeadset});
 }
@@ -206,7 +208,7 @@ INSTANTIATE_TEST_SUITE_P(AudioChannelVoiceRoundTrip,
         testing::Combine(testing::Values(make_ACL_VoiceCall()), testing::Values(true)));
 
 class AudioDeviceDescriptionRoundTripTest :
-        public testing::TestWithParam<media::AudioDeviceDescription> {};
+        public testing::TestWithParam<AudioDeviceDescription> {};
 TEST_P(AudioDeviceDescriptionRoundTripTest, Aidl2Legacy2Aidl) {
     const auto initial = GetParam();
     auto conv = aidl2legacy_AudioDeviceDescription_audio_devices_t(initial);
@@ -217,7 +219,7 @@ TEST_P(AudioDeviceDescriptionRoundTripTest, Aidl2Legacy2Aidl) {
 }
 INSTANTIATE_TEST_SUITE_P(AudioDeviceDescriptionRoundTrip,
         AudioDeviceDescriptionRoundTripTest,
-        testing::Values(media::AudioDeviceDescription{}, make_ADD_DefaultIn(),
+        testing::Values(AudioDeviceDescription{}, make_ADD_DefaultIn(),
                 make_ADD_DefaultOut(), make_ADD_WiredHeadset(), make_ADD_BtScoHeadset()));
 
 class AudioFormatDescriptionRoundTripTest :

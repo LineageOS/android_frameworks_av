@@ -25,6 +25,9 @@
 
 namespace android {
 
+using media::audio::common::AudioDevice;
+using media::audio::common::AudioDeviceAddress;
+
 namespace {
 
 static const std::string SUPPRESSED = "SUPPRESSED";
@@ -157,18 +160,16 @@ std::string dumpAudioDeviceTypeAddrVector(const AudioDeviceTypeAddrVector& devic
 }
 
 ConversionResult<AudioDeviceTypeAddr>
-aidl2legacy_AudioDeviceTypeAddress(const media::AudioDevice& aidl) {
-    audio_devices_t type = VALUE_OR_RETURN(
-            aidl2legacy_AudioDeviceDescription_audio_devices_t(aidl.type));
-    return AudioDeviceTypeAddr(type, aidl.address);
+aidl2legacy_AudioDeviceTypeAddress(const AudioDevice& aidl) {
+    audio_devices_t type;
+    std::string address;
+    RETURN_IF_ERROR(aidl2legacy_AudioDevice_audio_device(aidl, &type, &address));
+    return AudioDeviceTypeAddr(type, address);
 }
 
-ConversionResult<media::AudioDevice>
+ConversionResult<AudioDevice>
 legacy2aidl_AudioDeviceTypeAddress(const AudioDeviceTypeAddr& legacy) {
-    media::AudioDevice aidl;
-    aidl.type = VALUE_OR_RETURN(legacy2aidl_audio_devices_t_AudioDeviceDescription(legacy.mType));
-    aidl.address = legacy.getAddress();
-    return aidl;
+    return legacy2aidl_audio_device_AudioDevice(legacy.mType, legacy.getAddress());
 }
 
 } // namespace android
