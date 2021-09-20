@@ -485,6 +485,10 @@ Status Spatializer::setDisplayOrientation(float physicalToLogicalAngle) {
     if (mPoseController != nullptr) {
         mPoseController->setDisplayOrientation(mDisplayOrientation);
     }
+    if (mEngine != nullptr) {
+        setEffectParameter_l(
+            SPATIALIZER_PARAM_DISPLAY_ORIENTATION, std::vector<float>{physicalToLogicalAngle});
+    }
     return Status::ok();
 }
 
