@@ -35,6 +35,7 @@ cc_defaults {
     host_supported: true,
 
     shared_libs: [
+        "libbinder",
         "liblog",
         "libutils",
     ],
@@ -210,5 +211,13 @@ cc_test {
 
     srcs: [
         "inplace_function_tests.cpp"
+    ],
+}
+
+cc_test {
+    name: "shared_memory_allocator_tests",
+    defaults: ["libmediautils_tests_defaults"],
+    srcs: [
+        "shared_memory_allocator_tests.cpp",
     ],
 }

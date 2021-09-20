@@ -75,6 +75,7 @@
 #include <media/ExtendedAudioBufferProvider.h>
 #include <media/VolumeShaper.h>
 #include <mediautils/ServiceUtilities.h>
+#include <mediautils/SharedMemoryAllocator.h>
 #include <mediautils/Synchronization.h>
 #include <mediautils/ThreadSnapshot.h>
 
@@ -94,7 +95,7 @@
 #include "NBAIO_Tee.h"
 #include "ThreadMetrics.h"
 #include "TrackMetrics.h"
-
+#include "AllocatorFactory.h"
 #include <android/os/IPowerManager.h>
 
 #include <media/nblog/NBLog.h>
@@ -499,19 +500,19 @@ private:
 
     // --- Client ---
     class Client : public RefBase {
-    public:
-                            Client(const sp<AudioFlinger>& audioFlinger, pid_t pid);
+      public:
+        Client(const sp<AudioFlinger>& audioFlinger, pid_t pid);
         virtual             ~Client();
-        sp<MemoryDealer>    heap() const;
+        AllocatorFactory::ClientAllocator& allocator();
         pid_t               pid() const { return mPid; }
         sp<AudioFlinger>    audioFlinger() const { return mAudioFlinger; }
 
     private:
         DISALLOW_COPY_AND_ASSIGN(Client);
 
-        const sp<AudioFlinger> mAudioFlinger;
-              sp<MemoryDealer> mMemoryDealer;
+        const sp<AudioFlinger>    mAudioFlinger;
         const pid_t         mPid;
+        AllocatorFactory::ClientAllocator mClientAllocator;
     };
 
     // --- Notification Client ---
