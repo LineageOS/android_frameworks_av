@@ -2677,6 +2677,7 @@ status_t Camera3Device::configureStreamsLocked(int operatingMode,
     }
 
     mGroupIdPhysicalCameraMap.clear();
+    bool composerSurfacePresent = false;
     for (size_t i = 0; i < mOutputStreams.size(); i++) {
 
         // Don't configure bidi streams twice, nor add them twice to the list
@@ -2715,6 +2716,10 @@ status_t Camera3Device::configureStreamsLocked(int operatingMode,
             int32_t streamGroupId = mOutputStreams[i]->getHalStreamGroupId();
             const String8& physicalCameraId = mOutputStreams[i]->getPhysicalCameraId();
             mGroupIdPhysicalCameraMap[streamGroupId].insert(physicalCameraId);
+        }
+
+        if (outputStream->usage & GraphicBuffer::USAGE_HW_COMPOSER) {
+            composerSurfacePresent = true;
         }
     }
 
@@ -2782,6 +2787,8 @@ status_t Camera3Device::configureStreamsLocked(int operatingMode,
             }
         }
     }
+
+    mRequestThread->setComposerSurface(composerSurfacePresent);
 
     // Request thread needs to know to avoid using repeat-last-settings protocol
     // across configure_streams() calls
@@ -4179,6 +4186,7 @@ Camera3Device::RequestThread::RequestThread(wp<Camera3Device> parent,
         mCurrentAfTriggerId(0),
         mCurrentPreCaptureTriggerId(0),
         mRotateAndCropOverride(ANDROID_SCALER_ROTATE_AND_CROP_NONE),
+        mComposerOutput(false),
         mCameraMute(ANDROID_SENSOR_TEST_PATTERN_MODE_OFF),
         mCameraMuteChanged(false),
         mRepeatingLastFrameNumber(
@@ -4829,7 +4837,11 @@ status_t Camera3Device::RequestThread::prepareHalRequests() {
         bool triggersMixedIn = (triggerCount > 0 || mPrevTriggers > 0);
         mPrevTriggers = triggerCount;
 
-        bool rotateAndCropChanged = overrideAutoRotateAndCrop(captureRequest);
+        // Do not override rotate&crop for stream configurations that include
+        // SurfaceViews(HW_COMPOSER) output. The display rotation there will be
+        // compensated by NATIVE_WINDOW_TRANSFORM_INVERSE_DISPLAY
+        bool rotateAndCropChanged = mComposerOutput ? false :
+            overrideAutoRotateAndCrop(captureRequest);
         bool testPatternChanged = overrideTestPattern(captureRequest);
 
         // If the request is the same as last, or we had triggers now or last time or
@@ -5332,6 +5344,13 @@ status_t Camera3Device::RequestThread::setRotateAndCropAutoBehavior(
         return BAD_VALUE;
     }
     mRotateAndCropOverride = rotateAndCropValue;
+    return OK;
+}
+
+status_t Camera3Device::RequestThread::setComposerSurface(bool composerSurfacePresent) {
+    ATRACE_CALL();
+    Mutex::Autolock l(mTriggerMutex);
+    mComposerOutput = composerSurfacePresent;
     return OK;
 }
 
