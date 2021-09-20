@@ -50,9 +50,15 @@ interface ISpatializer {
     /** Gets the selected spatialization level (see SpatializationLevel.aidl) */
     SpatializationLevel getLevel();
 
+    /** Reports if the spatializer engine supports head tracking or not.
+     * This is a pre condition independent of the fact that a head tracking sensor is
+     * registered or not.
+     */
+    boolean isHeadTrackingSupported();
+
     /** Reports the list of supported head tracking modes (see SpatializerHeadTrackingMode.aidl).
      * The list can be empty if the spatializer implementation does not support head tracking or if
-     * no head tracking device is connected.
+     * no head tracking sensor is registered (see setHeadSensor() and setScreenSensor()).
      */
     SpatializerHeadTrackingMode[] getSupportedHeadTrackingModes();
 
@@ -113,4 +119,20 @@ interface ISpatializer {
      */
     void registerHeadTrackingCallback(@nullable ISpatializerHeadTrackingCallback callback);
 
+    /**
+     * Sets a parameter to the spatializer engine. Used by effect implementor for vendor
+     * specific configuration.
+     */
+     void setParameter(int key, in byte[] value);
+
+    /**
+     * Gets a parameter from the spatializer engine. Used by effect implementor for vendor
+     * specific configuration.
+     */
+     void getParameter(int key, inout byte[] value);
+
+    /**
+     * Gets the io handle of the output stream the spatializer is connected to.
+     */
+     int getOutput();
 }
