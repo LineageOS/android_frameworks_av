@@ -210,8 +210,10 @@ status_t AudioPort::writeToParcelable(media::AudioPort* parcelable) const {
     parcelable->name = mName;
     parcelable->type = VALUE_OR_RETURN_STATUS(legacy2aidl_audio_port_type_t_AudioPortType(mType));
     parcelable->role = VALUE_OR_RETURN_STATUS(legacy2aidl_audio_port_role_t_AudioPortRole(mRole));
-    parcelable->profiles = VALUE_OR_RETURN_STATUS(
+    auto aidl = VALUE_OR_RETURN_STATUS(
             legacy2aidl_AudioProfileVector(mProfiles, useInputChannelMask()));
+    parcelable->profiles = aidl.first;
+    parcelable->profilesSys = aidl.second;
     parcelable->extraAudioDescriptors = mExtraAudioDescriptors;
     parcelable->gains = VALUE_OR_RETURN_STATUS(legacy2aidl_AudioGains(mGains));
     return OK;
@@ -228,7 +230,9 @@ status_t AudioPort::readFromParcelable(const media::AudioPort& parcelable) {
     mType = VALUE_OR_RETURN_STATUS(aidl2legacy_AudioPortType_audio_port_type_t(parcelable.type));
     mRole = VALUE_OR_RETURN_STATUS(aidl2legacy_AudioPortRole_audio_port_role_t(parcelable.role));
     mProfiles = VALUE_OR_RETURN_STATUS(
-            aidl2legacy_AudioProfileVector(parcelable.profiles, useInputChannelMask()));
+            aidl2legacy_AudioProfileVector(
+                    std::make_pair(parcelable.profiles, parcelable.profilesSys),
+                    useInputChannelMask()));
     mExtraAudioDescriptors = parcelable.extraAudioDescriptors;
     mGains = VALUE_OR_RETURN_STATUS(aidl2legacy_AudioGains(parcelable.gains));
     return OK;

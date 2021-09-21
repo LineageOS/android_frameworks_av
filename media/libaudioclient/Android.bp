@@ -339,7 +339,7 @@ aidl_interface {
         "aidl/android/media/AudioPortRole.aidl",
         "aidl/android/media/AudioPortSessionExt.aidl",
         "aidl/android/media/AudioPortType.aidl",
-        "aidl/android/media/AudioProfile.aidl",
+        "aidl/android/media/AudioProfileSys.aidl",
         "aidl/android/media/AudioStandard.aidl",
         "aidl/android/media/AudioTimestampInternal.aidl",
         "aidl/android/media/AudioUniqueIdUse.aidl",

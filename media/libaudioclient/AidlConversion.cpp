@@ -49,6 +49,7 @@ using media::audio::common::AudioFormatDescription;
 using media::audio::common::AudioFormatType;
 using media::audio::common::AudioMode;
 using media::audio::common::AudioOffloadInfo;
+using media::audio::common::AudioProfile;
 using media::audio::common::AudioSource;
 using media::audio::common::AudioStreamType;
 using media::audio::common::AudioUsage;
@@ -2743,17 +2744,17 @@ ConversionResult<media::AudioPortExt> legacy2aidl_AudioPortExt(
 }
 
 ConversionResult<audio_profile>
-aidl2legacy_AudioProfile_audio_profile(const media::AudioProfile& aidl, bool isInput) {
+aidl2legacy_AudioProfile_audio_profile(const AudioProfile& aidl, bool isInput) {
     audio_profile legacy;
     legacy.format = VALUE_OR_RETURN(aidl2legacy_AudioFormatDescription_audio_format_t(aidl.format));
 
-    if (aidl.samplingRates.size() > std::size(legacy.sample_rates)) {
+    if (aidl.sampleRates.size() > std::size(legacy.sample_rates)) {
         return unexpected(BAD_VALUE);
     }
     RETURN_IF_ERROR(
-            convertRange(aidl.samplingRates.begin(), aidl.samplingRates.end(), legacy.sample_rates,
+            convertRange(aidl.sampleRates.begin(), aidl.sampleRates.end(), legacy.sample_rates,
                          convertIntegral<int32_t, unsigned int>));
-    legacy.num_sample_rates = aidl.samplingRates.size();
+    legacy.num_sample_rates = aidl.sampleRates.size();
 
     if (aidl.channelMasks.size() > std::size(legacy.channel_masks)) {
         return unexpected(BAD_VALUE);
@@ -2770,9 +2771,9 @@ aidl2legacy_AudioProfile_audio_profile(const media::AudioProfile& aidl, bool isI
     return legacy;
 }
 
-ConversionResult<media::AudioProfile>
+ConversionResult<AudioProfile>
 legacy2aidl_audio_profile_AudioProfile(const audio_profile& legacy, bool isInput) {
-    media::AudioProfile aidl;
+    AudioProfile aidl;
     aidl.format = VALUE_OR_RETURN(legacy2aidl_audio_format_t_AudioFormatDescription(legacy.format));
 
     if (legacy.num_sample_rates > std::size(legacy.sample_rates)) {
@@ -2780,7 +2781,7 @@ legacy2aidl_audio_profile_AudioProfile(const audio_profile& legacy, bool isInput
     }
     RETURN_IF_ERROR(
             convertRange(legacy.sample_rates, legacy.sample_rates + legacy.num_sample_rates,
-                         std::back_inserter(aidl.samplingRates),
+                         std::back_inserter(aidl.sampleRates),
                          convertIntegral<unsigned int, int32_t>));
 
     if (legacy.num_channel_masks > std::size(legacy.channel_masks)) {
@@ -2843,7 +2844,7 @@ aidl2legacy_AudioPort_audio_port_v7(const media::AudioPort& aidl) {
     }
     const bool isInput = VALUE_OR_RETURN(direction(aidl.role, aidl.type)) == Direction::INPUT;
     RETURN_IF_ERROR(convertRange(aidl.profiles.begin(), aidl.profiles.end(), legacy.audio_profiles,
-                                 [isInput](const media::AudioProfile& p) {
+                                 [isInput](const AudioProfile& p) {
                                      return aidl2legacy_AudioProfile_audio_profile(p, isInput);
                                  }));
     legacy.num_audio_profiles = aidl.profiles.size();
@@ -2892,6 +2893,7 @@ legacy2aidl_audio_port_v7_AudioPort(const audio_port_v7& legacy) {
     if (legacy.num_extra_audio_descriptors > std::size(legacy.extra_audio_descriptors)) {
         return unexpected(BAD_VALUE);
     }
+    aidl.profilesSys.resize(legacy.num_audio_profiles);
     RETURN_IF_ERROR(
             convertRange(legacy.extra_audio_descriptors,
                     legacy.extra_audio_descriptors + legacy.num_extra_audio_descriptors,

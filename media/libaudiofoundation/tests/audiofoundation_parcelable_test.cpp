@@ -75,6 +75,24 @@ AudioProfileVector getAudioProfileVectorForTest() {
     return audioProfiles;
 }
 
+TEST(AudioFoundationParcelableTest, ParcelingAudioProfile) {
+    sp<AudioProfile> profile = getAudioProfileVectorForTest()[0];
+    auto conv = legacy2aidl_AudioProfile(profile, false /*isInput*/);
+    ASSERT_TRUE(conv.ok());
+    auto convBack = aidl2legacy_AudioProfile(conv.value(), false /*isInput*/);
+    ASSERT_TRUE(convBack.ok());
+    ASSERT_TRUE(profile->equals(convBack.value()));
+}
+
+TEST(AudioFoundationParcelableTest, ParcelingAudioProfileVector) {
+    AudioProfileVector profiles = getAudioProfileVectorForTest();
+    auto conv = legacy2aidl_AudioProfileVector(profiles, false /*isInput*/);
+    ASSERT_TRUE(conv.ok());
+    auto convBack = aidl2legacy_AudioProfileVector(conv.value(), false /*isInput*/);
+    ASSERT_TRUE(convBack.ok());
+    ASSERT_TRUE(profiles.equals(convBack.value()));
+}
+
 TEST(AudioFoundationParcelableTest, ParcelingAudioGain) {
     Parcel data;
     AudioGains audioGains = getAudioGainsForTest();

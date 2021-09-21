@@ -39,7 +39,6 @@
 #include <android/media/AudioPortExt.h>
 #include <android/media/AudioPortMixExt.h>
 #include <android/media/AudioPortSessionExt.h>
-#include <android/media/AudioProfile.h>
 #include <android/media/AudioTimestampInternal.h>
 #include <android/media/AudioUniqueIdUse.h>
 #include <android/media/EffectDescriptor.h>
@@ -56,6 +55,7 @@
 #include <android/media/audio/common/AudioFormatDescription.h>
 #include <android/media/audio/common/AudioMode.h>
 #include <android/media/audio/common/AudioOffloadInfo.h>
+#include <android/media/audio/common/AudioProfile.h>
 #include <android/media/audio/common/AudioSource.h>
 #include <android/media/audio/common/AudioUsage.h>
 #include <android/media/audio/common/AudioUuid.h>
@@ -372,8 +372,9 @@ ConversionResult<media::AudioPortSessionExt>
 legacy2aidl_audio_port_session_ext_AudioPortSessionExt(const audio_port_session_ext& legacy);
 
 ConversionResult<audio_profile>
-aidl2legacy_AudioProfile_audio_profile(const media::AudioProfile& aidl, bool isInput);
-ConversionResult<media::AudioProfile>
+aidl2legacy_AudioProfile_audio_profile(
+        const media::audio::common::AudioProfile& aidl, bool isInput);
+ConversionResult<media::audio::common::AudioProfile>
 legacy2aidl_audio_profile_AudioProfile(const audio_profile& legacy, bool isInput);
 
 ConversionResult<audio_gain>
