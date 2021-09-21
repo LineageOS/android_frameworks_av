@@ -97,6 +97,22 @@ public:
         mContentType = contentType;
     }
 
+    aaudio_spatialization_behavior_t getSpatializationBehavior() const {
+        return mSpatializationBehavior;
+    }
+
+    void setSpatializationBehavior(aaudio_spatialization_behavior_t spatializationBehavior) {
+        mSpatializationBehavior = spatializationBehavior;
+    }
+
+    bool isContentSpatialized() const {
+        return mIsContentSpatialized;
+    }
+
+    void setIsContentSpatialized(bool isSpatialized) {
+        mIsContentSpatialized = isSpatialized;
+    }
+
     aaudio_input_preset_t getInputPreset() const {
         return mInputPreset;
     }
@@ -183,6 +199,9 @@ private:
     aaudio_direction_t              mDirection            = AAUDIO_DIRECTION_OUTPUT;
     aaudio_usage_t                  mUsage                = AAUDIO_UNSPECIFIED;
     aaudio_content_type_t           mContentType          = AAUDIO_UNSPECIFIED;
+    aaudio_spatialization_behavior_t mSpatializationBehavior
+                                                          = AAUDIO_UNSPECIFIED;
+    bool                            mIsContentSpatialized = false;
     aaudio_input_preset_t           mInputPreset          = AAUDIO_UNSPECIFIED;
     int32_t                         mBufferCapacity       = AAUDIO_UNSPECIFIED;
     aaudio_allowed_capture_policy_t mAllowedCapturePolicy = AAUDIO_UNSPECIFIED;
