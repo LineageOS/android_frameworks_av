@@ -328,7 +328,9 @@ void stereoVolumeHelperWithChannelMask(TO*& out, const TI*& in, const TV *vol, F
     DO_CHANNEL_POSITION(21);
     DO_CHANNEL_POSITION(22);
     DO_CHANNEL_POSITION(23);
-    static_assert(FCC_LIMIT <= FCC_24); // Note: this may need to change.
+    DO_CHANNEL_POSITION(24);
+    DO_CHANNEL_POSITION(25);
+    static_assert(FCC_LIMIT <= FCC_26); // Note: this may need to change.
 #pragma pop_macro("DO_CHANNEL_POSITION")
 }
 
@@ -346,6 +348,8 @@ constexpr inline audio_channel_mask_t canonicalChannelMaskFromCount(size_t chann
         [7] = AUDIO_CHANNEL_OUT_6POINT1,
         [8] = AUDIO_CHANNEL_OUT_7POINT1,
         [12] = AUDIO_CHANNEL_OUT_7POINT1POINT4,
+        [14] = AUDIO_CHANNEL_OUT_9POINT1POINT4,
+        [16] = AUDIO_CHANNEL_OUT_9POINT1POINT6,
         [24] = AUDIO_CHANNEL_OUT_22POINT2,
     };
     return channelCount < std::size(canonical) ? canonical[channelCount] : AUDIO_CHANNEL_NONE;
