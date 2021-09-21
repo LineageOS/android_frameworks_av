@@ -24,9 +24,9 @@
 #include <sys/wait.h>
 #include <cutils/properties.h>
 
-#include <android/media/AudioMMapPolicy.h>
-#include <android/media/AudioMMapPolicyInfo.h>
-#include <android/media/AudioMMapPolicyType.h>
+#include <android/media/audio/common/AudioMMapPolicy.h>
+#include <android/media/audio/common/AudioMMapPolicyInfo.h>
+#include <android/media/audio/common/AudioMMapPolicyType.h>
 #include <android/media/IAudioFlingerService.h>
 #include <binder/IPCThreadState.h>
 #include <binder/ProcessState.h>
@@ -43,6 +43,10 @@
 #include "MediaLogService.h"
 
 using namespace android;
+
+using android::media::audio::common::AudioMMapPolicy;
+using android::media::audio::common::AudioMMapPolicyInfo;
+using android::media::audio::common::AudioMMapPolicyType;
 
 int main(int argc __unused, char **argv)
 {
@@ -155,15 +159,15 @@ int main(int argc __unused, char **argv)
         // attempting to call audio flinger on a null pointer could make the process crash
         // and attract attentions.
         sp<IAudioFlinger> af = AudioSystem::get_audio_flinger();
-        std::vector<media::AudioMMapPolicyInfo> policyInfos;
+        std::vector<AudioMMapPolicyInfo> policyInfos;
         status_t status = af->getMmapPolicyInfos(
-                media::AudioMMapPolicyType::DEFAULT, &policyInfos);
+                AudioMMapPolicyType::DEFAULT, &policyInfos);
         // Initialize aaudio service when querying mmap policy succeeds and
         // any of the policy supports MMAP.
         if (status == NO_ERROR &&
             std::any_of(policyInfos.begin(), policyInfos.end(), [](const auto& info) {
-                    return info.mmapPolicy == media::AudioMMapPolicy::AUTO ||
-                           info.mmapPolicy == media::AudioMMapPolicy::ALWAYS;
+                    return info.mmapPolicy == AudioMMapPolicy::AUTO ||
+                           info.mmapPolicy == AudioMMapPolicy::ALWAYS;
             })) {
             AAudioService::instantiate();
         } else {
