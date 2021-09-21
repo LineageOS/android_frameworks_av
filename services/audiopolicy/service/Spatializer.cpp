@@ -536,7 +536,8 @@ Status Spatializer::setParameter(int key, const std::vector<unsigned char>& valu
 }
 
 Status Spatializer::getParameter(int key, std::vector<unsigned char> *value) {
-    ALOGV("%s key %d value size %d", __func__, key, (int)value->size());
+    ALOGV("%s key %d value size %d", __func__, key,
+          (value != nullptr ? (int)value->size() : -1));
     if (value == nullptr) {
         binderStatusFromStatusT(BAD_VALUE);
     }
