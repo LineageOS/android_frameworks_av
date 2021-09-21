@@ -58,12 +58,6 @@ using namespace std::chrono_literals;
        if (!_tmp.ok()) return aidl_utils::binderStatusFromStatusT(_tmp.error()); \
        std::move(_tmp.value()); })
 
-#define RETURN_IF_BINDER_ERROR(x)      \
-    {                                  \
-        binder::Status _tmp = (x);     \
-        if (!_tmp.isOk()) return _tmp; \
-    }
-
 // ---------------------------------------------------------------------------
 
 class Spatializer::EngineCallbackHandler : public AHandler {
@@ -332,6 +326,16 @@ Status Spatializer::getLevel(SpatializationLevel *level) {
     return Status::ok();
 }
 
+Status Spatializer::isHeadTrackingSupported(bool *supports) {
+    ALOGV("%s mSupportsHeadTracking %d", __func__, mSupportsHeadTracking);
+    if (supports == nullptr) {
+        return binderStatusFromStatusT(BAD_VALUE);
+    }
+    std::lock_guard lock(mLock);
+    *supports = mSupportsHeadTracking;
+    return Status::ok();
+}
+
 Status Spatializer::getSupportedHeadTrackingModes(
         std::vector<SpatializerHeadTrackingMode>* modes) {
     std::lock_guard lock(mLock);
@@ -485,6 +489,10 @@ Status Spatializer::setDisplayOrientation(float physicalToLogicalAngle) {
     if (mPoseController != nullptr) {
         mPoseController->setDisplayOrientation(mDisplayOrientation);
     }
+    if (mEngine != nullptr) {
+        setEffectParameter_l(
+            SPATIALIZER_PARAM_DISPLAY_ORIENTATION, std::vector<float>{physicalToLogicalAngle});
+    }
     return Status::ok();
 }
 
@@ -514,6 +522,42 @@ Status Spatializer::registerHeadTrackingCallback(
         return binderStatusFromStatusT(INVALID_OPERATION);
     }
     mHeadTrackingCallback = callback;
+    return Status::ok();
+}
+
+Status Spatializer::setParameter(int key, const std::vector<unsigned char>& value) {
+    ALOGV("%s key %d", __func__, key);
+    std::lock_guard lock(mLock);
+    status_t status = INVALID_OPERATION;
+    if (mEngine != nullptr) {
+        status = setEffectParameter_l(key, value);
+    }
+    return binderStatusFromStatusT(status);
+}
+
+Status Spatializer::getParameter(int key, std::vector<unsigned char> *value) {
+    ALOGV("%s key %d value size %d", __func__, key,
+          (value != nullptr ? (int)value->size() : -1));
+    if (value == nullptr) {
+        binderStatusFromStatusT(BAD_VALUE);
+    }
+    std::lock_guard lock(mLock);
+    status_t status = INVALID_OPERATION;
+    if (mEngine != nullptr) {
+        ALOGV("%s key %d mEngine %p", __func__, key, mEngine.get());
+        status = getEffectParameter_l(key, value);
+    }
+    return binderStatusFromStatusT(status);
+}
+
+Status Spatializer::getOutput(int *output) {
+    ALOGV("%s", __func__);
+    if (output == nullptr) {
+        binderStatusFromStatusT(BAD_VALUE);
+    }
+    std::lock_guard lock(mLock);
+    *output = VALUE_OR_RETURN_BINDER_STATUS(legacy2aidl_audio_io_handle_t_int32_t(mOutput));
+    ALOGV("%s got output %d", __func__, *output);
     return Status::ok();
 }
 
