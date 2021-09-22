@@ -340,6 +340,7 @@ cc_library {
         "android.hardware.media.omx@1.0",
         "framework-permission-aidl-cpp",
         "libaudioclient_aidl_conversion",
+        "packagemanager_aidl-cpp",
     ],
 
     static_libs: [
@@ -371,6 +372,7 @@ cc_library {
         "libmedia",
         "android.hidl.allocator@1.0",
         "framework-permission-aidl-cpp",
+        "packagemanager_aidl-cpp",
     ],
 
     export_include_dirs: [
