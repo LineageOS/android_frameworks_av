@@ -630,12 +630,12 @@ const detail::AudioDevicePairs& getAudioDevicePairs() {
                 AudioDeviceType::IN_SUBMIX, AudioDeviceType::OUT_SUBMIX);
         append_AudioDeviceDescription(pairs,
                 AUDIO_DEVICE_IN_ANLG_DOCK_HEADSET, AUDIO_DEVICE_OUT_ANLG_DOCK_HEADSET,
-                AudioDeviceType::IN_HEADSET, AudioDeviceType::OUT_HEADSET,
-                AudioDeviceDescription::CONNECTION_ANALOG_DOCK());
+                AudioDeviceType::IN_DOCK, AudioDeviceType::OUT_DOCK,
+                AudioDeviceDescription::CONNECTION_ANALOG());
         append_AudioDeviceDescription(pairs,
                 AUDIO_DEVICE_IN_DGTL_DOCK_HEADSET, AUDIO_DEVICE_OUT_DGTL_DOCK_HEADSET,
-                AudioDeviceType::IN_HEADSET, AudioDeviceType::OUT_HEADSET,
-                AudioDeviceDescription::CONNECTION_DIGITAL_DOCK());
+                AudioDeviceType::IN_DOCK, AudioDeviceType::OUT_DOCK,
+                AudioDeviceDescription::CONNECTION_USB());
         append_AudioDeviceDescription(pairs,
                 AUDIO_DEVICE_IN_USB_ACCESSORY, AUDIO_DEVICE_OUT_USB_ACCESSORY,
                 AudioDeviceType::IN_ACCESSORY, AudioDeviceType::OUT_ACCESSORY,
