@@ -608,28 +608,35 @@ Status AudioPolicyService::getInputForAttr(const media::AudioAttributesInternal&
             adjAttributionSource)));
 
     // check calling permissions.
-    // Capturing from FM_TUNER source is controlled by captureTunerAudioInputAllowed() and
-    // captureAudioOutputAllowed() (deprecated) as this does not affect users privacy
-    // as does capturing from an actual microphone.
-    if (!(recordingAllowed(adjAttributionSource, attr.source)
-            || attr.source == AUDIO_SOURCE_FM_TUNER)) {
+    // Capturing from the following sources does not require permission RECORD_AUDIO
+    // as the captured audio does not come from a microphone:
+    // - FM_TUNER source is controlled by captureTunerAudioInputAllowed() or
+    // captureAudioOutputAllowed() (deprecated).
+    // - REMOTE_SUBMIX source is controlled by captureAudioOutputAllowed() if the input
+    // type is API_INPUT_MIX_EXT_POLICY_REROUTE and by AudioService if a media projection
+    // is used and input type is API_INPUT_MIX_PUBLIC_CAPTURE_PLAYBACK
+    // - ECHO_REFERENCE source is controlled by captureAudioOutputAllowed()
+    if (!(recordingAllowed(adjAttributionSource, inputSource)
+            || inputSource == AUDIO_SOURCE_FM_TUNER
+            || inputSource == AUDIO_SOURCE_REMOTE_SUBMIX
+            || inputSource == AUDIO_SOURCE_ECHO_REFERENCE)) {
         ALOGE("%s permission denied: recording not allowed for %s",
                 __func__, adjAttributionSource.toString().c_str());
         return binderStatusFromStatusT(PERMISSION_DENIED);
     }
 
     bool canCaptureOutput = captureAudioOutputAllowed(adjAttributionSource);
-    if ((inputSource == AUDIO_SOURCE_VOICE_UPLINK ||
-        inputSource == AUDIO_SOURCE_VOICE_DOWNLINK ||
-        inputSource == AUDIO_SOURCE_VOICE_CALL ||
-        inputSource == AUDIO_SOURCE_ECHO_REFERENCE)
-        && !canCaptureOutput) {
+    if ((inputSource == AUDIO_SOURCE_VOICE_UPLINK
+            || inputSource == AUDIO_SOURCE_VOICE_DOWNLINK
+            || inputSource == AUDIO_SOURCE_VOICE_CALL
+            || inputSource == AUDIO_SOURCE_ECHO_REFERENCE)
+            && !canCaptureOutput) {
         return binderStatusFromStatusT(PERMISSION_DENIED);
     }
 
     if (inputSource == AUDIO_SOURCE_FM_TUNER
-        && !captureTunerAudioInputAllowed(adjAttributionSource)
-        && !canCaptureOutput) {
+        && !canCaptureOutput
+        && !captureTunerAudioInputAllowed(adjAttributionSource)) {
         return binderStatusFromStatusT(PERMISSION_DENIED);
     }
 
@@ -757,8 +764,10 @@ Status AudioPolicyService::startInput(int32_t portIdAidl)
 
     // check calling permissions
     if (!(startRecording(client->attributionSource, String16(msg.str().c_str()),
-        client->attributes.source)
-            || client->attributes.source == AUDIO_SOURCE_FM_TUNER)) {
+                         client->attributes.source)
+            || client->attributes.source == AUDIO_SOURCE_FM_TUNER
+            || client->attributes.source == AUDIO_SOURCE_REMOTE_SUBMIX
+            || client->attributes.source == AUDIO_SOURCE_ECHO_REFERENCE)) {
         ALOGE("%s permission denied: recording not allowed for attribution source %s",
                 __func__, client->attributionSource.toString().c_str());
         return binderStatusFromStatusT(PERMISSION_DENIED);
