@@ -96,7 +96,10 @@ void CCodecBuffers::handleImageData(const sp<Codec2Buffer> &buffer) {
         if (img->mNumPlanes > 0 && img->mType != img->MEDIA_IMAGE_TYPE_UNKNOWN) {
             int32_t stride = img->mPlane[0].mRowInc;
             mFormatWithImageData->setInt32(KEY_STRIDE, stride);
-            ALOGD("[%s] updating stride = %d", mName, stride);
+            mFormatWithImageData->setInt32(KEY_WIDTH, img->mWidth);
+            mFormatWithImageData->setInt32(KEY_HEIGHT, img->mHeight);
+            ALOGD("[%s] updating stride = %d, width: %d, height: %d",
+                  mName, stride, img->mWidth, img->mHeight);
             if (img->mNumPlanes > 1 && stride > 0) {
                 int64_t offsetDelta =
                     (int64_t)img->mPlane[1].mOffset - (int64_t)img->mPlane[0].mOffset;
