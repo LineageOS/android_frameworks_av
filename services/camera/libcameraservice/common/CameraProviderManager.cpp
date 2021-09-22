@@ -359,7 +359,13 @@ status_t CameraProviderManager::notifyDeviceStateChange(
     for (auto& provider : mProviders) {
         ALOGV("%s: Notifying %s for new state 0x%" PRIx64,
                 __FUNCTION__, provider->mProviderName.c_str(), newState);
+        // b/199240726 Camera providers can for example try to add/remove
+        // camera devices as part of the state change notification. Holding
+        // 'mInterfaceMutex' while calling 'notifyDeviceStateChange' can
+        // result in a recursive deadlock.
+        mInterfaceMutex.unlock();
         status_t singleRes = provider->notifyDeviceStateChange(mDeviceState);
+        mInterfaceMutex.lock();
         if (singleRes != OK) {
             ALOGE("%s: Unable to notify provider %s about device state change",
                     __FUNCTION__,
@@ -1185,10 +1191,12 @@ status_t CameraProviderManager::getSystemCameraKindLocked(const std::string& id,
 }
 
 bool CameraProviderManager::isHiddenPhysicalCamera(const std::string& cameraId) const {
+    std::lock_guard<std::mutex> lock(mInterfaceMutex);
     return isHiddenPhysicalCameraInternal(cameraId).first;
 }
 
 status_t CameraProviderManager::filterSmallJpegSizes(const std::string& cameraId) {
+    std::lock_guard<std::mutex> lock(mInterfaceMutex);
     for (auto& provider : mProviders) {
         for (auto& deviceInfo : provider->mDevices) {
             if (deviceInfo->mId == cameraId) {
