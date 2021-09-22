@@ -2367,6 +2367,22 @@ status_t AudioSystem::getMmapPolicyInfo(
     return af->getMmapPolicyInfos(policyType, policyInfos);
 }
 
+int32_t AudioSystem::getAAudioMixerBurstCount() {
+    const sp<IAudioFlinger>& af = AudioSystem::get_audio_flinger();
+    if (af == nullptr) {
+        return PERMISSION_DENIED;
+    }
+    return af->getAAudioMixerBurstCount();
+}
+
+int32_t AudioSystem::getAAudioHardwareBurstMinUsec() {
+    const sp<IAudioFlinger>& af = AudioSystem::get_audio_flinger();
+    if (af == nullptr) {
+        return PERMISSION_DENIED;
+    }
+    return af->getAAudioHardwareBurstMinUsec();
+}
+
 // ---------------------------------------------------------------------------
 
 int AudioSystem::AudioPolicyServiceClient::addAudioPortCallback(

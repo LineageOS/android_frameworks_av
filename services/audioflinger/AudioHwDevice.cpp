@@ -110,5 +110,13 @@ status_t AudioHwDevice::getMmapPolicyInfos(
     return mHwDevice->getMmapPolicyInfos(policyType, policyInfos);
 }
 
+int32_t AudioHwDevice::getAAudioMixerBurstCount() const {
+    return mHwDevice->getAAudioMixerBurstCount();
+}
+
+int32_t AudioHwDevice::getAAudioHardwareBurstMinUsec() const {
+    return mHwDevice->getAAudioHardwareBurstMinUsec();
+}
+
 
 }; // namespace android

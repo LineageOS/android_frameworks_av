@@ -125,6 +125,8 @@ class DeviceHalInterface : public RefBase
     virtual status_t getMmapPolicyInfos(
             media::audio::common::AudioMMapPolicyType policyType,
             std::vector<media::audio::common::AudioMMapPolicyInfo> *policyInfos)  = 0;
+    virtual int32_t getAAudioMixerBurstCount() = 0;
+    virtual int32_t getAAudioHardwareBurstMinUsec() = 0;
 
     virtual status_t dump(int fd, const Vector<String16>& args) = 0;
 
