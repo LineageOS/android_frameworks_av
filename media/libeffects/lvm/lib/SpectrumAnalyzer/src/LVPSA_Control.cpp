@@ -421,7 +421,6 @@ LVPSA_RETURN LVPSA_BPSinglePrecCoefs(LVM_UINT16 Fs, LVPSA_FilterParam_t* pFilter
      * Intermediate variables and temporary values
      */
     LVM_FLOAT T0;
-    LVM_FLOAT D;
     LVM_FLOAT A0;
     LVM_FLOAT B1;
     LVM_FLOAT B2;
@@ -444,9 +443,6 @@ LVPSA_RETURN LVPSA_BPSinglePrecCoefs(LVM_UINT16 Fs, LVPSA_FilterParam_t* pFilter
      * Calculating the intermediate values
      */
     T0 = Frequency * LVPSA_Float_TwoPiOnFsTable[Fs]; /* T0 = 2 * Pi * Fc / Fs */
-    D = 3200;                                        /* Floating point value 1.000000 (1*100*2^5) */
-    /* Force D = 1 : the function was originally used for a peaking filter.
-       The D parameter do not exist for a BandPass filter coefficients */
 
     /*
      * Calculate the B2 coefficient
@@ -535,7 +531,6 @@ LVPSA_RETURN LVPSA_BPDoublePrecCoefs(LVM_UINT16 Fs, LVPSA_FilterParam_t* pFilter
      * Intermediate variables and temporary values
      */
     LVM_FLOAT T0;
-    LVM_FLOAT D;
     LVM_FLOAT A0;
     LVM_FLOAT B1;
     LVM_FLOAT B2;
@@ -558,9 +553,6 @@ LVPSA_RETURN LVPSA_BPDoublePrecCoefs(LVM_UINT16 Fs, LVPSA_FilterParam_t* pFilter
      * Calculating the intermediate values
      */
     T0 = Frequency * LVPSA_Float_TwoPiOnFsTable[Fs]; /* T0 = 2 * Pi * Fc / Fs */
-    D = 3200;                                        /* Floating point value 1.000000 (1*100*2^5) */
-    /* Force D = 1 : the function was originally used for a peaking filter.
-       The D parameter do not exist for a BandPass filter coefficients */
 
     /*
      * Calculate the B2 coefficient
