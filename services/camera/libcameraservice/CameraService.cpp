@@ -2201,7 +2201,6 @@ Status CameraService::notifyDeviceStateChange(int64_t newState) {
     newDeviceState |= vendorBits;
 
     ALOGV("%s: New device state 0x%" PRIx64, __FUNCTION__, newDeviceState);
-    Mutex::Autolock l(mServiceLock);
     mCameraProviderManager->notifyDeviceStateChange(newDeviceState);
 
     return Status::ok();
