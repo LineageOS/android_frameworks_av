@@ -16,8 +16,6 @@
 
 package android.media;
 
-import android.media.AudioMMapPolicyInfo;
-import android.media.AudioMMapPolicyType;
 import android.media.AudioPatch;
 import android.media.AudioPort;
 import android.media.AudioPortConfig;
@@ -42,6 +40,8 @@ import android.media.RenderPosition;
 import android.media.TrackSecondaryOutputInfo;
 import android.media.audio.common.AudioChannelLayout;
 import android.media.audio.common.AudioFormatDescription;
+import android.media.audio.common.AudioMMapPolicyInfo;
+import android.media.audio.common.AudioMMapPolicyType;
 import android.media.audio.common.AudioMode;
 import android.media.audio.common.AudioStreamType;
 import android.media.audio.common.AudioUuid;

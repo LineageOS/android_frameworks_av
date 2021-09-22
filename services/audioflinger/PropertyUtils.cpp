@@ -16,54 +16,57 @@
 
 #include <aaudio/AAudio.h>
 #include <aaudio/AAudioTesting.h>
-#include <android/media/AudioMMapPolicy.h>
+#include <android/media/audio/common/AudioMMapPolicy.h>
 #include <cutils/properties.h>
 
 #include "PropertyUtils.h"
 
 namespace android {
 
-std::string getMmapPolicyProperty(media::AudioMMapPolicyType policyType) {
+using media::audio::common::AudioMMapPolicy;
+using media::audio::common::AudioMMapPolicyType;
+using media::audio::common::AudioMMapPolicyInfo;
+
+std::string getMmapPolicyProperty(AudioMMapPolicyType policyType) {
     switch (policyType) {
-        case media::AudioMMapPolicyType::DEFAULT:
+        case AudioMMapPolicyType::DEFAULT:
             return "aaudio.mmap_policy";
-        case media::AudioMMapPolicyType::EXCLUSIVE:
+        case AudioMMapPolicyType::EXCLUSIVE:
             return "aaudio.mmap_exclusive_policy";
         default:
             return "";
     }
 }
 
-int getDefaultPolicyFromType(media::AudioMMapPolicyType policyType) {
+int getDefaultPolicyFromType(AudioMMapPolicyType policyType) {
     switch (policyType) {
-        case media::AudioMMapPolicyType::EXCLUSIVE:
+        case AudioMMapPolicyType::EXCLUSIVE:
             return AAUDIO_UNSPECIFIED;
-        case media::AudioMMapPolicyType::DEFAULT:
+        case AudioMMapPolicyType::DEFAULT:
         default:
             return AAUDIO_POLICY_NEVER;
     }
 }
 
-media::AudioMMapPolicy legacy2aidl_aaudio_policy_t_AudioMMapPolicy(aaudio_policy_t legacy) {
+AudioMMapPolicy legacy2aidl_aaudio_policy_t_AudioMMapPolicy(aaudio_policy_t legacy) {
     switch (legacy) {
         case AAUDIO_POLICY_NEVER:
-            return media::AudioMMapPolicy::NEVER;
+            return AudioMMapPolicy::NEVER;
         case AAUDIO_POLICY_AUTO:
-            return media::AudioMMapPolicy::AUTO;
+            return AudioMMapPolicy::AUTO;
         case AAUDIO_POLICY_ALWAYS:
-            return media::AudioMMapPolicy::ALWAYS;
+            return AudioMMapPolicy::ALWAYS;
         case AAUDIO_UNSPECIFIED:
-            return media::AudioMMapPolicy::UNSPECIFIED;
+            return AudioMMapPolicy::UNSPECIFIED;
         default:
             ALOGE("%s unknown aaudio policy: %d", __func__, legacy);
-            return media::AudioMMapPolicy::UNSPECIFIED;
+            return AudioMMapPolicy::UNSPECIFIED;
     }
 }
 
 status_t getMmapPolicyInfosFromSystemProperty(
-        media::AudioMMapPolicyType policyType,
-        std::vector<media::AudioMMapPolicyInfo> *policyInfos) {
-    media::AudioMMapPolicyInfo policyInfo;
+        AudioMMapPolicyType policyType, std::vector<AudioMMapPolicyInfo> *policyInfos) {
+    AudioMMapPolicyInfo policyInfo;
     const std::string propertyStr = getMmapPolicyProperty(policyType);
     if (propertyStr.empty()) {
         return BAD_VALUE;

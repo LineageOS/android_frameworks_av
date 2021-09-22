@@ -22,14 +22,14 @@
 #include <set>
 #include <vector>
 
-#include <android/media/AudioMMapPolicyInfo.h>
-#include <android/media/AudioMMapPolicyType.h>
+#include <android/content/AttributionSourceState.h>
 #include <android/media/AudioVibratorInfo.h>
 #include <android/media/BnAudioFlingerClient.h>
 #include <android/media/BnAudioPolicyServiceClient.h>
 #include <android/media/INativeSpatializerCallback.h>
 #include <android/media/ISpatializer.h>
-#include <android/content/AttributionSourceState.h>
+#include <android/media/audio/common/AudioMMapPolicyInfo.h>
+#include <android/media/audio/common/AudioMMapPolicyType.h>
 #include <media/AidlConversionUtil.h>
 #include <media/AudioContainers.h>
 #include <media/AudioDeviceTypeAddr.h>
@@ -617,8 +617,8 @@ public:
     static status_t setVibratorInfos(const std::vector<media::AudioVibratorInfo>& vibratorInfos);
 
     static status_t getMmapPolicyInfo(
-            media::AudioMMapPolicyType policyType,
-            std::vector<media::AudioMMapPolicyInfo> *policyInfos);
+            media::audio::common::AudioMMapPolicyType policyType,
+            std::vector<media::audio::common::AudioMMapPolicyInfo> *policyInfos);
 
 private:
 

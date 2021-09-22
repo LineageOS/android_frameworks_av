@@ -100,6 +100,7 @@ class Spatializer : public media::BnSpatializer,
     binder::Status getSupportedLevels(std::vector<media::SpatializationLevel>* levels) override;
     binder::Status setLevel(media::SpatializationLevel level) override;
     binder::Status getLevel(media::SpatializationLevel *level) override;
+    binder::Status isHeadTrackingSupported(bool *supports);
     binder::Status getSupportedHeadTrackingModes(
             std::vector<media::SpatializerHeadTrackingMode>* modes) override;
     binder::Status setDesiredHeadTrackingMode(
@@ -115,6 +116,9 @@ class Spatializer : public media::BnSpatializer,
     binder::Status getSupportedModes(std::vector<media::SpatializationMode>* modes) override;
     binder::Status registerHeadTrackingCallback(
         const sp<media::ISpatializerHeadTrackingCallback>& callback) override;
+    binder::Status setParameter(int key, const std::vector<unsigned char>& value) override;
+    binder::Status getParameter(int key, std::vector<unsigned char> *value) override;
+    binder::Status getOutput(int *output);
 
     /** IBinder::DeathRecipient. Listen to the death of the INativeSpatializerCallback. */
     virtual void binderDied(const wp<IBinder>& who);
@@ -209,6 +213,7 @@ private:
         if (numParams > kMaxEffectParamValues) {
             return BAD_VALUE;
         }
+        (*values).clear();
         std::copy(&params[0], &params[numParams], back_inserter(*values));
         return NO_ERROR;
     }
@@ -229,7 +234,46 @@ private:
         *(uint32_t *)p->data = type;
         memcpy((uint32_t *)p->data + 1, values.data(), sizeof(T) * values.size());
 
-        return mEngine->setParameter(p);
+        status_t status = mEngine->setParameter(p);
+        if (status != NO_ERROR) {
+            return status;
+        }
+        if (p->status != NO_ERROR) {
+            return p->status;
+        }
+        return NO_ERROR;
+    }
+
+    /**
+     * Get a parameter from spatializer engine by calling getParameter on AudioEffect object.
+     * It is possible to read more than one value of type T according to the parameter type
+     * by specifying values vector size.
+     */
+    template<typename T>
+    status_t getEffectParameter_l(uint32_t type, std::vector<T> *values) REQUIRES(mLock) {
+        static_assert(sizeof(T) <= sizeof(uint32_t), "The size of T must less than 32 bits");
+
+        uint32_t cmd[sizeof(effect_param_t) / sizeof(uint32_t) + 1 + values->size()];
+        effect_param_t *p = (effect_param_t *)cmd;
+        p->psize = sizeof(uint32_t);
+        p->vsize = sizeof(T) * values->size();
+        *(uint32_t *)p->data = type;
+
+        status_t status = mEngine->getParameter(p);
+
+        if (status != NO_ERROR) {
+            return status;
+        }
+        if (p->status != NO_ERROR) {
+            return p->status;
+        }
+
+        int numValues = std::min(p->vsize / sizeof(T), values->size());
+        (*values).clear();
+        T *retValues = (T *)((uint8_t *)p->data + sizeof(uint32_t));
+        std::copy(&retValues[0], &retValues[numValues], back_inserter(*values));
+
+        return NO_ERROR;
     }
 
     void postFramesProcessedMsg(int frames);

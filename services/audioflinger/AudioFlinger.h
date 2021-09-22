@@ -283,8 +283,8 @@ public:
             const TrackSecondaryOutputsMap& trackSecondaryOutputs);
 
     virtual status_t getMmapPolicyInfos(
-            media::AudioMMapPolicyType policyType,
-            std::vector<media::AudioMMapPolicyInfo> *policyInfos);
+            media::audio::common::AudioMMapPolicyType policyType,
+            std::vector<media::audio::common::AudioMMapPolicyInfo> *policyInfos);
 
     status_t onTransactWrapper(TransactionCode code, const Parcel& data, uint32_t flags,
         const std::function<status_t()>& delegate) override;
@@ -1009,7 +1009,8 @@ private:
     // Keep in sync with java definition in media/java/android/media/AudioRecord.java
     static constexpr int32_t kMaxSharedAudioHistoryMs = 5000;
 
-    std::map<media::AudioMMapPolicyType, std::vector<media::AudioMMapPolicyInfo>> mPolicyInfos;
+    std::map<media::audio::common::AudioMMapPolicyType,
+             std::vector<media::audio::common::AudioMMapPolicyInfo>> mPolicyInfos;
 };
 
 #undef INCLUDING_FROM_AUDIOFLINGER_H

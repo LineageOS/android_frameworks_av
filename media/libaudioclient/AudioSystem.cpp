@@ -59,6 +59,8 @@ using media::audio::common::AudioDevice;
 using media::audio::common::AudioDeviceAddress;
 using media::audio::common::AudioDeviceDescription;
 using media::audio::common::AudioFormatDescription;
+using media::audio::common::AudioMMapPolicyInfo;
+using media::audio::common::AudioMMapPolicyType;
 using media::audio::common::AudioOffloadInfo;
 using media::audio::common::AudioSource;
 using media::audio::common::AudioStreamType;
@@ -2357,8 +2359,7 @@ status_t AudioSystem::setVibratorInfos(
 }
 
 status_t AudioSystem::getMmapPolicyInfo(
-        media::AudioMMapPolicyType policyType,
-        std::vector<media::AudioMMapPolicyInfo> *policyInfos) {
+        AudioMMapPolicyType policyType, std::vector<AudioMMapPolicyInfo> *policyInfos) {
     const sp<IAudioFlinger>& af = AudioSystem::get_audio_flinger();
     if (af == nullptr) {
         return PERMISSION_DENIED;

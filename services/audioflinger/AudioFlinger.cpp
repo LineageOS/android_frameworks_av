@@ -105,6 +105,8 @@
 namespace android {
 
 using media::IEffectClient;
+using media::audio::common::AudioMMapPolicyInfo;
+using media::audio::common::AudioMMapPolicyType;
 using android::content::AttributionSourceState;
 
 static const char kDeadlockedString[] = "AudioFlinger may be deadlocked\n";
@@ -340,8 +342,7 @@ status_t AudioFlinger::updateSecondaryOutputs(
 #define MAX_MMAP_PROPERTY_DEVICE_HAL_VERSION 7.0
 
 status_t AudioFlinger::getMmapPolicyInfos(
-            media::AudioMMapPolicyType policyType,
-            std::vector<media::AudioMMapPolicyInfo> *policyInfos) {
+            AudioMMapPolicyType policyType, std::vector<AudioMMapPolicyInfo> *policyInfos) {
     if (const auto it = mPolicyInfos.find(policyType); it != mPolicyInfos.end()) {
         *policyInfos = it->second;
         return NO_ERROR;
@@ -350,7 +351,7 @@ status_t AudioFlinger::getMmapPolicyInfos(
         AutoMutex lock(mHardwareLock);
         for (size_t i = 0; i < mAudioHwDevs.size(); ++i) {
             AudioHwDevice *dev = mAudioHwDevs.valueAt(i);
-            std::vector<media::AudioMMapPolicyInfo> infos;
+            std::vector<AudioMMapPolicyInfo> infos;
             status_t status = dev->getMmapPolicyInfos(policyType, &infos);
             if (status != NO_ERROR) {
                 ALOGE("Failed to query mmap policy info of %d, error %d",
