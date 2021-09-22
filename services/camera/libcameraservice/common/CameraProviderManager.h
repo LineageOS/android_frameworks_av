@@ -284,12 +284,6 @@ public:
             sp<hardware::camera::device::V3_2::ICameraDeviceSession> *session);
 
     /**
-     * Save the ICameraProvider while it is being used by a camera or torch client
-     */
-    void saveRef(DeviceMode usageType, const std::string &cameraId,
-            sp<hardware::camera::provider::V2_4::ICameraProvider> provider);
-
-    /**
      * Notify that the camera or torch is no longer being used by a camera client
      */
     void removeRef(DeviceMode usageType, const std::string &cameraId);
@@ -434,6 +428,10 @@ private:
 
         /**
          * Notify provider about top-level device physical state changes
+         *
+         * Note that 'mInterfaceMutex' should not be held when calling this method.
+         * It is possible for camera providers to add/remove devices and try to
+         * acquire it.
          */
         status_t notifyDeviceStateChange(
                 hardware::hidl_bitfield<hardware::camera::provider::V2_5::DeviceState>
@@ -661,6 +659,12 @@ private:
         status_t getConcurrentCameraIdsInternalLocked(
                 sp<hardware::camera::provider::V2_6::ICameraProvider> &interface2_6);
     };
+
+    /**
+     * Save the ICameraProvider while it is being used by a camera or torch client
+     */
+    void saveRef(DeviceMode usageType, const std::string &cameraId,
+            sp<hardware::camera::provider::V2_4::ICameraProvider> provider);
 
     // Utility to find a DeviceInfo by ID; pointer is only valid while mInterfaceMutex is held
     // and the calling code doesn't mutate the list of providers or their lists of devices.
