@@ -36,7 +36,7 @@ static std::pair<std::vector<int>, std::vector<float>> correlation(const int16_t
                                                                    const int16_t* sigY, int len,
                                                                    int16_t enableCrossCorr) {
     float maxCorrVal = 0.f, prevCorrVal = 0.f;
-    int delay = 0, peakIndex = 0, flag = 0;
+    int peakIndex = 0, flag = 0;
     int loopLim = (1 == enableCrossCorr) ? len : kMinLoopLimitValue;
     std::vector<int> peakIndexVect(kNumPeaks, 0);
     std::vector<float> peakValueVect(kNumPeaks, 0.f);
@@ -47,7 +47,6 @@ static std::pair<std::vector<int>, std::vector<float>> correlation(const int16_t
         }
         corrVal /= len - i;
         if (corrVal > maxCorrVal) {
-            delay = i;
             maxCorrVal = corrVal;
         }
         // Correlation peaks are expected to be observed at equal intervals. The interval length is
