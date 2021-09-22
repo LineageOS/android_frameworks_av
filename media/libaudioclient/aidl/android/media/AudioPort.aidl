@@ -16,13 +16,14 @@
 
 package android.media;
 
-import android.media.AudioGain;
+import android.media.AudioGainSys;
 import android.media.AudioPortConfig;
 import android.media.AudioPortExt;
 import android.media.AudioPortRole;
 import android.media.AudioPortType;
 import android.media.AudioProfileSys;
 import android.media.ExtraAudioDescriptor;
+import android.media.audio.common.AudioGain;
 import android.media.audio.common.AudioProfile;
 
 /**
@@ -47,6 +48,8 @@ parcelable AudioPort {
     ExtraAudioDescriptor[] extraAudioDescriptors;
     /** Gain controllers. */
     AudioGain[] gains;
+    /** System-only parameters for each AudioGain. */
+    AudioGainSys[] gainsSys;
     /** Current audio port configuration. */
     AudioPortConfig activeConfig;
     AudioPortExt ext;

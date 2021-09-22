@@ -94,14 +94,21 @@ TEST(AudioFoundationParcelableTest, ParcelingAudioProfileVector) {
 }
 
 TEST(AudioFoundationParcelableTest, ParcelingAudioGain) {
-    Parcel data;
-    AudioGains audioGains = getAudioGainsForTest();
+    sp<AudioGain> audioGain = getAudioGainsForTest()[0];
+    auto conv = legacy2aidl_AudioGain(audioGain);
+    ASSERT_TRUE(conv.ok());
+    auto convBack = aidl2legacy_AudioGain(conv.value());
+    ASSERT_TRUE(convBack.ok());
+    ASSERT_TRUE(audioGain->equals(convBack.value()));
+}
 
-    ASSERT_EQ(data.writeParcelable(audioGains), NO_ERROR);
-    data.setDataPosition(0);
-    AudioGains audioGainsFromParcel;
-    ASSERT_EQ(data.readParcelable(&audioGainsFromParcel), NO_ERROR);
-    ASSERT_TRUE(audioGainsFromParcel.equals(audioGains));
+TEST(AudioFoundationParcelableTest, ParcelingAudioGains) {
+    AudioGains audioGains = getAudioGainsForTest();
+    auto conv = legacy2aidl_AudioGains(audioGains);
+    ASSERT_TRUE(conv.ok());
+    auto convBack = aidl2legacy_AudioGains(conv.value());
+    ASSERT_TRUE(convBack.ok());
+    ASSERT_TRUE(audioGains.equals(convBack.value()));
 }
 
 TEST(AudioFoundationParcelableTest, ParcelingAudioPort) {

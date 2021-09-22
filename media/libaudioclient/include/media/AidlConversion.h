@@ -25,8 +25,6 @@
 #include <android/media/AudioClient.h>
 #include <android/media/AudioDualMonoMode.h>
 #include <android/media/AudioFlag.h>
-#include <android/media/AudioGain.h>
-#include <android/media/AudioGainMode.h>
 #include <android/media/AudioInputFlags.h>
 #include <android/media/AudioIoConfigEvent.h>
 #include <android/media/AudioIoDescriptor.h>
@@ -53,6 +51,9 @@
 #include <android/media/audio/common/AudioEncapsulationMode.h>
 #include <android/media/audio/common/AudioEncapsulationType.h>
 #include <android/media/audio/common/AudioFormatDescription.h>
+#include <android/media/audio/common/AudioGain.h>
+#include <android/media/audio/common/AudioGainConfig.h>
+#include <android/media/audio/common/AudioGainMode.h>
 #include <android/media/audio/common/AudioMode.h>
 #include <android/media/audio/common/AudioOffloadInfo.h>
 #include <android/media/audio/common/AudioProfile.h>
@@ -168,16 +169,18 @@ ConversionResult<media::audio::common::AudioFormatDescription>
 legacy2aidl_audio_format_t_AudioFormatDescription(audio_format_t legacy);
 
 ConversionResult<audio_gain_mode_t>
-aidl2legacy_AudioGainMode_audio_gain_mode_t(media::AudioGainMode aidl);
-ConversionResult<media::AudioGainMode>
+aidl2legacy_AudioGainMode_audio_gain_mode_t(media::audio::common::AudioGainMode aidl);
+ConversionResult<media::audio::common::AudioGainMode>
 legacy2aidl_audio_gain_mode_t_AudioGainMode(audio_gain_mode_t legacy);
 
 ConversionResult<audio_gain_mode_t> aidl2legacy_int32_t_audio_gain_mode_t_mask(int32_t aidl);
 ConversionResult<int32_t> legacy2aidl_audio_gain_mode_t_int32_t_mask(audio_gain_mode_t legacy);
 
 ConversionResult<audio_gain_config> aidl2legacy_AudioGainConfig_audio_gain_config(
-        const media::AudioGainConfig& aidl, media::AudioPortRole role, media::AudioPortType type);
-ConversionResult<media::AudioGainConfig> legacy2aidl_audio_gain_config_AudioGainConfig(
+        const media::audio::common::AudioGainConfig& aidl,
+        media::AudioPortRole role, media::AudioPortType type);
+ConversionResult<media::audio::common::AudioGainConfig>
+legacy2aidl_audio_gain_config_AudioGainConfig(
         const audio_gain_config& legacy, audio_port_role_t role, audio_port_type_t type);
 
 ConversionResult<audio_input_flags_t> aidl2legacy_AudioInputFlags_audio_input_flags_t(
@@ -378,9 +381,8 @@ ConversionResult<media::audio::common::AudioProfile>
 legacy2aidl_audio_profile_AudioProfile(const audio_profile& legacy, bool isInput);
 
 ConversionResult<audio_gain>
-aidl2legacy_AudioGain_audio_gain(const media::AudioGain& aidl);
-// The AIDL structure provides a flag for direction indication while the legacy type doesn't.
-ConversionResult<media::AudioGain>
+aidl2legacy_AudioGain_audio_gain(const media::audio::common::AudioGain& aidl, bool isInput);
+ConversionResult<media::audio::common::AudioGain>
 legacy2aidl_audio_gain_AudioGain(const audio_gain& legacy, bool isInput);
 
 ConversionResult<audio_port_v7>
