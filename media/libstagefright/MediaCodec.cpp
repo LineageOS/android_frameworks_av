@@ -2824,6 +2824,20 @@ void MediaCodec::onMessageReceived(const sp<AMessage> &msg) {
 
                 case kWhatDrainThisBuffer:
                 {
+                    if ((mFlags & kFlagUseBlockModel) == 0 && mTunneled) {
+                        sp<RefBase> obj;
+                        CHECK(msg->findObject("buffer", &obj));
+                        sp<MediaCodecBuffer> buffer = static_cast<MediaCodecBuffer *>(obj.get());
+                        if (mFlags & kFlagIsAsync) {
+                            // In asynchronous mode, output format change is processed immediately.
+                            handleOutputFormatChangeIfNeeded(buffer);
+                        } else {
+                            postActivityNotificationIfPossible();
+                        }
+                        mBufferChannel->discardBuffer(buffer);
+                        break;
+                    }
+
                     /* size_t index = */updateBuffers(kPortIndexOutput, msg);
 
                     if (mState == FLUSHING
