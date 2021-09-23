@@ -128,6 +128,8 @@ aaudio_result_t AudioStreamInternal::open(const AudioStreamBuilder &builder) {
 
     request.getConfiguration().setUsage(getUsage());
     request.getConfiguration().setContentType(getContentType());
+    request.getConfiguration().setSpatializationBehavior(getSpatializationBehavior());
+    request.getConfiguration().setIsContentSpatialized(isContentSpatialized());
     request.getConfiguration().setInputPreset(getInputPreset());
     request.getConfiguration().setPrivacySensitive(isPrivacySensitive());
 
@@ -187,6 +189,8 @@ aaudio_result_t AudioStreamInternal::open(const AudioStreamBuilder &builder) {
 
     setUsage(configurationOutput.getUsage());
     setContentType(configurationOutput.getContentType());
+    setSpatializationBehavior(configurationOutput.getSpatializationBehavior());
+    setIsContentSpatialized(configurationOutput.isContentSpatialized());
     setInputPreset(configurationOutput.getInputPreset());
 
     // Save device format so we can do format conversion and volume scaling together.

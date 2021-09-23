@@ -444,6 +444,22 @@ enum {
 };
 typedef int32_t aaudio_content_type_t;
 
+enum {
+
+    /**
+     * Constant indicating the audio content associated with these attributes will follow the
+     * default platform behavior with regards to which content will be spatialized or not.
+     */
+    AAUDIO_SPATIALIZATION_BEHAVIOR_AUTO = 1,
+
+    /**
+     * Constant indicating the audio content associated with these attributes should never
+     * be spatialized.
+     */
+    AAUDIO_SPATIALIZATION_BEHAVIOR_NEVER = 2,
+};
+typedef int32_t aaudio_spatialization_behavior_t;
+
 /**
  * Defines the audio source.
  * An audio source defines both a default physical source of audio signal, and a recording
@@ -983,6 +999,37 @@ AAUDIO_API void AAudioStreamBuilder_setUsage(AAudioStreamBuilder* builder,
  */
 AAUDIO_API void AAudioStreamBuilder_setContentType(AAudioStreamBuilder* builder,
         aaudio_content_type_t contentType) __INTRODUCED_IN(28);
+
+/**
+ * Sets the behavior affecting whether spatialization will be used.
+ *
+ * The AAudio system will use this information to select whether the stream will go
+ * through a spatializer effect or not when the effect is supported and enabled.
+ *
+ * Available since API level 32.
+ *
+ * @param builder reference provided by AAudio_createStreamBuilder()
+ * @param spatializationBehavior the desired behavior with regards to spatialization, eg.
+ *     {@link #AAUDIO_SPATIALIZATION_BEHAVIOR_AUTO}
+ */
+AAUDIO_API void AAudioStreamBuilder_setSpatializationBehavior(AAudioStreamBuilder* builder,
+        aaudio_spatialization_behavior_t spatializationBehavior) __INTRODUCED_IN(32);
+
+/**
+ * Specifies whether the audio data of this output stream has already been processed for
+ * spatialization.
+ *
+ * If the stream has been processed for spatialization, setting this to true will prevent
+ * issues such as double-processing on platforms that will spatialize audio data.
+ *
+ * Available since API level 32.
+ *
+ * @param builder reference provided by AAudio_createStreamBuilder()
+ * @param isSpatialized true if the content is already processed for binaural or transaural spatial
+ *     rendering, false otherwise.
+ */
+AAUDIO_API void AAudioStreamBuilder_setIsContentSpatialized(AAudioStreamBuilder* builder,
+        bool isSpatialized) __INTRODUCED_IN(32);
 
 /**
  * Set the input (capture) preset for the stream.
@@ -1789,6 +1836,31 @@ AAUDIO_API aaudio_usage_t AAudioStream_getUsage(AAudioStream* stream) __INTRODUC
  */
 AAUDIO_API aaudio_content_type_t AAudioStream_getContentType(AAudioStream* stream)
         __INTRODUCED_IN(28);
+
+/**
+ * Return the spatialization behavior for the stream.
+ *
+ * If none was explicitly set, it will return the default
+ * {@link #AAUDIO_SPATIALIZATION_BEHAVIOR_AUTO} behavior.
+ *
+ * Available since API level 32.
+ *
+ * @param stream reference provided by AAudioStreamBuilder_openStream()
+ * @return spatialization behavior, for example {@link #AAUDIO_SPATIALIZATION_BEHAVIOR_AUTO}
+ */
+AAUDIO_API aaudio_spatialization_behavior_t AAudioStream_getSpatializationBehavior(
+        AAudioStream* stream) __INTRODUCED_IN(32);
+
+/**
+ * Return whether the content of the stream is spatialized.
+ *
+ * Available since API level 32.
+ *
+ * @param stream reference provided by AAudioStreamBuilder_openStream()
+ * @return true if the content is spatialized
+ */
+AAUDIO_API bool AAudioStream_isContentSpatialized(AAudioStream* stream) __INTRODUCED_IN(32);
+
 
 /**
  * Return the input preset for the stream.
