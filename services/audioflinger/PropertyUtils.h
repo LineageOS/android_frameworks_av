@@ -25,4 +25,8 @@ status_t getMmapPolicyInfosFromSystemProperty(
         media::audio::common::AudioMMapPolicyType policyType,
         std::vector<media::audio::common::AudioMMapPolicyInfo> *policyInfos);
 
+int32_t getAAudioMixerBurstCountFromSystemProperty();
+
+int32_t getAAudioHardwareBurstMinUsecFromSystemProperty();
+
 } // namespace android

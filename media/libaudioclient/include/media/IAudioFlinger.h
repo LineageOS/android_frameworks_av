@@ -354,6 +354,10 @@ public:
     virtual status_t getMmapPolicyInfos(
             media::audio::common::AudioMMapPolicyType policyType,
             std::vector<media::audio::common::AudioMMapPolicyInfo> *policyInfos) = 0;
+
+    virtual int32_t getAAudioMixerBurstCount() = 0;
+
+    virtual int32_t getAAudioHardwareBurstMinUsec() = 0;
 };
 
 /**
@@ -455,6 +459,10 @@ public:
             media::audio::common::AudioMMapPolicyType policyType,
             std::vector<media::audio::common::AudioMMapPolicyInfo> *policyInfos) override;
 
+    int32_t getAAudioMixerBurstCount() override;
+
+    int32_t getAAudioHardwareBurstMinUsec() override;
+
 private:
     const sp<media::IAudioFlingerService> mDelegate;
 };
@@ -540,6 +548,8 @@ public:
             SET_VIBRATOR_INFOS = media::BnAudioFlingerService::TRANSACTION_setVibratorInfos,
             UPDATE_SECONDARY_OUTPUTS = media::BnAudioFlingerService::TRANSACTION_updateSecondaryOutputs,
             GET_MMAP_POLICY_INFOS = media::BnAudioFlingerService::TRANSACTION_getMmapPolicyInfos,
+            GET_AAUDIO_MIXER_BURST_COUNT = media::BnAudioFlingerService::TRANSACTION_getAAudioMixerBurstCount,
+            GET_AAUDIO_HARDWARE_BURST_MIN_USEC = media::BnAudioFlingerService::TRANSACTION_getAAudioHardwareBurstMinUsec,
         };
 
         /**
@@ -657,6 +667,8 @@ public:
     Status getMmapPolicyInfos(
             media::audio::common::AudioMMapPolicyType policyType,
             std::vector<media::audio::common::AudioMMapPolicyInfo> *_aidl_return) override;
+    Status getAAudioMixerBurstCount(int32_t* _aidl_return) override;
+    Status getAAudioHardwareBurstMinUsec(int32_t* _aidl_return) override;
 
 private:
     const sp<AudioFlingerServerAdapter::Delegate> mDelegate;

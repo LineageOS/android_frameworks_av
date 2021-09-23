@@ -221,4 +221,8 @@ interface IAudioFlingerService {
             in TrackSecondaryOutputInfo[] trackSecondaryOutputInfos);
 
     AudioMMapPolicyInfo[] getMmapPolicyInfos(AudioMMapPolicyType policyType);
+
+    int getAAudioMixerBurstCount();
+
+    int getAAudioHardwareBurstMinUsec();
 }

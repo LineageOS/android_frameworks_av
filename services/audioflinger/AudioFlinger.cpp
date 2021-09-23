@@ -104,6 +104,8 @@
 
 namespace android {
 
+#define MAX_AAUDIO_PROPERTY_DEVICE_HAL_VERSION 7.0
+
 using media::IEffectClient;
 using media::audio::common::AudioMMapPolicyInfo;
 using media::audio::common::AudioMMapPolicyType;
@@ -304,6 +306,11 @@ void AudioFlinger::onFirstRef()
 
     mDevicesFactoryHalCallback = new DevicesFactoryHalCallbackImpl;
     mDevicesFactoryHal->setCallbackOnce(mDevicesFactoryHalCallback);
+
+    if (mDevicesFactoryHal->getHalVersion() <= MAX_AAUDIO_PROPERTY_DEVICE_HAL_VERSION) {
+        mAAudioBurstsPerBuffer = getAAudioMixerBurstCountFromSystemProperty();
+        mAAudioHwBurstMinMicros = getAAudioHardwareBurstMinUsecFromSystemProperty();
+    }
 }
 
 status_t AudioFlinger::setAudioHalPids(const std::vector<pid_t>& pids) {
@@ -339,15 +346,14 @@ status_t AudioFlinger::updateSecondaryOutputs(
     return NO_ERROR;
 }
 
-#define MAX_MMAP_PROPERTY_DEVICE_HAL_VERSION 7.0
-
 status_t AudioFlinger::getMmapPolicyInfos(
             AudioMMapPolicyType policyType, std::vector<AudioMMapPolicyInfo> *policyInfos) {
+    Mutex::Autolock _l(mLock);
     if (const auto it = mPolicyInfos.find(policyType); it != mPolicyInfos.end()) {
         *policyInfos = it->second;
         return NO_ERROR;
     }
-    if (mDevicesFactoryHal->getHalVersion() > MAX_MMAP_PROPERTY_DEVICE_HAL_VERSION) {
+    if (mDevicesFactoryHal->getHalVersion() > MAX_AAUDIO_PROPERTY_DEVICE_HAL_VERSION) {
         AutoMutex lock(mHardwareLock);
         for (size_t i = 0; i < mAudioHwDevs.size(); ++i) {
             AudioHwDevice *dev = mAudioHwDevs.valueAt(i);
@@ -366,6 +372,16 @@ status_t AudioFlinger::getMmapPolicyInfos(
         mPolicyInfos[policyType] = *policyInfos;
     }
     return NO_ERROR;
+}
+
+int32_t AudioFlinger::getAAudioMixerBurstCount() {
+    Mutex::Autolock _l(mLock);
+    return mAAudioBurstsPerBuffer;
+}
+
+int32_t AudioFlinger::getAAudioHardwareBurstMinUsec() {
+    Mutex::Autolock _l(mLock);
+    return mAAudioHwBurstMinMicros;
 }
 
 // getDefaultVibratorInfo_l must be called with AudioFlinger lock held.
@@ -2320,6 +2336,17 @@ audio_module_handle_t AudioFlinger::loadHwModule_l(const char *name)
         mHardwareStatus = AUDIO_HW_SET_MODE;
         mPrimaryHardwareDev->hwDevice()->setMode(mMode);
         mHardwareStatus = AUDIO_HW_IDLE;
+    }
+
+    if (mDevicesFactoryHal->getHalVersion() > MAX_AAUDIO_PROPERTY_DEVICE_HAL_VERSION) {
+        if (int32_t mixerBursts = dev->getAAudioMixerBurstCount();
+            mixerBursts > mAAudioBurstsPerBuffer) {
+            mAAudioBurstsPerBuffer = mixerBursts;
+        }
+        if (int32_t hwBurstMinMicros = dev->getAAudioHardwareBurstMinUsec();
+            hwBurstMinMicros < mAAudioHwBurstMinMicros || mAAudioHwBurstMinMicros == 0) {
+            mAAudioHwBurstMinMicros = hwBurstMinMicros;
+        }
     }
 
     mAudioHwDevs.add(handle, audioDevice);

@@ -286,6 +286,10 @@ public:
             media::audio::common::AudioMMapPolicyType policyType,
             std::vector<media::audio::common::AudioMMapPolicyInfo> *policyInfos);
 
+    virtual int32_t getAAudioMixerBurstCount();
+
+    virtual int32_t getAAudioHardwareBurstMinUsec();
+
     status_t onTransactWrapper(TransactionCode code, const Parcel& data, uint32_t flags,
         const std::function<status_t()>& delegate) override;
 
@@ -1011,6 +1015,8 @@ private:
 
     std::map<media::audio::common::AudioMMapPolicyType,
              std::vector<media::audio::common::AudioMMapPolicyInfo>> mPolicyInfos;
+    int32_t mAAudioBurstsPerBuffer = 0;
+    int32_t mAAudioHwBurstMinMicros = 0;
 };
 
 #undef INCLUDING_FROM_AUDIOFLINGER_H

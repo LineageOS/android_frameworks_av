@@ -91,6 +91,10 @@ public:
             media::audio::common::AudioMMapPolicyType policyType,
             std::vector<media::audio::common::AudioMMapPolicyInfo> *policyInfos) const;
 
+    int32_t getAAudioMixerBurstCount() const;
+
+    int32_t getAAudioHardwareBurstMinUsec() const;
+
 private:
     const audio_module_handle_t mHandle;
     const char * const          mModuleName;
