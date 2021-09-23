@@ -325,7 +325,6 @@ aidl_interface {
         "aidl/android/media/AudioPlaybackRate.aidl",
         "aidl/android/media/AudioPort.aidl",
         "aidl/android/media/AudioPortConfig.aidl",
-        "aidl/android/media/AudioPortConfigType.aidl",
         "aidl/android/media/AudioPortConfigDeviceExt.aidl",
         "aidl/android/media/AudioPortConfigExt.aidl",
         "aidl/android/media/AudioPortConfigMixExt.aidl",
@@ -344,6 +343,7 @@ aidl_interface {
         "aidl/android/media/AudioVibratorInfo.aidl",
         "aidl/android/media/EffectDescriptor.aidl",
         "aidl/android/media/ExtraAudioDescriptor.aidl",
+        "aidl/android/media/Int.aidl",
         "aidl/android/media/TrackSecondaryOutputInfo.aidl",
     ],
     imports: [
@@ -466,7 +466,6 @@ aidl_interface {
         "aidl/android/media/GetInputForAttrResponse.aidl",
         "aidl/android/media/GetOutputForAttrResponse.aidl",
         "aidl/android/media/GetSpatializerResponse.aidl",
-        "aidl/android/media/Int.aidl",
         "aidl/android/media/RecordClientInfo.aidl",
         "aidl/android/media/IAudioPolicyService.aidl",
         "aidl/android/media/IAudioPolicyServiceClient.aidl",

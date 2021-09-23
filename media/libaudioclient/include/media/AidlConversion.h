@@ -32,7 +32,6 @@
 #include <android/media/AudioOutputFlags.h>
 #include <android/media/AudioPlaybackRate.h>
 #include <android/media/AudioPort.h>
-#include <android/media/AudioPortConfigType.h>
 #include <android/media/AudioPortDeviceExt.h>
 #include <android/media/AudioPortExt.h>
 #include <android/media/AudioPortMixExt.h>
@@ -94,13 +93,6 @@ ConversionResult<int32_t> legacy2aidl_audio_unique_id_t_int32_t(audio_unique_id_
 
 ConversionResult<audio_hw_sync_t> aidl2legacy_int32_t_audio_hw_sync_t(int32_t aidl);
 ConversionResult<int32_t> legacy2aidl_audio_hw_sync_t_int32_t(audio_hw_sync_t legacy);
-
-// The legacy enum is unnamed. Thus, we use int32_t.
-ConversionResult<int32_t> aidl2legacy_AudioPortConfigType_int32_t(
-        media::AudioPortConfigType aidl);
-// The legacy enum is unnamed. Thus, we use int32_t.
-ConversionResult<media::AudioPortConfigType> legacy2aidl_int32_t_AudioPortConfigType(
-        int32_t legacy);
 
 ConversionResult<unsigned int> aidl2legacy_int32_t_config_mask(int32_t aidl);
 ConversionResult<int32_t> legacy2aidl_config_mask_int32_t(unsigned int legacy);
@@ -177,11 +169,9 @@ ConversionResult<audio_gain_mode_t> aidl2legacy_int32_t_audio_gain_mode_t_mask(i
 ConversionResult<int32_t> legacy2aidl_audio_gain_mode_t_int32_t_mask(audio_gain_mode_t legacy);
 
 ConversionResult<audio_gain_config> aidl2legacy_AudioGainConfig_audio_gain_config(
-        const media::audio::common::AudioGainConfig& aidl,
-        media::AudioPortRole role, media::AudioPortType type);
+        const media::audio::common::AudioGainConfig& aidl, bool isInput);
 ConversionResult<media::audio::common::AudioGainConfig>
-legacy2aidl_audio_gain_config_AudioGainConfig(
-        const audio_gain_config& legacy, audio_port_role_t role, audio_port_type_t type);
+legacy2aidl_audio_gain_config_AudioGainConfig(const audio_gain_config& legacy, bool isInput);
 
 ConversionResult<audio_input_flags_t> aidl2legacy_AudioInputFlags_audio_input_flags_t(
         media::AudioInputFlags aidl);
