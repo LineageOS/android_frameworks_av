@@ -16,12 +16,15 @@
 
 package android.media;
 
+import android.media.AudioPortMixExtUseCase;
+
 /**
  * {@hide}
  */
 parcelable AudioPortMixExt {
-    /** Module the stream is attached to. Interpreted as audio_module_handle_t. */
-    int hwModule;
-    /** I/O handle of the input/output stream. Interpreted as audio_io_handle_t. */
+    /**
+     * I/O handle of the input/output stream. Interpreted as audio_io_handle_t.
+     */
     int handle;
+    AudioPortMixExtUseCase usecase;
 }

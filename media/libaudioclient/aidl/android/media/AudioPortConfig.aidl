@@ -17,7 +17,8 @@
 package android.media;
 
 import android.media.AudioIoFlags;
-import android.media.AudioPortConfigExt;
+import android.media.AudioPortExt;
+import android.media.AudioPortExtSys;
 import android.media.AudioPortRole;
 import android.media.AudioPortType;
 import android.media.Int;
@@ -48,5 +49,6 @@ parcelable AudioPortConfig {
     @nullable AudioGainConfig gain;
     /** Framework only: HW_AV_SYNC, DIRECT, ... Can be left unspecified. */
     @nullable AudioIoFlags flags;
-    AudioPortConfigExt ext;
+    AudioPortExt ext;
+    AudioPortExtSys extSys;
 }

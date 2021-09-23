@@ -1,5 +1,5 @@
 /*
- * Copyright (C) 2020 The Android Open Source Project
+ * Copyright (C) 2021 The Android Open Source Project
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -16,24 +16,19 @@
 
 package android.media;
 
-import android.media.AudioPortConfigDeviceExt;
-import android.media.AudioPortConfigMixExt;
-import android.media.AudioPortConfigSessionExt;
+import android.media.AudioPortDeviceExtSys;
+import android.media.AudioPortMixExtSys;
 
 /**
  * {@hide}
  */
-union AudioPortConfigExt {
+union AudioPortExtSys {
     /**
      * This represents an empty union. Value is ignored.
-     * TODO(ytai): replace with the canonical representation for an empty union, as soon as it is
-     *             established.
      */
     boolean unspecified;
-    /** Device specific info. */
-    AudioPortConfigDeviceExt device;
-    /** Mix specific info. */
-    AudioPortConfigMixExt mix;
-    /** Session specific info. */
-    AudioPortConfigSessionExt session;
+    /** System-only parameters when the port is an audio device. */
+    AudioPortDeviceExtSys device;
+    /** System-only parameters when the port is an audio mix. */
+    AudioPortMixExtSys mix;
 }

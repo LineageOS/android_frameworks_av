@@ -22,7 +22,7 @@ import android.media.audio.common.AudioStreamType;
 /**
  * {@hide}
  */
-union AudioPortConfigMixExtUseCase {
+union AudioPortMixExtUseCase {
     /**
      * This to be set if the containing config has the AudioPortRole::NONE role.
      * This represents an empty value (value is ignored).

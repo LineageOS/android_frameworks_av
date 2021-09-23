@@ -1,5 +1,5 @@
 /*
- * Copyright (C) 2020 The Android Open Source Project
+ * Copyright (C) 2021 The Android Open Source Project
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -16,19 +16,14 @@
 
 package android.media;
 
-import android.media.audio.common.AudioDevice;
-
 /**
  * {@hide}
  */
-parcelable AudioPortConfigDeviceExt {
-    /**
-     * Module the device is attached to.
-     * Interpreted as audio_module_handle_t.
-     */
+parcelable AudioPortDeviceExtSys {
+    /** Module the device is attached to. Interpreted as audio_module_handle_t. */
     int hwModule;
-    /**
-     * Audio device instance.
-     */
-    AudioDevice device;
+    /** Bitmask, indexed by AudioEncapsulationMode. */
+    int encapsulationModes;
+    /** Bitmask, indexed by AudioEncapsulationMetadataType. */
+    int encapsulationMetadataTypes;
 }
