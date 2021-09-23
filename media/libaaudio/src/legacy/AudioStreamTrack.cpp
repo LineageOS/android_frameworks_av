@@ -135,7 +135,9 @@ aaudio_result_t AudioStreamTrack::open(const AudioStreamBuilder& builder)
     const audio_usage_t usage =
             AAudioConvert_usageToInternal(builder.getUsage());
     const audio_flags_mask_t attributesFlags =
-        AAudioConvert_allowCapturePolicyToAudioFlagsMask(builder.getAllowedCapturePolicy());
+        AAudioConvert_allowCapturePolicyToAudioFlagsMask(builder.getAllowedCapturePolicy(),
+                                                         builder.getSpatializationBehavior(),
+                                                         builder.isContentSpatialized());
 
     const audio_attributes_t attributes = {
             .content_type = contentType,

@@ -27,6 +27,8 @@ parcelable StreamParameters {
     int /* aaudio_direction_t */              direction;  //            = AAUDIO_DIRECTION_OUTPUT;
     int /* aaudio_usage_t */                  usage;  //                = AAUDIO_UNSPECIFIED;
     int /* aaudio_content_type_t */           contentType;  //          = AAUDIO_UNSPECIFIED;
+    int /* aaudio_spatialization_behavior_t */spatializationBehavior; //= AAUDIO_UNSPECIFIED;
+    boolean                                   isContentSpatialized;  // = false;
     int /* aaudio_input_preset_t */           inputPreset;  //          = AAUDIO_UNSPECIFIED;
     int                                       bufferCapacity;  //       = AAUDIO_UNSPECIFIED;
     int /* aaudio_allowed_capture_policy_t */ allowedCapturePolicy;  // = AAUDIO_UNSPECIFIED;
