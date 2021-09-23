@@ -50,7 +50,7 @@ class Codec {
 
  private:
   tagvideoDecControls *mDecHandle = nullptr;
-  uint8_t *mOutputBuffer[kNumOutputBuffers];
+  uint8_t *mOutputBuffer[kNumOutputBuffers] = {};
   bool mInitialized = false;
   bool mFramesConfigured = false;
 #ifdef MPEG4
