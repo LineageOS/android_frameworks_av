@@ -539,7 +539,7 @@ Status Spatializer::getParameter(int key, std::vector<unsigned char> *value) {
     ALOGV("%s key %d value size %d", __func__, key,
           (value != nullptr ? (int)value->size() : -1));
     if (value == nullptr) {
-        binderStatusFromStatusT(BAD_VALUE);
+        return binderStatusFromStatusT(BAD_VALUE);
     }
     std::lock_guard lock(mLock);
     status_t status = INVALID_OPERATION;
