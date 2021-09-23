@@ -113,8 +113,18 @@ class DeviceHalLocal : public DeviceHalInterface
     status_t removeDeviceEffect(audio_port_handle_t device, sp<EffectHalInterface> effect) override;
 
     status_t getMmapPolicyInfos(
-            media::AudioMMapPolicyType policyType __unused,
-            std::vector<media::AudioMMapPolicyInfo> *policyInfos __unused) override {
+            media::audio::common::AudioMMapPolicyType policyType __unused,
+            std::vector<media::audio::common::AudioMMapPolicyInfo> *policyInfos __unused) override {
+        // This function will only be available on AIDL HAL.
+        return INVALID_OPERATION;
+    }
+
+    int32_t getAAudioMixerBurstCount() override {
+        // This function will only be available on AIDL HAL.
+        return INVALID_OPERATION;
+    }
+
+    int32_t getAAudioHardwareBurstMinUsec() override {
         // This function will only be available on AIDL HAL.
         return INVALID_OPERATION;
     }

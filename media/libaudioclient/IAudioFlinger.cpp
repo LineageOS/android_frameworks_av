@@ -33,6 +33,8 @@ using aidl_utils::statusTFromBinderStatus;
 using binder::Status;
 using media::audio::common::AudioChannelLayout;
 using media::audio::common::AudioFormatDescription;
+using media::audio::common::AudioMMapPolicyInfo;
+using media::audio::common::AudioMMapPolicyType;
 using media::audio::common::AudioMode;
 using media::audio::common::AudioStreamType;
 using media::audio::common::AudioUuid;
@@ -782,9 +784,29 @@ status_t AudioFlingerClientAdapter::updateSecondaryOutputs(
 }
 
 status_t AudioFlingerClientAdapter::getMmapPolicyInfos(
-        media::AudioMMapPolicyType policyType,
-        std::vector<media::AudioMMapPolicyInfo> *policyInfos) {
+        AudioMMapPolicyType policyType, std::vector<AudioMMapPolicyInfo> *policyInfos) {
     return statusTFromBinderStatus(mDelegate->getMmapPolicyInfos(policyType, policyInfos));
+}
+
+int32_t AudioFlingerClientAdapter::getAAudioMixerBurstCount() {
+    auto result = [&]() -> ConversionResult<int32_t> {
+        int32_t aidlRet;
+        RETURN_IF_ERROR(statusTFromBinderStatus(mDelegate->getAAudioMixerBurstCount(&aidlRet)));
+        return convertIntegral<int32_t>(aidlRet);
+    }();
+    // Failure is ignored.
+    return result.value_or(0);
+}
+
+int32_t AudioFlingerClientAdapter::getAAudioHardwareBurstMinUsec() {
+    auto result = [&]() -> ConversionResult<int32_t> {
+        int32_t aidlRet;
+        RETURN_IF_ERROR(statusTFromBinderStatus(
+                mDelegate->getAAudioHardwareBurstMinUsec(&aidlRet)));
+        return convertIntegral<int32_t>(aidlRet);
+    }();
+    // Failure is ignored.
+    return result.value_or(0);
 }
 
 
@@ -1260,9 +1282,20 @@ Status AudioFlingerServerAdapter::updateSecondaryOutputs(
 }
 
 Status AudioFlingerServerAdapter::getMmapPolicyInfos(
-        media::AudioMMapPolicyType policyType,
-        std::vector<media::AudioMMapPolicyInfo> *_aidl_return) {
+        AudioMMapPolicyType policyType, std::vector<AudioMMapPolicyInfo> *_aidl_return) {
     return Status::fromStatusT(mDelegate->getMmapPolicyInfos(policyType, _aidl_return));
+}
+
+Status AudioFlingerServerAdapter::getAAudioMixerBurstCount(int32_t* _aidl_return) {
+    *_aidl_return = VALUE_OR_RETURN_BINDER(
+            convertIntegral<int32_t>(mDelegate->getAAudioMixerBurstCount()));
+    return Status::ok();
+}
+
+Status AudioFlingerServerAdapter::getAAudioHardwareBurstMinUsec(int32_t* _aidl_return) {
+    *_aidl_return = VALUE_OR_RETURN_BINDER(
+            convertIntegral<int32_t>(mDelegate->getAAudioHardwareBurstMinUsec()));
+    return Status::ok();
 }
 
 } // namespace android

@@ -16,13 +16,17 @@
 
 #pragma once
 
-#include <android/media/AudioMMapPolicyType.h>
-#include <android/media/AudioMMapPolicyInfo.h>
+#include <android/media/audio/common/AudioMMapPolicyType.h>
+#include <android/media/audio/common/AudioMMapPolicyInfo.h>
 
 namespace android {
 
 status_t getMmapPolicyInfosFromSystemProperty(
-        media::AudioMMapPolicyType policyType,
-        std::vector<media::AudioMMapPolicyInfo> *policyInfos);
+        media::audio::common::AudioMMapPolicyType policyType,
+        std::vector<media::audio::common::AudioMMapPolicyInfo> *policyInfos);
+
+int32_t getAAudioMixerBurstCountFromSystemProperty();
+
+int32_t getAAudioHardwareBurstMinUsecFromSystemProperty();
 
 } // namespace android

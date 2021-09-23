@@ -27,6 +27,7 @@
 #include <aaudio/AAudio.h>
 #include <cutils/properties.h>
 
+#include <media/AudioSystem.h>
 #include <media/MediaMetricsItem.h>
 #include <utils/Trace.h>
 
@@ -95,7 +96,7 @@ aaudio_result_t AudioStreamInternal::open(const AudioStreamBuilder &builder) {
         return result;
     }
 
-    const int32_t burstMinMicros = AAudioProperty_getHardwareBurstMinMicros();
+    const int32_t burstMinMicros = android::AudioSystem::getAAudioHardwareBurstMinUsec();
     int32_t burstMicros = 0;
 
     const audio_format_t requestedFormat = getFormat();

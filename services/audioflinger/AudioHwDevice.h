@@ -22,6 +22,8 @@
 #include <stdlib.h>
 #include <sys/types.h>
 
+#include <android/media/audio/common/AudioMMapPolicyInfo.h>
+#include <android/media/audio/common/AudioMMapPolicyType.h>
 #include <media/audiohal/DeviceHalInterface.h>
 #include <utils/Errors.h>
 #include <system/audio.h>
@@ -86,8 +88,12 @@ public:
     status_t getAudioPort(struct audio_port_v7 *port) const;
 
     status_t getMmapPolicyInfos(
-            media::AudioMMapPolicyType policyType,
-            std::vector<media::AudioMMapPolicyInfo> *policyInfos) const;
+            media::audio::common::AudioMMapPolicyType policyType,
+            std::vector<media::audio::common::AudioMMapPolicyInfo> *policyInfos) const;
+
+    int32_t getAAudioMixerBurstCount() const;
+
+    int32_t getAAudioHardwareBurstMinUsec() const;
 
 private:
     const audio_module_handle_t mHandle;

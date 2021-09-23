@@ -110,6 +110,10 @@ public:
         mOpenDelayMillis = openDelayMillis;
     }
 
+    void setCloseEnabled(bool enabled) {
+        mCloseEnabled = enabled;
+    }
+
     void restartStream() {
         int retriesLeft = mMaxRetries;
         aaudio_result_t result;
@@ -189,10 +193,12 @@ public:
         std::lock_guard<std::mutex> lock(mLock);
         aaudio_result_t result = AAUDIO_OK;
         if (mStream != nullptr) {
-            result = AAudioStream_close(mStream);
-            if (result != AAUDIO_OK) {
-                printf("AAudioStream_close returned %s\n",
-                       AAudio_convertResultToText(result));
+            if (mCloseEnabled) {
+                result = AAudioStream_close(mStream);
+                printf("AAudioStream_close() returned %s\n",
+                        AAudio_convertResultToText(result));
+            } else {
+                printf("AAudioStream_close() DISABLED!\n");
             }
             mStream = nullptr;
         }
@@ -287,6 +293,7 @@ private:
     std::string         mName;
     int                 mMaxRetries = 1;
     int                 mOpenDelayMillis = 0;
+    bool                mCloseEnabled = true;
 };
 
 // Callback function that fills the audio output buffer.
@@ -319,11 +326,12 @@ static void s_myErrorCallbackProc(
 }
 
 static void s_usage() {
-    printf("test_steal_exclusive [-i] [-r{maxRetries}] [-d{delay}] -s\n");
+    printf("test_steal_exclusive [-i] [-r{maxRetries}] [-d{delay}] -s -c{flag}\n");
     printf("     -i direction INPUT, otherwise OUTPUT\n");
-    printf("     -d delay open by milliseconds, default = 0\n");
-    printf("     -r max retries in the error callback, default = 1\n");
+    printf("     -d Delay open by milliseconds, default = 0\n");
+    printf("     -r max Retries in the error callback, default = 1\n");
     printf("     -s try to open in SHARED mode\n");
+    printf("     -c enable or disabling Closing of the stream with 0/1, default = 1\n");
 }
 
 int main(int argc, char ** argv) {
@@ -334,6 +342,7 @@ int main(int argc, char ** argv) {
     int errorCount = 0;
     int maxRetries = 1;
     int openDelayMillis = 0;
+    bool closeEnabled = true;
     aaudio_sharing_mode_t requestedSharingMode = AAUDIO_SHARING_MODE_EXCLUSIVE;
 
     // Make printf print immediately so that debug info is not stuck
@@ -348,6 +357,9 @@ int main(int argc, char ** argv) {
         if (arg[0] == '-') {
             char option = arg[1];
             switch (option) {
+                case 'c':
+                    closeEnabled = atoi(&arg[2]) != 0;
+                    break;
                 case 'd':
                     openDelayMillis = atoi(&arg[2]);
                     break;
@@ -376,6 +388,8 @@ int main(int argc, char ** argv) {
     thief.setOpenDelayMillis(openDelayMillis);
     victim.setMaxRetries(maxRetries);
     thief.setMaxRetries(maxRetries);
+    victim.setCloseEnabled(closeEnabled);
+    thief.setCloseEnabled(closeEnabled);
 
     result = victim.openAudioStream(direction, requestedSharingMode);
     if (result != AAUDIO_OK) {
@@ -442,7 +456,7 @@ int main(int argc, char ** argv) {
     }
 
     LOGI("Both streams running. Ask user to plug in headset. ====");
-    printf("\n====\nPlease PLUG IN A HEADSET now!\n====\n\n");
+    printf("\n====\nPlease PLUG IN A HEADSET now! - OPTIONAL\n====\n\n");
 
     if (result == AAUDIO_OK) {
         const int watchLoops = DUET_DURATION_MSEC / SLEEP_DURATION_MSEC;

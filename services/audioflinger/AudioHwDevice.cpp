@@ -29,6 +29,9 @@
 
 namespace android {
 
+using media::audio::common::AudioMMapPolicyInfo;
+using media::audio::common::AudioMMapPolicyType;
+
 // ----------------------------------------------------------------------------
 
 status_t AudioHwDevice::openOutputStream(
@@ -102,12 +105,17 @@ status_t AudioHwDevice::getAudioPort(struct audio_port_v7 *port) const {
     return mHwDevice->getAudioPort(port);
 }
 
-
-
 status_t AudioHwDevice::getMmapPolicyInfos(
-            media::AudioMMapPolicyType policyType,
-            std::vector<media::AudioMMapPolicyInfo> *policyInfos) const {
+            AudioMMapPolicyType policyType, std::vector<AudioMMapPolicyInfo> *policyInfos) const {
     return mHwDevice->getMmapPolicyInfos(policyType, policyInfos);
+}
+
+int32_t AudioHwDevice::getAAudioMixerBurstCount() const {
+    return mHwDevice->getAAudioMixerBurstCount();
+}
+
+int32_t AudioHwDevice::getAAudioHardwareBurstMinUsec() const {
+    return mHwDevice->getAAudioHardwareBurstMinUsec();
 }
 
 
