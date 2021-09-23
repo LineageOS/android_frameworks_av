@@ -167,6 +167,18 @@ AAUDIO_API void AAudioStreamBuilder_setContentType(AAudioStreamBuilder* builder,
     streamBuilder->setContentType(contentType);
 }
 
+AAUDIO_API void AAudioStreamBuilder_setSpatializationBehavior(AAudioStreamBuilder* builder,
+        aaudio_spatialization_behavior_t spatializationBehavior) {
+    AudioStreamBuilder *streamBuilder = convertAAudioBuilderToStreamBuilder(builder);
+    streamBuilder->setSpatializationBehavior(spatializationBehavior);
+}
+
+AAUDIO_API void AAudioStreamBuilder_setIsContentSpatialized(AAudioStreamBuilder* builder,
+                                                            bool isSpatialized) {
+    AudioStreamBuilder *streamBuilder = convertAAudioBuilderToStreamBuilder(builder);
+    streamBuilder->setIsContentSpatialized(isSpatialized);
+}
+
 AAUDIO_API void AAudioStreamBuilder_setInputPreset(AAudioStreamBuilder* builder,
                                                    aaudio_input_preset_t inputPreset) {
     AudioStreamBuilder *streamBuilder = convertAAudioBuilderToStreamBuilder(builder);
@@ -501,6 +513,19 @@ AAUDIO_API aaudio_content_type_t AAudioStream_getContentType(AAudioStream* strea
 {
     AudioStream *audioStream = convertAAudioStreamToAudioStream(stream);
     return audioStream->getContentType();
+}
+
+AAUDIO_API aaudio_spatialization_behavior_t AAudioStream_getSpatializationBehavior(
+        AAudioStream* stream)
+{
+    AudioStream *audioStream = convertAAudioStreamToAudioStream(stream);
+    return audioStream->getSpatializationBehavior();
+}
+
+AAUDIO_API bool AAudioStream_isContentSpatialized(AAudioStream* stream)
+{
+    AudioStream *audioStream = convertAAudioStreamToAudioStream(stream);
+    return audioStream->isContentSpatialized();
 }
 
 AAUDIO_API aaudio_input_preset_t AAudioStream_getInputPreset(AAudioStream* stream)

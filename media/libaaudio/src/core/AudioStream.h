@@ -253,6 +253,14 @@ public:
         return mContentType;
     }
 
+    aaudio_spatialization_behavior_t getSpatializationBehavior() const {
+        return mSpatializationBehavior;
+    }
+
+    bool isContentSpatialized() const {
+        return mIsContentSpatialized;
+    }
+
     aaudio_input_preset_t getInputPreset() const {
         return mInputPreset;
     }
@@ -594,6 +602,14 @@ protected:
         mContentType = contentType;
     }
 
+    void setSpatializationBehavior(aaudio_spatialization_behavior_t spatializationBehavior) {
+        mSpatializationBehavior = spatializationBehavior;
+    }
+
+    void setIsContentSpatialized(bool isContentSpatialized) {
+        mIsContentSpatialized = isContentSpatialized;
+    }
+
     /**
      * This should not be called after the open() call.
      */
@@ -651,6 +667,8 @@ private:
 
     aaudio_usage_t              mUsage           = AAUDIO_UNSPECIFIED;
     aaudio_content_type_t       mContentType     = AAUDIO_UNSPECIFIED;
+    aaudio_spatialization_behavior_t mSpatializationBehavior = AAUDIO_UNSPECIFIED;
+    bool                        mIsContentSpatialized = false;
     aaudio_input_preset_t       mInputPreset     = AAUDIO_UNSPECIFIED;
     aaudio_allowed_capture_policy_t mAllowedCapturePolicy = AAUDIO_ALLOW_CAPTURE_BY_ALL;
     bool                        mIsPrivacySensitive = false;

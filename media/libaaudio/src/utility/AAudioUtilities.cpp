@@ -235,20 +235,46 @@ audio_source_t AAudioConvert_inputPresetToAudioSource(aaudio_input_preset_t pres
 }
 
 audio_flags_mask_t AAudioConvert_allowCapturePolicyToAudioFlagsMask(
-        aaudio_allowed_capture_policy_t policy) {
+        aaudio_allowed_capture_policy_t policy,
+        aaudio_spatialization_behavior_t spatializationBehavior,
+        bool isContentSpatialized) {
+    audio_flags_mask_t flagsMask = AUDIO_FLAG_NONE;
     switch (policy) {
         case AAUDIO_UNSPECIFIED:
         case AAUDIO_ALLOW_CAPTURE_BY_ALL:
-            return AUDIO_FLAG_NONE;
+            // flagsMask is not modified
+            break;
         case AAUDIO_ALLOW_CAPTURE_BY_SYSTEM:
-            return AUDIO_FLAG_NO_MEDIA_PROJECTION;
+            flagsMask = static_cast<audio_flags_mask_t>(flagsMask | AUDIO_FLAG_NO_MEDIA_PROJECTION);
+            break;
         case AAUDIO_ALLOW_CAPTURE_BY_NONE:
-            return static_cast<audio_flags_mask_t>(
+            flagsMask = static_cast<audio_flags_mask_t>(flagsMask |
                     AUDIO_FLAG_NO_MEDIA_PROJECTION | AUDIO_FLAG_NO_SYSTEM_CAPTURE);
+            break;
         default:
-            ALOGE("%s() 0x%08X unrecognized", __func__, policy);
-            return AUDIO_FLAG_NONE; //
+            ALOGE("%s() 0x%08X unrecognized capture policy", __func__, policy);
+            // flagsMask is not modified
     }
+
+    switch (spatializationBehavior) {
+        case AAUDIO_UNSPECIFIED:
+        case AAUDIO_SPATIALIZATION_BEHAVIOR_AUTO:
+            // flagsMask is not modified
+            break;
+        case AAUDIO_SPATIALIZATION_BEHAVIOR_NEVER:
+            flagsMask = static_cast<audio_flags_mask_t>(flagsMask | AUDIO_FLAG_NEVER_SPATIALIZE);
+            break;
+        default:
+            ALOGE("%s() 0x%08X unrecognized spatialization behavior",
+                  __func__, spatializationBehavior);
+            // flagsMask is not modified
+    }
+
+    if (isContentSpatialized) {
+        flagsMask = static_cast<audio_flags_mask_t>(flagsMask | AUDIO_FLAG_CONTENT_SPATIALIZED);
+    }
+
+    return flagsMask;
 }
 
 audio_flags_mask_t AAudioConvert_privacySensitiveToAudioFlagsMask(

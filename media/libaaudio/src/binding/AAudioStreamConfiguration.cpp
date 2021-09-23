@@ -43,6 +43,13 @@ AAudioStreamConfiguration::AAudioStreamConfiguration(const StreamParameters& par
     setUsage(parcelable.usage);
     static_assert(sizeof(aaudio_content_type_t) == sizeof(parcelable.contentType));
     setContentType(parcelable.contentType);
+
+    static_assert(sizeof(aaudio_spatialization_behavior_t) ==
+            sizeof(parcelable.spatializationBehavior));
+    setSpatializationBehavior(parcelable.spatializationBehavior);
+    setIsContentSpatialized(parcelable.isContentSpatialized);
+
+
     static_assert(sizeof(aaudio_input_preset_t) == sizeof(parcelable.inputPreset));
     setInputPreset(parcelable.inputPreset);
     setBufferCapacity(parcelable.bufferCapacity);
