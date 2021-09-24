@@ -109,6 +109,7 @@ cc_library_shared {
 
     srcs: [
         "CodecBase.cpp",
+        "DataConverter.cpp",
         "FrameRenderTracker.cpp",
         "MediaCodecListWriter.cpp",
         "SkipCutBuffer.cpp",
@@ -125,6 +126,7 @@ cc_library_shared {
     ],
 
     shared_libs: [
+        "libaudioutils",
         "libgui",
         "libhidlallocatorutils",
         "liblog",
@@ -267,7 +269,6 @@ cc_library {
         "CallbackMediaSource.cpp",
         "CameraSource.cpp",
         "CameraSourceTimeLapse.cpp",
-        "DataConverter.cpp",
         "FrameDecoder.cpp",
         "HevcUtils.cpp",
         "InterfaceUtils.cpp",
