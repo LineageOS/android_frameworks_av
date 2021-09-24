@@ -883,9 +883,18 @@ status_t MediaImageDecoder::onOutputReceived(
     }
 
     int32_t width, height, stride;
-    CHECK(outputFormat->findInt32("width", &width));
-    CHECK(outputFormat->findInt32("height", &height));
-    CHECK(outputFormat->findInt32("stride", &stride));
+    if (outputFormat->findInt32("width", &width) == false) {
+        ALOGE("MediaImageDecoder::onOutputReceived:width is missing in outputFormat");
+        return ERROR_MALFORMED;
+    }
+    if (outputFormat->findInt32("height", &height) == false) {
+        ALOGE("MediaImageDecoder::onOutputReceived:height is missing in outputFormat");
+        return ERROR_MALFORMED;
+    }
+    if (outputFormat->findInt32("stride", &stride) == false) {
+        ALOGE("MediaImageDecoder::onOutputReceived:stride is missing in outputFormat");
+        return ERROR_MALFORMED;
+    }
 
     if (mFrame == NULL) {
         sp<IMemory> frameMem = allocVideoFrame(
