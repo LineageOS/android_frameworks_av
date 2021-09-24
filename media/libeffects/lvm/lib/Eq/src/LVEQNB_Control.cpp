@@ -135,7 +135,6 @@ void LVEQNB_SetFilters(LVEQNB_Instance_t* pInstance, LVEQNB_Params_t* pParams) {
     LVM_UINT32 fs =
             (LVM_UINT32)LVEQNB_SampleRateTab[(LVM_UINT16)pParams->SampleRate]; /* Sample rate */
     LVM_UINT32 fc;     /* Filter centre frequency */
-    LVM_INT16 QFactor; /* Filter Q factor */
 
     pInstance->NBands = pParams->NBands;
 
@@ -144,7 +143,6 @@ void LVEQNB_SetFilters(LVEQNB_Instance_t* pInstance, LVEQNB_Params_t* pParams) {
          * Get the filter settings
          */
         fc = (LVM_UINT32)pParams->pBandDefinition[i].Frequency; /* Get the band centre frequency */
-        QFactor = (LVM_INT16)pParams->pBandDefinition[i].QFactor; /* Get the band Q factor */
 
         pInstance->pBiquadType[i] = LVEQNB_SinglePrecision_Float; /* Default to single precision */
 

@@ -193,7 +193,9 @@ audio_attributes_t AAudioServiceEndpoint::getAudioAttributesFrom(
     if (direction == AAUDIO_DIRECTION_OUTPUT) {
         flags = static_cast<audio_flags_mask_t>(AUDIO_FLAG_LOW_LATENCY
                 | AAudioConvert_allowCapturePolicyToAudioFlagsMask(
-                        params->getAllowedCapturePolicy()));
+                        params->getAllowedCapturePolicy(),
+                        params->getSpatializationBehavior(),
+                        params->isContentSpatialized()));
     } else {
         flags = static_cast<audio_flags_mask_t>(AUDIO_FLAG_LOW_LATENCY
                 | AAudioConvert_privacySensitiveToAudioFlagsMask(params->isPrivacySensitive()));
