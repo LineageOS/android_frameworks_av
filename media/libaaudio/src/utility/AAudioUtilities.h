@@ -91,7 +91,9 @@ audio_source_t AAudioConvert_inputPresetToAudioSource(aaudio_input_preset_t pres
  * @return internal audio flags mask
  */
 audio_flags_mask_t AAudioConvert_allowCapturePolicyToAudioFlagsMask(
-        aaudio_allowed_capture_policy_t policy);
+        aaudio_allowed_capture_policy_t policy,
+        aaudio_spatialization_behavior_t spatializationBehavior,
+        bool isContentSpatialized);
 
 audio_flags_mask_t AAudioConvert_privacySensitiveToAudioFlagsMask(
         bool privacySensitive);

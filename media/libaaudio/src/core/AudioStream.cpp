@@ -92,6 +92,12 @@ aaudio_result_t AudioStream::open(const AudioStreamBuilder& builder)
     if (mContentType == AAUDIO_UNSPECIFIED) {
         mContentType = AAUDIO_CONTENT_TYPE_MUSIC;
     }
+    mSpatializationBehavior = builder.getSpatializationBehavior();
+    // for consistency with other properties, note UNSPECIFIED is the same as AUTO
+    if (mSpatializationBehavior == AAUDIO_UNSPECIFIED) {
+        mSpatializationBehavior = AAUDIO_SPATIALIZATION_BEHAVIOR_AUTO;
+    }
+    mIsContentSpatialized = builder.isContentSpatialized();
     mInputPreset = builder.getInputPreset();
     if (mInputPreset == AAUDIO_UNSPECIFIED) {
         mInputPreset = AAUDIO_INPUT_PRESET_VOICE_RECOGNITION;

@@ -41,6 +41,8 @@ void AAudioStreamParameters::copyFrom(const AAudioStreamParameters &other) {
     mBufferCapacity       = other.mBufferCapacity;
     mUsage                = other.mUsage;
     mContentType          = other.mContentType;
+    mSpatializationBehavior = other.mSpatializationBehavior;
+    mIsContentSpatialized = other.mIsContentSpatialized;
     mInputPreset          = other.mInputPreset;
     mAllowedCapturePolicy = other.mAllowedCapturePolicy;
     mIsPrivacySensitive   = other.mIsPrivacySensitive;
@@ -157,6 +159,19 @@ aaudio_result_t AAudioStreamParameters::validate() const {
             return AAUDIO_ERROR_ILLEGAL_ARGUMENT;
             // break;
     }
+
+    switch (mSpatializationBehavior) {
+        case AAUDIO_UNSPECIFIED:
+        case AAUDIO_SPATIALIZATION_BEHAVIOR_AUTO:
+        case AAUDIO_SPATIALIZATION_BEHAVIOR_NEVER:
+            break; // valid
+        default:
+            ALOGD("spatialization behavior not valid = %d", mSpatializationBehavior);
+            return AAUDIO_ERROR_ILLEGAL_ARGUMENT;
+            // break;
+    }
+
+    // no validation required for mIsContentSpatialized
 
     switch (mInputPreset) {
         case AAUDIO_UNSPECIFIED:
@@ -287,6 +302,8 @@ void AAudioStreamParameters::dump() const {
     ALOGD("mBufferCapacity       = %6d", mBufferCapacity);
     ALOGD("mUsage                = %6d", mUsage);
     ALOGD("mContentType          = %6d", mContentType);
+    ALOGD("mSpatializationBehavior = %6d", mSpatializationBehavior);
+    ALOGD("mIsContentSpatialized = %s", mIsContentSpatialized ? "true" : "false");
     ALOGD("mInputPreset          = %6d", mInputPreset);
     ALOGD("mAllowedCapturePolicy = %6d", mAllowedCapturePolicy);
     ALOGD("mIsPrivacySensitive   = %s", mIsPrivacySensitive ? "true" : "false");
