@@ -61,9 +61,11 @@ public:
      * \retval C2_NOT_FOUND the extension symbol was not found.
      * \retval C2_BAD_INDEX the input allocatorId is not defined in platform store extension.
      */
-    c2_status_t createBlockPool(::C2Allocator::id_t allocatorId,
-                                ::C2BlockPool::local_id_t blockPoolId,
-                                std::shared_ptr<C2BlockPool>* pool);
+    c2_status_t createBlockPool(
+            ::C2Allocator::id_t allocatorId,
+            ::C2BlockPool::local_id_t blockPoolId,
+            std::shared_ptr<C2BlockPool>* pool,
+            std::function<void(C2BlockPool *)> deleter = std::default_delete<C2BlockPool>());
 
     /**
      * Creates allocator from platform store extension.
@@ -81,8 +83,10 @@ public:
      * \retval C2_BAD_INDEX the input allocatorId is not defined in platform store extension.
      * \retval C2_NO_MEMORY not enough memory to create the allocator
      */
-    c2_status_t createAllocator(::C2Allocator::id_t allocatorId,
-                                std::shared_ptr<C2Allocator>* const allocator);
+    c2_status_t createAllocator(
+            ::C2Allocator::id_t allocatorId,
+            std::shared_ptr<C2Allocator>* const allocator,
+            std::function<void(C2Allocator *)> deleter = std::default_delete<C2Allocator>());
 
 private:
     explicit C2PlatformStorePluginLoader(const char *libPath);
