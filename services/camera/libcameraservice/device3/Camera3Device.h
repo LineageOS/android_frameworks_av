@@ -297,6 +297,7 @@ class Camera3Device :
 
   private:
     status_t disconnectImpl();
+    static status_t removeFwkOnlyRegionKeys(CameraMetadata *request);
 
     // internal typedefs
     using RequestMetadataQueue = hardware::MessageQueue<uint8_t, hardware::kSynchronizedReadWrite>;
