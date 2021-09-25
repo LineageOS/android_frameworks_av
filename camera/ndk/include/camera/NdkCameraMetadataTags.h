@@ -4578,6 +4578,25 @@ typedef enum acamera_metadata_tag {
      *
      * <p>Also defines the direction of rolling shutter readout, which is from top to bottom in
      * the sensor's coordinate system.</p>
+     * <p>Starting with Android API level 32, camera clients that query the orientation via
+     * <a href="https://developer.android.com/reference/android/hardware/camera2/CameraCharacteristics.html#get">CameraCharacteristics#get</a> on foldable devices which
+     * include logical cameras can receive a value that can dynamically change depending on the
+     * device/fold state.
+     * Clients are advised to not cache or store the orientation value of such logical sensors.
+     * In case repeated queries to CameraCharacteristics are not preferred, then clients can
+     * also access the entire mapping from device state to sensor orientation in
+     * <a href="https://developer.android.com/reference/android/hardware/camera2/params/DeviceStateOrientationMap.html">DeviceStateOrientationMap</a>.
+     * Do note that a dynamically changing sensor orientation value in camera characteristics
+     * will not be the best way to establish the orientation per frame. Clients that want to
+     * know the sensor orientation of a particular captured frame should query the
+     * ACAMERA_LOGICAL_MULTI_CAMERA_ACTIVE_PHYSICAL_ID from the corresponding capture result and
+     * check the respective physical camera orientation.</p>
+     * <p>Native camera clients must query ACAMERA_INFO_DEVICE_STATE_ORIENTATIONS for the mapping
+     * between device state and camera sensor orientation. Dynamic updates to the sensor
+     * orientation are not supported in this code path.</p>
+     *
+     * @see ACAMERA_INFO_DEVICE_STATE_ORIENTATIONS
+     * @see ACAMERA_LOGICAL_MULTI_CAMERA_ACTIVE_PHYSICAL_ID
      */
     ACAMERA_SENSOR_ORIENTATION =                                // int32
             ACAMERA_SENSOR_START + 14,
@@ -6284,6 +6303,21 @@ typedef enum acamera_metadata_tag {
      */
     ACAMERA_INFO_VERSION =                                      // byte
             ACAMERA_INFO_START + 1,
+    /**
+     *
+     * <p>Type: int64[2*n]</p>
+     *
+     * <p>This tag may appear in:
+     * <ul>
+     *   <li>ACameraMetadata from ACameraManager_getCameraCharacteristics</li>
+     * </ul></p>
+     *
+     * <p>HAL must populate the array with
+     * (hardware::camera::provider::V2_5::DeviceState, sensorOrientation) pairs for each
+     * supported device state bitwise combination.</p>
+     */
+    ACAMERA_INFO_DEVICE_STATE_ORIENTATIONS =                    // int64[2*n]
+            ACAMERA_INFO_START + 3,
     ACAMERA_INFO_END,
 
     /**
