@@ -75,15 +75,40 @@ AudioProfileVector getAudioProfileVectorForTest() {
     return audioProfiles;
 }
 
-TEST(AudioFoundationParcelableTest, ParcelingAudioGain) {
-    Parcel data;
-    AudioGains audioGains = getAudioGainsForTest();
+TEST(AudioFoundationParcelableTest, ParcelingAudioProfile) {
+    sp<AudioProfile> profile = getAudioProfileVectorForTest()[0];
+    auto conv = legacy2aidl_AudioProfile(profile, false /*isInput*/);
+    ASSERT_TRUE(conv.ok());
+    auto convBack = aidl2legacy_AudioProfile(conv.value(), false /*isInput*/);
+    ASSERT_TRUE(convBack.ok());
+    ASSERT_TRUE(profile->equals(convBack.value()));
+}
 
-    ASSERT_EQ(data.writeParcelable(audioGains), NO_ERROR);
-    data.setDataPosition(0);
-    AudioGains audioGainsFromParcel;
-    ASSERT_EQ(data.readParcelable(&audioGainsFromParcel), NO_ERROR);
-    ASSERT_TRUE(audioGainsFromParcel.equals(audioGains));
+TEST(AudioFoundationParcelableTest, ParcelingAudioProfileVector) {
+    AudioProfileVector profiles = getAudioProfileVectorForTest();
+    auto conv = legacy2aidl_AudioProfileVector(profiles, false /*isInput*/);
+    ASSERT_TRUE(conv.ok());
+    auto convBack = aidl2legacy_AudioProfileVector(conv.value(), false /*isInput*/);
+    ASSERT_TRUE(convBack.ok());
+    ASSERT_TRUE(profiles.equals(convBack.value()));
+}
+
+TEST(AudioFoundationParcelableTest, ParcelingAudioGain) {
+    sp<AudioGain> audioGain = getAudioGainsForTest()[0];
+    auto conv = legacy2aidl_AudioGain(audioGain);
+    ASSERT_TRUE(conv.ok());
+    auto convBack = aidl2legacy_AudioGain(conv.value());
+    ASSERT_TRUE(convBack.ok());
+    ASSERT_TRUE(audioGain->equals(convBack.value()));
+}
+
+TEST(AudioFoundationParcelableTest, ParcelingAudioGains) {
+    AudioGains audioGains = getAudioGainsForTest();
+    auto conv = legacy2aidl_AudioGains(audioGains);
+    ASSERT_TRUE(conv.ok());
+    auto convBack = aidl2legacy_AudioGains(conv.value());
+    ASSERT_TRUE(convBack.ok());
+    ASSERT_TRUE(audioGains.equals(convBack.value()));
 }
 
 TEST(AudioFoundationParcelableTest, ParcelingAudioPort) {

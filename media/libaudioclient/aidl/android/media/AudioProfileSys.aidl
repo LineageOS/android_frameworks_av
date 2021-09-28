@@ -16,21 +16,15 @@
 
 package android.media;
 
-import android.media.audio.common.AudioEncapsulationType;
-import android.media.audio.common.AudioFormatDescription;
-import android.media.audio.common.AudioChannelLayout;
-
 /**
+ * Provides indication whether the parameters of the AudioProfiles in the
+ * AudioPort are dynamic. Each instance of AudioProfileSys corresponds
+ * to an instance of AudioProfile.
+ *
  * {@hide}
  */
-parcelable AudioProfile {
-    @utf8InCpp String name;
-    /** The format for an audio profile should only be set when initialized. */
-    AudioFormatDescription format;
-    AudioChannelLayout[] channelMasks;
-    int[] samplingRates;
+parcelable AudioProfileSys {
     boolean isDynamicFormat;
     boolean isDynamicChannels;
     boolean isDynamicRate;
-    AudioEncapsulationType encapsulationType;
 }
