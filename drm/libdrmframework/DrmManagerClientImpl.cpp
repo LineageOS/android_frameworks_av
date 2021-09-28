@@ -53,10 +53,8 @@ const sp<IDrmManagerService>& DrmManagerClientImpl::getDrmManagerService() {
     Mutex::Autolock lock(sMutex);
     if (NULL == sDrmManagerService.get()) {
         sp<IServiceManager> sm = defaultServiceManager();
-        sp<IBinder> binder = sm->getService(String16("drm.drmManager"));
+        sp<IBinder> binder = sm->checkService(String16("drm.drmManager"));
         if (binder == NULL) {
-            // Do NOT retry; IServiceManager already waits for ~5 seconds
-            // in getService if a service doesn't yet exist.
             return sDrmManagerService;
         }
         if (NULL == sDeathNotifier.get()) {
