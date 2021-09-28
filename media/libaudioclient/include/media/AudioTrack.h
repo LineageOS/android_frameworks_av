@@ -28,6 +28,7 @@
 #include <utils/threads.h>
 #include <android/content/AttributionSourceState.h>
 
+#include <chrono>
 #include <string>
 
 #include "android/media/BnAudioTrackCallback.h"
@@ -509,6 +510,14 @@ public:
      * and then the track is marked as paused.  It can be resumed with ramp up by start().
      */
             void        pause();
+
+    /* Pause and wait (with timeout) for the audio track to ramp to silence.
+     *
+     * \param timeout is the time limit to wait before returning.
+     *                A negative number is treated as 0.
+     * \return true if the track is ramped to silence, false if the timeout occurred.
+     */
+            bool        pauseAndWait(const std::chrono::milliseconds& timeout);
 
     /* Set volume for this track, mostly used for games' sound effects
      * left and right volumes. Levels must be >= 0.0 and <= 1.0.
