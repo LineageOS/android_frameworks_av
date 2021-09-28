@@ -142,11 +142,14 @@ void AudioPolicyService::onFirstRef()
     sensorPrivacyPolicy->registerSelf();
 
     // Create spatializer if supported
-    const audio_attributes_t attr = attributes_initializer(AUDIO_USAGE_MEDIA);
-    AudioDeviceTypeAddrVector devices;
-    bool hasSpatializer = mAudioPolicyManager->canBeSpatialized(&attr, nullptr, devices);
-    if (hasSpatializer) {
-        mSpatializer = Spatializer::create(this);
+    if (mAudioPolicyManager != nullptr) {
+        Mutex::Autolock _l(mLock);
+        const audio_attributes_t attr = attributes_initializer(AUDIO_USAGE_MEDIA);
+        AudioDeviceTypeAddrVector devices;
+        bool hasSpatializer = mAudioPolicyManager->canBeSpatialized(&attr, nullptr, devices);
+        if (hasSpatializer) {
+            mSpatializer = Spatializer::create(this);
+        }
     }
     AudioSystem::audioPolicyReady();
 }
@@ -381,6 +384,7 @@ void AudioPolicyService::doOnCheckSpatializer()
     Mutex::Autolock _l(mLock);
 
     if (mSpatializer != nullptr) {
+        // Note: mSpatializer != nullptr =>  mAudioPolicyManager != nullptr
         if (mSpatializer->getLevel() != media::SpatializationLevel::NONE) {
             audio_io_handle_t currentOutput = mSpatializer->getOutput();
             audio_io_handle_t newOutput;
