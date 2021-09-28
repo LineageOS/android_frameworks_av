@@ -273,6 +273,7 @@ private:
         size_t numExtraSlots;
         uint32_t inputDelay;
         uint32_t pipelineDelay;
+        c2_cntr64_t lastFlushIndex;
 
         FrameReassembler frameReassembler;
     };
