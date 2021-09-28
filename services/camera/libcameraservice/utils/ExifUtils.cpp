@@ -920,7 +920,7 @@ bool ExifUtilsImpl::setFromMetadata(const CameraMetadata& metadata,
     camera_metadata_ro_entry sensorPixelModeEntry = metadata.find(ANDROID_SENSOR_PIXEL_MODE);
     if (sensorPixelModeEntry.count != 0) {
         sensorPixelMode = sensorPixelModeEntry.data.u8[0];
-        if (sensorPixelMode != ANDROID_SENSOR_PIXEL_MODE_DEFAULT ||
+        if (sensorPixelMode != ANDROID_SENSOR_PIXEL_MODE_DEFAULT &&
             sensorPixelMode != ANDROID_SENSOR_PIXEL_MODE_MAXIMUM_RESOLUTION) {
             ALOGE("%s: Request sensor pixel mode is not one of the valid values %d",
                       __FUNCTION__, sensorPixelMode);
