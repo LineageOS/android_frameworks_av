@@ -24,8 +24,11 @@
 #include <map>
 #include <thread>
 
-#include <android/looper.h>
 #include <log/log_main.h>
+#include <sensor/Sensor.h>
+#include <sensor/SensorEventQueue.h>
+#include <sensor/SensorManager.h>
+#include <utils/Looper.h>
 
 #include "QuaternionUtil.h"
 
@@ -33,31 +36,42 @@ namespace android {
 namespace media {
 namespace {
 
+// Identifier to use for our event queue on the loop.
+// The number 19 is arbitrary, only useful if using multiple objects on the same looper.
+constexpr int kIdent = 19;
+
+static inline Looper* ALooper_to_Looper(ALooper* alooper) {
+    return reinterpret_cast<Looper*>(alooper);
+}
+
+static inline ALooper* Looper_to_ALooper(Looper* looper) {
+    return reinterpret_cast<ALooper*>(looper);
+}
+
 /**
- * RAII-wrapper around ASensorEventQueue, which destroys it on destruction.
+ * RAII-wrapper around SensorEventQueue, which unregisters it on destruction.
  */
 class EventQueueGuard {
   public:
-    EventQueueGuard(ASensorManager* manager, ASensorEventQueue* queue)
-        : mManager(manager), mQueue(queue) {}
+    EventQueueGuard(const sp<SensorEventQueue>& queue, Looper* looper) : mQueue(queue) {
+        mQueue->looper = Looper_to_ALooper(looper);
+        mQueue->requestAdditionalInfo = false;
+        looper->addFd(mQueue->getFd(), kIdent, ALOOPER_EVENT_INPUT, nullptr, nullptr);
+    }
 
     ~EventQueueGuard() {
         if (mQueue) {
-            int ret = ASensorManager_destroyEventQueue(mManager, mQueue);
-            if (ret) {
-                ALOGE("Failed to destroy event queue: %s\n", strerror(ret));
-            }
+            ALooper_to_Looper(mQueue->looper)->removeFd(mQueue->getFd());
         }
     }
 
     EventQueueGuard(const EventQueueGuard&) = delete;
     EventQueueGuard& operator=(const EventQueueGuard&) = delete;
 
-    [[nodiscard]] ASensorEventQueue* get() const { return mQueue; }
+    [[nodiscard]] SensorEventQueue* get() const { return mQueue.get(); }
 
   private:
-    ASensorManager* const mManager;
-    ASensorEventQueue* mQueue;
+    sp<SensorEventQueue> mQueue;
 };
 
 /**
@@ -65,12 +79,12 @@ class EventQueueGuard {
  */
 class SensorEnableGuard {
   public:
-    SensorEnableGuard(ASensorEventQueue* queue, const ASensor* sensor)
+    SensorEnableGuard(const sp<SensorEventQueue>& queue, int32_t sensor)
         : mQueue(queue), mSensor(sensor) {}
 
     ~SensorEnableGuard() {
-        if (mSensor) {
-            int ret = ASensorEventQueue_disableSensor(mQueue, mSensor);
+        if (mSensor != SensorPoseProvider::INVALID_HANDLE) {
+            int ret = mQueue->disableSensor(mSensor);
             if (ret) {
                 ALOGE("Failed to disable sensor: %s\n", strerror(ret));
             }
@@ -82,12 +96,12 @@ class SensorEnableGuard {
 
     // Enable moving.
     SensorEnableGuard(SensorEnableGuard&& other) : mQueue(other.mQueue), mSensor(other.mSensor) {
-        other.mSensor = nullptr;
+        other.mSensor = SensorPoseProvider::INVALID_HANDLE;
     }
 
   private:
-    ASensorEventQueue* const mQueue;
-    const ASensor* mSensor;
+    sp<SensorEventQueue> const mQueue;
+    int32_t mSensor;
 };
 
 /**
@@ -104,32 +118,30 @@ class SensorPoseProviderImpl : public SensorPoseProvider {
     ~SensorPoseProviderImpl() override {
         // Disable all active sensors.
         mEnabledSensors.clear();
-        ALooper_wake(mLooper);
+        mLooper->wake();
         mThread.join();
     }
 
-    int32_t startSensor(const ASensor* sensor, std::chrono::microseconds samplingPeriod) override {
-        int32_t handle = ASensor_getHandle(sensor);
-
+    bool startSensor(int32_t sensor, std::chrono::microseconds samplingPeriod) override {
         // Enable the sensor.
-        if (ASensorEventQueue_registerSensor(mQueue, sensor, samplingPeriod.count(), 0)) {
+        if (mQueue->enableSensor(sensor, samplingPeriod.count(), 0, 0)) {
             ALOGE("Failed to enable sensor");
-            return INVALID_HANDLE;
+            return false;
         }
 
-        mEnabledSensors.emplace(handle, SensorEnableGuard(mQueue, sensor));
-        return handle;
+        mEnabledSensors.emplace(sensor, SensorEnableGuard(mQueue.get(), sensor));
+        return true;
     }
 
     void stopSensor(int handle) override { mEnabledSensors.erase(handle); }
 
   private:
-    ALooper* mLooper;
+    sp<Looper> mLooper;
     Listener* const mListener;
 
     std::thread mThread;
     std::map<int32_t, SensorEnableGuard> mEnabledSensors;
-    ASensorEventQueue* mQueue;
+    sp<SensorEventQueue> mQueue;
 
     // We must do some of the initialization operations on the worker thread, because the API relies
     // on the thread-local looper. In addition, as a matter of convenience, we store some of the
@@ -149,21 +161,13 @@ class SensorPoseProviderImpl : public SensorPoseProvider {
 
     void threadFunc(const char* packageName) {
         // Obtain looper.
-        mLooper = ALooper_prepare(ALOOPER_PREPARE_ALLOW_NON_CALLBACKS);
-
-        // The number 19 is arbitrary, only useful if using multiple objects on the same looper.
-        constexpr int kIdent = 19;
+        mLooper = Looper::prepare(ALOOPER_PREPARE_ALLOW_NON_CALLBACKS);
 
         // Obtain sensor manager.
-        ASensorManager* sensor_manager = ASensorManager_getInstanceForPackage(packageName);
-        if (!sensor_manager) {
-            ALOGE("Failed to get a sensor manager");
-            initFinished(false);
-            return;
-        }
+        SensorManager& sensorManager = SensorManager::getInstanceForPackage(String16(packageName));
 
         // Create event queue.
-        mQueue = ASensorManager_createEventQueue(sensor_manager, mLooper, kIdent, nullptr, nullptr);
+        mQueue = sensorManager.createEventQueue();
 
         if (mQueue == nullptr) {
             ALOGE("Failed to create a sensor event queue");
@@ -171,12 +175,12 @@ class SensorPoseProviderImpl : public SensorPoseProvider {
             return;
         }
 
-        EventQueueGuard eventQueueGuard(sensor_manager, mQueue);
+        EventQueueGuard eventQueueGuard(mQueue, mLooper.get());
 
         initFinished(true);
 
         while (true) {
-            int ret = ALooper_pollOnce(-1 /* no timeout */, nullptr, nullptr, nullptr);
+            int ret = mLooper->pollOnce(-1 /* no timeout */, nullptr, nullptr, nullptr);
 
             switch (ret) {
                 case ALOOPER_POLL_WAKE:
@@ -188,14 +192,19 @@ class SensorPoseProviderImpl : public SensorPoseProvider {
                     break;
 
                 default:
-                    ALOGE("Unexpected status out of ALooper_pollOnce: %d", ret);
+                    ALOGE("Unexpected status out of Looper::pollOnce: %d", ret);
             }
 
             // Process an event.
             ASensorEvent event;
-            ssize_t size = ASensorEventQueue_getEvents(mQueue, &event, 1);
+            ssize_t actual = mQueue->read(&event, 1);
+            if (actual > 0) {
+                mQueue->sendAck(&event, actual);
+            }
+            ssize_t size = mQueue->filterEvents(&event, actual);
+
             if (size < 0 || size > 1) {
-                ALOGE("Unexpected return value from ASensorEventQueue_getEvents: %zd", size);
+                ALOGE("Unexpected return value from SensorEventQueue::filterEvents: %zd", size);
                 break;
             }
             if (size == 0) {
