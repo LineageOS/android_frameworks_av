@@ -234,7 +234,11 @@ AudioFlinger::ThreadBase::TrackBase::TrackBase(
 #ifdef TEE_SINK
         mTee.set(sampleRate, mChannelCount, format, NBAIO_Tee::TEE_FLAG_TRACK);
 #endif
-
+        // mState is mirrored for the client to read.
+        mState.setMirror(&mCblk->mState);
+        // ensure our state matches up until we consolidate the enumeration.
+        static_assert(CBLK_STATE_IDLE == IDLE);
+        static_assert(CBLK_STATE_PAUSING == PAUSING);
     }
 }
 
@@ -933,7 +937,7 @@ status_t AudioFlinger::PlaybackThread::Track::getNextBuffer(AudioBufferProvider:
     buffer->raw = buf.mRaw;
     if (buf.mFrameCount == 0 && !isStopping() && !isStopped() && !isPaused() && !isOffloaded()) {
         ALOGV("%s(%d): underrun,  framesReady(%zu) < framesDesired(%zd), state: %d",
-                __func__, mId, buf.mFrameCount, desiredFrames, mState);
+                __func__, mId, buf.mFrameCount, desiredFrames, (int)mState);
         mAudioTrackServerProxy->tallyUnderrunFrames(desiredFrames);
     } else {
         mAudioTrackServerProxy->tallyUnderrunFrames(0);
@@ -1590,7 +1594,7 @@ status_t AudioFlinger::PlaybackThread::Track::setSyncEvent(const sp<SyncEvent>& 
                                       (mState == STOPPED)))) {
         ALOGW("%s(%d): in invalid state %d on session %d %s mode, framesReady %zu",
               __func__, mId,
-              mState, mSessionId, (mSharedBuffer != 0) ? "static" : "stream", framesReady());
+              (int)mState, mSessionId, (mSharedBuffer != 0) ? "static" : "stream", framesReady());
         event->cancel();
         return INVALID_OPERATION;
     }
