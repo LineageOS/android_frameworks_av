@@ -32,12 +32,6 @@
 #include <private/media/AudioEffectShared.h>
 #include <utils/Log.h>
 
-#define RETURN_STATUS_IF_ERROR(x)    \
-    {                                \
-        auto _tmp = (x);             \
-        if (_tmp != OK) return _tmp; \
-    }
-
 namespace android {
 using aidl_utils::statusTFromBinderStatus;
 using binder::Status;
