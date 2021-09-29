@@ -78,5 +78,6 @@ geteuid: 1
 getgid: 1
 getegid: 1
 getgroups: 1
+sysinfo: 1
 
 @include /apex/com.android.media.swcodec/etc/seccomp_policy/code_coverage.arm64.policy
