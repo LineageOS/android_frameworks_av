@@ -22,11 +22,18 @@
 #include <utils/SystemClock.h>
 
 #include <media/SensorPoseProvider.h>
+#include <sensor/Sensor.h>
+#include <sensor/SensorManager.h>
 
 using android::elapsedRealtimeNano;
+using android::Sensor;
+using android::SensorManager;
+using android::String16;
 using android::media::Pose3f;
 using android::media::SensorPoseProvider;
 using android::media::Twist3f;
+
+using namespace std::chrono_literals;
 
 const char kPackageName[] = "SensorPoseProvider-example";
 
@@ -51,24 +58,18 @@ class Listener : public SensorPoseProvider::Listener {
 };
 
 int main() {
-    ASensorManager* sensor_manager = ASensorManager_getInstanceForPackage(kPackageName);
-    if (!sensor_manager) {
-        std::cerr << "Failed to get a sensor manager" << std::endl;
-        return 1;
-    }
+    SensorManager& sensorManager = SensorManager::getInstanceForPackage(String16(kPackageName));
 
-    const ASensor* headSensor =
-            ASensorManager_getDefaultSensor(sensor_manager, SENSOR_TYPE_GAME_ROTATION_VECTOR);
-    const ASensor* screenSensor =
-            ASensorManager_getDefaultSensor(sensor_manager, SENSOR_TYPE_ROTATION_VECTOR);
+    const Sensor* headSensor = sensorManager.getDefaultSensor(SENSOR_TYPE_GAME_ROTATION_VECTOR);
+    const Sensor* screenSensor = sensorManager.getDefaultSensor(SENSOR_TYPE_ROTATION_VECTOR);
 
     Listener listener;
 
     std::unique_ptr<SensorPoseProvider> provider =
             SensorPoseProvider::create(kPackageName, &listener);
-    int32_t headHandle = provider->startSensor(headSensor, std::chrono::milliseconds(500));
+    int32_t headHandle = provider->startSensor(headSensor->getHandle(), 500ms);
     sleep(2);
-    provider->startSensor(screenSensor, std::chrono::milliseconds(500));
+    provider->startSensor(screenSensor->getHandle(), 500ms);
     sleep(2);
     provider->stopSensor(headHandle);
     sleep(2);

@@ -25,7 +25,6 @@
 #include <sys/types.h>
 
 #include <android/content/AttributionSourceState.h>
-#include <android/sensor.h>
 #include <audio_utils/fixedfft.h>
 #include <cutils/bitops.h>
 #include <hardware/sensors.h>
@@ -346,9 +345,9 @@ Status Spatializer::getSupportedHeadTrackingModes(
 
     modes->push_back(SpatializerHeadTrackingMode::DISABLED);
     if (mSupportsHeadTracking) {
-        if (mHeadSensor != nullptr) {
+        if (mHeadSensor != SpatializerPoseController::INVALID_SENSOR) {
             modes->push_back(SpatializerHeadTrackingMode::RELATIVE_WORLD);
-            if (mScreenSensor != nullptr) {
+            if (mScreenSensor != SpatializerPoseController::INVALID_SENSOR) {
                 modes->push_back(SpatializerHeadTrackingMode::RELATIVE_SCREEN);
             }
         }
@@ -451,11 +450,7 @@ Status Spatializer::setHeadSensor(int sensorHandle) {
         return binderStatusFromStatusT(INVALID_OPERATION);
     }
     std::lock_guard lock(mLock);
-    if (sensorHandle == ASENSOR_INVALID) {
-        mHeadSensor = nullptr;
-    } else {
-        mHeadSensor = VALUE_OR_RETURN_BINDER_STATUS(getSensorFromHandle(sensorHandle));
-    }
+    mHeadSensor = sensorHandle;
     if (mPoseController != nullptr) {
         mPoseController->setHeadSensor(mHeadSensor);
     }
@@ -468,11 +463,7 @@ Status Spatializer::setScreenSensor(int sensorHandle) {
         return binderStatusFromStatusT(INVALID_OPERATION);
     }
     std::lock_guard lock(mLock);
-    if (sensorHandle == ASENSOR_INVALID) {
-        mScreenSensor = nullptr;
-    } else {
-        mScreenSensor = VALUE_OR_RETURN_BINDER_STATUS(getSensorFromHandle(sensorHandle));
-    }
+    mScreenSensor = sensorHandle;
     if (mPoseController != nullptr) {
         mPoseController->setScreenSensor(mScreenSensor);
     }
@@ -632,24 +623,6 @@ void Spatializer::onActualModeChangeMsg(HeadTrackingMode mode) {
     if (callback != nullptr) {
         callback->onHeadTrackingModeChanged(spatializerMode);
     }
-}
-
-/* static */
-ConversionResult<ASensorRef> Spatializer::getSensorFromHandle(int handle) {
-    ASensorManager* sensorManager =
-            ASensorManager_getInstanceForPackage("headtracker");
-    if (!sensorManager) {
-        ALOGE("Failed to get a sensor manager");
-        return base::unexpected(NO_INIT);
-    }
-    ASensorList sensorList;
-    int numSensors = ASensorManager_getSensorList(sensorManager, &sensorList);
-    for (int i = 0; i < numSensors; ++i) {
-        if (ASensor_getHandle(sensorList[i]) == handle) {
-            return sensorList[i];
-        }
-    }
-    return base::unexpected(BAD_VALUE);
 }
 
 status_t Spatializer::attachOutput(audio_io_handle_t output) {
