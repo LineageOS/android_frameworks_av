@@ -21,6 +21,7 @@
 #define LOG_TAG "MediaPlayerService"
 #include <utils/Log.h>
 
+#include <chrono>
 #include <sys/types.h>
 #include <sys/stat.h>
 #include <sys/time.h>
@@ -2467,8 +2468,13 @@ void MediaPlayerService::AudioOutput::flush()
 void MediaPlayerService::AudioOutput::pause()
 {
     ALOGV("pause");
+    // We use pauseAndWait() instead of pause() to ensure tracks ramp to silence before
+    // any flush. We choose 40 ms timeout to allow 1 deep buffer mixer period
+    // to occur.  Often waiting is 0 - 20 ms.
+    using namespace std::chrono_literals;
+    constexpr auto TIMEOUT_MS = 40ms;
     Mutex::Autolock lock(mLock);
-    if (mTrack != 0) mTrack->pause();
+    if (mTrack != 0) mTrack->pauseAndWait(TIMEOUT_MS);
 }
 
 void MediaPlayerService::AudioOutput::close()

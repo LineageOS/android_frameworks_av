@@ -26,7 +26,6 @@ cc_library_shared {
 
     shared_libs: [
         "libactivitymanager_aidl",
-        "libandroid",
         "libaudioclient",
         "libaudioclient_aidl_conversion",
         "libaudiofoundation",
