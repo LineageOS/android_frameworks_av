@@ -42,6 +42,8 @@ namespace android {
  */
 class SpatializerPoseController : private media::SensorPoseProvider::Listener {
   public:
+    static constexpr int32_t INVALID_SENSOR = media::SensorPoseProvider::INVALID_HANDLE;
+
     /**
      * Listener interface for getting pose and mode updates.
      * Methods will always be invoked from a designated thread.
@@ -68,15 +70,15 @@ class SpatializerPoseController : private media::SensorPoseProvider::Listener {
 
     /**
      * Set the sensor that is to be used for head-tracking.
-     * nullptr can be used to disable head-tracking.
+     * INVALID_SENSOR can be used to disable head-tracking.
      */
-    void setHeadSensor(const ASensor* sensor);
+    void setHeadSensor(int32_t sensor);
 
     /**
      * Set the sensor that is to be used for screen-tracking.
-     * nullptr can be used to disable screen-tracking.
+     * INVALID_SENSOR can be used to disable screen-tracking.
      */
-    void setScreenSensor(const ASensor* sensor);
+    void setScreenSensor(int32_t sensor);
 
     /** Sets the desired head-tracking mode. */
     void setDesiredMode(media::HeadTrackingMode mode);

@@ -17,6 +17,7 @@
 
 #define LOG_TAG "SpatializerPoseController"
 //#define LOG_NDEBUG 0
+#include <sensor/Sensor.h>
 #include <utils/Log.h>
 #include <utils/SystemClock.h>
 
@@ -129,45 +130,47 @@ SpatializerPoseController::~SpatializerPoseController() {
     mThread.join();
 }
 
-void SpatializerPoseController::setHeadSensor(const ASensor* sensor) {
+void SpatializerPoseController::setHeadSensor(int32_t sensor) {
     std::lock_guard lock(mMutex);
     // Stop current sensor, if valid and different from the other sensor.
-    if (mHeadSensor != SensorPoseProvider::INVALID_HANDLE && mHeadSensor != mScreenSensor) {
+    if (mHeadSensor != INVALID_SENSOR && mHeadSensor != mScreenSensor) {
         mPoseProvider->stopSensor(mHeadSensor);
     }
 
-    if (sensor != nullptr) {
-        if (ASensor_getHandle(sensor) != mScreenSensor) {
+    if (sensor != INVALID_SENSOR) {
+        if (sensor != mScreenSensor) {
             // Start new sensor.
-            mHeadSensor = mPoseProvider->startSensor(sensor, mSensorPeriod);
+            mHeadSensor =
+                    mPoseProvider->startSensor(sensor, mSensorPeriod) ? sensor : INVALID_SENSOR;
         } else {
             // Sensor is already enabled.
             mHeadSensor = mScreenSensor;
         }
     } else {
-        mHeadSensor = SensorPoseProvider::INVALID_HANDLE;
+        mHeadSensor = INVALID_SENSOR;
     }
 
     mProcessor->recenter(true, false);
 }
 
-void SpatializerPoseController::setScreenSensor(const ASensor* sensor) {
+void SpatializerPoseController::setScreenSensor(int32_t sensor) {
     std::lock_guard lock(mMutex);
     // Stop current sensor, if valid and different from the other sensor.
-    if (mScreenSensor != SensorPoseProvider::INVALID_HANDLE && mScreenSensor != mHeadSensor) {
+    if (mScreenSensor != INVALID_SENSOR && mScreenSensor != mHeadSensor) {
         mPoseProvider->stopSensor(mScreenSensor);
     }
 
-    if (sensor != nullptr) {
-        if (ASensor_getHandle(sensor) != mHeadSensor) {
+    if (sensor != INVALID_SENSOR) {
+        if (sensor != mHeadSensor) {
             // Start new sensor.
-            mScreenSensor = mPoseProvider->startSensor(sensor, mSensorPeriod);
+            mScreenSensor =
+                    mPoseProvider->startSensor(sensor, mSensorPeriod) ? sensor : INVALID_SENSOR;
         } else {
             // Sensor is already enabled.
             mScreenSensor = mHeadSensor;
         }
     } else {
-        mScreenSensor = SensorPoseProvider::INVALID_HANDLE;
+        mScreenSensor = INVALID_SENSOR;
     }
 
     mProcessor->recenter(false, true);
