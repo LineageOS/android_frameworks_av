@@ -28,7 +28,6 @@
 #include <android/media/AudioInputFlags.h>
 #include <android/media/AudioIoConfigEvent.h>
 #include <android/media/AudioIoDescriptor.h>
-#include <android/media/AudioMixLatencyClass.h>
 #include <android/media/AudioOutputFlags.h>
 #include <android/media/AudioPlaybackRate.h>
 #include <android/media/AudioPort.h>
@@ -341,13 +340,6 @@ ConversionResult<uint32_t>
 aidl2legacy_AudioEncapsulationMetadataType_mask(int32_t aidl);
 ConversionResult<int32_t>
 legacy2aidl_AudioEncapsulationMetadataType_mask(uint32_t legacy);
-
-ConversionResult<audio_mix_latency_class_t>
-aidl2legacy_AudioMixLatencyClass_audio_mix_latency_class_t(
-        media::AudioMixLatencyClass aidl);
-ConversionResult<media::AudioMixLatencyClass>
-legacy2aidl_audio_mix_latency_class_t_AudioMixLatencyClass(
-        audio_mix_latency_class_t legacy);
 
 ConversionResult<audio_port_device_ext>
 aidl2legacy_AudioPortDeviceExt_audio_port_device_ext(const media::AudioPortDeviceExt& aidl);

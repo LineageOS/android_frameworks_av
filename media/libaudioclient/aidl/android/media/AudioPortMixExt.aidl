@@ -16,8 +16,6 @@
 
 package android.media;
 
-import android.media.AudioMixLatencyClass;
-
 /**
  * {@hide}
  */
@@ -26,6 +24,4 @@ parcelable AudioPortMixExt {
     int hwModule;
     /** I/O handle of the input/output stream. Interpreted as audio_io_handle_t. */
     int handle;
-    /** Latency class */
-    AudioMixLatencyClass latencyClass;
 }

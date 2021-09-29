@@ -319,7 +319,6 @@ aidl_interface {
         "aidl/android/media/AudioIoConfigEvent.aidl",
         "aidl/android/media/AudioIoDescriptor.aidl",
         "aidl/android/media/AudioIoFlags.aidl",
-        "aidl/android/media/AudioMixLatencyClass.aidl",
         "aidl/android/media/AudioOutputFlags.aidl",
         "aidl/android/media/AudioPatch.aidl",
         "aidl/android/media/AudioPlaybackRate.aidl",

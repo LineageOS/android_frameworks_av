@@ -2559,30 +2559,6 @@ legacy2aidl_AudioEncapsulationMetadataType_mask(uint32_t legacy) {
             enumToMask_index<int32_t, AudioEncapsulationMetadataType>);
 }
 
-ConversionResult<audio_mix_latency_class_t>
-aidl2legacy_AudioMixLatencyClass_audio_mix_latency_class_t(
-        media::AudioMixLatencyClass aidl) {
-    switch (aidl) {
-        case media::AudioMixLatencyClass::LOW:
-            return AUDIO_LATENCY_LOW;
-        case media::AudioMixLatencyClass::NORMAL:
-            return AUDIO_LATENCY_NORMAL;
-    }
-    return unexpected(BAD_VALUE);
-}
-
-ConversionResult<media::AudioMixLatencyClass>
-legacy2aidl_audio_mix_latency_class_t_AudioMixLatencyClass(
-        audio_mix_latency_class_t legacy) {
-    switch (legacy) {
-        case AUDIO_LATENCY_LOW:
-            return media::AudioMixLatencyClass::LOW;
-        case AUDIO_LATENCY_NORMAL:
-            return media::AudioMixLatencyClass::NORMAL;
-    }
-    return unexpected(BAD_VALUE);
-}
-
 ConversionResult<audio_port_device_ext>
 aidl2legacy_AudioPortDeviceExt_audio_port_device_ext(const media::AudioPortDeviceExt& aidl) {
     audio_port_device_ext legacy;
@@ -2611,11 +2587,9 @@ legacy2aidl_audio_port_device_ext_AudioPortDeviceExt(const audio_port_device_ext
 
 ConversionResult<audio_port_mix_ext>
 aidl2legacy_AudioPortMixExt_audio_port_mix_ext(const media::AudioPortMixExt& aidl) {
-    audio_port_mix_ext legacy;
+    audio_port_mix_ext legacy{};
     legacy.hw_module = VALUE_OR_RETURN(aidl2legacy_int32_t_audio_module_handle_t(aidl.hwModule));
     legacy.handle = VALUE_OR_RETURN(aidl2legacy_int32_t_audio_io_handle_t(aidl.handle));
-    legacy.latency_class = VALUE_OR_RETURN(
-            aidl2legacy_AudioMixLatencyClass_audio_mix_latency_class_t(aidl.latencyClass));
     return legacy;
 }
 
@@ -2624,8 +2598,6 @@ legacy2aidl_audio_port_mix_ext_AudioPortMixExt(const audio_port_mix_ext& legacy)
     media::AudioPortMixExt aidl;
     aidl.hwModule = VALUE_OR_RETURN(legacy2aidl_audio_module_handle_t_int32_t(legacy.hw_module));
     aidl.handle = VALUE_OR_RETURN(legacy2aidl_audio_io_handle_t_int32_t(legacy.handle));
-    aidl.latencyClass = VALUE_OR_RETURN(
-            legacy2aidl_audio_mix_latency_class_t_AudioMixLatencyClass(legacy.latency_class));
     return aidl;
 }
 
