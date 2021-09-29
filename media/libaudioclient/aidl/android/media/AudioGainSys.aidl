@@ -13,14 +13,16 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
+
 package android.media;
 
 /**
+ * Provides additional runtime information for AudioGain, used by the framework.
+ *
  * {@hide}
  */
-@Backing(type="int")
-enum AudioGainMode {
-    JOINT    = 0,
-    CHANNELS = 1,
-    RAMP     = 2,
+parcelable AudioGainSys {
+    int index;
+    boolean isInput;
+    boolean useForVolume;
 }
