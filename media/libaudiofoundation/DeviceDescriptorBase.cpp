@@ -166,18 +166,18 @@ status_t DeviceDescriptorBase::writeToParcel(Parcel *parcel) const
 
 status_t DeviceDescriptorBase::writeToParcelable(media::AudioPort* parcelable) const {
     AudioPort::writeToParcelable(parcelable);
-    AudioPortConfig::writeToParcelable(&parcelable->activeConfig, useInputChannelMask());
-    parcelable->id = VALUE_OR_RETURN_STATUS(legacy2aidl_audio_port_handle_t_int32_t(mId));
+    AudioPortConfig::writeToParcelable(&parcelable->hal.activeConfig, useInputChannelMask());
+    parcelable->hal.id = VALUE_OR_RETURN_STATUS(legacy2aidl_audio_port_handle_t_int32_t(mId));
 
     media::audio::common::AudioDevice device = VALUE_OR_RETURN_STATUS(
             legacy2aidl_AudioDeviceTypeAddress(mDeviceTypeAddr));
-    UNION_SET(parcelable->ext, device, device);
+    UNION_SET(parcelable->hal.ext, device, device);
     media::AudioPortDeviceExtSys deviceSys;
     deviceSys.encapsulationModes = VALUE_OR_RETURN_STATUS(
             legacy2aidl_AudioEncapsulationMode_mask(mEncapsulationModes));
     deviceSys.encapsulationMetadataTypes = VALUE_OR_RETURN_STATUS(
             legacy2aidl_AudioEncapsulationMetadataType_mask(mEncapsulationMetadataTypes));
-    UNION_SET(parcelable->extSys, device, deviceSys);
+    UNION_SET(parcelable->sys.ext, device, deviceSys);
     return OK;
 }
 
@@ -188,21 +188,22 @@ status_t DeviceDescriptorBase::readFromParcel(const Parcel *parcel) {
 }
 
 status_t DeviceDescriptorBase::readFromParcelable(const media::AudioPort& parcelable) {
-    if (parcelable.type != media::AudioPortType::DEVICE) {
+    if (parcelable.sys.type != media::AudioPortType::DEVICE) {
         return BAD_VALUE;
     }
     status_t status = AudioPort::readFromParcelable(parcelable)
-            ?: AudioPortConfig::readFromParcelable(parcelable.activeConfig, useInputChannelMask());
+            ?: AudioPortConfig::readFromParcelable(
+                    parcelable.hal.activeConfig, useInputChannelMask());
     if (status != OK) {
         return status;
     }
 
     media::audio::common::AudioDevice device = VALUE_OR_RETURN_STATUS(
-            UNION_GET(parcelable.ext, device));
+            UNION_GET(parcelable.hal.ext, device));
     mDeviceTypeAddr = VALUE_OR_RETURN_STATUS(
             aidl2legacy_AudioDeviceTypeAddress(device));
     media::AudioPortDeviceExtSys deviceSys = VALUE_OR_RETURN_STATUS(
-            UNION_GET(parcelable.extSys, device));
+            UNION_GET(parcelable.sys.ext, device));
     mEncapsulationModes = VALUE_OR_RETURN_STATUS(
             aidl2legacy_AudioEncapsulationMode_mask(deviceSys.encapsulationModes));
     mEncapsulationMetadataTypes = VALUE_OR_RETURN_STATUS(

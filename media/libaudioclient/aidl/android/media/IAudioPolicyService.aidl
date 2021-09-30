@@ -40,7 +40,6 @@ import android.media.GetSpatializerResponse;
 import android.media.IAudioPolicyServiceClient;
 import android.media.ICaptureStateListener;
 import android.media.INativeSpatializerCallback;
-import android.media.Int;
 import android.media.SoundTriggerSession;
 import android.media.audio.common.AudioConfig;
 import android.media.audio.common.AudioConfigBase;
@@ -53,6 +52,7 @@ import android.media.audio.common.AudioSource;
 import android.media.audio.common.AudioStreamType;
 import android.media.audio.common.AudioUsage;
 import android.media.audio.common.AudioUuid;
+import android.media.audio.common.Int;
 
 /**
  * IAudioPolicyService interface (see AudioPolicyInterface for method descriptions).

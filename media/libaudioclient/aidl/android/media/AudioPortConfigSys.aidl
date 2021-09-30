@@ -16,17 +16,20 @@
 
 package android.media;
 
-import android.media.AudioStandard;
-import android.media.audio.common.AudioEncapsulationType;
+import android.media.AudioIoFlags;
+import android.media.AudioPortExtSys;
+import android.media.AudioPortRole;
+import android.media.AudioPortType;
 
 /**
- * The audio descriptor that descibes playback/capture capabilities according to
- * a particular standard.
- *
  * {@hide}
  */
-parcelable ExtraAudioDescriptor {
-    AudioStandard standard;
-    byte[] audioDescriptor;
-    AudioEncapsulationType encapsulationType;
+parcelable AudioPortConfigSys {
+    /** Sink or source. */
+    AudioPortRole role;
+    /** Device, mix ... */
+    AudioPortType type;
+    /** Flags: HW_AV_SYNC, DIRECT, ... Can be left unspecified. */
+    @nullable AudioIoFlags flags;
+    AudioPortExtSys ext;
 }
