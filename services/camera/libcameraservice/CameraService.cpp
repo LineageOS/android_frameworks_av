@@ -2054,6 +2054,11 @@ Status CameraService::setTorchMode(const String16& cameraId, bool enabled,
                     id.string());
                 errorCode = ERROR_ILLEGAL_ARGUMENT;
                 break;
+            case -EBUSY:
+                msg = String8::format("Camera \"%s\" is in use",
+                    id.string());
+                errorCode = ERROR_CAMERA_IN_USE;
+                break;
             default:
                 msg = String8::format(
                     "Setting torch mode of camera \"%s\" to %d failed: %s (%d)",
