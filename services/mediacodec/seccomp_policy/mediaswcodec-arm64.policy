@@ -78,6 +78,7 @@ geteuid: 1
 getgid: 1
 getegid: 1
 getgroups: 1
+sysinfo: 1
 
 # Android profiler (heapprofd, traced_perf) additions, where not already
 # covered by the rest of the file, or by builtin minijail allow-listing of

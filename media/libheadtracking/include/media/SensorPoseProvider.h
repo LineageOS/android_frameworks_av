@@ -81,17 +81,14 @@ class SensorPoseProvider {
      * @param sensor The sensor to subscribe to.
      * @param samplingPeriod Sampling interval, in microseconds. Actual rate might be slightly
      * different.
-     * @return The sensor handle, which can be later used for stopSensor(). INVALID_HANDLE would be
-     * returned in case of error. This is guaranteed to be the same handle as the one returned by
-     * ASensor_getHandle(sensor).
+     * @return true iff succeeded.
      */
-    virtual int32_t startSensor(const ASensor* sensor,
-                                std::chrono::microseconds samplingPeriod) = 0;
+    virtual bool startSensor(int32_t sensor, std::chrono::microseconds samplingPeriod) = 0;
 
     /**
      * Stop a sensor, previously started with startSensor(). It is not required to stop all sensors
      * before deleting the SensorPoseProvider instance.
-     * @param handle The sensor handle, as returned from startSensor().
+     * @param handle The sensor handle, as provided to startSensor().
      */
     virtual void stopSensor(int32_t handle) = 0;
 };
