@@ -22,7 +22,6 @@
 #include <android/media/SpatializationLevel.h>
 #include <android/media/SpatializationMode.h>
 #include <android/media/SpatializerHeadTrackingMode.h>
-#include <android/sensor.h>
 #include <media/audiohal/EffectHalInterface.h>
 #include <media/stagefright/foundation/ALooper.h>
 #include <media/AudioEffect.h>
@@ -161,9 +160,6 @@ private:
 
     void onHeadToStagePoseMsg(const std::vector<float>& headToStage);
     void onActualModeChangeMsg(media::HeadTrackingMode mode);
-
-
-    static ConversionResult<ASensorRef> getSensorFromHandle(int handle);
 
     static constexpr int kMaxEffectParamValues = 10;
     /**
@@ -312,10 +308,10 @@ private:
             = media::SpatializerHeadTrackingMode::DISABLED;
 
     /** Selected Head pose sensor */
-    ASensorRef mHeadSensor GUARDED_BY(mLock) = nullptr;
+    int32_t mHeadSensor GUARDED_BY(mLock) = SpatializerPoseController::INVALID_SENSOR;
 
     /** Selected Screen pose sensor */
-    ASensorRef mScreenSensor GUARDED_BY(mLock) = nullptr;
+    int32_t mScreenSensor GUARDED_BY(mLock) = SpatializerPoseController::INVALID_SENSOR;
 
     /** Last display orientation received */
     static constexpr float kDisplayOrientationInvalid = 1000;
