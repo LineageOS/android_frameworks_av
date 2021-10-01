@@ -569,6 +569,14 @@ size_t FlexBuffersImpl::numComponentBuffers() const {
             });
 }
 
+size_t FlexBuffersImpl::numClientBuffers() const {
+    return std::count_if(
+            mBuffers.begin(), mBuffers.end(),
+            [](const Entry &entry) {
+                return entry.clientBuffer != nullptr;
+            });
+}
+
 // BuffersArrayImpl
 
 void BuffersArrayImpl::initialize(
@@ -715,6 +723,14 @@ size_t BuffersArrayImpl::arraySize() const {
     return mBuffers.size();
 }
 
+size_t BuffersArrayImpl::numClientBuffers() const {
+    return std::count_if(
+            mBuffers.begin(), mBuffers.end(),
+            [](const Entry &entry) {
+                return entry.ownedByClient;
+            });
+}
+
 // InputBuffersArray
 
 void InputBuffersArray::initialize(
@@ -761,6 +777,10 @@ size_t InputBuffersArray::numActiveSlots() const {
     return mImpl.numActiveSlots();
 }
 
+size_t InputBuffersArray::numClientBuffers() const {
+    return mImpl.numClientBuffers();
+}
+
 sp<Codec2Buffer> InputBuffersArray::createNewBuffer() {
     return mAllocate();
 }
@@ -797,6 +817,10 @@ std::unique_ptr<InputBuffers> SlotInputBuffers::toArrayMode(size_t) {
 
 size_t SlotInputBuffers::numActiveSlots() const {
     return mImpl.numActiveSlots();
+}
+
+size_t SlotInputBuffers::numClientBuffers() const {
+    return mImpl.numClientBuffers();
 }
 
 sp<Codec2Buffer> SlotInputBuffers::createNewBuffer() {
@@ -849,6 +873,10 @@ std::unique_ptr<InputBuffers> LinearInputBuffers::toArrayMode(size_t size) {
 
 size_t LinearInputBuffers::numActiveSlots() const {
     return mImpl.numActiveSlots();
+}
+
+size_t LinearInputBuffers::numClientBuffers() const {
+    return mImpl.numClientBuffers();
 }
 
 // static
@@ -1033,6 +1061,10 @@ size_t GraphicMetadataInputBuffers::numActiveSlots() const {
     return mImpl.numActiveSlots();
 }
 
+size_t GraphicMetadataInputBuffers::numClientBuffers() const {
+    return mImpl.numClientBuffers();
+}
+
 sp<Codec2Buffer> GraphicMetadataInputBuffers::createNewBuffer() {
     std::shared_ptr<C2Allocator> alloc;
     c2_status_t err = mStore->fetchAllocator(mPool->getAllocatorId(), &alloc);
@@ -1111,6 +1143,10 @@ std::unique_ptr<InputBuffers> GraphicInputBuffers::toArrayMode(size_t size) {
 
 size_t GraphicInputBuffers::numActiveSlots() const {
     return mImpl.numActiveSlots();
+}
+
+size_t GraphicInputBuffers::numClientBuffers() const {
+    return mImpl.numClientBuffers();
 }
 
 sp<Codec2Buffer> GraphicInputBuffers::createNewBuffer() {
