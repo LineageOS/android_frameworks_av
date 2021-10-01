@@ -1083,6 +1083,12 @@ void CCodecBufferChannel::feedInputBufferIfAvailableInternal() {
             if (numActiveSlots >= input->numSlots) {
                 break;
             }
+            if (pipelineRoom <= input->buffers->numClientBuffers()) {
+                ALOGI("pipelineRoom(%zu) is <= numClientBuffers(%zu). "
+                    "Not signalling any more buffers to client",
+                    pipelineRoom, input->buffers->numClientBuffers());
+                break;
+            }
             if (!input->buffers->requestNewBuffer(&index, &inBuffer)) {
                 ALOGV("[%s] no new buffer available", mName);
                 break;
