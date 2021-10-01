@@ -1358,6 +1358,12 @@ status_t CCodecBufferChannel::start(
                 }
             }
         }
+
+        int32_t tunneled = 0;
+        if (!outputFormat->findInt32("android._tunneled", &tunneled)) {
+            tunneled = 0;
+        }
+        mTunneled = (tunneled != 0);
     }
 
     // Set up pipeline control. This has to be done after mInputBuffers and
@@ -1853,10 +1859,21 @@ bool CCodecBufferChannel::handleWork(
         }
     }
 
+    bool drop = false;
+    if (worklet->output.flags & C2FrameData::FLAG_DROP_FRAME) {
+        ALOGV("[%s] onWorkDone: drop buffer but keep metadata", mName);
+        drop = true;
+    }
+
     if (notifyClient && !buffer && !flags) {
-        ALOGV("[%s] onWorkDone: Not reporting output buffer (%lld)",
-              mName, work->input.ordinal.frameIndex.peekull());
-        notifyClient = false;
+        if (mTunneled && drop && outputFormat) {
+            ALOGV("[%s] onWorkDone: Keep tunneled, drop frame with format change (%lld)",
+                  mName, work->input.ordinal.frameIndex.peekull());
+        } else {
+            ALOGV("[%s] onWorkDone: Not reporting output buffer (%lld)",
+                  mName, work->input.ordinal.frameIndex.peekull());
+            notifyClient = false;
+        }
     }
 
     if (buffer) {
