@@ -40,8 +40,8 @@ public:
     JitterCalc(int32_t clockRate);
 
     void init(uint32_t rtpTime, int64_t arrivalTimeUs, int32_t base, int32_t inter);
-    void putInterArrivalData(int64_t rtpTime, int64_t arrivalTime);
-    void putBaseData(int64_t rtpTime, int64_t arrivalTimeUs);
+    void putInterArrivalData(uint32_t rtpTime, int64_t arrivalTime);
+    void putBaseData(uint32_t rtpTime, int64_t arrivalTimeUs);
     int32_t getBaseJitterMs();
     int32_t getInterArrivalJitterMs();
 };
