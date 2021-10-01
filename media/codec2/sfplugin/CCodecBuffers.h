@@ -161,6 +161,11 @@ public:
      */
     sp<Codec2Buffer> cloneAndReleaseBuffer(const sp<MediaCodecBuffer> &buffer);
 
+    /**
+     * Return number of buffers are given to client but have not yet queued back.
+     */
+    virtual size_t numClientBuffers() const = 0;
+
 protected:
     virtual sp<Codec2Buffer> createNewBuffer() = 0;
 
@@ -610,6 +615,11 @@ public:
     size_t numActiveSlots() const;
 
     /**
+     * Return number of buffers are given to client but have not yet queued back.
+     */
+    size_t numClientBuffers() const;
+
+    /**
      * Return the number of buffers that are sent to the component but not
      * returned back yet.
      */
@@ -734,6 +744,11 @@ public:
      */
     size_t arraySize() const;
 
+    /**
+     * Return number of buffers are given to client but have not yet queued back.
+     */
+    size_t numClientBuffers() const;
+
 private:
     std::string mImplName; ///< name for debugging
     const char *mName; ///< C-string version of name
@@ -789,6 +804,8 @@ public:
 
     size_t numActiveSlots() const final;
 
+    size_t numClientBuffers() const final;
+
 protected:
     sp<Codec2Buffer> createNewBuffer() override;
 
@@ -820,6 +837,8 @@ public:
 
     size_t numActiveSlots() const final;
 
+    size_t numClientBuffers() const final;
+
 protected:
     sp<Codec2Buffer> createNewBuffer() final;
 
@@ -849,6 +868,8 @@ public:
     std::unique_ptr<InputBuffers> toArrayMode(size_t size) override;
 
     size_t numActiveSlots() const final;
+
+    size_t numClientBuffers() const final;
 
 protected:
     sp<Codec2Buffer> createNewBuffer() override;
@@ -918,6 +939,8 @@ public:
 
     size_t numActiveSlots() const final;
 
+    size_t numClientBuffers() const final;
+
 protected:
     sp<Codec2Buffer> createNewBuffer() override;
 
@@ -947,6 +970,8 @@ public:
             size_t size) final;
 
     size_t numActiveSlots() const final;
+
+    size_t numClientBuffers() const final;
 
     uint32_t getPixelFormatIfApplicable() override;
 
@@ -993,6 +1018,10 @@ public:
     }
 
     size_t numActiveSlots() const final {
+        return 0u;
+    }
+
+    size_t numClientBuffers() const final {
         return 0u;
     }
 
