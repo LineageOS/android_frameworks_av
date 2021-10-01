@@ -28,19 +28,14 @@
 #include <android/media/AudioInputFlags.h>
 #include <android/media/AudioIoConfigEvent.h>
 #include <android/media/AudioIoDescriptor.h>
-#include <android/media/AudioMixLatencyClass.h>
 #include <android/media/AudioOutputFlags.h>
 #include <android/media/AudioPlaybackRate.h>
 #include <android/media/AudioPort.h>
-#include <android/media/AudioPortConfigType.h>
-#include <android/media/AudioPortDeviceExt.h>
-#include <android/media/AudioPortExt.h>
-#include <android/media/AudioPortMixExt.h>
-#include <android/media/AudioPortSessionExt.h>
+#include <android/media/AudioPortConfig.h>
+#include <android/media/AudioPortDeviceExtSys.h>
 #include <android/media/AudioTimestampInternal.h>
 #include <android/media/AudioUniqueIdUse.h>
 #include <android/media/EffectDescriptor.h>
-#include <android/media/ExtraAudioDescriptor.h>
 #include <android/media/TrackSecondaryOutputInfo.h>
 #include <android/media/audio/common/AudioChannelLayout.h>
 #include <android/media/audio/common/AudioConfig.h>
@@ -56,10 +51,14 @@
 #include <android/media/audio/common/AudioGainMode.h>
 #include <android/media/audio/common/AudioMode.h>
 #include <android/media/audio/common/AudioOffloadInfo.h>
+#include <android/media/audio/common/AudioPortExt.h>
+#include <android/media/audio/common/AudioPortMixExt.h>
 #include <android/media/audio/common/AudioProfile.h>
 #include <android/media/audio/common/AudioSource.h>
+#include <android/media/audio/common/AudioStandard.h>
 #include <android/media/audio/common/AudioUsage.h>
 #include <android/media/audio/common/AudioUuid.h>
+#include <android/media/audio/common/ExtraAudioDescriptor.h>
 
 #include <android/media/SharedFileRegion.h>
 #include <binder/IMemory.h>
@@ -94,13 +93,6 @@ ConversionResult<int32_t> legacy2aidl_audio_unique_id_t_int32_t(audio_unique_id_
 
 ConversionResult<audio_hw_sync_t> aidl2legacy_int32_t_audio_hw_sync_t(int32_t aidl);
 ConversionResult<int32_t> legacy2aidl_audio_hw_sync_t_int32_t(audio_hw_sync_t legacy);
-
-// The legacy enum is unnamed. Thus, we use int32_t.
-ConversionResult<int32_t> aidl2legacy_AudioPortConfigType_int32_t(
-        media::AudioPortConfigType aidl);
-// The legacy enum is unnamed. Thus, we use int32_t.
-ConversionResult<media::AudioPortConfigType> legacy2aidl_int32_t_AudioPortConfigType(
-        int32_t legacy);
 
 ConversionResult<unsigned int> aidl2legacy_int32_t_config_mask(int32_t aidl);
 ConversionResult<int32_t> legacy2aidl_config_mask_int32_t(unsigned int legacy);
@@ -177,11 +169,9 @@ ConversionResult<audio_gain_mode_t> aidl2legacy_int32_t_audio_gain_mode_t_mask(i
 ConversionResult<int32_t> legacy2aidl_audio_gain_mode_t_int32_t_mask(audio_gain_mode_t legacy);
 
 ConversionResult<audio_gain_config> aidl2legacy_AudioGainConfig_audio_gain_config(
-        const media::audio::common::AudioGainConfig& aidl,
-        media::AudioPortRole role, media::AudioPortType type);
+        const media::audio::common::AudioGainConfig& aidl, bool isInput);
 ConversionResult<media::audio::common::AudioGainConfig>
-legacy2aidl_audio_gain_config_AudioGainConfig(
-        const audio_gain_config& legacy, audio_port_role_t role, audio_port_type_t type);
+legacy2aidl_audio_gain_config_AudioGainConfig(const audio_gain_config& legacy, bool isInput);
 
 ConversionResult<audio_input_flags_t> aidl2legacy_AudioInputFlags_audio_input_flags_t(
         media::AudioInputFlags aidl);
@@ -209,11 +199,12 @@ ConversionResult<media::AudioIoFlags> legacy2aidl_audio_io_flags_AudioIoFlags(
         const audio_io_flags& legacy, audio_port_role_t role, audio_port_type_t type);
 
 ConversionResult<audio_port_config_device_ext>
-aidl2legacy_AudioPortConfigDeviceExt_audio_port_config_device_ext(
-        const media::AudioPortConfigDeviceExt& aidl);
-ConversionResult<media::AudioPortConfigDeviceExt>
-legacy2aidl_audio_port_config_device_ext_AudioPortConfigDeviceExt(
-        const audio_port_config_device_ext& legacy);
+aidl2legacy_AudioDevice_audio_port_config_device_ext(
+        const media::audio::common::AudioDevice& aidl,
+        const media::AudioPortDeviceExtSys& aidlDeviceExt);
+status_t legacy2aidl_audio_port_config_device_ext_AudioDevice(
+        const audio_port_config_device_ext& legacy,
+        media::audio::common::AudioDevice* aidl, media::AudioPortDeviceExtSys* aidlDeviceExt);
 
 ConversionResult<audio_stream_type_t> aidl2legacy_AudioStreamType_audio_stream_type_t(
         media::audio::common::AudioStreamType aidl);
@@ -229,16 +220,16 @@ ConversionResult<media::audio::common::AudioSource>
 ConversionResult<audio_session_t> aidl2legacy_int32_t_audio_session_t(int32_t aidl);
 ConversionResult<int32_t> legacy2aidl_audio_session_t_int32_t(audio_session_t legacy);
 
-ConversionResult<audio_port_config_mix_ext> aidl2legacy_AudioPortConfigMixExt(
-        const media::AudioPortConfigMixExt& aidl, media::AudioPortRole role);
-ConversionResult<media::AudioPortConfigMixExt> legacy2aidl_AudioPortConfigMixExt(
-        const audio_port_config_mix_ext& legacy, audio_port_role_t role);
+ConversionResult<audio_port_config_mix_ext> aidl2legacy_AudioPortMixExt(
+        const media::audio::common::AudioPortMixExt& aidl, media::AudioPortRole role,
+        const media::AudioPortMixExtSys& aidlMixExt);
+status_t legacy2aidl_AudioPortMixExt(
+        const audio_port_config_mix_ext& legacy, audio_port_role_t role,
+        media::audio::common::AudioPortMixExt* aidl, media::AudioPortMixExtSys* aidlMixExt);
 
 ConversionResult<audio_port_config_session_ext>
-aidl2legacy_AudioPortConfigSessionExt_audio_port_config_session_ext(
-        const media::AudioPortConfigSessionExt& aidl);
-ConversionResult<media::AudioPortConfigSessionExt>
-legacy2aidl_audio_port_config_session_ext_AudioPortConfigSessionExt(
+aidl2legacy_int32_t_audio_port_config_session_ext(int32_t aidl);
+ConversionResult<int32_t> legacy2aidl_audio_port_config_session_ext_AudioPortConfigSessionExt(
         const audio_port_config_session_ext& legacy);
 
 ConversionResult<audio_port_config> aidl2legacy_AudioPortConfig_audio_port_config(
@@ -352,27 +343,28 @@ aidl2legacy_AudioEncapsulationMetadataType_mask(int32_t aidl);
 ConversionResult<int32_t>
 legacy2aidl_AudioEncapsulationMetadataType_mask(uint32_t legacy);
 
-ConversionResult<audio_mix_latency_class_t>
-aidl2legacy_AudioMixLatencyClass_audio_mix_latency_class_t(
-        media::AudioMixLatencyClass aidl);
-ConversionResult<media::AudioMixLatencyClass>
-legacy2aidl_audio_mix_latency_class_t_AudioMixLatencyClass(
-        audio_mix_latency_class_t legacy);
-
 ConversionResult<audio_port_device_ext>
-aidl2legacy_AudioPortDeviceExt_audio_port_device_ext(const media::AudioPortDeviceExt& aidl);
-ConversionResult<media::AudioPortDeviceExt>
-legacy2aidl_audio_port_device_ext_AudioPortDeviceExt(const audio_port_device_ext& legacy);
+aidl2legacy_AudioDevice_audio_port_device_ext(
+        const media::audio::common::AudioDevice& aidl,
+        const media::AudioPortDeviceExtSys& aidlDeviceExt);
+status_t legacy2aidl_audio_port_device_ext_AudioDevice(
+        const audio_port_device_ext& legacy,
+        media::audio::common::AudioDevice* aidl,
+        media::AudioPortDeviceExtSys* aidlDeviceExt);
 
 ConversionResult<audio_port_mix_ext>
-aidl2legacy_AudioPortMixExt_audio_port_mix_ext(const media::AudioPortMixExt& aidl);
-ConversionResult<media::AudioPortMixExt>
-legacy2aidl_audio_port_mix_ext_AudioPortMixExt(const audio_port_mix_ext& legacy);
+aidl2legacy_AudioPortMixExt_audio_port_mix_ext(
+        const media::audio::common::AudioPortMixExt& aidl,
+        const media::AudioPortMixExtSys& aidlMixExt);
+status_t legacy2aidl_audio_port_mix_ext_AudioPortMixExt(
+        const audio_port_mix_ext& legacy,
+        media::audio::common::AudioPortMixExt* aidl,
+        media::AudioPortMixExtSys* aidlMixExt);
 
 ConversionResult<audio_port_session_ext>
-aidl2legacy_AudioPortSessionExt_audio_port_session_ext(const media::AudioPortSessionExt& aidl);
-ConversionResult<media::AudioPortSessionExt>
-legacy2aidl_audio_port_session_ext_AudioPortSessionExt(const audio_port_session_ext& legacy);
+aidl2legacy_int32_t_audio_port_session_ext(int32_t aidl);
+ConversionResult<int32_t>
+legacy2aidl_audio_port_session_ext_int32_t(const audio_port_session_ext& legacy);
 
 ConversionResult<audio_profile>
 aidl2legacy_AudioProfile_audio_profile(
@@ -426,14 +418,14 @@ ConversionResult<media::AudioPlaybackRate>
 legacy2aidl_audio_playback_rate_t_AudioPlaybackRate(const audio_playback_rate_t& legacy);
 
 ConversionResult<audio_standard_t>
-aidl2legacy_AudioStandard_audio_standard_t(media::AudioStandard aidl);
-ConversionResult<media::AudioStandard>
+aidl2legacy_AudioStandard_audio_standard_t(media::audio::common::AudioStandard aidl);
+ConversionResult<media::audio::common::AudioStandard>
 legacy2aidl_audio_standard_t_AudioStandard(audio_standard_t legacy);
 
 ConversionResult<audio_extra_audio_descriptor>
 aidl2legacy_ExtraAudioDescriptor_audio_extra_audio_descriptor(
-        const media::ExtraAudioDescriptor& aidl);
-ConversionResult<media::ExtraAudioDescriptor>
+        const media::audio::common::ExtraAudioDescriptor& aidl);
+ConversionResult<media::audio::common::ExtraAudioDescriptor>
 legacy2aidl_audio_extra_audio_descriptor_ExtraAudioDescriptor(
         const audio_extra_audio_descriptor& legacy);
 

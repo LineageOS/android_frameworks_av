@@ -16,12 +16,19 @@
 
 package android.media;
 
+import android.media.AudioPortDeviceExtSys;
+import android.media.AudioPortMixExtSys;
+
 /**
- * This is a simple wrapper around an 'int', putting it in a parcelable, so it can be used as an
- * inout parameter, be made @nullable, etc.
- *
  * {@hide}
  */
-parcelable Int {
-    int value;
+union AudioPortExtSys {
+    /**
+     * This represents an empty union. Value is ignored.
+     */
+    boolean unspecified;
+    /** System-only parameters when the port is an audio device. */
+    AudioPortDeviceExtSys device;
+    /** System-only parameters when the port is an audio mix. */
+    AudioPortMixExtSys mix;
 }

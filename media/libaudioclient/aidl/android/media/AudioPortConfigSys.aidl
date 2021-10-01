@@ -1,5 +1,5 @@
 /*
- * Copyright (C) 2020 The Android Open Source Project
+ * Copyright (C) 2021 The Android Open Source Project
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -16,16 +16,20 @@
 
 package android.media;
 
-import android.media.AudioMixLatencyClass;
+import android.media.AudioIoFlags;
+import android.media.AudioPortExtSys;
+import android.media.AudioPortRole;
+import android.media.AudioPortType;
 
 /**
  * {@hide}
  */
-parcelable AudioPortMixExt {
-    /** Module the stream is attached to. Interpreted as audio_module_handle_t. */
-    int hwModule;
-    /** I/O handle of the input/output stream. Interpreted as audio_io_handle_t. */
-    int handle;
-    /** Latency class */
-    AudioMixLatencyClass latencyClass;
+parcelable AudioPortConfigSys {
+    /** Sink or source. */
+    AudioPortRole role;
+    /** Device, mix ... */
+    AudioPortType type;
+    /** Flags: HW_AV_SYNC, DIRECT, ... Can be left unspecified. */
+    @nullable AudioIoFlags flags;
+    AudioPortExtSys ext;
 }

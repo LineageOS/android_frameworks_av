@@ -40,12 +40,6 @@
        if (!_tmp.ok()) return aidl_utils::binderStatusFromStatusT(_tmp.error()); \
        std::move(_tmp.value()); })
 
-#define RETURN_STATUS_IF_ERROR(x)    \
-    {                                \
-        auto _tmp = (x);             \
-        if (_tmp != OK) return _tmp; \
-    }
-
 // ----------------------------------------------------------------------------
 
 namespace android {
@@ -56,7 +50,6 @@ using media::IAudioPolicyService;
 using media::audio::common::AudioConfig;
 using media::audio::common::AudioConfigBase;
 using media::audio::common::AudioDevice;
-using media::audio::common::AudioDeviceAddress;
 using media::audio::common::AudioDeviceDescription;
 using media::audio::common::AudioFormatDescription;
 using media::audio::common::AudioMMapPolicyInfo;
@@ -65,6 +58,7 @@ using media::audio::common::AudioOffloadInfo;
 using media::audio::common::AudioSource;
 using media::audio::common::AudioStreamType;
 using media::audio::common::AudioUsage;
+using media::audio::common::Int;
 
 // client singleton for AudioFlinger binder interface
 Mutex AudioSystem::gLock;
@@ -1500,7 +1494,7 @@ status_t AudioSystem::listAudioPorts(audio_port_role_t role,
             legacy2aidl_audio_port_role_t_AudioPortRole(role));
     media::AudioPortType typeAidl = VALUE_OR_RETURN_STATUS(
             legacy2aidl_audio_port_type_t_AudioPortType(type));
-    media::Int numPortsAidl;
+    Int numPortsAidl;
     numPortsAidl.value = VALUE_OR_RETURN_STATUS(convertIntegral<int32_t>(*num_ports));
     std::vector<media::AudioPort> portsAidl;
     int32_t generationAidl;
@@ -1567,7 +1561,7 @@ status_t AudioSystem::listAudioPatches(unsigned int* num_patches,
     if (aps == 0) return PERMISSION_DENIED;
 
 
-    media::Int numPatchesAidl;
+    Int numPatchesAidl;
     numPatchesAidl.value = VALUE_OR_RETURN_STATUS(convertIntegral<int32_t>(*num_patches));
     std::vector<media::AudioPatch> patchesAidl;
     int32_t generationAidl;
@@ -1880,7 +1874,7 @@ status_t AudioSystem::getSurroundFormats(unsigned int* numSurroundFormats,
 
     const sp<IAudioPolicyService>& aps = AudioSystem::get_audio_policy_service();
     if (aps == 0) return PERMISSION_DENIED;
-    media::Int numSurroundFormatsAidl;
+    Int numSurroundFormatsAidl;
     numSurroundFormatsAidl.value =
             VALUE_OR_RETURN_STATUS(convertIntegral<int32_t>(*numSurroundFormats));
     std::vector<AudioFormatDescription> surroundFormatsAidl;
@@ -1907,7 +1901,7 @@ status_t AudioSystem::getReportedSurroundFormats(unsigned int* numSurroundFormat
 
     const sp<IAudioPolicyService>& aps = AudioSystem::get_audio_policy_service();
     if (aps == 0) return PERMISSION_DENIED;
-    media::Int numSurroundFormatsAidl;
+    Int numSurroundFormatsAidl;
     numSurroundFormatsAidl.value =
             VALUE_OR_RETURN_STATUS(convertIntegral<int32_t>(*numSurroundFormats));
     std::vector<AudioFormatDescription> surroundFormatsAidl;
