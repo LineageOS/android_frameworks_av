@@ -1854,14 +1854,25 @@ status_t CCodec::setSurface(const sp<Surface> &surface) {
     {
         Mutexed<std::unique_ptr<Config>>::Locked configLocked(mConfig);
         const std::unique_ptr<Config> &config = *configLocked;
+        sp<ANativeWindow> nativeWindow = static_cast<ANativeWindow *>(surface.get());
+        status_t err = OK;
+
         if (config->mTunneled && config->mSidebandHandle != nullptr) {
-            sp<ANativeWindow> nativeWindow = static_cast<ANativeWindow *>(surface.get());
-            status_t err = native_window_set_sideband_stream(
+            err = native_window_set_sideband_stream(
                     nativeWindow.get(),
                     const_cast<native_handle_t *>(config->mSidebandHandle->handle()));
             if (err != OK) {
                 ALOGE("NativeWindow(%p) native_window_set_sideband_stream(%p) failed! (err %d).",
                         nativeWindow.get(), config->mSidebandHandle->handle(), err);
+                return err;
+            }
+        } else {
+            // Explicitly reset the sideband handle of the window for
+            // non-tunneled video in case the window was previously used
+            // for a tunneled video playback.
+            err = native_window_set_sideband_stream(nativeWindow.get(), nullptr);
+            if (err != OK) {
+                ALOGE("native_window_set_sideband_stream(nullptr) failed! (err %d).", err);
                 return err;
             }
         }
