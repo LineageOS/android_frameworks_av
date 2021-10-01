@@ -128,27 +128,6 @@ audio_channel_mask_t AAudio_getChannelMaskForOpen(
 // Note that this code may be replaced by Settings or by some other system configuration tool.
 
 /**
- * Read system property.
- * @return AAUDIO_UNSPECIFIED, AAUDIO_POLICY_NEVER or AAUDIO_POLICY_AUTO or AAUDIO_POLICY_ALWAYS
- */
-int32_t AAudioProperty_getMMapPolicy();
-#define AAUDIO_PROP_MMAP_POLICY           "aaudio.mmap_policy"
-
-/**
- * Read system property.
- * @return AAUDIO_UNSPECIFIED, AAUDIO_POLICY_NEVER or AAUDIO_POLICY_AUTO or AAUDIO_POLICY_ALWAYS
- */
-int32_t AAudioProperty_getMMapExclusivePolicy();
-#define AAUDIO_PROP_MMAP_EXCLUSIVE_POLICY "aaudio.mmap_exclusive_policy"
-
-/**
- * Read system property.
- * @return number of bursts per AAudio service mixer cycle
- */
-int32_t AAudioProperty_getMixerBursts();
-#define AAUDIO_PROP_MIXER_BURSTS           "aaudio.mixer_bursts"
-
-/**
  * Read a system property that specifies the number of extra microseconds that a thread
  * should sleep when waiting for another thread to service a FIFO. This is used
  * to avoid the waking thread from being overly optimistic about the other threads
@@ -167,19 +146,6 @@ int32_t AAudioProperty_getWakeupDelayMicros();
  */
 int32_t AAudioProperty_getMinimumSleepMicros();
 #define AAUDIO_PROP_MINIMUM_SLEEP_USEC      "aaudio.minimum_sleep_usec"
-
-/**
- * Read system property.
- * This is handy in case the DMA is bursting too quickly for the CPU to keep up.
- * For example, there may be a DMA burst every 100 usec but you only
- * want to feed the MMAP buffer every 2000 usec.
- *
- * This will affect the framesPerBurst for an MMAP stream.
- *
- * @return minimum number of microseconds for a MMAP HW burst
- */
-int32_t AAudioProperty_getHardwareBurstMinMicros();
-#define AAUDIO_PROP_HW_BURST_MIN_USEC      "aaudio.hw_burst_min_usec"
 
 /**
  * Read a system property that specifies an offset that will be added to MMAP timestamps.
