@@ -41,6 +41,9 @@ using ConversionResult = base::expected<T, status_t>;
 #define RETURN_IF_ERROR(result) \
     if (status_t _tmp = (result); _tmp != OK) return base::unexpected(_tmp);
 
+#define RETURN_STATUS_IF_ERROR(result) \
+    if (status_t _tmp = (result); _tmp != OK) return _tmp;
+
 #define VALUE_OR_RETURN_STATUS(x)           \
     ({                                      \
        auto _tmp = (x);                     \

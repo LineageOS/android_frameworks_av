@@ -32,12 +32,6 @@
 #include <private/media/AudioEffectShared.h>
 #include <utils/Log.h>
 
-#define RETURN_STATUS_IF_ERROR(x)    \
-    {                                \
-        auto _tmp = (x);             \
-        if (_tmp != OK) return _tmp; \
-    }
-
 namespace android {
 using aidl_utils::statusTFromBinderStatus;
 using binder::Status;
@@ -573,7 +567,7 @@ status_t AudioEffect::queryDefaultPreProcessing(audio_session_t audioSession,
 
     int32_t audioSessionAidl = VALUE_OR_RETURN_STATUS(
             legacy2aidl_audio_session_t_int32_t(audioSession));
-    media::Int countAidl;
+    media::audio::common::Int countAidl;
     countAidl.value = VALUE_OR_RETURN_STATUS(convertIntegral<int32_t>(*count));
     std::vector<media::EffectDescriptor> retAidl;
     RETURN_STATUS_IF_ERROR(statusTFromBinderStatus(
