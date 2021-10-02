@@ -130,11 +130,11 @@ TEST(AudioFoundationParcelableTest, ParcelingAudioPortConfig) {
     Parcel data;
     sp<AudioPortConfig> audioPortConfig = new AudioPortConfigTestStub();
     audioPortConfig->applyAudioPortConfig(&TEST_AUDIO_PORT_CONFIG);
-    media::AudioPortConfig parcelable{};
+    media::audio::common::AudioPortConfig parcelable{};
     ASSERT_EQ(NO_ERROR, audioPortConfig->writeToParcelable(&parcelable, false /*isInput*/));
     ASSERT_EQ(NO_ERROR, data.writeParcelable(parcelable));
     data.setDataPosition(0);
-    media::AudioPortConfig parcelableFromParcel{};
+    media::audio::common::AudioPortConfig parcelableFromParcel{};
     ASSERT_EQ(NO_ERROR, data.readParcelable(&parcelableFromParcel));
     sp<AudioPortConfig> audioPortConfigFromParcel = new AudioPortConfigTestStub();
     ASSERT_EQ(NO_ERROR, audioPortConfigFromParcel->readFromParcelable(

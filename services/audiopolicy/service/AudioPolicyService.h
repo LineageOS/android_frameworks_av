@@ -59,6 +59,7 @@ using media::audio::common::AudioSource;
 using media::audio::common::AudioStreamType;
 using media::audio::common::AudioUsage;
 using media::audio::common::AudioUuid;
+using media::audio::common::Int;
 
 // ----------------------------------------------------------------------------
 
@@ -152,7 +153,7 @@ public:
                                           bool* _aidl_return) override;
     binder::Status isSourceActive(AudioSource source, bool* _aidl_return) override;
     binder::Status queryDefaultPreProcessing(
-            int32_t audioSession, media::Int* count,
+            int32_t audioSession, Int* count,
             std::vector<media::EffectDescriptor>* _aidl_return) override;
     binder::Status addSourceDefaultEffect(const AudioUuid& type,
                                           const std::string& opPackageName,
@@ -174,14 +175,14 @@ public:
                                            const media::AudioAttributesInternal& attributes,
                                            bool* _aidl_return) override;
     binder::Status listAudioPorts(media::AudioPortRole role, media::AudioPortType type,
-                                  media::Int* count, std::vector<media::AudioPort>* ports,
+                                  Int* count, std::vector<media::AudioPort>* ports,
                                   int32_t* _aidl_return) override;
     binder::Status getAudioPort(const media::AudioPort& port,
                                 media::AudioPort* _aidl_return) override;
     binder::Status createAudioPatch(const media::AudioPatch& patch, int32_t handle,
                                     int32_t* _aidl_return) override;
     binder::Status releaseAudioPatch(int32_t handle) override;
-    binder::Status listAudioPatches(media::Int* count, std::vector<media::AudioPatch>* patches,
+    binder::Status listAudioPatches(Int* count, std::vector<media::AudioPatch>* patches,
                                     int32_t* _aidl_return) override;
     binder::Status setAudioPortConfig(const media::AudioPortConfig& config) override;
     binder::Status registerClient(const sp<media::IAudioPolicyServiceClient>& client) override;
@@ -208,11 +209,11 @@ public:
     binder::Status getStreamVolumeDB(AudioStreamType stream, int32_t index,
                                      const AudioDeviceDescription& device,
                                      float* _aidl_return) override;
-    binder::Status getSurroundFormats(media::Int* count,
+    binder::Status getSurroundFormats(Int* count,
                                       std::vector<AudioFormatDescription>* formats,
                                       std::vector<bool>* formatsEnabled) override;
     binder::Status getReportedSurroundFormats(
-            media::Int* count, std::vector<AudioFormatDescription>* formats) override;
+            Int* count, std::vector<AudioFormatDescription>* formats) override;
     binder::Status getHwOffloadEncodingFormatsSupportedForA2DP(
             std::vector<AudioFormatDescription>* _aidl_return) override;
     binder::Status setSurroundFormatEnabled(const AudioFormatDescription& audioFormat,

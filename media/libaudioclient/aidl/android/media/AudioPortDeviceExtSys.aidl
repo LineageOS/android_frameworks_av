@@ -16,17 +16,14 @@
 
 package android.media;
 
-import android.media.AudioStandard;
-import android.media.audio.common.AudioEncapsulationType;
-
 /**
- * The audio descriptor that descibes playback/capture capabilities according to
- * a particular standard.
- *
  * {@hide}
  */
-parcelable ExtraAudioDescriptor {
-    AudioStandard standard;
-    byte[] audioDescriptor;
-    AudioEncapsulationType encapsulationType;
+parcelable AudioPortDeviceExtSys {
+    /** Module the device is attached to. Interpreted as audio_module_handle_t. */
+    int hwModule;
+    /** Bitmask, indexed by AudioEncapsulationMode. */
+    int encapsulationModes;
+    /** Bitmask, indexed by AudioEncapsulationMetadataType. */
+    int encapsulationMetadataTypes;
 }

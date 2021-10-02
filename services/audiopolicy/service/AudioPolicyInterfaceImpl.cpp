@@ -59,6 +59,7 @@ using media::audio::common::AudioSource;
 using media::audio::common::AudioStreamType;
 using media::audio::common::AudioUsage;
 using media::audio::common::AudioUuid;
+using media::audio::common::Int;
 
 const std::vector<audio_usage_t>& SYSTEM_USAGES = {
     AUDIO_USAGE_CALL_ASSISTANT,
@@ -1299,7 +1300,7 @@ status_t AudioPolicyService::getAudioPolicyEffects(sp<AudioPolicyEffects>& audio
 
 Status AudioPolicyService::queryDefaultPreProcessing(
         int32_t audioSessionAidl,
-        media::Int* countAidl,
+        Int* countAidl,
         std::vector<media::EffectDescriptor>* _aidl_return) {
     audio_session_t audioSession = VALUE_OR_RETURN_BINDER_STATUS(
             aidl2legacy_int32_t_audio_session_t(audioSessionAidl));
@@ -1480,7 +1481,7 @@ Status AudioPolicyService::isDirectOutputSupported(
 
 
 Status AudioPolicyService::listAudioPorts(media::AudioPortRole roleAidl,
-                                          media::AudioPortType typeAidl, media::Int* count,
+                                          media::AudioPortType typeAidl, Int* count,
                                           std::vector<media::AudioPort>* portsAidl,
                                           int32_t* _aidl_return) {
     audio_port_role_t role = VALUE_OR_RETURN_BINDER_STATUS(
@@ -1568,7 +1569,7 @@ Status AudioPolicyService::releaseAudioPatch(int32_t handleAidl)
                                                    IPCThreadState::self()->getCallingUid()));
 }
 
-Status AudioPolicyService::listAudioPatches(media::Int* count,
+Status AudioPolicyService::listAudioPatches(Int* count,
                                             std::vector<media::AudioPatch>* patchesAidl,
                                             int32_t* _aidl_return) {
     unsigned int num_patches = VALUE_OR_RETURN_BINDER_STATUS(
@@ -1853,7 +1854,7 @@ Status AudioPolicyService::getStreamVolumeDB(
     return Status::ok();
 }
 
-Status AudioPolicyService::getSurroundFormats(media::Int* count,
+Status AudioPolicyService::getSurroundFormats(Int* count,
         std::vector<AudioFormatDescription>* formats,
         std::vector<bool>* formatsEnabled) {
     unsigned int numSurroundFormats = VALUE_OR_RETURN_BINDER_STATUS(
@@ -1887,7 +1888,7 @@ Status AudioPolicyService::getSurroundFormats(media::Int* count,
 }
 
 Status AudioPolicyService::getReportedSurroundFormats(
-        media::Int* count, std::vector<AudioFormatDescription>* formats) {
+        Int* count, std::vector<AudioFormatDescription>* formats) {
     unsigned int numSurroundFormats = VALUE_OR_RETURN_BINDER_STATUS(
             convertIntegral<unsigned int>(count->value));
     if (numSurroundFormats > MAX_ITEMS_PER_LIST) {

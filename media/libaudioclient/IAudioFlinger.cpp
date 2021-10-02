@@ -48,12 +48,6 @@ using media::audio::common::AudioUuid;
        std::move(_tmp.value()); \
      })
 
-#define RETURN_STATUS_IF_ERROR(x)    \
-    {                                \
-       auto _tmp = (x);              \
-       if (_tmp != OK) return _tmp;  \
-    }
-
 #define RETURN_BINDER_IF_ERROR(x)                         \
     {                                                     \
        auto _tmp = (x);                                   \

@@ -21,7 +21,7 @@
 
 #include <android/media/AudioPort.h>
 #include <android/media/AudioPortConfig.h>
-#include <android/media/ExtraAudioDescriptor.h>
+#include <android/media/audio/common/ExtraAudioDescriptor.h>
 #include <binder/Parcel.h>
 #include <binder/Parcelable.h>
 #include <media/AudioGain.h>
@@ -69,10 +69,10 @@ public:
     AudioProfileVector &getAudioProfiles() { return mProfiles; }
 
     void setExtraAudioDescriptors(
-            const std::vector<media::ExtraAudioDescriptor> extraAudioDescriptors) {
+            const std::vector<media::audio::common::ExtraAudioDescriptor> extraAudioDescriptors) {
         mExtraAudioDescriptors = extraAudioDescriptors;
     }
-    std::vector<media::ExtraAudioDescriptor> &getExtraAudioDescriptors() {
+    std::vector<media::audio::common::ExtraAudioDescriptor> &getExtraAudioDescriptors() {
         return mExtraAudioDescriptors;
     }
 
@@ -114,7 +114,7 @@ protected:
 
     // Audio capabilities that are defined by hardware descriptors when the format is unrecognized
     // by the platform, e.g. short audio descriptor in EDID for HDMI.
-    std::vector<media::ExtraAudioDescriptor> mExtraAudioDescriptors;
+    std::vector<media::audio::common::ExtraAudioDescriptor> mExtraAudioDescriptors;
 private:
     template <typename T, std::enable_if_t<std::is_same<T, struct audio_port>::value
                                         || std::is_same<T, struct audio_port_v7>::value, int> = 0>
@@ -152,8 +152,10 @@ public:
 
     bool equals(const sp<AudioPortConfig>& other) const;
 
-    status_t writeToParcelable(media::AudioPortConfig* parcelable, bool isInput) const;
-    status_t readFromParcelable(const media::AudioPortConfig& parcelable, bool isInput);
+    status_t writeToParcelable(
+            media::audio::common::AudioPortConfig* parcelable, bool isInput) const;
+    status_t readFromParcelable(
+            const media::audio::common::AudioPortConfig& parcelable, bool isInput);
 
 protected:
     unsigned int mSamplingRate = 0u;
