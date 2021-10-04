@@ -21,7 +21,6 @@
 #include <aidl/android/media/tv/tuner/BnTunerLnb.h>
 #include <android/hardware/tv/tuner/1.0/ILnb.h>
 #include <android/hardware/tv/tuner/1.0/ILnbCallback.h>
-#include <media/stagefright/foundation/ADebug.h>
 #include <utils/Log.h>
 
 using ::aidl::android::hardware::tv::tuner::LnbEventType;

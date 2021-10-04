@@ -19,6 +19,7 @@
 #include "TunerDvr.h"
 
 #include <aidl/android/hardware/tv/tuner/Result.h>
+#include <utils/Log.h>
 
 #include "TunerFilter.h"
 

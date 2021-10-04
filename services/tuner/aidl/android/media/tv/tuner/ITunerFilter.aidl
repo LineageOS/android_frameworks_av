@@ -20,6 +20,7 @@ import android.hardware.common.fmq.MQDescriptor;
 import android.hardware.common.fmq.SynchronizedReadWrite;
 import android.hardware.common.NativeHandle;
 import android.hardware.tv.tuner.DemuxFilterSettings;
+import android.hardware.tv.tuner.DemuxFilterType;
 import android.hardware.tv.tuner.AvStreamType;
 import android.hardware.tv.tuner.DemuxFilterMonitorEventType;
 
@@ -98,4 +99,26 @@ interface ITunerFilter {
      * Close the filter.
      */
     void close();
+
+    /**
+     * Create a new SharedFilter instance.
+     *
+     * @return a token of the newly created SharedFilter instance.
+     */
+    String createSharedFilter();
+
+    /**
+     * Release a SharedFilter instance.
+     *
+     * @param filterToken the SharedFilter will be released.
+     * @return a token of the newly created SharedFilter instance.
+     */
+    void releaseSharedFilter(in String filterToken);
+
+    /**
+     * Get filter type.
+     *
+     * @return filter type.
+     */
+    DemuxFilterType getFilterType();
 }

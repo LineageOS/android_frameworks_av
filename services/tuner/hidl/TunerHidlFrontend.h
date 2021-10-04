@@ -22,7 +22,6 @@
 #include <android/hardware/tv/tuner/1.0/ITuner.h>
 #include <android/hardware/tv/tuner/1.1/IFrontend.h>
 #include <android/hardware/tv/tuner/1.1/IFrontendCallback.h>
-#include <media/stagefright/foundation/ADebug.h>
 #include <utils/Log.h>
 
 using ::aidl::android::hardware::tv::tuner::FrontendAtsc3Settings;

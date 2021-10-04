@@ -19,7 +19,6 @@
 
 #include <aidl/android/hardware/tv/tuner/ITimeFilter.h>
 #include <aidl/android/media/tv/tuner/BnTunerTimeFilter.h>
-#include <media/stagefright/foundation/ADebug.h>
 #include <utils/Log.h>
 
 using ::aidl::android::hardware::tv::tuner::ITimeFilter;

@@ -36,6 +36,11 @@ const static int TUNER_HAL_VERSION_1_0 = 1 << 16;
 const static int TUNER_HAL_VERSION_1_1 = (1 << 16) | 1;
 const static int TUNER_HAL_VERSION_2_0 = 2 << 16;
 
+// Keep syncing with ShareFilter.java
+const static int STATUS_INACCESSIBLE = 1 << 7;
+
+const static String16 sSharedFilterPermission("android.permission.ACCESS_TV_SHARED_FILTER");
+
 typedef enum {
     FRONTEND,
     LNB,

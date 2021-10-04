@@ -25,7 +25,11 @@
 #include <aidl/android/hardware/tv/tuner/ILnb.h>
 #include <aidl/android/hardware/tv/tuner/Result.h>
 #include <android/binder_manager.h>
+#include <binder/IPCThreadState.h>
+#include <binder/PermissionCache.h>
 #include <utils/Log.h>
+
+#include <string>
 
 #include "TunerDemux.h"
 #include "TunerDescrambler.h"
@@ -37,6 +41,8 @@ using ::aidl::android::hardware::tv::tuner::IDemux;
 using ::aidl::android::hardware::tv::tuner::IDescrambler;
 using ::aidl::android::hardware::tv::tuner::IFrontend;
 using ::aidl::android::hardware::tv::tuner::Result;
+using ::android::IPCThreadState;
+using ::android::PermissionCache;
 using ::android::sp;
 
 namespace aidl {
@@ -44,6 +50,8 @@ namespace android {
 namespace media {
 namespace tv {
 namespace tuner {
+
+shared_ptr<TunerService> TunerService::sTunerService = nullptr;
 
 TunerService::TunerService() {
     if (!TunerHelper::checkTunerFeature()) {
@@ -57,9 +65,12 @@ TunerService::TunerService() {
 TunerService::~TunerService() {}
 
 binder_status_t TunerService::instantiate() {
-    shared_ptr<TunerService> service =
-            ::ndk::SharedRefBase::make<TunerService>();
-    return AServiceManager_addService(service->asBinder().get(), getServiceName());
+    sTunerService = ::ndk::SharedRefBase::make<TunerService>();
+    return AServiceManager_addService(sTunerService->asBinder().get(), getServiceName());
+}
+
+shared_ptr<TunerService> TunerService::getTunerService() {
+    return sTunerService;
 }
 
 bool TunerService::hasITuner() {
@@ -208,6 +219,61 @@ bool TunerService::hasITuner() {
     hasITuner();
     *_aidl_return = mTunerVersion;
     return ::ndk::ScopedAStatus::ok();
+}
+
+::ndk::ScopedAStatus TunerService::openSharedFilter(const string& in_filterToken,
+                                                    const shared_ptr<ITunerFilterCallback>& in_cb,
+                                                    shared_ptr<ITunerFilter>* _aidl_return) {
+    if (!hasITuner()) {
+        ALOGE("get ITuner failed");
+        return ::ndk::ScopedAStatus::fromServiceSpecificError(
+                static_cast<int32_t>(Result::UNAVAILABLE));
+    }
+
+    if (!PermissionCache::checkCallingPermission(sSharedFilterPermission)) {
+        ALOGE("Request requires android.permission.ACCESS_TV_SHARED_FILTER");
+        return ::ndk::ScopedAStatus::fromServiceSpecificError(
+                static_cast<int32_t>(Result::UNAVAILABLE));
+    }
+
+    Mutex::Autolock _l(mSharedFiltersLock);
+    if (mSharedFilters.find(in_filterToken) == mSharedFilters.end()) {
+        *_aidl_return = nullptr;
+        ALOGD("fail to find %s", in_filterToken.c_str());
+        return ::ndk::ScopedAStatus::fromServiceSpecificError(
+                static_cast<int32_t>(Result::INVALID_STATE));
+    }
+
+    shared_ptr<TunerFilter> filter = mSharedFilters.at(in_filterToken);
+    IPCThreadState* ipc = IPCThreadState::self();
+    const int pid = ipc->getCallingPid();
+    if (!filter->isSharedFilterAllowed(pid)) {
+        *_aidl_return = nullptr;
+        ALOGD("shared filter %s is opened in the same process", in_filterToken.c_str());
+        return ::ndk::ScopedAStatus::fromServiceSpecificError(
+                static_cast<int32_t>(Result::INVALID_STATE));
+    }
+
+    filter->attachSharedFilterCallback(in_cb);
+
+    *_aidl_return = filter;
+    return ::ndk::ScopedAStatus::ok();
+}
+
+string TunerService::addFilterToShared(const shared_ptr<TunerFilter>& sharedFilter) {
+    Mutex::Autolock _l(mSharedFiltersLock);
+
+    // Use sharedFilter address as token.
+    string token = to_string(reinterpret_cast<std::uintptr_t>(sharedFilter.get()));
+    mSharedFilters[token] = sharedFilter;
+    return token;
+}
+
+void TunerService::removeSharedFilter(const shared_ptr<TunerFilter>& sharedFilter) {
+    Mutex::Autolock _l(mSharedFiltersLock);
+
+    // Use sharedFilter address as token.
+    mSharedFilters.erase(to_string(reinterpret_cast<std::uintptr_t>(sharedFilter.get())));
 }
 
 void TunerService::updateTunerResources() {
