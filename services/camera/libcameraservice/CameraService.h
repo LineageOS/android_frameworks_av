@@ -272,6 +272,10 @@ public:
         // Internal dump method to be called by CameraService
         virtual status_t dumpClient(int fd, const Vector<String16>& args) = 0;
 
+        virtual status_t startWatchingTags(const String8 &tags, int outFd);
+        virtual status_t stopWatchingTags(int outFd);
+        virtual status_t dumpWatchedEventsToVector(std::vector<std::string> &out);
+
         // Return the package name for this client
         virtual String16 getPackageName() const;
 
@@ -1148,6 +1152,26 @@ private:
 
     // Set the camera mute state
     status_t handleSetCameraMute(const Vector<String16>& args);
+
+    // Handle 'watch' command as passed through 'cmd'
+    status_t handleWatchCommand(const Vector<String16> &args, int out);
+
+    // Enable tag monitoring of the given tags in all attached clients
+    status_t startWatchingTags(const String16 &tags, int outFd);
+
+    // Disable tag monitoring in all attached clients
+    status_t stopWatchingTags(int outFd);
+
+    // Print events of monitored tags in all attached devices as they are captured
+    // NOTE: This function does not terminate unless interrupted.
+    status_t printWatchedTagsUntilInterrupt(const Vector<String16> &args, int outFd);
+
+    // Print all events in vector `events' that came after lastPrintedEvent
+    static void printNewWatchedEvents(int outFd,
+                                      const char *cameraId,
+                                      const String16 &packageName,
+                                      const std::vector<std::string> &events,
+                                      const std::string &lastPrintedEvent);
 
     // Prints the shell command help
     status_t printHelp(int out);

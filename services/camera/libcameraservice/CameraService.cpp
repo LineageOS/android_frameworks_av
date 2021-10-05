@@ -3115,6 +3115,21 @@ status_t CameraService::BasicClient::dump(int, const Vector<String16>&) {
     return OK;
 }
 
+status_t CameraService::BasicClient::startWatchingTags(const String8&, int) {
+    // Can't watch tags directly, must go through CameraService::startWatchingTags
+    return OK;
+}
+
+status_t CameraService::BasicClient::stopWatchingTags(int) {
+    // Can't watch tags directly, must go through CameraService::stopWatchingTags
+    return OK;
+}
+
+status_t CameraService::BasicClient::dumpWatchedEventsToVector(std::vector<std::string> &) {
+    // Can't watch tags directly, must go through CameraService::dumpWatchedEventsToVector
+    return OK;
+}
+
 String16 CameraService::BasicClient::getPackageName() const {
     return mClientPackageName;
 }
@@ -4136,7 +4151,7 @@ status_t CameraService::dump(int fd, const Vector<String16>& args) {
 
     // Dump camera traces if there were any
     dprintf(fd, "\n");
-    camera3::CameraTraces::dump(fd, args);
+    camera3::CameraTraces::dump(fd);
 
     // Process dump arguments, if any
     int n = args.size();
@@ -4534,9 +4549,11 @@ status_t CameraService::shellCommand(int in, int out, int err, const Vector<Stri
         return handleGetImageDumpMask(out);
     } else if (args.size() >= 2 && args[0] == String16("set-camera-mute")) {
         return handleSetCameraMute(args);
+    } else if (args.size() >= 2 && args[0] == String16("watch")) {
+        return handleWatchCommand(args, out);
     } else if (args.size() == 1 && args[0] == String16("help")) {
         printHelp(out);
-        return NO_ERROR;
+        return OK;
     }
     printHelp(err);
     return BAD_VALUE;
@@ -4680,6 +4697,134 @@ status_t CameraService::handleSetCameraMute(const Vector<String16>& args) {
     return OK;
 }
 
+status_t CameraService::handleWatchCommand(const Vector<String16>& args, int out) {
+    if (args.size() == 3 && args[1] == String16("start")) {
+        return startWatchingTags(args[2], out);
+    } else if (args.size() == 2 && args[1] == String16("dump")) {
+        return camera3::CameraTraces::dump(out);
+    } else if (args.size() == 2 && args[1] == String16("stop")) {
+        return stopWatchingTags(out);
+    } else if (args.size() >= 2 && args[1] == String16("live")) {
+        return printWatchedTagsUntilInterrupt(args, out);
+    }
+    dprintf(out, "Camera service watch commands:\n"
+                 "  start <comma_separated_tag_list> starts watching the provided tags\n"
+                 "                                   recognizes shorthands like '3a'\n"
+                 "  dump dumps camera trace\n"
+                 "  stop stops watching all tags\n"
+                 "  live prints the monitored information in real time\n"
+                 "        Hit Ctrl+C to stop.\n");
+  return BAD_VALUE;
+}
+
+status_t CameraService::startWatchingTags(const String16 &tags, int outFd) {
+    // track tags to initialize future clients with the monitoring information
+    mMonitorTags = String8(tags);
+
+    auto cameraClients = mActiveClientManager.getAll();
+    for (const auto &clientDescriptor: cameraClients) {
+        if (clientDescriptor == nullptr) { continue; }
+        sp<BasicClient> client = clientDescriptor->getValue();
+        if (client.get() == nullptr) { continue; }
+        client->startWatchingTags(mMonitorTags, outFd);
+    }
+    return OK;
+}
+
+status_t CameraService::stopWatchingTags(int outFd) {
+    // clear mMonitorTags to prevent new clients from monitoring tags at initialization
+    mMonitorTags = String8::empty();
+
+    auto cameraClients = mActiveClientManager.getAll();
+    for (const auto &clientDescriptor : cameraClients) {
+        if (clientDescriptor == nullptr) { continue; }
+        sp<BasicClient> client = clientDescriptor->getValue();
+        if (client.get() == nullptr) { continue; }
+        client->stopWatchingTags(outFd);
+    }
+    return OK;
+}
+
+status_t CameraService::printWatchedTagsUntilInterrupt(const Vector<String16> &args, int outFd) {
+    useconds_t refreshTimeoutMs = 1000; // refresh every 1s by default
+
+    if (args.size() > 2) {
+        size_t intervalIdx; // index of refresh interval argument
+        for (intervalIdx = 2;
+             intervalIdx < args.size()
+                && String16("-n") != args[intervalIdx]
+                && String16("--interval") != args[intervalIdx];
+             intervalIdx++);
+
+        size_t intervalValIdx = intervalIdx + 1;
+        if (intervalValIdx < args.size()) {
+            refreshTimeoutMs = strtol(String8(args[intervalValIdx].string()), nullptr, 10);
+            if (errno) { return BAD_VALUE; }
+        }
+    }
+
+    std::unordered_map<std::string, std::string> cameraToLastEvent;
+    auto cameraClients = mActiveClientManager.getAll();
+
+    if (cameraClients.empty()) {
+        dprintf(outFd, "No clients connected.\n");
+        return OK;
+    }
+
+    dprintf(outFd, "Press Ctrl + C to exit...\n\n");
+    while (true) {
+        for (const auto& clientDescriptor : cameraClients) {
+            if (clientDescriptor == nullptr) { continue; }
+            const char* cameraId = clientDescriptor->getKey().string();
+
+            // This also initializes the map entries with an empty string
+            const std::string& lastPrintedEvent = cameraToLastEvent[cameraId];
+
+            sp<BasicClient> client = clientDescriptor->getValue();
+            if (client.get() == nullptr) { continue; }
+
+            std::vector<std::string> latestEvents;
+            client->dumpWatchedEventsToVector(latestEvents);
+
+            if (!latestEvents.empty()) {
+                printNewWatchedEvents(outFd,
+                                      cameraId,
+                                      client->getPackageName(),
+                                      latestEvents,
+                                      lastPrintedEvent);
+                cameraToLastEvent[cameraId] = latestEvents[0];
+            }
+        }
+        usleep(refreshTimeoutMs * 1000);  // convert ms to us
+    }
+    return OK;
+}
+
+void CameraService::printNewWatchedEvents(int outFd,
+                                          const char *cameraId,
+                                          const String16 &packageName,
+                                          const std::vector<std::string> &events,
+                                          const std::string &lastPrintedEvent) {
+    if (events.empty()) { return; }
+
+    // index of lastPrintedEvent in events.
+    // lastPrintedIdx = events.size() if lastPrintedEvent is not in events
+    size_t lastPrintedIdx;
+    for (lastPrintedIdx = 0;
+         lastPrintedIdx < events.size() && lastPrintedEvent != events[lastPrintedIdx];
+         lastPrintedIdx++);
+
+    if (lastPrintedIdx == 0) { return; } // early exit if no new event in `events`
+
+    const char *printPackageName = String8(packageName).string();
+    // print events in chronological order (latest event last)
+    size_t idxToPrint = lastPrintedIdx;
+    do {
+        idxToPrint--;
+        dprintf(outFd, "%s:%s  %s", cameraId, printPackageName, events[idxToPrint].c_str());
+    } while (idxToPrint != 0);
+}
+
 status_t CameraService::printHelp(int out) {
     return dprintf(out, "Camera service commands:\n"
         "  get-uid-state <PACKAGE> [--user USER_ID] gets the uid state\n"
@@ -4692,6 +4837,7 @@ status_t CameraService::printHelp(int out) {
         "      Valid values 0=OFF, 1=ON for JPEG\n"
         "  get-image-dump-mask returns the current image-dump-mask value\n"
         "  set-camera-mute <0/1> enable or disable camera muting\n"
+        "  watch <start|stop|dump|live> manages tag monitoring in connected clients\n"
         "  help print this message\n");
 }
 
