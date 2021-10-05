@@ -293,10 +293,6 @@ aaudio_result_t AAudioServiceStreamBase::pause_l() {
             .set(AMEDIAMETRICS_PROP_STATUS, (int32_t)result)
             .record(); });
 
-    // Send it now because the timestamp gets rounded up when stopStream() is called below.
-    // Also we don't need the timestamps while we are shutting down.
-    sendCurrentTimestamp();
-
     result = stopTimestampThread();
     if (result != AAUDIO_OK) {
         disconnect_l();
@@ -342,10 +338,12 @@ aaudio_result_t AAudioServiceStreamBase::stop_l() {
 
     setState(AAUDIO_STREAM_STATE_STOPPING);
 
-    // Send it now because the timestamp gets rounded up when stopStream() is called below.
-    // Also we don't need the timestamps while we are shutting down.
-    sendCurrentTimestamp(); // warning - this calls a virtual function
+    // Temporarily unlock because we are joining the timestamp thread and it may try
+    // to acquire mLock.
+    mLock.unlock();
     result = stopTimestampThread();
+    mLock.lock();
+
     if (result != AAUDIO_OK) {
         disconnect_l();
         return result;
@@ -410,10 +408,11 @@ void AAudioServiceStreamBase::run() {
     timestampScheduler.start(AudioClock::getNanoseconds());
     int64_t nextTime = timestampScheduler.nextAbsoluteTime();
     int32_t loopCount = 0;
+    aaudio_result_t result = AAUDIO_OK;
     while(mThreadEnabled.load()) {
         loopCount++;
         if (AudioClock::getNanoseconds() >= nextTime) {
-            aaudio_result_t result = sendCurrentTimestamp();
+            result = sendCurrentTimestamp();
             if (result != AAUDIO_OK) {
                 ALOGE("%s() timestamp thread got result = %d", __func__, result);
                 break;
@@ -424,6 +423,11 @@ void AAudioServiceStreamBase::run() {
             // TODO Wait for a signal with a timeout so that we can stop more quickly.
             AudioClock::sleepUntilNanoTime(nextTime);
         }
+    }
+    // This was moved from the calls in stop_l() and pause_l(), which could cause a deadlock
+    // if it resulted in a call to disconnect.
+    if (result == AAUDIO_OK) {
+        (void) sendCurrentTimestamp();
     }
     ALOGD("%s() %s exiting after %d loops <<<<<<<<<<<<<< TIMESTAMPS",
           __func__, getTypeText(), loopCount);
