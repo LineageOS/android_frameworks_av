@@ -827,7 +827,7 @@ const std::string AudioPolicyManagerTestForHdmi::sTvConfig =
 
 void AudioPolicyManagerTestForHdmi::SetUp() {
     ASSERT_NO_FATAL_FAILURE(AudioPolicyManagerTest::SetUp());
-    // Note that 'AC3' isn't added as it is handled automatically by APM.
+    mClient->addSupportedFormat(AUDIO_FORMAT_AC3);
     mClient->addSupportedFormat(AUDIO_FORMAT_E_AC3);
     mManager->setDeviceConnectionState(
             AUDIO_DEVICE_OUT_HDMI, AUDIO_POLICY_DEVICE_STATE_AVAILABLE,
@@ -1392,7 +1392,8 @@ TEST_P(AudioPolicyManagerTestDeviceConnection, SetDeviceConnectionState) {
     if (type == AUDIO_DEVICE_OUT_HDMI) {
         // Set device connection state failed due to no device descriptor found
         // For HDMI case, it is easier to simulate device descriptor not found error
-        // by using a undeclared encoded format.
+        // by using an encoded format which isn't listed in the 'encodedFormats'
+        // attribute for this devicePort.
         ASSERT_EQ(INVALID_OPERATION, mManager->setDeviceConnectionState(
                 type, AUDIO_POLICY_DEVICE_STATE_AVAILABLE,
                 address.c_str(), name.c_str(), AUDIO_FORMAT_MAT_2_1));
