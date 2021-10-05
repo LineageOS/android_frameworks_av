@@ -1421,6 +1421,10 @@ void CCodec::configure(const sp<AMessage> &msg) {
             }
         }
 
+        if (config->mTunneled) {
+            config->mOutputFormat->setInt32("android._tunneled", 1);
+        }
+
         ALOGD("setup formats input: %s",
                 config->mInputFormat->debugString().c_str());
         ALOGD("setup formats output: %s",
