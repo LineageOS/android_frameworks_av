@@ -110,8 +110,16 @@ public:
     virtual void        onDeviceStatusChanged(const String8 &cameraId,
             const String8 &physicalCameraId,
             hardware::camera::common::V1_0::CameraDeviceStatus newHalStatus) override;
+    // This method may hold CameraProviderManager::mInterfaceMutex as a part
+    // of calling getSystemCameraKind() internally. Care should be taken not to
+    // directly / indirectly call this from callers who also hold
+    // mInterfaceMutex.
     virtual void        onTorchStatusChanged(const String8& cameraId,
             hardware::camera::common::V1_0::TorchModeStatus newStatus) override;
+    // Does not hold CameraProviderManager::mInterfaceMutex.
+    virtual void        onTorchStatusChanged(const String8& cameraId,
+            hardware::camera::common::V1_0::TorchModeStatus newStatus,
+            SystemCameraKind kind) override;
     virtual void        onNewProviderRegistered() override;
 
     /////////////////////////////////////////////////////////////////////
