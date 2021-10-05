@@ -406,7 +406,7 @@ void C2SoftMP3::process(
         mConfig->inputBufferCurrentLength = (inSize - inPos);
         mConfig->inputBufferMaxLength = 0;
         mConfig->inputBufferUsedLength = 0;
-        mConfig->outputFrameSize = (calOutSize - outSize);
+        mConfig->outputFrameSize = (calOutSize - outSize) / sizeof(int16_t);
         mConfig->pOutputBuffer = reinterpret_cast<int16_t *> (wView.data() + outSize);
 
         ERROR_CODE decoderErr;
