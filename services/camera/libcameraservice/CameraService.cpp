@@ -506,6 +506,13 @@ void CameraService::onTorchStatusChanged(const String8& cameraId,
     onTorchStatusChangedLocked(cameraId, newStatus);
 }
 
+
+void CameraService::onTorchStatusChanged(const String8& cameraId,
+        TorchModeStatus newStatus, SystemCameraKind systemCameraKind) {
+    Mutex::Autolock al(mTorchStatusMutex);
+    onTorchStatusChangedLocked(cameraId, newStatus, systemCameraKind);
+}
+
 void CameraService::onTorchStatusChangedLocked(const String8& cameraId,
         TorchModeStatus newStatus) {
     ALOGI("%s: Torch status changed for cameraId=%s, newStatus=%d",
