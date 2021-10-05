@@ -188,9 +188,11 @@ static bool Downmix_validChannelMask(uint32_t mask)
     if (!mask) {
         return false;
     }
-    // check against unsupported channels
-    if (mask & ~AUDIO_CHANNEL_OUT_22POINT2) {
-        ALOGE("Unsupported channels in %u", mask & ~AUDIO_CHANNEL_OUT_22POINT2);
+    // check against unsupported channels (up to FCC_26)
+    constexpr uint32_t MAXIMUM_CHANNEL_MASK = AUDIO_CHANNEL_OUT_22POINT2
+            | AUDIO_CHANNEL_OUT_FRONT_WIDE_LEFT | AUDIO_CHANNEL_OUT_FRONT_WIDE_RIGHT;
+    if (mask & ~MAXIMUM_CHANNEL_MASK) {
+        ALOGE("Unsupported channels in %#x", mask & ~MAXIMUM_CHANNEL_MASK);
         return false;
     }
     return true;
