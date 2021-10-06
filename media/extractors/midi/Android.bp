@@ -23,6 +23,10 @@ cc_library {
 
     srcs: ["MidiExtractor.cpp"],
 
+    export_include_dirs: [
+        "include",
+    ],
+
     header_libs: [
         "libmedia_datasource_headers",
     ],

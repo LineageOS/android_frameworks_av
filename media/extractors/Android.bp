@@ -24,10 +24,6 @@ package {
 cc_defaults {
     name: "extractor-defaults",
 
-    include_dirs: [
-        "frameworks/av/media/libstagefright/include",
-    ],
-
     shared_libs: [
         "liblog",
     ],

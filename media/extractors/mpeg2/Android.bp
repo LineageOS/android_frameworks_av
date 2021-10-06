@@ -38,6 +38,10 @@ cc_library {
         "MPEG2TSExtractor.cpp",
     ],
 
+    export_include_dirs: [
+        "include",
+    ],
+
     shared_libs: [
         "libbase",
         "libcgrouprc#29",
