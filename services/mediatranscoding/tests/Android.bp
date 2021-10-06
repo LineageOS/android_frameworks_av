@@ -30,18 +30,42 @@ cc_defaults {
         "libbinder_ndk",
         "liblog",
         "libutils",
-        "libmediatranscodingservice",
+        "libcutils",
     ],
 
     static_libs: [
         "mediatranscoding_aidl_interface-ndk",
+        "resourcemanager_aidl_interface-ndk",
+        "libmediatranscodingservice",
+    ],
+
+    required: [
+        "TranscodingUidPolicy_TestAppA",
+        "TranscodingUidPolicy_TestAppB",
+        "TranscodingUidPolicy_TestAppC",
     ],
 }
 
-// MediaTranscodingService unit test
+// MediaTranscodingService unit test using simulated transcoder
 cc_test {
-    name: "mediatranscodingservice_tests",
+    name: "mediatranscodingservice_simulated_tests",
     defaults: ["mediatranscodingservice_test_defaults"],
 
-    srcs: ["mediatranscodingservice_tests.cpp"],
+    srcs: ["mediatranscodingservice_simulated_tests.cpp"],
+}
+
+// MediaTranscodingService unit test using real transcoder
+cc_test {
+    name: "mediatranscodingservice_real_tests",
+    defaults: ["mediatranscodingservice_test_defaults"],
+
+    srcs: ["mediatranscodingservice_real_tests.cpp"],
+}
+
+// MediaTranscodingService unit test related to resource management
+cc_test {
+    name: "mediatranscodingservice_resource_tests",
+    defaults: ["mediatranscodingservice_test_defaults"],
+
+    srcs: ["mediatranscodingservice_resource_tests.cpp"],
 }

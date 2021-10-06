@@ -15,7 +15,7 @@
  */
 
 #include <algorithm>
-#include <unistd.h>
+#include <stdint.h>
 
 #ifdef __ANDROID__
 #include <audio_utils/primitives.h>

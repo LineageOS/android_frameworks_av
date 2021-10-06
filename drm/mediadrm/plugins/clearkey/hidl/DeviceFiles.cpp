@@ -38,7 +38,7 @@ bool Hash(const std::string& data, std::string* hash) {
 namespace android {
 namespace hardware {
 namespace drm {
-namespace V1_2 {
+namespace V1_4 {
 namespace clearkey {
 
 bool DeviceFiles::StoreLicense(
@@ -246,7 +246,7 @@ ssize_t DeviceFiles::GetFileSize(const std::string& fileName) const {
 }
 
 } // namespace clearkey
-} // namespace V1_2
+} // namespace V1_4
 } // namespace drm
 } // namespace hardware
 } // namespace android

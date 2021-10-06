@@ -83,10 +83,18 @@ public:
                                         std::vector<effect_descriptor_t> effects __unused,
                                         audio_patch_handle_t patchHandle __unused,
                                         audio_source_t source __unused) override { }
+    void onRoutingUpdated() override { }
     void setEffectSuspended(int effectId __unused,
                             audio_session_t sessionId __unused,
                             bool suspended __unused) {}
     void setSoundTriggerCaptureState(bool active __unused) override {};
+    status_t getAudioPort(struct audio_port_v7 *port __unused) override {
+        return INVALID_OPERATION;
+    };
+    status_t updateSecondaryOutputs(
+            const TrackSecondaryOutputsMap& trackSecondaryOutputs __unused) override {
+        return NO_INIT;
+    }
 };
 
 } // namespace android

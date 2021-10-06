@@ -17,6 +17,7 @@
 //          dylan.katz@leviathansecurity.com
 
 #include <android-base/file.h>
+#include <android/content/AttributionSourceState.h>
 #include <ctype.h>
 #include <media/mediarecorder.h>
 #include <media/stagefright/MPEG4Writer.h>
@@ -38,6 +39,8 @@ static constexpr uint16_t kMaxMPEGStrLen = 1000;
 static constexpr uint16_t kMaxMediaBlobSize = 1000;
 
 namespace android {
+
+using android::content::AttributionSourceState;
 
 std::string getFourCC(FuzzedDataProvider *fdp) {
     std::string fourCC = fdp->ConsumeRandomLengthString(4);
@@ -163,9 +166,12 @@ extern "C" int LLVMFuzzerTestOneInput(const uint8_t *data, size_t size) {
     StandardWriters writerType = dataProvider.ConsumeEnum<StandardWriters>();
     sp<MediaWriter> writer = createWriter(tf.fd, writerType, fileMeta);
 
-    std::string packageName = dataProvider.ConsumeRandomLengthString(kMaxPackageNameLen);
-
-    sp<MediaRecorder> mr = new MediaRecorder(String16(packageName.c_str()));
+    AttributionSourceState attributionSource;
+    attributionSource.packageName = dataProvider.ConsumeRandomLengthString(kMaxPackageNameLen);
+    attributionSource.uid = dataProvider.ConsumeIntegral<int32_t>();
+    attributionSource.pid = dataProvider.ConsumeIntegral<int32_t>();
+    attributionSource.token = sp<BBinder>::make();
+    sp<MediaRecorder> mr = new MediaRecorder(attributionSource);
     writer->setListener(mr);
 
     uint8_t baseOpLen = operations.size();

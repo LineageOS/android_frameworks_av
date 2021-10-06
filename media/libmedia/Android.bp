@@ -22,12 +22,14 @@ cc_library_headers {
 
     export_include_dirs: ["include"],
     header_libs: [
+        "av-headers",
         "libbase_headers",
         "libgui_headers",
         "libstagefright_headers",
         "media_plugin_headers",
     ],
     export_header_lib_headers: [
+        "av-headers",
         "libgui_headers",
         "libstagefright_headers",
         "media_plugin_headers",
@@ -70,28 +72,6 @@ filegroup {
         "aidl/android/IMediaExtractorService.aidl",
     ],
     path: "aidl",
-}
-
-filegroup {
-    name: "resourcemanager_aidl",
-    srcs: [
-        "aidl/android/media/IResourceManagerClient.aidl",
-        "aidl/android/media/IResourceManagerService.aidl",
-        "aidl/android/media/MediaResourceType.aidl",
-        "aidl/android/media/MediaResourceSubType.aidl",
-        "aidl/android/media/MediaResourceParcel.aidl",
-        "aidl/android/media/MediaResourcePolicyParcel.aidl",
-    ],
-    path: "aidl",
-}
-
-aidl_interface {
-    name: "resourcemanager_aidl_interface",
-    unstable: true,
-    local_include_dir: "aidl",
-    srcs: [
-        ":resourcemanager_aidl",
-    ],
 }
 
 cc_library_shared {
@@ -367,6 +347,8 @@ cc_library {
 
     shared_libs: [
         "android.hidl.token@1.0-utils",
+        "audioclient-types-aidl-cpp",
+        "av-types-aidl-cpp",
         "liblog",
         "libcutils",
         "libprocessgroup",
@@ -383,6 +365,7 @@ cc_library {
         "libaudioclient",
         "libmedia_codeclist",
         "libmedia_omx",
+        "framework-permission-aidl-cpp",
     ],
 
     export_shared_lib_headers: [
@@ -391,14 +374,17 @@ cc_library {
         "libandroidicu",
         //"libsonivox",
         "libmedia_omx",
+        "framework-permission-aidl-cpp",
     ],
 
     static_libs: [
         "resourcemanager_aidl_interface-ndk",
+        "framework-permission-aidl-cpp",
     ],
 
     export_static_lib_headers: [
         "resourcemanager_aidl_interface-ndk",
+        "framework-permission-aidl-cpp",
     ],
 
     export_include_dirs: [
@@ -452,5 +438,8 @@ cc_library_static {
         },
     },
 
-    apex_available: ["com.android.media"],
+    apex_available: [
+        "//apex_available:platform",
+        "com.android.media"
+    ],
 }

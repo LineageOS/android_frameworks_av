@@ -398,6 +398,14 @@ public:
 
         // consumer usage is queried earlier.
 
+        // priority
+        if (mConfig.mPriority != config.mPriority) {
+            if (config.mPriority != INT_MAX) {
+                mNode->setPriority(config.mPriority);
+            }
+            mConfig.mPriority = config.mPriority;
+        }
+
         if (status.str().empty()) {
             ALOGD("ISConfig not changed");
         } else {
@@ -736,17 +744,18 @@ void CCodec::allocate(const sp<MediaCodecInfo> &codecInfo) {
                 std::make_shared<Codec2ClientInterfaceWrapper>(client));
     }
 
-    std::shared_ptr<Codec2Client::Component> comp =
-            Codec2Client::CreateComponentByName(
+    std::shared_ptr<Codec2Client::Component> comp;
+    c2_status_t status = Codec2Client::CreateComponentByName(
             componentName.c_str(),
             mClientListener,
+            &comp,
             &client);
-    if (!comp) {
-        ALOGE("Failed Create component: %s", componentName.c_str());
+    if (status != C2_OK) {
+        ALOGE("Failed Create component: %s, error=%d", componentName.c_str(), status);
         Mutexed<State>::Locked state(mState);
         state->set(RELEASED);
         state.unlock();
-        mCallback->onError(UNKNOWN_ERROR, ACTION_CODE_FATAL);
+        mCallback->onError((status == C2_NO_MEMORY ? NO_MEMORY : UNKNOWN_ERROR), ACTION_CODE_FATAL);
         state.lock();
         return;
     }
@@ -986,6 +995,7 @@ void CCodec::configure(const sp<AMessage> &msg) {
                 }
             }
             config->mISConfig->mUsage = 0;
+            config->mISConfig->mPriority = INT_MAX;
         }
 
         /*
@@ -1177,6 +1187,16 @@ void CCodec::configure(const sp<AMessage> &msg) {
             configUpdate.push_back(std::move(qp));
         }
 
+        int32_t background = 0;
+        if ((config->mDomain & Config::IS_VIDEO)
+                && msg->findInt32("android._background-mode", &background)
+                && background) {
+            androidSetThreadPriority(gettid(), ANDROID_PRIORITY_BACKGROUND);
+            if (config->mISConfig) {
+                config->mISConfig->mPriority = ANDROID_PRIORITY_BACKGROUND;
+            }
+        }
+
         err = config->setParameters(comp, configUpdate, C2_DONT_BLOCK);
         if (err != OK) {
             ALOGW("failed to configure c2 params");
@@ -1210,6 +1230,7 @@ void CCodec::configure(const sp<AMessage> &msg) {
                 C2AndroidMemoryUsage androidUsage(C2MemoryUsage(usage.value));
                 config->mISConfig->mUsage = androidUsage.asGrallocUsage();
             }
+            config->mInputFormat->setInt64("android._C2MemoryUsage", usage.value);
         }
 
         // NOTE: we don't blindly use client specified input size if specified as clients
@@ -2453,7 +2474,18 @@ void CCodec::initiateReleaseIfStuck() {
         return;
     }
 
-    ALOGW("previous call to %s exceeded timeout", name.c_str());
+    C2String compName;
+    {
+        Mutexed<State>::Locked state(mState);
+        if (!state->comp) {
+            ALOGD("previous call to %s exceeded timeout "
+                  "and the component is already released", name.c_str());
+            return;
+        }
+        compName = state->comp->getName();
+    }
+    ALOGW("[%s] previous call to %s exceeded timeout", compName.c_str(), name.c_str());
+
     initiateRelease(false);
     mCallback->onError(UNKNOWN_ERROR, ACTION_CODE_FATAL);
 }
@@ -2703,15 +2735,17 @@ status_t CCodec::CanFetchLinearBlock(
             return OK;
         }
     }
-    uint64_t minUsage = usage.expected;
-    uint64_t maxUsage = ~0ull;
     std::set<C2Allocator::id_t> allocators;
     GetCommonAllocatorIds(names, C2Allocator::LINEAR, &allocators);
     if (allocators.empty()) {
         *isCompatible = false;
         return OK;
     }
+
+    uint64_t minUsage = 0;
+    uint64_t maxUsage = ~0ull;
     CalculateMinMaxUsage(names, &minUsage, &maxUsage);
+    minUsage |= usage.expected;
     *isCompatible = ((maxUsage & minUsage) == minUsage);
     return OK;
 }
@@ -2738,14 +2772,16 @@ static std::shared_ptr<C2BlockPool> GetPool(C2Allocator::id_t allocId) {
 // static
 std::shared_ptr<C2LinearBlock> CCodec::FetchLinearBlock(
         size_t capacity, const C2MemoryUsage &usage, const std::vector<std::string> &names) {
-    uint64_t minUsage = usage.expected;
-    uint64_t maxUsage = ~0ull;
     std::set<C2Allocator::id_t> allocators;
     GetCommonAllocatorIds(names, C2Allocator::LINEAR, &allocators);
     if (allocators.empty()) {
         allocators.insert(C2PlatformAllocatorStore::DEFAULT_LINEAR);
     }
+
+    uint64_t minUsage = 0;
+    uint64_t maxUsage = ~0ull;
     CalculateMinMaxUsage(names, &minUsage, &maxUsage);
+    minUsage |= usage.expected;
     if ((maxUsage & minUsage) != minUsage) {
         allocators.clear();
         allocators.insert(C2PlatformAllocatorStore::DEFAULT_LINEAR);

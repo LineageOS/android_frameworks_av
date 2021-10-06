@@ -161,6 +161,10 @@ CCodecBufferChannel::CCodecBufferChannel(
         output->outputDelay = 0u;
         output->numSlots = kSmoothnessFactor;
     }
+    {
+        Mutexed<BlockPools>::Locked pools(mBlockPools);
+        pools->outputPoolId = C2BlockPool::BASIC_LINEAR;
+    }
 }
 
 CCodecBufferChannel::~CCodecBufferChannel() {
@@ -1190,9 +1194,10 @@ status_t CCodecBufferChannel::start(
     if (outputFormat != nullptr) {
         sp<IGraphicBufferProducer> outputSurface;
         uint32_t outputGeneration;
+        int maxDequeueCount = 0;
         {
             Mutexed<OutputSurface>::Locked output(mOutputSurface);
-            output->maxDequeueBuffers = numOutputSlots +
+            maxDequeueCount = output->maxDequeueBuffers = numOutputSlots +
                     reorderDepth.value + kRenderingDepth;
             outputSurface = output->surface ?
                     output->surface->getIGraphicBufferProducer() : nullptr;
@@ -1204,9 +1209,12 @@ status_t CCodecBufferChannel::start(
 
         bool graphic = (oStreamFormat.value == C2BufferData::GRAPHIC);
         C2BlockPool::local_id_t outputPoolId_;
+        C2BlockPool::local_id_t prevOutputPoolId;
 
         {
             Mutexed<BlockPools>::Locked pools(mBlockPools);
+
+            prevOutputPoolId = pools->outputPoolId;
 
             // set default allocator ID.
             pools->outputAllocatorId = (graphic) ? C2PlatformAllocatorStore::GRALLOC
@@ -1301,6 +1309,15 @@ status_t CCodecBufferChannel::start(
             outputPoolId_ = pools->outputPoolId;
         }
 
+        if (prevOutputPoolId != C2BlockPool::BASIC_LINEAR
+                && prevOutputPoolId != C2BlockPool::BASIC_GRAPHIC) {
+            c2_status_t err = mComponent->destroyBlockPool(prevOutputPoolId);
+            if (err != C2_OK) {
+                ALOGW("Failed to clean up previous block pool %llu - %s (%d)\n",
+                        (unsigned long long) prevOutputPoolId, asString(err), err);
+            }
+        }
+
         Mutexed<Output>::Locked output(mOutput);
         output->outputDelay = outputDelayValue;
         output->numSlots = numOutputSlots;
@@ -1328,7 +1345,17 @@ status_t CCodecBufferChannel::start(
             mComponent->setOutputSurface(
                     outputPoolId_,
                     outputSurface,
-                    outputGeneration);
+                    outputGeneration,
+                    maxDequeueCount);
+        } else {
+            // configure CPU read consumer usage
+            C2StreamUsageTuning::output outputUsage{0u, C2MemoryUsage::CPU_READ};
+            std::vector<std::unique_ptr<C2SettingResult>> failures;
+            err = mComponent->config({ &outputUsage }, C2_MAY_BLOCK, &failures);
+            // do not print error message for now as most components may not yet
+            // support this setting
+            ALOGD_IF(err != C2_BAD_INDEX, "[%s] Configured output usage [%#llx]",
+                  mName, (long long)outputUsage.value);
         }
 
         if (oStreamFormat.value == C2BufferData::LINEAR) {
@@ -1799,10 +1826,17 @@ bool CCodecBufferChannel::handleWork(
         mCCodecCallback->onOutputBuffersChanged();
     }
     if (needMaxDequeueBufferCountUpdate) {
-        Mutexed<OutputSurface>::Locked output(mOutputSurface);
-        output->maxDequeueBuffers = numOutputSlots + reorderDepth + kRenderingDepth;
-        if (output->surface) {
-            output->surface->setMaxDequeuedBufferCount(output->maxDequeueBuffers);
+        int maxDequeueCount = 0;
+        {
+            Mutexed<OutputSurface>::Locked output(mOutputSurface);
+            maxDequeueCount = output->maxDequeueBuffers =
+                    numOutputSlots + reorderDepth + kRenderingDepth;
+            if (output->surface) {
+                output->surface->setMaxDequeuedBufferCount(output->maxDequeueBuffers);
+            }
+        }
+        if (maxDequeueCount > 0) {
+            mComponent->setOutputSurfaceMaxDequeueCount(maxDequeueCount);
         }
     }
 
@@ -1961,10 +1995,11 @@ status_t CCodecBufferChannel::setSurface(const sp<Surface> &newSurface) {
                 & ((1 << 10) - 1));
 
     sp<IGraphicBufferProducer> producer;
+    int maxDequeueCount = mOutputSurface.lock()->maxDequeueBuffers;
     if (newSurface) {
         newSurface->setScalingMode(NATIVE_WINDOW_SCALING_MODE_SCALE_TO_WINDOW);
         newSurface->setDequeueTimeout(kDequeueTimeoutNs);
-        newSurface->setMaxDequeuedBufferCount(mOutputSurface.lock()->maxDequeueBuffers);
+        newSurface->setMaxDequeuedBufferCount(maxDequeueCount);
         producer = newSurface->getIGraphicBufferProducer();
         producer->setGenerationNumber(generation);
     } else {
@@ -1984,7 +2019,8 @@ status_t CCodecBufferChannel::setSurface(const sp<Surface> &newSurface) {
         if (mComponent->setOutputSurface(
                 outputPoolId,
                 producer,
-                generation) != C2_OK) {
+                generation,
+                maxDequeueCount) != C2_OK) {
             ALOGI("[%s] setSurface: component setOutputSurface failed", mName);
             return INVALID_OPERATION;
         }

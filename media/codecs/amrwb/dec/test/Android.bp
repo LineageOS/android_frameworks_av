@@ -28,6 +28,7 @@ package {
 
 cc_test {
     name: "AmrwbDecoderTest",
+    test_suites: ["device-tests"],
     gtest: true,
 
     srcs: [

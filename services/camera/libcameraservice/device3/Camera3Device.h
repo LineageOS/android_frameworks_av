@@ -35,6 +35,7 @@
 #include <android/hardware/camera/device/3.4/ICameraDeviceSession.h>
 #include <android/hardware/camera/device/3.5/ICameraDeviceSession.h>
 #include <android/hardware/camera/device/3.6/ICameraDeviceSession.h>
+#include <android/hardware/camera/device/3.7/ICameraDeviceSession.h>
 #include <android/hardware/camera/device/3.2/ICameraDeviceCallback.h>
 #include <android/hardware/camera/device/3.4/ICameraDeviceCallback.h>
 #include <android/hardware/camera/device/3.5/ICameraDeviceCallback.h>
@@ -49,13 +50,22 @@
 #include "device3/DistortionMapper.h"
 #include "device3/ZoomRatioMapper.h"
 #include "device3/RotateAndCropMapper.h"
+#include "device3/UHRCropAndMeteringRegionMapper.h"
 #include "device3/InFlightRequest.h"
 #include "device3/Camera3OutputInterface.h"
 #include "device3/Camera3OfflineSession.h"
+#include "device3/Camera3StreamInterface.h"
 #include "utils/TagMonitor.h"
 #include "utils/LatencyHistogram.h"
 #include <camera_metadata_hidden.h>
 
+using android::camera3::camera_capture_request_t;
+using android::camera3::camera_jpeg_blob_t;
+using android::camera3::camera_request_template;
+using android::camera3::camera_stream_buffer_t;
+using android::camera3::camera_stream_configuration_t;
+using android::camera3::camera_stream_configuration_mode_t;
+using android::camera3::CAMERA_TEMPLATE_COUNT;
 using android::camera3::OutputStreamInfo;
 
 namespace android {
@@ -64,7 +74,6 @@ namespace camera3 {
 
 class Camera3Stream;
 class Camera3ZslStream;
-class Camera3OutputStreamInterface;
 class Camera3StreamInterface;
 
 } // namespace camera3
@@ -81,7 +90,7 @@ class Camera3Device :
             public camera3::FlushBufferInterface {
   public:
 
-    explicit Camera3Device(const String8& id);
+    explicit Camera3Device(const String8& id, bool overrideForPerfClass);
 
     virtual ~Camera3Device();
 
@@ -122,21 +131,26 @@ class Camera3Device :
     // and finish the stream configuration before starting output streaming.
     status_t createStream(sp<Surface> consumer,
             uint32_t width, uint32_t height, int format,
-            android_dataspace dataSpace, camera3_stream_rotation_t rotation, int *id,
+            android_dataspace dataSpace, camera_stream_rotation_t rotation, int *id,
             const String8& physicalCameraId,
+            const std::unordered_set<int32_t> &sensorPixelModesUsed,
             std::vector<int> *surfaceIds = nullptr,
             int streamSetId = camera3::CAMERA3_STREAM_SET_ID_INVALID,
-            bool isShared = false, uint64_t consumerUsage = 0) override;
+            bool isShared = false, bool isMultiResolution = false,
+            uint64_t consumerUsage = 0) override;
+
     status_t createStream(const std::vector<sp<Surface>>& consumers,
             bool hasDeferredConsumer, uint32_t width, uint32_t height, int format,
-            android_dataspace dataSpace, camera3_stream_rotation_t rotation, int *id,
+            android_dataspace dataSpace, camera_stream_rotation_t rotation, int *id,
             const String8& physicalCameraId,
+            const std::unordered_set<int32_t> &sensorPixelModesUsed,
             std::vector<int> *surfaceIds = nullptr,
             int streamSetId = camera3::CAMERA3_STREAM_SET_ID_INVALID,
-            bool isShared = false, uint64_t consumerUsage = 0) override;
+            bool isShared = false, bool isMultiResolution = false,
+            uint64_t consumerUsage = 0) override;
 
     status_t createInputStream(
-            uint32_t width, uint32_t height, int format,
+            uint32_t width, uint32_t height, int format, bool isMultiResolution,
             int *id) override;
 
     status_t getStreamInfo(int id, StreamInfo *streamInfo) override;
@@ -146,14 +160,14 @@ class Camera3Device :
 
     status_t configureStreams(const CameraMetadata& sessionParams,
             int operatingMode =
-            static_cast<int>(hardware::camera::device::V3_2::StreamConfigurationMode::NORMAL_MODE))
-            override;
+            camera_stream_configuration_mode_t::CAMERA_STREAM_CONFIGURATION_NORMAL_MODE) override;
     status_t getInputBufferProducer(
             sp<IGraphicBufferProducer> *producer) override;
 
     void getOfflineStreamIds(std::vector<int> *offlineStreamIds) override;
 
-    status_t createDefaultRequest(int templateId, CameraMetadata *request) override;
+    status_t createDefaultRequest(camera_request_template_t templateId,
+            CameraMetadata *request) override;
 
     // Transitions to the idle state on success
     status_t waitUntilDrained() override;
@@ -180,7 +194,7 @@ class Camera3Device :
 
     ssize_t getJpegBufferSize(uint32_t width, uint32_t height) const override;
     ssize_t getPointCloudBufferSize() const;
-    ssize_t getRawOpaqueBufferSize(int32_t width, int32_t height) const;
+    ssize_t getRawOpaqueBufferSize(int32_t width, int32_t height, bool maxResolution) const;
 
     // Methods called by subclasses
     void             notifyStatus(bool idle); // updates from StatusTracker
@@ -231,8 +245,35 @@ class Camera3Device :
     status_t setRotateAndCropAutoBehavior(
             camera_metadata_enum_android_scaler_rotate_and_crop_t rotateAndCropValue);
 
+    /**
+     * Whether camera muting (producing black-only output) is supported.
+     *
+     * Calling setCameraMute(true) when this returns false will return an
+     * INVALID_OPERATION error.
+     */
+    bool supportsCameraMute();
+
+    /**
+     * Mute the camera.
+     *
+     * When muted, black image data is output on all output streams.
+     */
+    status_t setCameraMute(bool enabled);
+
     // Get the status trackeer for the camera device
     wp<camera3::StatusTracker> getStatusTracker() { return mStatusTracker; }
+
+    /**
+     * The injection camera session to replace the internal camera
+     * session.
+     */
+    status_t injectCamera(const String8& injectedCamId,
+                          sp<CameraProviderManager> manager);
+
+    /**
+     * Stop the injection camera and restore to internal camera session.
+     */
+    status_t stopInjection();
 
     /**
      * Helper functions to map between framework and HIDL values
@@ -242,9 +283,9 @@ class Camera3Device :
             android_dataspace dataSpace);
     static hardware::camera::device::V3_2::BufferUsageFlags mapToConsumerUsage(uint64_t usage);
     static hardware::camera::device::V3_2::StreamRotation mapToStreamRotation(
-            camera3_stream_rotation_t rotation);
+            camera_stream_rotation_t rotation);
     // Returns a negative error code if the passed-in operation mode is not valid.
-    static status_t mapToStreamConfigurationMode(camera3_stream_configuration_mode_t operationMode,
+    static status_t mapToStreamConfigurationMode(camera_stream_configuration_mode_t operationMode,
             /*out*/ hardware::camera::device::V3_2::StreamConfigurationMode *mode);
     static int mapToFrameworkFormat(hardware::graphics::common::V1_0::PixelFormat pixelFormat);
     static android_dataspace mapToFrameworkDataspace(
@@ -255,7 +296,6 @@ class Camera3Device :
             hardware::camera::device::V3_2::BufferUsageFlags usage);
 
   private:
-
     status_t disconnectImpl();
 
     // internal typedefs
@@ -275,7 +315,7 @@ class Camera3Device :
 
     struct                     RequestTrigger;
     // minimal jpeg buffer size: 256KB + blob header
-    static const ssize_t       kMinJpegBufferSize = 256 * 1024 + sizeof(camera3_jpeg_blob);
+    static const ssize_t       kMinJpegBufferSize = 256 * 1024 + sizeof(camera_jpeg_blob_t);
     // Constant to use for stream ID when one doesn't exist
     static const int           NO_STREAM = -1;
 
@@ -330,18 +370,25 @@ class Camera3Device :
         // Calls into the HAL interface
 
         // Caller takes ownership of requestTemplate
-        status_t constructDefaultRequestSettings(camera3_request_template_t templateId,
+        status_t constructDefaultRequestSettings(camera_request_template templateId,
                 /*out*/ camera_metadata_t **requestTemplate);
         status_t configureStreams(const camera_metadata_t *sessionParams,
-                /*inout*/ camera3_stream_configuration *config,
+                /*inout*/ camera_stream_configuration_t *config,
                 const std::vector<uint32_t>& bufferSizes);
+
+        // The injection camera configures the streams to hal.
+        status_t configureInjectedStreams(
+                const camera_metadata_t* sessionParams,
+                /*inout*/ camera_stream_configuration_t* config,
+                const std::vector<uint32_t>& bufferSizes,
+                const CameraMetadata& cameraCharacteristics);
 
         // When the call succeeds, the ownership of acquire fences in requests is transferred to
         // HalInterface. More specifically, the current implementation will send the fence to
         // HAL process and close the FD in cameraserver process. When the call fails, the ownership
         // of the acquire fence still belongs to the caller.
         status_t processBatchCaptureRequests(
-                std::vector<camera3_capture_request_t*>& requests,
+                std::vector<camera_capture_request_t*>& requests,
                 /*out*/uint32_t* numRequestProcessed);
         status_t flush();
         status_t dump(int fd);
@@ -397,12 +444,14 @@ class Camera3Device :
         sp<hardware::camera::device::V3_5::ICameraDeviceSession> mHidlSession_3_5;
         // Valid if ICameraDeviceSession is @3.6 or newer
         sp<hardware::camera::device::V3_6::ICameraDeviceSession> mHidlSession_3_6;
+        // Valid if ICameraDeviceSession is @3.7 or newer
+        sp<hardware::camera::device::V3_7::ICameraDeviceSession> mHidlSession_3_7;
 
         std::shared_ptr<RequestMetadataQueue> mRequestMetadataQueue;
 
-        // The output HIDL request still depends on input camera3_capture_request_t
-        // Do not free input camera3_capture_request_t before output HIDL request
-        status_t wrapAsHidlRequest(camera3_capture_request_t* in,
+        // The output HIDL request still depends on input camera_capture_request_t
+        // Do not free input camera_capture_request_t before output HIDL request
+        status_t wrapAsHidlRequest(camera_capture_request_t* in,
                 /*out*/hardware::camera::device::V3_2::CaptureRequest* out,
                 /*out*/std::vector<native_handle_t*>* handlesCreated,
                 /*out*/std::vector<std::pair<int32_t, int32_t>>* inflightBuffers);
@@ -442,15 +491,13 @@ class Camera3Device :
     bool                       mSupportNativeZoomRatio;
     std::unordered_map<std::string, CameraMetadata> mPhysicalDeviceInfoMap;
 
-    CameraMetadata             mRequestTemplateCache[CAMERA3_TEMPLATE_COUNT];
+    CameraMetadata             mRequestTemplateCache[CAMERA_TEMPLATE_COUNT];
 
     struct Size {
         uint32_t width;
         uint32_t height;
         explicit Size(uint32_t w = 0, uint32_t h = 0) : width(w), height(h){}
     };
-    // Map from format to size.
-    Vector<Size>               mSupportedOpaqueInputSizes;
 
     enum Status {
         STATUS_ERROR,
@@ -471,10 +518,15 @@ class Camera3Device :
 
     camera3::StreamSet         mOutputStreams;
     sp<camera3::Camera3Stream> mInputStream;
+    bool                       mIsInputStreamMultiResolution;
+    SessionStatsBuilder        mSessionStatsBuilder;
+    // Map from stream group ID to physical cameras backing the stream group
+    std::map<int32_t, std::set<String8>> mGroupIdPhysicalCameraMap;
+
     int                        mNextStreamId;
     bool                       mNeedConfig;
 
-    int                        mDummyStreamId;
+    int                        mFakeStreamId;
 
     // Whether to send state updates upstream
     // Pause when doing transparent reconfiguration
@@ -501,7 +553,8 @@ class Camera3Device :
       public:
         PhysicalCameraSettingsList          mSettingsList;
         sp<camera3::Camera3Stream>          mInputStream;
-        camera3_stream_buffer_t             mInputBuffer;
+        camera_stream_buffer_t              mInputBuffer;
+        camera3::Size                       mInputBufferSize;
         Vector<sp<camera3::Camera3OutputStreamInterface> >
                                             mOutputStreams;
         SurfaceMap                          mOutputSurfaces;
@@ -517,9 +570,16 @@ class Camera3Device :
         // overriding of ROTATE_AND_CROP value and adjustment of coordinates
         // in several other controls in both the request and the result
         bool                                mRotateAndCropAuto;
+        // Original value of TEST_PATTERN_MODE and DATA so that they can be
+        // restored when sensor muting is turned off
+        int32_t                             mOriginalTestPatternMode;
+        int32_t                             mOriginalTestPatternData[4];
+
         // Whether this capture request has its zoom ratio set to 1.0x before
         // the framework overrides it for camera HAL consumption.
         bool                                mZoomRatioIs1x;
+        // The systemTime timestamp when the request is created.
+        nsecs_t                             mRequestTimeNs;
 
 
         // Whether this capture request's distortion correction update has
@@ -530,6 +590,9 @@ class Camera3Device :
         bool                                mRotationAndCropUpdated = false;
         // Whether this capture request's zoom ratio update has been done.
         bool                                mZoomRatioUpdated = false;
+        // Whether this max resolution capture request's  crop / metering region update has been
+        // done.
+        bool                                mUHRCropAndMeteringRegionsUpdated = false;
     };
     typedef List<sp<CaptureRequest> > RequestList;
 
@@ -538,7 +601,7 @@ class Camera3Device :
     status_t convertMetadataListToRequestListLocked(
             const List<const PhysicalCameraSettingsList> &metadataList,
             const std::list<const SurfaceMap> &surfaceMaps,
-            bool repeating,
+            bool repeating, nsecs_t requestTimeNs,
             /*out*/
             RequestList *requestList);
 
@@ -681,15 +744,15 @@ class Camera3Device :
     void               cancelStreamsConfigurationLocked();
 
     /**
-     * Add a dummy stream to the current stream set as a workaround for
+     * Add a fake stream to the current stream set as a workaround for
      * not allowing 0 streams in the camera HAL spec.
      */
-    status_t           addDummyStreamLocked();
+    status_t           addFakeStreamLocked();
 
     /**
-     * Remove a dummy stream if the current config includes real streams.
+     * Remove a fake stream if the current config includes real streams.
      */
-    status_t           tryRemoveDummyStreamLocked();
+    status_t           tryRemoveFakeStreamLocked();
 
     /**
      * Set device into an error state due to some fatal failure, and set an
@@ -715,12 +778,6 @@ class Camera3Device :
      * Try to acquire a lock a few times with sleeps between before giving up.
      */
     bool               tryLockSpinRightRound(Mutex& lock);
-
-    /**
-     * Helper function to get the largest Jpeg resolution (in area)
-     * Return Size(0, 0) if static metatdata is invalid
-     */
-    Size getMaxJpegResolution() const;
 
     /**
      * Helper function to get the offset between MONOTONIC and BOOTTIME
@@ -756,7 +813,8 @@ class Camera3Device :
                 sp<camera3::StatusTracker> statusTracker,
                 sp<HalInterface> interface,
                 const Vector<int32_t>& sessionParamKeys,
-                bool useHalBufManager);
+                bool useHalBufManager,
+                bool supportCameraMute);
         ~RequestThread();
 
         void     setNotificationListener(wp<NotificationListener> listener);
@@ -765,7 +823,8 @@ class Camera3Device :
          * Call after stream (re)-configuration is completed.
          */
         void     configurationComplete(bool isConstrainedHighSpeed,
-                const CameraMetadata& sessionParams);
+                const CameraMetadata& sessionParams,
+                const std::map<int32_t, std::set<String8>>& groupIdPhysicalCameraMap);
 
         /**
          * Set or clear the list of repeating requests. Does not block
@@ -858,6 +917,10 @@ class Camera3Device :
         status_t setRotateAndCropAutoBehavior(
                 camera_metadata_enum_android_scaler_rotate_and_crop_t rotateAndCropValue);
 
+        status_t setCameraMute(int32_t muteMode);
+
+        status_t setHalInterface(sp<HalInterface> newHalInterface);
+
       protected:
 
         virtual bool threadLoop();
@@ -874,10 +937,14 @@ class Camera3Device :
 
         // HAL workaround: Make sure a trigger ID always exists if
         // a trigger does
-        status_t           addDummyTriggerIds(const sp<CaptureRequest> &request);
+        status_t           addFakeTriggerIds(const sp<CaptureRequest> &request);
 
         // Override rotate_and_crop control if needed; returns true if the current value was changed
         bool               overrideAutoRotateAndCrop(const sp<CaptureRequest> &request);
+
+        // Override test_pattern control if needed for camera mute; returns true
+        // if the current value was changed
+        bool               overrideTestPattern(const sp<CaptureRequest> &request);
 
         static const nsecs_t kRequestTimeout = 50e6; // 50 ms
 
@@ -887,8 +954,8 @@ class Camera3Device :
         // Used to prepare a batch of requests.
         struct NextRequest {
             sp<CaptureRequest>              captureRequest;
-            camera3_capture_request_t       halRequest;
-            Vector<camera3_stream_buffer_t> outputBuffers;
+            camera_capture_request_t       halRequest;
+            Vector<camera_stream_buffer_t> outputBuffers;
             bool                            submitted;
         };
 
@@ -914,7 +981,7 @@ class Camera3Device :
 
         // Release physical camera settings and camera id resources.
         void cleanupPhysicalSettings(sp<CaptureRequest> request,
-                /*out*/camera3_capture_request_t *halRequest);
+                /*out*/camera_capture_request_t *halRequest);
 
         // Pause handling
         bool               waitIfPaused();
@@ -961,6 +1028,7 @@ class Camera3Device :
         Condition          mRequestSubmittedSignal;
         RequestList        mRequestQueue;
         RequestList        mRepeatingRequests;
+        bool               mFirstRepeating;
         // The next batch of requests being prepped for submission to the HAL, no longer
         // on the request queue. Read-only even with mRequestLock held, outside
         // of threadLoop
@@ -1000,6 +1068,8 @@ class Camera3Device :
         uint32_t           mCurrentAfTriggerId;
         uint32_t           mCurrentPreCaptureTriggerId;
         camera_metadata_enum_android_scaler_rotate_and_crop_t mRotateAndCropOverride;
+        int32_t            mCameraMute; // 0 = no mute, otherwise the TEST_PATTERN_MODE to use
+        bool               mCameraMuteChanged;
 
         int64_t            mRepeatingLastFrameNumber;
 
@@ -1014,7 +1084,10 @@ class Camera3Device :
         Vector<int32_t>    mSessionParamKeys;
         CameraMetadata     mLatestSessionParams;
 
+        std::map<int32_t, std::set<String8>> mGroupIdPhysicalCameraMap;
+
         const bool         mUseHalBufManager;
+        const bool         mSupportCameraMute;
     };
     sp<RequestThread> mRequestThread;
 
@@ -1033,9 +1106,11 @@ class Camera3Device :
 
     status_t registerInFlight(uint32_t frameNumber,
             int32_t numBuffers, CaptureResultExtras resultExtras, bool hasInput,
-            bool callback, nsecs_t maxExpectedDuration, std::set<String8>& physicalCameraIds,
+            bool callback, nsecs_t maxExpectedDuration,
+            const std::set<std::set<String8>>& physicalCameraIds,
             bool isStillCapture, bool isZslCapture, bool rotateAndCropAuto,
-            const std::set<std::string>& cameraIdsWithZoom, const SurfaceMap& outputSurfaces);
+            const std::set<std::string>& cameraIdsWithZoom, const SurfaceMap& outputSurfaces,
+            nsecs_t requestTimeNs);
 
     /**
      * Tracking for idle detection
@@ -1155,6 +1230,12 @@ class Camera3Device :
     std::unordered_map<std::string, camera3::ZoomRatioMapper> mZoomRatioMappers;
 
     /**
+     * UHR request crop / metering region mapper support
+     */
+    std::unordered_map<std::string, camera3::UHRCropAndMeteringRegionMapper>
+            mUHRCropAndMeteringRegionMappers;
+
+    /**
      * RotateAndCrop mapper support
      */
     std::unordered_map<std::string, camera3::RotateAndCropMapper> mRotateAndCropMappers;
@@ -1264,6 +1345,85 @@ class Camera3Device :
 
     // Whether HAL supports offline processing capability.
     bool mSupportOfflineProcessing = false;
+
+    // Whether the HAL supports camera muting via test pattern
+    bool mSupportCameraMute = false;
+    // Whether the HAL supports SOLID_COLOR or BLACK if mSupportCameraMute is true
+    bool mSupportTestPatternSolidColor = false;
+
+    // Whether the camera framework overrides the device characteristics for
+    // performance class.
+    bool mOverrideForPerfClass;
+
+    // Injection camera related methods.
+    class Camera3DeviceInjectionMethods : public virtual RefBase {
+      public:
+        Camera3DeviceInjectionMethods(wp<Camera3Device> parent);
+
+        ~Camera3DeviceInjectionMethods();
+
+        // Initialize the injection camera and generate an hal interface.
+        status_t injectionInitialize(
+                const String8& injectedCamId, sp<CameraProviderManager> manager,
+                const sp<
+                    android::hardware::camera::device::V3_2 ::ICameraDeviceCallback>&
+                    callback);
+
+        // Injection camera will replace the internal camera and configure streams
+        // when device is IDLE and request thread is paused.
+        status_t injectCamera(
+                camera3::camera_stream_configuration& injectionConfig,
+                std::vector<uint32_t>& injectionBufferSizes);
+
+        // Stop the injection camera and switch back to backup hal interface.
+        status_t stopInjection();
+
+        bool isInjecting();
+
+        const String8& getInjectedCamId() const;
+
+        void getInjectionConfig(/*out*/ camera3::camera_stream_configuration* injectionConfig,
+                /*out*/ std::vector<uint32_t>* injectionBufferSizes);
+
+      private:
+        // Configure the streams of injection camera, it need wait until the
+        // output streams are created and configured to the original camera before
+        // proceeding.
+        status_t injectionConfigureStreams(
+                camera3::camera_stream_configuration& injectionConfig,
+                std::vector<uint32_t>& injectionBufferSizes);
+
+        // Disconnect the injection camera and delete the hal interface.
+        void injectionDisconnectImpl();
+
+        // Use injection camera hal interface to replace and backup original
+        // camera hal interface.
+        status_t replaceHalInterface(sp<HalInterface> newHalInterface,
+                bool keepBackup);
+
+        wp<Camera3Device> mParent;
+
+        // Backup of the original camera hal interface.
+        sp<HalInterface> mBackupHalInterface;
+
+        // Generated injection camera hal interface.
+        sp<HalInterface> mInjectedCamHalInterface;
+
+        // Copy the configuration of the internal camera.
+        camera3::camera_stream_configuration mInjectionConfig;
+
+        // Copy the bufferSizes of the output streams of the internal camera.
+        std::vector<uint32_t> mInjectionBufferSizes;
+
+        // Synchronizes access to injection camera between initialize and
+        // disconnect.
+        Mutex mInjectionLock;
+
+        // The injection camera ID.
+        String8 mInjectedCamId;
+    };
+    sp<Camera3DeviceInjectionMethods> mInjectionMethods;
+
 }; // class Camera3Device
 
 }; // namespace android

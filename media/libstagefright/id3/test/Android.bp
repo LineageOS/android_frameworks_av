@@ -27,6 +27,7 @@ package {
 
 cc_test {
     name: "ID3Test",
+    test_suites: ["device-tests"],
     gtest: true,
 
     srcs: ["ID3Test.cpp"],

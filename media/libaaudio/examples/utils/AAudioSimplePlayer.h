@@ -359,22 +359,38 @@ aaudio_data_callback_result_t SimplePlayerDataCallbackProc(
 
     int32_t samplesPerFrame = AAudioStream_getChannelCount(stream);
 
-
-    int numActiveOscilators = (samplesPerFrame > MAX_CHANNELS) ? MAX_CHANNELS : samplesPerFrame;
+    int numActiveOscillators = std::min(samplesPerFrame, MAX_CHANNELS);
     switch (AAudioStream_getFormat(stream)) {
         case AAUDIO_FORMAT_PCM_I16: {
             int16_t *audioBuffer = (int16_t *) audioData;
-            for (int i = 0; i < numActiveOscilators; ++i) {
-                sineData->sineOscillators[i].render(&audioBuffer[i], samplesPerFrame,
-                                                    numFrames);
+            for (int i = 0; i < numActiveOscillators; ++i) {
+                sineData->sineOscillators[i].render(&audioBuffer[i],
+                                                    samplesPerFrame, numFrames);
             }
         }
             break;
         case AAUDIO_FORMAT_PCM_FLOAT: {
             float *audioBuffer = (float *) audioData;
-            for (int i = 0; i < numActiveOscilators; ++i) {
-                sineData->sineOscillators[i].render(&audioBuffer[i], samplesPerFrame,
-                                                    numFrames);
+            for (int i = 0; i < numActiveOscillators; ++i) {
+                sineData->sineOscillators[i].render(&audioBuffer[i],
+                                                    samplesPerFrame, numFrames);
+            }
+        }
+            break;
+        case AAUDIO_FORMAT_PCM_I24_PACKED: {
+            uint8_t *audioBuffer = (uint8_t *) audioData;
+            for (int i = 0; i < numActiveOscillators; ++i) {
+                static const int bytesPerSample = getBytesPerSample(AAUDIO_FORMAT_PCM_I24_PACKED);
+                sineData->sineOscillators[i].render24(&audioBuffer[i * bytesPerSample],
+                                                      samplesPerFrame, numFrames);
+            }
+        }
+            break;
+        case AAUDIO_FORMAT_PCM_I32: {
+            int32_t *audioBuffer = (int32_t *) audioData;
+            for (int i = 0; i < numActiveOscillators; ++i) {
+                sineData->sineOscillators[i].render(&audioBuffer[i],
+                                                    samplesPerFrame, numFrames);
             }
         }
             break;

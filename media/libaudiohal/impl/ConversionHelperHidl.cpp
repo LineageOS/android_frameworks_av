@@ -51,9 +51,9 @@ status_t ConversionHelperHidl::keysFromHal(const String8& keys, hidl_vec<hidl_st
                         value) == NO_ERROR;
 
     const bool keepDelayValue =
-            halKeys.get(String8(AUDIO_PARAMETER_DEVICE_ADDITIONAL_OUTPUT_DELAY),
+            halKeys.get(String8(AudioParameter::keyAdditionalOutputDeviceDelay),
                         value) == NO_ERROR ||
-            halKeys.get(String8(AUDIO_PARAMETER_DEVICE_MAX_ADDITIONAL_OUTPUT_DELAY),
+            halKeys.get(String8(AudioParameter::keyMaxAdditionalOutputDeviceDelay),
                         value) == NO_ERROR;
 
     for (size_t i = 0; i < halKeys.size(); ++i) {
@@ -62,8 +62,8 @@ status_t ConversionHelperHidl::keysFromHal(const String8& keys, hidl_vec<hidl_st
         if (status != OK) return status;
         if ((keepFormatValue && key == AudioParameter::keyFormat) ||
             (keepRoutingValue && key == AudioParameter::keyRouting) ||
-            (keepDelayValue && key == AUDIO_PARAMETER_DEVICE_ADDITIONAL_OUTPUT_DELAY) ||
-            (keepDelayValue && key == AUDIO_PARAMETER_DEVICE_MAX_ADDITIONAL_OUTPUT_DELAY)) {
+            (keepDelayValue && key == AudioParameter::keyAdditionalOutputDeviceDelay) ||
+            (keepDelayValue && key == AudioParameter::keyMaxAdditionalOutputDeviceDelay)) {
             AudioParameter keepValueParam;
             halKeys.getAt(i, key, value);
             keepValueParam.add(key, value);

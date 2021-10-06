@@ -19,19 +19,25 @@
 
 #include <aidl/android/media/BnMediaTranscodingService.h>
 #include <binder/IServiceManager.h>
-#include <media/TranscodingClientManager.h>
 
 namespace android {
 
 using Status = ::ndk::ScopedAStatus;
 using ::aidl::android::media::BnMediaTranscodingService;
-using ::aidl::android::media::ITranscodingServiceClient;
-using ::aidl::android::media::TranscodingJobParcel;
+using ::aidl::android::media::ITranscodingClient;
+using ::aidl::android::media::ITranscodingClientCallback;
 using ::aidl::android::media::TranscodingRequestParcel;
+using ::aidl::android::media::TranscodingSessionParcel;
+class TranscodingClientManager;
+class TranscodingLogger;
+class TranscodingSessionController;
+class UidPolicyInterface;
+class ResourcePolicyInterface;
+class ThermalPolicyInterface;
 
 class MediaTranscodingService : public BnMediaTranscodingService {
 public:
-    static constexpr int32_t kInvalidJobId = -1;
+    static constexpr int32_t kInvalidSessionId = -1;
     static constexpr int32_t kInvalidClientId = -1;
 
     MediaTranscodingService();
@@ -41,21 +47,11 @@ public:
 
     static const char* getServiceName() { return "media.transcoding"; }
 
-    Status registerClient(const std::shared_ptr<ITranscodingServiceClient>& in_client,
-                          const std::string& in_opPackageName, int32_t in_clientUid,
-                          int32_t in_clientPid, int32_t* _aidl_return) override;
-
-    Status unregisterClient(int32_t clientId, bool* _aidl_return) override;
+    Status registerClient(const std::shared_ptr<ITranscodingClientCallback>& in_callback,
+                          const std::string& in_clientName, const std::string& in_opPackageName,
+                          std::shared_ptr<ITranscodingClient>* _aidl_return) override;
 
     Status getNumOfClients(int32_t* _aidl_return) override;
-
-    Status submitRequest(int32_t in_clientId, const TranscodingRequestParcel& in_request,
-                         TranscodingJobParcel* out_job, int32_t* _aidl_return) override;
-
-    Status cancelJob(int32_t in_clientId, int32_t in_jobId, bool* _aidl_return) override;
-
-    Status getJobWithId(int32_t in_jobId, TranscodingJobParcel* out_job,
-                        bool* _aidl_return) override;
 
     virtual inline binder_status_t dump(int /*fd*/, const char** /*args*/, uint32_t /*numArgs*/);
 
@@ -64,7 +60,12 @@ private:
 
     mutable std::mutex mServiceLock;
 
-    TranscodingClientManager& mTranscodingClientManager;
+    std::shared_ptr<UidPolicyInterface> mUidPolicy;
+    std::shared_ptr<ResourcePolicyInterface> mResourcePolicy;
+    std::shared_ptr<ThermalPolicyInterface> mThermalPolicy;
+    std::shared_ptr<TranscodingLogger> mLogger;
+    std::shared_ptr<TranscodingSessionController> mSessionController;
+    std::shared_ptr<TranscodingClientManager> mClientManager;
 };
 
 }  // namespace android

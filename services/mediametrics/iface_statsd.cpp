@@ -27,7 +27,10 @@
 #include <pthread.h>
 #include <unistd.h>
 
+#include <map>
 #include <memory>
+#include <string>
+#include <vector>
 #include <string.h>
 #include <pwd.h>
 
@@ -45,33 +48,12 @@ namespace android {
 // has its own routine to handle this.
 //
 
-bool enabled_statsd = true;
+static bool enabled_statsd = true;
 
-struct statsd_hooks {
-    const char *key;
-    bool (*handler)(const mediametrics::Item *);
-};
-
-// keep this sorted, so we can do binary searches
-static constexpr struct statsd_hooks statsd_handlers[] =
-{
-    { "audiopolicy", statsd_audiopolicy },
-    { "audiorecord", statsd_audiorecord },
-    { "audiothread", statsd_audiothread },
-    { "audiotrack", statsd_audiotrack },
-    { "codec", statsd_codec},
-    { "drm.vendor.Google.WidevineCDM", statsd_widevineCDM },
-    { "drmmanager", statsd_drmmanager },
-    { "extractor", statsd_extractor },
-    { "mediadrm", statsd_mediadrm },
-    { "mediaparser", statsd_mediaparser },
-    { "nuplayer", statsd_nuplayer },
-    { "nuplayer2", statsd_nuplayer },
-    { "recorder", statsd_recorder },
-};
-
-// give me a record, i'll look at the type and upload appropriately
-bool dump2Statsd(const std::shared_ptr<const mediametrics::Item>& item) {
+namespace {
+template<typename Handler, typename... Args>
+bool dump2StatsdInternal(const std::map<std::string, Handler>& handlers,
+        const std::shared_ptr<const mediametrics::Item>& item, Args... args) {
     if (item == nullptr) return false;
 
     // get the key
@@ -82,12 +64,42 @@ bool dump2Statsd(const std::shared_ptr<const mediametrics::Item>& item) {
         return false;
     }
 
-    for (const auto &statsd_handler : statsd_handlers) {
-        if (key == statsd_handler.key) {
-            return statsd_handler.handler(item.get());
-        }
+    if (handlers.count(key)) {
+        return (handlers.at(key))(item, args...);
     }
     return false;
+}
+} // namespace
+
+// give me a record, I'll look at the type and upload appropriately
+bool dump2Statsd(
+        const std::shared_ptr<const mediametrics::Item>& item,
+        const std::shared_ptr<mediametrics::StatsdLog>& statsdLog) {
+    static const std::map<std::string, statsd_pusher*> statsd_pushers =
+    {
+        { "audiopolicy", statsd_audiopolicy },
+        { "audiorecord", statsd_audiorecord },
+        { "audiothread", statsd_audiothread },
+        { "audiotrack", statsd_audiotrack },
+        { "codec", statsd_codec},
+        { "drmmanager", statsd_drmmanager },
+        { "extractor", statsd_extractor },
+        { "mediadrm", statsd_mediadrm },
+        { "mediaparser", statsd_mediaparser },
+        { "nuplayer", statsd_nuplayer },
+        { "nuplayer2", statsd_nuplayer },
+        { "recorder", statsd_recorder },
+    };
+    return dump2StatsdInternal(statsd_pushers, item, statsdLog);
+}
+
+bool dump2Statsd(const std::shared_ptr<const mediametrics::Item>& item, AStatsEventList* out,
+        const std::shared_ptr<mediametrics::StatsdLog>& statsdLog) {
+    static const std::map<std::string, statsd_puller*> statsd_pullers =
+    {
+        { "mediadrm", statsd_mediadrm_puller },
+    };
+    return dump2StatsdInternal(statsd_pullers, item, out, statsdLog);
 }
 
 } // namespace android

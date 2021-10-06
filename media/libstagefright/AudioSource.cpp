@@ -21,6 +21,8 @@
 #define LOG_TAG "AudioSource"
 #include <utils/Log.h>
 
+#include <binder/IPCThreadState.h>
+#include <media/AidlConversion.h>
 #include <media/AudioRecord.h>
 #include <media/stagefright/AudioSource.h>
 #include <media/stagefright/MediaBuffer.h>
@@ -31,6 +33,8 @@
 #include <cutils/properties.h>
 
 namespace android {
+
+using content::AttributionSourceState;
 
 static void AudioRecordCallbackFunction(int event, void *user, void *info) {
     AudioSource *source = (AudioSource *) user;
@@ -50,74 +54,101 @@ static void AudioRecordCallbackFunction(int event, void *user, void *info) {
 }
 
 AudioSource::AudioSource(
+    const audio_attributes_t *attr, const AttributionSourceState& attributionSource,
+    uint32_t sampleRate, uint32_t channelCount, uint32_t outSampleRate,
+    audio_port_handle_t selectedDeviceId,
+    audio_microphone_direction_t selectedMicDirection,
+    float selectedMicFieldDimension)
+{
+  set(attr, attributionSource, sampleRate, channelCount, outSampleRate, selectedDeviceId,
+      selectedMicDirection, selectedMicFieldDimension);
+}
+
+AudioSource::AudioSource(
         const audio_attributes_t *attr, const String16 &opPackageName,
         uint32_t sampleRate, uint32_t channelCount, uint32_t outSampleRate,
         uid_t uid, pid_t pid, audio_port_handle_t selectedDeviceId,
         audio_microphone_direction_t selectedMicDirection,
         float selectedMicFieldDimension)
-    : mStarted(false),
-      mSampleRate(sampleRate),
-      mOutSampleRate(outSampleRate > 0 ? outSampleRate : sampleRate),
-      mTrackMaxAmplitude(false),
-      mStartTimeUs(0),
-      mStopSystemTimeUs(-1),
-      mLastFrameTimestampUs(0),
-      mMaxAmplitude(0),
-      mPrevSampleTimeUs(0),
-      mInitialReadTimeUs(0),
-      mNumFramesReceived(0),
-      mNumFramesSkipped(0),
-      mNumFramesLost(0),
-      mNumClientOwnedBuffers(0),
-      mNoMoreFramesToRead(false) {
-    ALOGV("sampleRate: %u, outSampleRate: %u, channelCount: %u",
-            sampleRate, outSampleRate, channelCount);
-    CHECK(channelCount == 1 || channelCount == 2);
-    CHECK(sampleRate > 0);
+{
+    // TODO b/182392769: use attribution source util
+    AttributionSourceState attributionSource;
+    attributionSource.packageName = VALUE_OR_FATAL(legacy2aidl_String16_string(opPackageName));
+    attributionSource.uid = VALUE_OR_FATAL(legacy2aidl_uid_t_int32_t(uid));
+    attributionSource.pid = VALUE_OR_FATAL(legacy2aidl_pid_t_int32_t(pid));
+    attributionSource.token = sp<BBinder>::make();
+    set(attr, attributionSource, sampleRate, channelCount, outSampleRate, selectedDeviceId,
+      selectedMicDirection, selectedMicFieldDimension);
+}
 
-    size_t minFrameCount;
-    status_t status = AudioRecord::getMinFrameCount(&minFrameCount,
-                                           sampleRate,
-                                           AUDIO_FORMAT_PCM_16_BIT,
-                                           audio_channel_in_mask_from_count(channelCount));
-    if (status == OK) {
-        // make sure that the AudioRecord callback never returns more than the maximum
-        // buffer size
-        uint32_t frameCount = kMaxBufferSize / sizeof(int16_t) / channelCount;
+void AudioSource::set(
+   const audio_attributes_t *attr, const AttributionSourceState& attributionSource,
+        uint32_t sampleRate, uint32_t channelCount, uint32_t outSampleRate,
+        audio_port_handle_t selectedDeviceId,
+        audio_microphone_direction_t selectedMicDirection,
+        float selectedMicFieldDimension)
+{
+   mStarted = false;
+   mSampleRate = sampleRate;
+   mOutSampleRate = outSampleRate > 0 ? outSampleRate : sampleRate;
+   mTrackMaxAmplitude = false;
+   mStartTimeUs = 0;
+   mStopSystemTimeUs = -1;
+   mLastFrameTimestampUs = 0;
+   mMaxAmplitude = 0;
+   mPrevSampleTimeUs = 0;
+   mInitialReadTimeUs = 0;
+   mNumFramesReceived = 0;
+   mNumFramesSkipped = 0;
+   mNumFramesLost = 0;
+   mNumClientOwnedBuffers = 0;
+   mNoMoreFramesToRead = false;
+  ALOGV("sampleRate: %u, outSampleRate: %u, channelCount: %u",
+        sampleRate, outSampleRate, channelCount);
+  CHECK(channelCount == 1 || channelCount == 2);
+  CHECK(sampleRate > 0);
 
-        // make sure that the AudioRecord total buffer size is large enough
-        size_t bufCount = 2;
-        while ((bufCount * frameCount) < minFrameCount) {
-            bufCount++;
-        }
+  size_t minFrameCount;
+  status_t status = AudioRecord::getMinFrameCount(&minFrameCount,
+                                                  sampleRate,
+                                                  AUDIO_FORMAT_PCM_16_BIT,
+                                                  audio_channel_in_mask_from_count(channelCount));
+  if (status == OK) {
+    // make sure that the AudioRecord callback never returns more than the maximum
+    // buffer size
+    uint32_t frameCount = kMaxBufferSize / sizeof(int16_t) / channelCount;
 
-        mRecord = new AudioRecord(
-                    AUDIO_SOURCE_DEFAULT, sampleRate, AUDIO_FORMAT_PCM_16_BIT,
-                    audio_channel_in_mask_from_count(channelCount),
-                    opPackageName,
-                    (size_t) (bufCount * frameCount),
-                    AudioRecordCallbackFunction,
-                    this,
-                    frameCount /*notificationFrames*/,
-                    AUDIO_SESSION_ALLOCATE,
-                    AudioRecord::TRANSFER_DEFAULT,
-                    AUDIO_INPUT_FLAG_NONE,
-                    uid,
-                    pid,
-                    attr,
-                    selectedDeviceId,
-                    selectedMicDirection,
-                    selectedMicFieldDimension);
-        // Set caller name so it can be logged in destructor.
-        // MediaMetricsConstants.h: AMEDIAMETRICS_PROP_CALLERNAME_VALUE_MEDIA
-        mRecord->setCallerName("media");
-        mInitCheck = mRecord->initCheck();
-        if (mInitCheck != OK) {
-            mRecord.clear();
-        }
-    } else {
-        mInitCheck = status;
+    // make sure that the AudioRecord total buffer size is large enough
+    size_t bufCount = 2;
+    while ((bufCount * frameCount) < minFrameCount) {
+      bufCount++;
     }
+
+    mRecord = new AudioRecord(
+        AUDIO_SOURCE_DEFAULT, sampleRate, AUDIO_FORMAT_PCM_16_BIT,
+        audio_channel_in_mask_from_count(channelCount),
+        attributionSource,
+        (size_t) (bufCount * frameCount),
+        AudioRecordCallbackFunction,
+        this,
+        frameCount /*notificationFrames*/,
+        AUDIO_SESSION_ALLOCATE,
+        AudioRecord::TRANSFER_DEFAULT,
+        AUDIO_INPUT_FLAG_NONE,
+        attr,
+        selectedDeviceId,
+        selectedMicDirection,
+        selectedMicFieldDimension);
+    // Set caller name so it can be logged in destructor.
+    // MediaMetricsConstants.h: AMEDIAMETRICS_PROP_CALLERNAME_VALUE_MEDIA
+    mRecord->setCallerName("media");
+    mInitCheck = mRecord->initCheck();
+    if (mInitCheck != OK) {
+      mRecord.clear();
+    }
+  } else {
+    mInitCheck = status;
+  }
 }
 
 AudioSource::~AudioSource() {

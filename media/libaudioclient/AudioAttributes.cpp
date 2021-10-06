@@ -20,48 +20,46 @@
 
 #include <binder/Parcel.h>
 
+#include <media/AidlConversion.h>
 #include <media/AudioAttributes.h>
+#include <media/PolicyAidlConversion.h>
+
+#define RETURN_STATUS_IF_ERROR(x) \
+    { auto _tmp = (x); if (_tmp != OK) return _tmp; }
 
 namespace android {
 
-status_t AudioAttributes::readFromParcel(const Parcel *parcel)
-{
-    status_t ret = NO_ERROR;
-    mAttributes.content_type = static_cast<audio_content_type_t>(parcel->readInt32());
-    mAttributes.usage = static_cast<audio_usage_t>(parcel->readInt32());
-    mAttributes.source = static_cast<audio_source_t>(parcel->readInt32());
-    mAttributes.flags = static_cast<audio_flags_mask_t>(parcel->readInt32());
-    const bool hasFlattenedTag = (parcel->readInt32() == 1);
-    if (hasFlattenedTag) {
-        std::string tags;
-        ret = parcel->readUtf8FromUtf16(&tags);
-        if (ret != NO_ERROR) {
-            return ret;
-        }
-        std::strncpy(mAttributes.tags, tags.c_str(), AUDIO_ATTRIBUTES_TAGS_MAX_SIZE - 1);
-    } else {
-        strcpy(mAttributes.tags, "");
-    }
-    mStreamType = static_cast<audio_stream_type_t>(parcel->readInt32());
-    mGroupId = static_cast<volume_group_t>(parcel->readUint32());
-    return NO_ERROR;
+status_t AudioAttributes::readFromParcel(const Parcel* parcel) {
+    media::AudioAttributesEx aidl;
+    RETURN_STATUS_IF_ERROR(aidl.readFromParcel(parcel));
+    *this = VALUE_OR_RETURN_STATUS(aidl2legacy_AudioAttributesEx_AudioAttributes(aidl));
+    return OK;
 }
 
-status_t AudioAttributes::writeToParcel(Parcel *parcel) const
-{
-    parcel->writeInt32(static_cast<int32_t>(mAttributes.content_type));
-    parcel->writeInt32(static_cast<int32_t>(mAttributes.usage));
-    parcel->writeInt32(static_cast<int32_t>(mAttributes.source));
-    parcel->writeInt32(static_cast<int32_t>(mAttributes.flags));
-    if (strlen(mAttributes.tags) == 0) {
-        parcel->writeInt32(0);
-    } else {
-        parcel->writeInt32(1);
-        parcel->writeUtf8AsUtf16(std::string(mAttributes.tags));
-    }
-    parcel->writeInt32(static_cast<int32_t>(mStreamType));
-    parcel->writeUint32(static_cast<uint32_t>(mGroupId));
-    return NO_ERROR;
+status_t AudioAttributes::writeToParcel(Parcel* parcel) const {
+    media::AudioAttributesEx aidl = VALUE_OR_RETURN_STATUS(
+            legacy2aidl_AudioAttributes_AudioAttributesEx(*this));
+    return aidl.writeToParcel(parcel);
+}
+
+ConversionResult<media::AudioAttributesEx>
+legacy2aidl_AudioAttributes_AudioAttributesEx(const AudioAttributes& legacy) {
+    media::AudioAttributesEx aidl;
+    aidl.attributes = VALUE_OR_RETURN(
+            legacy2aidl_audio_attributes_t_AudioAttributesInternal(legacy.getAttributes()));
+    aidl.streamType = VALUE_OR_RETURN(
+            legacy2aidl_audio_stream_type_t_AudioStreamType(legacy.getStreamType()));
+    aidl.groupId = VALUE_OR_RETURN(legacy2aidl_volume_group_t_int32_t(legacy.getGroupId()));
+    return aidl;
+}
+
+ConversionResult<AudioAttributes>
+aidl2legacy_AudioAttributesEx_AudioAttributes(const media::AudioAttributesEx& aidl) {
+    return AudioAttributes(VALUE_OR_RETURN(aidl2legacy_int32_t_volume_group_t(aidl.groupId)),
+                           VALUE_OR_RETURN(aidl2legacy_AudioStreamType_audio_stream_type_t(
+                                   aidl.streamType)),
+                           VALUE_OR_RETURN(aidl2legacy_AudioAttributesInternal_audio_attributes_t(
+                                   aidl.attributes)));
 }
 
 } // namespace android

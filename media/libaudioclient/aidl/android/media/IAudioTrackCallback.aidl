@@ -17,7 +17,7 @@
 package android.media;
 
 /**
- * @hide
+ * {@hide}
  */
 interface IAudioTrackCallback {
     oneway void onCodecFormatChanged(in byte[] audioMetadata);

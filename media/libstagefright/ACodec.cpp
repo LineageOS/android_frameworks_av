@@ -74,6 +74,12 @@ enum {
     kMaxIndicesToCheck = 32, // used when enumerating supported formats and profiles
 };
 
+namespace {
+
+constexpr char TUNNEL_PEEK_KEY[] = "android._trigger-tunnel-peek";
+
+}
+
 // OMX errors are directly mapped into status_t range if
 // there is no corresponding MediaError status code.
 // Use the statusFromOMXError(int32_t omxError) function.
@@ -1465,6 +1471,10 @@ void ACodec::notifyOfRenderedFrames(bool dropIncomplete, FrameRenderTracker::Inf
     mCallback->onOutputFramesRendered(done);
 }
 
+void ACodec::onFirstTunnelFrameReady() {
+    mCallback->onFirstTunnelFrameReady();
+}
+
 ACodec::BufferInfo *ACodec::dequeueBufferFromNativeWindow() {
     ANativeWindowBuffer *buf;
     CHECK(mNativeWindow.get() != NULL);
@@ -2457,6 +2467,30 @@ status_t ACodec::getLatency(uint32_t *latency) {
     if (err == OK) {
         *latency = config.nU32;
     }
+    return err;
+}
+
+status_t ACodec::setTunnelPeek(int32_t tunnelPeek) {
+    if (mIsEncoder) {
+        ALOGE("encoder does not support %s", TUNNEL_PEEK_KEY);
+        return BAD_VALUE;
+    }
+    if (!mTunneled) {
+        ALOGE("%s is only supported in tunnel mode", TUNNEL_PEEK_KEY);
+        return BAD_VALUE;
+    }
+
+    OMX_CONFIG_BOOLEANTYPE config;
+    InitOMXParams(&config);
+    config.bEnabled = (OMX_BOOL)(tunnelPeek != 0);
+    status_t err = mOMXNode->setConfig(
+            (OMX_INDEXTYPE)OMX_IndexConfigAndroidTunnelPeek,
+            &config, sizeof(config));
+    if (err != OK) {
+        ALOGE("decoder cannot set %s to %d (err %d)",
+              TUNNEL_PEEK_KEY, tunnelPeek, err);
+    }
+
     return err;
 }
 
@@ -7896,6 +7930,15 @@ status_t ACodec::setParameters(const sp<AMessage> &params) {
                 &presentation, sizeof(presentation));
         }
     }
+
+    int32_t tunnelPeek = 0;
+    if (params->findInt32(TUNNEL_PEEK_KEY, &tunnelPeek)) {
+        status_t err = setTunnelPeek(tunnelPeek);
+        if (err != OK) {
+            return err;
+        }
+    }
+
     return setVendorParameters(params);
 }
 
@@ -8358,6 +8401,12 @@ bool ACodec::ExecutingState::onOMXEvent(
 
         case OMX_EventBufferFlag:
         {
+            return true;
+        }
+
+        case OMX_EventOnFirstTunnelFrameReady:
+        {
+            mCodec->onFirstTunnelFrameReady();
             return true;
         }
 

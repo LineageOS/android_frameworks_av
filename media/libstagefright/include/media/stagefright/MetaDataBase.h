@@ -62,6 +62,7 @@ enum {
     kKeyDVCC              = 'dvcc',  // raw data
     kKeyAV1C              = 'av1c',  // raw data
     kKeyThumbnailHVCC     = 'thvc',  // raw data
+    kKeyThumbnailAV1C     = 'tav1',  // raw data
     kKeyD263              = 'd263',  // raw data
     kKeyOpusHeader        = 'ohdr',  // raw data
     kKeyOpusCodecDelay    = 'ocod',  // uint64_t (codec delay in ns)
@@ -126,6 +127,8 @@ enum {
     kKeyTrackTimeStatus   = 'tktm',  // int64_t
 
     kKeyRealTimeRecording = 'rtrc',  // bool (int32_t)
+    kKeyBackgroundMode = 'bkmd',  // bool (int32_t)
+
     kKeyNumBuffers        = 'nbbf',  // int32_t
 
     // Ogg files can be tagged to be automatically looping...
@@ -228,6 +231,8 @@ enum {
     kKeyExifSize         = 'exsz', // int64_t, Exif data size
     kKeyExifTiffOffset   = 'thdr', // int32_t, if > 0, buffer contains exif data block with
                                    // tiff hdr at specified offset
+    kKeyXmpOffset        = 'xmof', // int64_t, XMP data offset
+    kKeyXmpSize          = 'xmsz', // int64_t, XMP data size
     kKeyPcmBigEndian     = 'pcmb', // bool (int32_t)
 
     // Key for ALAC Magic Cookie
@@ -251,6 +256,7 @@ enum {
 
     // Treat empty track as malformed for MediaRecorder.
     kKeyEmptyTrackMalFormed = 'nemt', // bool (int32_t)
+
     kKeyVps              = 'sVps', // int32_t, indicates that a buffer has vps.
     kKeySps              = 'sSps', // int32_t, indicates that a buffer has sps.
     kKeyPps              = 'sPps', // int32_t, indicates that a buffer has pps.
@@ -260,6 +266,15 @@ enum {
     kKeyRtpCvoDegrees    = 'cvod', // int32_t, rtp cvo degrees as per 3GPP 26.114.
     kKeyRtpDscp          = 'dscp', // int32_t, DSCP(Differentiated services codepoint) of RFC 2474.
     kKeySocketNetwork    = 'sNet', // int64_t, socket will be bound to network handle.
+
+    // Slow-motion markers
+    kKeySlowMotionMarkers = 'slmo', // raw data, byte array following spec for
+                                    // MediaFormat#KEY_SLOW_MOTION_MARKERS
+
+    kKeySampleFileOffset = 'sfof', // int64_t, sample's offset in a media file.
+    kKeyLastSampleIndexInChunk = 'lsic',  //int64_t, index of last sample in a chunk.
+    kKeySampleTimeBeforeAppend = 'lsba', // int64_t, timestamp of last sample of a track.
+
 };
 
 enum {

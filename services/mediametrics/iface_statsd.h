@@ -14,23 +14,37 @@
  * limitations under the License.
  */
 
+#include <memory>
+#include <stats_event.h>
+
 namespace android {
+namespace mediametrics {
+class Item;
+}
 
-extern bool enabled_statsd;
-
+using statsd_pusher = bool (const std::shared_ptr<const mediametrics::Item>& item,
+         const std::shared_ptr<mediametrics::StatsdLog>& statsdLog);
 // component specific dumpers
-extern bool statsd_audiopolicy(const mediametrics::Item *);
-extern bool statsd_audiorecord(const mediametrics::Item *);
-extern bool statsd_audiothread(const mediametrics::Item *);
-extern bool statsd_audiotrack(const mediametrics::Item *);
-extern bool statsd_codec(const mediametrics::Item *);
-extern bool statsd_extractor(const mediametrics::Item *);
-extern bool statsd_mediaparser(const mediametrics::Item *);
-extern bool statsd_nuplayer(const mediametrics::Item *);
-extern bool statsd_recorder(const mediametrics::Item *);
+extern statsd_pusher statsd_audiopolicy;
+extern statsd_pusher statsd_audiorecord;
+extern statsd_pusher statsd_audiothread;
+extern statsd_pusher statsd_audiotrack;
+extern statsd_pusher statsd_codec;
+extern statsd_pusher statsd_extractor;
+extern statsd_pusher statsd_mediaparser;
 
-extern bool statsd_mediadrm(const mediametrics::Item *);
-extern bool statsd_widevineCDM(const mediametrics::Item *);
-extern bool statsd_drmmanager(const mediametrics::Item *);
+extern statsd_pusher statsd_nuplayer;
+extern statsd_pusher statsd_recorder;
+extern statsd_pusher statsd_mediadrm;
+extern statsd_pusher statsd_drmmanager;
 
+using statsd_puller = bool (const std::shared_ptr<const mediametrics::Item>& item,
+        AStatsEventList *, const std::shared_ptr<mediametrics::StatsdLog>& statsdLog);
+// component specific pullers
+extern statsd_puller statsd_mediadrm_puller;
+
+bool dump2Statsd(const std::shared_ptr<const mediametrics::Item>& item,
+        const std::shared_ptr<mediametrics::StatsdLog>& statsdLog);
+bool dump2Statsd(const std::shared_ptr<const mediametrics::Item>& item, AStatsEventList* out,
+        const std::shared_ptr<mediametrics::StatsdLog>& statsdLog);
 } // namespace android

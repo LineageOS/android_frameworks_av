@@ -15,8 +15,7 @@
  */
 
 #include <android-base/logging.h>
-#include <binder/IPCThreadState.h>
-#include <binder/ProcessState.h>
+#include <android/binder_process.h>
 
 #include "MediaTranscodingService.h"
 
@@ -25,12 +24,9 @@ using namespace android;
 int main(int argc __unused, char** argv) {
     LOG(INFO) << "media transcoding service starting";
 
-    // TODO(hkuang): Start the service with libbinder_ndk.
     strcpy(argv[0], "media.transcoding");
-    sp<ProcessState> proc(ProcessState::self());
-    sp<IServiceManager> sm = defaultServiceManager();
     android::MediaTranscodingService::instantiate();
 
-    ProcessState::self()->startThreadPool();
-    IPCThreadState::self()->joinThreadPool();
+    ABinderProcess_startThreadPool();
+    ABinderProcess_joinThreadPool();
 }

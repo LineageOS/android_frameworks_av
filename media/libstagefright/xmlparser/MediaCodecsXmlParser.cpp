@@ -146,7 +146,10 @@ std::vector<std::string> MediaCodecsXmlParser::getDefaultXmlNames() {
         };
     static std::vector<std::string> names = {
             prefixes[0] + variants[0] + ".xml",
-            prefixes[1] + variants[1] + ".xml"
+            prefixes[1] + variants[1] + ".xml",
+
+            // shaping information is not currently variant specific.
+            "media_codecs_shaping.xml"
         };
     return names;
 }
@@ -346,6 +349,8 @@ struct MediaCodecsXmlParser::Impl {
         status_t addAlias(const char **attrs);
         status_t addFeature(const char **attrs);
         status_t addLimit(const char **attrs);
+        status_t addMapping(const char **attrs);
+        status_t addTuning(const char **attrs);
         status_t addQuirk(const char **attrs, const char *prefix = nullptr);
         status_t addSetting(const char **attrs, const char *prefix = nullptr);
         status_t enterMediaCodec(const char **attrs, bool encoder);
@@ -428,7 +433,7 @@ status_t MediaCodecsXmlParser::Impl::parseXmlFilesInSearchDirs(
         if (findFileInDirs(searchDirs, fileName, &path)) {
             err = parseXmlPath(path);
         } else {
-            ALOGD("Cannot find %s", path.c_str());
+            ALOGI("Did not find %s in search path", fileName.c_str());
         }
         res = combineStatus(res, err);
     }
@@ -438,7 +443,7 @@ status_t MediaCodecsXmlParser::Impl::parseXmlFilesInSearchDirs(
 status_t MediaCodecsXmlParser::Impl::parseXmlPath(const std::string &path) {
     std::lock_guard<std::mutex> guard(mLock);
     if (!fileExists(path)) {
-        ALOGD("Cannot find %s", path.c_str());
+        ALOGV("Cannot find %s", path.c_str());
         mParsingStatus = combineStatus(mParsingStatus, NAME_NOT_FOUND);
         return NAME_NOT_FOUND;
     }
@@ -741,13 +746,19 @@ void MediaCodecsXmlParser::Impl::Parser::startElementHandler(
         {
             // ignore limits and features specified outside of type
             if (!mState->inType()
-                    && (strEq(name, "Limit") || strEq(name, "Feature") || strEq(name, "Variant"))) {
+                    && (strEq(name, "Limit") || strEq(name, "Feature")
+                        || strEq(name, "Variant") || strEq(name, "Mapping")
+                        || strEq(name, "Tuning"))) {
                 PLOGD("ignoring %s specified outside of a Type", name);
                 return;
             } else if (strEq(name, "Limit")) {
                 err = addLimit(attrs);
             } else if (strEq(name, "Feature")) {
                 err = addFeature(attrs);
+            } else if (strEq(name, "Mapping")) {
+                err = addMapping(attrs);
+            } else if (strEq(name, "Tuning")) {
+                err = addTuning(attrs);
             } else if (strEq(name, "Variant") && section != SECTION_VARIANT) {
                 err = limitVariants(attrs);
                 mState->enterSection(err == OK ? SECTION_VARIANT : SECTION_UNKNOWN);
@@ -981,7 +992,9 @@ MediaCodecsXmlParser::Impl::State::enterMediaCodec(
     TypeMap::iterator typeIt;
     if (codecIt == mData->mCodecMap.end()) { // New codec name
         if (updating) {
-            return { NAME_NOT_FOUND, "MediaCodec: cannot update non-existing codec" };
+            std::string msg = "MediaCodec: cannot update non-existing codec: ";
+            msg = msg + name;
+            return { NAME_NOT_FOUND, msg };
         }
         // Create a new codec in mCodecMap
         codecIt = mData->mCodecMap.insert(Codec(name, CodecProperties())).first;
@@ -994,19 +1007,25 @@ MediaCodecsXmlParser::Impl::State::enterMediaCodec(
         codecIt->second.order = mData->mCodecMap.size();
     } else { // Existing codec name
         if (!updating) {
-            return { ALREADY_EXISTS, "MediaCodec: cannot add existing codec" };
+            std::string msg = "MediaCodec: cannot add existing codec: ";
+            msg = msg + name;
+            return { ALREADY_EXISTS, msg };
         }
         if (type != nullptr) {
             typeIt = codecIt->second.typeMap.find(type);
             if (typeIt == codecIt->second.typeMap.end()) {
-                return { NAME_NOT_FOUND, "MediaCodec: cannot update non-existing type for codec" };
+                std::string msg = "MediaCodec: cannot update non-existing type for codec: ";
+                msg = msg + name;
+                return { NAME_NOT_FOUND, msg };
             }
         } else {
             // This should happen only when the codec has at most one type.
             typeIt = codecIt->second.typeMap.begin();
             if (typeIt == codecIt->second.typeMap.end()
                     || codecIt->second.typeMap.size() != 1) {
-                return { BAD_VALUE, "MediaCodec: cannot update codec without type specified" };
+                std::string msg = "MediaCodec: cannot update codec without type specified: ";
+                msg = msg + name;
+                return { BAD_VALUE, msg };
             }
         }
     }
@@ -1383,6 +1402,92 @@ status_t MediaCodecsXmlParser::Impl::Parser::addFeature(const char **attrs) {
     }
 
     mState->addDetail(std::string("feature-") + a_name, a_value ? : "0");
+    return OK;
+}
+
+status_t MediaCodecsXmlParser::Impl::Parser::addMapping(const char **attrs) {
+    CHECK(mState->inType());
+    size_t i = 0;
+    const char *a_name = nullptr;
+    const char *a_value = nullptr;
+    const char *a_kind = nullptr;
+
+    while (attrs[i] != nullptr) {
+        CHECK((i & 1) == 0);
+        if (attrs[i + 1] == nullptr) {
+            PLOGD("Mapping: attribute '%s' is null", attrs[i]);
+            return BAD_VALUE;
+        }
+
+        if (strEq(attrs[i], "name")) {
+            a_name = attrs[++i];
+        } else if (strEq(attrs[i], "kind")) {
+            a_kind = attrs[++i];
+        } else if (strEq(attrs[i], "value")) {
+            a_value = attrs[++i];
+        } else {
+            PLOGD("Mapping: ignoring unrecognized attribute '%s'", attrs[i]);
+            ++i;
+        }
+        ++i;
+    }
+
+    // Every mapping must have all 3 fields
+    if (a_name == nullptr) {
+        PLOGD("Mapping with no 'name' attribute");
+        return BAD_VALUE;
+    }
+
+    if (a_kind == nullptr) {
+        PLOGD("Mapping with no 'kind' attribute");
+        return BAD_VALUE;
+    }
+
+    if (a_value == nullptr) {
+        PLOGD("Mapping with no 'value' attribute");
+        return BAD_VALUE;
+    }
+
+    mState->addDetail(std::string("mapping-") + a_kind + "-" + a_name, a_value);
+    return OK;
+}
+
+status_t MediaCodecsXmlParser::Impl::Parser::addTuning(const char **attrs) {
+    CHECK(mState->inType());
+    size_t i = 0;
+    const char *a_name = nullptr;
+    const char *a_value = nullptr;
+
+    while (attrs[i] != nullptr) {
+        CHECK((i & 1) == 0);
+        if (attrs[i + 1] == nullptr) {
+            PLOGD("Mapping: attribute '%s' is null", attrs[i]);
+            return BAD_VALUE;
+        }
+
+        if (strEq(attrs[i], "name")) {
+            a_name = attrs[++i];
+        } else if (strEq(attrs[i], "value")) {
+            a_value = attrs[++i];
+        } else {
+            PLOGD("Tuning: ignoring unrecognized attribute '%s'", attrs[i]);
+            ++i;
+        }
+        ++i;
+    }
+
+    // Every tuning must have both fields
+    if (a_name == nullptr) {
+        PLOGD("Tuning with no 'name' attribute");
+        return BAD_VALUE;
+    }
+
+    if (a_value == nullptr) {
+        PLOGD("Tuning with no 'value' attribute");
+        return BAD_VALUE;
+    }
+
+    mState->addDetail(std::string("tuning-") + a_name, a_value);
     return OK;
 }
 

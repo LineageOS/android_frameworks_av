@@ -18,7 +18,7 @@
 #define A_WAKELOCK_H_
 
 #include <media/stagefright/foundation/ABase.h>
-#include <powermanager/IPowerManager.h>
+#include <android/os/IPowerManager.h>
 #include <utils/RefBase.h>
 
 namespace android {
@@ -37,7 +37,7 @@ public:
     virtual ~AWakeLock();
 
 private:
-    sp<IPowerManager> mPowerManager;
+    sp<os::IPowerManager> mPowerManager;
     sp<IBinder>       mWakeLockToken;
     uint32_t          mWakeLockCount;
 

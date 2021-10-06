@@ -55,6 +55,17 @@ std::vector<audio_devices_t> LastRemovableMediaDevices::getLastRemovableMediaDev
     return ret;
 }
 
+sp<DeviceDescriptor> LastRemovableMediaDevices::getLastRemovableMediaDevice(
+        const DeviceVector& excludedDevices, device_out_group_t group) const {
+    for (auto iter = mMediaDevices.begin(); iter != mMediaDevices.end(); ++iter) {
+        if ((group == GROUP_NONE || group == getDeviceOutGroup((iter->desc)->type())) &&
+                !excludedDevices.contains(iter->desc)) {
+            return iter->desc;
+        }
+    }
+    return nullptr;
+}
+
 device_out_group_t LastRemovableMediaDevices::getDeviceOutGroup(audio_devices_t device) const
 {
     switch (device) {

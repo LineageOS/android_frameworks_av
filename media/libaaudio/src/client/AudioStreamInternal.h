@@ -20,7 +20,6 @@
 #include <stdint.h>
 #include <aaudio/AAudio.h>
 
-#include "binding/IAAudioService.h"
 #include "binding/AudioEndpointParcelable.h"
 #include "binding/AAudioServiceInterface.h"
 #include "client/IsochronousClockModel.h"
@@ -29,7 +28,6 @@
 #include "utility/AudioClock.h"
 
 using android::sp;
-using android::IAAudioService;
 
 namespace aaudio {
 
@@ -46,10 +44,6 @@ public:
     AudioStreamInternal(AAudioServiceInterface  &serviceInterface, bool inService);
     virtual ~AudioStreamInternal();
 
-    aaudio_result_t requestStart() override;
-
-    aaudio_result_t requestStop() override;
-
     aaudio_result_t getTimestamp(clockid_t clockId,
                                        int64_t *framePosition,
                                        int64_t *timeNanoseconds) override;
@@ -58,15 +52,11 @@ public:
 
     aaudio_result_t open(const AudioStreamBuilder &builder) override;
 
-    aaudio_result_t release_l() override;
-
     aaudio_result_t setBufferSize(int32_t requestedFrames) override;
 
     int32_t getBufferSize() const override;
 
     int32_t getBufferCapacity() const override;
-
-    int32_t getFramesPerBurst() const override;
 
     int32_t getXRunCount() const override {
         return mXRunCount;
@@ -76,11 +66,8 @@ public:
 
     aaudio_result_t unregisterThread() override;
 
-    aaudio_result_t joinThread(void** returnArg);
-
     // Called internally from 'C'
     virtual void *callbackLoop() = 0;
-
 
     bool isMMap() override {
         return true;
@@ -100,6 +87,10 @@ public:
     }
 
 protected:
+    aaudio_result_t requestStart_l() REQUIRES(mStreamLock) override;
+    aaudio_result_t requestStop_l() REQUIRES(mStreamLock) override;
+
+    aaudio_result_t release_l() REQUIRES(mStreamLock) override;
 
     aaudio_result_t processData(void *buffer,
                          int32_t numFrames,
@@ -121,9 +112,11 @@ protected:
 
     aaudio_result_t processCommands();
 
-    aaudio_result_t stopCallback();
+    aaudio_result_t stopCallback_l();
 
-    virtual void advanceClientToMatchServerPosition() = 0;
+    virtual void prepareBuffersForStart() {}
+
+    virtual void advanceClientToMatchServerPosition(int32_t serverMargin = 0) = 0;
 
     virtual void onFlushFromServer() {}
 
@@ -159,7 +152,6 @@ protected:
 
     aaudio_handle_t          mServiceStreamHandle; // opaque handle returned from service
 
-    int32_t                  mFramesPerBurst = MIN_FRAMES_PER_BURST; // frames per HAL transfer
     int32_t                  mXRunCount = 0;      // how many underrun events?
 
     // Offset from underlying frame position.

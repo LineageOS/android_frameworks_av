@@ -27,6 +27,13 @@ LIBMEDIANDK {
     AImage_getPlaneRowStride; # introduced=24
     AImage_getTimestamp; # introduced=24
     AImage_getWidth; # introduced=24
+    AMEDIACODEC_KEY_HDR10_PLUS_INFO; # var introduced=31
+    AMEDIACODEC_KEY_LOW_LATENCY; # var introduced=31
+    AMEDIACODEC_KEY_OFFSET_TIME; # var introduced=31
+    AMEDIACODEC_KEY_REQUEST_SYNC_FRAME; # var introduced=31
+    AMEDIACODEC_KEY_SUSPEND; # var introduced=31
+    AMEDIACODEC_KEY_SUSPEND_TIME; # var introduced=31
+    AMEDIACODEC_KEY_VIDEO_BITRATE; # var introduced=31
     AMEDIAFORMAT_KEY_AAC_DRC_ATTENUATION_FACTOR; # var introduced=28
     AMEDIAFORMAT_KEY_AAC_DRC_BOOST_FACTOR; # var introduced=28
     AMEDIAFORMAT_KEY_AAC_DRC_HEAVY_COMPRESSION; # var introduced=28
@@ -91,6 +98,7 @@ LIBMEDIANDK {
     AMEDIAFORMAT_KEY_GRID_ROWS; # var introduced=28
     AMEDIAFORMAT_KEY_HAPTIC_CHANNEL_COUNT; # var introduced=29
     AMEDIAFORMAT_KEY_HDR_STATIC_INFO; # var introduced=28
+    AMEDIAFORMAT_KEY_HDR10_PLUS_INFO; # var introduced=31
     AMEDIAFORMAT_KEY_HEIGHT; # var introduced=21
     AMEDIAFORMAT_KEY_ICC_PROFILE; # var introduced=29
     AMEDIAFORMAT_KEY_INTRA_REFRESH_PERIOD; # var introduced=28
@@ -101,6 +109,7 @@ LIBMEDIANDK {
     AMEDIAFORMAT_KEY_IS_SYNC_FRAME; # var introduced=29
     AMEDIAFORMAT_KEY_I_FRAME_INTERVAL; # var introduced=21
     AMEDIAFORMAT_KEY_LANGUAGE; # var introduced=21
+    AMEDIAFORMAT_KEY_LAST_SAMPLE_INDEX_IN_CHUNK; # var introduced=31
     AMEDIAFORMAT_KEY_LATENCY; # var introduced=28
     AMEDIAFORMAT_KEY_LEVEL; # var introduced=28
     AMEDIAFORMAT_KEY_LOCATION; # var introduced=29
@@ -126,17 +135,21 @@ LIBMEDIANDK {
     AMEDIAFORMAT_KEY_PUSH_BLANK_BUFFERS_ON_STOP; # var introduced=21
     AMEDIAFORMAT_KEY_REPEAT_PREVIOUS_FRAME_AFTER; # var introduced=21
     AMEDIAFORMAT_KEY_ROTATION; # var introduced=28
+    AMEDIAFORMAT_KEY_SAMPLE_FILE_OFFSET; # var introduced=31
+    AMEDIAFORMAT_KEY_SAMPLE_TIME_BEFORE_APPEND; # var introduced=31
     AMEDIAFORMAT_KEY_SAMPLE_RATE; # var introduced=21
     AMEDIAFORMAT_KEY_SAR_HEIGHT; # var introduced=29
     AMEDIAFORMAT_KEY_SAR_WIDTH; # var introduced=29
     AMEDIAFORMAT_KEY_SEI; # var introduced=28
     AMEDIAFORMAT_KEY_SLICE_HEIGHT; # var introduced=28
+    AMEDIAFORMAT_KEY_SLOW_MOTION_MARKERS; # var introduced=31
     AMEDIAFORMAT_KEY_STRIDE; # var introduced=21
     AMEDIAFORMAT_KEY_TARGET_TIME; # var introduced=29
     AMEDIAFORMAT_KEY_TEMPORAL_LAYER_COUNT; # var introduced=29
     AMEDIAFORMAT_KEY_TEMPORAL_LAYER_ID; # var introduced=28
     AMEDIAFORMAT_KEY_TEMPORAL_LAYERING; # var introduced=28
     AMEDIAFORMAT_KEY_TEXT_FORMAT_DATA; # var introduced=29
+    AMEDIAFORMAT_KEY_THUMBNAIL_CSD_AV1C; # var introduced=31
     AMEDIAFORMAT_KEY_THUMBNAIL_CSD_HEVC; # var introduced=29
     AMEDIAFORMAT_KEY_THUMBNAIL_HEIGHT; # var introduced=29
     AMEDIAFORMAT_KEY_THUMBNAIL_TIME; # var introduced=29
@@ -149,6 +162,8 @@ LIBMEDIANDK {
     AMEDIAFORMAT_KEY_TRACK_ID; # var introduced=28
     AMEDIAFORMAT_KEY_VALID_SAMPLES; # var introduced=29
     AMEDIAFORMAT_KEY_WIDTH; # var introduced=21
+    AMEDIAFORMAT_KEY_XMP_OFFSET; # var introduced=31
+    AMEDIAFORMAT_KEY_XMP_SIZE; # var introduced=31
     AMEDIAFORMAT_KEY_YEAR; # var introduced=29
     AMediaCodecActionCode_isRecoverable; # introduced=28
     AMediaCodecActionCode_isTransient; # introduced=28
@@ -163,8 +178,11 @@ LIBMEDIANDK {
     AMediaCodecCryptoInfo_setPattern; # introduced=24
     AMediaCodec_configure;
     AMediaCodec_createCodecByName;
+    AMediaCodec_createCodecByNameForClient; # apex # introduced=31
     AMediaCodec_createDecoderByType;
+    AMediaCodec_createDecoderByTypeForClient; # apex # introduced=31
     AMediaCodec_createEncoderByType;
+    AMediaCodec_createEncoderByTypeForClient; # apex # introduced=31
     AMediaCodec_delete;
     AMediaCodec_dequeueInputBuffer;
     AMediaCodec_dequeueOutputBuffer;
@@ -271,7 +289,10 @@ LIBMEDIANDK {
     AMediaFormat_setString;
     AMediaFormat_toString;
     AMediaMuxer_addTrack;
+    AMediaMuxer_append; # introduced=31
     AMediaMuxer_delete;
+    AMediaMuxer_getTrackCount; # introduced=31
+    AMediaMuxer_getTrackFormat; # introduced=31
     AMediaMuxer_new;
     AMediaMuxer_setLocation;
     AMediaMuxer_setOrientationHint;

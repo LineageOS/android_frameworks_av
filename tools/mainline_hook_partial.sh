@@ -35,7 +35,8 @@
 
 ## tunables:
 ##
-DEV_BRANCH=rvc-dev
+DEV_BRANCH=master
+MAINLINE_BRANCH=sc-mainline-prod
 filelist_file=MainlineFiles.cfg
 
 ###
@@ -50,8 +51,9 @@ NORMAL=$(tput sgr0)
 ## get the active branch:
 ## * <localbranch> <shainfo> [goog/master] Fix to handle missing checks on error returned
 ## strip this down to "master"
+## * b157501573_advisory 25521834a6 [goog/sc-dev] Merge "PlayerBase: add audio session ID" into sc-dev
 ##
-current=`git branch -vv | grep -P "^\*[^\[]+\[goog/"|sed -e 's/^.*\[//' | sed -e 's/:.*$//'| sed -e 's/^goog\///'`
+current=`git branch -vv | grep -P "^\*[^\[]+\[goog/"|sed -e 's/^.*\[//' | sed -e 's/\].*$//'|sed -e 's/:.*$//'| sed -e 's/^goog\///'`
 if [ "${current}" = "" ] ; then
         current=unknown
 fi
@@ -142,12 +144,36 @@ if [ -z "${mainline_yes}" ] ; then
     exit 0
 fi
 
+#
+# exit 0 is "all good, no output passed along to user"
+# exit 77 is "a warning, pass along the output to the user"
+# exit 1 will be a failure.
+#
 result=0
+
+# simple reminder that it should also land in mainline branch
+#
+if [ "${current}" != "${MAINLINE_BRANCH}" ] ; then
+        # simple reminder to ensure it hits mainline
+        result=77
+        cat - <<EOF
+You are uploading repo  ${RED}${REPO_PATH}${NORMAL} to branch ${RED}${current}${NORMAL}.
+The mainline branch for ${RED}${REPO_PATH}${NORMAL} is branch ${RED}${MAINLINE_BRANCH}${NORMAL}.
+
+Ensure an appropriate cherry pick or equivalent lands in branch ${RED}${MAINLINE_BRANCH}${NORMAL}.
+Security bulletin timing or unreleased functionality may drive when this can be landed.
+EOF
+fi
+
+# watch for the mixed some mainline / some not CL
+# we usually want to reject such mixed CLs
+#
+
 if [ ! -z "${mainline_no}" ] ; then
         # mixed bag, suggest (not insist) that developer split them.
         result=1
         cat - <<EOF
-This CL contains files contains both mainline and non-mainline files.  Consider separating
+This change contains both mainline and non-mainline files.  Please separate
 them into separate CLs. It may also be appropriate to update the list of mainline
 files in ${RED}${REPO_ROOT}/${filelist_file}${NORMAL}.
 
@@ -162,33 +188,6 @@ EOF
         echo ${mainline_no} | sed -e 's/ //g'
         echo -e ${NORMAL}
 
-fi
-
-if [ "${current}" != "${DEV_BRANCH}" ] ; then
-    # Change is not in the desired mainline dev branch
-    result=1
-
-    #echo -e "${RED}"
-    cat - <<EOF
-
-You are uploading repo  ${RED}${REPO_PATH}${NORMAL} to branch ${RED}${current}${NORMAL}. 
-The source of truth for ${RED}${REPO_PATH}${NORMAL} is branch ${RED}${DEV_BRANCH}${NORMAL}. 
-
-Please upload this change to branch ${RED}${DEV_BRANCH}${NORMAL} unless one or more of
-the following apply:
-- this is a security bug prohibited from disclosure before the next dessert release.
-  (moderate security bugs fall into this category).
-- this is new functionality prohibitied from disclosure before the next dessert release.
-EOF
-    #echo -e "${NORMAL}"
-
-fi
-
-## since stdout is buffered in a way that complicates the below, we're just going
-## to tell the user what they can do to get around this check instead of asking them
-## as part of this run of the command.
-
-if [ ${result} != 0 ] ; then
     cat - <<EOF
 
 If you are sure you want to proceed uploading to branch ${RED}${current}${NORMAL},
@@ -196,5 +195,11 @@ re-run your repo upload command with the '--no-verify' option
 
 EOF
 fi
+
+# result will be:
+# 0: all good, no output passed to user
+# 77: warnings (but we pass), output passed along to user
+# else: failure, output passed along to the user
+
 exit ${result}
 

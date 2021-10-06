@@ -14,12 +14,20 @@ cc_library_headers {
 
     export_include_dirs: ["include"],
     header_libs: [
+        "libaudioclient_aidl_conversion_util",
         "libaudio_system_headers",
         "libmedia_helper_headers",
     ],
     export_header_lib_headers: [
+        "libaudioclient_aidl_conversion_util",
         "libaudio_system_headers",
         "libmedia_helper_headers",
+    ],
+    static_libs: [
+        "audioclient-types-aidl-cpp",
+    ],
+    export_static_lib_headers: [
+        "audioclient-types-aidl-cpp",
     ],
     host_supported: true,
     target: {
@@ -44,12 +52,19 @@ cc_library {
     ],
 
     shared_libs: [
+        "audioclient-types-aidl-cpp",
+        "libaudioclient_aidl_conversion",
         "libaudioutils",
         "libbase",
         "libbinder",
         "liblog",
         "libmedia_helper",
         "libutils",
+    ],
+
+    export_shared_lib_headers: [
+        "audioclient-types-aidl-cpp",
+        "libaudioclient_aidl_conversion",
     ],
 
     header_libs: [

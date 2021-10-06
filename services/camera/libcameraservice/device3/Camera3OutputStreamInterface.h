@@ -95,6 +95,19 @@ class Camera3OutputStreamInterface : public virtual Camera3StreamInterface {
      * Query the physical camera id for the output stream.
      */
     virtual const String8& getPhysicalCameraId() const = 0;
+
+    /**
+     * Set the batch size for buffer operations. The output stream will request
+     * buffers from buffer queue on a batch basis. Currently only video streams
+     * are allowed to set the batch size. Also if the stream is managed by
+     * buffer manager (Surface group in Java API) then batching is also not
+     * supported. Changing batch size on the fly while there is already batched
+     * buffers in the stream is also not supported.
+     * If the batch size is larger than the max dequeue count set
+     * by the camera HAL, the batch size will be set to the max dequeue count
+     * instead.
+     */
+    virtual status_t setBatchSize(size_t batchSize = 1) = 0;
 };
 
 // Helper class to organize a synchronized mapping of stream IDs to stream instances

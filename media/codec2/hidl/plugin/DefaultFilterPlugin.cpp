@@ -105,4 +105,13 @@ bool DefaultFilterPlugin::isFilteringEnabled(const std::shared_ptr<C2ComponentIn
     return mPlugin->isFilteringEnabled(intf);
 }
 
+c2_status_t DefaultFilterPlugin::queryParamsForPreviousComponent(
+        const std::shared_ptr<C2ComponentInterface> &intf,
+        std::vector<std::unique_ptr<C2Param>> *params) {
+    if (mInit != OK) {
+        return C2_NO_INIT;
+    }
+    return mPlugin->queryParamsForPreviousComponent(intf, params);
+}
+
 }  // namespace android

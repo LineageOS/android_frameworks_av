@@ -25,6 +25,8 @@ cc_test {
         "libmedia_helper",
         "libutils",
         "libxml2",
+        "libpermission",
+        "libbinder",
     ],
 
     static_libs: [
@@ -54,6 +56,7 @@ cc_test {
 
 cc_test {
     name: "audio_health_tests",
+    require_root: true,
 
     shared_libs: [
         "libaudiofoundation",

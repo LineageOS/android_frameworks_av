@@ -440,19 +440,22 @@ media_status_t WAVSource::read(
     int64_t seekTimeUs;
     ReadOptions::SeekMode mode;
     if (options != NULL && options->getSeekTo(&seekTimeUs, &mode)) {
-        int64_t pos = 0;
-
+        int64_t pos;
+        int64_t sampleNumber;
+        bool overflowed = __builtin_mul_overflow(seekTimeUs, mSampleRate, &sampleNumber);
+        sampleNumber /= 1000000;
         if (mWaveFormat == WAVE_FORMAT_MSGSM) {
             // 65 bytes decode to 320 8kHz samples
-            int64_t samplenumber = (seekTimeUs * mSampleRate) / 1000000;
-            int64_t framenumber = samplenumber / 320;
-            pos = framenumber * 65;
+            pos = sampleNumber / 320 * 65;
         } else {
-            pos = (seekTimeUs * mSampleRate) / 1000000 * mNumChannels * (mBitsPerSample >> 3);
+            int64_t bytesPerFrame;
+            overflowed |= __builtin_mul_overflow(mNumChannels, mBitsPerSample >> 3, &bytesPerFrame);
+            overflowed |= __builtin_mul_overflow(bytesPerFrame, sampleNumber, &pos);
         }
-        if (pos > (off64_t)mSize) {
-            pos = mSize;
+        if (overflowed) {
+          return AMEDIA_ERROR_MALFORMED;
         }
+        pos = std::clamp(pos, (int64_t) 0, (int64_t) mSize);
         mCurrentPos = pos + mOffset;
     }
 

@@ -27,6 +27,7 @@ package {
 
 cc_test {
     name: "HEVCUtilsUnitTest",
+    test_suites: ["device-tests"],
     gtest: true,
 
     srcs: [

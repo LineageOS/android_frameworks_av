@@ -32,6 +32,7 @@ cc_library {
     ],
 
     static_libs: [
+        "libstagefright_foundation_colorutils_ndk",   // for mainline-safe ColorUtils
         "libstagefright_foundation",
         "libstagefright_metadatautils",
         "libwebm",

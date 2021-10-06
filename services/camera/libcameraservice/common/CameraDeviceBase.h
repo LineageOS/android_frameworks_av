@@ -28,7 +28,6 @@
 #include <utils/List.h>
 
 #include "hardware/camera2.h"
-#include "hardware/camera3.h"
 #include "camera/CameraMetadata.h"
 #include "camera/CaptureResult.h"
 #include "gui/IGraphicBufferProducer.h"
@@ -40,6 +39,41 @@
 #include "CameraOfflineSessionBase.h"
 
 namespace android {
+
+namespace camera3 {
+
+typedef enum camera_request_template {
+    CAMERA_TEMPLATE_PREVIEW = 1,
+    CAMERA_TEMPLATE_STILL_CAPTURE = 2,
+    CAMERA_TEMPLATE_VIDEO_RECORD = 3,
+    CAMERA_TEMPLATE_VIDEO_SNAPSHOT = 4,
+    CAMERA_TEMPLATE_ZERO_SHUTTER_LAG = 5,
+    CAMERA_TEMPLATE_MANUAL = 6,
+    CAMERA_TEMPLATE_COUNT,
+    CAMERA_VENDOR_TEMPLATE_START = 0x40000000
+} camera_request_template_t;
+
+typedef enum camera_stream_configuration_mode {
+    CAMERA_STREAM_CONFIGURATION_NORMAL_MODE = 0,
+    CAMERA_STREAM_CONFIGURATION_CONSTRAINED_HIGH_SPEED_MODE = 1,
+    CAMERA_VENDOR_STREAM_CONFIGURATION_MODE_START = 0x8000
+} camera_stream_configuration_mode_t;
+
+typedef struct camera_jpeg_blob {
+    uint16_t jpeg_blob_id;
+    uint32_t jpeg_size;
+} camera_jpeg_blob_t;
+
+enum {
+    CAMERA_JPEG_BLOB_ID = 0x00FF,
+    CAMERA_JPEG_APP_SEGMENTS_BLOB_ID = 0x0100,
+};
+
+} // namespace camera3
+
+using camera3::camera_request_template_t;;
+using camera3::camera_stream_configuration_mode_t;
+using camera3::camera_stream_rotation_t;
 
 class CameraProviderManager;
 
@@ -128,11 +162,13 @@ class CameraDeviceBase : public virtual FrameProducer {
      */
     virtual status_t createStream(sp<Surface> consumer,
             uint32_t width, uint32_t height, int format,
-            android_dataspace dataSpace, camera3_stream_rotation_t rotation, int *id,
+            android_dataspace dataSpace, camera_stream_rotation_t rotation, int *id,
             const String8& physicalCameraId,
+            const std::unordered_set<int32_t>  &sensorPixelModesUsed,
             std::vector<int> *surfaceIds = nullptr,
             int streamSetId = camera3::CAMERA3_STREAM_SET_ID_INVALID,
-            bool isShared = false, uint64_t consumerUsage = 0) = 0;
+            bool isShared = false, bool isMultiResolution = false,
+            uint64_t consumerUsage = 0) = 0;
 
     /**
      * Create an output stream of the requested size, format, rotation and
@@ -143,11 +179,13 @@ class CameraDeviceBase : public virtual FrameProducer {
      */
     virtual status_t createStream(const std::vector<sp<Surface>>& consumers,
             bool hasDeferredConsumer, uint32_t width, uint32_t height, int format,
-            android_dataspace dataSpace, camera3_stream_rotation_t rotation, int *id,
+            android_dataspace dataSpace, camera_stream_rotation_t rotation, int *id,
             const String8& physicalCameraId,
+            const std::unordered_set<int32_t> &sensorPixelModesUsed,
             std::vector<int> *surfaceIds = nullptr,
             int streamSetId = camera3::CAMERA3_STREAM_SET_ID_INVALID,
-            bool isShared = false, uint64_t consumerUsage = 0) = 0;
+            bool isShared = false, bool isMultiResolution = false,
+            uint64_t consumerUsage = 0) = 0;
 
     /**
      * Create an input stream of width, height, and format.
@@ -155,7 +193,7 @@ class CameraDeviceBase : public virtual FrameProducer {
      * Return value is the stream ID if non-negative and an error if negative.
      */
     virtual status_t createInputStream(uint32_t width, uint32_t height,
-            int32_t format, /*out*/ int32_t *id) = 0;
+            int32_t format, bool multiResolution, /*out*/ int32_t *id) = 0;
 
     struct StreamInfo {
         uint32_t width;
@@ -225,7 +263,8 @@ class CameraDeviceBase : public virtual FrameProducer {
      * - INVALID_OPERATION if the device was in the wrong state
      */
     virtual status_t configureStreams(const CameraMetadata& sessionParams,
-            int operatingMode = 0) = 0;
+            int operatingMode =
+            camera_stream_configuration_mode_t::CAMERA_STREAM_CONFIGURATION_NORMAL_MODE) = 0;
 
     /**
      * Retrieve a list of all stream ids that were advertised as capable of
@@ -241,7 +280,7 @@ class CameraDeviceBase : public virtual FrameProducer {
      * Create a metadata buffer with fields that the HAL device believes are
      * best for the given use case
      */
-    virtual status_t createDefaultRequest(int templateId,
+    virtual status_t createDefaultRequest(camera_request_template_t templateId,
             CameraMetadata *request) = 0;
 
     /**
@@ -364,9 +403,32 @@ class CameraDeviceBase : public virtual FrameProducer {
             camera_metadata_enum_android_scaler_rotate_and_crop_t rotateAndCropValue) = 0;
 
     /**
+     * Whether camera muting (producing black-only output) is supported.
+     *
+     * Calling setCameraMute(true) when this returns false will return an
+     * INVALID_OPERATION error.
+     */
+    virtual bool supportsCameraMute() = 0;
+
+    /**
+     * Mute the camera.
+     *
+     * When muted, black image data is output on all output streams.
+     */
+    virtual status_t setCameraMute(bool enabled) = 0;
+
+    /**
      * Get the status tracker of the camera device
      */
     virtual wp<camera3::StatusTracker> getStatusTracker() = 0;
+
+    /**
+     * Set bitmask for image dump flag
+     */
+    void setImageDumpMask(int mask) { mImageDumpMask = mask; }
+
+protected:
+    bool mImageDumpMask = 0;
 };
 
 }; // namespace android

@@ -53,6 +53,7 @@ public:
         CFG_EVENT_CREATE_AUDIO_PATCH,
         CFG_EVENT_RELEASE_AUDIO_PATCH,
         CFG_EVENT_UPDATE_OUT_DEVICE,
+        CFG_EVENT_RESIZE_BUFFER
     };
 
     class ConfigEventData: public RefBase {
@@ -242,6 +243,28 @@ public:
         virtual ~UpdateOutDevicesConfigEvent();
     };
 
+    class ResizeBufferConfigEventData : public ConfigEventData {
+    public:
+        explicit ResizeBufferConfigEventData(int32_t maxSharedAudioHistoryMs) :
+            mMaxSharedAudioHistoryMs(maxSharedAudioHistoryMs) {}
+
+        virtual void dump(char *buffer, size_t size) {
+            snprintf(buffer, size, "mMaxSharedAudioHistoryMs: %d", mMaxSharedAudioHistoryMs);
+        }
+
+        int32_t mMaxSharedAudioHistoryMs;
+    };
+
+    class ResizeBufferConfigEvent : public ConfigEvent {
+    public:
+        explicit ResizeBufferConfigEvent(int32_t maxSharedAudioHistoryMs) :
+            ConfigEvent(CFG_EVENT_RESIZE_BUFFER) {
+            mData = new ResizeBufferConfigEventData(maxSharedAudioHistoryMs);
+        }
+
+        virtual ~ResizeBufferConfigEvent() {}
+    };
+
     class PMDeathRecipient : public IBinder::DeathRecipient {
     public:
         explicit    PMDeathRecipient(const wp<ThreadBase>& thread) : mThread(thread) {}
@@ -272,6 +295,7 @@ public:
                 // Called by AudioFlinger::frameCount(audio_io_handle_t output) and effects,
                 // and returns the [normal mix] buffer's frame count.
     virtual     size_t      frameCount() const = 0;
+    virtual     audio_channel_mask_t hapticChannelMask() const { return AUDIO_CHANNEL_NONE; }
     virtual     uint32_t    latency_l() const { return 0; }
     virtual     void        setVolumeForOutput_l(float left __unused, float right __unused) const {}
 
@@ -305,6 +329,7 @@ public:
                 status_t    sendReleaseAudioPatchConfigEvent(audio_patch_handle_t handle);
                 status_t    sendUpdateOutDeviceConfigEvent(
                                     const DeviceDescriptorBaseVector& outDevices);
+                void        sendResizeBufferConfigEvent_l(int32_t maxSharedAudioHistoryMs);
                 void        processConfigEvents_l();
     virtual     void        cacheParameters_l() = 0;
     virtual     status_t    createAudioPatch_l(const struct audio_patch *patch,
@@ -312,6 +337,9 @@ public:
     virtual     status_t    releaseAudioPatch_l(const audio_patch_handle_t handle) = 0;
     virtual     void        updateOutDevices(const DeviceDescriptorBaseVector& outDevices);
     virtual     void        toAudioPortConfig(struct audio_port_config *config) = 0;
+
+    virtual     void        resizeInputBuffer_l(int32_t maxSharedAudioHistoryMs);
+
 
 
                 // see note at declaration of mStandby, mOutDevice and mInDevice
@@ -348,7 +376,7 @@ public:
 
                 sp<EffectHandle> createEffect_l(
                                     const sp<AudioFlinger::Client>& client,
-                                    const sp<IEffectClient>& effectClient,
+                                    const sp<media::IEffectClient>& effectClient,
                                     int32_t priority,
                                     audio_session_t sessionId,
                                     effect_descriptor_t *desc,
@@ -434,8 +462,10 @@ public:
 
                 // the value returned by default implementation is not important as the
                 // strategy is only meaningful for PlaybackThread which implements this method
-                virtual uint32_t getStrategyForSession_l(audio_session_t sessionId __unused)
-                        { return 0; }
+                virtual product_strategy_t getStrategyForSession_l(
+                        audio_session_t sessionId __unused) {
+                    return static_cast<product_strategy_t>(0);
+                }
 
                 // check if some effects must be suspended/restored when an effect is enabled
                 // or disabled
@@ -477,6 +507,27 @@ public:
 
                 void onEffectEnable(const sp<EffectModule>& effect);
                 void onEffectDisable();
+
+                // invalidateTracksForAudioSession_l must be called with holding mLock.
+    virtual     void invalidateTracksForAudioSession_l(audio_session_t sessionId __unused) const { }
+                // Invalidate all the tracks with the given audio session.
+                void invalidateTracksForAudioSession(audio_session_t sessionId) const {
+                    Mutex::Autolock _l(mLock);
+                    invalidateTracksForAudioSession_l(sessionId);
+                }
+
+                template <typename T>
+                void invalidateTracksForAudioSession_l(audio_session_t sessionId,
+                                                       const T& tracks) const {
+                    for (size_t i = 0; i < tracks.size(); ++i) {
+                        const sp<TrackBase>& track = tracks[i];
+                        if (sessionId == track->sessionId()) {
+                            track->invalidate();
+                        }
+                    }
+                }
+
+    virtual     bool isStreamInitialized() = 0;
 
 protected:
 
@@ -575,7 +626,7 @@ protected:
 
                 static const int        kThreadNameLength = 16; // prctl(PR_SET_NAME) limit
                 char                    mThreadName[kThreadNameLength]; // guaranteed NUL-terminated
-                sp<IPowerManager>       mPowerManager;
+                sp<os::IPowerManager>   mPowerManager;
                 sp<IBinder>             mWakeLockToken;
                 const sp<PMDeathRecipient> mDeathRecipient;
                 // list of suspended effects per session and per type. The first (outer) vector is
@@ -692,7 +743,9 @@ protected:
                     void            updatePowerState(sp<ThreadBase> thread, bool force = false);
 
                     /** @return true if one or move active tracks was added or removed since the
-                     *          last time this function was called or the vector was created. */
+                     *          last time this function was called or the vector was created.
+                     *          true if volume of one of active tracks was changed.
+                     */
                     bool            readAndClearHasChanged();
 
                 private:
@@ -865,12 +918,11 @@ public:
                                 audio_session_t sessionId,
                                 audio_output_flags_t *flags,
                                 pid_t creatorPid,
+                                const AttributionSourceState& attributionSource,
                                 pid_t tid,
-                                uid_t uid,
                                 status_t *status /*non-NULL*/,
                                 audio_port_handle_t portId,
-                                const sp<media::IAudioTrackCallback>& callback,
-                                const std::string& opPackageName);
+                                const sp<media::IAudioTrackCallback>& callback);
 
                 AudioStreamOut* getOutput() const;
                 AudioStreamOut* clearOutput();
@@ -909,7 +961,7 @@ public:
                         uint32_t hasAudioSession_l(audio_session_t sessionId) const override {
                             return ThreadBase::hasAudioSession_l(sessionId, mTracks);
                         }
-                virtual uint32_t getStrategyForSession_l(audio_session_t sessionId);
+                virtual product_strategy_t getStrategyForSession_l(audio_session_t sessionId);
 
 
                 virtual status_t setSyncEvent(const sp<SyncEvent>& event);
@@ -945,10 +997,23 @@ public:
                                         && outDeviceTypes().count(mTimestampCorrectedDevice) != 0;
                             }
 
+    virtual     bool        isStreamInitialized() {
+                                return !(mOutput == nullptr || mOutput->stream == nullptr);
+                            }
+
+                audio_channel_mask_t hapticChannelMask() const override {
+                                         return mHapticChannelMask;
+                                     }
+                bool supportsHapticPlayback() const {
+                    return (mHapticChannelMask & AUDIO_CHANNEL_HAPTIC_ALL) != AUDIO_CHANNEL_NONE;
+                }
+
                 void setDownStreamPatch(const struct audio_patch *patch) {
                     Mutex::Autolock _l(mLock);
                     mDownStreamPatch = *patch;
                 }
+
+                PlaybackThread::Track* getTrackById_l(audio_port_handle_t trackId);
 
 protected:
     // updated by readOutputParameters_l()
@@ -1081,6 +1146,11 @@ protected:
                                     && (mOutput->flags & AUDIO_OUTPUT_FLAG_HW_AV_SYNC); }
 
                 uint32_t    trackCountForUid_l(uid_t uid) const;
+
+                void        invalidateTracksForAudioSession_l(
+                                    audio_session_t sessionId) const override {
+                                ThreadBase::invalidateTracksForAudioSession_l(sessionId, mTracks);
+                            }
 
 private:
 
@@ -1580,6 +1650,9 @@ public:
         // AudioBufferProvider interface
         virtual status_t    getNextBuffer(AudioBufferProvider::Buffer* buffer);
         virtual void        releaseBuffer(AudioBufferProvider::Buffer* buffer);
+
+                int32_t     getFront() const { return mRsmpInFront; }
+                void        setFront(int32_t front) { mRsmpInFront = front; }
     private:
         RecordTrack * const mRecordTrack;
         size_t              mRsmpInUnrel;   // unreleased frames remaining from
@@ -1625,12 +1698,12 @@ public:
                     audio_session_t sessionId,
                     size_t *pNotificationFrameCount,
                     pid_t creatorPid,
-                    uid_t uid,
+                    const AttributionSourceState& attributionSource,
                     audio_input_flags_t *flags,
                     pid_t tid,
                     status_t *status /*non-NULL*/,
                     audio_port_handle_t portId,
-                    const String16& opPackageName);
+                    int32_t maxSharedAudioHistoryMs);
 
             status_t    start(RecordTrack* recordTrack,
                               AudioSystem::sync_event_t event,
@@ -1654,6 +1727,7 @@ public:
                                            audio_patch_handle_t *handle);
     virtual status_t    releaseAudioPatch_l(const audio_patch_handle_t handle);
             void        updateOutDevices(const DeviceDescriptorBaseVector& outDevices) override;
+            void        resizeInputBuffer_l(int32_t maxSharedAudioHistoryMs) override;
 
             void        addPatchTrack(const sp<PatchRecord>& record);
             void        deletePatchTrack(const sp<PatchRecord>& record);
@@ -1709,6 +1783,18 @@ public:
                                     && inDeviceType() == mTimestampCorrectedDevice;
                         }
 
+            status_t    shareAudioHistory(const std::string& sharedAudioPackageName,
+                                          audio_session_t sharedSessionId = AUDIO_SESSION_NONE,
+                                          int64_t sharedAudioStartMs = -1);
+            status_t    shareAudioHistory_l(const std::string& sharedAudioPackageName,
+                                          audio_session_t sharedSessionId = AUDIO_SESSION_NONE,
+                                          int64_t sharedAudioStartMs = -1);
+            void        resetAudioHistory_l();
+
+    virtual bool        isStreamInitialized() {
+                            return !(mInput == nullptr || mInput->stream == nullptr);
+                        }
+
 protected:
             void        dumpInternals_l(int fd, const Vector<String16>& args) override;
             void        dumpTracks_l(int fd, const Vector<String16>& args) override;
@@ -1721,6 +1807,9 @@ private:
             void    inputStandBy();
 
             void    checkBtNrec_l();
+
+            int32_t getOldestFront_l();
+            void    updateFronts_l(int32_t offset);
 
             AudioStreamIn                       *mInput;
             Source                              *mSource;
@@ -1787,6 +1876,11 @@ private:
             int64_t                             mFramesRead = 0;    // continuous running counter.
 
             DeviceDescriptorBaseVector          mOutDevices;
+
+            int32_t                             mMaxSharedAudioHistoryMs = 0;
+            std::string                         mSharedAudioPackageName = {};
+            int32_t                             mSharedAudioStartFrames = -1;
+            audio_session_t                     mSharedAudioSessionId = AUDIO_SESSION_NONE;
 };
 
 class MmapThread : public ThreadBase
@@ -1818,6 +1912,7 @@ class MmapThread : public ThreadBase
                    audio_port_handle_t *handle);
     status_t stop(audio_port_handle_t handle);
     status_t standby();
+    virtual status_t getExternalPosition(uint64_t *position, int64_t *timeNaos) = 0;
 
     // RefBase
     virtual     void        onFirstRef();
@@ -1868,6 +1963,8 @@ class MmapThread : public ThreadBase
                 // Sets the UID records silence
     virtual     void        setRecordSilenced(audio_port_handle_t portId __unused,
                                               bool silenced __unused) {}
+
+    virtual     bool        isStreamInitialized() { return false; }
 
  protected:
                 void        dumpInternals_l(int fd, const Vector<String16>& args) override;
@@ -1929,6 +2026,12 @@ public:
 
     virtual     void        toAudioPortConfig(struct audio_port_config *config);
 
+                status_t    getExternalPosition(uint64_t *position, int64_t *timeNanos) override;
+
+    virtual     bool        isStreamInitialized() {
+                                return !(mOutput == nullptr || mOutput->stream == nullptr);
+                            }
+
 protected:
                 void        dumpInternals_l(int fd, const Vector<String16>& args) override;
 
@@ -1958,6 +2061,12 @@ public:
                                                  bool silenced) override;
 
     virtual     void           toAudioPortConfig(struct audio_port_config *config);
+
+                status_t       getExternalPosition(uint64_t *position, int64_t *timeNanos) override;
+
+    virtual     bool           isStreamInitialized() {
+                                   return !(mInput == nullptr || mInput->stream == nullptr);
+                               }
 
 protected:
 

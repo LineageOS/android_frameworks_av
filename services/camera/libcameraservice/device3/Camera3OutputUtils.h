@@ -33,6 +33,7 @@
 #include "device3/InFlightRequest.h"
 #include "device3/Camera3Stream.h"
 #include "device3/Camera3OutputStreamInterface.h"
+#include "utils/SessionStatsBuilder.h"
 #include "utils/TagMonitor.h"
 
 namespace android {
@@ -40,6 +41,66 @@ namespace android {
 using ResultMetadataQueue = hardware::MessageQueue<uint8_t, hardware::kSynchronizedReadWrite>;
 
 namespace camera3 {
+
+    typedef struct camera_stream_configuration {
+        uint32_t num_streams;
+        camera_stream_t **streams;
+        uint32_t operation_mode;
+        bool input_is_multi_resolution;
+    } camera_stream_configuration_t;
+
+    typedef struct camera_capture_request {
+        uint32_t frame_number;
+        const camera_metadata_t *settings;
+        camera_stream_buffer_t *input_buffer;
+        uint32_t num_output_buffers;
+        const camera_stream_buffer_t *output_buffers;
+        uint32_t num_physcam_settings;
+        const char **physcam_id;
+        const camera_metadata_t **physcam_settings;
+        int32_t input_width;
+        int32_t input_height;
+    } camera_capture_request_t;
+
+    typedef struct camera_capture_result {
+        uint32_t frame_number;
+        const camera_metadata_t *result;
+        uint32_t num_output_buffers;
+        const camera_stream_buffer_t *output_buffers;
+        const camera_stream_buffer_t *input_buffer;
+        uint32_t partial_result;
+        uint32_t num_physcam_metadata;
+        const char **physcam_ids;
+        const camera_metadata_t **physcam_metadata;
+    } camera_capture_result_t;
+
+    typedef struct camera_shutter_msg {
+        uint32_t frame_number;
+        uint64_t timestamp;
+    } camera_shutter_msg_t;
+
+    typedef struct camera_error_msg {
+        uint32_t frame_number;
+        camera_stream_t *error_stream;
+        int error_code;
+    } camera_error_msg_t;
+
+    typedef enum camera_error_msg_code {
+        CAMERA_MSG_ERROR_DEVICE = 1,
+        CAMERA_MSG_ERROR_REQUEST = 2,
+        CAMERA_MSG_ERROR_RESULT = 3,
+        CAMERA_MSG_ERROR_BUFFER = 4,
+        CAMERA_MSG_NUM_ERRORS
+    } camera_error_msg_code_t;
+
+    typedef struct camera_notify_msg {
+        int type;
+
+        union {
+            camera_error_msg_t error;
+            camera_shutter_msg_t shutter;
+        } message;
+    } camera_notify_msg_t;
 
     /**
      * Helper methods shared between Camera3Device/Camera3OfflineSession for HAL callbacks
@@ -50,8 +111,9 @@ namespace camera3 {
     void returnOutputBuffers(
             bool useHalBufManager,
             sp<NotificationListener> listener, // Only needed when outputSurfaces is not empty
-            const camera3_stream_buffer_t *outputBuffers,
-            size_t numBuffers, nsecs_t timestamp, bool timestampIncreasing = true,
+            const camera_stream_buffer_t *outputBuffers,
+            size_t numBuffers, nsecs_t timestamp, bool requested, nsecs_t requestTimeNs,
+            SessionStatsBuilder& sessionStatsBuilder, bool timestampIncreasing = true,
             // The following arguments are only meant for surface sharing use case
             const SurfaceMap& outputSurfaces = SurfaceMap{},
             // Used to send buffer error callback when failing to return buffer
@@ -64,7 +126,7 @@ namespace camera3 {
     void returnAndRemovePendingOutputBuffers(
             bool useHalBufManager,
             sp<NotificationListener> listener, // Only needed when outputSurfaces is not empty
-            InFlightRequest& request);
+            InFlightRequest& request, SessionStatsBuilder& sessionStatsBuilder);
 
     // Camera3Device/Camera3OfflineSession internal states used in notify/processCaptureResult
     // callbacks
@@ -72,8 +134,8 @@ namespace camera3 {
         const String8& cameraId;
         std::mutex& inflightLock;
         int64_t& lastCompletedRegularFrameNumber;
-        int64_t& lastCompletedZslFrameNumber;
         int64_t& lastCompletedReprocessFrameNumber;
+        int64_t& lastCompletedZslFrameNumber;
         InFlightRequestMap& inflightMap; // end of inflightLock scope
         std::mutex& outputLock;
         std::list<CaptureResult>& resultQueue;
@@ -98,6 +160,7 @@ namespace camera3 {
         TagMonitor& tagMonitor;
         sp<Camera3Stream> inputStream;
         StreamSet& outputStreams;
+        SessionStatsBuilder& sessionStatsBuilder;
         sp<NotificationListener> listener;
         SetErrorInterface& setErrIntf;
         InflightRequestUpdateInterface& inflightIntf;
@@ -121,6 +184,7 @@ namespace camera3 {
         std::mutex& reqBufferLock; // lock to serialize request buffer calls
         const bool useHalBufManager;
         StreamSet& outputStreams;
+        SessionStatsBuilder& sessionStatsBuilder;
         SetErrorInterface& setErrIntf;
         BufferRecordsInterface& bufferRecordsIntf;
         RequestBufferInterface& reqBufferIntf;
@@ -134,6 +198,7 @@ namespace camera3 {
         const String8& cameraId;
         const bool useHalBufManager;
         StreamSet& outputStreams;
+        SessionStatsBuilder& sessionStatsBuilder;
         BufferRecordsInterface& bufferRecordsIntf;
     };
 
@@ -149,6 +214,7 @@ namespace camera3 {
         InflightRequestUpdateInterface& inflightIntf;
         BufferRecordsInterface& bufferRecordsIntf;
         FlushBufferInterface& flushBufferIntf;
+        SessionStatsBuilder& sessionStatsBuilder;
     };
 
     void flushInflightRequests(FlushInflightReqStates& states);

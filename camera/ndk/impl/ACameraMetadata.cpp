@@ -24,6 +24,28 @@
 
 using namespace android;
 
+// Formats not listed in the public API, but still available to AImageReader
+// Enum value must match corresponding enum in ui/PublicFormat.h (which is not
+// available to VNDK)
+enum AIMAGE_PRIVATE_FORMATS {
+    /**
+     * Unprocessed implementation-dependent raw
+     * depth measurements, opaque with 16 bit
+     * samples.
+     *
+     */
+
+    AIMAGE_FORMAT_RAW_DEPTH = 0x1002,
+
+    /**
+     * Device specific 10 bits depth RAW image format.
+     *
+     * <p>Unprocessed implementation-dependent raw depth measurements, opaque with 10 bit samples
+     * and device specific bit layout.</p>
+     */
+    AIMAGE_FORMAT_RAW_DEPTH10 = 0x1003,
+};
+
 /**
  * ACameraMetadata Implementation
  */
@@ -290,6 +312,10 @@ ACameraMetadata::filterStreamConfigurations() {
             format = AIMAGE_FORMAT_DEPTH_POINT_CLOUD;
         } else if (format == HAL_PIXEL_FORMAT_Y16) {
             format = AIMAGE_FORMAT_DEPTH16;
+        } else if (format == HAL_PIXEL_FORMAT_RAW16) {
+            format = static_cast<int32_t>(AIMAGE_FORMAT_RAW_DEPTH);
+        } else if (format == HAL_PIXEL_FORMAT_RAW10) {
+            format = static_cast<int32_t>(AIMAGE_FORMAT_RAW_DEPTH10);
         }
 
         filteredDepthStreamConfigs.push_back(format);
@@ -426,6 +452,7 @@ ACameraMetadata::getTags(/*out*/int32_t* numTags,
             camera_metadata_ro_entry_t entry;
             int ret = get_camera_metadata_ro_entry(rawMetadata, i, &entry);
             if (ret != 0) {
+                mData->unlock(rawMetadata);
                 ALOGE("%s: error reading metadata index %zu", __FUNCTION__, i);
                 return ACAMERA_ERROR_UNKNOWN;
             }
@@ -527,11 +554,13 @@ ACameraMetadata::isCaptureRequestTag(const uint32_t tag) {
         case ACAMERA_LENS_OPTICAL_STABILIZATION_MODE:
         case ACAMERA_NOISE_REDUCTION_MODE:
         case ACAMERA_SCALER_CROP_REGION:
+        case ACAMERA_SCALER_ROTATE_AND_CROP:
         case ACAMERA_SENSOR_EXPOSURE_TIME:
         case ACAMERA_SENSOR_FRAME_DURATION:
         case ACAMERA_SENSOR_SENSITIVITY:
         case ACAMERA_SENSOR_TEST_PATTERN_DATA:
         case ACAMERA_SENSOR_TEST_PATTERN_MODE:
+        case ACAMERA_SENSOR_PIXEL_MODE:
         case ACAMERA_SHADING_MODE:
         case ACAMERA_STATISTICS_FACE_DETECT_MODE:
         case ACAMERA_STATISTICS_HOT_PIXEL_MAP_MODE:
@@ -582,6 +611,7 @@ std::unordered_set<uint32_t> ACameraMetadata::sSystemTags ({
     ANDROID_SENSOR_PROFILE_HUE_SAT_MAP,
     ANDROID_SENSOR_PROFILE_TONE_CURVE,
     ANDROID_SENSOR_OPAQUE_RAW_SIZE,
+    ANDROID_SENSOR_OPAQUE_RAW_SIZE_MAXIMUM_RESOLUTION,
     ANDROID_SHADING_STRENGTH,
     ANDROID_STATISTICS_HISTOGRAM_MODE,
     ANDROID_STATISTICS_SHARPNESS_MAP_MODE,

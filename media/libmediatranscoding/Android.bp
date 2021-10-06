@@ -14,7 +14,6 @@
  * limitations under the License.
  */
 
-// AIDL interfaces of MediaTranscoding.
 package {
     // See: http://go/android-license-faq
     // A large-scale-change added 'default_applicable_licenses' to import
@@ -24,47 +23,102 @@ package {
     default_applicable_licenses: ["frameworks_av_license"],
 }
 
+filegroup {
+    name: "libmediatranscoding_aidl",
+    srcs: [
+        "aidl/android/media/IMediaTranscodingService.aidl",
+        "aidl/android/media/ITranscodingClient.aidl",
+        "aidl/android/media/ITranscodingClientCallback.aidl",
+        "aidl/android/media/TranscodingErrorCode.aidl",
+        "aidl/android/media/TranscodingSessionPriority.aidl",
+        "aidl/android/media/TranscodingSessionStats.aidl",
+        "aidl/android/media/TranscodingType.aidl",
+        "aidl/android/media/TranscodingVideoCodecType.aidl",
+        "aidl/android/media/TranscodingVideoTrackFormat.aidl",
+        "aidl/android/media/TranscodingSessionParcel.aidl",
+        "aidl/android/media/TranscodingRequestParcel.aidl",
+        "aidl/android/media/TranscodingResultParcel.aidl",
+        "aidl/android/media/TranscodingTestConfig.aidl",
+    ],
+    path: "aidl",
+}
+
+// AIDL interfaces of MediaTranscoding.
 aidl_interface {
     name: "mediatranscoding_aidl_interface",
     unstable: true,
     local_include_dir: "aidl",
-    srcs: [
-        "aidl/android/media/IMediaTranscodingService.aidl",
-        "aidl/android/media/ITranscodingServiceClient.aidl",
-        "aidl/android/media/TranscodingErrorCode.aidl",
-        "aidl/android/media/TranscodingJobPriority.aidl",
-        "aidl/android/media/TranscodingType.aidl",
-        "aidl/android/media/TranscodingVideoCodecType.aidl",
-        "aidl/android/media/TranscodingJobParcel.aidl",
-        "aidl/android/media/TranscodingRequestParcel.aidl",
-        "aidl/android/media/TranscodingResultParcel.aidl",
-    ],
+    srcs: [":libmediatranscoding_aidl"],
+    backend:
+    {
+        java: {
+            enabled: true,
+            apex_available: [
+                "com.android.media",
+                "test_com.android.media",
+            ],
+            min_sdk_version: "29",
+        },
+        ndk: {
+            enabled: true,
+            apex_available: [
+                "com.android.media",
+                "test_com.android.media",
+            ],
+            min_sdk_version: "29",
+        },
+    },
 }
 
-cc_library_shared {
+cc_library {
     name: "libmediatranscoding",
 
+    min_sdk_version: "29",
+    apex_available: [
+        "com.android.media",
+        "test_com.android.media",
+    ],
+
     srcs: [
-        "TranscodingClientManager.cpp"
+        "TranscoderWrapper.cpp",
+        "TranscodingClientManager.cpp",
+        "TranscodingLogger.cpp",
+        "TranscodingResourcePolicy.cpp",
+        "TranscodingSessionController.cpp",
+        "TranscodingThermalPolicy.cpp",
+        "TranscodingUidPolicy.cpp",
     ],
 
     shared_libs: [
+        "libandroid#31",
         "libbinder_ndk",
         "libcutils",
         "liblog",
         "libutils",
+        "libmediatranscoder",
+        "libmediandk",
+        "libstatssocket#30",
+    ],
+    export_shared_lib_headers: [
+        "libmediandk",
     ],
 
     export_include_dirs: ["include"],
 
     static_libs: [
         "mediatranscoding_aidl_interface-ndk",
+        "resourceobserver_aidl_interface-V1-ndk",
+        "libstatslog_media",
     ],
 
     cflags: [
-        "-Werror",
-        "-Wno-error=deprecated-declarations",
         "-Wall",
+        "-Werror",
+        "-Wformat",
+        "-Wno-error=deprecated-declarations",
+        "-Wthread-safety",
+        "-Wunused",
+        "-Wunreachable-code",
     ],
 
     sanitize: {
@@ -74,4 +128,44 @@ cc_library_shared {
         ],
         cfi: true,
     },
+}
+
+cc_library_static {
+    name: "libstatslog_media",
+    generated_sources: ["statslog_media.cpp"],
+    generated_headers: ["statslog_media.h"],
+    min_sdk_version: "29",
+    cflags: [
+        "-Wall",
+        "-Werror",
+    ],
+    export_generated_headers: ["statslog_media.h"],
+    apex_available: [
+        "com.android.media",
+        "test_com.android.media",
+    ],
+    shared_libs: [
+        "libcutils",
+        "liblog",
+        "libstatssocket#30",
+        "libutils",
+    ],
+}
+
+genrule {
+    name: "statslog_media.h",
+    tools: ["stats-log-api-gen"],
+    cmd: "$(location stats-log-api-gen) --header $(genDir)/statslog_media.h --module media --namespace android,media,stats",
+    out: [
+        "statslog_media.h",
+    ],
+}
+
+genrule {
+    name: "statslog_media.cpp",
+    tools: ["stats-log-api-gen"],
+    cmd: "$(location stats-log-api-gen) --cpp $(genDir)/statslog_media.cpp --module media --namespace android,media,stats --importHeader statslog_media.h",
+    out: [
+        "statslog_media.cpp",
+    ],
 }

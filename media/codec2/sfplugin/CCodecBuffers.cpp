@@ -792,8 +792,9 @@ sp<Codec2Buffer> LinearInputBuffers::Alloc(
         capacity = kMaxLinearBufferSize;
     }
 
-    // TODO: read usage from intf
-    C2MemoryUsage usage = { C2MemoryUsage::CPU_READ, C2MemoryUsage::CPU_WRITE };
+    int64_t usageValue = 0;
+    (void)format->findInt64("android._C2MemoryUsage", &usageValue);
+    C2MemoryUsage usage{usageValue | C2MemoryUsage::CPU_READ | C2MemoryUsage::CPU_WRITE};
     std::shared_ptr<C2LinearBlock> block;
 
     c2_status_t err = pool->fetchLinearBlock(capacity, usage, &block);
@@ -1039,8 +1040,9 @@ size_t GraphicInputBuffers::numActiveSlots() const {
 }
 
 sp<Codec2Buffer> GraphicInputBuffers::createNewBuffer() {
-    // TODO: read usage from intf
-    C2MemoryUsage usage = { C2MemoryUsage::CPU_READ, C2MemoryUsage::CPU_WRITE };
+    int64_t usageValue = 0;
+    (void)mFormat->findInt64("android._C2MemoryUsage", &usageValue);
+    C2MemoryUsage usage{usageValue | C2MemoryUsage::CPU_READ | C2MemoryUsage::CPU_WRITE};
     return AllocateGraphicBuffer(
             mPool, mFormat, extractPixelFormat(mFormat), usage, mLocalBufferPool);
 }
@@ -1300,17 +1302,7 @@ RawGraphicOutputBuffers::RawGraphicOutputBuffers(
 
 sp<Codec2Buffer> RawGraphicOutputBuffers::wrap(const std::shared_ptr<C2Buffer> &buffer) {
     if (buffer == nullptr) {
-        sp<Codec2Buffer> c2buffer = ConstGraphicBlockBuffer::AllocateEmpty(
-                mFormat,
-                [lbp = mLocalBufferPool](size_t capacity) {
-                    return lbp->newBuffer(capacity);
-                });
-        if (c2buffer == nullptr) {
-            ALOGD("[%s] ConstGraphicBlockBuffer::AllocateEmpty failed", mName);
-            return nullptr;
-        }
-        c2buffer->setRange(0, 0);
-        return c2buffer;
+        return new Codec2Buffer(mFormat, new ABuffer(nullptr, 0));
     } else {
         return ConstGraphicBlockBuffer::Allocate(
                 mFormat,

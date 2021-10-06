@@ -27,7 +27,7 @@ namespace android {
 /**
  * A FifoControllerBase with counters external to the class.
  *
- * The actual copunters may be stored in separate regions of shared memory
+ * The actual counters may be stored in separate regions of shared memory
  * with different access rights.
  */
 class FifoControllerIndirect : public FifoControllerBase {

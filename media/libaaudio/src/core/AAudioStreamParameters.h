@@ -136,6 +136,23 @@ public:
         mIsPrivacySensitive = privacySensitive;
     }
 
+    const std::optional<std::string> getOpPackageName() const {
+        return mOpPackageName;
+    }
+
+    // TODO b/182392769: reexamine if Identity can be used
+    void setOpPackageName(const std::optional<std::string> opPackageName) {
+        mOpPackageName = opPackageName;
+    }
+
+    const std::optional<std::string> getAttributionTag() const {
+        return mAttributionTag;
+    }
+
+    void setAttributionTag(const std::optional<std::string> attributionTag) {
+        mAttributionTag = attributionTag;
+    }
+
     /**
      * @return bytes per frame of getFormat()
      */
@@ -167,6 +184,8 @@ private:
     aaudio_allowed_capture_policy_t mAllowedCapturePolicy = AAUDIO_UNSPECIFIED;
     aaudio_session_id_t             mSessionId            = AAUDIO_SESSION_ID_NONE;
     bool                            mIsPrivacySensitive   = false;
+    std::optional<std::string>      mOpPackageName        = {};
+    std::optional<std::string>      mAttributionTag       = {};
 };
 
 } /* namespace aaudio */

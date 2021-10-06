@@ -40,7 +40,13 @@
 
 __BEGIN_DECLS
 
+/**
+ * Camera status enum types.
+ */
 typedef enum {
+    /**
+     * Camera operation has succeeded.
+     */
     ACAMERA_OK = 0,
 
     ACAMERA_ERROR_BASE                  = -10000,

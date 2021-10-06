@@ -20,14 +20,19 @@
 #include <utils/Log.h>
 
 #include <set>
+#include <stdlib.h>
 
 #include <inttypes.h>
 #include <stdlib.h>
+#include <dlfcn.h>
 
 #include <C2Buffer.h>
 
 #include "include/SoftwareRenderer.h"
+#include "PlaybackDurationAccumulator.h"
 
+#include <android/binder_manager.h>
+#include <android/content/pm/IPackageManagerNative.h>
 #include <android/hardware/cas/native/1.0/IDescrambler.h>
 #include <android/hardware/media/omx/1.0/IGraphicBufferSource.h>
 
@@ -35,7 +40,9 @@
 #include <aidl/android/media/IResourceManagerService.h>
 #include <android/binder_ibinder.h>
 #include <android/binder_manager.h>
+#include <android/dlext.h>
 #include <binder/IMemory.h>
+#include <binder/IServiceManager.h>
 #include <binder/MemoryDealer.h>
 #include <cutils/properties.h>
 #include <gui/BufferQueue.h>
@@ -47,6 +54,10 @@
 #include <media/MediaCodecInfo.h>
 #include <media/MediaMetricsItem.h>
 #include <media/MediaResource.h>
+#include <media/NdkMediaErrorPriv.h>
+#include <media/NdkMediaFormat.h>
+#include <media/NdkMediaFormatPriv.h>
+#include <media/formatshaper/FormatShaper.h>
 #include <media/stagefright/foundation/ABuffer.h>
 #include <media/stagefright/foundation/ADebug.h>
 #include <media/stagefright/foundation/AMessage.h>
@@ -61,12 +72,14 @@
 #include <media/stagefright/MediaCodec.h>
 #include <media/stagefright/MediaCodecConstants.h>
 #include <media/stagefright/MediaCodecList.h>
+#include <media/stagefright/MediaCodecConstants.h>
 #include <media/stagefright/MediaDefs.h>
 #include <media/stagefright/MediaErrors.h>
 #include <media/stagefright/MediaFilter.h>
 #include <media/stagefright/OMXClient.h>
 #include <media/stagefright/PersistentSurface.h>
 #include <media/stagefright/SurfaceUtils.h>
+#include <nativeloader/dlext_namespaces.h>
 #include <private/android_filesystem_config.h>
 #include <utils/Singleton.h>
 
@@ -83,6 +96,7 @@ static const char *kCodecKeyName = "codec";
 // NB: these are matched with public Java API constants defined
 // in frameworks/base/media/java/android/media/MediaCodec.java
 // These must be kept synchronized with the constants there.
+static const char *kCodecLogSessionId = "android.media.mediacodec.log-session-id";
 static const char *kCodecCodec = "android.media.mediacodec.codec";  /* e.g. OMX.google.aac.decoder */
 static const char *kCodecMime = "android.media.mediacodec.mime";    /* e.g. audio/mime */
 static const char *kCodecMode = "android.media.mediacodec.mode";    /* audio, video */
@@ -93,6 +107,27 @@ static const char *kCodecSecure = "android.media.mediacodec.secure";   /* 0, 1 *
 static const char *kCodecWidth = "android.media.mediacodec.width";     /* 0..n */
 static const char *kCodecHeight = "android.media.mediacodec.height";   /* 0..n */
 static const char *kCodecRotation = "android.media.mediacodec.rotation-degrees";  /* 0/90/180/270 */
+static const char *kCodecColorFormat = "android.media.mediacodec.color-format";
+static const char *kCodecFrameRate = "android.media.mediacodec.frame-rate";
+static const char *kCodecCaptureRate = "android.media.mediacodec.capture-rate";
+static const char *kCodecOperatingRate = "android.media.mediacodec.operating-rate";
+static const char *kCodecPriority = "android.media.mediacodec.priority";
+
+// Min/Max QP before shaping
+static const char *kCodecOriginalVideoQPIMin = "android.media.mediacodec.original-video-qp-i-min";
+static const char *kCodecOriginalVideoQPIMax = "android.media.mediacodec.original-video-qp-i-max";
+static const char *kCodecOriginalVideoQPPMin = "android.media.mediacodec.original-video-qp-p-min";
+static const char *kCodecOriginalVideoQPPMax = "android.media.mediacodec.original-video-qp-p-max";
+static const char *kCodecOriginalVideoQPBMin = "android.media.mediacodec.original-video-qp-b-min";
+static const char *kCodecOriginalVideoQPBMax = "android.media.mediacodec.original-video-qp-b-max";
+
+// Min/Max QP after shaping
+static const char *kCodecRequestedVideoQPIMin = "android.media.mediacodec.video-qp-i-min";
+static const char *kCodecRequestedVideoQPIMax = "android.media.mediacodec.video-qp-i-max";
+static const char *kCodecRequestedVideoQPPMin = "android.media.mediacodec.video-qp-p-min";
+static const char *kCodecRequestedVideoQPPMax = "android.media.mediacodec.video-qp-p-max";
+static const char *kCodecRequestedVideoQPBMin = "android.media.mediacodec.video-qp-b-min";
+static const char *kCodecRequestedVideoQPBMax = "android.media.mediacodec.video-qp-b-max";
 
 // NB: These are not yet exposed as public Java API constants.
 static const char *kCodecCrypto = "android.media.mediacodec.crypto";   /* 0,1 */
@@ -100,6 +135,7 @@ static const char *kCodecProfile = "android.media.mediacodec.profile";  /* 0..n 
 static const char *kCodecLevel = "android.media.mediacodec.level";  /* 0..n */
 static const char *kCodecBitrateMode = "android.media.mediacodec.bitrate_mode";  /* CQ/VBR/CBR */
 static const char *kCodecBitrate = "android.media.mediacodec.bitrate";  /* 0..n */
+static const char *kCodecOriginalBitrate = "android.media.mediacodec.original.bitrate";  /* 0..n */
 static const char *kCodecMaxWidth = "android.media.mediacodec.maxwidth";  /* 0..n */
 static const char *kCodecMaxHeight = "android.media.mediacodec.maxheight";  /* 0..n */
 static const char *kCodecError = "android.media.mediacodec.errcode";
@@ -117,6 +153,13 @@ static const char *kCodecQueueInputBufferError = "android.media.mediacodec.queue
 static const char *kCodecNumLowLatencyModeOn = "android.media.mediacodec.low-latency.on";  /* 0..n */
 static const char *kCodecNumLowLatencyModeOff = "android.media.mediacodec.low-latency.off";  /* 0..n */
 static const char *kCodecFirstFrameIndexLowLatencyModeOn = "android.media.mediacodec.low-latency.first-frame";  /* 0..n */
+static const char *kCodecChannelCount = "android.media.mediacodec.channelCount";
+static const char *kCodecSampleRate = "android.media.mediacodec.sampleRate";
+static const char *kCodecVideoEncodedBytes = "android.media.mediacodec.vencode.bytes";
+static const char *kCodecVideoEncodedFrames = "android.media.mediacodec.vencode.frames";
+static const char *kCodecVideoInputBytes = "android.media.mediacodec.video.input.bytes";
+static const char *kCodecVideoInputFrames = "android.media.mediacodec.video.input.frames";
+static const char *kCodecVideoEncodedDurationUs = "android.media.mediacodec.vencode.durationUs";
 
 // the kCodecRecent* fields appear only in getMetrics() results
 static const char *kCodecRecentLatencyMax = "android.media.mediacodec.recent.max";      /* in us */
@@ -124,6 +167,12 @@ static const char *kCodecRecentLatencyMin = "android.media.mediacodec.recent.min
 static const char *kCodecRecentLatencyAvg = "android.media.mediacodec.recent.avg";      /* in us */
 static const char *kCodecRecentLatencyCount = "android.media.mediacodec.recent.n";
 static const char *kCodecRecentLatencyHist = "android.media.mediacodec.recent.hist";    /* in us */
+static const char *kCodecPlaybackDurationSec =
+        "android.media.mediacodec.playback-duration-sec"; /* in sec */
+
+/* -1: shaper disabled
+   >=0: number of fields changed */
+static const char *kCodecShapingEnhanced = "android.media.mediacodec.shaped";
 
 // XXX suppress until we get our representation right
 static bool kEmitHistogram = false;
@@ -253,14 +302,14 @@ void MediaCodec::ResourceManagerServiceProxy::init() {
         return;
     }
 
+    // Kill clients pending removal.
+    mService->reclaimResourcesFromClientsPendingRemoval(mPid);
+
     // so our handler will process the death notifications
     addCookie(this);
 
     // after this, require mLock whenever using mService
     AIBinder_linkToDeath(mService->asBinder().get(), mDeathRecipient.get(), this);
-
-    // Kill clients pending removal.
-    mService->reclaimResourcesFromClientsPendingRemoval(mPid);
 }
 
 //static
@@ -608,12 +657,20 @@ void CodecCallback::onFirstTunnelFrameReady() {
 sp<MediaCodec> MediaCodec::CreateByType(
         const sp<ALooper> &looper, const AString &mime, bool encoder, status_t *err, pid_t pid,
         uid_t uid) {
+    sp<AMessage> format;
+    return CreateByType(looper, mime, encoder, err, pid, uid, format);
+}
+
+sp<MediaCodec> MediaCodec::CreateByType(
+        const sp<ALooper> &looper, const AString &mime, bool encoder, status_t *err, pid_t pid,
+        uid_t uid, sp<AMessage> format) {
     Vector<AString> matchingCodecs;
 
     MediaCodecList::findMatchingCodecs(
             mime.c_str(),
             encoder,
             0,
+            format,
             &matchingCodecs);
 
     if (err != NULL) {
@@ -702,7 +759,13 @@ MediaCodec::MediaCodec(
       mHaveInputSurface(false),
       mHavePendingInputBuffers(false),
       mCpuBoostRequested(false),
+      mPlaybackDurationAccumulator(new PlaybackDurationAccumulator()),
+      mIsSurfaceToScreen(false),
       mLatencyUnknown(0),
+      mBytesEncoded(0),
+      mEarliestEncodedPtsUs(INT64_MAX),
+      mLatestEncodedPtsUs(INT64_MIN),
+      mFramesEncoded(0),
       mNumLowLatencyEnables(0),
       mNumLowLatencyDisables(0),
       mIsLowLatencyModeOn(false),
@@ -804,10 +867,28 @@ void MediaCodec::updateMediametrics() {
     if (mLatencyUnknown > 0) {
         mediametrics_setInt64(mMetricsHandle, kCodecLatencyUnknown, mLatencyUnknown);
     }
+    int64_t playbackDurationSec = mPlaybackDurationAccumulator->getDurationInSeconds();
+    if (playbackDurationSec > 0) {
+        mediametrics_setInt64(mMetricsHandle, kCodecPlaybackDurationSec, playbackDurationSec);
+    }
     if (mLifetimeStartNs > 0) {
         nsecs_t lifetime = systemTime(SYSTEM_TIME_MONOTONIC) - mLifetimeStartNs;
         lifetime = lifetime / (1000 * 1000);    // emitted in ms, truncated not rounded
         mediametrics_setInt64(mMetricsHandle, kCodecLifetimeMs, lifetime);
+    }
+
+    if (mBytesEncoded) {
+        Mutex::Autolock al(mOutputStatsLock);
+
+        mediametrics_setInt64(mMetricsHandle, kCodecVideoEncodedBytes, mBytesEncoded);
+        int64_t duration = 0;
+        if (mLatestEncodedPtsUs > mEarliestEncodedPtsUs) {
+            duration = mLatestEncodedPtsUs - mEarliestEncodedPtsUs;
+        }
+        mediametrics_setInt64(mMetricsHandle, kCodecVideoEncodedDurationUs, duration);
+        mediametrics_setInt64(mMetricsHandle, kCodecVideoEncodedFrames, mFramesEncoded);
+        mediametrics_setInt64(mMetricsHandle, kCodecVideoInputFrames, mFramesInput);
+        mediametrics_setInt64(mMetricsHandle, kCodecVideoInputBytes, mBytesInput);
     }
 
     {
@@ -947,6 +1028,28 @@ void MediaCodec::updateTunnelPeek(const sp<AMessage> &msg) {
     ALOGV("TunnelPeekState: %s -> %s", asString(previousState), asString(mTunnelPeekState));
 }
 
+void MediaCodec::updatePlaybackDuration(const sp<AMessage> &msg) {
+    int what = 0;
+    msg->findInt32("what", &what);
+    if (msg->what() != kWhatCodecNotify && what != kWhatOutputFramesRendered) {
+        static bool logged = false;
+        if (!logged) {
+            logged = true;
+            ALOGE("updatePlaybackDuration: expected kWhatOuputFramesRendered (%d)", msg->what());
+        }
+        return;
+    }
+    // Playback duration only counts if the buffers are going to the screen.
+    if (!mIsSurfaceToScreen) {
+        return;
+    }
+    int64_t renderTimeNs;
+    size_t index = 0;
+    while (msg->findInt64(AStringPrintf("%zu-system-nano", index++).c_str(), &renderTimeNs)) {
+        mPlaybackDurationAccumulator->processRenderTime(renderTimeNs);
+    }
+}
+
 bool MediaCodec::Histogram::setup(int nbuckets, int64_t width, int64_t floor)
 {
     if (nbuckets <= 0 || width <= 0) {
@@ -1038,7 +1141,7 @@ std::string MediaCodec::Histogram::emit()
 }
 
 // when we send a buffer to the codec;
-void MediaCodec::statsBufferSent(int64_t presentationUs) {
+void MediaCodec::statsBufferSent(int64_t presentationUs, const sp<MediaCodecBuffer> &buffer) {
 
     // only enqueue if we have a legitimate time
     if (presentationUs <= 0) {
@@ -1050,6 +1153,11 @@ void MediaCodec::statsBufferSent(int64_t presentationUs) {
         mBatteryChecker->onCodecActivity([this] () {
             mResourceManagerProxy->addResource(MediaResource::VideoBatteryResource());
         });
+    }
+
+    if (mIsVideo && (mFlags & kFlagIsEncoder)) {
+        mBytesInput += buffer->size();
+        mFramesInput++;
     }
 
     const int64_t nowNs = systemTime(SYSTEM_TIME_MONOTONIC);
@@ -1072,9 +1180,33 @@ void MediaCodec::statsBufferSent(int64_t presentationUs) {
 }
 
 // when we get a buffer back from the codec
-void MediaCodec::statsBufferReceived(int64_t presentationUs) {
+void MediaCodec::statsBufferReceived(int64_t presentationUs, const sp<MediaCodecBuffer> &buffer) {
 
     CHECK_NE(mState, UNINITIALIZED);
+
+    if (mIsVideo && (mFlags & kFlagIsEncoder)) {
+        int32_t flags = 0;
+        (void) buffer->meta()->findInt32("flags", &flags);
+
+        // some of these frames, we don't want to count
+        // standalone EOS.... has an invalid timestamp
+        if ((flags & (BUFFER_FLAG_CODECCONFIG|BUFFER_FLAG_EOS)) == 0) {
+            mBytesEncoded += buffer->size();
+            mFramesEncoded++;
+
+            Mutex::Autolock al(mOutputStatsLock);
+            int64_t timeUs = 0;
+            if (buffer->meta()->findInt64("timeUs", &timeUs)) {
+                if (timeUs > mLatestEncodedPtsUs) {
+                    mLatestEncodedPtsUs = timeUs;
+                }
+                // can't chain as an else-if or this never triggers
+                if (timeUs < mEarliestEncodedPtsUs) {
+                    mEarliestEncodedPtsUs = timeUs;
+                }
+            }
+        }
+    }
 
     // mutex access to mBuffersInFlight and other stats
     Mutex::Autolock al(mLatencyLock);
@@ -1131,7 +1263,7 @@ void MediaCodec::statsBufferReceived(int64_t presentationUs) {
         return;
     }
 
-    // nowNs start our calculations
+    // now start our calculations
     const int64_t nowNs = systemTime(SYSTEM_TIME_MONOTONIC);
     int64_t latencyUs = (nowNs - startdata.startedNs + 500) / 1000;
 
@@ -1354,6 +1486,15 @@ status_t MediaCodec::setOnFirstTunnelFrameReadyNotification(const sp<AMessage> &
     return msg->post();
 }
 
+/*
+ * MediaFormat Shaping forward declarations
+ * including the property name we use for control.
+ */
+static int enableMediaFormatShapingDefault = 1;
+static const char enableMediaFormatShapingProperty[] = "debug.stagefright.enableshaping";
+static void mapFormat(AString componentName, const sp<AMessage> &format, const char *kind,
+                      bool reverse);
+
 status_t MediaCodec::configure(
         const sp<AMessage> &format,
         const sp<Surface> &nativeWindow,
@@ -1384,6 +1525,8 @@ status_t MediaCodec::configure(
     }
 
     if (mIsVideo) {
+        // TODO: validity check log-session-id: it should be a 32-hex-digit.
+        format->findString("log-session-id", &mLogSessionId);
         format->findInt32("width", &mVideoWidth);
         format->findInt32("height", &mVideoHeight);
         if (!format->findInt32("rotation-degrees", &mRotationDegrees)) {
@@ -1391,6 +1534,7 @@ status_t MediaCodec::configure(
         }
 
         if (mMetricsHandle != 0) {
+            mediametrics_setCString(mMetricsHandle, kCodecLogSessionId, mLogSessionId.c_str());
             mediametrics_setInt32(mMetricsHandle, kCodecWidth, mVideoWidth);
             mediametrics_setInt32(mMetricsHandle, kCodecHeight, mVideoHeight);
             mediametrics_setInt32(mMetricsHandle, kCodecRotation, mRotationDegrees);
@@ -1402,6 +1546,26 @@ status_t MediaCodec::configure(
             if (format->findInt32("max-height", &maxHeight)) {
                 mediametrics_setInt32(mMetricsHandle, kCodecMaxHeight, maxHeight);
             }
+            int32_t colorFormat = -1;
+            if (format->findInt32("color-format", &colorFormat)) {
+                mediametrics_setInt32(mMetricsHandle, kCodecColorFormat, colorFormat);
+            }
+            float frameRate = -1.0;
+            if (format->findFloat("frame-rate", &frameRate)) {
+                mediametrics_setDouble(mMetricsHandle, kCodecFrameRate, frameRate);
+            }
+            float captureRate = -1.0;
+            if (format->findFloat("capture-rate", &captureRate)) {
+                mediametrics_setDouble(mMetricsHandle, kCodecCaptureRate, captureRate);
+            }
+            float operatingRate = -1.0;
+            if (format->findFloat("operating-rate", &operatingRate)) {
+                mediametrics_setDouble(mMetricsHandle, kCodecOperatingRate, operatingRate);
+            }
+            int32_t priority = -1;
+            if (format->findInt32("priority", &priority)) {
+                mediametrics_setInt32(mMetricsHandle, kCodecPriority, priority);
+            }
         }
 
         // Prevent possible integer overflow in downstream code.
@@ -1409,6 +1573,61 @@ status_t MediaCodec::configure(
                (uint64_t)mVideoWidth * mVideoHeight > (uint64_t)INT32_MAX / 4) {
             ALOGE("Invalid size(s), width=%d, height=%d", mVideoWidth, mVideoHeight);
             return BAD_VALUE;
+        }
+
+    } else {
+        if (mMetricsHandle != 0) {
+            int32_t channelCount;
+            if (format->findInt32(KEY_CHANNEL_COUNT, &channelCount)) {
+                mediametrics_setInt32(mMetricsHandle, kCodecChannelCount, channelCount);
+            }
+            int32_t sampleRate;
+            if (format->findInt32(KEY_SAMPLE_RATE, &sampleRate)) {
+                mediametrics_setInt32(mMetricsHandle, kCodecSampleRate, sampleRate);
+            }
+        }
+    }
+
+    if (flags & CONFIGURE_FLAG_ENCODE) {
+        int8_t enableShaping = property_get_bool(enableMediaFormatShapingProperty,
+                                                 enableMediaFormatShapingDefault);
+        if (!enableShaping) {
+            ALOGI("format shaping disabled, property '%s'", enableMediaFormatShapingProperty);
+            if (mMetricsHandle != 0) {
+                mediametrics_setInt32(mMetricsHandle, kCodecShapingEnhanced, -1);
+            }
+        } else {
+            (void) shapeMediaFormat(format, flags);
+            // XXX: do we want to do this regardless of shaping enablement?
+            mapFormat(mComponentName, format, nullptr, false);
+        }
+    }
+
+    // push min/max QP to MediaMetrics after shaping
+    if (mIsVideo && mMetricsHandle != 0) {
+        int32_t qpIMin = -1;
+        if (format->findInt32("video-qp-i-min", &qpIMin)) {
+            mediametrics_setInt32(mMetricsHandle, kCodecRequestedVideoQPIMin, qpIMin);
+        }
+        int32_t qpIMax = -1;
+        if (format->findInt32("video-qp-i-max", &qpIMax)) {
+            mediametrics_setInt32(mMetricsHandle, kCodecRequestedVideoQPIMax, qpIMax);
+        }
+        int32_t qpPMin = -1;
+        if (format->findInt32("video-qp-p-min", &qpPMin)) {
+            mediametrics_setInt32(mMetricsHandle, kCodecRequestedVideoQPPMin, qpPMin);
+        }
+        int32_t qpPMax = -1;
+        if (format->findInt32("video-qp-p-max", &qpPMax)) {
+            mediametrics_setInt32(mMetricsHandle, kCodecRequestedVideoQPPMax, qpPMax);
+        }
+        int32_t qpBMin = -1;
+        if (format->findInt32("video-qp-b-min", &qpBMin)) {
+            mediametrics_setInt32(mMetricsHandle, kCodecRequestedVideoQPBMin, qpBMin);
+        }
+        int32_t qpBMax = -1;
+        if (format->findInt32("video-qp-b-max", &qpBMax)) {
+            mediametrics_setInt32(mMetricsHandle, kCodecRequestedVideoQPBMax, qpBMax);
         }
     }
 
@@ -1476,6 +1695,465 @@ status_t MediaCodec::configure(
 
     return err;
 }
+
+// Media Format Shaping support
+//
+
+static android::mediaformatshaper::FormatShaperOps_t *sShaperOps = NULL;
+static bool sIsHandheld = true;
+
+static bool connectFormatShaper() {
+    static std::once_flag sCheckOnce;
+
+    ALOGV("connectFormatShaper...");
+
+    std::call_once(sCheckOnce, [&](){
+
+        void *libHandle = NULL;
+        nsecs_t loading_started = systemTime(SYSTEM_TIME_MONOTONIC);
+
+        // prefer any copy in the mainline module
+        //
+        android_namespace_t *mediaNs = android_get_exported_namespace("com_android_media");
+        AString libraryName = "libmediaformatshaper.so";
+
+        if (mediaNs != NULL) {
+            static const android_dlextinfo dlextinfo = {
+                .flags = ANDROID_DLEXT_USE_NAMESPACE,
+                .library_namespace = mediaNs,
+            };
+
+            AString libraryMainline = "/apex/com.android.media/";
+#if __LP64__
+            libraryMainline.append("lib64/");
+#else
+            libraryMainline.append("lib/");
+#endif
+            libraryMainline.append(libraryName);
+
+            libHandle = android_dlopen_ext(libraryMainline.c_str(), RTLD_NOW|RTLD_NODELETE,
+                                                 &dlextinfo);
+
+            if (libHandle != NULL) {
+                sShaperOps = (android::mediaformatshaper::FormatShaperOps_t*)
+                                dlsym(libHandle, "shaper_ops");
+            } else {
+                ALOGW("connectFormatShaper: unable to load mainline formatshaper %s",
+                      libraryMainline.c_str());
+            }
+        } else {
+            ALOGV("connectFormatShaper: couldn't find media namespace.");
+        }
+
+        // fall back to the system partition, if present.
+        //
+        if (sShaperOps == NULL) {
+
+            libHandle = dlopen(libraryName.c_str(), RTLD_NOW|RTLD_NODELETE);
+
+            if (libHandle != NULL) {
+                sShaperOps = (android::mediaformatshaper::FormatShaperOps_t*)
+                                dlsym(libHandle, "shaper_ops");
+            } else {
+                ALOGW("connectFormatShaper: unable to load formatshaper %s", libraryName.c_str());
+            }
+        }
+
+        if (sShaperOps != nullptr
+            && sShaperOps->version != android::mediaformatshaper::SHAPER_VERSION_V1) {
+            ALOGW("connectFormatShaper: unhandled version ShaperOps: %d, DISABLED",
+                  sShaperOps->version);
+            sShaperOps = nullptr;
+        }
+
+        if (sShaperOps != nullptr) {
+            ALOGV("connectFormatShaper: connected to library %s", libraryName.c_str());
+        }
+
+        nsecs_t loading_finished = systemTime(SYSTEM_TIME_MONOTONIC);
+        ALOGV("connectFormatShaper: loaded libraries: %" PRId64 " us",
+              (loading_finished - loading_started)/1000);
+
+
+        // we also want to know whether this is a handheld device
+        // start with assumption that the device is handheld.
+        sIsHandheld = true;
+        sp<IServiceManager> serviceMgr = defaultServiceManager();
+        sp<content::pm::IPackageManagerNative> packageMgr;
+        if (serviceMgr.get() != nullptr) {
+            sp<IBinder> binder = serviceMgr->waitForService(String16("package_native"));
+            packageMgr = interface_cast<content::pm::IPackageManagerNative>(binder);
+        }
+        // if we didn't get serviceMgr, we'll leave packageMgr as default null
+        if (packageMgr != nullptr) {
+
+            // MUST have these
+            static const String16 featuresNeeded[] = {
+                String16("android.hardware.touchscreen")
+            };
+            // these must be present to be a handheld
+            for (::android::String16 required : featuresNeeded) {
+                bool hasFeature = false;
+                binder::Status status = packageMgr->hasSystemFeature(required, 0, &hasFeature);
+                if (!status.isOk()) {
+                    ALOGE("%s: hasSystemFeature failed: %s",
+                        __func__, status.exceptionMessage().c_str());
+                    continue;
+                }
+                ALOGV("feature %s says %d", String8(required).c_str(), hasFeature);
+                if (!hasFeature) {
+                    ALOGV("... which means we are not handheld");
+                    sIsHandheld = false;
+                    break;
+                }
+            }
+
+            // MUST NOT have these
+            static const String16 featuresDisallowed[] = {
+                String16("android.hardware.type.automotive"),
+                String16("android.hardware.type.television"),
+                String16("android.hardware.type.watch")
+            };
+            // any of these present -- we aren't a handheld
+            for (::android::String16 forbidden : featuresDisallowed) {
+                bool hasFeature = false;
+                binder::Status status = packageMgr->hasSystemFeature(forbidden, 0, &hasFeature);
+                if (!status.isOk()) {
+                    ALOGE("%s: hasSystemFeature failed: %s",
+                        __func__, status.exceptionMessage().c_str());
+                    continue;
+                }
+                ALOGV("feature %s says %d", String8(forbidden).c_str(), hasFeature);
+                if (hasFeature) {
+                    ALOGV("... which means we are not handheld");
+                    sIsHandheld = false;
+                    break;
+                }
+            }
+        }
+
+    });
+
+    return true;
+}
+
+
+#if 0
+// a construct to force the above dlopen() to run very early.
+// goal: so the dlopen() doesn't happen on critical path of latency sensitive apps
+// failure of this means that cold start of those apps is slower by the time to dlopen()
+// TODO(b/183454066): tradeoffs between memory of early loading vs latency of late loading
+//
+static bool forceEarlyLoadingShaper = connectFormatShaper();
+#endif
+
+// parse the codec's properties: mapping, whether it meets min quality, etc
+// and pass them into the video quality code
+//
+static void loadCodecProperties(mediaformatshaper::shaperHandle_t shaperHandle,
+                                  sp<MediaCodecInfo> codecInfo, AString mediaType) {
+
+    sp<MediaCodecInfo::Capabilities> capabilities =
+                    codecInfo->getCapabilitiesFor(mediaType.c_str());
+    if (capabilities == nullptr) {
+        ALOGI("no capabilities as part of the codec?");
+    } else {
+        const sp<AMessage> &details = capabilities->getDetails();
+        AString mapTarget;
+        int count = details->countEntries();
+        for(int ix = 0; ix < count; ix++) {
+            AMessage::Type entryType;
+            const char *mapSrc = details->getEntryNameAt(ix, &entryType);
+            // XXX: re-use ix from getEntryAt() to avoid additional findXXX() invocation
+            //
+            static const char *featurePrefix = "feature-";
+            static const int featurePrefixLen = strlen(featurePrefix);
+            static const char *tuningPrefix = "tuning-";
+            static const int tuningPrefixLen = strlen(tuningPrefix);
+            static const char *mappingPrefix = "mapping-";
+            static const int mappingPrefixLen = strlen(mappingPrefix);
+
+            if (mapSrc == NULL) {
+                continue;
+            } else if (!strncmp(mapSrc, featurePrefix, featurePrefixLen)) {
+                int32_t intValue;
+                if (details->findInt32(mapSrc, &intValue)) {
+                    ALOGV("-- feature '%s' -> %d", mapSrc, intValue);
+                    (void)(sShaperOps->setFeature)(shaperHandle, &mapSrc[featurePrefixLen],
+                                                   intValue);
+                }
+                continue;
+            } else if (!strncmp(mapSrc, tuningPrefix, tuningPrefixLen)) {
+                AString value;
+                if (details->findString(mapSrc, &value)) {
+                    ALOGV("-- tuning '%s' -> '%s'", mapSrc, value.c_str());
+                    (void)(sShaperOps->setTuning)(shaperHandle, &mapSrc[tuningPrefixLen],
+                                                   value.c_str());
+                }
+                continue;
+            } else if (!strncmp(mapSrc, mappingPrefix, mappingPrefixLen)) {
+                AString target;
+                if (details->findString(mapSrc, &target)) {
+                    ALOGV("-- mapping %s: map %s to %s", mapSrc, &mapSrc[mappingPrefixLen],
+                          target.c_str());
+                    // key is really "kind-key"
+                    // separate that, so setMap() sees the triple  kind, key, value
+                    const char *kind = &mapSrc[mappingPrefixLen];
+                    const char *sep = strchr(kind, '-');
+                    const char *key = sep+1;
+                    if (sep != NULL) {
+                         std::string xkind = std::string(kind, sep-kind);
+                        (void)(sShaperOps->setMap)(shaperHandle, xkind.c_str(),
+                                                   key, target.c_str());
+                    }
+                }
+            }
+        }
+    }
+
+    // we also carry in the codec description whether we are on a handheld device.
+    // this info is eventually used by both the Codec and the C2 machinery to inform
+    // the underlying codec whether to do any shaping.
+    //
+    if (sIsHandheld) {
+        // set if we are indeed a handheld device (or in future 'any eligible device'
+        // missing on devices that aren't eligible for minimum quality enforcement.
+        (void)(sShaperOps->setFeature)(shaperHandle, "_vq_eligible.device", 1);
+        // strictly speaking, it's a tuning, but those are strings and feature stores int
+        (void)(sShaperOps->setFeature)(shaperHandle, "_quality.target", 1 /* S_HANDHELD */);
+    }
+}
+
+status_t MediaCodec::setupFormatShaper(AString mediaType) {
+    ALOGV("setupFormatShaper: initializing shaper data for codec %s mediaType %s",
+          mComponentName.c_str(), mediaType.c_str());
+
+    nsecs_t mapping_started = systemTime(SYSTEM_TIME_MONOTONIC);
+
+    // someone might have beaten us to it.
+    mediaformatshaper::shaperHandle_t shaperHandle;
+    shaperHandle = sShaperOps->findShaper(mComponentName.c_str(), mediaType.c_str());
+    if (shaperHandle != nullptr) {
+        ALOGV("shaperhandle %p -- no initialization needed", shaperHandle);
+        return OK;
+    }
+
+    // we get to build & register one
+    shaperHandle = sShaperOps->createShaper(mComponentName.c_str(), mediaType.c_str());
+    if (shaperHandle == nullptr) {
+        ALOGW("unable to create a shaper for cocodec %s mediaType %s",
+              mComponentName.c_str(), mediaType.c_str());
+        return OK;
+    }
+
+    (void) loadCodecProperties(shaperHandle, mCodecInfo, mediaType);
+
+    shaperHandle = sShaperOps->registerShaper(shaperHandle,
+                                              mComponentName.c_str(), mediaType.c_str());
+
+    nsecs_t mapping_finished = systemTime(SYSTEM_TIME_MONOTONIC);
+    ALOGV("setupFormatShaper: populated shaper node for codec %s: %" PRId64 " us",
+          mComponentName.c_str(), (mapping_finished - mapping_started)/1000);
+
+    return OK;
+}
+
+
+// Format Shaping
+//      Mapping and Manipulation of encoding parameters
+//
+//      All of these decisions are pushed into the shaper instead of here within MediaCodec.
+//      this includes decisions based on whether the codec implements minimum quality bars
+//      itself or needs to be shaped outside of the codec.
+//      This keeps all those decisions in one place.
+//      It also means that we push some extra decision information (is this a handheld device
+//      or one that is otherwise eligible for minimum quality manipulation, which generational
+//      quality target is in force, etc).  This allows those values to be cached in the
+//      per-codec structures that are done 1 time within a process instead of for each
+//      codec instantiation.
+//
+
+status_t MediaCodec::shapeMediaFormat(
+            const sp<AMessage> &format,
+            uint32_t flags) {
+    ALOGV("shapeMediaFormat entry");
+
+    if (!(flags & CONFIGURE_FLAG_ENCODE)) {
+        ALOGW("shapeMediaFormat: not encoder");
+        return OK;
+    }
+    if (mCodecInfo == NULL) {
+        ALOGW("shapeMediaFormat: no codecinfo");
+        return OK;
+    }
+
+    AString mediaType;
+    if (!format->findString("mime", &mediaType)) {
+        ALOGW("shapeMediaFormat: no mediaType information");
+        return OK;
+    }
+
+    // make sure we have the function entry points for the shaper library
+    //
+
+    connectFormatShaper();
+    if (sShaperOps == nullptr) {
+        ALOGW("shapeMediaFormat: no MediaFormatShaper hooks available");
+        return OK;
+    }
+
+    // find the shaper information for this codec+mediaType pair
+    //
+    mediaformatshaper::shaperHandle_t shaperHandle;
+    shaperHandle = sShaperOps->findShaper(mComponentName.c_str(), mediaType.c_str());
+    if (shaperHandle == nullptr)  {
+        setupFormatShaper(mediaType);
+        shaperHandle = sShaperOps->findShaper(mComponentName.c_str(), mediaType.c_str());
+    }
+    if (shaperHandle == nullptr) {
+        ALOGW("shapeMediaFormat: no handler for codec %s mediatype %s",
+              mComponentName.c_str(), mediaType.c_str());
+        return OK;
+    }
+
+    // run the shaper
+    //
+
+    ALOGV("Shaping input: %s", format->debugString(0).c_str());
+
+    sp<AMessage> updatedFormat = format->dup();
+    AMediaFormat *updatedNdkFormat = AMediaFormat_fromMsg(&updatedFormat);
+
+    int result = (*sShaperOps->shapeFormat)(shaperHandle, updatedNdkFormat, flags);
+    if (result == 0) {
+        AMediaFormat_getFormat(updatedNdkFormat, &updatedFormat);
+
+        sp<AMessage> deltas = updatedFormat->changesFrom(format, false /* deep */);
+        size_t changeCount = deltas->countEntries();
+        ALOGD("shapeMediaFormat: deltas(%zu): %s", changeCount, deltas->debugString(2).c_str());
+        if (mMetricsHandle != 0) {
+            mediametrics_setInt32(mMetricsHandle, kCodecShapingEnhanced, changeCount);
+        }
+        if (changeCount > 0) {
+            if (mMetricsHandle != 0) {
+                // save some old properties before we fold in the new ones
+                int32_t bitrate;
+                if (format->findInt32(KEY_BIT_RATE, &bitrate)) {
+                    mediametrics_setInt32(mMetricsHandle, kCodecOriginalBitrate, bitrate);
+                }
+                int32_t qpIMin = -1;
+                if (format->findInt32("original-video-qp-i-min", &qpIMin)) {
+                    mediametrics_setInt32(mMetricsHandle, kCodecOriginalVideoQPIMin, qpIMin);
+                }
+                int32_t qpIMax = -1;
+                if (format->findInt32("original-video-qp-i-max", &qpIMax)) {
+                    mediametrics_setInt32(mMetricsHandle, kCodecOriginalVideoQPIMax, qpIMax);
+                }
+                int32_t qpPMin = -1;
+                if (format->findInt32("original-video-qp-p-min", &qpPMin)) {
+                    mediametrics_setInt32(mMetricsHandle, kCodecOriginalVideoQPPMin, qpPMin);
+                }
+                int32_t qpPMax = -1;
+                if (format->findInt32("original-video-qp-p-max", &qpPMax)) {
+                    mediametrics_setInt32(mMetricsHandle, kCodecOriginalVideoQPPMax, qpPMax);
+                }
+                 int32_t qpBMin = -1;
+                if (format->findInt32("original-video-qp-b-min", &qpBMin)) {
+                    mediametrics_setInt32(mMetricsHandle, kCodecOriginalVideoQPBMin, qpBMin);
+                }
+                int32_t qpBMax = -1;
+                if (format->findInt32("original-video-qp-b-max", &qpBMax)) {
+                    mediametrics_setInt32(mMetricsHandle, kCodecOriginalVideoQPBMax, qpBMax);
+                }
+            }
+            // NB: for any field in both format and deltas, the deltas copy wins
+            format->extend(deltas);
+        }
+    }
+
+    AMediaFormat_delete(updatedNdkFormat);
+    return OK;
+}
+
+static void mapFormat(AString componentName, const sp<AMessage> &format, const char *kind,
+                      bool reverse) {
+    AString mediaType;
+    if (!format->findString("mime", &mediaType)) {
+        ALOGW("mapFormat: no mediaType information");
+        return;
+    }
+    ALOGV("mapFormat: codec %s mediatype %s kind %s reverse %d", componentName.c_str(),
+          mediaType.c_str(), kind ? kind : "<all>", reverse);
+
+    // make sure we have the function entry points for the shaper library
+    //
+
+#if 0
+    // let's play the faster "only do mapping if we've already loaded the library
+    connectFormatShaper();
+#endif
+    if (sShaperOps == nullptr) {
+        ALOGV("mapFormat: no MediaFormatShaper hooks available");
+        return;
+    }
+
+    // find the shaper information for this codec+mediaType pair
+    //
+    mediaformatshaper::shaperHandle_t shaperHandle;
+    shaperHandle = sShaperOps->findShaper(componentName.c_str(), mediaType.c_str());
+    if (shaperHandle == nullptr) {
+        ALOGV("mapFormat: no shaper handle");
+        return;
+    }
+
+    const char **mappings;
+    if (reverse)
+        mappings = sShaperOps->getReverseMappings(shaperHandle, kind);
+    else
+        mappings = sShaperOps->getMappings(shaperHandle, kind);
+
+    if (mappings == nullptr) {
+        ALOGV("no mappings returned");
+        return;
+    }
+
+    ALOGV("Pre-mapping: %s",  format->debugString(2).c_str());
+    // do the mapping
+    //
+    int entries = format->countEntries();
+    for (int i = 0; ; i += 2) {
+        if (mappings[i] == nullptr) {
+            break;
+        }
+
+        size_t ix = format->findEntryByName(mappings[i]);
+        if (ix < entries) {
+            ALOGV("map '%s' to '%s'", mappings[i], mappings[i+1]);
+            status_t status = format->setEntryNameAt(ix, mappings[i+1]);
+            if (status != OK) {
+                ALOGW("Unable to map from '%s' to '%s': status %d",
+                      mappings[i], mappings[i+1], status);
+            }
+        }
+    }
+    ALOGV("Post-mapping: %s",  format->debugString(2).c_str());
+
+
+    // reclaim the mapping memory
+    for (int i = 0; ; i += 2) {
+        if (mappings[i] == nullptr) {
+            break;
+        }
+        free((void*)mappings[i]);
+        free((void*)mappings[i + 1]);
+    }
+    free(mappings);
+    mappings = nullptr;
+}
+
+//
+// end of Format Shaping hooks within MediaCodec
+//
 
 status_t MediaCodec::releaseCrypto()
 {
@@ -2268,14 +2946,15 @@ bool MediaCodec::handleDequeueOutputBuffer(const sp<AReplyToken> &replyID, bool 
         int64_t timeUs;
         CHECK(buffer->meta()->findInt64("timeUs", &timeUs));
 
-        statsBufferReceived(timeUs);
-
         response->setInt64("timeUs", timeUs);
 
         int32_t flags;
         CHECK(buffer->meta()->findInt32("flags", &flags));
 
         response->setInt32("flags", flags);
+
+        statsBufferReceived(timeUs, buffer);
+
         response->postReply(replyID);
     }
 
@@ -2296,8 +2975,8 @@ void MediaCodec::onMessageReceived(const sp<AMessage> &msg) {
                     CHECK(msg->findInt32("err", &err));
                     CHECK(msg->findInt32("actionCode", &actionCode));
 
-                    ALOGE("Codec reported err %#x, actionCode %d, while in state %d",
-                            err, actionCode, mState);
+                    ALOGE("Codec reported err %#x, actionCode %d, while in state %d/%s",
+                            err, actionCode, mState, stateString(mState).c_str());
                     if (err == DEAD_OBJECT) {
                         mFlags |= kFlagSawMediaServerDie;
                         mFlags &= ~kFlagIsComponentAllocated;
@@ -2474,8 +3153,8 @@ void MediaCodec::onMessageReceived(const sp<AMessage> &msg) {
                     if (mState == RELEASING || mState == UNINITIALIZED) {
                         // In case a kWhatError or kWhatRelease message came in and replied,
                         // we log a warning and ignore.
-                        ALOGW("allocate interrupted by error or release, current state %d",
-                              mState);
+                        ALOGW("allocate interrupted by error or release, current state %d/%s",
+                              mState, stateString(mState).c_str());
                         break;
                     }
                     CHECK_EQ(mState, INITIALIZING);
@@ -2524,8 +3203,8 @@ void MediaCodec::onMessageReceived(const sp<AMessage> &msg) {
                     if (mState == RELEASING || mState == UNINITIALIZED || mState == INITIALIZED) {
                         // In case a kWhatError or kWhatRelease message came in and replied,
                         // we log a warning and ignore.
-                        ALOGW("configure interrupted by error or release, current state %d",
-                              mState);
+                        ALOGW("configure interrupted by error or release, current state %d/%s",
+                              mState, stateString(mState).c_str());
                         break;
                     }
                     CHECK_EQ(mState, CONFIGURING);
@@ -2540,7 +3219,7 @@ void MediaCodec::onMessageReceived(const sp<AMessage> &msg) {
                     if (mSurface != nullptr && !mAllowFrameDroppingBySurface) {
                         // signal frame dropping mode in the input format as this may also be
                         // meaningful and confusing for an encoder in a transcoder scenario
-                        mInputFormat->setInt32("allow-frame-drop", mAllowFrameDroppingBySurface);
+                        mInputFormat->setInt32(KEY_ALLOW_FRAME_DROP, mAllowFrameDroppingBySurface);
                     }
                     sp<AMessage> interestingFormat =
                             (mFlags & kFlagIsEncoder) ? mOutputFormat : mInputFormat;
@@ -2672,7 +3351,8 @@ void MediaCodec::onMessageReceived(const sp<AMessage> &msg) {
                     if (mState == RELEASING || mState == UNINITIALIZED) {
                         // In case a kWhatRelease message came in and replied,
                         // we log a warning and ignore.
-                        ALOGW("start interrupted by release, current state %d", mState);
+                        ALOGW("start interrupted by release, current state %d/%s",
+                              mState, stateString(mState).c_str());
                         break;
                     }
 
@@ -2704,6 +3384,7 @@ void MediaCodec::onMessageReceived(const sp<AMessage> &msg) {
                     ALOGV("TunnelPeekState: %s -> %s",
                           asString(previousState),
                           asString(TunnelPeekState::kBufferRendered));
+                    updatePlaybackDuration(msg);
                     // check that we have a notification set
                     if (mOnFrameRenderedNotification != NULL) {
                         sp<AMessage> notify = mOnFrameRenderedNotification->dup();
@@ -2878,7 +3559,8 @@ void MediaCodec::onMessageReceived(const sp<AMessage> &msg) {
                 case kWhatStopCompleted:
                 {
                     if (mState != STOPPING) {
-                        ALOGW("Received kWhatStopCompleted in state %d", mState);
+                        ALOGW("Received kWhatStopCompleted in state %d/%s",
+                              mState, stateString(mState).c_str());
                         break;
                     }
                     setState(INITIALIZED);
@@ -2895,7 +3577,8 @@ void MediaCodec::onMessageReceived(const sp<AMessage> &msg) {
                 case kWhatReleaseCompleted:
                 {
                     if (mState != RELEASING) {
-                        ALOGW("Received kWhatReleaseCompleted in state %d", mState);
+                        ALOGW("Received kWhatReleaseCompleted in state %d/%s",
+                              mState, stateString(mState).c_str());
                         break;
                     }
                     setState(UNINITIALIZED);
@@ -2925,8 +3608,8 @@ void MediaCodec::onMessageReceived(const sp<AMessage> &msg) {
                 case kWhatFlushCompleted:
                 {
                     if (mState != FLUSHING) {
-                        ALOGW("received FlushCompleted message in state %d",
-                                mState);
+                        ALOGW("received FlushCompleted message in state %d/%s",
+                                mState, stateString(mState).c_str());
                         break;
                     }
 
@@ -3049,7 +3732,7 @@ void MediaCodec::onMessageReceived(const sp<AMessage> &msg) {
             }
 
             if (obj != NULL) {
-                if (!format->findInt32("allow-frame-drop", &mAllowFrameDroppingBySurface)) {
+                if (!format->findInt32(KEY_ALLOW_FRAME_DROP, &mAllowFrameDroppingBySurface)) {
                     // allow frame dropping by surface by default
                     mAllowFrameDroppingBySurface = true;
                 }
@@ -3115,6 +3798,11 @@ void MediaCodec::onMessageReceived(const sp<AMessage> &msg) {
                 mTunneled = true;
             } else {
                 mTunneled = false;
+            }
+
+            int32_t background = 0;
+            if (format->findInt32("android._background-mode", &background) && background) {
+                androidSetThreadPriority(gettid(), ANDROID_PRIORITY_BACKGROUND);
             }
 
             mCodec->initiateConfigureComponent(format);
@@ -3289,7 +3977,13 @@ void MediaCodec::onMessageReceived(const sp<AMessage> &msg) {
             int32_t reclaimed = 0;
             msg->findInt32("reclaimed", &reclaimed);
             if (reclaimed) {
-                mReleasedByResourceManager = true;
+                if (!mReleasedByResourceManager) {
+                    // notify the async client
+                    if (mFlags & kFlagIsAsync) {
+                        onError(DEAD_OBJECT, ACTION_CODE_FATAL);
+                    }
+                    mReleasedByResourceManager = true;
+                }
 
                 int32_t force = 0;
                 msg->findInt32("force", &force);
@@ -3301,10 +3995,6 @@ void MediaCodec::onMessageReceived(const sp<AMessage> &msg) {
                     response->setInt32("err", WOULD_BLOCK);
                     response->postReply(replyID);
 
-                    // notify the async client
-                    if (mFlags & kFlagIsAsync) {
-                        onError(DEAD_OBJECT, ACTION_CODE_FATAL);
-                    }
                     break;
                 }
             }
@@ -3801,6 +4491,7 @@ void MediaCodec::handleOutputFormatChangeIfNeeded(const sp<MediaCodecBuffer> &bu
         buffer->meta()->setObject("changedKeys", changedKeys);
     }
     mOutputFormat = format;
+    mapFormat(mComponentName, format, nullptr, true);
     ALOGV("[%s] output format changed to: %s",
             mComponentName.c_str(), mOutputFormat->debugString(4).c_str());
 
@@ -4219,15 +4910,15 @@ status_t MediaCodec::onQueueInputBuffer(const sp<AMessage> &msg) {
                 buffer->meta()->setInt32("tunnel-first-frame", 1);
                 mTunnelPeekState = TunnelPeekState::kEnabledQueued;
                 ALOGV("TunnelPeekState: %s -> %s",
-                      asString(previousState),
-                      asString(mTunnelPeekState));
+                        asString(previousState),
+                        asString(mTunnelPeekState));
                 break;
             case TunnelPeekState::kDisabledNoBuffer:
                 buffer->meta()->setInt32("tunnel-first-frame", 1);
                 mTunnelPeekState = TunnelPeekState::kDisabledQueued;
                 ALOGV("TunnelPeekState: %s -> %s",
-                      asString(previousState),
-                      asString(mTunnelPeekState));
+                        asString(previousState),
+                        asString(mTunnelPeekState));
                 break;
             default:
                 break;
@@ -4278,7 +4969,7 @@ status_t MediaCodec::onQueueInputBuffer(const sp<AMessage> &msg) {
         info->mOwnedByClient = false;
         info->mData.clear();
 
-        statsBufferSent(timeUs);
+        statsBufferSent(timeUs, buffer);
     }
 
     return err;
@@ -4443,6 +5134,10 @@ status_t MediaCodec::connectToSurface(const sp<Surface> &surface) {
             return ALREADY_EXISTS;
         }
 
+        // in case we don't connect, ensure that we don't signal the surface is
+        // connected to the screen
+        mIsSurfaceToScreen = false;
+
         err = nativeWindowConnect(surface.get(), "connectToSurface");
         if (err == OK) {
             // Require a fresh set of buffers after each connect by using a unique generation
@@ -4468,6 +5163,10 @@ status_t MediaCodec::connectToSurface(const sp<Surface> &surface) {
             if (!mAllowFrameDroppingBySurface) {
                 disableLegacyBufferDropPostQ(surface);
             }
+            // keep track whether or not the buffers of the connected surface go to the screen
+            int result = 0;
+            surface->query(NATIVE_WINDOW_QUEUES_TO_WINDOW_COMPOSER, &result);
+            mIsSurfaceToScreen = result != 0;
         }
     }
     // do not return ALREADY_EXISTS unless surfaces are the same
@@ -4485,6 +5184,7 @@ status_t MediaCodec::disconnectFromSurface() {
         }
         // assume disconnected even on error
         mSurface.clear();
+        mIsSurfaceToScreen = false;
     }
     return err;
 }
@@ -4529,12 +5229,12 @@ void MediaCodec::onOutputBufferAvailable() {
 
         msg->setInt64("timeUs", timeUs);
 
-        statsBufferReceived(timeUs);
-
         int32_t flags;
         CHECK(buffer->meta()->findInt32("flags", &flags));
 
         msg->setInt32("flags", flags);
+
+        statsBufferReceived(timeUs, buffer);
 
         msg->post();
     }
@@ -4602,6 +5302,7 @@ status_t MediaCodec::setParameters(const sp<AMessage> &params) {
 
 status_t MediaCodec::onSetParameters(const sp<AMessage> &params) {
     updateLowLatency(params);
+    mapFormat(mComponentName, params, nullptr, false);
     updateTunnelPeek(params);
     mCodec->signalSetParameters(params);
 

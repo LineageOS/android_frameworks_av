@@ -160,7 +160,7 @@ c2_status_t FrameReassembler::process(
         if (mWriteView->error() != C2_OK) {
             return mWriteView->error();
         }
-        ALOGV("buffer={offset=%zu size=%zu) copySize=%zu",
+        ALOGV("buffer={offset=%zu size=%zu} copySize=%zu",
                 buffer->offset(), buffer->size(), copySize);
         memcpy(mWriteView->base(), buffer->data(), copySize);
         mWriteView->setOffset(0u);

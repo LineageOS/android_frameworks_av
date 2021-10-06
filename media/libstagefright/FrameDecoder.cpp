@@ -19,6 +19,7 @@
 
 #include "include/FrameDecoder.h"
 #include "include/FrameCaptureLayer.h"
+#include "include/HevcUtils.h"
 #include <binder/MemoryBase.h>
 #include <binder/MemoryHeapBase.h>
 #include <gui/Surface.h>
@@ -66,6 +67,12 @@ sp<IMemory> allocVideoFrame(const sp<MetaData>& trackMeta,
     if (trackMeta->findInt32(kKeySARWidth, &sarWidth)
             && trackMeta->findInt32(kKeySARHeight, &sarHeight)
             && sarHeight != 0) {
+        int32_t multVal;
+        if (width < 0 || sarWidth < 0 ||
+            __builtin_mul_overflow(width, sarWidth, &multVal)) {
+            ALOGE("displayWidth overflow %dx%d", width, sarWidth);
+            return NULL;
+        }
         displayWidth = (width * sarWidth) / sarHeight;
         displayHeight = height;
     } else if (trackMeta->findInt32(kKeyDisplayWidth, &displayWidth)
@@ -86,6 +93,16 @@ sp<IMemory> allocVideoFrame(const sp<MetaData>& trackMeta,
         rotationAngle = 0;
     }
 
+    if (!metaOnly) {
+        int32_t multVal;
+        if (width < 0 || height < 0 || dstBpp < 0 ||
+            __builtin_mul_overflow(dstBpp, width, &multVal) ||
+            __builtin_mul_overflow(multVal, height, &multVal)) {
+            ALOGE("Frame size overflow %dx%d bpp %d", width, height, dstBpp);
+            return NULL;
+        }
+    }
+
     VideoFrame frame(width, height, displayWidth, displayHeight,
             tileWidth, tileHeight, rotationAngle, dstBpp, !metaOnly, iccSize);
 
@@ -96,7 +113,7 @@ sp<IMemory> allocVideoFrame(const sp<MetaData>& trackMeta,
         return NULL;
     }
     sp<IMemory> frameMem = new MemoryBase(heap, 0, size);
-    if (frameMem == NULL) {
+    if (frameMem == NULL || frameMem->unsecurePointer() == NULL) {
         ALOGE("not enough memory for VideoFrame size=%zu", size);
         return NULL;
     }
@@ -120,15 +137,23 @@ sp<IMemory> allocMetaFrame(const sp<MetaData>& trackMeta,
             false /*allocRotated*/, true /*metaOnly*/);
 }
 
+bool isAvif(const sp<MetaData> &trackMeta) {
+    const char *mime;
+    return trackMeta->findCString(kKeyMIMEType, &mime)
+        && (!strcasecmp(mime, MEDIA_MIMETYPE_VIDEO_AV1)
+            || !strcasecmp(mime, MEDIA_MIMETYPE_IMAGE_AVIF));
+}
+
 bool findThumbnailInfo(
         const sp<MetaData> &trackMeta, int32_t *width, int32_t *height,
         uint32_t *type = NULL, const void **data = NULL, size_t *size = NULL) {
     uint32_t dummyType;
     const void *dummyData;
     size_t dummySize;
+    int codecConfigKey = isAvif(trackMeta) ? kKeyThumbnailAV1C : kKeyThumbnailHVCC;
     return trackMeta->findInt32(kKeyThumbnailWidth, width)
         && trackMeta->findInt32(kKeyThumbnailHeight, height)
-        && trackMeta->findData(kKeyThumbnailHVCC,
+        && trackMeta->findData(codecConfigKey,
                 type ?: &dummyType, data ?: &dummyData, size ?: &dummySize);
 }
 
@@ -453,7 +478,8 @@ VideoFrameDecoder::VideoFrameDecoder(
         const sp<IMediaSource> &source)
     : FrameDecoder(componentName, trackMeta, source),
       mFrame(NULL),
-      mIsAvcOrHevc(false),
+      mIsAvc(false),
+      mIsHevc(false),
       mSeekMode(MediaSource::ReadOptions::SEEK_PREVIOUS_SYNC),
       mTargetTimeUs(-1LL),
       mDefaultSampleDurationUs(0) {
@@ -476,8 +502,8 @@ sp<AMessage> VideoFrameDecoder::onGetFormatAndSeekOptions(
         return NULL;
     }
 
-    mIsAvcOrHevc = !strcasecmp(mime, MEDIA_MIMETYPE_VIDEO_AVC)
-            || !strcasecmp(mime, MEDIA_MIMETYPE_VIDEO_HEVC);
+    mIsAvc = !strcasecmp(mime, MEDIA_MIMETYPE_VIDEO_AVC);
+    mIsHevc = !strcasecmp(mime, MEDIA_MIMETYPE_VIDEO_HEVC);
 
     if (frameTimeUs < 0) {
         int64_t thumbNailTime = -1ll;
@@ -540,8 +566,10 @@ status_t VideoFrameDecoder::onInputReceived(
         ALOGV("Seeking closest: targetTimeUs=%lld", (long long)mTargetTimeUs);
     }
 
-    if (mIsAvcOrHevc && !isSeekingClosest
-            && IsIDR(codecBuffer->data(), codecBuffer->size())) {
+    if (!isSeekingClosest
+            && ((mIsAvc && IsIDR(codecBuffer->data(), codecBuffer->size()))
+            || (mIsHevc && IsIDR(
+            codecBuffer->data(), codecBuffer->size())))) {
         // Only need to decode one IDR frame, unless we're seeking with CLOSEST
         // option, in which case we need to actually decode to targetTimeUs.
         *flags |= MediaCodec::BUFFER_FLAG_EOS;
@@ -613,6 +641,10 @@ status_t VideoFrameDecoder::onOutputReceived(
                 0,
                 dstBpp(),
                 mCaptureLayer != nullptr /*allocRotated*/);
+        if (frameMem == nullptr) {
+            return NO_MEMORY;
+        }
+
         mFrame = static_cast<VideoFrame*>(frameMem->unsecurePointer());
 
         setFrame(frameMem);
@@ -709,7 +741,7 @@ status_t VideoFrameDecoder::captureSurface() {
 
 ////////////////////////////////////////////////////////////////////////
 
-ImageDecoder::ImageDecoder(
+MediaImageDecoder::MediaImageDecoder(
         const AString &componentName,
         const sp<MetaData> &trackMeta,
         const sp<IMediaSource> &source)
@@ -725,7 +757,7 @@ ImageDecoder::ImageDecoder(
       mTargetTiles(0) {
 }
 
-sp<AMessage> ImageDecoder::onGetFormatAndSeekOptions(
+sp<AMessage> MediaImageDecoder::onGetFormatAndSeekOptions(
         int64_t frameTimeUs, int /*seekMode*/,
         MediaSource::ReadOptions *options, sp<Surface> * /*window*/) {
     sp<MetaData> overrideMeta;
@@ -745,7 +777,10 @@ sp<AMessage> ImageDecoder::onGetFormatAndSeekOptions(
         overrideMeta->remove(kKeyDisplayHeight);
         overrideMeta->setInt32(kKeyWidth, mWidth);
         overrideMeta->setInt32(kKeyHeight, mHeight);
-        overrideMeta->setData(kKeyHVCC, type, data, size);
+        // The AV1 codec configuration data is passed via CSD0 to the AV1
+        // decoder.
+        const int codecConfigKey = isAvif(trackMeta()) ? kKeyOpaqueCSD0 : kKeyHVCC;
+        overrideMeta->setData(codecConfigKey, type, data, size);
         options->setSeekTo(-1);
     } else {
         CHECK(trackMeta()->findInt32(kKeyWidth, &mWidth));
@@ -798,7 +833,7 @@ sp<AMessage> ImageDecoder::onGetFormatAndSeekOptions(
     return videoFormat;
 }
 
-status_t ImageDecoder::onExtractRect(FrameRect *rect) {
+status_t MediaImageDecoder::onExtractRect(FrameRect *rect) {
     // TODO:
     // This callback is for verifying whether we can decode the rect,
     // and if so, set up the internal variables for decoding.
@@ -837,7 +872,7 @@ status_t ImageDecoder::onExtractRect(FrameRect *rect) {
     return OK;
 }
 
-status_t ImageDecoder::onOutputReceived(
+status_t MediaImageDecoder::onOutputReceived(
         const sp<MediaCodecBuffer> &videoFrameBuffer,
         const sp<AMessage> &outputFormat, int64_t /*timeUs*/, bool *done) {
     if (outputFormat == NULL) {
@@ -852,6 +887,11 @@ status_t ImageDecoder::onOutputReceived(
     if (mFrame == NULL) {
         sp<IMemory> frameMem = allocVideoFrame(
                 trackMeta(), mWidth, mHeight, mTileWidth, mTileHeight, dstBpp());
+
+        if (frameMem == nullptr) {
+            return NO_MEMORY;
+        }
+
         mFrame = static_cast<VideoFrame*>(frameMem->unsecurePointer());
 
         setFrame(frameMem);

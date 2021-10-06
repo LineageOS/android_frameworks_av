@@ -31,22 +31,35 @@
 
 namespace android {
 
+using content::AttributionSourceState;
+
 class AudioRecord;
 
 struct AudioSource : public MediaSource, public MediaBufferObserver {
     // Note that the "channels" parameter _is_ the number of channels,
     // _not_ a bitmask of audio_channels_t constants.
     AudioSource(
-            const audio_attributes_t *attr,
-            const String16 &opPackageName,
-            uint32_t sampleRate,
-            uint32_t channels,
-            uint32_t outSampleRate = 0,
-            uid_t uid = -1,
-            pid_t pid = -1,
-            audio_port_handle_t selectedDeviceId = AUDIO_PORT_HANDLE_NONE,
-            audio_microphone_direction_t selectedMicDirection = MIC_DIRECTION_UNSPECIFIED,
-            float selectedMicFieldDimension = MIC_FIELD_DIMENSION_NORMAL);
+        const audio_attributes_t *attr,
+        const AttributionSourceState& attributionSource,
+        uint32_t sampleRate,
+        uint32_t channels,
+        uint32_t outSampleRate = 0,
+        audio_port_handle_t selectedDeviceId = AUDIO_PORT_HANDLE_NONE,
+        audio_microphone_direction_t selectedMicDirection = MIC_DIRECTION_UNSPECIFIED,
+        float selectedMicFieldDimension = MIC_FIELD_DIMENSION_NORMAL);
+
+    // Legacy constructor kept for vendor dependencies
+    AudioSource(
+        const audio_attributes_t *attr,
+        const String16 &opPackageName,
+        uint32_t sampleRate,
+        uint32_t channels,
+        uint32_t outSampleRate = 0,
+        uid_t uid = -1,
+        pid_t pid = -1,
+        audio_port_handle_t selectedDeviceId = AUDIO_PORT_HANDLE_NONE,
+        audio_microphone_direction_t selectedMicDirection = MIC_DIRECTION_UNSPECIFIED,
+        float selectedMicFieldDimension = MIC_FIELD_DIMENSION_NORMAL);
 
     status_t initCheck() const;
 
@@ -131,6 +144,16 @@ private:
 
     AudioSource(const AudioSource &);
     AudioSource &operator=(const AudioSource &);
+
+    void set(
+        const audio_attributes_t *attr,
+        const AttributionSourceState& attributionSource,
+        uint32_t sampleRate,
+        uint32_t channels,
+        uint32_t outSampleRate = 0,
+        audio_port_handle_t selectedDeviceId = AUDIO_PORT_HANDLE_NONE,
+        audio_microphone_direction_t selectedMicDirection = MIC_DIRECTION_UNSPECIFIED,
+        float selectedMicFieldDimension = MIC_FIELD_DIMENSION_NORMAL);
 };
 
 }  // namespace android

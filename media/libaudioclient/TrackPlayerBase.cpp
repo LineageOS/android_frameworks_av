@@ -17,7 +17,7 @@
 #include <media/TrackPlayerBase.h>
 
 namespace android {
-
+using aidl_utils::binderStatusFromStatusT;
 using media::VolumeShaper;
 
 //--------------------------------------------------------------------------------------------------
@@ -33,9 +33,15 @@ TrackPlayerBase::~TrackPlayerBase() {
     doDestroy();
 }
 
-void TrackPlayerBase::init(AudioTrack* pat, player_type_t playerType, audio_usage_t usage) {
-    PlayerBase::init(playerType, usage);
+void TrackPlayerBase::init(AudioTrack* pat, player_type_t playerType, audio_usage_t usage,
+        audio_session_t sessionId) {
+    PlayerBase::init(playerType, usage, sessionId);
     mAudioTrack = pat;
+    if (mAudioTrack != 0) {
+        mSelfAudioDeviceCallback = new SelfAudioDeviceCallback(*this);
+        mAudioTrack->addAudioDeviceCallback(mSelfAudioDeviceCallback);
+        mAudioTrack->setPlayerIId(mPIId); // set in PlayerBase::init().
+    }
 }
 
 void TrackPlayerBase::destroy() {
@@ -43,9 +49,23 @@ void TrackPlayerBase::destroy() {
     baseDestroy();
 }
 
+TrackPlayerBase::SelfAudioDeviceCallback::SelfAudioDeviceCallback(PlayerBase& self) :
+    AudioSystem::AudioDeviceCallback(), mSelf(self) {
+}
+
+TrackPlayerBase::SelfAudioDeviceCallback::~SelfAudioDeviceCallback() {
+}
+
+void TrackPlayerBase::SelfAudioDeviceCallback::onAudioDeviceUpdate(audio_io_handle_t __unused,
+                                                                   audio_port_handle_t deviceId) {
+    mSelf.baseUpdateDeviceId(deviceId);
+}
+
 void TrackPlayerBase::doDestroy() {
     if (mAudioTrack != 0) {
         mAudioTrack->stop();
+        mAudioTrack->removeAudioDeviceCallback(mSelfAudioDeviceCallback);
+        mSelfAudioDeviceCallback.clear();
         // Note that there may still be another reference in post-unlock phase of SetPlayState
         mAudioTrack.clear();
     }
@@ -106,11 +126,17 @@ status_t TrackPlayerBase::doSetVolume() {
 
 
 binder::Status TrackPlayerBase::applyVolumeShaper(
-        const VolumeShaper::Configuration& configuration,
-        const VolumeShaper::Operation& operation) {
+        const media::VolumeShaperConfiguration& configuration,
+        const media::VolumeShaperOperation& operation) {
 
-    sp<VolumeShaper::Configuration> spConfiguration = new VolumeShaper::Configuration(configuration);
-    sp<VolumeShaper::Operation> spOperation = new VolumeShaper::Operation(operation);
+    sp<VolumeShaper::Configuration> spConfiguration = new VolumeShaper::Configuration();
+    sp<VolumeShaper::Operation> spOperation = new VolumeShaper::Operation();
+
+    status_t s = spConfiguration->readFromParcelable(configuration)
+            ?: spOperation->readFromParcelable(operation);
+    if (s != OK) {
+        return binderStatusFromStatusT(s);
+    }
 
     if (mAudioTrack != 0) {
         ALOGD("TrackPlayerBase::applyVolumeShaper() from IPlayer");
@@ -118,7 +144,7 @@ binder::Status TrackPlayerBase::applyVolumeShaper(
         if (status < 0) { // a non-negative value is the volume shaper id.
             ALOGE("TrackPlayerBase::applyVolumeShaper() failed with status %d", status);
         }
-        return binder::Status::fromStatusT(status);
+        return binderStatusFromStatusT(status);
     } else {
         ALOGD("TrackPlayerBase::applyVolumeShaper()"
               " no AudioTrack for volume control from IPlayer");

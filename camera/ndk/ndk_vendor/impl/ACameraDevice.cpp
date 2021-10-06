@@ -180,6 +180,7 @@ CameraDevice::createCaptureSession(
         const ACaptureRequest* sessionParameters,
         const ACameraCaptureSession_stateCallbacks* callbacks,
         /*out*/ACameraCaptureSession** session) {
+    nsecs_t startTimeNs = systemTime();
     sp<ACameraCaptureSession> currentSession = mCurrentSession.promote();
     Mutex::Autolock _l(mDeviceLock);
     camera_status_t ret = checkCameraClosedOrErrorLocked();
@@ -193,7 +194,7 @@ CameraDevice::createCaptureSession(
     }
 
     // Create new session
-    ret = configureStreamsLocked(outputs, sessionParameters);
+    ret = configureStreamsLocked(outputs, sessionParameters, startTimeNs);
     if (ret != ACAMERA_OK) {
         ALOGE("Fail to create new session. cannot configure streams");
         return ret;
@@ -355,7 +356,7 @@ CameraDevice::allocateCaptureRequestLocked(
     std::vector<int32_t> requestStreamIdxList;
     std::vector<int32_t> requestSurfaceIdxList;
     for (auto outputTarget : request->targets->mOutputs) {
-        native_handle_t* anw = outputTarget.mWindow;
+        const native_handle_t* anw = outputTarget.mWindow;
         bool found = false;
         req->mSurfaceList.push_back(anw);
         // lookup stream/surface ID
@@ -434,7 +435,7 @@ CameraDevice::allocateACaptureRequest(sp<CaptureRequest>& req, const char* devic
     }
     pRequest->targets = new ACameraOutputTargets();
     for (size_t i = 0; i < req->mSurfaceList.size(); i++) {
-        native_handle_t* anw = req->mSurfaceList[i];
+        const native_handle_t* anw = req->mSurfaceList[i];
         ACameraOutputTarget outputTarget(anw);
         pRequest->targets->mOutputs.insert(outputTarget);
     }
@@ -472,7 +473,11 @@ CameraDevice::notifySessionEndOfLifeLocked(ACameraCaptureSession* session) {
     }
 
     // No new session, unconfigure now
-    camera_status_t ret = configureStreamsLocked(nullptr, nullptr);
+    // Note: The unconfiguration of session won't be accounted for session
+    // latency because a stream configuration with 0 streams won't ever become
+    // active.
+    nsecs_t startTimeNs = systemTime();
+    camera_status_t ret = configureStreamsLocked(nullptr, nullptr, startTimeNs);
     if (ret != ACAMERA_OK) {
         ALOGE("Unconfigure stream failed. Device might still be configured! ret %d", ret);
     }
@@ -598,7 +603,7 @@ CameraDevice::waitUntilIdleLocked() {
 
 camera_status_t
 CameraDevice::configureStreamsLocked(const ACaptureSessionOutputContainer* outputs,
-        const ACaptureRequest* sessionParameters) {
+        const ACaptureRequest* sessionParameters, nsecs_t startTimeNs) {
     ACaptureSessionOutputContainer emptyOutput;
     if (outputs == nullptr) {
         outputs = &emptyOutput;
@@ -611,7 +616,7 @@ CameraDevice::configureStreamsLocked(const ACaptureSessionOutputContainer* outpu
 
     std::set<std::pair<native_handle_ptr_wrapper, OutputConfigurationWrapper>> outputSet;
     for (auto outConfig : outputs->mOutputs) {
-        native_handle_t* anw = outConfig.mWindow;
+        const native_handle_t* anw = outConfig.mWindow;
         OutputConfigurationWrapper outConfigInsertW;
         OutputConfiguration &outConfigInsert = outConfigInsertW.mOutputConfiguration;
         outConfigInsert.rotation = utils::convertToHidl(outConfig.mRotation);
@@ -697,7 +702,8 @@ CameraDevice::configureStreamsLocked(const ACaptureSessionOutputContainer* outpu
         utils::convertToHidl(params_metadata, &hidlParams);
         params.unlock(params_metadata);
     }
-    remoteRet = mRemote->endConfigure(StreamConfigurationMode::NORMAL_MODE, hidlParams);
+    remoteRet = mRemote->endConfigure_2_1(StreamConfigurationMode::NORMAL_MODE,
+                                          hidlParams, startTimeNs);
     CHECK_TRANSACTION_AND_RET(remoteRet, remoteRet, "endConfigure()")
     return ACAMERA_OK;
 }
@@ -846,8 +852,7 @@ CameraDevice::onCaptureErrorLocked(
             for (auto streamAndWindowId : request->mCaptureRequest.streamAndWindowIds) {
                 int32_t windowId = streamAndWindowId.windowId;
                 if (utils::isWindowNativeHandleEqual(windowHandles[windowId],outHandle)) {
-                    native_handle_t* anw =
-                        const_cast<native_handle_t *>(windowHandles[windowId].getNativeHandle());
+                    const native_handle_t* anw = windowHandles[windowId].getNativeHandle();
                     ALOGV("Camera %s Lost output buffer for ANW %p frame %" PRId64,
                             getId(), anw, frameNumber);
 
@@ -1244,7 +1249,7 @@ void CameraDevice::CallbackHandler::onMessageReceived(
                         return;
                     }
 
-                    native_handle_t* anw;
+                    const native_handle_t* anw;
                     found = msg->findPointer(kAnwKey, (void**) &anw);
                     if (!found) {
                         ALOGE("%s: Cannot find native_handle_t!", __FUNCTION__);

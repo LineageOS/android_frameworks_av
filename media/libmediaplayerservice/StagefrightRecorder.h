@@ -26,8 +26,11 @@
 #include <system/audio.h>
 
 #include <media/hardware/MetadataBufferType.h>
+#include <android/content/AttributionSourceState.h>
 
 namespace android {
+
+using content::AttributionSourceState;
 
 class Camera;
 class ICameraRecordingProxy;
@@ -42,9 +45,10 @@ class MediaProfiles;
 struct ALooper;
 
 struct StagefrightRecorder : public MediaRecorderBase {
-    explicit StagefrightRecorder(const String16 &opPackageName);
+    explicit StagefrightRecorder(const AttributionSourceState& attributionSource);
     virtual ~StagefrightRecorder();
     virtual status_t init();
+    virtual status_t setLogSessionId(const String8 &id);
     virtual status_t setAudioSource(audio_source_t as);
             status_t setPrivacySensitive(bool privacySensitive) override;
             status_t isPrivacySensitive(bool *privacySensitive) const override;
@@ -98,9 +102,6 @@ private:
     sp<IGraphicBufferProducer> mPreviewSurface;
     sp<PersistentSurface> mPersistentSurface;
     sp<IMediaRecorderClient> mListener;
-    String16 mClientName;
-    uid_t mClientUid;
-    pid_t mClientPid;
     sp<MediaWriter> mWriter;
     int mOutputFd;
     sp<AudioSource> mAudioSourceNode;
@@ -110,6 +111,7 @@ private:
     void flushAndResetMetrics(bool reinitialize);
     void updateMetrics();
 
+    AString mLogSessionId;
     audio_source_t mAudioSource;
     privacy_sensitive_t mPrivacySensitive;
     video_source mVideoSource;

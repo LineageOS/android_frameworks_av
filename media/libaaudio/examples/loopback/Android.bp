@@ -13,9 +13,11 @@ cc_test {
     srcs: ["src/loopback.cpp"],
     cflags: ["-Wall", "-Werror"],
     static_libs: ["libsndfile"],
+    include_dirs: ["external/oboe/apps/OboeTester/app/src/main/cpp"],
     shared_libs: [
         "libaaudio",
         "libaudioutils",
+        "liblog"
         ],
     header_libs: ["libaaudio_example_utils"],
 }

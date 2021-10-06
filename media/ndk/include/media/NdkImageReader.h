@@ -328,10 +328,10 @@ media_status_t AImageReader_setImageListener(
  * still acquire images from this {@link AImageReader} and access {@link AHardwareBuffer} via
  * {@link AImage_getHardwareBuffer()}. The {@link AHardwareBuffer} gained this way can then
  * be passed back to hardware (such as GPU or hardware encoder if supported) for future processing.
- * For example, you can obtain an {@link EGLClientBuffer} from the {@link AHardwareBuffer} by using
- * {@link eglGetNativeClientBufferANDROID} extension and pass that {@link EGLClientBuffer} to {@link
- * eglCreateImageKHR} to create an {@link EGLImage} resource type, which may then be bound to a
- * texture via {@link glEGLImageTargetTexture2DOES} on supported devices. This can be useful for
+ * For example, you can obtain an EGLClientBuffer from the {@link AHardwareBuffer} by using
+ * eglGetNativeClientBufferANDROID extension and pass that EGLClientBuffer to
+ * eglCreateImageKHR to create an EGLImage resource type, which may then be bound to a
+ * texture via glEGLImageTargetTexture2DOES on supported devices. This can be useful for
  * transporting textures that may be shared cross-process.</p>
  * <p>In general, when software access to image data is not necessary, an {@link AImageReader}
  * created with {@link AIMAGE_FORMAT_PRIVATE} format is more efficient, compared with {@link
@@ -339,7 +339,7 @@ media_status_t AImageReader_setImageListener(
  *
  * <p>Note that not all format and usage flag combination is supported by the {@link AImageReader},
  * especially if \c format is {@link AIMAGE_FORMAT_PRIVATE}, \c usage must not include either
- * {@link AHARDWAREBUFFER_USAGE_READ_RARELY} or {@link AHARDWAREBUFFER_USAGE_READ_OFTEN}</p>
+ * {@link AHARDWAREBUFFER_USAGE_CPU_READ_RARELY} or {@link AHARDWAREBUFFER_USAGE_CPU_READ_OFTEN}</p>
  *
  * @param width The default width in pixels of the Images that this reader will produce.
  * @param height The default height in pixels of the Images that this reader will produce.
@@ -358,7 +358,7 @@ media_status_t AImageReader_setImageListener(
  *   <th>Compatible usage flags</th>
  * </tr>
  * <tr>
- *   <td>non-{@link AIMAGE_FORMAT_PRIVATE PRIVATE} formats defined in {@link AImage.h}
+ *   <td>non-{@link AIMAGE_FORMAT_PRIVATE} formats defined in {@link NdkImage.h}
  * </td>
  *   <td>{@link AHARDWAREBUFFER_USAGE_CPU_READ_RARELY} or
  *   {@link AHARDWAREBUFFER_USAGE_CPU_READ_OFTEN}</td>
@@ -441,6 +441,10 @@ typedef void (*AImageReader_BufferRemovedCallback)(void* context,
         AImageReader* reader,
         AHardwareBuffer* buffer);
 
+/**
+ * A listener to the AHardwareBuffer removal event, use
+ * {@link AImageReader_setBufferRemovedListener} to register the listener object to AImageReader.
+ */
 typedef struct AImageReader_BufferRemovedListener {
     /// Optional application context passed as the first parameter of the callback.
     void*                      context;

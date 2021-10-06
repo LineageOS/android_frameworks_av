@@ -16,7 +16,9 @@
 #define LOG_TAG "AudioPort"
 
 #include <algorithm>
+#include <utility>
 
+#include <android/media/ExtraAudioDescriptor.h>
 #include <android-base/stringprintf.h>
 #include <media/AudioPort.h>
 #include <utils/Log.h>
@@ -34,6 +36,36 @@ void AudioPort::importAudioPort(const sp<AudioPort>& port, bool force __unused)
                 [profileToImport](const auto &profile) {
                         return *profile == *profileToImport; }) == mProfiles.end()) {
             addAudioProfile(profileToImport);
+        }
+    }
+}
+
+void AudioPort::importAudioPort(const audio_port_v7 &port) {
+    for (size_t i = 0; i < port.num_audio_profiles; ++i) {
+        sp<AudioProfile> profile = new AudioProfile(port.audio_profiles[i].format,
+                ChannelMaskSet(port.audio_profiles[i].channel_masks,
+                        port.audio_profiles[i].channel_masks +
+                        port.audio_profiles->num_channel_masks),
+                SampleRateSet(port.audio_profiles[i].sample_rates,
+                        port.audio_profiles[i].sample_rates +
+                        port.audio_profiles[i].num_sample_rates),
+                port.audio_profiles[i].encapsulation_type);
+        if (!mProfiles.contains(profile)) {
+            addAudioProfile(profile);
+        }
+    }
+
+    for (size_t i = 0; i < port.num_extra_audio_descriptors; ++i) {
+        auto convertedResult = legacy2aidl_audio_extra_audio_descriptor_ExtraAudioDescriptor(
+                port.extra_audio_descriptors[i]);
+        if (!convertedResult.ok()) {
+            ALOGE("%s, failed to convert extra audio descriptor", __func__);
+            continue;
+        }
+        if (std::find(mExtraAudioDescriptors.begin(),
+                      mExtraAudioDescriptors.end(),
+                      convertedResult.value()) == mExtraAudioDescriptors.end()) {
+            mExtraAudioDescriptors.push_back(std::move(convertedResult.value()));
         }
     }
 }
@@ -62,21 +94,56 @@ void AudioPort::toAudioPort(struct audio_port *port) const {
             }
         }
     }
-    port->role = mRole;
-    port->type = mType;
-    strlcpy(port->name, mName.c_str(), AUDIO_PORT_MAX_NAME_LEN);
+    toAudioPortBase(port);
     port->num_sample_rates = flatenedRates.size();
     port->num_channel_masks = flatenedChannels.size();
     port->num_formats = flatenedFormats.size();
     std::copy(flatenedRates.begin(), flatenedRates.end(), port->sample_rates);
     std::copy(flatenedChannels.begin(), flatenedChannels.end(), port->channel_masks);
     std::copy(flatenedFormats.begin(), flatenedFormats.end(), port->formats);
+}
 
-    ALOGV("AudioPort::toAudioPort() num gains %zu", mGains.size());
+void AudioPort::toAudioPort(struct audio_port_v7 *port) const {
+    toAudioPortBase(port);
+    port->num_audio_profiles = 0;
+    for (const auto& profile : mProfiles) {
+        if (profile->isValid()) {
+            const SampleRateSet &sampleRates = profile->getSampleRates();
+            const ChannelMaskSet &channelMasks = profile->getChannels();
 
-    port->num_gains = std::min(mGains.size(), (size_t) AUDIO_PORT_MAX_GAINS);
-    for (size_t i = 0; i < port->num_gains; i++) {
-        port->gains[i] = mGains[i]->getGain();
+            if (sampleRates.size() > AUDIO_PORT_MAX_SAMPLING_RATES ||
+                    channelMasks.size() > AUDIO_PORT_MAX_CHANNEL_MASKS ||
+                    port->num_audio_profiles >= AUDIO_PORT_MAX_AUDIO_PROFILES) {
+                ALOGE("%s: bailing out: cannot export profiles to port config", __func__);
+                break;
+            }
+
+            auto& dstProfile = port->audio_profiles[port->num_audio_profiles++];
+            dstProfile.format = profile->getFormat();
+            dstProfile.num_sample_rates = sampleRates.size();
+            std::copy(sampleRates.begin(), sampleRates.end(),
+                    std::begin(dstProfile.sample_rates));
+            dstProfile.num_channel_masks = channelMasks.size();
+            std::copy(channelMasks.begin(), channelMasks.end(),
+                    std::begin(dstProfile.channel_masks));
+            dstProfile.encapsulation_type = profile->getEncapsulationType();
+        }
+    }
+
+    port->num_extra_audio_descriptors = 0;
+    for (const auto& desc : mExtraAudioDescriptors) {
+        if (port->num_extra_audio_descriptors >= AUDIO_PORT_MAX_EXTRA_AUDIO_DESCRIPTORS) {
+            ALOGE("%s: bailing out: cannot export extra audio descriptor to port config", __func__);
+            return;
+        }
+
+        auto convertedResult = aidl2legacy_ExtraAudioDescriptor_audio_extra_audio_descriptor(desc);
+        if (!convertedResult.ok()) {
+            ALOGE("%s: failed to convert extra audio descriptor", __func__);
+            continue;
+        }
+        port->extra_audio_descriptors[port->num_extra_audio_descriptors++] =
+                std::move(convertedResult.value());
     }
 }
 
@@ -88,6 +155,22 @@ void AudioPort::dump(std::string *dst, int spaces, bool verbose) const {
         std::string profilesStr;
         mProfiles.dump(&profilesStr, spaces);
         dst->append(profilesStr);
+        if (!mExtraAudioDescriptors.empty()) {
+            dst->append(base::StringPrintf("%*s- extra audio descriptors: \n", spaces, ""));
+            const int eadSpaces = spaces + 4;
+            const int descSpaces = eadSpaces + 4;
+            for (size_t i = 0; i < mExtraAudioDescriptors.size(); i++) {
+                dst->append(
+                        base::StringPrintf("%*s extra audio descriptor %zu:\n", eadSpaces, "", i));
+                dst->append(base::StringPrintf(
+                    "%*s- standard: %u\n", descSpaces, "", mExtraAudioDescriptors[i].standard));
+                dst->append(base::StringPrintf("%*s- descriptor:", descSpaces, ""));
+                for (auto v : mExtraAudioDescriptors[i].audioDescriptor) {
+                    dst->append(base::StringPrintf(" %02x", v));
+                }
+                dst->append("\n");
+            }
+        }
 
         if (mGains.size() != 0) {
             dst->append(base::StringPrintf("%*s- gains:\n", spaces, ""));
@@ -112,37 +195,41 @@ bool AudioPort::equals(const sp<AudioPort> &other) const
            mName.compare(other->getName()) == 0 &&
            mType == other->getType() &&
            mRole == other->getRole() &&
-           mProfiles.equals(other->getAudioProfiles());
+           mProfiles.equals(other->getAudioProfiles()) &&
+           mExtraAudioDescriptors == other->getExtraAudioDescriptors();
 }
 
 status_t AudioPort::writeToParcel(Parcel *parcel) const
 {
-    status_t status = NO_ERROR;
-    if ((status = parcel->writeUtf8AsUtf16(mName)) != NO_ERROR) return status;
-    if ((status = parcel->writeUint32(mType)) != NO_ERROR) return status;
-    if ((status = parcel->writeUint32(mRole)) != NO_ERROR) return status;
-    if ((status = parcel->writeParcelable(mProfiles)) != NO_ERROR) return status;
-    if ((status = parcel->writeParcelable(mGains)) != NO_ERROR) return status;
-    return status;
+    media::AudioPort parcelable;
+    return writeToParcelable(&parcelable)
+        ?: parcelable.writeToParcel(parcel);
 }
 
-status_t AudioPort::readFromParcel(const Parcel *parcel)
-{
-    status_t status = NO_ERROR;
-    if ((status = parcel->readUtf8FromUtf16(&mName)) != NO_ERROR) return status;
-    static_assert(sizeof(mType) == sizeof(uint32_t));
-    if ((status = parcel->readUint32(reinterpret_cast<uint32_t*>(&mType))) != NO_ERROR) {
-        return status;
-    }
-    static_assert(sizeof(mRole) == sizeof(uint32_t));
-    if ((status = parcel->readUint32(reinterpret_cast<uint32_t*>(&mRole))) != NO_ERROR) {
-        return status;
-    }
-    mProfiles.clear();
-    if ((status = parcel->readParcelable(&mProfiles)) != NO_ERROR) return status;
-    mGains.clear();
-    if ((status = parcel->readParcelable(&mGains)) != NO_ERROR) return status;
-    return status;
+status_t AudioPort::writeToParcelable(media::AudioPort* parcelable) const {
+    parcelable->name = mName;
+    parcelable->type = VALUE_OR_RETURN_STATUS(legacy2aidl_audio_port_type_t_AudioPortType(mType));
+    parcelable->role = VALUE_OR_RETURN_STATUS(legacy2aidl_audio_port_role_t_AudioPortRole(mRole));
+    parcelable->profiles = VALUE_OR_RETURN_STATUS(legacy2aidl_AudioProfileVector(mProfiles));
+    parcelable->extraAudioDescriptors = mExtraAudioDescriptors;
+    parcelable->gains = VALUE_OR_RETURN_STATUS(legacy2aidl_AudioGains(mGains));
+    return OK;
+}
+
+status_t AudioPort::readFromParcel(const Parcel *parcel) {
+    media::AudioPort parcelable;
+    return parcelable.readFromParcel(parcel)
+        ?: readFromParcelable(parcelable);
+}
+
+status_t AudioPort::readFromParcelable(const media::AudioPort& parcelable) {
+    mName = parcelable.name;
+    mType = VALUE_OR_RETURN_STATUS(aidl2legacy_AudioPortType_audio_port_type_t(parcelable.type));
+    mRole = VALUE_OR_RETURN_STATUS(aidl2legacy_AudioPortRole_audio_port_role_t(parcelable.role));
+    mProfiles = VALUE_OR_RETURN_STATUS(aidl2legacy_AudioProfileVector(parcelable.profiles));
+    mExtraAudioDescriptors = parcelable.extraAudioDescriptors;
+    mGains = VALUE_OR_RETURN_STATUS(aidl2legacy_AudioGains(parcelable.gains));
+    return OK;
 }
 
 // --- AudioPortConfig class implementation
@@ -243,50 +330,56 @@ bool AudioPortConfig::equals(const sp<AudioPortConfig> &other) const
            mGain.ramp_duration_ms == other->mGain.ramp_duration_ms;
 }
 
-status_t AudioPortConfig::writeToParcel(Parcel *parcel) const
-{
-    status_t status = NO_ERROR;
-    if ((status = parcel->writeUint32(mSamplingRate)) != NO_ERROR) return status;
-    if ((status = parcel->writeUint32(mFormat)) != NO_ERROR) return status;
-    if ((status = parcel->writeUint32(mChannelMask)) != NO_ERROR) return status;
-    if ((status = parcel->writeInt32(mId)) != NO_ERROR) return status;
-    // Write mGain to parcel.
-    if ((status = parcel->writeInt32(mGain.index)) != NO_ERROR) return status;
-    if ((status = parcel->writeUint32(mGain.mode)) != NO_ERROR) return status;
-    if ((status = parcel->writeUint32(mGain.channel_mask)) != NO_ERROR) return status;
-    if ((status = parcel->writeUint32(mGain.ramp_duration_ms)) != NO_ERROR) return status;
-    std::vector<int> values(std::begin(mGain.values), std::end(mGain.values));
-    if ((status = parcel->writeInt32Vector(values)) != NO_ERROR) return status;
-    return status;
+status_t AudioPortConfig::writeToParcel(Parcel *parcel) const {
+    media::AudioPortConfig parcelable;
+    return writeToParcelable(&parcelable)
+        ?: parcelable.writeToParcel(parcel);
 }
 
-status_t AudioPortConfig::readFromParcel(const Parcel *parcel)
-{
-    status_t status = NO_ERROR;
-    if ((status = parcel->readUint32(&mSamplingRate)) != NO_ERROR) return status;
-    static_assert(sizeof(mFormat) == sizeof(uint32_t));
-    if ((status = parcel->readUint32(reinterpret_cast<uint32_t*>(&mFormat))) != NO_ERROR) {
-        return status;
-    }
-    uint32_t rawChannelMask;
-    if ((status = parcel->readUint32(&rawChannelMask)) != NO_ERROR) return status;
-    mChannelMask = static_cast<audio_channel_mask_t>(rawChannelMask);
-    if ((status = parcel->readInt32(&mId)) != NO_ERROR) return status;
-    // Read mGain from parcel.
-    if ((status = parcel->readInt32(&mGain.index)) != NO_ERROR) return status;
-    uint32_t rawGainMode;
-    if ((status = parcel->readUint32(&rawGainMode)) != NO_ERROR) return status;
-    mGain.mode = static_cast<audio_gain_mode_t>(rawGainMode);
-    if ((status = parcel->readUint32(&rawChannelMask)) != NO_ERROR) return status;
-    mGain.channel_mask = static_cast<audio_channel_mask_t>(rawChannelMask);
-    if ((status = parcel->readUint32(&mGain.ramp_duration_ms)) != NO_ERROR) return status;
-    std::vector<int> values;
-    if ((status = parcel->readInt32Vector(&values)) != NO_ERROR) return status;
-    if (values.size() != std::size(mGain.values)) {
+status_t AudioPortConfig::writeToParcelable(media::AudioPortConfig* parcelable) const {
+    parcelable->sampleRate = VALUE_OR_RETURN_STATUS(convertIntegral<int32_t>(mSamplingRate));
+    parcelable->format = VALUE_OR_RETURN_STATUS(legacy2aidl_audio_format_t_AudioFormat(mFormat));
+    parcelable->channelMask = VALUE_OR_RETURN_STATUS(
+            legacy2aidl_audio_channel_mask_t_int32_t(mChannelMask));
+    parcelable->id = VALUE_OR_RETURN_STATUS(legacy2aidl_audio_port_handle_t_int32_t(mId));
+    parcelable->gain.index = VALUE_OR_RETURN_STATUS(convertIntegral<int32_t>(mGain.index));
+    parcelable->gain.mode = VALUE_OR_RETURN_STATUS(
+            legacy2aidl_audio_gain_mode_t_int32_t_mask(mGain.mode));
+    parcelable->gain.channelMask = VALUE_OR_RETURN_STATUS(
+            legacy2aidl_audio_channel_mask_t_int32_t(mGain.channel_mask));
+    parcelable->gain.rampDurationMs = VALUE_OR_RETURN_STATUS(
+            convertIntegral<int32_t>(mGain.ramp_duration_ms));
+    parcelable->gain.values = VALUE_OR_RETURN_STATUS(convertContainer<std::vector<int32_t>>(
+            mGain.values, convertIntegral<int32_t, int>));
+    return OK;
+}
+
+status_t AudioPortConfig::readFromParcel(const Parcel *parcel) {
+    media::AudioPortConfig parcelable;
+    return parcelable.readFromParcel(parcel)
+        ?: readFromParcelable(parcelable);
+}
+
+status_t AudioPortConfig::readFromParcelable(const media::AudioPortConfig& parcelable) {
+    mSamplingRate = VALUE_OR_RETURN_STATUS(convertIntegral<unsigned int>(parcelable.sampleRate));
+    mFormat = VALUE_OR_RETURN_STATUS(aidl2legacy_AudioFormat_audio_format_t(parcelable.format));
+    mChannelMask = VALUE_OR_RETURN_STATUS(
+            aidl2legacy_int32_t_audio_channel_mask_t(parcelable.channelMask));
+    mId = VALUE_OR_RETURN_STATUS(aidl2legacy_int32_t_audio_port_handle_t(parcelable.id));
+    mGain.index = VALUE_OR_RETURN_STATUS(convertIntegral<int>(parcelable.gain.index));
+    mGain.mode = VALUE_OR_RETURN_STATUS(
+            aidl2legacy_int32_t_audio_gain_mode_t_mask(parcelable.gain.mode));
+    mGain.channel_mask = VALUE_OR_RETURN_STATUS(
+            aidl2legacy_int32_t_audio_channel_mask_t(parcelable.gain.channelMask));
+    mGain.ramp_duration_ms = VALUE_OR_RETURN_STATUS(
+            convertIntegral<unsigned int>(parcelable.gain.rampDurationMs));
+    if (parcelable.gain.values.size() > std::size(mGain.values)) {
         return BAD_VALUE;
     }
-    std::copy(values.begin(), values.end(), mGain.values);
-    return status;
+    for (size_t i = 0; i < parcelable.gain.values.size(); ++i) {
+        mGain.values[i] = VALUE_OR_RETURN_STATUS(convertIntegral<int>(parcelable.gain.values[i]));
+    }
+    return OK;
 }
 
 } // namespace android

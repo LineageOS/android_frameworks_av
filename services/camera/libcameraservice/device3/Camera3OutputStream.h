@@ -17,6 +17,7 @@
 #ifndef ANDROID_SERVERS_CAMERA3_OUTPUT_STREAM_H
 #define ANDROID_SERVERS_CAMERA3_OUTPUT_STREAM_H
 
+#include <mutex>
 #include <utils/RefBase.h>
 #include <gui/IProducerListener.h>
 #include <gui/Surface.h>
@@ -47,6 +48,7 @@ struct StreamInfo {
     uint64_t combinedUsage;
     size_t totalBufferCount;
     bool isConfigured;
+    bool isMultiRes;
     explicit StreamInfo(int id = CAMERA3_STREAM_ID_INVALID,
             int setId = CAMERA3_STREAM_SET_ID_INVALID,
             uint32_t w = 0,
@@ -55,7 +57,8 @@ struct StreamInfo {
             android_dataspace ds = HAL_DATASPACE_UNKNOWN,
             uint64_t usage = 0,
             size_t bufferCount = 0,
-            bool configured = false) :
+            bool configured = false,
+            bool multiRes = false) :
                 streamId(id),
                 streamSetId(setId),
                 width(w),
@@ -64,7 +67,8 @@ struct StreamInfo {
                 dataSpace(ds),
                 combinedUsage(usage),
                 totalBufferCount(bufferCount),
-                isConfigured(configured){}
+                isConfigured(configured),
+                isMultiRes(multiRes) {}
 };
 
 /**
@@ -81,10 +85,10 @@ class Camera3OutputStream :
      */
     Camera3OutputStream(int id, sp<Surface> consumer,
             uint32_t width, uint32_t height, int format,
-            android_dataspace dataSpace, camera3_stream_rotation_t rotation,
+            android_dataspace dataSpace, camera_stream_rotation_t rotation,
             nsecs_t timestampOffset, const String8& physicalCameraId,
-            int setId = CAMERA3_STREAM_SET_ID_INVALID);
-
+            const std::unordered_set<int32_t> &sensorPixelModesUsed,
+            int setId = CAMERA3_STREAM_SET_ID_INVALID, bool isMultiResolution = false);
     /**
      * Set up a stream for formats that have a variable buffer size for the same
      * dimensions, such as compressed JPEG.
@@ -93,10 +97,10 @@ class Camera3OutputStream :
      */
     Camera3OutputStream(int id, sp<Surface> consumer,
             uint32_t width, uint32_t height, size_t maxSize, int format,
-            android_dataspace dataSpace, camera3_stream_rotation_t rotation,
+            android_dataspace dataSpace, camera_stream_rotation_t rotation,
             nsecs_t timestampOffset, const String8& physicalCameraId,
-            int setId = CAMERA3_STREAM_SET_ID_INVALID);
-
+            const std::unordered_set<int32_t> &sensorPixelModesUsed,
+            int setId = CAMERA3_STREAM_SET_ID_INVALID, bool isMultiResolution = false);
     /**
      * Set up a stream with deferred consumer for formats that have 2 dimensions, such as
      * RAW and YUV. The consumer must be set before using this stream for output. A valid
@@ -104,9 +108,10 @@ class Camera3OutputStream :
      */
     Camera3OutputStream(int id, uint32_t width, uint32_t height, int format,
             uint64_t consumerUsage, android_dataspace dataSpace,
-            camera3_stream_rotation_t rotation, nsecs_t timestampOffset,
+            camera_stream_rotation_t rotation, nsecs_t timestampOffset,
             const String8& physicalCameraId,
-            int setId = CAMERA3_STREAM_SET_ID_INVALID);
+            const std::unordered_set<int32_t> &sensorPixelModesUsed,
+            int setId = CAMERA3_STREAM_SET_ID_INVALID, bool isMultiResolution = false);
 
     virtual ~Camera3OutputStream();
 
@@ -206,23 +211,39 @@ class Camera3OutputStream :
             KeyedVector<sp<Surface>, size_t> *outputMap/*out*/);
 
     /**
+     * Set the batch size for buffer operations. The output stream will request
+     * buffers from buffer queue on a batch basis. Currently only video streams
+     * are allowed to set the batch size. Also if the stream is managed by
+     * buffer manager (Surface group in Java API) then batching is also not
+     * supported. Changing batch size on the fly while there is already batched
+     * buffers in the stream is also not supported.
+     * If the batch size is larger than the max dequeue count set
+     * by the camera HAL, the batch size will be set to the max dequeue count
+     * instead.
+     */
+    virtual status_t setBatchSize(size_t batchSize = 1) override;
+
+    /**
      * Apply ZSL related consumer usage quirk.
      */
     static void applyZSLUsageQuirk(int format, uint64_t *consumerUsage /*inout*/);
 
+    void setImageDumpMask(int mask) { mImageDumpMask = mask; }
+
   protected:
-    Camera3OutputStream(int id, camera3_stream_type_t type,
+    Camera3OutputStream(int id, camera_stream_type_t type,
             uint32_t width, uint32_t height, int format,
-            android_dataspace dataSpace, camera3_stream_rotation_t rotation,
+            android_dataspace dataSpace, camera_stream_rotation_t rotation,
             const String8& physicalCameraId,
+            const std::unordered_set<int32_t> &sensorPixelModesUsed,
             uint64_t consumerUsage = 0, nsecs_t timestampOffset = 0,
-            int setId = CAMERA3_STREAM_SET_ID_INVALID);
+            int setId = CAMERA3_STREAM_SET_ID_INVALID, bool isMultiResolution = false);
 
     /**
      * Note that we release the lock briefly in this function
      */
     virtual status_t returnBufferCheckedLocked(
-            const camera3_stream_buffer &buffer,
+            const camera_stream_buffer &buffer,
             nsecs_t timestamp,
             bool output,
             const std::vector<size_t>& surface_ids,
@@ -290,14 +311,27 @@ class Camera3OutputStream :
     // Whether to drop valid buffers.
     bool mDropBuffers;
 
+
+
+    // The batch size for buffer operation
+    std::atomic_size_t mBatchSize = 1;
+
+    // Protecting batch states below, must be acquired after mLock
+    std::mutex mBatchLock;
+    // Prefetched buffers (ready to be handed to client)
+    std::vector<Surface::BatchBuffer> mBatchedBuffers;
+    // ---- End of mBatchLock protected scope ----
+
     /**
      * Internal Camera3Stream interface
      */
-    virtual status_t getBufferLocked(camera3_stream_buffer *buffer,
+    virtual status_t getBufferLocked(camera_stream_buffer *buffer,
             const std::vector<size_t>& surface_ids);
 
+    virtual status_t getBuffersLocked(/*out*/std::vector<OutstandingBuffer>* buffers) override;
+
     virtual status_t returnBufferLocked(
-            const camera3_stream_buffer &buffer,
+            const camera_stream_buffer &buffer,
             nsecs_t timestamp, const std::vector<size_t>& surface_ids);
 
     virtual status_t queueBufferToConsumer(sp<ANativeWindow>& consumer,
@@ -325,8 +359,15 @@ class Camera3OutputStream :
     // STATE_ABANDONED
     static bool shouldLogError(status_t res, StreamState state);
 
+    // Dump images to disk before returning to consumer
+    void dumpImageToDisk(nsecs_t timestamp, ANativeWindowBuffer* anwBuffer, int fence);
+
+    void returnPrefetchedBuffersLocked();
+
     static const int32_t kDequeueLatencyBinSize = 5; // in ms
     CameraLatencyHistogram mDequeueBufferLatency;
+
+    int mImageDumpMask = 0;
 
 }; // class Camera3OutputStream
 

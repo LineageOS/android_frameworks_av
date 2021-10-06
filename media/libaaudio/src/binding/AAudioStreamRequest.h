@@ -20,36 +20,28 @@
 #include <stdint.h>
 
 #include <aaudio/AAudio.h>
-#include <binder/Parcel.h>
-#include <binder/Parcelable.h>
+#include <aaudio/StreamRequest.h>
 
 #include "binding/AAudioStreamConfiguration.h"
-
-using android::status_t;
-using android::Parcel;
-using android::Parcelable;
+#include <android/content/AttributionSourceState.h>
 
 namespace aaudio {
 
-class AAudioStreamRequest : public Parcelable {
+using android::content::AttributionSourceState;
+
+class AAudioStreamRequest {
 public:
-    AAudioStreamRequest();
-    virtual ~AAudioStreamRequest();
+    AAudioStreamRequest() = default;
 
-    uid_t getUserId() const {
-        return mUserId;
+    // Construct based on a parcelable representation.
+    explicit AAudioStreamRequest(const StreamRequest& parcelable);
+
+    const AttributionSourceState &getAttributionSource() const {
+        return mAttributionSource;
     }
 
-    void setUserId(uid_t userId) {
-        mUserId = userId;
-    }
-
-    pid_t getProcessId() const {
-        return mProcessId;
-    }
-
-    void setProcessId(pid_t processId) {
-        mProcessId = processId;
+    void setAttributionSource(const AttributionSourceState &attributionSource) {
+        mAttributionSource = attributionSource;
     }
 
     bool isSharingModeMatchRequired() const {
@@ -76,18 +68,16 @@ public:
         mInService = inService;
     }
 
-    virtual status_t writeToParcel(Parcel* parcel) const override;
-
-    virtual status_t readFromParcel(const Parcel* parcel) override;
-
     aaudio_result_t validate() const;
 
     void dump() const;
 
-protected:
+    // Extract a parcelable representation of this object.
+    StreamRequest parcelable() const;
+
+private:
     AAudioStreamConfiguration  mConfiguration;
-    uid_t                      mUserId = (uid_t) -1;
-    pid_t                      mProcessId = (pid_t) -1;
+    AttributionSourceState mAttributionSource;
     bool                       mSharingModeMatchRequired = false;
     bool                       mInService = false; // Stream opened by AAudioservice
 };

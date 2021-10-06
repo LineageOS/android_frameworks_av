@@ -121,6 +121,24 @@ public:
 
     size_t getAudioPortListUpdateCount() const { return mAudioPortListUpdateCount; }
 
+    virtual void addSupportedFormat(audio_format_t /* format */) {}
+
+    void onRoutingUpdated() override {
+        mRoutingUpdatedUpdateCount++;
+    }
+
+    void resetRoutingUpdatedCounter() {
+        mRoutingUpdatedUpdateCount = 0;
+    }
+
+    size_t getRoutingUpdatedCounter() const {
+        return mRoutingUpdatedUpdateCount; }
+
+    status_t updateSecondaryOutputs(
+            const TrackSecondaryOutputsMap& trackSecondaryOutputs __unused) override {
+        return NO_ERROR;
+    }
+
 private:
     audio_module_handle_t mNextModuleHandle = AUDIO_MODULE_HANDLE_NONE + 1;
     audio_io_handle_t mNextIoHandle = AUDIO_IO_HANDLE_NONE + 1;
@@ -128,6 +146,7 @@ private:
     std::map<audio_patch_handle_t, struct audio_patch> mActivePatches;
     std::set<std::string> mAllowedModuleNames;
     size_t mAudioPortListUpdateCount = 0;
+    size_t mRoutingUpdatedUpdateCount = 0;
 };
 
 } // namespace android

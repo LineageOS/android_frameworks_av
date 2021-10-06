@@ -50,8 +50,10 @@ public:
     // CompositeStream overrides
     status_t createInternalStreams(const std::vector<sp<Surface>>& consumers,
             bool hasDeferredConsumer, uint32_t width, uint32_t height, int format,
-            camera3_stream_rotation_t rotation, int *id, const String8& physicalCameraId,
-            std::vector<int> *surfaceIds, int streamSetId, bool isShared) override;
+            camera_stream_rotation_t rotation, int *id, const String8& physicalCameraId,
+            const std::unordered_set<int32_t> &sensorPixelModesUsed,
+            std::vector<int> *surfaceIds,
+            int streamSetId, bool isShared) override;
     status_t deleteInternalStreams() override;
     status_t configureStream() override;
     status_t insertGbp(SurfaceMap* /*out*/outSurfaceMap, Vector<int32_t>* /*out*/outputStreamIds,
@@ -86,11 +88,17 @@ private:
     };
 
     // Helper methods
-    static void getSupportedDepthSizes(const CameraMetadata& ch,
+    static void getSupportedDepthSizes(const CameraMetadata& ch, bool maxResolution,
             std::vector<std::tuple<size_t, size_t>>* depthSizes /*out*/);
     static status_t getMatchingDepthSize(size_t width, size_t height,
             const std::vector<std::tuple<size_t, size_t>>& supporedDepthSizes,
             size_t *depthWidth /*out*/, size_t *depthHeight /*out*/);
+    static status_t checkAndGetMatchingDepthSize(size_t width, size_t height,
+        const std::vector<std::tuple<size_t, size_t>> &depthSizes,
+        const std::vector<std::tuple<size_t, size_t>> &depthSizesMaximumResolution,
+        const std::unordered_set<int32_t> &sensorPixelModesUsed,
+        size_t *depthWidth /*out*/, size_t *depthHeight /*out*/);
+
 
     // Dynamic depth processing
     status_t encodeGrayscaleJpeg(size_t width, size_t height, uint8_t *in, void *out,
@@ -124,8 +132,14 @@ private:
     sp<Surface>          mDepthSurface, mBlobSurface, mOutputSurface;
     sp<ProducerListener> mProducerListener;
 
-    ssize_t              mMaxJpegSize;
+    ssize_t              mMaxJpegBufferSize;
+    ssize_t              mUHRMaxJpegBufferSize;
+
+    camera3::Size        mDefaultMaxJpegSize;
+    camera3::Size        mUHRMaxJpegSize;
+
     std::vector<std::tuple<size_t, size_t>> mSupportedDepthSizes;
+    std::vector<std::tuple<size_t, size_t>> mSupportedDepthSizesMaximumResolution;
     std::vector<float>   mIntrinsicCalibration, mLensDistortion;
     bool                 mIsLogicalCamera;
 

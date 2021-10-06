@@ -44,10 +44,10 @@
 
 __BEGIN_DECLS
 
-// Container for output targets
+/** Container for output targets */
 typedef struct ACameraOutputTargets ACameraOutputTargets;
 
-// Container for a single output target
+/** Container for a single output target */
 typedef struct ACameraOutputTarget ACameraOutputTarget;
 
 /**
@@ -383,10 +383,10 @@ camera_status_t ACaptureRequest_getConstEntry_physicalCamera(
  * Set/change a camera capture control entry with unsigned 8 bits data type for
  * a physical camera backing a logical multi-camera device.
  *
- * <p>Same as ACaptureRequest_setEntry_u8, except that if {@link tag} is contained
+ * <p>Same as ACaptureRequest_setEntry_u8, except that if tag is contained
  * in {@link ACAMERA_REQUEST_AVAILABLE_PHYSICAL_CAMERA_REQUEST_KEYS}, this function
  * sets the entry for a particular physical sub-camera backing the logical multi-camera.
- * If {@link tag} is not contained in
+ * If tag is not contained in
  * {@link ACAMERA_REQUEST_AVAILABLE_PHYSICAL_CAMERA_REQUEST_KEYS}, the key will be ignored
  * by the camera device.</p>
  *
@@ -413,10 +413,10 @@ camera_status_t ACaptureRequest_setEntry_physicalCamera_u8(
  * Set/change a camera capture control entry with signed 32 bits data type for
  * a physical camera of a logical multi-camera device.
  *
- * <p>Same as ACaptureRequest_setEntry_i32, except that if {@link tag} is contained
+ * <p>Same as ACaptureRequest_setEntry_i32, except that if tag is contained
  * in {@link ACAMERA_REQUEST_AVAILABLE_PHYSICAL_CAMERA_REQUEST_KEYS}, this function
  * sets the entry for a particular physical sub-camera backing the logical multi-camera.
- * If {@link tag} is not contained in
+ * If tag is not contained in
  * {@link ACAMERA_REQUEST_AVAILABLE_PHYSICAL_CAMERA_REQUEST_KEYS}, the key will be ignored
  * by the camera device.</p>
  *
@@ -443,10 +443,10 @@ camera_status_t ACaptureRequest_setEntry_physicalCamera_i32(
  * Set/change a camera capture control entry with float data type for
  * a physical camera of a logical multi-camera device.
  *
- * <p>Same as ACaptureRequest_setEntry_float, except that if {@link tag} is contained
+ * <p>Same as ACaptureRequest_setEntry_float, except that if tag is contained
  * in {@link ACAMERA_REQUEST_AVAILABLE_PHYSICAL_CAMERA_REQUEST_KEYS}, this function
  * sets the entry for a particular physical sub-camera backing the logical multi-camera.
- * If {@link tag} is not contained in
+ * If tag is not contained in
  * {@link ACAMERA_REQUEST_AVAILABLE_PHYSICAL_CAMERA_REQUEST_KEYS}, the key will be ignored
  * by the camera device.</p>
  *
@@ -473,10 +473,10 @@ camera_status_t ACaptureRequest_setEntry_physicalCamera_float(
  * Set/change a camera capture control entry with signed 64 bits data type for
  * a physical camera of a logical multi-camera device.
  *
- * <p>Same as ACaptureRequest_setEntry_i64, except that if {@link tag} is contained
+ * <p>Same as ACaptureRequest_setEntry_i64, except that if tag is contained
  * in {@link ACAMERA_REQUEST_AVAILABLE_PHYSICAL_CAMERA_REQUEST_KEYS}, this function
  * sets the entry for a particular physical sub-camera backing the logical multi-camera.
- * If {@link tag} is not contained in
+ * If tag is not contained in
  * {@link ACAMERA_REQUEST_AVAILABLE_PHYSICAL_CAMERA_REQUEST_KEYS}, the key will be ignored
  * by the camera device.</p>
  *
@@ -503,10 +503,10 @@ camera_status_t ACaptureRequest_setEntry_physicalCamera_i64(
  * Set/change a camera capture control entry with double data type for
  * a physical camera of a logical multi-camera device.
  *
- * <p>Same as ACaptureRequest_setEntry_double, except that if {@link tag} is contained
+ * <p>Same as ACaptureRequest_setEntry_double, except that if tag is contained
  * in {@link ACAMERA_REQUEST_AVAILABLE_PHYSICAL_CAMERA_REQUEST_KEYS}, this function
  * sets the entry for a particular physical sub-camera backing the logical multi-camera.
- * If {@link tag} is not contained in
+ * If tag is not contained in
  * {@link ACAMERA_REQUEST_AVAILABLE_PHYSICAL_CAMERA_REQUEST_KEYS}, the key will be ignored
  * by the camera device.</p>
  *
@@ -533,10 +533,10 @@ camera_status_t ACaptureRequest_setEntry_physicalCamera_double(
  * Set/change a camera capture control entry with rational data type for
  * a physical camera of a logical multi-camera device.
  *
- * <p>Same as ACaptureRequest_setEntry_rational, except that if {@link tag} is contained
+ * <p>Same as ACaptureRequest_setEntry_rational, except that if tag is contained
  * in {@link ACAMERA_REQUEST_AVAILABLE_PHYSICAL_CAMERA_REQUEST_KEYS}, this function
  * sets the entry for a particular physical sub-camera backing the logical multi-camera.
- * If {@link tag} is not contained in
+ * If tag is not contained in
  * {@link ACAMERA_REQUEST_AVAILABLE_PHYSICAL_CAMERA_REQUEST_KEYS}, the key will be ignored
  * by the camera device.</p>
  *

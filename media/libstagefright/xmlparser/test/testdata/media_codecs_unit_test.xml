@@ -76,5 +76,17 @@
         <MediaCodec name="test8.encoder" type="audio/opus">
             <Limit name="limit1" max="limit1Max" />
         </MediaCodec>
+        <!-- entry for testing Mapping -->
+        <MediaCodec name="test9.encoder" type="video/avc" >
+            <Mapping kind="sure" name="before" value="after"/>
+        </MediaCodec>
+        <MediaCodec name="test10.encoder" type="video/hevc" >
+            <Mapping kind="fire" name="from" value="to"/>
+        </MediaCodec>
+        <!-- entry for testing Tuning -->
+        <MediaCodec name="test11.encoder" type="video/av01" >
+            <Tuning name="hungry" value="yes"/>
+            <Tuning name="pi" value="3.1415"/>
+        </MediaCodec>
     </Encoders>
 </Included>

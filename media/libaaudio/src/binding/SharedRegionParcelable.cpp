@@ -36,8 +36,18 @@ using android::Parcelable;
 
 using namespace aaudio;
 
-SharedRegionParcelable::SharedRegionParcelable() {}
-SharedRegionParcelable::~SharedRegionParcelable() {}
+SharedRegionParcelable::SharedRegionParcelable(const SharedRegion& parcelable)
+        : mSharedMemoryIndex(parcelable.sharedMemoryIndex),
+          mOffsetInBytes(parcelable.offsetInBytes),
+          mSizeInBytes(parcelable.sizeInBytes) {}
+
+SharedRegion SharedRegionParcelable::parcelable() const {
+    SharedRegion result;
+    result.sharedMemoryIndex = mSharedMemoryIndex;
+    result.offsetInBytes = mOffsetInBytes;
+    result.sizeInBytes = mSizeInBytes;
+    return result;
+}
 
 void SharedRegionParcelable::setup(int32_t sharedMemoryIndex,
                                    int32_t offsetInBytes,
@@ -45,41 +55,6 @@ void SharedRegionParcelable::setup(int32_t sharedMemoryIndex,
     mSharedMemoryIndex = sharedMemoryIndex;
     mOffsetInBytes = offsetInBytes;
     mSizeInBytes = sizeInBytes;
-}
-
-status_t SharedRegionParcelable::writeToParcel(Parcel* parcel) const {
-    status_t status = AAudioConvert_aaudioToAndroidStatus(validate());
-    if (status != NO_ERROR) goto error;
-
-    status = parcel->writeInt32(mSizeInBytes);
-    if (status != NO_ERROR) goto error;
-    if (mSizeInBytes > 0) {
-        status = parcel->writeInt32(mSharedMemoryIndex);
-        if (status != NO_ERROR) goto error;
-        status = parcel->writeInt32(mOffsetInBytes);
-        if (status != NO_ERROR) goto error;
-    }
-    return NO_ERROR;
-
-error:
-    ALOGE("%s returning %d", __func__, status);
-    return status;
-}
-
-status_t SharedRegionParcelable::readFromParcel(const Parcel* parcel) {
-    status_t status = parcel->readInt32(&mSizeInBytes);
-    if (status != NO_ERROR) goto error;
-    if (mSizeInBytes > 0) {
-        status = parcel->readInt32(&mSharedMemoryIndex);
-        if (status != NO_ERROR) goto error;
-        status = parcel->readInt32(&mOffsetInBytes);
-        if (status != NO_ERROR) goto error;
-    }
-    return AAudioConvert_aaudioToAndroidStatus(validate());
-
-error:
-    ALOGE("%s returning %d", __func__, status);
-    return status;
 }
 
 aaudio_result_t SharedRegionParcelable::resolve(SharedMemoryParcelable *memoryParcels,

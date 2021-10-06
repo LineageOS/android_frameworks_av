@@ -40,7 +40,7 @@ using namespace ::android::hardware::audio::effect::CPP_VERSION;
 
 EffectsFactoryHalHidl::EffectsFactoryHalHidl(sp<IEffectsFactory> effectsFactory)
         : ConversionHelperHidl("EffectsFactory") {
-    ALOG_ASSERT(effectsFactory != nullptr, "Provided IDevicesFactory service is NULL");
+    ALOG_ASSERT(effectsFactory != nullptr, "Provided IEffectsFactory service is NULL");
     mEffectsFactory = effectsFactory;
 }
 

@@ -366,6 +366,9 @@ Return<void> ComponentStore::createComponent_1_1(
             mStore->createComponent(name, &c2component));
 
     if (status == Status::OK) {
+#ifndef __ANDROID_APEX__
+        c2component = GetFilterWrapper()->maybeWrapComponent(c2component);
+#endif
         onInterfaceLoaded(c2component->intf());
         component = new Component(c2component, listener, this, pool);
         if (!component) {

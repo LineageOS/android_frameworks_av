@@ -570,12 +570,14 @@ static void searchFrac(
     Word16 corr[],     /* i   : normalized correlation  */
     Word16 flag3,      /* i   : subsample resolution
                                 (3: =1 / 6: =0)         */
-    Flag   *pOverflow
+    Flag   *pOverflow,
+    enum Mode mode
 )
 {
     Word16 i;
     Word16 max;
     Word16 corr_int;
+    Word16 minPitch;
 
     /* Test the fractions around T0 and choose the one which maximizes   */
     /* the interpolated normalized correlation.                          */
@@ -593,14 +595,22 @@ static void searchFrac(
         }
     }
 
+    minPitch = (mode == MR122) ? PIT_MIN_MR122 : PIT_MIN;
     if (flag3 == 0)
     {
         /* Limit the fraction value in the interval [-2,-1,0,1,2,3] */
 
         if (*frac == -3)
         {
-            *frac = 3;
-            (*lag)--;
+            if (*lag > minPitch)
+            {
+                *frac = 3;
+                (*lag)--;
+            }
+            else
+            {
+                *frac = -2;
+            }
         }
     }
     else
@@ -609,13 +619,27 @@ static void searchFrac(
 
         if (*frac == -2)
         {
-            *frac = 1;
-            (*lag)--;
+            if (*lag > minPitch)
+            {
+                *frac = 1;
+                (*lag)--;
+            }
+            else
+            {
+                *frac = -1;
+            }
         }
-        if (*frac == 2)
+        else if (*frac == 2)
         {
-            *frac = -1;
-            (*lag)++;
+            if (*lag < PIT_MAX)
+            {
+                *frac = -1;
+                (*lag)++;
+            }
+            else
+            {
+                *frac = 1;
+            }
         }
     }
 }
@@ -1533,20 +1557,20 @@ Word16 Pitch_fr(         /* o   : pitch period (integer)                    */
 
                 /* normal search in fractions around T0 */
 
-                searchFrac(&lag, &frac, last_frac, corr, flag3, pOverflow);
+                searchFrac(&lag, &frac, last_frac, corr, flag3, pOverflow, mode);
 
             }
             else if (lag == (tmp_lag - 2))
             {
                 /* limit search around T0 to the right side */
                 frac = 0;
-                searchFrac(&lag, &frac, last_frac, corr, flag3, pOverflow);
+                searchFrac(&lag, &frac, last_frac, corr, flag3, pOverflow, mode);
             }
             else if (lag == (tmp_lag + 1))
             {
                 /* limit search around T0 to the left side */
                 last_frac = 0;
-                searchFrac(&lag, &frac, last_frac, corr, flag3, pOverflow);
+                searchFrac(&lag, &frac, last_frac, corr, flag3, pOverflow, mode);
             }
             else
             {
@@ -1556,7 +1580,7 @@ Word16 Pitch_fr(         /* o   : pitch period (integer)                    */
         }
         else
             /* test the fractions around T0 */
-            searchFrac(&lag, &frac, last_frac, corr, flag3, pOverflow);
+            searchFrac(&lag, &frac, last_frac, corr, flag3, pOverflow, mode);
     }
 
     /*-----------------------------------------------------------------------*

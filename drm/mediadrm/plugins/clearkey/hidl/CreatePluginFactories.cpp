@@ -22,7 +22,7 @@
 namespace android {
 namespace hardware {
 namespace drm {
-namespace V1_3 {
+namespace V1_4 {
 namespace clearkey {
 
 extern "C" {
@@ -38,7 +38,7 @@ ICryptoFactory* createCryptoFactory() {
 } // extern "C"
 
 }  // namespace clearkey
-}  // namespace V1_3
+}  // namespace V1_4
 }  // namespace drm
 }  // namespace hardware
 }  // namespace android

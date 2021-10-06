@@ -87,6 +87,9 @@ public:
     virtual int32_t         getGlobalAudioRestriction();
     virtual status_t        setRotateAndCropOverride(uint8_t rotateAndCrop);
 
+    virtual bool            supportsCameraMute();
+    virtual status_t        setCameraMute(bool enabled);
+
     /**
      * Interface used by CameraService
      */
@@ -98,9 +101,11 @@ public:
             const String8& cameraDeviceId,
             int api1CameraId,
             int cameraFacing,
+            int sensorOrientation,
             int clientPid,
             uid_t clientUid,
-            int servicePid);
+            int servicePid,
+            bool overrideForPerfClass);
 
     virtual ~Camera2Client();
 
