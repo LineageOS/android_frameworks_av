@@ -253,6 +253,27 @@ public:
         ASSERT_EQ(0, err);
     }
 
+    // This test assumes the channel mask is invalid.
+    void testInvalidChannelMask(audio_channel_mask_t invalidChannelMask) {
+        reconfig(48000 /* sampleRate */, invalidChannelMask);
+        const int32_t sessionId = 0;
+        const int32_t ioId = 0;
+        int32_t err = AUDIO_EFFECT_LIBRARY_INFO_SYM.create_effect(
+                &downmix_uuid_, sessionId, ioId,  &handle_);
+        ASSERT_EQ(0, err);
+
+        const struct effect_interface_s * const downmixApi = *handle_;
+        int32_t reply = 0;
+        uint32_t replySize = (uint32_t)sizeof(reply);
+        err = (downmixApi->command)(
+                handle_, EFFECT_CMD_SET_CONFIG,
+                sizeof(effect_config_t), &config_, &replySize, &reply);
+        ASSERT_EQ(0, err);
+        ASSERT_NE(0, reply);  // error has occurred.
+        err = AUDIO_EFFECT_LIBRARY_INFO_SYM.release_effect(handle_);
+        ASSERT_EQ(0, err);
+    }
+
 private:
     void reconfig(int sampleRate, audio_channel_mask_t channelMask) {
         config_.inputCfg.accessMode = EFFECT_BUFFER_ACCESS_READ;
@@ -298,6 +319,16 @@ private:
     int outputChannelCount_{};
     int inputChannelCount_{};
 };
+
+TEST(DownmixTestSimple, invalidChannelMask) {
+    // Fill in a dummy test method to use DownmixTest outside of a parameterized test.
+    class DownmixTestComplete : public DownmixTest {
+        void TestBody() override {}
+    } downmixtest;
+
+    constexpr auto INVALID_CHANNEL_MASK = audio_channel_mask_t(1 << 31);
+    downmixtest.testInvalidChannelMask(INVALID_CHANNEL_MASK);
+}
 
 TEST_P(DownmixTest, basic) {
     testBalance(kSampleRates[std::get<0>(GetParam())],
