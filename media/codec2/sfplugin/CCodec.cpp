@@ -1311,8 +1311,8 @@ void CCodec::configure(const sp<AMessage> &msg) {
             }
         }
 
-        // set channel-mask
         if (config->mDomain & Config::IS_AUDIO) {
+            // set channel-mask
             int32_t mask;
             if (msg->findInt32(KEY_CHANNEL_MASK, &mask)) {
                 if (config->mDomain & Config::IS_ENCODER) {
@@ -1320,6 +1320,15 @@ void CCodec::configure(const sp<AMessage> &msg) {
                 } else {
                     config->mOutputFormat->setInt32(KEY_CHANNEL_MASK, mask);
                 }
+            }
+
+            // set PCM encoding
+            int32_t pcmEncoding = kAudioEncodingPcm16bit;
+            msg->findInt32(KEY_PCM_ENCODING, &pcmEncoding);
+            if (encoder) {
+                config->mInputFormat->setInt32("android._config-pcm-encoding", pcmEncoding);
+            } else {
+                config->mOutputFormat->setInt32("android._config-pcm-encoding", pcmEncoding);
             }
         }
 
