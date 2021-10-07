@@ -22,6 +22,7 @@
 #include <android/media/AudioVibratorInfo.h>
 #include <android/media/BnAudioFlingerClient.h>
 #include <android/media/BnAudioPolicyServiceClient.h>
+#include <android/media/AudioSessionInfo.h>
 #include <android/content/AttributionSourceState.h>
 #include <media/AidlConversionUtil.h>
 #include <media/AudioDeviceTypeAddr.h>
@@ -70,6 +71,7 @@ typedef void (*record_config_callback)(int event,
                                        audio_patch_handle_t patchHandle,
                                        audio_source_t source);
 typedef void (*routing_callback)();
+typedef void (*audio_session_callback)(const media::AudioSessionInfo& session, bool added);
 
 class IAudioFlinger;
 class String8;
@@ -147,6 +149,7 @@ public:
     static void setDynPolicyCallback(dynamic_policy_callback cb);
     static void setRecordConfigCallback(record_config_callback);
     static void setRoutingCallback(routing_callback cb);
+    static void setAudioSessionCallback(audio_session_callback cb);
 
     // Sets the binder to use for accessing the AudioFlinger service. This enables the system server
     // to grant specific isolated processes access to the audio system. Currently used only for the
@@ -509,6 +512,9 @@ public:
     static status_t registerSoundTriggerCaptureStateListener(
             const sp<CaptureStateListener>& listener);
 
+    static status_t listAudioSessions(audio_stream_type_t stream,
+            std::vector<media::AudioSessionInfo> *sessions);
+
     // ----------------------------------------------------------------------------
 
     class AudioVolumeGroupCallback : public RefBase
@@ -647,6 +653,7 @@ private:
                 int32_t patchHandle,
                 media::AudioSourceType source) override;
         binder::Status onRoutingUpdated();
+        virtual void onOutputSessionEffectsUpdate(const media::AudioSessionInfo& info, bool added);
 
     private:
         Mutex                               mLock;
@@ -674,6 +681,7 @@ private:
     static dynamic_policy_callback gDynPolicyCallback;
     static record_config_callback gRecordConfigCallback;
     static routing_callback gRoutingCallback;
+    static audio_session_callback gAudioSessionCallback;
 
     static size_t gInBuffSize;
     // previous parameters for recording buffer size queries

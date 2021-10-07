@@ -61,6 +61,7 @@ Mutex AudioSystem::gLockAPS;
 sp<IAudioFlinger> AudioSystem::gAudioFlinger;
 sp<AudioSystem::AudioFlingerClient> AudioSystem::gAudioFlingerClient;
 std::set<audio_error_callback> AudioSystem::gAudioErrorCallbacks;
+audio_session_callback AudioSystem::gAudioSessionCallback = NULL;
 dynamic_policy_callback AudioSystem::gDynPolicyCallback = NULL;
 record_config_callback AudioSystem::gRecordConfigCallback = NULL;
 routing_callback AudioSystem::gRoutingCallback = NULL;
@@ -772,6 +773,11 @@ status_t AudioSystem::AudioFlingerClient::removeAudioDeviceCallback(
 /*static*/ void AudioSystem::setRoutingCallback(routing_callback cb) {
     Mutex::Autolock _l(gLock);
     gRoutingCallback = cb;
+}
+
+/*static*/ void AudioSystem::setAudioSessionCallback(audio_session_callback cb) {
+    Mutex::Autolock _l(gLock);
+    gAudioSessionCallback = cb;
 }
 
 // client singleton for AudioPolicyService binder interface
@@ -2458,6 +2464,36 @@ Status AudioSystem::AudioPolicyServiceClient::onRoutingUpdated() {
         cb();
     }
     return Status::ok();
+}
+
+status_t AudioSystem::listAudioSessions(audio_stream_type_t stream,
+                                        std::vector<media::AudioSessionInfo> *sessions)
+{
+    const sp<IAudioPolicyService>& aps =
+            AudioSystem::get_audio_policy_service();
+    if (aps == 0) {
+        return PERMISSION_DENIED;
+    }
+    media::AudioStreamType streamAidl = VALUE_OR_RETURN_STATUS(
+                legacy2aidl_audio_stream_type_t_AudioStreamType(stream));
+    RETURN_STATUS_IF_ERROR(statusTFromBinderStatus(aps->listAudioSessions(streamAidl, sessions)));
+    return NO_ERROR;
+}
+
+void AudioSystem::AudioPolicyServiceClient::onOutputSessionEffectsUpdate(
+        const media::AudioSessionInfo& info, bool added)
+{
+    ALOGV("AudioPolicyServiceClient::onOutputSessionEffectsUpdate(%d, %d, %d)",
+            info.stream, info.session, added);
+    audio_session_callback cb = NULL;
+    {
+        Mutex::Autolock _l(AudioSystem::gLock);
+        cb = gAudioSessionCallback;
+    }
+
+    if (cb != NULL) {
+        cb(info, added);
+    }
 }
 
 void AudioSystem::AudioPolicyServiceClient::binderDied(const wp<IBinder>& who __unused) {
