@@ -18,9 +18,11 @@
 
 #define CCODEC_BUFFERS_H_
 
+#include <optional>
 #include <string>
 
 #include <C2Config.h>
+#include <DataConverter.h>
 #include <media/stagefright/foundation/AMessage.h>
 #include <media/MediaCodecBuffer.h>
 
@@ -382,6 +384,14 @@ protected:
      */
     void submit(const sp<MediaCodecBuffer> &buffer);
 
+    /**
+     * Apply DataConverter from |src| to |*dst| if needed. If |dst| is nullptr,
+     * a new buffer is allocated.
+     *
+     * Returns true if conversion was needed and executed; false otherwise.
+     */
+    bool convert(const std::shared_ptr<C2Buffer> &src, sp<Codec2Buffer> *dst);
+
 private:
     // SkipCutBuffer
     int32_t mDelay;
@@ -390,6 +400,12 @@ private:
     int32_t mChannelCount;
 
     void setSkipCutBuffer(int32_t skip, int32_t cut);
+
+    // DataConverter
+    sp<DataConverter> mDataConverter;
+    sp<AMessage> mFormatWithConverter;
+    std::optional<int32_t> mSrcEncoding;
+    std::optional<int32_t> mDstEncoding;
 
     // Output stash
 
