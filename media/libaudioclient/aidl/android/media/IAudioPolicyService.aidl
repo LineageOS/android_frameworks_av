@@ -38,6 +38,7 @@ import android.media.AudioPortConfig;
 import android.media.AudioPortRole;
 import android.media.AudioPortType;
 import android.media.AudioProductStrategy;
+import android.media.AudioSessionInfo;
 import android.media.AudioSourceType;
 import android.media.AudioStreamType;
 import android.media.AudioUsage;
@@ -348,4 +349,6 @@ interface IAudioPolicyService {
                                                     DeviceRole role);
 
     boolean registerSoundTriggerCaptureStateListener(ICaptureStateListener listener);
+
+    void listAudioSessions(AudioStreamType stream, out AudioSessionInfo[] sessions);
 }

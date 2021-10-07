@@ -2108,6 +2108,24 @@ Status AudioPolicyService::registerSoundTriggerCaptureStateListener(
     return Status::ok();
 }
 
+Status AudioPolicyService::listAudioSessions(
+         media::AudioStreamType /*stream*/,
+         std::vector<media::AudioSessionInfo>* /*sessions*/) {
+    sp<AudioPolicyEffects> audioPolicyEffects;
+    {
+        Mutex::Autolock _l(mLock);
+        if (mAudioPolicyManager == nullptr) {
+            return binderStatusFromStatusT(NO_INIT);
+        }
+        audioPolicyEffects = mAudioPolicyEffects;
+    }
+    if (audioPolicyEffects == nullptr) {
+        return binderStatusFromStatusT(NO_INIT);
+    }
+    //audioPolicyEffects->listAudioSessions(stream, sessions);
+    return Status::ok();
+}
+
 Status AudioPolicyService::setDevicesRoleForCapturePreset(
         media::AudioSourceType audioSourceAidl,
         media::DeviceRole roleAidl,

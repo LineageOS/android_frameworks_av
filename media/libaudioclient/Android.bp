@@ -49,6 +49,7 @@ cc_library_shared {
         "PolicyAidlConversion.cpp"
     ],
     shared_libs: [
+        "audioclient-sessioninfo-aidl-cpp",
         "audioclient-types-aidl-cpp",
         "audioflinger-aidl-cpp",
         "audiopolicy-aidl-cpp",
@@ -69,6 +70,7 @@ cc_library_shared {
     include_dirs: ["system/media/audio_utils/include"],
     export_include_dirs: ["include"],
     export_shared_lib_headers: [
+        "audioclient-sessioninfo-aidl-cpp",
         "audioclient-types-aidl-cpp",
         "audioflinger-aidl-cpp",
         "audiopolicy-aidl-cpp",
@@ -294,6 +296,27 @@ aidl_interface {
 }
 
 aidl_interface {
+    name: "audioclient-sessioninfo-aidl",
+    unstable: true,
+    host_supported: true,
+    vendor_available: true,
+    double_loadable: true,
+    local_include_dir: "aidl",
+    srcs: [
+        "aidl/android/media/AudioSessionInfo.aidl",
+    ],
+    backend: {
+        cpp: {
+            min_sdk_version: "29",
+            apex_available: [
+                "//apex_available:platform",
+                "com.android.media",
+            ],
+        },
+    },
+}
+
+aidl_interface {
     name: "audioclient-types-aidl",
     unstable: true,
     host_supported: true,
@@ -354,6 +377,7 @@ aidl_interface {
     ],
     imports: [
         "audio_common-aidl",
+        "audioclient-sessioninfo-aidl",
         "framework-permission-aidl",
     ],
     backend: {
@@ -466,6 +490,7 @@ aidl_interface {
     ],
     imports: [
         "audio_common-aidl",
+        "audioclient-sessioninfo-aidl",
         "audioclient-types-aidl",
         "audiopolicy-types-aidl",
         "capture_state_listener-aidl",
