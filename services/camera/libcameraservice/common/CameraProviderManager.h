@@ -40,7 +40,6 @@
 #include <camera/VendorTagDescriptor.h>
 
 namespace android {
-
 /**
  * The vendor tag descriptor class that takes HIDL vendor tag information as
  * input. Not part of VendorTagDescriptor class because that class is used
@@ -440,6 +439,15 @@ private:
         std::vector<std::unordered_set<std::string>> getConcurrentCameraIdCombinations();
 
         /**
+         * Notify 'DeviceInfo' instanced about top-level device physical state changes
+         *
+         * Note that 'mInterfaceMutex' should be held when calling this method.
+         */
+        void notifyDeviceInfoStateChangeLocked(
+               hardware::hidl_bitfield<hardware::camera::provider::V2_5::DeviceState>
+                   newDeviceState);
+
+        /**
          * Query the camera provider for concurrent stream configuration support
          */
         status_t isConcurrentSessionConfigurationSupported(
@@ -491,6 +499,9 @@ private:
                 return INVALID_OPERATION;
             }
             virtual status_t filterSmallJpegSizes() = 0;
+            virtual void notifyDeviceStateChange(
+                    hardware::hidl_bitfield<hardware::camera::provider::V2_5::DeviceState>
+                        /*newState*/) {}
 
             template<class InterfaceT>
             sp<InterfaceT> startDeviceInterface();
@@ -551,6 +562,9 @@ private:
                     bool *status /*out*/)
                     override;
             virtual status_t filterSmallJpegSizes() override;
+            virtual void notifyDeviceStateChange(
+                    hardware::hidl_bitfield<hardware::camera::provider::V2_5::DeviceState>
+                        newState) override;
 
             DeviceInfo3(const std::string& name, const metadata_vendor_id_t tagId,
                     const std::string &id, uint16_t minorVersion,
@@ -560,6 +574,8 @@ private:
             virtual ~DeviceInfo3();
         private:
             CameraMetadata mCameraCharacteristics;
+            // Map device states to sensor orientations
+            std::unordered_map<int64_t, int32_t> mDeviceStateOrientationMap;
             // A copy of mCameraCharacteristics without performance class
             // override
             std::unique_ptr<CameraMetadata> mCameraCharNoPCOverride;

@@ -919,6 +919,7 @@ class Camera3Device :
 
         status_t setRotateAndCropAutoBehavior(
                 camera_metadata_enum_android_scaler_rotate_and_crop_t rotateAndCropValue);
+        status_t setComposerSurface(bool composerSurfacePresent);
 
         status_t setCameraMute(int32_t muteMode);
 
@@ -1071,6 +1072,7 @@ class Camera3Device :
         uint32_t           mCurrentAfTriggerId;
         uint32_t           mCurrentPreCaptureTriggerId;
         camera_metadata_enum_android_scaler_rotate_and_crop_t mRotateAndCropOverride;
+        bool               mComposerOutput;
         int32_t            mCameraMute; // 0 = no mute, otherwise the TEST_PATTERN_MODE to use
         bool               mCameraMuteChanged;
 
