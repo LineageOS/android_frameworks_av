@@ -113,6 +113,7 @@ cc_binary {
         "libmediametricsservice",
         "libmediautils",
         "libutils",
+        "mediametricsservice-aidl-cpp",
     ],
     header_libs: [
         "libaudioutils_headers",
@@ -155,6 +156,7 @@ cc_library {
     },
 
     shared_libs: [
+        "mediametricsservice-aidl-cpp",
         "libbase", // android logging
         "libbinder",
         "libcutils",
@@ -164,12 +166,17 @@ cc_library {
         "libmediautils",
         "libmemunreachable",
         "libprotobuf-cpp-lite",
+        "libstagefright_foundation",
         "libstatslog",
+        "libstatspull",
+        "libstatssocket",
         "libutils",
         "packagemanager_aidl-cpp",
     ],
 
     export_shared_lib_headers: [
+        "libstatspull",
+        "libstatssocket",
         "packagemanager_aidl-cpp",
     ],
 

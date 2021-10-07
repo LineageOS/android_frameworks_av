@@ -28,6 +28,7 @@ package {
 cc_test{
     name: "Mpeg2tsUnitTest",
     gtest: true,
+    test_suites: ["device-tests"],
 
     srcs: [
         "Mpeg2tsUnitTest.cpp"

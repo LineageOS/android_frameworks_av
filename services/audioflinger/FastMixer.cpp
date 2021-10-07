@@ -48,6 +48,15 @@ namespace android {
 
 /*static*/ const FastMixerState FastMixer::sInitial;
 
+static audio_channel_mask_t getChannelMaskFromCount(size_t count) {
+    const audio_channel_mask_t mask = audio_channel_out_mask_from_count(count);
+    if (mask == AUDIO_CHANNEL_INVALID) {
+        // some counts have no positional masks. TODO: Update this to return index count?
+        return audio_channel_mask_for_index_assignment_from_count(count);
+    }
+    return mask;
+}
+
 FastMixer::FastMixer(audio_io_handle_t parentIoHandle)
     : FastThread("cycle_ms", "load_us"),
     // mFastTrackNames
@@ -79,7 +88,7 @@ FastMixer::FastMixer(audio_io_handle_t parentIoHandle)
     mDummyDumpState = &mDummyFastMixerDumpState;
     // TODO: Add channel mask to NBAIO_Format.
     // We assume that the channel mask must be a valid positional channel mask.
-    mSinkChannelMask = audio_channel_out_mask_from_count(mSinkChannelCount);
+    mSinkChannelMask = getChannelMaskFromCount(mSinkChannelCount);
 
     unsigned i;
     for (i = 0; i < FastMixerState::sMaxFastTracks; ++i) {
@@ -238,7 +247,7 @@ void FastMixer::onStateChange()
             LOG_ALWAYS_FATAL_IF(mSinkChannelCount > AudioMixer::MAX_NUM_CHANNELS);
 
             if (mSinkChannelMask == AUDIO_CHANNEL_NONE) {
-                mSinkChannelMask = audio_channel_out_mask_from_count(mSinkChannelCount);
+                mSinkChannelMask = getChannelMaskFromCount(mSinkChannelCount);
             }
             mAudioChannelCount = mSinkChannelCount - audio_channel_count_from_out_mask(
                     mSinkChannelMask & AUDIO_CHANNEL_HAPTIC_ALL);

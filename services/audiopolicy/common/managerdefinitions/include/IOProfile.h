@@ -144,7 +144,7 @@ public:
     bool devicesSupportEncodedFormats(DeviceTypeSet deviceTypes) const
     {
         if (deviceTypes.empty()) {
-            return true; // required for isOffloadSupported() check
+            return true; // required for getOffloadSupport() check
         }
         DeviceVector deviceList =
             mSupportedDevices.getDevicesFromTypes(deviceTypes);
@@ -155,6 +155,8 @@ public:
         }
         return false;
     }
+
+    bool containsSingleDeviceSupportingEncodedFormats(const sp<DeviceDescriptor>& device) const;
 
     void clearSupportedDevices() { mSupportedDevices.clear(); }
     void addSupportedDevice(const sp<DeviceDescriptor> &device)

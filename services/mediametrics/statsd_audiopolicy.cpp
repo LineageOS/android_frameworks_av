@@ -32,25 +32,25 @@
 #include <statslog.h>
 
 #include "MediaMetricsService.h"
-#include "frameworks/proto_logging/stats/enums/stats/mediametrics/mediametrics.pb.h"
+#include "frameworks/proto_logging/stats/message/mediametrics_message.pb.h"
 #include "iface_statsd.h"
 
 namespace android {
 
-bool statsd_audiopolicy(const mediametrics::Item *item)
+bool statsd_audiopolicy(const std::shared_ptr<const mediametrics::Item>& item,
+       const std::shared_ptr<mediametrics::StatsdLog>& statsdLog)
 {
     if (item == nullptr) return false;
 
     // these go into the statsd wrapper
-    const nsecs_t timestamp = MediaMetricsService::roundTime(item->getTimestamp());
-    std::string pkgName = item->getPkgName();
-    int64_t pkgVersionCode = item->getPkgVersionCode();
-    int64_t mediaApexVersion = 0;
-
+    const nsecs_t timestamp_nanos = MediaMetricsService::roundTime(item->getTimestamp());
+    const std::string package_name = item->getPkgName();
+    const int64_t package_version_code = item->getPkgVersionCode();
+    const int64_t media_apex_version = 0;
 
     // the rest into our own proto
     //
-    ::android::stats::mediametrics::AudioPolicyData metrics_proto;
+    ::android::stats::mediametrics_message::AudioPolicyData metrics_proto;
 
     // flesh out the protobuf we'll hand off with our data
     //
@@ -60,35 +60,35 @@ bool statsd_audiopolicy(const mediametrics::Item *item)
         metrics_proto.set_status(status);
     }
     //string char kAudioPolicyRqstSrc[] = "android.media.audiopolicy.rqst.src";
-    std::string rqst_src;
-    if (item->getString("android.media.audiopolicy.rqst.src", &rqst_src)) {
-        metrics_proto.set_request_source(std::move(rqst_src));
+    std::string request_source;
+    if (item->getString("android.media.audiopolicy.rqst.src", &request_source)) {
+        metrics_proto.set_request_source(request_source);
     }
     //string char kAudioPolicyRqstPkg[] = "android.media.audiopolicy.rqst.pkg";
-    std::string rqst_pkg;
-    if (item->getString("android.media.audiopolicy.rqst.pkg", &rqst_pkg)) {
-        metrics_proto.set_request_package(std::move(rqst_pkg));
+    std::string request_package;
+    if (item->getString("android.media.audiopolicy.rqst.pkg", &request_package)) {
+        metrics_proto.set_request_package(request_package);
     }
     //int32 char kAudioPolicyRqstSession[] = "android.media.audiopolicy.rqst.session";
-    int32_t rqst_session = -1;
-    if (item->getInt32("android.media.audiopolicy.rqst.session", &rqst_session)) {
-        metrics_proto.set_request_session(rqst_session);
+    int32_t request_session = -1;
+    if (item->getInt32("android.media.audiopolicy.rqst.session", &request_session)) {
+        metrics_proto.set_request_session(request_session);
     }
     //string char kAudioPolicyRqstDevice[] = "android.media.audiopolicy.rqst.device";
-    std::string rqst_device;
-    if (item->getString("android.media.audiopolicy.rqst.device", &rqst_device)) {
-        metrics_proto.set_request_device(std::move(rqst_device));
+    std::string request_device;
+    if (item->getString("android.media.audiopolicy.rqst.device", &request_device)) {
+        metrics_proto.set_request_device(request_device);
     }
 
     //string char kAudioPolicyActiveSrc[] = "android.media.audiopolicy.active.src";
-    std::string active_src;
-    if (item->getString("android.media.audiopolicy.active.src", &active_src)) {
-        metrics_proto.set_active_source(std::move(active_src));
+    std::string active_source;
+    if (item->getString("android.media.audiopolicy.active.src", &active_source)) {
+        metrics_proto.set_active_source(active_source);
     }
     //string char kAudioPolicyActivePkg[] = "android.media.audiopolicy.active.pkg";
-    std::string active_pkg;
-    if (item->getString("android.media.audiopolicy.active.pkg", &active_pkg)) {
-        metrics_proto.set_active_package(std::move(active_pkg));
+    std::string active_package;
+    if (item->getString("android.media.audiopolicy.active.pkg", &active_package)) {
+        metrics_proto.set_active_package(active_package);
     }
     //int32 char kAudioPolicyActiveSession[] = "android.media.audiopolicy.active.session";
     int32_t active_session = -1;
@@ -98,9 +98,8 @@ bool statsd_audiopolicy(const mediametrics::Item *item)
     //string char kAudioPolicyActiveDevice[] = "android.media.audiopolicy.active.device";
     std::string active_device;
     if (item->getString("android.media.audiopolicy.active.device", &active_device)) {
-        metrics_proto.set_active_device(std::move(active_device));
+        metrics_proto.set_active_device(active_device);
     }
-
 
     std::string serialized;
     if (!metrics_proto.SerializeToString(&serialized)) {
@@ -108,17 +107,31 @@ bool statsd_audiopolicy(const mediametrics::Item *item)
         return false;
     }
 
-    if (enabled_statsd) {
-        android::util::BytesField bf_serialized( serialized.c_str(), serialized.size());
-        (void)android::util::stats_write(android::util::MEDIAMETRICS_AUDIOPOLICY_REPORTED,
-                                   timestamp, pkgName.c_str(), pkgVersionCode,
-                                   mediaApexVersion,
-                                   bf_serialized);
+    android::util::BytesField bf_serialized( serialized.c_str(), serialized.size());
+    int result = android::util::stats_write(android::util::MEDIAMETRICS_AUDIOPOLICY_REPORTED,
+        timestamp_nanos, package_name.c_str(), package_version_code,
+        media_apex_version,
+        bf_serialized);
+    std::stringstream log;
+    log << "result:" << result << " {"
+            << " mediametrics_audiopolicy_reported:"
+            << android::util::MEDIAMETRICS_AUDIOPOLICY_REPORTED
+            << " timestamp_nanos:" << timestamp_nanos
+            << " package_name:" << package_name
+            << " package_version_code:" << package_version_code
+            << " media_apex_version:" << media_apex_version
 
-    } else {
-        ALOGV("NOT sending: private data (len=%zu)", strlen(serialized.c_str()));
-    }
-
+            << " status:" << status
+            << " request_source:" << request_source
+            << " request_package:" << request_package
+            << " request_session:" << request_session
+            << " request_device:" << request_device
+            << " active_source:" << active_source
+            << " active_package:" << active_package
+            << " active_session:" << active_session
+            << " active_device:" << active_device
+            << " }";
+    statsdLog->log(android::util::MEDIAMETRICS_AUDIOPOLICY_REPORTED, log.str());
     return true;
 }
 

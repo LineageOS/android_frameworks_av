@@ -52,7 +52,7 @@ public:
                                     struct audio_port *ports);
 
     /* Get supported attributes for a given audio port */
-    status_t getAudioPort(struct audio_port *port);
+    status_t getAudioPort(struct audio_port_v7 *port);
 
     /* Create a patch between several source and sink ports */
     status_t createAudioPatch(const struct audio_patch *patch,

@@ -4,8 +4,6 @@ package {
     // all of the 'license_kinds' from "frameworks_av_license"
     // to get the below license kinds:
     //   SPDX-license-identifier-Apache-2.0
-    //   SPDX-license-identifier-MIT
-    //   SPDX-license-identifier-Unicode-DFS
     default_applicable_licenses: ["frameworks_av_license"],
 }
 
@@ -16,5 +14,6 @@ filegroup {
         "test_audio_policy_primary_only_configuration.xml",
         "test_invalid_audio_policy_configuration.xml",
         "test_tv_apm_configuration.xml",
+        "test_settop_box_surround_configuration.xml",
     ],
 }

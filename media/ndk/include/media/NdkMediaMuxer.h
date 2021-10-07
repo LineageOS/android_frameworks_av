@@ -54,6 +54,17 @@ typedef enum {
     AMEDIAMUXER_OUTPUT_FORMAT_THREE_GPP   = 2,
 } OutputFormat;
 
+typedef enum {
+    /* Last group of pictures(GOP) of video track can be incomplete, so it would be safe to
+     * scrap that and rewrite.  If both audio and video tracks are present in a file, then
+     * samples of audio track after last GOP of video would be scrapped too.
+     * If only audio track is present, then no sample would be discarded.
+     */
+    AMEDIAMUXER_APPEND_IGNORE_LAST_VIDEO_GOP = 0,
+    // Keep all existing samples as it is and append new samples after that only.
+    AMEDIAMUXER_APPEND_TO_EXISTING_DATA = 1,
+} AppendMode;
+
 /**
  * Create new media muxer.
  *
@@ -137,6 +148,46 @@ media_status_t AMediaMuxer_stop(AMediaMuxer*) __INTRODUCED_IN(21);
 media_status_t AMediaMuxer_writeSampleData(AMediaMuxer *muxer,
         size_t trackIdx, const uint8_t *data,
         const AMediaCodecBufferInfo *info) __INTRODUCED_IN(21);
+
+/**
+ * Creates a new media muxer for appending data to an existing MPEG4 file.
+ * This is a synchronous API call and could take a while to return if the existing file is large.
+ * Only works for MPEG4 files matching one of the following characteristics:
+ * <ul>
+ *    <li>a single audio track.</li>
+ *    <li>a single video track.</li>
+ *    <li>a single audio and a single video track.</li>
+ * </ul>
+ * @param fd Must be opened with read and write permission. Does not take ownership of
+ * this fd i.e., caller is responsible for closing fd.
+ * @param mode Specifies how data will be appended; the AppendMode enum describes
+ *             the possible methods for appending..
+ * @return Pointer to AMediaMuxer if the file(fd) has tracks already, otherwise, nullptr.
+ * {@link AMediaMuxer_delete} should be used to free the returned pointer.
+ *
+ * Available since API level 31.
+ */
+AMediaMuxer* AMediaMuxer_append(int fd, AppendMode mode) __INTRODUCED_IN(31);
+
+/**
+ * Returns the number of tracks added in the file passed to {@link AMediaMuxer_new} or
+ * the number of existing tracks in the file passed to {@link AMediaMuxer_append}.
+ * Should be called in INITIALIZED or STARTED state, otherwise returns -1.
+ *
+ * Available since API level 31.
+ */
+ssize_t AMediaMuxer_getTrackCount(AMediaMuxer*) __INTRODUCED_IN(31);
+
+/**
+ * Returns AMediaFormat of the added track with index idx in the file passed to
+ * {@link AMediaMuxer_new} or the AMediaFormat of the existing track with index idx
+ * in the file passed to {@link AMediaMuxer_append}.
+ * Should be called in INITIALIZED or STARTED state, otherwise returns nullptr.
+ * {@link AMediaFormat_delete} should be used to free the returned pointer.
+ *
+ * Available since API level 31.
+ */
+AMediaFormat* AMediaMuxer_getTrackFormat(AMediaMuxer* muxer, size_t idx) __INTRODUCED_IN(31);
 
 __END_DECLS
 

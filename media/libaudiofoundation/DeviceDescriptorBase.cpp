@@ -19,6 +19,7 @@
 
 #include <android-base/stringprintf.h>
 #include <audio_utils/string.h>
+#include <media/AidlConversion.h>
 #include <media/DeviceDescriptorBase.h>
 #include <media/TypeConverter.h>
 
@@ -80,13 +81,12 @@ void DeviceDescriptorBase::toAudioPortConfig(struct audio_port_config *dstConfig
 void DeviceDescriptorBase::toAudioPort(struct audio_port *port) const
 {
     ALOGV("DeviceDescriptorBase::toAudioPort() handle %d type %08x", mId, mDeviceTypeAddr.mType);
-    AudioPort::toAudioPort(port);
-    toAudioPortConfig(&port->active_config);
-    port->id = mId;
-    port->ext.device.type = mDeviceTypeAddr.mType;
-    port->ext.device.encapsulation_modes = mEncapsulationModes;
-    port->ext.device.encapsulation_metadata_types = mEncapsulationMetadataTypes;
-    (void)audio_utils_strlcpy_zerofill(port->ext.device.address, mDeviceTypeAddr.getAddress());
+    toAudioPortInternal(port);
+}
+
+void DeviceDescriptorBase::toAudioPort(struct audio_port_v7 *port) const {
+    ALOGV("DeviceDescriptorBase::toAudioPort() v7 handle %d type %08x", mId, mDeviceTypeAddr.mType);
+    toAudioPortInternal(port);
 }
 
 status_t DeviceDescriptorBase::setEncapsulationModes(uint32_t encapsulationModes) {
@@ -122,9 +122,9 @@ void DeviceDescriptorBase::dump(std::string *dst, int spaces, int index,
             spaces, "", ::android::toString(mDeviceTypeAddr.mType).c_str()));
 
     dst->append(base::StringPrintf(
-            "%*s- supported encapsulation modes: %u", spaces, "", mEncapsulationModes));
+            "%*s- supported encapsulation modes: %u\n", spaces, "", mEncapsulationModes));
     dst->append(base::StringPrintf(
-            "%*s- supported encapsulation metadata types: %u",
+            "%*s- supported encapsulation metadata types: %u\n",
             spaces, "", mEncapsulationMetadataTypes));
 
     if (mDeviceTypeAddr.address().size() != 0) {
@@ -156,26 +156,53 @@ bool DeviceDescriptorBase::equals(const sp<DeviceDescriptorBase> &other) const
            mDeviceTypeAddr.equals(other->mDeviceTypeAddr);
 }
 
+
 status_t DeviceDescriptorBase::writeToParcel(Parcel *parcel) const
 {
-    status_t status = NO_ERROR;
-    if ((status = AudioPort::writeToParcel(parcel)) != NO_ERROR) return status;
-    if ((status = AudioPortConfig::writeToParcel(parcel)) != NO_ERROR) return status;
-    if ((status = parcel->writeParcelable(mDeviceTypeAddr)) != NO_ERROR) return status;
-    if ((status = parcel->writeUint32(mEncapsulationModes)) != NO_ERROR) return status;
-    if ((status = parcel->writeUint32(mEncapsulationMetadataTypes)) != NO_ERROR) return status;
-    return status;
+    media::AudioPort parcelable;
+    return writeToParcelable(&parcelable)
+        ?: parcelable.writeToParcel(parcel);
 }
 
-status_t DeviceDescriptorBase::readFromParcel(const Parcel *parcel)
-{
-    status_t status = NO_ERROR;
-    if ((status = AudioPort::readFromParcel(parcel)) != NO_ERROR) return status;
-    if ((status = AudioPortConfig::readFromParcel(parcel)) != NO_ERROR) return status;
-    if ((status = parcel->readParcelable(&mDeviceTypeAddr)) != NO_ERROR) return status;
-    if ((status = parcel->readUint32(&mEncapsulationModes)) != NO_ERROR) return status;
-    if ((status = parcel->readUint32(&mEncapsulationMetadataTypes)) != NO_ERROR) return status;
-    return status;
+status_t DeviceDescriptorBase::writeToParcelable(media::AudioPort* parcelable) const {
+    AudioPort::writeToParcelable(parcelable);
+    AudioPortConfig::writeToParcelable(&parcelable->activeConfig);
+    parcelable->id = VALUE_OR_RETURN_STATUS(legacy2aidl_audio_port_handle_t_int32_t(mId));
+
+    media::AudioPortDeviceExt ext;
+    ext.device = VALUE_OR_RETURN_STATUS(legacy2aidl_AudioDeviceTypeAddress(mDeviceTypeAddr));
+    ext.encapsulationModes = VALUE_OR_RETURN_STATUS(
+            legacy2aidl_AudioEncapsulationMode_mask(mEncapsulationModes));
+    ext.encapsulationMetadataTypes = VALUE_OR_RETURN_STATUS(
+            legacy2aidl_AudioEncapsulationMetadataType_mask(mEncapsulationMetadataTypes));
+    UNION_SET(parcelable->ext, device, std::move(ext));
+    return OK;
+}
+
+status_t DeviceDescriptorBase::readFromParcel(const Parcel *parcel) {
+    media::AudioPort parcelable;
+    return parcelable.readFromParcel(parcel)
+        ?: readFromParcelable(parcelable);
+}
+
+status_t DeviceDescriptorBase::readFromParcelable(const media::AudioPort& parcelable) {
+    if (parcelable.type != media::AudioPortType::DEVICE) {
+        return BAD_VALUE;
+    }
+    status_t status = AudioPort::readFromParcelable(parcelable)
+                      ?: AudioPortConfig::readFromParcelable(parcelable.activeConfig);
+    if (status != OK) {
+        return status;
+    }
+
+    media::AudioPortDeviceExt ext = VALUE_OR_RETURN_STATUS(UNION_GET(parcelable.ext, device));
+    mDeviceTypeAddr = VALUE_OR_RETURN_STATUS(
+            aidl2legacy_AudioDeviceTypeAddress(ext.device));
+    mEncapsulationModes = VALUE_OR_RETURN_STATUS(
+            aidl2legacy_AudioEncapsulationMode_mask(ext.encapsulationModes));
+    mEncapsulationMetadataTypes = VALUE_OR_RETURN_STATUS(
+            aidl2legacy_AudioEncapsulationMetadataType_mask(ext.encapsulationMetadataTypes));
+    return OK;
 }
 
 std::string toString(const DeviceDescriptorBaseVector& devices)
@@ -197,6 +224,26 @@ AudioDeviceTypeAddrVector deviceTypeAddrsFromDescriptors(const DeviceDescriptorB
         deviceTypeAddrs.push_back(device->getDeviceTypeAddr());
     }
     return deviceTypeAddrs;
+}
+
+ConversionResult<sp<DeviceDescriptorBase>>
+aidl2legacy_DeviceDescriptorBase(const media::AudioPort& aidl) {
+    sp<DeviceDescriptorBase> result = new DeviceDescriptorBase(AUDIO_DEVICE_NONE);
+    status_t status = result->readFromParcelable(aidl);
+    if (status != OK) {
+        return base::unexpected(status);
+    }
+    return result;
+}
+
+ConversionResult<media::AudioPort>
+legacy2aidl_DeviceDescriptorBase(const sp<DeviceDescriptorBase>& legacy) {
+    media::AudioPort aidl;
+    status_t status = legacy->writeToParcelable(&aidl);
+    if (status != OK) {
+        return base::unexpected(status);
+    }
+    return aidl;
 }
 
 } // namespace android

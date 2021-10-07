@@ -19,9 +19,11 @@
 #include <string>
 #include <vector>
 
+#include <android/media/AudioDevice.h>
 #include <binder/Parcelable.h>
 #include <binder/Parcel.h>
 #include <media/AudioContainers.h>
+#include <media/AidlConversionUtil.h>
 #include <system/audio.h>
 #include <utils/Errors.h>
 
@@ -83,5 +85,11 @@ AudioDeviceTypeAddrVector excludeDeviceTypeAddrsFrom(
 
 std::string dumpAudioDeviceTypeAddrVector(const AudioDeviceTypeAddrVector& deviceTypeAddrs,
                                           bool includeSensitiveInfo=false);
+
+// Conversion routines, according to AidlConversion.h conventions.
+ConversionResult<AudioDeviceTypeAddr>
+aidl2legacy_AudioDeviceTypeAddress(const media::AudioDevice& aidl);
+ConversionResult<media::AudioDevice>
+legacy2aidl_AudioDeviceTypeAddress(const AudioDeviceTypeAddr& legacy);
 
 } // namespace android

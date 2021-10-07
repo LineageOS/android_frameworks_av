@@ -25,7 +25,6 @@
 class AAudioMixer {
 public:
     AAudioMixer() {}
-    ~AAudioMixer();
 
     void allocate(int32_t samplesPerFrame, int32_t framesPerBurst);
 
@@ -38,7 +37,7 @@ public:
      * @param allowUnderflow if true then allow mixer to advance read index past the write index
      * @return frames read from this stream
      */
-    int32_t mix(int streamIndex, android::FifoBuffer *fifo, bool allowUnderflow);
+    int32_t mix(int streamIndex, std::shared_ptr<android::FifoBuffer> fifo, bool allowUnderflow);
 
     float *getOutputBuffer();
 
@@ -47,7 +46,7 @@ public:
 private:
     void mixPart(float *destination, float *source, int32_t numFrames);
 
-    float   *mOutputBuffer = nullptr;
+    std::unique_ptr<float[]> mOutputBuffer;
     int32_t  mSamplesPerFrame = 0;
     int32_t  mFramesPerBurst = 0;
     int32_t  mBufferSizeInBytes = 0;

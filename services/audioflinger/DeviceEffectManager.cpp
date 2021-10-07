@@ -30,6 +30,8 @@
 
 namespace android {
 
+using media::IEffectClient;
+
 void AudioFlinger::DeviceEffectManager::createAudioPatch(audio_patch_handle_t handle,
         const PatchPanel::Patch& patch) {
     ALOGV("%s handle %d mHalHandle %d num sinks %d device sink %08x",
@@ -115,10 +117,19 @@ sp<AudioFlinger::EffectHandle> AudioFlinger::DeviceEffectManager::createEffect_l
 
 status_t AudioFlinger::DeviceEffectManager::checkEffectCompatibility(
         const effect_descriptor_t *desc) {
+    sp<EffectsFactoryHalInterface> effectsFactory = mAudioFlinger.getEffectsFactory();
+    if (effectsFactory == nullptr) {
+        return BAD_VALUE;
+    }
 
-    if ((desc->flags & EFFECT_FLAG_TYPE_MASK) != EFFECT_FLAG_TYPE_PRE_PROC
-        && (desc->flags & EFFECT_FLAG_TYPE_MASK) != EFFECT_FLAG_TYPE_POST_PROC) {
-        ALOGW("%s() non pre/post processing device effect %s", __func__, desc->name);
+    static const float sMinDeviceEffectHalVersion = 6.0;
+    float halVersion = effectsFactory->getHalVersion();
+
+    if (((desc->flags & EFFECT_FLAG_TYPE_MASK) != EFFECT_FLAG_TYPE_PRE_PROC
+            && (desc->flags & EFFECT_FLAG_TYPE_MASK) != EFFECT_FLAG_TYPE_POST_PROC)
+            || halVersion < sMinDeviceEffectHalVersion) {
+        ALOGW("%s() non pre/post processing device effect %s or incompatible API version %f",
+                __func__, desc->name, halVersion);
         return BAD_VALUE;
     }
 

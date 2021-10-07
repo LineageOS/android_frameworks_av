@@ -20,11 +20,25 @@
 #include <algorithm>
 
 #include "device3/ZoomRatioMapper.h"
+#include "utils/SessionConfigurationUtils.h"
 
 namespace android {
 
 namespace camera3 {
 
+void ZoomRatioMapper::initRemappedKeys() {
+    mRemappedKeys.insert(
+            kMeteringRegionsToCorrect.begin(),
+            kMeteringRegionsToCorrect.end());
+    mRemappedKeys.insert(
+            kRectsToCorrect.begin(),
+            kRectsToCorrect.end());
+    mRemappedKeys.insert(
+            kResultPointsToCorrectNoClamp.begin(),
+            kResultPointsToCorrectNoClamp.end());
+
+    mRemappedKeys.insert(ANDROID_CONTROL_ZOOM_RATIO);
+}
 
 status_t ZoomRatioMapper::initZoomRatioInTemplate(CameraMetadata *request) {
     camera_metadata_entry_t entry;
@@ -117,30 +131,91 @@ status_t ZoomRatioMapper::overrideZoomRatioTags(
 
 ZoomRatioMapper::ZoomRatioMapper(const CameraMetadata* deviceInfo,
         bool supportNativeZoomRatio, bool usePrecorrectArray) {
-    camera_metadata_ro_entry_t entry;
+    initRemappedKeys();
 
-    entry = deviceInfo->find(ANDROID_SENSOR_INFO_PRE_CORRECTION_ACTIVE_ARRAY_SIZE);
-    if (entry.count != 4) return;
-    int32_t arrayW = entry.data.i32[2];
-    int32_t arrayH = entry.data.i32[3];
+    int32_t arrayW = 0;
+    int32_t arrayH = 0;
+    int32_t arrayMaximumResolutionW = 0;
+    int32_t arrayMaximumResolutionH = 0;
+    int32_t activeW = 0;
+    int32_t activeH = 0;
+    int32_t activeMaximumResolutionW = 0;
+    int32_t activeMaximumResolutionH = 0;
 
-    entry = deviceInfo->find(ANDROID_SENSOR_INFO_ACTIVE_ARRAY_SIZE);
-    if (entry.count != 4) return;
-    int32_t activeW = entry.data.i32[2];
-    int32_t activeH = entry.data.i32[3];
+    if (!SessionConfigurationUtils::getArrayWidthAndHeight(deviceInfo,
+            ANDROID_SENSOR_INFO_PRE_CORRECTION_ACTIVE_ARRAY_SIZE, &arrayW, &arrayH)) {
+        ALOGE("%s: Couldn't get pre correction active array size", __FUNCTION__);
+        return;
+    }
+     if (!SessionConfigurationUtils::getArrayWidthAndHeight(deviceInfo,
+            ANDROID_SENSOR_INFO_ACTIVE_ARRAY_SIZE, &activeW, &activeH)) {
+        ALOGE("%s: Couldn't get active array size", __FUNCTION__);
+        return;
+    }
+
+    bool isUltraHighResolutionSensor =
+            camera3::SessionConfigurationUtils::isUltraHighResolutionSensor(*deviceInfo);
+    if (isUltraHighResolutionSensor) {
+        if (!SessionConfigurationUtils::getArrayWidthAndHeight(deviceInfo,
+                ANDROID_SENSOR_INFO_PRE_CORRECTION_ACTIVE_ARRAY_SIZE_MAXIMUM_RESOLUTION,
+                &arrayMaximumResolutionW, &arrayMaximumResolutionH)) {
+            ALOGE("%s: Couldn't get maximum resolution pre correction active array size",
+                    __FUNCTION__);
+            return;
+        }
+         if (!SessionConfigurationUtils::getArrayWidthAndHeight(deviceInfo,
+                ANDROID_SENSOR_INFO_ACTIVE_ARRAY_SIZE_MAXIMUM_RESOLUTION,
+                &activeMaximumResolutionW, &activeMaximumResolutionH)) {
+            ALOGE("%s: Couldn't get maximum resolution pre correction active array size",
+                    __FUNCTION__);
+            return;
+        }
+    }
 
     if (usePrecorrectArray) {
         mArrayWidth = arrayW;
         mArrayHeight = arrayH;
+        mArrayWidthMaximumResolution = arrayMaximumResolutionW;
+        mArrayHeightMaximumResolution = arrayMaximumResolutionH;
     } else {
         mArrayWidth = activeW;
         mArrayHeight = activeH;
+        mArrayWidthMaximumResolution = activeMaximumResolutionW;
+        mArrayHeightMaximumResolution = activeMaximumResolutionH;
     }
     mHalSupportsZoomRatio = supportNativeZoomRatio;
 
-    ALOGV("%s: array size: %d x %d, mHalSupportsZoomRatio %d",
-            __FUNCTION__, mArrayWidth, mArrayHeight, mHalSupportsZoomRatio);
+    ALOGV("%s: array size: %d x %d, full res array size: %d x %d,  mHalSupportsZoomRatio %d",
+            __FUNCTION__, mArrayWidth, mArrayHeight, mArrayWidthMaximumResolution,
+            mArrayHeightMaximumResolution, mHalSupportsZoomRatio);
     mIsValid = true;
+}
+
+status_t ZoomRatioMapper::getArrayDimensionsToBeUsed(const CameraMetadata *settings,
+        int32_t *arrayWidth, int32_t *arrayHeight) {
+    if (settings == nullptr || arrayWidth == nullptr || arrayHeight == nullptr) {
+        return BAD_VALUE;
+    }
+    // First we get the sensorPixelMode from the settings metadata.
+    int32_t sensorPixelMode = ANDROID_SENSOR_PIXEL_MODE_DEFAULT;
+    camera_metadata_ro_entry sensorPixelModeEntry = settings->find(ANDROID_SENSOR_PIXEL_MODE);
+    if (sensorPixelModeEntry.count != 0) {
+        sensorPixelMode = sensorPixelModeEntry.data.u8[0];
+        if (sensorPixelMode != ANDROID_SENSOR_PIXEL_MODE_DEFAULT &&
+            sensorPixelMode != ANDROID_SENSOR_PIXEL_MODE_MAXIMUM_RESOLUTION) {
+            ALOGE("%s: Request sensor pixel mode is not one of the valid values %d",
+                      __FUNCTION__, sensorPixelMode);
+            return BAD_VALUE;
+        }
+    }
+    if (sensorPixelMode == ANDROID_SENSOR_PIXEL_MODE_DEFAULT) {
+        *arrayWidth = mArrayWidth;
+        *arrayHeight = mArrayHeight;
+    } else {
+        *arrayWidth = mArrayWidthMaximumResolution;
+        *arrayHeight = mArrayHeightMaximumResolution;
+    }
+    return OK;
 }
 
 status_t ZoomRatioMapper::updateCaptureRequest(CameraMetadata* request) {
@@ -149,7 +224,11 @@ status_t ZoomRatioMapper::updateCaptureRequest(CameraMetadata* request) {
     status_t res = OK;
     bool zoomRatioIs1 = true;
     camera_metadata_entry_t entry;
-
+    int arrayHeight, arrayWidth = 0;
+    res = getArrayDimensionsToBeUsed(request, &arrayWidth, &arrayHeight);
+    if (res != OK) {
+        return res;
+    }
     entry = request->find(ANDROID_CONTROL_ZOOM_RATIO);
     if (entry.count == 1 && entry.data.f[0] != 1.0f) {
         zoomRatioIs1 = false;
@@ -159,19 +238,19 @@ status_t ZoomRatioMapper::updateCaptureRequest(CameraMetadata* request) {
         if (cropRegionEntry.count == 4) {
             int cropWidth = cropRegionEntry.data.i32[2];
             int cropHeight = cropRegionEntry.data.i32[3];
-            if (cropWidth < mArrayWidth && cropHeight < mArrayHeight) {
+            if (cropWidth < arrayWidth && cropHeight < arrayHeight) {
                 cropRegionEntry.data.i32[0] = 0;
                 cropRegionEntry.data.i32[1] = 0;
-                cropRegionEntry.data.i32[2] = mArrayWidth;
-                cropRegionEntry.data.i32[3] = mArrayHeight;
+                cropRegionEntry.data.i32[2] = arrayWidth;
+                cropRegionEntry.data.i32[3] = arrayHeight;
             }
         }
     }
 
     if (mHalSupportsZoomRatio && zoomRatioIs1) {
-        res = separateZoomFromCropLocked(request, false/*isResult*/);
+        res = separateZoomFromCropLocked(request, false/*isResult*/, arrayWidth, arrayHeight);
     } else if (!mHalSupportsZoomRatio && !zoomRatioIs1) {
-        res = combineZoomAndCropLocked(request, false/*isResult*/);
+        res = combineZoomAndCropLocked(request, false/*isResult*/, arrayWidth, arrayHeight);
     }
 
     // If CONTROL_ZOOM_RATIO is in request, but HAL doesn't support
@@ -188,10 +267,15 @@ status_t ZoomRatioMapper::updateCaptureResult(CameraMetadata* result, bool reque
 
     status_t res = OK;
 
+    int arrayHeight, arrayWidth = 0;
+    res = getArrayDimensionsToBeUsed(result, &arrayWidth, &arrayHeight);
+    if (res != OK) {
+        return res;
+    }
     if (mHalSupportsZoomRatio && requestedZoomRatioIs1) {
-        res = combineZoomAndCropLocked(result, true/*isResult*/);
+        res = combineZoomAndCropLocked(result, true/*isResult*/, arrayWidth, arrayHeight);
     } else if (!mHalSupportsZoomRatio && !requestedZoomRatioIs1) {
-        res = separateZoomFromCropLocked(result, true/*isResult*/);
+        res = separateZoomFromCropLocked(result, true/*isResult*/, arrayWidth, arrayHeight);
     } else {
         camera_metadata_entry_t entry = result->find(ANDROID_CONTROL_ZOOM_RATIO);
         if (entry.count == 0) {
@@ -203,16 +287,22 @@ status_t ZoomRatioMapper::updateCaptureResult(CameraMetadata* result, bool reque
     return res;
 }
 
-float ZoomRatioMapper::deriveZoomRatio(const CameraMetadata* metadata) {
+status_t ZoomRatioMapper::deriveZoomRatio(const CameraMetadata* metadata, float *zoomRatioRet,
+        int arrayWidth, int arrayHeight) {
+    if (metadata == nullptr || zoomRatioRet == nullptr) {
+        return BAD_VALUE;
+    }
     float zoomRatio = 1.0;
 
     camera_metadata_ro_entry_t entry;
     entry = metadata->find(ANDROID_SCALER_CROP_REGION);
-    if (entry.count != 4) return zoomRatio;
-
+    if (entry.count != 4) {
+        *zoomRatioRet = 1;
+        return OK;
+    }
     // Center of the preCorrection/active size
-    float arrayCenterX = mArrayWidth / 2.0;
-    float arrayCenterY = mArrayHeight / 2.0;
+    float arrayCenterX = arrayWidth / 2.0;
+    float arrayCenterY = arrayHeight / 2.0;
 
     // Re-map crop region to coordinate system centered to (arrayCenterX,
     // arrayCenterY).
@@ -222,22 +312,30 @@ float ZoomRatioMapper::deriveZoomRatio(const CameraMetadata* metadata) {
     float cropRegionBottom = entry.data.i32[1] + entry.data.i32[3] - arrayCenterY;
 
     // Calculate the scaling factor for left, top, bottom, right
-    float zoomRatioLeft = std::max(mArrayWidth / (2 * cropRegionLeft), 1.0f);
-    float zoomRatioTop = std::max(mArrayHeight / (2 * cropRegionTop), 1.0f);
-    float zoomRatioRight = std::max(mArrayWidth / (2 * cropRegionRight), 1.0f);
-    float zoomRatioBottom = std::max(mArrayHeight / (2 * cropRegionBottom), 1.0f);
+    float zoomRatioLeft = std::max(arrayWidth / (2 * cropRegionLeft), 1.0f);
+    float zoomRatioTop = std::max(arrayHeight / (2 * cropRegionTop), 1.0f);
+    float zoomRatioRight = std::max(arrayWidth / (2 * cropRegionRight), 1.0f);
+    float zoomRatioBottom = std::max(arrayHeight / (2 * cropRegionBottom), 1.0f);
 
     // Use minimum scaling factor to handle letterboxing or pillarboxing
     zoomRatio = std::min(std::min(zoomRatioLeft, zoomRatioRight),
             std::min(zoomRatioTop, zoomRatioBottom));
 
     ALOGV("%s: derived zoomRatio is %f", __FUNCTION__, zoomRatio);
-    return zoomRatio;
+    *zoomRatioRet = zoomRatio;
+    return OK;
 }
 
-status_t ZoomRatioMapper::separateZoomFromCropLocked(CameraMetadata* metadata, bool isResult) {
-    status_t res;
-    float zoomRatio = deriveZoomRatio(metadata);
+status_t ZoomRatioMapper::separateZoomFromCropLocked(CameraMetadata* metadata, bool isResult,
+        int arrayWidth, int arrayHeight) {
+    float zoomRatio = 1.0;
+    status_t res = deriveZoomRatio(metadata, &zoomRatio, arrayWidth, arrayHeight);
+
+    if (res != OK) {
+        ALOGE("%s: Failed to derive zoom ratio: %s(%d)",
+                __FUNCTION__, strerror(-res), res);
+        return res;
+    }
 
     // Update zoomRatio metadata tag
     res = metadata->update(ANDROID_CONTROL_ZOOM_RATIO, &zoomRatio, 1);
@@ -257,12 +355,14 @@ status_t ZoomRatioMapper::separateZoomFromCropLocked(CameraMetadata* metadata, b
                 continue;
             }
             // Top left (inclusive)
-            scaleCoordinates(entry.data.i32 + j, 1, zoomRatio, true /*clamp*/);
+            scaleCoordinates(entry.data.i32 + j, 1, zoomRatio, true /*clamp*/, arrayWidth,
+                    arrayHeight);
             // Bottom right (exclusive): Use adjacent inclusive pixel to
             // calculate.
             entry.data.i32[j+2] -= 1;
             entry.data.i32[j+3] -= 1;
-            scaleCoordinates(entry.data.i32 + j + 2, 1, zoomRatio, true /*clamp*/);
+            scaleCoordinates(entry.data.i32 + j + 2, 1, zoomRatio, true /*clamp*/, arrayWidth,
+                    arrayHeight);
             entry.data.i32[j+2] += 1;
             entry.data.i32[j+3] += 1;
         }
@@ -270,20 +370,22 @@ status_t ZoomRatioMapper::separateZoomFromCropLocked(CameraMetadata* metadata, b
 
     for (auto rect : kRectsToCorrect) {
         entry = metadata->find(rect);
-        scaleRects(entry.data.i32, entry.count / 4, zoomRatio);
+        scaleRects(entry.data.i32, entry.count / 4, zoomRatio, arrayWidth, arrayHeight);
     }
 
     if (isResult) {
         for (auto pts : kResultPointsToCorrectNoClamp) {
             entry = metadata->find(pts);
-            scaleCoordinates(entry.data.i32, entry.count / 2, zoomRatio, false /*clamp*/);
+            scaleCoordinates(entry.data.i32, entry.count / 2, zoomRatio, false /*clamp*/,
+                    arrayWidth, arrayHeight);
         }
     }
 
     return OK;
 }
 
-status_t ZoomRatioMapper::combineZoomAndCropLocked(CameraMetadata* metadata, bool isResult) {
+status_t ZoomRatioMapper::combineZoomAndCropLocked(CameraMetadata* metadata, bool isResult,
+        int arrayWidth, int arrayHeight) {
     float zoomRatio = 1.0f;
     camera_metadata_entry_t entry;
     entry = metadata->find(ANDROID_CONTROL_ZOOM_RATIO);
@@ -292,7 +394,6 @@ status_t ZoomRatioMapper::combineZoomAndCropLocked(CameraMetadata* metadata, boo
     }
 
     // Unscale regions with zoomRatio
-    status_t res;
     for (auto region : kMeteringRegionsToCorrect) {
         entry = metadata->find(region);
         for (size_t j = 0; j < entry.count; j += 5) {
@@ -301,29 +402,32 @@ status_t ZoomRatioMapper::combineZoomAndCropLocked(CameraMetadata* metadata, boo
                 continue;
             }
             // Top-left (inclusive)
-            scaleCoordinates(entry.data.i32 + j, 1, 1.0 / zoomRatio, true /*clamp*/);
+            scaleCoordinates(entry.data.i32 + j, 1, 1.0 / zoomRatio, true /*clamp*/, arrayWidth,
+                    arrayHeight);
             // Bottom-right (exclusive): Use adjacent inclusive pixel to
             // calculate.
             entry.data.i32[j+2] -= 1;
             entry.data.i32[j+3] -= 1;
-            scaleCoordinates(entry.data.i32 + j + 2, 1, 1.0 / zoomRatio, true /*clamp*/);
+            scaleCoordinates(entry.data.i32 + j + 2, 1, 1.0 / zoomRatio, true /*clamp*/, arrayWidth,
+                    arrayHeight);
             entry.data.i32[j+2] += 1;
             entry.data.i32[j+3] += 1;
         }
     }
     for (auto rect : kRectsToCorrect) {
         entry = metadata->find(rect);
-        scaleRects(entry.data.i32, entry.count / 4, 1.0 / zoomRatio);
+        scaleRects(entry.data.i32, entry.count / 4, 1.0 / zoomRatio, arrayWidth, arrayHeight);
     }
     if (isResult) {
         for (auto pts : kResultPointsToCorrectNoClamp) {
             entry = metadata->find(pts);
-            scaleCoordinates(entry.data.i32, entry.count / 2, 1.0 / zoomRatio, false /*clamp*/);
+            scaleCoordinates(entry.data.i32, entry.count / 2, 1.0 / zoomRatio, false /*clamp*/,
+                    arrayWidth, arrayHeight);
         }
     }
 
     zoomRatio = 1.0;
-    res = metadata->update(ANDROID_CONTROL_ZOOM_RATIO, &zoomRatio, 1);
+    status_t res = metadata->update(ANDROID_CONTROL_ZOOM_RATIO, &zoomRatio, 1);
     if (res != OK) {
         return res;
     }
@@ -332,7 +436,7 @@ status_t ZoomRatioMapper::combineZoomAndCropLocked(CameraMetadata* metadata, boo
 }
 
 void ZoomRatioMapper::scaleCoordinates(int32_t* coordPairs, int coordCount,
-        float scaleRatio, bool clamp) {
+        float scaleRatio, bool clamp, int32_t arrayWidth, int32_t arrayHeight) {
     // A pixel's coordinate is represented by the position of its top-left corner.
     // To avoid the rounding error, we use the coordinate for the center of the
     // pixel instead:
@@ -345,18 +449,18 @@ void ZoomRatioMapper::scaleCoordinates(int32_t* coordPairs, int coordCount,
     for (int i = 0; i < coordCount * 2; i += 2) {
         float x = coordPairs[i];
         float y = coordPairs[i + 1];
-        float xCentered = x - (mArrayWidth - 2) / 2;
-        float yCentered = y - (mArrayHeight - 2) / 2;
+        float xCentered = x - (arrayWidth - 2) / 2;
+        float yCentered = y - (arrayHeight - 2) / 2;
         float scaledX = xCentered * scaleRatio;
         float scaledY = yCentered * scaleRatio;
-        scaledX += (mArrayWidth - 2) / 2;
-        scaledY += (mArrayHeight - 2) / 2;
+        scaledX += (arrayWidth - 2) / 2;
+        scaledY += (arrayHeight - 2) / 2;
         coordPairs[i] = static_cast<int32_t>(std::round(scaledX));
         coordPairs[i+1] = static_cast<int32_t>(std::round(scaledY));
         // Clamp to within activeArray/preCorrectionActiveArray
         if (clamp) {
-            int32_t right = mArrayWidth - 1;
-            int32_t bottom = mArrayHeight - 1;
+            int32_t right = arrayWidth - 1;
+            int32_t bottom = arrayHeight - 1;
             coordPairs[i] =
                     std::min(right, std::max(0, coordPairs[i]));
             coordPairs[i+1] =
@@ -367,7 +471,7 @@ void ZoomRatioMapper::scaleCoordinates(int32_t* coordPairs, int coordCount,
 }
 
 void ZoomRatioMapper::scaleRects(int32_t* rects, int rectCount,
-        float scaleRatio) {
+        float scaleRatio, int32_t arrayWidth, int32_t arrayHeight) {
     for (int i = 0; i < rectCount * 4; i += 4) {
         // Map from (l, t, width, height) to (l, t, l+width-1, t+height-1),
         // where both top-left and bottom-right are inclusive.
@@ -379,9 +483,9 @@ void ZoomRatioMapper::scaleRects(int32_t* rects, int rectCount,
         };
 
         // top-left
-        scaleCoordinates(coords, 1, scaleRatio, true /*clamp*/);
+        scaleCoordinates(coords, 1, scaleRatio, true /*clamp*/, arrayWidth, arrayHeight);
         // bottom-right
-        scaleCoordinates(coords+2, 1, scaleRatio, true /*clamp*/);
+        scaleCoordinates(coords+2, 1, scaleRatio, true /*clamp*/, arrayWidth, arrayHeight);
 
         // Map back to (l, t, width, height)
         rects[i] = coords[0];

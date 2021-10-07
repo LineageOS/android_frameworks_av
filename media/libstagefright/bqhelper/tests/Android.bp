@@ -9,16 +9,19 @@ package {
 
 cc_test {
     name: "FrameDropper_test",
-
+    test_suites: [
+        "device-tests",
+        "mts",
+    ],
     srcs: ["FrameDropper_test.cpp"],
-
     shared_libs: [
         "libstagefright_bufferqueue_helper",
         "libutils",
     ],
-
     cflags: [
         "-Werror",
         "-Wall",
     ],
+    compile_multilib: "first",
+
 }

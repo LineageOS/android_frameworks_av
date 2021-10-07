@@ -19,6 +19,7 @@
 
 #include <stdint.h>
 
+#include <aaudio/RingBuffer.h>
 #include <binder/Parcelable.h>
 
 #include "binding/AAudioServiceDefinitions.h"
@@ -26,10 +27,12 @@
 
 namespace aaudio {
 
-class RingBufferParcelable : public Parcelable {
+class RingBufferParcelable  {
 public:
-    RingBufferParcelable();
-    virtual ~RingBufferParcelable();
+    RingBufferParcelable() = default;
+
+    // Construct based on a parcelable representation.
+    explicit RingBufferParcelable(const RingBuffer& parcelable);
 
     // TODO This assumes that all three use the same SharedMemoryParcelable
     void setupMemory(int32_t sharedMemoryIndex,
@@ -57,21 +60,14 @@ public:
 
     bool isFileDescriptorSafe(SharedMemoryParcelable *memoryParcels);
 
-    /**
-     * The read and write must be symmetric.
-     */
-    virtual status_t writeToParcel(Parcel* parcel) const override;
-
-    virtual status_t readFromParcel(const Parcel* parcel) override;
-
     aaudio_result_t resolve(SharedMemoryParcelable *memoryParcels, RingBufferDescriptor *descriptor);
 
     void dump();
 
+    // Extract a parcelable representation of this object.
+    RingBuffer parcelable() const;
+
 private:
-
-    aaudio_result_t validate() const;
-
     SharedRegionParcelable  mReadCounterParcelable;
     SharedRegionParcelable  mWriteCounterParcelable;
     SharedRegionParcelable  mDataParcelable;
@@ -79,6 +75,8 @@ private:
     int32_t                 mFramesPerBurst = 0;    // for ISOCHRONOUS queues
     int32_t                 mCapacityInFrames = 0;  // zero if unused
     RingbufferFlags         mFlags = RingbufferFlags::NONE;
+
+    aaudio_result_t validate() const;
 };
 
 } /* namespace aaudio */

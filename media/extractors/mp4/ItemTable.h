@@ -34,7 +34,7 @@ namespace heif {
 
 struct AssociationEntry;
 struct ImageItem;
-struct ExifItem;
+struct ExternalMetaItem;
 struct ItemLoc;
 struct ItemInfo;
 struct ItemProperty;
@@ -42,12 +42,12 @@ struct ItemReference;
 
 /*
  * ItemTable keeps track of all image items (including coded images, grids and
- * tiles) inside a HEIF still image (ISO/IEC FDIS 23008-12.2:2017(E)).
+ * tiles) inside a HEIF/AVIF still image (ISO/IEC FDIS 23008-12.2:2017(E)).
  */
 
 class ItemTable : public RefBase {
 public:
-    explicit ItemTable(DataSourceHelper *source);
+    ItemTable(DataSourceHelper *source, bool isHeif);
 
     status_t parse(uint32_t type, off64_t offset, size_t size);
 
@@ -59,12 +59,15 @@ public:
     status_t getImageOffsetAndSize(
             uint32_t *itemIndex, off64_t *offset, size_t *size);
     status_t getExifOffsetAndSize(off64_t *offset, size_t *size);
+    status_t getXmpOffsetAndSize(off64_t *offset, size_t *size);
 
 protected:
     ~ItemTable();
 
 private:
     DataSourceHelper *mDataSource;
+    // If this is true, then this item table is for a HEIF image. Otherwise it is for an AVIF image.
+    bool mIsHeif;
 
     KeyedVector<uint32_t, ItemLoc> mItemLocs;
     Vector<ItemInfo> mItemInfos;
@@ -82,7 +85,7 @@ private:
     bool mImageItemsValid;
     uint32_t mCurrentItemIndex;
     KeyedVector<uint32_t, ImageItem> mItemIdToItemMap;
-    KeyedVector<uint32_t, ExifItem> mItemIdToExifMap;
+    KeyedVector<uint32_t, ExternalMetaItem> mItemIdToMetaMap;
     Vector<uint32_t> mDisplayables;
 
     status_t parseIlocBox(off64_t offset, size_t size);

@@ -20,10 +20,12 @@ cc_test {
     defaults: ["libaaudio_tests_defaults"],
     srcs: ["test_marshalling.cpp"],
     shared_libs: [
+        "aaudio-aidl-cpp",
         "libaaudio_internal",
         "libbinder",
         "libcutils",
         "libutils",
+        "shared-file-region-aidl-cpp",
     ],
 }
 
@@ -207,9 +209,9 @@ cc_test {
 }
 
 cc_test {
-    name: "test_stop_hang",
+    name: "test_callback_race",
     defaults: ["libaaudio_tests_defaults"],
-    srcs: ["test_stop_hang.cpp"],
+    srcs: ["test_callback_race.cpp"],
     shared_libs: [
         "libaaudio",
         "libbinder",
@@ -243,6 +245,19 @@ cc_test {
     shared_libs: [
         "libaaudio",
         "liblog",
+        "libbinder",
+        "libcutils",
+        "libutils",
+    ],
+}
+
+
+cc_test {
+    name: "test_disconnect_race",
+    defaults: ["libaaudio_tests_defaults"],
+    srcs: ["test_disconnect_race.cpp"],
+    shared_libs: [
+        "libaaudio",
         "libbinder",
         "libcutils",
         "libutils",

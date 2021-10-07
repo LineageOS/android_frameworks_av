@@ -32,25 +32,25 @@
 #include <statslog.h>
 
 #include "MediaMetricsService.h"
-#include "frameworks/proto_logging/stats/enums/stats/mediametrics/mediametrics.pb.h"
+#include "frameworks/proto_logging/stats/message/mediametrics_message.pb.h"
 #include "iface_statsd.h"
 
 namespace android {
 
-bool statsd_audiothread(const mediametrics::Item *item)
+bool statsd_audiothread(const std::shared_ptr<const mediametrics::Item>& item,
+        const std::shared_ptr<mediametrics::StatsdLog>& statsdLog)
 {
     if (item == nullptr) return false;
 
     // these go into the statsd wrapper
-    const nsecs_t timestamp = MediaMetricsService::roundTime(item->getTimestamp());
-    std::string pkgName = item->getPkgName();
-    int64_t pkgVersionCode = item->getPkgVersionCode();
-    int64_t mediaApexVersion = 0;
-
+    const nsecs_t timestamp_nanos = MediaMetricsService::roundTime(item->getTimestamp());
+    const std::string package_name = item->getPkgName();
+    const int64_t package_version_code = item->getPkgVersionCode();
+    const int64_t media_apex_version = 0;
 
     // the rest into our own proto
     //
-    ::android::stats::mediametrics::AudioThreadData metrics_proto;
+    ::android::stats::mediametrics_message::AudioThreadData metrics_proto;
 
 #define	MM_PREFIX "android.media.audiothread."
 
@@ -68,17 +68,17 @@ bool statsd_audiothread(const mediametrics::Item *item)
     if (item->getInt32(MM_PREFIX "samplerate", &samplerate)) {
         metrics_proto.set_samplerate(samplerate);
     }
-    std::string workhist;
-    if (item->getString(MM_PREFIX "workMs.hist", &workhist)) {
-        metrics_proto.set_work_millis_hist(std::move(workhist));
+    std::string work_millis_hist;
+    if (item->getString(MM_PREFIX "workMs.hist", &work_millis_hist)) {
+        metrics_proto.set_work_millis_hist(work_millis_hist);
     }
-    std::string latencyhist;
-    if (item->getString(MM_PREFIX "latencyMs.hist", &latencyhist)) {
-        metrics_proto.set_latency_millis_hist(std::move(latencyhist));
+    std::string latency_millis_hist;
+    if (item->getString(MM_PREFIX "latencyMs.hist", &latency_millis_hist)) {
+        metrics_proto.set_latency_millis_hist(latency_millis_hist);
     }
-    std::string warmuphist;
-    if (item->getString(MM_PREFIX "warmupMs.hist", &warmuphist)) {
-        metrics_proto.set_warmup_millis_hist(std::move(warmuphist));
+    std::string warmup_millis_hist;
+    if (item->getString(MM_PREFIX "warmupMs.hist", &warmup_millis_hist)) {
+        metrics_proto.set_warmup_millis_hist(warmup_millis_hist);
     }
     int64_t underruns = -1;
     if (item->getInt64(MM_PREFIX "underruns", &underruns)) {
@@ -88,101 +88,99 @@ bool statsd_audiothread(const mediametrics::Item *item)
     if (item->getInt64(MM_PREFIX "overruns", &overruns)) {
         metrics_proto.set_overruns(overruns);
     }
-    int64_t activeMs = -1;
-    if (item->getInt64(MM_PREFIX "activeMs", &activeMs)) {
-        metrics_proto.set_active_millis(activeMs);
+    int64_t active_millis = -1;
+    if (item->getInt64(MM_PREFIX "activeMs", &active_millis)) {
+        metrics_proto.set_active_millis(active_millis);
     }
-    int64_t durationMs = -1;
-    if (item->getInt64(MM_PREFIX "durationMs", &durationMs)) {
-        metrics_proto.set_duration_millis(durationMs);
+    int64_t duration_millis = -1;
+    if (item->getInt64(MM_PREFIX "durationMs", &duration_millis)) {
+        metrics_proto.set_duration_millis(duration_millis);
     }
 
-    // item->setInt32(MM_PREFIX "id", (int32_t)mId); // IO handle
     int32_t id = -1;
     if (item->getInt32(MM_PREFIX "id", &id)) {
         metrics_proto.set_id(id);
     }
-    // item->setInt32(MM_PREFIX "portId", (int32_t)mPortId);
+
     int32_t port_id = -1;
-    if (item->getInt32(MM_PREFIX "portId", &id)) {
+    if (item->getInt32(MM_PREFIX "portId", &port_id)) {
         metrics_proto.set_port_id(port_id);
     }
     // item->setCString(MM_PREFIX "type", threadTypeToString(mType));
     std::string type;
     if (item->getString(MM_PREFIX "type", &type)) {
-        metrics_proto.set_type(std::move(type));
+        metrics_proto.set_type(type);
     }
-    // item->setInt32(MM_PREFIX "sampleRate", (int32_t)mSampleRate);
+
     int32_t sample_rate = -1;
     if (item->getInt32(MM_PREFIX "sampleRate", &sample_rate)) {
         metrics_proto.set_sample_rate(sample_rate);
     }
-    // item->setInt64(MM_PREFIX "channelMask", (int64_t)mChannelMask);
+
     int32_t channel_mask = -1;
     if (item->getInt32(MM_PREFIX "channelMask", &channel_mask)) {
         metrics_proto.set_channel_mask(channel_mask);
     }
-    // item->setCString(MM_PREFIX "encoding", toString(mFormat).c_str());
+
     std::string encoding;
     if (item->getString(MM_PREFIX "encoding", &encoding)) {
-        metrics_proto.set_encoding(std::move(encoding));
+        metrics_proto.set_encoding(encoding);
     }
-    // item->setInt32(MM_PREFIX "frameCount", (int32_t)mFrameCount);
+
     int32_t frame_count = -1;
     if (item->getInt32(MM_PREFIX "frameCount", &frame_count)) {
         metrics_proto.set_frame_count(frame_count);
     }
-    // item->setCString(MM_PREFIX "outDevice", toString(mOutDevice).c_str());
-    std::string outDevice;
-    if (item->getString(MM_PREFIX "outDevice", &outDevice)) {
-        metrics_proto.set_output_device(std::move(outDevice));
-    }
-    // item->setCString(MM_PREFIX "inDevice", toString(mInDevice).c_str());
-    std::string inDevice;
-    if (item->getString(MM_PREFIX "inDevice", &inDevice)) {
-        metrics_proto.set_input_device(std::move(inDevice));
-    }
-    // item->setDouble(MM_PREFIX "ioJitterMs.mean", mIoJitterMs.getMean());
-    double iojitters_ms_mean = -1;
-    if (item->getDouble(MM_PREFIX "ioJitterMs.mean", &iojitters_ms_mean)) {
-        metrics_proto.set_io_jitter_mean_millis(iojitters_ms_mean);
-    }
-    // item->setDouble(MM_PREFIX "ioJitterMs.std", mIoJitterMs.getStdDev());
-    double iojitters_ms_std = -1;
-    if (item->getDouble(MM_PREFIX "ioJitterMs.std", &iojitters_ms_std)) {
-        metrics_proto.set_io_jitter_stddev_millis(iojitters_ms_std);
-    }
-    // item->setDouble(MM_PREFIX "processTimeMs.mean", mProcessTimeMs.getMean());
-    double process_time_ms_mean = -1;
-    if (item->getDouble(MM_PREFIX "processTimeMs.mean", &process_time_ms_mean)) {
-        metrics_proto.set_process_time_mean_millis(process_time_ms_mean);
-    }
-    // item->setDouble(MM_PREFIX "processTimeMs.std", mProcessTimeMs.getStdDev());
-    double process_time_ms_std = -1;
-    if (item->getDouble(MM_PREFIX "processTimeMs.std", &process_time_ms_std)) {
-        metrics_proto.set_process_time_stddev_millis(process_time_ms_std);
-    }
-    // item->setDouble(MM_PREFIX "timestampJitterMs.mean", tsjitter.getMean());
-    double timestamp_jitter_ms_mean = -1;
-    if (item->getDouble(MM_PREFIX "timestampJitterMs.mean", &timestamp_jitter_ms_mean)) {
-        metrics_proto.set_timestamp_jitter_mean_millis(timestamp_jitter_ms_mean);
-    }
-    // item->setDouble(MM_PREFIX "timestampJitterMs.std", tsjitter.getStdDev());
-    double timestamp_jitter_ms_stddev = -1;
-    if (item->getDouble(MM_PREFIX "timestampJitterMs.std", &timestamp_jitter_ms_stddev)) {
-        metrics_proto.set_timestamp_jitter_stddev_millis(timestamp_jitter_ms_stddev);
-    }
-    // item->setDouble(MM_PREFIX "latencyMs.mean", mLatencyMs.getMean());
-    double latency_ms_mean = -1;
-    if (item->getDouble(MM_PREFIX "latencyMs.mean", &latency_ms_mean)) {
-        metrics_proto.set_latency_mean_millis(latency_ms_mean);
-    }
-    // item->setDouble(MM_PREFIX "latencyMs.std", mLatencyMs.getStdDev());
-    double latency_ms_stddev = -1;
-    if (item->getDouble(MM_PREFIX "latencyMs.std", &latency_ms_stddev)) {
-        metrics_proto.set_latency_stddev_millis(latency_ms_stddev);
+
+    std::string output_device;
+    if (item->getString(MM_PREFIX "outDevice", &output_device)) {
+        metrics_proto.set_output_device(output_device);
     }
 
+    std::string input_device;
+    if (item->getString(MM_PREFIX "inDevice", &input_device)) {
+        metrics_proto.set_input_device(input_device);
+    }
+
+    double io_jitter_mean_millis = -1;
+    if (item->getDouble(MM_PREFIX "ioJitterMs.mean", &io_jitter_mean_millis)) {
+        metrics_proto.set_io_jitter_mean_millis(io_jitter_mean_millis);
+    }
+
+    double io_jitter_stddev_millis = -1;
+    if (item->getDouble(MM_PREFIX "ioJitterMs.std", &io_jitter_stddev_millis)) {
+        metrics_proto.set_io_jitter_stddev_millis(io_jitter_stddev_millis);
+    }
+
+    double process_time_mean_millis = -1;
+    if (item->getDouble(MM_PREFIX "processTimeMs.mean", &process_time_mean_millis)) {
+        metrics_proto.set_process_time_mean_millis(process_time_mean_millis);
+    }
+
+    double process_time_stddev_millis = -1;
+    if (item->getDouble(MM_PREFIX "processTimeMs.std", &process_time_stddev_millis)) {
+        metrics_proto.set_process_time_stddev_millis(process_time_stddev_millis);
+    }
+
+    double timestamp_jitter_mean_millis = -1;
+    if (item->getDouble(MM_PREFIX "timestampJitterMs.mean", &timestamp_jitter_mean_millis)) {
+        metrics_proto.set_timestamp_jitter_mean_millis(timestamp_jitter_mean_millis);
+    }
+
+    double timestamp_jitter_stddev_millis = -1;
+    if (item->getDouble(MM_PREFIX "timestampJitterMs.std", &timestamp_jitter_stddev_millis)) {
+        metrics_proto.set_timestamp_jitter_stddev_millis(timestamp_jitter_stddev_millis);
+    }
+
+    double latency_mean_millis = -1;
+    if (item->getDouble(MM_PREFIX "latencyMs.mean", &latency_mean_millis)) {
+        metrics_proto.set_latency_mean_millis(latency_mean_millis);
+    }
+
+    double latency_stddev_millis = -1;
+    if (item->getDouble(MM_PREFIX "latencyMs.std", &latency_stddev_millis)) {
+        metrics_proto.set_latency_stddev_millis(latency_stddev_millis);
+    }
 
     std::string serialized;
     if (!metrics_proto.SerializeToString(&serialized)) {
@@ -190,17 +188,50 @@ bool statsd_audiothread(const mediametrics::Item *item)
         return false;
     }
 
-    if (enabled_statsd) {
-        android::util::BytesField bf_serialized( serialized.c_str(), serialized.size());
-        (void)android::util::stats_write(android::util::MEDIAMETRICS_AUDIOTHREAD_REPORTED,
-                                   timestamp, pkgName.c_str(), pkgVersionCode,
-                                   mediaApexVersion,
-                                   bf_serialized);
+    android::util::BytesField bf_serialized( serialized.c_str(), serialized.size());
+    int result = android::util::stats_write(android::util::MEDIAMETRICS_AUDIOTHREAD_REPORTED,
+        timestamp_nanos, package_name.c_str(), package_version_code,
+        media_apex_version,
+        bf_serialized);
+    std::stringstream log;
+    log << "result:" << result << " {"
+            << " mediametrics_audiothread_reported:"
+            << android::util::MEDIAMETRICS_AUDIOTHREAD_REPORTED
+            << " timestamp_nanos:" << timestamp_nanos
+            << " package_name:" << package_name
+            << " package_version_code:" << package_version_code
+            << " media_apex_version:" << media_apex_version
 
-    } else {
-        ALOGV("NOT sending: private data (len=%zu)", strlen(serialized.c_str()));
-    }
+            << " type:" << type
+            << " framecount:" << framecount
+            << " samplerate:" << samplerate
+            << " work_millis_hist:" << work_millis_hist
+            << " latency_millis_hist:" << latency_millis_hist
+            << " warmup_millis_hist:" << warmup_millis_hist
+            << " underruns:" << underruns
+            << " overruns:" << overruns
+            << " active_millis:" << active_millis
+            << " duration_millis:" << duration_millis
 
+            << " id:" << id
+            << " port_id:" << port_id
+            << " sample_rate:" << sample_rate
+            << " channel_mask:" << channel_mask
+            << " encoding:" << encoding
+            << " frame_count:" << frame_count
+            << " output_device:" << output_device
+            << " input_device:" << input_device
+            << " io_jitter_mean_millis:" << io_jitter_mean_millis
+            << " io_jitter_stddev_millis:" << io_jitter_stddev_millis
+
+            << " process_time_mean_millis:" << process_time_mean_millis
+            << " process_time_stddev_millis:" << process_time_stddev_millis
+            << " timestamp_jitter_mean_millis:" << timestamp_jitter_mean_millis
+            << " timestamp_jitter_stddev_millis:" << timestamp_jitter_stddev_millis
+            << " latency_mean_millis:" << latency_mean_millis
+            << " latency_stddev_millis:" << latency_stddev_millis
+            << " }";
+    statsdLog->log(android::util::MEDIAMETRICS_AUDIOTHREAD_REPORTED, log.str());
     return true;
 }
 

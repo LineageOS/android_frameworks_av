@@ -31,21 +31,20 @@
 #include <statslog.h>
 
 #include "MediaMetricsService.h"
+#include "StringUtils.h"
 #include "frameworks/proto_logging/stats/enums/stats/mediametrics/mediametrics.pb.h"
 #include "iface_statsd.h"
 
 namespace android {
 
-bool statsd_mediaparser(const mediametrics::Item *item)
+bool statsd_mediaparser(const std::shared_ptr<const mediametrics::Item>& item,
+        const std::shared_ptr<mediametrics::StatsdLog>& statsdLog)
 {
-    if (item == nullptr) {
-        return false;
-    }
+    if (item == nullptr) return false;
 
-    // statsd wrapper data.
-    const nsecs_t timestamp = MediaMetricsService::roundTime(item->getTimestamp());
-    std::string pkgName = item->getPkgName();
-    int64_t pkgVersionCode = item->getPkgVersionCode();
+    const nsecs_t timestamp_nanos = MediaMetricsService::roundTime(item->getTimestamp());
+    const std::string package_name = item->getPkgName();
+    const int64_t package_version_code = item->getPkgVersionCode();
 
     std::string parserName;
     item->getString("android.media.mediaparser.parserName", &parserName);
@@ -80,26 +79,48 @@ bool statsd_mediaparser(const mediametrics::Item *item)
     int32_t videoHeight = -1;
     item->getInt32("android.media.mediaparser.videoHeight", &videoHeight);
 
-    if (enabled_statsd) {
-        (void) android::util::stats_write(android::util::MEDIAMETRICS_MEDIAPARSER_REPORTED,
-                                   timestamp,
-                                   pkgName.c_str(),
-                                   pkgVersionCode,
-                                   parserName.c_str(),
-                                   createdByName,
-                                   parserPool.c_str(),
-                                   lastException.c_str(),
-                                   resourceByteCount,
-                                   durationMillis,
-                                   trackMimeTypes.c_str(),
-                                   trackCodecs.c_str(),
-                                   alteredParameters.c_str(),
-                                   videoWidth,
-                                   videoHeight);
-    } else {
-        ALOGV("NOT sending MediaParser media metrics.");
-    }
+    std::string logSessionId;
+    item->getString("android.media.mediaparser.logSessionId", &logSessionId);
+    logSessionId = mediametrics::stringutils::sanitizeLogSessionId(logSessionId);
 
+    int result = android::util::stats_write(android::util::MEDIAMETRICS_MEDIAPARSER_REPORTED,
+                               timestamp_nanos,
+                               package_name.c_str(),
+                               package_version_code,
+                               parserName.c_str(),
+                               createdByName,
+                               parserPool.c_str(),
+                               lastException.c_str(),
+                               resourceByteCount,
+                               durationMillis,
+                               trackMimeTypes.c_str(),
+                               trackCodecs.c_str(),
+                               alteredParameters.c_str(),
+                               videoWidth,
+                               videoHeight,
+                               logSessionId.c_str());
+
+    std::stringstream log;
+    log << "result:" << result << " {"
+            << " mediametrics_mediaparser_reported:"
+            << android::util::MEDIAMETRICS_MEDIAPARSER_REPORTED
+            << " timestamp_nanos:" << timestamp_nanos
+            << " package_name:" << package_name
+            << " package_version_code:" << package_version_code
+            << " parser_name:" << parserName
+            << " created_by_name:" << createdByName
+            << " parser_pool:" << parserPool
+            << " last_exception:" << lastException
+            << " resource_byte_count:" << resourceByteCount
+            << " duration_millis:" << durationMillis
+            << " track_mime_types:" << trackMimeTypes
+            << " track_codecs:" << trackCodecs
+            << " altered_parameters:" << alteredParameters
+            << " video_width:" << videoWidth
+            << " video_height:" << videoHeight
+            << " log_session_id:" << logSessionId
+            << " }";
+    statsdLog->log(android::util::MEDIAMETRICS_MEDIAPARSER_REPORTED, log.str());
     return true;
 }
 

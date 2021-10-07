@@ -1,0 +1,34 @@
+package {
+    // See: http://go/android-license-faq
+    // A large-scale-change added 'default_applicable_licenses' to import
+    // all of the 'license_kinds' from "frameworks_av_services_mediatranscoding_license"
+    // to get the below license kinds:
+    //   SPDX-license-identifier-Apache-2.0
+    default_applicable_licenses: [
+        "frameworks_av_services_mediatranscoding_license",
+    ],
+}
+
+android_test_helper_app {
+    name: "TranscodingUidPolicy_TestAppA",
+    manifest: "TestAppA.xml",
+    static_libs: ["androidx.test.rules"],
+    sdk_version: "test_current",
+    srcs: ["src/**/*.java"],
+}
+
+android_test_helper_app {
+    name: "TranscodingUidPolicy_TestAppB",
+    manifest: "TestAppB.xml",
+    static_libs: ["androidx.test.rules"],
+    sdk_version: "test_current",
+    srcs: ["src/**/*.java"],
+}
+
+android_test_helper_app {
+    name: "TranscodingUidPolicy_TestAppC",
+    manifest: "TestAppC.xml",
+    static_libs: ["androidx.test.rules"],
+    sdk_version: "test_current",
+    srcs: ["src/**/*.java"],
+}

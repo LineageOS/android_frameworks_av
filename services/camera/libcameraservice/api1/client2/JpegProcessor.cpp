@@ -35,6 +35,8 @@
 namespace android {
 namespace camera2 {
 
+using android::camera3::CAMERA_STREAM_ROTATION_0;
+
 JpegProcessor::JpegProcessor(
     sp<Camera2Client> client,
     wp<CaptureSequencer> sequencer):
@@ -148,8 +150,8 @@ status_t JpegProcessor::updateStream(const Parameters &params) {
         res = device->createStream(mCaptureWindow,
                 params.pictureWidth, params.pictureHeight,
                 HAL_PIXEL_FORMAT_BLOB, HAL_DATASPACE_V0_JFIF,
-                CAMERA3_STREAM_ROTATION_0, &mCaptureStreamId,
-                String8());
+                CAMERA_STREAM_ROTATION_0, &mCaptureStreamId,
+                String8(), std::unordered_set<int32_t>{ANDROID_SENSOR_PIXEL_MODE_DEFAULT});
         if (res != OK) {
             ALOGE("%s: Camera %d: Can't create output stream for capture: "
                     "%s (%d)", __FUNCTION__, mId,

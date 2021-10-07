@@ -77,6 +77,7 @@ public:
 
     sp<DeviceDescriptor> getDeviceAndMixForInputSource(audio_source_t inputSource,
                                                        const DeviceVector &availableDeviceTypes,
+                                                       uid_t uid,
                                                        sp<AudioPolicyMix> *policyMix) const;
 
     /**

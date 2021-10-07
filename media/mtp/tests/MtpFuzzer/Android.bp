@@ -1,0 +1,40 @@
+package {
+    // See: http://go/android-license-faq
+    // A large-scale-change added 'default_applicable_licenses' to import
+    // all of the 'license_kinds' from "frameworks_av_media_mtp_license"
+    // to get the below license kinds:
+    //   SPDX-license-identifier-Apache-2.0
+    default_applicable_licenses: ["frameworks_av_media_mtp_license"],
+}
+
+cc_fuzz {
+    name: "mtp_fuzzer",
+    srcs: [
+        "mtp_fuzzer.cpp",
+        "MtpMockDatabase.cpp",
+    ],
+    shared_libs: [
+	"libmtp",
+	"libbase",
+	"liblog",
+	"libutils",
+    ],
+    cflags: [
+        "-Wall",
+        "-Wextra",
+        "-Werror",
+        "-DMTP_DEVICE",
+        "-Wno-unused-parameter",
+    ],
+    dictionary: "mtp_fuzzer.dict",
+    corpus: ["corpus/*"],
+
+    fuzz_config: {
+
+        cc: ["jameswei@google.com"],
+        componentid: 1344,
+        acknowledgement: [
+            "Grant Hernandez of Google",
+        ],
+    },
+}

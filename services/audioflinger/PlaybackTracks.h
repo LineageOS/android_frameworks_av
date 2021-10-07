@@ -26,11 +26,13 @@ public:
     bool hasOpPlayAudio() const;
 
     static sp<OpPlayAudioMonitor> createIfNeeded(
-            uid_t uid, const audio_attributes_t& attr, int id, audio_stream_type_t streamType,
-            const std::string& opPackageName);
+            const AttributionSourceState& attributionSource,
+            const audio_attributes_t& attr, int id,
+            audio_stream_type_t streamType);
 
 private:
-    OpPlayAudioMonitor(uid_t uid, audio_usage_t usage, int id, const String16& opPackageName);
+    OpPlayAudioMonitor(const AttributionSourceState& attributionSource,
+        audio_usage_t usage, int id);
     void onFirstRef() override;
     static void getPackagesForUid(uid_t uid, Vector<String16>& packages);
 
@@ -50,10 +52,9 @@ private:
     void checkPlayAudioForUsage();
 
     std::atomic_bool mHasOpPlayAudio;
-    const uid_t mUid;
+    const AttributionSourceState mAttributionSource;
     const int32_t mUsage; // on purpose not audio_usage_t because always checked in appOps as int32_t
     const int mId; // for logging purposes only
-    const String16 mOpPackageName;
 };
 
 // playback track
@@ -72,14 +73,14 @@ public:
                                 const sp<IMemory>& sharedBuffer,
                                 audio_session_t sessionId,
                                 pid_t creatorPid,
-                                uid_t uid,
+                                const AttributionSourceState& attributionSource,
                                 audio_output_flags_t flags,
                                 track_type type,
                                 audio_port_handle_t portId = AUDIO_PORT_HANDLE_NONE,
                                 /** default behaviour is to start when there are as many frames
                                   * ready as possible (aka. Buffer is full). */
                                 size_t frameCountToBeReady = SIZE_MAX,
-                                const std::string opPackageName = "");
+                                float speed = 1.0f);
     virtual             ~Track();
     virtual status_t    initCheck() const;
 
@@ -146,14 +147,6 @@ public:
     void                setFinalVolume(float volume);
     float               getFinalVolume() const { return mFinalVolume; }
 
-    /** @return true if the track has changed (metadata or volume) since
-     *          the last time this function was called,
-     *          true if this function was never called since the track creation,
-     *          false otherwise.
-     *  Thread safe.
-     */
-    bool            readAndClearHasChanged() { return !mChangeNotified.test_and_set(); }
-
     using SourceMetadatas = std::vector<playback_track_metadata_v7_t>;
     using MetadataInserter = std::back_insert_iterator<SourceMetadatas>;
     /** Copy the track metadata in the provided iterator. Thread safe. */
@@ -167,12 +160,12 @@ public:
                 mHapticPlaybackEnabled = hapticPlaybackEnabled;
             }
             /** Return at what intensity to play haptics, used in mixer. */
-            AudioMixer::haptic_intensity_t getHapticIntensity() const { return mHapticIntensity; }
+            os::HapticScale getHapticIntensity() const { return mHapticIntensity; }
             /** Set intensity of haptic playback, should be set after querying vibrator service. */
-            void    setHapticIntensity(AudioMixer::haptic_intensity_t hapticIntensity) {
-                if (AudioMixer::isValidHapticIntensity(hapticIntensity)) {
+            void    setHapticIntensity(os::HapticScale hapticIntensity) {
+                if (os::isValidHapticScale(hapticIntensity)) {
                     mHapticIntensity = hapticIntensity;
-                    setHapticPlaybackEnabled(mHapticIntensity != AudioMixer::HAPTIC_SCALE_MUTE);
+                    setHapticPlaybackEnabled(mHapticIntensity != os::HapticScale::MUTE);
                 }
             }
             sp<os::ExternalVibration> getExternalVibration() const { return mExternalVibration; }
@@ -189,6 +182,9 @@ public:
                    mAudioTrackServerProxy->getUnderrunFrames());
        }
     }
+
+    audio_output_flags_t getOutputFlags() const { return mFlags; }
+    float getSpeed() const { return mSpeed; }
 protected:
     // for numerous
     friend class PlaybackThread;
@@ -245,8 +241,6 @@ protected:
 
     void signalClientFlag(int32_t flag);
 
-    /** Set that a metadata has changed and needs to be notified to backend. Thread safe. */
-    void setMetadataHasChanged() { mChangeNotified.clear(); }
 public:
     void triggerEvents(AudioSystem::sync_event_t type);
     virtual void invalidate();
@@ -287,7 +281,7 @@ protected:
 
     bool                mHapticPlaybackEnabled = false; // indicates haptic playback enabled or not
     // intensity to play haptic data
-    AudioMixer::haptic_intensity_t mHapticIntensity = AudioMixer::HAPTIC_SCALE_MUTE;
+    os::HapticScale mHapticIntensity = os::HapticScale::MUTE;
     class AudioVibrationController : public os::BnExternalVibrationController {
     public:
         explicit AudioVibrationController(Track* track) : mTrack(track) {}
@@ -336,9 +330,8 @@ private:
     bool                mFlushHwPending; // track requests for thread flush
     bool                mPauseHwPending = false; // direct/offload track request for thread pause
     audio_output_flags_t mFlags;
-    // If the last track change was notified to the client with readAndClearHasChanged
-    std::atomic_flag     mChangeNotified = ATOMIC_FLAG_INIT;
     TeePatches  mTeePatches;
+    const float         mSpeed;
 };  // end of Track
 
 
@@ -357,7 +350,7 @@ public:
                                 audio_format_t format,
                                 audio_channel_mask_t channelMask,
                                 size_t frameCount,
-                                uid_t uid);
+                                const AttributionSourceState& attributionSource);
     virtual             ~OutputTrack();
 
     virtual status_t    start(AudioSystem::sync_event_t event =

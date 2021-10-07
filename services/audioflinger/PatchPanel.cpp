@@ -25,6 +25,7 @@
 
 #include "AudioFlinger.h"
 #include <media/AudioParameter.h>
+#include <media/AudioValidator.h>
 #include <media/DeviceDescriptorBase.h>
 #include <media/PatchBuilder.h>
 #include <mediautils/ServiceUtilities.h>
@@ -55,8 +56,12 @@ status_t AudioFlinger::listAudioPorts(unsigned int *num_ports,
 }
 
 /* Get supported attributes for a given audio port */
-status_t AudioFlinger::getAudioPort(struct audio_port *port)
-{
+status_t AudioFlinger::getAudioPort(struct audio_port_v7 *port) {
+    status_t status = AudioValidator::validateAudioPort(*port);
+    if (status != NO_ERROR) {
+        return status;
+    }
+
     Mutex::Autolock _l(mLock);
     return mPatchPanel.getAudioPort(port);
 }
@@ -65,6 +70,11 @@ status_t AudioFlinger::getAudioPort(struct audio_port *port)
 status_t AudioFlinger::createAudioPatch(const struct audio_patch *patch,
                                    audio_patch_handle_t *handle)
 {
+    status_t status = AudioValidator::validateAudioPatch(*patch);
+    if (status != NO_ERROR) {
+        return status;
+    }
+
     Mutex::Autolock _l(mLock);
     return mPatchPanel.createAudioPatch(patch, handle);
 }
@@ -103,10 +113,22 @@ status_t AudioFlinger::PatchPanel::listAudioPorts(unsigned int *num_ports __unus
 }
 
 /* Get supported attributes for a given audio port */
-status_t AudioFlinger::PatchPanel::getAudioPort(struct audio_port *port __unused)
+status_t AudioFlinger::PatchPanel::getAudioPort(struct audio_port_v7 *port)
 {
-    ALOGV(__func__);
-    return NO_ERROR;
+    if (port->type != AUDIO_PORT_TYPE_DEVICE) {
+        // Only query the HAL when the port is a device.
+        // TODO: implement getAudioPort for mix.
+        return INVALID_OPERATION;
+    }
+    AudioHwDevice* hwDevice = findAudioHwDeviceByModule(port->ext.device.hw_module);
+    if (hwDevice == nullptr) {
+        ALOGW("%s cannot find hw module %d", __func__, port->ext.device.hw_module);
+        return BAD_VALUE;
+    }
+    if (!hwDevice->supportsAudioPatches()) {
+        return INVALID_OPERATION;
+    }
+    return hwDevice->getAudioPort(port);
 }
 
 /* Connect a patch between several source and sink ports */

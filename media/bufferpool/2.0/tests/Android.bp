@@ -25,6 +25,7 @@ package {
 
 cc_test {
     name: "VtsVndkHidlBufferpoolV2_0TargetSingleTest",
+    test_suites: ["device-tests"],
     defaults: ["VtsHalTargetTestDefaults"],
     srcs: [
         "allocator.cpp",
@@ -33,7 +34,7 @@ cc_test {
     static_libs: [
         "android.hardware.media.bufferpool@2.0",
         "libcutils",
-        "libstagefright_bufferpool@2.0",
+        "libstagefright_bufferpool@2.0.1",
     ],
     shared_libs: [
         "libfmq",
@@ -43,6 +44,7 @@ cc_test {
 
 cc_test {
     name: "VtsVndkHidlBufferpoolV2_0TargetMultiTest",
+    test_suites: ["device-tests"],
     defaults: ["VtsHalTargetTestDefaults"],
     srcs: [
         "allocator.cpp",
@@ -51,9 +53,29 @@ cc_test {
     static_libs: [
         "android.hardware.media.bufferpool@2.0",
         "libcutils",
-        "libstagefright_bufferpool@2.0",
+        "libstagefright_bufferpool@2.0.1",
     ],
     shared_libs: [
+        "libfmq",
+    ],
+    compile_multilib: "both",
+}
+
+cc_test {
+    name: "VtsVndkHidlBufferpoolV2_0TargetCondTest",
+    test_suites: ["device-tests"],
+    defaults: ["VtsHalTargetTestDefaults"],
+    srcs: [
+        "allocator.cpp",
+        "cond.cpp",
+    ],
+    static_libs: [
+        "android.hardware.media.bufferpool@2.0",
+        "libcutils",
+        "libstagefright_bufferpool@2.0.1",
+    ],
+    shared_libs: [
+        "libhidlbase",
         "libfmq",
     ],
     compile_multilib: "both",

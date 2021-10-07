@@ -24,108 +24,57 @@
 #include <utils/RefBase.h>
 #include <utils/Errors.h>
 #include <binder/IInterface.h>
-#include <binder/Parcel.h>
-#include <binder/Parcelable.h>
+#include <media/AidlConversion.h>
 #include <media/AudioClient.h>
+#include <media/AudioCommonTypes.h>
 #include <media/DeviceDescriptorBase.h>
-#include <media/IAudioTrack.h>
-#include <media/IAudioFlingerClient.h>
 #include <system/audio.h>
 #include <system/audio_effect.h>
 #include <system/audio_policy.h>
-#include <media/IEffect.h>
-#include <media/IEffectClient.h>
 #include <utils/String8.h>
 #include <media/MicrophoneInfo.h>
+#include <map>
 #include <string>
 #include <vector>
 
+#include <android/media/AudioVibratorInfo.h>
+#include <android/media/BnAudioFlingerService.h>
+#include <android/media/BpAudioFlingerService.h>
+#include <android/content/AttributionSourceState.h>
+#include "android/media/CreateEffectRequest.h"
+#include "android/media/CreateEffectResponse.h"
+#include "android/media/CreateRecordRequest.h"
+#include "android/media/CreateRecordResponse.h"
+#include "android/media/CreateTrackRequest.h"
+#include "android/media/CreateTrackResponse.h"
 #include "android/media/IAudioRecord.h"
+#include "android/media/IAudioFlingerClient.h"
+#include "android/media/IAudioTrack.h"
 #include "android/media/IAudioTrackCallback.h"
+#include "android/media/IEffect.h"
+#include "android/media/IEffectClient.h"
+#include "android/media/OpenInputRequest.h"
+#include "android/media/OpenInputResponse.h"
+#include "android/media/OpenOutputRequest.h"
+#include "android/media/OpenOutputResponse.h"
+#include "android/media/TrackSecondaryOutputInfo.h"
 
 namespace android {
 
 // ----------------------------------------------------------------------------
 
-class IAudioFlinger : public IInterface
-{
+class IAudioFlinger : public RefBase {
 public:
-    DECLARE_META_INTERFACE(AudioFlinger);
+    static constexpr char DEFAULT_SERVICE_NAME[] = "media.audio_flinger";
+
+    virtual ~IAudioFlinger() = default;
 
     /* CreateTrackInput contains all input arguments sent by AudioTrack to AudioFlinger
      * when calling createTrack() including arguments that will be updated by AudioFlinger
      * and returned in CreateTrackOutput object
      */
-    class CreateTrackInput : public Parcelable {
+    class CreateTrackInput {
     public:
-        status_t readFromParcel(const Parcel *parcel) override {
-            /* input arguments*/
-            memset(&attr, 0, sizeof(audio_attributes_t));
-            if (parcel->read(&attr, sizeof(audio_attributes_t)) != NO_ERROR) {
-                return DEAD_OBJECT;
-            }
-            attr.tags[AUDIO_ATTRIBUTES_TAGS_MAX_SIZE -1] = '\0';
-            memset(&config, 0, sizeof(audio_config_t));
-            if (parcel->read(&config, sizeof(audio_config_t)) != NO_ERROR) {
-                return DEAD_OBJECT;
-            }
-            if (clientInfo.readFromParcel(parcel) != NO_ERROR) {
-                return DEAD_OBJECT;
-            }
-            if (parcel->readInt32() != 0) {
-                // TODO: Using unsecurePointer() has some associated security
-                //       pitfalls (see declaration for details).
-                //       Either document why it is safe in this case or address
-                //       the issue (e.g. by copying).
-                sharedBuffer = interface_cast<IMemory>(parcel->readStrongBinder());
-                if (sharedBuffer == 0 || sharedBuffer->unsecurePointer() == NULL) {
-                    return BAD_VALUE;
-                }
-            }
-            notificationsPerBuffer = parcel->readInt32();
-            speed = parcel->readFloat();
-            audioTrackCallback = interface_cast<media::IAudioTrackCallback>(
-                    parcel->readStrongBinder());
-            const char* opPackageNamePtr = parcel->readCString();
-            if (opPackageNamePtr == nullptr) {
-                return FAILED_TRANSACTION;
-            }
-            opPackageName = opPackageNamePtr;
-
-            /* input/output arguments*/
-            (void)parcel->read(&flags, sizeof(audio_output_flags_t));
-            frameCount = parcel->readInt64();
-            notificationFrameCount = parcel->readInt64();
-            (void)parcel->read(&selectedDeviceId, sizeof(audio_port_handle_t));
-            (void)parcel->read(&sessionId, sizeof(audio_session_t));
-            return NO_ERROR;
-        }
-
-        status_t writeToParcel(Parcel *parcel) const override {
-            /* input arguments*/
-            (void)parcel->write(&attr, sizeof(audio_attributes_t));
-            (void)parcel->write(&config, sizeof(audio_config_t));
-            (void)clientInfo.writeToParcel(parcel);
-            if (sharedBuffer != 0) {
-                (void)parcel->writeInt32(1);
-                (void)parcel->writeStrongBinder(IInterface::asBinder(sharedBuffer));
-            } else {
-                (void)parcel->writeInt32(0);
-            }
-            (void)parcel->writeInt32(notificationsPerBuffer);
-            (void)parcel->writeFloat(speed);
-            (void)parcel->writeStrongBinder(IInterface::asBinder(audioTrackCallback));
-            (void)parcel->writeCString(opPackageName.c_str());
-
-            /* input/output arguments*/
-            (void)parcel->write(&flags, sizeof(audio_output_flags_t));
-            (void)parcel->writeInt64(frameCount);
-            (void)parcel->writeInt64(notificationFrameCount);
-            (void)parcel->write(&selectedDeviceId, sizeof(audio_port_handle_t));
-            (void)parcel->write(&sessionId, sizeof(audio_session_t));
-            return NO_ERROR;
-        }
-
         /* input */
         audio_attributes_t attr;
         audio_config_t config;
@@ -134,7 +83,6 @@ public:
         uint32_t notificationsPerBuffer;
         float speed;
         sp<media::IAudioTrackCallback> audioTrackCallback;
-        std::string opPackageName;
 
         /* input/output */
         audio_output_flags_t flags;
@@ -142,50 +90,17 @@ public:
         size_t notificationFrameCount;
         audio_port_handle_t selectedDeviceId;
         audio_session_t sessionId;
+
+        ConversionResult<media::CreateTrackRequest> toAidl() const;
+        static ConversionResult<CreateTrackInput> fromAidl(const media::CreateTrackRequest& aidl);
     };
 
     /* CreateTrackOutput contains all output arguments returned by AudioFlinger to AudioTrack
      * when calling createTrack() including arguments that were passed as I/O for update by
      * CreateTrackInput.
      */
-    class CreateTrackOutput : public Parcelable {
+    class CreateTrackOutput {
     public:
-        status_t readFromParcel(const Parcel *parcel) override {
-            /* input/output arguments*/
-            (void)parcel->read(&flags, sizeof(audio_output_flags_t));
-            frameCount = parcel->readInt64();
-            notificationFrameCount = parcel->readInt64();
-            (void)parcel->read(&selectedDeviceId, sizeof(audio_port_handle_t));
-            (void)parcel->read(&sessionId, sizeof(audio_session_t));
-
-            /* output arguments*/
-            sampleRate = parcel->readUint32();
-            afFrameCount = parcel->readInt64();
-            afSampleRate = parcel->readInt64();
-            afLatencyMs = parcel->readInt32();
-            (void)parcel->read(&outputId, sizeof(audio_io_handle_t));
-            (void)parcel->read(&portId, sizeof(audio_port_handle_t));
-            return NO_ERROR;
-        }
-
-        status_t writeToParcel(Parcel *parcel) const override {
-            /* input/output arguments*/
-            (void)parcel->write(&flags, sizeof(audio_output_flags_t));
-            (void)parcel->writeInt64(frameCount);
-            (void)parcel->writeInt64(notificationFrameCount);
-            (void)parcel->write(&selectedDeviceId, sizeof(audio_port_handle_t));
-            (void)parcel->write(&sessionId, sizeof(audio_session_t));
-
-            /* output arguments*/
-            (void)parcel->writeUint32(sampleRate);
-            (void)parcel->writeInt64(afFrameCount);
-            (void)parcel->writeInt64(afSampleRate);
-            (void)parcel->writeInt32(afLatencyMs);
-            (void)parcel->write(&outputId, sizeof(audio_io_handle_t));
-            (void)parcel->write(&portId, sizeof(audio_port_handle_t));
-            return NO_ERROR;
-        }
-
         /* input/output */
         audio_output_flags_t flags;
         size_t frameCount;
@@ -195,70 +110,30 @@ public:
 
         /* output */
         uint32_t sampleRate;
+        audio_stream_type_t streamType;
         size_t   afFrameCount;
         uint32_t afSampleRate;
         uint32_t afLatencyMs;
         audio_io_handle_t outputId;
         audio_port_handle_t portId;
+        sp<media::IAudioTrack> audioTrack;
+
+        ConversionResult<media::CreateTrackResponse> toAidl() const;
+        static ConversionResult<CreateTrackOutput> fromAidl(const media::CreateTrackResponse& aidl);
     };
 
     /* CreateRecordInput contains all input arguments sent by AudioRecord to AudioFlinger
      * when calling createRecord() including arguments that will be updated by AudioFlinger
      * and returned in CreateRecordOutput object
      */
-    class CreateRecordInput : public Parcelable {
+    class CreateRecordInput {
     public:
-        status_t readFromParcel(const Parcel *parcel) override {
-            /* input arguments*/
-            memset(&attr, 0, sizeof(audio_attributes_t));
-            if (parcel->read(&attr, sizeof(audio_attributes_t)) != NO_ERROR) {
-                return DEAD_OBJECT;
-            }
-            attr.tags[AUDIO_ATTRIBUTES_TAGS_MAX_SIZE -1] = '\0';
-            memset(&config, 0, sizeof(audio_config_base_t));
-            if (parcel->read(&config, sizeof(audio_config_base_t)) != NO_ERROR) {
-                return DEAD_OBJECT;
-            }
-            if (clientInfo.readFromParcel(parcel) != NO_ERROR) {
-                return DEAD_OBJECT;
-            }
-            opPackageName = parcel->readString16();
-            if (parcel->read(&riid, sizeof(audio_unique_id_t)) != NO_ERROR) {
-                return DEAD_OBJECT;
-            }
-
-            /* input/output arguments*/
-            (void)parcel->read(&flags, sizeof(audio_input_flags_t));
-            frameCount = parcel->readInt64();
-            notificationFrameCount = parcel->readInt64();
-            (void)parcel->read(&selectedDeviceId, sizeof(audio_port_handle_t));
-            (void)parcel->read(&sessionId, sizeof(audio_session_t));
-            return NO_ERROR;
-        }
-
-        status_t writeToParcel(Parcel *parcel) const override {
-            /* input arguments*/
-            (void)parcel->write(&attr, sizeof(audio_attributes_t));
-            (void)parcel->write(&config, sizeof(audio_config_base_t));
-            (void)clientInfo.writeToParcel(parcel);
-            (void)parcel->writeString16(opPackageName);
-            (void)parcel->write(&riid, sizeof(audio_unique_id_t));
-
-            /* input/output arguments*/
-            (void)parcel->write(&flags, sizeof(audio_input_flags_t));
-            (void)parcel->writeInt64(frameCount);
-            (void)parcel->writeInt64(notificationFrameCount);
-            (void)parcel->write(&selectedDeviceId, sizeof(audio_port_handle_t));
-            (void)parcel->write(&sessionId, sizeof(audio_session_t));
-            return NO_ERROR;
-        }
-
         /* input */
         audio_attributes_t attr;
         audio_config_base_t config;
         AudioClient clientInfo;
-        String16 opPackageName;
         audio_unique_id_t riid;
+        int32_t maxSharedAudioHistoryMs;
 
         /* input/output */
         audio_input_flags_t flags;
@@ -266,77 +141,17 @@ public:
         size_t notificationFrameCount;
         audio_port_handle_t selectedDeviceId;
         audio_session_t sessionId;
+
+        ConversionResult<media::CreateRecordRequest> toAidl() const;
+        static ConversionResult<CreateRecordInput> fromAidl(const media::CreateRecordRequest& aidl);
     };
 
     /* CreateRecordOutput contains all output arguments returned by AudioFlinger to AudioRecord
      * when calling createRecord() including arguments that were passed as I/O for update by
      * CreateRecordInput.
      */
-    class CreateRecordOutput : public Parcelable {
+    class CreateRecordOutput {
     public:
-        status_t readFromParcel(const Parcel *parcel) override {
-            /* input/output arguments*/
-            (void)parcel->read(&flags, sizeof(audio_input_flags_t));
-            frameCount = parcel->readInt64();
-            notificationFrameCount = parcel->readInt64();
-            (void)parcel->read(&selectedDeviceId, sizeof(audio_port_handle_t));
-            (void)parcel->read(&sessionId, sizeof(audio_session_t));
-
-            /* output arguments*/
-            sampleRate = parcel->readUint32();
-            (void)parcel->read(&inputId, sizeof(audio_io_handle_t));
-            if (parcel->readInt32() != 0) {
-                cblk = interface_cast<IMemory>(parcel->readStrongBinder());
-                // TODO: Using unsecurePointer() has some associated security
-                //       pitfalls (see declaration for details).
-                //       Either document why it is safe in this case or address
-                //       the issue (e.g. by copying).
-                if (cblk == 0 || cblk->unsecurePointer() == NULL) {
-                    return BAD_VALUE;
-                }
-            }
-            if (parcel->readInt32() != 0) {
-                buffers = interface_cast<IMemory>(parcel->readStrongBinder());
-                // TODO: Using unsecurePointer() has some associated security
-                //       pitfalls (see declaration for details).
-                //       Either document why it is safe in this case or address
-                //       the issue (e.g. by copying).
-                if (buffers == 0 || buffers->unsecurePointer() == NULL) {
-                    return BAD_VALUE;
-                }
-            }
-            (void)parcel->read(&portId, sizeof(audio_port_handle_t));
-            return NO_ERROR;
-        }
-
-        status_t writeToParcel(Parcel *parcel) const override {
-            /* input/output arguments*/
-            (void)parcel->write(&flags, sizeof(audio_input_flags_t));
-            (void)parcel->writeInt64(frameCount);
-            (void)parcel->writeInt64(notificationFrameCount);
-            (void)parcel->write(&selectedDeviceId, sizeof(audio_port_handle_t));
-            (void)parcel->write(&sessionId, sizeof(audio_session_t));
-
-            /* output arguments*/
-            (void)parcel->writeUint32(sampleRate);
-            (void)parcel->write(&inputId, sizeof(audio_io_handle_t));
-            if (cblk != 0) {
-                (void)parcel->writeInt32(1);
-                (void)parcel->writeStrongBinder(IInterface::asBinder(cblk));
-            } else {
-                (void)parcel->writeInt32(0);
-            }
-            if (buffers != 0) {
-                (void)parcel->writeInt32(1);
-                (void)parcel->writeStrongBinder(IInterface::asBinder(buffers));
-            } else {
-                (void)parcel->writeInt32(0);
-            }
-            (void)parcel->write(&portId, sizeof(audio_port_handle_t));
-
-            return NO_ERROR;
-        }
-
         /* input/output */
         audio_input_flags_t flags;
         size_t frameCount;
@@ -350,21 +165,26 @@ public:
         sp<IMemory> cblk;
         sp<IMemory> buffers;
         audio_port_handle_t portId;
+        sp<media::IAudioRecord> audioRecord;
+
+        ConversionResult<media::CreateRecordResponse> toAidl() const;
+        static ConversionResult<CreateRecordOutput>
+        fromAidl(const media::CreateRecordResponse& aidl);
     };
 
-    // invariant on exit for all APIs that return an sp<>:
-    //   (return value != 0) == (*status == NO_ERROR)
-
     /* create an audio track and registers it with AudioFlinger.
-     * return null if the track cannot be created.
+     * The audioTrack field will be null if the track cannot be created and the status will reflect
+     * failure.
      */
-    virtual sp<IAudioTrack> createTrack(const CreateTrackInput& input,
-                                        CreateTrackOutput& output,
-                                        status_t *status) = 0;
+    virtual status_t createTrack(const media::CreateTrackRequest& input,
+                                 media::CreateTrackResponse& output) = 0;
 
-    virtual sp<media::IAudioRecord> createRecord(const CreateRecordInput& input,
-                                        CreateRecordOutput& output,
-                                        status_t *status) = 0;
+    /* create an audio record and registers it with AudioFlinger.
+     * The audioRecord field will be null if the track cannot be created and the status will reflect
+     * failure.
+     */
+    virtual status_t createRecord(const media::CreateRecordRequest& input,
+                                  media::CreateRecordResponse& output) = 0;
 
     // FIXME Surprisingly, format/latency don't work for input handles
 
@@ -420,32 +240,24 @@ public:
     // Register an object to receive audio input/output change and track notifications.
     // For a given calling pid, AudioFlinger disregards any registrations after the first.
     // Thus the IAudioFlingerClient must be a singleton per process.
-    virtual void registerClient(const sp<IAudioFlingerClient>& client) = 0;
+    virtual void registerClient(const sp<media::IAudioFlingerClient>& client) = 0;
 
     // retrieve the audio recording buffer size in bytes
     // FIXME This API assumes a route, and so should be deprecated.
     virtual size_t getInputBufferSize(uint32_t sampleRate, audio_format_t format,
             audio_channel_mask_t channelMask) const = 0;
 
-    virtual status_t openOutput(audio_module_handle_t module,
-                                audio_io_handle_t *output,
-                                audio_config_t *config,
-                                const sp<DeviceDescriptorBase>& device,
-                                uint32_t *latencyMs,
-                                audio_output_flags_t flags) = 0;
+    virtual status_t openOutput(const media::OpenOutputRequest& request,
+                                media::OpenOutputResponse* response) = 0;
     virtual audio_io_handle_t openDuplicateOutput(audio_io_handle_t output1,
                                     audio_io_handle_t output2) = 0;
     virtual status_t closeOutput(audio_io_handle_t output) = 0;
     virtual status_t suspendOutput(audio_io_handle_t output) = 0;
     virtual status_t restoreOutput(audio_io_handle_t output) = 0;
 
-    virtual status_t openInput(audio_module_handle_t module,
-                               audio_io_handle_t *input,
-                               audio_config_t *config,
-                               audio_devices_t *device,
-                               const String8& address,
-                               audio_source_t source,
-                               audio_input_flags_t flags) = 0;
+    virtual status_t openInput(const media::OpenInputRequest& request,
+                               media::OpenInputResponse* response) = 0;
+
     virtual status_t closeInput(audio_io_handle_t input) = 0;
 
     virtual status_t invalidateStream(audio_stream_type_t stream) = 0;
@@ -471,20 +283,8 @@ public:
                                          uint32_t preferredTypeFlag,
                                          effect_descriptor_t *pDescriptor) const = 0;
 
-    virtual sp<IEffect> createEffect(
-                                    effect_descriptor_t *pDesc,
-                                    const sp<IEffectClient>& client,
-                                    int32_t priority,
-                                    // AudioFlinger doesn't take over handle reference from client
-                                    audio_io_handle_t output,
-                                    audio_session_t sessionId,
-                                    const AudioDeviceTypeAddr& device,
-                                    const String16& callingPackage,
-                                    pid_t pid,
-                                    bool probe,
-                                    status_t *status,
-                                    int *id,
-                                    int *enabled) = 0;
+    virtual status_t createEffect(const media::CreateEffectRequest& request,
+                                  media::CreateEffectResponse* response) = 0;
 
     virtual status_t moveEffects(audio_session_t session, audio_io_handle_t srcOutput,
                                     audio_io_handle_t dstOutput) = 0;
@@ -507,12 +307,8 @@ public:
     // is obtained from android.app.ActivityManager.MemoryInfo.totalMem.
     virtual status_t setLowRamDevice(bool isLowRamDevice, int64_t totalMemory) = 0;
 
-    /* List available audio ports and their attributes */
-    virtual status_t listAudioPorts(unsigned int *num_ports,
-                                    struct audio_port *ports) = 0;
-
     /* Get attributes for a given audio port */
-    virtual status_t getAudioPort(struct audio_port *port) = 0;
+    virtual status_t getAudioPort(struct audio_port_v7 *port) = 0;
 
     /* Create an audio patch between several source and sink ports */
     virtual status_t createAudioPatch(const struct audio_patch *patch,
@@ -540,24 +336,304 @@ public:
     virtual status_t getMicrophones(std::vector<media::MicrophoneInfo> *microphones) = 0;
 
     virtual status_t setAudioHalPids(const std::vector<pid_t>& pids) = 0;
+
+    // Set vibrators' information.
+    // The values will be used to initialize HapticGenerator.
+    virtual status_t setVibratorInfos(
+            const std::vector<media::AudioVibratorInfo>& vibratorInfos) = 0;
+
+    virtual status_t updateSecondaryOutputs(
+            const TrackSecondaryOutputsMap& trackSecondaryOutputs) = 0;
 };
 
-
-// ----------------------------------------------------------------------------
-
-class BnAudioFlinger : public BnInterface<IAudioFlinger>
-{
+/**
+ * A client-side adapter, wrapping an IAudioFlingerService instance and presenting it as an
+ * IAudioFlinger. Intended to be used by legacy client code that was written against IAudioFlinger,
+ * before IAudioFlingerService was introduced as an AIDL service.
+ * New clients should not use this adapter, but rather IAudioFlingerService directly, via
+ * BpAudioFlingerService.
+ */
+class AudioFlingerClientAdapter : public IAudioFlinger {
 public:
-    virtual status_t    onTransact( uint32_t code,
-                                    const Parcel& data,
-                                    Parcel* reply,
-                                    uint32_t flags = 0);
+    explicit AudioFlingerClientAdapter(const sp<media::IAudioFlingerService> delegate);
 
-    // Requests media.log to start merging log buffers
-    virtual void requestLogMerge() = 0;
+    status_t createTrack(const media::CreateTrackRequest& input,
+                         media::CreateTrackResponse& output) override;
+    status_t createRecord(const media::CreateRecordRequest& input,
+                          media::CreateRecordResponse& output) override;
+    uint32_t sampleRate(audio_io_handle_t ioHandle) const override;
+    audio_format_t format(audio_io_handle_t output) const override;
+    size_t frameCount(audio_io_handle_t ioHandle) const override;
+    uint32_t latency(audio_io_handle_t output) const override;
+    status_t setMasterVolume(float value) override;
+    status_t setMasterMute(bool muted) override;
+    float masterVolume() const override;
+    bool masterMute() const override;
+    status_t setMasterBalance(float balance) override;
+    status_t getMasterBalance(float* balance) const override;
+    status_t setStreamVolume(audio_stream_type_t stream, float value,
+                             audio_io_handle_t output) override;
+    status_t setStreamMute(audio_stream_type_t stream, bool muted) override;
+    float streamVolume(audio_stream_type_t stream,
+                       audio_io_handle_t output) const override;
+    bool streamMute(audio_stream_type_t stream) const override;
+    status_t setMode(audio_mode_t mode) override;
+    status_t setMicMute(bool state) override;
+    bool getMicMute() const override;
+    void setRecordSilenced(audio_port_handle_t portId, bool silenced) override;
+    status_t setParameters(audio_io_handle_t ioHandle,
+                           const String8& keyValuePairs) override;
+    String8 getParameters(audio_io_handle_t ioHandle, const String8& keys)
+    const override;
+    void registerClient(const sp<media::IAudioFlingerClient>& client) override;
+    size_t getInputBufferSize(uint32_t sampleRate, audio_format_t format,
+                              audio_channel_mask_t channelMask) const override;
+    status_t openOutput(const media::OpenOutputRequest& request,
+                        media::OpenOutputResponse* response) override;
+    audio_io_handle_t openDuplicateOutput(audio_io_handle_t output1,
+                                          audio_io_handle_t output2) override;
+    status_t closeOutput(audio_io_handle_t output) override;
+    status_t suspendOutput(audio_io_handle_t output) override;
+    status_t restoreOutput(audio_io_handle_t output) override;
+    status_t openInput(const media::OpenInputRequest& request,
+                       media::OpenInputResponse* response) override;
+    status_t closeInput(audio_io_handle_t input) override;
+    status_t invalidateStream(audio_stream_type_t stream) override;
+    status_t setVoiceVolume(float volume) override;
+    status_t getRenderPosition(uint32_t* halFrames, uint32_t* dspFrames,
+                               audio_io_handle_t output) const override;
+    uint32_t getInputFramesLost(audio_io_handle_t ioHandle) const override;
+    audio_unique_id_t newAudioUniqueId(audio_unique_id_use_t use) override;
+    void acquireAudioSessionId(audio_session_t audioSession, pid_t pid, uid_t uid) override;
+    void releaseAudioSessionId(audio_session_t audioSession, pid_t pid) override;
+    status_t queryNumberEffects(uint32_t* numEffects) const override;
+    status_t queryEffect(uint32_t index, effect_descriptor_t* pDescriptor) const override;
+    status_t getEffectDescriptor(const effect_uuid_t* pEffectUUID,
+                                 const effect_uuid_t* pTypeUUID,
+                                 uint32_t preferredTypeFlag,
+                                 effect_descriptor_t* pDescriptor) const override;
+    status_t createEffect(const media::CreateEffectRequest& request,
+                          media::CreateEffectResponse* response) override;
+    status_t moveEffects(audio_session_t session, audio_io_handle_t srcOutput,
+                         audio_io_handle_t dstOutput) override;
+    void setEffectSuspended(int effectId,
+                            audio_session_t sessionId,
+                            bool suspended) override;
+    audio_module_handle_t loadHwModule(const char* name) override;
+    uint32_t getPrimaryOutputSamplingRate() override;
+    size_t getPrimaryOutputFrameCount() override;
+    status_t setLowRamDevice(bool isLowRamDevice, int64_t totalMemory) override;
+    status_t getAudioPort(struct audio_port_v7* port) override;
+    status_t createAudioPatch(const struct audio_patch* patch,
+                              audio_patch_handle_t* handle) override;
+    status_t releaseAudioPatch(audio_patch_handle_t handle) override;
+    status_t listAudioPatches(unsigned int* num_patches,
+                              struct audio_patch* patches) override;
+    status_t setAudioPortConfig(const struct audio_port_config* config) override;
+    audio_hw_sync_t getAudioHwSyncForSession(audio_session_t sessionId) override;
+    status_t systemReady() override;
+    size_t frameCountHAL(audio_io_handle_t ioHandle) const override;
+    status_t getMicrophones(std::vector<media::MicrophoneInfo>* microphones) override;
+    status_t setAudioHalPids(const std::vector<pid_t>& pids) override;
+    status_t setVibratorInfos(const std::vector<media::AudioVibratorInfo>& vibratorInfos) override;
+    status_t updateSecondaryOutputs(
+            const TrackSecondaryOutputsMap& trackSecondaryOutputs) override;
+
+private:
+    const sp<media::IAudioFlingerService> mDelegate;
 };
 
-// ----------------------------------------------------------------------------
+/**
+ * A server-side adapter, wrapping an IAudioFlinger instance and presenting it as an
+ * IAudioFlingerService. Intended to be used by legacy server code that was written against
+ * IAudioFlinger, before IAudioFlingerService was introduced as an AIDL service.
+ * New servers should not use this adapter, but rather implement IAudioFlingerService directly, via
+ * BnAudioFlingerService.
+ */
+class AudioFlingerServerAdapter : public media::BnAudioFlingerService {
+public:
+    using Status = binder::Status;
+
+    /**
+     * Legacy server should implement this interface in order to be wrapped.
+     */
+    class Delegate : public IAudioFlinger {
+    protected:
+        friend class AudioFlingerServerAdapter;
+
+        enum class TransactionCode {
+            CREATE_TRACK = media::BnAudioFlingerService::TRANSACTION_createTrack,
+            CREATE_RECORD = media::BnAudioFlingerService::TRANSACTION_createRecord,
+            SAMPLE_RATE = media::BnAudioFlingerService::TRANSACTION_sampleRate,
+            FORMAT = media::BnAudioFlingerService::TRANSACTION_format,
+            FRAME_COUNT = media::BnAudioFlingerService::TRANSACTION_frameCount,
+            LATENCY = media::BnAudioFlingerService::TRANSACTION_latency,
+            SET_MASTER_VOLUME = media::BnAudioFlingerService::TRANSACTION_setMasterVolume,
+            SET_MASTER_MUTE = media::BnAudioFlingerService::TRANSACTION_setMasterMute,
+            MASTER_VOLUME = media::BnAudioFlingerService::TRANSACTION_masterVolume,
+            MASTER_MUTE = media::BnAudioFlingerService::TRANSACTION_masterMute,
+            SET_STREAM_VOLUME = media::BnAudioFlingerService::TRANSACTION_setStreamVolume,
+            SET_STREAM_MUTE = media::BnAudioFlingerService::TRANSACTION_setStreamMute,
+            STREAM_VOLUME = media::BnAudioFlingerService::TRANSACTION_streamVolume,
+            STREAM_MUTE = media::BnAudioFlingerService::TRANSACTION_streamMute,
+            SET_MODE = media::BnAudioFlingerService::TRANSACTION_setMode,
+            SET_MIC_MUTE = media::BnAudioFlingerService::TRANSACTION_setMicMute,
+            GET_MIC_MUTE = media::BnAudioFlingerService::TRANSACTION_getMicMute,
+            SET_RECORD_SILENCED = media::BnAudioFlingerService::TRANSACTION_setRecordSilenced,
+            SET_PARAMETERS = media::BnAudioFlingerService::TRANSACTION_setParameters,
+            GET_PARAMETERS = media::BnAudioFlingerService::TRANSACTION_getParameters,
+            REGISTER_CLIENT = media::BnAudioFlingerService::TRANSACTION_registerClient,
+            GET_INPUTBUFFERSIZE = media::BnAudioFlingerService::TRANSACTION_getInputBufferSize,
+            OPEN_OUTPUT = media::BnAudioFlingerService::TRANSACTION_openOutput,
+            OPEN_DUPLICATE_OUTPUT = media::BnAudioFlingerService::TRANSACTION_openDuplicateOutput,
+            CLOSE_OUTPUT = media::BnAudioFlingerService::TRANSACTION_closeOutput,
+            SUSPEND_OUTPUT = media::BnAudioFlingerService::TRANSACTION_suspendOutput,
+            RESTORE_OUTPUT = media::BnAudioFlingerService::TRANSACTION_restoreOutput,
+            OPEN_INPUT = media::BnAudioFlingerService::TRANSACTION_openInput,
+            CLOSE_INPUT = media::BnAudioFlingerService::TRANSACTION_closeInput,
+            INVALIDATE_STREAM = media::BnAudioFlingerService::TRANSACTION_invalidateStream,
+            SET_VOICE_VOLUME = media::BnAudioFlingerService::TRANSACTION_setVoiceVolume,
+            GET_RENDER_POSITION = media::BnAudioFlingerService::TRANSACTION_getRenderPosition,
+            GET_INPUT_FRAMES_LOST = media::BnAudioFlingerService::TRANSACTION_getInputFramesLost,
+            NEW_AUDIO_UNIQUE_ID = media::BnAudioFlingerService::TRANSACTION_newAudioUniqueId,
+            ACQUIRE_AUDIO_SESSION_ID = media::BnAudioFlingerService::TRANSACTION_acquireAudioSessionId,
+            RELEASE_AUDIO_SESSION_ID = media::BnAudioFlingerService::TRANSACTION_releaseAudioSessionId,
+            QUERY_NUM_EFFECTS = media::BnAudioFlingerService::TRANSACTION_queryNumberEffects,
+            QUERY_EFFECT = media::BnAudioFlingerService::TRANSACTION_queryEffect,
+            GET_EFFECT_DESCRIPTOR = media::BnAudioFlingerService::TRANSACTION_getEffectDescriptor,
+            CREATE_EFFECT = media::BnAudioFlingerService::TRANSACTION_createEffect,
+            MOVE_EFFECTS = media::BnAudioFlingerService::TRANSACTION_moveEffects,
+            LOAD_HW_MODULE = media::BnAudioFlingerService::TRANSACTION_loadHwModule,
+            GET_PRIMARY_OUTPUT_SAMPLING_RATE = media::BnAudioFlingerService::TRANSACTION_getPrimaryOutputSamplingRate,
+            GET_PRIMARY_OUTPUT_FRAME_COUNT = media::BnAudioFlingerService::TRANSACTION_getPrimaryOutputFrameCount,
+            SET_LOW_RAM_DEVICE = media::BnAudioFlingerService::TRANSACTION_setLowRamDevice,
+            GET_AUDIO_PORT = media::BnAudioFlingerService::TRANSACTION_getAudioPort,
+            CREATE_AUDIO_PATCH = media::BnAudioFlingerService::TRANSACTION_createAudioPatch,
+            RELEASE_AUDIO_PATCH = media::BnAudioFlingerService::TRANSACTION_releaseAudioPatch,
+            LIST_AUDIO_PATCHES = media::BnAudioFlingerService::TRANSACTION_listAudioPatches,
+            SET_AUDIO_PORT_CONFIG = media::BnAudioFlingerService::TRANSACTION_setAudioPortConfig,
+            GET_AUDIO_HW_SYNC_FOR_SESSION = media::BnAudioFlingerService::TRANSACTION_getAudioHwSyncForSession,
+            SYSTEM_READY = media::BnAudioFlingerService::TRANSACTION_systemReady,
+            FRAME_COUNT_HAL = media::BnAudioFlingerService::TRANSACTION_frameCountHAL,
+            GET_MICROPHONES = media::BnAudioFlingerService::TRANSACTION_getMicrophones,
+            SET_MASTER_BALANCE = media::BnAudioFlingerService::TRANSACTION_setMasterBalance,
+            GET_MASTER_BALANCE = media::BnAudioFlingerService::TRANSACTION_getMasterBalance,
+            SET_EFFECT_SUSPENDED = media::BnAudioFlingerService::TRANSACTION_setEffectSuspended,
+            SET_AUDIO_HAL_PIDS = media::BnAudioFlingerService::TRANSACTION_setAudioHalPids,
+            SET_VIBRATOR_INFOS = media::BnAudioFlingerService::TRANSACTION_setVibratorInfos,
+            UPDATE_SECONDARY_OUTPUTS = media::BnAudioFlingerService::TRANSACTION_updateSecondaryOutputs,
+        };
+
+        /**
+         * And optional hook, called on every transaction, allowing additional operations to be
+         * performed before/after the unparceling  ofthe data and dispatching to the respective
+         * method. Useful for bulk operations, such as logging or permission checks.
+         * The implementer is responsible to invoke the provided delegate function, which is the
+         * actual onTransact(), unless an error occurs.
+         * By default, this is just a pass-through to the delegate.
+         */
+        virtual status_t onTransactWrapper(TransactionCode code,
+                                           const Parcel& data,
+                                           uint32_t flags,
+                                           const std::function<status_t()>& delegate) {
+            (void) code;
+            (void) data;
+            (void) flags;
+            return delegate();
+        }
+
+        /**
+         * An optional hook for implementing diagnostics dumping.
+         */
+        virtual status_t dump(int fd, const Vector<String16>& args) {
+            (void) fd;
+            (void) args;
+            return OK;
+        }
+    };
+
+    explicit AudioFlingerServerAdapter(
+            const sp<AudioFlingerServerAdapter::Delegate>& delegate);
+
+    status_t onTransact(uint32_t code, const Parcel& data, Parcel* reply, uint32_t flags) override;
+    status_t dump(int fd, const Vector<String16>& args) override;
+
+    Status createTrack(const media::CreateTrackRequest& request,
+                       media::CreateTrackResponse* _aidl_return) override;
+    Status createRecord(const media::CreateRecordRequest& request,
+                        media::CreateRecordResponse* _aidl_return) override;
+    Status sampleRate(int32_t ioHandle, int32_t* _aidl_return) override;
+    Status format(int32_t output, media::audio::common::AudioFormat* _aidl_return) override;
+    Status frameCount(int32_t ioHandle, int64_t* _aidl_return) override;
+    Status latency(int32_t output, int32_t* _aidl_return) override;
+    Status setMasterVolume(float value) override;
+    Status setMasterMute(bool muted) override;
+    Status masterVolume(float* _aidl_return) override;
+    Status masterMute(bool* _aidl_return) override;
+    Status setMasterBalance(float balance) override;
+    Status getMasterBalance(float* _aidl_return) override;
+    Status setStreamVolume(media::AudioStreamType stream, float value, int32_t output) override;
+    Status setStreamMute(media::AudioStreamType stream, bool muted) override;
+    Status
+    streamVolume(media::AudioStreamType stream, int32_t output, float* _aidl_return) override;
+    Status streamMute(media::AudioStreamType stream, bool* _aidl_return) override;
+    Status setMode(media::AudioMode mode) override;
+    Status setMicMute(bool state) override;
+    Status getMicMute(bool* _aidl_return) override;
+    Status setRecordSilenced(int32_t portId, bool silenced) override;
+    Status setParameters(int32_t ioHandle, const std::string& keyValuePairs) override;
+    Status
+    getParameters(int32_t ioHandle, const std::string& keys, std::string* _aidl_return) override;
+    Status registerClient(const sp<media::IAudioFlingerClient>& client) override;
+    Status getInputBufferSize(int32_t sampleRate, media::audio::common::AudioFormat format,
+                              int32_t channelMask, int64_t* _aidl_return) override;
+    Status openOutput(const media::OpenOutputRequest& request,
+                      media::OpenOutputResponse* _aidl_return) override;
+    Status openDuplicateOutput(int32_t output1, int32_t output2, int32_t* _aidl_return) override;
+    Status closeOutput(int32_t output) override;
+    Status suspendOutput(int32_t output) override;
+    Status restoreOutput(int32_t output) override;
+    Status openInput(const media::OpenInputRequest& request,
+                     media::OpenInputResponse* _aidl_return) override;
+    Status closeInput(int32_t input) override;
+    Status invalidateStream(media::AudioStreamType stream) override;
+    Status setVoiceVolume(float volume) override;
+    Status getRenderPosition(int32_t output, media::RenderPosition* _aidl_return) override;
+    Status getInputFramesLost(int32_t ioHandle, int32_t* _aidl_return) override;
+    Status newAudioUniqueId(media::AudioUniqueIdUse use, int32_t* _aidl_return) override;
+    Status acquireAudioSessionId(int32_t audioSession, int32_t pid, int32_t uid) override;
+    Status releaseAudioSessionId(int32_t audioSession, int32_t pid) override;
+    Status queryNumberEffects(int32_t* _aidl_return) override;
+    Status queryEffect(int32_t index, media::EffectDescriptor* _aidl_return) override;
+    Status getEffectDescriptor(const media::AudioUuid& effectUUID, const media::AudioUuid& typeUUID,
+                               int32_t preferredTypeFlag,
+                               media::EffectDescriptor* _aidl_return) override;
+    Status createEffect(const media::CreateEffectRequest& request,
+                        media::CreateEffectResponse* _aidl_return) override;
+    Status moveEffects(int32_t session, int32_t srcOutput, int32_t dstOutput) override;
+    Status setEffectSuspended(int32_t effectId, int32_t sessionId, bool suspended) override;
+    Status loadHwModule(const std::string& name, int32_t* _aidl_return) override;
+    Status getPrimaryOutputSamplingRate(int32_t* _aidl_return) override;
+    Status getPrimaryOutputFrameCount(int64_t* _aidl_return) override;
+    Status setLowRamDevice(bool isLowRamDevice, int64_t totalMemory) override;
+    Status getAudioPort(const media::AudioPort& port, media::AudioPort* _aidl_return) override;
+    Status createAudioPatch(const media::AudioPatch& patch, int32_t* _aidl_return) override;
+    Status releaseAudioPatch(int32_t handle) override;
+    Status listAudioPatches(int32_t maxCount,
+                            std::vector<media::AudioPatch>* _aidl_return) override;
+    Status setAudioPortConfig(const media::AudioPortConfig& config) override;
+    Status getAudioHwSyncForSession(int32_t sessionId, int32_t* _aidl_return) override;
+    Status systemReady() override;
+    Status frameCountHAL(int32_t ioHandle, int64_t* _aidl_return) override;
+    Status getMicrophones(std::vector<media::MicrophoneInfoData>* _aidl_return) override;
+    Status setAudioHalPids(const std::vector<int32_t>& pids) override;
+    Status setVibratorInfos(const std::vector<media::AudioVibratorInfo>& vibratorInfos) override;
+    Status updateSecondaryOutputs(
+            const std::vector<media::TrackSecondaryOutputInfo>& trackSecondaryOutputInfos) override;
+
+private:
+    const sp<AudioFlingerServerAdapter::Delegate> mDelegate;
+};
 
 }; // namespace android
 

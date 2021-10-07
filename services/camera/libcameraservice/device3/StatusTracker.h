@@ -17,13 +17,13 @@
 #ifndef ANDROID_SERVERS_CAMERA3_STATUSTRACKER_H
 #define ANDROID_SERVERS_CAMERA3_STATUSTRACKER_H
 
+#include <string>
 #include <utils/Condition.h>
 #include <utils/Errors.h>
 #include <utils/List.h>
 #include <utils/Mutex.h>
 #include <utils/Thread.h>
 #include <utils/KeyedVector.h>
-#include <hardware/camera3.h>
 
 #include "common/CameraDeviceBase.h"
 
@@ -54,7 +54,7 @@ class StatusTracker: public Thread {
     // Add a component to track; returns non-negative unique ID for the new
     // component on success, negative error code on failure.
     // New components start in the idle state.
-    int addComponent();
+    int addComponent(std::string componentName);
 
     // Remove existing component from idle tracking. Ignores unknown IDs
     void removeComponent(int id);
@@ -67,6 +67,8 @@ class StatusTracker: public Thread {
 
     // Set the state of a tracked component to be active. Ignores unknown IDs.
     void markComponentActive(int id);
+
+    void dumpActiveComponents();
 
     virtual void requestExit();
   protected:
@@ -105,6 +107,7 @@ class StatusTracker: public Thread {
 
     // Current component states
     KeyedVector<int, ComponentState> mStates;
+    KeyedVector<int, std::string> mComponentNames;
     // Merged fence for all processed state changes
     sp<Fence> mIdleFence;
     // Current overall device state

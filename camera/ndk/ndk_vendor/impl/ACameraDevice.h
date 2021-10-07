@@ -26,7 +26,7 @@
 #include <utils/Mutex.h>
 #include <utils/List.h>
 #include <utils/Vector.h>
-#include <android/frameworks/cameraservice/device/2.0/ICameraDeviceUser.h>
+#include <android/frameworks/cameraservice/device/2.1/ICameraDeviceUser.h>
 #include <android/frameworks/cameraservice/device/2.0/ICameraDeviceCallback.h>
 #include <android/frameworks/cameraservice/device/2.0/types.h>
 #include <fmq/MessageQueue.h>
@@ -44,7 +44,8 @@ namespace android {
 namespace acam {
 
 using ICameraDeviceCallback = frameworks::cameraservice::device::V2_0::ICameraDeviceCallback;
-using ICameraDeviceUser = frameworks::cameraservice::device::V2_0::ICameraDeviceUser;
+using ICameraDeviceUser_2_0 = frameworks::cameraservice::device::V2_0::ICameraDeviceUser;
+using ICameraDeviceUser = frameworks::cameraservice::device::V2_1::ICameraDeviceUser;
 using CaptureResultExtras = frameworks::cameraservice::device::V2_0::CaptureResultExtras;
 using PhysicalCaptureResultInfo = frameworks::cameraservice::device::V2_0::PhysicalCaptureResultInfo;
 using PhysicalCameraSettings = frameworks::cameraservice::device::V2_0::PhysicalCameraSettings;
@@ -201,7 +202,7 @@ class CameraDevice final : public RefBase {
     void notifySessionEndOfLifeLocked(ACameraCaptureSession* session);
 
     camera_status_t configureStreamsLocked(const ACaptureSessionOutputContainer* outputs,
-           const ACaptureRequest* sessionParameters);
+           const ACaptureRequest* sessionParameters, nsecs_t startTimeNs);
 
     // Input message will be posted and cleared after this returns
     void postSessionMsgAndCleanup(sp<AMessage>& msg);

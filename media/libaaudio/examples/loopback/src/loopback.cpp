@@ -36,8 +36,12 @@
 #include "AAudioSimpleRecorder.h"
 #include "AAudioExampleUtils.h"
 
+// Get logging macros from OboeTester
+#include "android_debug.h"
+// Get signal analyzers from OboeTester
 #include "analyzer/GlitchAnalyzer.h"
 #include "analyzer/LatencyAnalyzer.h"
+
 #include "../../utils/AAudioExampleUtils.h"
 
 // V0.4.00 = rectify and low-pass filter the echos, auto-correlate entire echo
@@ -45,8 +49,9 @@
 //           fix -n option to set output buffer for -tm
 //           plot first glitch
 // V0.4.02 = allow -n0 for minimal buffer size
-// V0.5.00 = use latency analyzer from OboeTester, uses random noise for latency
-#define APP_VERSION             "0.5.00"
+// V0.5.00 = use latency analyzer copied from OboeTester, uses random noise for latency
+// V0.5.01 = use latency analyzer directly from OboeTester in external/oboe
+#define APP_VERSION             "0.5.01"
 
 // Tag for machine readable results as property = value pairs
 #define RESULT_TAG              "RESULT: "

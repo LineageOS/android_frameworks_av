@@ -36,7 +36,7 @@ const std::string kTemporaryLicenseSession("temporary");
 namespace android {
 namespace hardware {
 namespace drm {
-namespace V1_2 {
+namespace V1_4 {
 namespace clearkey {
 
 JsonWebKey::JsonWebKey() {
@@ -65,7 +65,7 @@ bool JsonWebKey::extractKeysFromJsonWebKeySet(const std::string& jsonWebKeySet,
     // all the base64 encoded keys. Each key is also stored separately as
     // a JSON object in mJsonObjects[1..n] where n is the total
     // number of keys in the set.
-    if (!isJsonWebKeySet(mJsonObjects[0])) {
+    if (mJsonObjects.size() == 0 || !isJsonWebKeySet(mJsonObjects[0])) {
         return false;
     }
 
@@ -271,7 +271,7 @@ bool JsonWebKey::parseJsonWebKeySet(const std::string& jsonWebKeySet,
 }
 
 } // namespace clearkey
-} // namespace V1_2
+} // namespace V1_4
 } // namespace drm
 } // namespace hardware
 } // namespace android

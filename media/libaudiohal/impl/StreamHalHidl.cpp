@@ -63,7 +63,9 @@ StreamHalHidl::StreamHalHidl(IStream *stream)
 }
 
 StreamHalHidl::~StreamHalHidl() {
-    mStream = nullptr;
+    // The last step is to flush all binder commands so that the deletion
+    // of IStreamIn / IStreamOut (mStream) is issued with less delay. See b/35394629.
+    hardware::IPCThreadState::self()->flushCommands();
 }
 
 status_t StreamHalHidl::getBufferSize(size_t *size) {
@@ -307,7 +309,7 @@ struct StreamOutCallback : public IStreamOutCallback {
     }
 
   private:
-    wp<StreamOutHalHidl> mStream;
+    const wp<StreamOutHalHidl> mStream;
 };
 
 }  // namespace
@@ -318,21 +320,19 @@ StreamOutHalHidl::StreamOutHalHidl(const sp<IStreamOut>& stream)
 
 StreamOutHalHidl::~StreamOutHalHidl() {
     if (mStream != 0) {
-        if (mCallback.unsafe_get()) {
+        if (mCallback.load().unsafe_get()) {
             processReturn("clearCallback", mStream->clearCallback());
         }
 #if MAJOR_VERSION >= 6
-        if (mEventCallback.unsafe_get() != nullptr) {
+        if (mEventCallback.load().unsafe_get() != nullptr) {
             processReturn("setEventCallback",
                     mStream->setEventCallback(nullptr));
         }
 #endif
         processReturn("close", mStream->close());
-        mStream.clear();
     }
-    mCallback.clear();
-    mEventCallback.clear();
-    hardware::IPCThreadState::self()->flushCommands();
+    mCallback = nullptr;
+    mEventCallback = nullptr;
     if (mEfGroup) {
         EventFlag::deleteEventFlag(&mEfGroup);
     }
@@ -385,7 +385,7 @@ status_t StreamOutHalHidl::write(const void *buffer, size_t bytes, size_t *writt
 
     if (bytes == 0 && !mDataMQ) {
         // Can't determine the size for the MQ buffer. Wait for a non-empty write request.
-        ALOGW_IF(mCallback.unsafe_get(), "First call to async write with 0 bytes");
+        ALOGW_IF(mCallback.load().unsafe_get(), "First call to async write with 0 bytes");
         return OK;
     }
 
@@ -778,28 +778,28 @@ status_t StreamOutHalHidl::setEventCallback(
 #endif
 
 void StreamOutHalHidl::onWriteReady() {
-    sp<StreamOutHalInterfaceCallback> callback = mCallback.promote();
+    sp<StreamOutHalInterfaceCallback> callback = mCallback.load().promote();
     if (callback == 0) return;
     ALOGV("asyncCallback onWriteReady");
     callback->onWriteReady();
 }
 
 void StreamOutHalHidl::onDrainReady() {
-    sp<StreamOutHalInterfaceCallback> callback = mCallback.promote();
+    sp<StreamOutHalInterfaceCallback> callback = mCallback.load().promote();
     if (callback == 0) return;
     ALOGV("asyncCallback onDrainReady");
     callback->onDrainReady();
 }
 
 void StreamOutHalHidl::onError() {
-    sp<StreamOutHalInterfaceCallback> callback = mCallback.promote();
+    sp<StreamOutHalInterfaceCallback> callback = mCallback.load().promote();
     if (callback == 0) return;
     ALOGV("asyncCallback onError");
     callback->onError();
 }
 
 void StreamOutHalHidl::onCodecFormatChanged(const std::basic_string<uint8_t>& metadataBs) {
-    sp<StreamOutHalInterfaceEventCallback> callback = mEventCallback.promote();
+    sp<StreamOutHalInterfaceEventCallback> callback = mEventCallback.load().promote();
     if (callback == nullptr) return;
     ALOGV("asyncCodecFormatCallback %s", __func__);
     callback->onCodecFormatChanged(metadataBs);
@@ -813,8 +813,6 @@ StreamInHalHidl::StreamInHalHidl(const sp<IStreamIn>& stream)
 StreamInHalHidl::~StreamInHalHidl() {
     if (mStream != 0) {
         processReturn("close", mStream->close());
-        mStream.clear();
-        hardware::IPCThreadState::self()->flushCommands();
     }
     if (mEfGroup) {
         EventFlag::deleteEventFlag(&mEfGroup);

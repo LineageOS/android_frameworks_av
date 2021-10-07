@@ -15,43 +15,11 @@
 ** limitations under the License.
 */
 
+#include <android/content/AttributionSourceState.h>
+
 #ifndef INCLUDING_FROM_AUDIOFLINGER_H
     #error This header file should only be included from AudioFlinger.h
 #endif
-
-// Checks and monitors OP_RECORD_AUDIO
-class OpRecordAudioMonitor : public RefBase {
-public:
-    ~OpRecordAudioMonitor() override;
-    bool hasOpRecordAudio() const;
-
-    static sp<OpRecordAudioMonitor> createIfNeeded
-        (uid_t uid, const audio_attributes_t& attr, const String16& opPackageName);
-
-private:
-    OpRecordAudioMonitor(uid_t uid, const String16& opPackageName);
-    void onFirstRef() override;
-
-    AppOpsManager mAppOpsManager;
-
-    class RecordAudioOpCallback : public BnAppOpsCallback {
-    public:
-        explicit RecordAudioOpCallback(const wp<OpRecordAudioMonitor>& monitor);
-        void opChanged(int32_t op, const String16& packageName) override;
-
-    private:
-        const wp<OpRecordAudioMonitor> mMonitor;
-    };
-
-    sp<RecordAudioOpCallback> mOpCallback;
-    // called by RecordAudioOpCallback when OP_RECORD_AUDIO is updated in AppOp callback
-    // and in onFirstRef()
-    void checkRecordAudio();
-
-    std::atomic_bool mHasOpRecordAudio;
-    const uid_t mUid;
-    const String16 mPackage;
-};
 
 // record track
 class RecordTrack : public TrackBase {
@@ -67,11 +35,11 @@ public:
                                 size_t bufferSize,
                                 audio_session_t sessionId,
                                 pid_t creatorPid,
-                                uid_t uid,
+                                const AttributionSourceState& attributionSource,
                                 audio_input_flags_t flags,
                                 track_type type,
-                                const String16& opPackageName,
-                                audio_port_handle_t portId = AUDIO_PORT_HANDLE_NONE);
+                                audio_port_handle_t portId = AUDIO_PORT_HANDLE_NONE,
+                                int32_t startFrames = -1);
     virtual             ~RecordTrack();
     virtual status_t    initCheck() const;
 
@@ -103,12 +71,15 @@ public:
                                 { return (mFlags & AUDIO_INPUT_FLAG_DIRECT) != 0; }
 
             void        setSilenced(bool silenced) { if (!isPatchTrack()) mSilenced = silenced; }
-            bool        isSilenced() const;
+            bool        isSilenced() const { return mSilenced; }
 
             status_t    getActiveMicrophones(std::vector<media::MicrophoneInfo>* activeMicrophones);
 
             status_t    setPreferredMicrophoneDirection(audio_microphone_direction_t direction);
             status_t    setPreferredMicrophoneFieldDimension(float zoom);
+            status_t    shareAudioHistory(const std::string& sharedAudioPackageName,
+                                          int64_t sharedAudioStartMs);
+            int32_t     startFrames() { return mStartFrames; }
 
     static  bool        checkServerLatencySupported(
                                 audio_format_t format, audio_input_flags_t flags) {
@@ -147,10 +118,8 @@ private:
 
             bool                               mSilenced;
 
-            // used to enforce OP_RECORD_AUDIO
-            uid_t                              mUid;
-            String16                           mOpPackageName;
-            sp<OpRecordAudioMonitor>           mOpRecordAudioMonitor;
+            std::string                        mSharedAudioPackageName = {};
+            int32_t                            mStartFrames = -1;
 };
 
 // playback track, used by PatchPanel

@@ -43,8 +43,7 @@ using namespace aaudio;
 // on the edge of being ridiculous.
 // TODO These defines should be moved to a central place in audio.
 #define SAMPLES_PER_FRAME_MIN        1
-// TODO Remove 8 channel limitation.
-#define SAMPLES_PER_FRAME_MAX        FCC_8
+#define SAMPLES_PER_FRAME_MAX        FCC_LIMIT
 #define SAMPLE_RATE_HZ_MIN           8000
 // HDMI supports up to 32 channels at 1536000 Hz.
 #define SAMPLE_RATE_HZ_MAX           1600000
@@ -188,7 +187,8 @@ aaudio_result_t AudioStreamBuilder::build(AudioStream** streamPtr) {
             }
         }
         if (result == AAUDIO_OK) {
-            audioStream->logOpen();
+            audioStream->registerPlayerBase();
+            audioStream->logOpenActual();
             *streamPtr = startUsingStream(audioStream);
         } // else audioStream will go out of scope and be deleted
     }
@@ -281,4 +281,8 @@ void AudioStreamBuilder::logParameters() const {
     ALOGI("usage  = %6d, contentType = %d, inputPreset = %d, allowedCapturePolicy = %d",
           getUsage(), getContentType(), getInputPreset(), getAllowedCapturePolicy());
     ALOGI("privacy sensitive = %s", isPrivacySensitive() ? "true" : "false");
+    ALOGI("opPackageName = %s", !getOpPackageName().has_value() ?
+        "(null)" : getOpPackageName().value().c_str());
+    ALOGI("attributionTag = %s", !getAttributionTag().has_value() ?
+        "(null)" : getAttributionTag().value().c_str());
 }

@@ -51,8 +51,6 @@ AAudioServiceEndpointMMAP::AAudioServiceEndpointMMAP(AAudioService &audioService
         : mMmapStream(nullptr)
         , mAAudioService(audioService) {}
 
-AAudioServiceEndpointMMAP::~AAudioServiceEndpointMMAP() {}
-
 std::string AAudioServiceEndpointMMAP::dump() const {
     std::stringstream result;
 
@@ -72,24 +70,54 @@ std::string AAudioServiceEndpointMMAP::dump() const {
 
 aaudio_result_t AAudioServiceEndpointMMAP::open(const aaudio::AAudioStreamRequest &request) {
     aaudio_result_t result = AAUDIO_OK;
+    copyFrom(request.getConstantConfiguration());
+    mMmapClient.attributionSource = request.getAttributionSource();
+    // TODO b/182392769: use attribution source util
+    mMmapClient.attributionSource.uid = VALUE_OR_FATAL(
+        legacy2aidl_uid_t_int32_t(IPCThreadState::self()->getCallingUid()));
+    mMmapClient.attributionSource.pid = VALUE_OR_FATAL(
+        legacy2aidl_pid_t_int32_t(IPCThreadState::self()->getCallingPid()));
+
+    audio_format_t audioFormat = getFormat();
+
+    // FLOAT is not directly supported by the HAL so ask for a 32-bit.
+    if (audioFormat == AUDIO_FORMAT_PCM_FLOAT) {
+        // TODO remove these logs when finished debugging.
+        ALOGD("%s() change format from %d to 32_BIT", __func__, audioFormat);
+        audioFormat = AUDIO_FORMAT_PCM_32_BIT;
+    }
+
+    result = openWithFormat(audioFormat);
+    if (result == AAUDIO_OK) return result;
+
+    if (result == AAUDIO_ERROR_UNAVAILABLE && audioFormat == AUDIO_FORMAT_PCM_32_BIT) {
+        ALOGD("%s() 32_BIT failed, perhaps due to format. Try again with 24_BIT_PACKED", __func__);
+        audioFormat = AUDIO_FORMAT_PCM_24_BIT_PACKED;
+        result = openWithFormat(audioFormat);
+    }
+    if (result == AAUDIO_OK) return result;
+
+    // TODO The HAL and AudioFlinger should be recommending a format if the open fails.
+    //      But that recommendation is not propagating back from the HAL.
+    //      So for now just try something very likely to work.
+    if (result == AAUDIO_ERROR_UNAVAILABLE && audioFormat == AUDIO_FORMAT_PCM_24_BIT_PACKED) {
+        ALOGD("%s() 24_BIT failed, perhaps due to format. Try again with 16_BIT", __func__);
+        audioFormat = AUDIO_FORMAT_PCM_16_BIT;
+        result = openWithFormat(audioFormat);
+    }
+    return result;
+}
+
+aaudio_result_t AAudioServiceEndpointMMAP::openWithFormat(audio_format_t audioFormat) {
+    aaudio_result_t result = AAUDIO_OK;
     audio_config_base_t config;
     audio_port_handle_t deviceId;
 
-    copyFrom(request.getConstantConfiguration());
-
     const audio_attributes_t attributes = getAudioAttributesFrom(this);
-
-    mMmapClient.clientUid = request.getUserId();
-    mMmapClient.clientPid = request.getProcessId();
-    mMmapClient.packageName.setTo(String16(""));
 
     mRequestedDeviceId = deviceId = getDeviceId();
 
     // Fill in config
-    audio_format_t audioFormat = getFormat();
-    if (audioFormat == AUDIO_FORMAT_DEFAULT || audioFormat == AUDIO_FORMAT_PCM_FLOAT) {
-        audioFormat = AUDIO_FORMAT_PCM_16_BIT;
-    }
     config.format = audioFormat;
 
     int32_t aaudioSampleRate = getSampleRate();
@@ -137,8 +165,8 @@ aaudio_result_t AAudioServiceEndpointMMAP::open(const aaudio::AAudioStreamReques
                                                           this, // callback
                                                           mMmapStream,
                                                           &mPortHandle);
-    ALOGD("%s() mMapClient.uid = %d, pid = %d => portHandle = %d\n",
-          __func__, mMmapClient.clientUid,  mMmapClient.clientPid, mPortHandle);
+    ALOGD("%s() mMapClient.attributionSource = %s => portHandle = %d\n",
+          __func__, mMmapClient.attributionSource.toString().c_str(), mPortHandle);
     if (status != OK) {
         // This can happen if the resource is busy or the config does
         // not match the hardware.
@@ -186,8 +214,9 @@ aaudio_result_t AAudioServiceEndpointMMAP::open(const aaudio::AAudioStreamReques
     setBufferCapacity(mMmapBufferinfo.buffer_size_frames);
     if (!isBufferShareable) {
         // Exclusive mode can only be used by the service because the FD cannot be shared.
-        uid_t audioServiceUid = getuid();
-        if ((mMmapClient.clientUid != audioServiceUid) &&
+        int32_t audioServiceUid =
+            VALUE_OR_FATAL(legacy2aidl_uid_t_int32_t(getuid()));
+        if ((mMmapClient.attributionSource.uid != audioServiceUid) &&
             getSharingMode() == AAUDIO_SHARING_MODE_EXCLUSIVE) {
             ALOGW("%s() - exclusive FD cannot be used by client", __func__);
             result = AAUDIO_ERROR_UNAVAILABLE;
@@ -208,6 +237,12 @@ aaudio_result_t AAudioServiceEndpointMMAP::open(const aaudio::AAudioStreamReques
         result = AAUDIO_ERROR_INTERNAL;
         goto error;
     }
+    // Call to HAL to make sure the transport FD was able to be closed by binder.
+    // This is a tricky workaround for a problem in Binder.
+    // TODO:[b/192048842] When that problem is fixed we may be able to remove or change this code.
+    struct audio_mmap_position position;
+    mMmapStream->getMmapPosition(&position);
+
     mFramesPerBurst = mMmapBufferinfo.burst_size_frames;
     setFormat(config.format);
     setSampleRate(config.sample_rate);
@@ -331,7 +366,10 @@ void AAudioServiceEndpointMMAP::handleTearDownAsync(audio_port_handle_t portHand
 // This is called by AudioFlinger when it wants to destroy a stream.
 void AAudioServiceEndpointMMAP::onTearDown(audio_port_handle_t portHandle) {
     ALOGD("%s(portHandle = %d) called", __func__, portHandle);
-    std::thread asyncTask(&AAudioServiceEndpointMMAP::handleTearDownAsync, this, portHandle);
+    android::sp<AAudioServiceEndpointMMAP> holdEndpoint(this);
+    std::thread asyncTask([holdEndpoint, portHandle]() {
+        holdEndpoint->handleTearDownAsync(portHandle);
+    });
     asyncTask.detach();
 }
 
@@ -352,9 +390,11 @@ void AAudioServiceEndpointMMAP::onRoutingChanged(audio_port_handle_t portHandle)
     ALOGD("%s() called with dev %d, old = %d", __func__, deviceId, getDeviceId());
     if (getDeviceId() != deviceId) {
         if (getDeviceId() != AUDIO_PORT_HANDLE_NONE) {
-            std::thread asyncTask([this, deviceId]() {
-                disconnectRegisteredStreams();
-                setDeviceId(deviceId);
+            android::sp<AAudioServiceEndpointMMAP> holdEndpoint(this);
+            std::thread asyncTask([holdEndpoint, deviceId]() {
+                ALOGD("onRoutingChanged() asyncTask launched");
+                holdEndpoint->disconnectRegisteredStreams();
+                holdEndpoint->setDeviceId(deviceId);
             });
             asyncTask.detach();
         } else {
@@ -377,4 +417,19 @@ aaudio_result_t AAudioServiceEndpointMMAP::getDownDataDescription(AudioEndpointP
     parcelable.mDownDataQueueParcelable.setFramesPerBurst(mFramesPerBurst);
     parcelable.mDownDataQueueParcelable.setCapacityInFrames(getBufferCapacity());
     return AAUDIO_OK;
+}
+
+aaudio_result_t AAudioServiceEndpointMMAP::getExternalPosition(uint64_t *positionFrames,
+                                                               int64_t *timeNanos)
+{
+    if (!mExternalPositionSupported) {
+        return AAUDIO_ERROR_INVALID_STATE;
+    }
+    status_t status = mMmapStream->getExternalPosition(positionFrames, timeNanos);
+    if (status == INVALID_OPERATION) {
+        // getExternalPosition is not supported. Set mExternalPositionSupported as false
+        // so that the call will not go to the HAL next time.
+        mExternalPositionSupported = false;
+    }
+    return AAudioConvert_androidToAAudioResult(status);
 }

@@ -230,7 +230,7 @@ cc_library_shared {
     ],
 
     static_libs: [
-        "librenderengine",
+        "librenderfright",
     ],
 
     export_include_dirs: [
@@ -275,6 +275,7 @@ cc_library {
         "MPEG2TSWriter.cpp",
         "MPEG4Writer.cpp",
         "MediaAdapter.cpp",
+        "MediaAppender.cpp",
         "MediaClock.cpp",
         "MediaCodec.cpp",
         "MediaCodecList.cpp",
@@ -338,6 +339,8 @@ cc_library {
         "android.hardware.cas.native@1.0",
         "android.hardware.drm@1.0",
         "android.hardware.media.omx@1.0",
+        "framework-permission-aidl-cpp",
+        "libaudioclient_aidl_conversion",
         "packagemanager_aidl-cpp",
     ],
 
@@ -351,6 +354,9 @@ cc_library {
         "libogg",
         "libwebm",
         "libstagefright_id3",
+        "framework-permission-aidl-cpp",
+        "libmediandk_format",
+        "libmedia_ndkformatpriv",
     ],
 
     header_libs:[
@@ -358,6 +364,7 @@ cc_library {
         "libnativeloader-headers",
         "libstagefright_xmlparser_headers",
         "media_ndk_headers",
+        "libmediaformatshaper_headers",
     ],
 
     export_shared_lib_headers: [
@@ -365,6 +372,7 @@ cc_library {
         "libhidlmemory",
         "libmedia",
         "android.hidl.allocator@1.0",
+        "framework-permission-aidl-cpp",
         "packagemanager_aidl-cpp",
     ],
 

@@ -1,0 +1,104 @@
+// Unit tests for libmediatranscoder.
+package {
+    // See: http://go/android-license-faq
+    // A large-scale-change added 'default_applicable_licenses' to import
+    // all of the 'license_kinds' from "frameworks_av_license"
+    // to get the below license kinds:
+    //   SPDX-license-identifier-Apache-2.0
+    default_applicable_licenses: ["frameworks_av_license"],
+}
+
+cc_defaults {
+    name: "testdefaults",
+
+    header_libs: [
+        "libbase_headers",
+        "libmedia_headers",
+    ],
+
+    static_libs: [
+        "libmediatranscoder",
+    ],
+    shared_libs: [
+        "libbase",
+        "libbinder_ndk",
+        "libcrypto",
+        "libcutils",
+        "libmediandk",
+        "libnativewindow",
+        "libutils",
+    ],
+
+    cflags: [
+        "-Werror",
+        "-Wall",
+    ],
+
+    sanitize: {
+        misc_undefined: [
+            "unsigned-integer-overflow",
+            "signed-integer-overflow",
+        ],
+        cfi: true,
+    },
+
+    data: [":test_assets"],
+    test_config_template: "AndroidTestTemplate.xml",
+    test_suites: ["device-tests", "TranscoderTests"],
+}
+
+// MediaSampleReaderNDK unit test
+cc_test {
+    name: "MediaSampleReaderNDKTests",
+    defaults: ["testdefaults"],
+    srcs: ["MediaSampleReaderNDKTests.cpp"],
+}
+
+// MediaSampleQueue unit test
+cc_test {
+    name: "MediaSampleQueueTests",
+    defaults: ["testdefaults"],
+    srcs: ["MediaSampleQueueTests.cpp"],
+}
+
+// MediaTrackTranscoder unit test
+cc_test {
+    name: "MediaTrackTranscoderTests",
+    defaults: ["testdefaults"],
+    srcs: ["MediaTrackTranscoderTests.cpp"],
+}
+
+// VideoTrackTranscoder unit test
+cc_test {
+    name: "VideoTrackTranscoderTests",
+    defaults: ["testdefaults"],
+    srcs: ["VideoTrackTranscoderTests.cpp"],
+}
+
+// PassthroughTrackTranscoder unit test
+cc_test {
+    name: "PassthroughTrackTranscoderTests",
+    defaults: ["testdefaults"],
+    srcs: ["PassthroughTrackTranscoderTests.cpp"],
+}
+
+// MediaSampleWriter unit test
+cc_test {
+    name: "MediaSampleWriterTests",
+    defaults: ["testdefaults"],
+    srcs: ["MediaSampleWriterTests.cpp"],
+}
+
+// HDR Transcode unit test
+cc_test {
+    name: "HdrTranscodeTests",
+    defaults: ["testdefaults"],
+    srcs: ["HdrTranscodeTests.cpp"],
+}
+
+// MediaTranscoder unit test
+cc_test {
+    name: "MediaTranscoderTests",
+    defaults: ["testdefaults"],
+    srcs: ["MediaTranscoderTests.cpp"],
+}

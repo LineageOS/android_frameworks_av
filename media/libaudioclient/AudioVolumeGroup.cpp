@@ -21,64 +21,57 @@
 #include <utils/Log.h>
 #include <binder/Parcel.h>
 
+#include <media/AidlConversion.h>
 #include <media/AudioVolumeGroup.h>
 #include <media/AudioAttributes.h>
+#include <media/PolicyAidlConversion.h>
+
+#define RETURN_STATUS_IF_ERROR(x) \
+    { auto _tmp = (x); if (_tmp != OK) return _tmp; }
 
 namespace android {
 
 status_t AudioVolumeGroup::readFromParcel(const Parcel *parcel)
 {
-    status_t ret = parcel->readUtf8FromUtf16(&mName);
-    if (ret != NO_ERROR) {
-        return ret;
-    }
-    mGroupId = static_cast<volume_group_t>(parcel->readInt32());
-    size_t size = static_cast<size_t>(parcel->readInt32());
-    for (size_t i = 0; i < size; i++) {
-        AudioAttributes attribute;
-        attribute.readFromParcel(parcel);
-        if (ret != NO_ERROR) {
-            mAudioAttributes.clear();
-            return ret;
-        }
-        mAudioAttributes.push_back(attribute.getAttributes());
-    }
-    size = static_cast<size_t>(parcel->readInt32());
-    for (size_t i = 0; i < size; i++) {
-        audio_stream_type_t stream = static_cast<audio_stream_type_t>(parcel->readInt32());
-        mStreams.push_back(stream);
-    }
-    return NO_ERROR;
+    media::AudioVolumeGroup aidl;
+    RETURN_STATUS_IF_ERROR(aidl.readFromParcel(parcel));
+    *this = VALUE_OR_RETURN_STATUS(aidl2legacy_AudioVolumeGroup(aidl));
+    return OK;
 }
 
 status_t AudioVolumeGroup::writeToParcel(Parcel *parcel) const
 {
-    parcel->writeUtf8AsUtf16(mName);
-    parcel->writeInt32(static_cast<int32_t>(mGroupId));
-    size_t size = mAudioAttributes.size();
-    size_t sizePosition = parcel->dataPosition();
-    parcel->writeInt32(size);
-    size_t finalSize = size;
-    for (const auto &attributes : mAudioAttributes) {
-        size_t position = parcel->dataPosition();
-        AudioAttributes attribute(attributes);
-        status_t ret = attribute.writeToParcel(parcel);
-        if (ret != NO_ERROR) {
-            parcel->setDataPosition(position);
-            finalSize--;
-        }
-    }
-    if (size != finalSize) {
-        size_t position = parcel->dataPosition();
-        parcel->setDataPosition(sizePosition);
-        parcel->writeInt32(finalSize);
-        parcel->setDataPosition(position);
-    }
-    parcel->writeInt32(mStreams.size());
-    for (const auto &stream : mStreams) {
-        parcel->writeInt32(static_cast<int32_t>(stream));
-    }
-    return NO_ERROR;
+    media::AudioVolumeGroup aidl = VALUE_OR_RETURN_STATUS(legacy2aidl_AudioVolumeGroup(*this));
+    return aidl.writeToParcel(parcel);
+}
+
+ConversionResult<media::AudioVolumeGroup>
+legacy2aidl_AudioVolumeGroup(const AudioVolumeGroup& legacy) {
+    media::AudioVolumeGroup aidl;
+    aidl.groupId = VALUE_OR_RETURN(legacy2aidl_volume_group_t_int32_t(legacy.getId()));
+    aidl.name = legacy.getName();
+    aidl.audioAttributes = VALUE_OR_RETURN(
+            convertContainer<std::vector<media::AudioAttributesInternal>>(
+                    legacy.getAudioAttributes(),
+                    legacy2aidl_audio_attributes_t_AudioAttributesInternal));
+    aidl.streams = VALUE_OR_RETURN(
+            convertContainer<std::vector<media::AudioStreamType>>(legacy.getStreamTypes(),
+            legacy2aidl_audio_stream_type_t_AudioStreamType));
+    return aidl;
+}
+
+ConversionResult<AudioVolumeGroup>
+aidl2legacy_AudioVolumeGroup(const media::AudioVolumeGroup& aidl) {
+    return AudioVolumeGroup(
+            aidl.name,
+            VALUE_OR_RETURN(aidl2legacy_int32_t_volume_group_t(aidl.groupId)),
+            VALUE_OR_RETURN(convertContainer<AttributesVector>(
+                    aidl.audioAttributes,
+                    aidl2legacy_AudioAttributesInternal_audio_attributes_t)),
+            VALUE_OR_RETURN(convertContainer<StreamTypeVector>(
+                    aidl.streams,
+                    aidl2legacy_AudioStreamType_audio_stream_type_t))
+    );
 }
 
 } // namespace android

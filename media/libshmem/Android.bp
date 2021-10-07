@@ -1,0 +1,79 @@
+package {
+    // See: http://go/android-license-faq
+    // A large-scale-change added 'default_applicable_licenses' to import
+    // all of the 'license_kinds' from "frameworks_av_license"
+    // to get the below license kinds:
+    //   SPDX-license-identifier-Apache-2.0
+    default_applicable_licenses: ["frameworks_av_license"],
+}
+
+aidl_interface {
+    name: "shared-file-region-aidl",
+    unstable: true,
+    host_supported: true,
+    vendor_available: true,
+    double_loadable: true,
+    local_include_dir: "aidl",
+    srcs: [
+        "aidl/android/media/SharedFileRegion.aidl",
+    ],
+}
+
+cc_library {
+    name: "libshmemcompat",
+    export_include_dirs: ["include"],
+    srcs: ["ShmemCompat.cpp"],
+    host_supported: true,
+    vendor_available: true,
+    double_loadable: true,
+    shared_libs: [
+        "libbinder",
+        "libshmemutil",
+        "libutils",
+        "shared-file-region-aidl-cpp",
+    ],
+    export_shared_lib_headers: [
+        "libbinder",
+        "libutils",
+        "shared-file-region-aidl-cpp",
+    ],
+    target: {
+        darwin: {
+            enabled: false,
+        },
+    },
+}
+
+cc_library {
+    name: "libshmemutil",
+    export_include_dirs: ["include"],
+    srcs: ["ShmemUtil.cpp"],
+    host_supported: true,
+    vendor_available: true,
+    double_loadable: true,
+    shared_libs: [
+        "shared-file-region-aidl-cpp",
+    ],
+    export_shared_lib_headers: [
+        "shared-file-region-aidl-cpp",
+    ],
+    target: {
+        darwin: {
+            enabled: false,
+        },
+    },
+}
+
+cc_test {
+    name: "shmemTest",
+    srcs: ["ShmemTest.cpp"],
+    shared_libs: [
+        "libbinder",
+        "libcutils",
+        "libshmemcompat",
+        "libshmemutil",
+        "libutils",
+        "shared-file-region-aidl-cpp",
+    ],
+    test_suites: ["device-tests"],
+}

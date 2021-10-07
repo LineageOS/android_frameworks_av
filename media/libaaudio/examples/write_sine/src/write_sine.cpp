@@ -47,9 +47,11 @@ int main(int argc, const char **argv)
     int32_t  framesToPlay = 0;
     int32_t  framesLeft = 0;
     int32_t  xRunCount = 0;
-    int      numActiveOscilators = 0;
+    int      numActiveOscillators = 0;
     float   *floatData = nullptr;
     int16_t *shortData = nullptr;
+    int32_t *int32Data = nullptr;
+    uint8_t *byteData = nullptr;
 
     int      testFd = -1;
 
@@ -57,7 +59,7 @@ int main(int argc, const char **argv)
     // in a buffer if we hang or crash.
     setvbuf(stdout, nullptr, _IONBF, (size_t) 0);
 
-    printf("%s - Play a sine wave using AAudio V0.1.3\n", argv[0]);
+    printf("%s - Play a sine wave using AAudio V0.1.4\n", argv[0]);
 
     if (argParser.parseArgs(argc, argv)) {
         return EXIT_FAILURE;
@@ -91,13 +93,23 @@ int main(int argc, const char **argv)
     printf("Buffer: framesPerWrite = %d\n",framesPerWrite);
 
     // Allocate a buffer for the audio data.
-    if (actualDataFormat == AAUDIO_FORMAT_PCM_FLOAT) {
-        floatData = new float[framesPerWrite * actualChannelCount];
-    } else if (actualDataFormat == AAUDIO_FORMAT_PCM_I16) {
-        shortData = new int16_t[framesPerWrite * actualChannelCount];
-    } else {
-        printf("ERROR Unsupported data format!\n");
-        goto finish;
+    switch (actualDataFormat) {
+        case AAUDIO_FORMAT_PCM_FLOAT:
+            floatData = new float[framesPerWrite * actualChannelCount];
+            break;
+        case AAUDIO_FORMAT_PCM_I16:
+            shortData = new int16_t[framesPerWrite * actualChannelCount];
+            break;
+        case AAUDIO_FORMAT_PCM_I24_PACKED:
+            byteData = new uint8_t[framesPerWrite * actualChannelCount
+                                   * getBytesPerSample(AAUDIO_FORMAT_PCM_I24_PACKED)];
+            break;
+        case AAUDIO_FORMAT_PCM_I32:
+            int32Data = new int32_t[framesPerWrite * actualChannelCount];
+            break;
+        default:
+            printf("ERROR Unsupported data format!\n");
+            goto finish;
     }
 
     testFd = open("/data/aaudio_temp.raw", O_CREAT | O_RDWR, S_IRWXU);
@@ -117,29 +129,56 @@ int main(int argc, const char **argv)
     // Play for a while.
     framesToPlay = actualSampleRate * argParser.getDurationSeconds();
     framesLeft = framesToPlay;
-    numActiveOscilators = (actualChannelCount > MAX_CHANNELS) ? MAX_CHANNELS : actualChannelCount;
+    numActiveOscillators = (actualChannelCount > MAX_CHANNELS) ? MAX_CHANNELS : actualChannelCount;
     while (framesLeft > 0) {
         // Render as FLOAT or PCM
-        if (actualDataFormat == AAUDIO_FORMAT_PCM_FLOAT) {
-            for (int i = 0; i < numActiveOscilators; ++i) {
-                myData.sineOscillators[i].render(&floatData[i], actualChannelCount,
-                                                  framesPerWrite);
-            }
-        } else if (actualDataFormat == AAUDIO_FORMAT_PCM_I16) {
-            for (int i = 0; i < numActiveOscilators; ++i) {
-                myData.sineOscillators[i].render(&shortData[i], actualChannelCount,
-                                                  framesPerWrite);
-            }
+        switch (actualDataFormat) {
+            case AAUDIO_FORMAT_PCM_FLOAT:
+                for (int i = 0; i < numActiveOscillators; ++i) {
+                    myData.sineOscillators[i].render(&floatData[i], actualChannelCount,
+                                                     framesPerWrite);
+                }
+                break;
+            case AAUDIO_FORMAT_PCM_I16:
+                for (int i = 0; i < numActiveOscillators; ++i) {
+                    myData.sineOscillators[i].render(&shortData[i], actualChannelCount,
+                                                     framesPerWrite);
+                }
+                break;
+            case AAUDIO_FORMAT_PCM_I32:
+                for (int i = 0; i < numActiveOscillators; ++i) {
+                    myData.sineOscillators[i].render(&int32Data[i], actualChannelCount,
+                                                     framesPerWrite);
+                }
+                break;
+            case AAUDIO_FORMAT_PCM_I24_PACKED:
+                for (int i = 0; i < numActiveOscillators; ++i) {
+                    static const int
+                        bytesPerSample = getBytesPerSample(AAUDIO_FORMAT_PCM_I24_PACKED);
+                    myData.sineOscillators[i].render24(&byteData[i * bytesPerSample],
+                                                       actualChannelCount,
+                                                       framesPerWrite);
+                }
+                break;
         }
 
         // Write audio data to the stream.
         int64_t timeoutNanos = 1000 * NANOS_PER_MILLISECOND;
         int32_t minFrames = (framesToPlay < framesPerWrite) ? framesToPlay : framesPerWrite;
         int32_t actual = 0;
-        if (actualDataFormat == AAUDIO_FORMAT_PCM_FLOAT) {
-            actual = AAudioStream_write(aaudioStream, floatData, minFrames, timeoutNanos);
-        } else if (actualDataFormat == AAUDIO_FORMAT_PCM_I16) {
-            actual = AAudioStream_write(aaudioStream, shortData, minFrames, timeoutNanos);
+        switch (actualDataFormat) {
+            case AAUDIO_FORMAT_PCM_FLOAT:
+                actual = AAudioStream_write(aaudioStream, floatData, minFrames, timeoutNanos);
+                break;
+            case AAUDIO_FORMAT_PCM_I16:
+                actual = AAudioStream_write(aaudioStream, shortData, minFrames, timeoutNanos);
+                break;
+            case AAUDIO_FORMAT_PCM_I32:
+                actual = AAudioStream_write(aaudioStream, int32Data, minFrames, timeoutNanos);
+                break;
+            case AAUDIO_FORMAT_PCM_I24_PACKED:
+                actual = AAudioStream_write(aaudioStream, byteData, minFrames, timeoutNanos);
+                break;
         }
         if (actual < 0) {
             fprintf(stderr, "ERROR - AAudioStream_write() returned %d\n", actual);
@@ -196,6 +235,8 @@ finish:
 
     delete[] floatData;
     delete[] shortData;
+    delete[] int32Data;
+    delete[] byteData;
     printf("exiting - AAudio result = %d = %s\n", result, AAudio_convertResultToText(result));
     return (result != AAUDIO_OK) ? EXIT_FAILURE : EXIT_SUCCESS;
 }

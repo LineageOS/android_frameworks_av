@@ -17,73 +17,77 @@
 #ifndef ANDROID_MEDIA_TRANSCODING_CLIENT_MANAGER_H
 #define ANDROID_MEDIA_TRANSCODING_CLIENT_MANAGER_H
 
-#include <aidl/android/media/BnTranscodingServiceClient.h>
-#include <android/binder_ibinder.h>
+#include <aidl/android/media/ITranscodingClient.h>
+#include <aidl/android/media/ITranscodingClientCallback.h>
 #include <sys/types.h>
 #include <utils/Condition.h>
-#include <utils/RefBase.h>
 #include <utils/String8.h>
 #include <utils/Vector.h>
 
+#include <map>
 #include <mutex>
 #include <unordered_map>
+#include <unordered_set>
+
+#include "ControllerClientInterface.h"
 
 namespace android {
 
-using ::aidl::android::media::ITranscodingServiceClient;
-
-class MediaTranscodingService;
+using ::aidl::android::media::ITranscodingClient;
+using ::aidl::android::media::ITranscodingClientCallback;
 
 /*
  * TranscodingClientManager manages all the transcoding clients across different processes.
  *
- * TranscodingClientManager is a global singleton that could only acquired by
- * MediaTranscodingService. It manages all the clients's registration/unregistration and clients'
- * information. It also bookkeeps all the clients' information. It also monitors to the death of the
+ * TranscodingClientManager manages all the clients's registration/unregistration and clients'
+ * information. It also bookkeeps all the clients' information. It also monitors the death of the
  * clients. Upon client's death, it will remove the client from it.
  *
  * TODO(hkuang): Hook up with ResourceManager for resource management.
  * TODO(hkuang): Hook up with MediaMetrics to log all the transactions.
  */
-class TranscodingClientManager {
-   public:
+class TranscodingClientManager : public std::enable_shared_from_this<TranscodingClientManager> {
+public:
     virtual ~TranscodingClientManager();
-
-    /**
-     * ClientInfo contains a single client's information.
-     */
-    struct ClientInfo {
-        /* The remote client that this ClientInfo is associated with. */
-        std::shared_ptr<ITranscodingServiceClient> mClient;
-        /* A unique positive Id assigned to the client by the service. */
-        int32_t mClientId;
-        /* Process id of the client */
-        int32_t mClientPid;
-        /* User id of the client. */
-        int32_t mClientUid;
-        /* Package name of the client. */
-        std::string mClientOpPackageName;
-
-        ClientInfo(const std::shared_ptr<ITranscodingServiceClient>& client, int64_t clientId,
-                   int32_t pid, int32_t uid, const std::string& opPackageName)
-            : mClient(client),
-              mClientId(clientId),
-              mClientPid(pid),
-              mClientUid(uid),
-              mClientOpPackageName(opPackageName) {}
-    };
 
     /**
      * Adds a new client to the manager.
      *
-     * The client must have valid clientId, pid, uid and opPackageName, otherwise, this will return
-     * a non-zero errorcode. If the client has already been added, it will also return non-zero
-     * errorcode.
+     * The client must have valid callback, pid, uid, clientName and opPackageName.
+     * Otherwise, this will return a non-zero errorcode. If the client callback has
+     * already been added, it will also return non-zero errorcode.
      *
-     * @param client to be added to the manager.
+     * @param callback client callback for the service to call this client.
+     * @param clientName client's name.
+     * @param opPackageName client's package name.
+     * @param client output holding the ITranscodingClient interface for the client
+     *        to use for subsequent communications with the service.
      * @return 0 if client is added successfully, non-zero errorcode otherwise.
      */
-    status_t addClient(std::unique_ptr<ClientInfo> client);
+    status_t addClient(const std::shared_ptr<ITranscodingClientCallback>& callback,
+                       const std::string& clientName, const std::string& opPackageName,
+                       std::shared_ptr<ITranscodingClient>* client);
+
+    /**
+     * Gets the number of clients.
+     */
+    size_t getNumOfClients() const;
+
+    /**
+     * Dump all the client information to the fd.
+     */
+    void dumpAllClients(int fd, const Vector<String16>& args);
+
+private:
+    friend class MediaTranscodingService;
+    friend class TranscodingClientManagerTest;
+    struct ClientImpl;
+
+    // Only allow MediaTranscodingService and unit tests to instantiate.
+    TranscodingClientManager(const std::shared_ptr<ControllerClientInterface>& controller);
+
+    // Checks if a user is trusted (and allowed to submit sessions on behalf of other uids)
+    bool isTrustedCaller(pid_t pid, uid_t uid);
 
     /**
      * Removes an existing client from the manager.
@@ -93,39 +97,24 @@ class TranscodingClientManager {
      * @param clientId id of the client to be removed..
      * @return 0 if client is removed successfully, non-zero errorcode otherwise.
      */
-    status_t removeClient(int32_t clientId);
-
-    /**
-     * Gets the number of clients.
-     */
-    size_t getNumOfClients() const;
-
-    /**
-     * Checks if a client with clientId is already registered.
-     */
-    bool isClientIdRegistered(int32_t clientId) const;
-
-    /**
-     * Dump all the client information to the fd.
-     */
-    void dumpAllClients(int fd, const Vector<String16>& args);
-
-   private:
-    friend class MediaTranscodingService;
-    friend class TranscodingClientManagerTest;
-
-    /** Get the singleton instance of the TranscodingClientManager. */
-    static TranscodingClientManager& getInstance();
-
-    TranscodingClientManager();
+    status_t removeClient(ClientIdType clientId);
 
     static void BinderDiedCallback(void* cookie);
 
     mutable std::mutex mLock;
-    std::unordered_map<int32_t, std::unique_ptr<ClientInfo>> mClientIdToClientInfoMap
+    std::unordered_map<ClientIdType, std::shared_ptr<ClientImpl>> mClientIdToClientMap
             GUARDED_BY(mLock);
+    std::unordered_set<uintptr_t> mRegisteredCallbacks GUARDED_BY(mLock);
 
     ::ndk::ScopedAIBinder_DeathRecipient mDeathRecipient;
+
+    std::shared_ptr<ControllerClientInterface> mSessionController;
+    std::unordered_set<uid_t> mTrustedUids;
+
+    static std::atomic<ClientIdType> sCookieCounter;
+    static std::mutex sCookie2ClientLock;
+    static std::map<ClientIdType, std::shared_ptr<ClientImpl>> sCookie2Client
+            GUARDED_BY(sCookie2ClientLock);
 };
 
 }  // namespace android

@@ -29,13 +29,15 @@
 
 #include "Parameters.h"
 #include "system/camera.h"
-#include "hardware/camera_common.h"
+#include <android-base/properties.h>
 #include <android/hardware/ICamera.h>
 #include <media/MediaProfiles.h>
 #include <media/mediarecorder.h>
 
 namespace android {
 namespace camera2 {
+
+using android::camera3::CAMERA_TEMPLATE_PREVIEW;
 
 Parameters::Parameters(int cameraId,
         int cameraFacing) :
@@ -1246,6 +1248,7 @@ status_t Parameters::buildFastInfo(CameraDeviceBase *device) {
             }
         }
         fastInfo.maxZslSize = maxPrivInputSize;
+        fastInfo.usedZslSize = maxPrivInputSize;
     } else {
         fastInfo.maxZslSize = {0, 0};
     }
@@ -2046,12 +2049,33 @@ status_t Parameters::set(const String8& paramString) {
 
     slowJpegMode = false;
     Size pictureSize = { pictureWidth, pictureHeight };
-    int64_t minFrameDurationNs = getJpegStreamMinFrameDurationNs(pictureSize);
-    if (previewFpsRange[1] > 1e9/minFrameDurationNs + FPS_MARGIN) {
+    bool zslFrameRateSupported = false;
+    int64_t jpegMinFrameDurationNs = getJpegStreamMinFrameDurationNs(pictureSize);
+    if (previewFpsRange[1] > 1e9/jpegMinFrameDurationNs + FPS_MARGIN) {
         slowJpegMode = true;
     }
-    if (isDeviceZslSupported || slowJpegMode ||
-            property_get_bool("camera.disable_zsl_mode", false)) {
+    if (isZslReprocessPresent) {
+        unsigned int firstApiLevel =
+            android::base::GetUintProperty<unsigned int>("ro.product.first_api_level", 0);
+        Size chosenSize;
+        if ((firstApiLevel >= __ANDROID_API_S__) &&
+            !android::base::GetBoolProperty("ro.camera.enableCamera1MaxZsl", false)) {
+            chosenSize = pictureSize;
+        } else {
+          // follow old behavior of keeping max zsl size as the input / output
+          // zsl stream size
+          chosenSize = fastInfo.maxZslSize;
+        }
+        int64_t zslMinFrameDurationNs = getZslStreamMinFrameDurationNs(chosenSize);
+        if (zslMinFrameDurationNs > 0 &&
+                previewFpsRange[1] <= (1e9/zslMinFrameDurationNs + FPS_MARGIN)) {
+            zslFrameRateSupported = true;
+            fastInfo.usedZslSize = chosenSize;
+        }
+    }
+
+    if (isDeviceZslSupported || slowJpegMode || !zslFrameRateSupported ||
+            android::base::GetBoolProperty("camera.disable_zsl_mode", false)) {
         allowZslMode = false;
     } else {
         allowZslMode = isZslReprocessPresent;
@@ -2468,7 +2492,7 @@ status_t Parameters::getDefaultFocalLength(CameraDeviceBase *device) {
 
         // Use focal length in preview template if it exists
         CameraMetadata previewTemplate;
-        status_t res = device->createDefaultRequest(CAMERA3_TEMPLATE_PREVIEW, &previewTemplate);
+        status_t res = device->createDefaultRequest(CAMERA_TEMPLATE_PREVIEW, &previewTemplate);
         if (res != OK) {
             ALOGE("%s: Failed to create default PREVIEW request: %s (%d)",
                     __FUNCTION__, strerror(-res), res);
@@ -2975,7 +2999,7 @@ status_t Parameters::getFilteredSizes(Size limit, Vector<Size> *sizes) {
         const StreamConfiguration &sc = scs[i];
         if (sc.isInput == ANDROID_SCALER_AVAILABLE_STREAM_CONFIGURATIONS_OUTPUT &&
                 sc.format == HAL_PIXEL_FORMAT_IMPLEMENTATION_DEFINED &&
-                sc.width <= limit.width && sc.height <= limit.height) {
+                ((sc.width * sc.height) <= (limit.width * limit.height))) {
             int64_t minFrameDuration = getMinFrameDurationNs(
                     {sc.width, sc.height}, HAL_PIXEL_FORMAT_IMPLEMENTATION_DEFINED);
             if (minFrameDuration > MAX_PREVIEW_RECORD_DURATION_NS) {
@@ -3053,6 +3077,10 @@ Vector<Parameters::StreamConfiguration> Parameters::getStreamConfigurations() {
 
 int64_t Parameters::getJpegStreamMinFrameDurationNs(Parameters::Size size) {
     return getMinFrameDurationNs(size, HAL_PIXEL_FORMAT_BLOB);
+}
+
+int64_t Parameters::getZslStreamMinFrameDurationNs(Parameters::Size size) {
+    return getMinFrameDurationNs(size, HAL_PIXEL_FORMAT_IMPLEMENTATION_DEFINED);
 }
 
 int64_t Parameters::getMinFrameDurationNs(Parameters::Size size, int fmt) {
@@ -3253,6 +3281,8 @@ Parameters::CropRegion Parameters::calculateCropRegion(bool previewOnly) const {
 
 status_t Parameters::calculatePictureFovs(float *horizFov, float *vertFov)
         const {
+    // For external camera, use FOVs = (-1.0, -1.0) as default values. Calculate
+    // FOVs only if there is sufficient information.
     if (fastInfo.isExternalCamera) {
         if (horizFov != NULL) {
             *horizFov = -1.0;
@@ -3260,16 +3290,29 @@ status_t Parameters::calculatePictureFovs(float *horizFov, float *vertFov)
         if (vertFov != NULL) {
             *vertFov = -1.0;
         }
-        return OK;
     }
 
     camera_metadata_ro_entry_t sensorSize =
             staticInfo(ANDROID_SENSOR_INFO_PHYSICAL_SIZE, 2, 2);
-    if (!sensorSize.count) return NO_INIT;
+    if (!sensorSize.count) {
+        // It is non-fatal for external cameras since it has default values.
+        if (fastInfo.isExternalCamera) {
+            return OK;
+        } else {
+            return NO_INIT;
+        }
+    }
 
     camera_metadata_ro_entry_t pixelArraySize =
             staticInfo(ANDROID_SENSOR_INFO_PIXEL_ARRAY_SIZE, 2, 2);
-    if (!pixelArraySize.count) return NO_INIT;
+    if (!pixelArraySize.count) {
+        // It is non-fatal for external cameras since it has default values.
+        if (fastInfo.isExternalCamera) {
+            return OK;
+        } else {
+            return NO_INIT;
+        }
+    }
 
     float arrayAspect = static_cast<float>(fastInfo.arrayWidth) /
             fastInfo.arrayHeight;

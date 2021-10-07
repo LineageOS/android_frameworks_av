@@ -208,22 +208,23 @@ AudioPolicyMixCollection::MixMatchStatus AudioPolicyMixCollection::mixMatch(
         // Loopback render mixes are created from a public API and thus restricted
         // to non sensible audio that have not opted out.
         if (is_mix_loopback_render(mix->mRouteFlags)) {
-            auto hasFlag = [](auto flags, auto flag) { return (flags & flag) == flag; };
-            if (hasFlag(attributes.flags, AUDIO_FLAG_NO_SYSTEM_CAPTURE)) {
-                return MixMatchStatus::NO_MATCH;
-            }
-            if (!mix->mAllowPrivilegedPlaybackCapture &&
-                hasFlag(attributes.flags, AUDIO_FLAG_NO_MEDIA_PROJECTION)) {
-                return MixMatchStatus::NO_MATCH;
-            }
-            if (attributes.usage == AUDIO_USAGE_VOICE_COMMUNICATION &&
-                !mix->mVoiceCommunicationCaptureAllowed) {
-                return MixMatchStatus::NO_MATCH;
-            }
             if (!(attributes.usage == AUDIO_USAGE_UNKNOWN ||
                   attributes.usage == AUDIO_USAGE_MEDIA ||
                   attributes.usage == AUDIO_USAGE_GAME ||
                   attributes.usage == AUDIO_USAGE_VOICE_COMMUNICATION)) {
+                return MixMatchStatus::NO_MATCH;
+            }
+            auto hasFlag = [](auto flags, auto flag) { return (flags & flag) == flag; };
+            if (hasFlag(attributes.flags, AUDIO_FLAG_NO_SYSTEM_CAPTURE)) {
+                return MixMatchStatus::NO_MATCH;
+            }
+
+            if (attributes.usage == AUDIO_USAGE_VOICE_COMMUNICATION) {
+                if (!mix->mVoiceCommunicationCaptureAllowed) {
+                    return MixMatchStatus::NO_MATCH;
+                }
+            } else if (!mix->mAllowPrivilegedMediaPlaybackCapture &&
+                hasFlag(attributes.flags, AUDIO_FLAG_NO_MEDIA_PROJECTION)) {
                 return MixMatchStatus::NO_MATCH;
             }
         }
@@ -390,6 +391,7 @@ sp<DeviceDescriptor> AudioPolicyMixCollection::getDeviceAndMixForOutput(
 sp<DeviceDescriptor> AudioPolicyMixCollection::getDeviceAndMixForInputSource(
         audio_source_t inputSource,
         const DeviceVector &availDevices,
+        uid_t uid,
         sp<AudioPolicyMix> *policyMix) const
 {
     for (size_t i = 0; i < size(); i++) {
@@ -401,7 +403,11 @@ sp<DeviceDescriptor> AudioPolicyMixCollection::getDeviceAndMixForInputSource(
             if ((RULE_MATCH_ATTRIBUTE_CAPTURE_PRESET == mix->mCriteria[j].mRule &&
                     mix->mCriteria[j].mValue.mSource == inputSource) ||
                (RULE_EXCLUDE_ATTRIBUTE_CAPTURE_PRESET == mix->mCriteria[j].mRule &&
-                    mix->mCriteria[j].mValue.mSource != inputSource)) {
+                    mix->mCriteria[j].mValue.mSource != inputSource) ||
+               (RULE_MATCH_UID == mix->mCriteria[j].mRule &&
+                    mix->mCriteria[j].mValue.mUid == uid) ||
+               (RULE_EXCLUDE_UID == mix->mCriteria[j].mRule &&
+                    mix->mCriteria[j].mValue.mUid != uid)) {
                 // assuming PolicyMix only for remote submix for input
                 // so mix->mDeviceType can only be AUDIO_DEVICE_OUT_REMOTE_SUBMIX
                 audio_devices_t device = AUDIO_DEVICE_IN_REMOTE_SUBMIX;

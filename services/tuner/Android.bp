@@ -1,0 +1,146 @@
+package {
+    // See: http://go/android-license-faq
+    // A large-scale-change added 'default_applicable_licenses' to import
+    // all of the 'license_kinds' from "frameworks_av_license"
+    // to get the below license kinds:
+    //   SPDX-license-identifier-Apache-2.0
+    default_applicable_licenses: ["frameworks_av_license"],
+}
+
+filegroup {
+    name: "tv_tuner_aidl",
+    srcs: [
+        "aidl/android/media/tv/tuner/*.aidl",
+    ],
+    path: "aidl",
+}
+
+filegroup {
+    name: "tv_tuner_frontend_info",
+    srcs: [
+        "aidl/android/media/tv/tuner/TunerFrontendInfo.aidl",
+        "aidl/android/media/tv/tuner/TunerFrontend*Capabilities.aidl",
+    ],
+    path: "aidl",
+}
+
+aidl_interface {
+    name: "tv_tuner_aidl_interface",
+    unstable: true,
+    local_include_dir: "aidl",
+    srcs: [
+        ":tv_tuner_aidl",
+    ],
+    imports: [
+        "android.hardware.common-V2",
+        "android.hardware.common.fmq-V1",
+    ],
+
+    backend: {
+        java: {
+            enabled: false,
+        },
+        cpp: {
+            enabled: false,
+        },
+        ndk: {
+            enabled: true,
+        },
+    },
+}
+
+aidl_interface {
+    name: "tv_tuner_frontend_info_aidl_interface",
+    unstable: true,
+    local_include_dir: "aidl",
+    srcs: [
+        ":tv_tuner_frontend_info",
+    ],
+
+    backend: {
+        java: {
+            enabled: true,
+        },
+        cpp: {
+            enabled: true,
+        },
+        ndk: {
+            enabled: true,
+        },
+    },
+}
+
+cc_library {
+    name: "libtunerservice",
+
+    srcs: [
+        "Tuner*.cpp",
+    ],
+
+    shared_libs: [
+        "android.hardware.tv.tuner@1.0",
+        "android.hardware.tv.tuner@1.1",
+        "libbase",
+        "libbinder",
+        "libbinder_ndk",
+        "libcutils",
+        "libfmq",
+        "libhidlbase",
+        "liblog",
+        "libmedia",
+        "libutils",
+        "packagemanager_aidl-cpp",
+        "tv_tuner_aidl_interface-ndk",
+        "tv_tuner_resource_manager_aidl_interface-ndk",
+        "tv_tuner_resource_manager_aidl_interface-cpp",
+    ],
+
+    static_libs: [
+        "android.hardware.common.fmq-V1-ndk",
+        "libaidlcommonsupport",
+    ],
+
+    include_dirs: [
+        "frameworks/av/include"
+    ],
+
+    cflags: [
+        "-Werror",
+        "-Wall",
+    ],
+
+    export_include_dirs: ["."],
+}
+
+
+cc_binary {
+    name: "mediatuner",
+
+    srcs: [
+        "main_tunerservice.cpp",
+    ],
+
+    shared_libs: [
+        "android.hardware.tv.tuner@1.0",
+        "android.hardware.tv.tuner@1.1",
+        "libbase",
+        "libbinder",
+        "libfmq",
+        "liblog",
+        "libtunerservice",
+        "libutils",
+        "tv_tuner_resource_manager_aidl_interface-ndk",
+        "tv_tuner_resource_manager_aidl_interface-cpp",
+    ],
+
+    static_libs: [
+        "tv_tuner_aidl_interface-ndk",
+    ],
+
+    init_rc: ["mediatuner.rc"],
+
+    cflags: [
+        "-Werror",
+        "-Wall",
+    ],
+}

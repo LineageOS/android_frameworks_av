@@ -43,6 +43,9 @@ public:
         virtual std::shared_ptr<C2ComponentStore> getStore() = 0;
         virtual bool describe(C2String name, Descriptor *desc) = 0;
         virtual bool isFilteringEnabled(const std::shared_ptr<C2ComponentInterface> &intf) = 0;
+        virtual c2_status_t queryParamsForPreviousComponent(
+                const std::shared_ptr<C2ComponentInterface> &intf,
+                std::vector<std::unique_ptr<C2Param>> *params) = 0;
         C2_DO_NOT_COPY(Plugin);
     };
 
@@ -78,10 +81,20 @@ public:
      */
     bool isFilteringEnabled(const std::shared_ptr<C2ComponentInterface> &intf);
 
+    /**
+     * Create a C2BlockPool object with |allocatorId| for |component|.
+     */
     c2_status_t createBlockPool(
             C2PlatformAllocatorStore::id_t allocatorId,
             std::shared_ptr<const C2Component> component,
             std::shared_ptr<C2BlockPool> *pool);
+
+    /**
+     * Query parameters that |intf| wants from the previous component.
+     */
+    c2_status_t queryParamsForPreviousComponent(
+            const std::shared_ptr<C2ComponentInterface> &intf,
+            std::vector<std::unique_ptr<C2Param>> *params);
 
 private:
     status_t mInit;

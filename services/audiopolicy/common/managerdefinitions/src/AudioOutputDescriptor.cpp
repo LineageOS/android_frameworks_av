@@ -123,6 +123,12 @@ void AudioOutputDescriptor::setClientActive(const sp<TrackClientDescriptor>& cli
     client->setActive(active);
 }
 
+bool AudioOutputDescriptor::isClientActive(const sp<TrackClientDescriptor>& client)
+{
+    return client != nullptr &&
+            std::find(begin(mActiveClients), end(mActiveClients), client) != end(mActiveClients);
+}
+
 bool AudioOutputDescriptor::isActive(VolumeSource vs, uint32_t inPastMs, nsecs_t sysTime) const
 {
     return (vs == VOLUME_SOURCE_NONE) ?
@@ -209,7 +215,7 @@ void AudioOutputDescriptor::toAudioPortConfig(struct audio_port_config *dstConfi
     dstConfig->ext.mix.usecase.stream = AUDIO_STREAM_DEFAULT;
 }
 
-void AudioOutputDescriptor::toAudioPort(struct audio_port *port) const
+void AudioOutputDescriptor::toAudioPort(struct audio_port_v7 *port) const
 {
     // Should not be called for duplicated ports, see SwAudioOutputDescriptor::toAudioPortConfig.
     mPolicyAudioPort->asAudioPort()->toAudioPort(port);
@@ -338,6 +344,13 @@ bool SwAudioOutputDescriptor::supportsAllDevices(const DeviceVector &devices) co
     return supportedDevices().containsAllDevices(devices);
 }
 
+bool SwAudioOutputDescriptor::supportsDevicesForPlayback(const DeviceVector &devices) const
+{
+    // No considering duplicated output
+    // TODO: need to verify if the profile supports the devices combo for playback.
+    return !isDuplicated() && supportsAllDevices(devices);
+}
+
 DeviceVector SwAudioOutputDescriptor::filterSupportedDevices(const DeviceVector &devices) const
 {
     DeviceVector filteredDevices = supportedDevices();
@@ -352,6 +365,16 @@ bool SwAudioOutputDescriptor::devicesSupportEncodedFormats(const DeviceTypeSet& 
     } else {
        return mProfile->devicesSupportEncodedFormats(deviceTypes);
     }
+}
+
+bool SwAudioOutputDescriptor::containsSingleDeviceSupportingEncodedFormats(
+        const sp<DeviceDescriptor>& device) const
+{
+    if (isDuplicated()) {
+        return (mOutput1->containsSingleDeviceSupportingEncodedFormats(device) &&
+                mOutput2->containsSingleDeviceSupportingEncodedFormats(device));
+    }
+    return mProfile->containsSingleDeviceSupportingEncodedFormats(device);
 }
 
 uint32_t SwAudioOutputDescriptor::latency()
@@ -400,8 +423,7 @@ void SwAudioOutputDescriptor::toAudioPortConfig(
     dstConfig->ext.mix.handle = mIoHandle;
 }
 
-void SwAudioOutputDescriptor::toAudioPort(
-                                                    struct audio_port *port) const
+void SwAudioOutputDescriptor::toAudioPort(struct audio_port_v7 *port) const
 {
     ALOG_ASSERT(!isDuplicated(), "toAudioPort() called on duplicated output %d", mIoHandle);
 
@@ -651,8 +673,7 @@ void HwAudioOutputDescriptor::toAudioPortConfig(
     mSource->srcDevice()->toAudioPortConfig(dstConfig, srcConfig);
 }
 
-void HwAudioOutputDescriptor::toAudioPort(
-                                                    struct audio_port *port) const
+void HwAudioOutputDescriptor::toAudioPort(struct audio_port_v7 *port) const
 {
     mSource->srcDevice()->toAudioPort(port);
 }

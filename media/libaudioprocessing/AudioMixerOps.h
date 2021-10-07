@@ -17,6 +17,8 @@
 #ifndef ANDROID_AUDIO_MIXER_OPS_H
 #define ANDROID_AUDIO_MIXER_OPS_H
 
+#include <system/audio.h>
+
 namespace android {
 
 // Hack to make static_assert work in a constexpr
@@ -231,7 +233,7 @@ template <int MIXTYPE, int NCHAN,
         typename TO, typename TI, typename TV,
         typename F>
 void stereoVolumeHelper(TO*& out, const TI*& in, const TV *vol, F f) {
-    static_assert(NCHAN > 0 && NCHAN <= 8);
+    static_assert(NCHAN > 0 && NCHAN <= FCC_LIMIT);
     static_assert(MIXTYPE == MIXTYPE_MULTI_STEREOVOL
             || MIXTYPE == MIXTYPE_MULTI_SAVEONLY_STEREOVOL
             || MIXTYPE == MIXTYPE_STEREOEXPAND
@@ -291,6 +293,16 @@ void stereoVolumeHelper(TO*& out, const TI*& in, const TV *vol, F f) {
     // NCHAN == 8
     proc(*out++, f(inp(), vol[0])); // side left
     proc(*out++, f(inp(), vol[1])); // side right
+    if constexpr (NCHAN > FCC_8) {
+        // Mutes to zero extended surround channels.
+        // 7.1.4 has the correct behavior.
+        // 22.2 has the behavior that FLC and FRC will be mixed instead
+        // of SL and SR and LFE will be center, not left.
+        for (int i = 8; i < NCHAN; ++i) {
+            // TODO: Consider using android::audio_utils::channels::kSideFromChannelIdx
+            proc(*out++, f(inp(), 0.f));
+        }
+    }
 }
 
 /*

@@ -36,7 +36,7 @@
 namespace android {
 
 class IntUniquePtrComp {
-   public:
+public:
     bool operator()(const std::unique_ptr<int>& lhs, const std::unique_ptr<int>& rhs) const {
         return *lhs < *rhs;
     }
@@ -223,19 +223,19 @@ TEST(AdjustableMaxPriorityQueueTest, TestErasingItem) {
 }
 
 // Test the heap property and make sure it is the same as std::priority_queue.
-TEST(AdjustableMaxPriorityQueueTest, TranscodingJobTest) {
-    // Test data structure that mimics the Transcoding job.
-    struct TranscodingJob {
+TEST(AdjustableMaxPriorityQueueTest, TranscodingSessionTest) {
+    // Test data structure that mimics the Transcoding session.
+    struct TranscodingSession {
         int32_t priority;
         int64_t createTimeUs;
     };
 
-    // The job is arranging according to priority with highest priority comes first.
-    // For the job with the same priority, the job with early createTime will come first.
-    class TranscodingJobComp {
-       public:
-        bool operator()(const std::unique_ptr<TranscodingJob>& lhs,
-                        const std::unique_ptr<TranscodingJob>& rhs) const {
+    // The session is arranging according to priority with highest priority comes first.
+    // For the session with the same priority, the session with early createTime will come first.
+    class TranscodingSessionComp {
+    public:
+        bool operator()(const std::unique_ptr<TranscodingSession>& lhs,
+                        const std::unique_ptr<TranscodingSession>& rhs) const {
             if (lhs->priority != rhs->priority) {
                 return lhs->priority < rhs->priority;
             }
@@ -244,46 +244,47 @@ TEST(AdjustableMaxPriorityQueueTest, TranscodingJobTest) {
     };
 
     // Map to save each value's position in the heap.
-    std::unordered_map<int, TranscodingJob*> jobIdToJobMap;
+    std::unordered_map<int, TranscodingSession*> sessionIdToSessionMap;
 
-    TranscodingJob testJobs[] = {
-            {1 /*priority*/, 66 /*createTimeUs*/},  // First job,
-            {2 /*priority*/, 67 /*createTimeUs*/},  // Second job,
-            {2 /*priority*/, 66 /*createTimeUs*/},  // Third job,
-            {3 /*priority*/, 68 /*createTimeUs*/},  // Fourth job.
+    TranscodingSession testSessions[] = {
+            {1 /*priority*/, 66 /*createTimeUs*/},  // First session,
+            {2 /*priority*/, 67 /*createTimeUs*/},  // Second session,
+            {2 /*priority*/, 66 /*createTimeUs*/},  // Third session,
+            {3 /*priority*/, 68 /*createTimeUs*/},  // Fourth session.
     };
 
-    AdjustableMaxPriorityQueue<std::unique_ptr<TranscodingJob>, TranscodingJobComp> jobQueue;
+    AdjustableMaxPriorityQueue<std::unique_ptr<TranscodingSession>, TranscodingSessionComp>
+            sessionQueue;
 
-    // Pushes all the jobs into the heap.
-    for (int jobId = 0; jobId < 4; ++jobId) {
-        auto newJob = std::make_unique<TranscodingJob>(testJobs[jobId]);
-        jobIdToJobMap[jobId] = newJob.get();
-        EXPECT_TRUE(jobQueue.push(std::move(newJob)));
+    // Pushes all the sessions into the heap.
+    for (int sessionId = 0; sessionId < 4; ++sessionId) {
+        auto newSession = std::make_unique<TranscodingSession>(testSessions[sessionId]);
+        sessionIdToSessionMap[sessionId] = newSession.get();
+        EXPECT_TRUE(sessionQueue.push(std::move(newSession)));
     }
 
-    // Check the job queue size.
-    EXPECT_EQ(4, jobQueue.size());
+    // Check the session queue size.
+    EXPECT_EQ(4, sessionQueue.size());
 
-    // Check the top and it should be Forth job: (3, 68)
-    const std::unique_ptr<TranscodingJob>& topJob = jobQueue.top();
-    EXPECT_EQ(3, topJob->priority);
-    EXPECT_EQ(68, topJob->createTimeUs);
+    // Check the top and it should be Forth session: (3, 68)
+    const std::unique_ptr<TranscodingSession>& topSession = sessionQueue.top();
+    EXPECT_EQ(3, topSession->priority);
+    EXPECT_EQ(68, topSession->createTimeUs);
 
     // Consume the top.
-    std::unique_ptr<TranscodingJob> consumeJob = jobQueue.consume_top();
+    std::unique_ptr<TranscodingSession> consumeSession = sessionQueue.consume_top();
 
-    // Check the top and it should be Third Job (2, 66)
-    const std::unique_ptr<TranscodingJob>& topJob2 = jobQueue.top();
-    EXPECT_EQ(2, topJob2->priority);
-    EXPECT_EQ(66, topJob2->createTimeUs);
+    // Check the top and it should be Third Session (2, 66)
+    const std::unique_ptr<TranscodingSession>& topSession2 = sessionQueue.top();
+    EXPECT_EQ(2, topSession2->priority);
+    EXPECT_EQ(66, topSession2->createTimeUs);
 
-    // Change the Second job's priority to 4 from (2, 67) -> (4, 67). It should becomes top of the
-    // queue.
-    jobIdToJobMap[1]->priority = 4;
-    jobQueue.rebuild();
-    const std::unique_ptr<TranscodingJob>& topJob3 = jobQueue.top();
-    EXPECT_EQ(4, topJob3->priority);
-    EXPECT_EQ(67, topJob3->createTimeUs);
+    // Change the Second session's priority to 4 from (2, 67) -> (4, 67). It should becomes
+    // top of the queue.
+    sessionIdToSessionMap[1]->priority = 4;
+    sessionQueue.rebuild();
+    const std::unique_ptr<TranscodingSession>& topSession3 = sessionQueue.top();
+    EXPECT_EQ(4, topSession3->priority);
+    EXPECT_EQ(67, topSession3->createTimeUs);
 }
 }  // namespace android

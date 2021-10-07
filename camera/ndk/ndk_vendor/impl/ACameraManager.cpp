@@ -764,15 +764,15 @@ ACameraManager::openCamera(
     }
 
     sp<ICameraDeviceCallback> callbacks = device->getServiceCallback();
-    sp<ICameraDeviceUser> deviceRemote;
+    sp<ICameraDeviceUser_2_0> deviceRemote_2_0;
 
     // No way to get package name from native.
     // Send a zero length package name and let camera service figure it out from UID
     Status status = Status::NO_ERROR;
     auto serviceRet = cs->connectDevice(
-            callbacks, cameraId, [&status, &deviceRemote](auto s, auto &device) {
+            callbacks, cameraId, [&status, &deviceRemote_2_0](auto s, auto &device) {
                                      status = s;
-                                     deviceRemote = device;
+                                     deviceRemote_2_0 = device;
                                  });
 
     if (!serviceRet.isOk() || status != Status::NO_ERROR) {
@@ -780,11 +780,18 @@ ACameraManager::openCamera(
         delete device;
         return utils::convertFromHidl(status);
     }
-    if (deviceRemote == nullptr) {
+    if (deviceRemote_2_0 == nullptr) {
         ALOGE("%s: connect camera device failed! remote device is null", __FUNCTION__);
         delete device;
         return ACAMERA_ERROR_CAMERA_DISCONNECTED;
     }
+    auto castResult = ICameraDeviceUser::castFrom(deviceRemote_2_0);
+    if (!castResult.isOk()) {
+        ALOGE("%s: failed to cast remote device to version 2.1", __FUNCTION__);
+        delete device;
+        return ACAMERA_ERROR_CAMERA_DISCONNECTED;
+    }
+    sp<ICameraDeviceUser> deviceRemote = castResult;
     device->setRemoteDevice(deviceRemote);
     device->setDeviceMetadataQueues();
     *outDevice = device;

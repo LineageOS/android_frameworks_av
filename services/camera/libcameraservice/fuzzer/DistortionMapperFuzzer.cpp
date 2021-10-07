@@ -23,6 +23,7 @@
 
 using namespace android;
 using namespace android::camera3;
+using DistortionMapperInfo = android::camera3::DistortionMapper::DistortionMapperInfo;
 
 int32_t testActiveArray[] = {100, 100, 1000, 750};
 float testICal[] = { 1000.f, 1000.f, 500.f, 500.f, 0.f };
@@ -62,10 +63,10 @@ extern "C" int LLVMFuzzerTestOneInput(const uint8_t* data, size_t size) {
     for (int index = 0; fdp.remaining_bytes() > 0; index++) {
         input.push_back(fdp.ConsumeIntegral<int32_t>());
     }
-
+    DistortionMapperInfo *mapperInfo = m.getMapperInfo();
     // The size argument counts how many coordinate pairs there are, so
     // it is expected to be 1/2 the size of the input.
-    m.mapCorrectedToRaw(input.data(), input.size()/2,  clamp, simple);
+    m.mapCorrectedToRaw(input.data(), input.size()/2,  mapperInfo, clamp, simple);
 
     return 0;
 }

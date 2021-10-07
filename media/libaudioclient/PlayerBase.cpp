@@ -15,20 +15,23 @@
  */
 
 #include <binder/IServiceManager.h>
+#include <media/AidlConversionUtil.h>
 #include <media/PlayerBase.h>
 
 #define max(a, b) ((a) > (b) ? (a) : (b))
 #define min(a, b) ((a) < (b) ? (a) : (b))
 
 namespace android {
-
-using media::VolumeShaper;
+using aidl_utils::binderStatusFromStatusT;
+using media::VolumeShaperConfiguration;
+using media::VolumeShaperOperation;
 
 //--------------------------------------------------------------------------------------------------
 PlayerBase::PlayerBase() : BnPlayer(),
         mPanMultiplierL(1.0f), mPanMultiplierR(1.0f),
         mVolumeMultiplierL(1.0f), mVolumeMultiplierR(1.0f),
-        mPIId(PLAYER_PIID_INVALID), mLastReportedEvent(PLAYER_STATE_UNKNOWN)
+        mPIId(PLAYER_PIID_INVALID), mLastReportedEvent(PLAYER_STATE_UNKNOWN),
+        mLastReportedDeviceId(AUDIO_PORT_HANDLE_NONE)
 {
     ALOGD("PlayerBase::PlayerBase()");
     // use checkService() to avoid blocking if audio service is not up yet
@@ -46,11 +49,12 @@ PlayerBase::~PlayerBase() {
     baseDestroy();
 }
 
-void PlayerBase::init(player_type_t playerType, audio_usage_t usage) {
+void PlayerBase::init(player_type_t playerType, audio_usage_t usage, audio_session_t sessionId) {
     if (mAudioManager == 0) {
                 ALOGE("AudioPlayer realize: no audio service, player will not be registered");
     } else {
-        mPIId = mAudioManager->trackPlayer(playerType, usage, AUDIO_CONTENT_TYPE_UNKNOWN, this);
+        mPIId = mAudioManager->trackPlayer(playerType, usage, AUDIO_CONTENT_TYPE_UNKNOWN, this,
+                sessionId);
     }
 }
 
@@ -62,14 +66,26 @@ void PlayerBase::baseDestroy() {
 }
 
 //------------------------------------------------------------------------------
-void PlayerBase::servicePlayerEvent(player_state_t event) {
+void PlayerBase::servicePlayerEvent(player_state_t event, audio_port_handle_t deviceId) {
     if (mAudioManager != 0) {
-        // only report state change
-        Mutex::Autolock _l(mPlayerStateLock);
-        if (event != mLastReportedEvent
-                && mPIId != PLAYER_PIID_INVALID) {
-            mLastReportedEvent = event;
-            mAudioManager->playerEvent(mPIId, event);
+        bool changed = false;
+        {
+            Mutex::Autolock _l(mDeviceIdLock);
+            changed = mLastReportedDeviceId != deviceId;
+            mLastReportedDeviceId = deviceId;
+        }
+
+        {
+            Mutex::Autolock _l(mPlayerStateLock);
+            // PLAYER_UPDATE_DEVICE_ID is not saved as an actual state, instead it is used to update
+            // device ID only.
+            if ((event != PLAYER_UPDATE_DEVICE_ID) && (event != mLastReportedEvent)) {
+                mLastReportedEvent = event;
+                changed = true;
+            }
+        }
+        if (changed && (mPIId != PLAYER_PIID_INVALID)) {
+            mAudioManager->playerEvent(mPIId, event, deviceId);
         }
     }
 }
@@ -82,14 +98,18 @@ void PlayerBase::serviceReleasePlayer() {
 }
 
 //FIXME temporary method while some player state is outside of this class
-void PlayerBase::reportEvent(player_state_t event) {
-    servicePlayerEvent(event);
+void PlayerBase::reportEvent(player_state_t event, audio_port_handle_t deviceId) {
+    servicePlayerEvent(event, deviceId);
 }
 
-status_t PlayerBase::startWithStatus() {
+void PlayerBase::baseUpdateDeviceId(audio_port_handle_t deviceId) {
+    servicePlayerEvent(PLAYER_UPDATE_DEVICE_ID, deviceId);
+}
+
+status_t PlayerBase::startWithStatus(audio_port_handle_t deviceId) {
     status_t status = playerStart();
     if (status == NO_ERROR) {
-        servicePlayerEvent(PLAYER_STATE_STARTED);
+        servicePlayerEvent(PLAYER_STATE_STARTED, deviceId);
     } else {
         ALOGW("PlayerBase::start() error %d", status);
     }
@@ -99,18 +119,18 @@ status_t PlayerBase::startWithStatus() {
 status_t PlayerBase::pauseWithStatus() {
     status_t status = playerPause();
     if (status == NO_ERROR) {
-        servicePlayerEvent(PLAYER_STATE_PAUSED);
+        servicePlayerEvent(PLAYER_STATE_PAUSED, AUDIO_PORT_HANDLE_NONE);
     } else {
         ALOGW("PlayerBase::pause() error %d", status);
     }
     return status;
 }
 
-
 status_t PlayerBase::stopWithStatus() {
     status_t status = playerStop();
+
     if (status == NO_ERROR) {
-        servicePlayerEvent(PLAYER_STATE_STOPPED);
+        servicePlayerEvent(PLAYER_STATE_STOPPED, AUDIO_PORT_HANDLE_NONE);
     } else {
         ALOGW("PlayerBase::stop() error %d", status);
     }
@@ -121,7 +141,12 @@ status_t PlayerBase::stopWithStatus() {
 // Implementation of IPlayer
 binder::Status PlayerBase::start() {
     ALOGD("PlayerBase::start() from IPlayer");
-    (void)startWithStatus();
+    audio_port_handle_t deviceId;
+    {
+        Mutex::Autolock _l(mDeviceIdLock);
+        deviceId = mLastReportedDeviceId;
+    }
+    (void)startWithStatus(deviceId);
     return binder::Status::ok();
 }
 
@@ -149,7 +174,7 @@ binder::Status PlayerBase::setVolume(float vol) {
     if (status != NO_ERROR) {
         ALOGW("PlayerBase::setVolume() error %d", status);
     }
-    return binder::Status::fromStatusT(status);
+    return binderStatusFromStatusT(status);
 }
 
 binder::Status PlayerBase::setPan(float pan) {
@@ -169,7 +194,7 @@ binder::Status PlayerBase::setPan(float pan) {
     if (status != NO_ERROR) {
         ALOGW("PlayerBase::setPan() error %d", status);
     }
-    return binder::Status::fromStatusT(status);
+    return binderStatusFromStatusT(status);
 }
 
 binder::Status PlayerBase::setStartDelayMs(int32_t delayMs __unused) {
@@ -178,8 +203,8 @@ binder::Status PlayerBase::setStartDelayMs(int32_t delayMs __unused) {
 }
 
 binder::Status PlayerBase::applyVolumeShaper(
-            const VolumeShaper::Configuration& configuration __unused,
-            const VolumeShaper::Operation& operation __unused) {
+            const VolumeShaperConfiguration& configuration __unused,
+            const VolumeShaperOperation& operation __unused) {
     ALOGW("applyVolumeShaper() is not supported");
     return binder::Status::ok();
 }

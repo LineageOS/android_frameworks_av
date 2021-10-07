@@ -58,6 +58,7 @@ public:
 
 private:
     Mutex mAdapterLock;
+    std::mutex mBufferGatingMutex;
     // Make sure the read() wait for the incoming buffer.
     Condition mBufferReadCond;
     // Make sure the pushBuffer() wait for the current buffer consumed.

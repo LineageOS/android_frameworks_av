@@ -46,6 +46,7 @@ cc_library {
     ],
 
     cflags: [
+        "-Wthread-safety",
         "-Wno-unused-parameter",
         "-Wall",
         "-Werror",
@@ -64,6 +65,14 @@ cc_library {
         "libcutils",
         "liblog",
         "libutils",
+        "aaudio-aidl-cpp",
+        "framework-permission-aidl-cpp",
+        "libaudioclient_aidl_conversion",
+    ],
+
+    export_shared_lib_headers: [
+        "libaaudio_internal",
+        "framework-permission-aidl-cpp",
     ],
 
     header_libs: [

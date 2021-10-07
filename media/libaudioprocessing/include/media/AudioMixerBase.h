@@ -45,8 +45,7 @@ class AudioMixerBase
 {
 public:
     // Do not change these unless underlying code changes.
-    // This mixer has a hard-coded upper limit of 8 channels for output.
-    static constexpr uint32_t MAX_NUM_CHANNELS = FCC_8;
+    static constexpr uint32_t MAX_NUM_CHANNELS = FCC_LIMIT;
     static constexpr uint32_t MAX_NUM_VOLUMES = FCC_2; // stereo volume only
 
     static const uint16_t UNITY_GAIN_INT = 0x1000;

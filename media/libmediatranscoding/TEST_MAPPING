@@ -1,0 +1,35 @@
+{
+    "presubmit": [
+        {
+            "name": "MediaSampleQueueTests"
+        },
+        {
+            "name": "MediaSampleReaderNDKTests"
+        },
+        {
+            "name": "MediaSampleWriterTests"
+        },
+        {
+            "name": "MediaTrackTranscoderTests"
+        },
+        {
+            "name": "MediaTranscoderTests"
+        },
+        {
+            "name": "PassthroughTrackTranscoderTests"
+        },
+        {
+            "name": "TranscodingClientManager_tests"
+        },
+        {
+            "name": "TranscodingSessionController_tests"
+        },
+        {
+            "name": "VideoTrackTranscoderTests"
+        },
+        {
+            "name": "CtsMediaTranscodingTestCases"
+        }
+    ]
+}
+

@@ -34,6 +34,9 @@ cc_library {
     shared_libs: [
         "android.hardware.media.c2@1.0",
         "android.hardware.media.omx@1.0",
+        "av-types-aidl-cpp",
+        "framework-permission-aidl-cpp",
+        "libaudioclient_aidl_conversion",
         "libbase",
         "libactivitymanager_aidl",
         "libandroid_net",
@@ -74,10 +77,12 @@ cc_library {
         "libstagefright_nuplayer",
         "libstagefright_rtsp",
         "libstagefright_timedtext",
+        "framework-permission-aidl-cpp",
     ],
 
     export_shared_lib_headers: [
         "libmedia",
+        "framework-permission-aidl-cpp",
         "packagemanager_aidl-cpp",
     ],
 

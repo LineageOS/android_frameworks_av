@@ -15,7 +15,7 @@
 namespace android {
 namespace hardware {
 namespace drm {
-namespace V1_2 {
+namespace V1_4 {
 namespace clearkey {
 
 // Using android file system requires clearkey plugin to update
@@ -64,7 +64,7 @@ class MemoryFileSystem {
 };
 
 } // namespace clearkey
-} // namespace V1_2
+} // namespace V1_4
 } // namespace drm
 } // namespace hardware
 } // namespace android

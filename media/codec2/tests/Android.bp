@@ -9,6 +9,7 @@ package {
 
 cc_test {
     name: "codec2_core_param_test",
+    test_suites: ["device-tests"],
 
     srcs: [
         "C2Param_test.cpp",
@@ -37,6 +38,7 @@ cc_test {
 
 cc_test {
     name: "codec2_vndk_test",
+    test_suites: ["device-tests"],
 
     srcs: [
         "C2_test.cpp",

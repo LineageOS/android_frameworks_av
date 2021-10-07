@@ -63,7 +63,7 @@ std::array<char const*, 5> const& getXmlPaths() {
                      searchDirs[1] + fileName,
                      searchDirs[2] + fileName,
                      searchDirs[3] + fileName,
-                     "system/etc/media_profiles_V1_0.xml" // System fallback
+                     "system/etc/media_profiles.xml" // System fallback
                    };
         }();
     static std::array<char const*, 5> const cPaths = {
@@ -121,6 +121,11 @@ const MediaProfiles::NameToTagMap MediaProfiles::sCamcorderQualityNameMap[] = {
     {"1080p", CAMCORDER_QUALITY_1080P},
     {"2160p", CAMCORDER_QUALITY_2160P},
     {"qvga", CAMCORDER_QUALITY_QVGA},
+    {"vga", CAMCORDER_QUALITY_VGA},
+    {"4kdci", CAMCORDER_QUALITY_4KDCI},
+    {"qhd", CAMCORDER_QUALITY_QHD},
+    {"2k", CAMCORDER_QUALITY_2K},
+    {"8kuhd", CAMCORDER_QUALITY_8KUHD},
 
     {"timelapselow",  CAMCORDER_QUALITY_TIME_LAPSE_LOW},
     {"timelapsehigh", CAMCORDER_QUALITY_TIME_LAPSE_HIGH},
@@ -131,6 +136,10 @@ const MediaProfiles::NameToTagMap MediaProfiles::sCamcorderQualityNameMap[] = {
     {"timelapse1080p", CAMCORDER_QUALITY_TIME_LAPSE_1080P},
     {"timelapse2160p", CAMCORDER_QUALITY_TIME_LAPSE_2160P},
     {"timelapseqvga", CAMCORDER_QUALITY_TIME_LAPSE_QVGA},
+    {"timelapsevga", CAMCORDER_QUALITY_TIME_LAPSE_VGA},
+    {"timelapse4kdci", CAMCORDER_QUALITY_TIME_LAPSE_4KDCI},
+    {"timelapseqhd", CAMCORDER_QUALITY_TIME_LAPSE_QHD},
+    {"timelapse2k", CAMCORDER_QUALITY_TIME_LAPSE_2K},
 
     {"highspeedlow",  CAMCORDER_QUALITY_HIGH_SPEED_LOW},
     {"highspeedhigh", CAMCORDER_QUALITY_HIGH_SPEED_HIGH},
@@ -138,19 +147,11 @@ const MediaProfiles::NameToTagMap MediaProfiles::sCamcorderQualityNameMap[] = {
     {"highspeed720p", CAMCORDER_QUALITY_HIGH_SPEED_720P},
     {"highspeed1080p", CAMCORDER_QUALITY_HIGH_SPEED_1080P},
     {"highspeed2160p", CAMCORDER_QUALITY_HIGH_SPEED_2160P},
-
-    // Vendor-specific profiles
-    {"vga", CAMCORDER_QUALITY_VGA},
-    {"4kdci", CAMCORDER_QUALITY_4KDCI},
-    {"timelapsevga", CAMCORDER_QUALITY_TIME_LAPSE_VGA},
-    {"timelapse4kdci", CAMCORDER_QUALITY_TIME_LAPSE_4KDCI},
     {"highspeedcif", CAMCORDER_QUALITY_HIGH_SPEED_CIF},
     {"highspeedvga", CAMCORDER_QUALITY_HIGH_SPEED_VGA},
     {"highspeed4kdci", CAMCORDER_QUALITY_HIGH_SPEED_4KDCI},
-    {"qhd", CAMCORDER_QUALITY_QHD},
-    {"2k", CAMCORDER_QUALITY_2k},
-    {"timelapseqhd", CAMCORDER_QUALITY_TIME_LAPSE_QHD},
-    {"timelapse2k", CAMCORDER_QUALITY_TIME_LAPSE_2k},
+
+    // Vendor-specific profiles
 };
 
 #if LOG_NDEBUG

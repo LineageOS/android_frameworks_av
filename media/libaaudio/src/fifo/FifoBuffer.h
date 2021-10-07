@@ -38,15 +38,9 @@ struct WrappingBuffer {
 
 class FifoBuffer {
 public:
-    FifoBuffer(int32_t bytesPerFrame, fifo_frames_t capacityInFrames);
+    FifoBuffer(int32_t bytesPerFrame);
 
-    FifoBuffer(int32_t bytesPerFrame,
-               fifo_frames_t capacityInFrames,
-               fifo_counter_t *readCounterAddress,
-               fifo_counter_t *writeCounterAddress,
-               void *dataStorageAddress);
-
-    ~FifoBuffer();
+    virtual ~FifoBuffer() = default;
 
     int32_t convertFramesToBytes(fifo_frames_t frames);
 
@@ -121,17 +115,51 @@ public:
      */
     void eraseMemory();
 
-private:
+protected:
+
+    virtual uint8_t *getStorage() const = 0;
 
     void fillWrappingBuffer(WrappingBuffer *wrappingBuffer,
                             int32_t framesAvailable, int32_t startIndex);
 
     const int32_t             mBytesPerFrame;
-    // We do not use a std::unique_ptr for mStorage because it is often a pointer to
-    // memory shared between processes and cannot be deleted trivially.
-    uint8_t                  *mStorage = nullptr;
-    bool                      mStorageOwned = false; // did this object allocate the storage?
     std::unique_ptr<FifoControllerBase> mFifo{};
+};
+
+// Define two subclasses to handle the two ways that storage is allocated.
+
+// Allocate storage internally.
+class FifoBufferAllocated : public FifoBuffer {
+public:
+    FifoBufferAllocated(int32_t bytesPerFrame, fifo_frames_t capacityInFrames);
+
+private:
+
+    uint8_t *getStorage() const override {
+        return mInternalStorage.get();
+    };
+
+    std::unique_ptr<uint8_t[]> mInternalStorage;
+};
+
+// Allocate storage externally and pass it in.
+class FifoBufferIndirect : public FifoBuffer {
+public:
+    // We use raw pointers because the memory may be
+    // in the middle of an allocated block and cannot be deleted directly.
+    FifoBufferIndirect(int32_t bytesPerFrame,
+                       fifo_frames_t capacityInFrames,
+                       fifo_counter_t* readCounterAddress,
+                       fifo_counter_t* writeCounterAddress,
+                       void* dataStorageAddress);
+
+private:
+
+    uint8_t *getStorage() const override {
+        return mExternalStorage;
+    };
+
+    uint8_t *mExternalStorage = nullptr;
 };
 
 }  // android

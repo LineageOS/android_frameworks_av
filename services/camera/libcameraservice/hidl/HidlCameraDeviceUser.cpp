@@ -28,7 +28,7 @@ namespace android {
 namespace frameworks {
 namespace cameraservice {
 namespace device {
-namespace V2_0 {
+namespace V2_1 {
 namespace implementation {
 
 using hardware::cameraservice::utils::conversion::convertToHidl;
@@ -115,7 +115,7 @@ bool HidlCameraDeviceUser::copyPhysicalCameraSettings(
         // is guaranteed to be called serially by the client if it decides to
         // use fmq.
         if (e.settings.getDiscriminator() ==
-            FmqSizeOrMetadata::hidl_discriminator::fmqMetadataSize) {
+            V2_0::FmqSizeOrMetadata::hidl_discriminator::fmqMetadataSize) {
             /**
              * Get settings from the fmq.
              */
@@ -196,6 +196,12 @@ Return<HStatus> HidlCameraDeviceUser::beginConfigure() {
 
 Return<HStatus> HidlCameraDeviceUser::endConfigure(StreamConfigurationMode operatingMode,
                                                    const hidl_vec<uint8_t>& sessionParams) {
+    return endConfigure_2_1(operatingMode, sessionParams, systemTime());
+}
+
+Return<HStatus> HidlCameraDeviceUser::endConfigure_2_1(StreamConfigurationMode operatingMode,
+                                                   const hidl_vec<uint8_t>& sessionParams,
+                                                   nsecs_t startTimeNs) {
     android::CameraMetadata cameraMetadata;
     if (!convertFromHidl(sessionParams, &cameraMetadata)) {
         return HStatus::ILLEGAL_ARGUMENT;
@@ -203,7 +209,8 @@ Return<HStatus> HidlCameraDeviceUser::endConfigure(StreamConfigurationMode opera
 
     std::vector<int> offlineStreamIds;
     binder::Status ret = mDeviceRemote->endConfigure(convertFromHidl(operatingMode),
-                                                     cameraMetadata, &offlineStreamIds);
+                                                     cameraMetadata, ns2ms(startTimeNs),
+                                                     &offlineStreamIds);
     return B2HStatus(ret);
 }
 

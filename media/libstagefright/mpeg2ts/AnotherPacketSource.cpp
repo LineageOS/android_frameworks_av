@@ -60,21 +60,23 @@ void AnotherPacketSource::setFormat(const sp<MetaData> &meta) {
 
     mIsAudio = false;
     mIsVideo = false;
+    const char *mime;
 
-    if (meta == NULL) {
+    // Do not use meta if no mime.
+    if (meta == NULL || !meta->findCString(kKeyMIMEType, &mime)) {
         return;
     }
 
     mFormat = meta;
-    const char *mime;
-    CHECK(meta->findCString(kKeyMIMEType, &mime));
 
     if (!strncasecmp("audio/", mime, 6)) {
         mIsAudio = true;
-    } else  if (!strncasecmp("video/", mime, 6)) {
+    } else if (!strncasecmp("video/", mime, 6)) {
         mIsVideo = true;
+    } else if (!strncasecmp("text/", mime, 5) || !strncasecmp("application/", mime, 12)) {
+        return;
     } else {
-        CHECK(!strncasecmp("text/", mime, 5) || !strncasecmp("application/", mime, 12));
+        ALOGW("Unsupported mime type: %s", mime);
     }
 }
 

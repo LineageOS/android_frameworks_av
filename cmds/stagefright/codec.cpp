@@ -39,7 +39,7 @@
 #include <gui/ISurfaceComposer.h>
 #include <gui/SurfaceComposerClient.h>
 #include <gui/Surface.h>
-#include <ui/DisplayConfig.h>
+#include <ui/DisplayMode.h>
 
 static void usage(const char *me) {
     fprintf(stderr, "usage: %s [-a] use audio\n"
@@ -414,10 +414,10 @@ int main(int argc, char **argv) {
         const sp<IBinder> display = SurfaceComposerClient::getInternalDisplayToken();
         CHECK(display != nullptr);
 
-        DisplayConfig config;
-        CHECK_EQ(SurfaceComposerClient::getActiveDisplayConfig(display, &config), NO_ERROR);
+        ui::DisplayMode mode;
+        CHECK_EQ(SurfaceComposerClient::getActiveDisplayMode(display, &mode), NO_ERROR);
 
-        const ui::Size& resolution = config.resolution;
+        const ui::Size& resolution = mode.resolution;
         const ssize_t displayWidth = resolution.getWidth();
         const ssize_t displayHeight = resolution.getHeight();
 

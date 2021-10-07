@@ -49,3 +49,28 @@ cc_test {
         "-Wall",
     ],
 }
+
+cc_test {
+    name: "ResourceObserverService_test",
+    srcs: ["ResourceObserverService_test.cpp"],
+    test_suites: ["device-tests"],
+    static_libs: [
+        "libresourcemanagerservice",
+        "resourceobserver_aidl_interface-V1-ndk",
+    ],
+    shared_libs: [
+        "libbinder",
+        "libbinder_ndk",
+        "liblog",
+        "libmedia",
+        "libutils",
+    ],
+    include_dirs: [
+        "frameworks/av/include",
+        "frameworks/av/services/mediaresourcemanager",
+    ],
+    cflags: [
+        "-Werror",
+        "-Wall",
+    ],
+}

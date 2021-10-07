@@ -21,67 +21,28 @@
 #include <stdint.h>
 
 #include <sys/mman.h>
-#include <binder/Parcel.h>
-#include <binder/Parcelable.h>
 
 #include <aaudio/AAudio.h>
 
 #include "binding/AAudioStreamConfiguration.h"
 #include "binding/AAudioStreamRequest.h"
 
-using android::NO_ERROR;
-using android::status_t;
-using android::Parcel;
-using android::Parcelable;
-
 using namespace aaudio;
 
-AAudioStreamRequest::AAudioStreamRequest()
-    : mConfiguration()
-    {}
-
-AAudioStreamRequest::~AAudioStreamRequest() {}
-
-status_t AAudioStreamRequest::writeToParcel(Parcel* parcel) const {
-    status_t status = parcel->writeInt32((int32_t) mUserId);
-    if (status != NO_ERROR) goto error;
-
-    status = parcel->writeBool(mSharingModeMatchRequired);
-    if (status != NO_ERROR) goto error;
-
-    status = parcel->writeBool(mInService);
-    if (status != NO_ERROR) goto error;
-
-    status = mConfiguration.writeToParcel(parcel);
-    if (status != NO_ERROR) goto error;
-
-    return NO_ERROR;
-
-error:
-    ALOGE("writeToParcel(): write failed = %d", status);
-    return status;
+AAudioStreamRequest::AAudioStreamRequest(const StreamRequest& parcelable) :
+        mConfiguration(std::move(parcelable.params)),
+        mAttributionSource(parcelable.attributionSource),
+        mSharingModeMatchRequired(parcelable.sharingModeMatchRequired),
+        mInService(parcelable.inService) {
 }
 
-status_t AAudioStreamRequest::readFromParcel(const Parcel* parcel) {
-    int32_t temp;
-    status_t status = parcel->readInt32(&temp);
-    if (status != NO_ERROR) goto error;
-    mUserId = (uid_t) temp;
-
-    status = parcel->readBool(&mSharingModeMatchRequired);
-    if (status != NO_ERROR) goto error;
-
-    status = parcel->readBool(&mInService);
-    if (status != NO_ERROR) goto error;
-
-    status = mConfiguration.readFromParcel(parcel);
-    if (status != NO_ERROR) goto error;
-
-    return NO_ERROR;
-
-error:
-    ALOGE("readFromParcel(): read failed = %d", status);
-    return status;
+StreamRequest AAudioStreamRequest::parcelable() const {
+    StreamRequest result;
+    result.params = std::move(mConfiguration).parcelable();
+    result.attributionSource = mAttributionSource;
+    result.sharingModeMatchRequired = mSharingModeMatchRequired;
+    result.inService = mInService;
+    return result;
 }
 
 aaudio_result_t AAudioStreamRequest::validate() const {
@@ -89,8 +50,7 @@ aaudio_result_t AAudioStreamRequest::validate() const {
 }
 
 void AAudioStreamRequest::dump() const {
-    ALOGD("mUserId    = %d", mUserId);
-    ALOGD("mProcessId = %d", mProcessId);
+    ALOGD("mAttributionSource  = %s", mAttributionSource.toString().c_str());
     ALOGD("mSharingModeMatchRequired = %d", mSharingModeMatchRequired);
     ALOGD("mInService = %d", mInService);
     mConfiguration.dump();

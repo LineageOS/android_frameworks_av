@@ -31,7 +31,7 @@ constexpr uint8_t kMockByteArray[16] = {};
    static constexpr uint32_t PREPARE_DRM = IMediaPlayer::PREPARE_DRM;
 
    void SetUp() override {
-    mediaPlayer_ = new MediaPlayer();
+    mediaPlayer_ = sp<MediaPlayer>::make();
     sp<IServiceManager> serviceManager = defaultServiceManager();
     sp<IBinder> mediaPlayerService = serviceManager->getService(String16("media.player"));
     sp<IMediaPlayerService> iMediaPlayerService =

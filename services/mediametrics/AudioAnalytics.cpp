@@ -24,6 +24,7 @@
 #include <audio_utils/clock.h>    // clock conversions
 #include <cutils/properties.h>
 #include <statslog.h>             // statsd
+#include <system/audio.h>
 
 #include "AudioTypes.h"           // string to int conversions
 #include "MediaMetricsService.h"  // package info
@@ -87,6 +88,7 @@ static constexpr const char * const AudioRecordDeviceUsageFields[] = {
     "selected_device_id",
     "caller",
     "source",
+    "log_session_id",
 };
 
 static constexpr const char * const AudioThreadDeviceUsageFields[] = {
@@ -124,6 +126,7 @@ static constexpr const char * const AudioTrackDeviceUsageFields[] = {
     "content_type",
     "caller",
     "traits",
+    "log_session_id",
 };
 
 static constexpr const char * const AudioDeviceConnectionFields[] = {
@@ -135,6 +138,56 @@ static constexpr const char * const AudioDeviceConnectionFields[] = {
     "time_to_connect_millis",
     "connection_count",
 };
+
+static constexpr const char * const AAudioStreamFields[] {
+    "mediametrics_aaudiostream_reported",
+    "path",
+    "direction",
+    "frames_per_burst",
+    "buffer_size",
+    "buffer_capacity",
+    "channel_count",
+    "total_frames_transferred",
+    "perf_mode_requested",
+    "perf_mode_actual",
+    "sharing",
+    "xrun_count",
+    "device_type",
+    "format_app",
+    "format_device",
+    "log_session_id",
+    "sample_rate",
+    "content_type",
+    "sharing_requested",
+};
+
+/**
+ * printFields is a helper method that prints the fields and corresponding values
+ * in a human readable style.
+ */
+template <size_t N, typename ...Types>
+std::string printFields(const char * const (& fields)[N], Types ... args)
+{
+    std::stringstream ss;
+    ss << " { ";
+    stringutils::fieldPrint(ss, fields, args...);
+    ss << "}";
+    return ss.str();
+}
+
+/**
+ * sendToStatsd is a helper method that sends the arguments to statsd
+ */
+template <typename ...Types>
+int sendToStatsd(Types ... args)
+{
+    int result = 0;
+
+#ifdef STATSD_ENABLE
+    result = android::util::stats_write(args...);
+#endif
+    return result;
+}
 
 /**
  * sendToStatsd is a helper method that sends the arguments to statsd
@@ -156,8 +209,10 @@ std::pair<int, std::string> sendToStatsd(const char * const (& fields)[N], Types
     return { result, ss.str() };
 }
 
-AudioAnalytics::AudioAnalytics()
+AudioAnalytics::AudioAnalytics(const std::shared_ptr<StatsdLog>& statsdLog)
     : mDeliverStatistics(property_get_bool(PROP_AUDIO_ANALYTICS_CLOUD_ENABLED, true))
+    , mStatsdLog(statsdLog)
+    , mAudioPowerUsage(this, statsdLog)
 {
     SetMinimumLogSeverity(android::base::DEBUG); // for LOG().
     ALOGD("%s", __func__);
@@ -190,6 +245,33 @@ AudioAnalytics::AudioAnalytics()
                         mPreviousAnalyticsState->clear();  // removes data from the state.
                     }
                 });
+            }));
+
+    // Handle legacy aaudio playback stream statistics
+    mActions.addAction(
+        AMEDIAMETRICS_KEY_PREFIX_AUDIO_TRACK "*." AMEDIAMETRICS_PROP_EVENT,
+        std::string(AMEDIAMETRICS_PROP_EVENT_VALUE_ENDAAUDIOSTREAM),
+        std::make_shared<AnalyticsActions::Function>(
+            [this](const std::shared_ptr<const android::mediametrics::Item> &item) {
+                mAAudioStreamInfo.endAAudioStream(item, AAudioStreamInfo::CALLER_PATH_LEGACY);
+            }));
+
+    // Handle legacy aaudio capture stream statistics
+    mActions.addAction(
+        AMEDIAMETRICS_KEY_PREFIX_AUDIO_RECORD "*." AMEDIAMETRICS_PROP_EVENT,
+        std::string(AMEDIAMETRICS_PROP_EVENT_VALUE_ENDAAUDIOSTREAM),
+        std::make_shared<AnalyticsActions::Function>(
+            [this](const std::shared_ptr<const android::mediametrics::Item> &item) {
+                mAAudioStreamInfo.endAAudioStream(item, AAudioStreamInfo::CALLER_PATH_LEGACY);
+            }));
+
+    // Handle mmap aaudio stream statistics
+    mActions.addAction(
+        AMEDIAMETRICS_KEY_PREFIX_AUDIO_STREAM "*." AMEDIAMETRICS_PROP_EVENT,
+        std::string(AMEDIAMETRICS_PROP_EVENT_VALUE_ENDAAUDIOSTREAM),
+        std::make_shared<AnalyticsActions::Function>(
+            [this](const std::shared_ptr<const android::mediametrics::Item> &item) {
+                mAAudioStreamInfo.endAAudioStream(item, AAudioStreamInfo::CALLER_PATH_MMAP);
             }));
 
     // Handle device use record statistics
@@ -338,20 +420,6 @@ std::pair<std::string, int32_t> AudioAnalytics::dump(
         ll -= l;
     }
 
-    if (ll > 0) {
-        // Print the statsd atoms we sent out.
-        const std::string statsd = mStatsdLog.dumpToString("  " /* prefix */, ll - 1);
-        const size_t n = std::count(statsd.begin(), statsd.end(), '\n') + 1; // we control this.
-        if ((size_t)ll >= n) {
-            if (n == 1) {
-                ss << "Statsd atoms: empty or truncated\n";
-            } else {
-                ss << "Statsd atoms:\n" << statsd;
-            }
-            ll -= (int32_t)n;
-        }
-    }
-
     if (ll > 0 && prefix == nullptr) {
         auto [s, l] = mAudioPowerUsage.dump(ll);
         ss << s;
@@ -484,12 +552,18 @@ void AudioAnalytics::DeviceUse::endAudioIntervalGroup(
         std::string source;
         mAudioAnalytics.mAnalyticsState->timeMachine().get(
                 key, AMEDIAMETRICS_PROP_SOURCE, &source);
+        // Android S
+        std::string logSessionId;
+        mAudioAnalytics.mAnalyticsState->timeMachine().get(
+                key, AMEDIAMETRICS_PROP_LOGSESSIONID, &logSessionId);
 
         const auto callerNameForStats =
                 types::lookup<types::CALLER_NAME, short_enum_type_t>(callerName);
         const auto encodingForStats = types::lookup<types::ENCODING, short_enum_type_t>(encoding);
         const auto flagsForStats = types::lookup<types::INPUT_FLAG, short_enum_type_t>(flags);
         const auto sourceForStats = types::lookup<types::SOURCE_TYPE, short_enum_type_t>(source);
+        // Android S
+        const auto logSessionIdForStats = stringutils::sanitizeLogSessionId(logSessionId);
 
         LOG(LOG_LEVEL) << "key:" << key
               << " id:" << id
@@ -504,7 +578,9 @@ void AudioAnalytics::DeviceUse::endAudioIntervalGroup(
               << ") packageName:" << packageName
               << " selectedDeviceId:" << selectedDeviceId
               << " callerName:" << callerName << "(" << callerNameForStats
-              << ") source:" << source << "(" << sourceForStats << ")";
+              << ") source:" << source << "(" << sourceForStats
+              << ") logSessionId:" << logSessionId << "(" << logSessionIdForStats
+              << ")";
         if (clientCalled  // only log if client app called AudioRecord.
                 && mAudioAnalytics.mDeliverStatistics) {
             const auto [ result, str ] = sendToStatsd(AudioRecordDeviceUsageFields,
@@ -522,9 +598,11 @@ void AudioAnalytics::DeviceUse::endAudioIntervalGroup(
                     , selectedDeviceId
                     , ENUM_EXTRACT(callerNameForStats)
                     , ENUM_EXTRACT(sourceForStats)
+                    , logSessionIdForStats.c_str()
                     );
             ALOGV("%s: statsd %s", __func__, str.c_str());
-            mAudioAnalytics.mStatsdLog.log("%s", str.c_str());
+            mAudioAnalytics.mStatsdLog->log(
+                    android::util::MEDIAMETRICS_AUDIORECORDDEVICEUSAGE_REPORTED, str);
         }
     } break;
     case THREAD: {
@@ -572,7 +650,8 @@ void AudioAnalytics::DeviceUse::endAudioIntervalGroup(
                 , ENUM_EXTRACT(typeForStats)
             );
             ALOGV("%s: statsd %s", __func__, str.c_str());
-            mAudioAnalytics.mStatsdLog.log("%s", str.c_str());
+            mAudioAnalytics.mStatsdLog->log(
+                    android::util::MEDIAMETRICS_AUDIOTHREADDEVICEUSAGE_REPORTED, str);
         }
     } break;
     case TRACK: {
@@ -622,6 +701,10 @@ void AudioAnalytics::DeviceUse::endAudioIntervalGroup(
         std::string usage;
         mAudioAnalytics.mAnalyticsState->timeMachine().get(
                 key, AMEDIAMETRICS_PROP_USAGE, &usage);
+        // Android S
+        std::string logSessionId;
+        mAudioAnalytics.mAnalyticsState->timeMachine().get(
+                key, AMEDIAMETRICS_PROP_LOGSESSIONID, &logSessionId);
 
         const auto callerNameForStats =
                 types::lookup<types::CALLER_NAME, short_enum_type_t>(callerName);
@@ -634,6 +717,8 @@ void AudioAnalytics::DeviceUse::endAudioIntervalGroup(
         const auto traitsForStats =
                  types::lookup<types::TRACK_TRAITS, short_enum_type_t>(traits);
         const auto usageForStats = types::lookup<types::USAGE, short_enum_type_t>(usage);
+        // Android S
+        const auto logSessionIdForStats = stringutils::sanitizeLogSessionId(logSessionId);
 
         LOG(LOG_LEVEL) << "key:" << key
               << " id:" << id
@@ -658,6 +743,7 @@ void AudioAnalytics::DeviceUse::endAudioIntervalGroup(
               << " streamType:" << streamType << "(" << streamTypeForStats
               << ") traits:" << traits << "(" << traitsForStats
               << ") usage:" << usage << "(" << usageForStats
+              << ") logSessionId:" << logSessionId << "(" << logSessionIdForStats
               << ")";
         if (clientCalled // only log if client app called AudioTracks
                 && mAudioAnalytics.mDeliverStatistics) {
@@ -682,9 +768,11 @@ void AudioAnalytics::DeviceUse::endAudioIntervalGroup(
                     , ENUM_EXTRACT(contentTypeForStats)
                     , ENUM_EXTRACT(callerNameForStats)
                     , ENUM_EXTRACT(traitsForStats)
+                    , logSessionIdForStats.c_str()
                     );
             ALOGV("%s: statsd %s", __func__, str.c_str());
-            mAudioAnalytics.mStatsdLog.log("%s", str.c_str());
+            mAudioAnalytics.mStatsdLog->log(
+                    android::util::MEDIAMETRICS_AUDIOTRACKDEVICEUSAGE_REPORTED, str);
         }
         } break;
     }
@@ -760,7 +848,8 @@ void AudioAnalytics::DeviceConnection::createPatch(
                     , /* connection_count */ 1
                     );
             ALOGV("%s: statsd %s", __func__, str.c_str());
-            mAudioAnalytics.mStatsdLog.log("%s", str.c_str());
+            mAudioAnalytics.mStatsdLog->log(
+                    android::util::MEDIAMETRICS_AUDIODEVICECONNECTION_REPORTED, str);
         }
     }
 }
@@ -813,7 +902,8 @@ void AudioAnalytics::DeviceConnection::expire() {
                     , /* connection_count */ 1
                     );
             ALOGV("%s: statsd %s", __func__, str.c_str());
-            mAudioAnalytics.mStatsdLog.log("%s", str.c_str());
+            mAudioAnalytics.mStatsdLog->log(
+                    android::util::MEDIAMETRICS_AUDIODEVICECONNECTION_REPORTED, str);
         }
         return;
     }
@@ -839,7 +929,185 @@ void AudioAnalytics::DeviceConnection::expire() {
                 , /* connection_count */ 1
                 );
         ALOGV("%s: statsd %s", __func__, str.c_str());
-        mAudioAnalytics.mStatsdLog.log("%s", str.c_str());
+        mAudioAnalytics.mStatsdLog->log(
+                android::util::MEDIAMETRICS_AUDIODEVICECONNECTION_REPORTED, str);
+    }
+}
+
+void AudioAnalytics::AAudioStreamInfo::endAAudioStream(
+        const std::shared_ptr<const android::mediametrics::Item> &item, CallerPath path) const {
+    const std::string& key = item->getKey();
+
+    std::string directionStr;
+    mAudioAnalytics.mAnalyticsState->timeMachine().get(
+            key, AMEDIAMETRICS_PROP_DIRECTION, &directionStr);
+    const auto direction = types::lookup<types::AAUDIO_DIRECTION, int32_t>(directionStr);
+
+    int32_t framesPerBurst = -1;
+    mAudioAnalytics.mAnalyticsState->timeMachine().get(
+            key, AMEDIAMETRICS_PROP_BURSTFRAMES, &framesPerBurst);
+
+    int32_t bufferSizeInFrames = -1;
+    mAudioAnalytics.mAnalyticsState->timeMachine().get(
+            key, AMEDIAMETRICS_PROP_BUFFERSIZEFRAMES, &bufferSizeInFrames);
+
+    int32_t bufferCapacityInFrames = -1;
+    mAudioAnalytics.mAnalyticsState->timeMachine().get(
+            key, AMEDIAMETRICS_PROP_BUFFERCAPACITYFRAMES, &bufferCapacityInFrames);
+
+    int32_t channelCount = -1;
+    mAudioAnalytics.mAnalyticsState->timeMachine().get(
+            key, AMEDIAMETRICS_PROP_CHANNELCOUNT, &channelCount);
+    if (channelCount == -1) {
+        // Try to get channel count from channel mask. From the legacy path,
+        // only channel mask are logged.
+        int32_t channelMask = 0;
+        mAudioAnalytics.mAnalyticsState->timeMachine().get(
+                key, AMEDIAMETRICS_PROP_CHANNELMASK, &channelMask);
+        if (channelMask != 0) {
+            switch (direction) {
+                case 1: // Output, keep sync with AudioTypes#getAAudioDirection()
+                    channelCount = audio_channel_count_from_out_mask(channelMask);
+                    break;
+                case 2: // Input, keep sync with AudioTypes#getAAudioDirection()
+                    channelCount = audio_channel_count_from_in_mask(channelMask);
+                    break;
+                default:
+                    ALOGW("Invalid direction %d", direction);
+            }
+        }
+    }
+
+    int64_t totalFramesTransferred = -1;
+    mAudioAnalytics.mAnalyticsState->timeMachine().get(
+            key, AMEDIAMETRICS_PROP_FRAMESTRANSFERRED, &totalFramesTransferred);
+
+    std::string perfModeRequestedStr;
+    mAudioAnalytics.mAnalyticsState->timeMachine().get(
+            key, AMEDIAMETRICS_PROP_PERFORMANCEMODE, &perfModeRequestedStr);
+    const auto perfModeRequested =
+            types::lookup<types::AAUDIO_PERFORMANCE_MODE, int32_t>(perfModeRequestedStr);
+
+    std::string perfModeActualStr;
+    mAudioAnalytics.mAnalyticsState->timeMachine().get(
+            key, AMEDIAMETRICS_PROP_PERFORMANCEMODEACTUAL, &perfModeActualStr);
+    const auto perfModeActual =
+            types::lookup<types::AAUDIO_PERFORMANCE_MODE, int32_t>(perfModeActualStr);
+
+    std::string sharingModeActualStr;
+    mAudioAnalytics.mAnalyticsState->timeMachine().get(
+            key, AMEDIAMETRICS_PROP_SHARINGMODEACTUAL, &sharingModeActualStr);
+    const auto sharingModeActual =
+            types::lookup<types::AAUDIO_SHARING_MODE, int32_t>(sharingModeActualStr);
+
+    int32_t xrunCount = -1;
+    mAudioAnalytics.mAnalyticsState->timeMachine().get(
+            key, AMEDIAMETRICS_PROP_UNDERRUN, &xrunCount);
+
+    std::string serializedDeviceTypes;
+    // TODO: only routed device id is logged, but no device type
+
+    std::string formatAppStr;
+    mAudioAnalytics.mAnalyticsState->timeMachine().get(
+            key, AMEDIAMETRICS_PROP_ENCODINGCLIENT, &formatAppStr);
+    const auto formatApp = types::lookup<types::ENCODING, int32_t>(formatAppStr);
+
+    std::string formatDeviceStr;
+    mAudioAnalytics.mAnalyticsState->timeMachine().get(
+            key, AMEDIAMETRICS_PROP_ENCODING, &formatDeviceStr);
+    const auto formatDevice = types::lookup<types::ENCODING, int32_t>(formatDeviceStr);
+
+    std::string logSessionId;
+    mAudioAnalytics.mAnalyticsState->timeMachine().get(
+            key, AMEDIAMETRICS_PROP_LOGSESSIONID, &logSessionId);
+
+    int32_t sampleRate = 0;
+    mAudioAnalytics.mAnalyticsState->timeMachine().get(
+            key, AMEDIAMETRICS_PROP_SAMPLERATE, &sampleRate);
+
+    std::string contentTypeStr;
+    mAudioAnalytics.mAnalyticsState->timeMachine().get(
+            key, AMEDIAMETRICS_PROP_CONTENTTYPE, &contentTypeStr);
+    const auto contentType = types::lookup<types::CONTENT_TYPE, int32_t>(contentTypeStr);
+
+    std::string sharingModeRequestedStr;
+    mAudioAnalytics.mAnalyticsState->timeMachine().get(
+            key, AMEDIAMETRICS_PROP_SHARINGMODE, &sharingModeRequestedStr);
+    const auto sharingModeRequested =
+            types::lookup<types::AAUDIO_SHARING_MODE, int32_t>(sharingModeRequestedStr);
+
+    LOG(LOG_LEVEL) << "key:" << key
+            << " path:" << path
+            << " direction:" << direction << "(" << directionStr << ")"
+            << " frames_per_burst:" << framesPerBurst
+            << " buffer_size:" << bufferSizeInFrames
+            << " buffer_capacity:" << bufferCapacityInFrames
+            << " channel_count:" << channelCount
+            << " total_frames_transferred:" << totalFramesTransferred
+            << " perf_mode_requested:" << perfModeRequested << "(" << perfModeRequestedStr << ")"
+            << " perf_mode_actual:" << perfModeActual << "(" << perfModeActualStr << ")"
+            << " sharing:" << sharingModeActual << "(" << sharingModeActualStr << ")"
+            << " xrun_count:" << xrunCount
+            << " device_type:" << serializedDeviceTypes
+            << " format_app:" << formatApp << "(" << formatAppStr << ")"
+            << " format_device: " << formatDevice << "(" << formatDeviceStr << ")"
+            << " log_session_id: " << logSessionId
+            << " sample_rate: " << sampleRate
+            << " content_type: " << contentType << "(" << contentTypeStr << ")"
+            << " sharing_requested:" << sharingModeRequested
+                    << "(" << sharingModeRequestedStr << ")";
+
+    if (mAudioAnalytics.mDeliverStatistics) {
+        android::util::BytesField bf_serialized(
+            serializedDeviceTypes.c_str(), serializedDeviceTypes.size());
+        const auto result = sendToStatsd(
+                CONDITION(android::util::MEDIAMETRICS_AAUDIOSTREAM_REPORTED)
+                , path
+                , direction
+                , framesPerBurst
+                , bufferSizeInFrames
+                , bufferCapacityInFrames
+                , channelCount
+                , totalFramesTransferred
+                , perfModeRequested
+                , perfModeActual
+                , sharingModeActual
+                , xrunCount
+                , bf_serialized
+                , formatApp
+                , formatDevice
+                , logSessionId.c_str()
+                , sampleRate
+                , contentType
+                , sharingModeRequested
+                );
+        std::stringstream ss;
+        ss << "result:" << result;
+        const auto fieldsStr = printFields(AAudioStreamFields,
+                CONDITION(android::util::MEDIAMETRICS_AAUDIOSTREAM_REPORTED)
+                , path
+                , direction
+                , framesPerBurst
+                , bufferSizeInFrames
+                , bufferCapacityInFrames
+                , channelCount
+                , totalFramesTransferred
+                , perfModeRequested
+                , perfModeActual
+                , sharingModeActual
+                , xrunCount
+                , serializedDeviceTypes.c_str()
+                , formatApp
+                , formatDevice
+                , logSessionId.c_str()
+                , sampleRate
+                , contentType
+                , sharingModeRequested
+                );
+        ss << " " << fieldsStr;
+        std::string str = ss.str();
+        ALOGV("%s: statsd %s", __func__, str.c_str());
+        mAudioAnalytics.mStatsdLog->log(android::util::MEDIAMETRICS_AAUDIOSTREAM_REPORTED, str);
     }
 }
 

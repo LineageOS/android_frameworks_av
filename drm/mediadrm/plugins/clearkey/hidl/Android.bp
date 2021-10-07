@@ -57,6 +57,7 @@ cc_defaults {
         "android.hardware.drm@1.1",
         "android.hardware.drm@1.2",
         "android.hardware.drm@1.3",
+        "android.hardware.drm@1.4",
         "libbase",
         "libbinder",
         "libcrypto",
@@ -110,18 +111,18 @@ cc_binary {
 }
 
 cc_binary {
-    name: "android.hardware.drm@1.3-service.clearkey",
+    name: "android.hardware.drm@1.4-service.clearkey",
     defaults: ["clearkey_service_defaults"],
     srcs: ["service.cpp"],
-    init_rc: ["android.hardware.drm@1.3-service.clearkey.rc"],
-    vintf_fragments: ["manifest_android.hardware.drm@1.3-service.clearkey.xml"],
+    init_rc: ["android.hardware.drm@1.4-service.clearkey.rc"],
+    vintf_fragments: ["manifest_android.hardware.drm@1.4-service.clearkey.xml"],
 }
 
 cc_binary {
-    name: "android.hardware.drm@1.3-service-lazy.clearkey",
-    overrides: ["android.hardware.drm@1.3-service.clearkey"],
+    name: "android.hardware.drm@1.4-service-lazy.clearkey",
+    overrides: ["android.hardware.drm@1.4-service.clearkey"],
     defaults: ["clearkey_service_defaults"],
     srcs: ["serviceLazy.cpp"],
-    init_rc: ["android.hardware.drm@1.3-service-lazy.clearkey.rc"],
-    vintf_fragments: ["manifest_android.hardware.drm@1.3-service.clearkey.xml"],
+    init_rc: ["android.hardware.drm@1.4-service-lazy.clearkey.rc"],
+    vintf_fragments: ["manifest_android.hardware.drm@1.4-service.clearkey.xml"],
 }
