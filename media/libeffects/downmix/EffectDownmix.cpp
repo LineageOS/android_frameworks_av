@@ -647,6 +647,12 @@ static int Downmix_Configure(downmix_module_t *pDwmModule, effect_config_t *pCon
         ALOGE("Downmix_Configure error: invalid config");
         return -EINVAL;
     }
+    // when configuring the effect, do not allow a blank or unsupported channel mask
+    if (!Downmix_validChannelMask(pConfig->inputCfg.channels)) {
+        ALOGE("Downmix_Configure error: input channel mask(0x%x) not supported",
+                                                    pConfig->inputCfg.channels);
+        return -EINVAL;
+    }
 
     if (&pDwmModule->config != pConfig) {
         memcpy(&pDwmModule->config, pConfig, sizeof(effect_config_t));
@@ -657,12 +663,6 @@ static int Downmix_Configure(downmix_module_t *pDwmModule, effect_config_t *pCon
         pDownmixer->apply_volume_correction = false;
         pDownmixer->input_channel_count = 8; // matches default input of AUDIO_CHANNEL_OUT_7POINT1
     } else {
-        // when configuring the effect, do not allow a blank or unsupported channel mask
-        if (!Downmix_validChannelMask(pConfig->inputCfg.channels)) {
-            ALOGE("Downmix_Configure error: input channel mask(0x%x) not supported",
-                                                        pConfig->inputCfg.channels);
-            return -EINVAL;
-        }
         pDownmixer->input_channel_count =
                 audio_channel_count_from_out_mask(pConfig->inputCfg.channels);
     }
