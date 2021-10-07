@@ -61,7 +61,7 @@ class SensorPoseProvider {
         virtual ~Listener() = default;
 
         virtual void onPose(int64_t timestamp, int32_t handle, const Pose3f& pose,
-                            const std::optional<Twist3f>& twist) = 0;
+                            const std::optional<Twist3f>& twist, bool isNewReference) = 0;
     };
 
     /**
