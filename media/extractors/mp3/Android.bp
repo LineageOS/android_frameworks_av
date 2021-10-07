@@ -16,6 +16,10 @@ cc_library {
             "XINGSeeker.cpp",
     ],
 
+    export_include_dirs: [
+        "include",
+    ],
+
     static_libs: [
         "libutils",
         "libstagefright_id3",

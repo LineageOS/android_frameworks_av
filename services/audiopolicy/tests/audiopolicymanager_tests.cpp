@@ -151,7 +151,7 @@ class AudioPolicyManagerTest : public testing::Test {
 void AudioPolicyManagerTest::SetUp() {
     mClient.reset(getClient());
     mManager.reset(new AudioPolicyTestManager(mClient.get()));
-    SetUpManagerConfig();  // Subclasses may want to customize the config.
+    ASSERT_NO_FATAL_FAILURE(SetUpManagerConfig());  // Subclasses may want to customize the config.
     ASSERT_EQ(NO_ERROR, mManager->initialize());
     ASSERT_EQ(NO_ERROR, mManager->initCheck());
 }
@@ -401,7 +401,7 @@ INSTANTIATE_TEST_CASE_P(
 
 void AudioPolicyManagerTestMsd::SetUpManagerConfig() {
     // TODO: Consider using Serializer to load part of the config from a string.
-    AudioPolicyManagerTest::SetUpManagerConfig();
+    ASSERT_NO_FATAL_FAILURE(AudioPolicyManagerTest::SetUpManagerConfig());
     AudioPolicyConfig& config = mManager->getConfig();
     mMsdOutputDevice = new DeviceDescriptor(AUDIO_DEVICE_OUT_BUS);
     sp<AudioProfile> pcmOutputProfile = new AudioProfile(
@@ -660,6 +660,7 @@ const std::string AudioPolicyManagerTestWithConfigurationFile::sDefaultConfig =
 void AudioPolicyManagerTestWithConfigurationFile::SetUpManagerConfig() {
     status_t status = deserializeAudioPolicyFile(getConfigFile().c_str(), &mManager->getConfig());
     ASSERT_EQ(NO_ERROR, status);
+    mManager->getConfig().setSource(getConfigFile());
 }
 
 TEST_F(AudioPolicyManagerTestWithConfigurationFile, InitSuccess) {
@@ -825,8 +826,8 @@ const std::string AudioPolicyManagerTestForHdmi::sTvConfig =
         "test_settop_box_surround_configuration.xml";
 
 void AudioPolicyManagerTestForHdmi::SetUp() {
-    AudioPolicyManagerTest::SetUp();
-    // Note that 'AC3' isn't added as it is handled automatically by APM.
+    ASSERT_NO_FATAL_FAILURE(AudioPolicyManagerTest::SetUp());
+    mClient->addSupportedFormat(AUDIO_FORMAT_AC3);
     mClient->addSupportedFormat(AUDIO_FORMAT_E_AC3);
     mManager->setDeviceConnectionState(
             AUDIO_DEVICE_OUT_HDMI, AUDIO_POLICY_DEVICE_STATE_AVAILABLE,
@@ -1051,7 +1052,7 @@ protected:
 };
 
 void AudioPolicyManagerTestDPPlaybackReRouting::SetUp() {
-    AudioPolicyManagerTestDynamicPolicy::SetUp();
+    ASSERT_NO_FATAL_FAILURE(AudioPolicyManagerTestDynamicPolicy::SetUp());
 
     mTracker.reset(new RecordingActivityTracker());
 
@@ -1237,7 +1238,7 @@ protected:
 };
 
 void AudioPolicyManagerTestDPMixRecordInjection::SetUp() {
-    AudioPolicyManagerTestDynamicPolicy::SetUp();
+    ASSERT_NO_FATAL_FAILURE(AudioPolicyManagerTestDynamicPolicy::SetUp());
 
     mTracker.reset(new RecordingActivityTracker());
 
@@ -1391,7 +1392,8 @@ TEST_P(AudioPolicyManagerTestDeviceConnection, SetDeviceConnectionState) {
     if (type == AUDIO_DEVICE_OUT_HDMI) {
         // Set device connection state failed due to no device descriptor found
         // For HDMI case, it is easier to simulate device descriptor not found error
-        // by using a undeclared encoded format.
+        // by using an encoded format which isn't listed in the 'encodedFormats'
+        // attribute for this devicePort.
         ASSERT_EQ(INVALID_OPERATION, mManager->setDeviceConnectionState(
                 type, AUDIO_POLICY_DEVICE_STATE_AVAILABLE,
                 address.c_str(), name.c_str(), AUDIO_FORMAT_MAT_2_1));
@@ -1535,7 +1537,7 @@ protected:
 };
 
 void AudioPolicyManagerDynamicHwModulesTest::SetUpManagerConfig() {
-    AudioPolicyManagerTestWithConfigurationFile::SetUpManagerConfig();
+    ASSERT_NO_FATAL_FAILURE(AudioPolicyManagerTestWithConfigurationFile::SetUpManagerConfig());
     // Only allow successful opening of "primary" hw module during APM initialization.
     mClient->swapAllowedModuleNames({"primary"});
 }
