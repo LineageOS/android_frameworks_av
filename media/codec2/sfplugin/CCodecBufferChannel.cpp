@@ -19,6 +19,7 @@
 #include <utils/Log.h>
 
 #include <algorithm>
+#include <atomic>
 #include <list>
 #include <numeric>
 
@@ -155,6 +156,7 @@ CCodecBufferChannel::CCodecBufferChannel(
         input->pipelineDelay = 0u;
         input->numSlots = kSmoothnessFactor;
         input->numExtraSlots = 0u;
+        input->lastFlushIndex = 0u;
     }
     {
         Mutexed<Output>::Locked output(mOutput);
@@ -1116,6 +1118,7 @@ status_t CCodecBufferChannel::start(
         input->numSlots = numInputSlots;
         input->extraBuffers.flush();
         input->numExtraSlots = 0u;
+        input->lastFlushIndex = mFrameIndex.load(std::memory_order_relaxed);
         if (audioEncoder && encoderFrameSize && sampleRate && channelCount) {
             input->frameReassembler.init(
                     pool,
@@ -1523,6 +1526,7 @@ void CCodecBufferChannel::flush(const std::list<std::unique_ptr<C2Work>> &flushe
     ALOGV("[%s] flush", mName);
     std::vector<uint64_t> indices;
     std::list<std::unique_ptr<C2Work>> configs;
+    mInput.lock()->lastFlushIndex = mFrameIndex.load(std::memory_order_relaxed);
     for (const std::unique_ptr<C2Work> &work : flushedWork) {
         indices.push_back(work->input.ordinal.frameIndex.peeku());
         if (!(work->input.flags & C2FrameData::FLAG_CODEC_CONFIG)) {
@@ -1589,12 +1593,18 @@ void CCodecBufferChannel::onInputBufferDone(
     }
     std::shared_ptr<C2Buffer> buffer =
             mPipelineWatcher.lock()->onInputBufferReleased(frameIndex, arrayIndex);
-    bool newInputSlotAvailable;
+    bool newInputSlotAvailable = false;
     {
         Mutexed<Input>::Locked input(mInput);
-        newInputSlotAvailable = input->buffers->expireComponentBuffer(buffer);
-        if (!newInputSlotAvailable) {
-            (void)input->extraBuffers.expireComponentBuffer(buffer);
+        if (input->lastFlushIndex >= frameIndex) {
+            ALOGD("[%s] Ignoring stale input buffer done callback: "
+                  "last flush index = %lld, frameIndex = %lld",
+                  mName, input->lastFlushIndex.peekll(), (long long)frameIndex);
+        } else {
+            newInputSlotAvailable = input->buffers->expireComponentBuffer(buffer);
+            if (!newInputSlotAvailable) {
+                (void)input->extraBuffers.expireComponentBuffer(buffer);
+            }
         }
     }
     if (newInputSlotAvailable) {
