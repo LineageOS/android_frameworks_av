@@ -57,11 +57,6 @@ cc_test{
         "libstagefright_mpeg2support",
     ],
 
-    include_dirs: [
-        "frameworks/av/media/extractors/",
-        "frameworks/av/media/libstagefright/",
-    ],
-
     header_libs: [
         "libmedia_headers",
         "libaudioclient_headers",

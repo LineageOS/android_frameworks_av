@@ -908,6 +908,7 @@ bool AudioPolicyService::isAppOpSource(audio_source_t source)
     switch (source) {
         case AUDIO_SOURCE_FM_TUNER:
         case AUDIO_SOURCE_ECHO_REFERENCE:
+        case AUDIO_SOURCE_REMOTE_SUBMIX:
             return false;
         default:
             break;

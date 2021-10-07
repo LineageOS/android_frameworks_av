@@ -28,19 +28,26 @@ namespace android {
 class AudioPolicyManagerTestClientForHdmi : public AudioPolicyManagerTestClient {
 public:
     String8 getParameters(audio_io_handle_t /* ioHandle */, const String8&  /* keys*/ ) override {
+        AudioParameter mAudioParameters;
+        std::string formats;
+        for (const auto& f : mSupportedFormats) {
+            if (!formats.empty()) formats += AUDIO_PARAMETER_VALUE_LIST_SEPARATOR;
+            formats += audio_format_to_string(f);
+        }
+        mAudioParameters.add(
+                String8(AudioParameter::keyStreamSupportedFormats),
+                String8(formats.c_str()));
+        mAudioParameters.addInt(String8(AudioParameter::keyStreamSupportedSamplingRates), 48000);
+        mAudioParameters.add(String8(AudioParameter::keyStreamSupportedChannels), String8(""));
         return mAudioParameters.toString();
     }
 
     void addSupportedFormat(audio_format_t format) override {
-        mAudioParameters.add(
-                String8(AudioParameter::keyStreamSupportedFormats),
-                String8(audio_format_to_string(format)));
-        mAudioParameters.addInt(String8(AudioParameter::keyStreamSupportedSamplingRates), 48000);
-        mAudioParameters.add(String8(AudioParameter::keyStreamSupportedChannels), String8(""));
+        mSupportedFormats.insert(format);
     }
 
 private:
-    AudioParameter mAudioParameters;
+    std::set<audio_format_t> mSupportedFormats;
 };
 
 } // namespace android
