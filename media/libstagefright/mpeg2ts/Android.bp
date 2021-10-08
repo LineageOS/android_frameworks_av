@@ -27,11 +27,6 @@ cc_defaults {
         "ESQueue.cpp",
     ],
 
-    include_dirs: [
-        "frameworks/av/media/libstagefright",
-        "frameworks/native/include/media/openmax",
-    ],
-
     cflags: [
         "-Werror",
         "-Wall",
@@ -75,7 +70,6 @@ cc_defaults {
         },
     },
 }
-
 
 cc_library_static {
     name: "libstagefright_mpeg2support",
