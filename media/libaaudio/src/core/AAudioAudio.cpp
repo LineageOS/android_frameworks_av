@@ -352,7 +352,8 @@ AAUDIO_API aaudio_result_t AAudioStream_waitForStateChange(AAudioStream* stream,
 {
 
     AudioStream *audioStream = convertAAudioStreamToAudioStream(stream);
-    return audioStream->waitForStateChange(inputState, nextState, timeoutNanoseconds);
+    android::sp<AudioStream> spAudioStream(audioStream);
+    return spAudioStream->waitForStateChange(inputState, nextState, timeoutNanoseconds);
 }
 
 // ============================================================

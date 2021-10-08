@@ -25,6 +25,7 @@
 
 #include <gtest/gtest.h>
 #include <unistd.h>
+#include <thread>
 
 // Callback function that does nothing.
 aaudio_data_callback_result_t NoopDataCallbackProc(
@@ -51,6 +52,7 @@ aaudio_data_callback_result_t NoopDataCallbackProc(
 }
 
 constexpr int64_t NANOS_PER_MILLISECOND = 1000 * 1000;
+constexpr int64_t MICROS_PER_MILLISECOND = 1000;
 
 void checkReleaseThenClose(aaudio_performance_mode_t perfMode,
         aaudio_sharing_mode_t sharingMode,
@@ -760,6 +762,58 @@ TEST(test_various, aaudio_callback_once_none) {
 
 TEST(test_various, aaudio_callback_once_lowlat) {
     checkCallbackOnce(AAUDIO_PERFORMANCE_MODE_LOW_LATENCY);
+}
+
+void waitForStateChangeToClosingorClosed(AAudioStream **stream, std::atomic<bool>* isReady)
+{
+    *isReady = true;
+    aaudio_stream_state_t state = AAUDIO_STREAM_STATE_UNKNOWN;
+    EXPECT_EQ(AAUDIO_OK, AAudioStream_waitForStateChange(*stream,
+                                                         AAUDIO_STREAM_STATE_OPEN, &state,
+                                                         10000 * NANOS_PER_MILLISECOND));
+    if ((state != AAUDIO_STREAM_STATE_CLOSING) && (state != AAUDIO_STREAM_STATE_CLOSED)){
+        FAIL() << "ERROR - State not closing or closed. Current state: " <<
+                AAudio_convertStreamStateToText(state);
+    }
+}
+
+void testWaitForStateChangeClose(aaudio_performance_mode_t perfMode) {
+    AAudioStreamBuilder *aaudioBuilder = nullptr;
+    AAudioStream *aaudioStream = nullptr;
+
+    ASSERT_EQ(AAUDIO_OK, AAudio_createStreamBuilder(&aaudioBuilder));
+    AAudioStreamBuilder_setPerformanceMode(aaudioBuilder, perfMode);
+    ASSERT_EQ(AAUDIO_OK, AAudioStreamBuilder_openStream(aaudioBuilder, &aaudioStream));
+
+    // Verify Open State
+    aaudio_stream_state_t state = AAUDIO_STREAM_STATE_UNKNOWN;
+    EXPECT_EQ(AAUDIO_OK, AAudioStream_waitForStateChange(aaudioStream,
+                                                         AAUDIO_STREAM_STATE_UNKNOWN, &state,
+                                                         1000 * NANOS_PER_MILLISECOND));
+    EXPECT_EQ(AAUDIO_STREAM_STATE_OPEN, state);
+
+    std::atomic<bool> isWaitThreadReady{false};
+
+    // Spawn a new thread to wait for the state change
+    std::thread waitThread (waitForStateChangeToClosingorClosed, &aaudioStream,
+                            &isWaitThreadReady);
+
+    // Wait for worker thread to be ready
+    while (!isWaitThreadReady) {
+        usleep(MICROS_PER_MILLISECOND);
+    }
+    // Sleep an additional millisecond to make sure waitForAudioThread is called
+    usleep(MICROS_PER_MILLISECOND);
+    EXPECT_EQ(AAUDIO_OK, AAudioStream_close(aaudioStream));
+    waitThread.join();
+}
+
+TEST(test_various, wait_for_state_change_close_none) {
+    testWaitForStateChangeClose(AAUDIO_PERFORMANCE_MODE_NONE);
+}
+
+TEST(test_various, wait_for_state_change_close_lowlat) {
+    testWaitForStateChangeClose(AAUDIO_PERFORMANCE_MODE_LOW_LATENCY);
 }
 
 // ************************************************************
