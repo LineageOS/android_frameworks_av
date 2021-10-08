@@ -33,18 +33,13 @@ cc_defaults {
     },
     host_supported: true,
     double_loadable: true,
-    include_dirs: [
-        "frameworks/av/include",
-        "frameworks/native/include",
-        "frameworks/native/libs/arect/include",
-        "frameworks/native/libs/nativebase/include",
-    ],
 
     local_include_dirs: [
         "include/media/stagefright/foundation",
     ],
 
     header_libs: [
+        "av-headers",
         // this is only needed for the vendor variant that removes libbinder, but vendor
         // target below does not allow adding header_libs.
         "libbinder_headers",

@@ -21,7 +21,7 @@
 #include <fstream>
 
 #include <media/stagefright/foundation/ABitReader.h>
-#include "include/HevcUtils.h"
+#include <HevcUtils.h>
 
 #include "HEVCUtilsTestEnvironment.h"
 
