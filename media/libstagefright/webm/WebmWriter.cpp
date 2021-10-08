@@ -54,6 +54,19 @@ namespace android {
 
 static const int64_t kMinStreamableFileSizeInBytes = 5 * 1024 * 1024;
 
+bool WebmWriter::isFdOpenModeValid(int fd) {
+    // check for invalid file descriptor.
+    if (!MediaWriter::isFdOpenModeValid(fd)) {
+        return false;
+    }
+    int flags = fcntl(fd, F_GETFL);
+    if ((flags & O_RDWR) == 0) {
+        ALOGE("File must be in read-write mode for webm writer");
+        return false;
+    }
+    return true;
+}
+
 WebmWriter::WebmWriter(int fd)
     : mFd(dup(fd)),
       mInitCheck(mFd < 0 ? NO_INIT : OK),

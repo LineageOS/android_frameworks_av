@@ -31,6 +31,29 @@ struct MediaWriter : public RefBase {
           mMaxFileDurationLimitUs(0) {
     }
 
+    // Returns true if the file descriptor is opened using a mode
+    // which meets minimum writer/muxer requirements.
+    static bool isFdOpenModeValid(int fd) {
+        // check for invalid file descriptor.
+        int flags = fcntl(fd, F_GETFL);
+        if (flags == -1) {
+            ALOGE("Invalid File Status Flags and/or mode : %d", flags);
+            return false;
+        }
+        // fd must be in read-write mode or write-only mode.
+        if ((flags & (O_RDWR | O_WRONLY)) == 0) {
+            ALOGE("File must be writable");
+            return false;
+        }
+        // Verify fd is seekable
+        off64_t off = lseek64(fd, 0, SEEK_SET);
+        if (off < 0) {
+            ALOGE("File descriptor is not seekable");
+            return false;
+        }
+        return true;
+    }
+
     virtual status_t addSource(const sp<MediaSource> &source) = 0;
     virtual bool reachedEOS() = 0;
     virtual status_t start(MetaData *params = NULL) = 0;
