@@ -139,11 +139,6 @@ cc_library_static {
         },
     },
 
-    include_dirs: [
-        "frameworks/av/include",
-        "frameworks/av/media/libstagefright/include",
-    ],
-
     local_include_dirs: ["src"],
     export_include_dirs: ["inc"],
 
