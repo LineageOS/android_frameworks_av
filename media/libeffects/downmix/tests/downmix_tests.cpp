@@ -50,6 +50,8 @@ static constexpr audio_channel_mask_t kChannelPositionMasks[] = {
     AUDIO_CHANNEL_OUT_7POINT1POINT4,
     AUDIO_CHANNEL_OUT_13POINT_360RA,
     AUDIO_CHANNEL_OUT_22POINT2,
+    audio_channel_mask_t(AUDIO_CHANNEL_OUT_22POINT2
+            | AUDIO_CHANNEL_OUT_FRONT_WIDE_LEFT | AUDIO_CHANNEL_OUT_FRONT_WIDE_RIGHT),
 };
 
 constexpr float COEF_25 = 0.2508909536f;
@@ -82,6 +84,8 @@ constexpr inline float kScaleFromChannelIdxLeft[] = {
     M_SQRT1_2, // AUDIO_CHANNEL_OUT_BOTTOM_FRONT_CENTER   = 0x200000u,
     0.f, // AUDIO_CHANNEL_OUT_BOTTOM_FRONT_RIGHT    = 0x400000u,
     0.f, // AUDIO_CHANNEL_OUT_LOW_FREQUENCY_2       = 0x800000u,
+    M_SQRT1_2, // AUDIO_CHANNEL_OUT_FRONT_WIDE_LEFT       = 0x1000000u,
+    0.f,       // AUDIO_CHANNEL_OUT_FRONT_WIDE_RIGHT      = 0x2000000u,
 };
 
 constexpr inline float kScaleFromChannelIdxRight[] = {
@@ -109,6 +113,8 @@ constexpr inline float kScaleFromChannelIdxRight[] = {
     M_SQRT1_2, // AUDIO_CHANNEL_OUT_BOTTOM_FRONT_CENTER   = 0x200000u,
     1.f,       // AUDIO_CHANNEL_OUT_BOTTOM_FRONT_RIGHT    = 0x400000u,
     M_SQRT1_2, // AUDIO_CHANNEL_OUT_LOW_FREQUENCY_2       = 0x800000u,
+    0.f,       // AUDIO_CHANNEL_OUT_FRONT_WIDE_LEFT       = 0x1000000u,
+    M_SQRT1_2, // AUDIO_CHANNEL_OUT_FRONT_WIDE_RIGHT      = 0x2000000u,
 };
 
 // Downmix doesn't change with sample rate
@@ -156,7 +162,7 @@ public:
         double savedPower[32][2]{};
         for (unsigned i = 0, channel = channelMask; channel != 0; ++i) {
             const int index = __builtin_ctz(channel);
-            ASSERT_LT(index, FCC_24);
+            ASSERT_LT(index, FCC_26);
             const int pairIndex = pairIdxFromChannelIdx(index);
             const AUDIO_GEOMETRY_SIDE side = sideFromChannelIdx(index);
             const int channelBit = 1 << index;
@@ -243,12 +249,34 @@ public:
                 handle_, EFFECT_CMD_SET_CONFIG,
                 sizeof(effect_config_t), &config_, &replySize, &reply);
         ASSERT_EQ(0, err);
+        ASSERT_EQ(0, reply);
         err = (downmixApi->command)(
                 handle_, EFFECT_CMD_ENABLE,
                 0, nullptr, &replySize, &reply);
         ASSERT_EQ(0, err);
 
         process(input, output, frames);
+        err = AUDIO_EFFECT_LIBRARY_INFO_SYM.release_effect(handle_);
+        ASSERT_EQ(0, err);
+    }
+
+    // This test assumes the channel mask is invalid.
+    void testInvalidChannelMask(audio_channel_mask_t invalidChannelMask) {
+        reconfig(48000 /* sampleRate */, invalidChannelMask);
+        const int32_t sessionId = 0;
+        const int32_t ioId = 0;
+        int32_t err = AUDIO_EFFECT_LIBRARY_INFO_SYM.create_effect(
+                &downmix_uuid_, sessionId, ioId,  &handle_);
+        ASSERT_EQ(0, err);
+
+        const struct effect_interface_s * const downmixApi = *handle_;
+        int32_t reply = 0;
+        uint32_t replySize = (uint32_t)sizeof(reply);
+        err = (downmixApi->command)(
+                handle_, EFFECT_CMD_SET_CONFIG,
+                sizeof(effect_config_t), &config_, &replySize, &reply);
+        ASSERT_EQ(0, err);
+        ASSERT_NE(0, reply);  // error has occurred.
         err = AUDIO_EFFECT_LIBRARY_INFO_SYM.release_effect(handle_);
         ASSERT_EQ(0, err);
     }
@@ -298,6 +326,16 @@ private:
     int outputChannelCount_{};
     int inputChannelCount_{};
 };
+
+TEST(DownmixTestSimple, invalidChannelMask) {
+    // Fill in a dummy test method to use DownmixTest outside of a parameterized test.
+    class DownmixTestComplete : public DownmixTest {
+        void TestBody() override {}
+    } downmixtest;
+
+    constexpr auto INVALID_CHANNEL_MASK = audio_channel_mask_t(1 << 31);
+    downmixtest.testInvalidChannelMask(INVALID_CHANNEL_MASK);
+}
 
 TEST_P(DownmixTest, basic) {
     testBalance(kSampleRates[std::get<0>(GetParam())],
