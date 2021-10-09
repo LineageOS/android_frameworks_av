@@ -108,8 +108,6 @@ cc_library_static {
         cfi: true,
     },
 
-    include_dirs: ["frameworks/av/media/libstagefright/include"],
-
     header_libs: ["libstagefright_mp3dec_headers"],
     export_header_lib_headers: ["libstagefright_mp3dec_headers"],
 
