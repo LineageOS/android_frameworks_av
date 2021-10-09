@@ -1836,8 +1836,9 @@ Status CameraService::connectHelper(const sp<CALLBACK>& cameraCb, const String8&
         // Set rotate-and-crop override behavior
         if (mOverrideRotateAndCropMode != ANDROID_SCALER_ROTATE_AND_CROP_AUTO) {
             client->setRotateAndCropOverride(mOverrideRotateAndCropMode);
-        } else if (CameraServiceProxyWrapper::isRotateAndCropOverrideNeeded(clientPackageName,
-                    orientation, facing)) {
+        } else if ((effectiveApiLevel == API_2) &&
+                CameraServiceProxyWrapper::isRotateAndCropOverrideNeeded(clientPackageName,
+                        orientation, facing) ) {
             client->setRotateAndCropOverride(ANDROID_SCALER_ROTATE_AND_CROP_90);
         }
 
@@ -2239,7 +2240,7 @@ Status CameraService::notifyDisplayConfigurationChange() {
     for (auto& current : clients) {
         if (current != nullptr) {
             const auto basicClient = current->getValue();
-            if (basicClient.get() != nullptr) {
+            if (basicClient.get() != nullptr && basicClient->canCastToApiClient(API_2)) {
                 if (CameraServiceProxyWrapper::isRotateAndCropOverrideNeeded(
                             basicClient->getPackageName(), basicClient->getCameraOrientation(),
                             basicClient->getCameraFacing())) {
