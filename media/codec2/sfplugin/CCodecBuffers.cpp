@@ -236,7 +236,7 @@ bool OutputBuffers::convert(
     if (!srcBuffer) {
         return false;
     }
-    if (!dst) {
+    if (!*dst) {
         *dst = new Codec2Buffer(
                 mFormat,
                 new ABuffer(mDataConverter->targetSize(srcBuffer->size())));
