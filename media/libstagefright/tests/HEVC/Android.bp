@@ -44,10 +44,6 @@ cc_test {
         "libstagefright_foundation",
     ],
 
-    include_dirs: [
-        "frameworks/av/media/libstagefright",
-    ],
-
     cflags: [
         "-Werror",
         "-Wall",

@@ -22,10 +22,6 @@ cc_library_static {
         "ZeroFilter.cpp",
     ],
 
-    include_dirs: [
-        "frameworks/native/include/media/openmax",
-    ],
-
     cflags: [
         "-Wno-multichar",
         "-Werror",

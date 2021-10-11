@@ -33,7 +33,7 @@ cc_library_static {
         "WebmWriter.cpp",
     ],
 
-    include_dirs: ["frameworks/av/include"],
+    export_include_dirs: ["."],
 
     shared_libs: [
         "libdatasource",
@@ -44,6 +44,7 @@ cc_library_static {
     ],
 
     header_libs: [
+        "av-headers",
         "libmedia_headers",
         "media_ndk_headers",
     ],
