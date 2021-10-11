@@ -385,7 +385,7 @@ protected:
     void submit(const sp<MediaCodecBuffer> &buffer);
 
     /**
-     * Apply DataConverter from |src| to |*dst| if needed. If |dst| is nullptr,
+     * Apply DataConverter from |src| to |*dst| if needed. If |*dst| is nullptr,
      * a new buffer is allocated.
      *
      * Returns true if conversion was needed and executed; false otherwise.
