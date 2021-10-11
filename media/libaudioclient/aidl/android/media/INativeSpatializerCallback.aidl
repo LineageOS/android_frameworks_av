@@ -31,4 +31,9 @@ oneway interface INativeSpatializerCallback {
      * (e.g. when the spatializer is enabled or disabled)
      */
     void onLevelChanged(SpatializationLevel level);
+
+    /** Called when the output stream the Spatializer is attached to changes.
+     * Indicates the IO Handle of the new output.
+     */
+    void onOutputChanged(int output);
 }
