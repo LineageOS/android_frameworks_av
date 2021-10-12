@@ -25,10 +25,6 @@ cc_library_static {
         "SoftwareRenderer.cpp",
     ],
 
-    include_dirs: [
-        "frameworks/native/include/media/openmax",
-    ],
-
     shared_libs: [
         "libui",
         "libnativewindow",
@@ -37,6 +33,7 @@ cc_library_static {
     header_libs: [
         "libstagefright_headers",
         "libstagefright_foundation_headers",
+        "media_plugin_headers",
     ],
 
     static_libs: ["libyuv_static"],
