@@ -36,7 +36,7 @@
 #include <media/stagefright/MPEG2TSWriter.h>
 #include <media/stagefright/MPEG4Writer.h>
 #include <media/stagefright/OggWriter.h>
-#include <webm/WebmWriter.h>
+#include <WebmWriter.h>
 
 #include "WriterTestEnvironment.h"
 #include "WriterUtility.h"
