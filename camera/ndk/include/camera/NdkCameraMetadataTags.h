@@ -4585,7 +4585,7 @@ typedef enum acamera_metadata_tag {
      * Clients are advised to not cache or store the orientation value of such logical sensors.
      * In case repeated queries to CameraCharacteristics are not preferred, then clients can
      * also access the entire mapping from device state to sensor orientation in
-     * <a href="https://developer.android.com/reference/android/hardware/camera2/params/DeviceStateOrientationMap.html">DeviceStateOrientationMap</a>.
+     * <a href="https://developer.android.com/reference/android/hardware/camera2/params/DeviceStateSensorOrientationMap.html">DeviceStateSensorOrientationMap</a>.
      * Do note that a dynamically changing sensor orientation value in camera characteristics
      * will not be the best way to establish the orientation per frame. Clients that want to
      * know the sensor orientation of a particular captured frame should query the
