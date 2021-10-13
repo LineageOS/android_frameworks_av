@@ -25,6 +25,7 @@ cc_binary {
     ],
 
     shared_libs: [
+        "packagemanager_aidl-cpp",
         "libaaudioservice",
         "libaudioclient",
         "libaudioflinger",

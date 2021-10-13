@@ -33,6 +33,7 @@ cc_test {
         "libmediautils",
         "libutils",
         "mediametricsservice-aidl-cpp",
+        "packagemanager_aidl-cpp",
     ],
 
     header_libs: [
