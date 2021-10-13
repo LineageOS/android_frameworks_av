@@ -56,6 +56,7 @@ cc_fuzz {
         "libstatssocket",
         "libutils",
         "mediametricsservice-aidl-cpp",
+        "packagemanager_aidl-cpp",
     ],
 
     include_dirs: [
