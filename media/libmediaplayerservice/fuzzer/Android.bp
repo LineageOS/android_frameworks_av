@@ -63,3 +63,20 @@ cc_fuzz {
         "libmediametrics",
     ],
 }
+
+cc_fuzz {
+    name: "metadataretriever_fuzzer",
+    srcs: [
+        "metadataretriever_fuzzer.cpp",
+    ],
+    defaults: [
+        "libmediaplayerserviceFuzzer_defaults",
+    ],
+    static_libs: [
+        "libplayerservice_datasource",
+    ],
+    shared_libs: [
+        "libdatasource",
+        "libdrmframework",
+    ],
+}
