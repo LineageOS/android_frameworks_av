@@ -25,6 +25,7 @@ cc_binary {
     ],
 
     shared_libs: [
+        "packagemanager_aidl-cpp",
         "libaaudioservice",
         "libaudioflinger",
         "libaudiopolicyservice",
@@ -41,7 +42,6 @@ cc_binary {
         "libpowermanager",
         "libutils",
         "libvibrator",
-
     ],
 
     // TODO check if we still need all of these include directories
