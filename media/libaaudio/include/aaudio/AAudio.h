@@ -20,7 +20,7 @@
  */
 
 /**
- * @file AAudio.h
+ * @file aaudio/AAudio.h
  */
 
 /**
