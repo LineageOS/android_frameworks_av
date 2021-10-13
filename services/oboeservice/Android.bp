@@ -68,6 +68,7 @@ cc_library {
         "aaudio-aidl-cpp",
         "framework-permission-aidl-cpp",
         "libaudioclient_aidl_conversion",
+        "packagemanager_aidl-cpp",
     ],
 
     export_shared_lib_headers: [

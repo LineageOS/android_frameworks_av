@@ -18,6 +18,7 @@ cc_defaults {
         "libutils",
         "libbinder",
         "framework-permission-aidl-cpp",
+        "packagemanager_aidl-cpp",
     ],
 
     cflags: [
