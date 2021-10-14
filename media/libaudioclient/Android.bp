@@ -138,6 +138,7 @@ cc_library {
         "libshmemcompat",
         "libutils",
         "framework-permission-aidl-cpp",
+        "packagemanager_aidl-cpp",
     ],
     export_shared_lib_headers: [
         "audioflinger-aidl-cpp",

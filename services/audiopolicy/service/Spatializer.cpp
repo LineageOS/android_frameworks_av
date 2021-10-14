@@ -627,6 +627,9 @@ void Spatializer::onActualModeChangeMsg(HeadTrackingMode mode) {
 
 status_t Spatializer::attachOutput(audio_io_handle_t output) {
     std::shared_ptr<SpatializerPoseController> poseController;
+    bool outputChanged = false;
+    sp<media::INativeSpatializerCallback> callback;
+
     {
         std::lock_guard lock(mLock);
         ALOGV("%s output %d mOutput %d", __func__, (int)output, (int)mOutput);
@@ -654,6 +657,7 @@ status_t Spatializer::attachOutput(audio_io_handle_t output) {
                              std::vector<SpatializerHeadTrackingMode>{mActualHeadTrackingMode});
 
         mEngine->setEnabled(true);
+        outputChanged = mOutput != output;
         mOutput = output;
 
         if (mSupportsHeadTracking) {
@@ -668,26 +672,42 @@ status_t Spatializer::attachOutput(audio_io_handle_t output) {
             mPoseController->setDisplayOrientation(mDisplayOrientation);
             poseController = mPoseController;
         }
+        callback = mSpatializerCallback;
     }
     if (poseController != nullptr) {
         poseController->waitUntilCalculated();
     }
+
+    if (outputChanged && callback != nullptr) {
+        callback->onOutputChanged(output);
+    }
+
     return NO_ERROR;
 }
 
 audio_io_handle_t Spatializer::detachOutput() {
-    std::lock_guard lock(mLock);
-    ALOGV("%s mOutput %d", __func__, (int)mOutput);
     audio_io_handle_t output = AUDIO_IO_HANDLE_NONE;
-    if (mOutput == AUDIO_IO_HANDLE_NONE) {
-        return output;
+    sp<media::INativeSpatializerCallback> callback;
+
+    {
+        std::lock_guard lock(mLock);
+        ALOGV("%s mOutput %d", __func__, (int)mOutput);
+        if (mOutput == AUDIO_IO_HANDLE_NONE) {
+            return output;
+        }
+        // remove FX instance
+        mEngine->setEnabled(false);
+        mEngine.clear();
+        output = mOutput;
+        mOutput = AUDIO_IO_HANDLE_NONE;
+        mPoseController.reset();
+
+        callback = mSpatializerCallback;
     }
-    // remove FX instance
-    mEngine->setEnabled(false);
-    mEngine.clear();
-    output = mOutput;
-    mOutput = AUDIO_IO_HANDLE_NONE;
-    mPoseController.reset();
+
+    if (callback != nullptr) {
+        callback->onOutputChanged(AUDIO_IO_HANDLE_NONE);
+    }
     return output;
 }
 
