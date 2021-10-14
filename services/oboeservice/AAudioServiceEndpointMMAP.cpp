@@ -401,16 +401,17 @@ void AAudioServiceEndpointMMAP::onRoutingChanged(audio_port_handle_t portHandle)
 /**
  * Get an immutable description of the data queue from the HAL.
  */
-aaudio_result_t AAudioServiceEndpointMMAP::getDownDataDescription(AudioEndpointParcelable &parcelable)
+aaudio_result_t AAudioServiceEndpointMMAP::getDownDataDescription(
+        AudioEndpointParcelable* parcelable)
 {
     // Gather information on the data queue based on HAL info.
     int32_t bytesPerFrame = calculateBytesPerFrame();
     int32_t capacityInBytes = getBufferCapacity() * bytesPerFrame;
-    int fdIndex = parcelable.addFileDescriptor(mAudioDataFileDescriptor, capacityInBytes);
-    parcelable.mDownDataQueueParcelable.setupMemory(fdIndex, 0, capacityInBytes);
-    parcelable.mDownDataQueueParcelable.setBytesPerFrame(bytesPerFrame);
-    parcelable.mDownDataQueueParcelable.setFramesPerBurst(mFramesPerBurst);
-    parcelable.mDownDataQueueParcelable.setCapacityInFrames(getBufferCapacity());
+    int fdIndex = parcelable->addFileDescriptor(mAudioDataFileDescriptor, capacityInBytes);
+    parcelable->mDownDataQueueParcelable.setupMemory(fdIndex, 0, capacityInBytes);
+    parcelable->mDownDataQueueParcelable.setBytesPerFrame(bytesPerFrame);
+    parcelable->mDownDataQueueParcelable.setFramesPerBurst(mFramesPerBurst);
+    parcelable->mDownDataQueueParcelable.setCapacityInFrames(getBufferCapacity());
     return AAUDIO_OK;
 }
 

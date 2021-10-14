@@ -45,7 +45,7 @@ public:
 
     aaudio_result_t allocate(android::fifo_frames_t bytesPerFrame, android::fifo_frames_t capacityInFrames);
 
-    void fillParcelable(AudioEndpointParcelable &endpointParcelable,
+    void fillParcelable(AudioEndpointParcelable* endpointParcelable,
                         RingBufferParcelable &ringBufferParcelable);
 
     /**

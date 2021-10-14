@@ -88,11 +88,14 @@ public:
 
 protected:
 
-    aaudio_result_t getAudioDataDescription(AudioEndpointParcelable &parcelable) override;
+    aaudio_result_t getAudioDataDescription_l(
+            AudioEndpointParcelable* parcelable) REQUIRES(mLock) override;
 
-    aaudio_result_t getFreeRunningPosition(int64_t *positionFrames, int64_t *timeNanos) override;
+    aaudio_result_t getFreeRunningPosition_l(
+            int64_t *positionFrames, int64_t *timeNanos) REQUIRES(mLock) override;
 
-    aaudio_result_t getHardwareTimestamp(int64_t *positionFrames, int64_t *timeNanos) override;
+    aaudio_result_t getHardwareTimestamp_l(
+            int64_t *positionFrames, int64_t *timeNanos) REQUIRES(mLock) override;
 
     /**
      * @param requestedCapacityFrames
