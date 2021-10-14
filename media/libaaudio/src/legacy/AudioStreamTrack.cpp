@@ -103,7 +103,7 @@ aaudio_result_t AudioStreamTrack::open(const AudioStreamBuilder& builder)
             : getFormat();
 
     // Setup the callback if there is one.
-    AudioTrack::callback_t callback = nullptr;
+    AudioTrack::legacy_callback_t callback = nullptr;
     void *callbackData = nullptr;
     // Note that TRANSFER_SYNC does not allow FAST track
     AudioTrack::transfer_type streamTransferType = AudioTrack::transfer_type::TRANSFER_SYNC;
