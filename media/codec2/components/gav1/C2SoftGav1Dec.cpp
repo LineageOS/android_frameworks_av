@@ -20,6 +20,7 @@
 
 #include <C2Debug.h>
 #include <C2PlatformSupport.h>
+#include <Codec2Mapper.h>
 #include <SimpleC2Interface.h>
 #include <log/log.h>
 #include <media/stagefright/foundation/AUtils.h>
@@ -156,6 +157,42 @@ class C2SoftGav1Dec::IntfImpl : public SimpleInterface<void>::BaseParams {
             .withSetter(DefaultColorAspectsSetter)
             .build());
 
+      addParameter(
+              DefineParam(mCodedColorAspects, C2_PARAMKEY_VUI_COLOR_ASPECTS)
+              .withDefault(new C2StreamColorAspectsInfo::input(
+                      0u, C2Color::RANGE_LIMITED, C2Color::PRIMARIES_UNSPECIFIED,
+                      C2Color::TRANSFER_UNSPECIFIED, C2Color::MATRIX_UNSPECIFIED))
+              .withFields({
+                  C2F(mCodedColorAspects, range).inRange(
+                              C2Color::RANGE_UNSPECIFIED,     C2Color::RANGE_OTHER),
+                  C2F(mCodedColorAspects, primaries).inRange(
+                              C2Color::PRIMARIES_UNSPECIFIED, C2Color::PRIMARIES_OTHER),
+                  C2F(mCodedColorAspects, transfer).inRange(
+                              C2Color::TRANSFER_UNSPECIFIED,  C2Color::TRANSFER_OTHER),
+                  C2F(mCodedColorAspects, matrix).inRange(
+                              C2Color::MATRIX_UNSPECIFIED,    C2Color::MATRIX_OTHER)
+              })
+              .withSetter(CodedColorAspectsSetter)
+              .build());
+
+      addParameter(
+              DefineParam(mColorAspects, C2_PARAMKEY_COLOR_ASPECTS)
+              .withDefault(new C2StreamColorAspectsInfo::output(
+                      0u, C2Color::RANGE_UNSPECIFIED, C2Color::PRIMARIES_UNSPECIFIED,
+                      C2Color::TRANSFER_UNSPECIFIED, C2Color::MATRIX_UNSPECIFIED))
+              .withFields({
+                  C2F(mColorAspects, range).inRange(
+                              C2Color::RANGE_UNSPECIFIED,     C2Color::RANGE_OTHER),
+                  C2F(mColorAspects, primaries).inRange(
+                              C2Color::PRIMARIES_UNSPECIFIED, C2Color::PRIMARIES_OTHER),
+                  C2F(mColorAspects, transfer).inRange(
+                              C2Color::TRANSFER_UNSPECIFIED,  C2Color::TRANSFER_OTHER),
+                  C2F(mColorAspects, matrix).inRange(
+                              C2Color::MATRIX_UNSPECIFIED,    C2Color::MATRIX_OTHER)
+              })
+              .withSetter(ColorAspectsSetter, mDefaultColorAspects, mCodedColorAspects)
+              .build());
+
     // TODO: support more formats?
     addParameter(DefineParam(mPixelFormat, C2_PARAMKEY_PIXEL_FORMAT)
                      .withConstValue(new C2StreamPixelFormatInfo::output(
@@ -218,6 +255,37 @@ class C2SoftGav1Dec::IntfImpl : public SimpleInterface<void>::BaseParams {
     return C2R::Ok();
   }
 
+  static C2R CodedColorAspectsSetter(bool mayBlock, C2P<C2StreamColorAspectsInfo::input> &me) {
+    (void)mayBlock;
+    if (me.v.range > C2Color::RANGE_OTHER) {
+      me.set().range = C2Color::RANGE_OTHER;
+    }
+    if (me.v.primaries > C2Color::PRIMARIES_OTHER) {
+      me.set().primaries = C2Color::PRIMARIES_OTHER;
+    }
+    if (me.v.transfer > C2Color::TRANSFER_OTHER) {
+      me.set().transfer = C2Color::TRANSFER_OTHER;
+    }
+    if (me.v.matrix > C2Color::MATRIX_OTHER) {
+      me.set().matrix = C2Color::MATRIX_OTHER;
+    }
+    return C2R::Ok();
+  }
+
+  static C2R ColorAspectsSetter(bool mayBlock, C2P<C2StreamColorAspectsInfo::output> &me,
+                                const C2P<C2StreamColorAspectsTuning::output> &def,
+                                const C2P<C2StreamColorAspectsInfo::input> &coded) {
+    (void)mayBlock;
+    // take default values for all unspecified fields, and coded values for specified ones
+    me.set().range = coded.v.range == RANGE_UNSPECIFIED ? def.v.range : coded.v.range;
+    me.set().primaries = coded.v.primaries == PRIMARIES_UNSPECIFIED
+        ? def.v.primaries : coded.v.primaries;
+    me.set().transfer = coded.v.transfer == TRANSFER_UNSPECIFIED
+        ? def.v.transfer : coded.v.transfer;
+    me.set().matrix = coded.v.matrix == MATRIX_UNSPECIFIED ? def.v.matrix : coded.v.matrix;
+    return C2R::Ok();
+  }
+
   static C2R ProfileLevelSetter(
       bool mayBlock, C2P<C2StreamProfileLevelInfo::input> &me,
       const C2P<C2StreamPictureSizeInfo::output> &size) {
@@ -230,6 +298,10 @@ class C2SoftGav1Dec::IntfImpl : public SimpleInterface<void>::BaseParams {
   std::shared_ptr<C2StreamColorAspectsTuning::output>
   getDefaultColorAspects_l() {
     return mDefaultColorAspects;
+  }
+
+  std::shared_ptr<C2StreamColorAspectsInfo::output> getColorAspects_l() {
+      return mColorAspects;
   }
 
   static C2R Hdr10PlusInfoInputSetter(bool mayBlock,
@@ -254,6 +326,8 @@ class C2SoftGav1Dec::IntfImpl : public SimpleInterface<void>::BaseParams {
   std::shared_ptr<C2StreamColorInfo::output> mColorInfo;
   std::shared_ptr<C2StreamPixelFormatInfo::output> mPixelFormat;
   std::shared_ptr<C2StreamColorAspectsTuning::output> mDefaultColorAspects;
+  std::shared_ptr<C2StreamColorAspectsInfo::input> mCodedColorAspects;
+  std::shared_ptr<C2StreamColorAspectsInfo::output> mColorAspects;
   std::shared_ptr<C2StreamHdr10PlusInfo::input> mHdr10PlusInfoInput;
   std::shared_ptr<C2StreamHdr10PlusInfo::output> mHdr10PlusInfoOutput;
 };
@@ -371,6 +445,10 @@ void C2SoftGav1Dec::finishWork(uint64_t index,
                                const std::shared_ptr<C2GraphicBlock> &block) {
   std::shared_ptr<C2Buffer> buffer =
       createGraphicBuffer(block, C2Rect(mWidth, mHeight));
+  {
+      IntfImpl::Lock lock = mIntf->lock();
+      buffer->setInfo(mIntf->getColorAspects_l());
+  }
   auto fillWork = [buffer, index](const std::unique_ptr<C2Work> &work) {
     uint32_t flags = 0;
     if ((work->input.flags & C2FrameData::FLAG_END_OF_STREAM) &&
@@ -609,6 +687,38 @@ static void convertYUV420Planar16ToYUV420Planar(
   }
 }
 
+void C2SoftGav1Dec::getVuiParams(const libgav1::DecoderBuffer *buffer) {
+    VuiColorAspects vuiColorAspects;
+    vuiColorAspects.primaries = buffer->color_primary;
+    vuiColorAspects.transfer = buffer->transfer_characteristics;
+    vuiColorAspects.coeffs = buffer->matrix_coefficients;
+    vuiColorAspects.fullRange = buffer->color_range;
+
+    // convert vui aspects to C2 values if changed
+    if (!(vuiColorAspects == mBitstreamColorAspects)) {
+        mBitstreamColorAspects = vuiColorAspects;
+        ColorAspects sfAspects;
+        C2StreamColorAspectsInfo::input codedAspects = { 0u };
+        ColorUtils::convertIsoColorAspectsToCodecAspects(
+                vuiColorAspects.primaries, vuiColorAspects.transfer, vuiColorAspects.coeffs,
+                vuiColorAspects.fullRange, sfAspects);
+        if (!C2Mapper::map(sfAspects.mPrimaries, &codedAspects.primaries)) {
+            codedAspects.primaries = C2Color::PRIMARIES_UNSPECIFIED;
+        }
+        if (!C2Mapper::map(sfAspects.mRange, &codedAspects.range)) {
+            codedAspects.range = C2Color::RANGE_UNSPECIFIED;
+        }
+        if (!C2Mapper::map(sfAspects.mMatrixCoeffs, &codedAspects.matrix)) {
+            codedAspects.matrix = C2Color::MATRIX_UNSPECIFIED;
+        }
+        if (!C2Mapper::map(sfAspects.mTransfer, &codedAspects.transfer)) {
+            codedAspects.transfer = C2Color::TRANSFER_UNSPECIFIED;
+        }
+        std::vector<std::unique_ptr<C2SettingResult>> failures;
+        mIntf->config({&codedAspects}, C2_MAY_BLOCK, &failures);
+    }
+}
+
 bool C2SoftGav1Dec::outputBuffer(const std::shared_ptr<C2BlockPool> &pool,
                                  const std::unique_ptr<C2Work> &work) {
   if (!(work && pool)) return false;
@@ -651,6 +761,7 @@ bool C2SoftGav1Dec::outputBuffer(const std::shared_ptr<C2BlockPool> &pool,
     }
   }
 
+  getVuiParams(buffer);
   if (!(buffer->image_format == libgav1::kImageFormatYuv420 ||
         buffer->image_format == libgav1::kImageFormatMonochrome400)) {
     ALOGE("image_format %d not supported", buffer->image_format);
@@ -666,12 +777,12 @@ bool C2SoftGav1Dec::outputBuffer(const std::shared_ptr<C2BlockPool> &pool,
   uint32_t format = HAL_PIXEL_FORMAT_YV12;
   if (buffer->bitdepth == 10) {
     IntfImpl::Lock lock = mIntf->lock();
-    std::shared_ptr<C2StreamColorAspectsTuning::output> defaultColorAspects =
-        mIntf->getDefaultColorAspects_l();
+    std::shared_ptr<C2StreamColorAspectsInfo::output> codedColorAspects =
+        mIntf->getColorAspects_l();
 
-    if (defaultColorAspects->primaries == C2Color::PRIMARIES_BT2020 &&
-        defaultColorAspects->matrix == C2Color::MATRIX_BT2020 &&
-        defaultColorAspects->transfer == C2Color::TRANSFER_ST2084) {
+    if (codedColorAspects->primaries == C2Color::PRIMARIES_BT2020 &&
+        codedColorAspects->matrix == C2Color::MATRIX_BT2020 &&
+        codedColorAspects->transfer == C2Color::TRANSFER_ST2084) {
       if (buffer->image_format != libgav1::kImageFormatYuv420) {
         ALOGE("Only YUV420 output is supported when targeting RGBA_1010102");
         mSignalledError = true;
