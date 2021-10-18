@@ -17,7 +17,10 @@
 #ifndef ANDROID_C2_SOFT_GAV1_DEC_H_
 #define ANDROID_C2_SOFT_GAV1_DEC_H_
 
+#include <media/stagefright/foundation/ColorUtils.h>
+
 #include <SimpleC2Component.h>
+#include <C2Config.h>
 #include "libgav1/src/gav1/decoder.h"
 #include "libgav1/src/gav1/decoder_settings.h"
 
@@ -56,10 +59,32 @@ struct C2SoftGav1Dec : public SimpleC2Component {
   bool mSignalledOutputEos;
   bool mSignalledError;
 
+  // Color aspects. These are ISO values and are meant to detect changes in aspects to avoid
+  // converting them to C2 values for each frame
+  struct VuiColorAspects {
+      uint8_t primaries;
+      uint8_t transfer;
+      uint8_t coeffs;
+      uint8_t fullRange;
+
+      // default color aspects
+      VuiColorAspects()
+          : primaries(C2Color::PRIMARIES_UNSPECIFIED),
+            transfer(C2Color::TRANSFER_UNSPECIFIED),
+            coeffs(C2Color::MATRIX_UNSPECIFIED),
+            fullRange(C2Color::RANGE_UNSPECIFIED) { }
+
+      bool operator==(const VuiColorAspects &o) {
+          return primaries == o.primaries && transfer == o.transfer && coeffs == o.coeffs
+                  && fullRange == o.fullRange;
+      }
+  } mBitstreamColorAspects;
+
   struct timeval mTimeStart;  // Time at the start of decode()
   struct timeval mTimeEnd;    // Time at the end of decode()
 
   bool initDecoder();
+  void getVuiParams(const libgav1::DecoderBuffer *buffer);
   void destroyDecoder();
   void finishWork(uint64_t index, const std::unique_ptr<C2Work>& work,
                   const std::shared_ptr<C2GraphicBlock>& block);
