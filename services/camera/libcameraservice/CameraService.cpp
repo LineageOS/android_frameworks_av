@@ -137,6 +137,7 @@ static constexpr int32_t kVendorClientScore = resource_policy::PERCEPTIBLE_APP_A
 static constexpr int32_t kVendorClientState = ActivityManager::PROCESS_STATE_PERSISTENT_UI;
 
 const String8 CameraService::kOfflineDevice("offline-");
+const String16 CameraService::kWatchAllClientsFlag("all");
 
 // Set to keep track of logged service error events.
 static std::set<String8> sServiceErrorEventSet;
@@ -1788,7 +1789,8 @@ Status CameraService::connectHelper(const sp<CALLBACK>& cameraCb, const String8&
         LOG_ALWAYS_FATAL_IF(client.get() == nullptr, "%s: CameraService in invalid state",
                 __FUNCTION__);
 
-        err = client->initialize(mCameraProviderManager, mMonitorTags);
+        String8 monitorTags = isClientWatched(client.get()) ? mMonitorTags : String8("");
+        err = client->initialize(mCameraProviderManager, monitorTags);
         if (err != OK) {
             ALOGE("%s: Could not initialize client from HAL.", __FUNCTION__);
             // Errors could be from the HAL module open call or from AppOpsManager
@@ -1954,7 +1956,8 @@ status_t CameraService::addOfflineClient(String8 cameraId, sp<BasicClient> offli
             return BAD_VALUE;
         }
 
-        auto err = offlineClient->initialize(mCameraProviderManager, mMonitorTags);
+        String8 monitorTags = isClientWatched(offlineClient.get()) ? mMonitorTags : String8("");
+        auto err = offlineClient->initialize(mCameraProviderManager, monitorTags);
         if (err != OK) {
             ALOGE("%s: Could not initialize offline client.", __FUNCTION__);
             return err;
@@ -2620,6 +2623,7 @@ void CameraService::removeByClient(const BasicClient* client) {
     for (auto& i : mActiveClientManager.getAll()) {
         auto clientSp = i->getValue();
         if (clientSp.get() == client) {
+            cacheClientTagDumpIfNeeded(client->mCameraIdStr, clientSp.get());
             mActiveClientManager.remove(i);
         }
     }
@@ -2696,7 +2700,11 @@ sp<CameraService::BasicClient> CameraService::removeClientLocked(const String8& 
         return sp<BasicClient>{nullptr};
     }
 
-    return clientDescriptorPtr->getValue();
+    sp<BasicClient> client = clientDescriptorPtr->getValue();
+    if (client.get() != nullptr) {
+        cacheClientTagDumpIfNeeded(clientDescriptorPtr->getKey(), client.get());
+    }
+    return client;
 }
 
 void CameraService::doUserSwitch(const std::vector<int32_t>& newUserIds) {
@@ -4245,6 +4253,30 @@ void CameraService::dumpEventLog(int fd) {
     dprintf(fd, "\n");
 }
 
+void CameraService::cacheClientTagDumpIfNeeded(const char *cameraId, BasicClient* client) {
+    Mutex::Autolock lock(mLogLock);
+    if (!isClientWatchedLocked(client)) { return; }
+
+    std::vector<std::string> dumpVector;
+    client->dumpWatchedEventsToVector(dumpVector);
+
+    if (dumpVector.empty()) { return; }
+
+    std::string dumpString;
+    size_t i = dumpVector.size();
+
+    // Store the string in reverse order (latest last)
+    while (i > 0) {
+         i--;
+         dumpString += cameraId;
+         dumpString += ":";
+         dumpString += dumpVector[i]; // implicitly ends with '\n'
+    }
+
+    const String16 &packageName = client->getPackageName();
+    mWatchedClientsDumpCache[packageName] = dumpString;
+}
+
 void CameraService::handleTorchClientBinderDied(const wp<IBinder> &who) {
     Mutex::Autolock al(mTorchClientMapMutex);
     for (size_t i = 0; i < mTorchClientMap.size(); i++) {
@@ -4697,44 +4729,81 @@ status_t CameraService::handleSetCameraMute(const Vector<String16>& args) {
     return OK;
 }
 
-status_t CameraService::handleWatchCommand(const Vector<String16>& args, int out) {
-    if (args.size() == 3 && args[1] == String16("start")) {
-        return startWatchingTags(args[2], out);
+status_t CameraService::handleWatchCommand(const Vector<String16>& args, int outFd) {
+    if (args.size() >= 3 && args[1] == String16("start")) {
+        return startWatchingTags(args, outFd);
     } else if (args.size() == 2 && args[1] == String16("dump")) {
-        return camera3::CameraTraces::dump(out);
+        return camera3::CameraTraces::dump(outFd);
     } else if (args.size() == 2 && args[1] == String16("stop")) {
-        return stopWatchingTags(out);
-    } else if (args.size() >= 2 && args[1] == String16("live")) {
-        return printWatchedTagsUntilInterrupt(args, out);
+        return stopWatchingTags(outFd);
+    } else if (args.size() >= 2 && args[1] == String16("print")) {
+        return printWatchedTags(args, outFd);
     }
-    dprintf(out, "Camera service watch commands:\n"
-                 "  start <comma_separated_tag_list> starts watching the provided tags\n"
-                 "                                   recognizes shorthands like '3a'\n"
+    dprintf(outFd, "Camera service watch commands:\n"
+                 "  start -m <comma_separated_tag_list> [-c <comma_separated_client_list>]\n"
+                 "        starts watching the provided tags for clients with provided package\n"
+                 "        recognizes tag shorthands like '3a'\n"
+                 "        watches all clients if no client is passed, or if 'all' is listed\n"
                  "  dump dumps camera trace\n"
                  "  stop stops watching all tags\n"
-                 "  live prints the monitored information in real time\n"
-                 "        Hit Ctrl+C to stop.\n");
+                 "  print [-n <refresh_interval_ms>]\n"
+                 "        prints the monitored information in real time\n"
+                 "        Hit Ctrl+C to exit\n");
   return BAD_VALUE;
 }
 
-status_t CameraService::startWatchingTags(const String16 &tags, int outFd) {
+status_t CameraService::startWatchingTags(const Vector<String16> &args, int outFd) {
+    Mutex::Autolock lock(mLogLock);
+    size_t tagsIdx; // index of '-m'
+    String16 tags("");
+    for (tagsIdx = 2; tagsIdx < args.size() && args[tagsIdx] != String16("-m"); tagsIdx++);
+    if (tagsIdx < args.size() - 1) {
+        tags = args[tagsIdx + 1];
+    } else {
+        dprintf(outFd, "No tags provided.\n");
+        return BAD_VALUE;
+    }
+
+    size_t clientsIdx; // index of '-c'
+    String16 clients = kWatchAllClientsFlag; // watch all clients if no clients are provided
+    for (clientsIdx = 2; clientsIdx < args.size() && args[clientsIdx] != String16("-c");
+         clientsIdx++);
+    if (clientsIdx < args.size() - 1) {
+        clients = args[clientsIdx + 1];
+    }
+    parseClientsToWatchLocked(String8(clients));
+
     // track tags to initialize future clients with the monitoring information
     mMonitorTags = String8(tags);
 
+    bool serviceLock = tryLock(mServiceLock);
+    int numWatchedClients = 0;
     auto cameraClients = mActiveClientManager.getAll();
     for (const auto &clientDescriptor: cameraClients) {
         if (clientDescriptor == nullptr) { continue; }
         sp<BasicClient> client = clientDescriptor->getValue();
         if (client.get() == nullptr) { continue; }
-        client->startWatchingTags(mMonitorTags, outFd);
+
+        if (isClientWatchedLocked(client.get())) {
+            client->startWatchingTags(mMonitorTags, outFd);
+            numWatchedClients++;
+        }
     }
+    dprintf(outFd, "Started watching %d active clients\n", numWatchedClients);
+
+    if (serviceLock) { mServiceLock.unlock(); }
     return OK;
 }
 
 status_t CameraService::stopWatchingTags(int outFd) {
     // clear mMonitorTags to prevent new clients from monitoring tags at initialization
+    Mutex::Autolock lock(mLogLock);
     mMonitorTags = String8::empty();
 
+    mWatchedClientPackages.clear();
+    mWatchedClientsDumpCache.clear();
+
+    bool serviceLock = tryLock(mServiceLock);
     auto cameraClients = mActiveClientManager.getAll();
     for (const auto &clientDescriptor : cameraClients) {
         if (clientDescriptor == nullptr) { continue; }
@@ -4742,18 +4811,17 @@ status_t CameraService::stopWatchingTags(int outFd) {
         if (client.get() == nullptr) { continue; }
         client->stopWatchingTags(outFd);
     }
+    dprintf(outFd, "Stopped watching all clients.\n");
+    if (serviceLock) { mServiceLock.unlock(); }
     return OK;
 }
 
-status_t CameraService::printWatchedTagsUntilInterrupt(const Vector<String16> &args, int outFd) {
+status_t CameraService::printWatchedTags(const Vector<String16> &args, int outFd) {
+    // Figure outFd refresh interval, if present in args
     useconds_t refreshTimeoutMs = 1000; // refresh every 1s by default
-
     if (args.size() > 2) {
-        size_t intervalIdx; // index of refresh interval argument
-        for (intervalIdx = 2;
-             intervalIdx < args.size()
-                && String16("-n") != args[intervalIdx]
-                && String16("--interval") != args[intervalIdx];
+        size_t intervalIdx; // index of '-n'
+        for (intervalIdx = 2; intervalIdx < args.size() && String16("-n") != args[intervalIdx];
              intervalIdx++);
 
         size_t intervalValIdx = intervalIdx + 1;
@@ -4763,6 +4831,43 @@ status_t CameraService::printWatchedTagsUntilInterrupt(const Vector<String16> &a
         }
     }
 
+    mLogLock.lock();
+    bool serviceLock = tryLock(mServiceLock);
+    // get all watched clients that are currently connected
+    std::set<String16> connectedMoniterdClients;
+    for (const auto &clientDescriptor: mActiveClientManager.getAll()) {
+        if (clientDescriptor == nullptr) { continue; }
+
+        sp<BasicClient> client = clientDescriptor->getValue();
+        if (client.get() == nullptr) { continue; }
+        if (!isClientWatchedLocked(client.get())) { continue; }
+
+        connectedMoniterdClients.emplace(client->getPackageName());
+    }
+    if (serviceLock) { mServiceLock.unlock(); }
+
+    // Print entries in mWatchedClientsDumpCache for clients that are not connected
+    for (const auto &kv: mWatchedClientsDumpCache) {
+        const String16 &package = kv.first;
+        if (connectedMoniterdClients.find(package) != connectedMoniterdClients.end()) {
+            continue;
+        }
+
+        dprintf(outFd, "Client: %s\n", String8(package).string());
+        dprintf(outFd, "%s\n", kv.second.c_str());
+    }
+    mLogLock.unlock();
+
+    if (connectedMoniterdClients.empty()) {
+        dprintf(outFd, "No watched client active.\n");
+        return OK;
+    }
+
+    // For connected watched clients, print monitored tags live
+    return printWatchedTagsUntilInterrupt(refreshTimeoutMs  * 1000, outFd);
+}
+
+status_t CameraService::printWatchedTagsUntilInterrupt(useconds_t refreshMicros, int outFd) {
     std::unordered_map<std::string, std::string> cameraToLastEvent;
     auto cameraClients = mActiveClientManager.getAll();
 
@@ -4774,6 +4879,7 @@ status_t CameraService::printWatchedTagsUntilInterrupt(const Vector<String16> &a
     dprintf(outFd, "Press Ctrl + C to exit...\n\n");
     while (true) {
         for (const auto& clientDescriptor : cameraClients) {
+            Mutex::Autolock lock(mLogLock);
             if (clientDescriptor == nullptr) { continue; }
             const char* cameraId = clientDescriptor->getKey().string();
 
@@ -4782,6 +4888,7 @@ status_t CameraService::printWatchedTagsUntilInterrupt(const Vector<String16> &a
 
             sp<BasicClient> client = clientDescriptor->getValue();
             if (client.get() == nullptr) { continue; }
+            if (!isClientWatchedLocked(client.get())) { continue; }
 
             std::vector<std::string> latestEvents;
             client->dumpWatchedEventsToVector(latestEvents);
@@ -4795,7 +4902,7 @@ status_t CameraService::printWatchedTagsUntilInterrupt(const Vector<String16> &a
                 cameraToLastEvent[cameraId] = latestEvents[0];
             }
         }
-        usleep(refreshTimeoutMs * 1000);  // convert ms to us
+        usleep(refreshMicros);  // convert ms to us
     }
     return OK;
 }
@@ -4825,6 +4932,30 @@ void CameraService::printNewWatchedEvents(int outFd,
     } while (idxToPrint != 0);
 }
 
+void CameraService::parseClientsToWatchLocked(String8 clients) {
+    mWatchedClientPackages.clear();
+
+    const char *allSentinel = String8(kWatchAllClientsFlag).string();
+
+    char *tokenized = clients.lockBuffer(clients.size());
+    char *savePtr;
+    char *nextClient = strtok_r(tokenized, ",", &savePtr);
+
+    while (nextClient != nullptr) {
+        if (strcmp(nextClient, allSentinel) == 0) {
+            // Don't need to track any other package if 'all' is present
+            mWatchedClientPackages.clear();
+            mWatchedClientPackages.emplace(kWatchAllClientsFlag);
+            break;
+        }
+
+        // track package names
+        mWatchedClientPackages.emplace(nextClient);
+        nextClient = strtok_r(nullptr, ",", &savePtr);
+    }
+    clients.unlockBuffer();
+}
+
 status_t CameraService::printHelp(int out) {
     return dprintf(out, "Camera service commands:\n"
         "  get-uid-state <PACKAGE> [--user USER_ID] gets the uid state\n"
@@ -4839,6 +4970,16 @@ status_t CameraService::printHelp(int out) {
         "  set-camera-mute <0/1> enable or disable camera muting\n"
         "  watch <start|stop|dump|live> manages tag monitoring in connected clients\n"
         "  help print this message\n");
+}
+
+bool CameraService::isClientWatched(const BasicClient *client) {
+    Mutex::Autolock lock(mLogLock);
+    return isClientWatchedLocked(client);
+}
+
+bool CameraService::isClientWatchedLocked(const BasicClient *client) {
+    return mWatchedClientPackages.find(kWatchAllClientsFlag) != mWatchedClientPackages.end() ||
+           mWatchedClientPackages.find(client->getPackageName()) != mWatchedClientPackages.end();
 }
 
 int32_t CameraService::updateAudioRestriction() {
