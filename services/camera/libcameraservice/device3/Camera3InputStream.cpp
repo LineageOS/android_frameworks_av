@@ -106,6 +106,7 @@ status_t Camera3InputStream::returnBufferCheckedLocked(
             const camera_stream_buffer &buffer,
             nsecs_t timestamp,
             bool output,
+            int32_t /*transform*/,
             const std::vector<size_t>&,
             /*out*/
             sp<Fence> *releaseFenceOut) {
@@ -175,7 +176,7 @@ status_t Camera3InputStream::returnInputBufferLocked(
         const camera_stream_buffer &buffer) {
     ATRACE_CALL();
 
-    return returnAnyBufferLocked(buffer, /*timestamp*/0, /*output*/false);
+    return returnAnyBufferLocked(buffer, /*timestamp*/0, /*output*/false, /*transform*/ -1);
 }
 
 status_t Camera3InputStream::getInputBufferProducerLocked(
