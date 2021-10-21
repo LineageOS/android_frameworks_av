@@ -36,7 +36,7 @@ namespace android {
 #define ivdext_ctl_set_num_cores_op_t   ihevcd_cxa_ctl_set_num_cores_op_t
 #define ivdext_ctl_get_vui_params_ip_t  ihevcd_cxa_ctl_get_vui_params_ip_t
 #define ivdext_ctl_get_vui_params_op_t  ihevcd_cxa_ctl_get_vui_params_op_t
-#define ALIGN32(x)                      ((((x) + 31) >> 5) << 5)
+#define ALIGN128(x)                     ((((x) + 127) >> 7) << 7)
 #define MAX_NUM_CORES                   4
 #define IVDEXT_CMD_CTL_SET_NUM_CORES    \
         (IVD_CONTROL_API_COMMAND_TYPE_T)IHEVCD_CXA_CMD_CTL_SET_NUM_CORES
