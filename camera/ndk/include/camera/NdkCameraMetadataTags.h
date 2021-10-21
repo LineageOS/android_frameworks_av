@@ -2144,6 +2144,50 @@ typedef enum acamera_metadata_tag {
      */
     ACAMERA_FLASH_INFO_AVAILABLE =                              // byte (acamera_metadata_enum_android_flash_info_available_t)
             ACAMERA_FLASH_INFO_START,
+    /**
+     * <p>Maximum flashlight brightness level.</p>
+     *
+     * <p>Type: int32</p>
+     *
+     * <p>This tag may appear in:
+     * <ul>
+     *   <li>ACameraMetadata from ACameraManager_getCameraCharacteristics</li>
+     * </ul></p>
+     *
+     * <p>If this value is greater than 1, then the device supports controlling the
+     * flashlight brightness level via
+     * {android.hardware.camera2.CameraManager#setTorchStrengthLevel}.
+     * If this value is equal to 1, flashlight brightness control is not supported.
+     * This value will be -1 if the flash unit is not available.</p>
+     */
+    ACAMERA_FLASH_INFO_STRENGTH_MAXIMUM_LEVEL =                 // int32
+            ACAMERA_FLASH_INFO_START + 2,
+    /**
+     * <p>Default flashlight brightness level to be set via
+     * {android.hardware.camera2.CameraManager#setTorchStrengthLevel}.</p>
+     *
+     * <p>Type: int32</p>
+     *
+     * <p>This tag may appear in:
+     * <ul>
+     *   <li>ACameraMetadata from ACameraManager_getCameraCharacteristics</li>
+     * </ul></p>
+     *
+     * <p>If flash unit is available this will be greater than or equal to 1 and less
+     * or equal to <code>ACAMERA_FLASH_INFO_STRENGTH_MAXIMUM_LEVEL</code>.
+     * If flash unit is not available this will be set to -1.</p>
+     * <p>Setting flashlight brightness above the default level
+     * (i.e.<code>ACAMERA_FLASH_INFO_STRENGTH_DEFAULT_LEVEL</code>) may make the device more
+     * likely to reach thermal throttling conditions and slow down, or drain the
+     * battery quicker than normal. To minimize such issues, it is recommended to
+     * start the flashlight at this default brightness until a user explicitly requests
+     * a brighter level.</p>
+     *
+     * @see ACAMERA_FLASH_INFO_STRENGTH_DEFAULT_LEVEL
+     * @see ACAMERA_FLASH_INFO_STRENGTH_MAXIMUM_LEVEL
+     */
+    ACAMERA_FLASH_INFO_STRENGTH_DEFAULT_LEVEL =                 // int32
+            ACAMERA_FLASH_INFO_START + 3,
     ACAMERA_FLASH_INFO_END,
 
     /**
