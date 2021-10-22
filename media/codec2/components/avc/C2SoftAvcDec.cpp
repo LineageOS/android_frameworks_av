@@ -511,7 +511,7 @@ void C2SoftAvcDec::getVersion() {
 status_t C2SoftAvcDec::initDecoder() {
     if (OK != createDecoder()) return UNKNOWN_ERROR;
     mNumCores = MIN(getCpuCoreCount(), MAX_NUM_CORES);
-    mStride = ALIGN32(mWidth);
+    mStride = ALIGN128(mWidth);
     mSignalledError = false;
     resetPlugin();
     (void) setNumCores();
@@ -777,20 +777,20 @@ c2_status_t C2SoftAvcDec::ensureDecoderState(const std::shared_ptr<C2BlockPool> 
         return C2_CORRUPTED;
     }
     if (mOutBlock &&
-            (mOutBlock->width() != ALIGN32(mWidth) || mOutBlock->height() != mHeight)) {
+            (mOutBlock->width() != ALIGN128(mWidth) || mOutBlock->height() != mHeight)) {
         mOutBlock.reset();
     }
     if (!mOutBlock) {
         uint32_t format = HAL_PIXEL_FORMAT_YV12;
         C2MemoryUsage usage = { C2MemoryUsage::CPU_READ, C2MemoryUsage::CPU_WRITE };
         c2_status_t err =
-            pool->fetchGraphicBlock(ALIGN32(mWidth), mHeight, format, usage, &mOutBlock);
+            pool->fetchGraphicBlock(ALIGN128(mWidth), mHeight, format, usage, &mOutBlock);
         if (err != C2_OK) {
             ALOGE("fetchGraphicBlock for Output failed with status %d", err);
             return err;
         }
         ALOGV("provided (%dx%d) required (%dx%d)",
-              mOutBlock->width(), mOutBlock->height(), ALIGN32(mWidth), mHeight);
+              mOutBlock->width(), mOutBlock->height(), ALIGN128(mWidth), mHeight);
     }
 
     return C2_OK;
@@ -928,7 +928,7 @@ void C2SoftAvcDec::process(
         if (0 < ps_decode_op->u4_pic_wd && 0 < ps_decode_op->u4_pic_ht) {
             if (mHeaderDecoded == false) {
                 mHeaderDecoded = true;
-                mStride = ALIGN32(ps_decode_op->u4_pic_wd);
+                mStride = ALIGN128(ps_decode_op->u4_pic_wd);
                 setParams(mStride, IVD_DECODE_FRAME);
             }
             if (ps_decode_op->u4_pic_wd != mWidth || ps_decode_op->u4_pic_ht != mHeight) {
