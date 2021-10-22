@@ -16,6 +16,7 @@
 
 //#define LOG_NDEBUG 0
 #define LOG_TAG "C2BqBuffer"
+#include <android/hardware_buffer.h>
 #include <utils/Log.h>
 
 #include <ui/BufferQueueDefs.h>
@@ -171,6 +172,91 @@ int64_t getTimestampNow() {
     return stamp;
 }
 
+// Do not rely on AHardwareBuffer module for GraphicBuffer handling since AHardwareBuffer
+// module is linked to framework which could have a different implementation of GraphicBuffer
+// than mainline/vndk implementation.(See b/203347494.)
+//
+// b2h/h2b between HardwareBuffer and GraphicBuffer cannot be used. (b2h/h2b depend on
+// AHardwareBuffer module for the conversion between HardwareBuffer and GraphicBuffer.)
+// hgbp_ prefixed methods are added to be used instead of b2h/h2b.
+//
+// TODO: Remove dependency with existing AHwB module. Also clean up conversions.(conversions here
+// and h2b/b2h coversions)
+const GraphicBuffer* hgbp_AHBuffer_to_GraphicBuffer(const AHardwareBuffer* buffer) {
+    return GraphicBuffer::fromAHardwareBuffer(buffer);
+}
+
+int hgbp_createFromHandle(const AHardwareBuffer_Desc* desc,
+                                     const native_handle_t* handle,
+                                     sp<GraphicBuffer> *outBuffer) {
+
+    if (!desc || !handle || !outBuffer) return ::android::BAD_VALUE;
+    if (desc->rfu0 != 0 || desc->rfu1 != 0) return ::android::BAD_VALUE;
+    if (desc->format == AHARDWAREBUFFER_FORMAT_BLOB && desc->height != 1)
+        return ::android::BAD_VALUE;
+
+    const int format = uint32_t(desc->format);
+    const uint64_t usage = uint64_t(desc->usage);
+    sp<GraphicBuffer> gbuffer(new GraphicBuffer(handle,
+                                                GraphicBuffer::HandleWrapMethod::CLONE_HANDLE,
+                                                desc->width, desc->height,
+                                                format, desc->layers, usage, desc->stride));
+    status_t err = gbuffer->initCheck();
+    if (err != 0 || gbuffer->handle == 0) return err;
+
+    *outBuffer = gbuffer;
+
+    return ::android::NO_ERROR;
+}
+
+void hgbp_describe(const AHardwareBuffer* buffer,
+        AHardwareBuffer_Desc* outDesc) {
+    if (!buffer || !outDesc) return;
+
+    const GraphicBuffer* gbuffer = hgbp_AHBuffer_to_GraphicBuffer(buffer);
+
+    outDesc->width = gbuffer->getWidth();
+    outDesc->height = gbuffer->getHeight();
+    outDesc->layers = gbuffer->getLayerCount();
+    outDesc->format = uint32_t(gbuffer->getPixelFormat());
+    outDesc->usage = uint64_t(gbuffer->getUsage());
+    outDesc->stride = gbuffer->getStride();
+    outDesc->rfu0 = 0;
+    outDesc->rfu1 = 0;
+}
+
+
+bool hgbp_h2b(HBuffer const& from, sp<GraphicBuffer>* to) {
+    AHardwareBuffer_Desc const* desc =
+            reinterpret_cast<AHardwareBuffer_Desc const*>(
+            from.description.data());
+    native_handle_t const* handle = from.nativeHandle;
+    if (hgbp_createFromHandle(desc, handle, to) != ::android::OK) {
+        return false;
+    }
+    return true;
+}
+
+bool hgbp_b2h(sp<GraphicBuffer> const& from, HBuffer* to,
+         uint32_t* toGenerationNumber) {
+    if (!from) {
+        return false;
+    }
+    AHardwareBuffer* hwBuffer = from->toAHardwareBuffer();
+    to->nativeHandle.setTo(
+          const_cast<native_handle_t*>(from->handle),
+          false);
+    hgbp_describe(
+            hwBuffer,
+            reinterpret_cast<AHardwareBuffer_Desc*>(to->description.data()));
+    if (toGenerationNumber) {
+        *toGenerationNumber = from->getGenerationNumber();
+    }
+    return true;
+}
+
+// End of hgbp methods for GraphicBuffer creation.
+
 bool getGenerationNumberAndUsage(const sp<HGraphicBufferProducer> &producer,
                                  uint32_t *generation, uint64_t *usage) {
     status_t status{};
@@ -211,7 +297,7 @@ bool getGenerationNumberAndUsage(const sp<HGraphicBufferProducer> &producer,
                     HBuffer const& hBuffer,
                     uint32_t generationNumber){
                 if (h2b(hStatus, &status) &&
-                        h2b(hBuffer, &slotBuffer) &&
+                        hgbp_h2b(hBuffer, &slotBuffer) &&
                         slotBuffer) {
                     *generation = generationNumber;
                     *usage = slotBuffer->getUsage();
@@ -402,7 +488,7 @@ private:
                             HBuffer const& hBuffer,
                             uint32_t generationNumber){
                         if (h2b(hStatus, &status) &&
-                                h2b(hBuffer, &slotBuffer) &&
+                                hgbp_h2b(hBuffer, &slotBuffer) &&
                                 slotBuffer) {
                             slotBuffer->setGenerationNumber(generationNumber);
                             outGeneration = generationNumber;
@@ -804,7 +890,7 @@ int C2BufferQueueBlockPoolData::migrate(
 
     HBuffer hBuffer{};
     uint32_t hGenerationNumber{};
-    if (!b2h(graphicBuffer, &hBuffer, &hGenerationNumber)) {
+    if (!hgbp_b2h(graphicBuffer, &hBuffer, &hGenerationNumber)) {
         ALOGD("I to O conversion failed");
         return -1;
     }
