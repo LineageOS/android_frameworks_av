@@ -80,6 +80,7 @@ struct ValueTraits : public BaseSerializerTraits<ValuePair, ValuePairs> {
     struct Attributes {
         static constexpr const char *literal = "literal";
         static constexpr const char *numerical = "numerical";
+        static constexpr const char *androidType = "android_type";
     };
 
     static android::status_t deserialize(_xmlDoc *doc, const _xmlNode *root,
@@ -349,7 +350,16 @@ status_t ValueTraits::deserialize(_xmlDoc */*doc*/, const _xmlNode *child, Colle
         ALOGE("%s: No attribute %s found", __FUNCTION__, Attributes::literal);
         return BAD_VALUE;
     }
-    uint32_t numerical = 0;
+    uint32_t androidType = 0;
+    std::string androidTypeliteral = getXmlAttribute(child, Attributes::androidType);
+    if (!androidTypeliteral.empty()) {
+        ALOGV("%s: androidType %s", __FUNCTION__, androidTypeliteral.c_str());
+        if (!convertTo(androidTypeliteral, androidType)) {
+            ALOGE("%s: : Invalid typeset value(%s)", __FUNCTION__, androidTypeliteral.c_str());
+            return BAD_VALUE;
+        }
+    }
+    uint64_t numerical = 0;
     std::string numericalTag = getXmlAttribute(child, Attributes::numerical);
     if (numericalTag.empty()) {
         ALOGE("%s: No attribute %s found", __FUNCTION__, Attributes::literal);
@@ -359,7 +369,7 @@ status_t ValueTraits::deserialize(_xmlDoc */*doc*/, const _xmlNode *child, Colle
         ALOGE("%s: : Invalid value(%s)", __FUNCTION__, numericalTag.c_str());
         return BAD_VALUE;
     }
-    values.push_back({numerical, literal});
+    values.push_back({numerical,  androidType, literal});
     return NO_ERROR;
 }
 
