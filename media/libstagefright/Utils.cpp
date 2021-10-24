@@ -1759,39 +1759,24 @@ status_t convertMessageToMetaData(const sp<AMessage> &msg, sp<MetaData> &meta) {
     if (mime.startsWith("video/") || mime.startsWith("image/")) {
         int32_t width;
         int32_t height;
-        if (!msg->findInt32("width", &width) || !msg->findInt32("height", &height)) {
+        if (msg->findInt32("width", &width) && msg->findInt32("height", &height)) {
+            meta->setInt32(kKeyWidth, width);
+            meta->setInt32(kKeyHeight, height);
+        } else {
             ALOGV("did not find width and/or height");
             return BAD_VALUE;
         }
-        if (width <= 0 || height <= 0) {
-            ALOGE("Invalid value of width: %d and/or height: %d", width, height);
-            return BAD_VALUE;
-        }
-        meta->setInt32(kKeyWidth, width);
-        meta->setInt32(kKeyHeight, height);
 
-        int32_t sarWidth = -1, sarHeight = -1;
-        bool foundWidth, foundHeight;
-        foundWidth = msg->findInt32("sar-width", &sarWidth);
-        foundHeight = msg->findInt32("sar-height", &sarHeight);
-        if (foundWidth || foundHeight) {
-            if (sarWidth <= 0 || sarHeight <= 0) {
-                ALOGE("Invalid value of sarWidth: %d and/or sarHeight: %d", sarWidth, sarHeight);
-                return BAD_VALUE;
-            }
+        int32_t sarWidth, sarHeight;
+        if (msg->findInt32("sar-width", &sarWidth)
+                && msg->findInt32("sar-height", &sarHeight)) {
             meta->setInt32(kKeySARWidth, sarWidth);
             meta->setInt32(kKeySARHeight, sarHeight);
         }
 
-        int32_t displayWidth = -1, displayHeight = -1;
-        foundWidth = msg->findInt32("display-width", &displayWidth);
-        foundHeight = msg->findInt32("display-height", &displayHeight);
-        if (foundWidth || foundHeight) {
-            if (displayWidth <= 0 || displayHeight <= 0) {
-                ALOGE("Invalid value of displayWidth: %d and/or displayHeight: %d",
-                        displayWidth, displayHeight);
-                return BAD_VALUE;
-            }
+        int32_t displayWidth, displayHeight;
+        if (msg->findInt32("display-width", &displayWidth)
+                && msg->findInt32("display-height", &displayHeight)) {
             meta->setInt32(kKeyDisplayWidth, displayWidth);
             meta->setInt32(kKeyDisplayHeight, displayHeight);
         }
@@ -1801,29 +1786,17 @@ status_t convertMessageToMetaData(const sp<AMessage> &msg, sp<MetaData> &meta) {
             if (msg->findInt32("is-default", &isPrimary) && isPrimary) {
                 meta->setInt32(kKeyTrackIsDefault, 1);
             }
-            int32_t tileWidth = -1, tileHeight = -1;
-            foundWidth = msg->findInt32("tile-width", &tileWidth);
-            foundHeight = msg->findInt32("tile-height", &tileHeight);
-            if (foundWidth || foundHeight) {
-                if (tileWidth <= 0 || tileHeight <= 0) {
-                    ALOGE("Invalid value of tileWidth: %d and/or tileHeight: %d",
-                            tileWidth, tileHeight);
-                    return BAD_VALUE;
-                }
+            int32_t tileWidth, tileHeight, gridRows, gridCols;
+            if (msg->findInt32("tile-width", &tileWidth)) {
                 meta->setInt32(kKeyTileWidth, tileWidth);
+            }
+            if (msg->findInt32("tile-height", &tileHeight)) {
                 meta->setInt32(kKeyTileHeight, tileHeight);
             }
-            int32_t gridRows = -1, gridCols = -1;
-            bool foundRows, foundCols;
-            foundRows = msg->findInt32("grid-rows", &gridRows);
-            foundCols = msg->findInt32("grid-cols", &gridCols);
-            if (foundRows || foundCols) {
-                if (gridRows <= 0 || gridCols <= 0) {
-                    ALOGE("Invalid value of gridRows: %d and/or gridCols: %d",
-                            gridRows, gridCols);
-                    return BAD_VALUE;
-                }
+            if (msg->findInt32("grid-rows", &gridRows)) {
                 meta->setInt32(kKeyGridRows, gridRows);
+            }
+            if (msg->findInt32("grid-cols", &gridCols)) {
                 meta->setInt32(kKeyGridCols, gridCols);
             }
         }
@@ -1839,14 +1812,6 @@ status_t convertMessageToMetaData(const sp<AMessage> &msg, sp<MetaData> &meta) {
                           &cropTop,
                           &cropRight,
                           &cropBottom)) {
-            if (cropLeft < 0 || cropLeft > cropRight || cropRight >= width) {
-                ALOGE("Invalid value of cropLeft: %d and/or cropRight: %d", cropLeft, cropRight);
-                return BAD_VALUE;
-            }
-            if (cropTop < 0 || cropTop > cropBottom || cropBottom >= height) {
-                ALOGE("Invalid value of cropTop: %d and/or cropBottom: %d", cropTop, cropBottom);
-                return BAD_VALUE;
-            }
             meta->setRect(kKeyCropRect, cropLeft, cropTop, cropRight, cropBottom);
         }
 
@@ -1890,19 +1855,10 @@ status_t convertMessageToMetaData(const sp<AMessage> &msg, sp<MetaData> &meta) {
             ALOGV("did not find channel-count and/or sample-rate");
             return BAD_VALUE;
         }
-        if (sampleRate <= 0 || numChannels <= 0) {
-            ALOGE("Invalid value of channel-count: %d and/or sample-rate: %d",
-                   numChannels, sampleRate);
-            return BAD_VALUE;
-        }
         meta->setInt32(kKeyChannelCount, numChannels);
         meta->setInt32(kKeySampleRate, sampleRate);
         int32_t bitsPerSample;
         if (msg->findInt32("bits-per-sample", &bitsPerSample)) {
-            if (bitsPerSample <= 0) {
-                ALOGE("Invalid value of bitsPerSample: %d", bitsPerSample);
-                return BAD_VALUE;
-            }
             meta->setInt32(kKeyBitsPerSample, bitsPerSample);
         }
         int32_t channelMask;
