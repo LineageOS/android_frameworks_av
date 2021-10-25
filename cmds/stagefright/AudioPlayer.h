@@ -19,7 +19,6 @@
 #define AUDIO_PLAYER_H_
 
 #include <media/AudioResamplerPublic.h>
-#include <media/AudioTrack.h>
 #include <media/stagefright/MediaSource.h>
 #include <media/MediaPlayerInterface.h>
 #include <media/stagefright/MediaBuffer.h>
@@ -27,9 +26,10 @@
 
 namespace android {
 
+class AudioTrack;
 struct AwesomePlayer;
 
-class AudioPlayer : AudioTrack::IAudioTrackCallback {
+class AudioPlayer {
 public:
     enum {
         REACHED_EOS,
@@ -66,9 +66,6 @@ public:
     status_t getPlaybackRate(AudioPlaybackRate *rate /* nonnull */);
 
 private:
-    friend sp<AudioPlayer>;
-    size_t onMoreData(const AudioTrack::Buffer& buffer) override;
-    void onStreamEnd() override;
     sp<MediaSource> mSource;
     sp<AudioTrack> mAudioTrack;
 
