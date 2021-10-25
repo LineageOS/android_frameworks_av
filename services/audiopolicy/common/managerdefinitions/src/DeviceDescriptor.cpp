@@ -54,7 +54,7 @@ DeviceDescriptor::DeviceDescriptor(audio_devices_t type,
 DeviceDescriptor::DeviceDescriptor(const AudioDeviceTypeAddr &deviceTypeAddr,
                                    const std::string &tagName,
                                    const FormatVector &encodedFormats) :
-        DeviceDescriptorBase(deviceTypeAddr), mTagName(tagName), mEncodedFormats(encodedFormats),
+        DeviceDescriptorBase(deviceTypeAddr, encodedFormats), mTagName(tagName),
         mDeclaredAddress(DeviceDescriptorBase::address())
 {
     mCurrentEncodedFormat = AUDIO_FORMAT_DEFAULT;
@@ -107,20 +107,6 @@ bool DeviceDescriptor::hasCurrentEncodedFormat() const
     }
 
     return (mCurrentEncodedFormat != AUDIO_FORMAT_DEFAULT);
-}
-
-bool DeviceDescriptor::supportsFormat(audio_format_t format)
-{
-    if (mEncodedFormats.empty()) {
-        return true;
-    }
-
-    for (const auto& devFormat : mEncodedFormats) {
-        if (devFormat == format) {
-            return true;
-        }
-    }
-    return false;
 }
 
 status_t DeviceDescriptor::applyAudioPortConfig(const struct audio_port_config *config,

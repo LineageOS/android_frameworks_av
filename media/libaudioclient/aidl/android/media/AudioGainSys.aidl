@@ -24,5 +24,4 @@ package android.media;
 parcelable AudioGainSys {
     int index;
     boolean isInput;
-    boolean useForVolume;
 }

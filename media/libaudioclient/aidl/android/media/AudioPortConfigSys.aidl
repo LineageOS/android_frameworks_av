@@ -16,7 +16,6 @@
 
 package android.media;
 
-import android.media.AudioIoFlags;
 import android.media.AudioPortExtSys;
 import android.media.AudioPortRole;
 import android.media.AudioPortType;
@@ -29,7 +28,5 @@ parcelable AudioPortConfigSys {
     AudioPortRole role;
     /** Device, mix ... */
     AudioPortType type;
-    /** Flags: HW_AV_SYNC, DIRECT, ... Can be left unspecified. */
-    @nullable AudioIoFlags flags;
     AudioPortExtSys ext;
 }
