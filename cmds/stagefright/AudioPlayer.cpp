@@ -249,8 +249,7 @@ status_t AudioPlayer::start(bool sourceAlreadyStarted) {
 
         mAudioTrack = new AudioTrack(
                 AUDIO_STREAM_MUSIC, mSampleRate, AUDIO_FORMAT_PCM_16_BIT, audioMask,
-                0 /*frameCount*/, AUDIO_OUTPUT_FLAG_NONE,
-                wp<IAudioTrackCallback>::fromExisting(this),
+                0 /*frameCount*/, AUDIO_OUTPUT_FLAG_NONE, &AudioCallback, this,
                 0 /*notificationFrames*/);
 
         if ((err = mAudioTrack->initCheck()) != OK) {
@@ -398,6 +397,10 @@ void AudioPlayer::reset() {
     mStartPosUs = 0;
 }
 
+// static
+void AudioPlayer::AudioCallback(int event, void *user, void *info) {
+    static_cast<AudioPlayer *>(user)->AudioCallback(event, info);
+}
 
 bool AudioPlayer::reachedEOS(status_t *finalStatus) {
     *finalStatus = OK;
@@ -452,12 +455,20 @@ size_t AudioPlayer::AudioSinkCallback(
     return 0;
 }
 
-size_t AudioPlayer::onMoreData(const AudioTrack::Buffer& buffer) {
-    return fillBuffer(buffer.raw, buffer.size);
-}
+void AudioPlayer::AudioCallback(int event, void *info) {
+    switch (event) {
+    case AudioTrack::EVENT_MORE_DATA:
+        {
+        AudioTrack::Buffer *buffer = (AudioTrack::Buffer *)info;
+        size_t numBytesWritten = fillBuffer(buffer->raw, buffer->size);
+        buffer->size = numBytesWritten;
+        }
+        break;
 
-void AudioPlayer::onStreamEnd() {
-    mReachedEOS = true;
+    case AudioTrack::EVENT_STREAM_END:
+        mReachedEOS = true;
+        break;
+    }
 }
 
 size_t AudioPlayer::fillBuffer(void *data, size_t size) {
