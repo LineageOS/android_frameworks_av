@@ -166,9 +166,9 @@ int main(int argc, char* argv[])
         sp<MediaSource> decoder = SimpleDecodingSource::Create(encoder);
 
         if (playToSpeaker) {
-            sp<AudioPlayer> player = sp<AudioPlayer>::make(nullptr);
-            player->setSource(decoder);
-            player->start();
+            AudioPlayer player(NULL);
+            player.setSource(decoder);
+            player.start();
             sleep(duration);
 
 ALOGI("Line: %d", __LINE__);
