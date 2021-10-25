@@ -32,6 +32,7 @@
 #include <media/stagefright/SimpleDecodingSource.h>
 #include <media/MediaPlayerInterface.h>
 
+#include "AudioPlayer.h"
 
 using namespace android;
 
@@ -272,6 +273,17 @@ int main(int /* argc */, char ** /* argv */) {
     const int32_t kSampleRate = 22050;
     const int32_t kNumChannels = 2;
     sp<MediaSource> audioSource = new SineSource(kSampleRate, kNumChannels);
+
+#if 0
+    sp<MediaPlayerBase::AudioSink> audioSink;
+    AudioPlayer *player = new AudioPlayer(audioSink);
+    player->setSource(audioSource);
+    player->start();
+
+    sleep(10);
+
+    player->stop();
+#endif
 
     sp<AMessage> encMeta = new AMessage;
     encMeta->setString("mime",
