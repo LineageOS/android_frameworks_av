@@ -33,6 +33,7 @@ public:
     virtual bool isOffload() const = 0;
     virtual bool isOffloadOrDirect() const = 0;
     virtual bool isOffloadOrMmap() const = 0;
+    virtual bool isSpatializer() const = 0;
     virtual uint32_t sampleRate() const = 0;
     virtual audio_channel_mask_t inChannelMask(int id) const = 0;
     virtual uint32_t inChannelCount(int id) const = 0;
@@ -576,6 +577,7 @@ private:
         bool isOffload() const override;
         bool isOffloadOrDirect() const override;
         bool isOffloadOrMmap() const override;
+        bool isSpatializer() const override;
 
         uint32_t sampleRate() const override;
         audio_channel_mask_t inChannelMask(int id) const override;
@@ -608,14 +610,16 @@ private:
 
         wp<ThreadBase> thread() const { return mThread.load(); }
 
-        void setThread(const wp<ThreadBase>& thread) {
+        void setThread(const sp<ThreadBase>& thread) {
             mThread = thread;
+            mThreadType = thread->type();
         }
 
     private:
         const wp<EffectChain> mChain;
         mediautils::atomic_wp<ThreadBase> mThread;
         AudioFlinger &mAudioFlinger;  // implementation detail: outer instance always exists.
+        ThreadBase::type_t mThreadType;
     };
 
     friend class AudioFlinger;  // for mThread, mEffects
@@ -651,6 +655,8 @@ private:
     bool hasVolumeControlEnabled_l() const;
 
     void setVolumeForOutput_l(uint32_t left, uint32_t right);
+
+    ssize_t getInsertIndex(const effect_descriptor_t& desc);
 
     mutable  Mutex mLock;        // mutex protecting effect list
              Vector< sp<EffectModule> > mEffects; // list of effect modules
@@ -732,6 +738,7 @@ private:
         bool isOffload() const override { return false; }
         bool isOffloadOrDirect() const override { return false; }
         bool isOffloadOrMmap() const override { return false; }
+        bool isSpatializer() const override { return false; }
 
         uint32_t sampleRate() const override;
         audio_channel_mask_t inChannelMask(int id) const override;
