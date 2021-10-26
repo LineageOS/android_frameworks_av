@@ -460,6 +460,7 @@ sp<DeviceDescriptor> Engine::getDeviceForInputSource(audio_source_t inputSource)
         case AUDIO_SOURCE_HOTWORD:
         case AUDIO_SOURCE_CAMCORDER:
         case AUDIO_SOURCE_VOICE_PERFORMANCE:
+        case AUDIO_SOURCE_ULTRASOUND:
             inputSource = AUDIO_SOURCE_VOICE_COMMUNICATION;
             break;
         default:
@@ -585,6 +586,10 @@ sp<DeviceDescriptor> Engine::getDeviceForInputSource(audio_source_t inputSource)
     case AUDIO_SOURCE_ECHO_REFERENCE:
         device = availableDevices.getDevice(
                 AUDIO_DEVICE_IN_ECHO_REFERENCE, String8(""), AUDIO_FORMAT_DEFAULT);
+        break;
+    case AUDIO_SOURCE_ULTRASOUND:
+        device = availableDevices.getFirstExistingDevice({
+                AUDIO_DEVICE_IN_BUILTIN_MIC, AUDIO_DEVICE_IN_BACK_MIC});
         break;
     default:
         ALOGW("getDeviceForInputSource() invalid input source %d", inputSource);
