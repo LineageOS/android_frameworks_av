@@ -20,6 +20,7 @@
 #include <stdint.h>
 #include <sys/types.h>
 
+#include <audio_utils/ChannelMix.h>
 #include <media/AudioBufferProvider.h>
 #include <media/AudioResamplerPublic.h>
 #include <system/audio.h>
@@ -127,6 +128,23 @@ protected:
     // FIXME: should we allow effects outside of the framework?
     // We need to here. A special ioId that must be <= -2 so it does not map to a session.
     static const int32_t SESSION_ID_INVALID_AND_IGNORED = -2;
+};
+
+// ChannelMixBufferProvider derives from CopyBufferProvider to perform an
+// downmix to the proper channel count and mask.
+class ChannelMixBufferProvider : public CopyBufferProvider {
+public:
+    ChannelMixBufferProvider(audio_channel_mask_t inputChannelMask,
+            audio_channel_mask_t outputChannelMask, audio_format_t format,
+            size_t bufferFrameCount);
+
+    void copyFrames(void *dst, const void *src, size_t frames) override;
+
+    bool isValid() const { return mIsValid; }
+
+protected:
+    audio_utils::channels::ChannelMix mChannelMix;
+    bool mIsValid = false;
 };
 
 // RemixBufferProvider derives from CopyBufferProvider to perform an
