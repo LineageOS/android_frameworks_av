@@ -193,6 +193,24 @@ status_t AudioMixer::Track::prepareForDownmix()
         // mDownmixerBufferProvider reset below.
     }
 
+    // See if we should use our built-in non-effect downmixer.
+    if (mMixerInFormat == AUDIO_FORMAT_PCM_FLOAT
+            && mMixerChannelMask == AUDIO_CHANNEL_OUT_STEREO
+            && audio_channel_mask_get_representation(channelMask)
+                    == AUDIO_CHANNEL_REPRESENTATION_POSITION) {
+        mDownmixerBufferProvider.reset(new ChannelMixBufferProvider(channelMask,
+                mMixerChannelMask, mMixerInFormat, kCopyBufferFrameCount));
+        if (static_cast<ChannelMixBufferProvider *>(mDownmixerBufferProvider.get())
+                ->isValid()) {
+            mDownmixRequiresFormat = mMixerInFormat;
+            reconfigureBufferProviders();
+            ALOGD("%s: Fallback using ChannelMix", __func__);
+            return NO_ERROR;
+        } else {
+            ALOGD("%s: ChannelMix not supported for channel mask %#x", __func__, channelMask);
+        }
+    }
+
     // Effect downmixer does not accept the channel conversion.  Let's use our remixer.
     mDownmixerBufferProvider.reset(new RemixBufferProvider(channelMask,
             mMixerChannelMask, mMixerInFormat, kCopyBufferFrameCount));
