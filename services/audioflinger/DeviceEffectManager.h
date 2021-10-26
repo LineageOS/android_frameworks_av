@@ -162,6 +162,7 @@ public:
     bool isOffload() const override { return false; }
     bool isOffloadOrDirect() const override { return false; }
     bool isOffloadOrMmap() const override { return false; }
+    bool isSpatializer() const override { return false; }
 
     uint32_t  sampleRate() const override { return 0; }
     audio_channel_mask_t inChannelMask(int id __unused) const override {
