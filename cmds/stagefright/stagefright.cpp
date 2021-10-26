@@ -220,7 +220,7 @@ static void playSource(sp<MediaSource> &source) {
     }
 
     if (gPlaybackAudio) {
-        sp<AudioPlayer> player = sp<AudioPlayer>::make(nullptr);
+        AudioPlayer *player = new AudioPlayer(NULL);
         player->setSource(rawSource);
         rawSource.clear();
 
@@ -234,6 +234,9 @@ static void playSource(sp<MediaSource> &source) {
         } else {
             fprintf(stderr, "unable to start playback err=%d (0x%08x)\n", err, err);
         }
+
+        delete player;
+        player = NULL;
 
         return;
     } else if (gReproduceBug >= 3 && gReproduceBug <= 5) {
