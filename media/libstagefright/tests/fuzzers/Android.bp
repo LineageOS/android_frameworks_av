@@ -74,6 +74,7 @@ cc_fuzz {
     srcs: [
         "FrameDecoderFuzzer.cpp",
     ],
+    corpus: ["corpus/*"],
     defaults: ["libstagefright_fuzzer_defaults"],
 }
 
