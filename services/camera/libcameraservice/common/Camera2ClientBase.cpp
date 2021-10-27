@@ -155,6 +155,38 @@ status_t Camera2ClientBase<TClientBase>::dumpClient(int fd,
 }
 
 template <typename TClientBase>
+status_t Camera2ClientBase<TClientBase>::startWatchingTags(const String8 &tags, int out) {
+  sp<CameraDeviceBase> device = mDevice;
+  if (!device) {
+    dprintf(out, "  Device is detached");
+    return OK;
+  }
+
+  return device->startWatchingTags(tags);
+}
+
+template <typename TClientBase>
+status_t Camera2ClientBase<TClientBase>::stopWatchingTags(int out) {
+  sp<CameraDeviceBase> device = mDevice;
+  if (!device) {
+    dprintf(out, "  Device is detached");
+    return OK;
+  }
+
+  return device->stopWatchingTags();
+}
+
+template <typename TClientBase>
+status_t Camera2ClientBase<TClientBase>::dumpWatchedEventsToVector(std::vector<std::string> &out) {
+    sp<CameraDeviceBase> device = mDevice;
+    if (!device) {
+        // Nothing to dump if the device is detached
+        return OK;
+    }
+    return device->dumpWatchedEventsToVector(out);
+}
+
+template <typename TClientBase>
 status_t Camera2ClientBase<TClientBase>::dumpDevice(
                                                 int fd,
                                                 const Vector<String16>& args) {
