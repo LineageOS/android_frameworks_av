@@ -36,15 +36,20 @@ class DeviceDescriptorBase : public AudioPort, public AudioPortConfig
 public:
      // Note that empty name refers by convention to a generic device.
     explicit DeviceDescriptorBase(audio_devices_t type);
-    DeviceDescriptorBase(audio_devices_t type, const std::string& address);
-    explicit DeviceDescriptorBase(const AudioDeviceTypeAddr& deviceTypeAddr);
+    DeviceDescriptorBase(audio_devices_t type, const std::string& address,
+            const FormatVector &encodedFormats = FormatVector{});
+    DeviceDescriptorBase(const AudioDeviceTypeAddr& deviceTypeAddr,
+            const FormatVector &encodedFormats = FormatVector{});
 
-    virtual ~DeviceDescriptorBase() {}
+    virtual ~DeviceDescriptorBase() = default;
 
     audio_devices_t type() const { return mDeviceTypeAddr.mType; }
     const std::string& address() const { return mDeviceTypeAddr.address(); }
     void setAddress(const std::string &address);
     const AudioDeviceTypeAddr& getDeviceTypeAddr() const { return mDeviceTypeAddr; }
+
+    const FormatVector& encodedFormats() const { return mEncodedFormats; }
+    bool supportsFormat(audio_format_t format);
 
     // AudioPortConfig
     virtual sp<AudioPort> getAudioPort() const {
@@ -82,6 +87,7 @@ public:
 
 protected:
     AudioDeviceTypeAddr mDeviceTypeAddr;
+    FormatVector        mEncodedFormats;
     uint32_t mEncapsulationModes = 0;
     uint32_t mEncapsulationMetadataTypes = 0;
 private:

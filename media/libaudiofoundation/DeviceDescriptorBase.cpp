@@ -30,16 +30,20 @@ DeviceDescriptorBase::DeviceDescriptorBase(audio_devices_t type) :
 {
 }
 
-DeviceDescriptorBase::DeviceDescriptorBase(audio_devices_t type, const std::string& address) :
-        DeviceDescriptorBase(AudioDeviceTypeAddr(type, address))
+DeviceDescriptorBase::DeviceDescriptorBase(
+        audio_devices_t type, const std::string& address,
+        const FormatVector &encodedFormats) :
+        DeviceDescriptorBase(AudioDeviceTypeAddr(type, address), encodedFormats)
 {
 }
 
-DeviceDescriptorBase::DeviceDescriptorBase(const AudioDeviceTypeAddr &deviceTypeAddr) :
+DeviceDescriptorBase::DeviceDescriptorBase(
+        const AudioDeviceTypeAddr &deviceTypeAddr, const FormatVector &encodedFormats) :
         AudioPort("", AUDIO_PORT_TYPE_DEVICE,
                   audio_is_output_device(deviceTypeAddr.mType) ? AUDIO_PORT_ROLE_SINK :
                                          AUDIO_PORT_ROLE_SOURCE),
-        mDeviceTypeAddr(deviceTypeAddr)
+        mDeviceTypeAddr(deviceTypeAddr),
+        mEncodedFormats(encodedFormats)
 {
     if (mDeviceTypeAddr.address().empty() && audio_is_remote_submix_device(mDeviceTypeAddr.mType)) {
         mDeviceTypeAddr.setAddress("0");
@@ -148,12 +152,35 @@ void DeviceDescriptorBase::log() const
     AudioPort::log("  ");
 }
 
+template<typename T>
+bool checkEqual(const T& f1, const T& f2)
+{
+    std::set<typename T::value_type> s1(f1.begin(), f1.end());
+    std::set<typename T::value_type> s2(f2.begin(), f2.end());
+    return s1 == s2;
+}
+
 bool DeviceDescriptorBase::equals(const sp<DeviceDescriptorBase> &other) const
 {
     return other != nullptr &&
            static_cast<const AudioPort*>(this)->equals(other) &&
            static_cast<const AudioPortConfig*>(this)->equals(other) &&
-           mDeviceTypeAddr.equals(other->mDeviceTypeAddr);
+           mDeviceTypeAddr.equals(other->mDeviceTypeAddr) &&
+           checkEqual(mEncodedFormats, other->mEncodedFormats);
+}
+
+bool DeviceDescriptorBase::supportsFormat(audio_format_t format)
+{
+    if (mEncodedFormats.empty()) {
+        return true;
+    }
+
+    for (const auto& devFormat : mEncodedFormats) {
+        if (devFormat == format) {
+            return true;
+        }
+    }
+    return false;
 }
 
 
@@ -169,9 +196,13 @@ status_t DeviceDescriptorBase::writeToParcelable(media::AudioPort* parcelable) c
     AudioPortConfig::writeToParcelable(&parcelable->hal.activeConfig, useInputChannelMask());
     parcelable->hal.id = VALUE_OR_RETURN_STATUS(legacy2aidl_audio_port_handle_t_int32_t(mId));
 
-    media::audio::common::AudioDevice device = VALUE_OR_RETURN_STATUS(
+    media::audio::common::AudioPortDeviceExt deviceExt;
+    deviceExt.device = VALUE_OR_RETURN_STATUS(
             legacy2aidl_AudioDeviceTypeAddress(mDeviceTypeAddr));
-    UNION_SET(parcelable->hal.ext, device, device);
+    deviceExt.encodedFormats = VALUE_OR_RETURN_STATUS(
+            convertContainer<std::vector<media::audio::common::AudioFormatDescription>>(
+                    mEncodedFormats, legacy2aidl_audio_format_t_AudioFormatDescription));
+    UNION_SET(parcelable->hal.ext, device, deviceExt);
     media::AudioPortDeviceExtSys deviceSys;
     deviceSys.encapsulationModes = VALUE_OR_RETURN_STATUS(
             legacy2aidl_AudioEncapsulationMode_mask(mEncapsulationModes));
@@ -198,10 +229,13 @@ status_t DeviceDescriptorBase::readFromParcelable(const media::AudioPort& parcel
         return status;
     }
 
-    media::audio::common::AudioDevice device = VALUE_OR_RETURN_STATUS(
+    media::audio::common::AudioPortDeviceExt deviceExt = VALUE_OR_RETURN_STATUS(
             UNION_GET(parcelable.hal.ext, device));
     mDeviceTypeAddr = VALUE_OR_RETURN_STATUS(
-            aidl2legacy_AudioDeviceTypeAddress(device));
+            aidl2legacy_AudioDeviceTypeAddress(deviceExt.device));
+    mEncodedFormats = VALUE_OR_RETURN_STATUS(
+            convertContainer<FormatVector>(deviceExt.encodedFormats,
+                    aidl2legacy_AudioFormatDescription_audio_format_t));
     media::AudioPortDeviceExtSys deviceSys = VALUE_OR_RETURN_STATUS(
             UNION_GET(parcelable.sys.ext, device));
     mEncapsulationModes = VALUE_OR_RETURN_STATUS(

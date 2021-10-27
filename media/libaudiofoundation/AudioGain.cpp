@@ -122,20 +122,20 @@ bool AudioGain::equals(const sp<AudioGain>& other) const
 ConversionResult<AudioGain::Aidl> AudioGain::toParcelable() const {
     media::audio::common::AudioGain aidl = VALUE_OR_RETURN(
             legacy2aidl_audio_gain_AudioGain(mGain, mIsInput));
+    aidl.useForVolume = mUseForVolume;
     media::AudioGainSys aidlSys;
     aidlSys.index = VALUE_OR_RETURN(convertIntegral<int32_t>(mIndex));
     aidlSys.isInput = mIsInput;
-    aidlSys.useForVolume = mUseForVolume;
     return std::make_pair(aidl, aidlSys);
 }
 
 ConversionResult<sp<AudioGain>> AudioGain::fromParcelable(const AudioGain::Aidl& aidl) {
+    const media::audio::common::AudioGain& hal = aidl.first;
     const media::AudioGainSys& sys = aidl.second;
     auto index = VALUE_OR_RETURN(convertIntegral<int>(sys.index));
     sp<AudioGain> legacy = sp<AudioGain>::make(index, sys.isInput);
-    legacy->mGain = VALUE_OR_RETURN(
-            aidl2legacy_AudioGain_audio_gain(aidl.first, sys.isInput));
-    legacy->mUseForVolume = sys.useForVolume;
+    legacy->mGain = VALUE_OR_RETURN(aidl2legacy_AudioGain_audio_gain(hal, sys.isInput));
+    legacy->mUseForVolume = hal.useForVolume;
     return legacy;
 }
 

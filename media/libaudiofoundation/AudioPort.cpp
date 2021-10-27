@@ -219,6 +219,14 @@ status_t AudioPort::writeToParcelable(media::AudioPort* parcelable) const {
     auto aidlGains = VALUE_OR_RETURN_STATUS(legacy2aidl_AudioGains(mGains));
     parcelable->hal.gains = aidlGains.first;
     parcelable->sys.gains = aidlGains.second;
+    if (mType == AUDIO_PORT_TYPE_MIX) {
+        media::audio::common::AudioPortMixExt mixExt{};
+        mixExt.maxOpenStreamCount = maxOpenCount;
+        mixExt.maxActiveStreamCount = maxActiveCount;
+        mixExt.recommendedMuteDurationMs = recommendedMuteDurationMs;
+        parcelable->hal.ext = media::audio::common::AudioPortExt::make<
+                media::audio::common::AudioPortExt::mix>(mixExt);
+    }
     return OK;
 }
 
@@ -241,6 +249,13 @@ status_t AudioPort::readFromParcelable(const media::AudioPort& parcelable) {
     mExtraAudioDescriptors = parcelable.hal.extraAudioDescriptors;
     mGains = VALUE_OR_RETURN_STATUS(
             aidl2legacy_AudioGains(std::make_pair(parcelable.hal.gains, parcelable.sys.gains)));
+    if (mType == AUDIO_PORT_TYPE_MIX) {
+        const media::audio::common::AudioPortMixExt& mixExt =
+                parcelable.hal.ext.get<media::audio::common::AudioPortExt::mix>();
+        maxOpenCount = mixExt.maxOpenStreamCount;
+        maxActiveCount = mixExt.maxActiveStreamCount;
+        recommendedMuteDurationMs = mixExt.recommendedMuteDurationMs;
+    }
     return OK;
 }
 
