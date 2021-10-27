@@ -29,7 +29,9 @@
 #include <hardware/camera.h>
 
 #include <common/CameraProviderManager.h>
+#ifdef QTI_CAMERA_DEVICE
 #include <vendor/qti/hardware/camera/device/1.0/IQCameraDeviceCallback.h>
+#endif
 
 namespace android {
 
@@ -86,7 +88,11 @@ typedef void (*data_callback_timestamp_batch)(
 
 class CameraHardwareInterface :
         public virtual RefBase,
+#ifdef QTI_CAMERA_DEVICE
         public virtual vendor::qti::hardware::camera::device::V1_0::IQCameraDeviceCallback,
+#else
+        public virtual hardware::camera::device::V1_0::ICameraDeviceCallback,
+#endif
         public virtual hardware::camera::device::V1_0::ICameraDevicePreviewCallback {
 
 public:
@@ -396,10 +402,12 @@ private:
             hardware::camera::device::V1_0::DataCallbackMsg msgType,
             const hardware::hidl_vec<
                     hardware::camera::device::V1_0::HandleTimestampMessage>&) override;
+#ifdef QTI_CAMERA_DEVICE
     hardware::Return<void> QDataCallback(
             hardware::camera::device::V1_0::DataCallbackMsg msgType,
             uint32_t data, uint32_t bufferIndex,
             const vendor::qti::hardware::camera::device::V1_0::QCameraFrameMetadata& metadata) override;
+#endif
 
     /**
      * Implementation of android::hardware::camera::device::V1_0::ICameraDevicePreviewCallback
