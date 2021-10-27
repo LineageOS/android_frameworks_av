@@ -364,6 +364,29 @@ void RemixBufferProvider::copyFrames(void *dst, const void *src, size_t frames)
             src, mInputChannels, mIdxAry, mSampleSize, frames);
 }
 
+ChannelMixBufferProvider::ChannelMixBufferProvider(audio_channel_mask_t inputChannelMask,
+        audio_channel_mask_t outputChannelMask, audio_format_t format,
+        size_t bufferFrameCount) :
+        CopyBufferProvider(
+                audio_bytes_per_sample(format)
+                    * audio_channel_count_from_out_mask(inputChannelMask),
+                audio_bytes_per_sample(format)
+                    * audio_channel_count_from_out_mask(outputChannelMask),
+                bufferFrameCount)
+{
+    ALOGV("ChannelMixBufferProvider(%p)(%#x, %#x, %#x)",
+            this, format, inputChannelMask, outputChannelMask);
+    if (outputChannelMask == AUDIO_CHANNEL_OUT_STEREO && format == AUDIO_FORMAT_PCM_FLOAT) {
+        mIsValid = mChannelMix.setInputChannelMask(inputChannelMask);
+    }
+}
+
+void ChannelMixBufferProvider::copyFrames(void *dst, const void *src, size_t frames)
+{
+    mChannelMix.process(static_cast<const float *>(src), static_cast<float *>(dst),
+            frames, false /* accumulate */);
+}
+
 ReformatBufferProvider::ReformatBufferProvider(int32_t channelCount,
         audio_format_t inputFormat, audio_format_t outputFormat,
         size_t bufferFrameCount) :

@@ -43,15 +43,13 @@ public:
     DeviceDescriptor(const AudioDeviceTypeAddr &deviceTypeAddr, const std::string &tagName = "",
             const FormatVector &encodedFormats = FormatVector{});
 
-    virtual ~DeviceDescriptor() {}
+    virtual ~DeviceDescriptor() = default;
 
     virtual void addAudioProfile(const sp<AudioProfile> &profile) {
         addAudioProfileAndSort(mProfiles, profile);
     }
 
     virtual const std::string getTagName() const { return mTagName; }
-
-    const FormatVector& encodedFormats() const { return mEncodedFormats; }
 
     audio_format_t getEncodedFormat() { return mCurrentEncodedFormat; }
 
@@ -62,8 +60,6 @@ public:
     bool equals(const sp<DeviceDescriptor>& other) const;
 
     bool hasCurrentEncodedFormat() const;
-
-    bool supportsFormat(audio_format_t format);
 
     void setDynamic() { mIsDynamic = true; }
     bool isDynamic() const { return mIsDynamic; }
@@ -106,7 +102,6 @@ private:
     }
 
     std::string mTagName; // Unique human readable identifier for a device port found in conf file.
-    FormatVector        mEncodedFormats;
     audio_format_t      mCurrentEncodedFormat;
     bool                mIsDynamic = false;
     const std::string   mDeclaredAddress; // Original device address

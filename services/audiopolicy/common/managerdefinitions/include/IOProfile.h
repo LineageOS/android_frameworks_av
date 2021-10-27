@@ -37,9 +37,7 @@ class IOProfile : public AudioPort, public PolicyAudioPort
 public:
     IOProfile(const std::string &name, audio_port_role_t role)
         : AudioPort(name, AUDIO_PORT_TYPE_MIX, role),
-          maxOpenCount(1),
           curOpenCount(0),
-          maxActiveCount(1),
           curActiveCount(0) {}
 
     virtual ~IOProfile() = default;
@@ -194,21 +192,11 @@ public:
         return false;
     }
 
-    // Maximum number of input or output streams that can be simultaneously opened for this profile.
-    // By convention 0 means no limit. To respect legacy behavior, initialized to 1 for output
-    // profiles and 0 for input profiles
-    uint32_t     maxOpenCount;
     // Number of streams currently opened for this profile.
     uint32_t     curOpenCount;
-    // Maximum number of input or output streams that can be simultaneously active for this profile.
-    // By convention 0 means no limit. To respect legacy behavior, initialized to 0 for output
-    // profiles and 1 for input profiles
-    uint32_t     maxActiveCount;
     // Number of streams currently active for this profile. This is not the number of active clients
     // (AudioTrack or AudioRecord) but the number of active HAL streams.
     uint32_t     curActiveCount;
-    // Mute duration while changing device on this output profile.
-    uint32_t     recommendedMuteDurationMs = 0;
 
 private:
     DeviceVector mSupportedDevices; // supported devices: this input/output can be routed from/to

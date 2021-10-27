@@ -106,6 +106,21 @@ public:
     status_t readFromParcelable(const media::AudioPort& parcelable);
 
     AudioGains mGains; // gain controllers
+    // Maximum number of input or output streams that can be simultaneously
+    // opened for this profile. By convention 0 means no limit. To respect
+    // legacy behavior, initialized to 1 for output profiles and 0 for input
+    // profiles
+    // FIXME: IOProfile code used the same value for both cases.
+    uint32_t maxOpenCount = 1;
+    // Maximum number of input or output streams that can be simultaneously
+    // active for this profile. By convention 0 means no limit. To respect
+    // legacy behavior, initialized to 0 for output profiles and 1 for input
+    // profiles
+    // FIXME: IOProfile code used the same value for both cases.
+    uint32_t maxActiveCount = 1;
+    // Mute duration while changing device on this output profile.
+    uint32_t recommendedMuteDurationMs = 0;
+
 protected:
     std::string  mName;
     audio_port_type_t mType;
