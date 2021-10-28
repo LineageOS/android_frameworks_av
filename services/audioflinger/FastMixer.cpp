@@ -89,6 +89,7 @@ FastMixer::FastMixer(audio_io_handle_t parentIoHandle)
     // TODO: Add channel mask to NBAIO_Format.
     // We assume that the channel mask must be a valid positional channel mask.
     mSinkChannelMask = getChannelMaskFromCount(mSinkChannelCount);
+    mBalance.setChannelMask(mSinkChannelMask);
 
     unsigned i;
     for (i = 0; i < FastMixerState::sMaxFastTracks; ++i) {
