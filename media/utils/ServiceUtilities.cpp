@@ -71,6 +71,7 @@ int32_t getOpForSource(audio_source_t source) {
   switch (source) {
     case AUDIO_SOURCE_HOTWORD:
       return AppOpsManager::OP_RECORD_AUDIO_HOTWORD;
+    case AUDIO_SOURCE_ECHO_REFERENCE: // fallthrough
     case AUDIO_SOURCE_REMOTE_SUBMIX:
       return AppOpsManager::OP_RECORD_AUDIO_OUTPUT;
     case AUDIO_SOURCE_VOICE_DOWNLINK:
