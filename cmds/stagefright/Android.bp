@@ -1,0 +1,261 @@
+cc_binary {
+    name: "stagefright",
+
+    srcs: [
+        "AudioPlayer.cpp",
+        "stagefright.cpp",
+        "jpeg.cpp",
+        "SineSource.cpp",
+    ],
+
+    header_libs: [
+        "libmediametrics_headers",
+        "libstagefright_headers",
+    ],
+
+    shared_libs: [
+        "libstagefright",
+        "libmedia",
+        "libmedia_codeclist",
+        "libutils",
+        "libbinder",
+        "libstagefright_foundation",
+        "libjpeg",
+        "libui",
+        "libgui",
+        "libcutils",
+        "liblog",
+        "libhidlbase",
+        "libdatasource",
+        "libaudioclient",
+        "android.hardware.media.omx@1.0",
+        "framework-permission-aidl-cpp",
+    ],
+
+    static_libs: ["framework-permission-aidl-cpp"],
+
+    cflags: [
+        "-Wno-multichar",
+    ],
+
+    system_ext_specific: true,
+}
+
+cc_binary {
+    name: "record",
+
+    srcs: [
+        "AudioPlayer.cpp",
+        "SineSource.cpp",
+        "record.cpp",
+    ],
+
+    header_libs: [
+        "libmediametrics_headers",
+        "libstagefright_headers",
+        "camera_headers",
+    ],
+
+    shared_libs: [
+        "libstagefright",
+        "libmedia",
+        "liblog",
+        "libutils",
+        "libbinder",
+        "libstagefright_foundation",
+        "libdatasource",
+        "libaudioclient",
+        "framework-permission-aidl-cpp",
+    ],
+
+    cflags: [
+        "-Wno-multichar",
+    ],
+}
+
+cc_binary {
+    name: "recordvideo",
+
+    srcs: [
+        "AudioPlayer.cpp",
+        "recordvideo.cpp",
+    ],
+
+    header_libs: [
+        "libmediametrics_headers",
+        "libstagefright_headers",
+    ],
+
+    shared_libs: [
+        "libstagefright",
+        "libmedia",
+        "liblog",
+        "libutils",
+        "libbinder",
+        "libstagefright_foundation",
+        "libaudioclient",
+        "framework-permission-aidl-cpp",
+    ],
+
+    cflags: [
+        "-Wno-multichar",
+    ],
+}
+
+cc_binary {
+    name: "audioloop",
+
+    srcs: [
+        "AudioPlayer.cpp",
+        "SineSource.cpp",
+        "audioloop.cpp",
+    ],
+
+    header_libs: [
+        "libmediametrics_headers",
+        "libstagefright_headers",
+    ],
+
+    shared_libs: [
+        "libstagefright",
+        "libmedia",
+        "liblog",
+        "libutils",
+        "libbinder",
+        "libstagefright_foundation",
+        "libaudioclient",
+        "framework-permission-aidl-cpp",
+    ],
+
+    cflags: [
+        "-Wno-multichar",
+    ],
+}
+
+cc_binary {
+    name: "stream",
+
+    srcs: ["stream.cpp"],
+
+    header_libs: [
+        "libmediametrics_headers",
+        "libstagefright_headers",
+    ],
+
+    shared_libs: [
+        "libstagefright",
+        "liblog",
+        "libutils",
+        "libbinder",
+        "libui",
+        "libgui",
+        "libstagefright_foundation",
+        "libmedia",
+        "libcutils",
+        "libdatasource",
+    ],
+
+    cflags: [
+        "-Wno-multichar",
+    ],
+}
+
+cc_binary {
+    name: "codec",
+
+    srcs: [
+        "codec.cpp",
+        "SimplePlayer.cpp",
+    ],
+
+    header_libs: [
+        "libmediadrm_headers",
+        "libmediametrics_headers",
+        "libstagefright_headers",
+    ],
+
+    shared_libs: [
+        "libstagefright",
+        "liblog",
+        "libutils",
+        "libbinder",
+        "libstagefright_foundation",
+        "libmedia",
+        "libmedia_omx",
+        "libaudioclient",
+        "libui",
+        "libgui",
+        "libcutils",
+    ],
+
+    cflags: [
+        "-Wno-multichar",
+    ],
+}
+
+cc_binary {
+    name: "mediafilter",
+
+    srcs: [
+        "filters/argbtorgba.rscript",
+        "filters/nightvision.rscript",
+        "filters/saturation.rscript",
+        "mediafilter.cpp",
+    ],
+
+    header_libs: [
+        "libmediadrm_headers",
+        "libmediametrics_headers",
+        "libstagefright_headers",
+        "rs-headers",
+    ],
+
+    include_dirs: ["frameworks/av/media/libstagefright"],
+
+    shared_libs: [
+        "libstagefright",
+        "liblog",
+        "libutils",
+        "libbinder",
+        "libstagefright_foundation",
+        "libmedia_omx",
+        "libui",
+        "libgui",
+        "libRScpp",
+    ],
+
+    static_libs: ["libstagefright_mediafilter"],
+
+    cflags: [
+        "-Wno-multichar",
+    ],
+
+    sanitize: {
+        cfi: true,
+    },
+}
+
+cc_binary {
+    name: "muxer",
+
+    srcs: ["muxer.cpp"],
+
+    header_libs: [
+        "libmediametrics_headers",
+        "libstagefright_headers",
+    ],
+
+    shared_libs: [
+        "libstagefright",
+        "liblog",
+        "libutils",
+        "libbinder",
+        "libstagefright_foundation",
+        "libcutils",
+        "libc",
+    ],
+
+    cflags: [
+        "-Wno-multichar",
+    ],
+}
