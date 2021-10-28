@@ -48,6 +48,16 @@ AudioChannelLayout make_ACL_Stereo() {
             AudioChannelLayout::LAYOUT_STEREO);
 }
 
+AudioChannelLayout make_ACL_LayoutArbitrary() {
+    return AudioChannelLayout::make<AudioChannelLayout::Tag::layoutMask>(
+            // Use channels that exist both for input and output,
+            // but doesn't form a known layout mask.
+            AudioChannelLayout::CHANNEL_FRONT_LEFT |
+            AudioChannelLayout::CHANNEL_FRONT_RIGHT |
+            AudioChannelLayout::CHANNEL_TOP_SIDE_LEFT |
+            AudioChannelLayout::CHANNEL_TOP_SIDE_RIGHT);
+}
+
 AudioChannelLayout make_ACL_ChannelIndex2() {
     return AudioChannelLayout::make<AudioChannelLayout::Tag::indexMask>(
             AudioChannelLayout::INDEX_MASK_2);
@@ -168,7 +178,8 @@ class HashIdentityTest : public ::testing::Test {
 
 TEST_F(HashIdentityTest, AudioChannelLayoutHashIdentity) {
     verifyHashIdentity<AudioChannelLayout>({
-            make_ACL_None, make_ACL_Invalid, make_ACL_Stereo, make_ACL_ChannelIndex2,
+            make_ACL_None, make_ACL_Invalid, make_ACL_Stereo,
+            make_ACL_LayoutArbitrary, make_ACL_ChannelIndex2,
             make_ACL_ChannelIndexArbitrary, make_ACL_VoiceCall});
 }
 
@@ -200,12 +211,51 @@ INSTANTIATE_TEST_SUITE_P(AudioChannelLayoutRoundTrip,
         AudioChannelLayoutRoundTripTest,
         testing::Combine(
                 testing::Values(AudioChannelLayout{}, make_ACL_Invalid(), make_ACL_Stereo(),
-                        make_ACL_ChannelIndex2(), make_ACL_ChannelIndexArbitrary()),
+                        make_ACL_LayoutArbitrary(), make_ACL_ChannelIndex2(),
+                        make_ACL_ChannelIndexArbitrary()),
                 testing::Values(false, true)));
 INSTANTIATE_TEST_SUITE_P(AudioChannelVoiceRoundTrip,
         AudioChannelLayoutRoundTripTest,
         // In legacy constants the voice call is only defined for input.
         testing::Combine(testing::Values(make_ACL_VoiceCall()), testing::Values(true)));
+
+using ChannelLayoutEdgeCaseParam = std::tuple<int /*legacy*/, bool /*isInput*/, bool /*isValid*/>;
+class AudioChannelLayoutEdgeCaseTest :
+        public testing::TestWithParam<ChannelLayoutEdgeCaseParam> {};
+TEST_P(AudioChannelLayoutEdgeCaseTest, Legacy2Aidl) {
+    const audio_channel_mask_t legacy = static_cast<audio_channel_mask_t>(std::get<0>(GetParam()));
+    const bool isInput = std::get<1>(GetParam());
+    const bool isValid = std::get<2>(GetParam());
+    auto conv = legacy2aidl_audio_channel_mask_t_AudioChannelLayout(legacy, isInput);
+    EXPECT_EQ(isValid, conv.ok());
+}
+INSTANTIATE_TEST_SUITE_P(AudioChannelLayoutEdgeCase,
+        AudioChannelLayoutEdgeCaseTest,
+        testing::Values(
+                // Valid legacy input masks.
+                std::make_tuple(AUDIO_CHANNEL_IN_VOICE_UPLINK_MONO, true, true),
+                std::make_tuple(AUDIO_CHANNEL_IN_VOICE_DNLINK_MONO, true, true),
+                std::make_tuple(AUDIO_CHANNEL_IN_VOICE_CALL_MONO, true, true),
+                // Valid legacy output masks.
+                std::make_tuple(
+                        // This has the same numerical representation as Mask 'A' below
+                        AUDIO_CHANNEL_OUT_FRONT_CENTER | AUDIO_CHANNEL_OUT_LOW_FREQUENCY |
+                        AUDIO_CHANNEL_OUT_TOP_FRONT_RIGHT, false, true),
+                std::make_tuple(
+                        // This has the same numerical representation as Mask 'B' below
+                        AUDIO_CHANNEL_OUT_FRONT_CENTER | AUDIO_CHANNEL_OUT_LOW_FREQUENCY |
+                        AUDIO_CHANNEL_OUT_TOP_BACK_LEFT, false, true),
+                // Invalid legacy input masks.
+                std::make_tuple(AUDIO_CHANNEL_IN_6, true, false),
+                std::make_tuple(
+                        AUDIO_CHANNEL_IN_6 | AUDIO_CHANNEL_IN_FRONT_PROCESSED, true, false),
+                std::make_tuple(
+                        AUDIO_CHANNEL_IN_PRESSURE | AUDIO_CHANNEL_IN_X_AXIS |
+                        AUDIO_CHANNEL_IN_Y_AXIS | AUDIO_CHANNEL_IN_Z_AXIS, true, false),
+                std::make_tuple(  // Mask 'A'
+                        AUDIO_CHANNEL_IN_STEREO | AUDIO_CHANNEL_IN_VOICE_UPLINK, true, false),
+                std::make_tuple(  // Mask 'B'
+                        AUDIO_CHANNEL_IN_STEREO | AUDIO_CHANNEL_IN_VOICE_DNLINK, true, false)));
 
 class AudioDeviceDescriptionRoundTripTest :
         public testing::TestWithParam<AudioDeviceDescription> {};
