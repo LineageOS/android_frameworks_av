@@ -80,7 +80,6 @@ private:
             mPostDownmixReformatBufferProvider.reset(nullptr);
             mDownmixerBufferProvider.reset(nullptr);
             mReformatBufferProvider.reset(nullptr);
-            mContractChannelsNonDestructiveBufferProvider.reset(nullptr);
             mAdjustChannelsBufferProvider.reset(nullptr);
         }
 
@@ -95,10 +94,8 @@ private:
         void        unprepareForDownmix();
         status_t    prepareForReformat();
         void        unprepareForReformat();
-        status_t    prepareForAdjustChannels();
+        status_t    prepareForAdjustChannels(size_t frames);
         void        unprepareForAdjustChannels();
-        status_t    prepareForAdjustChannelsNonDestructive(size_t frames);
-        void        unprepareForAdjustChannelsNonDestructive();
         void        clearContractedBuffer();
         bool        setPlaybackRate(const AudioPlaybackRate &playbackRate);
         void        reconfigureBufferProviders();
@@ -114,24 +111,18 @@ private:
          * 2) mAdjustChannelsBufferProvider: Expands or contracts sample data from one interleaved
          *    channel format to another. Expanded channels are filled with zeros and put at the end
          *    of each audio frame. Contracted channels are copied to the end of the buffer.
-         * 3) mContractChannelsNonDestructiveBufferProvider: Non-destructively contract sample data.
-         *    This is currently using at audio-haptic coupled playback to separate audio and haptic
-         *    data. Contracted channels could be written to given buffer.
-         * 4) mReformatBufferProvider: If not NULL, performs the audio reformat to
+         * 3) mReformatBufferProvider: If not NULL, performs the audio reformat to
          *    match either mMixerInFormat or mDownmixRequiresFormat, if the downmixer
          *    requires reformat. For example, it may convert floating point input to
          *    PCM_16_bit if that's required by the downmixer.
-         * 5) mDownmixerBufferProvider: If not NULL, performs the channel remixing to match
+         * 4) mDownmixerBufferProvider: If not NULL, performs the channel remixing to match
          *    the number of channels required by the mixer sink.
-         * 6) mPostDownmixReformatBufferProvider: If not NULL, performs reformatting from
+         * 5) mPostDownmixReformatBufferProvider: If not NULL, performs reformatting from
          *    the downmixer requirements to the mixer engine input requirements.
-         * 7) mTimestretchBufferProvider: Adds timestretching for playback rate
+         * 6) mTimestretchBufferProvider: Adds timestretching for playback rate
          */
         AudioBufferProvider* mInputBufferProvider;    // externally provided buffer provider.
-        // TODO: combine mAdjustChannelsBufferProvider and
-        // mContractChannelsNonDestructiveBufferProvider
         std::unique_ptr<PassthruBufferProvider> mAdjustChannelsBufferProvider;
-        std::unique_ptr<PassthruBufferProvider> mContractChannelsNonDestructiveBufferProvider;
         std::unique_ptr<PassthruBufferProvider> mReformatBufferProvider;
         std::unique_ptr<PassthruBufferProvider> mDownmixerBufferProvider;
         std::unique_ptr<PassthruBufferProvider> mPostDownmixReformatBufferProvider;
@@ -153,8 +144,6 @@ private:
         uint32_t             mMixerHapticChannelCount;
         uint32_t             mAdjustInChannelCount;
         uint32_t             mAdjustOutChannelCount;
-        uint32_t             mAdjustNonDestructiveInChannelCount;
-        uint32_t             mAdjustNonDestructiveOutChannelCount;
         bool                 mKeepContractedChannels;
     };
 

@@ -241,17 +241,22 @@ private:
 // Extra expanded channels are filled with zeros and put at the end of each audio frame.
 // Contracted channels are copied to the end of the output buffer(storage should be
 // allocated appropriately).
-// Contracted channels could be written to output buffer.
+// Contracted channels could be written to output buffer and got adjusted. When the contracted
+// channels are adjusted in the contracted buffer, the input channel count will be calculated
+// as `inChannelCount - outChannelCount`. The output channel count is provided by caller, which
+// is `contractedOutChannelCount`. Currently, adjusting contracted channels is used for audio
+// coupled haptic playback. If the device supports two haptic channels while apps only provide
+// single haptic channel, the second haptic channel will be duplicated with the first haptic
+// channel's data. If the device supports single haptic channels while apps provide two haptic
+// channels, the second channel will be contracted.
 class AdjustChannelsBufferProvider : public CopyBufferProvider {
 public:
-    AdjustChannelsBufferProvider(audio_format_t format, size_t inChannelCount,
-            size_t outChannelCount, size_t frameCount) : AdjustChannelsBufferProvider(
-                    format, inChannelCount, outChannelCount,
-                    frameCount, AUDIO_FORMAT_INVALID, nullptr) { }
     // Contracted data is converted to contractedFormat and put into contractedBuffer.
     AdjustChannelsBufferProvider(audio_format_t format, size_t inChannelCount,
-            size_t outChannelCount, size_t frameCount, audio_format_t contractedFormat,
-            void* contractedBuffer);
+            size_t outChannelCount, size_t frameCount,
+            audio_format_t contractedFormat = AUDIO_FORMAT_INVALID,
+            void* contractedBuffer = nullptr,
+            size_t contractedOutChannelCount = 0);
     //Overrides
     status_t getNextBuffer(Buffer* pBuffer) override;
     void copyFrames(void *dst, const void *src, size_t frames) override;
@@ -265,11 +270,14 @@ protected:
     const size_t         mOutChannelCount;
     const size_t         mSampleSizeInBytes;
     const size_t         mFrameCount;
-    const size_t         mContractedChannelCount;
     const audio_format_t mContractedFormat;
+    const size_t         mContractedInChannelCount;
+    const size_t         mContractedOutChannelCount;
+    const size_t         mContractedSampleSizeInBytes;
+    const size_t         mContractedInputFrameSize; // contracted input frame size
     void                *mContractedBuffer;
     size_t               mContractedWrittenFrames;
-    size_t               mContractedFrameSize;
+    size_t               mContractedOutputFrameSize; // contracted output frame size
 };
 // ----------------------------------------------------------------------------
 } // namespace android
