@@ -46,6 +46,88 @@ namespace android {
 
 static const int64_t CAMERA_SOURCE_TIMEOUT_NS = 3000000000LL;
 
+struct CameraSourceListener : public CameraListener {
+    explicit CameraSourceListener(const sp<CameraSource> &source);
+
+    virtual void notify(int32_t msgType, int32_t ext1, int32_t ext2);
+    virtual void postData(int32_t msgType, const sp<IMemory> &dataPtr,
+                          camera_frame_metadata_t *metadata);
+
+    virtual void postDataTimestamp(
+            nsecs_t timestamp, int32_t msgType, const sp<IMemory>& dataPtr);
+
+    virtual void postRecordingFrameHandleTimestamp(nsecs_t timestamp, native_handle_t* handle);
+
+    virtual void postRecordingFrameHandleTimestampBatch(
+                const std::vector<nsecs_t>& timestamps,
+                const std::vector<native_handle_t*>& handles);
+
+protected:
+    virtual ~CameraSourceListener();
+
+private:
+    wp<CameraSource> mSource;
+
+    CameraSourceListener(const CameraSourceListener &);
+    CameraSourceListener &operator=(const CameraSourceListener &);
+};
+
+CameraSourceListener::CameraSourceListener(const sp<CameraSource> &source)
+    : mSource(source) {
+}
+
+CameraSourceListener::~CameraSourceListener() {
+}
+
+void CameraSourceListener::notify(int32_t msgType, int32_t ext1, int32_t ext2) {
+    UNUSED_UNLESS_VERBOSE(msgType);
+    UNUSED_UNLESS_VERBOSE(ext1);
+    UNUSED_UNLESS_VERBOSE(ext2);
+    ALOGV("notify(%d, %d, %d)", msgType, ext1, ext2);
+}
+
+void CameraSourceListener::postData(int32_t msgType, const sp<IMemory> &dataPtr,
+                                    camera_frame_metadata_t * /* metadata */) {
+    ALOGV("postData(%d, ptr:%p, size:%zu)",
+         msgType, dataPtr->unsecurePointer(), dataPtr->size());
+
+    sp<CameraSource> source = mSource.promote();
+    if (source.get() != NULL) {
+        source->dataCallback(msgType, dataPtr);
+    }
+}
+
+void CameraSourceListener::postDataTimestamp(
+        nsecs_t timestamp, int32_t msgType, const sp<IMemory>& dataPtr) {
+
+    sp<CameraSource> source = mSource.promote();
+    if (source.get() != NULL) {
+        source->dataCallbackTimestamp(timestamp/1000, msgType, dataPtr);
+    }
+}
+
+void CameraSourceListener::postRecordingFrameHandleTimestamp(nsecs_t timestamp,
+        native_handle_t* handle) {
+    sp<CameraSource> source = mSource.promote();
+    if (source.get() != nullptr) {
+        source->recordingFrameHandleCallbackTimestamp(timestamp/1000, handle);
+    }
+}
+
+void CameraSourceListener::postRecordingFrameHandleTimestampBatch(
+        const std::vector<nsecs_t>& timestamps,
+        const std::vector<native_handle_t*>& handles) {
+    sp<CameraSource> source = mSource.promote();
+    if (source.get() != nullptr) {
+        int n = timestamps.size();
+        std::vector<nsecs_t> modifiedTimestamps(n);
+        for (int i = 0; i < n; i++) {
+            modifiedTimestamps[i] = timestamps[i] / 1000;
+        }
+        source->recordingFrameHandleCallbackTimestampBatch(modifiedTimestamps, handles);
+    }
+}
+
 static int32_t getColorFormat(const char* colorFormat) {
     if (!colorFormat) {
         ALOGE("Invalid color format");
@@ -87,6 +169,16 @@ static int32_t getColorFormat(const char* colorFormat) {
     return -1;
 }
 
+CameraSource *CameraSource::Create(const String16 &clientName) {
+    Size size;
+    size.width = -1;
+    size.height = -1;
+
+    sp<hardware::ICamera> camera;
+    return new CameraSource(camera, NULL, 0, clientName, Camera::USE_CALLING_UID,
+            Camera::USE_CALLING_PID, size, -1, NULL, false);
+}
+
 // static
 CameraSource *CameraSource::CreateFromCamera(
     const sp<hardware::ICamera>& camera,
@@ -97,10 +189,12 @@ CameraSource *CameraSource::CreateFromCamera(
     pid_t clientPid,
     Size videoSize,
     int32_t frameRate,
-    const sp<IGraphicBufferProducer>& surface) {
+    const sp<IGraphicBufferProducer>& surface,
+    bool storeMetaDataInVideoBuffers) {
 
     CameraSource *source = new CameraSource(camera, proxy, cameraId,
-            clientName, clientUid, clientPid, videoSize, frameRate, surface);
+            clientName, clientUid, clientPid, videoSize, frameRate, surface,
+            storeMetaDataInVideoBuffers);
     return source;
 }
 
@@ -113,7 +207,8 @@ CameraSource::CameraSource(
     pid_t clientPid,
     Size videoSize,
     int32_t frameRate,
-    const sp<IGraphicBufferProducer>& surface)
+    const sp<IGraphicBufferProducer>& surface,
+    bool storeMetaDataInVideoBuffers)
     : mCameraFlags(0),
       mNumInputBuffers(0),
       mVideoFrameRate(-1),
@@ -136,7 +231,8 @@ CameraSource::CameraSource(
 
     mInitCheck = init(camera, proxy, cameraId,
                     clientName, clientUid, clientPid,
-                    videoSize, frameRate);
+                    videoSize, frameRate,
+                    storeMetaDataInVideoBuffers);
     if (mInitCheck != OK) releaseCamera();
 }
 
@@ -436,13 +532,15 @@ status_t CameraSource::init(
         uid_t clientUid,
         pid_t clientPid,
         Size videoSize,
-        int32_t frameRate) {
+        int32_t frameRate,
+        bool storeMetaDataInVideoBuffers) {
 
     ALOGV("init");
     status_t err = OK;
     int64_t token = IPCThreadState::self()->clearCallingIdentity();
     err = initWithCameraAccess(camera, proxy, cameraId, clientName, clientUid, clientPid,
-                               videoSize, frameRate);
+                               videoSize, frameRate,
+                               storeMetaDataInVideoBuffers);
     IPCThreadState::self()->restoreCallingIdentity(token);
     return err;
 }
@@ -529,7 +627,8 @@ status_t CameraSource::initWithCameraAccess(
         uid_t clientUid,
         pid_t clientPid,
         Size videoSize,
-        int32_t frameRate) {
+        int32_t frameRate,
+        bool storeMetaDataInVideoBuffers) {
     ALOGV("initWithCameraAccess");
     status_t err = OK;
 
@@ -569,12 +668,24 @@ status_t CameraSource::initWithCameraAccess(
         CHECK_EQ((status_t)OK, mCamera->setPreviewTarget(mSurface));
     }
 
-    // Use buffer queue to receive video buffers from camera
-    err = mCamera->setVideoBufferMode(hardware::ICamera::VIDEO_BUFFER_MODE_BUFFER_QUEUE);
-    if (err != OK) {
-        ALOGE("%s: Setting video buffer mode to VIDEO_BUFFER_MODE_BUFFER_QUEUE failed: "
-                "%s (err=%d)", __FUNCTION__, strerror(-err), err);
-        return err;
+    // By default, store real data in video buffers.
+    mVideoBufferMode = hardware::ICamera::VIDEO_BUFFER_MODE_DATA_CALLBACK_YUV;
+    if (storeMetaDataInVideoBuffers) {
+        if (OK == mCamera->setVideoBufferMode(hardware::ICamera::VIDEO_BUFFER_MODE_BUFFER_QUEUE)) {
+            mVideoBufferMode = hardware::ICamera::VIDEO_BUFFER_MODE_BUFFER_QUEUE;
+        } else if (OK == mCamera->setVideoBufferMode(
+                hardware::ICamera::VIDEO_BUFFER_MODE_DATA_CALLBACK_METADATA)) {
+            mVideoBufferMode = hardware::ICamera::VIDEO_BUFFER_MODE_DATA_CALLBACK_METADATA;
+        }
+    }
+
+    if (mVideoBufferMode == hardware::ICamera::VIDEO_BUFFER_MODE_DATA_CALLBACK_YUV) {
+        err = mCamera->setVideoBufferMode(hardware::ICamera::VIDEO_BUFFER_MODE_DATA_CALLBACK_YUV);
+        if (err != OK) {
+            ALOGE("%s: Setting video buffer mode to VIDEO_BUFFER_MODE_DATA_CALLBACK_YUV failed: "
+                    "%s (err=%d)", __FUNCTION__, strerror(-err), err);
+            return err;
+        }
     }
 
     int64_t glitchDurationUs = (1000000LL / mVideoFrameRate);
@@ -614,26 +725,54 @@ status_t CameraSource::startCameraRecording() {
     int64_t token = IPCThreadState::self()->clearCallingIdentity();
     status_t err;
 
-    // Initialize buffer queue.
-    err = initBufferQueue(mVideoSize.width, mVideoSize.height, mEncoderFormat,
-            (android_dataspace_t)mEncoderDataSpace,
-            mNumInputBuffers > 0 ? mNumInputBuffers : 1);
-    if (err != OK) {
-        ALOGE("%s: Failed to initialize buffer queue: %s (err=%d)", __FUNCTION__,
-                strerror(-err), err);
-        return err;
+    if (mVideoBufferMode == hardware::ICamera::VIDEO_BUFFER_MODE_BUFFER_QUEUE) {
+        // Initialize buffer queue.
+        err = initBufferQueue(mVideoSize.width, mVideoSize.height, mEncoderFormat,
+                (android_dataspace_t)mEncoderDataSpace,
+                mNumInputBuffers > 0 ? mNumInputBuffers : 1);
+        if (err != OK) {
+            ALOGE("%s: Failed to initialize buffer queue: %s (err=%d)", __FUNCTION__,
+                    strerror(-err), err);
+            return err;
+        }
+    } else {
+        if (mNumInputBuffers > 0) {
+            err = mCamera->sendCommand(
+                CAMERA_CMD_SET_VIDEO_BUFFER_COUNT, mNumInputBuffers, 0);
+
+            // This could happen for CameraHAL1 clients; thus the failure is
+            // not a fatal error
+            if (err != OK) {
+                ALOGW("Failed to set video buffer count to %d due to %d",
+                    mNumInputBuffers, err);
+            }
+        }
+
+        err = mCamera->sendCommand(
+            CAMERA_CMD_SET_VIDEO_FORMAT, mEncoderFormat, mEncoderDataSpace);
+
+        // This could happen for CameraHAL1 clients; thus the failure is
+        // not a fatal error
+        if (err != OK) {
+            ALOGW("Failed to set video encoder format/dataspace to %d, %d due to %d",
+                    mEncoderFormat, mEncoderDataSpace, err);
+        }
+
+        // Create memory heap to store buffers as VideoNativeMetadata.
+        createVideoBufferMemoryHeap(sizeof(VideoNativeHandleMetadata), kDefaultVideoBufferCount);
     }
 
-    // Start data flow
     err = OK;
     if (mCameraFlags & FLAGS_HOT_CAMERA) {
         mCamera->unlock();
         mCamera.clear();
-        if ((err = mCameraRecordingProxy->startRecording()) != OK) {
+        if ((err = mCameraRecordingProxy->startRecording(
+                new ProxyListener(this))) != OK) {
             ALOGE("Failed to start recording, received error: %s (%d)",
                     strerror(-err), err);
         }
     } else {
+        mCamera->setListener(new CameraSourceListener(this));
         mCamera->startRecording();
         if (!mCamera->recordingEnabled()) {
             err = -EINVAL;
@@ -699,6 +838,7 @@ void CameraSource::stopCameraRecording() {
         }
     } else {
         if (mCamera != 0) {
+            mCamera->setListener(NULL);
             mCamera->stopRecording();
         }
     }
@@ -797,31 +937,97 @@ status_t CameraSource::reset() {
 void CameraSource::releaseRecordingFrame(const sp<IMemory>& frame) {
     ALOGV("releaseRecordingFrame");
 
-    // Return the buffer to buffer queue in VIDEO_BUFFER_MODE_BUFFER_QUEUE mode.
-    ssize_t offset;
-    size_t size;
-    sp<IMemoryHeap> heap = frame->getMemory(&offset, &size);
-    if (heap->getHeapID() != mMemoryHeapBase->getHeapID()) {
-        ALOGE("%s: Mismatched heap ID, ignoring release (got %x, expected %x)", __FUNCTION__,
-                heap->getHeapID(), mMemoryHeapBase->getHeapID());
-        return;
+    if (mVideoBufferMode == hardware::ICamera::VIDEO_BUFFER_MODE_BUFFER_QUEUE) {
+        // Return the buffer to buffer queue in VIDEO_BUFFER_MODE_BUFFER_QUEUE mode.
+        ssize_t offset;
+        size_t size;
+        sp<IMemoryHeap> heap = frame->getMemory(&offset, &size);
+        if (heap->getHeapID() != mMemoryHeapBase->getHeapID()) {
+            ALOGE("%s: Mismatched heap ID, ignoring release (got %x, expected %x)", __FUNCTION__,
+                    heap->getHeapID(), mMemoryHeapBase->getHeapID());
+            return;
+        }
+
+        VideoNativeMetadata *payload = reinterpret_cast<VideoNativeMetadata*>(
+                (uint8_t*)heap->getBase() + offset);
+
+        // Find the corresponding buffer item for the native window buffer.
+        ssize_t index = mReceivedBufferItemMap.indexOfKey(payload->pBuffer);
+        if (index == NAME_NOT_FOUND) {
+            ALOGE("%s: Couldn't find buffer item for %p", __FUNCTION__, payload->pBuffer);
+            return;
+        }
+
+        BufferItem buffer = mReceivedBufferItemMap.valueAt(index);
+        mReceivedBufferItemMap.removeItemsAt(index);
+        mVideoBufferConsumer->releaseBuffer(buffer);
+        mMemoryBases.push_back(frame);
+        mMemoryBaseAvailableCond.signal();
+    } else {
+        native_handle_t* handle = nullptr;
+
+        // Check if frame contains a VideoNativeHandleMetadata.
+        if (frame->size() == sizeof(VideoNativeHandleMetadata)) {
+          // TODO: Using unsecurePointer() has some associated security pitfalls
+          //       (see declaration for details).
+          //       Either document why it is safe in this case or address the
+          //       issue (e.g. by copying).
+           VideoNativeHandleMetadata *metadata =
+                (VideoNativeHandleMetadata*)(frame->unsecurePointer());
+            if (metadata->eType == kMetadataBufferTypeNativeHandleSource) {
+                handle = metadata->pHandle;
+            }
+        }
+
+        if (handle != nullptr) {
+            ssize_t offset;
+            size_t size;
+            sp<IMemoryHeap> heap = frame->getMemory(&offset, &size);
+            if (heap->getHeapID() != mMemoryHeapBase->getHeapID()) {
+                ALOGE("%s: Mismatched heap ID, ignoring release (got %x, expected %x)",
+		     __FUNCTION__, heap->getHeapID(), mMemoryHeapBase->getHeapID());
+                return;
+            }
+            uint32_t batchSize = 0;
+            {
+                Mutex::Autolock autoLock(mBatchLock);
+                if (mInflightBatchSizes.size() > 0) {
+                    batchSize = mInflightBatchSizes[0];
+                }
+            }
+            if (batchSize == 0) { // return buffers one by one
+                // Frame contains a VideoNativeHandleMetadata. Send the handle back to camera.
+                releaseRecordingFrameHandle(handle);
+                mMemoryBases.push_back(frame);
+                mMemoryBaseAvailableCond.signal();
+            } else { // Group buffers in batch then return
+                Mutex::Autolock autoLock(mBatchLock);
+                mInflightReturnedHandles.push_back(handle);
+                mInflightReturnedMemorys.push_back(frame);
+                if (mInflightReturnedHandles.size() == batchSize) {
+                    releaseRecordingFrameHandleBatch(mInflightReturnedHandles);
+
+                    mInflightBatchSizes.pop_front();
+                    mInflightReturnedHandles.clear();
+                    for (const auto& mem : mInflightReturnedMemorys) {
+                        mMemoryBases.push_back(mem);
+                        mMemoryBaseAvailableCond.signal();
+                    }
+                    mInflightReturnedMemorys.clear();
+                }
+            }
+
+        } else if (mCameraRecordingProxy != nullptr) {
+            // mCamera is created by application. Return the frame back to camera via camera
+            // recording proxy.
+            mCameraRecordingProxy->releaseRecordingFrame(frame);
+        } else if (mCamera != nullptr) {
+            // mCamera is created by CameraSource. Return the frame directly back to camera.
+            int64_t token = IPCThreadState::self()->clearCallingIdentity();
+            mCamera->releaseRecordingFrame(frame);
+            IPCThreadState::self()->restoreCallingIdentity(token);
+        }
     }
-
-    VideoNativeMetadata *payload = reinterpret_cast<VideoNativeMetadata*>(
-        (uint8_t*)heap->getBase() + offset);
-
-    // Find the corresponding buffer item for the native window buffer.
-    ssize_t index = mReceivedBufferItemMap.indexOfKey(payload->pBuffer);
-    if (index == NAME_NOT_FOUND) {
-        ALOGE("%s: Couldn't find buffer item for %p", __FUNCTION__, payload->pBuffer);
-        return;
-    }
-
-    BufferItem buffer = mReceivedBufferItemMap.valueAt(index);
-    mReceivedBufferItemMap.removeItemsAt(index);
-    mVideoBufferConsumer->releaseBuffer(buffer);
-    mMemoryBases.push_back(frame);
-    mMemoryBaseAvailableCond.signal();
 }
 
 void CameraSource::releaseQueuedFrames() {
@@ -982,6 +1188,152 @@ bool CameraSource::shouldSkipFrameLocked(int64_t timestampUs) {
     return false;
 }
 
+void CameraSource::dataCallbackTimestamp(int64_t timestampUs,
+        int32_t msgType __unused, const sp<IMemory> &data) {
+    ALOGV("dataCallbackTimestamp: timestamp %lld us", (long long)timestampUs);
+    Mutex::Autolock autoLock(mLock);
+
+    if (shouldSkipFrameLocked(timestampUs)) {
+        releaseOneRecordingFrame(data);
+        return;
+    }
+
+    ++mNumFramesReceived;
+
+    CHECK(data != NULL && data->size() > 0);
+    mFramesReceived.push_back(data);
+    int64_t timeUs = mStartTimeUs + (timestampUs - mFirstFrameTimeUs);
+    mFrameTimes.push_back(timeUs);
+    ALOGV("initial delay: %" PRId64 ", current time stamp: %" PRId64,
+        mStartTimeUs, timeUs);
+    mFrameAvailableCondition.signal();
+}
+
+void CameraSource::releaseRecordingFrameHandle(native_handle_t* handle) {
+    if (mCameraRecordingProxy != nullptr) {
+        mCameraRecordingProxy->releaseRecordingFrameHandle(handle);
+    } else if (mCamera != nullptr) {
+        int64_t token = IPCThreadState::self()->clearCallingIdentity();
+        mCamera->releaseRecordingFrameHandle(handle);
+        IPCThreadState::self()->restoreCallingIdentity(token);
+    } else {
+        native_handle_close(handle);
+        native_handle_delete(handle);
+    }
+}
+
+void CameraSource::releaseRecordingFrameHandleBatch(const std::vector<native_handle_t*>& handles) {
+    if (mCameraRecordingProxy != nullptr) {
+        mCameraRecordingProxy->releaseRecordingFrameHandleBatch(handles);
+    } else if (mCamera != nullptr) {
+        int64_t token = IPCThreadState::self()->clearCallingIdentity();
+        mCamera->releaseRecordingFrameHandleBatch(handles);
+        IPCThreadState::self()->restoreCallingIdentity(token);
+    } else {
+        for (auto& handle : handles) {
+            native_handle_close(handle);
+            native_handle_delete(handle);
+        }
+    }
+}
+
+void CameraSource::recordingFrameHandleCallbackTimestamp(int64_t timestampUs,
+                native_handle_t* handle) {
+    ALOGV("%s: timestamp %lld us", __FUNCTION__, (long long)timestampUs);
+    Mutex::Autolock autoLock(mLock);
+    if (handle == nullptr) return;
+
+    if (shouldSkipFrameLocked(timestampUs)) {
+        releaseRecordingFrameHandle(handle);
+        return;
+    }
+
+    while (mMemoryBases.empty()) {
+        if (mMemoryBaseAvailableCond.waitRelative(mLock, kMemoryBaseAvailableTimeoutNs) ==
+                TIMED_OUT) {
+            ALOGW("Waiting on an available memory base timed out. Dropping a recording frame.");
+            releaseRecordingFrameHandle(handle);
+            return;
+        }
+    }
+
+    ++mNumFramesReceived;
+
+    sp<IMemory> data = *mMemoryBases.begin();
+    mMemoryBases.erase(mMemoryBases.begin());
+
+    // Wrap native handle in sp<IMemory> so it can be pushed to mFramesReceived.
+    VideoNativeHandleMetadata *metadata = (VideoNativeHandleMetadata*)(data->unsecurePointer());
+    metadata->eType = kMetadataBufferTypeNativeHandleSource;
+    metadata->pHandle = handle;
+
+    mFramesReceived.push_back(data);
+    int64_t timeUs = mStartTimeUs + (timestampUs - mFirstFrameTimeUs);
+    mFrameTimes.push_back(timeUs);
+    ALOGV("initial delay: %" PRId64 ", current time stamp: %" PRId64, mStartTimeUs, timeUs);
+    mFrameAvailableCondition.signal();
+}
+
+void CameraSource::recordingFrameHandleCallbackTimestampBatch(
+        const std::vector<int64_t>& timestampsUs,
+        const std::vector<native_handle_t*>& handles) {
+    size_t n = timestampsUs.size();
+    if (n != handles.size()) {
+        ALOGE("%s: timestampsUs(%zu) and handles(%zu) size mismatch!",
+                __FUNCTION__, timestampsUs.size(), handles.size());
+    }
+
+    Mutex::Autolock autoLock(mLock);
+    int batchSize = 0;
+    for (size_t i = 0; i < n; i++) {
+        int64_t timestampUs = timestampsUs[i];
+        native_handle_t* handle = handles[i];
+
+        ALOGV("%s: timestamp %lld us", __FUNCTION__, (long long)timestampUs);
+        if (handle == nullptr) continue;
+
+        if (shouldSkipFrameLocked(timestampUs)) {
+            releaseRecordingFrameHandle(handle);
+            continue;
+        }
+
+        while (mMemoryBases.empty()) {
+            if (mMemoryBaseAvailableCond.waitRelative(mLock, kMemoryBaseAvailableTimeoutNs) ==
+                    TIMED_OUT) {
+                ALOGW("Waiting on an available memory base timed out. Dropping a recording frame.");
+                releaseRecordingFrameHandle(handle);
+                continue;
+            }
+        }
+        ++batchSize;
+        ++mNumFramesReceived;
+        sp<IMemory> data = *mMemoryBases.begin();
+        mMemoryBases.erase(mMemoryBases.begin());
+
+        // Wrap native handle in sp<IMemory> so it can be pushed to mFramesReceived.
+        // TODO: Using unsecurePointer() has some associated security pitfalls
+        //       (see declaration for details).
+        //       Either document why it is safe in this case or address the
+        //       issue (e.g. by copying).
+        VideoNativeHandleMetadata *metadata = (VideoNativeHandleMetadata*)(data->unsecurePointer());
+        metadata->eType = kMetadataBufferTypeNativeHandleSource;
+        metadata->pHandle = handle;
+
+        mFramesReceived.push_back(data);
+        int64_t timeUs = mStartTimeUs + (timestampUs - mFirstFrameTimeUs);
+        mFrameTimes.push_back(timeUs);
+        ALOGV("initial delay: %" PRId64 ", current time stamp: %" PRId64, mStartTimeUs, timeUs);
+
+    }
+    if (batchSize > 0) {
+        Mutex::Autolock autoLock(mBatchLock);
+        mInflightBatchSizes.push_back(batchSize);
+    }
+    for (int i = 0; i < batchSize; i++) {
+        mFrameAvailableCondition.signal();
+    }
+}
+
 CameraSource::BufferQueueListener::BufferQueueListener(const sp<BufferItemConsumer>& consumer,
         const sp<CameraSource>& cameraSource) {
     mConsumer = consumer;
@@ -1073,7 +1425,41 @@ void CameraSource::processBufferQueueFrame(BufferItem& buffer) {
 MetadataBufferType CameraSource::metaDataStoredInVideoBuffers() const {
     ALOGV("metaDataStoredInVideoBuffers");
 
-    return kMetadataBufferTypeANWBuffer;
+    // Output buffers will contain metadata if camera sends us buffer in metadata mode or via
+    // buffer queue.
+    switch (mVideoBufferMode) {
+        case hardware::ICamera::VIDEO_BUFFER_MODE_DATA_CALLBACK_METADATA:
+            return kMetadataBufferTypeNativeHandleSource;
+        case hardware::ICamera::VIDEO_BUFFER_MODE_BUFFER_QUEUE:
+            return kMetadataBufferTypeANWBuffer;
+        default:
+            return kMetadataBufferTypeInvalid;
+    }
+}
+
+CameraSource::ProxyListener::ProxyListener(const sp<CameraSource>& source) {
+    mSource = source;
+}
+
+void CameraSource::ProxyListener::dataCallbackTimestamp(
+        nsecs_t timestamp, int32_t msgType, const sp<IMemory>& dataPtr) {
+    mSource->dataCallbackTimestamp(timestamp / 1000, msgType, dataPtr);
+}
+
+void CameraSource::ProxyListener::recordingFrameHandleCallbackTimestamp(nsecs_t timestamp,
+        native_handle_t* handle) {
+    mSource->recordingFrameHandleCallbackTimestamp(timestamp / 1000, handle);
+}
+
+void CameraSource::ProxyListener::recordingFrameHandleCallbackTimestampBatch(
+        const std::vector<int64_t>& timestampsUs,
+        const std::vector<native_handle_t*>& handles) {
+    int n = timestampsUs.size();
+    std::vector<nsecs_t> modifiedTimestamps(n);
+    for (int i = 0; i < n; i++) {
+        modifiedTimestamps[i] = timestampsUs[i] / 1000;
+    }
+    mSource->recordingFrameHandleCallbackTimestampBatch(modifiedTimestamps, handles);
 }
 
 void CameraSource::DeathNotifier::binderDied(const wp<IBinder>& who __unused) {

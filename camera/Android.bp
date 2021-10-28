@@ -70,6 +70,7 @@ cc_library_shared {
         "ICamera.cpp",
         "ICameraClient.cpp",
         "ICameraRecordingProxy.cpp",
+        "ICameraRecordingProxyListener.cpp",
         "camera2/CaptureRequest.cpp",
         "camera2/ConcurrentCamera.cpp",
         "camera2/OutputConfiguration.cpp",

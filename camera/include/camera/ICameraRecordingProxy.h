@@ -24,11 +24,13 @@
 
 namespace android {
 
+class ICameraRecordingProxyListener;
+class IMemory;
 class Parcel;
 
 /*
- * The purpose of ICameraRecordingProxy is to
- * allow applications to use the camera during recording with the old camera API.
+ * The purpose of ICameraRecordingProxy and ICameraRecordingProxyListener is to
+ * allow applications using the camera during recording.
  *
  * Camera service allows only one client at a time. Since camcorder application
  * needs to own the camera to do things like zoom, the media recorder cannot
@@ -40,29 +42,35 @@ class Parcel;
  * ICameraRecordingProxy
  *   startRecording()
  *   stopRecording()
+ *   releaseRecordingFrame()
  *
+ * ICameraRecordingProxyListener
+ *   dataCallbackTimestamp()
+
  * The camcorder app opens the camera and starts the preview. The app passes
  * ICamera and ICameraRecordingProxy to the media recorder by
  * MediaRecorder::setCamera(). The recorder uses ICamera to setup the camera in
  * MediaRecorder::start(). After setup, the recorder disconnects from camera
- * service. The recorder calls ICameraRecordingProxy::startRecording() and The
- * app owns the camera and can do things like zoom. The media recorder receives
- * the video frames via a buffer queue.  The recorder calls
- * ICameraRecordingProxy::stopRecording() to stop the recording.
+ * service. The recorder calls ICameraRecordingProxy::startRecording() and
+ * passes a ICameraRecordingProxyListener to the app. The app connects back to
+ * camera service and starts the recording. The app owns the camera and can do
+ * things like zoom. The media recorder receives the video frames from the
+ * listener and releases them by ICameraRecordingProxy::releaseRecordingFrame.
+ * The recorder calls ICameraRecordingProxy::stopRecording() to stop the
+ * recording.
  *
  * The call sequences are as follows:
  * 1. The app: Camera.unlock().
  * 2. The app: MediaRecorder.setCamera().
  * 3. Start recording
  *    (1) The app: MediaRecorder.start().
- *    (2) The recorder: ICamera.setVideoTarget(buffer queue).
- *    (3) The recorder: ICamera.unlock() and ICamera.disconnect().
- *    (4) The recorder: ICameraRecordingProxy.startRecording().
- *    (5) The app: ICamera.reconnect().
- *    (6) The app: ICamera.startRecording().
+ *    (2) The recorder: ICamera.unlock() and ICamera.disconnect().
+ *    (3) The recorder: ICameraRecordingProxy.startRecording().
+ *    (4) The app: ICamera.reconnect().
+ *    (5) The app: ICamera.startRecording().
  * 4. During recording
- *    (1) The recorder: receive frames via a buffer queue
- *    (2) The recorder: release frames via a buffer queue
+ *    (1) The recorder: receive frames from ICameraRecordingProxyListener.dataCallbackTimestamp()
+ *    (2) The recorder: release frames by ICameraRecordingProxy.releaseRecordingFrame().
  * 5. Stop recording
  *    (1) The app: MediaRecorder.stop()
  *    (2) The recorder: ICameraRecordingProxy.stopRecording().
@@ -74,8 +82,12 @@ class ICameraRecordingProxy: public IInterface
 public:
     DECLARE_META_INTERFACE(CameraRecordingProxy);
 
-    virtual status_t        startRecording() = 0;
+    virtual status_t        startRecording(const sp<ICameraRecordingProxyListener>& listener) = 0;
     virtual void            stopRecording() = 0;
+    virtual void            releaseRecordingFrame(const sp<IMemory>& mem) = 0;
+    virtual void            releaseRecordingFrameHandle(native_handle_t *handle) = 0;
+    virtual void            releaseRecordingFrameHandleBatch(
+                                    const std::vector<native_handle_t*>& handles) = 0;
 };
 
 // ----------------------------------------------------------------------------

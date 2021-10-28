@@ -259,6 +259,31 @@ int main(int argc, char **argv) {
     printf("$\n");
 #endif
 
+#if 0
+    CameraSource *source = CameraSource::Create(
+            String16(argv[0], strlen(argv[0])));
+    source->start();
+
+    printf("source = %p\n", source);
+
+    for (int i = 0; i < 100; ++i) {
+        MediaBuffer *buffer;
+        status_t err = source->read(&buffer);
+        CHECK_EQ(err, (status_t)OK);
+
+        printf("got a frame, data=%p, size=%d\n",
+               buffer->data(), buffer->range_length());
+
+        buffer->release();
+        buffer = NULL;
+    }
+
+    err = source->stop();
+
+    delete source;
+    source = NULL;
+#endif
+
     if (err != OK && err != ERROR_END_OF_STREAM) {
         fprintf(stderr, "record failed: %d\n", err);
         return 1;

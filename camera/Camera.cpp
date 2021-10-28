@@ -25,6 +25,7 @@
 #include <binder/IMemory.h>
 
 #include <Camera.h>
+#include <ICameraRecordingProxyListener.h>
 #include <android/hardware/ICameraService.h>
 #include <android/hardware/ICamera.h>
 
@@ -75,6 +76,63 @@ sp<Camera> Camera::connect(int cameraId, const String16& clientPackageName,
 {
     return CameraBaseT::connect(cameraId, clientPackageName, clientUid,
             clientPid, targetSdkVersion);
+}
+
+status_t Camera::connectLegacy(int cameraId, int halVersion,
+        const String16& clientPackageName,
+        int clientUid, int clientPid,
+        sp<Camera>& camera)
+{
+    ALOGV("%s: connect legacy camera device", __FUNCTION__);
+    sp<Camera> c = new Camera(cameraId);
+    sp<::android::hardware::ICameraClient> cl = c;
+    status_t status = NO_ERROR;
+    const sp<::android::hardware::ICameraService>& cs = CameraBaseT::getCameraService();
+
+    binder::Status ret;
+    if (cs != nullptr) {
+        ret = cs.get()->connectLegacy(cl, cameraId, halVersion, clientPackageName,
+                clientUid, clientPid, /*out*/&(c->mCamera));
+    }
+    if (ret.isOk() && c->mCamera != nullptr) {
+        IInterface::asBinder(c->mCamera)->linkToDeath(c);
+        c->mStatus = NO_ERROR;
+        camera = c;
+    } else {
+        switch(ret.serviceSpecificErrorCode()) {
+            case hardware::ICameraService::ERROR_DISCONNECTED:
+                status = -ENODEV;
+                break;
+            case hardware::ICameraService::ERROR_CAMERA_IN_USE:
+                status = -EBUSY;
+                break;
+            case hardware::ICameraService::ERROR_INVALID_OPERATION:
+                status = -EINVAL;
+                break;
+            case hardware::ICameraService::ERROR_MAX_CAMERAS_IN_USE:
+                status = -EUSERS;
+                break;
+            case hardware::ICameraService::ERROR_ILLEGAL_ARGUMENT:
+                status = BAD_VALUE;
+                break;
+            case hardware::ICameraService::ERROR_DEPRECATED_HAL:
+                status = -EOPNOTSUPP;
+                break;
+            case hardware::ICameraService::ERROR_DISABLED:
+                status = -EACCES;
+                break;
+            case hardware::ICameraService::ERROR_PERMISSION_DENIED:
+                status = PERMISSION_DENIED;
+                break;
+            default:
+                status = -EINVAL;
+                ALOGW("An error occurred while connecting to camera %d: %s", cameraId,
+                        (cs != nullptr) ? "Service not available" : ret.toString8().string());
+                break;
+        }
+        c.clear();
+    }
+    return status;
 }
 
 status_t Camera::reconnect()
@@ -157,6 +215,10 @@ void Camera::stopPreview()
 void Camera::stopRecording()
 {
     ALOGV("stopRecording");
+    {
+        Mutex::Autolock _l(mLock);
+        mRecordingProxyListener.clear();
+    }
     sp <::android::hardware::ICamera> c = mCamera;
     if (c == 0) return;
     c->stopRecording();
@@ -264,6 +326,12 @@ void Camera::setListener(const sp<CameraListener>& listener)
     mListener = listener;
 }
 
+void Camera::setRecordingProxyListener(const sp<ICameraRecordingProxyListener>& listener)
+{
+    Mutex::Autolock _l(mLock);
+    mRecordingProxyListener = listener;
+}
+
 void Camera::setPreviewCallbackFlags(int flag)
 {
     ALOGV("setPreviewCallbackFlags");
@@ -317,6 +385,19 @@ void Camera::dataCallback(int32_t msgType, const sp<IMemory>& dataPtr,
 // callback from camera service when timestamped frame is ready
 void Camera::dataCallbackTimestamp(nsecs_t timestamp, int32_t msgType, const sp<IMemory>& dataPtr)
 {
+    // If recording proxy listener is registered, forward the frame and return.
+    // The other listener (mListener) is ignored because the receiver needs to
+    // call releaseRecordingFrame.
+    sp<ICameraRecordingProxyListener> proxylistener;
+    {
+        Mutex::Autolock _l(mLock);
+        proxylistener = mRecordingProxyListener;
+    }
+    if (proxylistener != NULL) {
+        proxylistener->dataCallbackTimestamp(timestamp, msgType, dataPtr);
+        return;
+    }
+
     sp<CameraListener> listener;
     {
         Mutex::Autolock _l(mLock);
@@ -333,6 +414,19 @@ void Camera::dataCallbackTimestamp(nsecs_t timestamp, int32_t msgType, const sp<
 
 void Camera::recordingFrameHandleCallbackTimestamp(nsecs_t timestamp, native_handle_t* handle)
 {
+    // If recording proxy listener is registered, forward the frame and return.
+    // The other listener (mListener) is ignored because the receiver needs to
+    // call releaseRecordingFrameHandle.
+    sp<ICameraRecordingProxyListener> proxylistener;
+    {
+        Mutex::Autolock _l(mLock);
+        proxylistener = mRecordingProxyListener;
+    }
+    if (proxylistener != NULL) {
+        proxylistener->recordingFrameHandleCallbackTimestamp(timestamp, handle);
+        return;
+    }
+
     sp<CameraListener> listener;
     {
         Mutex::Autolock _l(mLock);
@@ -351,6 +445,19 @@ void Camera::recordingFrameHandleCallbackTimestampBatch(
         const std::vector<nsecs_t>& timestamps,
         const std::vector<native_handle_t*>& handles)
 {
+    // If recording proxy listener is registered, forward the frame and return.
+    // The other listener (mListener) is ignored because the receiver needs to
+    // call releaseRecordingFrameHandle.
+    sp<ICameraRecordingProxyListener> proxylistener;
+    {
+        Mutex::Autolock _l(mLock);
+        proxylistener = mRecordingProxyListener;
+    }
+    if (proxylistener != NULL) {
+        proxylistener->recordingFrameHandleCallbackTimestampBatch(timestamps, handles);
+        return;
+    }
+
     sp<CameraListener> listener;
     {
         Mutex::Autolock _l(mLock);
@@ -370,9 +477,10 @@ sp<ICameraRecordingProxy> Camera::getRecordingProxy() {
     return new RecordingProxy(this);
 }
 
-status_t Camera::RecordingProxy::startRecording()
+status_t Camera::RecordingProxy::startRecording(const sp<ICameraRecordingProxyListener>& listener)
 {
     ALOGV("RecordingProxy::startRecording");
+    mCamera->setRecordingProxyListener(listener);
     mCamera->reconnect();
     return mCamera->startRecording();
 }
@@ -381,6 +489,23 @@ void Camera::RecordingProxy::stopRecording()
 {
     ALOGV("RecordingProxy::stopRecording");
     mCamera->stopRecording();
+}
+
+void Camera::RecordingProxy::releaseRecordingFrame(const sp<IMemory>& mem)
+{
+    ALOGV("RecordingProxy::releaseRecordingFrame");
+    mCamera->releaseRecordingFrame(mem);
+}
+
+void Camera::RecordingProxy::releaseRecordingFrameHandle(native_handle_t* handle) {
+    ALOGV("RecordingProxy::releaseRecordingFrameHandle");
+    mCamera->releaseRecordingFrameHandle(handle);
+}
+
+void Camera::RecordingProxy::releaseRecordingFrameHandleBatch(
+        const std::vector<native_handle_t*>& handles) {
+    ALOGV("RecordingProxy::releaseRecordingFrameHandleBatch");
+    mCamera->releaseRecordingFrameHandleBatch(handles);
 }
 
 Camera::RecordingProxy::RecordingProxy(const sp<Camera>& camera)

@@ -45,7 +45,8 @@ public:
         Size videoSize,
         int32_t videoFrameRate,
         const sp<IGraphicBufferProducer>& surface,
-        int64_t timeBetweenTimeLapseFrameCaptureUs);
+        int64_t timeBetweenTimeLapseFrameCaptureUs,
+        bool storeMetaDataInVideoBuffers = true);
 
     virtual ~CameraSourceTimeLapse();
 
@@ -121,7 +122,8 @@ private:
         Size videoSize,
         int32_t videoFrameRate,
         const sp<IGraphicBufferProducer>& surface,
-        int64_t timeBetweenTimeLapseFrameCaptureUs);
+        int64_t timeBetweenTimeLapseFrameCaptureUs,
+        bool storeMetaDataInVideoBuffers = true);
 
     // Wrapper over CameraSource::signalBufferReturned() to implement quick stop.
     // It only handles the case when mLastReadBufferCopy is signalled. Otherwise
@@ -134,6 +136,33 @@ private:
     // mSkipCurrentFrame is set to true in dataCallbackTimestamp() if the current
     // frame needs to be skipped and this function just returns the value of mSkipCurrentFrame.
     virtual bool skipCurrentFrame(int64_t timestampUs);
+
+    // In the video camera case calls skipFrameAndModifyTimeStamp() to modify
+    // timestamp and set mSkipCurrentFrame.
+    // Then it calls the base CameraSource::dataCallbackTimestamp()
+    // This will be called in VIDEO_BUFFER_MODE_DATA_CALLBACK_YUV and
+    // VIDEO_BUFFER_MODE_DATA_CALLBACK_METADATA mode.
+    virtual void dataCallbackTimestamp(int64_t timestampUs, int32_t msgType,
+            const sp<IMemory> &data);
+
+    // In the video camera case calls skipFrameAndModifyTimeStamp() to modify
+    // timestamp and set mSkipCurrentFrame.
+    // Then it calls the base CameraSource::recordingFrameHandleCallbackTimestamp() or
+    // CameraSource::recordingFrameHandleCallbackTimestampBatch()
+    // This will be called in VIDEO_BUFFER_MODE_DATA_CALLBACK_METADATA mode when
+    // the metadata is VideoNativeHandleMetadata.
+    virtual void recordingFrameHandleCallbackTimestamp(int64_t timestampUs,
+            native_handle_t* handle);
+
+    // In the video camera case calls skipFrameAndModifyTimeStamp() to modify
+    // timestamp and set mSkipCurrentFrame.
+    // Then it calls the base CameraSource::recordingFrameHandleCallbackTimestamp() or
+    // CameraSource::recordingFrameHandleCallbackTimestampBatch()
+    // This will be called in VIDEO_BUFFER_MODE_DATA_CALLBACK_METADATA mode when
+    // the metadata is VideoNativeHandleMetadata.
+    virtual void recordingFrameHandleCallbackTimestampBatch(
+            const std::vector<int64_t>& timestampsUs,
+            const std::vector<native_handle_t*>& handles);
 
     // Process a buffer item received in CameraSource::BufferQueueListener.
     // This will be called in VIDEO_BUFFER_MODE_BUFFER_QUEUE mode.
@@ -157,6 +186,9 @@ private:
 
     // Wrapper to enter threadTimeLapseEntry()
     static void *ThreadTimeLapseWrapper(void *me);
+
+    // Creates a copy of source_data into a new memory of final type MemoryBase.
+    sp<IMemory> createIMemoryCopy(const sp<IMemory> &source_data);
 
     CameraSourceTimeLapse(const CameraSourceTimeLapse &);
     CameraSourceTimeLapse &operator=(const CameraSourceTimeLapse &);

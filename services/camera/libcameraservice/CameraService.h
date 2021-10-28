@@ -72,6 +72,7 @@ class CameraService :
     public virtual CameraProviderManager::StatusListener
 {
     friend class BinderService<CameraService>;
+    friend class CameraClient;
     friend class CameraOfflineSessionClient;
 public:
     class Client;
@@ -132,6 +133,12 @@ public:
     virtual binder::Status     connect(const sp<hardware::ICameraClient>& cameraClient,
             int32_t cameraId, const String16& clientPackageName,
             int32_t clientUid, int clientPid, int targetSdkVersion,
+            /*out*/
+            sp<hardware::ICamera>* device);
+
+    virtual binder::Status     connectLegacy(const sp<hardware::ICameraClient>& cameraClient,
+            int32_t cameraId, int32_t halVersion,
+            const String16& clientPackageName, int32_t clientUidclientPid, int clientPid,
             /*out*/
             sp<hardware::ICamera>* device);
 
@@ -777,7 +784,7 @@ private:
     // Single implementation shared between the various connect calls
     template<class CALLBACK, class CLIENT>
     binder::Status connectHelper(const sp<CALLBACK>& cameraCb, const String8& cameraId,
-            int api1CameraId, const String16& clientPackageName,
+            int api1CameraId, int halVersion, const String16& clientPackageName,
             const std::optional<String16>& clientFeatureId, int clientUid, int clientPid,
             apiLevel effectiveApiLevel, bool shimUpdateOnly, int scoreOffset, int targetSdkVersion,
             /*out*/sp<CLIENT>& device);
@@ -1146,7 +1153,7 @@ private:
             const sp<IInterface>& cameraCb, const String16& packageName,
             const std::optional<String16>& featureId, const String8& cameraId, int api1CameraId,
             int facing, int sensorOrientation, int clientPid, uid_t clientUid, int servicePid,
-            int deviceVersion, apiLevel effectiveApiLevel, bool overrideForPerfClass,
+            int halVersion, int deviceVersion, apiLevel effectiveApiLevel, bool overrideForPerfClass,
             /*out*/sp<BasicClient>* client);
 
     status_t checkCameraAccess(const String16& opPackageName);

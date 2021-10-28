@@ -283,6 +283,11 @@ public:
             /*out*/
             sp<hardware::camera::device::V3_2::ICameraDeviceSession> *session);
 
+    status_t openSession(const std::string &id,
+            const sp<hardware::camera::device::V1_0::ICameraDeviceCallback>& callback,
+            /*out*/
+            sp<hardware::camera::device::V1_0::ICameraDevice> *session);
+
     /**
      * Save the ICameraProvider while it is being used by a camera or torch client
      */
@@ -534,6 +539,28 @@ private:
         // advertised by the provider, and to distinguish against "hidden"
         // physical camera IDs.
         std::vector<std::string> mProviderPublicCameraIds;
+
+        // HALv1-specific camera fields, including the actual device interface
+        struct DeviceInfo1 : public DeviceInfo {
+            typedef hardware::camera::device::V1_0::ICameraDevice InterfaceT;
+
+            virtual status_t setTorchMode(bool enabled) override;
+            virtual status_t filterSmallJpegSizes() override;
+            virtual status_t getCameraInfo(hardware::CameraInfo *info) const override;
+            //In case of Device1Info assume that we are always API1 compatible
+            virtual bool isAPI1Compatible() const override { return true; }
+            virtual status_t dumpState(int fd) override;
+            DeviceInfo1(const std::string& name, const metadata_vendor_id_t tagId,
+                    const std::string &id, uint16_t minorVersion,
+                    const hardware::camera::common::V1_0::CameraResourceCost& resourceCost,
+                    sp<ProviderInfo> parentProvider,
+                    const std::vector<std::string>& publicCameraIds,
+                    sp<InterfaceT> interface);
+            virtual ~DeviceInfo1();
+        private:
+            CameraParameters2 mDefaultParameters;
+            status_t cacheCameraInfo(sp<InterfaceT> interface);
+        };
 
         // HALv3-specific camera fields, including the actual device interface
         struct DeviceInfo3 : public DeviceInfo {

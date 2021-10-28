@@ -24,6 +24,7 @@
 #include <gui/IGraphicBufferProducer.h>
 #include <system/camera.h>
 #include <camera/ICameraRecordingProxy.h>
+#include <camera/ICameraRecordingProxyListener.h>
 #include <camera/android/hardware/ICamera.h>
 #include <camera/android/hardware/ICameraClient.h>
 #include <camera/CameraBase.h>
@@ -82,6 +83,10 @@ public:
     static  sp<Camera>  connect(int cameraId,
                                 const String16& clientPackageName,
                                 int clientUid, int clientPid, int targetSdkVersion);
+
+    static  status_t  connectLegacy(int cameraId, int halVersion,
+                                     const String16& clientPackageName,
+                                     int clientUid, int clientPid, sp<Camera>& camera);
 
             virtual     ~Camera();
 
@@ -149,6 +154,7 @@ public:
             status_t    setVideoTarget(const sp<IGraphicBufferProducer>& bufferProducer);
 
             void        setListener(const sp<CameraListener>& listener);
+            void        setRecordingProxyListener(const sp<ICameraRecordingProxyListener>& listener);
 
             // Configure preview callbacks to app. Only one of the older
             // callbacks or the callback surface can be active at the same time;
@@ -181,8 +187,12 @@ public:
         explicit RecordingProxy(const sp<Camera>& camera);
 
         // ICameraRecordingProxy interface
-        virtual status_t startRecording();
+        virtual status_t startRecording(const sp<ICameraRecordingProxyListener>& listener);
         virtual void stopRecording();
+        virtual void releaseRecordingFrame(const sp<IMemory>& mem);
+        virtual void releaseRecordingFrameHandle(native_handle_t* handle);
+        virtual void releaseRecordingFrameHandleBatch(
+                const std::vector<native_handle_t*>& handles);
 
     private:
         sp<Camera>         mCamera;
@@ -192,6 +202,8 @@ protected:
     explicit            Camera(int cameraId);
                         Camera(const Camera&);
                         Camera& operator=(const Camera);
+
+    sp<ICameraRecordingProxyListener>  mRecordingProxyListener;
 
     friend class        CameraBase;
 };
