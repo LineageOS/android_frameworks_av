@@ -110,8 +110,16 @@ public:
     virtual void        onDeviceStatusChanged(const String8 &cameraId,
             const String8 &physicalCameraId,
             hardware::camera::common::V1_0::CameraDeviceStatus newHalStatus) override;
+    // This method may hold CameraProviderManager::mInterfaceMutex as a part
+    // of calling getSystemCameraKind() internally. Care should be taken not to
+    // directly / indirectly call this from callers who also hold
+    // mInterfaceMutex.
     virtual void        onTorchStatusChanged(const String8& cameraId,
             hardware::camera::common::V1_0::TorchModeStatus newStatus) override;
+    // Does not hold CameraProviderManager::mInterfaceMutex.
+    virtual void        onTorchStatusChanged(const String8& cameraId,
+            hardware::camera::common::V1_0::TorchModeStatus newStatus,
+            SystemCameraKind kind) override;
     virtual void        onNewProviderRegistered() override;
 
     /////////////////////////////////////////////////////////////////////
@@ -271,6 +279,10 @@ public:
         virtual status_t dump(int fd, const Vector<String16>& args);
         // Internal dump method to be called by CameraService
         virtual status_t dumpClient(int fd, const Vector<String16>& args) = 0;
+
+        virtual status_t startWatchingTags(const String8 &tags, int outFd);
+        virtual status_t stopWatchingTags(int outFd);
+        virtual status_t dumpWatchedEventsToVector(std::vector<std::string> &out);
 
         // Return the package name for this client
         virtual String16 getPackageName() const;
@@ -825,6 +837,14 @@ private:
     RingBuffer<String8> mEventLog;
     Mutex mLogLock;
 
+    // set of client package names to watch. if this set contains 'all', then all clients will
+    // be watched. Access should be guarded by mLogLock
+    std::set<String16> mWatchedClientPackages;
+    // cache of last monitored tags dump immediately before the client disconnects. If a client
+    // re-connects, its entry is not updated until it disconnects again. Access should be guarded
+    // by mLogLock
+    std::map<String16, std::string> mWatchedClientsDumpCache;
+
     // The last monitored tags set by client
     String8 mMonitorTags;
 
@@ -956,6 +976,8 @@ private:
      * Dump the event log to an FD
      */
     void dumpEventLog(int fd);
+
+    void cacheClientTagDumpIfNeeded(const char *cameraId, BasicClient *client);
 
     /**
      * This method will acquire mServiceLock
@@ -1149,8 +1171,46 @@ private:
     // Set the camera mute state
     status_t handleSetCameraMute(const Vector<String16>& args);
 
+    // Handle 'watch' command as passed through 'cmd'
+    status_t handleWatchCommand(const Vector<String16> &args, int outFd);
+
+    // Enable tag monitoring of the given tags in provided clients
+    status_t startWatchingTags(const Vector<String16> &args, int outFd);
+
+    // Disable tag monitoring
+    status_t stopWatchingTags(int outFd);
+
+    // Print events of monitored tags in all cached and attached clients
+    status_t printWatchedTags(const Vector<String16> &args, int outFd);
+
+    // Print events of monitored tags in all attached clients as they are captured. New events are
+    // fetched every `refreshMicros` us
+    // NOTE: This function does not terminate unless interrupted.
+    status_t printWatchedTagsUntilInterrupt(useconds_t refreshMicros, int outFd);
+
+    // Print all events in vector `events' that came after lastPrintedEvent
+    static void printNewWatchedEvents(int outFd,
+                                      const char *cameraId,
+                                      const String16 &packageName,
+                                      const std::vector<std::string> &events,
+                                      const std::string &lastPrintedEvent);
+
+    // Parses comma separated clients list and adds them to mWatchedClientPackages.
+    // Does not acquire mLogLock before modifying mWatchedClientPackages. It is the caller's
+    // responsibility to acquire mLogLock before calling this function.
+    void parseClientsToWatchLocked(String8 clients);
+
     // Prints the shell command help
     status_t printHelp(int out);
+
+    // Returns true if client should monitor tags based on the contents of mWatchedClientPackages.
+    // Acquires mLogLock before querying mWatchedClientPackages.
+    bool isClientWatched(const BasicClient *client);
+
+    // Returns true if client should monitor tags based on the contents of mWatchedClientPackages.
+    // Does not acquire mLogLock before querying mWatchedClientPackages. It is the caller's
+    // responsibility to acquire mLogLock before calling this functions.
+    bool isClientWatchedLocked(const BasicClient *client);
 
     /**
      * Get the current system time as a formatted string.
@@ -1181,6 +1241,10 @@ private:
     // Regular online and offline devices must not be in conflict at camera service layer.
     // Use separate keys for offline devices.
     static const String8 kOfflineDevice;
+
+    // Sentinel value to be stored in `mWatchedClientsPackages` to indicate that all clients should
+    // be watched.
+    static const String16 kWatchAllClientsFlag;
 
     // TODO: right now each BasicClient holds one AppOpsManager instance.
     // We can refactor the code so all of clients share this instance

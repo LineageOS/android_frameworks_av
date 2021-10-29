@@ -1797,6 +1797,35 @@ status_t CameraDeviceClient::dumpClient(int fd, const Vector<String16>& args) {
     return dumpDevice(fd, args);
 }
 
+status_t CameraDeviceClient::startWatchingTags(const String8 &tags, int out) {
+    sp<CameraDeviceBase> device = mDevice;
+    if (!device) {
+        dprintf(out, "  Device is detached.");
+        return OK;
+    }
+    device->startWatchingTags(tags);
+    return OK;
+}
+
+status_t CameraDeviceClient::stopWatchingTags(int out) {
+    sp<CameraDeviceBase> device = mDevice;
+    if (!device) {
+        dprintf(out, "  Device is detached.");
+        return OK;
+    }
+    device->stopWatchingTags();
+    return OK;
+}
+
+status_t CameraDeviceClient::dumpWatchedEventsToVector(std::vector<std::string> &out) {
+    sp<CameraDeviceBase> device = mDevice;
+    if (!device) {
+        return OK;
+    }
+    device->dumpWatchedEventsToVector(out);
+    return OK;
+}
+
 void CameraDeviceClient::notifyError(int32_t errorCode,
                                      const CaptureResultExtras& resultExtras) {
     // Thread safe. Don't bother locking.

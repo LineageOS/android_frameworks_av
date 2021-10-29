@@ -74,11 +74,23 @@ class TagMonitor {
     // Dump current event log to the provided fd
     void dumpMonitoredMetadata(int fd);
 
-  private:
+    // Dumps the latest monitored Tag events to the passed vector.
+    // NOTE: The events are appended to the vector in reverser chronological order
+    // (i.e. most recent first)
+    void getLatestMonitoredTagEvents(std::vector<std::string> &out);
 
-    static void printData(int fd, const uint8_t *data_ptr, uint32_t tag,
-            int type, int count, int indentation,
-            const std::unordered_set<int32_t> &outputStreamIds, int32_t inputStreamId);
+  private:
+    // Dumps monitored tag events to the passed vector without acquiring
+    // mMonitorMutex. mMonitorMutex must be acquired before calling this
+    // function.
+    void dumpMonitoredTagEventsToVectorLocked(std::vector<std::string> &out);
+
+    static String8 getEventDataString(const uint8_t *data_ptr,
+                                       uint32_t tag, int type,
+                                       int count,
+                                       int indentation,
+                                       const std::unordered_set<int32_t> &outputStreamIds,
+                                       int32_t inputStreamId);
 
     void monitorSingleMetadata(TagMonitor::eventSource source, int64_t frameNumber,
             nsecs_t timestamp, const std::string& cameraId, uint32_t tag,

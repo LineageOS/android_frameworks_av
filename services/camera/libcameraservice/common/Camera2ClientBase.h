@@ -61,6 +61,9 @@ public:
 
     virtual status_t      initialize(sp<CameraProviderManager> manager, const String8& monitorTags);
     virtual status_t      dumpClient(int fd, const Vector<String16>& args);
+    virtual status_t      startWatchingTags(const String8 &tags, int out);
+    virtual status_t      stopWatchingTags(int out);
+    virtual status_t      dumpWatchedEventsToVector(std::vector<std::string> &out);
 
     /**
      * NotificationListener implementation

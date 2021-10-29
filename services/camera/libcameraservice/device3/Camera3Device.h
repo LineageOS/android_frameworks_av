@@ -106,6 +106,9 @@ class Camera3Device :
     status_t initialize(sp<CameraProviderManager> manager, const String8& monitorTags) override;
     status_t disconnect() override;
     status_t dump(int fd, const Vector<String16> &args) override;
+    status_t startWatchingTags(const String8 &tags) override;
+    status_t stopWatchingTags() override;
+    status_t dumpWatchedEventsToVector(std::vector<std::string> &out) override;
     const CameraMetadata& info() const override;
     const CameraMetadata& infoPhysical(const String8& physicalId) const override;
 
