@@ -71,6 +71,10 @@ public:
 
     status_t dumpClient(int /*fd*/, const Vector<String16>& /*args*/) override;
 
+    status_t startWatchingTags(const String8 &tags, int outFd) override;
+    status_t stopWatchingTags(int outFd) override;
+    status_t dumpWatchedEventsToVector(std::vector<std::string> &out) override;
+
     status_t initialize(sp<CameraProviderManager> /*manager*/,
             const String8& /*monitorTags*/) override;
 
