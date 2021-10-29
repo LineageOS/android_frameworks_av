@@ -28,7 +28,7 @@
 
 namespace android {
 
-class ToneGenerator {
+class ToneGenerator : public AudioTrack::IAudioTrackCallback {
 public:
 
     // List of all available tones
@@ -156,6 +156,9 @@ public:
 
     ToneGenerator(audio_stream_type_t streamType, float volume, bool threadCanCallJava = false,
             std::string opPackageName = {});
+
+    void onFirstRef() override;
+
     ~ToneGenerator();
 
     bool startTone(tone_type toneType, int durationMs = -1);
@@ -311,6 +314,7 @@ private:
     unsigned int mProcessSize;  // Size of audio blocks generated at a time by audioCallback() (in PCM frames).
     struct timespec mStartTime; // tone start time: needed to guaranty actual tone duration
 
+    size_t onMoreData(const AudioTrack::Buffer& buffer) override;
     bool initAudioTrack();
     static void audioCallback(int event, void* user, void *info);
     bool prepareWave();
