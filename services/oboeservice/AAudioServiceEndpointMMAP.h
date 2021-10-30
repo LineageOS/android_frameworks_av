@@ -79,7 +79,7 @@ public:
     void onRoutingChanged(audio_port_handle_t portHandle) override;
     // ------------------------------------------------------------------------------
 
-    aaudio_result_t getDownDataDescription(AudioEndpointParcelable &parcelable);
+    aaudio_result_t getDownDataDescription(AudioEndpointParcelable* parcelable);
 
     int64_t getHardwareTimeOffsetNanos() const {
         return mHardwareTimeOffsetNanos;

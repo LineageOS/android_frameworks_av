@@ -27,6 +27,7 @@ cc_library {
 
     srcs: [
         "AAudioClientTracker.cpp",
+        "AAudioCommandQueue.cpp",
         "AAudioEndpointManager.cpp",
         "AAudioMixer.cpp",
         "AAudioService.cpp",

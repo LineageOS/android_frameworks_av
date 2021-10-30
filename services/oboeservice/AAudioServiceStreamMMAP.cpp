@@ -141,7 +141,7 @@ aaudio_result_t AAudioServiceStreamMMAP::stopClient(audio_port_handle_t clientHa
 }
 
 // Get free-running DSP or DMA hardware position from the HAL.
-aaudio_result_t AAudioServiceStreamMMAP::getFreeRunningPosition(int64_t *positionFrames,
+aaudio_result_t AAudioServiceStreamMMAP::getFreeRunningPosition_l(int64_t *positionFrames,
                                                                   int64_t *timeNanos) {
     sp<AAudioServiceEndpoint> endpoint = mServiceEndpointWeak.promote();
     if (endpoint == nullptr) {
@@ -158,14 +158,14 @@ aaudio_result_t AAudioServiceStreamMMAP::getFreeRunningPosition(int64_t *positio
         *positionFrames = timestamp.getPosition();
         *timeNanos = timestamp.getNanoseconds();
     } else if (result != AAUDIO_ERROR_UNAVAILABLE) {
-        disconnect();
+        disconnect_l();
     }
     return result;
 }
 
 // Get timestamp from presentation position.
 // If it fails, get timestamp that was written by getFreeRunningPosition()
-aaudio_result_t AAudioServiceStreamMMAP::getHardwareTimestamp(int64_t *positionFrames,
+aaudio_result_t AAudioServiceStreamMMAP::getHardwareTimestamp_l(int64_t *positionFrames,
                                                                 int64_t *timeNanos) {
 
     sp<AAudioServiceEndpoint> endpoint = mServiceEndpointWeak.promote();
@@ -198,8 +198,8 @@ aaudio_result_t AAudioServiceStreamMMAP::getHardwareTimestamp(int64_t *positionF
 }
 
 // Get an immutable description of the data queue from the HAL.
-aaudio_result_t AAudioServiceStreamMMAP::getAudioDataDescription(
-        AudioEndpointParcelable &parcelable)
+aaudio_result_t AAudioServiceStreamMMAP::getAudioDataDescription_l(
+        AudioEndpointParcelable* parcelable)
 {
     sp<AAudioServiceEndpoint> endpoint = mServiceEndpointWeak.promote();
     if (endpoint == nullptr) {
