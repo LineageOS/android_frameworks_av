@@ -368,12 +368,36 @@ ConversionResult<media::AudioPortType> legacy2aidl_audio_port_type_t_AudioPortTy
 namespace {
 
 namespace detail {
+using AudioChannelBitPair = std::pair<audio_channel_mask_t, int>;
+using AudioChannelBitPairs = std::vector<AudioChannelBitPair>;
 using AudioChannelPair = std::pair<audio_channel_mask_t, AudioChannelLayout>;
 using AudioChannelPairs = std::vector<AudioChannelPair>;
 using AudioDevicePair = std::pair<audio_devices_t, AudioDeviceDescription>;
 using AudioDevicePairs = std::vector<AudioDevicePair>;
 using AudioFormatPair = std::pair<audio_format_t, AudioFormatDescription>;
 using AudioFormatPairs = std::vector<AudioFormatPair>;
+}
+
+const detail::AudioChannelBitPairs& getInAudioChannelBits() {
+    static const detail::AudioChannelBitPairs pairs = {
+        { AUDIO_CHANNEL_IN_LEFT, AudioChannelLayout::CHANNEL_FRONT_LEFT },
+        { AUDIO_CHANNEL_IN_RIGHT, AudioChannelLayout::CHANNEL_FRONT_RIGHT },
+        // AUDIO_CHANNEL_IN_FRONT is at the end
+        { AUDIO_CHANNEL_IN_BACK, AudioChannelLayout::CHANNEL_BACK_CENTER },
+        // AUDIO_CHANNEL_IN_*_PROCESSED not supported
+        // AUDIO_CHANNEL_IN_PRESSURE not supported
+        // AUDIO_CHANNEL_IN_*_AXIS not supported
+        // AUDIO_CHANNEL_IN_VOICE_* not supported
+        { AUDIO_CHANNEL_IN_BACK_LEFT, AudioChannelLayout::CHANNEL_BACK_LEFT },
+        { AUDIO_CHANNEL_IN_BACK_RIGHT, AudioChannelLayout::CHANNEL_BACK_RIGHT },
+        { AUDIO_CHANNEL_IN_CENTER, AudioChannelLayout::CHANNEL_FRONT_CENTER },
+        { AUDIO_CHANNEL_IN_LOW_FREQUENCY, AudioChannelLayout::CHANNEL_LOW_FREQUENCY },
+        { AUDIO_CHANNEL_IN_TOP_LEFT, AudioChannelLayout::CHANNEL_TOP_SIDE_LEFT },
+        { AUDIO_CHANNEL_IN_TOP_RIGHT, AudioChannelLayout::CHANNEL_TOP_SIDE_RIGHT },
+        // When going from aidl to legacy, IN_CENTER is used
+        { AUDIO_CHANNEL_IN_FRONT, AudioChannelLayout::CHANNEL_FRONT_CENTER }
+    };
+    return pairs;
 }
 
 const detail::AudioChannelPairs& getInAudioChannelPairs() {
@@ -395,6 +419,44 @@ const detail::AudioChannelPairs& getInAudioChannelPairs() {
         DEFINE_INPUT_LAYOUT(3POINT1POINT2),
         DEFINE_INPUT_LAYOUT(5POINT1)
 #undef DEFINE_INPUT_LAYOUT
+    };
+    return pairs;
+}
+
+const detail::AudioChannelBitPairs& getOutAudioChannelBits() {
+    static const detail::AudioChannelBitPairs pairs = {
+#define DEFINE_OUTPUT_BITS(n)                                                  \
+            { AUDIO_CHANNEL_OUT_##n, AudioChannelLayout::CHANNEL_##n }
+
+        DEFINE_OUTPUT_BITS(FRONT_LEFT),
+        DEFINE_OUTPUT_BITS(FRONT_RIGHT),
+        DEFINE_OUTPUT_BITS(FRONT_CENTER),
+        DEFINE_OUTPUT_BITS(LOW_FREQUENCY),
+        DEFINE_OUTPUT_BITS(BACK_LEFT),
+        DEFINE_OUTPUT_BITS(BACK_RIGHT),
+        DEFINE_OUTPUT_BITS(FRONT_LEFT_OF_CENTER),
+        DEFINE_OUTPUT_BITS(FRONT_RIGHT_OF_CENTER),
+        DEFINE_OUTPUT_BITS(BACK_CENTER),
+        DEFINE_OUTPUT_BITS(SIDE_LEFT),
+        DEFINE_OUTPUT_BITS(SIDE_RIGHT),
+        DEFINE_OUTPUT_BITS(TOP_CENTER),
+        DEFINE_OUTPUT_BITS(TOP_FRONT_LEFT),
+        DEFINE_OUTPUT_BITS(TOP_FRONT_CENTER),
+        DEFINE_OUTPUT_BITS(TOP_FRONT_RIGHT),
+        DEFINE_OUTPUT_BITS(TOP_BACK_LEFT),
+        DEFINE_OUTPUT_BITS(TOP_BACK_CENTER),
+        DEFINE_OUTPUT_BITS(TOP_BACK_RIGHT),
+        DEFINE_OUTPUT_BITS(TOP_SIDE_LEFT),
+        DEFINE_OUTPUT_BITS(TOP_SIDE_RIGHT),
+        DEFINE_OUTPUT_BITS(BOTTOM_FRONT_LEFT),
+        DEFINE_OUTPUT_BITS(BOTTOM_FRONT_CENTER),
+        DEFINE_OUTPUT_BITS(BOTTOM_FRONT_RIGHT),
+        DEFINE_OUTPUT_BITS(LOW_FREQUENCY_2),
+        DEFINE_OUTPUT_BITS(FRONT_WIDE_LEFT),
+        DEFINE_OUTPUT_BITS(FRONT_WIDE_RIGHT),
+#undef DEFINE_OUTPUT_BITS
+        { AUDIO_CHANNEL_OUT_HAPTIC_A, AudioChannelLayout::CHANNEL_HAPTIC_A },
+        { AUDIO_CHANNEL_OUT_HAPTIC_B, AudioChannelLayout::CHANNEL_HAPTIC_B }
     };
     return pairs;
 }
@@ -1007,6 +1069,25 @@ std::unordered_map<T, S> make_ReverseMap(const std::vector<std::pair<S, T>>& v) 
 
 }  // namespace
 
+audio_channel_mask_t aidl2legacy_AudioChannelLayout_layout_audio_channel_mask_t_bits(
+        int aidlLayout, bool isInput) {
+    auto& bitMapping = isInput ? getInAudioChannelBits() : getOutAudioChannelBits();
+    const int aidlLayoutInitial = aidlLayout; // for error message
+    audio_channel_mask_t legacy = AUDIO_CHANNEL_NONE;
+    for (const auto& bitPair : bitMapping) {
+        if ((aidlLayout & bitPair.second) == bitPair.second) {
+            legacy = static_cast<audio_channel_mask_t>(legacy | bitPair.first);
+            aidlLayout &= ~bitPair.second;
+            if (aidlLayout == 0) {
+                return legacy;
+            }
+        }
+    }
+    ALOGE("%s: aidl layout 0x%x contains bits 0x%x that have no match to legacy %s bits",
+            __func__, aidlLayoutInitial, aidlLayout, isInput ? "input" : "output");
+    return AUDIO_CHANNEL_NONE;
+}
+
 ConversionResult<audio_channel_mask_t> aidl2legacy_AudioChannelLayout_audio_channel_mask_t(
         const AudioChannelLayout& aidl, bool isInput) {
     using ReverseMap = std::unordered_map<AudioChannelLayout, audio_channel_mask_t>;
@@ -1020,7 +1101,7 @@ ConversionResult<audio_channel_mask_t> aidl2legacy_AudioChannelLayout_audio_chan
         if (auto it = m.find(aidl); it != m.end()) {
             return it->second;
         } else {
-            ALOGE("%s: no legacy %s audio_channel_mask_t found for %s", func, type,
+            ALOGW("%s: no legacy %s audio_channel_mask_t found for %s", func, type,
                     aidl.toString().c_str());
             return unexpected(BAD_VALUE);
         }
@@ -1031,10 +1112,10 @@ ConversionResult<audio_channel_mask_t> aidl2legacy_AudioChannelLayout_audio_chan
             return AUDIO_CHANNEL_NONE;
         case Tag::invalid:
             return AUDIO_CHANNEL_INVALID;
-        case Tag::indexMask: {
+        case Tag::indexMask:
             // Index masks do not have pre-defined values.
-            const int bits = aidl.get<Tag::indexMask>();
-            if (__builtin_popcount(bits) != 0 &&
+            if (const int bits = aidl.get<Tag::indexMask>();
+                    __builtin_popcount(bits) != 0 &&
                     __builtin_popcount(bits) <= AUDIO_CHANNEL_COUNT_MAX) {
                 return audio_channel_mask_from_representation_and_bits(
                         AUDIO_CHANNEL_REPRESENTATION_INDEX, bits);
@@ -1043,14 +1124,45 @@ ConversionResult<audio_channel_mask_t> aidl2legacy_AudioChannelLayout_audio_chan
                         __func__, bits, aidl.toString().c_str());
                 return unexpected(BAD_VALUE);
             }
-        }
         case Tag::layoutMask:
-            return convert(aidl, isInput ? mIn : mOut, __func__, isInput ? "input" : "output");
+            // The fast path is to find a direct match for some known layout mask.
+            if (const auto layoutMatch = convert(aidl, isInput ? mIn : mOut, __func__,
+                    isInput ? "input" : "output");
+                    layoutMatch.ok()) {
+                return layoutMatch;
+            }
+            // If a match for a predefined layout wasn't found, make a custom one from bits.
+            if (audio_channel_mask_t bitMask =
+                    aidl2legacy_AudioChannelLayout_layout_audio_channel_mask_t_bits(
+                            aidl.get<Tag::layoutMask>(), isInput);
+                    bitMask != AUDIO_CHANNEL_NONE) {
+                return bitMask;
+            }
+            return unexpected(BAD_VALUE);
         case Tag::voiceMask:
             return convert(aidl, mVoice, __func__, "voice");
     }
     ALOGE("%s: unexpected tag value %d", __func__, aidl.getTag());
     return unexpected(BAD_VALUE);
+}
+
+int legacy2aidl_audio_channel_mask_t_bits_AudioChannelLayout_layout(
+        audio_channel_mask_t legacy, bool isInput) {
+    auto& bitMapping = isInput ? getInAudioChannelBits() : getOutAudioChannelBits();
+    const int legacyInitial = legacy; // for error message
+    int aidlLayout = 0;
+    for (const auto& bitPair : bitMapping) {
+        if ((legacy & bitPair.first) == bitPair.first) {
+            aidlLayout |= bitPair.second;
+            legacy = static_cast<audio_channel_mask_t>(legacy & ~bitPair.first);
+            if (legacy == 0) {
+                return aidlLayout;
+            }
+        }
+    }
+    ALOGE("%s: legacy %s audio_channel_mask_t 0x%x contains unrecognized bits 0x%x",
+            __func__, isInput ? "input" : "output", legacyInitial, legacy);
+    return 0;
 }
 
 ConversionResult<AudioChannelLayout> legacy2aidl_audio_channel_mask_t_AudioChannelLayout(
@@ -1066,7 +1178,7 @@ ConversionResult<AudioChannelLayout> legacy2aidl_audio_channel_mask_t_AudioChann
         if (auto it = m.find(legacy); it != m.end()) {
             return it->second;
         } else {
-            ALOGE("%s: no AudioChannelLayout found for legacy %s audio_channel_mask_t value 0x%x",
+            ALOGW("%s: no AudioChannelLayout found for legacy %s audio_channel_mask_t value 0x%x",
                     func, type, legacy);
             return unexpected(BAD_VALUE);
         }
@@ -1089,8 +1201,27 @@ ConversionResult<AudioChannelLayout> legacy2aidl_audio_channel_mask_t_AudioChann
             return unexpected(BAD_VALUE);
         }
     } else if (repr == AUDIO_CHANNEL_REPRESENTATION_POSITION) {
-        return convert(legacy, isInput ? mInAndVoice : mOut, __func__,
+        // The fast path is to find a direct match for some known layout mask.
+        if (const auto layoutMatch = convert(legacy, isInput ? mInAndVoice : mOut, __func__,
                 isInput ? "input / voice" : "output");
+                layoutMatch.ok()) {
+            return layoutMatch;
+        }
+        // If a match for a predefined layout wasn't found, make a custom one from bits,
+        // rejecting those with voice channel bits.
+        if (!isInput ||
+                (legacy & (AUDIO_CHANNEL_IN_VOICE_UPLINK | AUDIO_CHANNEL_IN_VOICE_DNLINK)) == 0) {
+            if (int bitMaskLayout =
+                    legacy2aidl_audio_channel_mask_t_bits_AudioChannelLayout_layout(
+                            legacy, isInput);
+                    bitMaskLayout != 0) {
+                return AudioChannelLayout::make<Tag::layoutMask>(bitMaskLayout);
+            }
+        } else {
+            ALOGE("%s: legacy audio_channel_mask_t value 0x%x contains voice bits",
+                    __func__, legacy);
+        }
+        return unexpected(BAD_VALUE);
     }
 
     ALOGE("%s: unknown representation %d in audio_channel_mask_t value 0x%x",
