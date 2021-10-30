@@ -231,6 +231,15 @@ sp<IMemory> StagefrightMetadataRetriever::getImageInternal(
         format = NULL;
     }
 
+    // If decoding thumbnail check decoder supports thumbnail dimensions instead
+    int32_t thumbHeight, thumbWidth;
+    if (thumbnail && format != NULL
+            && trackMeta->findInt32(kKeyThumbnailHeight, &thumbHeight)
+            && trackMeta->findInt32(kKeyThumbnailWidth, &thumbWidth)) {
+        format->setInt32("height", thumbHeight);
+        format->setInt32("width", thumbWidth);
+    }
+
     MediaCodecList::findMatchingCodecs(
             mime,
             false, /* encoder */
