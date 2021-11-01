@@ -20,6 +20,7 @@
 
 #include <aidl/android/hardware/tv/tuner/IFilter.h>
 #include <aidl/android/hardware/tv/tuner/Result.h>
+#include <utils/Log.h>
 
 #include "TunerDemux.h"
 #include "TunerFilter.h"

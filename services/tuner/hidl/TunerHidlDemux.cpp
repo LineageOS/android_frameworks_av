@@ -121,8 +121,8 @@ TunerHidlDemux::~TunerHidlDemux() {
     }
     HidlResult status;
     sp<HidlIFilter> filterSp;
-    sp<::android::hardware::tv::tuner::V1_0::IFilterCallback> cbSp =
-            new TunerHidlFilter::FilterCallback(in_cb);
+    sp<TunerHidlFilter::FilterCallback> filterCb = new TunerHidlFilter::FilterCallback(in_cb);
+    sp<::android::hardware::tv::tuner::V1_0::IFilterCallback> cbSp = filterCb;
     mDemux->openFilter(filterType, static_cast<uint32_t>(in_bufferSize), cbSp,
                        [&](HidlResult r, const sp<HidlIFilter>& filter) {
                            filterSp = filter;
@@ -132,7 +132,7 @@ TunerHidlDemux::~TunerHidlDemux() {
         return ::ndk::ScopedAStatus::fromServiceSpecificError(static_cast<int32_t>(status));
     }
 
-    *_aidl_return = ::ndk::SharedRefBase::make<TunerHidlFilter>(filterSp, in_type);
+    *_aidl_return = ::ndk::SharedRefBase::make<TunerHidlFilter>(filterSp, filterCb, in_type);
     return ::ndk::ScopedAStatus::ok();
 }
 

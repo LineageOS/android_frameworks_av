@@ -20,7 +20,6 @@
 #include <aidl/android/hardware/tv/tuner/BnLnbCallback.h>
 #include <aidl/android/hardware/tv/tuner/ILnb.h>
 #include <aidl/android/media/tv/tuner/BnTunerLnb.h>
-#include <media/stagefright/foundation/ADebug.h>
 #include <utils/Log.h>
 
 using ::aidl::android::hardware::tv::tuner::BnLnbCallback;
