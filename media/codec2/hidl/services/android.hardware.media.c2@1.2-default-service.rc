@@ -3,5 +3,5 @@ service android-hardware-media-c2-hal-1-2 /vendor/bin/hw/android.hardware.media.
     user mediacodec
     group camera mediadrm drmrpc
     ioprio rt 4
-    writepid /dev/cpuset/foreground/tasks
+    task_profiles ProcessCapacityHigh
 
