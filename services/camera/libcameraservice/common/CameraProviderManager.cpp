@@ -1631,7 +1631,6 @@ status_t CameraProviderManager::ProviderInfo::addDevice(const std::string& name,
         case 3:
             deviceInfo = initializeDeviceInfo<DeviceInfo3>(name, mProviderTagid,
                     id, minor);
-            deviceInfo->notifyDeviceStateChange(mDeviceState);
             break;
         default:
             ALOGE("%s: Device %s: Unknown HIDL device HAL major version %d:", __FUNCTION__,
@@ -1639,6 +1638,7 @@ status_t CameraProviderManager::ProviderInfo::addDevice(const std::string& name,
             return BAD_VALUE;
     }
     if (deviceInfo == nullptr) return BAD_VALUE;
+    deviceInfo->notifyDeviceStateChange(mDeviceState);
     deviceInfo->mStatus = initialStatus;
     bool isAPI1Compatible = deviceInfo->isAPI1Compatible();
 
