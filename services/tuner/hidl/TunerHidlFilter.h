@@ -34,7 +34,9 @@
 #include <android/hardware/tv/tuner/1.1/IFilterCallback.h>
 #include <android/hardware/tv/tuner/1.1/types.h>
 #include <fmq/MessageQueue.h>
-#include <media/stagefright/foundation/ADebug.h>
+#include <utils/Mutex.h>
+
+#include <map>
 
 using ::aidl::android::hardware::common::NativeHandle;
 using ::aidl::android::hardware::common::fmq::MQDescriptor;
@@ -52,12 +54,14 @@ using ::aidl::android::hardware::tv::tuner::DemuxFilterType;
 using ::aidl::android::hardware::tv::tuner::DemuxIpAddressIpAddress;
 using ::aidl::android::media::tv::tuner::BnTunerFilter;
 using ::aidl::android::media::tv::tuner::ITunerFilterCallback;
+using ::android::Mutex;
 using ::android::sp;
 using ::android::hardware::hidl_array;
 using ::android::hardware::MQDescriptorSync;
 using ::android::hardware::Return;
 using ::android::hardware::Void;
 using ::std::shared_ptr;
+using ::std::string;
 using ::std::vector;
 
 using HidlAvStreamType = ::android::hardware::tv::tuner::V1_1::AvStreamType;
@@ -111,29 +115,8 @@ const static int IP_V6_LENGTH = 16;
 
 class TunerHidlFilter : public BnTunerFilter {
 public:
-    TunerHidlFilter(sp<HidlIFilter> filter, DemuxFilterType type);
-    virtual ~TunerHidlFilter();
-
-    ::ndk::ScopedAStatus getId(int32_t* _aidl_return) override;
-    ::ndk::ScopedAStatus getId64Bit(int64_t* _aidl_return) override;
-    ::ndk::ScopedAStatus getQueueDesc(AidlMQDesc* _aidl_return) override;
-    ::ndk::ScopedAStatus configure(const DemuxFilterSettings& in_settings) override;
-    ::ndk::ScopedAStatus configureMonitorEvent(int32_t in_monitorEventTypes) override;
-    ::ndk::ScopedAStatus configureIpFilterContextId(int32_t in_cid) override;
-    ::ndk::ScopedAStatus configureAvStreamType(const AvStreamType& in_avStreamType) override;
-    ::ndk::ScopedAStatus getAvSharedHandle(NativeHandle* out_avMemory,
-                                           int64_t* _aidl_return) override;
-    ::ndk::ScopedAStatus releaseAvHandle(const NativeHandle& in_handle,
-                                         int64_t in_avDataId) override;
-    ::ndk::ScopedAStatus setDataSource(const shared_ptr<ITunerFilter>& in_filter) override;
-    ::ndk::ScopedAStatus start() override;
-    ::ndk::ScopedAStatus stop() override;
-    ::ndk::ScopedAStatus flush() override;
-    ::ndk::ScopedAStatus close() override;
-
-    sp<HidlIFilter> getHalFilter();
-
-    struct FilterCallback : public HidlIFilterCallback {
+    class FilterCallback : public HidlIFilterCallback {
+    public:
         FilterCallback(const shared_ptr<ITunerFilterCallback> tunerFilterCallback)
               : mTunerFilterCallback(tunerFilterCallback){};
 
@@ -142,6 +125,11 @@ public:
                                                const HidlDemuxFilterEventExt& filterEventExt);
         virtual Return<void> onFilterStatus(HidlDemuxFilterStatus status);
 
+        void sendSharedFilterStatus(int32_t status);
+        void attachSharedFilterCallback(const shared_ptr<ITunerFilterCallback>& in_cb);
+        void detachSharedFilterCallback();
+
+    private:
         void getAidlFilterEvent(const vector<HidlDemuxFilterEvent::Event>& events,
                                 const vector<HidlDemuxFilterEventExt::Event>& eventsExt,
                                 vector<DemuxFilterEvent>& aidlEvents);
@@ -169,8 +157,38 @@ public:
         void getRestartEvent(const vector<HidlDemuxFilterEventExt::Event>& eventsExt,
                              vector<DemuxFilterEvent>& res);
 
+    private:
         shared_ptr<ITunerFilterCallback> mTunerFilterCallback;
+        shared_ptr<ITunerFilterCallback> mOriginalCallback;
+        Mutex mCallbackLock;
     };
+
+    TunerHidlFilter(sp<HidlIFilter> filter, sp<FilterCallback> cb, DemuxFilterType type);
+    virtual ~TunerHidlFilter();
+
+    ::ndk::ScopedAStatus getId(int32_t* _aidl_return) override;
+    ::ndk::ScopedAStatus getId64Bit(int64_t* _aidl_return) override;
+    ::ndk::ScopedAStatus getQueueDesc(AidlMQDesc* _aidl_return) override;
+    ::ndk::ScopedAStatus configure(const DemuxFilterSettings& in_settings) override;
+    ::ndk::ScopedAStatus configureMonitorEvent(int32_t in_monitorEventTypes) override;
+    ::ndk::ScopedAStatus configureIpFilterContextId(int32_t in_cid) override;
+    ::ndk::ScopedAStatus configureAvStreamType(const AvStreamType& in_avStreamType) override;
+    ::ndk::ScopedAStatus getAvSharedHandle(NativeHandle* out_avMemory,
+                                           int64_t* _aidl_return) override;
+    ::ndk::ScopedAStatus releaseAvHandle(const NativeHandle& in_handle,
+                                         int64_t in_avDataId) override;
+    ::ndk::ScopedAStatus setDataSource(const shared_ptr<ITunerFilter>& in_filter) override;
+    ::ndk::ScopedAStatus start() override;
+    ::ndk::ScopedAStatus stop() override;
+    ::ndk::ScopedAStatus flush() override;
+    ::ndk::ScopedAStatus close() override;
+    ::ndk::ScopedAStatus createSharedFilter(string* _aidl_return) override;
+    ::ndk::ScopedAStatus releaseSharedFilter(const string& in_filterToken) override;
+    ::ndk::ScopedAStatus getFilterType(DemuxFilterType* _aidl_return) override;
+
+    bool isSharedFilterAllowed(int32_t pid);
+    void attachSharedFilterCallback(const shared_ptr<ITunerFilterCallback>& in_cb);
+    sp<HidlIFilter> getHalFilter();
 
 private:
     bool isAudioFilter();
@@ -204,6 +222,11 @@ private:
     int32_t mId;
     int64_t mId64Bit;
     DemuxFilterType mType;
+    bool mStarted;
+    bool mShared;
+    int32_t mClientPid;
+    sp<FilterCallback> mFilterCallback;
+    Mutex mLock;
 };
 
 }  // namespace tuner

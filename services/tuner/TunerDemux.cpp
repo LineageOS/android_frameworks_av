@@ -84,10 +84,12 @@ TunerDemux::~TunerDemux() {
     }
 
     shared_ptr<IFilter> filter;
-    shared_ptr<IFilterCallback> cb = ::ndk::SharedRefBase::make<TunerFilter::FilterCallback>(in_cb);
+    shared_ptr<TunerFilter::FilterCallback> filterCb =
+            ::ndk::SharedRefBase::make<TunerFilter::FilterCallback>(in_cb);
+    shared_ptr<IFilterCallback> cb = filterCb;
     auto status = mDemux->openFilter(in_type, in_bufferSize, cb, &filter);
     if (status.isOk()) {
-        *_aidl_return = ::ndk::SharedRefBase::make<TunerFilter>(filter, in_type);
+        *_aidl_return = ::ndk::SharedRefBase::make<TunerFilter>(filter, filterCb, in_type);
     }
 
     return status;
