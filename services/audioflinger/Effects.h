@@ -254,6 +254,13 @@ public:
         return mOutBuffer != 0 ? reinterpret_cast<int16_t*>(mOutBuffer->ptr()) : NULL;
     }
 
+    // Updates the access mode if it is out of date.  May issue a new effect configure.
+    void        updateAccessMode() {
+                    if (requiredEffectBufferAccessMode() != mConfig.outputCfg.accessMode) {
+                        configure();
+                    }
+                }
+
     status_t         setDevices(const AudioDeviceTypeAddrVector &devices);
     status_t         setInputDevice(const AudioDeviceTypeAddr &device);
     status_t         setVolume(uint32_t *left, uint32_t *right, bool controller);
@@ -289,6 +296,11 @@ private:
     status_t stop_l();
     status_t removeEffectFromHal_l();
     status_t sendSetAudioDevicesCommand(const AudioDeviceTypeAddrVector &devices, uint32_t cmdCode);
+    effect_buffer_access_e requiredEffectBufferAccessMode() const {
+        return mConfig.inputCfg.buffer.raw == mConfig.outputCfg.buffer.raw
+                ? EFFECT_BUFFER_ACCESS_WRITE : EFFECT_BUFFER_ACCESS_ACCUMULATE;
+    }
+
 
     effect_config_t     mConfig;    // input and output audio configuration
     sp<EffectHalInterface> mEffectInterface; // Effect module HAL
