@@ -91,7 +91,12 @@ namespace tuner {
 
 TunerHidlFilter::TunerHidlFilter(sp<HidlIFilter> filter, sp<FilterCallback> cb,
                                  DemuxFilterType type)
-      : mFilter(filter), mType(type), mStarted(false), mShared(false), mFilterCallback(cb) {
+      : mFilter(filter),
+        mType(type),
+        mStarted(false),
+        mShared(false),
+        mClientPid(-1),
+        mFilterCallback(cb) {
     mFilter_1_1 = ::android::hardware::tv::tuner::V1_1::IFilter::castFrom(filter);
 }
 
@@ -441,10 +446,10 @@ TunerHidlFilter::~TunerHidlFilter() {
     }
 
     HidlResult res = mFilter->stop();
+    mStarted = false;
     if (res != HidlResult::SUCCESS) {
         return ::ndk::ScopedAStatus::fromServiceSpecificError(static_cast<int32_t>(res));
     }
-    mStarted = false;
 
     return ::ndk::ScopedAStatus::ok();
 }
@@ -507,6 +512,7 @@ TunerHidlFilter::~TunerHidlFilter() {
     mFilter_1_1 = nullptr;
     mStarted = false;
     mShared = false;
+    mClientPid = -1;
 
     if (res != HidlResult::SUCCESS) {
         return ::ndk::ScopedAStatus::fromServiceSpecificError(static_cast<int32_t>(res));
@@ -575,7 +581,7 @@ TunerHidlFilter::~TunerHidlFilter() {
 }
 
 bool TunerHidlFilter::isSharedFilterAllowed(int callingPid) {
-    return mClientPid != callingPid;
+    return mShared && mClientPid != callingPid;
 }
 
 void TunerHidlFilter::attachSharedFilterCallback(const shared_ptr<ITunerFilterCallback>& in_cb) {
