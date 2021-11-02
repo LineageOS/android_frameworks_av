@@ -1,4 +1,4 @@
-service vendor.media.omx /vendor/bin/hw/android.hardware.media.omx@1.0-service
+service media.swcodec /apex/com.android.media.swcodec/bin/mediaswcodec
     class main
     user mediacodec
     group camera drmrpc mediadrm
