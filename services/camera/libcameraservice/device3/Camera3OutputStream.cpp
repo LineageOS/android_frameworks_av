@@ -263,14 +263,14 @@ status_t Camera3OutputStream::queueBufferToConsumer(sp<ANativeWindow>& consumer,
 
 status_t Camera3OutputStream::returnBufferLocked(
         const camera_stream_buffer &buffer,
-        nsecs_t timestamp, const std::vector<size_t>& surface_ids) {
+        nsecs_t timestamp, int32_t transform, const std::vector<size_t>& surface_ids) {
     ATRACE_HFR_CALL();
 
     if (mHandoutTotalBufferCount == 1) {
         returnPrefetchedBuffersLocked();
     }
 
-    status_t res = returnAnyBufferLocked(buffer, timestamp, /*output*/true, surface_ids);
+    status_t res = returnAnyBufferLocked(buffer, timestamp, /*output*/true, transform, surface_ids);
 
     if (res != OK) {
         return res;
@@ -286,6 +286,7 @@ status_t Camera3OutputStream::returnBufferCheckedLocked(
             const camera_stream_buffer &buffer,
             nsecs_t timestamp,
             bool output,
+            int32_t transform,
             const std::vector<size_t>& surface_ids,
             /*out*/
             sp<Fence> *releaseFenceOut) {
@@ -344,6 +345,10 @@ status_t Camera3OutputStream::returnBufferCheckedLocked(
                 ATRACE_NAME(traceLog);
             }
             mTraceFirstBuffer = false;
+        }
+
+        if (transform != -1) {
+            setTransformLocked(transform);
         }
 
         /* Certain consumers (such as AudioSource or HardwareComposer) use
