@@ -1,0 +1,6 @@
+service media.swcodec /apex/com.android.media.swcodec/bin/mediaswcodec
+    class main
+    user mediacodec
+    group camera drmrpc mediadrm
+    ioprio rt 4
+    task_profiles ProcessCapacityHigh
