@@ -22,8 +22,10 @@
 #include <aidl/android/media/tv/tuner/BnTunerService.h>
 #include <aidl/android/media/tv/tunerresourcemanager/TunerFrontendInfo.h>
 #include <android/hardware/tv/tuner/1.1/ITuner.h>
+#include <utils/Mutex.h>
 
 #include "TunerHelper.h"
+#include "TunerHidlFilter.h"
 
 using ::aidl::android::hardware::tv::tuner::DemuxCapabilities;
 using ::aidl::android::hardware::tv::tuner::DemuxFilterEvent;
@@ -34,11 +36,13 @@ using ::aidl::android::media::tv::tuner::ITunerDescrambler;
 using ::aidl::android::media::tv::tuner::ITunerFrontend;
 using ::aidl::android::media::tv::tuner::ITunerLnb;
 using ::aidl::android::media::tv::tunerresourcemanager::TunerFrontendInfo;
+using ::android::Mutex;
 using ::android::sp;
 using ::android::hardware::hidl_vec;
 using ::android::hardware::Return;
 using ::android::hardware::Void;
 using ::std::shared_ptr;
+using ::std::string;
 using ::std::vector;
 
 using HidlFrontendDtmbCapabilities = ::android::hardware::tv::tuner::V1_1::FrontendDtmbCapabilities;
@@ -78,6 +82,14 @@ public:
     ::ndk::ScopedAStatus openDescrambler(int32_t in_descramblerHandle,
                                          shared_ptr<ITunerDescrambler>* _aidl_return) override;
     ::ndk::ScopedAStatus getTunerHalVersion(int32_t* _aidl_return) override;
+    ::ndk::ScopedAStatus openSharedFilter(const string& in_filterToken,
+                                          const shared_ptr<ITunerFilterCallback>& in_cb,
+                                          shared_ptr<ITunerFilter>* _aidl_return) override;
+
+    string addFilterToShared(const shared_ptr<TunerHidlFilter>& sharedFilter);
+    void removeSharedFilter(const shared_ptr<TunerHidlFilter>& sharedFilter);
+
+    static shared_ptr<TunerHidlService> getTunerService();
 
 private:
     bool hasITuner();
@@ -94,6 +106,10 @@ private:
     sp<HidlITuner> mTuner;
     sp<::android::hardware::tv::tuner::V1_1::ITuner> mTuner_1_1;
     int mTunerVersion = TUNER_HAL_VERSION_UNKNOWN;
+    Mutex mSharedFiltersLock;
+    map<string, shared_ptr<TunerHidlFilter>> mSharedFilters;
+
+    static shared_ptr<TunerHidlService> sTunerService;
 };
 
 }  // namespace tuner

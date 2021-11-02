@@ -21,7 +21,6 @@
 #include <aidl/android/hardware/tv/tuner/IFrontend.h>
 #include <aidl/android/hardware/tv/tuner/IFrontendCallback.h>
 #include <aidl/android/media/tv/tuner/BnTunerFrontend.h>
-#include <media/stagefright/foundation/ADebug.h>
 #include <utils/Log.h>
 
 using ::aidl::android::hardware::tv::tuner::BnFrontendCallback;

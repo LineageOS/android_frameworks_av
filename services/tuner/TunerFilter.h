@@ -26,7 +26,7 @@
 #include <aidl/android/hardware/tv/tuner/IFilter.h>
 #include <aidl/android/media/tv/tuner/BnTunerFilter.h>
 #include <aidl/android/media/tv/tuner/ITunerFilterCallback.h>
-#include <media/stagefright/foundation/ADebug.h>
+#include <utils/Mutex.h>
 
 using ::aidl::android::hardware::common::NativeHandle;
 using ::aidl::android::hardware::common::fmq::MQDescriptor;
@@ -39,6 +39,7 @@ using ::aidl::android::hardware::tv::tuner::DemuxFilterStatus;
 using ::aidl::android::hardware::tv::tuner::DemuxFilterType;
 using ::aidl::android::hardware::tv::tuner::IFilter;
 using ::aidl::android::media::tv::tuner::BnTunerFilter;
+using ::android::Mutex;
 
 using namespace std;
 
@@ -53,7 +54,25 @@ using AidlMQDesc = MQDescriptor<int8_t, SynchronizedReadWrite>;
 class TunerFilter : public BnTunerFilter {
 
 public:
-    TunerFilter(shared_ptr<IFilter> filter, DemuxFilterType type);
+    class FilterCallback : public BnFilterCallback {
+    public:
+        FilterCallback(const shared_ptr<ITunerFilterCallback>& tunerFilterCallback)
+              : mTunerFilterCallback(tunerFilterCallback), mOriginalCallback(nullptr){};
+
+        ::ndk::ScopedAStatus onFilterEvent(const vector<DemuxFilterEvent>& events) override;
+        ::ndk::ScopedAStatus onFilterStatus(DemuxFilterStatus status) override;
+
+        void sendSharedFilterStatus(int32_t status);
+        void attachSharedFilterCallback(const shared_ptr<ITunerFilterCallback>& in_cb);
+        void detachSharedFilterCallback();
+
+    private:
+        shared_ptr<ITunerFilterCallback> mTunerFilterCallback;
+        shared_ptr<ITunerFilterCallback> mOriginalCallback;
+        Mutex mCallbackLock;
+    };
+
+    TunerFilter(shared_ptr<IFilter> filter, shared_ptr<FilterCallback> cb, DemuxFilterType type);
     virtual ~TunerFilter();
 
     ::ndk::ScopedAStatus getId(int32_t* _aidl_return) override;
@@ -72,26 +91,24 @@ public:
     ::ndk::ScopedAStatus stop() override;
     ::ndk::ScopedAStatus flush() override;
     ::ndk::ScopedAStatus close() override;
+    ::ndk::ScopedAStatus createSharedFilter(string* _aidl_return) override;
+    ::ndk::ScopedAStatus releaseSharedFilter(const string& in_filterToken) override;
+    ::ndk::ScopedAStatus getFilterType(DemuxFilterType* _aidl_return) override;
 
+    bool isSharedFilterAllowed(int32_t pid);
+    void attachSharedFilterCallback(const shared_ptr<ITunerFilterCallback>& in_cb);
     shared_ptr<IFilter> getHalFilter();
-
-    class FilterCallback : public BnFilterCallback {
-    public:
-        FilterCallback(const shared_ptr<ITunerFilterCallback> tunerFilterCallback)
-              : mTunerFilterCallback(tunerFilterCallback){};
-
-        ::ndk::ScopedAStatus onFilterEvent(const vector<DemuxFilterEvent>& events) override;
-        ::ndk::ScopedAStatus onFilterStatus(DemuxFilterStatus status) override;
-
-    private:
-        shared_ptr<ITunerFilterCallback> mTunerFilterCallback;
-    };
 
 private:
     shared_ptr<IFilter> mFilter;
     int32_t mId;
     int64_t mId64Bit;
     DemuxFilterType mType;
+    bool mStarted;
+    bool mShared;
+    int32_t mClientPid;
+    shared_ptr<FilterCallback> mFilterCallback;
+    Mutex mLock;
 };
 
 }  // namespace tuner

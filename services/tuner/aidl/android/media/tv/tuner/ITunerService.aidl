@@ -20,6 +20,8 @@ import android.hardware.tv.tuner.DemuxCapabilities;
 import android.hardware.tv.tuner.FrontendInfo;
 import android.media.tv.tuner.ITunerDemux;
 import android.media.tv.tuner.ITunerDescrambler;
+import android.media.tv.tuner.ITunerFilter;
+import android.media.tv.tuner.ITunerFilterCallback;
 import android.media.tv.tuner.ITunerFrontend;
 import android.media.tv.tuner.ITunerLnb;
 
@@ -93,4 +95,13 @@ interface ITunerService {
      * value is unknown version 0.
      */
     int getTunerHalVersion();
+
+    /**
+     * Open a new SharedFilter instance of ITunerFilter.
+     *
+     * @param filterToken the SharedFilter token created by ITunerFilter.
+     * @param cb the ITunerFilterCallback used to receive callback events
+     * @return a newly created ITunerFilter interface.
+     */
+    ITunerFilter openSharedFilter(in String filterToken, in ITunerFilterCallback cb);
 }
