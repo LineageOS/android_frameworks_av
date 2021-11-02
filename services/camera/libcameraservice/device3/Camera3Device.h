@@ -90,7 +90,7 @@ class Camera3Device :
             public camera3::FlushBufferInterface {
   public:
 
-    explicit Camera3Device(const String8& id, bool overrideForPerfClass);
+    explicit Camera3Device(const String8& id, bool overrideForPerfClass, bool legacyClient = false);
 
     virtual ~Camera3Device();
 
@@ -332,6 +332,9 @@ class Camera3Device :
 
     // Camera device ID
     const String8              mId;
+
+    // Legacy camera client flag
+    bool                       mLegacyClient;
 
     // Current stream configuration mode;
     int                        mOperatingMode;
