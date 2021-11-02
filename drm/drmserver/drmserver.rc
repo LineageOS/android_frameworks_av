@@ -3,7 +3,7 @@ service drm /system/bin/drmserver
     class main
     user drm
     group drm system inet drmrpc readproc
-    writepid /dev/cpuset/foreground/tasks
+    task_profiles ProcessCapacityHigh
 
 on property:drm.service.enabled=true
     start drm
