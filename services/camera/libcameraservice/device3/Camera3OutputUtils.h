@@ -118,7 +118,8 @@ namespace camera3 {
             const SurfaceMap& outputSurfaces = SurfaceMap{},
             // Used to send buffer error callback when failing to return buffer
             const CaptureResultExtras &resultExtras = CaptureResultExtras{},
-            ERROR_BUF_STRATEGY errorBufStrategy = ERROR_BUF_RETURN);
+            ERROR_BUF_STRATEGY errorBufStrategy = ERROR_BUF_RETURN,
+            int32_t transform = -1);
 
     // helper function to return the output buffers to output streams, and
     // remove the returned buffers from the inflight request's pending buffers
@@ -165,6 +166,7 @@ namespace camera3 {
         SetErrorInterface& setErrIntf;
         InflightRequestUpdateInterface& inflightIntf;
         BufferRecordsInterface& bufferRecordsIntf;
+        bool legacyClient;
     };
 
     // Handle one capture result. Assume callers hold the lock to serialize all

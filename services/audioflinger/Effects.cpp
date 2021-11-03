@@ -953,11 +953,7 @@ status_t AudioFlinger::EffectModule::configure()
     // Auxiliary effect:
     //      accumulates in output buffer: input buffer != output buffer
     // Therefore: accumulate <=> input buffer != output buffer
-    if (mConfig.inputCfg.buffer.raw != mConfig.outputCfg.buffer.raw) {
-        mConfig.outputCfg.accessMode = EFFECT_BUFFER_ACCESS_ACCUMULATE;
-    } else {
-        mConfig.outputCfg.accessMode = EFFECT_BUFFER_ACCESS_WRITE;
-    }
+    mConfig.outputCfg.accessMode = requiredEffectBufferAccessMode();
     mConfig.inputCfg.mask = EFFECT_CONFIG_ALL;
     mConfig.outputCfg.mask = EFFECT_CONFIG_ALL;
     mConfig.inputCfg.buffer.frameCount = callback->frameCount();
@@ -2340,8 +2336,10 @@ status_t AudioFlinger::EffectChain::addEffect_ll(const sp<EffectModule>& effect)
         // output buffer, otherwise to chain input buffer
         if (idx_insert == size) {
             if (idx_insert != 0) {
-                mEffects[idx_insert-1]->configure();
-                mEffects[idx_insert-1]->setOutBuffer(mInBuffer);
+                // update channel mask before setting output buffer.
+                mEffects[idx_insert - 1]->configure();
+                mEffects[idx_insert - 1]->setOutBuffer(mInBuffer); // set output buffer
+                mEffects[idx_insert - 1]->updateAccessMode();      // reconfig if neeeded.
             }
             effect->setOutBuffer(mOutBuffer);
         } else {
