@@ -75,8 +75,9 @@ using android::hardware::camera::metadata::V3_6::CameraMetadataEnumAndroidSensor
 
 namespace android {
 
-Camera3Device::Camera3Device(const String8 &id, bool overrideForPerfClass):
+Camera3Device::Camera3Device(const String8 &id, bool overrideForPerfClass, bool legacyClient):
         mId(id),
+        mLegacyClient(legacyClient),
         mOperatingMode(NO_MODE),
         mIsConstrainedHighSpeedConfiguration(false),
         mStatus(STATUS_UNINITIALIZED),
@@ -1104,7 +1105,7 @@ hardware::Return<void> Camera3Device::processCaptureResult_3_4(
         mNumPartialResults, mVendorTagId, mDeviceInfo, mPhysicalDeviceInfoMap,
         mResultMetadataQueue, mDistortionMappers, mZoomRatioMappers, mRotateAndCropMappers,
         mTagMonitor, mInputStream, mOutputStreams, mSessionStatsBuilder, listener, *this, *this,
-        *mInterface
+        *mInterface, mLegacyClient
     };
 
     for (const auto& result : results) {
@@ -1163,7 +1164,7 @@ hardware::Return<void> Camera3Device::processCaptureResult(
         mNumPartialResults, mVendorTagId, mDeviceInfo, mPhysicalDeviceInfoMap,
         mResultMetadataQueue, mDistortionMappers, mZoomRatioMappers, mRotateAndCropMappers,
         mTagMonitor, mInputStream, mOutputStreams, mSessionStatsBuilder, listener, *this, *this,
-        *mInterface
+        *mInterface, mLegacyClient
     };
 
     for (const auto& result : results) {
@@ -1204,7 +1205,7 @@ hardware::Return<void> Camera3Device::notify(
         mNumPartialResults, mVendorTagId, mDeviceInfo, mPhysicalDeviceInfoMap,
         mResultMetadataQueue, mDistortionMappers, mZoomRatioMappers, mRotateAndCropMappers,
         mTagMonitor, mInputStream, mOutputStreams, mSessionStatsBuilder, listener, *this, *this,
-        *mInterface
+        *mInterface, mLegacyClient
     };
     for (const auto& msg : msgs) {
         camera3::notify(states, msg);

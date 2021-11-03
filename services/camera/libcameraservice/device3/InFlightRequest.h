@@ -182,6 +182,9 @@ struct InFlightRequest {
     // What shared surfaces an output should go to
     SurfaceMap outputSurfaces;
 
+    // Current output transformation
+    int32_t transform;
+
     // TODO: dedupe
     static const nsecs_t kDefaultExpectedDuration = 100000000; // 100 ms
 
@@ -200,7 +203,8 @@ struct InFlightRequest {
             stillCapture(false),
             zslCapture(false),
             rotateAndCropAuto(false),
-            requestTimeNs(0) {
+            requestTimeNs(0),
+            transform(-1) {
     }
 
     InFlightRequest(int numBuffers, CaptureResultExtras extras, bool hasInput,
@@ -225,7 +229,8 @@ struct InFlightRequest {
             rotateAndCropAuto(rotateAndCropAuto),
             cameraIdsWithZoom(idsWithZoom),
             requestTimeNs(requestNs),
-            outputSurfaces(outSurfaces) {
+            outputSurfaces(outSurfaces),
+            transform(-1) {
     }
 };
 
