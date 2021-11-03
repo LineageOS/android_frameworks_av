@@ -2158,7 +2158,7 @@ typedef enum acamera_metadata_tag {
      * flashlight brightness level via
      * {android.hardware.camera2.CameraManager#setTorchStrengthLevel}.
      * If this value is equal to 1, flashlight brightness control is not supported.
-     * This value will be -1 if the flash unit is not available.</p>
+     * The value for this key will be null for devices with no flash unit.</p>
      */
     ACAMERA_FLASH_INFO_STRENGTH_MAXIMUM_LEVEL =                 // int32
             ACAMERA_FLASH_INFO_START + 2,
@@ -2174,14 +2174,15 @@ typedef enum acamera_metadata_tag {
      * </ul></p>
      *
      * <p>If flash unit is available this will be greater than or equal to 1 and less
-     * or equal to <code>ACAMERA_FLASH_INFO_STRENGTH_MAXIMUM_LEVEL</code>.
-     * If flash unit is not available this will be set to -1.</p>
+     * or equal to <code>ACAMERA_FLASH_INFO_STRENGTH_MAXIMUM_LEVEL</code>.</p>
      * <p>Setting flashlight brightness above the default level
      * (i.e.<code>ACAMERA_FLASH_INFO_STRENGTH_DEFAULT_LEVEL</code>) may make the device more
      * likely to reach thermal throttling conditions and slow down, or drain the
      * battery quicker than normal. To minimize such issues, it is recommended to
      * start the flashlight at this default brightness until a user explicitly requests
-     * a brighter level.</p>
+     * a brighter level.
+     * Note that the value for this key will be null for devices with no flash unit.
+     * The default level should always be &gt; 0.</p>
      *
      * @see ACAMERA_FLASH_INFO_STRENGTH_DEFAULT_LEVEL
      * @see ACAMERA_FLASH_INFO_STRENGTH_MAXIMUM_LEVEL

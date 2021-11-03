@@ -1,0 +1,12 @@
+# media.transcoding service is defined on com.android.media apex which goes back
+# to API29, but we only want it started on API31+ devices. So we declare it as
+# "disabled" and start it explicitly on boot.
+service media.transcoding /apex/com.android.media/bin/mediatranscoding
+    class main
+    user media
+    group media
+    ioprio rt 4
+    # Restrict to little cores only with system-background cpuset.
+    task_profiles ServiceCapacityLow
+    interface aidl media.transcoding
+    disabled
