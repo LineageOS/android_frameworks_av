@@ -107,6 +107,8 @@ int EffectCreate(const effect_uuid_t *uuid,
     const effect_descriptor_t *desc;
     int aux = 0;
     int preset = 0;
+    (void)sessionId;
+    (void)ioId;
 
     ALOGV("EffectLibCreateEffect start");
 
@@ -149,7 +151,7 @@ int EffectCreate(const effect_uuid_t *uuid,
 
     module->context.mState = REVERB_STATE_INITIALIZED;
 
-    ALOGV("EffectLibCreateEffect %p ,size %d", module, sizeof(reverb_module_t));
+    ALOGV("EffectLibCreateEffect %p ,size %zu", module, sizeof(reverb_module_t));
 
     return 0;
 }
@@ -283,7 +285,6 @@ static int Reverb_Command(effect_handle_t self, uint32_t cmdCode, uint32_t cmdSi
         void *pCmdData, uint32_t *replySize, void *pReplyData) {
     reverb_module_t *pRvbModule = (reverb_module_t *) self;
     reverb_object_t *pReverb;
-    int retsize;
 
     if (pRvbModule == NULL ||
             pRvbModule->context.mState == REVERB_STATE_UNINITIALIZED) {
@@ -758,7 +759,6 @@ int Reverb_getParameter(reverb_object_t *pReverb, int32_t param, uint32_t *pSize
     int32_t *pValue32;
     int16_t *pValue16;
     t_reverb_settings *pProperties;
-    int32_t i;
     int32_t temp;
     int32_t temp2;
     uint32_t size;
@@ -1654,7 +1654,6 @@ static int Reverb(reverb_object_t *pReverb, int nNumSamplesToAdd,
     int32_t nApOut;
 
     int32_t j;
-    int32_t nEarlyOut;
 
     int32_t tempValue;
 
@@ -2203,6 +2202,7 @@ static int ReverbReadInPresets(reverb_object_t *pReverb) {
     return 0;
 }
 
+__attribute__ ((visibility ("default")))
 audio_effect_library_t AUDIO_EFFECT_LIBRARY_INFO_SYM = {
     .tag = AUDIO_EFFECT_LIBRARY_TAG,
     .version = EFFECT_LIBRARY_API_VERSION,
