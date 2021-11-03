@@ -381,13 +381,15 @@ ALookup<C2Config::level_t, int32_t> sAv1Levels = {
     { C2Config::LEVEL_AV1_7_3,  AV1Level73 },
 };
 
-
 ALookup<C2Config::profile_t, int32_t> sAv1Profiles = {
-    // TODO: will need to disambiguate between Main8 and Main10
     { C2Config::PROFILE_AV1_0, AV1ProfileMain8 },
     { C2Config::PROFILE_AV1_0, AV1ProfileMain10 },
     { C2Config::PROFILE_AV1_0, AV1ProfileMain10HDR10 },
     { C2Config::PROFILE_AV1_0, AV1ProfileMain10HDR10Plus },
+};
+
+ALookup<C2Config::profile_t, int32_t> sAv1TenbitProfiles = {
+    { C2Config::PROFILE_AV1_0, AV1ProfileMain10 },
 };
 
 ALookup<C2Config::profile_t, int32_t> sAv1HdrProfiles = {
@@ -603,9 +605,9 @@ private:
 };
 
 struct Av1ProfileLevelMapper : ProfileLevelMapperHelper {
-    Av1ProfileLevelMapper(bool isHdr = false, bool isHdr10Plus = false) :
+    Av1ProfileLevelMapper(bool isHdr = false, bool isHdr10Plus = false, int32_t bitDepth = 8) :
         ProfileLevelMapperHelper(),
-        mIsHdr(isHdr), mIsHdr10Plus(isHdr10Plus) {}
+        mIsHdr(isHdr), mIsHdr10Plus(isHdr10Plus), mBitDepth(bitDepth) {}
 
     virtual bool simpleMap(C2Config::level_t from, int32_t *to) {
         return sAv1Levels.map(from, to);
@@ -614,19 +616,22 @@ struct Av1ProfileLevelMapper : ProfileLevelMapperHelper {
         return sAv1Levels.map(from, to);
     }
     virtual bool simpleMap(C2Config::profile_t from, int32_t *to) {
-        return mIsHdr10Plus ? sAv1Hdr10PlusProfiles.map(from, to) :
-                     mIsHdr ? sAv1HdrProfiles.map(from, to) :
-                              sAv1Profiles.map(from, to);
+        return (mBitDepth == 10) ? sAv1TenbitProfiles.map(from, to) :
+                    mIsHdr10Plus ? sAv1Hdr10PlusProfiles.map(from, to) :
+                          mIsHdr ? sAv1HdrProfiles.map(from, to) :
+                                   sAv1Profiles.map(from, to);
     }
     virtual bool simpleMap(int32_t from, C2Config::profile_t *to) {
-        return mIsHdr10Plus ? sAv1Hdr10PlusProfiles.map(from, to) :
-                     mIsHdr ? sAv1HdrProfiles.map(from, to) :
-                              sAv1Profiles.map(from, to);
+        return (mBitDepth == 10) ? sAv1TenbitProfiles.map(from, to) :
+                    mIsHdr10Plus ? sAv1Hdr10PlusProfiles.map(from, to) :
+                          mIsHdr ? sAv1HdrProfiles.map(from, to) :
+                                   sAv1Profiles.map(from, to);
     }
 
 private:
     bool mIsHdr;
     bool mIsHdr10Plus;
+    int32_t mBitDepth;
 };
 
 } // namespace
@@ -669,6 +674,18 @@ C2Mapper::GetHdrProfileLevelMapper(std::string mediaType, bool isHdr10Plus) {
         return std::make_shared<Vp9ProfileLevelMapper>(true, isHdr10Plus);
     } else if (mediaType == MIMETYPE_VIDEO_AV1) {
         return std::make_shared<Av1ProfileLevelMapper>(true, isHdr10Plus);
+    }
+    return nullptr;
+}
+
+// static
+std::shared_ptr<C2Mapper::ProfileLevelMapper>
+C2Mapper::GetBitDepthProfileLevelMapper(std::string mediaType, int32_t bitDepth) {
+    std::transform(mediaType.begin(), mediaType.end(), mediaType.begin(), ::tolower);
+    if (bitDepth == 8) {
+        return GetProfileLevelMapper(mediaType);
+    } else if (mediaType == MIMETYPE_VIDEO_AV1 && bitDepth == 10) {
+        return std::make_shared<Av1ProfileLevelMapper>(false, false, bitDepth);
     }
     return nullptr;
 }
