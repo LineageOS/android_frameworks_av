@@ -1158,12 +1158,19 @@ void TunerHidlFrontend::getHidlFrontendSettings(const FrontendSettings& aidlSett
     }
     case FrontendSettings::isdbt: {
         const FrontendIsdbtSettings& isdbt = aidlSettings.get<FrontendSettings::isdbt>();
+        HidlFrontendIsdbtModulation modulation = HidlFrontendIsdbtModulation::UNDEFINED;
+        HidlFrontendIsdbtCoderate coderate = HidlFrontendIsdbtCoderate::UNDEFINED;
+        if (isdbt.layerSettings.size() > 0) {
+            modulation =
+                    static_cast<HidlFrontendIsdbtModulation>(isdbt.layerSettings[0].modulation);
+            coderate = static_cast<HidlFrontendIsdbtCoderate>(isdbt.layerSettings[0].coderate);
+        }
         settings.isdbt({
                 .frequency = static_cast<uint32_t>(isdbt.frequency),
-                .modulation = static_cast<HidlFrontendIsdbtModulation>(isdbt.modulation),
+                .modulation = modulation,
                 .bandwidth = static_cast<HidlFrontendIsdbtBandwidth>(isdbt.bandwidth),
                 .mode = static_cast<HidlFrontendIsdbtMode>(isdbt.mode),
-                .coderate = static_cast<HidlFrontendIsdbtCoderate>(isdbt.coderate),
+                .coderate = coderate,
                 .guardInterval = static_cast<HidlFrontendIsdbtGuardInterval>(isdbt.guardInterval),
                 .serviceAreaId = static_cast<uint32_t>(isdbt.serviceAreaId),
         });
