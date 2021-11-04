@@ -38,7 +38,12 @@ using namespace std;
 
 TunerFilter::TunerFilter(shared_ptr<IFilter> filter, shared_ptr<FilterCallback> cb,
                          DemuxFilterType type)
-      : mFilter(filter), mType(type), mStarted(false), mShared(false), mFilterCallback(cb) {}
+      : mFilter(filter),
+        mType(type),
+        mStarted(false),
+        mShared(false),
+        mClientPid(-1),
+        mFilterCallback(cb) {}
 
 TunerFilter::~TunerFilter() {
     Mutex::Autolock _l(mLock);
@@ -278,8 +283,10 @@ TunerFilter::~TunerFilter() {
         }
     }
 
+    auto res = mFilter->stop();
     mStarted = false;
-    return mFilter->stop();
+
+    return res;
 }
 
 ::ndk::ScopedAStatus TunerFilter::flush() {
@@ -334,6 +341,7 @@ TunerFilter::~TunerFilter() {
     mFilter = nullptr;
     mStarted = false;
     mShared = false;
+    mClientPid = -1;
 
     return res;
 }
@@ -398,7 +406,7 @@ TunerFilter::~TunerFilter() {
 }
 
 bool TunerFilter::isSharedFilterAllowed(int callingPid) {
-    return mClientPid != callingPid;
+    return mShared && mClientPid != callingPid;
 }
 
 void TunerFilter::attachSharedFilterCallback(const shared_ptr<ITunerFilterCallback>& in_cb) {
