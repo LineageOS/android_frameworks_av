@@ -33,7 +33,7 @@
 
 namespace android {
 
-class AudioPort : public virtual RefBase, public virtual Parcelable
+class AudioPort : public virtual RefBase
 {
 public:
     AudioPort(const std::string& name, audio_port_type_t type,  audio_port_role_t role) :
@@ -46,6 +46,9 @@ public:
 
     audio_port_type_t getType() const { return mType; }
     audio_port_role_t getRole() const { return mRole; }
+
+    virtual void setFlags(uint32_t flags);
+    uint32_t getFlags() const { return useInputChannelMask() ? mFlags.input : mFlags.output; }
 
     void setGains(const AudioGains &gains) { mGains = gains; }
     const AudioGains &getGains() const { return mGains; }
@@ -93,14 +96,26 @@ public:
                 ((mType == AUDIO_PORT_TYPE_MIX) && (mRole == AUDIO_PORT_ROLE_SINK));
     }
 
+    bool isDirectOutput() const
+    {
+        return (mType == AUDIO_PORT_TYPE_MIX) && (mRole == AUDIO_PORT_ROLE_SOURCE) &&
+                ((mFlags.output & AUDIO_OUTPUT_FLAG_DIRECT) != 0);
+    }
+
+    bool isMmap() const
+    {
+        return (mType == AUDIO_PORT_TYPE_MIX)
+                && (((mRole == AUDIO_PORT_ROLE_SOURCE) &&
+                        ((mFlags.output & AUDIO_OUTPUT_FLAG_MMAP_NOIRQ) != 0))
+                    || ((mRole == AUDIO_PORT_ROLE_SINK) &&
+                        ((mFlags.input & AUDIO_INPUT_FLAG_MMAP_NOIRQ) != 0)));
+    }
+
     void dump(std::string *dst, int spaces, bool verbose = true) const;
 
     void log(const char* indent) const;
 
     bool equals(const sp<AudioPort>& other) const;
-
-    status_t writeToParcel(Parcel* parcel) const override;
-    status_t readFromParcel(const Parcel* parcel) override;
 
     status_t writeToParcelable(media::AudioPort* parcelable) const;
     status_t readFromParcelable(const media::AudioPort& parcelable);
@@ -130,6 +145,7 @@ protected:
     // Audio capabilities that are defined by hardware descriptors when the format is unrecognized
     // by the platform, e.g. short audio descriptor in EDID for HDMI.
     std::vector<media::audio::common::ExtraAudioDescriptor> mExtraAudioDescriptors;
+    union audio_io_flags mFlags = { .output = AUDIO_OUTPUT_FLAG_NONE };
 private:
     template <typename T, std::enable_if_t<std::is_same<T, struct audio_port>::value
                                         || std::is_same<T, struct audio_port_v7>::value, int> = 0>
@@ -162,10 +178,11 @@ public:
     audio_format_t getFormat() const { return mFormat; }
     audio_channel_mask_t getChannelMask() const { return mChannelMask; }
     audio_port_handle_t getId() const { return mId; }
+    audio_io_flags getFlags() const { return mFlags; }
 
     bool hasGainController(bool canUseForVolume = false) const;
 
-    bool equals(const sp<AudioPortConfig>& other) const;
+    bool equals(const sp<AudioPortConfig>& other, bool isInput) const;
 
     status_t writeToParcelable(
             media::audio::common::AudioPortConfig* parcelable, bool isInput) const;
@@ -178,6 +195,7 @@ protected:
     audio_channel_mask_t mChannelMask = AUDIO_CHANNEL_NONE;
     audio_port_handle_t mId = AUDIO_PORT_HANDLE_NONE;
     struct audio_gain_config mGain = { .index = -1 };
+    union audio_io_flags mFlags = { AUDIO_INPUT_FLAG_NONE };
 };
 
 } // namespace android

@@ -112,38 +112,37 @@ TEST(AudioFoundationParcelableTest, ParcelingAudioGains) {
 }
 
 TEST(AudioFoundationParcelableTest, ParcelingAudioPort) {
-    Parcel data;
     sp<AudioPort> audioPort = new AudioPort(
             "AudioPortName", AUDIO_PORT_TYPE_DEVICE, AUDIO_PORT_ROLE_SINK);
     audioPort->setGains(getAudioGainsForTest());
     audioPort->setAudioProfiles(getAudioProfileVectorForTest());
 
-    ASSERT_EQ(data.writeParcelable(*audioPort), NO_ERROR);
-    data.setDataPosition(0);
+    media::AudioPort parcelable;
+    ASSERT_EQ(NO_ERROR, audioPort->writeToParcelable(&parcelable));
     sp<AudioPort> audioPortFromParcel = new AudioPort(
             "", AUDIO_PORT_TYPE_NONE, AUDIO_PORT_ROLE_NONE);
-    ASSERT_EQ(data.readParcelable(audioPortFromParcel.get()), NO_ERROR);
+    ASSERT_EQ(NO_ERROR, audioPortFromParcel->readFromParcelable(parcelable));
     ASSERT_TRUE(audioPortFromParcel->equals(audioPort));
 }
 
 TEST(AudioFoundationParcelableTest, ParcelingAudioPortConfig) {
+    const bool isInput = false;
     Parcel data;
     sp<AudioPortConfig> audioPortConfig = new AudioPortConfigTestStub();
     audioPortConfig->applyAudioPortConfig(&TEST_AUDIO_PORT_CONFIG);
     media::audio::common::AudioPortConfig parcelable{};
-    ASSERT_EQ(NO_ERROR, audioPortConfig->writeToParcelable(&parcelable, false /*isInput*/));
+    ASSERT_EQ(NO_ERROR, audioPortConfig->writeToParcelable(&parcelable, isInput));
     ASSERT_EQ(NO_ERROR, data.writeParcelable(parcelable));
     data.setDataPosition(0);
     media::audio::common::AudioPortConfig parcelableFromParcel{};
     ASSERT_EQ(NO_ERROR, data.readParcelable(&parcelableFromParcel));
     sp<AudioPortConfig> audioPortConfigFromParcel = new AudioPortConfigTestStub();
     ASSERT_EQ(NO_ERROR, audioPortConfigFromParcel->readFromParcelable(
-                    parcelableFromParcel, false /*isInput*/));
-    ASSERT_TRUE(audioPortConfigFromParcel->equals(audioPortConfig));
+                    parcelableFromParcel, isInput));
+    ASSERT_TRUE(audioPortConfigFromParcel->equals(audioPortConfig, isInput));
 }
 
 TEST(AudioFoundationParcelableTest, ParcelingDeviceDescriptorBase) {
-    Parcel data;
     sp<DeviceDescriptorBase> desc = new DeviceDescriptorBase(AUDIO_DEVICE_OUT_SPEAKER);
     desc->setGains(getAudioGainsForTest());
     desc->setAudioProfiles(getAudioProfileVectorForTest());
@@ -153,10 +152,10 @@ TEST(AudioFoundationParcelableTest, ParcelingDeviceDescriptorBase) {
     ASSERT_EQ(desc->setEncapsulationMetadataTypes(
             AUDIO_ENCAPSULATION_METADATA_TYPE_ALL_POSITION_BITS), NO_ERROR);
 
-    ASSERT_EQ(data.writeParcelable(*desc), NO_ERROR);
-    data.setDataPosition(0);
+    media::AudioPort parcelable;
+    ASSERT_EQ(NO_ERROR, desc->writeToParcelable(&parcelable));
     sp<DeviceDescriptorBase> descFromParcel = new DeviceDescriptorBase(AUDIO_DEVICE_NONE);
-    ASSERT_EQ(data.readParcelable(descFromParcel.get()), NO_ERROR);
+    ASSERT_EQ(NO_ERROR, descFromParcel->readFromParcelable(parcelable));
     ASSERT_TRUE(descFromParcel->equals(desc));
 }
 

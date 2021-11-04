@@ -194,10 +194,9 @@ ConversionResult<int32_t> legacy2aidl_audio_output_flags_t_int32_t_mask(
         audio_output_flags_t legacy);
 
 ConversionResult<audio_io_flags> aidl2legacy_AudioIoFlags_audio_io_flags(
-        const media::audio::common::AudioIoFlags& aidl,
-        media::AudioPortRole role, media::AudioPortType type);
+        const media::audio::common::AudioIoFlags& aidl, bool isInput);
 ConversionResult<media::audio::common::AudioIoFlags> legacy2aidl_audio_io_flags_AudioIoFlags(
-        const audio_io_flags& legacy, audio_port_role_t role, audio_port_type_t type);
+        const audio_io_flags& legacy, bool isInput);
 
 ConversionResult<audio_port_config_device_ext>
 aidl2legacy_AudioPortDeviceExt_audio_port_config_device_ext(

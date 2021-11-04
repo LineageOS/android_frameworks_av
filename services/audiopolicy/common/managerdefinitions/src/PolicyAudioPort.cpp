@@ -87,7 +87,7 @@ void PolicyAudioPort::pickSamplingRate(uint32_t &pickedRate,
     // For direct outputs, pick minimum sampling rate: this helps ensuring that the
     // channel count / sampling rate combination chosen will be supported by the connected
     // sink
-    if (isDirectOutput()) {
+    if (asAudioPort()->isDirectOutput()) {
         uint32_t samplingRate = UINT_MAX;
         for (const auto rate : samplingRates) {
             if ((rate < samplingRate) && (rate > 0)) {
@@ -122,7 +122,7 @@ void PolicyAudioPort::pickChannelMask(audio_channel_mask_t &pickedChannelMask,
     // For direct outputs, pick minimum channel count: this helps ensuring that the
     // channel count / sampling rate combination chosen will be supported by the connected
     // sink
-    if (isDirectOutput()) {
+    if (asAudioPort()->isDirectOutput()) {
         uint32_t channelCount = UINT_MAX;
         for (const auto channelMask : channelMasks) {
             uint32_t cnlCount;
@@ -236,7 +236,7 @@ void PolicyAudioPort::pickAudioProfile(uint32_t &samplingRate,
     audio_format_t bestFormat = sPcmFormatCompareTable[ARRAY_SIZE(sPcmFormatCompareTable) - 1];
     // For mixed output and inputs, use best mixer output format.
     // Do not limit format otherwise
-    if ((asAudioPort()->getType() != AUDIO_PORT_TYPE_MIX) || isDirectOutput()) {
+    if ((asAudioPort()->getType() != AUDIO_PORT_TYPE_MIX) || asAudioPort()->isDirectOutput()) {
         bestFormat = AUDIO_FORMAT_INVALID;
     }
 
@@ -265,30 +265,5 @@ void PolicyAudioPort::pickAudioProfile(uint32_t &samplingRate,
     ALOGV("%s Port[nm:%s] profile rate=%d, format=%d, channels=%d", __FUNCTION__,
             asAudioPort()->getName().c_str(), samplingRate, channelMask, format);
 }
-
-// --- PolicyAudioPortConfig class implementation
-
-status_t PolicyAudioPortConfig::validationBeforeApplyConfig(
-        const struct audio_port_config *config) const
-{
-    sp<PolicyAudioPort> policyAudioPort = getPolicyAudioPort();
-    return policyAudioPort ? policyAudioPort->checkExactAudioProfile(config) : NO_INIT;
-}
-
-void PolicyAudioPortConfig::toPolicyAudioPortConfig(struct audio_port_config *dstConfig,
-                                                    const struct audio_port_config *srcConfig) const
-{
-    if (dstConfig->config_mask & AUDIO_PORT_CONFIG_FLAGS) {
-        if ((srcConfig != nullptr) && (srcConfig->config_mask & AUDIO_PORT_CONFIG_FLAGS)) {
-            dstConfig->flags = srcConfig->flags;
-        } else {
-            dstConfig->flags = mFlags;
-        }
-    } else {
-        dstConfig->flags = { AUDIO_INPUT_FLAG_NONE };
-    }
-}
-
-
 
 } // namespace android

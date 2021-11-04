@@ -164,7 +164,7 @@ bool DeviceDescriptorBase::equals(const sp<DeviceDescriptorBase> &other) const
 {
     return other != nullptr &&
            static_cast<const AudioPort*>(this)->equals(other) &&
-           static_cast<const AudioPortConfig*>(this)->equals(other) &&
+           static_cast<const AudioPortConfig*>(this)->equals(other, useInputChannelMask()) &&
            mDeviceTypeAddr.equals(other->mDeviceTypeAddr) &&
            checkEqual(mEncodedFormats, other->mEncodedFormats);
 }
@@ -181,14 +181,6 @@ bool DeviceDescriptorBase::supportsFormat(audio_format_t format)
         }
     }
     return false;
-}
-
-
-status_t DeviceDescriptorBase::writeToParcel(Parcel *parcel) const
-{
-    media::AudioPort parcelable;
-    return writeToParcelable(&parcelable)
-        ?: parcelable.writeToParcel(parcel);
 }
 
 status_t DeviceDescriptorBase::writeToParcelable(media::AudioPort* parcelable) const {
@@ -210,12 +202,6 @@ status_t DeviceDescriptorBase::writeToParcelable(media::AudioPort* parcelable) c
             legacy2aidl_AudioEncapsulationMetadataType_mask(mEncapsulationMetadataTypes));
     UNION_SET(parcelable->sys.ext, device, deviceSys);
     return OK;
-}
-
-status_t DeviceDescriptorBase::readFromParcel(const Parcel *parcel) {
-    media::AudioPort parcelable;
-    return parcelable.readFromParcel(parcel)
-        ?: readFromParcelable(parcelable);
 }
 
 status_t DeviceDescriptorBase::readFromParcelable(const media::AudioPort& parcelable) {
