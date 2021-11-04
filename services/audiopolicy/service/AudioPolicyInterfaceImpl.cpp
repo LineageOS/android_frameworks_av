@@ -1923,7 +1923,8 @@ Status AudioPolicyService::getReportedSurroundFormats(
     return Status::ok();
 }
 
-Status AudioPolicyService::getHwOffloadEncodingFormatsSupportedForA2DP(
+Status AudioPolicyService::getHwOffloadFormatsSupportedForBluetoothMedia(
+        const AudioDeviceDescription& deviceAidl,
         std::vector<AudioFormatDescription>* _aidl_return) {
     std::vector<audio_format_t> formats;
 
@@ -1932,8 +1933,10 @@ Status AudioPolicyService::getHwOffloadEncodingFormatsSupportedForA2DP(
     }
     Mutex::Autolock _l(mLock);
     AutoCallerClear acc;
+    audio_devices_t device = VALUE_OR_RETURN_BINDER_STATUS(
+            aidl2legacy_AudioDeviceDescription_audio_devices_t(deviceAidl));
     RETURN_IF_BINDER_ERROR(binderStatusFromStatusT(
-            mAudioPolicyManager->getHwOffloadEncodingFormatsSupportedForA2DP(&formats)));
+            mAudioPolicyManager->getHwOffloadFormatsSupportedForBluetoothMedia(device, &formats)));
     *_aidl_return = VALUE_OR_RETURN_BINDER_STATUS(
             convertContainer<std::vector<AudioFormatDescription>>(
                     formats,
