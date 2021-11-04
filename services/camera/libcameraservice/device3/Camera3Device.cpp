@@ -1176,6 +1176,16 @@ hardware::Return<void> Camera3Device::processCaptureResult(
 
 hardware::Return<void> Camera3Device::notify(
         const hardware::hidl_vec<hardware::camera::device::V3_2::NotifyMsg>& msgs) {
+    return notifyHelper<hardware::camera::device::V3_2::NotifyMsg>(msgs);
+}
+
+hardware::Return<void> Camera3Device::notify_3_8(
+        const hardware::hidl_vec<hardware::camera::device::V3_8::NotifyMsg>& msgs) {
+    return notifyHelper<hardware::camera::device::V3_8::NotifyMsg>(msgs);
+}
+
+template<typename NotifyMsgType>
+hardware::Return<void> Camera3Device::notifyHelper(const hardware::hidl_vec<NotifyMsgType>& msgs) {
     // Ideally we should grab mLock, but that can lead to deadlock, and
     // it's not super important to get up to date value of mStatus for this
     // warning print, hence skipping the lock here
@@ -5469,7 +5479,8 @@ void Camera3Device::RequestThread::cleanUpFailedRequests(bool sendRequestError) 
                     outputBuffers->editItemAt(i).acquire_fence = -1;
                 }
                 outputBuffers->editItemAt(i).status = CAMERA_BUFFER_STATUS_ERROR;
-                captureRequest->mOutputStreams.editItemAt(i)->returnBuffer((*outputBuffers)[i], 0,
+                captureRequest->mOutputStreams.editItemAt(i)->returnBuffer((*outputBuffers)[i],
+                        /*timestamp*/0, /*readoutTimestamp*/0,
                         /*timestampIncreasing*/true, std::vector<size_t> (),
                         captureRequest->mResultExtras.frameNumber);
             }
