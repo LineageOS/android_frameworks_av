@@ -2456,22 +2456,24 @@ sp<Camera3Device::CaptureRequest> Camera3Device::createCaptureRequest(
     }
 
     if (mSupportCameraMute) {
-        auto testPatternModeEntry =
-                newRequest->mSettingsList.begin()->metadata.find(ANDROID_SENSOR_TEST_PATTERN_MODE);
-        newRequest->mOriginalTestPatternMode = testPatternModeEntry.count > 0 ?
-                testPatternModeEntry.data.i32[0] :
-                ANDROID_SENSOR_TEST_PATTERN_MODE_OFF;
+        for (auto& settings : newRequest->mSettingsList) {
+            auto testPatternModeEntry =
+                    settings.metadata.find(ANDROID_SENSOR_TEST_PATTERN_MODE);
+            settings.mOriginalTestPatternMode = testPatternModeEntry.count > 0 ?
+                    testPatternModeEntry.data.i32[0] :
+                    ANDROID_SENSOR_TEST_PATTERN_MODE_OFF;
 
-        auto testPatternDataEntry =
-                newRequest->mSettingsList.begin()->metadata.find(ANDROID_SENSOR_TEST_PATTERN_DATA);
-        if (testPatternDataEntry.count >= 4) {
-            memcpy(newRequest->mOriginalTestPatternData, testPatternDataEntry.data.i32,
-                    sizeof(CaptureRequest::mOriginalTestPatternData));
-        } else {
-            newRequest->mOriginalTestPatternData[0] = 0;
-            newRequest->mOriginalTestPatternData[1] = 0;
-            newRequest->mOriginalTestPatternData[2] = 0;
-            newRequest->mOriginalTestPatternData[3] = 0;
+            auto testPatternDataEntry =
+                    settings.metadata.find(ANDROID_SENSOR_TEST_PATTERN_DATA);
+            if (testPatternDataEntry.count >= 4) {
+                memcpy(settings.mOriginalTestPatternData, testPatternDataEntry.data.i32,
+                        sizeof(PhysicalCameraSettings::mOriginalTestPatternData));
+            } else {
+                settings.mOriginalTestPatternData[0] = 0;
+                settings.mOriginalTestPatternData[1] = 0;
+                settings.mOriginalTestPatternData[2] = 0;
+                settings.mOriginalTestPatternData[3] = 0;
+            }
         }
     }
 
@@ -5928,48 +5930,53 @@ bool Camera3Device::RequestThread::overrideTestPattern(
 
     bool changed = false;
 
-    int32_t testPatternMode = request->mOriginalTestPatternMode;
-    int32_t testPatternData[4] = {
-        request->mOriginalTestPatternData[0],
-        request->mOriginalTestPatternData[1],
-        request->mOriginalTestPatternData[2],
-        request->mOriginalTestPatternData[3]
-    };
+    // For a multi-camera, the physical cameras support the same set of
+    // test pattern modes as the logical camera.
+    for (auto& settings : request->mSettingsList) {
+        CameraMetadata &metadata = settings.metadata;
 
-    if (mCameraMute != ANDROID_SENSOR_TEST_PATTERN_MODE_OFF) {
-        testPatternMode = mCameraMute;
-        testPatternData[0] = 0;
-        testPatternData[1] = 0;
-        testPatternData[2] = 0;
-        testPatternData[3] = 0;
-    }
-
-    CameraMetadata &metadata = request->mSettingsList.begin()->metadata;
-
-    auto testPatternEntry = metadata.find(ANDROID_SENSOR_TEST_PATTERN_MODE);
-    if (testPatternEntry.count > 0) {
-        if (testPatternEntry.data.i32[0] != testPatternMode) {
-            testPatternEntry.data.i32[0] = testPatternMode;
-            changed = true;
+        int32_t testPatternMode = settings.mOriginalTestPatternMode;
+        int32_t testPatternData[4] = {
+            settings.mOriginalTestPatternData[0],
+            settings.mOriginalTestPatternData[1],
+            settings.mOriginalTestPatternData[2],
+            settings.mOriginalTestPatternData[3]
+        };
+        if (mCameraMute != ANDROID_SENSOR_TEST_PATTERN_MODE_OFF) {
+            testPatternMode = mCameraMute;
+            testPatternData[0] = 0;
+            testPatternData[1] = 0;
+            testPatternData[2] = 0;
+            testPatternData[3] = 0;
         }
-    } else {
-        metadata.update(ANDROID_SENSOR_TEST_PATTERN_MODE,
-                &testPatternMode, 1);
-        changed = true;
-    }
 
-    auto testPatternColor = metadata.find(ANDROID_SENSOR_TEST_PATTERN_DATA);
-    if (testPatternColor.count >= 4) {
-        for (size_t i = 0; i < 4; i++) {
-            if (testPatternColor.data.i32[i] != testPatternData[i]) {
-                testPatternColor.data.i32[i] = testPatternData[i];
+        auto testPatternEntry = metadata.find(ANDROID_SENSOR_TEST_PATTERN_MODE);
+        bool supportTestPatternModeKey = settings.mHasTestPatternModeTag;
+        if (testPatternEntry.count > 0) {
+            if (testPatternEntry.data.i32[0] != testPatternMode) {
+                testPatternEntry.data.i32[0] = testPatternMode;
                 changed = true;
             }
+        } else if (supportTestPatternModeKey) {
+            metadata.update(ANDROID_SENSOR_TEST_PATTERN_MODE,
+                    &testPatternMode, 1);
+            changed = true;
         }
-    } else {
-        metadata.update(ANDROID_SENSOR_TEST_PATTERN_DATA,
-                testPatternData, 4);
-        changed = true;
+
+        auto testPatternColor = metadata.find(ANDROID_SENSOR_TEST_PATTERN_DATA);
+        bool supportTestPatternDataKey = settings.mHasTestPatternDataTag;
+        if (testPatternColor.count >= 4) {
+            for (size_t i = 0; i < 4; i++) {
+                if (testPatternColor.data.i32[i] != testPatternData[i]) {
+                    testPatternColor.data.i32[i] = testPatternData[i];
+                    changed = true;
+                }
+            }
+        } else if (supportTestPatternDataKey) {
+            metadata.update(ANDROID_SENSOR_TEST_PATTERN_DATA,
+                    testPatternData, 4);
+            changed = true;
+        }
     }
 
     return changed;
