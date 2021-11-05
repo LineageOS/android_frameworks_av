@@ -224,13 +224,19 @@ void SpatializerPoseController::recenter() {
 }
 
 void SpatializerPoseController::onPose(int64_t timestamp, int32_t sensor, const Pose3f& pose,
-                                       const std::optional<Twist3f>& twist) {
+                                       const std::optional<Twist3f>& twist, bool isNewReference) {
     std::lock_guard lock(mMutex);
     if (sensor == mHeadSensor) {
         mProcessor->setWorldToHeadPose(timestamp, pose, twist.value_or(Twist3f()));
+        if (isNewReference) {
+            mProcessor->recenter(true, false);
+        }
     }
     if (sensor == mScreenSensor) {
         mProcessor->setWorldToScreenPose(timestamp, pose);
+        if (isNewReference) {
+            mProcessor->recenter(false, true);
+        }
     }
 }
 
