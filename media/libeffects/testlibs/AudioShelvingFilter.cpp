@@ -89,8 +89,8 @@ void AudioShelvingFilter::setGain(int32_t millibel) {
 void AudioShelvingFilter::commit(bool immediate) {
     audio_coef_t coefs[5];
     int intCoord[2] = {
-        mFrequency >> FREQ_PRECISION_BITS,
-        mGain >> GAIN_PRECISION_BITS
+        (int)(mFrequency >> FREQ_PRECISION_BITS),
+        (int)(mGain >> GAIN_PRECISION_BITS)
     };
     uint32_t fracCoord[2] = {
         mFrequency << (32 - FREQ_PRECISION_BITS),

@@ -19,6 +19,7 @@
 
 #include "TunerHidlService.h"
 
+#include <aidl/android/hardware/tv/tuner/FrontendIsdbtTimeInterleaveMode.h>
 #include <aidl/android/hardware/tv/tuner/Result.h>
 #include <android/binder_manager.h>
 #include <binder/IPCThreadState.h>
@@ -42,6 +43,7 @@ using ::aidl::android::hardware::tv::tuner::FrontendDvbtCapabilities;
 using ::aidl::android::hardware::tv::tuner::FrontendIsdbs3Capabilities;
 using ::aidl::android::hardware::tv::tuner::FrontendIsdbsCapabilities;
 using ::aidl::android::hardware::tv::tuner::FrontendIsdbtCapabilities;
+using ::aidl::android::hardware::tv::tuner::FrontendIsdbtTimeInterleaveMode;
 using ::aidl::android::hardware::tv::tuner::FrontendType;
 using ::aidl::android::hardware::tv::tuner::Result;
 using ::aidl::android::media::tv::tunerresourcemanager::TunerFrontendInfo;
@@ -618,6 +620,10 @@ FrontendInfo TunerHidlService::getAidlFrontendInfo(
                             static_cast<int32_t>(halInfo.frontendCaps.isdbtCaps().coderateCap),
                     .guardIntervalCap =
                             static_cast<int32_t>(halInfo.frontendCaps.isdbtCaps().guardIntervalCap),
+                    .timeInterleaveCap =
+                            static_cast<int32_t>(FrontendIsdbtTimeInterleaveMode::UNDEFINED),
+                    .isSegmentAuto = false,
+                    .isFullSegment = false,
             };
             caps.set<FrontendCapabilities::isdbtCaps>(isdbtCaps);
         }
