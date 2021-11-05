@@ -949,6 +949,9 @@ void MediaPlayer::notify(int msg, int ext1, int ext2, const Parcel *obj)
         mVideoWidth = ext1;
         mVideoHeight = ext2;
         break;
+    case MEDIA_STARTED:
+        ALOGV("Received media started message");
+        break;
     case MEDIA_NOTIFY_TIME:
         ALOGV("Received notify time message");
         break;
