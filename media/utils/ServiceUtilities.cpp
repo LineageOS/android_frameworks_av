@@ -101,7 +101,11 @@ std::optional<AttributionSourceState> resolveAttributionSource(
     AttributionSourceState myAttributionSource;
     myAttributionSource.uid = VALUE_OR_FATAL(android::legacy2aidl_uid_t_int32_t(getuid()));
     myAttributionSource.pid = VALUE_OR_FATAL(android::legacy2aidl_pid_t_int32_t(getpid()));
-    myAttributionSource.token = sp<BBinder>::make();
+    if (callerAttributionSource.token != nullptr) {
+        myAttributionSource.token = callerAttributionSource.token;
+    } else {
+        myAttributionSource.token = sp<BBinder>::make();
+    }
     myAttributionSource.next.push_back(nextAttributionSource);
 
     return std::optional<AttributionSourceState>{myAttributionSource};
