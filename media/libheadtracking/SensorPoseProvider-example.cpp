@@ -40,7 +40,7 @@ const char kPackageName[] = "SensorPoseProvider-example";
 class Listener : public SensorPoseProvider::Listener {
   public:
     void onPose(int64_t timestamp, int32_t handle, const Pose3f& pose,
-                const std::optional<Twist3f>& twist) override {
+                const std::optional<Twist3f>& twist, bool isNewReference) override {
         int64_t now = elapsedRealtimeNano();
 
         std::cout << "onPose t=" << timestamp
@@ -53,7 +53,7 @@ class Listener : public SensorPoseProvider::Listener {
         } else {
             std::cout << "<none>";
         }
-        std::cout << std::endl;
+        std::cout << " isNewReference=" << isNewReference << std::endl;
     }
 };
 
@@ -67,11 +67,15 @@ int main() {
 
     std::unique_ptr<SensorPoseProvider> provider =
             SensorPoseProvider::create(kPackageName, &listener);
-    int32_t headHandle = provider->startSensor(headSensor->getHandle(), 500ms);
+    if (!provider->startSensor(headSensor->getHandle(), 500ms)) {
+        std::cout << "Failed to start head sensor" << std::endl;
+    }
     sleep(2);
-    provider->startSensor(screenSensor->getHandle(), 500ms);
+    if (!provider->startSensor(screenSensor->getHandle(), 500ms)) {
+        std::cout << "Failed to start screenSensor sensor" << std::endl;
+    }
     sleep(2);
-    provider->stopSensor(headHandle);
+    provider->stopSensor(headSensor->getHandle());
     sleep(2);
     return 0;
 }

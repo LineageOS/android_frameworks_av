@@ -1090,6 +1090,15 @@ typedef enum acamera_metadata_tag {
      * (ACAMERA_LENS_OPTICAL_STABILIZATION_MODE), turning both modes on may
      * produce undesirable interaction, so it is recommended not to enable
      * both at the same time.</p>
+     * <p>If video stabilization is set to "PREVIEW_STABILIZATION",
+     * ACAMERA_LENS_OPTICAL_STABILIZATION_MODE is overridden. The camera sub-system may choose
+     * to turn on hardware based image stabilization in addition to software based stabilization
+     * if it deems that appropriate.
+     * This key may be a part of the available session keys, which camera clients may
+     * query via
+     * {@link ACameraManager_getCameraCharacteristics }.
+     * If this is the case, changing this key over the life-time of a capture session may
+     * cause delays / glitches.</p>
      *
      * @see ACAMERA_CONTROL_VIDEO_STABILIZATION_MODE
      * @see ACAMERA_LENS_OPTICAL_STABILIZATION_MODE
@@ -2571,12 +2580,18 @@ typedef enum acamera_metadata_tag {
      * <p>If a camera device supports both OIS and digital image stabilization
      * (ACAMERA_CONTROL_VIDEO_STABILIZATION_MODE), turning both modes on may produce undesirable
      * interaction, so it is recommended not to enable both at the same time.</p>
+     * <p>If ACAMERA_CONTROL_VIDEO_STABILIZATION_MODE is set to "PREVIEW_STABILIZATION",
+     * ACAMERA_LENS_OPTICAL_STABILIZATION_MODE is overridden. The camera sub-system may choose
+     * to turn on hardware based image stabilization in addition to software based stabilization
+     * if it deems that appropriate. This key's value in the capture result will reflect which
+     * OIS mode was chosen.</p>
      * <p>Not all devices will support OIS; see
      * ACAMERA_LENS_INFO_AVAILABLE_OPTICAL_STABILIZATION for
      * available controls.</p>
      *
      * @see ACAMERA_CONTROL_VIDEO_STABILIZATION_MODE
      * @see ACAMERA_LENS_INFO_AVAILABLE_OPTICAL_STABILIZATION
+     * @see ACAMERA_LENS_OPTICAL_STABILIZATION_MODE
      */
     ACAMERA_LENS_OPTICAL_STABILIZATION_MODE =                   // byte (acamera_metadata_enum_android_lens_optical_stabilization_mode_t)
             ACAMERA_LENS_START + 4,
@@ -8013,6 +8028,17 @@ typedef enum acamera_metadata_enum_acamera_control_video_stabilization_mode {
      * <p>Video stabilization is enabled.</p>
      */
     ACAMERA_CONTROL_VIDEO_STABILIZATION_MODE_ON                      = 1,
+
+    /**
+     * <p>Preview stabilization, where the preview in addition to all other non-RAW streams are
+     * stabilized with the same quality of stabilization, is enabled. This mode aims to give
+     * clients a 'what you see is what you get' effect. In this mode, the FoV reduction will
+     * be a maximum of 20 % both horizontally and vertically
+     * (10% from left, right, top, bottom) for the given zoom ratio / crop region.
+     * The resultant FoV will also be the same across all processed streams
+     * (that have the same aspect ratio).</p>
+     */
+    ACAMERA_CONTROL_VIDEO_STABILIZATION_MODE_PREVIEW_STABILIZATION   = 2,
 
 } acamera_metadata_enum_android_control_video_stabilization_mode_t;
 
