@@ -48,6 +48,7 @@ cc_library_shared {
         "common/CameraOfflineSessionBase.cpp",
         "common/CameraProviderManager.cpp",
         "common/FrameProcessorBase.cpp",
+        "common/hidl/HidlProviderInfo.cpp",
         "api1/Camera2Client.cpp",
         "api1/client2/Parameters.cpp",
         "api1/client2/FrameProcessor.cpp",

@@ -65,6 +65,8 @@
 #include "utils/TraceHFR.h"
 #include "utils/CameraServiceProxyWrapper.h"
 
+#include "../common/hidl/HidlProviderInfo.h"
+
 #include <algorithm>
 #include <tuple>
 
@@ -126,7 +128,7 @@ status_t Camera3Device::initialize(sp<CameraProviderManager> manager, const Stri
 
     sp<ICameraDeviceSession> session;
     ATRACE_BEGIN("CameraHal::openSession");
-    status_t res = manager->openSession(mId.string(), this,
+    status_t res = manager->openHidlSession(mId.string(), this,
             /*out*/ &session);
     ATRACE_END();
     if (res != OK) {
@@ -3263,7 +3265,7 @@ status_t Camera3Device::HalInterface::constructDefaultRequestSettings(
         ALOGE("%s: Transaction error: %s", __FUNCTION__, err.description().c_str());
         res = DEAD_OBJECT;
     } else {
-        res = CameraProviderManager::mapToStatusT(status);
+        res = HidlProviderInfo::mapToStatusT(status);
     }
 
     return res;
@@ -3560,7 +3562,7 @@ status_t Camera3Device::HalInterface::configureStreams(const camera_metadata_t *
     }
 
     if (status != common::V1_0::Status::OK ) {
-        return CameraProviderManager::mapToStatusT(status);
+        return HidlProviderInfo::mapToStatusT(status);
     }
 
     // And convert output stream configuration from HIDL
@@ -4049,7 +4051,7 @@ status_t Camera3Device::HalInterface::processBatchCaptureRequests(
         status = common::V1_0::Status::INTERNAL_ERROR;
     }
 
-    res = CameraProviderManager::mapToStatusT(status);
+    res = HidlProviderInfo::mapToStatusT(status);
     if (res == OK) {
         if (mHidlSession->isRemote()) {
             // Only close acquire fence FDs when the HIDL transaction succeeds (so the FDs have been
@@ -4076,7 +4078,7 @@ status_t Camera3Device::HalInterface::flush() {
         ALOGE("%s: Transaction error: %s", __FUNCTION__, err.description().c_str());
         res = DEAD_OBJECT;
     } else {
-        res = CameraProviderManager::mapToStatusT(err);
+        res = HidlProviderInfo::mapToStatusT(err);
     }
 
     return res;
@@ -4161,7 +4163,7 @@ status_t Camera3Device::HalInterface::switchToOffline(
         return DEAD_OBJECT;
     }
 
-    status_t ret = CameraProviderManager::mapToStatusT(status);
+    status_t ret = HidlProviderInfo::mapToStatusT(status);
     if (ret != OK) {
         return ret;
     }

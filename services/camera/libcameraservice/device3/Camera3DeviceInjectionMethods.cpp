@@ -60,7 +60,7 @@ status_t Camera3Device::Camera3DeviceInjectionMethods::injectionInitialize(
     mInjectedCamId = injectedCamId;
     sp<ICameraDeviceSession> session;
     ATRACE_BEGIN("Injection CameraHal::openSession");
-    status_t res = manager->openSession(injectedCamId.string(), callback,
+    status_t res = manager->openHidlSession(injectedCamId.string(), callback,
                                           /*out*/ &session);
     ATRACE_END();
     if (res != OK) {
