@@ -130,7 +130,7 @@ class SpatializerPoseController : private media::SensorPoseProvider::Listener {
     bool mCalculated = false;
 
     void onPose(int64_t timestamp, int32_t sensor, const media::Pose3f& pose,
-                const std::optional<media::Twist3f>& twist) override;
+                const std::optional<media::Twist3f>& twist, bool isNewReference) override;
 
     /**
      * Calculates the new outputs and updates internal state. Must be called with the lock held.

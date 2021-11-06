@@ -106,6 +106,16 @@ class CameraDeviceBase : public virtual FrameProducer {
     struct PhysicalCameraSettings {
         std::string cameraId;
         CameraMetadata metadata;
+
+        // Whether the physical camera supports testPatternMode/testPatternData
+        bool mHasTestPatternModeTag = true;
+        bool mHasTestPatternDataTag = true;
+
+        // Original value of TEST_PATTERN_MODE and DATA so that they can be
+        // restored when sensor muting is turned off
+        int32_t mOriginalTestPatternMode = 0;
+        int32_t mOriginalTestPatternData[4] = {};
+
     };
     typedef List<PhysicalCameraSettings> PhysicalCameraSettingsList;
 

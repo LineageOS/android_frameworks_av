@@ -576,17 +576,12 @@ class Camera3Device :
         // overriding of ROTATE_AND_CROP value and adjustment of coordinates
         // in several other controls in both the request and the result
         bool                                mRotateAndCropAuto;
-        // Original value of TEST_PATTERN_MODE and DATA so that they can be
-        // restored when sensor muting is turned off
-        int32_t                             mOriginalTestPatternMode;
-        int32_t                             mOriginalTestPatternData[4];
 
         // Whether this capture request has its zoom ratio set to 1.0x before
         // the framework overrides it for camera HAL consumption.
         bool                                mZoomRatioIs1x;
         // The systemTime timestamp when the request is created.
         nsecs_t                             mRequestTimeNs;
-
 
         // Whether this capture request's distortion correction update has
         // been done.
