@@ -62,7 +62,6 @@ status_t AudioInputDescriptor::applyAudioPortConfig(const struct audio_port_conf
     toAudioPortConfig(&localBackupConfig);
     if ((status = validationBeforeApplyConfig(config)) == NO_ERROR) {
         AudioPortConfig::applyAudioPortConfig(config, backupConfig);
-        applyPolicyAudioPortConfig(config);
     }
 
     if (backupConfig != NULL) {
@@ -83,7 +82,6 @@ void AudioInputDescriptor::toAudioPortConfig(struct audio_port_config *dstConfig
     }
 
     AudioPortConfig::toAudioPortConfig(dstConfig, srcConfig);
-    toPolicyAudioPortConfig(dstConfig, srcConfig);
 
     dstConfig->role = AUDIO_PORT_ROLE_SINK;
     dstConfig->type = AUDIO_PORT_TYPE_MIX;

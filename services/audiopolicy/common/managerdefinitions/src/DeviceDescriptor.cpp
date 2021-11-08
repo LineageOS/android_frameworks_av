@@ -118,7 +118,6 @@ status_t DeviceDescriptor::applyAudioPortConfig(const struct audio_port_config *
     toAudioPortConfig(&localBackupConfig);
     if ((status = validationBeforeApplyConfig(config)) == NO_ERROR) {
         AudioPortConfig::applyAudioPortConfig(config, backupConfig);
-        applyPolicyAudioPortConfig(config);
     }
 
     if (backupConfig != NULL) {
@@ -131,8 +130,6 @@ void DeviceDescriptor::toAudioPortConfig(struct audio_port_config *dstConfig,
                                          const struct audio_port_config *srcConfig) const
 {
     DeviceDescriptorBase::toAudioPortConfig(dstConfig, srcConfig);
-    toPolicyAudioPortConfig(dstConfig, srcConfig);
-
     dstConfig->ext.device.hw_module = getModuleHandle();
 }
 

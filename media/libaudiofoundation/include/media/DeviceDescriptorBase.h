@@ -79,9 +79,6 @@ public:
 
     bool equals(const sp<DeviceDescriptorBase>& other) const;
 
-    status_t writeToParcel(Parcel* parcel) const override;
-    status_t readFromParcel(const Parcel* parcel) override;
-
     status_t writeToParcelable(media::AudioPort* parcelable) const;
     status_t readFromParcelable(const media::AudioPort& parcelable);
 
