@@ -24,9 +24,11 @@
 #include "Configuration.h"
 #include <utils/Log.h>
 #include <system/audio_effects/effect_aec.h>
+#include <system/audio_effects/effect_downmix.h>
 #include <system/audio_effects/effect_dynamicsprocessing.h>
 #include <system/audio_effects/effect_hapticgenerator.h>
 #include <system/audio_effects/effect_ns.h>
+#include <system/audio_effects/effect_spatializer.h>
 #include <system/audio_effects/effect_visualizer.h>
 #include <audio_utils/channels.h>
 #include <audio_utils/primitives.h>
@@ -2231,11 +2233,9 @@ status_t AudioFlinger::EffectChain::addEffect_l(const sp<EffectModule>& effect)
 // addEffect_l() must be called with ThreadBase::mLock and EffectChain::mLock held
 status_t AudioFlinger::EffectChain::addEffect_ll(const sp<EffectModule>& effect)
 {
-    effect_descriptor_t desc = effect->desc();
-    uint32_t insertPref = desc.flags & EFFECT_FLAG_INSERT_MASK;
-
     effect->setCallback(mEffectCallback);
 
+    effect_descriptor_t desc = effect->desc();
     if ((desc.flags & EFFECT_FLAG_TYPE_MASK) == EFFECT_FLAG_TYPE_AUXILIARY) {
         // Auxiliary effects are inserted at the beginning of mEffects vector as
         // they are processed first and accumulated in chain input buffer
@@ -2263,95 +2263,129 @@ status_t AudioFlinger::EffectChain::addEffect_ll(const sp<EffectModule>& effect)
         // by insert effects
         effect->setOutBuffer(mInBuffer);
     } else {
-        // Insert effects are inserted at the end of mEffects vector as they are processed
-        //  after track and auxiliary effects.
-        // Insert effect order as a function of indicated preference:
-        //  if EFFECT_FLAG_INSERT_EXCLUSIVE, insert in first position or reject if
-        //  another effect is present
-        //  else if EFFECT_FLAG_INSERT_FIRST, insert in first position or after the
-        //  last effect claiming first position
-        //  else if EFFECT_FLAG_INSERT_LAST, insert in last position or before the
-        //  first effect claiming last position
-        //  else if EFFECT_FLAG_INSERT_ANY insert after first or before last
-        // Reject insertion if an effect with EFFECT_FLAG_INSERT_EXCLUSIVE is
-        // already present
-
-        size_t size = mEffects.size();
-        size_t idx_insert = size;
-        ssize_t idx_insert_first = -1;
-        ssize_t idx_insert_last = -1;
-
-        for (size_t i = 0; i < size; i++) {
-            effect_descriptor_t d = mEffects[i]->desc();
-            uint32_t iMode = d.flags & EFFECT_FLAG_TYPE_MASK;
-            uint32_t iPref = d.flags & EFFECT_FLAG_INSERT_MASK;
-            if (iMode == EFFECT_FLAG_TYPE_INSERT) {
-                // check invalid effect chaining combinations
-                if (insertPref == EFFECT_FLAG_INSERT_EXCLUSIVE ||
-                    iPref == EFFECT_FLAG_INSERT_EXCLUSIVE) {
-                    ALOGW("addEffect_l() could not insert effect %s: exclusive conflict with %s",
-                            desc.name, d.name);
-                    return INVALID_OPERATION;
-                }
-                // remember position of first insert effect and by default
-                // select this as insert position for new effect
-                if (idx_insert == size) {
-                    idx_insert = i;
-                }
-                // remember position of last insert effect claiming
-                // first position
-                if (iPref == EFFECT_FLAG_INSERT_FIRST) {
-                    idx_insert_first = i;
-                }
-                // remember position of first insert effect claiming
-                // last position
-                if (iPref == EFFECT_FLAG_INSERT_LAST &&
-                    idx_insert_last == -1) {
-                    idx_insert_last = i;
-                }
-            }
+        ssize_t idx_insert = getInsertIndex(desc);
+        if (idx_insert < 0) {
+            return INVALID_OPERATION;
         }
 
-        // modify idx_insert from first position if needed
-        if (insertPref == EFFECT_FLAG_INSERT_LAST) {
-            if (idx_insert_last != -1) {
-                idx_insert = idx_insert_last;
-            } else {
-                idx_insert = size;
-            }
-        } else {
-            if (idx_insert_first != -1) {
-                idx_insert = idx_insert_first + 1;
-            }
-        }
-
+        size_t previousSize = mEffects.size();
         mEffects.insertAt(effect, idx_insert);
 
         effect->configure();
 
-        // always read samples from chain input buffer
-        effect->setInBuffer(mInBuffer);
-
-        // if last effect in the chain, output samples to chain
-        // output buffer, otherwise to chain input buffer
-        if (idx_insert == size) {
-            if (idx_insert != 0) {
-                // update channel mask before setting output buffer.
-                mEffects[idx_insert - 1]->configure();
-                mEffects[idx_insert - 1]->setOutBuffer(mInBuffer); // set output buffer
-                mEffects[idx_insert - 1]->updateAccessMode();      // reconfig if neeeded.
-            }
+        // - By default:
+        //   All effects read samples from chain input buffer.
+        //   The last effect in the chain, writes samples to chain output buffer,
+        //   otherwise to chain input buffer
+        // - In the OUTPUT_STAGE chain of a spatializer mixer thread:
+        //   The spatializer effect (first effect) reads samples from the input buffer
+        //   and writes samples to the output buffer.
+        //   All other effects read and writes samples to the output buffer
+        if (mEffectCallback->isSpatializer()
+                && mSessionId == AUDIO_SESSION_OUTPUT_STAGE) {
             effect->setOutBuffer(mOutBuffer);
+            if (idx_insert == 0) {
+                if (previousSize != 0) {
+                    mEffects[1]->configure();
+                    mEffects[1]->setInBuffer(mOutBuffer);
+                    mEffects[1]->updateAccessMode();      // reconfig if neeeded.
+                }
+                effect->setInBuffer(mInBuffer);
+            } else {
+                effect->setInBuffer(mOutBuffer);
+            }
         } else {
-            effect->setOutBuffer(mInBuffer);
+            effect->setInBuffer(mInBuffer);
+            if (idx_insert == previousSize) {
+                if (idx_insert != 0) {
+                    mEffects[idx_insert-1]->configure();
+                    mEffects[idx_insert-1]->setOutBuffer(mInBuffer);
+                    mEffects[idx_insert - 1]->updateAccessMode();      // reconfig if neeeded.
+                }
+                effect->setOutBuffer(mOutBuffer);
+            } else {
+                effect->setOutBuffer(mInBuffer);
+            }
         }
-
-        ALOGV("addEffect_l() effect %p, added in chain %p at rank %zu", effect.get(), this,
-                idx_insert);
+        ALOGV("%s effect %p, added in chain %p at rank %zu",
+                __func__, effect.get(), this, idx_insert);
     }
     effect->configure();
 
     return NO_ERROR;
+}
+
+ssize_t AudioFlinger::EffectChain::getInsertIndex(const effect_descriptor_t& desc) {
+    // Insert effects are inserted at the end of mEffects vector as they are processed
+    //  after track and auxiliary effects.
+    // Insert effect order as a function of indicated preference:
+    //  if EFFECT_FLAG_INSERT_EXCLUSIVE, insert in first position or reject if
+    //  another effect is present
+    //  else if EFFECT_FLAG_INSERT_FIRST, insert in first position or after the
+    //  last effect claiming first position
+    //  else if EFFECT_FLAG_INSERT_LAST, insert in last position or before the
+    //  first effect claiming last position
+    //  else if EFFECT_FLAG_INSERT_ANY insert after first or before last
+    // Reject insertion if an effect with EFFECT_FLAG_INSERT_EXCLUSIVE is
+    // already present
+    // Spatializer or Downmixer effects are inserted in first position because
+    // they adapt the channel count for all other effects in the chain
+    if ((memcmp(&desc.type, FX_IID_SPATIALIZER, sizeof(effect_uuid_t)) == 0)
+            || (memcmp(&desc.type, EFFECT_UIID_DOWNMIX, sizeof(effect_uuid_t)) == 0)) {
+        return 0;
+    }
+
+    size_t size = mEffects.size();
+    uint32_t insertPref = desc.flags & EFFECT_FLAG_INSERT_MASK;
+    ssize_t idx_insert;
+    ssize_t idx_insert_first = -1;
+    ssize_t idx_insert_last = -1;
+
+    idx_insert = size;
+    for (size_t i = 0; i < size; i++) {
+        effect_descriptor_t d = mEffects[i]->desc();
+        uint32_t iMode = d.flags & EFFECT_FLAG_TYPE_MASK;
+        uint32_t iPref = d.flags & EFFECT_FLAG_INSERT_MASK;
+        if (iMode == EFFECT_FLAG_TYPE_INSERT) {
+            // check invalid effect chaining combinations
+            if (insertPref == EFFECT_FLAG_INSERT_EXCLUSIVE ||
+                iPref == EFFECT_FLAG_INSERT_EXCLUSIVE) {
+                ALOGW("%s could not insert effect %s: exclusive conflict with %s",
+                        __func__, desc.name, d.name);
+                return -1;
+            }
+            // remember position of first insert effect and by default
+            // select this as insert position for new effect
+            if (idx_insert == size) {
+                idx_insert = i;
+            }
+            // remember position of last insert effect claiming
+            // first position
+            if (iPref == EFFECT_FLAG_INSERT_FIRST) {
+                idx_insert_first = i;
+            }
+            // remember position of first insert effect claiming
+            // last position
+            if (iPref == EFFECT_FLAG_INSERT_LAST &&
+                idx_insert_last == -1) {
+                idx_insert_last = i;
+            }
+        }
+    }
+
+    // modify idx_insert from first position if needed
+    if (insertPref == EFFECT_FLAG_INSERT_LAST) {
+        if (idx_insert_last != -1) {
+            idx_insert = idx_insert_last;
+        } else {
+            idx_insert = size;
+        }
+    } else {
+        if (idx_insert_first != -1) {
+            idx_insert = idx_insert_first + 1;
+        }
+    }
+    return idx_insert;
 }
 
 // removeEffect_l() must be called with ThreadBase::mLock held
@@ -2935,27 +2969,26 @@ bool AudioFlinger::EffectChain::EffectCallback::isOutput() const {
 }
 
 bool AudioFlinger::EffectChain::EffectCallback::isOffload() const {
-    sp<ThreadBase> t = thread().promote();
-    if (t == nullptr) {
-        return false;
-    }
-    return t->type() == ThreadBase::OFFLOAD;
+    return mThreadType == ThreadBase::OFFLOAD;
 }
 
 bool AudioFlinger::EffectChain::EffectCallback::isOffloadOrDirect() const {
-    sp<ThreadBase> t = thread().promote();
-    if (t == nullptr) {
-        return false;
-    }
-    return t->type() == ThreadBase::OFFLOAD || t->type() == ThreadBase::DIRECT;
+    return mThreadType == ThreadBase::OFFLOAD || mThreadType == ThreadBase::DIRECT;
 }
 
 bool AudioFlinger::EffectChain::EffectCallback::isOffloadOrMmap() const {
-    sp<ThreadBase> t = thread().promote();
-    if (t == nullptr) {
+    switch (mThreadType) {
+    case ThreadBase::OFFLOAD:
+    case ThreadBase::MMAP_PLAYBACK:
+    case ThreadBase::MMAP_CAPTURE:
+        return true;
+    default:
         return false;
     }
-    return t->isOffloadOrMmap();
+}
+
+bool AudioFlinger::EffectChain::EffectCallback::isSpatializer() const {
+    return mThreadType == ThreadBase::SPATIALIZER;
 }
 
 uint32_t AudioFlinger::EffectChain::EffectCallback::sampleRate() const {
@@ -2976,30 +3009,29 @@ audio_channel_mask_t AudioFlinger::EffectChain::EffectCallback::inChannelMask(in
         return AUDIO_CHANNEL_NONE;
     }
 
-    if (c->sessionId() != AUDIO_SESSION_OUTPUT_STAGE
-            || c->isFirstEffect(id)) {
-        return t->mixerChannelMask();
+    if (mThreadType == ThreadBase::SPATIALIZER) {
+        if (c->sessionId() == AUDIO_SESSION_OUTPUT_STAGE) {
+            if (c->isFirstEffect(id)) {
+                return t->mixerChannelMask();
+            } else {
+                return t->channelMask();
+            }
+        } else if (!audio_is_global_session(c->sessionId())) {
+            if ((t->hasAudioSession_l(c->sessionId()) & ThreadBase::SPATIALIZED_SESSION) != 0) {
+                return t->mixerChannelMask();
+            } else {
+                return t->channelMask();
+            }
+        } else {
+            return t->channelMask();
+        }
     } else {
         return t->channelMask();
     }
 }
 
 uint32_t AudioFlinger::EffectChain::EffectCallback::inChannelCount(int id) const {
-    sp<ThreadBase> t = thread().promote();
-    if (t == nullptr) {
-        return 0;
-    }
-    sp<EffectChain> c = chain().promote();
-    if (c == nullptr) {
-        return 0;
-    }
-
-    if (c->sessionId() != AUDIO_SESSION_OUTPUT_STAGE
-            || c->isFirstEffect(id)) {
-        return audio_channel_count_from_out_mask(t->mixerChannelMask());
-    } else {
-        return t->channelCount();
-    }
+    return audio_channel_count_from_out_mask(inChannelMask(id));
 }
 
 audio_channel_mask_t AudioFlinger::EffectChain::EffectCallback::outChannelMask() const {
@@ -3007,15 +3039,28 @@ audio_channel_mask_t AudioFlinger::EffectChain::EffectCallback::outChannelMask()
     if (t == nullptr) {
         return AUDIO_CHANNEL_NONE;
     }
-    return t->channelMask();
+    sp<EffectChain> c = chain().promote();
+    if (c == nullptr) {
+        return AUDIO_CHANNEL_NONE;
+    }
+
+    if (mThreadType == ThreadBase::SPATIALIZER) {
+        if (!audio_is_global_session(c->sessionId())) {
+            if ((t->hasAudioSession_l(c->sessionId()) & ThreadBase::SPATIALIZED_SESSION) != 0) {
+                return t->mixerChannelMask();
+            } else {
+                return t->channelMask();
+            }
+        } else {
+            return t->channelMask();
+        }
+    } else {
+        return t->channelMask();
+    }
 }
 
 uint32_t AudioFlinger::EffectChain::EffectCallback::outChannelCount() const {
-    sp<ThreadBase> t = thread().promote();
-    if (t == nullptr) {
-        return 0;
-    }
-    return t->channelCount();
+    return audio_channel_count_from_out_mask(outChannelMask());
 }
 
 audio_channel_mask_t AudioFlinger::EffectChain::EffectCallback::hapticChannelMask() const {
