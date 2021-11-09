@@ -1950,16 +1950,19 @@ hardware::Return<void> CameraProviderManager::ProviderInfo::torchModeStatusChang
         const hardware::hidl_string& cameraDeviceName,
         TorchModeStatus newStatus) {
     sp<StatusListener> listener;
+    SystemCameraKind systemCameraKind = SystemCameraKind::PUBLIC;
     std::string id;
+    bool known = false;
     {
-        std::lock_guard<std::mutex> lock(mManager->mStatusListenerMutex);
-        bool known = false;
+        // Hold mLock for accessing mDevices
+        std::lock_guard<std::mutex> lock(mLock);
         for (auto& deviceInfo : mDevices) {
             if (deviceInfo->mName == cameraDeviceName) {
                 ALOGI("Camera device %s torch status is now %s", cameraDeviceName.c_str(),
                         torchStatusToString(newStatus));
                 id = deviceInfo->mId;
                 known = true;
+                systemCameraKind = deviceInfo->mSystemCameraKind;
                 if (TorchModeStatus::AVAILABLE_ON != newStatus) {
                     mManager->removeRef(DeviceMode::TORCH, id);
                 }
@@ -1971,11 +1974,19 @@ hardware::Return<void> CameraProviderManager::ProviderInfo::torchModeStatusChang
                     mProviderName.c_str(), cameraDeviceName.c_str(), newStatus);
             return hardware::Void();
         }
+        // no lock needed since listener is set up only once during
+        // CameraProviderManager initialization and then never changed till it is
+        // destructed.
         listener = mManager->getStatusListener();
-    }
+     }
     // Call without lock held to allow reentrancy into provider manager
+    // The problem with holding mLock here is that we
+    // might be limiting re-entrancy : CameraService::onTorchStatusChanged calls
+    // back into CameraProviderManager which might try to hold mLock again (eg:
+    // findDeviceInfo, which should be holding mLock while iterating through
+    // each provider's devices).
     if (listener != nullptr) {
-        listener->onTorchStatusChanged(String8(id.c_str()), newStatus);
+        listener->onTorchStatusChanged(String8(id.c_str()), newStatus, systemCameraKind);
     }
     return hardware::Void();
 }
