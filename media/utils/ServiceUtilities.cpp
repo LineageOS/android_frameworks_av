@@ -45,6 +45,7 @@ using content::AttributionSourceState;
 static const String16 sAndroidPermissionRecordAudio("android.permission.RECORD_AUDIO");
 static const String16 sModifyPhoneState("android.permission.MODIFY_PHONE_STATE");
 static const String16 sModifyAudioRouting("android.permission.MODIFY_AUDIO_ROUTING");
+static const String16 sCallAudioInterception("android.permission.CALL_AUDIO_INTERCEPTION");
 
 static String16 resolveCallingPackage(PermissionController& permissionController,
         const std::optional<String16> opPackageName, uid_t uid) {
@@ -306,6 +307,17 @@ bool bypassInterruptionPolicyAllowed(const AttributionSourceState& attributionSo
         || PermissionCache::checkPermission(sModifyAudioRouting, pid, uid);
     ALOGE_IF(!ok, "Request requires %s or %s",
              String8(sModifyPhoneState).c_str(), String8(sWriteSecureSettings).c_str());
+    return ok;
+}
+
+bool callAudioInterceptionAllowed(const AttributionSourceState& attributionSource) {
+    uid_t uid = VALUE_OR_FATAL(aidl2legacy_int32_t_uid_t(attributionSource.uid));
+    pid_t pid = VALUE_OR_FATAL(aidl2legacy_int32_t_pid_t(attributionSource.pid));
+
+    // IMPORTANT: Use PermissionCache - not a runtime permission and may not change.
+    bool ok = PermissionCache::checkPermission(sCallAudioInterception, pid, uid);
+    if (!ok) ALOGE("%s(): android.permission.CALL_AUDIO_INTERCEPTION denied for uid %d",
+        __func__, uid);
     return ok;
 }
 

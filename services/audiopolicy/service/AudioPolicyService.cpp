@@ -729,7 +729,8 @@ void AudioPolicyService::updateUidStates_l()
         if (current->attributes.source != AUDIO_SOURCE_HOTWORD) {
             onlyHotwordActive = false;
         }
-        if (currentUid == mPhoneStateOwnerUid) {
+        if (currentUid == mPhoneStateOwnerUid &&
+                !isVirtualSource(current->attributes.source)) {
             isPhoneStateOwnerActive = true;
         }
     }
