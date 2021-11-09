@@ -156,6 +156,9 @@ public:
                 const String8 &physicalCameraId,
                 hardware::camera::common::V1_0::CameraDeviceStatus newStatus) = 0;
         virtual void onTorchStatusChanged(const String8 &cameraId,
+                hardware::camera::common::V1_0::TorchModeStatus newStatus,
+                SystemCameraKind kind) = 0;
+        virtual void onTorchStatusChanged(const String8 &cameraId,
                 hardware::camera::common::V1_0::TorchModeStatus newStatus) = 0;
         virtual void onNewProviderRegistered() = 0;
     };
@@ -336,8 +339,6 @@ private:
     // All private members, unless otherwise noted, expect mInterfaceMutex to be locked before use
     mutable std::mutex mInterfaceMutex;
 
-    // the status listener update callbacks will lock mStatusMutex
-    mutable std::mutex mStatusListenerMutex;
     wp<StatusListener> mListener;
     ServiceInteractionProxy* mServiceProxy;
 
