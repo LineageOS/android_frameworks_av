@@ -1320,8 +1320,8 @@ status_t AudioFlinger::PlaybackThread::checkEffectCompatibility_l(
 {
     // no preprocessing on playback threads
     if ((desc->flags & EFFECT_FLAG_TYPE_MASK) == EFFECT_FLAG_TYPE_PRE_PROC) {
-        ALOGW("checkEffectCompatibility_l(): pre processing effect %s created on playback"
-                " thread %s", desc->name, mThreadName);
+        ALOGW("%s: pre processing effect %s created on playback"
+                " thread %s", __func__, desc->name, mThreadName);
         return BAD_VALUE;
     }
 
@@ -1349,8 +1349,8 @@ status_t AudioFlinger::PlaybackThread::checkEffectCompatibility_l(
         // Reject any effect on mixer multichannel sinks.
         // TODO: fix both format and multichannel issues with effects.
         if (mChannelCount != FCC_2) {
-            ALOGW("checkEffectCompatibility_l(): effect %s for multichannel(%d) on MIXER"
-                    " thread %s", desc->name, mChannelCount, mThreadName);
+            ALOGW("%s: effect %s for multichannel(%d) on MIXER thread %s",
+                    __func__, desc->name, mChannelCount, mThreadName);
             return BAD_VALUE;
         }
 #endif
@@ -1364,15 +1364,15 @@ status_t AudioFlinger::PlaybackThread::checkEffectCompatibility_l(
             } else if (sessionId == AUDIO_SESSION_OUTPUT_STAGE) {
                 // only post processing on output stage session
                 if ((desc->flags & EFFECT_FLAG_TYPE_MASK) != EFFECT_FLAG_TYPE_POST_PROC) {
-                    ALOGW("checkEffectCompatibility_l(): non post processing effect %s not allowed"
-                            " on output stage session", desc->name);
+                    ALOGW("%s: non post processing effect %s not allowed on output stage session",
+                            __func__, desc->name);
                     return BAD_VALUE;
                 }
             } else if (sessionId == AUDIO_SESSION_DEVICE) {
                 // only post processing on output stage session
                 if ((desc->flags & EFFECT_FLAG_TYPE_MASK) != EFFECT_FLAG_TYPE_POST_PROC) {
-                    ALOGW("checkEffectCompatibility_l(): non post processing effect %s not allowed"
-                            " on device session", desc->name);
+                    ALOGW("%s: non post processing effect %s not allowed on device session",
+                            __func__, desc->name);
                     return BAD_VALUE;
                 }
             } else {
@@ -1383,13 +1383,12 @@ status_t AudioFlinger::PlaybackThread::checkEffectCompatibility_l(
             }
 
             if (flags & AUDIO_OUTPUT_FLAG_RAW) {
-                ALOGW("checkEffectCompatibility_l(): effect %s on playback thread in raw mode",
-                      desc->name);
+                ALOGW("%s: effect %s on playback thread in raw mode", __func__, desc->name);
                 return BAD_VALUE;
             }
             if ((desc->flags & EFFECT_FLAG_HW_ACC_TUNNEL) == 0) {
-                ALOGW("checkEffectCompatibility_l(): non HW effect %s on playback thread"
-                        " in fast mode", desc->name);
+                ALOGW("%s: non HW effect %s on playback thread in fast mode",
+                        __func__, desc->name);
                 return BAD_VALUE;
             }
         }
@@ -1403,40 +1402,62 @@ status_t AudioFlinger::PlaybackThread::checkEffectCompatibility_l(
     case DIRECT:
         // Reject any effect on Direct output threads for now, since the format of
         // mSinkBuffer is not guaranteed to be compatible with effect processing (PCM 16 stereo).
-        ALOGW("checkEffectCompatibility_l(): effect %s on DIRECT output thread %s",
-                desc->name, mThreadName);
+        ALOGW("%s: effect %s on DIRECT output thread %s",
+                __func__, desc->name, mThreadName);
         return BAD_VALUE;
     case DUPLICATING:
 #ifndef MULTICHANNEL_EFFECT_CHAIN
         // Reject any effect on mixer multichannel sinks.
         // TODO: fix both format and multichannel issues with effects.
         if (mChannelCount != FCC_2) {
-            ALOGW("checkEffectCompatibility_l(): effect %s for multichannel(%d)"
-                    " on DUPLICATING thread %s", desc->name, mChannelCount, mThreadName);
+            ALOGW("%s: effect %s for multichannel(%d) on DUPLICATING thread %s",
+                    __func__, desc->name, mChannelCount, mThreadName);
             return BAD_VALUE;
         }
 #endif
         if (audio_is_global_session(sessionId)) {
-            ALOGW("checkEffectCompatibility_l(): global effect %s on DUPLICATING"
-                    " thread %s", desc->name, mThreadName);
+            ALOGW("%s: global effect %s on DUPLICATING thread %s",
+                    __func__, desc->name, mThreadName);
             return BAD_VALUE;
         }
         if ((desc->flags & EFFECT_FLAG_TYPE_MASK) == EFFECT_FLAG_TYPE_POST_PROC) {
-            ALOGW("checkEffectCompatibility_l(): post processing effect %s on"
-                    " DUPLICATING thread %s", desc->name, mThreadName);
+            ALOGW("%s: post processing effect %s on DUPLICATING thread %s",
+                __func__, desc->name, mThreadName);
             return BAD_VALUE;
         }
         if ((desc->flags & EFFECT_FLAG_HW_ACC_TUNNEL) != 0) {
-            ALOGW("checkEffectCompatibility_l(): HW tunneled effect %s on"
-                    " DUPLICATING thread %s", desc->name, mThreadName);
+            ALOGW("%s: HW tunneled effect %s on DUPLICATING thread %s",
+                    __func__, desc->name, mThreadName);
             return BAD_VALUE;
         }
         break;
     case SPATIALIZER:
-        if (!audio_is_global_session(sessionId)) {
-            ALOGW("checkEffectCompatibility_l(): non global effect %s on SPATIALIZER"
-                    " thread %s", desc->name, mThreadName);
+        // Global effects (AUDIO_SESSION_OUTPUT_MIX) are not supported on spatializer mixer
+        // as there is no common accumulation buffer for sptialized and non sptialized tracks.
+        // Post processing effects (AUDIO_SESSION_OUTPUT_STAGE or AUDIO_SESSION_DEVICE)
+        // are supported and added after the spatializer.
+        if (sessionId == AUDIO_SESSION_OUTPUT_MIX) {
+            ALOGW("%s: global effect %s not supported on spatializer thread %s",
+                    __func__, desc->name, mThreadName);
             return BAD_VALUE;
+        } else if (sessionId == AUDIO_SESSION_OUTPUT_STAGE) {
+            // only post processing , downmixer or spatializer effects on output stage session
+            if (memcmp(&desc->type, FX_IID_SPATIALIZER, sizeof(effect_uuid_t)) == 0
+                    || memcmp(&desc->type, EFFECT_UIID_DOWNMIX, sizeof(effect_uuid_t)) == 0) {
+                break;
+            }
+            if ((desc->flags & EFFECT_FLAG_TYPE_MASK) != EFFECT_FLAG_TYPE_POST_PROC) {
+                ALOGW("%s: non post processing effect %s not allowed on output stage session",
+                        __func__, desc->name);
+                return BAD_VALUE;
+            }
+        } else if (sessionId == AUDIO_SESSION_DEVICE) {
+            // only post processing on output stage session
+            if ((desc->flags & EFFECT_FLAG_TYPE_MASK) != EFFECT_FLAG_TYPE_POST_PROC) {
+                ALOGW("%s: non post processing effect %s not allowed on device session",
+                        __func__, desc->name);
+                return BAD_VALUE;
+            }
         }
         break;
     default:
@@ -2046,7 +2067,7 @@ AudioFlinger::PlaybackThread::~PlaybackThread()
     free(mSinkBuffer);
     free(mMixerBuffer);
     free(mEffectBuffer);
-    free(mEffectToSinkBuffer);
+    free(mPostSpatializerBuffer);
 }
 
 // Thread virtuals
@@ -3009,17 +3030,11 @@ void AudioFlinger::PlaybackThread::readOutputParameters_l()
     // Originally this was int16_t[] array, need to remove legacy implications.
     free(mSinkBuffer);
     mSinkBuffer = NULL;
-    free(mEffectToSinkBuffer);
-    mEffectToSinkBuffer = nullptr;
 
     // For sink buffer size, we use the frame size from the downstream sink to avoid problems
     // with non PCM formats for compressed music, e.g. AAC, and Offload threads.
     const size_t sinkBufferSize = mNormalFrameCount * mFrameSize;
     (void)posix_memalign(&mSinkBuffer, 32, sinkBufferSize);
-
-    if (mType == SPATIALIZER) {
-        (void)posix_memalign(&mEffectToSinkBuffer, 32, sinkBufferSize);
-    }
 
     // We resize the mMixerBuffer according to the requirements of the sink buffer which
     // drives the output.
@@ -3038,6 +3053,14 @@ void AudioFlinger::PlaybackThread::readOutputParameters_l()
         mEffectBufferSize = mNormalFrameCount * mixerChannelCount
                 * audio_bytes_per_sample(mEffectBufferFormat);
         (void)posix_memalign(&mEffectBuffer, 32, mEffectBufferSize);
+    }
+
+    if (mType == SPATIALIZER) {
+        free(mPostSpatializerBuffer);
+        mPostSpatializerBuffer = nullptr;
+        mPostSpatializerBufferSize = mNormalFrameCount * mChannelCount
+                * audio_bytes_per_sample(mEffectBufferFormat);
+        (void)posix_memalign(&mPostSpatializerBuffer, 32, mPostSpatializerBufferSize);
     }
 
     mHapticChannelMask = static_cast<audio_channel_mask_t>(mChannelMask & AUDIO_CHANNEL_HAPTIC_ALL);
@@ -3423,24 +3446,34 @@ status_t AudioFlinger::PlaybackThread::addEffectChain_l(const sp<EffectChain>& c
 {
     audio_session_t session = chain->sessionId();
     sp<EffectBufferHalInterface> halInBuffer, halOutBuffer;
-    status_t result = mAudioFlinger->mEffectsFactoryHal->mirrorBuffer(
-            mEffectBufferEnabled ? mEffectBuffer : mSinkBuffer,
-            mEffectBufferEnabled ? mEffectBufferSize : mSinkBufferSize,
-            &halInBuffer);
-    if (result != OK) return result;
-    halOutBuffer = halInBuffer;
-    effect_buffer_t *buffer = reinterpret_cast<effect_buffer_t*>(halInBuffer->externalData());
-    ALOGV("addEffectChain_l() %p on thread %p for session %d", chain.get(), this, session);
-    if (!audio_is_global_session(session)) {
-        // Only one effect chain can be present in direct output thread and it uses
-        // the sink buffer as input
-        if (mType != DIRECT) {
+    effect_buffer_t *buffer = nullptr; // only used for non global sessions
+
+    if (mType == SPATIALIZER ) {
+        if (!audio_is_global_session(session)) {
+            // player sessions on a spatializer output will use a dedicated input buffer and
+            // will either output multi channel to mEffectBuffer if the track is spatilaized
+            // or stereo to mPostSpatializerBuffer if not spatialized.
+            uint32_t channelMask;
+            bool isSessionSpatialized =
+                (hasAudioSession_l(session) & ThreadBase::SPATIALIZED_SESSION) != 0;
+            if (isSessionSpatialized) {
+                channelMask = mMixerChannelMask;
+            } else {
+                channelMask = mChannelMask;
+            }
             size_t numSamples = mNormalFrameCount
-                    * (audio_channel_count_from_out_mask(mMixerChannelMask) + mHapticChannelCount);
+                    * (audio_channel_count_from_out_mask(channelMask) + mHapticChannelCount);
             status_t result = mAudioFlinger->mEffectsFactoryHal->allocateBuffer(
                     numSamples * sizeof(effect_buffer_t),
                     &halInBuffer);
             if (result != OK) return result;
+
+            result = mAudioFlinger->mEffectsFactoryHal->mirrorBuffer(
+                    isSessionSpatialized ? mEffectBuffer : mPostSpatializerBuffer,
+                    isSessionSpatialized ? mEffectBufferSize : mPostSpatializerBufferSize,
+                    &halOutBuffer);
+            if (result != OK) return result;
+
 #ifdef FLOAT_EFFECT_CHAIN
             buffer = halInBuffer->audioBuffer()->f32;
 #else
@@ -3448,14 +3481,60 @@ status_t AudioFlinger::PlaybackThread::addEffectChain_l(const sp<EffectChain>& c
 #endif
             ALOGV("addEffectChain_l() creating new input buffer %p session %d",
                     buffer, session);
-        }
+        } else {
+            // A global session on a SPATIALIZER thread is either OUTPUT_STAGE or DEVICE
+            // - OUTPUT_STAGE session uses the mEffectBuffer as input buffer and
+            // mPostSpatializerBuffer as output buffer
+            // - DEVICE session uses the mPostSpatializerBuffer as input and output buffer.
+            status_t result = mAudioFlinger->mEffectsFactoryHal->mirrorBuffer(
+                    mEffectBuffer, mEffectBufferSize, &halInBuffer);
+            if (result != OK) return result;
+            result = mAudioFlinger->mEffectsFactoryHal->mirrorBuffer(
+                    mPostSpatializerBuffer, mPostSpatializerBufferSize, &halOutBuffer);
+            if (result != OK) return result;
 
+            if (session == AUDIO_SESSION_DEVICE) {
+                halInBuffer = halOutBuffer;
+            }
+        }
+    } else {
+        status_t result = mAudioFlinger->mEffectsFactoryHal->mirrorBuffer(
+                mEffectBufferEnabled ? mEffectBuffer : mSinkBuffer,
+                mEffectBufferEnabled ? mEffectBufferSize : mSinkBufferSize,
+                &halInBuffer);
+        if (result != OK) return result;
+        halOutBuffer = halInBuffer;
+        ALOGV("addEffectChain_l() %p on thread %p for session %d", chain.get(), this, session);
+        if (!audio_is_global_session(session)) {
+            buffer = reinterpret_cast<effect_buffer_t*>(halInBuffer->externalData());
+            // Only one effect chain can be present in direct output thread and it uses
+            // the sink buffer as input
+            if (mType != DIRECT) {
+                size_t numSamples = mNormalFrameCount
+                        * (audio_channel_count_from_out_mask(mMixerChannelMask)
+                                                             + mHapticChannelCount);
+                status_t result = mAudioFlinger->mEffectsFactoryHal->allocateBuffer(
+                        numSamples * sizeof(effect_buffer_t),
+                        &halInBuffer);
+                if (result != OK) return result;
+#ifdef FLOAT_EFFECT_CHAIN
+                buffer = halInBuffer->audioBuffer()->f32;
+#else
+                buffer = halInBuffer->audioBuffer()->s16;
+#endif
+                ALOGV("addEffectChain_l() creating new input buffer %p session %d",
+                        buffer, session);
+            }
+        }
+    }
+
+    if (!audio_is_global_session(session)) {
         // Attach all tracks with same session ID to this chain.
         for (size_t i = 0; i < mTracks.size(); ++i) {
             sp<Track> track = mTracks[i];
             if (session == track->sessionId()) {
-                ALOGV("addEffectChain_l() track->setMainBuffer track %p buffer %p", track.get(),
-                        buffer);
+                ALOGV("addEffectChain_l() track->setMainBuffer track %p buffer %p",
+                        track.get(), buffer);
                 track->setMainBuffer(buffer);
                 chain->incTrackCnt();
             }
@@ -3464,11 +3543,13 @@ status_t AudioFlinger::PlaybackThread::addEffectChain_l(const sp<EffectChain>& c
         // indicate all active tracks in the chain
         for (const sp<Track> &track : mActiveTracks) {
             if (session == track->sessionId()) {
-                ALOGV("addEffectChain_l() activating track %p on session %d", track.get(), session);
+                ALOGV("addEffectChain_l() activating track %p on session %d",
+                        track.get(), session);
                 chain->incActiveTrackCnt();
             }
         }
     }
+
     chain->setThread(this);
     chain->setInBuffer(halInBuffer);
     chain->setOutBuffer(halOutBuffer);
@@ -3632,6 +3713,7 @@ bool AudioFlinger::PlaybackThread::threadLoop()
 
         Vector< sp<EffectChain> > effectChains;
         audio_session_t activeHapticSessionId = AUDIO_SESSION_NONE;
+        bool isHapticSessionSpatialized = false;
         std::vector<sp<Track>> activeTracks;
 
         // If the device is AUDIO_DEVICE_OUT_BUS, check for downstream latency.
@@ -3792,16 +3874,21 @@ bool AudioFlinger::PlaybackThread::threadLoop()
             // This must be done under the same lock as prepareTracks_l().
             // The haptic data from the effect is at a higher priority than the one from track.
             // TODO: Write haptic data directly to sink buffer when mixing.
-            if (mHapticChannelCount > 0 && effectChains.size() > 0) {
+            if (mHapticChannelCount > 0) {
                 for (const auto& track : mActiveTracks) {
                     sp<EffectChain> effectChain = getEffectChain_l(track->sessionId());
-                    if (effectChain != nullptr && effectChain->containsHapticGeneratingEffect_l()) {
+                    if (effectChain != nullptr
+                            && effectChain->containsHapticGeneratingEffect_l()) {
                         activeHapticSessionId = track->sessionId();
+                        isHapticSessionSpatialized =
+                                mType == SPATIALIZER && track->canBeSpatialized();
                         break;
                     }
-                    if (track->getHapticPlaybackEnabled()) {
+                    if (activeHapticSessionId == AUDIO_SESSION_NONE
+                            && track->getHapticPlaybackEnabled()) {
                         activeHapticSessionId = track->sessionId();
-                        break;
+                        isHapticSessionSpatialized =
+                                mType == SPATIALIZER && track->canBeSpatialized();
                     }
                 }
             }
@@ -3906,11 +3993,16 @@ bool AudioFlinger::PlaybackThread::threadLoop()
                             && activeHapticSessionId == effectChains[i]->sessionId()) {
                         // Haptic data is active in this case, copy it directly from
                         // in buffer to out buffer.
-                        uint32_t channelCount =
-                                effectChains[i]->sessionId() == AUDIO_SESSION_OUTPUT_STAGE ?
-                                        mixerChannelCount : mChannelCount;
+                        uint32_t hapticSessionChannelCount = mEffectBufferValid ?
+                                            audio_channel_count_from_out_mask(mMixerChannelMask) :
+                                            mChannelCount;
+                        if (mType == SPATIALIZER && !isHapticSessionSpatialized) {
+                            hapticSessionChannelCount = mChannelCount;
+                        }
+
                         const size_t audioBufferSize = mNormalFrameCount
-                                * audio_bytes_per_frame(channelCount, EFFECT_BUFFER_FORMAT);
+                            * audio_bytes_per_frame(hapticSessionChannelCount,
+                                                    EFFECT_BUFFER_FORMAT);
                         memcpy_by_audio_format(
                                 (uint8_t*)effectChains[i]->outBuffer() + audioBufferSize,
                                 EFFECT_BUFFER_FORMAT,
@@ -3936,9 +4028,9 @@ bool AudioFlinger::PlaybackThread::threadLoop()
         // TODO use mSleepTimeUs == 0 as an additional condition.
         if (mEffectBufferValid) {
             //ALOGV("writing effect buffer to sink buffer format %#x", mFormat);
-
+            void *effectBuffer = (mType == SPATIALIZER) ? mPostSpatializerBuffer : mEffectBuffer;
             if (requireMonoBlend()) {
-                mono_blend(mEffectBuffer, mEffectBufferFormat, mChannelCount, mNormalFrameCount,
+                mono_blend(effectBuffer, mEffectBufferFormat, mChannelCount, mNormalFrameCount,
                            true /*limit*/);
             }
 
@@ -3947,26 +4039,30 @@ bool AudioFlinger::PlaybackThread::threadLoop()
                 // We do it here if there is no FastMixer.
                 // mBalance detects zero balance within the class for speed (not needed here).
                 mBalance.setBalance(mMasterBalance.load());
-                mBalance.process((float *)mEffectBuffer, mNormalFrameCount);
+                mBalance.process((float *)effectBuffer, mNormalFrameCount);
             }
 
-            if (mType == SPATIALIZER) {
-                memcpy_by_audio_format(mEffectToSinkBuffer, mFormat, mEffectBuffer,
-                        mEffectBufferFormat,
-                        mNormalFrameCount * (mChannelCount + mHapticChannelCount));
-                accumulate_by_audio_format(mSinkBuffer, mEffectToSinkBuffer, mFormat,
-                                           mNormalFrameCount * mChannelCount);
-                const size_t audioBufferSize = mNormalFrameCount
-                        * audio_bytes_per_frame(mChannelCount, mFormat);
-                memcpy_by_audio_format(
-                        (uint8_t*)mSinkBuffer + audioBufferSize,
-                        mFormat,
-                        (uint8_t*)mEffectToSinkBuffer + audioBufferSize,
-                        mFormat, mNormalFrameCount * mHapticChannelCount);
-            } else {
-                memcpy_by_audio_format(mSinkBuffer, mFormat, mEffectBuffer, mEffectBufferFormat,
-                        mNormalFrameCount * (mChannelCount + mHapticChannelCount));
+            // for SPATIALIZER thread, Move haptics channels from mEffectBuffer to
+            // mPostSpatializerBuffer if the haptics track is spatialized.
+            // Otherwise, the haptics channels are already in mPostSpatializerBuffer.
+            // For other thread types, the haptics channels are already in mEffectBuffer.
+            if (mType == SPATIALIZER && isHapticSessionSpatialized) {
+                const size_t srcBufferSize = mNormalFrameCount *
+                        audio_bytes_per_frame(audio_channel_count_from_out_mask(mMixerChannelMask),
+                                              mEffectBufferFormat);
+                const size_t dstBufferSize = mNormalFrameCount
+                        * audio_bytes_per_frame(mChannelCount, mEffectBufferFormat);
+
+                memcpy_by_audio_format((uint8_t*)mPostSpatializerBuffer + dstBufferSize,
+                                       mEffectBufferFormat,
+                                       (uint8_t*)mEffectBuffer + srcBufferSize,
+                                       mEffectBufferFormat,
+                                       mNormalFrameCount * mHapticChannelCount);
             }
+
+            memcpy_by_audio_format(mSinkBuffer, mFormat, effectBuffer, mEffectBufferFormat,
+                    mNormalFrameCount * (mChannelCount + mHapticChannelCount));
+
             // The sample data is partially interleaved when haptic channels exist,
             // we need to adjust channels here.
             if (mHapticChannelCount > 0) {
@@ -4604,27 +4700,30 @@ AudioFlinger::MixerThread::MixerThread(const sp<AudioFlinger>& audioFlinger, Aud
 
     // initialize fast mixer depending on configuration
     bool initFastMixer;
-    switch (kUseFastMixer) {
-    case FastMixer_Never:
+    if (mType == SPATIALIZER) {
         initFastMixer = false;
-        break;
-    case FastMixer_Always:
-        initFastMixer = true;
-        break;
-    case FastMixer_Static:
-    case FastMixer_Dynamic:
-        // FastMixer was designed to operate with a HAL that pulls at a regular rate,
-        // where the period is less than an experimentally determined threshold that can be
-        // scheduled reliably with CFS. However, the BT A2DP HAL is
-        // bursty (does not pull at a regular rate) and so cannot operate with FastMixer.
-        initFastMixer = mFrameCount < mNormalFrameCount
-                && Intersection(outDeviceTypes(), getAudioDeviceOutAllA2dpSet()).empty();
-        break;
+    } else {
+        switch (kUseFastMixer) {
+        case FastMixer_Never:
+            initFastMixer = false;
+            break;
+        case FastMixer_Always:
+            initFastMixer = true;
+            break;
+        case FastMixer_Static:
+        case FastMixer_Dynamic:
+            // FastMixer was designed to operate with a HAL that pulls at a regular rate,
+            // where the period is less than an experimentally determined threshold that can be
+            // scheduled reliably with CFS. However, the BT A2DP HAL is
+            // bursty (does not pull at a regular rate) and so cannot operate with FastMixer.
+            initFastMixer = mFrameCount < mNormalFrameCount
+                    && Intersection(outDeviceTypes(), getAudioDeviceOutAllA2dpSet()).empty();
+            break;
+        }
+        ALOGW_IF(initFastMixer == false && mFrameCount < mNormalFrameCount,
+                "FastMixer is preferred for this sink as frameCount %zu is less than threshold %zu",
+                mFrameCount, mNormalFrameCount);
     }
-    ALOG_ASSERT(initFastMixer && mType == SPATIALIZER);
-    ALOGW_IF(initFastMixer == false && mFrameCount < mNormalFrameCount,
-            "FastMixer is preferred for this sink as frameCount %zu is less than threshold %zu",
-            mFrameCount, mNormalFrameCount);
     if (initFastMixer) {
         audio_format_t fastMixerFormat;
         if (mMixerBufferEnabled && mEffectBufferEnabled) {
@@ -5530,11 +5629,11 @@ AudioFlinger::PlaybackThread::mixer_state AudioFlinger::MixerThread::prepareTrac
                     mAudioMixer->setParameter(
                             trackId,
                             AudioMixer::TRACK,
-                            AudioMixer::MIXER_FORMAT, (void *)mFormat);
+                            AudioMixer::MIXER_FORMAT, (void *)mEffectBufferFormat);
                     mAudioMixer->setParameter(
                             trackId,
                             AudioMixer::TRACK,
-                            AudioMixer::MAIN_BUFFER, (void *)mSinkBuffer);
+                            AudioMixer::MAIN_BUFFER, (void *)mPostSpatializerBuffer);
                 } else {
                     mAudioMixer->setParameter(
                             trackId,
@@ -5732,6 +5831,9 @@ AudioFlinger::PlaybackThread::mixer_state AudioFlinger::MixerThread::prepareTrac
         // as long as there are effects we should clear the effects buffer, to avoid
         // passing a non-clean buffer to the effect chain
         memset(mEffectBuffer, 0, mEffectBufferSize);
+        if (mType == SPATIALIZER) {
+            memset(mPostSpatializerBuffer, 0, mPostSpatializerBufferSize);
+        }
     }
     // sink or mix buffer must be cleared if all tracks are connected to an
     // effect chain as in this case the mixer will not write to the sink or mix buffer

@@ -417,8 +417,10 @@ public:
                                             // effect
                     TRACK_SESSION = 0x2,    // the audio session corresponds to at least one
                                             // track
-                    FAST_SESSION = 0x4      // the audio session corresponds to at least one
+                    FAST_SESSION = 0x4,     // the audio session corresponds to at least one
                                             // fast track
+                    SPATIALIZED_SESSION = 0x8 // the audio session corresponds to at least one
+                                              // spatialized track
                 };
 
                 // get effect chain corresponding to session Id.
@@ -459,6 +461,7 @@ public:
                 // - EFFECT_SESSION if effects on this audio session exist in one chain
                 // - TRACK_SESSION if tracks on this audio session exist
                 // - FAST_SESSION if fast tracks on this audio session exist
+                // - SPATIALIZED_SESSION if spatialized tracks on this audio session exist
     virtual     uint32_t hasAudioSession_l(audio_session_t sessionId) const = 0;
                 uint32_t hasAudioSession(audio_session_t sessionId) const {
                     Mutex::Autolock _l(mLock);
@@ -479,6 +482,9 @@ public:
                             result |= TRACK_SESSION;
                             if (track->isFastTrack()) {
                                 result |= FAST_SESSION;  // caution, only represents first track.
+                            }
+                            if (track->canBeSpatialized()) {
+                                result |= SPATIALIZED_SESSION;  // caution, only first track.
                             }
                             break;
                         }
@@ -1122,9 +1128,13 @@ protected:
     // for any processing (including output processing).
     bool                            mEffectBufferValid;
 
-    // Frame size aligned buffer used to convert mEffectBuffer samples to mSinkBuffer format prior
-    // to accumulate into mSinkBuffer on SPATIALIZER threads
-    void*                           mEffectToSinkBuffer = nullptr;
+    // Frame size aligned buffer used as input and output to all post processing effects
+    // except the Spatializer in a SPATIALIZER thread. Non spatialized tracks are mixed into
+    // this buffer so that post processing effects can be applied.
+    void*                           mPostSpatializerBuffer = nullptr;
+
+    // Size of mPostSpatializerBuffer in bytes
+    size_t                          mPostSpatializerBufferSize;
 
 
     // suspend count, > 0 means suspended.  While suspended, the thread continues to pull from
