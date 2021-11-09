@@ -270,8 +270,10 @@ public:
     audio_patch_handle_t getPatchHandle() const override;
     void setPatchHandle(audio_patch_handle_t handle) override;
     bool isMmap() override {
-        if (getPolicyAudioPort() != nullptr) {
-            return getPolicyAudioPort()->isMmap();
+        if (const auto policyPort = getPolicyAudioPort(); policyPort != nullptr) {
+            if (const auto port = policyPort->asAudioPort(); port != nullptr) {
+                return port->isMmap();
+            }
         }
         return false;
     }
