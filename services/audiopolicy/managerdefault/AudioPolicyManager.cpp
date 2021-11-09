@@ -6134,11 +6134,11 @@ sp<DeviceDescriptor> AudioPolicyManager::getNewInputDevice(
     uid_t uid;
     sp<RecordClientDescriptor> topClient = inputDesc->getHighestPriorityClient();
     if (topClient != nullptr) {
-      attributes = topClient->attributes();
-      uid = topClient->uid();
+        attributes = topClient->attributes();
+        uid = topClient->uid();
     } else {
-      attributes = { .source = AUDIO_SOURCE_DEFAULT };
-      uid = 0;
+        attributes = { .source = AUDIO_SOURCE_DEFAULT };
+        uid = 0;
     }
 
     if (attributes.source == AUDIO_SOURCE_DEFAULT && isInCall()) {
@@ -6938,8 +6938,8 @@ bool AudioPolicyManager::isCallAudioAccessible()
 {
     audio_mode_t mode = mEngine->getPhoneState();
     return (mode == AUDIO_MODE_IN_CALL)
-            || (mode == AUDIO_MODE_IN_COMMUNICATION)
-            || (mode == AUDIO_MODE_CALL_SCREEN);
+            || (mode == AUDIO_MODE_CALL_SCREEN)
+            || (mode == AUDIO_MODE_CALL_REDIRECT);
 }
 
 void AudioPolicyManager::cleanUpForDevice(const sp<DeviceDescriptor>& deviceDesc)
