@@ -4953,9 +4953,8 @@ void AudioPolicyManager::onNewAudioModulesAvailableInt(DeviceVector *newDevices)
             continue;
         }
         mHwModules.push_back(hwModule);
-        // open all output streams needed to access attached devices
-        // except for direct output streams that are only opened when they are actually
-        // required by an app.
+        // open all output streams needed to access attached devices.
+        // direct outputs are closed immediately after checking the availability of attached devices
         // This also validates mAvailableOutputDevices list
         for (const auto& outProfile : hwModule->getOutputProfiles()) {
             if (!outProfile->canOpenNewIo()) {
