@@ -470,10 +470,11 @@ protected:
     status_t extract(std::string *val, const char **bufferpptr, const char *bufferptrmax) {
         const char *ptr = *bufferpptr;
         while (*ptr != 0) {
-            if (++ptr >= bufferptrmax) {
+            if (ptr >= bufferptrmax) {
                 ALOGE("%s: buffer exceeded", __func__);
                 return BAD_VALUE;
             }
+            ++ptr;
         }
         const size_t size = (ptr - *bufferpptr) + 1;
         *val = *bufferpptr;
