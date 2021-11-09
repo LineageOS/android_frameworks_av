@@ -4975,7 +4975,7 @@ status_t CameraService::printHelp(int out) {
         "      Valid values 0=OFF, 1=ON for JPEG\n"
         "  get-image-dump-mask returns the current image-dump-mask value\n"
         "  set-camera-mute <0/1> enable or disable camera muting\n"
-        "  watch <start|stop|dump|live> manages tag monitoring in connected clients\n"
+        "  watch <start|stop|dump|print> manages tag monitoring in connected clients\n"
         "  help print this message\n");
 }
 
