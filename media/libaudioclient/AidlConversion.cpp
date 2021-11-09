@@ -1589,44 +1589,29 @@ ConversionResult<int32_t> legacy2aidl_audio_output_flags_t_int32_t_mask(
 }
 
 ConversionResult<audio_io_flags> aidl2legacy_AudioIoFlags_audio_io_flags(
-        const AudioIoFlags& aidl, media::AudioPortRole role, media::AudioPortType type) {
+        const AudioIoFlags& aidl, bool isInput) {
     audio_io_flags legacy;
-    Direction dir = VALUE_OR_RETURN(direction(role, type));
-    switch (dir) {
-        case Direction::INPUT: {
-            legacy.input = VALUE_OR_RETURN(
-                    aidl2legacy_int32_t_audio_input_flags_t_mask(
-                            VALUE_OR_RETURN(UNION_GET(aidl, input))));
-        }
-            break;
-
-        case Direction::OUTPUT: {
-            legacy.output = VALUE_OR_RETURN(
-                    aidl2legacy_int32_t_audio_output_flags_t_mask(
-                            VALUE_OR_RETURN(UNION_GET(aidl, output))));
-        }
-            break;
+    if (isInput) {
+        legacy.input = VALUE_OR_RETURN(
+                aidl2legacy_int32_t_audio_input_flags_t_mask(
+                        VALUE_OR_RETURN(UNION_GET(aidl, input))));
+    } else {
+        legacy.output = VALUE_OR_RETURN(
+                aidl2legacy_int32_t_audio_output_flags_t_mask(
+                        VALUE_OR_RETURN(UNION_GET(aidl, output))));
     }
-
     return legacy;
 }
 
 ConversionResult<AudioIoFlags> legacy2aidl_audio_io_flags_AudioIoFlags(
-        const audio_io_flags& legacy, audio_port_role_t role, audio_port_type_t type) {
+        const audio_io_flags& legacy, bool isInput) {
     AudioIoFlags aidl;
-
-    Direction dir = VALUE_OR_RETURN(direction(role, type));
-    switch (dir) {
-        case Direction::INPUT:
-            UNION_SET(aidl, input,
-                      VALUE_OR_RETURN(legacy2aidl_audio_input_flags_t_int32_t_mask(
-                              legacy.input)));
-            break;
-        case Direction::OUTPUT:
-            UNION_SET(aidl, output,
-                      VALUE_OR_RETURN(legacy2aidl_audio_output_flags_t_int32_t_mask(
-                              legacy.output)));
-            break;
+    if (isInput) {
+        UNION_SET(aidl, input,
+                VALUE_OR_RETURN(legacy2aidl_audio_input_flags_t_int32_t_mask(legacy.input)));
+    } else {
+        UNION_SET(aidl, output,
+                VALUE_OR_RETURN(legacy2aidl_audio_output_flags_t_int32_t_mask(legacy.output)));
     }
     return aidl;
 }
@@ -2000,8 +1985,7 @@ ConversionResult<audio_port_config> aidl2legacy_AudioPortConfig_audio_port_confi
     }
     if (aidl.hal.flags.has_value()) {
         legacy.flags = VALUE_OR_RETURN(
-                aidl2legacy_AudioIoFlags_audio_io_flags(
-                        aidl.hal.flags.value(), aidl.sys.role, aidl.sys.type));
+                aidl2legacy_AudioIoFlags_audio_io_flags(aidl.hal.flags.value(), isInput));
         legacy.config_mask |= AUDIO_PORT_CONFIG_FLAGS;
     }
     legacy.ext = VALUE_OR_RETURN(
@@ -2037,7 +2021,7 @@ ConversionResult<media::AudioPortConfig> legacy2aidl_audio_port_config_AudioPort
     }
     if (legacy.config_mask & AUDIO_PORT_CONFIG_FLAGS) {
         aidl.hal.flags = VALUE_OR_RETURN(
-                legacy2aidl_audio_io_flags_AudioIoFlags(legacy.flags, legacy.role, legacy.type));
+                legacy2aidl_audio_io_flags_AudioIoFlags(legacy.flags, isInput));
     }
     RETURN_IF_ERROR(legacy2aidl_AudioPortExt(legacy.ext, legacy.type, legacy.role,
                     &aidl.hal.ext, &aidl.sys.ext));

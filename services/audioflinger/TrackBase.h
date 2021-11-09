@@ -107,6 +107,9 @@ public:
 
     audio_attributes_t  attributes() const { return mAttr; }
 
+            bool canBeSpatialized() const { return mIsOut && (mAttr.flags
+                    & (AUDIO_FLAG_CONTENT_SPATIALIZED | AUDIO_FLAG_NEVER_SPATIALIZE)) == 0; }
+
 #ifdef TEE_SINK
            void         dumpTee(int fd, const std::string &reason) const {
                                 mTee.dump(fd, reason);
