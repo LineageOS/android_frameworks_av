@@ -4269,6 +4269,11 @@ void CameraService::cacheClientTagDumpIfNeeded(const char *cameraId, BasicClient
 
     if (dumpVector.empty()) { return; }
 
+    const String16 &packageName = client->getPackageName();
+
+    String8 packageName8 = String8(packageName);
+    const char *printablePackageName = packageName8.lockBuffer(packageName.size());
+
     std::string dumpString;
     size_t i = dumpVector.size();
 
@@ -4277,10 +4282,12 @@ void CameraService::cacheClientTagDumpIfNeeded(const char *cameraId, BasicClient
          i--;
          dumpString += cameraId;
          dumpString += ":";
+         dumpString += printablePackageName;
+         dumpString += "  ";
          dumpString += dumpVector[i]; // implicitly ends with '\n'
     }
 
-    const String16 &packageName = client->getPackageName();
+    packageName8.unlockBuffer();
     mWatchedClientsDumpCache[packageName] = dumpString;
 }
 
@@ -4841,7 +4848,7 @@ status_t CameraService::printWatchedTags(const Vector<String16> &args, int outFd
     mLogLock.lock();
     bool serviceLock = tryLock(mServiceLock);
     // get all watched clients that are currently connected
-    std::set<String16> connectedMoniterdClients;
+    std::set<String16> connectedMonitoredClients;
     for (const auto &clientDescriptor: mActiveClientManager.getAll()) {
         if (clientDescriptor == nullptr) { continue; }
 
@@ -4849,14 +4856,14 @@ status_t CameraService::printWatchedTags(const Vector<String16> &args, int outFd
         if (client.get() == nullptr) { continue; }
         if (!isClientWatchedLocked(client.get())) { continue; }
 
-        connectedMoniterdClients.emplace(client->getPackageName());
+        connectedMonitoredClients.emplace(client->getPackageName());
     }
     if (serviceLock) { mServiceLock.unlock(); }
 
     // Print entries in mWatchedClientsDumpCache for clients that are not connected
     for (const auto &kv: mWatchedClientsDumpCache) {
         const String16 &package = kv.first;
-        if (connectedMoniterdClients.find(package) != connectedMoniterdClients.end()) {
+        if (connectedMonitoredClients.find(package) != connectedMonitoredClients.end()) {
             continue;
         }
 
@@ -4865,7 +4872,7 @@ status_t CameraService::printWatchedTags(const Vector<String16> &args, int outFd
     }
     mLogLock.unlock();
 
-    if (connectedMoniterdClients.empty()) {
+    if (connectedMonitoredClients.empty()) {
         dprintf(outFd, "No watched client active.\n");
         return OK;
     }
