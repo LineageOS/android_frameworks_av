@@ -43,9 +43,9 @@ const static String16 sSharedFilterPermission("android.permission.ACCESS_TV_SHAR
 
 typedef enum {
     FRONTEND,
-    LNB,
     DEMUX,
     DESCRAMBLER,
+    LNB
 } TunerResourceType;
 
 class TunerHelper {
