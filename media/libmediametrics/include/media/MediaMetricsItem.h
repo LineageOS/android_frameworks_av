@@ -469,16 +469,15 @@ protected:
     template <> // static
     status_t extract(std::string *val, const char **bufferpptr, const char *bufferptrmax) {
         const char *ptr = *bufferpptr;
-        while (*ptr != 0) {
+        do {
             if (ptr >= bufferptrmax) {
                 ALOGE("%s: buffer exceeded", __func__);
                 return BAD_VALUE;
             }
-            ++ptr;
-        }
-        const size_t size = (ptr - *bufferpptr) + 1;
+        } while (*ptr++ != 0);
+        // ptr is terminator+1, == bufferptrmax if we finished entire buffer
         *val = *bufferpptr;
-        *bufferpptr += size;
+        *bufferpptr = ptr;
         return NO_ERROR;
     }
     template <> // static
