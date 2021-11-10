@@ -2573,10 +2573,15 @@ sp<AudioFlinger::ThreadBase> AudioFlinger::openOutput_l(audio_module_handle_t mo
             //TODO: b/193496180 use spatializer flag at audio HAL when available
             if (flags == (audio_output_flags_t)(AUDIO_OUTPUT_FLAG_FAST
                                                     | AUDIO_OUTPUT_FLAG_DEEP_BUFFER)) {
+#ifdef MULTICHANNEL_EFFECT_CHAIN
                 thread = new SpatializerThread(this, outputStream, *output,
                                                     mSystemReady, mixerConfig);
-                ALOGD("openOutput_l() created virtualizer output: ID %d thread %p",
+                ALOGD("openOutput_l() created spatializer output: ID %d thread %p",
                       *output, thread.get());
+#else
+                ALOGE("openOutput_l() cannot create spatializer thread "
+                        "without #define MULTICHANNEL_EFFECT_CHAIN");
+#endif
             } else if (flags & AUDIO_OUTPUT_FLAG_COMPRESS_OFFLOAD) {
                 thread = new OffloadThread(this, outputStream, *output, mSystemReady);
                 ALOGV("openOutput_l() created offload output: ID %d thread %p",
