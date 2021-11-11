@@ -4949,13 +4949,17 @@ void CameraService::printNewWatchedEvents(int outFd,
 
     if (lastPrintedIdx == 0) { return; } // early exit if no new event in `events`
 
-    const char *printPackageName = String8(packageName).string();
+    String8 packageName8(packageName);
+    const char * printablePackageName = packageName8.lockBuffer(packageName8.size());
+
     // print events in chronological order (latest event last)
     size_t idxToPrint = lastPrintedIdx;
     do {
         idxToPrint--;
-        dprintf(outFd, "%s:%s  %s", cameraId, printPackageName, events[idxToPrint].c_str());
+        dprintf(outFd, "%s:%s  %s", cameraId, printablePackageName, events[idxToPrint].c_str());
     } while (idxToPrint != 0);
+
+    packageName8.unlockBuffer();
 }
 
 void CameraService::parseClientsToWatchLocked(String8 clients) {
