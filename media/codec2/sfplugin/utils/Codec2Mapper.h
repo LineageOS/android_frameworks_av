@@ -43,6 +43,9 @@ namespace android {
         static std::shared_ptr<ProfileLevelMapper>
         GetHdrProfileLevelMapper(std::string mediaType, bool isHdr10Plus = false);
 
+        static std::shared_ptr<ProfileLevelMapper>
+        GetBitDepthProfileLevelMapper(std::string mediaType, int32_t bitDepth = 8);
+
         // convert between bitrates
         static bool map(C2Config::bitrate_mode_t, int32_t*);
         static bool map(int32_t, C2Config::bitrate_mode_t*);
