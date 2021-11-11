@@ -1180,6 +1180,9 @@ private:
     // Disable tag monitoring
     status_t stopWatchingTags(int outFd);
 
+    // Clears mWatchedClientsDumpCache
+    status_t clearCachedMonitoredTagDumps(int outFd);
+
     // Print events of monitored tags in all cached and attached clients
     status_t printWatchedTags(const Vector<String16> &args, int outFd);
 

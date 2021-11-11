@@ -4752,6 +4752,8 @@ status_t CameraService::handleWatchCommand(const Vector<String16>& args, int out
         return stopWatchingTags(outFd);
     } else if (args.size() >= 2 && args[1] == String16("print")) {
         return printWatchedTags(args, outFd);
+    } else if (args.size() == 2 && args[1] == String16("clear")) {
+        return clearCachedMonitoredTagDumps(outFd);
     }
     dprintf(outFd, "Camera service watch commands:\n"
                  "  start -m <comma_separated_tag_list> [-c <comma_separated_client_list>]\n"
@@ -4762,7 +4764,8 @@ status_t CameraService::handleWatchCommand(const Vector<String16>& args, int out
                  "  stop stops watching all tags\n"
                  "  print [-n <refresh_interval_ms>]\n"
                  "        prints the monitored information in real time\n"
-                 "        Hit Ctrl+C to exit\n");
+                 "        Hit Ctrl+C to exit\n"
+                 "  clear clears all buffers storing information for watch command");
   return BAD_VALUE;
 }
 
@@ -4830,6 +4833,14 @@ status_t CameraService::stopWatchingTags(int outFd) {
     return OK;
 }
 
+status_t CameraService::clearCachedMonitoredTagDumps(int outFd) {
+    Mutex::Autolock lock(mLogLock);
+    size_t clearedSize = mWatchedClientsDumpCache.size();
+    mWatchedClientsDumpCache.clear();
+    dprintf(outFd, "Cleared tag information of %zu cached clients.\n", clearedSize);
+    return OK;
+}
+
 status_t CameraService::printWatchedTags(const Vector<String16> &args, int outFd) {
     // Figure outFd refresh interval, if present in args
     useconds_t refreshTimeoutMs = 1000; // refresh every 1s by default
@@ -4845,32 +4856,33 @@ status_t CameraService::printWatchedTags(const Vector<String16> &args, int outFd
         }
     }
 
-    mLogLock.lock();
-    bool serviceLock = tryLock(mServiceLock);
-    // get all watched clients that are currently connected
     std::set<String16> connectedMonitoredClients;
-    for (const auto &clientDescriptor: mActiveClientManager.getAll()) {
-        if (clientDescriptor == nullptr) { continue; }
+    {
+        Mutex::Autolock logLock(mLogLock);
+        bool serviceLock = tryLock(mServiceLock);
+        // get all watched clients that are currently connected
+        for (const auto &clientDescriptor: mActiveClientManager.getAll()) {
+            if (clientDescriptor == nullptr) { continue; }
 
-        sp<BasicClient> client = clientDescriptor->getValue();
-        if (client.get() == nullptr) { continue; }
-        if (!isClientWatchedLocked(client.get())) { continue; }
+            sp<BasicClient> client = clientDescriptor->getValue();
+            if (client.get() == nullptr) { continue; }
+            if (!isClientWatchedLocked(client.get())) { continue; }
 
-        connectedMonitoredClients.emplace(client->getPackageName());
-    }
-    if (serviceLock) { mServiceLock.unlock(); }
-
-    // Print entries in mWatchedClientsDumpCache for clients that are not connected
-    for (const auto &kv: mWatchedClientsDumpCache) {
-        const String16 &package = kv.first;
-        if (connectedMonitoredClients.find(package) != connectedMonitoredClients.end()) {
-            continue;
+            connectedMonitoredClients.emplace(client->getPackageName());
         }
+        if (serviceLock) { mServiceLock.unlock(); }
 
-        dprintf(outFd, "Client: %s\n", String8(package).string());
-        dprintf(outFd, "%s\n", kv.second.c_str());
+        // Print entries in mWatchedClientsDumpCache for clients that are not connected
+        for (const auto &kv: mWatchedClientsDumpCache) {
+            const String16 &package = kv.first;
+            if (connectedMonitoredClients.find(package) != connectedMonitoredClients.end()) {
+                continue;
+            }
+
+            dprintf(outFd, "Client: %s\n", String8(package).string());
+            dprintf(outFd, "%s\n", kv.second.c_str());
+        }
     }
-    mLogLock.unlock();
 
     if (connectedMonitoredClients.empty()) {
         dprintf(outFd, "No watched client active.\n");
@@ -4982,7 +4994,7 @@ status_t CameraService::printHelp(int out) {
         "      Valid values 0=OFF, 1=ON for JPEG\n"
         "  get-image-dump-mask returns the current image-dump-mask value\n"
         "  set-camera-mute <0/1> enable or disable camera muting\n"
-        "  watch <start|stop|dump|print> manages tag monitoring in connected clients\n"
+        "  watch <start|stop|dump|print|clear> manages tag monitoring in connected clients\n"
         "  help print this message\n");
 }
 
