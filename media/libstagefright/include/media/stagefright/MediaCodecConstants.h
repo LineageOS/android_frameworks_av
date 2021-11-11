@@ -364,7 +364,7 @@ constexpr int32_t AV1ProfileMain10HDR10Plus = 0x2000;
 inline static const char *asString_AV1Profile(int32_t i, const char *def = "??") {
     switch (i) {
         case AV1ProfileMain8:           return "Main8";
-        case AV1ProfileMain10:          return "Main10HDR";
+        case AV1ProfileMain10:          return "Main10";
         case AV1ProfileMain10HDR10:     return "Main10HDR10";
         case AV1ProfileMain10HDR10Plus: return "Main10HDRPlus";
         default:                        return def;
