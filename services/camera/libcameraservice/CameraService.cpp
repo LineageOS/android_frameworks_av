@@ -4894,41 +4894,42 @@ status_t CameraService::printWatchedTags(const Vector<String16> &args, int outFd
 }
 
 status_t CameraService::printWatchedTagsUntilInterrupt(useconds_t refreshMicros, int outFd) {
-    std::unordered_map<std::string, std::string> cameraToLastEvent;
-    auto cameraClients = mActiveClientManager.getAll();
-
-    if (cameraClients.empty()) {
-        dprintf(outFd, "No clients connected.\n");
-        return OK;
-    }
-
     dprintf(outFd, "Press Ctrl + C to exit...\n\n");
+    std::map<String16, std::string> packageNameToLastEvent;
+
     while (true) {
+        bool serviceLock = tryLock(mServiceLock);
+        auto cameraClients = mActiveClientManager.getAll();
+        if (serviceLock) { mServiceLock.unlock(); }
+
         for (const auto& clientDescriptor : cameraClients) {
             Mutex::Autolock lock(mLogLock);
             if (clientDescriptor == nullptr) { continue; }
-            const char* cameraId = clientDescriptor->getKey().string();
-
-            // This also initializes the map entries with an empty string
-            const std::string& lastPrintedEvent = cameraToLastEvent[cameraId];
 
             sp<BasicClient> client = clientDescriptor->getValue();
             if (client.get() == nullptr) { continue; }
             if (!isClientWatchedLocked(client.get())) { continue; }
 
+            const String16 &packageName = client->getPackageName();
+            // This also initializes the map entries with an empty string
+            const std::string& lastPrintedEvent = packageNameToLastEvent[packageName];
+
             std::vector<std::string> latestEvents;
             client->dumpWatchedEventsToVector(latestEvents);
 
             if (!latestEvents.empty()) {
+                String8 cameraId = clientDescriptor->getKey();
+                const char *printableCameraId = cameraId.lockBuffer(cameraId.size());
                 printNewWatchedEvents(outFd,
-                                      cameraId,
-                                      client->getPackageName(),
+                                      printableCameraId,
+                                      packageName,
                                       latestEvents,
                                       lastPrintedEvent);
-                cameraToLastEvent[cameraId] = latestEvents[0];
+                packageNameToLastEvent[packageName] = latestEvents[0];
+                cameraId.unlockBuffer();
             }
         }
-        usleep(refreshMicros);  // convert ms to us
+        usleep(refreshMicros);
     }
     return OK;
 }
@@ -4950,7 +4951,7 @@ void CameraService::printNewWatchedEvents(int outFd,
     if (lastPrintedIdx == 0) { return; } // early exit if no new event in `events`
 
     String8 packageName8(packageName);
-    const char * printablePackageName = packageName8.lockBuffer(packageName8.size());
+    const char *printablePackageName = packageName8.lockBuffer(packageName8.size());
 
     // print events in chronological order (latest event last)
     size_t idxToPrint = lastPrintedIdx;
