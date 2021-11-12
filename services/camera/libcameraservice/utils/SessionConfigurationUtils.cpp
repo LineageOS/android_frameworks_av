@@ -262,6 +262,18 @@ bool SessionConfigurationUtils::roundBufferDimensionNearest(int32_t width, int32
         }
     }
 
+    // Avoid roundBufferDimensionsNearest for privileged client YUV streams to meet the AIDE2
+    // requirement. AIDE2 is vendor enhanced feature which requires special resolutions and
+    // those are not populated in static capabilities.
+    if (isPriviledgedClient == true && format == HAL_PIXEL_FORMAT_YCbCr_420_888) {
+        ALOGI("Bypass roundBufferDimensionNearest for privilegedClient YUV streams "
+              "width %d height %d",
+              width, height);
+
+        bestWidth  = width;
+        bestHeight = height;
+    }
+
     if (bestWidth == -1) {
         // Return false if no configurations for this format were listed
         return false;
