@@ -565,6 +565,12 @@ private:
             : mChain(owner)
             , mThread(thread)
             , mAudioFlinger(*gAudioFlinger) {
+            sp<ThreadBase> base = thread.promote();
+            if (base != nullptr) {
+                mThreadType = base->type();
+            } else {
+                mThreadType = ThreadBase::MIXER;  // assure a consistent value.
+            }
         }
 
         status_t createEffectHal(const effect_uuid_t *pEffectUuid,
