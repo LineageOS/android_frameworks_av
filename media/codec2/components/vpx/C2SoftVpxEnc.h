@@ -237,259 +237,38 @@ const char *MEDIA_MIMETYPE_VIDEO = MEDIA_MIMETYPE_VIDEO_VP8;
 
 class C2SoftVpxEnc::IntfImpl : public SimpleInterface<void>::BaseParams {
    public:
-    explicit IntfImpl(const std::shared_ptr<C2ReflectorHelper> &helper)
-        : SimpleInterface<void>::BaseParams(
-                helper,
-                COMPONENT_NAME,
-                C2Component::KIND_ENCODER,
-                C2Component::DOMAIN_VIDEO,
-                MEDIA_MIMETYPE_VIDEO) {
-        noPrivateBuffers(); // TODO: account for our buffers here
-        noInputReferences();
-        noOutputReferences();
-        noInputLatency();
-        noTimeStretch();
-        setDerivedInstance(this);
-
-        addParameter(
-                DefineParam(mAttrib, C2_PARAMKEY_COMPONENT_ATTRIBUTES)
-                .withConstValue(new C2ComponentAttributesSetting(
-                    C2Component::ATTRIB_IS_TEMPORAL))
-                .build());
-
-        addParameter(
-                DefineParam(mUsage, C2_PARAMKEY_INPUT_STREAM_USAGE)
-                .withConstValue(new C2StreamUsageTuning::input(
-                        0u, (uint64_t)C2MemoryUsage::CPU_READ))
-                .build());
-
-        addParameter(
-            DefineParam(mSize, C2_PARAMKEY_PICTURE_SIZE)
-                .withDefault(new C2StreamPictureSizeInfo::input(0u, 320, 240))
-                .withFields({
-                    C2F(mSize, width).inRange(2, 2048, 2),
-                    C2F(mSize, height).inRange(2, 2048, 2),
-                })
-                .withSetter(SizeSetter)
-                .build());
-
-        addParameter(
-            DefineParam(mBitrateMode, C2_PARAMKEY_BITRATE_MODE)
-                .withDefault(new C2StreamBitrateModeTuning::output(
-                        0u, C2Config::BITRATE_VARIABLE))
-                .withFields({
-                    C2F(mBitrateMode, value).oneOf({
-                        C2Config::BITRATE_CONST, C2Config::BITRATE_VARIABLE })
-                })
-                .withSetter(
-                    Setter<decltype(*mBitrateMode)>::StrictValueWithNoDeps)
-                .build());
-
-        addParameter(
-            DefineParam(mFrameRate, C2_PARAMKEY_FRAME_RATE)
-                .withDefault(new C2StreamFrameRateInfo::output(0u, 30.))
-                // TODO: More restriction?
-                .withFields({C2F(mFrameRate, value).greaterThan(0.)})
-                .withSetter(
-                    Setter<decltype(*mFrameRate)>::StrictValueWithNoDeps)
-                .build());
-
-        addParameter(
-            DefineParam(mLayering, C2_PARAMKEY_TEMPORAL_LAYERING)
-                .withDefault(C2StreamTemporalLayeringTuning::output::AllocShared(0u, 0, 0, 0))
-                .withFields({
-                    C2F(mLayering, m.layerCount).inRange(0, 4),
-                    C2F(mLayering, m.bLayerCount).inRange(0, 0),
-                    C2F(mLayering, m.bitrateRatios).inRange(0., 1.)
-                })
-                .withSetter(LayeringSetter)
-                .build());
-
-        addParameter(
-                DefineParam(mSyncFramePeriod, C2_PARAMKEY_SYNC_FRAME_INTERVAL)
-                .withDefault(new C2StreamSyncFrameIntervalTuning::output(0u, 1000000))
-                .withFields({C2F(mSyncFramePeriod, value).any()})
-                .withSetter(Setter<decltype(*mSyncFramePeriod)>::StrictValueWithNoDeps)
-                .build());
-
-        addParameter(
-            DefineParam(mBitrate, C2_PARAMKEY_BITRATE)
-                .withDefault(new C2StreamBitrateInfo::output(0u, 64000))
-                .withFields({C2F(mBitrate, value).inRange(4096, 40000000)})
-                .withSetter(BitrateSetter)
-                .build());
-
-        addParameter(
-                DefineParam(mIntraRefresh, C2_PARAMKEY_INTRA_REFRESH)
-                .withConstValue(new C2StreamIntraRefreshTuning::output(
-                             0u, C2Config::INTRA_REFRESH_DISABLED, 0.))
-                .build());
-#ifdef VP9
-        addParameter(
-                DefineParam(mProfileLevel, C2_PARAMKEY_PROFILE_LEVEL)
-                .withDefault(new C2StreamProfileLevelInfo::output(
-                        0u, PROFILE_VP9_0, LEVEL_VP9_4_1))
-                .withFields({
-                    C2F(mProfileLevel, profile).equalTo(
-                        PROFILE_VP9_0
-                    ),
-                    C2F(mProfileLevel, level).equalTo(
-                        LEVEL_VP9_4_1),
-                })
-                .withSetter(ProfileLevelSetter)
-                .build());
-#else
-        addParameter(
-                DefineParam(mProfileLevel, C2_PARAMKEY_PROFILE_LEVEL)
-                .withDefault(new C2StreamProfileLevelInfo::output(
-                        0u, PROFILE_VP8_0, LEVEL_UNUSED))
-                .withFields({
-                    C2F(mProfileLevel, profile).equalTo(
-                        PROFILE_VP8_0
-                    ),
-                    C2F(mProfileLevel, level).equalTo(
-                        LEVEL_UNUSED),
-                })
-                .withSetter(ProfileLevelSetter)
-                .build());
-#endif
-        addParameter(
-                DefineParam(mRequestSync, C2_PARAMKEY_REQUEST_SYNC_FRAME)
-                .withDefault(new C2StreamRequestSyncFrameTuning::output(0u, C2_FALSE))
-                .withFields({C2F(mRequestSync, value).oneOf({ C2_FALSE, C2_TRUE }) })
-                .withSetter(Setter<decltype(*mRequestSync)>::NonStrictValueWithNoDeps)
-                .build());
-
-        addParameter(
-                DefineParam(mColorAspects, C2_PARAMKEY_COLOR_ASPECTS)
-                .withDefault(new C2StreamColorAspectsInfo::input(
-                        0u, C2Color::RANGE_UNSPECIFIED, C2Color::PRIMARIES_UNSPECIFIED,
-                        C2Color::TRANSFER_UNSPECIFIED, C2Color::MATRIX_UNSPECIFIED))
-                .withFields({
-                    C2F(mColorAspects, range).inRange(
-                                C2Color::RANGE_UNSPECIFIED,     C2Color::RANGE_OTHER),
-                    C2F(mColorAspects, primaries).inRange(
-                                C2Color::PRIMARIES_UNSPECIFIED, C2Color::PRIMARIES_OTHER),
-                    C2F(mColorAspects, transfer).inRange(
-                                C2Color::TRANSFER_UNSPECIFIED,  C2Color::TRANSFER_OTHER),
-                    C2F(mColorAspects, matrix).inRange(
-                                C2Color::MATRIX_UNSPECIFIED,    C2Color::MATRIX_OTHER)
-                })
-                .withSetter(ColorAspectsSetter)
-                .build());
-
-        addParameter(
-                DefineParam(mCodedColorAspects, C2_PARAMKEY_VUI_COLOR_ASPECTS)
-                .withDefault(new C2StreamColorAspectsInfo::output(
-                        0u, C2Color::RANGE_LIMITED, C2Color::PRIMARIES_UNSPECIFIED,
-                        C2Color::TRANSFER_UNSPECIFIED, C2Color::MATRIX_UNSPECIFIED))
-                .withFields({
-                    C2F(mCodedColorAspects, range).inRange(
-                                C2Color::RANGE_UNSPECIFIED,     C2Color::RANGE_OTHER),
-                    C2F(mCodedColorAspects, primaries).inRange(
-                                C2Color::PRIMARIES_UNSPECIFIED, C2Color::PRIMARIES_OTHER),
-                    C2F(mCodedColorAspects, transfer).inRange(
-                                C2Color::TRANSFER_UNSPECIFIED,  C2Color::TRANSFER_OTHER),
-                    C2F(mCodedColorAspects, matrix).inRange(
-                                C2Color::MATRIX_UNSPECIFIED,    C2Color::MATRIX_OTHER)
-                })
-                .withSetter(CodedColorAspectsSetter, mColorAspects)
-                .build());
-    }
-
-    static C2R BitrateSetter(bool mayBlock, C2P<C2StreamBitrateInfo::output> &me) {
-        (void)mayBlock;
-        C2R res = C2R::Ok();
-        if (me.v.value <= 4096) {
-            me.set().value = 4096;
-        }
-        return res;
-    }
+    explicit IntfImpl(const std::shared_ptr<C2ReflectorHelper> &helper);
+    static C2R BitrateSetter(bool mayBlock, C2P<C2StreamBitrateInfo::output> &me);
 
     static C2R SizeSetter(bool mayBlock, const C2P<C2StreamPictureSizeInfo::input> &oldMe,
-                          C2P<C2StreamPictureSizeInfo::input> &me) {
-        (void)mayBlock;
-        C2R res = C2R::Ok();
-        if (!me.F(me.v.width).supportsAtAll(me.v.width)) {
-            res = res.plus(C2SettingResultBuilder::BadValue(me.F(me.v.width)));
-            me.set().width = oldMe.v.width;
-        }
-        if (!me.F(me.v.height).supportsAtAll(me.v.height)) {
-            res = res.plus(C2SettingResultBuilder::BadValue(me.F(me.v.height)));
-            me.set().height = oldMe.v.height;
-        }
-        return res;
-    }
+                          C2P<C2StreamPictureSizeInfo::input> &me);
 
     static C2R ProfileLevelSetter(
             bool mayBlock,
-            C2P<C2StreamProfileLevelInfo::output> &me) {
-        (void)mayBlock;
-        if (!me.F(me.v.profile).supportsAtAll(me.v.profile)) {
-            me.set().profile = PROFILE_VP9_0;
-        }
-        if (!me.F(me.v.level).supportsAtAll(me.v.level)) {
-            me.set().level = LEVEL_VP9_4_1;
-        }
-        return C2R::Ok();
-    }
+            C2P<C2StreamProfileLevelInfo::output> &me);
 
-    static C2R LayeringSetter(bool mayBlock, C2P<C2StreamTemporalLayeringTuning::output>& me) {
-        (void)mayBlock;
-        C2R res = C2R::Ok();
-        if (me.v.m.layerCount > 4) {
-            me.set().m.layerCount = 4;
-        }
-        me.set().m.bLayerCount = 0;
-        // ensure ratios are monotonic and clamped between 0 and 1
-        for (size_t ix = 0; ix < me.v.flexCount(); ++ix) {
-            me.set().m.bitrateRatios[ix] = c2_clamp(
-                ix > 0 ? me.v.m.bitrateRatios[ix - 1] : 0, me.v.m.bitrateRatios[ix], 1.);
-        }
-        ALOGI("setting temporal layering %u + %u", me.v.m.layerCount, me.v.m.bLayerCount);
-        return res;
-    }
+    static C2R LayeringSetter(bool mayBlock, C2P<C2StreamTemporalLayeringTuning::output>& me);
 
     // unsafe getters
     std::shared_ptr<C2StreamPictureSizeInfo::input> getSize_l() const { return mSize; }
-    std::shared_ptr<C2StreamIntraRefreshTuning::output> getIntraRefresh_l() const { return mIntraRefresh; }
+    std::shared_ptr<C2StreamIntraRefreshTuning::output> getIntraRefresh_l() const {
+        return mIntraRefresh;
+    }
     std::shared_ptr<C2StreamFrameRateInfo::output> getFrameRate_l() const { return mFrameRate; }
     std::shared_ptr<C2StreamBitrateInfo::output> getBitrate_l() const { return mBitrate; }
-    std::shared_ptr<C2StreamBitrateModeTuning::output> getBitrateMode_l() const { return mBitrateMode; }
-    std::shared_ptr<C2StreamRequestSyncFrameTuning::output> getRequestSync_l() const { return mRequestSync; }
-    std::shared_ptr<C2StreamTemporalLayeringTuning::output> getTemporalLayers_l() const { return mLayering; }
-    uint32_t getSyncFramePeriod() const {
-        if (mSyncFramePeriod->value < 0 || mSyncFramePeriod->value == INT64_MAX) {
-            return 0;
-        }
-        double period = mSyncFramePeriod->value / 1e6 * mFrameRate->value;
-        return (uint32_t)c2_max(c2_min(period + 0.5, double(UINT32_MAX)), 1.);
+    std::shared_ptr<C2StreamBitrateModeTuning::output> getBitrateMode_l() const {
+        return mBitrateMode;
     }
-    static C2R ColorAspectsSetter(bool mayBlock, C2P<C2StreamColorAspectsInfo::input> &me) {
-        (void)mayBlock;
-        if (me.v.range > C2Color::RANGE_OTHER) {
-                me.set().range = C2Color::RANGE_OTHER;
-        }
-        if (me.v.primaries > C2Color::PRIMARIES_OTHER) {
-                me.set().primaries = C2Color::PRIMARIES_OTHER;
-        }
-        if (me.v.transfer > C2Color::TRANSFER_OTHER) {
-                me.set().transfer = C2Color::TRANSFER_OTHER;
-        }
-        if (me.v.matrix > C2Color::MATRIX_OTHER) {
-                me.set().matrix = C2Color::MATRIX_OTHER;
-        }
-        return C2R::Ok();
+    std::shared_ptr<C2StreamRequestSyncFrameTuning::output> getRequestSync_l() const {
+        return mRequestSync;
     }
+    std::shared_ptr<C2StreamTemporalLayeringTuning::output> getTemporalLayers_l() const {
+        return mLayering;
+    }
+    uint32_t getSyncFramePeriod() const;
+    static C2R ColorAspectsSetter(bool mayBlock, C2P<C2StreamColorAspectsInfo::input> &me);
     static C2R CodedColorAspectsSetter(bool mayBlock, C2P<C2StreamColorAspectsInfo::output> &me,
-                                       const C2P<C2StreamColorAspectsInfo::input> &coded) {
-        (void)mayBlock;
-        me.set().range = coded.v.range;
-        me.set().primaries = coded.v.primaries;
-        me.set().transfer = coded.v.transfer;
-        me.set().matrix = coded.v.matrix;
-        return C2R::Ok();
-    }
+                                       const C2P<C2StreamColorAspectsInfo::input> &coded);
 
    private:
     std::shared_ptr<C2StreamUsageTuning::input> mUsage;
