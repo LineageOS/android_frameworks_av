@@ -28,6 +28,7 @@
 #include <sys/types.h>
 #include <inttypes.h>
 #include <pthread.h>
+#include <poll.h>
 
 #include <android/hardware/ICamera.h>
 #include <android/hardware/ICameraClient.h>
@@ -4596,7 +4597,7 @@ status_t CameraService::shellCommand(int in, int out, int err, const Vector<Stri
     } else if (args.size() >= 2 && args[0] == String16("set-camera-mute")) {
         return handleSetCameraMute(args);
     } else if (args.size() >= 2 && args[0] == String16("watch")) {
-        return handleWatchCommand(args, out);
+        return handleWatchCommand(args, in, out);
     } else if (args.size() == 1 && args[0] == String16("help")) {
         printHelp(out);
         return OK;
@@ -4743,7 +4744,7 @@ status_t CameraService::handleSetCameraMute(const Vector<String16>& args) {
     return OK;
 }
 
-status_t CameraService::handleWatchCommand(const Vector<String16>& args, int outFd) {
+status_t CameraService::handleWatchCommand(const Vector<String16>& args, int inFd, int outFd) {
     if (args.size() >= 3 && args[1] == String16("start")) {
         return startWatchingTags(args, outFd);
     } else if (args.size() == 2 && args[1] == String16("dump")) {
@@ -4751,7 +4752,7 @@ status_t CameraService::handleWatchCommand(const Vector<String16>& args, int out
     } else if (args.size() == 2 && args[1] == String16("stop")) {
         return stopWatchingTags(outFd);
     } else if (args.size() >= 2 && args[1] == String16("print")) {
-        return printWatchedTags(args, outFd);
+        return printWatchedTags(args, inFd, outFd);
     } else if (args.size() == 2 && args[1] == String16("clear")) {
         return clearCachedMonitoredTagDumps(outFd);
     }
@@ -4764,7 +4765,7 @@ status_t CameraService::handleWatchCommand(const Vector<String16>& args, int out
                  "  stop stops watching all tags\n"
                  "  print [-n <refresh_interval_ms>]\n"
                  "        prints the monitored information in real time\n"
-                 "        Hit Ctrl+C to exit\n"
+                 "        Hit return to exit\n"
                  "  clear clears all buffers storing information for watch command");
   return BAD_VALUE;
 }
@@ -4841,9 +4842,9 @@ status_t CameraService::clearCachedMonitoredTagDumps(int outFd) {
     return OK;
 }
 
-status_t CameraService::printWatchedTags(const Vector<String16> &args, int outFd) {
+status_t CameraService::printWatchedTags(const Vector<String16> &args, int inFd, int outFd) {
     // Figure outFd refresh interval, if present in args
-    useconds_t refreshTimeoutMs = 1000; // refresh every 1s by default
+    long refreshTimeoutMs = 1000L; // refresh every 1s by default
     if (args.size() > 2) {
         size_t intervalIdx; // index of '-n'
         for (intervalIdx = 2; intervalIdx < args.size() && String16("-n") != args[intervalIdx];
@@ -4855,6 +4856,9 @@ status_t CameraService::printWatchedTags(const Vector<String16> &args, int outFd
             if (errno) { return BAD_VALUE; }
         }
     }
+
+    // Set min timeout of 10s. This prevents edge cases in polling when timeout of 0 is passed.
+    refreshTimeoutMs = refreshTimeoutMs < 10 ? 10 : refreshTimeoutMs;
 
     std::set<String16> connectedMonitoredClients;
     {
@@ -4890,11 +4894,109 @@ status_t CameraService::printWatchedTags(const Vector<String16> &args, int outFd
     }
 
     // For connected watched clients, print monitored tags live
-    return printWatchedTagsUntilInterrupt(refreshTimeoutMs  * 1000, outFd);
+    return printWatchedTagsUntilInterrupt(refreshTimeoutMs, inFd, outFd);
 }
 
-status_t CameraService::printWatchedTagsUntilInterrupt(useconds_t refreshMicros, int outFd) {
-    dprintf(outFd, "Press Ctrl + C to exit...\n\n");
+// Print all events in vector `events' that came after lastPrintedEvent
+void printNewWatchedEvents(int outFd,
+                           const char *cameraId,
+                           const String16 &packageName,
+                           const std::vector<std::string> &events,
+                           const std::string &lastPrintedEvent) {
+    if (events.empty()) { return; }
+
+    // index of lastPrintedEvent in events.
+    // lastPrintedIdx = events.size() if lastPrintedEvent is not in events
+    size_t lastPrintedIdx;
+    for (lastPrintedIdx = 0;
+         lastPrintedIdx < events.size() && lastPrintedEvent != events[lastPrintedIdx];
+         lastPrintedIdx++);
+
+    if (lastPrintedIdx == 0) { return; } // early exit if no new event in `events`
+
+    String8 packageName8(packageName);
+    const char *printablePackageName = packageName8.lockBuffer(packageName8.size());
+
+    // print events in chronological order (latest event last)
+    size_t idxToPrint = lastPrintedIdx;
+    do {
+        idxToPrint--;
+        dprintf(outFd, "%s:%s  %s", cameraId, printablePackageName, events[idxToPrint].c_str());
+    } while (idxToPrint != 0);
+
+    packageName8.unlockBuffer();
+}
+
+// Returns true if adb shell cmd watch should be interrupted based on data in inFd. The watch
+// command should be interrupted if the user presses the return key, or if user loses any way to
+// signal interrupt.
+// If timeoutMs == 0, this function will always return false
+bool shouldInterruptWatchCommand(int inFd, int outFd, long timeoutMs) {
+    struct timeval startTime;
+    int startTimeError = gettimeofday(&startTime, nullptr);
+    if (startTimeError) {
+        dprintf(outFd, "Failed waiting for interrupt, aborting.\n");
+        return true;
+    }
+
+    const nfds_t numFds = 1;
+    struct pollfd pollFd = { .fd = inFd, .events = POLLIN, .revents = 0 };
+
+    struct timeval currTime;
+    char buffer[2];
+    while(true) {
+        int currTimeError = gettimeofday(&currTime, nullptr);
+        if (currTimeError) {
+            dprintf(outFd, "Failed waiting for interrupt, aborting.\n");
+            return true;
+        }
+
+        long elapsedTimeMs = ((currTime.tv_sec - startTime.tv_sec) * 1000L)
+                + ((currTime.tv_usec - startTime.tv_usec) / 1000L);
+        int remainingTimeMs = (int) (timeoutMs - elapsedTimeMs);
+
+        if (remainingTimeMs <= 0) {
+            // No user interrupt within timeoutMs, don't interrupt watch command
+            return false;
+        }
+
+        int numFdsUpdated = poll(&pollFd, numFds, remainingTimeMs);
+        if (numFdsUpdated < 0) {
+            dprintf(outFd, "Failed while waiting for user input. Exiting.\n");
+            return true;
+        }
+
+        if (numFdsUpdated == 0) {
+            // No user input within timeoutMs, don't interrupt watch command
+            return false;
+        }
+
+        if (!(pollFd.revents & POLLIN)) {
+            dprintf(outFd, "Failed while waiting for user input. Exiting.\n");
+            return true;
+        }
+
+        ssize_t sizeRead = read(inFd, buffer, sizeof(buffer) - 1);
+        if (sizeRead < 0) {
+            dprintf(outFd, "Error reading user input. Exiting.\n");
+            return true;
+        }
+
+        if (sizeRead == 0) {
+            // Reached end of input fd (can happen if input is piped)
+            // User has no way to signal an interrupt, so interrupt here
+            return true;
+        }
+
+        if (buffer[0] == '\n') {
+            // User pressed return, interrupt watch command.
+            return true;
+        }
+    }
+}
+
+status_t CameraService::printWatchedTagsUntilInterrupt(long refreshMillis, int inFd, int outFd) {
+    dprintf(outFd, "Press return to exit...\n\n");
     std::map<String16, std::string> packageNameToLastEvent;
 
     while (true) {
@@ -4929,38 +5031,11 @@ status_t CameraService::printWatchedTagsUntilInterrupt(useconds_t refreshMicros,
                 cameraId.unlockBuffer();
             }
         }
-        usleep(refreshMicros);
+        if (shouldInterruptWatchCommand(inFd, outFd, refreshMillis)) {
+            break;
+        }
     }
     return OK;
-}
-
-void CameraService::printNewWatchedEvents(int outFd,
-                                          const char *cameraId,
-                                          const String16 &packageName,
-                                          const std::vector<std::string> &events,
-                                          const std::string &lastPrintedEvent) {
-    if (events.empty()) { return; }
-
-    // index of lastPrintedEvent in events.
-    // lastPrintedIdx = events.size() if lastPrintedEvent is not in events
-    size_t lastPrintedIdx;
-    for (lastPrintedIdx = 0;
-         lastPrintedIdx < events.size() && lastPrintedEvent != events[lastPrintedIdx];
-         lastPrintedIdx++);
-
-    if (lastPrintedIdx == 0) { return; } // early exit if no new event in `events`
-
-    String8 packageName8(packageName);
-    const char *printablePackageName = packageName8.lockBuffer(packageName8.size());
-
-    // print events in chronological order (latest event last)
-    size_t idxToPrint = lastPrintedIdx;
-    do {
-        idxToPrint--;
-        dprintf(outFd, "%s:%s  %s", cameraId, printablePackageName, events[idxToPrint].c_str());
-    } while (idxToPrint != 0);
-
-    packageName8.unlockBuffer();
 }
 
 void CameraService::parseClientsToWatchLocked(String8 clients) {
