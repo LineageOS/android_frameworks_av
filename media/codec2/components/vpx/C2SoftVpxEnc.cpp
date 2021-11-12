@@ -59,7 +59,7 @@ C2SoftVpxEnc::IntfImpl::IntfImpl(const std::shared_ptr<C2ReflectorHelper> &helpe
 
     addParameter(
         DefineParam(mSize, C2_PARAMKEY_PICTURE_SIZE)
-            .withDefault(new C2StreamPictureSizeInfo::input(0u, 320, 240))
+            .withDefault(new C2StreamPictureSizeInfo::input(0u, 64, 64))
             .withFields({
                 C2F(mSize, width).inRange(2, 2048, 2),
                 C2F(mSize, height).inRange(2, 2048, 2),
@@ -81,7 +81,7 @@ C2SoftVpxEnc::IntfImpl::IntfImpl(const std::shared_ptr<C2ReflectorHelper> &helpe
 
     addParameter(
         DefineParam(mFrameRate, C2_PARAMKEY_FRAME_RATE)
-            .withDefault(new C2StreamFrameRateInfo::output(0u, 30.))
+            .withDefault(new C2StreamFrameRateInfo::output(0u, 1.))
             // TODO: More restriction?
             .withFields({C2F(mFrameRate, value).greaterThan(0.)})
             .withSetter(
@@ -127,10 +127,18 @@ C2SoftVpxEnc::IntfImpl::IntfImpl(const std::shared_ptr<C2ReflectorHelper> &helpe
                 C2F(mProfileLevel, profile).equalTo(
                     PROFILE_VP9_0
                 ),
-                C2F(mProfileLevel, level).equalTo(
-                    LEVEL_VP9_4_1),
+                C2F(mProfileLevel, level).oneOf({
+                        C2Config::LEVEL_VP9_1,
+                        C2Config::LEVEL_VP9_1_1,
+                        C2Config::LEVEL_VP9_2,
+                        C2Config::LEVEL_VP9_2_1,
+                        C2Config::LEVEL_VP9_3,
+                        C2Config::LEVEL_VP9_3_1,
+                        C2Config::LEVEL_VP9_4,
+                        C2Config::LEVEL_VP9_4_1,
+                }),
             })
-            .withSetter(ProfileLevelSetter)
+            .withSetter(ProfileLevelSetter, mSize, mFrameRate, mBitrate)
             .build());
 #else
     addParameter(
@@ -144,7 +152,7 @@ C2SoftVpxEnc::IntfImpl::IntfImpl(const std::shared_ptr<C2ReflectorHelper> &helpe
                 C2F(mProfileLevel, level).equalTo(
                     LEVEL_UNUSED),
             })
-            .withSetter(ProfileLevelSetter)
+            .withSetter(ProfileLevelSetter, mSize, mFrameRate, mBitrate)
             .build());
 #endif
     addParameter(
@@ -217,14 +225,84 @@ C2R C2SoftVpxEnc::IntfImpl::SizeSetter(bool mayBlock,
 }
 
 C2R C2SoftVpxEnc::IntfImpl::ProfileLevelSetter(bool mayBlock,
-                                               C2P<C2StreamProfileLevelInfo::output>& me) {
+                                               C2P<C2StreamProfileLevelInfo::output>& me,
+                                               const C2P<C2StreamPictureSizeInfo::input>& size,
+                                               const C2P<C2StreamFrameRateInfo::output>& frameRate,
+                                               const C2P<C2StreamBitrateInfo::output>& bitrate) {
     (void)mayBlock;
+#ifdef VP9
     if (!me.F(me.v.profile).supportsAtAll(me.v.profile)) {
         me.set().profile = PROFILE_VP9_0;
     }
-    if (!me.F(me.v.level).supportsAtAll(me.v.level)) {
+    struct LevelLimits {
+        C2Config::level_t level;
+        float samplesPerSec;
+        uint64_t samples;
+        uint32_t bitrate;
+        size_t dimension;
+    };
+    constexpr LevelLimits kLimits[] = {
+            {LEVEL_VP9_1, 829440, 36864, 200000, 512},
+            {LEVEL_VP9_1_1, 2764800, 73728, 800000, 768},
+            {LEVEL_VP9_2, 4608000, 122880, 1800000, 960},
+            {LEVEL_VP9_2_1, 9216000, 245760, 3600000, 1344},
+            {LEVEL_VP9_3, 20736000, 552960, 7200000, 2048},
+            {LEVEL_VP9_3_1, 36864000, 983040, 12000000, 2752},
+            {LEVEL_VP9_4, 83558400, 2228224, 18000000, 4160},
+            {LEVEL_VP9_4_1, 160432128, 2228224, 30000000, 4160},
+    };
+
+    uint64_t samples = size.v.width * size.v.height;
+    float samplesPerSec = float(samples) * frameRate.v.value;
+    size_t dimension = std::max(size.v.width, size.v.height);
+
+    // Check if the supplied level meets the samples / bitrate requirements.
+    // If not, update the level with the lowest level meeting the requirements.
+    bool found = false;
+
+    // By default needsUpdate = false in case the supplied level does meet
+    // the requirements.
+    bool needsUpdate = false;
+    for (const LevelLimits& limit : kLimits) {
+        if (samples > limit.samples) continue;
+        if (samplesPerSec > limit.samplesPerSec) continue;
+        if (bitrate.v.value > limit.bitrate) continue;
+        if (dimension > limit.dimension) continue;
+
+        // This is the lowest level that meets the requirements, and if
+        // we haven't seen the supplied level yet, that means we don't
+        // need the update.
+        if (needsUpdate) {
+            ALOGD("Given level %x does not cover current configuration: "
+                    "adjusting to %x",
+                    me.v.level, limit.level);
+            me.set().level = limit.level;
+        }
+        found = true;
+        break;
+
+        if (me.v.level == limit.level) {
+            // We break out of the loop when the lowest feasible level is
+            // found. The fact that we're here means that our level doesn't
+            // meet the requirement and needs to be updated.
+            needsUpdate = true;
+        }
+    }
+    if (!found) {
+        // We set to the highest supported level.
         me.set().level = LEVEL_VP9_4_1;
     }
+#else
+    (void)size;
+    (void)frameRate;
+    (void)bitrate;
+    if (!me.F(me.v.profile).supportsAtAll(me.v.profile)) {
+        me.set().profile = PROFILE_VP8_0;
+    }
+    if (!me.F(me.v.level).supportsAtAll(me.v.level)) {
+        me.set().level = LEVEL_UNUSED;
+    }
+#endif
     return C2R::Ok();
 }
 

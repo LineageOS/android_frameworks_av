@@ -243,9 +243,10 @@ class C2SoftVpxEnc::IntfImpl : public SimpleInterface<void>::BaseParams {
     static C2R SizeSetter(bool mayBlock, const C2P<C2StreamPictureSizeInfo::input> &oldMe,
                           C2P<C2StreamPictureSizeInfo::input> &me);
 
-    static C2R ProfileLevelSetter(
-            bool mayBlock,
-            C2P<C2StreamProfileLevelInfo::output> &me);
+    static C2R ProfileLevelSetter(bool mayBlock, C2P<C2StreamProfileLevelInfo::output>& me,
+                                  const C2P<C2StreamPictureSizeInfo::input>& size,
+                                  const C2P<C2StreamFrameRateInfo::output>& frameRate,
+                                  const C2P<C2StreamBitrateInfo::output>& bitrate);
 
     static C2R LayeringSetter(bool mayBlock, C2P<C2StreamTemporalLayeringTuning::output>& me);
 
