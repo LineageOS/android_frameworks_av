@@ -23,6 +23,7 @@
 #include <camera/camera2/OutputConfiguration.h>
 #include <binder/Parcel.h>
 #include <gui/view/Surface.h>
+#include <system/camera_metadata.h>
 #include <utils/String8.h>
 
 namespace android {
@@ -76,6 +77,10 @@ const std::vector<int32_t> &OutputConfiguration::getSensorPixelModesUsed() const
     return mSensorPixelModesUsed;
 }
 
+int OutputConfiguration::getDynamicRangeProfile() const {
+    return mDynamicRangeProfile;
+}
+
 OutputConfiguration::OutputConfiguration() :
         mRotation(INVALID_ROTATION),
         mSurfaceSetID(INVALID_SET_ID),
@@ -84,7 +89,8 @@ OutputConfiguration::OutputConfiguration() :
         mHeight(0),
         mIsDeferred(false),
         mIsShared(false),
-        mIsMultiResolution(false) {
+        mIsMultiResolution(false),
+        mDynamicRangeProfile(ANDROID_REQUEST_AVAILABLE_DYNAMIC_RANGE_PROFILES_MAP_STANDARD) {
 }
 
 OutputConfiguration::OutputConfiguration(const android::Parcel& parcel) :
@@ -165,6 +171,12 @@ status_t OutputConfiguration::readFromParcel(const android::Parcel* parcel) {
         ALOGE("%s: Failed to read sensor pixel mode(s) from parcel", __FUNCTION__);
         return err;
     }
+    int dynamicProfile;
+    if ((err = parcel->readInt32(&dynamicProfile)) != OK) {
+        ALOGE("%s: Failed to read surface dynamic range profile flag from parcel", __FUNCTION__);
+        return err;
+    }
+
     mRotation = rotation;
     mSurfaceSetID = setID;
     mSurfaceType = surfaceType;
@@ -181,6 +193,7 @@ status_t OutputConfiguration::readFromParcel(const android::Parcel* parcel) {
     }
 
     mSensorPixelModesUsed = std::move(sensorPixelModesUsed);
+    mDynamicRangeProfile = dynamicProfile;
 
     ALOGV("%s: OutputConfiguration: rotation = %d, setId = %d, surfaceType = %d,"
           " physicalCameraId = %s, isMultiResolution = %d", __FUNCTION__, mRotation,
@@ -199,6 +212,7 @@ OutputConfiguration::OutputConfiguration(sp<IGraphicBufferProducer>& gbp, int ro
     mIsShared = isShared;
     mPhysicalCameraId = physicalId;
     mIsMultiResolution = false;
+    mDynamicRangeProfile = ANDROID_REQUEST_AVAILABLE_DYNAMIC_RANGE_PROFILES_MAP_STANDARD;
 }
 
 OutputConfiguration::OutputConfiguration(
@@ -207,7 +221,8 @@ OutputConfiguration::OutputConfiguration(
     int width, int height, bool isShared)
   : mGbps(gbps), mRotation(rotation), mSurfaceSetID(surfaceSetID), mSurfaceType(surfaceType),
     mWidth(width), mHeight(height), mIsDeferred(false), mIsShared(isShared),
-    mPhysicalCameraId(physicalCameraId), mIsMultiResolution(false) { }
+    mPhysicalCameraId(physicalCameraId), mIsMultiResolution(false),
+    mDynamicRangeProfile(ANDROID_REQUEST_AVAILABLE_DYNAMIC_RANGE_PROFILES_MAP_STANDARD) { }
 
 status_t OutputConfiguration::writeToParcel(android::Parcel* parcel) const {
 
@@ -252,6 +267,9 @@ status_t OutputConfiguration::writeToParcel(android::Parcel* parcel) const {
     if (err != OK) return err;
 
     err = parcel->writeParcelableVector(mSensorPixelModesUsed);
+    if (err != OK) return err;
+
+    err = parcel->writeInt32(mDynamicRangeProfile ? 1 : 0);
     if (err != OK) return err;
 
     return OK;

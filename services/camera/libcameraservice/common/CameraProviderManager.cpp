@@ -267,7 +267,7 @@ status_t CameraProviderManager::getCameraInfo(const std::string &id,
 }
 
 status_t CameraProviderManager::isSessionConfigurationSupported(const std::string& id,
-        const hardware::camera::device::V3_7::StreamConfiguration &configuration,
+        const hardware::camera::device::V3_8::StreamConfiguration &configuration,
         bool *status /*out*/) const {
     std::lock_guard<std::mutex> lock(mInterfaceMutex);
     auto deviceInfo = findDeviceInfoLocked(id);
@@ -2698,7 +2698,7 @@ status_t CameraProviderManager::ProviderInfo::DeviceInfo3::getPhysicalCameraChar
 }
 
 status_t CameraProviderManager::ProviderInfo::DeviceInfo3::isSessionConfigurationSupported(
-        const hardware::camera::device::V3_7::StreamConfiguration &configuration,
+        const hardware::camera::device::V3_8::StreamConfiguration &configuration,
         bool *status /*out*/) {
 
     const sp<CameraProviderManager::ProviderInfo::DeviceInfo3::InterfaceT> interface =
@@ -2710,6 +2710,8 @@ status_t CameraProviderManager::ProviderInfo::DeviceInfo3::isSessionConfiguratio
     sp<hardware::camera::device::V3_5::ICameraDevice> interface_3_5 = castResult_3_5;
     auto castResult_3_7 = device::V3_7::ICameraDevice::castFrom(interface);
     sp<hardware::camera::device::V3_7::ICameraDevice> interface_3_7 = castResult_3_7;
+    auto castResult_3_8 = device::V3_8::ICameraDevice::castFrom(interface);
+    sp<hardware::camera::device::V3_8::ICameraDevice> interface_3_8 = castResult_3_8;
 
     status_t res;
     Status callStatus;
@@ -2719,12 +2721,28 @@ status_t CameraProviderManager::ProviderInfo::DeviceInfo3::isSessionConfiguratio
                 callStatus = s;
                 *status = combStatus;
             };
-    if (interface_3_7 != nullptr) {
-        ret = interface_3_7->isStreamCombinationSupported_3_7(configuration, halCb);
+    if (interface_3_8 != nullptr) {
+        ret = interface_3_8->isStreamCombinationSupported_3_8(configuration, halCb);
+    } else if (interface_3_7 != nullptr) {
+        hardware::camera::device::V3_7::StreamConfiguration configuration_3_7;
+        bool success = SessionConfigurationUtils::convertHALStreamCombinationFromV38ToV37(
+                configuration_3_7, configuration);
+        if (!success) {
+            *status = false;
+            return OK;
+        }
+        ret = interface_3_7->isStreamCombinationSupported_3_7(configuration_3_7, halCb);
     } else if (interface_3_5 != nullptr) {
+        hardware::camera::device::V3_7::StreamConfiguration configuration_3_7;
+        bool success = SessionConfigurationUtils::convertHALStreamCombinationFromV38ToV37(
+                configuration_3_7, configuration);
+        if (!success) {
+            *status = false;
+            return OK;
+        }
         hardware::camera::device::V3_4::StreamConfiguration configuration_3_4;
-        bool success = SessionConfigurationUtils::convertHALStreamCombinationFromV37ToV34(
-                configuration_3_4, configuration);
+        success = SessionConfigurationUtils::convertHALStreamCombinationFromV37ToV34(
+                configuration_3_4, configuration_3_7);
         if (!success) {
             *status = false;
             return OK;
@@ -3201,7 +3219,7 @@ status_t CameraProviderManager::convertToHALStreamCombinationAndCameraIdsLocked(
     status_t res = OK;
     for (auto &cameraIdAndSessionConfig : cameraIdsAndSessionConfigs) {
         const std::string& cameraId = cameraIdAndSessionConfig.mCameraId;
-        hardware::camera::device::V3_7::StreamConfiguration streamConfiguration;
+        hardware::camera::device::V3_8::StreamConfiguration streamConfiguration;
         CameraMetadata deviceInfo;
         bool overrideForPerfClass =
                 SessionConfigurationUtils::targetPerfClassPrimaryCamera(
@@ -3235,7 +3253,8 @@ status_t CameraProviderManager::convertToHALStreamCombinationAndCameraIdsLocked(
         }
         CameraIdAndStreamCombination halCameraIdAndStream;
         halCameraIdAndStream.cameraId = cameraId;
-        halCameraIdAndStream.streamConfiguration = streamConfiguration;
+        SessionConfigurationUtils::convertHALStreamCombinationFromV38ToV37(
+                halCameraIdAndStream.streamConfiguration, streamConfiguration);
         halCameraIdsAndStreamsV.push_back(halCameraIdAndStream);
     }
     *halCameraIdsAndStreamCombinations = halCameraIdsAndStreamsV;

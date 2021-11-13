@@ -44,6 +44,7 @@ public:
     int                        getSurfaceType() const;
     int                        getWidth() const;
     int                        getHeight() const;
+    int                        getDynamicRangeProfile() const;
     bool                       isDeferred() const;
     bool                       isShared() const;
     String16                   getPhysicalCameraId() const;
@@ -89,7 +90,8 @@ public:
                 gbpsEqual(other) &&
                 mPhysicalCameraId == other.mPhysicalCameraId &&
                 mIsMultiResolution == other.mIsMultiResolution &&
-                sensorPixelModesUsedEqual(other));
+                sensorPixelModesUsedEqual(other) &&
+                mDynamicRangeProfile == other.mDynamicRangeProfile);
     }
     bool operator != (const OutputConfiguration& other) const {
         return !(*this == other);
@@ -126,6 +128,9 @@ public:
         if (!sensorPixelModesUsedEqual(other)) {
             return sensorPixelModesUsedLessThan(other);
         }
+        if (mDynamicRangeProfile != other.mDynamicRangeProfile) {
+            return mDynamicRangeProfile < other.mDynamicRangeProfile;
+        }
         return gbpsLessThan(other);
     }
 
@@ -150,6 +155,7 @@ private:
     String16                   mPhysicalCameraId;
     bool                       mIsMultiResolution;
     std::vector<int32_t>       mSensorPixelModesUsed;
+    int                        mDynamicRangeProfile;
 };
 } // namespace params
 } // namespace camera2

@@ -19,15 +19,18 @@
 #include "SessionConfigurationUtils.h"
 #include "../api2/DepthCompositeStream.h"
 #include "../api2/HeicCompositeStream.h"
+#include "android/hardware/camera/metadata/3.8/types.h"
 #include "common/CameraDeviceBase.h"
 #include "../CameraService.h"
 #include "device3/Camera3Device.h"
 #include "device3/Camera3OutputStream.h"
+#include "system/graphics-base-v1.1.h"
 
 using android::camera3::OutputStreamInfo;
 using android::camera3::OutputStreamInfo;
 using android::hardware::camera2::ICameraDeviceUser;
 using android::hardware::camera::metadata::V3_6::CameraMetadataEnumAndroidSensorPixelMode;
+using android::hardware::camera::metadata::V3_8::CameraMetadataEnumAndroidRequestAvailableDynamicRangeProfilesMap;
 
 namespace android {
 namespace camera3 {
@@ -206,6 +209,80 @@ bool roundBufferDimensionNearest(int32_t width, int32_t height,
     return true;
 }
 
+//check if format is 10-bit compatible
+bool is10bitCompatibleFormat(int32_t format) {
+    switch(format) {
+        case HAL_PIXEL_FORMAT_IMPLEMENTATION_DEFINED:
+        case HAL_PIXEL_FORMAT_YCBCR_P010:
+            return true;
+        default:
+            return false;
+    }
+}
+
+bool isDynamicRangeProfileSupported(int dynamicRangeProfile, const CameraMetadata& staticInfo) {
+    if (dynamicRangeProfile == ANDROID_REQUEST_AVAILABLE_DYNAMIC_RANGE_PROFILES_MAP_STANDARD) {
+        // Supported by default
+        return true;
+    }
+
+    camera_metadata_ro_entry_t entry = staticInfo.find(ANDROID_REQUEST_AVAILABLE_CAPABILITIES);
+    bool is10bitDynamicRangeSupported = false;
+    for (size_t i = 0; i < entry.count; ++i) {
+        uint8_t capability = entry.data.u8[i];
+        if (capability == ANDROID_REQUEST_AVAILABLE_CAPABILITIES_DYNAMIC_RANGE_TEN_BIT) {
+            is10bitDynamicRangeSupported = true;
+            break;
+        }
+    }
+
+    if (!is10bitDynamicRangeSupported) {
+        return false;
+    }
+
+    switch (dynamicRangeProfile) {
+        case ANDROID_REQUEST_AVAILABLE_DYNAMIC_RANGE_PROFILES_MAP_HDR10_PLUS:
+        case ANDROID_REQUEST_AVAILABLE_DYNAMIC_RANGE_PROFILES_MAP_HDR10:
+        case ANDROID_REQUEST_AVAILABLE_DYNAMIC_RANGE_PROFILES_MAP_HLG10:
+        case ANDROID_REQUEST_AVAILABLE_DYNAMIC_RANGE_PROFILES_MAP_DOLBY_VISION_10B_HDR_OEM:
+        case ANDROID_REQUEST_AVAILABLE_DYNAMIC_RANGE_PROFILES_MAP_DOLBY_VISION_10B_HDR_OEM_PO:
+        case ANDROID_REQUEST_AVAILABLE_DYNAMIC_RANGE_PROFILES_MAP_DOLBY_VISION_10B_HDR_REF:
+        case ANDROID_REQUEST_AVAILABLE_DYNAMIC_RANGE_PROFILES_MAP_DOLBY_VISION_10B_HDR_REF_PO:
+        case ANDROID_REQUEST_AVAILABLE_DYNAMIC_RANGE_PROFILES_MAP_DOLBY_VISION_8B_HDR_OEM:
+        case ANDROID_REQUEST_AVAILABLE_DYNAMIC_RANGE_PROFILES_MAP_DOLBY_VISION_8B_HDR_OEM_PO:
+        case ANDROID_REQUEST_AVAILABLE_DYNAMIC_RANGE_PROFILES_MAP_DOLBY_VISION_8B_HDR_REF:
+        case ANDROID_REQUEST_AVAILABLE_DYNAMIC_RANGE_PROFILES_MAP_DOLBY_VISION_8B_HDR_REF_PO:
+            entry = staticInfo.find(ANDROID_REQUEST_AVAILABLE_DYNAMIC_RANGE_PROFILES_MAP);
+            for (size_t i = 0; i < entry.count; i += 2) {
+                if (dynamicRangeProfile == entry.data.i32[i]) {
+                    return true;
+                }
+            }
+
+            return false;
+        default:
+            return false;
+    }
+
+    return false;
+}
+
+//check if format is 10-bit compatible
+bool is10bitDynamicRangeProfile(int32_t dynamicRangeProfile) {
+    switch (dynamicRangeProfile) {
+        case ANDROID_REQUEST_AVAILABLE_DYNAMIC_RANGE_PROFILES_MAP_HDR10_PLUS:
+        case ANDROID_REQUEST_AVAILABLE_DYNAMIC_RANGE_PROFILES_MAP_HDR10:
+        case ANDROID_REQUEST_AVAILABLE_DYNAMIC_RANGE_PROFILES_MAP_HLG10:
+        case ANDROID_REQUEST_AVAILABLE_DYNAMIC_RANGE_PROFILES_MAP_DOLBY_VISION_10B_HDR_OEM:
+        case ANDROID_REQUEST_AVAILABLE_DYNAMIC_RANGE_PROFILES_MAP_DOLBY_VISION_10B_HDR_OEM_PO:
+        case ANDROID_REQUEST_AVAILABLE_DYNAMIC_RANGE_PROFILES_MAP_DOLBY_VISION_10B_HDR_REF:
+        case ANDROID_REQUEST_AVAILABLE_DYNAMIC_RANGE_PROFILES_MAP_DOLBY_VISION_10B_HDR_REF_PO:
+            return true;
+        default:
+            return false;
+    }
+}
+
 bool isPublicFormat(int32_t format)
 {
     switch(format) {
@@ -237,7 +314,7 @@ binder::Status createSurfaceFromGbp(
         OutputStreamInfo& streamInfo, bool isStreamInfoValid,
         sp<Surface>& surface, const sp<IGraphicBufferProducer>& gbp,
         const String8 &logicalCameraId, const CameraMetadata &physicalCameraMetadata,
-        const std::vector<int32_t> &sensorPixelModesUsed){
+        const std::vector<int32_t> &sensorPixelModesUsed, int dynamicRangeProfile){
     // bufferProducer must be non-null
     if (gbp == nullptr) {
         String8 msg = String8::format("Camera %s: Surface is NULL", logicalCameraId.string());
@@ -335,6 +412,21 @@ binder::Status createSurfaceFromGbp(
         ALOGE("%s: %s", __FUNCTION__, msg.string());
         return STATUS_ERROR(CameraService::ERROR_ILLEGAL_ARGUMENT, msg.string());
     }
+    if (!SessionConfigurationUtils::isDynamicRangeProfileSupported(dynamicRangeProfile,
+                physicalCameraMetadata)) {
+        String8 msg = String8::format("Camera %s: Dynamic range profile 0x%x not supported,"
+                " failed to create output stream", logicalCameraId.string(), dynamicRangeProfile);
+        ALOGE("%s: %s", __FUNCTION__, msg.string());
+        return STATUS_ERROR(CameraService::ERROR_ILLEGAL_ARGUMENT, msg.string());
+    }
+    if (SessionConfigurationUtils::is10bitDynamicRangeProfile(dynamicRangeProfile) &&
+            !SessionConfigurationUtils::is10bitCompatibleFormat(format)) {
+        String8 msg = String8::format("Camera %s: No 10-bit supported stream configurations with "
+                "format %#x defined and profile %#x, failed to create output stream",
+                logicalCameraId.string(), format, dynamicRangeProfile);
+        ALOGE("%s: %s", __FUNCTION__, msg.string());
+        return STATUS_ERROR(CameraService::ERROR_ILLEGAL_ARGUMENT, msg.string());
+    }
 
     if (!isStreamInfoValid) {
         streamInfo.width = width;
@@ -343,6 +435,7 @@ binder::Status createSurfaceFromGbp(
         streamInfo.dataSpace = dataSpace;
         streamInfo.consumerUsage = consumerUsage;
         streamInfo.sensorPixelModesUsed = overriddenSensorPixelModes;
+        streamInfo.dynamicRangeProfile = dynamicRangeProfile;
         return binder::Status::ok();
     }
     if (width != streamInfo.width) {
@@ -385,30 +478,33 @@ binder::Status createSurfaceFromGbp(
 
 void mapStreamInfo(const OutputStreamInfo &streamInfo,
             camera3::camera_stream_rotation_t rotation, String8 physicalId,
-            int32_t groupId, hardware::camera::device::V3_7::Stream *stream /*out*/) {
+            int32_t groupId, hardware::camera::device::V3_8::Stream *stream /*out*/) {
     if (stream == nullptr) {
         return;
     }
 
-    stream->v3_4.v3_2.streamType = hardware::camera::device::V3_2::StreamType::OUTPUT;
-    stream->v3_4.v3_2.width = streamInfo.width;
-    stream->v3_4.v3_2.height = streamInfo.height;
-    stream->v3_4.v3_2.format = Camera3Device::mapToPixelFormat(streamInfo.format);
+    stream->v3_7.v3_4.v3_2.streamType = hardware::camera::device::V3_2::StreamType::OUTPUT;
+    stream->v3_7.v3_4.v3_2.width = streamInfo.width;
+    stream->v3_7.v3_4.v3_2.height = streamInfo.height;
+    stream->v3_7.v3_4.v3_2.format = Camera3Device::mapToPixelFormat(streamInfo.format);
     auto u = streamInfo.consumerUsage;
     camera3::Camera3OutputStream::applyZSLUsageQuirk(streamInfo.format, &u);
-    stream->v3_4.v3_2.usage = Camera3Device::mapToConsumerUsage(u);
-    stream->v3_4.v3_2.dataSpace = Camera3Device::mapToHidlDataspace(streamInfo.dataSpace);
-    stream->v3_4.v3_2.rotation = Camera3Device::mapToStreamRotation(rotation);
-    stream->v3_4.v3_2.id = -1; // Invalid stream id
-    stream->v3_4.physicalCameraId = std::string(physicalId.string());
-    stream->v3_4.bufferSize = 0;
-    stream->groupId = groupId;
-    stream->sensorPixelModesUsed.resize(streamInfo.sensorPixelModesUsed.size());
+    stream->v3_7.v3_4.v3_2.usage = Camera3Device::mapToConsumerUsage(u);
+    stream->v3_7.v3_4.v3_2.dataSpace = Camera3Device::mapToHidlDataspace(streamInfo.dataSpace);
+    stream->v3_7.v3_4.v3_2.rotation = Camera3Device::mapToStreamRotation(rotation);
+    stream->v3_7.v3_4.v3_2.id = -1; // Invalid stream id
+    stream->v3_7.v3_4.physicalCameraId = std::string(physicalId.string());
+    stream->v3_7.v3_4.bufferSize = 0;
+    stream->v3_7.groupId = groupId;
+    stream->v3_7.sensorPixelModesUsed.resize(streamInfo.sensorPixelModesUsed.size());
     size_t idx = 0;
     for (auto mode : streamInfo.sensorPixelModesUsed) {
-        stream->sensorPixelModesUsed[idx++] =
+        stream->v3_7.sensorPixelModesUsed[idx++] =
                 static_cast<CameraMetadataEnumAndroidSensorPixelMode>(mode);
     }
+    stream->dynamicRangeProfile =
+        static_cast<CameraMetadataEnumAndroidRequestAvailableDynamicRangeProfilesMap> (
+                streamInfo.dynamicRangeProfile);
 }
 
 binder::Status checkPhysicalCameraId(
@@ -488,7 +584,7 @@ convertToHALStreamCombination(
         const SessionConfiguration& sessionConfiguration,
         const String8 &logicalCameraId, const CameraMetadata &deviceInfo,
         metadataGetter getMetadata, const std::vector<std::string> &physicalCameraIds,
-        hardware::camera::device::V3_7::StreamConfiguration &streamConfiguration,
+        hardware::camera::device::V3_8::StreamConfiguration &streamConfiguration,
         bool overrideForPerfClass, bool *earlyExit) {
 
     auto operatingMode = sessionConfiguration.getOperatingMode();
@@ -529,7 +625,7 @@ convertToHALStreamCombination(
         defaultSensorPixelModes[0] =
                 static_cast<CameraMetadataEnumAndroidSensorPixelMode>(
                         ANDROID_SENSOR_PIXEL_MODE_DEFAULT);
-        streamConfiguration.streams[streamIdx++] = {{{/*streamId*/0,
+        streamConfiguration.streams[streamIdx++].v3_7 = {{{/*streamId*/0,
                 hardware::camera::device::V3_2::StreamType::INPUT,
                 static_cast<uint32_t> (sessionConfiguration.getInputWidth()),
                 static_cast<uint32_t> (sessionConfiguration.getInputHeight()),
@@ -547,6 +643,7 @@ convertToHALStreamCombination(
         bool deferredConsumer = it.isDeferred();
         String8 physicalCameraId = String8(it.getPhysicalCameraId());
 
+        int dynamicRangeProfile = it.getDynamicRangeProfile();
         std::vector<int32_t> sensorPixelModesUsed = it.getSensorPixelModesUsed();
         const CameraMetadata &physicalDeviceInfo = getMetadata(physicalCameraId,
                 overrideForPerfClass);
@@ -578,6 +675,7 @@ convertToHALStreamCombination(
             if (surfaceType == OutputConfiguration::SURFACE_TYPE_SURFACE_VIEW) {
                 streamInfo.consumerUsage |= GraphicBuffer::USAGE_HW_COMPOSER;
             }
+            streamInfo.dynamicRangeProfile = it.getDynamicRangeProfile();
             if (checkAndOverrideSensorPixelModesUsed(sensorPixelModesUsed,
                     streamInfo.format, streamInfo.width,
                     streamInfo.height, metadataChosen, false /*flexibleConsumer*/,
@@ -599,7 +697,7 @@ convertToHALStreamCombination(
         for (auto& bufferProducer : bufferProducers) {
             sp<Surface> surface;
             res = createSurfaceFromGbp(streamInfo, isStreamInfoValid, surface, bufferProducer,
-                    logicalCameraId, metadataChosen, sensorPixelModesUsed);
+                    logicalCameraId, metadataChosen, sensorPixelModesUsed, dynamicRangeProfile);
 
             if (!res.isOk())
                 return res;
@@ -739,6 +837,25 @@ status_t checkAndOverrideSensorPixelModesUsed(
     }
     *overriddenSensorPixelModesUsed = sensorPixelModesUsedSet;
     return OK;
+}
+
+bool convertHALStreamCombinationFromV38ToV37(
+        hardware::camera::device::V3_7::StreamConfiguration &streamConfigV37,
+        const hardware::camera::device::V3_8::StreamConfiguration &streamConfigV38) {
+    streamConfigV37.streams.resize(streamConfigV38.streams.size());
+    for (size_t i = 0; i < streamConfigV38.streams.size(); i++) {
+        if (static_cast<int32_t>(streamConfigV38.streams[i].dynamicRangeProfile) !=
+                ANDROID_REQUEST_AVAILABLE_DYNAMIC_RANGE_PROFILES_MAP_STANDARD) {
+            // ICameraDevice older than 3.8 doesn't support 10-bit dynamic range profiles
+            // image
+            return false;
+        }
+        streamConfigV37.streams[i] = streamConfigV38.streams[i].v3_7;
+    }
+    streamConfigV37.operationMode = streamConfigV38.operationMode;
+    streamConfigV37.sessionParams = streamConfigV38.sessionParams;
+
+    return true;
 }
 
 bool convertHALStreamCombinationFromV37ToV34(
