@@ -73,10 +73,8 @@ int main(int argc __unused, char **argv)
         IPCThreadState::self()->joinThreadPool();
         for (;;) {
             siginfo_t info;
-            int ret = waitid(P_PID, childPid, &info, WEXITED | WSTOPPED | WCONTINUED);
-            if (ret == EINTR) {
-                continue;
-            }
+            int ret = TEMP_FAILURE_RETRY(waitid(P_PID, childPid, &info,
+                                                WEXITED | WSTOPPED | WCONTINUED));
             if (ret < 0) {
                 break;
             }
