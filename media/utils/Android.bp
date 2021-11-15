@@ -34,6 +34,7 @@ cc_library {
         "SchedulingPolicyService.cpp",
         "ServiceUtilities.cpp",
         "TimeCheck.cpp",
+        "TimerThread.cpp",
     ],
     static_libs: [
         "libc_malloc_debug_backtrace",
@@ -117,4 +118,13 @@ cc_library_headers {
     vendor_available: true,  // required for platform/hardware/interfaces
 
     export_include_dirs: ["include"],
+}
+
+cc_test {
+    name: "libmediautils_test",
+    srcs: ["TimerThread-test.cpp"],
+    shared_libs: [
+      "libmediautils",
+      "libutils",
+    ]
 }
