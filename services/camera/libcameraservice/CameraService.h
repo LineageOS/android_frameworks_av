@@ -1184,12 +1184,12 @@ private:
     status_t clearCachedMonitoredTagDumps(int outFd);
 
     // Print events of monitored tags in all cached and attached clients
-    status_t printWatchedTags(const Vector<String16> &args, int inFd, int outFd);
+    status_t printWatchedTags(int outFd);
 
     // Print events of monitored tags in all attached clients as they are captured. New events are
     // fetched every `refreshMillis` ms
     // NOTE: This function does not terminate until user passes '\n' to inFd.
-    status_t printWatchedTagsUntilInterrupt(long refreshMillis, int inFd, int outFd);
+    status_t printWatchedTagsUntilInterrupt(const Vector<String16> &args, int inFd, int outFd);
 
     // Parses comma separated clients list and adds them to mWatchedClientPackages.
     // Does not acquire mLogLock before modifying mWatchedClientPackages. It is the caller's

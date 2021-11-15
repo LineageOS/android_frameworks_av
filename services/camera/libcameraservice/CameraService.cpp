@@ -4747,12 +4747,12 @@ status_t CameraService::handleSetCameraMute(const Vector<String16>& args) {
 status_t CameraService::handleWatchCommand(const Vector<String16>& args, int inFd, int outFd) {
     if (args.size() >= 3 && args[1] == String16("start")) {
         return startWatchingTags(args, outFd);
-    } else if (args.size() == 2 && args[1] == String16("dump")) {
-        return camera3::CameraTraces::dump(outFd);
     } else if (args.size() == 2 && args[1] == String16("stop")) {
         return stopWatchingTags(outFd);
-    } else if (args.size() >= 2 && args[1] == String16("print")) {
-        return printWatchedTags(args, inFd, outFd);
+    } else if (args.size() == 2 && args[1] == String16("dump")) {
+        return printWatchedTags(outFd);
+    } else if (args.size() >= 2 && args[1] == String16("live")) {
+        return printWatchedTagsUntilInterrupt(args, inFd, outFd);
     } else if (args.size() == 2 && args[1] == String16("clear")) {
         return clearCachedMonitoredTagDumps(outFd);
     }
@@ -4761,9 +4761,9 @@ status_t CameraService::handleWatchCommand(const Vector<String16>& args, int inF
                  "        starts watching the provided tags for clients with provided package\n"
                  "        recognizes tag shorthands like '3a'\n"
                  "        watches all clients if no client is passed, or if 'all' is listed\n"
-                 "  dump dumps camera trace\n"
+                 "  dump dumps the monitoring information and exits\n"
                  "  stop stops watching all tags\n"
-                 "  print [-n <refresh_interval_ms>]\n"
+                 "  live [-n <refresh_interval_ms>]\n"
                  "        prints the monitored information in real time\n"
                  "        Hit return to exit\n"
                  "  clear clears all buffers storing information for watch command");
@@ -4842,59 +4842,65 @@ status_t CameraService::clearCachedMonitoredTagDumps(int outFd) {
     return OK;
 }
 
-status_t CameraService::printWatchedTags(const Vector<String16> &args, int inFd, int outFd) {
-    // Figure outFd refresh interval, if present in args
-    long refreshTimeoutMs = 1000L; // refresh every 1s by default
-    if (args.size() > 2) {
-        size_t intervalIdx; // index of '-n'
-        for (intervalIdx = 2; intervalIdx < args.size() && String16("-n") != args[intervalIdx];
-             intervalIdx++);
-
-        size_t intervalValIdx = intervalIdx + 1;
-        if (intervalValIdx < args.size()) {
-            refreshTimeoutMs = strtol(String8(args[intervalValIdx].string()), nullptr, 10);
-            if (errno) { return BAD_VALUE; }
-        }
-    }
-
-    // Set min timeout of 10s. This prevents edge cases in polling when timeout of 0 is passed.
-    refreshTimeoutMs = refreshTimeoutMs < 10 ? 10 : refreshTimeoutMs;
-
+status_t CameraService::printWatchedTags(int outFd) {
+    Mutex::Autolock logLock(mLogLock);
     std::set<String16> connectedMonitoredClients;
-    {
-        Mutex::Autolock logLock(mLogLock);
-        bool serviceLock = tryLock(mServiceLock);
-        // get all watched clients that are currently connected
-        for (const auto &clientDescriptor: mActiveClientManager.getAll()) {
-            if (clientDescriptor == nullptr) { continue; }
 
-            sp<BasicClient> client = clientDescriptor->getValue();
-            if (client.get() == nullptr) { continue; }
-            if (!isClientWatchedLocked(client.get())) { continue; }
+    bool printedSomething = false; // tracks if any monitoring information was printed
+                                   // (from either cached or active clients)
 
-            connectedMonitoredClients.emplace(client->getPackageName());
+    bool serviceLock = tryLock(mServiceLock);
+    // get all watched clients that are currently connected
+    for (const auto &clientDescriptor: mActiveClientManager.getAll()) {
+        if (clientDescriptor == nullptr) { continue; }
+
+        sp<BasicClient> client = clientDescriptor->getValue();
+        if (client.get() == nullptr) { continue; }
+        if (!isClientWatchedLocked(client.get())) { continue; }
+
+        std::vector<std::string> dumpVector;
+        client->dumpWatchedEventsToVector(dumpVector);
+
+        size_t printIdx = dumpVector.size();
+        if (printIdx == 0) {
+            continue;
         }
-        if (serviceLock) { mServiceLock.unlock(); }
 
-        // Print entries in mWatchedClientsDumpCache for clients that are not connected
-        for (const auto &kv: mWatchedClientsDumpCache) {
-            const String16 &package = kv.first;
-            if (connectedMonitoredClients.find(package) != connectedMonitoredClients.end()) {
-                continue;
-            }
-
-            dprintf(outFd, "Client: %s\n", String8(package).string());
-            dprintf(outFd, "%s\n", kv.second.c_str());
+        // Print tag dumps for active client
+        const String8 &cameraId = clientDescriptor->getKey();
+        String8 packageName8 = String8(client->getPackageName());
+        const char *printablePackageName = packageName8.lockBuffer(packageName8.size());
+        dprintf(outFd, "Client: %s (active)\n", printablePackageName);
+        while(printIdx > 0) {
+            printIdx--;
+            dprintf(outFd, "%s:%s  %s", cameraId.string(), printablePackageName,
+                    dumpVector[printIdx].c_str());
         }
+        dprintf(outFd, "\n");
+        packageName8.unlockBuffer();
+        printedSomething = true;
+
+        connectedMonitoredClients.emplace(client->getPackageName());
+    }
+    if (serviceLock) { mServiceLock.unlock(); }
+
+    // Print entries in mWatchedClientsDumpCache for clients that are not connected
+    for (const auto &kv: mWatchedClientsDumpCache) {
+        const String16 &package = kv.first;
+        if (connectedMonitoredClients.find(package) != connectedMonitoredClients.end()) {
+            continue;
+        }
+
+        dprintf(outFd, "Client: %s (cached)\n", String8(package).string());
+        dprintf(outFd, "%s\n", kv.second.c_str());
+        printedSomething = true;
     }
 
-    if (connectedMonitoredClients.empty()) {
-        dprintf(outFd, "No watched client active.\n");
-        return OK;
+    if (!printedSomething) {
+        dprintf(outFd, "No monitoring information to print.\n");
     }
 
-    // For connected watched clients, print monitored tags live
-    return printWatchedTagsUntilInterrupt(refreshTimeoutMs, inFd, outFd);
+    return OK;
 }
 
 // Print all events in vector `events' that came after lastPrintedEvent
@@ -4995,7 +5001,25 @@ bool shouldInterruptWatchCommand(int inFd, int outFd, long timeoutMs) {
     }
 }
 
-status_t CameraService::printWatchedTagsUntilInterrupt(long refreshMillis, int inFd, int outFd) {
+status_t CameraService::printWatchedTagsUntilInterrupt(const Vector<String16> &args,
+                                                       int inFd, int outFd) {
+    // Figure out refresh interval, if present in args
+    long refreshTimeoutMs = 1000L; // refresh every 1s by default
+    if (args.size() > 2) {
+        size_t intervalIdx; // index of '-n'
+        for (intervalIdx = 2; intervalIdx < args.size() && String16("-n") != args[intervalIdx];
+             intervalIdx++);
+
+        size_t intervalValIdx = intervalIdx + 1;
+        if (intervalValIdx < args.size()) {
+            refreshTimeoutMs = strtol(String8(args[intervalValIdx].string()), nullptr, 10);
+            if (errno) { return BAD_VALUE; }
+        }
+    }
+
+    // Set min timeout of 10ms. This prevents edge cases in polling when timeout of 0 is passed.
+    refreshTimeoutMs = refreshTimeoutMs < 10 ? 10 : refreshTimeoutMs;
+
     dprintf(outFd, "Press return to exit...\n\n");
     std::map<String16, std::string> packageNameToLastEvent;
 
@@ -5031,7 +5055,7 @@ status_t CameraService::printWatchedTagsUntilInterrupt(long refreshMillis, int i
                 cameraId.unlockBuffer();
             }
         }
-        if (shouldInterruptWatchCommand(inFd, outFd, refreshMillis)) {
+        if (shouldInterruptWatchCommand(inFd, outFd, refreshTimeoutMs)) {
             break;
         }
     }
