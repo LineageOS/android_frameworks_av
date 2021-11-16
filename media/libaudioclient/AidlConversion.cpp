@@ -3033,6 +3033,10 @@ aidl2legacy_AudioMode_audio_mode_t(AudioMode aidl) {
             return AUDIO_MODE_IN_COMMUNICATION;
         case AudioMode::CALL_SCREEN:
             return AUDIO_MODE_CALL_SCREEN;
+        case AudioMode::SYS_RESERVED_CALL_REDIRECT:
+            return AUDIO_MODE_CALL_REDIRECT;
+        case AudioMode::SYS_RESERVED_COMMUNICATION_REDIRECT:
+            return AUDIO_MODE_COMMUNICATION_REDIRECT;
     }
     return unexpected(BAD_VALUE);
 }
@@ -3054,6 +3058,10 @@ legacy2aidl_audio_mode_t_AudioMode(audio_mode_t legacy) {
             return AudioMode::IN_COMMUNICATION;
         case AUDIO_MODE_CALL_SCREEN:
             return AudioMode::CALL_SCREEN;
+        case AUDIO_MODE_CALL_REDIRECT:
+            return AudioMode::SYS_RESERVED_CALL_REDIRECT;
+        case AUDIO_MODE_COMMUNICATION_REDIRECT:
+            return AudioMode::SYS_RESERVED_COMMUNICATION_REDIRECT;
         case AUDIO_MODE_CNT:
             break;
     }
