@@ -200,11 +200,6 @@ def parseAndroidAudioFile(androidaudiobaseheaderFile, androidaudiocommonbasehead
     #
     ignored_values = ['CNT', 'MAX', 'ALL', 'NONE']
 
-    #
-    # Reaching 32 bit limit for inclusive criterion out devices: removing
-    #
-    ignored_output_device_values = ['BleSpeaker', 'BleHeadset']
-
     criteria_pattern = re.compile(
         r"\s*V\((?P<type>(?:"+'|'.join(criterion_mapping_table.keys()) + "))_" \
         r"(?P<literal>(?!" + '|'.join(ignored_values) + ")\w*)\s*,\s*" \
@@ -240,9 +235,7 @@ def parseAndroidAudioFile(androidaudiobaseheaderFile, androidaudiocommonbasehead
             if criterion_name == "OutputDevicesMaskType":
                 if criterion_literal == "Default":
                     criterion_numerical_value = str(int("0x40000000", 0))
-                if criterion_literal in ignored_output_device_values:
-                    logging.info("OutputDevicesMaskType skipping {}".format(criterion_literal))
-                    continue
+
             try:
                 string_int = int(criterion_numerical_value, 0)
             except ValueError:
