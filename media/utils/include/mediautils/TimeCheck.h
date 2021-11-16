@@ -14,13 +14,11 @@
  * limitations under the License.
  */
 
+#pragma once
 
-#ifndef ANDROID_TIME_CHECK_H
-#define ANDROID_TIME_CHECK_H
-
-#include <utils/KeyedVector.h>
-#include <utils/Thread.h>
 #include <vector>
+
+#include <mediautils/TimerThread.h>
 
 namespace android {
 
@@ -28,48 +26,21 @@ namespace android {
 // if it exceeds a certain time
 
 class TimeCheck {
-public:
-
+  public:
     // The default timeout is chosen to be less than system server watchdog timeout
     static constexpr uint32_t kDefaultTimeOutMs = 5000;
 
-            TimeCheck(const char *tag, uint32_t timeoutMs = kDefaultTimeOutMs);
-            ~TimeCheck();
-    static  void setAudioHalPids(const std::vector<pid_t>& pids);
-    static  std::vector<pid_t> getAudioHalPids();
+    TimeCheck(const char* tag, uint32_t timeoutMs = kDefaultTimeOutMs);
+    ~TimeCheck();
+    static void setAudioHalPids(const std::vector<pid_t>& pids);
+    static std::vector<pid_t> getAudioHalPids();
 
-private:
-
-    class TimeCheckThread : public Thread {
-    public:
-
-                            TimeCheckThread() {}
-        virtual             ~TimeCheckThread() override;
-
-                nsecs_t     startMonitoring(const char *tag, uint32_t timeoutMs);
-                void        stopMonitoring(nsecs_t endTimeNs);
-
-    private:
-
-                // RefBase
-        virtual void        onFirstRef() override { run("TimeCheckThread", PRIORITY_URGENT_AUDIO); }
-
-                // Thread
-        virtual bool        threadLoop() override;
-
-                Condition           mCond;
-                Mutex               mMutex;
-                // using the end time in ns as key is OK given the risk is low that two entries
-                // are added in such a way that <add time> + <timeout> are the same for both.
-                KeyedVector< nsecs_t, const char*>  mMonitorRequests;
-    };
-
-    static sp<TimeCheckThread> getTimeCheckThread();
+  private:
+    static TimerThread* getTimeCheckThread();
     static void accessAudioHalPids(std::vector<pid_t>* pids, bool update);
+    static void crash(const char* tag);
 
-    const           nsecs_t mEndTimeNs;
+    const TimerThread::Handle mTimerHandle;
 };
 
-}; // namespace android
-
-#endif  // ANDROID_TIME_CHECK_H
+};  // namespace android
