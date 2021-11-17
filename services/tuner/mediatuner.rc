@@ -2,4 +2,7 @@ service media.tuner /system/bin/mediatuner
     class main
     group media
     ioprio rt 4
+    onrestart restart vendor.tuner-hal-1-0
+    onrestart restart vendor.tuner-hal-1-1
+    onrestart restart vendor.tuner-default
     task_profiles ProcessCapacityHigh HighPerformance

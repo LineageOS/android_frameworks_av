@@ -453,8 +453,10 @@ void TunerFilter::FilterCallback::attachSharedFilterCallback(
 
 void TunerFilter::FilterCallback::detachSharedFilterCallback() {
     Mutex::Autolock _l(mCallbackLock);
-    mTunerFilterCallback = mOriginalCallback;
-    mOriginalCallback = nullptr;
+    if (mTunerFilterCallback != nullptr && mOriginalCallback != nullptr) {
+        mTunerFilterCallback = mOriginalCallback;
+        mOriginalCallback = nullptr;
+    }
 }
 
 }  // namespace tuner

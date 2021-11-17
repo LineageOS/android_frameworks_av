@@ -941,8 +941,10 @@ void TunerHidlFilter::FilterCallback::attachSharedFilterCallback(
 
 void TunerHidlFilter::FilterCallback::detachSharedFilterCallback() {
     Mutex::Autolock _l(mCallbackLock);
-    mTunerFilterCallback = mOriginalCallback;
-    mOriginalCallback = nullptr;
+    if (mTunerFilterCallback != nullptr && mOriginalCallback != nullptr) {
+        mTunerFilterCallback = mOriginalCallback;
+        mOriginalCallback = nullptr;
+    }
 }
 
 /////////////// FilterCallback Helper Methods ///////////////////////
