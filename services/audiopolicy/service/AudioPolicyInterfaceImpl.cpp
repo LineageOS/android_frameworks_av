@@ -219,7 +219,15 @@ Status AudioPolicyService::setPhoneState(AudioMode stateAidl, int32_t uidAidl)
     // can be interleaved).
     Mutex::Autolock _l(mLock);
     // TODO: check if it is more appropriate to do it in platform specific policy manager
-    AudioSystem::setMode(state);
+
+    // Audio HAL mode conversion for call redirect modes
+    audio_mode_t halMode = state;
+    if (state == AUDIO_MODE_CALL_REDIRECT) {
+        halMode = AUDIO_MODE_CALL_SCREEN;
+    } else if (state == AUDIO_MODE_COMMUNICATION_REDIRECT) {
+        halMode = AUDIO_MODE_NORMAL;
+    }
+    AudioSystem::setMode(halMode);
 
     AutoCallerClear acc;
     mAudioPolicyManager->setPhoneState(state);
