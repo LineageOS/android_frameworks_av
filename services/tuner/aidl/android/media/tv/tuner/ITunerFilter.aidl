@@ -101,19 +101,19 @@ interface ITunerFilter {
     void close();
 
     /**
-     * Create a new SharedFilter instance.
+     * Acquire a new SharedFilter token.
      *
      * @return a token of the newly created SharedFilter instance.
      */
-    String createSharedFilter();
+    String acquireSharedFilterToken();
 
     /**
-     * Release a SharedFilter instance.
+     * Free a SharedFilter token.
      *
-     * @param filterToken the SharedFilter will be released.
+     * @param filterToken the SharedFilter token will be released.
      * @return a token of the newly created SharedFilter instance.
      */
-    void releaseSharedFilter(in String filterToken);
+    void freeSharedFilterToken(in String filterToken);
 
     /**
      * Get filter type.
