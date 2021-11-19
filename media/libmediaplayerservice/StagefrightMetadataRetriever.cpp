@@ -225,10 +225,26 @@ sp<IMemory> StagefrightMetadataRetriever::getImageInternal(
             "media.stagefright.thumbnail.prefer_hw_codecs", false);
     uint32_t flags = preferhw ? 0 : MediaCodecList::kPreferSoftwareCodecs;
     Vector<AString> matchingCodecs;
+    sp<AMessage> format = new AMessage;
+    status_t err = convertMetaDataToMessage(trackMeta, &format);
+    if (err != OK) {
+        format = NULL;
+    }
+
+    // If decoding thumbnail check decoder supports thumbnail dimensions instead
+    int32_t thumbHeight, thumbWidth;
+    if (thumbnail && format != NULL
+            && trackMeta->findInt32(kKeyThumbnailHeight, &thumbHeight)
+            && trackMeta->findInt32(kKeyThumbnailWidth, &thumbWidth)) {
+        format->setInt32("height", thumbHeight);
+        format->setInt32("width", thumbWidth);
+    }
+
     MediaCodecList::findMatchingCodecs(
             mime,
             false, /* encoder */
             flags,
+            format,
             &matchingCodecs);
 
     for (size_t i = 0; i < matchingCodecs.size(); ++i) {
@@ -348,11 +364,18 @@ sp<IMemory> StagefrightMetadataRetriever::getFrameInternal(
     bool preferhw = property_get_bool(
             "media.stagefright.thumbnail.prefer_hw_codecs", false);
     uint32_t flags = preferhw ? 0 : MediaCodecList::kPreferSoftwareCodecs;
+    sp<AMessage> format = new AMessage;
+    status_t err = convertMetaDataToMessage(trackMeta, &format);
+    if (err != OK) {
+        format = NULL;
+    }
+
     Vector<AString> matchingCodecs;
     MediaCodecList::findMatchingCodecs(
             mime,
             false, /* encoder */
             flags,
+            format,
             &matchingCodecs);
 
     for (size_t i = 0; i < matchingCodecs.size(); ++i) {
