@@ -18,6 +18,7 @@
 #define LEGACY_AUDIO_STREAM_LEGACY_H
 
 #include <media/AudioTimestamp.h>
+#include <media/AudioTrack.h>
 #include <media/AudioSystem.h>
 
 #include <aaudio/AAudio.h>
@@ -29,8 +30,6 @@
 
 namespace aaudio {
 
-
-typedef void (*aaudio_legacy_callback_t)(int event, void* user, void *info);
 
 enum {
     /**
@@ -56,21 +55,17 @@ enum {
 typedef int32_t aaudio_callback_operation_t;
 
 
-class AudioStreamLegacy : public AudioStream, public FixedBlockProcessor {
+class AudioStreamLegacy : public AudioStream,
+                          public FixedBlockProcessor,
+                          protected android::AudioTrack::IAudioTrackCallback {
 public:
     AudioStreamLegacy();
 
     virtual ~AudioStreamLegacy() = default;
 
-    aaudio_legacy_callback_t getLegacyCallback();
 
     int32_t callDataCallbackFrames(uint8_t *buffer, int32_t numFrames);
 
-    // This is public so it can be called from the C callback function.
-    // This is called from the AudioTrack/AudioRecord client.
-    virtual void processCallback(int event, void *info) = 0;
-
-    void processCallbackCommon(aaudio_callback_operation_t opcode, void *info);
 
     // Implement FixedBlockProcessor
     int32_t onProcessFixedBlock(uint8_t *buffer, int32_t numBytes) override;
@@ -86,7 +81,8 @@ public:
     }
 
 protected:
-
+    size_t onMoreData(const android::AudioTrack::Buffer& buffer) override;
+    void onNewIAudioTrack() override;
     aaudio_result_t getBestTimestamp(clockid_t clockId,
                                      int64_t *framePosition,
                                      int64_t *timeNanoseconds,

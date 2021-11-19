@@ -37,6 +37,10 @@ using android::content::AttributionSourceState;
 using namespace android;
 using namespace aaudio;
 
+static void sCallbackWrapper(int event, void* userData, void* info) {
+    static_cast<AudioStreamRecord*>(userData)->processCallback(event, info);
+}
+
 AudioStreamRecord::AudioStreamRecord()
     : AudioStreamLegacy()
     , mFixedBlockWriter(*this)
@@ -129,7 +133,7 @@ aaudio_result_t AudioStreamRecord::open(const AudioStreamBuilder& builder)
     AudioRecord::transfer_type streamTransferType = AudioRecord::transfer_type::TRANSFER_SYNC;
     if (builder.getDataCallbackProc() != nullptr) {
         streamTransferType = AudioRecord::transfer_type::TRANSFER_CALLBACK;
-        callback = getLegacyCallback();
+        callback = sCallbackWrapper;
         callbackData = this;
     }
     mCallbackBufferSize = builder.getFramesPerDataCallback();
@@ -353,14 +357,15 @@ const void * AudioStreamRecord::maybeConvertDeviceData(const void *audioData, in
 void AudioStreamRecord::processCallback(int event, void *info) {
     switch (event) {
         case AudioRecord::EVENT_MORE_DATA:
-            processCallbackCommon(AAUDIO_CALLBACK_OPERATION_PROCESS_DATA, info);
+        {
+            AudioTrack::Buffer *audioBuffer = static_cast<AudioTrack::Buffer *>(info);
+            audioBuffer->size = onMoreData(*audioBuffer);
             break;
-
+        }
             // Stream got rerouted so we disconnect.
         case AudioRecord::EVENT_NEW_IAUDIORECORD:
-            processCallbackCommon(AAUDIO_CALLBACK_OPERATION_DISCONNECTED, info);
+            onNewIAudioTrack();
             break;
-
         default:
             break;
     }
