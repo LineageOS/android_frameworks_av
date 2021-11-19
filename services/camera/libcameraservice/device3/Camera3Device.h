@@ -39,6 +39,7 @@
 #include <android/hardware/camera/device/3.2/ICameraDeviceCallback.h>
 #include <android/hardware/camera/device/3.4/ICameraDeviceCallback.h>
 #include <android/hardware/camera/device/3.5/ICameraDeviceCallback.h>
+#include <android/hardware/camera/device/3.8/ICameraDeviceCallback.h>
 #include <fmq/MessageQueue.h>
 
 #include <camera/CaptureResult.h>
@@ -83,7 +84,7 @@ class Camera3StreamInterface;
  */
 class Camera3Device :
             public CameraDeviceBase,
-            virtual public hardware::camera::device::V3_5::ICameraDeviceCallback,
+            virtual public hardware::camera::device::V3_8::ICameraDeviceCallback,
             public camera3::SetErrorInterface,
             public camera3::InflightRequestUpdateInterface,
             public camera3::RequestBufferInterface,
@@ -641,6 +642,14 @@ class Camera3Device :
     hardware::Return<void> returnStreamBuffers(
             const hardware::hidl_vec<
                     hardware::camera::device::V3_2::StreamBuffer>& buffers) override;
+
+    hardware::Return<void> notify_3_8(
+            const hardware::hidl_vec<
+                    hardware::camera::device::V3_8::NotifyMsg>& msgs) override;
+
+    template<typename NotifyMsgType>
+    hardware::Return<void> notifyHelper(
+            const hardware::hidl_vec<NotifyMsgType>& msgs);
 
     // Handle one notify message
     void notify(const hardware::camera::device::V3_2::NotifyMsg& msg);

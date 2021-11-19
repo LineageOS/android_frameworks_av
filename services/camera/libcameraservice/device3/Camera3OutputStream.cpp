@@ -264,14 +264,16 @@ status_t Camera3OutputStream::queueBufferToConsumer(sp<ANativeWindow>& consumer,
 
 status_t Camera3OutputStream::returnBufferLocked(
         const camera_stream_buffer &buffer,
-        nsecs_t timestamp, int32_t transform, const std::vector<size_t>& surface_ids) {
+        nsecs_t timestamp, nsecs_t readoutTimestamp,
+        int32_t transform, const std::vector<size_t>& surface_ids) {
     ATRACE_HFR_CALL();
 
     if (mHandoutTotalBufferCount == 1) {
         returnPrefetchedBuffersLocked();
     }
 
-    status_t res = returnAnyBufferLocked(buffer, timestamp, /*output*/true, transform, surface_ids);
+    status_t res = returnAnyBufferLocked(buffer, timestamp, readoutTimestamp,
+                                         /*output*/true, transform, surface_ids);
 
     if (res != OK) {
         return res;
@@ -286,6 +288,7 @@ status_t Camera3OutputStream::returnBufferLocked(
 status_t Camera3OutputStream::returnBufferCheckedLocked(
             const camera_stream_buffer &buffer,
             nsecs_t timestamp,
+            nsecs_t readoutTimestamp,
             bool output,
             int32_t transform,
             const std::vector<size_t>& surface_ids,
@@ -358,7 +361,8 @@ status_t Camera3OutputStream::returnBufferCheckedLocked(
         /* Certain consumers (such as AudioSource or HardwareComposer) use
          * MONOTONIC time, causing time misalignment if camera timestamp is
          * in BOOTTIME. Do the conversion if necessary. */
-        nsecs_t adjustedTs = mUseMonoTimestamp ? timestamp - mTimestampOffset : timestamp;
+        nsecs_t t = mPreviewFrameScheduler != nullptr ? readoutTimestamp : timestamp;
+        nsecs_t adjustedTs = mUseMonoTimestamp ? t - mTimestampOffset : t;
         if (mPreviewFrameScheduler != nullptr) {
             res = mPreviewFrameScheduler->queuePreviewBuffer(adjustedTs, transform,
                     anwBuffer, anwReleaseFence);

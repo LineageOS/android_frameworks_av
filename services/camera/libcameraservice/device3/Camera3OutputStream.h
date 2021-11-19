@@ -247,6 +247,7 @@ class Camera3OutputStream :
     virtual status_t returnBufferCheckedLocked(
             const camera_stream_buffer &buffer,
             nsecs_t timestamp,
+            nsecs_t readoutTimestamp,
             bool output,
             int32_t transform,
             const std::vector<size_t>& surface_ids,
@@ -335,7 +336,8 @@ class Camera3OutputStream :
 
     virtual status_t returnBufferLocked(
             const camera_stream_buffer &buffer,
-            nsecs_t timestamp, int32_t transform, const std::vector<size_t>& surface_ids);
+            nsecs_t timestamp, nsecs_t readoutTimestamp,
+            int32_t transform, const std::vector<size_t>& surface_ids);
 
     virtual status_t queueBufferToConsumer(sp<ANativeWindow>& consumer,
             ANativeWindowBuffer* buffer, int anwReleaseFence,

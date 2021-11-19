@@ -463,7 +463,7 @@ void removeInFlightRequestIfReadyLocked(CaptureOutputStates& states, int idx) {
         returnOutputBuffers(
             states.useHalBufManager, states.listener,
             request.pendingOutputBuffers.array(),
-            request.pendingOutputBuffers.size(), 0,
+            request.pendingOutputBuffers.size(), /*timestamp*/0, /*readoutTimestamp*/0,
             /*requested*/true, request.requestTimeNs, states.sessionStatsBuilder,
             /*timestampIncreasing*/true,
             request.outputSurfaces, request.resultExtras,
@@ -870,9 +870,9 @@ void returnOutputBuffers(
         bool useHalBufManager,
         sp<NotificationListener> listener,
         const camera_stream_buffer_t *outputBuffers, size_t numBuffers,
-        nsecs_t timestamp, bool requested, nsecs_t requestTimeNs,
-        SessionStatsBuilder& sessionStatsBuilder, bool timestampIncreasing,
-        const SurfaceMap& outputSurfaces,
+        nsecs_t timestamp, nsecs_t readoutTimestamp, bool requested,
+        nsecs_t requestTimeNs, SessionStatsBuilder& sessionStatsBuilder,
+        bool timestampIncreasing, const SurfaceMap& outputSurfaces,
         const CaptureResultExtras &inResultExtras,
         ERROR_BUF_STRATEGY errorBufStrategy, int32_t transform) {
 
@@ -916,11 +916,11 @@ void returnOutputBuffers(
                 errorBufStrategy != ERROR_BUF_CACHE) {
             if (it != outputSurfaces.end()) {
                 res = stream->returnBuffer(
-                        outputBuffers[i], timestamp, timestampIncreasing, it->second,
-                        inResultExtras.frameNumber, transform);
+                        outputBuffers[i], timestamp, readoutTimestamp, timestampIncreasing,
+                        it->second, inResultExtras.frameNumber, transform);
             } else {
                 res = stream->returnBuffer(
-                        outputBuffers[i], timestamp, timestampIncreasing,
+                        outputBuffers[i], timestamp, readoutTimestamp, timestampIncreasing,
                         std::vector<size_t> (), inResultExtras.frameNumber, transform);
             }
         }
@@ -951,7 +951,7 @@ void returnOutputBuffers(
             // cancel the buffer
             camera_stream_buffer_t sb = outputBuffers[i];
             sb.status = CAMERA_BUFFER_STATUS_ERROR;
-            stream->returnBuffer(sb, /*timestamp*/0,
+            stream->returnBuffer(sb, /*timestamp*/0, /*readoutTimestamp*/0,
                     timestampIncreasing, std::vector<size_t> (),
                     inResultExtras.frameNumber, transform);
 
@@ -973,8 +973,8 @@ void returnAndRemovePendingOutputBuffers(bool useHalBufManager,
     returnOutputBuffers(useHalBufManager, listener,
             request.pendingOutputBuffers.array(),
             request.pendingOutputBuffers.size(),
-            request.shutterTimestamp, /*requested*/true,
-            request.requestTimeNs, sessionStatsBuilder, timestampIncreasing,
+            request.shutterTimestamp, request.shutterReadoutTimestamp,
+            /*requested*/true, request.requestTimeNs, sessionStatsBuilder, timestampIncreasing,
             request.outputSurfaces, request.resultExtras,
             request.errorBufStrategy, request.transform);
 
@@ -1035,6 +1035,7 @@ void notifyShutter(CaptureOutputStates& states, const camera_shutter_msg_t &msg)
             }
 
             r.shutterTimestamp = msg.timestamp;
+            r.shutterReadoutTimestamp = msg.readout_timestamp;
             if (r.hasCallback) {
                 ALOGVV("Camera %s: %s: Shutter fired for frame %d (id %d) at %" PRId64,
                     states.cameraId.string(), __FUNCTION__,
@@ -1193,7 +1194,30 @@ void notify(CaptureOutputStates& states, const camera_notify_msg *msg) {
 }
 
 void notify(CaptureOutputStates& states,
-        const hardware::camera::device::V3_2::NotifyMsg& msg) {
+        const hardware::camera::device::V3_8::NotifyMsg& msg) {
+    using android::hardware::camera::device::V3_2::MsgType;
+
+    hardware::camera::device::V3_2::NotifyMsg msg_3_2;
+    msg_3_2.type = msg.type;
+    bool hasReadoutTime = false;
+    uint64_t readoutTime = 0;
+    switch (msg.type) {
+        case MsgType::ERROR:
+            msg_3_2.msg.error = msg.msg.error;
+            break;
+        case MsgType::SHUTTER:
+            msg_3_2.msg.shutter = msg.msg.shutter.v3_2;
+            hasReadoutTime = true;
+            readoutTime = msg.msg.shutter.readoutTimestamp;
+            break;
+    }
+    notify(states, msg_3_2, hasReadoutTime, readoutTime);
+}
+
+void notify(CaptureOutputStates& states,
+        const hardware::camera::device::V3_2::NotifyMsg& msg,
+        bool hasReadoutTime, uint64_t readoutTime) {
+
     using android::hardware::camera::device::V3_2::MsgType;
     using android::hardware::camera::device::V3_2::ErrorCode;
 
@@ -1234,6 +1258,8 @@ void notify(CaptureOutputStates& states,
             m.type = CAMERA_MSG_SHUTTER;
             m.message.shutter.frame_number = msg.msg.shutter.frameNumber;
             m.message.shutter.timestamp = msg.msg.shutter.timestamp;
+            m.message.shutter.readout_timestamp = hasReadoutTime ?
+                    readoutTime : m.message.shutter.timestamp;
             break;
     }
     notify(states, &m);
@@ -1416,7 +1442,8 @@ void requestStreamBuffers(RequestBufferStates& states,
                 sb.status = CAMERA_BUFFER_STATUS_ERROR;
             }
             returnOutputBuffers(states.useHalBufManager, /*listener*/nullptr,
-                    streamBuffers.data(), numAllocatedBuffers, 0, /*requested*/false,
+                    streamBuffers.data(), numAllocatedBuffers, /*timestamp*/0,
+                    /*readoutTimestamp*/0, /*requested*/false,
                     /*requestTimeNs*/0, states.sessionStatsBuilder);
             for (auto buf : newBuffers) {
                 states.bufferRecordsIntf.removeOneBufferCache(streamId, buf);
@@ -1477,8 +1504,8 @@ void returnStreamBuffers(ReturnBufferStates& states,
         }
         streamBuffer.stream = stream->asHalStream();
         returnOutputBuffers(states.useHalBufManager, /*listener*/nullptr,
-                &streamBuffer, /*size*/1, /*timestamp*/ 0, /*requested*/false,
-                /*requestTimeNs*/0, states.sessionStatsBuilder);
+                &streamBuffer, /*size*/1, /*timestamp*/ 0, /*readoutTimestamp*/0,
+                /*requested*/false, /*requestTimeNs*/0, states.sessionStatsBuilder);
     }
 }
 
@@ -1491,9 +1518,10 @@ void flushInflightRequests(FlushInflightReqStates& states) {
             returnOutputBuffers(
                 states.useHalBufManager, states.listener,
                 request.pendingOutputBuffers.array(),
-                request.pendingOutputBuffers.size(), 0, /*requested*/true,
-                request.requestTimeNs, states.sessionStatsBuilder, /*timestampIncreasing*/true,
-                request.outputSurfaces, request.resultExtras, request.errorBufStrategy);
+                request.pendingOutputBuffers.size(), /*timestamp*/0, /*readoutTimestamp*/0,
+                /*requested*/true, request.requestTimeNs, states.sessionStatsBuilder,
+                /*timestampIncreasing*/true, request.outputSurfaces, request.resultExtras,
+                request.errorBufStrategy);
             ALOGW("%s: Frame %d |  Timestamp: %" PRId64 ", metadata"
                     " arrived: %s, buffers left: %d.\n", __FUNCTION__,
                     states.inflightMap.keyAt(idx), request.shutterTimestamp,
@@ -1565,7 +1593,7 @@ void flushInflightRequests(FlushInflightReqStates& states) {
                 switch (halStream->stream_type) {
                     case CAMERA_STREAM_OUTPUT:
                         res = stream->returnBuffer(streamBuffer, /*timestamp*/ 0,
-                                /*timestampIncreasing*/true,
+                                /*readoutTimestamp*/0, /*timestampIncreasing*/true,
                                 std::vector<size_t> (), frameNumber);
                         if (res != OK) {
                             ALOGE("%s: Can't return output buffer for frame %d to"

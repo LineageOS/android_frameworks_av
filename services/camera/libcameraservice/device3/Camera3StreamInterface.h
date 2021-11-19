@@ -357,7 +357,7 @@ class Camera3StreamInterface : public virtual RefBase {
      * For bidirectional streams, this method applies to the output-side buffers
      */
     virtual status_t returnBuffer(const camera_stream_buffer &buffer,
-            nsecs_t timestamp, bool timestampIncreasing = true,
+            nsecs_t timestamp, nsecs_t readoutTimestamp, bool timestampIncreasing = true,
             const std::vector<size_t>& surface_ids = std::vector<size_t>(),
             uint64_t frameNumber = 0, int32_t transform = -1) = 0;
 
