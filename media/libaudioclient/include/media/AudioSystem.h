@@ -594,7 +594,7 @@ public:
     static status_t addAudioPortCallback(const sp<AudioPortCallback>& callback);
     static status_t removeAudioPortCallback(const sp<AudioPortCallback>& callback);
 
-    class AudioDeviceCallback : public RefBase
+    class AudioDeviceCallback : public virtual RefBase
     {
     public:
 

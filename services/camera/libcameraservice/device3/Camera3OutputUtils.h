@@ -26,6 +26,8 @@
 
 #include <common/CameraDeviceBase.h>
 
+#include <android/hardware/camera/device/3.8/ICameraDeviceCallback.h>
+
 #include "device3/BufferUtils.h"
 #include "device3/DistortionMapper.h"
 #include "device3/ZoomRatioMapper.h"
@@ -52,7 +54,8 @@ namespace camera3 {
             bool useHalBufManager,
             sp<NotificationListener> listener, // Only needed when outputSurfaces is not empty
             const camera_stream_buffer_t *outputBuffers,
-            size_t numBuffers, nsecs_t timestamp, bool requested, nsecs_t requestTimeNs,
+            size_t numBuffers, nsecs_t timestamp,
+            nsecs_t readoutTimestamp, bool requested, nsecs_t requestTimeNs,
             SessionStatsBuilder& sessionStatsBuilder, bool timestampIncreasing = true,
             // The following arguments are only meant for surface sharing use case
             const SurfaceMap& outputSurfaces = SurfaceMap{},
@@ -119,7 +122,10 @@ namespace camera3 {
 
     // Handle one notify message
     void notify(CaptureOutputStates& states,
-            const hardware::camera::device::V3_2::NotifyMsg& msg);
+            const hardware::camera::device::V3_2::NotifyMsg& msg,
+            bool hasReadoutTime = false, uint64_t readoutTime = 0LL);
+    void notify(CaptureOutputStates& states,
+            const hardware::camera::device::V3_8::NotifyMsg& msg);
 
     struct RequestBufferStates {
         const String8& cameraId;

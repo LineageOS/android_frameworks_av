@@ -1673,7 +1673,7 @@ C2ENUM(C2Config::picture_type_t, uint32_t,
     SYNC_FRAME = (1 << 0),  ///< sync frame, e.g. IDR
     I_FRAME    = (1 << 1),  ///< intra frame that is completely encoded
     P_FRAME    = (1 << 2),  ///< inter predicted frame from previous frames
-    B_FRAME    = (1 << 3),  ///< backward predicted (out-of-order) frame
+    B_FRAME    = (1 << 3),  ///< bidirectional predicted (out-of-order) frame
 )
 
 /**
