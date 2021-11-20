@@ -103,14 +103,12 @@ aaudio_result_t AudioStreamTrack::open(const AudioStreamBuilder& builder)
             : getFormat();
 
     // Setup the callback if there is one.
-    AudioTrack::legacy_callback_t callback = nullptr;
-    void *callbackData = nullptr;
+    wp<AudioTrack::IAudioTrackCallback> callback;
     // Note that TRANSFER_SYNC does not allow FAST track
     AudioTrack::transfer_type streamTransferType = AudioTrack::transfer_type::TRANSFER_SYNC;
     if (builder.getDataCallbackProc() != nullptr) {
         streamTransferType = AudioTrack::transfer_type::TRANSFER_CALLBACK;
-        callback = getLegacyCallback();
-        callbackData = this;
+        callback = wp<AudioTrack::IAudioTrackCallback>::fromExisting(this);
 
         // If the total buffer size is unspecified then base the size on the burst size.
         if (frameCount == 0
@@ -157,7 +155,6 @@ aaudio_result_t AudioStreamTrack::open(const AudioStreamBuilder& builder)
             frameCount,
             flags,
             callback,
-            callbackData,
             notificationFrames,
             nullptr,       // DEFAULT sharedBuffer*/,
             false,   // DEFAULT threadCanCallJava
@@ -293,31 +290,19 @@ void AudioStreamTrack::close_l() {
     AudioStream::close_l();
 }
 
-void AudioStreamTrack::processCallback(int event, void *info) {
 
-    switch (event) {
-        case AudioTrack::EVENT_MORE_DATA:
-            processCallbackCommon(AAUDIO_CALLBACK_OPERATION_PROCESS_DATA, info);
-            break;
-
-            // Stream got rerouted so we disconnect.
-        case AudioTrack::EVENT_NEW_IAUDIOTRACK:
-            // request stream disconnect if the restored AudioTrack has properties not matching
-            // what was requested initially
-            if (mAudioTrack->channelCount() != getSamplesPerFrame()
-                    || mAudioTrack->format() != getFormat()
-                    || mAudioTrack->getSampleRate() != getSampleRate()
-                    || mAudioTrack->getRoutedDeviceId() != getDeviceId()
-                    || getBufferCapacityFromDevice() != getBufferCapacity()
-                    || getFramesPerBurstFromDevice() != getFramesPerBurst()) {
-                processCallbackCommon(AAUDIO_CALLBACK_OPERATION_DISCONNECTED, info);
-            }
-            break;
-
-        default:
-            break;
+void AudioStreamTrack::onNewIAudioTrack() {
+    // Stream got rerouted so we disconnect.
+    // request stream disconnect if the restored AudioTrack has properties not matching
+    // what was requested initially
+    if (mAudioTrack->channelCount() != getSamplesPerFrame()
+          || mAudioTrack->format() != getFormat()
+          || mAudioTrack->getSampleRate() != getSampleRate()
+          || mAudioTrack->getRoutedDeviceId() != getDeviceId()
+          || getBufferCapacityFromDevice() != getBufferCapacity()
+          || getFramesPerBurstFromDevice() != getFramesPerBurst()) {
+        AudioStreamLegacy::onNewIAudioTrack();
     }
-    return;
 }
 
 aaudio_result_t AudioStreamTrack::requestStart_l() {

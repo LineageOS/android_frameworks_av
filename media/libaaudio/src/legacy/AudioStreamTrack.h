@@ -81,9 +81,6 @@ public:
 
     aaudio_result_t updateStateMachine() override;
 
-    // This is public so it can be called from the C callback function.
-    void processCallback(int event, void *info) override;
-
     int64_t incrementClientFrameCounter(int32_t frames) override {
         return incrementFramesWritten(frames);
     }
@@ -100,6 +97,7 @@ protected:
 
     int32_t getFramesPerBurstFromDevice() const override;
     int32_t getBufferCapacityFromDevice() const override;
+    void onNewIAudioTrack() override;
 
 private:
 
