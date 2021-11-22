@@ -186,37 +186,8 @@ aaudio_result_t AAudioServiceEndpointMMAP::openWithFormat(audio_format_t audioFo
     ALOGD("%s() deviceId = %d, sessionId = %d", __func__, getDeviceId(), getSessionId());
 
     // Create MMAP/NOIRQ buffer.
-    int32_t minSizeFrames = getBufferCapacity();
-    if (minSizeFrames <= 0) { // zero will get rejected
-        minSizeFrames = AAUDIO_BUFFER_CAPACITY_MIN;
-    }
-    status = mMmapStream->createMmapBuffer(minSizeFrames, &mMmapBufferinfo);
-    bool isBufferShareable = mMmapBufferinfo.flags & AUDIO_MMAP_APPLICATION_SHAREABLE;
-    if (status != OK) {
-        ALOGE("%s() - createMmapBuffer() failed with status %d %s",
-              __func__, status, strerror(-status));
-        result = AAUDIO_ERROR_UNAVAILABLE;
+    if (createMmapBuffer(&mAudioDataFileDescriptor) != AAUDIO_OK) {
         goto error;
-    } else {
-        ALOGD("%s() createMmapBuffer() buffer_size = %d fr, burst_size %d fr"
-                      ", Sharable FD: %s",
-              __func__,
-              mMmapBufferinfo.buffer_size_frames,
-              mMmapBufferinfo.burst_size_frames,
-              isBufferShareable ? "Yes" : "No");
-    }
-
-    setBufferCapacity(mMmapBufferinfo.buffer_size_frames);
-    if (!isBufferShareable) {
-        // Exclusive mode can only be used by the service because the FD cannot be shared.
-        int32_t audioServiceUid =
-            VALUE_OR_FATAL(legacy2aidl_uid_t_int32_t(getuid()));
-        if ((mMmapClient.attributionSource.uid != audioServiceUid) &&
-            getSharingMode() == AAUDIO_SHARING_MODE_EXCLUSIVE) {
-            ALOGW("%s() - exclusive FD cannot be used by client", __func__);
-            result = AAUDIO_ERROR_UNAVAILABLE;
-            goto error;
-        }
     }
 
     // Get information about the stream and pass it back to the caller.
@@ -224,21 +195,6 @@ aaudio_result_t AAudioServiceEndpointMMAP::openWithFormat(audio_format_t audioFo
             config.channel_mask, getDirection() == AAUDIO_DIRECTION_INPUT,
             AAudio_isChannelIndexMask(config.channel_mask)));
 
-    // AAudio creates a copy of this FD and retains ownership of the copy.
-    // Assume that AudioFlinger will close the original shared_memory_fd.
-    mAudioDataFileDescriptor.reset(dup(mMmapBufferinfo.shared_memory_fd));
-    if (mAudioDataFileDescriptor.get() == -1) {
-        ALOGE("%s() - could not dup shared_memory_fd", __func__);
-        result = AAUDIO_ERROR_INTERNAL;
-        goto error;
-    }
-    // Call to HAL to make sure the transport FD was able to be closed by binder.
-    // This is a tricky workaround for a problem in Binder.
-    // TODO:[b/192048842] When that problem is fixed we may be able to remove or change this code.
-    struct audio_mmap_position position;
-    mMmapStream->getMmapPosition(&position);
-
-    mFramesPerBurst = mMmapBufferinfo.burst_size_frames;
     setFormat(config.format);
     setSampleRate(config.sample_rate);
 
@@ -320,6 +276,32 @@ aaudio_result_t AAudioServiceEndpointMMAP::startClient(const android::AudioClien
 aaudio_result_t AAudioServiceEndpointMMAP::stopClient(audio_port_handle_t clientHandle) {
     if (mMmapStream == nullptr) return AAUDIO_ERROR_NULL;
     aaudio_result_t result = AAudioConvert_androidToAAudioResult(mMmapStream->stop(clientHandle));
+    return result;
+}
+
+aaudio_result_t AAudioServiceEndpointMMAP::standby() {
+    if (mMmapStream == nullptr) {
+        return AAUDIO_ERROR_NULL;
+    }
+    aaudio_result_t result = AAudioConvert_androidToAAudioResult(mMmapStream->standby());
+    return result;
+}
+
+aaudio_result_t AAudioServiceEndpointMMAP::exitStandby(AudioEndpointParcelable* parcelable) {
+    if (mMmapStream == nullptr) {
+        return AAUDIO_ERROR_NULL;
+    }
+    mAudioDataFileDescriptor.reset();
+    aaudio_result_t result = createMmapBuffer(&mAudioDataFileDescriptor);
+    if (result == AAUDIO_OK) {
+        int32_t bytesPerFrame = calculateBytesPerFrame();
+        int32_t capacityInBytes = getBufferCapacity() * bytesPerFrame;
+        int fdIndex = parcelable->addFileDescriptor(mAudioDataFileDescriptor, capacityInBytes);
+        parcelable->mDownDataQueueParcelable.setupMemory(fdIndex, 0, capacityInBytes);
+        parcelable->mDownDataQueueParcelable.setBytesPerFrame(bytesPerFrame);
+        parcelable->mDownDataQueueParcelable.setFramesPerBurst(mFramesPerBurst);
+        parcelable->mDownDataQueueParcelable.setCapacityInFrames(getBufferCapacity());
+    }
     return result;
 }
 
@@ -501,4 +483,58 @@ aaudio_result_t AAudioServiceEndpointMMAP::getExternalPosition(uint64_t *positio
     *positionFrames = tempPositionFrames;
     *timeNanos = tempTimeNanos;
     return mHalExternalPositionStatus;
+}
+
+aaudio_result_t AAudioServiceEndpointMMAP::createMmapBuffer(
+        android::base::unique_fd* fileDescriptor)
+{
+    memset(&mMmapBufferinfo, 0, sizeof(struct audio_mmap_buffer_info));
+    int32_t minSizeFrames = getBufferCapacity();
+    if (minSizeFrames <= 0) { // zero will get rejected
+        minSizeFrames = AAUDIO_BUFFER_CAPACITY_MIN;
+    }
+    status_t status = mMmapStream->createMmapBuffer(minSizeFrames, &mMmapBufferinfo);
+    bool isBufferShareable = mMmapBufferinfo.flags & AUDIO_MMAP_APPLICATION_SHAREABLE;
+    if (status != OK) {
+        ALOGE("%s() - createMmapBuffer() failed with status %d %s",
+              __func__, status, strerror(-status));
+        return AAUDIO_ERROR_UNAVAILABLE;
+    } else {
+        ALOGD("%s() createMmapBuffer() buffer_size = %d fr, burst_size %d fr"
+                      ", Sharable FD: %s",
+              __func__,
+              mMmapBufferinfo.buffer_size_frames,
+              mMmapBufferinfo.burst_size_frames,
+              isBufferShareable ? "Yes" : "No");
+    }
+
+    setBufferCapacity(mMmapBufferinfo.buffer_size_frames);
+    if (!isBufferShareable) {
+        // Exclusive mode can only be used by the service because the FD cannot be shared.
+        int32_t audioServiceUid =
+            VALUE_OR_FATAL(legacy2aidl_uid_t_int32_t(getuid()));
+        if ((mMmapClient.attributionSource.uid != audioServiceUid) &&
+            getSharingMode() == AAUDIO_SHARING_MODE_EXCLUSIVE) {
+            ALOGW("%s() - exclusive FD cannot be used by client", __func__);
+            return AAUDIO_ERROR_UNAVAILABLE;
+        }
+    }
+
+    // AAudio creates a copy of this FD and retains ownership of the copy.
+    // Assume that AudioFlinger will close the original shared_memory_fd.
+    fileDescriptor->reset(dup(mMmapBufferinfo.shared_memory_fd));
+    if (fileDescriptor->get() == -1) {
+        ALOGE("%s() - could not dup shared_memory_fd", __func__);
+        return AAUDIO_ERROR_INTERNAL;
+    }
+
+    // Call to HAL to make sure the transport FD was able to be closed by binder.
+    // This is a tricky workaround for a problem in Binder.
+    // TODO:[b/192048842] When that problem is fixed we may be able to remove or change this code.
+    struct audio_mmap_position position;
+    mMmapStream->getMmapPosition(&position);
+
+    mFramesPerBurst = mMmapBufferinfo.burst_size_frames;
+
+    return AAUDIO_OK;
 }

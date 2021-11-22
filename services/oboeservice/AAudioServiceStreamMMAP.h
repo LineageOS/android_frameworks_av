@@ -71,6 +71,10 @@ protected:
 
     aaudio_result_t stop_l() REQUIRES(mLock) override;
 
+    aaudio_result_t standby_l() REQUIRES(mLock) override;
+
+    aaudio_result_t exitStandby_l(AudioEndpointParcelable* parcelable) REQUIRES(mLock) override;
+
     aaudio_result_t getAudioDataDescription_l(
             AudioEndpointParcelable* parcelable) REQUIRES(mLock) override;
 

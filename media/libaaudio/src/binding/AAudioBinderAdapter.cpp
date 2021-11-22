@@ -124,4 +124,16 @@ aaudio_result_t AAudioBinderAdapter::unregisterAudioThread(aaudio_handle_t strea
     return result;
 }
 
+aaudio_result_t AAudioBinderAdapter::exitStandby(aaudio_handle_t streamHandle,
+                                                 AudioEndpointParcelable &endpointOut) {
+    aaudio_result_t result;
+    Endpoint endpoint;
+    Status status = mDelegate->exitStandby(streamHandle, &endpoint, &result);
+    if (!status.isOk()) {
+        result = AAudioConvert_androidToAAudioResult(statusTFromBinderStatus(status));
+    }
+    endpointOut = std::move(endpoint);
+    return result;
+}
+
 }  // namespace aaudio
