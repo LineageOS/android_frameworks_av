@@ -2487,6 +2487,7 @@ size_t EffectChain::removeEffect_l(const sp<IAfEffectModule>& effect,
     size_t size = mEffects.size();
     uint32_t type = effect->desc().flags & EFFECT_FLAG_TYPE_MASK;
 
+    const bool hasThreadAttached = mEffectCallback->hasThreadAttached();
     for (size_t i = 0; i < size; i++) {
         if (effect == mEffects[i]) {
             // calling stop here will remove pre-processing effect from the audio HAL.
@@ -2499,8 +2500,8 @@ size_t EffectChain::removeEffect_l(const sp<IAfEffectModule>& effect,
             if (release) {
                 mEffects[i]->release_l();
             }
-
-            if (type != EFFECT_FLAG_TYPE_AUXILIARY) {
+            // Skip operation when no thread attached (could lead to sigfpe as framecount is 0...)
+            if (hasThreadAttached && type != EFFECT_FLAG_TYPE_AUXILIARY) {
                 if (i == size - 1 && i != 0) {
                     mEffects[i - 1]->configure_l();
                     mEffects[i - 1]->setOutBuffer(mOutBuffer);
@@ -2512,7 +2513,7 @@ size_t EffectChain::removeEffect_l(const sp<IAfEffectModule>& effect,
             // make sure the input buffer configuration for the new first effect in the chain
             // is updated if needed (can switch from HAL channel mask to mixer channel mask)
             if (type != EFFECT_FLAG_TYPE_AUXILIARY // TODO(b/284522658) breaks for aux FX, why?
-                    && i == 0 && size > 1) {
+                    && hasThreadAttached && i == 0 && size > 1) {
                 mEffects[0]->configure_l();
                 mEffects[0]->setInBuffer(mInBuffer);
                 mEffects[0]->updateAccessMode_l();      // reconfig if needed.
