@@ -1225,3 +1225,29 @@ TEST(mediametrics_tests, ValidateId) {
         ASSERT_EQ(id, validateId.validateId(id));
     }
 }
+
+TEST(mediametrics_tests, ErrorConversion) {
+    constexpr status_t errors[] = {
+        NO_ERROR,
+        BAD_VALUE,
+        DEAD_OBJECT,
+        NO_MEMORY,
+        PERMISSION_DENIED,
+        INVALID_OPERATION,
+        WOULD_BLOCK,
+        UNKNOWN_ERROR,
+    };
+
+    auto roundTrip = [](status_t status) {
+        return android::mediametrics::errorStringToStatus(
+                android::mediametrics::statusToErrorString(status));
+    };
+
+    // Primary status error categories.
+    for (const auto error : errors) {
+        ASSERT_EQ(error, roundTrip(error));
+    }
+
+    // Status errors specially considered.
+    ASSERT_EQ(DEAD_OBJECT, roundTrip(FAILED_TRANSACTION));
+}
