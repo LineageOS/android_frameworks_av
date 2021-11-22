@@ -95,7 +95,8 @@ public:
     virtual bool updateOrphanEffectChains(const sp<IAfEffectModule>& effect)
             EXCLUDES_AudioFlinger_Mutex = 0;
     virtual status_t moveEffectChain_ll(audio_session_t sessionId,
-            IAfPlaybackThread* srcThread, IAfPlaybackThread* dstThread)
+            IAfPlaybackThread* srcThread, IAfPlaybackThread* dstThread,
+            IAfEffectChain* srcChain = nullptr)
             REQUIRES(mutex(), audio_utils::ThreadBase_Mutex) = 0;
 
     virtual void requestLogMerge() = 0;
