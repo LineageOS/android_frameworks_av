@@ -1390,6 +1390,9 @@ private:
     std::string mMetricsId;  // GUARDED_BY(mLock), could change in createTrack_l().
     std::string mCallerName; // for example "aaudio"
 
+    // report error to mediametrics.
+    void reportError(status_t status, const char *event, const char *message) const;
+
 private:
     class AudioTrackCallback : public media::BnAudioTrackCallback {
     public:
