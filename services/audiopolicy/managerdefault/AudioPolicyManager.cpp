@@ -4101,7 +4101,7 @@ status_t AudioPolicyManager::createAudioPatchInternal(const struct audio_patch *
                     }
                     if (outputDesc != nullptr) {
                         audio_port_config srcMixPortConfig = {};
-                        outputDesc->toAudioPortConfig(&srcMixPortConfig, &patch->sources[0]);
+                        outputDesc->toAudioPortConfig(&srcMixPortConfig, nullptr);
                         // for volume control, we may need a valid stream
                         srcMixPortConfig.ext.mix.usecase.stream = sourceDesc != nullptr ?
                                     sourceDesc->stream() : AUDIO_STREAM_PATCH;
