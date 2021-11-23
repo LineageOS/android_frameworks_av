@@ -50,6 +50,7 @@ import android.media.audio.common.AudioFormatDescription;
 import android.media.audio.common.AudioMode;
 import android.media.audio.common.AudioProfile;
 import android.media.audio.common.AudioOffloadInfo;
+import android.media.audio.common.AudioPort;
 import android.media.audio.common.AudioSource;
 import android.media.audio.common.AudioStreamType;
 import android.media.audio.common.AudioUsage;
@@ -64,9 +65,8 @@ import android.media.audio.common.Int;
 interface IAudioPolicyService {
     oneway void onNewAudioModulesAvailable();
 
-    void setDeviceConnectionState(in AudioDevice device,
-                                  in AudioPolicyDeviceState state,
-                                  @utf8InCpp String deviceName,
+    void setDeviceConnectionState(in AudioPolicyDeviceState state,
+                                  in android.media.audio.common.AudioPort port,
                                   in AudioFormatDescription encodedFormat);
 
     AudioPolicyDeviceState getDeviceConnectionState(in AudioDevice device);

@@ -30,6 +30,7 @@
 #include <android/media/ISpatializer.h>
 #include <android/media/audio/common/AudioMMapPolicyInfo.h>
 #include <android/media/audio/common/AudioMMapPolicyType.h>
+#include <android/media/audio/common/AudioPort.h>
 #include <media/AidlConversionUtil.h>
 #include <media/AudioContainers.h>
 #include <media/AudioDeviceTypeAddr.h>
@@ -263,8 +264,8 @@ public:
     // IAudioPolicyService interface (see AudioPolicyInterface for method descriptions)
     //
     static void onNewAudioModulesAvailable();
-    static status_t setDeviceConnectionState(audio_devices_t device, audio_policy_dev_state_t state,
-                                             const char *device_address, const char *device_name,
+    static status_t setDeviceConnectionState(audio_policy_dev_state_t state,
+                                             const android::media::audio::common::AudioPort& port,
                                              audio_format_t encodedFormat);
     static audio_policy_dev_state_t getDeviceConnectionState(audio_devices_t device,
                                                                 const char *device_address);

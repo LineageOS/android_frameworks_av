@@ -834,33 +834,18 @@ void AudioSystem::onNewAudioModulesAvailable() {
     aps->onNewAudioModulesAvailable();
 }
 
-status_t AudioSystem::setDeviceConnectionState(audio_devices_t device,
-                                               audio_policy_dev_state_t state,
-                                               const char* device_address,
-                                               const char* device_name,
+status_t AudioSystem::setDeviceConnectionState(audio_policy_dev_state_t state,
+                                               const android::media::audio::common::AudioPort& port,
                                                audio_format_t encodedFormat) {
     const sp<IAudioPolicyService>& aps = AudioSystem::get_audio_policy_service();
-    const char* address = "";
-    const char* name = "";
 
     if (aps == 0) return PERMISSION_DENIED;
 
-    if (device_address != NULL) {
-        address = device_address;
-    }
-    if (device_name != NULL) {
-        name = device_name;
-    }
-
-    AudioDevice deviceAidl = VALUE_OR_RETURN_STATUS(
-            legacy2aidl_audio_device_AudioDevice(device, address));
-
     return statusTFromBinderStatus(
             aps->setDeviceConnectionState(
-                    deviceAidl,
                     VALUE_OR_RETURN_STATUS(
                             legacy2aidl_audio_policy_dev_state_t_AudioPolicyDeviceState(state)),
-                    name,
+                    port,
                     VALUE_OR_RETURN_STATUS(
                             legacy2aidl_audio_format_t_AudioFormatDescription(encodedFormat))));
 }
