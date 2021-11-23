@@ -40,7 +40,7 @@ struct effect_param_cblk_t;
 
 // ----------------------------------------------------------------------------
 
-class AudioEffect : public RefBase
+class AudioEffect : public virtual RefBase
 {
 public:
 

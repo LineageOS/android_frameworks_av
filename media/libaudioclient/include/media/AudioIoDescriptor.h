@@ -39,7 +39,7 @@ enum audio_io_config_event_t {
 
 // audio input/output descriptor used to cache output configurations in client process to avoid
 // frequent calls through IAudioFlinger
-class AudioIoDescriptor : public RefBase {
+class AudioIoDescriptor : public virtual RefBase {
 public:
     AudioIoDescriptor() = default;
     // For AUDIO_{INPUT|OUTPUT}_CLOSED events.
