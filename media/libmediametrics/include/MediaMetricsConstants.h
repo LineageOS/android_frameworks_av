@@ -115,6 +115,19 @@
 #define AMEDIAMETRICS_PROP_DIRECTION      "direction"      // string AAudio input or output
 #define AMEDIAMETRICS_PROP_DURATIONNS     "durationNs"     // int64 duration time span
 #define AMEDIAMETRICS_PROP_ENCODING       "encoding"       // string value of format
+
+// Error statistics
+#define AMEDIAMETRICS_PROP_ERROR          "error#"         // string, empty or one of
+                                                           // AMEDIAMETRICS_PROP_ERROR_VALUE_*
+                                                           // Used for error categorization.
+#define AMEDIAMETRICS_PROP_ERRORSUBCODE   "errorSubCode#"  // int32, specific code for error
+                                                           // used in conjunction with error#.
+#define AMEDIAMETRICS_PROP_ERRORMESSAGE   "errorMessage#"  // string, supplemental to error.
+                                                           // Arbitrary information treated as
+                                                           // informational, may be logcat msg,
+                                                           // or an exception with stack trace.
+                                                           // Treated as "debug" information.
+
 #define AMEDIAMETRICS_PROP_EVENT          "event#"         // string value (often func name)
 #define AMEDIAMETRICS_PROP_EXECUTIONTIMENS "executionTimeNs"  // time to execute the event
 
@@ -214,5 +227,63 @@
 #define AMEDIAMETRICS_PROP_CALLERNAME_VALUE_SOUNDPOOL     "soundpool"      // SoundPool
 #define AMEDIAMETRICS_PROP_CALLERNAME_VALUE_TONEGENERATOR "tonegenerator"  // dial tones
 #define AMEDIAMETRICS_PROP_CALLERNAME_VALUE_UNKNOWN       "unknown"        // callerName not set
+
+// MediaMetrics errors are expected to cover the following sources:
+// https://docs.oracle.com/javase/7/docs/api/java/lang/RuntimeException.html
+// https://docs.oracle.com/javase/7/docs/api/java/lang/Exception.html
+// https://cs.android.com/android/platform/superproject/+/master:frameworks/native/libs/binder/include/binder/Status.h;drc=88e25c0861499ee3ab885814dddc097ab234cb7b;l=57
+// https://cs.android.com/android/platform/superproject/+/master:frameworks/base/media/java/android/media/AudioSystem.java;drc=3ac246c43294d7f7012bdcb0ccb7bae1aa695bd4;l=785
+// https://cs.android.com/android/platform/superproject/+/master:frameworks/av/media/libaaudio/include/aaudio/AAudio.h;drc=cfd3a6fa3aaaf712a890dc02452b38ef401083b8;l=120
+
+// Error category:
+// An empty error string indicates no error.
+
+// Error category: argument
+//   IllegalArgumentException
+//   NullPointerException
+//   BAD_VALUE
+//   Out of range, out of bounds.
+#define AMEDIAMETRICS_PROP_ERROR_VALUE_ARGUMENT           "argument"
+
+// Error category: io
+//   IOException
+//   android.os.DeadObjectException, android.os.RemoteException
+//   DEAD_OBJECT
+//   FAILED_TRANSACTION
+//   IO_ERROR
+//   file or ioctl failure
+//   Service, rpc, binder, or socket failure.
+//   Hardware or device failure.
+#define AMEDIAMETRICS_PROP_ERROR_VALUE_IO                 "io"
+
+// Error category: outOfMemory
+//   OutOfMemoryException
+//   NO_MEMORY
+#define AMEDIAMETRICS_PROP_ERROR_VALUE_MEMORY             "memory"
+
+// Error category: security
+//   SecurityException
+//   PERMISSION_DENIED
+#define AMEDIAMETRICS_PROP_ERROR_VALUE_SECURITY           "security"
+
+// Error category: state
+//   IllegalStateException
+//   UnsupportedOperationException
+//   INVALID_OPERATION
+//   NO_INIT
+//   Functionality not implemented (argument may or may not be correct).
+//   Call unexpected or out of order.
+#define AMEDIAMETRICS_PROP_ERROR_VALUE_STATE              "state"
+
+// Error category: timeout
+//   TimeoutException
+//   WOULD_BLOCK
+#define AMEDIAMETRICS_PROP_ERROR_VALUE_TIMEOUT            "timeout"
+
+// Error category: unknown
+//   Exception (Java specified not listed above, or custom app/service)
+//   UNKNOWN_ERROR
+//   Catch-all bucket for errors not listed above.
+#define AMEDIAMETRICS_PROP_ERROR_VALUE_UNKNOWN            "unknown"
 
 #endif // ANDROID_MEDIA_MEDIAMETRICSCONSTANTS_H
