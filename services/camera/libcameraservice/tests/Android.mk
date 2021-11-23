@@ -19,12 +19,14 @@ LOCAL_SRC_FILES:= $(call all-cpp-files-under, .)
 
 LOCAL_SHARED_LIBRARIES := \
     libbase \
+    libbinder \
     libcutils \
     libcameraservice \
     libhidlbase \
     liblog \
     libcamera_client \
     libcamera_metadata \
+    libgui \
     libui \
     libutils \
     libjpeg \
