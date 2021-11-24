@@ -19,6 +19,7 @@
 #include "TunerHidlFilter.h"
 
 #include <aidl/android/hardware/tv/tuner/Constant.h>
+#include <aidl/android/hardware/tv/tuner/DemuxScIndex.h>
 #include <aidl/android/hardware/tv/tuner/Result.h>
 #include <aidlcommonsupport/NativeHandle.h>
 #include <binder/IPCThreadState.h>
@@ -55,6 +56,7 @@ using ::aidl::android::hardware::tv::tuner::DemuxMmtpFilterSettings;
 using ::aidl::android::hardware::tv::tuner::DemuxMmtpFilterSettingsFilterSettings;
 using ::aidl::android::hardware::tv::tuner::DemuxMmtpFilterType;
 using ::aidl::android::hardware::tv::tuner::DemuxPid;
+using ::aidl::android::hardware::tv::tuner::DemuxScIndex;
 using ::aidl::android::hardware::tv::tuner::DemuxTlvFilterSettings;
 using ::aidl::android::hardware::tv::tuner::DemuxTlvFilterSettingsFilterSettings;
 using ::aidl::android::hardware::tv::tuner::DemuxTsFilterSettings;
@@ -866,16 +868,26 @@ HidlDemuxFilterRecordSettings TunerHidlFilter::getHidlRecordSettings(
         const DemuxFilterRecordSettings& settings) {
     HidlDemuxFilterRecordSettings record{
             .tsIndexMask = static_cast<uint32_t>(settings.tsIndexMask),
-            .scIndexType = static_cast<HidlDemuxRecordScIndexType>(settings.scIndexType),
     };
 
     switch (settings.scIndexMask.getTag()) {
     case DemuxFilterScIndexMask::scIndex: {
+        record.scIndexType = static_cast<HidlDemuxRecordScIndexType>(settings.scIndexType);
         record.scIndexMask.sc(
                 static_cast<uint32_t>(settings.scIndexMask.get<DemuxFilterScIndexMask::scIndex>()));
         break;
     }
+    case DemuxFilterScIndexMask::scAvc: {
+        record.scIndexType = HidlDemuxRecordScIndexType::SC;
+        uint32_t index =
+                static_cast<uint32_t>(settings.scIndexMask.get<DemuxFilterScIndexMask::scAvc>());
+        // HIDL HAL starting from 1 << 4; AIDL starting from 1 << 0.
+        index = index << 4;
+        record.scIndexMask.sc(index);
+        break;
+    }
     case DemuxFilterScIndexMask::scHevc: {
+        record.scIndexType = static_cast<HidlDemuxRecordScIndexType>(settings.scIndexType);
         record.scIndexMask.scHevc(
                 static_cast<uint32_t>(settings.scIndexMask.get<DemuxFilterScIndexMask::scHevc>()));
         break;
@@ -1094,8 +1106,13 @@ void TunerHidlFilter::FilterCallback::getTsRecordEvent(
         DemuxFilterScIndexMask scIndexMask;
         if (tsRecordEvent.scIndexMask.getDiscriminator() ==
             HidlDemuxFilterTsRecordEvent::ScIndexMask::hidl_discriminator::sc) {
-            scIndexMask.set<DemuxFilterScIndexMask::scIndex>(
-                    static_cast<int32_t>(tsRecordEvent.scIndexMask.sc()));
+            int32_t hidlScIndex = static_cast<int32_t>(tsRecordEvent.scIndexMask.sc());
+            if (hidlScIndex <= static_cast<int32_t>(DemuxScIndex::SEQUENCE)) {
+                scIndexMask.set<DemuxFilterScIndexMask::scIndex>(hidlScIndex);
+            } else {
+                // HIDL HAL starting from 1 << 4; AIDL starting from 1 << 0.
+                scIndexMask.set<DemuxFilterScIndexMask::scAvc>(hidlScIndex >> 4);
+            }
         } else if (tsRecordEvent.scIndexMask.getDiscriminator() ==
                    HidlDemuxFilterTsRecordEvent::ScIndexMask::hidl_discriminator::scHevc) {
             scIndexMask.set<DemuxFilterScIndexMask::scHevc>(
