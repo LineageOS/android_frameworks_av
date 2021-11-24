@@ -91,8 +91,8 @@ public:
     ::ndk::ScopedAStatus stop() override;
     ::ndk::ScopedAStatus flush() override;
     ::ndk::ScopedAStatus close() override;
-    ::ndk::ScopedAStatus createSharedFilter(string* _aidl_return) override;
-    ::ndk::ScopedAStatus releaseSharedFilter(const string& in_filterToken) override;
+    ::ndk::ScopedAStatus acquireSharedFilterToken(string* _aidl_return) override;
+    ::ndk::ScopedAStatus freeSharedFilterToken(const string& in_filterToken) override;
     ::ndk::ScopedAStatus getFilterType(DemuxFilterType* _aidl_return) override;
 
     bool isSharedFilterAllowed(int32_t pid);

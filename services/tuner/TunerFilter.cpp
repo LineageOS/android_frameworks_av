@@ -346,7 +346,7 @@ TunerFilter::~TunerFilter() {
     return res;
 }
 
-::ndk::ScopedAStatus TunerFilter::createSharedFilter(string* _aidl_return) {
+::ndk::ScopedAStatus TunerFilter::acquireSharedFilterToken(string* _aidl_return) {
     Mutex::Autolock _l(mLock);
     if (mFilter == nullptr) {
         ALOGE("IFilter is not initialized");
@@ -369,7 +369,7 @@ TunerFilter::~TunerFilter() {
     return ::ndk::ScopedAStatus::ok();
 }
 
-::ndk::ScopedAStatus TunerFilter::releaseSharedFilter(const string& /* in_filterToken */) {
+::ndk::ScopedAStatus TunerFilter::freeSharedFilterToken(const string& /* in_filterToken */) {
     Mutex::Autolock _l(mLock);
     if (mFilter == nullptr) {
         ALOGE("IFilter is not initialized");
