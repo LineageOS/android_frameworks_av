@@ -65,7 +65,7 @@ namespace android {
 
 // ----------------------------------------------------------------------------
 
-class IAudioFlinger : public RefBase {
+class IAudioFlinger : public virtual RefBase {
 public:
     static constexpr char DEFAULT_SERVICE_NAME[] = "media.audio_flinger";
 

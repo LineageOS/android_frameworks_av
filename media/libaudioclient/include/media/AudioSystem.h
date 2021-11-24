@@ -538,7 +538,7 @@ public:
 
 
     // A listener for capture state changes.
-    class CaptureStateListener : public RefBase {
+    class CaptureStateListener : public virtual RefBase {
     public:
         // Called whenever capture state changes.
         virtual void onStateChanged(bool active) = 0;
@@ -563,7 +563,7 @@ public:
 
     // ----------------------------------------------------------------------------
 
-    class AudioVolumeGroupCallback : public RefBase
+    class AudioVolumeGroupCallback : public virtual RefBase
     {
     public:
 
@@ -578,7 +578,7 @@ public:
     static status_t addAudioVolumeGroupCallback(const sp<AudioVolumeGroupCallback>& callback);
     static status_t removeAudioVolumeGroupCallback(const sp<AudioVolumeGroupCallback>& callback);
 
-    class AudioPortCallback : public RefBase
+    class AudioPortCallback : public virtual RefBase
     {
     public:
 
