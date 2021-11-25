@@ -23,6 +23,7 @@
 #include <aidl/android/hardware/tv/tuner/DemuxFilterSettings.h>
 #include <aidl/android/hardware/tv/tuner/DemuxFilterStatus.h>
 #include <aidl/android/hardware/tv/tuner/DemuxFilterType.h>
+#include <aidl/android/hardware/tv/tuner/FilterDelayHint.h>
 #include <aidl/android/hardware/tv/tuner/IFilter.h>
 #include <aidl/android/media/tv/tuner/BnTunerFilter.h>
 #include <aidl/android/media/tv/tuner/ITunerFilterCallback.h>
@@ -37,6 +38,7 @@ using ::aidl::android::hardware::tv::tuner::DemuxFilterEvent;
 using ::aidl::android::hardware::tv::tuner::DemuxFilterSettings;
 using ::aidl::android::hardware::tv::tuner::DemuxFilterStatus;
 using ::aidl::android::hardware::tv::tuner::DemuxFilterType;
+using ::aidl::android::hardware::tv::tuner::FilterDelayHint;
 using ::aidl::android::hardware::tv::tuner::IFilter;
 using ::aidl::android::media::tv::tuner::BnTunerFilter;
 using ::android::Mutex;
@@ -94,6 +96,7 @@ public:
     ::ndk::ScopedAStatus createSharedFilter(string* _aidl_return) override;
     ::ndk::ScopedAStatus releaseSharedFilter(const string& in_filterToken) override;
     ::ndk::ScopedAStatus getFilterType(DemuxFilterType* _aidl_return) override;
+    ::ndk::ScopedAStatus setDelayHint(const FilterDelayHint& in_hint) override;
 
     bool isSharedFilterAllowed(int32_t pid);
     void attachSharedFilterCallback(const shared_ptr<ITunerFilterCallback>& in_cb);

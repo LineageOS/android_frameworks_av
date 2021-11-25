@@ -580,6 +580,12 @@ TunerHidlFilter::~TunerHidlFilter() {
     return ::ndk::ScopedAStatus::ok();
 }
 
+::ndk::ScopedAStatus TunerHidlFilter::setDelayHint(const FilterDelayHint&) {
+    // setDelayHint is not supported in HIDL HAL
+    return ::ndk::ScopedAStatus::fromServiceSpecificError(
+                static_cast<int32_t>(Result::UNAVAILABLE));
+}
+
 bool TunerHidlFilter::isSharedFilterAllowed(int callingPid) {
     return mShared && mClientPid != callingPid;
 }
