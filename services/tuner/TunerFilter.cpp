@@ -405,6 +405,17 @@ TunerFilter::~TunerFilter() {
     return ::ndk::ScopedAStatus::ok();
 }
 
+::ndk::ScopedAStatus TunerFilter::setDelayHint(const FilterDelayHint& in_hint) {
+    Mutex::Autolock _l(mLock);
+    if (mFilter == nullptr) {
+        ALOGE("IFilter is not initialized");
+        return ::ndk::ScopedAStatus::fromServiceSpecificError(
+                static_cast<int32_t>(Result::UNAVAILABLE));
+    }
+
+    return mFilter->setDelayHint(in_hint);
+}
+
 bool TunerFilter::isSharedFilterAllowed(int callingPid) {
     return mShared && mClientPid != callingPid;
 }

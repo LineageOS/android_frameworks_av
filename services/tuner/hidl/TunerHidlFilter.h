@@ -52,6 +52,7 @@ using ::aidl::android::hardware::tv::tuner::DemuxFilterSettings;
 using ::aidl::android::hardware::tv::tuner::DemuxFilterStatus;
 using ::aidl::android::hardware::tv::tuner::DemuxFilterType;
 using ::aidl::android::hardware::tv::tuner::DemuxIpAddressIpAddress;
+using ::aidl::android::hardware::tv::tuner::FilterDelayHint;
 using ::aidl::android::media::tv::tuner::BnTunerFilter;
 using ::aidl::android::media::tv::tuner::ITunerFilterCallback;
 using ::android::Mutex;
@@ -185,6 +186,7 @@ public:
     ::ndk::ScopedAStatus acquireSharedFilterToken(string* _aidl_return) override;
     ::ndk::ScopedAStatus freeSharedFilterToken(const string& in_filterToken) override;
     ::ndk::ScopedAStatus getFilterType(DemuxFilterType* _aidl_return) override;
+    ::ndk::ScopedAStatus setDelayHint(const FilterDelayHint& in_hint) override;
 
     bool isSharedFilterAllowed(int32_t pid);
     void attachSharedFilterCallback(const shared_ptr<ITunerFilterCallback>& in_cb);
