@@ -23,6 +23,7 @@ import android.hardware.tv.tuner.DemuxFilterSettings;
 import android.hardware.tv.tuner.DemuxFilterType;
 import android.hardware.tv.tuner.AvStreamType;
 import android.hardware.tv.tuner.DemuxFilterMonitorEventType;
+import android.hardware.tv.tuner.FilterDelayHint;
 
 /**
  * Tuner Filter interface handles tuner related operations.
@@ -121,4 +122,6 @@ interface ITunerFilter {
      * @return filter type.
      */
     DemuxFilterType getFilterType();
+
+    void setDelayHint(in FilterDelayHint hint);
 }
