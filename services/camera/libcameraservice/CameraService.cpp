@@ -28,6 +28,7 @@
 #include <sys/types.h>
 #include <inttypes.h>
 #include <pthread.h>
+#include <poll.h>
 
 #include <android/hardware/ICamera.h>
 #include <android/hardware/ICameraClient.h>
@@ -4271,6 +4272,11 @@ void CameraService::cacheClientTagDumpIfNeeded(const char *cameraId, BasicClient
 
     if (dumpVector.empty()) { return; }
 
+    const String16 &packageName = client->getPackageName();
+
+    String8 packageName8 = String8(packageName);
+    const char *printablePackageName = packageName8.lockBuffer(packageName.size());
+
     std::string dumpString;
     size_t i = dumpVector.size();
 
@@ -4279,10 +4285,12 @@ void CameraService::cacheClientTagDumpIfNeeded(const char *cameraId, BasicClient
          i--;
          dumpString += cameraId;
          dumpString += ":";
+         dumpString += printablePackageName;
+         dumpString += "  ";
          dumpString += dumpVector[i]; // implicitly ends with '\n'
     }
 
-    const String16 &packageName = client->getPackageName();
+    packageName8.unlockBuffer();
     mWatchedClientsDumpCache[packageName] = dumpString;
 }
 
@@ -4591,7 +4599,7 @@ status_t CameraService::shellCommand(int in, int out, int err, const Vector<Stri
     } else if (args.size() >= 2 && args[0] == String16("set-camera-mute")) {
         return handleSetCameraMute(args);
     } else if (args.size() >= 2 && args[0] == String16("watch")) {
-        return handleWatchCommand(args, out);
+        return handleWatchCommand(args, in, out);
     } else if (args.size() == 1 && args[0] == String16("help")) {
         printHelp(out);
         return OK;
@@ -4738,26 +4746,29 @@ status_t CameraService::handleSetCameraMute(const Vector<String16>& args) {
     return OK;
 }
 
-status_t CameraService::handleWatchCommand(const Vector<String16>& args, int outFd) {
+status_t CameraService::handleWatchCommand(const Vector<String16>& args, int inFd, int outFd) {
     if (args.size() >= 3 && args[1] == String16("start")) {
         return startWatchingTags(args, outFd);
-    } else if (args.size() == 2 && args[1] == String16("dump")) {
-        return camera3::CameraTraces::dump(outFd);
     } else if (args.size() == 2 && args[1] == String16("stop")) {
         return stopWatchingTags(outFd);
-    } else if (args.size() >= 2 && args[1] == String16("print")) {
-        return printWatchedTags(args, outFd);
+    } else if (args.size() == 2 && args[1] == String16("dump")) {
+        return printWatchedTags(outFd);
+    } else if (args.size() >= 2 && args[1] == String16("live")) {
+        return printWatchedTagsUntilInterrupt(args, inFd, outFd);
+    } else if (args.size() == 2 && args[1] == String16("clear")) {
+        return clearCachedMonitoredTagDumps(outFd);
     }
     dprintf(outFd, "Camera service watch commands:\n"
                  "  start -m <comma_separated_tag_list> [-c <comma_separated_client_list>]\n"
                  "        starts watching the provided tags for clients with provided package\n"
                  "        recognizes tag shorthands like '3a'\n"
                  "        watches all clients if no client is passed, or if 'all' is listed\n"
-                 "  dump dumps camera trace\n"
+                 "  dump dumps the monitoring information and exits\n"
                  "  stop stops watching all tags\n"
-                 "  print [-n <refresh_interval_ms>]\n"
+                 "  live [-n <refresh_interval_ms>]\n"
                  "        prints the monitored information in real time\n"
-                 "        Hit Ctrl+C to exit\n");
+                 "        Hit return to exit\n"
+                 "  clear clears all buffers storing information for watch command");
   return BAD_VALUE;
 }
 
@@ -4825,9 +4836,177 @@ status_t CameraService::stopWatchingTags(int outFd) {
     return OK;
 }
 
-status_t CameraService::printWatchedTags(const Vector<String16> &args, int outFd) {
-    // Figure outFd refresh interval, if present in args
-    useconds_t refreshTimeoutMs = 1000; // refresh every 1s by default
+status_t CameraService::clearCachedMonitoredTagDumps(int outFd) {
+    Mutex::Autolock lock(mLogLock);
+    size_t clearedSize = mWatchedClientsDumpCache.size();
+    mWatchedClientsDumpCache.clear();
+    dprintf(outFd, "Cleared tag information of %zu cached clients.\n", clearedSize);
+    return OK;
+}
+
+status_t CameraService::printWatchedTags(int outFd) {
+    Mutex::Autolock logLock(mLogLock);
+    std::set<String16> connectedMonitoredClients;
+
+    bool printedSomething = false; // tracks if any monitoring information was printed
+                                   // (from either cached or active clients)
+
+    bool serviceLock = tryLock(mServiceLock);
+    // get all watched clients that are currently connected
+    for (const auto &clientDescriptor: mActiveClientManager.getAll()) {
+        if (clientDescriptor == nullptr) { continue; }
+
+        sp<BasicClient> client = clientDescriptor->getValue();
+        if (client.get() == nullptr) { continue; }
+        if (!isClientWatchedLocked(client.get())) { continue; }
+
+        std::vector<std::string> dumpVector;
+        client->dumpWatchedEventsToVector(dumpVector);
+
+        size_t printIdx = dumpVector.size();
+        if (printIdx == 0) {
+            continue;
+        }
+
+        // Print tag dumps for active client
+        const String8 &cameraId = clientDescriptor->getKey();
+        String8 packageName8 = String8(client->getPackageName());
+        const char *printablePackageName = packageName8.lockBuffer(packageName8.size());
+        dprintf(outFd, "Client: %s (active)\n", printablePackageName);
+        while(printIdx > 0) {
+            printIdx--;
+            dprintf(outFd, "%s:%s  %s", cameraId.string(), printablePackageName,
+                    dumpVector[printIdx].c_str());
+        }
+        dprintf(outFd, "\n");
+        packageName8.unlockBuffer();
+        printedSomething = true;
+
+        connectedMonitoredClients.emplace(client->getPackageName());
+    }
+    if (serviceLock) { mServiceLock.unlock(); }
+
+    // Print entries in mWatchedClientsDumpCache for clients that are not connected
+    for (const auto &kv: mWatchedClientsDumpCache) {
+        const String16 &package = kv.first;
+        if (connectedMonitoredClients.find(package) != connectedMonitoredClients.end()) {
+            continue;
+        }
+
+        dprintf(outFd, "Client: %s (cached)\n", String8(package).string());
+        dprintf(outFd, "%s\n", kv.second.c_str());
+        printedSomething = true;
+    }
+
+    if (!printedSomething) {
+        dprintf(outFd, "No monitoring information to print.\n");
+    }
+
+    return OK;
+}
+
+// Print all events in vector `events' that came after lastPrintedEvent
+void printNewWatchedEvents(int outFd,
+                           const char *cameraId,
+                           const String16 &packageName,
+                           const std::vector<std::string> &events,
+                           const std::string &lastPrintedEvent) {
+    if (events.empty()) { return; }
+
+    // index of lastPrintedEvent in events.
+    // lastPrintedIdx = events.size() if lastPrintedEvent is not in events
+    size_t lastPrintedIdx;
+    for (lastPrintedIdx = 0;
+         lastPrintedIdx < events.size() && lastPrintedEvent != events[lastPrintedIdx];
+         lastPrintedIdx++);
+
+    if (lastPrintedIdx == 0) { return; } // early exit if no new event in `events`
+
+    String8 packageName8(packageName);
+    const char *printablePackageName = packageName8.lockBuffer(packageName8.size());
+
+    // print events in chronological order (latest event last)
+    size_t idxToPrint = lastPrintedIdx;
+    do {
+        idxToPrint--;
+        dprintf(outFd, "%s:%s  %s", cameraId, printablePackageName, events[idxToPrint].c_str());
+    } while (idxToPrint != 0);
+
+    packageName8.unlockBuffer();
+}
+
+// Returns true if adb shell cmd watch should be interrupted based on data in inFd. The watch
+// command should be interrupted if the user presses the return key, or if user loses any way to
+// signal interrupt.
+// If timeoutMs == 0, this function will always return false
+bool shouldInterruptWatchCommand(int inFd, int outFd, long timeoutMs) {
+    struct timeval startTime;
+    int startTimeError = gettimeofday(&startTime, nullptr);
+    if (startTimeError) {
+        dprintf(outFd, "Failed waiting for interrupt, aborting.\n");
+        return true;
+    }
+
+    const nfds_t numFds = 1;
+    struct pollfd pollFd = { .fd = inFd, .events = POLLIN, .revents = 0 };
+
+    struct timeval currTime;
+    char buffer[2];
+    while(true) {
+        int currTimeError = gettimeofday(&currTime, nullptr);
+        if (currTimeError) {
+            dprintf(outFd, "Failed waiting for interrupt, aborting.\n");
+            return true;
+        }
+
+        long elapsedTimeMs = ((currTime.tv_sec - startTime.tv_sec) * 1000L)
+                + ((currTime.tv_usec - startTime.tv_usec) / 1000L);
+        int remainingTimeMs = (int) (timeoutMs - elapsedTimeMs);
+
+        if (remainingTimeMs <= 0) {
+            // No user interrupt within timeoutMs, don't interrupt watch command
+            return false;
+        }
+
+        int numFdsUpdated = poll(&pollFd, numFds, remainingTimeMs);
+        if (numFdsUpdated < 0) {
+            dprintf(outFd, "Failed while waiting for user input. Exiting.\n");
+            return true;
+        }
+
+        if (numFdsUpdated == 0) {
+            // No user input within timeoutMs, don't interrupt watch command
+            return false;
+        }
+
+        if (!(pollFd.revents & POLLIN)) {
+            dprintf(outFd, "Failed while waiting for user input. Exiting.\n");
+            return true;
+        }
+
+        ssize_t sizeRead = read(inFd, buffer, sizeof(buffer) - 1);
+        if (sizeRead < 0) {
+            dprintf(outFd, "Error reading user input. Exiting.\n");
+            return true;
+        }
+
+        if (sizeRead == 0) {
+            // Reached end of input fd (can happen if input is piped)
+            // User has no way to signal an interrupt, so interrupt here
+            return true;
+        }
+
+        if (buffer[0] == '\n') {
+            // User pressed return, interrupt watch command.
+            return true;
+        }
+    }
+}
+
+status_t CameraService::printWatchedTagsUntilInterrupt(const Vector<String16> &args,
+                                                       int inFd, int outFd) {
+    // Figure out refresh interval, if present in args
+    long refreshTimeoutMs = 1000L; // refresh every 1s by default
     if (args.size() > 2) {
         size_t intervalIdx; // index of '-n'
         for (intervalIdx = 2; intervalIdx < args.size() && String16("-n") != args[intervalIdx];
@@ -4840,105 +5019,49 @@ status_t CameraService::printWatchedTags(const Vector<String16> &args, int outFd
         }
     }
 
-    mLogLock.lock();
-    bool serviceLock = tryLock(mServiceLock);
-    // get all watched clients that are currently connected
-    std::set<String16> connectedMoniterdClients;
-    for (const auto &clientDescriptor: mActiveClientManager.getAll()) {
-        if (clientDescriptor == nullptr) { continue; }
+    // Set min timeout of 10ms. This prevents edge cases in polling when timeout of 0 is passed.
+    refreshTimeoutMs = refreshTimeoutMs < 10 ? 10 : refreshTimeoutMs;
 
-        sp<BasicClient> client = clientDescriptor->getValue();
-        if (client.get() == nullptr) { continue; }
-        if (!isClientWatchedLocked(client.get())) { continue; }
+    dprintf(outFd, "Press return to exit...\n\n");
+    std::map<String16, std::string> packageNameToLastEvent;
 
-        connectedMoniterdClients.emplace(client->getPackageName());
-    }
-    if (serviceLock) { mServiceLock.unlock(); }
-
-    // Print entries in mWatchedClientsDumpCache for clients that are not connected
-    for (const auto &kv: mWatchedClientsDumpCache) {
-        const String16 &package = kv.first;
-        if (connectedMoniterdClients.find(package) != connectedMoniterdClients.end()) {
-            continue;
-        }
-
-        dprintf(outFd, "Client: %s\n", String8(package).string());
-        dprintf(outFd, "%s\n", kv.second.c_str());
-    }
-    mLogLock.unlock();
-
-    if (connectedMoniterdClients.empty()) {
-        dprintf(outFd, "No watched client active.\n");
-        return OK;
-    }
-
-    // For connected watched clients, print monitored tags live
-    return printWatchedTagsUntilInterrupt(refreshTimeoutMs  * 1000, outFd);
-}
-
-status_t CameraService::printWatchedTagsUntilInterrupt(useconds_t refreshMicros, int outFd) {
-    std::unordered_map<std::string, std::string> cameraToLastEvent;
-    auto cameraClients = mActiveClientManager.getAll();
-
-    if (cameraClients.empty()) {
-        dprintf(outFd, "No clients connected.\n");
-        return OK;
-    }
-
-    dprintf(outFd, "Press Ctrl + C to exit...\n\n");
     while (true) {
+        bool serviceLock = tryLock(mServiceLock);
+        auto cameraClients = mActiveClientManager.getAll();
+        if (serviceLock) { mServiceLock.unlock(); }
+
         for (const auto& clientDescriptor : cameraClients) {
             Mutex::Autolock lock(mLogLock);
             if (clientDescriptor == nullptr) { continue; }
-            const char* cameraId = clientDescriptor->getKey().string();
-
-            // This also initializes the map entries with an empty string
-            const std::string& lastPrintedEvent = cameraToLastEvent[cameraId];
 
             sp<BasicClient> client = clientDescriptor->getValue();
             if (client.get() == nullptr) { continue; }
             if (!isClientWatchedLocked(client.get())) { continue; }
 
+            const String16 &packageName = client->getPackageName();
+            // This also initializes the map entries with an empty string
+            const std::string& lastPrintedEvent = packageNameToLastEvent[packageName];
+
             std::vector<std::string> latestEvents;
             client->dumpWatchedEventsToVector(latestEvents);
 
             if (!latestEvents.empty()) {
+                String8 cameraId = clientDescriptor->getKey();
+                const char *printableCameraId = cameraId.lockBuffer(cameraId.size());
                 printNewWatchedEvents(outFd,
-                                      cameraId,
-                                      client->getPackageName(),
+                                      printableCameraId,
+                                      packageName,
                                       latestEvents,
                                       lastPrintedEvent);
-                cameraToLastEvent[cameraId] = latestEvents[0];
+                packageNameToLastEvent[packageName] = latestEvents[0];
+                cameraId.unlockBuffer();
             }
         }
-        usleep(refreshMicros);  // convert ms to us
+        if (shouldInterruptWatchCommand(inFd, outFd, refreshTimeoutMs)) {
+            break;
+        }
     }
     return OK;
-}
-
-void CameraService::printNewWatchedEvents(int outFd,
-                                          const char *cameraId,
-                                          const String16 &packageName,
-                                          const std::vector<std::string> &events,
-                                          const std::string &lastPrintedEvent) {
-    if (events.empty()) { return; }
-
-    // index of lastPrintedEvent in events.
-    // lastPrintedIdx = events.size() if lastPrintedEvent is not in events
-    size_t lastPrintedIdx;
-    for (lastPrintedIdx = 0;
-         lastPrintedIdx < events.size() && lastPrintedEvent != events[lastPrintedIdx];
-         lastPrintedIdx++);
-
-    if (lastPrintedIdx == 0) { return; } // early exit if no new event in `events`
-
-    const char *printPackageName = String8(packageName).string();
-    // print events in chronological order (latest event last)
-    size_t idxToPrint = lastPrintedIdx;
-    do {
-        idxToPrint--;
-        dprintf(outFd, "%s:%s  %s", cameraId, printPackageName, events[idxToPrint].c_str());
-    } while (idxToPrint != 0);
 }
 
 void CameraService::parseClientsToWatchLocked(String8 clients) {
@@ -4977,7 +5100,7 @@ status_t CameraService::printHelp(int out) {
         "      Valid values 0=OFF, 1=ON for JPEG\n"
         "  get-image-dump-mask returns the current image-dump-mask value\n"
         "  set-camera-mute <0/1> enable or disable camera muting\n"
-        "  watch <start|stop|dump|live> manages tag monitoring in connected clients\n"
+        "  watch <start|stop|dump|print|clear> manages tag monitoring in connected clients\n"
         "  help print this message\n");
 }
 
