@@ -1348,6 +1348,7 @@ public:
     sp<IAudioTrackCallback> mLegacyCallbackWrapper;      // wrapper for legacy callback interface
     // for notification APIs
 
+    bool                    mInitialized = false;   // Set after track is initialized
     // next 2 fields are const after constructor or set()
     uint32_t                mNotificationFramesReq; // requested number of frames between each
                                                     // notification callback,
