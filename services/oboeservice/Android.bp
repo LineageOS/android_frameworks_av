@@ -70,6 +70,7 @@ cc_library {
         "framework-permission-aidl-cpp",
         "libaudioclient_aidl_conversion",
         "packagemanager_aidl-cpp",
+        "android.media.audio.common.types-V1-cpp",
     ],
 
     export_shared_lib_headers: [
