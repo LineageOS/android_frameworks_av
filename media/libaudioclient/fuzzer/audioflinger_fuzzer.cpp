@@ -232,7 +232,7 @@ void AudioFlingerFuzzer::invokeAudioTrack() {
     attributionSource.pid = VALUE_OR_FATAL(legacy2aidl_pid_t_int32_t(getpid()));
     attributionSource.token = sp<BBinder>::make();
     track->set(AUDIO_STREAM_DEFAULT, sampleRate, format, channelMask, frameCount, flags, nullptr,
-               nullptr, notificationFrames, sharedBuffer, false, sessionId,
+               notificationFrames, sharedBuffer, false, sessionId,
                ((fast && sharedBuffer == 0) || offload) ? AudioTrack::TRANSFER_CALLBACK
                                                         : AudioTrack::TRANSFER_DEFAULT,
                offload ? &offloadInfo : nullptr, attributionSource, &attributes, false, 1.0f,
