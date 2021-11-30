@@ -2217,8 +2217,7 @@ status_t MediaPlayerService::AudioOutput::open(
                     channelMask,
                     frameCount,
                     flags,
-                    NULL, // callback
-                    NULL, // user data
+                    nullptr, // callback
                     0, // notification frames
                     mSessionId,
                     AudioTrack::TRANSFER_DEFAULT,
