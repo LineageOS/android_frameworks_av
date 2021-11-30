@@ -1172,7 +1172,7 @@ private:
     status_t handleSetCameraMute(const Vector<String16>& args);
 
     // Handle 'watch' command as passed through 'cmd'
-    status_t handleWatchCommand(const Vector<String16> &args, int outFd);
+    status_t handleWatchCommand(const Vector<String16> &args, int inFd, int outFd);
 
     // Enable tag monitoring of the given tags in provided clients
     status_t startWatchingTags(const Vector<String16> &args, int outFd);
@@ -1180,20 +1180,16 @@ private:
     // Disable tag monitoring
     status_t stopWatchingTags(int outFd);
 
+    // Clears mWatchedClientsDumpCache
+    status_t clearCachedMonitoredTagDumps(int outFd);
+
     // Print events of monitored tags in all cached and attached clients
-    status_t printWatchedTags(const Vector<String16> &args, int outFd);
+    status_t printWatchedTags(int outFd);
 
     // Print events of monitored tags in all attached clients as they are captured. New events are
-    // fetched every `refreshMicros` us
-    // NOTE: This function does not terminate unless interrupted.
-    status_t printWatchedTagsUntilInterrupt(useconds_t refreshMicros, int outFd);
-
-    // Print all events in vector `events' that came after lastPrintedEvent
-    static void printNewWatchedEvents(int outFd,
-                                      const char *cameraId,
-                                      const String16 &packageName,
-                                      const std::vector<std::string> &events,
-                                      const std::string &lastPrintedEvent);
+    // fetched every `refreshMillis` ms
+    // NOTE: This function does not terminate until user passes '\n' to inFd.
+    status_t printWatchedTagsUntilInterrupt(const Vector<String16> &args, int inFd, int outFd);
 
     // Parses comma separated clients list and adds them to mWatchedClientPackages.
     // Does not acquire mLogLock before modifying mWatchedClientPackages. It is the caller's
