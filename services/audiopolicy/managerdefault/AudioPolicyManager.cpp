@@ -3568,7 +3568,7 @@ status_t AudioPolicyManager::removeUserIdDeviceAffinities(int userId) {
 void AudioPolicyManager::dump(String8 *dst) const
 {
     dst->appendFormat("\nAudioPolicyManager Dump: %p\n", this);
-    dst->appendFormat(" Primary Output: %d\n",
+    dst->appendFormat(" Primary Output I/O handle: %d\n",
              hasPrimaryOutput() ? mPrimaryOutput->mIoHandle : AUDIO_IO_HANDLE_NONE);
     std::string stateLiteral;
     AudioModeConverter::toString(mEngine->getPhoneState(), stateLiteral);
@@ -3593,8 +3593,8 @@ void AudioPolicyManager::dump(String8 *dst) const
     dst->appendFormat(" Communnication Strategy: %d\n", mCommunnicationStrategy);
     dst->appendFormat(" Config source: %s\n", mConfig.getSource().c_str()); // getConfig not const
 
-    mAvailableOutputDevices.dump(dst, String8("Available output"));
-    mAvailableInputDevices.dump(dst, String8("Available input"));
+    mAvailableOutputDevices.dump(dst, String8("\n Available output"));
+    mAvailableInputDevices.dump(dst, String8("\n Available input"));
     mHwModulesAll.dump(dst);
     mOutputs.dump(dst);
     mInputs.dump(dst);

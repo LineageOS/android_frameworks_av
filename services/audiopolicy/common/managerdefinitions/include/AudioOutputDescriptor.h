@@ -149,7 +149,7 @@ public:
                           AudioPolicyClientInterface *clientInterface);
     virtual ~AudioOutputDescriptor() {}
 
-    void dump(String8 *dst) const override;
+    void dump(String8 *dst, int spaces, const char* extraInfo = nullptr) const override;
     void        log(const char* indent);
 
     virtual DeviceVector devices() const { return mDevices; }
@@ -336,7 +336,7 @@ public:
                             AudioPolicyClientInterface *clientInterface);
     virtual ~SwAudioOutputDescriptor() {}
 
-            void dump(String8 *dst) const override;
+    void dump(String8 *dst, int spaces, const char* extraInfo = nullptr) const override;
     virtual DeviceVector devices() const;
     void setDevices(const DeviceVector &devices) { mDevices = devices; }
     bool sharesHwModuleWith(const sp<SwAudioOutputDescriptor>& outputDesc);
@@ -441,7 +441,7 @@ public:
                             AudioPolicyClientInterface *clientInterface);
     virtual ~HwAudioOutputDescriptor() {}
 
-            void dump(String8 *dst) const override;
+    void dump(String8 *dst, int spaces, const char* extraInfo) const override;
 
     virtual bool setVolume(float volumeDb,
                            VolumeSource volumeSource, const StreamTypeVector &streams,

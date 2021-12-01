@@ -180,7 +180,7 @@ void DeviceDescriptor::dump(String8 *dst, int spaces, int index, bool verbose) c
 {
     String8 extraInfo;
     if (!mTagName.empty()) {
-        extraInfo.appendFormat("%*s- tag name: %s\n", spaces, "", mTagName.c_str());
+        extraInfo.appendFormat("\"%s\"", mTagName.c_str());
     }
 
     std::string descBaseDumpStr;
@@ -447,7 +447,7 @@ void DeviceVector::dump(String8 *dst, const String8 &tag, int spaces, bool verbo
     if (isEmpty()) {
         return;
     }
-    dst->appendFormat("%*s- %s devices:\n", spaces, "", tag.string());
+    dst->appendFormat("%*s%s devices (%zu):\n", spaces, "", tag.string(), size());
     for (size_t i = 0; i < size(); i++) {
         itemAt(i)->dump(dst, spaces + 2, i, verbose);
     }
