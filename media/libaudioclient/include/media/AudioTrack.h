@@ -150,46 +150,74 @@ public:
     class IAudioTrackCallback : public virtual RefBase {
       friend AudioTrack;
       protected:
-        // Request to write more data to buffer.
-        // This event only occurs for TRANSFER_CALLBACK.
-        // If this event is delivered but the callback handler does not want to write more data,
-        // the handler must ignore the event by returning zero.
-        // This might occur, for example, if the application is waiting for source data or is at
-        // the end of stream.
-        // For data filling, it is preferred that the callback does not block and instead returns
-        // a short count of the amount of data actually delivered.
-        // buffer: Buffer to fill
-        virtual size_t onMoreData(const AudioTrack::Buffer& buffer) { return buffer.size; }
+       /* Request to write more data to buffer.
+        * This event only occurs for TRANSFER_CALLBACK.
+        * If this event is delivered but the callback handler does not want to write more data,
+        * the handler must ignore the event by returning zero.
+        * This might occur, for example, if the application is waiting for source data or is at
+        * the end of stream.
+        * For data filling, it is preferred that the callback does not block and instead returns
+        * a short count of the amount of data actually delivered.
+        * Parameters:
+        *  - buffer: Buffer to fill
+        * Returns:
+        * Amount of data actually written in bytes.
+        */
+        virtual size_t onMoreData([[maybe_unused]] const AudioTrack::Buffer& buffer) { return 0; }
+
         // Buffer underrun occurred. This will not occur for static tracks.
         virtual void onUnderrun() {}
-        // Sample loop end was reached; playback restarted from loop start if loop count was not 0
-        // for a static track.
-        // loopsRemaining: Number of loops remaining to be played. -1 if infinite looping.
+
+       /* Sample loop end was reached; playback restarted from loop start if loop count was not 0
+        * for a static track.
+        * Parameters:
+        *  - loopsRemaining: Number of loops remaining to be played. -1 if infinite looping.
+        */
         virtual void onLoopEnd([[maybe_unused]] int32_t loopsRemaining) {}
-        // Playback head is at the specified marker (See setMarkerPosition()).
-        // onMarker: Marker position in frames
+
+       /* Playback head is at the specified marker (See setMarkerPosition()).
+        * Parameters:
+        *  - onMarker: Marker position in frames
+        */
         virtual void onMarker([[maybe_unused]] uint32_t markerPosition) {}
-        // Playback head is at a new position (See setPositionUpdatePeriod()).
-        // newPos: New position in frames
+
+       /* Playback head is at a new position (See setPositionUpdatePeriod()).
+        * Parameters:
+        *  - newPos: New position in frames
+        */
         virtual void onNewPos([[maybe_unused]] uint32_t newPos) {}
+
         // Playback has completed for a static track.
         virtual void onBufferEnd() {}
+
         // IAudioTrack was re-created, either due to re-routing and voluntary invalidation
         // by mediaserver, or mediaserver crash.
         virtual void onNewIAudioTrack() {}
+
         // Sent after all the buffers queued in AF and HW are played back (after stop is called)
         // for an offloaded track.
         virtual void onStreamEnd() {}
-        // Delivered periodically and when there's a significant change
-        // in the mapping from frame position to presentation time.
-        // See AudioTimestamp for the information included with event.
-        // TODO not yet implemented.
+
+       /* Delivered periodically and when there's a significant change
+        * in the mapping from frame position to presentation time.
+        * See AudioTimestamp for the information included with event.
+        * TODO not yet implemented.
+        * Parameters:
+        *  - timestamp: New frame position and presentation time mapping.
+        */
         virtual void onNewTimestamp([[maybe_unused]] AudioTimestamp timestamp) {}
-        // Notification that more data can be given by write()
-        // This event only occurs for TRANSFER_SYNC_NOTIF_CALLBACK.
-        // Similar to onMoreData(), return the number of frames actually written
-        // buffer: Buffer to fill
-        virtual size_t onCanWriteMoreData(const AudioTrack::Buffer& buffer) { return buffer.size; }
+
+       /* Notification that more data can be given by write()
+        * This event only occurs for TRANSFER_SYNC_NOTIF_CALLBACK.
+        * Similar to onMoreData(), return the number of frames actually written
+        * Parameters:
+        *  - buffer: Buffer to fill
+        * Returns:
+        * Amount of data actually written in bytes.
+        */
+        virtual size_t onCanWriteMoreData([[maybe_unused]] const AudioTrack::Buffer& buffer) {
+            return 0;
+        }
     };
 
     /* Returns the minimum frame count required for the successful creation of
