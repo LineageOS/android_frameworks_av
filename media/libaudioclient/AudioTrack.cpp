@@ -353,8 +353,8 @@ void AudioTrack::stopAndJoinCallbacks() {
     // Otherwise the callback thread will never exit.
     stop();
     if (mAudioTrackThread != 0) { // not thread safe
-        mProxy->interrupt();
         mAudioTrackThread->requestExit();   // see comment in AudioTrack.h
+        mProxy->interrupt();
         mAudioTrackThread->requestExitAndWait();
         mAudioTrackThread.clear();
     }
