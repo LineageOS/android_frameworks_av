@@ -15,13 +15,24 @@
         },
         {
           "exclude-annotation": "android.platform.test.annotations.RequiresDevice"
+        }
+      ]
+    },
+    {
+      "name": "CtsMediaAudioTestCases",
+      "options": [
+        {
+          "include-annotation": "android.platform.test.annotations.Presubmit"
+        },
+        {
+          "exclude-annotation": "android.platform.test.annotations.RequiresDevice"
         },
         // TODO: b/149314419
         {
-          "exclude-filter": "android.media.cts.AudioPlaybackCaptureTest"
+          "exclude-filter": "android.media.audio.cts.AudioPlaybackCaptureTest"
         },
         {
-          "exclude-filter": "android.media.cts.AudioRecordTest"
+          "exclude-filter": "android.media.audio.cts.AudioRecordTest"
         }
       ]
     }
