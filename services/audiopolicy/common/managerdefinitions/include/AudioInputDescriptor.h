@@ -54,7 +54,7 @@ public:
     DeviceVector supportedDevices() const  {
         return mProfile != nullptr ? mProfile->getSupportedDevices() :  DeviceVector(); }
 
-    void dump(String8 *dst) const override;
+    void dump(String8 *dst, int spaces, const char* extraInfo) const override;
 
     audio_io_handle_t   mIoHandle = AUDIO_IO_HANDLE_NONE; // input handle
     wp<AudioPolicyMix>  mPolicyMix;                   // non NULL when used by a dynamic policy

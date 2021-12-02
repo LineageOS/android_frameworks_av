@@ -69,7 +69,7 @@ public:
     void setDynamicFormat(bool dynamic) { mIsDynamicFormat = dynamic; }
     bool isDynamicFormat() const { return mIsDynamicFormat; }
 
-    bool isDynamic() { return mIsDynamicFormat || mIsDynamicChannels || mIsDynamicRate; }
+    bool isDynamic() const { return mIsDynamicFormat || mIsDynamicChannels || mIsDynamicRate; }
 
     audio_encapsulation_type_t getEncapsulationType() const { return mEncapsulationType; }
     void setEncapsulationType(audio_encapsulation_type_t encapsulationType) {

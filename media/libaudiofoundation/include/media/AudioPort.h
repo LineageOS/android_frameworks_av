@@ -111,7 +111,8 @@ public:
                         ((mFlags.input & AUDIO_INPUT_FLAG_MMAP_NOIRQ) != 0)));
     }
 
-    void dump(std::string *dst, int spaces, bool verbose = true) const;
+    void dump(std::string *dst, int spaces,
+              const char* extraInfo = nullptr, bool verbose = true) const;
 
     void log(const char* indent) const;
 
