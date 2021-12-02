@@ -70,7 +70,7 @@ static const std::unordered_map<std::string, int32_t>& getErrorStringMap() {
 
 status_t errorStringToStatus(const char *error) {
     const auto& map = getErrorStringMap();
-    if (error == nullptr || error == "") return NO_ERROR;
+    if (error == nullptr || error[0] == '\0') return NO_ERROR;
     auto it = map.find(error);
     if (it != map.end()) {
         return it->second;
