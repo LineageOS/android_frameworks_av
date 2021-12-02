@@ -182,7 +182,7 @@ ACameraMetadata::filterDurations(uint32_t tag) {
         int64_t format = entry.data.i64[i + STREAM_FORMAT_OFFSET];
         int64_t width = entry.data.i64[i + STREAM_WIDTH_OFFSET];
         int64_t height = entry.data.i64[i + STREAM_HEIGHT_OFFSET];
-        int64_t duration = entry.data.i32[i + STREAM_DURATION_OFFSET];
+        int64_t duration = entry.data.i64[i + STREAM_DURATION_OFFSET];
 
         // Leave the unfiltered format in so apps depending on previous wrong
         // filter behavior continue to work
