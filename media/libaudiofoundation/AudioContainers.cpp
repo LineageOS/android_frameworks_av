@@ -70,48 +70,34 @@ const DeviceTypeSet& getAudioDeviceOutAllBleSet() {
     return audioDeviceOutAllBleSet;
 }
 
-bool deviceTypesToString(const DeviceTypeSet &deviceTypes, std::string &str) {
+std::string deviceTypesToString(const DeviceTypeSet &deviceTypes) {
     if (deviceTypes.empty()) {
-        str = "Empty device types";
-        return true;
+        return "Empty device types";
     }
-    bool ret = true;
-    for (auto it = deviceTypes.begin(); it != deviceTypes.end();) {
-        std::string deviceTypeStr;
-        ret = audio_is_output_device(*it) ?
-              OutputDeviceConverter::toString(*it, deviceTypeStr) :
-              InputDeviceConverter::toString(*it, deviceTypeStr);
-        if (!ret) {
-            break;
+    std::stringstream ss;
+    for (auto it = deviceTypes.begin(); it != deviceTypes.end(); ++it) {
+        if (it != deviceTypes.begin()) {
+            ss << ", ";
         }
-        str.append(deviceTypeStr);
-        if (++it != deviceTypes.end()) {
-            str.append(" , ");
+        const char* strType = audio_device_to_string(*it);
+        if (strlen(strType) != 0) {
+            ss << strType;
+        } else {
+            ss << "unknown type:0x" << std::hex << *it;
         }
     }
-    if (!ret) {
-        str = "Unknown values";
-    }
-    return ret;
+    return ss.str();
 }
 
 std::string dumpDeviceTypes(const DeviceTypeSet &deviceTypes) {
-    std::string ret;
-    for (auto it = deviceTypes.begin(); it != deviceTypes.end();) {
-        std::stringstream ss;
-        ss << "0x" << std::hex << (*it);
-        ret.append(ss.str());
-        if (++it != deviceTypes.end()) {
-            ret.append(" , ");
+    std::stringstream ss;
+    for (auto it = deviceTypes.begin(); it != deviceTypes.end(); ++it) {
+        if (it != deviceTypes.begin()) {
+            ss << ", ";
         }
+        ss << "0x" << std::hex << (*it);
     }
-    return ret;
-}
-
-std::string toString(const DeviceTypeSet& deviceTypes) {
-    std::string ret;
-    deviceTypesToString(deviceTypes, ret);
-    return ret;
+    return ss.str();
 }
 
 } // namespace android

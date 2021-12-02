@@ -121,8 +121,7 @@ void DeviceDescriptorBase::dump(std::string *dst, int spaces, int index,
     if (extraInfo != nullptr) {
         dst->append(base::StringPrintf("%s; ", extraInfo));
     }
-    dst->append(base::StringPrintf("%s (%s)\n",
-                    audio_device_to_string(mDeviceTypeAddr.mType),
+    dst->append(base::StringPrintf("{%s}\n",
                     mDeviceTypeAddr.toString(true /*includeSensitiveInfo*/).c_str()));
 
     dst->append(base::StringPrintf(
