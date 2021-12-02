@@ -255,32 +255,35 @@ void AudioOutputDescriptor::dump(String8 *dst, int spaces, const char* extraInfo
             devices().toString(true /*includeSensitiveInfo*/).c_str());
     dst->appendFormat("%*sGlobal active count: %u\n", spaces, "", mGlobalActiveCount);
     if (!mRoutingActivities.empty()) {
-        dst->appendFormat("%*sProduct Strategies (%zu):\n", spaces, "", mRoutingActivities.size());
+        dst->appendFormat("%*s- Product Strategies (%zu):\n", spaces - 2, "",
+                mRoutingActivities.size());
         for (const auto &iter : mRoutingActivities) {
             dst->appendFormat("%*sid %d: ", spaces + 1, "", iter.first);
             iter.second.dump(dst, 0);
         }
     }
     if (!mVolumeActivities.empty()) {
-        dst->appendFormat("%*sVolume Activities (%zu):\n", spaces, "", mVolumeActivities.size());
+        dst->appendFormat("%*s- Volume Activities (%zu):\n", spaces - 2, "",
+                mVolumeActivities.size());
         for (const auto &iter : mVolumeActivities) {
             dst->appendFormat("%*sid %d: ", spaces + 1, "", iter.first);
             iter.second.dump(dst, 0);
         }
     }
     if (getClientCount() != 0) {
-        dst->appendFormat("%*sAudioTrack Clients (%zu):\n", spaces, "", getClientCount());
+        dst->appendFormat("%*s- AudioTrack clients (%zu):\n", spaces - 2, "", getClientCount());
         ClientMapHandler<TrackClientDescriptor>::dump(dst, spaces);
-        dst->append("\n");
     }
     if (!mActiveClients.empty()) {
-        dst->appendFormat("%*sAudioTrack active (stream) clients (%zu):\n", spaces, "",
+        dst->appendFormat("%*s- AudioTrack active (stream) clients (%zu):\n", spaces - 2, "",
                 mActiveClients.size());
         size_t index = 0;
         for (const auto& client : mActiveClients) {
-            client->dump(dst, spaces, index++);
+            const std::string prefix = base::StringPrintf(
+                    "%*sid %zu: ", spaces + 1, "", index + 1);
+            dst->appendFormat("%s", prefix.c_str());
+            client->dump(dst, prefix.size());
         }
-        dst->append("\n");
     }
 }
 
@@ -708,7 +711,7 @@ void HwAudioOutputDescriptor::dump(String8 *dst, int spaces, const char* extraIn
 {
     AudioOutputDescriptor::dump(dst, spaces, extraInfo);
     dst->appendFormat("%*sSource:\n", spaces, "");
-    mSource->dump(dst, spaces, 0);
+    mSource->dump(dst, spaces);
 }
 
 void HwAudioOutputDescriptor::toAudioPortConfig(

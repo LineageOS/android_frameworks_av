@@ -255,7 +255,7 @@ void HwModule::dump(String8 *dst, int spaces) const
     if (mOutputProfiles.size()) {
         dst->appendFormat("%*s- Output MixPorts (%zu):\n", spaces - 2, "", mOutputProfiles.size());
         for (size_t i = 0; i < mOutputProfiles.size(); i++) {
-            const std::string prefix = base::StringPrintf("%*s%zu. ", spaces, "", i + 1);
+            const std::string prefix = base::StringPrintf("%*s %zu. ", spaces, "", i + 1);
             dst->append(prefix.c_str());
             mOutputProfiles[i]->dump(dst, prefix.size());
         }
@@ -263,7 +263,7 @@ void HwModule::dump(String8 *dst, int spaces) const
     if (mInputProfiles.size()) {
         dst->appendFormat("%*s- Input MixPorts (%zu):\n", spaces - 2, "", mInputProfiles.size());
         for (size_t i = 0; i < mInputProfiles.size(); i++) {
-            const std::string prefix = base::StringPrintf("%*s%zu. ", spaces, "", i + 1);
+            const std::string prefix = base::StringPrintf("%*s %zu. ", spaces, "", i + 1);
             dst->append(prefix.c_str());
             mInputProfiles[i]->dump(dst, prefix.size());
         }

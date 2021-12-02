@@ -110,11 +110,9 @@ status_t DeviceDescriptorBase::setEncapsulationMetadataTypes(uint32_t encapsulat
     return NO_ERROR;
 }
 
-void DeviceDescriptorBase::dump(std::string *dst, int spaces, int index,
+void DeviceDescriptorBase::dump(std::string *dst, int spaces,
                                 const char* extraInfo, bool verbose) const
 {
-    const std::string prefix = base::StringPrintf("%*s %d. ", spaces, "", index + 1);
-    dst->append(prefix);
     if (mId != 0) {
         dst->append(base::StringPrintf("Port ID: %d; ", mId));
     }
@@ -125,11 +123,10 @@ void DeviceDescriptorBase::dump(std::string *dst, int spaces, int index,
                     mDeviceTypeAddr.toString(true /*includeSensitiveInfo*/).c_str()));
 
     dst->append(base::StringPrintf(
-                    "%*sEncapsulation modes: %u, metadata types: %u\n",
-                    static_cast<int>(prefix.size()), "",
+                    "%*sEncapsulation modes: %u, metadata types: %u\n", spaces, "",
                     mEncapsulationModes, mEncapsulationMetadataTypes));
 
-    AudioPort::dump(dst, prefix.size(), nullptr, verbose);
+    AudioPort::dump(dst, spaces, nullptr, verbose);
 }
 
 std::string DeviceDescriptorBase::toString(bool includeSensitiveInfo) const

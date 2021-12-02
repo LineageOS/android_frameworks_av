@@ -675,7 +675,7 @@ status_t AudioPolicyMixCollection::getDevicesForUserId(int userId,
 
 void AudioPolicyMixCollection::dump(String8 *dst) const
 {
-    dst->append("\nAudio Policy Mix:\n");
+    dst->append("\n Audio Policy Mix:\n");
     for (size_t i = 0; i < size(); i++) {
         itemAt(i)->dump(dst, 2, i);
     }

@@ -39,7 +39,7 @@ static void dumpPatchEndpoints(
 {
     for (int i = 0; i < count; ++i) {
         const audio_port_config &cfg = cfgs[i];
-        dst->appendFormat("%*s  [%s %d] ", spaces, "", prefix, i + 1);
+        dst->appendFormat("%*s[%s %d] ", spaces, "", prefix, i + 1);
         if (cfg.type == AUDIO_PORT_TYPE_DEVICE) {
             AudioDeviceTypeAddr device(cfg.ext.device.type, cfg.ext.device.address);
             dst->appendFormat("Device Port ID: %d; {%s}",
@@ -138,9 +138,9 @@ status_t AudioPatchCollection::listAudioPatches(unsigned int *num_patches,
 
 void AudioPatchCollection::dump(String8 *dst) const
 {
-    dst->appendFormat("\nAudio Patches (%zu):\n", size());
+    dst->appendFormat("\n Audio Patches (%zu):\n", size());
     for (size_t i = 0; i < size(); i++) {
-        const std::string prefix = base::StringPrintf(" %zu. ", i + 1);
+        const std::string prefix = base::StringPrintf("  %zu. ", i + 1);
         dst->appendFormat("%s", prefix.c_str());
         valueAt(i)->dump(dst, prefix.size());
     }

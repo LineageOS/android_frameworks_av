@@ -91,7 +91,7 @@ public:
 
     void setEncapsulationInfoFromHal(AudioPolicyClientInterface *clientInterface);
 
-    void dump(String8 *dst, int spaces, int index, bool verbose = true) const;
+    void dump(String8 *dst, int spaces, bool verbose = true) const;
 
 private:
     template <typename T, std::enable_if_t<std::is_same<T, struct audio_port>::value
