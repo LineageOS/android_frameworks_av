@@ -99,18 +99,14 @@ void AudioProfile::clear()
 
 void AudioProfile::dump(std::string *dst, int spaces) const
 {
-    dst->append(base::StringPrintf("%s%s%s\n", mIsDynamicFormat ? "[dynamic format]" : "",
+    dst->append(base::StringPrintf("\"%s\"; ", mName.c_str()));
+    dst->append(base::StringPrintf("%s%s%s%s", mIsDynamicFormat ? "[dynamic format]" : "",
              mIsDynamicChannels ? "[dynamic channels]" : "",
-             mIsDynamicRate ? "[dynamic rates]" : ""));
-    if (mName.length() != 0) {
-        dst->append(base::StringPrintf("%*s- name: %s\n", spaces, "", mName.c_str()));
-    }
-    std::string formatLiteral;
-    if (FormatConverter::toString(mFormat, formatLiteral)) {
-        dst->append(base::StringPrintf("%*s- format: %s\n", spaces, "", formatLiteral.c_str()));
-    }
+             mIsDynamicRate ? "[dynamic rates]" : "", isDynamic() ? "; " : ""));
+    dst->append(base::StringPrintf("%s (0x%x)\n", audio_format_to_string(mFormat), mFormat));
+
     if (!mSamplingRates.empty()) {
-        dst->append(base::StringPrintf("%*s- sampling rates:", spaces, ""));
+        dst->append(base::StringPrintf("%*ssampling rates: ", spaces, ""));
         for (auto it = mSamplingRates.begin(); it != mSamplingRates.end();) {
             dst->append(base::StringPrintf("%d", *it));
             dst->append(++it == mSamplingRates.end() ? "" : ", ");
@@ -119,7 +115,7 @@ void AudioProfile::dump(std::string *dst, int spaces) const
     }
 
     if (!mChannelMasks.empty()) {
-        dst->append(base::StringPrintf("%*s- channel masks:", spaces, ""));
+        dst->append(base::StringPrintf("%*schannel masks: ", spaces, ""));
         for (auto it = mChannelMasks.begin(); it != mChannelMasks.end();) {
             dst->append(base::StringPrintf("0x%04x", *it));
             dst->append(++it == mChannelMasks.end() ? "" : ", ");
@@ -128,7 +124,7 @@ void AudioProfile::dump(std::string *dst, int spaces) const
     }
 
     dst->append(base::StringPrintf(
-            "%*s- encapsulation type: %#x\n", spaces, "", mEncapsulationType));
+             "%*s%s\n", spaces, "", audio_encapsulation_type_to_string(mEncapsulationType)));
 }
 
 bool AudioProfile::equals(const sp<AudioProfile>& other) const
@@ -321,11 +317,12 @@ bool AudioProfileVector::contains(const sp<AudioProfile>& profile) const
 
 void AudioProfileVector::dump(std::string *dst, int spaces) const
 {
-    dst->append(base::StringPrintf("%*s- Profiles:\n", spaces, ""));
+    dst->append(base::StringPrintf("%*s- Profiles (%zu):\n", spaces - 2, "", size()));
     for (size_t i = 0; i < size(); i++) {
-        dst->append(base::StringPrintf("%*sProfile %zu:", spaces + 4, "", i));
+        const std::string prefix = base::StringPrintf("%*s%zu. ", spaces + 1, "", i + 1);
+        dst->append(prefix);
         std::string profileStr;
-        at(i)->dump(&profileStr, spaces + 8);
+        at(i)->dump(&profileStr, prefix.size());
         dst->append(profileStr);
     }
 }

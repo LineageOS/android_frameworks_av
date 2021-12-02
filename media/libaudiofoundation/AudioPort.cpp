@@ -162,9 +162,16 @@ void AudioPort::toAudioPort(struct audio_port_v7 *port) const {
     }
 }
 
-void AudioPort::dump(std::string *dst, int spaces, bool verbose) const {
+void AudioPort::dump(std::string *dst, int spaces, const char* extraInfo, bool verbose) const {
     if (!mName.empty()) {
-        dst->append(base::StringPrintf("%*s- name: %s\n", spaces, "", mName.c_str()));
+        dst->append(base::StringPrintf("\"%s\"%s", mName.c_str(),
+                        extraInfo != nullptr ? "; " : ""));
+    }
+    if (extraInfo != nullptr) {
+        dst->append(base::StringPrintf("%s", extraInfo));
+    }
+    if (!mName.empty() || extraInfo != nullptr) {
+        dst->append("\n");
     }
     if (verbose) {
         std::string profilesStr;

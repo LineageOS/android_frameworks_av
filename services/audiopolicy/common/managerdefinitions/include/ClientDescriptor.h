@@ -269,10 +269,11 @@ public:
     size_t getClientCount() const {
         return mClients.size();
     }
-    virtual void dump(String8 *dst) const {
+    virtual void dump(String8 *dst, int spaces, const char* extraInfo = nullptr) const {
+        (void)extraInfo;
         size_t index = 0;
         for (const auto& client: getClientIterable()) {
-            client->dump(dst, 2, index++);
+            client->dump(dst, spaces, index++);
         }
     }
 

@@ -115,9 +115,6 @@ TEST(PreviewSchedulerTest, BasicPreviewSchedulerTest) {
 
     // The pair of nsecs_t: camera timestamp delta (negative means in the past) and frame interval
     const std::pair<nsecs_t, nsecs_t> inputTimestamps[][BUFFER_COUNT] = {
-        // 30fps, no interval
-        {{-100000000LL, 0}, {-66666667LL, 0},
-          {-33333333LL, 0}, {0, 0}},
         // 30fps, 33ms interval
         {{-100000000LL, 33333333LL}, {-66666667LL, 33333333LL},
           {-33333333LL, 33333333LL}, {0, 0}},
@@ -130,22 +127,6 @@ TEST(PreviewSchedulerTest, BasicPreviewSchedulerTest) {
         // 60fps, variable interval
         {{-50000000LL, 8666667LL}, {-33333333LL, 19666667LL},
           {-16666667LL, 20666667LL}, {0, 0}},
-    };
-
-    const nsecs_t USE_AS_IS = -1; // Use the producer set timestamp
-    const nsecs_t USE_OVERRIDE = -2; // Use the scheduler overridden timestamp
-    const nsecs_t expectedTimestamps[][BUFFER_COUNT] = {
-        // 30fps, no interval: first 2 frames as is, and last 2 frames are
-        // overridden.
-        {USE_AS_IS, USE_AS_IS, USE_OVERRIDE, USE_OVERRIDE},
-        // 30fps, 33ms interval: all frames are overridden
-        {USE_OVERRIDE, USE_OVERRIDE, USE_OVERRIDE, USE_OVERRIDE},
-        // 30fps, variable interval: all frames are overridden
-        {USE_OVERRIDE, USE_OVERRIDE, USE_OVERRIDE, USE_OVERRIDE},
-        // 60fps, 16.7ms interval: all frames are overridden
-        {USE_OVERRIDE, USE_OVERRIDE, USE_OVERRIDE, USE_OVERRIDE},
-        // 60fps, variable interval: all frames are overridden
-        {USE_OVERRIDE, USE_OVERRIDE, USE_OVERRIDE, USE_OVERRIDE},
     };
 
     // Go through different use cases, and check the buffer timestamp
@@ -185,11 +166,7 @@ TEST(PreviewSchedulerTest, BasicPreviewSchedulerTest) {
             outputTimestamps[j] = bufferItem.mTimestamp;
             ALOGV("%s: [%zu][%zu]: input: %" PRId64 ", output: %" PRId64, __FUNCTION__,
                   i, j, timeBase + inputTimestamps[i][j].first, bufferItem.mTimestamp);
-            if (expectedTimestamps[i][j] == USE_OVERRIDE) {
-                ASSERT_GT(bufferItem.mTimestamp, inputTimestamps[i][j].first);
-            } else if (expectedTimestamps[i][j] == USE_AS_IS) {
-                ASSERT_EQ(bufferItem.mTimestamp, timeBase + inputTimestamps[i][j].first);
-            }
+            ASSERT_GT(bufferItem.mTimestamp, inputTimestamps[i][j].first);
 
             ASSERT_EQ(NO_ERROR, bufferConsumer->releaseBuffer(bufferItem));
         }
@@ -197,12 +174,9 @@ TEST(PreviewSchedulerTest, BasicPreviewSchedulerTest) {
         // Check the output timestamp intervals are aligned with input intervals
         const nsecs_t SHIFT_THRESHOLD = ms2ns(2);
         for (size_t j = 0; j < BUFFER_COUNT - 1; j ++) {
-            if (expectedTimestamps[i][j] == USE_OVERRIDE &&
-                    expectedTimestamps[i][j+1] == USE_OVERRIDE) {
-                nsecs_t interval_shift = outputTimestamps[j+1] - outputTimestamps[j] -
-                        (inputTimestamps[i][j+1].first - inputTimestamps[i][j].first);
-                ASSERT_LE(std::abs(interval_shift), SHIFT_THRESHOLD);
-            }
+            nsecs_t interval_shift = outputTimestamps[j+1] - outputTimestamps[j] -
+                    (inputTimestamps[i][j+1].first - inputTimestamps[i][j].first);
+            ASSERT_LE(std::abs(interval_shift), SHIFT_THRESHOLD);
         }
 
         consumerListener->reset(BUFFER_COUNT);

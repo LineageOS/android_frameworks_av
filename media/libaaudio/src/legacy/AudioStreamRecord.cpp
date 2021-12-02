@@ -128,7 +128,7 @@ aaudio_result_t AudioStreamRecord::open(const AudioStreamBuilder& builder)
     uint32_t notificationFrames = 0;
 
     // Setup the callback if there is one.
-    AudioRecord::callback_t callback = nullptr;
+    AudioRecord::legacy_callback_t callback = nullptr;
     void *callbackData = nullptr;
     AudioRecord::transfer_type streamTransferType = AudioRecord::transfer_type::TRANSFER_SYNC;
     if (builder.getDataCallbackProc() != nullptr) {
