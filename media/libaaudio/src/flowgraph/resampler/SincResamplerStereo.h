@@ -1,5 +1,5 @@
 /*
- * Copyright 2018 The Android Open Source Project
+ * Copyright 2019 The Android Open Source Project
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -14,30 +14,26 @@
  * limitations under the License.
  */
 
-#ifndef FLOWGRAPH_SINK_I16_H
-#define FLOWGRAPH_SINK_I16_H
+#ifndef OBOE_SINC_RESAMPLER_STEREO_H
+#define OBOE_SINC_RESAMPLER_STEREO_H
 
-#include <unistd.h>
 #include <sys/types.h>
+#include <unistd.h>
+#include "SincResampler.h"
 
-#include "FlowGraphNode.h"
+namespace resampler {
 
-namespace flowgraph {
-
-/**
- * AudioSink that lets you read data as 16-bit signed integers.
- */
-class SinkI16 : public FlowGraphSink {
+class SincResamplerStereo : public SincResampler {
 public:
-    explicit SinkI16(int32_t channelCount);
+    explicit SincResamplerStereo(const MultiChannelResampler::Builder &builder);
 
-    int32_t read(void *data, int32_t numFrames) override;
+    virtual ~SincResamplerStereo() = default;
 
-    const char *getName() override {
-        return "SinkI16";
-    }
+    void writeFrame(const float *frame) override;
+
+    void readFrame(float *frame) override;
+
 };
 
-} /* namespace flowgraph */
-
-#endif //FLOWGRAPH_SINK_I16_H
+} // namespace resampler
+#endif //OBOE_SINC_RESAMPLER_STEREO_H
