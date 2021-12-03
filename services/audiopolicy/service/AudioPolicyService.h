@@ -214,7 +214,8 @@ public:
                                       std::vector<bool>* formatsEnabled) override;
     binder::Status getReportedSurroundFormats(
             Int* count, std::vector<AudioFormatDescription>* formats) override;
-    binder::Status getHwOffloadEncodingFormatsSupportedForA2DP(
+    binder::Status getHwOffloadFormatsSupportedForBluetoothMedia(
+            const AudioDeviceDescription& device,
             std::vector<AudioFormatDescription>* _aidl_return) override;
     binder::Status setSurroundFormatEnabled(const AudioFormatDescription& audioFormat,
                                             bool enabled) override;
