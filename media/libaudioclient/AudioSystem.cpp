@@ -1972,8 +1972,8 @@ bool AudioSystem::isHapticPlaybackSupported() {
     return result.value_or(false);
 }
 
-status_t AudioSystem::getHwOffloadEncodingFormatsSupportedForA2DP(
-        std::vector<audio_format_t>* formats) {
+status_t AudioSystem::getHwOffloadFormatsSupportedForBluetoothMedia(
+        audio_devices_t device, std::vector<audio_format_t>* formats) {
     if (formats == nullptr) {
         return BAD_VALUE;
     }
@@ -1983,8 +1983,10 @@ status_t AudioSystem::getHwOffloadEncodingFormatsSupportedForA2DP(
     if (aps == 0) return PERMISSION_DENIED;
 
     std::vector<AudioFormatDescription> formatsAidl;
+    AudioDeviceDescription deviceAidl = VALUE_OR_RETURN_STATUS(
+            legacy2aidl_audio_devices_t_AudioDeviceDescription(device));
     RETURN_STATUS_IF_ERROR(statusTFromBinderStatus(
-            aps->getHwOffloadEncodingFormatsSupportedForA2DP(&formatsAidl)));
+            aps->getHwOffloadFormatsSupportedForBluetoothMedia(deviceAidl, &formatsAidl)));
     *formats = VALUE_OR_RETURN_STATUS(
             convertContainer<std::vector<audio_format_t>>(
                     formatsAidl,
