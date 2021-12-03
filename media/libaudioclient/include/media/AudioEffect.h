@@ -277,7 +277,7 @@ public:
     static status_t removeStreamDefaultEffect(audio_unique_id_t id);
 
     /*
-     * Events used by callback function (effect_callback_t).
+     * Events used by callback function (legacy_callback_t).
      */
     enum event_type {
         EVENT_CONTROL_STATUS_CHANGED = 0,
@@ -285,6 +285,47 @@ public:
         EVENT_PARAMETER_CHANGED = 2,
         EVENT_ERROR = 3,
         EVENT_FRAMES_PROCESSED = 4,
+    };
+
+    class IAudioEffectCallback : public virtual RefBase {
+        friend AudioEffect;
+     protected:
+        /* The event is received when an application loses or
+         * gains the control of the effect engine. Loss of control happens
+         * if another application requests the use of the engine by creating an AudioEffect for
+         * the same effect type but with a higher priority. Control is returned when the
+         * application having the control deletes its AudioEffect object.
+         * @param isGranted: True if control has been granted. False if stolen.
+         */
+        virtual void onControlStatusChanged([[maybe_unused]] bool isGranted) {}
+
+        /* The event is received by all applications not having the
+         * control of the effect engine when the effect is enabled or disabled.
+         * @param isEnabled: True if enabled. False if disabled.
+         */
+        virtual void onEnableStatusChanged([[maybe_unused]] bool isEnabled) {}
+
+        /* The event is received by all applications not having the
+         * control of the effect engine when an effect parameter is changed.
+         * @param param: A vector containing the raw bytes of a effect_param_type containing
+         *   raw data representing a param type, value pair.
+         */
+        // TODO pass an AIDL parcel instead of effect_param_type
+        virtual void onParameterChanged([[maybe_unused]] std::vector<uint8_t> param) {}
+
+        /* The event is received when the binder connection to the mediaserver
+         * is no longer valid. Typically the server has been killed.
+         * @param errorCode: A code representing the type of error.
+         */
+        virtual void onError([[maybe_unused]] status_t errorCode) {}
+
+
+        /* The event is received when the audio server has processed a block of
+         * data.
+         * @param framesProcessed: The number of frames the audio server has
+         *   processed.
+         */
+        virtual void onFramesProcessed([[maybe_unused]] int32_t framesProcessed) {}
     };
 
     /* Callback function notifying client application of a change in effect engine state or
@@ -315,7 +356,7 @@ public:
      *  - EVENT_ERROR:  status_t indicating the error (DEAD_OBJECT when media server dies).
      */
 
-    typedef void (*effect_callback_t)(int32_t event, void* user, void *info);
+    typedef void (*legacy_callback_t)(int32_t event, void* user, void *info);
 
 
     /* Constructor.
@@ -360,7 +401,7 @@ public:
      * priority:    requested priority for effect control: the priority level corresponds to the
      *      value of priority parameter: negative values indicate lower priorities, positive values
      *      higher priorities, 0 being the normal priority.
-     * cbf:         optional callback function (see effect_callback_t)
+     * cbf:         optional callback function (see legacy_callback_t)
      * user:        pointer to context for use by the callback receiver.
      * sessionId:   audio session this effect is associated to.
      *      If equal to AUDIO_SESSION_OUTPUT_MIX, the effect will be global to
@@ -383,10 +424,20 @@ public:
      *  - NO_INIT: audio flinger or audio hardware not initialized
      */
             status_t    set(const effect_uuid_t *type,
-                            const effect_uuid_t *uuid = NULL,
+                            const effect_uuid_t *uuid = nullptr,
                             int32_t priority = 0,
-                            effect_callback_t cbf = NULL,
-                            void* user = NULL,
+                            const wp<IAudioEffectCallback>& callback = nullptr,
+                            audio_session_t sessionId = AUDIO_SESSION_OUTPUT_MIX,
+                            audio_io_handle_t io = AUDIO_IO_HANDLE_NONE,
+                            const AudioDeviceTypeAddr& device = {},
+                            bool probe = false,
+                            bool notifyFramesProcessed = false);
+
+            status_t    set(const effect_uuid_t *type,
+                            const effect_uuid_t *uuid,
+                            int32_t priority,
+                            legacy_callback_t cbf,
+                            void* user,
                             audio_session_t sessionId = AUDIO_SESSION_OUTPUT_MIX,
                             audio_io_handle_t io = AUDIO_IO_HANDLE_NONE,
                             const AudioDeviceTypeAddr& device = {},
@@ -396,10 +447,21 @@ public:
      * Same as above but with type and uuid specified by character strings.
      */
             status_t    set(const char *typeStr,
-                            const char *uuidStr = NULL,
+                            const char *uuidStr = nullptr,
                             int32_t priority = 0,
-                            effect_callback_t cbf = NULL,
-                            void* user = NULL,
+                            const wp<IAudioEffectCallback>& callback = nullptr,
+                            audio_session_t sessionId = AUDIO_SESSION_OUTPUT_MIX,
+                            audio_io_handle_t io = AUDIO_IO_HANDLE_NONE,
+                            const AudioDeviceTypeAddr& device = {},
+                            bool probe = false,
+                            bool notifyFramesProcessed = false);
+
+
+            status_t    set(const char *typeStr,
+                            const char *uuidStr,
+                            int32_t priority,
+                            legacy_callback_t cbf,
+                            void* user,
                             audio_session_t sessionId = AUDIO_SESSION_OUTPUT_MIX,
                             audio_io_handle_t io = AUDIO_IO_HANDLE_NONE,
                             const AudioDeviceTypeAddr& device = {},
@@ -535,18 +597,19 @@ public:
 
 protected:
      android::content::AttributionSourceState mClientAttributionSource; // source for app op checks.
-     bool                    mEnabled = false;   // enable state
-     audio_session_t         mSessionId = AUDIO_SESSION_OUTPUT_MIX; // audio session ID
-     int32_t                 mPriority = 0;      // priority for effect control
-     status_t                mStatus = NO_INIT;  // effect status
-     bool                    mProbe = false;     // effect created in probe mode: all commands
-                                                 // are no ops because mIEffect is NULL
-     effect_callback_t       mCbf = nullptr;     // callback function for status, control and
-                                                 // parameter changes notifications
-     void*                   mUserData = nullptr;// client context for callback function
-     effect_descriptor_t     mDescriptor = {};   // effect descriptor
-     int32_t                 mId = -1;           // system wide unique effect engine instance ID
-     Mutex                   mLock;              // Mutex for mEnabled access
+     bool                     mEnabled = false;   // enable state
+     audio_session_t          mSessionId = AUDIO_SESSION_OUTPUT_MIX; // audio session ID
+     int32_t                  mPriority = 0;      // priority for effect control
+     status_t                 mStatus = NO_INIT;  // effect status
+     bool                     mProbe = false;     // effect created in probe mode: all commands
+                                                 // are no ops because mIEffect is nullptr
+
+     wp<IAudioEffectCallback> mCallback = nullptr; // callback interface for status, control and
+                                                   // parameter changes notifications
+     sp<IAudioEffectCallback> mLegacyWrapper = nullptr;
+     effect_descriptor_t      mDescriptor = {};   // effect descriptor
+     int32_t                  mId = -1;           // system wide unique effect engine instance ID
+     Mutex                    mLock;              // Mutex for mEnabled access
 
 
      // IEffectClient
