@@ -65,7 +65,7 @@ public:
     status_t setEncapsulationModes(uint32_t encapsulationModes);
     status_t setEncapsulationMetadataTypes(uint32_t encapsulationMetadataTypes);
 
-    void dump(std::string *dst, int spaces, int index,
+    void dump(std::string *dst, int spaces,
               const char* extraInfo = nullptr, bool verbose = true) const;
     void log() const;
 

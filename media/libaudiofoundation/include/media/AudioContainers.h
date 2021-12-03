@@ -131,14 +131,16 @@ static inline DeviceTypeSet deviceTypesFromBitMask(audio_devices_t types) {
     return deviceTypes;
 }
 
-bool deviceTypesToString(const DeviceTypeSet& deviceTypes, std::string &str);
+std::string deviceTypesToString(const DeviceTypeSet& deviceTypes);
 
 std::string dumpDeviceTypes(const DeviceTypeSet& deviceTypes);
 
 /**
  * Return human readable string for device types.
  */
-std::string toString(const DeviceTypeSet& deviceTypes);
+inline std::string toString(const DeviceTypeSet& deviceTypes) {
+    return deviceTypesToString(deviceTypes);
+}
 
 
 } // namespace android
