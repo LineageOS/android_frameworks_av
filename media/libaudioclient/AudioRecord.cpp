@@ -205,8 +205,8 @@ void AudioRecord::stopAndJoinCallbacks() {
     // Otherwise the callback thread will never exit.
     stop();
     if (mAudioRecordThread != 0) {
-        mProxy->interrupt();
         mAudioRecordThread->requestExit();  // see comment in AudioRecord.h
+        mProxy->interrupt();
         mAudioRecordThread->requestExitAndWait();
         mAudioRecordThread.clear();
     }
