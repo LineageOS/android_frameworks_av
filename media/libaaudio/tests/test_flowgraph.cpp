@@ -23,6 +23,7 @@
 #include <gtest/gtest.h>
 
 #include "flowgraph/ClipToRange.h"
+#include "flowgraph/MonoBlend.h"
 #include "flowgraph/MonoToMultiConverter.h"
 #include "flowgraph/SourceFloat.h"
 #include "flowgraph/RampLinear.h"
@@ -164,3 +165,29 @@ TEST(test_flowgraph, module_clip_to_range) {
         EXPECT_NEAR(expected[i], output[i], tolerance);
     }
 }
+
+TEST(test_flowgraph, module_mono_blend) {
+    // Two channel to two channel with 3 inputs and outputs.
+    constexpr int numChannels = 2;
+    constexpr int numFrames = 3;
+
+    static const float input[] = {-0.7, 0.5, -0.25, 1.25, 1000, 2000};
+    static const float expected[] = {-0.1, -0.1, 0.5, 0.5, 1500, 1500};
+    float output[100];
+    SourceFloat sourceFloat{numChannels};
+    MonoBlend monoBlend{numChannels};
+    SinkFloat sinkFloat{numChannels};
+
+    sourceFloat.setData(input, numFrames);
+
+    sourceFloat.output.connect(&monoBlend.input);
+    monoBlend.output.connect(&sinkFloat.input);
+
+    int32_t numRead = sinkFloat.read(output, numFrames);
+    ASSERT_EQ(numRead, numFrames);
+    constexpr float tolerance = 0.000001f; // arbitrary
+    for (int i = 0; i < numRead; i++) {
+        EXPECT_NEAR(expected[i], output[i], tolerance);
+    }
+}
+
