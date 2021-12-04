@@ -176,8 +176,9 @@ bool DeviceDescriptorBase::supportsFormat(audio_format_t format)
 
 status_t DeviceDescriptorBase::writeToParcelable(media::AudioPort* parcelable) const {
     AudioPort::writeToParcelable(parcelable);
-    AudioPortConfig::writeToParcelable(&parcelable->hal.activeConfig, useInputChannelMask());
+    AudioPortConfig::writeToParcelable(&parcelable->sys.activeConfig.hal, useInputChannelMask());
     parcelable->hal.id = VALUE_OR_RETURN_STATUS(legacy2aidl_audio_port_handle_t_int32_t(mId));
+    parcelable->sys.activeConfig.hal.portId = parcelable->hal.id;
 
     media::audio::common::AudioPortDeviceExt deviceExt;
     deviceExt.device = VALUE_OR_RETURN_STATUS(
@@ -201,7 +202,7 @@ status_t DeviceDescriptorBase::readFromParcelable(const media::AudioPort& parcel
     }
     status_t status = AudioPort::readFromParcelable(parcelable)
             ?: AudioPortConfig::readFromParcelable(
-                    parcelable.hal.activeConfig, useInputChannelMask());
+                    parcelable.sys.activeConfig.hal, useInputChannelMask());
     if (status != OK) {
         return status;
     }
