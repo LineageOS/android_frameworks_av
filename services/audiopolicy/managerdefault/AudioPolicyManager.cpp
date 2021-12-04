@@ -3608,12 +3608,14 @@ void AudioPolicyManager::dump(String8 *dst) const
     dst->appendFormat(" Communnication Strategy: %d\n", mCommunnicationStrategy);
     dst->appendFormat(" Config source: %s\n", mConfig.getSource().c_str()); // getConfig not const
 
-    mAvailableOutputDevices.dump(dst, String8("\n Available output"));
-    mAvailableInputDevices.dump(dst, String8("\n Available input"));
+    dst->append("\n");
+    mAvailableOutputDevices.dump(dst, String8("Available output"), 1);
+    dst->append("\n");
+    mAvailableInputDevices.dump(dst, String8("Available input"), 1);
     mHwModulesAll.dump(dst);
     mOutputs.dump(dst);
     mInputs.dump(dst);
-    mEffects.dump(dst);
+    mEffects.dump(dst, 1);
     mAudioPatches.dump(dst);
     mPolicyMixes.dump(dst);
     mAudioSources.dump(dst);

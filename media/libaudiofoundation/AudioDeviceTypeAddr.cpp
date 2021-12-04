@@ -100,10 +100,13 @@ void AudioDeviceTypeAddr::reset() {
 
 std::string AudioDeviceTypeAddr::toString(bool includeSensitiveInfo) const {
     std::stringstream sstream;
-    sstream << "type:0x" << std::hex << mType;
+    sstream << audio_device_to_string(mType);
+    if (sstream.str().empty()) {
+        sstream << "unknown type:0x" << std::hex << mType;
+    }
     // IP and MAC address are sensitive information. The sensitive information will be suppressed
     // is `includeSensitiveInfo` is false.
-    sstream << ",@:"
+    sstream << ", @:"
             << (!includeSensitiveInfo && mIsAddressSensitive ? SUPPRESSED : mAddress);
     return sstream.str();
 }

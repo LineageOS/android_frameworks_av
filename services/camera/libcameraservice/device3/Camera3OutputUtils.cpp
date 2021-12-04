@@ -1265,6 +1265,14 @@ void notify(CaptureOutputStates& states,
     notify(states, &m);
 }
 
+// The buffers requested through this call are not tied to any CaptureRequest in
+// particular. They may used by the hal for a particular frame's output buffer
+// or for its internal use as well. In the case that the hal does use any buffer
+// from the requested list here, for a particular frame's output buffer, the
+// buffer will be returned with the processCaptureResult call corresponding to
+// the frame. The other buffers will be returned through returnStreamBuffers.
+// The buffers returned via returnStreamBuffers will not have a valid
+// timestamp(0) and will be dropped by the bufferqueue.
 void requestStreamBuffers(RequestBufferStates& states,
         const hardware::hidl_vec<hardware::camera::device::V3_5::BufferRequest>& bufReqs,
         hardware::camera::device::V3_5::ICameraDeviceCallback::requestStreamBuffers_cb _hidl_cb) {

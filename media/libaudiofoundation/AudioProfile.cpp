@@ -319,7 +319,7 @@ void AudioProfileVector::dump(std::string *dst, int spaces) const
 {
     dst->append(base::StringPrintf("%*s- Profiles (%zu):\n", spaces - 2, "", size()));
     for (size_t i = 0; i < size(); i++) {
-        const std::string prefix = base::StringPrintf("%*s%zu. ", spaces + 1, "", i + 1);
+        const std::string prefix = base::StringPrintf("%*s %zu. ", spaces, "", i + 1);
         dst->append(prefix);
         std::string profileStr;
         at(i)->dump(&profileStr, prefix.size());

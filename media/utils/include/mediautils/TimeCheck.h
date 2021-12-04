@@ -38,7 +38,7 @@ class TimeCheck {
   private:
     static TimerThread* getTimeCheckThread();
     static void accessAudioHalPids(std::vector<pid_t>* pids, bool update);
-    static void crash(const char* tag);
+    static void crash(const char* tag, std::chrono::system_clock::time_point startTime);
 
     const TimerThread::Handle mTimerHandle;
 };

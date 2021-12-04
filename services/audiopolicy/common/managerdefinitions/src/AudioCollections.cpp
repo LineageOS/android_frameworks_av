@@ -44,7 +44,7 @@ void dumpAudioRouteVector(const AudioRouteVector& audioRouteVector, String8 *dst
     }
     dst->appendFormat("%*s- Audio Routes (%zu):\n", spaces - 2, "", audioRouteVector.size());
     for (size_t i = 0; i < audioRouteVector.size(); i++) {
-        const std::string prefix = base::StringPrintf("%*s%zu. ", spaces + 1, "", i + 1);
+        const std::string prefix = base::StringPrintf("%*s %zu. ", spaces, "", i + 1);
         dst->append(prefix.c_str());
         audioRouteVector.itemAt(i)->dump(dst, prefix.size());
     }
