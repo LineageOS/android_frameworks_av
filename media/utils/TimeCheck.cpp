@@ -17,6 +17,7 @@
 #define LOG_TAG "TimeCheck"
 
 #include <optional>
+#include <sstream>
 
 #include <mediautils/EventLog.h>
 #include <mediautils/TimeCheck.h>
@@ -24,6 +25,15 @@
 #include "debuggerd/handler.h"
 
 namespace android {
+
+namespace {
+
+std::string formatTime(std::chrono::system_clock::time_point t) {
+    auto msSinceEpoch = std::chrono::round<std::chrono::milliseconds>(t.time_since_epoch());
+    return (std::ostringstream() << msSinceEpoch.count()).str();
+}
+
+}  // namespace
 
 // Audio HAL server pids vector used to generate audio HAL processes tombstone
 // when audioserver watchdog triggers.
@@ -66,15 +76,18 @@ TimerThread* TimeCheck::getTimeCheckThread() {
 }
 
 TimeCheck::TimeCheck(const char* tag, uint32_t timeoutMs)
-    : mTimerHandle(getTimeCheckThread()->scheduleTask([tag] { crash(tag); },
-                                                      std::chrono::milliseconds(timeoutMs))) {}
+    : mTimerHandle(getTimeCheckThread()->scheduleTask(
+              [tag, startTime = std::chrono::system_clock::now()] { crash(tag, startTime); },
+              std::chrono::milliseconds(timeoutMs))) {}
 
 TimeCheck::~TimeCheck() {
     getTimeCheckThread()->cancelTask(mTimerHandle);
 }
 
 /* static */
-void TimeCheck::crash(const char* tag) {
+void TimeCheck::crash(const char* tag, std::chrono::system_clock::time_point startTime) {
+    std::chrono::system_clock::time_point endTime = std::chrono::system_clock::now();
+
     // Generate audio HAL processes tombstones and allow time to complete
     // before forcing restart
     std::vector<pid_t> pids = getAudioHalPids();
@@ -88,7 +101,8 @@ void TimeCheck::crash(const char* tag) {
         ALOGI("No HAL process pid available, skipping tombstones");
     }
     LOG_EVENT_STRING(LOGTAG_AUDIO_BINDER_TIMEOUT, tag);
-    LOG_ALWAYS_FATAL("TimeCheck timeout for %s", tag);
+    LOG_ALWAYS_FATAL("TimeCheck timeout for %s (start=%s, end=%s)", tag,
+                     formatTime(startTime).c_str(), formatTime(endTime).c_str());
 }
 
 };  // namespace android
