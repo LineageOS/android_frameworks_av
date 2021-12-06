@@ -5455,8 +5455,7 @@ status_t AudioPolicyManager::checkOutputsForDevice(const sp<DeviceDescriptor>& d
             if (!desc->isDuplicated()) {
                 // exact match on device
                 if (device_distinguishes_on_address(deviceType) && desc->supportsDevice(device)
-                        && desc->containsSingleDeviceSupportingEncodedFormats(device)
-                        && !mAvailableOutputDevices.containsAtLeastOne(desc->supportedDevices())) {
+                        && desc->containsSingleDeviceSupportingEncodedFormats(device)) {
                     outputs.add(mOutputs.keyAt(i));
                 } else if (!mAvailableOutputDevices.containsAtLeastOne(desc->supportedDevices())) {
                     ALOGV("checkOutputsForDevice(): disconnecting adding output %d",
