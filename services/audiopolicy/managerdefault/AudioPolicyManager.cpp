@@ -6548,7 +6548,7 @@ status_t AudioPolicyManager::checkAndSetVolume(IVolumeCurves &curves,
     outputDesc->setVolume(
             volumeDb, volumeSource, curves.getStreamTypes(), deviceTypes, delayMs, force);
 
-    if (isVoiceVolSrc || isBtScoVolSrc) {
+    if (outputDesc == mPrimaryOutput && (isVoiceVolSrc || isBtScoVolSrc)) {
         float voiceVolume;
         // Force voice volume to max or mute for Bluetooth SCO as other attenuations are managed by the headset
         if (isVoiceVolSrc) {

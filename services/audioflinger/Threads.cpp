@@ -5089,7 +5089,7 @@ AudioFlinger::PlaybackThread::mixer_state AudioFlinger::MixerThread::prepareTrac
                 break;
             case TrackBase::IDLE:
             default:
-                LOG_ALWAYS_FATAL("unexpected track state %d", track->mState);
+                LOG_ALWAYS_FATAL("unexpected track state %d", (int)track->mState);
             }
 
             if (isActive) {
@@ -5148,7 +5148,7 @@ AudioFlinger::PlaybackThread::mixer_state AudioFlinger::MixerThread::prepareTrac
                     // TODO Remove the ALOGW when this theory is confirmed.
                     ALOGW("fast track %d should have been active; "
                             "mState=%d, mTrackMask=%#x, recentUnderruns=%u, isShared=%d",
-                            j, track->mState, state->mTrackMask, recentUnderruns,
+                            j, (int)track->mState, state->mTrackMask, recentUnderruns,
                             track->sharedBuffer() != 0);
                     // Since the FastMixer state already has the track inactive, do nothing here.
                 }
@@ -8041,7 +8041,7 @@ status_t AudioFlinger::RecordThread::start(RecordThread::RecordTrack* recordTrac
                 ALOGV("active record track PAUSING -> ACTIVE");
                 recordTrack->mState = TrackBase::ACTIVE;
             } else {
-                ALOGV("active record track state %d", recordTrack->mState);
+                ALOGV("active record track state %d", (int)recordTrack->mState);
             }
             return status;
         }
@@ -8067,7 +8067,7 @@ status_t AudioFlinger::RecordThread::start(RecordThread::RecordTrack* recordTrac
             }
             if (recordTrack->mState != TrackBase::STARTING_1) {
                 ALOGW("%s(%d): unsynchronized mState:%d change",
-                    __func__, recordTrack->id(), recordTrack->mState);
+                    __func__, recordTrack->id(), (int)recordTrack->mState);
                 // Someone else has changed state, let them take over,
                 // leave mState in the new state.
                 recordTrack->clearSyncStartEvent();

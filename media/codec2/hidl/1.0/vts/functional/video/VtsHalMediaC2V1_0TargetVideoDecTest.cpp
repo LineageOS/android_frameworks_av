@@ -123,8 +123,10 @@ class Codec2VideoDecHidlTestBase : public ::testing::Test {
         ASSERT_NE(mLinearPool, nullptr);
 
         std::vector<std::unique_ptr<C2Param>> queried;
-        mComponent->query({}, {C2PortMediaTypeSetting::input::PARAM_TYPE}, C2_DONT_BLOCK, &queried);
-        ASSERT_GT(queried.size(), 0);
+        c2_status_t c2err = mComponent->query({}, {C2PortMediaTypeSetting::input::PARAM_TYPE},
+                                              C2_DONT_BLOCK, &queried);
+        ASSERT_EQ(c2err, C2_OK) << "Query media type failed";
+        ASSERT_EQ(queried.size(), 1) << "Size of the vector returned is invalid";
 
         mMime = ((C2PortMediaTypeSetting::input*)queried[0].get())->m.value;
         mEos = false;
