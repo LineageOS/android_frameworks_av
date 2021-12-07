@@ -2301,6 +2301,8 @@ aidl2legacy_AudioFlag_audio_flags_mask_t(media::AudioFlag aidl) {
             return AUDIO_FLAG_CONTENT_SPATIALIZED;
         case media::AudioFlag::NEVER_SPATIALIZE:
             return AUDIO_FLAG_NEVER_SPATIALIZE;
+        case media::AudioFlag::CALL_REDIRECTION:
+            return AUDIO_FLAG_CALL_REDIRECTION;
     }
     return unexpected(BAD_VALUE);
 }
@@ -2342,6 +2344,8 @@ legacy2aidl_audio_flags_mask_t_AudioFlag(audio_flags_mask_t legacy) {
             return media::AudioFlag::CONTENT_SPATIALIZED;
         case AUDIO_FLAG_NEVER_SPATIALIZE:
             return media::AudioFlag::NEVER_SPATIALIZE;
+        case AUDIO_FLAG_CALL_REDIRECTION:
+            return media::AudioFlag::CALL_REDIRECTION;
     }
     return unexpected(BAD_VALUE);
 }

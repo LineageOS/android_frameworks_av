@@ -385,8 +385,9 @@ private:
     app_state_t apmStatFromAmState(int amState);
 
     bool isSupportedSystemUsage(audio_usage_t usage);
-    status_t validateUsage(audio_usage_t usage);
-    status_t validateUsage(audio_usage_t usage, const AttributionSourceState& attributionSource);
+    status_t validateUsage(const audio_attributes_t& attr);
+    status_t validateUsage(const audio_attributes_t& attr,
+                           const AttributionSourceState& attributionSource);
 
     void updateUidStates();
     void updateUidStates_l() REQUIRES(mLock);
