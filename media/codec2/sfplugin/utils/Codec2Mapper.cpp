@@ -255,6 +255,8 @@ ALookup<C2Config::profile_t, int32_t> sHevcProfiles = {
     { C2Config::PROFILE_HEVC_MAIN_STILL, HEVCProfileMainStill },
     { C2Config::PROFILE_HEVC_MAIN_INTRA, HEVCProfileMain },
     { C2Config::PROFILE_HEVC_MAIN_10_INTRA, HEVCProfileMain10 },
+    { C2Config::PROFILE_HEVC_MAIN_10, HEVCProfileMain10HDR10 },
+    { C2Config::PROFILE_HEVC_MAIN_10, HEVCProfileMain10HDR10Plus },
 };
 
 ALookup<C2Config::profile_t, int32_t> sHevcHdrProfiles = {
