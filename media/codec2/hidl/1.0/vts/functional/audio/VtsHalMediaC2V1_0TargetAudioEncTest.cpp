@@ -30,6 +30,7 @@
 #include <C2Config.h>
 #include <C2Debug.h>
 #include <codec2/hidl/client.h>
+#include <android-base/properties.h>
 
 using android::C2AllocatorIon;
 
@@ -54,7 +55,12 @@ class Codec2AudioEncHidlTestBase : public ::testing::Test {
     // google.codec2 Audio test setup
     virtual void SetUp() override {
         getParams();
-        mDisableTest = false;
+        int option = android::base::GetIntProperty("debug.stagefright.ccodec", 4);
+        if (option == 0) {
+            mDisableTest = true;
+        } else {
+            mDisableTest = false;
+        }
         ALOGV("Codec2AudioEncHidlTest SetUp");
         mClient = android::Codec2Client::CreateFromService(
                 mInstanceName.c_str(),

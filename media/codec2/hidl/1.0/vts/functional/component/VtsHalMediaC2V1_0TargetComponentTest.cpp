@@ -23,7 +23,7 @@
 
 #include <C2Config.h>
 #include <codec2/hidl/client.h>
-
+#include <android-base/properties.h>
 #include "media_c2_hidl_test_common.h"
 
 /* Time_Out for start(), stop(), reset(), release(), flush(), queue() are
@@ -62,6 +62,11 @@ class Codec2ComponentHidlTestBase : public ::testing::Test {
   public:
     virtual void SetUp() override {
         getParams();
+        mDisableTest = false;
+        int option = android::base::GetIntProperty("debug.stagefright.ccodec", 4);
+        if (!option) {
+            mDisableTest = true;
+        }
         mEos = false;
         mClient = android::Codec2Client::CreateFromService(mInstanceName.c_str());
         ASSERT_NE(mClient, nullptr);
@@ -106,6 +111,7 @@ class Codec2ComponentHidlTestBase : public ::testing::Test {
     std::string mInstanceName;
     std::string mComponentName;
     bool mEos;
+    bool mDisableTest;
     std::mutex mQueueLock;
     std::condition_variable mQueueCondition;
     std::list<std::unique_ptr<C2Work>> mWorkQueue;
@@ -132,6 +138,7 @@ class Codec2ComponentHidlTest
 // Test Empty Flush
 TEST_P(Codec2ComponentHidlTest, EmptyFlush) {
     ALOGV("Empty Flush Test");
+    if (mDisableTest) GTEST_SKIP() << "Test is disabled";
     c2_status_t err = mComponent->start();
     ASSERT_EQ(err, C2_OK);
 
@@ -148,6 +155,7 @@ TEST_P(Codec2ComponentHidlTest, EmptyFlush) {
 // Test Queue Empty Work
 TEST_P(Codec2ComponentHidlTest, QueueEmptyWork) {
     ALOGV("Queue Empty Work Test");
+    if (mDisableTest) GTEST_SKIP() << "Test is disabled";
     c2_status_t err = mComponent->start();
     ASSERT_EQ(err, C2_OK);
 
@@ -162,6 +170,7 @@ TEST_P(Codec2ComponentHidlTest, QueueEmptyWork) {
 // Test Component Configuration
 TEST_P(Codec2ComponentHidlTest, Config) {
     ALOGV("Configuration Test");
+    if (mDisableTest) GTEST_SKIP() << "Test is disabled";
 
     C2String name = mComponent->getName();
     EXPECT_NE(name.empty(), true) << "Invalid Component Name";
@@ -191,6 +200,7 @@ TEST_P(Codec2ComponentHidlTest, Config) {
 // Test Multiple Start Stop Reset Test
 TEST_P(Codec2ComponentHidlTest, MultipleStartStopReset) {
     ALOGV("Multiple Start Stop and Reset Test");
+    if (mDisableTest) GTEST_SKIP() << "Test is disabled";
 
     for (size_t i = 0; i < MAX_RETRY; i++) {
         mComponent->start();
@@ -213,6 +223,7 @@ TEST_P(Codec2ComponentHidlTest, MultipleStartStopReset) {
 // Test Component Release API
 TEST_P(Codec2ComponentHidlTest, MultipleRelease) {
     ALOGV("Multiple Release Test");
+    if (mDisableTest) GTEST_SKIP() << "Test is disabled";
     c2_status_t err = mComponent->start();
     ASSERT_EQ(err, C2_OK);
 
@@ -238,6 +249,7 @@ TEST_P(Codec2ComponentHidlTest, MultipleRelease) {
 // Test API's Timeout
 TEST_P(Codec2ComponentHidlTest, Timeout) {
     ALOGV("Timeout Test");
+    if (mDisableTest) GTEST_SKIP() << "Test is disabled";
     c2_status_t err = C2_OK;
 
     int64_t startTime = getNowUs();
@@ -329,7 +341,7 @@ class Codec2ComponentInputTests
 
 TEST_P(Codec2ComponentInputTests, InputBufferTest) {
     description("Tests for different inputs");
-
+    if (mDisableTest) GTEST_SKIP() << "Test is disabled";
     uint32_t flags = std::stoul(std::get<2>(GetParam()));
     bool isNullBuffer = !std::get<3>(GetParam()).compare("true");
     if (isNullBuffer)

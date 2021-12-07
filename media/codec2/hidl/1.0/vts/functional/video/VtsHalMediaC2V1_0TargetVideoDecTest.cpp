@@ -34,6 +34,7 @@
 #include <gui/IConsumerListener.h>
 #include <gui/IProducerListener.h>
 #include <system/window.h>
+#include <android-base/properties.h>
 
 using android::C2AllocatorIon;
 
@@ -64,7 +65,13 @@ class Codec2VideoDecHidlTestBase : public ::testing::Test {
     // google.codec2 Video test setup
     virtual void SetUp() override {
         getParams();
-        mDisableTest = false;
+        // Disable the tests if device does not support codec2
+        int option = android::base::GetIntProperty("debug.stagefright.ccodec", 4);
+        if (option == 0) {
+            mDisableTest = true;
+        } else {
+            mDisableTest = false;
+        }
         ALOGV("Codec2VideoDecHidlTest SetUp");
         mClient = android::Codec2Client::CreateFromService(
                 mInstanceName.c_str(),
