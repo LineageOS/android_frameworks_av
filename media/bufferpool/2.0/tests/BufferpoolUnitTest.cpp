@@ -72,6 +72,7 @@ class BufferpoolTest {
   public:
     BufferpoolTest() : mConnectionValid(false), mManager(nullptr), mAllocator(nullptr) {
         mConnectionId = -1;
+        mReceiverId = -1;
     }
 
     ~BufferpoolTest() {
@@ -83,6 +84,7 @@ class BufferpoolTest {
   protected:
     bool mConnectionValid;
     ConnectionId mConnectionId;
+    ConnectionId mReceiverId;
 
     android::sp<ClientManager> mManager;
     std::shared_ptr<BufferPoolAllocator> mAllocator;
@@ -297,6 +299,89 @@ TEST_F(BufferpoolUnitTest, RecycleBuffer) {
         native_handle_delete(handle);
     }
     allocHandle.clear();
+}
+
+// Validate cache evict and invalidate APIs.
+TEST_F(BufferpoolUnitTest, FlushTest) {
+    std::vector<uint8_t> vecParams;
+    getTestAllocatorParams(&vecParams);
+
+    ResultStatus status = mManager->registerSender(mManager, mConnectionId, &mReceiverId);
+    ASSERT_TRUE(status == ResultStatus::ALREADY_EXISTS && mReceiverId == mConnectionId);
+
+    // testing empty flush
+    status = mManager->flush(mConnectionId);
+    ASSERT_EQ(status, ResultStatus::OK) << "failed to flush connection : " << mConnectionId;
+
+    std::vector<std::shared_ptr<BufferPoolData>> senderBuffer{};
+    std::vector<native_handle_t*> allocHandle{};
+    std::vector<TransactionId> tid{};
+    std::vector<int64_t> timestampUs{};
+
+    std::map<TransactionId, BufferId> bufferMap{};
+
+    for (int i = 0; i < kNumIterationCount; i++) {
+        int64_t postUs;
+        TransactionId transactionId;
+        native_handle_t* handle = nullptr;
+        std::shared_ptr<BufferPoolData> buffer{};
+        status = mManager->allocate(mConnectionId, vecParams, &handle, &buffer);
+        ASSERT_EQ(status, ResultStatus::OK) << "allocate failed for " << i << " iteration";
+
+        ASSERT_TRUE(TestBufferPoolAllocator::Fill(handle, i));
+
+        status = mManager->postSend(mReceiverId, buffer, &transactionId, &postUs);
+        ASSERT_EQ(status, ResultStatus::OK) << "unable to post send transaction on bufferpool";
+
+        timestampUs.push_back(postUs);
+        tid.push_back(transactionId);
+        bufferMap.insert({transactionId, buffer->mId});
+
+        senderBuffer.push_back(std::move(buffer));
+        if (handle) {
+            allocHandle.push_back(std::move(handle));
+        }
+        buffer.reset();
+    }
+
+    status = mManager->flush(mConnectionId);
+    ASSERT_EQ(status, ResultStatus::OK) << "failed to flush connection : " << mConnectionId;
+
+    std::shared_ptr<BufferPoolData> receiverBuffer{};
+    native_handle_t* recvHandle = nullptr;
+    for (int i = 0; i < kNumIterationCount; i++) {
+        status = mManager->receive(mReceiverId, tid[i], senderBuffer[i]->mId, timestampUs[i],
+                                   &recvHandle, &receiverBuffer);
+        ASSERT_EQ(status, ResultStatus::OK) << "receive failed for buffer " << senderBuffer[i]->mId;
+
+        // find the buffer id from transaction id
+        auto findIt = bufferMap.find(tid[i]);
+        ASSERT_NE(findIt, bufferMap.end()) << "inconsistent buffer mapping";
+
+        // buffer id received must be same as the buffer id sent
+        ASSERT_EQ(findIt->second, receiverBuffer->mId) << "invalid buffer received";
+
+        ASSERT_TRUE(TestBufferPoolAllocator::Verify(recvHandle, i))
+                << "Message received not same as that sent";
+
+        bufferMap.erase(findIt);
+        if (recvHandle) {
+            native_handle_close(recvHandle);
+            native_handle_delete(recvHandle);
+        }
+        recvHandle = nullptr;
+        receiverBuffer.reset();
+    }
+
+    ASSERT_EQ(bufferMap.size(), 0) << "buffers received is less than the number of buffers sent";
+
+    for (auto handle : allocHandle) {
+        native_handle_close(handle);
+        native_handle_delete(handle);
+    }
+    allocHandle.clear();
+    senderBuffer.clear();
+    timestampUs.clear();
 }
 
 // Buffer transfer test between processes.
