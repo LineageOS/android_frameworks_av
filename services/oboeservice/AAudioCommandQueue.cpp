@@ -28,6 +28,10 @@ namespace aaudio {
 aaudio_result_t AAudioCommandQueue::sendCommand(std::shared_ptr<AAudioCommand> command) {
     {
         std::scoped_lock<std::mutex> _l(mLock);
+        if (!mRunning) {
+            ALOGE("Tried to send command while it was not running");
+            return AAUDIO_ERROR_INVALID_STATE;
+        }
         mCommands.push(command);
         mWaitWorkCond.notify_one();
     }
@@ -68,7 +72,7 @@ std::shared_ptr<AAudioCommand> AAudioCommandQueue::waitForCommand(int64_t timeou
                 return !mRunning || !mCommands.empty();
             });
         }
-        if (!mCommands.empty()) {
+        if (!mCommands.empty() && mRunning) {
             command = mCommands.front();
             mCommands.pop();
         }
@@ -76,9 +80,27 @@ std::shared_ptr<AAudioCommand> AAudioCommandQueue::waitForCommand(int64_t timeou
     return command;
 }
 
+void AAudioCommandQueue::startWaiting() {
+    std::scoped_lock<std::mutex> _l(mLock);
+    mRunning = true;
+}
+
 void AAudioCommandQueue::stopWaiting() {
     std::scoped_lock<std::mutex> _l(mLock);
     mRunning = false;
+    // Clear all commands in the queue as the command thread is stopped.
+    while (!mCommands.empty()) {
+        auto command = mCommands.front();
+        mCommands.pop();
+        std::scoped_lock<std::mutex> _cl(command->lock);
+        // If the command is waiting for result, returns AAUDIO_ERROR_INVALID_STATE
+        // as there is no thread waiting for the command.
+        if (command->isWaitingForReply) {
+            command->result = AAUDIO_ERROR_INVALID_STATE;
+            command->isWaitingForReply = false;
+            command->conditionVariable.notify_one();
+        }
+    }
     mWaitWorkCond.notify_one();
 }
 
