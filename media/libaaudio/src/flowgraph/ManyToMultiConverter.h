@@ -14,30 +14,40 @@
  * limitations under the License.
  */
 
-#ifndef FLOWGRAPH_SINK_I16_H
-#define FLOWGRAPH_SINK_I16_H
+#ifndef FLOWGRAPH_MANY_TO_MULTI_CONVERTER_H
+#define FLOWGRAPH_MANY_TO_MULTI_CONVERTER_H
 
 #include <unistd.h>
 #include <sys/types.h>
+#include <vector>
 
 #include "FlowGraphNode.h"
 
 namespace flowgraph {
 
 /**
- * AudioSink that lets you read data as 16-bit signed integers.
+ * Combine multiple mono inputs into one interleaved multi-channel output.
  */
-class SinkI16 : public FlowGraphSink {
+class ManyToMultiConverter : public flowgraph::FlowGraphNode {
 public:
-    explicit SinkI16(int32_t channelCount);
+    explicit ManyToMultiConverter(int32_t channelCount);
 
-    int32_t read(void *data, int32_t numFrames) override;
+    virtual ~ManyToMultiConverter() = default;
+
+    int32_t onProcess(int numFrames) override;
+
+    void setEnabled(bool /*enabled*/) {}
+
+    std::vector<std::unique_ptr<flowgraph::FlowGraphPortFloatInput>> inputs;
+    flowgraph::FlowGraphPortFloatOutput output;
 
     const char *getName() override {
-        return "SinkI16";
+        return "ManyToMultiConverter";
     }
+
+private:
 };
 
 } /* namespace flowgraph */
 
-#endif //FLOWGRAPH_SINK_I16_H
+#endif //FLOWGRAPH_MANY_TO_MULTI_CONVERTER_H

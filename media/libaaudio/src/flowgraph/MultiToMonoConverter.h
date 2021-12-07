@@ -1,5 +1,5 @@
 /*
- * Copyright 2018 The Android Open Source Project
+ * Copyright 2015 The Android Open Source Project
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -14,8 +14,8 @@
  * limitations under the License.
  */
 
-#ifndef FLOWGRAPH_SINK_I16_H
-#define FLOWGRAPH_SINK_I16_H
+#ifndef FLOWGRAPH_MULTI_TO_MONO_CONVERTER_H
+#define FLOWGRAPH_MULTI_TO_MONO_CONVERTER_H
 
 #include <unistd.h>
 #include <sys/types.h>
@@ -25,19 +25,25 @@
 namespace flowgraph {
 
 /**
- * AudioSink that lets you read data as 16-bit signed integers.
+ * Convert a multi-channel interleaved stream to a monophonic stream
+ * by extracting channel[0].
  */
-class SinkI16 : public FlowGraphSink {
-public:
-    explicit SinkI16(int32_t channelCount);
+    class MultiToMonoConverter : public FlowGraphNode {
+    public:
+        explicit MultiToMonoConverter(int32_t inputChannelCount);
 
-    int32_t read(void *data, int32_t numFrames) override;
+        virtual ~MultiToMonoConverter();
 
-    const char *getName() override {
-        return "SinkI16";
-    }
-};
+        int32_t onProcess(int32_t numFrames) override;
+
+        const char *getName() override {
+            return "MultiToMonoConverter";
+        }
+
+        FlowGraphPortFloatInput input;
+        FlowGraphPortFloatOutput output;
+    };
 
 } /* namespace flowgraph */
 
-#endif //FLOWGRAPH_SINK_I16_H
+#endif //FLOWGRAPH_MULTI_TO_MONO_CONVERTER_H

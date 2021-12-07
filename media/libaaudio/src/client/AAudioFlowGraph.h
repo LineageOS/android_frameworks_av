@@ -53,11 +53,11 @@ public:
     void setRampLengthInFrames(int32_t numFrames);
 
 private:
-    std::unique_ptr<flowgraph::AudioSource>          mSource;
-    std::unique_ptr<flowgraph::RampLinear>           mVolumeRamp;
-    std::unique_ptr<flowgraph::ClipToRange>          mClipper;
-    std::unique_ptr<flowgraph::MonoToMultiConverter> mChannelConverter;
-    std::unique_ptr<flowgraph::AudioSink>            mSink;
+    std::unique_ptr<flowgraph::FlowGraphSourceBuffered>     mSource;
+    std::unique_ptr<flowgraph::RampLinear>                  mVolumeRamp;
+    std::unique_ptr<flowgraph::ClipToRange>                 mClipper;
+    std::unique_ptr<flowgraph::MonoToMultiConverter>        mChannelConverter;
+    std::unique_ptr<flowgraph::FlowGraphSink>               mSink;
 };
 
 
