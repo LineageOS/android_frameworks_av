@@ -1296,13 +1296,18 @@ private:
             wp<CameraService> mParent;
     };
 
+    // When injecting the camera, it will check whether the injecting camera status is unavailable.
+    // If it is, the disconnect function will be called to to prevent camera access on the device.
+    status_t checkIfInjectionCameraIsPresent(const String8& externalCamId,
+            sp<BasicClient> clientSp);
+
     void clearInjectionParameters();
 
     // This is the existing camera id being replaced.
     String8 mInjectionInternalCamId;
     // This is the external camera Id replacing the internalId.
     String8 mInjectionExternalCamId;
-    bool mInjectionInitPending = true;
+    bool mInjectionInitPending = false;
     // Guard mInjectionInternalCamId and mInjectionInitPending.
     Mutex mInjectionParametersLock;
 };

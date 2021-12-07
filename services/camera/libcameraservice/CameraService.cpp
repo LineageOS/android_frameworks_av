@@ -1908,8 +1908,14 @@ Status CameraService::connectHelper(const sp<CALLBACK>& cameraCb, const String8&
             status_t res = NO_ERROR;
             auto clientDescriptor = mActiveClientManager.get(mInjectionInternalCamId);
             if (clientDescriptor != nullptr) {
-                BasicClient* baseClientPtr = clientDescriptor->getValue().get();
-                res = baseClientPtr->injectCamera(mInjectionExternalCamId, mCameraProviderManager);
+                sp<BasicClient> clientSp = clientDescriptor->getValue();
+                res = checkIfInjectionCameraIsPresent(mInjectionExternalCamId, clientSp);
+                if(res != OK) {
+                    return STATUS_ERROR_FMT(ERROR_DISCONNECTED,
+                            "No camera device with ID \"%s\" currently available",
+                            mInjectionExternalCamId.string());
+                }
+                res = clientSp->injectCamera(mInjectionExternalCamId, mCameraProviderManager);
                 if (res != OK) {
                     mInjectionStatusListener->notifyInjectionError(mInjectionExternalCamId, res);
                 }
@@ -2606,6 +2612,8 @@ Status CameraService::injectCamera(
         Mutex::Autolock lock(mInjectionParametersLock);
         mInjectionInternalCamId = String8(internalCamId);
         mInjectionExternalCamId = String8(externalCamId);
+        mInjectionStatusListener->addListener(callback);
+        *cameraInjectionSession = new CameraInjectionSession(this);
         status_t res = NO_ERROR;
         auto clientDescriptor = mActiveClientManager.get(mInjectionInternalCamId);
         // If the client already exists, we can directly connect to the camera device through the
@@ -2613,8 +2621,14 @@ Status CameraService::injectCamera(
         // (execute connectHelper()) before injecting the camera to the camera device.
         if (clientDescriptor != nullptr) {
             mInjectionInitPending = false;
-            BasicClient* baseClientPtr = clientDescriptor->getValue().get();
-            res = baseClientPtr->injectCamera(mInjectionExternalCamId, mCameraProviderManager);
+            sp<BasicClient> clientSp = clientDescriptor->getValue();
+            res = checkIfInjectionCameraIsPresent(mInjectionExternalCamId, clientSp);
+            if(res != OK) {
+                return STATUS_ERROR_FMT(ERROR_DISCONNECTED,
+                        "No camera device with ID \"%s\" currently available",
+                        mInjectionExternalCamId.string());
+            }
+            res = clientSp->injectCamera(mInjectionExternalCamId, mCameraProviderManager);
             if(res != OK) {
                 mInjectionStatusListener->notifyInjectionError(mInjectionExternalCamId, res);
             }
@@ -2622,8 +2636,6 @@ Status CameraService::injectCamera(
             mInjectionInitPending = true;
         }
     }
-    mInjectionStatusListener->addListener(callback);
-    *cameraInjectionSession = new CameraInjectionSession(this);
 
     return binder::Status::ok();
 }
@@ -5135,10 +5147,39 @@ int32_t CameraService::updateAudioRestrictionLocked() {
     return mode;
 }
 
+status_t CameraService::checkIfInjectionCameraIsPresent(const String8& externalCamId,
+        sp<BasicClient> clientSp) {
+    std::unique_ptr<AutoConditionLock> lock =
+            AutoConditionLock::waitAndAcquire(mServiceLockWrapper);
+    status_t res = NO_ERROR;
+    if ((res = checkIfDeviceIsUsable(externalCamId)) != NO_ERROR) {
+        ALOGW("Device %s is not usable!", externalCamId.string());
+        mInjectionStatusListener->notifyInjectionError(
+                externalCamId, UNKNOWN_TRANSACTION);
+        clientSp->notifyError(
+                hardware::camera2::ICameraDeviceCallbacks::ERROR_CAMERA_DISCONNECTED,
+                CaptureResultExtras());
+
+        // Do not hold mServiceLock while disconnecting clients, but retain the condition blocking
+        // other clients from connecting in mServiceLockWrapper if held
+        mServiceLock.unlock();
+
+        // Clear caller identity temporarily so client disconnect PID checks work correctly
+        int64_t token = CameraThreadState::clearCallingIdentity();
+        clientSp->disconnect();
+        CameraThreadState::restoreCallingIdentity(token);
+
+        // Reacquire mServiceLock
+        mServiceLock.lock();
+    }
+
+    return res;
+}
+
 void CameraService::clearInjectionParameters() {
     {
         Mutex::Autolock lock(mInjectionParametersLock);
-        mInjectionInitPending = true;
+        mInjectionInitPending = false;
         mInjectionInternalCamId = "";
     }
     mInjectionExternalCamId = "";
