@@ -285,8 +285,8 @@ public:
 
     virtual bool     isHapticPlaybackSupported() = 0;
 
-    virtual status_t getHwOffloadEncodingFormatsSupportedForA2DP(
-                std::vector<audio_format_t> *formats) = 0;
+    virtual status_t getHwOffloadFormatsSupportedForBluetoothMedia(
+                audio_devices_t device, std::vector<audio_format_t> *formats) = 0;
 
     virtual void     setAppState(audio_port_handle_t portId, app_state_t state) = 0;
 
