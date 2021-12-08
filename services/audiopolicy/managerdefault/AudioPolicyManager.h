@@ -320,8 +320,8 @@ public:
                                                     audio_format_t *surroundFormats);
         virtual status_t setSurroundFormatEnabled(audio_format_t audioFormat, bool enabled);
 
-        virtual status_t getHwOffloadEncodingFormatsSupportedForA2DP(
-                    std::vector<audio_format_t> *formats);
+        virtual status_t getHwOffloadFormatsSupportedForBluetoothMedia(
+                    audio_devices_t device, std::vector<audio_format_t> *formats);
 
         virtual void setAppState(audio_port_handle_t portId, app_state_t state);
 

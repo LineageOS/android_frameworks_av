@@ -40,6 +40,7 @@ const DeviceTypeSet& getAudioDeviceOutAllScoSet();
 const DeviceTypeSet& getAudioDeviceOutAllUsbSet();
 const DeviceTypeSet& getAudioDeviceInAllSet();
 const DeviceTypeSet& getAudioDeviceInAllUsbSet();
+const DeviceTypeSet& getAudioDeviceOutAllBleSet();
 
 template<typename T>
 static std::vector<T> Intersection(const std::set<T>& a, const std::set<T>& b) {

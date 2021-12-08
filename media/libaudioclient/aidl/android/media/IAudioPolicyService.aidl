@@ -293,7 +293,7 @@ interface IAudioPolicyService {
     void getReportedSurroundFormats(inout Int count,
                                     out AudioFormat[] formats);
 
-    AudioFormat[] getHwOffloadEncodingFormatsSupportedForA2DP();
+    AudioFormat[] getHwOffloadFormatsSupportedForBluetoothMedia(int /* audio_devices_t */ device);
 
     void setSurroundFormatEnabled(AudioFormat audioFormat, boolean enabled);
 
