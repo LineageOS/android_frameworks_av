@@ -214,6 +214,7 @@ cc_library {
         "flowgraph/MonoBlend.cpp",
         "flowgraph/MonoToMultiConverter.cpp",
         "flowgraph/MultiToMonoConverter.cpp",
+        "flowgraph/MultiToManyConverter.cpp",
         "flowgraph/RampLinear.cpp",
         "flowgraph/SampleRateConverter.cpp",
         "flowgraph/SinkFloat.cpp",
