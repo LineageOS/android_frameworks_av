@@ -2301,6 +2301,8 @@ aidl2legacy_AudioFlag_audio_flags_mask_t(media::AudioFlag aidl) {
             return AUDIO_FLAG_CONTENT_SPATIALIZED;
         case media::AudioFlag::NEVER_SPATIALIZE:
             return AUDIO_FLAG_NEVER_SPATIALIZE;
+        case media::AudioFlag::CALL_REDIRECTION:
+            return AUDIO_FLAG_CALL_REDIRECTION;
     }
     return unexpected(BAD_VALUE);
 }
@@ -2342,6 +2344,8 @@ legacy2aidl_audio_flags_mask_t_AudioFlag(audio_flags_mask_t legacy) {
             return media::AudioFlag::CONTENT_SPATIALIZED;
         case AUDIO_FLAG_NEVER_SPATIALIZE:
             return media::AudioFlag::NEVER_SPATIALIZE;
+        case AUDIO_FLAG_CALL_REDIRECTION:
+            return media::AudioFlag::CALL_REDIRECTION;
     }
     return unexpected(BAD_VALUE);
 }
@@ -2957,11 +2961,8 @@ aidl2legacy_AudioPort_audio_port_v7(const media::AudioPort& aidl) {
                                  }));
     legacy.num_gains = aidl.hal.gains.size();
 
-    media::AudioPortConfig aidlPortConfig;
-    aidlPortConfig.hal = aidl.hal.activeConfig;
-    aidlPortConfig.sys = aidl.sys.activeConfig;
     legacy.active_config = VALUE_OR_RETURN(
-            aidl2legacy_AudioPortConfig_audio_port_config(aidlPortConfig));
+            aidl2legacy_AudioPortConfig_audio_port_config(aidl.sys.activeConfig));
     legacy.ext = VALUE_OR_RETURN(
             aidl2legacy_AudioPortExt_audio_port_v7_ext(aidl.hal.ext, aidl.sys.type, aidl.sys.ext));
     return legacy;
@@ -3007,10 +3008,9 @@ legacy2aidl_audio_port_v7_AudioPort(const audio_port_v7& legacy) {
                          }));
     aidl.sys.gains.resize(legacy.num_gains);
 
-    media::AudioPortConfig aidlPortConfig = VALUE_OR_RETURN(
+    aidl.sys.activeConfig = VALUE_OR_RETURN(
             legacy2aidl_audio_port_config_AudioPortConfig(legacy.active_config));
-    aidl.hal.activeConfig = aidlPortConfig.hal;
-    aidl.sys.activeConfig = aidlPortConfig.sys;
+    aidl.sys.activeConfig.hal.portId = aidl.hal.id;
     RETURN_IF_ERROR(
             legacy2aidl_AudioPortExt(legacy.ext, legacy.type, &aidl.hal.ext, &aidl.sys.ext));
     return aidl;
