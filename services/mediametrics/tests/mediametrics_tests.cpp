@@ -1226,8 +1226,8 @@ TEST(mediametrics_tests, ValidateId) {
     }
 }
 
-TEST(mediametrics_tests, ErrorConversion) {
-    constexpr status_t errors[] = {
+TEST(mediametrics_tests, StatusConversion) {
+    constexpr status_t statuses[] = {
         NO_ERROR,
         BAD_VALUE,
         DEAD_OBJECT,
@@ -1239,13 +1239,13 @@ TEST(mediametrics_tests, ErrorConversion) {
     };
 
     auto roundTrip = [](status_t status) {
-        return android::mediametrics::errorStringToStatus(
-                android::mediametrics::statusToErrorString(status));
+        return android::mediametrics::statusStringToStatus(
+                android::mediametrics::statusToStatusString(status));
     };
 
     // Primary status error categories.
-    for (const auto error : errors) {
-        ASSERT_EQ(error, roundTrip(error));
+    for (const auto status : statuses) {
+        ASSERT_EQ(status, roundTrip(status));
     }
 
     // Status errors specially considered.
@@ -1260,20 +1260,20 @@ TEST(mediametrics_tests, HeatMap) {
 
     ASSERT_EQ((size_t)0, heatMap.size());
     heatMap.add("someKey", "someSuffix", "someEvent",
-            AMEDIAMETRICS_PROP_ERROR_VALUE_OK, UID, "message", SUBCODE);
+            AMEDIAMETRICS_PROP_STATUS_VALUE_OK, UID, "message", SUBCODE);
     ASSERT_EQ((size_t)1, heatMap.size());
     heatMap.add("someKey", "someSuffix", "someEvent",
-            AMEDIAMETRICS_PROP_ERROR_VALUE_OK, UID, "message", SUBCODE);
+            AMEDIAMETRICS_PROP_STATUS_VALUE_OK, UID, "message", SUBCODE);
     heatMap.add("someKey", "someSuffix", "anotherEvent",
-            AMEDIAMETRICS_PROP_ERROR_VALUE_ARGUMENT, UID, "message", SUBCODE);
+            AMEDIAMETRICS_PROP_STATUS_VALUE_ARGUMENT, UID, "message", SUBCODE);
     ASSERT_EQ((size_t)1, heatMap.size());
     heatMap.add("anotherKey", "someSuffix", "someEvent",
-            AMEDIAMETRICS_PROP_ERROR_VALUE_OK, UID, "message", SUBCODE);
+            AMEDIAMETRICS_PROP_STATUS_VALUE_OK, UID, "message", SUBCODE);
     ASSERT_EQ((size_t)2, heatMap.size());
     ASSERT_EQ((size_t)0, heatMap.rejected());
 
     heatMap.add("thirdKey", "someSuffix", "someEvent",
-            AMEDIAMETRICS_PROP_ERROR_VALUE_OK, UID, "message", SUBCODE);
+            AMEDIAMETRICS_PROP_STATUS_VALUE_OK, UID, "message", SUBCODE);
     ASSERT_EQ((size_t)2, heatMap.size());
     ASSERT_EQ((size_t)1, heatMap.rejected());
 

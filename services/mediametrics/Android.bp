@@ -183,6 +183,10 @@ cc_library {
         "libplatformprotos",
     ],
 
+    header_libs: [
+        "libaaudio_headers",
+    ],
+
     include_dirs: [
         "system/media/audio_utils/include",
     ],
