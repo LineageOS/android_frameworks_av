@@ -17,7 +17,7 @@
 package android.media;
 
 import android.media.AudioGainSys;
-import android.media.AudioPortConfigSys;
+import android.media.AudioPortConfig;
 import android.media.AudioPortExtSys;
 import android.media.AudioPortRole;
 import android.media.AudioPortType;
@@ -35,8 +35,8 @@ parcelable AudioPortSys {
     AudioProfileSys[] profiles;
     /** System-only parameters for each AudioGain from 'port.gains'. */
     AudioGainSys[] gains;
-    /** System-only parameters for 'port.activeConfig'. */
-    AudioPortConfigSys activeConfig;
+    /** Current audio port configuration. */
+    AudioPortConfig activeConfig;
     /** System-only extra parameters for 'port.ext'. */
     AudioPortExtSys ext;
 }

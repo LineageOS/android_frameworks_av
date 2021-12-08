@@ -104,6 +104,7 @@ bool modifyDefaultAudioEffectsAllowed(const AttributionSourceState& attributionS
 bool dumpAllowed();
 bool modifyPhoneStateAllowed(const AttributionSourceState& attributionSource);
 bool bypassInterruptionPolicyAllowed(const AttributionSourceState& attributionSource);
+bool callAudioInterceptionAllowed(const AttributionSourceState& attributionSource);
 void purgePermissionCache();
 int32_t getOpForSource(audio_source_t source);
 
