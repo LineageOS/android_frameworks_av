@@ -199,6 +199,7 @@ void AudioTrack::MediaMetrics::gather(const AudioTrack *track)
 
 #define MM_PREFIX "android.media.audiotrack." // avoid cut-n-paste errors.
 
+    // Do not change this without changing the MediaMetricsService side.
     // Java API 28 entries, do not change.
     mMetricsItem->setCString(MM_PREFIX "streamtype", toString(track->streamType()).c_str());
     mMetricsItem->setCString(MM_PREFIX "type",
@@ -214,6 +215,7 @@ void AudioTrack::MediaMetrics::gather(const AudioTrack *track)
     mMetricsItem->setInt32(MM_PREFIX "frameCount", (int32_t)track->mFrameCount);
     mMetricsItem->setCString(MM_PREFIX "attributes", toString(track->mAttributes).c_str());
     mMetricsItem->setCString(MM_PREFIX "logSessionId", track->mLogSessionId.c_str());
+    mMetricsItem->setInt32(MM_PREFIX "underrunFrames", (int32_t)track->getUnderrunFrames());
 }
 
 // hand the user a snapshot of the metrics.
@@ -406,8 +408,18 @@ status_t AudioTrack::set(
           sessionId, transferType, attributionSource.uid, attributionSource.pid);
 
     mThreadCanCallJava = threadCanCallJava;
+
+    // These variables are pulled in an error report, so we initialize them early.
     mSelectedDeviceId = selectedDeviceId;
     mSessionId = sessionId;
+    mChannelMask = channelMask;
+    mFormat = format;
+    mOrigFlags = mFlags = flags;
+    mReqFrameCount = mFrameCount = frameCount;
+    mSampleRate = sampleRate;
+    mOriginalSampleRate = sampleRate;
+    mAttributes = pAttributes != nullptr ? *pAttributes : AUDIO_ATTRIBUTES_INITIALIZER;
+    mPlaybackRate = AUDIO_PLAYBACK_RATE_DEFAULT;
 
     switch (transferType) {
     case TRANSFER_DEFAULT:
@@ -482,7 +494,6 @@ status_t AudioTrack::set(
 
     } else {
         // stream type shouldn't be looked at, this track has audio attributes
-        memcpy(&mAttributes, pAttributes, sizeof(audio_attributes_t));
         ALOGV("%s(): Building AudioTrack with attributes:"
                 " usage=%d content=%d flags=0x%x tags=[%s]",
                 __func__,
@@ -504,14 +515,12 @@ status_t AudioTrack::set(
         status = BAD_VALUE;
         goto error;
     }
-    mFormat = format;
 
     if (!audio_is_output_channel(channelMask)) {
         errorMessage = StringPrintf("%s: Invalid channel mask %#x",  __func__, channelMask);
         status = BAD_VALUE;
         goto error;
     }
-    mChannelMask = channelMask;
     channelCount = audio_channel_count_from_out_mask(channelMask);
     mChannelCount = channelCount;
 
@@ -553,9 +562,6 @@ status_t AudioTrack::set(
         status = BAD_VALUE;
         goto error;
     }
-    mSampleRate = sampleRate;
-    mOriginalSampleRate = sampleRate;
-    mPlaybackRate = AUDIO_PLAYBACK_RATE_DEFAULT;
     // 1.0 <= mMaxRequiredSpeed <= AUDIO_TIMESTRETCH_SPEED_MAX
     mMaxRequiredSpeed = min(max(maxRequiredSpeed, 1.0f), AUDIO_TIMESTRETCH_SPEED_MAX);
 
@@ -575,7 +581,6 @@ status_t AudioTrack::set(
     mVolume[AUDIO_INTERLEAVE_RIGHT] = 1.0f;
     mSendLevel = 0.0f;
     // mFrameCount is initialized in createTrack_l
-    mReqFrameCount = frameCount;
     if (notificationFrames >= 0) {
         mNotificationFramesReq = notificationFrames;
         mNotificationsPerBufferReq = 0;
@@ -616,7 +621,6 @@ status_t AudioTrack::set(
         mClientAttributionSource.pid = VALUE_OR_FATAL(legacy2aidl_uid_t_int32_t(callingPid));
     }
     mAuxEffectId = 0;
-    mOrigFlags = mFlags = flags;
     mCbf = cbf;
 
     if (cbf != NULL) {
@@ -2010,7 +2014,8 @@ void AudioTrack::reportError(status_t status, const char *event, const char *mes
     if (status == NO_ERROR) return;
     // We report error on the native side because some callers do not come
     // from Java.
-    mediametrics::LogItem(std::string(AMEDIAMETRICS_KEY_PREFIX_AUDIO_TRACK) + "error")
+    // Ensure these variables are initialized in set().
+    mediametrics::LogItem(AMEDIAMETRICS_KEY_AUDIO_TRACK_ERROR)
         .set(AMEDIAMETRICS_PROP_EVENT, event)
         .set(AMEDIAMETRICS_PROP_ERROR, mediametrics::statusToErrorString(status))
         .set(AMEDIAMETRICS_PROP_ERRORMESSAGE, message)
@@ -2021,8 +2026,10 @@ void AudioTrack::reportError(status_t status, const char *event, const char *mes
         .set(AMEDIAMETRICS_PROP_SELECTEDDEVICEID, (int32_t)mSelectedDeviceId)
         .set(AMEDIAMETRICS_PROP_ENCODING, toString(mFormat).c_str())
         .set(AMEDIAMETRICS_PROP_CHANNELMASK, (int32_t)mChannelMask)
-        .set(AMEDIAMETRICS_PROP_FRAMECOUNT, (int32_t)mReqFrameCount) // requested frame count
         // the following are NOT immutable
+        // frame count is initially the requested frame count, but may be adjusted
+        // by AudioFlinger after creation.
+        .set(AMEDIAMETRICS_PROP_FRAMECOUNT, (int32_t)mFrameCount)
         .set(AMEDIAMETRICS_PROP_SAMPLERATE, (int32_t)mSampleRate)
         .set(AMEDIAMETRICS_PROP_PLAYBACK_SPEED, (double)mPlaybackRate.mSpeed)
         .set(AMEDIAMETRICS_PROP_PLAYBACK_PITCH, (double)mPlaybackRate.mPitch)
