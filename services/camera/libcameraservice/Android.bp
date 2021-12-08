@@ -95,7 +95,6 @@ cc_library_shared {
         "utils/CameraThreadState.cpp",
         "utils/CameraTraces.cpp",
         "utils/AutoConditionLock.cpp",
-        "utils/ExifUtils.cpp",
         "utils/SessionConfigurationUtils.cpp",
         "utils/SessionStatsBuilder.cpp",
         "utils/TagMonitor.cpp",
@@ -164,6 +163,7 @@ cc_library_shared {
         "libprocessinfoservice_aidl",
         "libbinderthreadstateutils",
         "media_permission-aidl-cpp",
+        "libcameraservice_host",
     ],
 
     export_shared_lib_headers: [
@@ -181,6 +181,41 @@ cc_library_shared {
         "frameworks/av/media/ndk",
         "external/dynamic_depth/includes",
         "external/dynamic_depth/internal",
+    ],
+
+    export_include_dirs: ["."],
+
+    cflags: [
+        "-Wall",
+        "-Wextra",
+        "-Werror",
+        "-Wno-ignored-qualifiers",
+    ],
+
+}
+
+cc_library_static {
+    name: "libcameraservice_host",
+    host_supported: true,
+
+    // Camera service source
+
+    srcs: [
+        "utils/ExifUtils.cpp",
+    ],
+
+    shared_libs: [
+        "libbase",
+        "libbinder",
+        "libcamera_metadata",
+        "libexif",
+        "liblog",
+        "libutils",
+    ],
+
+    include_dirs: [
+        "frameworks/av/camera/include",
+        "frameworks/av/camera/include/camera",
     ],
 
     export_include_dirs: ["."],

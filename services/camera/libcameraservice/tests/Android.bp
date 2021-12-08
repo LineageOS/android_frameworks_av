@@ -75,3 +75,40 @@ cc_test {
     test_suites: ["device-tests"],
 
 }
+
+cc_test_host {
+    name: "cameraservice_test_host",
+
+    include_dirs: [
+        "frameworks/av/camera/include",
+        "frameworks/av/camera/include/camera",
+    ],
+
+    shared_libs: [
+        "libbase",
+        "libbinder",
+        "libcamera_metadata",
+        "libexif",
+        "liblog",
+        "libutils",
+    ],
+
+    static_libs: [
+        "libcamera_client_host",
+        "libcameraservice_host",
+        "libgmock",
+    ],
+
+    srcs: [
+        "ExifUtilsTest.cpp",
+    ],
+
+    cflags: [
+        "-Wall",
+        "-Wextra",
+        "-Werror",
+    ],
+
+    test_suites: ["device-tests"],
+
+}
