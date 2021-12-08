@@ -27,6 +27,7 @@
 #include <variant>
 
 #include <binder/Parcel.h>
+#include <log/log.h>
 #include <utils/Errors.h>
 #include <utils/Timers.h> // nsecs_t
 
@@ -472,6 +473,7 @@ protected:
         do {
             if (ptr >= bufferptrmax) {
                 ALOGE("%s: buffer exceeded", __func__);
+                android_errorWriteLog(0x534e4554, "204445255");
                 return BAD_VALUE;
             }
         } while (*ptr++ != 0);
