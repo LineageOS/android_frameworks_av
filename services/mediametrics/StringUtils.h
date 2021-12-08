@@ -167,4 +167,41 @@ inline std::string bytesToString(const std::vector<uint8_t>& bytes, size_t maxSi
     return ss.str();
 }
 
+/**
+ * Returns true if the string is non-null, not empty, and contains only digits.
+ */
+inline constexpr bool isNumeric(const char *s)
+{
+    if (s == nullptr || *s == 0) return false;
+    do {
+        if (!isdigit(*s)) return false;
+    } while (*++s != 0);
+    return true;  // all digits
+}
+
+/**
+ * Extracts out the prefix from the key, returning a pair of prefix, suffix.
+ *
+ * Usually the key is something like:
+ * Prefix.(ID)
+ *   where ID is an integer,
+ *               or "error" if the id was not returned because of failure,
+ *               or "status" if general status.
+ *
+ * Example: audio.track.10     -> prefix = audio.track, suffix = 10
+ *          audio.track.error  -> prefix = audio.track, suffix = error
+ *          audio.track.status -> prefix = audio.track, suffix = status
+ *          audio.mute         -> prefix = audio.mute,  suffix = ""
+ */
+inline std::pair<std::string /* prefix */,
+                 std::string /* suffix */> splitPrefixKey(const std::string &key)
+{
+    const size_t split = key.rfind('.');
+    const char* suffix = key.c_str() + split + 1;
+    if (*suffix && (!strcmp(suffix, "error") || !strcmp(suffix, "status") || isNumeric(suffix))) {
+        return { key.substr(0, split), suffix };
+    }
+    return { key, "" };
+}
+
 } // namespace android::mediametrics::stringutils

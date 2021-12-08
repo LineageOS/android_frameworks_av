@@ -81,7 +81,7 @@ public:
             size_t ok = 0;
             size_t error = 0;
             for (const auto &[name, count] : eventPair.second) {
-                if (name == AMEDIAMETRICS_PROP_ERROR_VALUE_OK) {
+                if (name == AMEDIAMETRICS_PROP_STATUS_VALUE_OK) {
                     ok += count;
                 } else {
                     error += count;
