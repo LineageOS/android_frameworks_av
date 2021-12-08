@@ -52,7 +52,8 @@ aaudio_result_t AudioStreamInternalPlay::open(const AudioStreamBuilder &builder)
         result = mFlowGraph.configure(getFormat(),
                              getSamplesPerFrame(),
                              getDeviceFormat(),
-                             getDeviceChannelCount());
+                             getDeviceChannelCount(),
+                             getRequireMonoBlend());
 
         if (result != AAUDIO_OK) {
             safeReleaseClose();

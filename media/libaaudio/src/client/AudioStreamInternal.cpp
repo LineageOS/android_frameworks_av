@@ -27,6 +27,7 @@
 #include <aaudio/AAudio.h>
 #include <cutils/properties.h>
 
+#include <media/AudioParameter.h>
 #include <media/AudioSystem.h>
 #include <media/MediaMetricsItem.h>
 #include <utils/Trace.h>
@@ -268,6 +269,15 @@ aaudio_result_t AudioStreamInternal::open(const AudioStreamBuilder &builder) {
 
         const int32_t callbackBufferSize = mCallbackFrames * getBytesPerFrame();
         mCallbackBuffer = std::make_unique<uint8_t[]>(callbackBufferSize);
+    }
+
+    // Exclusive output streams should combine channels when mono audio adjustment
+    // is enabled.
+    if ((getDirection() == AAUDIO_DIRECTION_OUTPUT) &&
+        (getSharingMode() == AAUDIO_SHARING_MODE_EXCLUSIVE)) {
+        bool isMasterMono = false;
+        android::AudioSystem::getMasterMono(&isMasterMono);
+        setRequireMonoBlend(isMasterMono);
     }
 
     // For debugging and analyzing the distribution of MMAP timestamps.
