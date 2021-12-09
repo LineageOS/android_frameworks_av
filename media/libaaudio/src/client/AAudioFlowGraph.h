@@ -24,6 +24,7 @@
 
 #include <aaudio/AAudio.h>
 #include <flowgraph/ClipToRange.h>
+#include <flowgraph/MonoBlend.h>
 #include <flowgraph/MonoToMultiConverter.h>
 #include <flowgraph/RampLinear.h>
 
@@ -41,7 +42,8 @@ public:
     aaudio_result_t configure(audio_format_t sourceFormat,
                               int32_t sourceChannelCount,
                               audio_format_t sinkFormat,
-                              int32_t sinkChannelCount);
+                              int32_t sinkChannelCount,
+                              bool useMonoBlend);
 
     void process(const void *source, void *destination, int32_t numFrames);
 
@@ -54,6 +56,7 @@ public:
 
 private:
     std::unique_ptr<flowgraph::FlowGraphSourceBuffered>     mSource;
+    std::unique_ptr<flowgraph::MonoBlend>                   mMonoBlend;
     std::unique_ptr<flowgraph::RampLinear>                  mVolumeRamp;
     std::unique_ptr<flowgraph::ClipToRange>                 mClipper;
     std::unique_ptr<flowgraph::MonoToMultiConverter>        mChannelConverter;

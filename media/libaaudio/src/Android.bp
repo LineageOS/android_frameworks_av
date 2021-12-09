@@ -211,6 +211,7 @@ cc_library {
         "flowgraph/ClipToRange.cpp",
         "flowgraph/FlowGraphNode.cpp",
         "flowgraph/ManyToMultiConverter.cpp",
+        "flowgraph/MonoBlend.cpp",
         "flowgraph/MonoToMultiConverter.cpp",
         "flowgraph/MultiToMonoConverter.cpp",
         "flowgraph/RampLinear.cpp",
