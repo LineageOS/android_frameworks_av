@@ -409,7 +409,7 @@ void ClientProxy::binderDied()
         android_atomic_or(CBLK_FUTEX_WAKE, &cblk->mFutex);
         // it seems that a FUTEX_WAKE_PRIVATE will not wake a FUTEX_WAIT, even within same process
         (void) syscall(__NR_futex, &cblk->mFutex, mClientInServer ? FUTEX_WAKE_PRIVATE : FUTEX_WAKE,
-                1);
+                INT_MAX);
     }
 }
 
@@ -419,7 +419,7 @@ void ClientProxy::interrupt()
     if (!(android_atomic_or(CBLK_INTERRUPT, &cblk->mFlags) & CBLK_INTERRUPT)) {
         android_atomic_or(CBLK_FUTEX_WAKE, &cblk->mFutex);
         (void) syscall(__NR_futex, &cblk->mFutex, mClientInServer ? FUTEX_WAKE_PRIVATE : FUTEX_WAKE,
-                1);
+                INT_MAX);
     }
 }
 
@@ -747,7 +747,7 @@ void ServerProxy::flushBufferIfNeeded()
             int32_t old = android_atomic_or(CBLK_FUTEX_WAKE, &cblk->mFutex);
             if (!(old & CBLK_FUTEX_WAKE)) {
                 (void) syscall(__NR_futex, &cblk->mFutex,
-                        mClientInServer ? FUTEX_WAKE_PRIVATE : FUTEX_WAKE, 1);
+                        mClientInServer ? FUTEX_WAKE_PRIVATE : FUTEX_WAKE, INT_MAX);
             }
         }
         mFlushed += (newFront - front) & mask;
@@ -917,7 +917,7 @@ void ServerProxy::releaseBuffer(Buffer* buffer)
         int32_t old = android_atomic_or(CBLK_FUTEX_WAKE, &cblk->mFutex);
         if (!(old & CBLK_FUTEX_WAKE)) {
             (void) syscall(__NR_futex, &cblk->mFutex,
-                    mClientInServer ? FUTEX_WAKE_PRIVATE : FUTEX_WAKE, 1);
+                    mClientInServer ? FUTEX_WAKE_PRIVATE : FUTEX_WAKE, INT_MAX);
         }
     }
 
