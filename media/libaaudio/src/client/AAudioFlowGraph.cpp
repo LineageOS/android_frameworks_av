@@ -42,14 +42,15 @@ aaudio_result_t AAudioFlowGraph::configure(audio_format_t sourceFormat,
                           audio_format_t sinkFormat,
                           int32_t sinkChannelCount,
                           bool useMonoBlend,
-                          float audioBalance) {
+                          float audioBalance,
+                          bool isExclusive) {
     FlowGraphPortFloatOutput *lastOutput = nullptr;
 
     // TODO change back to ALOGD
     ALOGI("%s() source format = 0x%08x, channels = %d, sink format = 0x%08x, channels = %d, "
-          "useMonoBlend = %d, audioBalance = %f",
+          "useMonoBlend = %d, audioBalance = %f, isExclusive %d",
           __func__, sourceFormat, sourceChannelCount, sinkFormat, sinkChannelCount,
-          useMonoBlend, audioBalance);
+          useMonoBlend, audioBalance, isExclusive);
 
     switch (sourceFormat) {
         case AUDIO_FORMAT_PCM_FLOAT:
@@ -94,22 +95,25 @@ aaudio_result_t AAudioFlowGraph::configure(audio_format_t sourceFormat,
         return AAUDIO_ERROR_UNIMPLEMENTED;
     }
 
-    // Apply volume ramps to set the left/right audio balance and target volumes.
-    // The signals will be decoupled, volume ramps will be applied, before the signals are
-    // combined again.
-    mMultiToManyConverter = std::make_unique<MultiToManyConverter>(sinkChannelCount);
-    mManyToMultiConverter = std::make_unique<ManyToMultiConverter>(sinkChannelCount);
-    lastOutput->connect(&mMultiToManyConverter->input);
-    for (int i = 0; i < sinkChannelCount; i++) {
-        mVolumeRamps.emplace_back(std::make_unique<RampLinear>(1));
-        mPanningVolumes.emplace_back(1.0f);
-        lastOutput = mMultiToManyConverter->outputs[i].get();
-        lastOutput->connect(&(mVolumeRamps[i].get()->input));
-        lastOutput = &(mVolumeRamps[i].get()->output);
-        lastOutput->connect(mManyToMultiConverter->inputs[i].get());
+    // Apply volume ramps for only exclusive streams.
+    if (isExclusive) {
+        // Apply volume ramps to set the left/right audio balance and target volumes.
+        // The signals will be decoupled, volume ramps will be applied, before the signals are
+        // combined again.
+        mMultiToManyConverter = std::make_unique<MultiToManyConverter>(sinkChannelCount);
+        mManyToMultiConverter = std::make_unique<ManyToMultiConverter>(sinkChannelCount);
+        lastOutput->connect(&mMultiToManyConverter->input);
+        for (int i = 0; i < sinkChannelCount; i++) {
+            mVolumeRamps.emplace_back(std::make_unique<RampLinear>(1));
+            mPanningVolumes.emplace_back(1.0f);
+            lastOutput = mMultiToManyConverter->outputs[i].get();
+            lastOutput->connect(&(mVolumeRamps[i].get()->input));
+            lastOutput = &(mVolumeRamps[i].get()->output);
+            lastOutput->connect(mManyToMultiConverter->inputs[i].get());
+        }
+        lastOutput = &mManyToMultiConverter->output;
+        setAudioBalance(audioBalance);
     }
-    lastOutput = &mManyToMultiConverter->output;
-    setAudioBalance(audioBalance);
 
     switch (sinkFormat) {
         case AUDIO_FORMAT_PCM_FLOAT:
