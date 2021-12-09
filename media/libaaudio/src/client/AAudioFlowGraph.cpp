@@ -21,6 +21,7 @@
 #include "AAudioFlowGraph.h"
 
 #include <flowgraph/ClipToRange.h>
+#include <flowgraph/MonoBlend.h>
 #include <flowgraph/MonoToMultiConverter.h>
 #include <flowgraph/RampLinear.h>
 #include <flowgraph/SinkFloat.h>
@@ -37,7 +38,8 @@ using namespace flowgraph;
 aaudio_result_t AAudioFlowGraph::configure(audio_format_t sourceFormat,
                           int32_t sourceChannelCount,
                           audio_format_t sinkFormat,
-                          int32_t sinkChannelCount) {
+                          int32_t sinkChannelCount,
+                          bool useMonoBlend) {
     FlowGraphPortFloatOutput *lastOutput = nullptr;
 
     // TODO change back to ALOGD
@@ -74,6 +76,12 @@ aaudio_result_t AAudioFlowGraph::configure(audio_format_t sourceFormat,
         mClipper = std::make_unique<ClipToRange>(sourceChannelCount);
         lastOutput->connect(&mClipper->input);
         lastOutput = &mClipper->output;
+    }
+
+    if (useMonoBlend) {
+        mMonoBlend = std::make_unique<MonoBlend>(sourceChannelCount);
+        lastOutput->connect(&mMonoBlend->input);
+        lastOutput = &mMonoBlend->output;
     }
 
     // Expand the number of channels if required.
