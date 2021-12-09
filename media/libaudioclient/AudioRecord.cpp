@@ -210,11 +210,13 @@ void AudioRecord::stopAndJoinCallbacks() {
         mAudioRecordThread->requestExitAndWait();
         mAudioRecordThread.clear();
     }
-    // No lock here: worst case we remove a NULL callback which will be a nop
+
+    AutoMutex lock(mLock);
     if (mDeviceCallback != 0 && mInput != AUDIO_IO_HANDLE_NONE) {
         // This may not stop all of these device callbacks!
         // TODO: Add some sort of protection.
         AudioSystem::removeAudioDeviceCallback(this, mInput, mPortId);
+        mDeviceCallback.clear();
     }
 }
 status_t AudioRecord::set(

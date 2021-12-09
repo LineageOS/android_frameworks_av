@@ -358,7 +358,8 @@ void AudioTrack::stopAndJoinCallbacks() {
         mAudioTrackThread->requestExitAndWait();
         mAudioTrackThread.clear();
     }
-    // No lock here: worst case we remove a NULL callback which will be a nop
+
+    AutoMutex lock(mLock);
     if (mDeviceCallback != 0 && mOutput != AUDIO_IO_HANDLE_NONE) {
         // This may not stop all of these device callbacks!
         // TODO: Add some sort of protection.
