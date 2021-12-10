@@ -192,9 +192,11 @@ class Camera3Device :
 
     status_t prepare(int maxCount, int streamId) override;
 
-    ssize_t getJpegBufferSize(uint32_t width, uint32_t height) const override;
-    ssize_t getPointCloudBufferSize() const;
-    ssize_t getRawOpaqueBufferSize(int32_t width, int32_t height, bool maxResolution) const;
+    ssize_t getJpegBufferSize(const CameraMetadata &info, uint32_t width,
+            uint32_t height) const override;
+    ssize_t getPointCloudBufferSize(const CameraMetadata &info) const;
+    ssize_t getRawOpaqueBufferSize(const CameraMetadata &info, int32_t width, int32_t height,
+            bool maxResolution) const;
 
     // Methods called by subclasses
     void             notifyStatus(bool idle); // updates from StatusTracker
