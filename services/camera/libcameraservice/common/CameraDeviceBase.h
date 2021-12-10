@@ -102,7 +102,8 @@ class CameraDeviceBase : public virtual FrameProducer {
     virtual status_t dumpWatchedEventsToVector(std::vector<std::string> &out) = 0;
 
     /**
-     * The physical camera device's static characteristics metadata buffer
+     * The physical camera device's static characteristics metadata buffer, or
+     * the logical camera's static characteristics if physical id is empty.
      */
     virtual const CameraMetadata& infoPhysical(const String8& physicalId) const = 0;
 
@@ -307,7 +308,8 @@ class CameraDeviceBase : public virtual FrameProducer {
      * Get Jpeg buffer size for a given jpeg resolution.
      * Negative values are error codes.
      */
-    virtual ssize_t getJpegBufferSize(uint32_t width, uint32_t height) const = 0;
+    virtual ssize_t getJpegBufferSize(const CameraMetadata &info, uint32_t width,
+            uint32_t height) const = 0;
 
     /**
      * Connect HAL notifications to a listener. Overwrites previous
