@@ -430,6 +430,10 @@ private:
             LOG(DEBUG) << "WrappedDecoderInterface: FilterWrapper not found";
             return C2_OK;
         }
+        if (!filterWrapper->isFilteringEnabled(next)) {
+            LOG(VERBOSE) << "WrappedDecoderInterface: filtering not enabled";
+            return C2_OK;
+        }
         std::vector<std::unique_ptr<C2Param>> params;
         c2_status_t err = filterWrapper->queryParamsForPreviousComponent(next, &params);
         if (err != C2_OK) {
