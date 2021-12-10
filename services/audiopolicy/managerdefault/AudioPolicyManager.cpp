@@ -3653,53 +3653,7 @@ audio_offload_mode_t AudioPolicyManager::getOffloadSupport(const audio_offload_i
      offloadInfo.stream_type, offloadInfo.bit_rate, offloadInfo.duration_us,
      offloadInfo.has_video);
 
-    if (mMasterMono) {
-        return AUDIO_OFFLOAD_NOT_SUPPORTED; // no offloading if mono is set.
-    }
-
-    // Check if offload has been disabled
-    if (property_get_bool("audio.offload.disable", false /* default_value */)) {
-        ALOGV("%s: offload disabled by audio.offload.disable", __func__);
-        return AUDIO_OFFLOAD_NOT_SUPPORTED;
-    }
-
-    // Check if stream type is music, then only allow offload as of now.
-    if (offloadInfo.stream_type != AUDIO_STREAM_MUSIC)
-    {
-        ALOGV("%s: stream_type != MUSIC, returning false", __func__);
-        return AUDIO_OFFLOAD_NOT_SUPPORTED;
-    }
-
-    //TODO: enable audio offloading with video when ready
-    const bool allowOffloadWithVideo =
-            property_get_bool("audio.offload.video", false /* default_value */);
-    if (offloadInfo.has_video && !allowOffloadWithVideo) {
-        ALOGV("%s: has_video == true, returning false", __func__);
-        return AUDIO_OFFLOAD_NOT_SUPPORTED;
-    }
-
-    //If duration is less than minimum value defined in property, return false
-    const int min_duration_secs = property_get_int32(
-            "audio.offload.min.duration.secs", -1 /* default_value */);
-    if (min_duration_secs >= 0) {
-        if (offloadInfo.duration_us < min_duration_secs * 1000000LL) {
-            ALOGV("%s: Offload denied by duration < audio.offload.min.duration.secs(=%d)",
-                    __func__, min_duration_secs);
-            return AUDIO_OFFLOAD_NOT_SUPPORTED;
-        }
-    } else if (offloadInfo.duration_us < OFFLOAD_DEFAULT_MIN_DURATION_SECS * 1000000) {
-        ALOGV("%s: Offload denied by duration < default min(=%u)",
-                __func__, OFFLOAD_DEFAULT_MIN_DURATION_SECS);
-        return AUDIO_OFFLOAD_NOT_SUPPORTED;
-    }
-
-    // Do not allow offloading if one non offloadable effect is enabled. This prevents from
-    // creating an offloaded track and tearing it down immediately after start when audioflinger
-    // detects there is an active non offloadable effect.
-    // FIXME: We should check the audio session here but we do not have it in this context.
-    // This may prevent offloading in rare situations where effects are left active by apps
-    // in the background.
-    if (mEffects.isNonOffloadableEffectEnabled()) {
+    if (!isOffloadPossible(offloadInfo)) {
         return AUDIO_OFFLOAD_NOT_SUPPORTED;
     }
 
@@ -3739,6 +3693,122 @@ bool AudioPolicyManager::isDirectOutputSupported(const audio_config_base_t& conf
         (profile != 0 ? profile->getTagName().c_str() : "null"),
         config.sample_rate, config.format, config.channel_mask, output_flags);
     return (profile != 0);
+}
+
+bool AudioPolicyManager::isOffloadPossible(const audio_offload_info_t &offloadInfo,
+                                           bool durationIgnored) {
+    if (mMasterMono) {
+        return false; // no offloading if mono is set.
+    }
+
+    // Check if offload has been disabled
+    if (property_get_bool("audio.offload.disable", false /* default_value */)) {
+        ALOGV("%s: offload disabled by audio.offload.disable", __func__);
+        return false;
+    }
+
+    // Check if stream type is music, then only allow offload as of now.
+    if (offloadInfo.stream_type != AUDIO_STREAM_MUSIC)
+    {
+        ALOGV("%s: stream_type != MUSIC, returning false", __func__);
+        return false;
+    }
+
+    //TODO: enable audio offloading with video when ready
+    const bool allowOffloadWithVideo =
+            property_get_bool("audio.offload.video", false /* default_value */);
+    if (offloadInfo.has_video && !allowOffloadWithVideo) {
+        ALOGV("%s: has_video == true, returning false", __func__);
+        return false;
+    }
+
+    //If duration is less than minimum value defined in property, return false
+    const int min_duration_secs = property_get_int32(
+            "audio.offload.min.duration.secs", -1 /* default_value */);
+    if (!durationIgnored) {
+        if (min_duration_secs >= 0) {
+            if (offloadInfo.duration_us < min_duration_secs * 1000000LL) {
+                ALOGV("%s: Offload denied by duration < audio.offload.min.duration.secs(=%d)",
+                      __func__, min_duration_secs);
+                return false;
+            }
+        } else if (offloadInfo.duration_us < OFFLOAD_DEFAULT_MIN_DURATION_SECS * 1000000) {
+            ALOGV("%s: Offload denied by duration < default min(=%u)",
+                  __func__, OFFLOAD_DEFAULT_MIN_DURATION_SECS);
+            return false;
+        }
+    }
+
+    // Do not allow offloading if one non offloadable effect is enabled. This prevents from
+    // creating an offloaded track and tearing it down immediately after start when audioflinger
+    // detects there is an active non offloadable effect.
+    // FIXME: We should check the audio session here but we do not have it in this context.
+    // This may prevent offloading in rare situations where effects are left active by apps
+    // in the background.
+    if (mEffects.isNonOffloadableEffectEnabled()) {
+        return false;
+    }
+
+    return true;
+}
+
+audio_direct_mode_t AudioPolicyManager::getDirectPlaybackSupport(const audio_attributes_t *attr,
+                                                                 const audio_config_t *config) {
+    audio_offload_info_t offloadInfo = AUDIO_INFO_INITIALIZER;
+    offloadInfo.format = config->format;
+    offloadInfo.sample_rate = config->sample_rate;
+    offloadInfo.channel_mask = config->channel_mask;
+    offloadInfo.stream_type = mEngine->getStreamTypeForAttributes(*attr);
+    offloadInfo.has_video = false;
+    offloadInfo.is_streaming = false;
+    const bool offloadPossible = isOffloadPossible(offloadInfo, true /*durationIgnored*/);
+
+    audio_direct_mode_t directMode = AUDIO_DIRECT_NOT_SUPPORTED;
+    audio_output_flags_t flags = AUDIO_OUTPUT_FLAG_NONE;
+    audio_flags_to_audio_output_flags(attr->flags, &flags);
+    // only retain flags that will drive compressed offload or passthrough
+    uint32_t relevantFlags = AUDIO_OUTPUT_FLAG_HW_AV_SYNC;
+    if (offloadPossible) {
+        relevantFlags |= AUDIO_OUTPUT_FLAG_COMPRESS_OFFLOAD;
+    }
+    flags = (audio_output_flags_t)((flags & relevantFlags) | AUDIO_OUTPUT_FLAG_DIRECT);
+
+    for (const auto& hwModule : mHwModules) {
+        for (const auto& curProfile : hwModule->getOutputProfiles()) {
+            if (!curProfile->isCompatibleProfile(DeviceVector(),
+                    config->sample_rate, nullptr /*updatedSamplingRate*/,
+                    config->format, nullptr /*updatedFormat*/,
+                    config->channel_mask, nullptr /*updatedChannelMask*/,
+                    flags)) {
+                continue;
+            }
+            // reject profiles not corresponding to a device currently available
+            if (!mAvailableOutputDevices.containsAtLeastOne(curProfile->getSupportedDevices())) {
+                continue;
+            }
+            if ((curProfile->getFlags() & AUDIO_OUTPUT_FLAG_COMPRESS_OFFLOAD)
+                        != AUDIO_OUTPUT_FLAG_NONE) {
+                if ((directMode | AUDIO_DIRECT_OFFLOAD_GAPLESS_SUPPORTED)
+                        != AUDIO_DIRECT_NOT_SUPPORTED) {
+                    // Already reports offload gapless supported. No need to report offload support.
+                    continue;
+                }
+                if ((curProfile->getFlags() & AUDIO_OUTPUT_FLAG_GAPLESS_OFFLOAD)
+                        != AUDIO_OUTPUT_FLAG_NONE) {
+                    // If offload gapless is reported, no need to report offload support.
+                    directMode = (audio_direct_mode_t) ((directMode &
+                            ~AUDIO_DIRECT_OFFLOAD_SUPPORTED) |
+                            AUDIO_DIRECT_OFFLOAD_GAPLESS_SUPPORTED);
+                } else {
+                    directMode = (audio_direct_mode_t)(directMode |AUDIO_DIRECT_OFFLOAD_SUPPORTED);
+                }
+            } else {
+                directMode = (audio_direct_mode_t) (directMode |
+                                                    AUDIO_DIRECT_BITSTREAM_SUPPORTED);
+            }
+        }
+    }
+    return directMode;
 }
 
 status_t AudioPolicyManager::listAudioPorts(audio_port_role_t role,

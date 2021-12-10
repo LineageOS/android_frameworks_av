@@ -2311,4 +2311,24 @@ Status AudioPolicyService::canBeSpatialized(
     return Status::ok();
 }
 
+Status AudioPolicyService::getDirectPlaybackSupport(const media::AudioAttributesInternal &attrAidl,
+                                                    const AudioConfig &configAidl,
+                                                    media::AudioDirectMode *_aidl_return) {
+    if (mAudioPolicyManager == nullptr) {
+        return binderStatusFromStatusT(NO_INIT);
+    }
+    if (_aidl_return == nullptr) {
+        return binderStatusFromStatusT(BAD_VALUE);
+    }
+    audio_attributes_t attr = VALUE_OR_RETURN_BINDER_STATUS(
+            aidl2legacy_AudioAttributesInternal_audio_attributes_t(attrAidl));
+    audio_config_t config = VALUE_OR_RETURN_BINDER_STATUS(
+            aidl2legacy_AudioConfig_audio_config_t(configAidl, false /*isInput*/));
+    Mutex::Autolock _l(mLock);
+    *_aidl_return = static_cast<media::AudioDirectMode>(
+            VALUE_OR_RETURN_BINDER_STATUS(legacy2aidl_audio_direct_mode_t_int32_t_mask(
+                    mAudioPolicyManager->getDirectPlaybackSupport(&attr, &config))));
+    return Status::ok();
+}
+
 } // namespace android

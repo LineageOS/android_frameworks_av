@@ -2289,6 +2289,31 @@ status_t AudioSystem::canBeSpatialized(const audio_attributes_t *attr,
     return OK;
 }
 
+status_t AudioSystem::getDirectPlaybackSupport(const audio_attributes_t *attr,
+                                               const audio_config_t *config,
+                                               audio_direct_mode_t* directMode) {
+    if (attr == nullptr || config == nullptr || directMode == nullptr) {
+        return BAD_VALUE;
+    }
+
+    const sp<IAudioPolicyService>& aps = AudioSystem::get_audio_policy_service();
+    if (aps == 0) {
+        return PERMISSION_DENIED;
+    }
+
+    media::AudioAttributesInternal attrAidl = VALUE_OR_RETURN_STATUS(
+            legacy2aidl_audio_attributes_t_AudioAttributesInternal(*attr));
+    AudioConfig configAidl = VALUE_OR_RETURN_STATUS(
+            legacy2aidl_audio_config_t_AudioConfig(*config, false /*isInput*/));
+
+    media::AudioDirectMode retAidl;
+    RETURN_STATUS_IF_ERROR(statusTFromBinderStatus(
+            aps->getDirectPlaybackSupport(attrAidl, configAidl, &retAidl)));
+    *directMode = VALUE_OR_RETURN_STATUS(aidl2legacy_int32_t_audio_direct_mode_t_mask(
+            static_cast<int32_t>(retAidl)));
+    return NO_ERROR;
+}
+
 
 class CaptureStateListenerImpl : public media::BnCaptureStateListener,
                                  public IBinder::DeathRecipient {
