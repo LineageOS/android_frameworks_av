@@ -602,15 +602,16 @@ uint64_t Camera3Device::mapProducerToFrameworkUsage(
     return usage;
 }
 
-ssize_t Camera3Device::getJpegBufferSize(uint32_t width, uint32_t height) const {
+ssize_t Camera3Device::getJpegBufferSize(const CameraMetadata &info, uint32_t width,
+        uint32_t height) const {
     // Get max jpeg size (area-wise) for default sensor pixel mode
     camera3::Size maxDefaultJpegResolution =
-            SessionConfigurationUtils::getMaxJpegResolution(mDeviceInfo,
+            SessionConfigurationUtils::getMaxJpegResolution(info,
                     /*isUltraHighResolutionSensor*/false);
     // Get max jpeg size (area-wise) for max resolution sensor pixel mode / 0 if
     // not ultra high res sensor
     camera3::Size uhrMaxJpegResolution =
-            SessionConfigurationUtils::getMaxJpegResolution(mDeviceInfo,
+            SessionConfigurationUtils::getMaxJpegResolution(info,
                     /*isUltraHighResolution*/true);
     if (maxDefaultJpegResolution.width == 0) {
         ALOGE("%s: Camera %s: Can't find valid available jpeg sizes in static metadata!",
@@ -626,7 +627,7 @@ ssize_t Camera3Device::getJpegBufferSize(uint32_t width, uint32_t height) const 
 
     // Get max jpeg buffer size
     ssize_t maxJpegBufferSize = 0;
-    camera_metadata_ro_entry jpegBufMaxSize = mDeviceInfo.find(ANDROID_JPEG_MAX_SIZE);
+    camera_metadata_ro_entry jpegBufMaxSize = info.find(ANDROID_JPEG_MAX_SIZE);
     if (jpegBufMaxSize.count == 0) {
         ALOGE("%s: Camera %s: Can't find maximum JPEG size in static metadata!", __FUNCTION__,
                 mId.string());
@@ -656,9 +657,9 @@ ssize_t Camera3Device::getJpegBufferSize(uint32_t width, uint32_t height) const 
     return jpegBufferSize;
 }
 
-ssize_t Camera3Device::getPointCloudBufferSize() const {
+ssize_t Camera3Device::getPointCloudBufferSize(const CameraMetadata &info) const {
     const int FLOATS_PER_POINT=4;
-    camera_metadata_ro_entry maxPointCount = mDeviceInfo.find(ANDROID_DEPTH_MAX_DEPTH_SAMPLES);
+    camera_metadata_ro_entry maxPointCount = info.find(ANDROID_DEPTH_MAX_DEPTH_SAMPLES);
     if (maxPointCount.count == 0) {
         ALOGE("%s: Camera %s: Can't find maximum depth point cloud size in static metadata!",
                 __FUNCTION__, mId.string());
@@ -669,14 +670,14 @@ ssize_t Camera3Device::getPointCloudBufferSize() const {
     return maxBytesForPointCloud;
 }
 
-ssize_t Camera3Device::getRawOpaqueBufferSize(int32_t width, int32_t height,
-        bool maxResolution) const {
+ssize_t Camera3Device::getRawOpaqueBufferSize(const CameraMetadata &info, int32_t width,
+        int32_t height, bool maxResolution) const {
     const int PER_CONFIGURATION_SIZE = 3;
     const int WIDTH_OFFSET = 0;
     const int HEIGHT_OFFSET = 1;
     const int SIZE_OFFSET = 2;
     camera_metadata_ro_entry rawOpaqueSizes =
-        mDeviceInfo.find(
+        info.find(
             camera3::SessionConfigurationUtils::getAppropriateModeTag(
                     ANDROID_SENSOR_OPAQUE_RAW_SIZE,
                     maxResolution));
@@ -1452,7 +1453,7 @@ status_t Camera3Device::createStream(const std::vector<sp<Surface>>& consumers,
     if (format == HAL_PIXEL_FORMAT_BLOB) {
         ssize_t blobBufferSize;
         if (dataSpace == HAL_DATASPACE_DEPTH) {
-            blobBufferSize = getPointCloudBufferSize();
+            blobBufferSize = getPointCloudBufferSize(infoPhysical(physicalCameraId));
             if (blobBufferSize <= 0) {
                 SET_ERR_L("Invalid point cloud buffer size %zd", blobBufferSize);
                 return BAD_VALUE;
@@ -1460,7 +1461,7 @@ status_t Camera3Device::createStream(const std::vector<sp<Surface>>& consumers,
         } else if (dataSpace == static_cast<android_dataspace>(HAL_DATASPACE_JPEG_APP_SEGMENTS)) {
             blobBufferSize = width * height;
         } else {
-            blobBufferSize = getJpegBufferSize(width, height);
+            blobBufferSize = getJpegBufferSize(infoPhysical(physicalCameraId), width, height);
             if (blobBufferSize <= 0) {
                 SET_ERR_L("Invalid jpeg buffer size %zd", blobBufferSize);
                 return BAD_VALUE;
@@ -1474,7 +1475,8 @@ status_t Camera3Device::createStream(const std::vector<sp<Surface>>& consumers,
         bool maxResolution =
                 sensorPixelModesUsed.find(ANDROID_SENSOR_PIXEL_MODE_MAXIMUM_RESOLUTION) !=
                         sensorPixelModesUsed.end();
-        ssize_t rawOpaqueBufferSize = getRawOpaqueBufferSize(width, height, maxResolution);
+        ssize_t rawOpaqueBufferSize = getRawOpaqueBufferSize(infoPhysical(physicalCameraId), width,
+                height, maxResolution);
         if (rawOpaqueBufferSize <= 0) {
             SET_ERR_L("Invalid RAW opaque buffer size %zd", rawOpaqueBufferSize);
             return BAD_VALUE;
@@ -2705,7 +2707,8 @@ status_t Camera3Device::configureStreamsLocked(int operatingMode,
                                                                 // always occupy the initial entry.
             if (outputStream->data_space == HAL_DATASPACE_V0_JFIF) {
                 bufferSizes[k] = static_cast<uint32_t>(
-                        getJpegBufferSize(outputStream->width, outputStream->height));
+                        getJpegBufferSize(infoPhysical(String8(outputStream->physical_camera_id)),
+                                outputStream->width, outputStream->height));
             } else if (outputStream->data_space ==
                     static_cast<android_dataspace>(HAL_DATASPACE_JPEG_APP_SEGMENTS)) {
                 bufferSizes[k] = outputStream->width * outputStream->height;
