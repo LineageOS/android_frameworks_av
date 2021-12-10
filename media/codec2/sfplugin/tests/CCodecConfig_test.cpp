@@ -224,6 +224,17 @@ public:
                                 Copy<C2StreamBitrateInfo::output, C2StreamBitrateInfo::input>,
                                 mInputBitrate)
                             .build());
+
+                    addParameter(
+                            DefineParam(mOutputProfileLevel, C2_PARAMKEY_PROFILE_LEVEL)
+                            .withDefault(new C2StreamProfileLevelInfo::output(
+                                    0u, PROFILE_UNUSED, LEVEL_UNUSED))
+                            .withFields({
+                                C2F(mOutputProfileLevel, profile).any(),
+                                C2F(mOutputProfileLevel, level).any(),
+                            })
+                            .withSetter(Setter<C2StreamProfileLevelInfo::output>)
+                            .build());
                 }
 
                 // TODO: more SDK params
@@ -241,6 +252,8 @@ public:
             std::shared_ptr<C2StreamPixelAspectRatioInfo::output> mPixelAspectRatio;
             std::shared_ptr<C2StreamBitrateInfo::input> mInputBitrate;
             std::shared_ptr<C2StreamBitrateInfo::output> mOutputBitrate;
+            std::shared_ptr<C2StreamProfileLevelInfo::input> mInputProfileLevel;
+            std::shared_ptr<C2StreamProfileLevelInfo::output> mOutputProfileLevel;
 
             template<typename T>
             static C2R Setter(bool, C2P<T> &) {
@@ -575,5 +588,52 @@ TEST_F(CCodecConfigTest, DataspaceUpdate) {
     EXPECT_EQ(COLOR_TRANSFER_ST2084, transfer)
             << "mOutputFormat = " << mConfig.mOutputFormat->debugString().c_str();
 }
+
+typedef std::tuple<std::string, C2Config::profile_t, int32_t> HdrProfilesParams;
+
+class HdrProfilesTest
+    : public CCodecConfigTest,
+      public ::testing::WithParamInterface<HdrProfilesParams> {
+};
+
+TEST_P(HdrProfilesTest, SetFromSdk) {
+    HdrProfilesParams params = GetParam();
+    std::string mediaType = std::get<0>(params);
+    C2Config::profile_t c2Profile = std::get<1>(params);
+    int32_t sdkProfile = std::get<2>(params);
+
+    init(C2Component::DOMAIN_VIDEO, C2Component::KIND_ENCODER, mediaType.c_str());
+
+    ASSERT_EQ(OK, mConfig.initialize(mReflector, mConfigurable));
+
+    sp<AMessage> format{new AMessage};
+    format->setInt32(KEY_PROFILE, sdkProfile);
+
+    std::vector<std::unique_ptr<C2Param>> configUpdate;
+    ASSERT_EQ(OK, mConfig.getConfigUpdateFromSdkParams(
+            mConfigurable, format, D::ALL, C2_MAY_BLOCK, &configUpdate));
+
+    ASSERT_EQ(1u, configUpdate.size());
+    C2StreamProfileLevelInfo::input *pl =
+        FindParam<std::remove_pointer<decltype(pl)>::type>(configUpdate);
+    ASSERT_NE(nullptr, pl);
+    ASSERT_EQ(c2Profile, pl->profile);
+}
+
+HdrProfilesParams kHdrProfilesParams[] = {
+    std::make_tuple(MIMETYPE_VIDEO_HEVC, PROFILE_HEVC_MAIN_10, HEVCProfileMain10HDR10),
+    std::make_tuple(MIMETYPE_VIDEO_HEVC, PROFILE_HEVC_MAIN_10, HEVCProfileMain10HDR10Plus),
+    std::make_tuple(MIMETYPE_VIDEO_VP9,  PROFILE_VP9_2,        VP9Profile2HDR),
+    std::make_tuple(MIMETYPE_VIDEO_VP9,  PROFILE_VP9_2,        VP9Profile2HDR10Plus),
+    std::make_tuple(MIMETYPE_VIDEO_VP9,  PROFILE_VP9_3,        VP9Profile3HDR),
+    std::make_tuple(MIMETYPE_VIDEO_VP9,  PROFILE_VP9_3,        VP9Profile3HDR10Plus),
+    std::make_tuple(MIMETYPE_VIDEO_AV1,  PROFILE_AV1_0,        AV1ProfileMain10HDR10),
+    std::make_tuple(MIMETYPE_VIDEO_AV1,  PROFILE_AV1_0,        AV1ProfileMain10HDR10Plus),
+};
+
+INSTANTIATE_TEST_SUITE_P(
+        CCodecConfig,
+        HdrProfilesTest,
+        ::testing::ValuesIn(kHdrProfilesParams));
 
 } // namespace android
