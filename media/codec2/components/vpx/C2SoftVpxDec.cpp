@@ -25,6 +25,7 @@
 
 #include <C2Debug.h>
 #include <C2PlatformSupport.h>
+#include <Codec2BufferUtils.h>
 #include <SimpleC2Interface.h>
 
 #include "C2SoftVpxDec.h"
@@ -351,6 +352,7 @@ C2SoftVpxDec::C2SoftVpxDec(
       mCodecCtx(nullptr),
       mCoreCount(1),
       mQueue(new Mutexed<ConversionQueue>) {
+      mIsFormatR10G10B10A2Supported = IsFormatR10G10B10A2SupportedForLegacyRendering();
 }
 
 C2SoftVpxDec::~C2SoftVpxDec() {
@@ -804,7 +806,14 @@ status_t C2SoftVpxDec::outputBuffer(
         if (defaultColorAspects->primaries == C2Color::PRIMARIES_BT2020 &&
             defaultColorAspects->matrix == C2Color::MATRIX_BT2020 &&
             defaultColorAspects->transfer == C2Color::TRANSFER_ST2084) {
-            format = HAL_PIXEL_FORMAT_RGBA_1010102;
+            // TODO (b/201787956) For devices that do not support HAL_PIXEL_FORMAT_RGBA_1010102,
+            // HAL_PIXEL_FORMAT_YV12 is used as a temporary work around.
+            if (!mIsFormatR10G10B10A2Supported)  {
+                ALOGE("HAL_PIXEL_FORMAT_RGBA_1010102 isn't supported");
+                format = HAL_PIXEL_FORMAT_YV12;
+            } else {
+                format = HAL_PIXEL_FORMAT_RGBA_1010102;
+            }
         }
     }
     C2MemoryUsage usage = { C2MemoryUsage::CPU_READ, C2MemoryUsage::CPU_WRITE };
