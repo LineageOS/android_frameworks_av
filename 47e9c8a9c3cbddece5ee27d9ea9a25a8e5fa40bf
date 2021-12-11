@@ -1,0 +1,21 @@
+{
+  "comments": [
+    {
+      "unresolved": false,
+      "key": {
+        "uuid": "eaae4d5b_e393b629",
+        "filename": "/PATCHSET_LEVEL",
+        "patchSetId": 1
+      },
+      "lineNbr": 0,
+      "author": {
+        "id": 23518
+      },
+      "writtenOn": "2021-12-11T13:48:52Z",
+      "side": 1,
+      "message": "All good on Moto G LTE Peregrine - Thank you for your continuing support.",
+      "revId": "47e9c8a9c3cbddece5ee27d9ea9a25a8e5fa40bf",
+      "serverId": "1ec6b3db-b2c1-4fa4-84a2-4c7efe89ba71"
+    }
+  ]
+}
