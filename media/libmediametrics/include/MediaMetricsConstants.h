@@ -61,6 +61,9 @@
 #define AMEDIAMETRICS_KEY_AUDIO_FLINGER       AMEDIAMETRICS_KEY_PREFIX_AUDIO "flinger"
 #define AMEDIAMETRICS_KEY_AUDIO_POLICY        AMEDIAMETRICS_KEY_PREFIX_AUDIO "policy"
 
+// Error keys
+#define AMEDIAMETRICS_KEY_AUDIO_TRACK_ERROR   AMEDIAMETRICS_KEY_PREFIX_AUDIO_TRACK "error"
+
 /*
  * MediaMetrics Properties are unified space for consistency and readability.
  */
