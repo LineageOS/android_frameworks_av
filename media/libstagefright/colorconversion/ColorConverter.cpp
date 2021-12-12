@@ -23,6 +23,7 @@
 #include <media/stagefright/foundation/ALooper.h>
 #include <media/stagefright/foundation/ColorUtils.h>
 #include <media/stagefright/ColorConverter.h>
+#include <media/stagefright/MediaCodecConstants.h>
 #include <media/stagefright/MediaErrors.h>
 
 #include "libyuv/convert_from.h"
@@ -51,7 +52,8 @@ namespace android {
 static bool isRGB(OMX_COLOR_FORMATTYPE colorFormat) {
     return colorFormat == OMX_COLOR_Format16bitRGB565
             || colorFormat == OMX_COLOR_Format32BitRGBA8888
-            || colorFormat == OMX_COLOR_Format32bitBGRA8888;
+            || colorFormat == OMX_COLOR_Format32bitBGRA8888
+            || colorFormat == COLOR_Format32bitABGR2101010;
 }
 
 bool ColorConverter::ColorSpace::isBt709() {
@@ -102,7 +104,6 @@ bool ColorConverter::isValid() const {
 #else
             return mDstFormat == OMX_COLOR_Format16bitRGB565;
 #endif
-
         default:
             return false;
     }
