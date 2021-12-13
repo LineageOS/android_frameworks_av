@@ -319,11 +319,19 @@ status_t MediaMetricsService::dump(int fd, const Vector<String16>& args)
                 result << "-- some lines may be truncated --\n";
             }
 
-            result << "LogSessionId:\n"
+            const int32_t heatLinesToDump = all ? INT32_MAX : 20;
+            const auto [ heatDumpString, heatLines] =
+                    mAudioAnalytics.dumpHeatMap(heatLinesToDump);
+            result << "\n" << heatDumpString;
+            if (heatLines == heatLinesToDump) {
+                result << "-- some lines may be truncated --\n";
+            }
+
+            result << "\nLogSessionId:\n"
                    << mediametrics::ValidateId::get()->dump();
 
             // Dump the statsd atoms we sent out.
-            result << "Statsd atoms:\n"
+            result << "\nStatsd atoms:\n"
                    << mStatsdLog->dumpToString("  " /* prefix */,
                            all ? STATSD_LOG_LINES_MAX : STATSD_LOG_LINES_DUMP);
         }

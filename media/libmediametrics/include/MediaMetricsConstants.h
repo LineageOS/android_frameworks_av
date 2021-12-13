@@ -238,8 +238,9 @@
 // https://cs.android.com/android/platform/superproject/+/master:frameworks/base/media/java/android/media/AudioSystem.java;drc=3ac246c43294d7f7012bdcb0ccb7bae1aa695bd4;l=785
 // https://cs.android.com/android/platform/superproject/+/master:frameworks/av/media/libaaudio/include/aaudio/AAudio.h;drc=cfd3a6fa3aaaf712a890dc02452b38ef401083b8;l=120
 
-// Error category:
-// An empty error string indicates no error.
+// Status errors:
+// An empty status string or "ok" is interpreted as no error.
+#define AMEDIAMETRICS_PROP_ERROR_VALUE_OK                 "ok"
 
 // Error category: argument
 //   IllegalArgumentException
