@@ -2570,7 +2570,10 @@ public:
         std::vector<std::unique_ptr<C2Param>> params;
         err = intf->query(
                 {&mApiFeatures},
-                {C2PortAllocatorsTuning::input::PARAM_TYPE},
+                {
+                    C2StreamBufferTypeSetting::input::PARAM_TYPE,
+                    C2PortAllocatorsTuning::input::PARAM_TYPE
+                },
                 C2_MAY_BLOCK,
                 &params);
         if (err != C2_OK && err != C2_BAD_INDEX) {
@@ -2583,7 +2586,10 @@ public:
             if (!param) {
                 continue;
             }
-            if (param->type() == C2PortAllocatorsTuning::input::PARAM_TYPE) {
+            if (param->type() == C2StreamBufferTypeSetting::input::PARAM_TYPE) {
+                mInputStreamFormat.reset(
+                        C2StreamBufferTypeSetting::input::From(param));
+            } else if (param->type() == C2PortAllocatorsTuning::input::PARAM_TYPE) {
                 mInputAllocators.reset(
                         C2PortAllocatorsTuning::input::From(param));
             }
@@ -2603,6 +2609,16 @@ public:
         return mApiFeatures;
     }
 
+    const C2StreamBufferTypeSetting::input &getInputStreamFormat() const {
+        static std::unique_ptr<C2StreamBufferTypeSetting::input> sInvalidated = []{
+            std::unique_ptr<C2StreamBufferTypeSetting::input> param;
+            param.reset(new C2StreamBufferTypeSetting::input(0u, C2BufferData::INVALID));
+            param->invalidate();
+            return param;
+        }();
+        return mInputStreamFormat ? *mInputStreamFormat : *sInvalidated;
+    }
+
     const C2PortAllocatorsTuning::input &getInputAllocators() const {
         static std::unique_ptr<C2PortAllocatorsTuning::input> sInvalidated = []{
             std::unique_ptr<C2PortAllocatorsTuning::input> param =
@@ -2618,6 +2634,7 @@ private:
 
     std::vector<C2FieldSupportedValuesQuery> mFields;
     C2ApiFeaturesSetting mApiFeatures;
+    std::unique_ptr<C2StreamBufferTypeSetting::input> mInputStreamFormat;
     std::unique_ptr<C2PortAllocatorsTuning::input> mInputAllocators;
 };
 
@@ -2659,6 +2676,24 @@ static status_t GetCommonAllocatorIds(
         if (intfCache.initCheck() != OK) {
             continue;
         }
+        const C2StreamBufferTypeSetting::input &streamFormat = intfCache.getInputStreamFormat();
+        if (streamFormat) {
+            C2Allocator::type_t allocatorType = C2Allocator::LINEAR;
+            if (streamFormat.value == C2BufferData::GRAPHIC
+                    || streamFormat.value == C2BufferData::GRAPHIC_CHUNKS) {
+                allocatorType = C2Allocator::GRAPHIC;
+            }
+
+            if (type != allocatorType) {
+                // requested type is not supported at input allocators
+                ids->clear();
+                ids->insert(defaultAllocatorId);
+                ALOGV("name(%s) does not support a type(0x%x) as input allocator."
+                        " uses default allocator id(%d)", name.c_str(), type, defaultAllocatorId);
+                break;
+            }
+        }
+
         const C2PortAllocatorsTuning::input &allocators = intfCache.getInputAllocators();
         if (firstIteration) {
             firstIteration = false;
