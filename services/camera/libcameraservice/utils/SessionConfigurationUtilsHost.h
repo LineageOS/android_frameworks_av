@@ -26,6 +26,9 @@ bool isUltraHighResolutionSensor(const CameraMetadata &deviceInfo);
 
 int32_t getAppropriateModeTag(int32_t defaultTag, bool maxResolution = false);
 
+bool getArrayWidthAndHeight(const CameraMetadata *deviceInfo, int32_t arrayTag,
+        int32_t *width, int32_t *height);
+
 } // SessionConfigurationUtils
 } // camera3
 } // android

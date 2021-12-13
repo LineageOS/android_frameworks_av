@@ -129,20 +129,6 @@ size_t getUHRMaxJpegBufferSize(camera3::Size uhrMaxJpegSize,
             (defaultMaxJpegSize.width * defaultMaxJpegSize.height) * defaultMaxJpegBufferSize;
 }
 
-bool getArrayWidthAndHeight(const CameraMetadata *deviceInfo,
-        int32_t arrayTag, int32_t *width, int32_t *height) {
-    if (width == nullptr || height == nullptr) {
-        ALOGE("%s: width / height nullptr", __FUNCTION__);
-        return false;
-    }
-    camera_metadata_ro_entry_t entry;
-    entry = deviceInfo->find(arrayTag);
-    if (entry.count != 4) return false;
-    *width = entry.data.i32[2];
-    *height = entry.data.i32[3];
-    return true;
-}
-
 StreamConfigurationPair
 getStreamConfigurationPair(const CameraMetadata &staticInfo) {
     camera3::StreamConfigurationPair streamConfigurationPair;
