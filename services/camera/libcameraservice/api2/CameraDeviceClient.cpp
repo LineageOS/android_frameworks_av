@@ -51,8 +51,8 @@
 
 namespace android {
 using namespace camera2;
+using namespace camera3;
 using camera3::camera_stream_rotation_t::CAMERA_STREAM_ROTATION_0;
-using camera3::SessionConfigurationUtils;
 
 CameraDeviceClientBase::CameraDeviceClientBase(
         const sp<CameraService>& cameraService,

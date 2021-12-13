@@ -30,6 +30,8 @@
 #include <set>
 #include <stdint.h>
 
+#include "SessionConfigurationUtilsHost.h"
+
 // Convenience methods for constructing binder::Status objects for error returns
 
 #define STATUS_ERROR(errorCode, errorString) \
@@ -69,96 +71,93 @@ struct StreamConfigurationPair {
             mMaximumResolutionStreamConfigurationMap;
 };
 
-class SessionConfigurationUtils {
-public:
-    static camera3::Size getMaxJpegResolution(const CameraMetadata &metadata,
-            bool ultraHighResolution);
+namespace SessionConfigurationUtils {
 
-    static size_t getUHRMaxJpegBufferSize(camera3::Size uhrMaxJpegSize,
-            camera3::Size defaultMaxJpegSize, size_t defaultMaxJpegBufferSize);
+camera3::Size getMaxJpegResolution(const CameraMetadata &metadata,
+        bool ultraHighResolution);
 
-    static int64_t euclidDistSquare(int32_t x0, int32_t y0, int32_t x1, int32_t y1);
+size_t getUHRMaxJpegBufferSize(camera3::Size uhrMaxJpegSize,
+        camera3::Size defaultMaxJpegSize, size_t defaultMaxJpegBufferSize);
 
-    // Find the closest dimensions for a given format in available stream configurations with
-    // a width <= ROUNDING_WIDTH_CAP
-    static bool roundBufferDimensionNearest(int32_t width, int32_t height, int32_t format,
-            android_dataspace dataSpace, const CameraMetadata& info, bool maxResolution,
-            /*out*/int32_t* outWidth, /*out*/int32_t* outHeight);
+int64_t euclidDistSquare(int32_t x0, int32_t y0, int32_t x1, int32_t y1);
 
-    static bool getArrayWidthAndHeight(const CameraMetadata *deviceInfo, int32_t arrayTag,
-            int32_t *width, int32_t *height);
+// Find the closest dimensions for a given format in available stream configurations with
+// a width <= ROUNDING_WIDTH_CAP
+bool roundBufferDimensionNearest(int32_t width, int32_t height, int32_t format,
+        android_dataspace dataSpace, const CameraMetadata& info, bool maxResolution,
+        /*out*/int32_t* outWidth, /*out*/int32_t* outHeight);
 
-    //check if format is not custom format
-    static bool isPublicFormat(int32_t format);
+bool getArrayWidthAndHeight(const CameraMetadata *deviceInfo, int32_t arrayTag,
+        int32_t *width, int32_t *height);
 
-    // Create a Surface from an IGraphicBufferProducer. Returns error if
-    // IGraphicBufferProducer's property doesn't match with streamInfo
-    static binder::Status createSurfaceFromGbp(
-        camera3::OutputStreamInfo& streamInfo, bool isStreamInfoValid,
-        sp<Surface>& surface, const sp<IGraphicBufferProducer>& gbp,
-        const String8 &logicalCameraId, const CameraMetadata &physicalCameraMetadata,
-        const std::vector<int32_t> &sensorPixelModesUsed);
+// check if format is not custom format
+bool isPublicFormat(int32_t format);
 
-    static void mapStreamInfo(const camera3::OutputStreamInfo &streamInfo,
-            camera3::camera_stream_rotation_t rotation, String8 physicalId, int32_t groupId,
-            hardware::camera::device::V3_7::Stream *stream /*out*/);
+// Create a Surface from an IGraphicBufferProducer. Returns error if
+// IGraphicBufferProducer's property doesn't match with streamInfo
+binder::Status createSurfaceFromGbp(
+camera3::OutputStreamInfo& streamInfo, bool isStreamInfoValid,
+sp<Surface>& surface, const sp<IGraphicBufferProducer>& gbp,
+const String8 &logicalCameraId, const CameraMetadata &physicalCameraMetadata,
+const std::vector<int32_t> &sensorPixelModesUsed);
 
-    // Check that the physicalCameraId passed in is spported by the camera
-    // device.
-    static binder::Status checkPhysicalCameraId(
-        const std::vector<std::string> &physicalCameraIds, const String8 &physicalCameraId,
-        const String8 &logicalCameraId);
+void mapStreamInfo(const camera3::OutputStreamInfo &streamInfo,
+        camera3::camera_stream_rotation_t rotation, String8 physicalId, int32_t groupId,
+        hardware::camera::device::V3_7::Stream *stream /*out*/);
 
-    static binder::Status checkSurfaceType(size_t numBufferProducers,
-        bool deferredConsumer, int surfaceType);
+// Check that the physicalCameraId passed in is spported by the camera
+// device.
+binder::Status checkPhysicalCameraId(
+const std::vector<std::string> &physicalCameraIds, const String8 &physicalCameraId,
+const String8 &logicalCameraId);
 
-    static binder::Status checkOperatingMode(int operatingMode,
-        const CameraMetadata &staticInfo, const String8 &cameraId);
+binder::Status checkSurfaceType(size_t numBufferProducers,
+bool deferredConsumer, int surfaceType);
 
-    // utility function to convert AIDL SessionConfiguration to HIDL
-    // streamConfiguration. Also checks for validity of SessionConfiguration and
-    // returns a non-ok binder::Status if the passed in session configuration
-    // isn't valid.
-    static binder::Status
-    convertToHALStreamCombination(const SessionConfiguration& sessionConfiguration,
-            const String8 &cameraId, const CameraMetadata &deviceInfo,
-            metadataGetter getMetadata, const std::vector<std::string> &physicalCameraIds,
-            hardware::camera::device::V3_7::StreamConfiguration &streamConfiguration,
-            bool overrideForPerfClass, bool *earlyExit);
+binder::Status checkOperatingMode(int operatingMode,
+const CameraMetadata &staticInfo, const String8 &cameraId);
 
-    // Utility function to convert a V3_7::StreamConfiguration to
-    // V3_4::StreamConfiguration. Return false if the original V3_7 configuration cannot
-    // be used by older version HAL.
-    static bool convertHALStreamCombinationFromV37ToV34(
-            hardware::camera::device::V3_4::StreamConfiguration &streamConfigV34,
-            const hardware::camera::device::V3_7::StreamConfiguration &streamConfigV37);
+// utility function to convert AIDL SessionConfiguration to HIDL
+// streamConfiguration. Also checks for validity of SessionConfiguration and
+// returns a non-ok binder::Status if the passed in session configuration
+// isn't valid.
+binder::Status
+convertToHALStreamCombination(const SessionConfiguration& sessionConfiguration,
+        const String8 &cameraId, const CameraMetadata &deviceInfo,
+        metadataGetter getMetadata, const std::vector<std::string> &physicalCameraIds,
+        hardware::camera::device::V3_7::StreamConfiguration &streamConfiguration,
+        bool overrideForPerfClass, bool *earlyExit);
 
-    static StreamConfigurationPair getStreamConfigurationPair(const CameraMetadata &metadata);
+// Utility function to convert a V3_7::StreamConfiguration to
+// V3_4::StreamConfiguration. Return false if the original V3_7 configuration cannot
+// be used by older version HAL.
+bool convertHALStreamCombinationFromV37ToV34(
+        hardware::camera::device::V3_4::StreamConfiguration &streamConfigV34,
+        const hardware::camera::device::V3_7::StreamConfiguration &streamConfigV37);
 
-    static status_t checkAndOverrideSensorPixelModesUsed(
-            const std::vector<int32_t> &sensorPixelModesUsed, int format, int width, int height,
-            const CameraMetadata &staticInfo, bool flexibleConsumer,
-            std::unordered_set<int32_t> *overriddenSensorPixelModesUsed);
+StreamConfigurationPair getStreamConfigurationPair(const CameraMetadata &metadata);
 
-    static bool isUltraHighResolutionSensor(const CameraMetadata &deviceInfo);
+status_t checkAndOverrideSensorPixelModesUsed(
+        const std::vector<int32_t> &sensorPixelModesUsed, int format, int width, int height,
+        const CameraMetadata &staticInfo, bool flexibleConsumer,
+        std::unordered_set<int32_t> *overriddenSensorPixelModesUsed);
 
-    static int32_t getAppropriateModeTag(int32_t defaultTag, bool maxResolution = false);
+bool targetPerfClassPrimaryCamera(
+        const std::set<std::string>& perfClassPrimaryCameraIds, const std::string& cameraId,
+        int32_t targetSdkVersion);
 
-    static bool targetPerfClassPrimaryCamera(
-            const std::set<std::string>& perfClassPrimaryCameraIds, const std::string& cameraId,
-            int32_t targetSdkVersion);
+constexpr int32_t MAX_SURFACES_PER_STREAM = 4;
 
-    static const int32_t MAX_SURFACES_PER_STREAM = 4;
+constexpr int32_t ROUNDING_WIDTH_CAP = 1920;
 
-    static const int32_t ROUNDING_WIDTH_CAP = 1920;
+constexpr int32_t SDK_VERSION_S = 31;
+extern int32_t PERF_CLASS_LEVEL;
+extern bool IS_PERF_CLASS;
+constexpr int32_t PERF_CLASS_JPEG_THRESH_W = 1920;
+constexpr int32_t PERF_CLASS_JPEG_THRESH_H = 1080;
 
-    static const int32_t SDK_VERSION_S = 31;
-    static int32_t PERF_CLASS_LEVEL;
-    static bool IS_PERF_CLASS;
-    static const int32_t PERF_CLASS_JPEG_THRESH_W = 1920;
-    static const int32_t PERF_CLASS_JPEG_THRESH_H = 1080;
-};
-
+} // SessionConfigurationUtils
 } // camera3
 } // android
+
 #endif
