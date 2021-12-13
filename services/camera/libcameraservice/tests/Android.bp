@@ -105,6 +105,7 @@ cc_test_host {
         "ClientManagerTest.cpp",
         "DistortionMapperTest.cpp",
         "ExifUtilsTest.cpp",
+        "RotateAndCropMapperTest.cpp",
     ],
 
     cflags: [

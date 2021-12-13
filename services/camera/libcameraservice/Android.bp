@@ -77,7 +77,6 @@ cc_library_shared {
         "device3/Camera3BufferManager.cpp",
         "device3/Camera3StreamSplitter.cpp",
         "device3/ZoomRatioMapper.cpp",
-        "device3/RotateAndCropMapper.cpp",
         "device3/Camera3OutputStreamInterface.cpp",
         "device3/Camera3OutputUtils.cpp",
         "device3/Camera3DeviceInjectionMethods.cpp",
@@ -201,6 +200,7 @@ cc_library_static {
     srcs: [
         "device3/CoordinateMapper.cpp",
         "device3/DistortionMapper.cpp",
+        "device3/RotateAndCropMapper.cpp",
         "utils/ExifUtils.cpp",
         "utils/SessionConfigurationUtilsHost.cpp",
     ],
