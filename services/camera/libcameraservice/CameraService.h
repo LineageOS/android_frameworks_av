@@ -172,6 +172,12 @@ public:
     virtual binder::Status    setTorchMode(const String16& cameraId, bool enabled,
             const sp<IBinder>& clientBinder);
 
+    virtual binder::Status    turnOnTorchWithStrengthLevel(const String16& cameraId,
+            int32_t torchStrength, const sp<IBinder>& clientBinder);
+
+    virtual binder::Status    getTorchStrengthLevel(const String16& cameraId,
+            int32_t* torchStrength);
+
     virtual binder::Status    notifySystemEvent(int32_t eventId,
             const std::vector<int32_t>& args);
 
@@ -1232,6 +1238,8 @@ private:
             hardware::camera::common::V1_0::TorchModeStatus status,
             SystemCameraKind systemCameraKind);
 
+    void broadcastTorchStrengthLevel(const String8& cameraId, int32_t newTorchStrengthLevel);
+
     void disconnectClient(const String8& id, sp<BasicClient> clientToDisconnect);
 
     // Regular online and offline devices must not be in conflict at camera service layer.
@@ -1310,6 +1318,8 @@ private:
     bool mInjectionInitPending = false;
     // Guard mInjectionInternalCamId and mInjectionInitPending.
     Mutex mInjectionParametersLock;
+
+    void updateTorchUidMapLocked(const String16& cameraId, int uid);
 };
 
 } // namespace android
