@@ -17,9 +17,25 @@
 //#define LOG_NDEBUG 0
 #define LOG_TAG "AudioTestUtils"
 
+#include <system/audio_config.h>
 #include <utils/Log.h>
 
 #include "audio_test_utils.h"
+
+template <class T>
+constexpr void (*xmlDeleter)(T* t);
+template <>
+constexpr auto xmlDeleter<xmlDoc> = xmlFreeDoc;
+template <>
+constexpr auto xmlDeleter<xmlChar> = [](xmlChar* s) { xmlFree(s); };
+
+/** @return a unique_ptr with the correct deleter for the libxml2 object. */
+template <class T>
+constexpr auto make_xmlUnique(T* t) {
+    // Wrap deleter in lambda to enable empty base optimization
+    auto deleter = [](T* t) { xmlDeleter<T>(t); };
+    return std::unique_ptr<T, decltype(deleter)>{t, deleter};
+}
 
 // Generates a random string.
 void CreateRandomFile(int& fd) {
@@ -466,6 +482,11 @@ status_t AudioCapture::stop() {
     status_t status = OK;
     mStopRecording = true;
     if (mState != REC_STOPPED) {
+        if (mInputSource != AUDIO_SOURCE_DEFAULT) {
+            bool state = false;
+            status = AudioSystem::isSourceActive(mInputSource, &state);
+            if (status == OK && !state) status = BAD_VALUE;
+        }
         mRecord->stopAndJoinCallbacks();
         mState = REC_STOPPED;
         LOG_FATAL_IF(true != mRecord->stopped());
@@ -792,4 +813,92 @@ std::string dumpPort(const audio_port_v7& port) {
     }
     result << dumpPortConfig(port.active_config);
     return result.str();
+}
+
+std::string getXmlAttribute(const xmlNode* cur, const char* attribute) {
+    auto charPtr = make_xmlUnique(xmlGetProp(cur, reinterpret_cast<const xmlChar*>(attribute)));
+    if (charPtr == NULL) {
+        return "";
+    }
+    std::string value(reinterpret_cast<const char*>(charPtr.get()));
+    return value;
+}
+
+status_t parse_audio_policy_configuration_xml(std::vector<std::string>& attachedDevices,
+                                              std::vector<MixPort>& mixPorts,
+                                              std::vector<Route>& routes) {
+    std::string path = audio_find_readable_configuration_file("audio_policy_configuration.xml");
+    if (path.length() == 0) return UNKNOWN_ERROR;
+    auto doc = make_xmlUnique(xmlParseFile(path.c_str()));
+    if (doc == nullptr) return UNKNOWN_ERROR;
+    xmlNode* root = xmlDocGetRootElement(doc.get());
+    if (root == nullptr) return UNKNOWN_ERROR;
+    if (xmlXIncludeProcess(doc.get()) < 0) return UNKNOWN_ERROR;
+    mixPorts.clear();
+    if (!xmlStrcmp(root->name, reinterpret_cast<const xmlChar*>("audioPolicyConfiguration"))) {
+        std::string raw{getXmlAttribute(root, "version")};
+        for (auto* child = root->xmlChildrenNode; child != nullptr; child = child->next) {
+            if (!xmlStrcmp(child->name, reinterpret_cast<const xmlChar*>("modules"))) {
+                xmlNode* root = child;
+                for (auto* child = root->xmlChildrenNode; child != nullptr; child = child->next) {
+                    if (!xmlStrcmp(child->name, reinterpret_cast<const xmlChar*>("module"))) {
+                        xmlNode* root = child;
+                        for (auto* child = root->xmlChildrenNode; child != nullptr;
+                             child = child->next) {
+                            if (!xmlStrcmp(child->name,
+                                           reinterpret_cast<const xmlChar*>("mixPorts"))) {
+                                xmlNode* root = child;
+                                for (auto* child = root->xmlChildrenNode; child != nullptr;
+                                     child = child->next) {
+                                    if (!xmlStrcmp(child->name,
+                                                   reinterpret_cast<const xmlChar*>("mixPort"))) {
+                                        MixPort mixPort;
+                                        xmlNode* root = child;
+                                        mixPort.name = getXmlAttribute(root, "name");
+                                        mixPort.role = getXmlAttribute(root, "role");
+                                        mixPort.flags = getXmlAttribute(root, "flags");
+                                        if (mixPort.role == "source") mixPorts.push_back(mixPort);
+                                    }
+                                }
+                            } else if (!xmlStrcmp(child->name, reinterpret_cast<const xmlChar*>(
+                                                                       "attachedDevices"))) {
+                                xmlNode* root = child;
+                                for (auto* child = root->xmlChildrenNode; child != nullptr;
+                                     child = child->next) {
+                                    if (!xmlStrcmp(child->name,
+                                                   reinterpret_cast<const xmlChar*>("item"))) {
+                                        auto xmlValue = make_xmlUnique(xmlNodeListGetString(
+                                                child->doc, child->xmlChildrenNode, 1));
+                                        if (xmlValue == nullptr) {
+                                            raw = "";
+                                        } else {
+                                            raw = reinterpret_cast<const char*>(xmlValue.get());
+                                        }
+                                        std::string& value = raw;
+                                        attachedDevices.push_back(std::move(value));
+                                    }
+                                }
+                            } else if (!xmlStrcmp(child->name,
+                                                  reinterpret_cast<const xmlChar*>("routes"))) {
+                                xmlNode* root = child;
+                                for (auto* child = root->xmlChildrenNode; child != nullptr;
+                                     child = child->next) {
+                                    if (!xmlStrcmp(child->name,
+                                                   reinterpret_cast<const xmlChar*>("route"))) {
+                                        Route route;
+                                        xmlNode* root = child;
+                                        route.name = getXmlAttribute(root, "name");
+                                        route.sources = getXmlAttribute(root, "sources");
+                                        route.sink = getXmlAttribute(root, "sink");
+                                        routes.push_back(route);
+                                    }
+                                }
+                            }
+                        }
+                    }
+                }
+            }
+        }
+    }
+    return OK;
 }
