@@ -104,4 +104,11 @@ interface ITunerService {
      * @return a newly created ITunerFilter interface.
      */
     ITunerFilter openSharedFilter(in String filterToken, in ITunerFilterCallback cb);
+
+    /**
+     * Enable or Disable Low Noise Amplifier (LNA).
+     *
+     * @param bEnable enable Lna or not.
+     */
+    void setLna(in boolean bEnable);
 }

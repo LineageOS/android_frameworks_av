@@ -69,13 +69,6 @@ interface ITunerFrontend {
     void setLnb(in ITunerLnb lnb);
 
     /**
-     * Enable or Disable Low Noise Amplifier (LNA).
-     *
-     * @param bEnable enable Lna or not.
-     */
-    void setLna(in boolean bEnable);
-
-    /**
      * Link Frontend to the cicam with given id.
      *
      * @return lts id
@@ -101,4 +94,9 @@ interface ITunerFrontend {
      * Gets the id of the frontend.
      */
     int getFrontendId();
+
+    /**
+     * Request hardware information about the frontend.
+     */
+    String getHardwareInfo();
 }
