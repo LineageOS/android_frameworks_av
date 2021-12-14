@@ -200,8 +200,11 @@ bool AMediaFormat_getString(AMediaFormat* mData, const char *name, const char **
     AString tmp;
     if (mData->mFormat->findString(name, &tmp)) {
         String8 ret(tmp.c_str());
-        mData->mStringCache.add(String8(name), ret);
-        *out = ret.string();
+        ssize_t i = mData->mStringCache.add(String8(name), ret);
+        if (i < 0) {
+            return false;
+        }
+        *out = mData->mStringCache.valueAt(i).string();
         return true;
     }
     return false;

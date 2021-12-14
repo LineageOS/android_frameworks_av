@@ -287,6 +287,7 @@ c2_status_t C2SoftAacDec::onStop() {
     mOutputDelayRingBufferWritePos = 0;
     mOutputDelayRingBufferReadPos = 0;
     mOutputDelayRingBufferFilled = 0;
+    mOutputDelayRingBuffer.reset();
     mBuffersInfo.clear();
 
     status_t status = UNKNOWN_ERROR;
@@ -308,10 +309,7 @@ void C2SoftAacDec::onRelease() {
         aacDecoder_Close(mAACDecoder);
         mAACDecoder = nullptr;
     }
-    if (mOutputDelayRingBuffer) {
-        delete[] mOutputDelayRingBuffer;
-        mOutputDelayRingBuffer = nullptr;
-    }
+    mOutputDelayRingBuffer.reset();
 }
 
 status_t C2SoftAacDec::initDecoder() {
@@ -327,7 +325,7 @@ status_t C2SoftAacDec::initDecoder() {
 
     mOutputDelayCompensated = 0;
     mOutputDelayRingBufferSize = 2048 * MAX_CHANNEL_COUNT * kNumDelayBlocksMax;
-    mOutputDelayRingBuffer = new short[mOutputDelayRingBufferSize];
+    mOutputDelayRingBuffer.reset(new short[mOutputDelayRingBufferSize]);
     mOutputDelayRingBufferWritePos = 0;
     mOutputDelayRingBufferReadPos = 0;
     mOutputDelayRingBufferFilled = 0;

@@ -21,6 +21,7 @@
 #include <inttypes.h>
 #include <math.h>
 #include <sys/resource.h>
+#include <thread>
 
 #include <android/media/IAudioPolicyService.h>
 #include <android-base/macros.h>
@@ -945,6 +946,44 @@ void AudioTrack::flush_l()
     }
     mProxy->flush();
     mAudioTrack->flush();
+}
+
+bool AudioTrack::pauseAndWait(const std::chrono::milliseconds& timeout)
+{
+    using namespace std::chrono_literals;
+
+    pause();
+
+    AutoMutex lock(mLock);
+    // offload and direct tracks do not wait because pause volume ramp is handled by hardware.
+    if (isOffloadedOrDirect_l()) return true;
+
+    // Wait for the track state to be anything besides pausing.
+    // This ensures that the volume has ramped down.
+    constexpr auto SLEEP_INTERVAL_MS = 10ms;
+    auto begin = std::chrono::steady_clock::now();
+    while (true) {
+        // wait for state to change
+        const int state = mProxy->getState();
+
+        mLock.unlock(); // only local variables accessed until lock.
+        auto elapsed = std::chrono::duration_cast<std::chrono::milliseconds>(
+                std::chrono::steady_clock::now() - begin);
+        if (state != CBLK_STATE_PAUSING) {
+            ALOGV("%s: success state:%d after %lld ms", __func__, state, elapsed.count());
+            return true;
+        }
+        std::chrono::milliseconds remaining = timeout - elapsed;
+        if (remaining.count() <= 0) {
+            ALOGW("%s: timeout expired state:%d still pausing:%d after %lld ms",
+                    __func__, state, CBLK_STATE_PAUSING, elapsed.count());
+            return false;
+        }
+        // It is conceivable that the track is restored while sleeping;
+        // as this logic is advisory, we allow that.
+        std::this_thread::sleep_for(std::min(remaining, SLEEP_INTERVAL_MS));
+        mLock.lock();
+    }
 }
 
 void AudioTrack::pause()

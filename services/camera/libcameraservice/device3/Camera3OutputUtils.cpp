@@ -1305,6 +1305,7 @@ void requestStreamBuffers(RequestBufferStates& states,
         hardware::hidl_vec<StreamBuffer> tmpRetBuffers(numBuffersRequested);
         bool currentReqSucceeds = true;
         std::vector<camera_stream_buffer_t> streamBuffers(numBuffersRequested);
+        std::vector<buffer_handle_t> newBuffers;
         size_t numAllocatedBuffers = 0;
         size_t numPushedInflightBuffers = 0;
         for (size_t b = 0; b < numBuffersRequested; b++) {
@@ -1344,6 +1345,9 @@ void requestStreamBuffers(RequestBufferStates& states,
             hBuf.buffer = (isNewBuffer) ? *buffer : nullptr;
             hBuf.status = BufferStatus::OK;
             hBuf.releaseFence = nullptr;
+            if (isNewBuffer) {
+                newBuffers.push_back(*buffer);
+            }
 
             native_handle_t *acquireFence = nullptr;
             if (sb.acquire_fence != -1) {
@@ -1386,6 +1390,9 @@ void requestStreamBuffers(RequestBufferStates& states,
             returnOutputBuffers(states.useHalBufManager, /*listener*/nullptr,
                     streamBuffers.data(), numAllocatedBuffers, 0, /*requested*/false,
                     /*requestTimeNs*/0, states.sessionStatsBuilder);
+            for (auto buf : newBuffers) {
+                states.bufferRecordsIntf.removeOneBufferCache(streamId, buf);
+            }
         }
     }
 
