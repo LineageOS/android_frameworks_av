@@ -66,7 +66,7 @@ public:
      * Returns false if the session doesn't exist, or the client is already requesting the
      * session. Returns true otherwise.
      */
-    virtual bool addClientUid(ClientIdType clientId, SessionIdType sessionId, uid_t clientUid);
+    virtual bool addClientUid(ClientIdType clientId, SessionIdType sessionId, uid_t clientUid) = 0;
 
     /**
      * Retrieves the (unsorted) list of all clients requesting the session identified by
@@ -81,7 +81,7 @@ public:
      * Returns false if the session doesn't exist. Returns true otherwise.
      */
     virtual bool getClientUids(ClientIdType clientId, SessionIdType sessionId,
-                               std::vector<int32_t>* out_clientUids);
+                               std::vector<int32_t>* out_clientUids) = 0;
 
 protected:
     virtual ~ControllerClientInterface() = default;
