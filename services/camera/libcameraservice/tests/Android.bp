@@ -90,7 +90,9 @@ cc_test_host {
         "libbase",
         "libbinder",
         "libcamera_metadata",
+        "libdynamic_depth",
         "libexif",
+        "libjpeg",
         "liblog",
         "libutils",
     ],
@@ -103,8 +105,10 @@ cc_test_host {
 
     srcs: [
         "ClientManagerTest.cpp",
+        "DepthProcessorTest.cpp",
         "DistortionMapperTest.cpp",
         "ExifUtilsTest.cpp",
+        "NV12Compressor.cpp",
         "RotateAndCropMapperTest.cpp",
         "ZoomRatioTest.cpp",
     ],

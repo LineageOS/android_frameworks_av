@@ -47,7 +47,6 @@ cc_library_shared {
         "common/CameraDeviceBase.cpp",
         "common/CameraOfflineSessionBase.cpp",
         "common/CameraProviderManager.cpp",
-        "common/DepthPhotoProcessor.cpp",
         "common/FrameProcessorBase.cpp",
         "api1/Camera2Client.cpp",
         "api1/client2/Parameters.cpp",
@@ -197,6 +196,7 @@ cc_library_static {
     // Camera service source
 
     srcs: [
+        "common/DepthPhotoProcessor.cpp",
         "device3/CoordinateMapper.cpp",
         "device3/DistortionMapper.cpp",
         "device3/RotateAndCropMapper.cpp",
@@ -209,12 +209,17 @@ cc_library_static {
         "libbase",
         "libbinder",
         "libcamera_metadata",
+        "libdynamic_depth",
         "libexif",
+        "libjpeg",
         "liblog",
         "libutils",
+        "libxml2",
     ],
 
     include_dirs: [
+        "external/dynamic_depth/includes",
+        "external/dynamic_depth/internal",
         "frameworks/av/camera/include",
         "frameworks/av/camera/include/camera",
     ],
