@@ -74,9 +74,10 @@ class Codec2VideoEncHidlTestBase : public ::testing::Test {
         ASSERT_NE(mGraphicPool, nullptr);
 
         std::vector<std::unique_ptr<C2Param>> queried;
-        mComponent->query({}, {C2PortMediaTypeSetting::output::PARAM_TYPE}, C2_DONT_BLOCK,
-                          &queried);
-        ASSERT_GT(queried.size(), 0);
+        c2_status_t c2err = mComponent->query({}, {C2PortMediaTypeSetting::output::PARAM_TYPE},
+                                              C2_DONT_BLOCK, &queried);
+        ASSERT_EQ(c2err, C2_OK) << "Query media type failed";
+        ASSERT_EQ(queried.size(), 1) << "Size of the vector returned is invalid";
 
         mMime = ((C2PortMediaTypeSetting::output*)queried[0].get())->m.value;
         std::cout << "mime : " << mMime << "\n";
@@ -531,9 +532,17 @@ TEST_P(Codec2VideoEncEncodeTest, EncodeTest) {
                   << " resetting num BFrames to 0\n";
         mConfigBPictures = false;
     } else {
-        size_t offset = sizeof(C2Param);
-        C2Param* param = inParams[0].get();
-        int32_t numBFrames = *(int32_t*)((uint8_t*)param + offset);
+        int32_t numBFrames = 0;
+        C2StreamGopTuning::output* gop = C2StreamGopTuning::output::From(inParams[0].get());
+        if (gop && gop->flexCount() >= 1) {
+            for (size_t i = 0; i < gop->flexCount(); ++i) {
+                const C2GopLayerStruct& layer = gop->m.values[i];
+                if (layer.type_ == C2Config::picture_type_t(P_FRAME | B_FRAME)) {
+                    numBFrames = layer.count;
+                    break;
+                }
+            }
+        }
 
         if (!numBFrames) {
             std::cout << "[   WARN   ] Bframe not supported for " << mComponentName
@@ -817,6 +826,10 @@ INSTANTIATE_TEST_SUITE_P(EncodeTestwithEOS, Codec2VideoEncEncodeTest,
 TEST_P(Codec2VideoEncHidlTest, AdaptiveBitrateTest) {
     description("Encodes input file for different bitrates");
     if (mDisableTest) GTEST_SKIP() << "Test is disabled";
+    if (mMime != "video/avc" && mMime != "video/hevc" && mMime != "video/x-vnd.on2.vp8" &&
+        mMime != "video/x-vnd.on2.vp9") {
+        GTEST_SKIP() << "AdaptiveBitrateTest is enabled only for avc, hevc, vp8 and vp9 encoders";
+    }
 
     std::ifstream eleStream;
     eleStream.open(mInputFile, std::ifstream::binary);

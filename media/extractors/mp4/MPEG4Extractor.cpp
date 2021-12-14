@@ -157,6 +157,7 @@ private:
 
     MediaBufferHelper *mBuffer;
 
+    size_t mSrcBufferSize;
     uint8_t *mSrcBuffer;
 
     bool mIsHeif;
@@ -5083,6 +5084,7 @@ MPEG4Source::MPEG4Source(
       mNALLengthSize(0),
       mStarted(false),
       mBuffer(NULL),
+      mSrcBufferSize(0),
       mSrcBuffer(NULL),
       mItemTable(itemTable),
       mElstShiftStartTicks(elstShiftStartTicks),
@@ -5264,6 +5266,7 @@ media_status_t MPEG4Source::start() {
         // file probably specified a bad max size
         return AMEDIA_ERROR_MALFORMED;
     }
+    mSrcBufferSize = max_size;
 
     mStarted = true;
 
@@ -5280,6 +5283,7 @@ media_status_t MPEG4Source::stop() {
         mBuffer = NULL;
     }
 
+    mSrcBufferSize = 0;
     delete[] mSrcBuffer;
     mSrcBuffer = NULL;
 
@@ -6467,13 +6471,19 @@ media_status_t MPEG4Source::read(
         // Whole NAL units are returned but each fragment is prefixed by
         // the start code (0x00 00 00 01).
         ssize_t num_bytes_read = 0;
-        num_bytes_read = mDataSource->readAt(offset, mSrcBuffer, size);
+        bool mSrcBufferFitsDataToRead = size <= mSrcBufferSize;
+        if (mSrcBufferFitsDataToRead) {
+          num_bytes_read = mDataSource->readAt(offset, mSrcBuffer, size);
+        } else {
+          // We are trying to read a sample larger than the expected max sample size.
+          // Fall through and let the failure be handled by the following if.
+          android_errorWriteLog(0x534e4554, "188893559");
+        }
 
         if (num_bytes_read < (ssize_t)size) {
             mBuffer->release();
             mBuffer = NULL;
-
-            return AMEDIA_ERROR_IO;
+            return mSrcBufferFitsDataToRead ? AMEDIA_ERROR_IO : AMEDIA_ERROR_MALFORMED;
         }
 
         uint8_t *dstData = (uint8_t *)mBuffer->data();

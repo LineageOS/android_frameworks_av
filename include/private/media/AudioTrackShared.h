@@ -53,6 +53,83 @@ namespace android {
 //EL_FIXME 20 seconds may not be enough and must be reconciled with new obtainBuffer implementation
 #define MAX_RUN_OFFLOADED_TIMEOUT_MS 20000 // assuming up to a maximum of 20 seconds of offloaded
 
+// for audio_track_cblk_t::mState, to match TrackBase.h
+static inline constexpr int CBLK_STATE_IDLE = 0;
+static inline constexpr int CBLK_STATE_PAUSING = 7;
+
+/**
+ * MirroredVariable is a local variable which simultaneously updates
+ * a mirrored storage location.  This is useful for server side variables
+ * where a local copy is kept, but a client visible copy is offered through shared memory.
+ *
+ * We use std::atomic as the default container class to access this memory.
+ */
+template <typename T, template <typename> class Container = std::atomic>
+class MirroredVariable {
+    template <typename C>
+    struct Constraints {
+        // If setMirror is used with a different type U != T passed in,
+        // as a general rule, the Container must issue a memcpy to read or write
+        // (or its equivalent) to avoid possible strict aliasing issues.
+        // The memcpy also avoids gaps in structs and alignment issues with different types.
+        static constexpr bool ok_ = false;  // Containers must specify constraints.
+    };
+    template <typename X>
+    struct Constraints<std::atomic<X>> {
+        // Atomics force read and write to memory.
+        static constexpr bool ok = std::is_same_v<X, T> ||
+                (std::atomic<X>::is_always_lock_free                   // no additional locking
+                && sizeof(std::atomic<X>) == sizeof(X)                 // layout identical to X.
+                && (std::is_arithmetic_v<X> || std::is_enum_v<X>));    // No gaps in the layout.
+    };
+
+static_assert(Constraints<Container<T>>::ok);
+public:
+    explicit MirroredVariable(const T& t) : t_{t} {}
+
+    // implicit conversion operator
+    operator T() const {
+        return t_;
+    }
+
+    MirroredVariable& operator=(const T& t) {
+        t_ = t;
+        if (mirror_ != nullptr) {
+            *mirror_ = t;
+        }
+        return *this;
+    }
+
+    template <typename U>
+    void setMirror(Container<U> *other_mirror) {
+        // Much of the concern is with T != U, however there are additional concerns
+        // when storage uses shared memory between processes.  For atomics, it must be
+        // lock free.
+        static_assert(sizeof(U) == sizeof(T));
+        static_assert(alignof(U) == alignof(T));
+        static_assert(Constraints<Container<U>>::ok);
+        static_assert(sizeof(Container<U>) == sizeof(Container<T>));
+        static_assert(alignof(Container<U>) == alignof(Container<T>));
+        auto mirror = reinterpret_cast<Container<T>*>(other_mirror);
+        if (mirror_ != mirror) {
+            mirror_ = mirror;
+            if (mirror != nullptr) {
+                *mirror = t_;
+            }
+        }
+    }
+
+    void clear() {
+        mirror_ = nullptr;
+    }
+
+    MirroredVariable& operator&() const = delete;
+
+protected:
+    T t_{};
+    Container<T>* mirror_ = nullptr;
+};
+
 struct AudioTrackSharedStreaming {
     // similar to NBAIO MonoPipe
     // in continuously incrementing frame units, take modulo buffer size, which must be a power of 2
@@ -188,6 +265,8 @@ public:
 
     volatile    int32_t     mFlags;         // combinations of CBLK_*
 
+                std::atomic<int32_t>  mState; // current TrackBase state.
+
 public:
                 union {
                     AudioTrackSharedStreaming   mStreaming;
@@ -197,6 +276,9 @@ public:
 
                 // Cache line boundary (32 bytes)
 };
+
+// TODO: ensure standard layout.
+// static_assert(std::is_standard_layout_v<audio_track_cblk_t>);
 
 // ----------------------------------------------------------------------------
 
@@ -323,6 +405,7 @@ public:
         return mEpoch;
     }
 
+    int32_t getState() const { return mCblk->mState; }
     uint32_t      getBufferSizeInFrames() const { return mBufferSizeInFrames; }
     // See documentation for AudioTrack::setBufferSizeInFrames()
     uint32_t      setBufferSizeInFrames(uint32_t requestedSize);
