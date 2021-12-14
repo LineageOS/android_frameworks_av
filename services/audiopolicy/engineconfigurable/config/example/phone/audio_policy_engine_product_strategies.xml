@@ -57,9 +57,6 @@
     <ProductStrategy name="STRATEGY_SONIFICATION_RESPECTFUL">
         <AttributesGroup streamType="AUDIO_STREAM_NOTIFICATION" volumeGroup="notification">
             <Attributes> <Usage value="AUDIO_USAGE_NOTIFICATION"/> </Attributes>
-            <Attributes> <Usage value="AUDIO_USAGE_NOTIFICATION_COMMUNICATION_REQUEST"/> </Attributes>
-            <Attributes> <Usage value="AUDIO_USAGE_NOTIFICATION_COMMUNICATION_INSTANT"/> </Attributes>
-            <Attributes> <Usage value="AUDIO_USAGE_NOTIFICATION_COMMUNICATION_DELAYED"/> </Attributes>
             <Attributes> <Usage value="AUDIO_USAGE_NOTIFICATION_EVENT"/> </Attributes>
         </AttributesGroup>
     </ProductStrategy>
