@@ -29,5 +29,10 @@
     {
       "name": "trackplayerbase_tests"
     }
+  ],
+  "postsubmit": [
+    {
+      "name": "audiosystem_tests"
+    }
   ]
 }
