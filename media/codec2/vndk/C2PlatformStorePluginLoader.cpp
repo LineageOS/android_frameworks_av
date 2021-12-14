@@ -59,13 +59,14 @@ C2PlatformStorePluginLoader::~C2PlatformStorePluginLoader() {
 
 c2_status_t C2PlatformStorePluginLoader::createBlockPool(
         ::C2Allocator::id_t allocatorId, ::C2BlockPool::local_id_t blockPoolId,
-        std::shared_ptr<C2BlockPool>* pool) {
+        std::shared_ptr<C2BlockPool>* pool,
+        std::function<void(C2BlockPool *)> deleter) {
     if (mCreateBlockPool == nullptr) {
         ALOGD("Handle or CreateBlockPool symbol is null");
         return C2_NOT_FOUND;
     }
 
-    std::shared_ptr<::C2BlockPool> ptr(mCreateBlockPool(allocatorId, blockPoolId));
+    std::shared_ptr<::C2BlockPool> ptr(mCreateBlockPool(allocatorId, blockPoolId), deleter);
     if (ptr) {
         *pool = ptr;
         return C2_OK;
@@ -75,14 +76,16 @@ c2_status_t C2PlatformStorePluginLoader::createBlockPool(
 }
 
 c2_status_t C2PlatformStorePluginLoader::createAllocator(
-        ::C2Allocator::id_t allocatorId, std::shared_ptr<C2Allocator>* const allocator) {
+        ::C2Allocator::id_t allocatorId,
+        std::shared_ptr<C2Allocator>* const allocator,
+        std::function<void(C2Allocator *)> deleter) {
     if (mCreateAllocator == nullptr) {
         ALOGD("Handle or CreateAllocator symbol is null");
         return C2_NOT_FOUND;
     }
 
     c2_status_t res = C2_CORRUPTED;
-    allocator->reset(mCreateAllocator(allocatorId, &res));
+    allocator->reset(mCreateAllocator(allocatorId, &res), deleter);
     if (res != C2_OK) {
         ALOGD("Failed to CreateAllocator by id: %u, res: %d", allocatorId, res);
         allocator->reset();
