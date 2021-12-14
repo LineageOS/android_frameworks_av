@@ -50,6 +50,10 @@ namespace camera3 {
         // return pair of (newlySeenBuffer?, bufferId)
         virtual std::pair<bool, uint64_t> getBufferId(const buffer_handle_t& buf, int streamId) = 0;
 
+        // Return the removed buffer ID if input cache is found.
+        // Otherwise return BUFFER_ID_NO_BUFFER
+        virtual uint64_t removeOneBufferCache(int streamId, const native_handle_t* handle) = 0;
+
         // Find a buffer_handle_t based on frame number and stream ID
         virtual status_t popInflightBuffer(int32_t frameNumber, int32_t streamId,
                 /*out*/ buffer_handle_t **buffer) = 0;
