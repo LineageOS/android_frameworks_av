@@ -299,8 +299,13 @@ DeviceVector Engine::getOutputDevicesForAttributes(const audio_attributes_t &att
     if (device != nullptr) {
         return DeviceVector(device);
     }
+    return fromCache? getCachedDevices(strategy) : getDevicesForProductStrategy(strategy);
+}
 
-    return fromCache? mDevicesForStrategies.at(strategy) : getDevicesForProductStrategy(strategy);
+DeviceVector Engine::getCachedDevices(product_strategy_t ps) const
+{
+    return mDevicesForStrategies.find(ps) != mDevicesForStrategies.end() ?
+                mDevicesForStrategies.at(ps) : DeviceVector{};
 }
 
 DeviceVector Engine::getOutputDevicesForStream(audio_stream_type_t stream, bool fromCache) const
