@@ -89,6 +89,11 @@ std::string deviceTypesToString(const DeviceTypeSet &deviceTypes) {
     return ss.str();
 }
 
+bool deviceTypesToString(const DeviceTypeSet &deviceTypes, std::string &str) {
+    str = deviceTypesToString(deviceTypes);
+    return true;
+}
+
 std::string dumpDeviceTypes(const DeviceTypeSet &deviceTypes) {
     std::stringstream ss;
     for (auto it = deviceTypes.begin(); it != deviceTypes.end(); ++it) {
