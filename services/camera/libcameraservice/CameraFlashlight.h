@@ -44,6 +44,14 @@ class FlashControlBase : public virtual VirtualLightRefBase {
         // set the torch mode to on or off.
         virtual status_t setTorchMode(const String8& cameraId,
                     bool enabled) = 0;
+
+        // Change the brightness level of the torch. If the torch is OFF and
+        // torchStrength >= 1, then the torch will also be turned ON.
+        virtual status_t turnOnTorchWithStrengthLevel(const String8& cameraId,
+                    int32_t torchStrength) = 0;
+
+        // Returns the torch strength level.
+        virtual status_t getTorchStrengthLevel(const String8& cameraId, int32_t* torchStrength) = 0;
 };
 
 /**
@@ -66,6 +74,12 @@ class CameraFlashlight : public virtual VirtualLightRefBase {
 
         // set the torch mode to on or off.
         status_t setTorchMode(const String8& cameraId, bool enabled);
+
+        // Change the torch strength level of the flash unit in torch mode.
+        status_t turnOnTorchWithStrengthLevel(const String8& cameraId, int32_t torchStrength);
+
+        // Get the torch strength level
+        status_t getTorchStrengthLevel(const String8& cameraId, int32_t* torchStrength);
 
         // Notify CameraFlashlight that camera service is going to open a camera
         // device. CameraFlashlight will free the resources that may cause the
@@ -115,6 +129,8 @@ class ProviderFlashControl : public FlashControlBase {
         // FlashControlBase
         status_t hasFlashUnit(const String8& cameraId, bool *hasFlash);
         status_t setTorchMode(const String8& cameraId, bool enabled);
+        status_t turnOnTorchWithStrengthLevel(const String8& cameraId, int32_t torchStrength);
+        status_t getTorchStrengthLevel(const String8& cameraId, int32_t* torchStrength);
 
     private:
         sp<CameraProviderManager> mProviderManager;

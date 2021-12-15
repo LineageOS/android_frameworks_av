@@ -83,6 +83,8 @@ interface ICameraServiceListener
 
     oneway void onTorchStatusChanged(int status, String cameraId);
 
+    oneway void onTorchStrengthLevelChanged(String cameraId, int newTorchStrength);
+
     /**
      * Notify registered clients about camera access priority changes.
      * Clients which were previously unable to open a certain camera device

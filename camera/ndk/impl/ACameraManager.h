@@ -95,6 +95,9 @@ class CameraManagerGlobal final : public RefBase {
         virtual binder::Status onTorchStatusChanged(int32_t, const String16&) {
             return binder::Status::ok();
         }
+        virtual binder::Status onTorchStrengthLevelChanged(const String16&, int32_t) {
+            return binder::Status::ok();
+        }
 
         virtual binder::Status onCameraAccessPrioritiesChanged();
         virtual binder::Status onCameraOpened(const String16&, const String16&) {

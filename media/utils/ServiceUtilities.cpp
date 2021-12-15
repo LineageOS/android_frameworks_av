@@ -316,7 +316,7 @@ bool callAudioInterceptionAllowed(const AttributionSourceState& attributionSourc
 
     // IMPORTANT: Use PermissionCache - not a runtime permission and may not change.
     bool ok = PermissionCache::checkPermission(sCallAudioInterception, pid, uid);
-    if (!ok) ALOGE("%s(): android.permission.CALL_AUDIO_INTERCEPTION denied for uid %d",
+    if (!ok) ALOGV("%s(): android.permission.CALL_AUDIO_INTERCEPTION denied for uid %d",
         __func__, uid);
     return ok;
 }

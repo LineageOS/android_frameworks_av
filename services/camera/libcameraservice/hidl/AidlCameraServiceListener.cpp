@@ -70,6 +70,11 @@ binder::Status H2BCameraServiceListener::onPhysicalCameraStatusChanged(
   return binder::Status::ok();
 }
 
+::android::binder::Status H2BCameraServiceListener::onTorchStrengthLevelChanged(
+    const ::android::String16&, int32_t) {
+  return binder::Status::ok();
+}
+
 } // implementation
 } // V2_0
 } // common

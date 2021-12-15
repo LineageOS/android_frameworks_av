@@ -105,7 +105,6 @@ public:
         if (mMemory.get() == nullptr || mMemory->unsecurePointer() == nullptr) return 0;
         int32_t remoteRefcount =
                 reinterpret_cast<SharedControl *>(mMemory->unsecurePointer())->getRemoteRefcount();
-        // Sanity check so that remoteRefCount() is non-negative.
         return remoteRefcount >= 0 ? remoteRefcount : 0; // do not allow corrupted data.
 #else
         return 0;
