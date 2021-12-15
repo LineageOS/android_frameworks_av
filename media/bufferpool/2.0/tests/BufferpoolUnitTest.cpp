@@ -444,6 +444,94 @@ TEST_F(BufferpoolFunctionalityTest, TransferBuffer) {
             << "received error during buffer transfer\n";
 }
 
+/* Validate bufferpool for following corner cases:
+ 1. invalid connectionID
+ 2. invalid receiver
+ 3. when sender is not registered
+ 4. when connection is closed
+*/
+// TODO: Enable when the issue in b/212196495 is fixed
+TEST_F(BufferpoolFunctionalityTest, DISABLED_ValidityTest) {
+    std::vector<uint8_t> vecParams;
+    getTestAllocatorParams(&vecParams);
+
+    std::shared_ptr<BufferPoolData> senderBuffer;
+    native_handle_t* allocHandle = nullptr;
+
+    // call allocate() on a random connection id
+    ConnectionId randomId = rand();
+    ResultStatus status = mManager->allocate(randomId, vecParams, &allocHandle, &senderBuffer);
+    EXPECT_TRUE(status == ResultStatus::NOT_FOUND);
+
+    // initialize the receiver
+    PipeMessage message;
+    message.data.command = PipeCommand::INIT;
+    sendMessage(mCommandPipeFds, message);
+    ASSERT_TRUE(receiveMessage(mResultPipeFds, &message)) << "receiveMessage failed\n";
+    ASSERT_EQ(message.data.command, PipeCommand::INIT_OK) << "receiver init failed";
+
+    allocHandle = nullptr;
+    senderBuffer.reset();
+    status = mManager->allocate(mConnectionId, vecParams, &allocHandle, &senderBuffer);
+
+    ASSERT_TRUE(TestBufferPoolAllocator::Fill(allocHandle, 0x77));
+
+    // send buffers w/o registering sender
+    int64_t postUs;
+    TransactionId transactionId;
+
+    // random receiver
+    status = mManager->postSend(randomId, senderBuffer, &transactionId, &postUs);
+    ASSERT_NE(status, ResultStatus::OK) << "bufferpool shouldn't allow send on random receiver";
+
+    // establish connection
+    android::sp<IClientManager> receiver = IClientManager::getService();
+    ASSERT_NE(receiver, nullptr) << "getService failed for receiver\n";
+
+    ConnectionId receiverId;
+    status = mManager->registerSender(receiver, mConnectionId, &receiverId);
+    ASSERT_EQ(status, ResultStatus::OK)
+            << "registerSender failed for connection id " << mConnectionId << "\n";
+
+    allocHandle = nullptr;
+    senderBuffer.reset();
+    status = mManager->allocate(mConnectionId, vecParams, &allocHandle, &senderBuffer);
+    ASSERT_EQ(status, ResultStatus::OK) << "allocate failed for connection " << mConnectionId;
+
+    ASSERT_TRUE(TestBufferPoolAllocator::Fill(allocHandle, 0x88));
+
+    // send the buffer to the receiver
+    status = mManager->postSend(receiverId, senderBuffer, &transactionId, &postUs);
+    ASSERT_EQ(status, ResultStatus::OK) << "postSend failed for receiver " << receiverId << "\n";
+
+    // PipeMessage message;
+    message.data.command = PipeCommand::TRANSFER;
+    message.data.memsetValue = 0x88;
+    message.data.bufferId = senderBuffer->mId;
+    message.data.connectionId = receiverId;
+    message.data.transactionId = transactionId;
+    message.data.timestampUs = postUs;
+    sendMessage(mCommandPipeFds, message);
+    ASSERT_TRUE(receiveMessage(mResultPipeFds, &message)) << "receiveMessage failed\n";
+    ASSERT_EQ(message.data.command, PipeCommand::TRANSFER_OK)
+            << "received error during buffer transfer\n";
+
+    if (allocHandle) {
+        native_handle_close(allocHandle);
+        native_handle_delete(allocHandle);
+    }
+
+    message.data.command = PipeCommand::STOP;
+    sendMessage(mCommandPipeFds, message);
+    ASSERT_TRUE(receiveMessage(mResultPipeFds, &message)) << "receiveMessage failed\n";
+    ASSERT_EQ(message.data.command, PipeCommand::STOP_OK)
+            << "received error during buffer transfer\n";
+
+    // try to send msg to closed connection
+    status = mManager->postSend(receiverId, senderBuffer, &transactionId, &postUs);
+    ASSERT_NE(status, ResultStatus::OK) << "bufferpool shouldn't allow send on closed connection";
+}
+
 int main(int argc, char** argv) {
     android::hardware::details::setTrebleTestingOverride(true);
     ::testing::InitGoogleTest(&argc, argv);
