@@ -1036,6 +1036,8 @@ void TunerHidlFilter::FilterCallback::getMediaEvent(
         media.streamId = static_cast<int32_t>(mediaEvent.streamId);
         media.isPtsPresent = mediaEvent.isPtsPresent;
         media.pts = static_cast<int64_t>(mediaEvent.pts);
+        media.isDtsPresent = false;
+        media.dts = static_cast<int64_t>(-1);
         media.dataLength = static_cast<int64_t>(mediaEvent.dataLength);
         media.offset = static_cast<int64_t>(mediaEvent.offset);
         media.isSecureMemory = mediaEvent.isSecureMemory;
@@ -1078,7 +1080,7 @@ void TunerHidlFilter::FilterCallback::getSectionEvent(
         section.tableId = static_cast<int32_t>(sectionEvent.tableId);
         section.version = static_cast<int32_t>(sectionEvent.version);
         section.sectionNum = static_cast<int32_t>(sectionEvent.sectionNum);
-        section.dataLength = static_cast<int32_t>(sectionEvent.dataLength);
+        section.dataLength = static_cast<int64_t>(sectionEvent.dataLength);
 
         DemuxFilterEvent filterEvent;
         filterEvent.set<DemuxFilterEvent::section>(move(section));
@@ -1186,6 +1188,7 @@ void TunerHidlFilter::FilterCallback::getDownloadEvent(
         DemuxFilterDownloadEvent download;
 
         download.itemId = static_cast<int32_t>(downloadEvent.itemId);
+        download.downloadId = -1;
         download.itemFragmentIndex = static_cast<int32_t>(downloadEvent.itemFragmentIndex);
         download.mpuSequenceNumber = static_cast<int32_t>(downloadEvent.mpuSequenceNumber);
         download.lastItemFragmentIndex = static_cast<int32_t>(downloadEvent.lastItemFragmentIndex);

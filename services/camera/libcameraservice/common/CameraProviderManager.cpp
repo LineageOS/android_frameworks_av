@@ -20,7 +20,7 @@
 
 #include "CameraProviderManager.h"
 
-#include <android/hardware/camera/device/3.7/ICameraDevice.h>
+#include <android/hardware/camera/device/3.8/ICameraDevice.h>
 
 #include <algorithm>
 #include <chrono>
@@ -305,6 +305,50 @@ status_t CameraProviderManager::getHighestSupportedVersion(const std::string &id
     }
     *v = maxVersion;
     return OK;
+}
+
+status_t CameraProviderManager::getTorchStrengthLevel(const std::string &id,
+        int32_t* torchStrength /*out*/) {
+    std::lock_guard<std::mutex> lock(mInterfaceMutex);
+
+    auto deviceInfo = findDeviceInfoLocked(id);
+    if (deviceInfo == nullptr) return NAME_NOT_FOUND;
+
+    return deviceInfo->getTorchStrengthLevel(torchStrength);
+}
+
+status_t CameraProviderManager::turnOnTorchWithStrengthLevel(const std::string &id,
+        int32_t torchStrength) {
+    std::lock_guard<std::mutex> lock(mInterfaceMutex);
+
+    auto deviceInfo = findDeviceInfoLocked(id);
+    if (deviceInfo == nullptr) return NAME_NOT_FOUND;
+
+    return deviceInfo->turnOnTorchWithStrengthLevel(torchStrength);
+}
+
+bool CameraProviderManager::shouldSkipTorchStrengthUpdate(const std::string &id,
+        int32_t torchStrength) const {
+    std::lock_guard<std::mutex> lock(mInterfaceMutex);
+
+    auto deviceInfo = findDeviceInfoLocked(id);
+    if (deviceInfo == nullptr) return NAME_NOT_FOUND;
+
+    if (deviceInfo->mTorchStrengthLevel == torchStrength) {
+        ALOGV("%s: Skipping torch strength level updates prev_level: %d, new_level: %d",
+                __FUNCTION__, deviceInfo->mTorchStrengthLevel, torchStrength);
+        return true;
+    }
+    return false;
+}
+
+int32_t CameraProviderManager::getTorchDefaultStrengthLevel(const std::string &id) const {
+    std::lock_guard<std::mutex> lock(mInterfaceMutex);
+
+    auto deviceInfo = findDeviceInfoLocked(id);
+    if (deviceInfo == nullptr) return NAME_NOT_FOUND;
+
+    return deviceInfo->mTorchDefaultStrengthLevel;
 }
 
 bool CameraProviderManager::supportSetTorchMode(const std::string &id) const {
@@ -2385,6 +2429,22 @@ CameraProviderManager::ProviderInfo::DeviceInfo3::DeviceInfo3(const std::string&
         mHasFlashUnit = false;
     }
 
+    camera_metadata_entry entry =
+            mCameraCharacteristics.find(ANDROID_FLASH_INFO_STRENGTH_DEFAULT_LEVEL);
+    if (entry.count == 1) {
+        mTorchDefaultStrengthLevel = entry.data.i32[0];
+    } else {
+        mTorchDefaultStrengthLevel = 0;
+    }
+
+    entry = mCameraCharacteristics.find(ANDROID_FLASH_INFO_STRENGTH_MAXIMUM_LEVEL);
+    if (entry.count == 1) {
+        mTorchMaximumStrengthLevel = entry.data.i32[0];
+    } else {
+        mTorchMaximumStrengthLevel = 0;
+    }
+
+    mTorchStrengthLevel = 0;
     queryPhysicalCameraIds();
 
     // Get physical camera characteristics if applicable
@@ -2466,6 +2526,80 @@ void CameraProviderManager::ProviderInfo::DeviceInfo3::notifyDeviceStateChange(
 
 status_t CameraProviderManager::ProviderInfo::DeviceInfo3::setTorchMode(bool enabled) {
     return setTorchModeForDevice<InterfaceT>(enabled);
+}
+
+status_t CameraProviderManager::ProviderInfo::DeviceInfo3::turnOnTorchWithStrengthLevel(
+        int32_t torchStrength) {
+    const sp<CameraProviderManager::ProviderInfo::DeviceInfo3::InterfaceT> interface =
+        startDeviceInterface<CameraProviderManager::ProviderInfo::DeviceInfo3::InterfaceT>();
+    if (interface == nullptr) {
+        return DEAD_OBJECT;
+    }
+    sp<hardware::camera::device::V3_8::ICameraDevice> interface_3_8 = nullptr;
+    auto castResult_3_8 = device::V3_8::ICameraDevice::castFrom(interface);
+    if (castResult_3_8.isOk()) {
+        interface_3_8 = castResult_3_8;
+    }
+
+    if (interface_3_8 == nullptr) {
+        return INVALID_OPERATION;
+    }
+
+    Status s = interface_3_8->turnOnTorchWithStrengthLevel(torchStrength);
+    if (s == Status::OK) {
+        mTorchStrengthLevel = torchStrength;
+    }
+    return mapToStatusT(s);
+}
+
+status_t CameraProviderManager::ProviderInfo::DeviceInfo3::getTorchStrengthLevel(
+        int32_t *torchStrength) {
+    if (torchStrength == nullptr) {
+        return BAD_VALUE;
+    }
+    const sp<CameraProviderManager::ProviderInfo::DeviceInfo3::InterfaceT> interface =
+        startDeviceInterface<CameraProviderManager::ProviderInfo::DeviceInfo3::InterfaceT>();
+    if (interface == nullptr) {
+        return DEAD_OBJECT;
+    }
+    auto castResult_3_8 = device::V3_8::ICameraDevice::castFrom(interface);
+    sp<hardware::camera::device::V3_8::ICameraDevice> interface_3_8 = nullptr;
+    if (castResult_3_8.isOk()) {
+        interface_3_8 = castResult_3_8;
+    }
+
+    if (interface_3_8 == nullptr) {
+        return INVALID_OPERATION;
+    }
+
+    Status callStatus;
+    status_t res;
+    hardware::Return<void> ret = interface_3_8->getTorchStrengthLevel([&callStatus, &torchStrength]
+        (Status status, const int32_t& torchStrengthLevel) {
+        callStatus = status;
+        if (status == Status::OK) {
+             *torchStrength = torchStrengthLevel;
+        } });
+
+    if (ret.isOk()) {
+        switch (callStatus) {
+            case Status::OK:
+                // Expected case, do nothing.
+                res = OK;
+                break;
+            case Status::METHOD_NOT_SUPPORTED:
+                res = INVALID_OPERATION;
+                break;
+            default:
+                ALOGE("%s: Get torch strength level failed: %d", __FUNCTION__, callStatus);
+                res = UNKNOWN_ERROR;
+        }
+    } else {
+        ALOGE("%s: Unexpected binder error: %s", __FUNCTION__, ret.description().c_str());
+        res = UNKNOWN_ERROR;
+    }
+
+    return res;
 }
 
 status_t CameraProviderManager::ProviderInfo::DeviceInfo3::getCameraInfo(
