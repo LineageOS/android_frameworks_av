@@ -90,7 +90,8 @@ class Camera3OutputStream :
             nsecs_t timestampOffset, const String8& physicalCameraId,
             const std::unordered_set<int32_t> &sensorPixelModesUsed,
             int setId = CAMERA3_STREAM_SET_ID_INVALID, bool isMultiResolution = false,
-            int dynamicProfile = ANDROID_REQUEST_AVAILABLE_DYNAMIC_RANGE_PROFILES_MAP_STANDARD);
+            int dynamicProfile = ANDROID_REQUEST_AVAILABLE_DYNAMIC_RANGE_PROFILES_MAP_STANDARD,
+            int streamUseCase = ANDROID_SCALER_AVAILABLE_STREAM_USE_CASES_DEFAULT);
     /**
      * Set up a stream for formats that have a variable buffer size for the same
      * dimensions, such as compressed JPEG.
@@ -103,7 +104,8 @@ class Camera3OutputStream :
             nsecs_t timestampOffset, const String8& physicalCameraId,
             const std::unordered_set<int32_t> &sensorPixelModesUsed,
             int setId = CAMERA3_STREAM_SET_ID_INVALID, bool isMultiResolution = false,
-            int dynamicProfile = ANDROID_REQUEST_AVAILABLE_DYNAMIC_RANGE_PROFILES_MAP_STANDARD);
+            int dynamicProfile = ANDROID_REQUEST_AVAILABLE_DYNAMIC_RANGE_PROFILES_MAP_STANDARD,
+            int streamUseCase = ANDROID_SCALER_AVAILABLE_STREAM_USE_CASES_DEFAULT);
     /**
      * Set up a stream with deferred consumer for formats that have 2 dimensions, such as
      * RAW and YUV. The consumer must be set before using this stream for output. A valid
@@ -115,7 +117,8 @@ class Camera3OutputStream :
             const String8& physicalCameraId,
             const std::unordered_set<int32_t> &sensorPixelModesUsed,
             int setId = CAMERA3_STREAM_SET_ID_INVALID, bool isMultiResolution = false,
-            int dynamicProfile = ANDROID_REQUEST_AVAILABLE_DYNAMIC_RANGE_PROFILES_MAP_STANDARD);
+            int dynamicProfile = ANDROID_REQUEST_AVAILABLE_DYNAMIC_RANGE_PROFILES_MAP_STANDARD,
+            int streamUseCase = ANDROID_SCALER_AVAILABLE_STREAM_USE_CASES_DEFAULT);
 
     virtual ~Camera3OutputStream();
 
@@ -243,7 +246,8 @@ class Camera3OutputStream :
             const std::unordered_set<int32_t> &sensorPixelModesUsed,
             uint64_t consumerUsage = 0, nsecs_t timestampOffset = 0,
             int setId = CAMERA3_STREAM_SET_ID_INVALID, bool isMultiResolution = false,
-            int dynamicProfile = ANDROID_REQUEST_AVAILABLE_DYNAMIC_RANGE_PROFILES_MAP_STANDARD);
+            int dynamicProfile = ANDROID_REQUEST_AVAILABLE_DYNAMIC_RANGE_PROFILES_MAP_STANDARD,
+            int streamUseCase = ANDROID_SCALER_AVAILABLE_STREAM_USE_CASES_DEFAULT);
 
     /**
      * Note that we release the lock briefly in this function

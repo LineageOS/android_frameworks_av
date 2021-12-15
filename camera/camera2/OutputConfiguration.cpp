@@ -81,6 +81,10 @@ int OutputConfiguration::getDynamicRangeProfile() const {
     return mDynamicRangeProfile;
 }
 
+int OutputConfiguration::getStreamUseCase() const {
+    return mStreamUseCase;
+}
+
 OutputConfiguration::OutputConfiguration() :
         mRotation(INVALID_ROTATION),
         mSurfaceSetID(INVALID_SET_ID),
@@ -90,7 +94,8 @@ OutputConfiguration::OutputConfiguration() :
         mIsDeferred(false),
         mIsShared(false),
         mIsMultiResolution(false),
-        mDynamicRangeProfile(ANDROID_REQUEST_AVAILABLE_DYNAMIC_RANGE_PROFILES_MAP_STANDARD) {
+        mDynamicRangeProfile(ANDROID_REQUEST_AVAILABLE_DYNAMIC_RANGE_PROFILES_MAP_STANDARD),
+        mStreamUseCase(ANDROID_SCALER_AVAILABLE_STREAM_USE_CASES_DEFAULT) {
 }
 
 OutputConfiguration::OutputConfiguration(const android::Parcel& parcel) :
@@ -177,6 +182,12 @@ status_t OutputConfiguration::readFromParcel(const android::Parcel* parcel) {
         return err;
     }
 
+    int streamUseCase = ANDROID_SCALER_AVAILABLE_STREAM_USE_CASES_DEFAULT;
+    if ((err = parcel->readInt32(&streamUseCase)) != OK) {
+        ALOGE("%s: Failed to read stream use case from parcel", __FUNCTION__);
+        return err;
+    }
+
     mRotation = rotation;
     mSurfaceSetID = setID;
     mSurfaceType = surfaceType;
@@ -185,6 +196,7 @@ status_t OutputConfiguration::readFromParcel(const android::Parcel* parcel) {
     mIsDeferred = isDeferred != 0;
     mIsShared = isShared != 0;
     mIsMultiResolution = isMultiResolution != 0;
+    mStreamUseCase = streamUseCase;
     for (auto& surface : surfaceShims) {
         ALOGV("%s: OutputConfiguration: %p, name %s", __FUNCTION__,
                 surface.graphicBufferProducer.get(),
@@ -196,8 +208,9 @@ status_t OutputConfiguration::readFromParcel(const android::Parcel* parcel) {
     mDynamicRangeProfile = dynamicProfile;
 
     ALOGV("%s: OutputConfiguration: rotation = %d, setId = %d, surfaceType = %d,"
-          " physicalCameraId = %s, isMultiResolution = %d", __FUNCTION__, mRotation,
-          mSurfaceSetID, mSurfaceType, String8(mPhysicalCameraId).string(), mIsMultiResolution);
+          " physicalCameraId = %s, isMultiResolution = %d, streamUseCase = %d", __FUNCTION__,
+          mRotation, mSurfaceSetID, mSurfaceType, String8(mPhysicalCameraId).string(),
+          mIsMultiResolution, mStreamUseCase);
 
     return err;
 }
@@ -213,6 +226,7 @@ OutputConfiguration::OutputConfiguration(sp<IGraphicBufferProducer>& gbp, int ro
     mPhysicalCameraId = physicalId;
     mIsMultiResolution = false;
     mDynamicRangeProfile = ANDROID_REQUEST_AVAILABLE_DYNAMIC_RANGE_PROFILES_MAP_STANDARD;
+    mStreamUseCase = ANDROID_SCALER_AVAILABLE_STREAM_USE_CASES_DEFAULT;
 }
 
 OutputConfiguration::OutputConfiguration(
@@ -222,7 +236,8 @@ OutputConfiguration::OutputConfiguration(
   : mGbps(gbps), mRotation(rotation), mSurfaceSetID(surfaceSetID), mSurfaceType(surfaceType),
     mWidth(width), mHeight(height), mIsDeferred(false), mIsShared(isShared),
     mPhysicalCameraId(physicalCameraId), mIsMultiResolution(false),
-    mDynamicRangeProfile(ANDROID_REQUEST_AVAILABLE_DYNAMIC_RANGE_PROFILES_MAP_STANDARD) { }
+    mDynamicRangeProfile(ANDROID_REQUEST_AVAILABLE_DYNAMIC_RANGE_PROFILES_MAP_STANDARD),
+    mStreamUseCase(ANDROID_SCALER_AVAILABLE_STREAM_USE_CASES_DEFAULT) { }
 
 status_t OutputConfiguration::writeToParcel(android::Parcel* parcel) const {
 
@@ -270,6 +285,9 @@ status_t OutputConfiguration::writeToParcel(android::Parcel* parcel) const {
     if (err != OK) return err;
 
     err = parcel->writeInt32(mDynamicRangeProfile ? 1 : 0);
+    if (err != OK) return err;
+
+    err = parcel->writeInt32(mStreamUseCase);
     if (err != OK) return err;
 
     return OK;

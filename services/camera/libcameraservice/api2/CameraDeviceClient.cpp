@@ -145,9 +145,9 @@ status_t CameraDeviceClient::initializeImpl(TProviderPtr providerPtr, const Stri
             ANDROID_REQUEST_AVAILABLE_DYNAMIC_RANGE_PROFILES_MAP_STANDARD,
             ANDROID_REQUEST_AVAILABLE_DYNAMIC_RANGE_PROFILES_MAP_STANDARD);
     if (entry.count > 0) {
-        const auto it = std::find(entry.data.i32, entry.data.i32 + entry.count,
+        const auto it = std::find(entry.data.u8, entry.data.u8 + entry.count,
                 ANDROID_REQUEST_AVAILABLE_CAPABILITIES_DYNAMIC_RANGE_TEN_BIT);
-        if (it != entry.data.i32 + entry.count) {
+        if (it != entry.data.u8 + entry.count) {
             entry = deviceInfo.find(ANDROID_REQUEST_AVAILABLE_DYNAMIC_RANGE_PROFILES_MAP);
             if (entry.count > 0 || ((entry.count % 2) != 0)) {
                 int standardBitmap = ANDROID_REQUEST_AVAILABLE_DYNAMIC_RANGE_PROFILES_MAP_STANDARD;
@@ -856,6 +856,7 @@ binder::Status CameraDeviceClient::createStream(
     bool deferredConsumerOnly = deferredConsumer && numBufferProducers == 0;
     bool isMultiResolution = outputConfiguration.isMultiResolution();
     int dynamicRangeProfile = outputConfiguration.getDynamicRangeProfile();
+    int streamUseCase = outputConfiguration.getStreamUseCase();
 
     res = SessionConfigurationUtils::checkSurfaceType(numBufferProducers, deferredConsumer,
             outputConfiguration.getSurfaceType());
@@ -899,7 +900,8 @@ binder::Status CameraDeviceClient::createStream(
         sp<Surface> surface;
         res = SessionConfigurationUtils::createSurfaceFromGbp(streamInfo,
                 isStreamInfoValid, surface, bufferProducer, mCameraIdStr,
-                mDevice->infoPhysical(physicalCameraId), sensorPixelModesUsed, dynamicRangeProfile);
+                mDevice->infoPhysical(physicalCameraId), sensorPixelModesUsed, dynamicRangeProfile,
+                streamUseCase);
 
         if (!res.isOk())
             return res;
@@ -944,7 +946,7 @@ binder::Status CameraDeviceClient::createStream(
                 static_cast<camera_stream_rotation_t>(outputConfiguration.getRotation()),
                 &streamId, physicalCameraId, streamInfo.sensorPixelModesUsed, &surfaceIds,
                 outputConfiguration.getSurfaceSetID(), isShared, isMultiResolution,
-                streamInfo.dynamicRangeProfile);
+                /*consumerUsage*/0, streamInfo.dynamicRangeProfile, streamInfo.streamUseCase);
     }
 
     if (err != OK) {
@@ -1039,7 +1041,8 @@ binder::Status CameraDeviceClient::createDeferredSurfaceStreamLocked(
             &surfaceIds,
             outputConfiguration.getSurfaceSetID(), isShared,
             outputConfiguration.isMultiResolution(), consumerUsage,
-            outputConfiguration.getDynamicRangeProfile());
+            outputConfiguration.getDynamicRangeProfile(),
+            outputConfiguration.getStreamUseCase());
 
     if (err != OK) {
         res = STATUS_ERROR_FMT(CameraService::ERROR_INVALID_OPERATION,
@@ -1053,7 +1056,8 @@ binder::Status CameraDeviceClient::createDeferredSurfaceStreamLocked(
         mStreamInfoMap.emplace(std::piecewise_construct, std::forward_as_tuple(streamId),
                 std::forward_as_tuple(width, height, format, dataSpace, consumerUsage,
                         overriddenSensorPixelModesUsed,
-                        outputConfiguration.getDynamicRangeProfile()));
+                        outputConfiguration.getDynamicRangeProfile(),
+                        outputConfiguration.getStreamUseCase()));
 
         ALOGV("%s: Camera %s: Successfully created a new stream ID %d for a deferred surface"
                 " (%d x %d) stream with format 0x%x.",
@@ -1241,6 +1245,7 @@ binder::Status CameraDeviceClient::updateOutputConfiguration(int streamId,
     }
     const std::vector<int32_t> &sensorPixelModesUsed =
             outputConfiguration.getSensorPixelModesUsed();
+    int streamUseCase = outputConfiguration.getStreamUseCase();
 
     int dynamicRangeProfile = outputConfiguration.getDynamicRangeProfile();
 
@@ -1249,7 +1254,8 @@ binder::Status CameraDeviceClient::updateOutputConfiguration(int streamId,
         sp<Surface> surface;
         res = SessionConfigurationUtils::createSurfaceFromGbp(outInfo,
                 /*isStreamInfoValid*/ false, surface, newOutputsMap.valueAt(i), mCameraIdStr,
-                mDevice->infoPhysical(physicalCameraId), sensorPixelModesUsed, dynamicRangeProfile);
+                mDevice->infoPhysical(physicalCameraId), sensorPixelModesUsed, dynamicRangeProfile,
+                streamUseCase);
         if (!res.isOk())
             return res;
 
@@ -1607,6 +1613,7 @@ binder::Status CameraDeviceClient::finalizeOutputConfigurations(int32_t streamId
     const std::vector<int32_t> &sensorPixelModesUsed =
             outputConfiguration.getSensorPixelModesUsed();
     int dynamicRangeProfile = outputConfiguration.getDynamicRangeProfile();
+    int streamUseCase= outputConfiguration.getStreamUseCase();
     for (auto& bufferProducer : bufferProducers) {
         // Don't create multiple streams for the same target surface
         ssize_t index = mStreamMap.indexOfKey(IInterface::asBinder(bufferProducer));
@@ -1619,7 +1626,8 @@ binder::Status CameraDeviceClient::finalizeOutputConfigurations(int32_t streamId
         sp<Surface> surface;
         res = SessionConfigurationUtils::createSurfaceFromGbp(mStreamInfoMap[streamId],
                 true /*isStreamInfoValid*/, surface, bufferProducer, mCameraIdStr,
-                mDevice->infoPhysical(physicalId), sensorPixelModesUsed, dynamicRangeProfile);
+                mDevice->infoPhysical(physicalId), sensorPixelModesUsed, dynamicRangeProfile,
+                streamUseCase);
 
         if (!res.isOk())
             return res;

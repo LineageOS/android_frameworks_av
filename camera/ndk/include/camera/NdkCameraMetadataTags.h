@@ -4206,6 +4206,55 @@ typedef enum acamera_metadata_tag {
      */
     ACAMERA_SCALER_MULTI_RESOLUTION_STREAM_SUPPORTED =          // byte (acamera_metadata_enum_android_scaler_multi_resolution_stream_supported_t)
             ACAMERA_SCALER_START + 24,
+    /**
+     * <p>The stream use cases supported by this camera device.</p>
+     *
+     * <p>Type: int32[n] (acamera_metadata_enum_android_scaler_available_stream_use_cases_t)</p>
+     *
+     * <p>This tag may appear in:
+     * <ul>
+     *   <li>ACameraMetadata from ACameraManager_getCameraCharacteristics</li>
+     * </ul></p>
+     *
+     * <p>The stream use case indicates the purpose of a particular camera stream from
+     * the end-user perspective. Some examples of camera use cases are: preview stream for
+     * live viewfinder shown to the user, still capture for generating high quality photo
+     * capture, video record for encoding the camera output for the purpose of future playback,
+     * and video call for live realtime video conferencing.</p>
+     * <p>With this flag, the camera device can optimize the image processing pipeline
+     * parameters, such as tuning, sensor mode, and ISP settings, indepedent of
+     * the properties of the immediate camera output surface. For example, if the output
+     * surface is a SurfaceTexture, the stream use case flag can be used to indicate whether
+     * the camera frames eventually go to display, video encoder,
+     * still image capture, or all of them combined.</p>
+     * <p>The application sets the use case of a camera stream by calling
+     * <a href="https://developer.android.com/reference/android/hardware/camera2/params/OutputConfiguration.html#setStreamUseCase">OutputConfiguration#setStreamUseCase</a>.</p>
+     * <p>A camera device with
+     * <a href="https://developer.android.com/reference/android/hardware/camera2/CameraCharacteristics.html#REQUEST_AVAILABLE_CAPABILITIES_STREAM_USE_CASE">CameraCharacteristics#REQUEST_AVAILABLE_CAPABILITIES_STREAM_USE_CASE</a>
+     * capability must support the following stream use cases:</p>
+     * <ul>
+     * <li>DEFAULT</li>
+     * <li>PREVIEW</li>
+     * <li>STILL_CAPTURE</li>
+     * <li>VIDEO_RECORD</li>
+     * <li>PREVIEW_VIDEO_STILL</li>
+     * <li>VIDEO_CALL</li>
+     * </ul>
+     * <p>The guaranteed stream combinations related to stream use case for a camera device with
+     * <a href="https://developer.android.com/reference/android/hardware/camera2/CameraCharacteristics.html#REQUEST_AVAILABLE_CAPABILITIES_STREAM_USE_CASE">CameraCharacteristics#REQUEST_AVAILABLE_CAPABILITIES_STREAM_USE_CASE</a>
+     * capability is documented in the camera device
+     * <a href="https://developer.android.com/reference/android/hardware/camera2/CameraDevice.html#createCaptureSession">guideline</a>. The
+     * application is strongly recommended to use one of the guaranteed stream combintations.
+     * If the application creates a session with a stream combination not in the guaranteed
+     * list, or with mixed DEFAULT and non-DEFAULT use cases within the same session,
+     * the camera device may ignore some stream use cases due to hardware constraints
+     * and implementation details.</p>
+     * <p>For stream combinations not covered by the stream use case mandatory lists, such as
+     * reprocessable session, constrained high speed session, or RAW stream combinations, the
+     * application should leave stream use cases within the session as DEFAULT.</p>
+     */
+    ACAMERA_SCALER_AVAILABLE_STREAM_USE_CASES =                 // int32[n] (acamera_metadata_enum_android_scaler_available_stream_use_cases_t)
+            ACAMERA_SCALER_START + 25,
     ACAMERA_SCALER_END,
 
     /**
@@ -9142,6 +9191,35 @@ typedef enum acamera_metadata_enum_acamera_request_available_capabilities {
     ACAMERA_REQUEST_AVAILABLE_CAPABILITIES_ULTRA_HIGH_RESOLUTION_SENSOR
                                                                       = 16,
 
+    /**
+     * <p>The camera device supports selecting a per-stream use case via
+     * <a href="https://developer.android.com/reference/android/hardware/camera2/params/OutputConfiguration.html#setStreamUseCase">OutputConfiguration#setStreamUseCase</a>
+     * so that the device can optimize camera pipeline parameters such as tuning, sensor
+     * mode, or ISP settings for a specific user scenario.
+     * Some sample usages of this capability are:
+     * * Distinguish high quality YUV captures from a regular YUV stream where
+     *   the image quality may not be as good as the JPEG stream, or
+     * * Use one stream to serve multiple purposes: viewfinder, video recording and
+     *   still capture. This is common with applications that wish to apply edits equally
+     *   to preview, saved images, and saved videos.</p>
+     * <p>This capability requires the camera device to support the following
+     * stream use cases:
+     * * DEFAULT for backward compatibility where the application doesn't set
+     *   a stream use case
+     * * PREVIEW for live viewfinder and in-app image analysis
+     * * STILL_CAPTURE for still photo capture
+     * * VIDEO_RECORD for recording video clips
+     * * PREVIEW_VIDEO_STILL for one single stream used for viewfinder, video
+     *   recording, and still capture.
+     * * VIDEO_CALL for long running video calls</p>
+     * <p><a href="https://developer.android.com/reference/android/hardware/camera2/CameraCharacteristics.html#SCALER_AVAILABLE_STREAM_USE_CASES">CameraCharacteristics#SCALER_AVAILABLE_STREAM_USE_CASES</a>
+     * lists all of the supported stream use cases.</p>
+     * <p>Refer to <a href="https://developer.android.com/reference/android/hardware/camera2/CameraDevice.html#createCaptureSession">CameraDevice#createCaptureSession</a> for the
+     * mandatory stream combinations involving stream use cases, which can also be queried
+     * via <a href="https://developer.android.com/reference/android/hardware/camera2/params/MandatoryStreamCombination.html">MandatoryStreamCombination</a>.</p>
+     */
+    ACAMERA_REQUEST_AVAILABLE_CAPABILITIES_STREAM_USE_CASE           = 19,
+
 } acamera_metadata_enum_android_request_available_capabilities_t;
 
 // ACAMERA_REQUEST_AVAILABLE_DYNAMIC_RANGE_PROFILES_MAP
@@ -9419,6 +9497,76 @@ typedef enum acamera_metadata_enum_acamera_scaler_multi_resolution_stream_suppor
     ACAMERA_SCALER_MULTI_RESOLUTION_STREAM_SUPPORTED_TRUE            = 1,
 
 } acamera_metadata_enum_android_scaler_multi_resolution_stream_supported_t;
+
+// ACAMERA_SCALER_AVAILABLE_STREAM_USE_CASES
+typedef enum acamera_metadata_enum_acamera_scaler_available_stream_use_cases {
+    /**
+     * <p>Default stream use case.</p>
+     * <p>This use case is the same as when the application doesn't set any use case for
+     * the stream. The camera device uses the properties of the output target, such as
+     * format, dataSpace, or surface class type, to optimize the image processing pipeline.</p>
+     */
+    ACAMERA_SCALER_AVAILABLE_STREAM_USE_CASES_DEFAULT                = 0x0,
+
+    /**
+     * <p>Live stream shown to the user.</p>
+     * <p>Optimized for performance and usability as a viewfinder, but not necessarily for
+     * image quality. The output is not meant to be persisted as saved images or video.</p>
+     * <p>No stall if android.control.<em> are set to FAST; may have stall if android.control.</em>
+     * are set to HIGH_QUALITY. This use case has the same behavior as the default
+     * SurfaceView and SurfaceTexture targets. Additionally, this use case can be used for
+     * in-app image analysis.</p>
+     */
+    ACAMERA_SCALER_AVAILABLE_STREAM_USE_CASES_PREVIEW                = 0x1,
+
+    /**
+     * <p>Still photo capture.</p>
+     * <p>Optimized for high-quality high-resolution capture, and not expected to maintain
+     * preview-like frame rates.</p>
+     * <p>The stream may have stalls regardless of whether ACAMERA_CONTROL_* is HIGH_QUALITY.
+     * This use case has the same behavior as the default JPEG and RAW related formats.</p>
+     */
+    ACAMERA_SCALER_AVAILABLE_STREAM_USE_CASES_STILL_CAPTURE          = 0x2,
+
+    /**
+     * <p>Recording video clips.</p>
+     * <p>Optimized for high-quality video capture, including high-quality image stabilization
+     * if supported by the device and enabled by the application. As a result, may produce
+     * output frames with a substantial lag from real time, to allow for highest-quality
+     * stabilization or other processing. As such, such an output is not suitable for drawing
+     * to screen directly, and is expected to be persisted to disk or similar for later
+     * playback or processing. Only streams that set the VIDEO_RECORD use case are guaranteed
+     * to have video stabilization applied when the video stabilization control is set
+     * to ON, as opposed to PREVIEW_STABILIZATION.</p>
+     * <p>This use case has the same behavior as the default MediaRecorder and MediaCodec
+     * targets.</p>
+     */
+    ACAMERA_SCALER_AVAILABLE_STREAM_USE_CASES_VIDEO_RECORD           = 0x3,
+
+    /**
+     * <p>One single stream used for combined purposes of preview, video, and still capture.</p>
+     * <p>For such multi-purpose streams, the camera device aims to make the best tradeoff
+     * between the individual use cases. For example, the STILL_CAPTURE use case by itself
+     * may have stalls for achieving best image quality. But if combined with PREVIEW and
+     * VIDEO_RECORD, the camera device needs to trade off the additional image processing
+     * for speed so that preview and video recording aren't slowed down.</p>
+     * <p>Similarly, VIDEO_RECORD may produce frames with a substantial lag, but
+     * PREVIEW_VIDEO_STILL must have minimal output delay. This means that to enable video
+     * stabilization with this use case, the device must support and the app must select the
+     * PREVIEW_STABILIZATION mode for video stabilization.</p>
+     */
+    ACAMERA_SCALER_AVAILABLE_STREAM_USE_CASES_PREVIEW_VIDEO_STILL    = 0x4,
+
+    /**
+     * <p>Long-running video call optimized for both power efficienty and video quality.</p>
+     * <p>The camera sensor may run in a lower-resolution mode to reduce power consumption
+     * at the cost of some image and digital zoom quality. Unlike VIDEO_RECORD, VIDEO_CALL
+     * outputs are expected to work in dark conditions, so are usually accompanied with
+     * variable frame rate settings to allow sufficient exposure time in low light.</p>
+     */
+    ACAMERA_SCALER_AVAILABLE_STREAM_USE_CASES_VIDEO_CALL             = 0x5,
+
+} acamera_metadata_enum_android_scaler_available_stream_use_cases_t;
 
 
 // ACAMERA_SENSOR_REFERENCE_ILLUMINANT1

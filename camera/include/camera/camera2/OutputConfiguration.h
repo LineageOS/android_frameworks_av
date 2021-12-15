@@ -49,6 +49,7 @@ public:
     bool                       isShared() const;
     String16                   getPhysicalCameraId() const;
     bool                       isMultiResolution() const;
+    int                        getStreamUseCase() const;
 
     // set of sensor pixel mode resolutions allowed {MAX_RESOLUTION, DEFAULT_MODE};
     const std::vector<int32_t>&            getSensorPixelModesUsed() const;
@@ -91,7 +92,8 @@ public:
                 mPhysicalCameraId == other.mPhysicalCameraId &&
                 mIsMultiResolution == other.mIsMultiResolution &&
                 sensorPixelModesUsedEqual(other) &&
-                mDynamicRangeProfile == other.mDynamicRangeProfile);
+                mDynamicRangeProfile == other.mDynamicRangeProfile &&
+                mStreamUseCase == other.mStreamUseCase );
     }
     bool operator != (const OutputConfiguration& other) const {
         return !(*this == other);
@@ -131,6 +133,9 @@ public:
         if (mDynamicRangeProfile != other.mDynamicRangeProfile) {
             return mDynamicRangeProfile < other.mDynamicRangeProfile;
         }
+        if (mStreamUseCase != other.mStreamUseCase) {
+            return mStreamUseCase < other.mStreamUseCase;
+        }
         return gbpsLessThan(other);
     }
 
@@ -156,6 +161,7 @@ private:
     bool                       mIsMultiResolution;
     std::vector<int32_t>       mSensorPixelModesUsed;
     int                        mDynamicRangeProfile;
+    int                        mStreamUseCase;
 };
 } // namespace params
 } // namespace camera2

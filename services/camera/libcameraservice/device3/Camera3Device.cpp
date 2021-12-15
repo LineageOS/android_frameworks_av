@@ -978,7 +978,7 @@ status_t Camera3Device::createStream(sp<Surface> consumer,
             const String8& physicalCameraId,
             const std::unordered_set<int32_t> &sensorPixelModesUsed,
             std::vector<int> *surfaceIds, int streamSetId, bool isShared, bool isMultiResolution,
-            uint64_t consumerUsage, int dynamicRangeProfile) {
+            uint64_t consumerUsage, int dynamicRangeProfile, int streamUseCase) {
     ATRACE_CALL();
 
     if (consumer == nullptr) {
@@ -991,7 +991,8 @@ status_t Camera3Device::createStream(sp<Surface> consumer,
 
     return createStream(consumers, /*hasDeferredConsumer*/ false, width, height,
             format, dataSpace, rotation, id, physicalCameraId, sensorPixelModesUsed, surfaceIds,
-            streamSetId, isShared, isMultiResolution, consumerUsage, dynamicRangeProfile);
+            streamSetId, isShared, isMultiResolution, consumerUsage, dynamicRangeProfile,
+            streamUseCase);
 }
 
 static bool isRawFormat(int format) {
@@ -1011,7 +1012,7 @@ status_t Camera3Device::createStream(const std::vector<sp<Surface>>& consumers,
         android_dataspace dataSpace, camera_stream_rotation_t rotation, int *id,
         const String8& physicalCameraId, const std::unordered_set<int32_t> &sensorPixelModesUsed,
         std::vector<int> *surfaceIds, int streamSetId, bool isShared, bool isMultiResolution,
-        uint64_t consumerUsage, int dynamicRangeProfile) {
+        uint64_t consumerUsage, int dynamicRangeProfile, int streamUseCase) {
     ATRACE_CALL();
 
     Mutex::Autolock il(mInterfaceLock);
@@ -1089,7 +1090,7 @@ status_t Camera3Device::createStream(const std::vector<sp<Surface>>& consumers,
         newStream = new Camera3OutputStream(mNextStreamId, consumers[0],
                 width, height, blobBufferSize, format, dataSpace, rotation,
                 mTimestampOffset, physicalCameraId, sensorPixelModesUsed, streamSetId,
-                isMultiResolution, dynamicRangeProfile);
+                isMultiResolution, dynamicRangeProfile, streamUseCase);
     } else if (format == HAL_PIXEL_FORMAT_RAW_OPAQUE) {
         bool maxResolution =
                 sensorPixelModesUsed.find(ANDROID_SENSOR_PIXEL_MODE_MAXIMUM_RESOLUTION) !=
@@ -1103,22 +1104,22 @@ status_t Camera3Device::createStream(const std::vector<sp<Surface>>& consumers,
         newStream = new Camera3OutputStream(mNextStreamId, consumers[0],
                 width, height, rawOpaqueBufferSize, format, dataSpace, rotation,
                 mTimestampOffset, physicalCameraId, sensorPixelModesUsed, streamSetId,
-                isMultiResolution, dynamicRangeProfile);
+                isMultiResolution, dynamicRangeProfile, streamUseCase);
     } else if (isShared) {
         newStream = new Camera3SharedOutputStream(mNextStreamId, consumers,
                 width, height, format, consumerUsage, dataSpace, rotation,
                 mTimestampOffset, physicalCameraId, sensorPixelModesUsed, streamSetId,
-                mUseHalBufManager, dynamicRangeProfile);
+                mUseHalBufManager, dynamicRangeProfile, streamUseCase);
     } else if (consumers.size() == 0 && hasDeferredConsumer) {
         newStream = new Camera3OutputStream(mNextStreamId,
                 width, height, format, consumerUsage, dataSpace, rotation,
                 mTimestampOffset, physicalCameraId, sensorPixelModesUsed, streamSetId,
-                isMultiResolution, dynamicRangeProfile);
+                isMultiResolution, dynamicRangeProfile, streamUseCase);
     } else {
         newStream = new Camera3OutputStream(mNextStreamId, consumers[0],
                 width, height, format, dataSpace, rotation,
                 mTimestampOffset, physicalCameraId, sensorPixelModesUsed, streamSetId,
-                isMultiResolution, dynamicRangeProfile);
+                isMultiResolution, dynamicRangeProfile, streamUseCase);
     }
 
     size_t consumerCount = consumers.size();
@@ -1812,14 +1813,16 @@ void Camera3Device::notifyStatus(bool idle) {
                 streamIds.push_back(stream->getId());
                 Camera3Stream* camera3Stream = Camera3Stream::cast(stream->asHalStream());
                 int64_t usage = 0LL;
+                int streamUseCase = ANDROID_SCALER_AVAILABLE_STREAM_USE_CASES_DEFAULT;
                 if (camera3Stream != nullptr) {
                     usage = camera3Stream->getUsage();
+                    streamUseCase = camera3Stream->getStreamUseCase();
                 }
                 streamStats.emplace_back(stream->getWidth(), stream->getHeight(),
                     stream->getFormat(), stream->getDataSpace(), usage,
                     stream->getMaxHalBuffers(),
                     stream->getMaxTotalBuffers() - stream->getMaxHalBuffers(),
-                    stream->getDynamicRangeProfile());
+                    stream->getDynamicRangeProfile(), streamUseCase);
             }
         }
     }

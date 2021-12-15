@@ -178,6 +178,7 @@ class Camera3Stream :
     android_dataspace getOriginalDataSpace() const;
     int               getMaxHalBuffers() const;
     const String8&    physicalCameraId() const;
+    int               getStreamUseCase() const;
 
     void              setOfflineProcessingSupport(bool) override;
     bool              getOfflineProcessingSupport() const override;
@@ -505,7 +506,8 @@ class Camera3Stream :
             android_dataspace dataSpace, camera_stream_rotation_t rotation,
             const String8& physicalCameraId,
             const std::unordered_set<int32_t> &sensorPixelModesUsed,
-            int setId, bool isMultiResolution, int dynamicRangeProfile);
+            int setId, bool isMultiResolution, int dynamicRangeProfile,
+            int streamUseCase);
 
     wp<Camera3StreamBufferFreedListener> mBufferFreedListener;
 

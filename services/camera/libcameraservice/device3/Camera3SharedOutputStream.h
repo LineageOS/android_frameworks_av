@@ -41,7 +41,8 @@ public:
             const std::unordered_set<int32_t> &sensorPixelModesUsed,
             int setId = CAMERA3_STREAM_SET_ID_INVALID,
             bool useHalBufManager = false,
-            int dynamicProfile = ANDROID_REQUEST_AVAILABLE_DYNAMIC_RANGE_PROFILES_MAP_STANDARD);
+            int dynamicProfile = ANDROID_REQUEST_AVAILABLE_DYNAMIC_RANGE_PROFILES_MAP_STANDARD,
+            int streamUseCase = ANDROID_SCALER_AVAILABLE_STREAM_USE_CASES_DEFAULT);
 
     virtual ~Camera3SharedOutputStream();
 
