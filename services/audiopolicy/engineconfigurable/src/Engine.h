@@ -126,6 +126,7 @@ private:
     status_t loadAudioPolicyEngineConfig();
 
     DeviceVector getDevicesForProductStrategy(product_strategy_t strategy) const;
+    DeviceVector getCachedDevices(product_strategy_t ps) const;
 
     /**
      * Policy Parameter Manager hidden through a wrapper.
