@@ -35,6 +35,17 @@
           "exclude-filter": "android.media.audio.cts.AudioRecordTest"
         }
       ]
+    },
+    {
+      "name": "CtsMediaPlayerTestCases",
+      "options": [
+        {
+          "include-annotation": "android.platform.test.annotations.Presubmit"
+        },
+        {
+          "exclude-annotation": "android.platform.test.annotations.RequiresDevice"
+        }
+      ]
     }
   ]
 }
