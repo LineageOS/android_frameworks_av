@@ -552,8 +552,10 @@ private:
                     mName(name), mId(id), mVersion(version), mProviderTagid(tagId),
                     mIsLogicalCamera(false), mResourceCost(resourceCost),
                     mStatus(hardware::camera::common::V1_0::CameraDeviceStatus::PRESENT),
-                    mParentProvider(parentProvider), mHasFlashUnit(false),
-                    mSupportNativeZoomRatio(false), mPublicCameraIds(publicCameraIds) {}
+                    mParentProvider(parentProvider), mTorchStrengthLevel(0),
+                    mTorchMaximumStrengthLevel(0), mTorchDefaultStrengthLevel(0),
+                    mHasFlashUnit(false), mSupportNativeZoomRatio(false),
+                    mPublicCameraIds(publicCameraIds) {}
             virtual ~DeviceInfo();
         protected:
             bool mHasFlashUnit; // const after constructor
