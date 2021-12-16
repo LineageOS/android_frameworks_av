@@ -366,6 +366,13 @@ private:
     aaudio_result_t sendServiceEvent(aaudio_service_event_t event,
                                      double dataDouble);
 
+    aaudio_result_t sendCommand(aaudio_command_opcode opCode,
+                                std::shared_ptr<AAudioCommandParam> param = nullptr,
+                                bool waitForReply = false,
+                                int64_t timeoutNanos = 0);
+
+    aaudio_result_t closeAndClear();
+
     /**
      * @return true if the queue is getting full.
      */

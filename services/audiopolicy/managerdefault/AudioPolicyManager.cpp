@@ -1702,6 +1702,8 @@ audio_io_handle_t AudioPolicyManager::selectOutput(const SortedVector<audio_io_h
     // The priority is as follows:
     // 1: the output supporting haptic playback when requesting haptic playback
     // 2: the output with the highest number of requested functional flags
+    //    with tiebreak preferring the minimum number of extra functional flags
+    //    (see b/200293124, the incorrect selection of AUDIO_OUTPUT_FLAG_VOIP_RX).
     // 3: the output supporting the exact channel mask
     // 4: the output with a higher channel count than requested
     // 5: the output with a higher sampling rate than requested
@@ -1743,7 +1745,12 @@ audio_io_handle_t AudioPolicyManager::selectOutput(const SortedVector<audio_io_h
         }
 
         // functional flags match
-        currentMatchCriteria[1] = popcount(outputDesc->mFlags & functionalFlags);
+        const int matchingFunctionalFlags =
+                __builtin_popcount(outputDesc->mFlags & functionalFlags);
+        const int totalFunctionalFlags =
+                __builtin_popcount(outputDesc->mFlags & kFunctionalFlags);
+        // Prefer matching functional flags, but subtract unnecessary functional flags.
+        currentMatchCriteria[1] = 100 * (matchingFunctionalFlags + 1) - totalFunctionalFlags;
 
         // channel mask and channel count match
         uint32_t outputChannelCount = audio_channel_count_from_out_mask(
