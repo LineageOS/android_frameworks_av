@@ -205,15 +205,14 @@ public:
         std::stringstream ss;
         int32_t ll = lines;
         std::lock_guard l(mLock);
-        auto it = mMap.begin();
         if (ll > 0) {
             ss << "Error Heat Map (rejected: " << mRejected << "):\n";
             --ll;
         }
         // TODO: restriction is implemented alphabetically not on priority.
-        for (int32_t count = 0; it != mMap.end() && count < lines; ++count, ++it) {
+        for (const auto& [name, data] : mMap) {
             if (ll <= 0) break;
-            ss << it->first << ": " << it->second.dump() << "\n";
+            ss << name << ": " << data.dump() << "\n";
             --ll;
         }
         return { ss.str(), lines - ll };
