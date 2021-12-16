@@ -27,6 +27,11 @@
 namespace android {
 
 /**
+ * Check if R10G10B10A2 is supported in legacy rendering path that involves GPU
+ */
+bool IsFormatR10G10B10A2SupportedForLegacyRendering();
+
+/**
  * Converts an RGB view to planar YUV 420 media image.
  *
  * \param dstY       pointer to media image buffer

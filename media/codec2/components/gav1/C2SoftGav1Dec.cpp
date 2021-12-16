@@ -20,6 +20,7 @@
 
 #include <C2Debug.h>
 #include <C2PlatformSupport.h>
+#include <Codec2BufferUtils.h>
 #include <Codec2Mapper.h>
 #include <SimpleC2Interface.h>
 #include <log/log.h>
@@ -338,6 +339,7 @@ C2SoftGav1Dec::C2SoftGav1Dec(const char *name, c2_node_id_t id,
           std::make_shared<SimpleInterface<IntfImpl>>(name, id, intfImpl)),
       mIntf(intfImpl),
       mCodecCtx(nullptr) {
+  mIsFormatR10G10B10A2Supported = IsFormatR10G10B10A2SupportedForLegacyRendering();
   gettimeofday(&mTimeStart, nullptr);
   gettimeofday(&mTimeEnd, nullptr);
 }
@@ -790,7 +792,14 @@ bool C2SoftGav1Dec::outputBuffer(const std::shared_ptr<C2BlockPool> &pool,
         work->workletsProcessed = 1u;
         return false;
       }
-      format = HAL_PIXEL_FORMAT_RGBA_1010102;
+      // TODO (b/201787956) For devices that do not support HAL_PIXEL_FORMAT_RGBA_1010102,
+      // HAL_PIXEL_FORMAT_YV12 is used as a temporary work around.
+      if (!mIsFormatR10G10B10A2Supported)  {
+        ALOGE("HAL_PIXEL_FORMAT_RGBA_1010102 isn't supported");
+        format = HAL_PIXEL_FORMAT_YV12;
+      } else {
+        format = HAL_PIXEL_FORMAT_RGBA_1010102;
+      }
     }
   }
   C2MemoryUsage usage = {C2MemoryUsage::CPU_READ, C2MemoryUsage::CPU_WRITE};
