@@ -5857,7 +5857,8 @@ DeviceVector AudioPolicyManager::getNewOutputDevices(const sp<SwAudioOutputDescr
             return hasVoiceStream(streams) && (outputDesc == mPrimaryOutput ||
                 outputDesc->isActive(toVolumeSource(AUDIO_STREAM_VOICE_CALL))) &&
                 (isInCall() ||
-                 mOutputs.isStrategyActiveOnSameModule(productStrategy, outputDesc));
+                 mOutputs.isStrategyActiveOnSameModule(productStrategy, outputDesc)) &&
+                !isStreamActive(AUDIO_STREAM_ENFORCED_AUDIBLE, 0);
         };
 
         // With low-latency playing on speaker, music on WFD, when the first low-latency
