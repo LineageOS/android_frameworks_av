@@ -229,6 +229,7 @@ LIBMEDIANDK {
     AMediaDrm_decrypt;
     AMediaDrm_encrypt;
     AMediaDrm_getKeyRequest;
+    AMediaDrm_getKeyRequestWithDefaultUrlAndType; # introduced=Tiramisu
     AMediaDrm_getPropertyByteArray;
     AMediaDrm_getPropertyString;
     AMediaDrm_getProvisionRequest;
