@@ -20,6 +20,7 @@
 #include "PoseDriftCompensator.h"
 #include "QuaternionUtil.h"
 #include "ScreenHeadFusion.h"
+#include "StillnessDetector.h"
 
 namespace android {
 namespace media {
@@ -39,6 +40,11 @@ class HeadTrackingProcessorImpl : public HeadTrackingProcessor {
           mScreenPoseDriftCompensator(PoseDriftCompensator::Options{
                   .translationalDriftTimeConstant = options.translationalDriftTimeConstant,
                   .rotationalDriftTimeConstant = options.rotationalDriftTimeConstant,
+          }),
+          mHeadStillnessDetector(StillnessDetector::Options{
+                  .windowDuration = options.autoRecenterWindowDuration,
+                  .translationalThreshold = options.autoRecenterTranslationalThreshold,
+                  .rotationalThreshold = options.autoRecenterRotationalThreshold,
           }),
           mModeSelector(ModeSelector::Options{.freshnessTimeout = options.freshnessTimeout},
                         initialMode),
@@ -78,7 +84,14 @@ class HeadTrackingProcessorImpl : public HeadTrackingProcessor {
 
     void calculate(int64_t timestamp) override {
         if (mWorldToHeadTimestamp.has_value()) {
-            const Pose3f worldToHead = mHeadPoseDriftCompensator.getOutput();
+            Pose3f worldToHead = mHeadPoseDriftCompensator.getOutput();
+            mHeadStillnessDetector.setInput(mWorldToHeadTimestamp.value(), worldToHead);
+            // Auto-recenter.
+            if (mHeadStillnessDetector.calculate(timestamp)) {
+                recenter(true, false);
+                worldToHead = mHeadPoseDriftCompensator.getOutput();
+            }
+
             mScreenHeadFusion.setWorldToHeadPose(mWorldToHeadTimestamp.value(), worldToHead);
             mModeSelector.setWorldToHeadPose(mWorldToHeadTimestamp.value(), worldToHead);
         }
@@ -114,6 +127,7 @@ class HeadTrackingProcessorImpl : public HeadTrackingProcessor {
     void recenter(bool recenterHead, bool recenterScreen) override {
         if (recenterHead) {
             mHeadPoseDriftCompensator.recenter();
+            mHeadStillnessDetector.reset();
         }
         if (recenterScreen) {
             mScreenPoseDriftCompensator.recenter();
@@ -140,6 +154,7 @@ class HeadTrackingProcessorImpl : public HeadTrackingProcessor {
     Pose3f mHeadToStagePose;
     PoseDriftCompensator mHeadPoseDriftCompensator;
     PoseDriftCompensator mScreenPoseDriftCompensator;
+    StillnessDetector mHeadStillnessDetector;
     ScreenHeadFusion mScreenHeadFusion;
     ModeSelector mModeSelector;
     PoseRateLimiter mRateLimiter;

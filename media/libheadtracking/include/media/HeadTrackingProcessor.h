@@ -42,6 +42,9 @@ class HeadTrackingProcessor {
         float rotationalDriftTimeConstant = std::numeric_limits<float>::infinity();
         int64_t freshnessTimeout = std::numeric_limits<int64_t>::max();
         float predictionDuration = 0;
+        int64_t autoRecenterWindowDuration = std::numeric_limits<int64_t>::max();
+        float autoRecenterTranslationalThreshold = std::numeric_limits<float>::infinity();
+        float autoRecenterRotationalThreshold = std::numeric_limits<float>::infinity();
     };
 
     /** Sets the desired head-tracking mode. */
