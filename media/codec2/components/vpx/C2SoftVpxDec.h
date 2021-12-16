@@ -80,7 +80,7 @@ struct C2SoftVpxDec : public SimpleC2Component {
     };
     std::shared_ptr<Mutexed<ConversionQueue>> mQueue;
     std::vector<sp<ConverterThread>> mConverterThreads;
-
+    bool mIsFormatR10G10B10A2Supported;
     status_t initDecoder();
     status_t destroyDecoder();
     void finishWork(uint64_t index, const std::unique_ptr<C2Work> &work,
