@@ -53,7 +53,8 @@ aaudio_result_t AudioStreamInternalPlay::open(const AudioStreamBuilder &builder)
                              getSamplesPerFrame(),
                              getDeviceFormat(),
                              getDeviceChannelCount(),
-                             getRequireMonoBlend());
+                             getRequireMonoBlend(),
+                             getAudioBalance());
 
         if (result != AAUDIO_OK) {
             safeReleaseClose();

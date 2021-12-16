@@ -272,12 +272,15 @@ aaudio_result_t AudioStreamInternal::open(const AudioStreamBuilder &builder) {
     }
 
     // Exclusive output streams should combine channels when mono audio adjustment
-    // is enabled.
+    // is enabled. They should also adjust for audio balance.
     if ((getDirection() == AAUDIO_DIRECTION_OUTPUT) &&
         (getSharingMode() == AAUDIO_SHARING_MODE_EXCLUSIVE)) {
         bool isMasterMono = false;
         android::AudioSystem::getMasterMono(&isMasterMono);
         setRequireMonoBlend(isMasterMono);
+        float audioBalance = 0;
+        android::AudioSystem::getMasterBalance(&audioBalance);
+        setAudioBalance(audioBalance);
     }
 
     // For debugging and analyzing the distribution of MMAP timestamps.

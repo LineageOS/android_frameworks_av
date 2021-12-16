@@ -57,18 +57,19 @@ static const std::unordered_map<std::string, int32_t>& getErrorStringMap() {
     // This may be found in frameworks/av/media/libmediametrics/include/MediaMetricsConstants.h
     static std::unordered_map<std::string, int32_t> map{
         {"",                                      NO_ERROR},
-        {AMEDIAMETRICS_PROP_ERROR_VALUE_ARGUMENT, BAD_VALUE},
-        {AMEDIAMETRICS_PROP_ERROR_VALUE_IO,       DEAD_OBJECT},
-        {AMEDIAMETRICS_PROP_ERROR_VALUE_MEMORY,   NO_MEMORY},
-        {AMEDIAMETRICS_PROP_ERROR_VALUE_SECURITY, PERMISSION_DENIED},
-        {AMEDIAMETRICS_PROP_ERROR_VALUE_STATE,    INVALID_OPERATION},
-        {AMEDIAMETRICS_PROP_ERROR_VALUE_TIMEOUT,  WOULD_BLOCK},
-        {AMEDIAMETRICS_PROP_ERROR_VALUE_UNKNOWN,  UNKNOWN_ERROR},
+        {AMEDIAMETRICS_PROP_STATUS_VALUE_OK,       NO_ERROR},
+        {AMEDIAMETRICS_PROP_STATUS_VALUE_ARGUMENT, BAD_VALUE},
+        {AMEDIAMETRICS_PROP_STATUS_VALUE_IO,       DEAD_OBJECT},
+        {AMEDIAMETRICS_PROP_STATUS_VALUE_MEMORY,   NO_MEMORY},
+        {AMEDIAMETRICS_PROP_STATUS_VALUE_SECURITY, PERMISSION_DENIED},
+        {AMEDIAMETRICS_PROP_STATUS_VALUE_STATE,    INVALID_OPERATION},
+        {AMEDIAMETRICS_PROP_STATUS_VALUE_TIMEOUT,  WOULD_BLOCK},
+        {AMEDIAMETRICS_PROP_STATUS_VALUE_UNKNOWN,  UNKNOWN_ERROR},
     };
     return map;
 }
 
-status_t errorStringToStatus(const char *error) {
+status_t statusStringToStatus(const char *error) {
     const auto& map = getErrorStringMap();
     if (error == nullptr || error[0] == '\0') return NO_ERROR;
     auto it = map.find(error);
