@@ -167,7 +167,7 @@ cc_library_shared {
     stubs: {
         symbol_file: "libmediandk.map.txt",
         versions: ["29"],
-    },
+    }
 }
 
 cc_library {

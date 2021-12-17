@@ -4453,12 +4453,20 @@ void CameraService::cacheClientTagDumpIfNeeded(const char *cameraId, BasicClient
 
     if (dumpVector.empty()) { return; }
 
+    std::string dumpString;
+
+    String8 currentTime = getFormattedCurrentTime();
+    dumpString += "Cached @ ";
+    dumpString += currentTime.string();
+    dumpString += "\n"; // First line is the timestamp of when client is cached.
+
+
     const String16 &packageName = client->getPackageName();
 
     String8 packageName8 = String8(packageName);
     const char *printablePackageName = packageName8.lockBuffer(packageName.size());
 
-    std::string dumpString;
+
     size_t i = dumpVector.size();
 
     // Store the string in reverse order (latest last)
