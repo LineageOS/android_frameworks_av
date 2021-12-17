@@ -187,7 +187,7 @@ Status_V1_2 DrmPlugin::getKeyRequestCommon(const hidl_vec<uint8_t>& scope,
         return Status_V1_2::ERROR_DRM_CANNOT_HANDLE;
     }
 
-    *defaultUrl = "";
+    *defaultUrl = "https://default.url";
     *keyRequestType = KeyRequestType_V1_1::UNKNOWN;
     *request = std::vector<uint8_t>();
 

@@ -133,6 +133,8 @@ static inline DeviceTypeSet deviceTypesFromBitMask(audio_devices_t types) {
 
 std::string deviceTypesToString(const DeviceTypeSet& deviceTypes);
 
+bool deviceTypesToString(const DeviceTypeSet& deviceTypes, std::string &str);
+
 std::string dumpDeviceTypes(const DeviceTypeSet& deviceTypes);
 
 /**
