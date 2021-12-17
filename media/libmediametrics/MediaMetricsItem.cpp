@@ -57,6 +57,7 @@ static const std::unordered_map<std::string, int32_t>& getErrorStringMap() {
     // This may be found in frameworks/av/media/libmediametrics/include/MediaMetricsConstants.h
     static std::unordered_map<std::string, int32_t> map{
         {"",                                      NO_ERROR},
+        {AMEDIAMETRICS_PROP_ERROR_VALUE_OK,       NO_ERROR},
         {AMEDIAMETRICS_PROP_ERROR_VALUE_ARGUMENT, BAD_VALUE},
         {AMEDIAMETRICS_PROP_ERROR_VALUE_IO,       DEAD_OBJECT},
         {AMEDIAMETRICS_PROP_ERROR_VALUE_MEMORY,   NO_MEMORY},
