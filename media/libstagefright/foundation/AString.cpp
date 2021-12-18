@@ -27,7 +27,7 @@
 #include "ADebug.h"
 #include "AString.h"
 
-#if !defined(__ANDROID_VNDK__) && !defined(__ANDROID_APEX__)
+#if defined(__ANDROID__) && !defined(__ANDROID_VNDK__) && !defined(__ANDROID_APEX__)
 #include <binder/Parcel.h>
 #endif
 
@@ -365,7 +365,7 @@ bool AString::endsWithIgnoreCase(const char *suffix) const {
     return !strcasecmp(mData + mSize - suffixLen, suffix);
 }
 
-#if !defined(__ANDROID_VNDK__) && !defined(__ANDROID_APEX__)
+#if defined(__ANDROID__) && !defined(__ANDROID_VNDK__) && !defined(__ANDROID_APEX__)
 // static
 AString AString::FromParcel(const Parcel &parcel) {
     size_t size = static_cast<size_t>(parcel.readInt32());
@@ -380,7 +380,7 @@ status_t AString::writeToParcel(Parcel *parcel) const {
     }
     return err;
 }
-#endif // !defined(__ANDROID_VNDK__) && !defined(__ANDROID_APEX__)
+#endif // defined(__ANDROID__) && !defined(__ANDROID_VNDK__) && !defined(__ANDROID_APEX__)
 
 AString AStringPrintf(const char *format, ...) {
     va_list ap;
