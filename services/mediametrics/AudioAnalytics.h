@@ -109,11 +109,18 @@ private:
      */
 
     /**
-     * Checks for any pending actions for a particular item.
+     * Processes any pending actions for a particular item.
      *
      * \param item to check against the current AnalyticsActions.
      */
-    void checkActions(const std::shared_ptr<const mediametrics::Item>& item);
+    void processActions(const std::shared_ptr<const mediametrics::Item>& item);
+
+    /**
+     * Processes status information contained in the item.
+     *
+     * \param item to check against for status handling
+     */
+    void processStatus(const std::shared_ptr<const mediametrics::Item>& item);
 
     // HELPER METHODS
     /**
