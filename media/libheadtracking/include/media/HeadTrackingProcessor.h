@@ -45,6 +45,9 @@ class HeadTrackingProcessor {
         int64_t autoRecenterWindowDuration = std::numeric_limits<int64_t>::max();
         float autoRecenterTranslationalThreshold = std::numeric_limits<float>::infinity();
         float autoRecenterRotationalThreshold = std::numeric_limits<float>::infinity();
+        int64_t screenStillnessWindowDuration = 0;
+        float screenStillnessTranslationalThreshold = std::numeric_limits<float>::infinity();
+        float screenStillnessRotationalThreshold = std::numeric_limits<float>::infinity();
     };
 
     /** Sets the desired head-tracking mode. */

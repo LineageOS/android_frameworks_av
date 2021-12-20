@@ -44,6 +44,7 @@ TEST(ModeSelector, InitialWorldRelative) {
     ModeSelector selector(options, HeadTrackingMode::WORLD_RELATIVE);
 
     selector.setWorldToHeadPose(0, worldToHead);
+    selector.setScreenStable(0, true);
     selector.calculate(0);
     EXPECT_EQ(HeadTrackingMode::WORLD_RELATIVE, selector.getActualMode());
     EXPECT_EQ(selector.getHeadToStagePose(), worldToHead.inverse());
@@ -69,12 +70,44 @@ TEST(ModeSelector, WorldRelative) {
     ModeSelector selector(options);
 
     selector.setScreenToStagePose(screenToStage);
-
     selector.setDesiredMode(HeadTrackingMode::WORLD_RELATIVE);
     selector.setWorldToHeadPose(0, worldToHead);
+    selector.setScreenStable(0, true);
     selector.calculate(0);
     EXPECT_EQ(HeadTrackingMode::WORLD_RELATIVE, selector.getActualMode());
     EXPECT_EQ(selector.getHeadToStagePose(), worldToHead.inverse() * screenToStage);
+}
+
+TEST(ModeSelector, WorldRelativeUnstable) {
+    const Pose3f worldToHead({1, 2, 3}, Quaternionf::UnitRandom());
+    const Pose3f screenToStage({4, 5, 6}, Quaternionf::UnitRandom());
+
+    ModeSelector::Options options{.freshnessTimeout = 100};
+    ModeSelector selector(options);
+
+    selector.setScreenToStagePose(screenToStage);
+    selector.setDesiredMode(HeadTrackingMode::WORLD_RELATIVE);
+    selector.setWorldToHeadPose(0, worldToHead);
+    selector.setScreenStable(0, false);
+    selector.calculate(10);
+    EXPECT_EQ(HeadTrackingMode::STATIC, selector.getActualMode());
+    EXPECT_EQ(selector.getHeadToStagePose(), screenToStage);
+}
+
+TEST(ModeSelector, WorldRelativeStableStale) {
+    const Pose3f worldToHead({1, 2, 3}, Quaternionf::UnitRandom());
+    const Pose3f screenToStage({4, 5, 6}, Quaternionf::UnitRandom());
+
+    ModeSelector::Options options{.freshnessTimeout = 100};
+    ModeSelector selector(options);
+
+    selector.setScreenToStagePose(screenToStage);
+    selector.setDesiredMode(HeadTrackingMode::WORLD_RELATIVE);
+    selector.setWorldToHeadPose(100, worldToHead);
+    selector.setScreenStable(0, true);
+    selector.calculate(101);
+    EXPECT_EQ(HeadTrackingMode::STATIC, selector.getActualMode());
+    EXPECT_EQ(selector.getHeadToStagePose(), screenToStage);
 }
 
 TEST(ModeSelector, WorldRelativeStale) {
@@ -85,7 +118,6 @@ TEST(ModeSelector, WorldRelativeStale) {
     ModeSelector selector(options);
 
     selector.setScreenToStagePose(screenToStage);
-
     selector.setDesiredMode(HeadTrackingMode::WORLD_RELATIVE);
     selector.setWorldToHeadPose(0, worldToHead);
     selector.calculate(101);
@@ -101,7 +133,6 @@ TEST(ModeSelector, ScreenRelative) {
     ModeSelector selector(options);
 
     selector.setScreenToStagePose(screenToStage);
-
     selector.setDesiredMode(HeadTrackingMode::SCREEN_RELATIVE);
     selector.setScreenToHeadPose(0, screenToHead);
     selector.calculate(0);
@@ -118,10 +149,10 @@ TEST(ModeSelector, ScreenRelativeStaleToWorldRelative) {
     ModeSelector selector(options);
 
     selector.setScreenToStagePose(screenToStage);
-
     selector.setDesiredMode(HeadTrackingMode::SCREEN_RELATIVE);
     selector.setScreenToHeadPose(0, screenToHead);
     selector.setWorldToHeadPose(50, worldToHead);
+    selector.setScreenStable(50, true);
     selector.calculate(101);
     EXPECT_EQ(HeadTrackingMode::WORLD_RELATIVE, selector.getActualMode());
     EXPECT_EQ(selector.getHeadToStagePose(), worldToHead.inverse() * screenToStage);
@@ -139,6 +170,7 @@ TEST(ModeSelector, ScreenRelativeInvalidToWorldRelative) {
     selector.setDesiredMode(HeadTrackingMode::SCREEN_RELATIVE);
     selector.setScreenToHeadPose(50, std::nullopt);
     selector.setWorldToHeadPose(50, worldToHead);
+    selector.setScreenStable(50, true);
     selector.calculate(101);
     EXPECT_EQ(HeadTrackingMode::WORLD_RELATIVE, selector.getActualMode());
     EXPECT_EQ(selector.getHeadToStagePose(), worldToHead.inverse() * screenToStage);

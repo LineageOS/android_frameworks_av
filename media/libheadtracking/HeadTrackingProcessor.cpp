@@ -46,6 +46,11 @@ class HeadTrackingProcessorImpl : public HeadTrackingProcessor {
                   .translationalThreshold = options.autoRecenterTranslationalThreshold,
                   .rotationalThreshold = options.autoRecenterRotationalThreshold,
           }),
+          mScreenStillnessDetector(StillnessDetector::Options{
+                  .windowDuration = options.screenStillnessWindowDuration,
+                  .translationalThreshold = options.screenStillnessTranslationalThreshold,
+                  .rotationalThreshold = options.screenStillnessRotationalThreshold,
+          }),
           mModeSelector(ModeSelector::Options{.freshnessTimeout = options.freshnessTimeout},
                         initialMode),
           mRateLimiter(PoseRateLimiter::Options{
@@ -83,6 +88,22 @@ class HeadTrackingProcessorImpl : public HeadTrackingProcessor {
     }
 
     void calculate(int64_t timestamp) override {
+        // Handle the screen first, since it might trigger a recentering of the head.
+        if (mWorldToScreenTimestamp.has_value()) {
+            const Pose3f worldToLogicalScreen = mScreenPoseDriftCompensator.getOutput();
+            mScreenStillnessDetector.setInput(mWorldToScreenTimestamp.value(),
+                                              worldToLogicalScreen);
+            bool screenStable = mScreenStillnessDetector.calculate(timestamp);
+            mModeSelector.setScreenStable(mWorldToScreenTimestamp.value(), screenStable);
+            // Whenever the screen is unstable, recenter the head pose.
+            if (!screenStable) {
+                recenter(true, false);
+            }
+            mScreenHeadFusion.setWorldToScreenPose(mWorldToScreenTimestamp.value(),
+                                                   worldToLogicalScreen);
+        }
+
+        // Handle head.
         if (mWorldToHeadTimestamp.has_value()) {
             Pose3f worldToHead = mHeadPoseDriftCompensator.getOutput();
             mHeadStillnessDetector.setInput(mWorldToHeadTimestamp.value(), worldToHead);
@@ -94,12 +115,6 @@ class HeadTrackingProcessorImpl : public HeadTrackingProcessor {
 
             mScreenHeadFusion.setWorldToHeadPose(mWorldToHeadTimestamp.value(), worldToHead);
             mModeSelector.setWorldToHeadPose(mWorldToHeadTimestamp.value(), worldToHead);
-        }
-
-        if (mWorldToScreenTimestamp.has_value()) {
-            const Pose3f worldToLogicalScreen = mScreenPoseDriftCompensator.getOutput();
-            mScreenHeadFusion.setWorldToScreenPose(mWorldToScreenTimestamp.value(),
-                                                   worldToLogicalScreen);
         }
 
         auto maybeScreenToHead = mScreenHeadFusion.calculate();
@@ -131,6 +146,7 @@ class HeadTrackingProcessorImpl : public HeadTrackingProcessor {
         }
         if (recenterScreen) {
             mScreenPoseDriftCompensator.recenter();
+            mScreenStillnessDetector.reset();
         }
 
         // If a sensor being recentered is included in the current mode, apply rate limiting to
@@ -155,6 +171,7 @@ class HeadTrackingProcessorImpl : public HeadTrackingProcessor {
     PoseDriftCompensator mHeadPoseDriftCompensator;
     PoseDriftCompensator mScreenPoseDriftCompensator;
     StillnessDetector mHeadStillnessDetector;
+    StillnessDetector mScreenStillnessDetector;
     ScreenHeadFusion mScreenHeadFusion;
     ModeSelector mModeSelector;
     PoseRateLimiter mRateLimiter;
