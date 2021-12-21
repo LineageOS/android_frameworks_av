@@ -363,17 +363,17 @@ struct CCodecConfig {
             const std::vector<std::string> &names,
             c2_blocking_t blocking = C2_DONT_BLOCK);
 
-private:
-
-    /// initializes the standard MediaCodec to Codec 2.0 params mapping
-    void initializeStandardParams();
-
     /// Adds indices to the subscribed indices, and updated subscription to component
     /// \param blocking blocking mode to use with the component
     status_t subscribeToConfigUpdate(
             const std::shared_ptr<Codec2Client::Configurable> &configurable,
             const std::vector<C2Param::Index> &indices,
             c2_blocking_t blocking = C2_DONT_BLOCK);
+
+private:
+
+    /// initializes the standard MediaCodec to Codec 2.0 params mapping
+    void initializeStandardParams();
 
     /// Gets SDK format from codec 2.0 reflected configuration
     /// \param domain input/output bitmask
