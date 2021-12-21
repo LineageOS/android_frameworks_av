@@ -476,7 +476,8 @@ void ARTPSource::addReceiverReport(const sp<ABuffer> &buffer) {
     data[18] = (mHighestSeqNumber >> 8) & 0xff;
     data[19] = mHighestSeqNumber & 0xff;
 
-    uint32_t jitterTime = 0;
+    uint32_t jitterTimeMs = (uint32_t)getInterArrivalJitterTimeMs();
+    uint32_t jitterTime = jitterTimeMs * mClockRate / 1000;
     data[20] = jitterTime >> 24;    // Interarrival jitter
     data[21] = (jitterTime >> 16) & 0xff;
     data[22] = (jitterTime >> 8) & 0xff;
