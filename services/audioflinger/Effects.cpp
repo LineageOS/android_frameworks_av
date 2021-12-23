@@ -2413,6 +2413,7 @@ size_t AudioFlinger::EffectChain::removeEffect_l(const sp<EffectModule>& effect,
                 if (i == size - 1 && i != 0) {
                     mEffects[i - 1]->configure();
                     mEffects[i - 1]->setOutBuffer(mOutBuffer);
+                    mEffects[i - 1]->updateAccessMode();      // reconfig if neeeded.
                 }
             }
             mEffects.removeAt(i);
@@ -2422,6 +2423,7 @@ size_t AudioFlinger::EffectChain::removeEffect_l(const sp<EffectModule>& effect,
             if (i == 0 && size > 1) {
                 mEffects[0]->configure();
                 mEffects[0]->setInBuffer(mInBuffer);
+                mEffects[0]->updateAccessMode();      // reconfig if neeeded.
             }
 
             ALOGV("removeEffect_l() effect %p, removed from chain %p at rank %zu", effect.get(),
