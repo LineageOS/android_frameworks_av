@@ -43,6 +43,7 @@ public:
      * @param useMonoBlend
      * @param audioBalance
      * @param channelMask
+     * @param isExclusive
      * @return
      */
     aaudio_result_t configure(audio_format_t sourceFormat,
@@ -50,7 +51,8 @@ public:
                               audio_format_t sinkFormat,
                               int32_t sinkChannelCount,
                               bool useMonoBlend,
-                              float audioBalance);
+                              float audioBalance,
+                              bool isExclusive);
 
     void process(const void *source, void *destination, int32_t numFrames);
 
