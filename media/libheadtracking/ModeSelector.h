@@ -56,6 +56,7 @@ namespace media {
  *   from screen-relative to world-relative.
  * - When we cannot get a fresh estimate of the world-to-head pose, we will fall back from
  *   world-relative to static.
+ * - In world-relative mode, if the screen is unstable, we will fall back to static.
  *
  * All the timestamps used here are of arbitrary units and origin. They just need to be consistent
  * between all the calls and with the Options provided for determining freshness and rate limiting.
@@ -92,6 +93,12 @@ class ModeSelector {
     void setWorldToHeadPose(int64_t timestamp, const Pose3f& worldToHead);
 
     /**
+     * Set whether the screen is considered stable.
+     * The timestamp needs to reflect how fresh the sample is.
+     */
+     void setScreenStable(int64_t timestamp, bool stable);
+
+    /**
      * Process all the previous inputs and update the outputs.
      */
     void calculate(int64_t timestamp);
@@ -116,6 +123,8 @@ class ModeSelector {
     int64_t mScreenToHeadTimestamp;
     std::optional<Pose3f> mWorldToHead;
     int64_t mWorldToHeadTimestamp;
+    std::optional<bool> mScreenStable;
+    int64_t mScreenStableTimestamp;
 
     HeadTrackingMode mActualMode;
     Pose3f mHeadToStage;

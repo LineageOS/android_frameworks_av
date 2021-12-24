@@ -260,6 +260,16 @@ bool TunerService::hasITuner() {
     return ::ndk::ScopedAStatus::ok();
 }
 
+::ndk::ScopedAStatus TunerService::setLna(bool bEnable) {
+    if (!hasITuner()) {
+        ALOGD("get ITuner failed");
+        return ::ndk::ScopedAStatus::fromServiceSpecificError(
+                static_cast<int32_t>(Result::UNAVAILABLE));
+    }
+
+    return mTuner->setLna(bEnable);
+}
+
 string TunerService::addFilterToShared(const shared_ptr<TunerFilter>& sharedFilter) {
     Mutex::Autolock _l(mSharedFiltersLock);
 

@@ -18,6 +18,7 @@ cc_library {
       "PoseRateLimiter.cpp",
       "QuaternionUtil.cpp",
       "ScreenHeadFusion.cpp",
+      "StillnessDetector.cpp",
       "Twist.cpp",
     ],
     export_include_dirs: [
@@ -70,6 +71,7 @@ cc_test_host {
         "PoseRateLimiter-test.cpp",
         "QuaternionUtil-test.cpp",
         "ScreenHeadFusion-test.cpp",
+        "StillnessDetector-test.cpp",
         "Twist-test.cpp",
     ],
     shared_libs: [

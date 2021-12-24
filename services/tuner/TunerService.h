@@ -76,6 +76,7 @@ public:
     ::ndk::ScopedAStatus openSharedFilter(const string& in_filterToken,
                                           const shared_ptr<ITunerFilterCallback>& in_cb,
                                           shared_ptr<ITunerFilter>* _aidl_return) override;
+    ::ndk::ScopedAStatus setLna(bool in_bEnable) override;
 
     string addFilterToShared(const shared_ptr<TunerFilter>& sharedFilter);
     void removeSharedFilter(const shared_ptr<TunerFilter>& sharedFilter);
