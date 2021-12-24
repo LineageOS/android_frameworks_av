@@ -45,14 +45,14 @@ constexpr auto kMaxRotationalVelocity = 4 * M_PI;
 // determine the time constants used for high-pass filtering those readings. If the value is set
 // too high, we may experience drift. If it is set too low, we may experience poses tending toward
 // identity too fast.
-constexpr auto kTranslationalDriftTimeConstant = 20s;
+constexpr auto kTranslationalDriftTimeConstant = 40s;
 
 // This should be set to the typical time scale that the rotation sensors used drift in. This
 // means, loosely, for how long we can trust the reading to be "accurate enough". This would
 // determine the time constants used for high-pass filtering those readings. If the value is set
 // too high, we may experience drift. If it is set too low, we may experience poses tending toward
 // identity too fast.
-constexpr auto kRotationalDriftTimeConstant = 20s;
+constexpr auto kRotationalDriftTimeConstant = 60s;
 
 // This is how far into the future we predict the head pose, using linear extrapolation based on
 // twist (velocity). It should be set to a value that matches the characteristic durations of moving
@@ -63,6 +63,25 @@ constexpr auto kPredictionDuration = 10ms;
 // After losing this many consecutive samples from either sensor, we would treat the measurement as
 // stale;
 constexpr auto kMaxLostSamples = 4;
+
+// Auto-recenter kicks in after the head has been still for this long.
+constexpr auto kAutoRecenterWindowDuration = 10s;
+
+// Auto-recenter considers head not still if translated by this much (in meters, approx).
+constexpr float kAutoRecenterTranslationThreshold = 0.1f;
+
+// Auto-recenter considers head not still if rotated by this much (in radians, approx).
+constexpr float kAutoRecenterRotationThreshold = 5.0f / 180 * M_PI;
+
+// Screen is considered to be unstable (not still) if it has moved significantly within the last
+// time window of this duration.
+constexpr auto kScreenStillnessWindowDuration = 10s;
+
+// Screen is considered to have moved significantly if translated by this much (in meter, approx).
+constexpr float kScreenStillnessTranslationThreshold = 0.1f;
+
+// Screen is considered to have moved significantly if rotated by this much (in radians, approx).
+constexpr float kScreenStillnessRotationThreshold = 5.0f / 180 * M_PI;
 
 // Time units for system clock ticks. This is what the Sensor Framework timestamps represent and
 // what we use for pose filtering.
@@ -81,10 +100,17 @@ SpatializerPoseController::SpatializerPoseController(Listener* listener,
       mProcessor(createHeadTrackingProcessor(HeadTrackingProcessor::Options{
               .maxTranslationalVelocity = kMaxTranslationalVelocity / kTicksPerSecond,
               .maxRotationalVelocity = kMaxRotationalVelocity / kTicksPerSecond,
-              .translationalDriftTimeConstant = Ticks(kTranslationalDriftTimeConstant).count(),
-              .rotationalDriftTimeConstant = Ticks(kRotationalDriftTimeConstant).count(),
+              .translationalDriftTimeConstant =
+                      double(Ticks(kTranslationalDriftTimeConstant).count()),
+              .rotationalDriftTimeConstant = double(Ticks(kRotationalDriftTimeConstant).count()),
               .freshnessTimeout = Ticks(sensorPeriod * kMaxLostSamples).count(),
               .predictionDuration = Ticks(kPredictionDuration).count(),
+              .autoRecenterWindowDuration = Ticks(kAutoRecenterWindowDuration).count(),
+              .autoRecenterTranslationalThreshold = kAutoRecenterTranslationThreshold,
+              .autoRecenterRotationalThreshold = kAutoRecenterRotationThreshold,
+              .screenStillnessWindowDuration = Ticks(kScreenStillnessWindowDuration).count(),
+              .screenStillnessTranslationalThreshold = kScreenStillnessTranslationThreshold,
+              .screenStillnessRotationalThreshold = kScreenStillnessRotationThreshold,
       })),
       mPoseProvider(SensorPoseProvider::create("headtracker", this)),
       mThread([this, maxUpdatePeriod] {

@@ -56,13 +56,13 @@ public:
                               FrontendScanType in_frontendScanType) override;
     ::ndk::ScopedAStatus stopScan() override;
     ::ndk::ScopedAStatus setLnb(const shared_ptr<ITunerLnb>& in_lnb) override;
-    ::ndk::ScopedAStatus setLna(bool in_bEnable) override;
     ::ndk::ScopedAStatus linkCiCamToFrontend(int32_t in_ciCamId, int32_t* _aidl_return) override;
     ::ndk::ScopedAStatus unlinkCiCamToFrontend(int32_t in_ciCamId) override;
     ::ndk::ScopedAStatus close() override;
     ::ndk::ScopedAStatus getStatus(const vector<FrontendStatusType>& in_statusTypes,
                                    vector<FrontendStatus>* _aidl_return) override;
     ::ndk::ScopedAStatus getFrontendId(int32_t* _aidl_return) override;
+    ::ndk::ScopedAStatus getHardwareInfo(std::string* _aidl_return) override;
 
     struct FrontendCallback : public BnFrontendCallback {
         FrontendCallback(const shared_ptr<ITunerFrontendCallback> tunerFrontendCallback)
