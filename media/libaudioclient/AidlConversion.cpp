@@ -3314,4 +3314,53 @@ legacy2aidl_TrackSecondaryOutputInfoPair_TrackSecondaryOutputInfo(
     return trackSecondaryOutputInfo;
 }
 
+ConversionResult<audio_direct_mode_t>
+aidl2legacy_AudioDirectMode_audio_direct_mode_t(media::AudioDirectMode aidl) {
+    switch (aidl) {
+        case media::AudioDirectMode::NONE:
+            return AUDIO_DIRECT_NOT_SUPPORTED;
+        case media::AudioDirectMode::OFFLOAD:
+            return AUDIO_DIRECT_OFFLOAD_SUPPORTED;
+        case media::AudioDirectMode::OFFLOAD_GAPLESS:
+            return AUDIO_DIRECT_OFFLOAD_GAPLESS_SUPPORTED;
+        case media::AudioDirectMode::BITSTREAM:
+            return AUDIO_DIRECT_BITSTREAM_SUPPORTED;
+    }
+    return unexpected(BAD_VALUE);
+}
+ConversionResult<media::AudioDirectMode>
+legacy2aidl_audio_direct_mode_t_AudioDirectMode(audio_direct_mode_t legacy) {
+    switch (legacy) {
+        case AUDIO_DIRECT_NOT_SUPPORTED:
+            return media::AudioDirectMode::NONE;
+        case AUDIO_DIRECT_OFFLOAD_SUPPORTED:
+            return media::AudioDirectMode::OFFLOAD;
+        case AUDIO_DIRECT_OFFLOAD_GAPLESS_SUPPORTED:
+            return media::AudioDirectMode::OFFLOAD_GAPLESS;
+        case AUDIO_DIRECT_BITSTREAM_SUPPORTED:
+            return media::AudioDirectMode::BITSTREAM;
+    }
+    return unexpected(BAD_VALUE);
+}
+
+ConversionResult<audio_direct_mode_t> aidl2legacy_int32_t_audio_direct_mode_t_mask(int32_t aidl) {
+    using LegacyMask = std::underlying_type_t<audio_direct_mode_t>;
+
+    LegacyMask converted = VALUE_OR_RETURN(
+            (convertBitmask<LegacyMask, int32_t, audio_direct_mode_t, media::AudioDirectMode>(
+                    aidl, aidl2legacy_AudioDirectMode_audio_direct_mode_t,
+                    indexToEnum_index<media::AudioDirectMode>,
+                    enumToMask_bitmask<LegacyMask, audio_direct_mode_t>)));
+    return static_cast<audio_direct_mode_t>(converted);
+}
+ConversionResult<int32_t> legacy2aidl_audio_direct_mode_t_int32_t_mask(audio_direct_mode_t legacy) {
+    using LegacyMask = std::underlying_type_t<audio_direct_mode_t>;
+
+    LegacyMask legacyMask = static_cast<LegacyMask>(legacy);
+    return convertBitmask<int32_t, LegacyMask, media::AudioDirectMode, audio_direct_mode_t>(
+            legacyMask, legacy2aidl_audio_direct_mode_t_AudioDirectMode,
+            indexToEnum_bitmask<audio_direct_mode_t>,
+            enumToMask_index<int32_t, media::AudioDirectMode>);
+}
+
 }  // namespace android

@@ -272,6 +272,10 @@ public:
             const std::vector<AudioDevice>& devices,
             bool* _aidl_return) override;
 
+    binder::Status getDirectPlaybackSupport(const media::AudioAttributesInternal& attr,
+                                            const AudioConfig& config,
+                                            media::AudioDirectMode* _aidl_return) override;
+
     status_t onTransact(uint32_t code, const Parcel& data, Parcel* reply, uint32_t flags) override;
 
     // IBinder::DeathRecipient

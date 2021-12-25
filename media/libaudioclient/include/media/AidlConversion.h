@@ -23,6 +23,7 @@
 
 #include <android/media/AudioAttributesInternal.h>
 #include <android/media/AudioClient.h>
+#include <android/media/AudioDirectMode.h>
 #include <android/media/AudioDualMonoMode.h>
 #include <android/media/AudioFlag.h>
 #include <android/media/AudioIoConfigEvent.h>
@@ -444,6 +445,14 @@ aidl2legacy_TrackSecondaryOutputInfo_TrackSecondaryOutputInfoPair(
 ConversionResult<media::TrackSecondaryOutputInfo>
 legacy2aidl_TrackSecondaryOutputInfoPair_TrackSecondaryOutputInfo(
         const TrackSecondaryOutputInfoPair& legacy);
+
+ConversionResult<audio_direct_mode_t>
+aidl2legacy_AudioDirectMode_audio_direct_mode_t(media::AudioDirectMode aidl);
+ConversionResult<media::AudioDirectMode>
+legacy2aidl_audio_direct_mode_t_AudioDirectMode(audio_direct_mode_t legacy);
+
+ConversionResult<audio_direct_mode_t> aidl2legacy_int32_t_audio_direct_mode_t_mask(int32_t aidl);
+ConversionResult<int32_t> legacy2aidl_audio_direct_mode_t_int32_t_mask(audio_direct_mode_t legacy);
 
 
 }  // namespace android
