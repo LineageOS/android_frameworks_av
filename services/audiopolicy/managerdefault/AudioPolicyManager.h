@@ -366,6 +366,9 @@ public:
 
         virtual status_t releaseSpatializerOutput(audio_io_handle_t output);
 
+        virtual audio_direct_mode_t getDirectPlaybackSupport(const audio_attributes_t *attr,
+                                                             const audio_config_t *config);
+
         bool isCallScreenModeSupported() override;
 
         void onNewAudioModulesAvailable() override;
@@ -1058,6 +1061,9 @@ private:
 
         sp<SwAudioOutputDescriptor> openOutputWithProfileAndDevice(const sp<IOProfile>& profile,
                                                                    const DeviceVector& devices);
+
+        bool isOffloadPossible(const audio_offload_info_t& offloadInfo,
+                               bool durationIgnored = false);
 
 };
 

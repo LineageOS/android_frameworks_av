@@ -841,6 +841,8 @@ class AudioPolicyManagerFuzzerDeviceConnection
         : AudioPolicyManagerFuzzerWithConfigurationFile(fdp){};
     void process() override;
 
+    void fuzzGetDirectPlaybackSupport();
+
    protected:
     void setDeviceConnectionState();
     void explicitlyRoutingAfterConnection();
@@ -891,10 +893,27 @@ void AudioPolicyManagerFuzzerDeviceConnection::explicitlyRoutingAfterConnection(
     }
 }
 
+void AudioPolicyManagerFuzzerDeviceConnection::fuzzGetDirectPlaybackSupport() {
+    const uint32_t numTestCases = mFdp->ConsumeIntegralInRange<uint32_t>(1, 10);
+    for (int i = 0; i < numTestCases; ++i) {
+        audio_attributes_t attr = AUDIO_ATTRIBUTES_INITIALIZER;
+        attr.content_type = getValueFromVector<audio_content_type_t>(mFdp, kAudioContentTypes);
+        attr.usage = getValueFromVector<audio_usage_t>(mFdp, kAudioUsages);
+        attr.source = getValueFromVector<audio_source_t>(mFdp, kAudioSources);
+        attr.flags = getValueFromVector<audio_flags_mask_t>(mFdp, kAudioFlagMasks);
+        audio_config_t config = AUDIO_CONFIG_INITIALIZER;
+        config.channel_mask = getValueFromVector<audio_channel_mask_t>(mFdp, kAudioChannelOutMasks);
+        config.format = getValueFromVector<audio_format_t>(mFdp, kAudioFormats);
+        config.sample_rate = getValueFromVector<uint32_t>(mFdp, kSamplingRates);
+        mManager->getDirectPlaybackSupport(&attr, &config);
+    }
+}
+
 void AudioPolicyManagerFuzzerDeviceConnection::process() {
     if (initialize()) {
         setDeviceConnectionState();
         explicitlyRoutingAfterConnection();
+        fuzzGetDirectPlaybackSupport();
         fuzzPatchCreation();
     }
 }

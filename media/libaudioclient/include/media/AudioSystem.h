@@ -536,6 +536,19 @@ public:
                                      const AudioDeviceTypeAddrVector &devices,
                                      bool *canBeSpatialized);
 
+    /**
+     * Query how the direct playback is currently supported on the device.
+     * @param attr audio attributes describing the playback use case
+     * @param config audio configuration for the playback
+     * @param directMode out: a set of flags describing how the direct playback is currently
+     *        supported on the device
+     * @return NO_ERROR in case of success, DEAD_OBJECT, NO_INIT, BAD_VALUE, PERMISSION_DENIED
+     *         in case of error.
+     */
+    static status_t getDirectPlaybackSupport(const audio_attributes_t *attr,
+                                             const audio_config_t *config,
+                                             audio_direct_mode_t *directMode);
+
 
     // A listener for capture state changes.
     class CaptureStateListener : public virtual RefBase {
