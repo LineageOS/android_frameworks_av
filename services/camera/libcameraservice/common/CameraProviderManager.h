@@ -189,6 +189,9 @@ public:
     status_t initialize(wp<StatusListener> listener,
             HidlServiceInteractionProxy *hidlProxy = &sHidlServiceInteractionProxy);
 
+    status_t getCameraIdIPCTransport(const std::string &id,
+            IPCTransport *providerTransport) const;
+
     /**
      * Retrieve the total number of available cameras.
      * This value may change dynamically as cameras are added or removed.

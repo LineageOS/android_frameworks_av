@@ -278,6 +278,21 @@ status_t CameraProviderManager::isSessionConfigurationSupported(const std::strin
     return deviceInfo->isSessionConfigurationSupported(configuration, overrideForPerfClass, status);
 }
 
+status_t CameraProviderManager::getCameraIdIPCTransport(const std::string &id,
+        IPCTransport *providerTransport) const {
+    std::lock_guard<std::mutex> lock(mInterfaceMutex);
+    auto deviceInfo = findDeviceInfoLocked(id);
+    if (deviceInfo == nullptr) {
+        return NAME_NOT_FOUND;
+    }
+    sp<ProviderInfo> parentProvider = deviceInfo->mParentProvider.promote();
+    if (parentProvider == nullptr) {
+        return DEAD_OBJECT;
+    }
+    *providerTransport = parentProvider->getIPCTransport();
+    return OK;
+}
+
 status_t CameraProviderManager::getCameraCharacteristics(const std::string &id,
         bool overrideForPerfClass, CameraMetadata* characteristics) const {
     std::lock_guard<std::mutex> lock(mInterfaceMutex);
