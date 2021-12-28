@@ -178,3 +178,9 @@ cc_test {
         "audio_test_utils.cpp",
     ],
 }
+
+cc_test {
+    name: "trackplayerbase_tests",
+    defaults: ["libaudioclient_gtests_defaults"],
+    srcs: ["trackplayerbase_tests.cpp"],
+}
