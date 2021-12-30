@@ -227,4 +227,10 @@ std::vector<sp<::android::hardware::audio::CPP_VERSION::IDevicesFactory>>
     return mDeviceFactories;
 }
 
+// Main entry-point to the shared library.
+extern "C" __attribute__((visibility("default"))) void* createIDevicesFactory() {
+    auto service = hardware::audio::CPP_VERSION::IDevicesFactory::getService();
+    return service ? new DevicesFactoryHalHidl(service) : nullptr;
+}
+
 } // namespace android
