@@ -505,124 +505,6 @@ void C2SoftAomDec::process(const std::unique_ptr<C2Work>& work,
     }
 }
 
-static void copyOutputBufferToYuvPlanarFrame(
-        uint8_t *dstY, uint8_t *dstU, uint8_t *dstV,
-        const uint8_t *srcY, const uint8_t *srcU, const uint8_t *srcV,
-        size_t srcYStride, size_t srcUStride, size_t srcVStride,
-        size_t dstYStride, size_t dstUVStride,
-        uint32_t width, uint32_t height) {
-
-    for (size_t i = 0; i < height; ++i) {
-        memcpy(dstY, srcY, width);
-        srcY += srcYStride;
-        dstY += dstYStride;
-    }
-
-    for (size_t i = 0; i < height / 2; ++i) {
-        memcpy(dstV, srcV, width / 2);
-        srcV += srcVStride;
-        dstV += dstUVStride;
-    }
-
-    for (size_t i = 0; i < height / 2; ++i) {
-        memcpy(dstU, srcU, width / 2);
-        srcU += srcUStride;
-        dstU += dstUVStride;
-    }
-}
-
-static void convertYUV420Planar16ToY410(uint32_t *dst,
-        const uint16_t *srcY, const uint16_t *srcU, const uint16_t *srcV,
-        size_t srcYStride, size_t srcUStride, size_t srcVStride,
-        size_t dstStride, size_t width, size_t height) {
-
-    // Converting two lines at a time, slightly faster
-    for (size_t y = 0; y < height; y += 2) {
-        uint32_t *dstTop = (uint32_t *) dst;
-        uint32_t *dstBot = (uint32_t *) (dst + dstStride);
-        uint16_t *ySrcTop = (uint16_t*) srcY;
-        uint16_t *ySrcBot = (uint16_t*) (srcY + srcYStride);
-        uint16_t *uSrc = (uint16_t*) srcU;
-        uint16_t *vSrc = (uint16_t*) srcV;
-
-        uint32_t u01, v01, y01, y23, y45, y67, uv0, uv1;
-        size_t x = 0;
-        for (; x < width - 3; x += 4) {
-
-            u01 = *((uint32_t*)uSrc); uSrc += 2;
-            v01 = *((uint32_t*)vSrc); vSrc += 2;
-
-            y01 = *((uint32_t*)ySrcTop); ySrcTop += 2;
-            y23 = *((uint32_t*)ySrcTop); ySrcTop += 2;
-            y45 = *((uint32_t*)ySrcBot); ySrcBot += 2;
-            y67 = *((uint32_t*)ySrcBot); ySrcBot += 2;
-
-            uv0 = (u01 & 0x3FF) | ((v01 & 0x3FF) << 20);
-            uv1 = (u01 >> 16) | ((v01 >> 16) << 20);
-
-            *dstTop++ = 3 << 30 | ((y01 & 0x3FF) << 10) | uv0;
-            *dstTop++ = 3 << 30 | ((y01 >> 16) << 10) | uv0;
-            *dstTop++ = 3 << 30 | ((y23 & 0x3FF) << 10) | uv1;
-            *dstTop++ = 3 << 30 | ((y23 >> 16) << 10) | uv1;
-
-            *dstBot++ = 3 << 30 | ((y45 & 0x3FF) << 10) | uv0;
-            *dstBot++ = 3 << 30 | ((y45 >> 16) << 10) | uv0;
-            *dstBot++ = 3 << 30 | ((y67 & 0x3FF) << 10) | uv1;
-            *dstBot++ = 3 << 30 | ((y67 >> 16) << 10) | uv1;
-        }
-
-        // There should be at most 2 more pixels to process. Note that we don't
-        // need to consider odd case as the buffer is always aligned to even.
-        if (x < width) {
-            u01 = *uSrc;
-            v01 = *vSrc;
-            y01 = *((uint32_t*)ySrcTop);
-            y45 = *((uint32_t*)ySrcBot);
-            uv0 = (u01 & 0x3FF) | ((v01 & 0x3FF) << 20);
-            *dstTop++ = ((y01 & 0x3FF) << 10) | uv0;
-            *dstTop++ = ((y01 >> 16) << 10) | uv0;
-            *dstBot++ = ((y45 & 0x3FF) << 10) | uv0;
-            *dstBot++ = ((y45 >> 16) << 10) | uv0;
-        }
-
-        srcY += srcYStride * 2;
-        srcU += srcUStride;
-        srcV += srcVStride;
-        dst += dstStride * 2;
-    }
-
-    return;
-}
-
-static void convertYUV420Planar16ToYUV420Planar(
-        uint8_t *dstY, uint8_t *dstU, uint8_t *dstV,
-        const uint16_t *srcY, const uint16_t *srcU, const uint16_t *srcV,
-        size_t srcYStride, size_t srcUStride, size_t srcVStride,
-        size_t dstYStride, size_t dstUVStride,
-        size_t width, size_t height) {
-
-    for (size_t y = 0; y < height; ++y) {
-        for (size_t x = 0; x < width; ++x) {
-            dstY[x] = (uint8_t)(srcY[x] >> 2);
-        }
-
-        srcY += srcYStride;
-        dstY += dstYStride;
-    }
-
-    for (size_t y = 0; y < (height + 1) / 2; ++y) {
-        for (size_t x = 0; x < (width + 1) / 2; ++x) {
-            dstU[x] = (uint8_t)(srcU[x] >> 2);
-            dstV[x] = (uint8_t)(srcV[x] >> 2);
-        }
-
-        srcU += srcUStride;
-        srcV += srcVStride;
-        dstU += dstUVStride;
-        dstV += dstUVStride;
-    }
-    return;
-}
 bool C2SoftAomDec::outputBuffer(
         const std::shared_ptr<C2BlockPool> &pool,
         const std::unique_ptr<C2Work> &work)
@@ -711,21 +593,16 @@ bool C2SoftAomDec::outputBuffer(
                                     dstYStride / sizeof(uint32_t),
                                     mWidth, mHeight);
         } else {
-            convertYUV420Planar16ToYUV420Planar(dstY, dstU, dstV,
-                                    srcY, srcU, srcV,
-                                    srcYStride / 2, srcUStride / 2, srcVStride / 2,
-                                    dstYStride, dstUVStride,
-                                    mWidth, mHeight);
+            convertYUV420Planar16ToYV12(dstY, dstU, dstV, srcY, srcU, srcV, srcYStride / 2,
+                                        srcUStride / 2, srcVStride / 2, dstYStride, dstUVStride,
+                                        mWidth, mHeight);
         }
     } else {
         const uint8_t *srcY = (const uint8_t *)img->planes[AOM_PLANE_Y];
         const uint8_t *srcU = (const uint8_t *)img->planes[AOM_PLANE_U];
         const uint8_t *srcV = (const uint8_t *)img->planes[AOM_PLANE_V];
-        copyOutputBufferToYuvPlanarFrame(
-                dstY, dstU, dstV, srcY, srcU, srcV,
-                srcYStride, srcUStride, srcVStride,
-                dstYStride, dstUVStride,
-                mWidth, mHeight);
+        convertYUV420Planar8ToYV12(dstY, dstU, dstV, srcY, srcU, srcV, srcYStride, srcUStride,
+                                   srcVStride, dstYStride, dstUVStride, mWidth, mHeight);
     }
     finishWork(*(int64_t*)img->user_priv, work, std::move(block));
     block = nullptr;
