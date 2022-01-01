@@ -3797,7 +3797,7 @@ audio_direct_mode_t AudioPolicyManager::getDirectPlaybackSupport(const audio_att
             }
             if ((curProfile->getFlags() & AUDIO_OUTPUT_FLAG_COMPRESS_OFFLOAD)
                         != AUDIO_OUTPUT_FLAG_NONE) {
-                if ((directMode | AUDIO_DIRECT_OFFLOAD_GAPLESS_SUPPORTED)
+                if ((directMode & AUDIO_DIRECT_OFFLOAD_GAPLESS_SUPPORTED)
                         != AUDIO_DIRECT_NOT_SUPPORTED) {
                     // Already reports offload gapless supported. No need to report offload support.
                     continue;
