@@ -276,6 +276,9 @@ public:
                                             const AudioConfig& config,
                                             media::AudioDirectMode* _aidl_return) override;
 
+    binder::Status getDirectProfilesForAttributes(const media::AudioAttributesInternal& attr,
+                        std::vector<media::audio::common::AudioProfile>* _aidl_return) override;
+
     status_t onTransact(uint32_t code, const Parcel& data, Parcel* reply, uint32_t flags) override;
 
     // IBinder::DeathRecipient

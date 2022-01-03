@@ -3831,6 +3831,47 @@ audio_direct_mode_t AudioPolicyManager::getDirectPlaybackSupport(const audio_att
     return directMode;
 }
 
+status_t AudioPolicyManager::getDirectProfilesForAttributes(const audio_attributes_t* attr,
+                                                AudioProfileVector& audioProfilesVector) {
+    AudioDeviceTypeAddrVector devices;
+    status_t status = getDevicesForAttributes(*attr, &devices);
+    if (status != OK) {
+        return status;
+    }
+    ALOGV("%s: found %zu output devices for attributes.", __func__, devices.size());
+    if (devices.empty()) {
+        return OK; // no output devices for the attributes
+    }
+
+    for (const auto& hwModule : mHwModules) {
+        for (const auto& curProfile : hwModule->getOutputProfiles()) {
+            if (!curProfile->asAudioPort()->isDirectOutput()) {
+                continue;
+            }
+            // Allow only profiles that support all the available and routed devices
+            DeviceVector supportedDevices = curProfile->getSupportedDevices();
+            if (supportedDevices.getDevicesFromDeviceTypeAddrVec(devices).size()
+                    != devices.size()) {
+                continue;
+            }
+
+            const auto audioProfiles = curProfile->asAudioPort()->getAudioProfiles();
+            ALOGV("%s: found direct profile (%s) with %zu audio profiles.",
+                __func__, curProfile->getTagName().c_str(), audioProfiles.size());
+            for (const auto& audioProfile : audioProfiles) {
+                if (audioProfile->isValid() && !audioProfilesVector.contains(audioProfile)
+                // TODO - why do we have same PCM format with both dynamic and non dynamic format
+                    && audioProfile->isDynamicFormat()) {
+                    ALOGV("%s: adding audio profile with encoding (%d).",
+                        __func__, audioProfile->getFormat());
+                    audioProfilesVector.add(audioProfile);
+                }
+            }
+        }
+    }
+    return NO_ERROR;
+}
+
 status_t AudioPolicyManager::listAudioPorts(audio_port_role_t role,
                                             audio_port_type_t type,
                                             unsigned int *num_ports,
@@ -6306,6 +6347,7 @@ DeviceTypeSet AudioPolicyManager::getDevicesForStream(audio_stream_type_t stream
     return devices.types();
 }
 
+// TODO - consider MSD routes b/214971780
 status_t AudioPolicyManager::getDevicesForAttributes(
         const audio_attributes_t &attr, AudioDeviceTypeAddrVector *devices) {
     if (devices == nullptr) {
