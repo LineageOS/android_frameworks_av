@@ -49,6 +49,7 @@ cc_library_shared {
         "common/CameraProviderManager.cpp",
         "common/FrameProcessorBase.cpp",
         "common/hidl/HidlProviderInfo.cpp",
+        "common/aidl/AidlProviderInfo.cpp",
         "api1/Camera2Client.cpp",
         "api1/client2/Parameters.cpp",
         "api1/client2/FrameProcessor.cpp",
@@ -115,6 +116,7 @@ cc_library_shared {
         "libutilscallstack",
         "libutils",
         "libbinder",
+        "libbinder_ndk",
         "libactivitymanager_aidl",
         "libpermission",
         "libcutils",
@@ -148,6 +150,7 @@ cc_library_shared {
         "android.hardware.camera.provider@2.5",
         "android.hardware.camera.provider@2.6",
         "android.hardware.camera.provider@2.7",
+        "android.hardware.camera.provider-V1-ndk",
         "android.hardware.camera.device@3.2",
         "android.hardware.camera.device@3.3",
         "android.hardware.camera.device@3.4",
@@ -159,6 +162,7 @@ cc_library_shared {
     ],
 
     static_libs: [
+        "libaidlcommonsupport",
         "libprocessinfoservice_aidl",
         "libbinderthreadstateutils",
         "media_permission-aidl-cpp",
