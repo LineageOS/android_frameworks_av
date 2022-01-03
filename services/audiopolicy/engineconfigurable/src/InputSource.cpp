@@ -46,12 +46,6 @@ status_t Element<audio_source_t>::setIdentifier(audio_source_t identifier)
 template <>
 status_t Element<audio_source_t>::set(audio_devices_t devices)
 {
-    if (devices == AUDIO_DEVICE_NONE) {
-        // Reset
-        mApplicableDevices = devices;
-        return NO_ERROR;
-    }
-    devices = static_cast<audio_devices_t>(devices | AUDIO_DEVICE_BIT_IN);
     if (!audio_is_input_device(devices)) {
         ALOGE("%s: trying to set an invalid device 0x%X for input source %s",
               __FUNCTION__, devices, getName().c_str());
