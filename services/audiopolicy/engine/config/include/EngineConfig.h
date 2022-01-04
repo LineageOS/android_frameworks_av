@@ -70,7 +70,7 @@ struct ProductStrategy {
 
 using ProductStrategies = std::vector<ProductStrategy>;
 
-using ValuePair = std::pair<uint32_t, std::string>;
+using ValuePair = std::tuple<uint64_t, uint32_t, std::string>;
 using ValuePairs = std::vector<ValuePair>;
 
 struct CriterionType
