@@ -595,6 +595,7 @@ bool AudioStream::collidesWithCallback() const {
 
 void AudioStream::setDuckAndMuteVolume(float duckAndMuteVolume) {
     ALOGD("%s() to %f", __func__, duckAndMuteVolume);
+    std::lock_guard<std::mutex> lock(mStreamLock);
     mDuckAndMuteVolume = duckAndMuteVolume;
     doSetVolume(); // apply this change
 }
