@@ -86,7 +86,7 @@ namespace android {
 
 using base::StringPrintf;
 using binder::Status;
-using camera3::SessionConfigurationUtils;
+using namespace camera3;
 using frameworks::cameraservice::service::V2_0::implementation::HidlCameraService;
 using hardware::ICamera;
 using hardware::ICameraClient;
