@@ -82,9 +82,11 @@ cc_test_host {
     include_dirs: [
         "frameworks/av/camera/include",
         "frameworks/av/camera/include/camera",
+        "frameworks/native/libs/binder/include_activitymanager"
     ],
 
     shared_libs: [
+        "libactivity_manager_procstate_aidl-cpp",
         "libbase",
         "libbinder",
         "libcamera_metadata",
@@ -100,6 +102,7 @@ cc_test_host {
     ],
 
     srcs: [
+        "ClientManagerTest.cpp",
         "ExifUtilsTest.cpp",
     ],
 
