@@ -387,6 +387,19 @@ bool TunerHidlService::hasITuner_1_1() {
     return ::ndk::ScopedAStatus::ok();
 }
 
+::ndk::ScopedAStatus TunerHidlService::setMaxNumberOfFrontends(FrontendType /* in_frontendType */,
+                                                               int32_t /* in_maxNumber */) {
+    return ::ndk::ScopedAStatus::fromServiceSpecificError(
+            static_cast<int32_t>(Result::UNAVAILABLE));
+}
+
+::ndk::ScopedAStatus TunerHidlService::getMaxNumberOfFrontends(FrontendType /* in_frontendType */,
+                                                               int32_t* _aidl_return) {
+    *_aidl_return = -1;
+    return ::ndk::ScopedAStatus::fromServiceSpecificError(
+            static_cast<int32_t>(Result::UNAVAILABLE));
+}
+
 string TunerHidlService::addFilterToShared(const shared_ptr<TunerHidlFilter>& sharedFilter) {
     Mutex::Autolock _l(mSharedFiltersLock);
 

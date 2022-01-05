@@ -34,6 +34,7 @@ using ::aidl::android::hardware::tv::tuner::DemuxCapabilities;
 using ::aidl::android::hardware::tv::tuner::DemuxFilterEvent;
 using ::aidl::android::hardware::tv::tuner::DemuxFilterStatus;
 using ::aidl::android::hardware::tv::tuner::FrontendInfo;
+using ::aidl::android::hardware::tv::tuner::FrontendType;
 using ::aidl::android::media::tv::tuner::ITunerDemux;
 using ::aidl::android::media::tv::tuner::ITunerDescrambler;
 using ::aidl::android::media::tv::tuner::ITunerFrontend;
@@ -89,6 +90,10 @@ public:
                                           const shared_ptr<ITunerFilterCallback>& in_cb,
                                           shared_ptr<ITunerFilter>* _aidl_return) override;
     ::ndk::ScopedAStatus setLna(bool in_bEnable) override;
+    ::ndk::ScopedAStatus setMaxNumberOfFrontends(FrontendType in_frontendType,
+                                                 int32_t in_maxNumber) override;
+    ::ndk::ScopedAStatus getMaxNumberOfFrontends(FrontendType in_frontendType,
+                                                 int32_t* _aidl_return) override;
 
     string addFilterToShared(const shared_ptr<TunerHidlFilter>& sharedFilter);
     void removeSharedFilter(const shared_ptr<TunerHidlFilter>& sharedFilter);
