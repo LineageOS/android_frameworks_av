@@ -82,13 +82,17 @@ cc_test_host {
     include_dirs: [
         "frameworks/av/camera/include",
         "frameworks/av/camera/include/camera",
+        "frameworks/native/libs/binder/include_activitymanager"
     ],
 
     shared_libs: [
+        "libactivity_manager_procstate_aidl-cpp",
         "libbase",
         "libbinder",
         "libcamera_metadata",
+        "libdynamic_depth",
         "libexif",
+        "libjpeg",
         "liblog",
         "libutils",
     ],
@@ -100,7 +104,13 @@ cc_test_host {
     ],
 
     srcs: [
+        "ClientManagerTest.cpp",
+        "DepthProcessorTest.cpp",
+        "DistortionMapperTest.cpp",
         "ExifUtilsTest.cpp",
+        "NV12Compressor.cpp",
+        "RotateAndCropMapperTest.cpp",
+        "ZoomRatioTest.cpp",
     ],
 
     cflags: [

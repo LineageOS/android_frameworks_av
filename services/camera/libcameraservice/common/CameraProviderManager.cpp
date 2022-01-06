@@ -46,7 +46,7 @@ namespace android {
 
 using namespace ::android::hardware::camera;
 using namespace ::android::hardware::camera::common::V1_0;
-using camera3::SessionConfigurationUtils;
+using namespace ::android::camera3;
 using std::literals::chrono_literals::operator""s;
 using hardware::camera2::utils::CameraIdAndSessionConfiguration;
 using hardware::camera::provider::V2_7::CameraIdAndStreamCombination;
