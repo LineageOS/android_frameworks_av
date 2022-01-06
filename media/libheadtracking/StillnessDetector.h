@@ -92,6 +92,11 @@ class StillnessDetector {
     const float mCosHalfRotationalThreshold;
     std::deque<TimestampedPose> mFifo;
     bool mWindowFull = false;
+    // As soon as motion is detected, this will be set for the time of detection + window duration,
+    // and during this time we will always consider outselves in motion without checking. This is
+    // used for hyteresis purposes, since because of the approximate method we use for determining
+    // stillness, we may toggle back and forth at a rate faster than the window side.
+    std::optional<int64_t> mSuppressionDeadline;
 
     bool areNear(const Pose3f& pose1, const Pose3f& pose2) const;
     void discardOld(int64_t timestamp);

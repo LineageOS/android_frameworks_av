@@ -25,6 +25,7 @@ StillnessDetector::StillnessDetector(const Options& options)
 void StillnessDetector::reset() {
     mFifo.clear();
     mWindowFull = false;
+    mSuppressionDeadline.reset();
 }
 
 void StillnessDetector::setInput(int64_t timestamp, const Pose3f& input) {
@@ -35,27 +36,34 @@ void StillnessDetector::setInput(int64_t timestamp, const Pose3f& input) {
 bool StillnessDetector::calculate(int64_t timestamp) {
     discardOld(timestamp);
 
+    // Check whether all the poses in the queue are in the proximity of the new
+    // one. We want to do this before checking the overriding conditions below, in order to update
+    // the suppression deadline correctly.
+    bool moved = false;
+
+    if (!mFifo.empty()) {
+        for (auto iter = mFifo.begin(); iter != mFifo.end() - 1; ++iter) {
+            const auto& event = *iter;
+            if (!areNear(event.pose, mFifo.back().pose)) {
+                // Enable suppression for the duration of the window.
+                mSuppressionDeadline = timestamp + mOptions.windowDuration;
+                moved = true;
+                break;
+            }
+        }
+    }
+
     // If the window has not been full, return the default value.
     if (!mWindowFull) {
         return mOptions.defaultValue;
     }
 
-    // An empty FIFO and window full is considered still (this will happen when the window duration
-    // is shorter than the gap between samples, including the window size being 0).
-    if (mFifo.empty()) {
-        return true;
+    // Force "in motion" while the suppression deadline is active.
+    if (mSuppressionDeadline.has_value()) {
+        return false;
     }
 
-    // Otherwise, check whether all the poses remaining in the queue are in the proximity of the new
-    // one.
-    for (auto iter = mFifo.begin(); iter != mFifo.end() - 1; ++iter) {
-        const auto& event = *iter;
-        if (!areNear(event.pose, mFifo.back().pose)) {
-            return false;
-        }
-    }
-
-    return true;
+    return !moved;
 }
 
 void StillnessDetector::discardOld(int64_t timestamp) {
@@ -71,6 +79,11 @@ void StillnessDetector::discardOld(int64_t timestamp) {
     while (!mFifo.empty() && mFifo.front().timestamp <= windowStart) {
         mWindowFull = true;
         mFifo.pop_front();
+    }
+
+    // Expire the suppression deadline.
+    if (mSuppressionDeadline.has_value() && mSuppressionDeadline <= timestamp) {
+        mSuppressionDeadline.reset();
     }
 }
 

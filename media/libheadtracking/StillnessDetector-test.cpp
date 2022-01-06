@@ -85,9 +85,11 @@ TEST_P(StillnessDetectorTest, NotStillTranslation) {
     EXPECT_EQ(mDefaultValue, detector.calculate(600));
     detector.setInput(900, withinThreshold);
     EXPECT_EQ(mDefaultValue, detector.calculate(900));
-    detector.setInput(1299, baseline);
-    EXPECT_FALSE(detector.calculate(1299));
-    EXPECT_TRUE(detector.calculate(1300));
+    detector.setInput(1300, baseline);
+    EXPECT_FALSE(detector.calculate(1300));
+    detector.setInput(1500, baseline);
+    EXPECT_FALSE(detector.calculate(1899));
+    EXPECT_TRUE(detector.calculate(1900));
 }
 
 TEST_P(StillnessDetectorTest, NotStillRotation) {
@@ -100,6 +102,7 @@ TEST_P(StillnessDetectorTest, NotStillRotation) {
     const Pose3f withinThreshold =
             baseline * Pose3f(Vector3f(0.3, -0.3, 0), rotateX(0.03) * rotateY(-0.03));
     const Pose3f outsideThreshold = baseline * Pose3f(rotateZ(0.06));
+
     EXPECT_EQ(mDefaultValue, detector.calculate(0));
     detector.setInput(0, baseline);
     EXPECT_EQ(mDefaultValue, detector.calculate(0));
@@ -109,9 +112,32 @@ TEST_P(StillnessDetectorTest, NotStillRotation) {
     EXPECT_EQ(mDefaultValue, detector.calculate(600));
     detector.setInput(900, withinThreshold);
     EXPECT_EQ(mDefaultValue, detector.calculate(900));
-    detector.setInput(1299, baseline);
-    EXPECT_FALSE(detector.calculate(1299));
-    EXPECT_TRUE(detector.calculate(1300));
+    detector.setInput(1300, baseline);
+    EXPECT_FALSE(detector.calculate(1300));
+    detector.setInput(1500, baseline);
+    EXPECT_FALSE(detector.calculate(1899));
+    EXPECT_TRUE(detector.calculate(1900));
+}
+
+TEST_P(StillnessDetectorTest, Suppression) {
+    StillnessDetector detector(Options{.defaultValue = mDefaultValue,
+                                       .windowDuration = 1000,
+                                       .translationalThreshold = 1,
+                                       .rotationalThreshold = 0.05});
+
+    const Pose3f baseline(Vector3f{1, 2, 3}, Quaternionf::UnitRandom());
+    const Pose3f outsideThreshold = baseline * Pose3f(Vector3f(1.1, 0, 0));
+    const Pose3f middlePoint = baseline * Pose3f(Vector3f(0.55, 0, 0));
+
+    detector.setInput(0, baseline);
+    detector.setInput(1000, baseline);
+    EXPECT_TRUE(detector.calculate(1000));
+    detector.setInput(1100, outsideThreshold);
+    EXPECT_FALSE(detector.calculate(1100));
+    detector.setInput(2000, middlePoint);
+    EXPECT_FALSE(detector.calculate(2000));
+    EXPECT_FALSE(detector.calculate(2099));
+    EXPECT_TRUE(detector.calculate(2100));
 }
 
 TEST_P(StillnessDetectorTest, Reset) {
