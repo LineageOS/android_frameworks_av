@@ -571,7 +571,7 @@ private:
          * returned in the HAL's camera_info struct for each device.
          */
         CameraState(const String8& id, int cost, const std::set<String8>& conflicting,
-                SystemCameraKind deviceKind);
+                SystemCameraKind deviceKind, const std::vector<std::string>& physicalCameras);
         virtual ~CameraState();
 
         /**
@@ -629,6 +629,12 @@ private:
         SystemCameraKind getSystemCameraKind() const;
 
         /**
+         * Return whether this camera is a logical multi-camera and has a
+         * particular physical sub-camera.
+         */
+        bool containsPhysicalCamera(const std::string& physicalCameraId) const;
+
+        /**
          * Add/Remove the unavailable physical camera ID.
          */
         bool addUnavailablePhysicalId(const String8& physicalId);
@@ -649,6 +655,7 @@ private:
         mutable Mutex mStatusLock;
         CameraParameters mShimParams;
         const SystemCameraKind mSystemCameraKind;
+        const std::vector<std::string> mPhysicalCameras; // Empty if not a logical multi-camera
     }; // class CameraState
 
     // Observer for UID lifecycle enforcing that UIDs in idle
