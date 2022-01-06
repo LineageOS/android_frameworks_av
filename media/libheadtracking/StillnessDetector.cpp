@@ -35,13 +35,13 @@ void StillnessDetector::setInput(int64_t timestamp, const Pose3f& input) {
 bool StillnessDetector::calculate(int64_t timestamp) {
     discardOld(timestamp);
 
-    // If the window has not been full, we don't consider ourselves still.
+    // If the window has not been full, return the default value.
     if (!mWindowFull) {
-        return false;
+        return mOptions.defaultValue;
     }
 
-    // An empty FIFO and window full is considered still (this will happen in the unlikely case when
-    // the window duration is shorter than the gap between samples).
+    // An empty FIFO and window full is considered still (this will happen when the window duration
+    // is shorter than the gap between samples, including the window size being 0).
     if (mFifo.empty()) {
         return true;
     }

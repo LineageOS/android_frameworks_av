@@ -42,11 +42,13 @@ class HeadTrackingProcessorImpl : public HeadTrackingProcessor {
                   .rotationalDriftTimeConstant = options.rotationalDriftTimeConstant,
           }),
           mHeadStillnessDetector(StillnessDetector::Options{
+                  .defaultValue = false,
                   .windowDuration = options.autoRecenterWindowDuration,
                   .translationalThreshold = options.autoRecenterTranslationalThreshold,
                   .rotationalThreshold = options.autoRecenterRotationalThreshold,
           }),
           mScreenStillnessDetector(StillnessDetector::Options{
+                  .defaultValue = true,
                   .windowDuration = options.screenStillnessWindowDuration,
                   .translationalThreshold = options.screenStillnessTranslationalThreshold,
                   .rotationalThreshold = options.screenStillnessRotationalThreshold,

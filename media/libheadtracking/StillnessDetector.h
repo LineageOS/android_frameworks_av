@@ -36,10 +36,11 @@ namespace media {
  *    bool still = detector.calculate(timestamp);
  * }
  *
- * The stream is considered not still until a sufficient number of samples has been provided for an
- * initial fill-up of the window. In the special case of the window size being 0, this is not
- * required and the state is considered always "still". The reset() method can be used to empty the
- * window again and get back to this initial state.
+ * The detection is not considered reliable until a sufficient number of samples has been provided
+ * for an initial fill-up of the window. During that time, the detector will return whatever default
+ * value has been configured.
+ * The reset() method can be used to empty the window again and get back to this initial state.
+ * In the special case of the window size being 0, the state will always be considered "still".
  */
 class StillnessDetector {
   public:
@@ -47,6 +48,10 @@ class StillnessDetector {
      * Configuration options for the detector.
      */
     struct Options {
+        /**
+         * During the initial fill of the window, should we consider the state still?
+         */
+         bool defaultValue;
         /**
          * How long is the window, in ticks. The special value of 0 indicates that the stream is
          * always considered still.
