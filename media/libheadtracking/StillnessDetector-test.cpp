@@ -84,8 +84,8 @@ TEST(StillnessDetectorTest, NotStillRotation) {
 
     const Pose3f baseline(Vector3f{1, 2, 3}, Quaternionf::UnitRandom());
     const Pose3f withinThreshold =
-            baseline * Pose3f(Vector3f(0.3, -0.3, 0), rotateX(0.01) * rotateY(-0.01));
-    const Pose3f outsideThreshold = baseline * Pose3f(rotateZ(0.08));
+            baseline * Pose3f(Vector3f(0.3, -0.3, 0), rotateX(0.03) * rotateY(-0.03));
+    const Pose3f outsideThreshold = baseline * Pose3f(rotateZ(0.06));
     EXPECT_FALSE(detector.calculate(0));
     detector.setInput(0, baseline);
     EXPECT_FALSE(detector.calculate(0));
