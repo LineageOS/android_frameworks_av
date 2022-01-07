@@ -158,7 +158,7 @@ cc_library_shared {
         "libprocessinfoservice_aidl",
         "libbinderthreadstateutils",
         "media_permission-aidl-cpp",
-        "libcameraservice_host",
+        "libcameraservice_device_independent",
     ],
 
     export_shared_lib_headers: [
@@ -190,7 +190,7 @@ cc_library_shared {
 }
 
 cc_library_static {
-    name: "libcameraservice_host",
+    name: "libcameraservice_device_independent",
     host_supported: true,
 
     // Camera service source
