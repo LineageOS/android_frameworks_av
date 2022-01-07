@@ -99,7 +99,7 @@ cc_test_host {
 
     static_libs: [
         "libcamera_client_host",
-        "libcameraservice_host",
+        "libcameraservice_device_independent",
         "libgmock",
     ],
 
