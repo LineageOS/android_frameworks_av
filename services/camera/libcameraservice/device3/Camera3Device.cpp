@@ -65,8 +65,6 @@
 #include "utils/TraceHFR.h"
 #include "utils/CameraServiceProxyWrapper.h"
 
-#include "../common/hidl/HidlProviderInfo.h"
-
 #include <algorithm>
 #include <tuple>
 
@@ -2728,11 +2726,7 @@ void Camera3Device::monitorMetadata(TagMonitor::eventSource source,
             physicalMetadata, outputBuffers, numOutputBuffers, inputStreamId);
 }
 
-/**
- * HalInterface inner class methods
- */
-
-void Camera3Device::HalInterface::cleanupNativeHandles(
+void Camera3Device::cleanupNativeHandles(
         std::vector<native_handle_t*> *handles, bool closeFd) {
     if (handles == nullptr) {
         return;
@@ -2748,6 +2742,10 @@ void Camera3Device::HalInterface::cleanupNativeHandles(
     handles->clear();
     return;
 }
+
+/**
+ * HalInterface inner class methods
+ */
 
 void Camera3Device::HalInterface::getInflightBufferKeys(
         std::vector<std::pair<int32_t, int32_t>>* out) {

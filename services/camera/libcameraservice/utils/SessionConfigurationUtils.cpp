@@ -23,6 +23,7 @@
 #include "common/CameraDeviceBase.h"
 #include "common/HalConversionsTemplated.h"
 #include "../CameraService.h"
+#include "device3/aidl/AidlCamera3Device.h"
 #include "device3/hidl/HidlCamera3Device.h"
 #include "device3/Camera3OutputStream.h"
 #include "system/graphics-base-v1.1.h"
@@ -505,61 +506,6 @@ binder::Status createSurfaceFromGbp(
     return binder::Status::ok();
 }
 
-aidl::android::hardware::graphics::common::PixelFormat mapToAidlPixelFormat(
-        int frameworkFormat) {
-    return (aidl::android::hardware::graphics::common::PixelFormat) frameworkFormat;
-}
-
-aidl::android::hardware::graphics::common::Dataspace mapToAidlDataspace(
-        android_dataspace dataSpace) {
-    return (aidl::android::hardware::graphics::common::Dataspace)dataSpace;
-}
-
-aidl::android::hardware::graphics::common::BufferUsage mapToAidlConsumerUsage(
-        uint64_t usage) {
-    return (aidl::android::hardware::graphics::common::BufferUsage)usage;
-}
-
-aidl::android::hardware::camera::device::StreamRotation
-mapToAidlStreamRotation(camera_stream_rotation_t rotation) {
-    switch (rotation) {
-        case CAMERA_STREAM_ROTATION_0:
-            return aidl::android::hardware::camera::device::StreamRotation::ROTATION_0;
-        case CAMERA_STREAM_ROTATION_90:
-            return aidl::android::hardware::camera::device::StreamRotation::ROTATION_90;
-        case CAMERA_STREAM_ROTATION_180:
-            return aidl::android::hardware::camera::device::StreamRotation::ROTATION_180;
-        case CAMERA_STREAM_ROTATION_270:
-            return aidl::android::hardware::camera::device::StreamRotation::ROTATION_270;
-    }
-    ALOGE("%s: Unknown stream rotation %d", __FUNCTION__, rotation);
-    return aidl::android::hardware::camera::device::StreamRotation::ROTATION_0;
-}
-
-status_t mapToAidlStreamConfigurationMode(
-        camera_stream_configuration_mode_t operationMode,
-        aidl::android::hardware::camera::device::StreamConfigurationMode *mode) {
-    using StreamConfigurationMode =
-            aidl::android::hardware::camera::device::StreamConfigurationMode;
-    if (mode == nullptr) return BAD_VALUE;
-    if (operationMode < CAMERA_VENDOR_STREAM_CONFIGURATION_MODE_START) {
-        switch(operationMode) {
-            case CAMERA_STREAM_CONFIGURATION_NORMAL_MODE:
-                *mode = StreamConfigurationMode::NORMAL_MODE;
-                break;
-            case CAMERA_STREAM_CONFIGURATION_CONSTRAINED_HIGH_SPEED_MODE:
-                *mode = StreamConfigurationMode::CONSTRAINED_HIGH_SPEED_MODE;
-                break;
-            default:
-                ALOGE("%s: Unknown stream configuration mode %d", __FUNCTION__, operationMode);
-                return BAD_VALUE;
-        }
-    } else {
-        *mode = static_cast<StreamConfigurationMode>(operationMode);
-    }
-    return OK;
-}
-
 void mapStreamInfo(const OutputStreamInfo &streamInfo,
             camera3::camera_stream_rotation_t rotation, String8 physicalId,
             int32_t groupId, aidl::android::hardware::camera::device::Stream *stream /*out*/) {
@@ -570,12 +516,12 @@ void mapStreamInfo(const OutputStreamInfo &streamInfo,
     stream->streamType = aidl::android::hardware::camera::device::StreamType::OUTPUT;
     stream->width = streamInfo.width;
     stream->height = streamInfo.height;
-    stream->format = mapToAidlPixelFormat(streamInfo.format);
+    stream->format = AidlCamera3Device::mapToAidlPixelFormat(streamInfo.format);
     auto u = streamInfo.consumerUsage;
     camera3::Camera3OutputStream::applyZSLUsageQuirk(streamInfo.format, &u);
-    stream->usage = mapToAidlConsumerUsage(u);
-    stream->dataSpace = mapToAidlDataspace(streamInfo.dataSpace);
-    stream->rotation = mapToAidlStreamRotation(rotation);
+    stream->usage = AidlCamera3Device::mapToAidlConsumerUsage(u);
+    stream->dataSpace = AidlCamera3Device::mapToAidlDataspace(streamInfo.dataSpace);
+    stream->rotation = AidlCamera3Device::mapToAidlStreamRotation(rotation);
     stream->id = -1; // Invalid stream id
     stream->physicalCameraId = std::string(physicalId.string());
     stream->bufferSize = 0;
@@ -668,8 +614,7 @@ convertToHALStreamCombination(
         metadataGetter getMetadata, const std::vector<std::string> &physicalCameraIds,
         aidl::android::hardware::camera::device::StreamConfiguration &streamConfiguration,
         bool overrideForPerfClass, bool *earlyExit) {
-    using SensorPixelMode =
-            aidl::android::hardware::camera::metadata::SensorPixelMode;
+    using SensorPixelMode = aidl::android::hardware::camera::metadata::SensorPixelMode;
     auto operatingMode = sessionConfiguration.getOperatingMode();
     binder::Status res = checkOperatingMode(operatingMode, deviceInfo, logicalCameraId);
     if (!res.isOk()) {
@@ -682,7 +627,7 @@ convertToHALStreamCombination(
         return STATUS_ERROR(CameraService::ERROR_ILLEGAL_ARGUMENT, msg.string());
     }
     *earlyExit = false;
-    auto ret = mapToAidlStreamConfigurationMode(
+    auto ret = AidlCamera3Device::mapToAidlStreamConfigurationMode(
             static_cast<camera_stream_configuration_mode_t> (operatingMode),
             /*out*/ &streamConfiguration.operationMode);
     if (ret != OK) {
@@ -712,7 +657,9 @@ convertToHALStreamCombination(
         stream.streamType =  aidl::android::hardware::camera::device::StreamType::INPUT;
         stream.width = static_cast<uint32_t> (sessionConfiguration.getInputWidth());
         stream.height =  static_cast<uint32_t> (sessionConfiguration.getInputHeight());
-        stream.format = mapToAidlPixelFormat(sessionConfiguration.getInputFormat());
+        stream.format =
+                AidlCamera3Device::AidlCamera3Device::mapToAidlPixelFormat(
+                        sessionConfiguration.getInputFormat());
         stream.usage = static_cast<aidl::android::hardware::graphics::common::BufferUsage>(0);
         stream.dataSpace =
               static_cast<aidl::android::hardware::graphics::common::Dataspace>(

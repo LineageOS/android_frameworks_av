@@ -344,6 +344,11 @@ public:
         /*out*/
         std::shared_ptr<aidl::android::hardware::camera::device::ICameraDeviceSession> *session);
 
+    status_t openAidlInjectionSession(const std::string &id,
+        const std::shared_ptr<
+                aidl::android::hardware::camera::device::ICameraDeviceCallback>& callback,
+        /*out*/
+        std::shared_ptr<aidl::android::hardware::camera::device::ICameraInjectionSession> *session);
 
     /**
      * Open an active session to a camera device.

@@ -34,6 +34,7 @@
 #include "api2/CameraDeviceClient.h"
 
 #include "device3/Camera3Device.h"
+#include "device3/aidl/AidlCamera3Device.h"
 #include "device3/hidl/HidlCamera3Device.h"
 #include "utils/CameraThreadState.h"
 #include "utils/CameraServiceProxyWrapper.h"
@@ -118,8 +119,10 @@ status_t Camera2ClientBase<TClientBase>::initializeImpl(TProviderPtr providerPtr
                             mLegacyClient);
             break;
         case IPCTransport::AIDL:
-            ALOGE("%s: AIDL camera3Devices not available yet", __FUNCTION__);
-            return NO_INIT;
+            mDevice =
+                    new AidlCamera3Device(TClientBase::mCameraIdStr, mOverrideForPerfClass,
+                            mLegacyClient);
+             break;
         default:
             ALOGE("%s Invalid transport for camera id %s", __FUNCTION__,
                     TClientBase::mCameraIdStr.string());

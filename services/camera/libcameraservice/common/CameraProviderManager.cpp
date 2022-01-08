@@ -647,6 +647,47 @@ status_t CameraProviderManager::openAidlSession(const std::string &id,
     return OK;
 }
 
+status_t CameraProviderManager::openAidlInjectionSession(const std::string &id,
+        const std::shared_ptr<
+                aidl::android::hardware::camera::device::ICameraDeviceCallback>& callback,
+        /*out*/
+        std::shared_ptr<
+                aidl::android::hardware::camera::device::ICameraInjectionSession> *session) {
+
+    std::lock_guard<std::mutex> lock(mInterfaceMutex);
+
+    auto deviceInfo = findDeviceInfoLocked(id);
+    if (deviceInfo == nullptr) return NAME_NOT_FOUND;
+
+    auto *aidlDeviceInfo3 = static_cast<AidlProviderInfo::AidlDeviceInfo3*>(deviceInfo);
+    sp<ProviderInfo> parentProvider = deviceInfo->mParentProvider.promote();
+    if (parentProvider == nullptr) {
+        return DEAD_OBJECT;
+    }
+    auto provider =
+            static_cast<AidlProviderInfo *>(parentProvider.get())->startProviderInterface();
+    if (provider == nullptr) {
+        return DEAD_OBJECT;
+    }
+    std::shared_ptr<HalCameraProvider> halCameraProvider =
+            std::make_shared<AidlHalCameraProvider>(provider, provider->descriptor);
+    saveRef(DeviceMode::CAMERA, id, halCameraProvider);
+
+    auto interface = aidlDeviceInfo3->startDeviceInterface();
+    if (interface == nullptr) {
+        return DEAD_OBJECT;
+    }
+
+    auto ret = interface->openInjectionSession(callback, session);
+    if (!ret.isOk()) {
+        removeRef(DeviceMode::CAMERA, id);
+        ALOGE("%s: Transaction error opening a session for camera device %s: %s",
+                __FUNCTION__, id.c_str(), ret.getMessage());
+        return DEAD_OBJECT;
+    }
+    return OK;
+}
+
 status_t CameraProviderManager::openHidlSession(const std::string &id,
         const sp<device::V3_2::ICameraDeviceCallback>& callback,
         /*out*/
