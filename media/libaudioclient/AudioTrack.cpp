@@ -413,13 +413,49 @@ status_t AudioTrack::set(
     mSelectedDeviceId = selectedDeviceId;
     mSessionId = sessionId;
     mChannelMask = channelMask;
-    mFormat = format;
-    mOrigFlags = mFlags = flags;
     mReqFrameCount = mFrameCount = frameCount;
     mSampleRate = sampleRate;
     mOriginalSampleRate = sampleRate;
     mAttributes = pAttributes != nullptr ? *pAttributes : AUDIO_ATTRIBUTES_INITIALIZER;
     mPlaybackRate = AUDIO_PLAYBACK_RATE_DEFAULT;
+
+    // update format and flags before storing them in mFormat, mOrigFlags and mFlags
+    if (pAttributes != NULL) {
+        // stream type shouldn't be looked at, this track has audio attributes
+        ALOGV("%s(): Building AudioTrack with attributes:"
+                " usage=%d content=%d flags=0x%x tags=[%s]",
+                __func__,
+                 mAttributes.usage, mAttributes.content_type, mAttributes.flags, mAttributes.tags);
+        audio_flags_to_audio_output_flags(mAttributes.flags, &flags);
+    }
+
+    // these below should probably come from the audioFlinger too...
+    if (format == AUDIO_FORMAT_DEFAULT) {
+        format = AUDIO_FORMAT_PCM_16_BIT;
+    } else if (format == AUDIO_FORMAT_IEC61937) { // HDMI pass-through?
+        flags = static_cast<audio_output_flags_t>(flags | AUDIO_OUTPUT_FLAG_IEC958_NONAUDIO);
+    }
+
+    // force direct flag if format is not linear PCM
+    // or offload was requested
+    if ((flags & AUDIO_OUTPUT_FLAG_COMPRESS_OFFLOAD)
+            || !audio_is_linear_pcm(format)) {
+        ALOGV( (flags & AUDIO_OUTPUT_FLAG_COMPRESS_OFFLOAD)
+                    ? "%s(): Offload request, forcing to Direct Output"
+                    : "%s(): Not linear PCM, forcing to Direct Output",
+                    __func__);
+        flags = (audio_output_flags_t)
+                // FIXME why can't we allow direct AND fast?
+                ((flags | AUDIO_OUTPUT_FLAG_DIRECT) & ~AUDIO_OUTPUT_FLAG_FAST);
+    }
+
+    // force direct flag if HW A/V sync requested
+    if ((flags & AUDIO_OUTPUT_FLAG_HW_AV_SYNC) != 0) {
+        flags = (audio_output_flags_t)(flags | AUDIO_OUTPUT_FLAG_DIRECT);
+    }
+
+    mFormat = format;
+    mOrigFlags = mFlags = flags;
 
     switch (transferType) {
     case TRANSFER_DEFAULT:
@@ -470,9 +506,6 @@ status_t AudioTrack::set(
     ALOGV_IF(sharedBuffer != 0, "%s(): sharedBuffer: %p, size: %zu",
             __func__, sharedBuffer->unsecurePointer(), sharedBuffer->size());
 
-    ALOGV("%s(): streamType %d frameCount %zu flags %04x",
-            __func__, streamType, frameCount, flags);
-
     // invariant that mAudioTrack != 0 is true only after set() returns successfully
     if (mAudioTrack != 0) {
         errorMessage = StringPrintf("%s: Track already in use", __func__);
@@ -491,22 +524,8 @@ status_t AudioTrack::set(
             goto error;
         }
         mOriginalStreamType = streamType;
-
     } else {
-        // stream type shouldn't be looked at, this track has audio attributes
-        ALOGV("%s(): Building AudioTrack with attributes:"
-                " usage=%d content=%d flags=0x%x tags=[%s]",
-                __func__,
-                 mAttributes.usage, mAttributes.content_type, mAttributes.flags, mAttributes.tags);
         mOriginalStreamType = AUDIO_STREAM_DEFAULT;
-        audio_flags_to_audio_output_flags(mAttributes.flags, &flags);
-    }
-
-    // these below should probably come from the audioFlinger too...
-    if (format == AUDIO_FORMAT_DEFAULT) {
-        format = AUDIO_FORMAT_PCM_16_BIT;
-    } else if (format == AUDIO_FORMAT_IEC61937) { // HDMI pass-through?
-        flags = static_cast<audio_output_flags_t>(flags | AUDIO_OUTPUT_FLAG_IEC958_NONAUDIO);
     }
 
     // validate parameters
@@ -524,25 +543,7 @@ status_t AudioTrack::set(
     channelCount = audio_channel_count_from_out_mask(channelMask);
     mChannelCount = channelCount;
 
-    // force direct flag if format is not linear PCM
-    // or offload was requested
-    if ((flags & AUDIO_OUTPUT_FLAG_COMPRESS_OFFLOAD)
-            || !audio_is_linear_pcm(format)) {
-        ALOGV( (flags & AUDIO_OUTPUT_FLAG_COMPRESS_OFFLOAD)
-                    ? "%s(): Offload request, forcing to Direct Output"
-                    : "%s(): Not linear PCM, forcing to Direct Output",
-                    __func__);
-        flags = (audio_output_flags_t)
-                // FIXME why can't we allow direct AND fast?
-                ((flags | AUDIO_OUTPUT_FLAG_DIRECT) & ~AUDIO_OUTPUT_FLAG_FAST);
-    }
-
-    // force direct flag if HW A/V sync requested
-    if ((flags & AUDIO_OUTPUT_FLAG_HW_AV_SYNC) != 0) {
-        flags = (audio_output_flags_t)(flags | AUDIO_OUTPUT_FLAG_DIRECT);
-    }
-
-    if (flags & AUDIO_OUTPUT_FLAG_DIRECT) {
+    if (mFlags & AUDIO_OUTPUT_FLAG_DIRECT) {
         if (audio_has_proportional_frames(format)) {
             mFrameSize = channelCount * audio_bytes_per_sample(format);
         } else {
@@ -556,7 +557,7 @@ status_t AudioTrack::set(
     }
 
     // sampling rate must be specified for direct outputs
-    if (sampleRate == 0 && (flags & AUDIO_OUTPUT_FLAG_DIRECT) != 0) {
+    if (sampleRate == 0 && (mFlags & AUDIO_OUTPUT_FLAG_DIRECT) != 0) {
         errorMessage = StringPrintf(
                 "%s: sample rate must be specified for direct outputs", __func__);
         status = BAD_VALUE;
@@ -585,7 +586,7 @@ status_t AudioTrack::set(
         mNotificationFramesReq = notificationFrames;
         mNotificationsPerBufferReq = 0;
     } else {
-        if (!(flags & AUDIO_OUTPUT_FLAG_FAST)) {
+        if (!(mFlags & AUDIO_OUTPUT_FLAG_FAST)) {
             errorMessage = StringPrintf(
                     "%s: notificationFrames=%d not permitted for non-fast track",
                     __func__, notificationFrames);
