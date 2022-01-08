@@ -19,7 +19,8 @@
 namespace android {
 namespace media {
 
-StillnessDetector::StillnessDetector(const Options& options) : mOptions(options) {}
+StillnessDetector::StillnessDetector(const Options& options)
+    : mOptions(options), mCosHalfRotationalThreshold(cos(mOptions.rotationalThreshold / 2)) {}
 
 void StillnessDetector::reset() {
     mFifo.clear();
@@ -77,17 +78,15 @@ bool StillnessDetector::areNear(const Pose3f& pose1, const Pose3f& pose2) const 
     // Check translation. We use the L1 norm to reduce computational load on expense of accuracy.
     // The L1 norm is an upper bound for the actual (L2) norm, so this approach will err on the side
     // of "not near".
-    if ((pose1.translation() - pose2.translation()).lpNorm<1>() >=
-        mOptions.translationalThreshold) {
+    if ((pose1.translation() - pose2.translation()).lpNorm<1>() > mOptions.translationalThreshold) {
         return false;
     }
 
-    // Check orientation. We use the L1 norm of the imaginary components of the quaternion to reduce
-    // computational load on expense of accuracy. For small angles, those components are approx.
-    // equal to the angle of rotation and so the norm is approx. the total angle of rotation. The
-    // L1 norm is an upper bound, so this approach will err on the side of "not near".
-    if ((pose1.rotation().vec() - pose2.rotation().vec()).lpNorm<1>() >=
-        mOptions.rotationalThreshold) {
+    // Check orientation.
+    // The angle x between the quaternions is greater than that threshold iff
+    // cos(x/2) < cos(threshold/2).
+    // cos(x/2) can be efficiently calculated as the dot product of both quaternions.
+    if (pose1.rotation().dot(pose2.rotation()) < mCosHalfRotationalThreshold) {
         return false;
     }
 
