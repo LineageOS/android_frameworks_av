@@ -83,6 +83,8 @@ class StillnessDetector {
     };
 
     const Options mOptions;
+    // Precalculated cos(mOptions.rotationalThreshold / 2)
+    const float mCosHalfRotationalThreshold;
     std::deque<TimestampedPose> mFifo;
     bool mWindowFull = false;
 
