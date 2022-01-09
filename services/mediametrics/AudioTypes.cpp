@@ -192,6 +192,31 @@ const std::unordered_map<std::string, int32_t>& getAAudioSharingMode() {
     return map;
 }
 
+const std::unordered_map<std::string, int32_t>& getStatusMap() {
+    // DO NOT MODIFY VALUES(OK to add new ones).
+    static std::unordered_map<std::string, int32_t> map {
+        {"",
+            util::MEDIAMETRICS_AUDIO_TRACK_STATUS_REPORTED__STATUS__OK},
+        {AMEDIAMETRICS_PROP_STATUS_VALUE_OK,
+            util::MEDIAMETRICS_AUDIO_TRACK_STATUS_REPORTED__STATUS__OK},
+        {AMEDIAMETRICS_PROP_STATUS_VALUE_ARGUMENT,
+            util::MEDIAMETRICS_AUDIO_TRACK_STATUS_REPORTED__STATUS__ERROR_ARGUMENT},
+        {AMEDIAMETRICS_PROP_STATUS_VALUE_IO,
+            util::MEDIAMETRICS_AUDIO_TRACK_STATUS_REPORTED__STATUS__ERROR_IO},
+        {AMEDIAMETRICS_PROP_STATUS_VALUE_MEMORY,
+            util::MEDIAMETRICS_AUDIO_TRACK_STATUS_REPORTED__STATUS__ERROR_MEMORY},
+        {AMEDIAMETRICS_PROP_STATUS_VALUE_SECURITY,
+            util::MEDIAMETRICS_AUDIO_TRACK_STATUS_REPORTED__STATUS__ERROR_SECURITY},
+        {AMEDIAMETRICS_PROP_STATUS_VALUE_STATE,
+            util::MEDIAMETRICS_AUDIO_TRACK_STATUS_REPORTED__STATUS__ERROR_STATE},
+        {AMEDIAMETRICS_PROP_STATUS_VALUE_TIMEOUT,
+            util::MEDIAMETRICS_AUDIO_TRACK_STATUS_REPORTED__STATUS__ERROR_TIMEOUT},
+        {AMEDIAMETRICS_PROP_STATUS_VALUE_UNKNOWN,
+            util::MEDIAMETRICS_AUDIO_TRACK_STATUS_REPORTED__STATUS__ERROR_UNKNOWN},
+    };
+    return map;
+}
+
 // Helper: Create the corresponding int32 from string flags split with '|'.
 template <typename Traits>
 int32_t int32FromFlags(const std::string &flags)
@@ -430,6 +455,17 @@ std::string lookup<CALLER_NAME>(const std::string &callerName)
         return "";
     }
     return callerName;
+}
+
+template <>
+int32_t lookup<STATUS>(const std::string &status)
+{
+    auto& map = getStatusMap();
+    auto it = map.find(status);
+    if (it == map.end()) {
+        return util::MEDIAMETRICS_AUDIO_TRACK_STATUS_REPORTED__STATUS__ERROR_UNKNOWN;
+    }
+    return it->second;
 }
 
 template <>
