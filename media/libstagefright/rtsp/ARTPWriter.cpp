@@ -18,7 +18,7 @@
 #define LOG_TAG "ARTPWriter"
 #include <utils/Log.h>
 
-#include "ARTPWriter.h"
+#include <media/stagefright/rtsp/ARTPWriter.h>
 
 #include <media/stagefright/MediaSource.h>
 #include <media/stagefright/foundation/ABuffer.h>

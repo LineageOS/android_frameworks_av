@@ -21,12 +21,12 @@
 #include "RTSPSource.h"
 
 #include "AnotherPacketSource.h"
-#include "MyHandler.h"
-#include "SDPLoader.h"
 
 #include <media/IMediaHTTPService.h>
 #include <media/stagefright/MediaDefs.h>
 #include <media/stagefright/MetaData.h>
+#include <media/stagefright/rtsp/MyHandler.h>
+#include <media/stagefright/rtsp/SDPLoader.h>
 
 namespace android {
 

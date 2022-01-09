@@ -66,7 +66,7 @@
 
 #include <system/audio.h>
 
-#include "ARTPWriter.h"
+#include <media/stagefright/rtsp/ARTPWriter.h>
 
 namespace android {
 

@@ -41,14 +41,13 @@ cc_library_static {
         "libmediadrm_headers",
         "libmediametrics_headers",
         "media_plugin_headers",
+        "libstagefright_headers",
+        "libstagefright_rtsp_headers",
     ],
 
     include_dirs: [
-        "frameworks/av/media/libstagefright",
         "frameworks/av/media/libstagefright/httplive",
-        "frameworks/av/media/libstagefright/include",
         "frameworks/av/media/libstagefright/mpeg2ts",
-        "frameworks/av/media/libstagefright/rtsp",
         "frameworks/av/media/libstagefright/timedtext",
         "frameworks/native/include/android",
     ],

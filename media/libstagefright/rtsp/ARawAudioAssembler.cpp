@@ -18,10 +18,10 @@
 #define LOG_TAG "ARawAudioAssembler"
 #include <utils/Log.h>
 
-#include "ARawAudioAssembler.h"
+#include <media/stagefright/rtsp/ARawAudioAssembler.h>
 
-#include "ARTPSource.h"
-#include "ASessionDescription.h"
+#include <media/stagefright/rtsp/ARTPSource.h>
+#include <media/stagefright/rtsp/ASessionDescription.h>
 
 #include <media/stagefright/foundation/ABuffer.h>
 #include <media/stagefright/foundation/ADebug.h>

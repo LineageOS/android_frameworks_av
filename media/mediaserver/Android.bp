@@ -49,7 +49,6 @@ cc_binary {
 
     include_dirs: [
         "frameworks/av/media/libmediaplayerservice",
-        "frameworks/av/services/mediaresourcemanager",
     ],
 
     // By default mediaserver runs in 32-bit to save memory, except
