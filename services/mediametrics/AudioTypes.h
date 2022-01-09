@@ -39,6 +39,10 @@ enum DeviceConnectionResult : int32_t {
 };
 
 // Enumeration for all the string translations to integers (generally int32_t) unless noted.
+// This is used to index the template method below:
+// template <AudioEnumCategory C, typename T, typename S>  T lookup(const S &str);
+//
+// Okay to keep AudioEnumCategory alphabetical and add new translations in the middle.
 enum AudioEnumCategory {
     AAUDIO_DIRECTION,
     AAUDIO_PERFORMANCE_MODE,
@@ -51,6 +55,7 @@ enum AudioEnumCategory {
     OUTPUT_DEVICE, // int64_t
     OUTPUT_FLAG,
     SOURCE_TYPE,
+    STATUS,
     STREAM_TYPE,
     THREAD_TYPE,
     TRACK_TRAITS,
