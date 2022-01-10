@@ -13,16 +13,28 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
-#pragma once
-
-#include <array>
-#include <cstdint>
-#include <vector>
+#include "Buffer.h"
 
 namespace clearkeydrm {
 
-bool isClearKeyUUID(const uint8_t uuid[16]);
+Buffer::Buffer(size_t capacity) : mRangeOffset(0), mOwnsData(true) {
+    mData = malloc(capacity);
+    if (mData == nullptr) {
+        mCapacity = 0;
+        mRangeLength = 0;
+    } else {
+        mCapacity = capacity;
+        mRangeLength = capacity;
+    }
+}
 
-std::vector<std::array<uint8_t, 16>> getSupportedCryptoSchemes();
+Buffer::~Buffer() {
+    if (mOwnsData) {
+        if (mData != nullptr) {
+            free(mData);
+            mData = nullptr;
+        }
+    }
+}
 
 }  // namespace clearkeydrm

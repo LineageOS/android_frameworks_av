@@ -15,14 +15,16 @@
  */
 #pragma once
 
-#include <array>
-#include <cstdint>
-#include <vector>
+#include "Buffer.h"
 
 namespace clearkeydrm {
 
-bool isClearKeyUUID(const uint8_t uuid[16]);
+struct Buffer;
 
-std::vector<std::array<uint8_t, 16>> getSupportedCryptoSchemes();
+::android::sp<Buffer> decodeBase64(const std::string& s);
+
+void encodeBase64(const void* data, size_t size, std::string* out);
+
+void encodeBase64Url(const void* data, size_t size, std::string* out);
 
 }  // namespace clearkeydrm

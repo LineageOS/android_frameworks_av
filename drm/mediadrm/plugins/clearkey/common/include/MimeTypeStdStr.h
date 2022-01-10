@@ -15,14 +15,13 @@
  */
 #pragma once
 
-#include <array>
-#include <cstdint>
-#include <vector>
+#include <string>
 
-namespace clearkeydrm {
-
-bool isClearKeyUUID(const uint8_t uuid[16]);
-
-std::vector<std::array<uint8_t, 16>> getSupportedCryptoSchemes();
-
-}  // namespace clearkeydrm
+namespace {
+const std::string kCencInitDataFormat("cenc");
+const std::string kIsoBmffAudioMimeType("audio/mp4");
+const std::string kIsoBmffVideoMimeType("video/mp4");
+const std::string kWebmInitDataFormat("webm");
+const std::string kWebmAudioMimeType("audio/webm");
+const std::string kWebmVideoMimeType("video/webm");
+}  // namespace
