@@ -23,6 +23,10 @@
 #include <media/stagefright/foundation/ADebug.h>
 #include <media/stagefright/foundation/AMessage.h>
 #include <media/stagefright/MediaSource.h>
+#include <media/stagefright/rtsp/APacketSource.h>
+#include <media/stagefright/rtsp/ARTPConnection.h>
+#include <media/stagefright/rtsp/ARTPSource.h>
+#include <media/stagefright/rtsp/ASessionDescription.h>
 #include <media/stagefright/Utils.h>
 #include <media/BufferingSettings.h>
 
@@ -31,10 +35,6 @@
 #include <utils/RefBase.h>
 
 #include "AnotherPacketSource.h"
-#include "APacketSource.h"
-#include "ARTPConnection.h"
-#include "ARTPSource.h"
-#include "ASessionDescription.h"
 #include "NuPlayerSource.h"
 
 
