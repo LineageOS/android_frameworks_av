@@ -1213,11 +1213,25 @@ void CCodec::configure(const sp<AMessage> &msg) {
         std::initializer_list<C2Param::Index> indices {
             colorAspectsRequestIndex.withStream(0u),
         };
-        c2_status_t c2err = comp->query(
-                { &usage, &maxInputSize, &prepend },
-                indices,
-                C2_DONT_BLOCK,
-                &params);
+        int32_t colorTransferRequest = 0;
+        if (config->mDomain & (Config::IS_IMAGE | Config::IS_VIDEO)
+                && !sdkParams->findInt32("color-transfer-request", &colorTransferRequest)) {
+            colorTransferRequest = 0;
+        }
+        c2_status_t c2err = C2_OK;
+        if (colorTransferRequest != 0) {
+            c2err = comp->query(
+                    { &usage, &maxInputSize, &prepend },
+                    indices,
+                    C2_DONT_BLOCK,
+                    &params);
+        } else {
+            c2err = comp->query(
+                    { &usage, &maxInputSize, &prepend },
+                    {},
+                    C2_DONT_BLOCK,
+                    &params);
+        }
         if (c2err != C2_OK && c2err != C2_BAD_INDEX) {
             ALOGE("Failed to query component interface: %d", c2err);
             return UNKNOWN_ERROR;
@@ -1359,11 +1373,6 @@ void CCodec::configure(const sp<AMessage> &msg) {
                 ALOGI("found color transfer request param");
                 colorTransferRequestParam = std::move(param);
             }
-        }
-        int32_t colorTransferRequest = 0;
-        if (config->mDomain & (Config::IS_IMAGE | Config::IS_VIDEO)
-                && !sdkParams->findInt32("color-transfer-request", &colorTransferRequest)) {
-            colorTransferRequest = 0;
         }
 
         if (colorTransferRequest != 0) {
