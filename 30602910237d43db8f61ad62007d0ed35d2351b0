@@ -1,0 +1,21 @@
+{
+  "comments": [
+    {
+      "unresolved": false,
+      "key": {
+        "uuid": "66e2ef1b_4936f4fd",
+        "filename": "/PATCHSET_LEVEL",
+        "patchSetId": 1
+      },
+      "lineNbr": 0,
+      "author": {
+        "id": 24080
+      },
+      "writtenOn": "2022-01-11T12:40:41Z",
+      "side": 1,
+      "message": "Topic Q_asb_2022-01 builds OK for sargo",
+      "revId": "30602910237d43db8f61ad62007d0ed35d2351b0",
+      "serverId": "1ec6b3db-b2c1-4fa4-84a2-4c7efe89ba71"
+    }
+  ]
+}
