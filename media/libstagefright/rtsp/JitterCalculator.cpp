@@ -17,7 +17,7 @@
 #define LOG_TAG "JitterCalc"
 #include <utils/Log.h>
 
-#include "JitterCalculator.h"
+#include <media/stagefright/rtsp/JitterCalculator.h>
 
 #include <stdlib.h>
 

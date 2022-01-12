@@ -47,10 +47,9 @@ cc_defaults {
         "libmedia",
     ],
 
-    include_dirs: [
-        "frameworks/av/media/libstagefright",
-        "frameworks/native/include/media/openmax",
-        "frameworks/native/include/android",
+    header_libs: [
+        "libstagefright_headers",
+        "libstagefright_rtsp_headers",
     ],
 
     arch: {
@@ -70,6 +69,18 @@ cc_defaults {
             "unsigned-integer-overflow",
         ],
         cfi: true,
+    },
+}
+
+cc_library_headers {
+    name: "libstagefright_rtsp_headers",
+    export_include_dirs: ["include"],
+    vendor_available: true,
+    host_supported: true,
+    target: {
+        darwin: {
+            enabled: false,
+        },
     },
 }
 

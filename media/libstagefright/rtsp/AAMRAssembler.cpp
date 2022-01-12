@@ -18,9 +18,8 @@
 #define LOG_TAG "AAMRAssembler"
 #include <utils/Log.h>
 
-#include "AAMRAssembler.h"
-
-#include "ARTPSource.h"
+#include <media/stagefright/rtsp/AAMRAssembler.h>
+#include <media/stagefright/rtsp/ARTPSource.h>
 
 #include <media/stagefright/foundation/ABuffer.h>
 #include <media/stagefright/foundation/ADebug.h>

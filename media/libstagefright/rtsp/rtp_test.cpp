@@ -27,9 +27,9 @@
 #include <media/stagefright/MediaBuffer.h>
 #include <media/stagefright/SimpleDecodingSource.h>
 
-#include "ARTPSession.h"
-#include "ASessionDescription.h"
-#include "UDPPusher.h"
+#include <media/stagefright/rtsp/ARTPSession.h>
+#include <media/stagefright/rtsp/ASessionDescription.h>
+#include <media/stagefright/rtsp/UDPPusher.h>
 
 using namespace android;
 
