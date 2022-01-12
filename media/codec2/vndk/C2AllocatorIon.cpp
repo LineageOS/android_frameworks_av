@@ -202,6 +202,7 @@ public:
 
         c2_status_t err = mapInternal(mapSize, mapOffset, alignmentBytes, prot, flags, &(map.addr), addr);
         if (map.addr) {
+            std::lock_guard<std::mutex> guard(mMutexMappings);
             mMappings.push_back(map);
         }
         return err;
@@ -212,22 +213,26 @@ public:
             ALOGD("tried to unmap unmapped buffer");
             return C2_NOT_FOUND;
         }
-        for (auto it = mMappings.begin(); it != mMappings.end(); ++it) {
-            if (addr != (uint8_t *)it->addr + it->alignmentBytes ||
-                    size + it->alignmentBytes != it->size) {
-                continue;
+        { // Scope for the lock_guard of mMutexMappings.
+            std::lock_guard<std::mutex> guard(mMutexMappings);
+            for (auto it = mMappings.begin(); it != mMappings.end(); ++it) {
+                if (addr != (uint8_t *)it->addr + it->alignmentBytes ||
+                        size + it->alignmentBytes != it->size) {
+                    continue;
+                }
+                int err = munmap(it->addr, it->size);
+                if (err != 0) {
+                    ALOGD("munmap failed");
+                    return c2_map_errno<EINVAL>(errno);
+                }
+                if (fence) {
+                    *fence = C2Fence(); // not using fences
+                }
+                (void)mMappings.erase(it);
+                ALOGV("successfully unmapped: addr=%p size=%zu fd=%d", addr, size,
+                          mHandle.bufferFd());
+                return C2_OK;
             }
-            int err = munmap(it->addr, it->size);
-            if (err != 0) {
-                ALOGD("munmap failed");
-                return c2_map_errno<EINVAL>(errno);
-            }
-            if (fence) {
-                *fence = C2Fence(); // not using fences
-            }
-            (void)mMappings.erase(it);
-            ALOGV("successfully unmapped: addr=%p size=%zu fd=%d", addr, size, mHandle.bufferFd());
-            return C2_OK;
         }
         ALOGD("unmap failed to find specified map");
         return C2_BAD_VALUE;
@@ -236,6 +241,7 @@ public:
     virtual ~Impl() {
         if (!mMappings.empty()) {
             ALOGD("Dangling mappings!");
+            std::lock_guard<std::mutex> guard(mMutexMappings);
             for (const Mapping &map : mMappings) {
                 (void)munmap(map.addr, map.size);
             }
@@ -315,6 +321,7 @@ protected:
         size_t size;
     };
     std::list<Mapping> mMappings;
+    std::mutex mMutexMappings;
 };
 
 class C2AllocationIon::ImplV2 : public C2AllocationIon::Impl {
