@@ -122,6 +122,19 @@ private:
      */
     void processStatus(const std::shared_ptr<const mediametrics::Item>& item);
 
+    // Specific reporting methods
+    bool reportAudioRecordStatus(
+            const std::shared_ptr<const mediametrics::Item>& item,
+            const std::string& key, const std::string& eventStr,
+            const std::string& statusString, uid_t uid, const std::string& message,
+            int32_t subCode) const;
+
+    bool reportAudioTrackStatus(
+            const std::shared_ptr<const mediametrics::Item>& item,
+            const std::string& key, const std::string& eventStr,
+            const std::string& statusString, uid_t uid, const std::string& message,
+            int32_t subCode) const;
+
     // HELPER METHODS
     /**
      * Return the audio thread associated with an audio track name.
