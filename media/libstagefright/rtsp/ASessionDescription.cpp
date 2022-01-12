@@ -18,7 +18,7 @@
 #define LOG_TAG "ASessionDescription"
 #include <utils/Log.h>
 
-#include "ASessionDescription.h"
+#include <media/stagefright/rtsp/ASessionDescription.h>
 
 #include <media/stagefright/foundation/ADebug.h>
 #include <media/stagefright/foundation/AString.h>

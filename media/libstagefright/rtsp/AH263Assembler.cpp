@@ -17,9 +17,9 @@
 #define LOG_TAG "AH263Assembler"
 #include <utils/Log.h>
 
-#include "AH263Assembler.h"
+#include <media/stagefright/rtsp/AH263Assembler.h>
 
-#include "ARTPSource.h"
+#include <media/stagefright/rtsp/ARTPSource.h>
 
 #include <media/stagefright/foundation/ABuffer.h>
 #include <media/stagefright/foundation/ADebug.h>
