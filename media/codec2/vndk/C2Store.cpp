@@ -301,13 +301,21 @@ void C2PlatformAllocatorStoreImpl::setComponentStore(std::shared_ptr<C2Component
         std::lock_guard<std::mutex> lock(_mComponentStoreReadLock);
         _mComponentStore = store;
     }
-    std::shared_ptr<C2AllocatorIon> allocator;
+    std::shared_ptr<C2AllocatorIon> ionAllocator;
     {
         std::lock_guard<std::mutex> lock(gIonAllocatorMutex);
-        allocator = gIonAllocator.lock();
+        ionAllocator = gIonAllocator.lock();
     }
-    if (allocator) {
-        UseComponentStoreForIonAllocator(allocator, store);
+    if (ionAllocator) {
+        UseComponentStoreForIonAllocator(ionAllocator, store);
+    }
+    std::shared_ptr<C2DmaBufAllocator> dmaAllocator;
+    {
+        std::lock_guard<std::mutex> lock(gDmaBufAllocatorMutex);
+        dmaAllocator = gDmaBufAllocator.lock();
+    }
+    if (dmaAllocator) {
+        UseComponentStoreForDmaBufAllocator(dmaAllocator, store);
     }
 }
 
