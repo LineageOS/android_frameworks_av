@@ -61,6 +61,7 @@ static inline bool isAudioServerOrRootUid(uid_t uid) {
 
 // Used for calls that should come from system server or internal.
 // Note: system server is multiprocess for multiple users.  audioserver is not.
+// Note: if this method is modified, also update the same method in SensorService.h.
 static inline bool isAudioServerOrSystemServerUid(uid_t uid) {
     return multiuser_get_app_id(uid) == AID_SYSTEM || uid == AID_AUDIOSERVER;
 }
