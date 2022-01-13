@@ -28,100 +28,145 @@ using Eigen::Quaternionf;
 using Eigen::Vector3f;
 using Options = StillnessDetector::Options;
 
-TEST(StillnessDetectorTest, Still) {
-    StillnessDetector detector(Options{
-            .windowDuration = 1000, .translationalThreshold = 1, .rotationalThreshold = 0.05});
+class StillnessDetectorTest : public testing::TestWithParam<bool> {
+  public:
+    void SetUp() override { mDefaultValue = GetParam(); }
+
+  protected:
+    bool mDefaultValue;
+};
+
+TEST_P(StillnessDetectorTest, Still) {
+    StillnessDetector detector(Options{.defaultValue = mDefaultValue,
+                                       .windowDuration = 1000,
+                                       .translationalThreshold = 1,
+                                       .rotationalThreshold = 0.05});
 
     const Pose3f baseline(Vector3f{1, 2, 3}, Quaternionf::UnitRandom());
     const Pose3f withinThreshold =
             baseline * Pose3f(Vector3f(0.3, -0.3, 0), rotateX(0.01) * rotateY(-0.01));
 
-    EXPECT_FALSE(detector.calculate(0));
+    EXPECT_EQ(mDefaultValue, detector.calculate(0));
     detector.setInput(0, baseline);
-    EXPECT_FALSE(detector.calculate(0));
+    EXPECT_EQ(mDefaultValue, detector.calculate(0));
     detector.setInput(300, withinThreshold);
-    EXPECT_FALSE(detector.calculate(300));
+    EXPECT_EQ(mDefaultValue, detector.calculate(300));
     detector.setInput(600, baseline);
-    EXPECT_FALSE(detector.calculate(600));
+    EXPECT_EQ(mDefaultValue, detector.calculate(600));
     detector.setInput(999, withinThreshold);
-    EXPECT_FALSE(detector.calculate(999));
+    EXPECT_EQ(mDefaultValue, detector.calculate(999));
     detector.setInput(1000, baseline);
     EXPECT_TRUE(detector.calculate(1000));
 }
 
-TEST(StillnessDetectorTest, ZeroDuration) {
-    StillnessDetector detector(Options{.windowDuration = 0});
+TEST_P(StillnessDetectorTest, ZeroDuration) {
+    StillnessDetector detector(Options{.defaultValue = mDefaultValue, .windowDuration = 0});
     EXPECT_TRUE(detector.calculate(0));
     EXPECT_TRUE(detector.calculate(1000));
 }
 
-TEST(StillnessDetectorTest, NotStillTranslation) {
-    StillnessDetector detector(Options{
-            .windowDuration = 1000, .translationalThreshold = 1, .rotationalThreshold = 0.05});
+TEST_P(StillnessDetectorTest, NotStillTranslation) {
+    StillnessDetector detector(Options{.defaultValue = mDefaultValue,
+                                       .windowDuration = 1000,
+                                       .translationalThreshold = 1,
+                                       .rotationalThreshold = 0.05});
 
     const Pose3f baseline(Vector3f{1, 2, 3}, Quaternionf::UnitRandom());
     const Pose3f withinThreshold =
             baseline * Pose3f(Vector3f(0.3, -0.3, 0), rotateX(0.01) * rotateY(-0.01));
     const Pose3f outsideThreshold = baseline * Pose3f(Vector3f(1, 1, 0));
 
-    EXPECT_FALSE(detector.calculate(0));
+    EXPECT_EQ(mDefaultValue, detector.calculate(0));
     detector.setInput(0, baseline);
-    EXPECT_FALSE(detector.calculate(0));
+    EXPECT_EQ(mDefaultValue, detector.calculate(0));
     detector.setInput(300, outsideThreshold);
-    EXPECT_FALSE(detector.calculate(300));
+    EXPECT_EQ(mDefaultValue, detector.calculate(300));
     detector.setInput(600, baseline);
-    EXPECT_FALSE(detector.calculate(600));
+    EXPECT_EQ(mDefaultValue, detector.calculate(600));
     detector.setInput(900, withinThreshold);
-    EXPECT_FALSE(detector.calculate(900));
-    detector.setInput(1299, baseline);
-    EXPECT_FALSE(detector.calculate(1299));
-    EXPECT_TRUE(detector.calculate(1300));
+    EXPECT_EQ(mDefaultValue, detector.calculate(900));
+    detector.setInput(1300, baseline);
+    EXPECT_FALSE(detector.calculate(1300));
+    detector.setInput(1500, baseline);
+    EXPECT_FALSE(detector.calculate(1899));
+    EXPECT_TRUE(detector.calculate(1900));
 }
 
-TEST(StillnessDetectorTest, NotStillRotation) {
-    StillnessDetector detector(Options{
-            .windowDuration = 1000, .translationalThreshold = 1, .rotationalThreshold = 0.05});
+TEST_P(StillnessDetectorTest, NotStillRotation) {
+    StillnessDetector detector(Options{.defaultValue = mDefaultValue,
+                                       .windowDuration = 1000,
+                                       .translationalThreshold = 1,
+                                       .rotationalThreshold = 0.05});
 
     const Pose3f baseline(Vector3f{1, 2, 3}, Quaternionf::UnitRandom());
     const Pose3f withinThreshold =
             baseline * Pose3f(Vector3f(0.3, -0.3, 0), rotateX(0.03) * rotateY(-0.03));
     const Pose3f outsideThreshold = baseline * Pose3f(rotateZ(0.06));
-    EXPECT_FALSE(detector.calculate(0));
+
+    EXPECT_EQ(mDefaultValue, detector.calculate(0));
     detector.setInput(0, baseline);
-    EXPECT_FALSE(detector.calculate(0));
+    EXPECT_EQ(mDefaultValue, detector.calculate(0));
     detector.setInput(300, outsideThreshold);
-    EXPECT_FALSE(detector.calculate(300));
+    EXPECT_EQ(mDefaultValue, detector.calculate(300));
     detector.setInput(600, baseline);
-    EXPECT_FALSE(detector.calculate(600));
+    EXPECT_EQ(mDefaultValue, detector.calculate(600));
     detector.setInput(900, withinThreshold);
-    EXPECT_FALSE(detector.calculate(900));
-    detector.setInput(1299, baseline);
-    EXPECT_FALSE(detector.calculate(1299));
-    EXPECT_TRUE(detector.calculate(1300));
+    EXPECT_EQ(mDefaultValue, detector.calculate(900));
+    detector.setInput(1300, baseline);
+    EXPECT_FALSE(detector.calculate(1300));
+    detector.setInput(1500, baseline);
+    EXPECT_FALSE(detector.calculate(1899));
+    EXPECT_TRUE(detector.calculate(1900));
 }
 
-TEST(StillnessDetectorTest, Reset) {
-    StillnessDetector detector(Options{
-            .windowDuration = 1000, .translationalThreshold = 1, .rotationalThreshold = 0.05});
+TEST_P(StillnessDetectorTest, Suppression) {
+    StillnessDetector detector(Options{.defaultValue = mDefaultValue,
+                                       .windowDuration = 1000,
+                                       .translationalThreshold = 1,
+                                       .rotationalThreshold = 0.05});
+
+    const Pose3f baseline(Vector3f{1, 2, 3}, Quaternionf::UnitRandom());
+    const Pose3f outsideThreshold = baseline * Pose3f(Vector3f(1.1, 0, 0));
+    const Pose3f middlePoint = baseline * Pose3f(Vector3f(0.55, 0, 0));
+
+    detector.setInput(0, baseline);
+    detector.setInput(1000, baseline);
+    EXPECT_TRUE(detector.calculate(1000));
+    detector.setInput(1100, outsideThreshold);
+    EXPECT_FALSE(detector.calculate(1100));
+    detector.setInput(2000, middlePoint);
+    EXPECT_FALSE(detector.calculate(2000));
+    EXPECT_FALSE(detector.calculate(2099));
+    EXPECT_TRUE(detector.calculate(2100));
+}
+
+TEST_P(StillnessDetectorTest, Reset) {
+    StillnessDetector detector(Options{.defaultValue = mDefaultValue,
+                                       .windowDuration = 1000,
+                                       .translationalThreshold = 1,
+                                       .rotationalThreshold = 0.05});
 
     const Pose3f baseline(Vector3f{1, 2, 3}, Quaternionf::UnitRandom());
     const Pose3f withinThreshold =
             baseline * Pose3f(Vector3f(0.3, -0.3, 0), rotateX(0.01) * rotateY(-0.01));
-    EXPECT_FALSE(detector.calculate(0));
+    EXPECT_EQ(mDefaultValue, detector.calculate(0));
     detector.setInput(0, baseline);
-    EXPECT_FALSE(detector.calculate(0));
+    EXPECT_EQ(mDefaultValue, detector.calculate(0));
     detector.reset();
     detector.setInput(600, baseline);
-    EXPECT_FALSE(detector.calculate(600));
+    EXPECT_EQ(mDefaultValue, detector.calculate(600));
     detector.setInput(900, withinThreshold);
-    EXPECT_FALSE(detector.calculate(900));
+    EXPECT_EQ(mDefaultValue, detector.calculate(900));
     detector.setInput(1200, baseline);
-    EXPECT_FALSE(detector.calculate(1200));
+    EXPECT_EQ(mDefaultValue, detector.calculate(1200));
     detector.setInput(1599, withinThreshold);
-    EXPECT_FALSE(detector.calculate(1599));
+    EXPECT_EQ(mDefaultValue, detector.calculate(1599));
     detector.setInput(1600, baseline);
     EXPECT_TRUE(detector.calculate(1600));
 }
+
+INSTANTIATE_TEST_SUITE_P(StillnessDetectorTestParametrized, StillnessDetectorTest,
+                         testing::Values(false, true));
 
 }  // namespace
 }  // namespace media

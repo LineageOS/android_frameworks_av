@@ -38,7 +38,7 @@ namespace {
 constexpr auto kMaxTranslationalVelocity = 2;
 
 // This is how fast, in rad/s, we allow rotation angle to shift during rate-limiting.
-constexpr auto kMaxRotationalVelocity = 4 * M_PI;
+constexpr auto kMaxRotationalVelocity = 8;
 
 // This should be set to the typical time scale that the translation sensors used drift in. This
 // means, loosely, for how long we can trust the reading to be "accurate enough". This would
@@ -65,23 +65,23 @@ constexpr auto kPredictionDuration = 10ms;
 constexpr auto kMaxLostSamples = 4;
 
 // Auto-recenter kicks in after the head has been still for this long.
-constexpr auto kAutoRecenterWindowDuration = 10s;
+constexpr auto kAutoRecenterWindowDuration = 6s;
 
 // Auto-recenter considers head not still if translated by this much (in meters, approx).
 constexpr float kAutoRecenterTranslationThreshold = 0.1f;
 
 // Auto-recenter considers head not still if rotated by this much (in radians, approx).
-constexpr float kAutoRecenterRotationThreshold = 5.0f / 180 * M_PI;
+constexpr float kAutoRecenterRotationThreshold = 7.0f / 180 * M_PI;
 
 // Screen is considered to be unstable (not still) if it has moved significantly within the last
 // time window of this duration.
-constexpr auto kScreenStillnessWindowDuration = 10s;
+constexpr auto kScreenStillnessWindowDuration = 3s;
 
 // Screen is considered to have moved significantly if translated by this much (in meter, approx).
 constexpr float kScreenStillnessTranslationThreshold = 0.1f;
 
 // Screen is considered to have moved significantly if rotated by this much (in radians, approx).
-constexpr float kScreenStillnessRotationThreshold = 5.0f / 180 * M_PI;
+constexpr float kScreenStillnessRotationThreshold = 7.0f / 180 * M_PI;
 
 // Time units for system clock ticks. This is what the Sensor Framework timestamps represent and
 // what we use for pose filtering.
