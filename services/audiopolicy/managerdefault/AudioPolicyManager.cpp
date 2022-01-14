@@ -3782,9 +3782,10 @@ audio_direct_mode_t AudioPolicyManager::getDirectPlaybackSupport(const audio_att
     }
     flags = (audio_output_flags_t)((flags & relevantFlags) | AUDIO_OUTPUT_FLAG_DIRECT);
 
+    DeviceVector outputDevices = mEngine->getOutputDevicesForAttributes(*attr);
     for (const auto& hwModule : mHwModules) {
         for (const auto& curProfile : hwModule->getOutputProfiles()) {
-            if (!curProfile->isCompatibleProfile(DeviceVector(),
+            if (!curProfile->isCompatibleProfile(outputDevices,
                     config->sample_rate, nullptr /*updatedSamplingRate*/,
                     config->format, nullptr /*updatedFormat*/,
                     config->channel_mask, nullptr /*updatedChannelMask*/,

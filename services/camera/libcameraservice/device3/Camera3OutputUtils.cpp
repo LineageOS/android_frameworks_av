@@ -472,7 +472,7 @@ void removeInFlightRequestIfReadyLocked(CaptureOutputStates& states, int idx) {
         // Note down the just completed frame number
         if (request.hasInputBuffer) {
             states.lastCompletedReprocessFrameNumber = frameNumber;
-        } else if (request.zslCapture) {
+        } else if (request.zslCapture && request.stillCapture) {
             states.lastCompletedZslFrameNumber = frameNumber;
         } else {
             states.lastCompletedRegularFrameNumber = frameNumber;
@@ -969,7 +969,8 @@ void returnOutputBuffers(
 void returnAndRemovePendingOutputBuffers(bool useHalBufManager,
         sp<NotificationListener> listener, InFlightRequest& request,
         SessionStatsBuilder& sessionStatsBuilder) {
-    bool timestampIncreasing = !(request.zslCapture || request.hasInputBuffer);
+    bool timestampIncreasing =
+            !((request.zslCapture && request.stillCapture) || request.hasInputBuffer);
     returnOutputBuffers(useHalBufManager, listener,
             request.pendingOutputBuffers.array(),
             request.pendingOutputBuffers.size(),
