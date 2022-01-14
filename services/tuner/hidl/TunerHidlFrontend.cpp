@@ -433,6 +433,14 @@ TunerHidlFrontend::~TunerHidlFrontend() {
             static_cast<int32_t>(Result::UNAVAILABLE));
 }
 
+::ndk::ScopedAStatus TunerHidlFrontend::getFrontendStatusReadiness(
+        const std::vector<FrontendStatusType>& /* in_statusTypes */,
+        std::vector<FrontendStatusReadiness>* _aidl_return) {
+    _aidl_return->clear();
+    return ::ndk::ScopedAStatus::fromServiceSpecificError(
+            static_cast<int32_t>(Result::UNAVAILABLE));
+}
+
 void TunerHidlFrontend::setLna(bool bEnable) {
     if (mFrontend == nullptr) {
         ALOGD("IFrontend is not initialized");
