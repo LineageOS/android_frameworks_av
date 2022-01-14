@@ -28,9 +28,6 @@ package {
 
 cc_defaults {
     name: "libmediaplayerserviceFuzzer_defaults",
-    include_dirs: [
-        "frameworks/av/media/libmediaplayerservice",
-    ],
     static_libs: [
         "libmediaplayerservice",
         "liblog",

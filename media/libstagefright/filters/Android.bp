@@ -22,6 +22,14 @@ cc_library_static {
         "ZeroFilter.cpp",
     ],
 
+    export_include_dirs: [
+        "include",
+    ],
+
+    local_include_dirs: [
+        "include/filters",
+    ],
+
     cflags: [
         "-Wno-multichar",
         "-Werror",
