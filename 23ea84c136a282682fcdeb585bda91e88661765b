@@ -16,6 +16,23 @@
       "message": "Topic P_asb_2022-01 builds OK for hammerhead",
       "revId": "23ea84c136a282682fcdeb585bda91e88661765b",
       "serverId": "1ec6b3db-b2c1-4fa4-84a2-4c7efe89ba71"
+    },
+    {
+      "unresolved": false,
+      "key": {
+        "uuid": "7129e7c0_ba4d4cae",
+        "filename": "/PATCHSET_LEVEL",
+        "patchSetId": 1
+      },
+      "lineNbr": 0,
+      "author": {
+        "id": 23518
+      },
+      "writtenOn": "2022-01-15T18:10:53Z",
+      "side": 1,
+      "message": "All good on LG G4 LTE - Thank you.",
+      "revId": "23ea84c136a282682fcdeb585bda91e88661765b",
+      "serverId": "1ec6b3db-b2c1-4fa4-84a2-4c7efe89ba71"
     }
   ]
 }
