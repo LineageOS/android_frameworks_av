@@ -50,6 +50,24 @@
       "message": "No security string bump for pie?",
       "revId": "23ea84c136a282682fcdeb585bda91e88661765b",
       "serverId": "1ec6b3db-b2c1-4fa4-84a2-4c7efe89ba71"
+    },
+    {
+      "unresolved": false,
+      "key": {
+        "uuid": "6e4a5eb8_e1378f68",
+        "filename": "/PATCHSET_LEVEL",
+        "patchSetId": 1
+      },
+      "lineNbr": 0,
+      "author": {
+        "id": 15173
+      },
+      "writtenOn": "2022-01-16T14:18:33Z",
+      "side": 1,
+      "message": "No security bump for anything because the bulletin is not linked and traceability cannot yet be verified.",
+      "parentUuid": "5148a53c_2560f528",
+      "revId": "23ea84c136a282682fcdeb585bda91e88661765b",
+      "serverId": "1ec6b3db-b2c1-4fa4-84a2-4c7efe89ba71"
     }
   ]
 }
