@@ -59,6 +59,17 @@
       ]
     },
     {
+      "name": "CtsMediaCodecTestCases",
+      "options": [
+        {
+          "include-annotation": "android.platform.test.annotations.Presubmit"
+        },
+        {
+          "exclude-annotation": "android.platform.test.annotations.RequiresDevice"
+        }
+      ]
+    },
+    {
       "name": "CtsMediaPlayerTestCases",
       "options": [
         {
