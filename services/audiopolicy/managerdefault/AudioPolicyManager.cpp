@@ -3690,7 +3690,8 @@ bool AudioPolicyManager::isDirectOutputSupported(const audio_config_base_t& conf
                                                  const audio_attributes_t& attributes) {
     audio_output_flags_t output_flags = AUDIO_OUTPUT_FLAG_NONE;
     audio_flags_to_audio_output_flags(attributes.flags, &output_flags);
-    sp<IOProfile> profile = getProfileForOutput(DeviceVector() /*ignore device */,
+    DeviceVector outputDevices = mEngine->getOutputDevicesForAttributes(attributes);
+    sp<IOProfile> profile = getProfileForOutput(outputDevices,
                                             config.sample_rate,
                                             config.format,
                                             config.channel_mask,
