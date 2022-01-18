@@ -355,7 +355,7 @@ void AudioFlingerFuzzer::invokeAudioRecord() {
     audioBuffer.frameCount = static_cast<size_t>(mFdp.ConsumeIntegral<uint32_t>());
     record->obtainBuffer(&audioBuffer, waitCount, &nonContig);
     bool blocking = false;
-    record->read(audioBuffer.raw, audioBuffer.size, blocking);
+    record->read(audioBuffer.data(), audioBuffer.size(), blocking);
     record->getInputFramesLost();
     record->getFlags();
 

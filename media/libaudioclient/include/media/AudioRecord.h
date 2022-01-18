@@ -40,7 +40,6 @@ namespace android {
 
 struct audio_track_cblk_t;
 class AudioRecordClientProxy;
-
 // ----------------------------------------------------------------------------
 
 class AudioRecord : public AudioSystem::AudioDeviceCallback
@@ -70,15 +69,21 @@ public:
 
     class Buffer
     {
+      friend AudioRecord;
     public:
-        // FIXME use m prefix
+        size_t size() const { return mSize; }
+        size_t getFrameCount() const { return frameCount; }
+        uint8_t* data() const { return ui8; }
+        // Leaving public for now to assist refactoring. This class will
+        // be replaced.
         size_t      frameCount;     // number of sample frames corresponding to size;
                                     // on input to obtainBuffer() it is the number of frames desired
                                     // on output from obtainBuffer() it is the number of available
                                     //    frames to be read
                                     // on input to releaseBuffer() it is currently ignored
 
-        size_t      size;           // input/output in bytes == frameCount * frameSize
+    private:
+        size_t      mSize;          // input/output in bytes == frameCount * frameSize
                                     // on input to obtainBuffer() it is ignored
                                     // on output from obtainBuffer() it is the number of available
                                     //    bytes to be read, which is frameCount * frameSize
@@ -90,7 +95,7 @@ public:
         union {
             void*       raw;
             int16_t*    i16;        // signed 16-bit
-            int8_t*     i8;         // unsigned 8-bit, offset by 0x80
+            uint8_t*    ui8;        // unsigned 8-bit, offset by 0x80
                                     // input to obtainBuffer(): unused, output: pointer to buffer
         };
 
