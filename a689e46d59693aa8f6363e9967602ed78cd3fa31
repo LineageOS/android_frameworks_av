@@ -33,6 +33,24 @@
       "message": "All good and working on Moto G5 Cedric. THANK YOU!\nWill this be the only patch for January, or eben the end of support for Nougat?",
       "revId": "a689e46d59693aa8f6363e9967602ed78cd3fa31",
       "serverId": "1ec6b3db-b2c1-4fa4-84a2-4c7efe89ba71"
+    },
+    {
+      "unresolved": false,
+      "key": {
+        "uuid": "4ab64b3b_4ccb3ef2",
+        "filename": "/PATCHSET_LEVEL",
+        "patchSetId": 1
+      },
+      "lineNbr": 0,
+      "author": {
+        "id": 12604
+      },
+      "writtenOn": "2022-01-18T19:52:15Z",
+      "side": 1,
+      "message": "This is the only one that applied to cm-14.1 for january asb.",
+      "parentUuid": "e1fb5fce_b7544a86",
+      "revId": "a689e46d59693aa8f6363e9967602ed78cd3fa31",
+      "serverId": "1ec6b3db-b2c1-4fa4-84a2-4c7efe89ba71"
     }
   ]
 }
