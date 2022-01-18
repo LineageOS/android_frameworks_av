@@ -63,6 +63,7 @@
 
 // Error keys
 #define AMEDIAMETRICS_KEY_AUDIO_TRACK_ERROR   AMEDIAMETRICS_KEY_PREFIX_AUDIO_TRACK "error"
+#define AMEDIAMETRICS_KEY_AUDIO_RECORD_ERROR  AMEDIAMETRICS_KEY_PREFIX_AUDIO_RECORD "error"
 
 /*
  * MediaMetrics Properties are unified space for consistency and readability.
