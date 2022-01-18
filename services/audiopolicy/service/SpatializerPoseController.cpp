@@ -35,10 +35,10 @@ using namespace std::chrono_literals;
 namespace {
 
 // This is how fast, in m/s, we allow position to shift during rate-limiting.
-constexpr auto kMaxTranslationalVelocity = 2;
+constexpr float kMaxTranslationalVelocity = 2;
 
 // This is how fast, in rad/s, we allow rotation angle to shift during rate-limiting.
-constexpr auto kMaxRotationalVelocity = 8;
+constexpr float kMaxRotationalVelocity = 8;
 
 // This should be set to the typical time scale that the translation sensors used drift in. This
 // means, loosely, for how long we can trust the reading to be "accurate enough". This would
