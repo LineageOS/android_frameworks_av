@@ -3,18 +3,18 @@
     "presubmit-large": [
         // runs whenever we change something in this tree
         {
-            "name": "CtsMediaTestCases",
+            "name": "CtsMediaCodecTestCases",
             "options": [
                 {
-                    "include-filter": "android.media.cts.EncodeDecodeTest"
+                    "include-filter": "android.media.codec.cts.EncodeDecodeTest"
                 }
             ]
         },
         {
-            "name": "CtsMediaTestCases",
+            "name": "CtsMediaCodecTestCases",
             "options": [
                 {
-                    "include-filter": "android.media.cts.DecodeEditEncodeTest"
+                    "include-filter": "android.media.codec.cts.DecodeEditEncodeTest"
                 }
             ]
         }
@@ -46,18 +46,18 @@
         // runs regularly, independent of changes in this tree.
         // signals if changes elsewhere break media functionality
         {
-            "name": "CtsMediaTestCases",
+            "name": "CtsMediaCodecTestCases",
             "options": [
                 {
-                    "include-filter": "android.media.cts.EncodeDecodeTest"
+                    "include-filter": "android.media.codec.cts.EncodeDecodeTest"
                 }
             ]
         },
         {
-            "name": "CtsMediaTestCases",
+            "name": "CtsMediaCodecTestCases",
             "options": [
                 {
-                    "include-filter": "android.media.cts.DecodeEditEncodeTest"
+                    "include-filter": "android.media.codec.cts.DecodeEditEncodeTest"
                 }
             ]
         }
