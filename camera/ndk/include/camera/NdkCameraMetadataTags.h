@@ -3463,6 +3463,25 @@ typedef enum acamera_metadata_tag {
      */
     ACAMERA_REQUEST_AVAILABLE_PHYSICAL_CAMERA_REQUEST_KEYS =    // int32[n]
             ACAMERA_REQUEST_START + 17,
+    /**
+     * <p>A map of all available 10-bit dynamic range profiles along with their
+     * capture request constraints.</p>
+     *
+     * <p>Type: int32[n*2] (acamera_metadata_enum_android_request_available_dynamic_range_profiles_map_t)</p>
+     *
+     * <p>This tag may appear in:
+     * <ul>
+     *   <li>ACameraMetadata from ACameraManager_getCameraCharacteristics</li>
+     * </ul></p>
+     *
+     * <p>Devices supporting the 10-bit output capability
+     * <a href="https://developer.android.com/reference/android/hardware/camera2/CameraCharacteristics.html#REQUEST_AVAILABLE_CAPABILITIES_DYNAMIC_RANGE_TEN_BIT">CameraCharacteristics#REQUEST_AVAILABLE_CAPABILITIES_DYNAMIC_RANGE_TEN_BIT</a>
+     * must list their supported dynamic range profiles. In case the camera is not able to
+     * support every possible profile combination within a single capture request, then the
+     * constraints must be listed here as well.</p>
+     */
+    ACAMERA_REQUEST_AVAILABLE_DYNAMIC_RANGE_PROFILES_MAP =      // int32[n*2] (acamera_metadata_enum_android_request_available_dynamic_range_profiles_map_t)
+            ACAMERA_REQUEST_START + 19,
     ACAMERA_REQUEST_END,
 
     /**
@@ -9125,6 +9144,97 @@ typedef enum acamera_metadata_enum_acamera_request_available_capabilities {
 
 } acamera_metadata_enum_android_request_available_capabilities_t;
 
+// ACAMERA_REQUEST_AVAILABLE_DYNAMIC_RANGE_PROFILES_MAP
+typedef enum acamera_metadata_enum_acamera_request_available_dynamic_range_profiles_map {
+    /**
+     * <p>8-bit SDR profile which is the default for all non 10-bit output capable devices.</p>
+     */
+    ACAMERA_REQUEST_AVAILABLE_DYNAMIC_RANGE_PROFILES_MAP_STANDARD    = 0x1,
+
+    /**
+     * <p>10-bit pixel samples encoded using the Hybrid log-gamma transfer function.</p>
+     */
+    ACAMERA_REQUEST_AVAILABLE_DYNAMIC_RANGE_PROFILES_MAP_HLG10       = 0x2,
+
+    /**
+     * <p>10-bit pixel samples encoded using the SMPTE ST 2084 transfer function.
+     * This profile utilizes internal static metadata to increase the quality
+     * of the capture.</p>
+     */
+    ACAMERA_REQUEST_AVAILABLE_DYNAMIC_RANGE_PROFILES_MAP_HDR10       = 0x4,
+
+    /**
+     * <p>10-bit pixel samples encoded using the SMPTE ST 2084 transfer function.
+     * In contrast to HDR10, this profile uses internal per-frame metadata
+     * to further enhance the quality of the capture.</p>
+     */
+    ACAMERA_REQUEST_AVAILABLE_DYNAMIC_RANGE_PROFILES_MAP_HDR10_PLUS  = 0x8,
+
+    /**
+     * <p>This is a camera mode for Dolby Vision capture optimized for a more scene
+     * accurate capture. This would typically differ from what a specific device
+     * might want to tune for a consumer optimized Dolby Vision general capture.</p>
+     */
+    ACAMERA_REQUEST_AVAILABLE_DYNAMIC_RANGE_PROFILES_MAP_DOLBY_VISION_10B_HDR_REF
+                                                                      = 0x10,
+
+    /**
+     * <p>This is the power optimized mode for 10-bit Dolby Vision HDR Reference Mode.</p>
+     */
+    ACAMERA_REQUEST_AVAILABLE_DYNAMIC_RANGE_PROFILES_MAP_DOLBY_VISION_10B_HDR_REF_PO
+                                                                      = 0x20,
+
+    /**
+     * <p>This is the camera mode for the default Dolby Vision capture mode for the
+     * specific device. This would be tuned by each specific device for consumer
+     * pleasing results that resonate with their particular audience. We expect
+     * that each specific device would have a different look for their default
+     * Dolby Vision capture.</p>
+     */
+    ACAMERA_REQUEST_AVAILABLE_DYNAMIC_RANGE_PROFILES_MAP_DOLBY_VISION_10B_HDR_OEM
+                                                                      = 0x40,
+
+    /**
+     * <p>This is the power optimized mode for 10-bit Dolby Vision HDR device specific
+     * capture Mode.</p>
+     */
+    ACAMERA_REQUEST_AVAILABLE_DYNAMIC_RANGE_PROFILES_MAP_DOLBY_VISION_10B_HDR_OEM_PO
+                                                                      = 0x80,
+
+    /**
+     * <p>This is the 8-bit version of the Dolby Vision reference capture mode optimized
+     * for scene accuracy.</p>
+     */
+    ACAMERA_REQUEST_AVAILABLE_DYNAMIC_RANGE_PROFILES_MAP_DOLBY_VISION_8B_HDR_REF
+                                                                      = 0x100,
+
+    /**
+     * <p>This is the power optimized mode for 8-bit Dolby Vision HDR Reference Mode.</p>
+     */
+    ACAMERA_REQUEST_AVAILABLE_DYNAMIC_RANGE_PROFILES_MAP_DOLBY_VISION_8B_HDR_REF_PO
+                                                                      = 0x200,
+
+    /**
+     * <p>This is the 8-bit version of device specific tuned and optimized Dolby Vision
+     * capture mode.</p>
+     */
+    ACAMERA_REQUEST_AVAILABLE_DYNAMIC_RANGE_PROFILES_MAP_DOLBY_VISION_8B_HDR_OEM
+                                                                      = 0x400,
+
+    /**
+     * <p>This is the power optimized mode for 8-bit Dolby Vision HDR device specific
+     * capture Mode.</p>
+     */
+    ACAMERA_REQUEST_AVAILABLE_DYNAMIC_RANGE_PROFILES_MAP_DOLBY_VISION_8B_HDR_OEM_PO
+                                                                      = 0x800,
+
+    /**
+     *
+     */
+    ACAMERA_REQUEST_AVAILABLE_DYNAMIC_RANGE_PROFILES_MAP_MAX         = 0x1000,
+
+} acamera_metadata_enum_android_request_available_dynamic_range_profiles_map_t;
+
 
 // ACAMERA_SCALER_AVAILABLE_STREAM_CONFIGURATIONS
 typedef enum acamera_metadata_enum_acamera_scaler_available_stream_configurations {
@@ -9214,6 +9324,20 @@ typedef enum acamera_metadata_enum_acamera_scaler_available_recommended_stream_c
 
     ACAMERA_SCALER_AVAILABLE_RECOMMENDED_STREAM_CONFIGURATIONS_PUBLIC_END
                                                                       = 0x7,
+
+    /**
+     * <p>If supported, the recommended 10-bit output stream configurations must include
+     * a subset of the advertised <a href="https://developer.android.com/reference/android/graphics/ImageFormat.html#YCBCR_P010">ImageFormat#YCBCR_P010</a> and
+     * <a href="https://developer.android.com/reference/android/graphics/ImageFormat.html#PRIVATE">ImageFormat#PRIVATE</a> outputs that are optimized for power
+     * and performance when registered along with a supported 10-bit dynamic range profile.
+     * see android.hardware.camera2.params.OutputConfiguration#setDynamicRangeProfile for
+     * details.</p>
+     */
+    ACAMERA_SCALER_AVAILABLE_RECOMMENDED_STREAM_CONFIGURATIONS_10BIT_OUTPUT
+                                                                      = 0x8,
+
+    ACAMERA_SCALER_AVAILABLE_RECOMMENDED_STREAM_CONFIGURATIONS_PUBLIC_END_3_8
+                                                                      = 0x9,
 
     /**
      * <p>Vendor defined use cases. These depend on the vendor implementation.</p>

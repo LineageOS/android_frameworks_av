@@ -36,6 +36,7 @@
 #include <android/hardware/camera/provider/2.6/ICameraProvider.h>
 #include <android/hardware/camera/provider/2.7/ICameraProvider.h>
 #include <android/hardware/camera/device/3.7/types.h>
+#include <android/hardware/camera/device/3.8/types.h>
 #include <android/hidl/manager/1.0/IServiceNotification.h>
 #include <camera/VendorTagDescriptor.h>
 
@@ -243,7 +244,7 @@ public:
      * Check for device support of specific stream combination.
      */
     status_t isSessionConfigurationSupported(const std::string& id,
-            const hardware::camera::device::V3_7::StreamConfiguration &configuration,
+            const hardware::camera::device::V3_8::StreamConfiguration &configuration,
             bool *status /*out*/) const;
 
     /**
@@ -532,7 +533,7 @@ private:
             }
 
             virtual status_t isSessionConfigurationSupported(
-                    const hardware::camera::device::V3_7::StreamConfiguration &/*configuration*/,
+                    const hardware::camera::device::V3_8::StreamConfiguration &/*configuration*/,
                     bool * /*status*/) {
                 return INVALID_OPERATION;
             }
@@ -601,7 +602,7 @@ private:
             virtual status_t getPhysicalCameraCharacteristics(const std::string& physicalCameraId,
                     CameraMetadata *characteristics) const override;
             virtual status_t isSessionConfigurationSupported(
-                    const hardware::camera::device::V3_7::StreamConfiguration &configuration,
+                    const hardware::camera::device::V3_8::StreamConfiguration &configuration,
                     bool *status /*out*/)
                     override;
             virtual status_t filterSmallJpegSizes() override;

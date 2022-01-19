@@ -196,6 +196,9 @@ status_t PreviewFrameScheduler::queueBufferToClientLocked(
         return res;
     }
 
+    Camera3Stream::queueHDRMetadata(bufferHolder.anwBuffer.get()->handle, mConsumer,
+            mParent.getDynamicRangeProfile());
+
     res = mConsumer->queueBuffer(mConsumer.get(), bufferHolder.anwBuffer.get(),
             bufferHolder.releaseFence);
     if (res != OK) {
