@@ -51,6 +51,24 @@
       "parentUuid": "e1fb5fce_b7544a86",
       "revId": "a689e46d59693aa8f6363e9967602ed78cd3fa31",
       "serverId": "1ec6b3db-b2c1-4fa4-84a2-4c7efe89ba71"
+    },
+    {
+      "unresolved": false,
+      "key": {
+        "uuid": "3ff910ef_a8ae83d6",
+        "filename": "/PATCHSET_LEVEL",
+        "patchSetId": 1
+      },
+      "lineNbr": 0,
+      "author": {
+        "id": 12604
+      },
+      "writtenOn": "2022-01-19T21:38:34Z",
+      "side": 1,
+      "message": "I just found a few more cve for january that could be applied. Thanks for testing.",
+      "parentUuid": "4ab64b3b_4ccb3ef2",
+      "revId": "a689e46d59693aa8f6363e9967602ed78cd3fa31",
+      "serverId": "1ec6b3db-b2c1-4fa4-84a2-4c7efe89ba71"
     }
   ]
 }
