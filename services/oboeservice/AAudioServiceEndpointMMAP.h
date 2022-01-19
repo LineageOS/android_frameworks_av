@@ -64,6 +64,10 @@ public:
 
     aaudio_result_t stopClient(audio_port_handle_t clientHandle)  override;
 
+    aaudio_result_t standby() override;
+
+    aaudio_result_t exitStandby(AudioEndpointParcelable* parcelable) override;
+
     aaudio_result_t getFreeRunningPosition(int64_t *positionFrames, int64_t *timeNanos) override;
 
     aaudio_result_t getTimestamp(int64_t *positionFrames, int64_t *timeNanos) override;
@@ -90,6 +94,8 @@ public:
 private:
 
     aaudio_result_t openWithFormat(audio_format_t audioFormat);
+
+    aaudio_result_t createMmapBuffer(android::base::unique_fd* fileDescriptor);
 
     MonotonicCounter                          mFramesTransferred;
 
