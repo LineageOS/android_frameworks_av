@@ -444,6 +444,8 @@ public:
 
     static bool     isHapticPlaybackSupported();
 
+    static bool     isUltrasoundSupported();
+
     static status_t listAudioProductStrategies(AudioProductStrategyVector &strategies);
     static status_t getProductStrategyFromAudioAttributes(
             const AudioAttributes &aa, product_strategy_t &productStrategy,

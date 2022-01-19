@@ -2058,6 +2058,17 @@ Status AudioPolicyService::isHapticPlaybackSupported(bool* _aidl_return)
     return Status::ok();
 }
 
+Status AudioPolicyService::isUltrasoundSupported(bool* _aidl_return)
+{
+    if (mAudioPolicyManager == NULL) {
+        return binderStatusFromStatusT(NO_INIT);
+    }
+    Mutex::Autolock _l(mLock);
+    AutoCallerClear acc;
+    *_aidl_return = mAudioPolicyManager->isUltrasoundSupported();
+    return Status::ok();
+}
+
 Status AudioPolicyService::listAudioProductStrategies(
         std::vector<media::AudioProductStrategy>* _aidl_return) {
     AudioProductStrategyVector strategies;

@@ -300,6 +300,8 @@ public:
 
     virtual bool     isHapticPlaybackSupported() = 0;
 
+    virtual bool     isUltrasoundSupported() = 0;
+
     virtual status_t getHwOffloadFormatsSupportedForBluetoothMedia(
                 audio_devices_t device, std::vector<audio_format_t> *formats) = 0;
 
