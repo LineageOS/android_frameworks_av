@@ -890,6 +890,8 @@ private:
     MediaMetrics mMediaMetrics;
     std::string mMetricsId;  // GUARDED_BY(mLock), could change in createRecord_l().
     std::string mCallerName; // for example "aaudio"
+
+    void reportError(status_t status, const char *event, const char *message) const;
 };
 
 }; // namespace android
