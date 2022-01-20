@@ -18,8 +18,6 @@
 #define LOG_TAG "MediaCodecListOverrides"
 #include <utils/Log.h>
 
-#include "MediaCodecListOverrides.h"
-
 #include <cutils/properties.h>
 #include <gui/Surface.h>
 #include <mediadrm/ICrypto.h>
@@ -30,6 +28,7 @@
 #include <media/stagefright/foundation/AMessage.h>
 #include <media/stagefright/MediaCodec.h>
 #include <media/stagefright/MediaCodecList.h>
+#include <media/stagefright/MediaCodecListOverrides.h>
 
 namespace android {
 

@@ -21,11 +21,10 @@
 #include "NuPlayer.h"
 #include "NuPlayerSource.h"
 
-#include "ATSParser.h"
-
 #include <android-base/unique_fd.h>
 #include <media/mediaplayer.h>
 #include <media/stagefright/MediaBuffer.h>
+#include <mpeg2ts/ATSParser.h>
 
 namespace android {
 

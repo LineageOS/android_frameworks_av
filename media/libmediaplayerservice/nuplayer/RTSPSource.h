@@ -20,7 +20,7 @@
 
 #include "NuPlayerSource.h"
 
-#include "ATSParser.h"
+#include <mpeg2ts/ATSParser.h>
 
 namespace android {
 

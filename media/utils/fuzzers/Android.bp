@@ -32,11 +32,6 @@ cc_defaults {
         "bionic_libc_platform_headers",
         "libmedia_headers",
     ],
-
-    include_dirs: [
-        // For DEBUGGER_SIGNAL
-        "system/core/debuggerd/include",
-    ],
 }
 
 cc_fuzz {

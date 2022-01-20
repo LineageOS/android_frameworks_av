@@ -47,10 +47,6 @@ cc_binary {
         "libregistermsext",
     ],
 
-    include_dirs: [
-        "frameworks/av/media/libmediaplayerservice",
-    ],
-
     // By default mediaserver runs in 32-bit to save memory, except
     // on 64-bit-only lunch targets.
     // ****************************************************************
