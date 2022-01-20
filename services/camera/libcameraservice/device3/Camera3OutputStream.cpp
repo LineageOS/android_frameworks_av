@@ -46,10 +46,11 @@ Camera3OutputStream::Camera3OutputStream(int id,
         android_dataspace dataSpace, camera_stream_rotation_t rotation,
         nsecs_t timestampOffset, const String8& physicalCameraId,
         const std::unordered_set<int32_t> &sensorPixelModesUsed,
-        int setId, bool isMultiResolution) :
+        int setId, bool isMultiResolution, int dynamicRangeProfile) :
         Camera3IOStreamBase(id, CAMERA_STREAM_OUTPUT, width, height,
                             /*maxSize*/0, format, dataSpace, rotation,
-                            physicalCameraId, sensorPixelModesUsed, setId, isMultiResolution),
+                            physicalCameraId, sensorPixelModesUsed, setId, isMultiResolution,
+                            dynamicRangeProfile),
         mConsumer(consumer),
         mTransform(0),
         mTraceFirstBuffer(true),
@@ -74,10 +75,10 @@ Camera3OutputStream::Camera3OutputStream(int id,
         android_dataspace dataSpace, camera_stream_rotation_t rotation,
         nsecs_t timestampOffset, const String8& physicalCameraId,
         const std::unordered_set<int32_t> &sensorPixelModesUsed,
-        int setId, bool isMultiResolution) :
+        int setId, bool isMultiResolution, int dynamicRangeProfile) :
         Camera3IOStreamBase(id, CAMERA_STREAM_OUTPUT, width, height, maxSize,
                             format, dataSpace, rotation, physicalCameraId, sensorPixelModesUsed,
-                            setId, isMultiResolution),
+                            setId, isMultiResolution, dynamicRangeProfile),
         mConsumer(consumer),
         mTransform(0),
         mTraceFirstBuffer(true),
@@ -109,10 +110,11 @@ Camera3OutputStream::Camera3OutputStream(int id,
         camera_stream_rotation_t rotation, nsecs_t timestampOffset,
         const String8& physicalCameraId,
         const std::unordered_set<int32_t> &sensorPixelModesUsed,
-        int setId, bool isMultiResolution) :
+        int setId, bool isMultiResolution, int dynamicRangeProfile) :
         Camera3IOStreamBase(id, CAMERA_STREAM_OUTPUT, width, height,
                             /*maxSize*/0, format, dataSpace, rotation,
-                            physicalCameraId, sensorPixelModesUsed, setId, isMultiResolution),
+                            physicalCameraId, sensorPixelModesUsed, setId, isMultiResolution,
+                            dynamicRangeProfile),
         mConsumer(nullptr),
         mTransform(0),
         mTraceFirstBuffer(true),
@@ -149,11 +151,13 @@ Camera3OutputStream::Camera3OutputStream(int id, camera_stream_type_t type,
                                          const String8& physicalCameraId,
                                         const std::unordered_set<int32_t> &sensorPixelModesUsed,
                                          uint64_t consumerUsage, nsecs_t timestampOffset,
-                                         int setId, bool isMultiResolution) :
+                                         int setId, bool isMultiResolution,
+                                         int dynamicRangeProfile) :
         Camera3IOStreamBase(id, type, width, height,
                             /*maxSize*/0,
                             format, dataSpace, rotation,
-                            physicalCameraId, sensorPixelModesUsed, setId, isMultiResolution),
+                            physicalCameraId, sensorPixelModesUsed, setId, isMultiResolution,
+                            dynamicRangeProfile),
         mTransform(0),
         mTraceFirstBuffer(true),
         mUseMonoTimestamp(false),
@@ -379,6 +383,9 @@ status_t Camera3OutputStream::returnBufferCheckedLocked(
                       __FUNCTION__, mId, strerror(-res), res);
                 return res;
             }
+
+            queueHDRMetadata(anwBuffer->handle, currentConsumer, dynamic_range_profile);
+
             res = queueBufferToConsumer(currentConsumer, anwBuffer, anwReleaseFence, surface_ids);
             if (shouldLogError(res, state)) {
                 ALOGE("%s: Stream %d: Error queueing buffer to native window:"

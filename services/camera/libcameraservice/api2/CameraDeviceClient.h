@@ -22,6 +22,7 @@
 #include <camera/camera2/OutputConfiguration.h>
 #include <camera/camera2/SessionConfiguration.h>
 #include <camera/camera2/SubmitInfo.h>
+#include <unordered_map>
 
 #include "CameraOfflineSessionClient.h"
 #include "CameraService.h"
@@ -302,6 +303,10 @@ private:
 
     // Stream ID -> OutputConfiguration. Used for looking up Surface by stream/surface index
     KeyedVector<int32_t, hardware::camera2::params::OutputConfiguration> mConfiguredOutputs;
+
+    // Dynamic range profile id -> Supported dynamic profiles bitmap within an single capture
+    // request
+    std::unordered_map<int, int> mDynamicProfileMap;
 
     struct InputStreamConfiguration {
         bool configured;
