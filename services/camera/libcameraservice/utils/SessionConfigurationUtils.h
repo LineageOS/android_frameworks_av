@@ -138,8 +138,8 @@ convertToHALStreamCombination(const SessionConfiguration& sessionConfiguration,
 // V3_7::StreamConfiguration. Return false if the original V3_8 configuration cannot
 // be used by older version HAL.
 bool convertHALStreamCombinationFromV38ToV37(
-        hardware::camera::device::V3_7::StreamConfiguration &streamConfigV34,
-        const hardware::camera::device::V3_8::StreamConfiguration &streamConfigV37);
+        hardware::camera::device::V3_7::StreamConfiguration &streamConfigV37,
+        const hardware::camera::device::V3_8::StreamConfiguration &streamConfigV38);
 
 // Utility function to convert a V3_7::StreamConfiguration to
 // V3_4::StreamConfiguration. Return false if the original V3_7 configuration cannot
