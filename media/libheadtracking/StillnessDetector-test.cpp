@@ -83,13 +83,10 @@ TEST_P(StillnessDetectorTest, NotStillTranslation) {
     EXPECT_EQ(mDefaultValue, detector.calculate(300));
     detector.setInput(600, baseline);
     EXPECT_EQ(mDefaultValue, detector.calculate(600));
-    detector.setInput(900, withinThreshold);
-    EXPECT_EQ(mDefaultValue, detector.calculate(900));
+    detector.setInput(1299, withinThreshold);
+    EXPECT_FALSE(detector.calculate(1299));
     detector.setInput(1300, baseline);
-    EXPECT_FALSE(detector.calculate(1300));
-    detector.setInput(1500, baseline);
-    EXPECT_FALSE(detector.calculate(1899));
-    EXPECT_TRUE(detector.calculate(1900));
+    EXPECT_TRUE(detector.calculate(1300));
 }
 
 TEST_P(StillnessDetectorTest, NotStillRotation) {
@@ -110,13 +107,10 @@ TEST_P(StillnessDetectorTest, NotStillRotation) {
     EXPECT_EQ(mDefaultValue, detector.calculate(300));
     detector.setInput(600, baseline);
     EXPECT_EQ(mDefaultValue, detector.calculate(600));
-    detector.setInput(900, withinThreshold);
-    EXPECT_EQ(mDefaultValue, detector.calculate(900));
+    detector.setInput(1299, withinThreshold);
+    EXPECT_FALSE(detector.calculate(1299));
     detector.setInput(1300, baseline);
-    EXPECT_FALSE(detector.calculate(1300));
-    detector.setInput(1500, baseline);
-    EXPECT_FALSE(detector.calculate(1899));
-    EXPECT_TRUE(detector.calculate(1900));
+    EXPECT_TRUE(detector.calculate(1300));
 }
 
 TEST_P(StillnessDetectorTest, Suppression) {
@@ -134,10 +128,10 @@ TEST_P(StillnessDetectorTest, Suppression) {
     EXPECT_TRUE(detector.calculate(1000));
     detector.setInput(1100, outsideThreshold);
     EXPECT_FALSE(detector.calculate(1100));
-    detector.setInput(2000, middlePoint);
-    EXPECT_FALSE(detector.calculate(2000));
-    EXPECT_FALSE(detector.calculate(2099));
-    EXPECT_TRUE(detector.calculate(2100));
+    detector.setInput(1500, middlePoint);
+    EXPECT_FALSE(detector.calculate(1500));
+    EXPECT_FALSE(detector.calculate(1999));
+    EXPECT_TRUE(detector.calculate(2000));
 }
 
 TEST_P(StillnessDetectorTest, Reset) {
@@ -150,8 +144,8 @@ TEST_P(StillnessDetectorTest, Reset) {
     const Pose3f withinThreshold =
             baseline * Pose3f(Vector3f(0.3, -0.3, 0), rotateX(0.01) * rotateY(-0.01));
     EXPECT_EQ(mDefaultValue, detector.calculate(0));
-    detector.setInput(0, baseline);
-    EXPECT_EQ(mDefaultValue, detector.calculate(0));
+    detector.setInput(300, baseline);
+    EXPECT_EQ(mDefaultValue, detector.calculate(300));
     detector.reset();
     detector.setInput(600, baseline);
     EXPECT_EQ(mDefaultValue, detector.calculate(600));
