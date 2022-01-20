@@ -187,6 +187,8 @@ interface ICameraService
      */
     const int EVENT_NONE = 0;
     const int EVENT_USER_SWITCHED = 1; // The argument is the set of new foreground user IDs.
+    const int EVENT_USB_DEVICE_ATTACHED = 2; // The argument is the deviceId and vendorId
+    const int EVENT_USB_DEVICE_DETACHED = 3; // The argument is the deviceId and vendorId
     oneway void notifySystemEvent(int eventId, in int[] args);
 
     /**
