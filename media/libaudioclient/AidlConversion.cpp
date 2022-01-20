@@ -1434,6 +1434,8 @@ ConversionResult<audio_input_flags_t> aidl2legacy_AudioInputFlags_audio_input_fl
             return AUDIO_INPUT_FLAG_HW_AV_SYNC;
         case AudioInputFlags::DIRECT:
             return AUDIO_INPUT_FLAG_DIRECT;
+        case AudioInputFlags::ULTRASOUND:
+            return AUDIO_INPUT_FLAG_ULTRASOUND;
     }
     return unexpected(BAD_VALUE);
 }
@@ -1459,6 +1461,8 @@ ConversionResult<AudioInputFlags> legacy2aidl_audio_input_flags_t_AudioInputFlag
             return AudioInputFlags::HW_AV_SYNC;
         case AUDIO_INPUT_FLAG_DIRECT:
             return AudioInputFlags::DIRECT;
+        case AUDIO_INPUT_FLAG_ULTRASOUND:
+            return AudioInputFlags::ULTRASOUND;
     }
     return unexpected(BAD_VALUE);
 }
@@ -1498,6 +1502,8 @@ ConversionResult<audio_output_flags_t> aidl2legacy_AudioOutputFlags_audio_output
             return AUDIO_OUTPUT_FLAG_INCALL_MUSIC;
         case AudioOutputFlags::GAPLESS_OFFLOAD:
             return AUDIO_OUTPUT_FLAG_GAPLESS_OFFLOAD;
+        case AudioOutputFlags::ULTRASOUND:
+            return AUDIO_OUTPUT_FLAG_ULTRASOUND;
     }
     return unexpected(BAD_VALUE);
 }
@@ -1539,6 +1545,8 @@ ConversionResult<AudioOutputFlags> legacy2aidl_audio_output_flags_t_AudioOutputF
             return AudioOutputFlags::INCALL_MUSIC;
         case AUDIO_OUTPUT_FLAG_GAPLESS_OFFLOAD:
             return AudioOutputFlags::GAPLESS_OFFLOAD;
+        case AUDIO_OUTPUT_FLAG_ULTRASOUND:
+            return AudioOutputFlags::ULTRASOUND;
     }
     return unexpected(BAD_VALUE);
 }
@@ -1744,6 +1752,8 @@ ConversionResult<audio_source_t> aidl2legacy_AudioSource_audio_source_t(
             return AUDIO_SOURCE_UNPROCESSED;
         case AudioSource::VOICE_PERFORMANCE:
             return AUDIO_SOURCE_VOICE_PERFORMANCE;
+        case AudioSource::ULTRASOUND:
+            return AUDIO_SOURCE_ULTRASOUND;
         case AudioSource::ECHO_REFERENCE:
             return AUDIO_SOURCE_ECHO_REFERENCE;
         case AudioSource::FM_TUNER:
@@ -1781,6 +1791,8 @@ ConversionResult<AudioSource> legacy2aidl_audio_source_t_AudioSource(
             return AudioSource::UNPROCESSED;
         case AUDIO_SOURCE_VOICE_PERFORMANCE:
             return AudioSource::VOICE_PERFORMANCE;
+        case AUDIO_SOURCE_ULTRASOUND:
+            return AudioSource::ULTRASOUND;
         case AUDIO_SOURCE_ECHO_REFERENCE:
             return AudioSource::ECHO_REFERENCE;
         case AUDIO_SOURCE_FM_TUNER:
@@ -2141,6 +2153,8 @@ aidl2legacy_AudioContentType_audio_content_type_t(AudioContentType aidl) {
             return AUDIO_CONTENT_TYPE_MOVIE;
         case AudioContentType::SONIFICATION:
             return AUDIO_CONTENT_TYPE_SONIFICATION;
+        case AudioContentType::ULTRASOUND:
+            return AUDIO_CONTENT_TYPE_ULTRASOUND;
     }
     return unexpected(BAD_VALUE);
 }
@@ -2158,6 +2172,8 @@ legacy2aidl_audio_content_type_t_AudioContentType(audio_content_type_t legacy) {
             return AudioContentType::MOVIE;
         case AUDIO_CONTENT_TYPE_SONIFICATION:
             return AudioContentType::SONIFICATION;
+        case AUDIO_CONTENT_TYPE_ULTRASOUND:
+            return AudioContentType::ULTRASOUND;
     }
     return unexpected(BAD_VALUE);
 }

@@ -96,6 +96,7 @@ bool captureAudioOutputAllowed(const AttributionSourceState& attributionSource);
 bool captureMediaOutputAllowed(const AttributionSourceState& attributionSource);
 bool captureTunerAudioInputAllowed(const AttributionSourceState& attributionSource);
 bool captureVoiceCommunicationOutputAllowed(const AttributionSourceState& attributionSource);
+bool accessUltrasoundAllowed(const AttributionSourceState& attributionSource);
 bool captureHotwordAllowed(const AttributionSourceState& attributionSource);
 bool settingsAllowed();
 bool modifyAudioRoutingAllowed();

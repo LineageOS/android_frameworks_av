@@ -1386,6 +1386,11 @@ audio_io_handle_t AudioPolicyManager::getOutputForDevices(
         ALOGV("Set VoIP and Direct output flags for PCM format");
     }
 
+    // Attach the Ultrasound flag for the AUDIO_CONTENT_TYPE_ULTRASOUND
+    if (attr->content_type == AUDIO_CONTENT_TYPE_ULTRASOUND) {
+        *flags = (audio_output_flags_t)(*flags | AUDIO_OUTPUT_FLAG_ULTRASOUND);
+    }
+
     if (mSpatializerOutput != nullptr
             && canBeSpatialized(attr, config, devices.toTypeAddrVector())) {
         return mSpatializerOutput->mIoHandle;
@@ -1683,7 +1688,7 @@ audio_io_handle_t AudioPolicyManager::selectOutput(const SortedVector<audio_io_h
     // other criteria
     static const audio_output_flags_t kFunctionalFlags = (audio_output_flags_t)
         (AUDIO_OUTPUT_FLAG_VOIP_RX | AUDIO_OUTPUT_FLAG_INCALL_MUSIC |
-            AUDIO_OUTPUT_FLAG_TTS | AUDIO_OUTPUT_FLAG_DIRECT_PCM);
+            AUDIO_OUTPUT_FLAG_TTS | AUDIO_OUTPUT_FLAG_DIRECT_PCM | AUDIO_OUTPUT_FLAG_ULTRASOUND);
     // Flags expressing a performance request: have lower priority than serving
     // requested sampling rate or channel mask
     static const audio_output_flags_t kPerformanceFlags = (audio_output_flags_t)
@@ -2369,6 +2374,10 @@ audio_io_handle_t AudioPolicyManager::getInputForDevice(const sp<DeviceDescripto
     } else if (attributes.source == AUDIO_SOURCE_VOICE_COMMUNICATION &&
                audio_is_linear_pcm(config->format)) {
         flags = (audio_input_flags_t)(flags | AUDIO_INPUT_FLAG_VOIP_TX);
+    }
+
+    if (attributes.source == AUDIO_SOURCE_ULTRASOUND) {
+        flags = (audio_input_flags_t)(flags | AUDIO_INPUT_FLAG_ULTRASOUND);
     }
 
     // find a compatible input profile (not necessarily identical in parameters)

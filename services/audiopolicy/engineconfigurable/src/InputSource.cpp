@@ -26,7 +26,8 @@ namespace audio_policy {
 status_t Element<audio_source_t>::setIdentifier(audio_source_t identifier)
 {
     if (identifier > AUDIO_SOURCE_MAX && identifier != AUDIO_SOURCE_HOTWORD
-        && identifier != AUDIO_SOURCE_FM_TUNER && identifier != AUDIO_SOURCE_ECHO_REFERENCE) {
+        && identifier != AUDIO_SOURCE_FM_TUNER && identifier != AUDIO_SOURCE_ECHO_REFERENCE
+        && identifier != AUDIO_SOURCE_ULTRASOUND) {
         return BAD_VALUE;
     }
     mIdentifier = identifier;
