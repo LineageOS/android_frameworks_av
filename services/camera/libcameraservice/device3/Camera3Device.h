@@ -36,6 +36,7 @@
 #include <android/hardware/camera/device/3.5/ICameraDeviceSession.h>
 #include <android/hardware/camera/device/3.6/ICameraDeviceSession.h>
 #include <android/hardware/camera/device/3.7/ICameraDeviceSession.h>
+#include <android/hardware/camera/device/3.8/ICameraDeviceSession.h>
 #include <android/hardware/camera/device/3.2/ICameraDeviceCallback.h>
 #include <android/hardware/camera/device/3.4/ICameraDeviceCallback.h>
 #include <android/hardware/camera/device/3.5/ICameraDeviceCallback.h>
@@ -44,6 +45,7 @@
 
 #include <camera/CaptureResult.h>
 
+#include "android/hardware/camera/metadata/3.8/types.h"
 #include "common/CameraDeviceBase.h"
 #include "device3/BufferUtils.h"
 #include "device3/StatusTracker.h"
@@ -68,6 +70,7 @@ using android::camera3::camera_stream_configuration_t;
 using android::camera3::camera_stream_configuration_mode_t;
 using android::camera3::CAMERA_TEMPLATE_COUNT;
 using android::camera3::OutputStreamInfo;
+using android::hardware::camera::metadata::V3_8::CameraMetadataEnumAndroidRequestAvailableDynamicRangeProfilesMap;
 
 namespace android {
 
@@ -141,7 +144,9 @@ class Camera3Device :
             std::vector<int> *surfaceIds = nullptr,
             int streamSetId = camera3::CAMERA3_STREAM_SET_ID_INVALID,
             bool isShared = false, bool isMultiResolution = false,
-            uint64_t consumerUsage = 0) override;
+            uint64_t consumerUsage = 0,
+            int dynamicRangeProfile =
+            ANDROID_REQUEST_AVAILABLE_DYNAMIC_RANGE_PROFILES_MAP_STANDARD) override;
 
     status_t createStream(const std::vector<sp<Surface>>& consumers,
             bool hasDeferredConsumer, uint32_t width, uint32_t height, int format,
@@ -151,7 +156,9 @@ class Camera3Device :
             std::vector<int> *surfaceIds = nullptr,
             int streamSetId = camera3::CAMERA3_STREAM_SET_ID_INVALID,
             bool isShared = false, bool isMultiResolution = false,
-            uint64_t consumerUsage = 0) override;
+            uint64_t consumerUsage = 0,
+            int dynamicRangeProfile =
+            ANDROID_REQUEST_AVAILABLE_DYNAMIC_RANGE_PROFILES_MAP_STANDARD) override;
 
     status_t createInputStream(
             uint32_t width, uint32_t height, int format, bool isMultiResolution,
@@ -287,6 +294,8 @@ class Camera3Device :
     static hardware::graphics::common::V1_0::PixelFormat mapToPixelFormat(int frameworkFormat);
     static hardware::camera::device::V3_2::DataspaceFlags mapToHidlDataspace(
             android_dataspace dataSpace);
+    static CameraMetadataEnumAndroidRequestAvailableDynamicRangeProfilesMap mapToHidlDynamicProfile(
+            int dynamicRangeProfile);
     static hardware::camera::device::V3_2::BufferUsageFlags mapToConsumerUsage(uint64_t usage);
     static hardware::camera::device::V3_2::StreamRotation mapToStreamRotation(
             camera_stream_rotation_t rotation);
@@ -416,6 +425,8 @@ class Camera3Device :
                 /*out*/sp<hardware::camera::device::V3_6::ICameraOfflineSession>* offlineSession,
                 /*out*/camera3::BufferRecords* bufferRecords);
 
+        status_t repeatingRequestEnd(uint32_t frameNumber, hardware::hidl_vec<int32_t> streamIds);
+
         /////////////////////////////////////////////////////////////////////
         // Implements BufferRecordsInterface
 
@@ -458,6 +469,8 @@ class Camera3Device :
         sp<hardware::camera::device::V3_6::ICameraDeviceSession> mHidlSession_3_6;
         // Valid if ICameraDeviceSession is @3.7 or newer
         sp<hardware::camera::device::V3_7::ICameraDeviceSession> mHidlSession_3_7;
+        // Valid if ICameraDeviceSession is @3.8 or newer
+        sp<hardware::camera::device::V3_8::ICameraDeviceSession> mHidlSession_3_8;
 
         std::shared_ptr<RequestMetadataQueue> mRequestMetadataQueue;
 

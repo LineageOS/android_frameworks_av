@@ -138,6 +138,10 @@ class Camera3Stream :
     static Camera3Stream*       cast(camera_stream *stream);
     static const Camera3Stream* cast(const camera_stream *stream);
 
+    // Queue corresponding HDR metadata to given native window.
+    static void queueHDRMetadata(buffer_handle_t buffer, sp<ANativeWindow>& anw,
+            int dynamicRangeProfile);
+
     /**
      * Get the stream's ID
      */
@@ -168,6 +172,7 @@ class Camera3Stream :
     void              setFormatOverride(bool formatOverriden);
     bool              isFormatOverridden() const;
     int               getOriginalFormat() const;
+    int               getDynamicRangeProfile() const;
     void              setDataSpaceOverride(bool dataSpaceOverriden);
     bool              isDataSpaceOverridden() const;
     android_dataspace getOriginalDataSpace() const;
@@ -500,7 +505,7 @@ class Camera3Stream :
             android_dataspace dataSpace, camera_stream_rotation_t rotation,
             const String8& physicalCameraId,
             const std::unordered_set<int32_t> &sensorPixelModesUsed,
-            int setId, bool isMultiResolution);
+            int setId, bool isMultiResolution, int dynamicRangeProfile);
 
     wp<Camera3StreamBufferFreedListener> mBufferFreedListener;
 

@@ -531,6 +531,12 @@ nsecs_t Camera3Device::getMonoToBoottimeOffset() {
     return measured;
 }
 
+CameraMetadataEnumAndroidRequestAvailableDynamicRangeProfilesMap
+Camera3Device::mapToHidlDynamicProfile(int dynamicRangeProfile) {
+    return static_cast<CameraMetadataEnumAndroidRequestAvailableDynamicRangeProfilesMap>(
+            dynamicRangeProfile);
+}
+
 hardware::graphics::common::V1_0::PixelFormat Camera3Device::mapToPixelFormat(
         int frameworkFormat) {
     return (hardware::graphics::common::V1_0::PixelFormat) frameworkFormat;
@@ -1384,7 +1390,7 @@ status_t Camera3Device::createStream(sp<Surface> consumer,
             const String8& physicalCameraId,
             const std::unordered_set<int32_t> &sensorPixelModesUsed,
             std::vector<int> *surfaceIds, int streamSetId, bool isShared, bool isMultiResolution,
-            uint64_t consumerUsage) {
+            uint64_t consumerUsage, int dynamicRangeProfile) {
     ATRACE_CALL();
 
     if (consumer == nullptr) {
@@ -1397,7 +1403,7 @@ status_t Camera3Device::createStream(sp<Surface> consumer,
 
     return createStream(consumers, /*hasDeferredConsumer*/ false, width, height,
             format, dataSpace, rotation, id, physicalCameraId, sensorPixelModesUsed, surfaceIds,
-            streamSetId, isShared, isMultiResolution, consumerUsage);
+            streamSetId, isShared, isMultiResolution, consumerUsage, dynamicRangeProfile);
 }
 
 static bool isRawFormat(int format) {
@@ -1417,7 +1423,7 @@ status_t Camera3Device::createStream(const std::vector<sp<Surface>>& consumers,
         android_dataspace dataSpace, camera_stream_rotation_t rotation, int *id,
         const String8& physicalCameraId, const std::unordered_set<int32_t> &sensorPixelModesUsed,
         std::vector<int> *surfaceIds, int streamSetId, bool isShared, bool isMultiResolution,
-        uint64_t consumerUsage) {
+        uint64_t consumerUsage, int dynamicRangeProfile) {
     ATRACE_CALL();
 
     Mutex::Autolock il(mInterfaceLock);
@@ -1495,7 +1501,7 @@ status_t Camera3Device::createStream(const std::vector<sp<Surface>>& consumers,
         newStream = new Camera3OutputStream(mNextStreamId, consumers[0],
                 width, height, blobBufferSize, format, dataSpace, rotation,
                 mTimestampOffset, physicalCameraId, sensorPixelModesUsed, streamSetId,
-                isMultiResolution);
+                isMultiResolution, dynamicRangeProfile);
     } else if (format == HAL_PIXEL_FORMAT_RAW_OPAQUE) {
         bool maxResolution =
                 sensorPixelModesUsed.find(ANDROID_SENSOR_PIXEL_MODE_MAXIMUM_RESOLUTION) !=
@@ -1509,22 +1515,22 @@ status_t Camera3Device::createStream(const std::vector<sp<Surface>>& consumers,
         newStream = new Camera3OutputStream(mNextStreamId, consumers[0],
                 width, height, rawOpaqueBufferSize, format, dataSpace, rotation,
                 mTimestampOffset, physicalCameraId, sensorPixelModesUsed, streamSetId,
-                isMultiResolution);
+                isMultiResolution, dynamicRangeProfile);
     } else if (isShared) {
         newStream = new Camera3SharedOutputStream(mNextStreamId, consumers,
                 width, height, format, consumerUsage, dataSpace, rotation,
                 mTimestampOffset, physicalCameraId, sensorPixelModesUsed, streamSetId,
-                mUseHalBufManager);
+                mUseHalBufManager, dynamicRangeProfile);
     } else if (consumers.size() == 0 && hasDeferredConsumer) {
         newStream = new Camera3OutputStream(mNextStreamId,
                 width, height, format, consumerUsage, dataSpace, rotation,
                 mTimestampOffset, physicalCameraId, sensorPixelModesUsed, streamSetId,
-                isMultiResolution);
+                isMultiResolution, dynamicRangeProfile);
     } else {
         newStream = new Camera3OutputStream(mNextStreamId, consumers[0],
                 width, height, format, dataSpace, rotation,
                 mTimestampOffset, physicalCameraId, sensorPixelModesUsed, streamSetId,
-                isMultiResolution);
+                isMultiResolution, dynamicRangeProfile);
     }
 
     size_t consumerCount = consumers.size();
@@ -1611,6 +1617,7 @@ status_t Camera3Device::getStreamInfo(int id, StreamInfo *streamInfo) {
     streamInfo->originalFormat = stream->getOriginalFormat();
     streamInfo->dataSpaceOverridden = stream->isDataSpaceOverridden();
     streamInfo->originalDataSpace = stream->getOriginalDataSpace();
+    streamInfo->dynamicRangeProfile = stream->getDynamicRangeProfile();
     return OK;
 }
 
@@ -2223,7 +2230,8 @@ void Camera3Device::notifyStatus(bool idle) {
                 streamStats.emplace_back(stream->getWidth(), stream->getHeight(),
                     stream->getFormat(), stream->getDataSpace(), usage,
                     stream->getMaxHalBuffers(),
-                    stream->getMaxTotalBuffers() - stream->getMaxHalBuffers());
+                    stream->getMaxTotalBuffers() - stream->getMaxHalBuffers(),
+                    stream->getDynamicRangeProfile());
             }
         }
     }
@@ -3144,6 +3152,10 @@ Camera3Device::HalInterface::HalInterface(
         mSupportOfflineProcessing(supportOfflineProcessing) {
     // Check with hardware service manager if we can downcast these interfaces
     // Somewhat expensive, so cache the results at startup
+    auto castResult_3_8 = device::V3_8::ICameraDeviceSession::castFrom(mHidlSession);
+    if (castResult_3_8.isOk()) {
+        mHidlSession_3_8 = castResult_3_8;
+    }
     auto castResult_3_7 = device::V3_7::ICameraDeviceSession::castFrom(mHidlSession);
     if (castResult_3_7.isOk()) {
         mHidlSession_3_7 = castResult_3_7;
@@ -3181,6 +3193,7 @@ bool Camera3Device::HalInterface::valid() {
 }
 
 void Camera3Device::HalInterface::clear() {
+    mHidlSession_3_8.clear();
     mHidlSession_3_7.clear();
     mHidlSession_3_6.clear();
     mHidlSession_3_5.clear();
@@ -3318,13 +3331,16 @@ status_t Camera3Device::HalInterface::configureStreams(const camera_metadata_t *
     device::V3_2::StreamConfiguration requestedConfiguration3_2;
     device::V3_4::StreamConfiguration requestedConfiguration3_4;
     device::V3_7::StreamConfiguration requestedConfiguration3_7;
+    device::V3_8::StreamConfiguration requestedConfiguration3_8;
     requestedConfiguration3_2.streams.resize(config->num_streams);
     requestedConfiguration3_4.streams.resize(config->num_streams);
     requestedConfiguration3_7.streams.resize(config->num_streams);
+    requestedConfiguration3_8.streams.resize(config->num_streams);
     for (size_t i = 0; i < config->num_streams; i++) {
         device::V3_2::Stream &dst3_2 = requestedConfiguration3_2.streams[i];
         device::V3_4::Stream &dst3_4 = requestedConfiguration3_4.streams[i];
         device::V3_7::Stream &dst3_7 = requestedConfiguration3_7.streams[i];
+        device::V3_8::Stream &dst3_8 = requestedConfiguration3_8.streams[i];
         camera3::camera_stream_t *src = config->streams[i];
 
         Camera3Stream* cam3stream = Camera3Stream::cast(src);
@@ -3373,6 +3389,15 @@ status_t Camera3Device::HalInterface::configureStreams(const camera_metadata_t *
             dst3_7.sensorPixelModesUsed[j++] =
                     static_cast<CameraMetadataEnumAndroidSensorPixelMode>(mode);
         }
+        if ((src->dynamic_range_profile !=
+                    ANDROID_REQUEST_AVAILABLE_DYNAMIC_RANGE_PROFILES_MAP_STANDARD) &&
+                (mHidlSession_3_8 == nullptr)) {
+            ALOGE("%s: Camera device doesn't support non-standard dynamic range profiles: %d",
+                    __FUNCTION__, src->dynamic_range_profile);
+            return BAD_VALUE;
+        }
+        dst3_8.v3_7 = dst3_7;
+        dst3_8.dynamicRangeProfile = mapToHidlDynamicProfile(src->dynamic_range_profile);
         activeStreams.insert(streamId);
         // Create Buffer ID map if necessary
         mBufferRecords.tryCreateBufferCache(streamId);
@@ -3396,6 +3421,10 @@ status_t Camera3Device::HalInterface::configureStreams(const camera_metadata_t *
             sessionParamSize);
     requestedConfiguration3_7.operationMode = operationMode;
     requestedConfiguration3_7.sessionParams.setToExternal(
+            reinterpret_cast<uint8_t*>(const_cast<camera_metadata_t*>(sessionParams)),
+            sessionParamSize);
+    requestedConfiguration3_8.operationMode = operationMode;
+    requestedConfiguration3_8.sessionParams.setToExternal(
             reinterpret_cast<uint8_t*>(const_cast<camera_metadata_t*>(sessionParams)),
             sessionParamSize);
 
@@ -3444,7 +3473,17 @@ status_t Camera3Device::HalInterface::configureStreams(const camera_metadata_t *
             };
 
     // See which version of HAL we have
-    if (mHidlSession_3_7 != nullptr) {
+    if (mHidlSession_3_8 != nullptr) {
+        ALOGV("%s: v3.8 device found", __FUNCTION__);
+        requestedConfiguration3_8.streamConfigCounter = mNextStreamConfigCounter++;
+        requestedConfiguration3_8.multiResolutionInputImage = config->input_is_multi_resolution;
+        auto err = mHidlSession_3_8->configureStreams_3_8(requestedConfiguration3_8,
+                configStream36Cb);
+        res = postprocConfigStream36(err);
+        if (res != OK) {
+            return res;
+        }
+    } else if (mHidlSession_3_7 != nullptr) {
         ALOGV("%s: v3.7 device found", __FUNCTION__);
         requestedConfiguration3_7.streamConfigCounter = mNextStreamConfigCounter++;
         requestedConfiguration3_7.multiResolutionInputImage = config->input_is_multi_resolution;
@@ -4052,6 +4091,18 @@ status_t Camera3Device::HalInterface::dump(int /*fd*/) {
     return OK;
 }
 
+status_t Camera3Device::HalInterface::repeatingRequestEnd(uint32_t frameNumber,
+        hardware::hidl_vec<int32_t> streamIds) {
+    ATRACE_NAME("CameraHal::repeatingRequestEnd");
+    if (!valid()) return INVALID_OPERATION;
+
+    if (mHidlSession_3_8.get() != nullptr) {
+        mHidlSession_3_8->repeatingRequestEnd(frameNumber, streamIds);
+    }
+
+    return OK;
+}
+
 status_t Camera3Device::HalInterface::close() {
     ATRACE_NAME("CameraHal::close()");
     if (!valid()) return INVALID_OPERATION;
@@ -4386,10 +4437,20 @@ status_t Camera3Device::RequestThread::clearRepeatingRequests(/*out*/int64_t *la
 }
 
 status_t Camera3Device::RequestThread::clearRepeatingRequestsLocked(/*out*/int64_t *lastFrameNumber) {
+    std::vector<int32_t> streamIds;
+    for (const auto& request : mRepeatingRequests) {
+        for (const auto& stream : request->mOutputStreams) {
+            streamIds.push_back(stream->getId());
+        }
+    }
+
     mRepeatingRequests.clear();
     if (lastFrameNumber != NULL) {
         *lastFrameNumber = mRepeatingLastFrameNumber;
     }
+
+    mInterface->repeatingRequestEnd(mRepeatingLastFrameNumber, streamIds);
+
     mRepeatingLastFrameNumber = hardware::camera2::ICameraDeviceUser::NO_IN_FLIGHT_REPEATING_FRAMES;
     return OK;
 }

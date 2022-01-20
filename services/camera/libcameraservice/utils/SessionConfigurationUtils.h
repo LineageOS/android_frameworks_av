@@ -24,6 +24,7 @@
 #include <android/hardware/camera/device/3.8/types.h>
 #include <android/hardware/camera/device/3.4/ICameraDeviceSession.h>
 #include <android/hardware/camera/device/3.7/ICameraDeviceSession.h>
+#include <android/hardware/camera/device/3.8/ICameraDeviceSession.h>
 
 #include <device3/Camera3StreamInterface.h>
 
@@ -96,11 +97,19 @@ binder::Status createSurfaceFromGbp(
 camera3::OutputStreamInfo& streamInfo, bool isStreamInfoValid,
 sp<Surface>& surface, const sp<IGraphicBufferProducer>& gbp,
 const String8 &logicalCameraId, const CameraMetadata &physicalCameraMetadata,
-const std::vector<int32_t> &sensorPixelModesUsed);
-
+const std::vector<int32_t> &sensorPixelModesUsed,  int dynamicRangeProfile);
 void mapStreamInfo(const camera3::OutputStreamInfo &streamInfo,
         camera3::camera_stream_rotation_t rotation, String8 physicalId, int32_t groupId,
         hardware::camera::device::V3_7::Stream *stream /*out*/);
+
+//check if format is 10-bit output compatible
+bool is10bitCompatibleFormat(int32_t format);
+
+// check if the dynamic range requires 10-bit output
+bool is10bitDynamicRangeProfile(int32_t dynamicRangeProfile);
+
+// Check if the device supports a given dynamicRangeProfile
+bool isDynamicRangeProfileSupported(int dynamicRangeProfile, const CameraMetadata& staticMeta);
 
 // Check that the physicalCameraId passed in is spported by the camera
 // device.
@@ -122,8 +131,15 @@ binder::Status
 convertToHALStreamCombination(const SessionConfiguration& sessionConfiguration,
         const String8 &cameraId, const CameraMetadata &deviceInfo,
         metadataGetter getMetadata, const std::vector<std::string> &physicalCameraIds,
-        hardware::camera::device::V3_7::StreamConfiguration &streamConfiguration,
+        hardware::camera::device::V3_8::StreamConfiguration &streamConfiguration,
         bool overrideForPerfClass, bool *earlyExit);
+
+// Utility function to convert a V3_8::StreamConfiguration to
+// V3_7::StreamConfiguration. Return false if the original V3_8 configuration cannot
+// be used by older version HAL.
+bool convertHALStreamCombinationFromV38ToV37(
+        hardware::camera::device::V3_7::StreamConfiguration &streamConfigV34,
+        const hardware::camera::device::V3_8::StreamConfiguration &streamConfigV37);
 
 // Utility function to convert a V3_7::StreamConfiguration to
 // V3_4::StreamConfiguration. Return false if the original V3_7 configuration cannot
