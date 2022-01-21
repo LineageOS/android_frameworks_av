@@ -174,6 +174,16 @@ TunerFrontend::~TunerFrontend() {
     return mFrontend->getHardwareInfo(_aidl_return);
 }
 
+::ndk::ScopedAStatus TunerFrontend::removeOutputPid(int32_t in_pid) {
+    if (mFrontend == nullptr) {
+        ALOGD("IFrontend is not initialized");
+        return ::ndk::ScopedAStatus::fromServiceSpecificError(
+                static_cast<int32_t>(Result::UNAVAILABLE));
+    }
+
+    return mFrontend->removeOutputPid(in_pid);
+}
+
 /////////////// FrontendCallback ///////////////////////
 ::ndk::ScopedAStatus TunerFrontend::FrontendCallback::onEvent(FrontendEventType frontendEventType) {
     ALOGV("FrontendCallback::onEvent, type=%d", frontendEventType);

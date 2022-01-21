@@ -99,4 +99,9 @@ interface ITunerFrontend {
      * Request hardware information about the frontend.
      */
     String getHardwareInfo();
+
+    /**
+     * Filter out unnecessary PID from frontend output.
+     */
+    void removeOutputPid(int pid);
 }

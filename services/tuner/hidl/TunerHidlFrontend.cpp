@@ -428,6 +428,11 @@ TunerHidlFrontend::~TunerHidlFrontend() {
             static_cast<int32_t>(Result::UNAVAILABLE));
 }
 
+::ndk::ScopedAStatus TunerHidlFrontend::removeOutputPid(int32_t /* in_pid */) {
+    return ::ndk::ScopedAStatus::fromServiceSpecificError(
+            static_cast<int32_t>(Result::UNAVAILABLE));
+}
+
 void TunerHidlFrontend::setLna(bool bEnable) {
     if (mFrontend == nullptr) {
         ALOGD("IFrontend is not initialized");

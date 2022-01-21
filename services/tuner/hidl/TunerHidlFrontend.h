@@ -83,6 +83,7 @@ public:
                                    vector<FrontendStatus>* _aidl_return) override;
     ::ndk::ScopedAStatus getFrontendId(int32_t* _aidl_return) override;
     ::ndk::ScopedAStatus getHardwareInfo(std::string* _aidl_return) override;
+    ::ndk::ScopedAStatus removeOutputPid(int32_t in_pid) override;
 
     void setLna(bool in_bEnable);
 
