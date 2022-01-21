@@ -645,7 +645,7 @@ DeviceVector Engine::getPreferredAvailableDevicesForProductStrategy(
         // there is a preferred device, is it available?
         preferredAvailableDevVec =
                 availableOutputDevices.getDevicesFromDeviceTypeAddrVec(preferredStrategyDevices);
-        if (preferredAvailableDevVec.size() == preferredAvailableDevVec.size()) {
+        if (preferredAvailableDevVec.size() == preferredStrategyDevices.size()) {
             ALOGVV("%s using pref device %s for strategy %u",
                    __func__, preferredAvailableDevVec.toString().c_str(), strategy);
             return preferredAvailableDevVec;
