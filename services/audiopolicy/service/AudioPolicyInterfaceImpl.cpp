@@ -376,6 +376,15 @@ Status AudioPolicyService::getOutputForAttr(const media::AudioAttributesInternal
         attr.flags = static_cast<audio_flags_mask_t>(
                 attr.flags & ~(AUDIO_FLAG_BYPASS_INTERRUPTION_POLICY|AUDIO_FLAG_BYPASS_MUTE));
     }
+
+    if (attr.content_type == AUDIO_CONTENT_TYPE_ULTRASOUND) {
+        if (!accessUltrasoundAllowed(adjAttributionSource)) {
+            ALOGE("%s: permission denied: ultrasound not allowed for uid %d pid %d",
+                    __func__, adjAttributionSource.uid, adjAttributionSource.pid);
+            return binderStatusFromStatusT(PERMISSION_DENIED);
+        }
+    }
+
     AutoCallerClear acc;
     AudioPolicyInterface::output_type_t outputType;
     status_t result = mAudioPolicyManager->getOutputForAttr(&attr, &output, session,
@@ -596,7 +605,8 @@ Status AudioPolicyService::getInputForAttr(const media::AudioAttributesInternal&
             || (inputSource >= AUDIO_SOURCE_CNT
                 && inputSource != AUDIO_SOURCE_HOTWORD
                 && inputSource != AUDIO_SOURCE_FM_TUNER
-                && inputSource != AUDIO_SOURCE_ECHO_REFERENCE)) {
+                && inputSource != AUDIO_SOURCE_ECHO_REFERENCE
+                && inputSource != AUDIO_SOURCE_ULTRASOUND)) {
         return binderStatusFromStatusT(BAD_VALUE);
     }
 
@@ -675,6 +685,14 @@ Status AudioPolicyService::getInputForAttr(const media::AudioAttributesInternal&
         ALOGE("%s: permission denied: hotword mode not allowed"
               " for uid %d pid %d", __func__, adjAttributionSource.uid, adjAttributionSource.pid);
         return binderStatusFromStatusT(PERMISSION_DENIED);
+    }
+
+    if (attr.source == AUDIO_SOURCE_ULTRASOUND) {
+        if (!accessUltrasoundAllowed(adjAttributionSource)) {
+            ALOGE("%s: permission denied: ultrasound not allowed for uid %d pid %d",
+                    __func__, adjAttributionSource.uid, adjAttributionSource.pid);
+            return binderStatusFromStatusT(PERMISSION_DENIED);
+        }
     }
 
     sp<AudioPolicyEffects>audioPolicyEffects;

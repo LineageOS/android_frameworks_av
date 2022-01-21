@@ -57,6 +57,9 @@ public:
     aaudio_result_t unregisterAudioThread(aaudio_handle_t streamHandle,
                                           pid_t clientThreadId) override;
 
+    aaudio_result_t exitStandby(aaudio_handle_t streamHandle,
+                                AudioEndpointParcelable &parcelable) override;
+
 private:
     IAAudioService* const mDelegate;
 };

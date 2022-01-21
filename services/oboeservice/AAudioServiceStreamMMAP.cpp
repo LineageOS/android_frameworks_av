@@ -117,6 +117,35 @@ aaudio_result_t AAudioServiceStreamMMAP::stop_l() {
     return result;
 }
 
+aaudio_result_t AAudioServiceStreamMMAP::standby_l() {
+    sp<AAudioServiceEndpoint> endpoint = mServiceEndpointWeak.promote();
+    if (endpoint == nullptr) {
+        ALOGE("%s() has no endpoint", __func__);
+        return AAUDIO_ERROR_INVALID_STATE;
+    }
+    aaudio_result_t result = endpoint->standby();
+    if (result == AAUDIO_OK) {
+        setStandby_l(true);
+    }
+    return result;
+}
+
+aaudio_result_t AAudioServiceStreamMMAP::exitStandby_l(AudioEndpointParcelable* parcelable) {
+    sp<AAudioServiceEndpoint> endpoint = mServiceEndpointWeak.promote();
+    if (endpoint == nullptr) {
+        ALOGE("%s() has no endpoint", __func__);
+        return AAUDIO_ERROR_INVALID_STATE;
+    }
+    aaudio_result_t result = endpoint->exitStandby(parcelable);
+    if (result == AAUDIO_OK) {
+        setStandby_l(false);
+    } else {
+        ALOGE("%s failed, result %d, disconnecting stream.", __func__, result);
+        disconnect_l();
+    }
+    return result;
+}
+
 aaudio_result_t AAudioServiceStreamMMAP::startClient(const android::AudioClient& client,
                                                      const audio_attributes_t *attr,
                                                      audio_port_handle_t *clientHandle) {

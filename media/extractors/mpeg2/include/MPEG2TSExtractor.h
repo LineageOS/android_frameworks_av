@@ -23,11 +23,10 @@
 #include <media/MediaExtractorPluginApi.h>
 #include <media/MediaExtractorPluginHelper.h>
 #include <media/stagefright/MetaDataBase.h>
+#include <mpeg2ts/ATSParser.h>
 #include <utils/threads.h>
 #include <utils/KeyedVector.h>
 #include <utils/Vector.h>
-
-#include <ATSParser.h>
 
 namespace android {
 

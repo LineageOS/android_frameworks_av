@@ -180,6 +180,11 @@ class FuzzAAudioClient : public virtual RefBase, public AAudioServiceInterface {
         return AAUDIO_ERROR_UNAVAILABLE;
     }
 
+    aaudio_result_t exitStandby(aaudio_handle_t streamHandle UNUSED_PARAM,
+                                AudioEndpointParcelable &parcelable UNUSED_PARAM) override {
+        return AAUDIO_ERROR_UNAVAILABLE;
+    }
+
     void onStreamChange(aaudio_handle_t handle, int32_t opcode, int32_t value) {}
 
     int getDeathCount() { return mDeathCount; }

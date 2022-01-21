@@ -27,7 +27,7 @@
 #include <media/stagefright/foundation/AString.h>
 #include <media/stagefright/foundation/ByteUtils.h>
 
-#include "timedtext/TextDescriptions.h"
+#include <timedtext/TextDescriptions.h>
 
 #include "TimedTextTestEnvironment.h"
 
