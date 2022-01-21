@@ -270,6 +270,9 @@ enum C2ParamIndexKind : C2Param::type_index_t {
 
     // encoding quality requirements
     kParamIndexEncodingQualityLevel, // encoders, enum
+
+    // encoding statistics, average block qp of a frame
+    kParamIndexAverageBlockQuantization, // int32
 };
 
 }
@@ -2410,6 +2413,17 @@ C2ENUM(C2PlatformConfig::encoding_quality_level_t, uint32_t,
     NONE = 0,
     S_HANDHELD = 1              // corresponds to VMAF=70
 );
+
+/**
+ * Video Encoding Statistics Export
+ */
+
+/**
+ * Average block QP exported from video encoder.
+ */
+typedef C2StreamParam<C2Info, C2SimpleValueStruct<int32_t>, kParamIndexAverageBlockQuantization>
+        C2AndroidStreamAverageBlockQuantizationInfo;
+constexpr char C2_PARAMKEY_AVERAGE_QP[] = "coded.average-qp";
 
 /// @}
 
