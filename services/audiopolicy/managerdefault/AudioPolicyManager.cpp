@@ -1689,7 +1689,8 @@ audio_io_handle_t AudioPolicyManager::selectOutput(const SortedVector<audio_io_h
     // other criteria
     static const audio_output_flags_t kFunctionalFlags = (audio_output_flags_t)
         (AUDIO_OUTPUT_FLAG_VOIP_RX | AUDIO_OUTPUT_FLAG_INCALL_MUSIC |
-            AUDIO_OUTPUT_FLAG_TTS | AUDIO_OUTPUT_FLAG_DIRECT_PCM | AUDIO_OUTPUT_FLAG_ULTRASOUND);
+            AUDIO_OUTPUT_FLAG_TTS | AUDIO_OUTPUT_FLAG_DIRECT_PCM | AUDIO_OUTPUT_FLAG_ULTRASOUND |
+            AUDIO_OUTPUT_FLAG_SPATIALIZER);
     // Flags expressing a performance request: have lower priority than serving
     // requested sampling rate or channel mask
     static const audio_output_flags_t kPerformanceFlags = (audio_output_flags_t)
@@ -5187,8 +5188,6 @@ void AudioPolicyManager::loadConfig() {
         ALOGE("could not load audio policy configuration file, setting defaults");
         getConfig().setDefault();
     }
-    //TODO: b/193496180 use spatializer flag at audio HAL when available
-    getConfig().convertSpatializerFlag();
 }
 
 status_t AudioPolicyManager::initialize() {
