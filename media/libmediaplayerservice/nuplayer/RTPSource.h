@@ -29,18 +29,13 @@
 #include <media/stagefright/rtsp/ASessionDescription.h>
 #include <media/stagefright/Utils.h>
 #include <media/BufferingSettings.h>
+#include <mpeg2ts/AnotherPacketSource.h>
 
 #include <utils/KeyedVector.h>
 #include <utils/Vector.h>
 #include <utils/RefBase.h>
 
-#include "AnotherPacketSource.h"
 #include "NuPlayerSource.h"
-
-
-
-
-
 
 namespace android {
 

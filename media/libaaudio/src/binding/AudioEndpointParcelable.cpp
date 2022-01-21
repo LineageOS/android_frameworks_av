@@ -79,6 +79,22 @@ int32_t AudioEndpointParcelable::addFileDescriptor(const unique_fd& fd,
     return index;
 }
 
+void AudioEndpointParcelable::closeDataFileDescriptor() {
+    const int32_t curDataMemoryIndex = mDownDataQueueParcelable.getSharedMemoryIndex();
+    mSharedMemories[curDataMemoryIndex].closeAndReleaseFd();
+}
+
+void AudioEndpointParcelable::updateDataFileDescriptor(
+        AudioEndpointParcelable* endpointParcelable) {
+    const int32_t curDataMemoryIndex = mDownDataQueueParcelable.getSharedMemoryIndex();
+    const int32_t newDataMemoryIndex =
+            endpointParcelable->mDownDataQueueParcelable.getSharedMemoryIndex();
+    mSharedMemories[curDataMemoryIndex].close();
+    mSharedMemories[curDataMemoryIndex].setup(
+            endpointParcelable->mSharedMemories[newDataMemoryIndex]);
+    mDownDataQueueParcelable.updateMemory(endpointParcelable->mDownDataQueueParcelable);
+}
+
 aaudio_result_t AudioEndpointParcelable::resolve(EndpointDescriptor *descriptor) {
     aaudio_result_t result = mUpMessageQueueParcelable.resolve(mSharedMemories,
                                                            &descriptor->upMessageQueueDescriptor);
@@ -90,6 +106,10 @@ aaudio_result_t AudioEndpointParcelable::resolve(EndpointDescriptor *descriptor)
     result = mDownDataQueueParcelable.resolve(mSharedMemories,
                                               &descriptor->dataQueueDescriptor);
     return result;
+}
+
+aaudio_result_t AudioEndpointParcelable::resolveDataQueue(RingBufferDescriptor *descriptor) {
+    return mDownDataQueueParcelable.resolve(mSharedMemories, descriptor);
 }
 
 aaudio_result_t AudioEndpointParcelable::close() {

@@ -14,7 +14,7 @@
  * limitations under the License.
  */
 
-#include "include/FrameDecoder.h"
+#include <FrameDecoder.h>
 #include <fuzzer/FuzzedDataProvider.h>
 #include <media/IMediaSource.h>
 #include <media/stagefright/MetaData.h>

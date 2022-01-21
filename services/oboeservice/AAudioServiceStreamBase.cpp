@@ -41,6 +41,8 @@ using namespace aaudio;   // TODO just import names needed
 using content::AttributionSourceState;
 
 static const int64_t TIMEOUT_NANOS = 3LL * 1000 * 1000 * 1000;
+// If the stream is idle for more than `IDLE_TIMEOUT_NANOS`, the stream will be put into standby.
+static const int64_t IDLE_TIMEOUT_NANOS = 3e9;
 
 /**
  * Base class for streams in the service.
@@ -247,6 +249,12 @@ aaudio_result_t AAudioServiceStreamBase::start_l() {
         return AAUDIO_ERROR_INVALID_STATE;
     }
 
+    if (mStandby) {
+        ALOGW("%s() the stream is standby, return ERROR_STANDBY, "
+              "expecting the client call exitStandby before start", __func__);
+        return AAUDIO_ERROR_STANDBY;
+    }
+
     mediametrics::Defer defer([&] {
         mediametrics::LogItem(mMetricsId)
             .set(AMEDIAMETRICS_PROP_EVENT, AMEDIAMETRICS_PROP_EVENT_VALUE_START)
@@ -394,6 +402,7 @@ void AAudioServiceStreamBase::run() {
     android::sp<AAudioServiceStreamBase> holdStream(this);
     TimestampScheduler timestampScheduler;
     int64_t nextTime;
+    int64_t standbyTime = AudioClock::getNanoseconds() + IDLE_TIMEOUT_NANOS;
     // Balance the incStrong from when the thread was launched.
     holdStream->decStrong(nullptr);
 
@@ -405,8 +414,8 @@ void AAudioServiceStreamBase::run() {
     while (mThreadEnabled.load()) {
         loopCount++;
         int64_t timeoutNanos = -1;
-        if (isRunning()) {
-            timeoutNanos = nextTime - AudioClock::getNanoseconds();
+        if (isRunning() || (isIdle_l() && !isStandby_l())) {
+            timeoutNanos = (isRunning() ? nextTime : standbyTime) - AudioClock::getNanoseconds();
             timeoutNanos = std::max<int64_t>(0, timeoutNanos);
         }
 
@@ -425,6 +434,9 @@ void AAudioServiceStreamBase::run() {
                 nextTime = timestampScheduler.nextAbsoluteTime();
             }
         }
+        if (isIdle_l() && AudioClock::getNanoseconds() >= standbyTime) {
+            standby_l();
+        }
 
         if (command != nullptr) {
             std::scoped_lock<std::mutex> _commandLock(command->lock);
@@ -437,9 +449,11 @@ void AAudioServiceStreamBase::run() {
                     break;
                 case PAUSE:
                     command->result = pause_l();
+                    standbyTime = AudioClock::getNanoseconds() + IDLE_TIMEOUT_NANOS;
                     break;
                 case STOP:
                     command->result = stop_l();
+                    standbyTime = AudioClock::getNanoseconds() + IDLE_TIMEOUT_NANOS;
                     break;
                 case FLUSH:
                     command->result = flush_l();
@@ -474,6 +488,12 @@ void AAudioServiceStreamBase::run() {
                                                         : getDescription_l(param->mParcelable);
                 }
                     break;
+                case EXIT_STANDBY: {
+                    ExitStandbyParam *param = (ExitStandbyParam *) command->parameter.get();
+                    command->result = param == nullptr ? AAUDIO_ERROR_ILLEGAL_ARGUMENT
+                                                       : exitStandby_l(param->mParcelable);
+                    standbyTime = AudioClock::getNanoseconds() + IDLE_TIMEOUT_NANOS;
+                } break;
                 default:
                     ALOGE("Invalid command op code: %d", command->operationCode);
                     break;
@@ -671,6 +691,15 @@ aaudio_result_t AAudioServiceStreamBase::getDescription_l(AudioEndpointParcelabl
                                         parcelable->mUpMessageQueueParcelable);
     }
     return getAudioDataDescription_l(parcelable);
+}
+
+aaudio_result_t AAudioServiceStreamBase::exitStandby(AudioEndpointParcelable *parcelable) {
+    auto command = std::make_shared<AAudioCommand>(
+            EXIT_STANDBY,
+            std::make_shared<ExitStandbyParam>(parcelable),
+            true /*waitForReply*/,
+            TIMEOUT_NANOS);
+    return mCommandQueue.sendCommand(command);
 }
 
 void AAudioServiceStreamBase::onVolumeChanged(float volume) {

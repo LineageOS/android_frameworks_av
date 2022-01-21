@@ -184,8 +184,13 @@ private:
     aaudio_result_t writeNowWithConversion(const void *buffer,
                                      int32_t numFrames);
 
+    // Exit the stream from standby, will reconstruct data path.
+    aaudio_result_t exitStandby_l() REQUIRES(mStreamLock);
+
     // Adjust timing model based on timestamp from service.
     void processTimestamp(uint64_t position, int64_t time);
+
+    aaudio_result_t configureDataInformation(int32_t callbackFrames);
 
     // Thread on other side of FIFO will have wakeup jitter.
     // By delaying slightly we can avoid waking up before other side is ready.

@@ -181,15 +181,16 @@ cc_library {
         "libstatssocket",
     ],
 
+    export_include_dirs: [
+        ".",
+    ],
+
     static_libs: [
         "libplatformprotos",
     ],
 
     header_libs: [
         "libaaudio_headers",
-    ],
-
-    include_dirs: [
-        "system/media/audio_utils/include",
+        "libaudioutils_headers",
     ],
 }
