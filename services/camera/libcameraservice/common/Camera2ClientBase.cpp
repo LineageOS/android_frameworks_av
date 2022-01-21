@@ -34,6 +34,7 @@
 #include "api2/CameraDeviceClient.h"
 
 #include "device3/Camera3Device.h"
+#include "device3/hidl/HidlCamera3Device.h"
 #include "utils/CameraThreadState.h"
 #include "utils/CameraServiceProxyWrapper.h"
 
@@ -62,14 +63,14 @@ Camera2ClientBase<TClientBase>::Camera2ClientBase(
                 servicePid),
         mSharedCameraCallbacks(remoteCallback),
         mDeviceVersion(cameraService->getDeviceVersion(TClientBase::mCameraIdStr)),
-        mDevice(new Camera3Device(cameraId, overrideForPerfClass, legacyClient)),
         mDeviceActive(false), mApi1CameraId(api1CameraId)
 {
     ALOGI("Camera %s: Opened. Client: %s (PID %d, UID %d)", cameraId.string(),
             String8(clientPackageName).string(), clientPid, clientUid);
 
     mInitialClientPid = clientPid;
-    LOG_ALWAYS_FATAL_IF(mDevice == 0, "Device should never be NULL here.");
+    mOverrideForPerfClass = overrideForPerfClass;
+    mLegacyClient = legacyClient;
 }
 
 template <typename TClientBase>
@@ -104,7 +105,26 @@ status_t Camera2ClientBase<TClientBase>::initializeImpl(TProviderPtr providerPtr
     if (res != OK) {
         return res;
     }
-
+    IPCTransport providerTransport = IPCTransport::INVALID;
+    res = providerPtr->getCameraIdIPCTransport(TClientBase::mCameraIdStr.string(),
+            &providerTransport);
+    if (res != OK) {
+        return res;
+    }
+    switch (providerTransport) {
+        case IPCTransport::HIDL:
+            mDevice =
+                    new HidlCamera3Device(TClientBase::mCameraIdStr, mOverrideForPerfClass,
+                            mLegacyClient);
+            break;
+        case IPCTransport::AIDL:
+            ALOGE("%s: AIDL camera3Devices not available yet", __FUNCTION__);
+            return NO_INIT;
+        default:
+            ALOGE("%s Invalid transport for camera id %s", __FUNCTION__,
+                    TClientBase::mCameraIdStr.string());
+            return NO_INIT;
+    }
     if (mDevice == NULL) {
         ALOGE("%s: Camera %s: No device connected",
                 __FUNCTION__, TClientBase::mCameraIdStr.string());

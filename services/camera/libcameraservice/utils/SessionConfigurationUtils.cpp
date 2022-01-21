@@ -22,7 +22,7 @@
 #include "android/hardware/camera/metadata/3.8/types.h"
 #include "common/CameraDeviceBase.h"
 #include "../CameraService.h"
-#include "device3/Camera3Device.h"
+#include "device3/hidl/HidlCamera3Device.h"
 #include "device3/Camera3OutputStream.h"
 #include "system/graphics-base-v1.1.h"
 
@@ -486,17 +486,18 @@ void mapStreamInfo(const OutputStreamInfo &streamInfo,
     stream->v3_7.v3_4.v3_2.streamType = hardware::camera::device::V3_2::StreamType::OUTPUT;
     stream->v3_7.v3_4.v3_2.width = streamInfo.width;
     stream->v3_7.v3_4.v3_2.height = streamInfo.height;
-    stream->v3_7.v3_4.v3_2.format = Camera3Device::mapToPixelFormat(streamInfo.format);
+    stream->v3_7.v3_4.v3_2.format = HidlCamera3Device::mapToPixelFormat(streamInfo.format);
     auto u = streamInfo.consumerUsage;
     camera3::Camera3OutputStream::applyZSLUsageQuirk(streamInfo.format, &u);
-    stream->v3_7.v3_4.v3_2.usage = Camera3Device::mapToConsumerUsage(u);
-    stream->v3_7.v3_4.v3_2.dataSpace = Camera3Device::mapToHidlDataspace(streamInfo.dataSpace);
-    stream->v3_7.v3_4.v3_2.rotation = Camera3Device::mapToStreamRotation(rotation);
+    stream->v3_7.v3_4.v3_2.usage = HidlCamera3Device::mapToConsumerUsage(u);
+    stream->v3_7.v3_4.v3_2.dataSpace = HidlCamera3Device::mapToHidlDataspace(streamInfo.dataSpace);
+    stream->v3_7.v3_4.v3_2.rotation = HidlCamera3Device::mapToStreamRotation(rotation);
     stream->v3_7.v3_4.v3_2.id = -1; // Invalid stream id
     stream->v3_7.v3_4.physicalCameraId = std::string(physicalId.string());
     stream->v3_7.v3_4.bufferSize = 0;
     stream->v3_7.groupId = groupId;
     stream->v3_7.sensorPixelModesUsed.resize(streamInfo.sensorPixelModesUsed.size());
+
     size_t idx = 0;
     for (auto mode : streamInfo.sensorPixelModesUsed) {
         stream->v3_7.sensorPixelModesUsed[idx++] =
@@ -599,7 +600,7 @@ convertToHALStreamCombination(
         return STATUS_ERROR(CameraService::ERROR_ILLEGAL_ARGUMENT, msg.string());
     }
     *earlyExit = false;
-    auto ret = Camera3Device::mapToStreamConfigurationMode(
+    auto ret = HidlCamera3Device::mapToStreamConfigurationMode(
             static_cast<camera_stream_configuration_mode_t> (operatingMode),
             /*out*/ &streamConfiguration.operationMode);
     if (ret != OK) {
@@ -629,7 +630,7 @@ convertToHALStreamCombination(
                 hardware::camera::device::V3_2::StreamType::INPUT,
                 static_cast<uint32_t> (sessionConfiguration.getInputWidth()),
                 static_cast<uint32_t> (sessionConfiguration.getInputHeight()),
-                Camera3Device::mapToPixelFormat(sessionConfiguration.getInputFormat()),
+                HidlCamera3Device::mapToPixelFormat(sessionConfiguration.getInputFormat()),
                 /*usage*/ 0, HAL_DATASPACE_UNKNOWN,
                 hardware::camera::device::V3_2::StreamRotation::ROTATION_0},
                 /*physicalId*/ nullptr, /*bufferSize*/0}, /*groupId*/-1, defaultSensorPixelModes};
