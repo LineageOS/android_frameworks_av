@@ -36,17 +36,22 @@ void StillnessDetector::setInput(int64_t timestamp, const Pose3f& input) {
 bool StillnessDetector::calculate(int64_t timestamp) {
     discardOld(timestamp);
 
-    // Check whether all the poses in the queue are in the proximity of the new
-    // one. We want to do this before checking the overriding conditions below, in order to update
-    // the suppression deadline correctly.
+    // Check whether all the poses in the queue are in the proximity of the new one. We want to do
+    // this before checking the overriding conditions below, in order to update the suppression
+    // deadline correctly. We always go from end to start, to find the most recent pose that
+    // violated stillness and update the suppression deadline if it has not been set or if the new
+    // one ends after the current one.
     bool moved = false;
 
     if (!mFifo.empty()) {
-        for (auto iter = mFifo.begin(); iter != mFifo.end() - 1; ++iter) {
+        for (auto iter = mFifo.rbegin() + 1; iter != mFifo.rend(); ++iter) {
             const auto& event = *iter;
             if (!areNear(event.pose, mFifo.back().pose)) {
                 // Enable suppression for the duration of the window.
-                mSuppressionDeadline = timestamp + mOptions.windowDuration;
+                int64_t deadline = event.timestamp + mOptions.windowDuration;
+                if (!mSuppressionDeadline.has_value() || mSuppressionDeadline.value() < deadline) {
+                    mSuppressionDeadline = deadline;
+                }
                 moved = true;
                 break;
             }

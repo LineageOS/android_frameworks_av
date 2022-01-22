@@ -91,8 +91,6 @@ using frameworks::cameraservice::service::V2_0::implementation::HidlCameraServic
 using hardware::ICamera;
 using hardware::ICameraClient;
 using hardware::ICameraServiceListener;
-using hardware::camera::common::V1_0::CameraDeviceStatus;
-using hardware::camera::common::V1_0::TorchModeStatus;
 using hardware::camera2::ICameraInjectionCallback;
 using hardware::camera2::ICameraInjectionSession;
 using hardware::camera2::utils::CameraIdAndSessionConfiguration;
@@ -363,7 +361,7 @@ void CameraService::filterSPerfClassCharacteristicsLocked() {
 
 void CameraService::addStates(const String8 id) {
     std::string cameraId(id.c_str());
-    hardware::camera::common::V1_0::CameraResourceCost cost;
+    CameraResourceCost cost;
     status_t res = mCameraProviderManager->getResourceCost(cameraId, &cost);
     if (res != OK) {
         ALOGE("Failed to query device resource cost: %s (%d)", strerror(-res), res);
@@ -2335,6 +2333,13 @@ Status CameraService::notifySystemEvent(int32_t eventId,
             doUserSwitch(/*newUserIds*/ args);
             break;
         }
+        case ICameraService::EVENT_USB_DEVICE_ATTACHED:
+        case ICameraService::EVENT_USB_DEVICE_DETACHED: {
+            // Notify CameraProviderManager for lazy HALs
+            mCameraProviderManager->notifyUsbDeviceEvent(eventId,
+                                                        std::to_string(args[0]));
+            break;
+        }
         case ICameraService::EVENT_NONE:
         default: {
             ALOGW("%s: Received invalid system event from system_server: %d", __FUNCTION__,
@@ -2377,23 +2382,7 @@ Status CameraService::notifyDeviceStateChange(int64_t newState) {
 
     ATRACE_CALL();
 
-    using hardware::camera::provider::V2_5::DeviceState;
-    hardware::hidl_bitfield<DeviceState> newDeviceState{};
-    if (newState & ICameraService::DEVICE_STATE_BACK_COVERED) {
-        newDeviceState |= DeviceState::BACK_COVERED;
-    }
-    if (newState & ICameraService::DEVICE_STATE_FRONT_COVERED) {
-        newDeviceState |= DeviceState::FRONT_COVERED;
-    }
-    if (newState & ICameraService::DEVICE_STATE_FOLDED) {
-        newDeviceState |= DeviceState::FOLDED;
-    }
-    // Only map vendor bits directly
-    uint64_t vendorBits = static_cast<uint64_t>(newState) & 0xFFFFFFFF00000000l;
-    newDeviceState |= vendorBits;
-
-    ALOGV("%s: New device state 0x%" PRIx64, __FUNCTION__, newDeviceState);
-    mCameraProviderManager->notifyDeviceStateChange(newDeviceState);
+    mCameraProviderManager->notifyDeviceStateChange(newState);
 
     return Status::ok();
 }

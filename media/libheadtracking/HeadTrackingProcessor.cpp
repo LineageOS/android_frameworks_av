@@ -66,6 +66,7 @@ class HeadTrackingProcessorImpl : public HeadTrackingProcessor {
         Pose3f predictedWorldToHead =
                 worldToHead * integrate(headTwist, mOptions.predictionDuration);
         mHeadPoseDriftCompensator.setInput(timestamp, predictedWorldToHead);
+        mHeadStillnessDetector.setInput(timestamp, predictedWorldToHead);
         mWorldToHeadTimestamp = timestamp;
     }
 
@@ -76,8 +77,9 @@ class HeadTrackingProcessorImpl : public HeadTrackingProcessor {
             mPhysicalToLogicalAngle = mPendingPhysicalToLogicalAngle;
         }
 
-        mScreenPoseDriftCompensator.setInput(
-                timestamp, worldToScreen * Pose3f(rotateY(-mPhysicalToLogicalAngle)));
+        Pose3f worldToLogicalScreen = worldToScreen * Pose3f(rotateY(-mPhysicalToLogicalAngle));
+        mScreenPoseDriftCompensator.setInput(timestamp, worldToLogicalScreen);
+        mScreenStillnessDetector.setInput(timestamp, worldToLogicalScreen);
         mWorldToScreenTimestamp = timestamp;
     }
 
@@ -93,8 +95,6 @@ class HeadTrackingProcessorImpl : public HeadTrackingProcessor {
         // Handle the screen first, since it might trigger a recentering of the head.
         if (mWorldToScreenTimestamp.has_value()) {
             const Pose3f worldToLogicalScreen = mScreenPoseDriftCompensator.getOutput();
-            mScreenStillnessDetector.setInput(mWorldToScreenTimestamp.value(),
-                                              worldToLogicalScreen);
             bool screenStable = mScreenStillnessDetector.calculate(timestamp);
             mModeSelector.setScreenStable(mWorldToScreenTimestamp.value(), screenStable);
             // Whenever the screen is unstable, recenter the head pose.
@@ -108,7 +108,6 @@ class HeadTrackingProcessorImpl : public HeadTrackingProcessor {
         // Handle head.
         if (mWorldToHeadTimestamp.has_value()) {
             Pose3f worldToHead = mHeadPoseDriftCompensator.getOutput();
-            mHeadStillnessDetector.setInput(mWorldToHeadTimestamp.value(), worldToHead);
             // Auto-recenter.
             if (mHeadStillnessDetector.calculate(timestamp)) {
                 recenter(true, false);

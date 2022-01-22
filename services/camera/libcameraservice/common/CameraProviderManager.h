@@ -29,7 +29,10 @@
 #include <camera/CameraParameters2.h>
 #include <camera/CameraMetadata.h>
 #include <camera/CameraBase.h>
+#include <utils/Condition.h>
 #include <utils/Errors.h>
+#include <android/hardware/ICameraService.h>
+#include <utils/IPCTransport.h>
 #include <android/hardware/camera/common/1.0/types.h>
 #include <android/hardware/camera/provider/2.5/ICameraProvider.h>
 #include <android/hardware/camera/provider/2.6/ICameraProviderCallback.h>
@@ -38,26 +41,28 @@
 #include <android/hardware/camera/device/3.7/types.h>
 #include <android/hardware/camera/device/3.8/types.h>
 #include <android/hidl/manager/1.0/IServiceNotification.h>
+#include <binder/IServiceManager.h>
 #include <camera/VendorTagDescriptor.h>
 
 namespace android {
-/**
- * The vendor tag descriptor class that takes HIDL vendor tag information as
- * input. Not part of VendorTagDescriptor class because that class is used
- * in AIDL generated sources which don't have access to HIDL headers.
- */
-class HidlVendorTagDescriptor : public VendorTagDescriptor {
-public:
-    /**
-     * Create a VendorTagDescriptor object from the HIDL VendorTagSection
-     * vector.
-     *
-     * Returns OK on success, or a negative error code.
-     */
-    static status_t createDescriptorFromHidl(
-            const hardware::hidl_vec<hardware::camera::common::V1_0::VendorTagSection>& vts,
-            /*out*/
-            sp<VendorTagDescriptor>& descriptor);
+
+using hardware::camera2::utils::CameraIdAndSessionConfiguration;
+
+enum class CameraDeviceStatus : uint32_t {
+  NOT_PRESENT = 0,
+  PRESENT = 1,
+  ENUMERATING = 2
+};
+
+enum class TorchModeStatus : uint32_t {
+  NOT_AVAILABLE = 0,
+  AVAILABLE_OFF = 1,
+  AVAILABLE_ON = 2
+};
+
+struct CameraResourceCost {
+  uint32_t resourceCost;
+  std::vector<std::string> conflictingDevices;
 };
 
 enum SystemCameraKind {
@@ -103,12 +108,14 @@ enum SystemCameraKind {
  */
 class CameraProviderManager : virtual public hidl::manager::V1_0::IServiceNotification {
 public:
-
+    // needs to be made friend strict since HidlProviderInfo needs to inherit
+    // from CameraProviderManager::ProviderInfo which isn't a public member.
+    friend struct HidlProviderInfo;
     ~CameraProviderManager();
 
     // Tiny proxy for the static methods in a HIDL interface that communicate with the hardware
     // service manager, to be replacable in unit tests with a fake.
-    struct ServiceInteractionProxy {
+    struct HidlServiceInteractionProxy {
         virtual bool registerForNotifications(
                 const std::string &serviceName,
                 const sp<hidl::manager::V1_0::IServiceNotification>
@@ -120,12 +127,12 @@ public:
         virtual sp<hardware::camera::provider::V2_4::ICameraProvider> getService(
                 const std::string &serviceName) = 0;
         virtual hardware::hidl_vec<hardware::hidl_string> listServices() = 0;
-        virtual ~ServiceInteractionProxy() {}
+        virtual ~HidlServiceInteractionProxy() {}
     };
 
     // Standard use case - call into the normal generated static methods which invoke
     // the real hardware service manager
-    struct HardwareServiceInteractionProxy : public ServiceInteractionProxy {
+    struct HidlServiceInteractionProxyImpl : public HidlServiceInteractionProxy {
         virtual bool registerForNotifications(
                 const std::string &serviceName,
                 const sp<hidl::manager::V1_0::IServiceNotification>
@@ -152,15 +159,15 @@ public:
         ~StatusListener() {}
 
         virtual void onDeviceStatusChanged(const String8 &cameraId,
-                hardware::camera::common::V1_0::CameraDeviceStatus newStatus) = 0;
+                CameraDeviceStatus newStatus) = 0;
         virtual void onDeviceStatusChanged(const String8 &cameraId,
                 const String8 &physicalCameraId,
-                hardware::camera::common::V1_0::CameraDeviceStatus newStatus) = 0;
+                CameraDeviceStatus newStatus) = 0;
         virtual void onTorchStatusChanged(const String8 &cameraId,
-                hardware::camera::common::V1_0::TorchModeStatus newStatus,
+                TorchModeStatus newStatus,
                 SystemCameraKind kind) = 0;
         virtual void onTorchStatusChanged(const String8 &cameraId,
-                hardware::camera::common::V1_0::TorchModeStatus newStatus) = 0;
+                TorchModeStatus newStatus) = 0;
         virtual void onNewProviderRegistered() = 0;
     };
 
@@ -180,7 +187,10 @@ public:
      * used for testing. The lifetime of the proxy must exceed the lifetime of the manager.
      */
     status_t initialize(wp<StatusListener> listener,
-            ServiceInteractionProxy *proxy = &sHardwareServiceInteractionProxy);
+            HidlServiceInteractionProxy *hidlProxy = &sHidlServiceInteractionProxy);
+
+    status_t getCameraIdIPCTransport(const std::string &id,
+            IPCTransport *providerTransport) const;
 
     /**
      * Retrieve the total number of available cameras.
@@ -218,7 +228,7 @@ public:
      * Return the resource cost of this camera device
      */
     status_t getResourceCost(const std::string &id,
-            hardware::camera::common::V1_0::CameraResourceCost* cost) const;
+            CameraResourceCost* cost) const;
 
     /**
      * Return the old camera API camera info
@@ -244,7 +254,8 @@ public:
      * Check for device support of specific stream combination.
      */
     status_t isSessionConfigurationSupported(const std::string& id,
-            const hardware::camera::device::V3_8::StreamConfiguration &configuration,
+            const SessionConfiguration &configuration,
+            bool overrideForPerfClass,
             bool *status /*out*/) const;
 
     /**
@@ -302,8 +313,7 @@ public:
     /**
      * Inform registered providers about a device state change, such as folding or unfolding
      */
-    status_t notifyDeviceStateChange(
-        android::hardware::hidl_bitfield<hardware::camera::provider::V2_5::DeviceState> newState);
+    status_t notifyDeviceStateChange(int64_t newState);
 
     /**
      * Open an active session to a camera device.
@@ -311,7 +321,7 @@ public:
      * This fully powers on the camera device hardware, and returns a handle to a
      * session to be used for hardware configuration and operation.
      */
-    status_t openSession(const std::string &id,
+    status_t openHidlSession(const std::string &id,
             const sp<hardware::camera::device::V3_2::ICameraDeviceCallback>& callback,
             /*out*/
             sp<hardware::camera::device::V3_2::ICameraDeviceSession> *session);
@@ -358,41 +368,56 @@ public:
 
     status_t filterSmallJpegSizes(const std::string& cameraId);
 
+    status_t notifyUsbDeviceEvent(int32_t eventId, const std::string &usbDeviceId);
+
     static const float kDepthARTolerance;
 private:
     // All private members, unless otherwise noted, expect mInterfaceMutex to be locked before use
     mutable std::mutex mInterfaceMutex;
 
     wp<StatusListener> mListener;
-    ServiceInteractionProxy* mServiceProxy;
+    HidlServiceInteractionProxy* mHidlServiceProxy;
 
     // Current overall Android device physical status
-    android::hardware::hidl_bitfield<hardware::camera::provider::V2_5::DeviceState> mDeviceState;
+    int64_t mDeviceState;
 
     // mProviderLifecycleLock is locked during onRegistration and removeProvider
     mutable std::mutex mProviderLifecycleLock;
 
-    static HardwareServiceInteractionProxy sHardwareServiceInteractionProxy;
+    static HidlServiceInteractionProxyImpl sHidlServiceInteractionProxy;
+
+    struct HalCameraProvider {
+      // Empty parent struct for storing either aidl / hidl camera provider reference
+      HalCameraProvider(const char *descriptor) : mDescriptor(descriptor) { };
+      virtual ~HalCameraProvider() {};
+      std::string mDescriptor;
+    };
+
+    struct HidlHalCameraProvider : public HalCameraProvider {
+        HidlHalCameraProvider(
+                const sp<hardware::camera::provider::V2_4::ICameraProvider> &provider,
+                const char *descriptor) :
+                HalCameraProvider(descriptor), mCameraProvider(provider) { };
+     private:
+        sp<hardware::camera::provider::V2_4::ICameraProvider> mCameraProvider;
+    };
 
     // Mapping from CameraDevice IDs to CameraProviders. This map is used to keep the
     // ICameraProvider alive while it is in use by the camera with the given ID for camera
     // capabilities
-    std::unordered_map<std::string, sp<hardware::camera::provider::V2_4::ICameraProvider>>
+    std::unordered_map<std::string, std::shared_ptr<HalCameraProvider>>
             mCameraProviderByCameraId;
 
     // Mapping from CameraDevice IDs to CameraProviders. This map is used to keep the
     // ICameraProvider alive while it is in use by the camera with the given ID for torch
     // capabilities
-    std::unordered_map<std::string, sp<hardware::camera::provider::V2_4::ICameraProvider>>
+    std::unordered_map<std::string, std::shared_ptr<HalCameraProvider>>
             mTorchProviderByCameraId;
 
     // Lock for accessing mCameraProviderByCameraId and mTorchProviderByCameraId
     std::mutex mProviderInterfaceMapLock;
-
-    struct ProviderInfo :
-            virtual public hardware::camera::provider::V2_6::ICameraProviderCallback,
-            virtual public hardware::hidl_death_recipient
-    {
+    struct ProviderInfo : public virtual RefBase {
+        friend struct HidlProviderInfo;
         const std::string mProviderName;
         const std::string mProviderInstance;
         const metadata_vendor_id_t mProviderTagid;
@@ -401,61 +426,20 @@ private:
         bool mSetTorchModeSupported;
         bool mIsRemote;
 
-        // Current overall Android device physical status
-        hardware::hidl_bitfield<hardware::camera::provider::V2_5::DeviceState> mDeviceState;
-
-        // This pointer is used to keep a reference to the ICameraProvider that was last accessed.
-        wp<hardware::camera::provider::V2_4::ICameraProvider> mActiveInterface;
-
-        sp<hardware::camera::provider::V2_4::ICameraProvider> mSavedInterface;
-
         ProviderInfo(const std::string &providerName, const std::string &providerInstance,
                 CameraProviderManager *manager);
         ~ProviderInfo();
 
-        status_t initialize(sp<hardware::camera::provider::V2_4::ICameraProvider>& interface,
-                hardware::hidl_bitfield<hardware::camera::provider::V2_5::DeviceState>
-                    currentDeviceState);
-
-        const sp<hardware::camera::provider::V2_4::ICameraProvider> startProviderInterface();
+        virtual IPCTransport getIPCTransport() = 0;
 
         const std::string& getType() const;
 
-        status_t addDevice(const std::string& name,
-                hardware::camera::common::V1_0::CameraDeviceStatus initialStatus =
-                hardware::camera::common::V1_0::CameraDeviceStatus::PRESENT,
-                /*out*/ std::string *parsedId = nullptr);
-
         status_t dump(int fd, const Vector<String16>& args) const;
-
-        // ICameraProviderCallbacks interface - these lock the parent mInterfaceMutex
-        hardware::Return<void> cameraDeviceStatusChange(
-                const hardware::hidl_string& cameraDeviceName,
-                hardware::camera::common::V1_0::CameraDeviceStatus newStatus) override;
-        hardware::Return<void> torchModeStatusChange(
-                const hardware::hidl_string& cameraDeviceName,
-                hardware::camera::common::V1_0::TorchModeStatus newStatus) override;
-        hardware::Return<void> physicalCameraDeviceStatusChange(
-                const hardware::hidl_string& cameraDeviceName,
-                const hardware::hidl_string& physicalCameraDeviceName,
-                hardware::camera::common::V1_0::CameraDeviceStatus newStatus) override;
-
-        status_t cameraDeviceStatusChangeLocked(
-                std::string* id, const hardware::hidl_string& cameraDeviceName,
-                hardware::camera::common::V1_0::CameraDeviceStatus newStatus);
-        status_t physicalCameraDeviceStatusChangeLocked(
-                std::string* id, std::string* physicalId,
-                const hardware::hidl_string& cameraDeviceName,
-                const hardware::hidl_string& physicalCameraDeviceName,
-                hardware::camera::common::V1_0::CameraDeviceStatus newStatus);
-
-        // hidl_death_recipient interface - this locks the parent mInterfaceMutex
-        virtual void serviceDied(uint64_t cookie, const wp<hidl::base::V1_0::IBase>& who) override;
 
         /**
          * Setup vendor tags for this provider
          */
-        status_t setUpVendorTags();
+        virtual status_t setUpVendorTags() = 0;
 
         /**
          * Notify provider about top-level device physical state changes
@@ -464,9 +448,9 @@ private:
          * It is possible for camera providers to add/remove devices and try to
          * acquire it.
          */
-        status_t notifyDeviceStateChange(
-                hardware::hidl_bitfield<hardware::camera::provider::V2_5::DeviceState>
-                    newDeviceState);
+        virtual status_t notifyDeviceStateChange(int64_t newDeviceState) = 0;
+
+        virtual bool successfullyStartedProviderInterface() = 0;
 
         std::vector<std::unordered_set<std::string>> getConcurrentCameraIdCombinations();
 
@@ -475,34 +459,44 @@ private:
          *
          * Note that 'mInterfaceMutex' should be held when calling this method.
          */
-        void notifyDeviceInfoStateChangeLocked(
-               hardware::hidl_bitfield<hardware::camera::provider::V2_5::DeviceState>
-                   newDeviceState);
+        void notifyDeviceInfoStateChangeLocked(int64_t newDeviceState);
 
         /**
          * Query the camera provider for concurrent stream configuration support
          */
-        status_t isConcurrentSessionConfigurationSupported(
-                const hardware::hidl_vec<
-                        hardware::camera::provider::V2_7::CameraIdAndStreamCombination>
-                                &halCameraIdsAndStreamCombinations,
-                bool *isSupported);
+        virtual status_t isConcurrentSessionConfigurationSupported(
+                    const std::vector<CameraIdAndSessionConfiguration> &cameraIdsAndSessionConfigs,
+                    const std::set<std::string>& perfClassPrimaryCameraIds,
+                    int targetSdkVersion, bool *isSupported) = 0;
+
+
+        /**
+         * Remove all devices associated with this provider and notify listeners
+         * with NOT_PRESENT state.
+         */
+        void removeAllDevices();
+
+        /**
+         * Provider is an external lazy HAL
+         */
+        bool isExternalLazyHAL() const;
 
         // Basic device information, common to all camera devices
         struct DeviceInfo {
             const std::string mName;  // Full instance name
             const std::string mId;    // ID section of full name
+            //Both hidl and aidl DeviceInfos. Aidl deviceInfos get {3, 8} to
+            //start off.
             const hardware::hidl_version mVersion;
             const metadata_vendor_id_t mProviderTagid;
             bool mIsLogicalCamera;
             std::vector<std::string> mPhysicalIds;
             hardware::CameraInfo mInfo;
-            sp<IBase> mSavedInterface;
             SystemCameraKind mSystemCameraKind = SystemCameraKind::PUBLIC;
 
-            const hardware::camera::common::V1_0::CameraResourceCost mResourceCost;
+            const CameraResourceCost mResourceCost;
 
-            hardware::camera::common::V1_0::CameraDeviceStatus mStatus;
+            CameraDeviceStatus mStatus;
 
             wp<ProviderInfo> mParentProvider;
             // Torch strength default, maximum levels if the torch strength control
@@ -510,6 +504,12 @@ private:
             int32_t mTorchStrengthLevel;
             int32_t mTorchMaximumStrengthLevel;
             int32_t mTorchDefaultStrengthLevel;
+
+            // Wait for lazy HALs to confirm device availability
+            static const nsecs_t kDeviceAvailableTimeout = 2000e6; // 2000 ms
+            Mutex     mDeviceAvailableLock;
+            Condition mDeviceAvailableSignal;
+            bool mIsDeviceAvailable = true;
 
             bool hasFlashUnit() const { return mHasFlashUnit; }
             bool supportNativeZoomRatio() const { return mSupportNativeZoomRatio; }
@@ -533,46 +533,32 @@ private:
             }
 
             virtual status_t isSessionConfigurationSupported(
-                    const hardware::camera::device::V3_8::StreamConfiguration &/*configuration*/,
+                    const SessionConfiguration &/*configuration*/,
+                    bool /*overrideForPerfClass*/,
                     bool * /*status*/) {
                 return INVALID_OPERATION;
             }
             virtual status_t filterSmallJpegSizes() = 0;
-            virtual void notifyDeviceStateChange(
-                    hardware::hidl_bitfield<hardware::camera::provider::V2_5::DeviceState>
-                        /*newState*/) {}
-
-            template<class InterfaceT>
-            sp<InterfaceT> startDeviceInterface();
+            virtual void notifyDeviceStateChange(int64_t /*newState*/) {}
 
             DeviceInfo(const std::string& name, const metadata_vendor_id_t tagId,
                     const std::string &id, const hardware::hidl_version& version,
                     const std::vector<std::string>& publicCameraIds,
-                    const hardware::camera::common::V1_0::CameraResourceCost& resourceCost,
+                    const CameraResourceCost& resourceCost,
                     sp<ProviderInfo> parentProvider) :
                     mName(name), mId(id), mVersion(version), mProviderTagid(tagId),
                     mIsLogicalCamera(false), mResourceCost(resourceCost),
-                    mStatus(hardware::camera::common::V1_0::CameraDeviceStatus::PRESENT),
+                    mStatus(CameraDeviceStatus::PRESENT),
                     mParentProvider(parentProvider), mTorchStrengthLevel(0),
                     mTorchMaximumStrengthLevel(0), mTorchDefaultStrengthLevel(0),
                     mHasFlashUnit(false), mSupportNativeZoomRatio(false),
                     mPublicCameraIds(publicCameraIds) {}
-            virtual ~DeviceInfo();
+            virtual ~DeviceInfo() {}
         protected:
+
             bool mHasFlashUnit; // const after constructor
             bool mSupportNativeZoomRatio; // const after constructor
             const std::vector<std::string>& mPublicCameraIds;
-
-            template<class InterfaceT>
-            static status_t setTorchMode(InterfaceT& interface, bool enabled);
-
-            template<class InterfaceT>
-            status_t setTorchModeForDevice(bool enabled) {
-                // Don't save the ICameraProvider interface here because we assume that this was
-                // called from CameraProviderManager::setTorchMode(), which does save it.
-                const sp<InterfaceT> interface = startDeviceInterface<InterfaceT>();
-                return DeviceInfo::setTorchMode(interface, enabled);
-            }
         };
         std::vector<std::unique_ptr<DeviceInfo>> mDevices;
         std::unordered_set<std::string> mUniqueCameraIds;
@@ -587,36 +573,33 @@ private:
 
         // HALv3-specific camera fields, including the actual device interface
         struct DeviceInfo3 : public DeviceInfo {
-            typedef hardware::camera::device::V3_2::ICameraDevice InterfaceT;
 
-            virtual status_t setTorchMode(bool enabled) override;
-            virtual status_t turnOnTorchWithStrengthLevel(int32_t torchStrength) override;
-            virtual status_t getTorchStrengthLevel(int32_t *torchStrength) override;
-
+            virtual status_t setTorchMode(bool enabled) = 0;
+            virtual status_t turnOnTorchWithStrengthLevel(int32_t torchStrength) = 0;
+            virtual status_t getTorchStrengthLevel(int32_t *torchStrength) = 0;
             virtual status_t getCameraInfo(hardware::CameraInfo *info) const override;
             virtual bool isAPI1Compatible() const override;
-            virtual status_t dumpState(int fd) override;
+            virtual status_t dumpState(int fd) = 0;
             virtual status_t getCameraCharacteristics(
                     bool overrideForPerfClass,
                     CameraMetadata *characteristics) const override;
             virtual status_t getPhysicalCameraCharacteristics(const std::string& physicalCameraId,
                     CameraMetadata *characteristics) const override;
             virtual status_t isSessionConfigurationSupported(
-                    const hardware::camera::device::V3_8::StreamConfiguration &configuration,
-                    bool *status /*out*/)
-                    override;
+                    const SessionConfiguration &configuration, bool /*overrideForPerfClass*/,
+                    bool *status /*out*/) = 0;
             virtual status_t filterSmallJpegSizes() override;
             virtual void notifyDeviceStateChange(
-                    hardware::hidl_bitfield<hardware::camera::provider::V2_5::DeviceState>
-                        newState) override;
+                        int64_t newState) override;
 
             DeviceInfo3(const std::string& name, const metadata_vendor_id_t tagId,
                     const std::string &id, uint16_t minorVersion,
-                    const hardware::camera::common::V1_0::CameraResourceCost& resourceCost,
+                    const CameraResourceCost& resourceCost,
                     sp<ProviderInfo> parentProvider,
-                    const std::vector<std::string>& publicCameraIds, sp<InterfaceT> interface);
-            virtual ~DeviceInfo3();
-        private:
+                    const std::vector<std::string>& publicCameraIds);
+            virtual ~DeviceInfo3() {};
+        protected:
+            // Modified by derived transport specific (hidl / aidl) class
             CameraMetadata mCameraCharacteristics;
             // Map device states to sensor orientations
             std::unordered_map<int64_t, int32_t> mDeviceStateOrientationMap;
@@ -656,8 +639,7 @@ private:
                     const camera_metadata_entry& halStreamConfigs,
                     const camera_metadata_entry& halStreamDurations);
         };
-
-    private:
+    protected:
         std::string mType;
         uint32_t mId;
 
@@ -667,12 +649,12 @@ private:
 
         struct CameraStatusInfoT {
             bool isPhysicalCameraStatus = false;
-            hardware::hidl_string cameraId;
-            hardware::hidl_string physicalCameraId;
-            hardware::camera::common::V1_0::CameraDeviceStatus status;
-            CameraStatusInfoT(bool isForPhysicalCamera, const hardware::hidl_string& id,
-                    const hardware::hidl_string& physicalId,
-                    hardware::camera::common::V1_0::CameraDeviceStatus s) :
+            std::string cameraId;
+            std::string physicalCameraId;
+            CameraDeviceStatus status;
+            CameraStatusInfoT(bool isForPhysicalCamera, const std::string& id,
+                    const std::string& physicalId,
+                    CameraDeviceStatus s) :
                     isPhysicalCameraStatus(isForPhysicalCamera), cameraId(id),
                     physicalCameraId(physicalId), status(s) {}
         };
@@ -689,17 +671,6 @@ private:
 
         std::vector<std::unordered_set<std::string>> mConcurrentCameraIdCombinations;
 
-        // Templated method to instantiate the right kind of DeviceInfo and call the
-        // right CameraProvider getCameraDeviceInterface_* method.
-        template<class DeviceInfoT>
-        std::unique_ptr<DeviceInfo> initializeDeviceInfo(const std::string &name,
-                const metadata_vendor_id_t tagId, const std::string &id,
-                uint16_t minorVersion);
-
-        // Helper for initializeDeviceInfo to use the right CameraProvider get method.
-        template<class InterfaceT>
-        sp<InterfaceT> startDeviceInterface(const std::string &name);
-
         // Parse provider instance name for type and id
         static status_t parseProviderName(const std::string& name,
                 std::string *type, uint32_t *id);
@@ -713,18 +684,13 @@ private:
 
         void removeDevice(std::string id);
 
-        // Expects to have mLock locked
-        status_t reCacheConcurrentStreamingCameraIdsLocked();
-        // Expects to have mLock locked
-        status_t getConcurrentCameraIdsInternalLocked(
-                sp<hardware::camera::provider::V2_6::ICameraProvider> &interface2_6);
     };
 
     /**
      * Save the ICameraProvider while it is being used by a camera or torch client
      */
     void saveRef(DeviceMode usageType, const std::string &cameraId,
-            sp<hardware::camera::provider::V2_4::ICameraProvider> provider);
+            std::shared_ptr<HalCameraProvider> provider);
 
     // Utility to find a DeviceInfo by ID; pointer is only valid while mInterfaceMutex is held
     // and the calling code doesn't mutate the list of providers or their lists of devices.
@@ -735,9 +701,15 @@ private:
             hardware::hidl_version minVersion = hardware::hidl_version{0,0},
             hardware::hidl_version maxVersion = hardware::hidl_version{1000,0}) const;
 
-    status_t addProviderLocked(const std::string& newProvider, bool preexisting = false);
+    // Map external providers to USB devices in order to handle USB hotplug
+    // events for lazy HALs
+    std::pair<std::vector<std::string>, sp<ProviderInfo>>
+        mExternalUsbDevicesForProvider;
+    sp<ProviderInfo> startExternalLazyProvider() const;
 
-    status_t tryToInitializeProviderLocked(const std::string& providerName,
+    status_t addHidlProviderLocked(const std::string& newProvider, bool preexisting = false);
+
+    status_t tryToInitializeHidlProviderLocked(const std::string& providerName,
             const sp<ProviderInfo>& providerInfo);
 
     bool isLogicalCameraLocked(const std::string& id, std::vector<std::string>* physicalCameraIds);
@@ -750,14 +722,6 @@ private:
     size_t mProviderInstanceId = 0;
     std::vector<sp<ProviderInfo>> mProviders;
 
-    void addProviderToMap(
-            const std::string &cameraId,
-            sp<hardware::camera::provider::V2_4::ICameraProvider> provider,
-            bool isTorchUsage);
-    void removeCameraIdFromMap(
-        std::unordered_map<std::string, sp<hardware::camera::provider::V2_4::ICameraProvider>> &map,
-        const std::string &cameraId);
-
     static const char* deviceStatusToString(
         const hardware::camera::common::V1_0::CameraDeviceStatus&);
     static const char* torchStatusToString(
@@ -768,20 +732,14 @@ private:
     void filterLogicalCameraIdsLocked(std::vector<std::string>& deviceIds) const;
 
     status_t getSystemCameraKindLocked(const std::string& id, SystemCameraKind *kind) const;
-    std::pair<bool, ProviderInfo::DeviceInfo *> isHiddenPhysicalCameraInternal(const std::string& cameraId) const;
+    std::pair<bool, ProviderInfo::DeviceInfo *> isHiddenPhysicalCameraInternal(
+            const std::string& cameraId) const;
 
     void collectDeviceIdsLocked(const std::vector<std::string> deviceIds,
             std::vector<std::string>& normalDeviceIds,
             std::vector<std::string>& systemCameraDeviceIds) const;
 
-    status_t convertToHALStreamCombinationAndCameraIdsLocked(
-              const std::vector<hardware::camera2::utils::CameraIdAndSessionConfiguration>
-                      &cameraIdsAndSessionConfigs,
-              const std::set<std::string>& perfClassPrimaryCameraIds,
-              int targetSdkVersion,
-              hardware::hidl_vec<hardware::camera::provider::V2_7::CameraIdAndStreamCombination>
-                      *halCameraIdsAndStreamCombinations,
-              bool *earlyExit);
+    status_t usbDeviceDetached(const std::string &usbDeviceId);
 };
 
 } // namespace android

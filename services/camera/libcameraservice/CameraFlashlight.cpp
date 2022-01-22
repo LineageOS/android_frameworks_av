@@ -32,8 +32,6 @@
 
 namespace android {
 
-using hardware::camera::common::V1_0::TorchModeStatus;
-
 /////////////////////////////////////////////////////////////////////
 // CameraFlashlight implementation begins
 // used by camera service to control flashflight.
