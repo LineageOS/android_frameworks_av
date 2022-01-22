@@ -15,14 +15,21 @@
  */
 #pragma once
 
-#include <array>
-#include <cstdint>
-#include <vector>
+#include "CryptoFactory.h"
+#include "DrmFactory.h"
 
-namespace clearkeydrm {
+namespace aidl {
+namespace android {
+namespace hardware {
+namespace drm {
+namespace clearkey {
+//extern "C" {
+std::shared_ptr<DrmFactory> createDrmFactory();
+std::shared_ptr<CryptoFactory> createCryptoFactory();
+//}
 
-bool isClearKeyUUID(const uint8_t uuid[16]);
-
-std::vector<std::array<uint8_t, 16>> getSupportedCryptoSchemes();
-
-}  // namespace clearkeydrm
+}  // namespace clearkey
+}  // namespace drm
+}  // namespace hardware
+}  // namespace android
+}  // namespace aidl

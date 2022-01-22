@@ -15,14 +15,32 @@
  */
 #pragma once
 
-#include <array>
-#include <cstdint>
-#include <vector>
+#include <utils/RefBase.h>
+
+#include "ClearKeyTypes.h"
 
 namespace clearkeydrm {
+struct Buffer : public ::android::RefBase {
+    explicit Buffer(size_t capacity);
 
-bool isClearKeyUUID(const uint8_t uuid[16]);
+    uint8_t* base() { return reinterpret_cast<uint8_t*>(mData); }
+    uint8_t* data() { return reinterpret_cast<uint8_t*>(mData) + mRangeOffset; }
+    size_t capacity() const { return mCapacity; }
+    size_t size() const { return mRangeLength; }
+    size_t offset() const { return mRangeOffset; }
 
-std::vector<std::array<uint8_t, 16>> getSupportedCryptoSchemes();
+  protected:
+    virtual ~Buffer();
+
+  private:
+    void* mData;
+    size_t mCapacity;
+    size_t mRangeOffset;
+    size_t mRangeLength;
+
+    bool mOwnsData;
+
+    CLEARKEY_DISALLOW_COPY_AND_ASSIGN(Buffer);
+};
 
 }  // namespace clearkeydrm
