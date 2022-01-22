@@ -154,9 +154,6 @@ namespace camera3 {
     }; // class BufferRecords
 
     static const uint64_t BUFFER_ID_NO_BUFFER = 0;
-
-    camera_buffer_status_t mapHidlBufferStatus(
-            hardware::camera::device::V3_2::BufferStatus status);
 } // namespace camera3
 
 } // namespace android

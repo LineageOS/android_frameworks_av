@@ -28,16 +28,6 @@
 namespace android {
 namespace camera3 {
 
-camera_buffer_status_t mapHidlBufferStatus(hardware::camera::device::V3_2::BufferStatus status) {
-    using hardware::camera::device::V3_2::BufferStatus;
-
-    switch (status) {
-        case BufferStatus::OK: return CAMERA_BUFFER_STATUS_OK;
-        case BufferStatus::ERROR: return CAMERA_BUFFER_STATUS_ERROR;
-    }
-    return CAMERA_BUFFER_STATUS_ERROR;
-}
-
 void BufferRecords::takeInflightBufferMap(BufferRecords& other) {
     std::lock_guard<std::mutex> oLock(other.mInflightLock);
     std::lock_guard<std::mutex> lock(mInflightLock);

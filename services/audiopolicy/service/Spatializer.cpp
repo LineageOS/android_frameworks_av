@@ -227,12 +227,8 @@ status_t Spatializer::loadEngineConfiguration(sp<EffectHalInterface> effect) {
     if (status != NO_ERROR) {
         return status;
     }
-    status = getHalParameter<true>(effect, SPATIALIZER_PARAM_SUPPORTED_CHANNEL_MASKS,
+    return getHalParameter<true>(effect, SPATIALIZER_PARAM_SUPPORTED_CHANNEL_MASKS,
                                  &mChannelMasks);
-    if (status != NO_ERROR) {
-        return status;
-    }
-    return NO_ERROR;
 }
 
 /** Gets the channel mask, sampling rate and format set for the spatializer input. */

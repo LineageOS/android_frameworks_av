@@ -106,19 +106,19 @@ public:
     // HAL Callbacks - implements CameraProviderManager::StatusListener
 
     virtual void        onDeviceStatusChanged(const String8 &cameraId,
-            hardware::camera::common::V1_0::CameraDeviceStatus newHalStatus) override;
+            CameraDeviceStatus newHalStatus) override;
     virtual void        onDeviceStatusChanged(const String8 &cameraId,
             const String8 &physicalCameraId,
-            hardware::camera::common::V1_0::CameraDeviceStatus newHalStatus) override;
+            CameraDeviceStatus newHalStatus) override;
     // This method may hold CameraProviderManager::mInterfaceMutex as a part
     // of calling getSystemCameraKind() internally. Care should be taken not to
     // directly / indirectly call this from callers who also hold
     // mInterfaceMutex.
     virtual void        onTorchStatusChanged(const String8& cameraId,
-            hardware::camera::common::V1_0::TorchModeStatus newStatus) override;
+            TorchModeStatus newStatus) override;
     // Does not hold CameraProviderManager::mInterfaceMutex.
     virtual void        onTorchStatusChanged(const String8& cameraId,
-            hardware::camera::common::V1_0::TorchModeStatus newStatus,
+            TorchModeStatus newStatus,
             SystemCameraKind kind) override;
     virtual void        onNewProviderRegistered() override;
 
@@ -557,8 +557,6 @@ public:
     int32_t updateAudioRestrictionLocked();
 
 private:
-
-    typedef hardware::camera::common::V1_0::CameraDeviceStatus CameraDeviceStatus;
 
     /**
      * Typesafe version of device status, containing both the HAL-layer and the service interface-
@@ -1102,7 +1100,7 @@ private:
     // guard mTorchUidMap
     Mutex                mTorchUidMapMutex;
     // camera id -> torch status
-    KeyedVector<String8, hardware::camera::common::V1_0::TorchModeStatus>
+    KeyedVector<String8, TorchModeStatus>
             mTorchStatusMap;
     // camera id -> torch client binder
     // only store the last client that turns on each camera's torch mode
@@ -1116,16 +1114,16 @@ private:
     // handle torch mode status change and invoke callbacks. mTorchStatusMutex
     // should be locked.
     void onTorchStatusChangedLocked(const String8& cameraId,
-            hardware::camera::common::V1_0::TorchModeStatus newStatus,
+            TorchModeStatus newStatus,
             SystemCameraKind systemCameraKind);
 
     // get a camera's torch status. mTorchStatusMutex should be locked.
     status_t getTorchStatusLocked(const String8 &cameraId,
-             hardware::camera::common::V1_0::TorchModeStatus *status) const;
+             TorchModeStatus *status) const;
 
     // set a camera's torch status. mTorchStatusMutex should be locked.
     status_t setTorchStatusLocked(const String8 &cameraId,
-            hardware::camera::common::V1_0::TorchModeStatus status);
+            TorchModeStatus status);
 
     // notify physical camera status when the physical camera is public.
     // Expects mStatusListenerLock to be locked.
@@ -1236,14 +1234,13 @@ private:
     status_t checkCameraAccess(const String16& opPackageName);
 
     static String8 toString(std::set<userid_t> intSet);
-    static int32_t mapToInterface(hardware::camera::common::V1_0::TorchModeStatus status);
-    static StatusInternal mapToInternal(hardware::camera::common::V1_0::CameraDeviceStatus status);
+    static int32_t mapToInterface(TorchModeStatus status);
+    static StatusInternal mapToInternal(CameraDeviceStatus status);
     static int32_t mapToInterface(StatusInternal status);
 
 
     void broadcastTorchModeStatus(const String8& cameraId,
-            hardware::camera::common::V1_0::TorchModeStatus status,
-            SystemCameraKind systemCameraKind);
+            TorchModeStatus status, SystemCameraKind systemCameraKind);
 
     void broadcastTorchStrengthLevel(const String8& cameraId, int32_t newTorchStrengthLevel);
 

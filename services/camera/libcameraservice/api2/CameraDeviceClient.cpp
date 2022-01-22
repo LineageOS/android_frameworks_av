@@ -710,27 +710,9 @@ binder::Status CameraDeviceClient::isSessionConfigurationSupported(
         return STATUS_ERROR(CameraService::ERROR_ILLEGAL_ARGUMENT, msg.string());
     }
 
-    hardware::camera::device::V3_8::StreamConfiguration streamConfiguration;
-    bool earlyExit = false;
-    camera3::metadataGetter getMetadata = [this](const String8 &id, bool /*overrideForPerfClass*/) {
-          return mDevice->infoPhysical(id);};
-    std::vector<std::string> physicalCameraIds;
-    mProviderManager->isLogicalCamera(mCameraIdStr.string(), &physicalCameraIds);
-    res = SessionConfigurationUtils::convertToHALStreamCombination(sessionConfiguration,
-            mCameraIdStr, mDevice->info(), getMetadata, physicalCameraIds, streamConfiguration,
-            mOverrideForPerfClass, &earlyExit);
-    if (!res.isOk()) {
-        return res;
-    }
-
-    if (earlyExit) {
-        *status = false;
-        return binder::Status::ok();
-    }
-
     *status = false;
     ret = mProviderManager->isSessionConfigurationSupported(mCameraIdStr.string(),
-            streamConfiguration, status);
+            sessionConfiguration, mOverrideForPerfClass, status);
     switch (ret) {
         case OK:
             // Expected, do nothing.
