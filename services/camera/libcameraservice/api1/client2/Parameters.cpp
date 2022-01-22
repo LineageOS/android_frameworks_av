@@ -75,23 +75,43 @@ status_t Parameters::initialize(CameraDeviceBase *device, int deviceVersion) {
     // Treat the H.264 max size as the max supported video size.
     MediaProfiles *videoEncoderProfiles = MediaProfiles::getInstance();
     Vector<video_encoder> encoders = videoEncoderProfiles->getVideoEncoders();
+    int32_t minVideoWidth = MAX_PREVIEW_WIDTH;
+    int32_t minVideoHeight = MAX_PREVIEW_HEIGHT;
     int32_t maxVideoWidth = 0;
     int32_t maxVideoHeight = 0;
     for (size_t i = 0; i < encoders.size(); i++) {
-        int width = videoEncoderProfiles->getVideoEncoderParamByName(
+        int w0 = videoEncoderProfiles->getVideoEncoderParamByName(
+                "enc.vid.width.min", encoders[i]);
+        int h0 = videoEncoderProfiles->getVideoEncoderParamByName(
+                "enc.vid.height.min", encoders[i]);
+        int w1 = videoEncoderProfiles->getVideoEncoderParamByName(
                 "enc.vid.width.max", encoders[i]);
-        int height = videoEncoderProfiles->getVideoEncoderParamByName(
+        int h1 = videoEncoderProfiles->getVideoEncoderParamByName(
                 "enc.vid.height.max", encoders[i]);
-        // Treat width/height separately here to handle the case where different
-        // profile might report max size of different aspect ratio
-        if (width > maxVideoWidth) {
-            maxVideoWidth = width;
+        // Assume the min size is 0 if it's not reported by encoder
+        if (w0 == -1) {
+            w0 = 0;
         }
-        if (height > maxVideoHeight) {
-            maxVideoHeight = height;
+        if (h0 == -1) {
+            h0 = 0;
+        }
+        // Treat width/height separately here to handle the case where different
+        // profile might report min/max size of different aspect ratio
+        if (w0 < minVideoWidth) {
+            minVideoWidth = w0;
+        }
+        if (h0 < minVideoHeight) {
+            minVideoHeight = h0;
+        }
+        if (w1 > maxVideoWidth) {
+            maxVideoWidth = w1;
+        }
+        if (h1 > maxVideoHeight) {
+            maxVideoHeight = h1;
         }
     }
-    // This is just an upper bound and may not be an actually valid video size
+    // These are upper/lower bounds and may not be an actually valid video size
+    const Size VIDEO_SIZE_LOWER_BOUND = {minVideoWidth, minVideoHeight};
     Size videoSizeUpperBound = {maxVideoWidth, maxVideoHeight};
 
     if (fastInfo.supportsPreferredConfigs) {
@@ -99,9 +119,10 @@ status_t Parameters::initialize(CameraDeviceBase *device, int deviceVersion) {
         videoSizeUpperBound = getMaxSize(getPreferredVideoSizes());
     }
 
-    res = getFilteredSizes(maxPreviewSize, &availablePreviewSizes);
+    res = getFilteredSizes(Size{0, 0}, maxPreviewSize, &availablePreviewSizes);
     if (res != OK) return res;
-    res = getFilteredSizes(videoSizeUpperBound, &availableVideoSizes);
+    res = getFilteredSizes(
+        VIDEO_SIZE_LOWER_BOUND, videoSizeUpperBound, &availableVideoSizes);
     if (res != OK) return res;
 
     // Select initial preview and video size that's under the initial bound and
@@ -1055,7 +1076,8 @@ status_t Parameters::buildFastInfo(CameraDeviceBase *device) {
     if (fastInfo.supportsPreferredConfigs) {
         previewSizeBound = getMaxSize(getPreferredPreviewSizes());
     }
-    status_t res = getFilteredSizes(previewSizeBound, &supportedPreviewSizes);
+    status_t res = getFilteredSizes(
+        Size{0, 0}, previewSizeBound, &supportedPreviewSizes);
     if (res != OK) return res;
     for (size_t i=0; i < availableFpsRanges.count; i += 2) {
         if (!isFpsSupported(supportedPreviewSizes,
@@ -2998,7 +3020,8 @@ int Parameters::arrayYToNormalizedWithCrop(int y,
     }
 }
 
-status_t Parameters::getFilteredSizes(Size limit, Vector<Size> *sizes) {
+status_t Parameters::getFilteredSizes(const Size &lower, const Size &upper,
+        Vector<Size> *sizes) {
     if (info == NULL) {
         ALOGE("%s: Static metadata is not initialized", __FUNCTION__);
         return NO_INIT;
@@ -3014,7 +3037,8 @@ status_t Parameters::getFilteredSizes(Size limit, Vector<Size> *sizes) {
         const StreamConfiguration &sc = scs[i];
         if (sc.isInput == ANDROID_SCALER_AVAILABLE_STREAM_CONFIGURATIONS_OUTPUT &&
                 sc.format == HAL_PIXEL_FORMAT_IMPLEMENTATION_DEFINED &&
-                ((sc.width * sc.height) <= (limit.width * limit.height))) {
+                ((sc.width * sc.height) >= (lower.width * lower.height)) &&
+                ((sc.width * sc.height) <= (upper.width * upper.height))) {
             int64_t minFrameDuration = getMinFrameDurationNs(
                     {sc.width, sc.height}, HAL_PIXEL_FORMAT_IMPLEMENTATION_DEFINED);
             if (minFrameDuration > MAX_PREVIEW_RECORD_DURATION_NS) {
