@@ -5304,7 +5304,8 @@ void AudioPolicyManager::onNewAudioModulesAvailableInt(DeviceVector *newDevices)
                 ALOGW("Output profile contains no device on module %s", hwModule->getName());
                 continue;
             }
-            if ((outProfile->getFlags() & AUDIO_OUTPUT_FLAG_TTS) != 0) {
+            if ((outProfile->getFlags() & AUDIO_OUTPUT_FLAG_TTS) != 0 ||
+                (outProfile->getFlags() & AUDIO_OUTPUT_FLAG_ULTRASOUND) != 0) {
                 mTtsOutputAvailable = true;
             }
 

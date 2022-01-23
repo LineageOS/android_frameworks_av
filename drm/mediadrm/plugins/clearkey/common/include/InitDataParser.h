@@ -15,14 +15,24 @@
  */
 #pragma once
 
-#include <array>
-#include <cstdint>
-#include <vector>
+#include "ClearKeyTypes.h"
 
 namespace clearkeydrm {
 
-bool isClearKeyUUID(const uint8_t uuid[16]);
+class InitDataParser {
+  public:
+    InitDataParser() {}
 
-std::vector<std::array<uint8_t, 16>> getSupportedCryptoSchemes();
+    CdmResponseType parse(const std::vector<uint8_t>& initData, const std::string& mimeType,
+                          CdmKeyType keyType, std::vector<uint8_t>* licenseRequest);
+
+  private:
+    CLEARKEY_DISALLOW_COPY_AND_ASSIGN(InitDataParser);
+
+    CdmResponseType parsePssh(const std::vector<uint8_t>& initData,
+                              std::vector<const uint8_t*>* keyIds);
+
+    std::string generateRequest(CdmKeyType keyType, const std::vector<const uint8_t*>& keyIds);
+};
 
 }  // namespace clearkeydrm

@@ -15,14 +15,24 @@
  */
 #pragma once
 
-#include <array>
 #include <cstdint>
-#include <vector>
+
+#include "ClearKeyTypes.h"
 
 namespace clearkeydrm {
 
-bool isClearKeyUUID(const uint8_t uuid[16]);
+class AesCtrDecryptor {
+  public:
+    AesCtrDecryptor() {}
 
-std::vector<std::array<uint8_t, 16>> getSupportedCryptoSchemes();
+    CdmResponseType decrypt(const std::vector<uint8_t>& key, const Iv iv, const uint8_t* source,
+                            uint8_t* destination,
+                            const std::vector<int32_t>& clearDataLengths,
+                            const std::vector<int32_t>& encryptedDataLengths,
+                            size_t* bytesDecryptedOut);
+
+  private:
+    CLEARKEY_DISALLOW_COPY_AND_ASSIGN(AesCtrDecryptor);
+};
 
 }  // namespace clearkeydrm
