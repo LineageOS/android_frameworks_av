@@ -557,7 +557,7 @@ int64_t AudioStreamRecord::getFramesWritten() {
         case AAUDIO_STREAM_STATE_STARTED:
             result = mAudioRecord->getPosition(&position);
             if (result == OK) {
-                mFramesWritten.update32(position);
+                mFramesWritten.update32((int32_t)position);
             }
             break;
         case AAUDIO_STREAM_STATE_STOPPING:
