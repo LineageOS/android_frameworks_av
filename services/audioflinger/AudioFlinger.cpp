@@ -2590,7 +2590,7 @@ sp<AudioFlinger::ThreadBase> AudioFlinger::openOutput_l(audio_module_handle_t mo
 {
     AudioHwDevice *outHwDev = findSuitableHwDev_l(module, deviceType);
     if (outHwDev == NULL) {
-        return 0;
+        return nullptr;
     }
 
     if (*output == AUDIO_IO_HANDLE_NONE) {
@@ -2599,8 +2599,16 @@ sp<AudioFlinger::ThreadBase> AudioFlinger::openOutput_l(audio_module_handle_t mo
         // Audio Policy does not currently request a specific output handle.
         // If this is ever needed, see openInput_l() for example code.
         ALOGE("openOutput_l requested output handle %d is not AUDIO_IO_HANDLE_NONE", *output);
-        return 0;
+        return nullptr;
     }
+
+#ifndef MULTICHANNEL_EFFECT_CHAIN
+    if (flags & AUDIO_OUTPUT_FLAG_SPATIALIZER) {
+        ALOGE("openOutput_l() cannot create spatializer thread "
+                "without #define MULTICHANNEL_EFFECT_CHAIN");
+        return nullptr;
+    }
+#endif
 
     mHardwareStatus = AUDIO_HW_OUTPUT_OPEN;
 
@@ -2646,18 +2654,11 @@ sp<AudioFlinger::ThreadBase> AudioFlinger::openOutput_l(audio_module_handle_t mo
             return thread;
         } else {
             sp<PlaybackThread> thread;
-            //TODO: b/193496180 use spatializer flag at audio HAL when available
-            if (flags == (audio_output_flags_t)(AUDIO_OUTPUT_FLAG_FAST
-                                                    | AUDIO_OUTPUT_FLAG_DEEP_BUFFER)) {
-#ifdef MULTICHANNEL_EFFECT_CHAIN
+            if (flags & AUDIO_OUTPUT_FLAG_SPATIALIZER) {
                 thread = new SpatializerThread(this, outputStream, *output,
                                                     mSystemReady, mixerConfig);
-                ALOGD("openOutput_l() created spatializer output: ID %d thread %p",
+                ALOGV("openOutput_l() created spatializer output: ID %d thread %p",
                       *output, thread.get());
-#else
-                ALOGE("openOutput_l() cannot create spatializer thread "
-                        "without #define MULTICHANNEL_EFFECT_CHAIN");
-#endif
             } else if (flags & AUDIO_OUTPUT_FLAG_COMPRESS_OFFLOAD) {
                 thread = new OffloadThread(this, outputStream, *output, mSystemReady);
                 ALOGV("openOutput_l() created offload output: ID %d thread %p",
@@ -2683,7 +2684,7 @@ sp<AudioFlinger::ThreadBase> AudioFlinger::openOutput_l(audio_module_handle_t mo
         }
     }
 
-    return 0;
+    return nullptr;
 }
 
 status_t AudioFlinger::openOutput(const media::OpenOutputRequest& request,
