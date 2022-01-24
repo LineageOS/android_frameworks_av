@@ -601,6 +601,11 @@ const detail::AudioDevicePairs& getAudioDevicePairs() {
                         AudioDeviceType::OUT_SPEAKER,
                         AudioDeviceDescription::CONNECTION_BT_LE())
             },
+            {
+                AUDIO_DEVICE_OUT_BLE_BROADCAST, make_AudioDeviceDescription(
+                        AudioDeviceType::OUT_BROADCAST,
+                        AudioDeviceDescription::CONNECTION_BT_LE())
+            },
             // AUDIO_DEVICE_IN_AMBIENT and IN_COMMUNICATION are removed since they were deprecated.
             {
                 AUDIO_DEVICE_IN_BUILTIN_MIC, make_AudioDeviceDescription(
