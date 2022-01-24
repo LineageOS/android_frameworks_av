@@ -14,7 +14,6 @@
  * limitations under the License.
  */
 //#define LOG_NDEBUG 0
-#include "include/ClearKeyTypes.h"
 #define LOG_TAG "clearkey-InitDataParser"
 
 #include <algorithm>
