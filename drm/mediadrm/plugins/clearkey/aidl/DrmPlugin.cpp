@@ -706,7 +706,6 @@ void DrmPlugin::installSecureStop(const std::vector<uint8_t>& sessionId) {
         if (!res.isOk() && res.getExceptionCode() == EX_SERVICE_SPECIFIC) {
             status = static_cast<Status>(res.getServiceSpecificError());
         }
-        return toNdkScopedAStatus(status);
         if (Status::OK != status) break;
     }
 
@@ -811,8 +810,6 @@ void DrmPlugin::sendEvent(::aidl::android::hardware::drm::EventType in_eventType
                                           const std::vector<uint8_t>& in_data) {
     if (mListener != nullptr) {
         mListener->onEvent(in_eventType, in_sessionId, in_data);
-    } else if (mListener != nullptr) {
-        mListener->onEvent(in_eventType, in_sessionId, in_data);
     } else {
         ALOGE("Null event listener, event not sent");
     }
@@ -822,8 +819,6 @@ void DrmPlugin::sendEvent(::aidl::android::hardware::drm::EventType in_eventType
 void DrmPlugin::sendExpirationUpdate(const std::vector<uint8_t>& in_sessionId,
                                                      int64_t in_expiryTimeInMS) {
     if (mListener != nullptr) {
-        mListener->onExpirationUpdate(in_sessionId, in_expiryTimeInMS);
-    } else if (mListener != nullptr) {
         mListener->onExpirationUpdate(in_sessionId, in_expiryTimeInMS);
     } else {
         ALOGE("Null event listener, event not sent");
@@ -836,8 +831,6 @@ void DrmPlugin::sendKeysChange(
         const std::vector<::aidl::android::hardware::drm::KeyStatus>& in_keyStatusList,
         bool in_hasNewUsableKey) {
     if (mListener != nullptr) {
-        mListener->onKeysChange(in_sessionId, in_keyStatusList, in_hasNewUsableKey);
-    } else if (mListener != nullptr) {
         mListener->onKeysChange(in_sessionId, in_keyStatusList, in_hasNewUsableKey);
     } else {
         ALOGE("Null event listener, event not sent");

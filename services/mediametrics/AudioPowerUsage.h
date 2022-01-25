@@ -26,6 +26,7 @@
 
 namespace android::mediametrics {
 
+
 class AudioAnalytics;
 
 class AudioPowerUsage {
@@ -83,13 +84,21 @@ public:
     static bool deviceFromString(const std::string& device_string, int32_t& device);
     static int32_t deviceFromStringPairs(const std::string& device_strings);
 private:
-    bool saveAsItem_l(int32_t device, int64_t duration, int32_t type, double average_vol)
-         REQUIRES(mLock);
+    bool saveAsItem_l(int32_t device, int64_t duration, int32_t type, double average_vol,
+                      int64_t max_volume_duration, double max_volume,
+                      int64_t min_volume_duration, double min_volume)
+                      REQUIRES(mLock);
     void sendItem(const std::shared_ptr<const mediametrics::Item>& item) const;
     void collect();
-    bool saveAsItems_l(int32_t device, int64_t duration, int32_t type, double average_vol)
-         REQUIRES(mLock);
-
+    bool saveAsItems_l(int32_t device, int64_t duration, int32_t type, double average_vol,
+                      int64_t max_volume_duration, double max_volume,
+                      int64_t min_volume_duration, double min_volume)
+                      REQUIRES(mLock);
+    void updateMinMaxVolumeAndDuration(
+            const int64_t cur_max_volume_duration_ns, const double cur_max_volume,
+            const int64_t cur_min_volume_duration_ns, const double cur_min_volume,
+            int64_t& f_max_volume_duration_ns, double& f_max_volume,
+            int64_t& f_min_volume_duration_ns, double& f_min_volume);
     AudioAnalytics * const mAudioAnalytics;
     const std::shared_ptr<StatsdLog> mStatsdLog;  // mStatsdLog is internally locked
     const bool mDisabled;
@@ -100,6 +109,10 @@ private:
 
     double mVoiceVolume GUARDED_BY(mLock) = 0.;
     double mDeviceVolume GUARDED_BY(mLock) = 0.;
+    double mMaxVoiceVolume GUARDED_BY(mLock) = AMEDIAMETRICS_INITIAL_MAX_VOLUME;
+    double mMinVoiceVolume GUARDED_BY(mLock) = AMEDIAMETRICS_INITIAL_MIN_VOLUME;
+    int64_t mMaxVoiceVolumeDurationNs GUARDED_BY(mLock) = 0;
+    int64_t mMinVoiceVolumeDurationNs GUARDED_BY(mLock) = 0;
     int64_t mStartCallNs GUARDED_BY(mLock) = 0; // advisory only
     int64_t mVolumeTimeNs GUARDED_BY(mLock) = 0;
     int64_t mDeviceTimeNs GUARDED_BY(mLock) = 0;

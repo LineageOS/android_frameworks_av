@@ -45,6 +45,10 @@
 #define AUDIO_POWER_USAGE_PROP_DURATION_NS    "durationNs" // int64
 #define AUDIO_POWER_USAGE_PROP_TYPE           "type"       // int32
 #define AUDIO_POWER_USAGE_PROP_VOLUME         "volume"     // double
+#define AUDIO_POWER_USAGE_PROP_MIN_VOLUME_DURATION_NS "minVolumeDurationNs" // int64
+#define AUDIO_POWER_USAGE_PROP_MIN_VOLUME             "minVolume"           // double
+#define AUDIO_POWER_USAGE_PROP_MAX_VOLUME_DURATION_NS "maxVolumeDurationNs" // int64
+#define AUDIO_POWER_USAGE_PROP_MAX_VOLUME             "maxVolume"           // double
 
 namespace android::mediametrics {
 
@@ -141,13 +145,34 @@ void AudioPowerUsage::sendItem(const std::shared_ptr<const mediametrics::Item>& 
     double volume;
     if (!item->getDouble(AUDIO_POWER_USAGE_PROP_VOLUME, &volume)) return;
 
+    int64_t min_volume_duration_ns;
+    if (!item->getInt64(AUDIO_POWER_USAGE_PROP_MIN_VOLUME_DURATION_NS, &min_volume_duration_ns)) {
+        return;
+    }
+
+    double min_volume;
+    if (!item->getDouble(AUDIO_POWER_USAGE_PROP_MIN_VOLUME, &min_volume)) return;
+
+    int64_t max_volume_duration_ns;
+    if (!item->getInt64(AUDIO_POWER_USAGE_PROP_MAX_VOLUME_DURATION_NS, &max_volume_duration_ns)) {
+        return;
+    }
+
+    double max_volume;
+    if (!item->getDouble(AUDIO_POWER_USAGE_PROP_MAX_VOLUME, &max_volume)) return;
+
     const int32_t duration_secs = (int32_t)(duration_ns / NANOS_PER_SECOND);
-    const float average_volume = (float)volume;
+    const int32_t min_volume_duration_secs = (int32_t)(min_volume_duration_ns / NANOS_PER_SECOND);
+    const int32_t max_volume_duration_secs = (int32_t)(max_volume_duration_ns / NANOS_PER_SECOND);
     const int result = android::util::stats_write(android::util::AUDIO_POWER_USAGE_DATA_REPORTED,
                                          audio_device,
                                          duration_secs,
-                                         average_volume,
-                                         type);
+                                         (float)volume,
+                                         type,
+                                         min_volume_duration_secs,
+                                         (float)min_volume,
+                                         max_volume_duration_secs,
+                                         (float)max_volume);
 
     std::stringstream log;
     log << "result:" << result << " {"
@@ -155,17 +180,43 @@ void AudioPowerUsage::sendItem(const std::shared_ptr<const mediametrics::Item>& 
             << android::util::AUDIO_POWER_USAGE_DATA_REPORTED
             << " audio_device:" << audio_device
             << " duration_secs:" << duration_secs
-            << " average_volume:" << average_volume
+            << " average_volume:" << (float)volume
             << " type:" << type
+            << " min_volume_duration_secs:" << min_volume_duration_secs
+            << " min_volume:" << (float)min_volume
+            << " max_volume_duration_secs:" << max_volume_duration_secs
+            << " max_volume:" << (float)max_volume
             << " }";
     mStatsdLog->log(android::util::AUDIO_POWER_USAGE_DATA_REPORTED, log.str());
 }
 
+void AudioPowerUsage::updateMinMaxVolumeAndDuration(
+            const int64_t cur_max_volume_duration_ns, const double cur_max_volume,
+            const int64_t cur_min_volume_duration_ns, const double cur_min_volume,
+            int64_t& f_max_volume_duration_ns, double& f_max_volume,
+            int64_t& f_min_volume_duration_ns, double& f_min_volume)
+{
+    if (f_min_volume > cur_min_volume) {
+        f_min_volume = cur_min_volume;
+        f_min_volume_duration_ns = cur_min_volume_duration_ns;
+    } else if (f_min_volume == cur_min_volume) {
+        f_min_volume_duration_ns += cur_min_volume_duration_ns;
+    }
+    if (f_max_volume < cur_max_volume) {
+        f_max_volume = cur_max_volume;
+        f_max_volume_duration_ns = cur_max_volume_duration_ns;
+    } else if (f_max_volume == cur_max_volume) {
+        f_max_volume_duration_ns += cur_max_volume_duration_ns;
+    }
+}
+
 bool AudioPowerUsage::saveAsItem_l(
-        int32_t device, int64_t duration_ns, int32_t type, double average_vol)
+        int32_t device, int64_t duration_ns, int32_t type, double average_vol,
+        int64_t max_volume_duration_ns, double max_volume,
+        int64_t min_volume_duration_ns, double min_volume)
 {
     ALOGV("%s: (%#x, %d, %lld, %f)", __func__, device, type,
-                                   (long long)duration_ns, average_vol );
+                                   (long long)duration_ns, average_vol);
     if (duration_ns == 0) {
         return true; // skip duration 0 usage
     }
@@ -193,10 +244,36 @@ bool AudioPowerUsage::saveAsItem_l(
             item->setDouble(AUDIO_POWER_USAGE_PROP_VOLUME, final_volume);
             item->setTimestamp(systemTime(SYSTEM_TIME_REALTIME));
 
-            ALOGV("%s: update (%#x, %d, %lld, %f) --> (%lld, %f)", __func__,
+            // Update the max/min volume and duration
+            int64_t final_min_volume_duration_ns;
+            int64_t final_max_volume_duration_ns;
+            double final_min_volume;
+            double final_max_volume;
+
+            item->getInt64(AUDIO_POWER_USAGE_PROP_MIN_VOLUME_DURATION_NS,
+                           &final_min_volume_duration_ns);
+            item->getDouble(AUDIO_POWER_USAGE_PROP_MIN_VOLUME, &final_min_volume);
+            item->getInt64(AUDIO_POWER_USAGE_PROP_MAX_VOLUME_DURATION_NS,
+                           &final_max_volume_duration_ns);
+            item->getDouble(AUDIO_POWER_USAGE_PROP_MAX_VOLUME, &final_max_volume);
+            updateMinMaxVolumeAndDuration(max_volume_duration_ns, max_volume,
+                                          min_volume_duration_ns, min_volume,
+                                          final_max_volume_duration_ns, final_max_volume,
+                                          final_min_volume_duration_ns, final_min_volume);
+            item->setInt64(AUDIO_POWER_USAGE_PROP_MIN_VOLUME_DURATION_NS,
+                           final_min_volume_duration_ns);
+            item->setDouble(AUDIO_POWER_USAGE_PROP_MIN_VOLUME, final_min_volume);
+            item->setInt64(AUDIO_POWER_USAGE_PROP_MAX_VOLUME_DURATION_NS,
+                           final_max_volume_duration_ns);
+            item->setDouble(AUDIO_POWER_USAGE_PROP_MAX_VOLUME, final_max_volume);
+
+            ALOGV("%s: update (%#x, %d, %lld, %f) --> (%lld, %f) min(%lld, %f) max(%lld, %f)",
+                  __func__,
                   device, type,
                   (long long)item_duration_ns, item_volume,
-                  (long long)final_duration_ns, final_volume);
+                  (long long)final_duration_ns, final_volume,
+                  (long long)final_min_volume_duration_ns, final_min_volume,
+                  (long long)final_max_volume_duration_ns, final_max_volume);
 
             return true;
         }
@@ -208,12 +285,18 @@ bool AudioPowerUsage::saveAsItem_l(
     sitem->setInt64(AUDIO_POWER_USAGE_PROP_DURATION_NS, duration_ns);
     sitem->setInt32(AUDIO_POWER_USAGE_PROP_TYPE, type);
     sitem->setDouble(AUDIO_POWER_USAGE_PROP_VOLUME, average_vol);
+    sitem->setInt64(AUDIO_POWER_USAGE_PROP_MIN_VOLUME_DURATION_NS, min_volume_duration_ns);
+    sitem->setDouble(AUDIO_POWER_USAGE_PROP_MIN_VOLUME, min_volume);
+    sitem->setInt64(AUDIO_POWER_USAGE_PROP_MAX_VOLUME_DURATION_NS, max_volume_duration_ns);
+    sitem->setDouble(AUDIO_POWER_USAGE_PROP_MAX_VOLUME, max_volume);
     mItems.emplace_back(sitem);
     return true;
 }
 
 bool AudioPowerUsage::saveAsItems_l(
-        int32_t device, int64_t duration_ns, int32_t type, double average_vol)
+        int32_t device, int64_t duration_ns, int32_t type, double average_vol,
+        int64_t max_volume_duration, double max_volume,
+        int64_t min_volume_duration, double min_volume)
 {
     ALOGV("%s: (%#x, %d, %lld, %f)", __func__, device, type,
                                    (long long)duration_ns, average_vol );
@@ -232,7 +315,9 @@ bool AudioPowerUsage::saveAsItems_l(
         int32_t tmp_device = device_bits & -device_bits; // get lowest bit
         device_bits ^= tmp_device;  // clear lowest bit
         tmp_device |= input_bit;    // restore input bit
-        ret = saveAsItem_l(tmp_device, duration_ns, type, average_vol);
+        ret = saveAsItem_l(tmp_device, duration_ns, type, average_vol,
+                           max_volume_duration, max_volume,
+                           min_volume_duration, min_volume);
 
         ALOGV("%s: device %#x recorded, remaining device_bits = %#x", __func__,
             tmp_device, device_bits);
@@ -250,9 +335,28 @@ void AudioPowerUsage::checkTrackRecord(
         return;
     }
     double deviceVolume = 1.;
-    if (isTrack && !item->getDouble(AMEDIAMETRICS_PROP_DEVICEVOLUME, &deviceVolume)) {
-        return;
+    int64_t maxVolumeDurationNs = 0;
+    double maxVolume = AMEDIAMETRICS_INITIAL_MAX_VOLUME;
+    int64_t minVolumeDurationNs = 0;
+    double minVolume = AMEDIAMETRICS_INITIAL_MIN_VOLUME;
+    if (isTrack) {
+        if (!item->getDouble(AMEDIAMETRICS_PROP_DEVICEVOLUME, &deviceVolume)) {
+            return;
+        }
+        if (!item->getInt64(AMEDIAMETRICS_PROP_DEVICEMAXVOLUMEDURATIONNS, &maxVolumeDurationNs)) {
+            return;
+        }
+        if (!item->getDouble(AMEDIAMETRICS_PROP_DEVICEMAXVOLUME, &maxVolume)) {
+            return;
+        }
+        if (!item->getInt64(AMEDIAMETRICS_PROP_DEVICEMINVOLUMEDURATIONNS, &minVolumeDurationNs)) {
+            return;
+        }
+        if (!item->getDouble(AMEDIAMETRICS_PROP_DEVICEMINVOLUME, &minVolume)) {
+            return;
+        }
     }
+
     int32_t type = 0;
     std::string type_string;
     if ((isTrack && mAudioAnalytics->mAnalyticsState->timeMachine().get(
@@ -285,7 +389,8 @@ void AudioPowerUsage::checkTrackRecord(
         ALOGV("device = %s => %d", device_strings.c_str(), device);
     }
     std::lock_guard l(mLock);
-    saveAsItems_l(device, deviceTimeNs, type, deviceVolume);
+    saveAsItems_l(device, deviceTimeNs, type, deviceVolume,
+                  maxVolumeDurationNs, maxVolume, minVolumeDurationNs, minVolume);
 }
 
 void AudioPowerUsage::checkMode(const std::shared_ptr<const mediametrics::Item>& item)
@@ -299,10 +404,17 @@ void AudioPowerUsage::checkMode(const std::shared_ptr<const mediametrics::Item>&
     if (mMode == "AUDIO_MODE_IN_CALL") { // leaving call mode
         const int64_t endCallNs = item->getTimestamp();
         const int64_t durationNs = endCallNs - mDeviceTimeNs;
+        const int64_t volumeDurationNs = endCallNs - mVolumeTimeNs;
         if (durationNs > 0) {
             mDeviceVolume = (mDeviceVolume * double(mVolumeTimeNs - mDeviceTimeNs) +
-                    mVoiceVolume * double(endCallNs - mVolumeTimeNs)) / (double)durationNs;
-            saveAsItems_l(mPrimaryDevice, durationNs, VOICE_CALL_TYPE, mDeviceVolume);
+                    mVoiceVolume * double(volumeDurationNs)) / (double)durationNs;
+            updateMinMaxVolumeAndDuration(volumeDurationNs, mVoiceVolume,
+                          volumeDurationNs, mVoiceVolume,
+                          mMaxVoiceVolumeDurationNs, mMaxVoiceVolume,
+                          mMinVoiceVolumeDurationNs, mMinVoiceVolume);
+            saveAsItems_l(mPrimaryDevice, durationNs, VOICE_CALL_TYPE, mDeviceVolume,
+                          mMaxVoiceVolumeDurationNs, mMaxVoiceVolume,
+                          mMinVoiceVolumeDurationNs, mMinVoiceVolume);
         }
     } else if (mode == "AUDIO_MODE_IN_CALL") { // entering call mode
         mStartCallNs = item->getTimestamp(); // advisory only
@@ -327,10 +439,15 @@ void AudioPowerUsage::checkVoiceVolume(const std::shared_ptr<const mediametrics:
     if (mMode == "AUDIO_MODE_IN_CALL") {
         const int64_t timeNs = item->getTimestamp();
         const int64_t durationNs = timeNs - mDeviceTimeNs;
+        const int64_t volumeDurationNs = timeNs - mVolumeTimeNs;
         if (durationNs > 0) {
             mDeviceVolume = (mDeviceVolume * double(mVolumeTimeNs - mDeviceTimeNs) +
-                    mVoiceVolume * double(timeNs - mVolumeTimeNs)) / (double)durationNs;
+                    mVoiceVolume * double(volumeDurationNs)) / (double)durationNs;
             mVolumeTimeNs = timeNs;
+            updateMinMaxVolumeAndDuration(volumeDurationNs, mVoiceVolume,
+                          volumeDurationNs, mVoiceVolume,
+                          mMaxVoiceVolumeDurationNs, mMaxVoiceVolume,
+                          mMinVoiceVolumeDurationNs, mMinVoiceVolume);
         }
     }
     ALOGV("%s: new voice volume:%lf  old voice volume:%lf", __func__, voiceVolume, mVoiceVolume);
@@ -358,15 +475,26 @@ void AudioPowerUsage::checkCreatePatch(const std::shared_ptr<const mediametrics:
         // Save statistics
         const int64_t endDeviceNs = item->getTimestamp();
         const int64_t durationNs = endDeviceNs - mDeviceTimeNs;
+        const int64_t volumeDurationNs = endDeviceNs - mVolumeTimeNs;
         if (durationNs > 0) {
             mDeviceVolume = (mDeviceVolume * double(mVolumeTimeNs - mDeviceTimeNs) +
-                    mVoiceVolume * double(endDeviceNs - mVolumeTimeNs)) / (double)durationNs;
-            saveAsItems_l(mPrimaryDevice, durationNs, VOICE_CALL_TYPE, mDeviceVolume);
+                    mVoiceVolume * double(volumeDurationNs)) / (double)durationNs;
+            updateMinMaxVolumeAndDuration(volumeDurationNs, mVoiceVolume,
+                          volumeDurationNs, mVoiceVolume,
+                          mMaxVoiceVolumeDurationNs, mMaxVoiceVolume,
+                          mMinVoiceVolumeDurationNs, mMinVoiceVolume);
+            saveAsItems_l(mPrimaryDevice, durationNs, VOICE_CALL_TYPE, mDeviceVolume,
+                          mMaxVoiceVolumeDurationNs, mMaxVoiceVolume,
+                          mMinVoiceVolumeDurationNs, mMinVoiceVolume);
         }
         // reset statistics
         mDeviceVolume = 0;
         mDeviceTimeNs = endDeviceNs;
         mVolumeTimeNs = endDeviceNs;
+        mMaxVoiceVolume = AMEDIAMETRICS_INITIAL_MAX_VOLUME;
+        mMinVoiceVolume = AMEDIAMETRICS_INITIAL_MIN_VOLUME;
+        mMaxVoiceVolumeDurationNs = 0;
+        mMinVoiceVolumeDurationNs = 0;
     }
     ALOGV("%s: new primary device:%#x  old primary device:%#x", __func__, device, mPrimaryDevice);
     mPrimaryDevice = device;

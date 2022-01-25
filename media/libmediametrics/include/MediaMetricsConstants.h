@@ -25,6 +25,9 @@
  * 2) Consistent behavior and documentation.
  */
 
+#define AMEDIAMETRICS_INITIAL_MAX_VOLUME (0.f)
+#define AMEDIAMETRICS_INITIAL_MIN_VOLUME (1.f)
+
 /*
  * Taxonomy of audio keys
  *
@@ -115,6 +118,11 @@
 #define AMEDIAMETRICS_PROP_DEVICESTARTUPMS "deviceStartupMs" // double - avg startup time
 #define AMEDIAMETRICS_PROP_DEVICETIMENS   "deviceTimeNs"   // int64_t playback/record time
 #define AMEDIAMETRICS_PROP_DEVICEVOLUME   "deviceVolume"   // double - average device volume
+
+#define AMEDIAMETRICS_PROP_DEVICEMAXVOLUMEDURATIONNS "deviceMaxVolumeDurationNs" // int64_t
+#define AMEDIAMETRICS_PROP_DEVICEMAXVOLUME "deviceMaxVolume" // double - maximum device volume
+#define AMEDIAMETRICS_PROP_DEVICEMINVOLUMEDURATIONNS "deviceMinVolumeDurationNs" // int64_t
+#define AMEDIAMETRICS_PROP_DEVICEMINVOLUME "deviceMinVolume" // double - minimum device volume
 
 #define AMEDIAMETRICS_PROP_DIRECTION      "direction"      // string AAudio input or output
 #define AMEDIAMETRICS_PROP_DURATIONNS     "durationNs"     // int64 duration time span
