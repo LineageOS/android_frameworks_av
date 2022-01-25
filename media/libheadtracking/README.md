@@ -157,6 +157,14 @@ and estimates the pose of the head relative to the screen. Optionally, this
 module may indicate that the user is likely not in front of the screen via the
 “valid” output.
 
+## Stillness Detector
+
+The stillness detector blocks detect when their incoming pose stream has been
+stable for a given amount of time (allowing for a configurable amount of error).
+When the head is considered still, we would trigger a recenter operation
+(“auto-recentering”) and when the screen is considered not still, the mode
+selector would use this information to force static mode.
+
 ### Mode Selector
 
 The Mode Selector block aggregates the various sources of pose information into
@@ -168,7 +176,8 @@ The actual mode may diverge from the desired mode. It is determined as follows:
 
 - If the desired mode is static, the actual mode is static.
 - If the desired mode is world-relative:
-    - If head poses are fresh, the actual mode is world-relative.
+    - If head and screen poses are fresh and the screen is stable (stillness
+      detector output is true), the actual mode is world-relative.
     - Otherwise the actual mode is static.
 - If the desired mode is screen-relative:
     - If head and screen poses are fresh and the ‘valid’ signal is asserted, the
