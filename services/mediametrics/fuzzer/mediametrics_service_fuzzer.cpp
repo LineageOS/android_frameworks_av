@@ -19,14 +19,13 @@
  */
 #include <fuzzer/FuzzedDataProvider.h>
 #include <media/MediaMetricsItem.h>
+#include <mediametricsservice/AudioTypes.h>
+#include <mediametricsservice/MediaMetricsService.h>
+#include <mediametricsservice/StringUtils.h>
 #include <stdio.h>
 #include <string.h>
 #include <utils/Log.h>
 #include <algorithm>
-
-#include "AudioTypes.h"
-#include "MediaMetricsService.h"
-#include "StringUtils.h"
 
 using namespace android;
 
