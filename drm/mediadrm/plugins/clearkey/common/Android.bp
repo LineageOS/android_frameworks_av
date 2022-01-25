@@ -88,7 +88,10 @@ cc_library_static {
         "libclearkeydevicefiles-protos.common",
     ],
 
-    export_include_dirs: ["include"],
+    export_include_dirs: [
+        "include",
+        "include/clearkeydrm",
+    ],
 
     sanitize: {
         integer_overflow: true,

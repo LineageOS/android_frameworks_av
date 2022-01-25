@@ -272,7 +272,8 @@ DeviceVector Engine::getDevicesForStrategyInt(legacy_strategy strategy,
         devices = availableOutputDevices.getFirstDevicesFromTypes(
                                           getLastRemovableMediaDevices());
         if (!devices.isEmpty()) break;
-        devices = availableOutputDevices.getDevicesFromType(AUDIO_DEVICE_OUT_EARPIECE);
+        devices = availableOutputDevices.getFirstDevicesFromTypes({
+                AUDIO_DEVICE_OUT_DGTL_DOCK_HEADSET, AUDIO_DEVICE_OUT_EARPIECE});
     } break;
 
     case STRATEGY_SONIFICATION:
@@ -364,7 +365,8 @@ DeviceVector Engine::getDevicesForStrategyInt(legacy_strategy strategy,
                     AUDIO_DEVICE_OUT_ANLG_DOCK_HEADSET);
         }
         if (devices2.isEmpty()) {
-            devices2 = availableOutputDevices.getDevicesFromType(AUDIO_DEVICE_OUT_SPEAKER);
+            devices2 = availableOutputDevices.getFirstDevicesFromTypes({
+                        AUDIO_DEVICE_OUT_DGTL_DOCK_HEADSET, AUDIO_DEVICE_OUT_SPEAKER});
         }
         DeviceVector devices3;
         if (strategy == STRATEGY_MEDIA) {

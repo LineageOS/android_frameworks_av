@@ -69,8 +69,9 @@ status_t AudioRecord::getMinFrameCount(
 
     // We double the size of input buffer for ping pong use of record buffer.
     // Assumes audio_is_linear_pcm(format)
-    if ((*frameCount = (size * 2) / (audio_channel_count_from_in_mask(channelMask) *
-            audio_bytes_per_sample(format))) == 0) {
+    const auto sampleSize = audio_channel_count_from_in_mask(channelMask) *
+                                      audio_bytes_per_sample(format);
+    if (sampleSize == 0 || ((*frameCount = (size * 2) / sampleSize) == 0)) {
         ALOGE("%s(): Unsupported configuration: sampleRate %u, format %#x, channelMask %#x",
                 __func__, sampleRate, format, channelMask);
         return BAD_VALUE;
@@ -357,6 +358,12 @@ status_t AudioRecord::set(
     if (format == AUDIO_FORMAT_DEFAULT) {
         format = AUDIO_FORMAT_PCM_16_BIT;
     }
+    if (!audio_is_linear_pcm(format)) {
+       // Compressed capture requires direct
+       flags = (audio_input_flags_t) (flags | AUDIO_INPUT_FLAG_DIRECT);
+       ALOGI("%s(): Format %#x is not linear pcm. Setting DIRECT, using flags %#x", __func__,
+             format, flags);
+    }
     mFormat = format;
     mChannelMask = channelMask;
     mSessionId = sessionId;
@@ -396,9 +403,8 @@ status_t AudioRecord::set(
         goto error;
     }
 
-    // AudioFlinger capture only supports linear PCM
-    if (!audio_is_valid_format(mFormat) || !audio_is_linear_pcm(mFormat)) {
-        errorMessage = StringPrintf("%s: Format %#x is not linear pcm", __func__, mFormat);
+    if (!audio_is_valid_format(mFormat)) {
+        errorMessage = StringPrintf("%s: Format %#x is not valid", __func__, mFormat);
         status = BAD_VALUE;
         goto error;
     }
@@ -718,6 +724,11 @@ status_t AudioRecord::getTimestamp(ExtendedTimestamp *timestamp)
     if (status == OK) {
         timestamp->mPosition[ExtendedTimestamp::LOCATION_CLIENT] = mFramesRead;
         timestamp->mTimeNs[ExtendedTimestamp::LOCATION_CLIENT] = 0;
+        if (!audio_is_linear_pcm(mFormat)) {
+            // Don't do retrograde corrections or server offset if track is
+            // compressed
+            return OK;
+        }
         // server side frame offset in case AudioRecord has been restored.
         for (int i = ExtendedTimestamp::LOCATION_SERVER;
                 i < ExtendedTimestamp::LOCATION_MAX; ++i) {
@@ -1184,7 +1195,13 @@ status_t AudioRecord::obtainBuffer(Buffer* audioBuffer, const struct timespec *r
             if (status == DEAD_OBJECT) {
                 // re-create track, unless someone else has already done so
                 if (newSequence == oldSequence) {
-                    status = restoreRecord_l("obtainBuffer");
+                    if (!audio_is_linear_pcm(mFormat)) {
+                        // If compressed capture, don't attempt to restore the track.
+                        // Return a DEAD_OBJECT error and let the caller recreate.
+                        tryCounter = 0;
+                    } else {
+                        status = restoreRecord_l("obtainBuffer");
+                    }
                     if (status != NO_ERROR) {
                         buffer.mFrameCount = 0;
                         buffer.mRaw = NULL;

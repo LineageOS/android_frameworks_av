@@ -205,6 +205,16 @@ status_t DeviceHalHidl::openOutputStream(
             status != OK) {
         return status;
     }
+
+#if !(MAJOR_VERSION == 7 && MINOR_VERSION == 1)
+    //TODO: b/193496180 use spatializer flag at audio HAL when available
+    if ((flags & AUDIO_OUTPUT_FLAG_SPATIALIZER) != 0) {
+        flags = (audio_output_flags_t)(flags & ~AUDIO_OUTPUT_FLAG_SPATIALIZER);
+        flags = (audio_output_flags_t)
+                (flags | AUDIO_OUTPUT_FLAG_FAST | AUDIO_OUTPUT_FLAG_DEEP_BUFFER);
+    }
+#endif
+
     CoreUtils::AudioOutputFlags hidlFlags;
     if (status_t status = CoreUtils::audioOutputFlagsFromHal(flags, &hidlFlags); status != OK) {
         return status;
