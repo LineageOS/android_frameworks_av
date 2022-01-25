@@ -59,6 +59,7 @@ struct C2Config {
     enum drc_compression_mode_t : int32_t;  ///< DRC compression mode
     enum drc_effect_type_t : int32_t;       ///< DRC effect type
     enum drc_album_mode_t : int32_t;        ///< DRC album mode
+    enum hdr_dynamic_metadata_type_t : uint32_t;  ///< HDR dynamic metadata type
     enum intra_refresh_mode_t : uint32_t;   ///< intra refresh modes
     enum level_t : uint32_t;                ///< coding level
     enum ordinal_key_t : uint32_t;          ///< work ordering keys
@@ -189,9 +190,12 @@ enum C2ParamIndexKind : C2Param::type_index_t {
 
     kParamIndexPictureTypeMask,
     kParamIndexPictureType,
+    // deprecated
     kParamIndexHdr10PlusMetadata,
 
     kParamIndexPictureQuantization,
+
+    kParamIndexHdrDynamicMetadata,
 
     /* ------------------------------------ video components ------------------------------------ */
 
@@ -1605,16 +1609,54 @@ struct C2HdrStaticMetadataStruct {
     C2FIELD(maxFall, "max-fall")
 };
 typedef C2StreamParam<C2Info, C2HdrStaticMetadataStruct, kParamIndexHdrStaticMetadata>
-        C2StreamHdrStaticInfo;
+        C2StreamHdrStaticMetadataInfo;
+typedef C2StreamParam<C2Info, C2HdrStaticMetadataStruct, kParamIndexHdrStaticMetadata>
+        C2StreamHdrStaticInfo;  // deprecated
 constexpr char C2_PARAMKEY_HDR_STATIC_INFO[] = "raw.hdr-static-info";
 
 /**
  * HDR10+ Metadata Info.
+ *
+ * Deprecated. Use C2StreamHdrDynamicMetadataInfo with
+ * HDR_DYNAMIC_METADATA_TYPE_SMPTE_2094_40
  */
 typedef C2StreamParam<C2Info, C2BlobValue, kParamIndexHdr10PlusMetadata>
-        C2StreamHdr10PlusInfo;
-constexpr char C2_PARAMKEY_INPUT_HDR10_PLUS_INFO[] = "input.hdr10-plus-info";
-constexpr char C2_PARAMKEY_OUTPUT_HDR10_PLUS_INFO[] = "output.hdr10-plus-info";
+        C2StreamHdr10PlusInfo;  // deprecated
+constexpr char C2_PARAMKEY_INPUT_HDR10_PLUS_INFO[] = "input.hdr10-plus-info";  // deprecated
+constexpr char C2_PARAMKEY_OUTPUT_HDR10_PLUS_INFO[] = "output.hdr10-plus-info";  // deprecated
+
+/**
+ * HDR dynamic metadata types
+ */
+C2ENUM(C2Config::hdr_dynamic_metadata_type_t, uint32_t,
+    HDR_DYNAMIC_METADATA_TYPE_SMPTE_2094_10,  ///< SMPTE ST 2094-10
+    HDR_DYNAMIC_METADATA_TYPE_SMPTE_2094_40,  ///< SMPTE ST 2094-40
+)
+
+struct C2HdrDynamicMetadataStruct {
+    inline C2HdrDynamicMetadataStruct() { memset(this, 0, sizeof(*this)); }
+
+    inline C2HdrDynamicMetadataStruct(
+            size_t flexCount, C2Config::hdr_dynamic_metadata_type_t type)
+        : type_(type) {
+        memset(data, 0, flexCount);
+    }
+
+    C2Config::hdr_dynamic_metadata_type_t type_;
+    uint8_t data[];
+
+    DEFINE_AND_DESCRIBE_FLEX_C2STRUCT(HdrDynamicMetadata, data)
+    C2FIELD(type_, "type")
+    C2FIELD(data, "data")
+};
+
+/**
+ * Dynamic HDR Metadata Info.
+ */
+typedef C2StreamParam<C2Info, C2HdrDynamicMetadataStruct, kParamIndexHdrDynamicMetadata>
+        C2StreamHdrDynamicMetadataInfo;
+constexpr char C2_PARAMKEY_INPUT_HDR_DYNAMIC_INFO[] = "input.hdr-dynamic-info";
+constexpr char C2_PARAMKEY_OUTPUT_HDR_DYNAMIC_INFO[] = "output.hdr-dynamic-info";
 
 /* ------------------------------------ block-based coding ----------------------------------- */
 
