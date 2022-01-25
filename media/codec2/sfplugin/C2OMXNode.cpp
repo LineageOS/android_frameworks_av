@@ -42,6 +42,7 @@
 
 #include "utils/Codec2Mapper.h"
 #include "C2OMXNode.h"
+#include "Codec2Buffer.h"
 
 namespace android {
 
@@ -466,6 +467,18 @@ status_t C2OMXNode::emptyBuffer(
                 new Buffer2D(block->share(
                         C2Rect(block->width(), block->height()), ::C2Fence())));
         work->input.buffers.push_back(c2Buffer);
+        std::shared_ptr<C2StreamHdrStaticInfo::input> staticInfo;
+        std::shared_ptr<C2StreamHdrDynamicMetadataInfo::input> dynamicInfo;
+        GetHdrMetadataFromGralloc4Handle(
+                block->handle(),
+                &staticInfo,
+                &dynamicInfo);
+        if (staticInfo && *staticInfo) {
+            c2Buffer->setInfo(staticInfo);
+        }
+        if (dynamicInfo && *dynamicInfo) {
+            c2Buffer->setInfo(dynamicInfo);
+        }
     }
     work->worklets.clear();
     work->worklets.emplace_back(new C2Worklet);
