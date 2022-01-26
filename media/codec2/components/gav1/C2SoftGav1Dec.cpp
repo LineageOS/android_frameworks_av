@@ -32,6 +32,8 @@ namespace android {
 // codecname set and passed in as a compile flag from Android.bp
 constexpr char COMPONENT_NAME[] = CODECNAME;
 
+constexpr size_t kMinInputBufferSize = 2 * 1024 * 1024;
+
 class C2SoftGav1Dec::IntfImpl : public SimpleInterface<void>::BaseParams {
  public:
   explicit IntfImpl(const std::shared_ptr<C2ReflectorHelper> &helper)
@@ -110,8 +112,7 @@ class C2SoftGav1Dec::IntfImpl : public SimpleInterface<void>::BaseParams {
             .build());
 
     addParameter(DefineParam(mMaxInputSize, C2_PARAMKEY_INPUT_MAX_BUFFER_SIZE)
-                     .withDefault(new C2StreamMaxBufferSizeInfo::input(
-                         0u, 320 * 240 * 3 / 4))
+                     .withDefault(new C2StreamMaxBufferSizeInfo::input(0u, kMinInputBufferSize))
                      .withFields({
                          C2F(mMaxInputSize, value).any(),
                      })
@@ -227,9 +228,9 @@ class C2SoftGav1Dec::IntfImpl : public SimpleInterface<void>::BaseParams {
       bool mayBlock, C2P<C2StreamMaxBufferSizeInfo::input> &me,
       const C2P<C2StreamMaxPictureSizeTuning::output> &maxSize) {
     (void)mayBlock;
-    // assume compression ratio of 2
-    me.set().value =
-        (((maxSize.v.width + 63) / 64) * ((maxSize.v.height + 63) / 64) * 3072);
+    // assume compression ratio of 2, but enforce a floor
+    me.set().value = c2_max((((maxSize.v.width + 63) / 64)
+                * ((maxSize.v.height + 63) / 64) * 3072), kMinInputBufferSize);
     return C2R::Ok();
   }
 
