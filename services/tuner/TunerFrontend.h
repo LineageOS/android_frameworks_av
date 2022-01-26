@@ -30,6 +30,7 @@ using ::aidl::android::hardware::tv::tuner::FrontendScanMessageType;
 using ::aidl::android::hardware::tv::tuner::FrontendScanType;
 using ::aidl::android::hardware::tv::tuner::FrontendSettings;
 using ::aidl::android::hardware::tv::tuner::FrontendStatus;
+using ::aidl::android::hardware::tv::tuner::FrontendStatusReadiness;
 using ::aidl::android::hardware::tv::tuner::FrontendStatusType;
 using ::aidl::android::hardware::tv::tuner::IFrontend;
 using ::aidl::android::hardware::tv::tuner::IFrontendCallback;
@@ -64,6 +65,9 @@ public:
     ::ndk::ScopedAStatus getFrontendId(int32_t* _aidl_return) override;
     ::ndk::ScopedAStatus getHardwareInfo(std::string* _aidl_return) override;
     ::ndk::ScopedAStatus removeOutputPid(int32_t in_pid) override;
+    ::ndk::ScopedAStatus getFrontendStatusReadiness(
+            const std::vector<FrontendStatusType>& in_statusTypes,
+            std::vector<FrontendStatusReadiness>* _aidl_return) override;
 
     struct FrontendCallback : public BnFrontendCallback {
         FrontendCallback(const shared_ptr<ITunerFrontendCallback> tunerFrontendCallback)

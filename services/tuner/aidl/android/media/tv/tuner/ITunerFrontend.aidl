@@ -19,6 +19,7 @@ package android.media.tv.tuner;
 import android.hardware.tv.tuner.FrontendScanType;
 import android.hardware.tv.tuner.FrontendSettings;
 import android.hardware.tv.tuner.FrontendStatus;
+import android.hardware.tv.tuner.FrontendStatusReadiness;
 import android.hardware.tv.tuner.FrontendStatusType;
 import android.media.tv.tuner.ITunerFrontendCallback;
 import android.media.tv.tuner.ITunerLnb;
@@ -104,4 +105,9 @@ interface ITunerFrontend {
      * Filter out unnecessary PID from frontend output.
      */
     void removeOutputPid(int pid);
+
+    /**
+     * Gets FrontendStatus’ readiness statuses for given status types.
+     */
+    FrontendStatusReadiness[] getFrontendStatusReadiness(in FrontendStatusType[] statusTypes);
 }
