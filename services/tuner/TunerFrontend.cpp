@@ -184,6 +184,18 @@ TunerFrontend::~TunerFrontend() {
     return mFrontend->removeOutputPid(in_pid);
 }
 
+::ndk::ScopedAStatus TunerFrontend::getFrontendStatusReadiness(
+        const std::vector<FrontendStatusType>& in_statusTypes,
+        std::vector<FrontendStatusReadiness>* _aidl_return) {
+    if (mFrontend == nullptr) {
+        ALOGD("IFrontend is not initialized");
+        return ::ndk::ScopedAStatus::fromServiceSpecificError(
+                static_cast<int32_t>(Result::UNAVAILABLE));
+    }
+
+    return mFrontend->getFrontendStatusReadiness(in_statusTypes, _aidl_return);
+}
+
 /////////////// FrontendCallback ///////////////////////
 ::ndk::ScopedAStatus TunerFrontend::FrontendCallback::onEvent(FrontendEventType frontendEventType) {
     ALOGV("FrontendCallback::onEvent, type=%d", frontendEventType);
