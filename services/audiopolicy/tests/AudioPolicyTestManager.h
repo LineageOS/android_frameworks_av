@@ -34,6 +34,7 @@ class AudioPolicyTestManager : public AudioPolicyManager {
     using AudioPolicyManager::setMsdOutputPatches;
     using AudioPolicyManager::getAudioPatches;
     using AudioPolicyManager::getDirectPlaybackSupport;
+    using AudioPolicyManager::getDirectProfilesForAttributes;
     uint32_t getAudioPortGeneration() const { return mAudioPortGeneration; }
 };
 

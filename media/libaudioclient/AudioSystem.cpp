@@ -2314,6 +2314,28 @@ status_t AudioSystem::getDirectPlaybackSupport(const audio_attributes_t *attr,
     return NO_ERROR;
 }
 
+status_t AudioSystem::getDirectProfilesForAttributes(const audio_attributes_t* attr,
+                                                std::vector<audio_profile>* audioProfiles) {
+    if (attr == nullptr) {
+        return BAD_VALUE;
+    }
+
+    const sp<IAudioPolicyService>& aps = AudioSystem::get_audio_policy_service();
+    if (aps == 0) {
+        return PERMISSION_DENIED;
+    }
+
+    media::AudioAttributesInternal attrAidl = VALUE_OR_RETURN_STATUS(
+            legacy2aidl_audio_attributes_t_AudioAttributesInternal(*attr));
+
+    std::vector<media::audio::common::AudioProfile> audioProfilesAidl;
+    RETURN_STATUS_IF_ERROR(statusTFromBinderStatus(
+            aps->getDirectProfilesForAttributes(attrAidl, &audioProfilesAidl)));
+    *audioProfiles = VALUE_OR_RETURN_STATUS(convertContainer<std::vector<audio_profile>>(
+                    audioProfilesAidl, aidl2legacy_AudioProfile_audio_profile, false /*isInput*/));
+
+    return NO_ERROR;
+}
 
 class CaptureStateListenerImpl : public media::BnCaptureStateListener,
                                  public IBinder::DeathRecipient {
