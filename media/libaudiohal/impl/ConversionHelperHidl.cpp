@@ -24,10 +24,9 @@
 #include "ConversionHelperHidl.h"
 
 namespace android {
-namespace CPP_VERSION {
 
-using namespace ::android::hardware::audio::common::CPP_VERSION;
-using namespace ::android::hardware::audio::CPP_VERSION;
+using namespace ::android::hardware::audio::common::COMMON_TYPES_CPP_VERSION;
+using namespace ::android::hardware::audio::CORE_TYPES_CPP_VERSION;
 
 // static
 status_t ConversionHelperHidl::keysFromHal(const String8& keys, hidl_vec<hidl_string> *hidlKeys) {
@@ -120,5 +119,4 @@ void ConversionHelperHidl::emitError(const char* funcName, const char* descripti
     ALOGE("%s %p %s: %s (from rpc)", mClassName, this, funcName, description);
 }
 
-}  // namespace CPP_VERSION
 }  // namespace android
