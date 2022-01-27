@@ -5626,6 +5626,20 @@ uint32_t AudioFlinger::PlaybackThread::trackCountForUid_l(uid_t uid) const
     return trackCount;
 }
 
+bool AudioFlinger::PlaybackThread::checkRunningTimestamp()
+{
+    uint64_t position = 0;
+    struct timespec unused;
+    const status_t ret = mOutput->getPresentationPosition(&position, &unused);
+    if (ret == NO_ERROR) {
+        if (position != mLastCheckedTimestampPosition) {
+            mLastCheckedTimestampPosition = position;
+            return true;
+        }
+    }
+    return false;
+}
+
 // isTrackAllowed_l() must be called with ThreadBase::mLock held
 bool AudioFlinger::MixerThread::isTrackAllowed_l(
         audio_channel_mask_t channelMask, audio_format_t format,
@@ -6054,19 +6068,24 @@ AudioFlinger::PlaybackThread::mixer_state AudioFlinger::DirectOutputThread::prep
                 // fill a buffer, then remove it from active list.
                 // Only consider last track started for mixer state control
                 if (--(track->mRetryCount) <= 0) {
-                    ALOGV("BUFFER TIMEOUT: remove track(%d) from active list", trackId);
-                    tracksToRemove->add(track);
-                    // indicate to client process that the track was disabled because of underrun;
-                    // it will then automatically call start() when data is available
-                    track->disable();
-                    // only do hw pause when track is going to be removed due to BUFFER TIMEOUT.
-                    // unlike mixerthread, HAL can be paused for direct output
-                    ALOGW("pause because of UNDERRUN, framesReady = %zu,"
-                            "minFrames = %u, mFormat = %#x",
-                            framesReady, minFrames, mFormat);
-                    if (last && mHwSupportsPause && !mHwPaused && !mStandby) {
-                        doHwPause = true;
-                        mHwPaused = true;
+                    const bool running = checkRunningTimestamp();
+                    if (running) { // still running, give us more time.
+                        track->mRetryCount = kMaxTrackRetriesOffload;
+                    } else {
+                        ALOGV("BUFFER TIMEOUT: remove track(%d) from active list", trackId);
+                        tracksToRemove->add(track);
+                        // indicate to client process that the track was disabled because of
+                        // underrun; it will then automatically call start() when data is available
+                        track->disable();
+                        // only do hw pause when track is going to be removed due to BUFFER TIMEOUT.
+                        // unlike mixerthread, HAL can be paused for direct output
+                        ALOGW("pause because of UNDERRUN, framesReady = %zu,"
+                                "minFrames = %u, mFormat = %#x",
+                                framesReady, minFrames, mFormat);
+                        if (last && mHwSupportsPause && !mHwPaused && !mStandby) {
+                            doHwPause = true;
+                            mHwPaused = true;
+                        }
                     }
                 } else if (last) {
                     mixerStatus = MIXER_TRACKS_ENABLED;
@@ -6277,6 +6296,7 @@ void AudioFlinger::DirectOutputThread::cacheParameters_l()
 
 void AudioFlinger::DirectOutputThread::flushHw_l()
 {
+    PlaybackThread::flushHw_l();
     mOutput->flush();
     mHwPaused = false;
     mFlushPending = false;
@@ -6412,8 +6432,7 @@ void AudioFlinger::AsyncCallbackThread::setAsyncError()
 AudioFlinger::OffloadThread::OffloadThread(const sp<AudioFlinger>& audioFlinger,
         AudioStreamOut* output, audio_io_handle_t id, bool systemReady)
     :   DirectOutputThread(audioFlinger, output, id, OFFLOAD, systemReady),
-        mPausedWriteLength(0), mPausedBytesRemaining(0), mKeepWakeLock(true),
-        mOffloadUnderrunPosition(~0LL)
+        mPausedWriteLength(0), mPausedBytesRemaining(0), mKeepWakeLock(true)
 {
     //FIXME: mStandby should be set to true by ThreadBase constructo
     mStandby = true;
@@ -6630,19 +6649,7 @@ AudioFlinger::PlaybackThread::mixer_state AudioFlinger::OffloadThread::prepareTr
                 // No buffers for this track. Give it a few chances to
                 // fill a buffer, then remove it from active list.
                 if (--(track->mRetryCount) <= 0) {
-                    bool running = false;
-                    uint64_t position = 0;
-                    struct timespec unused;
-                    // The running check restarts the retry counter at least once.
-                    status_t ret = mOutput->stream->getPresentationPosition(&position, &unused);
-                    if (ret == NO_ERROR && position != mOffloadUnderrunPosition) {
-                        running = true;
-                        mOffloadUnderrunPosition = position;
-                    }
-                    if (ret == NO_ERROR) {
-                        ALOGVV("underrun counter, running(%d): %lld vs %lld", running,
-                                (long long)position, (long long)mOffloadUnderrunPosition);
-                    }
+                    const bool running = checkRunningTimestamp();
                     if (running) { // still running, give us more time.
                         track->mRetryCount = kMaxTrackRetriesOffload;
                     } else {
@@ -6713,7 +6720,6 @@ void AudioFlinger::OffloadThread::flushHw_l()
     mPausedBytesRemaining = 0;
     // reset bytes written count to reflect that DSP buffers are empty after flush.
     mBytesWritten = 0;
-    mOffloadUnderrunPosition = ~0LL;
 
     if (mUseAsyncWrite) {
         // discard any pending drain or write ack by incrementing sequence
