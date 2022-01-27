@@ -1314,6 +1314,14 @@ protected:
                 // audio patch used by the downstream software patch.
                 // Only used if ThreadBase::mIsMsdDevice is true.
                 struct audio_patch mDownStreamPatch;
+
+                // A differential check on the timestamps to see if there is a change in the
+                // timestamp frame position between the last call to checkRunningTimestamp.
+                uint64_t mLastCheckedTimestampPosition = ~0LL;
+
+                bool checkRunningTimestamp();
+
+    virtual     void flushHw_l() { mLastCheckedTimestampPosition = ~0LL; }
 };
 
 class MixerThread : public PlaybackThread {
@@ -1430,7 +1438,7 @@ public:
     virtual     bool        checkForNewParameter_l(const String8& keyValuePair,
                                                    status_t& status);
 
-    virtual     void        flushHw_l();
+                void        flushHw_l() override;
 
                 void        setMasterBalance(float balance) override;
 
@@ -1495,7 +1503,7 @@ public:
     OffloadThread(const sp<AudioFlinger>& audioFlinger, AudioStreamOut* output,
                   audio_io_handle_t id, bool systemReady);
     virtual                 ~OffloadThread() {};
-    virtual     void        flushHw_l();
+                void        flushHw_l() override;
 
 protected:
     // threadLoop snippets
@@ -1512,10 +1520,6 @@ private:
     size_t      mPausedWriteLength;     // length in bytes of write interrupted by pause
     size_t      mPausedBytesRemaining;  // bytes still waiting in mixbuffer after resume
     bool        mKeepWakeLock;          // keep wake lock while waiting for write callback
-    uint64_t    mOffloadUnderrunPosition; // Current frame position for offloaded playback
-                                          // used and valid only during underrun.  ~0 if
-                                          // no underrun has occurred during playback and
-                                          // is not reset on standby.
 };
 
 class AsyncCallbackThread : public Thread {
