@@ -27,6 +27,7 @@ cc_library_shared {
         "libaudiohal@5.0",
         "libaudiohal@6.0",
         "libaudiohal@7.0",
+        "libaudiohal@7.1",
     ],
 
     shared_libs: [
