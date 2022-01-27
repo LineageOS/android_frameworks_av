@@ -285,6 +285,9 @@ static void parseDolbyVisionProfileLevelFromDvcc(const uint8_t *ptr, size_t size
         {7, DolbyVisionLevelUhd30},
         {8, DolbyVisionLevelUhd48},
         {9, DolbyVisionLevelUhd60},
+        {10, DolbyVisionLevelUhd120},
+        {11, DolbyVisionLevel8k30},
+        {12, DolbyVisionLevel8k60},
     };
     // set rpuAssoc
     if (rpu_present_flag && el_present_flag && !bl_present_flag) {
@@ -2073,6 +2076,9 @@ status_t convertMessageToMetaData(const sp<AMessage> &msg, sp<MetaData> &meta) {
                         {DolbyVisionLevelUhd30, 7},
                         {DolbyVisionLevelUhd48, 8},
                         {DolbyVisionLevelUhd60, 9},
+                        {DolbyVisionLevelUhd120, 10},
+                        {DolbyVisionLevel8k30, 11},
+                        {DolbyVisionLevel8k60, 12},
                     };
                     levels.map(level, &level_val);
                     ALOGV("found dolby vision level: %d, value: %d", level, level_val);
