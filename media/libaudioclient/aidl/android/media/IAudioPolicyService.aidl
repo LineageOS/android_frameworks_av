@@ -48,6 +48,7 @@ import android.media.audio.common.AudioDevice;
 import android.media.audio.common.AudioDeviceDescription;
 import android.media.audio.common.AudioFormatDescription;
 import android.media.audio.common.AudioMode;
+import android.media.audio.common.AudioProfile;
 import android.media.audio.common.AudioOffloadInfo;
 import android.media.audio.common.AudioSource;
 import android.media.audio.common.AudioStreamType;
@@ -381,6 +382,12 @@ interface IAudioPolicyService {
     /**
      * Query how the direct playback is currently supported on the device.
      */
-     AudioDirectMode getDirectPlaybackSupport(in AudioAttributesInternal attr,
+    AudioDirectMode getDirectPlaybackSupport(in AudioAttributesInternal attr,
                                               in AudioConfig config);
+
+    /**
+     * Query audio profiles available for direct playback on the current output device(s)
+     * for the specified audio attributes.
+     */
+    AudioProfile[] getDirectProfilesForAttributes(in AudioAttributesInternal attr);
 }

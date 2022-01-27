@@ -2372,4 +2372,24 @@ Status AudioPolicyService::getDirectPlaybackSupport(const media::AudioAttributes
     return Status::ok();
 }
 
+Status AudioPolicyService::getDirectProfilesForAttributes(
+                                const media::AudioAttributesInternal& attrAidl,
+                                std::vector<media::audio::common::AudioProfile>* _aidl_return) {
+   if (mAudioPolicyManager == nullptr) {
+        return binderStatusFromStatusT(NO_INIT);
+    }
+    audio_attributes_t attr = VALUE_OR_RETURN_BINDER_STATUS(
+            aidl2legacy_AudioAttributesInternal_audio_attributes_t(attrAidl));
+    AudioProfileVector audioProfiles;
+
+    Mutex::Autolock _l(mLock);
+    RETURN_IF_BINDER_ERROR(binderStatusFromStatusT(
+            mAudioPolicyManager->getDirectProfilesForAttributes(&attr, audioProfiles)));
+    *_aidl_return = VALUE_OR_RETURN_BINDER_STATUS(
+            convertContainer<std::vector<media::audio::common::AudioProfile>>(
+                audioProfiles, legacy2aidl_AudioProfile_common, false /*isInput*/));
+
+    return Status::ok();
+}
+
 } // namespace android

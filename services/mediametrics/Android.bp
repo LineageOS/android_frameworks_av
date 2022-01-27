@@ -181,8 +181,14 @@ cc_library {
         "libstatssocket",
     ],
 
+    // within the library, we use "xxx.h"
+    local_include_dirs: [
+        "include/mediametricsservice",
+    ],
+
+    // external parties use <mediametricsservice/xxx.h>
     export_include_dirs: [
-        ".",
+        "include",
     ],
 
     static_libs: [

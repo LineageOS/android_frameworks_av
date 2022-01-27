@@ -404,8 +404,11 @@ public:
      */
     virtual audio_direct_mode_t getDirectPlaybackSupport(const audio_attributes_t *attr,
                                                          const audio_config_t *config) = 0;
-};
 
+    // retrieves the list of available direct audio profiles for the given audio attributes
+    virtual status_t getDirectProfilesForAttributes(const audio_attributes_t* attr,
+                                                    AudioProfileVector& audioProfiles) = 0;
+};
 
 // Audio Policy client Interface
 class AudioPolicyClientInterface

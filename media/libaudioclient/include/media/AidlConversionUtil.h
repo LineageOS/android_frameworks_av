@@ -123,6 +123,21 @@ convertContainer(const InputContainer& input, const Func& itemConversion) {
 }
 
 /**
+ * A generic template that helps convert containers of convertible types
+ * using an item conversion function with an additional parameter.
+ */
+template<typename OutputContainer, typename InputContainer, typename Func, typename Parameter>
+ConversionResult<OutputContainer>
+convertContainer(const InputContainer& input, const Func& itemConversion, const Parameter& param) {
+    OutputContainer output;
+    auto ins = std::inserter(output, output.begin());
+    for (const auto& item : input) {
+        *ins = VALUE_OR_RETURN(itemConversion(item, param));
+    }
+    return output;
+}
+
+/**
  * A generic template that helps to "zip" two input containers of the same size
  * into a single vector of converted types. The conversion function must
  * thus accept two arguments.

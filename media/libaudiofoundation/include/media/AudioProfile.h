@@ -85,6 +85,11 @@ public:
     static ConversionResult<sp<AudioProfile>> fromParcelable(
             const Aidl& aidl, bool isInput);
 
+    ConversionResult<media::audio::common::AudioProfile>
+            toCommonParcelable(bool isInput) const;
+    static ConversionResult<sp<AudioProfile>> fromCommonParcelable(
+        const media::audio::common::AudioProfile& aidl, bool isInput);
+
 private:
 
     std::string  mName;
@@ -107,6 +112,11 @@ ConversionResult<sp<AudioProfile>>
 aidl2legacy_AudioProfile(const AudioProfile::Aidl& aidl, bool isInput);
 ConversionResult<AudioProfile::Aidl>
 legacy2aidl_AudioProfile(const sp<AudioProfile>& legacy, bool isInput);
+
+ConversionResult<sp<AudioProfile>>
+aidl2legacy_AudioProfile_common(const media::audio::common::AudioProfile& aidl, bool isInput);
+ConversionResult<media::audio::common::AudioProfile>
+legacy2aidl_AudioProfile_common(const sp<AudioProfile>& legacy, bool isInput);
 
 class AudioProfileVector : public std::vector<sp<AudioProfile>>
 {

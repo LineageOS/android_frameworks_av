@@ -37,6 +37,14 @@ cc_library_static {
         "StreamingSource.cpp",
     ],
 
+    local_include_dirs: [
+        "include/nuplayer",
+    ],
+
+    export_include_dirs: [
+        "include",
+    ],
+
     header_libs: [
         "libmediadrm_headers",
         "libmediametrics_headers",
