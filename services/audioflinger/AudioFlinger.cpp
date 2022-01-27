@@ -4082,6 +4082,7 @@ status_t AudioFlinger::moveEffectChain_l(audio_session_t sessionId,
     // so that a new chain is created with correct parameters when first effect is added. This is
     // otherwise unnecessary as removeEffect_l() will remove the chain when last effect is
     // removed.
+    // TODO(b/216875016): consider holding the effect chain locks for the duration of the move.
     srcThread->removeEffectChain_l(chain);
 
     // transfer all effects one by one so that new effect chain is created on new thread with
@@ -4091,7 +4092,7 @@ status_t AudioFlinger::moveEffectChain_l(audio_session_t sessionId,
     Vector< sp<EffectModule> > removed;
     status_t status = NO_ERROR;
     std::string errorString;
-    while (effect != 0) {
+    while (effect != nullptr) {
         srcThread->removeEffect_l(effect);
         removed.add(effect);
         status = dstThread->addEffect_l(effect);
@@ -4100,16 +4101,13 @@ status_t AudioFlinger::moveEffectChain_l(audio_session_t sessionId,
                     "cannot add effect %p to destination thread", effect.get());
             break;
         }
-        // removeEffect_l() has stopped the effect if it was active so it must be restarted
-        if (effect->state() == EffectModule::ACTIVE ||
-                effect->state() == EffectModule::STOPPING) {
-            effect->start();
-        }
         // if the move request is not received from audio policy manager, the effect must be
-        // re-registered with the new strategy and output
-        if (dstChain == 0) {
+        // re-registered with the new strategy and output.
+
+        // We obtain the dstChain once the effect is on the new thread.
+        if (dstChain == nullptr) {
             dstChain = effect->getCallback()->chain().promote();
-            if (dstChain == 0) {
+            if (dstChain == nullptr) {
                 errorString = StringPrintf("cannot get chain from effect %p", effect.get());
                 status = NO_INIT;
                 break;
@@ -4120,13 +4118,35 @@ status_t AudioFlinger::moveEffectChain_l(audio_session_t sessionId,
 
     size_t restored = 0;
     if (status != NO_ERROR) {
+        dstChain.clear(); // dstChain is now from the srcThread (could be recreated).
         for (const auto& effect : removed) {
             dstThread->removeEffect_l(effect); // Note: Depending on error location, the last
                                                // effect may not have been placed on dstThread.
             if (srcThread->addEffect_l(effect) == NO_ERROR) {
                 ++restored;
+                if (dstChain == nullptr) {
+                    dstChain = effect->getCallback()->chain().promote();
+                }
             }
         }
+    }
+
+    // After all the effects have been moved to new thread (or put back) we restart the effects
+    // because removeEffect_l() has stopped the effect if it is currently active.
+    size_t started = 0;
+    if (dstChain != nullptr && !removed.empty()) {
+        // If we do not take the dstChain lock, it is possible that processing is ongoing
+        // while we are starting the effect.  This can cause glitches with volume,
+        // see b/202360137.
+        dstChain->lock();
+        for (const auto& effect : removed) {
+            if (effect->state() == EffectModule::ACTIVE ||
+                    effect->state() == EffectModule::STOPPING) {
+                ++started;
+                effect->start();
+            }
+        }
+        dstChain->unlock();
     }
 
     if (status != NO_ERROR) {
@@ -4134,13 +4154,14 @@ status_t AudioFlinger::moveEffectChain_l(audio_session_t sessionId,
             errorString = StringPrintf("%s: failed status %d", __func__, status);
         }
         ALOGW("%s: %s unsuccessful move of session %d from srcThread %p to dstThread %p "
-                "(%zu effects removed from srcThread, %zu effects restored to srcThread)",
+                "(%zu effects removed from srcThread, %zu effects restored to srcThread, "
+                "%zu effects started)",
                 __func__, errorString.c_str(), sessionId, srcThread, dstThread,
-                removed.size(), restored);
+                removed.size(), restored, started);
     } else {
         ALOGD("%s: successful move of session %d from srcThread %p to dstThread %p "
-                "(%zu effects moved)",
-                __func__, sessionId, srcThread, dstThread, removed.size());
+                "(%zu effects moved, %zu effects started)",
+                __func__, sessionId, srcThread, dstThread, removed.size(), started);
     }
     return status;
 }
