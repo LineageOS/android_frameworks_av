@@ -422,11 +422,11 @@ Status ResourceManagerService::addResource(
     mServiceLog->add(log);
 
     Mutex::Autolock lock(mLock);
-    if (!mProcessInfo->isValidPid(pid)) {
+    if (!mProcessInfo->isPidUidTrusted(pid, uid)) {
         pid_t callingPid = IPCThreadState::self()->getCallingPid();
         uid_t callingUid = IPCThreadState::self()->getCallingUid();
-        ALOGW("%s called with untrusted pid %d, using calling pid %d, uid %d", __FUNCTION__,
-                pid, callingPid, callingUid);
+        ALOGW("%s called with untrusted pid %d or uid %d, using calling pid %d, uid %d",
+                __FUNCTION__, pid, uid, callingPid, callingUid);
         pid = callingPid;
         uid = callingUid;
     }
@@ -481,7 +481,7 @@ Status ResourceManagerService::removeResource(
     mServiceLog->add(log);
 
     Mutex::Autolock lock(mLock);
-    if (!mProcessInfo->isValidPid(pid)) {
+    if (!mProcessInfo->isPidTrusted(pid)) {
         pid_t callingPid = IPCThreadState::self()->getCallingPid();
         ALOGW("%s called with untrusted pid %d, using calling pid %d", __FUNCTION__,
                 pid, callingPid);
@@ -549,7 +549,7 @@ Status ResourceManagerService::removeResource(int pid, int64_t clientId, bool ch
     mServiceLog->add(log);
 
     Mutex::Autolock lock(mLock);
-    if (checkValid && !mProcessInfo->isValidPid(pid)) {
+    if (checkValid && !mProcessInfo->isPidTrusted(pid)) {
         pid_t callingPid = IPCThreadState::self()->getCallingPid();
         ALOGW("%s called with untrusted pid %d, using calling pid %d", __FUNCTION__,
                 pid, callingPid);
@@ -607,7 +607,7 @@ Status ResourceManagerService::reclaimResource(
     Vector<std::shared_ptr<IResourceManagerClient>> clients;
     {
         Mutex::Autolock lock(mLock);
-        if (!mProcessInfo->isValidPid(callingPid)) {
+        if (!mProcessInfo->isPidTrusted(callingPid)) {
             pid_t actualCallingPid = IPCThreadState::self()->getCallingPid();
             ALOGW("%s called with untrusted pid %d, using actual calling pid %d", __FUNCTION__,
                     callingPid, actualCallingPid);
@@ -846,7 +846,7 @@ Status ResourceManagerService::markClientForPendingRemoval(int32_t pid, int64_t 
     mServiceLog->add(log);
 
     Mutex::Autolock lock(mLock);
-    if (!mProcessInfo->isValidPid(pid)) {
+    if (!mProcessInfo->isPidTrusted(pid)) {
         pid_t callingPid = IPCThreadState::self()->getCallingPid();
         ALOGW("%s called with untrusted pid %d, using calling pid %d", __FUNCTION__,
                 pid, callingPid);
@@ -878,7 +878,7 @@ Status ResourceManagerService::reclaimResourcesFromClientsPendingRemoval(int32_t
     Vector<std::shared_ptr<IResourceManagerClient>> clients;
     {
         Mutex::Autolock lock(mLock);
-        if (!mProcessInfo->isValidPid(pid)) {
+        if (!mProcessInfo->isPidTrusted(pid)) {
             pid_t callingPid = IPCThreadState::self()->getCallingPid();
             ALOGW("%s called with untrusted pid %d, using calling pid %d", __FUNCTION__,
                     pid, callingPid);

@@ -401,7 +401,6 @@ private:
     struct ResourceManagerServiceProxy;
 
     State mState;
-    uid_t mUid;
     bool mReleasedByResourceManager;
     sp<ALooper> mLooper;
     sp<ALooper> mCodecLooper;
