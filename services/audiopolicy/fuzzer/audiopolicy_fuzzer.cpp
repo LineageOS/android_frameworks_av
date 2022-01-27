@@ -30,6 +30,7 @@
 #include <libxml/parser.h>
 #include <libxml/xinclude.h>
 #include <media/AudioPolicy.h>
+#include <media/AudioProfile.h>
 #include <media/PatchBuilder.h>
 #include <media/RecordingActivityTracker.h>
 
@@ -842,6 +843,7 @@ class AudioPolicyManagerFuzzerDeviceConnection
     void process() override;
 
     void fuzzGetDirectPlaybackSupport();
+    void fuzzGetDirectProfilesForAttributes();
 
    protected:
     void setDeviceConnectionState();
@@ -909,11 +911,25 @@ void AudioPolicyManagerFuzzerDeviceConnection::fuzzGetDirectPlaybackSupport() {
     }
 }
 
+void AudioPolicyManagerFuzzerDeviceConnection::fuzzGetDirectProfilesForAttributes() {
+    const uint32_t numTestCases = mFdp->ConsumeIntegralInRange<uint32_t>(1, 10);
+    for (int i = 0; i < numTestCases; ++i) {
+        AudioProfileVector audioProfiles;
+        audio_attributes_t attr = AUDIO_ATTRIBUTES_INITIALIZER;
+        attr.content_type = getValueFromVector<audio_content_type_t>(mFdp, kAudioContentTypes);
+        attr.usage = getValueFromVector<audio_usage_t>(mFdp, kAudioUsages);
+        attr.source = getValueFromVector<audio_source_t>(mFdp, kAudioSources);
+        attr.flags = getValueFromVector<audio_flags_mask_t>(mFdp, kAudioFlagMasks);
+        mManager->getDirectProfilesForAttributes(&attr, audioProfiles);
+    }
+}
+
 void AudioPolicyManagerFuzzerDeviceConnection::process() {
     if (initialize()) {
         setDeviceConnectionState();
         explicitlyRoutingAfterConnection();
         fuzzGetDirectPlaybackSupport();
+        fuzzGetDirectProfilesForAttributes();
         fuzzPatchCreation();
     }
 }

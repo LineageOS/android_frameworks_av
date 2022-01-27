@@ -82,7 +82,7 @@
 #include "MediaPlayerFactory.h"
 
 #include "TestPlayerStub.h"
-#include "nuplayer/NuPlayerDriver.h"
+#include <nuplayer/NuPlayerDriver.h>
 
 
 static const int kDumpLockRetries = 50;

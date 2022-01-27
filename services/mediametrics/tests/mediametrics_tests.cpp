@@ -17,18 +17,17 @@
 #define LOG_TAG "mediametrics_tests"
 #include <utils/Log.h>
 
-#include "MediaMetricsService.h"
 
 #include <stdio.h>
 #include <unordered_set>
 
 #include <gtest/gtest.h>
 #include <media/MediaMetricsItem.h>
+#include <mediametricsservice/AudioTypes.h>
+#include <mediametricsservice/MediaMetricsService.h>
+#include <mediametricsservice/StringUtils.h>
+#include <mediametricsservice/ValidateId.h>
 #include <system/audio.h>
-
-#include "AudioTypes.h"
-#include "StringUtils.h"
-#include "ValidateId.h"
 
 using namespace android;
 

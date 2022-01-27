@@ -550,6 +550,16 @@ public:
                                              audio_direct_mode_t *directMode);
 
 
+    /**
+     * Query which direct audio profiles are available for the specified audio attributes.
+     * @param attr audio attributes describing the playback use case
+     * @param audioProfiles out: a vector of audio profiles
+     * @return NO_ERROR in case of success, DEAD_OBJECT, NO_INIT, BAD_VALUE, PERMISSION_DENIED
+     *         in case of error.
+     */
+    static status_t getDirectProfilesForAttributes(const audio_attributes_t* attr,
+                                            std::vector<audio_profile>* audioProfiles);
+
     // A listener for capture state changes.
     class CaptureStateListener : public virtual RefBase {
     public:

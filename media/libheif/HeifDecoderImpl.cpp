@@ -485,6 +485,11 @@ bool HeifDecoderImpl::setOutputColor(HeifColorFormat heifColor) {
             mOutputColor = HAL_PIXEL_FORMAT_BGRA_8888;
             break;
         }
+        case kHeifColorFormat_RGBA_1010102:
+        {
+            mOutputColor = HAL_PIXEL_FORMAT_RGBA_1010102;
+            break;
+        }
         default:
             ALOGE("Unsupported output color format %d", heifColor);
             return false;

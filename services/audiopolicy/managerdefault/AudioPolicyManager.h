@@ -371,6 +371,9 @@ public:
         virtual audio_direct_mode_t getDirectPlaybackSupport(const audio_attributes_t *attr,
                                                              const audio_config_t *config);
 
+        virtual status_t getDirectProfilesForAttributes(const audio_attributes_t* attr,
+                                                         AudioProfileVector& audioProfiles);
+
         bool isCallScreenModeSupported() override;
 
         void onNewAudioModulesAvailable() override;
