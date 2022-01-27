@@ -1890,7 +1890,7 @@ Status CameraService::connectHelper(const sp<CALLBACK>& cameraCb, const String8&
 
         // Set camera muting behavior
         bool isCameraPrivacyEnabled =
-                mSensorPrivacyPolicy->isCameraPrivacyEnabled(multiuser_get_user_id(clientUid));
+                mSensorPrivacyPolicy->isCameraPrivacyEnabled();
         if (client->supportsCameraMute()) {
             client->setCameraMute(
                     mOverrideCameraMuteMode || isCameraPrivacyEnabled);
@@ -3385,8 +3385,7 @@ status_t CameraService::BasicClient::handleAppOpMode(int32_t mode) {
         bool isUidActive = sCameraService->mUidPolicy->isUidActive(mClientUid,
                 mClientPackageName);
         bool isCameraPrivacyEnabled =
-                sCameraService->mSensorPrivacyPolicy->isCameraPrivacyEnabled(
-                    multiuser_get_user_id(mClientUid));
+                sCameraService->mSensorPrivacyPolicy->isCameraPrivacyEnabled();
         if (!isUidActive || !isCameraPrivacyEnabled) {
             ALOGI("Camera %s: Access for \"%s\" has been restricted",
                     mCameraIdStr.string(), String8(mClientPackageName).string());
@@ -3568,8 +3567,7 @@ void CameraService::BasicClient::opChanged(int32_t op, const String16&) {
     } else if (res == AppOpsManager::MODE_IGNORED) {
         bool isUidActive = sCameraService->mUidPolicy->isUidActive(mClientUid, mClientPackageName);
         bool isCameraPrivacyEnabled =
-                sCameraService->mSensorPrivacyPolicy->isCameraPrivacyEnabled(
-                        multiuser_get_user_id(mClientUid));
+                sCameraService->mSensorPrivacyPolicy->isCameraPrivacyEnabled();
         ALOGI("Camera %s: Access for \"%s\" has been restricted, isUidTrusted %d, isUidActive %d",
                 mCameraIdStr.string(), String8(mClientPackageName).string(),
                 mUidIsTrusted, isUidActive);
@@ -3881,18 +3879,18 @@ bool CameraService::SensorPrivacyPolicy::isSensorPrivacyEnabled() {
     return mSensorPrivacyEnabled;
 }
 
-bool CameraService::SensorPrivacyPolicy::isCameraPrivacyEnabled(userid_t userId) {
+bool CameraService::SensorPrivacyPolicy::isCameraPrivacyEnabled() {
     if (!hasCameraPrivacyFeature()) {
         return false;
     }
-    return mSpm.isIndividualSensorPrivacyEnabled(userId,
-        SensorPrivacyManager::INDIVIDUAL_SENSOR_CAMERA);
+    return mSpm.isToggleSensorPrivacyEnabled(SensorPrivacyManager::TOGGLE_SENSOR_CAMERA);
 }
 
-binder::Status CameraService::SensorPrivacyPolicy::onSensorPrivacyChanged(bool enabled) {
+binder::Status CameraService::SensorPrivacyPolicy::onSensorPrivacyChanged(
+    int toggleType __unused, int sensor __unused, bool enabled) {
     {
         Mutex::Autolock _l(mSensorPrivacyLock);
-        mSensorPrivacyEnabled = enabled;
+        mSensorPrivacyEnabled = mSpm.isToggleSensorPrivacyEnabled(SensorPrivacyManager::TOGGLE_SENSOR_CAMERA);
     }
     // if sensor privacy is enabled then block all clients from accessing the camera
     if (enabled) {
@@ -3911,7 +3909,11 @@ void CameraService::SensorPrivacyPolicy::binderDied(const wp<IBinder>& /*who*/) 
 }
 
 bool CameraService::SensorPrivacyPolicy::hasCameraPrivacyFeature() {
-    return mSpm.supportsSensorToggle(SensorPrivacyManager::INDIVIDUAL_SENSOR_CAMERA);
+    bool supportsSoftwareToggle = mSpm.supportsSensorToggle(
+            SensorPrivacyManager::TOGGLE_TYPE_SOFTWARE, SensorPrivacyManager::TOGGLE_SENSOR_CAMERA);
+    bool supportsHardwareToggle = mSpm.supportsSensorToggle(
+            SensorPrivacyManager::TOGGLE_TYPE_HARDWARE, SensorPrivacyManager::TOGGLE_SENSOR_CAMERA);
+    return supportsSoftwareToggle || supportsHardwareToggle;
 }
 
 // ----------------------------------------------------------------------------
