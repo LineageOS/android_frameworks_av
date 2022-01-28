@@ -93,6 +93,44 @@ cc_library {
     ],
 }
 
+// public dependency for statically linking to libcodec2_vndk for unit tests
+cc_defaults {
+    name: "libcodec2-static-defaults",
+
+    static_libs: [
+        "liblog",
+        "libion",
+        "libfmq",
+        "libbase",
+        "libutils",
+        "libcutils",
+        "libcodec2",
+        "libhidlbase",
+        "libdmabufheap",
+        "libcodec2_vndk",
+        "libnativewindow",
+        "libcodec2_soft_common",
+        "libsfplugin_ccodec_utils",
+        "libstagefright_foundation",
+        "libstagefright_bufferpool@2.0.1",
+        "libgralloctypes",
+        "android.hardware.graphics.mapper@2.0",
+        "android.hardware.graphics.mapper@3.0",
+        "android.hardware.media.bufferpool@2.0",
+        "android.hardware.graphics.allocator@2.0",
+        "android.hardware.graphics.allocator@3.0",
+        "android.hardware.graphics.bufferqueue@2.0",
+    ],
+
+    shared_libs: [
+        "libui",
+        "libdl",
+        "libhardware",
+        "libvndksupport",
+        "libprocessgroup",
+    ],
+}
+
 // public dependency for implementing Codec 2 components
 cc_defaults {
     name: "libcodec2-impl-defaults",
