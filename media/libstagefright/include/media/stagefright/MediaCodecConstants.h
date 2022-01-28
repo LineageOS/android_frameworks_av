@@ -540,6 +540,9 @@ constexpr int32_t DolbyVisionLevelUhd24   = 0x20;
 constexpr int32_t DolbyVisionLevelUhd30   = 0x40;
 constexpr int32_t DolbyVisionLevelUhd48   = 0x80;
 constexpr int32_t DolbyVisionLevelUhd60   = 0x100;
+constexpr int32_t DolbyVisionLevelUhd120  = 0x200;
+constexpr int32_t DolbyVisionLevel8k30    = 0x400;
+constexpr int32_t DolbyVisionLevel8k60    = 0x800;
 
 inline static const char *asString_DolbyVisionLevel(int32_t i, const char *def = "??") {
     switch (i) {
@@ -552,6 +555,9 @@ inline static const char *asString_DolbyVisionLevel(int32_t i, const char *def =
         case DolbyVisionLevelUhd30: return "Uhd30";
         case DolbyVisionLevelUhd48: return "Uhd48";
         case DolbyVisionLevelUhd60: return "Uhd60";
+        case DolbyVisionLevelUhd120: return "Uhd120";
+        case DolbyVisionLevel8k30:  return "8k30";
+        case DolbyVisionLevel8k60:  return "8k60";
         default:                    return def;
     }
 }
