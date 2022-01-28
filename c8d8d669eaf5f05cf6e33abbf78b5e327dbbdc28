@@ -16,6 +16,23 @@
       "message": "Topic O_asb_2022-01 builds OK for hammerhead and yuga",
       "revId": "c8d8d669eaf5f05cf6e33abbf78b5e327dbbdc28",
       "serverId": "1ec6b3db-b2c1-4fa4-84a2-4c7efe89ba71"
+    },
+    {
+      "unresolved": false,
+      "key": {
+        "uuid": "25626bc7_03a218c1",
+        "filename": "/PATCHSET_LEVEL",
+        "patchSetId": 1
+      },
+      "lineNbr": 0,
+      "author": {
+        "id": 28998
+      },
+      "writtenOn": "2022-01-28T17:25:33Z",
+      "side": 1,
+      "message": "Entire topic builds and runs fine on flounder (Nexus 9).  Thanks Kevin on behalf of 1212 15.1 flounder users for the Jan 5 security patches.",
+      "revId": "c8d8d669eaf5f05cf6e33abbf78b5e327dbbdc28",
+      "serverId": "1ec6b3db-b2c1-4fa4-84a2-4c7efe89ba71"
     }
   ]
 }
