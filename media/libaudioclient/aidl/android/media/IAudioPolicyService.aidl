@@ -312,6 +312,8 @@ interface IAudioPolicyService {
 
     boolean isHapticPlaybackSupported();
 
+    boolean isUltrasoundSupported();
+
     AudioProductStrategy[] listAudioProductStrategies();
     int /* product_strategy_t */ getProductStrategyFromAudioAttributes(in AudioAttributesEx aa,
                                                                        boolean fallbackOnDefault);

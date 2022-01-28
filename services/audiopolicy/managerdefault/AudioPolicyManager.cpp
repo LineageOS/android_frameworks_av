@@ -4933,6 +4933,37 @@ bool AudioPolicyManager::isHapticPlaybackSupported()
     return false;
 }
 
+bool AudioPolicyManager::isUltrasoundSupported()
+{
+    bool hasUltrasoundOutput = false;
+    bool hasUltrasoundInput = false;
+    for (const auto& hwModule : mHwModules) {
+        const OutputProfileCollection &outputProfiles = hwModule->getOutputProfiles();
+        if (!hasUltrasoundOutput) {
+            for (const auto &outProfile : outputProfiles) {
+                if (outProfile->getFlags() & AUDIO_OUTPUT_FLAG_ULTRASOUND) {
+                    hasUltrasoundOutput = true;
+                    break;
+                }
+            }
+        }
+
+        const InputProfileCollection &inputProfiles = hwModule->getInputProfiles();
+        if (!hasUltrasoundInput) {
+            for (const auto &inputProfile : inputProfiles) {
+                if (inputProfile->getFlags() & AUDIO_INPUT_FLAG_ULTRASOUND) {
+                    hasUltrasoundInput = true;
+                    break;
+                }
+            }
+        }
+
+        if (hasUltrasoundOutput && hasUltrasoundInput)
+            return true;
+    }
+    return false;
+}
+
 bool AudioPolicyManager::isCallScreenModeSupported()
 {
     return getConfig().isCallScreenModeSupported();

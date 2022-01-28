@@ -327,6 +327,8 @@ public:
 
         virtual bool isHapticPlaybackSupported();
 
+        virtual bool isUltrasoundSupported();
+
         virtual status_t listAudioProductStrategies(AudioProductStrategyVector &strategies)
         {
             return mEngine->listAudioProductStrategies(strategies);
