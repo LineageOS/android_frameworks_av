@@ -24,6 +24,8 @@
 #include <mediadrm/DrmHal.h>
 #include <utils/String8.h>
 #include "fuzzer/FuzzedDataProvider.h"
+#include <binder/PersistableBundle.h>
+#include <android/hardware/drm/1.0/types.h>
 
 #define AES_BLOCK_SIZE 16
 #define UNUSED_PARAM __attribute__((unused))
@@ -33,6 +35,7 @@ using namespace android;
 using android::hardware::fromHeap;
 using ::android::os::PersistableBundle;
 using drm::V1_0::BufferType;
+using ::android::hardware::drm::V1_0::DestinationBuffer;
 
 enum {
     INVALID_UUID = 0,
