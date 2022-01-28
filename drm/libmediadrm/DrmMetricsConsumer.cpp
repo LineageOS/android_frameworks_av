@@ -32,7 +32,7 @@ using ::android::os::PersistableBundle;
 
 namespace {
 
-std::string GetAttributeName(std::string typeName, uint32_t attribute) {
+std::string GetAttributeName(const std::string &typeName, uint32_t attribute) {
     if (typeName == "KeyStatusChange") {
         static const char *type_names[] = {"USABLE", "EXPIRED",
                                        "OUTPUT_NOT_ALLOWED", "STATUS_PENDING",
@@ -85,7 +85,7 @@ void ExportCounterMetric(const android::CounterMetric<T> &counter,
 
 template <typename T>
 void ExportCounterMetricWithAttributeNames(
-    const android::CounterMetric<T> &counter, std::string typeName, PersistableBundle *metrics) {
+    const android::CounterMetric<T> &counter, const std::string &typeName, PersistableBundle *metrics) {
     if (!metrics) {
         ALOGE("metrics was unexpectedly null.");
         return;
