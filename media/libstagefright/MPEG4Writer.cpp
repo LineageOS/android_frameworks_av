@@ -4349,30 +4349,31 @@ void MPEG4Writer::Track::writeColrBox() {
     memset(&aspects, 0, sizeof(aspects));
     // Color metadata may have changed.
     sp<MetaData> meta = mSource->getFormat();
-    // TRICKY: using | instead of || because we want to execute all findInt32-s
-    if (meta->findInt32(kKeyColorPrimaries, (int32_t*)&aspects.mPrimaries)
-            | meta->findInt32(kKeyTransferFunction, (int32_t*)&aspects.mTransfer)
-            | meta->findInt32(kKeyColorMatrix, (int32_t*)&aspects.mMatrixCoeffs)
-            | meta->findInt32(kKeyColorRange, (int32_t*)&aspects.mRange)) {
-        int32_t primaries, transfer, coeffs;
-        bool fullRange;
-        ALOGV("primaries=%s transfer=%s matrix=%s range=%s",
-                asString(aspects.mPrimaries),
-                asString(aspects.mTransfer),
-                asString(aspects.mMatrixCoeffs),
-                asString(aspects.mRange));
-        ColorUtils::convertCodecColorAspectsToIsoAspects(
-                aspects, &primaries, &transfer, &coeffs, &fullRange);
-        mOwner->beginBox("colr");
-        mOwner->writeFourcc("nclx");
-        mOwner->writeInt16(primaries);
-        mOwner->writeInt16(transfer);
-        mOwner->writeInt16(coeffs);
-        mOwner->writeInt8(int8_t(fullRange ? 0x80 : 0x0));
-        mOwner->endBox(); // colr
-    } else {
+    bool findPrimaries = meta->findInt32(kKeyColorPrimaries, (int32_t*)&aspects.mPrimaries);
+    bool findTransfer = meta->findInt32(kKeyTransferFunction, (int32_t*)&aspects.mTransfer);
+    bool findMatrix = meta->findInt32(kKeyColorMatrix, (int32_t*)&aspects.mMatrixCoeffs);
+    bool findRange = meta->findInt32(kKeyColorRange, (int32_t*)&aspects.mRange);
+    if (!findPrimaries && !findTransfer && !findMatrix && !findRange) {
         ALOGV("no color information");
+        return;
     }
+
+    int32_t primaries, transfer, coeffs;
+    bool fullRange;
+    ALOGV("primaries=%s transfer=%s matrix=%s range=%s",
+            asString(aspects.mPrimaries),
+            asString(aspects.mTransfer),
+            asString(aspects.mMatrixCoeffs),
+            asString(aspects.mRange));
+    ColorUtils::convertCodecColorAspectsToIsoAspects(
+            aspects, &primaries, &transfer, &coeffs, &fullRange);
+    mOwner->beginBox("colr");
+    mOwner->writeFourcc("nclx");
+    mOwner->writeInt16(primaries);
+    mOwner->writeInt16(transfer);
+    mOwner->writeInt16(coeffs);
+    mOwner->writeInt8(int8_t(fullRange ? 0x80 : 0x0));
+    mOwner->endBox(); // colr
 }
 
 void MPEG4Writer::Track::writeAudioFourCCBox() {
