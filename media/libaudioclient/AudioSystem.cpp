@@ -1972,6 +1972,19 @@ bool AudioSystem::isHapticPlaybackSupported() {
     return result.value_or(false);
 }
 
+bool AudioSystem::isUltrasoundSupported() {
+    const sp<IAudioPolicyService>& aps = AudioSystem::get_audio_policy_service();
+    if (aps == 0) return false;
+
+    auto result = [&]() -> ConversionResult<bool> {
+        bool retVal;
+        RETURN_IF_ERROR(
+                statusTFromBinderStatus(aps->isUltrasoundSupported(&retVal)));
+        return retVal;
+    }();
+    return result.value_or(false);
+}
+
 status_t AudioSystem::getHwOffloadFormatsSupportedForBluetoothMedia(
         audio_devices_t device, std::vector<audio_format_t>* formats) {
     if (formats == nullptr) {

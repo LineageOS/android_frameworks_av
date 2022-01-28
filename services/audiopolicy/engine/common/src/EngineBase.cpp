@@ -71,7 +71,10 @@ status_t EngineBase::setDeviceConnectionState(const sp<DeviceDescriptor> devDesc
                                               audio_policy_dev_state_t state)
 {
     audio_devices_t deviceType = devDesc->type();
-    if ((deviceType != AUDIO_DEVICE_NONE) && audio_is_output_device(deviceType)) {
+    if ((deviceType != AUDIO_DEVICE_NONE) && audio_is_output_device(deviceType)
+            && deviceType != AUDIO_DEVICE_OUT_DGTL_DOCK_HEADSET) {
+        // USB dock does not follow the rule of last removable device connected wins.
+        // It is only used if no removable device is connected or if set as preferred device
         mLastRemovableMediaDevices.setRemovableMediaDevices(devDesc, state);
     }
 
