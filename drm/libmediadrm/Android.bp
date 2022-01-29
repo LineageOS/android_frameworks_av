@@ -28,7 +28,11 @@ cc_library {
         "DrmSessionManager.cpp",
         "SharedLibrary.cpp",
         "DrmHal.cpp",
+        "DrmHalHidl.cpp",
+        "DrmHalAidl.cpp",
         "CryptoHal.cpp",
+        "CryptoHalHidl.cpp",
+        "CryptoHalAidl.cpp",
         "DrmUtils.cpp",
     ],
 
@@ -63,10 +67,12 @@ cc_library {
         "android.hardware.drm@1.4",
         "libhidlallocatorutils",
         "libhidlbase",
+        "android.hardware.drm-V1-ndk",
     ],
 
     static_libs: [
         "resourcemanager_aidl_interface-ndk",
+        "libaidlcommonsupport",
     ],
 
     export_shared_lib_headers: [

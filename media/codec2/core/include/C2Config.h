@@ -687,6 +687,9 @@ enum C2Config::level_t : uint32_t {
     LEVEL_DV_MAIN_UHD_30,                       ///< Dolby Vision main tier uhd30
     LEVEL_DV_MAIN_UHD_48,                       ///< Dolby Vision main tier uhd48
     LEVEL_DV_MAIN_UHD_60,                       ///< Dolby Vision main tier uhd60
+    LEVEL_DV_MAIN_UHD_120,                      ///< Dolby Vision main tier uhd120
+    LEVEL_DV_MAIN_8K_30,                        ///< Dolby Vision main tier 8k30
+    LEVEL_DV_MAIN_8K_60,                        ///< Dolby Vision main tier 8k60
 
     LEVEL_DV_HIGH_HD_24 = _C2_PL_DV_BASE + 0x100,  ///< Dolby Vision high tier hd24
     LEVEL_DV_HIGH_HD_30,                        ///< Dolby Vision high tier hd30
@@ -697,6 +700,9 @@ enum C2Config::level_t : uint32_t {
     LEVEL_DV_HIGH_UHD_30,                       ///< Dolby Vision high tier uhd30
     LEVEL_DV_HIGH_UHD_48,                       ///< Dolby Vision high tier uhd48
     LEVEL_DV_HIGH_UHD_60,                       ///< Dolby Vision high tier uhd60
+    LEVEL_DV_HIGH_UHD_120,                      ///< Dolby Vision high tier uhd120
+    LEVEL_DV_HIGH_8K_30,                        ///< Dolby Vision high tier 8k30
+    LEVEL_DV_HIGH_8K_60,                        ///< Dolby Vision high tier 8k60
 
     // AV1 levels
     LEVEL_AV1_2    = _C2_PL_AV1_BASE ,          ///< AV1 Level 2
