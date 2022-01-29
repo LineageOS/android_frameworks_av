@@ -594,6 +594,8 @@ status_t AudioPolicyService::dumpInternals(int fd)
     }
 
     write(fd, result.string(), result.size());
+
+    mUidPolicy->dumpInternals(fd);
     return NO_ERROR;
 }
 
@@ -1036,7 +1038,7 @@ status_t AudioPolicyService::onTransact(
         case TRANSACTION_getSurroundFormats:
         case TRANSACTION_getReportedSurroundFormats:
         case TRANSACTION_setSurroundFormatEnabled:
-        case TRANSACTION_setAssistantUid:
+        case TRANSACTION_setAssistantServicesUids:
         case TRANSACTION_setA11yServicesUids:
         case TRANSACTION_setUidDeviceAffinities:
         case TRANSACTION_removeUidDeviceAffinities:
@@ -1472,6 +1474,54 @@ bool AudioPolicyService::UidPolicy::isA11yUid(uid_t uid)
 {
     std::vector<uid_t>::iterator it = find(mA11yUids.begin(), mA11yUids.end(), uid);
     return it != mA11yUids.end();
+}
+
+void AudioPolicyService::UidPolicy::setAssistantUids(const std::vector<uid_t>& uids) {
+    mAssistantUids.clear();
+    mAssistantUids = uids;
+}
+
+bool AudioPolicyService::UidPolicy::isAssistantUid(uid_t uid)
+{
+    std::vector<uid_t>::iterator it = find(mAssistantUids.begin(), mAssistantUids.end(), uid);
+    return it != mAssistantUids.end();
+}
+
+void AudioPolicyService::UidPolicy::dumpInternals(int fd) {
+    const size_t SIZE = 256;
+    char buffer[SIZE];
+    String8 result;
+    auto appendUidsToResult = [&](const char* title, const std::vector<uid_t> &uids) {
+        snprintf(buffer, SIZE, "\t%s: \n", title);
+        result.append(buffer);
+        int counter = 0;
+        if (uids.empty()) {
+            snprintf(buffer, SIZE, "\t\tNo UIDs present.\n");
+            result.append(buffer);
+            return;
+        }
+        for (const auto &uid : uids) {
+            snprintf(buffer, SIZE, "\t\tUID[%d]=%d\n", counter++, uid);
+            result.append(buffer);
+        }
+    };
+
+    snprintf(buffer, SIZE, "UID Policy:\n");
+    result.append(buffer);
+    snprintf(buffer, SIZE, "\tmObserverRegistered=%s\n",(mObserverRegistered ? "True":"False"));
+    result.append(buffer);
+
+    appendUidsToResult("Assistants UIDs", mAssistantUids);
+
+    appendUidsToResult("Accessibility UIDs", mA11yUids);
+
+    snprintf(buffer, SIZE, "\tInput Method Service UID=%d\n", mCurrentImeUid);
+    result.append(buffer);
+
+    snprintf(buffer, SIZE, "\tIs RTT Enabled: %s\n", (mRttEnabled ? "True":"False"));
+    result.append(buffer);
+
+    write(fd, result.string(), result.size());
 }
 
 // -----------  AudioPolicyService::SensorPrivacyService implementation ----------
