@@ -31,6 +31,7 @@
 #include <sys/resource.h>
 #include <thread>
 
+#include <android-base/stringprintf.h>
 #include <android/media/IAudioPolicyService.h>
 #include <android/os/IExternalVibratorService.h>
 #include <binder/IPCThreadState.h>
@@ -106,6 +107,7 @@ namespace android {
 
 #define MAX_AAUDIO_PROPERTY_DEVICE_HAL_VERSION 7.0
 
+using ::android::base::StringPrintf;
 using media::IEffectClient;
 using media::audio::common::AudioMMapPolicyInfo;
 using media::audio::common::AudioMMapPolicyType;
@@ -4088,11 +4090,14 @@ status_t AudioFlinger::moveEffectChain_l(audio_session_t sessionId,
     sp<EffectModule> effect = chain->getEffectFromId_l(0);
     Vector< sp<EffectModule> > removed;
     status_t status = NO_ERROR;
+    std::string errorString;
     while (effect != 0) {
         srcThread->removeEffect_l(effect);
         removed.add(effect);
         status = dstThread->addEffect_l(effect);
         if (status != NO_ERROR) {
+            errorString = StringPrintf(
+                    "cannot add effect %p to destination thread", effect.get());
             break;
         }
         // removeEffect_l() has stopped the effect if it was active so it must be restarted
@@ -4105,7 +4110,7 @@ status_t AudioFlinger::moveEffectChain_l(audio_session_t sessionId,
         if (dstChain == 0) {
             dstChain = effect->getCallback()->chain().promote();
             if (dstChain == 0) {
-                ALOGW("moveEffectChain_l() cannot get chain from effect %p", effect.get());
+                errorString = StringPrintf("cannot get chain from effect %p", effect.get());
                 status = NO_INIT;
                 break;
             }
@@ -4113,12 +4118,28 @@ status_t AudioFlinger::moveEffectChain_l(audio_session_t sessionId,
         effect = chain->getEffectFromId_l(0);
     }
 
+    size_t restored = 0;
     if (status != NO_ERROR) {
-        for (size_t i = 0; i < removed.size(); i++) {
-            srcThread->addEffect_l(removed[i]);
+        for (const auto& effect : removed) {
+            if (srcThread->addEffect_l(effect) == NO_ERROR) {
+                ++restored;
+            }
         }
     }
 
+    if (status != NO_ERROR) {
+        if (errorString.empty()) {
+            errorString = StringPrintf("%s: failed status %d", __func__, status);
+        }
+        ALOGW("%s: %s unsuccessful move of session %d from srcThread %p to dstThread %p "
+                "(%zu effects removed from srcThread, %zu effects restored to srcThread)",
+                __func__, errorString.c_str(), sessionId, srcThread, dstThread,
+                removed.size(), restored);
+    } else {
+        ALOGD("%s: successful move of session %d from srcThread %p to dstThread %p "
+                "(%zu effects moved)",
+                __func__, sessionId, srcThread, dstThread, removed.size());
+    }
     return status;
 }
 
