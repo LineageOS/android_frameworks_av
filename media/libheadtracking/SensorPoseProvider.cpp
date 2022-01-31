@@ -351,7 +351,7 @@ class SensorPoseProviderImpl : public SensorPoseProvider {
                 Eigen::Vector3f rotation = {event.head_tracker.rx, event.head_tracker.ry,
                                             event.head_tracker.rz};
                 Eigen::Vector3f twist = {event.head_tracker.vx, event.head_tracker.vy,
-                                         event.head_tracker.rz};
+                                         event.head_tracker.vz};
                 Eigen::Quaternionf quat = rotationVectorToQuaternion(rotation);
                 bool isNewReference =
                         !discontinutyCount->has_value() ||
