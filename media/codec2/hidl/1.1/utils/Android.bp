@@ -67,6 +67,11 @@ cc_library {
     name: "libcodec2_hidl@1.1",
     vendor_available: true,
     min_sdk_version: "29",
+    apex_available: [
+        "//apex_available:platform",
+        "com.android.media.swcodec",
+    ],
+
 
     defaults: ["hidl_defaults"],
 
