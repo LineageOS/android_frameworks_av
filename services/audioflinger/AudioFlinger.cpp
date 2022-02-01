@@ -3990,6 +3990,12 @@ status_t AudioFlinger::createEffect(const media::CreateEffectRequest& request,
 
 Register:
     if (!probe && (lStatus == NO_ERROR || lStatus == ALREADY_EXISTS)) {
+        if (lStatus == ALREADY_EXISTS) {
+            response->alreadyExists = true;
+            lStatus = NO_ERROR;
+        } else {
+            response->alreadyExists = false;
+        }
         // Check CPU and memory usage
         sp<EffectBase> effect = handle->effect().promote();
         if (effect != nullptr) {
