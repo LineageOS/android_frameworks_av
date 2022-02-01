@@ -23,29 +23,26 @@
 #include <mediautils/SchedulingPolicyService.h>
 #include <utils/Log.h>
 
-#include PATH(android/hardware/audio/FILE_VERSION/IStreamOutCallback.h)
+#include PATH(android/hardware/audio/CORE_TYPES_FILE_VERSION/IStreamOutCallback.h)
 #include <HidlUtils.h>
 #include <util/CoreUtils.h>
 
 #include "DeviceHalHidl.h"
-#include "EffectHalHidl.h"
 #include "ParameterUtils.h"
 #include "StreamHalHidl.h"
 
-using ::android::hardware::audio::common::CPP_VERSION::implementation::HidlUtils;
-using ::android::hardware::audio::CPP_VERSION::implementation::CoreUtils;
+using ::android::hardware::audio::common::COMMON_TYPES_CPP_VERSION::implementation::HidlUtils;
+using ::android::hardware::audio::CORE_TYPES_CPP_VERSION::implementation::CoreUtils;
 using ::android::hardware::MQDescriptorSync;
 using ::android::hardware::Return;
 using ::android::hardware::Void;
 
 namespace android {
-namespace CPP_VERSION {
 
-using EffectHalHidl = ::android::effect::CPP_VERSION::EffectHalHidl;
 using ReadCommand = ::android::hardware::audio::CPP_VERSION::IStreamIn::ReadCommand;
 
-using namespace ::android::hardware::audio::common::CPP_VERSION;
-using namespace ::android::hardware::audio::CPP_VERSION;
+using namespace ::android::hardware::audio::common::COMMON_TYPES_CPP_VERSION;
+using namespace ::android::hardware::audio::CORE_TYPES_CPP_VERSION;
 
 StreamHalHidl::StreamHalHidl(IStream *stream)
         : ConversionHelperHidl("Stream"),
@@ -137,14 +134,12 @@ status_t StreamHalHidl::getParameters(const String8& keys, String8 *values) {
 
 status_t StreamHalHidl::addEffect(sp<EffectHalInterface> effect) {
     if (!mStream) return NO_INIT;
-    return processReturn("addEffect", mStream->addEffect(
-                    static_cast<EffectHalHidl*>(effect.get())->effectId()));
+    return processReturn("addEffect", mStream->addEffect(effect->effectId()));
 }
 
 status_t StreamHalHidl::removeEffect(sp<EffectHalInterface> effect) {
     if (!mStream) return NO_INIT;
-    return processReturn("removeEffect", mStream->removeEffect(
-                    static_cast<EffectHalHidl*>(effect.get())->effectId()));
+    return processReturn("removeEffect", mStream->removeEffect(effect->effectId()));
 }
 
 status_t StreamHalHidl::standby() {
@@ -328,7 +323,8 @@ struct StreamOutCallback : public IStreamOutCallback {
 
 }  // namespace
 
-StreamOutHalHidl::StreamOutHalHidl(const sp<IStreamOut>& stream)
+StreamOutHalHidl::StreamOutHalHidl(
+        const sp<::android::hardware::audio::CPP_VERSION::IStreamOut>& stream)
         : StreamHalHidl(stream.get()), mStream(stream), mWriterClient(0), mEfGroup(nullptr) {
 }
 
@@ -644,7 +640,11 @@ status_t StreamOutHalHidl::updateSourceMetadata(
 #elif MAJOR_VERSION >= 4
 status_t StreamOutHalHidl::updateSourceMetadata(
         const StreamOutHalInterface::SourceMetadata& sourceMetadata) {
-    CPP_VERSION::SourceMetadata hidlMetadata;
+#if MAJOR_VERSION == 4
+    ::android::hardware::audio::CORE_TYPES_CPP_VERSION::SourceMetadata hidlMetadata;
+#else
+    ::android::hardware::audio::common::COMMON_TYPES_CPP_VERSION::SourceMetadata hidlMetadata;
+#endif
     if (status_t status = CoreUtils::sourceMetadataFromHalV7(
                     sourceMetadata.tracks, true /*ignoreNonVendorTags*/, &hidlMetadata);
             status != OK) {
@@ -755,7 +755,7 @@ status_t StreamOutHalHidl::setPlaybackRateParameters(const audio_playback_rate_t
                     static_cast<TimestretchFallbackMode>(playbackRate.mFallbackMode)}));
 }
 
-#include PATH(android/hardware/audio/FILE_VERSION/IStreamOutEventCallback.h)
+#include PATH(android/hardware/audio/CORE_TYPES_FILE_VERSION/IStreamOutEventCallback.h)
 
 namespace {
 
@@ -820,7 +820,8 @@ void StreamOutHalHidl::onCodecFormatChanged(const std::basic_string<uint8_t>& me
 }
 
 
-StreamInHalHidl::StreamInHalHidl(const sp<IStreamIn>& stream)
+StreamInHalHidl::StreamInHalHidl(
+        const sp<::android::hardware::audio::CPP_VERSION::IStreamIn>& stream)
         : StreamHalHidl(stream.get()), mStream(stream), mReaderClient(0), mEfGroup(nullptr) {
 }
 
@@ -1033,7 +1034,11 @@ status_t StreamInHalHidl::getActiveMicrophones(
 
 status_t StreamInHalHidl::updateSinkMetadata(const
         StreamInHalInterface::SinkMetadata& sinkMetadata) {
-    CPP_VERSION::SinkMetadata hidlMetadata;
+#if MAJOR_VERSION == 4
+    ::android::hardware::audio::CORE_TYPES_CPP_VERSION::SinkMetadata hidlMetadata;
+#else
+    ::android::hardware::audio::common::COMMON_TYPES_CPP_VERSION::SinkMetadata hidlMetadata;
+#endif
     if (status_t status = CoreUtils::sinkMetadataFromHalV7(
                     sinkMetadata.tracks, true /*ignoreNonVendorTags*/, &hidlMetadata);
             status != OK) {
@@ -1068,5 +1073,4 @@ status_t StreamInHalHidl::setPreferredMicrophoneFieldDimension(float zoom) {
 }
 #endif
 
-} // namespace CPP_VERSION
 } // namespace android

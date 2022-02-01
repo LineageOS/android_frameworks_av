@@ -22,7 +22,6 @@
 #include "DevicesFactoryHalLocal.h"
 
 namespace android {
-namespace CPP_VERSION {
 
 DevicesFactoryHalHybrid::DevicesFactoryHalHybrid(sp<IDevicesFactory> hidlFactory)
         : mLocalFactory(new DevicesFactoryHalLocal()),
@@ -51,11 +50,9 @@ status_t DevicesFactoryHalHybrid::setCallbackOnce(sp<DevicesFactoryHalCallback> 
     return INVALID_OPERATION;
 }
 
-} // namespace CPP_VERSION
-
 extern "C" __attribute__((visibility("default"))) void* createIDevicesFactory() {
     auto service = hardware::audio::CPP_VERSION::IDevicesFactory::getService();
-    return service ? new CPP_VERSION::DevicesFactoryHalHybrid(service) : nullptr;
+    return service ? new DevicesFactoryHalHybrid(service) : nullptr;
 }
 
 } // namespace android

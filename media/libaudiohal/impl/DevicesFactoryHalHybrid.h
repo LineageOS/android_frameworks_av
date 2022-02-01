@@ -25,7 +25,6 @@
 using ::android::hardware::audio::CPP_VERSION::IDevicesFactory;
 
 namespace android {
-namespace CPP_VERSION {
 
 class DevicesFactoryHalHybrid : public DevicesFactoryHalInterface
 {
@@ -49,7 +48,6 @@ class DevicesFactoryHalHybrid : public DevicesFactoryHalInterface
     sp<DevicesFactoryHalInterface> mHidlFactory;
 };
 
-} // namespace CPP_VERSION
 } // namespace android
 
 #endif // ANDROID_HARDWARE_DEVICES_FACTORY_HAL_HYBRID_H
