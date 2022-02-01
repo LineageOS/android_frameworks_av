@@ -781,5 +781,14 @@ bool ColorUtils::getHDRStaticInfoFromFormat(const sp<AMessage> &format, HDRStati
     return true;
 }
 
+// static
+bool ColorUtils::isHDRStaticInfoValid(HDRStaticInfo *info) {
+    if (info->sType1.mMaxDisplayLuminance > 0.0f
+        && info->sType1.mMinDisplayLuminance > 0.0f)  return true;
+    if (info->sType1.mMaxContentLightLevel > 0.0f
+        && info->sType1.mMaxFrameAverageLightLevel > 0.0f)  return true;
+    return false;
+}
+
 }  // namespace android
 
