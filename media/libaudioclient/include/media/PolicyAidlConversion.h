@@ -39,11 +39,6 @@
 
 namespace android {
 
-ConversionResult<volume_group_t>
-aidl2legacy_int32_t_volume_group_t(int32_t aidl);
-ConversionResult<int32_t>
-legacy2aidl_volume_group_t_int32_t(volume_group_t legacy);
-
 ConversionResult<product_strategy_t>
 aidl2legacy_int32_t_product_strategy_t(int32_t aidl);
 ConversionResult<int32_t>
