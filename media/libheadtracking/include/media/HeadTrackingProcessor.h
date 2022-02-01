@@ -38,8 +38,6 @@ class HeadTrackingProcessor {
     struct Options {
         float maxTranslationalVelocity = std::numeric_limits<float>::infinity();
         float maxRotationalVelocity = std::numeric_limits<float>::infinity();
-        float translationalDriftTimeConstant = std::numeric_limits<float>::infinity();
-        float rotationalDriftTimeConstant = std::numeric_limits<float>::infinity();
         int64_t freshnessTimeout = std::numeric_limits<int64_t>::max();
         float predictionDuration = 0;
         int64_t autoRecenterWindowDuration = std::numeric_limits<int64_t>::max();
