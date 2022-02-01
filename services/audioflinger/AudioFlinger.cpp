@@ -4121,6 +4121,8 @@ status_t AudioFlinger::moveEffectChain_l(audio_session_t sessionId,
     size_t restored = 0;
     if (status != NO_ERROR) {
         for (const auto& effect : removed) {
+            dstThread->removeEffect_l(effect); // Note: Depending on error location, the last
+                                               // effect may not have been placed on dstThread.
             if (srcThread->addEffect_l(effect) == NO_ERROR) {
                 ++restored;
             }
