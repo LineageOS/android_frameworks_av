@@ -245,7 +245,7 @@ c2_status_t C2SoftOpusEnc::initEncoder() {
     mIsFirstFrame = true;
     mEncoderFlushed = false;
     mBufferAvailable = false;
-    mAnchorTimeStamp = 0ull;
+    mAnchorTimeStamp = 0;
     mProcessedSamples = 0;
     mFilledLen = 0;
     mFrameDurationMs = DEFAULT_FRAME_DURATION_MS;
@@ -266,7 +266,7 @@ c2_status_t C2SoftOpusEnc::onStop() {
     mIsFirstFrame = true;
     mEncoderFlushed = false;
     mBufferAvailable = false;
-    mAnchorTimeStamp = 0ull;
+    mAnchorTimeStamp = 0;
     mProcessedSamples = 0u;
     mFilledLen = 0;
     if (mEncoder) {
@@ -363,7 +363,7 @@ void C2SoftOpusEnc::process(const std::unique_ptr<C2Work>& work,
         }
     }
     if (mIsFirstFrame && inSize > 0) {
-        mAnchorTimeStamp = work->input.ordinal.timestamp.peekull();
+        mAnchorTimeStamp = work->input.ordinal.timestamp.peekll();
         mIsFirstFrame = false;
     }
 
@@ -386,7 +386,7 @@ void C2SoftOpusEnc::process(const std::unique_ptr<C2Work>& work,
     size_t inPos = 0;
     size_t processSize = 0;
     mBytesEncoded = 0;
-    uint64_t outTimeStamp = 0u;
+    int64_t outTimeStamp = 0;
     std::shared_ptr<C2Buffer> buffer;
     uint64_t inputIndex = work->input.ordinal.frameIndex.peeku();
     const uint8_t* inPtr = rView.data() + inOffset;
@@ -584,7 +584,7 @@ c2_status_t C2SoftOpusEnc::drainInternal(
         mOutputBlock.reset();
     }
     mProcessedSamples += (mNumPcmBytesPerInputFrame / sizeof(int16_t));
-    uint64_t outTimeStamp =
+    int64_t outTimeStamp =
         mProcessedSamples * 1000000ll / mChannelCount / mSampleRate;
     outOrdinal.frameIndex = mOutIndex++;
     outOrdinal.timestamp = mAnchorTimeStamp + outTimeStamp;
@@ -612,7 +612,7 @@ c2_status_t C2SoftOpusEnc::drain(uint32_t drainMode,
         return C2_OMITTED;
     }
     mIsFirstFrame = true;
-    mAnchorTimeStamp = 0ull;
+    mAnchorTimeStamp = 0;
     mProcessedSamples = 0u;
     return drainInternal(pool, nullptr);
 }
