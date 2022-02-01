@@ -439,6 +439,8 @@ public:
     static status_t setSurroundFormatEnabled(audio_format_t audioFormat, bool enabled);
 
     static status_t setAssistantServicesUids(const std::vector<uid_t>& uids);
+    static status_t setActiveAssistantServicesUids(const std::vector<uid_t>& activeUids);
+
     static status_t setA11yServicesUids(const std::vector<uid_t>& uids);
     static status_t setCurrentImeUid(uid_t uid);
 

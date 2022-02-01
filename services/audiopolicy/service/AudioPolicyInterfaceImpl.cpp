@@ -2024,6 +2024,16 @@ Status AudioPolicyService::setAssistantServicesUids(const std::vector<int32_t>& 
     return Status::ok();
 }
 
+Status AudioPolicyService::setActiveAssistantServicesUids(
+        const std::vector<int32_t>& activeUidsAidl) {
+    std::vector<uid_t> activeUids;
+    RETURN_IF_BINDER_ERROR(convertInt32VectorToUidVectorWithLimit(activeUidsAidl, activeUids));
+
+    Mutex::Autolock _l(mLock);
+    mUidPolicy->setActiveAssistantUids(activeUids);
+    return Status::ok();
+}
+
 Status AudioPolicyService::setA11yServicesUids(const std::vector<int32_t>& uidsAidl)
 {
     std::vector<uid_t> uids;

@@ -304,6 +304,8 @@ interface IAudioPolicyService {
 
     void setAssistantServicesUids(in int[] /* uid_t[] */ uids);
 
+    void setActiveAssistantServicesUids(in int[] /* uid_t[] */ activeUids);
+
     void setA11yServicesUids(in int[] /* uid_t[] */ uids);
 
     void setCurrentImeUid(int /* uid_t */ uid);

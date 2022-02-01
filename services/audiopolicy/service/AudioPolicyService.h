@@ -219,6 +219,7 @@ public:
     binder::Status setSurroundFormatEnabled(const AudioFormatDescription& audioFormat,
                                             bool enabled) override;
     binder::Status setAssistantServicesUids(const std::vector<int32_t>& uids) override;
+    binder::Status setActiveAssistantServicesUids(const std::vector<int32_t>& activeUids) override;
     binder::Status setA11yServicesUids(const std::vector<int32_t>& uids) override;
     binder::Status setCurrentImeUid(int32_t uid) override;
     binder::Status isHapticPlaybackSupported(bool* _aidl_return) override;
@@ -432,6 +433,8 @@ private:
         int getUidState(uid_t uid);
         void setAssistantUids(const std::vector<uid_t>& uids);
         bool isAssistantUid(uid_t uid);
+        void setActiveAssistantUids(const std::vector<uid_t>& activeUids);
+        bool isActiveAssistantUid(uid_t uid);
         void setA11yUids(const std::vector<uid_t>& uids) { mA11yUids.clear(); mA11yUids = uids; }
         bool isA11yUid(uid_t uid);
         bool isA11yOnTop();
@@ -469,6 +472,7 @@ private:
         std::unordered_map<uid_t, std::pair<bool, int>> mOverrideUids;
         std::unordered_map<uid_t, std::pair<bool, int>> mCachedUids;
         std::vector<uid_t> mAssistantUids;
+        std::vector<uid_t> mActiveAssistantUids;
         std::vector<uid_t> mA11yUids;
         uid_t mCurrentImeUid = -1;
         bool mRttEnabled = false;
