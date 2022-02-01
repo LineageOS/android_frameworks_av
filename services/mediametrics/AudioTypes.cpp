@@ -196,9 +196,9 @@ const std::unordered_map<std::string, int32_t>& getStatusMap() {
     // DO NOT MODIFY VALUES(OK to add new ones).
     static std::unordered_map<std::string, int32_t> map {
         {"",
-            util::MEDIAMETRICS_AUDIO_TRACK_STATUS_REPORTED__STATUS__OK},
+            util::MEDIAMETRICS_AUDIO_TRACK_STATUS_REPORTED__STATUS__NO_ERROR},
         {AMEDIAMETRICS_PROP_STATUS_VALUE_OK,
-            util::MEDIAMETRICS_AUDIO_TRACK_STATUS_REPORTED__STATUS__OK},
+            util::MEDIAMETRICS_AUDIO_TRACK_STATUS_REPORTED__STATUS__NO_ERROR},
         {AMEDIAMETRICS_PROP_STATUS_VALUE_ARGUMENT,
             util::MEDIAMETRICS_AUDIO_TRACK_STATUS_REPORTED__STATUS__ERROR_ARGUMENT},
         {AMEDIAMETRICS_PROP_STATUS_VALUE_IO,
