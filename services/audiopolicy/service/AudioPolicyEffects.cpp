@@ -387,7 +387,7 @@ status_t AudioPolicyEffects::addSourceDefaultEffect(const effect_uuid_t *type,
         return res;
     }
     EffectDesc *effect = new EffectDesc(
-            descriptor.name, *type, opPackageName, *uuid, priority, *id);
+            descriptor.name, descriptor.type, opPackageName, descriptor.uuid, priority, *id);
     desc->mEffects.add(effect);
     // TODO(b/71813697): Support setting params as well.
 
@@ -452,7 +452,7 @@ status_t AudioPolicyEffects::addStreamDefaultEffect(const effect_uuid_t *type,
         return res;
     }
     EffectDesc *effect = new EffectDesc(
-            descriptor.name, *type, opPackageName, *uuid, priority, *id);
+            descriptor.name, descriptor.type, opPackageName, descriptor.uuid, priority, *id);
     desc->mEffects.add(effect);
     // TODO(b/71813697): Support setting params as well.
 
