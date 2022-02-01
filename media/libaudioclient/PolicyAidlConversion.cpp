@@ -26,16 +26,6 @@ namespace android {
 
 using base::unexpected;
 
-ConversionResult<volume_group_t>
-aidl2legacy_int32_t_volume_group_t(int32_t aidl) {
-    return convertReinterpret<volume_group_t>(aidl);
-}
-
-ConversionResult<int32_t>
-legacy2aidl_volume_group_t_int32_t(volume_group_t legacy) {
-    return convertReinterpret<int32_t>(legacy);
-}
-
 ConversionResult<uint32_t>
 aidl2legacy_AudioMixType_uint32_t(media::AudioMixType aidl) {
     switch (aidl) {
