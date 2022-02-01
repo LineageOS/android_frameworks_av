@@ -765,6 +765,12 @@ status_t AudioFlingerClientAdapter::updateSecondaryOutputs(
     return statusTFromBinderStatus(mDelegate->updateSecondaryOutputs(trackSecondaryOutputInfos));
 }
 
+status_t AudioFlingerClientAdapter::setDeviceConnectedState(
+        const struct audio_port_v7 *port, bool connected) {
+    media::AudioPort aidlPort = VALUE_OR_RETURN_STATUS(
+            legacy2aidl_audio_port_v7_AudioPort(*port));
+    return statusTFromBinderStatus(mDelegate->setDeviceConnectedState(aidlPort, connected));
+}
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////
 // AudioFlingerServerAdapter
@@ -1234,6 +1240,12 @@ Status AudioFlingerServerAdapter::updateSecondaryOutputs(
                     trackSecondaryOutputInfos,
                     aidl2legacy_TrackSecondaryOutputInfo_TrackSecondaryOutputInfoPair));
     return Status::fromStatusT(mDelegate->updateSecondaryOutputs(trackSecondaryOutputs));
+}
+
+Status AudioFlingerServerAdapter::setDeviceConnectedState(
+        const media::AudioPort& port, bool connected) {
+    audio_port_v7 portLegacy = VALUE_OR_RETURN_BINDER(aidl2legacy_AudioPort_audio_port_v7(port));
+    return Status::fromStatusT(mDelegate->setDeviceConnectedState(&portLegacy, connected));
 }
 
 } // namespace android

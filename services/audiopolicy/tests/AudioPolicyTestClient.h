@@ -95,6 +95,10 @@ public:
             const TrackSecondaryOutputsMap& trackSecondaryOutputs __unused) override {
         return NO_INIT;
     }
+    status_t setDeviceConnectedState(
+            const struct audio_port_v7 *port __unused, bool connected __unused) override {
+        return NO_INIT;
+    }
 };
 
 } // namespace android

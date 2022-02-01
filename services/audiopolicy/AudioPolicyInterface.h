@@ -459,6 +459,8 @@ public:
 
     virtual status_t updateSecondaryOutputs(
             const TrackSecondaryOutputsMap& trackSecondaryOutputs) = 0;
+
+    virtual status_t setDeviceConnectedState(const struct audio_port_v7 *port, bool connected) = 0;
 };
 
     // These are the signatures of createAudioPolicyManager/destroyAudioPolicyManager
