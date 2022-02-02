@@ -184,7 +184,8 @@ class CameraDeviceBase : public virtual FrameProducer {
             bool isShared = false, bool isMultiResolution = false,
             uint64_t consumerUsage = 0,
             int dynamicProfile = ANDROID_REQUEST_AVAILABLE_DYNAMIC_RANGE_PROFILES_MAP_STANDARD,
-            int streamUseCase = ANDROID_SCALER_AVAILABLE_STREAM_USE_CASES_DEFAULT) = 0;
+            int streamUseCase = ANDROID_SCALER_AVAILABLE_STREAM_USE_CASES_DEFAULT,
+            int timestampBase = OutputConfiguration::TIMESTAMP_BASE_DEFAULT) = 0;
 
     /**
      * Create an output stream of the requested size, format, rotation and
@@ -203,7 +204,8 @@ class CameraDeviceBase : public virtual FrameProducer {
             bool isShared = false, bool isMultiResolution = false,
             uint64_t consumerUsage = 0,
             int dynamicProfile = ANDROID_REQUEST_AVAILABLE_DYNAMIC_RANGE_PROFILES_MAP_STANDARD,
-            int streamUseCase = ANDROID_SCALER_AVAILABLE_STREAM_USE_CASES_DEFAULT) = 0;
+            int streamUseCase = ANDROID_SCALER_AVAILABLE_STREAM_USE_CASES_DEFAULT,
+            int timestampBase = OutputConfiguration::TIMESTAMP_BASE_DEFAULT) = 0;
 
     /**
      * Create an input stream of width, height, and format.

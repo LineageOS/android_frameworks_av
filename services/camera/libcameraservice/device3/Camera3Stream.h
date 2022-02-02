@@ -179,6 +179,8 @@ class Camera3Stream :
     int               getMaxHalBuffers() const;
     const String8&    physicalCameraId() const;
     int               getStreamUseCase() const;
+    int               getTimestampBase() const;
+    bool              isDeviceTimeBaseRealtime() const;
 
     void              setOfflineProcessingSupport(bool) override;
     bool              getOfflineProcessingSupport() const override;
@@ -507,7 +509,7 @@ class Camera3Stream :
             const String8& physicalCameraId,
             const std::unordered_set<int32_t> &sensorPixelModesUsed,
             int setId, bool isMultiResolution, int dynamicRangeProfile,
-            int streamUseCase);
+            int streamUseCase, bool deviceTimeBaseIsRealtime, int timestampBase);
 
     wp<Camera3StreamBufferFreedListener> mBufferFreedListener;
 
@@ -630,6 +632,9 @@ class Camera3Stream :
 
     bool mIsMultiResolution = false;
     bool mSupportOfflineProcessing = false;
+
+    bool mDeviceTimeBaseIsRealtime;
+    int mTimestampBase;
 }; // class Camera3Stream
 
 }; // namespace camera3
