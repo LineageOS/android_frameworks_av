@@ -168,10 +168,6 @@ cc_library_shared {
         "DrmMetricsConsumer.cpp",
     ],
 
-    include_dirs: [
-        "frameworks/av/media/libmedia/include"
-    ],
-
     shared_libs: [
         "android.hardware.drm@1.0",
         "android.hardware.drm@1.1",
@@ -187,5 +183,6 @@ cc_library_shared {
     header_libs: [
         "libmediametrics_headers",
         "libstagefright_foundation_headers",
+        "libmedia_headers",
     ],
 }
