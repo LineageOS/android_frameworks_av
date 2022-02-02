@@ -42,7 +42,7 @@ std::string GetAttributeName(const std::string &typeName, uint32_t attribute) {
         }
         return type_names[attribute];
     }
-    
+
     static const char *type_names[] = {"PROVISION_REQUIRED", "KEY_NEEDED",
                                        "KEY_EXPIRED", "VENDOR_DEFINED",
                                        "SESSION_RECLAIMED"};
