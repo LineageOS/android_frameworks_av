@@ -78,7 +78,7 @@ public:
 
     void dump(std::string *dst, int spaces) const;
 
-    bool equals(const sp<AudioProfile>& other) const;
+    bool equals(const sp<AudioProfile>& other, bool ignoreDynamicFlags = false) const;
 
     using Aidl = std::pair<media::audio::common::AudioProfile, media::AudioProfileSys>;
     ConversionResult<Aidl> toParcelable(bool isInput) const;
@@ -139,11 +139,12 @@ public:
     bool hasDynamicProfile() const;
     bool hasDynamicRateFor(audio_format_t format) const;
 
-    bool contains(const sp<AudioProfile>& profile) const;
+    bool contains(const sp<AudioProfile>& profile, bool ignoreDynamicFlags = false) const;
 
     virtual void dump(std::string *dst, int spaces) const;
 
     bool equals(const AudioProfileVector& other) const;
+    void addAllValidProfiles(const AudioProfileVector& audioProfiles);
 
     using Aidl = std::pair<
             std::vector<media::audio::common::AudioProfile>,

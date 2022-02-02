@@ -127,16 +127,17 @@ void AudioProfile::dump(std::string *dst, int spaces) const
              "%*s%s\n", spaces, "", audio_encapsulation_type_to_string(mEncapsulationType)));
 }
 
-bool AudioProfile::equals(const sp<AudioProfile>& other) const
+bool AudioProfile::equals(const sp<AudioProfile>& other, bool ignoreDynamicFlags) const
 {
     return other != nullptr &&
            mName.compare(other->mName) == 0 &&
            mFormat == other->getFormat() &&
            mChannelMasks == other->getChannels() &&
            mSamplingRates == other->getSampleRates() &&
-           mIsDynamicFormat == other->isDynamicFormat() &&
-           mIsDynamicChannels == other->isDynamicChannels() &&
-           mIsDynamicRate == other->isDynamicRate() &&
+           (ignoreDynamicFlags ||
+               (mIsDynamicFormat == other->isDynamicFormat() &&
+               mIsDynamicChannels == other->isDynamicChannels() &&
+               mIsDynamicRate == other->isDynamicRate())) &&
            mEncapsulationType == other->getEncapsulationType();
 }
 
@@ -326,10 +327,10 @@ bool AudioProfileVector::hasDynamicRateFor(audio_format_t format) const
     return false;
 }
 
-bool AudioProfileVector::contains(const sp<AudioProfile>& profile) const
+bool AudioProfileVector::contains(const sp<AudioProfile>& profile, bool ignoreDynamicFlags) const
 {
     for (const auto& audioProfile : *this) {
-        if (audioProfile->equals(profile)) {
+        if (audioProfile->equals(profile, ignoreDynamicFlags)) {
             return true;
         }
     }
@@ -354,6 +355,14 @@ bool AudioProfileVector::equals(const AudioProfileVector& other) const
                       [](const sp<AudioProfile>& left, const sp<AudioProfile>& right) {
                           return left->equals(right);
                       });
+}
+
+void AudioProfileVector::addAllValidProfiles(const AudioProfileVector& audioProfiles) {
+    for (const auto& audioProfile : audioProfiles) {
+        if (audioProfile->isValid() && !contains(audioProfile, true /*ignoreDynamicFlags*/)) {
+            add(audioProfile);
+        }
+    }
 }
 
 ConversionResult<AudioProfileVector>

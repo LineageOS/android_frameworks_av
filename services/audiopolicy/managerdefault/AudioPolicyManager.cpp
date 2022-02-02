@@ -1709,6 +1709,28 @@ void AudioPolicyManager::releaseMsdOutputPatches(const DeviceVector& devices) {
     }
 }
 
+bool AudioPolicyManager::msdHasPatchesToAllDevices(const AudioDeviceTypeAddrVector& devices) {
+    DeviceVector devicesToCheck = mOutputDevicesAll.getDevicesFromDeviceTypeAddrVec(devices);
+    AudioPatchCollection msdPatches = getMsdOutputPatches();
+    for (size_t i = 0; i < msdPatches.size(); i++) {
+        const auto& patch = msdPatches[i];
+        for (size_t j = 0; j < patch->mPatch.num_sinks; ++j) {
+            const struct audio_port_config *sink = &patch->mPatch.sinks[j];
+            if (sink->type == AUDIO_PORT_TYPE_DEVICE) {
+                const auto& foundDevice = devicesToCheck.getDevice(
+                    sink->ext.device.type, String8(sink->ext.device.address), AUDIO_FORMAT_DEFAULT);
+                if (foundDevice != nullptr) {
+                    devicesToCheck.remove(foundDevice);
+                    if (devicesToCheck.isEmpty()) {
+                        return true;
+                    }
+                }
+            }
+        }
+    }
+    return false;
+}
+
 audio_io_handle_t AudioPolicyManager::selectOutput(const SortedVector<audio_io_handle_t>& outputs,
                                                    audio_output_flags_t flags,
                                                    audio_format_t format,
@@ -3895,31 +3917,41 @@ status_t AudioPolicyManager::getDirectProfilesForAttributes(const audio_attribut
     }
 
     for (const auto& hwModule : mHwModules) {
-        for (const auto& curProfile : hwModule->getOutputProfiles()) {
-            if (!curProfile->asAudioPort()->isDirectOutput()) {
+        // the MSD module checks for different conditions
+        if (strcmp(hwModule->getName(), AUDIO_HARDWARE_MODULE_ID_MSD) == 0) {
+            continue;
+        }
+        for (const auto& outputProfile : hwModule->getOutputProfiles()) {
+            if (!outputProfile->asAudioPort()->isDirectOutput()) {
                 continue;
             }
-            // Allow only profiles that support all the available and routed devices
-            DeviceVector supportedDevices = curProfile->getSupportedDevices();
-            if (supportedDevices.getDevicesFromDeviceTypeAddrVec(devices).size()
+            // allow only profiles that support all the available and routed devices
+            if (outputProfile->getSupportedDevices().getDevicesFromDeviceTypeAddrVec(devices).size()
                     != devices.size()) {
                 continue;
             }
-
-            const auto audioProfiles = curProfile->asAudioPort()->getAudioProfiles();
-            ALOGV("%s: found direct profile (%s) with %zu audio profiles.",
-                __func__, curProfile->getTagName().c_str(), audioProfiles.size());
-            for (const auto& audioProfile : audioProfiles) {
-                if (audioProfile->isValid() && !audioProfilesVector.contains(audioProfile)
-                // TODO - why do we have same PCM format with both dynamic and non dynamic format
-                    && audioProfile->isDynamicFormat()) {
-                    ALOGV("%s: adding audio profile with encoding (%d).",
-                        __func__, audioProfile->getFormat());
-                    audioProfilesVector.add(audioProfile);
-                }
-            }
+            audioProfilesVector.addAllValidProfiles(
+                    outputProfile->asAudioPort()->getAudioProfiles());
         }
     }
+
+    // add the direct profiles from MSD if present and has audio patches to all the output(s)
+    const auto& msdModule = mHwModules.getModuleFromName(AUDIO_HARDWARE_MODULE_ID_MSD);
+    if (msdModule != nullptr) {
+        if (msdHasPatchesToAllDevices(devices)) {
+            ALOGV("%s: MSD audio patches set to all output devices.", __func__);
+            for (const auto& outputProfile : msdModule->getOutputProfiles()) {
+                if (!outputProfile->asAudioPort()->isDirectOutput()) {
+                    continue;
+                }
+                audioProfilesVector.addAllValidProfiles(
+                        outputProfile->asAudioPort()->getAudioProfiles());
+            }
+        } else {
+            ALOGV("%s: MSD audio patches NOT set to all output devices.", __func__);
+        }
+    }
+
     return NO_ERROR;
 }
 
