@@ -315,7 +315,7 @@ void AudioFlingerFuzzer::invokeAudioRecord() {
     attributionSource.packageName = std::string(mFdp.ConsumeRandomLengthString().c_str());
     attributionSource.token = sp<BBinder>::make();
     sp<AudioRecord> record = new AudioRecord(attributionSource);
-    record->set(AUDIO_SOURCE_DEFAULT, sampleRate, format, channelMask, frameCount, nullptr, nullptr,
+    record->set(AUDIO_SOURCE_DEFAULT, sampleRate, format, channelMask, frameCount, nullptr,
                 notificationFrames, false, sessionId,
                 fast ? AudioRecord::TRANSFER_CALLBACK : AudioRecord::TRANSFER_DEFAULT, flags,
                 getuid(), getpid(), &attributes, AUDIO_PORT_HANDLE_NONE);

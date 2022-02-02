@@ -98,14 +98,14 @@ int testRecord(FILE *inputFile, int outputFileFd)
         attributes.source = inputSource;
 
         sp<AudioRecord> record = new AudioRecord(attributionSource);
+        const auto emptyCallback = sp<AudioRecord::IAudioRecordCallback>::make();
 
         record->set(AUDIO_SOURCE_DEFAULT,
                    sampleRate,
                    format,
                    channelMask,
                    frameCount,
-                   fast ? callback : nullptr,
-                   nullptr,
+                   fast ? emptyCallback : nullptr,
                    notificationFrames,
                    false,
                    sessionId,

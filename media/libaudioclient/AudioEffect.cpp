@@ -128,6 +128,9 @@ status_t AudioEffect::set(const effect_uuid_t *type,
     mStatus = audioFlinger->createEffect(request, &response);
 
     if (mStatus == OK) {
+        if (response.alreadyExists) {
+            mStatus = ALREADY_EXISTS;
+        }
         mId = response.id;
         enabled = response.enabled;
         iEffect = response.effect;
