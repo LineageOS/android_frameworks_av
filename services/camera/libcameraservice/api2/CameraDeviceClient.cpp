@@ -206,6 +206,7 @@ binder::Status CameraDeviceClient::insertGbpLocked(const sp<IGraphicBufferProduc
     int compositeIdx;
     int idx = mStreamMap.indexOfKey(IInterface::asBinder(gbp));
 
+    Mutex::Autolock l(mCompositeLock);
     // Trying to submit request with surface that wasn't created
     if (idx == NAME_NOT_FOUND) {
         ALOGE("%s: Camera %s: Tried to submit a request with a surface that"
@@ -640,6 +641,7 @@ binder::Status CameraDeviceClient::endConfigure(int operatingMode,
         offlineStreamIds->clear();
         mDevice->getOfflineStreamIds(offlineStreamIds);
 
+        Mutex::Autolock l(mCompositeLock);
         for (size_t i = 0; i < mCompositeStreamMap.size(); ++i) {
             err = mCompositeStreamMap.valueAt(i)->configureStream();
             if (err != OK) {
@@ -774,6 +776,7 @@ binder::Status CameraDeviceClient::deleteStream(int streamId) {
             }
         }
 
+        Mutex::Autolock l(mCompositeLock);
         for (size_t i = 0; i < mCompositeStreamMap.size(); ++i) {
             if (streamId == mCompositeStreamMap.valueAt(i)->getStreamId()) {
                 compositeIndex = i;
@@ -812,6 +815,7 @@ binder::Status CameraDeviceClient::deleteStream(int streamId) {
             }
 
             if (compositeIndex != NAME_NOT_FOUND) {
+                Mutex::Autolock l(mCompositeLock);
                 status_t ret;
                 if ((ret = mCompositeStreamMap.valueAt(compositeIndex)->deleteStream())
                         != OK) {
@@ -935,6 +939,7 @@ binder::Status CameraDeviceClient::createStream(
                 &streamId, physicalCameraId, streamInfo.sensorPixelModesUsed, &surfaceIds,
                 outputConfiguration.getSurfaceSetID(), isShared, isMultiResolution);
         if (err == OK) {
+            Mutex::Autolock l(mCompositeLock);
             mCompositeStreamMap.add(IInterface::asBinder(surfaces[0]->getIGraphicBufferProducer()),
                     compositeStream);
         }
@@ -1754,8 +1759,9 @@ binder::Status CameraDeviceClient::switchToOffline(
             return STATUS_ERROR(CameraService::ERROR_ILLEGAL_ARGUMENT, msg.string());
         }
 
+        Mutex::Autolock l(mCompositeLock);
         bool isCompositeStream = false;
-        for (const auto& gbp : mConfiguredOutputs[streamId].getGraphicBufferProducers()) {
+        for (const auto& gbp : mConfiguredOutputs.valueAt(index).getGraphicBufferProducers()) {
             sp<Surface> s = new Surface(gbp, false /*controlledByApp*/);
             isCompositeStream = camera3::DepthCompositeStream::isDepthCompositeStream(s) |
                 camera3::HeicCompositeStream::isHeicCompositeStream(s);
@@ -1804,6 +1810,7 @@ binder::Status CameraDeviceClient::switchToOffline(
         mConfiguredOutputs.clear();
         mDeferredStreams.clear();
         mStreamInfoMap.clear();
+        Mutex::Autolock l(mCompositeLock);
         mCompositeStreamMap.clear();
         mInputStream = {false, 0, 0, 0, 0};
     } else {
@@ -1899,11 +1906,16 @@ void CameraDeviceClient::notifyError(int32_t errorCode,
     // Thread safe. Don't bother locking.
     sp<hardware::camera2::ICameraDeviceCallbacks> remoteCb = getRemoteCallback();
 
-    // Composites can have multiple internal streams. Error notifications coming from such internal
-    // streams may need to remain within camera service.
     bool skipClientNotification = false;
-    for (size_t i = 0; i < mCompositeStreamMap.size(); i++) {
-        skipClientNotification |= mCompositeStreamMap.valueAt(i)->onError(errorCode, resultExtras);
+    {
+        // Access to the composite stream map must be synchronized
+        Mutex::Autolock l(mCompositeLock);
+        // Composites can have multiple internal streams. Error notifications coming from such
+        // internal streams may need to remain within camera service.
+        for (size_t i = 0; i < mCompositeStreamMap.size(); i++) {
+            skipClientNotification |= mCompositeStreamMap.valueAt(i)->onError(errorCode,
+                    resultExtras);
+        }
     }
 
     if ((remoteCb != 0) && (!skipClientNotification)) {
@@ -1943,6 +1955,8 @@ void CameraDeviceClient::notifyShutter(const CaptureResultExtras& resultExtras,
     }
     Camera2ClientBase::notifyShutter(resultExtras, timestamp);
 
+    // Access to the composite stream map must be synchronized
+    Mutex::Autolock l(mCompositeLock);
     for (size_t i = 0; i < mCompositeStreamMap.size(); i++) {
         mCompositeStreamMap.valueAt(i)->onShutter(resultExtras, timestamp);
     }
@@ -1992,14 +2006,17 @@ void CameraDeviceClient::detachDevice() {
         }
     }
 
-    for (size_t i = 0; i < mCompositeStreamMap.size(); i++) {
-        auto ret = mCompositeStreamMap.valueAt(i)->deleteInternalStreams();
-        if (ret != OK) {
-            ALOGE("%s: Failed removing composite stream  %s (%d)", __FUNCTION__,
-                    strerror(-ret), ret);
+    {
+        Mutex::Autolock l(mCompositeLock);
+        for (size_t i = 0; i < mCompositeStreamMap.size(); i++) {
+            auto ret = mCompositeStreamMap.valueAt(i)->deleteInternalStreams();
+            if (ret != OK) {
+                ALOGE("%s: Failed removing composite stream  %s (%d)", __FUNCTION__,
+                        strerror(-ret), ret);
+            }
         }
+        mCompositeStreamMap.clear();
     }
-    mCompositeStreamMap.clear();
 
     Camera2ClientBase::detachDevice();
 
@@ -2019,6 +2036,8 @@ void CameraDeviceClient::onResultAvailable(const CaptureResult& result) {
                 result.mPhysicalMetadatas);
     }
 
+    // Access to the composite stream map must be synchronized
+    Mutex::Autolock l(mCompositeLock);
     for (size_t i = 0; i < mCompositeStreamMap.size(); i++) {
         mCompositeStreamMap.valueAt(i)->onResultAvailable(result);
     }

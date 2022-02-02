@@ -18,9 +18,6 @@ cc_test {
     gtest: true,
     host_supported: true,
     vendor: true,
-    include_dirs: [
-        "frameworks/av/media/libeffects/downmix",
-    ],
     header_libs: [
         "libaudioeffects",
     ],
@@ -51,9 +48,6 @@ cc_test {
     name:"downmixtest",
     host_supported: false,
     proprietary: true,
-    include_dirs: [
-        "frameworks/av/media/libeffects/downmix",
-    ],
 
     header_libs: [
         "libaudioeffects",

@@ -89,6 +89,8 @@ cc_library {
 
     local_include_dirs: ["Reverb"],
 
+    export_include_dirs: ["Reverb"],
+
     header_libs: [
         "libhardware_headers",
         "libaudioeffects",

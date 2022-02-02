@@ -56,6 +56,16 @@ class Twist3f {
                mRotationalVelocity.isApprox(other.mRotationalVelocity, prec);
     }
 
+    template<typename T>
+    Twist3f operator*(const T& s) const {
+        return Twist3f(mTranslationalVelocity * s, mRotationalVelocity * s);
+    }
+
+    template<typename T>
+    Twist3f operator/(const T& s) const {
+        return Twist3f(mTranslationalVelocity / s, mRotationalVelocity / s);
+    }
+
   private:
     Eigen::Vector3f mTranslationalVelocity;
     Eigen::Vector3f mRotationalVelocity;

@@ -44,7 +44,7 @@ constexpr float kMaxRotationalVelocity = 8;
 // twist (velocity). It should be set to a value that matches the characteristic durations of moving
 // one's head. The higher we set this, the more latency we are able to reduce, but setting this too
 // high will result in high prediction errors whenever the head accelerates (changes velocity).
-constexpr auto kPredictionDuration = 10ms;
+constexpr auto kPredictionDuration = 50ms;
 
 // After losing this many consecutive samples from either sensor, we would treat the measurement as
 // stale;
@@ -236,7 +236,8 @@ void SpatializerPoseController::onPose(int64_t timestamp, int32_t sensor, const 
                                        const std::optional<Twist3f>& twist, bool isNewReference) {
     std::lock_guard lock(mMutex);
     if (sensor == mHeadSensor) {
-        mProcessor->setWorldToHeadPose(timestamp, pose, twist.value_or(Twist3f()));
+        mProcessor->setWorldToHeadPose(timestamp, pose,
+                                       twist.value_or(Twist3f()) / kTicksPerSecond);
         if (isNewReference) {
             mProcessor->recenter(true, false);
         }
