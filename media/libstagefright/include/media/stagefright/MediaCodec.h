@@ -502,7 +502,7 @@ private:
 
     std::shared_ptr<BufferChannelBase> mBufferChannel;
 
-    PlaybackDurationAccumulator * mPlaybackDurationAccumulator;
+    std::unique_ptr<PlaybackDurationAccumulator> mPlaybackDurationAccumulator;
     bool mIsSurfaceToScreen;
 
     MediaCodec(
