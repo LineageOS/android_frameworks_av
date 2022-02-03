@@ -179,10 +179,10 @@ static constexpr const char * const AudioTrackStatusFields[] {
     "mediametrics_audiotrackstatus_reported",
     "status",
     "debug_message",
-    "sub_code",
+    "status_subcode",
     "uid",
     "event",
-    "flags",
+    "output_flags",
     "content_type",
     "usage",
     "encoding",
@@ -542,8 +542,8 @@ void AudioAnalytics::processStatus(const std::shared_ptr<const mediametrics::Ite
         const int atom_status = types::lookup<types::STATUS, int32_t>(statusString);
 
         // currently we only send create status events.
-        const int32_t event =
-                android::util::MEDIAMETRICS_AUDIO_TRACK_STATUS_REPORTED__EVENT__EVENT_CREATE;
+        const int32_t event = android::util::
+                MEDIAMETRICS_AUDIO_TRACK_STATUS_REPORTED__EVENT__AUDIO_TRACK_EVENT_CREATE;
 
         // The following fields should all be present in a create event.
         std::string flagsStr;
