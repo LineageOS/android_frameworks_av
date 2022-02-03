@@ -39,7 +39,7 @@ cc_library {
         darwin: {
             enabled: false,
         },
-        linux_glibc: {
+        glibc: {
             cflags: [
                 "-Dsigev_notify_thread_id=_sigev_un._tid",
             ],
