@@ -168,6 +168,18 @@ class StreamOutHalLocal : public StreamOutHalInterface, public StreamHalLocal {
 
     status_t setEventCallback(const sp<StreamOutHalInterfaceEventCallback>& callback) override;
 
+    status_t setLatencyMode(audio_latency_mode_t mode __unused) override {
+        return INVALID_OPERATION;
+    }
+    status_t getRecommendedLatencyModes(
+            std::vector<audio_latency_mode_t> *modes __unused) override {
+        return INVALID_OPERATION;
+    }
+    status_t setLatencyModeCallback(
+            const sp<StreamOutHalInterfaceLatencyModeCallback>& callback __unused) override {
+        return INVALID_OPERATION;
+    }
+
   private:
     audio_stream_out_t *mStream;
     wp<StreamOutHalInterfaceCallback> mCallback;
