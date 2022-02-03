@@ -62,6 +62,7 @@ inline static const char *asString(MediaResource::SubType i, const char *def = "
         case MediaResource::SubType::kUnspecifiedSubType: return "unspecified";
         case MediaResource::SubType::kAudioCodec:         return "audio-codec";
         case MediaResource::SubType::kVideoCodec:         return "video-codec";
+        case MediaResource::SubType::kImageCodec:         return "image-codec";
         default:                                 return def;
     }
 }
