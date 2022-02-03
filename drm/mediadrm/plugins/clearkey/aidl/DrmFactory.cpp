@@ -72,7 +72,8 @@ using ::aidl::android::hardware::drm::Uuid;
     // This should match the in_mimeTypes handed by InitDataParser.
     *_aidl_return = in_mimeType == kIsoBmffVideoMimeType || in_mimeType == kIsoBmffAudioMimeType ||
                     in_mimeType == kCencInitDataFormat || in_mimeType == kWebmVideoMimeType ||
-                    in_mimeType == kWebmAudioMimeType || in_mimeType == kWebmInitDataFormat;
+                    in_mimeType == kWebmAudioMimeType || in_mimeType == kWebmInitDataFormat ||
+                    in_mimeType.empty();
     return ::ndk::ScopedAStatus::ok();
 }
 
@@ -85,7 +86,9 @@ using ::aidl::android::hardware::drm::Uuid;
         ALOGD("%s mime type is not supported by crypto scheme", in_mimeType.c_str());
     }
     *_aidl_return = isClearKeyUUID(in_uuid.uuid.data()) && isSupportedMimeType &&
-                    in_securityLevel == SecurityLevel::SW_SECURE_CRYPTO;
+                    (in_securityLevel == SecurityLevel::SW_SECURE_CRYPTO ||
+                     in_securityLevel == SecurityLevel::DEFAULT ||
+                     in_securityLevel == SecurityLevel::UNKNOWN);
     return ::ndk::ScopedAStatus::ok();
 }
 

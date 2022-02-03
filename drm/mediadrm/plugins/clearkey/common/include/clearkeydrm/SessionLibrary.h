@@ -23,7 +23,7 @@
 
 namespace clearkeydrm {
 
-class SessionLibrary : public ::android::RefBase {
+class SessionLibrary {
   public:
     static SessionLibrary* get();
 
