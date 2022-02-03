@@ -1689,7 +1689,7 @@ binder::Status CameraDeviceClient::switchToOffline(
         bool isCompositeStream = false;
         for (const auto& gbp : mConfiguredOutputs[streamId].getGraphicBufferProducers()) {
             sp<Surface> s = new Surface(gbp, false /*controlledByApp*/);
-            isCompositeStream = camera3::DepthCompositeStream::isDepthCompositeStream(s) |
+            isCompositeStream = camera3::DepthCompositeStream::isDepthCompositeStream(s) ||
                 camera3::HeicCompositeStream::isHeicCompositeStream(s);
             if (isCompositeStream) {
                 auto compositeIdx = mCompositeStreamMap.indexOfKey(IInterface::asBinder(gbp));
