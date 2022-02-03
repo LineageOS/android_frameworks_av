@@ -167,6 +167,7 @@ protected:
     static constexpr uint32_t NO_DRAIN = ~0u;
 
     C2ReadView mDummyReadView;
+    int getHalPixelFormatForBitDepth10(bool allowRGBA1010102);
 
 private:
     const std::shared_ptr<C2ComponentInterface> mIntf;
@@ -250,6 +251,7 @@ private:
     class BlockingBlockPool;
     std::shared_ptr<BlockingBlockPool> mOutputBlockPool;
 
+    std::vector<int> mBitDepth10HalPixelFormats;
     SimpleC2Component() = delete;
 };
 
