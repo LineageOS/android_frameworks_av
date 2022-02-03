@@ -59,7 +59,6 @@ using ValueHidl = ::android::hardware::drm::V1_1::DrmMetricGroup::Value;
 using AttributeHidl = ::android::hardware::drm::V1_1::DrmMetricGroup::Attribute;
 using IDrmPluginAidl = ::aidl::android::hardware::drm::IDrmPlugin;
 using EventTypeAidl = ::aidl::android::hardware::drm::EventType;
-using KeyStatusAidl = ::aidl::android::hardware::drm::KeyStatus;
 using ::android::hardware::hidl_vec;
 
 namespace {
@@ -396,7 +395,8 @@ DrmHalAidl::DrmSessionClient::~DrmSessionClient() {
 
 // DrmHalAidl methods
 DrmHalAidl::DrmHalAidl()
-    : mFactories(makeDrmFactories()),
+    : mListener(::ndk::SharedRefBase::make<DrmHalListener>(&mMetrics)),
+      mFactories(makeDrmFactories()),
       mInitCheck((mFactories.size() == 0) ? ERROR_UNSUPPORTED : NO_INIT) {}
 
 status_t DrmHalAidl::initCheck() const {
@@ -427,8 +427,7 @@ std::vector<std::shared_ptr<IDrmFactoryAidl>> DrmHalAidl::makeDrmFactories() {
 }
 
 status_t DrmHalAidl::setListener(const sp<IDrmClient>& listener) {
-    Mutex::Autolock lock(mEventLock);
-    mListener = listener;
+    mListener->setListener(listener);
     return NO_ERROR;
 }
 
@@ -437,8 +436,9 @@ status_t DrmHalAidl::isCryptoSchemeSupported(const uint8_t uuid[16], const Strin
     Mutex::Autolock autoLock(mLock);
     *isSupported = false;
     Uuid uuidAidl = toAidlUuid(uuid);
-    SecurityLevel levelAidl = static_cast<SecurityLevel>((int32_t)level);
+    SecurityLevel levelAidl = toAidlSecurityLevel(level);
     std::string mimeTypeStr = mimeType.string();
+
     for (ssize_t i = mFactories.size() - 1; i >= 0; i--) {
         if (mFactories[i]
                     ->isCryptoSchemeSupported(uuidAidl, mimeTypeStr, levelAidl, isSupported)
@@ -477,9 +477,14 @@ status_t DrmHalAidl::createPlugin(const uint8_t uuid[16], const String8& appPack
         mInitCheck = ERROR_UNSUPPORTED;
     } else {
         mInitCheck = OK;
-
-        if (!mPlugin->setListener(shared_from_this()).isOk()) {
+        // Stored pointer mListener upcast to base BnDrmPluginListener
+        ::ndk::ScopedAStatus status = mPlugin
+            ->setListener(std::static_pointer_cast<BnDrmPluginListener>(mListener));
+        if (!status.isOk()) {
             mInitCheck = DEAD_OBJECT;
+            ALOGE("setListener failed: ex %d svc err %d",
+                status.getExceptionCode(),
+                status.getServiceSpecificError());
         }
 
         if (mInitCheck != OK) {
@@ -1203,124 +1208,22 @@ status_t DrmHalAidl::destroyPlugin() {
 ::ndk::ScopedAStatus DrmHalAidl::onEvent(EventTypeAidl eventTypeAidl,
                                          const std::vector<uint8_t>& sessionId,
                                          const std::vector<uint8_t>& data) {
-    ::ndk::ScopedAStatus _aidl_status;
-    mMetrics.mEventCounter.Increment((uint32_t)eventTypeAidl);
-
-    mEventLock.lock();
-    sp<IDrmClient> listener = mListener;
-    mEventLock.unlock();
-
-    if (listener != NULL) {
-        Mutex::Autolock lock(mNotifyLock);
-        DrmPlugin::EventType eventType;
-        switch (eventTypeAidl) {
-            case EventTypeAidl::PROVISION_REQUIRED:
-                eventType = DrmPlugin::kDrmPluginEventProvisionRequired;
-                break;
-            case EventTypeAidl::KEY_NEEDED:
-                eventType = DrmPlugin::kDrmPluginEventKeyNeeded;
-                break;
-            case EventTypeAidl::KEY_EXPIRED:
-                eventType = DrmPlugin::kDrmPluginEventKeyExpired;
-                break;
-            case EventTypeAidl::VENDOR_DEFINED:
-                eventType = DrmPlugin::kDrmPluginEventVendorDefined;
-                break;
-            case EventTypeAidl::SESSION_RECLAIMED:
-                eventType = DrmPlugin::kDrmPluginEventSessionReclaimed;
-                break;
-            default:
-                return _aidl_status;
-        }
-
-        listener->sendEvent(eventType, toHidlVec(toVector(sessionId)), toHidlVec(toVector(data)));
-    }
-
-    return _aidl_status;
+    return mListener->onEvent(eventTypeAidl, sessionId, data);
 }
 
 ::ndk::ScopedAStatus DrmHalAidl::onExpirationUpdate(const std::vector<uint8_t>& sessionId,
                                                     int64_t expiryTimeInMS) {
-    ::ndk::ScopedAStatus _aidl_status;
-    mEventLock.lock();
-    sp<IDrmClient> listener = mListener;
-    mEventLock.unlock();
-
-    if (listener != NULL) {
-        Mutex::Autolock lock(mNotifyLock);
-        listener->sendExpirationUpdate(toHidlVec(toVector(sessionId)), expiryTimeInMS);
-    }
-
-    return _aidl_status;
+    return mListener->onExpirationUpdate(sessionId, expiryTimeInMS);
 }
 
 ::ndk::ScopedAStatus DrmHalAidl::onKeysChange(const std::vector<uint8_t>& sessionId,
                                               const std::vector<KeyStatus>& keyStatusListAidl,
                                               bool hasNewUsableKey) {
-    ::ndk::ScopedAStatus _aidl_status;
-    mEventLock.lock();
-    sp<IDrmClient> listener = mListener;
-    mEventLock.unlock();
-
-    if (listener != NULL) {
-        std::vector<DrmKeyStatus> keyStatusList;
-        size_t nKeys = keyStatusListAidl.size();
-        for (size_t i = 0; i < nKeys; ++i) {
-            const KeyStatus& keyStatus = keyStatusListAidl[i];
-            uint32_t type;
-            switch (keyStatus.type) {
-                case KeyStatusType::USABLE:
-                    type = DrmPlugin::kKeyStatusType_Usable;
-                    break;
-                case KeyStatusType::EXPIRED:
-                    type = DrmPlugin::kKeyStatusType_Expired;
-                    break;
-                case KeyStatusType::OUTPUTNOTALLOWED:
-                    type = DrmPlugin::kKeyStatusType_OutputNotAllowed;
-                    break;
-                case KeyStatusType::STATUSPENDING:
-                    type = DrmPlugin::kKeyStatusType_StatusPending;
-                    break;
-                case KeyStatusType::USABLEINFUTURE:
-                    type = DrmPlugin::kKeyStatusType_UsableInFuture;
-                    break;
-                case KeyStatusType::INTERNALERROR:
-                default:
-                    type = DrmPlugin::kKeyStatusType_InternalError;
-                    break;
-            }
-            keyStatusList.push_back({type, toHidlVec(toVector(keyStatus.keyId))});
-            mMetrics.mKeyStatusChangeCounter.Increment((uint32_t)keyStatus.type);
-        }
-
-        Mutex::Autolock lock(mNotifyLock);
-        listener->sendKeysChange(toHidlVec(toVector(sessionId)), keyStatusList, hasNewUsableKey);
-    }
-    else {
-        // There's no listener. But we still want to count the key change
-        // events.
-        size_t nKeys = keyStatusListAidl.size();
-
-        for (size_t i = 0; i < nKeys; i++) {
-            mMetrics.mKeyStatusChangeCounter.Increment((uint32_t)keyStatusListAidl[i].type);
-        }
-    }
-
-    return _aidl_status;
+    return mListener->onKeysChange(sessionId, keyStatusListAidl, hasNewUsableKey);
 }
 
 ::ndk::ScopedAStatus DrmHalAidl::onSessionLostState(const std::vector<uint8_t>& sessionId) {
-    ::ndk::ScopedAStatus _aidl_status;
-    mEventLock.lock();
-    sp<IDrmClient> listener = mListener;
-    mEventLock.unlock();
-
-    if (listener != NULL) {
-        Mutex::Autolock lock(mNotifyLock);
-        listener->sendSessionLostState(toHidlVec(toVector(sessionId)));
-    }
-
-    return _aidl_status;
+    return mListener->onSessionLostState(sessionId);
 }
 
 }  // namespace android

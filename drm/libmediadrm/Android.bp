@@ -34,6 +34,7 @@ cc_library {
         "CryptoHalHidl.cpp",
         "CryptoHalAidl.cpp",
         "DrmUtils.cpp",
+        "DrmHalListener.cpp",
     ],
 
     local_include_dirs: [
