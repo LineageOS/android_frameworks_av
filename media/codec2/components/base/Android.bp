@@ -34,6 +34,12 @@ cc_library {
         "libstagefright_foundation", // for Mutexed
     ],
 
+    min_sdk_version: "29",
+    apex_available: [
+        "//apex_available:platform",
+        "com.android.media.swcodec",
+    ],
+
     sanitize: {
         misc_undefined: [
             "unsigned-integer-overflow",
@@ -75,6 +81,12 @@ cc_defaults {
     ],
 
     ldflags: ["-Wl,-Bsymbolic"],
+
+    min_sdk_version: "29",
+    apex_available: [
+        "//apex_available:platform",
+        "com.android.media.swcodec",
+    ],
 }
 
 // public dependency for software codec implementation

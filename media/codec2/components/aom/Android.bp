@@ -22,8 +22,4 @@ cc_library {
 
     srcs: ["C2SoftAomDec.cpp"],
     static_libs: ["libaom"],
-
-    include_dirs: [
-        "external/libaom/",
-    ],
 }
