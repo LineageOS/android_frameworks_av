@@ -246,6 +246,12 @@ static List<Vector<uint8_t>> toKeySetIds(const std::vector<KeySetId>& hKeySetIds
     return keySetIds;
 }
 
+static hidl_vec<uint8_t> toHidlVec(const Vector<uint8_t>& vector) {
+    hidl_vec<uint8_t> vec;
+    vec.setToExternal(const_cast<uint8_t*>(vector.array()), vector.size());
+    return vec;
+}
+
 static DrmPlugin::OfflineLicenseState toOfflineLicenseState(OfflineLicenseState licenseState) {
     switch (licenseState) {
         case OfflineLicenseState::USABLE:
@@ -257,24 +263,17 @@ static DrmPlugin::OfflineLicenseState toOfflineLicenseState(OfflineLicenseState 
     }
 }
 
-template <typename T = uint8_t>
-static hidl_vec<T> toHidlVec(const Vector<T>& vector) {
-    hidl_vec<T> vec;
-    vec.setToExternal(const_cast<T*>(vector.array()), vector.size());
-    return vec;
-}
-
 Mutex DrmHalAidl::mLock;
 
 static hidl_vec<DrmMetricGroupHidl> toDrmMetricGroupHidl(std::vector<DrmMetricGroupAidl> result) {
-    Vector<DrmMetricGroupHidl> resultHidl;
+    std::vector<DrmMetricGroupHidl> resultHidl;
     for (auto r : result) {
         DrmMetricGroupHidl re;
-        Vector<DrmMetricHidl> tmpMetric;
+        std::vector<DrmMetricHidl> tmpMetric;
         for (auto m : r.metrics) {
             DrmMetricHidl me;
             me.name = m.name;
-            Vector<AttributeHidl> aTmp;
+            std::vector<AttributeHidl> aTmp;
             for (auto attr : m.attributes) {
                 AttributeHidl attrHidl;
                 attrHidl.name = attr.name;
@@ -299,9 +298,9 @@ static hidl_vec<DrmMetricGroupHidl> toDrmMetricGroupHidl(std::vector<DrmMetricGr
                 aTmp.push_back(attrHidl);
             }
 
-            me.attributes = toHidlVec<AttributeHidl>(aTmp);
+            me.attributes = aTmp;
 
-            Vector<ValueHidl> vTmp;
+            std::vector<ValueHidl> vTmp;
             for (auto value : m.values) {
                 ValueHidl valueHidl;
                 valueHidl.componentName = value.name;
@@ -325,15 +324,15 @@ static hidl_vec<DrmMetricGroupHidl> toDrmMetricGroupHidl(std::vector<DrmMetricGr
                 vTmp.push_back(valueHidl);
             }
 
-            me.values = toHidlVec<ValueHidl>(vTmp);
+            me.values = vTmp;
             tmpMetric.push_back(me);
         }
 
-        re.metrics = toHidlVec<DrmMetricHidl>(tmpMetric);
+        re.metrics = tmpMetric;
         resultHidl.push_back(re);
     }
 
-    return toHidlVec<DrmMetricGroupHidl>(resultHidl);
+    return resultHidl;
 }
 
 // DrmSessionClient Definition
@@ -560,6 +559,7 @@ status_t DrmHalAidl::closeSession(Vector<uint8_t> const& sessionId) {
         mMetrics.mCloseSessionCounter.Increment(response);
         return response;
     }
+
     mMetrics.mCloseSessionCounter.Increment(DEAD_OBJECT);
     return DEAD_OBJECT;
 }
