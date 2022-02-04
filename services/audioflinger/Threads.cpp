@@ -4585,19 +4585,7 @@ status_t AudioFlinger::PlaybackThread::createAudioPatch_l(const struct audio_pat
                                             patch->sinks,
                                             handle);
     } else {
-        char *address;
-        if (strcmp(patch->sinks[0].ext.device.address, "") != 0) {
-            //FIXME: we only support address on first sink with HAL version < 3.0
-            address = audio_device_address_to_parameter(
-                                                        patch->sinks[0].ext.device.type,
-                                                        patch->sinks[0].ext.device.address);
-        } else {
-            address = (char *)calloc(1, 1);
-        }
-        AudioParameter param = AudioParameter(String8(address));
-        free(address);
-        param.addInt(String8(AudioParameter::keyRouting), (int)type);
-        status = mOutput->stream->setParameters(param.toString());
+        status = mOutput->stream->legacyCreateAudioPatch(patch->sinks[0], std::nullopt, type);
         *handle = AUDIO_PATCH_HANDLE_NONE;
     }
     const std::string patchSinksAsString = patchSinksToString(patch);
@@ -4642,9 +4630,7 @@ status_t AudioFlinger::PlaybackThread::releaseAudioPatch_l(const audio_patch_han
         sp<DeviceHalInterface> hwDevice = mOutput->audioHwDev->hwDevice();
         status = hwDevice->releaseAudioPatch(handle);
     } else {
-        AudioParameter param;
-        param.addInt(String8(AudioParameter::keyRouting), 0);
-        status = mOutput->stream->setParameters(param.toString());
+        status = mOutput->stream->legacyReleaseAudioPatch();
     }
     return status;
 }
@@ -9130,21 +9116,9 @@ status_t AudioFlinger::RecordThread::createAudioPatch_l(const struct audio_patch
                                             patch->sinks,
                                             handle);
     } else {
-        char *address;
-        if (strcmp(patch->sources[0].ext.device.address, "") != 0) {
-            address = audio_device_address_to_parameter(
-                                                patch->sources[0].ext.device.type,
-                                                patch->sources[0].ext.device.address);
-        } else {
-            address = (char *)calloc(1, 1);
-        }
-        AudioParameter param = AudioParameter(String8(address));
-        free(address);
-        param.addInt(String8(AudioParameter::keyRouting),
-                     (int)patch->sources[0].ext.device.type);
-        param.addInt(String8(AudioParameter::keyInputSource),
-                                         (int)patch->sinks[0].ext.mix.usecase.source);
-        status = mInput->stream->setParameters(param.toString());
+        status = mInput->stream->legacyCreateAudioPatch(patch->sources[0],
+                                                        patch->sinks[0].ext.mix.usecase.source,
+                                                        patch->sources[0].ext.device.type);
         *handle = AUDIO_PATCH_HANDLE_NONE;
     }
 
@@ -9176,9 +9150,7 @@ status_t AudioFlinger::RecordThread::releaseAudioPatch_l(const audio_patch_handl
         sp<DeviceHalInterface> hwDevice = mInput->audioHwDev->hwDevice();
         status = hwDevice->releaseAudioPatch(handle);
     } else {
-        AudioParameter param;
-        param.addInt(String8(AudioParameter::keyRouting), 0);
-        status = mInput->stream->setParameters(param.toString());
+        status = mInput->stream->legacyReleaseAudioPatch();
     }
     return status;
 }
@@ -9897,29 +9869,18 @@ status_t AudioFlinger::MmapThread::createAudioPatch_l(const struct audio_patch *
     }
 
     if (mAudioHwDev->supportsAudioPatches()) {
-        status = mHalDevice->createAudioPatch(patch->num_sources,
-                                            patch->sources,
-                                            patch->num_sinks,
-                                            patch->sinks,
-                                            handle);
+        status = mHalDevice->createAudioPatch(patch->num_sources, patch->sources, patch->num_sinks,
+                                              patch->sinks, handle);
     } else {
-        char *address;
-        if (strcmp(patch->sinks[0].ext.device.address, "") != 0) {
-            //FIXME: we only support address on first sink with HAL version < 3.0
-            address = audio_device_address_to_parameter(
-                                                        patch->sinks[0].ext.device.type,
-                                                        patch->sinks[0].ext.device.address);
+        audio_port_config port;
+        std::optional<audio_source_t> source;
+        if (isOutput()) {
+            port = patch->sinks[0];
         } else {
-            address = (char *)calloc(1, 1);
+            port = patch->sources[0];
+            source = patch->sinks[0].ext.mix.usecase.source;
         }
-        AudioParameter param = AudioParameter(String8(address));
-        free(address);
-        param.addInt(String8(AudioParameter::keyRouting), (int)type);
-        if (!isOutput()) {
-            param.addInt(String8(AudioParameter::keyInputSource),
-                                         (int)patch->sinks[0].ext.mix.usecase.source);
-        }
-        status = mHalStream->setParameters(param.toString());
+        status = mHalStream->legacyCreateAudioPatch(port, source, type);
         *handle = AUDIO_PATCH_HANDLE_NONE;
     }
 
@@ -9958,9 +9919,7 @@ status_t AudioFlinger::MmapThread::releaseAudioPatch_l(const audio_patch_handle_
     if (supportsAudioPatches) {
         status = mHalDevice->releaseAudioPatch(handle);
     } else {
-        AudioParameter param;
-        param.addInt(String8(AudioParameter::keyRouting), 0);
-        status = mHalStream->setParameters(param.toString());
+        status = mHalStream->legacyReleaseAudioPatch();
     }
     return status;
 }

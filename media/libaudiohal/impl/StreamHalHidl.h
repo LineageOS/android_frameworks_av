@@ -88,6 +88,12 @@ class StreamHalHidl : public virtual StreamHalInterface, public ConversionHelper
     // (must match the priority of the audioflinger's thread that calls 'read' / 'write')
     virtual status_t setHalThreadPriority(int priority);
 
+    status_t legacyCreateAudioPatch(const struct audio_port_config& port,
+                                            std::optional<audio_source_t> source,
+                                            audio_devices_t type) override;
+
+    status_t legacyReleaseAudioPatch() override;
+
   protected:
     // Subclasses can not be constructed directly by clients.
     explicit StreamHalHidl(IStream *stream);

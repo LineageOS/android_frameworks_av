@@ -89,6 +89,12 @@ class StreamHalInterface : public virtual RefBase
     // (must match the priority of the audioflinger's thread that calls 'read' / 'write')
     virtual status_t setHalThreadPriority(int priority) = 0;
 
+    virtual status_t legacyCreateAudioPatch(const struct audio_port_config& port,
+                                            std::optional<audio_source_t> source,
+                                            audio_devices_t type) = 0;
+
+    virtual status_t legacyReleaseAudioPatch() = 0;
+
   protected:
     // Subclasses can not be constructed directly by clients.
     StreamHalInterface() {}
