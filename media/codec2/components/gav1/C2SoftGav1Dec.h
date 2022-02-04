@@ -82,7 +82,6 @@ struct C2SoftGav1Dec : public SimpleC2Component {
 
   struct timeval mTimeStart;  // Time at the start of decode()
   struct timeval mTimeEnd;    // Time at the end of decode()
-  bool mIsFormatR10G10B10A2Supported;
 
   bool initDecoder();
   void getVuiParams(const libgav1::DecoderBuffer *buffer);

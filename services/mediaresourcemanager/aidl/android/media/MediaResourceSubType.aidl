@@ -26,4 +26,5 @@ enum MediaResourceSubType {
     kUnspecifiedSubType = 0,
     kAudioCodec = 1,
     kVideoCodec = 2,
+    kImageCodec = 3,
 }
