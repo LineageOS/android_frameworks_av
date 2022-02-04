@@ -38,6 +38,7 @@
 #include <vector>
 
 #include <Serializer.h>
+#include <android/media/audio/common/AudioPort.h>
 #include <cutils/bitops.h>
 #include <cutils/properties.h>
 #include <media/AudioParameter.h>
@@ -53,6 +54,10 @@
 
 namespace android {
 
+using android::media::audio::common::AudioDevice;
+using android::media::audio::common::AudioDeviceAddress;
+using android::media::audio::common::AudioPortDeviceExt;
+using android::media::audio::common::AudioPortExt;
 using content::AttributionSourceState;
 
 //FIXME: workaround for truncated touch sounds
@@ -97,16 +102,26 @@ bool operator!= (const SortedVector<T> &left, const SortedVector<T> &right)
 // AudioPolicyInterface implementation
 // ----------------------------------------------------------------------------
 
-status_t AudioPolicyManager::setDeviceConnectionState(audio_devices_t device,
-                                                      audio_policy_dev_state_t state,
-                                                      const char *device_address,
-                                                      const char *device_name,
-                                                      audio_format_t encodedFormat)
-{
-    status_t status = setDeviceConnectionStateInt(device, state, device_address,
-                                                  device_name, encodedFormat);
+status_t AudioPolicyManager::setDeviceConnectionState(audio_policy_dev_state_t state,
+        const android::media::audio::common::AudioPort& port, audio_format_t encodedFormat) {
+    status_t status = setDeviceConnectionStateInt(state, port, encodedFormat);
     nextAudioPortGeneration();
     return status;
+}
+
+status_t AudioPolicyManager::setDeviceConnectionState(audio_devices_t device,
+                                                      audio_policy_dev_state_t state,
+                                                      const char* device_address,
+                                                      const char* device_name,
+                                                      audio_format_t encodedFormat) {
+    media::AudioPort aidlPort;
+    if (status_t status = deviceToAudioPort(device, device_address, device_name, &aidlPort);
+        status == OK) {
+        return setDeviceConnectionState(state, aidlPort.hal, encodedFormat);
+    } else {
+        ALOGE("Failed to convert to AudioPort Parcelable: %s", statusToString(status).c_str());
+        return status;
+    }
 }
 
 void AudioPolicyManager::broadcastDeviceConnectionState(const sp<DeviceDescriptor> &device,
@@ -122,22 +137,45 @@ void AudioPolicyManager::broadcastDeviceConnectionState(const sp<DeviceDescripto
     }
 }
 
+status_t AudioPolicyManager::setDeviceConnectionStateInt(
+        audio_policy_dev_state_t state, const android::media::audio::common::AudioPort& port,
+        audio_format_t encodedFormat) {
+    // TODO: b/211601178 Forward 'port' to Audio HAL via mHwModules. For now, only device_type,
+    // device_address and device_name are forwarded.
+    if (port.ext.getTag() != AudioPortExt::device) {
+        return BAD_VALUE;
+    }
+    audio_devices_t device_type;
+    std::string device_address;
+    if (status_t status = aidl2legacy_AudioDevice_audio_device(
+                port.ext.get<AudioPortExt::device>().device, &device_type, &device_address);
+        status != OK) {
+        return status;
+    };
+    const char* device_name = port.name.c_str();
+    // connect/disconnect only 1 device at a time
+    if (!audio_is_output_device(device_type) && !audio_is_input_device(device_type))
+        return BAD_VALUE;
+
+    sp<DeviceDescriptor> device = mHwModules.getDeviceDescriptor(
+            device_type, device_address.c_str(), device_name, encodedFormat,
+            state == AUDIO_POLICY_DEVICE_STATE_AVAILABLE);
+    return device ? setDeviceConnectionStateInt(device, state) : INVALID_OPERATION;
+}
+
 status_t AudioPolicyManager::setDeviceConnectionStateInt(audio_devices_t deviceType,
                                                          audio_policy_dev_state_t state,
-                                                         const char *device_address,
-                                                         const char *device_name,
-                                                         audio_format_t encodedFormat)
-{
-    ALOGV("setDeviceConnectionStateInt() device: 0x%X, state %d, address %s name %s format 0x%X",
-            deviceType, state, device_address, device_name, encodedFormat);
-
-    // connect/disconnect only 1 device at a time
-    if (!audio_is_output_device(deviceType) && !audio_is_input_device(deviceType)) return BAD_VALUE;
-
-    sp<DeviceDescriptor> device =
-            mHwModules.getDeviceDescriptor(deviceType, device_address, device_name, encodedFormat,
-                                           state == AUDIO_POLICY_DEVICE_STATE_AVAILABLE);
-    return device ? setDeviceConnectionStateInt(device, state) : INVALID_OPERATION;
+                                                         const char* device_address,
+                                                         const char* device_name,
+                                                         audio_format_t encodedFormat) {
+    media::AudioPort aidlPort;
+    if (status_t status = deviceToAudioPort(deviceType, device_address, device_name, &aidlPort);
+        status == OK) {
+        return setDeviceConnectionStateInt(state, aidlPort.hal, encodedFormat);
+    } else {
+        ALOGE("Failed to convert to AudioPort Parcelable: %s", statusToString(status).c_str());
+        return status;
+    }
 }
 
 status_t AudioPolicyManager::setDeviceConnectionStateInt(const sp<DeviceDescriptor> &device,
@@ -400,6 +438,14 @@ status_t AudioPolicyManager::setDeviceConnectionStateInt(const sp<DeviceDescript
 
     ALOGW("%s() invalid device: %s", __func__, device->toString().c_str());
     return BAD_VALUE;
+}
+
+status_t AudioPolicyManager::deviceToAudioPort(audio_devices_t device, const char* device_address,
+                                               const char* device_name,
+                                               media::AudioPort* aidlPort) {
+    DeviceDescriptorBase devDescr(device, device_address);
+    devDescr.setName(device_name);
+    return devDescr.writeToParcelable(aidlPort);
 }
 
 void AudioPolicyManager::setEngineDeviceConnectionState(const sp<DeviceDescriptor> device,
