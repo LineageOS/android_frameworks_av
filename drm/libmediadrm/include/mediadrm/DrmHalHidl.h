@@ -17,10 +17,6 @@
 #ifndef DRM_HAL_HIDL_H_
 #define DRM_HAL_HIDL_H_
 
-#include <android/hardware/drm/1.0/IDrmFactory.h>
-#include <android/hardware/drm/1.0/IDrmPlugin.h>
-#include <android/hardware/drm/1.1/IDrmFactory.h>
-#include <android/hardware/drm/1.1/IDrmPlugin.h>
 #include <android/hardware/drm/1.2/IDrmFactory.h>
 #include <android/hardware/drm/1.2/IDrmPlugin.h>
 #include <android/hardware/drm/1.2/IDrmPluginListener.h>
@@ -255,4 +251,4 @@ private:
 
 }  // namespace android
 
-#endif  // DRM_HAL_H_
+#endif // DRM_HAL_HIDL_H_

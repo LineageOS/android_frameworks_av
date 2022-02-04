@@ -26,7 +26,7 @@ namespace android {
 
 DrmHal::DrmHal() {
     mDrmHalHidl = sp<DrmHalHidl>::make();
-    mDrmHalAidl = ndk::SharedRefBase::make<DrmHalAidl>();
+    mDrmHalAidl = sp<DrmHalAidl>::make();
 }
 
 DrmHal::~DrmHal() {}

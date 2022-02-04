@@ -120,10 +120,10 @@ struct DrmHal : public IDrm {
 
 private:
     sp<IDrm> mDrmHalHidl;
-    std::shared_ptr<IDrm> mDrmHalAidl;
+    sp<IDrm> mDrmHalAidl;
     DISALLOW_EVIL_CONSTRUCTORS(DrmHal);
 };
 
 } // namespace android
 
-#endif
+#endif  // DRM_HAL_H_
