@@ -931,6 +931,11 @@ void StreamOutHalHidl::onRecommendedLatencyModeChanged(
     callback->onRecommendedLatencyModeChanged(modes);
 }
 
+status_t StreamOutHalHidl::exit() {
+    // FIXME this is using hard-coded strings but in the future, this functionality will be
+    //       converted to use audio HAL extensions required to support tunneling
+    return setParameters(String8("exiting=1"));
+}
 
 StreamInHalHidl::StreamInHalHidl(
         const sp<::android::hardware::audio::CPP_VERSION::IStreamIn>& stream)

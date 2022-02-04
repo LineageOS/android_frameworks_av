@@ -248,6 +248,11 @@ class StreamOutHalInterface : public virtual StreamHalInterface {
     virtual status_t setLatencyModeCallback(
             const sp<StreamOutHalInterfaceLatencyModeCallback>& callback) = 0;
 
+    /**
+     * Signal the end of audio output, interrupting an ongoing 'write' operation.
+     */
+    virtual status_t exit() = 0;
+
   protected:
     virtual ~StreamOutHalInterface() {}
 };

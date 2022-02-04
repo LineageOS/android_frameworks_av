@@ -202,6 +202,8 @@ class StreamOutHalHidl : public StreamOutHalInterface, public StreamHalHidl {
 
     void onRecommendedLatencyModeChanged(const std::vector<audio_latency_mode_t>& modes);
 
+    status_t exit() override;
+
   private:
     friend class DeviceHalHidl;
     typedef MessageQueue<WriteCommand, hardware::kSynchronizedReadWrite> CommandMQ;
