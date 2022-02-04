@@ -763,6 +763,43 @@ bool SimpleC2Component::processQueue() {
     return hasQueuedWork;
 }
 
+int SimpleC2Component::getHalPixelFormatForBitDepth10(bool allowRGBA1010102) {
+    // Save supported hal pixel formats for bit depth of 10, the first time this is called
+    if (!mBitDepth10HalPixelFormats.size()) {
+        std::vector<int> halPixelFormats;
+        // TODO(b/178229371) Enable HAL_PIXEL_FORMAT_YCBCR_P010 once framework supports it
+        // halPixelFormats.push_back(HAL_PIXEL_FORMAT_YCBCR_P010);
+
+        // since allowRGBA1010102 can chance in each call, but mBitDepth10HalPixelFormats
+        // is populated only once, allowRGBA1010102 is not considered at this stage.
+        halPixelFormats.push_back(HAL_PIXEL_FORMAT_RGBA_1010102);
+
+        for (int halPixelFormat : halPixelFormats) {
+            std::shared_ptr<C2GraphicBlock> block;
+
+            uint32_t gpuConsumerFlags = halPixelFormat == HAL_PIXEL_FORMAT_RGBA_1010102
+                                                ? C2AndroidMemoryUsage::HW_TEXTURE_READ
+                                                : 0;
+            C2MemoryUsage usage = {C2MemoryUsage::CPU_READ | gpuConsumerFlags,
+                                   C2MemoryUsage::CPU_WRITE};
+            // TODO(b/214411172) Use AHardwareBuffer_isSupported once it supports P010
+            c2_status_t status =
+                    mOutputBlockPool->fetchGraphicBlock(320, 240, halPixelFormat, usage, &block);
+            if (status == C2_OK) {
+                mBitDepth10HalPixelFormats.push_back(halPixelFormat);
+            }
+        }
+        // Add YV12 in the end as a fall-back option
+        mBitDepth10HalPixelFormats.push_back(HAL_PIXEL_FORMAT_YV12);
+    }
+    // When RGBA1010102 is not allowed and if the first supported hal pixel is format is
+    // HAL_PIXEL_FORMAT_RGBA_1010102, then return HAL_PIXEL_FORMAT_YV12
+    if (!allowRGBA1010102 && mBitDepth10HalPixelFormats[0] == HAL_PIXEL_FORMAT_RGBA_1010102) {
+        return HAL_PIXEL_FORMAT_YV12;
+    }
+    // Return the first entry from supported formats
+    return mBitDepth10HalPixelFormats[0];
+}
 std::shared_ptr<C2Buffer> SimpleC2Component::createLinearBuffer(
         const std::shared_ptr<C2LinearBlock> &block, size_t offset, size_t size) {
     return C2Buffer::CreateLinearBuffer(block->share(offset, size, ::C2Fence()));

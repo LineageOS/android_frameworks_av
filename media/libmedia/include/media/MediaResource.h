@@ -37,7 +37,8 @@ public:
     MediaResource(Type type, SubType subType, int64_t value);
     MediaResource(Type type, const std::vector<uint8_t> &id, int64_t value);
 
-    static MediaResource CodecResource(bool secure, bool video, int64_t instanceCount = 1);
+    static MediaResource CodecResource(bool secure, MediaResourceSubType subType,
+            int64_t instanceCount = 1);
     static MediaResource GraphicMemoryResource(int64_t value);
     static MediaResource CpuBoostResource();
     static MediaResource VideoBatteryResource();
@@ -62,6 +63,7 @@ inline static const char *asString(MediaResource::SubType i, const char *def = "
         case MediaResource::SubType::kUnspecifiedSubType: return "unspecified";
         case MediaResource::SubType::kAudioCodec:         return "audio-codec";
         case MediaResource::SubType::kVideoCodec:         return "video-codec";
+        case MediaResource::SubType::kImageCodec:         return "image-codec";
         default:                                 return def;
     }
 }
