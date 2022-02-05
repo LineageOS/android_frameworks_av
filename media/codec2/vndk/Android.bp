@@ -18,6 +18,25 @@ cc_library_headers {
     vendor_available: true,
 
     min_sdk_version: "29",
+    apex_available: [
+        "//apex_available:platform",
+        "com.android.media.swcodec",
+    ],
+
+}
+
+cc_library_headers {
+    name: "libcodec2_vndk_headers",
+    vendor_available: true,
+    min_sdk_version: "29",
+
+    export_include_dirs: [
+        "include",
+    ],
+    apex_available: [
+        "//apex_available:platform",
+        "com.android.media.swcodec",
+    ],
 }
 
 // !!!DO NOT DEPEND ON THIS SHARED LIBRARY DIRECTLY!!!
@@ -28,6 +47,11 @@ cc_library {
     min_sdk_version: "29",
     // TODO: b/147147883
     double_loadable: true,
+    apex_available: [
+        "//apex_available:platform",
+        "com.android.media.swcodec",
+    ],
+
 
     srcs: [
         "C2AllocatorBlob.cpp",

@@ -22,4 +22,10 @@ cc_library {
 
     srcs: ["C2SoftGav1Dec.cpp"],
     static_libs: ["libgav1"],
+
+    apex_available: [
+        "//apex_available:platform",
+        "com.android.media.swcodec",
+    ],
+
 }

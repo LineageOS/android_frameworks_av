@@ -89,4 +89,4 @@ struct CryptoHalAidl : public ICrypto {
 
 }  // namespace android
 
-#endif  // CRYPTO_HAL_H_
+#endif // CRYPTO_HAL_AIDL_H_

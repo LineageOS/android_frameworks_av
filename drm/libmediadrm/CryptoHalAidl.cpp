@@ -109,7 +109,12 @@ static DestinationBufferAidl hidlDestinationBufferToAidlDestinationBuffer(
     // skip negative convert check as count of enum elements are 2
     aidldb.type = static_cast<BufferType>((int32_t)buffer.type);
     aidldb.nonsecureMemory = hidlSharedBufferToAidlSharedBuffer(buffer.nonsecureMemory);
-    aidldb.secureMemory = ::android::makeToAidl(buffer.secureMemory.getNativeHandle());
+    auto handle = buffer.secureMemory.getNativeHandle();
+    if (handle) {
+        aidldb.secureMemory = ::android::makeToAidl(handle);
+    } else {
+        aidldb.secureMemory = {.fds = {}, .ints = {}};
+    }
     return aidldb;
 }
 
@@ -128,6 +133,13 @@ static const Vector<uint8_t> toVector(const std::vector<uint8_t>& vec) {
 
 static String8 toString8(const std::string& string) {
     return String8(string.c_str());
+}
+
+static std::vector<uint8_t> toStdVec(const uint8_t* ptr, size_t n) {
+    if (!ptr) {
+        return std::vector<uint8_t>();
+    }
+    return std::vector<uint8_t>(ptr, ptr + n);
 }
 
 // -------Hidl interface related end--------------
@@ -335,8 +347,8 @@ ssize_t CryptoHalAidl::decrypt(const uint8_t keyId[16], const uint8_t iv[16],
     status_t err = UNKNOWN_ERROR;
     mLock.unlock();
 
-    std::vector<uint8_t> keyIdAidl = std::vector<uint8_t>(keyId, keyId + 16);
-    std::vector<uint8_t> ivAidl = std::vector<uint8_t>(iv, iv + 16);
+    std::vector<uint8_t> keyIdAidl(toStdVec(keyId, 16));
+    std::vector<uint8_t> ivAidl(toStdVec(iv, 16));
     DecryptResult result;
     err = mPlugin->decrypt(secure, keyIdAidl, ivAidl, aMode, aPattern, stdSubSamples,
                            hidlSharedBufferToAidlSharedBuffer(hSource), offset,

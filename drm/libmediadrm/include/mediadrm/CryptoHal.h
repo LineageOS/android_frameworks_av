@@ -54,6 +54,6 @@ private:
     DISALLOW_EVIL_CONSTRUCTORS(CryptoHal);
 };
 
-}
+}  // namespace android
 
-#endif
+#endif  // CRYPTO_HAL_H_

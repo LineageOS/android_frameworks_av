@@ -35,6 +35,7 @@
 #include <media/PatchBuilder.h>
 #include "AudioPolicyInterface.h"
 
+#include <android/media/audio/common/AudioPort.h>
 #include <AudioPolicyManagerObserver.h>
 #include <AudioPolicyConfig.h>
 #include <PolicyAudioPort.h>
@@ -95,11 +96,8 @@ public:
         virtual ~AudioPolicyManager();
 
         // AudioPolicyInterface
-        virtual status_t setDeviceConnectionState(audio_devices_t device,
-                                                          audio_policy_dev_state_t state,
-                                                          const char *device_address,
-                                                          const char *device_name,
-                                                          audio_format_t encodedFormat);
+        virtual status_t setDeviceConnectionState(audio_policy_dev_state_t state,
+                const android::media::audio::common::AudioPort& port, audio_format_t encodedFormat);
         virtual audio_policy_dev_state_t getDeviceConnectionState(audio_devices_t device,
                                                                               const char *device_address);
         virtual status_t handleDeviceConfigChange(audio_devices_t device,
@@ -911,6 +909,16 @@ protected:
         PatchBuilder buildMsdPatch(bool msdIsSource, const sp<DeviceDescriptor> &device) const;
         status_t setMsdOutputPatches(const DeviceVector *outputDevices = nullptr);
         void releaseMsdOutputPatches(const DeviceVector& devices);
+
+        // Overload of setDeviceConnectionState()
+        status_t setDeviceConnectionState(audio_devices_t deviceType,
+                                          audio_policy_dev_state_t state,
+                                          const char* device_address, const char* device_name,
+                                          audio_format_t encodedFormat);
+
+        // Called by setDeviceConnectionState()
+        status_t deviceToAudioPort(audio_devices_t deviceType, const char* device_address,
+                                   const char* device_name, media::AudioPort* aidPort);
 private:
         void onNewAudioModulesAvailableInt(DeviceVector *newDevices);
 
@@ -1030,6 +1038,9 @@ private:
         bool     isValidAttributes(const audio_attributes_t *paa);
 
         // Called by setDeviceConnectionState().
+        status_t setDeviceConnectionStateInt(audio_policy_dev_state_t state,
+                                             const android::media::audio::common::AudioPort& port,
+                                             audio_format_t encodedFormat);
         status_t setDeviceConnectionStateInt(audio_devices_t deviceType,
                                              audio_policy_dev_state_t state,
                                              const char *device_address,

@@ -17,16 +17,16 @@
 #ifndef DRM_HAL_AIDL_H_
 #define DRM_HAL_AIDL_H_
 
+#include <memory>
 #include <aidl/android/hardware/drm/BnDrmPluginListener.h>
 #include <aidl/android/hardware/drm/IDrmFactory.h>
 #include <aidl/android/hardware/drm/IDrmPlugin.h>
 #include <aidl/android/media/BnResourceManagerClient.h>
 #include <mediadrm/DrmMetrics.h>
 #include <mediadrm/DrmSessionManager.h>
+#include <mediadrm/DrmHalListener.h>
 #include <mediadrm/IDrm.h>
-#include <memory>
 
-using ::aidl::android::hardware::drm::BnDrmPluginListener;
 using IDrmPluginAidl = ::aidl::android::hardware::drm::IDrmPlugin;
 using IDrmFactoryAidl = ::aidl::android::hardware::drm::IDrmFactory;
 using EventTypeAidl = ::aidl::android::hardware::drm::EventType;
@@ -34,9 +34,7 @@ using KeyStatusAidl = ::aidl::android::hardware::drm::KeyStatus;
 using ::aidl::android::hardware::drm::Uuid;
 
 namespace android {
-struct DrmHalAidl : public IDrm,
-                    public BnDrmPluginListener,
-                    std::enable_shared_from_this<BnDrmPluginListener> {
+struct DrmHalAidl : public IDrm{
     struct DrmSessionClient;
     DrmHalAidl();
     virtual ~DrmHalAidl();
@@ -107,7 +105,7 @@ struct DrmHalAidl : public IDrm,
                                            bool* required) const;
     virtual status_t setPlaybackId(Vector<uint8_t> const& sessionId, const char* playbackId);
     virtual status_t getLogMessages(Vector<drm::V1_4::LogMessage>& logs) const;
-    // Methods of IDrmPluginListenerAidl
+
     ::ndk::ScopedAStatus onEvent(EventTypeAidl in_eventType,
                                  const std::vector<uint8_t>& in_sessionId,
                                  const std::vector<uint8_t>& in_data);
@@ -117,17 +115,14 @@ struct DrmHalAidl : public IDrm,
                                       const std::vector<KeyStatusAidl>& in_keyStatusList,
                                       bool in_hasNewUsableKey);
     ::ndk::ScopedAStatus onSessionLostState(const std::vector<uint8_t>& in_sessionId);
-
   private:
     static Mutex mLock;
-    sp<IDrmClient> mListener;
-    mutable Mutex mEventLock;
-    mutable Mutex mNotifyLock;
+    mutable MediaDrmMetrics mMetrics;
+    std::shared_ptr<DrmHalListener> mListener;
     const std::vector<std::shared_ptr<IDrmFactoryAidl>> mFactories;
     std::shared_ptr<IDrmPluginAidl> mPlugin;
     std::vector<std::shared_ptr<IDrmFactoryAidl>> makeDrmFactories();
     status_t mInitCheck;
-    mutable MediaDrmMetrics mMetrics;
     std::vector<std::shared_ptr<DrmSessionClient>> mOpenSessions;
     void cleanup();
     void closeOpenSessions();
@@ -140,4 +135,4 @@ struct DrmHalAidl : public IDrm,
 
 }  // namespace android
 
-#endif
+#endif // DRM_HAL_AIDL_H_

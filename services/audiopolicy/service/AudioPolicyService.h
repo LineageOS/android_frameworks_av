@@ -82,9 +82,8 @@ public:
     //
     binder::Status onNewAudioModulesAvailable() override;
     binder::Status setDeviceConnectionState(
-            const AudioDevice& device,
             media::AudioPolicyDeviceState state,
-            const std::string& deviceName,
+            const android::media::audio::common::AudioPort& port,
             const AudioFormatDescription& encodedFormat) override;
     binder::Status getDeviceConnectionState(const AudioDevice& device,
                                             media::AudioPolicyDeviceState* _aidl_return) override;
@@ -807,6 +806,9 @@ private:
 
         status_t updateSecondaryOutputs(
                 const TrackSecondaryOutputsMap& trackSecondaryOutputs) override;
+
+        status_t setDeviceConnectedState(
+                const struct audio_port_v7 *port, bool connected) override;
 
      private:
         AudioPolicyService *mAudioPolicyService;

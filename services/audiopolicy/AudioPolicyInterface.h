@@ -105,10 +105,8 @@ public:
     virtual void onNewAudioModulesAvailable() = 0;
 
     // indicate a change in device connection status
-    virtual status_t setDeviceConnectionState(audio_devices_t device,
-                                              audio_policy_dev_state_t state,
-                                              const char *device_address,
-                                              const char *device_name,
+    virtual status_t setDeviceConnectionState(audio_policy_dev_state_t state,
+                                              const android::media::audio::common::AudioPort& port,
                                               audio_format_t encodedFormat) = 0;
     // retrieve a device connection status
     virtual audio_policy_dev_state_t getDeviceConnectionState(audio_devices_t device,
@@ -546,6 +544,8 @@ public:
 
     virtual status_t updateSecondaryOutputs(
             const TrackSecondaryOutputsMap& trackSecondaryOutputs) = 0;
+
+    virtual status_t setDeviceConnectedState(const struct audio_port_v7 *port, bool connected) = 0;
 };
 
     // These are the signatures of createAudioPolicyManager/destroyAudioPolicyManager
