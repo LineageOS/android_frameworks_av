@@ -714,6 +714,10 @@ private:
 
     bool isLogicalCameraLocked(const std::string& id, std::vector<std::string>* physicalCameraIds);
 
+    // No method corresponding to the same provider / member belonging to the
+    // same provider should be used after this method is called since it'll lead
+    // to invalid memory access (especially since this is called by ProviderInfo methods on hal
+    // service death).
     status_t removeProvider(const std::string& provider);
     sp<StatusListener> getStatusListener() const;
 
