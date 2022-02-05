@@ -128,6 +128,9 @@ class DeviceHalInterface : public RefBase
     virtual int32_t getAAudioMixerBurstCount() = 0;
     virtual int32_t getAAudioHardwareBurstMinUsec() = 0;
 
+    // Update the connection status of an external device.
+    virtual status_t setConnectedState(const struct audio_port_v7 *port, bool connected) = 0;
+
     virtual status_t dump(int fd, const Vector<String16>& args) = 0;
 
   protected:

@@ -590,9 +590,10 @@ android_dataspace ColorUtils::getDataSpaceForColorAspects(ColorAspects &aspects,
     uint32_t gfxRange = range;
     uint32_t gfxStandard = standard;
     uint32_t gfxTransfer = transfer;
-    // TRICKY: use & to ensure all three mappings are completed
-    if (!(sGfxRanges.map(range, &gfxRange) & sGfxStandards.map(standard, &gfxStandard)
-            & sGfxTransfers.map(transfer, &gfxTransfer))) {
+    bool mappedRange = sGfxRanges.map(range, &gfxRange);
+    bool mappedStandard = sGfxStandards.map(standard, &gfxStandard);
+    bool mappedTransfer = sGfxTransfers.map(transfer, &gfxTransfer);
+    if (! (mappedRange && mappedStandard && mappedTransfer)) {
         ALOGW("could not safely map platform color aspects (R:%u(%s) S:%u(%s) T:%u(%s) to "
               "graphics dataspace (R:%u S:%u T:%u)",
               range, asString(range), standard, asString(standard), transfer, asString(transfer),
@@ -626,9 +627,10 @@ void ColorUtils::getColorConfigFromDataSpace(
     CU::ColorRange    cuRange    = CU::kColorRangeUnspecified;
     CU::ColorStandard cuStandard = CU::kColorStandardUnspecified;
     CU::ColorTransfer cuTransfer = CU::kColorTransferUnspecified;
-    // TRICKY: use & to ensure all three mappings are completed
-    if (!(sGfxRanges.map(gfxRange, &cuRange) & sGfxStandards.map(gfxStandard, &cuStandard)
-            & sGfxTransfers.map(gfxTransfer, &cuTransfer))) {
+    bool mappedRange = sGfxRanges.map(gfxRange, &cuRange);
+    bool mappedStandard = sGfxStandards.map(gfxStandard, &cuStandard);
+    bool mappedTransfer = sGfxTransfers.map(gfxTransfer, &cuTransfer);
+    if (! (mappedRange && mappedStandard && mappedTransfer)) {
         ALOGW("could not safely map graphics dataspace (R:%u S:%u T:%u) to "
               "platform color aspects (R:%u(%s) S:%u(%s) T:%u(%s)",
               gfxRange, gfxStandard, gfxTransfer,

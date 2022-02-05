@@ -311,13 +311,10 @@ status_t DeviceHalHidl::openInputStream(
         sinkMetadata.tracks[0].destination.device(std::move(hidlOutputDevice));
     }
 #endif
-#if MAJOR_VERSION == 7 && MINOR_VERSION == 1
-    Return<void> ret = mDevice->openInputStream_7_1(
-#else
     Return<void> ret = mDevice->openInputStream(
-#endif
             handle, hidlDevice, hidlConfig, hidlFlags, sinkMetadata,
-            [&](Result r, const sp<::android::hardware::audio::CPP_VERSION::IStreamIn>& result,
+            [&](Result r,
+                const sp<::android::hardware::audio::CORE_TYPES_CPP_VERSION::IStreamIn>& result,
                     const AudioConfig& suggestedConfig) {
                 retval = r;
                 if (retval == Result::OK) {
@@ -488,6 +485,32 @@ status_t DeviceHalHidl::removeDeviceEffect(
     return INVALID_OPERATION;
 }
 #endif
+
+status_t DeviceHalHidl::setConnectedState(const struct audio_port_v7 *port, bool connected) {
+    if (mDevice == 0) return NO_INIT;
+#if MAJOR_VERSION == 7 && MINOR_VERSION == 1
+    if (supportsSetConnectedState7_1) {
+        AudioPort hidlPort;
+        if (status_t result = HidlUtils::audioPortFromHal(*port, &hidlPort); result != NO_ERROR) {
+            return result;
+        }
+        Return<Result> ret = mDevice->setConnectedState_7_1(hidlPort, connected);
+        if (!ret.isOk() || ret != Result::NOT_SUPPORTED) {
+            return processReturn("setConnectedState_7_1", ret);
+        } else if (ret == Result::OK) {
+            return NO_ERROR;
+        }
+        supportsSetConnectedState7_1 = false;
+    }
+#endif
+    DeviceAddress hidlAddress;
+    if (status_t result = CoreUtils::deviceAddressFromHal(
+                    port->ext.device.type, port->ext.device.address, &hidlAddress);
+            result != NO_ERROR) {
+        return result;
+    }
+    return processReturn("setConnectedState", mDevice->setConnectedState(hidlAddress, connected));
+}
 
 status_t DeviceHalHidl::dump(int fd, const Vector<String16>& args) {
     if (mDevice == 0) return NO_INIT;

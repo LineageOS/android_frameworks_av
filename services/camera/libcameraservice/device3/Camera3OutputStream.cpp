@@ -581,7 +581,7 @@ status_t Camera3OutputStream::configureConsumerQueueLocked(bool allowPreviewSche
     mHandoutTotalBufferCount = 0;
     mFrameCount = 0;
     mLastTimestamp = 0;
-    mUseMonoTimestamp = (isConsumedByHWComposer() | isVideoStream());
+    mUseMonoTimestamp = (isConsumedByHWComposer() || isVideoStream());
 
     res = native_window_set_buffer_count(mConsumer.get(),
             mTotalBufferCount);

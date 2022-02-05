@@ -358,6 +358,8 @@ public:
     virtual int32_t getAAudioMixerBurstCount() = 0;
 
     virtual int32_t getAAudioHardwareBurstMinUsec() = 0;
+
+    virtual status_t setDeviceConnectedState(const struct audio_port_v7 *port, bool connected) = 0;
 };
 
 /**
@@ -454,14 +456,12 @@ public:
     status_t setVibratorInfos(const std::vector<media::AudioVibratorInfo>& vibratorInfos) override;
     status_t updateSecondaryOutputs(
             const TrackSecondaryOutputsMap& trackSecondaryOutputs) override;
-
     status_t getMmapPolicyInfos(
             media::audio::common::AudioMMapPolicyType policyType,
             std::vector<media::audio::common::AudioMMapPolicyInfo> *policyInfos) override;
-
     int32_t getAAudioMixerBurstCount() override;
-
     int32_t getAAudioHardwareBurstMinUsec() override;
+    status_t setDeviceConnectedState(const struct audio_port_v7 *port, bool connected) override;
 
 private:
     const sp<media::IAudioFlingerService> mDelegate;
@@ -550,6 +550,7 @@ public:
             GET_MMAP_POLICY_INFOS = media::BnAudioFlingerService::TRANSACTION_getMmapPolicyInfos,
             GET_AAUDIO_MIXER_BURST_COUNT = media::BnAudioFlingerService::TRANSACTION_getAAudioMixerBurstCount,
             GET_AAUDIO_HARDWARE_BURST_MIN_USEC = media::BnAudioFlingerService::TRANSACTION_getAAudioHardwareBurstMinUsec,
+            SET_DEVICE_CONNECTED_STATE = media::BnAudioFlingerService::TRANSACTION_setDeviceConnectedState,
         };
 
         /**
@@ -669,6 +670,7 @@ public:
             std::vector<media::audio::common::AudioMMapPolicyInfo> *_aidl_return) override;
     Status getAAudioMixerBurstCount(int32_t* _aidl_return) override;
     Status getAAudioHardwareBurstMinUsec(int32_t* _aidl_return) override;
+    Status setDeviceConnectedState(const media::AudioPort& port, bool connected) override;
 
 private:
     const sp<AudioFlingerServerAdapter::Delegate> mDelegate;
