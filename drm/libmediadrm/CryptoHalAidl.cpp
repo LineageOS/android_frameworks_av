@@ -41,7 +41,7 @@ using ::aidl::android::hardware::drm::Uuid;
 using ::aidl::android::hardware::common::Ashmem;
 
 using ::android::sp;
-using ::android::DrmUtils::toStatusTAidl;
+using ::android::DrmUtils::statusAidlToStatusT;
 using ::android::hardware::hidl_array;
 using ::android::hardware::hidl_handle;
 using ::android::hardware::hidl_memory;
@@ -281,7 +281,7 @@ status_t CryptoHalAidl::setMediaDrmSession(const Vector<uint8_t>& sessionId) {
     }
 
     auto err = mPlugin->setMediaDrmSession(toStdVec(sessionId));
-    return err.isOk() ? toStatusTAidl(err.getServiceSpecificError()) : DEAD_OBJECT;
+    return statusAidlToStatusT(err);
 }
 
 ssize_t CryptoHalAidl::decrypt(const uint8_t keyId[16], const uint8_t iv[16],
@@ -350,13 +350,12 @@ ssize_t CryptoHalAidl::decrypt(const uint8_t keyId[16], const uint8_t iv[16],
     std::vector<uint8_t> keyIdAidl(toStdVec(keyId, 16));
     std::vector<uint8_t> ivAidl(toStdVec(iv, 16));
     DecryptResult result;
-    err = mPlugin->decrypt(secure, keyIdAidl, ivAidl, aMode, aPattern, stdSubSamples,
+    ::ndk::ScopedAStatus statusAidl = mPlugin->decrypt(secure,
+                           keyIdAidl, ivAidl, aMode, aPattern, stdSubSamples,
                            hidlSharedBufferToAidlSharedBuffer(hSource), offset,
-                           hidlDestinationBufferToAidlDestinationBuffer(hDestination), &result)
-                          .isOk()
-                  ? OK
-                  : DEAD_OBJECT;
+                           hidlDestinationBufferToAidlDestinationBuffer(hDestination), &result);
 
+    err = statusAidlToStatusT(statusAidl);
     *errorDetailMsg = toString8(result.detailedError);
     if (err != OK) {
         ALOGE("Failed on decrypt, error message:%s, bytes written:%d", result.detailedError.c_str(),
@@ -416,6 +415,6 @@ status_t CryptoHalAidl::getLogMessages(Vector<drm::V1_4::LogMessage>& logs) cons
     Mutex::Autolock autoLock(mLock);
     // Need to convert logmessage
 
-    return  DrmUtils::GetLogMessagesAidl<ICryptoPluginAidl>(mPlugin, logs);
+    return DrmUtils::GetLogMessagesAidl<ICryptoPluginAidl>(mPlugin, logs);
 }
 }  // namespace android

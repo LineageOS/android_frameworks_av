@@ -330,13 +330,14 @@ void DrmHalHidl::cleanup() {
 std::vector<sp<IDrmFactory>> DrmHalHidl::makeDrmFactories() {
     static std::vector<sp<IDrmFactory>> factories(DrmUtils::MakeDrmFactories());
     if (factories.size() == 0) {
-        // must be in passthrough mode, load the default passthrough service
+        DrmUtils::LOG2BI("No hidl drm factories found");
+        // could be in passthrough mode, load the default passthrough service
         auto passthrough = IDrmFactory::getService();
         if (passthrough != NULL) {
             DrmUtils::LOG2BI("makeDrmFactories: using default passthrough drm instance");
             factories.push_back(passthrough);
         } else {
-            DrmUtils::LOG2BE("Failed to find any drm factories");
+            DrmUtils::LOG2BE("Failed to find passthrough drm factories");
         }
     }
     return factories;
