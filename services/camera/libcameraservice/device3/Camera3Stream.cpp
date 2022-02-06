@@ -54,7 +54,8 @@ Camera3Stream::Camera3Stream(int id,
         android_dataspace dataSpace, camera_stream_rotation_t rotation,
         const String8& physicalCameraId,
         const std::unordered_set<int32_t> &sensorPixelModesUsed,
-        int setId, bool isMultiResolution, int dynamicRangeProfile) :
+        int setId, bool isMultiResolution, int dynamicRangeProfile,
+        int streamUseCase) :
     camera_stream(),
     mId(id),
     mSetId(setId),
@@ -91,6 +92,7 @@ Camera3Stream::Camera3Stream(int id,
     camera_stream::physical_camera_id = mPhysicalCameraId.string();
     camera_stream::sensor_pixel_modes_used = sensorPixelModesUsed;
     camera_stream::dynamic_range_profile = dynamicRangeProfile;
+    camera_stream::use_case = streamUseCase;
 
     if ((format == HAL_PIXEL_FORMAT_BLOB || format == HAL_PIXEL_FORMAT_RAW_OPAQUE) &&
             maxSize == 0) {
@@ -173,6 +175,10 @@ const String8& Camera3Stream::physicalCameraId() const {
 
 int Camera3Stream::getMaxHalBuffers() const {
     return camera_stream::max_buffers;
+}
+
+int Camera3Stream::getStreamUseCase() const {
+    return camera_stream::use_case;
 }
 
 void Camera3Stream::setOfflineProcessingSupport(bool support) {

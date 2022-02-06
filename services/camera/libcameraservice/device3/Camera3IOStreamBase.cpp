@@ -34,11 +34,11 @@ Camera3IOStreamBase::Camera3IOStreamBase(int id, camera_stream_type_t type,
         android_dataspace dataSpace, camera_stream_rotation_t rotation,
         const String8& physicalCameraId,
         const std::unordered_set<int32_t> &sensorPixelModesUsed,
-        int setId, bool isMultiResolution, int dynamicRangeProfile) :
+        int setId, bool isMultiResolution, int dynamicRangeProfile, int streamUseCase) :
         Camera3Stream(id, type,
                 width, height, maxSize, format, dataSpace, rotation,
                 physicalCameraId, sensorPixelModesUsed, setId, isMultiResolution,
-                dynamicRangeProfile),
+                dynamicRangeProfile, streamUseCase),
         mTotalBufferCount(0),
         mHandoutTotalBufferCount(0),
         mHandoutOutputBufferCount(0),
@@ -89,6 +89,7 @@ void Camera3IOStreamBase::dump(int fd, const Vector<String16> &args) const {
         lines.appendFormat("      Physical camera id: %s\n", camera_stream::physical_camera_id);
     }
     lines.appendFormat("      Dynamic Range Profile: 0x%x", camera_stream::dynamic_range_profile);
+    lines.appendFormat("      Stream use case: %d\n", camera_stream::use_case);
     lines.appendFormat("      Frames produced: %d, last timestamp: %" PRId64 " ns\n",
             mFrameCount, mLastTimestamp);
     lines.appendFormat("      Total buffers: %zu, currently dequeued: %zu\n",
