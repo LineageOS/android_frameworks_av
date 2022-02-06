@@ -65,6 +65,7 @@ using namespace android::camera3;
 using namespace android::hardware::camera;
 using namespace android::hardware::camera::device::V3_2;
 using android::hardware::camera::metadata::V3_6::CameraMetadataEnumAndroidSensorPixelMode;
+using android::hardware::camera::metadata::V3_8::CameraMetadataEnumAndroidScalerAvailableStreamUseCases;
 
 namespace android {
 
@@ -969,8 +970,16 @@ status_t HidlCamera3Device::HidlHalInterface::configureStreams(
                     __FUNCTION__, src->dynamic_range_profile);
             return BAD_VALUE;
         }
+        if (src->use_case != ANDROID_SCALER_AVAILABLE_STREAM_USE_CASES_DEFAULT &&
+                mHidlSession_3_8 == nullptr) {
+            ALOGE("%s: Camera device doesn't support non-default stream use case %d!",
+                    __FUNCTION__, src->use_case);
+            return BAD_VALUE;
+        }
         dst3_8.v3_7 = dst3_7;
         dst3_8.dynamicRangeProfile = mapToHidlDynamicProfile(src->dynamic_range_profile);
+        dst3_8.useCase =
+                static_cast<CameraMetadataEnumAndroidScalerAvailableStreamUseCases>(src->use_case);
         activeStreams.insert(streamId);
         // Create Buffer ID map if necessary
         mBufferRecords.tryCreateBufferCache(streamId);
@@ -992,7 +1001,6 @@ status_t HidlCamera3Device::HidlHalInterface::configureStreams(
     requestedConfiguration3_4.sessionParams.setToExternal(
             reinterpret_cast<uint8_t*>(const_cast<camera_metadata_t*>(sessionParams)),
             sessionParamSize);
-    requestedConfiguration3_7.operationMode = operationMode;
     requestedConfiguration3_7.sessionParams.setToExternal(
             reinterpret_cast<uint8_t*>(const_cast<camera_metadata_t*>(sessionParams)),
             sessionParamSize);

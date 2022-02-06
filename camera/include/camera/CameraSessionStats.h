@@ -64,19 +64,24 @@ public:
 
     // Dynamic range profile
     int mDynamicRangeProfile;
+    // Stream use case
+    int mStreamUseCase;
 
     CameraStreamStats() :
             mWidth(0), mHeight(0), mFormat(0), mDataSpace(0), mUsage(0),
             mRequestCount(0), mErrorCount(0), mStartLatencyMs(0),
             mMaxHalBuffers(0), mMaxAppBuffers(0), mHistogramType(HISTOGRAM_TYPE_UNKNOWN),
-            mDynamicRangeProfile(ANDROID_REQUEST_AVAILABLE_DYNAMIC_RANGE_PROFILES_MAP_STANDARD) {}
+            mDynamicRangeProfile(ANDROID_REQUEST_AVAILABLE_DYNAMIC_RANGE_PROFILES_MAP_STANDARD),
+            mStreamUseCase(ANDROID_SCALER_AVAILABLE_STREAM_USE_CASES_DEFAULT) {}
     CameraStreamStats(int width, int height, int format, int dataSpace, int64_t usage,
-            int maxHalBuffers, int maxAppBuffers, int dynamicRangeProfile)
+            int maxHalBuffers, int maxAppBuffers, int dynamicRangeProfile,
+            int streamUseCase)
             : mWidth(width), mHeight(height), mFormat(format), mDataSpace(dataSpace),
               mUsage(usage), mRequestCount(0), mErrorCount(0), mStartLatencyMs(0),
               mMaxHalBuffers(maxHalBuffers), mMaxAppBuffers(maxAppBuffers),
               mHistogramType(HISTOGRAM_TYPE_UNKNOWN),
-              mDynamicRangeProfile(dynamicRangeProfile) {}
+              mDynamicRangeProfile(dynamicRangeProfile),
+              mStreamUseCase(streamUseCase) {}
 
     virtual status_t readFromParcel(const android::Parcel* parcel) override;
     virtual status_t writeToParcel(android::Parcel* parcel) const override;

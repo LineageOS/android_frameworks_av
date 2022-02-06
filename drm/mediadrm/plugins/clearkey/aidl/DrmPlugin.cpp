@@ -21,6 +21,7 @@
 #include <inttypes.h>
 #include <stdio.h>
 #include <chrono>
+#include <set>
 
 #include "AidlUtils.h"
 #include "ClearKeyDrmProperties.h"
@@ -188,7 +189,8 @@ void DrmPlugin::installSecureStop(const std::vector<uint8_t>& sessionId) {
 
     const std::vector<uint8_t> scopeId = in_scope;
     ::android::sp<Session> session;
-    if (in_keyType == KeyType::STREAMING || in_keyType == KeyType::OFFLINE) {
+    std::set<KeyType> init_types{KeyType::STREAMING, KeyType::OFFLINE};
+    if (init_types.count(in_keyType)) {
         std::vector<uint8_t> sessionId(scopeId.begin(), scopeId.end());
         session = mSessionLibrary->findSession(sessionId);
         if (!session.get()) {
@@ -402,8 +404,8 @@ void DrmPlugin::installSecureStop(const std::vector<uint8_t>& sessionId) {
     auto itr = mSecureStops.find(in_secureStopId.secureStopId);
     if (itr != mSecureStops.end()) {
         ClearkeySecureStop clearkeyStop = itr->second;
-        stop.assign(clearkeyStop.id.begin(), clearkeyStop.id.end());
-        stop.assign(clearkeyStop.data.begin(), clearkeyStop.data.end());
+        stop.insert(stop.end(), clearkeyStop.id.begin(), clearkeyStop.id.end());
+        stop.insert(stop.end(), clearkeyStop.data.begin(), clearkeyStop.data.end());
     }
     mSecureStopLock.unlock();
 
@@ -439,9 +441,9 @@ void DrmPlugin::installSecureStop(const std::vector<uint8_t>& sessionId) {
     std::vector<::aidl::android::hardware::drm::SecureStop> stops;
     for (auto itr = mSecureStops.begin(); itr != mSecureStops.end(); ++itr) {
         ClearkeySecureStop clearkeyStop = itr->second;
-        std::vector<uint8_t> stop = {};
-        stop.assign(clearkeyStop.id.begin(), clearkeyStop.id.end());
-        stop.assign(clearkeyStop.data.begin(), clearkeyStop.data.end());
+        std::vector<uint8_t> stop{};
+        stop.insert(stop.end(), clearkeyStop.id.begin(), clearkeyStop.id.end());
+        stop.insert(stop.end(), clearkeyStop.data.begin(), clearkeyStop.data.end());
 
         SecureStop secureStop;
         secureStop.opaqueData = stop;
@@ -476,7 +478,7 @@ void DrmPlugin::installSecureStop(const std::vector<uint8_t>& sessionId) {
         return toNdkScopedAStatus(Status::ERROR_DRM_INVALID_STATE);
     }
 
-    *_aidl_return = itr->second;
+    *_aidl_return = SecurityLevel::SW_SECURE_CRYPTO;
     return toNdkScopedAStatus(Status::OK);
 }
 

@@ -31,6 +31,7 @@ using android::camera3::OutputStreamInfo;
 using android::hardware::camera2::ICameraDeviceUser;
 using android::hardware::camera::metadata::V3_6::CameraMetadataEnumAndroidSensorPixelMode;
 using android::hardware::camera::metadata::V3_8::CameraMetadataEnumAndroidRequestAvailableDynamicRangeProfilesMap;
+using android::hardware::camera::metadata::V3_8::CameraMetadataEnumAndroidScalerAvailableStreamUseCases;
 
 namespace android {
 namespace camera3 {
@@ -310,11 +311,30 @@ bool isPublicFormat(int32_t format)
     }
 }
 
+bool isStreamUseCaseSupported(int streamUseCase,
+        const CameraMetadata &deviceInfo) {
+    camera_metadata_ro_entry_t availableStreamUseCases =
+            deviceInfo.find(ANDROID_SCALER_AVAILABLE_STREAM_USE_CASES);
+
+    if (availableStreamUseCases.count == 0 &&
+            streamUseCase == ANDROID_SCALER_AVAILABLE_STREAM_USE_CASES_DEFAULT) {
+        return true;
+    }
+
+    for (size_t i = 0; i < availableStreamUseCases.count; i++) {
+        if (availableStreamUseCases.data.i32[i] == streamUseCase) {
+            return true;
+        }
+    }
+    return false;
+}
+
 binder::Status createSurfaceFromGbp(
         OutputStreamInfo& streamInfo, bool isStreamInfoValid,
         sp<Surface>& surface, const sp<IGraphicBufferProducer>& gbp,
         const String8 &logicalCameraId, const CameraMetadata &physicalCameraMetadata,
-        const std::vector<int32_t> &sensorPixelModesUsed, int dynamicRangeProfile){
+        const std::vector<int32_t> &sensorPixelModesUsed, int dynamicRangeProfile,
+        int streamUseCase) {
     // bufferProducer must be non-null
     if (gbp == nullptr) {
         String8 msg = String8::format("Camera %s: Surface is NULL", logicalCameraId.string());
@@ -427,6 +447,13 @@ binder::Status createSurfaceFromGbp(
         ALOGE("%s: %s", __FUNCTION__, msg.string());
         return STATUS_ERROR(CameraService::ERROR_ILLEGAL_ARGUMENT, msg.string());
     }
+    if (!SessionConfigurationUtils::isStreamUseCaseSupported(streamUseCase,
+            physicalCameraMetadata)) {
+        String8 msg = String8::format("Camera %s: stream use case %d not supported,"
+                " failed to create output stream", logicalCameraId.string(), streamUseCase);
+        ALOGE("%s: %s", __FUNCTION__, msg.string());
+        return STATUS_ERROR(CameraService::ERROR_ILLEGAL_ARGUMENT, msg.string());
+    }
 
     if (!isStreamInfoValid) {
         streamInfo.width = width;
@@ -436,6 +463,7 @@ binder::Status createSurfaceFromGbp(
         streamInfo.consumerUsage = consumerUsage;
         streamInfo.sensorPixelModesUsed = overriddenSensorPixelModes;
         streamInfo.dynamicRangeProfile = dynamicRangeProfile;
+        streamInfo.streamUseCase = streamUseCase;
         return binder::Status::ok();
     }
     if (width != streamInfo.width) {
@@ -506,6 +534,8 @@ void mapStreamInfo(const OutputStreamInfo &streamInfo,
     stream->dynamicRangeProfile =
         static_cast<CameraMetadataEnumAndroidRequestAvailableDynamicRangeProfilesMap> (
                 streamInfo.dynamicRangeProfile);
+    stream->useCase = static_cast<CameraMetadataEnumAndroidScalerAvailableStreamUseCases>(
+            streamInfo.streamUseCase);
 }
 
 binder::Status checkPhysicalCameraId(
@@ -666,6 +696,7 @@ convertToHALStreamCombination(
             return res;
         }
 
+        int streamUseCase = it.getStreamUseCase();
         if (deferredConsumer) {
             streamInfo.width = it.getWidth();
             streamInfo.height = it.getHeight();
@@ -686,6 +717,7 @@ convertToHALStreamCombination(
                         return STATUS_ERROR(CameraService::ERROR_ILLEGAL_ARGUMENT,
                                 "Deferred surface sensor pixel modes not valid");
             }
+            streamInfo.streamUseCase = streamUseCase;
             mapStreamInfo(streamInfo, camera3::CAMERA_STREAM_ROTATION_0, physicalCameraId, groupId,
                     &streamConfiguration.streams[streamIdx++]);
             isStreamInfoValid = true;
@@ -698,7 +730,8 @@ convertToHALStreamCombination(
         for (auto& bufferProducer : bufferProducers) {
             sp<Surface> surface;
             res = createSurfaceFromGbp(streamInfo, isStreamInfoValid, surface, bufferProducer,
-                    logicalCameraId, metadataChosen, sensorPixelModesUsed, dynamicRangeProfile);
+                    logicalCameraId, metadataChosen, sensorPixelModesUsed, dynamicRangeProfile,
+                    streamUseCase);
 
             if (!res.isOk())
                 return res;
@@ -849,6 +882,11 @@ bool convertHALStreamCombinationFromV38ToV37(
                 ANDROID_REQUEST_AVAILABLE_DYNAMIC_RANGE_PROFILES_MAP_STANDARD) {
             // ICameraDevice older than 3.8 doesn't support 10-bit dynamic range profiles
             // image
+            return false;
+        }
+        if (static_cast<int32_t>(streamConfigV38.streams[i].useCase) !=
+                ANDROID_SCALER_AVAILABLE_STREAM_USE_CASES_DEFAULT) {
+            // ICameraDevice older than 3.8 doesn't support stream use case
             return false;
         }
         streamConfigV37.streams[i] = streamConfigV38.streams[i].v3_7;

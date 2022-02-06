@@ -134,7 +134,8 @@ class Camera3Device :
             bool isShared = false, bool isMultiResolution = false,
             uint64_t consumerUsage = 0,
             int dynamicRangeProfile =
-            ANDROID_REQUEST_AVAILABLE_DYNAMIC_RANGE_PROFILES_MAP_STANDARD) override;
+            ANDROID_REQUEST_AVAILABLE_DYNAMIC_RANGE_PROFILES_MAP_STANDARD,
+            int streamUseCase = ANDROID_SCALER_AVAILABLE_STREAM_USE_CASES_DEFAULT) override;
 
     status_t createStream(const std::vector<sp<Surface>>& consumers,
             bool hasDeferredConsumer, uint32_t width, uint32_t height, int format,
@@ -146,7 +147,8 @@ class Camera3Device :
             bool isShared = false, bool isMultiResolution = false,
             uint64_t consumerUsage = 0,
             int dynamicRangeProfile =
-            ANDROID_REQUEST_AVAILABLE_DYNAMIC_RANGE_PROFILES_MAP_STANDARD) override;
+            ANDROID_REQUEST_AVAILABLE_DYNAMIC_RANGE_PROFILES_MAP_STANDARD,
+            int streamUseCase = ANDROID_SCALER_AVAILABLE_STREAM_USE_CASES_DEFAULT) override;
 
     status_t createInputStream(
             uint32_t width, uint32_t height, int format, bool isMultiResolution,
