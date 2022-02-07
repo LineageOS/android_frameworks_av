@@ -30,27 +30,40 @@
 #include <util/CoreUtils.h>
 
 #include "DeviceHalHidl.h"
-#include "EffectHalHidl.h"
 #include "ParameterUtils.h"
 #include "StreamHalHidl.h"
 
-using ::android::hardware::audio::common::CPP_VERSION::implementation::HidlUtils;
+using ::android::hardware::audio::common::COMMON_TYPES_CPP_VERSION::implementation::HidlUtils;
 using ::android::hardware::audio::common::utils::EnumBitfield;
-using ::android::hardware::audio::CPP_VERSION::implementation::CoreUtils;
+using ::android::hardware::audio::CORE_TYPES_CPP_VERSION::implementation::CoreUtils;
 using ::android::hardware::hidl_string;
 using ::android::hardware::hidl_vec;
 
 namespace android {
-namespace CPP_VERSION {
 
-using namespace ::android::hardware::audio::common::CPP_VERSION;
-using namespace ::android::hardware::audio::CPP_VERSION;
+using namespace ::android::hardware::audio::common::COMMON_TYPES_CPP_VERSION;
+using namespace ::android::hardware::audio::CORE_TYPES_CPP_VERSION;
 
-using EffectHalHidl = ::android::effect::CPP_VERSION::EffectHalHidl;
+DeviceHalHidl::DeviceHalHidl(const sp<::android::hardware::audio::CPP_VERSION::IDevice>& device)
+        : ConversionHelperHidl("Device"), mDevice(device) {
+}
 
-DeviceHalHidl::DeviceHalHidl(const sp<IDevice>& device)
-        : ConversionHelperHidl("Device"), mDevice(device),
-          mPrimaryDevice(IPrimaryDevice::castFrom(device)) {
+DeviceHalHidl::DeviceHalHidl(
+        const sp<::android::hardware::audio::CPP_VERSION::IPrimaryDevice>& device)
+        : ConversionHelperHidl("Device"),
+#if MAJOR_VERSION <= 6 || (MAJOR_VERSION == 7 && MINOR_VERSION == 0)
+          mDevice(device),
+#endif
+          mPrimaryDevice(device) {
+#if MAJOR_VERSION == 7 && MINOR_VERSION == 1
+    auto getDeviceRet = mPrimaryDevice->getDevice();
+    if (getDeviceRet.isOk()) {
+        mDevice = getDeviceRet;
+    } else {
+        ALOGE("Call to IPrimaryDevice.getDevice has failed: %s",
+                getDeviceRet.description().c_str());
+    }
+#endif
 }
 
 DeviceHalHidl::~DeviceHalHidl() {
@@ -209,12 +222,17 @@ status_t DeviceHalHidl::openOutputStream(
         return status;
     }
     Result retval = Result::NOT_INITIALIZED;
+#if MAJOR_VERSION == 7 && MINOR_VERSION == 1
+    Return<void> ret = mDevice->openOutputStream_7_1(
+#else
     Return<void> ret = mDevice->openOutputStream(
+#endif
             handle, hidlDevice, hidlConfig, hidlFlags,
 #if MAJOR_VERSION >= 4
             {} /* metadata */,
 #endif
-            [&](Result r, const sp<IStreamOut>& result, const AudioConfig& suggestedConfig) {
+            [&](Result r, const sp<::android::hardware::audio::CPP_VERSION::IStreamOut>& result,
+                    const AudioConfig& suggestedConfig) {
                 retval = r;
                 if (retval == Result::OK) {
                     *outStream = new StreamOutHalHidl(result);
@@ -282,9 +300,14 @@ status_t DeviceHalHidl::openInputStream(
         sinkMetadata.tracks[0].destination.device(std::move(hidlOutputDevice));
     }
 #endif
+#if MAJOR_VERSION == 7 && MINOR_VERSION == 1
+    Return<void> ret = mDevice->openInputStream_7_1(
+#else
     Return<void> ret = mDevice->openInputStream(
+#endif
             handle, hidlDevice, hidlConfig, hidlFlags, sinkMetadata,
-            [&](Result r, const sp<IStreamIn>& result, const AudioConfig& suggestedConfig) {
+            [&](Result r, const sp<::android::hardware::audio::CPP_VERSION::IStreamIn>& result,
+                    const AudioConfig& suggestedConfig) {
                 retval = r;
                 if (retval == Result::OK) {
                     *inStream = new StreamInHalHidl(result);
@@ -432,8 +455,7 @@ status_t DeviceHalHidl::addDeviceEffect(
         audio_port_handle_t device, sp<EffectHalInterface> effect) {
     if (mDevice == 0) return NO_INIT;
     return processReturn("addDeviceEffect", mDevice->addDeviceEffect(
-            static_cast<AudioPortHandle>(device),
-            static_cast<EffectHalHidl*>(effect.get())->effectId()));
+            static_cast<AudioPortHandle>(device), effect->effectId()));
 }
 #else
 status_t DeviceHalHidl::addDeviceEffect(
@@ -447,8 +469,7 @@ status_t DeviceHalHidl::removeDeviceEffect(
         audio_port_handle_t device, sp<EffectHalInterface> effect) {
     if (mDevice == 0) return NO_INIT;
     return processReturn("removeDeviceEffect", mDevice->removeDeviceEffect(
-            static_cast<AudioPortHandle>(device),
-            static_cast<EffectHalHidl*>(effect.get())->effectId()));
+            static_cast<AudioPortHandle>(device), effect->effectId()));
 }
 #else
 status_t DeviceHalHidl::removeDeviceEffect(
@@ -478,5 +499,4 @@ status_t DeviceHalHidl::dump(int fd) {
     return processReturn("dump", ret);
 }
 
-} // namespace CPP_VERSION
 } // namespace android

@@ -861,10 +861,10 @@ status_t PolicySerializer::deserialize(const char *configFile, AudioPolicyConfig
         ALOGE("%s: No version found in root node %s", __func__, rootName);
         return BAD_VALUE;
     }
-    if (version == "7.0") {
+    if (version == "7.0" || version == "7.1") {
         mChannelMasksSeparator = mSamplingRatesSeparator = mFlagsSeparator = " ";
     } else if (version != "1.0") {
-        ALOGE("%s: Version does not match; expected \"1.0\" or \"7.0\" got \"%s\"",
+        ALOGE("%s: Version does not match; expected \"1.0\", \"7.0\", or \"7.1\" got \"%s\"",
                 __func__, version.c_str());
         return BAD_VALUE;
     }
