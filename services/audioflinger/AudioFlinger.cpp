@@ -2493,21 +2493,17 @@ audio_hw_sync_t AudioFlinger::getAudioHwSyncForSession(audio_session_t sessionId
     if (dev == nullptr) {
         return AUDIO_HW_SYNC_INVALID;
     }
-    String8 reply;
-    AudioParameter param;
-    if (dev->getParameters(String8(AudioParameter::keyHwAvSync), &reply) == OK) {
-        param = AudioParameter(reply);
-    }
 
-    int value;
-    if (param.getInt(String8(AudioParameter::keyHwAvSync), value) != NO_ERROR) {
+    error::Result<audio_hw_sync_t> result = dev->getHwAvSync();
+    if (!result.ok()) {
         ALOGW("getAudioHwSyncForSession error getting sync for session %d", sessionId);
         return AUDIO_HW_SYNC_INVALID;
     }
+    audio_hw_sync_t value = VALUE_OR_FATAL(result);
 
     // allow only one session for a given HW A/V sync ID.
     for (size_t i = 0; i < mHwAvSyncIds.size(); i++) {
-        if (mHwAvSyncIds.valueAt(i) == (audio_hw_sync_t)value) {
+        if (mHwAvSyncIds.valueAt(i) == value) {
             ALOGV("getAudioHwSyncForSession removing ID %d for session %d",
                   value, mHwAvSyncIds.keyAt(i));
             mHwAvSyncIds.removeItemsAt(i);

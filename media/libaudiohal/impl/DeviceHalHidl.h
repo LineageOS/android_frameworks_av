@@ -134,6 +134,8 @@ class DeviceHalHidl : public DeviceHalInterface, public ConversionHelperHidl
 
     status_t setConnectedState(const struct audio_port_v7 *port, bool connected) override;
 
+    error::Result<audio_hw_sync_t> getHwAvSync() override;
+
     status_t dump(int fd, const Vector<String16>& args) override;
 
   private:

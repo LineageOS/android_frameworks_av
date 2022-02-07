@@ -10,12 +10,8 @@ package {
 filegroup {
     name: "audio_core_hal_client_sources",
     srcs: [
-        "DeviceHalLocal.cpp",
-        "DevicesFactoryHalHybrid.cpp",
-        "DevicesFactoryHalLocal.cpp",
         "DeviceHalHidl.cpp",
         "DevicesFactoryHalHidl.cpp",
-        "StreamHalLocal.cpp",
         "StreamHalHidl.cpp",
     ],
 }
