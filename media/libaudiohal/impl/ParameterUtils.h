@@ -16,17 +16,16 @@
 
 #pragma once
 
-#include PATH(android/hardware/audio/FILE_VERSION/types.h)
+#include PATH(android/hardware/audio/CORE_TYPES_FILE_VERSION/types.h)
 #include <hidl/HidlSupport.h>
 
-using ::android::hardware::audio::CPP_VERSION::ParameterValue;
-using ::android::hardware::audio::CPP_VERSION::Result;
+using ::android::hardware::audio::CORE_TYPES_CPP_VERSION::ParameterValue;
+using ::android::hardware::audio::CORE_TYPES_CPP_VERSION::Result;
 using ::android::hardware::Return;
 using ::android::hardware::hidl_vec;
 using ::android::hardware::hidl_string;
 
 namespace android {
-namespace CPP_VERSION {
 namespace utils {
 
 #if MAJOR_VERSION == 2
@@ -56,5 +55,4 @@ Return<Result> setParameters(T& object, hidl_vec<ParameterValue> context,
 #endif
 
 } // namespace utils
-} // namespace CPP_VERSION
 } // namespace android
