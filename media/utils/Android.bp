@@ -122,7 +122,10 @@ cc_library_headers {
 
 cc_test {
     name: "libmediautils_test",
-    srcs: ["TimerThread-test.cpp"],
+    srcs: [
+        "memory-test.cpp",
+        "TimerThread-test.cpp",
+    ],
     shared_libs: [
       "libmediautils",
       "libutils",

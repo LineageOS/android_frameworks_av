@@ -20,6 +20,7 @@
 #include <android/hidl/manager/1.0/IServiceManager.h>
 #include <hwbinder/IPCThreadState.h>
 #include <media/AudioParameter.h>
+#include <mediautils/memory.h>
 #include <mediautils/SchedulingPolicyService.h>
 #include <utils/Log.h>
 
@@ -275,15 +276,15 @@ status_t StreamHalHidl::legacyCreateAudioPatch(const struct audio_port_config& p
                                                std::optional<audio_source_t> source,
                                                audio_devices_t type) {
     LOG_ALWAYS_FATAL_IF(port.type != AUDIO_PORT_TYPE_DEVICE, "port type must be device");
-    char* address;
+    unique_malloced_ptr<char> address;
     if (strcmp(port.ext.device.address, "") != 0) {
         // FIXME: we only support address on first sink with HAL version < 3.0
-        address = audio_device_address_to_parameter(port.ext.device.type, port.ext.device.address);
+        address.reset(
+                audio_device_address_to_parameter(port.ext.device.type, port.ext.device.address));
     } else {
-        address = (char*)calloc(1, 1);
+        address.reset((char*)calloc(1, 1));
     }
-    AudioParameter param = AudioParameter(String8(address));
-    free(address);
+    AudioParameter param = AudioParameter(String8(address.get()));
     param.addInt(String8(AudioParameter::keyRouting), (int)type);
     if (source.has_value()) {
         param.addInt(String8(AudioParameter::keyInputSource), (int)source.value());
