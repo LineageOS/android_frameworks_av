@@ -7,22 +7,33 @@ package {
     default_applicable_licenses: ["frameworks_av_license"],
 }
 
-cc_defaults {
-    name: "libaudiohal_default",
-
+filegroup {
+    name: "audio_core_hal_client_sources",
     srcs: [
         "DeviceHalLocal.cpp",
         "DevicesFactoryHalHybrid.cpp",
         "DevicesFactoryHalLocal.cpp",
-        "StreamHalLocal.cpp",
-
-        "ConversionHelperHidl.cpp",
         "DeviceHalHidl.cpp",
         "DevicesFactoryHalHidl.cpp",
+        "StreamHalLocal.cpp",
+        "StreamHalHidl.cpp",
+    ],
+}
+
+filegroup {
+    name: "audio_effect_hal_client_sources",
+    srcs: [
         "EffectBufferHalHidl.cpp",
         "EffectHalHidl.cpp",
         "EffectsFactoryHalHidl.cpp",
-        "StreamHalHidl.cpp",
+    ],
+}
+
+cc_defaults {
+    name: "libaudiohal_default",
+
+    srcs: [
+        "ConversionHelperHidl.cpp",
     ],
 
     cflags: [
@@ -65,6 +76,10 @@ cc_defaults {
 cc_library_shared {
     name: "libaudiohal@4.0",
     defaults: ["libaudiohal_default"],
+    srcs: [
+        ":audio_core_hal_client_sources",
+        ":audio_effect_hal_client_sources",
+    ],
     shared_libs: [
         "android.hardware.audio.common@4.0",
         "android.hardware.audio.common@4.0-util",
@@ -83,6 +98,10 @@ cc_library_shared {
 cc_library_shared {
     name: "libaudiohal@5.0",
     defaults: ["libaudiohal_default"],
+    srcs: [
+        ":audio_core_hal_client_sources",
+        ":audio_effect_hal_client_sources",
+    ],
     shared_libs: [
         "android.hardware.audio.common@5.0",
         "android.hardware.audio.common@5.0-util",
@@ -101,6 +120,10 @@ cc_library_shared {
 cc_library_shared {
     name: "libaudiohal@6.0",
     defaults: ["libaudiohal_default"],
+    srcs: [
+        ":audio_core_hal_client_sources",
+        ":audio_effect_hal_client_sources",
+    ],
     shared_libs: [
         "android.hardware.audio.common@6.0",
         "android.hardware.audio.common@6.0-util",
@@ -119,6 +142,10 @@ cc_library_shared {
 cc_library_shared {
     name: "libaudiohal@7.0",
     defaults: ["libaudiohal_default"],
+    srcs: [
+        ":audio_core_hal_client_sources",
+        ":audio_effect_hal_client_sources",
+    ],
     shared_libs: [
         "android.hardware.audio.common@7.0",
         "android.hardware.audio.common@7.0-util",
@@ -130,6 +157,28 @@ cc_library_shared {
     cflags: [
         "-DMAJOR_VERSION=7",
         "-DMINOR_VERSION=0",
+        "-include common/all-versions/VersionMacro.h",
+    ]
+}
+
+cc_library_shared {
+    name: "libaudiohal@7.1",
+    defaults: ["libaudiohal_default"],
+    srcs: [
+        ":audio_core_hal_client_sources",
+    ],
+    shared_libs: [
+        "android.hardware.audio.common@7.0",
+        "android.hardware.audio.common@7.0-util",
+        "android.hardware.audio@7.0",
+        "android.hardware.audio@7.1",
+        "android.hardware.audio@7.0-util",
+    ],
+    cflags: [
+        "-DMAJOR_VERSION=7",
+        "-DMINOR_VERSION=1",
+        "-DCOMMON_TYPES_MINOR_VERSION=0",
+        "-DCORE_TYPES_MINOR_VERSION=0",
         "-include common/all-versions/VersionMacro.h",
     ]
 }
