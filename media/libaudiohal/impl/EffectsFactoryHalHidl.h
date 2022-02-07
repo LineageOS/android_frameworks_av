@@ -24,10 +24,9 @@
 
 namespace android {
 namespace effect {
-namespace CPP_VERSION {
 
 using ::android::hardware::hidl_vec;
-using ::android::CPP_VERSION::ConversionHelperHidl;
+using ::android::ConversionHelperHidl;
 using namespace ::android::hardware::audio::effect::CPP_VERSION;
 
 class EffectsFactoryHalHidl : public EffectsFactoryHalInterface, public ConversionHelperHidl
@@ -67,7 +66,6 @@ class EffectsFactoryHalHidl : public EffectsFactoryHalInterface, public Conversi
     status_t queryAllDescriptors();
 };
 
-} // namespace CPP_VERSION
 } // namespace effect
 } // namespace android
 

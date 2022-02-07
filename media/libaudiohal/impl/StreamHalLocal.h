@@ -21,7 +21,6 @@
 #include "StreamPowerLog.h"
 
 namespace android {
-namespace CPP_VERSION {
 
 class DeviceHalLocal;
 
@@ -246,7 +245,6 @@ class StreamInHalLocal : public StreamInHalInterface, public StreamHalLocal {
     void doUpdateSinkMetadataV7(const SinkMetadata& sinkMetadata);
 };
 
-} // namespace CPP_VERSION
 } // namespace android
 
 #endif // ANDROID_HARDWARE_STREAM_HAL_LOCAL_H

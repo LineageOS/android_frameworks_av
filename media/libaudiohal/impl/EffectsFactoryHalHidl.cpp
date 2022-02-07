@@ -33,7 +33,6 @@ using ::android::hardware::Return;
 
 namespace android {
 namespace effect {
-namespace CPP_VERSION {
 
 using namespace ::android::hardware::audio::common::CPP_VERSION;
 using namespace ::android::hardware::audio::effect::CPP_VERSION;
@@ -173,12 +172,11 @@ status_t EffectsFactoryHalHidl::mirrorBuffer(void* external, size_t size,
     return EffectBufferHalHidl::mirror(external, size, buffer);
 }
 
-} // namespace CPP_VERSION
 } // namespace effect
 
 extern "C" __attribute__((visibility("default"))) void* createIEffectsFactory() {
     auto service = hardware::audio::effect::CPP_VERSION::IEffectsFactory::getService();
-    return service ? new effect::CPP_VERSION::EffectsFactoryHalHidl(service) : nullptr;
+    return service ? new effect::EffectsFactoryHalHidl(service) : nullptr;
 }
 
 } // namespace android

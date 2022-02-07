@@ -31,14 +31,13 @@
 #include "DevicesFactoryHalHidl.h"
 
 using ::android::hardware::audio::CPP_VERSION::IDevice;
-using ::android::hardware::audio::CPP_VERSION::Result;
+using ::android::hardware::audio::CORE_TYPES_CPP_VERSION::Result;
 using ::android::hardware::Return;
 using ::android::hardware::Void;
 using ::android::hidl::manager::V1_0::IServiceManager;
 using ::android::hidl::manager::V1_0::IServiceNotification;
 
 namespace android {
-namespace CPP_VERSION {
 
 class ServiceNotificationListener : public IServiceNotification {
   public:
@@ -115,14 +114,37 @@ status_t DevicesFactoryHalHidl::openDevice(const char *name, sp<DeviceHalInterfa
     if (status != OK) return status;
     Result retval = Result::NOT_INITIALIZED;
     for (const auto& factory : factories) {
-        Return<void> ret = factory->openDevice(
-                hidlId,
-                [&](Result r, const sp<IDevice>& result) {
-                    retval = r;
-                    if (retval == Result::OK) {
-                        *device = new DeviceHalHidl(result);
-                    }
-                });
+        Return<void> ret;
+        if (strcmp(name, AUDIO_HARDWARE_MODULE_ID_PRIMARY) == 0) {
+            // In V7.1 it's not possible to cast IDevice back to IPrimaryDevice,
+            // thus openPrimaryDevice must be used.
+#if MAJOR_VERSION == 7 && MINOR_VERSION == 1
+            ret = factory->openPrimaryDevice_7_1(
+#else
+            ret = factory->openPrimaryDevice(
+#endif
+                    [&](Result r,
+                        const sp<::android::hardware::audio::CPP_VERSION::IPrimaryDevice>& result) {
+                        retval = r;
+                        if (retval == Result::OK) {
+                            *device = new DeviceHalHidl(result);
+                        }
+                    });
+        } else {
+#if MAJOR_VERSION == 7 && MINOR_VERSION == 1
+            ret = factory->openDevice_7_1(
+#else
+            ret = factory->openDevice(
+#endif
+                    hidlId,
+                    [&](Result r,
+                        const sp<::android::hardware::audio::CPP_VERSION::IDevice>& result) {
+                        retval = r;
+                        if (retval == Result::OK) {
+                            *device = new DeviceHalHidl(result);
+                        }
+                    });
+        }
         if (!ret.isOk()) return FAILED_TRANSACTION;
         switch (retval) {
             // Device was found and was initialized successfully.
@@ -178,7 +200,8 @@ status_t DevicesFactoryHalHidl::setCallbackOnce(sp<DevicesFactoryHalCallback> ca
     return NO_ERROR;
 }
 
-void DevicesFactoryHalHidl::addDeviceFactory(sp<IDevicesFactory> factory, bool needToNotify) {
+void DevicesFactoryHalHidl::addDeviceFactory(
+        sp<::android::hardware::audio::CPP_VERSION::IDevicesFactory> factory, bool needToNotify) {
     // It is assumed that the DevicesFactoryHalInterface instance is owned
     // by AudioFlinger and thus have the same lifespan.
     factory->linkToDeath(HalDeathHandler::getInstance(), 0 /*cookie*/);
@@ -198,10 +221,10 @@ void DevicesFactoryHalHidl::addDeviceFactory(sp<IDevicesFactory> factory, bool n
     }
 }
 
-std::vector<sp<IDevicesFactory>> DevicesFactoryHalHidl::copyDeviceFactories() {
+std::vector<sp<::android::hardware::audio::CPP_VERSION::IDevicesFactory>>
+        DevicesFactoryHalHidl::copyDeviceFactories() {
     std::lock_guard<std::mutex> lock(mLock);
     return mDeviceFactories;
 }
 
-} // namespace CPP_VERSION
 } // namespace android

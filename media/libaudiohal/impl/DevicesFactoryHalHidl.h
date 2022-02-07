@@ -30,7 +30,6 @@
 using ::android::hardware::audio::CPP_VERSION::IDevicesFactory;
 
 namespace android {
-namespace CPP_VERSION {
 
 class DevicesFactoryHalHidl : public DevicesFactoryHalInterface
 {
@@ -59,7 +58,6 @@ class DevicesFactoryHalHidl : public DevicesFactoryHalInterface
     virtual ~DevicesFactoryHalHidl() = default;
 };
 
-} // namespace CPP_VERSION
 } // namespace android
 
 #endif // ANDROID_HARDWARE_DEVICES_FACTORY_HAL_HIDL_H

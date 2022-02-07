@@ -27,7 +27,6 @@
 #include "StreamHalLocal.h"
 
 namespace android {
-namespace CPP_VERSION {
 
 StreamHalLocal::StreamHalLocal(audio_stream_t *stream, sp<DeviceHalLocal> device)
         : mDevice(device),
@@ -517,7 +516,4 @@ status_t StreamInHalLocal::setPreferredMicrophoneFieldDimension(float zoom) {
 }
 #endif
 
-} // namespace CPP_VERSION
 } // namespace android
-
-
