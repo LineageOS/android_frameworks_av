@@ -72,6 +72,8 @@ typedef enum acamera_metadata_section {
     ACAMERA_DISTORTION_CORRECTION,
     ACAMERA_HEIC,
     ACAMERA_HEIC_INFO,
+    ACAMERA_AUTOMOTIVE,
+    ACAMERA_AUTOMOTIVE_LENS,
     ACAMERA_SECTION_COUNT,
 
     ACAMERA_VENDOR = 0x8000
@@ -115,6 +117,8 @@ typedef enum acamera_metadata_section_start {
                                                                 << 16,
     ACAMERA_HEIC_START             = ACAMERA_HEIC              << 16,
     ACAMERA_HEIC_INFO_START        = ACAMERA_HEIC_INFO         << 16,
+    ACAMERA_AUTOMOTIVE_START       = ACAMERA_AUTOMOTIVE        << 16,
+    ACAMERA_AUTOMOTIVE_LENS_START  = ACAMERA_AUTOMOTIVE_LENS   << 16,
     ACAMERA_VENDOR_START           = ACAMERA_VENDOR            << 16
 } acamera_metadata_section_start_t;
 
@@ -2694,6 +2698,9 @@ typedef enum acamera_metadata_tag {
      * with PRIMARY_CAMERA.</p>
      * <p>When ACAMERA_LENS_POSE_REFERENCE is UNDEFINED, this position cannot be accurately
      * represented by the camera device, and will be represented as <code>(0, 0, 0)</code>.</p>
+     * <p>When ACAMERA_LENS_POSE_REFERENCE is AUTOMOTIVE, then this position is relative to the
+     * origin of the automotive sensor coordinate system, which is at the center of the rear
+     * axle.</p>
      *
      * @see ACAMERA_LENS_DISTORTION
      * @see ACAMERA_LENS_INTRINSIC_CALIBRATION
@@ -7199,6 +7206,87 @@ typedef enum acamera_metadata_tag {
             ACAMERA_HEIC_START + 5,
     ACAMERA_HEIC_END,
 
+    /**
+     * <p>Location of the cameras on the automotive devices.</p>
+     *
+     * <p>Type: byte (acamera_metadata_enum_android_automotive_location_t)</p>
+     *
+     * <p>This tag may appear in:
+     * <ul>
+     *   <li>ACameraMetadata from ACameraManager_getCameraCharacteristics</li>
+     * </ul></p>
+     *
+     * <p>This enum defines the locations of the cameras relative to the vehicle body frame on
+     * <a href="https://source.android.com/devices/sensors/sensor-types#auto_axes">the automotive sensor coordinate system</a>.
+     * If the system has FEATURE_AUTOMOTIVE, the camera will have this entry in its static
+     * metadata.</p>
+     * <ul>
+     * <li>INTERIOR is the inside of the vehicle body frame (or the passenger cabin).</li>
+     * <li>EXTERIOR is the outside of the vehicle body frame.</li>
+     * <li>EXTRA is the extra vehicle such as a trailer.</li>
+     * </ul>
+     * <p>Each side of the vehicle body frame on this coordinate system is defined as below:</p>
+     * <ul>
+     * <li>FRONT is where the Y-axis increases toward.</li>
+     * <li>REAR is where the Y-axis decreases toward.</li>
+     * <li>LEFT is where the X-axis decreases toward.</li>
+     * <li>RIGHT is where the X-axis increases toward.</li>
+     * </ul>
+     * <p>If the camera has either EXTERIOR_OTHER or EXTRA_OTHER, its static metadata will list
+     * the following entries, so that applications can determine the camera's exact location:</p>
+     * <ul>
+     * <li>ACAMERA_LENS_POSE_REFERENCE</li>
+     * <li>ACAMERA_LENS_POSE_ROTATION</li>
+     * <li>ACAMERA_LENS_POSE_TRANSLATION</li>
+     * </ul>
+     *
+     * @see ACAMERA_LENS_POSE_REFERENCE
+     * @see ACAMERA_LENS_POSE_ROTATION
+     * @see ACAMERA_LENS_POSE_TRANSLATION
+     */
+    ACAMERA_AUTOMOTIVE_LOCATION =                               // byte (acamera_metadata_enum_android_automotive_location_t)
+            ACAMERA_AUTOMOTIVE_START,
+    ACAMERA_AUTOMOTIVE_END,
+
+    /**
+     * <p>The direction of the camera faces relative to the vehicle body frame and the
+     * passenger seats.</p>
+     *
+     * <p>Type: byte[n] (acamera_metadata_enum_android_automotive_lens_facing_t)</p>
+     *
+     * <p>This tag may appear in:
+     * <ul>
+     *   <li>ACameraMetadata from ACameraManager_getCameraCharacteristics</li>
+     * </ul></p>
+     *
+     * <p>This enum defines the lens facing characteristic of the cameras on the automotive
+     * devices with locations ACAMERA_AUTOMOTIVE_LOCATION defines.  If the system has
+     * FEATURE_AUTOMOTIVE, the camera will have this entry in its static metadata.</p>
+     * <p>When ACAMERA_AUTOMOTIVE_LOCATION is INTERIOR, this has one or more INTERIOR_*
+     * values or a single EXTERIOR_* value.  When this has more than one INTERIOR_*,
+     * the first value must be the one for the seat closest to the optical axis. If this
+     * contains INTERIOR_OTHER, all other values will be ineffective.</p>
+     * <p>When ACAMERA_AUTOMOTIVE_LOCATION is EXTERIOR_* or EXTRA, this has a single
+     * EXTERIOR_* value.</p>
+     * <p>If a camera has INTERIOR_OTHER or EXTERIOR_OTHER, or more than one camera is at the
+     * same location and facing the same direction, their static metadata will list the
+     * following entries, so that applications can determain their lenses' exact facing
+     * directions:</p>
+     * <ul>
+     * <li>ACAMERA_LENS_POSE_REFERENCE</li>
+     * <li>ACAMERA_LENS_POSE_ROTATION</li>
+     * <li>ACAMERA_LENS_POSE_TRANSLATION</li>
+     * </ul>
+     *
+     * @see ACAMERA_AUTOMOTIVE_LOCATION
+     * @see ACAMERA_LENS_POSE_REFERENCE
+     * @see ACAMERA_LENS_POSE_ROTATION
+     * @see ACAMERA_LENS_POSE_TRANSLATION
+     */
+    ACAMERA_AUTOMOTIVE_LENS_FACING =                            // byte[n] (acamera_metadata_enum_android_automotive_lens_facing_t)
+            ACAMERA_AUTOMOTIVE_LENS_START,
+    ACAMERA_AUTOMOTIVE_LENS_END,
+
 } acamera_metadata_tag_t;
 
 /**
@@ -8590,6 +8678,14 @@ typedef enum acamera_metadata_enum_acamera_lens_pose_reference {
      * @see ACAMERA_LENS_POSE_TRANSLATION
      */
     ACAMERA_LENS_POSE_REFERENCE_UNDEFINED                            = 2,
+
+    /**
+     * <p>The value of ACAMERA_LENS_POSE_TRANSLATION is relative to the origin of the
+     * automotive sensor coodinate system, which is at the center of the rear axle.</p>
+     *
+     * @see ACAMERA_LENS_POSE_TRANSLATION
+     */
+    ACAMERA_LENS_POSE_REFERENCE_AUTOMOTIVE                           = 3,
 
 } acamera_metadata_enum_android_lens_pose_reference_t;
 
@@ -10327,6 +10423,167 @@ typedef enum acamera_metadata_enum_acamera_heic_available_heic_stream_configurat
 
 } acamera_metadata_enum_android_heic_available_heic_stream_configurations_maximum_resolution_t;
 
+
+
+// ACAMERA_AUTOMOTIVE_LOCATION
+typedef enum acamera_metadata_enum_acamera_automotive_location {
+    /**
+     * <p>The camera device exists inside of the vehicle cabin.</p>
+     */
+    ACAMERA_AUTOMOTIVE_LOCATION_INTERIOR                             = 0,
+
+    /**
+     * <p>The camera exists outside of the vehicle body frame but not exactly on one of the
+     * exterior locations this enum defines.  The applications should determine the exact
+     * location from ACAMERA_LENS_POSE_TRANSLATION.</p>
+     *
+     * @see ACAMERA_LENS_POSE_TRANSLATION
+     */
+    ACAMERA_AUTOMOTIVE_LOCATION_EXTERIOR_OTHER                       = 1,
+
+    /**
+     * <p>The camera device exists outside of the vehicle body frame and on its front side.</p>
+     */
+    ACAMERA_AUTOMOTIVE_LOCATION_EXTERIOR_FRONT                       = 2,
+
+    /**
+     * <p>The camera device exists outside of the vehicle body frame and on its rear side.</p>
+     */
+    ACAMERA_AUTOMOTIVE_LOCATION_EXTERIOR_REAR                        = 3,
+
+    /**
+     * <p>The camera device exists outside and on left side of the vehicle body frame.</p>
+     */
+    ACAMERA_AUTOMOTIVE_LOCATION_EXTERIOR_LEFT                        = 4,
+
+    /**
+     * <p>The camera device exists outside and on right side of the vehicle body frame.</p>
+     */
+    ACAMERA_AUTOMOTIVE_LOCATION_EXTERIOR_RIGHT                       = 5,
+
+    /**
+     * <p>The camera device exists on an extra vehicle, such as the trailer, but not exactly
+     * on one of front, rear, left, or right side.  Applications should determine the exact
+     * location from ACAMERA_LENS_POSE_TRANSLATION.</p>
+     *
+     * @see ACAMERA_LENS_POSE_TRANSLATION
+     */
+    ACAMERA_AUTOMOTIVE_LOCATION_EXTRA_OTHER                          = 6,
+
+    /**
+     * <p>The camera device exists outside of the extra vehicle's body frame and on its front
+     * side.</p>
+     */
+    ACAMERA_AUTOMOTIVE_LOCATION_EXTRA_FRONT                          = 7,
+
+    /**
+     * <p>The camera device exists outside of the extra vehicle's body frame and on its rear
+     * side.</p>
+     */
+    ACAMERA_AUTOMOTIVE_LOCATION_EXTRA_REAR                           = 8,
+
+    /**
+     * <p>The camera device exists outside and on left side of the extra vehicle body.</p>
+     */
+    ACAMERA_AUTOMOTIVE_LOCATION_EXTRA_LEFT                           = 9,
+
+    /**
+     * <p>The camera device exists outside and on right side of the extra vehicle body.</p>
+     */
+    ACAMERA_AUTOMOTIVE_LOCATION_EXTRA_RIGHT                          = 10,
+
+} acamera_metadata_enum_android_automotive_location_t;
+
+
+// ACAMERA_AUTOMOTIVE_LENS_FACING
+typedef enum acamera_metadata_enum_acamera_automotive_lens_facing {
+    /**
+     * <p>The camera device faces the outside of the vehicle body frame but not exactly
+     * one of the exterior sides defined by this enum.  Applications should determine
+     * the exact facing direction from ACAMERA_LENS_POSE_ROTATION and
+     * ACAMERA_LENS_POSE_TRANSLATION.</p>
+     *
+     * @see ACAMERA_LENS_POSE_ROTATION
+     * @see ACAMERA_LENS_POSE_TRANSLATION
+     */
+    ACAMERA_AUTOMOTIVE_LENS_FACING_EXTERIOR_OTHER                    = 0,
+
+    /**
+     * <p>The camera device faces the front of the vehicle body frame.</p>
+     */
+    ACAMERA_AUTOMOTIVE_LENS_FACING_EXTERIOR_FRONT                    = 1,
+
+    /**
+     * <p>The camera device faces the rear of the vehicle body frame.</p>
+     */
+    ACAMERA_AUTOMOTIVE_LENS_FACING_EXTERIOR_REAR                     = 2,
+
+    /**
+     * <p>The camera device faces the left side of the vehicle body frame.</p>
+     */
+    ACAMERA_AUTOMOTIVE_LENS_FACING_EXTERIOR_LEFT                     = 3,
+
+    /**
+     * <p>The camera device faces the right side of the vehicle body frame.</p>
+     */
+    ACAMERA_AUTOMOTIVE_LENS_FACING_EXTERIOR_RIGHT                    = 4,
+
+    /**
+     * <p>The camera device faces the inside of the vehicle body frame but not exactly
+     * one of seats described by this enum.  Applications should determine the exact
+     * facing direction from ACAMERA_LENS_POSE_ROTATION and ACAMERA_LENS_POSE_TRANSLATION.</p>
+     *
+     * @see ACAMERA_LENS_POSE_ROTATION
+     * @see ACAMERA_LENS_POSE_TRANSLATION
+     */
+    ACAMERA_AUTOMOTIVE_LENS_FACING_INTERIOR_OTHER                    = 5,
+
+    /**
+     * <p>The camera device faces the left side seat of the first row.</p>
+     */
+    ACAMERA_AUTOMOTIVE_LENS_FACING_INTERIOR_SEAT_ROW_1_LEFT          = 6,
+
+    /**
+     * <p>The camera device faces the center seat of the first row.</p>
+     */
+    ACAMERA_AUTOMOTIVE_LENS_FACING_INTERIOR_SEAT_ROW_1_CENTER        = 7,
+
+    /**
+     * <p>The camera device faces the right seat of the first row.</p>
+     */
+    ACAMERA_AUTOMOTIVE_LENS_FACING_INTERIOR_SEAT_ROW_1_RIGHT         = 8,
+
+    /**
+     * <p>The camera device faces the left side seat of the second row.</p>
+     */
+    ACAMERA_AUTOMOTIVE_LENS_FACING_INTERIOR_SEAT_ROW_2_LEFT          = 9,
+
+    /**
+     * <p>The camera device faces the center seat of the second row.</p>
+     */
+    ACAMERA_AUTOMOTIVE_LENS_FACING_INTERIOR_SEAT_ROW_2_CENTER        = 10,
+
+    /**
+     * <p>The camera device faces the right side seat of the second row.</p>
+     */
+    ACAMERA_AUTOMOTIVE_LENS_FACING_INTERIOR_SEAT_ROW_2_RIGHT         = 11,
+
+    /**
+     * <p>The camera device faces the left side seat of the third row.</p>
+     */
+    ACAMERA_AUTOMOTIVE_LENS_FACING_INTERIOR_SEAT_ROW_3_LEFT          = 12,
+
+    /**
+     * <p>The camera device faces the center seat of the third row.</p>
+     */
+    ACAMERA_AUTOMOTIVE_LENS_FACING_INTERIOR_SEAT_ROW_3_CENTER        = 13,
+
+    /**
+     * <p>The camera device faces the right seat of the third row.</p>
+     */
+    ACAMERA_AUTOMOTIVE_LENS_FACING_INTERIOR_SEAT_ROW_3_RIGHT         = 14,
+
+} acamera_metadata_enum_android_automotive_lens_facing_t;
 
 
 
