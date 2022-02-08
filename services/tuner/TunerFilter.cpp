@@ -337,6 +337,9 @@ TunerFilter::~TunerFilter() {
         }
     }
 
+    if (mFilterCallback != nullptr) {
+        mFilterCallback->detachCallbacks();
+    }
     auto res = mFilter->close();
     mFilter = nullptr;
     mStarted = false;
@@ -468,6 +471,12 @@ void TunerFilter::FilterCallback::detachSharedFilterCallback() {
         mTunerFilterCallback = mOriginalCallback;
         mOriginalCallback = nullptr;
     }
+}
+
+void TunerFilter::FilterCallback::detachCallbacks() {
+    Mutex::Autolock _l(mCallbackLock);
+    mOriginalCallback = nullptr;
+    mTunerFilterCallback = nullptr;
 }
 
 }  // namespace tuner

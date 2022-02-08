@@ -67,6 +67,7 @@ public:
         void sendSharedFilterStatus(int32_t status);
         void attachSharedFilterCallback(const shared_ptr<ITunerFilterCallback>& in_cb);
         void detachSharedFilterCallback();
+        void detachCallbacks();
 
     private:
         shared_ptr<ITunerFilterCallback> mTunerFilterCallback;
