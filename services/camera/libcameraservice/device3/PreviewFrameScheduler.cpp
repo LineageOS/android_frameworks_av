@@ -187,7 +187,7 @@ void PreviewFrameScheduler::onNewPresentationTime(const std::vector<nsecs_t>& ti
 
 status_t PreviewFrameScheduler::queueBufferToClientLocked(
         const BufferHolder& bufferHolder, nsecs_t timestamp) {
-    mParent.setTransform(bufferHolder.transform);
+    mParent.setTransform(bufferHolder.transform, true/*mayChangeMirror*/);
 
     status_t res = native_window_set_buffers_timestamp(mConsumer.get(), timestamp);
     if (res != OK) {

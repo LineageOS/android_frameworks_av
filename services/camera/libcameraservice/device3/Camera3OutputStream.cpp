@@ -47,7 +47,8 @@ Camera3OutputStream::Camera3OutputStream(int id,
         nsecs_t timestampOffset, const String8& physicalCameraId,
         const std::unordered_set<int32_t> &sensorPixelModesUsed,
         int setId, bool isMultiResolution, int dynamicRangeProfile,
-        int streamUseCase, bool deviceTimeBaseIsRealtime, int timestampBase) :
+        int streamUseCase, bool deviceTimeBaseIsRealtime, int timestampBase,
+        int mirrorMode) :
         Camera3IOStreamBase(id, CAMERA_STREAM_OUTPUT, width, height,
                             /*maxSize*/0, format, dataSpace, rotation,
                             physicalCameraId, sensorPixelModesUsed, setId, isMultiResolution,
@@ -60,6 +61,7 @@ Camera3OutputStream::Camera3OutputStream(int id,
         mTimestampOffset(timestampOffset),
         mConsumerUsage(0),
         mDropBuffers(false),
+        mMirrorMode(mirrorMode),
         mDequeueBufferLatency(kDequeueLatencyBinSize) {
 
     if (mConsumer == NULL) {
@@ -78,7 +80,8 @@ Camera3OutputStream::Camera3OutputStream(int id,
         nsecs_t timestampOffset, const String8& physicalCameraId,
         const std::unordered_set<int32_t> &sensorPixelModesUsed,
         int setId, bool isMultiResolution, int dynamicRangeProfile,
-        int streamUseCase, bool deviceTimeBaseIsRealtime, int timestampBase) :
+        int streamUseCase, bool deviceTimeBaseIsRealtime, int timestampBase,
+        int mirrorMode) :
         Camera3IOStreamBase(id, CAMERA_STREAM_OUTPUT, width, height, maxSize,
                             format, dataSpace, rotation, physicalCameraId, sensorPixelModesUsed,
                             setId, isMultiResolution, dynamicRangeProfile, streamUseCase,
@@ -90,6 +93,7 @@ Camera3OutputStream::Camera3OutputStream(int id,
         mTimestampOffset(timestampOffset),
         mConsumerUsage(0),
         mDropBuffers(false),
+        mMirrorMode(mirrorMode),
         mDequeueBufferLatency(kDequeueLatencyBinSize) {
 
     if (format != HAL_PIXEL_FORMAT_BLOB && format != HAL_PIXEL_FORMAT_RAW_OPAQUE) {
@@ -114,7 +118,8 @@ Camera3OutputStream::Camera3OutputStream(int id,
         const String8& physicalCameraId,
         const std::unordered_set<int32_t> &sensorPixelModesUsed,
         int setId, bool isMultiResolution, int dynamicRangeProfile,
-        int streamUseCase, bool deviceTimeBaseIsRealtime, int timestampBase) :
+        int streamUseCase, bool deviceTimeBaseIsRealtime, int timestampBase,
+        int mirrorMode) :
         Camera3IOStreamBase(id, CAMERA_STREAM_OUTPUT, width, height,
                             /*maxSize*/0, format, dataSpace, rotation,
                             physicalCameraId, sensorPixelModesUsed, setId, isMultiResolution,
@@ -127,6 +132,7 @@ Camera3OutputStream::Camera3OutputStream(int id,
         mTimestampOffset(timestampOffset),
         mConsumerUsage(consumerUsage),
         mDropBuffers(false),
+        mMirrorMode(mirrorMode),
         mDequeueBufferLatency(kDequeueLatencyBinSize) {
     // Deferred consumer only support preview surface format now.
     if (format != HAL_PIXEL_FORMAT_IMPLEMENTATION_DEFINED) {
@@ -158,7 +164,8 @@ Camera3OutputStream::Camera3OutputStream(int id, camera_stream_type_t type,
                                          uint64_t consumerUsage, nsecs_t timestampOffset,
                                          int setId, bool isMultiResolution,
                                          int dynamicRangeProfile, int streamUseCase,
-                                         bool deviceTimeBaseIsRealtime, int timestampBase) :
+                                         bool deviceTimeBaseIsRealtime, int timestampBase,
+                                         int mirrorMode) :
         Camera3IOStreamBase(id, type, width, height,
                             /*maxSize*/0,
                             format, dataSpace, rotation,
@@ -171,6 +178,7 @@ Camera3OutputStream::Camera3OutputStream(int id, camera_stream_type_t type,
         mTimestampOffset(timestampOffset),
         mConsumerUsage(consumerUsage),
         mDropBuffers(false),
+        mMirrorMode(mirrorMode),
         mDequeueBufferLatency(kDequeueLatencyBinSize) {
 
     bool needsReleaseNotify = setId > CAMERA3_STREAM_SET_ID_INVALID;
@@ -379,7 +387,7 @@ status_t Camera3OutputStream::returnBufferCheckedLocked(
                 return res;
             }
         } else {
-            setTransform(transform);
+            setTransform(transform, true/*mayChangeMirror*/);
             res = native_window_set_buffers_timestamp(mConsumer.get(), t);
             if (res != OK) {
                 ALOGE("%s: Stream %d: Error setting timestamp: %s (%d)",
@@ -426,9 +434,15 @@ void Camera3OutputStream::dump(int fd, const Vector<String16> &args) const {
         "      DequeueBuffer latency histogram:");
 }
 
-status_t Camera3OutputStream::setTransform(int transform) {
+status_t Camera3OutputStream::setTransform(int transform, bool mayChangeMirror) {
     ATRACE_CALL();
     Mutex::Autolock l(mLock);
+    if (mMirrorMode != OutputConfiguration::MIRROR_MODE_AUTO && mayChangeMirror) {
+        // If the mirroring mode is not AUTO, do not allow transform update
+        // which may change mirror.
+        return OK;
+    }
+
     return setTransformLocked(transform);
 }
 

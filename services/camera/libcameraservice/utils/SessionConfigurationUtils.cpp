@@ -334,7 +334,7 @@ binder::Status createSurfaceFromGbp(
         sp<Surface>& surface, const sp<IGraphicBufferProducer>& gbp,
         const String8 &logicalCameraId, const CameraMetadata &physicalCameraMetadata,
         const std::vector<int32_t> &sensorPixelModesUsed, int dynamicRangeProfile,
-        int streamUseCase, int timestampBase) {
+        int streamUseCase, int timestampBase, int mirrorMode) {
     // bufferProducer must be non-null
     if (gbp == nullptr) {
         String8 msg = String8::format("Camera %s: Surface is NULL", logicalCameraId.string());
@@ -461,6 +461,13 @@ binder::Status createSurfaceFromGbp(
         ALOGE("%s: %s", __FUNCTION__, msg.string());
         return STATUS_ERROR(CameraService::ERROR_ILLEGAL_ARGUMENT, msg.string());
     }
+    if (mirrorMode < OutputConfiguration::MIRROR_MODE_AUTO ||
+            mirrorMode > OutputConfiguration::MIRROR_MODE_V) {
+        String8 msg = String8::format("Camera %s: invalid mirroring mode %d",
+                logicalCameraId.string(), mirrorMode);
+        ALOGE("%s: %s", __FUNCTION__, msg.string());
+        return STATUS_ERROR(CameraService::ERROR_ILLEGAL_ARGUMENT, msg.string());
+    }
 
     if (!isStreamInfoValid) {
         streamInfo.width = width;
@@ -472,6 +479,7 @@ binder::Status createSurfaceFromGbp(
         streamInfo.dynamicRangeProfile = dynamicRangeProfile;
         streamInfo.streamUseCase = streamUseCase;
         streamInfo.timestampBase = timestampBase;
+        streamInfo.mirrorMode = mirrorMode;
         return binder::Status::ok();
     }
     if (width != streamInfo.width) {
@@ -706,6 +714,7 @@ convertToHALStreamCombination(
 
         int streamUseCase = it.getStreamUseCase();
         int timestampBase = it.getTimestampBase();
+        int mirrorMode = it.getMirrorMode();
         if (deferredConsumer) {
             streamInfo.width = it.getWidth();
             streamInfo.height = it.getHeight();
@@ -740,7 +749,7 @@ convertToHALStreamCombination(
             sp<Surface> surface;
             res = createSurfaceFromGbp(streamInfo, isStreamInfoValid, surface, bufferProducer,
                     logicalCameraId, metadataChosen, sensorPixelModesUsed, dynamicRangeProfile,
-                    streamUseCase, timestampBase);
+                    streamUseCase, timestampBase, mirrorMode);
 
             if (!res.isOk())
                 return res;
