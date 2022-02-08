@@ -334,7 +334,7 @@ binder::Status createSurfaceFromGbp(
         sp<Surface>& surface, const sp<IGraphicBufferProducer>& gbp,
         const String8 &logicalCameraId, const CameraMetadata &physicalCameraMetadata,
         const std::vector<int32_t> &sensorPixelModesUsed, int dynamicRangeProfile,
-        int streamUseCase) {
+        int streamUseCase, int timestampBase) {
     // bufferProducer must be non-null
     if (gbp == nullptr) {
         String8 msg = String8::format("Camera %s: Surface is NULL", logicalCameraId.string());
@@ -454,6 +454,13 @@ binder::Status createSurfaceFromGbp(
         ALOGE("%s: %s", __FUNCTION__, msg.string());
         return STATUS_ERROR(CameraService::ERROR_ILLEGAL_ARGUMENT, msg.string());
     }
+    if (timestampBase < OutputConfiguration::TIMESTAMP_BASE_DEFAULT ||
+            timestampBase > OutputConfiguration::TIMESTAMP_BASE_CHOREOGRAPHER_SYNCED) {
+        String8 msg = String8::format("Camera %s: invalid timestamp base %d",
+                logicalCameraId.string(), timestampBase);
+        ALOGE("%s: %s", __FUNCTION__, msg.string());
+        return STATUS_ERROR(CameraService::ERROR_ILLEGAL_ARGUMENT, msg.string());
+    }
 
     if (!isStreamInfoValid) {
         streamInfo.width = width;
@@ -464,6 +471,7 @@ binder::Status createSurfaceFromGbp(
         streamInfo.sensorPixelModesUsed = overriddenSensorPixelModes;
         streamInfo.dynamicRangeProfile = dynamicRangeProfile;
         streamInfo.streamUseCase = streamUseCase;
+        streamInfo.timestampBase = timestampBase;
         return binder::Status::ok();
     }
     if (width != streamInfo.width) {
@@ -697,6 +705,7 @@ convertToHALStreamCombination(
         }
 
         int streamUseCase = it.getStreamUseCase();
+        int timestampBase = it.getTimestampBase();
         if (deferredConsumer) {
             streamInfo.width = it.getWidth();
             streamInfo.height = it.getHeight();
@@ -731,7 +740,7 @@ convertToHALStreamCombination(
             sp<Surface> surface;
             res = createSurfaceFromGbp(streamInfo, isStreamInfoValid, surface, bufferProducer,
                     logicalCameraId, metadataChosen, sensorPixelModesUsed, dynamicRangeProfile,
-                    streamUseCase);
+                    streamUseCase, timestampBase);
 
             if (!res.isOk())
                 return res;

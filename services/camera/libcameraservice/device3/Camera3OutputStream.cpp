@@ -47,11 +47,12 @@ Camera3OutputStream::Camera3OutputStream(int id,
         nsecs_t timestampOffset, const String8& physicalCameraId,
         const std::unordered_set<int32_t> &sensorPixelModesUsed,
         int setId, bool isMultiResolution, int dynamicRangeProfile,
-        int streamUseCase) :
+        int streamUseCase, bool deviceTimeBaseIsRealtime, int timestampBase) :
         Camera3IOStreamBase(id, CAMERA_STREAM_OUTPUT, width, height,
                             /*maxSize*/0, format, dataSpace, rotation,
                             physicalCameraId, sensorPixelModesUsed, setId, isMultiResolution,
-                            dynamicRangeProfile, streamUseCase),
+                            dynamicRangeProfile, streamUseCase, deviceTimeBaseIsRealtime,
+                            timestampBase),
         mConsumer(consumer),
         mTransform(0),
         mTraceFirstBuffer(true),
@@ -77,14 +78,14 @@ Camera3OutputStream::Camera3OutputStream(int id,
         nsecs_t timestampOffset, const String8& physicalCameraId,
         const std::unordered_set<int32_t> &sensorPixelModesUsed,
         int setId, bool isMultiResolution, int dynamicRangeProfile,
-        int streamUseCase) :
+        int streamUseCase, bool deviceTimeBaseIsRealtime, int timestampBase) :
         Camera3IOStreamBase(id, CAMERA_STREAM_OUTPUT, width, height, maxSize,
                             format, dataSpace, rotation, physicalCameraId, sensorPixelModesUsed,
-                            setId, isMultiResolution, dynamicRangeProfile, streamUseCase),
+                            setId, isMultiResolution, dynamicRangeProfile, streamUseCase,
+                            deviceTimeBaseIsRealtime, timestampBase),
         mConsumer(consumer),
         mTransform(0),
         mTraceFirstBuffer(true),
-        mUseMonoTimestamp(false),
         mUseBufferManager(false),
         mTimestampOffset(timestampOffset),
         mConsumerUsage(0),
@@ -113,11 +114,12 @@ Camera3OutputStream::Camera3OutputStream(int id,
         const String8& physicalCameraId,
         const std::unordered_set<int32_t> &sensorPixelModesUsed,
         int setId, bool isMultiResolution, int dynamicRangeProfile,
-        int streamUseCase) :
+        int streamUseCase, bool deviceTimeBaseIsRealtime, int timestampBase) :
         Camera3IOStreamBase(id, CAMERA_STREAM_OUTPUT, width, height,
                             /*maxSize*/0, format, dataSpace, rotation,
                             physicalCameraId, sensorPixelModesUsed, setId, isMultiResolution,
-                            dynamicRangeProfile, streamUseCase),
+                            dynamicRangeProfile, streamUseCase, deviceTimeBaseIsRealtime,
+                            timestampBase),
         mConsumer(nullptr),
         mTransform(0),
         mTraceFirstBuffer(true),
@@ -152,18 +154,19 @@ Camera3OutputStream::Camera3OutputStream(int id, camera_stream_type_t type,
                                          android_dataspace dataSpace,
                                          camera_stream_rotation_t rotation,
                                          const String8& physicalCameraId,
-                                        const std::unordered_set<int32_t> &sensorPixelModesUsed,
+                                         const std::unordered_set<int32_t> &sensorPixelModesUsed,
                                          uint64_t consumerUsage, nsecs_t timestampOffset,
                                          int setId, bool isMultiResolution,
-                                         int dynamicRangeProfile, int streamUseCase) :
+                                         int dynamicRangeProfile, int streamUseCase,
+                                         bool deviceTimeBaseIsRealtime, int timestampBase) :
         Camera3IOStreamBase(id, type, width, height,
                             /*maxSize*/0,
                             format, dataSpace, rotation,
                             physicalCameraId, sensorPixelModesUsed, setId, isMultiResolution,
-                            dynamicRangeProfile, streamUseCase),
+                            dynamicRangeProfile, streamUseCase, deviceTimeBaseIsRealtime,
+                            timestampBase),
         mTransform(0),
         mTraceFirstBuffer(true),
-        mUseMonoTimestamp(false),
         mUseBufferManager(false),
         mTimestampOffset(timestampOffset),
         mConsumerUsage(consumerUsage),
@@ -365,13 +368,10 @@ status_t Camera3OutputStream::returnBufferCheckedLocked(
             dumpImageToDisk(timestamp, anwBuffer, anwReleaseFence);
         }
 
-        /* Certain consumers (such as AudioSource or HardwareComposer) use
-         * MONOTONIC time, causing time misalignment if camera timestamp is
-         * in BOOTTIME. Do the conversion if necessary. */
         nsecs_t t = mPreviewFrameScheduler != nullptr ? readoutTimestamp : timestamp;
-        nsecs_t adjustedTs = mUseMonoTimestamp ? t - mTimestampOffset : t;
+        t -= mTimestampOffset;
         if (mPreviewFrameScheduler != nullptr) {
-            res = mPreviewFrameScheduler->queuePreviewBuffer(adjustedTs, transform,
+            res = mPreviewFrameScheduler->queuePreviewBuffer(t, transform,
                     anwBuffer, anwReleaseFence);
             if (res != OK) {
                 ALOGE("%s: Stream %d: Error queuing buffer to preview buffer scheduler: %s (%d)",
@@ -380,7 +380,7 @@ status_t Camera3OutputStream::returnBufferCheckedLocked(
             }
         } else {
             setTransform(transform);
-            res = native_window_set_buffers_timestamp(mConsumer.get(), adjustedTs);
+            res = native_window_set_buffers_timestamp(mConsumer.get(), t);
             if (res != OK) {
                 ALOGE("%s: Stream %d: Error setting timestamp: %s (%d)",
                       __FUNCTION__, mId, strerror(-res), res);
@@ -572,10 +572,18 @@ status_t Camera3OutputStream::configureConsumerQueueLocked(bool allowPreviewSche
     }
 
     mTotalBufferCount = maxConsumerBuffers + camera_stream::max_buffers;
-    if (allowPreviewScheduler && isConsumedByHWComposer()) {
+
+    int timestampBase = getTimestampBase();
+    bool isDefaultTimeBase = (timestampBase ==
+            OutputConfiguration::TIMESTAMP_BASE_DEFAULT);
+    if (allowPreviewScheduler)  {
         // We cannot distinguish between a SurfaceView and an ImageReader of
         // preview buffer format. The PreviewFrameScheduler needs to handle both.
-        if (!property_get_bool("camera.disable_preview_scheduler", false)) {
+        bool forceChoreographer = (timestampBase ==
+                OutputConfiguration::TIMESTAMP_BASE_CHOREOGRAPHER_SYNCED);
+        bool defaultToChoreographer = (isDefaultTimeBase && isConsumedByHWComposer() &&
+                !property_get_bool("camera.disable_preview_scheduler", false));
+        if (forceChoreographer || defaultToChoreographer) {
             mPreviewFrameScheduler = std::make_unique<PreviewFrameScheduler>(*this, mConsumer);
             mTotalBufferCount += PreviewFrameScheduler::kQueueDepthWatermark;
         }
@@ -584,7 +592,27 @@ status_t Camera3OutputStream::configureConsumerQueueLocked(bool allowPreviewSche
     mHandoutTotalBufferCount = 0;
     mFrameCount = 0;
     mLastTimestamp = 0;
-    mUseMonoTimestamp = (isConsumedByHWComposer() || isVideoStream());
+
+    if (isDeviceTimeBaseRealtime()) {
+        if (isDefaultTimeBase && !isConsumedByHWComposer() && !isVideoStream()) {
+            // Default time base, but not hardware composer or video encoder
+            mTimestampOffset = 0;
+        } else if (timestampBase == OutputConfiguration::TIMESTAMP_BASE_REALTIME ||
+                timestampBase == OutputConfiguration::TIMESTAMP_BASE_SENSOR) {
+            mTimestampOffset = 0;
+        }
+        // If timestampBase is CHOREOGRAPHER SYNCED or MONOTONIC, leave
+        // timestamp offset as bootTime - monotonicTime.
+    } else {
+        if (timestampBase == OutputConfiguration::TIMESTAMP_BASE_REALTIME) {
+            // Reverse offset for monotonicTime -> bootTime
+            mTimestampOffset = -mTimestampOffset;
+        } else {
+            // If timestampBase is DEFAULT, MONOTONIC, SENSOR, or
+            // CHOREOGRAPHER_SYNCED, timestamp offset is 0.
+            mTimestampOffset = 0;
+        }
+    }
 
     res = native_window_set_buffer_count(mConsumer.get(),
             mTotalBufferCount);
