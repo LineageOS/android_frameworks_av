@@ -510,6 +510,9 @@ TunerHidlFilter::~TunerHidlFilter() {
         }
     }
 
+    if (mFilterCallback != nullptr) {
+        mFilterCallback->detachCallbacks();
+    }
     HidlResult res = mFilter->close();
     mFilter = nullptr;
     mFilter_1_1 = nullptr;
@@ -968,6 +971,12 @@ void TunerHidlFilter::FilterCallback::detachSharedFilterCallback() {
         mTunerFilterCallback = mOriginalCallback;
         mOriginalCallback = nullptr;
     }
+}
+
+void TunerHidlFilter::FilterCallback::detachCallbacks() {
+    Mutex::Autolock _l(mCallbackLock);
+    mOriginalCallback = nullptr;
+    mTunerFilterCallback = nullptr;
 }
 
 /////////////// FilterCallback Helper Methods ///////////////////////
