@@ -189,6 +189,13 @@ class StreamOutHalHidl : public StreamOutHalInterface, public StreamHalHidl {
     // Methods used by StreamCodecFormatCallback (HIDL).
     void onCodecFormatChanged(const std::basic_string<uint8_t>& metadataBs);
 
+    status_t setLatencyMode(audio_latency_mode_t mode) override;
+    status_t getRecommendedLatencyModes(std::vector<audio_latency_mode_t> *modes) override;
+    status_t setLatencyModeCallback(
+            const sp<StreamOutHalInterfaceLatencyModeCallback>& callback) override;
+
+    void onRecommendedLatencyModeChanged(const std::vector<audio_latency_mode_t>& modes);
+
   private:
     friend class DeviceHalHidl;
     typedef MessageQueue<WriteCommand, hardware::kSynchronizedReadWrite> CommandMQ;
@@ -197,6 +204,8 @@ class StreamOutHalHidl : public StreamOutHalInterface, public StreamHalHidl {
 
     mediautils::atomic_wp<StreamOutHalInterfaceCallback> mCallback;
     mediautils::atomic_wp<StreamOutHalInterfaceEventCallback> mEventCallback;
+    mediautils::atomic_wp<StreamOutHalInterfaceLatencyModeCallback> mLatencyModeCallback;
+
     const sp<::android::hardware::audio::CPP_VERSION::IStreamOut> mStream;
     std::unique_ptr<CommandMQ> mCommandMQ;
     std::unique_ptr<DataMQ> mDataMQ;
