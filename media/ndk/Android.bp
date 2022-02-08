@@ -177,10 +177,6 @@ cc_library {
         "NdkMediaDataSourceCallbacks.cpp",
     ],
 
-    include_dirs: [
-        "frameworks/av/media/libstagefright/include",
-        "frameworks/av/media/ndk/include",
-    ],
 
     export_include_dirs: [
         "include",
@@ -193,6 +189,7 @@ cc_library {
     ],
 
     header_libs: [
+        "libstagefright_headers",
         "libmedia_headers",
     ],
 
@@ -223,15 +220,13 @@ cc_test {
         "libcutils",
         "android.hardware.graphics.bufferqueue@1.0",
     ],
+
     header_libs: [
         "libstagefright_foundation_headers",
     ],
 
     cflags: [
         "-D__ANDROID_VNDK__",
-    ],
-    include_dirs: [
-        "frameworks/av/media/ndk/",
     ],
 }
 
