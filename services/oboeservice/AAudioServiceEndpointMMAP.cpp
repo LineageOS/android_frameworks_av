@@ -186,7 +186,8 @@ aaudio_result_t AAudioServiceEndpointMMAP::openWithFormat(audio_format_t audioFo
     ALOGD("%s() deviceId = %d, sessionId = %d", __func__, getDeviceId(), getSessionId());
 
     // Create MMAP/NOIRQ buffer.
-    if (createMmapBuffer(&mAudioDataFileDescriptor) != AAUDIO_OK) {
+    result = createMmapBuffer(&mAudioDataFileDescriptor);
+    if (result != AAUDIO_OK) {
         goto error;
     }
 
