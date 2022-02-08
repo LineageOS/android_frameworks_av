@@ -40,11 +40,17 @@ inline ::aidl::android::hardware::drm::Status toMockStatus(
     }
 }
 
-inline ::ndk::ScopedAStatus toNdkScopedAStatus(::aidl::android::hardware::drm::Status status) {
+inline ::ndk::ScopedAStatus toNdkScopedAStatus(::aidl::android::hardware::drm::Status status,
+                                               const char* msg = nullptr) {
     if (Status::OK == status) {
         return ::ndk::ScopedAStatus::ok();
     } else {
-        return ::ndk::ScopedAStatus::fromServiceSpecificError(static_cast<int32_t>(status));
+        auto err = static_cast<int32_t>(status);
+        if (msg) {
+            return ::ndk::ScopedAStatus::fromServiceSpecificErrorWithMessage(err, msg);
+        } else {
+            return ::ndk::ScopedAStatus::fromServiceSpecificError(err);
+        }
     }
 }
 

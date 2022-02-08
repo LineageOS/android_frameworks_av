@@ -114,8 +114,6 @@ struct DrmPlugin : public BnDrmPlugin {
     ::ndk::ScopedAStatus requiresSecureDecoder(
             const std::string& in_mime, ::aidl::android::hardware::drm::SecurityLevel in_level,
             bool* _aidl_return) override;
-    ::ndk::ScopedAStatus requiresSecureDecoderDefault(const std::string& in_mime,
-                                                      bool* _aidl_return) override;
     ::ndk::ScopedAStatus restoreKeys(
             const std::vector<uint8_t>& in_sessionId,
             const ::aidl::android::hardware::drm::KeySetId& in_keySetId) override;

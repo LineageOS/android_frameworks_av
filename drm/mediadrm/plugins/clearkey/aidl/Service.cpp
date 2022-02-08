@@ -26,9 +26,7 @@
 using ::android::base::InitLogging;
 using ::android::base::LogdLogger;
 
-using ::aidl::android::hardware::drm::clearkey::createCryptoFactory;
 using ::aidl::android::hardware::drm::clearkey::createDrmFactory;
-using ::aidl::android::hardware::drm::clearkey::CryptoFactory;
 using ::aidl::android::hardware::drm::clearkey::DrmFactory;
 
 int main(int /*argc*/, char* argv[]) {
@@ -40,11 +38,6 @@ int main(int /*argc*/, char* argv[]) {
     const std::string drmInstance = std::string() + DrmFactory::descriptor + "/clearkey";
     binder_status_t status =
             AServiceManager_addService(drmFactory->asBinder().get(), drmInstance.c_str());
-    CHECK(status == STATUS_OK);
-
-    std::shared_ptr<CryptoFactory> cryptoFactory = createCryptoFactory();
-    const std::string cryptoInstance = std::string() + CryptoFactory::descriptor + "/clearkey";
-    status = AServiceManager_addService(cryptoFactory->asBinder().get(), cryptoInstance.c_str());
     CHECK(status == STATUS_OK);
 
     ABinderProcess_joinThreadPool();

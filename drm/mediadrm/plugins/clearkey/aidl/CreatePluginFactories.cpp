@@ -25,10 +25,6 @@ std::shared_ptr<DrmFactory> createDrmFactory() {
   return ::ndk::SharedRefBase::make<DrmFactory>();
 }
 
-std::shared_ptr<CryptoFactory> createCryptoFactory() {
-    return ::ndk::SharedRefBase::make<CryptoFactory>();
-}
-
 }  // namespace clearkey
 }  // namespace drm
 }  // namespace hardware

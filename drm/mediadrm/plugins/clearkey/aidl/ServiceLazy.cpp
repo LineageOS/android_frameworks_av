@@ -24,29 +24,20 @@
 #include <android/binder_process.h>
 
 using ::android::base::InitLogging;
-using ::android::base::StderrLogger;
+using ::android::base::LogdLogger;
 
-using ::aidl::android::hardware::drm::clearkey::createCryptoFactory;
 using ::aidl::android::hardware::drm::clearkey::createDrmFactory;
-using ::aidl::android::hardware::drm::clearkey::CryptoFactory;
 using ::aidl::android::hardware::drm::clearkey::DrmFactory;
 
 int main(int /*argc*/, char* argv[]) {
-    InitLogging(argv, StderrLogger);
+    InitLogging(argv, LogdLogger());
     ::android::base::SetMinimumLogSeverity(::android::base::VERBOSE);
     ABinderProcess_setThreadPoolMaxThreadCount(8);
 
-    binder_status_t status{};
     std::shared_ptr<DrmFactory> drmFactory = createDrmFactory();
     const std::string drmInstance = std::string() + DrmFactory::descriptor + "/clearkey";
-    status = AServiceManager_registerLazyService(drmFactory->asBinder().get(),
-                                                 drmInstance.c_str());
-    CHECK(status == STATUS_OK);
-
-    std::shared_ptr<CryptoFactory> cryptoFactory = createCryptoFactory();
-    const std::string cryptoInstance = std::string() + CryptoFactory::descriptor + "/clearkey";
-    status = AServiceManager_registerLazyService(cryptoFactory->asBinder().get(),
-                                                 cryptoInstance.c_str());
+    binder_status_t status =
+            AServiceManager_registerLazyService(drmFactory->asBinder().get(), drmInstance.c_str());
     CHECK(status == STATUS_OK);
 
     ABinderProcess_joinThreadPool();

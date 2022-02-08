@@ -15,7 +15,6 @@
  */
 #pragma once
 
-#include "CryptoFactory.h"
 #include "DrmFactory.h"
 
 namespace aidl {
@@ -23,10 +22,8 @@ namespace android {
 namespace hardware {
 namespace drm {
 namespace clearkey {
-//extern "C" {
+
 std::shared_ptr<DrmFactory> createDrmFactory();
-std::shared_ptr<CryptoFactory> createCryptoFactory();
-//}
 
 }  // namespace clearkey
 }  // namespace drm

@@ -583,7 +583,7 @@ void DrmPlugin::installSecureStop(const std::vector<uint8_t>& sessionId) {
 
         std::vector<uint8_t> keyId3 = {0x0, 0x1, 0x2};
         keyStatus.keyId = keyId3;
-        keyStatus.type = KeyStatusType::USABLEINFUTURE;
+        keyStatus.type = KeyStatusType::USABLE_IN_FUTURE;
         keysStatus.push_back(keyStatus);
 
         sendKeysChange(sessionId, keysStatus, true);
@@ -760,15 +760,6 @@ void DrmPlugin::installSecureStop(const std::vector<uint8_t>& sessionId) {
         bool* _aidl_return) {
     UNUSED(in_mime);
     UNUSED(in_level);
-    *_aidl_return = false;
-    return ::ndk::ScopedAStatus::ok();
-}
-
-::ndk::ScopedAStatus DrmPlugin::requiresSecureDecoderDefault(const std::string& in_mime,
-                                                             bool* _aidl_return) {
-    UNUSED(in_mime);
-    // Clearkey only supports SW_SECURE_CRYPTO, so we always returns false
-    // regardless of mime type.
     *_aidl_return = false;
     return ::ndk::ScopedAStatus::ok();
 }
