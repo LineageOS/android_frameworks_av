@@ -271,6 +271,32 @@ bool StreamHalHidl::requestHalThreadPriority(pid_t threadPid, pid_t threadId) {
     return err == 0;
 }
 
+status_t StreamHalHidl::legacyCreateAudioPatch(const struct audio_port_config& port,
+                                               std::optional<audio_source_t> source,
+                                               audio_devices_t type) {
+    LOG_ALWAYS_FATAL_IF(port.type != AUDIO_PORT_TYPE_DEVICE, "port type must be device");
+    char* address;
+    if (strcmp(port.ext.device.address, "") != 0) {
+        // FIXME: we only support address on first sink with HAL version < 3.0
+        address = audio_device_address_to_parameter(port.ext.device.type, port.ext.device.address);
+    } else {
+        address = (char*)calloc(1, 1);
+    }
+    AudioParameter param = AudioParameter(String8(address));
+    free(address);
+    param.addInt(String8(AudioParameter::keyRouting), (int)type);
+    if (source.has_value()) {
+        param.addInt(String8(AudioParameter::keyInputSource), (int)source.value());
+    }
+    return setParameters(param.toString());
+}
+
+status_t StreamHalHidl::legacyReleaseAudioPatch() {
+    AudioParameter param;
+    param.addInt(String8(AudioParameter::keyRouting), 0);
+    return setParameters(param.toString());
+}
+
 namespace {
 
 /* Notes on callback ownership.
@@ -905,6 +931,11 @@ void StreamOutHalHidl::onRecommendedLatencyModeChanged(
     callback->onRecommendedLatencyModeChanged(modes);
 }
 
+status_t StreamOutHalHidl::exit() {
+    // FIXME this is using hard-coded strings but in the future, this functionality will be
+    //       converted to use audio HAL extensions required to support tunneling
+    return setParameters(String8("exiting=1"));
+}
 
 StreamInHalHidl::StreamInHalHidl(
         const sp<::android::hardware::audio::CORE_TYPES_CPP_VERSION::IStreamIn>& stream)
