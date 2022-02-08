@@ -558,6 +558,7 @@ void ARTPConnection::onPollStreams() {
                 if (n != (ssize_t)buffer->size()) {
                     ALOGW("failed to send RTCP receiver report (%s).",
                             n >= 0 ? "connection gone" : strerror(errno));
+                    ++it;
                     continue;
                 }
 
