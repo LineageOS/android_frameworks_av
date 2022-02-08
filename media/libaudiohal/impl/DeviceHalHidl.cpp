@@ -512,6 +512,18 @@ status_t DeviceHalHidl::setConnectedState(const struct audio_port_v7 *port, bool
     return processReturn("setConnectedState", mDevice->setConnectedState(hidlAddress, connected));
 }
 
+error::Result<audio_hw_sync_t> DeviceHalHidl::getHwAvSync() {
+    if (mDevice == 0) return NO_INIT;
+    audio_hw_sync_t value;
+    Result result;
+    Return<void> ret = mDevice->getHwAvSync([&value, &result](Result r, audio_hw_sync_t v) {
+        value = v;
+        result = r;
+    });
+    RETURN_IF_ERROR(processReturn("getHwAvSync", ret, result));
+    return value;
+}
+
 status_t DeviceHalHidl::dump(int fd, const Vector<String16>& args) {
     if (mDevice == 0) return NO_INIT;
     native_handle_t* hidlHandle = native_handle_create(1, 0);
