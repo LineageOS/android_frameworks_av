@@ -17,6 +17,7 @@
 //#define LOG_NDEBUG 0
 #define LOG_TAG "DrmUtils"
 
+#include <android/binder_manager.h>
 #include <android/hardware/drm/1.0/ICryptoFactory.h>
 #include <android/hardware/drm/1.0/ICryptoPlugin.h>
 #include <android/hardware/drm/1.0/IDrmFactory.h>
@@ -167,6 +168,27 @@ sp<::V1_0::ICryptoPlugin> MakeCryptoPlugin(const sp<::V1_0::ICryptoFactory>& fac
 
 bool UseDrmService() {
     return property_get_bool("mediadrm.use_mediadrmserver", true);
+}
+
+std::vector<std::shared_ptr<IDrmFactoryAidl>> makeDrmFactoriesAidl() {
+    std::vector<std::shared_ptr<IDrmFactoryAidl>> factories;
+    AServiceManager_forEachDeclaredInstance(
+        IDrmFactoryAidl::descriptor, static_cast<void*>(&factories),
+        [](const char* instance, void* context) {
+            auto fullName = std::string(IDrmFactoryAidl::descriptor) + "/" + std::string(instance);
+            auto factory = IDrmFactoryAidl::fromBinder(
+                    ::ndk::SpAIBinder(AServiceManager_getService(fullName.c_str())));
+            if (factory == nullptr) {
+                ALOGE("not found IDrmFactory. Instance name:[%s]", fullName.c_str());
+                return;
+            }
+
+            ALOGI("found IDrmFactory. Instance name:[%s]", fullName.c_str());
+            static_cast<std::vector<std::shared_ptr<IDrmFactoryAidl>>*>(context)->emplace_back(
+                    factory);
+        });
+
+    return factories;
 }
 
 sp<IDrm> MakeDrm(status_t* pstatus) {

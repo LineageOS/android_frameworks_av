@@ -119,16 +119,16 @@ void DrmHalListener::setListener(sp<IDrmClient> listener) {
                 case KeyStatusType::EXPIRED:
                     type = DrmPlugin::kKeyStatusType_Expired;
                     break;
-                case KeyStatusType::OUTPUTNOTALLOWED:
+                case KeyStatusType::OUTPUT_NOT_ALLOWED:
                     type = DrmPlugin::kKeyStatusType_OutputNotAllowed;
                     break;
-                case KeyStatusType::STATUSPENDING:
+                case KeyStatusType::STATUS_PENDING:
                     type = DrmPlugin::kKeyStatusType_StatusPending;
                     break;
-                case KeyStatusType::USABLEINFUTURE:
+                case KeyStatusType::USABLE_IN_FUTURE:
                     type = DrmPlugin::kKeyStatusType_UsableInFuture;
                     break;
-                case KeyStatusType::INTERNALERROR:
+                case KeyStatusType::INTERNAL_ERROR:
                 default:
                     type = DrmPlugin::kKeyStatusType_InternalError;
                     break;
