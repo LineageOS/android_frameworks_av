@@ -175,7 +175,7 @@ void DrmPlugin::installSecureStop(const std::vector<uint8_t>& sessionId) {
     UNUSED(in_optionalParameters);
 
     KeyRequestType keyRequestType = KeyRequestType::UNKNOWN;
-    std::string defaultUrl("");
+    std::string defaultUrl("https://default.url");
 
     _aidl_return->request = {};
     _aidl_return->requestType = keyRequestType;

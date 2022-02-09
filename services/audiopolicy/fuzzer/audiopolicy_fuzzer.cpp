@@ -127,13 +127,20 @@ static const std::vector<audio_usage_t> kAudioUsages = [] {
     return result;
 }();
 
+/**
+ * AudioSource - AUDIO_SOURCE_VOICE_COMMUNICATION and AUDIO_SOURCE_HOTWORD
+ * are excluded from kAudioSources[] in order to avoid the abort triggered
+ * for these two types of AudioSource in Engine::getDeviceForInputSource()
+ */
 static const std::vector<audio_source_t> kAudioSources = [] {
     std::vector<audio_source_t> result;
     for (const auto enumVal : xsdc_enum_range<xsd::AudioSource>{}) {
         audio_source_t audioSourceHal;
         std::string audioSource = toString(enumVal);
-        if (audio_source_from_string(audioSource.c_str(), &audioSourceHal)) {
-            result.push_back(audioSourceHal);
+        if (enumVal != xsd::AudioSource::AUDIO_SOURCE_VOICE_COMMUNICATION &&
+            enumVal != xsd::AudioSource::AUDIO_SOURCE_HOTWORD &&
+            audio_source_from_string(audioSource.c_str(), &audioSourceHal)) {
+          result.push_back(audioSourceHal);
         }
     }
     return result;
