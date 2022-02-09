@@ -183,7 +183,9 @@ aaudio_result_t AAudioServiceEndpointMMAP::openWithFormat(audio_format_t audioFo
             ? AAUDIO_SESSION_ID_NONE
             : (aaudio_session_id_t) sessionId;
     setSessionId(actualSessionId);
-    ALOGD("%s() deviceId = %d, sessionId = %d", __func__, getDeviceId(), getSessionId());
+
+    ALOGD("%s(format = 0x%X) deviceId = %d, sessionId = %d",
+          __func__, audioFormat, getDeviceId(), getSessionId());
 
     // Create MMAP/NOIRQ buffer.
     result = createMmapBuffer(&mAudioDataFileDescriptor);
@@ -207,12 +209,13 @@ aaudio_result_t AAudioServiceEndpointMMAP::openWithFormat(audio_format_t audioFo
     mTimestampGracePeriodMs = ((int64_t) kTimestampGraceBurstCount * mFramesPerBurst
             * AAUDIO_MILLIS_PER_SECOND) / getSampleRate();
 
-    ALOGD("%s() actual rate = %d, channels = %d channelMask = %#x, deviceId = %d, capacity = %d\n",
+    ALOGD("%s() got rate = %d, channels = %d channelMask = %#x, deviceId = %d, capacity = %d\n",
           __func__, getSampleRate(), getSamplesPerFrame(), getChannelMask(),
           deviceId, getBufferCapacity());
 
-    ALOGD("%s() format = 0x%08x, frame size = %d, burst size = %d",
-          __func__, getFormat(), calculateBytesPerFrame(), mFramesPerBurst);
+    ALOGD("%s() got format = 0x%X = %s, frame size = %d, burst size = %d",
+          __func__, getFormat(), audio_format_to_string(getFormat()),
+          calculateBytesPerFrame(), mFramesPerBurst);
 
     return result;
 
