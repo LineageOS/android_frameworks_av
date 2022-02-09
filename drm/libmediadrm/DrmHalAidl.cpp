@@ -28,7 +28,7 @@
 #include <mediadrm/DrmSessionManager.h>
 #include <mediadrm/DrmUtils.h>
 
-using ::android::DrmUtils::toStatusTAidl;
+using ::android::DrmUtils::statusAidlToStatusT;
 
 using ::aidl::android::hardware::drm::DrmMetricNamedValue;
 using ::aidl::android::hardware::drm::DrmMetricValue;
@@ -511,7 +511,7 @@ status_t DrmHalAidl::openSession(DrmPlugin::SecurityLevel level, Vector<uint8_t>
 
         ::ndk::ScopedAStatus status = mPlugin->openSession(aSecurityLevel, &aSessionId);
         if (status.isOk()) sessionId = toVector(aSessionId);
-        err = status.isOk() ? toStatusTAidl(status.getServiceSpecificError()) : DEAD_OBJECT;
+        err = statusAidlToStatusT(status);
 
         if (err == ERROR_DRM_RESOURCE_BUSY && retry) {
             mLock.unlock();
@@ -545,6 +545,7 @@ status_t DrmHalAidl::closeSession(Vector<uint8_t> const& sessionId) {
 
     std::vector<uint8_t> sessionIdAidl = toStdVec(sessionId);
     ::ndk::ScopedAStatus status = mPlugin->closeSession(sessionIdAidl);
+    status_t response = statusAidlToStatusT(status);
     if (status.isOk()) {
         DrmSessionManager::Instance()->removeSession(sessionId);
         for (auto i = mOpenSessions.begin(); i != mOpenSessions.end(); i++) {
@@ -554,14 +555,11 @@ status_t DrmHalAidl::closeSession(Vector<uint8_t> const& sessionId) {
             }
         }
 
-        status_t response = toStatusTAidl(status.getServiceSpecificError());
         mMetrics.SetSessionEnd(sessionId);
-        mMetrics.mCloseSessionCounter.Increment(response);
-        return response;
     }
 
-    mMetrics.mCloseSessionCounter.Increment(DEAD_OBJECT);
-    return DEAD_OBJECT;
+    mMetrics.mCloseSessionCounter.Increment(response);
+    return response;
 }
 
 status_t DrmHalAidl::getKeyRequest(Vector<uint8_t> const& sessionId,
@@ -603,7 +601,7 @@ status_t DrmHalAidl::getKeyRequest(Vector<uint8_t> const& sessionId,
         *keyRequestType = toKeyRequestType(keyRequest.requestType);
     }
 
-    err = status.isOk() ? toStatusTAidl(status.getServiceSpecificError()) : DEAD_OBJECT;
+    err = statusAidlToStatusT(status);
     keyRequestTimer.SetAttribute(err);
     return err;
 }
@@ -626,7 +624,7 @@ status_t DrmHalAidl::provideKeyResponse(Vector<uint8_t> const& sessionId,
             mPlugin->provideKeyResponse(sessionIdAidl, responseAidl, &keySetIdsAidl);
 
     if (status.isOk()) keySetId = toVector(keySetIdsAidl.keySetId);
-    err = status.isOk() ? toStatusTAidl(status.getServiceSpecificError()) : DEAD_OBJECT;
+    err = statusAidlToStatusT(status);
     keyResponseTimer.SetAttribute(err);
     return err;
 }
@@ -636,7 +634,7 @@ status_t DrmHalAidl::removeKeys(Vector<uint8_t> const& keySetId) {
     INIT_CHECK();
 
     ::ndk::ScopedAStatus status = mPlugin->removeKeys(toStdVec(keySetId));
-    return status.isOk() ? toStatusTAidl(status.getServiceSpecificError()) : DEAD_OBJECT;
+    return statusAidlToStatusT(status);
 }
 
 status_t DrmHalAidl::restoreKeys(Vector<uint8_t> const& sessionId,
@@ -649,7 +647,7 @@ status_t DrmHalAidl::restoreKeys(Vector<uint8_t> const& sessionId,
     KeySetId keySetIdsAidl;
     keySetIdsAidl.keySetId = toStdVec(keySetId);
     ::ndk::ScopedAStatus status = mPlugin->restoreKeys(toStdVec(sessionId), keySetIdsAidl);
-    return status.isOk() ? toStatusTAidl(status.getServiceSpecificError()) : DEAD_OBJECT;
+    return statusAidlToStatusT(status);
 }
 
 status_t DrmHalAidl::queryKeyStatus(Vector<uint8_t> const& sessionId,
@@ -664,7 +662,7 @@ status_t DrmHalAidl::queryKeyStatus(Vector<uint8_t> const& sessionId,
 
     infoMap = toKeyedVector(infoMapAidl);
 
-    return status.isOk() ? toStatusTAidl(status.getServiceSpecificError()) : DEAD_OBJECT;
+    return statusAidlToStatusT(status);
 }
 
 status_t DrmHalAidl::getProvisionRequest(String8 const& certType, String8 const& certAuthority,
@@ -681,7 +679,7 @@ status_t DrmHalAidl::getProvisionRequest(String8 const& certType, String8 const&
     request = toVector(requestAidl.request);
     defaultUrl = toString8(requestAidl.defaultUrl);
 
-    err = status.isOk() ? toStatusTAidl(status.getServiceSpecificError()) : DEAD_OBJECT;
+    err = statusAidlToStatusT(status);
     mMetrics.mGetProvisionRequestCounter.Increment(err);
     return err;
 }
@@ -698,7 +696,7 @@ status_t DrmHalAidl::provideProvisionResponse(Vector<uint8_t> const& response,
 
     certificate = toVector(result.certificate);
     wrappedKey = toVector(result.wrappedKey);
-    err = status.isOk() ? toStatusTAidl(status.getServiceSpecificError()) : DEAD_OBJECT;
+    err = statusAidlToStatusT(status);
     mMetrics.mProvideProvisionResponseCounter.Increment(err);
     return err;
 }
@@ -712,7 +710,7 @@ status_t DrmHalAidl::getSecureStops(List<Vector<uint8_t>>& secureStops) {
 
     secureStops = toSecureStops(result);
 
-    return status.isOk() ? toStatusTAidl(status.getServiceSpecificError()) : DEAD_OBJECT;
+    return statusAidlToStatusT(status);
 }
 
 status_t DrmHalAidl::getSecureStopIds(List<Vector<uint8_t>>& secureStopIds) {
@@ -724,7 +722,7 @@ status_t DrmHalAidl::getSecureStopIds(List<Vector<uint8_t>>& secureStopIds) {
 
     secureStopIds = toSecureStopIds(result);
 
-    return status.isOk() ? toStatusTAidl(status.getServiceSpecificError()) : DEAD_OBJECT;
+    return statusAidlToStatusT(status);
 }
 
 status_t DrmHalAidl::getSecureStop(Vector<uint8_t> const& ssid, Vector<uint8_t>& secureStop) {
@@ -739,7 +737,7 @@ status_t DrmHalAidl::getSecureStop(Vector<uint8_t> const& ssid, Vector<uint8_t>&
 
     secureStop = toVector(result.opaqueData);
 
-    return status.isOk() ? toStatusTAidl(status.getServiceSpecificError()) : DEAD_OBJECT;
+    return statusAidlToStatusT(status);
 }
 
 status_t DrmHalAidl::releaseSecureStops(Vector<uint8_t> const& ssRelease) {
@@ -750,7 +748,7 @@ status_t DrmHalAidl::releaseSecureStops(Vector<uint8_t> const& ssRelease) {
     ssId.opaqueData = toStdVec(ssRelease);
     ::ndk::ScopedAStatus status = mPlugin->releaseSecureStops(ssId);
 
-    return status.isOk() ? toStatusTAidl(status.getServiceSpecificError()) : DEAD_OBJECT;
+    return statusAidlToStatusT(status);
 }
 
 status_t DrmHalAidl::removeSecureStop(Vector<uint8_t> const& ssid) {
@@ -761,7 +759,7 @@ status_t DrmHalAidl::removeSecureStop(Vector<uint8_t> const& ssid) {
     SecureStopId ssidAidl;
     ssidAidl.secureStopId = toStdVec(ssid);
     ::ndk::ScopedAStatus status = mPlugin->removeSecureStop(ssidAidl);
-    return status.isOk() ? toStatusTAidl(status.getServiceSpecificError()) : DEAD_OBJECT;
+    return statusAidlToStatusT(status);
 }
 
 status_t DrmHalAidl::removeAllSecureStops() {
@@ -769,7 +767,7 @@ status_t DrmHalAidl::removeAllSecureStops() {
     INIT_CHECK();
 
     ::ndk::ScopedAStatus status = mPlugin->releaseAllSecureStops();
-    return status.isOk() ? toStatusTAidl(status.getServiceSpecificError()) : DEAD_OBJECT;
+    return statusAidlToStatusT(status);
 }
 
 status_t DrmHalAidl::getHdcpLevels(DrmPlugin::HdcpLevel* connected,
@@ -790,7 +788,7 @@ status_t DrmHalAidl::getHdcpLevels(DrmPlugin::HdcpLevel* connected,
     *connected = toHdcpLevel(lvlsAidl.connectedLevel);
     *max = toHdcpLevel(lvlsAidl.maxLevel);
 
-    return status.isOk() ? toStatusTAidl(status.getServiceSpecificError()) : DEAD_OBJECT;
+    return statusAidlToStatusT(status);
 }
 
 status_t DrmHalAidl::getNumberOfSessions(uint32_t* open, uint32_t* max) const {
@@ -810,7 +808,7 @@ status_t DrmHalAidl::getNumberOfSessions(uint32_t* open, uint32_t* max) const {
     *open = result.currentSessions;
     *max = result.maxSessions;
 
-    return status.isOk() ? toStatusTAidl(status.getServiceSpecificError()) : DEAD_OBJECT;
+    return statusAidlToStatusT(status);
 }
 
 status_t DrmHalAidl::getSecurityLevel(Vector<uint8_t> const& sessionId,
@@ -829,7 +827,7 @@ status_t DrmHalAidl::getSecurityLevel(Vector<uint8_t> const& sessionId,
 
     *level = toSecurityLevel(result);
 
-    return status.isOk() ? toStatusTAidl(status.getServiceSpecificError()) : DEAD_OBJECT;
+    return statusAidlToStatusT(status);
 }
 
 status_t DrmHalAidl::getOfflineLicenseKeySetIds(List<Vector<uint8_t>>& keySetIds) const {
@@ -841,7 +839,7 @@ status_t DrmHalAidl::getOfflineLicenseKeySetIds(List<Vector<uint8_t>>& keySetIds
 
     keySetIds = toKeySetIds(result);
 
-    return status.isOk() ? toStatusTAidl(status.getServiceSpecificError()) : DEAD_OBJECT;
+    return statusAidlToStatusT(status);
 }
 
 status_t DrmHalAidl::removeOfflineLicense(Vector<uint8_t> const& keySetId) {
@@ -851,7 +849,7 @@ status_t DrmHalAidl::removeOfflineLicense(Vector<uint8_t> const& keySetId) {
     KeySetId keySetIdAidl;
     keySetIdAidl.keySetId = toStdVec(keySetId);
     ::ndk::ScopedAStatus status = mPlugin->removeOfflineLicense(keySetIdAidl);
-    return status.isOk() ? toStatusTAidl(status.getServiceSpecificError()) : DEAD_OBJECT;
+    return statusAidlToStatusT(status);
 }
 
 status_t DrmHalAidl::getOfflineLicenseState(Vector<uint8_t> const& keySetId,
@@ -869,7 +867,7 @@ status_t DrmHalAidl::getOfflineLicenseState(Vector<uint8_t> const& keySetId,
 
     *licenseState = toOfflineLicenseState(result);
 
-    return status.isOk() ? toStatusTAidl(status.getServiceSpecificError()) : DEAD_OBJECT;
+    return statusAidlToStatusT(status);
 }
 
 status_t DrmHalAidl::getPropertyString(String8 const& name, String8& value) const {
@@ -887,7 +885,7 @@ status_t DrmHalAidl::getPropertyStringInternal(String8 const& name, String8& val
 
     value = toString8(result);
 
-    return status.isOk() ? toStatusTAidl(status.getServiceSpecificError()) : DEAD_OBJECT;
+    return statusAidlToStatusT(status);
 }
 
 status_t DrmHalAidl::getPropertyByteArray(String8 const& name, Vector<uint8_t>& value) const {
@@ -907,7 +905,7 @@ status_t DrmHalAidl::getPropertyByteArrayInternal(String8 const& name,
     ::ndk::ScopedAStatus status = mPlugin->getPropertyByteArray(toStdString(name), &result);
 
     value = toVector(result);
-    err = status.isOk() ? toStatusTAidl(status.getServiceSpecificError()) : DEAD_OBJECT;
+    err = statusAidlToStatusT(status);
     if (name == kPropertyDeviceUniqueId) {
         mMetrics.mGetDeviceUniqueIdCounter.Increment(err);
     }
@@ -919,7 +917,7 @@ status_t DrmHalAidl::setPropertyString(String8 const& name, String8 const& value
     INIT_CHECK();
 
     ::ndk::ScopedAStatus status = mPlugin->setPropertyString(toStdString(name), toStdString(value));
-    return status.isOk() ? toStatusTAidl(status.getServiceSpecificError()) : DEAD_OBJECT;
+    return statusAidlToStatusT(status);
 }
 
 status_t DrmHalAidl::setPropertyByteArray(String8 const& name, Vector<uint8_t> const& value) const {
@@ -927,7 +925,7 @@ status_t DrmHalAidl::setPropertyByteArray(String8 const& name, Vector<uint8_t> c
     INIT_CHECK();
 
     ::ndk::ScopedAStatus status = mPlugin->setPropertyByteArray(toStdString(name), toStdVec(value));
-    return status.isOk() ? toStatusTAidl(status.getServiceSpecificError()) : DEAD_OBJECT;
+    return statusAidlToStatusT(status);
 }
 
 status_t DrmHalAidl::getMetrics(const sp<IDrmMetricsConsumer>& consumer) {
@@ -963,7 +961,7 @@ status_t DrmHalAidl::getMetrics(const sp<IDrmMetricsConsumer>& consumer) {
         consumer->consumeHidlMetrics(vendor, pluginMetrics);
     }
 
-    err = status.isOk() ? toStatusTAidl(status.getServiceSpecificError()) : DEAD_OBJECT;
+    err = statusAidlToStatusT(status);
 
     return err;
 }
@@ -977,7 +975,7 @@ status_t DrmHalAidl::setCipherAlgorithm(Vector<uint8_t> const& sessionId,
 
     ::ndk::ScopedAStatus status =
             mPlugin->setCipherAlgorithm(toStdVec(sessionId), toStdString(algorithm));
-    return status.isOk() ? toStatusTAidl(status.getServiceSpecificError()) : DEAD_OBJECT;
+    return statusAidlToStatusT(status);
 }
 
 status_t DrmHalAidl::setMacAlgorithm(Vector<uint8_t> const& sessionId, String8 const& algorithm) {
@@ -988,7 +986,7 @@ status_t DrmHalAidl::setMacAlgorithm(Vector<uint8_t> const& sessionId, String8 c
 
     ::ndk::ScopedAStatus status =
             mPlugin->setMacAlgorithm(toStdVec(sessionId), toStdString(algorithm));
-    return status.isOk() ? toStatusTAidl(status.getServiceSpecificError()) : DEAD_OBJECT;
+    return statusAidlToStatusT(status);
 }
 
 status_t DrmHalAidl::encrypt(Vector<uint8_t> const& sessionId, Vector<uint8_t> const& keyId,
@@ -1005,7 +1003,7 @@ status_t DrmHalAidl::encrypt(Vector<uint8_t> const& sessionId, Vector<uint8_t> c
 
     output = toVector(result);
 
-    return status.isOk() ? toStatusTAidl(status.getServiceSpecificError()) : DEAD_OBJECT;
+    return statusAidlToStatusT(status);
 }
 
 status_t DrmHalAidl::decrypt(Vector<uint8_t> const& sessionId, Vector<uint8_t> const& keyId,
@@ -1022,7 +1020,7 @@ status_t DrmHalAidl::decrypt(Vector<uint8_t> const& sessionId, Vector<uint8_t> c
 
     output = toVector(result);
 
-    return status.isOk() ? toStatusTAidl(status.getServiceSpecificError()) : DEAD_OBJECT;
+    return statusAidlToStatusT(status);
 }
 
 status_t DrmHalAidl::sign(Vector<uint8_t> const& sessionId, Vector<uint8_t> const& keyId,
@@ -1038,7 +1036,7 @@ status_t DrmHalAidl::sign(Vector<uint8_t> const& sessionId, Vector<uint8_t> cons
 
     signature = toVector(result);
 
-    return status.isOk() ? toStatusTAidl(status.getServiceSpecificError()) : DEAD_OBJECT;
+    return statusAidlToStatusT(status);
 }
 
 status_t DrmHalAidl::verify(Vector<uint8_t> const& sessionId, Vector<uint8_t> const& keyId,
@@ -1052,7 +1050,7 @@ status_t DrmHalAidl::verify(Vector<uint8_t> const& sessionId, Vector<uint8_t> co
     ::ndk::ScopedAStatus status = mPlugin->verify(toStdVec(sessionId), toStdVec(keyId),
                                                   toStdVec(message), toStdVec(signature), &match);
 
-    return status.isOk() ? toStatusTAidl(status.getServiceSpecificError()) : DEAD_OBJECT;
+    return statusAidlToStatusT(status);
 }
 
 status_t DrmHalAidl::signRSA(Vector<uint8_t> const& sessionId, String8 const& algorithm,
@@ -1070,7 +1068,7 @@ status_t DrmHalAidl::signRSA(Vector<uint8_t> const& sessionId, String8 const& al
 
     signature = toVector(result);
 
-    return status.isOk() ? toStatusTAidl(status.getServiceSpecificError()) : DEAD_OBJECT;
+    return statusAidlToStatusT(status);
 }
 
 status_t DrmHalAidl::requiresSecureDecoder(const char* mime, bool* required) const {
@@ -1095,12 +1093,13 @@ status_t DrmHalAidl::requiresSecureDecoder(const char* mime, DrmPlugin::Security
     auto aLevel = toAidlSecurityLevel(securityLevel);
     std::string mimeAidl(mime);
     ::ndk::ScopedAStatus status = mPlugin->requiresSecureDecoder(mimeAidl, aLevel, required);
+
+    status_t err = statusAidlToStatusT(status);
     if (!status.isOk()) {
         DrmUtils::LOG2BE("requiresSecureDecoder txn failed: %d", status.getServiceSpecificError());
-        return DEAD_OBJECT;
     }
 
-    return OK;
+    return err;
 }
 
 status_t DrmHalAidl::setPlaybackId(Vector<uint8_t> const& sessionId, const char* playbackId) {
@@ -1108,7 +1107,7 @@ status_t DrmHalAidl::setPlaybackId(Vector<uint8_t> const& sessionId, const char*
     INIT_CHECK();
     std::string playbackIdAidl(playbackId);
     ::ndk::ScopedAStatus status = mPlugin->setPlaybackId(toStdVec(sessionId), playbackIdAidl);
-    return status.isOk() ? toStatusTAidl(status.getServiceSpecificError()) : DEAD_OBJECT;
+    return statusAidlToStatusT(status);
 }
 
 status_t DrmHalAidl::getLogMessages(Vector<drm::V1_4::LogMessage>& logs) const {

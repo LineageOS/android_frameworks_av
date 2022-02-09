@@ -186,8 +186,10 @@ inline status_t toStatusT(const android::hardware::Return<T> &status) {
     return toStatusT_1_4(err);
 }
 
-inline status_t toStatusTAidl(int32_t serviceError) {
-    auto status = static_cast<StatusAidl>(serviceError);
+inline status_t statusAidlToStatusT(::ndk::ScopedAStatus &statusAidl) {
+    if (statusAidl.isOk()) return OK;
+    if (statusAidl.getExceptionCode() != EX_SERVICE_SPECIFIC) return DEAD_OBJECT;
+    auto status = static_cast<StatusAidl>(statusAidl.getServiceSpecificError());
     switch (status) {
     case StatusAidl::OK:
         return OK;
