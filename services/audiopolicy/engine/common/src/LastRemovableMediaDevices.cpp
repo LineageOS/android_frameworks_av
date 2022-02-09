@@ -85,6 +85,7 @@ device_out_group_t LastRemovableMediaDevices::getDeviceOutGroup(audio_devices_t 
     case AUDIO_DEVICE_OUT_HEARING_AID:
     case AUDIO_DEVICE_OUT_BLE_HEADSET:
     case AUDIO_DEVICE_OUT_BLE_SPEAKER:
+    case AUDIO_DEVICE_OUT_BLE_BROADCAST:
         return GROUP_BT_A2DP;
     default:
         return GROUP_NONE;
