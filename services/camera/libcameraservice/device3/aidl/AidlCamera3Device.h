@@ -78,9 +78,9 @@ class AidlCamera3Device :
                 bool useHalBufManager, bool supportOfflineProcessing);
         AidlHalInterface(
                 std::shared_ptr<aidl::android::hardware::camera::device::ICameraDeviceSession>
-                    &injectionSession,
+                    &deviceSession,
                 std::shared_ptr<
-                aidl::android::hardware::camera::device::ICameraInjectionSession> &session,
+                aidl::android::hardware::camera::device::ICameraInjectionSession> &injectionSession,
                 std::shared_ptr<AidlRequestMetadataQueue> queue,
                 bool useHalBufManager, bool supportOfflineProcessing);
 
