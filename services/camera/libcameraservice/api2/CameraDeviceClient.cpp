@@ -861,6 +861,7 @@ binder::Status CameraDeviceClient::createStream(
     bool isMultiResolution = outputConfiguration.isMultiResolution();
     int dynamicRangeProfile = outputConfiguration.getDynamicRangeProfile();
     int streamUseCase = outputConfiguration.getStreamUseCase();
+    int timestampBase = outputConfiguration.getTimestampBase();
 
     res = SessionConfigurationUtils::checkSurfaceType(numBufferProducers, deferredConsumer,
             outputConfiguration.getSurfaceType());
@@ -905,7 +906,7 @@ binder::Status CameraDeviceClient::createStream(
         res = SessionConfigurationUtils::createSurfaceFromGbp(streamInfo,
                 isStreamInfoValid, surface, bufferProducer, mCameraIdStr,
                 mDevice->infoPhysical(physicalCameraId), sensorPixelModesUsed, dynamicRangeProfile,
-                streamUseCase);
+                streamUseCase, timestampBase);
 
         if (!res.isOk())
             return res;
@@ -951,7 +952,8 @@ binder::Status CameraDeviceClient::createStream(
                 static_cast<camera_stream_rotation_t>(outputConfiguration.getRotation()),
                 &streamId, physicalCameraId, streamInfo.sensorPixelModesUsed, &surfaceIds,
                 outputConfiguration.getSurfaceSetID(), isShared, isMultiResolution,
-                /*consumerUsage*/0, streamInfo.dynamicRangeProfile, streamInfo.streamUseCase);
+                /*consumerUsage*/0, streamInfo.dynamicRangeProfile, streamInfo.streamUseCase,
+                streamInfo.timestampBase);
     }
 
     if (err != OK) {
@@ -1062,7 +1064,8 @@ binder::Status CameraDeviceClient::createDeferredSurfaceStreamLocked(
                 std::forward_as_tuple(width, height, format, dataSpace, consumerUsage,
                         overriddenSensorPixelModesUsed,
                         outputConfiguration.getDynamicRangeProfile(),
-                        outputConfiguration.getStreamUseCase()));
+                        outputConfiguration.getStreamUseCase(),
+                        outputConfiguration.getTimestampBase()));
 
         ALOGV("%s: Camera %s: Successfully created a new stream ID %d for a deferred surface"
                 " (%d x %d) stream with format 0x%x.",
@@ -1251,7 +1254,7 @@ binder::Status CameraDeviceClient::updateOutputConfiguration(int streamId,
     const std::vector<int32_t> &sensorPixelModesUsed =
             outputConfiguration.getSensorPixelModesUsed();
     int streamUseCase = outputConfiguration.getStreamUseCase();
-
+    int timestampBase = outputConfiguration.getTimestampBase();
     int dynamicRangeProfile = outputConfiguration.getDynamicRangeProfile();
 
     for (size_t i = 0; i < newOutputsMap.size(); i++) {
@@ -1260,7 +1263,7 @@ binder::Status CameraDeviceClient::updateOutputConfiguration(int streamId,
         res = SessionConfigurationUtils::createSurfaceFromGbp(outInfo,
                 /*isStreamInfoValid*/ false, surface, newOutputsMap.valueAt(i), mCameraIdStr,
                 mDevice->infoPhysical(physicalCameraId), sensorPixelModesUsed, dynamicRangeProfile,
-                streamUseCase);
+                streamUseCase, timestampBase);
         if (!res.isOk())
             return res;
 
@@ -1619,6 +1622,7 @@ binder::Status CameraDeviceClient::finalizeOutputConfigurations(int32_t streamId
             outputConfiguration.getSensorPixelModesUsed();
     int dynamicRangeProfile = outputConfiguration.getDynamicRangeProfile();
     int streamUseCase= outputConfiguration.getStreamUseCase();
+    int timestampBase = outputConfiguration.getTimestampBase();
     for (auto& bufferProducer : bufferProducers) {
         // Don't create multiple streams for the same target surface
         ssize_t index = mStreamMap.indexOfKey(IInterface::asBinder(bufferProducer));
@@ -1632,7 +1636,7 @@ binder::Status CameraDeviceClient::finalizeOutputConfigurations(int32_t streamId
         res = SessionConfigurationUtils::createSurfaceFromGbp(mStreamInfoMap[streamId],
                 true /*isStreamInfoValid*/, surface, bufferProducer, mCameraIdStr,
                 mDevice->infoPhysical(physicalId), sensorPixelModesUsed, dynamicRangeProfile,
-                streamUseCase);
+                streamUseCase, timestampBase);
 
         if (!res.isOk())
             return res;
