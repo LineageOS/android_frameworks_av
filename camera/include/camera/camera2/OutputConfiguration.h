@@ -38,12 +38,18 @@ public:
         SURFACE_TYPE_SURFACE_VIEW = 0,
         SURFACE_TYPE_SURFACE_TEXTURE = 1
     };
-    enum TimestampBaseByte {
+    enum TimestampBaseType {
         TIMESTAMP_BASE_DEFAULT = 0,
         TIMESTAMP_BASE_SENSOR = 1,
         TIMESTAMP_BASE_MONOTONIC = 2,
         TIMESTAMP_BASE_REALTIME = 3,
         TIMESTAMP_BASE_CHOREOGRAPHER_SYNCED = 4
+    };
+    enum MirrorModeType {
+        MIRROR_MODE_AUTO = 0,
+        MIRROR_MODE_NONE = 1,
+        MIRROR_MODE_H = 2,
+        MIRROR_MODE_V = 3,
     };
 
     const std::vector<sp<IGraphicBufferProducer>>& getGraphicBufferProducers() const;
@@ -59,6 +65,7 @@ public:
     bool                       isMultiResolution() const;
     int                        getStreamUseCase() const;
     int                        getTimestampBase() const;
+    int                        getMirrorMode() const;
 
     // set of sensor pixel mode resolutions allowed {MAX_RESOLUTION, DEFAULT_MODE};
     const std::vector<int32_t>&            getSensorPixelModesUsed() const;
@@ -103,7 +110,8 @@ public:
                 sensorPixelModesUsedEqual(other) &&
                 mDynamicRangeProfile == other.mDynamicRangeProfile &&
                 mStreamUseCase == other.mStreamUseCase &&
-                mTimestampBase == other.mTimestampBase);
+                mTimestampBase == other.mTimestampBase &&
+                mMirrorMode == other.mMirrorMode);
     }
     bool operator != (const OutputConfiguration& other) const {
         return !(*this == other);
@@ -149,6 +157,9 @@ public:
         if (mTimestampBase != other.mTimestampBase) {
             return mTimestampBase < other.mTimestampBase;
         }
+        if (mMirrorMode != other.mMirrorMode) {
+            return mMirrorMode < other.mMirrorMode;
+        }
         return gbpsLessThan(other);
     }
 
@@ -176,6 +187,7 @@ private:
     int                        mDynamicRangeProfile;
     int                        mStreamUseCase;
     int                        mTimestampBase;
+    int                        mMirrorMode;
 };
 } // namespace params
 } // namespace camera2

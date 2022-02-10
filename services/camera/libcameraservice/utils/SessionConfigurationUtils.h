@@ -99,7 +99,7 @@ binder::Status createSurfaceFromGbp(
         sp<Surface>& surface, const sp<IGraphicBufferProducer>& gbp,
         const String8 &logicalCameraId, const CameraMetadata &physicalCameraMetadata,
         const std::vector<int32_t> &sensorPixelModesUsed,  int dynamicRangeProfile,
-        int streamUseCase, int timestampBase);
+        int streamUseCase, int timestampBase, int mirrorMode);
 
 void mapStreamInfo(const camera3::OutputStreamInfo &streamInfo,
         camera3::camera_stream_rotation_t rotation, String8 physicalId, int32_t groupId,

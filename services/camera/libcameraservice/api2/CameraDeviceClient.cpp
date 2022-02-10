@@ -865,6 +865,7 @@ binder::Status CameraDeviceClient::createStream(
     int dynamicRangeProfile = outputConfiguration.getDynamicRangeProfile();
     int streamUseCase = outputConfiguration.getStreamUseCase();
     int timestampBase = outputConfiguration.getTimestampBase();
+    int mirrorMode = outputConfiguration.getMirrorMode();
 
     res = SessionConfigurationUtils::checkSurfaceType(numBufferProducers, deferredConsumer,
             outputConfiguration.getSurfaceType());
@@ -909,7 +910,7 @@ binder::Status CameraDeviceClient::createStream(
         res = SessionConfigurationUtils::createSurfaceFromGbp(streamInfo,
                 isStreamInfoValid, surface, bufferProducer, mCameraIdStr,
                 mDevice->infoPhysical(physicalCameraId), sensorPixelModesUsed, dynamicRangeProfile,
-                streamUseCase, timestampBase);
+                streamUseCase, timestampBase, mirrorMode);
 
         if (!res.isOk())
             return res;
@@ -956,7 +957,7 @@ binder::Status CameraDeviceClient::createStream(
                 &streamId, physicalCameraId, streamInfo.sensorPixelModesUsed, &surfaceIds,
                 outputConfiguration.getSurfaceSetID(), isShared, isMultiResolution,
                 /*consumerUsage*/0, streamInfo.dynamicRangeProfile, streamInfo.streamUseCase,
-                streamInfo.timestampBase);
+                streamInfo.timestampBase, streamInfo.mirrorMode);
     }
 
     if (err != OK) {
@@ -982,7 +983,7 @@ binder::Status CameraDeviceClient::createStream(
                   streamInfo.height, streamInfo.format);
 
         // Set transform flags to ensure preview to be rotated correctly.
-        res = setStreamTransformLocked(streamId);
+        res = setStreamTransformLocked(streamId, streamInfo.mirrorMode);
 
         // Fill in mHighResolutionCameraIdToStreamIdSet map
         const String8 &cameraIdUsed =
@@ -1052,7 +1053,8 @@ binder::Status CameraDeviceClient::createDeferredSurfaceStreamLocked(
             outputConfiguration.getSurfaceSetID(), isShared,
             outputConfiguration.isMultiResolution(), consumerUsage,
             outputConfiguration.getDynamicRangeProfile(),
-            outputConfiguration.getStreamUseCase());
+            outputConfiguration.getStreamUseCase(),
+            outputConfiguration.getMirrorMode());
 
     if (err != OK) {
         res = STATUS_ERROR_FMT(CameraService::ERROR_INVALID_OPERATION,
@@ -1068,14 +1070,15 @@ binder::Status CameraDeviceClient::createDeferredSurfaceStreamLocked(
                         overriddenSensorPixelModesUsed,
                         outputConfiguration.getDynamicRangeProfile(),
                         outputConfiguration.getStreamUseCase(),
-                        outputConfiguration.getTimestampBase()));
+                        outputConfiguration.getTimestampBase(),
+                        outputConfiguration.getMirrorMode()));
 
         ALOGV("%s: Camera %s: Successfully created a new stream ID %d for a deferred surface"
                 " (%d x %d) stream with format 0x%x.",
               __FUNCTION__, mCameraIdStr.string(), streamId, width, height, format);
 
         // Set transform flags to ensure preview to be rotated correctly.
-        res = setStreamTransformLocked(streamId);
+        res = setStreamTransformLocked(streamId, outputConfiguration.getMirrorMode());
 
         *newStreamId = streamId;
         // Fill in mHighResolutionCameraIdToStreamIdSet
@@ -1089,7 +1092,7 @@ binder::Status CameraDeviceClient::createDeferredSurfaceStreamLocked(
     return res;
 }
 
-binder::Status CameraDeviceClient::setStreamTransformLocked(int streamId) {
+binder::Status CameraDeviceClient::setStreamTransformLocked(int streamId, int mirrorMode) {
     int32_t transform = 0;
     status_t err;
     binder::Status res;
@@ -1098,7 +1101,7 @@ binder::Status CameraDeviceClient::setStreamTransformLocked(int streamId) {
         return STATUS_ERROR(CameraService::ERROR_DISCONNECTED, "Camera device no longer alive");
     }
 
-    err = getRotationTransformLocked(&transform);
+    err = getRotationTransformLocked(mirrorMode, &transform);
     if (err != OK) {
         // Error logged by getRotationTransformLocked.
         return STATUS_ERROR(CameraService::ERROR_INVALID_OPERATION,
@@ -1259,6 +1262,7 @@ binder::Status CameraDeviceClient::updateOutputConfiguration(int streamId,
     int streamUseCase = outputConfiguration.getStreamUseCase();
     int timestampBase = outputConfiguration.getTimestampBase();
     int dynamicRangeProfile = outputConfiguration.getDynamicRangeProfile();
+    int mirrorMode = outputConfiguration.getMirrorMode();
 
     for (size_t i = 0; i < newOutputsMap.size(); i++) {
         OutputStreamInfo outInfo;
@@ -1266,7 +1270,7 @@ binder::Status CameraDeviceClient::updateOutputConfiguration(int streamId,
         res = SessionConfigurationUtils::createSurfaceFromGbp(outInfo,
                 /*isStreamInfoValid*/ false, surface, newOutputsMap.valueAt(i), mCameraIdStr,
                 mDevice->infoPhysical(physicalCameraId), sensorPixelModesUsed, dynamicRangeProfile,
-                streamUseCase, timestampBase);
+                streamUseCase, timestampBase, mirrorMode);
         if (!res.isOk())
             return res;
 
@@ -1626,6 +1630,7 @@ binder::Status CameraDeviceClient::finalizeOutputConfigurations(int32_t streamId
     int dynamicRangeProfile = outputConfiguration.getDynamicRangeProfile();
     int streamUseCase= outputConfiguration.getStreamUseCase();
     int timestampBase = outputConfiguration.getTimestampBase();
+    int mirrorMode = outputConfiguration.getMirrorMode();
     for (auto& bufferProducer : bufferProducers) {
         // Don't create multiple streams for the same target surface
         ssize_t index = mStreamMap.indexOfKey(IInterface::asBinder(bufferProducer));
@@ -1639,7 +1644,7 @@ binder::Status CameraDeviceClient::finalizeOutputConfigurations(int32_t streamId
         res = SessionConfigurationUtils::createSurfaceFromGbp(mStreamInfoMap[streamId],
                 true /*isStreamInfoValid*/, surface, bufferProducer, mCameraIdStr,
                 mDevice->infoPhysical(physicalId), sensorPixelModesUsed, dynamicRangeProfile,
-                streamUseCase, timestampBase);
+                streamUseCase, timestampBase, mirrorMode);
 
         if (!res.isOk())
             return res;
@@ -2121,11 +2126,12 @@ bool CameraDeviceClient::enforceRequestPermissions(CameraMetadata& metadata) {
     return true;
 }
 
-status_t CameraDeviceClient::getRotationTransformLocked(int32_t* transform) {
+status_t CameraDeviceClient::getRotationTransformLocked(int mirrorMode,
+        int32_t* transform) {
     ALOGV("%s: begin", __FUNCTION__);
 
     const CameraMetadata& staticInfo = mDevice->info();
-    return CameraUtils::getRotationTransform(staticInfo, transform);
+    return CameraUtils::getRotationTransform(staticInfo, mirrorMode, transform);
 }
 
 binder::Status CameraDeviceClient::mapRequestTemplate(int templateId,
