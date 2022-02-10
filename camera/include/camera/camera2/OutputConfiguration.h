@@ -38,6 +38,14 @@ public:
         SURFACE_TYPE_SURFACE_VIEW = 0,
         SURFACE_TYPE_SURFACE_TEXTURE = 1
     };
+    enum TimestampBaseByte {
+        TIMESTAMP_BASE_DEFAULT = 0,
+        TIMESTAMP_BASE_SENSOR = 1,
+        TIMESTAMP_BASE_MONOTONIC = 2,
+        TIMESTAMP_BASE_REALTIME = 3,
+        TIMESTAMP_BASE_CHOREOGRAPHER_SYNCED = 4
+    };
+
     const std::vector<sp<IGraphicBufferProducer>>& getGraphicBufferProducers() const;
     int                        getRotation() const;
     int                        getSurfaceSetID() const;
@@ -50,6 +58,7 @@ public:
     String16                   getPhysicalCameraId() const;
     bool                       isMultiResolution() const;
     int                        getStreamUseCase() const;
+    int                        getTimestampBase() const;
 
     // set of sensor pixel mode resolutions allowed {MAX_RESOLUTION, DEFAULT_MODE};
     const std::vector<int32_t>&            getSensorPixelModesUsed() const;
@@ -93,7 +102,8 @@ public:
                 mIsMultiResolution == other.mIsMultiResolution &&
                 sensorPixelModesUsedEqual(other) &&
                 mDynamicRangeProfile == other.mDynamicRangeProfile &&
-                mStreamUseCase == other.mStreamUseCase );
+                mStreamUseCase == other.mStreamUseCase &&
+                mTimestampBase == other.mTimestampBase);
     }
     bool operator != (const OutputConfiguration& other) const {
         return !(*this == other);
@@ -136,6 +146,9 @@ public:
         if (mStreamUseCase != other.mStreamUseCase) {
             return mStreamUseCase < other.mStreamUseCase;
         }
+        if (mTimestampBase != other.mTimestampBase) {
+            return mTimestampBase < other.mTimestampBase;
+        }
         return gbpsLessThan(other);
     }
 
@@ -162,6 +175,7 @@ private:
     std::vector<int32_t>       mSensorPixelModesUsed;
     int                        mDynamicRangeProfile;
     int                        mStreamUseCase;
+    int                        mTimestampBase;
 };
 } // namespace params
 } // namespace camera2

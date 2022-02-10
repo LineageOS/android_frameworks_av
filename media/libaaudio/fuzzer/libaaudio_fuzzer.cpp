@@ -202,7 +202,7 @@ void LibAaudioFuzzer::process(const uint8_t *data, size_t size) {
 
   int32_t framesPerBurst = AAudioStream_getFramesPerBurst(mAaudioStream);
   uint8_t numberOfBursts = fdp.ConsumeIntegral<uint8_t>();
-  int32_t maxInputFrames = numberOfBursts * framesPerBurst;
+  int32_t maxFrames = numberOfBursts * framesPerBurst;
   int32_t requestedBufferSize =
       fdp.ConsumeIntegral<uint16_t>() * framesPerBurst;
   AAudioStream_setBufferSizeInFrames(mAaudioStream, requestedBufferSize);
@@ -218,26 +218,24 @@ void LibAaudioFuzzer::process(const uint8_t *data, size_t size) {
 
   int32_t count = fdp.ConsumeIntegral<int32_t>();
   direction = AAudioStream_getDirection(mAaudioStream);
-  framesPerDataCallback = AAudioStream_getFramesPerDataCallback(mAaudioStream);
 
   if (actualFormat == AAUDIO_FORMAT_PCM_I16) {
-    std::vector<int16_t> inputShortData(maxInputFrames * actualChannelCount,
-                                        0x0);
-    if (direction == AAUDIO_DIRECTION_INPUT) {
-      AAudioStream_read(mAaudioStream, inputShortData.data(),
-                        framesPerDataCallback, count * kNanosPerMillisecond);
+      std::vector<int16_t> inputShortData(maxFrames * actualChannelCount, 0x0);
+      if (direction == AAUDIO_DIRECTION_INPUT) {
+          AAudioStream_read(mAaudioStream, inputShortData.data(), maxFrames,
+                            count * kNanosPerMillisecond);
     } else if (direction == AAUDIO_DIRECTION_OUTPUT) {
-      AAudioStream_write(mAaudioStream, inputShortData.data(),
-                         framesPerDataCallback, count * kNanosPerMillisecond);
+        AAudioStream_write(mAaudioStream, inputShortData.data(), maxFrames,
+                           count * kNanosPerMillisecond);
     }
   } else if (actualFormat == AAUDIO_FORMAT_PCM_FLOAT) {
-    std::vector<float> inputFloatData(maxInputFrames * actualChannelCount, 0x0);
-    if (direction == AAUDIO_DIRECTION_INPUT) {
-      AAudioStream_read(mAaudioStream, inputFloatData.data(),
-                        framesPerDataCallback, count * kNanosPerMillisecond);
+      std::vector<float> inputFloatData(maxFrames * actualChannelCount, 0x0);
+      if (direction == AAUDIO_DIRECTION_INPUT) {
+          AAudioStream_read(mAaudioStream, inputFloatData.data(), maxFrames,
+                            count * kNanosPerMillisecond);
     } else if (direction == AAUDIO_DIRECTION_OUTPUT) {
-      AAudioStream_write(mAaudioStream, inputFloatData.data(),
-                         framesPerDataCallback, count * kNanosPerMillisecond);
+        AAudioStream_write(mAaudioStream, inputFloatData.data(), maxFrames,
+                           count * kNanosPerMillisecond);
     }
   }
 

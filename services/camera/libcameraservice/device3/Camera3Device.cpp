@@ -86,6 +86,7 @@ Camera3Device::Camera3Device(const String8 &id, bool overrideForPerfClass, bool 
         mStatusWaiters(0),
         mUsePartialResult(false),
         mNumPartialResults(1),
+        mDeviceTimeBaseIsRealtime(false),
         mTimestampOffset(0),
         mNextResultFrameNumber(0),
         mNextReprocessResultFrameNumber(0),
@@ -189,11 +190,12 @@ status_t Camera3Device::initializeCommonLocked() {
     mIsInputStreamMultiResolution = false;
 
     // Measure the clock domain offset between camera and video/hw_composer
+    mTimestampOffset = getMonoToBoottimeOffset();
     camera_metadata_entry timestampSource =
             mDeviceInfo.find(ANDROID_SENSOR_INFO_TIMESTAMP_SOURCE);
     if (timestampSource.count > 0 && timestampSource.data.u8[0] ==
             ANDROID_SENSOR_INFO_TIMESTAMP_SOURCE_REALTIME) {
-        mTimestampOffset = getMonoToBoottimeOffset();
+        mDeviceTimeBaseIsRealtime = true;
     }
 
     // Will the HAL be sending in early partial result metadata?
@@ -978,7 +980,7 @@ status_t Camera3Device::createStream(sp<Surface> consumer,
             const String8& physicalCameraId,
             const std::unordered_set<int32_t> &sensorPixelModesUsed,
             std::vector<int> *surfaceIds, int streamSetId, bool isShared, bool isMultiResolution,
-            uint64_t consumerUsage, int dynamicRangeProfile, int streamUseCase) {
+            uint64_t consumerUsage, int dynamicRangeProfile, int streamUseCase, int timestampBase) {
     ATRACE_CALL();
 
     if (consumer == nullptr) {
@@ -992,7 +994,7 @@ status_t Camera3Device::createStream(sp<Surface> consumer,
     return createStream(consumers, /*hasDeferredConsumer*/ false, width, height,
             format, dataSpace, rotation, id, physicalCameraId, sensorPixelModesUsed, surfaceIds,
             streamSetId, isShared, isMultiResolution, consumerUsage, dynamicRangeProfile,
-            streamUseCase);
+            streamUseCase, timestampBase);
 }
 
 static bool isRawFormat(int format) {
@@ -1012,16 +1014,18 @@ status_t Camera3Device::createStream(const std::vector<sp<Surface>>& consumers,
         android_dataspace dataSpace, camera_stream_rotation_t rotation, int *id,
         const String8& physicalCameraId, const std::unordered_set<int32_t> &sensorPixelModesUsed,
         std::vector<int> *surfaceIds, int streamSetId, bool isShared, bool isMultiResolution,
-        uint64_t consumerUsage, int dynamicRangeProfile, int streamUseCase) {
+        uint64_t consumerUsage, int dynamicRangeProfile, int streamUseCase, int timestampBase) {
     ATRACE_CALL();
 
     Mutex::Autolock il(mInterfaceLock);
     nsecs_t maxExpectedDuration = getExpectedInFlightDuration();
     Mutex::Autolock l(mLock);
     ALOGV("Camera %s: Creating new stream %d: %d x %d, format %d, dataspace %d rotation %d"
-            " consumer usage %" PRIu64 ", isShared %d, physicalCameraId %s, isMultiResolution %d",
+            " consumer usage %" PRIu64 ", isShared %d, physicalCameraId %s, isMultiResolution %d"
+            " dynamicRangeProfile %d, streamUseCase %d, timestampBase %d",
             mId.string(), mNextStreamId, width, height, format, dataSpace, rotation,
-            consumerUsage, isShared, physicalCameraId.string(), isMultiResolution);
+            consumerUsage, isShared, physicalCameraId.string(), isMultiResolution,
+            dynamicRangeProfile, streamUseCase, timestampBase);
 
     status_t res;
     bool wasActive = false;
@@ -1090,7 +1094,8 @@ status_t Camera3Device::createStream(const std::vector<sp<Surface>>& consumers,
         newStream = new Camera3OutputStream(mNextStreamId, consumers[0],
                 width, height, blobBufferSize, format, dataSpace, rotation,
                 mTimestampOffset, physicalCameraId, sensorPixelModesUsed, streamSetId,
-                isMultiResolution, dynamicRangeProfile, streamUseCase);
+                isMultiResolution, dynamicRangeProfile, streamUseCase, mDeviceTimeBaseIsRealtime,
+                timestampBase);
     } else if (format == HAL_PIXEL_FORMAT_RAW_OPAQUE) {
         bool maxResolution =
                 sensorPixelModesUsed.find(ANDROID_SENSOR_PIXEL_MODE_MAXIMUM_RESOLUTION) !=
@@ -1104,22 +1109,26 @@ status_t Camera3Device::createStream(const std::vector<sp<Surface>>& consumers,
         newStream = new Camera3OutputStream(mNextStreamId, consumers[0],
                 width, height, rawOpaqueBufferSize, format, dataSpace, rotation,
                 mTimestampOffset, physicalCameraId, sensorPixelModesUsed, streamSetId,
-                isMultiResolution, dynamicRangeProfile, streamUseCase);
+                isMultiResolution, dynamicRangeProfile, streamUseCase, mDeviceTimeBaseIsRealtime,
+                timestampBase);
     } else if (isShared) {
         newStream = new Camera3SharedOutputStream(mNextStreamId, consumers,
                 width, height, format, consumerUsage, dataSpace, rotation,
                 mTimestampOffset, physicalCameraId, sensorPixelModesUsed, streamSetId,
-                mUseHalBufManager, dynamicRangeProfile, streamUseCase);
+                mUseHalBufManager, dynamicRangeProfile, streamUseCase, mDeviceTimeBaseIsRealtime,
+                timestampBase);
     } else if (consumers.size() == 0 && hasDeferredConsumer) {
         newStream = new Camera3OutputStream(mNextStreamId,
                 width, height, format, consumerUsage, dataSpace, rotation,
                 mTimestampOffset, physicalCameraId, sensorPixelModesUsed, streamSetId,
-                isMultiResolution, dynamicRangeProfile, streamUseCase);
+                isMultiResolution, dynamicRangeProfile, streamUseCase, mDeviceTimeBaseIsRealtime,
+                timestampBase);
     } else {
         newStream = new Camera3OutputStream(mNextStreamId, consumers[0],
                 width, height, format, dataSpace, rotation,
                 mTimestampOffset, physicalCameraId, sensorPixelModesUsed, streamSetId,
-                isMultiResolution, dynamicRangeProfile, streamUseCase);
+                isMultiResolution, dynamicRangeProfile, streamUseCase, mDeviceTimeBaseIsRealtime,
+                timestampBase);
     }
 
     size_t consumerCount = consumers.size();

@@ -34,11 +34,11 @@ Camera3SharedOutputStream::Camera3SharedOutputStream(int id,
         nsecs_t timestampOffset, const String8& physicalCameraId,
         const std::unordered_set<int32_t> &sensorPixelModesUsed,
         int setId, bool useHalBufManager, int dynamicProfile,
-        int streamUseCase) :
+        int streamUseCase, bool deviceTimeBaseIsRealtime, int timestampBase) :
         Camera3OutputStream(id, CAMERA_STREAM_OUTPUT, width, height,
                             format, dataSpace, rotation, physicalCameraId, sensorPixelModesUsed,
                             consumerUsage, timestampOffset, setId, /*isMultiResolution*/false,
-                            dynamicProfile, streamUseCase),
+                            dynamicProfile, streamUseCase, deviceTimeBaseIsRealtime, timestampBase),
         mUseHalBufManager(useHalBufManager) {
     size_t consumerCount = std::min(surfaces.size(), kMaxOutputs);
     if (surfaces.size() > consumerCount) {
