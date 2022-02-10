@@ -20,15 +20,18 @@
 
 #include "CameraProviderManager.h"
 
+#include <aidl/android/hardware/camera/device/ICameraDevice.h>
 #include <android/hardware/camera/device/3.8/ICameraDevice.h>
 
 #include <algorithm>
 #include <chrono>
 #include "common/DepthPhotoProcessor.h"
 #include "hidl/HidlProviderInfo.h"
+#include "aidl/AidlProviderInfo.h"
 #include <dlfcn.h>
 #include <future>
 #include <inttypes.h>
+#include <android/binder_manager.h>
 #include <android/hidl/manager/1.2/IServiceManager.h>
 #include <hidl/ServiceManagement.h>
 #include <functional>
@@ -59,10 +62,41 @@ const std::string kExternalProviderName = "external/0";
 
 const float CameraProviderManager::kDepthARTolerance = .1f;
 
+// AIDL Devices start with major version 1, offset added to bring them up to HIDL.
+const uint16_t kAidlDeviceMajorOffset = 2;
+// AIDL Devices start with minor version 1, offset added to bring them up to HIDL.
+const uint16_t kAidlDeviceMinorOffset = 7;
+
 CameraProviderManager::HidlServiceInteractionProxyImpl
 CameraProviderManager::sHidlServiceInteractionProxy{};
 
 CameraProviderManager::~CameraProviderManager() {
+}
+
+const char* FrameworkTorchStatusToString(const TorchModeStatus& s) {
+    switch (s) {
+        case TorchModeStatus::NOT_AVAILABLE:
+            return "NOT_AVAILABLE";
+        case TorchModeStatus::AVAILABLE_OFF:
+            return "AVAILABLE_OFF";
+        case TorchModeStatus::AVAILABLE_ON:
+            return "AVAILABLE_ON";
+    }
+    ALOGW("Unexpected HAL torch mode status code %d", s);
+    return "UNKNOWN_STATUS";
+}
+
+const char* FrameworkDeviceStatusToString(const CameraDeviceStatus& s) {
+    switch (s) {
+        case CameraDeviceStatus::NOT_PRESENT:
+            return "NOT_PRESENT";
+        case CameraDeviceStatus::PRESENT:
+            return "PRESENT";
+        case CameraDeviceStatus::ENUMERATING:
+            return "ENUMERATING";
+    }
+    ALOGW("Unexpected HAL device status code %d", s);
+    return "UNKNOWN_STATUS";
 }
 
 hardware::hidl_vec<hardware::hidl_string>
@@ -78,17 +112,9 @@ CameraProviderManager::HidlServiceInteractionProxyImpl::listServices() {
     return ret;
 }
 
-status_t CameraProviderManager::initialize(wp<CameraProviderManager::StatusListener> listener,
-        HidlServiceInteractionProxy* hidlProxy) {
-    std::lock_guard<std::mutex> lock(mInterfaceMutex);
-    if (hidlProxy == nullptr) {
-        ALOGE("%s: No valid service interaction proxy provided", __FUNCTION__);
-        return BAD_VALUE;
-    }
-    mListener = listener;
+status_t CameraProviderManager::tryToInitAndAddHidlProvidersLocked(
+        HidlServiceInteractionProxy *hidlProxy) {
     mHidlServiceProxy = hidlProxy;
-    mDeviceState = 0;
-
     // Registering will trigger notifications for all already-known providers
     bool success = mHidlServiceProxy->registerForNotifications(
         /* instance name, empty means no filter */ "",
@@ -102,10 +128,54 @@ status_t CameraProviderManager::initialize(wp<CameraProviderManager::StatusListe
     for (const auto& instance : mHidlServiceProxy->listServices()) {
         this->addHidlProviderLocked(instance);
     }
+    return OK;
+}
+
+static std::string getFullAidlProviderName(const std::string instance) {
+    std::string aidlHalServiceDescriptor =
+            std::string(aidl::android::hardware::camera::provider::ICameraProvider::descriptor);
+   return aidlHalServiceDescriptor + "/" + instance;
+}
+
+status_t CameraProviderManager::tryToAddAidlProvidersLocked() {
+    const char * aidlHalServiceDescriptor =
+            aidl::android::hardware::camera::provider::ICameraProvider::descriptor;
+    auto sm = defaultServiceManager();
+    auto aidlProviders = sm->getDeclaredInstances(
+            String16(aidlHalServiceDescriptor));
+    for (const auto &aidlInstance : aidlProviders) {
+        std::string aidlServiceName =
+                getFullAidlProviderName(std::string(String8(aidlInstance).c_str()));
+        auto res = sm->registerForNotifications(String16(aidlServiceName.c_str()), this);
+        if (res != OK) {
+            ALOGE("%s Unable to register for notifications with AIDL service manager",
+                    __FUNCTION__);
+            return res;
+        }
+        addAidlProviderLocked(aidlServiceName.c_str());
+    }
+    return OK;
+}
+
+status_t CameraProviderManager::initialize(wp<CameraProviderManager::StatusListener> listener,
+        HidlServiceInteractionProxy* hidlProxy) {
+    std::lock_guard<std::mutex> lock(mInterfaceMutex);
+    if (hidlProxy == nullptr) {
+        ALOGE("%s: No valid service interaction proxy provided", __FUNCTION__);
+        return BAD_VALUE;
+    }
+    mListener = listener;
+    mDeviceState = 0;
+    auto res = tryToInitAndAddHidlProvidersLocked(hidlProxy);
+    if (res != OK) {
+        // Logging done in called function;
+        return res;
+    }
+    res = tryToAddAidlProvidersLocked();
 
     IPCThreadState::self()->flushCommands();
 
-    return OK;
+    return res;
 }
 
 std::pair<int, int> CameraProviderManager::getCameraCount() const {
@@ -380,6 +450,22 @@ bool CameraProviderManager::supportSetTorchMode(const std::string &id) const {
     return false;
 }
 
+template <class ProviderInfoType, class HalCameraProviderType>
+status_t CameraProviderManager::setTorchModeT(sp<ProviderInfo> &parentProvider,
+        std::shared_ptr<HalCameraProvider> *halCameraProvider) {
+    if (halCameraProvider == nullptr) {
+        return BAD_VALUE;
+    }
+    ProviderInfoType *idlProviderInfo = static_cast<ProviderInfoType *>(parentProvider.get());
+    auto idlInterface = idlProviderInfo->startProviderInterface();
+    if (idlInterface == nullptr) {
+        return DEAD_OBJECT;
+    }
+    *halCameraProvider =
+            std::make_shared<HalCameraProviderType>(idlInterface, idlInterface->descriptor);
+    return OK;
+}
+
 status_t CameraProviderManager::setTorchMode(const std::string &id, bool enabled) {
     std::lock_guard<std::mutex> lock(mInterfaceMutex);
 
@@ -394,18 +480,19 @@ status_t CameraProviderManager::setTorchMode(const std::string &id, bool enabled
     }
     std::shared_ptr<HalCameraProvider> halCameraProvider = nullptr;
     IPCTransport providerTransport = parentProvider->getIPCTransport();
+    status_t res = OK;
     if (providerTransport == IPCTransport::HIDL) {
-        HidlProviderInfo * hidlProviderInfo = static_cast<HidlProviderInfo *>(parentProvider.get());
-        const sp<provider::V2_4::ICameraProvider> hidlInterface =
-                hidlProviderInfo->startProviderInterface();
-        if (hidlInterface == nullptr) {
-            return DEAD_OBJECT;
+        res = setTorchModeT<HidlProviderInfo, HidlHalCameraProvider>(parentProvider,
+                &halCameraProvider);
+        if (res != OK) {
+            return res;
         }
-        halCameraProvider =
-                std::make_shared<HidlHalCameraProvider>(hidlInterface, hidlInterface->descriptor);
     } else if (providerTransport == IPCTransport::AIDL) {
-        ALOGE("%s AIDL hal providers not supported yet", __FUNCTION__);
-        return INVALID_OPERATION;
+        res = setTorchModeT<AidlProviderInfo, AidlHalCameraProvider>(parentProvider,
+                &halCameraProvider);
+        if (res != OK) {
+            return res;
+        }
     } else {
         ALOGE("%s Invalid provider transport", __FUNCTION__);
         return INVALID_OPERATION;
@@ -518,6 +605,89 @@ status_t CameraProviderManager::notifyDeviceStateChange(int64_t newState) {
     return res;
 }
 
+status_t CameraProviderManager::openAidlSession(const std::string &id,
+        const std::shared_ptr<
+                aidl::android::hardware::camera::device::ICameraDeviceCallback>& callback,
+        /*out*/
+        std::shared_ptr<aidl::android::hardware::camera::device::ICameraDeviceSession> *session) {
+
+    std::lock_guard<std::mutex> lock(mInterfaceMutex);
+
+    auto deviceInfo = findDeviceInfoLocked(id,
+            /*minVersion*/ {3,0}, /*maxVersion*/ {4,0});
+    if (deviceInfo == nullptr) return NAME_NOT_FOUND;
+
+    auto *aidlDeviceInfo3 = static_cast<AidlProviderInfo::AidlDeviceInfo3*>(deviceInfo);
+    sp<ProviderInfo> parentProvider = deviceInfo->mParentProvider.promote();
+    if (parentProvider == nullptr) {
+        return DEAD_OBJECT;
+    }
+    auto provider =
+            static_cast<AidlProviderInfo *>(parentProvider.get())->startProviderInterface();
+    if (provider == nullptr) {
+        return DEAD_OBJECT;
+    }
+    std::shared_ptr<HalCameraProvider> halCameraProvider =
+            std::make_shared<AidlHalCameraProvider>(provider, provider->descriptor);
+    saveRef(DeviceMode::CAMERA, id, halCameraProvider);
+
+    auto interface = aidlDeviceInfo3->startDeviceInterface();
+    if (interface == nullptr) {
+        removeRef(DeviceMode::CAMERA, id);
+        return DEAD_OBJECT;
+    }
+
+    auto ret = interface->open(callback, session);
+    if (!ret.isOk()) {
+        removeRef(DeviceMode::CAMERA, id);
+        ALOGE("%s: Transaction error opening a session for camera device %s: %s",
+                __FUNCTION__, id.c_str(), ret.getMessage());
+        return DEAD_OBJECT;
+    }
+    return OK;
+}
+
+status_t CameraProviderManager::openAidlInjectionSession(const std::string &id,
+        const std::shared_ptr<
+                aidl::android::hardware::camera::device::ICameraDeviceCallback>& callback,
+        /*out*/
+        std::shared_ptr<
+                aidl::android::hardware::camera::device::ICameraInjectionSession> *session) {
+
+    std::lock_guard<std::mutex> lock(mInterfaceMutex);
+
+    auto deviceInfo = findDeviceInfoLocked(id);
+    if (deviceInfo == nullptr) return NAME_NOT_FOUND;
+
+    auto *aidlDeviceInfo3 = static_cast<AidlProviderInfo::AidlDeviceInfo3*>(deviceInfo);
+    sp<ProviderInfo> parentProvider = deviceInfo->mParentProvider.promote();
+    if (parentProvider == nullptr) {
+        return DEAD_OBJECT;
+    }
+    auto provider =
+            static_cast<AidlProviderInfo *>(parentProvider.get())->startProviderInterface();
+    if (provider == nullptr) {
+        return DEAD_OBJECT;
+    }
+    std::shared_ptr<HalCameraProvider> halCameraProvider =
+            std::make_shared<AidlHalCameraProvider>(provider, provider->descriptor);
+    saveRef(DeviceMode::CAMERA, id, halCameraProvider);
+
+    auto interface = aidlDeviceInfo3->startDeviceInterface();
+    if (interface == nullptr) {
+        return DEAD_OBJECT;
+    }
+
+    auto ret = interface->openInjectionSession(callback, session);
+    if (!ret.isOk()) {
+        removeRef(DeviceMode::CAMERA, id);
+        ALOGE("%s: Transaction error opening a session for camera device %s: %s",
+                __FUNCTION__, id.c_str(), ret.getMessage());
+        return DEAD_OBJECT;
+    }
+    return OK;
+}
+
 status_t CameraProviderManager::openHidlSession(const std::string &id,
         const sp<device::V3_2::ICameraDeviceCallback>& callback,
         /*out*/
@@ -622,6 +792,26 @@ void CameraProviderManager::removeRef(DeviceMode usageType, const std::string &c
     }
 }
 
+// We ignore sp<IBinder> param here since we need std::shared_ptr<...> which
+// will be retrieved through the ndk api through addAidlProviderLocked ->
+// tryToInitializeAidlProvider.
+void CameraProviderManager::onServiceRegistration(const String16 &name, const sp<IBinder>&) {
+    status_t res = OK;
+    std::lock_guard<std::mutex> providerLock(mProviderLifecycleLock);
+    {
+        std::lock_guard<std::mutex> lock(mInterfaceMutex);
+
+        res = addAidlProviderLocked(String8(name).c_str());
+    }
+
+    sp<StatusListener> listener = getStatusListener();
+    if (nullptr != listener.get() && res == OK) {
+        listener->onNewProviderRegistered();
+    }
+
+    IPCThreadState::self()->flushCommands();
+}
+
 hardware::Return<void> CameraProviderManager::onRegistration(
         const hardware::hidl_string& /*fqName*/,
         const hardware::hidl_string& name,
@@ -651,6 +841,59 @@ status_t CameraProviderManager::dump(int fd, const Vector<String16>& args) {
         provider->dump(fd, args);
     }
     return OK;
+}
+
+void CameraProviderManager::ProviderInfo::initializeProviderInfoCommon(
+        const std::vector<std::string> &devices) {
+
+    sp<StatusListener> listener = mManager->getStatusListener();
+
+    for (auto& device : devices) {
+        std::string id;
+        status_t res = addDevice(device, CameraDeviceStatus::PRESENT, &id);
+        if (res != OK) {
+            ALOGE("%s: Unable to enumerate camera device '%s': %s (%d)",
+                    __FUNCTION__, device.c_str(), strerror(-res), res);
+            continue;
+        }
+    }
+
+    ALOGI("Camera provider %s ready with %zu camera devices",
+            mProviderName.c_str(), mDevices.size());
+
+    // Process cached status callbacks
+    std::unique_ptr<std::vector<CameraStatusInfoT>> cachedStatus =
+            std::make_unique<std::vector<CameraStatusInfoT>>();
+    {
+        std::lock_guard<std::mutex> lock(mInitLock);
+
+        for (auto& statusInfo : mCachedStatus) {
+            std::string id, physicalId;
+            status_t res = OK;
+            if (statusInfo.isPhysicalCameraStatus) {
+                res = physicalCameraDeviceStatusChangeLocked(&id, &physicalId,
+                    statusInfo.cameraId, statusInfo.physicalCameraId, statusInfo.status);
+            } else {
+                res = cameraDeviceStatusChangeLocked(&id, statusInfo.cameraId, statusInfo.status);
+            }
+            if (res == OK) {
+                cachedStatus->emplace_back(statusInfo.isPhysicalCameraStatus,
+                        id.c_str(), physicalId.c_str(), statusInfo.status);
+            }
+        }
+        mCachedStatus.clear();
+
+        mInitialized = true;
+    }
+
+    // The cached status change callbacks cannot be fired directly from this
+    // function, due to same-thread deadlock trying to acquire mInterfaceMutex
+    // twice.
+    if (listener != nullptr) {
+        mInitialStatusCallbackFuture = std::async(std::launch::async,
+                &CameraProviderManager::ProviderInfo::notifyInitialStatusChange, this,
+                listener, std::move(cachedStatus));
+    }
 }
 
 CameraProviderManager::ProviderInfo::DeviceInfo* CameraProviderManager::findDeviceInfoLocked(
@@ -1387,6 +1630,23 @@ CameraProviderManager::isHiddenPhysicalCameraInternal(const std::string& cameraI
     return falseRet;
 }
 
+status_t CameraProviderManager::tryToInitializeAidlProviderLocked(
+        const std::string& providerName, const sp<ProviderInfo>& providerInfo) {
+    using aidl::android::hardware::camera::provider::ICameraProvider;
+    std::shared_ptr<ICameraProvider> interface =
+            ICameraProvider::fromBinder(ndk::SpAIBinder(
+                    AServiceManager_getService(providerName.c_str())));
+
+    if (interface == nullptr) {
+        ALOGW("%s: AIDL Camera provider HAL '%s' is not actually available", __FUNCTION__,
+                providerName.c_str());
+        return BAD_VALUE;
+    }
+
+    AidlProviderInfo *aidlProviderInfo = static_cast<AidlProviderInfo *>(providerInfo.get());
+    return aidlProviderInfo->initializeAidlProvider(interface, mDeviceState);
+}
+
 status_t CameraProviderManager::tryToInitializeHidlProviderLocked(
         const std::string& providerName, const sp<ProviderInfo>& providerInfo) {
     sp<provider::V2_4::ICameraProvider> interface;
@@ -1395,13 +1655,61 @@ status_t CameraProviderManager::tryToInitializeHidlProviderLocked(
     if (interface == nullptr) {
         // The interface may not be started yet. In that case, this is not a
         // fatal error.
-        ALOGW("%s: Camera provider HAL '%s' is not actually available", __FUNCTION__,
+        ALOGW("%s: HIDL Camera provider HAL '%s' is not actually available", __FUNCTION__,
                 providerName.c_str());
         return BAD_VALUE;
     }
 
     HidlProviderInfo *hidlProviderInfo = static_cast<HidlProviderInfo *>(providerInfo.get());
     return hidlProviderInfo->initializeHidlProvider(interface, mDeviceState);
+}
+
+status_t CameraProviderManager::addAidlProviderLocked(const std::string& newProvider) {
+    // Several camera provider instances can be temporarily present.
+    // Defer initialization of a new instance until the older instance is properly removed.
+    auto providerInstance = newProvider + "-" + std::to_string(mProviderInstanceId);
+    bool providerPresent = false;
+    bool preexisting =
+            (mAidlProviderWithBinders.find(newProvider) != mAidlProviderWithBinders.end());
+
+    // We need to use the extracted provider name here since 'newProvider' has
+    // the fully qualified name of the provider service in case of AIDL. We want
+    // just instance name.
+    using aidl::android::hardware::camera::provider::ICameraProvider;
+    std::string extractedProviderName =
+            newProvider.substr(std::string(ICameraProvider::descriptor).size() + 1);
+    for (const auto& providerInfo : mProviders) {
+        if (providerInfo->mProviderName == extractedProviderName) {
+            ALOGW("%s: Camera provider HAL with name '%s' already registered",
+                    __FUNCTION__, newProvider.c_str());
+            // Do not add new instances for lazy HAL external provider or aidl
+            // binders previously seen.
+            if (preexisting || providerInfo->isExternalLazyHAL()) {
+                return ALREADY_EXISTS;
+            } else {
+                ALOGW("%s: The new provider instance will get initialized immediately after the"
+                        " currently present instance is removed!", __FUNCTION__);
+                providerPresent = true;
+                break;
+            }
+        }
+    }
+
+    sp<AidlProviderInfo> providerInfo =
+            new AidlProviderInfo(extractedProviderName, providerInstance, this);
+
+    if (!providerPresent) {
+        status_t res = tryToInitializeAidlProviderLocked(newProvider, providerInfo);
+        if (res != OK) {
+            return res;
+        }
+        mAidlProviderWithBinders.emplace(newProvider);
+    }
+
+    mProviders.push_back(providerInfo);
+    mProviderInstanceId++;
+
+    return OK;
 }
 
 status_t CameraProviderManager::addHidlProviderLocked(const std::string& newProvider,
@@ -1467,9 +1775,13 @@ status_t CameraProviderManager::removeProvider(const std::string& provider) {
         for (const auto& providerInfo : mProviders) {
             if (providerInfo->mProviderName == removedProviderName) {
                 IPCTransport providerTransport = providerInfo->getIPCTransport();
+                std::string removedAidlProviderName = getFullAidlProviderName(removedProviderName);
                 switch(providerTransport) {
                     case IPCTransport::HIDL:
                         return tryToInitializeHidlProviderLocked(removedProviderName, providerInfo);
+                    case IPCTransport::AIDL:
+                        return tryToInitializeAidlProviderLocked(removedAidlProviderName,
+                                providerInfo);
                     default:
                         ALOGE("%s Unsupported Transport %d", __FUNCTION__, providerTransport);
                 }
@@ -1511,6 +1823,70 @@ CameraProviderManager::ProviderInfo::ProviderInfo(
 
 const std::string& CameraProviderManager::ProviderInfo::getType() const {
     return mType;
+}
+
+status_t CameraProviderManager::ProviderInfo::addDevice(
+        const std::string& name, CameraDeviceStatus initialStatus,
+        /*out*/ std::string* parsedId) {
+
+    ALOGI("Enumerating new camera device: %s", name.c_str());
+
+    uint16_t major, minor;
+    std::string type, id;
+
+    status_t res = parseDeviceName(name, &major, &minor, &type, &id);
+    if (res != OK) {
+        return res;
+    }
+    if (getIPCTransport() == IPCTransport::AIDL) {
+        // Till HIDL support exists, map AIDL versions to HIDL.
+        // TODO:b/196432585 Explore if we can get rid of this.
+        major += kAidlDeviceMajorOffset;
+        minor += kAidlDeviceMinorOffset;
+    }
+
+    if (type != mType) {
+        ALOGE("%s: Device type %s does not match provider type %s", __FUNCTION__,
+                type.c_str(), mType.c_str());
+        return BAD_VALUE;
+    }
+    if (mManager->isValidDeviceLocked(id, major)) {
+        ALOGE("%s: Device %s: ID %s is already in use for device major version %d", __FUNCTION__,
+                name.c_str(), id.c_str(), major);
+        return BAD_VALUE;
+    }
+
+    std::unique_ptr<DeviceInfo> deviceInfo;
+    switch (major) {
+        case 3:
+            deviceInfo = initializeDeviceInfo(name, mProviderTagid, id, minor);
+            break;
+        default:
+            ALOGE("%s: Device %s: Unsupported IDL device HAL major version %d:", __FUNCTION__,
+                    name.c_str(), major);
+            return BAD_VALUE;
+    }
+    if (deviceInfo == nullptr) return BAD_VALUE;
+    deviceInfo->notifyDeviceStateChange(getDeviceState());
+    deviceInfo->mStatus = initialStatus;
+    bool isAPI1Compatible = deviceInfo->isAPI1Compatible();
+
+    mDevices.push_back(std::move(deviceInfo));
+
+    mUniqueCameraIds.insert(id);
+    if (isAPI1Compatible) {
+        // addDevice can be called more than once for the same camera id if HAL
+        // supports openLegacy.
+        if (std::find(mUniqueAPI1CompatibleCameraIds.begin(), mUniqueAPI1CompatibleCameraIds.end(),
+                id) == mUniqueAPI1CompatibleCameraIds.end()) {
+            mUniqueAPI1CompatibleCameraIds.push_back(id);
+        }
+    }
+
+    if (parsedId != nullptr) {
+        *parsedId = id;
+    }
+    return OK;
 }
 
 void CameraProviderManager::ProviderInfo::removeDevice(std::string id) {
@@ -1641,6 +2017,197 @@ std::vector<std::unordered_set<std::string>>
 CameraProviderManager::ProviderInfo::getConcurrentCameraIdCombinations() {
     std::lock_guard<std::mutex> lock(mLock);
     return mConcurrentCameraIdCombinations;
+}
+
+void CameraProviderManager::ProviderInfo::cameraDeviceStatusChangeInternal(
+        const std::string& cameraDeviceName, CameraDeviceStatus newStatus) {
+    sp<StatusListener> listener;
+    std::string id;
+    std::lock_guard<std::mutex> lock(mInitLock);
+    CameraDeviceStatus internalNewStatus = newStatus;
+    if (!mInitialized) {
+        mCachedStatus.emplace_back(false /*isPhysicalCameraStatus*/,
+                cameraDeviceName.c_str(), std::string().c_str(),
+                internalNewStatus);
+        return;
+    }
+
+    {
+        std::lock_guard<std::mutex> lock(mLock);
+        if (OK != cameraDeviceStatusChangeLocked(&id, cameraDeviceName, newStatus)) {
+            return;
+        }
+        listener = mManager->getStatusListener();
+    }
+
+    // Call without lock held to allow reentrancy into provider manager
+    if (listener != nullptr) {
+        listener->onDeviceStatusChanged(String8(id.c_str()), internalNewStatus);
+    }
+}
+
+status_t CameraProviderManager::ProviderInfo::cameraDeviceStatusChangeLocked(
+        std::string* id, const std::string& cameraDeviceName,
+        CameraDeviceStatus newStatus) {
+    bool known = false;
+    std::string cameraId;
+    for (auto& deviceInfo : mDevices) {
+        if (deviceInfo->mName == cameraDeviceName) {
+            Mutex::Autolock l(deviceInfo->mDeviceAvailableLock);
+            ALOGI("Camera device %s status is now %s, was %s", cameraDeviceName.c_str(),
+                    FrameworkDeviceStatusToString(newStatus),
+                    FrameworkDeviceStatusToString(deviceInfo->mStatus));
+            deviceInfo->mStatus = newStatus;
+            // TODO: Handle device removal (NOT_PRESENT)
+            cameraId = deviceInfo->mId;
+            known = true;
+            deviceInfo->mIsDeviceAvailable =
+                (newStatus == CameraDeviceStatus::PRESENT);
+            deviceInfo->mDeviceAvailableSignal.signal();
+            break;
+        }
+    }
+    // Previously unseen device; status must not be NOT_PRESENT
+    if (!known) {
+        if (newStatus == CameraDeviceStatus::NOT_PRESENT) {
+            ALOGW("Camera provider %s says an unknown camera device %s is not present. Curious.",
+                mProviderName.c_str(), cameraDeviceName.c_str());
+            return BAD_VALUE;
+        }
+        addDevice(cameraDeviceName, newStatus, &cameraId);
+    } else if (newStatus == CameraDeviceStatus::NOT_PRESENT) {
+        removeDevice(cameraId);
+    } else if (isExternalLazyHAL()) {
+        // Do not notify CameraService for PRESENT->PRESENT (lazy HAL restart)
+        // because NOT_AVAILABLE is set on CameraService::connect and a PRESENT
+        // notif. would overwrite it
+        return BAD_VALUE;
+    }
+
+    if (reCacheConcurrentStreamingCameraIdsLocked() != OK) {
+        ALOGE("%s: CameraProvider %s could not re-cache concurrent streaming camera id list ",
+                  __FUNCTION__, mProviderName.c_str());
+    }
+    *id = cameraId;
+    return OK;
+}
+
+void CameraProviderManager::ProviderInfo::physicalCameraDeviceStatusChangeInternal(
+        const std::string& cameraDeviceName,
+        const std::string& physicalCameraDeviceName,
+        CameraDeviceStatus newStatus) {
+    sp<StatusListener> listener;
+    std::string id;
+    std::string physicalId;
+    std::lock_guard<std::mutex> lock(mInitLock);
+    if (!mInitialized) {
+        mCachedStatus.emplace_back(true /*isPhysicalCameraStatus*/, cameraDeviceName,
+                physicalCameraDeviceName, newStatus);
+        return;
+    }
+
+    {
+        std::lock_guard<std::mutex> lock(mLock);
+
+        if (OK != physicalCameraDeviceStatusChangeLocked(&id, &physicalId, cameraDeviceName,
+                physicalCameraDeviceName, newStatus)) {
+            return;
+        }
+
+        listener = mManager->getStatusListener();
+    }
+    // Call without lock held to allow reentrancy into provider manager
+    if (listener != nullptr) {
+        listener->onDeviceStatusChanged(String8(id.c_str()),
+                String8(physicalId.c_str()), newStatus);
+    }
+    return;
+}
+
+status_t CameraProviderManager::ProviderInfo::physicalCameraDeviceStatusChangeLocked(
+            std::string* id, std::string* physicalId,
+            const std::string& cameraDeviceName,
+            const std::string& physicalCameraDeviceName,
+            CameraDeviceStatus newStatus) {
+    bool known = false;
+    std::string cameraId;
+    for (auto& deviceInfo : mDevices) {
+        if (deviceInfo->mName == cameraDeviceName) {
+            cameraId = deviceInfo->mId;
+            if (!deviceInfo->mIsLogicalCamera) {
+                ALOGE("%s: Invalid combination of camera id %s, physical id %s",
+                        __FUNCTION__, cameraId.c_str(), physicalCameraDeviceName.c_str());
+                return BAD_VALUE;
+            }
+            if (std::find(deviceInfo->mPhysicalIds.begin(), deviceInfo->mPhysicalIds.end(),
+                    physicalCameraDeviceName) == deviceInfo->mPhysicalIds.end()) {
+                ALOGE("%s: Invalid combination of camera id %s, physical id %s",
+                        __FUNCTION__, cameraId.c_str(), physicalCameraDeviceName.c_str());
+                return BAD_VALUE;
+            }
+            ALOGI("Camera device %s physical device %s status is now %s",
+                    cameraDeviceName.c_str(), physicalCameraDeviceName.c_str(),
+                    FrameworkDeviceStatusToString(newStatus));
+            known = true;
+            break;
+        }
+    }
+    // Previously unseen device; status must not be NOT_PRESENT
+    if (!known) {
+        ALOGW("Camera provider %s says an unknown camera device %s-%s is not present. Curious.",
+                mProviderName.c_str(), cameraDeviceName.c_str(),
+                physicalCameraDeviceName.c_str());
+        return BAD_VALUE;
+    }
+
+    *id = cameraId;
+    *physicalId = physicalCameraDeviceName.c_str();
+    return OK;
+}
+
+void CameraProviderManager::ProviderInfo::torchModeStatusChangeInternal(
+        const std::string& cameraDeviceName,
+        TorchModeStatus newStatus) {
+    sp<StatusListener> listener;
+    SystemCameraKind systemCameraKind = SystemCameraKind::PUBLIC;
+    std::string id;
+    bool known = false;
+    {
+        // Hold mLock for accessing mDevices
+        std::lock_guard<std::mutex> lock(mLock);
+        for (auto& deviceInfo : mDevices) {
+            if (deviceInfo->mName == cameraDeviceName) {
+                ALOGI("Camera device %s torch status is now %s", cameraDeviceName.c_str(),
+                        FrameworkTorchStatusToString(newStatus));
+                id = deviceInfo->mId;
+                known = true;
+                systemCameraKind = deviceInfo->mSystemCameraKind;
+                if (TorchModeStatus::AVAILABLE_ON != newStatus) {
+                    mManager->removeRef(CameraProviderManager::DeviceMode::TORCH, id);
+                }
+                break;
+            }
+        }
+        if (!known) {
+            ALOGW("Camera provider %s says an unknown camera %s now has torch status %d. Curious.",
+                    mProviderName.c_str(), cameraDeviceName.c_str(), newStatus);
+            return;
+        }
+        // no lock needed since listener is set up only once during
+        // CameraProviderManager initialization and then never changed till it is
+        // destructed.
+        listener = mManager->getStatusListener();
+     }
+    // Call without lock held to allow reentrancy into provider manager
+    // The problem with holding mLock here is that we
+    // might be limiting re-entrancy : CameraService::onTorchStatusChanged calls
+    // back into CameraProviderManager which might try to hold mLock again (eg:
+    // findDeviceInfo, which should be holding mLock while iterating through
+    // each provider's devices).
+    if (listener != nullptr) {
+        listener->onTorchStatusChanged(String8(id.c_str()), newStatus, systemCameraKind);
+    }
+    return;
 }
 
 void CameraProviderManager::ProviderInfo::notifyDeviceInfoStateChangeLocked(

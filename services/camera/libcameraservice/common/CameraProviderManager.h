@@ -33,6 +33,7 @@
 #include <utils/Errors.h>
 #include <android/hardware/ICameraService.h>
 #include <utils/IPCTransport.h>
+#include <aidl/android/hardware/camera/provider/ICameraProvider.h>
 #include <android/hardware/camera/common/1.0/types.h>
 #include <android/hardware/camera/provider/2.5/ICameraProvider.h>
 #include <android/hardware/camera/provider/2.6/ICameraProviderCallback.h>
@@ -97,6 +98,26 @@ enum SystemCameraKind {
 #define CAMERA_DEVICE_API_VERSION_3_8 HARDWARE_DEVICE_API_VERSION(3, 8)
 
 /**
+ * The vendor tag descriptor class that takes HIDL/AIDL vendor tag information as
+ * input. Not part of VendorTagDescriptor class because that class is used
+ * in AIDL generated sources which don't have access to AIDL / HIDL headers.
+ */
+class IdlVendorTagDescriptor : public VendorTagDescriptor {
+public:
+    /**
+     * Create a VendorTagDescriptor object from the HIDL/AIDL VendorTagSection
+     * vector.
+     *
+     * Returns OK on success, or a negative error code.
+     */
+    template <class VendorTagSectionVectorType, class VendorTagSectionType>
+    static status_t createDescriptorFromIdl(
+            const VendorTagSectionVectorType& vts,
+            /*out*/
+            sp<VendorTagDescriptor>& descriptor);
+};
+
+/**
  * A manager for all camera providers available on an Android device.
  *
  * Responsible for enumerating providers and the individual camera devices
@@ -106,11 +127,13 @@ enum SystemCameraKind {
  * opening them for active use.
  *
  */
-class CameraProviderManager : virtual public hidl::manager::V1_0::IServiceNotification {
+class CameraProviderManager : virtual public hidl::manager::V1_0::IServiceNotification,
+        public virtual IServiceManager::LocalRegistrationCallback {
 public:
     // needs to be made friend strict since HidlProviderInfo needs to inherit
     // from CameraProviderManager::ProviderInfo which isn't a public member.
     friend struct HidlProviderInfo;
+    friend struct AidlProviderInfo;
     ~CameraProviderManager();
 
     // Tiny proxy for the static methods in a HIDL interface that communicate with the hardware
@@ -315,6 +338,18 @@ public:
      */
     status_t notifyDeviceStateChange(int64_t newState);
 
+    status_t openAidlSession(const std::string &id,
+        const std::shared_ptr<
+                aidl::android::hardware::camera::device::ICameraDeviceCallback>& callback,
+        /*out*/
+        std::shared_ptr<aidl::android::hardware::camera::device::ICameraDeviceSession> *session);
+
+    status_t openAidlInjectionSession(const std::string &id,
+        const std::shared_ptr<
+                aidl::android::hardware::camera::device::ICameraDeviceCallback>& callback,
+        /*out*/
+        std::shared_ptr<aidl::android::hardware::camera::device::ICameraInjectionSession> *session);
+
     /**
      * Open an active session to a camera device.
      *
@@ -338,6 +373,9 @@ public:
     virtual hardware::Return<void> onRegistration(const hardware::hidl_string& fqName,
             const hardware::hidl_string& name,
             bool preexisting) override;
+
+    // LocalRegistrationCallback::onServiceRegistration
+    virtual void onServiceRegistration(const String16& name, const sp<IBinder> &binder) override;
 
     /**
      * Dump out information about available providers and devices
@@ -402,6 +440,17 @@ private:
         sp<hardware::camera::provider::V2_4::ICameraProvider> mCameraProvider;
     };
 
+    struct AidlHalCameraProvider : public HalCameraProvider {
+        AidlHalCameraProvider(
+                const std::shared_ptr<
+                        aidl::android::hardware::camera::provider::ICameraProvider> &provider,
+                const char *descriptor) :
+                HalCameraProvider(descriptor), mCameraProvider(provider) { };
+     private:
+        std::shared_ptr<aidl::android::hardware::camera::provider::ICameraProvider> mCameraProvider;
+    };
+
+
     // Mapping from CameraDevice IDs to CameraProviders. This map is used to keep the
     // ICameraProvider alive while it is in use by the camera with the given ID for camera
     // capabilities
@@ -418,10 +467,11 @@ private:
     std::mutex mProviderInterfaceMapLock;
     struct ProviderInfo : public virtual RefBase {
         friend struct HidlProviderInfo;
+        friend struct AidlProviderInfo;
         const std::string mProviderName;
         const std::string mProviderInstance;
         const metadata_vendor_id_t mProviderTagid;
-        int mMinorVersion;
+        int32_t mMinorVersion;
         sp<VendorTagDescriptor> mVendorTagDescriptor;
         bool mSetTorchModeSupported;
         bool mIsRemote;
@@ -436,6 +486,7 @@ private:
 
         status_t dump(int fd, const Vector<String16>& args) const;
 
+        void initializeProviderInfoCommon(const std::vector<std::string> &devices);
         /**
          * Setup vendor tags for this provider
          */
@@ -451,6 +502,8 @@ private:
         virtual status_t notifyDeviceStateChange(int64_t newDeviceState) = 0;
 
         virtual bool successfullyStartedProviderInterface() = 0;
+
+        virtual int64_t getDeviceState() = 0;
 
         std::vector<std::unordered_set<std::string>> getConcurrentCameraIdCombinations();
 
@@ -468,7 +521,6 @@ private:
                     const std::vector<CameraIdAndSessionConfiguration> &cameraIdsAndSessionConfigs,
                     const std::set<std::string>& perfClassPrimaryCameraIds,
                     int targetSdkVersion, bool *isSupported) = 0;
-
 
         /**
          * Remove all devices associated with this provider and notify listeners
@@ -666,6 +718,14 @@ private:
         // End of scope for mInitLock
 
         std::future<void> mInitialStatusCallbackFuture;
+
+        std::unique_ptr<ProviderInfo::DeviceInfo>
+        virtual initializeDeviceInfo(
+                const std::string &name, const metadata_vendor_id_t tagId,
+                const std::string &id, uint16_t minorVersion) = 0;
+
+        virtual status_t reCacheConcurrentStreamingCameraIdsLocked() = 0;
+
         void notifyInitialStatusChange(sp<StatusListener> listener,
                 std::unique_ptr<std::vector<CameraStatusInfoT>> cachedStatus);
 
@@ -682,9 +742,45 @@ private:
         // Generate vendor tag id
         static metadata_vendor_id_t generateVendorTagId(const std::string &name);
 
+        status_t addDevice(
+                const std::string& name, CameraDeviceStatus initialStatus,
+                /*out*/ std::string* parsedId);
+
+        void cameraDeviceStatusChangeInternal(const std::string& cameraDeviceName,
+                CameraDeviceStatus newStatus);
+
+        status_t cameraDeviceStatusChangeLocked(
+                std::string* id, const std::string& cameraDeviceName,
+                CameraDeviceStatus newStatus);
+
+        void physicalCameraDeviceStatusChangeInternal(const std::string& cameraDeviceName,
+                const std::string& physicalCameraDeviceName,
+                CameraDeviceStatus newStatus);
+
+      status_t physicalCameraDeviceStatusChangeLocked(
+            std::string* id, std::string* physicalId,
+            const std::string& cameraDeviceName,
+            const std::string& physicalCameraDeviceName,
+            CameraDeviceStatus newStatus);
+
+        void torchModeStatusChangeInternal(const std::string& cameraDeviceName,
+                TorchModeStatus newStatus);
+
         void removeDevice(std::string id);
 
     };
+
+    template <class ProviderInfoType, class HalCameraProviderType>
+    status_t setTorchModeT(sp<ProviderInfo> &parentProvider,
+            std::shared_ptr<HalCameraProvider> *halCameraProvider);
+
+    // Try to get hidl provider services declared. Expects mInterfaceMutex to be
+    // locked. Also registers for hidl provider service notifications.
+    status_t tryToInitAndAddHidlProvidersLocked(HidlServiceInteractionProxy *hidlProxy);
+
+    // Try to get aidl provider services declared. Expects mInterfaceMutex to be
+    // locked. Also registers for aidl provider service notifications.
+    status_t tryToAddAidlProvidersLocked();
 
     /**
      * Save the ICameraProvider while it is being used by a camera or torch client
@@ -709,7 +805,12 @@ private:
 
     status_t addHidlProviderLocked(const std::string& newProvider, bool preexisting = false);
 
+    status_t addAidlProviderLocked(const std::string& newProvider);
+
     status_t tryToInitializeHidlProviderLocked(const std::string& providerName,
+            const sp<ProviderInfo>& providerInfo);
+
+    status_t tryToInitializeAidlProviderLocked(const std::string& providerName,
             const sp<ProviderInfo>& providerInfo);
 
     bool isLogicalCameraLocked(const std::string& id, std::vector<std::string>* physicalCameraIds);
@@ -725,6 +826,8 @@ private:
 
     size_t mProviderInstanceId = 0;
     std::vector<sp<ProviderInfo>> mProviders;
+    // Provider names of AIDL providers with retrieved binders.
+    std::set<std::string> mAidlProviderWithBinders;
 
     static const char* deviceStatusToString(
         const hardware::camera::common::V1_0::CameraDeviceStatus&);
@@ -744,6 +847,8 @@ private:
             std::vector<std::string>& systemCameraDeviceIds) const;
 
     status_t usbDeviceDetached(const std::string &usbDeviceId);
+    ndk::ScopedAStatus onAidlRegistration(const std::string& in_name,
+            const ::ndk::SpAIBinder& in_binder);
 };
 
 } // namespace android
