@@ -302,9 +302,9 @@ interface IAudioPolicyService {
 
     void setSurroundFormatEnabled(in AudioFormatDescription audioFormat, boolean enabled);
 
-    void setAssistantUid(int /* uid_t */ uid);
+    void setAssistantServicesUids(in int[] /* uid_t[] */ uids);
 
-    void setHotwordDetectionServiceUid(int /* uid_t */ uid);
+    void setActiveAssistantServicesUids(in int[] /* uid_t[] */ activeUids);
 
     void setA11yServicesUids(in int[] /* uid_t[] */ uids);
 
