@@ -295,6 +295,10 @@ ARTPAssembler::AssemblyStatus AAVCAssembler::addNALUnit(
 }
 
 void AAVCAssembler::checkSpsUpdated(const sp<ABuffer> &buffer) {
+    if (buffer->size() == 0) {
+        android_errorWriteLog(0x534e4554, "204077881");
+        return;
+    }
     const uint8_t *data = buffer->data();
     unsigned nalType = data[0] & 0x1f;
     if (nalType == 0x7) {
