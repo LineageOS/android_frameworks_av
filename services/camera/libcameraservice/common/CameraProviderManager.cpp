@@ -152,7 +152,7 @@ status_t CameraProviderManager::tryToAddAidlProvidersLocked() {
                     __FUNCTION__);
             return res;
         }
-        addAidlProviderLocked(aidlServiceName.c_str());
+        addAidlProviderLocked(aidlServiceName);
     }
     return OK;
 }
