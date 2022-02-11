@@ -39,7 +39,7 @@ using ::android::hardware::Void;
 
 namespace android {
 
-using ReadCommand = ::android::hardware::audio::CPP_VERSION::IStreamIn::ReadCommand;
+using ReadCommand = ::android::hardware::audio::CORE_TYPES_CPP_VERSION::IStreamIn::ReadCommand;
 
 using namespace ::android::hardware::audio::common::COMMON_TYPES_CPP_VERSION;
 using namespace ::android::hardware::audio::CORE_TYPES_CPP_VERSION;
@@ -907,7 +907,7 @@ void StreamOutHalHidl::onRecommendedLatencyModeChanged(
 
 
 StreamInHalHidl::StreamInHalHidl(
-        const sp<::android::hardware::audio::CPP_VERSION::IStreamIn>& stream)
+        const sp<::android::hardware::audio::CORE_TYPES_CPP_VERSION::IStreamIn>& stream)
         : StreamHalHidl(stream.get()), mStream(stream), mReaderClient(0), mEfGroup(nullptr) {
 }
 

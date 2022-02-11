@@ -300,13 +300,10 @@ status_t DeviceHalHidl::openInputStream(
         sinkMetadata.tracks[0].destination.device(std::move(hidlOutputDevice));
     }
 #endif
-#if MAJOR_VERSION == 7 && MINOR_VERSION == 1
-    Return<void> ret = mDevice->openInputStream_7_1(
-#else
     Return<void> ret = mDevice->openInputStream(
-#endif
             handle, hidlDevice, hidlConfig, hidlFlags, sinkMetadata,
-            [&](Result r, const sp<::android::hardware::audio::CPP_VERSION::IStreamIn>& result,
+            [&](Result r,
+                const sp<::android::hardware::audio::CORE_TYPES_CPP_VERSION::IStreamIn>& result,
                     const AudioConfig& suggestedConfig) {
                 retval = r;
                 if (retval == Result::OK) {
