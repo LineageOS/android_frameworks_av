@@ -329,6 +329,9 @@ public:
     /* Indicate JAVA services are ready (scheduling, power management ...) */
     virtual status_t systemReady() = 0;
 
+    // Indicate audio policy service is ready
+    virtual status_t audioPolicyReady() = 0;
+
     // Returns the number of frames per audio HAL buffer.
     virtual size_t frameCountHAL(audio_io_handle_t ioHandle) const = 0;
 
@@ -432,6 +435,8 @@ public:
     status_t setAudioPortConfig(const struct audio_port_config* config) override;
     audio_hw_sync_t getAudioHwSyncForSession(audio_session_t sessionId) override;
     status_t systemReady() override;
+    status_t audioPolicyReady() override;
+
     size_t frameCountHAL(audio_io_handle_t ioHandle) const override;
     status_t getMicrophones(std::vector<media::MicrophoneInfo>* microphones) override;
     status_t setAudioHalPids(const std::vector<pid_t>& pids) override;
@@ -514,6 +519,7 @@ public:
             SET_AUDIO_PORT_CONFIG = media::BnAudioFlingerService::TRANSACTION_setAudioPortConfig,
             GET_AUDIO_HW_SYNC_FOR_SESSION = media::BnAudioFlingerService::TRANSACTION_getAudioHwSyncForSession,
             SYSTEM_READY = media::BnAudioFlingerService::TRANSACTION_systemReady,
+            AUDIO_POLICY_READY = media::BnAudioFlingerService::TRANSACTION_audioPolicyReady,
             FRAME_COUNT_HAL = media::BnAudioFlingerService::TRANSACTION_frameCountHAL,
             GET_MICROPHONES = media::BnAudioFlingerService::TRANSACTION_getMicrophones,
             SET_MASTER_BALANCE = media::BnAudioFlingerService::TRANSACTION_setMasterBalance,
@@ -624,6 +630,7 @@ public:
     Status setAudioPortConfig(const media::AudioPortConfig& config) override;
     Status getAudioHwSyncForSession(int32_t sessionId, int32_t* _aidl_return) override;
     Status systemReady() override;
+    Status audioPolicyReady() override;
     Status frameCountHAL(int32_t ioHandle, int64_t* _aidl_return) override;
     Status getMicrophones(std::vector<media::MicrophoneInfoData>* _aidl_return) override;
     Status setAudioHalPids(const std::vector<int32_t>& pids) override;

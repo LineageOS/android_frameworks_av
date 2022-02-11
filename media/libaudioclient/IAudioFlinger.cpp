@@ -715,6 +715,10 @@ status_t AudioFlingerClientAdapter::systemReady() {
     return statusTFromBinderStatus(mDelegate->systemReady());
 }
 
+status_t AudioFlingerClientAdapter::audioPolicyReady() {
+    return statusTFromBinderStatus(mDelegate->audioPolicyReady());
+}
+
 size_t AudioFlingerClientAdapter::frameCountHAL(audio_io_handle_t ioHandle) const {
     auto result = [&]() -> ConversionResult<size_t> {
         int32_t ioHandleAidl = VALUE_OR_RETURN(legacy2aidl_audio_io_handle_t_int32_t(ioHandle));
@@ -1187,6 +1191,11 @@ Status AudioFlingerServerAdapter::getAudioHwSyncForSession(int32_t sessionId,
 
 Status AudioFlingerServerAdapter::systemReady() {
     return Status::fromStatusT(mDelegate->systemReady());
+}
+
+Status AudioFlingerServerAdapter::audioPolicyReady() {
+    mDelegate->audioPolicyReady();
+    return Status::ok();
 }
 
 Status AudioFlingerServerAdapter::frameCountHAL(int32_t ioHandle, int64_t* _aidl_return) {

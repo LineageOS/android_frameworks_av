@@ -190,6 +190,10 @@ public:
 
     wp<EffectChain> chain() const override { return nullptr; }
 
+    bool isAudioPolicyReady() const override {
+        return mManager.audioFlinger().isAudioPolicyReady();
+    }
+
     int newEffectId() { return mManager.audioFlinger().nextUniqueId(AUDIO_UNIQUE_ID_USE_EFFECT); }
 
     status_t addEffectToHal(audio_port_handle_t deviceId,
