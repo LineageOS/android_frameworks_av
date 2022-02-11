@@ -226,33 +226,31 @@ void ResourceManagerServiceFuzzer::setResources() {
         mFuzzedDataProvider->ConsumeIntegralInRange<size_t>(kMinThreadPairs, kMaxThreadPairs);
     // Make even number of threads
     size_t numThreads = numThreadPairs * 2;
-    resourceThreadArgs threadArgs;
-    vector<MediaResourceParcel> mediaResource;
+    resourceThreadArgs threadArgs[numThreadPairs];
+    vector<MediaResourceParcel> mediaResource[numThreadPairs];
     pthread_t pt[numThreads];
-    int i;
-    for (i = 0; i < numThreads - 1; i += 2) {
-        threadArgs.pid = mFuzzedDataProvider->ConsumeIntegral<int32_t>();
-        threadArgs.uid = mFuzzedDataProvider->ConsumeIntegral<int32_t>();
+    for (int k = 0; k < numThreadPairs; ++k) {
+        threadArgs[k].pid = mFuzzedDataProvider->ConsumeIntegral<int32_t>();
+        threadArgs[k].uid = mFuzzedDataProvider->ConsumeIntegral<int32_t>();
         int32_t mediaResourceType = mFuzzedDataProvider->ConsumeIntegralInRange<int32_t>(
             kMinResourceType, kMaxResourceType);
         int32_t mediaResourceSubType = mFuzzedDataProvider->ConsumeIntegralInRange<int32_t>(
             kMinResourceType, kMaxResourceType);
         uint64_t mediaResourceValue = mFuzzedDataProvider->ConsumeIntegral<uint64_t>();
-        threadArgs.service = mService;
+        threadArgs[k].service = mService;
         shared_ptr<IResourceManagerClient> testClient =
-            ::ndk::SharedRefBase::make<TestClient>(threadArgs.pid, mService);
-        threadArgs.testClient = testClient;
-        threadArgs.testClientId = getId(testClient);
-        mediaResource.push_back(MediaResource(static_cast<MedResType>(mediaResourceType),
-                                              static_cast<MedResSubType>(mediaResourceSubType),
-                                              mediaResourceValue));
-        threadArgs.mediaResource = mediaResource;
-        pthread_create(&pt[i], nullptr, addResource, &threadArgs);
-        pthread_create(&pt[i + 1], nullptr, removeResource, &threadArgs);
-        mediaResource.clear();
+                ::ndk::SharedRefBase::make<TestClient>(threadArgs[k].pid, mService);
+        threadArgs[k].testClient = testClient;
+        threadArgs[k].testClientId = getId(testClient);
+        mediaResource[k].push_back(MediaResource(static_cast<MedResType>(mediaResourceType),
+                                                 static_cast<MedResSubType>(mediaResourceSubType),
+                                                 mediaResourceValue));
+        threadArgs[k].mediaResource = mediaResource[k];
+        pthread_create(&pt[2 * k], nullptr, addResource, &threadArgs[k]);
+        pthread_create(&pt[2 * k + 1], nullptr, removeResource, &threadArgs[k]);
     }
 
-    for (i = 0; i < numThreads; ++i) {
+    for (int i = 0; i < numThreads; ++i) {
         pthread_join(pt[i], nullptr);
     }
 
@@ -265,14 +263,14 @@ void ResourceManagerServiceFuzzer::setResources() {
     int32_t mediaResourceSubType =
         mFuzzedDataProvider->ConsumeIntegralInRange<int32_t>(kMinResourceType, kMaxResourceType);
     uint64_t mediaResourceValue = mFuzzedDataProvider->ConsumeIntegral<uint64_t>();
-    mediaResource.push_back(MediaResource(static_cast<MedResType>(mediaResourceType),
-                                          static_cast<MedResSubType>(mediaResourceSubType),
-                                          mediaResourceValue));
+    vector<MediaResourceParcel> mediaRes;
+    mediaRes.push_back(MediaResource(static_cast<MedResType>(mediaResourceType),
+                                     static_cast<MedResSubType>(mediaResourceSubType),
+                                     mediaResourceValue));
     bool result;
-    mService->reclaimResource(pidZero, mediaResource, &result);
-    mService->removeResource(pidZero, getId(testClient), mediaResource);
+    mService->reclaimResource(pidZero, mediaRes, &result);
+    mService->removeResource(pidZero, getId(testClient), mediaRes);
     mService->removeClient(pidZero, getId(testClient));
-    mediaResource.clear();
 }
 
 void ResourceManagerServiceFuzzer::setServiceLog() {
