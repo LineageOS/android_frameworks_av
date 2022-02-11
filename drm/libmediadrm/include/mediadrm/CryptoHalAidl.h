@@ -17,14 +17,13 @@
 #ifndef CRYPTO_HAL_AIDL_H_
 #define CRYPTO_HAL_AIDL_H_
 
-#include <aidl/android/hardware/drm/ICryptoFactory.h>
 #include <aidl/android/hardware/drm/ICryptoPlugin.h>
-
+#include <aidl/android/hardware/drm/IDrmFactory.h>
 #include <mediadrm/ICrypto.h>
 #include <utils/KeyedVector.h>
 #include <utils/threads.h>
 
-using ICryptoFactoryAidl = ::aidl::android::hardware::drm::ICryptoFactory;
+using IDrmFactoryAidl = ::aidl::android::hardware::drm::IDrmFactory;
 using ICryptoPluginAidl = ::aidl::android::hardware::drm::ICryptoPlugin;
 using ::aidl::android::hardware::drm::Uuid;
 
@@ -63,7 +62,7 @@ struct CryptoHalAidl : public ICrypto {
   private:
     mutable Mutex mLock;
 
-    const std::vector<std::shared_ptr<ICryptoFactoryAidl>> mFactories;
+    const std::vector<std::shared_ptr<IDrmFactoryAidl>> mFactories;
     std::shared_ptr<ICryptoPluginAidl> mPlugin;
 
     /**
@@ -77,12 +76,12 @@ struct CryptoHalAidl : public ICrypto {
     KeyedVector<int32_t, size_t> mHeapSizes;
     int32_t mHeapSeqNum;
 
-    std::vector<std::shared_ptr<ICryptoFactoryAidl>> makeCryptoFactories();
     std::shared_ptr<ICryptoPluginAidl> makeCryptoPlugin(
-            const std::shared_ptr<ICryptoFactoryAidl>& factory, const Uuid& uuidAidl,
+            const std::shared_ptr<IDrmFactoryAidl>& factory, const Uuid& uuidAidl,
             const std::vector<uint8_t> initData);
 
     status_t checkSharedBuffer(const ::SharedBuffer& buffer);
+    bool isCryptoSchemeSupportedInternal(const uint8_t uuid[16], int* factoryIdx);
 
     DISALLOW_EVIL_CONSTRUCTORS(CryptoHalAidl);
 };

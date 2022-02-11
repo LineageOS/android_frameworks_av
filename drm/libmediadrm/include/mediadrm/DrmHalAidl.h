@@ -121,7 +121,6 @@ struct DrmHalAidl : public IDrm{
     std::shared_ptr<DrmHalListener> mListener;
     const std::vector<std::shared_ptr<IDrmFactoryAidl>> mFactories;
     std::shared_ptr<IDrmPluginAidl> mPlugin;
-    std::vector<std::shared_ptr<IDrmFactoryAidl>> makeDrmFactories();
     status_t mInitCheck;
     std::vector<std::shared_ptr<DrmSessionClient>> mOpenSessions;
     void cleanup();

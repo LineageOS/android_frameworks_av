@@ -17,6 +17,8 @@
 //#define LOG_NDEBUG 0
 #define LOG_TAG "DrmHalAidl"
 
+#include <array>
+#include <algorithm>
 #include <android/binder_auto_utils.h>
 #include <android/binder_manager.h>
 #include <media/PluginMetricsReporting.h>
@@ -29,7 +31,7 @@
 #include <mediadrm/DrmUtils.h>
 
 using ::android::DrmUtils::statusAidlToStatusT;
-
+using ::aidl::android::hardware::drm::CryptoSchemes;
 using ::aidl::android::hardware::drm::DrmMetricNamedValue;
 using ::aidl::android::hardware::drm::DrmMetricValue;
 using ::aidl::android::hardware::drm::HdcpLevel;
@@ -93,12 +95,6 @@ namespace android {
     {                                            \
         if (mInitCheck != OK) return mInitCheck; \
     }
-
-static Uuid toAidlUuid(const uint8_t* uuid) {
-    Uuid uuidAidl;
-    uuidAidl.uuid = std::vector<uint8_t>(uuid, uuid + 16);
-    return uuidAidl;
-}
 
 template <typename Byte = uint8_t>
 static std::vector<Byte> toStdVec(const Vector<uint8_t>& vector) {
@@ -395,7 +391,7 @@ DrmHalAidl::DrmSessionClient::~DrmSessionClient() {
 // DrmHalAidl methods
 DrmHalAidl::DrmHalAidl()
     : mListener(::ndk::SharedRefBase::make<DrmHalListener>(&mMetrics)),
-      mFactories(makeDrmFactories()),
+      mFactories(DrmUtils::makeDrmFactoriesAidl()),
       mInitCheck((mFactories.size() == 0) ? ERROR_UNSUPPORTED : NO_INIT) {}
 
 status_t DrmHalAidl::initCheck() const {
@@ -403,27 +399,6 @@ status_t DrmHalAidl::initCheck() const {
 }
 
 DrmHalAidl::~DrmHalAidl() {}
-
-std::vector<std::shared_ptr<IDrmFactoryAidl>> DrmHalAidl::makeDrmFactories() {
-    std::vector<std::shared_ptr<IDrmFactoryAidl>> factories;
-    AServiceManager_forEachDeclaredInstance(
-            IDrmFactoryAidl::descriptor, static_cast<void*>(&factories),
-            [](const char* instance, void* context) {
-                auto fullName = std::string(IDrmFactoryAidl::descriptor) + "/" + std::string(instance);
-                auto factory = IDrmFactoryAidl::fromBinder(
-                        ::ndk::SpAIBinder(AServiceManager_getService(fullName.c_str())));
-                if (factory == nullptr) {
-                    ALOGE("not found IDrmFactory. Instance name:[%s]", fullName.c_str());
-                    return;
-                }
-
-                ALOGI("found IDrmFactory. Instance name:[%s]", fullName.c_str());
-                static_cast<std::vector<std::shared_ptr<IDrmFactoryAidl>>*>(context)->emplace_back(
-                        factory);
-            });
-
-    return factories;
-}
 
 status_t DrmHalAidl::setListener(const sp<IDrmClient>& listener) {
     mListener->setListener(listener);
@@ -434,16 +409,31 @@ status_t DrmHalAidl::isCryptoSchemeSupported(const uint8_t uuid[16], const Strin
                                              DrmPlugin::SecurityLevel level, bool* isSupported) {
     Mutex::Autolock autoLock(mLock);
     *isSupported = false;
-    Uuid uuidAidl = toAidlUuid(uuid);
+    Uuid uuidAidl = DrmUtils::toAidlUuid(uuid);
     SecurityLevel levelAidl = toAidlSecurityLevel(level);
     std::string mimeTypeStr = mimeType.string();
 
     for (ssize_t i = mFactories.size() - 1; i >= 0; i--) {
-        if (mFactories[i]
-                    ->isCryptoSchemeSupported(uuidAidl, mimeTypeStr, levelAidl, isSupported)
-                    .isOk()) {
-            if (*isSupported) break;
+        CryptoSchemes schemes{};
+        auto err = mFactories[i]->getSupportedCryptoSchemes(&schemes);
+        if (!err.isOk() || !std::count(schemes.uuids.begin(), schemes.uuids.end(), uuidAidl)) {
+            continue;
         }
+
+        if (levelAidl != SecurityLevel::DEFAULT && levelAidl != SecurityLevel::UNKNOWN) {
+            if (levelAidl > schemes.maxLevel || levelAidl < schemes.minLevel) {
+                continue;
+            }
+        }
+
+        if (!mimeTypeStr.empty()) {
+            if (!std::count(schemes.mimeTypes.begin(), schemes.mimeTypes.end(), mimeTypeStr)) {
+                continue;
+            }
+        }
+
+        *isSupported = true;
+        break;
     }
 
     return OK;
@@ -452,14 +442,14 @@ status_t DrmHalAidl::isCryptoSchemeSupported(const uint8_t uuid[16], const Strin
 status_t DrmHalAidl::createPlugin(const uint8_t uuid[16], const String8& appPackageName) {
     Mutex::Autolock autoLock(mLock);
 
-    Uuid uuidAidl = toAidlUuid(uuid);
+    Uuid uuidAidl = DrmUtils::toAidlUuid(uuid);
     std::string appPackageNameAidl = toStdString(appPackageName);
     std::shared_ptr<IDrmPluginAidl> pluginAidl;
     mMetrics.SetAppPackageName(appPackageName);
     mMetrics.SetAppUid(AIBinder_getCallingUid());
     for (ssize_t i = mFactories.size() - 1; i >= 0; i--) {
         ::ndk::ScopedAStatus status =
-                mFactories[i]->createPlugin(uuidAidl, appPackageNameAidl, &pluginAidl);
+                mFactories[i]->createDrmPlugin(uuidAidl, appPackageNameAidl, &pluginAidl);
         if (status.isOk()) {
             if (pluginAidl != NULL) {
                 mPlugin = pluginAidl;
@@ -1076,7 +1066,8 @@ status_t DrmHalAidl::requiresSecureDecoder(const char* mime, bool* required) con
     INIT_CHECK();
 
     std::string mimeAidl(mime);
-    ::ndk::ScopedAStatus status = mPlugin->requiresSecureDecoderDefault(mimeAidl, required);
+    ::ndk::ScopedAStatus status =
+        mPlugin->requiresSecureDecoder(mimeAidl, SecurityLevel::DEFAULT, required);
     if (!status.isOk()) {
         DrmUtils::LOG2BE("requiresSecureDecoder txn failed: %d", status.getServiceSpecificError());
         return DEAD_OBJECT;
