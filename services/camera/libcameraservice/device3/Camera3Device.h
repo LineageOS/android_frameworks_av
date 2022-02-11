@@ -78,11 +78,17 @@ class Camera3Device :
             public camera3::RequestBufferInterface,
             public camera3::FlushBufferInterface {
   friend class HidlCamera3Device;
+  friend class AidlCamera3Device;
   public:
 
     explicit Camera3Device(const String8& id, bool overrideForPerfClass, bool legacyClient = false);
 
     virtual ~Camera3Device();
+    // Delete and optionally close native handles and clear the input vector afterward
+    static void cleanupNativeHandles(
+            std::vector<native_handle_t*> *handles, bool closeFd = false);
+
+    IPCTransport getTransportType() { return mInterface->getTransportType(); }
 
     /**
      * CameraDeviceBase interface
@@ -136,7 +142,8 @@ class Camera3Device :
             int dynamicRangeProfile =
             ANDROID_REQUEST_AVAILABLE_DYNAMIC_RANGE_PROFILES_MAP_STANDARD,
             int streamUseCase = ANDROID_SCALER_AVAILABLE_STREAM_USE_CASES_DEFAULT,
-            int timestampBase = OutputConfiguration::TIMESTAMP_BASE_DEFAULT) override;
+            int timestampBase = OutputConfiguration::TIMESTAMP_BASE_DEFAULT,
+            int mirrorMode = OutputConfiguration::MIRROR_MODE_AUTO) override;
 
     status_t createStream(const std::vector<sp<Surface>>& consumers,
             bool hasDeferredConsumer, uint32_t width, uint32_t height, int format,
@@ -150,7 +157,8 @@ class Camera3Device :
             int dynamicRangeProfile =
             ANDROID_REQUEST_AVAILABLE_DYNAMIC_RANGE_PROFILES_MAP_STANDARD,
             int streamUseCase = ANDROID_SCALER_AVAILABLE_STREAM_USE_CASES_DEFAULT,
-            int timestampBase = OutputConfiguration::TIMESTAMP_BASE_DEFAULT) override;
+            int timestampBase = OutputConfiguration::TIMESTAMP_BASE_DEFAULT,
+            int mirrorMode = OutputConfiguration::MIRROR_MODE_AUTO) override;
 
     status_t createInputStream(
             uint32_t width, uint32_t height, int format, bool isMultiResolution,
@@ -449,10 +457,6 @@ class Camera3Device :
             bufferRecords->takeRequestedBufferMap(mBufferRecords);
             return OK;
         }
-
-        // Delete and optionally close native handles and clear the input vector afterward
-        static void cleanupNativeHandles(
-                std::vector<native_handle_t*> *handles, bool closeFd = false);
 
         virtual void onBufferFreed(int streamId, const native_handle_t* handle) override;
 

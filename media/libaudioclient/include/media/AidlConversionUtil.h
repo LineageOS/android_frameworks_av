@@ -77,6 +77,26 @@ status_t convertRange(InputIterator start,
 }
 
 /**
+ * A generic template that helps convert containers of convertible types, using iterators.
+ * Uses a limit as maximum conversion items.
+ */
+template<typename InputIterator, typename OutputIterator, typename Func>
+status_t convertRangeWithLimit(InputIterator start,
+                      InputIterator end,
+                      OutputIterator out,
+                      const Func& itemConversion,
+                      const size_t limit) {
+    InputIterator last = end;
+    if (end - start > limit) {
+        last = start + limit;
+    }
+    for (InputIterator iter = start; (iter != last); ++iter, ++out) {
+        *out = VALUE_OR_RETURN_STATUS(itemConversion(*iter));
+    }
+    return OK;
+}
+
+/**
  * A generic template that helps convert containers of convertible types.
  */
 template<typename OutputContainer, typename InputContainer, typename Func>

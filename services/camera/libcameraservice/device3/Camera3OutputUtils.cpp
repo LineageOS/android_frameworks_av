@@ -532,7 +532,7 @@ void processCaptureResult(CaptureOutputStates& states, const camera_capture_resu
                     auto orientation = deviceInfo->second.find(ANDROID_SENSOR_ORIENTATION);
                     if (orientation.count > 0) {
                         ret = CameraUtils::getRotationTransform(deviceInfo->second,
-                                &request.transform);
+                                OutputConfiguration::MIRROR_MODE_AUTO, &request.transform);
                         if (ret != OK) {
                             ALOGE("%s: Failed to calculate current stream transformation: %s (%d)",
                                     __FUNCTION__, strerror(-ret), ret);

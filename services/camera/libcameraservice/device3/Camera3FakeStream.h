@@ -52,7 +52,7 @@ class Camera3FakeStream :
 
     virtual void     dump(int fd, const Vector<String16> &args) const;
 
-    status_t         setTransform(int transform);
+    status_t         setTransform(int transform, bool mayChangeMirror);
 
     virtual status_t detachBuffer(sp<GraphicBuffer>* buffer, int* fenceFd);
 

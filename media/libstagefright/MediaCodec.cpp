@@ -256,7 +256,7 @@ struct MediaCodec::ResourceManagerServiceProxy : public RefBase {
             const std::shared_ptr<IResourceManagerClient> &client);
     virtual ~ResourceManagerServiceProxy();
 
-    void init();
+    status_t init();
 
     // implements DeathRecipient
     static void BinderDiedCallback(void* cookie);
@@ -285,6 +285,9 @@ MediaCodec::ResourceManagerServiceProxy::ResourceManagerServiceProxy(
         pid_t pid, uid_t uid, const std::shared_ptr<IResourceManagerClient> &client)
         : mPid(pid), mUid(uid), mClient(client),
           mDeathRecipient(AIBinder_DeathRecipient_new(BinderDiedCallback)) {
+    if (mUid == MediaCodec::kNoUid) {
+        mUid = AIBinder_getCallingUid();
+    }
     if (mPid == MediaCodec::kNoPid) {
         mPid = AIBinder_getCallingPid();
     }
@@ -303,12 +306,26 @@ MediaCodec::ResourceManagerServiceProxy::~ResourceManagerServiceProxy() {
     }
 }
 
-void MediaCodec::ResourceManagerServiceProxy::init() {
+status_t MediaCodec::ResourceManagerServiceProxy::init() {
     ::ndk::SpAIBinder binder(AServiceManager_getService("media.resource_manager"));
     mService = IResourceManagerService::fromBinder(binder);
     if (mService == nullptr) {
         ALOGE("Failed to get ResourceManagerService");
-        return;
+        return UNKNOWN_ERROR;
+    }
+
+    int callerPid = AIBinder_getCallingPid();
+    int callerUid = AIBinder_getCallingUid();
+    if (mPid != callerPid || mUid != callerUid) {
+        // Media processes don't need special permissions to act on behalf of other processes.
+        if (callerUid != AID_MEDIA) {
+            char const * permission = "android.permission.MEDIA_RESOURCE_OVERRIDE_PID";
+            if (!checkCallingPermission(String16(permission))) {
+                ALOGW("%s is required to override the caller's PID for media resource management.",
+                        permission);
+                return PERMISSION_DENIED;
+            }
+        }
     }
 
     // Kill clients pending removal.
@@ -319,6 +336,7 @@ void MediaCodec::ResourceManagerServiceProxy::init() {
 
     // after this, require mLock whenever using mService
     AIBinder_linkToDeath(mService->asBinder().get(), mDeathRecipient.get(), this);
+    return OK;
 }
 
 //static
@@ -801,12 +819,7 @@ MediaCodec::MediaCodec(
       mInputBufferCounter(0),
       mGetCodecBase(getCodecBase),
       mGetCodecInfo(getCodecInfo) {
-    if (uid == kNoUid) {
-        mUid = AIBinder_getCallingUid();
-    } else {
-        mUid = uid;
-    }
-    mResourceManagerProxy = new ResourceManagerServiceProxy(pid, mUid,
+    mResourceManagerProxy = new ResourceManagerServiceProxy(pid, uid,
             ::ndk::SharedRefBase::make<ResourceManagerClient>(this));
     if (!mGetCodecBase) {
         mGetCodecBase = [](const AString &name, const char *owner) {
@@ -835,7 +848,6 @@ MediaCodec::MediaCodec(
             return NAME_NOT_FOUND;
         };
     }
-
     initMediametrics();
 }
 
@@ -1393,7 +1405,11 @@ static const CodecListCache &GetCodecListCache() {
 }
 
 status_t MediaCodec::init(const AString &name) {
-    mResourceManagerProxy->init();
+    status_t err = mResourceManagerProxy->init();
+    if (err != OK) {
+        mCodec = NULL; // remove the codec
+        return err;
+    }
 
     // save init parameters for reset
     mInitName = name;
@@ -1408,7 +1424,7 @@ status_t MediaCodec::init(const AString &name) {
     bool secureCodec = false;
     const char *owner = "";
     if (!name.startsWith("android.filter.")) {
-        status_t err = mGetCodecInfo(name, &mCodecInfo);
+        err = mGetCodecInfo(name, &mCodecInfo);
         if (err != OK) {
             mCodec = NULL;  // remove the codec.
             return err;
@@ -1481,7 +1497,6 @@ status_t MediaCodec::init(const AString &name) {
         mBatteryChecker = new BatteryChecker(new AMessage(kWhatCheckBatteryStats, this));
     }
 
-    status_t err;
     std::vector<MediaResourceParcel> resources;
     resources.push_back(MediaResource::CodecResource(secureCodec, toMediaResourceSubType(mDomain)));
     for (int i = 0; i <= kMaxRetry; ++i) {
@@ -4674,7 +4689,6 @@ status_t MediaCodec::queueCSDInputBuffer(size_t bufferIndex) {
     mCSD.erase(mCSD.begin());
     std::shared_ptr<C2Buffer> c2Buffer;
     sp<hardware::HidlMemory> memory;
-    size_t offset = 0;
 
     if (mFlags & kFlagUseBlockModel) {
         if (hasCryptoOrDescrambler()) {
@@ -4695,7 +4709,6 @@ status_t MediaCodec::queueCSDInputBuffer(size_t bufferIndex) {
             memcpy(mem->unsecurePointer(), csd->data(), csd->size());
             ssize_t heapOffset;
             memory = hardware::fromHeap(mem->getMemory(&heapOffset, nullptr));
-            offset += heapOffset;
         } else {
             std::shared_ptr<C2LinearBlock> block =
                 FetchLinearBlock(csd->size(), {std::string{mComponentName.c_str()}});

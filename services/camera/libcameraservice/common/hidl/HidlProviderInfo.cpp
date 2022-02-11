@@ -14,6 +14,8 @@
  * limitations under the License.
  */
 #include "HidlProviderInfo.h"
+#include "common/HalConversionsTemplated.h"
+#include "common/CameraProviderInfoTemplated.h"
 
 #include <cutils/properties.h>
 
@@ -42,6 +44,7 @@ using hardware::camera2::utils::CameraIdAndSessionConfiguration;
 
 
 using StatusListener = CameraProviderManager::StatusListener;
+using HalDeviceStatusType = android::hardware::camera::common::V1_0::CameraDeviceStatus;
 
 using hardware::camera::provider::V2_5::DeviceState;
 using hardware::ICameraService;
@@ -109,83 +112,6 @@ const char* statusToString(const Status& s) {
     }
     ALOGW("Unexpected HAL status code %d", s);
     return "UNKNOWN_ERROR";
-}
-
-static common::V1_0::CameraDeviceStatus mapToHidlCameraDeviceStatus(const CameraDeviceStatus& s)  {
-    switch(s) {
-        case CameraDeviceStatus::PRESENT:
-            return common::V1_0::CameraDeviceStatus::PRESENT;
-        case CameraDeviceStatus::NOT_PRESENT:
-            return common::V1_0::CameraDeviceStatus::NOT_PRESENT;
-        case CameraDeviceStatus::ENUMERATING:
-            return common::V1_0::CameraDeviceStatus::ENUMERATING;
-    }
-    ALOGW("Unexpectedcamera device status code %d", s);
-    return common::V1_0::CameraDeviceStatus::NOT_PRESENT;
-}
-
-static CameraDeviceStatus hidlToInternalCameraDeviceStatus(
-        const common::V1_0::CameraDeviceStatus& s)  {
-    switch(s) {
-        case common::V1_0::CameraDeviceStatus::PRESENT:
-            return CameraDeviceStatus::PRESENT;
-        case common::V1_0::CameraDeviceStatus::NOT_PRESENT:
-            return CameraDeviceStatus::NOT_PRESENT;
-        case common::V1_0::CameraDeviceStatus::ENUMERATING:
-            return CameraDeviceStatus::ENUMERATING;
-    }
-    ALOGW("Unexpectedcamera device status code %d", s);
-    return CameraDeviceStatus::NOT_PRESENT;
-}
-
-static TorchModeStatus hidlToInternalTorchModeStatus(
-        const common::V1_0::TorchModeStatus& s)  {
-    switch(s) {
-        case common::V1_0::TorchModeStatus::NOT_AVAILABLE:
-            return TorchModeStatus::NOT_AVAILABLE;
-        case common::V1_0::TorchModeStatus::AVAILABLE_OFF:
-            return TorchModeStatus::AVAILABLE_OFF;
-        case common::V1_0::TorchModeStatus::AVAILABLE_ON:
-            return TorchModeStatus::AVAILABLE_ON;
-    }
-    ALOGW("Unexpectedcamera torch mode status code %d", s);
-    return TorchModeStatus::NOT_AVAILABLE;
-}
-
-static CameraResourceCost hidlToInternalResourceCost(
-        const common::V1_0::CameraResourceCost& s)  {
-    CameraResourceCost internalResourceCost;
-    internalResourceCost.resourceCost = s.resourceCost;
-    for (const auto device : s.conflictingDevices) {
-        internalResourceCost.conflictingDevices.emplace_back(device.c_str());
-    }
-    return internalResourceCost;
-}
-
-static const char* deviceStatusToString(const common::V1_0::CameraDeviceStatus& s) {
-    switch(s) {
-        case common::V1_0::CameraDeviceStatus::NOT_PRESENT:
-            return "NOT_PRESENT";
-        case common::V1_0::CameraDeviceStatus::PRESENT:
-            return "PRESENT";
-        case common::V1_0::CameraDeviceStatus::ENUMERATING:
-            return "ENUMERATING";
-    }
-    ALOGW("Unexpected HAL device status code %d", s);
-    return "UNKNOWN_STATUS";
-}
-
-static const char* torchStatusToString(const common::V1_0::TorchModeStatus& s) {
-    switch(s) {
-        case common::V1_0::TorchModeStatus::NOT_AVAILABLE:
-            return "NOT_AVAILABLE";
-        case common::V1_0::TorchModeStatus::AVAILABLE_OFF:
-            return "AVAILABLE_OFF";
-        case common::V1_0::TorchModeStatus::AVAILABLE_ON:
-            return "AVAILABLE_ON";
-    }
-    ALOGW("Unexpected HAL torch mode status code %d", s);
-    return "UNKNOWN_STATUS";
 }
 
 status_t HidlProviderInfo::initializeHidlProvider(
@@ -326,55 +252,7 @@ status_t HidlProviderInfo::initializeHidlProvider(
 
     mIsRemote = interface->isRemote();
 
-    sp<StatusListener> listener = mManager->getStatusListener();
-    for (auto& device : devices) {
-        std::string id;
-        status_t res = addDevice(device, common::V1_0::CameraDeviceStatus::PRESENT, &id);
-        if (res != OK) {
-            ALOGE("%s: Unable to enumerate camera device '%s': %s (%d)",
-                    __FUNCTION__, device.c_str(), strerror(-res), res);
-            continue;
-        }
-    }
-
-    ALOGI("Camera provider %s ready with %zu camera devices",
-            mProviderName.c_str(), mDevices.size());
-
-    // Process cached status callbacks
-    std::unique_ptr<std::vector<CameraStatusInfoT>> cachedStatus =
-            std::make_unique<std::vector<CameraStatusInfoT>>();
-    {
-        std::lock_guard<std::mutex> lock(mInitLock);
-
-        for (auto& statusInfo : mCachedStatus) {
-            std::string id, physicalId;
-            status_t res = OK;
-            if (statusInfo.isPhysicalCameraStatus) {
-                res = physicalCameraDeviceStatusChangeLocked(&id, &physicalId,
-                    statusInfo.cameraId, statusInfo.physicalCameraId,
-                    mapToHidlCameraDeviceStatus(statusInfo.status));
-            } else {
-                res = cameraDeviceStatusChangeLocked(&id, statusInfo.cameraId,
-                        mapToHidlCameraDeviceStatus(statusInfo.status));
-            }
-            if (res == OK) {
-                cachedStatus->emplace_back(statusInfo.isPhysicalCameraStatus,
-                        id.c_str(), physicalId.c_str(), statusInfo.status);
-            }
-        }
-        mCachedStatus.clear();
-
-        mInitialized = true;
-    }
-
-    // The cached status change callbacks cannot be fired directly from this
-    // function, due to same-thread deadlock trying to acquire mInterfaceMutex
-    // twice.
-    if (listener != nullptr) {
-        mInitialStatusCallbackFuture = std::async(std::launch::async,
-                &CameraProviderManager::ProviderInfo::notifyInitialStatusChange, this,
-                listener, std::move(cachedStatus));
-    }
+    initializeProviderInfoCommon(devices);
 
     return OK;
 }
@@ -409,7 +287,10 @@ status_t HidlProviderInfo::setUpVendorTags() {
 
     // Read all vendor tag definitions into a descriptor
     status_t res;
-    if ((res = HidlVendorTagDescriptor::createDescriptorFromHidl(vts, /*out*/mVendorTagDescriptor))
+    if ((res = IdlVendorTagDescriptor::createDescriptorFromIdl<
+                hardware::hidl_vec<hardware::camera::common::V1_0::VendorTagSection>,
+                        hardware::camera::common::V1_0::VendorTagSection>(vts,
+                                /*out*/mVendorTagDescriptor))
             != OK) {
         ALOGE("%s: Could not generate descriptor from vendor tag operations,"
                 "received error %s (%d). Camera clients will not be able to use"
@@ -539,256 +420,25 @@ HidlProviderInfo::startProviderInterface() {
 
 hardware::Return<void> HidlProviderInfo::cameraDeviceStatusChange(
         const hardware::hidl_string& cameraDeviceName,
-        hardware::camera::common::V1_0::CameraDeviceStatus newStatus) {
-    sp<StatusListener> listener;
-    std::string id;
-    std::lock_guard<std::mutex> lock(mInitLock);
-    CameraDeviceStatus internalNewStatus = hidlToInternalCameraDeviceStatus(newStatus);
-    if (!mInitialized) {
-        mCachedStatus.emplace_back(false /*isPhysicalCameraStatus*/,
-                cameraDeviceName.c_str(), std::string().c_str(),
-                internalNewStatus);
-        return hardware::Void();
-    }
-
-    {
-        std::lock_guard<std::mutex> lock(mLock);
-        if (OK != cameraDeviceStatusChangeLocked(&id, cameraDeviceName, newStatus)) {
-            return hardware::Void();
-        }
-        listener = mManager->getStatusListener();
-    }
-
-    // Call without lock held to allow reentrancy into provider manager
-    if (listener != nullptr) {
-        listener->onDeviceStatusChanged(String8(id.c_str()), internalNewStatus);
-    }
-
+        HalDeviceStatusType newStatus) {
+    cameraDeviceStatusChangeInternal(cameraDeviceName, HalToFrameworkCameraDeviceStatus(newStatus));
     return hardware::Void();
-}
-
-status_t HidlProviderInfo::addDevice(const std::string& name,
-        common::V1_0::CameraDeviceStatus initialStatus, /*out*/ std::string* parsedId) {
-
-    ALOGI("Enumerating new camera device: %s", name.c_str());
-
-    uint16_t major, minor;
-    std::string type, id;
-
-    status_t res = parseDeviceName(name, &major, &minor, &type, &id);
-    if (res != OK) {
-        return res;
-    }
-    if (type != mType) {
-        ALOGE("%s: Device type %s does not match provider type %s", __FUNCTION__,
-                type.c_str(), mType.c_str());
-        return BAD_VALUE;
-    }
-    if (mManager->isValidDeviceLocked(id, major)) {
-        ALOGE("%s: Device %s: ID %s is already in use for device major version %d", __FUNCTION__,
-                name.c_str(), id.c_str(), major);
-        return BAD_VALUE;
-    }
-
-    std::unique_ptr<DeviceInfo> deviceInfo;
-    switch (major) {
-        case 1:
-            ALOGE("%s: Device %s: Unsupported HIDL device HAL major version %d:", __FUNCTION__,
-                    name.c_str(), major);
-            return BAD_VALUE;
-        case 3:
-            deviceInfo = initializeDeviceInfo(name, mProviderTagid, id, minor);
-            break;
-        default:
-            ALOGE("%s: Device %s: Unknown HIDL device HAL major version %d:", __FUNCTION__,
-                    name.c_str(), major);
-            return BAD_VALUE;
-    }
-    if (deviceInfo == nullptr) return BAD_VALUE;
-    deviceInfo->notifyDeviceStateChange(mDeviceState);
-    deviceInfo->mStatus = hidlToInternalCameraDeviceStatus(initialStatus);
-    bool isAPI1Compatible = deviceInfo->isAPI1Compatible();
-
-    mDevices.push_back(std::move(deviceInfo));
-
-    mUniqueCameraIds.insert(id);
-    if (isAPI1Compatible) {
-        // addDevice can be called more than once for the same camera id if HAL
-        // supports openLegacy.
-        if (std::find(mUniqueAPI1CompatibleCameraIds.begin(), mUniqueAPI1CompatibleCameraIds.end(),
-                id) == mUniqueAPI1CompatibleCameraIds.end()) {
-            mUniqueAPI1CompatibleCameraIds.push_back(id);
-        }
-    }
-
-    if (parsedId != nullptr) {
-        *parsedId = id;
-    }
-    return OK;
-}
-
-status_t HidlProviderInfo::cameraDeviceStatusChangeLocked(
-        std::string* id, const hardware::hidl_string& cameraDeviceName,
-        hardware::camera::common::V1_0::CameraDeviceStatus newStatus) {
-    bool known = false;
-    std::string cameraId;
-    for (auto& deviceInfo : mDevices) {
-        if (deviceInfo->mName == cameraDeviceName) {
-            Mutex::Autolock l(deviceInfo->mDeviceAvailableLock);
-            ALOGI("Camera device %s status is now %s, was %s", cameraDeviceName.c_str(),
-                    deviceStatusToString(newStatus),
-                    deviceStatusToString(mapToHidlCameraDeviceStatus(deviceInfo->mStatus)));
-            deviceInfo->mStatus = hidlToInternalCameraDeviceStatus(newStatus);
-            // TODO: Handle device removal (NOT_PRESENT)
-            cameraId = deviceInfo->mId;
-            known = true;
-            deviceInfo->mIsDeviceAvailable =
-                (newStatus == hardware::camera::common::V1_0::CameraDeviceStatus::PRESENT);
-            deviceInfo->mDeviceAvailableSignal.signal();
-            break;
-        }
-    }
-    // Previously unseen device; status must not be NOT_PRESENT
-    if (!known) {
-        if (newStatus == hardware::camera::common::V1_0::CameraDeviceStatus::NOT_PRESENT) {
-            ALOGW("Camera provider %s says an unknown camera device %s is not present. Curious.",
-                mProviderName.c_str(), cameraDeviceName.c_str());
-            return BAD_VALUE;
-        }
-        addDevice(cameraDeviceName, newStatus, &cameraId);
-    } else if (newStatus == hardware::camera::common::V1_0::CameraDeviceStatus::NOT_PRESENT) {
-        removeDevice(cameraId);
-    } else if (isExternalLazyHAL()) {
-        // Do not notify CameraService for PRESENT->PRESENT (lazy HAL restart)
-        // because NOT_AVAILABLE is set on CameraService::connect and a PRESENT
-        // notif. would overwrite it
-        return BAD_VALUE;
-    }
-    if (reCacheConcurrentStreamingCameraIdsLocked() != OK) {
-        ALOGE("%s: CameraProvider %s could not re-cache concurrent streaming camera id list ",
-                  __FUNCTION__, mProviderName.c_str());
-    }
-    *id = cameraId;
-    return OK;
 }
 
 hardware::Return<void> HidlProviderInfo::physicalCameraDeviceStatusChange(
         const hardware::hidl_string& cameraDeviceName,
         const hardware::hidl_string& physicalCameraDeviceName,
-        hardware::camera::common::V1_0::CameraDeviceStatus newStatus) {
-    sp<StatusListener> listener;
-    std::string id;
-    std::string physicalId;
-    std::lock_guard<std::mutex> lock(mInitLock);
-    CameraDeviceStatus newInternalStatus = hidlToInternalCameraDeviceStatus(newStatus);
-    if (!mInitialized) {
-        mCachedStatus.emplace_back(true /*isPhysicalCameraStatus*/, cameraDeviceName,
-                physicalCameraDeviceName, newInternalStatus);
-        return hardware::Void();
-    }
-
-    {
-        std::lock_guard<std::mutex> lock(mLock);
-
-        if (OK != physicalCameraDeviceStatusChangeLocked(&id, &physicalId, cameraDeviceName,
-                physicalCameraDeviceName, newStatus)) {
-            return hardware::Void();
-        }
-
-        listener = mManager->getStatusListener();
-    }
-    // Call without lock held to allow reentrancy into provider manager
-    if (listener != nullptr) {
-        listener->onDeviceStatusChanged(String8(id.c_str()),
-                String8(physicalId.c_str()), newInternalStatus);
-    }
+        HalDeviceStatusType newStatus) {
+    physicalCameraDeviceStatusChangeInternal(cameraDeviceName, physicalCameraDeviceName,
+            HalToFrameworkCameraDeviceStatus(newStatus));
     return hardware::Void();
-}
-
-status_t HidlProviderInfo::physicalCameraDeviceStatusChangeLocked(
-            std::string* id, std::string* physicalId,
-            const hardware::hidl_string& cameraDeviceName,
-            const hardware::hidl_string& physicalCameraDeviceName,
-            hardware::camera::common::V1_0::CameraDeviceStatus newStatus) {
-    bool known = false;
-    std::string cameraId;
-    for (auto& deviceInfo : mDevices) {
-        if (deviceInfo->mName == cameraDeviceName) {
-            cameraId = deviceInfo->mId;
-            if (!deviceInfo->mIsLogicalCamera) {
-                ALOGE("%s: Invalid combination of camera id %s, physical id %s",
-                        __FUNCTION__, cameraId.c_str(), physicalCameraDeviceName.c_str());
-                return BAD_VALUE;
-            }
-            if (std::find(deviceInfo->mPhysicalIds.begin(), deviceInfo->mPhysicalIds.end(),
-                    physicalCameraDeviceName) == deviceInfo->mPhysicalIds.end()) {
-                ALOGE("%s: Invalid combination of camera id %s, physical id %s",
-                        __FUNCTION__, cameraId.c_str(), physicalCameraDeviceName.c_str());
-                return BAD_VALUE;
-            }
-            ALOGI("Camera device %s physical device %s status is now %s",
-                    cameraDeviceName.c_str(), physicalCameraDeviceName.c_str(),
-                    deviceStatusToString(newStatus));
-            known = true;
-            break;
-        }
-    }
-    // Previously unseen device; status must not be NOT_PRESENT
-    if (!known) {
-        ALOGW("Camera provider %s says an unknown camera device %s-%s is not present. Curious.",
-                mProviderName.c_str(), cameraDeviceName.c_str(),
-                physicalCameraDeviceName.c_str());
-        return BAD_VALUE;
-    }
-
-    *id = cameraId;
-    *physicalId = physicalCameraDeviceName.c_str();
-    return OK;
 }
 
 hardware::Return<void> HidlProviderInfo::torchModeStatusChange(
         const hardware::hidl_string& cameraDeviceName,
         hardware::camera::common::V1_0::TorchModeStatus newStatus) {
-    sp<StatusListener> listener;
-    SystemCameraKind systemCameraKind = SystemCameraKind::PUBLIC;
-    std::string id;
-    bool known = false;
-    {
-        // Hold mLock for accessing mDevices
-        std::lock_guard<std::mutex> lock(mLock);
-        for (auto& deviceInfo : mDevices) {
-            if (deviceInfo->mName == cameraDeviceName) {
-                ALOGI("Camera device %s torch status is now %s", cameraDeviceName.c_str(),
-                        torchStatusToString(newStatus));
-                id = deviceInfo->mId;
-                known = true;
-                systemCameraKind = deviceInfo->mSystemCameraKind;
-                if (hardware::camera::common::V1_0::TorchModeStatus::AVAILABLE_ON != newStatus) {
-                    mManager->removeRef(CameraProviderManager::DeviceMode::TORCH, id);
-                }
-                break;
-            }
-        }
-        if (!known) {
-            ALOGW("Camera provider %s says an unknown camera %s now has torch status %d. Curious.",
-                    mProviderName.c_str(), cameraDeviceName.c_str(), newStatus);
-            return hardware::Void();
-        }
-        // no lock needed since listener is set up only once during
-        // CameraProviderManager initialization and then never changed till it is
-        // destructed.
-        listener = mManager->getStatusListener();
-     }
-    // Call without lock held to allow reentrancy into provider manager
-    // The problem with holding mLock here is that we
-    // might be limiting re-entrancy : CameraService::onTorchStatusChanged calls
-    // back into CameraProviderManager which might try to hold mLock again (eg:
-    // findDeviceInfo, which should be holding mLock while iterating through
-    // each provider's devices).
-    if (listener != nullptr) {
-        listener->onTorchStatusChanged(String8(id.c_str()),
-                hidlToInternalTorchModeStatus(newStatus), systemCameraKind);
-    }
+
+    torchModeStatusChangeInternal(cameraDeviceName, HalToFrameworkTorchModeStatus(newStatus));
     return hardware::Void();
 }
 
@@ -836,7 +486,7 @@ std::unique_ptr<CameraProviderManager::ProviderInfo::DeviceInfo>
     }
 
     return std::unique_ptr<DeviceInfo3>(
-        new HidlDeviceInfo3(name, tagId, id, minorVersion, hidlToInternalResourceCost(resourceCost),
+        new HidlDeviceInfo3(name, tagId, id, minorVersion, HalToFrameworkResourceCost(resourceCost),
                 this, mProviderPublicCameraIds, cameraInterface));
 }
 
@@ -1472,93 +1122,6 @@ status_t HidlProviderInfo::isConcurrentSessionConfigurationSupported(
     }
     // unsupported operation
     return INVALID_OPERATION;
-}
-
-status_t HidlVendorTagDescriptor::createDescriptorFromHidl(
-        const hardware::hidl_vec<common::V1_0::VendorTagSection>& vts,
-        sp<VendorTagDescriptor>& descriptor) {
-
-    int tagCount = 0;
-
-    for (size_t s = 0; s < vts.size(); s++) {
-        tagCount += vts[s].tags.size();
-    }
-
-    if (tagCount < 0 || tagCount > INT32_MAX) {
-        ALOGE("%s: tag count %d from vendor tag sections is invalid.", __FUNCTION__, tagCount);
-        return BAD_VALUE;
-    }
-
-    Vector<uint32_t> tagArray;
-    LOG_ALWAYS_FATAL_IF(tagArray.resize(tagCount) != tagCount,
-            "%s: too many (%u) vendor tags defined.", __FUNCTION__, tagCount);
-
-
-    sp<HidlVendorTagDescriptor> desc = new HidlVendorTagDescriptor();
-    desc->mTagCount = tagCount;
-
-    SortedVector<String8> sections;
-    KeyedVector<uint32_t, String8> tagToSectionMap;
-
-    int idx = 0;
-    for (size_t s = 0; s < vts.size(); s++) {
-        const common::V1_0::VendorTagSection& section = vts[s];
-        const char *sectionName = section.sectionName.c_str();
-        if (sectionName == NULL) {
-            ALOGE("%s: no section name defined for vendor tag section %zu.", __FUNCTION__, s);
-            return BAD_VALUE;
-        }
-        String8 sectionString(sectionName);
-        sections.add(sectionString);
-
-        for (size_t j = 0; j < section.tags.size(); j++) {
-            uint32_t tag = section.tags[j].tagId;
-            if (tag < CAMERA_METADATA_VENDOR_TAG_BOUNDARY) {
-                ALOGE("%s: vendor tag %d not in vendor tag section.", __FUNCTION__, tag);
-                return BAD_VALUE;
-            }
-
-            tagArray.editItemAt(idx++) = section.tags[j].tagId;
-
-            const char *tagName = section.tags[j].tagName.c_str();
-            if (tagName == NULL) {
-                ALOGE("%s: no tag name defined for vendor tag %d.", __FUNCTION__, tag);
-                return BAD_VALUE;
-            }
-            desc->mTagToNameMap.add(tag, String8(tagName));
-            tagToSectionMap.add(tag, sectionString);
-
-            int tagType = (int) section.tags[j].tagType;
-            if (tagType < 0 || tagType >= NUM_TYPES) {
-                ALOGE("%s: tag type %d from vendor ops does not exist.", __FUNCTION__, tagType);
-                return BAD_VALUE;
-            }
-            desc->mTagToTypeMap.add(tag, tagType);
-        }
-    }
-
-    desc->mSections = sections;
-
-    for (size_t i = 0; i < tagArray.size(); ++i) {
-        uint32_t tag = tagArray[i];
-        String8 sectionString = tagToSectionMap.valueFor(tag);
-
-        // Set up tag to section index map
-        ssize_t index = sections.indexOf(sectionString);
-        LOG_ALWAYS_FATAL_IF(index < 0, "index %zd must be non-negative", index);
-        desc->mTagToSectionMap.add(tag, static_cast<uint32_t>(index));
-
-        // Set up reverse mapping
-        ssize_t reverseIndex = -1;
-        if ((reverseIndex = desc->mReverseMapping.indexOfKey(sectionString)) < 0) {
-            KeyedVector<String8, uint32_t>* nameMapper = new KeyedVector<String8, uint32_t>();
-            reverseIndex = desc->mReverseMapping.add(sectionString, nameMapper);
-        }
-        desc->mReverseMapping[reverseIndex]->add(desc->mTagToNameMap.valueFor(tag), tag);
-    }
-
-    descriptor = std::move(desc);
-    return OK;
 }
 
 } //namespace android
