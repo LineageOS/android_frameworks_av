@@ -2,7 +2,6 @@
     <hal format="aidl">
         <name>android.hardware.drm</name>
         <version>1</version>
-        <fqname>ICryptoFactory/clearkey</fqname>
         <fqname>IDrmFactory/clearkey</fqname>
     </hal>
 </manifest>

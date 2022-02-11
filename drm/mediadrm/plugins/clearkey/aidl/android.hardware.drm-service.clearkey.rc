@@ -5,4 +5,3 @@ service vendor.drm-clearkey-service /vendor/bin/hw/android.hardware.drm-service.
     ioprio rt 4
     task_profiles ProcessCapacityHigh
     interface aidl android.hardware.drm.IDrmFactory/clearkey
-    interface aidl android.hardware.drm.ICryptoFactory/clearkey
