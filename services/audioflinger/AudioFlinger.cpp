@@ -105,7 +105,7 @@
 
 namespace android {
 
-#define MAX_AAUDIO_PROPERTY_DEVICE_HAL_VERSION 7.0
+#define MAX_AAUDIO_PROPERTY_DEVICE_HAL_VERSION 7.1
 
 using ::android::base::StringPrintf;
 using media::IEffectClient;
@@ -2360,11 +2360,12 @@ audio_module_handle_t AudioFlinger::loadHwModule_l(const char *name)
 
     if (mDevicesFactoryHal->getHalVersion() > MAX_AAUDIO_PROPERTY_DEVICE_HAL_VERSION) {
         if (int32_t mixerBursts = dev->getAAudioMixerBurstCount();
-            mixerBursts > mAAudioBurstsPerBuffer) {
+            mixerBursts > 0 && mixerBursts > mAAudioBurstsPerBuffer) {
             mAAudioBurstsPerBuffer = mixerBursts;
         }
         if (int32_t hwBurstMinMicros = dev->getAAudioHardwareBurstMinUsec();
-            hwBurstMinMicros < mAAudioHwBurstMinMicros || mAAudioHwBurstMinMicros == 0) {
+            hwBurstMinMicros > 0
+            && (hwBurstMinMicros < mAAudioHwBurstMinMicros || mAAudioHwBurstMinMicros == 0)) {
             mAAudioHwBurstMinMicros = hwBurstMinMicros;
         }
     }
