@@ -40,4 +40,5 @@ enum AudioSourceType {
      * Used only internally by the framework.
      */
     HOTWORD = 1999,
+    ULTRASOUND = 2000,
 }
