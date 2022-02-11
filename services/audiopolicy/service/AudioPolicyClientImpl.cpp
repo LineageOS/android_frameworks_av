@@ -301,4 +301,15 @@ status_t AudioPolicyService::AudioPolicyClient::updateSecondaryOutputs(
     return af->updateSecondaryOutputs(trackSecondaryOutputs);
 }
 
+status_t AudioPolicyService::AudioPolicyClient::setDeviceConnectedState(
+        const struct audio_port_v7 *port, bool connected) {
+    sp<IAudioFlinger> af = AudioSystem::get_audio_flinger();
+    if (af == nullptr) {
+        ALOGW("%s: could not get AudioFlinger", __func__);
+        return PERMISSION_DENIED;
+    }
+    return af->setDeviceConnectedState(port, connected);
+}
+
+
 } // namespace android

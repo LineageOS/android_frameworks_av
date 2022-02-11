@@ -715,6 +715,10 @@ status_t AudioFlingerClientAdapter::systemReady() {
     return statusTFromBinderStatus(mDelegate->systemReady());
 }
 
+status_t AudioFlingerClientAdapter::audioPolicyReady() {
+    return statusTFromBinderStatus(mDelegate->audioPolicyReady());
+}
+
 size_t AudioFlingerClientAdapter::frameCountHAL(audio_io_handle_t ioHandle) const {
     auto result = [&]() -> ConversionResult<size_t> {
         int32_t ioHandleAidl = VALUE_OR_RETURN(legacy2aidl_audio_io_handle_t_int32_t(ioHandle));
@@ -761,6 +765,12 @@ status_t AudioFlingerClientAdapter::updateSecondaryOutputs(
     return statusTFromBinderStatus(mDelegate->updateSecondaryOutputs(trackSecondaryOutputInfos));
 }
 
+status_t AudioFlingerClientAdapter::setDeviceConnectedState(
+        const struct audio_port_v7 *port, bool connected) {
+    media::AudioPort aidlPort = VALUE_OR_RETURN_STATUS(
+            legacy2aidl_audio_port_v7_AudioPort(*port));
+    return statusTFromBinderStatus(mDelegate->setDeviceConnectedState(aidlPort, connected));
+}
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////
 // AudioFlingerServerAdapter
@@ -1189,6 +1199,11 @@ Status AudioFlingerServerAdapter::systemReady() {
     return Status::fromStatusT(mDelegate->systemReady());
 }
 
+Status AudioFlingerServerAdapter::audioPolicyReady() {
+    mDelegate->audioPolicyReady();
+    return Status::ok();
+}
+
 Status AudioFlingerServerAdapter::frameCountHAL(int32_t ioHandle, int64_t* _aidl_return) {
     audio_io_handle_t ioHandleLegacy = VALUE_OR_RETURN_BINDER(
             aidl2legacy_int32_t_audio_io_handle_t(ioHandle));
@@ -1225,6 +1240,12 @@ Status AudioFlingerServerAdapter::updateSecondaryOutputs(
                     trackSecondaryOutputInfos,
                     aidl2legacy_TrackSecondaryOutputInfo_TrackSecondaryOutputInfoPair));
     return Status::fromStatusT(mDelegate->updateSecondaryOutputs(trackSecondaryOutputs));
+}
+
+Status AudioFlingerServerAdapter::setDeviceConnectedState(
+        const media::AudioPort& port, bool connected) {
+    audio_port_v7 portLegacy = VALUE_OR_RETURN_BINDER(aidl2legacy_AudioPort_audio_port_v7(port));
+    return Status::fromStatusT(mDelegate->setDeviceConnectedState(&portLegacy, connected));
 }
 
 } // namespace android

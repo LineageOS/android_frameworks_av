@@ -269,6 +269,9 @@ public:
 
     /* Indicate JAVA services are ready (scheduling, power management ...) */
     virtual status_t systemReady();
+    virtual status_t audioPolicyReady() { mAudioPolicyReady.store(true); return NO_ERROR; }
+            bool isAudioPolicyReady() const { return mAudioPolicyReady.load(); }
+
 
     virtual status_t getMicrophones(std::vector<media::MicrophoneInfo> *microphones);
 
@@ -278,6 +281,8 @@ public:
 
     virtual status_t updateSecondaryOutputs(
             const TrackSecondaryOutputsMap& trackSecondaryOutputs);
+
+    virtual status_t setDeviceConnectedState(const struct audio_port_v7 *port, bool connected);
 
     status_t onTransactWrapper(TransactionCode code, const Parcel& data, uint32_t flags,
         const std::function<status_t()>& delegate) override;
@@ -900,6 +905,7 @@ using effect_buffer_t = int16_t;
         AUDIO_HW_SET_MASTER_MUTE,       // set_master_mute
         AUDIO_HW_GET_MASTER_MUTE,       // get_master_mute
         AUDIO_HW_GET_MICROPHONES,       // getMicrophones
+        AUDIO_HW_SET_CONNECTED_STATE,   // setConnectedState
     };
 
     mutable     hardware_call_state                 mHardwareStatus;    // for dump only
@@ -986,6 +992,7 @@ private:
     DeviceEffectManager mDeviceEffectManager;
 
     bool       mSystemReady;
+    std::atomic_bool mAudioPolicyReady{};
 
     mediautils::UidInfo mUidInfo;
 

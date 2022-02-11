@@ -761,6 +761,9 @@ private:
         status_t updateSecondaryOutputs(
                 const TrackSecondaryOutputsMap& trackSecondaryOutputs) override;
 
+        status_t setDeviceConnectedState(
+                const struct audio_port_v7 *port, bool connected) override;
+
      private:
         AudioPolicyService *mAudioPolicyService;
     };

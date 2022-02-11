@@ -17,6 +17,7 @@
 #define LOG_TAG "DeviceHalLocal"
 //#define LOG_NDEBUG 0
 
+#include <media/AudioParameter.h>
 #include <utils/Log.h>
 
 #include "DeviceHalLocal.h"
@@ -232,7 +233,15 @@ status_t DeviceHalLocal::removeDeviceEffect(
     return INVALID_OPERATION;
 }
 
-status_t DeviceHalLocal::dump(int fd) {
+status_t DeviceHalLocal::setConnectedState(const struct audio_port_v7 *port, bool connected) {
+    AudioParameter param(String8(port->ext.device.address));
+    const String8 key(connected ?
+            AudioParameter::keyDeviceConnect : AudioParameter::keyDeviceDisconnect);
+    param.addInt(key, port->ext.device.type);
+    return setParameters(param.toString());
+}
+
+status_t DeviceHalLocal::dump(int fd, const Vector<String16>& /* args */) {
     return mDev->dump(mDev, fd);
 }
 

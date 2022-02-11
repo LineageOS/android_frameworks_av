@@ -335,6 +335,24 @@ status_t AudioFlinger::updateSecondaryOutputs(
     return NO_ERROR;
 }
 
+status_t AudioFlinger::setDeviceConnectedState(const struct audio_port_v7 *port, bool connected) {
+    status_t final_result = NO_INIT;
+    Mutex::Autolock _l(mLock);
+    AutoMutex lock(mHardwareLock);
+    mHardwareStatus = AUDIO_HW_SET_CONNECTED_STATE;
+    for (size_t i = 0; i < mAudioHwDevs.size(); i++) {
+        sp<DeviceHalInterface> dev = mAudioHwDevs.valueAt(i)->hwDevice();
+        status_t result = dev->setConnectedState(port, connected);
+        // Same logic as with setParameter: it's a success if at least one
+        // HAL module accepts the update.
+        if (final_result != NO_ERROR) {
+            final_result = result;
+        }
+    }
+    mHardwareStatus = AUDIO_HW_IDLE;
+    return final_result;
+}
+
 // getDefaultVibratorInfo_l must be called with AudioFlinger lock held.
 const media::AudioVibratorInfo* AudioFlinger::getDefaultVibratorInfo_l() {
     if (mAudioVibratorInfos.empty()) {
@@ -695,7 +713,7 @@ status_t AudioFlinger::dump(int fd, const Vector<String16>& args)
         // dump all hardware devs
         for (size_t i = 0; i < mAudioHwDevs.size(); i++) {
             sp<DeviceHalInterface> dev = mAudioHwDevs.valueAt(i)->hwDevice();
-            dev->dump(fd);
+            dev->dump(fd, args);
         }
 
         mPatchPanel.dump(fd);
@@ -2456,6 +2474,10 @@ status_t AudioFlinger::systemReady()
         ThreadBase *thread = (ThreadBase *)mRecordThreads.valueAt(i).get();
         thread->systemReady();
     }
+    for (size_t i = 0; i < mMmapThreads.size(); i++) {
+        ThreadBase *thread = (ThreadBase *)mMmapThreads.valueAt(i).get();
+        thread->systemReady();
+    }
     return NO_ERROR;
 }
 
@@ -4179,6 +4201,8 @@ status_t AudioFlinger::onTransactWrapper(TransactionCode code,
         case TransactionCode::LIST_AUDIO_PATCHES:
         case TransactionCode::SET_AUDIO_PORT_CONFIG:
         case TransactionCode::SET_RECORD_SILENCED:
+        case TransactionCode::AUDIO_POLICY_READY:
+        case TransactionCode::SET_DEVICE_CONNECTED_STATE:
             ALOGW("%s: transaction %d received from PID %d",
                   __func__, code, IPCThreadState::self()->getCallingPid());
             // return status only for non void methods

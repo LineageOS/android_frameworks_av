@@ -39,7 +39,7 @@ using ::android::hardware::Void;
 
 namespace android {
 
-using ReadCommand = ::android::hardware::audio::CPP_VERSION::IStreamIn::ReadCommand;
+using ReadCommand = ::android::hardware::audio::CORE_TYPES_CPP_VERSION::IStreamIn::ReadCommand;
 
 using namespace ::android::hardware::audio::common::COMMON_TYPES_CPP_VERSION;
 using namespace ::android::hardware::audio::CORE_TYPES_CPP_VERSION;
@@ -147,11 +147,13 @@ status_t StreamHalHidl::standby() {
     return processReturn("standby", mStream->standby());
 }
 
-status_t StreamHalHidl::dump(int fd) {
+status_t StreamHalHidl::dump(int fd, const Vector<String16>& args) {
     if (!mStream) return NO_INIT;
     native_handle_t* hidlHandle = native_handle_create(1, 0);
     hidlHandle->data[0] = fd;
-    Return<void> ret = mStream->debug(hidlHandle, {} /* options */);
+    hidl_vec<hidl_string> hidlArgs;
+    argsFromHal(args, &hidlArgs);
+    Return<void> ret = mStream->debug(hidlHandle, hidlArgs);
     native_handle_delete(hidlHandle);
 
     // TODO(b/111997867, b/177271958)  Workaround - remove when fixed.
@@ -905,7 +907,7 @@ void StreamOutHalHidl::onRecommendedLatencyModeChanged(
 
 
 StreamInHalHidl::StreamInHalHidl(
-        const sp<::android::hardware::audio::CPP_VERSION::IStreamIn>& stream)
+        const sp<::android::hardware::audio::CORE_TYPES_CPP_VERSION::IStreamIn>& stream)
         : StreamHalHidl(stream.get()), mStream(stream), mReaderClient(0), mEfGroup(nullptr) {
 }
 

@@ -20,7 +20,7 @@
 #include <atomic>
 
 #include PATH(android/hardware/audio/CORE_TYPES_FILE_VERSION/IStream.h)
-#include PATH(android/hardware/audio/FILE_VERSION/IStreamIn.h)
+#include PATH(android/hardware/audio/CORE_TYPES_FILE_VERSION/IStreamIn.h)
 #include PATH(android/hardware/audio/FILE_VERSION/IStreamOut.h)
 #include <fmq/EventFlag.h>
 #include <fmq/MessageQueue.h>
@@ -35,8 +35,9 @@ using ::android::hardware::audio::CORE_TYPES_CPP_VERSION::IStream;
 using ::android::hardware::EventFlag;
 using ::android::hardware::MessageQueue;
 using ::android::hardware::Return;
-using ReadParameters = ::android::hardware::audio::CPP_VERSION::IStreamIn::ReadParameters;
-using ReadStatus = ::android::hardware::audio::CPP_VERSION::IStreamIn::ReadStatus;
+using ReadParameters =
+        ::android::hardware::audio::CORE_TYPES_CPP_VERSION::IStreamIn::ReadParameters;
+using ReadStatus = ::android::hardware::audio::CORE_TYPES_CPP_VERSION::IStreamIn::ReadStatus;
 using WriteCommand = ::android::hardware::audio::CPP_VERSION::IStreamOut::WriteCommand;
 using WriteStatus = ::android::hardware::audio::CPP_VERSION::IStreamOut::WriteStatus;
 
@@ -69,7 +70,7 @@ class StreamHalHidl : public virtual StreamHalInterface, public ConversionHelper
     // Put the audio hardware input/output into standby mode.
     virtual status_t standby();
 
-    virtual status_t dump(int fd);
+    virtual status_t dump(int fd, const Vector<String16>& args) override;
 
     // Start a stream operating in mmap mode.
     virtual status_t start();
@@ -262,7 +263,7 @@ class StreamInHalHidl : public StreamInHalInterface, public StreamHalHidl {
     typedef MessageQueue<uint8_t, hardware::kSynchronizedReadWrite> DataMQ;
     typedef MessageQueue<ReadStatus, hardware::kSynchronizedReadWrite> StatusMQ;
 
-    const sp<::android::hardware::audio::CPP_VERSION::IStreamIn> mStream;
+    const sp<::android::hardware::audio::CORE_TYPES_CPP_VERSION::IStreamIn> mStream;
     std::unique_ptr<CommandMQ> mCommandMQ;
     std::unique_ptr<DataMQ> mDataMQ;
     std::unique_ptr<StatusMQ> mStatusMQ;
@@ -270,7 +271,8 @@ class StreamInHalHidl : public StreamInHalInterface, public StreamHalHidl {
     EventFlag* mEfGroup;
 
     // Can not be constructed directly by clients.
-    StreamInHalHidl(const sp<::android::hardware::audio::CPP_VERSION::IStreamIn>& stream);
+    StreamInHalHidl(
+            const sp<::android::hardware::audio::CORE_TYPES_CPP_VERSION::IStreamIn>& stream);
 
     virtual ~StreamInHalHidl();
 

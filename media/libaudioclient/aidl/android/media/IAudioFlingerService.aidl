@@ -197,6 +197,9 @@ interface IAudioFlingerService {
     /* Indicate JAVA services are ready (scheduling, power management ...) */
     oneway void systemReady();
 
+    /* Indicate audio policy service is ready */
+    oneway void audioPolicyReady();
+
     // Returns the number of frames per audio HAL buffer.
     long frameCountHAL(int /* audio_io_handle_t */ ioHandle);
 
@@ -213,4 +216,6 @@ interface IAudioFlingerService {
     // This usually happens when there is a dynamic policy registered.
     void updateSecondaryOutputs(
             in TrackSecondaryOutputInfo[] trackSecondaryOutputInfos);
+
+    void setDeviceConnectedState(in AudioPort devicePort, boolean connected);
 }

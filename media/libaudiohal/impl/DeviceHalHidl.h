@@ -115,13 +115,16 @@ class DeviceHalHidl : public DeviceHalInterface, public ConversionHelperHidl
     status_t addDeviceEffect(audio_port_handle_t device, sp<EffectHalInterface> effect) override;
     status_t removeDeviceEffect(audio_port_handle_t device, sp<EffectHalInterface> effect) override;
 
-    virtual status_t dump(int fd);
+    status_t setConnectedState(const struct audio_port_v7 *port, bool connected) override;
+
+    status_t dump(int fd, const Vector<String16>& args) override;
 
   private:
     friend class DevicesFactoryHalHidl;
     sp<::android::hardware::audio::CPP_VERSION::IDevice> mDevice;
-    sp<::android::hardware::audio::CPP_VERSION::IPrimaryDevice> mPrimaryDevice;
     // Null if it's not a primary device.
+    sp<::android::hardware::audio::CPP_VERSION::IPrimaryDevice> mPrimaryDevice;
+    bool supportsSetConnectedState7_1 = true;
 
     // Can not be constructed directly by clients.
     explicit DeviceHalHidl(const sp<::android::hardware::audio::CPP_VERSION::IDevice>& device);

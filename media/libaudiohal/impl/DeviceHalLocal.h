@@ -111,7 +111,9 @@ class DeviceHalLocal : public DeviceHalInterface
     status_t addDeviceEffect(audio_port_handle_t device, sp<EffectHalInterface> effect) override;
     status_t removeDeviceEffect(audio_port_handle_t device, sp<EffectHalInterface> effect) override;
 
-    virtual status_t dump(int fd);
+    status_t setConnectedState(const struct audio_port_v7 *port, bool connected) override;
+
+    status_t dump(int fd, const Vector<String16>& args) override;
 
     void closeOutputStream(struct audio_stream_out *stream_out);
     void closeInputStream(struct audio_stream_in *stream_in);

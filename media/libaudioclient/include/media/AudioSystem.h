@@ -225,6 +225,9 @@ public:
     // Indicate JAVA services are ready (scheduling, power management ...)
     static status_t systemReady();
 
+    // Indicate audio policy service is ready
+    static status_t audioPolicyReady();
+
     // Returns the number of frames per audio HAL buffer.
     // Corresponds to audio_stream->get_buffer_size()/audio_stream_in_frame_size() for input.
     // See also getFrameCount().
