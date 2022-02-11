@@ -216,4 +216,6 @@ interface IAudioFlingerService {
     // This usually happens when there is a dynamic policy registered.
     void updateSecondaryOutputs(
             in TrackSecondaryOutputInfo[] trackSecondaryOutputInfos);
+
+    void setDeviceConnectedState(in AudioPort devicePort, boolean connected);
 }

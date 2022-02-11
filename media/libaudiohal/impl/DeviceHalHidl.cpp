@@ -478,6 +478,32 @@ status_t DeviceHalHidl::removeDeviceEffect(
 }
 #endif
 
+status_t DeviceHalHidl::setConnectedState(const struct audio_port_v7 *port, bool connected) {
+    if (mDevice == 0) return NO_INIT;
+#if MAJOR_VERSION == 7 && MINOR_VERSION == 1
+    if (supportsSetConnectedState7_1) {
+        AudioPort hidlPort;
+        if (status_t result = HidlUtils::audioPortFromHal(*port, &hidlPort); result != NO_ERROR) {
+            return result;
+        }
+        Return<Result> ret = mDevice->setConnectedState_7_1(hidlPort, connected);
+        if (!ret.isOk() || ret != Result::NOT_SUPPORTED) {
+            return processReturn("setConnectedState_7_1", ret);
+        } else if (ret == Result::OK) {
+            return NO_ERROR;
+        }
+        supportsSetConnectedState7_1 = false;
+    }
+#endif
+    DeviceAddress hidlAddress;
+    if (status_t result = CoreUtils::deviceAddressFromHal(
+                    port->ext.device.type, port->ext.device.address, &hidlAddress);
+            result != NO_ERROR) {
+        return result;
+    }
+    return processReturn("setConnectedState", mDevice->setConnectedState(hidlAddress, connected));
+}
+
 status_t DeviceHalHidl::dump(int fd, const Vector<String16>& args) {
     if (mDevice == 0) return NO_INIT;
     native_handle_t* hidlHandle = native_handle_create(1, 0);
