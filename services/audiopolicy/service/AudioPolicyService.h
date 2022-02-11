@@ -218,8 +218,8 @@ public:
             std::vector<AudioFormatDescription>* _aidl_return) override;
     binder::Status setSurroundFormatEnabled(const AudioFormatDescription& audioFormat,
                                             bool enabled) override;
-    binder::Status setAssistantUid(int32_t uid) override;
-    binder::Status setHotwordDetectionServiceUid(int32_t uid) override;
+    binder::Status setAssistantServicesUids(const std::vector<int32_t>& uids) override;
+    binder::Status setActiveAssistantServicesUids(const std::vector<int32_t>& activeUids) override;
     binder::Status setA11yServicesUids(const std::vector<int32_t>& uids) override;
     binder::Status setCurrentImeUid(int32_t uid) override;
     binder::Status isHapticPlaybackSupported(bool* _aidl_return) override;
@@ -420,7 +420,7 @@ private:
     public:
         explicit UidPolicy(wp<AudioPolicyService> service)
                 : mService(service), mObserverRegistered(false),
-                  mAssistantUid(0), mHotwordDetectionServiceUid(0), mCurrentImeUid(0),
+                  mCurrentImeUid(0),
                   mRttEnabled(false) {}
 
         void registerSelf();
@@ -431,13 +431,10 @@ private:
 
         bool isUidActive(uid_t uid);
         int getUidState(uid_t uid);
-        void setAssistantUid(uid_t uid) { mAssistantUid = uid; };
-        void setHotwordDetectionServiceUid(uid_t uid) { mHotwordDetectionServiceUid = uid; }
-        bool isAssistantUid(uid_t uid) const {
-            // The HotwordDetectionService is part of the Assistant package but runs with a separate
-            // (isolated) uid, so we check for either uid here.
-            return uid == mAssistantUid || uid == mHotwordDetectionServiceUid;
-        }
+        void setAssistantUids(const std::vector<uid_t>& uids);
+        bool isAssistantUid(uid_t uid);
+        void setActiveAssistantUids(const std::vector<uid_t>& activeUids);
+        bool isActiveAssistantUid(uid_t uid);
         void setA11yUids(const std::vector<uid_t>& uids) { mA11yUids.clear(); mA11yUids = uids; }
         bool isA11yUid(uid_t uid);
         bool isA11yOnTop();
@@ -459,6 +456,8 @@ private:
         void updateUid(std::unordered_map<uid_t, std::pair<bool, int>> *uids,
                        uid_t uid, bool active, int state, bool insert);
 
+        void dumpInternals(int fd);
+
      private:
         void notifyService();
         void updateOverrideUid(uid_t uid, bool active, bool insert);
@@ -472,8 +471,8 @@ private:
         bool mObserverRegistered = false;
         std::unordered_map<uid_t, std::pair<bool, int>> mOverrideUids;
         std::unordered_map<uid_t, std::pair<bool, int>> mCachedUids;
-        uid_t mAssistantUid = -1;
-        uid_t mHotwordDetectionServiceUid = -1;
+        std::vector<uid_t> mAssistantUids;
+        std::vector<uid_t> mActiveAssistantUids;
         std::vector<uid_t> mA11yUids;
         uid_t mCurrentImeUid = -1;
         bool mRttEnabled = false;

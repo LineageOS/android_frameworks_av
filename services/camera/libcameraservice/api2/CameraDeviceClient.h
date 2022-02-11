@@ -50,6 +50,7 @@ protected:
     CameraDeviceClientBase(const sp<CameraService>& cameraService,
             const sp<hardware::camera2::ICameraDeviceCallbacks>& remoteCallback,
             const String16& clientPackageName,
+            bool systemNativeClient,
             const std::optional<String16>& clientFeatureId,
             const String8& cameraId,
             int api1CameraId,
@@ -178,6 +179,7 @@ public:
     CameraDeviceClient(const sp<CameraService>& cameraService,
             const sp<hardware::camera2::ICameraDeviceCallbacks>& remoteCallback,
             const String16& clientPackageName,
+            bool clientPackageOverride,
             const std::optional<String16>& clientFeatureId,
             const String8& cameraId,
             int cameraFacing,
@@ -227,7 +229,7 @@ protected:
     virtual void          detachDevice();
 
     // Calculate the ANativeWindow transform from android.sensor.orientation
-    status_t              getRotationTransformLocked(/*out*/int32_t* transform);
+    status_t              getRotationTransformLocked(int mirrorMode, /*out*/int32_t* transform);
 
     bool isUltraHighResolutionSensor(const String8 &cameraId);
 
@@ -287,7 +289,7 @@ private:
 
     // Set the stream transform flags to automatically rotate the camera stream for preview use
     // cases.
-    binder::Status setStreamTransformLocked(int streamId);
+    binder::Status setStreamTransformLocked(int streamId, int mirrorMode);
 
     // Utility method to insert the surface into SurfaceMap
     binder::Status insertGbpLocked(const sp<IGraphicBufferProducer>& gbp,

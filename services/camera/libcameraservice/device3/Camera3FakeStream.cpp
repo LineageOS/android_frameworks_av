@@ -76,7 +76,7 @@ void Camera3FakeStream::dump(int fd, const Vector<String16> &args) const {
     Camera3IOStreamBase::dump(fd, args);
 }
 
-status_t Camera3FakeStream::setTransform(int) {
+status_t Camera3FakeStream::setTransform(int, bool) {
     ATRACE_CALL();
     // Do nothing
     return OK;

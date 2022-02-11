@@ -60,12 +60,12 @@ inline void readBufferFromVec(hardware::hidl_vec<uint8_t> &dst,
 }
 
 inline void readBufferFromVec(std::vector<uint8_t> &dst, const std::vector<uint8_t> &src) {
-    // TODO: Check if we're really supposed to copy
     dst = src;
 }
+
 // Reading one camera metadata from result argument via fmq or from the result
 // Assuming the fmq is protected by a lock already
-template <class FmqType, class MetadataType>
+template <class FmqType, class FmqPayloadType, class MetadataType>
 status_t readOneCameraMetadataLockedT(
         std::unique_ptr<FmqType>& fmq,
         uint64_t fmqResultSize,
@@ -76,7 +76,7 @@ status_t readOneCameraMetadataLockedT(
         if (fmq == nullptr) {
             return NO_MEMORY; // logged in initialize()
         }
-        if (!fmq->read(resultMetadata.data(), fmqResultSize)) {
+        if (!fmq->read(reinterpret_cast<FmqPayloadType *>(resultMetadata.data()), fmqResultSize)) {
             ALOGE("%s: Cannot read camera metadata from fmq, size = %" PRIu64,
                     __FUNCTION__, fmqResultSize);
             return INVALID_OPERATION;
@@ -130,8 +130,21 @@ inline int32_t getHandleFirstFd(const aidl::android::hardware::common::NativeHan
     return handle.fds[0].get();
 }
 
+inline const hardware::hidl_vec<uint8_t>&
+getResultMetadata(const android::hardware::camera::device::V3_2::CameraMetadata &result) {
+    return result;
+}
+
+inline const std::vector<uint8_t>&
+getResultMetadata(const aidl::android::hardware::camera::device::CameraMetadata &result) {
+    return result.metadata;
+}
+
+// Fmqpayload type is needed since AIDL generates an fmq of payload type int8_t
+// for a byte fmq vs MetadataType which is uint8_t. For HIDL, the same type is
+// generated for metadata and fmq payload : uint8_t.
 template <class StatesType, class CaptureResultType, class PhysMetadataType, class MetadataType,
-        class FmqType, class BufferStatusType>
+         class FmqType, class BufferStatusType, class FmqPayloadType = uint8_t>
 void processOneCaptureResultLockedT(
         StatesType& states,
         const CaptureResultType& result,
@@ -144,9 +157,9 @@ void processOneCaptureResultLockedT(
 
     // Read and validate the result metadata.
     MetadataType resultMetadata;
-    res = readOneCameraMetadataLockedT(
+    res = readOneCameraMetadataLockedT<FmqType, FmqPayloadType, MetadataType>(
             fmq, result.fmqResultSize,
-            resultMetadata, result.result);
+            resultMetadata, getResultMetadata(result.result));
     if (res != OK) {
         ALOGE("%s: Frame %d: Failed to read capture result metadata",
                 __FUNCTION__, result.frameNumber);
@@ -161,8 +174,9 @@ void processOneCaptureResultLockedT(
     std::vector<MetadataType> physResultMetadata;
     physResultMetadata.resize(physResultCount);
     for (size_t i = 0; i < physicalCameraMetadata.size(); i++) {
-        res = readOneCameraMetadataLockedT(fmq, physicalCameraMetadata[i].fmqMetadataSize,
-                physResultMetadata[i], physicalCameraMetadata[i].metadata);
+        res = readOneCameraMetadataLockedT<FmqType, FmqPayloadType, MetadataType>(fmq,
+                physicalCameraMetadata[i].fmqMetadataSize,
+                physResultMetadata[i], getResultMetadata(physicalCameraMetadata[i].metadata));
         if (res != OK) {
             ALOGE("%s: Frame %d: Failed to read capture result metadata for camera %s",
                     __FUNCTION__, result.frameNumber,
@@ -170,8 +184,8 @@ void processOneCaptureResultLockedT(
             return;
         }
         physCamIds[i] = physicalCameraMetadata[i].physicalCameraId.c_str();
-        phyCamMetadatas[i] = reinterpret_cast<const camera_metadata_t*>(
-                physResultMetadata[i].data());
+        phyCamMetadatas[i] =
+                reinterpret_cast<const camera_metadata_t*>(physResultMetadata[i].data());
     }
     r.num_physcam_metadata = physResultCount;
     r.physcam_ids = physCamIds.data();

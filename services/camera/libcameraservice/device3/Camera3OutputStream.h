@@ -93,7 +93,8 @@ class Camera3OutputStream :
             int dynamicProfile = ANDROID_REQUEST_AVAILABLE_DYNAMIC_RANGE_PROFILES_MAP_STANDARD,
             int streamUseCase = ANDROID_SCALER_AVAILABLE_STREAM_USE_CASES_DEFAULT,
             bool deviceTimeBaseIsRealtime = false,
-            int timestampBase = OutputConfiguration::TIMESTAMP_BASE_DEFAULT);
+            int timestampBase = OutputConfiguration::TIMESTAMP_BASE_DEFAULT,
+            int mirrorMode = OutputConfiguration::MIRROR_MODE_AUTO);
     /**
      * Set up a stream for formats that have a variable buffer size for the same
      * dimensions, such as compressed JPEG.
@@ -109,7 +110,8 @@ class Camera3OutputStream :
             int dynamicProfile = ANDROID_REQUEST_AVAILABLE_DYNAMIC_RANGE_PROFILES_MAP_STANDARD,
             int streamUseCase = ANDROID_SCALER_AVAILABLE_STREAM_USE_CASES_DEFAULT,
             bool deviceTimeBaseIsRealtime = false,
-            int timestampBase = OutputConfiguration::TIMESTAMP_BASE_DEFAULT);
+            int timestampBase = OutputConfiguration::TIMESTAMP_BASE_DEFAULT,
+            int mirrorMode = OutputConfiguration::MIRROR_MODE_AUTO);
     /**
      * Set up a stream with deferred consumer for formats that have 2 dimensions, such as
      * RAW and YUV. The consumer must be set before using this stream for output. A valid
@@ -124,7 +126,8 @@ class Camera3OutputStream :
             int dynamicProfile = ANDROID_REQUEST_AVAILABLE_DYNAMIC_RANGE_PROFILES_MAP_STANDARD,
             int streamUseCase = ANDROID_SCALER_AVAILABLE_STREAM_USE_CASES_DEFAULT,
             bool deviceTimeBaseIsRealtime = false,
-            int timestampBase = OutputConfiguration::TIMESTAMP_BASE_DEFAULT);
+            int timestampBase = OutputConfiguration::TIMESTAMP_BASE_DEFAULT,
+            int mirrorMode = OutputConfiguration::MIRROR_MODE_AUTO);
 
     virtual ~Camera3OutputStream();
 
@@ -138,7 +141,7 @@ class Camera3OutputStream :
      * Set the transform on the output stream; one of the
      * HAL_TRANSFORM_* / NATIVE_WINDOW_TRANSFORM_* constants.
      */
-    status_t         setTransform(int transform);
+    status_t         setTransform(int transform, bool mayChangeMirror);
 
     /**
      * Return if this output stream is for video encoding.
@@ -255,7 +258,8 @@ class Camera3OutputStream :
             int dynamicProfile = ANDROID_REQUEST_AVAILABLE_DYNAMIC_RANGE_PROFILES_MAP_STANDARD,
             int streamUseCase = ANDROID_SCALER_AVAILABLE_STREAM_USE_CASES_DEFAULT,
             bool deviceTimeBaseIsRealtime = false,
-            int timestampBase = OutputConfiguration::TIMESTAMP_BASE_DEFAULT);
+            int timestampBase = OutputConfiguration::TIMESTAMP_BASE_DEFAULT,
+            int mirrorMode = OutputConfiguration::MIRROR_MODE_AUTO);
 
     /**
      * Note that we release the lock briefly in this function
@@ -342,6 +346,8 @@ class Camera3OutputStream :
     // Prefetched buffers (ready to be handed to client)
     std::vector<Surface::BatchBuffer> mBatchedBuffers;
     // ---- End of mBatchLock protected scope ----
+
+    const int mMirrorMode;
 
     /**
      * Internal Camera3Stream interface

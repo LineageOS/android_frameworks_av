@@ -21,7 +21,9 @@
 #include "../api2/HeicCompositeStream.h"
 #include "android/hardware/camera/metadata/3.8/types.h"
 #include "common/CameraDeviceBase.h"
+#include "common/HalConversionsTemplated.h"
 #include "../CameraService.h"
+#include "device3/aidl/AidlCamera3Device.h"
 #include "device3/hidl/HidlCamera3Device.h"
 #include "device3/Camera3OutputStream.h"
 #include "system/graphics-base-v1.1.h"
@@ -334,7 +336,7 @@ binder::Status createSurfaceFromGbp(
         sp<Surface>& surface, const sp<IGraphicBufferProducer>& gbp,
         const String8 &logicalCameraId, const CameraMetadata &physicalCameraMetadata,
         const std::vector<int32_t> &sensorPixelModesUsed, int dynamicRangeProfile,
-        int streamUseCase, int timestampBase) {
+        int streamUseCase, int timestampBase, int mirrorMode) {
     // bufferProducer must be non-null
     if (gbp == nullptr) {
         String8 msg = String8::format("Camera %s: Surface is NULL", logicalCameraId.string());
@@ -461,6 +463,13 @@ binder::Status createSurfaceFromGbp(
         ALOGE("%s: %s", __FUNCTION__, msg.string());
         return STATUS_ERROR(CameraService::ERROR_ILLEGAL_ARGUMENT, msg.string());
     }
+    if (mirrorMode < OutputConfiguration::MIRROR_MODE_AUTO ||
+            mirrorMode > OutputConfiguration::MIRROR_MODE_V) {
+        String8 msg = String8::format("Camera %s: invalid mirroring mode %d",
+                logicalCameraId.string(), mirrorMode);
+        ALOGE("%s: %s", __FUNCTION__, msg.string());
+        return STATUS_ERROR(CameraService::ERROR_ILLEGAL_ARGUMENT, msg.string());
+    }
 
     if (!isStreamInfoValid) {
         streamInfo.width = width;
@@ -472,6 +481,7 @@ binder::Status createSurfaceFromGbp(
         streamInfo.dynamicRangeProfile = dynamicRangeProfile;
         streamInfo.streamUseCase = streamUseCase;
         streamInfo.timestampBase = timestampBase;
+        streamInfo.mirrorMode = mirrorMode;
         return binder::Status::ok();
     }
     if (width != streamInfo.width) {
@@ -507,6 +517,296 @@ binder::Status createSurfaceFromGbp(
                     logicalCameraId.string(), consumerUsage, streamInfo.consumerUsage);
             ALOGE("%s: %s", __FUNCTION__, msg.string());
             return STATUS_ERROR(CameraService::ERROR_ILLEGAL_ARGUMENT, msg.string());
+        }
+    }
+    return binder::Status::ok();
+}
+
+void mapStreamInfo(const OutputStreamInfo &streamInfo,
+            camera3::camera_stream_rotation_t rotation, String8 physicalId,
+            int32_t groupId, aidl::android::hardware::camera::device::Stream *stream /*out*/) {
+    if (stream == nullptr) {
+        return;
+    }
+
+    stream->streamType = aidl::android::hardware::camera::device::StreamType::OUTPUT;
+    stream->width = streamInfo.width;
+    stream->height = streamInfo.height;
+    stream->format = AidlCamera3Device::mapToAidlPixelFormat(streamInfo.format);
+    auto u = streamInfo.consumerUsage;
+    camera3::Camera3OutputStream::applyZSLUsageQuirk(streamInfo.format, &u);
+    stream->usage = AidlCamera3Device::mapToAidlConsumerUsage(u);
+    stream->dataSpace = AidlCamera3Device::mapToAidlDataspace(streamInfo.dataSpace);
+    stream->rotation = AidlCamera3Device::mapToAidlStreamRotation(rotation);
+    stream->id = -1; // Invalid stream id
+    stream->physicalCameraId = std::string(physicalId.string());
+    stream->bufferSize = 0;
+    stream->groupId = groupId;
+    stream->sensorPixelModesUsed.resize(streamInfo.sensorPixelModesUsed.size());
+    size_t idx = 0;
+    using SensorPixelMode = aidl::android::hardware::camera::metadata::SensorPixelMode;
+    for (auto mode : streamInfo.sensorPixelModesUsed) {
+        stream->sensorPixelModesUsed[idx++] =
+                static_cast<SensorPixelMode>(mode);
+    }
+    using DynamicRangeProfile =
+            aidl::android::hardware::camera::metadata::RequestAvailableDynamicRangeProfilesMap;
+    stream->dynamicRangeProfile = static_cast<DynamicRangeProfile>(streamInfo.dynamicRangeProfile);
+    using StreamUseCases =
+            aidl::android::hardware::camera::metadata::ScalerAvailableStreamUseCases;
+    stream->useCase = static_cast<StreamUseCases>(streamInfo.streamUseCase);
+}
+
+status_t
+convertAidlToHidl38StreamCombination(
+        const aidl::android::hardware::camera::device::StreamConfiguration &aidl,
+        hardware::camera::device::V3_8::StreamConfiguration &hidl) {
+    hidl.operationMode =
+        static_cast<hardware::camera::device::V3_2::StreamConfigurationMode>(aidl.operationMode);
+    if (aidl.streamConfigCounter < 0) {
+        return BAD_VALUE;
+    }
+    hidl.streamConfigCounter = static_cast<uint32_t>(aidl.streamConfigCounter);
+    hidl.multiResolutionInputImage = aidl.multiResolutionInputImage;
+    hidl.sessionParams = aidl.sessionParams.metadata;
+    hidl.streams.resize(aidl.streams.size());
+    size_t i = 0;
+    for (const auto &stream : aidl.streams) {
+        //hidlv3_8
+        hidl.streams[i].dynamicRangeProfile =
+                static_cast<
+                        CameraMetadataEnumAndroidRequestAvailableDynamicRangeProfilesMap>
+                                (stream.dynamicRangeProfile);
+        hidl.streams[i].useCase =
+                static_cast<
+                        CameraMetadataEnumAndroidScalerAvailableStreamUseCases>
+                                (stream.useCase);
+
+        // hidl v3_7
+        hidl.streams[i].v3_7.groupId = stream.groupId;
+        hidl.streams[i].v3_7.sensorPixelModesUsed.resize(stream.sensorPixelModesUsed.size());
+        size_t j = 0;
+        for (const auto &mode : stream.sensorPixelModesUsed) {
+            hidl.streams[i].v3_7.sensorPixelModesUsed[j] =
+                    static_cast<CameraMetadataEnumAndroidSensorPixelMode>(mode);
+            j++;
+        }
+
+        //hidl v3_4
+        hidl.streams[i].v3_7.v3_4.physicalCameraId = stream.physicalCameraId;
+
+        if (stream.bufferSize < 0) {
+            return BAD_VALUE;
+        }
+        hidl.streams[i].v3_7.v3_4.bufferSize = static_cast<uint32_t>(stream.bufferSize);
+
+        // hild v3_2
+        hidl.streams[i].v3_7.v3_4.v3_2.id = stream.id;
+        hidl.streams[i].v3_7.v3_4.v3_2.format =
+                static_cast<hardware::graphics::common::V1_0::PixelFormat>(stream.format);
+
+        if (stream.width < 0 || stream.height < 0) {
+            return BAD_VALUE;
+        }
+        hidl.streams[i].v3_7.v3_4.v3_2.width = static_cast<uint32_t>(stream.width);
+        hidl.streams[i].v3_7.v3_4.v3_2.height = static_cast<uint32_t>(stream.height);
+        hidl.streams[i].v3_7.v3_4.v3_2.usage =
+                static_cast<hardware::camera::device::V3_2::BufferUsageFlags>(stream.usage);
+        hidl.streams[i].v3_7.v3_4.v3_2.streamType =
+                static_cast<hardware::camera::device::V3_2::StreamType>(stream.streamType);
+        hidl.streams[i].v3_7.v3_4.v3_2.dataSpace =
+                static_cast<hardware::camera::device::V3_2::DataspaceFlags>(stream.dataSpace);
+        hidl.streams[i].v3_7.v3_4.v3_2.rotation =
+                static_cast<hardware::camera::device::V3_2::StreamRotation>(stream.rotation);
+        i++;
+    }
+    return OK;
+}
+
+binder::Status
+convertToHALStreamCombination(
+        const SessionConfiguration& sessionConfiguration,
+        const String8 &logicalCameraId, const CameraMetadata &deviceInfo,
+        metadataGetter getMetadata, const std::vector<std::string> &physicalCameraIds,
+        aidl::android::hardware::camera::device::StreamConfiguration &streamConfiguration,
+        bool overrideForPerfClass, bool *earlyExit) {
+    using SensorPixelMode = aidl::android::hardware::camera::metadata::SensorPixelMode;
+    auto operatingMode = sessionConfiguration.getOperatingMode();
+    binder::Status res = checkOperatingMode(operatingMode, deviceInfo, logicalCameraId);
+    if (!res.isOk()) {
+        return res;
+    }
+
+    if (earlyExit == nullptr) {
+        String8 msg("earlyExit nullptr");
+        ALOGE("%s: %s", __FUNCTION__, msg.string());
+        return STATUS_ERROR(CameraService::ERROR_ILLEGAL_ARGUMENT, msg.string());
+    }
+    *earlyExit = false;
+    auto ret = AidlCamera3Device::mapToAidlStreamConfigurationMode(
+            static_cast<camera_stream_configuration_mode_t> (operatingMode),
+            /*out*/ &streamConfiguration.operationMode);
+    if (ret != OK) {
+        String8 msg = String8::format(
+            "Camera %s: Failed mapping operating mode %d requested: %s (%d)",
+            logicalCameraId.string(), operatingMode, strerror(-ret), ret);
+        ALOGE("%s: %s", __FUNCTION__, msg.string());
+        return STATUS_ERROR(CameraService::ERROR_ILLEGAL_ARGUMENT,
+                msg.string());
+    }
+
+    bool isInputValid = (sessionConfiguration.getInputWidth() > 0) &&
+            (sessionConfiguration.getInputHeight() > 0) &&
+            (sessionConfiguration.getInputFormat() > 0);
+    auto outputConfigs = sessionConfiguration.getOutputConfigurations();
+    size_t streamCount = outputConfigs.size();
+    streamCount = isInputValid ? streamCount + 1 : streamCount;
+    streamConfiguration.streams.resize(streamCount);
+    size_t streamIdx = 0;
+    if (isInputValid) {
+        std::vector<SensorPixelMode> defaultSensorPixelModes;
+        defaultSensorPixelModes.resize(1);
+        defaultSensorPixelModes[0] =
+                static_cast<SensorPixelMode>(ANDROID_SENSOR_PIXEL_MODE_DEFAULT);
+        aidl::android::hardware::camera::device::Stream stream;
+        stream.id = 0;
+        stream.streamType =  aidl::android::hardware::camera::device::StreamType::INPUT;
+        stream.width = static_cast<uint32_t> (sessionConfiguration.getInputWidth());
+        stream.height =  static_cast<uint32_t> (sessionConfiguration.getInputHeight());
+        stream.format =
+                AidlCamera3Device::AidlCamera3Device::mapToAidlPixelFormat(
+                        sessionConfiguration.getInputFormat());
+        stream.usage = static_cast<aidl::android::hardware::graphics::common::BufferUsage>(0);
+        stream.dataSpace =
+              static_cast<aidl::android::hardware::graphics::common::Dataspace>(
+                      HAL_DATASPACE_UNKNOWN);
+        stream.rotation = aidl::android::hardware::camera::device::StreamRotation::ROTATION_0;
+        stream.bufferSize = 0;
+        stream.groupId = -1;
+        stream.sensorPixelModesUsed = defaultSensorPixelModes;
+        streamConfiguration.streams[streamIdx++] = stream;
+        streamConfiguration.multiResolutionInputImage =
+                sessionConfiguration.inputIsMultiResolution();
+    }
+
+    for (const auto &it : outputConfigs) {
+        const std::vector<sp<IGraphicBufferProducer>>& bufferProducers =
+            it.getGraphicBufferProducers();
+        bool deferredConsumer = it.isDeferred();
+        String8 physicalCameraId = String8(it.getPhysicalCameraId());
+
+        int dynamicRangeProfile = it.getDynamicRangeProfile();
+        std::vector<int32_t> sensorPixelModesUsed = it.getSensorPixelModesUsed();
+        const CameraMetadata &physicalDeviceInfo = getMetadata(physicalCameraId,
+                overrideForPerfClass);
+        const CameraMetadata &metadataChosen =
+                physicalCameraId.size() > 0 ? physicalDeviceInfo : deviceInfo;
+
+        size_t numBufferProducers = bufferProducers.size();
+        bool isStreamInfoValid = false;
+        int32_t groupId = it.isMultiResolution() ? it.getSurfaceSetID() : -1;
+        OutputStreamInfo streamInfo;
+
+        res = checkSurfaceType(numBufferProducers, deferredConsumer, it.getSurfaceType());
+        if (!res.isOk()) {
+            return res;
+        }
+        res = checkPhysicalCameraId(physicalCameraIds, physicalCameraId,
+                logicalCameraId);
+        if (!res.isOk()) {
+            return res;
+        }
+
+        int streamUseCase = it.getStreamUseCase();
+        int timestampBase = it.getTimestampBase();
+        int mirrorMode = it.getMirrorMode();
+        if (deferredConsumer) {
+            streamInfo.width = it.getWidth();
+            streamInfo.height = it.getHeight();
+            streamInfo.format = HAL_PIXEL_FORMAT_IMPLEMENTATION_DEFINED;
+            streamInfo.dataSpace = android_dataspace_t::HAL_DATASPACE_UNKNOWN;
+            auto surfaceType = it.getSurfaceType();
+            streamInfo.consumerUsage = GraphicBuffer::USAGE_HW_TEXTURE;
+            if (surfaceType == OutputConfiguration::SURFACE_TYPE_SURFACE_VIEW) {
+                streamInfo.consumerUsage |= GraphicBuffer::USAGE_HW_COMPOSER;
+            }
+            streamInfo.dynamicRangeProfile = it.getDynamicRangeProfile();
+            if (checkAndOverrideSensorPixelModesUsed(sensorPixelModesUsed,
+                    streamInfo.format, streamInfo.width,
+                    streamInfo.height, metadataChosen, false /*flexibleConsumer*/,
+                    &streamInfo.sensorPixelModesUsed) != OK) {
+                        ALOGE("%s: Deferred surface sensor pixel modes not valid",
+                                __FUNCTION__);
+                        return STATUS_ERROR(CameraService::ERROR_ILLEGAL_ARGUMENT,
+                                "Deferred surface sensor pixel modes not valid");
+            }
+            streamInfo.streamUseCase = streamUseCase;
+            mapStreamInfo(streamInfo, camera3::CAMERA_STREAM_ROTATION_0, physicalCameraId, groupId,
+                    &streamConfiguration.streams[streamIdx++]);
+            isStreamInfoValid = true;
+
+            if (numBufferProducers == 0) {
+                continue;
+            }
+        }
+
+        for (auto& bufferProducer : bufferProducers) {
+            sp<Surface> surface;
+            res = createSurfaceFromGbp(streamInfo, isStreamInfoValid, surface, bufferProducer,
+                    logicalCameraId, metadataChosen, sensorPixelModesUsed, dynamicRangeProfile,
+                    streamUseCase, timestampBase, mirrorMode);
+
+            if (!res.isOk())
+                return res;
+
+            if (!isStreamInfoValid) {
+                bool isDepthCompositeStream =
+                        camera3::DepthCompositeStream::isDepthCompositeStream(surface);
+                bool isHeicCompositeStream =
+                        camera3::HeicCompositeStream::isHeicCompositeStream(surface);
+                if (isDepthCompositeStream || isHeicCompositeStream) {
+                    // We need to take in to account that composite streams can have
+                    // additional internal camera streams.
+                    std::vector<OutputStreamInfo> compositeStreams;
+                    if (isDepthCompositeStream) {
+                      // TODO: Take care of composite streams.
+                        ret = camera3::DepthCompositeStream::getCompositeStreamInfo(streamInfo,
+                                deviceInfo, &compositeStreams);
+                    } else {
+                        ret = camera3::HeicCompositeStream::getCompositeStreamInfo(streamInfo,
+                            deviceInfo, &compositeStreams);
+                    }
+                    if (ret != OK) {
+                        String8 msg = String8::format(
+                                "Camera %s: Failed adding composite streams: %s (%d)",
+                                logicalCameraId.string(), strerror(-ret), ret);
+                        ALOGE("%s: %s", __FUNCTION__, msg.string());
+                        return STATUS_ERROR(CameraService::ERROR_ILLEGAL_ARGUMENT, msg.string());
+                    }
+
+                    if (compositeStreams.size() == 0) {
+                        // No internal streams means composite stream not
+                        // supported.
+                        *earlyExit = true;
+                        return binder::Status::ok();
+                    } else if (compositeStreams.size() > 1) {
+                        streamCount += compositeStreams.size() - 1;
+                        streamConfiguration.streams.resize(streamCount);
+                    }
+
+                    for (const auto& compositeStream : compositeStreams) {
+                        mapStreamInfo(compositeStream,
+                                static_cast<camera_stream_rotation_t> (it.getRotation()),
+                                physicalCameraId, groupId,
+                                &streamConfiguration.streams[streamIdx++]);
+                    }
+                } else {
+                    mapStreamInfo(streamInfo,
+                            static_cast<camera_stream_rotation_t> (it.getRotation()),
+                            physicalCameraId, groupId, &streamConfiguration.streams[streamIdx++]);
+                }
+                isStreamInfoValid = true;
+            }
         }
     }
     return binder::Status::ok();
@@ -625,176 +925,22 @@ convertToHALStreamCombination(
         metadataGetter getMetadata, const std::vector<std::string> &physicalCameraIds,
         hardware::camera::device::V3_8::StreamConfiguration &streamConfiguration,
         bool overrideForPerfClass, bool *earlyExit) {
-
-    auto operatingMode = sessionConfiguration.getOperatingMode();
-    binder::Status res = checkOperatingMode(operatingMode, deviceInfo, logicalCameraId);
-    if (!res.isOk()) {
-        return res;
+    aidl::android::hardware::camera::device::StreamConfiguration aidlStreamConfiguration;
+    auto ret = convertToHALStreamCombination(sessionConfiguration, logicalCameraId, deviceInfo,
+            getMetadata, physicalCameraIds, aidlStreamConfiguration, overrideForPerfClass,
+            earlyExit);
+    if (!ret.isOk()) {
+        return ret;
+    }
+    if (earlyExit != nullptr && *earlyExit) {
+        return binder::Status::ok();
     }
 
-    if (earlyExit == nullptr) {
-        String8 msg("earlyExit nullptr");
-        ALOGE("%s: %s", __FUNCTION__, msg.string());
-        return STATUS_ERROR(CameraService::ERROR_ILLEGAL_ARGUMENT, msg.string());
-    }
-    *earlyExit = false;
-    auto ret = HidlCamera3Device::mapToStreamConfigurationMode(
-            static_cast<camera_stream_configuration_mode_t> (operatingMode),
-            /*out*/ &streamConfiguration.operationMode);
-    if (ret != OK) {
-        String8 msg = String8::format(
-            "Camera %s: Failed mapping operating mode %d requested: %s (%d)",
-            logicalCameraId.string(), operatingMode, strerror(-ret), ret);
-        ALOGE("%s: %s", __FUNCTION__, msg.string());
+    if (convertAidlToHidl38StreamCombination(aidlStreamConfiguration, streamConfiguration) != OK) {
         return STATUS_ERROR(CameraService::ERROR_ILLEGAL_ARGUMENT,
-                msg.string());
+                "Invalid AIDL->HIDL3.8 conversion");
     }
 
-    bool isInputValid = (sessionConfiguration.getInputWidth() > 0) &&
-            (sessionConfiguration.getInputHeight() > 0) &&
-            (sessionConfiguration.getInputFormat() > 0);
-    auto outputConfigs = sessionConfiguration.getOutputConfigurations();
-    size_t streamCount = outputConfigs.size();
-    streamCount = isInputValid ? streamCount + 1 : streamCount;
-    streamConfiguration.streams.resize(streamCount);
-    size_t streamIdx = 0;
-    if (isInputValid) {
-        hardware::hidl_vec<CameraMetadataEnumAndroidSensorPixelMode> defaultSensorPixelModes;
-        defaultSensorPixelModes.resize(1);
-        defaultSensorPixelModes[0] =
-                static_cast<CameraMetadataEnumAndroidSensorPixelMode>(
-                        ANDROID_SENSOR_PIXEL_MODE_DEFAULT);
-        streamConfiguration.streams[streamIdx++].v3_7 = {{{/*streamId*/0,
-                hardware::camera::device::V3_2::StreamType::INPUT,
-                static_cast<uint32_t> (sessionConfiguration.getInputWidth()),
-                static_cast<uint32_t> (sessionConfiguration.getInputHeight()),
-                HidlCamera3Device::mapToPixelFormat(sessionConfiguration.getInputFormat()),
-                /*usage*/ 0, HAL_DATASPACE_UNKNOWN,
-                hardware::camera::device::V3_2::StreamRotation::ROTATION_0},
-                /*physicalId*/ nullptr, /*bufferSize*/0}, /*groupId*/-1, defaultSensorPixelModes};
-        streamConfiguration.multiResolutionInputImage =
-                sessionConfiguration.inputIsMultiResolution();
-    }
-
-    for (const auto &it : outputConfigs) {
-        const std::vector<sp<IGraphicBufferProducer>>& bufferProducers =
-            it.getGraphicBufferProducers();
-        bool deferredConsumer = it.isDeferred();
-        String8 physicalCameraId = String8(it.getPhysicalCameraId());
-
-        int dynamicRangeProfile = it.getDynamicRangeProfile();
-        std::vector<int32_t> sensorPixelModesUsed = it.getSensorPixelModesUsed();
-        const CameraMetadata &physicalDeviceInfo = getMetadata(physicalCameraId,
-                overrideForPerfClass);
-        const CameraMetadata &metadataChosen =
-                physicalCameraId.size() > 0 ? physicalDeviceInfo : deviceInfo;
-
-        size_t numBufferProducers = bufferProducers.size();
-        bool isStreamInfoValid = false;
-        int32_t groupId = it.isMultiResolution() ? it.getSurfaceSetID() : -1;
-        OutputStreamInfo streamInfo;
-
-        res = checkSurfaceType(numBufferProducers, deferredConsumer, it.getSurfaceType());
-        if (!res.isOk()) {
-            return res;
-        }
-        res = checkPhysicalCameraId(physicalCameraIds, physicalCameraId,
-                logicalCameraId);
-        if (!res.isOk()) {
-            return res;
-        }
-
-        int streamUseCase = it.getStreamUseCase();
-        int timestampBase = it.getTimestampBase();
-        if (deferredConsumer) {
-            streamInfo.width = it.getWidth();
-            streamInfo.height = it.getHeight();
-            streamInfo.format = HAL_PIXEL_FORMAT_IMPLEMENTATION_DEFINED;
-            streamInfo.dataSpace = android_dataspace_t::HAL_DATASPACE_UNKNOWN;
-            auto surfaceType = it.getSurfaceType();
-            streamInfo.consumerUsage = GraphicBuffer::USAGE_HW_TEXTURE;
-            if (surfaceType == OutputConfiguration::SURFACE_TYPE_SURFACE_VIEW) {
-                streamInfo.consumerUsage |= GraphicBuffer::USAGE_HW_COMPOSER;
-            }
-            streamInfo.dynamicRangeProfile = it.getDynamicRangeProfile();
-            if (checkAndOverrideSensorPixelModesUsed(sensorPixelModesUsed,
-                    streamInfo.format, streamInfo.width,
-                    streamInfo.height, metadataChosen, false /*flexibleConsumer*/,
-                    &streamInfo.sensorPixelModesUsed) != OK) {
-                        ALOGE("%s: Deferred surface sensor pixel modes not valid",
-                                __FUNCTION__);
-                        return STATUS_ERROR(CameraService::ERROR_ILLEGAL_ARGUMENT,
-                                "Deferred surface sensor pixel modes not valid");
-            }
-            streamInfo.streamUseCase = streamUseCase;
-            mapStreamInfo(streamInfo, camera3::CAMERA_STREAM_ROTATION_0, physicalCameraId, groupId,
-                    &streamConfiguration.streams[streamIdx++]);
-            isStreamInfoValid = true;
-
-            if (numBufferProducers == 0) {
-                continue;
-            }
-        }
-
-        for (auto& bufferProducer : bufferProducers) {
-            sp<Surface> surface;
-            res = createSurfaceFromGbp(streamInfo, isStreamInfoValid, surface, bufferProducer,
-                    logicalCameraId, metadataChosen, sensorPixelModesUsed, dynamicRangeProfile,
-                    streamUseCase, timestampBase);
-
-            if (!res.isOk())
-                return res;
-
-            if (!isStreamInfoValid) {
-                bool isDepthCompositeStream =
-                        camera3::DepthCompositeStream::isDepthCompositeStream(surface);
-                bool isHeicCompositeStream =
-                        camera3::HeicCompositeStream::isHeicCompositeStream(surface);
-                if (isDepthCompositeStream || isHeicCompositeStream) {
-                    // We need to take in to account that composite streams can have
-                    // additional internal camera streams.
-                    std::vector<OutputStreamInfo> compositeStreams;
-                    if (isDepthCompositeStream) {
-                      // TODO: Take care of composite streams.
-                        ret = camera3::DepthCompositeStream::getCompositeStreamInfo(streamInfo,
-                                deviceInfo, &compositeStreams);
-                    } else {
-                        ret = camera3::HeicCompositeStream::getCompositeStreamInfo(streamInfo,
-                            deviceInfo, &compositeStreams);
-                    }
-                    if (ret != OK) {
-                        String8 msg = String8::format(
-                                "Camera %s: Failed adding composite streams: %s (%d)",
-                                logicalCameraId.string(), strerror(-ret), ret);
-                        ALOGE("%s: %s", __FUNCTION__, msg.string());
-                        return STATUS_ERROR(CameraService::ERROR_ILLEGAL_ARGUMENT, msg.string());
-                    }
-
-                    if (compositeStreams.size() == 0) {
-                        // No internal streams means composite stream not
-                        // supported.
-                        *earlyExit = true;
-                        return binder::Status::ok();
-                    } else if (compositeStreams.size() > 1) {
-                        streamCount += compositeStreams.size() - 1;
-                        streamConfiguration.streams.resize(streamCount);
-                    }
-
-                    for (const auto& compositeStream : compositeStreams) {
-                        mapStreamInfo(compositeStream,
-                                static_cast<camera_stream_rotation_t> (it.getRotation()),
-                                physicalCameraId, groupId,
-                                &streamConfiguration.streams[streamIdx++]);
-                    }
-                } else {
-                    mapStreamInfo(streamInfo,
-                            static_cast<camera_stream_rotation_t> (it.getRotation()),
-                            physicalCameraId, groupId, &streamConfiguration.streams[streamIdx++]);
-                }
-                isStreamInfoValid = true;
-            }
-        }
-    }
     return binder::Status::ok();
 }
 

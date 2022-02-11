@@ -38,6 +38,8 @@
 #include <camera_metadata_hidden.h>
 
 #include "device3/hidl/HidlCamera3OutputUtils.h"
+#include "device3/aidl/AidlCamera3OutputUtils.h"
+#include "device3/Camera3Device.h"
 #include "device3/Camera3OutputUtilsTemplated.h"
 
 #include "system/camera_metadata.h"
@@ -132,7 +134,116 @@ void notify(CaptureOutputStates& states,
     notify(states, &m);
 }
 
+static void convertToAidl(
+        const hardware::hidl_vec<hardware::camera::device::V3_5::BufferRequest>& hidlBufReqs,
+        std::vector<aidl::android::hardware::camera::device::BufferRequest> &aidlBufReqs) {
+    size_t i = 0;
+    aidlBufReqs.resize(hidlBufReqs.size());
+    for (const auto &hidlBufReq : hidlBufReqs) {
+        aidlBufReqs[i].streamId = hidlBufReq.streamId;
+        aidlBufReqs[i].numBuffersRequested = hidlBufReq.numBuffersRequested;
+        i++;
+    }
+}
 
+static hardware::camera::device::V3_5::StreamBufferRequestError
+convertToHidl(aidl::android::hardware::camera::device::StreamBufferRequestError aError) {
+    using AError = aidl::android::hardware::camera::device::StreamBufferRequestError;
+    using HError = hardware::camera::device::V3_5::StreamBufferRequestError;
+
+    switch(aError) {
+        case AError::NO_BUFFER_AVAILABLE:
+            return HError::NO_BUFFER_AVAILABLE;
+        case AError::MAX_BUFFER_EXCEEDED:
+            return HError::MAX_BUFFER_EXCEEDED;
+        case AError::STREAM_DISCONNECTED:
+            return HError::STREAM_DISCONNECTED;
+        default:
+            return HError::UNKNOWN_ERROR;
+    }
+}
+
+static hardware::camera::device::V3_5::BufferRequestStatus
+convertToHidl(const aidl::android::hardware::camera::device::BufferRequestStatus &aBufStatus) {
+    using AStatus = aidl::android::hardware::camera::device::BufferRequestStatus;
+    using HStatus = hardware::camera::device::V3_5::BufferRequestStatus;
+    switch (aBufStatus) {
+        case AStatus::OK:
+            return HStatus::OK;
+        case AStatus::FAILED_PARTIAL:
+            return HStatus::FAILED_PARTIAL;
+        case AStatus::FAILED_CONFIGURING:
+            return HStatus::FAILED_CONFIGURING;
+        case AStatus::FAILED_ILLEGAL_ARGUMENTS:
+            return HStatus::FAILED_ILLEGAL_ARGUMENTS;
+        case AStatus::FAILED_UNKNOWN:
+            return HStatus::FAILED_UNKNOWN;
+    }
+    return HStatus::FAILED_UNKNOWN;
+}
+
+static hardware::camera::device::V3_2::BufferStatus
+convertToHidl(const aidl::android::hardware::camera::device::BufferStatus &aBufStatus) {
+    using AStatus = aidl::android::hardware::camera::device::BufferStatus;
+    using HStatus = hardware::camera::device::V3_2::BufferStatus;
+    switch (aBufStatus) {
+        case AStatus::OK:
+            return HStatus::OK;
+        case AStatus::ERROR:
+            return HStatus::ERROR;
+    }
+    return HStatus::ERROR;
+}
+
+static native_handle_t *convertToHidl(const aidl::android::hardware::common::NativeHandle &ah,
+        std::vector<native_handle_t *> &handlesCreated) {
+    if (isHandleNull(ah)) {
+        return nullptr;
+    }
+    native_handle_t *nh = makeFromAidl(ah);
+    handlesCreated.emplace_back(nh);
+    return nh;
+}
+
+static void convertToHidl(
+        const std::vector<aidl::android::hardware::camera::device::StreamBuffer> &aBuffers,
+        hardware::camera::device::V3_5::StreamBuffersVal &hBuffersVal,
+        std::vector<native_handle_t *> &handlesCreated) {
+    using HStreamBuffer = hardware::camera::device::V3_2::StreamBuffer;
+    hardware::hidl_vec<HStreamBuffer> tmpBuffers(aBuffers.size());
+    size_t i = 0;
+    for (const auto &aBuf : aBuffers) {
+        tmpBuffers[i].status = convertToHidl(aBuf.status);
+        tmpBuffers[i].streamId = aBuf.streamId;
+        tmpBuffers[i].bufferId = aBuf.bufferId;
+        tmpBuffers[i].buffer = convertToHidl(aBuf.buffer, handlesCreated);
+        tmpBuffers[i].acquireFence = convertToHidl(aBuf.acquireFence, handlesCreated);
+        tmpBuffers[i].releaseFence = convertToHidl(aBuf.releaseFence, handlesCreated);
+    }
+    hBuffersVal.buffers(std::move(tmpBuffers));
+}
+
+static void convertToHidl(
+        const std::vector<aidl::android::hardware::camera::device::StreamBufferRet> &aidlBufRets,
+        hardware::hidl_vec<hardware::camera::device::V3_5::StreamBufferRet> &hidlBufRets,
+        std::vector<native_handle_t *> &handlesCreated) {
+    size_t i = 0;
+    using Tag = aidl::android::hardware::camera::device::StreamBuffersVal::Tag;
+    hidlBufRets.resize(aidlBufRets.size());
+    for (const auto &aidlBufRet : aidlBufRets) {
+        auto &hidlBufRet = hidlBufRets[i];
+        hidlBufRet.streamId = aidlBufRet.streamId;
+        switch(aidlBufRet.val.getTag()) {
+          case Tag::error:
+              hidlBufRet.val.error(convertToHidl(aidlBufRet.val.get<Tag::error>()));
+              break;
+          case Tag::buffers:
+              convertToHidl(aidlBufRet.val.get<Tag::buffers>(), hidlBufRet.val, handlesCreated);
+              break;
+        }
+        i++;
+    }
+}
 
 // The buffers requested through this call are not tied to any CaptureRequest in
 // particular. They may used by the hal for a particular frame's output buffer
@@ -145,194 +256,22 @@ void notify(CaptureOutputStates& states,
 void requestStreamBuffers(RequestBufferStates& states,
         const hardware::hidl_vec<hardware::camera::device::V3_5::BufferRequest>& bufReqs,
         hardware::camera::device::V3_5::ICameraDeviceCallback::requestStreamBuffers_cb _hidl_cb) {
-    using android::hardware::camera::device::V3_2::BufferStatus;
+   using android::hardware::camera::device::V3_2::BufferStatus;
     using android::hardware::camera::device::V3_2::StreamBuffer;
     using android::hardware::camera::device::V3_5::BufferRequestStatus;
     using android::hardware::camera::device::V3_5::StreamBufferRet;
     using android::hardware::camera::device::V3_5::StreamBufferRequestError;
+    std::vector<aidl::android::hardware::camera::device::BufferRequest> aidlBufReqs;
+    hardware::hidl_vec<hardware::camera::device::V3_5::StreamBufferRet> hidlBufRets;
+    convertToAidl(bufReqs, aidlBufReqs);
+    std::vector<::aidl::android::hardware::camera::device::StreamBufferRet> aidlBufRets;
+    ::aidl::android::hardware::camera::device::BufferRequestStatus aidlBufRetStatus;
 
-    std::lock_guard<std::mutex> lock(states.reqBufferLock);
-
-    hardware::hidl_vec<StreamBufferRet> bufRets;
-    if (!states.useHalBufManager) {
-        ALOGE("%s: Camera %s does not support HAL buffer management",
-                __FUNCTION__, states.cameraId.string());
-        _hidl_cb(BufferRequestStatus::FAILED_ILLEGAL_ARGUMENTS, bufRets);
-        return;
-    }
-
-    SortedVector<int32_t> streamIds;
-    ssize_t sz = streamIds.setCapacity(bufReqs.size());
-    if (sz < 0 || static_cast<size_t>(sz) != bufReqs.size()) {
-        ALOGE("%s: failed to allocate memory for %zu buffer requests",
-                __FUNCTION__, bufReqs.size());
-        _hidl_cb(BufferRequestStatus::FAILED_ILLEGAL_ARGUMENTS, bufRets);
-        return;
-    }
-
-    if (bufReqs.size() > states.outputStreams.size()) {
-        ALOGE("%s: too many buffer requests (%zu > # of output streams %zu)",
-                __FUNCTION__, bufReqs.size(), states.outputStreams.size());
-        _hidl_cb(BufferRequestStatus::FAILED_ILLEGAL_ARGUMENTS, bufRets);
-        return;
-    }
-
-    // Check for repeated streamId
-    for (const auto& bufReq : bufReqs) {
-        if (streamIds.indexOf(bufReq.streamId) != NAME_NOT_FOUND) {
-            ALOGE("%s: Stream %d appear multiple times in buffer requests",
-                    __FUNCTION__, bufReq.streamId);
-            _hidl_cb(BufferRequestStatus::FAILED_ILLEGAL_ARGUMENTS, bufRets);
-            return;
-        }
-        streamIds.add(bufReq.streamId);
-    }
-
-    if (!states.reqBufferIntf.startRequestBuffer()) {
-        ALOGE("%s: request buffer disallowed while camera service is configuring",
-                __FUNCTION__);
-        _hidl_cb(BufferRequestStatus::FAILED_CONFIGURING, bufRets);
-        return;
-    }
-
-    bufRets.resize(bufReqs.size());
-
-    bool allReqsSucceeds = true;
-    bool oneReqSucceeds = false;
-    for (size_t i = 0; i < bufReqs.size(); i++) {
-        const auto& bufReq = bufReqs[i];
-        auto& bufRet = bufRets[i];
-        int32_t streamId = bufReq.streamId;
-        sp<Camera3OutputStreamInterface> outputStream = states.outputStreams.get(streamId);
-        if (outputStream == nullptr) {
-            ALOGE("%s: Output stream id %d not found!", __FUNCTION__, streamId);
-            hardware::hidl_vec<StreamBufferRet> emptyBufRets;
-            _hidl_cb(BufferRequestStatus::FAILED_ILLEGAL_ARGUMENTS, emptyBufRets);
-            states.reqBufferIntf.endRequestBuffer();
-            return;
-        }
-
-        bufRet.streamId = streamId;
-        if (outputStream->isAbandoned()) {
-            bufRet.val.error(StreamBufferRequestError::STREAM_DISCONNECTED);
-            allReqsSucceeds = false;
-            continue;
-        }
-
-        size_t handOutBufferCount = outputStream->getOutstandingBuffersCount();
-        uint32_t numBuffersRequested = bufReq.numBuffersRequested;
-        size_t totalHandout = handOutBufferCount + numBuffersRequested;
-        uint32_t maxBuffers = outputStream->asHalStream()->max_buffers;
-        if (totalHandout > maxBuffers) {
-            // Not able to allocate enough buffer. Exit early for this stream
-            ALOGE("%s: request too much buffers for stream %d: at HAL: %zu + requesting: %d"
-                    " > max: %d", __FUNCTION__, streamId, handOutBufferCount,
-                    numBuffersRequested, maxBuffers);
-            bufRet.val.error(StreamBufferRequestError::MAX_BUFFER_EXCEEDED);
-            allReqsSucceeds = false;
-            continue;
-        }
-
-        hardware::hidl_vec<StreamBuffer> tmpRetBuffers(numBuffersRequested);
-        bool currentReqSucceeds = true;
-        std::vector<camera_stream_buffer_t> streamBuffers(numBuffersRequested);
-        std::vector<buffer_handle_t> newBuffers;
-        size_t numAllocatedBuffers = 0;
-        size_t numPushedInflightBuffers = 0;
-        for (size_t b = 0; b < numBuffersRequested; b++) {
-            camera_stream_buffer_t& sb = streamBuffers[b];
-            // Since this method can run concurrently with request thread
-            // We need to update the wait duration everytime we call getbuffer
-            nsecs_t waitDuration =  states.reqBufferIntf.getWaitDuration();
-            status_t res = outputStream->getBuffer(&sb, waitDuration);
-            if (res != OK) {
-                if (res == NO_INIT || res == DEAD_OBJECT) {
-                    ALOGV("%s: Can't get output buffer for stream %d: %s (%d)",
-                            __FUNCTION__, streamId, strerror(-res), res);
-                    bufRet.val.error(StreamBufferRequestError::STREAM_DISCONNECTED);
-                    states.sessionStatsBuilder.stopCounter(streamId);
-                } else {
-                    ALOGE("%s: Can't get output buffer for stream %d: %s (%d)",
-                            __FUNCTION__, streamId, strerror(-res), res);
-                    if (res == TIMED_OUT || res == NO_MEMORY) {
-                        bufRet.val.error(StreamBufferRequestError::NO_BUFFER_AVAILABLE);
-                    } else {
-                        bufRet.val.error(StreamBufferRequestError::UNKNOWN_ERROR);
-                    }
-                }
-                currentReqSucceeds = false;
-                break;
-            }
-            numAllocatedBuffers++;
-
-            buffer_handle_t *buffer = sb.buffer;
-            auto pair = states.bufferRecordsIntf.getBufferId(*buffer, streamId);
-            bool isNewBuffer = pair.first;
-            uint64_t bufferId = pair.second;
-            StreamBuffer& hBuf = tmpRetBuffers[b];
-
-            hBuf.streamId = streamId;
-            hBuf.bufferId = bufferId;
-            hBuf.buffer = (isNewBuffer) ? *buffer : nullptr;
-            hBuf.status = BufferStatus::OK;
-            hBuf.releaseFence = nullptr;
-            if (isNewBuffer) {
-                newBuffers.push_back(*buffer);
-            }
-
-            native_handle_t *acquireFence = nullptr;
-            if (sb.acquire_fence != -1) {
-                acquireFence = native_handle_create(1,0);
-                acquireFence->data[0] = sb.acquire_fence;
-            }
-            hBuf.acquireFence.setTo(acquireFence, /*shouldOwn*/true);
-            hBuf.releaseFence = nullptr;
-
-            res = states.bufferRecordsIntf.pushInflightRequestBuffer(bufferId, buffer, streamId);
-            if (res != OK) {
-                ALOGE("%s: Can't get register request buffers for stream %d: %s (%d)",
-                        __FUNCTION__, streamId, strerror(-res), res);
-                bufRet.val.error(StreamBufferRequestError::UNKNOWN_ERROR);
-                currentReqSucceeds = false;
-                break;
-            }
-            numPushedInflightBuffers++;
-        }
-        if (currentReqSucceeds) {
-            bufRet.val.buffers(std::move(tmpRetBuffers));
-            oneReqSucceeds = true;
-        } else {
-            allReqsSucceeds = false;
-            for (size_t b = 0; b < numPushedInflightBuffers; b++) {
-                StreamBuffer& hBuf = tmpRetBuffers[b];
-                buffer_handle_t* buffer;
-                status_t res = states.bufferRecordsIntf.popInflightRequestBuffer(
-                        hBuf.bufferId, &buffer);
-                if (res != OK) {
-                    SET_ERR("%s: popInflightRequestBuffer failed for stream %d: %s (%d)",
-                            __FUNCTION__, streamId, strerror(-res), res);
-                }
-            }
-            for (size_t b = 0; b < numAllocatedBuffers; b++) {
-                camera_stream_buffer_t& sb = streamBuffers[b];
-                sb.acquire_fence = -1;
-                sb.status = CAMERA_BUFFER_STATUS_ERROR;
-            }
-            returnOutputBuffers(states.useHalBufManager, /*listener*/nullptr,
-                    streamBuffers.data(), numAllocatedBuffers, /*timestamp*/0,
-                    /*readoutTimestamp*/0, /*requested*/false,
-                    /*requestTimeNs*/0, states.sessionStatsBuilder);
-            for (auto buf : newBuffers) {
-                states.bufferRecordsIntf.removeOneBufferCache(streamId, buf);
-            }
-        }
-    }
-
-    _hidl_cb(allReqsSucceeds ? BufferRequestStatus::OK :
-            oneReqSucceeds ? BufferRequestStatus::FAILED_PARTIAL :
-                             BufferRequestStatus::FAILED_UNKNOWN,
-            bufRets);
-    states.reqBufferIntf.endRequestBuffer();
+    requestStreamBuffers(states, aidlBufReqs, &aidlBufRets, &aidlBufRetStatus);
+    std::vector<native_handle_t *> handlesCreated;
+    convertToHidl(aidlBufRets, hidlBufRets, handlesCreated);
+    _hidl_cb(convertToHidl(aidlBufRetStatus), hidlBufRets);
+    Camera3Device::cleanupNativeHandles(&handlesCreated);
 }
 
 void returnStreamBuffers(ReturnBufferStates& states,

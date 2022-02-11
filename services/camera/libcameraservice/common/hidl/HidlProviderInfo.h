@@ -21,25 +21,6 @@
 
 namespace android {
 
-/**
- * The vendor tag descriptor class that takes HIDL vendor tag information as
- * input. Not part of VendorTagDescriptor class because that class is used
- * in AIDL generated sources which don't have access to HIDL headers.
- */
-class HidlVendorTagDescriptor : public VendorTagDescriptor {
-public:
-    /**
-     * Create a VendorTagDescriptor object from the HIDL VendorTagSection
-     * vector.
-     *
-     * Returns OK on success, or a negative error code.
-     */
-    static status_t createDescriptorFromHidl(
-            const hardware::hidl_vec<hardware::camera::common::V1_0::VendorTagSection>& vts,
-            /*out*/
-            sp<VendorTagDescriptor>& descriptor);
-};
-
 struct HidlProviderInfo : public CameraProviderManager::ProviderInfo,
             virtual public hardware::camera::provider::V2_6::ICameraProviderCallback,
             virtual public hardware::hidl_death_recipient {
@@ -69,6 +50,8 @@ struct HidlProviderInfo : public CameraProviderManager::ProviderInfo,
     const sp<hardware::camera::provider::V2_4::ICameraProvider> startProviderInterface();
 
     virtual bool successfullyStartedProviderInterface() override;
+
+    virtual int64_t getDeviceState() override {return mDeviceState;};
 
     virtual status_t setUpVendorTags() override;
     virtual status_t notifyDeviceStateChange(int64_t) override;
@@ -129,24 +112,10 @@ struct HidlProviderInfo : public CameraProviderManager::ProviderInfo,
 
  private:
 
-    status_t cameraDeviceStatusChangeLocked(
-                std::string* , const hardware::hidl_string& ,
-                hardware::camera::common::V1_0::CameraDeviceStatus );
-
-    status_t physicalCameraDeviceStatusChangeLocked(
-                std::string* , std::string* ,
-                const hardware::hidl_string& ,
-                const hardware::hidl_string& ,
-                hardware::camera::common::V1_0::CameraDeviceStatus );
-
-   status_t addDevice(const std::string& ,
-            hardware::camera::common::V1_0::CameraDeviceStatus ,
-            /*out*/ std::string *);
-
-    std::unique_ptr<DeviceInfo> initializeDeviceInfo(const std::string &,
+    virtual std::unique_ptr<DeviceInfo> initializeDeviceInfo(const std::string &,
             const metadata_vendor_id_t , const std::string &,
-            uint16_t );
-    status_t reCacheConcurrentStreamingCameraIdsLocked();
+            uint16_t ) override;
+    virtual status_t reCacheConcurrentStreamingCameraIdsLocked() override;
 
     //Expects to have mLock locked
     status_t getConcurrentCameraIdsInternalLocked(

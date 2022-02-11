@@ -350,6 +350,7 @@ public:
         BasicClient(const sp<CameraService>& cameraService,
                 const sp<IBinder>& remoteCallback,
                 const String16& clientPackageName,
+                bool nativeClient,
                 const std::optional<String16>& clientFeatureId,
                 const String8& cameraIdStr,
                 int cameraFacing,
@@ -372,6 +373,7 @@ public:
         const int                       mCameraFacing;
         const int                       mOrientation;
         String16                        mClientPackageName;
+        bool                            mSystemNativeClient;
         std::optional<String16>         mClientFeatureId;
         pid_t                           mClientPid;
         const uid_t                     mClientUid;
@@ -459,6 +461,7 @@ public:
         Client(const sp<CameraService>& cameraService,
                 const sp<hardware::ICameraClient>& cameraClient,
                 const String16& clientPackageName,
+                bool systemNativeClient,
                 const std::optional<String16>& clientFeatureId,
                 const String8& cameraIdStr,
                 int api1CameraId,
@@ -542,14 +545,15 @@ public:
          */
         static DescriptorPtr makeClientDescriptor(const String8& key, const sp<BasicClient>& value,
                 int32_t cost, const std::set<String8>& conflictingKeys, int32_t score,
-                int32_t ownerId, int32_t state, int oomScoreOffset);
+                int32_t ownerId, int32_t state, int oomScoreOffset, bool systemNativeClient);
 
         /**
          * Make a ClientDescriptor object wrapping the given BasicClient strong pointer with
          * values intialized from a prior ClientDescriptor.
          */
         static DescriptorPtr makeClientDescriptor(const sp<BasicClient>& value,
-                const CameraService::DescriptorPtr& partial, int oomScoreOffset);
+                const CameraService::DescriptorPtr& partial, int oomScoreOffset,
+                bool systemNativeClient);
 
     }; // class CameraClientManager
 
@@ -783,7 +787,7 @@ private:
     // Only call with with mServiceLock held.
     status_t handleEvictionsLocked(const String8& cameraId, int clientPid,
         apiLevel effectiveApiLevel, const sp<IBinder>& remoteCallback, const String8& packageName,
-        int scoreOffset,
+        int scoreOffset, bool systemNativeClient,
         /*out*/
         sp<BasicClient>* client,
         std::shared_ptr<resource_policy::ClientDescriptor<String8, sp<BasicClient>>>* partial);
@@ -815,7 +819,7 @@ private:
     // Single implementation shared between the various connect calls
     template<class CALLBACK, class CLIENT>
     binder::Status connectHelper(const sp<CALLBACK>& cameraCb, const String8& cameraId,
-            int api1CameraId, const String16& clientPackageName,
+            int api1CameraId, const String16& clientPackageName, bool systemNativeClient,
             const std::optional<String16>& clientFeatureId, int clientUid, int clientPid,
             apiLevel effectiveApiLevel, bool shimUpdateOnly, int scoreOffset, int targetSdkVersion,
             /*out*/sp<CLIENT>& device);
@@ -892,7 +896,7 @@ private:
      * This method must be called with mServiceLock held.
      */
     void finishConnectLocked(const sp<BasicClient>& client, const DescriptorPtr& desc,
-            int oomScoreOffset);
+            int oomScoreOffset, bool systemNativeClient);
 
     /**
      * Returns the underlying camera Id string mapped to a camera id int
@@ -1226,10 +1230,10 @@ private:
 
     static binder::Status makeClient(const sp<CameraService>& cameraService,
             const sp<IInterface>& cameraCb, const String16& packageName,
-            const std::optional<String16>& featureId, const String8& cameraId, int api1CameraId,
-            int facing, int sensorOrientation, int clientPid, uid_t clientUid, int servicePid,
-            int deviceVersion, apiLevel effectiveApiLevel, bool overrideForPerfClass,
-            /*out*/sp<BasicClient>* client);
+            bool systemNativeClient, const std::optional<String16>& featureId,
+            const String8& cameraId, int api1CameraId, int facing, int sensorOrientation,
+            int clientPid, uid_t clientUid, int servicePid, int deviceVersion,
+            apiLevel effectiveApiLevel, bool overrideForPerfClass, /*out*/sp<BasicClient>* client);
 
     status_t checkCameraAccess(const String16& opPackageName);
 

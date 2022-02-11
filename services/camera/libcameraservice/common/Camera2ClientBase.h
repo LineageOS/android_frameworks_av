@@ -48,6 +48,7 @@ public:
     Camera2ClientBase(const sp<CameraService>& cameraService,
                       const sp<TCamCallbacks>& remoteCallback,
                       const String16& clientPackageName,
+                      bool systemNativeClient,
                       const std::optional<String16>& clientFeatureId,
                       const String8& cameraId,
                       int api1CameraId,

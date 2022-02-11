@@ -132,8 +132,9 @@ static const String16 sCameraOpenCloseListenerPermission(
 static const String16
         sCameraInjectExternalCameraPermission("android.permission.CAMERA_INJECT_EXTERNAL_CAMERA");
 const char *sFileName = "lastOpenSessionDumpFile";
-static constexpr int32_t kVendorClientScore = resource_policy::PERCEPTIBLE_APP_ADJ;
-static constexpr int32_t kVendorClientState = ActivityManager::PROCESS_STATE_PERSISTENT_UI;
+static constexpr int32_t kSystemNativeClientScore = resource_policy::PERCEPTIBLE_APP_ADJ;
+static constexpr int32_t kSystemNativeClientState =
+        ActivityManager::PROCESS_STATE_PERSISTENT_UI;
 
 const String8 CameraService::kOfflineDevice("offline-");
 const String16 CameraService::kWatchAllClientsFlag("all");
@@ -153,6 +154,12 @@ CameraService::CameraService() :
     if (mMemFd == -1) {
         ALOGE("%s: Error while creating the file: %s", __FUNCTION__, sFileName);
     }
+}
+
+// The word 'System' here does not refer to clients only on the system
+// partition. They just need to have a android system uid.
+static bool doesClientHaveSystemUid() {
+    return (CameraThreadState::getCallingUid() < AID_APP_START);
 }
 
 void CameraService::onFirstRef()
@@ -923,7 +930,7 @@ Status CameraService::filterGetInfoErrorCode(status_t err) {
 }
 
 Status CameraService::makeClient(const sp<CameraService>& cameraService,
-        const sp<IInterface>& cameraCb, const String16& packageName,
+        const sp<IInterface>& cameraCb, const String16& packageName, bool systemNativeClient,
         const std::optional<String16>& featureId,  const String8& cameraId,
         int api1CameraId, int facing, int sensorOrientation, int clientPid, uid_t clientUid,
         int servicePid, int deviceVersion, apiLevel effectiveApiLevel, bool overrideForPerfClass,
@@ -949,15 +956,14 @@ Status CameraService::makeClient(const sp<CameraService>& cameraService,
             if (effectiveApiLevel == API_1) { // Camera1 API route
                 sp<ICameraClient> tmp = static_cast<ICameraClient*>(cameraCb.get());
                 *client = new Camera2Client(cameraService, tmp, packageName, featureId,
-                        cameraId, api1CameraId,
-                        facing, sensorOrientation, clientPid, clientUid,
+                        cameraId, api1CameraId, facing, sensorOrientation, clientPid, clientUid,
                         servicePid, overrideForPerfClass);
             } else { // Camera2 API route
                 sp<hardware::camera2::ICameraDeviceCallbacks> tmp =
                         static_cast<hardware::camera2::ICameraDeviceCallbacks*>(cameraCb.get());
-                *client = new CameraDeviceClient(cameraService, tmp, packageName, featureId,
-                        cameraId, facing, sensorOrientation, clientPid, clientUid, servicePid,
-                        overrideForPerfClass);
+                *client = new CameraDeviceClient(cameraService, tmp, packageName,
+                        systemNativeClient, featureId, cameraId, facing, sensorOrientation,
+                        clientPid, clientUid, servicePid, overrideForPerfClass);
             }
             break;
         default:
@@ -1053,7 +1059,7 @@ Status CameraService::initializeShimMetadata(int cameraId) {
     sp<Client> tmp = nullptr;
     if (!(ret = connectHelper<ICameraClient,Client>(
             sp<ICameraClient>{nullptr}, id, cameraId,
-            internalPackageName, {}, uid, USE_CALLING_PID,
+            internalPackageName, /*systemNativeClient*/ false, {}, uid, USE_CALLING_PID,
             API_1, /*shimUpdateOnly*/ true, /*oomScoreOffset*/ 0,
             /*targetSdkVersion*/ __ANDROID_API_FUTURE__, /*out*/ tmp)
             ).isOk()) {
@@ -1288,9 +1294,9 @@ Status CameraService::validateClientPermissionsLocked(const String8& cameraId,
 
     userid_t clientUserId = multiuser_get_user_id(clientUid);
 
-    // Only allow clients who are being used by the current foreground device user, unless calling
-    // from our own process OR the caller is using the cameraserver's HIDL interface.
-    if (getCurrentServingCall() != BinderCallType::HWBINDER && callingPid != getpid() &&
+    // For non-system clients : Only allow clients who are being used by the current foreground
+    // device user, unless calling from our own process.
+    if (!doesClientHaveSystemUid() && callingPid != getpid() &&
             (mAllowedUsers.find(clientUserId) == mAllowedUsers.end())) {
         ALOGE("CameraService::connect X (PID %d) rejected (cannot connect from "
                 "device user %d, currently allowed device users: %s)", callingPid, clientUserId,
@@ -1327,12 +1333,12 @@ status_t CameraService::checkIfDeviceIsUsable(const String8& cameraId) const {
 }
 
 void CameraService::finishConnectLocked(const sp<BasicClient>& client,
-        const CameraService::DescriptorPtr& desc, int oomScoreOffset) {
+        const CameraService::DescriptorPtr& desc, int oomScoreOffset, bool systemNativeClient) {
 
     // Make a descriptor for the incoming client
     auto clientDescriptor =
             CameraService::CameraClientManager::makeClientDescriptor(client, desc,
-                    oomScoreOffset);
+                    oomScoreOffset, systemNativeClient);
     auto evicted = mActiveClientManager.addAndEvict(clientDescriptor);
 
     logConnected(desc->getKey(), static_cast<int>(desc->getOwnerId()),
@@ -1362,7 +1368,7 @@ void CameraService::finishConnectLocked(const sp<BasicClient>& client,
 
 status_t CameraService::handleEvictionsLocked(const String8& cameraId, int clientPid,
         apiLevel effectiveApiLevel, const sp<IBinder>& remoteCallback, const String8& packageName,
-        int oomScoreOffset,
+        int oomScoreOffset, bool systemNativeClient,
         /*out*/
         sp<BasicClient>* client,
         std::shared_ptr<resource_policy::ClientDescriptor<String8, sp<BasicClient>>>* partial) {
@@ -1437,7 +1443,7 @@ status_t CameraService::handleEvictionsLocked(const String8& cameraId, int clien
         clientDescriptor = CameraClientManager::makeClientDescriptor(cameraId,
                 sp<BasicClient>{nullptr}, static_cast<int32_t>(state->getCost()),
                 state->getConflicting(), actualScore, clientPid, actualState,
-                oomScoreOffset);
+                oomScoreOffset, systemNativeClient);
 
         resource_policy::ClientPriority clientPriority = clientDescriptor->getPriority();
 
@@ -1580,7 +1586,7 @@ Status CameraService::connect(
     String8 id = cameraIdIntToStr(api1CameraId);
     sp<Client> client = nullptr;
     ret = connectHelper<ICameraClient,Client>(cameraClient, id, api1CameraId,
-            clientPackageName, {}, clientUid, clientPid, API_1,
+            clientPackageName,/*systemNativeClient*/ false, {}, clientUid, clientPid, API_1,
             /*shimUpdateOnly*/ false, /*oomScoreOffset*/ 0, targetSdkVersion, /*out*/client);
 
     if(!ret.isOk()) {
@@ -1612,14 +1618,14 @@ bool CameraService::shouldRejectSystemCameraConnection(const String8& cameraId) 
     // 1) If cameraserver tries to access this camera device, accept the
     //    connection.
     // 2) The camera device is a publicly hidden secure camera device AND some
-    //    component is trying to access it on a non-hwbinder thread (generally a non HAL client),
-    //    reject it.
+    //    non system component is trying to access it.
     // 3) if the camera device is advertised by the camera HAL as SYSTEM_ONLY
     //    and the serving thread is a non hwbinder thread, the client must have
     //    android.permission.SYSTEM_CAMERA permissions to connect.
 
     int cPid = CameraThreadState::getCallingPid();
     int cUid = CameraThreadState::getCallingUid();
+    bool systemClient = doesClientHaveSystemUid();
     SystemCameraKind systemCameraKind = SystemCameraKind::PUBLIC;
     if (getSystemCameraKind(cameraId, &systemCameraKind) != OK) {
         // This isn't a known camera ID, so it's not a system camera
@@ -1632,8 +1638,7 @@ bool CameraService::shouldRejectSystemCameraConnection(const String8& cameraId) 
         return false;
     }
     // (2)
-    if (getCurrentServingCall() != BinderCallType::HWBINDER &&
-            systemCameraKind == SystemCameraKind::HIDDEN_SECURE_CAMERA) {
+    if (!systemClient && systemCameraKind == SystemCameraKind::HIDDEN_SECURE_CAMERA) {
         ALOGW("Rejecting access to secure hidden camera %s", cameraId.c_str());
         return true;
     }
@@ -1641,8 +1646,7 @@ bool CameraService::shouldRejectSystemCameraConnection(const String8& cameraId) 
     //     getCameraCharacteristics() allows for calls to succeed (albeit after hiding some
     //     characteristics) even if clients don't have android.permission.CAMERA. We do not want the
     //     same behavior for system camera devices.
-    if (getCurrentServingCall() != BinderCallType::HWBINDER &&
-            systemCameraKind == SystemCameraKind::SYSTEM_ONLY_CAMERA &&
+    if (!systemClient && systemCameraKind == SystemCameraKind::SYSTEM_ONLY_CAMERA &&
             !hasPermissionsForSystemCamera(cPid, cUid, /*logPermissionFailure*/true)) {
         ALOGW("Rejecting access to system only camera %s, inadequete permissions",
                 cameraId.c_str());
@@ -1667,11 +1671,12 @@ Status CameraService::connectDevice(
     sp<CameraDeviceClient> client = nullptr;
     String16 clientPackageNameAdj = clientPackageName;
     int callingPid = CameraThreadState::getCallingPid();
-
-    if (getCurrentServingCall() == BinderCallType::HWBINDER) {
-        std::string vendorClient =
-                StringPrintf("vendor.client.pid<%d>", CameraThreadState::getCallingPid());
-        clientPackageNameAdj = String16(vendorClient.c_str());
+    bool systemNativeClient = false;
+    if (doesClientHaveSystemUid() && (clientPackageNameAdj.size() == 0)) {
+        std::string systemClient =
+                StringPrintf("client.pid<%d>", CameraThreadState::getCallingPid());
+        clientPackageNameAdj = String16(systemClient.c_str());
+        systemNativeClient = true;
     }
 
     if (oomScoreOffset < 0) {
@@ -1695,7 +1700,7 @@ Status CameraService::connectDevice(
     }
 
     ret = connectHelper<hardware::camera2::ICameraDeviceCallbacks,CameraDeviceClient>(cameraCb, id,
-            /*api1CameraId*/-1, clientPackageNameAdj, clientFeatureId,
+            /*api1CameraId*/-1, clientPackageNameAdj, systemNativeClient,clientFeatureId,
             clientUid, USE_CALLING_PID, API_2, /*shimUpdateOnly*/ false, oomScoreOffset,
             targetSdkVersion, /*out*/client);
 
@@ -1726,7 +1731,7 @@ Status CameraService::connectDevice(
 
 template<class CALLBACK, class CLIENT>
 Status CameraService::connectHelper(const sp<CALLBACK>& cameraCb, const String8& cameraId,
-        int api1CameraId, const String16& clientPackageName,
+        int api1CameraId, const String16& clientPackageName, bool systemNativeClient,
         const std::optional<String16>& clientFeatureId, int clientUid, int clientPid,
         apiLevel effectiveApiLevel, bool shimUpdateOnly, int oomScoreOffset, int targetSdkVersion,
         /*out*/sp<CLIENT>& device) {
@@ -1745,7 +1750,7 @@ Status CameraService::connectHelper(const sp<CALLBACK>& cameraCb, const String8&
     sp<CLIENT> client = nullptr;
     int facing = -1;
     int orientation = 0;
-    bool isNdk = (clientPackageName.size() == 0);
+    bool isNonSystemNdk = (clientPackageName.size() == 0);
     {
         // Acquire mServiceLock and prevent other clients from connecting
         std::unique_ptr<AutoConditionLock> lock =
@@ -1779,8 +1784,8 @@ Status CameraService::connectHelper(const sp<CALLBACK>& cameraCb, const String8&
         sp<BasicClient> clientTmp = nullptr;
         std::shared_ptr<resource_policy::ClientDescriptor<String8, sp<BasicClient>>> partial;
         if ((err = handleEvictionsLocked(cameraId, originalClientPid, effectiveApiLevel,
-                IInterface::asBinder(cameraCb), clientName8, oomScoreOffset, /*out*/&clientTmp,
-                /*out*/&partial)) != NO_ERROR) {
+                IInterface::asBinder(cameraCb), clientName8, oomScoreOffset, systemNativeClient,
+                /*out*/&clientTmp, /*out*/&partial)) != NO_ERROR) {
             switch (err) {
                 case -ENODEV:
                     return STATUS_ERROR_FMT(ERROR_DISCONNECTED,
@@ -1820,8 +1825,8 @@ Status CameraService::connectHelper(const sp<CALLBACK>& cameraCb, const String8&
         sp<BasicClient> tmp = nullptr;
         bool overrideForPerfClass = SessionConfigurationUtils::targetPerfClassPrimaryCamera(
                 mPerfClassPrimaryCameraIds, cameraId.string(), targetSdkVersion);
-        if(!(ret = makeClient(this, cameraCb, clientPackageName, clientFeatureId,
-                cameraId, api1CameraId, facing, orientation,
+        if(!(ret = makeClient(this, cameraCb, clientPackageName, systemNativeClient,
+                clientFeatureId, cameraId, api1CameraId, facing, orientation,
                 clientPid, clientUid, getpid(),
                 deviceVersion, effectiveApiLevel, overrideForPerfClass,
                 /*out*/&tmp)).isOk()) {
@@ -1923,7 +1928,7 @@ Status CameraService::connectHelper(const sp<CALLBACK>& cameraCb, const String8&
             mServiceLock.lock();
         } else {
             // Otherwise, add client to active clients list
-            finishConnectLocked(client, partial, oomScoreOffset);
+            finishConnectLocked(client, partial, oomScoreOffset, systemNativeClient);
         }
 
         client->setImageDumpMask(mImageDumpMask);
@@ -1935,7 +1940,7 @@ Status CameraService::connectHelper(const sp<CALLBACK>& cameraCb, const String8&
 
     int32_t openLatencyMs = ns2ms(systemTime() - openTimeNs);
     CameraServiceProxyWrapper::logOpen(cameraId, facing, clientPackageName,
-            effectiveApiLevel, isNdk, openLatencyMs);
+            effectiveApiLevel, isNonSystemNdk, openLatencyMs);
 
     {
         Mutex::Autolock lock(mInjectionParametersLock);
@@ -1998,7 +2003,8 @@ status_t CameraService::addOfflineClient(String8 cameraId, sp<BasicClient> offli
                 kOfflineDevice + onlineClientDesc->getKey(), offlineClient, /*cost*/ 0,
                 /*conflictingKeys*/ std::set<String8>(), onlinePriority.getScore(),
                 onlineClientDesc->getOwnerId(), onlinePriority.getState(),
-                /*ommScoreOffset*/ 0);
+                // native clients don't have offline processing support.
+                /*ommScoreOffset*/ 0, /*systemNativeClient*/false);
 
         // Allow only one offline device per camera
         auto incompatibleClients = mActiveClientManager.getIncompatibleClients(offlineClientDesc);
@@ -3169,7 +3175,7 @@ void CameraService::playSound(sound_kind kind) {
 
 CameraService::Client::Client(const sp<CameraService>& cameraService,
         const sp<ICameraClient>& cameraClient,
-        const String16& clientPackageName,
+        const String16& clientPackageName, bool systemNativeClient,
         const std::optional<String16>& clientFeatureId,
         const String8& cameraIdStr,
         int api1CameraId, int cameraFacing, int sensorOrientation,
@@ -3177,7 +3183,7 @@ CameraService::Client::Client(const sp<CameraService>& cameraService,
         int servicePid) :
         CameraService::BasicClient(cameraService,
                 IInterface::asBinder(cameraClient),
-                clientPackageName, clientFeatureId,
+                clientPackageName, systemNativeClient, clientFeatureId,
                 cameraIdStr, cameraFacing, sensorOrientation,
                 clientPid, clientUid,
                 servicePid),
@@ -3207,13 +3213,14 @@ sp<CameraService> CameraService::BasicClient::BasicClient::sCameraService;
 
 CameraService::BasicClient::BasicClient(const sp<CameraService>& cameraService,
         const sp<IBinder>& remoteCallback,
-        const String16& clientPackageName, const std::optional<String16>& clientFeatureId,
-        const String8& cameraIdStr, int cameraFacing, int sensorOrientation,
-        int clientPid, uid_t clientUid,
+        const String16& clientPackageName, bool nativeClient,
+        const std::optional<String16>& clientFeatureId, const String8& cameraIdStr,
+        int cameraFacing, int sensorOrientation, int clientPid, uid_t clientUid,
         int servicePid):
         mDestructionStarted(false),
         mCameraIdStr(cameraIdStr), mCameraFacing(cameraFacing), mOrientation(sensorOrientation),
-        mClientPackageName(clientPackageName), mClientFeatureId(clientFeatureId),
+        mClientPackageName(clientPackageName), mSystemNativeClient(nativeClient),
+        mClientFeatureId(clientFeatureId),
         mClientPid(clientPid), mClientUid(clientUid),
         mServicePid(servicePid),
         mDisconnected(false), mUidIsTrusted(false),
@@ -3256,7 +3263,19 @@ CameraService::BasicClient::BasicClient(const sp<CameraService>& cameraService,
         }
         mClientPackageName = packages[0];
     }
-    if (getCurrentServingCall() != BinderCallType::HWBINDER) {
+
+    // There are 2 scenarios in which a client won't have AppOps operations
+    // (both scenarios : native clients)
+    //    1) It's an system native client*, the package name will be empty
+    //       and it will return from this function in the previous if condition
+    //       (This is the same as the previously existing behavior).
+    //    2) It is a system native client, but its package name has been
+    //       modified for debugging, however it still must not use AppOps since
+    //       the package name is not a real one.
+    //
+    //       * system native client - native client with UID < AID_APP_START. It
+    //         doesn't exclude clients not on the system partition.
+    if (!mSystemNativeClient) {
         mAppOpsManager = std::make_unique<AppOpsManager>();
     }
 
@@ -4078,23 +4097,23 @@ String8 CameraService::CameraClientManager::toString() const {
 CameraService::DescriptorPtr CameraService::CameraClientManager::makeClientDescriptor(
         const String8& key, const sp<BasicClient>& value, int32_t cost,
         const std::set<String8>& conflictingKeys, int32_t score, int32_t ownerId,
-        int32_t state, int32_t oomScoreOffset) {
+        int32_t state, int32_t oomScoreOffset, bool systemNativeClient) {
 
-    bool isVendorClient = getCurrentServingCall() == BinderCallType::HWBINDER;
-    int32_t score_adj = isVendorClient ? kVendorClientScore : score;
-    int32_t state_adj = isVendorClient ? kVendorClientState: state;
+    int32_t score_adj = systemNativeClient ? kSystemNativeClientScore : score;
+    int32_t state_adj = systemNativeClient ? kSystemNativeClientState: state;
 
     return std::make_shared<resource_policy::ClientDescriptor<String8, sp<BasicClient>>>(
-            key, value, cost, conflictingKeys, score_adj, ownerId, state_adj, isVendorClient,
-            oomScoreOffset);
+            key, value, cost, conflictingKeys, score_adj, ownerId, state_adj,
+            systemNativeClient, oomScoreOffset);
 }
 
 CameraService::DescriptorPtr CameraService::CameraClientManager::makeClientDescriptor(
         const sp<BasicClient>& value, const CameraService::DescriptorPtr& partial,
-        int32_t oomScoreOffset) {
+        int32_t oomScoreOffset, bool systemNativeClient) {
     return makeClientDescriptor(partial->getKey(), value, partial->getCost(),
             partial->getConflicting(), partial->getPriority().getScore(),
-            partial->getOwnerId(), partial->getPriority().getState(), oomScoreOffset);
+            partial->getOwnerId(), partial->getPriority().getState(), oomScoreOffset,
+            systemNativeClient);
 }
 
 // ----------------------------------------------------------------------------

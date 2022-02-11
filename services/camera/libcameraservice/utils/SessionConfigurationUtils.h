@@ -22,6 +22,7 @@
 #include <camera/camera2/SessionConfiguration.h>
 #include <camera/camera2/SubmitInfo.h>
 #include <android/hardware/camera/device/3.8/types.h>
+#include <aidl/android/hardware/camera/device/ICameraDevice.h>
 #include <android/hardware/camera/device/3.4/ICameraDeviceSession.h>
 #include <android/hardware/camera/device/3.7/ICameraDeviceSession.h>
 #include <android/hardware/camera/device/3.8/ICameraDeviceSession.h>
@@ -98,7 +99,7 @@ binder::Status createSurfaceFromGbp(
         sp<Surface>& surface, const sp<IGraphicBufferProducer>& gbp,
         const String8 &logicalCameraId, const CameraMetadata &physicalCameraMetadata,
         const std::vector<int32_t> &sensorPixelModesUsed,  int dynamicRangeProfile,
-        int streamUseCase, int timestampBase);
+        int streamUseCase, int timestampBase, int mirrorMode);
 
 void mapStreamInfo(const camera3::OutputStreamInfo &streamInfo,
         camera3::camera_stream_rotation_t rotation, String8 physicalId, int32_t groupId,
@@ -114,6 +115,10 @@ bool is10bitDynamicRangeProfile(int32_t dynamicRangeProfile);
 bool isDynamicRangeProfileSupported(int dynamicRangeProfile, const CameraMetadata& staticMeta);
 
 bool isStreamUseCaseSupported(int streamUseCase, const CameraMetadata &deviceInfo);
+
+void mapStreamInfo(const OutputStreamInfo &streamInfo,
+        camera3::camera_stream_rotation_t rotation, String8 physicalId,
+        int32_t groupId, aidl::android::hardware::camera::device::Stream *stream /*out*/);
 
 // Check that the physicalCameraId passed in is spported by the camera
 // device.
@@ -144,6 +149,14 @@ convertToHALStreamCombination(const SessionConfiguration& sessionConfiguration,
 bool convertHALStreamCombinationFromV38ToV37(
         hardware::camera::device::V3_7::StreamConfiguration &streamConfigV37,
         const hardware::camera::device::V3_8::StreamConfiguration &streamConfigV38);
+
+binder::Status
+convertToHALStreamCombination(
+    const SessionConfiguration& sessionConfiguration,
+    const String8 &logicalCameraId, const CameraMetadata &deviceInfo,
+    metadataGetter getMetadata, const std::vector<std::string> &physicalCameraIds,
+    aidl::android::hardware::camera::device::StreamConfiguration &streamConfiguration,
+    bool overrideForPerfClass, bool *earlyExit);
 
 // Utility function to convert a V3_7::StreamConfiguration to
 // V3_4::StreamConfiguration. Return false if the original V3_7 configuration cannot
