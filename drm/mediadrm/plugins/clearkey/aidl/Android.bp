@@ -13,7 +13,6 @@ cc_defaults {
 
     srcs: [
         "CreatePluginFactories.cpp",
-        "CryptoFactory.cpp",
         "CryptoPlugin.cpp",
         "DrmFactory.cpp",
         "DrmPlugin.cpp",

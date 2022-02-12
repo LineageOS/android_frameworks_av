@@ -1,5 +1,5 @@
 /*
- * Copyright (C) 2018 The Android Open Source Project
+ * Copyright (C) 2021 The Android Open Source Project
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -13,20 +13,28 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
-#include "CreatePluginFactories.h"
 
-namespace aidl {
+#include <gtest/gtest.h>
+#include <mediautils/memory.h>
+
 namespace android {
-namespace hardware {
-namespace drm {
-namespace clearkey {
+namespace {
 
-std::shared_ptr<DrmFactory> createDrmFactory() {
-  return ::ndk::SharedRefBase::make<DrmFactory>();
+TEST(UniqueMallocedPtr, Void) {
+    unique_malloced_ptr<void> p(std::malloc(10));
 }
 
-}  // namespace clearkey
-}  // namespace drm
-}  // namespace hardware
+TEST(UniqueMallocedPtr, Char) {
+    unique_malloced_ptr<char> p(reinterpret_cast<char*>(std::malloc(10)));
+}
+
+TEST(UniqueMallocedPtr, Null) {
+    unique_malloced_ptr<char> p(nullptr);
+}
+
+TEST(UniqueMallocedPtr, Default) {
+    unique_malloced_ptr<char> p;
+}
+
+}  // namespace
 }  // namespace android
-}  // namespace aidl

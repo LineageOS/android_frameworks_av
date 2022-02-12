@@ -28,8 +28,7 @@
 #include <mediadrm/CryptoHalAidl.h>
 #include <mediadrm/DrmUtils.h>
 
-using ::aidl::android::hardware::drm::BufferType;
-using ::aidl::android::hardware::drm::DecryptResult;
+using ::aidl::android::hardware::drm::CryptoSchemes;
 using DestinationBufferAidl = ::aidl::android::hardware::drm::DestinationBuffer;
 using ::aidl::android::hardware::drm::Mode;
 using ::aidl::android::hardware::drm::Pattern;
@@ -37,8 +36,9 @@ using SharedBufferAidl = ::aidl::android::hardware::drm::SharedBuffer;
 using ::aidl::android::hardware::drm::Status;
 using ::aidl::android::hardware::drm::SubSample;
 using ::aidl::android::hardware::drm::Uuid;
-
-using ::aidl::android::hardware::common::Ashmem;
+using ::aidl::android::hardware::drm::SecurityLevel;
+using NativeHandleAidlCommon = ::aidl::android::hardware::common::NativeHandle;
+using ::aidl::android::hardware::drm::DecryptArgs;
 
 using ::android::sp;
 using ::android::DrmUtils::statusAidlToStatusT;
@@ -62,12 +62,6 @@ using DestinationBufferHidl = ::android::hardware::drm::V1_0::DestinationBuffer;
 // -------Hidl interface related end-------------
 
 namespace android {
-
-static Uuid toAidlUuid(const uint8_t* uuid) {
-    Uuid uuidAidl;
-    uuidAidl.uuid = std::vector<uint8_t>(uuid, uuid + 16);
-    return uuidAidl;
-}
 
 template <typename Byte = uint8_t>
 static std::vector<Byte> toStdVec(const Vector<uint8_t>& vector) {
@@ -107,14 +101,24 @@ static DestinationBufferAidl hidlDestinationBufferToAidlDestinationBuffer(
         const DestinationBufferHidl& buffer) {
     DestinationBufferAidl aidldb;
     // skip negative convert check as count of enum elements are 2
-    aidldb.type = static_cast<BufferType>((int32_t)buffer.type);
-    aidldb.nonsecureMemory = hidlSharedBufferToAidlSharedBuffer(buffer.nonsecureMemory);
-    auto handle = buffer.secureMemory.getNativeHandle();
-    if (handle) {
-        aidldb.secureMemory = ::android::makeToAidl(handle);
-    } else {
-        aidldb.secureMemory = {.fds = {}, .ints = {}};
+    switch(buffer.type) {
+        case BufferTypeHidl::SHARED_MEMORY:
+            aidldb.set<DestinationBufferAidl::Tag::nonsecureMemory>(
+                hidlSharedBufferToAidlSharedBuffer(buffer.nonsecureMemory));
+            break;
+        default:
+            auto handle = buffer.secureMemory.getNativeHandle();
+            if (handle) {
+                aidldb.set<DestinationBufferAidl::Tag::secureMemory>(
+                    ::android::makeToAidl(handle));
+            } else {
+                NativeHandleAidlCommon emptyhandle;
+                aidldb.set<DestinationBufferAidl::Tag::secureMemory>(
+                    std::move(emptyhandle));
+            }
+            break;
     }
+
     return aidldb;
 }
 
@@ -144,33 +148,27 @@ static std::vector<uint8_t> toStdVec(const uint8_t* ptr, size_t n) {
 
 // -------Hidl interface related end--------------
 
+bool CryptoHalAidl::isCryptoSchemeSupportedInternal(const uint8_t uuid[16], int* factoryIdx) {
+    Uuid uuidAidl = DrmUtils::toAidlUuid(uuid);
+    for (size_t i = 0; i < mFactories.size(); i++) {
+        CryptoSchemes schemes{};
+        if (mFactories[i]->getSupportedCryptoSchemes(&schemes).isOk()) {
+            if (std::count(schemes.uuids.begin(), schemes.uuids.end(), uuidAidl)) {
+                if (factoryIdx != NULL) *factoryIdx = i;
+                return true;
+            }
+        }
+    }
+
+    return false;
+}
+
 CryptoHalAidl::CryptoHalAidl()
-    : mFactories(makeCryptoFactories()),
+    : mFactories(DrmUtils::makeDrmFactoriesAidl()),
       mInitCheck((mFactories.size() == 0) ? ERROR_UNSUPPORTED : NO_INIT),
       mHeapSeqNum(0) {}
 
 CryptoHalAidl::~CryptoHalAidl() {}
-
-std::vector<std::shared_ptr<ICryptoFactoryAidl>> CryptoHalAidl::makeCryptoFactories() {
-    std::vector<std::shared_ptr<ICryptoFactoryAidl>> factories;
-    AServiceManager_forEachDeclaredInstance(
-            ICryptoFactoryAidl::descriptor, static_cast<void*>(&factories),
-            [](const char* instance, void* context) {
-                auto fullName = std::string(ICryptoFactoryAidl::descriptor) + "/" + std::string(instance);
-                auto factory = ICryptoFactoryAidl::fromBinder(
-                        ::ndk::SpAIBinder(AServiceManager_getService(fullName.c_str())));
-                if (factory == nullptr) {
-                    ALOGE("not found ICryptoFactoryAidl. Instance name:[%s]", fullName.c_str());
-                    return;
-                }
-
-                ALOGI("found ICryptoFactoryAidl. Instance name:[%s]", fullName.c_str());
-                static_cast<std::vector<std::shared_ptr<ICryptoFactoryAidl>>*>(context)
-                        ->emplace_back(factory);
-            });
-
-    return factories;
-}
 
 status_t CryptoHalAidl::initCheck() const {
     return mInitCheck;
@@ -179,29 +177,17 @@ status_t CryptoHalAidl::initCheck() const {
 bool CryptoHalAidl::isCryptoSchemeSupported(const uint8_t uuid[16]) {
     Mutex::Autolock autoLock(mLock);
 
-    bool isSupported = false;
-    Uuid uuidAidl = toAidlUuid(uuid);
-    for (size_t i = 0; i < mFactories.size(); i++) {
-        if (mFactories[i]->isCryptoSchemeSupported(uuidAidl, &isSupported).isOk()) {
-            if (isSupported) break;
-        }
-    }
-    return isSupported;
+    return isCryptoSchemeSupportedInternal(uuid, NULL);
 }
 
 status_t CryptoHalAidl::createPlugin(const uint8_t uuid[16], const void* data, size_t size) {
     Mutex::Autolock autoLock(mLock);
 
-    bool isSupported = false;
-    Uuid uuidAidl = toAidlUuid(uuid);
+    Uuid uuidAidl = DrmUtils::toAidlUuid(uuid);
     std::vector<uint8_t> dataAidl = toStdVec(toVector(toHidlVec(data, size)));
-    for (size_t i = 0; i < mFactories.size(); i++) {
-        if (mFactories[i]->isCryptoSchemeSupported(uuidAidl, &isSupported).isOk() && isSupported) {
-            mPlugin = makeCryptoPlugin(mFactories[i], uuidAidl, dataAidl);
-            // Reserve place for future plugins with new versions
-
-            break;
-        }
+    int i = 0;
+    if (isCryptoSchemeSupportedInternal(uuid, &i)) {
+        mPlugin = makeCryptoPlugin(mFactories[i], uuidAidl, dataAidl);
     }
 
     if (mInitCheck == NO_INIT) {
@@ -212,10 +198,10 @@ status_t CryptoHalAidl::createPlugin(const uint8_t uuid[16], const void* data, s
 }
 
 std::shared_ptr<ICryptoPluginAidl> CryptoHalAidl::makeCryptoPlugin(
-        const std::shared_ptr<ICryptoFactoryAidl>& factory, const Uuid& uuidAidl,
+        const std::shared_ptr<IDrmFactoryAidl>& factory, const Uuid& uuidAidl,
         const std::vector<uint8_t> initData) {
     std::shared_ptr<ICryptoPluginAidl> pluginAidl;
-    if (factory->createPlugin(uuidAidl, initData, &pluginAidl).isOk()) {
+    if (factory->createCryptoPlugin(uuidAidl, initData, &pluginAidl).isOk()) {
         ALOGI("Create ICryptoPluginAidl. UUID:[%s]", uuidAidl.toString().c_str());
     } else {
         mInitCheck = DEAD_OBJECT;
@@ -349,21 +335,32 @@ ssize_t CryptoHalAidl::decrypt(const uint8_t keyId[16], const uint8_t iv[16],
 
     std::vector<uint8_t> keyIdAidl(toStdVec(keyId, 16));
     std::vector<uint8_t> ivAidl(toStdVec(iv, 16));
-    DecryptResult result;
-    ::ndk::ScopedAStatus statusAidl = mPlugin->decrypt(secure,
-                           keyIdAidl, ivAidl, aMode, aPattern, stdSubSamples,
-                           hidlSharedBufferToAidlSharedBuffer(hSource), offset,
-                           hidlDestinationBufferToAidlDestinationBuffer(hDestination), &result);
+
+    DecryptArgs args;
+    args.secure = secure;
+    args.keyId = keyIdAidl;
+    args.iv = ivAidl;
+    args.mode = aMode;
+    args.pattern = aPattern;
+    args.subSamples = std::move(stdSubSamples);
+    args.source = hidlSharedBufferToAidlSharedBuffer(hSource);
+    args.offset = offset;
+    args.destination = hidlDestinationBufferToAidlDestinationBuffer(hDestination);
+
+
+    int32_t result = 0;
+    ::ndk::ScopedAStatus statusAidl = mPlugin->decrypt(args, &result);
 
     err = statusAidlToStatusT(statusAidl);
-    *errorDetailMsg = toString8(result.detailedError);
+    std::string msgStr(statusAidl.getMessage());
+    *errorDetailMsg = toString8(msgStr);
     if (err != OK) {
-        ALOGE("Failed on decrypt, error message:%s, bytes written:%d", result.detailedError.c_str(),
-              result.bytesWritten);
+        ALOGE("Failed on decrypt, error message:%s, bytes written:%d", statusAidl.getMessage(),
+              result);
         return err;
     }
 
-    return result.bytesWritten;
+    return result;
 }
 
 int32_t CryptoHalAidl::setHeap(const sp<HidlMemory>& heap) {
@@ -378,11 +375,13 @@ int32_t CryptoHalAidl::setHeap(const sp<HidlMemory>& heap) {
     uint32_t bufferId = static_cast<uint32_t>(seqNum);
     mHeapSizes.add(seqNum, heap->size());
 
-    Ashmem memAidl;
-    memAidl.fd.set(heap->handle()->data[0]);
+    SharedBufferAidl memAidl;
+    memAidl.handle = ::android::makeToAidl(heap->handle());
     memAidl.size = heap->size();
+    memAidl.bufferId = bufferId;
 
-    ALOGE_IF(!mPlugin->setSharedBufferBase(memAidl, bufferId).isOk(),
+    auto status = mPlugin->setSharedBufferBase(memAidl);
+       ALOGE_IF(!status.isOk(),
              "setSharedBufferBase(): remote call failed");
     return seqNum;
 }
@@ -401,10 +400,10 @@ void CryptoHalAidl::unsetHeap(int32_t seqNum) {
     if (index >= 0) {
         if (mPlugin != NULL) {
             uint32_t bufferId = static_cast<uint32_t>(seqNum);
-            Ashmem memAidl;
-            memAidl.fd.set(-1);
-            memAidl.size = 0;
-            ALOGE_IF(!mPlugin->setSharedBufferBase(memAidl, bufferId).isOk(),
+            SharedBufferAidl memAidl{};
+            memAidl.bufferId = bufferId;
+            auto status = mPlugin->setSharedBufferBase(memAidl);
+            ALOGE_IF(!status.isOk(),
                      "setSharedBufferBase(): remote call failed");
         }
         mHeapSizes.removeItem(seqNum);
