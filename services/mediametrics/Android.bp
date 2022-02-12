@@ -149,7 +149,8 @@ cc_library {
         "statsd_mediaparser.cpp",
         "statsd_nuplayer.cpp",
         "statsd_recorder.cpp",
-        "StringUtils.cpp"
+        "StringUtils.cpp",
+        "ValidateId.cpp",
     ],
 
     proto: {
@@ -182,6 +183,10 @@ cc_library {
 
     static_libs: [
         "libplatformprotos",
+    ],
+
+    header_libs: [
+        "libaaudio_headers",
     ],
 
     include_dirs: [

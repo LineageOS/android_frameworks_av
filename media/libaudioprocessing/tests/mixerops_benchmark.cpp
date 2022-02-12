@@ -16,11 +16,9 @@
 
 #include <inttypes.h>
 #include <type_traits>
-#include "../../../../system/media/audio_utils/include/audio_utils/primitives.h"
 #define LOG_ALWAYS_FATAL(...)
 
 #include <../AudioMixerOps.h>
-
 #include <benchmark/benchmark.h>
 
 using namespace android;

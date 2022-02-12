@@ -19,6 +19,7 @@
 #define ANDROID_AUDIOPOLICYSERVICE_H
 
 #include <android/media/BnAudioPolicyService.h>
+#include <android/media/GetSpatializerResponse.h>
 #include <android-base/thread_annotations.h>
 #include <cutils/misc.h>
 #include <cutils/config_utils.h>
@@ -38,6 +39,7 @@
 #include <mediautils/ServiceUtilities.h>
 #include "AudioPolicyEffects.h"
 #include "CaptureStateNotifier.h"
+#include "Spatializer.h"
 #include <AudioPolicyInterface.h>
 #include <android/hardware/BnSensorPrivacyListener.h>
 #include <android/content/AttributionSourceState.h>
@@ -53,7 +55,8 @@ using content::AttributionSourceState;
 class AudioPolicyService :
     public BinderService<AudioPolicyService>,
     public media::BnAudioPolicyService,
-    public IBinder::DeathRecipient
+    public IBinder::DeathRecipient,
+    public SpatializerPolicyCallback
 {
     friend class BinderService<AudioPolicyService>;
 
@@ -243,11 +246,15 @@ public:
     binder::Status registerSoundTriggerCaptureStateListener(
             const sp<media::ICaptureStateListener>& listener, bool* _aidl_return) override;
 
-    virtual     status_t    onTransact(
-                                uint32_t code,
-                                const Parcel& data,
-                                Parcel* reply,
-                                uint32_t flags);
+    binder::Status getSpatializer(const sp<media::INativeSpatializerCallback>& callback,
+            media::GetSpatializerResponse* _aidl_return) override;
+    binder::Status canBeSpatialized(
+            const std::optional<media::AudioAttributesInternal>& attr,
+            const std::optional<media::AudioConfig>& config,
+            const std::vector<media::AudioDevice>& devices,
+            bool* _aidl_return) override;
+
+    status_t onTransact(uint32_t code, const Parcel& data, Parcel* reply, uint32_t flags) override;
 
     // IBinder::DeathRecipient
     virtual     void        binderDied(const wp<IBinder>& who);
@@ -312,6 +319,16 @@ public:
 
     void onRoutingUpdated();
     void doOnRoutingUpdated();
+
+    /**
+     * Spatializer SpatializerPolicyCallback implementation.
+     * onCheckSpatializer() sends an event on mOutputCommandThread which executes
+     * doOnCheckSpatializer() to check if a Spatializer output must be opened or closed
+     * by audio policy manager and attach/detach the spatializer effect accordingly.
+     */
+    void onCheckSpatializer() override;
+    void onCheckSpatializer_l();
+    void doOnCheckSpatializer();
 
     void setEffectSuspended(int effectId,
                             audio_session_t sessionId,
@@ -483,7 +500,8 @@ private:
             SET_EFFECT_SUSPENDED,
             AUDIO_MODULES_UPDATE,
             ROUTING_UPDATED,
-            UPDATE_UID_STATES
+            UPDATE_UID_STATES,
+            CHECK_SPATIALIZER
         };
 
         AudioCommandThread (String8 name, const wp<AudioPolicyService>& service);
@@ -532,6 +550,7 @@ private:
                     void        audioModulesUpdateCommand();
                     void        routingChangedCommand();
                     void        updateUidStatesCommand();
+                    void        checkSpatializerCommand();
                     void        insertCommand_l(AudioCommand *command, int delayMs = 0);
     private:
         class AudioCommandData;
@@ -667,7 +686,8 @@ private:
         // The audio policy manager can check if the proposed parameters are suitable or not and act accordingly.
         virtual status_t openOutput(audio_module_handle_t module,
                                     audio_io_handle_t *output,
-                                    audio_config_t *config,
+                                    audio_config_t *halConfig,
+                                    audio_config_base_t *mixerConfig,
                                     const sp<DeviceDescriptorBase>& device,
                                     uint32_t *latencyMs,
                                     audio_output_flags_t flags);
@@ -987,6 +1007,8 @@ private:
     MediaPackageManager mPackageManager; // To check allowPlaybackCapture
 
     CaptureStateNotifier mCaptureStateNotifier;
+
+    sp<Spatializer> mSpatializer;
 
     void *mLibraryHandle = nullptr;
     CreateAudioPolicyManagerInstance mCreateAudioPolicyManager;

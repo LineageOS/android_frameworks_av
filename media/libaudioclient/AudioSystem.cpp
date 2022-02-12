@@ -2242,6 +2242,47 @@ status_t AudioSystem::getDevicesForRoleAndCapturePreset(audio_source_t audioSour
     return OK;
 }
 
+status_t AudioSystem::getSpatializer(const sp<media::INativeSpatializerCallback>& callback,
+                                          sp<media::ISpatializer>* spatializer) {
+    const sp<IAudioPolicyService>& aps = AudioSystem::get_audio_policy_service();
+    if (spatializer == nullptr) {
+        return BAD_VALUE;
+    }
+    if (aps == 0) {
+        return PERMISSION_DENIED;
+    }
+    media::GetSpatializerResponse response;
+    RETURN_STATUS_IF_ERROR(statusTFromBinderStatus(
+            aps->getSpatializer(callback, &response)));
+
+    *spatializer = response.spatializer;
+    return OK;
+}
+
+status_t AudioSystem::canBeSpatialized(const audio_attributes_t *attr,
+                                    const audio_config_t *config,
+                                    const AudioDeviceTypeAddrVector &devices,
+                                    bool *canBeSpatialized) {
+    const sp<IAudioPolicyService>& aps = AudioSystem::get_audio_policy_service();
+    if (aps == 0) {
+        return PERMISSION_DENIED;
+    }
+    audio_attributes_t attributes = attr != nullptr ? *attr : AUDIO_ATTRIBUTES_INITIALIZER;
+    audio_config_t configuration = config != nullptr ? *config : AUDIO_CONFIG_INITIALIZER;
+
+    std::optional<media::AudioAttributesInternal> attrAidl = VALUE_OR_RETURN_STATUS(
+            legacy2aidl_audio_attributes_t_AudioAttributesInternal(attributes));
+    std::optional<media::AudioConfig> configAidl = VALUE_OR_RETURN_STATUS(
+            legacy2aidl_audio_config_t_AudioConfig(configuration));
+    std::vector<media::AudioDevice> devicesAidl = VALUE_OR_RETURN_STATUS(
+            convertContainer<std::vector<media::AudioDevice>>(devices,
+                                                   legacy2aidl_AudioDeviceTypeAddress));
+    RETURN_STATUS_IF_ERROR(statusTFromBinderStatus(
+            aps->canBeSpatialized(attrAidl, configAidl, devicesAidl, canBeSpatialized)));
+    return OK;
+}
+
+
 class CaptureStateListenerImpl : public media::BnCaptureStateListener,
                                  public IBinder::DeathRecipient {
 public:

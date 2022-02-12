@@ -15,8 +15,10 @@
  */
 
 #include "AudioTypes.h"
+#include "MediaMetricsConstants.h"
 #include "StringUtils.h"
 #include <media/TypeConverter.h> // requires libmedia_helper to get the Audio code.
+#include <statslog.h>            // statsd
 
 namespace android::mediametrics::types {
 

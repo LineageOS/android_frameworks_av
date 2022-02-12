@@ -126,20 +126,15 @@ aaudio_result_t AAudioServiceEndpointMMAP::openWithFormat(audio_format_t audioFo
     }
     config.sample_rate = aaudioSampleRate;
 
-    int32_t aaudioSamplesPerFrame = getSamplesPerFrame();
-
     const aaudio_direction_t direction = getDirection();
 
+    config.channel_mask = AAudio_getChannelMaskForOpen(
+            getChannelMask(), getSamplesPerFrame(), direction == AAUDIO_DIRECTION_INPUT);
+
     if (direction == AAUDIO_DIRECTION_OUTPUT) {
-        config.channel_mask = (aaudioSamplesPerFrame == AAUDIO_UNSPECIFIED)
-                              ? AUDIO_CHANNEL_OUT_STEREO
-                              : audio_channel_out_mask_from_count(aaudioSamplesPerFrame);
         mHardwareTimeOffsetNanos = OUTPUT_ESTIMATED_HARDWARE_OFFSET_NANOS; // frames at DAC later
 
     } else if (direction == AAUDIO_DIRECTION_INPUT) {
-        config.channel_mask =  (aaudioSamplesPerFrame == AAUDIO_UNSPECIFIED)
-                               ? AUDIO_CHANNEL_IN_STEREO
-                               : audio_channel_in_mask_from_count(aaudioSamplesPerFrame);
         mHardwareTimeOffsetNanos = INPUT_ESTIMATED_HARDWARE_OFFSET_NANOS; // frames at ADC earlier
 
     } else {
@@ -225,9 +220,9 @@ aaudio_result_t AAudioServiceEndpointMMAP::openWithFormat(audio_format_t audioFo
     }
 
     // Get information about the stream and pass it back to the caller.
-    setSamplesPerFrame((direction == AAUDIO_DIRECTION_OUTPUT)
-                       ? audio_channel_count_from_out_mask(config.channel_mask)
-                       : audio_channel_count_from_in_mask(config.channel_mask));
+    setChannelMask(AAudioConvert_androidToAAudioChannelMask(
+            config.channel_mask, getDirection() == AAUDIO_DIRECTION_INPUT,
+            AAudio_isChannelIndexMask(config.channel_mask)));
 
     // AAudio creates a copy of this FD and retains ownership of the copy.
     // Assume that AudioFlinger will close the original shared_memory_fd.
@@ -247,9 +242,9 @@ aaudio_result_t AAudioServiceEndpointMMAP::openWithFormat(audio_format_t audioFo
     setFormat(config.format);
     setSampleRate(config.sample_rate);
 
-    ALOGD("%s() actual rate = %d, channels = %d"
-          ", deviceId = %d, capacity = %d\n",
-          __func__, getSampleRate(), getSamplesPerFrame(), deviceId, getBufferCapacity());
+    ALOGD("%s() actual rate = %d, channels = %d channelMask = %#x, deviceId = %d, capacity = %d\n",
+          __func__, getSampleRate(), getSamplesPerFrame(), getChannelMask(),
+          deviceId, getBufferCapacity());
 
     ALOGD("%s() format = 0x%08x, frame size = %d, burst size = %d",
           __func__, getFormat(), calculateBytesPerFrame(), mFramesPerBurst);

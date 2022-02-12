@@ -19,6 +19,8 @@
     #error This header file should only be included from AudioFlinger.h
 #endif
 
+#include <math.h>
+
 // Checks and monitors OP_PLAY_AUDIO
 class OpPlayAudioMonitor : public RefBase {
 public:
@@ -161,12 +163,20 @@ public:
             }
             /** Return at what intensity to play haptics, used in mixer. */
             os::HapticScale getHapticIntensity() const { return mHapticIntensity; }
+            /** Return the maximum amplitude allowed for haptics data, used in mixer. */
+            float getHapticMaxAmplitude() const { return mHapticMaxAmplitude; }
             /** Set intensity of haptic playback, should be set after querying vibrator service. */
             void    setHapticIntensity(os::HapticScale hapticIntensity) {
                 if (os::isValidHapticScale(hapticIntensity)) {
                     mHapticIntensity = hapticIntensity;
                     setHapticPlaybackEnabled(mHapticIntensity != os::HapticScale::MUTE);
                 }
+            }
+            /** Set maximum amplitude allowed for haptic data, should be set after querying
+             *  vibrator service.
+             */
+            void    setHapticMaxAmplitude(float maxAmplitude) {
+                mHapticMaxAmplitude = maxAmplitude;
             }
             sp<os::ExternalVibration> getExternalVibration() const { return mExternalVibration; }
 
@@ -191,6 +201,7 @@ public:
 
     audio_output_flags_t getOutputFlags() const { return mFlags; }
     float getSpeed() const { return mSpeed; }
+
 protected:
     // for numerous
     friend class PlaybackThread;
@@ -288,6 +299,8 @@ protected:
     bool                mHapticPlaybackEnabled = false; // indicates haptic playback enabled or not
     // intensity to play haptic data
     os::HapticScale mHapticIntensity = os::HapticScale::MUTE;
+    // max amplitude allowed for haptic data
+    float mHapticMaxAmplitude = NAN;
     class AudioVibrationController : public os::BnExternalVibrationController {
     public:
         explicit AudioVibrationController(Track* track) : mTrack(track) {}

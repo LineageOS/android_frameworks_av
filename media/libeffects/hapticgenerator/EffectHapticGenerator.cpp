@@ -22,12 +22,15 @@
 
 #include <algorithm>
 #include <memory>
+#include <string>
 #include <utility>
 
 #include <errno.h>
 #include <inttypes.h>
 #include <math.h>
 
+#include <android-base/parsedouble.h>
+#include <android-base/properties.h>
 #include <audio_effects/effect_hapticgenerator.h>
 #include <audio_utils/format.h>
 #include <system/audio.h>
@@ -35,6 +38,7 @@
 static constexpr float DEFAULT_RESONANT_FREQUENCY = 150.0f;
 static constexpr float DEFAULT_BSF_ZERO_Q = 8.0f;
 static constexpr float DEFAULT_BSF_POLE_Q = 4.0f;
+static constexpr float DEFAULT_DISTORTION_OUTPUT_GAIN = 1.5f;
 
 // This is the only symbol that needs to be exported
 __attribute__ ((visibility ("default")))
@@ -81,6 +85,15 @@ static const effect_descriptor_t gHgDescriptor = {
 
 namespace {
 
+float getFloatProperty(const std::string& key, float defaultValue) {
+    float result;
+    std::string value = android::base::GetProperty(key, "");
+    if (!value.empty() && android::base::ParseFloat(value, &result)) {
+        return result;
+    }
+    return defaultValue;
+}
+
 int HapticGenerator_Init(struct HapticGeneratorContext *context) {
     context->itfe = &gHapticGeneratorInterface;
 
@@ -114,7 +127,9 @@ int HapticGenerator_Init(struct HapticGeneratorContext *context) {
     context->param.distortionCornerFrequency = 300.0f;
     context->param.distortionInputGain = 0.3f;
     context->param.distortionCubeThreshold = 0.1f;
-    context->param.distortionOutputGain = 1.5f;
+    context->param.distortionOutputGain = getFloatProperty(
+            "vendor.audio.hapticgenerator.distortion.output.gain", DEFAULT_DISTORTION_OUTPUT_GAIN);
+    ALOGD("Using distortion output gain as %f", context->param.distortionOutputGain);
 
     context->state = HAPTICGENERATOR_STATE_INITIALIZED;
     return 0;
@@ -287,15 +302,17 @@ int HapticGenerator_SetParameter(struct HapticGeneratorContext *context,
         break;
     }
     case HG_PARAM_VIBRATOR_INFO: {
-        if (value == nullptr || size != 2 * sizeof(float)) {
+        if (value == nullptr || size != 3 * sizeof(float)) {
             return -EINVAL;
         }
         const float resonantFrequency = *(float*) value;
         const float qFactor = *((float *) value + 1);
+        const float maxAmplitude = *((float *) value + 2);
         context->param.resonantFrequency =
                 isnan(resonantFrequency) ? DEFAULT_RESONANT_FREQUENCY : resonantFrequency;
         context->param.bsfZeroQ = isnan(qFactor) ? DEFAULT_BSF_POLE_Q : qFactor;
         context->param.bsfPoleQ = context->param.bsfZeroQ / 2.0f;
+        context->param.maxHapticAmplitude = maxAmplitude;
 
         if (context->processorsRecord.bpf != nullptr) {
             context->processorsRecord.bpf->setCoefficients(
@@ -448,7 +465,8 @@ int32_t HapticGenerator_Process(effect_handle_t self,
     float* hapticOutBuffer = HapticGenerator_runProcessingChain(
             context->processingChain, context->inputBuffer.data(),
             context->outputBuffer.data(), inBuffer->frameCount);
-    os::scaleHapticData(hapticOutBuffer, hapticSampleCount, context->param.maxHapticIntensity);
+    os::scaleHapticData(hapticOutBuffer, hapticSampleCount, context->param.maxHapticIntensity,
+                        context->param.maxHapticAmplitude);
 
     // For haptic data, the haptic playback thread will copy the data from effect input buffer,
     // which contains haptic data at the end of the buffer, directly to sink buffer.

@@ -442,6 +442,14 @@ DeviceVector DeviceVector::getDevicesFromDeviceTypeAddrVec(
     return devices;
 }
 
+AudioDeviceTypeAddrVector DeviceVector::toTypeAddrVector() const {
+    AudioDeviceTypeAddrVector result;
+    for (const auto& device : *this) {
+        result.push_back(AudioDeviceTypeAddr(device->type(), device->address()));
+    }
+    return result;
+}
+
 void DeviceVector::replaceDevicesByType(
         audio_devices_t typeToRemove, const DeviceVector &devicesToAdd) {
     DeviceVector devicesToRemove = getDevicesFromType(typeToRemove);
