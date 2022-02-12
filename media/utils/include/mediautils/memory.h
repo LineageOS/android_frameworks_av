@@ -1,5 +1,5 @@
 /*
- * Copyright (C) 2018 The Android Open Source Project
+ * Copyright (C) 2022 The Android Open Source Project
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -13,20 +13,21 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
-#include "CreatePluginFactories.h"
+#pragma once
 
-namespace aidl {
 namespace android {
-namespace hardware {
-namespace drm {
-namespace clearkey {
 
-std::shared_ptr<DrmFactory> createDrmFactory() {
-  return ::ndk::SharedRefBase::make<DrmFactory>();
-}
+namespace {
+struct FreeDeleter {
+    void operator()(void* p) { free(p); }
+};
 
-}  // namespace clearkey
-}  // namespace drm
-}  // namespace hardware
+}  // namespace
+
+/**
+ * Used to wrap pointers allocated by legacy code using malloc / calloc / etc.
+ */
+template <typename T>
+using unique_malloced_ptr = std::unique_ptr<T, FreeDeleter>;
+
 }  // namespace android
-}  // namespace aidl

@@ -18,6 +18,7 @@
 #include <aidl/android/hardware/drm/BnDrmFactory.h>
 #include <aidl/android/hardware/drm/IDrmFactory.h>
 #include <aidl/android/hardware/drm/IDrmPlugin.h>
+#include <aidl/android/hardware/drm/ICryptoPlugin.h>
 
 #include <string>
 #include <vector>
@@ -34,21 +35,18 @@ struct DrmFactory : public BnDrmFactory {
     DrmFactory() {}
     virtual ~DrmFactory() {}
 
-    ::ndk::ScopedAStatus createPlugin(
+    ::ndk::ScopedAStatus createDrmPlugin(
             const ::aidl::android::hardware::drm::Uuid& in_uuid,
             const std::string& in_appPackageName,
             std::shared_ptr<::aidl::android::hardware::drm::IDrmPlugin>* _aidl_return) override;
 
+    ::ndk::ScopedAStatus createCryptoPlugin(
+            const ::aidl::android::hardware::drm::Uuid& in_uuid,
+            const std::vector<uint8_t>& in_initData,
+            std::shared_ptr<::aidl::android::hardware::drm::ICryptoPlugin>* _aidl_return) override;
+
     ::ndk::ScopedAStatus getSupportedCryptoSchemes(
-            std::vector<::aidl::android::hardware::drm::Uuid>* _aidl_return) override;
-
-    ::ndk::ScopedAStatus isContentTypeSupported(const std::string& in_mimeType,
-                                                bool* _aidl_return) override;
-
-    ::ndk::ScopedAStatus isCryptoSchemeSupported(
-            const ::aidl::android::hardware::drm::Uuid& in_uuid, const std::string& in_mimeType,
-            ::aidl::android::hardware::drm::SecurityLevel in_securityLevel,
-            bool* _aidl_return) override;
+            ::aidl::android::hardware::drm::CryptoSchemes* _aidl_return) override;
 
     binder_status_t dump(int fd, const char** args, uint32_t numArgs) override;
 

@@ -31,110 +31,101 @@ namespace clearkey {
 
 using ::aidl::android::hardware::drm::Status;
 
-::ndk::ScopedAStatus CryptoPlugin::decrypt(
-        bool in_secure, const std::vector<uint8_t>& in_keyId, const std::vector<uint8_t>& in_iv,
-        ::aidl::android::hardware::drm::Mode in_mode,
-        const ::aidl::android::hardware::drm::Pattern& in_pattern,
-        const std::vector<::aidl::android::hardware::drm::SubSample>& in_subSamples,
-        const ::aidl::android::hardware::drm::SharedBuffer& in_source, int64_t in_offset,
-        const ::aidl::android::hardware::drm::DestinationBuffer& in_destination,
-        ::aidl::android::hardware::drm::DecryptResult* _aidl_return) {
-    UNUSED(in_pattern);
+::ndk::ScopedAStatus CryptoPlugin::decrypt(const DecryptArgs& in_args, int32_t* _aidl_return) {
+    const char* detailedError = "";
 
-    std::string detailedError;
-
-    _aidl_return->bytesWritten = 0;
-    if (in_secure) {
-        _aidl_return->detailedError = "secure decryption is not supported with ClearKey";
-        return toNdkScopedAStatus(Status::ERROR_DRM_CANNOT_HANDLE);
+    *_aidl_return = 0;
+    if (in_args.secure) {
+        detailedError = "secure decryption is not supported with ClearKey";
+        return toNdkScopedAStatus(Status::ERROR_DRM_CANNOT_HANDLE, detailedError);
     }
 
     std::lock_guard<std::mutex> shared_buffer_lock(mSharedBufferLock);
-    if (mSharedBufferMap.find(in_source.bufferId) == mSharedBufferMap.end()) {
-        _aidl_return->detailedError = "source decrypt buffer base not set";
-        return toNdkScopedAStatus(Status::ERROR_DRM_CANNOT_HANDLE);
+    if (mSharedBufferMap.find(in_args.source.bufferId) == mSharedBufferMap.end()) {
+        detailedError = "source decrypt buffer base not set";
+        return toNdkScopedAStatus(Status::ERROR_DRM_CANNOT_HANDLE, detailedError);
     }
 
-    if (in_destination.type == BufferType::SHARED_MEMORY) {
-        const SharedBuffer& dest = in_destination.nonsecureMemory;
-        if (mSharedBufferMap.find(dest.bufferId) == mSharedBufferMap.end()) {
-            _aidl_return->detailedError = "destination decrypt buffer base not set";
-            return toNdkScopedAStatus(Status::ERROR_DRM_CANNOT_HANDLE);
-        }
-    } else {
-        _aidl_return->detailedError = "destination type not supported";
-        return toNdkScopedAStatus(Status::ERROR_DRM_CANNOT_HANDLE);
+    const auto NON_SECURE = DestinationBuffer::Tag::nonsecureMemory;
+    if (in_args.destination.getTag() != NON_SECURE) {
+        detailedError = "destination type not supported";
+        return toNdkScopedAStatus(Status::ERROR_DRM_CANNOT_HANDLE, detailedError);
     }
 
-    auto src = mSharedBufferMap[in_source.bufferId];
+    const SharedBuffer& destBuffer = in_args.destination.get<NON_SECURE>();
+    if (mSharedBufferMap.find(destBuffer.bufferId) == mSharedBufferMap.end()) {
+        detailedError = "destination decrypt buffer base not set";
+        return toNdkScopedAStatus(Status::ERROR_DRM_CANNOT_HANDLE, detailedError);
+    }
+
+    auto src = mSharedBufferMap[in_args.source.bufferId];
     if (src->mBase == nullptr) {
-        _aidl_return->detailedError = "source is a nullptr";
-        return toNdkScopedAStatus(Status::ERROR_DRM_CANNOT_HANDLE);
+        detailedError = "source is a nullptr";
+        return toNdkScopedAStatus(Status::ERROR_DRM_CANNOT_HANDLE, detailedError);
     }
 
     size_t totalSize = 0;
-    if (__builtin_add_overflow(in_source.offset, in_offset, &totalSize) ||
-        __builtin_add_overflow(totalSize, in_source.size, &totalSize) || totalSize > src->mSize) {
+    if (__builtin_add_overflow(in_args.source.offset, in_args.offset, &totalSize) ||
+        __builtin_add_overflow(totalSize, in_args.source.size, &totalSize) ||
+        totalSize > src->mSize) {
         android_errorWriteLog(0x534e4554, "176496160");
-        _aidl_return->detailedError = "invalid buffer size";
-        return toNdkScopedAStatus(Status::ERROR_DRM_CANNOT_HANDLE);
+        detailedError = "invalid buffer size";
+        return toNdkScopedAStatus(Status::ERROR_DRM_CANNOT_HANDLE, detailedError);
     }
 
-    // destination.type == BufferType::SHARED_MEMORY
-    const SharedBuffer& destBuffer = in_destination.nonsecureMemory;
+    // destination type must be non-secure shared memory
     auto dest = mSharedBufferMap[destBuffer.bufferId];
     if (dest->mBase == nullptr) {
-        _aidl_return->detailedError = "destination is a nullptr";
-        return toNdkScopedAStatus(Status::ERROR_DRM_CANNOT_HANDLE);
+        detailedError = "destination is a nullptr";
+        return toNdkScopedAStatus(Status::ERROR_DRM_CANNOT_HANDLE, detailedError);
     }
 
     totalSize = 0;
     if (__builtin_add_overflow(destBuffer.offset, destBuffer.size, &totalSize) ||
         totalSize > dest->mSize) {
         android_errorWriteLog(0x534e4554, "176444622");
-        _aidl_return->detailedError = "invalid buffer size";
-        return toNdkScopedAStatus(Status::ERROR_DRM_FRAME_TOO_LARGE);
+        detailedError = "invalid buffer size";
+        return toNdkScopedAStatus(Status::ERROR_DRM_FRAME_TOO_LARGE, detailedError);
     }
 
     // Calculate the output buffer size and determine if any subsamples are
     // encrypted.
-    uint8_t* srcPtr = src->mBase + in_source.offset + in_offset;
-    uint8_t* destPtr = dest->mBase + in_destination.nonsecureMemory.offset;
+    uint8_t* srcPtr = src->mBase + in_args.source.offset + in_args.offset;
+    uint8_t* destPtr = dest->mBase + destBuffer.offset;
     size_t destSize = 0;
     size_t srcSize = 0;
     bool haveEncryptedSubsamples = false;
-    for (size_t i = 0; i < in_subSamples.size(); i++) {
-        const SubSample& subSample = in_subSamples[i];
+    for (size_t i = 0; i < in_args.subSamples.size(); i++) {
+        const SubSample& subSample = in_args.subSamples[i];
         if (__builtin_add_overflow(destSize, subSample.numBytesOfClearData, &destSize) ||
             __builtin_add_overflow(srcSize, subSample.numBytesOfClearData, &srcSize)) {
-            _aidl_return->detailedError = "subsample clear size overflow";
-            return toNdkScopedAStatus(Status::ERROR_DRM_FRAME_TOO_LARGE);
+            detailedError = "subsample clear size overflow";
+            return toNdkScopedAStatus(Status::ERROR_DRM_FRAME_TOO_LARGE, detailedError);
         }
         if (__builtin_add_overflow(destSize, subSample.numBytesOfEncryptedData, &destSize) ||
             __builtin_add_overflow(srcSize, subSample.numBytesOfEncryptedData, &srcSize)) {
-            _aidl_return->detailedError = "subsample encrypted size overflow";
-            return toNdkScopedAStatus(Status::ERROR_DRM_FRAME_TOO_LARGE);
+            detailedError = "subsample encrypted size overflow";
+            return toNdkScopedAStatus(Status::ERROR_DRM_FRAME_TOO_LARGE, detailedError);
         }
         if (subSample.numBytesOfEncryptedData > 0) {
             haveEncryptedSubsamples = true;
         }
     }
 
-    if (destSize > destBuffer.size || srcSize > in_source.size) {
-        _aidl_return->detailedError = "subsample sum too large";
-        return toNdkScopedAStatus(Status::ERROR_DRM_FRAME_TOO_LARGE);
+    if (destSize > destBuffer.size || srcSize > in_args.source.size) {
+        detailedError = "subsample sum too large";
+        return toNdkScopedAStatus(Status::ERROR_DRM_FRAME_TOO_LARGE, detailedError);
     }
 
-    if (in_mode == Mode::UNENCRYPTED) {
+    if (in_args.mode == Mode::UNENCRYPTED) {
         if (haveEncryptedSubsamples) {
-            _aidl_return->detailedError =
-                    "Encrypted subsamples found in allegedly unencrypted data.";
-            return toNdkScopedAStatus(Status::ERROR_DRM_CANNOT_HANDLE);
+            detailedError = "Encrypted subsamples found in allegedly unencrypted data.";
+            return toNdkScopedAStatus(Status::ERROR_DRM_CANNOT_HANDLE, detailedError);
         }
 
         size_t offset = 0;
-        for (size_t i = 0; i < in_subSamples.size(); ++i) {
-            const SubSample& subSample = in_subSamples[i];
+        for (size_t i = 0; i < in_args.subSamples.size(); ++i) {
+            const SubSample& subSample = in_args.subSamples[i];
             if (subSample.numBytesOfClearData != 0) {
                 memcpy(reinterpret_cast<uint8_t*>(destPtr) + offset,
                        reinterpret_cast<const uint8_t*>(srcPtr) + offset,
@@ -143,37 +134,33 @@ using ::aidl::android::hardware::drm::Status;
             }
         }
 
-        _aidl_return->bytesWritten = static_cast<ssize_t>(offset);
-        _aidl_return->detailedError = "";
+        *_aidl_return = static_cast<ssize_t>(offset);
         return toNdkScopedAStatus(Status::OK);
-    } else if (in_mode == Mode::AES_CTR) {
+    } else if (in_args.mode == Mode::AES_CTR) {
         size_t bytesDecrypted{};
         std::vector<int32_t> clearDataLengths;
         std::vector<int32_t> encryptedDataLengths;
-        for (auto ss : in_subSamples) {
+        for (auto ss : in_args.subSamples) {
             clearDataLengths.push_back(ss.numBytesOfClearData);
             encryptedDataLengths.push_back(ss.numBytesOfEncryptedData);
         }
         auto res =
-                mSession->decrypt(in_keyId.data(), in_iv.data(),
+                mSession->decrypt(in_args.keyId.data(), in_args.iv.data(),
                                   srcPtr, static_cast<uint8_t*>(destPtr),
                                   clearDataLengths, encryptedDataLengths,
                                   &bytesDecrypted);
         if (res == clearkeydrm::OK) {
-            _aidl_return->bytesWritten = static_cast<ssize_t>(bytesDecrypted);
-            _aidl_return->detailedError = "";
+            *_aidl_return = static_cast<ssize_t>(bytesDecrypted);
             return toNdkScopedAStatus(Status::OK);
         } else {
-            _aidl_return->bytesWritten = 0;
-            _aidl_return->detailedError = "Decryption Error";
-            return toNdkScopedAStatus(static_cast<Status>(res));
+            *_aidl_return = 0;
+            detailedError = "Decryption Error";
+            return toNdkScopedAStatus(static_cast<Status>(res), detailedError);
         }
     } else {
-        _aidl_return->bytesWritten = 0;
-        _aidl_return->detailedError =
-                "selected encryption mode is not supported by the ClearKey DRM \
-Plugin";
-        return toNdkScopedAStatus(Status::ERROR_DRM_CANNOT_HANDLE);
+        *_aidl_return = 0;
+        detailedError = "selected encryption mode is not supported by the ClearKey DRM Plugin";
+        return toNdkScopedAStatus(Status::ERROR_DRM_CANNOT_HANDLE, detailedError);
     }
 }
 
@@ -218,24 +205,22 @@ Plugin";
     return toNdkScopedAStatus(status);
 }
 
-::ndk::ScopedAStatus CryptoPlugin::setSharedBufferBase(
-        const ::aidl::android::hardware::common::Ashmem& in_base, int32_t in_bufferId) {
+::ndk::ScopedAStatus CryptoPlugin::setSharedBufferBase(const SharedBuffer& in_base) {
     std::lock_guard<std::mutex> shared_buffer_lock(mSharedBufferLock);
-    mSharedBufferMap[in_bufferId] = std::make_shared<SharedBufferBase>(in_base);
+    mSharedBufferMap[in_base.bufferId] = std::make_shared<SharedBufferBase>(in_base);
     return ::ndk::ScopedAStatus::ok();
 }
 
-SharedBufferBase::SharedBufferBase(const ::aidl::android::hardware::common::Ashmem& mem)
+SharedBufferBase::SharedBufferBase(const SharedBuffer& mem)
         : mBase(nullptr),
           mSize(mem.size) {
-    if (mem.fd.get() < 0) {
+    if (mem.handle.fds.empty()) {
         return;
     }
-    auto addr = mmap(nullptr, mem.size, PROT_READ | PROT_WRITE, MAP_SHARED,
-                     mem.fd.get(), 0);
+    auto fd = mem.handle.fds[0].get();
+    auto addr = mmap(nullptr, mem.size, PROT_READ | PROT_WRITE, MAP_SHARED, fd, 0);
     if (addr == MAP_FAILED) {
-        ALOGE("mmap err: fd %d; errno %s",
-              mem.fd.get(), strerror(errno));
+        ALOGE("mmap err: fd %d; errno %s", fd, strerror(errno));
     } else {
         mBase = static_cast<uint8_t*>(addr);
     }

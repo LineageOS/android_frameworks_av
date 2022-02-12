@@ -20,6 +20,7 @@
 #include "DrmFactory.h"
 
 #include "ClearKeyUUID.h"
+#include "CryptoPlugin.h"
 #include "DrmPlugin.h"
 #include "MimeTypeStdStr.h"
 #include "SessionLibrary.h"
@@ -38,7 +39,7 @@ using ::aidl::android::hardware::drm::SecurityLevel;
 using ::aidl::android::hardware::drm::Status;
 using ::aidl::android::hardware::drm::Uuid;
 
-::ndk::ScopedAStatus DrmFactory::createPlugin(
+::ndk::ScopedAStatus DrmFactory::createDrmPlugin(
         const Uuid& in_uuid, const string& in_appPackageName,
         std::shared_ptr<::aidl::android::hardware::drm::IDrmPlugin>* _aidl_return) {
     UNUSED(in_appPackageName);
@@ -56,40 +57,37 @@ using ::aidl::android::hardware::drm::Uuid;
     return toNdkScopedAStatus(Status::OK);
 }
 
-::ndk::ScopedAStatus DrmFactory::getSupportedCryptoSchemes(vector<Uuid>* _aidl_return) {
-    vector<Uuid> schemes;
-    Uuid scheme;
-    for (const auto& uuid : ::aidl::android::hardware::drm::clearkey::getSupportedCryptoSchemes()) {
-        scheme.uuid.assign(uuid.begin(), uuid.end());
-        schemes.push_back(scheme);
+::ndk::ScopedAStatus DrmFactory::createCryptoPlugin(
+        const Uuid& in_uuid, const std::vector<uint8_t>& in_initData,
+        std::shared_ptr<::aidl::android::hardware::drm::ICryptoPlugin>* _aidl_return) {
+    if (!isClearKeyUUID(in_uuid.uuid.data())) {
+        ALOGE("Clearkey Drm HAL: failed to create crypto plugin, "
+              "invalid crypto scheme");
+        *_aidl_return = nullptr;
+        return toNdkScopedAStatus(Status::BAD_VALUE);
     }
+
+    std::shared_ptr<CryptoPlugin> plugin = ::ndk::SharedRefBase::make<CryptoPlugin>(in_initData);
+    Status status = plugin->getInitStatus();
+    if (status != Status::OK) {
+        plugin.reset();
+        plugin = nullptr;
+    }
+    *_aidl_return = plugin;
+    return toNdkScopedAStatus(status);
+}
+
+::ndk::ScopedAStatus DrmFactory::getSupportedCryptoSchemes(CryptoSchemes* _aidl_return) {
+    CryptoSchemes schemes{};
+    for (const auto& uuid : ::aidl::android::hardware::drm::clearkey::getSupportedCryptoSchemes()) {
+        schemes.uuids.push_back({uuid});
+    }
+    schemes.minLevel = SecurityLevel::SW_SECURE_CRYPTO;
+    schemes.maxLevel = SecurityLevel::SW_SECURE_CRYPTO;
+    schemes.mimeTypes = {kIsoBmffVideoMimeType, kIsoBmffAudioMimeType, kCencInitDataFormat,
+                         kWebmVideoMimeType, kWebmAudioMimeType, kWebmInitDataFormat};
     *_aidl_return = schemes;
     return ndk::ScopedAStatus::ok();
-}
-
-::ndk::ScopedAStatus DrmFactory::isContentTypeSupported(const string& in_mimeType,
-                                                        bool* _aidl_return) {
-    // This should match the in_mimeTypes handed by InitDataParser.
-    *_aidl_return = in_mimeType == kIsoBmffVideoMimeType || in_mimeType == kIsoBmffAudioMimeType ||
-                    in_mimeType == kCencInitDataFormat || in_mimeType == kWebmVideoMimeType ||
-                    in_mimeType == kWebmAudioMimeType || in_mimeType == kWebmInitDataFormat ||
-                    in_mimeType.empty();
-    return ::ndk::ScopedAStatus::ok();
-}
-
-::ndk::ScopedAStatus DrmFactory::isCryptoSchemeSupported(const Uuid& in_uuid,
-                                                         const string& in_mimeType,
-                                                         SecurityLevel in_securityLevel,
-                                                         bool* _aidl_return) {
-    bool isSupportedMimeType = false;
-    if (!isContentTypeSupported(in_mimeType, &isSupportedMimeType).isOk()) {
-        ALOGD("%s mime type is not supported by crypto scheme", in_mimeType.c_str());
-    }
-    *_aidl_return = isClearKeyUUID(in_uuid.uuid.data()) && isSupportedMimeType &&
-                    (in_securityLevel == SecurityLevel::SW_SECURE_CRYPTO ||
-                     in_securityLevel == SecurityLevel::DEFAULT ||
-                     in_securityLevel == SecurityLevel::UNKNOWN);
-    return ::ndk::ScopedAStatus::ok();
 }
 
 binder_status_t DrmFactory::dump(int fd, const char** args, uint32_t numArgs) {
@@ -111,4 +109,4 @@ binder_status_t DrmFactory::dump(int fd, const char** args, uint32_t numArgs) {
 }  // namespace drm
 }  // namespace hardware
 }  // namespace android
-}  // namespace aidl
+} // namespace aidl

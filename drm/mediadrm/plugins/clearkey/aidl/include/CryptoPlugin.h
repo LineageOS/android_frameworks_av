@@ -40,12 +40,13 @@ namespace drm {
 namespace clearkey {
 
 using namespace clearkeydrm;
+using ::aidl::android::hardware::drm::DecryptArgs;
 using ::aidl::android::hardware::drm::Status;
 
 struct SharedBufferBase {
     uint8_t* mBase;
     int64_t mSize;
-    SharedBufferBase(const ::aidl::android::hardware::common::Ashmem& mem);
+    SharedBufferBase(const ::aidl::android::hardware::drm::SharedBuffer& mem);
     ~SharedBufferBase();
 };
 
@@ -59,14 +60,7 @@ struct CryptoPlugin : public BnCryptoPlugin {
     }
     virtual ~CryptoPlugin() {}
 
-    ::ndk::ScopedAStatus decrypt(
-            bool in_secure, const std::vector<uint8_t>& in_keyId, const std::vector<uint8_t>& in_iv,
-            ::aidl::android::hardware::drm::Mode in_mode,
-            const ::aidl::android::hardware::drm::Pattern& in_pattern,
-            const std::vector<::aidl::android::hardware::drm::SubSample>& in_subSamples,
-            const ::aidl::android::hardware::drm::SharedBuffer& in_source, int64_t in_offset,
-            const ::aidl::android::hardware::drm::DestinationBuffer& in_destination,
-            ::aidl::android::hardware::drm::DecryptResult* _aidl_return) override;
+    ::ndk::ScopedAStatus decrypt(const DecryptArgs& in_args, int32_t* _aidl_return) override;
 
     ::ndk::ScopedAStatus getLogMessages(
             std::vector<::aidl::android::hardware::drm::LogMessage>* _aidl_return) override;
@@ -79,7 +73,7 @@ struct CryptoPlugin : public BnCryptoPlugin {
     ::ndk::ScopedAStatus setMediaDrmSession(const std::vector<uint8_t>& in_sessionId) override;
 
     ::ndk::ScopedAStatus setSharedBufferBase(
-            const ::aidl::android::hardware::common::Ashmem& in_base, int32_t in_bufferId) override;
+            const ::aidl::android::hardware::drm::SharedBuffer& in_base) override;
 
     ::aidl::android::hardware::drm::Status getInitStatus() const { return mInitStatus; }
 
