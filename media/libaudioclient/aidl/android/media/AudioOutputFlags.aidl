@@ -37,4 +37,5 @@ enum AudioOutputFlags {
     INCALL_MUSIC     = 14,
     GAPLESS_OFFLOAD  = 15,
     SPATIALIZER      = 16,
+    ULTRASOUND       = 17,
 }
