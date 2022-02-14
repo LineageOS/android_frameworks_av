@@ -61,6 +61,7 @@ cc_library {
         "libhidlbase",
         "libhidlmemory",
         "libjsoncpp",
+        "libmedia_helper",
         "libprocessgroup",
         "libstagefright_esds",
         "libstagefright_foundation_without_imemory",
