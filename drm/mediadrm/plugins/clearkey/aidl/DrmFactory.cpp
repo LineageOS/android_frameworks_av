@@ -82,10 +82,12 @@ using ::aidl::android::hardware::drm::Uuid;
     for (const auto& uuid : ::aidl::android::hardware::drm::clearkey::getSupportedCryptoSchemes()) {
         schemes.uuids.push_back({uuid});
     }
-    schemes.minLevel = SecurityLevel::SW_SECURE_CRYPTO;
-    schemes.maxLevel = SecurityLevel::SW_SECURE_CRYPTO;
-    schemes.mimeTypes = {kIsoBmffVideoMimeType, kIsoBmffAudioMimeType, kCencInitDataFormat,
-                         kWebmVideoMimeType, kWebmAudioMimeType, kWebmInitDataFormat};
+    for (auto mime : {kIsoBmffVideoMimeType, kIsoBmffAudioMimeType, kCencInitDataFormat,
+                      kWebmVideoMimeType, kWebmAudioMimeType, kWebmInitDataFormat}) {
+        const auto minLevel = SecurityLevel::SW_SECURE_CRYPTO;
+        const auto maxLevel = SecurityLevel::SW_SECURE_CRYPTO;
+        schemes.mimeTypes.push_back({mime, minLevel, maxLevel});
+    }
     *_aidl_return = schemes;
     return ndk::ScopedAStatus::ok();
 }
