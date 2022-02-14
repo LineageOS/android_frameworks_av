@@ -734,7 +734,11 @@ status_t AidlCamera3Device::AidlHalInterface::repeatingRequestEnd(uint32_t frame
     ATRACE_NAME("AidlCameraHal::repeatingRequestEnd");
     if (!valid()) return INVALID_OPERATION;
 
-    mAidlSession->repeatingRequestEnd(frameNumber, streamIds);
+    auto err = mAidlSession->repeatingRequestEnd(frameNumber, streamIds);
+    if (!err.isOk()) {
+        ALOGE("%s: Transaction error: %s", __FUNCTION__, err.getMessage());
+        return AidlProviderInfo::mapToStatusT(err);
+    }
 
     return OK;
 }
