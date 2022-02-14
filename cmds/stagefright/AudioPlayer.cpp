@@ -453,7 +453,7 @@ size_t AudioPlayer::AudioSinkCallback(
 }
 
 size_t AudioPlayer::onMoreData(const AudioTrack::Buffer& buffer) {
-    return fillBuffer(buffer.raw, buffer.size);
+    return fillBuffer(buffer.data(), buffer.size());
 }
 
 void AudioPlayer::onStreamEnd() {

@@ -267,7 +267,7 @@ class LegacyCallbackWrapper : public AudioRecord::IAudioRecordCallback {
     size_t onMoreData(const AudioRecord::Buffer& buffer) override {
         AudioRecord::Buffer copy = buffer;
         mCallback(AudioRecord::EVENT_MORE_DATA, mData, &copy);
-        return copy.size;
+        return copy.size();
     }
 
     void onOverrun() override { mCallback(AudioRecord::EVENT_OVERRUN, mData, nullptr); }
@@ -1142,7 +1142,7 @@ status_t AudioRecord::obtainBuffer(Buffer* audioBuffer, int32_t waitCount, size_
     }
     if (mTransfer != TRANSFER_OBTAIN) {
         audioBuffer->frameCount = 0;
-        audioBuffer->size = 0;
+        audioBuffer->mSize = 0;
         audioBuffer->raw = NULL;
         if (nonContig != NULL) {
             *nonContig = 0;
@@ -1231,7 +1231,7 @@ status_t AudioRecord::obtainBuffer(Buffer* audioBuffer, const struct timespec *r
     } while ((status == DEAD_OBJECT) && (tryCounter-- > 0));
 
     audioBuffer->frameCount = buffer.mFrameCount;
-    audioBuffer->size = buffer.mFrameCount * mServerFrameSize;
+    audioBuffer->mSize = buffer.mFrameCount * mServerFrameSize;
     audioBuffer->raw = buffer.mRaw;
     audioBuffer->sequence = oldSequence;
     if (nonContig != NULL) {
@@ -1308,7 +1308,7 @@ ssize_t AudioRecord::read(void* buffer, size_t userSize, bool blocking)
 
         size_t bytesRead = audioBuffer.frameCount * mFrameSize;
         memcpy_by_audio_format(buffer, mFormat, audioBuffer.raw, mServerConfig.format,
-                               audioBuffer.size / mServerSampleSize);
+                               audioBuffer.mSize / mServerSampleSize);
         buffer = ((char *) buffer) + bytesRead;
         userSize -= bytesRead;
         read += bytesRead;
@@ -1514,15 +1514,15 @@ nsecs_t AudioRecord::processAudioBuffer()
         if (mServerConfig.format != mFormat) {
             buffer = &mFormatConversionBuffer;
             buffer->frameCount = audioBuffer.frameCount;
-            buffer->size = buffer->frameCount * mFrameSize;
+            buffer->mSize = buffer->frameCount * mFrameSize;
             buffer->sequence = audioBuffer.sequence;
             memcpy_by_audio_format(buffer->raw, mFormat, audioBuffer.raw,
-                                   mServerConfig.format, audioBuffer.size / mServerSampleSize);
+                                   mServerConfig.format, audioBuffer.size() / mServerSampleSize);
         }
 
-        const size_t reqSize = buffer->size;
+        const size_t reqSize = buffer->size();
         const size_t readSize = callback->onMoreData(*buffer);
-        buffer->size = readSize;
+        buffer->mSize = readSize;
 
         // Validate on returned size
         if (ssize_t(readSize) < 0 || readSize > reqSize) {
