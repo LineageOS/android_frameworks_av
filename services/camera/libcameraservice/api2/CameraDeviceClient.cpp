@@ -2004,13 +2004,15 @@ void CameraDeviceClient::detachDevice() {
     nsecs_t startTime = systemTime();
     ALOGV("Camera %s: Stopping processors", mCameraIdStr.string());
 
-    mFrameProcessor->removeListener(camera2::FrameProcessorBase::FRAME_PROCESSOR_LISTENER_MIN_ID,
-                                    camera2::FrameProcessorBase::FRAME_PROCESSOR_LISTENER_MAX_ID,
-                                    /*listener*/this);
-    mFrameProcessor->requestExit();
-    ALOGV("Camera %s: Waiting for threads", mCameraIdStr.string());
-    mFrameProcessor->join();
-    ALOGV("Camera %s: Disconnecting device", mCameraIdStr.string());
+    if (mFrameProcessor.get() != nullptr) {
+        mFrameProcessor->removeListener(
+                camera2::FrameProcessorBase::FRAME_PROCESSOR_LISTENER_MIN_ID,
+                camera2::FrameProcessorBase::FRAME_PROCESSOR_LISTENER_MAX_ID, /*listener*/this);
+        mFrameProcessor->requestExit();
+        ALOGV("Camera %s: Waiting for threads", mCameraIdStr.string());
+        mFrameProcessor->join();
+        ALOGV("Camera %s: Disconnecting device", mCameraIdStr.string());
+    }
 
     // WORKAROUND: HAL refuses to disconnect while there's streams in flight
     {
