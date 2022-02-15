@@ -35,7 +35,9 @@ using content::AttributionSourceState;
 
 class AudioRecord;
 
-struct AudioSource : public MediaSource, public MediaBufferObserver {
+struct AudioSource : public MediaSource,
+                     public MediaBufferObserver,
+                     public AudioRecord::IAudioRecordCallback {
     // Note that the "channels" parameter _is_ the number of channels,
     // _not_ a bitmask of audio_channels_t constants.
     AudioSource(
@@ -74,7 +76,6 @@ struct AudioSource : public MediaSource, public MediaBufferObserver {
             MediaBufferBase **buffer, const ReadOptions *options = NULL);
     virtual status_t setStopTimeUs(int64_t stopTimeUs);
 
-    status_t dataCallback(const AudioRecord::Buffer& buffer);
     virtual void signalBufferReturned(MediaBufferBase *buffer);
 
     status_t setInputDevice(audio_port_handle_t deviceId);
@@ -141,6 +142,10 @@ private:
     void releaseQueuedFrames_l();
     void waitOutstandingEncodingFrames_l();
     status_t reset();
+
+    // IAudioRecordCallback implementation
+    size_t onMoreData(const AudioRecord::Buffer&) override;
+    void onOverrun() override;
 
     AudioSource(const AudioSource &);
     AudioSource &operator=(const AudioSource &);

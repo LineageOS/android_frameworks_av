@@ -1329,7 +1329,7 @@ bool ToneGenerator::initAudioTrack() {
 //
 //    Input:
 //        buffer  An buffer object containing a pointer which we will fill with
-//                buffer.size bytes.
+//                buffer.size() bytes.
 //
 //    Output:
 //        The number of bytes we successfully wrote.
@@ -1337,16 +1337,16 @@ bool ToneGenerator::initAudioTrack() {
 ////////////////////////////////////////////////////////////////////////////////
 size_t ToneGenerator::onMoreData(const AudioTrack::Buffer& buffer) {
 
-    int16_t *lpOut = buffer.i16;
-    uint32_t lNumSmp = (buffer.size / sizeof(int16_t) < UINT32_MAX) ?
-            buffer.size / sizeof(int16_t) : UINT32_MAX;
-    if (buffer.size == 0) return 0;
+    int16_t *lpOut = reinterpret_cast<int16_t*>(buffer.data());
+    uint32_t lNumSmp = (buffer.size() / sizeof(int16_t) < UINT32_MAX) ?
+            buffer.size() / sizeof(int16_t) : UINT32_MAX;
+    if (buffer.size() == 0) return 0;
     // We will write to the entire buffer unless we are stopped, then we return
     // 0 at loop end
     size_t bytesWritten = lNumSmp * sizeof(int16_t);
 
     // Clear output buffer: WaveGenerator accumulates into lpOut buffer
-    memset(lpOut, 0, buffer.size);
+    memset(lpOut, 0, buffer.size());
 
     while (lNumSmp) {
         unsigned int lReqSmp = lNumSmp < mProcessSize*2 ? lNumSmp : mProcessSize;
