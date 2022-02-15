@@ -373,6 +373,7 @@ class AudioPolicyManagerTestMsd : public AudioPolicyManagerTest,
   protected:
     void SetUpManagerConfig() override;
     void TearDown() override;
+    AudioProfileVector getDirectProfilesForAttributes(const audio_attributes_t& attr);
 
     sp<DeviceDescriptor> mMsdOutputDevice;
     sp<DeviceDescriptor> mMsdInputDevice;
@@ -500,6 +501,13 @@ void AudioPolicyManagerTestMsd::TearDown() {
     mSpdifDevice.clear();
     mHdmiInputDevice.clear();
     AudioPolicyManagerTest::TearDown();
+}
+
+AudioProfileVector AudioPolicyManagerTestMsd::getDirectProfilesForAttributes(
+                                                    const audio_attributes_t& attr) {
+    AudioProfileVector audioProfilesVector;
+    mManager->getDirectProfilesForAttributes(&attr, audioProfilesVector);
+    return audioProfilesVector;
 }
 
 TEST_P(AudioPolicyManagerTestMsd, InitSuccess) {
@@ -640,6 +648,48 @@ TEST_P(AudioPolicyManagerTestMsd, PatchCreationFromHdmiInToMsd) {
     ASSERT_EQ(48000, patch->mPatch.sources[0].sample_rate);
     ASSERT_EQ(48000, patch->mPatch.sinks[0].sample_rate);
     ASSERT_EQ(1, patchCount.deltaFromSnapshot());
+}
+
+TEST_P(AudioPolicyManagerTestMsd, GetDirectProfilesForAttributesWithMsd) {
+    const audio_attributes_t attr = {
+        AUDIO_CONTENT_TYPE_UNKNOWN, AUDIO_USAGE_UNKNOWN,
+        AUDIO_SOURCE_DEFAULT, AUDIO_FLAG_NONE, ""};
+
+    // count expected direct profiles for the default device
+    int countDirectProfilesPrimary = 0;
+    const auto& primary = mManager->getConfig().getHwModules()
+            .getModuleFromName(AUDIO_HARDWARE_MODULE_ID_PRIMARY);
+    for (const auto outputProfile : primary->getOutputProfiles()) {
+        if (outputProfile->asAudioPort()->isDirectOutput()) {
+            countDirectProfilesPrimary += outputProfile->asAudioPort()->getAudioProfiles().size();
+        }
+    }
+
+    // count expected direct profiles for the msd device
+    int countDirectProfilesMsd = 0;
+    const auto& msd = mManager->getConfig().getHwModules()
+            .getModuleFromName(AUDIO_HARDWARE_MODULE_ID_MSD);
+    for (const auto outputProfile : msd->getOutputProfiles()) {
+        if (outputProfile->asAudioPort()->isDirectOutput()) {
+            countDirectProfilesMsd += outputProfile->asAudioPort()->getAudioProfiles().size();
+        }
+    }
+
+    // before setting up MSD audio patches we only have the primary hal direct profiles
+    ASSERT_EQ(countDirectProfilesPrimary, getDirectProfilesForAttributes(attr).size());
+
+    DeviceVector outputDevices = mManager->getAvailableOutputDevices();
+    // Remove MSD output device to avoid patching to itself
+    outputDevices.remove(mMsdOutputDevice);
+    mManager->setMsdOutputPatches(&outputDevices);
+
+    // after setting up MSD audio patches the MSD direct profiles are added
+    ASSERT_EQ(countDirectProfilesPrimary + countDirectProfilesMsd,
+                getDirectProfilesForAttributes(attr).size());
+
+    mManager->releaseMsdOutputPatches(outputDevices);
+    // releasing the MSD audio patches gets us back to the primary hal direct profiles only
+    ASSERT_EQ(countDirectProfilesPrimary, getDirectProfilesForAttributes(attr).size());
 }
 
 class AudioPolicyManagerTestWithConfigurationFile : public AudioPolicyManagerTest {
