@@ -137,6 +137,8 @@ class AudioPolicyManagerTest : public testing::Test {
             audio_port_handle_t *portId = nullptr);
     PatchCountCheck snapshotPatchCount() { return PatchCountCheck(mClient.get()); }
 
+    void getAudioPorts(audio_port_type_t type, audio_port_role_t role,
+            std::vector<audio_port_v7>* ports);
     // Tries to find a device port. If 'foundPort' isn't nullptr,
     // will generate a failure if the port hasn't been found.
     bool findDevicePort(audio_port_role_t role, audio_devices_t deviceType,
@@ -255,21 +257,26 @@ void AudioPolicyManagerTest::getInputForAttr(
     ASSERT_NE(AUDIO_PORT_HANDLE_NONE, *portId);
 }
 
-bool AudioPolicyManagerTest::findDevicePort(audio_port_role_t role,
-        audio_devices_t deviceType, const std::string &address, audio_port_v7 *foundPort) {
+void AudioPolicyManagerTest::getAudioPorts(audio_port_type_t type, audio_port_role_t role,
+        std::vector<audio_port_v7>* ports) {
     uint32_t numPorts = 0;
     uint32_t generation1;
     status_t ret;
 
-    ret = mManager->listAudioPorts(role, AUDIO_PORT_TYPE_DEVICE, &numPorts, nullptr, &generation1);
-    EXPECT_EQ(NO_ERROR, ret) << "mManager->listAudioPorts returned error";
-    if (HasFailure()) return false;
+    ret = mManager->listAudioPorts(role, type, &numPorts, nullptr, &generation1);
+    ASSERT_EQ(NO_ERROR, ret) << "mManager->listAudioPorts returned error";
 
     uint32_t generation2;
-    struct audio_port_v7 ports[numPorts];
-    ret = mManager->listAudioPorts(role, AUDIO_PORT_TYPE_DEVICE, &numPorts, ports, &generation2);
-    EXPECT_EQ(NO_ERROR, ret) << "mManager->listAudioPorts returned error";
-    EXPECT_EQ(generation1, generation2) << "Generations changed during ports retrieval";
+    ports->resize(numPorts);
+    ret = mManager->listAudioPorts(role, type, &numPorts, ports->data(), &generation2);
+    ASSERT_EQ(NO_ERROR, ret) << "mManager->listAudioPorts returned error";
+    ASSERT_EQ(generation1, generation2) << "Generations changed during ports retrieval";
+}
+
+bool AudioPolicyManagerTest::findDevicePort(audio_port_role_t role,
+        audio_devices_t deviceType, const std::string &address, audio_port_v7 *foundPort) {
+    std::vector<audio_port_v7> ports;
+    getAudioPorts(AUDIO_PORT_TYPE_DEVICE, role, &ports);
     if (HasFailure()) return false;
 
     for (const auto &port : ports) {
@@ -669,6 +676,44 @@ TEST_F(AudioPolicyManagerTestWithConfigurationFile, InitSuccess) {
 
 TEST_F(AudioPolicyManagerTestWithConfigurationFile, Dump) {
     dumpToLog();
+}
+
+TEST_F(AudioPolicyManagerTestWithConfigurationFile, ListAudioPortsHasFlags) {
+    // Create an input for VOIP TX because it's not opened automatically like outputs are.
+    audio_port_handle_t selectedDeviceId = AUDIO_PORT_HANDLE_NONE;
+    audio_port_handle_t mixPortId = AUDIO_PORT_HANDLE_NONE;
+    audio_source_t source = AUDIO_SOURCE_VOICE_COMMUNICATION;
+    audio_attributes_t attr = {
+        AUDIO_CONTENT_TYPE_UNKNOWN, AUDIO_USAGE_UNKNOWN, source, AUDIO_FLAG_NONE, ""};
+    ASSERT_NO_FATAL_FAILURE(getInputForAttr(attr, 1, &selectedDeviceId, AUDIO_FORMAT_PCM_16_BIT,
+                    AUDIO_CHANNEL_IN_MONO, 8000, AUDIO_INPUT_FLAG_VOIP_TX, &mixPortId));
+
+    std::vector<audio_port_v7> ports;
+    ASSERT_NO_FATAL_FAILURE(
+            getAudioPorts(AUDIO_PORT_TYPE_MIX, AUDIO_PORT_ROLE_NONE, &ports));
+    EXPECT_NE(0, ports.size());
+    bool hasFlags = false, foundPrimary = false, foundVoipRx = false, foundVoipTx = false;
+    for (const auto& port : ports) {
+        if ((port.active_config.config_mask & AUDIO_PORT_CONFIG_FLAGS) != 0) {
+            hasFlags = true;
+            if (port.role == AUDIO_PORT_ROLE_SOURCE) {
+                if ((port.active_config.flags.output & AUDIO_OUTPUT_FLAG_PRIMARY) != 0) {
+                    foundPrimary = true;
+                }
+                if ((port.active_config.flags.output & AUDIO_OUTPUT_FLAG_VOIP_RX) != 0) {
+                    foundVoipRx = true;
+                }
+            } else if (port.role == AUDIO_PORT_ROLE_SINK) {
+                if ((port.active_config.flags.input & AUDIO_INPUT_FLAG_VOIP_TX) != 0) {
+                    foundVoipTx = true;
+                }
+            }
+        }
+    }
+    EXPECT_TRUE(hasFlags);
+    EXPECT_TRUE(foundPrimary);
+    EXPECT_TRUE(foundVoipRx);
+    EXPECT_TRUE(foundVoipTx);
 }
 
 using PolicyMixTuple = std::tuple<audio_usage_t, audio_source_t, uint32_t>;
