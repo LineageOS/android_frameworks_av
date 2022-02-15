@@ -488,12 +488,12 @@ private:
                     : mService(service) {}
 
             void registerSelf();
-            void registerSelfForMicrophoneOnly(int userId);
             void unregisterSelf();
 
             bool isSensorPrivacyEnabled();
 
-            binder::Status onSensorPrivacyChanged(bool enabled);
+            binder::Status onSensorPrivacyChanged(int toggleType, int sensor,
+                                                  bool enabled);
 
         private:
             wp<AudioPolicyService> mService;

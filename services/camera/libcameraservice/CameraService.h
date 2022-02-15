@@ -739,9 +739,10 @@ private:
             void unregisterSelf();
 
             bool isSensorPrivacyEnabled();
-            bool isCameraPrivacyEnabled(userid_t userId);
+            bool isCameraPrivacyEnabled();
 
-            binder::Status onSensorPrivacyChanged(bool enabled);
+            binder::Status onSensorPrivacyChanged(int toggleType, int sensor,
+                                                  bool enabled);
 
             // IBinder::DeathRecipient implementation
             virtual void binderDied(const wp<IBinder> &who);
