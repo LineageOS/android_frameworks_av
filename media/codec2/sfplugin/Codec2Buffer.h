@@ -19,6 +19,7 @@
 #define CODEC2_BUFFER_H_
 
 #include <C2Buffer.h>
+#include <C2Config.h>
 
 #include <binder/IMemory.h>
 #include <media/hardware/VideoAPI.h>
@@ -390,6 +391,36 @@ private:
     sp<hardware::HidlMemory> mHidlMemory;
     int32_t mHeapSeqNum;
 };
+
+/**
+ * Get HDR metadata from Gralloc4 handle.
+ *
+ * \param[in]   handle      handle of the allocation
+ * \param[out]  staticInfo  HDR static info to be filled. Ignored if null;
+ *                          if |handle| is invalid or does not contain the metadata,
+ *                          the shared_ptr is reset.
+ * \param[out]  dynamicInfo HDR dynamic info to be filled. Ignored if null;
+ *                          if |handle| is invalid or does not contain the metadata,
+ *                          the shared_ptr is reset.
+ * \return C2_OK if successful
+ */
+c2_status_t GetHdrMetadataFromGralloc4Handle(
+        const C2Handle *const handle,
+        std::shared_ptr<C2StreamHdrStaticMetadataInfo::input> *staticInfo,
+        std::shared_ptr<C2StreamHdrDynamicMetadataInfo::input> *dynamicInfo);
+
+/**
+ * Set HDR metadata to Gralloc4 handle.
+ *
+ * \param[in]   staticInfo  HDR static info to set. Ignored if null or invalid.
+ * \param[in]   dynamicInfo HDR dynamic info to set. Ignored if null or invalid.
+ * \param[out]  handle      handle of the allocation.
+ * \return C2_OK if successful
+ */
+c2_status_t SetHdrMetadataToGralloc4Handle(
+        const std::shared_ptr<const C2StreamHdrStaticMetadataInfo::output> &staticInfo,
+        const std::shared_ptr<const C2StreamHdrDynamicMetadataInfo::output> &dynamicInfo,
+        const C2Handle *const handle);
 
 }  // namespace android
 

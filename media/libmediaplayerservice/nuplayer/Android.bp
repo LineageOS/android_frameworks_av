@@ -37,20 +37,22 @@ cc_library_static {
         "StreamingSource.cpp",
     ],
 
+    local_include_dirs: [
+        "include/nuplayer",
+    ],
+
+    export_include_dirs: [
+        "include",
+    ],
+
     header_libs: [
         "libmediadrm_headers",
         "libmediametrics_headers",
         "media_plugin_headers",
-    ],
-
-    include_dirs: [
-        "frameworks/av/media/libstagefright",
-        "frameworks/av/media/libstagefright/httplive",
-        "frameworks/av/media/libstagefright/include",
-        "frameworks/av/media/libstagefright/mpeg2ts",
-        "frameworks/av/media/libstagefright/rtsp",
-        "frameworks/av/media/libstagefright/timedtext",
-        "frameworks/native/include/android",
+        "libstagefright_headers",
+        "libstagefright_httplive_headers",
+        "libstagefright_mpeg2support_headers",
+        "libstagefright_rtsp_headers",
     ],
 
     cflags: [
@@ -74,10 +76,12 @@ cc_library_static {
         "libmedia",
         "libmediadrm",
         "libpowermanager",
+        "android.hardware.drm-V1-ndk",
     ],
 
     static_libs: [
         "libplayerservice_datasource",
+        "libstagefright_timedtext",
     ],
 
     name: "libstagefright_nuplayer",

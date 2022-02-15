@@ -419,40 +419,6 @@ bool C2SoftMpeg4Dec::handleResChange(const std::unique_ptr<C2Work> &work) {
     return resChanged;
 }
 
-/* TODO: can remove temporary copy after library supports writing to display
- * buffer Y, U and V plane pointers using stride info. */
-static void copyOutputBufferToYuvPlanarFrame(
-        uint8_t *dstY, uint8_t *dstU, uint8_t *dstV, uint8_t *src,
-        size_t dstYStride, size_t dstUVStride,
-        size_t srcYStride, uint32_t width,
-        uint32_t height) {
-    size_t srcUVStride = srcYStride / 2;
-    uint8_t *srcStart = src;
-
-    size_t vStride = align(height, 16);
-    for (size_t i = 0; i < height; ++i) {
-         memcpy(dstY, src, width);
-         src += srcYStride;
-         dstY += dstYStride;
-    }
-
-    /* U buffer */
-    src = srcStart + vStride * srcYStride;
-    for (size_t i = 0; i < height / 2; ++i) {
-         memcpy(dstU, src, width / 2);
-         src += srcUVStride;
-         dstU += dstUVStride;
-    }
-
-    /* V buffer */
-    src = srcStart + vStride * srcYStride * 5 / 4;
-    for (size_t i = 0; i < height / 2; ++i) {
-         memcpy(dstV, src, width / 2);
-         src += srcUVStride;
-         dstV += dstUVStride;
-    }
-}
-
 void C2SoftMpeg4Dec::process(
         const std::unique_ptr<C2Work> &work,
         const std::shared_ptr<C2BlockPool> &pool) {
@@ -636,11 +602,17 @@ void C2SoftMpeg4Dec::process(
         C2PlanarLayout layout = wView.layout();
         size_t dstYStride = layout.planes[C2PlanarLayout::PLANE_Y].rowInc;
         size_t dstUVStride = layout.planes[C2PlanarLayout::PLANE_U].rowInc;
-        (void)copyOutputBufferToYuvPlanarFrame(
-                outputBufferY, outputBufferU, outputBufferV,
-                mOutputBuffer[mNumSamplesOutput & 1],
-                dstYStride, dstUVStride,
-                align(mWidth, 16), mWidth, mHeight);
+        size_t srcYStride = align(mWidth, 16);
+        size_t srcUStride = srcYStride / 2;
+        size_t srcVStride = srcYStride / 2;
+        size_t vStride = align(mHeight, 16);
+        const uint8_t *srcY = (const uint8_t *)mOutputBuffer[mNumSamplesOutput & 1];
+        const uint8_t *srcU = (const uint8_t *)srcY + vStride * srcYStride;
+        const uint8_t *srcV = (const uint8_t *)srcY + vStride * srcYStride * 5 / 4;
+
+        convertYUV420Planar8ToYV12(outputBufferY, outputBufferU, outputBufferV, srcY, srcU, srcV,
+                                   srcYStride, srcUStride, srcVStride, dstYStride, dstUVStride,
+                                   mWidth, mHeight);
 
         inPos += inSize - (size_t)tmpInSize;
         finishWork(workIndex, work);

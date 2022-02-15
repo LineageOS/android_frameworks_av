@@ -11,6 +11,8 @@ cc_library {
     name: "libsfplugin_ccodec_utils",
     vendor_available: true,
     min_sdk_version: "29",
+    apex_available: [ "//apex_available:platform", "com.android.media.swcodec", ],
+
     double_loadable: true,
 
     srcs: [

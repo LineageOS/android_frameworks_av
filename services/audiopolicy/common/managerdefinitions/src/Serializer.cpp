@@ -483,7 +483,14 @@ std::variant<status_t, MixPortTraits::Element> PolicySerializer::deserialize<Mix
     if (!flags.empty()) {
         // Source role
         if (portRole == AUDIO_PORT_ROLE_SOURCE) {
-            mixPort->setFlags(OutputFlagConverter::maskFromString(flags, mFlagsSeparator.c_str()));
+            //TODO: b/193496180 use spatializer flag at audio HAL when available until then,
+            // use DEEP_BUFFER+FAST flag combo to indicate the spatializer output profile
+            uint32_t intFlags =
+                    OutputFlagConverter::maskFromString(flags, mFlagsSeparator.c_str());
+            if (intFlags == (AUDIO_OUTPUT_FLAG_FAST | AUDIO_OUTPUT_FLAG_DEEP_BUFFER)) {
+                intFlags = AUDIO_OUTPUT_FLAG_SPATIALIZER;
+            }
+            mixPort->setFlags(intFlags);
         } else {
             // Sink role
             mixPort->setFlags(InputFlagConverter::maskFromString(flags, mFlagsSeparator.c_str()));
@@ -869,10 +876,10 @@ status_t PolicySerializer::deserialize(const char *configFile, AudioPolicyConfig
         ALOGE("%s: No version found in root node %s", __func__, rootName);
         return BAD_VALUE;
     }
-    if (version == "7.0") {
+    if (version == "7.0" || version == "7.1") {
         mChannelMasksSeparator = mSamplingRatesSeparator = mFlagsSeparator = " ";
     } else if (version != "1.0") {
-        ALOGE("%s: Version does not match; expected \"1.0\" or \"7.0\" got \"%s\"",
+        ALOGE("%s: Version does not match; expected \"1.0\", \"7.0\", or \"7.1\" got \"%s\"",
                 __func__, version.c_str());
         return BAD_VALUE;
     }

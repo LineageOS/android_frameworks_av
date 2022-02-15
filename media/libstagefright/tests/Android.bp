@@ -32,11 +32,6 @@ cc_test {
         "liblog",
     ],
 
-    include_dirs: [
-        "frameworks/av/media/libstagefright",
-        "frameworks/av/media/libstagefright/include",
-    ],
-
     cflags: [
         "-Werror",
         "-Wall",

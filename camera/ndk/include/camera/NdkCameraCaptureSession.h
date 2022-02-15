@@ -811,6 +811,184 @@ camera_status_t ACameraCaptureSession_logicalCamera_setRepeatingRequest(
         int numRequests, ACaptureRequest** requests,
         /*optional*/int* captureSequenceId) __INTRODUCED_IN(29);
 
+/**
+ * The definition of camera capture start callback. The same as
+ * {@link ACameraCaptureSession_captureCallbacks#onCaptureStarted}, except that
+ * it has the frame number of the capture as well.
+ *
+ * @param context The optional application context provided by user in
+ *                {@link ACameraCaptureSession_captureCallbacks}.
+ * @param session The camera capture session of interest.
+ * @param request The capture request that is starting. Note that this pointer points to a copy of
+ *                capture request sent by application, so the address is different to what
+ *                application sent but the content will match. This request will be freed by
+ *                framework immediately after this callback returns.
+ * @param timestamp The timestamp when the capture is started. This timestamp will match
+ *                  {@link ACAMERA_SENSOR_TIMESTAMP} of the {@link ACameraMetadata} in
+ *                  {@link ACameraCaptureSession_captureCallbacks#onCaptureCompleted} callback.
+ * @param frameNumber the frame number of the capture started
+ */
+typedef void (*ACameraCaptureSession_captureCallback_startV2)(
+        void* context, ACameraCaptureSession* session,
+        const ACaptureRequest* request, int64_t timestamp, int64_t frameNumber);
+/**
+ * This has the same functionality as ACameraCaptureSession_captureCallbacks,
+ * with the exception that captureCallback_startV2 callback is
+ * used, instead of captureCallback_start, to support retrieving the frame number.
+ */
+typedef struct ACameraCaptureSession_captureCallbacksV2 {
+    /**
+     * Same as ACameraCaptureSession_captureCallbacks
+     */
+    void*                                               context;
+
+    /**
+     * Same as {@link ACameraCaptureSession_captureCallbacks#onCaptureStarted},
+     * except that it has the frame number of the capture added in the parameter
+     * list.
+     */
+    ACameraCaptureSession_captureCallback_startV2         onCaptureStarted;
+
+    /**
+     * Same as {@link ACameraCaptureSession_captureCallbacks#onCaptureProgressed}.
+     */
+    ACameraCaptureSession_captureCallback_result        onCaptureProgressed;
+
+    /**
+     * Same as {@link ACameraCaptureSession_captureCallbacks#onCaptureCompleted}.
+     */
+    ACameraCaptureSession_captureCallback_result        onCaptureCompleted;
+
+    /**
+     * Same as {@link ACameraCaptureSession_captureCallbacks#onCaptureFailed}.
+     */
+    ACameraCaptureSession_captureCallback_failed        onCaptureFailed;
+
+    /**
+     * Same as {@link ACameraCaptureSession_captureCallbacks#onCaptureSequenceCompleted}.
+     */
+    ACameraCaptureSession_captureCallback_sequenceEnd   onCaptureSequenceCompleted;
+
+    /**
+     * Same as {@link ACameraCaptureSession_captureCallbacks#onCaptureSequenceAborted}.
+     */
+    ACameraCaptureSession_captureCallback_sequenceAbort onCaptureSequenceAborted;
+
+    /**
+     * Same as {@link ACameraCaptureSession_captureCallbacks#onCaptureBufferLost}.
+     */
+    ACameraCaptureSession_captureCallback_bufferLost    onCaptureBufferLost;
+
+
+} ACameraCaptureSession_captureCallbacksV2;
+
+/**
+ * This has the same functionality as ACameraCaptureSession_logicalCamera_captureCallbacks,
+ * with the exception that an captureCallback_startV2 callback is
+ * used, instead of captureCallback_start, to support retrieving frame number.
+ */
+typedef struct ACameraCaptureSession_logicalCamera_captureCallbacksV2 {
+    /**
+     * Same as ACameraCaptureSession_captureCallbacks
+     */
+    void*                                               context;
+
+    /**
+     * Same as {@link ACameraCaptureSession_captureCallbacks#onCaptureStarted},
+     * except that it has the frame number of the capture added in the parameter
+     * list.
+     */
+    ACameraCaptureSession_captureCallback_startV2         onCaptureStarted;
+
+
+    /**
+     * Same as {@link ACameraCaptureSession_captureCallbacks#onCaptureProgressed}.
+     */
+    ACameraCaptureSession_captureCallback_result        onCaptureProgressed;
+
+    /**
+     * Same as
+     * {@link ACameraCaptureSession_logicalCamera_captureCallbacks#onLogicalCaptureCompleted}.
+     */
+    ACameraCaptureSession_logicalCamera_captureCallback_result onLogicalCameraCaptureCompleted;
+
+    /**
+     * This callback is called instead of {@link onLogicalCameraCaptureCompleted} when the
+     * camera device failed to produce a capture result for the
+     * request.
+     *
+     * <p>Other requests are unaffected, and some or all image buffers from
+     * the capture may have been pushed to their respective output
+     * streams.</p>
+     *
+     * <p>Note that the ACaptureRequest pointer in the callback will not match what application has
+     * submitted, but the contents the ACaptureRequest will match what application submitted.</p>
+     *
+     * @see ALogicalCameraCaptureFailure
+     */
+    ACameraCaptureSession_logicalCamera_captureCallback_failed onLogicalCameraCaptureFailed;
+
+    /**
+     * Same as {@link ACameraCaptureSession_captureCallbacks#onCaptureSequenceCompleted}.
+     */
+    ACameraCaptureSession_captureCallback_sequenceEnd   onCaptureSequenceCompleted;
+
+    /**
+     * Same as {@link ACameraCaptureSession_captureCallbacks#onCaptureSequenceAborted}.
+     */
+    ACameraCaptureSession_captureCallback_sequenceAbort onCaptureSequenceAborted;
+
+    /**
+     * Same as {@link ACameraCaptureSession_captureCallbacks#onCaptureBufferLost}.
+     */
+    ACameraCaptureSession_captureCallback_bufferLost    onCaptureBufferLost;
+
+} ACameraCaptureSession_logicalCamera_captureCallbacksV2;
+
+/**
+ * This has the same functionality as ACameraCaptureSession_capture, with added
+ * support for v2 of camera callbacks, where the onCaptureStarted callback
+ * adds frame number in its parameter list.
+ */
+camera_status_t ACameraCaptureSession_captureV2(
+        ACameraCaptureSession* session,
+        /*optional*/ACameraCaptureSession_captureCallbacksV2* callbacks,
+        int numRequests, ACaptureRequest** requests,
+        /*optional*/int* captureSequenceId) __INTRODUCED_IN(33);
+
+/**
+ * This has the same functionality as ACameraCaptureSession_logical_setRepeatingRequest, with added
+ * support for v2 of logical multi-camera callbacks where the onCaptureStarted
+ * callback adds frame number in its parameter list.
+ */
+camera_status_t ACameraCaptureSession_setRepeatingRequestV2(
+        ACameraCaptureSession* session,
+        /*optional*/ACameraCaptureSession_captureCallbacksV2* callbacks,
+        int numRequests, ACaptureRequest** requests,
+        /*optional*/int* captureSequenceId) __INTRODUCED_IN(33);
+
+/**
+ * This has the same functionality as ACameraCaptureSession_logical_capture, with added
+ * support for v2 of logical multi-camera  callbacks where the onCaptureStarted callback
+ * adds frame number in its parameter list.
+ */
+camera_status_t ACameraCaptureSession_logicalCamera_captureV2(
+        ACameraCaptureSession* session,
+        /*optional*/ACameraCaptureSession_logicalCamera_captureCallbacksV2* callbacks,
+        int numRequests, ACaptureRequest** requests,
+        /*optional*/int* captureSequenceId) __INTRODUCED_IN(33);
+
+/**
+ * This has the same functionality as ACameraCaptureSession_logical_setRepeatingRequest, with added
+ * support for v2 of logical multi-camera callbacks where the onCaptureStarted
+ * callback adds frame number in its parameter list.
+ */
+camera_status_t ACameraCaptureSession_logicalCamera_setRepeatingRequestV2(
+        ACameraCaptureSession* session,
+        /*optional*/ACameraCaptureSession_logicalCamera_captureCallbacksV2* callbacks,
+        int numRequests, ACaptureRequest** requests,
+        /*optional*/int* captureSequenceId) __INTRODUCED_IN(33);
+
 __END_DECLS
 
 #endif /* _NDK_CAMERA_CAPTURE_SESSION_H */

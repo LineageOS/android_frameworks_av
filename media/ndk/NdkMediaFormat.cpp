@@ -361,6 +361,7 @@ EXPORT const char* AMEDIAFORMAT_KEY_MPEGH_REFERENCE_CHANNEL_LAYOUT =
         "mpegh-reference-channel-layout";
 EXPORT const char* AMEDIAFORMAT_KEY_OPERATING_RATE = "operating-rate";
 EXPORT const char* AMEDIAFORMAT_KEY_PCM_ENCODING = "pcm-encoding";
+EXPORT const char* AMEDIAFORMAT_KEY_PICTURE_TYPE = "picture-type";
 EXPORT const char* AMEDIAFORMAT_KEY_PRIORITY = "priority";
 EXPORT const char* AMEDIAFORMAT_KEY_PROFILE = "profile";
 EXPORT const char* AMEDIAFORMAT_KEY_PCM_BIG_ENDIAN = "pcm-big-endian";
@@ -394,6 +395,9 @@ EXPORT const char* AMEDIAFORMAT_KEY_TITLE = "title";
 EXPORT const char* AMEDIAFORMAT_KEY_TRACK_ID = "track-id";
 EXPORT const char* AMEDIAFORMAT_KEY_TRACK_INDEX = "track-index";
 EXPORT const char* AMEDIAFORMAT_KEY_VALID_SAMPLES = "valid-samples";
+EXPORT const char* AMEDIAFORMAT_KEY_VIDEO_ENCODING_STATISTICS_LEVEL =
+        "video-encoding-statistics-level";
+EXPORT const char* AMEDIAFORMAT_KEY_VIDEO_QP_AVERAGE = "video-qp-average";
 EXPORT const char* AMEDIAFORMAT_VIDEO_QP_B_MAX = "video-qp-b-max";
 EXPORT const char* AMEDIAFORMAT_VIDEO_QP_B_MIN = "video-qp-b-min";
 EXPORT const char* AMEDIAFORMAT_VIDEO_QP_I_MAX = "video-qp-i-max";

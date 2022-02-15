@@ -122,8 +122,12 @@ const engineConfig::ProductStrategies gOrderedStrategies = {
     {"STRATEGY_TRANSMITTED_THROUGH_SPEAKER",
      {
          {"", AUDIO_STREAM_TTS, "AUDIO_STREAM_TTS",
-          {{AUDIO_CONTENT_TYPE_UNKNOWN, AUDIO_USAGE_UNKNOWN, AUDIO_SOURCE_DEFAULT,
-            AUDIO_FLAG_BEACON, ""}}
+          {
+              {AUDIO_CONTENT_TYPE_UNKNOWN, AUDIO_USAGE_UNKNOWN, AUDIO_SOURCE_DEFAULT,
+                AUDIO_FLAG_BEACON, ""},
+              {AUDIO_CONTENT_TYPE_ULTRASOUND, AUDIO_USAGE_UNKNOWN, AUDIO_SOURCE_DEFAULT,
+                AUDIO_FLAG_NONE, ""}
+          }
          }
      },
     }

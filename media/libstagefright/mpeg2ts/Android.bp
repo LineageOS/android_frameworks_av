@@ -54,16 +54,21 @@ cc_defaults {
         "libstagefright_foundation_headers",
     ],
 
-    export_include_dirs: ["."],
+    export_include_dirs: ["include"],
+
+    local_include_dirs: ["include/mpeg2ts"],
 
     whole_static_libs: [
         "libstagefright_metadatautils",
     ],
 
+}
+
+cc_defaults {
+    name: "libstagefright_mpeg2support_sdk_defaults",
+
     min_sdk_version: "29",
-
     host_supported: true,
-
     target: {
         darwin: {
             enabled: false,
@@ -71,10 +76,19 @@ cc_defaults {
     },
 }
 
+cc_library_headers {
+    name: "libstagefright_mpeg2support_headers",
+    defaults: [
+        "libstagefright_mpeg2support_sdk_defaults",
+    ],
+    export_include_dirs: ["include"],
+}
+
 cc_library_static {
     name: "libstagefright_mpeg2support",
     defaults: [
         "libstagefright_mpeg2support_defaults",
+        "libstagefright_mpeg2support_sdk_defaults",
     ],
     cflags: [
         "-DENABLE_CRYPTO",
@@ -91,6 +105,7 @@ cc_library_static {
     name: "libstagefright_mpeg2support_nocrypto",
     defaults: [
         "libstagefright_mpeg2support_defaults",
+        "libstagefright_mpeg2support_sdk_defaults",
     ],
     apex_available: [
         "com.android.media",

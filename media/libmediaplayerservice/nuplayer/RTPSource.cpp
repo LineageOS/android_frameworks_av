@@ -336,7 +336,7 @@ status_t NuPlayer::RTPSource::getDuration(int64_t *durationUs) {
     *durationUs = 0ll;
 
     int64_t audioDurationUs;
-    if (mAudioTrack != NULL
+    if (mAudioTrack != NULL && mAudioTrack->getFormat() != NULL
             && mAudioTrack->getFormat()->findInt64(
                 kKeyDuration, &audioDurationUs)
             && audioDurationUs > *durationUs) {
@@ -344,7 +344,7 @@ status_t NuPlayer::RTPSource::getDuration(int64_t *durationUs) {
     }
 
     int64_t videoDurationUs;
-    if (mVideoTrack != NULL
+    if (mVideoTrack != NULL && mVideoTrack->getFormat() != NULL
             && mVideoTrack->getFormat()->findInt64(
                 kKeyDuration, &videoDurationUs)
             && videoDurationUs > *durationUs) {

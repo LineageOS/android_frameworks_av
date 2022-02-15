@@ -13,6 +13,11 @@ cc_defaults {
         "-Wall",
         "-Werror",
     ],
+
+    sanitize: {
+        integer_overflow: true,
+        misc_undefined: ["bounds"],
+    },
 }
 
 cc_test {
@@ -138,6 +143,18 @@ cc_test {
     name: "test_flowgraph",
     defaults: ["libaaudio_tests_defaults"],
     srcs: ["test_flowgraph.cpp"],
+    shared_libs: [
+        "libaaudio_internal",
+        "libbinder",
+        "libcutils",
+        "libutils",
+    ],
+}
+
+cc_test {
+    name: "test_monotonic_counter",
+    defaults: ["libaaudio_tests_defaults"],
+    srcs: ["test_monotonic_counter.cpp"],
     shared_libs: [
         "libaaudio_internal",
         "libbinder",

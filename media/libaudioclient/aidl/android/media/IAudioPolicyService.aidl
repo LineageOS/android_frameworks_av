@@ -20,6 +20,7 @@ import android.content.AttributionSourceState;
 
 import android.media.AudioAttributesEx;
 import android.media.AudioAttributesInternal;
+import android.media.AudioDirectMode;
 import android.media.AudioMix;
 import android.media.AudioOffloadMode;
 import android.media.AudioPatch;
@@ -47,7 +48,9 @@ import android.media.audio.common.AudioDevice;
 import android.media.audio.common.AudioDeviceDescription;
 import android.media.audio.common.AudioFormatDescription;
 import android.media.audio.common.AudioMode;
+import android.media.audio.common.AudioProfile;
 import android.media.audio.common.AudioOffloadInfo;
+import android.media.audio.common.AudioPort;
 import android.media.audio.common.AudioSource;
 import android.media.audio.common.AudioStreamType;
 import android.media.audio.common.AudioUsage;
@@ -62,9 +65,8 @@ import android.media.audio.common.Int;
 interface IAudioPolicyService {
     oneway void onNewAudioModulesAvailable();
 
-    void setDeviceConnectionState(in AudioDevice device,
-                                  in AudioPolicyDeviceState state,
-                                  @utf8InCpp String deviceName,
+    void setDeviceConnectionState(in AudioPolicyDeviceState state,
+                                  in android.media.audio.common.AudioPort port,
                                   in AudioFormatDescription encodedFormat);
 
     AudioPolicyDeviceState getDeviceConnectionState(in AudioDevice device);
@@ -300,15 +302,17 @@ interface IAudioPolicyService {
 
     void setSurroundFormatEnabled(in AudioFormatDescription audioFormat, boolean enabled);
 
-    void setAssistantUid(int /* uid_t */ uid);
+    void setAssistantServicesUids(in int[] /* uid_t[] */ uids);
 
-    void setHotwordDetectionServiceUid(int /* uid_t */ uid);
+    void setActiveAssistantServicesUids(in int[] /* uid_t[] */ activeUids);
 
     void setA11yServicesUids(in int[] /* uid_t[] */ uids);
 
     void setCurrentImeUid(int /* uid_t */ uid);
 
     boolean isHapticPlaybackSupported();
+
+    boolean isUltrasoundSupported();
 
     AudioProductStrategy[] listAudioProductStrategies();
     int /* product_strategy_t */ getProductStrategyFromAudioAttributes(in AudioAttributesEx aa,
@@ -376,4 +380,16 @@ interface IAudioPolicyService {
     boolean canBeSpatialized(in @nullable AudioAttributesInternal attr,
                              in @nullable AudioConfig config,
                              in AudioDevice[] devices);
+
+    /**
+     * Query how the direct playback is currently supported on the device.
+     */
+    AudioDirectMode getDirectPlaybackSupport(in AudioAttributesInternal attr,
+                                              in AudioConfig config);
+
+    /**
+     * Query audio profiles available for direct playback on the current output device(s)
+     * for the specified audio attributes.
+     */
+    AudioProfile[] getDirectProfilesForAttributes(in AudioAttributesInternal attr);
 }

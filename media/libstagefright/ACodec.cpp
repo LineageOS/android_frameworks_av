@@ -2195,7 +2195,10 @@ status_t ACodec::configureCodec(
             }
 
             if (!msg->findInt32("aac-max-output-channel_count", &maxOutputChannelCount)) {
-                maxOutputChannelCount = -1;
+                // check non AAC-specific key
+                if (!msg->findInt32("max-output-channel-count", &maxOutputChannelCount)) {
+                    maxOutputChannelCount = -1;
+                }
             }
             if (!msg->findInt32("aac-pcm-limiter-enable", &pcmLimiterEnable)) {
                 // value is unknown

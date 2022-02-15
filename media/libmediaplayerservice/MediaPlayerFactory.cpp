@@ -30,7 +30,7 @@
 #include "MediaPlayerFactory.h"
 
 #include "TestPlayerStub.h"
-#include "nuplayer/NuPlayerDriver.h"
+#include <nuplayer/NuPlayerDriver.h>
 
 namespace android {
 

@@ -272,7 +272,8 @@ DeviceVector Engine::getDevicesForStrategyInt(legacy_strategy strategy,
         devices = availableOutputDevices.getFirstDevicesFromTypes(
                                           getLastRemovableMediaDevices());
         if (!devices.isEmpty()) break;
-        devices = availableOutputDevices.getDevicesFromType(AUDIO_DEVICE_OUT_EARPIECE);
+        devices = availableOutputDevices.getFirstDevicesFromTypes({
+                AUDIO_DEVICE_OUT_DGTL_DOCK_HEADSET, AUDIO_DEVICE_OUT_EARPIECE});
     } break;
 
     case STRATEGY_SONIFICATION:
@@ -364,7 +365,8 @@ DeviceVector Engine::getDevicesForStrategyInt(legacy_strategy strategy,
                     AUDIO_DEVICE_OUT_ANLG_DOCK_HEADSET);
         }
         if (devices2.isEmpty()) {
-            devices2 = availableOutputDevices.getDevicesFromType(AUDIO_DEVICE_OUT_SPEAKER);
+            devices2 = availableOutputDevices.getFirstDevicesFromTypes({
+                        AUDIO_DEVICE_OUT_DGTL_DOCK_HEADSET, AUDIO_DEVICE_OUT_SPEAKER});
         }
         DeviceVector devices3;
         if (strategy == STRATEGY_MEDIA) {
@@ -460,6 +462,7 @@ sp<DeviceDescriptor> Engine::getDeviceForInputSource(audio_source_t inputSource)
         case AUDIO_SOURCE_HOTWORD:
         case AUDIO_SOURCE_CAMCORDER:
         case AUDIO_SOURCE_VOICE_PERFORMANCE:
+        case AUDIO_SOURCE_ULTRASOUND:
             inputSource = AUDIO_SOURCE_VOICE_COMMUNICATION;
             break;
         default:
@@ -586,6 +589,10 @@ sp<DeviceDescriptor> Engine::getDeviceForInputSource(audio_source_t inputSource)
         device = availableDevices.getDevice(
                 AUDIO_DEVICE_IN_ECHO_REFERENCE, String8(""), AUDIO_FORMAT_DEFAULT);
         break;
+    case AUDIO_SOURCE_ULTRASOUND:
+        device = availableDevices.getFirstExistingDevice({
+                AUDIO_DEVICE_IN_BUILTIN_MIC, AUDIO_DEVICE_IN_BACK_MIC});
+        break;
     default:
         ALOGW("getDeviceForInputSource() invalid input source %d", inputSource);
         break;
@@ -645,7 +652,7 @@ DeviceVector Engine::getPreferredAvailableDevicesForProductStrategy(
         // there is a preferred device, is it available?
         preferredAvailableDevVec =
                 availableOutputDevices.getDevicesFromDeviceTypeAddrVec(preferredStrategyDevices);
-        if (preferredAvailableDevVec.size() == preferredAvailableDevVec.size()) {
+        if (preferredAvailableDevVec.size() == preferredStrategyDevices.size()) {
             ALOGVV("%s using pref device %s for strategy %u",
                    __func__, preferredAvailableDevVec.toString().c_str(), strategy);
             return preferredAvailableDevVec;

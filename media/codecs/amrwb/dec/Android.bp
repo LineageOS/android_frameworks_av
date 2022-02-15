@@ -35,6 +35,10 @@ cc_library_static {
     vendor_available: true,
     host_supported: true,
     min_sdk_version: "29",
+    apex_available: [
+        "//apex_available:platform",
+        "com.android.media.swcodec",
+    ],
 
     srcs: [
         "src/agc2_amr_wb.cpp",

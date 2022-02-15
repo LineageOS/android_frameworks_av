@@ -89,6 +89,12 @@ class StreamHalInterface : public virtual RefBase
     // (must match the priority of the audioflinger's thread that calls 'read' / 'write')
     virtual status_t setHalThreadPriority(int priority) = 0;
 
+    virtual status_t legacyCreateAudioPatch(const struct audio_port_config& port,
+                                            std::optional<audio_source_t> source,
+                                            audio_devices_t type) = 0;
+
+    virtual status_t legacyReleaseAudioPatch() = 0;
+
   protected:
     // Subclasses can not be constructed directly by clients.
     StreamHalInterface() {}
@@ -115,6 +121,18 @@ public:
 protected:
     StreamOutHalInterfaceEventCallback() {}
     virtual ~StreamOutHalInterfaceEventCallback() {}
+};
+
+class StreamOutHalInterfaceLatencyModeCallback : public virtual RefBase {
+public:
+    /**
+     * Called with the new list of supported latency modes when a change occurs.
+     */
+    virtual void onRecommendedLatencyModeChanged(std::vector<audio_latency_mode_t> modes) = 0;
+
+protected:
+    StreamOutHalInterfaceLatencyModeCallback() {}
+    virtual ~StreamOutHalInterfaceLatencyModeCallback() {}
 };
 
 class StreamOutHalInterface : public virtual StreamHalInterface {
@@ -193,6 +211,47 @@ class StreamOutHalInterface : public virtual StreamHalInterface {
     virtual status_t setPlaybackRateParameters(const audio_playback_rate_t& playbackRate) = 0;
 
     virtual status_t setEventCallback(const sp<StreamOutHalInterfaceEventCallback>& callback) = 0;
+
+    /**
+     * Indicates the requested latency mode for this output stream.
+     *
+     * The requested mode can be one of the modes returned by
+     * getRecommendedLatencyModes() API.
+     *
+     * @param mode the requested latency mode.
+     * @return operation completion status.
+     */
+    virtual status_t setLatencyMode(audio_latency_mode_t mode) = 0;
+
+    /**
+     * Indicates which latency modes are currently supported on this output stream.
+     * If the transport protocol (e.g Bluetooth A2DP) used by this output stream to reach
+     * the output device supports variable latency modes, the HAL indicates which
+     * modes are currently supported.
+     * The framework can then call setLatencyMode() with one of the supported modes to select
+     * the desired operation mode.
+     *
+     * @param modes currrently supported latency modes.
+     * @return operation completion status.
+     */
+    virtual status_t getRecommendedLatencyModes(std::vector<audio_latency_mode_t> *modes) = 0;
+
+    /**
+     * Set the callback interface for notifying changes in supported latency modes.
+     *
+     * Calling this method with a null pointer will result in releasing
+     * the callback.
+     *
+     * @param callback the registered callback or null to unregister.
+     * @return operation completion status.
+     */
+    virtual status_t setLatencyModeCallback(
+            const sp<StreamOutHalInterfaceLatencyModeCallback>& callback) = 0;
+
+    /**
+     * Signal the end of audio output, interrupting an ongoing 'write' operation.
+     */
+    virtual status_t exit() = 0;
 
   protected:
     virtual ~StreamOutHalInterface() {}

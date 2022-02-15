@@ -21,6 +21,7 @@
 
 #include "AudioAnalytics.h"
 
+#include <aaudio/AAudio.h>        // error codes
 #include <audio_utils/clock.h>    // clock conversions
 #include <cutils/properties.h>
 #include <statslog.h>             // statsd
@@ -61,6 +62,50 @@ auto ENUM_EXTRACT(const T& x) {
         return x.c_str();
     } else {
         return x;
+    }
+}
+
+// The status variable contains status_t codes which are used by
+// the core audio framework. We also consider AAudio status codes.
+//
+// Compare with mediametrics::statusToStatusString
+//
+inline constexpr const char* extendedStatusToStatusString(status_t status) {
+    switch (status) {
+    case BAD_VALUE:           // status_t
+    case AAUDIO_ERROR_ILLEGAL_ARGUMENT:
+    case AAUDIO_ERROR_INVALID_FORMAT:
+    case AAUDIO_ERROR_INVALID_RATE:
+    case AAUDIO_ERROR_NULL:
+    case AAUDIO_ERROR_OUT_OF_RANGE:
+        return AMEDIAMETRICS_PROP_STATUS_VALUE_ARGUMENT;
+    case DEAD_OBJECT:         // status_t
+    case FAILED_TRANSACTION:  // status_t
+    case AAUDIO_ERROR_DISCONNECTED:
+    case AAUDIO_ERROR_INVALID_HANDLE:
+    case AAUDIO_ERROR_NO_SERVICE:
+        return AMEDIAMETRICS_PROP_STATUS_VALUE_IO;
+    case NO_MEMORY:           // status_t
+    case AAUDIO_ERROR_NO_FREE_HANDLES:
+    case AAUDIO_ERROR_NO_MEMORY:
+        return AMEDIAMETRICS_PROP_STATUS_VALUE_MEMORY;
+    case PERMISSION_DENIED:   // status_t
+        return AMEDIAMETRICS_PROP_STATUS_VALUE_SECURITY;
+    case INVALID_OPERATION:   // status_t
+    case NO_INIT:             // status_t
+    case AAUDIO_ERROR_INVALID_STATE:
+    case AAUDIO_ERROR_UNAVAILABLE:
+    case AAUDIO_ERROR_UNIMPLEMENTED:
+        return AMEDIAMETRICS_PROP_STATUS_VALUE_STATE;
+    case WOULD_BLOCK:         // status_t
+    case AAUDIO_ERROR_TIMEOUT:
+    case AAUDIO_ERROR_WOULD_BLOCK:
+        return AMEDIAMETRICS_PROP_STATUS_VALUE_TIMEOUT;
+    default:
+        if (status >= 0) return AMEDIAMETRICS_PROP_STATUS_VALUE_OK; // non-negative values "OK"
+        [[fallthrough]];            // negative values are error.
+    case UNKNOWN_ERROR:       // status_t
+        return AMEDIAMETRICS_PROP_STATUS_VALUE_UNKNOWN;
     }
 }
 
@@ -128,6 +173,39 @@ static constexpr const char * const AudioTrackDeviceUsageFields[] = {
     "caller",
     "traits",
     "log_session_id",
+};
+
+static constexpr const char * const AudioRecordStatusFields[] {
+    "mediametrics_audiorecordstatus_reported",
+    "status",
+    "debug_message",
+    "status_subcode",
+    "uid",
+    "event",
+    "input_flags",
+    "source",
+    "encoding",
+    "channel_mask",
+    "buffer_frame_count",
+    "sample_rate",
+};
+
+static constexpr const char * const AudioTrackStatusFields[] {
+    "mediametrics_audiotrackstatus_reported",
+    "status",
+    "debug_message",
+    "status_subcode",
+    "uid",
+    "event",
+    "output_flags",
+    "content_type",
+    "usage",
+    "encoding",
+    "channel_mask",
+    "buffer_frame_count",
+    "sample_rate",
+    "speed",
+    "pitch",
 };
 
 static constexpr const char * const AudioDeviceConnectionFields[] = {
@@ -392,11 +470,15 @@ status_t AudioAnalytics::submit(
 {
     if (!startsWith(item->getKey(), AMEDIAMETRICS_KEY_PREFIX_AUDIO)) return BAD_VALUE;
     status_t status = mAnalyticsState->submit(item, isTrusted);
+
+    // Status is selectively authenticated.
+    processStatus(item);
+
     if (status != NO_ERROR) return status;  // may not be permitted.
 
     // Only if the item was successfully submitted (permission)
     // do we check triggered actions.
-    checkActions(item);
+    processActions(item);
     return NO_ERROR;
 }
 
@@ -430,13 +512,209 @@ std::pair<std::string, int32_t> AudioAnalytics::dump(
     return { ss.str(), lines - ll };
 }
 
-void AudioAnalytics::checkActions(const std::shared_ptr<const mediametrics::Item>& item)
+void AudioAnalytics::processActions(const std::shared_ptr<const mediametrics::Item>& item)
 {
     auto actions = mActions.getActionsForItem(item); // internally locked.
     // Execute actions with no lock held.
     for (const auto& action : actions) {
         (*action)(item);
     }
+}
+
+void AudioAnalytics::processStatus(const std::shared_ptr<const mediametrics::Item>& item)
+{
+    int32_t status;
+    if (!item->get(AMEDIAMETRICS_PROP_STATUS, &status)) return;
+
+    // Any record with a status will automatically be added to a heat map.
+    // Standard information.
+    const auto key = item->getKey();
+    const auto uid = item->getUid();
+
+    // from audio.track.10 ->  prefix = audio.track, suffix = 10
+    // from audio.track.error -> prefix = audio.track, suffix = error
+    const auto [prefixKey, suffixKey] = stringutils::splitPrefixKey(key);
+
+    std::string message;
+    item->get(AMEDIAMETRICS_PROP_STATUSMESSAGE, &message); // optional
+
+    int32_t subCode = 0; // not used
+    (void)item->get(AMEDIAMETRICS_PROP_STATUSSUBCODE, &subCode); // optional
+
+    std::string eventStr; // optional
+    item->get(AMEDIAMETRICS_PROP_EVENT, &eventStr);
+
+    const std::string statusString = extendedStatusToStatusString(status);
+
+    // Add to the heat map - we automatically track every item's status to see
+    // the types of errors and the frequency of errors.
+    mHeatMap.add(prefixKey, suffixKey, eventStr, statusString, uid, message, subCode);
+
+    // Certain keys/event pairs are sent to statsd.  If we get a match (true) we return early.
+    if (reportAudioRecordStatus(item, key, eventStr, statusString, uid, message, subCode)) return;
+    if (reportAudioTrackStatus(item, key, eventStr, statusString, uid, message, subCode)) return;
+}
+
+bool AudioAnalytics::reportAudioRecordStatus(
+        const std::shared_ptr<const mediametrics::Item>& item,
+        const std::string& key, const std::string& eventStr,
+        const std::string& statusString, uid_t uid, const std::string& message,
+        int32_t subCode) const
+{
+    // Note that the prefixes often end with a '.' so we use startsWith.
+    if (!startsWith(key, AMEDIAMETRICS_KEY_PREFIX_AUDIO_RECORD)) return false;
+    if (eventStr == AMEDIAMETRICS_PROP_EVENT_VALUE_CREATE) {
+        const int atom_status = types::lookup<types::STATUS, int32_t>(statusString);
+
+        // currently we only send create status events.
+        const int32_t event = android::util::
+                MEDIAMETRICS_AUDIO_RECORD_STATUS_REPORTED__EVENT__AUDIO_RECORD_EVENT_CREATE;
+
+        // The following fields should all be present in a create event.
+        std::string flagsStr;
+        ALOGD_IF(!item->get(AMEDIAMETRICS_PROP_ORIGINALFLAGS, &flagsStr),
+                "%s: %s missing %s field", __func__,
+                AMEDIAMETRICS_KEY_PREFIX_AUDIO_RECORD, AMEDIAMETRICS_PROP_ORIGINALFLAGS);
+        const auto flags = types::lookup<types::INPUT_FLAG, int32_t>(flagsStr);
+
+        // AMEDIAMETRICS_PROP_SESSIONID omitted from atom
+
+        std::string sourceStr;
+        ALOGD_IF(!item->get(AMEDIAMETRICS_PROP_SOURCE, &sourceStr),
+                "%s: %s missing %s field",
+                __func__, AMEDIAMETRICS_KEY_PREFIX_AUDIO_RECORD, AMEDIAMETRICS_PROP_SOURCE);
+        const int32_t source = types::lookup<types::SOURCE_TYPE, int32_t>(sourceStr);
+
+        // AMEDIAMETRICS_PROP_SELECTEDDEVICEID omitted from atom
+
+        std::string encodingStr;
+        ALOGD_IF(!item->get(AMEDIAMETRICS_PROP_ENCODING, &encodingStr),
+                "%s: %s missing %s field",
+                __func__, AMEDIAMETRICS_KEY_PREFIX_AUDIO_RECORD, AMEDIAMETRICS_PROP_ENCODING);
+        const auto encoding = types::lookup<types::ENCODING, int32_t>(encodingStr);
+
+        int32_t channelMask = 0;
+        ALOGD_IF(!item->get(AMEDIAMETRICS_PROP_CHANNELMASK, &channelMask),
+                "%s: %s missing %s field",
+                __func__, AMEDIAMETRICS_KEY_PREFIX_AUDIO_RECORD, AMEDIAMETRICS_PROP_CHANNELMASK);
+        int32_t frameCount = 0;
+        ALOGD_IF(!item->get(AMEDIAMETRICS_PROP_FRAMECOUNT, &frameCount),
+                "%s: %s missing %s field",
+                __func__, AMEDIAMETRICS_KEY_PREFIX_AUDIO_RECORD, AMEDIAMETRICS_PROP_FRAMECOUNT);
+        int32_t sampleRate = 0;
+        ALOGD_IF(!item->get(AMEDIAMETRICS_PROP_SAMPLERATE, &sampleRate),
+                "%s: %s missing %s field",
+                __func__, AMEDIAMETRICS_KEY_PREFIX_AUDIO_RECORD, AMEDIAMETRICS_PROP_SAMPLERATE);
+
+        const auto [ result, str ] = sendToStatsd(AudioRecordStatusFields,
+                CONDITION(android::util::MEDIAMETRICS_AUDIORECORDSTATUS_REPORTED)
+                , atom_status
+                , message.c_str()
+                , subCode
+                , uid
+                , event
+                , flags
+                , source
+                , encoding
+                , (int64_t)channelMask
+                , frameCount
+                , sampleRate
+                );
+        ALOGV("%s: statsd %s", __func__, str.c_str());
+        mStatsdLog->log(android::util::MEDIAMETRICS_AUDIORECORDSTATUS_REPORTED, str);
+        return true;
+    }
+    return false;
+}
+
+bool AudioAnalytics::reportAudioTrackStatus(
+        const std::shared_ptr<const mediametrics::Item>& item,
+        const std::string& key, const std::string& eventStr,
+        const std::string& statusString, uid_t uid, const std::string& message,
+        int32_t subCode) const
+{
+    // Note that the prefixes often end with a '.' so we use startsWith.
+    if (!startsWith(key, AMEDIAMETRICS_KEY_PREFIX_AUDIO_TRACK)) return false;
+    if (eventStr == AMEDIAMETRICS_PROP_EVENT_VALUE_CREATE) {
+        const int atom_status = types::lookup<types::STATUS, int32_t>(statusString);
+
+        // currently we only send create status events.
+        const int32_t event = android::util::
+                MEDIAMETRICS_AUDIO_TRACK_STATUS_REPORTED__EVENT__AUDIO_TRACK_EVENT_CREATE;
+
+        // The following fields should all be present in a create event.
+        std::string flagsStr;
+        ALOGD_IF(!item->get(AMEDIAMETRICS_PROP_ORIGINALFLAGS, &flagsStr),
+                "%s: %s missing %s field",
+                __func__, AMEDIAMETRICS_KEY_PREFIX_AUDIO_TRACK, AMEDIAMETRICS_PROP_ORIGINALFLAGS);
+        const auto flags = types::lookup<types::OUTPUT_FLAG, int32_t>(flagsStr);
+
+        // AMEDIAMETRICS_PROP_SESSIONID omitted from atom
+
+        std::string contentTypeStr;
+        ALOGD_IF(!item->get(AMEDIAMETRICS_PROP_CONTENTTYPE, &contentTypeStr),
+                "%s: %s missing %s field",
+                __func__, AMEDIAMETRICS_KEY_PREFIX_AUDIO_TRACK, AMEDIAMETRICS_PROP_CONTENTTYPE);
+        const auto contentType = types::lookup<types::CONTENT_TYPE, int32_t>(contentTypeStr);
+
+        std::string usageStr;
+        ALOGD_IF(!item->get(AMEDIAMETRICS_PROP_USAGE, &usageStr),
+                "%s: %s missing %s field",
+                __func__, AMEDIAMETRICS_KEY_PREFIX_AUDIO_TRACK, AMEDIAMETRICS_PROP_USAGE);
+        const auto usage = types::lookup<types::USAGE, int32_t>(usageStr);
+
+        // AMEDIAMETRICS_PROP_SELECTEDDEVICEID omitted from atom
+
+        std::string encodingStr;
+        ALOGD_IF(!item->get(AMEDIAMETRICS_PROP_ENCODING, &encodingStr),
+                "%s: %s missing %s field",
+                __func__, AMEDIAMETRICS_KEY_PREFIX_AUDIO_TRACK, AMEDIAMETRICS_PROP_ENCODING);
+        const auto encoding = types::lookup<types::ENCODING, int32_t>(encodingStr);
+
+        int32_t channelMask = 0;
+        ALOGD_IF(!item->get(AMEDIAMETRICS_PROP_CHANNELMASK, &channelMask),
+                "%s: %s missing %s field",
+                __func__, AMEDIAMETRICS_KEY_PREFIX_AUDIO_TRACK, AMEDIAMETRICS_PROP_CHANNELMASK);
+        int32_t frameCount = 0;
+        ALOGD_IF(!item->get(AMEDIAMETRICS_PROP_FRAMECOUNT, &frameCount),
+                "%s: %s missing %s field",
+                __func__, AMEDIAMETRICS_KEY_PREFIX_AUDIO_TRACK, AMEDIAMETRICS_PROP_FRAMECOUNT);
+        int32_t sampleRate = 0;
+        ALOGD_IF(!item->get(AMEDIAMETRICS_PROP_SAMPLERATE, &sampleRate),
+                "%s: %s missing %s field",
+                __func__, AMEDIAMETRICS_KEY_PREFIX_AUDIO_TRACK, AMEDIAMETRICS_PROP_SAMPLERATE);
+        double speed = 0.f;  // default is 1.f
+        ALOGD_IF(!item->get(AMEDIAMETRICS_PROP_PLAYBACK_SPEED, &speed),
+                "%s: %s missing %s field",
+                __func__,
+                AMEDIAMETRICS_KEY_PREFIX_AUDIO_TRACK, AMEDIAMETRICS_PROP_PLAYBACK_SPEED);
+        double pitch = 0.f;  // default is 1.f
+        ALOGD_IF(!item->get(AMEDIAMETRICS_PROP_PLAYBACK_PITCH, &pitch),
+                "%s: %s missing %s field",
+                __func__,
+                AMEDIAMETRICS_KEY_PREFIX_AUDIO_TRACK, AMEDIAMETRICS_PROP_PLAYBACK_PITCH);
+        const auto [ result, str ] = sendToStatsd(AudioTrackStatusFields,
+                CONDITION(android::util::MEDIAMETRICS_AUDIOTRACKSTATUS_REPORTED)
+                , atom_status
+                , message.c_str()
+                , subCode
+                , uid
+                , event
+                , flags
+                , contentType
+                , usage
+                , encoding
+                , (int64_t)channelMask
+                , frameCount
+                , sampleRate
+                , (float)speed
+                , (float)pitch
+                );
+        ALOGV("%s: statsd %s", __func__, str.c_str());
+        mStatsdLog->log(android::util::MEDIAMETRICS_AUDIOTRACKSTATUS_REPORTED, str);
+        return true;
+    }
+    return false;
 }
 
 // HELPER METHODS

@@ -47,10 +47,9 @@ cc_defaults {
         "libmedia",
     ],
 
-    include_dirs: [
-        "frameworks/av/media/libstagefright",
-        "frameworks/native/include/media/openmax",
-        "frameworks/native/include/android",
+    header_libs: [
+        "libstagefright_headers",
+        "libstagefright_rtsp_headers",
     ],
 
     arch: {
@@ -73,6 +72,18 @@ cc_defaults {
     },
 }
 
+cc_library_headers {
+    name: "libstagefright_rtsp_headers",
+    export_include_dirs: ["include"],
+    vendor_available: true,
+    host_supported: true,
+    target: {
+        darwin: {
+            enabled: false,
+        },
+    },
+}
+
 cc_library_static {
     name: "libstagefright_rtsp",
 
@@ -90,6 +101,10 @@ cc_library_static {
 
 //###############################################################################
 
+// 2022-01-13: this is stale; it's been disabled for 5 years.
+// test references UDPPusher and ARTPSession, neither of which is built into
+// libstagefright_rtsp
+//
 cc_test {
     name: "rtp_test",
     gtest: false,
@@ -108,10 +123,9 @@ cc_test {
 
     static_libs: ["libstagefright_rtsp"],
 
-    include_dirs: [
-        "frameworks/av/media/libstagefright",
-        "frameworks/av/cmds/stagefright",
-        "frameworks/native/include/media/openmax",
+    header_libs: [
+        "libstagefright_headers",
+        "libstagefright_rtsp_headers",
     ],
 
     cflags: [

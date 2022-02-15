@@ -20,45 +20,13 @@
 #include <type_traits>
 #include <utility>
 
-#include <android-base/expected.h>
 #include <binder/Status.h>
+#include <error/Result.h>
 
 namespace android {
 
 template <typename T>
-using ConversionResult = base::expected<T, status_t>;
-
-// Convenience macros for working with ConversionResult, useful for writing converted for aggregate
-// types.
-
-#define VALUE_OR_RETURN(result)                                \
-    ({                                                         \
-        auto _tmp = (result);                                  \
-        if (!_tmp.ok()) return base::unexpected(_tmp.error()); \
-        std::move(_tmp.value());                               \
-    })
-
-#define RETURN_IF_ERROR(result) \
-    if (status_t _tmp = (result); _tmp != OK) return base::unexpected(_tmp);
-
-#define RETURN_STATUS_IF_ERROR(result) \
-    if (status_t _tmp = (result); _tmp != OK) return _tmp;
-
-#define VALUE_OR_RETURN_STATUS(x)           \
-    ({                                      \
-       auto _tmp = (x);                     \
-       if (!_tmp.ok()) return _tmp.error(); \
-       std::move(_tmp.value());             \
-     })
-
-#define VALUE_OR_FATAL(result)                                        \
-    ({                                                                \
-       auto _tmp = (result);                                          \
-       LOG_ALWAYS_FATAL_IF(!_tmp.ok(),                                \
-                           "Function: %s Line: %d Failed result (%d)",\
-                           __FUNCTION__, __LINE__, _tmp.error());     \
-       std::move(_tmp.value());                                       \
-     })
+using ConversionResult = error::Result<T>;
 
 /**
  * A generic template to safely cast between integral types, respecting limits of the destination
@@ -109,6 +77,26 @@ status_t convertRange(InputIterator start,
 }
 
 /**
+ * A generic template that helps convert containers of convertible types, using iterators.
+ * Uses a limit as maximum conversion items.
+ */
+template<typename InputIterator, typename OutputIterator, typename Func>
+status_t convertRangeWithLimit(InputIterator start,
+                      InputIterator end,
+                      OutputIterator out,
+                      const Func& itemConversion,
+                      const size_t limit) {
+    InputIterator last = end;
+    if (end - start > limit) {
+        last = start + limit;
+    }
+    for (InputIterator iter = start; (iter != last); ++iter, ++out) {
+        *out = VALUE_OR_RETURN_STATUS(itemConversion(*iter));
+    }
+    return OK;
+}
+
+/**
  * A generic template that helps convert containers of convertible types.
  */
 template<typename OutputContainer, typename InputContainer, typename Func>
@@ -118,6 +106,21 @@ convertContainer(const InputContainer& input, const Func& itemConversion) {
     auto ins = std::inserter(output, output.begin());
     for (const auto& item : input) {
         *ins = VALUE_OR_RETURN(itemConversion(item));
+    }
+    return output;
+}
+
+/**
+ * A generic template that helps convert containers of convertible types
+ * using an item conversion function with an additional parameter.
+ */
+template<typename OutputContainer, typename InputContainer, typename Func, typename Parameter>
+ConversionResult<OutputContainer>
+convertContainer(const InputContainer& input, const Func& itemConversion, const Parameter& param) {
+    OutputContainer output;
+    auto ins = std::inserter(output, output.begin());
+    for (const auto& item : input) {
+        *ins = VALUE_OR_RETURN(itemConversion(item, param));
     }
     return output;
 }

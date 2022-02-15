@@ -25,22 +25,60 @@
 namespace android {
 
 class ResourceManagerServiceTest : public ResourceManagerServiceTestBase {
+private:
+    static MediaResource createSecureVideoCodecResource(int amount = 1) {
+        return MediaResource(MediaResource::Type::kSecureCodec,
+            MediaResource::SubType::kVideoCodec, amount);
+    }
+
+    static MediaResource createNonSecureVideoCodecResource(int amount = 1) {
+        return MediaResource(MediaResource::Type::kNonSecureCodec,
+            MediaResource::SubType::kVideoCodec, amount);
+    }
+
+    static MediaResource createSecureAudioCodecResource(int amount = 1) {
+        return MediaResource(MediaResource::Type::kSecureCodec,
+            MediaResource::SubType::kAudioCodec, amount);
+    }
+
+    static MediaResource createNonSecureAudioCodecResource(int amount = 1) {
+        return MediaResource(MediaResource::Type::kNonSecureCodec,
+            MediaResource::SubType::kAudioCodec, amount);
+    }
+
+    static MediaResource createSecureImageCodecResource(int amount = 1) {
+        return MediaResource(MediaResource::Type::kSecureCodec,
+            MediaResource::SubType::kImageCodec, amount);
+    }
+
+    static MediaResource createNonSecureImageCodecResource(int amount = 1) {
+        return MediaResource(MediaResource::Type::kNonSecureCodec,
+            MediaResource::SubType::kImageCodec, amount);
+    }
+
+    static MediaResource createGraphicMemoryResource(int amount = 1) {
+        return MediaResource(MediaResource::Type::kGraphicMemory,
+            MediaResource::SubType::kUnspecifiedSubType, amount);
+    }
+
+    static MediaResource createDrmSessionResource(int amount = 1) {
+        return MediaResource(MediaResource::Type::kDrmSession,
+            MediaResource::SubType::kUnspecifiedSubType, amount);
+    }
+
+    static MediaResource createBatteryResource() {
+        return MediaResource(MediaResource::Type::kBattery,
+            MediaResource::SubType::kUnspecifiedSubType, 1);
+    }
+
+    static MediaResource createCpuBoostResource() {
+        return MediaResource(MediaResource::Type::kCpuBoost,
+            MediaResource::SubType::kUnspecifiedSubType, 1);
+    }
+
 public:
     ResourceManagerServiceTest() : ResourceManagerServiceTestBase() {}
 
-    void verifyClients(bool c1, bool c2, bool c3) {
-        TestClient *client1 = static_cast<TestClient*>(mTestClient1.get());
-        TestClient *client2 = static_cast<TestClient*>(mTestClient2.get());
-        TestClient *client3 = static_cast<TestClient*>(mTestClient3.get());
-
-        EXPECT_EQ(c1, client1->reclaimed());
-        EXPECT_EQ(c2, client2->reclaimed());
-        EXPECT_EQ(c3, client3->reclaimed());
-
-        client1->reset();
-        client2->reset();
-        client3->reset();
-    }
 
     // test set up
     // ---------------------------------------------------------------------------------
@@ -268,7 +306,6 @@ public:
 
     void testOverridePid() {
 
-        bool result;
         std::vector<MediaResourceParcel> resources;
         resources.push_back(MediaResource(MediaResource::Type::kSecureCodec, 1));
         resources.push_back(MediaResource(MediaResource::Type::kGraphicMemory, 150));
@@ -293,8 +330,6 @@ public:
     }
 
     void testMarkClientForPendingRemoval() {
-        bool result;
-
         {
             addResource();
             mService->mSupportsSecureWithNonSecureCodec = true;
@@ -307,13 +342,17 @@ public:
 
             // no lower priority client
             CHECK_STATUS_FALSE(mService->reclaimResource(kTestPid2, resources, &result));
-            verifyClients(false /* c1 */, false /* c2 */, false /* c3 */);
+            EXPECT_EQ(false, toTestClient(mTestClient1)->checkIfReclaimedAndReset());
+            EXPECT_EQ(false, toTestClient(mTestClient2)->checkIfReclaimedAndReset());
+            EXPECT_EQ(false, toTestClient(mTestClient3)->checkIfReclaimedAndReset());
 
             mService->markClientForPendingRemoval(kTestPid2, getId(mTestClient2));
 
             // client marked for pending removal from the same process got reclaimed
             CHECK_STATUS_TRUE(mService->reclaimResource(kTestPid2, resources, &result));
-            verifyClients(false /* c1 */, true /* c2 */, false /* c3 */);
+            EXPECT_EQ(false, toTestClient(mTestClient1)->checkIfReclaimedAndReset());
+            EXPECT_EQ(true, toTestClient(mTestClient2)->checkIfReclaimedAndReset());
+            EXPECT_EQ(false, toTestClient(mTestClient3)->checkIfReclaimedAndReset());
 
             // clean up client 3 which still left
             mService->removeClient(kTestPid2, getId(mTestClient3));
@@ -331,11 +370,15 @@ public:
             // client marked for pending removal from the same process got reclaimed
             // first, even though there are lower priority process
             CHECK_STATUS_TRUE(mService->reclaimResource(kTestPid2, resources, &result));
-            verifyClients(false /* c1 */, true /* c2 */, false /* c3 */);
+            EXPECT_EQ(false, toTestClient(mTestClient1)->checkIfReclaimedAndReset());
+            EXPECT_EQ(true, toTestClient(mTestClient2)->checkIfReclaimedAndReset());
+            EXPECT_EQ(false, toTestClient(mTestClient3)->checkIfReclaimedAndReset());
 
             // lower priority client got reclaimed
             CHECK_STATUS_TRUE(mService->reclaimResource(kTestPid2, resources, &result));
-            verifyClients(true /* c1 */, false /* c2 */, false /* c3 */);
+            EXPECT_EQ(true, toTestClient(mTestClient1)->checkIfReclaimedAndReset());
+            EXPECT_EQ(false, toTestClient(mTestClient2)->checkIfReclaimedAndReset());
+            EXPECT_EQ(false, toTestClient(mTestClient3)->checkIfReclaimedAndReset());
 
             // clean up client 3 which still left
             mService->removeClient(kTestPid2, getId(mTestClient3));
@@ -349,17 +392,23 @@ public:
 
             // client marked for pending removal got reclaimed
             EXPECT_TRUE(mService->reclaimResourcesFromClientsPendingRemoval(kTestPid2).isOk());
-            verifyClients(false /* c1 */, true /* c2 */, false /* c3 */);
+            EXPECT_EQ(false, toTestClient(mTestClient1)->checkIfReclaimedAndReset());
+            EXPECT_EQ(true, toTestClient(mTestClient2)->checkIfReclaimedAndReset());
+            EXPECT_EQ(false, toTestClient(mTestClient3)->checkIfReclaimedAndReset());
 
             // No more clients marked for removal
             EXPECT_TRUE(mService->reclaimResourcesFromClientsPendingRemoval(kTestPid2).isOk());
-            verifyClients(false /* c1 */, false /* c2 */, false /* c3 */);
+            EXPECT_EQ(false, toTestClient(mTestClient1)->checkIfReclaimedAndReset());
+            EXPECT_EQ(false, toTestClient(mTestClient2)->checkIfReclaimedAndReset());
+            EXPECT_EQ(false, toTestClient(mTestClient3)->checkIfReclaimedAndReset());
 
             mService->markClientForPendingRemoval(kTestPid2, getId(mTestClient3));
 
             // client marked for pending removal got reclaimed
             EXPECT_TRUE(mService->reclaimResourcesFromClientsPendingRemoval(kTestPid2).isOk());
-            verifyClients(false /* c1 */, false /* c2 */, true /* c3 */);
+            EXPECT_EQ(false, toTestClient(mTestClient1)->checkIfReclaimedAndReset());
+            EXPECT_EQ(false, toTestClient(mTestClient2)->checkIfReclaimedAndReset());
+            EXPECT_EQ(true, toTestClient(mTestClient3)->checkIfReclaimedAndReset());
 
             // clean up client 1 which still left
             mService->removeClient(kTestPid1, getId(mTestClient1));
@@ -384,14 +433,15 @@ public:
 
     void testGetAllClients() {
         addResource();
-
         MediaResource::Type type = MediaResource::Type::kSecureCodec;
+        MediaResource::SubType subType = MediaResource::SubType::kUnspecifiedSubType;
+
         Vector<std::shared_ptr<IResourceManagerClient> > clients;
-        EXPECT_FALSE(mService->getAllClients_l(kLowPriorityPid, type, &clients));
+        EXPECT_FALSE(mService->getAllClients_l(kLowPriorityPid, type, subType, &clients));
         // some higher priority process (e.g. kTestPid2) owns the resource, so getAllClients_l
         // will fail.
-        EXPECT_FALSE(mService->getAllClients_l(kMidPriorityPid, type, &clients));
-        EXPECT_TRUE(mService->getAllClients_l(kHighPriorityPid, type, &clients));
+        EXPECT_FALSE(mService->getAllClients_l(kMidPriorityPid, type, subType, &clients));
+        EXPECT_TRUE(mService->getAllClients_l(kHighPriorityPid, type, subType, &clients));
 
         EXPECT_EQ(2u, clients.size());
         // (OK to require ordering in clients[], as the pid map is sorted)
@@ -400,7 +450,6 @@ public:
     }
 
     void testReclaimResourceSecure() {
-        bool result;
         std::vector<MediaResourceParcel> resources;
         resources.push_back(MediaResource(MediaResource::Type::kSecureCodec, 1));
         resources.push_back(MediaResource(MediaResource::Type::kGraphicMemory, 150));
@@ -417,11 +466,15 @@ public:
 
             // reclaim all secure codecs
             CHECK_STATUS_TRUE(mService->reclaimResource(kHighPriorityPid, resources, &result));
-            verifyClients(true /* c1 */, false /* c2 */, true /* c3 */);
+            EXPECT_TRUE(toTestClient(mTestClient1)->checkIfReclaimedAndReset());
+            EXPECT_FALSE(toTestClient(mTestClient2)->checkIfReclaimedAndReset());
+            EXPECT_TRUE(toTestClient(mTestClient3)->checkIfReclaimedAndReset());
 
             // call again should reclaim one largest graphic memory from lowest process
             CHECK_STATUS_TRUE(mService->reclaimResource(kHighPriorityPid, resources, &result));
-            verifyClients(false /* c1 */, true /* c2 */, false /* c3 */);
+            EXPECT_FALSE(toTestClient(mTestClient1)->checkIfReclaimedAndReset());
+            EXPECT_TRUE(toTestClient(mTestClient2)->checkIfReclaimedAndReset());
+            EXPECT_FALSE(toTestClient(mTestClient3)->checkIfReclaimedAndReset());
 
             // nothing left
             CHECK_STATUS_FALSE(mService->reclaimResource(kHighPriorityPid, resources, &result));
@@ -439,7 +492,9 @@ public:
 
             // reclaim all secure and non-secure codecs
             CHECK_STATUS_TRUE(mService->reclaimResource(kHighPriorityPid, resources, &result));
-            verifyClients(true /* c1 */, true /* c2 */, true /* c3 */);
+            EXPECT_TRUE(toTestClient(mTestClient1)->checkIfReclaimedAndReset());
+            EXPECT_TRUE(toTestClient(mTestClient2)->checkIfReclaimedAndReset());
+            EXPECT_TRUE(toTestClient(mTestClient3)->checkIfReclaimedAndReset());
 
             // nothing left
             CHECK_STATUS_FALSE(mService->reclaimResource(kHighPriorityPid, resources, &result));
@@ -458,15 +513,21 @@ public:
 
             // reclaim all non-secure codecs
             CHECK_STATUS_TRUE(mService->reclaimResource(kHighPriorityPid, resources, &result));
-            verifyClients(false /* c1 */, true /* c2 */, false /* c3 */);
+            EXPECT_FALSE(toTestClient(mTestClient1)->checkIfReclaimedAndReset());
+            EXPECT_TRUE(toTestClient(mTestClient2)->checkIfReclaimedAndReset());
+            EXPECT_FALSE(toTestClient(mTestClient3)->checkIfReclaimedAndReset());
 
             // call again should reclaim one largest graphic memory from lowest process
             CHECK_STATUS_TRUE(mService->reclaimResource(kHighPriorityPid, resources, &result));
-            verifyClients(true /* c1 */, false /* c2 */, false /* c3 */);
+            EXPECT_TRUE(toTestClient(mTestClient1)->checkIfReclaimedAndReset());
+            EXPECT_FALSE(toTestClient(mTestClient2)->checkIfReclaimedAndReset());
+            EXPECT_FALSE(toTestClient(mTestClient3)->checkIfReclaimedAndReset());
 
             // call again should reclaim another largest graphic memory from lowest process
             CHECK_STATUS_TRUE(mService->reclaimResource(kHighPriorityPid, resources, &result));
-            verifyClients(false /* c1 */, false /* c2 */, true /* c3 */);
+            EXPECT_FALSE(toTestClient(mTestClient1)->checkIfReclaimedAndReset());
+            EXPECT_FALSE(toTestClient(mTestClient2)->checkIfReclaimedAndReset());
+            EXPECT_TRUE(toTestClient(mTestClient3)->checkIfReclaimedAndReset());
 
             // nothing left
             CHECK_STATUS_FALSE(mService->reclaimResource(kHighPriorityPid, resources, &result));
@@ -483,15 +544,21 @@ public:
 
             CHECK_STATUS_TRUE(mService->reclaimResource(kHighPriorityPid, resources, &result));
             // one largest graphic memory from lowest process got reclaimed
-            verifyClients(true /* c1 */, false /* c2 */, false /* c3 */);
+            EXPECT_TRUE(toTestClient(mTestClient1)->checkIfReclaimedAndReset());
+            EXPECT_FALSE(toTestClient(mTestClient2)->checkIfReclaimedAndReset());
+            EXPECT_FALSE(toTestClient(mTestClient3)->checkIfReclaimedAndReset());
 
             // call again should reclaim another graphic memory from lowest process
             CHECK_STATUS_TRUE(mService->reclaimResource(kHighPriorityPid, resources, &result));
-            verifyClients(false /* c1 */, true /* c2 */, false /* c3 */);
+            EXPECT_FALSE(toTestClient(mTestClient1)->checkIfReclaimedAndReset());
+            EXPECT_TRUE(toTestClient(mTestClient2)->checkIfReclaimedAndReset());
+            EXPECT_FALSE(toTestClient(mTestClient3)->checkIfReclaimedAndReset());
 
             // call again should reclaim another graphic memory from lowest process
             CHECK_STATUS_TRUE(mService->reclaimResource(kHighPriorityPid, resources, &result));
-            verifyClients(false /* c1 */, false /* c2 */, true /* c3 */);
+            EXPECT_FALSE(toTestClient(mTestClient1)->checkIfReclaimedAndReset());
+            EXPECT_FALSE(toTestClient(mTestClient2)->checkIfReclaimedAndReset());
+            EXPECT_TRUE(toTestClient(mTestClient3)->checkIfReclaimedAndReset());
 
             // nothing left
             CHECK_STATUS_FALSE(mService->reclaimResource(kHighPriorityPid, resources, &result));
@@ -508,20 +575,25 @@ public:
 
             CHECK_STATUS_TRUE(mService->reclaimResource(kHighPriorityPid, resources, &result));
             // secure codec from lowest process got reclaimed
-            verifyClients(true /* c1 */, false /* c2 */, false /* c3 */);
+            EXPECT_TRUE(toTestClient(mTestClient1)->checkIfReclaimedAndReset());
+            EXPECT_FALSE(toTestClient(mTestClient2)->checkIfReclaimedAndReset());
+            EXPECT_FALSE(toTestClient(mTestClient3)->checkIfReclaimedAndReset());
 
             // call again should reclaim another secure codec from lowest process
             CHECK_STATUS_TRUE(mService->reclaimResource(kHighPriorityPid, resources, &result));
-            verifyClients(false /* c1 */, false /* c2 */, true /* c3 */);
+            EXPECT_FALSE(toTestClient(mTestClient1)->checkIfReclaimedAndReset());
+            EXPECT_FALSE(toTestClient(mTestClient2)->checkIfReclaimedAndReset());
+            EXPECT_TRUE(toTestClient(mTestClient3)->checkIfReclaimedAndReset());
 
             // no more secure codec, non-secure codec will be reclaimed.
             CHECK_STATUS_TRUE(mService->reclaimResource(kHighPriorityPid, resources, &result));
-            verifyClients(false /* c1 */, true /* c2 */, false /* c3 */);
+            EXPECT_FALSE(toTestClient(mTestClient1)->checkIfReclaimedAndReset());
+            EXPECT_TRUE(toTestClient(mTestClient2)->checkIfReclaimedAndReset());
+            EXPECT_FALSE(toTestClient(mTestClient3)->checkIfReclaimedAndReset());
         }
     }
 
     void testReclaimResourceNonSecure() {
-        bool result;
         std::vector<MediaResourceParcel> resources;
         resources.push_back(MediaResource(MediaResource::Type::kNonSecureCodec, 1));
         resources.push_back(MediaResource(MediaResource::Type::kGraphicMemory, 150));
@@ -537,11 +609,15 @@ public:
 
             // reclaim all secure codecs
             CHECK_STATUS_TRUE(mService->reclaimResource(kHighPriorityPid, resources, &result));
-            verifyClients(true /* c1 */, false /* c2 */, true /* c3 */);
+            EXPECT_TRUE(toTestClient(mTestClient1)->checkIfReclaimedAndReset());
+            EXPECT_FALSE(toTestClient(mTestClient2)->checkIfReclaimedAndReset());
+            EXPECT_TRUE(toTestClient(mTestClient3)->checkIfReclaimedAndReset());
 
             // call again should reclaim one graphic memory from lowest process
             CHECK_STATUS_TRUE(mService->reclaimResource(kHighPriorityPid, resources, &result));
-            verifyClients(false /* c1 */, true /* c2 */, false /* c3 */);
+            EXPECT_FALSE(toTestClient(mTestClient1)->checkIfReclaimedAndReset());
+            EXPECT_TRUE(toTestClient(mTestClient2)->checkIfReclaimedAndReset());
+            EXPECT_FALSE(toTestClient(mTestClient3)->checkIfReclaimedAndReset());
 
             // nothing left
             CHECK_STATUS_FALSE(mService->reclaimResource(kHighPriorityPid, resources, &result));
@@ -558,15 +634,21 @@ public:
 
             CHECK_STATUS_TRUE(mService->reclaimResource(kHighPriorityPid, resources, &result));
             // one largest graphic memory from lowest process got reclaimed
-            verifyClients(true /* c1 */, false /* c2 */, false /* c3 */);
+            EXPECT_TRUE(toTestClient(mTestClient1)->checkIfReclaimedAndReset());
+            EXPECT_FALSE(toTestClient(mTestClient2)->checkIfReclaimedAndReset());
+            EXPECT_FALSE(toTestClient(mTestClient3)->checkIfReclaimedAndReset());
 
             // call again should reclaim another graphic memory from lowest process
             CHECK_STATUS_TRUE(mService->reclaimResource(kHighPriorityPid, resources, &result));
-            verifyClients(false /* c1 */, true /* c2 */, false /* c3 */);
+            EXPECT_FALSE(toTestClient(mTestClient1)->checkIfReclaimedAndReset());
+            EXPECT_TRUE(toTestClient(mTestClient2)->checkIfReclaimedAndReset());
+            EXPECT_FALSE(toTestClient(mTestClient3)->checkIfReclaimedAndReset());
 
             // call again should reclaim another graphic memory from lowest process
             CHECK_STATUS_TRUE(mService->reclaimResource(kHighPriorityPid, resources, &result));
-            verifyClients(false /* c1 */, false /* c2 */, true /* c3 */);
+            EXPECT_FALSE(toTestClient(mTestClient1)->checkIfReclaimedAndReset());
+            EXPECT_FALSE(toTestClient(mTestClient2)->checkIfReclaimedAndReset());
+            EXPECT_TRUE(toTestClient(mTestClient3)->checkIfReclaimedAndReset());
 
             // nothing left
             CHECK_STATUS_FALSE(mService->reclaimResource(kHighPriorityPid, resources, &result));
@@ -582,11 +664,15 @@ public:
 
             CHECK_STATUS_TRUE(mService->reclaimResource(kHighPriorityPid, resources, &result));
             // one non secure codec from lowest process got reclaimed
-            verifyClients(false /* c1 */, true /* c2 */, false /* c3 */);
+            EXPECT_FALSE(toTestClient(mTestClient1)->checkIfReclaimedAndReset());
+            EXPECT_TRUE(toTestClient(mTestClient2)->checkIfReclaimedAndReset());
+            EXPECT_FALSE(toTestClient(mTestClient3)->checkIfReclaimedAndReset());
 
             // no more non-secure codec, secure codec from lowest priority process will be reclaimed
             CHECK_STATUS_TRUE(mService->reclaimResource(kHighPriorityPid, resources, &result));
-            verifyClients(true /* c1 */, false /* c2 */, false /* c3 */);
+            EXPECT_TRUE(toTestClient(mTestClient1)->checkIfReclaimedAndReset());
+            EXPECT_FALSE(toTestClient(mTestClient2)->checkIfReclaimedAndReset());
+            EXPECT_FALSE(toTestClient(mTestClient3)->checkIfReclaimedAndReset());
 
             // clean up client 3 which still left
             mService->removeClient(kTestPid2, getId(mTestClient3));
@@ -595,13 +681,17 @@ public:
 
     void testGetLowestPriorityBiggestClient() {
         MediaResource::Type type = MediaResource::Type::kGraphicMemory;
+        MediaResource::SubType subType = MediaResource::SubType::kUnspecifiedSubType;
         std::shared_ptr<IResourceManagerClient> client;
-        EXPECT_FALSE(mService->getLowestPriorityBiggestClient_l(kHighPriorityPid, type, &client));
+        EXPECT_FALSE(mService->getLowestPriorityBiggestClient_l(kHighPriorityPid, type, subType,
+                &client));
 
         addResource();
 
-        EXPECT_FALSE(mService->getLowestPriorityBiggestClient_l(kLowPriorityPid, type, &client));
-        EXPECT_TRUE(mService->getLowestPriorityBiggestClient_l(kHighPriorityPid, type, &client));
+        EXPECT_FALSE(mService->getLowestPriorityBiggestClient_l(kLowPriorityPid, type, subType,
+                &client));
+        EXPECT_TRUE(mService->getLowestPriorityBiggestClient_l(kHighPriorityPid, type, subType,
+                &client));
 
         // kTestPid1 is the lowest priority process with MediaResource::Type::kGraphicMemory.
         // mTestClient1 has the largest MediaResource::Type::kGraphicMemory within kTestPid1.
@@ -614,33 +704,23 @@ public:
         TestProcessInfo processInfo;
 
         MediaResource::Type type = MediaResource::Type::kGraphicMemory;
-        EXPECT_FALSE(mService->getLowestPriorityPid_l(type, &pid, &priority));
+        MediaResource::SubType subType = MediaResource::SubType::kUnspecifiedSubType;
+        EXPECT_FALSE(mService->getLowestPriorityPid_l(type, subType, &pid, &priority));
 
         addResource();
 
-        EXPECT_TRUE(mService->getLowestPriorityPid_l(type, &pid, &priority));
+        EXPECT_TRUE(mService->getLowestPriorityPid_l(type, subType, &pid, &priority));
         EXPECT_EQ(kTestPid1, pid);
         int priority1;
         processInfo.getPriority(kTestPid1, &priority1);
         EXPECT_EQ(priority1, priority);
 
         type = MediaResource::Type::kNonSecureCodec;
-        EXPECT_TRUE(mService->getLowestPriorityPid_l(type, &pid, &priority));
+        EXPECT_TRUE(mService->getLowestPriorityPid_l(type, subType, &pid, &priority));
         EXPECT_EQ(kTestPid2, pid);
         int priority2;
         processInfo.getPriority(kTestPid2, &priority2);
         EXPECT_EQ(priority2, priority);
-    }
-
-    void testGetBiggestClient() {
-        MediaResource::Type type = MediaResource::Type::kGraphicMemory;
-        std::shared_ptr<IResourceManagerClient> client;
-        EXPECT_FALSE(mService->getBiggestClient_l(kTestPid2, type, &client));
-
-        addResource();
-
-        EXPECT_TRUE(mService->getBiggestClient_l(kTestPid2, type, &client));
-        EXPECT_EQ(mTestClient2, client);
     }
 
     void testIsCallingPriorityHigher() {
@@ -725,6 +805,361 @@ public:
         EXPECT_EQ(4u, mSystemCB->eventCount());
         EXPECT_EQ(EventType::CPUSET_DISABLE, mSystemCB->lastEventType());
     }
+
+    void testReclaimResources_withVideoCodec_reclaimsOnlyVideoCodec() {
+        const std::shared_ptr<IResourceManagerClient>& audioImageTestClient = mTestClient1;
+        const std::shared_ptr<IResourceManagerClient>& videoTestClient = mTestClient2;
+
+        // Create an audio and image codec resource
+        std::vector<MediaResourceParcel> audioImageResources;
+        audioImageResources.push_back(createNonSecureAudioCodecResource());
+        audioImageResources.push_back(createNonSecureImageCodecResource());
+        mService->addResource(kLowPriorityPid, kTestUid1, getId(audioImageTestClient),
+                audioImageTestClient, audioImageResources);
+
+        // Fail to reclaim a video codec resource
+        std::vector<MediaResourceParcel> reclaimResources;
+        reclaimResources.push_back(createNonSecureVideoCodecResource());
+        CHECK_STATUS_FALSE(mService->reclaimResource(kHighPriorityPid, reclaimResources, &result));
+
+        // Now add a video codec resource
+        std::vector<MediaResourceParcel> videoResources;
+        videoResources.push_back(createNonSecureVideoCodecResource());
+        mService->addResource(kLowPriorityPid, kTestUid1, getId(videoTestClient), videoTestClient,
+                videoResources);
+
+        // Verify that the newly-created video codec resource can be reclaimed
+        CHECK_STATUS_TRUE(mService->reclaimResource(kHighPriorityPid, reclaimResources, &result));
+
+        // Verify that the audio and image resources are untouched
+        EXPECT_FALSE(toTestClient(audioImageTestClient)->checkIfReclaimedAndReset());
+        // But the video resource was reclaimed
+        EXPECT_TRUE(toTestClient(videoTestClient)->checkIfReclaimedAndReset());
+    }
+
+    void testReclaimResources_withAudioCodec_reclaimsOnlyAudioCodec() {
+        const auto & videoImageTestClient = mTestClient1;
+        const auto & audioTestClient = mTestClient2;
+
+        // Create a video and audio codec resource
+        std::vector<MediaResourceParcel> videoImageResources;
+        videoImageResources.push_back(createNonSecureVideoCodecResource());
+        videoImageResources.push_back(createNonSecureImageCodecResource());
+        mService->addResource(kLowPriorityPid, kTestUid1, getId(videoImageTestClient),
+                videoImageTestClient, videoImageResources);
+
+        // Fail to reclaim an audio codec resource
+        std::vector<MediaResourceParcel> reclaimResources;
+        reclaimResources.push_back(createNonSecureAudioCodecResource());
+        CHECK_STATUS_FALSE(mService->reclaimResource(kHighPriorityPid, reclaimResources, &result));
+
+        // Now add an audio codec resource
+        std::vector<MediaResourceParcel> audioResources;
+        audioResources.push_back(createNonSecureAudioCodecResource());
+        mService->addResource(kLowPriorityPid, kTestUid2, getId(audioTestClient), audioTestClient,
+                audioResources);
+
+        // Verify that the newly-created audio codec resource can be reclaimed
+        CHECK_STATUS_TRUE(mService->reclaimResource(kHighPriorityPid, reclaimResources, &result));
+
+        // Verify that the video and image resources are untouched
+        EXPECT_FALSE(toTestClient(videoImageTestClient)->checkIfReclaimedAndReset());
+        // But the audio resource was reclaimed
+        EXPECT_TRUE(toTestClient(audioTestClient)->checkIfReclaimedAndReset());
+    }
+
+    void testReclaimResources_withImageCodec_reclaimsOnlyImageCodec() {
+        const auto & videoAudioTestClient = mTestClient1;
+        const auto & imageTestClient = mTestClient2;
+
+        // Create a video and audio codec resource
+        std::vector<MediaResourceParcel> videoAudioResources;
+        videoAudioResources.push_back(createNonSecureVideoCodecResource());
+        videoAudioResources.push_back(createNonSecureAudioCodecResource());
+        mService->addResource(kLowPriorityPid, kTestUid1, getId(videoAudioTestClient),
+                videoAudioTestClient, videoAudioResources);
+
+        // Fail to reclaim an image codec resource
+        std::vector<MediaResourceParcel> reclaimResources;
+        reclaimResources.push_back(createNonSecureImageCodecResource());
+        CHECK_STATUS_FALSE(mService->reclaimResource(kHighPriorityPid, reclaimResources, &result));
+
+        // Now add an image codec resource
+        std::vector<MediaResourceParcel> imageResources;
+        imageResources.push_back(createNonSecureImageCodecResource());
+        mService->addResource(kLowPriorityPid, kTestUid2, getId(imageTestClient), imageTestClient,
+                imageResources);
+
+        // Verify that the newly-created image codec resource can be reclaimed
+        CHECK_STATUS_TRUE(mService->reclaimResource(kHighPriorityPid, reclaimResources, &result));
+
+        // Verify that the video and audio resources are untouched
+        EXPECT_FALSE(toTestClient(mTestClient1)->checkIfReclaimedAndReset());
+        // But the image resource was reclaimed
+        EXPECT_TRUE(toTestClient(mTestClient2)->checkIfReclaimedAndReset());
+    }
+
+    void testReclaimResources_whenPartialResourceMatch_reclaims() {
+        const int onlyUid = kTestUid1;
+        const auto onlyClient = createTestClient(kLowPriorityPid);
+
+        std::vector<MediaResourceParcel> ownedResources;
+        ownedResources.push_back(createNonSecureVideoCodecResource());
+        ownedResources.push_back(createGraphicMemoryResource(100));
+        mService->addResource(kLowPriorityPid, onlyUid, getId(onlyClient), onlyClient,
+                ownedResources);
+
+        // Reclaim an image codec instead of the video codec that is owned, but also reclaim
+        // graphics memory, which will trigger the reclaim.
+        std::vector<MediaResourceParcel> reclaimResources;
+        reclaimResources.push_back(createNonSecureImageCodecResource());
+        reclaimResources.push_back(createGraphicMemoryResource(100));
+        CHECK_STATUS_TRUE(mService->reclaimResource(kHighPriorityPid, reclaimResources, &result));
+
+        // Verify that the video codec resources (including the needed graphic memory) is reclaimed
+        EXPECT_TRUE(toTestClient(onlyClient)->checkIfReclaimedAndReset());
+    }
+
+    void testReclaimResourcesFromMarkedClients_removesBiggestMarkedClientForSomeResources() {
+        // this test only uses one pid and one uid
+        const int onlyPid = kTestPid1;
+        const int onlyUid = kTestUid1;
+
+        // secure video codec
+        const auto smallSecureVideoMarkedClient = createTestClient(onlyPid);
+        const auto largeSecureVideoMarkedClient = createTestClient(onlyPid);
+        const auto largestSecureVideoActiveClient = createTestClient(onlyPid);
+        {
+            std::vector<MediaResourceParcel> resources;
+            resources.push_back(createSecureVideoCodecResource(1));
+            mService->addResource(onlyPid, onlyUid, getId(smallSecureVideoMarkedClient),
+                    smallSecureVideoMarkedClient, resources);
+            resources.clear();
+            resources.push_back(createSecureVideoCodecResource(2));
+            mService->addResource(onlyPid, onlyUid, getId(largeSecureVideoMarkedClient),
+                    largeSecureVideoMarkedClient, resources);
+            resources.clear();
+            resources.push_back(createSecureVideoCodecResource(3));
+            mService->addResource(onlyPid, onlyUid, getId(largestSecureVideoActiveClient),
+                    largestSecureVideoActiveClient, resources);
+        }
+        mService->markClientForPendingRemoval(onlyPid, getId(smallSecureVideoMarkedClient));
+        mService->markClientForPendingRemoval(onlyPid, getId(largeSecureVideoMarkedClient));
+        // don't mark the largest client
+
+        // non-secure video codec
+        const auto smallNonSecureVideoMarkedClient = createTestClient(onlyPid);
+        const auto largeNonSecureVideoMarkedClient = createTestClient(onlyPid);
+        const auto largestNonSecureVideoActiveClient = createTestClient(onlyPid);
+        {
+            std::vector<MediaResourceParcel> resources;
+            resources.push_back(createNonSecureVideoCodecResource(1));
+            mService->addResource(onlyPid, onlyUid, getId(smallNonSecureVideoMarkedClient),
+                    smallNonSecureVideoMarkedClient, resources);
+            resources.clear();
+            resources.push_back(createNonSecureVideoCodecResource(2));
+            mService->addResource(onlyPid, onlyUid, getId(largeNonSecureVideoMarkedClient),
+                    largeNonSecureVideoMarkedClient, resources);
+            resources.clear();
+            resources.push_back(createNonSecureVideoCodecResource(3));
+            mService->addResource(onlyPid, onlyUid, getId(largestNonSecureVideoActiveClient),
+                    largestNonSecureVideoActiveClient, resources);
+        }
+        mService->markClientForPendingRemoval(onlyPid, getId(smallNonSecureVideoMarkedClient));
+        mService->markClientForPendingRemoval(onlyPid, getId(largeNonSecureVideoMarkedClient));
+        // don't mark the largest client
+
+        // secure audio codec
+        const auto smallSecureAudioMarkedClient = createTestClient(onlyPid);
+        const auto largeSecureAudioMarkedClient = createTestClient(onlyPid);
+        const auto largestSecureAudioActiveClient = createTestClient(onlyPid);
+        {
+            std::vector<MediaResourceParcel> resources;
+            resources.push_back(createSecureAudioCodecResource(1));
+            mService->addResource(onlyPid, onlyUid, getId(smallSecureAudioMarkedClient),
+                    smallSecureAudioMarkedClient, resources);
+            resources.clear();
+            resources.push_back(createSecureAudioCodecResource(2));
+            mService->addResource(onlyPid, onlyUid, getId(largeSecureAudioMarkedClient),
+                    largeSecureAudioMarkedClient, resources);
+            resources.clear();
+            resources.push_back(createSecureAudioCodecResource(3));
+            mService->addResource(onlyPid, onlyUid, getId(largestSecureVideoActiveClient),
+                    largestSecureVideoActiveClient, resources);
+        }
+        mService->markClientForPendingRemoval(onlyPid, getId(smallSecureAudioMarkedClient));
+        mService->markClientForPendingRemoval(onlyPid, getId(largeSecureAudioMarkedClient));
+        // don't mark the largest client
+
+        // non-secure audio codec
+        const auto smallNonSecureAudioMarkedClient = createTestClient(onlyPid);
+        const auto largeNonSecureAudioMarkedClient = createTestClient(onlyPid);
+        const auto largestNonSecureAudioActiveClient = createTestClient(onlyPid);
+        {
+            std::vector<MediaResourceParcel> resources;
+            resources.push_back(createNonSecureAudioCodecResource(1));
+            mService->addResource(onlyPid, onlyUid, getId(smallNonSecureAudioMarkedClient),
+                    smallNonSecureAudioMarkedClient, resources);
+            resources.clear();
+            resources.push_back(createNonSecureAudioCodecResource(2));
+            mService->addResource(onlyPid, onlyUid, getId(largeNonSecureAudioMarkedClient),
+                    largeNonSecureAudioMarkedClient, resources);
+            resources.clear();
+            resources.push_back(createNonSecureAudioCodecResource(3));
+            mService->addResource(onlyPid, onlyUid, getId(largestNonSecureAudioActiveClient),
+                    largestNonSecureAudioActiveClient, resources);
+        }
+        mService->markClientForPendingRemoval(onlyPid, getId(smallNonSecureAudioMarkedClient));
+        mService->markClientForPendingRemoval(onlyPid, getId(largeNonSecureAudioMarkedClient));
+        // don't mark the largest client
+
+        // secure image codec
+        const auto smallSecureImageMarkedClient = createTestClient(onlyPid);
+        const auto largeSecureImageMarkedClient = createTestClient(onlyPid);
+        const auto largestSecureImageActiveClient = createTestClient(onlyPid);
+        {
+            std::vector<MediaResourceParcel> resources;
+            resources.push_back(createSecureImageCodecResource(1));
+            mService->addResource(onlyPid, onlyUid, getId(smallSecureImageMarkedClient),
+                    smallSecureImageMarkedClient, resources);
+            resources.clear();
+            resources.push_back(createSecureImageCodecResource(2));
+            mService->addResource(onlyPid, onlyUid, getId(largeSecureImageMarkedClient),
+                    largeSecureImageMarkedClient, resources);
+            resources.clear();
+            resources.push_back(createSecureImageCodecResource(3));
+            mService->addResource(onlyPid, onlyUid, getId(largestSecureImageActiveClient),
+                    largestSecureImageActiveClient, resources);
+        }
+        mService->markClientForPendingRemoval(onlyPid, getId(smallSecureImageMarkedClient));
+        mService->markClientForPendingRemoval(onlyPid, getId(largeSecureImageMarkedClient));
+        // don't mark the largest client
+
+        // non-secure image codec
+        const auto smallNonSecureImageMarkedClient = createTestClient(onlyPid);
+        const auto largeNonSecureImageMarkedClient = createTestClient(onlyPid);
+        const auto largestNonSecureImageActiveClient = createTestClient(onlyPid);
+        {
+            std::vector<MediaResourceParcel> resources;
+            resources.push_back(createNonSecureImageCodecResource(1));
+            mService->addResource(onlyPid, onlyUid, getId(smallNonSecureImageMarkedClient),
+                    smallNonSecureImageMarkedClient, resources);
+            resources.clear();
+            resources.push_back(createNonSecureImageCodecResource(2));
+            mService->addResource(onlyPid, onlyUid, getId(largeNonSecureImageMarkedClient),
+                    largeNonSecureImageMarkedClient, resources);
+            resources.clear();
+            resources.push_back(createNonSecureImageCodecResource(3));
+            mService->addResource(onlyPid, onlyUid, getId(largestNonSecureImageActiveClient),
+                    largestNonSecureImageActiveClient, resources);
+        }
+        mService->markClientForPendingRemoval(onlyPid, getId(smallNonSecureImageMarkedClient));
+        mService->markClientForPendingRemoval(onlyPid, getId(largeNonSecureImageMarkedClient));
+        // don't mark the largest client
+
+        // graphic memory
+        const auto smallGraphicMemoryMarkedClient = createTestClient(onlyPid);
+        const auto largeGraphicMemoryMarkedClient = createTestClient(onlyPid);
+        const auto largestGraphicMemoryActiveClient = createTestClient(onlyPid);
+        {
+            std::vector<MediaResourceParcel> resources;
+            resources.push_back(createGraphicMemoryResource(100));
+            mService->addResource(onlyPid, onlyUid, getId(smallGraphicMemoryMarkedClient),
+                    smallGraphicMemoryMarkedClient, resources);
+            resources.clear();
+            resources.push_back(createGraphicMemoryResource(200));
+            mService->addResource(onlyPid, onlyUid, getId(largeGraphicMemoryMarkedClient),
+                    largeGraphicMemoryMarkedClient, resources);
+            resources.clear();
+            resources.push_back(createGraphicMemoryResource(300));
+            mService->addResource(onlyPid, onlyUid, getId(largestGraphicMemoryActiveClient),
+                    largestGraphicMemoryActiveClient, resources);
+        }
+        mService->markClientForPendingRemoval(onlyPid, getId(smallGraphicMemoryMarkedClient));
+        mService->markClientForPendingRemoval(onlyPid, getId(largeGraphicMemoryMarkedClient));
+        // don't mark the largest client
+
+        // DRM session
+        const auto smallDrmSessionMarkedClient = createTestClient(onlyPid);
+        const auto largeDrmSessionMarkedClient = createTestClient(onlyPid);
+        const auto largestDrmSessionActiveClient = createTestClient(onlyPid);
+        {
+            std::vector<MediaResourceParcel> resources;
+            resources.push_back(createDrmSessionResource(1));
+            mService->addResource(onlyPid, onlyUid, getId(smallDrmSessionMarkedClient),
+                    smallDrmSessionMarkedClient, resources);
+            resources.clear();
+            resources.push_back(createDrmSessionResource(2));
+            mService->addResource(onlyPid, onlyUid, getId(largeDrmSessionMarkedClient),
+                    largeDrmSessionMarkedClient, resources);
+            resources.clear();
+            resources.push_back(createDrmSessionResource(3));
+            mService->addResource(onlyPid, onlyUid, getId(largestDrmSessionActiveClient),
+                    largestDrmSessionActiveClient, resources);
+        }
+        mService->markClientForPendingRemoval(onlyPid, getId(smallDrmSessionMarkedClient));
+        mService->markClientForPendingRemoval(onlyPid, getId(largeDrmSessionMarkedClient));
+        // don't mark the largest client
+
+        // battery
+        const auto batteryMarkedClient = createTestClient(onlyPid);
+        {
+            std::vector<MediaResourceParcel> resources;
+            resources.push_back(createBatteryResource());
+            mService->addResource(onlyPid, onlyUid, getId(batteryMarkedClient),
+                    batteryMarkedClient, resources);
+        }
+        mService->markClientForPendingRemoval(onlyPid, getId(batteryMarkedClient));
+
+        // CPU boost
+        const auto cpuBoostMarkedClient = createTestClient(onlyPid);
+        {
+            std::vector<MediaResourceParcel> resources;
+            resources.push_back(createCpuBoostResource());
+            mService->addResource(onlyPid, onlyUid, getId(cpuBoostMarkedClient),
+                    cpuBoostMarkedClient, resources);
+        }
+        mService->markClientForPendingRemoval(onlyPid, getId(cpuBoostMarkedClient));
+
+        // now we expect that we only reclaim resources from the biggest marked client
+        EXPECT_TRUE(mService->reclaimResourcesFromClientsPendingRemoval(onlyPid).isOk());
+        // secure video codec
+        EXPECT_FALSE(toTestClient(smallSecureVideoMarkedClient)->checkIfReclaimedAndReset());
+        EXPECT_TRUE(toTestClient(largeSecureVideoMarkedClient)->checkIfReclaimedAndReset());
+        EXPECT_FALSE(toTestClient(largestSecureVideoActiveClient)->checkIfReclaimedAndReset());
+        // non-secure video codec
+        EXPECT_FALSE(toTestClient(smallNonSecureVideoMarkedClient)->checkIfReclaimedAndReset());
+        EXPECT_TRUE(toTestClient(largeNonSecureVideoMarkedClient)->checkIfReclaimedAndReset());
+        EXPECT_FALSE(toTestClient(largestNonSecureVideoActiveClient)->checkIfReclaimedAndReset());
+        // secure audio codec
+        EXPECT_FALSE(toTestClient(smallSecureAudioMarkedClient)->checkIfReclaimedAndReset());
+        EXPECT_TRUE(toTestClient(largeSecureAudioMarkedClient)->checkIfReclaimedAndReset());
+        EXPECT_FALSE(toTestClient(largestSecureAudioActiveClient)->checkIfReclaimedAndReset());
+        // non-secure audio codec
+        EXPECT_FALSE(toTestClient(smallNonSecureAudioMarkedClient)->checkIfReclaimedAndReset());
+        EXPECT_TRUE(toTestClient(largeNonSecureAudioMarkedClient)->checkIfReclaimedAndReset());
+        EXPECT_FALSE(toTestClient(largestNonSecureAudioActiveClient)->checkIfReclaimedAndReset());
+        // secure image codec
+        EXPECT_FALSE(toTestClient(smallSecureImageMarkedClient)->checkIfReclaimedAndReset());
+        EXPECT_TRUE(toTestClient(largeSecureImageMarkedClient)->checkIfReclaimedAndReset());
+        EXPECT_FALSE(toTestClient(largestSecureImageActiveClient)->checkIfReclaimedAndReset());
+        // non-secure image codec
+        EXPECT_FALSE(toTestClient(smallNonSecureImageMarkedClient)->checkIfReclaimedAndReset());
+        EXPECT_TRUE(toTestClient(largeNonSecureImageMarkedClient)->checkIfReclaimedAndReset());
+        EXPECT_FALSE(toTestClient(largestNonSecureImageActiveClient)->checkIfReclaimedAndReset());
+        // graphic memory
+        EXPECT_FALSE(toTestClient(smallGraphicMemoryMarkedClient)->checkIfReclaimedAndReset());
+        EXPECT_TRUE(toTestClient(largeGraphicMemoryMarkedClient)->checkIfReclaimedAndReset());
+        EXPECT_FALSE(toTestClient(largestGraphicMemoryActiveClient)->checkIfReclaimedAndReset());
+        // DRM session
+        EXPECT_FALSE(toTestClient(smallDrmSessionMarkedClient)->checkIfReclaimedAndReset());
+        EXPECT_TRUE(toTestClient(largeDrmSessionMarkedClient)->checkIfReclaimedAndReset());
+        EXPECT_FALSE(toTestClient(largestDrmSessionActiveClient)->checkIfReclaimedAndReset());
+        // battery is not expected to be reclaimed when marked as pending removal
+        EXPECT_FALSE(toTestClient(batteryMarkedClient)->checkIfReclaimedAndReset());
+        // CPU boost is not expected to be reclaimed when marked as pending removal
+        EXPECT_FALSE(toTestClient(cpuBoostMarkedClient)->checkIfReclaimedAndReset());
+    }
 };
 
 TEST_F(ResourceManagerServiceTest, config) {
@@ -768,19 +1203,15 @@ TEST_F(ResourceManagerServiceTest, getLowestPriorityPid_l) {
     testGetLowestPriorityPid();
 }
 
-TEST_F(ResourceManagerServiceTest, getBiggestClient_l) {
-    testGetBiggestClient();
-}
-
 TEST_F(ResourceManagerServiceTest, isCallingPriorityHigher_l) {
     testIsCallingPriorityHigher();
 }
 
-TEST_F(ResourceManagerServiceTest, testBatteryStats) {
+TEST_F(ResourceManagerServiceTest, batteryStats) {
     testBatteryStats();
 }
 
-TEST_F(ResourceManagerServiceTest, testCpusetBoost) {
+TEST_F(ResourceManagerServiceTest, cpusetBoost) {
     testCpusetBoost();
 }
 
@@ -790,6 +1221,27 @@ TEST_F(ResourceManagerServiceTest, overridePid) {
 
 TEST_F(ResourceManagerServiceTest, markClientForPendingRemoval) {
     testMarkClientForPendingRemoval();
+}
+
+TEST_F(ResourceManagerServiceTest, reclaimResources_withVideoCodec_reclaimsOnlyVideoCodec) {
+    testReclaimResources_withVideoCodec_reclaimsOnlyVideoCodec();
+}
+
+TEST_F(ResourceManagerServiceTest, reclaimResources_withAudioCodec_reclaimsOnlyAudioCodec) {
+    testReclaimResources_withAudioCodec_reclaimsOnlyAudioCodec();
+}
+
+TEST_F(ResourceManagerServiceTest, reclaimResources_withImageCodec_reclaimsOnlyImageCodec) {
+    testReclaimResources_withImageCodec_reclaimsOnlyImageCodec();
+}
+
+TEST_F(ResourceManagerServiceTest, reclaimResources_whenPartialResourceMatch_reclaims) {
+    testReclaimResources_whenPartialResourceMatch_reclaims();
+}
+
+TEST_F(ResourceManagerServiceTest,
+        reclaimResourcesFromMarkedClients_removesBiggestMarkedClientForSomeResources) {
+    testReclaimResourcesFromMarkedClients_removesBiggestMarkedClientForSomeResources();
 }
 
 } // namespace android

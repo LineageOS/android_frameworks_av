@@ -47,8 +47,7 @@ status_t AudioValidator::validateEffectDescriptor(
         const effect_descriptor_t& desc, std::string_view bugNumber)
 {
     status_t status = NO_ERROR;
-    if (checkStringOverflow(desc.name)
-        | /* always */ checkStringOverflow(desc.implementor)) {
+    if (checkStringOverflow(desc.name) || checkStringOverflow(desc.implementor)) {
         status = BAD_VALUE;
     }
     return safetyNetLog(status, bugNumber);

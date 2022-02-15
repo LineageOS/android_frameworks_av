@@ -53,7 +53,9 @@ aaudio_result_t AudioStreamInternalPlay::open(const AudioStreamBuilder &builder)
                              getSamplesPerFrame(),
                              getDeviceFormat(),
                              getDeviceChannelCount(),
-                             getRequireMonoBlend());
+                             getRequireMonoBlend(),
+                             getAudioBalance(),
+                             (getSharingMode() == AAUDIO_SHARING_MODE_EXCLUSIVE));
 
         if (result != AAUDIO_OK) {
             safeReleaseClose();

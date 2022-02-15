@@ -10,8 +10,8 @@
      <!--#################### GLOBAL COMPONENTS END ####################-->
 
     <!-- Automatically filled from audio-base.h file -->
-    <ComponentType Name="OutputDevicesMask" Description="32th bit is not allowed as dedicated for input devices detection">
-        <BitParameterBlock Name="mask" Size="32">
+    <ComponentType Name="OutputDevicesMask" Description="64bit representation of devices">
+        <BitParameterBlock Name="mask" Size="64">
         </BitParameterBlock>
     </ComponentType>
 
@@ -19,8 +19,8 @@
     profile. It must match with the Input device enum parameter.
     -->
     <!-- Automatically filled from audio-base.h file -->
-    <ComponentType Name="InputDevicesMask">
-        <BitParameterBlock Name="mask" Size="32">
+    <ComponentType Name="InputDevicesMask" Description="64bit representation of devices">
+        <BitParameterBlock Name="mask" Size="64">
         </BitParameterBlock>
     </ComponentType>
 

@@ -43,7 +43,7 @@ std::tuple<Pose3f, bool> moveWithRateLimit(const Pose3f& from, const Pose3f& to,
         return {to, false};
     }
     // Always rate limit if t is 0 (required to avoid division by 0).
-    if (t == 0) {
+    if (t == 0 || maxTranslationalVelocity == 0 || maxRotationalVelocity == 0) {
         return {from, true};
     }
 

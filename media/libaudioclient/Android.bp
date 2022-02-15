@@ -11,6 +11,10 @@ cc_library_headers {
     name: "libaudioclient_headers",
     vendor_available: true,
     min_sdk_version: "29",
+    apex_available: [
+        "//apex_available:platform",
+        "com.android.media",
+    ],
     host_supported: true,
 
     header_libs: [
@@ -41,7 +45,7 @@ cc_library_headers {
     },
 }
 
-cc_library_shared {
+cc_library {
     name: "libaudiopolicy",
     srcs: [
         "AudioAttributes.cpp",
@@ -199,13 +203,15 @@ cc_library_headers {
     ],
     header_libs: [
         "libbase_headers",
+        "liberror_headers",
     ],
     export_header_lib_headers: [
         "libbase_headers",
+        "liberror_headers",
     ],
     apex_available: [
         "//apex_available:platform",
-        "com.android.bluetooth.updatable",
+        "com.android.bluetooth",
         "com.android.media",
         "com.android.media.swcodec",
     ],
@@ -314,6 +320,7 @@ aidl_interface {
     srcs: [
         "aidl/android/media/AudioAttributesInternal.aidl",
         "aidl/android/media/AudioClient.aidl",
+        "aidl/android/media/AudioDirectMode.aidl",
         "aidl/android/media/AudioDualMonoMode.aidl",
         "aidl/android/media/AudioFlag.aidl",
         "aidl/android/media/AudioGainSys.aidl",

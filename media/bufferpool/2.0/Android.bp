@@ -40,6 +40,12 @@ cc_library {
     defaults: ["libstagefright_bufferpool@2.0-default"],
     vendor_available: true,
     min_sdk_version: "29",
+    apex_available: [
+        "//apex_available:platform",
+        "com.android.media.swcodec",
+        "test_com.android.media.swcodec",
+    ],
+
     // TODO: b/147147992
     double_loadable: true,
     cflags: [

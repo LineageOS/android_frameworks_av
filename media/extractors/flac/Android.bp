@@ -19,7 +19,7 @@ license {
 
 cc_library {
     name: "libflacextractor",
-    defaults: ["extractor-defaults", "libbinder_ndk_host_user"],
+    defaults: ["extractor-defaults"],
 
     srcs: ["FLACExtractor.cpp"],
 

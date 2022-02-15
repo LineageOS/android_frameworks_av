@@ -18,6 +18,7 @@ package android.media.tv.tuner;
 
 import android.hardware.tv.tuner.DemuxCapabilities;
 import android.hardware.tv.tuner.FrontendInfo;
+import android.hardware.tv.tuner.FrontendType;
 import android.media.tv.tuner.ITunerDemux;
 import android.media.tv.tuner.ITunerDescrambler;
 import android.media.tv.tuner.ITunerFilter;
@@ -104,4 +105,29 @@ interface ITunerService {
      * @return a newly created ITunerFilter interface.
      */
     ITunerFilter openSharedFilter(in String filterToken, in ITunerFilterCallback cb);
+
+    /**
+     * Enable or Disable Low Noise Amplifier (LNA).
+     *
+     * @param bEnable enable Lna or not.
+     */
+    void setLna(in boolean bEnable);
+
+    /**
+     * Set the maximum usable frontends number of a given frontend type. It's used by client
+     * to enable or disable frontends when cable connection status is changed by user.
+     *
+     * @param frontendType the frontend type which the maximum usable number will be set.
+     * @param maxNumber the new maximum usable number.
+     */
+    void setMaxNumberOfFrontends(in FrontendType frontendType, in int maxNumber);
+
+    /**
+     * Get the maximum usable frontends number of a given frontend type.
+     *
+     * @param frontendType the frontend type which the maximum usable number will be queried.
+     *
+     * @return the maximum usable number of the queried frontend type.
+     */
+    int getMaxNumberOfFrontends(in FrontendType frontendType);
 }

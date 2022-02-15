@@ -392,7 +392,8 @@ void AudioPolicyService::doOnCheckSpatializer()
             audio_config_base_t config = mSpatializer->getAudioInConfig();
             status_t status =
                     mAudioPolicyManager->getSpatializerOutput(&config, &attr, &newOutput);
-
+            ALOGV("%s currentOutput %d newOutput %d channel_mask %#x",
+                    __func__, currentOutput, newOutput, config.channel_mask);
             if (status == NO_ERROR && currentOutput == newOutput) {
                 return;
             }
@@ -593,6 +594,8 @@ status_t AudioPolicyService::dumpInternals(int fd)
     }
 
     write(fd, result.string(), result.size());
+
+    mUidPolicy->dumpInternals(fd);
     return NO_ERROR;
 }
 
@@ -606,13 +609,20 @@ void AudioPolicyService::updateUidStates_l()
 {
 //    Go over all active clients and allow capture (does not force silence) in the
 //    following cases:
-//    The client is the assistant
+//    The client is in the active assistant list
+//         AND is TOP
+//               AND an accessibility service is TOP
+//                  AND source is either VOICE_RECOGNITION OR HOTWORD
+//               OR there is no active privacy sensitive capture or call
+//                          OR client has CAPTURE_AUDIO_OUTPUT privileged permission
+//                  AND source is VOICE_RECOGNITION OR HOTWORD
+//    The client is an assistant AND active assistant is not being used
 //        AND an accessibility service is on TOP or a RTT call is active
 //                AND the source is VOICE_RECOGNITION or HOTWORD
-//            OR uses VOICE_RECOGNITION AND is on TOP
-//                OR uses HOTWORD
-//            AND there is no active privacy sensitive capture or call
+//        OR there is no active privacy sensitive capture or call
 //                OR client has CAPTURE_AUDIO_OUTPUT privileged permission
+//            AND is TOP most recent assistant and uses VOICE_RECOGNITION or HOTWORD
+//                OR there is no top recent assistant and source is HOTWORD
 //    OR The client is an accessibility service
 //        AND Is on TOP
 //                AND the source is VOICE_RECOGNITION or HOTWORD
@@ -640,13 +650,16 @@ void AudioPolicyService::updateUidStates_l()
     sp<AudioRecordClient> latestActive;
     sp<AudioRecordClient> topSensitiveActive;
     sp<AudioRecordClient> latestSensitiveActiveOrComm;
+    sp<AudioRecordClient> latestActiveAssistant;
 
     nsecs_t topStartNs = 0;
     nsecs_t latestStartNs = 0;
     nsecs_t topSensitiveStartNs = 0;
     nsecs_t latestSensitiveStartNs = 0;
+    nsecs_t latestAssistantStartNs = 0;
     bool isA11yOnTop = mUidPolicy->isA11yOnTop();
     bool isAssistantOnTop = false;
+    bool useActiveAssistantList = false;
     bool isSensitiveActive = false;
     bool isInCall = mPhoneState == AUDIO_MODE_IN_CALL;
     bool isInCommunication = mPhoneState == AUDIO_MODE_IN_COMMUNICATION;
@@ -681,6 +694,7 @@ void AudioPolicyService::updateUidStates_l()
         // for top or latest active to avoid masking regular clients started before
         if (!isAccessibility && !isVirtualSource(current->attributes.source)) {
             bool isAssistant = mUidPolicy->isAssistantUid(currentUid);
+            bool isActiveAssistant = mUidPolicy->isActiveAssistantUid(currentUid);
             bool isPrivacySensitive =
                     (current->attributes.flags & AUDIO_FLAG_CAPTURE_PRIVATE) != 0;
 
@@ -698,6 +712,14 @@ void AudioPolicyService::updateUidStates_l()
                 }
                 if (isAssistant) {
                     isAssistantOnTop = true;
+                    if (isActiveAssistant) {
+                        useActiveAssistantList = true;
+                    } else if (!useActiveAssistantList) {
+                        if (current->startTimeNs > latestAssistantStartNs) {
+                            latestActiveAssistant = current;
+                            latestAssistantStartNs = current->startTimeNs;
+                        }
+                    }
                 }
             }
             // Clients capturing for HOTWORD are not considered
@@ -777,6 +799,8 @@ void AudioPolicyService::updateUidStates_l()
             current->attributionSource.uid == topActive->attributionSource.uid;
         bool isTopOrLatestSensitive = topSensitiveActive == nullptr ? false :
             current->attributionSource.uid == topSensitiveActive->attributionSource.uid;
+        bool isTopOrLatestAssistant = latestActiveAssistant == nullptr ? false :
+            current->attributionSource.uid == latestActiveAssistant->attributionSource.uid;
 
         auto canCaptureIfInCallOrCommunication = [&](const auto &recordClient) REQUIRES(mLock) {
             uid_t recordUid = VALUE_OR_FATAL(aidl2legacy_int32_t_uid_t(
@@ -806,23 +830,45 @@ void AudioPolicyService::updateUidStates_l()
         } else if (isVirtualSource(source)) {
             // Allow capture for virtual (remote submix, call audio TX or RX...) sources
             allowCapture = true;
-        } else if (mUidPolicy->isAssistantUid(currentUid)) {
+        } else if (!useActiveAssistantList && mUidPolicy->isAssistantUid(currentUid)) {
             // For assistant allow capture if:
-            //     An accessibility service is on TOP or a RTT call is active
+            //     Active assistant list is not being used
+            //     AND accessibility service is on TOP or a RTT call is active
             //            AND the source is VOICE_RECOGNITION or HOTWORD
-            //     OR is on TOP AND uses VOICE_RECOGNITION
-            //            OR uses HOTWORD
-            //         AND there is no active privacy sensitive capture or call
-            //             OR client has CAPTURE_AUDIO_OUTPUT privileged permission
+            //     OR there is no active privacy sensitive capture or call
+            //          OR client has CAPTURE_AUDIO_OUTPUT privileged permission
+            //            AND is latest TOP assistant AND
+            //               uses VOICE_RECOGNITION OR uses HOTWORD
+            //            OR there is no TOP assistant and uses HOTWORD
             if (isA11yOnTop || rttCallActive) {
                 if (source == AUDIO_SOURCE_HOTWORD || source == AUDIO_SOURCE_VOICE_RECOGNITION) {
                     allowCapture = true;
                 }
-            } else {
-                if (((isAssistantOnTop && source == AUDIO_SOURCE_VOICE_RECOGNITION) ||
-                        source == AUDIO_SOURCE_HOTWORD)
-                        && !(isSensitiveActive && !current->canCaptureOutput)
+            } else if (!(isSensitiveActive && !current->canCaptureOutput)
+                    && canCaptureIfInCallOrCommunication(current)) {
+                if (isTopOrLatestAssistant
+                    && (source == AUDIO_SOURCE_VOICE_RECOGNITION
+                        || source == AUDIO_SOURCE_HOTWORD)) {
+                        allowCapture = true;
+                } else if (!isAssistantOnTop && (source == AUDIO_SOURCE_HOTWORD)) {
+                    allowCapture = true;
+                }
+            }
+        } else if (useActiveAssistantList && mUidPolicy->isActiveAssistantUid(currentUid)) {
+            // For assistant on active list and on top allow capture if:
+            //     An accessibility service is on TOP
+            //         AND the source is VOICE_RECOGNITION or HOTWORD
+            //     OR there is no active privacy sensitive capture or call
+            //             OR client has CAPTURE_AUDIO_OUTPUT privileged permission
+            //         AND uses VOICE_RECOGNITION OR uses HOTWORD
+            if (isA11yOnTop) {
+                if (source == AUDIO_SOURCE_HOTWORD || source == AUDIO_SOURCE_VOICE_RECOGNITION) {
+                    allowCapture = true;
+                }
+            } else if (!(isSensitiveActive && !current->canCaptureOutput)
                         && canCaptureIfInCallOrCommunication(current)) {
+                if ((source == AUDIO_SOURCE_VOICE_RECOGNITION) || (source == AUDIO_SOURCE_HOTWORD))
+                {
                     allowCapture = true;
                 }
             }
@@ -1035,7 +1081,8 @@ status_t AudioPolicyService::onTransact(
         case TRANSACTION_getSurroundFormats:
         case TRANSACTION_getReportedSurroundFormats:
         case TRANSACTION_setSurroundFormatEnabled:
-        case TRANSACTION_setAssistantUid:
+        case TRANSACTION_setAssistantServicesUids:
+        case TRANSACTION_setActiveAssistantServicesUids:
         case TRANSACTION_setA11yServicesUids:
         case TRANSACTION_setUidDeviceAffinities:
         case TRANSACTION_removeUidDeviceAffinities:
@@ -1471,6 +1518,66 @@ bool AudioPolicyService::UidPolicy::isA11yUid(uid_t uid)
 {
     std::vector<uid_t>::iterator it = find(mA11yUids.begin(), mA11yUids.end(), uid);
     return it != mA11yUids.end();
+}
+
+void AudioPolicyService::UidPolicy::setAssistantUids(const std::vector<uid_t>& uids) {
+    mAssistantUids.clear();
+    mAssistantUids = uids;
+}
+
+bool AudioPolicyService::UidPolicy::isAssistantUid(uid_t uid)
+{
+    std::vector<uid_t>::iterator it = find(mAssistantUids.begin(), mAssistantUids.end(), uid);
+    return it != mAssistantUids.end();
+}
+
+void AudioPolicyService::UidPolicy::setActiveAssistantUids(const std::vector<uid_t>& activeUids) {
+    mActiveAssistantUids = activeUids;
+}
+
+bool AudioPolicyService::UidPolicy::isActiveAssistantUid(uid_t uid)
+{
+    std::vector<uid_t>::iterator it = find(mActiveAssistantUids.begin(),
+            mActiveAssistantUids.end(), uid);
+    return it != mActiveAssistantUids.end();
+}
+
+void AudioPolicyService::UidPolicy::dumpInternals(int fd) {
+    const size_t SIZE = 256;
+    char buffer[SIZE];
+    String8 result;
+    auto appendUidsToResult = [&](const char* title, const std::vector<uid_t> &uids) {
+        snprintf(buffer, SIZE, "\t%s: \n", title);
+        result.append(buffer);
+        int counter = 0;
+        if (uids.empty()) {
+            snprintf(buffer, SIZE, "\t\tNo UIDs present.\n");
+            result.append(buffer);
+            return;
+        }
+        for (const auto &uid : uids) {
+            snprintf(buffer, SIZE, "\t\tUID[%d]=%d\n", counter++, uid);
+            result.append(buffer);
+        }
+    };
+
+    snprintf(buffer, SIZE, "UID Policy:\n");
+    result.append(buffer);
+    snprintf(buffer, SIZE, "\tmObserverRegistered=%s\n",(mObserverRegistered ? "True":"False"));
+    result.append(buffer);
+
+    appendUidsToResult("Assistants UIDs", mAssistantUids);
+    appendUidsToResult("Active Assistants UIDs", mActiveAssistantUids);
+
+    appendUidsToResult("Accessibility UIDs", mA11yUids);
+
+    snprintf(buffer, SIZE, "\tInput Method Service UID=%d\n", mCurrentImeUid);
+    result.append(buffer);
+
+    snprintf(buffer, SIZE, "\tIs RTT Enabled: %s\n", (mRttEnabled ? "True":"False"));
+    result.append(buffer);
+
+    write(fd, result.string(), result.size());
 }
 
 // -----------  AudioPolicyService::SensorPrivacyService implementation ----------

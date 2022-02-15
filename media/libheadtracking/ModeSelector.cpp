@@ -41,11 +41,18 @@ void ModeSelector::setWorldToHeadPose(int64_t timestamp, const Pose3f& worldToHe
     mWorldToHeadTimestamp = timestamp;
 }
 
+void ModeSelector::setScreenStable(int64_t timestamp, bool stable) {
+    mScreenStable = stable;
+    mScreenStableTimestamp = timestamp;
+}
+
 void ModeSelector::calculateActualMode(int64_t timestamp) {
     bool isValidScreenToHead = mScreenToHead.has_value() &&
                                timestamp - mScreenToHeadTimestamp < mOptions.freshnessTimeout;
     bool isValidWorldToHead = mWorldToHead.has_value() &&
                               timestamp - mWorldToHeadTimestamp < mOptions.freshnessTimeout;
+    bool isValidScreenStable = mScreenStable.has_value() &&
+                              timestamp - mScreenStableTimestamp < mOptions.freshnessTimeout;
 
     HeadTrackingMode mode = mDesiredMode;
 
@@ -58,7 +65,7 @@ void ModeSelector::calculateActualMode(int64_t timestamp) {
 
     // Optional downgrade from world-relative to static.
     if (mode == HeadTrackingMode::WORLD_RELATIVE) {
-        if (!isValidWorldToHead) {
+        if (!isValidWorldToHead || !isValidScreenStable || !mScreenStable.value()) {
             mode = HeadTrackingMode::STATIC;
         }
     }

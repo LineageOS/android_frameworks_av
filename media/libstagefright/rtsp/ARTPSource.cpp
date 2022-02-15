@@ -18,17 +18,17 @@
 #define LOG_TAG "ARTPSource"
 #include <utils/Log.h>
 
-#include "ARTPSource.h"
+#include <media/stagefright/rtsp/ARTPSource.h>
 
-#include "AAMRAssembler.h"
-#include "AAVCAssembler.h"
-#include "AHEVCAssembler.h"
-#include "AH263Assembler.h"
-#include "AMPEG2TSAssembler.h"
-#include "AMPEG4AudioAssembler.h"
-#include "AMPEG4ElementaryAssembler.h"
-#include "ARawAudioAssembler.h"
-#include "ASessionDescription.h"
+#include <media/stagefright/rtsp/AAMRAssembler.h>
+#include <media/stagefright/rtsp/AAVCAssembler.h>
+#include <media/stagefright/rtsp/AHEVCAssembler.h>
+#include <media/stagefright/rtsp/AH263Assembler.h>
+#include <media/stagefright/rtsp/AMPEG2TSAssembler.h>
+#include <media/stagefright/rtsp/AMPEG4AudioAssembler.h>
+#include <media/stagefright/rtsp/AMPEG4ElementaryAssembler.h>
+#include <media/stagefright/rtsp/ARawAudioAssembler.h>
+#include <media/stagefright/rtsp/ASessionDescription.h>
 
 #include <media/stagefright/foundation/ABuffer.h>
 #include <media/stagefright/foundation/ADebug.h>

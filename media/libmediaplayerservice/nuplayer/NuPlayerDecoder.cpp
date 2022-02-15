@@ -40,9 +40,8 @@
 #include <media/stagefright/MediaDefs.h>
 #include <media/stagefright/MediaErrors.h>
 #include <media/stagefright/SurfaceUtils.h>
+#include <mpeg2ts/ATSParser.h>
 #include <gui/Surface.h>
-
-#include "ATSParser.h"
 
 namespace android {
 

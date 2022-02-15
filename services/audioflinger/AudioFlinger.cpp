@@ -31,6 +31,7 @@
 #include <sys/resource.h>
 #include <thread>
 
+#include <android-base/stringprintf.h>
 #include <android/media/IAudioPolicyService.h>
 #include <android/os/IExternalVibratorService.h>
 #include <binder/IPCThreadState.h>
@@ -104,8 +105,9 @@
 
 namespace android {
 
-#define MAX_AAUDIO_PROPERTY_DEVICE_HAL_VERSION 7.0
+#define MAX_AAUDIO_PROPERTY_DEVICE_HAL_VERSION 7.1
 
+using ::android::base::StringPrintf;
 using media::IEffectClient;
 using media::audio::common::AudioMMapPolicyInfo;
 using media::audio::common::AudioMMapPolicyType;
@@ -382,6 +384,24 @@ int32_t AudioFlinger::getAAudioMixerBurstCount() {
 int32_t AudioFlinger::getAAudioHardwareBurstMinUsec() {
     Mutex::Autolock _l(mLock);
     return mAAudioHwBurstMinMicros;
+}
+
+status_t AudioFlinger::setDeviceConnectedState(const struct audio_port_v7 *port, bool connected) {
+    status_t final_result = NO_INIT;
+    Mutex::Autolock _l(mLock);
+    AutoMutex lock(mHardwareLock);
+    mHardwareStatus = AUDIO_HW_SET_CONNECTED_STATE;
+    for (size_t i = 0; i < mAudioHwDevs.size(); i++) {
+        sp<DeviceHalInterface> dev = mAudioHwDevs.valueAt(i)->hwDevice();
+        status_t result = dev->setConnectedState(port, connected);
+        // Same logic as with setParameter: it's a success if at least one
+        // HAL module accepts the update.
+        if (final_result != NO_ERROR) {
+            final_result = result;
+        }
+    }
+    mHardwareStatus = AUDIO_HW_IDLE;
+    return final_result;
 }
 
 // getDefaultVibratorInfo_l must be called with AudioFlinger lock held.
@@ -2340,11 +2360,12 @@ audio_module_handle_t AudioFlinger::loadHwModule_l(const char *name)
 
     if (mDevicesFactoryHal->getHalVersion() > MAX_AAUDIO_PROPERTY_DEVICE_HAL_VERSION) {
         if (int32_t mixerBursts = dev->getAAudioMixerBurstCount();
-            mixerBursts > mAAudioBurstsPerBuffer) {
+            mixerBursts > 0 && mixerBursts > mAAudioBurstsPerBuffer) {
             mAAudioBurstsPerBuffer = mixerBursts;
         }
         if (int32_t hwBurstMinMicros = dev->getAAudioHardwareBurstMinUsec();
-            hwBurstMinMicros < mAAudioHwBurstMinMicros || mAAudioHwBurstMinMicros == 0) {
+            hwBurstMinMicros > 0
+            && (hwBurstMinMicros < mAAudioHwBurstMinMicros || mAAudioHwBurstMinMicros == 0)) {
             mAAudioHwBurstMinMicros = hwBurstMinMicros;
         }
     }
@@ -2473,21 +2494,17 @@ audio_hw_sync_t AudioFlinger::getAudioHwSyncForSession(audio_session_t sessionId
     if (dev == nullptr) {
         return AUDIO_HW_SYNC_INVALID;
     }
-    String8 reply;
-    AudioParameter param;
-    if (dev->getParameters(String8(AudioParameter::keyHwAvSync), &reply) == OK) {
-        param = AudioParameter(reply);
-    }
 
-    int value;
-    if (param.getInt(String8(AudioParameter::keyHwAvSync), value) != NO_ERROR) {
+    error::Result<audio_hw_sync_t> result = dev->getHwAvSync();
+    if (!result.ok()) {
         ALOGW("getAudioHwSyncForSession error getting sync for session %d", sessionId);
         return AUDIO_HW_SYNC_INVALID;
     }
+    audio_hw_sync_t value = VALUE_OR_FATAL(result);
 
     // allow only one session for a given HW A/V sync ID.
     for (size_t i = 0; i < mHwAvSyncIds.size(); i++) {
-        if (mHwAvSyncIds.valueAt(i) == (audio_hw_sync_t)value) {
+        if (mHwAvSyncIds.valueAt(i) == value) {
             ALOGV("getAudioHwSyncForSession removing ID %d for session %d",
                   value, mHwAvSyncIds.keyAt(i));
             mHwAvSyncIds.removeItemsAt(i);
@@ -2590,7 +2607,7 @@ sp<AudioFlinger::ThreadBase> AudioFlinger::openOutput_l(audio_module_handle_t mo
 {
     AudioHwDevice *outHwDev = findSuitableHwDev_l(module, deviceType);
     if (outHwDev == NULL) {
-        return 0;
+        return nullptr;
     }
 
     if (*output == AUDIO_IO_HANDLE_NONE) {
@@ -2599,8 +2616,16 @@ sp<AudioFlinger::ThreadBase> AudioFlinger::openOutput_l(audio_module_handle_t mo
         // Audio Policy does not currently request a specific output handle.
         // If this is ever needed, see openInput_l() for example code.
         ALOGE("openOutput_l requested output handle %d is not AUDIO_IO_HANDLE_NONE", *output);
-        return 0;
+        return nullptr;
     }
+
+#ifndef MULTICHANNEL_EFFECT_CHAIN
+    if (flags & AUDIO_OUTPUT_FLAG_SPATIALIZER) {
+        ALOGE("openOutput_l() cannot create spatializer thread "
+                "without #define MULTICHANNEL_EFFECT_CHAIN");
+        return nullptr;
+    }
+#endif
 
     mHardwareStatus = AUDIO_HW_OUTPUT_OPEN;
 
@@ -2646,18 +2671,11 @@ sp<AudioFlinger::ThreadBase> AudioFlinger::openOutput_l(audio_module_handle_t mo
             return thread;
         } else {
             sp<PlaybackThread> thread;
-            //TODO: b/193496180 use spatializer flag at audio HAL when available
-            if (flags == (audio_output_flags_t)(AUDIO_OUTPUT_FLAG_FAST
-                                                    | AUDIO_OUTPUT_FLAG_DEEP_BUFFER)) {
-#ifdef MULTICHANNEL_EFFECT_CHAIN
+            if (flags & AUDIO_OUTPUT_FLAG_SPATIALIZER) {
                 thread = new SpatializerThread(this, outputStream, *output,
                                                     mSystemReady, mixerConfig);
-                ALOGD("openOutput_l() created spatializer output: ID %d thread %p",
+                ALOGV("openOutput_l() created spatializer output: ID %d thread %p",
                       *output, thread.get());
-#else
-                ALOGE("openOutput_l() cannot create spatializer thread "
-                        "without #define MULTICHANNEL_EFFECT_CHAIN");
-#endif
             } else if (flags & AUDIO_OUTPUT_FLAG_COMPRESS_OFFLOAD) {
                 thread = new OffloadThread(this, outputStream, *output, mSystemReady);
                 ALOGV("openOutput_l() created offload output: ID %d thread %p",
@@ -2683,7 +2701,7 @@ sp<AudioFlinger::ThreadBase> AudioFlinger::openOutput_l(audio_module_handle_t mo
         }
     }
 
-    return 0;
+    return nullptr;
 }
 
 status_t AudioFlinger::openOutput(const media::OpenOutputRequest& request,
@@ -3987,6 +4005,12 @@ status_t AudioFlinger::createEffect(const media::CreateEffectRequest& request,
 
 Register:
     if (!probe && (lStatus == NO_ERROR || lStatus == ALREADY_EXISTS)) {
+        if (lStatus == ALREADY_EXISTS) {
+            response->alreadyExists = true;
+            lStatus = NO_ERROR;
+        } else {
+            response->alreadyExists = false;
+        }
         // Check CPU and memory usage
         sp<EffectBase> effect = handle->effect().promote();
         if (effect != nullptr) {
@@ -4079,6 +4103,7 @@ status_t AudioFlinger::moveEffectChain_l(audio_session_t sessionId,
     // so that a new chain is created with correct parameters when first effect is added. This is
     // otherwise unnecessary as removeEffect_l() will remove the chain when last effect is
     // removed.
+    // TODO(b/216875016): consider holding the effect chain locks for the duration of the move.
     srcThread->removeEffectChain_l(chain);
 
     // transfer all effects one by one so that new effect chain is created on new thread with
@@ -4087,24 +4112,24 @@ status_t AudioFlinger::moveEffectChain_l(audio_session_t sessionId,
     sp<EffectModule> effect = chain->getEffectFromId_l(0);
     Vector< sp<EffectModule> > removed;
     status_t status = NO_ERROR;
-    while (effect != 0) {
+    std::string errorString;
+    while (effect != nullptr) {
         srcThread->removeEffect_l(effect);
         removed.add(effect);
         status = dstThread->addEffect_l(effect);
         if (status != NO_ERROR) {
+            errorString = StringPrintf(
+                    "cannot add effect %p to destination thread", effect.get());
             break;
         }
-        // removeEffect_l() has stopped the effect if it was active so it must be restarted
-        if (effect->state() == EffectModule::ACTIVE ||
-                effect->state() == EffectModule::STOPPING) {
-            effect->start();
-        }
         // if the move request is not received from audio policy manager, the effect must be
-        // re-registered with the new strategy and output
-        if (dstChain == 0) {
+        // re-registered with the new strategy and output.
+
+        // We obtain the dstChain once the effect is on the new thread.
+        if (dstChain == nullptr) {
             dstChain = effect->getCallback()->chain().promote();
-            if (dstChain == 0) {
-                ALOGW("moveEffectChain_l() cannot get chain from effect %p", effect.get());
+            if (dstChain == nullptr) {
+                errorString = StringPrintf("cannot get chain from effect %p", effect.get());
                 status = NO_INIT;
                 break;
             }
@@ -4112,12 +4137,53 @@ status_t AudioFlinger::moveEffectChain_l(audio_session_t sessionId,
         effect = chain->getEffectFromId_l(0);
     }
 
+    size_t restored = 0;
     if (status != NO_ERROR) {
-        for (size_t i = 0; i < removed.size(); i++) {
-            srcThread->addEffect_l(removed[i]);
+        dstChain.clear(); // dstChain is now from the srcThread (could be recreated).
+        for (const auto& effect : removed) {
+            dstThread->removeEffect_l(effect); // Note: Depending on error location, the last
+                                               // effect may not have been placed on dstThread.
+            if (srcThread->addEffect_l(effect) == NO_ERROR) {
+                ++restored;
+                if (dstChain == nullptr) {
+                    dstChain = effect->getCallback()->chain().promote();
+                }
+            }
         }
     }
 
+    // After all the effects have been moved to new thread (or put back) we restart the effects
+    // because removeEffect_l() has stopped the effect if it is currently active.
+    size_t started = 0;
+    if (dstChain != nullptr && !removed.empty()) {
+        // If we do not take the dstChain lock, it is possible that processing is ongoing
+        // while we are starting the effect.  This can cause glitches with volume,
+        // see b/202360137.
+        dstChain->lock();
+        for (const auto& effect : removed) {
+            if (effect->state() == EffectModule::ACTIVE ||
+                    effect->state() == EffectModule::STOPPING) {
+                ++started;
+                effect->start();
+            }
+        }
+        dstChain->unlock();
+    }
+
+    if (status != NO_ERROR) {
+        if (errorString.empty()) {
+            errorString = StringPrintf("%s: failed status %d", __func__, status);
+        }
+        ALOGW("%s: %s unsuccessful move of session %d from srcThread %p to dstThread %p "
+                "(%zu effects removed from srcThread, %zu effects restored to srcThread, "
+                "%zu effects started)",
+                __func__, errorString.c_str(), sessionId, srcThread, dstThread,
+                removed.size(), restored, started);
+    } else {
+        ALOGD("%s: successful move of session %d from srcThread %p to dstThread %p "
+                "(%zu effects moved, %zu effects started)",
+                __func__, sessionId, srcThread, dstThread, removed.size(), started);
+    }
     return status;
 }
 
@@ -4283,6 +4349,7 @@ status_t AudioFlinger::onTransactWrapper(TransactionCode code,
         case TransactionCode::SET_AUDIO_PORT_CONFIG:
         case TransactionCode::SET_RECORD_SILENCED:
         case TransactionCode::AUDIO_POLICY_READY:
+        case TransactionCode::SET_DEVICE_CONNECTED_STATE:
             ALOGW("%s: transaction %d received from PID %d",
                   __func__, code, IPCThreadState::self()->getCallingPid());
             // return status only for non void methods

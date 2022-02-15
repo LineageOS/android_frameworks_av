@@ -2,11 +2,15 @@ LIBCAMERA2NDK {
   global:
     ACameraCaptureSession_abortCaptures;
     ACameraCaptureSession_capture;
+    ACameraCaptureSession_captureV2; # introduced=33
     ACameraCaptureSession_logicalCamera_capture; # introduced=29
+    ACameraCaptureSession_logicalCamera_captureV2; # introduced=33
     ACameraCaptureSession_close;
     ACameraCaptureSession_getDevice;
     ACameraCaptureSession_setRepeatingRequest;
+    ACameraCaptureSession_setRepeatingRequestV2; # introduced=33
     ACameraCaptureSession_logicalCamera_setRepeatingRequest; # introduced=29
+    ACameraCaptureSession_logicalCamera_setRepeatingRequestV2; # introduced=33
     ACameraCaptureSession_stopRepeating;
     ACameraCaptureSession_updateSharedOutput; # introduced=28
     ACameraDevice_close;

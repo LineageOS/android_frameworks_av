@@ -74,7 +74,10 @@ TunerHidlService::TunerHidlService() {
     updateTunerResources();
 }
 
-TunerHidlService::~TunerHidlService() {}
+TunerHidlService::~TunerHidlService() {
+    mOpenedFrontends.clear();
+    mLnaStatus = -1;
+}
 
 binder_status_t TunerHidlService::instantiate() {
     if (HidlITuner::getService() == nullptr) {
@@ -237,7 +240,17 @@ bool TunerHidlService::hasITuner_1_1() {
     if (status != HidlResult::SUCCESS) {
         return ::ndk::ScopedAStatus::fromServiceSpecificError(static_cast<int32_t>(status));
     }
-    *_aidl_return = ::ndk::SharedRefBase::make<TunerHidlFrontend>(frontend, id);
+
+    shared_ptr<TunerHidlFrontend> tunerFrontend =
+            ::ndk::SharedRefBase::make<TunerHidlFrontend>(frontend, id);
+    if (mLnaStatus != -1) {
+        tunerFrontend->setLna(mLnaStatus == 1);
+    }
+    {
+        Mutex::Autolock _l(mOpenedFrontendsLock);
+        mOpenedFrontends.insert(tunerFrontend);
+    }
+    *_aidl_return = tunerFrontend;
     return ::ndk::ScopedAStatus::ok();
 }
 
@@ -355,6 +368,38 @@ bool TunerHidlService::hasITuner_1_1() {
     return ::ndk::ScopedAStatus::ok();
 }
 
+::ndk::ScopedAStatus TunerHidlService::setLna(bool bEnable) {
+    if (!hasITuner()) {
+        ALOGE("get ITuner failed");
+        return ::ndk::ScopedAStatus::fromServiceSpecificError(
+                static_cast<int32_t>(Result::UNAVAILABLE));
+    }
+
+    mLnaStatus = bEnable ? 1 : 0;
+
+    {
+        Mutex::Autolock _l(mOpenedFrontendsLock);
+        for (auto it = mOpenedFrontends.begin(); it != mOpenedFrontends.end(); ++it) {
+            (*it)->setLna(mLnaStatus == 1);
+        }
+    }
+
+    return ::ndk::ScopedAStatus::ok();
+}
+
+::ndk::ScopedAStatus TunerHidlService::setMaxNumberOfFrontends(FrontendType /* in_frontendType */,
+                                                               int32_t /* in_maxNumber */) {
+    return ::ndk::ScopedAStatus::fromServiceSpecificError(
+            static_cast<int32_t>(Result::UNAVAILABLE));
+}
+
+::ndk::ScopedAStatus TunerHidlService::getMaxNumberOfFrontends(FrontendType /* in_frontendType */,
+                                                               int32_t* _aidl_return) {
+    *_aidl_return = -1;
+    return ::ndk::ScopedAStatus::fromServiceSpecificError(
+            static_cast<int32_t>(Result::UNAVAILABLE));
+}
+
 string TunerHidlService::addFilterToShared(const shared_ptr<TunerHidlFilter>& sharedFilter) {
     Mutex::Autolock _l(mSharedFiltersLock);
 
@@ -370,6 +415,16 @@ void TunerHidlService::removeSharedFilter(const shared_ptr<TunerHidlFilter>& sha
 
     // Use sharedFilter address as token.
     mSharedFilters.erase(to_string(reinterpret_cast<std::uintptr_t>(sharedFilter.get())));
+}
+
+void TunerHidlService::removeFrontend(const shared_ptr<TunerHidlFrontend>& frontend) {
+    Mutex::Autolock _l(mOpenedFrontendsLock);
+    for (auto it = mOpenedFrontends.begin(); it != mOpenedFrontends.end(); ++it) {
+        if (it->get() == frontend.get()) {
+            mOpenedFrontends.erase(it);
+            break;
+        }
+    }
 }
 
 void TunerHidlService::updateTunerResources() {

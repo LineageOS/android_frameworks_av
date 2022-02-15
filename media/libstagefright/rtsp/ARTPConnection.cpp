@@ -18,9 +18,9 @@
 #define LOG_TAG "ARTPConnection"
 #include <utils/Log.h>
 
-#include "ARTPConnection.h"
-#include "ARTPSource.h"
-#include "ASessionDescription.h"
+#include <media/stagefright/rtsp/ARTPConnection.h>
+#include <media/stagefright/rtsp/ARTPSource.h>
+#include <media/stagefright/rtsp/ASessionDescription.h>
 
 #include <media/stagefright/foundation/ABuffer.h>
 #include <media/stagefright/foundation/ADebug.h>
@@ -558,6 +558,7 @@ void ARTPConnection::onPollStreams() {
                 if (n != (ssize_t)buffer->size()) {
                     ALOGW("failed to send RTCP receiver report (%s).",
                             n >= 0 ? "connection gone" : strerror(errno));
+                    ++it;
                     continue;
                 }
 

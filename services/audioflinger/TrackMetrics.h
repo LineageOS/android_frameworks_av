@@ -116,6 +116,21 @@ public:
         mDeviceStartupMs.add(startupMs);
     }
 
+    void updateMinMaxVolume(int64_t durationNs, double deviceVolume) {
+        if (deviceVolume > mMaxVolume) {
+            mMaxVolume = deviceVolume;
+            mMaxVolumeDurationNs = durationNs;
+        } else if (deviceVolume == mMaxVolume) {
+            mMaxVolumeDurationNs += durationNs;
+        }
+        if (deviceVolume < mMinVolume) {
+            mMinVolume = deviceVolume;
+            mMinVolumeDurationNs = durationNs;
+        } else if (deviceVolume == mMinVolume) {
+            mMinVolumeDurationNs += durationNs;
+        }
+    }
+
     // may be called multiple times during an interval
     void logVolume(float volume) {
         const int64_t timeNs = systemTime();
@@ -123,10 +138,13 @@ public:
         if (mStartVolumeTimeNs == 0) {
             mDeviceVolume = mVolume = volume;
             mLastVolumeChangeTimeNs = mStartVolumeTimeNs = timeNs;
+            updateMinMaxVolume(0, mVolume);
             return;
         }
+        const int64_t durationNs = timeNs - mLastVolumeChangeTimeNs;
+        updateMinMaxVolume(durationNs, mVolume);
         mDeviceVolume = (mDeviceVolume * (mLastVolumeChangeTimeNs - mStartVolumeTimeNs) +
-            mVolume * (timeNs - mLastVolumeChangeTimeNs)) / (timeNs - mStartVolumeTimeNs);
+            mVolume * durationNs) / (timeNs - mStartVolumeTimeNs);
         mVolume = volume;
         mLastVolumeChangeTimeNs = timeNs;
     }
@@ -157,7 +175,11 @@ private:
                 .set(AMEDIAMETRICS_PROP_EVENT, eventName)
                 .set(AMEDIAMETRICS_PROP_INTERVALCOUNT, (int32_t)mIntervalCount);
             if (mIsOut) {
-                item.set(AMEDIAMETRICS_PROP_DEVICEVOLUME, mDeviceVolume);
+                item.set(AMEDIAMETRICS_PROP_DEVICEVOLUME, mDeviceVolume)
+                    .set(AMEDIAMETRICS_PROP_DEVICEMAXVOLUMEDURATIONNS, mMaxVolumeDurationNs)
+                    .set(AMEDIAMETRICS_PROP_DEVICEMAXVOLUME, mMaxVolume)
+                    .set(AMEDIAMETRICS_PROP_DEVICEMINVOLUMEDURATIONNS, mMinVolumeDurationNs)
+                    .set(AMEDIAMETRICS_PROP_DEVICEMINVOLUME, mMinVolume);
             }
             if (mDeviceLatencyMs.getN() > 0) {
                 item.set(AMEDIAMETRICS_PROP_DEVICELATENCYMS, mDeviceLatencyMs.getMean())
@@ -185,6 +207,10 @@ private:
         mDeviceVolume = 0.f;
         mStartVolumeTimeNs = 0;
         mLastVolumeChangeTimeNs = 0;
+        mMinVolume = AMEDIAMETRICS_INITIAL_MIN_VOLUME;
+        mMaxVolume = AMEDIAMETRICS_INITIAL_MAX_VOLUME;
+        mMinVolumeDurationNs = 0;
+        mMaxVolumeDurationNs = 0;
 
         mDeviceLatencyMs.reset();
         mDeviceStartupMs.reset();
@@ -213,6 +239,12 @@ private:
     double            mDeviceVolume GUARDED_BY(mLock) = 0.f;
     int64_t           mStartVolumeTimeNs GUARDED_BY(mLock) = 0;
     int64_t           mLastVolumeChangeTimeNs GUARDED_BY(mLock) = 0;
+
+    // Min/Max volume
+    double            mMinVolume GUARDED_BY(mLock) = AMEDIAMETRICS_INITIAL_MIN_VOLUME;
+    double            mMaxVolume GUARDED_BY(mLock) = AMEDIAMETRICS_INITIAL_MAX_VOLUME;
+    int64_t           mMinVolumeDurationNs GUARDED_BY(mLock) = 0;
+    int64_t           mMaxVolumeDurationNs GUARDED_BY(mLock) = 0;
 
     // latency and startup for each interval.
     audio_utils::Statistics<double> mDeviceLatencyMs GUARDED_BY(mLock);

@@ -47,14 +47,12 @@ Camera3OfflineSession::Camera3OfflineSession(const String8 &id,
         const camera3::StreamSet& offlineStreamSet,
         camera3::BufferRecords&& bufferRecords,
         const camera3::InFlightRequestMap& offlineReqs,
-        const Camera3OfflineStates& offlineStates,
-        sp<hardware::camera::device::V3_6::ICameraOfflineSession> offlineSession) :
+        const Camera3OfflineStates& offlineStates) :
         mId(id),
         mInputStream(inputStream),
         mOutputStreams(offlineStreamSet),
         mBufferRecords(std::move(bufferRecords)),
         mOfflineReqs(offlineReqs),
-        mSession(offlineSession),
         mTagMonitor(offlineStates.mTagMonitor),
         mVendorTagId(offlineStates.mVendorTagId),
         mUseHalBufManager(offlineStates.mUseHalBufManager),
@@ -90,43 +88,6 @@ const String8& Camera3OfflineSession::getId() const {
     return mId;
 }
 
-status_t Camera3OfflineSession::initialize(wp<NotificationListener> listener) {
-    ATRACE_CALL();
-
-    if (mSession == nullptr) {
-        ALOGE("%s: HIDL session is null!", __FUNCTION__);
-        return DEAD_OBJECT;
-    }
-
-    {
-        std::lock_guard<std::mutex> lock(mLock);
-
-        mListener = listener;
-
-        // setup result FMQ
-        std::unique_ptr<ResultMetadataQueue>& resQueue = mResultMetadataQueue;
-        auto resultQueueRet = mSession->getCaptureResultMetadataQueue(
-            [&resQueue](const auto& descriptor) {
-                resQueue = std::make_unique<ResultMetadataQueue>(descriptor);
-                if (!resQueue->isValid() || resQueue->availableToWrite() <= 0) {
-                    ALOGE("HAL returns empty result metadata fmq, not use it");
-                    resQueue = nullptr;
-                    // Don't use resQueue onwards.
-                }
-            });
-        if (!resultQueueRet.isOk()) {
-            ALOGE("Transaction error when getting result metadata queue from camera session: %s",
-                    resultQueueRet.description().c_str());
-            return DEAD_OBJECT;
-        }
-        mStatus = STATUS_ACTIVE;
-    }
-
-    mSession->setCallback(this);
-
-    return OK;
-}
-
 status_t Camera3OfflineSession::dump(int /*fd*/) {
     ATRACE_CALL();
     std::lock_guard<std::mutex> il(mInterfaceLock);
@@ -135,6 +96,7 @@ status_t Camera3OfflineSession::dump(int /*fd*/) {
 
 status_t Camera3OfflineSession::disconnect() {
     ATRACE_CALL();
+    disconnectSession();
     return disconnectImpl();
 }
 
@@ -170,10 +132,6 @@ status_t Camera3OfflineSession::disconnectImpl() {
         streams.push_back(mInputStream);
     }
 
-    if (mSession != nullptr) {
-        mSession->close();
-    }
-
     FlushInflightReqStates states {
         mId, mOfflineReqsLock, mOfflineReqs, mUseHalBufManager,
         listener, *this, mBufferRecords, *this, mSessionStatsBuilder};
@@ -182,7 +140,6 @@ status_t Camera3OfflineSession::disconnectImpl() {
 
     {
         std::lock_guard<std::mutex> lock(mLock);
-        mSession.clear();
         mOutputStreams.clear();
         mInputStream.clear();
         mStatus = STATUS_CLOSED;
@@ -233,149 +190,6 @@ status_t Camera3OfflineSession::getNextResult(CaptureResult* frame) {
     mResultQueue.erase(mResultQueue.begin());
 
     return OK;
-}
-
-hardware::Return<void> Camera3OfflineSession::processCaptureResult_3_4(
-        const hardware::hidl_vec<
-                hardware::camera::device::V3_4::CaptureResult>& results) {
-    sp<NotificationListener> listener;
-    {
-        std::lock_guard<std::mutex> lock(mLock);
-        if (mStatus != STATUS_ACTIVE) {
-            ALOGE("%s called in wrong state %d", __FUNCTION__, mStatus);
-            return hardware::Void();
-        }
-        listener = mListener.promote();
-    }
-
-    CaptureOutputStates states {
-        mId,
-        mOfflineReqsLock, mLastCompletedRegularFrameNumber,
-        mLastCompletedReprocessFrameNumber, mLastCompletedZslFrameNumber,
-        mOfflineReqs, mOutputLock, mResultQueue, mResultSignal,
-        mNextShutterFrameNumber,
-        mNextReprocessShutterFrameNumber, mNextZslStillShutterFrameNumber,
-        mNextResultFrameNumber,
-        mNextReprocessResultFrameNumber, mNextZslStillResultFrameNumber,
-        mUseHalBufManager, mUsePartialResult, mNeedFixupMonochromeTags,
-        mNumPartialResults, mVendorTagId, mDeviceInfo, mPhysicalDeviceInfoMap,
-        mResultMetadataQueue, mDistortionMappers, mZoomRatioMappers, mRotateAndCropMappers,
-        mTagMonitor, mInputStream, mOutputStreams, mSessionStatsBuilder, listener, *this, *this,
-        mBufferRecords, /*legacyClient*/ false
-    };
-
-    std::lock_guard<std::mutex> lock(mProcessCaptureResultLock);
-    for (const auto& result : results) {
-        processOneCaptureResultLocked(states, result.v3_2, result.physicalCameraMetadata);
-    }
-    return hardware::Void();
-}
-
-hardware::Return<void> Camera3OfflineSession::processCaptureResult(
-        const hardware::hidl_vec<
-                hardware::camera::device::V3_2::CaptureResult>& results) {
-    // TODO: changed impl to call into processCaptureResult_3_4 instead?
-    //       might need to figure how to reduce copy though.
-    sp<NotificationListener> listener;
-    {
-        std::lock_guard<std::mutex> lock(mLock);
-        if (mStatus != STATUS_ACTIVE) {
-            ALOGE("%s called in wrong state %d", __FUNCTION__, mStatus);
-            return hardware::Void();
-        }
-        listener = mListener.promote();
-    }
-
-    hardware::hidl_vec<hardware::camera::device::V3_4::PhysicalCameraMetadata> noPhysMetadata;
-
-    CaptureOutputStates states {
-        mId,
-        mOfflineReqsLock, mLastCompletedRegularFrameNumber,
-        mLastCompletedReprocessFrameNumber, mLastCompletedZslFrameNumber,
-        mOfflineReqs, mOutputLock, mResultQueue, mResultSignal,
-        mNextShutterFrameNumber,
-        mNextReprocessShutterFrameNumber, mNextZslStillShutterFrameNumber,
-        mNextResultFrameNumber,
-        mNextReprocessResultFrameNumber, mNextZslStillResultFrameNumber,
-        mUseHalBufManager, mUsePartialResult, mNeedFixupMonochromeTags,
-        mNumPartialResults, mVendorTagId, mDeviceInfo, mPhysicalDeviceInfoMap,
-        mResultMetadataQueue, mDistortionMappers, mZoomRatioMappers, mRotateAndCropMappers,
-        mTagMonitor, mInputStream, mOutputStreams, mSessionStatsBuilder, listener, *this, *this,
-        mBufferRecords, /*legacyClient*/ false
-    };
-
-    std::lock_guard<std::mutex> lock(mProcessCaptureResultLock);
-    for (const auto& result : results) {
-        processOneCaptureResultLocked(states, result, noPhysMetadata);
-    }
-    return hardware::Void();
-}
-
-hardware::Return<void> Camera3OfflineSession::notify(
-        const hardware::hidl_vec<hardware::camera::device::V3_2::NotifyMsg>& msgs) {
-    sp<NotificationListener> listener;
-    {
-        std::lock_guard<std::mutex> lock(mLock);
-        if (mStatus != STATUS_ACTIVE) {
-            ALOGE("%s called in wrong state %d", __FUNCTION__, mStatus);
-            return hardware::Void();
-        }
-        listener = mListener.promote();
-    }
-
-    CaptureOutputStates states {
-        mId,
-        mOfflineReqsLock, mLastCompletedRegularFrameNumber,
-        mLastCompletedReprocessFrameNumber, mLastCompletedZslFrameNumber,
-        mOfflineReqs, mOutputLock, mResultQueue, mResultSignal,
-        mNextShutterFrameNumber,
-        mNextReprocessShutterFrameNumber, mNextZslStillShutterFrameNumber,
-        mNextResultFrameNumber,
-        mNextReprocessResultFrameNumber, mNextZslStillResultFrameNumber,
-        mUseHalBufManager, mUsePartialResult, mNeedFixupMonochromeTags,
-        mNumPartialResults, mVendorTagId, mDeviceInfo, mPhysicalDeviceInfoMap,
-        mResultMetadataQueue, mDistortionMappers, mZoomRatioMappers, mRotateAndCropMappers,
-        mTagMonitor, mInputStream, mOutputStreams, mSessionStatsBuilder, listener, *this, *this,
-        mBufferRecords, /*legacyClient*/ false
-    };
-    for (const auto& msg : msgs) {
-        camera3::notify(states, msg);
-    }
-    return hardware::Void();
-}
-
-hardware::Return<void> Camera3OfflineSession::requestStreamBuffers(
-        const hardware::hidl_vec<hardware::camera::device::V3_5::BufferRequest>& bufReqs,
-        requestStreamBuffers_cb _hidl_cb) {
-    {
-        std::lock_guard<std::mutex> lock(mLock);
-        if (mStatus != STATUS_ACTIVE) {
-            ALOGE("%s called in wrong state %d", __FUNCTION__, mStatus);
-            return hardware::Void();
-        }
-    }
-
-    RequestBufferStates states {
-        mId, mRequestBufferInterfaceLock, mUseHalBufManager, mOutputStreams, mSessionStatsBuilder,
-        *this, mBufferRecords, *this};
-    camera3::requestStreamBuffers(states, bufReqs, _hidl_cb);
-    return hardware::Void();
-}
-
-hardware::Return<void> Camera3OfflineSession::returnStreamBuffers(
-        const hardware::hidl_vec<hardware::camera::device::V3_2::StreamBuffer>& buffers) {
-    {
-        std::lock_guard<std::mutex> lock(mLock);
-        if (mStatus != STATUS_ACTIVE) {
-            ALOGE("%s called in wrong state %d", __FUNCTION__, mStatus);
-            return hardware::Void();
-        }
-    }
-
-    ReturnBufferStates states {
-        mId, mUseHalBufManager, mOutputStreams, mSessionStatsBuilder, mBufferRecords};
-    camera3::returnStreamBuffers(states, buffers);
-    return hardware::Void();
 }
 
 void Camera3OfflineSession::setErrorState(const char *fmt, ...) {

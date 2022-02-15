@@ -1864,6 +1864,8 @@ public:
 
             bool        isTimestampCorrectionEnabled() const override {
                             // checks popcount for exactly one device.
+                            // Is currently disabled. Before enabling,
+                            // verify compressed record timestamps.
                             return audio_is_input_device(mTimestampCorrectedDevice)
                                     && inDeviceType() == mTimestampCorrectedDevice;
                         }

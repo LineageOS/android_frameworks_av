@@ -59,6 +59,7 @@ struct C2Config {
     enum drc_compression_mode_t : int32_t;  ///< DRC compression mode
     enum drc_effect_type_t : int32_t;       ///< DRC effect type
     enum drc_album_mode_t : int32_t;        ///< DRC album mode
+    enum hdr_dynamic_metadata_type_t : uint32_t;  ///< HDR dynamic metadata type
     enum intra_refresh_mode_t : uint32_t;   ///< intra refresh modes
     enum level_t : uint32_t;                ///< coding level
     enum ordinal_key_t : uint32_t;          ///< work ordering keys
@@ -189,9 +190,12 @@ enum C2ParamIndexKind : C2Param::type_index_t {
 
     kParamIndexPictureTypeMask,
     kParamIndexPictureType,
+    // deprecated
     kParamIndexHdr10PlusMetadata,
 
     kParamIndexPictureQuantization,
+
+    kParamIndexHdrDynamicMetadata,
 
     /* ------------------------------------ video components ------------------------------------ */
 
@@ -270,6 +274,9 @@ enum C2ParamIndexKind : C2Param::type_index_t {
 
     // encoding quality requirements
     kParamIndexEncodingQualityLevel, // encoders, enum
+
+    // encoding statistics, average block qp of a frame
+    kParamIndexAverageBlockQuantization, // int32
 };
 
 }
@@ -680,6 +687,9 @@ enum C2Config::level_t : uint32_t {
     LEVEL_DV_MAIN_UHD_30,                       ///< Dolby Vision main tier uhd30
     LEVEL_DV_MAIN_UHD_48,                       ///< Dolby Vision main tier uhd48
     LEVEL_DV_MAIN_UHD_60,                       ///< Dolby Vision main tier uhd60
+    LEVEL_DV_MAIN_UHD_120,                      ///< Dolby Vision main tier uhd120
+    LEVEL_DV_MAIN_8K_30,                        ///< Dolby Vision main tier 8k30
+    LEVEL_DV_MAIN_8K_60,                        ///< Dolby Vision main tier 8k60
 
     LEVEL_DV_HIGH_HD_24 = _C2_PL_DV_BASE + 0x100,  ///< Dolby Vision high tier hd24
     LEVEL_DV_HIGH_HD_30,                        ///< Dolby Vision high tier hd30
@@ -690,6 +700,9 @@ enum C2Config::level_t : uint32_t {
     LEVEL_DV_HIGH_UHD_30,                       ///< Dolby Vision high tier uhd30
     LEVEL_DV_HIGH_UHD_48,                       ///< Dolby Vision high tier uhd48
     LEVEL_DV_HIGH_UHD_60,                       ///< Dolby Vision high tier uhd60
+    LEVEL_DV_HIGH_UHD_120,                      ///< Dolby Vision high tier uhd120
+    LEVEL_DV_HIGH_8K_30,                        ///< Dolby Vision high tier 8k30
+    LEVEL_DV_HIGH_8K_60,                        ///< Dolby Vision high tier 8k60
 
     // AV1 levels
     LEVEL_AV1_2    = _C2_PL_AV1_BASE ,          ///< AV1 Level 2
@@ -1602,16 +1615,54 @@ struct C2HdrStaticMetadataStruct {
     C2FIELD(maxFall, "max-fall")
 };
 typedef C2StreamParam<C2Info, C2HdrStaticMetadataStruct, kParamIndexHdrStaticMetadata>
-        C2StreamHdrStaticInfo;
+        C2StreamHdrStaticMetadataInfo;
+typedef C2StreamParam<C2Info, C2HdrStaticMetadataStruct, kParamIndexHdrStaticMetadata>
+        C2StreamHdrStaticInfo;  // deprecated
 constexpr char C2_PARAMKEY_HDR_STATIC_INFO[] = "raw.hdr-static-info";
 
 /**
  * HDR10+ Metadata Info.
+ *
+ * Deprecated. Use C2StreamHdrDynamicMetadataInfo with
+ * HDR_DYNAMIC_METADATA_TYPE_SMPTE_2094_40
  */
 typedef C2StreamParam<C2Info, C2BlobValue, kParamIndexHdr10PlusMetadata>
-        C2StreamHdr10PlusInfo;
-constexpr char C2_PARAMKEY_INPUT_HDR10_PLUS_INFO[] = "input.hdr10-plus-info";
-constexpr char C2_PARAMKEY_OUTPUT_HDR10_PLUS_INFO[] = "output.hdr10-plus-info";
+        C2StreamHdr10PlusInfo;  // deprecated
+constexpr char C2_PARAMKEY_INPUT_HDR10_PLUS_INFO[] = "input.hdr10-plus-info";  // deprecated
+constexpr char C2_PARAMKEY_OUTPUT_HDR10_PLUS_INFO[] = "output.hdr10-plus-info";  // deprecated
+
+/**
+ * HDR dynamic metadata types
+ */
+C2ENUM(C2Config::hdr_dynamic_metadata_type_t, uint32_t,
+    HDR_DYNAMIC_METADATA_TYPE_SMPTE_2094_10,  ///< SMPTE ST 2094-10
+    HDR_DYNAMIC_METADATA_TYPE_SMPTE_2094_40,  ///< SMPTE ST 2094-40
+)
+
+struct C2HdrDynamicMetadataStruct {
+    inline C2HdrDynamicMetadataStruct() { memset(this, 0, sizeof(*this)); }
+
+    inline C2HdrDynamicMetadataStruct(
+            size_t flexCount, C2Config::hdr_dynamic_metadata_type_t type)
+        : type_(type) {
+        memset(data, 0, flexCount);
+    }
+
+    C2Config::hdr_dynamic_metadata_type_t type_;
+    uint8_t data[];
+
+    DEFINE_AND_DESCRIBE_FLEX_C2STRUCT(HdrDynamicMetadata, data)
+    C2FIELD(type_, "type")
+    C2FIELD(data, "data")
+};
+
+/**
+ * Dynamic HDR Metadata Info.
+ */
+typedef C2StreamParam<C2Info, C2HdrDynamicMetadataStruct, kParamIndexHdrDynamicMetadata>
+        C2StreamHdrDynamicMetadataInfo;
+constexpr char C2_PARAMKEY_INPUT_HDR_DYNAMIC_INFO[] = "input.hdr-dynamic-info";
+constexpr char C2_PARAMKEY_OUTPUT_HDR_DYNAMIC_INFO[] = "output.hdr-dynamic-info";
 
 /* ------------------------------------ block-based coding ----------------------------------- */
 
@@ -2410,6 +2461,17 @@ C2ENUM(C2PlatformConfig::encoding_quality_level_t, uint32_t,
     NONE = 0,
     S_HANDHELD = 1              // corresponds to VMAF=70
 );
+
+/**
+ * Video Encoding Statistics Export
+ */
+
+/**
+ * Average block QP exported from video encoder.
+ */
+typedef C2StreamParam<C2Info, C2SimpleValueStruct<int32_t>, kParamIndexAverageBlockQuantization>
+        C2AndroidStreamAverageBlockQuantizationInfo;
+constexpr char C2_PARAMKEY_AVERAGE_QP[] = "coded.average-qp";
 
 /// @}
 

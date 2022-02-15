@@ -44,10 +44,12 @@ cc_test {
         "android.hardware.camera.provider@2.5",
         "android.hardware.camera.provider@2.6",
         "android.hardware.camera.provider@2.7",
+        "android.hardware.camera.provider-V1-ndk",
         "android.hardware.camera.device@1.0",
         "android.hardware.camera.device@3.2",
         "android.hardware.camera.device@3.4",
         "android.hardware.camera.device@3.7",
+        "android.hardware.camera.device@3.8",
         "android.hidl.token@1.0-utils",
     ],
 
@@ -57,6 +59,53 @@ cc_test {
 
     srcs: [
         "CameraProviderManagerTest.cpp",
+        "ClientManagerTest.cpp",
+        "DepthProcessorTest.cpp",
+        "DistortionMapperTest.cpp",
+        "ExifUtilsTest.cpp",
+        "NV12Compressor.cpp",
+        "RotateAndCropMapperTest.cpp",
+        "ZoomRatioTest.cpp",
+    ],
+
+    cflags: [
+        "-Wall",
+        "-Wextra",
+        "-Werror",
+    ],
+
+    test_suites: ["device-tests"],
+
+}
+
+cc_test_host {
+    name: "cameraservice_test_host",
+
+    include_dirs: [
+        "frameworks/av/camera/include",
+        "frameworks/av/camera/include/camera",
+        "frameworks/native/libs/binder/include_activitymanager"
+    ],
+
+    shared_libs: [
+        "libactivity_manager_procstate_aidl-cpp",
+        "libbase",
+        "libbinder",
+        "libcamera_metadata",
+        "libdynamic_depth",
+        "libexif",
+        "libjpeg",
+        "liblog",
+        "libutils",
+    ],
+
+    static_libs: [
+        "libcamera_client_host",
+        "libcameraservice_device_independent",
+        "libgmock",
+    ],
+
+    srcs: [
         "ClientManagerTest.cpp",
         "DepthProcessorTest.cpp",
         "DistortionMapperTest.cpp",

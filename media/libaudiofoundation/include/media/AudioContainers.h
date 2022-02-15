@@ -111,27 +111,9 @@ static inline audio_devices_t deviceTypesToBitMask(const DeviceTypeSet& deviceTy
     return types;
 }
 
-// FIXME: This is temporary helper function. Remove this when getting rid of all
-//  bit mask usages of audio device types.
-static inline DeviceTypeSet deviceTypesFromBitMask(audio_devices_t types) {
-    DeviceTypeSet deviceTypes;
-    if ((types & AUDIO_DEVICE_BIT_IN) == 0) {
-        for (auto deviceType : AUDIO_DEVICE_OUT_ALL_ARRAY) {
-            if ((types & deviceType) == deviceType) {
-                deviceTypes.insert(deviceType);
-            }
-        }
-    } else {
-        for (auto deviceType : AUDIO_DEVICE_IN_ALL_ARRAY) {
-            if ((types & deviceType) == deviceType) {
-                deviceTypes.insert(deviceType);
-            }
-        }
-    }
-    return deviceTypes;
-}
-
 std::string deviceTypesToString(const DeviceTypeSet& deviceTypes);
+
+bool deviceTypesToString(const DeviceTypeSet& deviceTypes, std::string &str);
 
 std::string dumpDeviceTypes(const DeviceTypeSet& deviceTypes);
 

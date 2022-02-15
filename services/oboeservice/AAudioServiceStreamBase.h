@@ -116,6 +116,11 @@ public:
      */
     aaudio_result_t flush() EXCLUDES(mLock);
 
+    /**
+     * Exit standby mode. The MMAP buffer will be reallocated.
+     */
+    aaudio_result_t exitStandby(AudioEndpointParcelable *parcelable) EXCLUDES(mLock);
+
     virtual aaudio_result_t startClient(const android::AudioClient& client,
                                         const audio_attributes_t *attr __unused,
                                         audio_port_handle_t *clientHandle __unused) {
@@ -314,6 +319,33 @@ protected:
         mDisconnected = flag;
     }
 
+    virtual aaudio_result_t standby_l() REQUIRES(mLock) {
+        return AAUDIO_ERROR_UNAVAILABLE;
+    }
+    class ExitStandbyParam : public AAudioCommandParam {
+    public:
+        ExitStandbyParam(AudioEndpointParcelable* parcelable)
+                : AAudioCommandParam(), mParcelable(parcelable) { }
+        ~ExitStandbyParam() = default;
+
+        AudioEndpointParcelable* mParcelable;
+    };
+    virtual aaudio_result_t exitStandby_l(
+            AudioEndpointParcelable* parcelable __unused) REQUIRES(mLock) {
+        return AAUDIO_ERROR_UNAVAILABLE;
+    }
+    bool isStandby_l() const REQUIRES(mLock) {
+        return mStandby;
+    }
+    void setStandby_l(bool standby) REQUIRES(mLock) {
+        mStandby = standby;
+    }
+
+    bool isIdle_l() const REQUIRES(mLock) {
+        return mState == AAUDIO_STREAM_STATE_OPEN || mState == AAUDIO_STREAM_STATE_PAUSED
+                || mState == AAUDIO_STREAM_STATE_STOPPED;
+    }
+
     pid_t                   mRegisteredClientThread = ILLEGAL_THREAD_ID;
 
     std::mutex              mUpMessageQueueLock;
@@ -329,6 +361,7 @@ protected:
         REGISTER_AUDIO_THREAD,
         UNREGISTER_AUDIO_THREAD,
         GET_DESCRIPTION,
+        EXIT_STANDBY,
     };
     AAudioThread            mCommandThread;
     std::atomic<bool>       mThreadEnabled{false};
@@ -366,6 +399,13 @@ private:
     aaudio_result_t sendServiceEvent(aaudio_service_event_t event,
                                      double dataDouble);
 
+    aaudio_result_t sendCommand(aaudio_command_opcode opCode,
+                                std::shared_ptr<AAudioCommandParam> param = nullptr,
+                                bool waitForReply = false,
+                                int64_t timeoutNanos = 0);
+
+    aaudio_result_t closeAndClear();
+
     /**
      * @return true if the queue is getting full.
      */
@@ -383,6 +423,8 @@ private:
     std::atomic<bool>       mSuspended{false};
 
     bool                    mDisconnected GUARDED_BY(mLock) {false};
+
+    bool                    mStandby GUARDED_BY(mLock) = false;
 
 protected:
     // Locking order is important.

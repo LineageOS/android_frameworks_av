@@ -227,8 +227,6 @@ cc_binary {
         "rs-headers",
     ],
 
-    include_dirs: ["frameworks/av/media/libstagefright"],
-
     shared_libs: [
         "libstagefright",
         "liblog",

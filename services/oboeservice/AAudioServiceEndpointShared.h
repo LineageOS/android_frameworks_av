@@ -69,6 +69,8 @@ protected:
 
     aaudio_result_t          stopSharingThread();
 
+    void                     handleDisconnectRegisteredStreamsAsync();
+
     // An MMAP stream that is shared by multiple clients.
     android::sp<AudioStreamInternal> mStreamInternal;
 

@@ -31,10 +31,10 @@
 #include "AAudioSimplePlayer.h"
 #include "AAudioArgsParser.h"
 
-#define APP_VERSION  "0.1.8"
+#define APP_VERSION  "0.2.1"
 
-constexpr int32_t kDefaultHangTimeMSec = 10;
-
+static constexpr int32_t kDefaultHangTimeMSec = 10;
+static constexpr int32_t kWorkPeriodSeconds = 6;
 /**
  * Open stream, play some sine waves, then close the stream.
  *
@@ -44,7 +44,11 @@ constexpr int32_t kDefaultHangTimeMSec = 10;
 static aaudio_result_t testOpenPlayClose(AAudioArgsParser &argParser,
                                          int32_t loopCount,
                                          int32_t prefixToneMsec,
-                                         int32_t hangTimeMSec)
+                                         int32_t hangTimeMSec,
+                                         int     cpuAffinity,
+                                         double  lowWorkLoad,
+                                         double  highWorkLoad,
+                                         int32_t workPeriodSeconds)
 {
     SineThreadedData_t myData;
     AAudioSimplePlayer &player = myData.simplePlayer;
@@ -57,6 +61,7 @@ static aaudio_result_t testOpenPlayClose(AAudioArgsParser &argParser,
     myData.schedulerChecked = false;
     myData.callbackCount = 0;
     myData.hangTimeMSec = hangTimeMSec; // test AAudioStream_getXRunCount()
+    myData.cpuAffinity = cpuAffinity;
 
     result = player.open(argParser,
                          SimplePlayerDataCallbackProc,
@@ -111,8 +116,8 @@ static aaudio_result_t testOpenPlayClose(AAudioArgsParser &argParser,
         }
 
         // Play a sine wave in the background.
-        printf("Sleep for %d seconds while audio plays in a callback thread. %d of %d\n",
-               argParser.getDurationSeconds(), (loopIndex + 1), loopCount);
+        printf("Monitor for %d seconds while audio plays in a callback thread. %d of %d, %d\n",
+               argParser.getDurationSeconds(), (loopIndex + 1), loopCount, workPeriodSeconds);
         startedAtNanos = getNanoseconds(CLOCK_MONOTONIC);
         for (int second = 0; second < durationSeconds; second++) {
             // Sleep a while. Wake up early if there is an error, for example a DISCONNECT.
@@ -123,13 +128,17 @@ static aaudio_result_t testOpenPlayClose(AAudioArgsParser &argParser,
             const int32_t framesWritten = (int32_t) AAudioStream_getFramesWritten(player.getStream());
             const int32_t framesRead = (int32_t) AAudioStream_getFramesRead(player.getStream());
             const int32_t xruns = AAudioStream_getXRunCount(player.getStream());
+            myData.workload = ((second % (2 * workPeriodSeconds)) < workPeriodSeconds)
+                    ? lowWorkLoad : highWorkLoad;
             printf(" waker result = %d, at %6d millis"
-                           ", second = %3d, frames written %8d - read %8d = %8d, underruns = %d\n",
+                   ", second = %3d, frames written %8d - read %8d = %8d"
+                   ", work = %5.1f, underruns = %d\n",
                    result, (int) millis,
                    second,
                    framesWritten,
                    framesRead,
                    framesWritten - framesRead,
+                   myData.workload,
                    xruns);
             if (result != AAUDIO_OK) {
                 disconnected = (result == AAUDIO_ERROR_DISCONNECTED);
@@ -220,6 +229,11 @@ static void usage() {
     AAudioArgsParser::usage();
     printf("      -l{count} loopCount start/stop, every other one is silent\n");
     printf("      -t{msec}  play a high pitched tone at the beginning\n");
+    printf("      -w{workload}  set base workload, default 0.0\n");
+    printf("      -W{workload}  alternate between this higher workload and base workload\n");
+    printf("      -Z{duration}  number of seconds to spend at each workload, default = %d\n",
+           kWorkPeriodSeconds);
+    printf("      -a{cpu}   set CPU affinity, default none\n");
     printf("      -h{msec}  force periodic underruns by hanging in callback\n");
     printf("                If no value specified then %d used.\n",
             kDefaultHangTimeMSec);
@@ -232,6 +246,10 @@ int main(int argc, const char **argv)
     int32_t            loopCount = 1;
     int32_t            prefixToneMsec = 0;
     int32_t            hangTimeMSec = 0;
+    int                cpuAffinity = -1;
+    double             lowWorkLoad = 0.0;
+    double             highWorkLoad = -1.0;
+    int32_t            workPeriodSeconds = kWorkPeriodSeconds;
 
     // Make printf print immediately so that debug info is not stuck
     // in a buffer if we hang or crash.
@@ -247,6 +265,9 @@ int main(int argc, const char **argv)
             if (arg[0] == '-') {
                 char option = arg[1];
                 switch (option) {
+                    case 'a':
+                        cpuAffinity = atoi(&arg[2]);
+                        break;
                     case 'l':
                         loopCount = atoi(&arg[2]);
                         break;
@@ -257,6 +278,15 @@ int main(int argc, const char **argv)
                         hangTimeMSec = (arg[2]) // value specified?
                                 ? atoi(&arg[2])
                                 : kDefaultHangTimeMSec;
+                        break;
+                    case 'w':
+                        lowWorkLoad = atof(&arg[2]);
+                        break;
+                    case 'W':
+                        highWorkLoad = atof(&arg[2]);
+                        break;
+                    case 'Z':
+                        workPeriodSeconds = atoi(&arg[2]);
                         break;
                     default:
                         usage();
@@ -271,9 +301,21 @@ int main(int argc, const char **argv)
         }
     }
 
+    if (highWorkLoad > 0) {
+        if (highWorkLoad < lowWorkLoad) {
+            printf("ERROR - -W%f workload lower than -w%f workload", highWorkLoad, lowWorkLoad);
+            return EXIT_FAILURE;
+        }
+    } else {
+        highWorkLoad = lowWorkLoad; // high not specified so use low
+    }
+
     // Keep looping until we can complete the test without disconnecting.
     while((result = testOpenPlayClose(argParser, loopCount,
-            prefixToneMsec, hangTimeMSec))
+            prefixToneMsec, hangTimeMSec,
+            cpuAffinity,
+            lowWorkLoad, highWorkLoad,
+            workPeriodSeconds))
             == AAUDIO_ERROR_DISCONNECTED);
 
     return (result) ? EXIT_FAILURE : EXIT_SUCCESS;

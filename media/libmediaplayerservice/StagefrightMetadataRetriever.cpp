@@ -206,6 +206,7 @@ sp<IMemory> StagefrightMetadataRetriever::getImageInternal(
     }
 
     const char *mime;
+    bool isHeif = false;
     if (!trackMeta->findCString(kKeyMIMEType, &mime)) {
         ALOGE("image track has no mime type");
         return NULL;
@@ -215,6 +216,7 @@ sp<IMemory> StagefrightMetadataRetriever::getImageInternal(
         mime = MEDIA_MIMETYPE_VIDEO_HEVC;
         trackMeta = new MetaData(*trackMeta);
         trackMeta->setCString(kKeyMIMEType, mime);
+        isHeif = true;
     } else if (!strcasecmp(mime, MEDIA_MIMETYPE_IMAGE_AVIF)) {
         mime = MEDIA_MIMETYPE_VIDEO_AV1;
         trackMeta = new MetaData(*trackMeta);
@@ -238,6 +240,16 @@ sp<IMemory> StagefrightMetadataRetriever::getImageInternal(
             && trackMeta->findInt32(kKeyThumbnailWidth, &thumbWidth)) {
         format->setInt32("height", thumbHeight);
         format->setInt32("width", thumbWidth);
+    }
+
+    // If decoding tiled HEIF check decoder supports tile dimensions instead
+    if (!thumbnail && isHeif && format != NULL) {
+        int32_t tileWidth, tileHeight;
+        if (trackMeta->findInt32(kKeyTileWidth, &tileWidth) && tileWidth > 0
+                && trackMeta->findInt32(kKeyTileHeight, &tileHeight) && tileHeight > 0) {
+            format->setInt32("height", tileHeight);
+            format->setInt32("width", tileWidth);
+        }
     }
 
     MediaCodecList::findMatchingCodecs(

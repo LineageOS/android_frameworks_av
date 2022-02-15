@@ -15,8 +15,10 @@
  */
 
 #include "AudioTypes.h"
+#include "MediaMetricsConstants.h"
 #include "StringUtils.h"
 #include <media/TypeConverter.h> // requires libmedia_helper to get the Audio code.
+#include <statslog.h>            // statsd
 
 namespace android::mediametrics::types {
 
@@ -186,6 +188,31 @@ const std::unordered_map<std::string, int32_t>& getAAudioSharingMode() {
         // UNKNOWN is 0
         {"AAUDIO_SHARING_MODE_EXCLUSIVE",    1 /* AAUDIO_SHARING_MODE_EXCLUSIVE + 1 */},
         {"AAUDIO_SHARING_MODE_SHARED",       2 /* AAUDIO_SHARING_MODE_SHARED + 1 */},
+    };
+    return map;
+}
+
+const std::unordered_map<std::string, int32_t>& getStatusMap() {
+    // DO NOT MODIFY VALUES(OK to add new ones).
+    static std::unordered_map<std::string, int32_t> map {
+        {"",
+            util::MEDIAMETRICS_AUDIO_TRACK_STATUS_REPORTED__STATUS__NO_ERROR},
+        {AMEDIAMETRICS_PROP_STATUS_VALUE_OK,
+            util::MEDIAMETRICS_AUDIO_TRACK_STATUS_REPORTED__STATUS__NO_ERROR},
+        {AMEDIAMETRICS_PROP_STATUS_VALUE_ARGUMENT,
+            util::MEDIAMETRICS_AUDIO_TRACK_STATUS_REPORTED__STATUS__ERROR_ARGUMENT},
+        {AMEDIAMETRICS_PROP_STATUS_VALUE_IO,
+            util::MEDIAMETRICS_AUDIO_TRACK_STATUS_REPORTED__STATUS__ERROR_IO},
+        {AMEDIAMETRICS_PROP_STATUS_VALUE_MEMORY,
+            util::MEDIAMETRICS_AUDIO_TRACK_STATUS_REPORTED__STATUS__ERROR_MEMORY},
+        {AMEDIAMETRICS_PROP_STATUS_VALUE_SECURITY,
+            util::MEDIAMETRICS_AUDIO_TRACK_STATUS_REPORTED__STATUS__ERROR_SECURITY},
+        {AMEDIAMETRICS_PROP_STATUS_VALUE_STATE,
+            util::MEDIAMETRICS_AUDIO_TRACK_STATUS_REPORTED__STATUS__ERROR_STATE},
+        {AMEDIAMETRICS_PROP_STATUS_VALUE_TIMEOUT,
+            util::MEDIAMETRICS_AUDIO_TRACK_STATUS_REPORTED__STATUS__ERROR_TIMEOUT},
+        {AMEDIAMETRICS_PROP_STATUS_VALUE_UNKNOWN,
+            util::MEDIAMETRICS_AUDIO_TRACK_STATUS_REPORTED__STATUS__ERROR_UNKNOWN},
     };
     return map;
 }
@@ -428,6 +455,17 @@ std::string lookup<CALLER_NAME>(const std::string &callerName)
         return "";
     }
     return callerName;
+}
+
+template <>
+int32_t lookup<STATUS>(const std::string &status)
+{
+    auto& map = getStatusMap();
+    auto it = map.find(status);
+    if (it == map.end()) {
+        return util::MEDIAMETRICS_AUDIO_TRACK_STATUS_REPORTED__STATUS__ERROR_UNKNOWN;
+    }
+    return it->second;
 }
 
 template <>

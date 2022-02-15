@@ -182,7 +182,11 @@ class CameraDeviceBase : public virtual FrameProducer {
             std::vector<int> *surfaceIds = nullptr,
             int streamSetId = camera3::CAMERA3_STREAM_SET_ID_INVALID,
             bool isShared = false, bool isMultiResolution = false,
-            uint64_t consumerUsage = 0) = 0;
+            uint64_t consumerUsage = 0,
+            int dynamicProfile = ANDROID_REQUEST_AVAILABLE_DYNAMIC_RANGE_PROFILES_MAP_STANDARD,
+            int streamUseCase = ANDROID_SCALER_AVAILABLE_STREAM_USE_CASES_DEFAULT,
+            int timestampBase = OutputConfiguration::TIMESTAMP_BASE_DEFAULT,
+            int mirrorMode = OutputConfiguration::MIRROR_MODE_AUTO) = 0;
 
     /**
      * Create an output stream of the requested size, format, rotation and
@@ -199,7 +203,11 @@ class CameraDeviceBase : public virtual FrameProducer {
             std::vector<int> *surfaceIds = nullptr,
             int streamSetId = camera3::CAMERA3_STREAM_SET_ID_INVALID,
             bool isShared = false, bool isMultiResolution = false,
-            uint64_t consumerUsage = 0) = 0;
+            uint64_t consumerUsage = 0,
+            int dynamicProfile = ANDROID_REQUEST_AVAILABLE_DYNAMIC_RANGE_PROFILES_MAP_STANDARD,
+            int streamUseCase = ANDROID_SCALER_AVAILABLE_STREAM_USE_CASES_DEFAULT,
+            int timestampBase = OutputConfiguration::TIMESTAMP_BASE_DEFAULT,
+            int mirrorMode = OutputConfiguration::MIRROR_MODE_AUTO) = 0;
 
     /**
      * Create an input stream of width, height, and format.
@@ -220,10 +228,12 @@ class CameraDeviceBase : public virtual FrameProducer {
         android_dataspace dataSpace;
         bool dataSpaceOverridden;
         android_dataspace originalDataSpace;
+        uint32_t dynamicRangeProfile;
 
         StreamInfo() : width(0), height(0), format(0), formatOverridden(false), originalFormat(0),
                 dataSpace(HAL_DATASPACE_UNKNOWN), dataSpaceOverridden(false),
-                originalDataSpace(HAL_DATASPACE_UNKNOWN) {}
+                originalDataSpace(HAL_DATASPACE_UNKNOWN),
+                dynamicRangeProfile(ANDROID_REQUEST_AVAILABLE_DYNAMIC_RANGE_PROFILES_MAP_STANDARD){}
         /**
          * Check whether the format matches the current or the original one in case
          * it got overridden.

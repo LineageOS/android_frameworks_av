@@ -834,33 +834,18 @@ void AudioSystem::onNewAudioModulesAvailable() {
     aps->onNewAudioModulesAvailable();
 }
 
-status_t AudioSystem::setDeviceConnectionState(audio_devices_t device,
-                                               audio_policy_dev_state_t state,
-                                               const char* device_address,
-                                               const char* device_name,
+status_t AudioSystem::setDeviceConnectionState(audio_policy_dev_state_t state,
+                                               const android::media::audio::common::AudioPort& port,
                                                audio_format_t encodedFormat) {
     const sp<IAudioPolicyService>& aps = AudioSystem::get_audio_policy_service();
-    const char* address = "";
-    const char* name = "";
 
     if (aps == 0) return PERMISSION_DENIED;
 
-    if (device_address != NULL) {
-        address = device_address;
-    }
-    if (device_name != NULL) {
-        name = device_name;
-    }
-
-    AudioDevice deviceAidl = VALUE_OR_RETURN_STATUS(
-            legacy2aidl_audio_device_AudioDevice(device, address));
-
     return statusTFromBinderStatus(
             aps->setDeviceConnectionState(
-                    deviceAidl,
                     VALUE_OR_RETURN_STATUS(
                             legacy2aidl_audio_policy_dev_state_t_AudioPolicyDeviceState(state)),
-                    name,
+                    port,
                     VALUE_OR_RETURN_STATUS(
                             legacy2aidl_audio_format_t_AudioFormatDescription(encodedFormat))));
 }
@@ -1926,20 +1911,22 @@ status_t AudioSystem::setSurroundFormatEnabled(audio_format_t audioFormat, bool 
             aps->setSurroundFormatEnabled(audioFormatAidl, enabled));
 }
 
-status_t AudioSystem::setAssistantUid(uid_t uid) {
+status_t AudioSystem::setAssistantServicesUids(const std::vector<uid_t>& uids) {
     const sp<IAudioPolicyService>& aps = AudioSystem::get_audio_policy_service();
     if (aps == 0) return PERMISSION_DENIED;
 
-    int32_t uidAidl = VALUE_OR_RETURN_STATUS(legacy2aidl_uid_t_int32_t(uid));
-    return statusTFromBinderStatus(aps->setAssistantUid(uidAidl));
+    std::vector<int32_t> uidsAidl = VALUE_OR_RETURN_STATUS(
+                convertContainer<std::vector<int32_t>>(uids, legacy2aidl_uid_t_int32_t));
+    return statusTFromBinderStatus(aps->setAssistantServicesUids(uidsAidl));
 }
 
-status_t AudioSystem::setHotwordDetectionServiceUid(uid_t uid) {
+status_t AudioSystem::setActiveAssistantServicesUids(const std::vector<uid_t>& activeUids) {
     const sp<IAudioPolicyService>& aps = AudioSystem::get_audio_policy_service();
     if (aps == 0) return PERMISSION_DENIED;
 
-    int32_t uidAidl = VALUE_OR_RETURN_STATUS(legacy2aidl_uid_t_int32_t(uid));
-    return statusTFromBinderStatus(aps->setHotwordDetectionServiceUid(uidAidl));
+    std::vector<int32_t> activeUidsAidl = VALUE_OR_RETURN_STATUS(
+                convertContainer<std::vector<int32_t>>(activeUids, legacy2aidl_uid_t_int32_t));
+    return statusTFromBinderStatus(aps->setActiveAssistantServicesUids(activeUidsAidl));
 }
 
 status_t AudioSystem::setA11yServicesUids(const std::vector<uid_t>& uids) {
@@ -1967,6 +1954,19 @@ bool AudioSystem::isHapticPlaybackSupported() {
         bool retVal;
         RETURN_IF_ERROR(
                 statusTFromBinderStatus(aps->isHapticPlaybackSupported(&retVal)));
+        return retVal;
+    }();
+    return result.value_or(false);
+}
+
+bool AudioSystem::isUltrasoundSupported() {
+    const sp<IAudioPolicyService>& aps = AudioSystem::get_audio_policy_service();
+    if (aps == 0) return false;
+
+    auto result = [&]() -> ConversionResult<bool> {
+        bool retVal;
+        RETURN_IF_ERROR(
+                statusTFromBinderStatus(aps->isUltrasoundSupported(&retVal)));
         return retVal;
     }();
     return result.value_or(false);
@@ -2289,6 +2289,53 @@ status_t AudioSystem::canBeSpatialized(const audio_attributes_t *attr,
     return OK;
 }
 
+status_t AudioSystem::getDirectPlaybackSupport(const audio_attributes_t *attr,
+                                               const audio_config_t *config,
+                                               audio_direct_mode_t* directMode) {
+    if (attr == nullptr || config == nullptr || directMode == nullptr) {
+        return BAD_VALUE;
+    }
+
+    const sp<IAudioPolicyService>& aps = AudioSystem::get_audio_policy_service();
+    if (aps == 0) {
+        return PERMISSION_DENIED;
+    }
+
+    media::AudioAttributesInternal attrAidl = VALUE_OR_RETURN_STATUS(
+            legacy2aidl_audio_attributes_t_AudioAttributesInternal(*attr));
+    AudioConfig configAidl = VALUE_OR_RETURN_STATUS(
+            legacy2aidl_audio_config_t_AudioConfig(*config, false /*isInput*/));
+
+    media::AudioDirectMode retAidl;
+    RETURN_STATUS_IF_ERROR(statusTFromBinderStatus(
+            aps->getDirectPlaybackSupport(attrAidl, configAidl, &retAidl)));
+    *directMode = VALUE_OR_RETURN_STATUS(aidl2legacy_int32_t_audio_direct_mode_t_mask(
+            static_cast<int32_t>(retAidl)));
+    return NO_ERROR;
+}
+
+status_t AudioSystem::getDirectProfilesForAttributes(const audio_attributes_t* attr,
+                                                std::vector<audio_profile>* audioProfiles) {
+    if (attr == nullptr) {
+        return BAD_VALUE;
+    }
+
+    const sp<IAudioPolicyService>& aps = AudioSystem::get_audio_policy_service();
+    if (aps == 0) {
+        return PERMISSION_DENIED;
+    }
+
+    media::AudioAttributesInternal attrAidl = VALUE_OR_RETURN_STATUS(
+            legacy2aidl_audio_attributes_t_AudioAttributesInternal(*attr));
+
+    std::vector<media::audio::common::AudioProfile> audioProfilesAidl;
+    RETURN_STATUS_IF_ERROR(statusTFromBinderStatus(
+            aps->getDirectProfilesForAttributes(attrAidl, &audioProfilesAidl)));
+    *audioProfiles = VALUE_OR_RETURN_STATUS(convertContainer<std::vector<audio_profile>>(
+                    audioProfilesAidl, aidl2legacy_AudioProfile_audio_profile, false /*isInput*/));
+
+    return NO_ERROR;
+}
 
 class CaptureStateListenerImpl : public media::BnCaptureStateListener,
                                  public IBinder::DeathRecipient {

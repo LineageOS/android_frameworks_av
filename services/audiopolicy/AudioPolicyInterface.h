@@ -105,10 +105,8 @@ public:
     virtual void onNewAudioModulesAvailable() = 0;
 
     // indicate a change in device connection status
-    virtual status_t setDeviceConnectionState(audio_devices_t device,
-                                              audio_policy_dev_state_t state,
-                                              const char *device_address,
-                                              const char *device_name,
+    virtual status_t setDeviceConnectionState(audio_policy_dev_state_t state,
+                                              const android::media::audio::common::AudioPort& port,
                                               audio_format_t encodedFormat) = 0;
     // retrieve a device connection status
     virtual audio_policy_dev_state_t getDeviceConnectionState(audio_devices_t device,
@@ -300,6 +298,8 @@ public:
 
     virtual bool     isHapticPlaybackSupported() = 0;
 
+    virtual bool     isUltrasoundSupported() = 0;
+
     virtual status_t getHwOffloadFormatsSupportedForBluetoothMedia(
                 audio_devices_t device, std::vector<audio_format_t> *formats) = 0;
 
@@ -392,8 +392,23 @@ public:
      * @return NO_ERROR if an output was closed, INVALID_OPERATION or BAD_VALUE otherwise
      */
     virtual status_t releaseSpatializerOutput(audio_io_handle_t output) = 0;
-};
 
+    /**
+     * Query how the direct playback is currently supported on the device.
+     * @param attr audio attributes describing the playback use case
+     * @param config audio configuration for the playback
+     * @param directMode out: a set of flags describing how the direct playback is currently
+     *        supported on the device
+     * @return NO_ERROR in case of success, DEAD_OBJECT, NO_INIT, BAD_VALUE, PERMISSION_DENIED
+     *         in case of error.
+     */
+    virtual audio_direct_mode_t getDirectPlaybackSupport(const audio_attributes_t *attr,
+                                                         const audio_config_t *config) = 0;
+
+    // retrieves the list of available direct audio profiles for the given audio attributes
+    virtual status_t getDirectProfilesForAttributes(const audio_attributes_t* attr,
+                                                    AudioProfileVector& audioProfiles) = 0;
+};
 
 // Audio Policy client Interface
 class AudioPolicyClientInterface
@@ -529,6 +544,8 @@ public:
 
     virtual status_t updateSecondaryOutputs(
             const TrackSecondaryOutputsMap& trackSecondaryOutputs) = 0;
+
+    virtual status_t setDeviceConnectedState(const struct audio_port_v7 *port, bool connected) = 0;
 };
 
     // These are the signatures of createAudioPolicyManager/destroyAudioPolicyManager

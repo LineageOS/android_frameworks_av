@@ -840,6 +840,35 @@ status_t CCodecBufferChannel::renderOutputBuffer(
         hdr10PlusInfo.reset();
     }
 
+    // HDR dynamic info
+    std::shared_ptr<const C2StreamHdrDynamicMetadataInfo::output> hdrDynamicInfo =
+        std::static_pointer_cast<const C2StreamHdrDynamicMetadataInfo::output>(
+                c2Buffer->getInfo(C2StreamHdrDynamicMetadataInfo::output::PARAM_TYPE));
+    // TODO: make this sticky & enable unset
+    if (hdrDynamicInfo && hdrDynamicInfo->flexCount() == 0) {
+        hdrDynamicInfo.reset();
+    }
+
+    if (hdr10PlusInfo) {
+        // C2StreamHdr10PlusInfo is deprecated; components should use
+        // C2StreamHdrDynamicMetadataInfo
+        // TODO: #metric
+        if (hdrDynamicInfo) {
+            // It is unexpected that C2StreamHdr10PlusInfo and
+            // C2StreamHdrDynamicMetadataInfo is both present.
+            // C2StreamHdrDynamicMetadataInfo takes priority.
+            // TODO: #metric
+        } else {
+            std::shared_ptr<C2StreamHdrDynamicMetadataInfo::output> info =
+                    C2StreamHdrDynamicMetadataInfo::output::AllocShared(
+                            hdr10PlusInfo->flexCount(),
+                            0u,
+                            C2Config::HDR_DYNAMIC_METADATA_TYPE_SMPTE_2094_40);
+            memcpy(info->m.data, hdr10PlusInfo->m.value, hdr10PlusInfo->flexCount());
+            hdrDynamicInfo = info;
+        }
+    }
+
     std::vector<C2ConstGraphicBlock> blocks = c2Buffer->data().graphicBlocks();
     if (blocks.size() != 1u) {
         ALOGD("[%s] expected 1 graphic block, but got %zu", mName, blocks.size());
@@ -859,7 +888,7 @@ status_t CCodecBufferChannel::renderOutputBuffer(
             videoScalingMode,
             transform,
             Fence::NO_FENCE, 0);
-    if (hdrStaticInfo || hdr10PlusInfo) {
+    if (hdrStaticInfo || hdrDynamicInfo) {
         HdrMetadata hdr;
         if (hdrStaticInfo) {
             // If mastering max and min luminance fields are 0, do not use them.
@@ -896,13 +925,16 @@ status_t CCodecBufferChannel::renderOutputBuffer(
                 hdr.cta8613 = cta861_meta;
             }
         }
-        if (hdr10PlusInfo) {
+        if (hdrDynamicInfo
+                && hdrDynamicInfo->m.type_ == C2Config::HDR_DYNAMIC_METADATA_TYPE_SMPTE_2094_40) {
             hdr.validTypes |= HdrMetadata::HDR10PLUS;
             hdr.hdr10plus.assign(
-                    hdr10PlusInfo->m.value,
-                    hdr10PlusInfo->m.value + hdr10PlusInfo->flexCount());
+                    hdrDynamicInfo->m.data,
+                    hdrDynamicInfo->m.data + hdrDynamicInfo->flexCount());
         }
         qbi.setHdrMetadata(hdr);
+
+        SetHdrMetadataToGralloc4Handle(hdrStaticInfo, hdrDynamicInfo, block.handle());
     }
     // we don't have dirty regions
     qbi.setSurfaceDamage(Region::INVALID_REGION);

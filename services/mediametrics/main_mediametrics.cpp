@@ -18,11 +18,10 @@
 //#define LOG_NDEBUG 0
 #include <utils/Log.h>
 
-#include "MediaMetricsService.h"
-
 #include <binder/IPCThreadState.h>
 #include <binder/IServiceManager.h>
 #include <binder/ProcessState.h>
+#include <mediametricsservice/MediaMetricsService.h>
 #include <mediautils/LimitProcessMemory.h>
 
 int main(int argc __unused, char **argv)

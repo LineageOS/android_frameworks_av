@@ -23,9 +23,10 @@
  * The output color pixel format of heif decoder.
  */
 typedef enum {
-    kHeifColorFormat_RGB565     = 0,
-    kHeifColorFormat_RGBA_8888  = 1,
-    kHeifColorFormat_BGRA_8888  = 2,
+    kHeifColorFormat_RGB565       = 0,
+    kHeifColorFormat_RGBA_8888    = 1,
+    kHeifColorFormat_BGRA_8888    = 2,
+    kHeifColorFormat_RGBA_1010102 = 3,
 } HeifColorFormat;
 
 /*

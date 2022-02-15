@@ -82,7 +82,7 @@
 #include "MediaPlayerFactory.h"
 
 #include "TestPlayerStub.h"
-#include "nuplayer/NuPlayerDriver.h"
+#include <nuplayer/NuPlayerDriver.h>
 
 
 static const int kDumpLockRetries = 50;
@@ -2658,7 +2658,7 @@ size_t MediaPlayerService::AudioOutput::CallbackData::onMoreData(const AudioTrac
         return 0;
     }
     size_t actualSize = (*me->mCallback)(
-            me.get(), buffer.raw, buffer.size, me->mCallbackCookie,
+            me.get(), buffer.data(), buffer.size(), me->mCallbackCookie,
             CB_EVENT_FILL_BUFFER);
 
     // Log when no data is returned from the callback.

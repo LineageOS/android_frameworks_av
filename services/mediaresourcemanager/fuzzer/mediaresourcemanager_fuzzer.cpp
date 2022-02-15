@@ -71,7 +71,8 @@ struct TestProcessInfo : public ProcessInfoInterface {
         return true;
     }
 
-    virtual bool isValidPid(int /* pid */) { return true; }
+    virtual bool isPidTrusted(int /* pid */) { return true; }
+    virtual bool isPidUidTrusted(int /* pid */, int /* uid */) { return true; }
     virtual bool overrideProcessInfo(int /* pid */, int /*procState*/, int /*oomScore*/) {
         return true;
     }

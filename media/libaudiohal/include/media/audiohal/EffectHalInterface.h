@@ -57,6 +57,9 @@ class EffectHalInterface : public RefBase
 
     virtual status_t dump(int fd) = 0;
 
+    // Unique effect ID to use with the core HAL.
+    virtual uint64_t effectId() const = 0;
+
   protected:
     // Subclasses can not be constructed directly by clients.
     EffectHalInterface() {}

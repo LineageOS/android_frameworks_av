@@ -46,21 +46,27 @@ public:
                      int32_t dataMemoryOffset,
                      int32_t dataSizeInBytes);
 
-    int32_t getBytesPerFrame();
+    int32_t getBytesPerFrame() const;
 
     void setBytesPerFrame(int32_t bytesPerFrame);
 
-    int32_t getFramesPerBurst();
+    int32_t getFramesPerBurst() const;
 
     void setFramesPerBurst(int32_t framesPerBurst);
 
-    int32_t getCapacityInFrames();
+    int32_t getCapacityInFrames() const;
 
     void setCapacityInFrames(int32_t capacityInFrames);
 
     bool isFileDescriptorSafe(SharedMemoryParcelable *memoryParcels);
 
     aaudio_result_t resolve(SharedMemoryParcelable *memoryParcels, RingBufferDescriptor *descriptor);
+
+    void updateMemory(const RingBufferParcelable& parcelable);
+
+    int32_t getSharedMemoryIndex() const {
+        return mSharedMemoryIndex;
+    }
 
     void dump();
 
@@ -71,6 +77,7 @@ private:
     SharedRegionParcelable  mReadCounterParcelable;
     SharedRegionParcelable  mWriteCounterParcelable;
     SharedRegionParcelable  mDataParcelable;
+    int32_t                 mSharedMemoryIndex = -1;
     int32_t                 mBytesPerFrame = 0;     // index is in frames
     int32_t                 mFramesPerBurst = 0;    // for ISOCHRONOUS queues
     int32_t                 mCapacityInFrames = 0;  // zero if unused

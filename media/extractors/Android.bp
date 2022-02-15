@@ -28,12 +28,14 @@ cc_defaults {
         "liblog",
     ],
 
-    // extractors are supposed to work on Q(29)
+    // extractors are expected to run on Q(29)
     min_sdk_version: "29",
+    apex_available: [
+        "//apex_available:platform",
+        "com.android.media",
+    ],
 
     relative_install_path: "extractors",
-
-    compile_multilib: "first",
 
     cflags: [
         "-Werror",

@@ -85,6 +85,9 @@ def parseArgs():
     return argparser.parse_args()
 
 
+output_devices_type_value = {}
+input_devices_type_value = {}
+
 def generateXmlCriterionTypesFile(criterionTypes, addressCriteria, criterionTypesFile, outputFile):
 
     logging.info("Importing criterionTypesFile {}".format(criterionTypesFile))
@@ -101,6 +104,11 @@ def generateXmlCriterionTypesFile(criterionTypes, addressCriteria, criterionType
                     value_node = ET.SubElement(values_node, "value")
                     value_node.set('numerical', str(value))
                     value_node.set('literal', key)
+
+                    if criterion_type.get('name') == "OutputDevicesMaskType":
+                        value_node.set('android_type', output_devices_type_value[key])
+                    if criterion_type.get('name') == "InputDevicesMaskType":
+                        value_node.set('android_type', input_devices_type_value[key])
 
     if addressCriteria:
         for criterion_name, values_list in addressCriteria.items():
@@ -200,10 +208,8 @@ def parseAndroidAudioFile(androidaudiobaseheaderFile, androidaudiocommonbasehead
     #
     ignored_values = ['CNT', 'MAX', 'ALL', 'NONE']
 
-    #
-    # Reaching 32 bit limit for inclusive criterion out devices: removing
-    #
-    ignored_output_device_values = ['BleSpeaker', 'BleHeadset']
+    multi_bit_outputdevice_shift = 32
+    multi_bit_inputdevice_shift = 32
 
     criteria_pattern = re.compile(
         r"\s*V\((?P<type>(?:"+'|'.join(criterion_mapping_table.keys()) + "))_" \
@@ -223,28 +229,59 @@ def parseAndroidAudioFile(androidaudiobaseheaderFile, androidaudiocommonbasehead
                 ''.join((w.capitalize() for w in match.groupdict()['literal'].split('_')))
             criterion_numerical_value = match.groupdict()['values']
 
-            # for AUDIO_DEVICE_IN: need to remove sign bit / rename default to stub
+            # for AUDIO_DEVICE_IN: rename default to stub
             if criterion_name == "InputDevicesMaskType":
                 if criterion_literal == "Default":
                     criterion_numerical_value = str(int("0x40000000", 0))
+                    input_devices_type_value[criterion_literal] = "0xC0000000"
                 else:
                     try:
                         string_int = int(criterion_numerical_value, 0)
+                        # Append AUDIO_DEVICE_IN for android type tag
+                        input_devices_type_value[criterion_literal] = hex(string_int | 2147483648)
+
+                        num_bits = bin(string_int).count("1")
+                        if num_bits > 1:
+                            logging.info("The value {}:{} is for criterion {} binary rep {} has {} bits sets"
+                                .format(criterion_numerical_value, criterion_literal, criterion_name, bin(string_int), num_bits))
+                            string_int = 2**multi_bit_inputdevice_shift
+                            logging.info("new val assigned is {} {}" .format(string_int, bin(string_int)))
+                            multi_bit_inputdevice_shift += 1
+                            criterion_numerical_value = str(string_int)
+
                     except ValueError:
                         # Handle the exception
                         logging.info("value {}:{} for criterion {} is not a number, ignoring"
                             .format(criterion_numerical_value, criterion_literal, criterion_name))
                         continue
-                    criterion_numerical_value = str(int(criterion_numerical_value, 0) & ~2147483648)
 
             if criterion_name == "OutputDevicesMaskType":
                 if criterion_literal == "Default":
                     criterion_numerical_value = str(int("0x40000000", 0))
-                if criterion_literal in ignored_output_device_values:
-                    logging.info("OutputDevicesMaskType skipping {}".format(criterion_literal))
-                    continue
+                    output_devices_type_value[criterion_literal] = "0x40000000"
+                else:
+                    try:
+                        string_int = int(criterion_numerical_value, 0)
+                        output_devices_type_value[criterion_literal] = criterion_numerical_value
+
+                        num_bits = bin(string_int).count("1")
+                        if num_bits > 1:
+                            logging.info("The value {}:{} is for criterion {} binary rep {} has {} bits sets"
+                                .format(criterion_numerical_value, criterion_literal, criterion_name, bin(string_int), num_bits))
+                            string_int = 2**multi_bit_outputdevice_shift
+                            logging.info("new val assigned is {} {}" .format(string_int, bin(string_int)))
+                            multi_bit_outputdevice_shift += 1
+                            criterion_numerical_value = str(string_int)
+
+                    except ValueError:
+                        # Handle the exception
+                        logging.info("The value {}:{} is for criterion {} is not a number, ignoring"
+                            .format(criterion_numerical_value, criterion_literal, criterion_name))
+                        continue
+
             try:
                 string_int = int(criterion_numerical_value, 0)
+
             except ValueError:
                 # Handle the exception
                 logging.info("The value {}:{} is for criterion {} is not a number, ignoring"

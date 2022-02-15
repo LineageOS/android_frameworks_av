@@ -13,70 +13,30 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
+
 #include <cutils/properties.h>
 
 #include "SessionConfigurationUtils.h"
 #include "../api2/DepthCompositeStream.h"
 #include "../api2/HeicCompositeStream.h"
+#include "android/hardware/camera/metadata/3.8/types.h"
 #include "common/CameraDeviceBase.h"
+#include "common/HalConversionsTemplated.h"
 #include "../CameraService.h"
-#include "device3/Camera3Device.h"
+#include "device3/aidl/AidlCamera3Device.h"
+#include "device3/hidl/HidlCamera3Device.h"
 #include "device3/Camera3OutputStream.h"
+#include "system/graphics-base-v1.1.h"
 
 using android::camera3::OutputStreamInfo;
 using android::camera3::OutputStreamInfo;
 using android::hardware::camera2::ICameraDeviceUser;
 using android::hardware::camera::metadata::V3_6::CameraMetadataEnumAndroidSensorPixelMode;
+using android::hardware::camera::metadata::V3_8::CameraMetadataEnumAndroidRequestAvailableDynamicRangeProfilesMap;
+using android::hardware::camera::metadata::V3_8::CameraMetadataEnumAndroidScalerAvailableStreamUseCases;
 
 namespace android {
 namespace camera3 {
-
-int32_t SessionConfigurationUtils::PERF_CLASS_LEVEL =
-        property_get_int32("ro.odm.build.media_performance_class", 0);
-
-bool SessionConfigurationUtils::IS_PERF_CLASS = (PERF_CLASS_LEVEL == SDK_VERSION_S);
-
-camera3::Size SessionConfigurationUtils::getMaxJpegResolution(const CameraMetadata &metadata,
-        bool ultraHighResolution) {
-    int32_t maxJpegWidth = 0, maxJpegHeight = 0;
-    const int STREAM_CONFIGURATION_SIZE = 4;
-    const int STREAM_FORMAT_OFFSET = 0;
-    const int STREAM_WIDTH_OFFSET = 1;
-    const int STREAM_HEIGHT_OFFSET = 2;
-    const int STREAM_IS_INPUT_OFFSET = 3;
-
-    int32_t scalerSizesTag = ultraHighResolution ?
-            ANDROID_SCALER_AVAILABLE_STREAM_CONFIGURATIONS_MAXIMUM_RESOLUTION :
-                    ANDROID_SCALER_AVAILABLE_STREAM_CONFIGURATIONS;
-    camera_metadata_ro_entry_t availableStreamConfigs =
-            metadata.find(scalerSizesTag);
-    if (availableStreamConfigs.count == 0 ||
-            availableStreamConfigs.count % STREAM_CONFIGURATION_SIZE != 0) {
-        return camera3::Size(0, 0);
-    }
-
-    // Get max jpeg size (area-wise).
-    for (size_t i= 0; i < availableStreamConfigs.count; i+= STREAM_CONFIGURATION_SIZE) {
-        int32_t format = availableStreamConfigs.data.i32[i + STREAM_FORMAT_OFFSET];
-        int32_t width = availableStreamConfigs.data.i32[i + STREAM_WIDTH_OFFSET];
-        int32_t height = availableStreamConfigs.data.i32[i + STREAM_HEIGHT_OFFSET];
-        int32_t isInput = availableStreamConfigs.data.i32[i + STREAM_IS_INPUT_OFFSET];
-        if (isInput == ANDROID_SCALER_AVAILABLE_STREAM_CONFIGURATIONS_OUTPUT
-                && format == HAL_PIXEL_FORMAT_BLOB &&
-                (width * height > maxJpegWidth * maxJpegHeight)) {
-            maxJpegWidth = width;
-            maxJpegHeight = height;
-        }
-    }
-
-    return camera3::Size(maxJpegWidth, maxJpegHeight);
-}
-
-size_t SessionConfigurationUtils::getUHRMaxJpegBufferSize(camera3::Size uhrMaxJpegSize,
-        camera3::Size defaultMaxJpegSize, size_t defaultMaxJpegBufferSize) {
-    return (uhrMaxJpegSize.width * uhrMaxJpegSize.height) /
-            (defaultMaxJpegSize.width * defaultMaxJpegSize.height) * defaultMaxJpegBufferSize;
-}
 
 void StreamConfiguration::getStreamConfigurations(
         const CameraMetadata &staticInfo, int configuration,
@@ -126,65 +86,57 @@ void StreamConfiguration::getStreamConfigurations(
     getStreamConfigurations(staticInfo, heicKey, scm);
 }
 
-int32_t SessionConfigurationUtils::getAppropriateModeTag(int32_t defaultTag, bool maxResolution) {
-    if (!maxResolution) {
-        return defaultTag;
+namespace SessionConfigurationUtils {
+
+int32_t PERF_CLASS_LEVEL =
+        property_get_int32("ro.odm.build.media_performance_class", 0);
+
+bool IS_PERF_CLASS = (PERF_CLASS_LEVEL == SDK_VERSION_S);
+
+camera3::Size getMaxJpegResolution(const CameraMetadata &metadata,
+        bool ultraHighResolution) {
+    int32_t maxJpegWidth = 0, maxJpegHeight = 0;
+    const int STREAM_CONFIGURATION_SIZE = 4;
+    const int STREAM_FORMAT_OFFSET = 0;
+    const int STREAM_WIDTH_OFFSET = 1;
+    const int STREAM_HEIGHT_OFFSET = 2;
+    const int STREAM_IS_INPUT_OFFSET = 3;
+
+    int32_t scalerSizesTag = ultraHighResolution ?
+            ANDROID_SCALER_AVAILABLE_STREAM_CONFIGURATIONS_MAXIMUM_RESOLUTION :
+                    ANDROID_SCALER_AVAILABLE_STREAM_CONFIGURATIONS;
+    camera_metadata_ro_entry_t availableStreamConfigs =
+            metadata.find(scalerSizesTag);
+    if (availableStreamConfigs.count == 0 ||
+            availableStreamConfigs.count % STREAM_CONFIGURATION_SIZE != 0) {
+        return camera3::Size(0, 0);
     }
-    switch (defaultTag) {
-        case ANDROID_SCALER_AVAILABLE_STREAM_CONFIGURATIONS:
-            return ANDROID_SCALER_AVAILABLE_STREAM_CONFIGURATIONS_MAXIMUM_RESOLUTION;
-        case ANDROID_SCALER_AVAILABLE_MIN_FRAME_DURATIONS:
-            return ANDROID_SCALER_AVAILABLE_MIN_FRAME_DURATIONS_MAXIMUM_RESOLUTION;
-        case ANDROID_SCALER_AVAILABLE_STALL_DURATIONS:
-            return ANDROID_SCALER_AVAILABLE_STALL_DURATIONS_MAXIMUM_RESOLUTION;
-        case ANDROID_DEPTH_AVAILABLE_DEPTH_STREAM_CONFIGURATIONS:
-            return ANDROID_DEPTH_AVAILABLE_DEPTH_STREAM_CONFIGURATIONS_MAXIMUM_RESOLUTION;
-        case ANDROID_DEPTH_AVAILABLE_DEPTH_MIN_FRAME_DURATIONS:
-            return ANDROID_DEPTH_AVAILABLE_DEPTH_MIN_FRAME_DURATIONS_MAXIMUM_RESOLUTION;
-        case ANDROID_DEPTH_AVAILABLE_DEPTH_STALL_DURATIONS:
-            return ANDROID_DEPTH_AVAILABLE_DEPTH_STALL_DURATIONS_MAXIMUM_RESOLUTION;
-        case ANDROID_DEPTH_AVAILABLE_DYNAMIC_DEPTH_STREAM_CONFIGURATIONS:
-            return ANDROID_DEPTH_AVAILABLE_DYNAMIC_DEPTH_STREAM_CONFIGURATIONS_MAXIMUM_RESOLUTION;
-        case ANDROID_DEPTH_AVAILABLE_DYNAMIC_DEPTH_MIN_FRAME_DURATIONS:
-            return ANDROID_DEPTH_AVAILABLE_DYNAMIC_DEPTH_MIN_FRAME_DURATIONS_MAXIMUM_RESOLUTION;
-        case ANDROID_DEPTH_AVAILABLE_DYNAMIC_DEPTH_STALL_DURATIONS:
-            return ANDROID_DEPTH_AVAILABLE_DYNAMIC_DEPTH_STALL_DURATIONS_MAXIMUM_RESOLUTION;
-        case ANDROID_HEIC_AVAILABLE_HEIC_STREAM_CONFIGURATIONS:
-            return ANDROID_HEIC_AVAILABLE_HEIC_STREAM_CONFIGURATIONS_MAXIMUM_RESOLUTION;
-        case ANDROID_HEIC_AVAILABLE_HEIC_MIN_FRAME_DURATIONS:
-            return ANDROID_HEIC_AVAILABLE_HEIC_MIN_FRAME_DURATIONS_MAXIMUM_RESOLUTION;
-        case ANDROID_HEIC_AVAILABLE_HEIC_STALL_DURATIONS:
-            return ANDROID_HEIC_AVAILABLE_HEIC_STALL_DURATIONS_MAXIMUM_RESOLUTION;
-        case ANDROID_SENSOR_OPAQUE_RAW_SIZE:
-            return ANDROID_SENSOR_OPAQUE_RAW_SIZE_MAXIMUM_RESOLUTION;
-        case ANDROID_LENS_INTRINSIC_CALIBRATION:
-            return ANDROID_LENS_INTRINSIC_CALIBRATION_MAXIMUM_RESOLUTION;
-        case ANDROID_LENS_DISTORTION:
-            return ANDROID_LENS_DISTORTION_MAXIMUM_RESOLUTION;
-        default:
-            ALOGE("%s: Tag %d doesn't have a maximum resolution counterpart", __FUNCTION__,
-                    defaultTag);
-            return -1;
+
+    // Get max jpeg size (area-wise).
+    for (size_t i= 0; i < availableStreamConfigs.count; i+= STREAM_CONFIGURATION_SIZE) {
+        int32_t format = availableStreamConfigs.data.i32[i + STREAM_FORMAT_OFFSET];
+        int32_t width = availableStreamConfigs.data.i32[i + STREAM_WIDTH_OFFSET];
+        int32_t height = availableStreamConfigs.data.i32[i + STREAM_HEIGHT_OFFSET];
+        int32_t isInput = availableStreamConfigs.data.i32[i + STREAM_IS_INPUT_OFFSET];
+        if (isInput == ANDROID_SCALER_AVAILABLE_STREAM_CONFIGURATIONS_OUTPUT
+                && format == HAL_PIXEL_FORMAT_BLOB &&
+                (width * height > maxJpegWidth * maxJpegHeight)) {
+            maxJpegWidth = width;
+            maxJpegHeight = height;
+        }
     }
-    return -1;
+
+    return camera3::Size(maxJpegWidth, maxJpegHeight);
 }
 
-bool SessionConfigurationUtils::getArrayWidthAndHeight(const CameraMetadata *deviceInfo,
-        int32_t arrayTag, int32_t *width, int32_t *height) {
-    if (width == nullptr || height == nullptr) {
-        ALOGE("%s: width / height nullptr", __FUNCTION__);
-        return false;
-    }
-    camera_metadata_ro_entry_t entry;
-    entry = deviceInfo->find(arrayTag);
-    if (entry.count != 4) return false;
-    *width = entry.data.i32[2];
-    *height = entry.data.i32[3];
-    return true;
+size_t getUHRMaxJpegBufferSize(camera3::Size uhrMaxJpegSize,
+        camera3::Size defaultMaxJpegSize, size_t defaultMaxJpegBufferSize) {
+    return (uhrMaxJpegSize.width * uhrMaxJpegSize.height) /
+            (defaultMaxJpegSize.width * defaultMaxJpegSize.height) * defaultMaxJpegBufferSize;
 }
 
 StreamConfigurationPair
-SessionConfigurationUtils::getStreamConfigurationPair(const CameraMetadata &staticInfo) {
+getStreamConfigurationPair(const CameraMetadata &staticInfo) {
     camera3::StreamConfigurationPair streamConfigurationPair;
     camera3::StreamConfiguration::getStreamConfigurations(staticInfo, false,
             &streamConfigurationPair.mDefaultStreamConfigurationMap);
@@ -193,13 +145,13 @@ SessionConfigurationUtils::getStreamConfigurationPair(const CameraMetadata &stat
     return streamConfigurationPair;
 }
 
-int64_t SessionConfigurationUtils::euclidDistSquare(int32_t x0, int32_t y0, int32_t x1, int32_t y1) {
+int64_t euclidDistSquare(int32_t x0, int32_t y0, int32_t x1, int32_t y1) {
     int64_t d0 = x0 - x1;
     int64_t d1 = y0 - y1;
     return d0 * d0 + d1 * d1;
 }
 
-bool SessionConfigurationUtils::roundBufferDimensionNearest(int32_t width, int32_t height,
+bool roundBufferDimensionNearest(int32_t width, int32_t height,
         int32_t format, android_dataspace dataSpace,
         const CameraMetadata& info, bool maxResolution, /*out*/int32_t* outWidth,
         /*out*/int32_t* outHeight) {
@@ -260,7 +212,81 @@ bool SessionConfigurationUtils::roundBufferDimensionNearest(int32_t width, int32
     return true;
 }
 
-bool SessionConfigurationUtils::isPublicFormat(int32_t format)
+//check if format is 10-bit compatible
+bool is10bitCompatibleFormat(int32_t format) {
+    switch(format) {
+        case HAL_PIXEL_FORMAT_IMPLEMENTATION_DEFINED:
+        case HAL_PIXEL_FORMAT_YCBCR_P010:
+            return true;
+        default:
+            return false;
+    }
+}
+
+bool isDynamicRangeProfileSupported(int dynamicRangeProfile, const CameraMetadata& staticInfo) {
+    if (dynamicRangeProfile == ANDROID_REQUEST_AVAILABLE_DYNAMIC_RANGE_PROFILES_MAP_STANDARD) {
+        // Supported by default
+        return true;
+    }
+
+    camera_metadata_ro_entry_t entry = staticInfo.find(ANDROID_REQUEST_AVAILABLE_CAPABILITIES);
+    bool is10bitDynamicRangeSupported = false;
+    for (size_t i = 0; i < entry.count; ++i) {
+        uint8_t capability = entry.data.u8[i];
+        if (capability == ANDROID_REQUEST_AVAILABLE_CAPABILITIES_DYNAMIC_RANGE_TEN_BIT) {
+            is10bitDynamicRangeSupported = true;
+            break;
+        }
+    }
+
+    if (!is10bitDynamicRangeSupported) {
+        return false;
+    }
+
+    switch (dynamicRangeProfile) {
+        case ANDROID_REQUEST_AVAILABLE_DYNAMIC_RANGE_PROFILES_MAP_HDR10_PLUS:
+        case ANDROID_REQUEST_AVAILABLE_DYNAMIC_RANGE_PROFILES_MAP_HDR10:
+        case ANDROID_REQUEST_AVAILABLE_DYNAMIC_RANGE_PROFILES_MAP_HLG10:
+        case ANDROID_REQUEST_AVAILABLE_DYNAMIC_RANGE_PROFILES_MAP_DOLBY_VISION_10B_HDR_OEM:
+        case ANDROID_REQUEST_AVAILABLE_DYNAMIC_RANGE_PROFILES_MAP_DOLBY_VISION_10B_HDR_OEM_PO:
+        case ANDROID_REQUEST_AVAILABLE_DYNAMIC_RANGE_PROFILES_MAP_DOLBY_VISION_10B_HDR_REF:
+        case ANDROID_REQUEST_AVAILABLE_DYNAMIC_RANGE_PROFILES_MAP_DOLBY_VISION_10B_HDR_REF_PO:
+        case ANDROID_REQUEST_AVAILABLE_DYNAMIC_RANGE_PROFILES_MAP_DOLBY_VISION_8B_HDR_OEM:
+        case ANDROID_REQUEST_AVAILABLE_DYNAMIC_RANGE_PROFILES_MAP_DOLBY_VISION_8B_HDR_OEM_PO:
+        case ANDROID_REQUEST_AVAILABLE_DYNAMIC_RANGE_PROFILES_MAP_DOLBY_VISION_8B_HDR_REF:
+        case ANDROID_REQUEST_AVAILABLE_DYNAMIC_RANGE_PROFILES_MAP_DOLBY_VISION_8B_HDR_REF_PO:
+            entry = staticInfo.find(ANDROID_REQUEST_AVAILABLE_DYNAMIC_RANGE_PROFILES_MAP);
+            for (size_t i = 0; i < entry.count; i += 2) {
+                if (dynamicRangeProfile == entry.data.i32[i]) {
+                    return true;
+                }
+            }
+
+            return false;
+        default:
+            return false;
+    }
+
+    return false;
+}
+
+//check if format is 10-bit compatible
+bool is10bitDynamicRangeProfile(int32_t dynamicRangeProfile) {
+    switch (dynamicRangeProfile) {
+        case ANDROID_REQUEST_AVAILABLE_DYNAMIC_RANGE_PROFILES_MAP_HDR10_PLUS:
+        case ANDROID_REQUEST_AVAILABLE_DYNAMIC_RANGE_PROFILES_MAP_HDR10:
+        case ANDROID_REQUEST_AVAILABLE_DYNAMIC_RANGE_PROFILES_MAP_HLG10:
+        case ANDROID_REQUEST_AVAILABLE_DYNAMIC_RANGE_PROFILES_MAP_DOLBY_VISION_10B_HDR_OEM:
+        case ANDROID_REQUEST_AVAILABLE_DYNAMIC_RANGE_PROFILES_MAP_DOLBY_VISION_10B_HDR_OEM_PO:
+        case ANDROID_REQUEST_AVAILABLE_DYNAMIC_RANGE_PROFILES_MAP_DOLBY_VISION_10B_HDR_REF:
+        case ANDROID_REQUEST_AVAILABLE_DYNAMIC_RANGE_PROFILES_MAP_DOLBY_VISION_10B_HDR_REF_PO:
+            return true;
+        default:
+            return false;
+    }
+}
+
+bool isPublicFormat(int32_t format)
 {
     switch(format) {
         case HAL_PIXEL_FORMAT_RGBA_8888:
@@ -287,11 +313,30 @@ bool SessionConfigurationUtils::isPublicFormat(int32_t format)
     }
 }
 
-binder::Status SessionConfigurationUtils::createSurfaceFromGbp(
+bool isStreamUseCaseSupported(int streamUseCase,
+        const CameraMetadata &deviceInfo) {
+    camera_metadata_ro_entry_t availableStreamUseCases =
+            deviceInfo.find(ANDROID_SCALER_AVAILABLE_STREAM_USE_CASES);
+
+    if (availableStreamUseCases.count == 0 &&
+            streamUseCase == ANDROID_SCALER_AVAILABLE_STREAM_USE_CASES_DEFAULT) {
+        return true;
+    }
+
+    for (size_t i = 0; i < availableStreamUseCases.count; i++) {
+        if (availableStreamUseCases.data.i32[i] == streamUseCase) {
+            return true;
+        }
+    }
+    return false;
+}
+
+binder::Status createSurfaceFromGbp(
         OutputStreamInfo& streamInfo, bool isStreamInfoValid,
         sp<Surface>& surface, const sp<IGraphicBufferProducer>& gbp,
         const String8 &logicalCameraId, const CameraMetadata &physicalCameraMetadata,
-        const std::vector<int32_t> &sensorPixelModesUsed){
+        const std::vector<int32_t> &sensorPixelModesUsed, int dynamicRangeProfile,
+        int streamUseCase, int timestampBase, int mirrorMode) {
     // bufferProducer must be non-null
     if (gbp == nullptr) {
         String8 msg = String8::format("Camera %s: Surface is NULL", logicalCameraId.string());
@@ -389,6 +434,42 @@ binder::Status SessionConfigurationUtils::createSurfaceFromGbp(
         ALOGE("%s: %s", __FUNCTION__, msg.string());
         return STATUS_ERROR(CameraService::ERROR_ILLEGAL_ARGUMENT, msg.string());
     }
+    if (!SessionConfigurationUtils::isDynamicRangeProfileSupported(dynamicRangeProfile,
+                physicalCameraMetadata)) {
+        String8 msg = String8::format("Camera %s: Dynamic range profile 0x%x not supported,"
+                " failed to create output stream", logicalCameraId.string(), dynamicRangeProfile);
+        ALOGE("%s: %s", __FUNCTION__, msg.string());
+        return STATUS_ERROR(CameraService::ERROR_ILLEGAL_ARGUMENT, msg.string());
+    }
+    if (SessionConfigurationUtils::is10bitDynamicRangeProfile(dynamicRangeProfile) &&
+            !SessionConfigurationUtils::is10bitCompatibleFormat(format)) {
+        String8 msg = String8::format("Camera %s: No 10-bit supported stream configurations with "
+                "format %#x defined and profile %#x, failed to create output stream",
+                logicalCameraId.string(), format, dynamicRangeProfile);
+        ALOGE("%s: %s", __FUNCTION__, msg.string());
+        return STATUS_ERROR(CameraService::ERROR_ILLEGAL_ARGUMENT, msg.string());
+    }
+    if (!SessionConfigurationUtils::isStreamUseCaseSupported(streamUseCase,
+            physicalCameraMetadata)) {
+        String8 msg = String8::format("Camera %s: stream use case %d not supported,"
+                " failed to create output stream", logicalCameraId.string(), streamUseCase);
+        ALOGE("%s: %s", __FUNCTION__, msg.string());
+        return STATUS_ERROR(CameraService::ERROR_ILLEGAL_ARGUMENT, msg.string());
+    }
+    if (timestampBase < OutputConfiguration::TIMESTAMP_BASE_DEFAULT ||
+            timestampBase > OutputConfiguration::TIMESTAMP_BASE_CHOREOGRAPHER_SYNCED) {
+        String8 msg = String8::format("Camera %s: invalid timestamp base %d",
+                logicalCameraId.string(), timestampBase);
+        ALOGE("%s: %s", __FUNCTION__, msg.string());
+        return STATUS_ERROR(CameraService::ERROR_ILLEGAL_ARGUMENT, msg.string());
+    }
+    if (mirrorMode < OutputConfiguration::MIRROR_MODE_AUTO ||
+            mirrorMode > OutputConfiguration::MIRROR_MODE_V) {
+        String8 msg = String8::format("Camera %s: invalid mirroring mode %d",
+                logicalCameraId.string(), mirrorMode);
+        ALOGE("%s: %s", __FUNCTION__, msg.string());
+        return STATUS_ERROR(CameraService::ERROR_ILLEGAL_ARGUMENT, msg.string());
+    }
 
     if (!isStreamInfoValid) {
         streamInfo.width = width;
@@ -397,6 +478,10 @@ binder::Status SessionConfigurationUtils::createSurfaceFromGbp(
         streamInfo.dataSpace = dataSpace;
         streamInfo.consumerUsage = consumerUsage;
         streamInfo.sensorPixelModesUsed = overriddenSensorPixelModes;
+        streamInfo.dynamicRangeProfile = dynamicRangeProfile;
+        streamInfo.streamUseCase = streamUseCase;
+        streamInfo.timestampBase = timestampBase;
+        streamInfo.mirrorMode = mirrorMode;
         return binder::Status::ok();
     }
     if (width != streamInfo.width) {
@@ -437,114 +522,115 @@ binder::Status SessionConfigurationUtils::createSurfaceFromGbp(
     return binder::Status::ok();
 }
 
-void SessionConfigurationUtils::mapStreamInfo(const OutputStreamInfo &streamInfo,
+void mapStreamInfo(const OutputStreamInfo &streamInfo,
             camera3::camera_stream_rotation_t rotation, String8 physicalId,
-            int32_t groupId, hardware::camera::device::V3_7::Stream *stream /*out*/) {
+            int32_t groupId, aidl::android::hardware::camera::device::Stream *stream /*out*/) {
     if (stream == nullptr) {
         return;
     }
 
-    stream->v3_4.v3_2.streamType = hardware::camera::device::V3_2::StreamType::OUTPUT;
-    stream->v3_4.v3_2.width = streamInfo.width;
-    stream->v3_4.v3_2.height = streamInfo.height;
-    stream->v3_4.v3_2.format = Camera3Device::mapToPixelFormat(streamInfo.format);
+    stream->streamType = aidl::android::hardware::camera::device::StreamType::OUTPUT;
+    stream->width = streamInfo.width;
+    stream->height = streamInfo.height;
+    stream->format = AidlCamera3Device::mapToAidlPixelFormat(streamInfo.format);
     auto u = streamInfo.consumerUsage;
     camera3::Camera3OutputStream::applyZSLUsageQuirk(streamInfo.format, &u);
-    stream->v3_4.v3_2.usage = Camera3Device::mapToConsumerUsage(u);
-    stream->v3_4.v3_2.dataSpace = Camera3Device::mapToHidlDataspace(streamInfo.dataSpace);
-    stream->v3_4.v3_2.rotation = Camera3Device::mapToStreamRotation(rotation);
-    stream->v3_4.v3_2.id = -1; // Invalid stream id
-    stream->v3_4.physicalCameraId = std::string(physicalId.string());
-    stream->v3_4.bufferSize = 0;
+    stream->usage = AidlCamera3Device::mapToAidlConsumerUsage(u);
+    stream->dataSpace = AidlCamera3Device::mapToAidlDataspace(streamInfo.dataSpace);
+    stream->rotation = AidlCamera3Device::mapToAidlStreamRotation(rotation);
+    stream->id = -1; // Invalid stream id
+    stream->physicalCameraId = std::string(physicalId.string());
+    stream->bufferSize = 0;
     stream->groupId = groupId;
     stream->sensorPixelModesUsed.resize(streamInfo.sensorPixelModesUsed.size());
     size_t idx = 0;
+    using SensorPixelMode = aidl::android::hardware::camera::metadata::SensorPixelMode;
     for (auto mode : streamInfo.sensorPixelModesUsed) {
         stream->sensorPixelModesUsed[idx++] =
-                static_cast<CameraMetadataEnumAndroidSensorPixelMode>(mode);
+                static_cast<SensorPixelMode>(mode);
     }
+    using DynamicRangeProfile =
+            aidl::android::hardware::camera::metadata::RequestAvailableDynamicRangeProfilesMap;
+    stream->dynamicRangeProfile = static_cast<DynamicRangeProfile>(streamInfo.dynamicRangeProfile);
+    using StreamUseCases =
+            aidl::android::hardware::camera::metadata::ScalerAvailableStreamUseCases;
+    stream->useCase = static_cast<StreamUseCases>(streamInfo.streamUseCase);
 }
 
-binder::Status SessionConfigurationUtils::checkPhysicalCameraId(
-        const std::vector<std::string> &physicalCameraIds, const String8 &physicalCameraId,
-        const String8 &logicalCameraId) {
-    if (physicalCameraId.size() == 0) {
-        return binder::Status::ok();
+status_t
+convertAidlToHidl38StreamCombination(
+        const aidl::android::hardware::camera::device::StreamConfiguration &aidl,
+        hardware::camera::device::V3_8::StreamConfiguration &hidl) {
+    hidl.operationMode =
+        static_cast<hardware::camera::device::V3_2::StreamConfigurationMode>(aidl.operationMode);
+    if (aidl.streamConfigCounter < 0) {
+        return BAD_VALUE;
     }
-    if (std::find(physicalCameraIds.begin(), physicalCameraIds.end(),
-        physicalCameraId.string()) == physicalCameraIds.end()) {
-        String8 msg = String8::format("Camera %s: Camera doesn't support physicalCameraId %s.",
-                logicalCameraId.string(), physicalCameraId.string());
-        ALOGE("%s: %s", __FUNCTION__, msg.string());
-        return STATUS_ERROR(CameraService::ERROR_ILLEGAL_ARGUMENT, msg.string());
-    }
-    return binder::Status::ok();
-}
+    hidl.streamConfigCounter = static_cast<uint32_t>(aidl.streamConfigCounter);
+    hidl.multiResolutionInputImage = aidl.multiResolutionInputImage;
+    hidl.sessionParams = aidl.sessionParams.metadata;
+    hidl.streams.resize(aidl.streams.size());
+    size_t i = 0;
+    for (const auto &stream : aidl.streams) {
+        //hidlv3_8
+        hidl.streams[i].dynamicRangeProfile =
+                static_cast<
+                        CameraMetadataEnumAndroidRequestAvailableDynamicRangeProfilesMap>
+                                (stream.dynamicRangeProfile);
+        hidl.streams[i].useCase =
+                static_cast<
+                        CameraMetadataEnumAndroidScalerAvailableStreamUseCases>
+                                (stream.useCase);
 
-binder::Status SessionConfigurationUtils::checkSurfaceType(size_t numBufferProducers,
-        bool deferredConsumer, int surfaceType)  {
-    if (numBufferProducers > MAX_SURFACES_PER_STREAM) {
-        ALOGE("%s: GraphicBufferProducer count %zu for stream exceeds limit of %d",
-                __FUNCTION__, numBufferProducers, MAX_SURFACES_PER_STREAM);
-        return STATUS_ERROR(CameraService::ERROR_ILLEGAL_ARGUMENT, "Surface count is too high");
-    } else if ((numBufferProducers == 0) && (!deferredConsumer)) {
-        ALOGE("%s: Number of consumers cannot be smaller than 1", __FUNCTION__);
-        return STATUS_ERROR(CameraService::ERROR_ILLEGAL_ARGUMENT, "No valid consumers.");
-    }
-
-    bool validSurfaceType = ((surfaceType == OutputConfiguration::SURFACE_TYPE_SURFACE_VIEW) ||
-            (surfaceType == OutputConfiguration::SURFACE_TYPE_SURFACE_TEXTURE));
-
-    if (deferredConsumer && !validSurfaceType) {
-        ALOGE("%s: Target surface has invalid surfaceType = %d.", __FUNCTION__, surfaceType);
-        return STATUS_ERROR(CameraService::ERROR_ILLEGAL_ARGUMENT, "Target Surface is invalid");
-    }
-
-    return binder::Status::ok();
-}
-
-binder::Status SessionConfigurationUtils::checkOperatingMode(int operatingMode,
-        const CameraMetadata &staticInfo, const String8 &cameraId) {
-    if (operatingMode < 0) {
-        String8 msg = String8::format(
-            "Camera %s: Invalid operating mode %d requested", cameraId.string(), operatingMode);
-        ALOGE("%s: %s", __FUNCTION__, msg.string());
-        return STATUS_ERROR(CameraService::ERROR_ILLEGAL_ARGUMENT,
-                msg.string());
-    }
-
-    bool isConstrainedHighSpeed = (operatingMode == ICameraDeviceUser::CONSTRAINED_HIGH_SPEED_MODE);
-    if (isConstrainedHighSpeed) {
-        camera_metadata_ro_entry_t entry = staticInfo.find(ANDROID_REQUEST_AVAILABLE_CAPABILITIES);
-        bool isConstrainedHighSpeedSupported = false;
-        for(size_t i = 0; i < entry.count; ++i) {
-            uint8_t capability = entry.data.u8[i];
-            if (capability == ANDROID_REQUEST_AVAILABLE_CAPABILITIES_CONSTRAINED_HIGH_SPEED_VIDEO) {
-                isConstrainedHighSpeedSupported = true;
-                break;
-            }
+        // hidl v3_7
+        hidl.streams[i].v3_7.groupId = stream.groupId;
+        hidl.streams[i].v3_7.sensorPixelModesUsed.resize(stream.sensorPixelModesUsed.size());
+        size_t j = 0;
+        for (const auto &mode : stream.sensorPixelModesUsed) {
+            hidl.streams[i].v3_7.sensorPixelModesUsed[j] =
+                    static_cast<CameraMetadataEnumAndroidSensorPixelMode>(mode);
+            j++;
         }
-        if (!isConstrainedHighSpeedSupported) {
-            String8 msg = String8::format(
-                "Camera %s: Try to create a constrained high speed configuration on a device"
-                " that doesn't support it.", cameraId.string());
-            ALOGE("%s: %s", __FUNCTION__, msg.string());
-            return STATUS_ERROR(CameraService::ERROR_ILLEGAL_ARGUMENT,
-                    msg.string());
-        }
-    }
 
-    return binder::Status::ok();
+        //hidl v3_4
+        hidl.streams[i].v3_7.v3_4.physicalCameraId = stream.physicalCameraId;
+
+        if (stream.bufferSize < 0) {
+            return BAD_VALUE;
+        }
+        hidl.streams[i].v3_7.v3_4.bufferSize = static_cast<uint32_t>(stream.bufferSize);
+
+        // hild v3_2
+        hidl.streams[i].v3_7.v3_4.v3_2.id = stream.id;
+        hidl.streams[i].v3_7.v3_4.v3_2.format =
+                static_cast<hardware::graphics::common::V1_0::PixelFormat>(stream.format);
+
+        if (stream.width < 0 || stream.height < 0) {
+            return BAD_VALUE;
+        }
+        hidl.streams[i].v3_7.v3_4.v3_2.width = static_cast<uint32_t>(stream.width);
+        hidl.streams[i].v3_7.v3_4.v3_2.height = static_cast<uint32_t>(stream.height);
+        hidl.streams[i].v3_7.v3_4.v3_2.usage =
+                static_cast<hardware::camera::device::V3_2::BufferUsageFlags>(stream.usage);
+        hidl.streams[i].v3_7.v3_4.v3_2.streamType =
+                static_cast<hardware::camera::device::V3_2::StreamType>(stream.streamType);
+        hidl.streams[i].v3_7.v3_4.v3_2.dataSpace =
+                static_cast<hardware::camera::device::V3_2::DataspaceFlags>(stream.dataSpace);
+        hidl.streams[i].v3_7.v3_4.v3_2.rotation =
+                static_cast<hardware::camera::device::V3_2::StreamRotation>(stream.rotation);
+        i++;
+    }
+    return OK;
 }
 
 binder::Status
-SessionConfigurationUtils::convertToHALStreamCombination(
+convertToHALStreamCombination(
         const SessionConfiguration& sessionConfiguration,
         const String8 &logicalCameraId, const CameraMetadata &deviceInfo,
         metadataGetter getMetadata, const std::vector<std::string> &physicalCameraIds,
-        hardware::camera::device::V3_7::StreamConfiguration &streamConfiguration,
+        aidl::android::hardware::camera::device::StreamConfiguration &streamConfiguration,
         bool overrideForPerfClass, bool *earlyExit) {
-
+    using SensorPixelMode = aidl::android::hardware::camera::metadata::SensorPixelMode;
     auto operatingMode = sessionConfiguration.getOperatingMode();
     binder::Status res = checkOperatingMode(operatingMode, deviceInfo, logicalCameraId);
     if (!res.isOk()) {
@@ -557,7 +643,7 @@ SessionConfigurationUtils::convertToHALStreamCombination(
         return STATUS_ERROR(CameraService::ERROR_ILLEGAL_ARGUMENT, msg.string());
     }
     *earlyExit = false;
-    auto ret = Camera3Device::mapToStreamConfigurationMode(
+    auto ret = AidlCamera3Device::mapToAidlStreamConfigurationMode(
             static_cast<camera_stream_configuration_mode_t> (operatingMode),
             /*out*/ &streamConfiguration.operationMode);
     if (ret != OK) {
@@ -578,19 +664,27 @@ SessionConfigurationUtils::convertToHALStreamCombination(
     streamConfiguration.streams.resize(streamCount);
     size_t streamIdx = 0;
     if (isInputValid) {
-        hardware::hidl_vec<CameraMetadataEnumAndroidSensorPixelMode> defaultSensorPixelModes;
+        std::vector<SensorPixelMode> defaultSensorPixelModes;
         defaultSensorPixelModes.resize(1);
         defaultSensorPixelModes[0] =
-                static_cast<CameraMetadataEnumAndroidSensorPixelMode>(
-                        ANDROID_SENSOR_PIXEL_MODE_DEFAULT);
-        streamConfiguration.streams[streamIdx++] = {{{/*streamId*/0,
-                hardware::camera::device::V3_2::StreamType::INPUT,
-                static_cast<uint32_t> (sessionConfiguration.getInputWidth()),
-                static_cast<uint32_t> (sessionConfiguration.getInputHeight()),
-                Camera3Device::mapToPixelFormat(sessionConfiguration.getInputFormat()),
-                /*usage*/ 0, HAL_DATASPACE_UNKNOWN,
-                hardware::camera::device::V3_2::StreamRotation::ROTATION_0},
-                /*physicalId*/ nullptr, /*bufferSize*/0}, /*groupId*/-1, defaultSensorPixelModes};
+                static_cast<SensorPixelMode>(ANDROID_SENSOR_PIXEL_MODE_DEFAULT);
+        aidl::android::hardware::camera::device::Stream stream;
+        stream.id = 0;
+        stream.streamType =  aidl::android::hardware::camera::device::StreamType::INPUT;
+        stream.width = static_cast<uint32_t> (sessionConfiguration.getInputWidth());
+        stream.height =  static_cast<uint32_t> (sessionConfiguration.getInputHeight());
+        stream.format =
+                AidlCamera3Device::AidlCamera3Device::mapToAidlPixelFormat(
+                        sessionConfiguration.getInputFormat());
+        stream.usage = static_cast<aidl::android::hardware::graphics::common::BufferUsage>(0);
+        stream.dataSpace =
+              static_cast<aidl::android::hardware::graphics::common::Dataspace>(
+                      HAL_DATASPACE_UNKNOWN);
+        stream.rotation = aidl::android::hardware::camera::device::StreamRotation::ROTATION_0;
+        stream.bufferSize = 0;
+        stream.groupId = -1;
+        stream.sensorPixelModesUsed = defaultSensorPixelModes;
+        streamConfiguration.streams[streamIdx++] = stream;
         streamConfiguration.multiResolutionInputImage =
                 sessionConfiguration.inputIsMultiResolution();
     }
@@ -601,6 +695,7 @@ SessionConfigurationUtils::convertToHALStreamCombination(
         bool deferredConsumer = it.isDeferred();
         String8 physicalCameraId = String8(it.getPhysicalCameraId());
 
+        int dynamicRangeProfile = it.getDynamicRangeProfile();
         std::vector<int32_t> sensorPixelModesUsed = it.getSensorPixelModesUsed();
         const CameraMetadata &physicalDeviceInfo = getMetadata(physicalCameraId,
                 overrideForPerfClass);
@@ -622,6 +717,9 @@ SessionConfigurationUtils::convertToHALStreamCombination(
             return res;
         }
 
+        int streamUseCase = it.getStreamUseCase();
+        int timestampBase = it.getTimestampBase();
+        int mirrorMode = it.getMirrorMode();
         if (deferredConsumer) {
             streamInfo.width = it.getWidth();
             streamInfo.height = it.getHeight();
@@ -632,6 +730,7 @@ SessionConfigurationUtils::convertToHALStreamCombination(
             if (surfaceType == OutputConfiguration::SURFACE_TYPE_SURFACE_VIEW) {
                 streamInfo.consumerUsage |= GraphicBuffer::USAGE_HW_COMPOSER;
             }
+            streamInfo.dynamicRangeProfile = it.getDynamicRangeProfile();
             if (checkAndOverrideSensorPixelModesUsed(sensorPixelModesUsed,
                     streamInfo.format, streamInfo.width,
                     streamInfo.height, metadataChosen, false /*flexibleConsumer*/,
@@ -641,6 +740,7 @@ SessionConfigurationUtils::convertToHALStreamCombination(
                         return STATUS_ERROR(CameraService::ERROR_ILLEGAL_ARGUMENT,
                                 "Deferred surface sensor pixel modes not valid");
             }
+            streamInfo.streamUseCase = streamUseCase;
             mapStreamInfo(streamInfo, camera3::CAMERA_STREAM_ROTATION_0, physicalCameraId, groupId,
                     &streamConfiguration.streams[streamIdx++]);
             isStreamInfoValid = true;
@@ -653,7 +753,8 @@ SessionConfigurationUtils::convertToHALStreamCombination(
         for (auto& bufferProducer : bufferProducers) {
             sp<Surface> surface;
             res = createSurfaceFromGbp(streamInfo, isStreamInfoValid, surface, bufferProducer,
-                    logicalCameraId, metadataChosen, sensorPixelModesUsed);
+                    logicalCameraId, metadataChosen, sensorPixelModesUsed, dynamicRangeProfile,
+                    streamUseCase, timestampBase, mirrorMode);
 
             if (!res.isOk())
                 return res;
@@ -711,6 +812,138 @@ SessionConfigurationUtils::convertToHALStreamCombination(
     return binder::Status::ok();
 }
 
+void mapStreamInfo(const OutputStreamInfo &streamInfo,
+            camera3::camera_stream_rotation_t rotation, String8 physicalId,
+            int32_t groupId, hardware::camera::device::V3_8::Stream *stream /*out*/) {
+    if (stream == nullptr) {
+        return;
+    }
+
+    stream->v3_7.v3_4.v3_2.streamType = hardware::camera::device::V3_2::StreamType::OUTPUT;
+    stream->v3_7.v3_4.v3_2.width = streamInfo.width;
+    stream->v3_7.v3_4.v3_2.height = streamInfo.height;
+    stream->v3_7.v3_4.v3_2.format = HidlCamera3Device::mapToPixelFormat(streamInfo.format);
+    auto u = streamInfo.consumerUsage;
+    camera3::Camera3OutputStream::applyZSLUsageQuirk(streamInfo.format, &u);
+    stream->v3_7.v3_4.v3_2.usage = HidlCamera3Device::mapToConsumerUsage(u);
+    stream->v3_7.v3_4.v3_2.dataSpace = HidlCamera3Device::mapToHidlDataspace(streamInfo.dataSpace);
+    stream->v3_7.v3_4.v3_2.rotation = HidlCamera3Device::mapToStreamRotation(rotation);
+    stream->v3_7.v3_4.v3_2.id = -1; // Invalid stream id
+    stream->v3_7.v3_4.physicalCameraId = std::string(physicalId.string());
+    stream->v3_7.v3_4.bufferSize = 0;
+    stream->v3_7.groupId = groupId;
+    stream->v3_7.sensorPixelModesUsed.resize(streamInfo.sensorPixelModesUsed.size());
+
+    size_t idx = 0;
+    for (auto mode : streamInfo.sensorPixelModesUsed) {
+        stream->v3_7.sensorPixelModesUsed[idx++] =
+                static_cast<CameraMetadataEnumAndroidSensorPixelMode>(mode);
+    }
+    stream->dynamicRangeProfile =
+        static_cast<CameraMetadataEnumAndroidRequestAvailableDynamicRangeProfilesMap> (
+                streamInfo.dynamicRangeProfile);
+    stream->useCase = static_cast<CameraMetadataEnumAndroidScalerAvailableStreamUseCases>(
+            streamInfo.streamUseCase);
+}
+
+binder::Status checkPhysicalCameraId(
+        const std::vector<std::string> &physicalCameraIds, const String8 &physicalCameraId,
+        const String8 &logicalCameraId) {
+    if (physicalCameraId.size() == 0) {
+        return binder::Status::ok();
+    }
+    if (std::find(physicalCameraIds.begin(), physicalCameraIds.end(),
+        physicalCameraId.string()) == physicalCameraIds.end()) {
+        String8 msg = String8::format("Camera %s: Camera doesn't support physicalCameraId %s.",
+                logicalCameraId.string(), physicalCameraId.string());
+        ALOGE("%s: %s", __FUNCTION__, msg.string());
+        return STATUS_ERROR(CameraService::ERROR_ILLEGAL_ARGUMENT, msg.string());
+    }
+    return binder::Status::ok();
+}
+
+binder::Status checkSurfaceType(size_t numBufferProducers,
+        bool deferredConsumer, int surfaceType)  {
+    if (numBufferProducers > MAX_SURFACES_PER_STREAM) {
+        ALOGE("%s: GraphicBufferProducer count %zu for stream exceeds limit of %d",
+                __FUNCTION__, numBufferProducers, MAX_SURFACES_PER_STREAM);
+        return STATUS_ERROR(CameraService::ERROR_ILLEGAL_ARGUMENT, "Surface count is too high");
+    } else if ((numBufferProducers == 0) && (!deferredConsumer)) {
+        ALOGE("%s: Number of consumers cannot be smaller than 1", __FUNCTION__);
+        return STATUS_ERROR(CameraService::ERROR_ILLEGAL_ARGUMENT, "No valid consumers.");
+    }
+
+    bool validSurfaceType = ((surfaceType == OutputConfiguration::SURFACE_TYPE_SURFACE_VIEW) ||
+            (surfaceType == OutputConfiguration::SURFACE_TYPE_SURFACE_TEXTURE));
+
+    if (deferredConsumer && !validSurfaceType) {
+        ALOGE("%s: Target surface has invalid surfaceType = %d.", __FUNCTION__, surfaceType);
+        return STATUS_ERROR(CameraService::ERROR_ILLEGAL_ARGUMENT, "Target Surface is invalid");
+    }
+
+    return binder::Status::ok();
+}
+
+binder::Status checkOperatingMode(int operatingMode,
+        const CameraMetadata &staticInfo, const String8 &cameraId) {
+    if (operatingMode < 0) {
+        String8 msg = String8::format(
+            "Camera %s: Invalid operating mode %d requested", cameraId.string(), operatingMode);
+        ALOGE("%s: %s", __FUNCTION__, msg.string());
+        return STATUS_ERROR(CameraService::ERROR_ILLEGAL_ARGUMENT,
+                msg.string());
+    }
+
+    bool isConstrainedHighSpeed = (operatingMode == ICameraDeviceUser::CONSTRAINED_HIGH_SPEED_MODE);
+    if (isConstrainedHighSpeed) {
+        camera_metadata_ro_entry_t entry = staticInfo.find(ANDROID_REQUEST_AVAILABLE_CAPABILITIES);
+        bool isConstrainedHighSpeedSupported = false;
+        for(size_t i = 0; i < entry.count; ++i) {
+            uint8_t capability = entry.data.u8[i];
+            if (capability == ANDROID_REQUEST_AVAILABLE_CAPABILITIES_CONSTRAINED_HIGH_SPEED_VIDEO) {
+                isConstrainedHighSpeedSupported = true;
+                break;
+            }
+        }
+        if (!isConstrainedHighSpeedSupported) {
+            String8 msg = String8::format(
+                "Camera %s: Try to create a constrained high speed configuration on a device"
+                " that doesn't support it.", cameraId.string());
+            ALOGE("%s: %s", __FUNCTION__, msg.string());
+            return STATUS_ERROR(CameraService::ERROR_ILLEGAL_ARGUMENT,
+                    msg.string());
+        }
+    }
+
+    return binder::Status::ok();
+}
+
+binder::Status
+convertToHALStreamCombination(
+        const SessionConfiguration& sessionConfiguration,
+        const String8 &logicalCameraId, const CameraMetadata &deviceInfo,
+        metadataGetter getMetadata, const std::vector<std::string> &physicalCameraIds,
+        hardware::camera::device::V3_8::StreamConfiguration &streamConfiguration,
+        bool overrideForPerfClass, bool *earlyExit) {
+    aidl::android::hardware::camera::device::StreamConfiguration aidlStreamConfiguration;
+    auto ret = convertToHALStreamCombination(sessionConfiguration, logicalCameraId, deviceInfo,
+            getMetadata, physicalCameraIds, aidlStreamConfiguration, overrideForPerfClass,
+            earlyExit);
+    if (!ret.isOk()) {
+        return ret;
+    }
+    if (earlyExit != nullptr && *earlyExit) {
+        return binder::Status::ok();
+    }
+
+    if (convertAidlToHidl38StreamCombination(aidlStreamConfiguration, streamConfiguration) != OK) {
+        return STATUS_ERROR(CameraService::ERROR_ILLEGAL_ARGUMENT,
+                "Invalid AIDL->HIDL3.8 conversion");
+    }
+
+    return binder::Status::ok();
+}
+
 static bool inStreamConfigurationMap(int format, int width, int height,
         const std::unordered_map<int, std::vector<camera3::StreamConfiguration>> &sm) {
     auto scs = sm.find(format);
@@ -729,7 +962,7 @@ static std::unordered_set<int32_t> convertToSet(const std::vector<int32_t> &sens
     return std::unordered_set<int32_t>(sensorPixelModesUsed.begin(), sensorPixelModesUsed.end());
 }
 
-status_t SessionConfigurationUtils::checkAndOverrideSensorPixelModesUsed(
+status_t checkAndOverrideSensorPixelModesUsed(
         const std::vector<int32_t> &sensorPixelModesUsed, int format, int width, int height,
         const CameraMetadata &staticInfo, bool flexibleConsumer,
         std::unordered_set<int32_t> *overriddenSensorPixelModesUsed) {
@@ -795,21 +1028,31 @@ status_t SessionConfigurationUtils::checkAndOverrideSensorPixelModesUsed(
     return OK;
 }
 
-bool SessionConfigurationUtils::isUltraHighResolutionSensor(const CameraMetadata &deviceInfo) {
-    camera_metadata_ro_entry_t entryCap;
-    entryCap = deviceInfo.find(ANDROID_REQUEST_AVAILABLE_CAPABILITIES);
-    // Go through the capabilities and check if it has
-    // ANDROID_REQUEST_AVAILABLE_CAPABILITIES_ULTRA_HIGH_RESOLUTION_SENSOR
-    for (size_t i = 0; i < entryCap.count; ++i) {
-        uint8_t capability = entryCap.data.u8[i];
-        if (capability == ANDROID_REQUEST_AVAILABLE_CAPABILITIES_ULTRA_HIGH_RESOLUTION_SENSOR) {
-            return true;
+bool convertHALStreamCombinationFromV38ToV37(
+        hardware::camera::device::V3_7::StreamConfiguration &streamConfigV37,
+        const hardware::camera::device::V3_8::StreamConfiguration &streamConfigV38) {
+    streamConfigV37.streams.resize(streamConfigV38.streams.size());
+    for (size_t i = 0; i < streamConfigV38.streams.size(); i++) {
+        if (static_cast<int32_t>(streamConfigV38.streams[i].dynamicRangeProfile) !=
+                ANDROID_REQUEST_AVAILABLE_DYNAMIC_RANGE_PROFILES_MAP_STANDARD) {
+            // ICameraDevice older than 3.8 doesn't support 10-bit dynamic range profiles
+            // image
+            return false;
         }
+        if (static_cast<int32_t>(streamConfigV38.streams[i].useCase) !=
+                ANDROID_SCALER_AVAILABLE_STREAM_USE_CASES_DEFAULT) {
+            // ICameraDevice older than 3.8 doesn't support stream use case
+            return false;
+        }
+        streamConfigV37.streams[i] = streamConfigV38.streams[i].v3_7;
     }
-    return false;
+    streamConfigV37.operationMode = streamConfigV38.operationMode;
+    streamConfigV37.sessionParams = streamConfigV38.sessionParams;
+
+    return true;
 }
 
-bool SessionConfigurationUtils::convertHALStreamCombinationFromV37ToV34(
+bool convertHALStreamCombinationFromV37ToV34(
         hardware::camera::device::V3_4::StreamConfiguration &streamConfigV34,
         const hardware::camera::device::V3_7::StreamConfiguration &streamConfigV37) {
     if (streamConfigV37.multiResolutionInputImage) {
@@ -832,7 +1075,7 @@ bool SessionConfigurationUtils::convertHALStreamCombinationFromV37ToV34(
     return true;
 }
 
-bool SessionConfigurationUtils::targetPerfClassPrimaryCamera(
+bool targetPerfClassPrimaryCamera(
         const std::set<std::string>& perfClassPrimaryCameraIds, const std::string& cameraId,
         int targetSdkVersion) {
     bool isPerfClassPrimaryCamera =
@@ -840,5 +1083,6 @@ bool SessionConfigurationUtils::targetPerfClassPrimaryCamera(
     return targetSdkVersion >= SDK_VERSION_S && isPerfClassPrimaryCamera;
 }
 
+} // namespace SessionConfigurationUtils
 } // namespace camera3
 } // namespace android

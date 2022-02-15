@@ -220,6 +220,17 @@ bool captureVoiceCommunicationOutputAllowed(const AttributionSourceState& attrib
     return ok;
 }
 
+bool accessUltrasoundAllowed(const AttributionSourceState& attributionSource) {
+    uid_t uid = VALUE_OR_FATAL(aidl2legacy_int32_t_uid_t(attributionSource.uid));
+    uid_t pid = VALUE_OR_FATAL(aidl2legacy_int32_t_pid_t(attributionSource.pid));
+    if (isAudioServerOrRootUid(uid)) return true;
+    static const String16 sAccessUltrasound(
+        "android.permission.ACCESS_ULTRASOUND");
+    bool ok = PermissionCache::checkPermission(sAccessUltrasound, pid, uid);
+    if (!ok) ALOGE("Request requires android.permission.ACCESS_ULTRASOUND");
+    return ok;
+}
+
 bool captureHotwordAllowed(const AttributionSourceState& attributionSource) {
     // CAPTURE_AUDIO_HOTWORD permission implies RECORD_AUDIO permission
     bool ok = recordingAllowed(attributionSource);

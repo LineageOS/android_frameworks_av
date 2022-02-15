@@ -112,6 +112,41 @@ typedef enum AMediaDrmKeyType {
 } AMediaDrmKeyType;
 
 /**
+ * Introduced in API 33.
+ */
+typedef enum AMediaDrmKeyRequestType : int32_t {
+    /**
+     * Key request type is initial license request.
+     * An initial license request is necessary to load keys.
+     */
+    KEY_REQUEST_TYPE_INITIAL,
+
+    /**
+     * Key request type is license renewal.
+     * A renewal license request is necessary to prevent the keys from expiring.
+     */
+    KEY_REQUEST_TYPE_RENEWAL,
+
+    /**
+     * Key request type is license release.
+     * A license release request indicates that keys are removed.
+     */
+    KEY_REQUEST_TYPE_RELEASE,
+
+    /**
+     * Keys are already loaded and are available for use. No license request is necessary, and
+     * no key request data is returned.
+     */
+    KEY_REQUEST_TYPE_NONE,
+
+    /**
+     * Keys have been loaded but an additional license request is needed
+     * to update their values.
+     */
+    KEY_REQUEST_TYPE_UPDATE
+} AMediaDrmKeyRequestType;
+
+/**
  *  Data type containing {key, value} pair
  */
 typedef struct AMediaDrmKeyValuePair {
@@ -248,7 +283,10 @@ media_status_t AMediaDrm_closeSession(AMediaDrm *,
  * to obtain or release keys used to decrypt encrypted content.
  * AMediaDrm_getKeyRequest is used to obtain an opaque key request byte array that
  * is delivered to the license server.  The opaque key request byte array is
- * returned in KeyRequest.data.
+ * returned in *keyRequest and the number of bytes in the request is
+ * returned in *keyRequestSize.
+ * This API has same functionality as AMediaDrm_getKeyRequestWithDefaultUrlAndType()
+ * when defaultUrl and keyRequestType are passed in as NULL.
  *
  * After the app has received the key request response from the server,
  * it should deliver to the response to the DRM engine plugin using the method
@@ -280,11 +318,14 @@ media_status_t AMediaDrm_closeSession(AMediaDrm *,
  *   by the caller
  *
  * On exit:
+ *   If this returns AMEDIA_OK,
  *   1. The keyRequest pointer will reference the opaque key request data.  It
  *       will reside in memory owned by the AMediaDrm object, and will remain
- *       accessible until the next call to AMediaDrm_getKeyRequest or until the
+ *       accessible until the next call to AMediaDrm_getKeyRequest
+ *       or AMediaDrm_getKeyRequestWithDefaultUrlAndType or until the
  *       MediaDrm object is released.
  *   2. keyRequestSize will be set to the size of the request
+ *   If this does not return AMEDIA_OK, value of these parameters should not be used.
  *
  * Returns MEDIADRM_NOT_PROVISIONED_ERROR if reprovisioning is needed, due to a
  * problem with the device certificate.
@@ -295,6 +336,72 @@ media_status_t AMediaDrm_getKeyRequest(AMediaDrm *, const AMediaDrmScope *scope,
         const uint8_t *init, size_t initSize, const char *mimeType, AMediaDrmKeyType keyType,
         const AMediaDrmKeyValue *optionalParameters, size_t numOptionalParameters,
         const uint8_t **keyRequest, size_t *keyRequestSize) __INTRODUCED_IN(21);
+
+/**
+ * A key request/response exchange occurs between the app and a license server
+ * to obtain or release keys used to decrypt encrypted content.
+ * AMediaDrm_getKeyRequest is used to obtain an opaque key request byte array that
+ * is delivered to the license server.  The opaque key request byte array is
+ * returned in *keyRequest and the number of bytes in the request is
+ * returned in *keyRequestSize.
+ *
+ * After the app has received the key request response from the server,
+ * it should deliver to the response to the DRM engine plugin using the method
+ * AMediaDrm_provideKeyResponse.
+ *
+ * scope may be a sessionId or a keySetId, depending on the specified keyType.
+ * When the keyType is KEY_TYPE_STREAMING or KEY_TYPE_OFFLINE, scope should be set
+ * to the sessionId the keys will be provided to.  When the keyType is
+ * KEY_TYPE_RELEASE, scope should be set to the keySetId of the keys being released.
+ * Releasing keys from a device invalidates them for all sessions.
+ *
+ * init container-specific data, its meaning is interpreted based on the mime type
+ * provided in the mimeType parameter.  It could contain, for example, the content
+ * ID, key ID or other data obtained from the content metadata that is required in
+ * generating the key request. init may be null when keyType is KEY_TYPE_RELEASE.
+ *
+ * initSize is the number of bytes of initData
+ *
+ * mimeType identifies the mime type of the content.
+ *
+ * keyType specifes the type of the request. The request may be to acquire keys for
+ *   streaming or offline content, or to release previously acquired keys, which are
+ *   identified by a keySetId.
+ *
+ * optionalParameters are included in the key request message to allow a client
+ *   application to provide additional message parameters to the server.
+ *
+ * numOptionalParameters indicates the number of optional parameters provided
+ *   by the caller
+ *
+ * On exit:
+ *   If this returns AMEDIA_OK,
+ *   1. The keyRequest pointer will reference the opaque key request data.  It
+ *       will reside in memory owned by the AMediaDrm object, and will remain
+ *       accessible until the next call to either AMediaDrm_getKeyRequest
+ *       or AMediaDrm_getKeyRequestWithDefaultUrlAndType or until the
+ *       MediaDrm object is released.
+ *   2. keyRequestSize will be set to the size of the request.
+ *   3. defaultUrl will be set to the recommended URL to deliver the key request.
+ *      The defaultUrl pointer will reference a NULL terminated URL string.
+ *      It will be UTF-8 encoded and have same lifetime with the key request data
+ *      KeyRequest pointer references to. Passing in NULL means you don't need it
+ *      to be reported.
+ *   4. keyRequestType will be set to the key request type. Passing in NULL means
+*       you don't need it to be reported.
+ *
+ * Returns MEDIADRM_NOT_PROVISIONED_ERROR if reprovisioning is needed, due to a
+ * problem with the device certificate.
+ *
+ * Available since API level 33.
+ */
+media_status_t AMediaDrm_getKeyRequestWithDefaultUrlAndType(AMediaDrm *,
+        const AMediaDrmScope *scope, const uint8_t *init, size_t initSize,
+        const char *mimeType, AMediaDrmKeyType keyType,
+        const AMediaDrmKeyValue *optionalParameters,
+        size_t numOptionalParameters, const uint8_t **keyRequest,
+        size_t *keyRequestSize, const char **defaultUrl,
+        AMediaDrmKeyRequestType *keyRequestType) __INTRODUCED_IN(__ANDROID_API_T__);
 
 /**
  * A key response is received from the license server by the app, then it is

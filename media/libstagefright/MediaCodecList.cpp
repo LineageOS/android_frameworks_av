@@ -18,8 +18,6 @@
 #define LOG_TAG "MediaCodecList"
 #include <utils/Log.h>
 
-#include "MediaCodecListOverrides.h"
-
 #include <binder/IServiceManager.h>
 
 #include <media/IMediaCodecList.h>
@@ -34,6 +32,7 @@
 #include <media/stagefright/CCodec.h>
 #include <media/stagefright/Codec2InfoBuilder.h>
 #include <media/stagefright/MediaCodecList.h>
+#include <media/stagefright/MediaCodecListOverrides.h>
 #include <media/stagefright/MediaErrors.h>
 #include <media/stagefright/OmxInfoBuilder.h>
 #include <media/stagefright/PersistentSurface.h>

@@ -20,15 +20,11 @@
 #include PATH(android/hardware/audio/FILE_VERSION/IDevice.h)
 #include PATH(android/hardware/audio/FILE_VERSION/IPrimaryDevice.h)
 #include <media/audiohal/DeviceHalInterface.h>
+#include <media/audiohal/EffectHalInterface.h>
 
 #include "ConversionHelperHidl.h"
 
-using ::android::hardware::audio::CPP_VERSION::IDevice;
-using ::android::hardware::audio::CPP_VERSION::IPrimaryDevice;
-using ::android::hardware::Return;
-
 namespace android {
-namespace CPP_VERSION {
 
 class DeviceHalHidl : public DeviceHalInterface, public ConversionHelperHidl
 {
@@ -136,15 +132,23 @@ class DeviceHalHidl : public DeviceHalInterface, public ConversionHelperHidl
         return INVALID_OPERATION;
     }
 
+    status_t setConnectedState(const struct audio_port_v7 *port, bool connected) override;
+
+    error::Result<audio_hw_sync_t> getHwAvSync() override;
+
     status_t dump(int fd, const Vector<String16>& args) override;
 
   private:
     friend class DevicesFactoryHalHidl;
-    sp<IDevice> mDevice;
-    sp<IPrimaryDevice> mPrimaryDevice;  // Null if it's not a primary device.
+    sp<::android::hardware::audio::CPP_VERSION::IDevice> mDevice;
+    // Null if it's not a primary device.
+    sp<::android::hardware::audio::CPP_VERSION::IPrimaryDevice> mPrimaryDevice;
+    bool supportsSetConnectedState7_1 = true;
 
     // Can not be constructed directly by clients.
-    explicit DeviceHalHidl(const sp<IDevice>& device);
+    explicit DeviceHalHidl(const sp<::android::hardware::audio::CPP_VERSION::IDevice>& device);
+    explicit DeviceHalHidl(
+            const sp<::android::hardware::audio::CPP_VERSION::IPrimaryDevice>& device);
 
     // The destructor automatically closes the device.
     virtual ~DeviceHalHidl();
@@ -152,7 +156,6 @@ class DeviceHalHidl : public DeviceHalInterface, public ConversionHelperHidl
     template <typename HalPort> status_t getAudioPortImpl(HalPort *port);
 };
 
-} // namespace CPP_VERSION
 } // namespace android
 
 #endif // ANDROID_HARDWARE_DEVICE_HAL_HIDL_H

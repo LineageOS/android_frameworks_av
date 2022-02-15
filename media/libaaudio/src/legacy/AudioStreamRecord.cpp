@@ -37,10 +37,6 @@ using android::content::AttributionSourceState;
 using namespace android;
 using namespace aaudio;
 
-static void sCallbackWrapper(int event, void* userData, void* info) {
-    static_cast<AudioStreamRecord*>(userData)->processCallback(event, info);
-}
-
 AudioStreamRecord::AudioStreamRecord()
     : AudioStreamLegacy()
     , mFixedBlockWriter(*this)
@@ -128,13 +124,11 @@ aaudio_result_t AudioStreamRecord::open(const AudioStreamBuilder& builder)
     uint32_t notificationFrames = 0;
 
     // Setup the callback if there is one.
-    AudioRecord::legacy_callback_t callback = nullptr;
-    void *callbackData = nullptr;
+    sp<AudioRecord::IAudioRecordCallback> callback;
     AudioRecord::transfer_type streamTransferType = AudioRecord::transfer_type::TRANSFER_SYNC;
     if (builder.getDataCallbackProc() != nullptr) {
         streamTransferType = AudioRecord::transfer_type::TRANSFER_CALLBACK;
-        callback = sCallbackWrapper;
-        callbackData = this;
+        callback = sp<AudioRecord::IAudioRecordCallback>::fromExisting(this);
     }
     mCallbackBufferSize = builder.getFramesPerDataCallback();
 
@@ -181,7 +175,6 @@ aaudio_result_t AudioStreamRecord::open(const AudioStreamBuilder& builder)
                 channelMask,
                 frameCount,
                 callback,
-                callbackData,
                 notificationFrames,
                 false /*threadCanCallJava*/,
                 sessionId,
@@ -352,24 +345,6 @@ const void * AudioStreamRecord::maybeConvertDeviceData(const void *audioData, in
     } else {
         return audioData;
     }
-}
-
-void AudioStreamRecord::processCallback(int event, void *info) {
-    switch (event) {
-        case AudioRecord::EVENT_MORE_DATA:
-        {
-            AudioTrack::Buffer *audioBuffer = static_cast<AudioTrack::Buffer *>(info);
-            audioBuffer->size = onMoreData(*audioBuffer);
-            break;
-        }
-            // Stream got rerouted so we disconnect.
-        case AudioRecord::EVENT_NEW_IAUDIORECORD:
-            onNewIAudioTrack();
-            break;
-        default:
-            break;
-    }
-    return;
 }
 
 aaudio_result_t AudioStreamRecord::requestStart_l()
@@ -557,7 +532,7 @@ int64_t AudioStreamRecord::getFramesWritten() {
         case AAUDIO_STREAM_STATE_STARTED:
             result = mAudioRecord->getPosition(&position);
             if (result == OK) {
-                mFramesWritten.update32(position);
+                mFramesWritten.update32((int32_t)position);
             }
             break;
         case AAUDIO_STREAM_STATE_STOPPING:

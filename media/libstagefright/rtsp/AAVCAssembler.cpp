@@ -18,9 +18,9 @@
 #define LOG_TAG "AAVCAssembler"
 #include <utils/Log.h>
 
-#include "AAVCAssembler.h"
+#include <media/stagefright/rtsp/AAVCAssembler.h>
 
-#include "ARTPSource.h"
+#include <media/stagefright/rtsp/ARTPSource.h>
 
 #include <media/stagefright/foundation/ABuffer.h>
 #include <media/stagefright/foundation/ADebug.h>

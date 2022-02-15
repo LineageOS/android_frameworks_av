@@ -48,6 +48,7 @@ public:
     Camera2ClientBase(const sp<CameraService>& cameraService,
                       const sp<TCamCallbacks>& remoteCallback,
                       const String16& clientPackageName,
+                      bool systemNativeClient,
                       const std::optional<String16>& clientFeatureId,
                       const String8& cameraId,
                       int api1CameraId,
@@ -126,6 +127,8 @@ protected:
 
     // The PID provided in the constructor call
     pid_t mInitialClientPid;
+    bool mOverrideForPerfClass = false;
+    bool mLegacyClient = false;
 
     virtual sp<IBinder> asBinderWrapper() {
         return IInterface::asBinder(this);
@@ -145,9 +148,12 @@ protected:
 
     const int mDeviceVersion;
 
-    // Set to const to avoid mDevice being updated (update of sp<> is racy) during
-    // dumpDevice (which is important to be lock free for debugging purpose)
-    const sp<CameraDeviceBase>  mDevice;
+    // Note: This was previously set to const to avoid mDevice being updated -
+    // b/112639939 (update of sp<> is racy) during dumpDevice (which is important to be lock free
+    // for debugging purpose). The const has been removed since CameraDeviceBase
+    // needs to be set during initializeImpl(). This must not be set / cleared
+    // anywhere else.
+    sp<CameraDeviceBase>  mDevice;
 
     /** Utility members */
 

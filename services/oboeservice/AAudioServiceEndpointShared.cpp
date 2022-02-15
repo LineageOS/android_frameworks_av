@@ -214,3 +214,12 @@ aaudio_result_t AAudioServiceEndpointShared::getTimestamp(int64_t *positionFrame
     }
     return result;
 }
+
+void AAudioServiceEndpointShared::handleDisconnectRegisteredStreamsAsync() {
+    android::sp<AAudioServiceEndpointShared> holdEndpoint(this);
+    std::thread asyncTask([holdEndpoint]() {
+        // We do not need the returned vector.
+        holdEndpoint->disconnectRegisteredStreams();
+    });
+    asyncTask.detach();
+}

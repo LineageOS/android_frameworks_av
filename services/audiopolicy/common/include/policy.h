@@ -133,6 +133,7 @@ static inline bool device_has_encoding_capability(audio_devices_t device)
  * - AUDIO_SOURCE_FM_TUNER
  * - AUDIO_SOURCE_VOICE_RECOGNITION
  * - AUDIO_SOURCE_HOTWORD
+ * - AUDIO_SOURCE_ULTRASOUND
  *
  * @return the corresponding input source priority or 0 if priority is irrelevant for this source.
  *      This happens when the specified source cannot share a given input stream (e.g remote submix)
@@ -142,22 +143,24 @@ static inline int32_t source_priority(audio_source_t inputSource)
 {
     switch (inputSource) {
     case AUDIO_SOURCE_VOICE_COMMUNICATION:
-        return 9;
+        return 10;
     case AUDIO_SOURCE_CAMCORDER:
-        return 8;
+        return 9;
     case AUDIO_SOURCE_VOICE_PERFORMANCE:
-        return 7;
+        return 8;
     case AUDIO_SOURCE_UNPROCESSED:
-        return 6;
+        return 7;
     case AUDIO_SOURCE_MIC:
-        return 5;
+        return 6;
     case AUDIO_SOURCE_ECHO_REFERENCE:
-        return 4;
+        return 5;
     case AUDIO_SOURCE_FM_TUNER:
-        return 3;
+        return 4;
     case AUDIO_SOURCE_VOICE_RECOGNITION:
-        return 2;
+        return 3;
     case AUDIO_SOURCE_HOTWORD:
+        return 2;
+    case AUDIO_SOURCE_ULTRASOUND:
         return 1;
     default:
         break;

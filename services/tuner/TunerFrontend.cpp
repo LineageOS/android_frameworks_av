@@ -115,16 +115,6 @@ TunerFrontend::~TunerFrontend() {
     return mFrontend->setLnb(static_cast<TunerLnb*>(lnb.get())->getId());
 }
 
-::ndk::ScopedAStatus TunerFrontend::setLna(bool bEnable) {
-    if (mFrontend == nullptr) {
-        ALOGD("IFrontend is not initialized");
-        return ::ndk::ScopedAStatus::fromServiceSpecificError(
-                static_cast<int32_t>(Result::UNAVAILABLE));
-    }
-
-    return mFrontend->setLna(bEnable);
-}
-
 ::ndk::ScopedAStatus TunerFrontend::linkCiCamToFrontend(int32_t ciCamId, int32_t* _aidl_return) {
     if (mFrontend == nullptr) {
         ALOGD("IFrontend is not initialized");
@@ -172,6 +162,38 @@ TunerFrontend::~TunerFrontend() {
 ::ndk::ScopedAStatus TunerFrontend::getFrontendId(int32_t* _aidl_return) {
     *_aidl_return = mId;
     return ::ndk::ScopedAStatus::ok();
+}
+
+::ndk::ScopedAStatus TunerFrontend::getHardwareInfo(std::string* _aidl_return) {
+    if (mFrontend == nullptr) {
+        ALOGD("IFrontend is not initialized");
+        return ::ndk::ScopedAStatus::fromServiceSpecificError(
+                static_cast<int32_t>(Result::UNAVAILABLE));
+    }
+
+    return mFrontend->getHardwareInfo(_aidl_return);
+}
+
+::ndk::ScopedAStatus TunerFrontend::removeOutputPid(int32_t in_pid) {
+    if (mFrontend == nullptr) {
+        ALOGD("IFrontend is not initialized");
+        return ::ndk::ScopedAStatus::fromServiceSpecificError(
+                static_cast<int32_t>(Result::UNAVAILABLE));
+    }
+
+    return mFrontend->removeOutputPid(in_pid);
+}
+
+::ndk::ScopedAStatus TunerFrontend::getFrontendStatusReadiness(
+        const std::vector<FrontendStatusType>& in_statusTypes,
+        std::vector<FrontendStatusReadiness>* _aidl_return) {
+    if (mFrontend == nullptr) {
+        ALOGD("IFrontend is not initialized");
+        return ::ndk::ScopedAStatus::fromServiceSpecificError(
+                static_cast<int32_t>(Result::UNAVAILABLE));
+    }
+
+    return mFrontend->getFrontendStatusReadiness(in_statusTypes, _aidl_return);
 }
 
 /////////////// FrontendCallback ///////////////////////

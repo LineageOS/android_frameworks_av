@@ -64,6 +64,10 @@ void SharedMemoryParcelable::setup(const unique_fd& fd, int32_t sizeInBytes) {
     mSizeInBytes = sizeInBytes;
 }
 
+void SharedMemoryParcelable::setup(const SharedMemoryParcelable &sharedMemoryParcelable) {
+    setup(sharedMemoryParcelable.mFd, sharedMemoryParcelable.mSizeInBytes);
+}
+
 aaudio_result_t SharedMemoryParcelable::close() {
     if (mResolvedAddress != MMAP_UNRESOLVED_ADDRESS) {
         int err = munmap(mResolvedAddress, mSizeInBytes);
@@ -74,6 +78,14 @@ aaudio_result_t SharedMemoryParcelable::close() {
         mResolvedAddress = MMAP_UNRESOLVED_ADDRESS;
     }
     return AAUDIO_OK;
+}
+
+aaudio_result_t SharedMemoryParcelable::closeAndReleaseFd() {
+    aaudio_result_t result = close();
+    if (result == AAUDIO_OK) {
+        mFd.reset();
+    }
+    return result;
 }
 
 aaudio_result_t SharedMemoryParcelable::resolveSharedMemory(const unique_fd& fd) {

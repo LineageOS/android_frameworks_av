@@ -35,8 +35,16 @@ cc_library_static {
         cfi: true,
     },
 
-    include_dirs: [
-        "frameworks/av/media/libstagefright",
+    export_include_dirs: [
+        "include",
+    ],
+
+    local_include_dirs: [
+        "include/timedtext",
+    ],
+
+    header_libs: [
+        "libstagefright_headers",
     ],
 
     shared_libs: ["libmedia"],

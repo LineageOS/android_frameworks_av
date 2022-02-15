@@ -20,9 +20,6 @@
 
 #include "MPEG2PSExtractor.h"
 
-#include <AnotherPacketSource.h>
-#include <ESQueue.h>
-
 #include <media/stagefright/foundation/ABitReader.h>
 #include <media/stagefright/foundation/ABuffer.h>
 #include <media/stagefright/foundation/ADebug.h>
@@ -33,6 +30,8 @@
 #include <media/stagefright/MediaErrors.h>
 #include <media/stagefright/MetaData.h>
 #include <media/stagefright/Utils.h>
+#include <mpeg2ts/AnotherPacketSource.h>
+#include <mpeg2ts/ESQueue.h>
 #include <utils/String8.h>
 
 #include <inttypes.h>

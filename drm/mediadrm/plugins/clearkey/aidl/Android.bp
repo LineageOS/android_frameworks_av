@@ -1,0 +1,71 @@
+package {
+    // See: http://go/android-license-faq
+    // A large-scale-change added 'default_applicable_licenses' to import
+    // all of the 'license_kinds' from "hardware_interfaces_license"
+    // to get the below license kinds:
+    //   SPDX-license-identifier-Apache-2.0
+    default_applicable_licenses: ["frameworks_av_license"],
+}
+
+cc_defaults {
+    name: "aidl_clearkey_service_defaults",
+    vendor: true,
+
+    srcs: [
+        "CreatePluginFactories.cpp",
+        "CryptoPlugin.cpp",
+        "DrmFactory.cpp",
+        "DrmPlugin.cpp",
+    ],
+
+    relative_install_path: "hw",
+
+    cflags: ["-Wall", "-Werror", "-Wthread-safety"],
+
+    include_dirs: ["frameworks/av/include"],
+
+    shared_libs: [
+        "libbase",
+        "libbinder_ndk",
+        "libcrypto",
+        "liblog",
+        "libprotobuf-cpp-lite",
+        "libutils",
+        "android.hardware.drm-V1-ndk",
+    ],
+
+    static_libs: [
+        "android.hardware.common-V2-ndk",
+        "libclearkeybase",
+    ],
+
+    local_include_dirs: ["include"],
+
+    sanitize: {
+        integer_overflow: true,
+    },
+}
+
+cc_binary {
+    name: "android.hardware.drm-service.clearkey",
+    defaults: ["aidl_clearkey_service_defaults"],
+    srcs: ["Service.cpp"],
+    init_rc: ["android.hardware.drm-service.clearkey.rc"],
+    vintf_fragments: ["android.hardware.drm-service.clearkey.xml"],
+}
+
+cc_binary {
+    name: "android.hardware.drm-service-lazy.clearkey",
+    defaults: ["aidl_clearkey_service_defaults"],
+    overrides: ["android.hardware.drm-service.clearkey"],
+    srcs: ["ServiceLazy.cpp"],
+    init_rc: ["android.hardware.drm-service-lazy.clearkey.rc"],
+    vintf_fragments: ["android.hardware.drm-service.clearkey.xml"],
+}
+
+phony {
+    name: "android.hardware.drm@latest-service.clearkey",
+    required: [
+        "android.hardware.drm-service.clearkey",
+    ],
+}

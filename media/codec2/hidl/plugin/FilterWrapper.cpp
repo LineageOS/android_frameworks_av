@@ -49,6 +49,11 @@ public:
             std::weak_ptr<FilterWrapper> filterWrapper)
         : mIntf(intf), mFilterWrapper(filterWrapper) {
         takeFilters(std::move(filters));
+        for (size_t i = 0; i < mFilters.size(); ++i) {
+            mControlParamTypes.insert(
+                    mFilters[i].desc.controlParams.begin(),
+                    mFilters[i].desc.controlParams.end());
+        }
     }
 
     ~WrappedDecoderInterface() override = default;
@@ -187,7 +192,12 @@ public:
         }
 
         std::vector<C2Param *> stackParamsForIntf;
-        std::copy_n(stackParamsList.begin(), stackParamsList.size(), stackParamsForIntf.begin());
+        for (C2Param *param : stackParamsList) {
+            if (mControlParamTypes.count(param->type()) != 0) {
+                continue;
+            }
+            stackParamsForIntf.push_back(param);
+        }
 
         // Gather heap params that did not get queried from the filter interfaces above.
         // These need to be queried from the decoder interface.
@@ -195,6 +205,9 @@ public:
         for (size_t j = 0; j < heapParamIndices.size(); ++j) {
             uint32_t type = heapParamIndices[j].type();
             if (mTypeToIndexForQuery.find(type) != mTypeToIndexForQuery.end()) {
+                continue;
+            }
+            if (mControlParamTypes.count(type) != 0) {
                 continue;
             }
             heapParamIndicesForIntf.push_back(heapParamIndices[j]);
@@ -251,10 +264,13 @@ public:
             std::vector<C2Param *> paramsForFilter;
             for (C2Param* param : params) {
                 auto it = mTypeToIndexForConfig.find(param->type().type());
-                if (it != mTypeToIndexForConfig.end() && it->second != i) {
+                if (it == mTypeToIndexForConfig.end() || it->second != i) {
                     continue;
                 }
                 paramsForFilter.push_back(param);
+            }
+            if (paramsForFilter.empty()) {
+                continue;
             }
             c2_status_t err = filter->config_vb(paramsForFilter, mayBlock, &filterFailures);
             if (err != C2_OK) {
@@ -356,6 +372,7 @@ private:
     std::weak_ptr<FilterWrapper> mFilterWrapper;
     std::map<uint32_t, size_t> mTypeToIndexForQuery;
     std::map<uint32_t, size_t> mTypeToIndexForConfig;
+    std::set<C2Param::Type> mControlParamTypes;
 
     c2_status_t transferParams_l(
             const std::shared_ptr<C2ComponentInterface> &curr,
@@ -598,6 +615,8 @@ public:
             }
         }
         mRunningFilters.clear();
+        std::vector<FilterWrapper::Component> filters(mFilters);
+        mIntf->takeFilters(std::move(filters));
         return result;
     }
 

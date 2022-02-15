@@ -112,6 +112,18 @@ status_t CameraStreamStats::readFromParcel(const android::Parcel* parcel) {
         return err;
     }
 
+    int dynamicRangeProfile = ANDROID_REQUEST_AVAILABLE_DYNAMIC_RANGE_PROFILES_MAP_STANDARD;
+    if ((err = parcel->readInt32(&dynamicRangeProfile)) != OK) {
+        ALOGE("%s: Failed to read dynamic range profile type from parcel", __FUNCTION__);
+        return err;
+    }
+
+    int streamUseCase = ANDROID_SCALER_AVAILABLE_STREAM_USE_CASES_DEFAULT;
+    if ((err = parcel->readInt32(&streamUseCase)) != OK) {
+        ALOGE("%s: Failed to read stream use case from parcel", __FUNCTION__);
+        return err;
+    }
+
     mWidth = width;
     mHeight = height;
     mFormat = format;
@@ -125,6 +137,8 @@ status_t CameraStreamStats::readFromParcel(const android::Parcel* parcel) {
     mHistogramType = histogramType;
     mHistogramBins = std::move(histogramBins);
     mHistogramCounts = std::move(histogramCounts);
+    mDynamicRangeProfile = dynamicRangeProfile;
+    mStreamUseCase = streamUseCase;
 
     return OK;
 }
@@ -199,6 +213,16 @@ status_t CameraStreamStats::writeToParcel(android::Parcel* parcel) const {
 
     if ((err = parcel->writeInt64Vector(mHistogramCounts)) != OK) {
         ALOGE("%s: Failed to write histogram counts!", __FUNCTION__);
+        return err;
+    }
+
+    if ((err = parcel->writeInt32(mDynamicRangeProfile)) != OK) {
+        ALOGE("%s: Failed to write dynamic range profile type", __FUNCTION__);
+        return err;
+    }
+
+    if ((err = parcel->writeInt32(mStreamUseCase)) != OK) {
+        ALOGE("%s: Failed to write stream use case!", __FUNCTION__);
         return err;
     }
 

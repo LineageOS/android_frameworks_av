@@ -212,7 +212,7 @@ struct TestICameraProvider : virtual public provider::V2_5::ICameraProvider {
  * Simple test version of the interaction proxy, to use to inject onRegistered calls to the
  * CameraProviderManager
  */
-struct TestInteractionProxy : public CameraProviderManager::ServiceInteractionProxy {
+struct TestInteractionProxy : public CameraProviderManager::HidlServiceInteractionProxy {
     sp<hidl::manager::V1_0::IServiceNotification> mManagerNotificationInterface;
     sp<TestICameraProvider> mTestCameraProvider;
 
@@ -269,13 +269,13 @@ struct TestStatusListener : public CameraProviderManager::StatusListener {
     ~TestStatusListener() {}
 
     void onDeviceStatusChanged(const String8 &,
-            hardware::camera::common::V1_0::CameraDeviceStatus) override {}
+            CameraDeviceStatus) override {}
     void onDeviceStatusChanged(const String8 &, const String8 &,
-            hardware::camera::common::V1_0::CameraDeviceStatus) override {}
+            CameraDeviceStatus) override {}
     void onTorchStatusChanged(const String8 &,
-            hardware::camera::common::V1_0::TorchModeStatus) override {}
+            TorchModeStatus) override {}
     void onTorchStatusChanged(const String8 &,
-            hardware::camera::common::V1_0::TorchModeStatus, SystemCameraKind) override {}
+            TorchModeStatus, SystemCameraKind) override {}
     void onNewProviderRegistered() override {}
 };
 

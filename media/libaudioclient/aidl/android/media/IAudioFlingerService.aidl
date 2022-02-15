@@ -225,4 +225,6 @@ interface IAudioFlingerService {
     int getAAudioMixerBurstCount();
 
     int getAAudioHardwareBurstMinUsec();
+
+    void setDeviceConnectedState(in AudioPort devicePort, boolean connected);
 }

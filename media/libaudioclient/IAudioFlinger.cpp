@@ -803,6 +803,12 @@ int32_t AudioFlingerClientAdapter::getAAudioHardwareBurstMinUsec() {
     return result.value_or(0);
 }
 
+status_t AudioFlingerClientAdapter::setDeviceConnectedState(
+        const struct audio_port_v7 *port, bool connected) {
+    media::AudioPort aidlPort = VALUE_OR_RETURN_STATUS(
+            legacy2aidl_audio_port_v7_AudioPort(*port));
+    return statusTFromBinderStatus(mDelegate->setDeviceConnectedState(aidlPort, connected));
+}
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////
 // AudioFlingerServerAdapter
@@ -1290,6 +1296,12 @@ Status AudioFlingerServerAdapter::getAAudioHardwareBurstMinUsec(int32_t* _aidl_r
     *_aidl_return = VALUE_OR_RETURN_BINDER(
             convertIntegral<int32_t>(mDelegate->getAAudioHardwareBurstMinUsec()));
     return Status::ok();
+}
+
+Status AudioFlingerServerAdapter::setDeviceConnectedState(
+        const media::AudioPort& port, bool connected) {
+    audio_port_v7 portLegacy = VALUE_OR_RETURN_BINDER(aidl2legacy_AudioPort_audio_port_v7(port));
+    return Status::fromStatusT(mDelegate->setDeviceConnectedState(&portLegacy, connected));
 }
 
 } // namespace android

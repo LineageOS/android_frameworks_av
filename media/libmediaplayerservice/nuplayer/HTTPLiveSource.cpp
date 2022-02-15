@@ -19,8 +19,6 @@
 #include <utils/Log.h>
 
 #include "HTTPLiveSource.h"
-
-#include "AnotherPacketSource.h"
 #include "LiveDataSource.h"
 
 #include <media/IMediaHTTPService.h>
@@ -31,6 +29,7 @@
 #include <media/stagefright/MetaData.h>
 #include <media/stagefright/MediaDefs.h>
 #include <media/stagefright/Utils.h>
+#include <mpeg2ts/AnotherPacketSource.h>
 
 // default buffer prepare/ready/underflow marks
 static const int kReadyMarkMs     = 5000;  // 5 seconds

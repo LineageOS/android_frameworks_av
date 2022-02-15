@@ -29,6 +29,7 @@
 #include "TunerHidlService.h"
 
 using ::aidl::android::hardware::tv::tuner::AudioExtraMetaData;
+using ::aidl::android::hardware::tv::tuner::AudioStreamType;
 using ::aidl::android::hardware::tv::tuner::Constant;
 using ::aidl::android::hardware::tv::tuner::DemuxAlpFilterSettings;
 using ::aidl::android::hardware::tv::tuner::DemuxAlpFilterSettingsFilterSettings;
@@ -509,6 +510,9 @@ TunerHidlFilter::~TunerHidlFilter() {
         }
     }
 
+    if (mFilterCallback != nullptr) {
+        mFilterCallback->detachCallbacks();
+    }
     HidlResult res = mFilter->close();
     mFilter = nullptr;
     mFilter_1_1 = nullptr;
@@ -604,7 +608,11 @@ sp<HidlIFilter> TunerHidlFilter::getHalFilter() {
 
 bool TunerHidlFilter::getHidlAvStreamType(const AvStreamType avStreamType, HidlAvStreamType& type) {
     if (isAudioFilter()) {
-        type.audio(static_cast<HidlAudioStreamType>(avStreamType.get<AvStreamType::audio>()));
+        AudioStreamType audio = avStreamType.get<AvStreamType::audio>();
+        if (static_cast<int32_t>(audio) > static_cast<int32_t>(HidlAudioStreamType::DRA)) {
+            return false;
+        }
+        type.audio(static_cast<HidlAudioStreamType>(audio));
         return true;
     }
 
@@ -965,6 +973,12 @@ void TunerHidlFilter::FilterCallback::detachSharedFilterCallback() {
     }
 }
 
+void TunerHidlFilter::FilterCallback::detachCallbacks() {
+    Mutex::Autolock _l(mCallbackLock);
+    mOriginalCallback = nullptr;
+    mTunerFilterCallback = nullptr;
+}
+
 /////////////// FilterCallback Helper Methods ///////////////////////
 void TunerHidlFilter::FilterCallback::getAidlFilterEvent(
         const vector<HidlDemuxFilterEvent::Event>& events,
@@ -1044,6 +1058,8 @@ void TunerHidlFilter::FilterCallback::getMediaEvent(
         media.avDataId = static_cast<int64_t>(mediaEvent.avDataId);
         media.mpuSequenceNumber = static_cast<int32_t>(mediaEvent.mpuSequenceNumber);
         media.isPesPrivateData = mediaEvent.isPesPrivateData;
+        media.scIndexMask.set<DemuxFilterScIndexMask::scIndex>(
+                static_cast<int32_t>(DemuxScIndex::UNDEFINED));
 
         if (mediaEvent.extraMetaData.getDiscriminator() ==
             HidlDemuxFilterMediaEvent::ExtraMetaData::hidl_discriminator::audio) {

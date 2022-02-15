@@ -34,7 +34,7 @@ class Camera3OutputStreamInterface : public virtual Camera3StreamInterface {
      * Set the transform on the output stream; one of the
      * HAL_TRANSFORM_* / NATIVE_WINDOW_TRANSFORM_* constants.
      */
-    virtual status_t setTransform(int transform) = 0;
+    virtual status_t setTransform(int transform, bool mayChangeMirror) = 0;
 
     /**
      * Return if this output stream is for video encoding.

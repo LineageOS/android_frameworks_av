@@ -28,8 +28,13 @@ cc_library {
         "DrmSessionManager.cpp",
         "SharedLibrary.cpp",
         "DrmHal.cpp",
+        "DrmHalHidl.cpp",
+        "DrmHalAidl.cpp",
         "CryptoHal.cpp",
+        "CryptoHalHidl.cpp",
+        "CryptoHalAidl.cpp",
         "DrmUtils.cpp",
+        "DrmHalListener.cpp",
     ],
 
     local_include_dirs: [
@@ -63,10 +68,12 @@ cc_library {
         "android.hardware.drm@1.4",
         "libhidlallocatorutils",
         "libhidlbase",
+        "android.hardware.drm-V1-ndk",
     ],
 
     static_libs: [
         "resourcemanager_aidl_interface-ndk",
+        "libaidlcommonsupport",
     ],
 
     export_shared_lib_headers: [
@@ -162,10 +169,6 @@ cc_library_shared {
         "DrmMetricsConsumer.cpp",
     ],
 
-    include_dirs: [
-        "frameworks/av/media/libmedia/include"
-    ],
-
     shared_libs: [
         "android.hardware.drm@1.0",
         "android.hardware.drm@1.1",
@@ -181,5 +184,6 @@ cc_library_shared {
     header_libs: [
         "libmediametrics_headers",
         "libstagefright_foundation_headers",
+        "libmedia_headers",
     ],
 }

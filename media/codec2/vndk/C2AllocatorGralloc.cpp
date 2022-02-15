@@ -20,8 +20,10 @@
 
 #include <mutex>
 
+#include <aidl/android/hardware/graphics/common/PlaneLayoutComponentType.h>
 #include <android/hardware/graphics/common/1.2/types.h>
 #include <cutils/native_handle.h>
+#include <gralloctypes/Gralloc4.h>
 #include <hardware/gralloc.h>
 #include <ui/GraphicBufferAllocator.h>
 #include <ui/GraphicBufferMapper.h>
@@ -29,6 +31,7 @@
 
 #include <C2AllocatorGralloc.h>
 #include <C2Buffer.h>
+#include <C2Debug.h>
 #include <C2PlatformSupport.h>
 
 using ::android::hardware::hidl_handle;
@@ -230,7 +233,88 @@ public:
     }
 };
 
+static
+c2_status_t Gralloc4Mapper_lock(native_handle_t *handle, uint64_t usage, const Rect& bounds,
+        C2PlanarLayout *layout, uint8_t **addr) {
+    GraphicBufferMapper &mapper = GraphicBufferMapper::get();
+
+    std::vector<ui::PlaneLayout> planes;
+    // this method is only supported on Gralloc 4 or later
+    status_t err = mapper.getPlaneLayouts(handle, &planes);
+    if (err != NO_ERROR || planes.empty()) {
+        return C2_CANNOT_DO;
+    }
+
+    uint8_t *pointer = nullptr;
+    err = mapper.lock(handle, usage, bounds, (void **)&pointer, nullptr, nullptr);
+    if (err != NO_ERROR || pointer == nullptr) {
+        return C2_CORRUPTED;
+    }
+
+    using aidl::android::hardware::graphics::common::PlaneLayoutComponentType;
+    using aidl::android::hardware::graphics::common::PlaneLayoutComponent;
+
+    layout->type = C2PlanarLayout::TYPE_YUV;
+    layout->numPlanes = 0;
+    layout->rootPlanes = 0;
+
+    for (const ui::PlaneLayout &plane : planes) {
+        layout->rootPlanes++;
+        uint32_t lastOffsetInBits = 0;
+        uint32_t rootIx = 0;
+
+        for (const PlaneLayoutComponent &component : plane.components) {
+            if (!gralloc4::isStandardPlaneLayoutComponentType(component.type)) {
+                return C2_CANNOT_DO;
+            }
+
+            uint32_t rightShiftBits = component.offsetInBits - lastOffsetInBits;
+            uint32_t allocatedDepthInBits = component.sizeInBits + rightShiftBits;
+            C2PlanarLayout::plane_index_t planeId;
+            C2PlaneInfo::channel_t channel;
+
+            switch (static_cast<PlaneLayoutComponentType>(component.type.value)) {
+                case PlaneLayoutComponentType::Y:
+                    planeId = C2PlanarLayout::PLANE_Y;
+                    channel = C2PlaneInfo::CHANNEL_Y;
+                    break;
+                case PlaneLayoutComponentType::CB:
+                    planeId = C2PlanarLayout::PLANE_U;
+                    channel = C2PlaneInfo::CHANNEL_CB;
+                    break;
+                case PlaneLayoutComponentType::CR:
+                    planeId = C2PlanarLayout::PLANE_V;
+                    channel = C2PlaneInfo::CHANNEL_CR;
+                    break;
+                default:
+                    return C2_CORRUPTED;
+            }
+
+            addr[planeId] = pointer + plane.offsetInBytes + (component.offsetInBits / 8);
+            layout->planes[planeId] = {
+                channel,                                                // channel
+                static_cast<int32_t>(plane.sampleIncrementInBits / 8),  // colInc
+                static_cast<int32_t>(plane.strideInBytes),              // rowInc
+                static_cast<uint32_t>(plane.horizontalSubsampling),     // mColSampling
+                static_cast<uint32_t>(plane.verticalSubsampling),       // mRowSampling
+                allocatedDepthInBits,                                   // allocatedDepth (bits)
+                static_cast<uint32_t>(component.sizeInBits),            // bitDepth (bits)
+                rightShiftBits,                                         // rightShift (bits)
+                C2PlaneInfo::NATIVE,                                    // endianness
+                rootIx,                                                 // rootIx
+                static_cast<uint32_t>(component.offsetInBits / 8),      // offset (bytes)
+            };
+
+            layout->numPlanes++;
+            lastOffsetInBits = component.offsetInBits + component.sizeInBits;
+            rootIx++;
+        }
+    }
+    return C2_OK;
+}
+
 } // unnamed namespace
+
 
 native_handle_t *UnwrapNativeCodec2GrallocHandle(const C2Handle *const handle) {
     return C2HandleGralloc::UnwrapNativeHandle(handle);
@@ -385,6 +469,10 @@ c2_status_t C2AllocationGralloc::map(
                 mBuffer, mWidth, mHeight, mFormat, mGrallocUsage,
                 mStride, generation, igbp_id, igbp_slot);
     }
+
+    // 'NATIVE' on Android means LITTLE_ENDIAN
+    constexpr C2PlaneInfo::endianness_t kEndianness = C2PlaneInfo::NATIVE;
+
     switch (mFormat) {
         case static_cast<uint32_t>(PixelFormat4::RGBA_1010102): {
             // TRICKY: this is used for media as YUV444 in the case when it is queued directly to a
@@ -646,7 +734,7 @@ c2_status_t C2AllocationGralloc::map(
                 16,                             // allocatedDepth
                 10,                             // bitDepth
                 6,                              // rightShift
-                C2PlaneInfo::LITTLE_END,        // endianness
+                kEndianness,                    // endianness
                 C2PlanarLayout::PLANE_Y,        // rootIx
                 0,                              // offset
             };
@@ -659,7 +747,7 @@ c2_status_t C2AllocationGralloc::map(
                 16,                             // allocatedDepth
                 10,                             // bitDepth
                 6,                              // rightShift
-                C2PlaneInfo::LITTLE_END,        // endianness
+                kEndianness,                    // endianness
                 C2PlanarLayout::PLANE_U,        // rootIx
                 0,                              // offset
             };
@@ -672,7 +760,7 @@ c2_status_t C2AllocationGralloc::map(
                 16,                             // allocatedDepth
                 10,                             // bitDepth
                 6,                              // rightShift
-                C2PlaneInfo::LITTLE_END,        // endianness
+                kEndianness,                    // endianness
                 C2PlanarLayout::PLANE_U,        // rootIx
                 2,                              // offset
             };
@@ -680,9 +768,15 @@ c2_status_t C2AllocationGralloc::map(
         }
 
         default: {
-            // We don't know what it is, but let's try to lock it.
+            // We don't know what it is, let's try to lock it with gralloc4
             android_ycbcr ycbcrLayout;
+            c2_status_t status = Gralloc4Mapper_lock(
+                    const_cast<native_handle_t*>(mBuffer), grallocUsage, rect, layout, addr);
+            if (status == C2_OK) {
+                break;
+            }
 
+            // fallback to lockYCbCr
             status_t err = GraphicBufferMapper::get().lockYCbCr(
                     const_cast<native_handle_t*>(mBuffer), grallocUsage, rect, &ycbcrLayout);
             if (err == OK && ycbcrLayout.y && ycbcrLayout.cb && ycbcrLayout.cr

@@ -45,7 +45,7 @@ InputSource::InputSource(const string &mappingValue,
 
 bool InputSource::sendToHW(string & /*error*/)
 {
-    audio_devices_t applicableInputDevice;
+    uint64_t applicableInputDevice;
     blackboardRead(&applicableInputDevice, sizeof(applicableInputDevice));
     return mPolicyPluginInterface->setDeviceForInputSource(mId, applicableInputDevice);
 }

@@ -15,12 +15,9 @@ cc_test {
         "C2Param_test.cpp",
     ],
 
-    include_dirs: [
-        "frameworks/av/media/codec2/vndk/include",
-    ],
-
     header_libs: [
         "libcodec2_headers",
+        "libcodec2_vndk_headers",
     ],
 
     // param tests must not depend on any codec2 libraries as all params should be templated
@@ -45,9 +42,6 @@ cc_test {
         "C2SampleComponent_test.cpp",
         "C2UtilTest.cpp",
         "vndk/C2BufferTest.cpp",
-    ],
-
-    include_dirs: [
     ],
 
     shared_libs: [

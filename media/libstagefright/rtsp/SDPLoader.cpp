@@ -18,9 +18,10 @@
 #define LOG_TAG "SDPLoader"
 #include <utils/Log.h>
 
-#include "include/SDPLoader.h"
+// #include "include/SDPLoader.h"
+#include <media/stagefright/rtsp/SDPLoader.h>
 
-#include "ASessionDescription.h"
+#include <media/stagefright/rtsp/ASessionDescription.h>
 
 #include <datasource/MediaHTTP.h>
 #include <media/MediaHTTPConnection.h>

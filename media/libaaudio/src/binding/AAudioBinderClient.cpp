@@ -201,3 +201,11 @@ aaudio_result_t AAudioBinderClient::unregisterAudioThread(aaudio_handle_t stream
 
     return service->unregisterAudioThread(streamHandle, clientThreadId);
 }
+
+aaudio_result_t AAudioBinderClient::exitStandby(aaudio_handle_t streamHandle,
+                                                AudioEndpointParcelable &endpointOut) {
+    std::shared_ptr<AAudioServiceInterface> service = getAAudioService();
+    if (service.get() == nullptr) return AAUDIO_ERROR_NO_SERVICE;
+
+    return service->exitStandby(streamHandle, endpointOut);
+}

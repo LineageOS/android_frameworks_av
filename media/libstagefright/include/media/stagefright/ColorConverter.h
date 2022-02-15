@@ -54,6 +54,7 @@ private:
         uint32_t mTransfer;
 
         bool isBt709();
+        bool isBt2020();
         bool isJpeg();
     };
 
@@ -78,8 +79,10 @@ private:
     OMX_COLOR_FORMATTYPE mSrcFormat, mDstFormat;
     ColorSpace mSrcColorSpace;
     uint8_t *mClip;
+    uint16_t *mClip10Bit;
 
     uint8_t *initClip();
+    uint16_t *initClip10Bit();
 
     status_t convertCbYCrY(
             const BitmapParams &src, const BitmapParams &dst);
@@ -110,6 +113,12 @@ private:
 
     status_t convertTIYUV420PackedSemiPlanar(
             const BitmapParams &src, const BitmapParams &dst);
+
+    status_t convertYUVP010(
+                const BitmapParams &src, const BitmapParams &dst);
+
+    status_t convertYUVP010ToRGBA1010102(
+                const BitmapParams &src, const BitmapParams &dst);
 
     ColorConverter(const ColorConverter &);
     ColorConverter &operator=(const ColorConverter &);

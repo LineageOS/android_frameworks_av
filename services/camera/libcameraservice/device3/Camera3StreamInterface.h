@@ -19,6 +19,7 @@
 
 #include <utils/RefBase.h>
 
+#include <camera/camera2/OutputConfiguration.h>
 #include <camera/CameraMetadata.h>
 #include "Camera3StreamBufferListener.h"
 #include "Camera3StreamBufferFreedListener.h"
@@ -64,6 +65,8 @@ typedef struct camera_stream {
     const char* physical_camera_id;
 
     std::unordered_set<int32_t> sensor_pixel_modes_used;
+    int dynamic_range_profile;
+    int use_case;
 } camera_stream_t;
 
 typedef struct camera_stream_buffer {
@@ -107,14 +110,24 @@ class OutputStreamInfo {
         bool finalized = false;
         bool supportsOffline = false;
         std::unordered_set<int32_t> sensorPixelModesUsed;
+        int dynamicRangeProfile;
+        int streamUseCase;
+        int timestampBase;
+        int mirrorMode;
         OutputStreamInfo() :
             width(-1), height(-1), format(-1), dataSpace(HAL_DATASPACE_UNKNOWN),
-            consumerUsage(0) {}
+            consumerUsage(0),
+            dynamicRangeProfile(ANDROID_REQUEST_AVAILABLE_DYNAMIC_RANGE_PROFILES_MAP_STANDARD),
+            streamUseCase(ANDROID_SCALER_AVAILABLE_STREAM_USE_CASES_DEFAULT),
+            timestampBase(OutputConfiguration::TIMESTAMP_BASE_DEFAULT),
+            mirrorMode(OutputConfiguration::MIRROR_MODE_AUTO) {}
         OutputStreamInfo(int _width, int _height, int _format, android_dataspace _dataSpace,
-                uint64_t _consumerUsage, const std::unordered_set<int32_t>& _sensorPixelModesUsed) :
+                uint64_t _consumerUsage, const std::unordered_set<int32_t>& _sensorPixelModesUsed,
+                int _dynamicRangeProfile, int _streamUseCase, int _timestampBase, int _mirrorMode) :
             width(_width), height(_height), format(_format),
             dataSpace(_dataSpace), consumerUsage(_consumerUsage),
-            sensorPixelModesUsed(_sensorPixelModesUsed) {}
+            sensorPixelModesUsed(_sensorPixelModesUsed), dynamicRangeProfile(_dynamicRangeProfile),
+            streamUseCase(_streamUseCase), timestampBase(_timestampBase), mirrorMode(_mirrorMode) {}
 };
 
 /**
@@ -154,6 +167,7 @@ class Camera3StreamInterface : public virtual RefBase {
     virtual uint32_t getWidth() const = 0;
     virtual uint32_t getHeight() const = 0;
     virtual int      getFormat() const = 0;
+    virtual int      getDynamicRangeProfile() const = 0;
     virtual android_dataspace getDataSpace() const = 0;
     virtual void setFormatOverride(bool formatOverriden) = 0;
     virtual bool isFormatOverridden() const = 0;

@@ -117,6 +117,35 @@ aaudio_result_t AAudioServiceStreamMMAP::stop_l() {
     return result;
 }
 
+aaudio_result_t AAudioServiceStreamMMAP::standby_l() {
+    sp<AAudioServiceEndpoint> endpoint = mServiceEndpointWeak.promote();
+    if (endpoint == nullptr) {
+        ALOGE("%s() has no endpoint", __func__);
+        return AAUDIO_ERROR_INVALID_STATE;
+    }
+    aaudio_result_t result = endpoint->standby();
+    if (result == AAUDIO_OK) {
+        setStandby_l(true);
+    }
+    return result;
+}
+
+aaudio_result_t AAudioServiceStreamMMAP::exitStandby_l(AudioEndpointParcelable* parcelable) {
+    sp<AAudioServiceEndpoint> endpoint = mServiceEndpointWeak.promote();
+    if (endpoint == nullptr) {
+        ALOGE("%s() has no endpoint", __func__);
+        return AAUDIO_ERROR_INVALID_STATE;
+    }
+    aaudio_result_t result = endpoint->exitStandby(parcelable);
+    if (result == AAUDIO_OK) {
+        setStandby_l(false);
+    } else {
+        ALOGE("%s failed, result %d, disconnecting stream.", __func__, result);
+        disconnect_l();
+    }
+    return result;
+}
+
 aaudio_result_t AAudioServiceStreamMMAP::startClient(const android::AudioClient& client,
                                                      const audio_attributes_t *attr,
                                                      audio_port_handle_t *clientHandle) {
@@ -167,7 +196,6 @@ aaudio_result_t AAudioServiceStreamMMAP::getFreeRunningPosition_l(int64_t *posit
 // If it fails, get timestamp that was written by getFreeRunningPosition()
 aaudio_result_t AAudioServiceStreamMMAP::getHardwareTimestamp_l(int64_t *positionFrames,
                                                                 int64_t *timeNanos) {
-
     sp<AAudioServiceEndpoint> endpoint = mServiceEndpointWeak.promote();
     if (endpoint == nullptr) {
         ALOGE("%s() has no endpoint", __func__);
@@ -176,17 +204,17 @@ aaudio_result_t AAudioServiceStreamMMAP::getHardwareTimestamp_l(int64_t *positio
     sp<AAudioServiceEndpointMMAP> serviceEndpointMMAP =
             static_cast<AAudioServiceEndpointMMAP *>(endpoint.get());
 
-    // Disable this code temporarily because the HAL is not returning
-    // a useful result.
-#if 0
     uint64_t position;
-    if (serviceEndpointMMAP->getExternalPosition(&position, timeNanos) == AAUDIO_OK) {
-        ALOGD("%s() getExternalPosition() says pos = %" PRIi64 ", time = %" PRIi64,
+    aaudio_result_t result = serviceEndpointMMAP->getExternalPosition(&position, timeNanos);
+    if (result == AAUDIO_OK) {
+        ALOGV("%s() getExternalPosition() says pos = %" PRIi64 ", time = %" PRIi64,
                 __func__, position, *timeNanos);
         *positionFrames = (int64_t) position;
         return AAUDIO_OK;
-    } else
-#endif
+    } else {
+        ALOGV("%s() getExternalPosition() returns error %d", __func__, result);
+    }
+
     if (mAtomicStreamTimestamp.isValid()) {
         Timestamp timestamp = mAtomicStreamTimestamp.read();
         *positionFrames = timestamp.getPosition();

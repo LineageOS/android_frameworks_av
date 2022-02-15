@@ -36,6 +36,8 @@
 
 #include <media/TypeConverter.h>
 
+#include <cinttypes>
+
 using std::string;
 using std::map;
 
@@ -166,16 +168,13 @@ audio_policy_forced_cfg_t Engine::getForceUse(audio_policy_force_use_t usage) co
 status_t Engine::setDeviceConnectionState(const sp<DeviceDescriptor> device,
                                           audio_policy_dev_state_t state)
 {
-    mPolicyParameterMgr->setDeviceConnectionState(
-                device->type(), device->address().c_str(), state);
+    mPolicyParameterMgr->setDeviceConnectionState(device->type(), device->address(), state);
     if (audio_is_output_device(device->type())) {
-        // FIXME: Use DeviceTypeSet when the interface is ready
         return mPolicyParameterMgr->setAvailableOutputDevices(
-                    deviceTypesToBitMask(getApmObserver()->getAvailableOutputDevices().types()));
+                    getApmObserver()->getAvailableOutputDevices().types());
     } else if (audio_is_input_device(device->type())) {
-        // FIXME: Use DeviceTypeSet when the interface is ready
         return mPolicyParameterMgr->setAvailableInputDevices(
-                    deviceTypesToBitMask(getApmObserver()->getAvailableInputDevices().types()));
+                    getApmObserver()->getAvailableInputDevices().types());
     }
     return EngineBase::setDeviceConnectionState(device, state);
 }
@@ -299,8 +298,13 @@ DeviceVector Engine::getOutputDevicesForAttributes(const audio_attributes_t &att
     if (device != nullptr) {
         return DeviceVector(device);
     }
+    return fromCache? getCachedDevices(strategy) : getDevicesForProductStrategy(strategy);
+}
 
-    return fromCache? mDevicesForStrategies.at(strategy) : getDevicesForProductStrategy(strategy);
+DeviceVector Engine::getCachedDevices(product_strategy_t ps) const
+{
+    return mDevicesForStrategies.find(ps) != mDevicesForStrategies.end() ?
+                mDevicesForStrategies.at(ps) : DeviceVector{};
 }
 
 DeviceVector Engine::getOutputDevicesForStream(audio_stream_type_t stream, bool fromCache) const
@@ -369,15 +373,26 @@ void Engine::setDeviceAddressForProductStrategy(product_strategy_t strategy,
     getProductStrategies().at(strategy)->setDeviceAddress(address);
 }
 
-bool Engine::setDeviceTypesForProductStrategy(product_strategy_t strategy, audio_devices_t devices)
+bool Engine::setDeviceTypesForProductStrategy(product_strategy_t strategy, uint64_t devices)
 {
     if (getProductStrategies().find(strategy) == getProductStrategies().end()) {
-        ALOGE("%s: set device %d on invalid strategy %d", __FUNCTION__, devices, strategy);
+        ALOGE("%s: set device %" PRId64 " on invalid strategy %d", __FUNCTION__, devices, strategy);
         return false;
     }
-    // FIXME: stop using deviceTypesFromBitMask when the interface is ready
-    getProductStrategies().at(strategy)->setDeviceTypes(deviceTypesFromBitMask(devices));
+    // Here device matches the criterion value, need to rebuitd android device types;
+    DeviceTypeSet types =
+            mPolicyParameterMgr->convertDeviceCriterionValueToDeviceTypes(devices, true /*isOut*/);
+    getProductStrategies().at(strategy)->setDeviceTypes(types);
     return true;
+}
+
+bool Engine::setDeviceForInputSource(const audio_source_t &inputSource, uint64_t device)
+{
+    DeviceTypeSet types = mPolicyParameterMgr->convertDeviceCriterionValueToDeviceTypes(
+                device, false /*isOut*/);
+    ALOG_ASSERT(types.size() <= 1, "one input device expected at most");
+    audio_devices_t deviceType = types.empty() ? AUDIO_DEVICE_IN_DEFAULT : *types.begin();
+    return setPropertyForKey<audio_devices_t, audio_source_t>(deviceType, inputSource);
 }
 
 template <>

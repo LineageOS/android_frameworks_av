@@ -26,4 +26,5 @@ parcelable RingBuffer {
     int                 framesPerBurst;    // for ISOCHRONOUS queues
     int                 capacityInFrames;  // zero if unused
     int /* RingbufferFlags */ flags;  // = RingbufferFlags::NONE;
+    int                 sharedMemoryIndex;
 }

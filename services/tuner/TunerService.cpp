@@ -260,6 +260,38 @@ bool TunerService::hasITuner() {
     return ::ndk::ScopedAStatus::ok();
 }
 
+::ndk::ScopedAStatus TunerService::setLna(bool bEnable) {
+    if (!hasITuner()) {
+        ALOGD("get ITuner failed");
+        return ::ndk::ScopedAStatus::fromServiceSpecificError(
+                static_cast<int32_t>(Result::UNAVAILABLE));
+    }
+
+    return mTuner->setLna(bEnable);
+}
+
+::ndk::ScopedAStatus TunerService::setMaxNumberOfFrontends(FrontendType in_frontendType,
+                                                           int32_t in_maxNumber) {
+    if (!hasITuner()) {
+        ALOGD("get ITuner failed");
+        return ::ndk::ScopedAStatus::fromServiceSpecificError(
+                static_cast<int32_t>(Result::UNAVAILABLE));
+    }
+
+    return mTuner->setMaxNumberOfFrontends(in_frontendType, in_maxNumber);
+}
+
+::ndk::ScopedAStatus TunerService::getMaxNumberOfFrontends(FrontendType in_frontendType,
+                                                           int32_t* _aidl_return) {
+    if (!hasITuner()) {
+        ALOGD("get ITuner failed");
+        return ::ndk::ScopedAStatus::fromServiceSpecificError(
+                static_cast<int32_t>(Result::UNAVAILABLE));
+    }
+
+    return mTuner->getMaxNumberOfFrontends(in_frontendType, _aidl_return);
+}
+
 string TunerService::addFilterToShared(const shared_ptr<TunerFilter>& sharedFilter) {
     Mutex::Autolock _l(mSharedFiltersLock);
 

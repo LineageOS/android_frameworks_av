@@ -28,41 +28,10 @@ package {
 cc_defaults {
     name: "C2Fuzzer-defaults",
 
+    defaults: [ "libcodec2-static-defaults" ],
+
     srcs: [
         "C2Fuzzer.cpp",
-    ],
-
-    static_libs: [
-        "liblog",
-        "libion",
-        "libfmq",
-        "libbase",
-        "libutils",
-        "libcutils",
-        "libcodec2",
-        "libhidlbase",
-        "libdmabufheap",
-        "libcodec2_vndk",
-        "libnativewindow",
-        "libcodec2_soft_common",
-        "libsfplugin_ccodec_utils",
-        "libstagefright_foundation",
-        "libstagefright_bufferpool@2.0.1",
-        "android.hardware.graphics.mapper@2.0",
-        "android.hardware.graphics.mapper@3.0",
-        "android.hardware.media.bufferpool@2.0",
-        "android.hardware.graphics.allocator@2.0",
-        "android.hardware.graphics.allocator@3.0",
-        "android.hardware.graphics.bufferqueue@2.0",
-    ],
-
-    shared_libs: [
-        "libui",
-        "libdl",
-        "libbinder",
-        "libhardware",
-        "libvndksupport",
-        "libprocessgroup",
     ],
 
     cflags: [

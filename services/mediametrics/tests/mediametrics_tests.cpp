@@ -17,18 +17,17 @@
 #define LOG_TAG "mediametrics_tests"
 #include <utils/Log.h>
 
-#include "MediaMetricsService.h"
 
 #include <stdio.h>
 #include <unordered_set>
 
 #include <gtest/gtest.h>
 #include <media/MediaMetricsItem.h>
+#include <mediametricsservice/AudioTypes.h>
+#include <mediametricsservice/MediaMetricsService.h>
+#include <mediametricsservice/StringUtils.h>
+#include <mediametricsservice/ValidateId.h>
 #include <system/audio.h>
-
-#include "AudioTypes.h"
-#include "StringUtils.h"
-#include "ValidateId.h"
 
 using namespace android;
 
@@ -1226,8 +1225,8 @@ TEST(mediametrics_tests, ValidateId) {
     }
 }
 
-TEST(mediametrics_tests, ErrorConversion) {
-    constexpr status_t errors[] = {
+TEST(mediametrics_tests, StatusConversion) {
+    constexpr status_t statuses[] = {
         NO_ERROR,
         BAD_VALUE,
         DEAD_OBJECT,
@@ -1239,15 +1238,58 @@ TEST(mediametrics_tests, ErrorConversion) {
     };
 
     auto roundTrip = [](status_t status) {
-        return android::mediametrics::errorStringToStatus(
-                android::mediametrics::statusToErrorString(status));
+        return android::mediametrics::statusStringToStatus(
+                android::mediametrics::statusToStatusString(status));
     };
 
     // Primary status error categories.
-    for (const auto error : errors) {
-        ASSERT_EQ(error, roundTrip(error));
+    for (const auto status : statuses) {
+        ASSERT_EQ(status, roundTrip(status));
     }
 
     // Status errors specially considered.
     ASSERT_EQ(DEAD_OBJECT, roundTrip(FAILED_TRANSACTION));
+}
+
+TEST(mediametrics_tests, HeatMap) {
+    constexpr size_t SIZE = 2;
+    android::mediametrics::HeatMap heatMap{SIZE};
+    constexpr uid_t UID = 0;
+    constexpr int32_t SUBCODE = 1;
+
+    ASSERT_EQ((size_t)0, heatMap.size());
+    heatMap.add("someKey", "someSuffix", "someEvent",
+            AMEDIAMETRICS_PROP_STATUS_VALUE_OK, UID, "message", SUBCODE);
+    ASSERT_EQ((size_t)1, heatMap.size());
+    heatMap.add("someKey", "someSuffix", "someEvent",
+            AMEDIAMETRICS_PROP_STATUS_VALUE_OK, UID, "message", SUBCODE);
+    heatMap.add("someKey", "someSuffix", "anotherEvent",
+            AMEDIAMETRICS_PROP_STATUS_VALUE_ARGUMENT, UID, "message", SUBCODE);
+    ASSERT_EQ((size_t)1, heatMap.size());
+    heatMap.add("anotherKey", "someSuffix", "someEvent",
+            AMEDIAMETRICS_PROP_STATUS_VALUE_OK, UID, "message", SUBCODE);
+    ASSERT_EQ((size_t)2, heatMap.size());
+    ASSERT_EQ((size_t)0, heatMap.rejected());
+
+    heatMap.add("thirdKey", "someSuffix", "someEvent",
+            AMEDIAMETRICS_PROP_STATUS_VALUE_OK, UID, "message", SUBCODE);
+    ASSERT_EQ((size_t)2, heatMap.size());
+    ASSERT_EQ((size_t)1, heatMap.rejected());
+
+    android::mediametrics::HeatData heatData = heatMap.getData("someKey");
+    ASSERT_EQ((size_t)2, heatData.size());
+    auto count = heatData.heatCount();
+    ASSERT_EQ((size_t)3, count.size()); // pairs in order { total, "anotherEvent", "someEvent" }
+    // check total value
+    ASSERT_EQ((size_t)2, count[0].first);  // OK
+    ASSERT_EQ((size_t)1, count[0].second); // ERROR;
+    // first key "anotherEvent"
+    ASSERT_EQ((size_t)0, count[1].first);  // OK
+    ASSERT_EQ((size_t)1, count[1].second); // ERROR;
+    // second key "someEvent"
+    ASSERT_EQ((size_t)2, count[2].first);  // OK
+    ASSERT_EQ((size_t)0, count[2].second); // ERROR;
+
+    heatMap.clear();
+    ASSERT_EQ((size_t)0, heatMap.size());
 }

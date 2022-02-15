@@ -396,9 +396,10 @@ private:
 
     Vector<Size> availablePreviewSizes;
     Vector<Size> availableVideoSizes;
-    // Get size list (that are no larger than limit) from static metadata.
+    // Get size list (that fall within lower/upper bounds) from static metadata.
     // This method filtered size with minFrameDuration < MAX_PREVIEW_RECORD_DURATION_NS
-    status_t getFilteredSizes(Size limit, Vector<Size> *sizes);
+    status_t getFilteredSizes(const Size &lower, const Size &upper,
+            Vector<Size> *sizes);
     // Get max size (from the size array) that matches the given aspect ratio.
     Size getMaxSizeForRatio(float ratio, const int32_t* sizeArray, size_t count);
 

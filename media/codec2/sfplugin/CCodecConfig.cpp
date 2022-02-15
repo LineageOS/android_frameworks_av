@@ -899,6 +899,9 @@ void CCodecConfig::initializeStandardParams() {
     add(ConfigMapper(KEY_AAC_MAX_OUTPUT_CHANNEL_COUNT, C2_PARAMKEY_MAX_CHANNEL_COUNT, "value")
         .limitTo(D::AUDIO & (D::CONFIG | D::PARAM | D::READ)));
 
+    add(ConfigMapper(KEY_MAX_OUTPUT_CHANNEL_COUNT, C2_PARAMKEY_MAX_CHANNEL_COUNT, "value")
+        .limitTo(D::AUDIO & (D::CONFIG | D::PARAM | D::READ)));
+
     add(ConfigMapper(KEY_AAC_SBR_MODE, C2_PARAMKEY_AAC_SBR_MODE, "value")
         .limitTo(D::AUDIO & D::ENCODER & (D::CONFIG | D::PARAM | D::READ))
         .withMapper([](C2Value v) -> C2Value {
@@ -952,6 +955,12 @@ void CCodecConfig::initializeStandardParams() {
             (void)v.get(&value);
             return value == 0 ? C2_FALSE : C2_TRUE;
         }));
+
+    add(ConfigMapper(KEY_VIDEO_QP_AVERAGE, C2_PARAMKEY_AVERAGE_QP, "value")
+        .limitTo(D::ENCODER & D::VIDEO & D::READ));
+
+    add(ConfigMapper(KEY_PICTURE_TYPE, C2_PARAMKEY_PICTURE_TYPE, "value")
+        .limitTo(D::ENCODER & D::VIDEO & D::READ));
 
     /* still to do
     constexpr char KEY_PUSH_BLANK_BUFFERS_ON_STOP[] = "push-blank-buffers-on-shutdown";

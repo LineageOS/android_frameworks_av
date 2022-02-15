@@ -78,6 +78,12 @@ public:
     std::shared_ptr<AAudioCommand> waitForCommand(int64_t timeoutNanos = -1);
 
     /**
+     * Start waiting for commands. Commands can only be pushed into the command queue after it
+     * starts waiting.
+     */
+    void startWaiting();
+
+    /**
      * Force stop waiting for next command
      */
     void stopWaiting();
@@ -87,7 +93,7 @@ private:
     std::condition_variable mWaitWorkCond;
 
     std::queue<std::shared_ptr<AAudioCommand>> mCommands GUARDED_BY(mLock);
-    bool mRunning GUARDED_BY(mLock) = true;
+    bool mRunning GUARDED_BY(mLock) = false;
 };
 
 } // namespace aaudio

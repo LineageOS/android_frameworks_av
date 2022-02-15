@@ -508,7 +508,7 @@ int64_t AudioStreamTrack::getFramesRead() {
     case AAUDIO_STREAM_STATE_PAUSED:
         result = mAudioTrack->getPosition(&position);
         if (result == OK) {
-            mFramesRead.update32(position);
+            mFramesRead.update32((int32_t)position);
         }
         break;
     default:

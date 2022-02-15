@@ -293,7 +293,7 @@ namespace {
         size_t onMoreData(const AudioTrack::Buffer & buffer) override {
           AudioTrack::Buffer copy = buffer;
           mCallback(AudioTrack::EVENT_MORE_DATA, mData, static_cast<void*>(&copy));
-          return copy.size;
+          return copy.size();
         }
         void onUnderrun() override {
             mCallback(AudioTrack::EVENT_UNDERRUN, mData, nullptr);
@@ -319,7 +319,7 @@ namespace {
         size_t onCanWriteMoreData(const AudioTrack::Buffer & buffer) override {
           AudioTrack::Buffer copy = buffer;
           mCallback(AudioTrack::EVENT_CAN_WRITE_MORE_DATA, mData, static_cast<void*>(&copy));
-          return copy.size;
+          return copy.size();
         }
     };
 }
@@ -537,6 +537,8 @@ status_t AudioTrack::set(
         float maxRequiredSpeed,
         audio_port_handle_t selectedDeviceId)
 {
+    LOG_ALWAYS_FATAL_IF(mInitialized, "%s: should not be called twice", __func__);
+    mInitialized = true;
     status_t status;
     uint32_t channelCount;
     pid_t callingPid;
@@ -558,13 +560,49 @@ status_t AudioTrack::set(
     mSelectedDeviceId = selectedDeviceId;
     mSessionId = sessionId;
     mChannelMask = channelMask;
-    mFormat = format;
-    mOrigFlags = mFlags = flags;
     mReqFrameCount = mFrameCount = frameCount;
     mSampleRate = sampleRate;
     mOriginalSampleRate = sampleRate;
     mAttributes = pAttributes != nullptr ? *pAttributes : AUDIO_ATTRIBUTES_INITIALIZER;
     mPlaybackRate = AUDIO_PLAYBACK_RATE_DEFAULT;
+
+    // update format and flags before storing them in mFormat, mOrigFlags and mFlags
+    if (pAttributes != NULL) {
+        // stream type shouldn't be looked at, this track has audio attributes
+        ALOGV("%s(): Building AudioTrack with attributes:"
+                " usage=%d content=%d flags=0x%x tags=[%s]",
+                __func__,
+                 mAttributes.usage, mAttributes.content_type, mAttributes.flags, mAttributes.tags);
+        audio_flags_to_audio_output_flags(mAttributes.flags, &flags);
+    }
+
+    // these below should probably come from the audioFlinger too...
+    if (format == AUDIO_FORMAT_DEFAULT) {
+        format = AUDIO_FORMAT_PCM_16_BIT;
+    } else if (format == AUDIO_FORMAT_IEC61937) { // HDMI pass-through?
+        flags = static_cast<audio_output_flags_t>(flags | AUDIO_OUTPUT_FLAG_IEC958_NONAUDIO);
+    }
+
+    // force direct flag if format is not linear PCM
+    // or offload was requested
+    if ((flags & AUDIO_OUTPUT_FLAG_COMPRESS_OFFLOAD)
+            || !audio_is_linear_pcm(format)) {
+        ALOGV( (flags & AUDIO_OUTPUT_FLAG_COMPRESS_OFFLOAD)
+                    ? "%s(): Offload request, forcing to Direct Output"
+                    : "%s(): Not linear PCM, forcing to Direct Output",
+                    __func__);
+        flags = (audio_output_flags_t)
+                // FIXME why can't we allow direct AND fast?
+                ((flags | AUDIO_OUTPUT_FLAG_DIRECT) & ~AUDIO_OUTPUT_FLAG_FAST);
+    }
+
+    // force direct flag if HW A/V sync requested
+    if ((flags & AUDIO_OUTPUT_FLAG_HW_AV_SYNC) != 0) {
+        flags = (audio_output_flags_t)(flags | AUDIO_OUTPUT_FLAG_DIRECT);
+    }
+
+    mFormat = format;
+    mOrigFlags = mFlags = flags;
 
     switch (transferType) {
     case TRANSFER_DEFAULT:
@@ -615,9 +653,6 @@ status_t AudioTrack::set(
     ALOGV_IF(sharedBuffer != 0, "%s(): sharedBuffer: %p, size: %zu",
             __func__, sharedBuffer->unsecurePointer(), sharedBuffer->size());
 
-    ALOGV("%s(): streamType %d frameCount %zu flags %04x",
-            __func__, streamType, frameCount, flags);
-
     // invariant that mAudioTrack != 0 is true only after set() returns successfully
     if (mAudioTrack != 0) {
         errorMessage = StringPrintf("%s: Track already in use", __func__);
@@ -636,22 +671,8 @@ status_t AudioTrack::set(
             goto error;
         }
         mOriginalStreamType = streamType;
-
     } else {
-        // stream type shouldn't be looked at, this track has audio attributes
-        ALOGV("%s(): Building AudioTrack with attributes:"
-                " usage=%d content=%d flags=0x%x tags=[%s]",
-                __func__,
-                 mAttributes.usage, mAttributes.content_type, mAttributes.flags, mAttributes.tags);
         mOriginalStreamType = AUDIO_STREAM_DEFAULT;
-        audio_flags_to_audio_output_flags(mAttributes.flags, &flags);
-    }
-
-    // these below should probably come from the audioFlinger too...
-    if (format == AUDIO_FORMAT_DEFAULT) {
-        format = AUDIO_FORMAT_PCM_16_BIT;
-    } else if (format == AUDIO_FORMAT_IEC61937) { // HDMI pass-through?
-        flags = static_cast<audio_output_flags_t>(flags | AUDIO_OUTPUT_FLAG_IEC958_NONAUDIO);
     }
 
     // validate parameters
@@ -669,25 +690,7 @@ status_t AudioTrack::set(
     channelCount = audio_channel_count_from_out_mask(channelMask);
     mChannelCount = channelCount;
 
-    // force direct flag if format is not linear PCM
-    // or offload was requested
-    if ((flags & AUDIO_OUTPUT_FLAG_COMPRESS_OFFLOAD)
-            || !audio_is_linear_pcm(format)) {
-        ALOGV( (flags & AUDIO_OUTPUT_FLAG_COMPRESS_OFFLOAD)
-                    ? "%s(): Offload request, forcing to Direct Output"
-                    : "%s(): Not linear PCM, forcing to Direct Output",
-                    __func__);
-        flags = (audio_output_flags_t)
-                // FIXME why can't we allow direct AND fast?
-                ((flags | AUDIO_OUTPUT_FLAG_DIRECT) & ~AUDIO_OUTPUT_FLAG_FAST);
-    }
-
-    // force direct flag if HW A/V sync requested
-    if ((flags & AUDIO_OUTPUT_FLAG_HW_AV_SYNC) != 0) {
-        flags = (audio_output_flags_t)(flags | AUDIO_OUTPUT_FLAG_DIRECT);
-    }
-
-    if (flags & AUDIO_OUTPUT_FLAG_DIRECT) {
+    if (mFlags & AUDIO_OUTPUT_FLAG_DIRECT) {
         if (audio_has_proportional_frames(format)) {
             mFrameSize = channelCount * audio_bytes_per_sample(format);
         } else {
@@ -701,7 +704,7 @@ status_t AudioTrack::set(
     }
 
     // sampling rate must be specified for direct outputs
-    if (sampleRate == 0 && (flags & AUDIO_OUTPUT_FLAG_DIRECT) != 0) {
+    if (sampleRate == 0 && (mFlags & AUDIO_OUTPUT_FLAG_DIRECT) != 0) {
         errorMessage = StringPrintf(
                 "%s: sample rate must be specified for direct outputs", __func__);
         status = BAD_VALUE;
@@ -730,7 +733,7 @@ status_t AudioTrack::set(
         mNotificationFramesReq = notificationFrames;
         mNotificationsPerBufferReq = 0;
     } else {
-        if (!(flags & AUDIO_OUTPUT_FLAG_FAST)) {
+        if (!(mFlags & AUDIO_OUTPUT_FLAG_FAST)) {
             errorMessage = StringPrintf(
                     "%s: notificationFrames=%d not permitted for non-fast track",
                     __func__, notificationFrames);
@@ -1119,7 +1122,15 @@ bool AudioTrack::pauseAndWait(const std::chrono::milliseconds& timeout)
 {
     using namespace std::chrono_literals;
 
+    // We use atomic access here for state variables - these are used as hints
+    // to ensure we have ramped down audio.
+    const int priorState = mProxy->getState();
+    const uint32_t priorPosition = mProxy->getPosition().unsignedValue();
+
     pause();
+
+    // Only if we were previously active, do we wait to ramp down the audio.
+    if (priorState != CBLK_STATE_ACTIVE) return true;
 
     AutoMutex lock(mLock);
     // offload and direct tracks do not wait because pause volume ramp is handled by hardware.
@@ -1128,16 +1139,25 @@ bool AudioTrack::pauseAndWait(const std::chrono::milliseconds& timeout)
     // Wait for the track state to be anything besides pausing.
     // This ensures that the volume has ramped down.
     constexpr auto SLEEP_INTERVAL_MS = 10ms;
+    constexpr auto POSITION_TIMEOUT_MS = 40ms; // don't wait longer than this for position change.
     auto begin = std::chrono::steady_clock::now();
     while (true) {
-        // wait for state to change
+        // Wait for state and position to change.
+        // After pause() the server state should be PAUSING, but that may immediately
+        // convert to PAUSED by prepareTracks before data is read into the mixer.
+        // Hence we check that the state is not PAUSING and that the server position
+        // has advanced to be a more reliable estimate that the volume ramp has completed.
         const int state = mProxy->getState();
+        const uint32_t position = mProxy->getPosition().unsignedValue();
 
         mLock.unlock(); // only local variables accessed until lock.
         auto elapsed = std::chrono::duration_cast<std::chrono::milliseconds>(
                 std::chrono::steady_clock::now() - begin);
-        if (state != CBLK_STATE_PAUSING) {
-            ALOGV("%s: success state:%d after %lld ms", __func__, state, elapsed.count());
+        if (state != CBLK_STATE_PAUSING &&
+                (elapsed >= POSITION_TIMEOUT_MS || position != priorPosition)) {
+            ALOGV("%s: success state:%d, position:%u after %lld ms"
+                    " (prior state:%d  prior position:%u)",
+                    __func__, state, position, elapsed.count(), priorState, priorPosition);
             return true;
         }
         std::chrono::milliseconds remaining = timeout - elapsed;
@@ -1573,12 +1593,12 @@ void AudioTrack::setLoop_l(uint32_t loopStart, uint32_t loopEnd, int loopCount)
 
 status_t AudioTrack::setMarkerPosition(uint32_t marker)
 {
+    AutoMutex lock(mLock);
     // The only purpose of setting marker position is to get a callback
-    if (!mCallback.promote() || isOffloadedOrDirect()) {
+    if (!mCallback.promote() || isOffloadedOrDirect_l()) {
         return INVALID_OPERATION;
     }
 
-    AutoMutex lock(mLock);
     mMarkerPosition = marker;
     mMarkerReached = false;
 
@@ -1606,12 +1626,12 @@ status_t AudioTrack::getMarkerPosition(uint32_t *marker) const
 
 status_t AudioTrack::setPositionUpdatePeriod(uint32_t updatePeriod)
 {
+    AutoMutex lock(mLock);
     // The only purpose of setting position update period is to get a callback
-    if (!mCallback.promote() || isOffloadedOrDirect()) {
+    if (!mCallback.promote() || isOffloadedOrDirect_l()) {
         return INVALID_OPERATION;
     }
 
-    AutoMutex lock(mLock);
     mNewPosition = updateAndGetPosition_l() + updatePeriod;
     mUpdatePeriod = updatePeriod;
 
@@ -2121,6 +2141,7 @@ status_t AudioTrack::createTrack_l()
         .set(AMEDIAMETRICS_PROP_VOLUME_LEFT, (double)mVolume[AUDIO_INTERLEAVE_LEFT])
         .set(AMEDIAMETRICS_PROP_VOLUME_RIGHT, (double)mVolume[AUDIO_INTERLEAVE_RIGHT])
         .set(AMEDIAMETRICS_PROP_STATE, stateToString(mState))
+        .set(AMEDIAMETRICS_PROP_STATUS, (int32_t)NO_ERROR)
         .set(AMEDIAMETRICS_PROP_AUXEFFECTID, (int32_t)mAuxEffectId)
         .set(AMEDIAMETRICS_PROP_SAMPLERATE, (int32_t)mSampleRate)
         .set(AMEDIAMETRICS_PROP_PLAYBACK_SPEED, (double)mPlaybackRate.mSpeed)
@@ -2163,8 +2184,8 @@ void AudioTrack::reportError(status_t status, const char *event, const char *mes
     // Ensure these variables are initialized in set().
     mediametrics::LogItem(AMEDIAMETRICS_KEY_AUDIO_TRACK_ERROR)
         .set(AMEDIAMETRICS_PROP_EVENT, event)
-        .set(AMEDIAMETRICS_PROP_ERROR, mediametrics::statusToErrorString(status))
-        .set(AMEDIAMETRICS_PROP_ERRORMESSAGE, message)
+        .set(AMEDIAMETRICS_PROP_STATUS, (int32_t)status)
+        .set(AMEDIAMETRICS_PROP_STATUSMESSAGE, message)
         .set(AMEDIAMETRICS_PROP_ORIGINALFLAGS, toString(mOrigFlags).c_str())
         .set(AMEDIAMETRICS_PROP_SESSIONID, (int32_t)mSessionId)
         .set(AMEDIAMETRICS_PROP_CONTENTTYPE, toString(mAttributes.content_type).c_str())
@@ -2192,7 +2213,7 @@ status_t AudioTrack::obtainBuffer(Buffer* audioBuffer, int32_t waitCount, size_t
     }
     if (mTransfer != TRANSFER_OBTAIN) {
         audioBuffer->frameCount = 0;
-        audioBuffer->size = 0;
+        audioBuffer->mSize = 0;
         audioBuffer->raw = NULL;
         if (nonContig != NULL) {
             *nonContig = 0;
@@ -2284,7 +2305,7 @@ status_t AudioTrack::obtainBuffer(Buffer* audioBuffer, const struct timespec *re
     } while (((status == DEAD_OBJECT) || (status == NOT_ENOUGH_DATA)) && (tryCounter-- > 0));
 
     audioBuffer->frameCount = buffer.mFrameCount;
-    audioBuffer->size = buffer.mFrameCount * mFrameSize;
+    audioBuffer->mSize = buffer.mFrameCount * mFrameSize;
     audioBuffer->raw = buffer.mRaw;
     audioBuffer->sequence = oldSequence;
     if (nonContig != NULL) {
@@ -2300,7 +2321,7 @@ void AudioTrack::releaseBuffer(const Buffer* audioBuffer)
         return;
     }
 
-    size_t stepCount = audioBuffer->size / mFrameSize;
+    size_t stepCount = audioBuffer->mSize / mFrameSize;
     if (stepCount == 0) {
         return;
     }
@@ -2380,8 +2401,8 @@ ssize_t AudioTrack::write(const void* buffer, size_t userSize, bool blocking)
             return ssize_t(err);
         }
 
-        size_t toWrite = audioBuffer.size;
-        memcpy(audioBuffer.i8, buffer, toWrite);
+        size_t toWrite = audioBuffer.size();
+        memcpy(audioBuffer.raw, buffer, toWrite);
         buffer = ((const char *) buffer) + toWrite;
         userSize -= toWrite;
         written += toWrite;
@@ -2738,11 +2759,11 @@ nsecs_t AudioTrack::processAudioBuffer()
             }
         }
 
-        size_t reqSize = audioBuffer.size;
+        size_t reqSize = audioBuffer.size();
         if (mTransfer == TRANSFER_SYNC_NOTIF_CALLBACK) {
             // when notifying client it can write more data, pass the total size that can be
             // written in the next write() call, since it's not passed through the callback
-            audioBuffer.size += nonContig;
+            audioBuffer.mSize += nonContig;
         }
         const size_t writtenSize = (mTransfer == TRANSFER_CALLBACK)
                                       ? callback->onMoreData(audioBuffer)
@@ -2807,7 +2828,7 @@ nsecs_t AudioTrack::processAudioBuffer()
         }
 
         // releaseBuffer reads from audioBuffer.size
-        audioBuffer.size = writtenSize;
+        audioBuffer.mSize = writtenSize;
 
         size_t releasedFrames = writtenSize / mFrameSize;
         audioBuffer.frameCount = releasedFrames;

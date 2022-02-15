@@ -113,6 +113,30 @@ cc_library_shared {
 
 }
 
+cc_library_host_static {
+    name: "libcamera_client_host",
+
+    srcs: [
+        "CameraMetadata.cpp",
+        "VendorTagDescriptor.cpp",
+    ],
+
+    shared_libs: [
+        "libbase",
+        "libcamera_metadata",
+    ],
+
+    include_dirs: [
+        "system/media/private/camera/include",
+        "frameworks/native/include/media/openmax",
+    ],
+
+    export_include_dirs: [
+        "include",
+        "include/camera"
+    ],
+}
+
 // AIDL interface between camera clients and the camera service.
 filegroup {
     name: "libcamera_client_aidl",

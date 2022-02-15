@@ -54,7 +54,8 @@ public:
             CameraService::BasicClient(
                     cameraService,
                     IInterface::asBinder(remoteCallback),
-                    clientPackageName, clientFeatureId,
+                    // (v)ndk doesn't have offline session support
+                    clientPackageName, /*overridePackageName*/false, clientFeatureId,
                     cameraIdStr, cameraFacing, sensorOrientation, clientPid, clientUid, servicePid),
             mRemoteCallback(remoteCallback), mOfflineSession(session),
             mCompositeStreamMap(offlineCompositeStreamMap) {}

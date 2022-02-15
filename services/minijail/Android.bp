@@ -28,6 +28,11 @@ cc_library_shared {
     defaults: ["libavservices_minijail_defaults"],
     vendor_available: true,
     min_sdk_version: "29",
+    apex_available: [
+        "//apex_available:platform",
+        "com.android.media.swcodec",
+    ],
+
     export_include_dirs: ["."],
 }
 

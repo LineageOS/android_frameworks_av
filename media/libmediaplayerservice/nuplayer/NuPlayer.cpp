@@ -35,9 +35,7 @@
 #include "RTSPSource.h"
 #include "StreamingSource.h"
 #include "GenericSource.h"
-#include "TextDescriptions.h"
-
-#include "ATSParser.h"
+#include <timedtext/TextDescriptions.h>
 
 #include <cutils/properties.h>
 
@@ -55,6 +53,8 @@
 #include <media/stagefright/MediaDefs.h>
 #include <media/stagefright/MediaErrors.h>
 #include <media/stagefright/MetaData.h>
+
+#include <mpeg2ts/ATSParser.h>
 
 #include <gui/IGraphicBufferProducer.h>
 #include <gui/Surface.h>

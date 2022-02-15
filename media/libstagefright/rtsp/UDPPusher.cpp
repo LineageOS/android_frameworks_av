@@ -18,7 +18,7 @@
 #define LOG_TAG "UDPPusher"
 #include <utils/Log.h>
 
-#include "UDPPusher.h"
+#include <media/stagefright/rtsp/UDPPusher.h>
 
 #include <media/stagefright/foundation/ABuffer.h>
 #include <media/stagefright/foundation/ADebug.h>

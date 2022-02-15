@@ -31,6 +31,7 @@ namespace {
 /** Supported HAL versions, in order of preference.
  */
 const char* sAudioHALVersions[] = {
+    "7.1",
     "7.0",
     "6.0",
     "5.0",

@@ -15,9 +15,6 @@ cc_binary {
         "codec2.cpp",
     ],
 
-    include_dirs: [
-    ],
-
     header_libs: [
         "libmediadrm_headers",
     ],
