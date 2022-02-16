@@ -134,9 +134,6 @@ public:
                                                   int32_t* _aidl_return) override;
     binder::Status getStrategyForStream(AudioStreamType stream,
                                         int32_t* _aidl_return) override;
-    binder::Status getDevicesForStream(
-            AudioStreamType stream,
-            std::vector<AudioDeviceDescription>* _aidl_return) override;
     binder::Status getDevicesForAttributes(const media::AudioAttributesEx& attr,
                                            bool forVolume,
                                            std::vector<AudioDevice>* _aidl_return) override;
