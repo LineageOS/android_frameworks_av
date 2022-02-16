@@ -139,7 +139,7 @@ interface IAudioPolicyService {
 
     AudioDeviceDescription[] getDevicesForStream(AudioStreamType stream);
 
-    AudioDevice[] getDevicesForAttributes(in AudioAttributesEx attr);
+    AudioDevice[] getDevicesForAttributes(in AudioAttributesEx attr, boolean forVolume);
 
     int /* audio_io_handle_t */ getOutputForEffect(in EffectDescriptor desc);
 

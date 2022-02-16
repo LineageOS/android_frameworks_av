@@ -1270,7 +1270,8 @@ DeviceTypeSet AudioSystem::getDevicesForStream(audio_stream_type_t stream) {
 }
 
 status_t AudioSystem::getDevicesForAttributes(const AudioAttributes& aa,
-                                              AudioDeviceTypeAddrVector* devices) {
+                                              AudioDeviceTypeAddrVector* devices,
+                                              bool forVolume) {
     if (devices == nullptr) {
         return BAD_VALUE;
     }
@@ -1281,7 +1282,7 @@ status_t AudioSystem::getDevicesForAttributes(const AudioAttributes& aa,
             legacy2aidl_AudioAttributes_AudioAttributesEx(aa));
     std::vector<AudioDevice> retAidl;
     RETURN_STATUS_IF_ERROR(
-            statusTFromBinderStatus(aps->getDevicesForAttributes(aaAidl, &retAidl)));
+            statusTFromBinderStatus(aps->getDevicesForAttributes(aaAidl, forVolume, &retAidl)));
     *devices = VALUE_OR_RETURN_STATUS(
             convertContainer<AudioDeviceTypeAddrVector>(
                     retAidl,

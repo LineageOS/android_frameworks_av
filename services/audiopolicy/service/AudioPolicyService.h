@@ -138,6 +138,7 @@ public:
             AudioStreamType stream,
             std::vector<AudioDeviceDescription>* _aidl_return) override;
     binder::Status getDevicesForAttributes(const media::AudioAttributesEx& attr,
+                                           bool forVolume,
                                            std::vector<AudioDevice>* _aidl_return) override;
     binder::Status getOutputForEffect(const media::EffectDescriptor& desc,
                                       int32_t* _aidl_return) override;
