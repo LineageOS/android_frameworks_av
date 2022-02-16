@@ -117,7 +117,7 @@ void AudioSource::set(
         audio_channel_in_mask_from_count(channelCount),
         attributionSource,
         (size_t) (bufCount * frameCount),
-        wp<AudioRecord::IAudioRecordCallback>::fromExisting(this),
+        wp<AudioRecord::IAudioRecordCallback>{this},
         frameCount /*notificationFrames*/,
         AUDIO_SESSION_ALLOCATE,
         AudioRecord::TRANSFER_DEFAULT,

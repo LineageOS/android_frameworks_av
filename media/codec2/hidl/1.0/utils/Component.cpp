@@ -482,6 +482,37 @@ void Component::initListener(const sp<Component>& self) {
     if (res != C2_OK) {
         mInit = res;
     }
+
+    struct ListenerDeathRecipient : public HwDeathRecipient {
+        ListenerDeathRecipient(const wp<Component>& comp)
+            : mComponent{comp} {
+        }
+
+        virtual void serviceDied(
+                uint64_t /* cookie */,
+                const wp<::android::hidl::base::V1_0::IBase>& /* who */
+                ) override {
+            auto strongComponent = mComponent.promote();
+            if (strongComponent) {
+                LOG(INFO) << "Client died ! release the component !!";
+                strongComponent->release();
+            } else {
+                LOG(ERROR) << "Client died ! no component to release !!";
+            }
+        }
+
+        wp<Component> mComponent;
+    };
+
+    mDeathRecipient = new ListenerDeathRecipient(self);
+    Return<bool> transStatus = mListener->linkToDeath(
+            mDeathRecipient, 0);
+    if (!transStatus.isOk()) {
+        LOG(ERROR) << "Listener linkToDeath() transaction failed.";
+    }
+    if (!static_cast<bool>(transStatus)) {
+        LOG(DEBUG) << "Listener linkToDeath() call failed.";
+    }
 }
 
 Component::~Component() {

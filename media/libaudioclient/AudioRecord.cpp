@@ -307,7 +307,6 @@ status_t AudioRecord::set(
         int32_t maxSharedAudioHistoryMs)
 {
     status_t status = NO_ERROR;
-    const sp<IAudioRecordCallback> callbackHandle = callback.promote();
     // Note mPortId is not valid until the track is created, so omit mPortId in ALOG for set.
     ALOGV("%s(): inputSource %d, sampleRate %u, format %#x, channelMask %#x, frameCount %zu, "
           "notificationFrames %u, sessionId %d, transferType %d, flags %#x, attributionSource %s"
@@ -373,14 +372,14 @@ status_t AudioRecord::set(
     mTransfer = transferType;
     switch (mTransfer) {
     case TRANSFER_DEFAULT:
-        if (callbackHandle == nullptr || threadCanCallJava) {
+        if (callback == nullptr || threadCanCallJava) {
             mTransfer = TRANSFER_SYNC;
         } else {
             mTransfer = TRANSFER_CALLBACK;
         }
         break;
     case TRANSFER_CALLBACK:
-        if (callbackHandle == nullptr) {
+        if (callback == nullptr) {
             errorMessage = StringPrintf(
                     "%s: Transfer type TRANSFER_CALLBACK but callback == nullptr", __func__);
             status = BAD_VALUE;
@@ -429,7 +428,7 @@ status_t AudioRecord::set(
     mNotificationFramesReq = notificationFrames;
     // mNotificationFramesAct is initialized in createRecord_l
 
-    mCallback = callbackHandle;
+    mCallback = callback;
     if (mCallback != nullptr) {
         mAudioRecordThread = new AudioRecordThread(*this);
         mAudioRecordThread->run("AudioRecord", ANDROID_PRIORITY_AUDIO);
@@ -640,7 +639,7 @@ status_t AudioRecord::setMarkerPosition(uint32_t marker)
 {
     AutoMutex lock(mLock);
     // The only purpose of setting marker position is to get a callback
-    if (mCallback.promote() == nullptr) {
+    if (mCallback == nullptr) {
         return INVALID_OPERATION;
     }
 
@@ -670,7 +669,7 @@ status_t AudioRecord::setPositionUpdatePeriod(uint32_t updatePeriod)
 {
     AutoMutex lock(mLock);
     // The only purpose of setting position update period is to get a callback
-    if (mCallback.promote() == nullptr) {
+    if (mCallback == nullptr) {
         return INVALID_OPERATION;
     }
 
@@ -1037,7 +1036,7 @@ status_t AudioRecord::createRecord_l(const Modulo<uint32_t> &epoch)
                 mNotificationFramesReq, output.notificationFrameCount, output.frameCount);
     }
     mNotificationFramesAct = (uint32_t)output.notificationFrameCount;
-    if (mServerConfig.format != mFormat && mCallback.promote() != nullptr) {
+    if (mServerConfig.format != mFormat && mCallback != nullptr) {
         mFormatConversionBufRaw = std::make_unique<uint8_t[]>(mNotificationFramesAct * mFrameSize);
         mFormatConversionBuffer.raw = mFormatConversionBufRaw.get();
     }

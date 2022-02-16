@@ -1587,14 +1587,6 @@ void AudioPolicyService::SensorPrivacyPolicy::registerSelf() {
     spm.addSensorPrivacyListener(this);
 }
 
-void AudioPolicyService::SensorPrivacyPolicy::registerSelfForMicrophoneOnly(int userId) {
-    SensorPrivacyManager spm;
-    mSensorPrivacyEnabled = spm.isIndividualSensorPrivacyEnabled(userId,
-            SensorPrivacyManager::INDIVIDUAL_SENSOR_MICROPHONE);
-    spm.addIndividualSensorPrivacyListener(userId,
-            SensorPrivacyManager::INDIVIDUAL_SENSOR_MICROPHONE, this);
-}
-
 void AudioPolicyService::SensorPrivacyPolicy::unregisterSelf() {
     SensorPrivacyManager spm;
     spm.removeSensorPrivacyListener(this);
@@ -1604,7 +1596,8 @@ bool AudioPolicyService::SensorPrivacyPolicy::isSensorPrivacyEnabled() {
     return mSensorPrivacyEnabled;
 }
 
-binder::Status AudioPolicyService::SensorPrivacyPolicy::onSensorPrivacyChanged(bool enabled) {
+binder::Status AudioPolicyService::SensorPrivacyPolicy::onSensorPrivacyChanged(
+    int toggleType __unused, int sensor __unused, bool enabled) {
     mSensorPrivacyEnabled = enabled;
     sp<AudioPolicyService> service = mService.promote();
     if (service != nullptr) {
