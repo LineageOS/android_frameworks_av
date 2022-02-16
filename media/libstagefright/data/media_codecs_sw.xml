@@ -91,11 +91,11 @@
         <MediaCodec name="c2.android.mpeg4.decoder" type="video/mp4v-es">
             <Alias name="OMX.google.mpeg4.decoder" />
             <!-- profiles and levels:  ProfileSimple : Level3 -->
-            <Limit name="size" min="2x2" max="352x288" />
+            <Limit name="size" min="2x2" max="1920x1920" />
             <Limit name="alignment" value="2x2" />
-            <Limit name="block-size" value="16x16" />
-            <Limit name="blocks-per-second" range="12-11880" />
-            <Limit name="bitrate" range="1-384000" />
+            <Limit name="block-count" range="1-14400" />
+            <Limit name="blocks-per-second" range="1-432000" />
+            <Limit name="bitrate" range="1-40000000" />
             <Feature name="adaptive-playback" />
         </MediaCodec>
         <MediaCodec name="c2.android.h263.decoder" type="video/3gpp">
