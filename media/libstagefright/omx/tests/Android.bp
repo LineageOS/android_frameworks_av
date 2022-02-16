@@ -43,7 +43,6 @@ cc_test {
     header_libs: [
         "libbase_headers",
         "libmediametrics_headers",
-        "media_ndk_headers",
     ],
 
     cflags: [
