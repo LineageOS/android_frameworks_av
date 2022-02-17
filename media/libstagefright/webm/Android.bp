@@ -50,7 +50,6 @@ cc_library_static {
     header_libs: [
         "av-headers",
         "libmedia_headers",
-        "media_ndk_headers",
     ],
 }
 
