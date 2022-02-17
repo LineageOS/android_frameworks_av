@@ -39,6 +39,7 @@ AudioInputDescriptor::AudioInputDescriptor(const sp<IOProfile>& profile,
         if (profile->getGains().size() > 0) {
             profile->getGains()[0]->getDefaultConfig(&mGain);
         }
+        mFlags = (audio_input_flags_t)profile->getFlags();
     }
 }
 
@@ -77,8 +78,7 @@ void AudioInputDescriptor::toAudioPortConfig(struct audio_port_config *dstConfig
 {
     ALOG_ASSERT(mProfile != 0,
                 "toAudioPortConfig() called on input with null profile %d", mIoHandle);
-    dstConfig->config_mask = AUDIO_PORT_CONFIG_SAMPLE_RATE|AUDIO_PORT_CONFIG_CHANNEL_MASK|
-                            AUDIO_PORT_CONFIG_FORMAT|AUDIO_PORT_CONFIG_GAIN;
+    dstConfig->config_mask = AUDIO_PORT_CONFIG_ALL;
     if (srcConfig != NULL) {
         dstConfig->config_mask |= srcConfig->config_mask;
     }
@@ -512,8 +512,13 @@ void AudioInputDescriptor::checkSuspendEffects()
 
 void AudioInputDescriptor::dump(String8 *dst, int spaces, const char* extraInfo) const
 {
-    dst->appendFormat("Port ID: %d%s%s\n",
-            getId(), extraInfo != nullptr ? "; " : "", extraInfo != nullptr ? extraInfo : "");
+    std::string flagsLiteral = toString(mFlags);
+    if (!flagsLiteral.empty()) {
+        flagsLiteral = " (" + flagsLiteral + ")";
+    }
+    dst->appendFormat("Port ID: %d; 0x%04x%s%s%s\n",
+            getId(), mFlags, flagsLiteral.c_str(),
+            extraInfo != nullptr ? "; " : "", extraInfo != nullptr ? extraInfo : "");
     dst->appendFormat("%*s%s; %d; Channel mask: 0x%x\n", spaces, "",
             audio_format_to_string(mFormat), mSamplingRate, mChannelMask);
     dst->appendFormat("%*sDevices: %s\n", spaces, "",

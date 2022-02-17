@@ -144,6 +144,7 @@ public:
     AudioPolicyClientInterface * const mClientInterface;
     int32_t mGlobalActiveCount = 0;  // non-client-specific activity ref count
     EffectDescriptorCollection mEnabledEffects;
+    audio_input_flags_t& mFlags = AudioPortConfig::mFlags.input;
 };
 
 class AudioInputCollection :
