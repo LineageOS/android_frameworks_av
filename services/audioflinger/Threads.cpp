@@ -10261,20 +10261,10 @@ void AudioFlinger::MmapPlaybackThread::processVolume_l()
         } else {
             sp<MmapStreamCallback> callback = mCallback.promote();
             if (callback != 0) {
-                int channelCount;
-                if (isOutput()) {
-                    channelCount = audio_channel_count_from_out_mask(mChannelMask);
-                } else {
-                    channelCount = audio_channel_count_from_in_mask(mChannelMask);
-                }
-                Vector<float> values;
-                for (int i = 0; i < channelCount; i++) {
-                    values.add(volume);
-                }
                 mHalVolFloat = volume; // SW volume control worked, so update value.
                 mNoCallbackWarningCount = 0;
                 mLock.unlock();
-                callback->onVolumeChanged(mChannelMask, values);
+                callback->onVolumeChanged(volume);
                 mLock.lock();
             } else {
                 if (mNoCallbackWarningCount < kMaxNoCallbackWarnings) {
