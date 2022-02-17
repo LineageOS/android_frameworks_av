@@ -698,11 +698,13 @@ private:
         bool isUidActive(uid_t uid, String16 callingPackage);
         int32_t getProcState(uid_t uid);
 
-        void onUidGone(uid_t uid, bool disabled);
-        void onUidActive(uid_t uid);
-        void onUidIdle(uid_t uid, bool disabled);
+        // IUidObserver
+        void onUidGone(uid_t uid, bool disabled) override;
+        void onUidActive(uid_t uid) override;
+        void onUidIdle(uid_t uid, bool disabled) override;
         void onUidStateChanged(uid_t uid, int32_t procState, int64_t procStateSeq,
-                int32_t capability);
+                int32_t capability) override;
+        void onUidProcAdjChanged(uid_t uid) override;
 
         void addOverrideUid(uid_t uid, String16 callingPackage, bool active);
         void removeOverrideUid(uid_t uid, String16 callingPackage);
@@ -717,13 +719,18 @@ private:
         int32_t getProcStateLocked(uid_t uid);
         void updateOverrideUid(uid_t uid, String16 callingPackage, bool active, bool insert);
 
+        struct MonitoredUid {
+            int32_t procState;
+            size_t refCount;
+        };
+
         Mutex mUidLock;
         bool mRegistered;
         ActivityManager mAm;
         wp<CameraService> mService;
         std::unordered_set<uid_t> mActiveUids;
-        // Monitored uid map to cached procState and refCount pair
-        std::unordered_map<uid_t, std::pair<int32_t, size_t>> mMonitoredUids;
+        // Monitored uid map
+        std::unordered_map<uid_t, MonitoredUid> mMonitoredUids;
         std::unordered_map<uid_t, bool> mOverrideUids;
     }; // class UidPolicy
 
