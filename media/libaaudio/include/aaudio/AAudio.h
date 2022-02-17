@@ -1433,7 +1433,10 @@ AAUDIO_API aaudio_result_t  AAudioStream_requestPause(AAudioStream* stream) __IN
 /**
  * Asynchronous request for the stream to flush.
  * Flushing will discard any pending data.
- * This call only works if the stream is pausing or paused. TODO review
+ * This call only works if the stream is OPEN, PAUSED, STOPPED, or FLUSHED.
+ * Calling this function when in other states,
+ * or calling from an AAudio callback function,
+ * will have no effect and an error will be returned.
  * Frame counters are not reset by a flush. They may be advanced.
  * After this call the state will be in {@link #AAUDIO_STREAM_STATE_FLUSHING} or
  * {@link #AAUDIO_STREAM_STATE_FLUSHED}.
