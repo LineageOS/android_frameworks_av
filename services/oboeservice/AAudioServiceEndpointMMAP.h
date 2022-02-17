@@ -77,8 +77,7 @@ public:
     // -------------- Callback functions for MmapStreamCallback ---------------------
     void onTearDown(audio_port_handle_t portHandle) override;
 
-    void onVolumeChanged(audio_channel_mask_t channels,
-                         android::Vector<float> values) override;
+    void onVolumeChanged(float volume) override;
 
     void onRoutingChanged(audio_port_handle_t portHandle) override;
     // ------------------------------------------------------------------------------

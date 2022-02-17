@@ -362,12 +362,8 @@ void AAudioServiceEndpointMMAP::onTearDown(audio_port_handle_t portHandle) {
     asyncTask.detach();
 }
 
-void AAudioServiceEndpointMMAP::onVolumeChanged(audio_channel_mask_t channels,
-                                              android::Vector<float> values) {
-    // TODO Do we really need a different volume for each channel?
-    // We get called with an array filled with a single value!
-    float volume = values[0];
-    ALOGD("%s() volume[0] = %f", __func__, volume);
+void AAudioServiceEndpointMMAP::onVolumeChanged(float volume) {
+    ALOGD("%s() volume = %f", __func__, volume);
     std::lock_guard<std::mutex> lock(mLockStreams);
     for(const auto& stream : mRegisteredStreams) {
         stream->onVolumeChanged(volume);
