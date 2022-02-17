@@ -421,13 +421,30 @@ protected:
         {
             return static_cast<VolumeSource>(volumeGroup);
         }
-        VolumeSource toVolumeSource(const audio_attributes_t &attributes) const
+        /**
+         * @brief toVolumeSource converts an audio attributes into a volume source
+         * (either a legacy stream or a volume group). If fallback on default is allowed, and if
+         * the audio attributes do not follow any specific product strategy's rule, it will be
+         * associated to default volume source, e.g. music. Thus, any of call of volume API
+         * using this translation function may affect the default volume source.
+         * If fallback is not allowed and no matching rule is identified for the given attributes,
+         * the volume source will be undefined, thus, no volume will be altered/modified.
+         * @param attributes to be considered
+         * @param fallbackOnDefault
+         * @return volume source associated with given attributes, otherwise either music if
+         * fallbackOnDefault is set or none.
+         */
+        VolumeSource toVolumeSource(
+            const audio_attributes_t &attributes, bool fallbackOnDefault = true) const
         {
-            return toVolumeSource(mEngine->getVolumeGroupForAttributes(attributes));
+            return toVolumeSource(mEngine->getVolumeGroupForAttributes(
+                attributes, fallbackOnDefault));
         }
-        VolumeSource toVolumeSource(audio_stream_type_t stream) const
+        VolumeSource toVolumeSource(
+            audio_stream_type_t stream, bool fallbackOnDefault = true) const
         {
-            return toVolumeSource(mEngine->getVolumeGroupForStreamType(stream));
+            return toVolumeSource(mEngine->getVolumeGroupForStreamType(
+                stream, fallbackOnDefault));
         }
         IVolumeCurves &getVolumeCurves(VolumeSource volumeSource)
         {
@@ -453,14 +470,27 @@ protected:
         void removeOutput(audio_io_handle_t output);
         void addInput(audio_io_handle_t input, const sp<AudioInputDescriptor>& inputDesc);
 
-        // change the route of the specified output. Returns the number of ms we have slept to
-        // allow new routing to take effect in certain cases.
+        /**
+         * @brief setOutputDevices change the route of the specified output.
+         * @param outputDesc to be considered
+         * @param device to be considered to route the output
+         * @param force if true, force the routing even if no change.
+         * @param delayMs if specified, delay to apply for mute/volume op when changing device
+         * @param patchHandle if specified, the patch handle this output is connected through.
+         * @param requiresMuteCheck if specified, for e.g. when another output is on a shared device
+         *        and currently active, allow to have proper drain and avoid pops
+         * @param requiresVolumeCheck true if called requires to reapply volume if the routing did
+         * not change (but the output is still routed).
+         * @return the number of ms we have slept to allow new routing to take effect in certain
+         * cases.
+         */
         uint32_t setOutputDevices(const sp<SwAudioOutputDescriptor>& outputDesc,
                                   const DeviceVector &device,
                                   bool force = false,
                                   int delayMs = 0,
                                   audio_patch_handle_t *patchHandle = NULL,
-                                  bool requiresMuteCheck = true);
+                                  bool requiresMuteCheck = true,
+                                  bool requiresVolumeCheck = false);
         status_t resetOutputDevice(const sp<AudioOutputDescriptor>& outputDesc,
                                    int delayMs = 0,
                                    audio_patch_handle_t *patchHandle = NULL);
