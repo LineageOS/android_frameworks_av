@@ -7,6 +7,12 @@ package {
     default_applicable_licenses: ["frameworks_av_license"],
 }
 
+cc_library_headers {
+    name: "libsfplugin_ccodec_internal_headers",
+    export_include_dirs: ["."],
+    // only for internal tests, perhaps restrict via visibility clause
+}
+
 cc_library_shared {
     name: "libsfplugin_ccodec",
 

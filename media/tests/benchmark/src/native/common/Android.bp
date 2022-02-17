@@ -94,10 +94,6 @@ cc_defaults {
         "libmediabenchmark_soft_sanitize_all-defaults",
     ],
 
-    include_dirs: [
-        "frameworks/av/media/codec2/hidl/client/include",
-    ],
-
     shared_libs: [
         "libcodec2_client",
         "libmediandk",

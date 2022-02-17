@@ -909,6 +909,7 @@ protected:
         PatchBuilder buildMsdPatch(bool msdIsSource, const sp<DeviceDescriptor> &device) const;
         status_t setMsdOutputPatches(const DeviceVector *outputDevices = nullptr);
         void releaseMsdOutputPatches(const DeviceVector& devices);
+        bool msdHasPatchesToAllDevices(const AudioDeviceTypeAddrVector& devices);
 
         // Overload of setDeviceConnectionState()
         status_t setDeviceConnectionState(audio_devices_t deviceType,
@@ -1120,6 +1121,10 @@ private:
         bool isOffloadPossible(const audio_offload_info_t& offloadInfo,
                                bool durationIgnored = false);
 
+        // adds the profiles from the outputProfile to the passed audioProfilesVector
+        // without duplicating them if already present
+        void addPortProfilesToVector(sp<IOProfile> outputProfile,
+                                    AudioProfileVector& audioProfilesVector);
 };
 
 };

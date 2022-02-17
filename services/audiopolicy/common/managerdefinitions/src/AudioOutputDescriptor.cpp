@@ -202,8 +202,7 @@ status_t AudioOutputDescriptor::applyAudioPortConfig(const struct audio_port_con
 void AudioOutputDescriptor::toAudioPortConfig(struct audio_port_config *dstConfig,
                                               const struct audio_port_config *srcConfig) const
 {
-    dstConfig->config_mask = AUDIO_PORT_CONFIG_SAMPLE_RATE|AUDIO_PORT_CONFIG_CHANNEL_MASK|
-                            AUDIO_PORT_CONFIG_FORMAT|AUDIO_PORT_CONFIG_GAIN;
+    dstConfig->config_mask = AUDIO_PORT_CONFIG_ALL;
     if (srcConfig != NULL) {
         dstConfig->config_mask |= srcConfig->config_mask;
     }
@@ -298,7 +297,6 @@ SwAudioOutputDescriptor::SwAudioOutputDescriptor(const sp<IOProfile>& profile,
                                                  AudioPolicyClientInterface *clientInterface)
     : AudioOutputDescriptor(profile, clientInterface),
     mProfile(profile), mIoHandle(AUDIO_IO_HANDLE_NONE), mLatency(0),
-    mFlags((audio_output_flags_t)0),
     mOutput1(0), mOutput2(0), mDirectOpenCount(0),
     mDirectClientSession(AUDIO_SESSION_NONE)
 {
