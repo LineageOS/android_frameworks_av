@@ -110,7 +110,7 @@ static DestinationBufferAidl hidlDestinationBufferToAidlDestinationBuffer(
             auto handle = buffer.secureMemory.getNativeHandle();
             if (handle) {
                 aidldb.set<DestinationBufferAidl::Tag::secureMemory>(
-                    ::android::makeToAidl(handle));
+                    ::android::dupToAidl(handle));
             } else {
                 NativeHandleAidlCommon emptyhandle;
                 aidldb.set<DestinationBufferAidl::Tag::secureMemory>(
