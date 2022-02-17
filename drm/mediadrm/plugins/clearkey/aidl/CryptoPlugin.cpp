@@ -227,7 +227,7 @@ SharedBufferBase::SharedBufferBase(const SharedBuffer& mem)
 }
 
 SharedBufferBase::~SharedBufferBase() {
-    if (munmap(mBase, mSize)) {
+    if (mBase && munmap(mBase, mSize)) {
         ALOGE("munmap err: base %p; errno %s",
               mBase, strerror(errno));
     }
