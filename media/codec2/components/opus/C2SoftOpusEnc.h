@@ -67,7 +67,7 @@ private:
     uint32_t mSampleRate;
     uint32_t mChannelCount;
     uint32_t mFrameDurationMs;
-    uint64_t mAnchorTimeStamp;
+    int64_t mAnchorTimeStamp;
     uint64_t mProcessedSamples;
     // Codec delay in ns
     uint64_t mCodecDelay;
