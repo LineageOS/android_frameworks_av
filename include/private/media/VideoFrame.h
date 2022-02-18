@@ -38,13 +38,13 @@ public:
     VideoFrame(uint32_t width, uint32_t height,
             uint32_t displayWidth, uint32_t displayHeight,
             uint32_t tileWidth, uint32_t tileHeight,
-            uint32_t angle, uint32_t bpp, bool hasData, size_t iccSize):
+            uint32_t angle, uint32_t bpp, uint32_t bitDepth, bool hasData, size_t iccSize):
         mWidth(width), mHeight(height),
         mDisplayWidth(displayWidth), mDisplayHeight(displayHeight),
         mTileWidth(tileWidth), mTileHeight(tileHeight), mDurationUs(0),
         mRotationAngle(angle), mBytesPerPixel(bpp), mRowBytes(bpp * width),
         mSize(hasData ? (bpp * width * height) : 0),
-        mIccSize(iccSize), mReserved(0) {
+        mIccSize(iccSize), mBitDepth(bitDepth) {
     }
 
     void init(const VideoFrame& copy, const void* iccData, size_t iccSize) {
@@ -84,7 +84,9 @@ public:
     uint32_t mRowBytes;        // Number of bytes per row before rotation
     uint32_t mSize;            // Number of bytes of frame data
     uint32_t mIccSize;         // Number of bytes of ICC data
-    uint32_t mReserved;        // (padding to make mData 64-bit aligned)
+    uint32_t mBitDepth;        // number of bits per R / G / B channel
+
+    // Adding new items must be 64-bit aligned.
 };
 
 }; // namespace android
