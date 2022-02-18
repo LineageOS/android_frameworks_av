@@ -9,14 +9,15 @@
 
   "presubmit-large": [
     // this doesn't seem to run any tests.
-    // but: cts-tradefed run -m CtsMediaTestCases -t android.media.cts.MediaMetadataRetrieverTest
+    // but: cts-tradefed run -m CtsMediaMiscTestCases -t \
+    // android.media.misc.cts.MediaMetadataRetrieverTest
     // does run he 32 and 64 bit tests, but not the instant tests
     // but all I know is that with 'atest', it's not running
     {
-      "name": "CtsMediaTestCases",
+      "name": "CtsMediaMiscTestCases",
       "options": [
           {
-            "include-filter": "android.media.cts.MediaMetadataRetrieverTest"
+            "include-filter": "android.media.misc.cts.MediaMetadataRetrieverTest"
           }
       ]
     }
