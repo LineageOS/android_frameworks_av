@@ -185,7 +185,6 @@ cc_library_shared {
     include_dirs: [
         "system/media/private/camera/include",
         "frameworks/native/include/media/openmax",
-        "frameworks/av/media/ndk",
         "external/dynamic_depth/includes",
         "external/dynamic_depth/internal",
     ],
