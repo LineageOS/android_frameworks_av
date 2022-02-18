@@ -63,6 +63,7 @@ ndk_headers {
 }
 
 // for use with header_libs
+// supports use as <media/NdkMediaExtractor.h> not <NdkMediaExtractor.h>
 cc_library_headers {
     name: "media_ndk_headers",
     vendor_available: true,
@@ -103,8 +104,6 @@ cc_library_shared {
     ],
 
     include_dirs: [
-        "frameworks/base/core/jni",
-        "frameworks/native/include/media/openmax",
         "system/media/camera/include",
     ],
 
@@ -178,6 +177,9 @@ cc_library {
         "NdkMediaDataSourceCallbacks.cpp",
     ],
 
+    local_include_dirs: [
+        "include",
+    ],
 
     export_include_dirs: [
         "include",
@@ -192,6 +194,7 @@ cc_library {
     header_libs: [
         "libstagefright_headers",
         "libmedia_headers",
+        "libstagefright_headers",
     ],
 
     shared_libs: [
