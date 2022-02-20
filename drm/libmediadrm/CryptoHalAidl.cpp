@@ -375,7 +375,7 @@ int32_t CryptoHalAidl::setHeap(const sp<HidlMemory>& heap) {
     mHeapSizes.add(seqNum, heap->size());
 
     SharedBufferAidl memAidl;
-    memAidl.handle = ::android::makeToAidl(heap->handle());
+    memAidl.handle = ::android::dupToAidl(heap->handle());
     memAidl.size = heap->size();
     memAidl.bufferId = bufferId;
 
