@@ -59,8 +59,8 @@ class C2SoftGav1Dec::IntfImpl : public SimpleInterface<void>::BaseParams {
         DefineParam(mSize, C2_PARAMKEY_PICTURE_SIZE)
             .withDefault(new C2StreamPictureSizeInfo::output(0u, 320, 240))
             .withFields({
-                C2F(mSize, width).inRange(2, 4096, 2),
-                C2F(mSize, height).inRange(2, 4096, 2),
+                C2F(mSize, width).inRange(2, 4096),
+                C2F(mSize, height).inRange(2, 4096),
             })
             .withSetter(SizeSetter)
             .build());
@@ -559,23 +559,23 @@ static void copyOutputBufferToYV12Frame(uint8_t *dstY, uint8_t *dstU, uint8_t *d
 
   if (isMonochrome) {
     // Fill with neutral U/V values.
-    for (size_t i = 0; i < height / 2; ++i) {
-      memset(dstV, NEUTRAL_UV_VALUE, width / 2);
-      memset(dstU, NEUTRAL_UV_VALUE, width / 2);
+    for (size_t i = 0; i < (height + 1) / 2; ++i) {
+      memset(dstV, NEUTRAL_UV_VALUE, (width + 1) / 2);
+      memset(dstU, NEUTRAL_UV_VALUE, (width + 1) / 2);
       dstV += dstUVStride;
       dstU += dstUVStride;
     }
     return;
   }
 
-  for (size_t i = 0; i < height / 2; ++i) {
-    memcpy(dstV, srcV, width / 2);
+  for (size_t i = 0; i < (height + 1) / 2; ++i) {
+    memcpy(dstV, srcV, (width + 1) / 2);
     srcV += srcVStride;
     dstV += dstUVStride;
   }
 
-  for (size_t i = 0; i < height / 2; ++i) {
-    memcpy(dstU, srcU, width / 2);
+  for (size_t i = 0; i < (height + 1) / 2; ++i) {
+    memcpy(dstU, srcU, (width + 1) / 2);
     srcU += srcUStride;
     dstU += dstUVStride;
   }
@@ -796,8 +796,12 @@ bool C2SoftGav1Dec::outputBuffer(const std::shared_ptr<C2BlockPool> &pool,
   }
   C2MemoryUsage usage = {C2MemoryUsage::CPU_READ, C2MemoryUsage::CPU_WRITE};
 
-  c2_status_t err = pool->fetchGraphicBlock(align(mWidth, 16), mHeight, format,
-                                            usage, &block);
+  // We always create a graphic block that is width aligned to 16 and height
+  // aligned to 2. We set the correct "crop" value of the image in the call to
+  // createGraphicBuffer() by setting the correct image dimensions.
+  c2_status_t err = pool->fetchGraphicBlock(align(mWidth, 16),
+                                            align(mHeight, 2), format, usage,
+                                            &block);
 
   if (err != C2_OK) {
     ALOGE("fetchGraphicBlock for Output failed with status %d", err);
