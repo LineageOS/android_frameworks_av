@@ -55,8 +55,8 @@ class C2SoftGav1Dec::IntfImpl : public SimpleInterface<void>::BaseParams {
         DefineParam(mSize, C2_PARAMKEY_PICTURE_SIZE)
             .withDefault(new C2StreamPictureSizeInfo::output(0u, 320, 240))
             .withFields({
-                C2F(mSize, width).inRange(2, 4096, 2),
-                C2F(mSize, height).inRange(2, 4096, 2),
+                C2F(mSize, width).inRange(2, 4096),
+                C2F(mSize, height).inRange(2, 4096),
             })
             .withSetter(SizeSetter)
             .build());
@@ -650,8 +650,12 @@ bool C2SoftGav1Dec::outputBuffer(const std::shared_ptr<C2BlockPool> &pool,
   }
   C2MemoryUsage usage = {C2MemoryUsage::CPU_READ, C2MemoryUsage::CPU_WRITE};
 
-  c2_status_t err = pool->fetchGraphicBlock(align(mWidth, 16), mHeight, format,
-                                            usage, &block);
+  // We always create a graphic block that is width aligned to 16 and height
+  // aligned to 2. We set the correct "crop" value of the image in the call to
+  // createGraphicBuffer() by setting the correct image dimensions.
+  c2_status_t err = pool->fetchGraphicBlock(align(mWidth, 16),
+                                            align(mHeight, 2), format, usage,
+                                            &block);
 
   if (err != C2_OK) {
     ALOGE("fetchGraphicBlock for Output failed with status %d", err);
