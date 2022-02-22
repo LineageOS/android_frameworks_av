@@ -105,6 +105,8 @@ cc_library_shared {
     ],
 
     header_libs: [
+        "libdynamic_depth-internal_headers",
+        "libdynamic_depth-public_headers",
         "libmediadrm_headers",
         "libmediametrics_headers",
     ],
@@ -185,8 +187,6 @@ cc_library_shared {
     include_dirs: [
         "system/media/private/camera/include",
         "frameworks/native/include/media/openmax",
-        "external/dynamic_depth/includes",
-        "external/dynamic_depth/internal",
     ],
 
     export_include_dirs: ["."],
@@ -216,6 +216,11 @@ cc_library_static {
         "utils/SessionConfigurationUtilsHost.cpp",
     ],
 
+    header_libs: [
+        "libdynamic_depth-internal_headers",
+        "libdynamic_depth-public_headers",
+    ],
+
     shared_libs: [
         "libbase",
         "libbinder",
@@ -229,8 +234,6 @@ cc_library_static {
     ],
 
     include_dirs: [
-        "external/dynamic_depth/includes",
-        "external/dynamic_depth/internal",
         "frameworks/av/camera/include",
         "frameworks/av/camera/include/camera",
     ],
