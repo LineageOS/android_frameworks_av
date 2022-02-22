@@ -43,10 +43,10 @@ MediaResource::MediaResource(Type type, const std::vector<uint8_t> &id, int64_t 
 }
 
 //static
-MediaResource MediaResource::CodecResource(bool secure, SubType subType, int64_t instanceCount) {
+MediaResource MediaResource::CodecResource(bool secure, bool video, int64_t instanceCount) {
     return MediaResource(
             secure ? Type::kSecureCodec : Type::kNonSecureCodec,
-            subType,
+            video ? SubType::kVideoCodec : SubType::kAudioCodec,
             instanceCount);
 }
 
