@@ -585,13 +585,23 @@ status_t AudioPolicyService::dumpInternals(int fd)
     snprintf(buffer, SIZE, "Command Thread: %p\n", mAudioCommandThread.get());
     result.append(buffer);
 
-    snprintf(buffer, SIZE, "Supported System Usages:\n");
+    snprintf(buffer, SIZE, "Supported System Usages:\n  ");
     result.append(buffer);
-    for (std::vector<audio_usage_t>::iterator it = mSupportedSystemUsages.begin();
-        it != mSupportedSystemUsages.end(); ++it) {
-        snprintf(buffer, SIZE, "\t%d\n", *it);
-        result.append(buffer);
+    std::stringstream msg;
+    size_t i = 0;
+    for (auto usage : mSupportedSystemUsages) {
+        if (i++ != 0) msg << ", ";
+        if (const char* strUsage = audio_usage_to_string(usage); strUsage) {
+            msg << strUsage;
+        } else {
+            msg << usage << " (unknown)";
+        }
     }
+    if (i == 0) {
+        msg << "None";
+    }
+    msg << std::endl;
+    result.append(msg.str().c_str());
 
     write(fd, result.string(), result.size());
 
