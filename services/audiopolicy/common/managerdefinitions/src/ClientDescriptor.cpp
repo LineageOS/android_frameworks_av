@@ -88,7 +88,8 @@ void RecordClientDescriptor::trackEffectEnabled(const sp<EffectDescriptor> &effe
 void RecordClientDescriptor::dump(String8 *dst, int spaces) const
 {
     ClientDescriptor::dump(dst, spaces);
-    dst->appendFormat("%*sSource: %d; Flags: %08x\n", spaces, "", mSource, mFlags);
+    dst->appendFormat("%*sSource: %d; Flags: %08x; is soundtrigger: %d\n",
+            spaces, "", mSource, mFlags, mIsSoundTrigger);
     mEnabledEffects.dump(dst, spaces + 2 /*spaces*/, false /*verbose*/);
 }
 
