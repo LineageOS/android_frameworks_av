@@ -57,7 +57,7 @@ constexpr auto kAutoRecenterWindowDuration = 6s;
 constexpr float kAutoRecenterTranslationThreshold = 0.1f;
 
 // Auto-recenter considers head not still if rotated by this much (in radians, approx).
-constexpr float kAutoRecenterRotationThreshold = 7.0f / 180 * M_PI;
+constexpr float kAutoRecenterRotationThreshold = 10.5f / 180 * M_PI;
 
 // Screen is considered to be unstable (not still) if it has moved significantly within the last
 // time window of this duration.
