@@ -3706,7 +3706,7 @@ void AudioPolicyManager::dump(String8 *dst) const
     }
     dst->appendFormat(" TTS output %savailable\n", mTtsOutputAvailable ? "" : "not ");
     dst->appendFormat(" Master mono: %s\n", mMasterMono ? "on" : "off");
-    dst->appendFormat(" Communnication Strategy: %d\n", mCommunnicationStrategy);
+    dst->appendFormat(" Communication Strategy id: %d\n", mCommunnicationStrategy);
     dst->appendFormat(" Config source: %s\n", mConfig.getSource().c_str()); // getConfig not const
 
     dst->append("\n");
