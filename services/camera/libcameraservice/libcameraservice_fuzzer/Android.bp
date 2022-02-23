@@ -65,6 +65,7 @@ cc_fuzz {
     fuzz_config: {
         cc: [
             "android-media-fuzzing-reports@google.com",
+            "android-camera-fwk-eng@google.com",
         ],
         componentid: 155276,
         libfuzzer_options: [

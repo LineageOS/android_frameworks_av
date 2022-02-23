@@ -125,6 +125,7 @@ class CameraFuzzer : public ::android::hardware::BnCameraClient {
     void invokeDump();
     void invokeShellCommand();
     void invokeNotifyCalls();
+    void invokeTorchAPIs(int32_t cameraId);
 
     // CameraClient interface
     void notifyCallback(int32_t msgType, int32_t, int32_t) override;
@@ -311,9 +312,23 @@ void CameraFuzzer::invokeNotifyCalls() {
     mCameraService->notifySystemEvent(eventId, args);
 }
 
+void CameraFuzzer::invokeTorchAPIs(int32_t cameraId) {
+    String16 cameraIdStr = String16(String8::format("%d", cameraId));
+    sp<IBinder> binder = new BBinder;
+
+    mCameraService->setTorchMode(cameraIdStr, true, binder);
+    ALOGV("Turned torch on.");
+    int32_t torchStrength = rand() % 5 + 1;
+    ALOGV("Changing torch strength level to %d", torchStrength);
+    mCameraService->turnOnTorchWithStrengthLevel(cameraIdStr, torchStrength, binder);
+    mCameraService->setTorchMode(cameraIdStr, false, binder);
+    ALOGV("Turned torch off.");
+}
+
 void CameraFuzzer::invokeCameraAPIs() {
     for (int32_t cameraId = 0; cameraId < mNumCameras; ++cameraId) {
         getCameraInformation(cameraId);
+        invokeTorchAPIs(cameraId);
 
         ::android::binder::Status rc;
         sp<ICamera> cameraDevice;
