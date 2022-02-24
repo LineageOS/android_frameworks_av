@@ -3474,7 +3474,7 @@ typedef enum acamera_metadata_tag {
      * <p>A map of all available 10-bit dynamic range profiles along with their
      * capture request constraints.</p>
      *
-     * <p>Type: int32[n*2] (acamera_metadata_enum_android_request_available_dynamic_range_profiles_map_t)</p>
+     * <p>Type: int64[n*3] (acamera_metadata_enum_android_request_available_dynamic_range_profiles_map_t)</p>
      *
      * <p>This tag may appear in:
      * <ul>
@@ -3487,7 +3487,7 @@ typedef enum acamera_metadata_tag {
      * support every possible profile combination within a single capture request, then the
      * constraints must be listed here as well.</p>
      */
-    ACAMERA_REQUEST_AVAILABLE_DYNAMIC_RANGE_PROFILES_MAP =      // int32[n*2] (acamera_metadata_enum_android_request_available_dynamic_range_profiles_map_t)
+    ACAMERA_REQUEST_AVAILABLE_DYNAMIC_RANGE_PROFILES_MAP =      // int64[n*3] (acamera_metadata_enum_android_request_available_dynamic_range_profiles_map_t)
             ACAMERA_REQUEST_START + 19,
     ACAMERA_REQUEST_END,
 

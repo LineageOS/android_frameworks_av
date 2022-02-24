@@ -43,7 +43,7 @@ namespace android {
 status_t Camera3StreamSplitter::connect(const std::unordered_map<size_t, sp<Surface>> &surfaces,
         uint64_t consumerUsage, uint64_t producerUsage, size_t halMaxBuffers, uint32_t width,
         uint32_t height, android::PixelFormat format, sp<Surface>* consumer,
-        int dynamicRangeProfile) {
+        int64_t dynamicRangeProfile) {
     ATRACE_CALL();
     if (consumer == nullptr) {
         SP_LOGE("%s: consumer pointer is NULL", __FUNCTION__);

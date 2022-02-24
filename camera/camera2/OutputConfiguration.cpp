@@ -77,7 +77,7 @@ const std::vector<int32_t> &OutputConfiguration::getSensorPixelModesUsed() const
     return mSensorPixelModesUsed;
 }
 
-int OutputConfiguration::getDynamicRangeProfile() const {
+int64_t OutputConfiguration::getDynamicRangeProfile() const {
     return mDynamicRangeProfile;
 }
 
@@ -186,8 +186,8 @@ status_t OutputConfiguration::readFromParcel(const android::Parcel* parcel) {
         ALOGE("%s: Failed to read sensor pixel mode(s) from parcel", __FUNCTION__);
         return err;
     }
-    int dynamicProfile;
-    if ((err = parcel->readInt32(&dynamicProfile)) != OK) {
+    int64_t dynamicProfile;
+    if ((err = parcel->readInt64(&dynamicProfile)) != OK) {
         ALOGE("%s: Failed to read surface dynamic range profile flag from parcel", __FUNCTION__);
         return err;
     }
@@ -314,7 +314,7 @@ status_t OutputConfiguration::writeToParcel(android::Parcel* parcel) const {
     err = parcel->writeParcelableVector(mSensorPixelModesUsed);
     if (err != OK) return err;
 
-    err = parcel->writeInt32(mDynamicRangeProfile ? 1 : 0);
+    err = parcel->writeInt64(mDynamicRangeProfile);
     if (err != OK) return err;
 
     err = parcel->writeInt32(mStreamUseCase);
