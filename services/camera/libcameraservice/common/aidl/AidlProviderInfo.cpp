@@ -57,8 +57,6 @@ status_t AidlProviderInfo::mapToStatusT(const ndk::ScopedAStatus& s) {
             return -EBUSY;
         case Status::MAX_CAMERAS_IN_USE:
             return -EUSERS;
-        case Status::METHOD_NOT_SUPPORTED:
-            return UNKNOWN_TRANSACTION;
         case Status::OPERATION_NOT_SUPPORTED:
             return INVALID_OPERATION;
         case Status::CAMERA_DISCONNECTED:
@@ -660,18 +658,14 @@ AidlProviderInfo::AidlDeviceInfo3::startDeviceInterface() {
 }
 
 status_t AidlProviderInfo::AidlDeviceInfo3::dumpState(int fd) {
-    native_handle_t* handle = native_handle_create(1,0);
-    handle->data[0] = fd;
     const std::shared_ptr<camera::device::ICameraDevice> interface = startDeviceInterface();
     if (interface == nullptr) {
         return DEAD_OBJECT;
     }
-    ::ndk::ScopedFileDescriptor sFd;
-    sFd.set(fcntl(fd, F_DUPFD_CLOEXEC, 0));
-    auto ret = interface->dumpState(sFd);
-    native_handle_delete(handle);
-    if (!ret.isOk()) {
-        return mapToStatusT(ret);
+    const char *args = nullptr;
+    auto ret = interface->dump(fd, &args, /*numArgs*/0);
+    if (ret != OK) {
+        return ret;
     }
     return OK;
 }

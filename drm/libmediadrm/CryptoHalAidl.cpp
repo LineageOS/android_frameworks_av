@@ -355,8 +355,7 @@ ssize_t CryptoHalAidl::decrypt(const uint8_t keyId[16], const uint8_t iv[16],
     std::string msgStr(statusAidl.getMessage());
     *errorDetailMsg = toString8(msgStr);
     if (err != OK) {
-        ALOGE("Failed on decrypt, error message:%s, bytes written:%d", statusAidl.getMessage(),
-              result);
+        ALOGE("Failed on decrypt, error description:%s", statusAidl.getDescription().c_str());
         return err;
     }
 
@@ -376,7 +375,7 @@ int32_t CryptoHalAidl::setHeap(const sp<HidlMemory>& heap) {
     mHeapSizes.add(seqNum, heap->size());
 
     SharedBufferAidl memAidl;
-    memAidl.handle = ::android::makeToAidl(heap->handle());
+    memAidl.handle = ::android::dupToAidl(heap->handle());
     memAidl.size = heap->size();
     memAidl.bufferId = bufferId;
 
