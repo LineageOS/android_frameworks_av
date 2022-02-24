@@ -82,7 +82,7 @@ using aidl::android::hardware::camera::metadata::ScalerAvailableStreamUseCases;
 namespace android {
 
 RequestAvailableDynamicRangeProfilesMap
-mapToAidlDynamicProfile(int dynamicRangeProfile) {
+mapToAidlDynamicProfile(int64_t dynamicRangeProfile) {
     return static_cast<RequestAvailableDynamicRangeProfilesMap>(dynamicRangeProfile);
 }
 

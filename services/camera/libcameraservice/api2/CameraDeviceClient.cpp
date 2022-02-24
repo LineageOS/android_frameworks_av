@@ -152,19 +152,20 @@ status_t CameraDeviceClient::initializeImpl(TProviderPtr providerPtr, const Stri
                 ANDROID_REQUEST_AVAILABLE_CAPABILITIES_DYNAMIC_RANGE_TEN_BIT);
         if (it != entry.data.u8 + entry.count) {
             entry = deviceInfo.find(ANDROID_REQUEST_AVAILABLE_DYNAMIC_RANGE_PROFILES_MAP);
-            if (entry.count > 0 || ((entry.count % 2) != 0)) {
-                int standardBitmap = ANDROID_REQUEST_AVAILABLE_DYNAMIC_RANGE_PROFILES_MAP_STANDARD;
-                for (size_t i = 0; i < entry.count; i += 2) {
-                    if (entry.data.i32[i] !=
+            if (entry.count > 0 || ((entry.count % 3) != 0)) {
+                int64_t standardBitmap =
+                        ANDROID_REQUEST_AVAILABLE_DYNAMIC_RANGE_PROFILES_MAP_STANDARD;
+                for (size_t i = 0; i < entry.count; i += 3) {
+                    if (entry.data.i64[i] !=
                             ANDROID_REQUEST_AVAILABLE_DYNAMIC_RANGE_PROFILES_MAP_STANDARD) {
-                        mDynamicProfileMap.emplace(entry.data.i32[i], entry.data.i32[i+1]);
-                        if ((entry.data.i32[i+1] == 0) || (entry.data.i32[i+1] &
+                        mDynamicProfileMap.emplace(entry.data.i64[i], entry.data.i64[i+1]);
+                        if ((entry.data.i64[i+1] == 0) || (entry.data.i64[i+1] &
                                 ANDROID_REQUEST_AVAILABLE_DYNAMIC_RANGE_PROFILES_MAP_STANDARD)) {
-                            standardBitmap |= entry.data.i32[i];
+                            standardBitmap |= entry.data.i64[i];
                         }
                     } else {
-                        ALOGE("%s: Device %s includes unexpected profile entry: 0x%x!",
-                                __FUNCTION__, mCameraIdStr.c_str(), entry.data.i32[i]);
+                        ALOGE("%s: Device %s includes unexpected profile entry: 0x%" PRIx64 "!",
+                                __FUNCTION__, mCameraIdStr.c_str(), entry.data.i64[i]);
                     }
                 }
                 mDynamicProfileMap.emplace(
@@ -335,7 +336,7 @@ binder::Status CameraDeviceClient::submitRequestList(
         SurfaceMap surfaceMap;
         Vector<int32_t> outputStreamIds;
         std::vector<std::string> requestedPhysicalIds;
-        int dynamicProfileBitmap = 0;
+        int64_t dynamicProfileBitmap = 0;
         if (request.mSurfaceList.size() > 0) {
             for (const sp<Surface>& surface : request.mSurfaceList) {
                 if (surface == 0) continue;
@@ -410,7 +411,7 @@ binder::Status CameraDeviceClient::submitRequestList(
                     } else {
                         ALOGE("%s: Camera %s: Tried to submit a request with a surfaces that"
                                 " reference an unsupported dynamic range profile combination"
-                                " 0x%x!", __FUNCTION__, mCameraIdStr.string(),
+                                " 0x%" PRIx64 "!", __FUNCTION__, mCameraIdStr.string(),
                                 dynamicProfileBitmap);
                         return STATUS_ERROR(CameraService::ERROR_ILLEGAL_ARGUMENT,
                                 "Request targets an unsupported dynamic range profile"
@@ -862,7 +863,7 @@ binder::Status CameraDeviceClient::createStream(
     String8 physicalCameraId = String8(outputConfiguration.getPhysicalCameraId());
     bool deferredConsumerOnly = deferredConsumer && numBufferProducers == 0;
     bool isMultiResolution = outputConfiguration.isMultiResolution();
-    int dynamicRangeProfile = outputConfiguration.getDynamicRangeProfile();
+    int64_t dynamicRangeProfile = outputConfiguration.getDynamicRangeProfile();
     int streamUseCase = outputConfiguration.getStreamUseCase();
     int timestampBase = outputConfiguration.getTimestampBase();
     int mirrorMode = outputConfiguration.getMirrorMode();
@@ -1261,7 +1262,7 @@ binder::Status CameraDeviceClient::updateOutputConfiguration(int streamId,
             outputConfiguration.getSensorPixelModesUsed();
     int streamUseCase = outputConfiguration.getStreamUseCase();
     int timestampBase = outputConfiguration.getTimestampBase();
-    int dynamicRangeProfile = outputConfiguration.getDynamicRangeProfile();
+    int64_t dynamicRangeProfile = outputConfiguration.getDynamicRangeProfile();
     int mirrorMode = outputConfiguration.getMirrorMode();
 
     for (size_t i = 0; i < newOutputsMap.size(); i++) {
@@ -1627,7 +1628,7 @@ binder::Status CameraDeviceClient::finalizeOutputConfigurations(int32_t streamId
     std::vector<sp<Surface>> consumerSurfaces;
     const std::vector<int32_t> &sensorPixelModesUsed =
             outputConfiguration.getSensorPixelModesUsed();
-    int dynamicRangeProfile = outputConfiguration.getDynamicRangeProfile();
+    int64_t dynamicRangeProfile = outputConfiguration.getDynamicRangeProfile();
     int streamUseCase= outputConfiguration.getStreamUseCase();
     int timestampBase = outputConfiguration.getTimestampBase();
     int mirrorMode = outputConfiguration.getMirrorMode();
