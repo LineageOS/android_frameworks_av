@@ -63,7 +63,7 @@ public:
     std::vector<int64_t> mHistogramCounts;
 
     // Dynamic range profile
-    int mDynamicRangeProfile;
+    int64_t mDynamicRangeProfile;
     // Stream use case
     int mStreamUseCase;
 
