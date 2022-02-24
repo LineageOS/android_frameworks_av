@@ -1184,6 +1184,7 @@ Status AudioPolicyService::getDevicesForStream(
 }
 
 Status AudioPolicyService::getDevicesForAttributes(const media::AudioAttributesEx& attrAidl,
+                                                   bool forVolume,
                                                    std::vector<AudioDevice>* _aidl_return)
 {
     AudioAttributes aa = VALUE_OR_RETURN_BINDER_STATUS(
@@ -1196,7 +1197,8 @@ Status AudioPolicyService::getDevicesForAttributes(const media::AudioAttributesE
     Mutex::Autolock _l(mLock);
     AutoCallerClear acc;
     RETURN_IF_BINDER_ERROR(binderStatusFromStatusT(
-            mAudioPolicyManager->getDevicesForAttributes(aa.getAttributes(), &devices)));
+            mAudioPolicyManager->getDevicesForAttributes(
+                    aa.getAttributes(), &devices, forVolume)));
     *_aidl_return = VALUE_OR_RETURN_BINDER_STATUS(
             convertContainer<std::vector<AudioDevice>>(devices,
                                                        legacy2aidl_AudioDeviceTypeAddress));
