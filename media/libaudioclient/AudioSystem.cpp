@@ -1497,13 +1497,12 @@ status_t AudioSystem::getAudioPort(struct audio_port_v7* port) {
     if (port == nullptr) {
         return BAD_VALUE;
     }
-
     const sp<IAudioPolicyService>& aps = AudioSystem::get_audio_policy_service();
     if (aps == 0) return PERMISSION_DENIED;
 
-    media::AudioPort portAidl = VALUE_OR_RETURN_STATUS(legacy2aidl_audio_port_v7_AudioPort(*port));
+    media::AudioPort portAidl;
     RETURN_STATUS_IF_ERROR(
-            statusTFromBinderStatus(aps->getAudioPort(portAidl, &portAidl)));
+            statusTFromBinderStatus(aps->getAudioPort(port->id, &portAidl)));
     *port = VALUE_OR_RETURN_STATUS(aidl2legacy_AudioPort_audio_port_v7(portAidl));
     return OK;
 }
