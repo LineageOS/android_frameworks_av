@@ -138,6 +138,7 @@ public:
             AudioStreamType stream,
             std::vector<AudioDeviceDescription>* _aidl_return) override;
     binder::Status getDevicesForAttributes(const media::AudioAttributesEx& attr,
+                                           bool forVolume,
                                            std::vector<AudioDevice>* _aidl_return) override;
     binder::Status getOutputForEffect(const media::EffectDescriptor& desc,
                                       int32_t* _aidl_return) override;
@@ -176,7 +177,7 @@ public:
     binder::Status listAudioPorts(media::AudioPortRole role, media::AudioPortType type,
                                   Int* count, std::vector<media::AudioPort>* ports,
                                   int32_t* _aidl_return) override;
-    binder::Status getAudioPort(const media::AudioPort& port,
+    binder::Status getAudioPort(int portId,
                                 media::AudioPort* _aidl_return) override;
     binder::Status createAudioPatch(const media::AudioPatch& patch, int32_t handle,
                                     int32_t* _aidl_return) override;

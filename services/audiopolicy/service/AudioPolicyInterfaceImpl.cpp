@@ -1184,6 +1184,7 @@ Status AudioPolicyService::getDevicesForStream(
 }
 
 Status AudioPolicyService::getDevicesForAttributes(const media::AudioAttributesEx& attrAidl,
+                                                   bool forVolume,
                                                    std::vector<AudioDevice>* _aidl_return)
 {
     AudioAttributes aa = VALUE_OR_RETURN_BINDER_STATUS(
@@ -1196,7 +1197,8 @@ Status AudioPolicyService::getDevicesForAttributes(const media::AudioAttributesE
     Mutex::Autolock _l(mLock);
     AutoCallerClear acc;
     RETURN_IF_BINDER_ERROR(binderStatusFromStatusT(
-            mAudioPolicyManager->getDevicesForAttributes(aa.getAttributes(), &devices)));
+            mAudioPolicyManager->getDevicesForAttributes(
+                    aa.getAttributes(), &devices, forVolume)));
     *_aidl_return = VALUE_OR_RETURN_BINDER_STATUS(
             convertContainer<std::vector<AudioDevice>>(devices,
                                                        legacy2aidl_AudioDeviceTypeAddress));
@@ -1567,12 +1569,9 @@ Status AudioPolicyService::listAudioPorts(media::AudioPortRole roleAidl,
     return Status::ok();
 }
 
-Status AudioPolicyService::getAudioPort(const media::AudioPort& portAidl,
+Status AudioPolicyService::getAudioPort(int portId,
                                         media::AudioPort* _aidl_return) {
-    audio_port_v7 port = VALUE_OR_RETURN_BINDER_STATUS(
-            aidl2legacy_AudioPort_audio_port_v7(portAidl));
-    RETURN_IF_BINDER_ERROR(binderStatusFromStatusT(AudioValidator::validateAudioPort(port)));
-
+    audio_port_v7 port{ .id = portId };
     Mutex::Autolock _l(mLock);
     if (mAudioPolicyManager == NULL) {
         return binderStatusFromStatusT(NO_INIT);

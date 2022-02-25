@@ -65,7 +65,7 @@ typedef struct camera_stream {
     const char* physical_camera_id;
 
     std::unordered_set<int32_t> sensor_pixel_modes_used;
-    int dynamic_range_profile;
+    int64_t dynamic_range_profile;
     int use_case;
 } camera_stream_t;
 
@@ -110,7 +110,7 @@ class OutputStreamInfo {
         bool finalized = false;
         bool supportsOffline = false;
         std::unordered_set<int32_t> sensorPixelModesUsed;
-        int dynamicRangeProfile;
+        int64_t dynamicRangeProfile;
         int streamUseCase;
         int timestampBase;
         int mirrorMode;
@@ -123,7 +123,7 @@ class OutputStreamInfo {
             mirrorMode(OutputConfiguration::MIRROR_MODE_AUTO) {}
         OutputStreamInfo(int _width, int _height, int _format, android_dataspace _dataSpace,
                 uint64_t _consumerUsage, const std::unordered_set<int32_t>& _sensorPixelModesUsed,
-                int _dynamicRangeProfile, int _streamUseCase, int _timestampBase, int _mirrorMode) :
+                int64_t _dynamicRangeProfile, int _streamUseCase, int _timestampBase, int _mirrorMode) :
             width(_width), height(_height), format(_format),
             dataSpace(_dataSpace), consumerUsage(_consumerUsage),
             sensorPixelModesUsed(_sensorPixelModesUsed), dynamicRangeProfile(_dynamicRangeProfile),
@@ -167,7 +167,7 @@ class Camera3StreamInterface : public virtual RefBase {
     virtual uint32_t getWidth() const = 0;
     virtual uint32_t getHeight() const = 0;
     virtual int      getFormat() const = 0;
-    virtual int      getDynamicRangeProfile() const = 0;
+    virtual int64_t  getDynamicRangeProfile() const = 0;
     virtual android_dataspace getDataSpace() const = 0;
     virtual void setFormatOverride(bool formatOverriden) = 0;
     virtual bool isFormatOverridden() const = 0;

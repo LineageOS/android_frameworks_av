@@ -80,3 +80,22 @@ cc_test {
     ],
     compile_multilib: "both",
 }
+
+cc_test {
+    name: "BufferpoolUnitTest",
+    test_suites: ["device-tests"],
+    defaults: ["VtsHalTargetTestDefaults"],
+    srcs: [
+        "allocator.cpp",
+        "BufferpoolUnitTest.cpp",
+    ],
+    static_libs: [
+        "android.hardware.media.bufferpool@2.0",
+        "libcutils",
+        "libstagefright_bufferpool@2.0.1",
+    ],
+    shared_libs: [
+        "libfmq",
+    ],
+    compile_multilib: "both",
+}

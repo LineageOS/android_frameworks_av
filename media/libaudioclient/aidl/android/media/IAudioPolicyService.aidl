@@ -139,7 +139,7 @@ interface IAudioPolicyService {
 
     AudioDeviceDescription[] getDevicesForStream(AudioStreamType stream);
 
-    AudioDevice[] getDevicesForAttributes(in AudioAttributesEx attr);
+    AudioDevice[] getDevicesForAttributes(in AudioAttributesEx attr, boolean forVolume);
 
     int /* audio_io_handle_t */ getOutputForEffect(in EffectDescriptor desc);
 
@@ -216,8 +216,8 @@ interface IAudioPolicyService {
                        inout Int count,
                        out AudioPort[] ports);
 
-    /** Get attributes for a given audio port. */
-    AudioPort getAudioPort(in AudioPort port);
+    /** Get attributes for the audio port with the given id (AudioPort.hal.id field). */
+    AudioPort getAudioPort(int /* audio_port_handle_t */ portId);
 
     /**
      * Create an audio patch between several source and sink ports.
