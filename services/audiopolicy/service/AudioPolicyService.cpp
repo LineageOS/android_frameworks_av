@@ -1085,7 +1085,6 @@ status_t AudioPolicyService::onTransact(
         case TRANSACTION_isStreamActive:
         case TRANSACTION_isStreamActiveRemotely:
         case TRANSACTION_isSourceActive:
-        case TRANSACTION_getDevicesForStream:
         case TRANSACTION_registerPolicyMixes:
         case TRANSACTION_setMasterMono:
         case TRANSACTION_getSurroundFormats:
