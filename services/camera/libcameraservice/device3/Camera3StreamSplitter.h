@@ -58,7 +58,7 @@ public:
     status_t connect(const std::unordered_map<size_t, sp<Surface>> &surfaces,
             uint64_t consumerUsage, uint64_t producerUsage, size_t halMaxBuffers, uint32_t width,
             uint32_t height, android::PixelFormat format, sp<Surface>* consumer,
-            int dynamicRangeProfile);
+            int64_t dynamicRangeProfile);
 
     // addOutput adds an output BufferQueue to the splitter. The splitter
     // connects to outputQueue as a CPU producer, and any buffers queued

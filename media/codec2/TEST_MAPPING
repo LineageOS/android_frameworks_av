@@ -8,7 +8,7 @@
   ],
   "presubmit-large": [
     {
-      "name": "CtsMediaTestCases",
+      "name": "CtsMediaMiscTestCases",
       "options": [
         {
           "include-annotation": "android.platform.test.annotations.Presubmit"

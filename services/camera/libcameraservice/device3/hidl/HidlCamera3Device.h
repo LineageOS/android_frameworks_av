@@ -45,7 +45,7 @@ class HidlCamera3Device :
             android_dataspace dataSpace);
     static hardware::camera::device::V3_2::BufferUsageFlags mapToConsumerUsage(uint64_t usage);
     static CameraMetadataEnumAndroidRequestAvailableDynamicRangeProfilesMap mapToHidlDynamicProfile(
-                    int dynamicRangeProfile);
+                    int64_t dynamicRangeProfile);
     static hardware::camera::device::V3_2::StreamRotation mapToStreamRotation(
             camera_stream_rotation_t rotation);
     // Returns a negative error code if the passed-in operation mode is not valid.
