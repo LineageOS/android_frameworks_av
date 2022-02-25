@@ -978,8 +978,8 @@ status_t Camera3Device::createStream(sp<Surface> consumer,
             const String8& physicalCameraId,
             const std::unordered_set<int32_t> &sensorPixelModesUsed,
             std::vector<int> *surfaceIds, int streamSetId, bool isShared, bool isMultiResolution,
-            uint64_t consumerUsage, int dynamicRangeProfile, int streamUseCase, int timestampBase,
-            int mirrorMode) {
+            uint64_t consumerUsage, int64_t dynamicRangeProfile, int streamUseCase,
+            int timestampBase, int mirrorMode) {
     ATRACE_CALL();
 
     if (consumer == nullptr) {
@@ -1013,7 +1013,7 @@ status_t Camera3Device::createStream(const std::vector<sp<Surface>>& consumers,
         android_dataspace dataSpace, camera_stream_rotation_t rotation, int *id,
         const String8& physicalCameraId, const std::unordered_set<int32_t> &sensorPixelModesUsed,
         std::vector<int> *surfaceIds, int streamSetId, bool isShared, bool isMultiResolution,
-        uint64_t consumerUsage, int dynamicRangeProfile, int streamUseCase, int timestampBase,
+        uint64_t consumerUsage, int64_t dynamicRangeProfile, int streamUseCase, int timestampBase,
         int mirrorMode) {
     ATRACE_CALL();
 
@@ -1022,7 +1022,7 @@ status_t Camera3Device::createStream(const std::vector<sp<Surface>>& consumers,
     Mutex::Autolock l(mLock);
     ALOGV("Camera %s: Creating new stream %d: %d x %d, format %d, dataspace %d rotation %d"
             " consumer usage %" PRIu64 ", isShared %d, physicalCameraId %s, isMultiResolution %d"
-            " dynamicRangeProfile %d, streamUseCase %d, timestampBase %d, mirrorMode %d",
+            " dynamicRangeProfile %" PRIx64 ", streamUseCase %d, timestampBase %d, mirrorMode %d",
             mId.string(), mNextStreamId, width, height, format, dataSpace, rotation,
             consumerUsage, isShared, physicalCameraId.string(), isMultiResolution,
             dynamicRangeProfile, streamUseCase, timestampBase, mirrorMode);
