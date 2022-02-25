@@ -1787,6 +1787,20 @@ status_t Camera3Device::addBufferListenerForStream(int streamId,
     return OK;
 }
 
+float Camera3Device::getMaxPreviewFps(sp<camera3::Camera3OutputStreamInterface> stream) {
+    camera_metadata_entry minDurations =
+            mDeviceInfo.find(ANDROID_SCALER_AVAILABLE_MIN_FRAME_DURATIONS);
+    for (size_t i = 0; i < minDurations.count; i += 4) {
+        if (minDurations.data.i64[i] == stream->getFormat()
+                && minDurations.data.i64[i+1] == stream->getWidth()
+                && minDurations.data.i64[i+2] == stream->getHeight()) {
+            int64_t minFrameDuration = minDurations.data.i64[i+3];
+            return 1e9f / minFrameDuration;
+        }
+    }
+    return 0.0f;
+}
+
 /**
  * Methods called by subclasses
  */
@@ -1795,6 +1809,7 @@ void Camera3Device::notifyStatus(bool idle) {
     ATRACE_CALL();
     std::vector<int> streamIds;
     std::vector<hardware::CameraStreamStats> streamStats;
+    float sessionMaxPreviewFps = 0.0f;
 
     {
         // Need mLock to safely update state and synchronize to current
@@ -1814,11 +1829,15 @@ void Camera3Device::notifyStatus(bool idle) {
         // state changes
         if (mPauseStateNotify) return;
 
-        // Populate stream statistics in case of Idle
-        if (idle) {
-            for (size_t i = 0; i < mOutputStreams.size(); i++) {
-                auto stream = mOutputStreams[i];
-                if (stream.get() == nullptr) continue;
+        for (size_t i = 0; i < mOutputStreams.size(); i++) {
+            auto stream = mOutputStreams[i];
+            if (stream.get() == nullptr) continue;
+
+            float streamMaxPreviewFps = getMaxPreviewFps(stream);
+            sessionMaxPreviewFps = std::max(sessionMaxPreviewFps, streamMaxPreviewFps);
+
+            // Populate stream statistics in case of Idle
+            if (idle) {
                 streamIds.push_back(stream->getId());
                 Camera3Stream* camera3Stream = Camera3Stream::cast(stream->asHalStream());
                 int64_t usage = 0LL;
@@ -1828,7 +1847,7 @@ void Camera3Device::notifyStatus(bool idle) {
                     streamUseCase = camera3Stream->getStreamUseCase();
                 }
                 streamStats.emplace_back(stream->getWidth(), stream->getHeight(),
-                    stream->getFormat(), stream->getDataSpace(), usage,
+                    stream->getFormat(), streamMaxPreviewFps, stream->getDataSpace(), usage,
                     stream->getMaxHalBuffers(),
                     stream->getMaxTotalBuffers() - stream->getMaxHalBuffers(),
                     stream->getDynamicRangeProfile(), streamUseCase);
@@ -1869,7 +1888,7 @@ void Camera3Device::notifyStatus(bool idle) {
             }
             listener->notifyIdle(requestCount, resultErrorCount, deviceError, streamStats);
         } else {
-            res = listener->notifyActive();
+            res = listener->notifyActive(sessionMaxPreviewFps);
         }
     }
     if (res != OK) {

@@ -287,7 +287,7 @@ void CameraOfflineSessionClient::notifyShutter(const CaptureResultExtras& result
     }
 }
 
-status_t CameraOfflineSessionClient::notifyActive() {
+status_t CameraOfflineSessionClient::notifyActive(float maxPreviewFps __unused) {
     return startCameraStreamingOps();
 }
 

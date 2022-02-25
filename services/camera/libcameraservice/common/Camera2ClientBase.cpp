@@ -315,7 +315,7 @@ void Camera2ClientBase<TClientBase>::notifyError(
 }
 
 template <typename TClientBase>
-status_t Camera2ClientBase<TClientBase>::notifyActive() {
+status_t Camera2ClientBase<TClientBase>::notifyActive(float maxPreviewFps) {
     if (!mDeviceActive) {
         status_t res = TClientBase::startCameraStreamingOps();
         if (res != OK) {
@@ -323,7 +323,7 @@ status_t Camera2ClientBase<TClientBase>::notifyActive() {
                     TClientBase::mCameraIdStr.string(), res);
             return res;
         }
-        CameraServiceProxyWrapper::logActive(TClientBase::mCameraIdStr);
+        CameraServiceProxyWrapper::logActive(TClientBase::mCameraIdStr, maxPreviewFps);
     }
     mDeviceActive = true;
 
