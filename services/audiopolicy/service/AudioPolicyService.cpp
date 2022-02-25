@@ -580,11 +580,6 @@ status_t AudioPolicyService::dumpInternals(int fd)
     char buffer[SIZE];
     String8 result;
 
-    snprintf(buffer, SIZE, "AudioPolicyManager: %p\n", mAudioPolicyManager);
-    result.append(buffer);
-    snprintf(buffer, SIZE, "Command Thread: %p\n", mAudioCommandThread.get());
-    result.append(buffer);
-
     snprintf(buffer, SIZE, "Supported System Usages:\n  ");
     result.append(buffer);
     std::stringstream msg;
@@ -1014,12 +1009,24 @@ status_t AudioPolicyService::dump(int fd, const Vector<String16>& args __unused)
         }
 
         dumpInternals(fd);
+
+        String8 actPtr = String8::format("AudioCommandThread: %p\n", mAudioCommandThread.get());
+        write(fd, actPtr.string(), actPtr.size());
         if (mAudioCommandThread != 0) {
             mAudioCommandThread->dump(fd);
         }
 
+        String8 octPtr = String8::format("OutputCommandThread: %p\n", mOutputCommandThread.get());
+        write(fd, octPtr.string(), octPtr.size());
+        if (mOutputCommandThread != 0) {
+            mOutputCommandThread->dump(fd);
+        }
+
         if (mAudioPolicyManager) {
             mAudioPolicyManager->dump(fd);
+        } else {
+            String8 apmPtr = String8::format("AudioPolicyManager: %p\n", mAudioPolicyManager);
+            write(fd, apmPtr.string(), apmPtr.size());
         }
 
         mPackageManager.dump(fd);
@@ -2009,10 +2016,6 @@ status_t AudioPolicyService::AudioCommandThread::dump(int fd)
     const size_t SIZE = 256;
     char buffer[SIZE];
     String8 result;
-
-    snprintf(buffer, SIZE, "AudioCommandThread %p Dump\n", this);
-    result.append(buffer);
-    write(fd, result.string(), result.size());
 
     const bool locked = dumpTryLock(mLock);
     if (!locked) {
