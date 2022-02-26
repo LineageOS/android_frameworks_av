@@ -16,6 +16,23 @@
       "message": "I have verified that on a device which sets ro.vendor.qti.va_aosp.support to true and ro.media.xml_variant.codecs to shima_v1 it loads media_profiles_shima_v1.xml, just like it does on stock \u0026 caf. In order to not break devices that set ro.media.xml_variant.codecs and ro.vendor.qti.va_aosp.support but do not ship a media profiles for the variant, i modified the logic to write to vendorValue instead of value directly and at the end vendorValue is checked and if it\u0027s a valid xml file this is being used. That should ensure that this code does not break any currently working devices. Note that this diverges from the CAF logic, on CAF devices that set the properties but do not ship the corresponding media profiles can\u0027t boot!\nI have verified that the media profiles from media.settings.xml is being used if media_profiles_shima_v1.xml does not exist on the device i desribed above.",
       "revId": "b3d55495cc7e07de63bdedb1964ebf244ec5fde5",
       "serverId": "1ec6b3db-b2c1-4fa4-84a2-4c7efe89ba71"
+    },
+    {
+      "unresolved": false,
+      "key": {
+        "uuid": "e431d55c_b45cdccd",
+        "filename": "/PATCHSET_LEVEL",
+        "patchSetId": 5
+      },
+      "lineNbr": 0,
+      "author": {
+        "id": 21290
+      },
+      "writtenOn": "2022-02-26T12:15:51Z",
+      "side": 1,
+      "message": "The ro.media.xml_variant.profiles property introduced here https://github.com/LineageOS/android_frameworks_av/commit/eaac82f33f2a064c6ae1a5f1791bb13669820687 should allow to handle all these cases.\n",
+      "revId": "b3d55495cc7e07de63bdedb1964ebf244ec5fde5",
+      "serverId": "1ec6b3db-b2c1-4fa4-84a2-4c7efe89ba71"
     }
   ]
 }
