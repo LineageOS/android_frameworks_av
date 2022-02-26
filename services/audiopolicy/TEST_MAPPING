@@ -2,6 +2,15 @@
   "presubmit": [
     {
        "name": "audiopolicy_tests"
+    },
+    {
+      "name": "GtsGmscoreHostTestCases",
+      "keywords": ["primary-device"],
+      "options" : [
+        {
+          "include-filter": "com.google.android.gts.audio.AudioHostTest#testTwoChannelCapturing"
+        }
+      ]
     }
   ]
 }
