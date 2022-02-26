@@ -967,10 +967,10 @@ void AudioAnalytics::AAudioStreamInfo::endAAudioStream(
         if (channelMask != 0) {
             switch (direction) {
                 case 1: // Output, keep sync with AudioTypes#getAAudioDirection()
-                    channelCount = audio_channel_count_from_out_mask(channelMask);
+                    channelCount = (int32_t)audio_channel_count_from_out_mask(channelMask);
                     break;
                 case 2: // Input, keep sync with AudioTypes#getAAudioDirection()
-                    channelCount = audio_channel_count_from_in_mask(channelMask);
+                    channelCount = (int32_t)audio_channel_count_from_in_mask(channelMask);
                     break;
                 default:
                     ALOGW("Invalid direction %d", direction);
