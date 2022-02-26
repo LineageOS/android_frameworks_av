@@ -265,6 +265,7 @@ c2_status_t Gralloc4Mapper_lock(native_handle_t *handle, uint64_t usage, const R
 
         for (const PlaneLayoutComponent &component : plane.components) {
             if (!gralloc4::isStandardPlaneLayoutComponentType(component.type)) {
+                mapper.unlock(handle);
                 return C2_CANNOT_DO;
             }
 
@@ -287,6 +288,7 @@ c2_status_t Gralloc4Mapper_lock(native_handle_t *handle, uint64_t usage, const R
                     channel = C2PlaneInfo::CHANNEL_CR;
                     break;
                 default:
+                    mapper.unlock(handle);
                     return C2_CORRUPTED;
             }
 
