@@ -16,6 +16,23 @@
       "message": "I have verified that my device which sets ro.vendor.qti.va_aosp.support to true and ro.media.xml_variant.codecs to shima_v1 loads media_codecs_shima_v1_vendor.xml now. Before changing the loaded file this patch checks wether the new file exists and if it does not the regular config will be loaded, so it does not change the behaviour for devices which do not ship _vendor variants of the media codecs. I have verified that media_codecs_shima_v1.xml is loaded (like it does without this patch) if media_codecs_shima_v1_vendor.xml does not exist.",
       "revId": "b1be887bcc828a4a22d7ada48f439cdc3165e73c",
       "serverId": "1ec6b3db-b2c1-4fa4-84a2-4c7efe89ba71"
+    },
+    {
+      "unresolved": false,
+      "key": {
+        "uuid": "d7c25210_f010af72",
+        "filename": "/PATCHSET_LEVEL",
+        "patchSetId": 10
+      },
+      "lineNbr": 0,
+      "author": {
+        "id": 16185
+      },
+      "writtenOn": "2022-02-27T01:20:04Z",
+      "side": 1,
+      "message": "Holding at Arian\u0027s request",
+      "revId": "b1be887bcc828a4a22d7ada48f439cdc3165e73c",
+      "serverId": "1ec6b3db-b2c1-4fa4-84a2-4c7efe89ba71"
     }
   ]
 }
