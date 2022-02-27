@@ -171,7 +171,7 @@ std::vector<uint8_t> base64DecodeNoPad(std::string& str) {
     std::vector<uint8_t> buf(str.length() / 4 * 3, 0);
     size_t size = buf.size();
     if (decodeBase64(buf.data(), &size, str.c_str()) && size <= buf.size()) {
-        buf.erase(buf.begin() + size, buf.end());
+        buf.erase(buf.begin() + (ptrdiff_t)size, buf.end());
         return buf;
     }
     return {};
