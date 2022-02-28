@@ -3501,7 +3501,7 @@ status_t MPEG4Extractor::parseEAC3SpecificBox(off64_t offset) {
         }
         unsigned mask = br.getBits(8);
         for (unsigned i = 0; i < 8; i++) {
-            if (((0x1 << i) && mask) == 0)
+            if (((0x1 << i) & mask) == 0)
                 continue;
 
             if (br.numBitsLeft() < 8) {
