@@ -12,6 +12,7 @@ cc_defaults {
     double_loadable: true,
 
     srcs: [
+        ":libgui_frame_event_aidl",
         "FrameDropper.cpp",
         "GraphicBufferSource.cpp",
     ],
