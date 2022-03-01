@@ -100,7 +100,6 @@ cc_library {
         "libdmabufheap",
         "libfmq",
         "libgralloctypes",
-        "libhardware",
         "libhidlbase",
         "libion",
         "liblog",
@@ -149,7 +148,6 @@ cc_defaults {
     shared_libs: [
         "libui",
         "libdl",
-        "libhardware",
         "libvndksupport",
         "libprocessgroup",
     ],
