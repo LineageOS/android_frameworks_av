@@ -277,10 +277,12 @@ AudioTrack::AudioTrack(
 {
     mAttributes = AUDIO_ATTRIBUTES_INITIALIZER;
 
-    (void)set(streamType, sampleRate, format, channelMask,
-            frameCount, flags, callback, notificationFrames,
-            0 /*sharedBuffer*/, false /*threadCanCallJava*/, sessionId, transferType, offloadInfo,
-            attributionSource, pAttributes, doNotReconnect, maxRequiredSpeed, selectedDeviceId);
+    // make_unique does not aggregate init until c++20
+    mSetParams = std::unique_ptr<SetParams>{
+            new SetParams{streamType, sampleRate, format, channelMask, frameCount, flags, callback,
+                          notificationFrames, 0 /*sharedBuffer*/, false /*threadCanCallJava*/,
+                          sessionId, transferType, offloadInfo, attributionSource, pAttributes,
+                          doNotReconnect, maxRequiredSpeed, selectedDeviceId}};
 }
 
 namespace {
@@ -355,10 +357,11 @@ AudioTrack::AudioTrack(
     } else if (user) {
         LOG_ALWAYS_FATAL("Callback data provided without callback pointer!");
     }
-    (void)set(streamType, sampleRate, format, channelMask,
-            frameCount, flags, mLegacyCallbackWrapper, notificationFrames,
-            0 /*sharedBuffer*/, false /*threadCanCallJava*/, sessionId, transferType, offloadInfo,
-            attributionSource, pAttributes, doNotReconnect, maxRequiredSpeed, selectedDeviceId);
+    mSetParams = std::unique_ptr<SetParams>{new SetParams{
+            streamType, sampleRate, format, channelMask, frameCount, flags, mLegacyCallbackWrapper,
+            notificationFrames, 0 /*sharedBuffer*/, false /*threadCanCallJava*/, sessionId,
+            transferType, offloadInfo, attributionSource, pAttributes, doNotReconnect,
+            maxRequiredSpeed, selectedDeviceId}};
 }
 
 AudioTrack::AudioTrack(
@@ -387,10 +390,11 @@ AudioTrack::AudioTrack(
 {
     mAttributes = AUDIO_ATTRIBUTES_INITIALIZER;
 
-    (void)set(streamType, sampleRate, format, channelMask,
-            0 /*frameCount*/, flags, callback, notificationFrames,
-            sharedBuffer, false /*threadCanCallJava*/, sessionId, transferType, offloadInfo,
-            attributionSource, pAttributes, doNotReconnect, maxRequiredSpeed);
+    mSetParams = std::unique_ptr<SetParams>{
+            new SetParams{streamType, sampleRate, format, channelMask, 0 /*frameCount*/, flags,
+                          callback, notificationFrames, sharedBuffer, false /*threadCanCallJava*/,
+                          sessionId, transferType, offloadInfo, attributionSource, pAttributes,
+                          doNotReconnect, maxRequiredSpeed, AUDIO_PORT_HANDLE_NONE}};
 }
 
 AudioTrack::AudioTrack(
@@ -424,11 +428,18 @@ AudioTrack::AudioTrack(
     } else if (user) {
         LOG_ALWAYS_FATAL("Callback data provided without callback pointer!");
     }
+    mSetParams = std::unique_ptr<SetParams>{new SetParams{
+            streamType, sampleRate, format, channelMask, 0 /*frameCount*/, flags,
+            mLegacyCallbackWrapper, notificationFrames, sharedBuffer, false /*threadCanCallJava*/,
+            sessionId, transferType, offloadInfo, attributionSource, pAttributes, doNotReconnect,
+            maxRequiredSpeed, AUDIO_PORT_HANDLE_NONE}};
+}
 
-    (void)set(streamType, sampleRate, format, channelMask, 0 /*frameCount*/, flags,
-              mLegacyCallbackWrapper, notificationFrames, sharedBuffer,
-              false /*threadCanCallJava*/, sessionId, transferType, offloadInfo, attributionSource,
-              pAttributes, doNotReconnect, maxRequiredSpeed);
+void AudioTrack::onFirstRef() {
+    if (mSetParams) {
+        set(*mSetParams);
+        mSetParams.reset();
+    }
 }
 
 AudioTrack::~AudioTrack()

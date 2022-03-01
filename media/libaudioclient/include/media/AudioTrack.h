@@ -458,6 +458,38 @@ public:
                             float maxRequiredSpeed = 1.0f,
                             audio_port_handle_t selectedDeviceId = AUDIO_PORT_HANDLE_NONE);
 
+            struct SetParams {
+                audio_stream_type_t streamType;
+                uint32_t sampleRate;
+                audio_format_t format;
+                audio_channel_mask_t channelMask;
+                size_t frameCount;
+                audio_output_flags_t flags;
+                wp<IAudioTrackCallback> callback;
+                int32_t notificationFrames;
+                sp<IMemory> sharedBuffer;
+                bool threadCanCallJava;
+                audio_session_t sessionId;
+                transfer_type transferType;
+                // TODO don't take pointers here
+                const audio_offload_info_t *offloadInfo;
+                AttributionSourceState attributionSource;
+                const audio_attributes_t* pAttributes;
+                bool doNotReconnect;
+                float maxRequiredSpeed;
+                audio_port_handle_t selectedDeviceId;
+            };
+        private:
+            // Note: Consumes parameters
+            void        set(SetParams& s) {
+                (void)set(s.streamType, s.sampleRate, s.format, s.channelMask, s.frameCount,
+                          s.flags, std::move(s.callback), s.notificationFrames,
+                          std::move(s.sharedBuffer), s.threadCanCallJava, s.sessionId,
+                          s.transferType, s.offloadInfo, std::move(s.attributionSource),
+                          s.pAttributes, s.doNotReconnect, s.maxRequiredSpeed, s.selectedDeviceId);
+                        }
+            void       onFirstRef() override;
+        public:
             status_t    set(audio_stream_type_t streamType,
                             uint32_t sampleRate,
                             audio_format_t format,
@@ -1349,6 +1381,8 @@ public:
     wp<IAudioTrackCallback> mCallback;                   // callback handler for events, or NULL
     sp<IAudioTrackCallback> mLegacyCallbackWrapper;      // wrapper for legacy callback interface
     // for notification APIs
+    std::unique_ptr<SetParams> mSetParams;          // Temporary copy of ctor params to allow for
+                                                    // deferred set after first reference.
 
     bool                    mInitialized = false;   // Set after track is initialized
     // next 2 fields are const after constructor or set()
