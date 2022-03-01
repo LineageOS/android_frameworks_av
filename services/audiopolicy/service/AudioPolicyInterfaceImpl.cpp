@@ -1163,30 +1163,6 @@ Status AudioPolicyService::getStrategyForStream(AudioStreamType streamAidl,
     return Status::ok();
 }
 
-//audio policy: use audio_device_t appropriately
-
-Status AudioPolicyService::getDevicesForStream(
-        AudioStreamType streamAidl,
-        std::vector<AudioDeviceDescription>* _aidl_return) {
-    audio_stream_type_t stream = VALUE_OR_RETURN_BINDER_STATUS(
-            aidl2legacy_AudioStreamType_audio_stream_type_t(streamAidl));
-
-    if (uint32_t(stream) >= AUDIO_STREAM_PUBLIC_CNT) {
-        *_aidl_return = std::vector<AudioDeviceDescription>{};
-        return Status::ok();
-    }
-    if (mAudioPolicyManager == NULL) {
-        return binderStatusFromStatusT(NO_INIT);
-    }
-    Mutex::Autolock _l(mLock);
-    AutoCallerClear acc;
-    *_aidl_return = VALUE_OR_RETURN_BINDER_STATUS(
-            convertContainer<std::vector<AudioDeviceDescription>>(
-                    mAudioPolicyManager->getDevicesForStream(stream),
-                    legacy2aidl_audio_devices_t_AudioDeviceDescription));
-    return Status::ok();
-}
-
 Status AudioPolicyService::getDevicesForAttributes(const media::AudioAttributesEx& attrAidl,
                                                    bool forVolume,
                                                    std::vector<AudioDevice>* _aidl_return)
