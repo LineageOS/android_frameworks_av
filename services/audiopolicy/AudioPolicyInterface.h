@@ -215,7 +215,8 @@ public:
 
     // retrieves the list of enabled output devices for the given audio attributes
     virtual status_t getDevicesForAttributes(const audio_attributes_t &attr,
-                                             AudioDeviceTypeAddrVector *devices) = 0;
+                                             AudioDeviceTypeAddrVector *devices,
+                                             bool forVolume) = 0;
 
     // Audio effect management
     virtual audio_io_handle_t getOutputForEffect(const effect_descriptor_t *desc) = 0;
