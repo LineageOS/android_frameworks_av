@@ -190,9 +190,6 @@ public:
             return mEngine->getProductStrategyForAttributes(attributes);
         }
 
-        // return the enabled output devices for the given stream type
-        virtual DeviceTypeSet getDevicesForStream(audio_stream_type_t stream);
-
         /**
          * Returns a vector of devices associated with attributes.
          *

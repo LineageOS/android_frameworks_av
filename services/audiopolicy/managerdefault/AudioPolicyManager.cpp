@@ -6430,46 +6430,6 @@ bool AudioPolicyManager::streamsMatchForvolume(audio_stream_type_t stream1,
     return (stream1 == stream2);
 }
 
-DeviceTypeSet AudioPolicyManager::getDevicesForStream(audio_stream_type_t stream) {
-    // By checking the range of stream before calling getStrategy, we avoid
-    // getOutputDevicesForStream's behavior for invalid streams.
-    // engine's getOutputDevicesForStream would fallback on its default behavior (most probably
-    // device for music stream), but we want to return the empty set.
-    if (stream < AUDIO_STREAM_MIN || stream >= AUDIO_STREAM_PUBLIC_CNT) {
-        return DeviceTypeSet{};
-    }
-    DeviceVector activeDevices;
-    DeviceVector devices;
-    for (int i = AUDIO_STREAM_MIN; i < AUDIO_STREAM_PUBLIC_CNT; ++i) {
-        const audio_stream_type_t curStream{static_cast<audio_stream_type_t>(i)};
-        if (!streamsMatchForvolume(stream, curStream)) {
-            continue;
-        }
-        DeviceVector curDevices = mEngine->getOutputDevicesForStream(curStream, false/*fromCache*/);
-        devices.merge(curDevices);
-        for (audio_io_handle_t output : getOutputsForDevices(curDevices, mOutputs)) {
-            sp<AudioOutputDescriptor> outputDesc = mOutputs.valueFor(output);
-            if (outputDesc->isActive(toVolumeSource(curStream, false))) {
-                activeDevices.merge(outputDesc->devices());
-            }
-        }
-    }
-
-    // Favor devices selected on active streams if any to report correct device in case of
-    // explicit device selection
-    if (!activeDevices.isEmpty()) {
-        devices = activeDevices;
-    }
-    /*Filter SPEAKER_SAFE out of results, as AudioService doesn't know about it
-      and doesn't really need to.*/
-    DeviceVector speakerSafeDevices = devices.getDevicesFromType(AUDIO_DEVICE_OUT_SPEAKER_SAFE);
-    if (!speakerSafeDevices.isEmpty()) {
-        devices.merge(mAvailableOutputDevices.getDevicesFromType(AUDIO_DEVICE_OUT_SPEAKER));
-        devices.remove(speakerSafeDevices);
-    }
-    return devices.types();
-}
-
 // TODO - consider MSD routes b/214971780
 status_t AudioPolicyManager::getDevicesForAttributes(
         const audio_attributes_t &attr, AudioDeviceTypeAddrVector *devices, bool forVolume) {
