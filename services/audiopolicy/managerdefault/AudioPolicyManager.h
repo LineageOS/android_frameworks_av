@@ -193,9 +193,37 @@ public:
         // return the enabled output devices for the given stream type
         virtual DeviceTypeSet getDevicesForStream(audio_stream_type_t stream);
 
+        /**
+         * Returns a vector of devices associated with attributes.
+         *
+         * An AudioTrack opened with specified attributes should play on the returned devices.
+         * If forVolume is set to true, the caller is AudioService, determining the proper
+         * device volume to adjust.
+         *
+         * Devices are determined in the following precedence:
+         * 1) Devices associated with a dynamic policy matching the attributes.  This is often
+         *    a remote submix from MIX_ROUTE_FLAG_LOOP_BACK.  Secondary mixes from a
+         *    dynamic policy are not included.
+         *
+         * If no such dynamic policy then
+         * 2) Devices containing an active client using setPreferredDevice
+         *    with same strategy as the attributes.
+         *    (from the default Engine::getOutputDevicesForAttributes() implementation).
+         *
+         * If no corresponding active client with setPreferredDevice then
+         * 3) Devices associated with the strategy determined by the attributes
+         *    (from the default Engine::getOutputDevicesForAttributes() implementation).
+         *
+         * @param attributes to be considered
+         * @param devices    an AudioDeviceTypeAddrVector container passed in that
+         *                   will be filled on success.
+         * @param forVolume  true if the devices are to be associated with current device volume.
+         * @return           NO_ERROR on success.
+         */
         virtual status_t getDevicesForAttributes(
                 const audio_attributes_t &attributes,
-                AudioDeviceTypeAddrVector *devices);
+                AudioDeviceTypeAddrVector *devices,
+                bool forVolume);
 
         virtual audio_io_handle_t getOutputForEffect(const effect_descriptor_t *desc = NULL);
         virtual status_t registerEffect(const effect_descriptor_t *desc,
