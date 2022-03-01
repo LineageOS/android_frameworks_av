@@ -350,8 +350,12 @@ public:
      * by audio policy manager and attach/detach the spatializer effect accordingly.
      */
     void onCheckSpatializer() override;
-    void onCheckSpatializer_l();
+    void onCheckSpatializer_l() REQUIRES(mLock);
     void doOnCheckSpatializer();
+
+    void onUpdateActiveSpatializerTracks_l() REQUIRES(mLock);
+    void doOnUpdateActiveSpatializerTracks();
+
 
     void setEffectSuspended(int effectId,
                             audio_session_t sessionId,
@@ -524,7 +528,8 @@ private:
             AUDIO_MODULES_UPDATE,
             ROUTING_UPDATED,
             UPDATE_UID_STATES,
-            CHECK_SPATIALIZER
+            CHECK_SPATIALIZER_OUTPUT, // verify if spatializer effect should be created or moved
+            UPDATE_ACTIVE_SPATIALIZER_TRACKS // Update active track counts on spalializer output
         };
 
         AudioCommandThread (String8 name, const wp<AudioPolicyService>& service);
@@ -574,6 +579,8 @@ private:
                     void        routingChangedCommand();
                     void        updateUidStatesCommand();
                     void        checkSpatializerCommand();
+                    void        updateActiveSpatializerTracksCommand();
+
                     void        insertCommand_l(AudioCommand *command, int delayMs = 0);
     private:
         class AudioCommandData;
@@ -997,6 +1004,8 @@ private:
     status_t dumpPermissionDenial(int fd);
     void loadAudioPolicyManager();
     void unloadAudioPolicyManager();
+
+    size_t countActiveClientsOnOutput_l(audio_io_handle_t output) REQUIRES(mLock);
 
     mutable Mutex mLock;    // prevents concurrent access to AudioPolicy manager functions changing
                             // device connection state  or routing

@@ -485,6 +485,7 @@ Status AudioPolicyService::startOutput(int32_t portIdAidl)
     status_t status = mAudioPolicyManager->startOutput(portId);
     if (status == NO_ERROR) {
         client->active = true;
+        onUpdateActiveSpatializerTracks_l();
     }
     return binderStatusFromStatusT(status);
 }
@@ -522,6 +523,7 @@ status_t  AudioPolicyService::doStopOutput(audio_port_handle_t portId)
     status_t status = mAudioPolicyManager->stopOutput(portId);
     if (status == NO_ERROR) {
         client->active = false;
+        onUpdateActiveSpatializerTracks_l();
     }
     return status;
 }
@@ -552,8 +554,10 @@ void AudioPolicyService::doReleaseOutput(audio_port_handle_t portId)
             client->io, client->stream, client->session);
     }
     Mutex::Autolock _l(mLock);
+    if (client != nullptr && client->active) {
+        onUpdateActiveSpatializerTracks_l();
+    }
     mAudioPlaybackClients.removeItem(portId);
-
     // called from internal thread: no need to clear caller identity
     mAudioPolicyManager->releaseOutput(portId);
 }
