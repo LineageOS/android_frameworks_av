@@ -485,6 +485,7 @@ Status AudioPolicyService::startOutput(int32_t portIdAidl)
     status_t status = mAudioPolicyManager->startOutput(portId);
     if (status == NO_ERROR) {
         client->active = true;
+        onUpdateActiveSpatializerTracks_l();
     }
     return binderStatusFromStatusT(status);
 }
@@ -522,6 +523,7 @@ status_t  AudioPolicyService::doStopOutput(audio_port_handle_t portId)
     status_t status = mAudioPolicyManager->stopOutput(portId);
     if (status == NO_ERROR) {
         client->active = false;
+        onUpdateActiveSpatializerTracks_l();
     }
     return status;
 }
@@ -552,8 +554,10 @@ void AudioPolicyService::doReleaseOutput(audio_port_handle_t portId)
             client->io, client->stream, client->session);
     }
     Mutex::Autolock _l(mLock);
+    if (client != nullptr && client->active) {
+        onUpdateActiveSpatializerTracks_l();
+    }
     mAudioPlaybackClients.removeItem(portId);
-
     // called from internal thread: no need to clear caller identity
     mAudioPolicyManager->releaseOutput(portId);
 }
@@ -1156,30 +1160,6 @@ Status AudioPolicyService::getStrategyForStream(AudioStreamType streamAidl,
     *_aidl_return = VALUE_OR_RETURN_BINDER_STATUS(
             legacy2aidl_product_strategy_t_int32_t(
                     mAudioPolicyManager->getStrategyForStream(stream)));
-    return Status::ok();
-}
-
-//audio policy: use audio_device_t appropriately
-
-Status AudioPolicyService::getDevicesForStream(
-        AudioStreamType streamAidl,
-        std::vector<AudioDeviceDescription>* _aidl_return) {
-    audio_stream_type_t stream = VALUE_OR_RETURN_BINDER_STATUS(
-            aidl2legacy_AudioStreamType_audio_stream_type_t(streamAidl));
-
-    if (uint32_t(stream) >= AUDIO_STREAM_PUBLIC_CNT) {
-        *_aidl_return = std::vector<AudioDeviceDescription>{};
-        return Status::ok();
-    }
-    if (mAudioPolicyManager == NULL) {
-        return binderStatusFromStatusT(NO_INIT);
-    }
-    Mutex::Autolock _l(mLock);
-    AutoCallerClear acc;
-    *_aidl_return = VALUE_OR_RETURN_BINDER_STATUS(
-            convertContainer<std::vector<AudioDeviceDescription>>(
-                    mAudioPolicyManager->getDevicesForStream(stream),
-                    legacy2aidl_audio_devices_t_AudioDeviceDescription));
     return Status::ok();
 }
 
