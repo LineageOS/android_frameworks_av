@@ -28,6 +28,7 @@
 #include "DrmPlugin.h"
 #include "Session.h"
 #include "Utils.h"
+#include "AidlClearKeryProperties.h"
 
 namespace {
 const std::string kKeySetIdPrefix("ckid");
@@ -81,12 +82,13 @@ DrmPlugin::DrmPlugin(SessionLibrary* sessionLibrary)
 
 void DrmPlugin::initProperties() {
     mStringProperties.clear();
-    mStringProperties[kVendorKey] = kVendorValue;
+    mStringProperties[kVendorKey] = kAidlVendorValue;
     mStringProperties[kVersionKey] = kVersionValue;
-    mStringProperties[kPluginDescriptionKey] = kPluginDescriptionValue;
-    mStringProperties[kAlgorithmsKey] = kAlgorithmsValue;
-    mStringProperties[kListenerTestSupportKey] = kListenerTestSupportValue;
-    mStringProperties[kDrmErrorTestKey] = kDrmErrorTestValue;
+    mStringProperties[kPluginDescriptionKey] = kAidlPluginDescriptionValue;
+    mStringProperties[kAlgorithmsKey] = kAidlAlgorithmsValue;
+    mStringProperties[kListenerTestSupportKey] = kAidlListenerTestSupportValue;
+    mStringProperties[kDrmErrorTestKey] = kAidlDrmErrorTestValue;
+    mStringProperties[kAidlVersionKey] = kAidlVersionValue;
 
     std::vector<uint8_t> valueVector;
     valueVector.clear();
@@ -377,6 +379,8 @@ void DrmPlugin::installSecureStop(const std::vector<uint8_t>& sessionId) {
         value = mStringProperties[kListenerTestSupportKey];
     } else if (name == kDrmErrorTestKey) {
         value = mStringProperties[kDrmErrorTestKey];
+    } else if (name == kAidlVersionKey) {
+        value = mStringProperties[kAidlVersionValue];
     } else {
         ALOGE("App requested unknown string property %s", name.c_str());
         status = Status::ERROR_DRM_CANNOT_HANDLE;
