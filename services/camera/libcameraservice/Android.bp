@@ -42,6 +42,7 @@ cc_library_shared {
 
     srcs: [
         "CameraService.cpp",
+        "CameraServiceWatchdog.cpp",
         "CameraFlashlight.cpp",
         "common/Camera2ClientBase.cpp",
         "common/CameraDeviceBase.cpp",
