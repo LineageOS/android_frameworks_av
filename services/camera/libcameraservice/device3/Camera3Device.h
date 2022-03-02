@@ -32,6 +32,7 @@
 #include <camera/CaptureResult.h>
 
 #include "android/hardware/camera/metadata/3.8/types.h"
+#include "CameraServiceWatchdog.h"
 #include "common/CameraDeviceBase.h"
 #include "device3/BufferUtils.h"
 #include "device3/StatusTracker.h"
@@ -97,6 +98,9 @@ class Camera3Device :
     const String8& getId() const override;
 
     metadata_vendor_id_t getVendorTagId() const override { return mVendorTagId; }
+
+    // Watchdog thread
+    sp<CameraServiceWatchdog> mCameraServiceWatchdog;
 
     // Transitions to idle state on success.
     virtual status_t initialize(sp<CameraProviderManager> /*manager*/,
