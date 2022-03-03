@@ -66,7 +66,7 @@ private:
     }
 
     bool mVerboseStats;
-    uint32_t mMessageCounter;
+    uint64_t mMessageCounter;
     KeyedVector<uint32_t, uint32_t> mMessages;
 
     void deliverMessage(const sp<AMessage> &msg);

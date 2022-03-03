@@ -210,9 +210,6 @@ public:
     // return the strategy corresponding to a given stream type
     virtual product_strategy_t getStrategyForStream(audio_stream_type_t stream) = 0;
 
-    // return the enabled output devices for the given stream type
-    virtual DeviceTypeSet getDevicesForStream(audio_stream_type_t stream) = 0;
-
     // retrieves the list of enabled output devices for the given audio attributes
     virtual status_t getDevicesForAttributes(const audio_attributes_t &attr,
                                              AudioDeviceTypeAddrVector *devices,
