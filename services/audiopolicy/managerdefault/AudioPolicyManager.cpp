@@ -1051,19 +1051,27 @@ status_t AudioPolicyManager::getOutputForAttrInt(
                                                   primaryMix->mDeviceAddress,
                                                   AUDIO_FORMAT_DEFAULT);
         sp<SwAudioOutputDescriptor> policyDesc = primaryMix->getOutput();
-        if (deviceDesc != nullptr
-                && (policyDesc == nullptr || (policyDesc->mFlags & AUDIO_OUTPUT_FLAG_DIRECT))) {
+        bool tryDirectForFlags = policyDesc == nullptr ||
+                (policyDesc->mFlags & AUDIO_OUTPUT_FLAG_DIRECT);
+        // if a direct output can be opened to deliver the track's multi-channel content to the
+        // output rather than being downmixed by the primary output, then use this direct
+        // output by by-passing the primary mix if possible, otherwise fall-through to primary
+        // mix.
+        bool tryDirectForChannelMask = policyDesc != nullptr
+                    && (audio_channel_count_from_out_mask(policyDesc->getConfig().channel_mask) <
+                        audio_channel_count_from_out_mask(config->channel_mask));
+        if (deviceDesc != nullptr && (tryDirectForFlags || tryDirectForChannelMask)) {
             audio_io_handle_t newOutput;
             status = openDirectOutput(
                     *stream, session, config,
                     (audio_output_flags_t)(*flags | AUDIO_OUTPUT_FLAG_DIRECT),
                     DeviceVector(deviceDesc), &newOutput);
-            if (status != NO_ERROR) {
-                policyDesc = nullptr;
-            } else {
+            if (status == NO_ERROR) {
                 policyDesc = mOutputs.valueFor(newOutput);
                 primaryMix->setOutput(policyDesc);
-            }
+            } else if (tryDirectForFlags) {
+                policyDesc = nullptr;
+            } // otherwise use primary if available.
         }
         if (policyDesc != nullptr) {
             policyDesc->mPolicyMix = primaryMix;
