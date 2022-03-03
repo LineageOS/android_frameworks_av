@@ -54,7 +54,7 @@ private:
     bool mIsFirst;
     bool mSignalledError;
     bool mSignalledOutputEos;
-    uint64_t mAnchorTimeStamp;
+    int64_t mAnchorTimeStamp;
     uint64_t mProcessedSamples;
     int32_t mFilledLen;
     int16_t mInputFrame[kNumSamplesPerFrame];
