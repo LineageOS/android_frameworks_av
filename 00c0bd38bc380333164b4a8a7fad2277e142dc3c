@@ -1,0 +1,21 @@
+{
+  "comments": [
+    {
+      "unresolved": false,
+      "key": {
+        "uuid": "c2c55457_16bafa9e",
+        "filename": "/PATCHSET_LEVEL",
+        "patchSetId": 2
+      },
+      "lineNbr": 0,
+      "author": {
+        "id": 11801
+      },
+      "writtenOn": "2022-03-03T17:17:06Z",
+      "side": 1,
+      "message": "Looking at this code, it looks like it\u0027s taken from a leaked BSP source. The comments and commented out lines make me very very very suspicious of this.",
+      "revId": "00c0bd38bc380333164b4a8a7fad2277e142dc3c",
+      "serverId": "1ec6b3db-b2c1-4fa4-84a2-4c7efe89ba71"
+    }
+  ]
+}
