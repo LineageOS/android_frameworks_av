@@ -50,7 +50,8 @@ struct FrameDecoder : public RefBase {
     sp<IMemory> extractFrame(FrameRect *rect = NULL);
 
     static sp<IMemory> getMetadataOnly(
-            const sp<MetaData> &trackMeta, int colorFormat, bool thumbnail = false);
+            const sp<MetaData> &trackMeta, int colorFormat,
+            bool thumbnail = false, uint32_t bitDepth = 0);
 
 protected:
     virtual ~FrameDecoder();
