@@ -2139,10 +2139,14 @@ Status CameraService::turnOnTorchWithStrengthLevel(const String16& cameraId, int
                     id.string());
                 errorCode = ERROR_CAMERA_IN_USE;
                 break;
+            case -EINVAL:
+                msg = String8::format("Torch strength level %d is not within the "
+                        "valid range.", torchStrength);
+                errorCode = ERROR_ILLEGAL_ARGUMENT;
+                break;
             default:
                 msg = String8::format("Changing torch strength level failed.");
                 errorCode = ERROR_INVALID_OPERATION;
-
         }
         ALOGE("%s: %s", __FUNCTION__, msg.string());
         return STATUS_ERROR(errorCode, msg.string());
