@@ -21,7 +21,9 @@
 #include <atomic>
 #include <stdint.h>
 
+#include <linux/futex.h>
 #include <media/MediaMetricsItem.h>
+#include <sys/syscall.h>
 
 #include <aaudio/AAudio.h>
 
@@ -362,34 +364,37 @@ void AudioStream::close_l() {
 }
 
 void AudioStream::setState(aaudio_stream_state_t state) {
-    ALOGD("%s(s#%d) from %d to %d", __func__, getId(), mState, state);
-    if (state == mState) {
+    aaudio_stream_state_t oldState = mState.load();
+    ALOGD("%s(s#%d) from %d to %d", __func__, getId(), oldState, state);
+    if (state == oldState) {
         return; // no change
     }
     // Track transition to DISCONNECTED state.
     if (state == AAUDIO_STREAM_STATE_DISCONNECTED) {
         android::mediametrics::LogItem(mMetricsId)
                 .set(AMEDIAMETRICS_PROP_EVENT, AMEDIAMETRICS_PROP_EVENT_VALUE_DISCONNECT)
-                .set(AMEDIAMETRICS_PROP_STATE, AudioGlobal_convertStreamStateToText(getState()))
+                .set(AMEDIAMETRICS_PROP_STATE, AudioGlobal_convertStreamStateToText(oldState))
                 .record();
     }
     // CLOSED is a final state
-    if (mState == AAUDIO_STREAM_STATE_CLOSED) {
+    if (oldState == AAUDIO_STREAM_STATE_CLOSED) {
         ALOGW("%s(%d) tried to set to %d but already CLOSED", __func__, getId(), state);
 
     // Once CLOSING, we can only move to CLOSED state.
-    } else if (mState == AAUDIO_STREAM_STATE_CLOSING
+    } else if (oldState == AAUDIO_STREAM_STATE_CLOSING
                && state != AAUDIO_STREAM_STATE_CLOSED) {
         ALOGW("%s(%d) tried to set to %d but already CLOSING", __func__, getId(), state);
 
     // Once DISCONNECTED, we can only move to CLOSING or CLOSED state.
-    } else if (mState == AAUDIO_STREAM_STATE_DISCONNECTED
+    } else if (oldState == AAUDIO_STREAM_STATE_DISCONNECTED
                && !(state == AAUDIO_STREAM_STATE_CLOSING
                    || state == AAUDIO_STREAM_STATE_CLOSED)) {
         ALOGW("%s(%d) tried to set to %d but already DISCONNECTED", __func__, getId(), state);
 
     } else {
-        mState = state;
+        mState.store(state);
+        // Wake up a wakeForStateChange thread if it exists.
+        syscall(SYS_futex, &mState, FUTEX_WAKE_PRIVATE, INT_MAX, NULL, NULL, 0);
     }
 }
 
@@ -408,9 +413,15 @@ aaudio_result_t AudioStream::waitForStateChange(aaudio_stream_state_t currentSta
         if (durationNanos > timeoutNanoseconds) {
             durationNanos = timeoutNanoseconds;
         }
-        AudioClock::sleepForNanos(durationNanos);
-        timeoutNanoseconds -= durationNanos;
+        struct timespec time;
+        time.tv_sec = durationNanos / AAUDIO_NANOS_PER_SECOND;
+        // Add the fractional nanoseconds.
+        time.tv_nsec = durationNanos - (time.tv_sec * AAUDIO_NANOS_PER_SECOND);
 
+        // Sleep for durationNanos. If mState changes from the callback
+        // thread, this thread will wake up earlier.
+        syscall(SYS_futex, &mState, FUTEX_WAIT_PRIVATE, currentState, &time, NULL, 0);
+        timeoutNanoseconds -= durationNanos;
         aaudio_result_t result = updateStateMachine();
         if (result != AAUDIO_OK) {
             return result;

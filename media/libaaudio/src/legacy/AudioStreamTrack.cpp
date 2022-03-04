@@ -378,8 +378,7 @@ aaudio_result_t AudioStreamTrack::requestStop_l() {
     return checkForDisconnectRequest(false);;
 }
 
-aaudio_result_t AudioStreamTrack::updateStateMachine()
-{
+aaudio_result_t AudioStreamTrack::processCommands() {
     status_t err;
     aaudio_wrapping_frames_t position;
     switch (getState()) {
