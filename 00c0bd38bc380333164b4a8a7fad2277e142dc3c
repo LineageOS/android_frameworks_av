@@ -16,6 +16,74 @@
       "message": "Looking at this code, it looks like it\u0027s taken from a leaked BSP source. The comments and commented out lines make me very very very suspicious of this.",
       "revId": "00c0bd38bc380333164b4a8a7fad2277e142dc3c",
       "serverId": "1ec6b3db-b2c1-4fa4-84a2-4c7efe89ba71"
+    },
+    {
+      "unresolved": true,
+      "key": {
+        "uuid": "6e9faf51_bcab3486",
+        "filename": "services/audiopolicy/managerdefault/AudioPolicyManager.cpp",
+        "patchSetId": 2
+      },
+      "lineNbr": 6214,
+      "author": {
+        "id": 30604
+      },
+      "writtenOn": "2022-03-04T06:32:05Z",
+      "side": 1,
+      "message": "It\u0027s not good practice to leave spaces.",
+      "revId": "00c0bd38bc380333164b4a8a7fad2277e142dc3c",
+      "serverId": "1ec6b3db-b2c1-4fa4-84a2-4c7efe89ba71"
+    },
+    {
+      "unresolved": true,
+      "key": {
+        "uuid": "57560405_3c649290",
+        "filename": "services/audiopolicy/managerdefault/AudioPolicyManager.cpp",
+        "patchSetId": 2
+      },
+      "lineNbr": 6605,
+      "author": {
+        "id": 30604
+      },
+      "writtenOn": "2022-03-04T06:32:05Z",
+      "side": 1,
+      "message": "It\u0027s not good practice to leave spaces.",
+      "revId": "00c0bd38bc380333164b4a8a7fad2277e142dc3c",
+      "serverId": "1ec6b3db-b2c1-4fa4-84a2-4c7efe89ba71"
+    },
+    {
+      "unresolved": true,
+      "key": {
+        "uuid": "45dbb22e_aca0fa3a",
+        "filename": "services/audiopolicy/managerdefault/AudioPolicyManager.cpp",
+        "patchSetId": 2
+      },
+      "lineNbr": 7274,
+      "author": {
+        "id": 30604
+      },
+      "writtenOn": "2022-03-04T06:32:05Z",
+      "side": 1,
+      "message": "Unnecessary #endif",
+      "revId": "00c0bd38bc380333164b4a8a7fad2277e142dc3c",
+      "serverId": "1ec6b3db-b2c1-4fa4-84a2-4c7efe89ba71"
+    },
+    {
+      "unresolved": true,
+      "key": {
+        "uuid": "240030b7_f931039d",
+        "filename": "services/audiopolicy/managerdefault/AudioPolicyManager.cpp",
+        "patchSetId": 2
+      },
+      "lineNbr": 7303,
+      "author": {
+        "id": 30604
+      },
+      "writtenOn": "2022-03-04T06:32:05Z",
+      "side": 1,
+      "message": "It\u0027s not good practice to leave spaces.",
+      "revId": "00c0bd38bc380333164b4a8a7fad2277e142dc3c",
+      "serverId": "1ec6b3db-b2c1-4fa4-84a2-4c7efe89ba71"
     }
   ]
 }
