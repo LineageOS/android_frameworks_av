@@ -2,22 +2,22 @@
 #     CONSULT THE OWNERS AND opensource-licensing@google.com BEFORE
 #     DEPENDING ON IT IN YOUR PROJECT. ***
 third_party {
-  # would be NOTICE save for Widevine Master License Agreement in:
-  #   drm/mediadrm/plugins/clearkey/hidl/DeviceFiles.cpp
-  #   drm/mediadrm/plugins/clearkey/hidl/MemoryFileSystem.cpp
-  #   drm/mediadrm/plugins/clearkey/hidl/include/DeviceFiles.h
-  #   drm/mediadrm/plugins/clearkey/hidl/protos/DeviceFiles.proto
-  #   drm/mediadrm/plugins/clearkey/hidl/include/MemoryFileSystem.h
-  # and patent disclaimers in:
-  #   media/codec2/components/aac/patent_disclaimer.txt
-  #   media/codec2/components/amr_nb_wb/patent_disclaimer.txt
-  #   media/codec2/components/mp3/patent_disclaimer.txt
-  #   media/codec2/components/mpeg4_h263/patent_disclaimer.txt
-  #   media/codecs/amrnb/patent_disclaimer.txt
-  #   media/codecs/amrwb/dec/patent_disclaimer.txt
-  #   media/codecs/amrwb/enc/patent_disclaimer.txt
-  #   media/codecs/m4v_h263/patent_disclaimer.txt
-  #   media/codecs/mp3dec/patent_disclaimer.txt
-  #   media/libstagefright/codecs/aacenc/patent_disclaimer.txt
+  license_note: "would be NOTICE save for Widevine Master License Agreement in:\n"
+  "   drm/mediadrm/plugins/clearkey/hidl/DeviceFiles.cpp\n"
+  "   drm/mediadrm/plugins/clearkey/hidl/MemoryFileSystem.cpp\n"
+  "   drm/mediadrm/plugins/clearkey/hidl/include/DeviceFiles.h\n"
+  "   drm/mediadrm/plugins/clearkey/hidl/protos/DeviceFiles.proto\n"
+  "   drm/mediadrm/plugins/clearkey/hidl/include/MemoryFileSystem.h\n"
+  " and patent disclaimers in:\n"
+  "   media/codec2/components/aac/patent_disclaimer.txt\n"
+  "   media/codec2/components/amr_nb_wb/patent_disclaimer.txt\n"
+  "   media/codec2/components/mp3/patent_disclaimer.txt\n"
+  "   media/codec2/components/mpeg4_h263/patent_disclaimer.txt\n"
+  "   media/codecs/amrnb/patent_disclaimer.txt\n"
+  "   media/codecs/amrwb/dec/patent_disclaimer.txt\n"
+  "   media/codecs/amrwb/enc/patent_disclaimer.txt\n"
+  "   media/codecs/m4v_h263/patent_disclaimer.txt\n"
+  "   media/codecs/mp3dec/patent_disclaimer.txt\n"
+  "   media/libstagefright/codecs/aacenc/patent_disclaimer.txt"
   license_type: BY_EXCEPTION_ONLY
 }

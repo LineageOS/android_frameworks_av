@@ -29,6 +29,7 @@ cc_library_headers {
 cc_library {
     name: "libmedia_helper",
     vendor_available: true,
+    min_sdk_version: "29",
     vndk: {
         enabled: true,
     },
@@ -58,4 +59,9 @@ cc_library {
             enabled: false,
         },
     },
+    apex_available: [
+        "//apex_available:platform",
+        "com.android.media",
+        "test_com.android.media",
+    ],
 }

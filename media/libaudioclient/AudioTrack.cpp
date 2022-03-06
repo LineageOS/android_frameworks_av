@@ -556,7 +556,6 @@ status_t AudioTrack::set(
     pid_t myPid;
     uid_t uid = VALUE_OR_FATAL(aidl2legacy_int32_t_uid_t(attributionSource.uid));
     pid_t pid = VALUE_OR_FATAL(aidl2legacy_int32_t_pid_t(attributionSource.pid));
-    sp<IAudioTrackCallback> _callback = callback.promote();
     std::string errorMessage;
     // Note mPortId is not valid until the track is created, so omit mPortId in ALOG for set.
     ALOGV("%s(): streamType %d, sampleRate %u, format %#x, channelMask %#x, frameCount %zu, "
@@ -619,7 +618,7 @@ status_t AudioTrack::set(
     case TRANSFER_DEFAULT:
         if (sharedBuffer != 0) {
             transferType = TRANSFER_SHARED;
-        } else if (_callback == nullptr|| threadCanCallJava) {
+        } else if (callback == nullptr|| threadCanCallJava) {
             transferType = TRANSFER_SYNC;
         } else {
             transferType = TRANSFER_CALLBACK;
@@ -627,7 +626,7 @@ status_t AudioTrack::set(
         break;
     case TRANSFER_CALLBACK:
     case TRANSFER_SYNC_NOTIF_CALLBACK:
-        if (_callback == nullptr || sharedBuffer != 0) {
+        if (callback == nullptr || sharedBuffer != 0) {
             errorMessage = StringPrintf(
                     "%s: Transfer type %s but callback == nullptr || sharedBuffer != 0",
                     convertTransferToText(transferType), __func__);
@@ -782,7 +781,7 @@ status_t AudioTrack::set(
     mAuxEffectId = 0;
     mCallback = callback;
 
-    if (_callback != nullptr) {
+    if (callback != nullptr) {
         mAudioTrackThread = sp<AudioTrackThread>::make(*this);
         mAudioTrackThread->run("AudioTrack", ANDROID_PRIORITY_AUDIO, 0 /*stack*/);
         // thread begins in paused state, and will not reference us until start()
