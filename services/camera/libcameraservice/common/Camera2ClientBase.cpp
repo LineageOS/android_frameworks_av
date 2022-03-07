@@ -332,9 +332,10 @@ status_t Camera2ClientBase<TClientBase>::notifyActive(float maxPreviewFps) {
 }
 
 template <typename TClientBase>
-void Camera2ClientBase<TClientBase>::notifyIdle(
+void Camera2ClientBase<TClientBase>::notifyIdleWithUserTag(
         int64_t requestCount, int64_t resultErrorCount, bool deviceError,
-        const std::vector<hardware::CameraStreamStats>& streamStats) {
+        const std::vector<hardware::CameraStreamStats>& streamStats,
+        const std::string& userTag) {
     if (mDeviceActive) {
         status_t res = TClientBase::finishCameraStreamingOps();
         if (res != OK) {
@@ -342,7 +343,7 @@ void Camera2ClientBase<TClientBase>::notifyIdle(
                     TClientBase::mCameraIdStr.string(), res);
         }
         CameraServiceProxyWrapper::logIdle(TClientBase::mCameraIdStr,
-                requestCount, resultErrorCount, deviceError, streamStats);
+                requestCount, resultErrorCount, deviceError, userTag, streamStats);
     }
     mDeviceActive = false;
 

@@ -146,6 +146,20 @@ status_t CaptureRequest::readFromParcel(const android::Parcel* parcel) {
         mSurfaceIdxList.push_back(surfaceIdx);
     }
 
+    int32_t hasUserTag;
+    if ((err = parcel->readInt32(&hasUserTag)) != OK) {
+        ALOGE("%s: Failed to read user tag availability flag", __FUNCTION__);
+        return BAD_VALUE;
+    }
+    if (hasUserTag) {
+        String16 userTag;
+        if ((err = parcel->readString16(&userTag)) != OK) {
+            ALOGE("%s: Failed to read user tag!", __FUNCTION__);
+            return BAD_VALUE;
+        }
+        mUserTag = String8(userTag).c_str();
+    }
+
     return OK;
 }
 
@@ -213,6 +227,14 @@ status_t CaptureRequest::writeToParcel(android::Parcel* parcel) const {
             return err;
         }
     }
+
+    if (mUserTag.empty()) {
+        parcel->writeInt32(0);
+    } else {
+        parcel->writeInt32(1);
+        parcel->writeString16(String16(mUserTag.c_str()));
+    }
+
     return OK;
 }
 
