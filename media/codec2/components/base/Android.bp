@@ -9,6 +9,16 @@ package {
     default_applicable_licenses: ["frameworks_av_license"],
 }
 
+cc_library_headers {
+    name: "libcodec2_soft_common_headers",
+    defaults: ["libcodec2-impl-defaults"],
+    vendor_available: true,
+
+    export_include_dirs: [
+        "include",
+    ],
+}
+
 cc_library {
     name: "libcodec2_soft_common",
     defaults: ["libcodec2-impl-defaults"],
