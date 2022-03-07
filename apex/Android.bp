@@ -23,7 +23,6 @@ package {
 
 apex_defaults {
     name: "com.android.media-defaults",
-    updatable: true,
     bootclasspath_fragments: ["com.android.media-bootclasspath-fragment"],
     systemserverclasspath_fragments: ["com.android.media-systemserverclasspath-fragment"],
     multilib: {
@@ -67,14 +66,13 @@ apex_defaults {
     // Use a custom AndroidManifest.xml used for API targeting.
     androidManifest: ":com.android.media-androidManifest",
 
-    // IMPORTANT: For the APEX to be installed on Android 10 (API 29),
-    // min_sdk_version should be 29. This enables the build system to make
+    // IMPORTANT: q-launched-apex-module enables the build system to make
     // sure the package compatible to Android 10 in two ways:
     // - build the APEX package compatible to Android 10
     //   so that the package can be installed.
     // - build artifacts (lib/javalib/bin) against Android 10 SDK
     //   so that the artifacts can run.
-    min_sdk_version: "29",
+    defaults: ["q-launched-apex-module"],
     // Indicates that pre-installed version of this apex can be compressed.
     // Whether it actually will be compressed is controlled on per-device basis.
     compressible: true,
@@ -148,7 +146,6 @@ filegroup {
 
 apex_defaults {
     name: "com.android.media.swcodec-defaults",
-    updatable: true,
     binaries: [
         "mediaswcodec",
     ],
@@ -172,14 +169,13 @@ apex_defaults {
     // Use a custom AndroidManifest.xml used for API targeting.
     androidManifest: ":com.android.media.swcodec-androidManifest",
 
-    // IMPORTANT: For the APEX to be installed on Android 10 (API 29),
-    // min_sdk_version should be 29. This enables the build system to make
+    // IMPORTANT: q-launched-apex-module enables the build system to make
     // sure the package compatible to Android 10 in two ways:
     // - build the APEX package compatible to Android 10
     //   so that the package can be installed.
     // - build artifacts (lib/javalib/bin) against Android 10 SDK
     //   so that the artifacts can run.
-    min_sdk_version: "29",
+    defaults: ["q-launched-apex-module"],
     // Indicates that pre-installed version of this apex can be compressed.
     // Whether it actually will be compressed is controlled on per-device basis.
     compressible: true,
