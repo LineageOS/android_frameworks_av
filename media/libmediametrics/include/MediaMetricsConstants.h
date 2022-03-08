@@ -140,6 +140,8 @@
 #define AMEDIAMETRICS_PROP_INTERVALCOUNT  "intervalCount"  // int32
 #define AMEDIAMETRICS_PROP_LATENCYMS      "latencyMs"      // double value
 #define AMEDIAMETRICS_PROP_LOGSESSIONID   "logSessionId"   // hex string, "" none
+#define AMEDIAMETRICS_PROP_METHODCODE     "methodCode"     // int64_t an int indicating method
+#define AMEDIAMETRICS_PROP_METHODNAME     "methodName"     // string method name
 #define AMEDIAMETRICS_PROP_NAME           "name"           // string value
 #define AMEDIAMETRICS_PROP_ORIGINALFLAGS  "originalFlags"  // int32
 #define AMEDIAMETRICS_PROP_OUTPUTDEVICES  "outputDevices"  // string value
@@ -224,6 +226,7 @@
 #define AMEDIAMETRICS_PROP_EVENT_VALUE_SETVOLUME  "setVolume"  // AudioTrack
 #define AMEDIAMETRICS_PROP_EVENT_VALUE_START      "start"  // AudioTrack, AudioRecord
 #define AMEDIAMETRICS_PROP_EVENT_VALUE_STOP       "stop"   // AudioTrack, AudioRecord
+#define AMEDIAMETRICS_PROP_EVENT_VALUE_TIMEOUT    "timeout"  // AudioFlinger, AudioPolicy
 #define AMEDIAMETRICS_PROP_EVENT_VALUE_UNDERRUN   "underrun" // from Thread
 
 // Possible values for AMEDIAMETRICS_PROP_CALLERNAME
