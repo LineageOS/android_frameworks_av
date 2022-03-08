@@ -294,6 +294,8 @@ class Camera3Device :
     status_t disconnectImpl();
     static status_t removeFwkOnlyRegionKeys(CameraMetadata *request);
 
+    float getMaxPreviewFps(sp<camera3::Camera3OutputStreamInterface> stream);
+
     static const size_t        kDumpLockAttempts  = 10;
     static const size_t        kDumpSleepDuration = 100000; // 0.10 sec
     static const nsecs_t       kActiveTimeout     = 500000000;  // 500 ms
