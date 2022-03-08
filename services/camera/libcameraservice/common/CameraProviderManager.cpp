@@ -359,7 +359,13 @@ status_t CameraProviderManager::notifyDeviceStateChange(
     for (auto& provider : mProviders) {
         ALOGV("%s: Notifying %s for new state 0x%" PRIx64,
                 __FUNCTION__, provider->mProviderName.c_str(), newState);
+        // b/199240726 Camera providers can for example try to add/remove
+        // camera devices as part of the state change notification. Holding
+        // 'mInterfaceMutex' while calling 'notifyDeviceStateChange' can
+        // result in a recursive deadlock.
+        mInterfaceMutex.unlock();
         status_t singleRes = provider->notifyDeviceStateChange(mDeviceState);
+        mInterfaceMutex.lock();
         if (singleRes != OK) {
             ALOGE("%s: Unable to notify provider %s about device state change",
                     __FUNCTION__,
@@ -367,6 +373,7 @@ status_t CameraProviderManager::notifyDeviceStateChange(
             res = singleRes;
             // continue to do the rest of the providers instead of returning now
         }
+        provider->notifyDeviceInfoStateChangeLocked(mDeviceState);
     }
     return res;
 }
@@ -1185,10 +1192,12 @@ status_t CameraProviderManager::getSystemCameraKindLocked(const std::string& id,
 }
 
 bool CameraProviderManager::isHiddenPhysicalCamera(const std::string& cameraId) const {
+    std::lock_guard<std::mutex> lock(mInterfaceMutex);
     return isHiddenPhysicalCameraInternal(cameraId).first;
 }
 
 status_t CameraProviderManager::filterSmallJpegSizes(const std::string& cameraId) {
+    std::lock_guard<std::mutex> lock(mInterfaceMutex);
     for (auto& provider : mProviders) {
         for (auto& deviceInfo : provider->mDevices) {
             if (deviceInfo->mId == cameraId) {
@@ -1629,6 +1638,7 @@ status_t CameraProviderManager::ProviderInfo::addDevice(const std::string& name,
             return BAD_VALUE;
     }
     if (deviceInfo == nullptr) return BAD_VALUE;
+    deviceInfo->notifyDeviceStateChange(mDeviceState);
     deviceInfo->mStatus = initialStatus;
     bool isAPI1Compatible = deviceInfo->isAPI1Compatible();
 
@@ -2042,6 +2052,14 @@ status_t CameraProviderManager::ProviderInfo::setUpVendorTags() {
     return OK;
 }
 
+void CameraProviderManager::ProviderInfo::notifyDeviceInfoStateChangeLocked(
+        hardware::hidl_bitfield<provider::V2_5::DeviceState> newDeviceState) {
+    std::lock_guard<std::mutex> lock(mLock);
+    for (auto it = mDevices.begin(); it != mDevices.end(); it++) {
+        (*it)->notifyDeviceStateChange(newDeviceState);
+    }
+}
+
 status_t CameraProviderManager::ProviderInfo::notifyDeviceStateChange(
         hardware::hidl_bitfield<provider::V2_5::DeviceState> newDeviceState) {
     mDeviceState = newDeviceState;
@@ -2296,6 +2314,18 @@ CameraProviderManager::ProviderInfo::DeviceInfo3::DeviceInfo3(const std::string&
         return;
     }
 
+    if (mCameraCharacteristics.exists(ANDROID_INFO_DEVICE_STATE_ORIENTATIONS)) {
+        const auto &stateMap = mCameraCharacteristics.find(ANDROID_INFO_DEVICE_STATE_ORIENTATIONS);
+        if ((stateMap.count > 0) && ((stateMap.count % 2) == 0)) {
+            for (size_t i = 0; i < stateMap.count; i += 2) {
+                mDeviceStateOrientationMap.emplace(stateMap.data.i64[i], stateMap.data.i64[i+1]);
+            }
+        } else {
+            ALOGW("%s: Invalid ANDROID_INFO_DEVICE_STATE_ORIENTATIONS map size: %zu", __FUNCTION__,
+                    stateMap.count);
+        }
+    }
+
     mSystemCameraKind = getSystemCameraKind();
 
     status_t res = fixupMonochromeTags();
@@ -2423,6 +2453,16 @@ CameraProviderManager::ProviderInfo::DeviceInfo3::DeviceInfo3(const std::string&
 }
 
 CameraProviderManager::ProviderInfo::DeviceInfo3::~DeviceInfo3() {}
+
+void CameraProviderManager::ProviderInfo::DeviceInfo3::notifyDeviceStateChange(
+        hardware::hidl_bitfield<hardware::camera::provider::V2_5::DeviceState> newState) {
+
+    if (!mDeviceStateOrientationMap.empty() &&
+            (mDeviceStateOrientationMap.find(newState) != mDeviceStateOrientationMap.end())) {
+        mCameraCharacteristics.update(ANDROID_SENSOR_ORIENTATION,
+                &mDeviceStateOrientationMap[newState], 1);
+    }
+}
 
 status_t CameraProviderManager::ProviderInfo::DeviceInfo3::setTorchMode(bool enabled) {
     return setTorchModeForDevice<InterfaceT>(enabled);

@@ -78,7 +78,8 @@ status_t JpegProcessor::updateStream(const Parameters &params) {
     }
 
     // Find out buffer size for JPEG
-    ssize_t maxJpegSize = device->getJpegBufferSize(params.pictureWidth, params.pictureHeight);
+    ssize_t maxJpegSize = device->getJpegBufferSize(device->infoPhysical(String8("")),
+            params.pictureWidth, params.pictureHeight);
     if (maxJpegSize <= 0) {
         ALOGE("%s: Camera %d: Jpeg buffer size (%zu) is invalid ",
                 __FUNCTION__, mId, maxJpegSize);

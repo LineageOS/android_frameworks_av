@@ -1843,9 +1843,11 @@ Status CameraService::connectHelper(const sp<CALLBACK>& cameraCb, const String8&
         // Set rotate-and-crop override behavior
         if (mOverrideRotateAndCropMode != ANDROID_SCALER_ROTATE_AND_CROP_AUTO) {
             client->setRotateAndCropOverride(mOverrideRotateAndCropMode);
-        } else if (CameraServiceProxyWrapper::isRotateAndCropOverrideNeeded(clientPackageName,
-                    orientation, facing)) {
-            client->setRotateAndCropOverride(ANDROID_SCALER_ROTATE_AND_CROP_90);
+        } else if (effectiveApiLevel == API_2) {
+
+          client->setRotateAndCropOverride(
+              CameraServiceProxyWrapper::getRotateAndCropOverride(
+                  clientPackageName, facing, multiuser_get_user_id(clientUid)));
         }
 
         // Set camera muting behavior
@@ -2192,7 +2194,6 @@ Status CameraService::notifyDeviceStateChange(int64_t newState) {
     newDeviceState |= vendorBits;
 
     ALOGV("%s: New device state 0x%" PRIx64, __FUNCTION__, newDeviceState);
-    Mutex::Autolock l(mServiceLock);
     mCameraProviderManager->notifyDeviceStateChange(newDeviceState);
 
     return Status::ok();
@@ -2226,14 +2227,12 @@ Status CameraService::notifyDisplayConfigurationChange() {
     for (auto& current : clients) {
         if (current != nullptr) {
             const auto basicClient = current->getValue();
-            if (basicClient.get() != nullptr) {
-                if (CameraServiceProxyWrapper::isRotateAndCropOverrideNeeded(
-                            basicClient->getPackageName(), basicClient->getCameraOrientation(),
-                            basicClient->getCameraFacing())) {
-                    basicClient->setRotateAndCropOverride(ANDROID_SCALER_ROTATE_AND_CROP_90);
-                } else {
-                    basicClient->setRotateAndCropOverride(ANDROID_SCALER_ROTATE_AND_CROP_NONE);
-                }
+            if (basicClient.get() != nullptr && basicClient->canCastToApiClient(API_2)) {
+              basicClient->setRotateAndCropOverride(
+                  CameraServiceProxyWrapper::getRotateAndCropOverride(
+                      basicClient->getPackageName(),
+                      basicClient->getCameraFacing(),
+                      multiuser_get_user_id(basicClient->getClientUid())));
             }
         }
     }

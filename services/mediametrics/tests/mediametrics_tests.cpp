@@ -28,6 +28,7 @@
 
 #include "AudioTypes.h"
 #include "StringUtils.h"
+#include "ValidateId.h"
 
 using namespace android;
 
@@ -1126,4 +1127,170 @@ TEST(mediametrics_tests, sanitizeLogSessionId) {
    // replacing one character with an invalid character makes an invalid id.
    validId2[3] = '!';
    ASSERT_EQ("", mediametrics::stringutils::sanitizeLogSessionId(validId2));
+}
+
+TEST(mediametrics_tests, LruSet) {
+    constexpr size_t LRU_SET_SIZE = 2;
+    mediametrics::LruSet<std::string> lruSet(LRU_SET_SIZE);
+
+    // test adding a couple strings.
+    lruSet.add("abc");
+    ASSERT_EQ(1u, lruSet.size());
+    ASSERT_TRUE(lruSet.check("abc"));
+    lruSet.add("def");
+    ASSERT_EQ(2u, lruSet.size());
+
+    // now adding the third string causes eviction of the oldest.
+    lruSet.add("ghi");
+    ASSERT_FALSE(lruSet.check("abc"));
+    ASSERT_TRUE(lruSet.check("ghi"));
+    ASSERT_TRUE(lruSet.check("def"));  // "def" is most recent.
+    ASSERT_EQ(2u, lruSet.size());      // "abc" is correctly discarded.
+
+    // adding another string will evict the oldest.
+    lruSet.add("foo");
+    ASSERT_FALSE(lruSet.check("ghi")); // note: "ghi" discarded when "foo" added.
+    ASSERT_TRUE(lruSet.check("foo"));
+    ASSERT_TRUE(lruSet.check("def"));
+
+    // manual removing of a string works, too.
+    ASSERT_TRUE(lruSet.remove("def"));
+    ASSERT_FALSE(lruSet.check("def")); // we manually removed "def".
+    ASSERT_TRUE(lruSet.check("foo"));  // "foo" is still there.
+    ASSERT_EQ(1u, lruSet.size());
+
+    // you can't remove a string that has not been added.
+    ASSERT_FALSE(lruSet.remove("bar")); // Note: "bar" doesn't exist, so remove returns false.
+    ASSERT_EQ(1u, lruSet.size());
+
+    lruSet.add("foo");   // adding "foo" (which already exists) doesn't change size.
+    ASSERT_EQ(1u, lruSet.size());
+    lruSet.add("bar");   // add "bar"
+    ASSERT_EQ(2u, lruSet.size());
+    lruSet.add("glorp"); // add "glorp" evicts "foo".
+    ASSERT_EQ(2u, lruSet.size());
+    ASSERT_TRUE(lruSet.check("bar"));
+    ASSERT_TRUE(lruSet.check("glorp"));
+    ASSERT_FALSE(lruSet.check("foo"));
+}
+
+TEST(mediametrics_tests, LruSet0) {
+    constexpr size_t LRU_SET_SIZE = 0;
+    mediametrics::LruSet<std::string> lruSet(LRU_SET_SIZE);
+
+    lruSet.add("a");
+    ASSERT_EQ(0u, lruSet.size());
+    ASSERT_FALSE(lruSet.check("a"));
+    ASSERT_FALSE(lruSet.remove("a")); // never added.
+    ASSERT_EQ(0u, lruSet.size());
+}
+
+// Returns a 16 Base64Url string representing the decimal representation of value
+// (with leading 0s) e.g. 0000000000000000, 0000000000000001, 0000000000000002, ...
+static std::string generateId(size_t value)
+{
+    char id[16 + 1]; // to be filled with 16 Base64Url chars (and zero termination)
+    char *sptr = id + 16; // start at the end.
+    *sptr-- = 0; // zero terminate.
+    // output the digits from least significant to most significant.
+    while (value) {
+        *sptr-- = value % 10;
+        value /= 10;
+    }
+    // add leading 0's
+    while (sptr > id) {
+        *sptr-- = '0';
+    }
+    return std::string(id);
+}
+
+TEST(mediametrics_tests, ValidateId) {
+    constexpr size_t LRU_SET_SIZE = 3;
+    constexpr size_t IDS = 10;
+    static_assert(IDS > LRU_SET_SIZE);  // IDS must be greater than LRU_SET_SIZE.
+    mediametrics::ValidateId validateId(LRU_SET_SIZE);
+
+
+    // register IDs as integer strings counting from 0.
+    for (size_t i = 0; i < IDS; ++i) {
+        validateId.registerId(generateId(i));
+    }
+
+    // only the last LRU_SET_SIZE exist.
+    for (size_t i = 0; i < IDS - LRU_SET_SIZE; ++i) {
+        ASSERT_EQ("", validateId.validateId(generateId(i)));
+    }
+    for (size_t i = IDS - LRU_SET_SIZE; i < IDS; ++i) {
+        const std::string id = generateId(i);
+        ASSERT_EQ(id, validateId.validateId(id));
+    }
+}
+
+TEST(mediametrics_tests, StatusConversion) {
+    constexpr status_t statuses[] = {
+        NO_ERROR,
+        BAD_VALUE,
+        DEAD_OBJECT,
+        NO_MEMORY,
+        PERMISSION_DENIED,
+        INVALID_OPERATION,
+        WOULD_BLOCK,
+        UNKNOWN_ERROR,
+    };
+
+    auto roundTrip = [](status_t status) {
+        return android::mediametrics::statusStringToStatus(
+                android::mediametrics::statusToStatusString(status));
+    };
+
+    // Primary status error categories.
+    for (const auto status : statuses) {
+        ASSERT_EQ(status, roundTrip(status));
+    }
+
+    // Status errors specially considered.
+    ASSERT_EQ(DEAD_OBJECT, roundTrip(FAILED_TRANSACTION));
+}
+
+TEST(mediametrics_tests, HeatMap) {
+    constexpr size_t SIZE = 2;
+    android::mediametrics::HeatMap heatMap{SIZE};
+    constexpr uid_t UID = 0;
+    constexpr int32_t SUBCODE = 1;
+
+    ASSERT_EQ((size_t)0, heatMap.size());
+    heatMap.add("someKey", "someSuffix", "someEvent",
+            AMEDIAMETRICS_PROP_STATUS_VALUE_OK, UID, "message", SUBCODE);
+    ASSERT_EQ((size_t)1, heatMap.size());
+    heatMap.add("someKey", "someSuffix", "someEvent",
+            AMEDIAMETRICS_PROP_STATUS_VALUE_OK, UID, "message", SUBCODE);
+    heatMap.add("someKey", "someSuffix", "anotherEvent",
+            AMEDIAMETRICS_PROP_STATUS_VALUE_ARGUMENT, UID, "message", SUBCODE);
+    ASSERT_EQ((size_t)1, heatMap.size());
+    heatMap.add("anotherKey", "someSuffix", "someEvent",
+            AMEDIAMETRICS_PROP_STATUS_VALUE_OK, UID, "message", SUBCODE);
+    ASSERT_EQ((size_t)2, heatMap.size());
+    ASSERT_EQ((size_t)0, heatMap.rejected());
+
+    heatMap.add("thirdKey", "someSuffix", "someEvent",
+            AMEDIAMETRICS_PROP_STATUS_VALUE_OK, UID, "message", SUBCODE);
+    ASSERT_EQ((size_t)2, heatMap.size());
+    ASSERT_EQ((size_t)1, heatMap.rejected());
+
+    android::mediametrics::HeatData heatData = heatMap.getData("someKey");
+    ASSERT_EQ((size_t)2, heatData.size());
+    auto count = heatData.heatCount();
+    ASSERT_EQ((size_t)3, count.size()); // pairs in order { total, "anotherEvent", "someEvent" }
+    // check total value
+    ASSERT_EQ((size_t)2, count[0].first);  // OK
+    ASSERT_EQ((size_t)1, count[0].second); // ERROR;
+    // first key "anotherEvent"
+    ASSERT_EQ((size_t)0, count[1].first);  // OK
+    ASSERT_EQ((size_t)1, count[1].second); // ERROR;
+    // second key "someEvent"
+    ASSERT_EQ((size_t)2, count[2].first);  // OK
+    ASSERT_EQ((size_t)0, count[2].second); // ERROR;
+
+    heatMap.clear();
+    ASSERT_EQ((size_t)0, heatMap.size());
 }

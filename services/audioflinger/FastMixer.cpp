@@ -89,6 +89,7 @@ FastMixer::FastMixer(audio_io_handle_t parentIoHandle)
     // TODO: Add channel mask to NBAIO_Format.
     // We assume that the channel mask must be a valid positional channel mask.
     mSinkChannelMask = getChannelMaskFromCount(mSinkChannelCount);
+    mBalance.setChannelMask(mSinkChannelMask);
 
     unsigned i;
     for (i = 0; i < FastMixerState::sMaxFastTracks; ++i) {
@@ -204,6 +205,8 @@ void FastMixer::updateMixerTrack(int index, Reason reason) {
                 (void *)(uintptr_t)fastTrack->mHapticPlaybackEnabled);
         mMixer->setParameter(index, AudioMixer::TRACK, AudioMixer::HAPTIC_INTENSITY,
                 (void *)(uintptr_t)fastTrack->mHapticIntensity);
+        mMixer->setParameter(index, AudioMixer::TRACK, AudioMixer::HAPTIC_MAX_AMPLITUDE,
+                (void *)(&(fastTrack->mHapticMaxAmplitude)));
 
         mMixer->enable(index);
         break;

@@ -70,7 +70,8 @@ status_t AudioEffect::set(const effect_uuid_t *type,
                 audio_session_t sessionId,
                 audio_io_handle_t io,
                 const AudioDeviceTypeAddr& device,
-                bool probe)
+                bool probe,
+                bool notifyFramesProcessed)
 {
     sp<media::IEffect> iEffect;
     sp<IMemory> cblk;
@@ -124,6 +125,7 @@ status_t AudioEffect::set(const effect_uuid_t *type,
     request.device = VALUE_OR_RETURN_STATUS(legacy2aidl_AudioDeviceTypeAddress(device));
     request.attributionSource = mClientAttributionSource;
     request.probe = probe;
+    request.notifyFramesProcessed = notifyFramesProcessed;
 
     media::CreateEffectResponse response;
 
@@ -194,7 +196,8 @@ status_t AudioEffect::set(const char *typeStr,
                 audio_session_t sessionId,
                 audio_io_handle_t io,
                 const AudioDeviceTypeAddr& device,
-                bool probe)
+                bool probe,
+                bool notifyFramesProcessed)
 {
     effect_uuid_t type;
     effect_uuid_t *pType = nullptr;
@@ -211,7 +214,8 @@ status_t AudioEffect::set(const char *typeStr,
         pUuid = &uuid;
     }
 
-    return set(pType, pUuid, priority, cbf, user, sessionId, io, device, probe);
+    return set(pType, pUuid, priority, cbf, user, sessionId, io,
+               device, probe, notifyFramesProcessed);
 }
 
 
@@ -519,6 +523,13 @@ void AudioEffect::commandExecuted(int32_t cmdCode,
         effect_param_t* cmd = reinterpret_cast<effect_param_t *>(cmdDataCopy.data());
         cmd->status = *reinterpret_cast<const int32_t *>(replyData.data());
         mCbf(EVENT_PARAMETER_CHANGED, mUserData, cmd);
+    }
+}
+
+void AudioEffect::framesProcessed(int32_t frames)
+{
+    if (mCbf != NULL) {
+        mCbf(EVENT_FRAMES_PROCESSED, mUserData, &frames);
     }
 }
 

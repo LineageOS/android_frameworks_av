@@ -30,7 +30,7 @@ using namespace aaudio;
 using android::media::audio::common::AudioFormat;
 
 AAudioStreamConfiguration::AAudioStreamConfiguration(const StreamParameters& parcelable) {
-    setSamplesPerFrame(parcelable.samplesPerFrame);
+    setChannelMask(parcelable.channelMask);
     setSampleRate(parcelable.sampleRate);
     setDeviceId(parcelable.deviceId);
     static_assert(sizeof(aaudio_sharing_mode_t) == sizeof(parcelable.sharingMode));
@@ -43,6 +43,13 @@ AAudioStreamConfiguration::AAudioStreamConfiguration(const StreamParameters& par
     setUsage(parcelable.usage);
     static_assert(sizeof(aaudio_content_type_t) == sizeof(parcelable.contentType));
     setContentType(parcelable.contentType);
+
+    static_assert(sizeof(aaudio_spatialization_behavior_t) ==
+            sizeof(parcelable.spatializationBehavior));
+    setSpatializationBehavior(parcelable.spatializationBehavior);
+    setIsContentSpatialized(parcelable.isContentSpatialized);
+
+
     static_assert(sizeof(aaudio_input_preset_t) == sizeof(parcelable.inputPreset));
     setInputPreset(parcelable.inputPreset);
     setBufferCapacity(parcelable.bufferCapacity);
@@ -63,7 +70,7 @@ AAudioStreamConfiguration::operator=(const StreamParameters& parcelable) {
 
 StreamParameters AAudioStreamConfiguration::parcelable() const {
     StreamParameters result;
-    result.samplesPerFrame = getSamplesPerFrame();
+    result.channelMask = getChannelMask();
     result.sampleRate = getSampleRate();
     result.deviceId = getDeviceId();
     static_assert(sizeof(aaudio_sharing_mode_t) == sizeof(result.sharingMode));

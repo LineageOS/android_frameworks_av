@@ -974,6 +974,7 @@ status_t AudioRecord::createRecord_l(const Modulo<uint32_t> &epoch)
         .set(AMEDIAMETRICS_PROP_SAMPLERATE, (int32_t)mSampleRate)
         // the following are NOT immutable
         .set(AMEDIAMETRICS_PROP_STATE, stateToString(mActive))
+        .set(AMEDIAMETRICS_PROP_STATUS, (int32_t)status)
         .set(AMEDIAMETRICS_PROP_SELECTEDMICDIRECTION, (int32_t)mSelectedMicDirection)
         .set(AMEDIAMETRICS_PROP_SELECTEDMICFIELDDIRECTION, (double)mSelectedMicFieldDimension)
         .record();

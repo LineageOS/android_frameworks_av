@@ -261,7 +261,7 @@ hardware::Return<void> Camera3OfflineSession::processCaptureResult_3_4(
         mNumPartialResults, mVendorTagId, mDeviceInfo, mPhysicalDeviceInfoMap,
         mResultMetadataQueue, mDistortionMappers, mZoomRatioMappers, mRotateAndCropMappers,
         mTagMonitor, mInputStream, mOutputStreams, mSessionStatsBuilder, listener, *this, *this,
-        mBufferRecords
+        mBufferRecords, /*legacyClient*/ false
     };
 
     std::lock_guard<std::mutex> lock(mProcessCaptureResultLock);
@@ -301,7 +301,7 @@ hardware::Return<void> Camera3OfflineSession::processCaptureResult(
         mNumPartialResults, mVendorTagId, mDeviceInfo, mPhysicalDeviceInfoMap,
         mResultMetadataQueue, mDistortionMappers, mZoomRatioMappers, mRotateAndCropMappers,
         mTagMonitor, mInputStream, mOutputStreams, mSessionStatsBuilder, listener, *this, *this,
-        mBufferRecords
+        mBufferRecords, /*legacyClient*/ false
     };
 
     std::lock_guard<std::mutex> lock(mProcessCaptureResultLock);
@@ -336,7 +336,7 @@ hardware::Return<void> Camera3OfflineSession::notify(
         mNumPartialResults, mVendorTagId, mDeviceInfo, mPhysicalDeviceInfoMap,
         mResultMetadataQueue, mDistortionMappers, mZoomRatioMappers, mRotateAndCropMappers,
         mTagMonitor, mInputStream, mOutputStreams, mSessionStatsBuilder, listener, *this, *this,
-        mBufferRecords
+        mBufferRecords, /*legacyClient*/ false
     };
     for (const auto& msg : msgs) {
         camera3::notify(states, msg);

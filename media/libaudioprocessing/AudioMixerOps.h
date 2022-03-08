@@ -17,6 +17,8 @@
 #ifndef ANDROID_AUDIO_MIXER_OPS_H
 #define ANDROID_AUDIO_MIXER_OPS_H
 
+#include <audio_utils/channels.h>
+#include <audio_utils/primitives.h>
 #include <system/audio.h>
 
 namespace android {
@@ -229,15 +231,26 @@ enum {
  * complexity of working on interleaved streams is now getting
  * too high, and likely limits compiler optimization.
  */
-template <int MIXTYPE, int NCHAN,
+
+// compile-time function.
+constexpr inline bool usesCenterChannel(audio_channel_mask_t mask) {
+    using namespace audio_utils::channels;
+    for (size_t i = 0; i < std::size(kSideFromChannelIdx); ++i) {
+        if ((mask & (1 << i)) != 0 && kSideFromChannelIdx[i] == AUDIO_GEOMETRY_SIDE_CENTER) {
+            return true;
+        }
+    }
+    return false;
+}
+
+/*
+ * Applies stereo volume to the audio data based on proper left right channel affinity
+ * (templated channel MASK parameter).
+ */
+template <int MIXTYPE, audio_channel_mask_t MASK,
         typename TO, typename TI, typename TV,
         typename F>
-void stereoVolumeHelper(TO*& out, const TI*& in, const TV *vol, F f) {
-    static_assert(NCHAN > 0 && NCHAN <= FCC_LIMIT);
-    static_assert(MIXTYPE == MIXTYPE_MULTI_STEREOVOL
-            || MIXTYPE == MIXTYPE_MULTI_SAVEONLY_STEREOVOL
-            || MIXTYPE == MIXTYPE_STEREOEXPAND
-            || MIXTYPE == MIXTYPE_MONOEXPAND);
+void stereoVolumeHelperWithChannelMask(TO*& out, const TI*& in, const TV *vol, F f) {
     auto proc = [](auto& a, const auto& b) {
         if constexpr (MIXTYPE == MIXTYPE_MULTI_STEREOVOL
                 || MIXTYPE == MIXTYPE_STEREOEXPAND
@@ -250,59 +263,113 @@ void stereoVolumeHelper(TO*& out, const TI*& in, const TV *vol, F f) {
     auto inp = [&in]() -> const TI& {
         if constexpr (MIXTYPE == MIXTYPE_STEREOEXPAND
                 || MIXTYPE == MIXTYPE_MONOEXPAND) {
-            return *in;
+            return *in; // note STEREOEXPAND assumes replicated L/R channels (see doc below).
         } else {
             return *in++;
         }
     };
 
-    // HALs should only expose the canonical channel masks.
-    proc(*out++, f(inp(), vol[0])); // front left
-    if constexpr (NCHAN == 1) return;
-    proc(*out++, f(inp(), vol[1])); // front right
-    if constexpr (NCHAN == 2)  return;
-    if constexpr (NCHAN == 4) {
-        proc(*out++, f(inp(), vol[0])); // back left
-        proc(*out++, f(inp(), vol[1])); // back right
-        return;
-    }
-
-    // TODO: Precompute center volume if not ramping.
     std::decay_t<TV> center;
-    if constexpr (std::is_floating_point_v<TV>) {
-        center = (vol[0] + vol[1]) * 0.5;       // do not use divide
-    } else {
-        center = (vol[0] >> 1) + (vol[1] >> 1); // rounds to 0.
-    }
-    proc(*out++, f(inp(), center)); // center (or 2.1 LFE)
-    if constexpr (NCHAN == 3) return;
-    if constexpr (NCHAN == 5) {
-        proc(*out++, f(inp(), vol[0]));  // back left
-        proc(*out++, f(inp(), vol[1]));  // back right
-        return;
-    }
-
-    proc(*out++, f(inp(), center)); // lfe
-    proc(*out++, f(inp(), vol[0])); // back left
-    proc(*out++, f(inp(), vol[1])); // back right
-    if constexpr (NCHAN == 6) return;
-    if constexpr (NCHAN == 7) {
-        proc(*out++, f(inp(), center)); // back center
-        return;
-    }
-    // NCHAN == 8
-    proc(*out++, f(inp(), vol[0])); // side left
-    proc(*out++, f(inp(), vol[1])); // side right
-    if constexpr (NCHAN > FCC_8) {
-        // Mutes to zero extended surround channels.
-        // 7.1.4 has the correct behavior.
-        // 22.2 has the behavior that FLC and FRC will be mixed instead
-        // of SL and SR and LFE will be center, not left.
-        for (int i = 8; i < NCHAN; ++i) {
-            // TODO: Consider using android::audio_utils::channels::kSideFromChannelIdx
-            proc(*out++, f(inp(), 0.f));
+    constexpr bool USES_CENTER_CHANNEL = usesCenterChannel(MASK);
+    if constexpr (USES_CENTER_CHANNEL) {
+        if constexpr (std::is_floating_point_v<TV>) {
+            center = (vol[0] + vol[1]) * 0.5;       // do not use divide
+        } else {
+            center = (vol[0] >> 1) + (vol[1] >> 1); // rounds to 0.
         }
     }
+
+    using namespace audio_utils::channels;
+
+    // if LFE and LFE2 are both present, they take left and right volume respectively.
+    constexpr unsigned LFE_LFE2 = \
+             AUDIO_CHANNEL_OUT_LOW_FREQUENCY | AUDIO_CHANNEL_OUT_LOW_FREQUENCY_2;
+    constexpr bool has_LFE_LFE2 = (MASK & LFE_LFE2) == LFE_LFE2;
+
+#pragma push_macro("DO_CHANNEL_POSITION")
+#undef DO_CHANNEL_POSITION
+#define DO_CHANNEL_POSITION(BIT_INDEX) \
+    if constexpr ((MASK & (1 << BIT_INDEX)) != 0) { \
+        constexpr auto side = kSideFromChannelIdx[BIT_INDEX]; \
+        if constexpr (side == AUDIO_GEOMETRY_SIDE_LEFT || \
+               has_LFE_LFE2 && (1 << BIT_INDEX) == AUDIO_CHANNEL_OUT_LOW_FREQUENCY) { \
+            proc(*out++, f(inp(), vol[0])); \
+        } else if constexpr (side == AUDIO_GEOMETRY_SIDE_RIGHT || \
+               has_LFE_LFE2 && (1 << BIT_INDEX) == AUDIO_CHANNEL_OUT_LOW_FREQUENCY_2) { \
+            proc(*out++, f(inp(), vol[1])); \
+        } else /* constexpr */ { \
+            proc(*out++, f(inp(), center)); \
+        } \
+    }
+
+    DO_CHANNEL_POSITION(0);
+    DO_CHANNEL_POSITION(1);
+    DO_CHANNEL_POSITION(2);
+    DO_CHANNEL_POSITION(3);
+    DO_CHANNEL_POSITION(4);
+    DO_CHANNEL_POSITION(5);
+    DO_CHANNEL_POSITION(6);
+    DO_CHANNEL_POSITION(7);
+
+    DO_CHANNEL_POSITION(8);
+    DO_CHANNEL_POSITION(9);
+    DO_CHANNEL_POSITION(10);
+    DO_CHANNEL_POSITION(11);
+    DO_CHANNEL_POSITION(12);
+    DO_CHANNEL_POSITION(13);
+    DO_CHANNEL_POSITION(14);
+    DO_CHANNEL_POSITION(15);
+
+    DO_CHANNEL_POSITION(16);
+    DO_CHANNEL_POSITION(17);
+    DO_CHANNEL_POSITION(18);
+    DO_CHANNEL_POSITION(19);
+    DO_CHANNEL_POSITION(20);
+    DO_CHANNEL_POSITION(21);
+    DO_CHANNEL_POSITION(22);
+    DO_CHANNEL_POSITION(23);
+    DO_CHANNEL_POSITION(24);
+    DO_CHANNEL_POSITION(25);
+    static_assert(FCC_LIMIT <= FCC_26); // Note: this may need to change.
+#pragma pop_macro("DO_CHANNEL_POSITION")
+}
+
+// These are the channel position masks we expect from the HAL.
+// See audio_channel_out_mask_from_count() but this is constexpr
+constexpr inline audio_channel_mask_t canonicalChannelMaskFromCount(size_t channelCount) {
+    constexpr audio_channel_mask_t canonical[] = {
+        [0] = AUDIO_CHANNEL_NONE,
+        [1] = AUDIO_CHANNEL_OUT_MONO,
+        [2] = AUDIO_CHANNEL_OUT_STEREO,
+        [3] = AUDIO_CHANNEL_OUT_2POINT1,
+        [4] = AUDIO_CHANNEL_OUT_QUAD,
+        [5] = AUDIO_CHANNEL_OUT_PENTA,
+        [6] = AUDIO_CHANNEL_OUT_5POINT1,
+        [7] = AUDIO_CHANNEL_OUT_6POINT1,
+        [8] = AUDIO_CHANNEL_OUT_7POINT1,
+        [12] = AUDIO_CHANNEL_OUT_7POINT1POINT4,
+        [14] = AUDIO_CHANNEL_OUT_9POINT1POINT4,
+        [16] = AUDIO_CHANNEL_OUT_9POINT1POINT6,
+        [24] = AUDIO_CHANNEL_OUT_22POINT2,
+    };
+    return channelCount < std::size(canonical) ? canonical[channelCount] : AUDIO_CHANNEL_NONE;
+}
+
+template <int MIXTYPE, int NCHAN,
+        typename TO, typename TI, typename TV,
+        typename F>
+void stereoVolumeHelper(TO*& out, const TI*& in, const TV *vol, F f) {
+    static_assert(NCHAN > 0 && NCHAN <= FCC_LIMIT);
+    static_assert(MIXTYPE == MIXTYPE_MULTI_STEREOVOL
+            || MIXTYPE == MIXTYPE_MULTI_SAVEONLY_STEREOVOL
+            || MIXTYPE == MIXTYPE_STEREOEXPAND
+            || MIXTYPE == MIXTYPE_MONOEXPAND);
+    constexpr audio_channel_mask_t MASK{canonicalChannelMaskFromCount(NCHAN)};
+    if constexpr (MASK == AUDIO_CHANNEL_NONE) {
+        ALOGE("%s: Invalid position count %d", __func__, NCHAN);
+        return; // not a valid system mask, ignore.
+    }
+    stereoVolumeHelperWithChannelMask<MIXTYPE, MASK, TO, TI, TV, F>(out, in, vol, f);
 }
 
 /*

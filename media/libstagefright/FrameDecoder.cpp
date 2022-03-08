@@ -810,8 +810,16 @@ sp<AMessage> MediaImageDecoder::onGetFormatAndSeekOptions(
     if (overrideMeta == NULL) {
         // check if we're dealing with a tiled heif
         int32_t tileWidth, tileHeight, gridRows, gridCols;
+        int32_t widthColsProduct = 0;
+        int32_t heightRowsProduct = 0;
         if (findGridInfo(trackMeta(), &tileWidth, &tileHeight, &gridRows, &gridCols)) {
-            if (mWidth <= tileWidth * gridCols && mHeight <= tileHeight * gridRows) {
+            if (__builtin_mul_overflow(tileWidth, gridCols, &widthColsProduct) ||
+                    __builtin_mul_overflow(tileHeight, gridRows, &heightRowsProduct)) {
+                ALOGE("Multiplication overflowed Grid size: %dx%d, Picture size: %dx%d",
+                        gridCols, gridRows, tileWidth, tileHeight);
+                return nullptr;
+            }
+            if (mWidth <= widthColsProduct && mHeight <= heightRowsProduct) {
                 ALOGV("grid: %dx%d, tile size: %dx%d, picture size: %dx%d",
                         gridCols, gridRows, tileWidth, tileHeight, mWidth, mHeight);
 

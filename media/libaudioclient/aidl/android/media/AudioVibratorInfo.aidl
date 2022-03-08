@@ -24,4 +24,5 @@ parcelable AudioVibratorInfo {
     int id;
     float resonantFrequency;
     float qFactor;
+    float maxAmplitude;
 }

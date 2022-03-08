@@ -16,6 +16,8 @@ cc_library_shared {
         "AudioPolicyInterfaceImpl.cpp",
         "AudioPolicyService.cpp",
         "CaptureStateNotifier.cpp",
+        "Spatializer.cpp",
+        "SpatializerPoseController.cpp",
     ],
 
     include_dirs: [
@@ -27,6 +29,7 @@ cc_library_shared {
         "libaudioclient",
         "libaudioclient_aidl_conversion",
         "libaudiofoundation",
+        "libaudiohal",
         "libaudiopolicy",
         "libaudiopolicymanagerdefault",
         "libaudioutils",
@@ -34,13 +37,18 @@ cc_library_shared {
         "libcutils",
         "libeffectsconfig",
         "libhardware_legacy",
+        "libheadtracking",
+        "libheadtracking-binding",
         "liblog",
         "libmedia_helper",
         "libmediametrics",
         "libmediautils",
         "libpermission",
+        "libsensor",
         "libsensorprivacy",
+        "libshmemcompat",
         "libutils",
+        "libstagefright_foundation",
         "audioclient-types-aidl-cpp",
         "audioflinger-aidl-cpp",
         "audiopolicy-aidl-cpp",
@@ -48,6 +56,7 @@ cc_library_shared {
         "capture_state_listener-aidl-cpp",
         "framework-permission-aidl-cpp",
         "packagemanager_aidl-cpp",
+        "spatializer-aidl-cpp",
     ],
 
     static_libs: [
@@ -56,6 +65,7 @@ cc_library_shared {
     ],
 
     header_libs: [
+        "libaudiohal_headers",
         "libaudiopolicycommon",
         "libaudiopolicyengine_interface_headers",
         "libaudiopolicymanager_interface_headers",
@@ -71,6 +81,8 @@ cc_library_shared {
 
     export_shared_lib_headers: [
         "libactivitymanager_aidl",
+        "libheadtracking",
+        "libheadtracking-binding",
         "libsensorprivacy",
         "framework-permission-aidl-cpp",
     ],

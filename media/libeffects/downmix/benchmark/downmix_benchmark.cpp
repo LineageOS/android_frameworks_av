@@ -35,16 +35,14 @@ static constexpr audio_channel_mask_t kChannelPositionMasks[] = {
     AUDIO_CHANNEL_OUT_STEREO,
     AUDIO_CHANNEL_OUT_2POINT1,
     AUDIO_CHANNEL_OUT_2POINT0POINT2,
-    AUDIO_CHANNEL_OUT_QUAD,
-    AUDIO_CHANNEL_OUT_QUAD_BACK,
+    AUDIO_CHANNEL_OUT_QUAD, // AUDIO_CHANNEL_OUT_QUAD_BACK
     AUDIO_CHANNEL_OUT_QUAD_SIDE,
     AUDIO_CHANNEL_OUT_SURROUND,
     AUDIO_CHANNEL_OUT_2POINT1POINT2,
     AUDIO_CHANNEL_OUT_3POINT0POINT2,
     AUDIO_CHANNEL_OUT_PENTA,
     AUDIO_CHANNEL_OUT_3POINT1POINT2,
-    AUDIO_CHANNEL_OUT_5POINT1,
-    AUDIO_CHANNEL_OUT_5POINT1_BACK,
+    AUDIO_CHANNEL_OUT_5POINT1, // AUDIO_CHANNEL_OUT_5POINT1_BACK
     AUDIO_CHANNEL_OUT_5POINT1_SIDE,
     AUDIO_CHANNEL_OUT_6POINT1,
     AUDIO_CHANNEL_OUT_5POINT1POINT2,
@@ -62,58 +60,34 @@ static constexpr effect_uuid_t downmix_uuid = {
 static constexpr size_t kFrameCount = 1000;
 
 /*
-Pixel 3XL
-downmix_benchmark:
-  #BM_Downmix/0     4723 ns    4708 ns       148694
-  #BM_Downmix/1     4717 ns    4702 ns       148873
-  #BM_Downmix/2     4803 ns    4788 ns       145893
-  #BM_Downmix/3     5056 ns    5041 ns       139110
-  #BM_Downmix/4     4710 ns    4696 ns       149625
-  #BM_Downmix/5     1514 ns    1509 ns       463694
-  #BM_Downmix/6     1513 ns    1509 ns       463451
-  #BM_Downmix/7     1516 ns    1511 ns       463899
-  #BM_Downmix/8     4445 ns    4431 ns       157831
-  #BM_Downmix/9     5081 ns    5065 ns       138412
-  #BM_Downmix/10    4354 ns    4341 ns       161247
-  #BM_Downmix/11    4411 ns    4397 ns       158893
-  #BM_Downmix/12    4434 ns    4420 ns       157992
-  #BM_Downmix/13    4845 ns    4830 ns       144873
-  #BM_Downmix/14    4851 ns    4835 ns       144954
-  #BM_Downmix/15    4884 ns    4870 ns       144233
-  #BM_Downmix/16    5832 ns    5813 ns       120565
-  #BM_Downmix/17    5241 ns    5224 ns       133927
-  #BM_Downmix/18    5044 ns    5028 ns       139131
-  #BM_Downmix/19    5244 ns    5227 ns       132315
-  #BM_Downmix/20    5943 ns    5923 ns       117759
-  #BM_Downmix/21    5990 ns    5971 ns       117263
-  #BM_Downmix/22    4468 ns    4454 ns       156689
-  #BM_Downmix/23    7306 ns    7286 ns        95911
---
-downmix_benchmark: (generic fold)
-  #BM_Downmix/0     4722 ns    4707 ns       149847
-  #BM_Downmix/1     4714 ns    4698 ns       148748
-  #BM_Downmix/2     4794 ns    4779 ns       145661
-  #BM_Downmix/3     5053 ns    5035 ns       139172
-  #BM_Downmix/4     4695 ns    4678 ns       149762
-  #BM_Downmix/5     4381 ns    4368 ns       159675
-  #BM_Downmix/6     4387 ns    4373 ns       160267
-  #BM_Downmix/7     4732 ns    4717 ns       148514
-  #BM_Downmix/8     4430 ns    4415 ns       158133
-  #BM_Downmix/9     5101 ns    5084 ns       138353
-  #BM_Downmix/10    4356 ns    4343 ns       160821
-  #BM_Downmix/11    4397 ns    4383 ns       159995
-  #BM_Downmix/12    4438 ns    4424 ns       158117
-  #BM_Downmix/13    5243 ns    5226 ns       133863
-  #BM_Downmix/14    5259 ns    5242 ns       131855
-  #BM_Downmix/15    5245 ns    5228 ns       133686
-  #BM_Downmix/16    5829 ns    5809 ns       120543
-  #BM_Downmix/17    5245 ns    5228 ns       133533
-  #BM_Downmix/18    5935 ns    5916 ns       118282
-  #BM_Downmix/19    5263 ns    5245 ns       133657
-  #BM_Downmix/20    5998 ns    5978 ns       114693
-  #BM_Downmix/21    5989 ns    5969 ns       117450
-  #BM_Downmix/22    4442 ns    4431 ns       157913
-  #BM_Downmix/23    7309 ns    7290 ns        95797
+Pixel 4XL
+$ adb shell /data/benchmarktest/downmix_benchmark/vendor/downmix_benchmark
+
+--------------------------------------------------------
+Benchmark              Time             CPU   Iterations
+--------------------------------------------------------
+BM_Downmix/0        3638 ns         3624 ns       197517 AUDIO_CHANNEL_OUT_MONO
+BM_Downmix/1        4040 ns         4024 ns       178766
+BM_Downmix/2        4759 ns         4740 ns       134741 AUDIO_CHANNEL_OUT_STEREO
+BM_Downmix/3        6042 ns         6017 ns       129546 AUDIO_CHANNEL_OUT_2POINT1
+BM_Downmix/4        6897 ns         6868 ns        96316 AUDIO_CHANNEL_OUT_2POINT0POINT2
+BM_Downmix/5        2117 ns         2109 ns       331705 AUDIO_CHANNEL_OUT_QUAD
+BM_Downmix/6        2097 ns         2088 ns       335421 AUDIO_CHANNEL_OUT_QUAD_SIDE
+BM_Downmix/7        7291 ns         7263 ns        96256 AUDIO_CHANNEL_OUT_SURROUND
+BM_Downmix/8        8246 ns         8206 ns        84318 AUDIO_CHANNEL_OUT_2POINT1POINT2
+BM_Downmix/9        8341 ns         8303 ns        84298 AUDIO_CHANNEL_OUT_3POINT0POINT2
+BM_Downmix/10       7549 ns         7517 ns        84293 AUDIO_CHANNEL_OUT_PENTA
+BM_Downmix/11       9395 ns         9354 ns        75209 AUDIO_CHANNEL_OUT_3POINT1POINT2
+BM_Downmix/12       3267 ns         3253 ns       215596 AUDIO_CHANNEL_OUT_5POINT1
+BM_Downmix/13       3178 ns         3163 ns       220132 AUDIO_CHANNEL_OUT_5POINT1_SIDE
+BM_Downmix/14      10245 ns        10199 ns        67486 AUDIO_CHANNEL_OUT_6POINT1
+BM_Downmix/15      10975 ns        10929 ns        61359 AUDIO_CHANNEL_OUT_5POINT1POINT2
+BM_Downmix/16       3796 ns         3780 ns       184728 AUDIO_CHANNEL_OUT_7POINT1
+BM_Downmix/17      13562 ns        13503 ns        51823 AUDIO_CHANNEL_OUT_5POINT1POINT4
+BM_Downmix/18      13573 ns        13516 ns        51800 AUDIO_CHANNEL_OUT_7POINT1POINT2
+BM_Downmix/19      15502 ns        15435 ns        47147 AUDIO_CHANNEL_OUT_7POINT1POINT4
+BM_Downmix/20      16693 ns        16624 ns        42109 AUDIO_CHANNEL_OUT_13POINT_360RA
+BM_Downmix/21      28267 ns        28116 ns        24982 AUDIO_CHANNEL_OUT_22POINT2
 */
 
 static void BM_Downmix(benchmark::State& state) {
@@ -125,7 +99,7 @@ static void BM_Downmix(benchmark::State& state) {
     std::minstd_rand gen(channelMask);
     std::uniform_real_distribution<> dis(-1.0f, 1.0f);
     std::vector<float> input(kFrameCount * channelCount);
-    std::vector<float> output(kFrameCount * 2);
+    std::vector<float> output(kFrameCount * FCC_2);
     for (auto& in : input) {
         in = dis(gen);
     }
@@ -187,7 +161,8 @@ static void BM_Downmix(benchmark::State& state) {
         benchmark::ClobberMemory();
     }
 
-    state.SetComplexityN(state.range(0));
+    state.SetComplexityN(channelCount);
+    state.SetLabel(audio_channel_out_mask_to_string(channelMask));
 
     if (int status = AUDIO_EFFECT_LIBRARY_INFO_SYM.release_effect(effectHandle); status != 0) {
         ALOGE("release_effect returned an error = %d\n", status);

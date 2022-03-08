@@ -42,9 +42,12 @@
 #include <android/hardware/camera/device/3.5/ICameraDeviceCallback.h>
 #include <android/hardware/camera/device/3.5/ICameraDeviceSession.h>
 
+#include <camera/CameraUtils.h>
 #include <camera_metadata_hidden.h>
 
 #include "device3/Camera3OutputUtils.h"
+
+#include "system/camera_metadata.h"
 
 using namespace android::camera3;
 using namespace android::hardware::camera;
@@ -464,7 +467,7 @@ void removeInFlightRequestIfReadyLocked(CaptureOutputStates& states, int idx) {
             /*requested*/true, request.requestTimeNs, states.sessionStatsBuilder,
             /*timestampIncreasing*/true,
             request.outputSurfaces, request.resultExtras,
-            request.errorBufStrategy);
+            request.errorBufStrategy, request.transform);
 
         // Note down the just completed frame number
         if (request.hasInputBuffer) {
@@ -554,6 +557,31 @@ void processCaptureResult(CaptureOutputStates& states, const camera_capture_resu
         // into one, the latest partial count will be used.
         if (result->partial_result != 0)
             request.resultExtras.partialResultCount = result->partial_result;
+
+        if ((result->result != nullptr) && !states.legacyClient) {
+            camera_metadata_ro_entry entry;
+            auto ret = find_camera_metadata_ro_entry(result->result,
+                    ANDROID_LOGICAL_MULTI_CAMERA_ACTIVE_PHYSICAL_ID, &entry);
+            if ((ret == OK) && (entry.count > 0)) {
+                std::string physicalId(reinterpret_cast<const char *>(entry.data.u8));
+                auto deviceInfo = states.physicalDeviceInfoMap.find(physicalId);
+                if (deviceInfo != states.physicalDeviceInfoMap.end()) {
+                    auto orientation = deviceInfo->second.find(ANDROID_SENSOR_ORIENTATION);
+                    if (orientation.count > 0) {
+                        ret = CameraUtils::getRotationTransform(deviceInfo->second,
+                                &request.transform);
+                        if (ret != OK) {
+                            ALOGE("%s: Failed to calculate current stream transformation: %s (%d)",
+                                    __FUNCTION__, strerror(-ret), ret);
+                        }
+                    } else {
+                        ALOGE("%s: Physical device orientation absent!", __FUNCTION__);
+                    }
+                } else {
+                    ALOGE("%s: Physical device not found in device info map found!", __FUNCTION__);
+                }
+            }
+        }
 
         // Check if this result carries only partial metadata
         if (states.usePartialResult && result->result != NULL) {
@@ -846,7 +874,7 @@ void returnOutputBuffers(
         SessionStatsBuilder& sessionStatsBuilder, bool timestampIncreasing,
         const SurfaceMap& outputSurfaces,
         const CaptureResultExtras &inResultExtras,
-        ERROR_BUF_STRATEGY errorBufStrategy) {
+        ERROR_BUF_STRATEGY errorBufStrategy, int32_t transform) {
 
     for (size_t i = 0; i < numBuffers; i++)
     {
@@ -889,11 +917,11 @@ void returnOutputBuffers(
             if (it != outputSurfaces.end()) {
                 res = stream->returnBuffer(
                         outputBuffers[i], timestamp, timestampIncreasing, it->second,
-                        inResultExtras.frameNumber);
+                        inResultExtras.frameNumber, transform);
             } else {
                 res = stream->returnBuffer(
-                        outputBuffers[i], timestamp, timestampIncreasing, std::vector<size_t> (),
-                        inResultExtras.frameNumber);
+                        outputBuffers[i], timestamp, timestampIncreasing,
+                        std::vector<size_t> (), inResultExtras.frameNumber, transform);
             }
         }
         // Note: stream may be deallocated at this point, if this buffer was
@@ -925,7 +953,7 @@ void returnOutputBuffers(
             sb.status = CAMERA_BUFFER_STATUS_ERROR;
             stream->returnBuffer(sb, /*timestamp*/0,
                     timestampIncreasing, std::vector<size_t> (),
-                    inResultExtras.frameNumber);
+                    inResultExtras.frameNumber, transform);
 
             if (listener != nullptr) {
                 CaptureResultExtras extras = inResultExtras;
@@ -949,7 +977,7 @@ void returnAndRemovePendingOutputBuffers(bool useHalBufManager,
             request.shutterTimestamp, /*requested*/true,
             request.requestTimeNs, sessionStatsBuilder, timestampIncreasing,
             request.outputSurfaces, request.resultExtras,
-            request.errorBufStrategy);
+            request.errorBufStrategy, request.transform);
 
     // Remove error buffers that are not cached.
     for (auto iter = request.pendingOutputBuffers.begin();

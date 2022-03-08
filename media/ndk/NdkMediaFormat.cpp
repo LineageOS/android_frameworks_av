@@ -354,6 +354,11 @@ EXPORT const char* AMEDIAFORMAT_KEY_MAX_WIDTH = "max-width";
 EXPORT const char* AMEDIAFORMAT_KEY_MIME = "mime";
 EXPORT const char* AMEDIAFORMAT_KEY_MPEG_USER_DATA = "mpeg-user-data";
 EXPORT const char* AMEDIAFORMAT_KEY_MPEG2_STREAM_HEADER = "mpeg2-stream-header";
+EXPORT const char* AMEDIAFORMAT_KEY_MPEGH_COMPATIBLE_SETS = "mpegh-compatible-sets";
+EXPORT const char* AMEDIAFORMAT_KEY_MPEGH_PROFILE_LEVEL_INDICATION =
+        "mpegh-profile-level-indication";
+EXPORT const char* AMEDIAFORMAT_KEY_MPEGH_REFERENCE_CHANNEL_LAYOUT =
+        "mpegh-reference-channel-layout";
 EXPORT const char* AMEDIAFORMAT_KEY_OPERATING_RATE = "operating-rate";
 EXPORT const char* AMEDIAFORMAT_KEY_PCM_ENCODING = "pcm-encoding";
 EXPORT const char* AMEDIAFORMAT_KEY_PICTURE_TYPE = "picture-type";

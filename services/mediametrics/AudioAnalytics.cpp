@@ -21,6 +21,7 @@
 
 #include "AudioAnalytics.h"
 
+#include <aaudio/AAudio.h>        // error codes
 #include <audio_utils/clock.h>    // clock conversions
 #include <cutils/properties.h>
 #include <statslog.h>             // statsd
@@ -29,6 +30,7 @@
 #include "AudioTypes.h"           // string to int conversions
 #include "MediaMetricsService.h"  // package info
 #include "StringUtils.h"
+#include "ValidateId.h"
 
 #define PROP_AUDIO_ANALYTICS_CLOUD_ENABLED "persist.audio.analytics.cloud.enabled"
 
@@ -60,6 +62,59 @@ auto ENUM_EXTRACT(const T& x) {
         return x.c_str();
     } else {
         return x;
+    }
+}
+
+// The status variable contains status_t codes which are used by
+// the core audio framework.
+//
+// We also consider AAudio status codes as they are non-overlapping with status_t
+// and compiler checked here.
+//
+// Caution: As AAUDIO_ERROR codes have a unique range (AAUDIO_ERROR_BASE = -900),
+// overlap with status_t should not present an issue.
+//
+// See: system/core/libutils/include/utils/Errors.h
+//      frameworks/av/media/libaaudio/include/aaudio/AAudio.h
+//
+// Compare with mediametrics::statusToStatusString
+//
+inline constexpr const char* extendedStatusToStatusString(status_t status) {
+    switch (status) {
+    case BAD_VALUE:           // status_t
+    case AAUDIO_ERROR_ILLEGAL_ARGUMENT:
+    case AAUDIO_ERROR_INVALID_FORMAT:
+    case AAUDIO_ERROR_INVALID_RATE:
+    case AAUDIO_ERROR_NULL:
+    case AAUDIO_ERROR_OUT_OF_RANGE:
+        return AMEDIAMETRICS_PROP_STATUS_VALUE_ARGUMENT;
+    case DEAD_OBJECT:         // status_t
+    case FAILED_TRANSACTION:  // status_t
+    case AAUDIO_ERROR_DISCONNECTED:
+    case AAUDIO_ERROR_INVALID_HANDLE:
+    case AAUDIO_ERROR_NO_SERVICE:
+        return AMEDIAMETRICS_PROP_STATUS_VALUE_IO;
+    case NO_MEMORY:           // status_t
+    case AAUDIO_ERROR_NO_FREE_HANDLES:
+    case AAUDIO_ERROR_NO_MEMORY:
+        return AMEDIAMETRICS_PROP_STATUS_VALUE_MEMORY;
+    case PERMISSION_DENIED:   // status_t
+        return AMEDIAMETRICS_PROP_STATUS_VALUE_SECURITY;
+    case INVALID_OPERATION:   // status_t
+    case NO_INIT:             // status_t
+    case AAUDIO_ERROR_INVALID_STATE:
+    case AAUDIO_ERROR_UNAVAILABLE:
+    case AAUDIO_ERROR_UNIMPLEMENTED:
+        return AMEDIAMETRICS_PROP_STATUS_VALUE_STATE;
+    case WOULD_BLOCK:         // status_t
+    case AAUDIO_ERROR_TIMEOUT:
+    case AAUDIO_ERROR_WOULD_BLOCK:
+        return AMEDIAMETRICS_PROP_STATUS_VALUE_TIMEOUT;
+    default:
+        if (status >= 0) return AMEDIAMETRICS_PROP_STATUS_VALUE_OK; // non-negative values "OK"
+        [[fallthrough]];            // negative values are error.
+    case UNKNOWN_ERROR:       // status_t
+        return AMEDIAMETRICS_PROP_STATUS_VALUE_UNKNOWN;
     }
 }
 
@@ -391,11 +446,15 @@ status_t AudioAnalytics::submit(
 {
     if (!startsWith(item->getKey(), AMEDIAMETRICS_KEY_PREFIX_AUDIO)) return BAD_VALUE;
     status_t status = mAnalyticsState->submit(item, isTrusted);
+
+    // Status is selectively authenticated.
+    processStatus(item);
+
     if (status != NO_ERROR) return status;  // may not be permitted.
 
     // Only if the item was successfully submitted (permission)
     // do we check triggered actions.
-    checkActions(item);
+    processActions(item);
     return NO_ERROR;
 }
 
@@ -429,13 +488,43 @@ std::pair<std::string, int32_t> AudioAnalytics::dump(
     return { ss.str(), lines - ll };
 }
 
-void AudioAnalytics::checkActions(const std::shared_ptr<const mediametrics::Item>& item)
+void AudioAnalytics::processActions(const std::shared_ptr<const mediametrics::Item>& item)
 {
     auto actions = mActions.getActionsForItem(item); // internally locked.
     // Execute actions with no lock held.
     for (const auto& action : actions) {
         (*action)(item);
     }
+}
+
+void AudioAnalytics::processStatus(const std::shared_ptr<const mediametrics::Item>& item)
+{
+    int32_t status;
+    if (!item->get(AMEDIAMETRICS_PROP_STATUS, &status)) return;
+
+    // Any record with a status will automatically be added to a heat map.
+    // Standard information.
+    const auto key = item->getKey();
+    const auto uid = item->getUid();
+
+    // from audio.track.10 ->  prefix = audio.track, suffix = 10
+    // from audio.track.error -> prefix = audio.track, suffix = error
+    const auto [prefixKey, suffixKey] = stringutils::splitPrefixKey(key);
+
+    std::string message;
+    item->get(AMEDIAMETRICS_PROP_STATUSMESSAGE, &message); // optional
+
+    int32_t subCode = 0; // not used
+    (void)item->get(AMEDIAMETRICS_PROP_STATUSSUBCODE, &subCode); // optional
+
+    std::string eventStr; // optional
+    item->get(AMEDIAMETRICS_PROP_EVENT, &eventStr);
+
+    const std::string statusString = extendedStatusToStatusString(status);
+
+    // Add to the heat map - we automatically track every item's status to see
+    // the types of errors and the frequency of errors.
+    mHeatMap.add(prefixKey, suffixKey, eventStr, statusString, uid, message, subCode);
 }
 
 // HELPER METHODS
@@ -563,7 +652,7 @@ void AudioAnalytics::DeviceUse::endAudioIntervalGroup(
         const auto flagsForStats = types::lookup<types::INPUT_FLAG, short_enum_type_t>(flags);
         const auto sourceForStats = types::lookup<types::SOURCE_TYPE, short_enum_type_t>(source);
         // Android S
-        const auto logSessionIdForStats = stringutils::sanitizeLogSessionId(logSessionId);
+        const auto logSessionIdForStats = ValidateId::get()->validateId(logSessionId);
 
         LOG(LOG_LEVEL) << "key:" << key
               << " id:" << id
@@ -718,7 +807,7 @@ void AudioAnalytics::DeviceUse::endAudioIntervalGroup(
                  types::lookup<types::TRACK_TRAITS, short_enum_type_t>(traits);
         const auto usageForStats = types::lookup<types::USAGE, short_enum_type_t>(usage);
         // Android S
-        const auto logSessionIdForStats = stringutils::sanitizeLogSessionId(logSessionId);
+        const auto logSessionIdForStats = ValidateId::get()->validateId(logSessionId);
 
         LOG(LOG_LEVEL) << "key:" << key
               << " id:" << id

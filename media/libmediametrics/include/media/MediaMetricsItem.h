@@ -106,6 +106,36 @@ enum Type {
 };
 
 /*
+ * Helper for status conversions
+ */
+
+inline constexpr const char* statusToStatusString(status_t status) {
+    switch (status) {
+    case BAD_VALUE:
+        return AMEDIAMETRICS_PROP_STATUS_VALUE_ARGUMENT;
+    case DEAD_OBJECT:
+    case FAILED_TRANSACTION:
+        return AMEDIAMETRICS_PROP_STATUS_VALUE_IO;
+    case NO_MEMORY:
+        return AMEDIAMETRICS_PROP_STATUS_VALUE_MEMORY;
+    case PERMISSION_DENIED:
+        return AMEDIAMETRICS_PROP_STATUS_VALUE_SECURITY;
+    case NO_INIT:
+    case INVALID_OPERATION:
+        return AMEDIAMETRICS_PROP_STATUS_VALUE_STATE;
+    case WOULD_BLOCK:
+        return AMEDIAMETRICS_PROP_STATUS_VALUE_TIMEOUT;
+    default:
+        if (status >= 0) return AMEDIAMETRICS_PROP_STATUS_VALUE_OK; // non-negative values "OK"
+        [[fallthrough]];            // negative values are error.
+    case UNKNOWN_ERROR:
+        return AMEDIAMETRICS_PROP_STATUS_VALUE_UNKNOWN;
+    }
+}
+
+status_t statusStringToStatus(const char *error);
+
+/*
  * Time printing
  *
  * kPrintFormatLong time string is 19 characters (including null termination).

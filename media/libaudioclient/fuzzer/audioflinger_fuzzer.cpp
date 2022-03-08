@@ -383,6 +383,9 @@ struct EffectClient : public android::media::BnEffectClient {
                                    const std::vector<uint8_t> &replyData __unused) override {
         return binder::Status::ok();
     }
+    binder::Status framesProcessed(int32_t frames __unused) override {
+        return binder::Status::ok();
+    }
 };
 
 status_t AudioFlingerFuzzer::invokeAudioEffect() {
@@ -424,6 +427,7 @@ status_t AudioFlingerFuzzer::invokeAudioEffect() {
     request.attributionSource.packageName = opPackageName;
     request.attributionSource.pid = VALUE_OR_RETURN_STATUS(legacy2aidl_pid_t_int32_t(getpid()));
     request.probe = false;
+    request.notifyFramesProcessed = false;
 
     media::CreateEffectResponse response{};
     status_t status = af->createEffect(request, &response);
@@ -648,11 +652,15 @@ status_t AudioFlingerFuzzer::invokeAudioOutputDevice() {
     sp<DeviceDescriptorBase> device = new DeviceDescriptorBase(getValue(&mFdp, kDevices));
     audio_output_flags_t flags = getValue(&mFdp, kOutputFlags);
 
+    audio_config_base_t mixerConfig = AUDIO_CONFIG_BASE_INITIALIZER;
+
     media::OpenOutputRequest request{};
     media::OpenOutputResponse response{};
 
     request.module = VALUE_OR_RETURN_STATUS(legacy2aidl_audio_module_handle_t_int32_t(module));
-    request.config = VALUE_OR_RETURN_STATUS(legacy2aidl_audio_config_t_AudioConfig(config));
+    request.halConfig = VALUE_OR_RETURN_STATUS(legacy2aidl_audio_config_t_AudioConfig(config));
+    request.mixerConfig =
+            VALUE_OR_RETURN_STATUS(legacy2aidl_audio_config_base_t_AudioConfigBase(mixerConfig));
     request.device = VALUE_OR_RETURN_STATUS(legacy2aidl_DeviceDescriptorBase(device));
     request.flags = VALUE_OR_RETURN_STATUS(legacy2aidl_audio_output_flags_t_int32_t_mask(flags));
 

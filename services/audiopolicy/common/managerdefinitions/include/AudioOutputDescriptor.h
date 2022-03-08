@@ -377,7 +377,8 @@ public:
                            const struct audio_port_config *srcConfig = NULL) const;
     virtual void toAudioPort(struct audio_port_v7 *port) const;
 
-        status_t open(const audio_config_t *config,
+        status_t open(const audio_config_t *halConfig,
+                      const audio_config_base_t *mixerConfig,
                       const DeviceVector &devices,
                       audio_stream_type_t stream,
                       audio_output_flags_t flags,
@@ -438,6 +439,7 @@ public:
     uint32_t mDirectOpenCount; // number of clients using this output (direct outputs only)
     audio_session_t mDirectClientSession; // session id of the direct output client
     bool mPendingReopenToQueryProfiles = false;
+    audio_channel_mask_t mMixerChannelMask = AUDIO_CHANNEL_NONE;
 };
 
 // Audio output driven by an input device directly.

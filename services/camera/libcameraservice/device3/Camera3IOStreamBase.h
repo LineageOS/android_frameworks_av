@@ -68,12 +68,14 @@ class Camera3IOStreamBase :
             const camera_stream_buffer &buffer,
             nsecs_t timestamp,
             bool output,
+            int32_t transform,
             const std::vector<size_t>& surface_ids = std::vector<size_t>());
 
     virtual status_t returnBufferCheckedLocked(
             const camera_stream_buffer &buffer,
             nsecs_t timestamp,
             bool output,
+            int32_t transform,
             const std::vector<size_t>& surface_ids,
             /*out*/
             sp<Fence> *releaseFenceOut) = 0;

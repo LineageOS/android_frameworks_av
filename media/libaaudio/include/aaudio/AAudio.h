@@ -444,6 +444,22 @@ enum {
 };
 typedef int32_t aaudio_content_type_t;
 
+enum {
+
+    /**
+     * Constant indicating the audio content associated with these attributes will follow the
+     * default platform behavior with regards to which content will be spatialized or not.
+     */
+    AAUDIO_SPATIALIZATION_BEHAVIOR_AUTO = 1,
+
+    /**
+     * Constant indicating the audio content associated with these attributes should never
+     * be spatialized.
+     */
+    AAUDIO_SPATIALIZATION_BEHAVIOR_NEVER = 2,
+};
+typedef int32_t aaudio_spatialization_behavior_t;
+
 /**
  * Defines the audio source.
  * An audio source defines both a default physical source of audio signal, and a recording
@@ -564,6 +580,145 @@ enum {
     AAUDIO_SESSION_ID_ALLOCATE = 0,
 };
 typedef int32_t aaudio_session_id_t;
+
+/**
+ * Defines the audio channel mask.
+ * Channel masks are used to describe the samples and their
+ * arrangement in the audio frame. They are also used in the endpoint
+ * (e.g. a USB audio interface, a DAC connected to headphones) to
+ * specify allowable configurations of a particular device.
+ *
+ * Added in API level 32.
+ */
+enum {
+    /**
+     * Invalid channel mask
+     */
+    AAUDIO_CHANNEL_INVALID = -1,
+
+    /**
+     * Output audio channel mask
+     */
+    AAUDIO_CHANNEL_FRONT_LEFT = 1 << 0,
+    AAUDIO_CHANNEL_FRONT_RIGHT = 1 << 1,
+    AAUDIO_CHANNEL_FRONT_CENTER = 1 << 2,
+    AAUDIO_CHANNEL_LOW_FREQUENCY = 1 << 3,
+    AAUDIO_CHANNEL_BACK_LEFT = 1 << 4,
+    AAUDIO_CHANNEL_BACK_RIGHT = 1 << 5,
+    AAUDIO_CHANNEL_FRONT_LEFT_OF_CENTER = 1 << 6,
+    AAUDIO_CHANNEL_FRONT_RIGHT_OF_CENTER = 1 << 7,
+    AAUDIO_CHANNEL_BACK_CENTER = 1 << 8,
+    AAUDIO_CHANNEL_SIDE_LEFT = 1 << 9,
+    AAUDIO_CHANNEL_SIDE_RIGHT = 1 << 10,
+    AAUDIO_CHANNEL_TOP_CENTER = 1 << 11,
+    AAUDIO_CHANNEL_TOP_FRONT_LEFT = 1 << 12,
+    AAUDIO_CHANNEL_TOP_FRONT_CENTER = 1 << 13,
+    AAUDIO_CHANNEL_TOP_FRONT_RIGHT = 1 << 14,
+    AAUDIO_CHANNEL_TOP_BACK_LEFT = 1 << 15,
+    AAUDIO_CHANNEL_TOP_BACK_CENTER = 1 << 16,
+    AAUDIO_CHANNEL_TOP_BACK_RIGHT = 1 << 17,
+    AAUDIO_CHANNEL_TOP_SIDE_LEFT = 1 << 18,
+    AAUDIO_CHANNEL_TOP_SIDE_RIGHT = 1 << 19,
+    AAUDIO_CHANNEL_BOTTOM_FRONT_LEFT = 1 << 20,
+    AAUDIO_CHANNEL_BOTTOM_FRONT_CENTER = 1 << 21,
+    AAUDIO_CHANNEL_BOTTOM_FRONT_RIGHT = 1 << 22,
+    AAUDIO_CHANNEL_LOW_FREQUENCY_2 = 1 << 23,
+    AAUDIO_CHANNEL_FRONT_WIDE_LEFT = 1 << 24,
+    AAUDIO_CHANNEL_FRONT_WIDE_RIGHT = 1 << 25,
+
+    AAUDIO_CHANNEL_MONO = AAUDIO_CHANNEL_FRONT_LEFT,
+    AAUDIO_CHANNEL_STEREO = AAUDIO_CHANNEL_FRONT_LEFT |
+                            AAUDIO_CHANNEL_FRONT_RIGHT,
+    AAUDIO_CHANNEL_2POINT1 = AAUDIO_CHANNEL_FRONT_LEFT |
+                             AAUDIO_CHANNEL_FRONT_RIGHT |
+                             AAUDIO_CHANNEL_LOW_FREQUENCY,
+    AAUDIO_CHANNEL_TRI = AAUDIO_CHANNEL_FRONT_LEFT |
+                         AAUDIO_CHANNEL_FRONT_RIGHT |
+                         AAUDIO_CHANNEL_FRONT_CENTER,
+    AAUDIO_CHANNEL_TRI_BACK = AAUDIO_CHANNEL_FRONT_LEFT |
+                              AAUDIO_CHANNEL_FRONT_RIGHT |
+                              AAUDIO_CHANNEL_BACK_CENTER,
+    AAUDIO_CHANNEL_3POINT1 = AAUDIO_CHANNEL_FRONT_LEFT |
+                             AAUDIO_CHANNEL_FRONT_RIGHT |
+                             AAUDIO_CHANNEL_FRONT_CENTER |
+                             AAUDIO_CHANNEL_LOW_FREQUENCY,
+    AAUDIO_CHANNEL_2POINT0POINT2 = AAUDIO_CHANNEL_FRONT_LEFT |
+                                   AAUDIO_CHANNEL_FRONT_RIGHT |
+                                   AAUDIO_CHANNEL_TOP_SIDE_LEFT |
+                                   AAUDIO_CHANNEL_TOP_SIDE_RIGHT,
+    AAUDIO_CHANNEL_2POINT1POINT2 = AAUDIO_CHANNEL_2POINT0POINT2 |
+                                   AAUDIO_CHANNEL_LOW_FREQUENCY,
+    AAUDIO_CHANNEL_3POINT0POINT2 = AAUDIO_CHANNEL_FRONT_LEFT |
+                                   AAUDIO_CHANNEL_FRONT_RIGHT |
+                                   AAUDIO_CHANNEL_FRONT_CENTER |
+                                   AAUDIO_CHANNEL_TOP_SIDE_LEFT |
+                                   AAUDIO_CHANNEL_TOP_SIDE_RIGHT,
+    AAUDIO_CHANNEL_3POINT1POINT2 = AAUDIO_CHANNEL_3POINT0POINT2 |
+                                   AAUDIO_CHANNEL_LOW_FREQUENCY,
+    AAUDIO_CHANNEL_QUAD = AAUDIO_CHANNEL_FRONT_LEFT |
+                          AAUDIO_CHANNEL_FRONT_RIGHT |
+                          AAUDIO_CHANNEL_BACK_LEFT |
+                          AAUDIO_CHANNEL_BACK_RIGHT,
+    AAUDIO_CHANNEL_QUAD_SIDE = AAUDIO_CHANNEL_FRONT_LEFT |
+                               AAUDIO_CHANNEL_FRONT_RIGHT |
+                               AAUDIO_CHANNEL_SIDE_LEFT |
+                               AAUDIO_CHANNEL_SIDE_RIGHT,
+    AAUDIO_CHANNEL_SURROUND = AAUDIO_CHANNEL_FRONT_LEFT |
+                              AAUDIO_CHANNEL_FRONT_RIGHT |
+                              AAUDIO_CHANNEL_FRONT_CENTER |
+                              AAUDIO_CHANNEL_BACK_CENTER,
+    AAUDIO_CHANNEL_PENTA = AAUDIO_CHANNEL_QUAD |
+                           AAUDIO_CHANNEL_FRONT_CENTER,
+    // aka 5POINT1_BACK
+    AAUDIO_CHANNEL_5POINT1 = AAUDIO_CHANNEL_FRONT_LEFT |
+                             AAUDIO_CHANNEL_FRONT_RIGHT |
+                             AAUDIO_CHANNEL_FRONT_CENTER |
+                             AAUDIO_CHANNEL_LOW_FREQUENCY |
+                             AAUDIO_CHANNEL_BACK_LEFT |
+                             AAUDIO_CHANNEL_BACK_RIGHT,
+    AAUDIO_CHANNEL_5POINT1_SIDE = AAUDIO_CHANNEL_FRONT_LEFT |
+                                  AAUDIO_CHANNEL_FRONT_RIGHT |
+                                  AAUDIO_CHANNEL_FRONT_CENTER |
+                                  AAUDIO_CHANNEL_LOW_FREQUENCY |
+                                  AAUDIO_CHANNEL_SIDE_LEFT |
+                                  AAUDIO_CHANNEL_SIDE_RIGHT,
+    AAUDIO_CHANNEL_6POINT1 = AAUDIO_CHANNEL_FRONT_LEFT |
+                             AAUDIO_CHANNEL_FRONT_RIGHT |
+                             AAUDIO_CHANNEL_FRONT_CENTER |
+                             AAUDIO_CHANNEL_LOW_FREQUENCY |
+                             AAUDIO_CHANNEL_BACK_LEFT |
+                             AAUDIO_CHANNEL_BACK_RIGHT |
+                             AAUDIO_CHANNEL_BACK_CENTER,
+    AAUDIO_CHANNEL_7POINT1 = AAUDIO_CHANNEL_5POINT1 |
+                             AAUDIO_CHANNEL_SIDE_LEFT |
+                             AAUDIO_CHANNEL_SIDE_RIGHT,
+    AAUDIO_CHANNEL_5POINT1POINT2 = AAUDIO_CHANNEL_5POINT1 |
+                                   AAUDIO_CHANNEL_TOP_SIDE_LEFT |
+                                   AAUDIO_CHANNEL_TOP_SIDE_RIGHT,
+    AAUDIO_CHANNEL_5POINT1POINT4 = AAUDIO_CHANNEL_5POINT1 |
+                                   AAUDIO_CHANNEL_TOP_FRONT_LEFT |
+                                   AAUDIO_CHANNEL_TOP_FRONT_RIGHT |
+                                   AAUDIO_CHANNEL_TOP_BACK_LEFT |
+                                   AAUDIO_CHANNEL_TOP_BACK_RIGHT,
+    AAUDIO_CHANNEL_7POINT1POINT2 = AAUDIO_CHANNEL_7POINT1 |
+                                   AAUDIO_CHANNEL_TOP_SIDE_LEFT |
+                                   AAUDIO_CHANNEL_TOP_SIDE_RIGHT,
+    AAUDIO_CHANNEL_7POINT1POINT4 = AAUDIO_CHANNEL_7POINT1 |
+                                   AAUDIO_CHANNEL_TOP_FRONT_LEFT |
+                                   AAUDIO_CHANNEL_TOP_FRONT_RIGHT |
+                                   AAUDIO_CHANNEL_TOP_BACK_LEFT |
+                                   AAUDIO_CHANNEL_TOP_BACK_RIGHT,
+    AAUDIO_CHANNEL_9POINT1POINT4 = AAUDIO_CHANNEL_7POINT1POINT4 |
+                                   AAUDIO_CHANNEL_FRONT_WIDE_LEFT |
+                                   AAUDIO_CHANNEL_FRONT_WIDE_RIGHT,
+    AAUDIO_CHANNEL_9POINT1POINT6 = AAUDIO_CHANNEL_9POINT1POINT4 |
+                                   AAUDIO_CHANNEL_TOP_SIDE_LEFT |
+                                   AAUDIO_CHANNEL_TOP_SIDE_RIGHT,
+
+    AAUDIO_CHANNEL_FRONT_BACK = AAUDIO_CHANNEL_FRONT_CENTER |
+                                AAUDIO_CHANNEL_BACK_CENTER,
+};
+typedef uint32_t aaudio_channel_mask_t;
 
 typedef struct AAudioStreamStruct         AAudioStream;
 typedef struct AAudioStreamBuilderStruct  AAudioStreamBuilder;
@@ -699,6 +854,11 @@ AAUDIO_API void AAudioStreamBuilder_setSampleRate(AAudioStreamBuilder* builder,
  * If an exact value is specified then an opened stream will use that value.
  * If a stream cannot be opened with the specified value then the open will fail.
  *
+ * As the channel count provided here may be different from the corresponding channel count
+ * of channel mask used in {@link AAudioStreamBuilder_setChannelMask}, the last called function
+ * will be respected if both this function and {@link AAudioStreamBuilder_setChannelMask} are
+ * called.
+ *
  * Available since API level 26.
  *
  * @param builder reference provided by AAudio_createStreamBuilder()
@@ -714,6 +874,8 @@ AAUDIO_API void AAudioStreamBuilder_setChannelCount(AAudioStreamBuilder* builder
  *
  * @param builder reference provided by AAudio_createStreamBuilder()
  * @param samplesPerFrame Number of samples in a frame.
+ *
+ * @deprecated use {@link AAudioStreamBuilder_setChannelCount}
  */
 AAUDIO_API void AAudioStreamBuilder_setSamplesPerFrame(AAudioStreamBuilder* builder,
                                                        int32_t samplesPerFrame) __INTRODUCED_IN(26);
@@ -834,6 +996,37 @@ AAUDIO_API void AAudioStreamBuilder_setUsage(AAudioStreamBuilder* builder,
  */
 AAUDIO_API void AAudioStreamBuilder_setContentType(AAudioStreamBuilder* builder,
         aaudio_content_type_t contentType) __INTRODUCED_IN(28);
+
+/**
+ * Sets the behavior affecting whether spatialization will be used.
+ *
+ * The AAudio system will use this information to select whether the stream will go
+ * through a spatializer effect or not when the effect is supported and enabled.
+ *
+ * Available since API level 32.
+ *
+ * @param builder reference provided by AAudio_createStreamBuilder()
+ * @param spatializationBehavior the desired behavior with regards to spatialization, eg.
+ *     {@link #AAUDIO_SPATIALIZATION_BEHAVIOR_AUTO}
+ */
+AAUDIO_API void AAudioStreamBuilder_setSpatializationBehavior(AAudioStreamBuilder* builder,
+        aaudio_spatialization_behavior_t spatializationBehavior) __INTRODUCED_IN(32);
+
+/**
+ * Specifies whether the audio data of this output stream has already been processed for
+ * spatialization.
+ *
+ * If the stream has been processed for spatialization, setting this to true will prevent
+ * issues such as double-processing on platforms that will spatialize audio data.
+ *
+ * Available since API level 32.
+ *
+ * @param builder reference provided by AAudio_createStreamBuilder()
+ * @param isSpatialized true if the content is already processed for binaural or transaural spatial
+ *     rendering, false otherwise.
+ */
+AAUDIO_API void AAudioStreamBuilder_setIsContentSpatialized(AAudioStreamBuilder* builder,
+        bool isSpatialized) __INTRODUCED_IN(32);
 
 /**
  * Set the input (capture) preset for the stream.
@@ -1135,6 +1328,32 @@ AAUDIO_API aaudio_result_t  AAudioStreamBuilder_openStream(AAudioStreamBuilder* 
  */
 AAUDIO_API aaudio_result_t  AAudioStreamBuilder_delete(AAudioStreamBuilder* builder)
     __INTRODUCED_IN(26);
+
+/**
+ * Set audio channel mask for the stream.
+ *
+ * The default, if you do not call this function, is {@link #AAUDIO_UNSPECIFIED}.
+ * If both channel mask and count are not set, then stereo will then be chosen when the
+ * stream is opened.
+ * After opening a stream with an unspecified value, the application must query for the
+ * actual value, which may vary by device.
+ *
+ * If an exact value is specified then an opened stream will use that value.
+ * If a stream cannot be opened with the specified value then the open will fail.
+ *
+ * As the corresponding channel count of provided channel mask here may be different
+ * from the channel count used in {@link AAudioStreamBuilder_setChannelCount} or
+ * {@link AAudioStreamBuilder_setSamplesPerFrame}, the last called function will be
+ * respected if this function and {@link AAudioStreamBuilder_setChannelCount} or
+ * {@link AAudioStreamBuilder_setSamplesPerFrame} are called.
+ *
+ * Available since API level 32.
+ *
+ * @param builder reference provided by AAudio_createStreamBuilder()
+ * @param channelMask Audio channel mask desired.
+ */
+AAUDIO_API void AAudioStreamBuilder_setChannelMask(AAudioStreamBuilder* builder,
+        aaudio_channel_mask_t channelMask) __INTRODUCED_IN(32);
 
 // ============================================================
 // Stream Control
@@ -1616,6 +1835,31 @@ AAUDIO_API aaudio_content_type_t AAudioStream_getContentType(AAudioStream* strea
         __INTRODUCED_IN(28);
 
 /**
+ * Return the spatialization behavior for the stream.
+ *
+ * If none was explicitly set, it will return the default
+ * {@link #AAUDIO_SPATIALIZATION_BEHAVIOR_AUTO} behavior.
+ *
+ * Available since API level 32.
+ *
+ * @param stream reference provided by AAudioStreamBuilder_openStream()
+ * @return spatialization behavior, for example {@link #AAUDIO_SPATIALIZATION_BEHAVIOR_AUTO}
+ */
+AAUDIO_API aaudio_spatialization_behavior_t AAudioStream_getSpatializationBehavior(
+        AAudioStream* stream) __INTRODUCED_IN(32);
+
+/**
+ * Return whether the content of the stream is spatialized.
+ *
+ * Available since API level 32.
+ *
+ * @param stream reference provided by AAudioStreamBuilder_openStream()
+ * @return true if the content is spatialized
+ */
+AAUDIO_API bool AAudioStream_isContentSpatialized(AAudioStream* stream) __INTRODUCED_IN(32);
+
+
+/**
  * Return the input preset for the stream.
  *
  * Available since API level 28.
@@ -1651,6 +1895,18 @@ AAUDIO_API aaudio_allowed_capture_policy_t AAudioStream_getAllowedCapturePolicy(
  */
 AAUDIO_API bool AAudioStream_isPrivacySensitive(AAudioStream* stream)
         __INTRODUCED_IN(30);
+
+/**
+ * Return the channel mask for the stream. This will be the mask set using
+ * {@link #AAudioStreamBuilder_setChannelMask}, or {@link #AAUDIO_UNSPECIFIED} otherwise.
+ *
+ * Available since API level 32.
+ *
+ * @param stream reference provided by AAudioStreamBuilder_openStream()
+ * @return actual channel mask
+ */
+AAUDIO_API aaudio_channel_mask_t AAudioStream_getChannelMask(AAudioStream* stream)
+        __INTRODUCED_IN(32);
 
 #ifdef __cplusplus
 }
