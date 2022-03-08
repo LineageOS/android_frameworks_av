@@ -34,6 +34,7 @@ static const std::string kResourceContentionValue("resourceContention");
 static const std::string kLostStateValue("lostState");
 static const std::string kFrameTooLargeValue("frameTooLarge");
 static const std::string kInvalidStateValue("invalidState");
+static const std::string kAidlVersionKey("aidlVersion");
 
 static const std::string kDeviceIdKey("deviceId");
 static const uint8_t kTestDeviceIdData[] = {0x0, 0x1, 0x2, 0x3, 0x4, 0x5, 0x6, 0x7,
