@@ -100,7 +100,8 @@ SourceClientDescriptor::SourceClientDescriptor(audio_port_handle_t portId, uid_t
     TrackClientDescriptor::TrackClientDescriptor(portId, uid, AUDIO_SESSION_NONE, attributes,
         {config.sample_rate, config.channel_mask, config.format}, AUDIO_PORT_HANDLE_NONE,
         stream, strategy, volumeSource, AUDIO_OUTPUT_FLAG_NONE, false,
-        {} /* Sources do not support secondary outputs*/, nullptr), mSrcDevice(srcDevice)
+        {} /* Sources do not support secondary outputs*/, nullptr),
+    mSrcDevice(srcDevice)
 {
 }
 
