@@ -18,6 +18,8 @@ cc_library {
     static_libs: ["libavcdec"],
 
     srcs: ["C2SoftAvcDec.cpp"],
+
+    export_include_dirs: ["."],
 }
 
 cc_library {
@@ -31,6 +33,8 @@ cc_library {
     static_libs: ["libavcenc"],
 
     srcs: ["C2SoftAvcEnc.cpp"],
+
+    export_include_dirs: ["."],
 
     cflags: [
         "-Wno-unused-variable",
