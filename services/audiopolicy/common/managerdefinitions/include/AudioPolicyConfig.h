@@ -202,6 +202,20 @@ public:
             {AUDIO_FORMAT_AC4, {}}};
     }
 
+    //TODO: b/193496180 use spatializer flag at audio HAL when available
+    // until then, use DEEP_BUFFER+FAST flag combo to indicate the spatializer output profile
+    void convertSpatializerFlag()
+    {
+        for (const auto& hwModule : mHwModules) {
+            for (const auto& curProfile : hwModule->getOutputProfiles()) {
+                if (curProfile->getFlags()
+                        == (AUDIO_OUTPUT_FLAG_FAST | AUDIO_OUTPUT_FLAG_DEEP_BUFFER)) {
+                    curProfile->setFlags(AUDIO_OUTPUT_FLAG_SPATIALIZER);
+                }
+            }
+        }
+    }
+
 private:
     static const constexpr char* const kDefaultEngineLibraryNameSuffix = "default";
 

@@ -34,7 +34,7 @@
 
 #include "cleaner.h"
 #include "MediaMetricsService.h"
-#include "StringUtils.h"
+#include "ValidateId.h"
 #include "frameworks/proto_logging/stats/message/mediametrics_message.pb.h"
 #include "iface_statsd.h"
 
@@ -228,7 +228,7 @@ bool statsd_codec(const std::shared_ptr<const mediametrics::Item>& item,
 
     std::string sessionId;
     if (item->getString("android.media.mediacodec.log-session-id", &sessionId)) {
-        sessionId = mediametrics::stringutils::sanitizeLogSessionId(sessionId);
+        sessionId = mediametrics::ValidateId::get()->validateId(sessionId);
         metrics_proto.set_log_session_id(sessionId);
     }
     AStatsEvent_writeString(event, codec.c_str());

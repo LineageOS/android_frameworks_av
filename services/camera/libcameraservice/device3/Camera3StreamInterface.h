@@ -359,7 +359,7 @@ class Camera3StreamInterface : public virtual RefBase {
     virtual status_t returnBuffer(const camera_stream_buffer &buffer,
             nsecs_t timestamp, bool timestampIncreasing = true,
             const std::vector<size_t>& surface_ids = std::vector<size_t>(),
-            uint64_t frameNumber = 0) = 0;
+            uint64_t frameNumber = 0, int32_t transform = -1) = 0;
 
     /**
      * Fill in the camera_stream_buffer with the next valid buffer for this

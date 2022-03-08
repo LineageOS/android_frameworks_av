@@ -55,13 +55,14 @@ Camera2ClientBase<TClientBase>::Camera2ClientBase(
         int clientPid,
         uid_t clientUid,
         int servicePid,
-        bool overrideForPerfClass):
+        bool overrideForPerfClass,
+        bool legacyClient):
         TClientBase(cameraService, remoteCallback, clientPackageName, clientFeatureId,
                 cameraId, api1CameraId, cameraFacing, sensorOrientation, clientPid, clientUid,
                 servicePid),
         mSharedCameraCallbacks(remoteCallback),
         mDeviceVersion(cameraService->getDeviceVersion(TClientBase::mCameraIdStr)),
-        mDevice(new Camera3Device(cameraId, overrideForPerfClass)),
+        mDevice(new Camera3Device(cameraId, overrideForPerfClass, legacyClient)),
         mDeviceActive(false), mApi1CameraId(api1CameraId)
 {
     ALOGI("Camera %s: Opened. Client: %s (PID %d, UID %d)", cameraId.string(),

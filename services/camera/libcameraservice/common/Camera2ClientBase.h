@@ -56,7 +56,8 @@ public:
                       int clientPid,
                       uid_t clientUid,
                       int servicePid,
-                      bool overrideForPerfClass);
+                      bool overrideForPerfClass,
+                      bool legacyClient = false);
     virtual ~Camera2ClientBase();
 
     virtual status_t      initialize(sp<CameraProviderManager> manager, const String8& monitorTags);

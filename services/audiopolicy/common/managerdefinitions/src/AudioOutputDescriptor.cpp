@@ -519,7 +519,8 @@ bool SwAudioOutputDescriptor::setVolume(float volumeDb, bool muted,
     return true;
 }
 
-status_t SwAudioOutputDescriptor::open(const audio_config_t *config,
+status_t SwAudioOutputDescriptor::open(const audio_config_t *halConfig,
+                                       const audio_config_base_t *mixerConfig,
                                        const DeviceVector &devices,
                                        audio_stream_type_t stream,
                                        audio_output_flags_t flags,
@@ -532,45 +533,62 @@ status_t SwAudioOutputDescriptor::open(const audio_config_t *config,
                         "with the requested devices, all device types: %s",
                         __func__, dumpDeviceTypes(devices.types()).c_str());
 
-    audio_config_t lConfig;
-    if (config == nullptr) {
-        lConfig = AUDIO_CONFIG_INITIALIZER;
-        lConfig.sample_rate = mSamplingRate;
-        lConfig.channel_mask = mChannelMask;
-        lConfig.format = mFormat;
+    audio_config_t lHalConfig;
+    if (halConfig == nullptr) {
+        lHalConfig = AUDIO_CONFIG_INITIALIZER;
+        lHalConfig.sample_rate = mSamplingRate;
+        lHalConfig.channel_mask = mChannelMask;
+        lHalConfig.format = mFormat;
     } else {
-        lConfig = *config;
+        lHalConfig = *halConfig;
     }
 
     // if the selected profile is offloaded and no offload info was specified,
     // create a default one
     if ((mProfile->getFlags() & AUDIO_OUTPUT_FLAG_COMPRESS_OFFLOAD) &&
-            lConfig.offload_info.format == AUDIO_FORMAT_DEFAULT) {
+            lHalConfig.offload_info.format == AUDIO_FORMAT_DEFAULT) {
         flags = (audio_output_flags_t)(flags | AUDIO_OUTPUT_FLAG_COMPRESS_OFFLOAD);
-        lConfig.offload_info = AUDIO_INFO_INITIALIZER;
-        lConfig.offload_info.sample_rate = lConfig.sample_rate;
-        lConfig.offload_info.channel_mask = lConfig.channel_mask;
-        lConfig.offload_info.format = lConfig.format;
-        lConfig.offload_info.stream_type = stream;
-        lConfig.offload_info.duration_us = -1;
-        lConfig.offload_info.has_video = true; // conservative
-        lConfig.offload_info.is_streaming = true; // likely
-        lConfig.offload_info.encapsulation_mode = lConfig.offload_info.encapsulation_mode;
-        lConfig.offload_info.content_id = lConfig.offload_info.content_id;
-        lConfig.offload_info.sync_id = lConfig.offload_info.sync_id;
+        lHalConfig.offload_info = AUDIO_INFO_INITIALIZER;
+        lHalConfig.offload_info.sample_rate = lHalConfig.sample_rate;
+        lHalConfig.offload_info.channel_mask = lHalConfig.channel_mask;
+        lHalConfig.offload_info.format = lHalConfig.format;
+        lHalConfig.offload_info.stream_type = stream;
+        lHalConfig.offload_info.duration_us = -1;
+        lHalConfig.offload_info.has_video = true; // conservative
+        lHalConfig.offload_info.is_streaming = true; // likely
+        lHalConfig.offload_info.encapsulation_mode = lHalConfig.offload_info.encapsulation_mode;
+        lHalConfig.offload_info.content_id = lHalConfig.offload_info.content_id;
+        lHalConfig.offload_info.sync_id = lHalConfig.offload_info.sync_id;
+    }
+
+    audio_config_base_t lMixerConfig;
+    if (mixerConfig == nullptr) {
+        lMixerConfig = AUDIO_CONFIG_BASE_INITIALIZER;
+        lMixerConfig.sample_rate = lHalConfig.sample_rate;
+        lMixerConfig.channel_mask = lHalConfig.channel_mask;
+        lMixerConfig.format = lHalConfig.format;
+    } else {
+        lMixerConfig = *mixerConfig;
     }
 
     mFlags = (audio_output_flags_t)(mFlags | flags);
+
+    //TODO: b/193496180 use spatializer flag at audio HAL when available
+    audio_output_flags_t halFlags = mFlags;
+    if ((mFlags & AUDIO_OUTPUT_FLAG_SPATIALIZER) != 0) {
+        halFlags = (audio_output_flags_t)(AUDIO_OUTPUT_FLAG_FAST | AUDIO_OUTPUT_FLAG_DEEP_BUFFER);
+    }
 
     ALOGV("opening output for device %s profile %p name %s",
           mDevices.toString().c_str(), mProfile.get(), mProfile->getName().c_str());
 
     status_t status = mClientInterface->openOutput(mProfile->getModuleHandle(),
                                                    output,
-                                                   &lConfig,
+                                                   &lHalConfig,
+                                                   &lMixerConfig,
                                                    device,
                                                    &mLatency,
-                                                   mFlags);
+                                                   halFlags);
 
     if (status == NO_ERROR) {
         LOG_ALWAYS_FATAL_IF(*output == AUDIO_IO_HANDLE_NONE,
@@ -578,9 +596,10 @@ status_t SwAudioOutputDescriptor::open(const audio_config_t *config,
                             "selected device %s for opening",
                             __FUNCTION__, *output, devices.toString().c_str(),
                             device->toString().c_str());
-        mSamplingRate = lConfig.sample_rate;
-        mChannelMask = lConfig.channel_mask;
-        mFormat = lConfig.format;
+        mSamplingRate = lHalConfig.sample_rate;
+        mChannelMask = lHalConfig.channel_mask;
+        mFormat = lHalConfig.format;
+        mMixerChannelMask = lMixerConfig.channel_mask;
         mId = PolicyAudioPort::getNextUniqueId();
         mIoHandle = *output;
         mProfile->curOpenCount++;

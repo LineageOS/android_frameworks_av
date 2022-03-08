@@ -76,6 +76,7 @@ cc_binary {
 //
 cc_binary {
     name: "mixerops_objdump",
+    header_libs: ["libaudioutils_headers"],
     srcs: ["mixerops_objdump.cpp"],
 }
 
@@ -84,6 +85,16 @@ cc_binary {
 //
 cc_benchmark {
     name: "mixerops_benchmark",
+    header_libs: ["libaudioutils_headers"],
     srcs: ["mixerops_benchmark.cpp"],
     static_libs: ["libgoogle-benchmark"],
+}
+
+//
+// mixerops unit test
+//
+cc_test {
+    name: "mixerops_tests",
+    defaults: ["libaudioprocessing_test_defaults"],
+    srcs: ["mixerops_tests.cpp"],
 }

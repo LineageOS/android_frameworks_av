@@ -17,6 +17,8 @@
 #ifndef ANDROID_AUDIO_FAST_MIXER_STATE_H
 #define ANDROID_AUDIO_FAST_MIXER_STATE_H
 
+#include <math.h>
+
 #include <audio_utils/minifloat.h>
 #include <system/audio.h>
 #include <media/AudioMixer.h>
@@ -51,6 +53,7 @@ struct FastTrack {
     int                     mGeneration;     // increment when any field is assigned
     bool                    mHapticPlaybackEnabled = false; // haptic playback is enabled or not
     os::HapticScale         mHapticIntensity = os::HapticScale::MUTE; // intensity of haptic data
+    float                   mHapticMaxAmplitude = NAN; // max amplitude allowed for haptic data
 };
 
 // Represents a single state of the fast mixer
