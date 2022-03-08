@@ -66,10 +66,11 @@ void CameraServiceProxyWrapper::CameraSessionStatsWrapper::onStreamConfigured(
     }
 }
 
-void CameraServiceProxyWrapper::CameraSessionStatsWrapper::onActive() {
+void CameraServiceProxyWrapper::CameraSessionStatsWrapper::onActive(float maxPreviewFps) {
     Mutex::Autolock l(mLock);
 
     mSessionStats.mNewCameraState = CameraSessionStats::CAMERA_STATE_ACTIVE;
+    mSessionStats.mMaxPreviewFps = maxPreviewFps;
     updateProxyDeviceState(mSessionStats);
 
     // Reset mCreationDuration to -1 to distinguish between 1st session
@@ -158,7 +159,7 @@ void CameraServiceProxyWrapper::logStreamConfigured(const String8& id,
     sessionStats->onStreamConfigured(operatingMode, internalConfig, latencyMs);
 }
 
-void CameraServiceProxyWrapper::logActive(const String8& id) {
+void CameraServiceProxyWrapper::logActive(const String8& id, float maxPreviewFps) {
     std::shared_ptr<CameraSessionStatsWrapper> sessionStats;
     {
         Mutex::Autolock l(mLock);
@@ -171,7 +172,7 @@ void CameraServiceProxyWrapper::logActive(const String8& id) {
     }
 
     ALOGV("%s: id %s", __FUNCTION__, id.c_str());
-    sessionStats->onActive();
+    sessionStats->onActive(maxPreviewFps);
 }
 
 void CameraServiceProxyWrapper::logIdle(const String8& id,
