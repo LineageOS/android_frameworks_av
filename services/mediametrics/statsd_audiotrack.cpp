@@ -32,7 +32,7 @@
 #include <statslog.h>
 
 #include "MediaMetricsService.h"
-#include "StringUtils.h"
+#include "ValidateId.h"
 #include "frameworks/proto_logging/stats/message/mediametrics_message.pb.h"
 #include "iface_statsd.h"
 
@@ -56,52 +56,47 @@ bool statsd_audiotrack(const std::shared_ptr<const mediametrics::Item>& item,
     // flesh out the protobuf we'll hand off with our data
     //
 
-    // static constexpr char kAudioTrackStreamType[] = "android.media.audiotrack.streamtype";
+    // Do not change this without changing AudioTrack.cpp collection.
+
     // optional string streamType;
     std::string stream_type;
     if (item->getString("android.media.audiotrack.streamtype", &stream_type)) {
         metrics_proto.set_stream_type(stream_type);
     }
 
-    // static constexpr char kAudioTrackContentType[] = "android.media.audiotrack.type";
     // optional string contentType;
     std::string content_type;
     if (item->getString("android.media.audiotrack.type", &content_type)) {
         metrics_proto.set_content_type(content_type);
     }
 
-    // static constexpr char kAudioTrackUsage[] = "android.media.audiotrack.usage";
     // optional string trackUsage;
     std::string track_usage;
     if (item->getString("android.media.audiotrack.usage", &track_usage)) {
         metrics_proto.set_track_usage(track_usage);
     }
 
-    // static constexpr char kAudioTrackSampleRate[] = "android.media.audiotrack.samplerate";
-    // optional int32 samplerate;
+    // optional int32 sampleRate;
     int32_t sample_rate = -1;
-    if (item->getInt32("android.media.audiotrack.samplerate", &sample_rate)) {
+    if (item->getInt32("android.media.audiotrack.sampleRate", &sample_rate)) {
         metrics_proto.set_sample_rate(sample_rate);
     }
 
-    // static constexpr char kAudioTrackChannelMask[] = "android.media.audiotrack.channelmask";
     // optional int64 channelMask;
     int64_t channel_mask = -1;
-    if (item->getInt64("android.media.audiotrack.channelmask", &channel_mask)) {
+    if (item->getInt64("android.media.audiotrack.channelMask", &channel_mask)) {
         metrics_proto.set_channel_mask(channel_mask);
     }
 
-    // NB: These are not yet exposed as public Java API constants.
-    // static constexpr char kAudioTrackUnderrunFrames[] = "android.media.audiotrack.underrunframes";
-    // optional int32 underrunframes;
+    // optional int32 underrunFrames;
     int32_t underrun_frames = -1;
-    if (item->getInt32("android.media.audiotrack.underrunframes", &underrun_frames)) {
+    if (item->getInt32("android.media.audiotrack.underrunFrames", &underrun_frames)) {
         metrics_proto.set_underrun_frames(underrun_frames);
     }
 
-    // static constexpr char kAudioTrackStartupGlitch[] = "android.media.audiotrack.glitch.startup";
-    // optional int32 startupglitch;
+    // optional int32 glitch.startup;
     int32_t startup_glitch = -1;
+    // Not currently sent from client.
     if (item->getInt32("android.media.audiotrack.glitch.startup", &startup_glitch)) {
         metrics_proto.set_startup_glitch(startup_glitch);
     }
@@ -137,8 +132,7 @@ bool statsd_audiotrack(const std::shared_ptr<const mediametrics::Item>& item,
     // log_session_id (string)
     std::string logSessionId;
     (void)item->getString("android.media.audiotrack.logSessionId", &logSessionId);
-    const auto log_session_id =
-            mediametrics::stringutils::sanitizeLogSessionId(logSessionId);
+    const auto log_session_id = mediametrics::ValidateId::get()->validateId(logSessionId);
 
     android::util::BytesField bf_serialized( serialized.c_str(), serialized.size());
     int result = android::util::stats_write(android::util::MEDIAMETRICS_AUDIOTRACK_REPORTED,

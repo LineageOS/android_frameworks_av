@@ -66,13 +66,8 @@ aaudio_result_t AudioStreamTrack::open(const AudioStreamBuilder& builder)
     const aaudio_session_id_t requestedSessionId = builder.getSessionId();
     const audio_session_t sessionId = AAudioConvert_aaudioToAndroidSessionId(requestedSessionId);
 
-    // Try to create an AudioTrack
-    // Use stereo if unspecified.
-    int32_t samplesPerFrame = (getSamplesPerFrame() == AAUDIO_UNSPECIFIED)
-                              ? 2 : getSamplesPerFrame();
-    audio_channel_mask_t channelMask = samplesPerFrame <= 2 ?
-                            audio_channel_out_mask_from_count(samplesPerFrame) :
-                            audio_channel_mask_for_index_assignment_from_count(samplesPerFrame);
+    audio_channel_mask_t channelMask =
+            AAudio_getChannelMaskForOpen(getChannelMask(), getSamplesPerFrame(), false /*isInput*/);
 
     audio_output_flags_t flags;
     aaudio_performance_mode_t perfMode = getPerformanceMode();
@@ -140,7 +135,9 @@ aaudio_result_t AudioStreamTrack::open(const AudioStreamBuilder& builder)
     const audio_usage_t usage =
             AAudioConvert_usageToInternal(builder.getUsage());
     const audio_flags_mask_t attributesFlags =
-        AAudioConvert_allowCapturePolicyToAudioFlagsMask(builder.getAllowedCapturePolicy());
+        AAudioConvert_allowCapturePolicyToAudioFlagsMask(builder.getAllowedCapturePolicy(),
+                                                         builder.getSpatializationBehavior(),
+                                                         builder.isContentSpatialized());
 
     const audio_attributes_t attributes = {
             .content_type = contentType,
@@ -199,7 +196,9 @@ aaudio_result_t AudioStreamTrack::open(const AudioStreamBuilder& builder)
     doSetVolume();
 
     // Get the actual values from the AudioTrack.
-    setSamplesPerFrame(mAudioTrack->channelCount());
+    setChannelMask(AAudioConvert_androidToAAudioChannelMask(
+        mAudioTrack->channelMask(), false /*isInput*/,
+        AAudio_isChannelIndexMask(getChannelMask())));
     setFormat(mAudioTrack->format());
     setDeviceFormat(mAudioTrack->format());
     setSampleRate(mAudioTrack->getSampleRate());

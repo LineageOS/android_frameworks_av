@@ -80,6 +80,7 @@ public:
 
     sp<DeviceDescriptor> getRouteSinkDevice(const sp<AudioRoute> &route) const;
     DeviceVector getRouteSourceDevices(const sp<AudioRoute> &route) const;
+    const AudioRouteVector& getRoutes() const { return mRoutes; }
     void setRoutes(const AudioRouteVector &routes);
 
     status_t addOutputProfile(const sp<IOProfile> &profile);

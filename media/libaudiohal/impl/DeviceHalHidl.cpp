@@ -457,11 +457,13 @@ status_t DeviceHalHidl::removeDeviceEffect(
 }
 #endif
 
-status_t DeviceHalHidl::dump(int fd) {
+status_t DeviceHalHidl::dump(int fd, const Vector<String16>& args) {
     if (mDevice == 0) return NO_INIT;
     native_handle_t* hidlHandle = native_handle_create(1, 0);
     hidlHandle->data[0] = fd;
-    Return<void> ret = mDevice->debug(hidlHandle, {} /* options */);
+    hidl_vec<hidl_string> hidlArgs;
+    argsFromHal(args, &hidlArgs);
+    Return<void> ret = mDevice->debug(hidlHandle, hidlArgs);
     native_handle_delete(hidlHandle);
 
     // TODO(b/111997867, b/177271958)  Workaround - remove when fixed.

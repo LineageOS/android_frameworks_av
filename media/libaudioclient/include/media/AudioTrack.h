@@ -402,6 +402,7 @@ public:
 
             uint32_t    channelCount() const { return mChannelCount; }
             size_t      frameCount() const  { return mFrameCount; }
+            audio_channel_mask_t channelMask() const { return mChannelMask; }
 
     /*
      * Return the period of the notification callback in frames.
@@ -1388,6 +1389,9 @@ private:
     MediaMetrics mMediaMetrics;
     std::string mMetricsId;  // GUARDED_BY(mLock), could change in createTrack_l().
     std::string mCallerName; // for example "aaudio"
+
+    // report error to mediametrics.
+    void reportError(status_t status, const char *event, const char *message) const;
 
 private:
     class AudioTrackCallback : public media::BnAudioTrackCallback {

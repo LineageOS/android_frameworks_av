@@ -68,10 +68,71 @@ aaudio_input_preset_t kAAudioInputPresets[] = {
     AAUDIO_INPUT_PRESET_UNPROCESSED,       AAUDIO_INPUT_PRESET_VOICE_PERFORMANCE,
 };
 
+aaudio_channel_mask_t kAAudioChannelMasks[] = {
+    AAUDIO_UNSPECIFIED,
+    AAUDIO_CHANNEL_INDEX_MASK_1,
+    AAUDIO_CHANNEL_INDEX_MASK_2,
+    AAUDIO_CHANNEL_INDEX_MASK_3,
+    AAUDIO_CHANNEL_INDEX_MASK_4,
+    AAUDIO_CHANNEL_INDEX_MASK_5,
+    AAUDIO_CHANNEL_INDEX_MASK_6,
+    AAUDIO_CHANNEL_INDEX_MASK_7,
+    AAUDIO_CHANNEL_INDEX_MASK_8,
+    AAUDIO_CHANNEL_INDEX_MASK_9,
+    AAUDIO_CHANNEL_INDEX_MASK_10,
+    AAUDIO_CHANNEL_INDEX_MASK_11,
+    AAUDIO_CHANNEL_INDEX_MASK_12,
+    AAUDIO_CHANNEL_INDEX_MASK_13,
+    AAUDIO_CHANNEL_INDEX_MASK_14,
+    AAUDIO_CHANNEL_INDEX_MASK_15,
+    AAUDIO_CHANNEL_INDEX_MASK_16,
+    AAUDIO_CHANNEL_INDEX_MASK_17,
+    AAUDIO_CHANNEL_INDEX_MASK_18,
+    AAUDIO_CHANNEL_INDEX_MASK_19,
+    AAUDIO_CHANNEL_INDEX_MASK_20,
+    AAUDIO_CHANNEL_INDEX_MASK_21,
+    AAUDIO_CHANNEL_INDEX_MASK_22,
+    AAUDIO_CHANNEL_INDEX_MASK_23,
+    AAUDIO_CHANNEL_INDEX_MASK_24,
+    AAUDIO_CHANNEL_MONO,
+    AAUDIO_CHANNEL_STEREO,
+    AAUDIO_CHANNEL_FRONT_BACK,
+    AAUDIO_CHANNEL_2POINT0POINT2,
+    AAUDIO_CHANNEL_2POINT1POINT2,
+    AAUDIO_CHANNEL_3POINT0POINT2,
+    AAUDIO_CHANNEL_3POINT1POINT2,
+    AAUDIO_CHANNEL_5POINT1,
+    AAUDIO_CHANNEL_MONO,
+    AAUDIO_CHANNEL_STEREO,
+    AAUDIO_CHANNEL_2POINT1,
+    AAUDIO_CHANNEL_TRI,
+    AAUDIO_CHANNEL_TRI_BACK,
+    AAUDIO_CHANNEL_3POINT1,
+    AAUDIO_CHANNEL_2POINT0POINT2,
+    AAUDIO_CHANNEL_2POINT1POINT2,
+    AAUDIO_CHANNEL_3POINT0POINT2,
+    AAUDIO_CHANNEL_3POINT1POINT2,
+    AAUDIO_CHANNEL_QUAD,
+    AAUDIO_CHANNEL_QUAD_SIDE,
+    AAUDIO_CHANNEL_SURROUND,
+    AAUDIO_CHANNEL_PENTA,
+    AAUDIO_CHANNEL_5POINT1,
+    AAUDIO_CHANNEL_5POINT1_SIDE,
+    AAUDIO_CHANNEL_5POINT1POINT2,
+    AAUDIO_CHANNEL_5POINT1POINT4,
+    AAUDIO_CHANNEL_6POINT1,
+    AAUDIO_CHANNEL_7POINT1,
+    AAUDIO_CHANNEL_7POINT1POINT2,
+    AAUDIO_CHANNEL_7POINT1POINT4,
+    AAUDIO_CHANNEL_9POINT1POINT4,
+    AAUDIO_CHANNEL_9POINT1POINT6,
+};
+
 const size_t kNumAAudioFormats = std::size(kAAudioFormats);
 const size_t kNumAAudioUsages = std::size(kAAudioUsages);
 const size_t kNumAAudioContentTypes = std::size(kAAudioContentTypes);
 const size_t kNumAAudioInputPresets = std::size(kAAudioInputPresets);
+const size_t kNumAAudioChannelMasks = std::size(kAAudioChannelMasks);
 
 class FuzzAAudioClient : public virtual RefBase, public AAudioServiceInterface {
    public:
@@ -305,7 +366,11 @@ void OboeserviceFuzzer::process(const uint8_t *data, size_t size) {
 
     request.getConfiguration().setDeviceId(fdp.ConsumeIntegral<int32_t>());
     request.getConfiguration().setSampleRate(fdp.ConsumeIntegral<int32_t>());
-    request.getConfiguration().setSamplesPerFrame(fdp.ConsumeIntegral<int32_t>());
+    request.getConfiguration().setChannelMask((aaudio_channel_mask_t)(
+        fdp.ConsumeBool()
+            ? fdp.ConsumeIntegral<int32_t>()
+            : kAAudioChannelMasks[fdp.ConsumeIntegralInRange<int32_t>(
+                    0, kNumAAudioChannelMasks - 1)]));
     request.getConfiguration().setDirection(
         fdp.ConsumeBool() ? fdp.ConsumeIntegral<int32_t>()
                           : (fdp.ConsumeBool() ? AAUDIO_DIRECTION_OUTPUT : AAUDIO_DIRECTION_INPUT));

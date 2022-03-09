@@ -109,6 +109,7 @@ class Camera3FakeStream :
             const camera_stream_buffer &buffer,
             nsecs_t timestamp,
             bool output,
+            int32_t transform,
             const std::vector<size_t>& surface_ids,
             /*out*/
             sp<Fence> *releaseFenceOut);
@@ -134,7 +135,7 @@ class Camera3FakeStream :
             const std::vector<size_t>& surface_ids = std::vector<size_t>());
     virtual status_t returnBufferLocked(
             const camera_stream_buffer &buffer,
-            nsecs_t timestamp, const std::vector<size_t>& surface_ids);
+            nsecs_t timestamp, int32_t transform, const std::vector<size_t>& surface_ids);
 
     virtual status_t configureQueueLocked();
 

@@ -59,6 +59,7 @@ std::string AAudioServiceEndpoint::dump() const NO_THREAD_SAFETY_ANALYSIS {
     result << "    Device Id:            " << getDeviceId() << "\n";
     result << "    Sample Rate:          " << getSampleRate() << "\n";
     result << "    Channel Count:        " << getSamplesPerFrame() << "\n";
+    result << "    Channel Mask:         0x" << std::hex << getChannelMask() << std::dec << "\n";
     result << "    Format:               " << getFormat() << "\n";
     result << "    Frames Per Burst:     " << mFramesPerBurst << "\n";
     result << "    Usage:                " << getUsage() << "\n";
@@ -164,6 +165,10 @@ bool AAudioServiceEndpoint::matches(const AAudioStreamConfiguration& configurati
         configuration.getSamplesPerFrame() != getSamplesPerFrame()) {
         return false;
     }
+    if (configuration.getChannelMask() != AAUDIO_UNSPECIFIED &&
+        configuration.getChannelMask() != getChannelMask()) {
+        return false;
+    }
     return true;
 }
 
@@ -188,7 +193,9 @@ audio_attributes_t AAudioServiceEndpoint::getAudioAttributesFrom(
     if (direction == AAUDIO_DIRECTION_OUTPUT) {
         flags = static_cast<audio_flags_mask_t>(AUDIO_FLAG_LOW_LATENCY
                 | AAudioConvert_allowCapturePolicyToAudioFlagsMask(
-                        params->getAllowedCapturePolicy()));
+                        params->getAllowedCapturePolicy(),
+                        params->getSpatializationBehavior(),
+                        params->isContentSpatialized()));
     } else {
         flags = static_cast<audio_flags_mask_t>(AUDIO_FLAG_LOW_LATENCY
                 | AAudioConvert_privacySensitiveToAudioFlagsMask(params->isPrivacySensitive()));

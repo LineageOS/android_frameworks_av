@@ -1511,6 +1511,9 @@ status_t MediaCodec::configure(
         uint32_t flags) {
     sp<AMessage> msg = new AMessage(kWhatConfigure, this);
 
+    // TODO: validity check log-session-id: it should be a 32-hex-digit.
+    format->findString("log-session-id", &mLogSessionId);
+
     if (mMetricsHandle != 0) {
         int32_t profile = 0;
         if (format->findInt32("profile", &profile)) {
@@ -1522,11 +1525,11 @@ status_t MediaCodec::configure(
         }
         mediametrics_setInt32(mMetricsHandle, kCodecEncoder,
                               (flags & CONFIGURE_FLAG_ENCODE) ? 1 : 0);
+
+        mediametrics_setCString(mMetricsHandle, kCodecLogSessionId, mLogSessionId.c_str());
     }
 
     if (mIsVideo) {
-        // TODO: validity check log-session-id: it should be a 32-hex-digit.
-        format->findString("log-session-id", &mLogSessionId);
         format->findInt32("width", &mVideoWidth);
         format->findInt32("height", &mVideoHeight);
         if (!format->findInt32("rotation-degrees", &mRotationDegrees)) {
@@ -1534,7 +1537,6 @@ status_t MediaCodec::configure(
         }
 
         if (mMetricsHandle != 0) {
-            mediametrics_setCString(mMetricsHandle, kCodecLogSessionId, mLogSessionId.c_str());
             mediametrics_setInt32(mMetricsHandle, kCodecWidth, mVideoWidth);
             mediametrics_setInt32(mMetricsHandle, kCodecHeight, mVideoHeight);
             mediametrics_setInt32(mMetricsHandle, kCodecRotation, mRotationDegrees);

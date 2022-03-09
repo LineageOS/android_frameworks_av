@@ -333,6 +333,50 @@ public:
     virtual status_t getDevicesForRoleAndCapturePreset(audio_source_t audioSource,
                                                        device_role_t role,
                                                        AudioDeviceTypeAddrVector &devices) = 0;
+
+    /**
+     * Queries if some kind of spatialization will be performed if the audio playback context
+     * described by the provided arguments is present.
+     * The context is made of:
+     * - The audio attributes describing the playback use case.
+     * - The audio configuration describing the audio format, channels, sampling rate ...
+     * - The devices describing the sink audio device selected for playback.
+     * All arguments are optional and only the specified arguments are used to match against
+     * supported criteria. For instance, supplying no argument will tell if spatialization is
+     * supported or not in general.
+     * @param attr audio attributes describing the playback use case
+     * @param config audio configuration describing the audio format, channels, sampling rate...
+     * @param devices the sink audio device selected for playback
+     * @return true if spatialization is enabled for this context,
+     *        false otherwise
+     */
+     virtual bool canBeSpatialized(const audio_attributes_t *attr,
+                                  const audio_config_t *config,
+                                  const AudioDeviceTypeAddrVector &devices) const = 0;
+
+    /**
+     * Opens a specialized spatializer output if supported by the platform.
+     * If several spatializer output profiles exist, the one supporting the sink device
+     * corresponding to the provided audio attributes will be selected.
+     * Only one spatializer output stream can be opened at a time and an error is returned
+     * if one already exists.
+     * @param config audio format, channel mask and sampling rate to be used as the mixer
+     *        configuration for the spatializer mixer created.
+     * @param attr audio attributes describing the playback use case that will drive the
+     *        sink device selection
+     * @param output the IO handle of the output opened
+     * @return NO_ERROR if an output was opened, INVALID_OPERATION or BAD_VALUE otherwise
+     */
+    virtual status_t getSpatializerOutput(const audio_config_base_t *config,
+                                            const audio_attributes_t *attr,
+                                            audio_io_handle_t *output) = 0;
+
+    /**
+     * Closes a previously opened specialized spatializer output.
+     * @param output the IO handle of the output to close.
+     * @return NO_ERROR if an output was closed, INVALID_OPERATION or BAD_VALUE otherwise
+     */
+    virtual status_t releaseSpatializerOutput(audio_io_handle_t output) = 0;
 };
 
 
@@ -359,7 +403,8 @@ public:
     // The audio policy manager can check if the proposed parameters are suitable or not and act accordingly.
     virtual status_t openOutput(audio_module_handle_t module,
                                 audio_io_handle_t *output,
-                                audio_config_t *config,
+                                audio_config_t *halConfig,
+                                audio_config_base_t *mixerConfig,
                                 const sp<DeviceDescriptorBase>& device,
                                 uint32_t *latencyMs,
                                 audio_output_flags_t flags) = 0;

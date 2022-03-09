@@ -20,6 +20,7 @@
 #include "AnalyticsActions.h"
 #include "AnalyticsState.h"
 #include "AudioPowerUsage.h"
+#include "HeatMap.h"
 #include "StatsdLog.h"
 #include "TimedAction.h"
 #include "Wrap.h"
@@ -73,10 +74,22 @@ public:
     std::pair<std::string, int32_t> dump(
             int32_t lines = INT32_MAX, int64_t sinceNs = 0, const char *prefix = nullptr) const;
 
+    /**
+     * Returns a pair consisting of the dump string and the number of lines in the string.
+     *
+     * HeatMap dump.
+     */
+    std::pair<std::string, int32_t> dumpHeatMap(int32_t lines = INT32_MAX) const {
+        return mHeatMap.dump(lines);
+    }
+
     void clear() {
         // underlying state is locked.
         mPreviousAnalyticsState->clear();
         mAnalyticsState->clear();
+
+        // Clears the status map
+        mHeatMap.clear();
 
         // Clear power usage state.
         mAudioPowerUsage.clear();
@@ -96,11 +109,18 @@ private:
      */
 
     /**
-     * Checks for any pending actions for a particular item.
+     * Processes any pending actions for a particular item.
      *
      * \param item to check against the current AnalyticsActions.
      */
-    void checkActions(const std::shared_ptr<const mediametrics::Item>& item);
+    void processActions(const std::shared_ptr<const mediametrics::Item>& item);
+
+    /**
+     * Processes status information contained in the item.
+     *
+     * \param item to check against for status handling
+     */
+    void processStatus(const std::shared_ptr<const mediametrics::Item>& item);
 
     // HELPER METHODS
     /**
@@ -123,6 +143,9 @@ private:
 
     TimedAction mTimedAction; // locked internally
     const std::shared_ptr<StatsdLog> mStatsdLog; // locked internally, ok for multiple threads.
+
+    static constexpr size_t kHeatEntries = 100;
+    HeatMap mHeatMap{kHeatEntries}; // locked internally, ok for multiple threads.
 
     // DeviceUse is a nested class which handles audio device usage accounting.
     // We define this class at the end to ensure prior variables all properly constructed.

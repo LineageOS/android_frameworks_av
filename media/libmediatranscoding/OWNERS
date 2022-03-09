@@ -1,5 +1,4 @@
-chz@google.com
-gokrishnan@google.com
-hkuang@google.com
-lnilsson@google.com
-pawin@google.com
+# Bug component: 761430
+
+# go/android-fwk-media-solutions for info on areas of ownership.
+include platform/frameworks/av:/media/janitors/media_solutions_OWNERS

@@ -91,10 +91,39 @@ audio_source_t AAudioConvert_inputPresetToAudioSource(aaudio_input_preset_t pres
  * @return internal audio flags mask
  */
 audio_flags_mask_t AAudioConvert_allowCapturePolicyToAudioFlagsMask(
-        aaudio_allowed_capture_policy_t policy);
+        aaudio_allowed_capture_policy_t policy,
+        aaudio_spatialization_behavior_t spatializationBehavior,
+        bool isContentSpatialized);
 
 audio_flags_mask_t AAudioConvert_privacySensitiveToAudioFlagsMask(
         bool privacySensitive);
+
+audio_channel_mask_t AAudioConvert_aaudioToAndroidChannelLayoutMask(
+        aaudio_channel_mask_t channelMask, bool isInput);
+
+aaudio_channel_mask_t AAudioConvert_androidToAAudioChannelLayoutMask(
+        audio_channel_mask_t channelMask, bool isInput);
+
+aaudio_channel_mask_t AAudioConvert_androidToAAudioChannelIndexMask(
+        audio_channel_mask_t channelMask);
+
+audio_channel_mask_t AAudioConvert_aaudioToAndroidChannelIndexMask(
+        aaudio_channel_mask_t channelMask);
+
+aaudio_channel_mask_t AAudioConvert_androidToAAudioChannelMask(
+        audio_channel_mask_t channelMask, bool isInput, bool indexMaskRequired);
+
+audio_channel_mask_t AAudioConvert_aaudioToAndroidChannelMask(
+        aaudio_channel_mask_t channelMask, bool isInput);
+
+bool AAudio_isChannelIndexMask(aaudio_channel_mask_t channelMask);
+
+int32_t AAudioConvert_channelMaskToCount(aaudio_channel_mask_t channelMask);
+
+aaudio_channel_mask_t AAudioConvert_channelCountToMask(int32_t channelCount);
+
+audio_channel_mask_t AAudio_getChannelMaskForOpen(
+        aaudio_channel_mask_t channelMask, int32_t samplesPerFrame, bool isInput);
 
 // Note that this code may be replaced by Settings or by some other system configuration tool.
 
@@ -318,4 +347,36 @@ private:
     std::atomic<int> mRequested{0};
     std::atomic<int> mAcknowledged{0};
 };
+
+enum {
+    /**
+     * Audio channel index mask, only used internally.
+     */
+    AAUDIO_CHANNEL_BIT_INDEX = 0x80000000,
+    AAUDIO_CHANNEL_INDEX_MASK_1 = AAUDIO_CHANNEL_BIT_INDEX | (1 << 1) - 1,
+    AAUDIO_CHANNEL_INDEX_MASK_2 = AAUDIO_CHANNEL_BIT_INDEX | (1 << 2) - 1,
+    AAUDIO_CHANNEL_INDEX_MASK_3 = AAUDIO_CHANNEL_BIT_INDEX | (1 << 3) - 1,
+    AAUDIO_CHANNEL_INDEX_MASK_4 = AAUDIO_CHANNEL_BIT_INDEX | (1 << 4) - 1,
+    AAUDIO_CHANNEL_INDEX_MASK_5 = AAUDIO_CHANNEL_BIT_INDEX | (1 << 5) - 1,
+    AAUDIO_CHANNEL_INDEX_MASK_6 = AAUDIO_CHANNEL_BIT_INDEX | (1 << 6) - 1,
+    AAUDIO_CHANNEL_INDEX_MASK_7 = AAUDIO_CHANNEL_BIT_INDEX | (1 << 7) - 1,
+    AAUDIO_CHANNEL_INDEX_MASK_8 = AAUDIO_CHANNEL_BIT_INDEX | (1 << 8) - 1,
+    AAUDIO_CHANNEL_INDEX_MASK_9 = AAUDIO_CHANNEL_BIT_INDEX | (1 << 9) - 1,
+    AAUDIO_CHANNEL_INDEX_MASK_10 = AAUDIO_CHANNEL_BIT_INDEX | (1 << 10) - 1,
+    AAUDIO_CHANNEL_INDEX_MASK_11 = AAUDIO_CHANNEL_BIT_INDEX | (1 << 11) - 1,
+    AAUDIO_CHANNEL_INDEX_MASK_12 = AAUDIO_CHANNEL_BIT_INDEX | (1 << 12) - 1,
+    AAUDIO_CHANNEL_INDEX_MASK_13 = AAUDIO_CHANNEL_BIT_INDEX | (1 << 13) - 1,
+    AAUDIO_CHANNEL_INDEX_MASK_14 = AAUDIO_CHANNEL_BIT_INDEX | (1 << 14) - 1,
+    AAUDIO_CHANNEL_INDEX_MASK_15 = AAUDIO_CHANNEL_BIT_INDEX | (1 << 15) - 1,
+    AAUDIO_CHANNEL_INDEX_MASK_16 = AAUDIO_CHANNEL_BIT_INDEX | (1 << 16) - 1,
+    AAUDIO_CHANNEL_INDEX_MASK_17 = AAUDIO_CHANNEL_BIT_INDEX | (1 << 17) - 1,
+    AAUDIO_CHANNEL_INDEX_MASK_18 = AAUDIO_CHANNEL_BIT_INDEX | (1 << 18) - 1,
+    AAUDIO_CHANNEL_INDEX_MASK_19 = AAUDIO_CHANNEL_BIT_INDEX | (1 << 19) - 1,
+    AAUDIO_CHANNEL_INDEX_MASK_20 = AAUDIO_CHANNEL_BIT_INDEX | (1 << 20) - 1,
+    AAUDIO_CHANNEL_INDEX_MASK_21 = AAUDIO_CHANNEL_BIT_INDEX | (1 << 21) - 1,
+    AAUDIO_CHANNEL_INDEX_MASK_22 = AAUDIO_CHANNEL_BIT_INDEX | (1 << 22) - 1,
+    AAUDIO_CHANNEL_INDEX_MASK_23 = AAUDIO_CHANNEL_BIT_INDEX | (1 << 23) - 1,
+    AAUDIO_CHANNEL_INDEX_MASK_24 = AAUDIO_CHANNEL_BIT_INDEX | (1 << 24) - 1,
+};
+
 #endif //UTILITY_AAUDIO_UTILITIES_H

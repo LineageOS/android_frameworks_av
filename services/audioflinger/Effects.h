@@ -33,9 +33,12 @@ public:
     virtual bool isOffload() const = 0;
     virtual bool isOffloadOrDirect() const = 0;
     virtual bool isOffloadOrMmap() const = 0;
+    virtual bool isSpatializer() const = 0;
     virtual uint32_t sampleRate() const = 0;
-    virtual audio_channel_mask_t channelMask() const = 0;
-    virtual uint32_t channelCount() const = 0;
+    virtual audio_channel_mask_t inChannelMask(int id) const = 0;
+    virtual uint32_t inChannelCount(int id) const = 0;
+    virtual audio_channel_mask_t outChannelMask() const = 0;
+    virtual uint32_t outChannelCount() const = 0;
     virtual audio_channel_mask_t hapticChannelMask() const = 0;
     virtual size_t frameCount() const = 0;
 
@@ -64,6 +67,8 @@ public:
     virtual void resetVolume() = 0;
 
     virtual wp<EffectChain> chain() const = 0;
+
+    virtual bool isAudioPolicyReady() const = 0;
 };
 
 // EffectBase(EffectModule) and EffectChain classes both have their own mutex to protect
@@ -164,6 +169,16 @@ public:
 
     void             dump(int fd, const Vector<String16>& args);
 
+protected:
+    bool             isInternal_l() const {
+                         for (auto handle : mHandles) {
+                            if (handle->client() != nullptr) {
+                                return false;
+                            }
+                         }
+                         return true;
+                     }
+
 private:
     friend class AudioFlinger;      // for mHandles
     bool             mPinned = false;
@@ -240,6 +255,13 @@ public:
         return mOutBuffer != 0 ? reinterpret_cast<int16_t*>(mOutBuffer->ptr()) : NULL;
     }
 
+    // Updates the access mode if it is out of date.  May issue a new effect configure.
+    void        updateAccessMode() {
+                    if (requiredEffectBufferAccessMode() != mConfig.outputCfg.accessMode) {
+                        configure();
+                    }
+                }
+
     status_t         setDevices(const AudioDeviceTypeAddrVector &devices);
     status_t         setInputDevice(const AudioDeviceTypeAddr &device);
     status_t         setVolume(uint32_t *left, uint32_t *right, bool controller);
@@ -259,7 +281,7 @@ public:
     bool             isHapticGenerator() const;
 
     status_t         setHapticIntensity(int id, int intensity);
-    status_t         setVibratorInfo(const media::AudioVibratorInfo* vibratorInfo);
+    status_t         setVibratorInfo(const media::AudioVibratorInfo& vibratorInfo);
 
     void             dump(int fd, const Vector<String16>& args);
 
@@ -275,6 +297,11 @@ private:
     status_t stop_l();
     status_t removeEffectFromHal_l();
     status_t sendSetAudioDevicesCommand(const AudioDeviceTypeAddrVector &devices, uint32_t cmdCode);
+    effect_buffer_access_e requiredEffectBufferAccessMode() const {
+        return mConfig.inputCfg.buffer.raw == mConfig.outputCfg.buffer.raw
+                ? EFFECT_BUFFER_ACCESS_WRITE : EFFECT_BUFFER_ACCESS_ACCUMULATE;
+    }
+
 
     effect_config_t     mConfig;    // input and output audio configuration
     sp<EffectHalInterface> mEffectInterface; // Effect module HAL
@@ -327,7 +354,7 @@ public:
     EffectHandle(const sp<EffectBase>& effect,
             const sp<AudioFlinger::Client>& client,
             const sp<media::IEffectClient>& effectClient,
-            int32_t priority);
+            int32_t priority, bool notifyFramesProcessed);
     virtual ~EffectHandle();
     virtual status_t initCheck();
 
@@ -342,6 +369,8 @@ public:
     android::binder::Status disconnect() override;
     android::binder::Status getCblk(media::SharedFileRegion* _aidl_return) override;
 
+    sp<Client> client() const { return mClient; }
+
 private:
     void disconnect(bool unpinIfLast);
 
@@ -355,6 +384,8 @@ private:
                          const std::vector<uint8_t>& replyData);
     void setEnabled(bool enabled);
     bool enabled() const { return mEnabled; }
+
+    void framesProcessed(int32_t frames) const;
 
     // Getters
     wp<EffectBase> effect() const { return mEffect; }
@@ -389,6 +420,8 @@ private:
     bool mEnabled;                           // cached enable state: needed when the effect is
                                              // restored after being suspended
     bool mDisconnected;                      // Set to true by disconnect()
+    const bool mNotifyFramesProcessed;       // true if the client callback event
+                                             // EVENT_FRAMES_PROCESSED must be generated
 };
 
 // the EffectChain class represents a group of effects associated to one audio session.
@@ -511,6 +544,8 @@ public:
     sp<EffectCallbackInterface> effectCallback() const { return mEffectCallback; }
     wp<ThreadBase> thread() const { return mEffectCallback->thread(); }
 
+    bool isFirstEffect(int id) const { return !mEffects.isEmpty() && id == mEffects[0]->id(); }
+
     void dump(int fd, const Vector<String16>& args);
 
 private:
@@ -530,6 +565,12 @@ private:
             : mChain(owner)
             , mThread(thread)
             , mAudioFlinger(*gAudioFlinger) {
+            sp<ThreadBase> base = thread.promote();
+            if (base != nullptr) {
+                mThreadType = base->type();
+            } else {
+                mThreadType = ThreadBase::MIXER;  // assure a consistent value.
+            }
         }
 
         status_t createEffectHal(const effect_uuid_t *pEffectUuid,
@@ -542,10 +583,13 @@ private:
         bool isOffload() const override;
         bool isOffloadOrDirect() const override;
         bool isOffloadOrMmap() const override;
+        bool isSpatializer() const override;
 
         uint32_t sampleRate() const override;
-        audio_channel_mask_t channelMask() const override;
-        uint32_t channelCount() const override;
+        audio_channel_mask_t inChannelMask(int id) const override;
+        uint32_t inChannelCount(int id) const override;
+        audio_channel_mask_t outChannelMask() const override;
+        uint32_t outChannelCount() const override;
         audio_channel_mask_t hapticChannelMask() const override;
         size_t frameCount() const override;
         uint32_t latency() const override;
@@ -566,16 +610,22 @@ private:
 
         wp<EffectChain> chain() const override { return mChain; }
 
+        bool isAudioPolicyReady() const override {
+            return mAudioFlinger.isAudioPolicyReady();
+        }
+
         wp<ThreadBase> thread() const { return mThread.load(); }
 
-        void setThread(const wp<ThreadBase>& thread) {
+        void setThread(const sp<ThreadBase>& thread) {
             mThread = thread;
+            mThreadType = thread->type();
         }
 
     private:
         const wp<EffectChain> mChain;
         mediautils::atomic_wp<ThreadBase> mThread;
         AudioFlinger &mAudioFlinger;  // implementation detail: outer instance always exists.
+        ThreadBase::type_t mThreadType;
     };
 
     friend class AudioFlinger;  // for mThread, mEffects
@@ -612,6 +662,8 @@ private:
 
     void setVolumeForOutput_l(uint32_t left, uint32_t right);
 
+    ssize_t getInsertIndex(const effect_descriptor_t& desc);
+
     mutable  Mutex mLock;        // mutex protecting effect list
              Vector< sp<EffectModule> > mEffects; // list of effect modules
              audio_session_t mSessionId; // audio session ID
@@ -643,11 +695,11 @@ class DeviceEffectProxy : public EffectBase {
 public:
         DeviceEffectProxy (const AudioDeviceTypeAddr& device,
                 const sp<DeviceEffectManagerCallback>& callback,
-                effect_descriptor_t *desc, int id)
+                effect_descriptor_t *desc, int id, bool notifyFramesProcessed)
             : EffectBase(callback, desc, id, AUDIO_SESSION_DEVICE, false),
                 mDevice(device), mManagerCallback(callback),
-                mMyCallback(new ProxyCallback(wp<DeviceEffectProxy>(this),
-                                              callback)) {}
+                mMyCallback(new ProxyCallback(wp<DeviceEffectProxy>(this), callback)),
+                mNotifyFramesProcessed(notifyFramesProcessed) {}
 
     status_t setEnabled(bool enabled, bool fromHandle) override;
     sp<DeviceEffectProxy> asDeviceEffectProxy() override { return this; }
@@ -692,10 +744,13 @@ private:
         bool isOffload() const override { return false; }
         bool isOffloadOrDirect() const override { return false; }
         bool isOffloadOrMmap() const override { return false; }
+        bool isSpatializer() const override { return false; }
 
         uint32_t sampleRate() const override;
-        audio_channel_mask_t channelMask() const override;
-        uint32_t channelCount() const override;
+        audio_channel_mask_t inChannelMask(int id) const override;
+        uint32_t inChannelCount(int id) const override;
+        audio_channel_mask_t outChannelMask() const override;
+        uint32_t outChannelCount() const override;
         audio_channel_mask_t hapticChannelMask() const override { return AUDIO_CHANNEL_NONE; }
         size_t frameCount() const override  { return 0; }
         uint32_t latency() const override  { return 0; }
@@ -716,6 +771,10 @@ private:
 
         wp<EffectChain> chain() const override { return nullptr; }
 
+        bool isAudioPolicyReady() const override {
+            return mManagerCallback->isAudioPolicyReady();
+        }
+
         int newEffectId();
 
     private:
@@ -734,4 +793,5 @@ private:
     std::map<audio_patch_handle_t, sp<EffectHandle>> mEffectHandles; // protected by mProxyLock
     sp<EffectModule> mHalEffect; // protected by mProxyLock
     struct audio_port_config mDevicePort = { .id = AUDIO_PORT_HANDLE_NONE };
+    const bool mNotifyFramesProcessed;
 };

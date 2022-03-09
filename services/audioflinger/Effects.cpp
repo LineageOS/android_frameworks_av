@@ -24,9 +24,11 @@
 #include "Configuration.h"
 #include <utils/Log.h>
 #include <system/audio_effects/effect_aec.h>
+#include <system/audio_effects/effect_downmix.h>
 #include <system/audio_effects/effect_dynamicsprocessing.h>
 #include <system/audio_effects/effect_hapticgenerator.h>
 #include <system/audio_effects/effect_ns.h>
+#include <system/audio_effects/effect_spatializer.h>
 #include <system/audio_effects/effect_visualizer.h>
 #include <audio_utils/channels.h>
 #include <audio_utils/primitives.h>
@@ -242,6 +244,12 @@ status_t AudioFlinger::EffectBase::updatePolicyState()
 
     {
         Mutex::Autolock _l(mLock);
+
+        if ((isInternal_l() && !mPolicyRegistered)
+                || !getCallback()->isAudioPolicyReady()) {
+            return NO_ERROR;
+        }
+
         // register effect when first handle is attached and unregister when last handle is removed
         if (mPolicyRegistered != mHandles.size() > 0) {
             doRegister = true;
@@ -642,6 +650,13 @@ bool AudioFlinger::EffectModule::updateState() {
             mState = IDLE;
         }
         break;
+    case ACTIVE:
+        for (size_t i = 0; i < mHandles.size(); i++) {
+            if (!mHandles[i]->disconnected()) {
+                mHandles[i]->framesProcessed(mConfig.inputCfg.buffer.frameCount);
+            }
+        }
+        break;
     default: //IDLE , ACTIVE, DESTROYED
         break;
     }
@@ -875,9 +890,9 @@ status_t AudioFlinger::EffectModule::configure()
     // similar to output EFFECT_FLAG_TYPE_INSERT/REPLACE,
     // in which case input channel masks should be used here.
     callback = getCallback();
-    channelMask = callback->channelMask();
+    channelMask = callback->inChannelMask(mId);
     mConfig.inputCfg.channels = channelMask;
-    mConfig.outputCfg.channels = channelMask;
+    mConfig.outputCfg.channels = callback->outChannelMask();
 
     if ((mDescriptor.flags & EFFECT_FLAG_TYPE_MASK) == EFFECT_FLAG_TYPE_AUXILIARY) {
         if (mConfig.inputCfg.channels != AUDIO_CHANNEL_OUT_MONO) {
@@ -940,11 +955,7 @@ status_t AudioFlinger::EffectModule::configure()
     // Auxiliary effect:
     //      accumulates in output buffer: input buffer != output buffer
     // Therefore: accumulate <=> input buffer != output buffer
-    if (mConfig.inputCfg.buffer.raw != mConfig.outputCfg.buffer.raw) {
-        mConfig.outputCfg.accessMode = EFFECT_BUFFER_ACCESS_ACCUMULATE;
-    } else {
-        mConfig.outputCfg.accessMode = EFFECT_BUFFER_ACCESS_WRITE;
-    }
+    mConfig.outputCfg.accessMode = requiredEffectBufferAccessMode();
     mConfig.inputCfg.mask = EFFECT_CONFIG_ALL;
     mConfig.outputCfg.mask = EFFECT_CONFIG_ALL;
     mConfig.inputCfg.buffer.frameCount = callback->frameCount();
@@ -1600,7 +1611,7 @@ status_t AudioFlinger::EffectModule::setHapticIntensity(int id, int intensity)
     return status;
 }
 
-status_t AudioFlinger::EffectModule::setVibratorInfo(const media::AudioVibratorInfo* vibratorInfo)
+status_t AudioFlinger::EffectModule::setVibratorInfo(const media::AudioVibratorInfo& vibratorInfo)
 {
     if (mStatus != NO_ERROR) {
         return mStatus;
@@ -1610,15 +1621,17 @@ status_t AudioFlinger::EffectModule::setVibratorInfo(const media::AudioVibratorI
         return INVALID_OPERATION;
     }
 
+    const size_t paramCount = 3;
     std::vector<uint8_t> request(
-            sizeof(effect_param_t) + sizeof(int32_t) + 2 * sizeof(float));
+            sizeof(effect_param_t) + sizeof(int32_t) + paramCount * sizeof(float));
     effect_param_t *param = (effect_param_t*) request.data();
     param->psize = sizeof(int32_t);
-    param->vsize = 2 * sizeof(float);
+    param->vsize = paramCount * sizeof(float);
     *(int32_t*)param->data = HG_PARAM_VIBRATOR_INFO;
     float* vibratorInfoPtr = reinterpret_cast<float*>(param->data + sizeof(int32_t));
-    vibratorInfoPtr[0] = vibratorInfo->resonantFrequency;
-    vibratorInfoPtr[1] = vibratorInfo->qFactor;
+    vibratorInfoPtr[0] = vibratorInfo.resonantFrequency;
+    vibratorInfoPtr[1] = vibratorInfo.qFactor;
+    vibratorInfoPtr[2] = vibratorInfo.maxAmplitude;
     std::vector<uint8_t> response;
     status_t status = command(EFFECT_CMD_SET_PARAM, request, sizeof(int32_t), &response);
     if (status == NO_ERROR) {
@@ -1708,10 +1721,11 @@ void AudioFlinger::EffectModule::dump(int fd, const Vector<String16>& args)
 AudioFlinger::EffectHandle::EffectHandle(const sp<EffectBase>& effect,
                                          const sp<AudioFlinger::Client>& client,
                                          const sp<media::IEffectClient>& effectClient,
-                                         int32_t priority)
+                                         int32_t priority, bool notifyFramesProcessed)
     : BnEffect(),
     mEffect(effect), mEffectClient(effectClient), mClient(client), mCblk(NULL),
-    mPriority(priority), mHasControl(false), mEnabled(false), mDisconnected(false)
+    mPriority(priority), mHasControl(false), mEnabled(false), mDisconnected(false),
+    mNotifyFramesProcessed(notifyFramesProcessed)
 {
     ALOGV("constructor %p client %p", this, client.get());
 
@@ -2020,6 +2034,13 @@ void AudioFlinger::EffectHandle::setEnabled(bool enabled)
     }
 }
 
+void AudioFlinger::EffectHandle::framesProcessed(int32_t frames) const
+{
+    if (mEffectClient != 0 && mNotifyFramesProcessed) {
+        mEffectClient->framesProcessed(frames);
+    }
+}
+
 void AudioFlinger::EffectHandle::dumpToBuffer(char* buffer, size_t size)
 {
     bool locked = mCblk != NULL && AudioFlinger::dumpTryLock(mCblk->lock);
@@ -2048,11 +2069,11 @@ AudioFlinger::EffectChain::EffectChain(const wp<ThreadBase>& thread,
       mNewLeftVolume(UINT_MAX), mNewRightVolume(UINT_MAX),
       mEffectCallback(new EffectCallback(wp<EffectChain>(this), thread))
 {
-    mStrategy = AudioSystem::getStrategyForStream(AUDIO_STREAM_MUSIC);
     sp<ThreadBase> p = thread.promote();
     if (p == nullptr) {
         return;
     }
+    mStrategy = p->getStrategyForStream(AUDIO_STREAM_MUSIC);
     mMaxTailBuffers = ((kProcessTailDurationMs * p->sampleRate()) / 1000) /
                                     p->frameCount();
 }
@@ -2125,8 +2146,8 @@ void AudioFlinger::EffectChain::clearInputBuffer_l()
     if (mInBuffer == NULL) {
         return;
     }
-    const size_t frameSize =
-            audio_bytes_per_sample(EFFECT_BUFFER_FORMAT) * mEffectCallback->channelCount();
+    const size_t frameSize = audio_bytes_per_sample(EFFECT_BUFFER_FORMAT)
+            * mEffectCallback->inChannelCount(mEffects[0]->id());
 
     memset(mInBuffer->audioBuffer()->raw, 0, mEffectCallback->frameCount() * frameSize);
     mInBuffer->commit();
@@ -2212,11 +2233,9 @@ status_t AudioFlinger::EffectChain::addEffect_l(const sp<EffectModule>& effect)
 // addEffect_l() must be called with ThreadBase::mLock and EffectChain::mLock held
 status_t AudioFlinger::EffectChain::addEffect_ll(const sp<EffectModule>& effect)
 {
-    effect_descriptor_t desc = effect->desc();
-    uint32_t insertPref = desc.flags & EFFECT_FLAG_INSERT_MASK;
-
     effect->setCallback(mEffectCallback);
 
+    effect_descriptor_t desc = effect->desc();
     if ((desc.flags & EFFECT_FLAG_TYPE_MASK) == EFFECT_FLAG_TYPE_AUXILIARY) {
         // Auxiliary effects are inserted at the beginning of mEffects vector as
         // they are processed first and accumulated in chain input buffer
@@ -2236,95 +2255,137 @@ status_t AudioFlinger::EffectChain::addEffect_ll(const sp<EffectModule>& effect)
                 numSamples * sizeof(int32_t), &halBuffer);
 #endif
         if (result != OK) return result;
+
+        effect->configure();
+
         effect->setInBuffer(halBuffer);
         // auxiliary effects output samples to chain input buffer for further processing
         // by insert effects
         effect->setOutBuffer(mInBuffer);
     } else {
-        // Insert effects are inserted at the end of mEffects vector as they are processed
-        //  after track and auxiliary effects.
-        // Insert effect order as a function of indicated preference:
-        //  if EFFECT_FLAG_INSERT_EXCLUSIVE, insert in first position or reject if
-        //  another effect is present
-        //  else if EFFECT_FLAG_INSERT_FIRST, insert in first position or after the
-        //  last effect claiming first position
-        //  else if EFFECT_FLAG_INSERT_LAST, insert in last position or before the
-        //  first effect claiming last position
-        //  else if EFFECT_FLAG_INSERT_ANY insert after first or before last
-        // Reject insertion if an effect with EFFECT_FLAG_INSERT_EXCLUSIVE is
-        // already present
-
-        size_t size = mEffects.size();
-        size_t idx_insert = size;
-        ssize_t idx_insert_first = -1;
-        ssize_t idx_insert_last = -1;
-
-        for (size_t i = 0; i < size; i++) {
-            effect_descriptor_t d = mEffects[i]->desc();
-            uint32_t iMode = d.flags & EFFECT_FLAG_TYPE_MASK;
-            uint32_t iPref = d.flags & EFFECT_FLAG_INSERT_MASK;
-            if (iMode == EFFECT_FLAG_TYPE_INSERT) {
-                // check invalid effect chaining combinations
-                if (insertPref == EFFECT_FLAG_INSERT_EXCLUSIVE ||
-                    iPref == EFFECT_FLAG_INSERT_EXCLUSIVE) {
-                    ALOGW("addEffect_l() could not insert effect %s: exclusive conflict with %s",
-                            desc.name, d.name);
-                    return INVALID_OPERATION;
-                }
-                // remember position of first insert effect and by default
-                // select this as insert position for new effect
-                if (idx_insert == size) {
-                    idx_insert = i;
-                }
-                // remember position of last insert effect claiming
-                // first position
-                if (iPref == EFFECT_FLAG_INSERT_FIRST) {
-                    idx_insert_first = i;
-                }
-                // remember position of first insert effect claiming
-                // last position
-                if (iPref == EFFECT_FLAG_INSERT_LAST &&
-                    idx_insert_last == -1) {
-                    idx_insert_last = i;
-                }
-            }
+        ssize_t idx_insert = getInsertIndex(desc);
+        if (idx_insert < 0) {
+            return INVALID_OPERATION;
         }
 
-        // modify idx_insert from first position if needed
-        if (insertPref == EFFECT_FLAG_INSERT_LAST) {
-            if (idx_insert_last != -1) {
-                idx_insert = idx_insert_last;
-            } else {
-                idx_insert = size;
-            }
-        } else {
-            if (idx_insert_first != -1) {
-                idx_insert = idx_insert_first + 1;
-            }
-        }
-
-        // always read samples from chain input buffer
-        effect->setInBuffer(mInBuffer);
-
-        // if last effect in the chain, output samples to chain
-        // output buffer, otherwise to chain input buffer
-        if (idx_insert == size) {
-            if (idx_insert != 0) {
-                mEffects[idx_insert-1]->setOutBuffer(mInBuffer);
-                mEffects[idx_insert-1]->configure();
-            }
-            effect->setOutBuffer(mOutBuffer);
-        } else {
-            effect->setOutBuffer(mInBuffer);
-        }
+        size_t previousSize = mEffects.size();
         mEffects.insertAt(effect, idx_insert);
 
-        ALOGV("addEffect_l() effect %p, added in chain %p at rank %zu", effect.get(), this,
-                idx_insert);
+        effect->configure();
+
+        // - By default:
+        //   All effects read samples from chain input buffer.
+        //   The last effect in the chain, writes samples to chain output buffer,
+        //   otherwise to chain input buffer
+        // - In the OUTPUT_STAGE chain of a spatializer mixer thread:
+        //   The spatializer effect (first effect) reads samples from the input buffer
+        //   and writes samples to the output buffer.
+        //   All other effects read and writes samples to the output buffer
+        if (mEffectCallback->isSpatializer()
+                && mSessionId == AUDIO_SESSION_OUTPUT_STAGE) {
+            effect->setOutBuffer(mOutBuffer);
+            if (idx_insert == 0) {
+                if (previousSize != 0) {
+                    mEffects[1]->configure();
+                    mEffects[1]->setInBuffer(mOutBuffer);
+                    mEffects[1]->updateAccessMode();      // reconfig if neeeded.
+                }
+                effect->setInBuffer(mInBuffer);
+            } else {
+                effect->setInBuffer(mOutBuffer);
+            }
+        } else {
+            effect->setInBuffer(mInBuffer);
+            if (idx_insert == previousSize) {
+                if (idx_insert != 0) {
+                    mEffects[idx_insert-1]->configure();
+                    mEffects[idx_insert-1]->setOutBuffer(mInBuffer);
+                    mEffects[idx_insert - 1]->updateAccessMode();      // reconfig if neeeded.
+                }
+                effect->setOutBuffer(mOutBuffer);
+            } else {
+                effect->setOutBuffer(mInBuffer);
+            }
+        }
+        ALOGV("%s effect %p, added in chain %p at rank %zu",
+                __func__, effect.get(), this, idx_insert);
     }
     effect->configure();
 
     return NO_ERROR;
+}
+
+ssize_t AudioFlinger::EffectChain::getInsertIndex(const effect_descriptor_t& desc) {
+    // Insert effects are inserted at the end of mEffects vector as they are processed
+    //  after track and auxiliary effects.
+    // Insert effect order as a function of indicated preference:
+    //  if EFFECT_FLAG_INSERT_EXCLUSIVE, insert in first position or reject if
+    //  another effect is present
+    //  else if EFFECT_FLAG_INSERT_FIRST, insert in first position or after the
+    //  last effect claiming first position
+    //  else if EFFECT_FLAG_INSERT_LAST, insert in last position or before the
+    //  first effect claiming last position
+    //  else if EFFECT_FLAG_INSERT_ANY insert after first or before last
+    // Reject insertion if an effect with EFFECT_FLAG_INSERT_EXCLUSIVE is
+    // already present
+    // Spatializer or Downmixer effects are inserted in first position because
+    // they adapt the channel count for all other effects in the chain
+    if ((memcmp(&desc.type, FX_IID_SPATIALIZER, sizeof(effect_uuid_t)) == 0)
+            || (memcmp(&desc.type, EFFECT_UIID_DOWNMIX, sizeof(effect_uuid_t)) == 0)) {
+        return 0;
+    }
+
+    size_t size = mEffects.size();
+    uint32_t insertPref = desc.flags & EFFECT_FLAG_INSERT_MASK;
+    ssize_t idx_insert;
+    ssize_t idx_insert_first = -1;
+    ssize_t idx_insert_last = -1;
+
+    idx_insert = size;
+    for (size_t i = 0; i < size; i++) {
+        effect_descriptor_t d = mEffects[i]->desc();
+        uint32_t iMode = d.flags & EFFECT_FLAG_TYPE_MASK;
+        uint32_t iPref = d.flags & EFFECT_FLAG_INSERT_MASK;
+        if (iMode == EFFECT_FLAG_TYPE_INSERT) {
+            // check invalid effect chaining combinations
+            if (insertPref == EFFECT_FLAG_INSERT_EXCLUSIVE ||
+                iPref == EFFECT_FLAG_INSERT_EXCLUSIVE) {
+                ALOGW("%s could not insert effect %s: exclusive conflict with %s",
+                        __func__, desc.name, d.name);
+                return -1;
+            }
+            // remember position of first insert effect and by default
+            // select this as insert position for new effect
+            if (idx_insert == size) {
+                idx_insert = i;
+            }
+            // remember position of last insert effect claiming
+            // first position
+            if (iPref == EFFECT_FLAG_INSERT_FIRST) {
+                idx_insert_first = i;
+            }
+            // remember position of first insert effect claiming
+            // last position
+            if (iPref == EFFECT_FLAG_INSERT_LAST &&
+                idx_insert_last == -1) {
+                idx_insert_last = i;
+            }
+        }
+    }
+
+    // modify idx_insert from first position if needed
+    if (insertPref == EFFECT_FLAG_INSERT_LAST) {
+        if (idx_insert_last != -1) {
+            idx_insert = idx_insert_last;
+        } else {
+            idx_insert = size;
+        }
+    } else {
+        if (idx_insert_first != -1) {
+            idx_insert = idx_insert_first + 1;
+        }
+    }
+    return idx_insert;
 }
 
 // removeEffect_l() must be called with ThreadBase::mLock held
@@ -2350,14 +2411,23 @@ size_t AudioFlinger::EffectChain::removeEffect_l(const sp<EffectModule>& effect,
 
             if (type != EFFECT_FLAG_TYPE_AUXILIARY) {
                 if (i == size - 1 && i != 0) {
-                    mEffects[i - 1]->setOutBuffer(mOutBuffer);
                     mEffects[i - 1]->configure();
+                    mEffects[i - 1]->setOutBuffer(mOutBuffer);
+                    mEffects[i - 1]->updateAccessMode();      // reconfig if neeeded.
                 }
             }
             mEffects.removeAt(i);
+
+            // make sure the input buffer configuration for the new first effect in the chain
+            // is updated if needed (can switch from HAL channel mask to mixer channel mask)
+            if (i == 0 && size > 1) {
+                mEffects[0]->configure();
+                mEffects[0]->setInBuffer(mInBuffer);
+                mEffects[0]->updateAccessMode();      // reconfig if neeeded.
+            }
+
             ALOGV("removeEffect_l() effect %p, removed from chain %p at rank %zu", effect.get(),
                     this, i);
-
             break;
         }
     }
@@ -2901,27 +2971,26 @@ bool AudioFlinger::EffectChain::EffectCallback::isOutput() const {
 }
 
 bool AudioFlinger::EffectChain::EffectCallback::isOffload() const {
-    sp<ThreadBase> t = thread().promote();
-    if (t == nullptr) {
-        return false;
-    }
-    return t->type() == ThreadBase::OFFLOAD;
+    return mThreadType == ThreadBase::OFFLOAD;
 }
 
 bool AudioFlinger::EffectChain::EffectCallback::isOffloadOrDirect() const {
-    sp<ThreadBase> t = thread().promote();
-    if (t == nullptr) {
-        return false;
-    }
-    return t->type() == ThreadBase::OFFLOAD || t->type() == ThreadBase::DIRECT;
+    return mThreadType == ThreadBase::OFFLOAD || mThreadType == ThreadBase::DIRECT;
 }
 
 bool AudioFlinger::EffectChain::EffectCallback::isOffloadOrMmap() const {
-    sp<ThreadBase> t = thread().promote();
-    if (t == nullptr) {
+    switch (mThreadType) {
+    case ThreadBase::OFFLOAD:
+    case ThreadBase::MMAP_PLAYBACK:
+    case ThreadBase::MMAP_CAPTURE:
+        return true;
+    default:
         return false;
     }
-    return t->isOffloadOrMmap();
+}
+
+bool AudioFlinger::EffectChain::EffectCallback::isSpatializer() const {
+    return mThreadType == ThreadBase::SPATIALIZER;
 }
 
 uint32_t AudioFlinger::EffectChain::EffectCallback::sampleRate() const {
@@ -2932,20 +3001,68 @@ uint32_t AudioFlinger::EffectChain::EffectCallback::sampleRate() const {
     return t->sampleRate();
 }
 
-audio_channel_mask_t AudioFlinger::EffectChain::EffectCallback::channelMask() const {
+audio_channel_mask_t AudioFlinger::EffectChain::EffectCallback::inChannelMask(int id) const {
     sp<ThreadBase> t = thread().promote();
     if (t == nullptr) {
         return AUDIO_CHANNEL_NONE;
     }
-    return t->channelMask();
+    sp<EffectChain> c = chain().promote();
+    if (c == nullptr) {
+        return AUDIO_CHANNEL_NONE;
+    }
+
+    if (mThreadType == ThreadBase::SPATIALIZER) {
+        if (c->sessionId() == AUDIO_SESSION_OUTPUT_STAGE) {
+            if (c->isFirstEffect(id)) {
+                return t->mixerChannelMask();
+            } else {
+                return t->channelMask();
+            }
+        } else if (!audio_is_global_session(c->sessionId())) {
+            if ((t->hasAudioSession_l(c->sessionId()) & ThreadBase::SPATIALIZED_SESSION) != 0) {
+                return t->mixerChannelMask();
+            } else {
+                return t->channelMask();
+            }
+        } else {
+            return t->channelMask();
+        }
+    } else {
+        return t->channelMask();
+    }
 }
 
-uint32_t AudioFlinger::EffectChain::EffectCallback::channelCount() const {
+uint32_t AudioFlinger::EffectChain::EffectCallback::inChannelCount(int id) const {
+    return audio_channel_count_from_out_mask(inChannelMask(id));
+}
+
+audio_channel_mask_t AudioFlinger::EffectChain::EffectCallback::outChannelMask() const {
     sp<ThreadBase> t = thread().promote();
     if (t == nullptr) {
-        return 0;
+        return AUDIO_CHANNEL_NONE;
     }
-    return t->channelCount();
+    sp<EffectChain> c = chain().promote();
+    if (c == nullptr) {
+        return AUDIO_CHANNEL_NONE;
+    }
+
+    if (mThreadType == ThreadBase::SPATIALIZER) {
+        if (!audio_is_global_session(c->sessionId())) {
+            if ((t->hasAudioSession_l(c->sessionId()) & ThreadBase::SPATIALIZED_SESSION) != 0) {
+                return t->mixerChannelMask();
+            } else {
+                return t->channelMask();
+            }
+        } else {
+            return t->channelMask();
+        }
+    } else {
+        return t->channelMask();
+    }
+}
+
+uint32_t AudioFlinger::EffectChain::EffectCallback::outChannelCount() const {
+    return audio_channel_count_from_out_mask(outChannelMask());
 }
 
 audio_channel_mask_t AudioFlinger::EffectChain::EffectCallback::hapticChannelMask() const {
@@ -3143,7 +3260,8 @@ status_t AudioFlinger::DeviceEffectProxy::checkPort(const PatchPanel::Patch& pat
         } else {
             mHalEffect->setDevices({mDevice});
         }
-        *handle = new EffectHandle(mHalEffect, nullptr, nullptr, 0 /*priority*/);
+        *handle = new EffectHandle(mHalEffect, nullptr, nullptr, 0 /*priority*/,
+                                   mNotifyFramesProcessed);
         status = (*handle)->initCheck();
         if (status == OK) {
             status = mHalEffect->addHandle((*handle).get());
@@ -3169,7 +3287,8 @@ status_t AudioFlinger::DeviceEffectProxy::checkPort(const PatchPanel::Patch& pat
         int enabled;
         *handle = thread->createEffect_l(nullptr, nullptr, 0, AUDIO_SESSION_DEVICE,
                                          const_cast<effect_descriptor_t *>(&mDescriptor),
-                                         &enabled, &status, false, false /*probe*/);
+                                         &enabled, &status, false, false /*probe*/,
+                                         mNotifyFramesProcessed);
         ALOGV("%s thread->createEffect_l status %d", __func__, status);
     } else {
         status = BAD_VALUE;
@@ -3364,7 +3483,8 @@ uint32_t AudioFlinger::DeviceEffectProxy::ProxyCallback::sampleRate() const {
     return proxy->sampleRate();
 }
 
-audio_channel_mask_t AudioFlinger::DeviceEffectProxy::ProxyCallback::channelMask() const {
+audio_channel_mask_t AudioFlinger::DeviceEffectProxy::ProxyCallback::inChannelMask(
+        int id __unused) const {
     sp<DeviceEffectProxy> proxy = mProxy.promote();
     if (proxy == nullptr) {
         return AUDIO_CHANNEL_OUT_STEREO;
@@ -3372,7 +3492,23 @@ audio_channel_mask_t AudioFlinger::DeviceEffectProxy::ProxyCallback::channelMask
     return proxy->channelMask();
 }
 
-uint32_t AudioFlinger::DeviceEffectProxy::ProxyCallback::channelCount() const {
+uint32_t AudioFlinger::DeviceEffectProxy::ProxyCallback::inChannelCount(int id __unused) const {
+    sp<DeviceEffectProxy> proxy = mProxy.promote();
+    if (proxy == nullptr) {
+        return 2;
+    }
+    return proxy->channelCount();
+}
+
+audio_channel_mask_t AudioFlinger::DeviceEffectProxy::ProxyCallback::outChannelMask() const {
+    sp<DeviceEffectProxy> proxy = mProxy.promote();
+    if (proxy == nullptr) {
+        return AUDIO_CHANNEL_OUT_STEREO;
+    }
+    return proxy->channelMask();
+}
+
+uint32_t AudioFlinger::DeviceEffectProxy::ProxyCallback::outChannelCount() const {
     sp<DeviceEffectProxy> proxy = mProxy.promote();
     if (proxy == nullptr) {
         return 2;

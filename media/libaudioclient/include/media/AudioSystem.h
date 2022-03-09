@@ -22,6 +22,8 @@
 #include <android/media/AudioVibratorInfo.h>
 #include <android/media/BnAudioFlingerClient.h>
 #include <android/media/BnAudioPolicyServiceClient.h>
+#include <android/media/INativeSpatializerCallback.h>
+#include <android/media/ISpatializer.h>
 #include <android/content/AttributionSourceState.h>
 #include <media/AidlConversionUtil.h>
 #include <media/AudioDeviceTypeAddr.h>
@@ -224,6 +226,9 @@ public:
 
     // Indicate JAVA services are ready (scheduling, power management ...)
     static status_t systemReady();
+
+    // Indicate audio policy service is ready
+    static status_t audioPolicyReady();
 
     // Returns the number of frames per audio HAL buffer.
     // Corresponds to audio_stream->get_buffer_size()/audio_stream_in_frame_size() for input.
@@ -485,6 +490,49 @@ public:
     static status_t getDeviceForStrategy(product_strategy_t strategy,
             AudioDeviceTypeAddr &device);
 
+
+    /**
+     * If a spatializer stage effect is present on the platform, this will return an
+     * ISpatializer interface to control this feature.
+     * If no spatializer stage is present, a null interface is returned.
+     * The INativeSpatializerCallback passed must not be null.
+     * Only one ISpatializer interface can exist at a given time. The native audio policy
+     * service will reject the request if an interface was already acquired and previous owner
+     * did not die or call ISpatializer.release().
+     * @param callback in: the callback to receive state updates if the ISpatializer
+     *        interface is acquired.
+     * @param spatializer out: the ISpatializer interface made available to control the
+     *        platform spatializer
+     * @return NO_ERROR in case of success, DEAD_OBJECT, NO_INIT, PERMISSION_DENIED, BAD_VALUE
+     *         in case of error.
+     */
+    static status_t getSpatializer(const sp<media::INativeSpatializerCallback>& callback,
+                                        sp<media::ISpatializer>* spatializer);
+
+    /**
+     * Queries if some kind of spatialization will be performed if the audio playback context
+     * described by the provided arguments is present.
+     * The context is made of:
+     * - The audio attributes describing the playback use case.
+     * - The audio configuration describing the audio format, channels, sampling rate ...
+     * - The devices describing the sink audio device selected for playback.
+     * All arguments are optional and only the specified arguments are used to match against
+     * supported criteria. For instance, supplying no argument will tell if spatialization is
+     * supported or not in general.
+     * @param attr audio attributes describing the playback use case
+     * @param config audio configuration describing the audio format, channels, sampling rate...
+     * @param devices the sink audio device selected for playback
+     * @param canBeSpatialized out: true if spatialization is enabled for this context,
+     *        false otherwise
+     * @return NO_ERROR in case of success, DEAD_OBJECT, NO_INIT, BAD_VALUE
+     *         in case of error.
+     */
+    static status_t canBeSpatialized(const audio_attributes_t *attr,
+                                     const audio_config_t *config,
+                                     const AudioDeviceTypeAddrVector &devices,
+                                     bool *canBeSpatialized);
+
+
     // A listener for capture state changes.
     class CaptureStateListener : public RefBase {
     public:
@@ -497,11 +545,11 @@ public:
         virtual ~CaptureStateListener() = default;
     };
 
-    // Regiseters a listener for sound trigger capture state changes.
+    // Registers a listener for sound trigger capture state changes.
     // There may only be one such listener registered at any point.
-    // The listener onStateChanged() method will be invoked sychronously from
+    // The listener onStateChanged() method will be invoked synchronously from
     // this call with the initial value.
-    // The listener onServiceDied() method will be invoked sychronously from
+    // The listener onServiceDied() method will be invoked synchronously from
     // this call if initial attempt to register failed.
     // If the audio policy service cannot be reached, this method will return
     // PERMISSION_DENIED and will not invoke the callback, otherwise, it will

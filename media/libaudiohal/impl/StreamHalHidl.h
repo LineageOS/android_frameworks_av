@@ -71,7 +71,7 @@ class StreamHalHidl : public virtual StreamHalInterface, public ConversionHelper
     // Put the audio hardware input/output into standby mode.
     virtual status_t standby();
 
-    virtual status_t dump(int fd);
+    virtual status_t dump(int fd, const Vector<String16>& args) override;
 
     // Start a stream operating in mmap mode.
     virtual status_t start();

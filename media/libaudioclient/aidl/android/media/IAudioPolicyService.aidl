@@ -47,8 +47,10 @@ import android.media.DeviceRole;
 import android.media.EffectDescriptor;
 import android.media.GetInputForAttrResponse;
 import android.media.GetOutputForAttrResponse;
+import android.media.GetSpatializerResponse;
 import android.media.IAudioPolicyServiceClient;
 import android.media.ICaptureStateListener;
+import android.media.INativeSpatializerCallback;
 import android.media.Int;
 import android.media.SoundTriggerSession;
 
@@ -348,4 +350,29 @@ interface IAudioPolicyService {
                                                     DeviceRole role);
 
     boolean registerSoundTriggerCaptureStateListener(ICaptureStateListener listener);
+
+    /** If a spatializer stage effect is present on the platform, this will return an
+     * ISpatializer interface (see GetSpatializerResponse,aidl) to control this
+     * feature.
+     * If no spatializer stage is present, a null interface is returned.
+     * The INativeSpatializerCallback passed must not be null.
+     * Only one ISpatializer interface can exist at a given time. The native audio policy
+     * service will reject the request if an interface was already acquired and previous owner
+     * did not die or call ISpatializer.release().
+     */
+    GetSpatializerResponse getSpatializer(INativeSpatializerCallback callback);
+
+    /** Queries if some kind of spatialization will be performed if the audio playback context
+     * described by the provided arguments is present.
+     * The context is made of:
+     * - The audio attributes describing the playback use case.
+     * - The audio configuration describing the audio format, channels, sampling rate...
+     * - The devices describing the sink audio device selected for playback.
+     * All arguments are optional and only the specified arguments are used to match against
+     * supported criteria. For instance, supplying no argument will tell if spatialization is
+     * supported or not in general.
+     */
+    boolean canBeSpatialized(in @nullable AudioAttributesInternal attr,
+                             in @nullable AudioConfig config,
+                             in AudioDevice[] devices);
 }

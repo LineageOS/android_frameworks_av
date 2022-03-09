@@ -32,7 +32,7 @@
 #include <statslog.h>
 
 #include "MediaMetricsService.h"
-#include "StringUtils.h"
+#include "ValidateId.h"
 #include "frameworks/proto_logging/stats/message/mediametrics_message.pb.h"
 #include "iface_statsd.h"
 
@@ -59,7 +59,7 @@ bool statsd_recorder(const std::shared_ptr<const mediametrics::Item>& item,
     // string kRecorderLogSessionId = "android.media.mediarecorder.log-session-id";
     std::string log_session_id;
     if (item->getString("android.media.mediarecorder.log-session-id", &log_session_id)) {
-        log_session_id = mediametrics::stringutils::sanitizeLogSessionId(log_session_id);
+        log_session_id = mediametrics::ValidateId::get()->validateId(log_session_id);
         metrics_proto.set_log_session_id(log_session_id);
     }
     // string kRecorderAudioMime = "android.media.mediarecorder.audio.mime";

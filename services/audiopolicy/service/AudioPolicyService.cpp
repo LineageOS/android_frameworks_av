@@ -127,6 +127,7 @@ void AudioPolicyService::onFirstRef()
         loadAudioPolicyManager();
         mAudioPolicyManager = mCreateAudioPolicyManager(mAudioPolicyClient);
     }
+
     // load audio processing modules
     sp<AudioPolicyEffects> audioPolicyEffects = new AudioPolicyEffects();
     sp<UidPolicy> uidPolicy = new UidPolicy(this);
@@ -139,6 +140,18 @@ void AudioPolicyService::onFirstRef()
     }
     uidPolicy->registerSelf();
     sensorPrivacyPolicy->registerSelf();
+
+    // Create spatializer if supported
+    if (mAudioPolicyManager != nullptr) {
+        Mutex::Autolock _l(mLock);
+        const audio_attributes_t attr = attributes_initializer(AUDIO_USAGE_MEDIA);
+        AudioDeviceTypeAddrVector devices;
+        bool hasSpatializer = mAudioPolicyManager->canBeSpatialized(&attr, nullptr, devices);
+        if (hasSpatializer) {
+            mSpatializer = Spatializer::create(this);
+        }
+    }
+    AudioSystem::audioPolicyReady();
 }
 
 void AudioPolicyService::unloadAudioPolicyManager()
@@ -350,6 +363,60 @@ void AudioPolicyService::doOnRoutingUpdated()
   Mutex::Autolock _l(mNotificationClientsLock);
     for (size_t i = 0; i < mNotificationClients.size(); i++) {
         mNotificationClients.valueAt(i)->onRoutingUpdated();
+    }
+}
+
+void AudioPolicyService::onCheckSpatializer()
+{
+    Mutex::Autolock _l(mLock);
+    onCheckSpatializer_l();
+}
+
+void AudioPolicyService::onCheckSpatializer_l()
+{
+    if (mSpatializer != nullptr) {
+        mOutputCommandThread->checkSpatializerCommand();
+    }
+}
+
+void AudioPolicyService::doOnCheckSpatializer()
+{
+    Mutex::Autolock _l(mLock);
+
+    if (mSpatializer != nullptr) {
+        // Note: mSpatializer != nullptr =>  mAudioPolicyManager != nullptr
+        if (mSpatializer->getLevel() != media::SpatializationLevel::NONE) {
+            audio_io_handle_t currentOutput = mSpatializer->getOutput();
+            audio_io_handle_t newOutput;
+            const audio_attributes_t attr = attributes_initializer(AUDIO_USAGE_MEDIA);
+            audio_config_base_t config = mSpatializer->getAudioInConfig();
+            status_t status =
+                    mAudioPolicyManager->getSpatializerOutput(&config, &attr, &newOutput);
+
+            if (status == NO_ERROR && currentOutput == newOutput) {
+                return;
+            }
+            mLock.unlock();
+            // It is OK to call detachOutput() is none is already attached.
+            mSpatializer->detachOutput();
+            if (status != NO_ERROR || newOutput == AUDIO_IO_HANDLE_NONE) {
+                mLock.lock();
+                return;
+            }
+            status = mSpatializer->attachOutput(newOutput);
+            mLock.lock();
+            if (status != NO_ERROR) {
+                mAudioPolicyManager->releaseSpatializerOutput(newOutput);
+            }
+        } else if (mSpatializer->getLevel() == media::SpatializationLevel::NONE
+                               && mSpatializer->getOutput() != AUDIO_IO_HANDLE_NONE) {
+            mLock.unlock();
+            audio_io_handle_t output = mSpatializer->detachOutput();
+            mLock.lock();
+            if (output != AUDIO_IO_HANDLE_NONE) {
+                mAudioPolicyManager->releaseSpatializerOutput(output);
+            }
+        }
     }
 }
 
@@ -990,7 +1057,8 @@ status_t AudioPolicyService::onTransact(
         case TRANSACTION_addDevicesRoleForCapturePreset:
         case TRANSACTION_removeDevicesRoleForCapturePreset:
         case TRANSACTION_clearDevicesRoleForCapturePreset:
-        case TRANSACTION_getDevicesForRoleAndCapturePreset: {
+        case TRANSACTION_getDevicesForRoleAndCapturePreset:
+        case TRANSACTION_getSpatializer: {
             if (!isServiceUid(IPCThreadState::self()->getCallingUid())) {
                 ALOGW("%s: transaction %d received from PID %d unauthorized UID %d",
                       __func__, code, IPCThreadState::self()->getCallingPid(),
@@ -1764,6 +1832,17 @@ bool AudioPolicyService::AudioCommandThread::threadLoop()
                     mLock.lock();
                     } break;
 
+                case CHECK_SPATIALIZER: {
+                    ALOGV("AudioCommandThread() processing updateUID states");
+                    svc = mService.promote();
+                    if (svc == 0) {
+                        break;
+                    }
+                    mLock.unlock();
+                    svc->doOnCheckSpatializer();
+                    mLock.lock();
+                    } break;
+
                 default:
                     ALOGW("AudioCommandThread() unknown command %d", command->mCommand);
                 }
@@ -2072,6 +2151,14 @@ void AudioPolicyService::AudioCommandThread::routingChangedCommand()
     sp<AudioCommand>command = new AudioCommand();
     command->mCommand = ROUTING_UPDATED;
     ALOGV("AudioCommandThread() adding routing update");
+    sendCommand(command);
+}
+
+void AudioPolicyService::AudioCommandThread::checkSpatializerCommand()
+{
+    sp<AudioCommand>command = new AudioCommand();
+    command->mCommand = CHECK_SPATIALIZER;
+    ALOGV("AudioCommandThread() adding check spatializer");
     sendCommand(command);
 }
 

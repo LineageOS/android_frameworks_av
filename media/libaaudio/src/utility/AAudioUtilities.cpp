@@ -235,25 +235,293 @@ audio_source_t AAudioConvert_inputPresetToAudioSource(aaudio_input_preset_t pres
 }
 
 audio_flags_mask_t AAudioConvert_allowCapturePolicyToAudioFlagsMask(
-        aaudio_allowed_capture_policy_t policy) {
+        aaudio_allowed_capture_policy_t policy,
+        aaudio_spatialization_behavior_t spatializationBehavior,
+        bool isContentSpatialized) {
+    audio_flags_mask_t flagsMask = AUDIO_FLAG_NONE;
     switch (policy) {
         case AAUDIO_UNSPECIFIED:
         case AAUDIO_ALLOW_CAPTURE_BY_ALL:
-            return AUDIO_FLAG_NONE;
+            // flagsMask is not modified
+            break;
         case AAUDIO_ALLOW_CAPTURE_BY_SYSTEM:
-            return AUDIO_FLAG_NO_MEDIA_PROJECTION;
+            flagsMask = static_cast<audio_flags_mask_t>(flagsMask | AUDIO_FLAG_NO_MEDIA_PROJECTION);
+            break;
         case AAUDIO_ALLOW_CAPTURE_BY_NONE:
-            return static_cast<audio_flags_mask_t>(
+            flagsMask = static_cast<audio_flags_mask_t>(flagsMask |
                     AUDIO_FLAG_NO_MEDIA_PROJECTION | AUDIO_FLAG_NO_SYSTEM_CAPTURE);
+            break;
         default:
-            ALOGE("%s() 0x%08X unrecognized", __func__, policy);
-            return AUDIO_FLAG_NONE; //
+            ALOGE("%s() 0x%08X unrecognized capture policy", __func__, policy);
+            // flagsMask is not modified
     }
+
+    switch (spatializationBehavior) {
+        case AAUDIO_UNSPECIFIED:
+        case AAUDIO_SPATIALIZATION_BEHAVIOR_AUTO:
+            // flagsMask is not modified
+            break;
+        case AAUDIO_SPATIALIZATION_BEHAVIOR_NEVER:
+            flagsMask = static_cast<audio_flags_mask_t>(flagsMask | AUDIO_FLAG_NEVER_SPATIALIZE);
+            break;
+        default:
+            ALOGE("%s() 0x%08X unrecognized spatialization behavior",
+                  __func__, spatializationBehavior);
+            // flagsMask is not modified
+    }
+
+    if (isContentSpatialized) {
+        flagsMask = static_cast<audio_flags_mask_t>(flagsMask | AUDIO_FLAG_CONTENT_SPATIALIZED);
+    }
+
+    return flagsMask;
 }
 
 audio_flags_mask_t AAudioConvert_privacySensitiveToAudioFlagsMask(
         bool privacySensitive) {
     return privacySensitive ? AUDIO_FLAG_CAPTURE_PRIVATE : AUDIO_FLAG_NONE;
+}
+
+audio_channel_mask_t AAudioConvert_aaudioToAndroidChannelLayoutMask(
+        aaudio_channel_mask_t channelMask, bool isInput) {
+    if (isInput) {
+        switch (channelMask) {
+            case AAUDIO_CHANNEL_MONO:
+                return AUDIO_CHANNEL_IN_MONO;
+            case AAUDIO_CHANNEL_STEREO:
+                return AUDIO_CHANNEL_IN_STEREO;
+            case AAUDIO_CHANNEL_FRONT_BACK:
+                return AUDIO_CHANNEL_IN_FRONT_BACK;
+            case AAUDIO_CHANNEL_2POINT0POINT2:
+                return AUDIO_CHANNEL_IN_2POINT0POINT2;
+            case AAUDIO_CHANNEL_2POINT1POINT2:
+                return AUDIO_CHANNEL_IN_2POINT1POINT2;
+            case AAUDIO_CHANNEL_3POINT0POINT2:
+                return AUDIO_CHANNEL_IN_3POINT0POINT2;
+            case AAUDIO_CHANNEL_3POINT1POINT2:
+                return AUDIO_CHANNEL_IN_3POINT1POINT2;
+            case AAUDIO_CHANNEL_5POINT1:
+                return AUDIO_CHANNEL_IN_5POINT1;
+            default:
+                ALOGE("%s() %#x unrecognized", __func__, channelMask);
+                return AUDIO_CHANNEL_INVALID;
+        }
+    } else {
+        switch (channelMask) {
+            case AAUDIO_CHANNEL_MONO:
+                return AUDIO_CHANNEL_OUT_MONO;
+            case AAUDIO_CHANNEL_STEREO:
+                return AUDIO_CHANNEL_OUT_STEREO;
+            case AAUDIO_CHANNEL_2POINT1:
+                return AUDIO_CHANNEL_OUT_2POINT1;
+            case AAUDIO_CHANNEL_TRI:
+                return AUDIO_CHANNEL_OUT_TRI;
+            case AAUDIO_CHANNEL_TRI_BACK:
+                return AUDIO_CHANNEL_OUT_TRI_BACK;
+            case AAUDIO_CHANNEL_3POINT1:
+                return AUDIO_CHANNEL_OUT_3POINT1;
+            case AAUDIO_CHANNEL_2POINT0POINT2:
+                return AUDIO_CHANNEL_OUT_2POINT0POINT2;
+            case AAUDIO_CHANNEL_2POINT1POINT2:
+                return AUDIO_CHANNEL_OUT_2POINT1POINT2;
+            case AAUDIO_CHANNEL_3POINT0POINT2:
+                return AUDIO_CHANNEL_OUT_3POINT0POINT2;
+            case AAUDIO_CHANNEL_3POINT1POINT2:
+                return AUDIO_CHANNEL_OUT_3POINT1POINT2;
+            case AAUDIO_CHANNEL_QUAD:
+                return AUDIO_CHANNEL_OUT_QUAD;
+            case AAUDIO_CHANNEL_QUAD_SIDE:
+                return AUDIO_CHANNEL_OUT_QUAD_SIDE;
+            case AAUDIO_CHANNEL_SURROUND:
+                return AUDIO_CHANNEL_OUT_SURROUND;
+            case AAUDIO_CHANNEL_PENTA:
+                return AUDIO_CHANNEL_OUT_PENTA;
+            case AAUDIO_CHANNEL_5POINT1:
+                return AUDIO_CHANNEL_OUT_5POINT1;
+            case AAUDIO_CHANNEL_5POINT1_SIDE:
+                return AUDIO_CHANNEL_OUT_5POINT1_SIDE;
+            case AAUDIO_CHANNEL_5POINT1POINT2:
+                return AUDIO_CHANNEL_OUT_5POINT1POINT2;
+            case AAUDIO_CHANNEL_5POINT1POINT4:
+                return AUDIO_CHANNEL_OUT_5POINT1POINT4;
+            case AAUDIO_CHANNEL_6POINT1:
+                return AUDIO_CHANNEL_OUT_6POINT1;
+            case AAUDIO_CHANNEL_7POINT1:
+                return AUDIO_CHANNEL_OUT_7POINT1;
+            case AAUDIO_CHANNEL_7POINT1POINT2:
+                return AUDIO_CHANNEL_OUT_7POINT1POINT2;
+            case AAUDIO_CHANNEL_7POINT1POINT4:
+                return AUDIO_CHANNEL_OUT_7POINT1POINT4;
+            // TODO: add 9point1point4 and 9point1point6 when they are added in audio-hal-enums.h
+            // case AAUDIO_CHANNEL_9POINT1POINT4:
+            //     return AUDIO_CHANNEL_OUT_9POINT1POINT4;
+            // case AAUDIO_CHANNEL_9POINT1POINT6:
+            //     return AUDIO_CHANNEL_OUT_9POINT1POINT6;
+            default:
+                ALOGE("%s() %#x unrecognized", __func__, channelMask);
+                return AUDIO_CHANNEL_INVALID;
+        }
+    }
+}
+
+aaudio_channel_mask_t AAudioConvert_androidToAAudioChannelLayoutMask(
+        audio_channel_mask_t channelMask, bool isInput) {
+    if (isInput) {
+        switch (channelMask) {
+            case AUDIO_CHANNEL_IN_MONO:
+                return AAUDIO_CHANNEL_MONO;
+            case AUDIO_CHANNEL_IN_STEREO:
+                return AAUDIO_CHANNEL_STEREO;
+            case AUDIO_CHANNEL_IN_FRONT_BACK:
+                return AAUDIO_CHANNEL_FRONT_BACK;
+            case AUDIO_CHANNEL_IN_2POINT0POINT2:
+                return AAUDIO_CHANNEL_2POINT0POINT2;
+            case AUDIO_CHANNEL_IN_2POINT1POINT2:
+                return AAUDIO_CHANNEL_2POINT1POINT2;
+            case AUDIO_CHANNEL_IN_3POINT0POINT2:
+                return AAUDIO_CHANNEL_3POINT0POINT2;
+            case AUDIO_CHANNEL_IN_3POINT1POINT2:
+                return AAUDIO_CHANNEL_3POINT1POINT2;
+            case AUDIO_CHANNEL_IN_5POINT1:
+                return AAUDIO_CHANNEL_5POINT1;
+            default:
+                ALOGE("%s() %#x unrecognized", __func__, channelMask);
+                return AAUDIO_CHANNEL_INVALID;
+        }
+    } else {
+        switch (channelMask) {
+            case AUDIO_CHANNEL_OUT_MONO:
+                return AAUDIO_CHANNEL_MONO;
+            case AUDIO_CHANNEL_OUT_STEREO:
+                return AAUDIO_CHANNEL_STEREO;
+            case AUDIO_CHANNEL_OUT_2POINT1:
+                return AAUDIO_CHANNEL_2POINT1;
+            case AUDIO_CHANNEL_OUT_TRI:
+                return AAUDIO_CHANNEL_TRI;
+            case AUDIO_CHANNEL_OUT_TRI_BACK:
+                return AAUDIO_CHANNEL_TRI_BACK;
+            case AUDIO_CHANNEL_OUT_3POINT1:
+                return AAUDIO_CHANNEL_3POINT1;
+            case AUDIO_CHANNEL_OUT_2POINT0POINT2:
+                return AAUDIO_CHANNEL_2POINT0POINT2;
+            case AUDIO_CHANNEL_OUT_2POINT1POINT2:
+                return AAUDIO_CHANNEL_2POINT1POINT2;
+            case AUDIO_CHANNEL_OUT_3POINT0POINT2:
+                return AAUDIO_CHANNEL_3POINT0POINT2;
+            case AUDIO_CHANNEL_OUT_3POINT1POINT2:
+                return AAUDIO_CHANNEL_3POINT1POINT2;
+            case AUDIO_CHANNEL_OUT_QUAD:
+                return AAUDIO_CHANNEL_QUAD;
+            case AUDIO_CHANNEL_OUT_QUAD_SIDE:
+                return AAUDIO_CHANNEL_QUAD_SIDE;
+            case AUDIO_CHANNEL_OUT_SURROUND:
+                return AAUDIO_CHANNEL_SURROUND;
+            case AUDIO_CHANNEL_OUT_PENTA:
+                return AAUDIO_CHANNEL_PENTA;
+            case AUDIO_CHANNEL_OUT_5POINT1:
+                return AAUDIO_CHANNEL_5POINT1;
+            case AUDIO_CHANNEL_OUT_5POINT1_SIDE:
+                return AAUDIO_CHANNEL_5POINT1_SIDE;
+            case AUDIO_CHANNEL_OUT_5POINT1POINT2:
+                return AAUDIO_CHANNEL_5POINT1POINT2;
+            case AUDIO_CHANNEL_OUT_5POINT1POINT4:
+                return AAUDIO_CHANNEL_5POINT1POINT4;
+            case AUDIO_CHANNEL_OUT_6POINT1:
+                return AAUDIO_CHANNEL_6POINT1;
+            case AUDIO_CHANNEL_OUT_7POINT1:
+                return AAUDIO_CHANNEL_7POINT1;
+            case AUDIO_CHANNEL_OUT_7POINT1POINT2:
+                return AAUDIO_CHANNEL_7POINT1POINT2;
+            case AUDIO_CHANNEL_OUT_7POINT1POINT4:
+                return AAUDIO_CHANNEL_7POINT1POINT4;
+            // TODO: add 9point1point4 and 9point1point6 when they are added in audio-hal-enums.h
+            // case AUDIO_CHANNEL_OUT_9POINT1POINT4:
+            //     return AAUDIO_CHANNEL_9POINT1POINT4;
+            // case AUDIO_CHANNEL_OUT_9POINT1POINT6:
+            //     return AAUDIO_CHANNEL_9POINT1POINT6;
+            default:
+                ALOGE("%s() %#x unrecognized", __func__, channelMask);
+                return AAUDIO_CHANNEL_INVALID;
+        }
+    }
+}
+
+int32_t AAudioConvert_channelMaskToCount(aaudio_channel_mask_t channelMask) {
+    return __builtin_popcount(channelMask & ~AAUDIO_CHANNEL_BIT_INDEX);
+}
+
+aaudio_channel_mask_t AAudioConvert_channelCountToMask(int32_t channelCount) {
+    if (channelCount < 0 || channelCount > AUDIO_CHANNEL_COUNT_MAX) {
+        return AAUDIO_CHANNEL_INVALID;
+    }
+
+    if (channelCount == 0) {
+        return AAUDIO_UNSPECIFIED;
+    }
+
+    // Return index mask if the channel count is greater than 2.
+    return AAUDIO_CHANNEL_BIT_INDEX | ((1 << channelCount) - 1);
+}
+
+aaudio_channel_mask_t AAudioConvert_androidToAAudioChannelIndexMask(
+        audio_channel_mask_t channelMask) {
+    if (audio_channel_mask_get_representation(channelMask) != AUDIO_CHANNEL_REPRESENTATION_INDEX) {
+        ALOGE("%s() %#x not an index mask", __func__, channelMask);
+        return AAUDIO_CHANNEL_INVALID;
+    }
+    return (channelMask & ~AUDIO_CHANNEL_INDEX_HDR) | AAUDIO_CHANNEL_BIT_INDEX;
+}
+
+audio_channel_mask_t AAudioConvert_aaudioToAndroidChannelIndexMask(
+        aaudio_channel_mask_t channelMask) {
+    if (!AAudio_isChannelIndexMask(channelMask)) {
+        ALOGE("%s() %#x not an index mask", __func__, channelMask);
+        return AUDIO_CHANNEL_INVALID;
+    }
+    return audio_channel_mask_for_index_assignment_from_count(
+            AAudioConvert_channelMaskToCount(channelMask));
+}
+
+aaudio_channel_mask_t AAudioConvert_androidToAAudioChannelMask(
+        audio_channel_mask_t channelMask, bool isInput, bool indexMaskRequired) {
+    if (audio_channel_mask_get_representation(channelMask) == AUDIO_CHANNEL_REPRESENTATION_INDEX) {
+        return AAudioConvert_androidToAAudioChannelIndexMask(channelMask);
+    }
+    if (indexMaskRequired) {
+        // Require index mask, `channelMask` here is a position mask.
+        const int channelCount = isInput ? audio_channel_count_from_in_mask(channelMask)
+                                         : audio_channel_count_from_out_mask(channelMask);
+        return AAudioConvert_channelCountToMask(channelCount);
+    }
+    return AAudioConvert_androidToAAudioChannelLayoutMask(channelMask, isInput);
+}
+
+audio_channel_mask_t AAudioConvert_aaudioToAndroidChannelMask(
+        aaudio_channel_mask_t channelMask, bool isInput) {
+    return AAudio_isChannelIndexMask(channelMask)
+            ? AAudioConvert_aaudioToAndroidChannelIndexMask(channelMask)
+            : AAudioConvert_aaudioToAndroidChannelLayoutMask(channelMask, isInput);
+}
+
+bool AAudio_isChannelIndexMask(aaudio_channel_mask_t channelMask) {
+    return (channelMask & AAUDIO_CHANNEL_BIT_INDEX) == AAUDIO_CHANNEL_BIT_INDEX;
+}
+
+audio_channel_mask_t AAudio_getChannelMaskForOpen(
+        aaudio_channel_mask_t channelMask, int32_t samplesPerFrame, bool isInput) {
+    if (channelMask != AAUDIO_UNSPECIFIED) {
+        if (AAudio_isChannelIndexMask(channelMask) && samplesPerFrame <= 2) {
+            // When it is index mask and the count is less than 3, use position mask
+            // instead of index mask for opening a stream. This may need to be revisited
+            // when making channel index mask public.
+            return isInput ? audio_channel_in_mask_from_count(samplesPerFrame)
+                           : audio_channel_out_mask_from_count(samplesPerFrame);
+        }
+        return AAudioConvert_aaudioToAndroidChannelMask(channelMask, isInput);
+    }
+
+    // Return stereo when unspecified.
+    return isInput ? AUDIO_CHANNEL_IN_STEREO : AUDIO_CHANNEL_OUT_STEREO;
 }
 
 int32_t AAudioConvert_framesToBytes(int32_t numFrames,
