@@ -358,7 +358,9 @@ public:
 
         virtual bool canBeSpatialized(const audio_attributes_t *attr,
                                       const audio_config_t *config,
-                                      const AudioDeviceTypeAddrVector &devices) const;
+                                      const AudioDeviceTypeAddrVector &devices) const {
+            return canBeSpatializedInt(attr, config, devices);
+        }
 
         virtual status_t getSpatializerOutput(const audio_config_base_t *config,
                                                 const audio_attributes_t *attr,
@@ -961,6 +963,30 @@ private:
                 const DeviceVector &devices,
                 audio_io_handle_t *output);
 
+        /**
+         * @brief Queries if some kind of spatialization will be performed if the audio playback
+         * context described by the provided arguments is present.
+         * The context is made of:
+         * - The audio attributes describing the playback use case.
+         * - The audio configuration describing the audio format, channels, sampling rate ...
+         * - The devices describing the sink audio device selected for playback.
+         * All arguments are optional and only the specified arguments are used to match against
+         * supported criteria. For instance, supplying no argument will tell if spatialization is
+         * supported or not in general.
+         * @param attr audio attributes describing the playback use case
+         * @param config audio configuration describing the audio format, channels, sample rate...
+         * @param devices the sink audio device selected for playback
+         * @param allowCurrentOutputReconfig if true, the result will be considering it is possible
+         *      to close and reopen an existing spatializer output stream to match the requested
+         *      criteria. If false, the criteria must be compatible with the opened sptializer
+         *      output.
+         * @return true if spatialization is possible for this context, false otherwise.
+         */
+        virtual bool canBeSpatializedInt(const audio_attributes_t *attr,
+                                      const audio_config_t *config,
+                                      const AudioDeviceTypeAddrVector &devices,
+                                      bool allowCurrentOutputReconfig = true) const;
+
         sp<IOProfile> getSpatializerOutputProfile(const audio_config_t *config,
                                                   const AudioDeviceTypeAddrVector &devices) const;
 
@@ -1056,8 +1082,20 @@ private:
 
         bool areAllActiveTracksRerouted(const sp<SwAudioOutputDescriptor>& output);
 
-        sp<SwAudioOutputDescriptor> openOutputWithProfileAndDevice(const sp<IOProfile>& profile,
-                                                                   const DeviceVector& devices);
+        /**
+         * @brief Opens an output stream from the supplied IOProfile and route it to the
+         * supplied audio devices. If a mixer config is specified, it is forwarded to audio
+         * flinger. If not, a default config is derived from the output stream config.
+         * Also opens a duplicating output if needed and queries the audio HAL for supported
+         * audio profiles if the IOProfile is dynamic.
+         * @param[in] profile IOProfile to use as template
+         * @param[in] devices initial route to apply to this output stream
+         * @param[in] mixerConfig if not null, use this to configure the mixer
+         * @return an output descriptor for the newly opened stream or null in case of error.
+         */
+        sp<SwAudioOutputDescriptor> openOutputWithProfileAndDevice(
+                const sp<IOProfile>& profile, const DeviceVector& devices,
+                const audio_config_base_t *mixerConfig = nullptr);
 
 };
 
