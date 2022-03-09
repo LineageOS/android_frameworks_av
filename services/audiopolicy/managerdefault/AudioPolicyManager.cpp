@@ -6188,6 +6188,12 @@ void AudioPolicyManager::checkOutputForAttributes(const audio_attributes_t &attr
             for (auto stream :  mEngine->getStreamTypesForProductStrategy(psId)) {
                 mpClientInterface->invalidateStream(stream);
             }
+            for (audio_io_handle_t srcOut : srcOutputs) {
+                sp<SwAudioOutputDescriptor> desc = mPreviousOutputs.valueFor(srcOut);
+                if (desc == nullptr) continue;
+
+                desc->setTracksInvalidatedStatusByStrategy(psId);
+            }
         }
     }
 }
@@ -7509,7 +7515,10 @@ bool AudioPolicyManager::areAllActiveTracksRerouted(const sp<SwAudioOutputDescri
         routedDevices.add(device);
     }
     for (const auto& client : activeClients) {
-        // TODO: b/175343099 only travel the valid client
+        if (client->isInvalid()) {
+            // No need to take care about invalidated clients.
+            continue;
+        }
         sp<DeviceDescriptor> preferredDevice =
                 mAvailableOutputDevices.getDeviceFromId(client->preferredDeviceId());
         if (mEngine->getOutputDevicesForAttributes(
