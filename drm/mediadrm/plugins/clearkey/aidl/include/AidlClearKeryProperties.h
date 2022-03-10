@@ -19,7 +19,7 @@
 
 namespace clearkeydrm {
 static const std::string kAidlVendorValue("Google");
-static const std::string kAidlVersionValue("1.0");
+static const std::string kAidlVersionValue("aidl-1");
 static const std::string kAidlPluginDescriptionValue("ClearKey CDM");
 static const std::string kAidlAlgorithmsValue("");
 static const std::string kAidlListenerTestSupportValue("true");
