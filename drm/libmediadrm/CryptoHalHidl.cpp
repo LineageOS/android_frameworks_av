@@ -342,7 +342,9 @@ ssize_t CryptoHalHidl::decrypt(const uint8_t keyId[16], const uint8_t iv[16],
                 [&](Status_V1_2 status, uint32_t hBytesWritten, hidl_string hDetailedError) {
                     if (status == Status_V1_2::OK) {
                         bytesWritten = hBytesWritten;
-                        *errorDetailMsg = toString8(hDetailedError);
+                        if (errorDetailMsg != nullptr) {
+                            *errorDetailMsg = toString8(hDetailedError);
+                        }
                     }
                     err = toStatusT(status);
                 });
@@ -353,7 +355,9 @@ ssize_t CryptoHalHidl::decrypt(const uint8_t keyId[16], const uint8_t iv[16],
                 [&](Status status, uint32_t hBytesWritten, hidl_string hDetailedError) {
                     if (status == Status::OK) {
                         bytesWritten = hBytesWritten;
-                        *errorDetailMsg = toString8(hDetailedError);
+                        if (errorDetailMsg != nullptr) {
+                            *errorDetailMsg = toString8(hDetailedError);
+                        }
                     }
                     err = toStatusT(status);
                 });
