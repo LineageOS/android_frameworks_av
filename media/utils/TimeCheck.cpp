@@ -24,7 +24,7 @@
 #include <utils/Log.h>
 #include "debuggerd/handler.h"
 
-namespace android {
+namespace android::mediautils {
 
 namespace {
 
@@ -48,7 +48,7 @@ std::string formatTime(std::chrono::system_clock::time_point t) {
 void TimeCheck::accessAudioHalPids(std::vector<pid_t>* pids, bool update) {
     static constexpr int kNumAudioHalPidsVectors = 3;
     static std::vector<pid_t> audioHalPids[kNumAudioHalPidsVectors];
-    static std::atomic<int> curAudioHalPids = 0;
+    static std::atomic<unsigned> curAudioHalPids = 0;
 
     if (update) {
         audioHalPids[(curAudioHalPids++ + 1) % kNumAudioHalPidsVectors] = *pids;
@@ -70,27 +70,54 @@ std::vector<pid_t> TimeCheck::getAudioHalPids() {
 }
 
 /* static */
-TimerThread* TimeCheck::getTimeCheckThread() {
-    static TimerThread* sTimeCheckThread = new TimerThread();
+TimerThread& TimeCheck::getTimeCheckThread() {
+    static TimerThread sTimeCheckThread{};
     return sTimeCheckThread;
 }
 
-TimeCheck::TimeCheck(const char* tag, uint32_t timeoutMs)
-    : mTimerHandle(getTimeCheckThread()->scheduleTask(
-              [tag, startTime = std::chrono::system_clock::now()] { crash(tag, startTime); },
+TimeCheck::TimeCheck(std::string tag, OnTimerFunc&& onTimer, uint32_t timeoutMs,
+        bool crashOnTimeout)
+    : mTimeCheckHandler(new TimeCheckHandler{
+            std::move(tag), std::move(onTimer), crashOnTimeout,
+            std::chrono::system_clock::now(), gettid()})
+    , mTimerHandle(getTimeCheckThread().scheduleTask(
+              // Pass in all the arguments by value to this task for safety.
+              // The thread could call the callback before the constructor is finished.
+              // The destructor will be blocked on the callback, but that is implementation
+              // dependent.
+              [ timeCheckHandler = mTimeCheckHandler ] {
+                  timeCheckHandler->onTimeout();
+              },
               std::chrono::milliseconds(timeoutMs))) {}
 
 TimeCheck::~TimeCheck() {
-    getTimeCheckThread()->cancelTask(mTimerHandle);
+    mTimeCheckHandler->onCancel(mTimerHandle);
 }
 
-/* static */
-void TimeCheck::crash(const char* tag, std::chrono::system_clock::time_point startTime) {
-    std::chrono::system_clock::time_point endTime = std::chrono::system_clock::now();
+void TimeCheck::TimeCheckHandler::onCancel(TimerThread::Handle timerHandle) const
+{
+    if (TimeCheck::getTimeCheckThread().cancelTask(timerHandle) && onTimer) {
+        const std::chrono::system_clock::time_point endTime = std::chrono::system_clock::now();
+        onTimer(false /* timeout */,
+                std::chrono::duration_cast<std::chrono::duration<float, std::milli>>(
+                        endTime - startTime).count());
+    }
+}
+
+void TimeCheck::TimeCheckHandler::onTimeout() const
+{
+    const std::chrono::system_clock::time_point endTime = std::chrono::system_clock::now();
+    if (onTimer) {
+        onTimer(true /* timeout */,
+                std::chrono::duration_cast<std::chrono::duration<float, std::milli>>(
+                        endTime - startTime).count());
+    }
+
+    if (!crashOnTimeout) return;
 
     // Generate audio HAL processes tombstones and allow time to complete
     // before forcing restart
-    std::vector<pid_t> pids = getAudioHalPids();
+    std::vector<pid_t> pids = TimeCheck::getAudioHalPids();
     if (pids.size() != 0) {
         for (const auto& pid : pids) {
             ALOGI("requesting tombstone for pid: %d", pid);
@@ -100,9 +127,9 @@ void TimeCheck::crash(const char* tag, std::chrono::system_clock::time_point sta
     } else {
         ALOGI("No HAL process pid available, skipping tombstones");
     }
-    LOG_EVENT_STRING(LOGTAG_AUDIO_BINDER_TIMEOUT, tag);
-    LOG_ALWAYS_FATAL("TimeCheck timeout for %s (start=%s, end=%s)", tag,
-                     formatTime(startTime).c_str(), formatTime(endTime).c_str());
+    LOG_EVENT_STRING(LOGTAG_AUDIO_BINDER_TIMEOUT, tag.c_str());
+    LOG_ALWAYS_FATAL("TimeCheck timeout for %s on thread %d (start=%s, end=%s)",
+            tag.c_str(), tid, formatTime(startTime).c_str(), formatTime(endTime).c_str());
 }
 
-};  // namespace android
+}  // namespace android::mediautils
