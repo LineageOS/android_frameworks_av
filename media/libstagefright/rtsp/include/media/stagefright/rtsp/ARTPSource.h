@@ -50,6 +50,7 @@ struct ARTPSource : public RefBase {
         RTCP_FIRST_PACKET = 101,
         RTP_QUALITY = 102,
         RTP_QUALITY_EMC = 103,
+        RTP_QUALITY_CD = 104,
         RTCP_SR = 200,
         RTCP_RR = 201,
         RTCP_TSFB = 205,
