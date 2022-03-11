@@ -83,7 +83,7 @@ DrmPlugin::DrmPlugin(SessionLibrary* sessionLibrary)
 void DrmPlugin::initProperties() {
     mStringProperties.clear();
     mStringProperties[kVendorKey] = kAidlVendorValue;
-    mStringProperties[kVersionKey] = kVersionValue;
+    mStringProperties[kVersionKey] = kAidlVersionValue;
     mStringProperties[kPluginDescriptionKey] = kAidlPluginDescriptionValue;
     mStringProperties[kAlgorithmsKey] = kAidlAlgorithmsValue;
     mStringProperties[kListenerTestSupportKey] = kAidlListenerTestSupportValue;
@@ -380,7 +380,7 @@ void DrmPlugin::installSecureStop(const std::vector<uint8_t>& sessionId) {
     } else if (name == kDrmErrorTestKey) {
         value = mStringProperties[kDrmErrorTestKey];
     } else if (name == kAidlVersionKey) {
-        value = mStringProperties[kAidlVersionValue];
+        value = mStringProperties[kAidlVersionKey];
     } else {
         ALOGE("App requested unknown string property %s", name.c_str());
         status = Status::ERROR_DRM_CANNOT_HANDLE;
