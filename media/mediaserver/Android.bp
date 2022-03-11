@@ -33,7 +33,7 @@ cc_binary {
 
     shared_libs: [
         "android.hardware.media.omx@1.0",
-        "libandroidicu",
+        "libicu",
         "libfmq",
         "libbinder",
         "libhidlbase",
