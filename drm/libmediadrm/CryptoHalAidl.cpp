@@ -353,7 +353,9 @@ ssize_t CryptoHalAidl::decrypt(const uint8_t keyId[16], const uint8_t iv[16],
 
     err = statusAidlToStatusT(statusAidl);
     std::string msgStr(statusAidl.getMessage());
-    *errorDetailMsg = toString8(msgStr);
+    if (errorDetailMsg != nullptr) {
+        *errorDetailMsg = toString8(msgStr);
+    }
     if (err != OK) {
         ALOGE("Failed on decrypt, error description:%s", statusAidl.getDescription().c_str());
         return err;
