@@ -177,7 +177,7 @@ std::vector<std::shared_ptr<IDrmFactoryAidl>> makeDrmFactoriesAidl() {
         [](const char* instance, void* context) {
             auto fullName = std::string(IDrmFactoryAidl::descriptor) + "/" + std::string(instance);
             auto factory = IDrmFactoryAidl::fromBinder(
-                    ::ndk::SpAIBinder(AServiceManager_getService(fullName.c_str())));
+                    ::ndk::SpAIBinder(AServiceManager_waitForService(fullName.c_str())));
             if (factory == nullptr) {
                 ALOGE("not found IDrmFactory. Instance name:[%s]", fullName.c_str());
                 return;
