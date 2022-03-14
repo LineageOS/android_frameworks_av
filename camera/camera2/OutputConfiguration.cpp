@@ -81,7 +81,7 @@ int64_t OutputConfiguration::getDynamicRangeProfile() const {
     return mDynamicRangeProfile;
 }
 
-int OutputConfiguration::getStreamUseCase() const {
+int64_t OutputConfiguration::getStreamUseCase() const {
     return mStreamUseCase;
 }
 
@@ -192,8 +192,8 @@ status_t OutputConfiguration::readFromParcel(const android::Parcel* parcel) {
         return err;
     }
 
-    int streamUseCase = ANDROID_SCALER_AVAILABLE_STREAM_USE_CASES_DEFAULT;
-    if ((err = parcel->readInt32(&streamUseCase)) != OK) {
+    int64_t streamUseCase = ANDROID_SCALER_AVAILABLE_STREAM_USE_CASES_DEFAULT;
+    if ((err = parcel->readInt64(&streamUseCase)) != OK) {
         ALOGE("%s: Failed to read stream use case from parcel", __FUNCTION__);
         return err;
     }
@@ -232,8 +232,8 @@ status_t OutputConfiguration::readFromParcel(const android::Parcel* parcel) {
     mDynamicRangeProfile = dynamicProfile;
 
     ALOGV("%s: OutputConfiguration: rotation = %d, setId = %d, surfaceType = %d,"
-          " physicalCameraId = %s, isMultiResolution = %d, streamUseCase = %d, timestampBase = %d,"
-          " mirrorMode = %d",
+          " physicalCameraId = %s, isMultiResolution = %d, streamUseCase = %" PRId64
+          ", timestampBase = %d, mirrorMode = %d",
           __FUNCTION__, mRotation, mSurfaceSetID, mSurfaceType,
           String8(mPhysicalCameraId).string(), mIsMultiResolution, mStreamUseCase, timestampBase,
           mMirrorMode);
@@ -317,7 +317,7 @@ status_t OutputConfiguration::writeToParcel(android::Parcel* parcel) const {
     err = parcel->writeInt64(mDynamicRangeProfile);
     if (err != OK) return err;
 
-    err = parcel->writeInt32(mStreamUseCase);
+    err = parcel->writeInt64(mStreamUseCase);
     if (err != OK) return err;
 
     err = parcel->writeInt32(mTimestampBase);
