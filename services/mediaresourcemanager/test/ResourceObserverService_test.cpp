@@ -116,6 +116,26 @@ private:
 
 const EventTracker::Event EventTracker::NoEvent;
 
+static MediaResource createSecureVideoCodecResource(int amount = 1) {
+    return MediaResource(MediaResource::Type::kSecureCodec,
+        MediaResource::SubType::kVideoCodec, amount);
+}
+
+static MediaResource createNonSecureVideoCodecResource(int amount = 1) {
+    return MediaResource(MediaResource::Type::kNonSecureCodec,
+        MediaResource::SubType::kVideoCodec, amount);
+}
+
+static MediaResource createSecureAudioCodecResource(int amount = 1) {
+    return MediaResource(MediaResource::Type::kSecureCodec,
+        MediaResource::SubType::kAudioCodec, amount);
+}
+
+static MediaResource createNonSecureAudioCodecResource(int amount = 1) {
+    return MediaResource(MediaResource::Type::kNonSecureCodec,
+        MediaResource::SubType::kAudioCodec, amount);
+}
+
 // Operators for GTest macros.
 bool operator==(const EventTracker::Event& lhs, const EventTracker::Event& rhs) {
     return lhs.type == rhs.type && lhs.uid == rhs.uid && lhs.pid == rhs.pid &&
@@ -233,30 +253,30 @@ TEST_F(ResourceObserverServiceTest, testAddResourceBasic) {
 
     std::vector<MediaResourceParcel> resources;
     // Add secure video codec.
-    resources = {MediaResource::CodecResource(1 /*secure*/, 1 /*video*/)};
+    resources = {createSecureVideoCodecResource()};
     mService->addResource(kTestPid1, kTestUid1, getId(mTestClient1), mTestClient1, resources);
     EXPECT_EQ(mTestObserver1->pop(), EventTracker::Busy(kTestUid1, kTestPid1, observables1));
     EXPECT_EQ(mTestObserver2->pop(), EventTracker::NoEvent);
     EXPECT_EQ(mTestObserver3->pop(), EventTracker::Busy(kTestUid1, kTestPid1, observables1));
 
     // Add non-secure video codec.
-    resources = {MediaResource::CodecResource(0 /*secure*/, 1 /*video*/)};
+    resources = {createNonSecureVideoCodecResource()};
     mService->addResource(kTestPid2, kTestUid2, getId(mTestClient2), mTestClient2, resources);
     EXPECT_EQ(mTestObserver1->pop(), EventTracker::NoEvent);
     EXPECT_EQ(mTestObserver2->pop(), EventTracker::Busy(kTestUid2, kTestPid2, observables2));
     EXPECT_EQ(mTestObserver3->pop(), EventTracker::Busy(kTestUid2, kTestPid2, observables2));
 
     // Add secure & non-secure video codecs.
-    resources = {MediaResource::CodecResource(1 /*secure*/, 1 /*video*/),
-                 MediaResource::CodecResource(0 /*secure*/, 1 /*video*/)};
+    resources = {createSecureVideoCodecResource(),
+                 createNonSecureVideoCodecResource()};
     mService->addResource(kTestPid2, kTestUid2, getId(mTestClient3), mTestClient3, resources);
     EXPECT_EQ(mTestObserver1->pop(), EventTracker::Busy(kTestUid2, kTestPid2, observables1));
     EXPECT_EQ(mTestObserver2->pop(), EventTracker::Busy(kTestUid2, kTestPid2, observables2));
     EXPECT_EQ(mTestObserver3->pop(), EventTracker::Busy(kTestUid2, kTestPid2, observables3));
 
     // Add additional audio codecs, should be ignored.
-    resources.push_back(MediaResource::CodecResource(1 /*secure*/, 0 /*video*/));
-    resources.push_back(MediaResource::CodecResource(0 /*secure*/, 0 /*video*/));
+    resources.push_back(createSecureAudioCodecResource());
+    resources.push_back(createNonSecureAudioCodecResource());
     mService->addResource(kTestPid1, kTestUid1, getId(mTestClient1), mTestClient1, resources);
     EXPECT_EQ(mTestObserver1->pop(), EventTracker::Busy(kTestUid1, kTestPid1, observables1));
     EXPECT_EQ(mTestObserver2->pop(), EventTracker::Busy(kTestUid1, kTestPid1, observables2));
@@ -276,9 +296,9 @@ TEST_F(ResourceObserverServiceTest, testAddResourceMultiple) {
 
     // Add multiple secure & non-secure video codecs.
     // Multiple entries of the same type should be merged, count should be propagated correctly.
-    resources = {MediaResource::CodecResource(1 /*secure*/, 1 /*video*/),
-                 MediaResource::CodecResource(1 /*secure*/, 1 /*video*/),
-                 MediaResource::CodecResource(0 /*secure*/, 1 /*video*/, 3 /*count*/)};
+    resources = {createSecureVideoCodecResource(),
+                 createSecureVideoCodecResource(),
+                 createNonSecureVideoCodecResource(3)};
     observables1 = {{MediaObservableType::kVideoSecureCodec, 2}};
     observables2 = {{MediaObservableType::kVideoNonSecureCodec, 3}};
     observables3 = {{MediaObservableType::kVideoSecureCodec, 2},
@@ -300,7 +320,7 @@ TEST_F(ResourceObserverServiceTest, testRemoveResourceBasic) {
 
     std::vector<MediaResourceParcel> resources;
     // Add secure video codec to client1.
-    resources = {MediaResource::CodecResource(1 /*secure*/, 1 /*video*/)};
+    resources = {createSecureVideoCodecResource()};
     mService->addResource(kTestPid1, kTestUid1, getId(mTestClient1), mTestClient1, resources);
     EXPECT_EQ(mTestObserver1->pop(), EventTracker::Busy(kTestUid1, kTestPid1, observables1));
     EXPECT_EQ(mTestObserver2->pop(), EventTracker::NoEvent);
@@ -322,7 +342,7 @@ TEST_F(ResourceObserverServiceTest, testRemoveResourceBasic) {
     EXPECT_EQ(mTestObserver3->pop(), EventTracker::NoEvent);
 
     // Add non-secure video codec to client2.
-    resources = {MediaResource::CodecResource(0 /*secure*/, 1 /*video*/)};
+    resources = {createNonSecureVideoCodecResource()};
     mService->addResource(kTestPid2, kTestUid2, getId(mTestClient2), mTestClient2, resources);
     EXPECT_EQ(mTestObserver1->pop(), EventTracker::NoEvent);
     EXPECT_EQ(mTestObserver2->pop(), EventTracker::Busy(kTestUid2, kTestPid2, observables2));
@@ -344,24 +364,24 @@ TEST_F(ResourceObserverServiceTest, testRemoveResourceBasic) {
     EXPECT_EQ(mTestObserver3->pop(), EventTracker::NoEvent);
 
     // Add secure & non-secure video codecs, plus audio codecs (that's ignored).
-    resources = {MediaResource::CodecResource(1 /*secure*/, 1 /*video*/),
-                 MediaResource::CodecResource(0 /*secure*/, 1 /*video*/),
-                 MediaResource::CodecResource(1 /*secure*/, 0 /*video*/),
-                 MediaResource::CodecResource(0 /*secure*/, 0 /*video*/)};
+    resources = {createSecureVideoCodecResource(),
+                 createNonSecureVideoCodecResource(),
+                 createSecureAudioCodecResource(),
+                 createNonSecureAudioCodecResource()};
     mService->addResource(kTestPid2, kTestUid2, getId(mTestClient3), mTestClient3, resources);
     EXPECT_EQ(mTestObserver1->pop(), EventTracker::Busy(kTestUid2, kTestPid2, observables1));
     EXPECT_EQ(mTestObserver2->pop(), EventTracker::Busy(kTestUid2, kTestPid2, observables2));
     EXPECT_EQ(mTestObserver3->pop(), EventTracker::Busy(kTestUid2, kTestPid2, observables3));
     // Remove one audio codec, should have no event.
-    resources = {MediaResource::CodecResource(1 /*secure*/, 0 /*video*/)};
+    resources = {createSecureAudioCodecResource()};
     mService->removeResource(kTestPid2, getId(mTestClient3), resources);
     EXPECT_EQ(mTestObserver1->pop(), EventTracker::NoEvent);
     EXPECT_EQ(mTestObserver2->pop(), EventTracker::NoEvent);
     EXPECT_EQ(mTestObserver3->pop(), EventTracker::NoEvent);
     // Remove the other audio codec and the secure video codec, only secure video codec
     // removal should be reported.
-    resources = {MediaResource::CodecResource(0 /*secure*/, 0 /*video*/),
-                 MediaResource::CodecResource(1 /*secure*/, 1 /*video*/)};
+    resources = {createNonSecureAudioCodecResource(),
+                 createSecureVideoCodecResource()};
     mService->removeResource(kTestPid2, getId(mTestClient3), resources);
     EXPECT_EQ(mTestObserver1->pop(), EventTracker::Idle(kTestUid2, kTestPid2, observables1));
     EXPECT_EQ(mTestObserver2->pop(), EventTracker::NoEvent);
@@ -386,10 +406,10 @@ TEST_F(ResourceObserverServiceTest, testRemoveResourceMultiple) {
 
     // Add multiple secure & non-secure video codecs, plus audio codecs (that's ignored).
     // (ResourceManager will merge these internally.)
-    resources = {MediaResource::CodecResource(1 /*secure*/, 1 /*video*/),
-                 MediaResource::CodecResource(0 /*secure*/, 1 /*video*/, 4 /*count*/),
-                 MediaResource::CodecResource(1 /*secure*/, 0 /*video*/),
-                 MediaResource::CodecResource(0 /*secure*/, 0 /*video*/)};
+    resources = {createSecureVideoCodecResource(),
+                 createNonSecureVideoCodecResource(4),
+                 createSecureAudioCodecResource(),
+                 createNonSecureAudioCodecResource()};
     mService->addResource(kTestPid2, kTestUid2, getId(mTestClient3), mTestClient3, resources);
     observables1 = {{MediaObservableType::kVideoSecureCodec, 1}};
     observables2 = {{MediaObservableType::kVideoNonSecureCodec, 4}};
@@ -400,10 +420,10 @@ TEST_F(ResourceObserverServiceTest, testRemoveResourceMultiple) {
     EXPECT_EQ(mTestObserver3->pop(), EventTracker::Busy(kTestUid2, kTestPid2, observables3));
     // Remove one audio codec, 2 secure video codecs and 2 non-secure video codecs.
     // 1 secure video codec removal and 2 non-secure video codec removals should be reported.
-    resources = {MediaResource::CodecResource(0 /*secure*/, 0 /*video*/),
-                 MediaResource::CodecResource(1 /*secure*/, 1 /*video*/),
-                 MediaResource::CodecResource(1 /*secure*/, 1 /*video*/),
-                 MediaResource::CodecResource(0 /*secure*/, 1 /*video*/, 2 /*count*/)};
+    resources = {createNonSecureAudioCodecResource(),
+                 createSecureVideoCodecResource(),
+                 createSecureVideoCodecResource(),
+                 createNonSecureVideoCodecResource(2)};
     mService->removeResource(kTestPid2, getId(mTestClient3), resources);
     observables1 = {{MediaObservableType::kVideoSecureCodec, 1}};
     observables2 = {{MediaObservableType::kVideoNonSecureCodec, 2}};
@@ -443,8 +463,8 @@ TEST_F(ResourceObserverServiceTest, testEventFilters) {
     std::vector<MediaResourceParcel> resources;
 
     // Add secure & non-secure video codecs.
-    resources = {MediaResource::CodecResource(1 /*secure*/, 1 /*video*/),
-                 MediaResource::CodecResource(0 /*secure*/, 1 /*video*/)};
+    resources = {createSecureVideoCodecResource(),
+                 createNonSecureVideoCodecResource()};
     mService->addResource(kTestPid2, kTestUid2, getId(mTestClient3), mTestClient3, resources);
     EXPECT_EQ(mTestObserver1->pop(), EventTracker::Busy(kTestUid2, kTestPid2, observables1));
     EXPECT_EQ(mTestObserver2->pop(), EventTracker::NoEvent);
