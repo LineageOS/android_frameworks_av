@@ -597,9 +597,9 @@ protected:
         audio_mode_t getPhoneState();
 
         // true if device is in a telephony or VoIP call
-        virtual bool isInCall();
+        virtual bool isInCall() const;
         // true if given state represents a device in a telephony or VoIP call
-        virtual bool isStateInCall(int state);
+        virtual bool isStateInCall(int state) const;
         // true if playback to call TX or capture from call RX is possible
         bool isCallAudioAccessible();
 
@@ -885,6 +885,21 @@ protected:
 
         void closeActiveClients(const sp<AudioInputDescriptor>& input);
         void closeClient(audio_port_handle_t portId);
+
+        /**
+         * @brief isAnyDeviceTypeActive: returns true if at least one active client is routed to
+         * one of the specified devices
+         * @param deviceTypes list of devices to consider
+         */
+        bool isAnyDeviceTypeActive(const DeviceTypeSet& deviceTypes) const;
+        /**
+         * @brief isLeUnicastActive: returns true if a call is active or at least one active client
+         * is routed to a LE unicast device
+         */
+        bool isLeUnicastActive() const;
+
+        void checkLeBroadcastRoutes(bool wasUnicastActive,
+                sp<SwAudioOutputDescriptor> ignoredOutput, uint32_t delayMs);
 
         const uid_t mUidCached;                         // AID_AUDIOSERVER
         AudioPolicyClientInterface *mpClientInterface;  // audio policy client interface
