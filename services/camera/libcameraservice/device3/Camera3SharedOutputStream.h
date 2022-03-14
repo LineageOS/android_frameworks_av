@@ -42,7 +42,7 @@ public:
             int setId = CAMERA3_STREAM_SET_ID_INVALID,
             bool useHalBufManager = false,
             int64_t dynamicProfile = ANDROID_REQUEST_AVAILABLE_DYNAMIC_RANGE_PROFILES_MAP_STANDARD,
-            int streamUseCase = ANDROID_SCALER_AVAILABLE_STREAM_USE_CASES_DEFAULT,
+            int64_t streamUseCase = ANDROID_SCALER_AVAILABLE_STREAM_USE_CASES_DEFAULT,
             bool deviceTimeBaseIsRealtime = false,
             int timestampBase = OutputConfiguration::TIMESTAMP_BASE_DEFAULT,
             int mirrorMode = OutputConfiguration::MIRROR_MODE_AUTO);
