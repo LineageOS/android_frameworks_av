@@ -978,7 +978,7 @@ status_t Camera3Device::createStream(sp<Surface> consumer,
             const String8& physicalCameraId,
             const std::unordered_set<int32_t> &sensorPixelModesUsed,
             std::vector<int> *surfaceIds, int streamSetId, bool isShared, bool isMultiResolution,
-            uint64_t consumerUsage, int64_t dynamicRangeProfile, int streamUseCase,
+            uint64_t consumerUsage, int64_t dynamicRangeProfile, int64_t streamUseCase,
             int timestampBase, int mirrorMode) {
     ATRACE_CALL();
 
@@ -1013,8 +1013,8 @@ status_t Camera3Device::createStream(const std::vector<sp<Surface>>& consumers,
         android_dataspace dataSpace, camera_stream_rotation_t rotation, int *id,
         const String8& physicalCameraId, const std::unordered_set<int32_t> &sensorPixelModesUsed,
         std::vector<int> *surfaceIds, int streamSetId, bool isShared, bool isMultiResolution,
-        uint64_t consumerUsage, int64_t dynamicRangeProfile, int streamUseCase, int timestampBase,
-        int mirrorMode) {
+        uint64_t consumerUsage, int64_t dynamicRangeProfile, int64_t streamUseCase,
+        int timestampBase, int mirrorMode) {
     ATRACE_CALL();
 
     Mutex::Autolock il(mInterfaceLock);
@@ -1022,7 +1022,8 @@ status_t Camera3Device::createStream(const std::vector<sp<Surface>>& consumers,
     Mutex::Autolock l(mLock);
     ALOGV("Camera %s: Creating new stream %d: %d x %d, format %d, dataspace %d rotation %d"
             " consumer usage %" PRIu64 ", isShared %d, physicalCameraId %s, isMultiResolution %d"
-            " dynamicRangeProfile %" PRIx64 ", streamUseCase %d, timestampBase %d, mirrorMode %d",
+            " dynamicRangeProfile 0x%" PRIx64 ", streamUseCase %" PRId64 ", timestampBase %d,"
+            " mirrorMode %d",
             mId.string(), mNextStreamId, width, height, format, dataSpace, rotation,
             consumerUsage, isShared, physicalCameraId.string(), isMultiResolution,
             dynamicRangeProfile, streamUseCase, timestampBase, mirrorMode);
@@ -1841,7 +1842,7 @@ void Camera3Device::notifyStatus(bool idle) {
                 streamIds.push_back(stream->getId());
                 Camera3Stream* camera3Stream = Camera3Stream::cast(stream->asHalStream());
                 int64_t usage = 0LL;
-                int streamUseCase = ANDROID_SCALER_AVAILABLE_STREAM_USE_CASES_DEFAULT;
+                int64_t streamUseCase = ANDROID_SCALER_AVAILABLE_STREAM_USE_CASES_DEFAULT;
                 if (camera3Stream != nullptr) {
                     usage = camera3Stream->getUsage();
                     streamUseCase = camera3Stream->getStreamUseCase();

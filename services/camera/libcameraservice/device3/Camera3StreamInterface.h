@@ -66,7 +66,7 @@ typedef struct camera_stream {
 
     std::unordered_set<int32_t> sensor_pixel_modes_used;
     int64_t dynamic_range_profile;
-    int use_case;
+    int64_t use_case;
 } camera_stream_t;
 
 typedef struct camera_stream_buffer {
@@ -111,7 +111,7 @@ class OutputStreamInfo {
         bool supportsOffline = false;
         std::unordered_set<int32_t> sensorPixelModesUsed;
         int64_t dynamicRangeProfile;
-        int streamUseCase;
+        int64_t streamUseCase;
         int timestampBase;
         int mirrorMode;
         OutputStreamInfo() :
