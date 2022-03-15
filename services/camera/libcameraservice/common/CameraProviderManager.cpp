@@ -642,7 +642,7 @@ status_t CameraProviderManager::openAidlSession(const std::string &id,
         removeRef(DeviceMode::CAMERA, id);
         ALOGE("%s: Transaction error opening a session for camera device %s: %s",
                 __FUNCTION__, id.c_str(), ret.getMessage());
-        return DEAD_OBJECT;
+        return AidlProviderInfo::mapToStatusT(ret);
     }
     return OK;
 }
