@@ -114,6 +114,13 @@ void AudioPolicyService::loadAudioPolicyManager()
 
 void AudioPolicyService::onFirstRef()
 {
+    // Log an AudioPolicy "constructor" mediametrics event on first ref.
+    // This records the time it takes to load the audio modules and devices.
+    mediametrics::Defer defer([beginNs = systemTime()] {
+        mediametrics::LogItem(AMEDIAMETRICS_KEY_AUDIO_POLICY)
+            .set(AMEDIAMETRICS_PROP_EVENT, AMEDIAMETRICS_PROP_EVENT_VALUE_CTOR)
+            .set(AMEDIAMETRICS_PROP_EXECUTIONTIMENS, (int64_t)(systemTime() - beginNs))
+            .record(); });
     {
         Mutex::Autolock _l(mLock);
 
