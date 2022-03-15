@@ -3061,10 +3061,8 @@ void MediaCodec::onMessageReceived(const sp<AMessage> &msg) {
                         case STOPPING:
                         {
                             if (mFlags & kFlagSawMediaServerDie) {
-                                bool postPendingReplies = true;
                                 if (mState == RELEASING && !mReplyID) {
                                     ALOGD("Releasing asynchronously, so nothing to reply here.");
-                                    postPendingReplies = false;
                                 }
                                 // MediaServer died, there definitely won't
                                 // be a shutdown complete notification after
@@ -3077,8 +3075,11 @@ void MediaCodec::onMessageReceived(const sp<AMessage> &msg) {
                                 if (mState == RELEASING) {
                                     mComponentName.clear();
                                 }
-                                if (postPendingReplies) {
+                                if (mReplyID) {
                                     postPendingRepliesAndDeferredMessages(origin + ":dead");
+                                } else {
+                                    ALOGD("no pending replies: %s:dead following %s",
+                                          origin.c_str(), mLastReplyOrigin.c_str());
                                 }
                                 sendErrorResponse = false;
                             } else if (!mReplyID) {
