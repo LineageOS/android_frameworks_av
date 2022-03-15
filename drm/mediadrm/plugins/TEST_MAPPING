@@ -11,6 +11,9 @@
         },
         {
           "include-filter": "android.media.cts.MediaDrmMetricsTest"
+        },
+        {
+          "include-filter": "android.media.cts.NativeMediaDrmClearkeyTest"
         }
       ]
     }
