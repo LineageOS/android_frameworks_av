@@ -2123,7 +2123,7 @@ static void mapFormat(AString componentName, const sp<AMessage> &format, const c
                       bool reverse) {
     AString mediaType;
     if (!format->findString("mime", &mediaType)) {
-        ALOGW("mapFormat: no mediaType information");
+        ALOGV("mapFormat: no mediaType information");
         return;
     }
     ALOGV("mapFormat: codec %s mediatype %s kind %s reverse %d", componentName.c_str(),
