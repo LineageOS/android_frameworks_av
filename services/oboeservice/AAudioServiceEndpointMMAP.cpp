@@ -228,9 +228,6 @@ void AAudioServiceEndpointMMAP::close() {
     if (mMmapStream != nullptr) {
         // Needs to be explicitly cleared or CTS will fail but it is not clear why.
         mMmapStream.clear();
-        // Apparently the above close is asynchronous. An attempt to open a new device
-        // right after a close can fail. Also some callbacks may still be in flight!
-        // FIXME Make closing synchronous.
         AudioClock::sleepForNanos(100 * AAUDIO_NANOS_PER_MILLISECOND);
     }
 }
