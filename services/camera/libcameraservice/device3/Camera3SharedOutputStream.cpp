@@ -34,7 +34,7 @@ Camera3SharedOutputStream::Camera3SharedOutputStream(int id,
         nsecs_t timestampOffset, const String8& physicalCameraId,
         const std::unordered_set<int32_t> &sensorPixelModesUsed,
         int setId, bool useHalBufManager, int64_t dynamicProfile,
-        int streamUseCase, bool deviceTimeBaseIsRealtime, int timestampBase,
+        int64_t streamUseCase, bool deviceTimeBaseIsRealtime, int timestampBase,
         int mirrorMode) :
         Camera3OutputStream(id, CAMERA_STREAM_OUTPUT, width, height,
                             format, dataSpace, rotation, physicalCameraId, sensorPixelModesUsed,

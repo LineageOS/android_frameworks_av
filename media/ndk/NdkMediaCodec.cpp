@@ -15,6 +15,8 @@
  */
 
 #include <inttypes.h>
+#include <mutex>
+#include <set>
 
 //#define LOG_NDEBUG 0
 #define LOG_TAG "NdkMediaCodec"
@@ -42,6 +44,7 @@ using namespace android;
 
 
 static media_status_t translate_error(status_t err) {
+
     if (err == OK) {
         return AMEDIA_OK;
     } else if (err == -EAGAIN) {
@@ -51,7 +54,18 @@ static media_status_t translate_error(status_t err) {
     } else if (err == DEAD_OBJECT) {
         return AMEDIACODEC_ERROR_RECLAIMED;
     }
-    ALOGE("sf error code: %d", err);
+
+    {
+        // minimize log flooding. Some CTS behavior made this noisy and apps could do the same.
+        static std::set<status_t> untranslated;
+        static std::mutex mutex;
+        std::lock_guard lg(mutex);
+
+        if (untranslated.find(err) == untranslated.end()) {
+            ALOGE("untranslated sf error code: %d", err);
+            untranslated.insert(err);
+        }
+    }
     return AMEDIA_ERROR_UNKNOWN;
 }
 

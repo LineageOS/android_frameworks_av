@@ -972,7 +972,7 @@ status_t HidlCamera3Device::HidlHalInterface::configureStreams(
         }
         if (src->use_case != ANDROID_SCALER_AVAILABLE_STREAM_USE_CASES_DEFAULT &&
                 mHidlSession_3_8 == nullptr) {
-            ALOGE("%s: Camera device doesn't support non-default stream use case %d!",
+            ALOGE("%s: Camera device doesn't support non-default stream use case %" PRId64 "!",
                     __FUNCTION__, src->use_case);
             return BAD_VALUE;
         }

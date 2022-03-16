@@ -1932,7 +1932,7 @@ ConversionResult<audio_port_config_ext> aidl2legacy_AudioPortExt_audio_port_conf
         case media::AudioPortType::SESSION:
             legacy.session = VALUE_OR_RETURN(
                     aidl2legacy_int32_t_audio_port_config_session_ext(
-                            VALUE_OR_RETURN(UNION_GET(aidl, session))));
+                            VALUE_OR_RETURN(UNION_GET(aidlSys, session))));
             return legacy;
 
     }
@@ -1966,9 +1966,9 @@ status_t legacy2aidl_AudioPortExt(
             return OK;
         }
         case AUDIO_PORT_TYPE_SESSION:
-            UNION_SET(*aidl, session, VALUE_OR_RETURN_STATUS(
+            UNION_SET(*aidl, unspecified, false);
+            UNION_SET(*aidlSys, session, VALUE_OR_RETURN_STATUS(
                             legacy2aidl_audio_port_config_session_ext_int32_t(legacy.session)));
-            UNION_SET(*aidlSys, unspecified, false);
             return OK;
     }
     LOG_ALWAYS_FATAL("Shouldn't get here"); // with -Werror,-Wswitch may compile-time fail
@@ -2816,7 +2816,7 @@ ConversionResult<audio_port_v7_ext> aidl2legacy_AudioPortExt_audio_port_v7_ext(
         case media::AudioPortType::SESSION:
             legacy.session = VALUE_OR_RETURN(
                     aidl2legacy_int32_t_audio_port_session_ext(
-                            VALUE_OR_RETURN(UNION_GET(aidl, session))));
+                            VALUE_OR_RETURN(UNION_GET(aidlSys, session))));
             return legacy;
 
     }
@@ -2852,9 +2852,9 @@ status_t legacy2aidl_AudioPortExt(
             return OK;
         }
         case AUDIO_PORT_TYPE_SESSION:
-            UNION_SET(*aidl, session, VALUE_OR_RETURN_STATUS(
+            UNION_SET(*aidl, unspecified, false);
+            UNION_SET(*aidlSys, session, VALUE_OR_RETURN_STATUS(
                             legacy2aidl_audio_port_session_ext_int32_t(legacy.session)));
-            UNION_SET(*aidlSys, unspecified, false);
             return OK;
     }
     LOG_ALWAYS_FATAL("Shouldn't get here"); // with -Werror,-Wswitch may compile-time fail

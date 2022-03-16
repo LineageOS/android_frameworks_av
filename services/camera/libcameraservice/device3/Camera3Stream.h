@@ -178,7 +178,7 @@ class Camera3Stream :
     android_dataspace getOriginalDataSpace() const;
     int               getMaxHalBuffers() const;
     const String8&    physicalCameraId() const;
-    int               getStreamUseCase() const;
+    int64_t           getStreamUseCase() const;
     int               getTimestampBase() const;
     bool              isDeviceTimeBaseRealtime() const;
 
@@ -509,7 +509,7 @@ class Camera3Stream :
             const String8& physicalCameraId,
             const std::unordered_set<int32_t> &sensorPixelModesUsed,
             int setId, bool isMultiResolution, int64_t dynamicRangeProfile,
-            int streamUseCase, bool deviceTimeBaseIsRealtime, int timestampBase);
+            int64_t streamUseCase, bool deviceTimeBaseIsRealtime, int timestampBase);
 
     wp<Camera3StreamBufferFreedListener> mBufferFreedListener;
 

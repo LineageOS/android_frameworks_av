@@ -4216,7 +4216,7 @@ typedef enum acamera_metadata_tag {
     /**
      * <p>The stream use cases supported by this camera device.</p>
      *
-     * <p>Type: int32[n] (acamera_metadata_enum_android_scaler_available_stream_use_cases_t)</p>
+     * <p>Type: int64[n] (acamera_metadata_enum_android_scaler_available_stream_use_cases_t)</p>
      *
      * <p>This tag may appear in:
      * <ul>
@@ -4260,7 +4260,7 @@ typedef enum acamera_metadata_tag {
      * reprocessable session, constrained high speed session, or RAW stream combinations, the
      * application should leave stream use cases within the session as DEFAULT.</p>
      */
-    ACAMERA_SCALER_AVAILABLE_STREAM_USE_CASES =                 // int32[n] (acamera_metadata_enum_android_scaler_available_stream_use_cases_t)
+    ACAMERA_SCALER_AVAILABLE_STREAM_USE_CASES =                 // int64[n] (acamera_metadata_enum_android_scaler_available_stream_use_cases_t)
             ACAMERA_SCALER_START + 25,
     ACAMERA_SCALER_END,
 

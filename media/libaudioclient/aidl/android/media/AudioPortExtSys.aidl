@@ -31,4 +31,6 @@ union AudioPortExtSys {
     AudioPortDeviceExtSys device;
     /** System-only parameters when the port is an audio mix. */
     AudioPortMixExtSys mix;
+    /** Framework audio session identifier. */
+    int session;
 }
