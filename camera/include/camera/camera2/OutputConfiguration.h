@@ -63,7 +63,7 @@ public:
     bool                       isShared() const;
     String16                   getPhysicalCameraId() const;
     bool                       isMultiResolution() const;
-    int                        getStreamUseCase() const;
+    int64_t                    getStreamUseCase() const;
     int                        getTimestampBase() const;
     int                        getMirrorMode() const;
 
@@ -185,7 +185,7 @@ private:
     bool                       mIsMultiResolution;
     std::vector<int32_t>       mSensorPixelModesUsed;
     int64_t                    mDynamicRangeProfile;
-    int                        mStreamUseCase;
+    int64_t                    mStreamUseCase;
     int                        mTimestampBase;
     int                        mMirrorMode;
 };

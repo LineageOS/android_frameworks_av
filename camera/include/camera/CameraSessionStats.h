@@ -66,7 +66,7 @@ public:
     // Dynamic range profile
     int64_t mDynamicRangeProfile;
     // Stream use case
-    int mStreamUseCase;
+    int64_t mStreamUseCase;
 
     CameraStreamStats() :
             mWidth(0), mHeight(0), mFormat(0), mMaxPreviewFps(0), mDataSpace(0), mUsage(0),
