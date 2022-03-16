@@ -91,6 +91,13 @@ AAUDIO_API aaudio_policy_t AAudio_getMMapPolicy();
  */
 AAUDIO_API bool AAudioStream_isMMapUsed(AAudioStream* stream);
 
+/**
+ * Returns the count of audio server death.
+ *
+ * @return audio server death count.
+ */
+AAUDIO_API int AAudio_getAudioServerDeathCount();
+
 #ifdef __cplusplus
 }
 #endif
