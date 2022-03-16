@@ -55,7 +55,7 @@ Camera3Stream::Camera3Stream(int id,
         const String8& physicalCameraId,
         const std::unordered_set<int32_t> &sensorPixelModesUsed,
         int setId, bool isMultiResolution, int64_t dynamicRangeProfile,
-        int streamUseCase, bool deviceTimeBaseIsRealtime, int timestampBase) :
+        int64_t streamUseCase, bool deviceTimeBaseIsRealtime, int timestampBase) :
     camera_stream(),
     mId(id),
     mSetId(setId),
@@ -179,7 +179,7 @@ int Camera3Stream::getMaxHalBuffers() const {
     return camera_stream::max_buffers;
 }
 
-int Camera3Stream::getStreamUseCase() const {
+int64_t Camera3Stream::getStreamUseCase() const {
     return camera_stream::use_case;
 }
 
