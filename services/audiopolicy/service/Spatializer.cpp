@@ -216,7 +216,9 @@ status_t Spatializer::loadEngineConfiguration(sp<EffectHalInterface> effect) {
     if (status != NO_ERROR) {
         return status;
     }
-    mSupportsHeadTracking = supportsHeadTracking[0];
+// Disable head tracking until head sensor activity is properly controlled.
+//    mSupportsHeadTracking = supportsHeadTracking[0];
+    mSupportsHeadTracking = false;
 
     status = getHalParameter<true>(effect, SPATIALIZER_PARAM_SUPPORTED_LEVELS, &mLevels);
     if (status != NO_ERROR) {
