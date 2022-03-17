@@ -17,6 +17,8 @@
 #define LOG_TAG "AudioSystem"
 //#define LOG_NDEBUG 0
 
+#include <atomic>
+
 #include <utils/Log.h>
 
 #include <android/media/IAudioPolicyService.h>
@@ -81,6 +83,8 @@ sp<CaptureStateListenerImpl> gSoundTriggerCaptureStateListener = nullptr;
 // This allows specific isolated processes to access the audio system. Currently used only for the
 // HotwordDetectionService.
 sp<IBinder> gAudioFlingerBinder = nullptr;
+
+std::atomic<int> gAudioFlingerDeathCount{0};
 
 void AudioSystem::setAudioFlingerBinder(const sp<IBinder>& audioFlinger) {
     if (audioFlinger->getInterfaceDescriptor() != media::IAudioFlingerService::descriptor) {
@@ -534,6 +538,8 @@ void AudioSystem::AudioFlingerClient::binderDied(const wp<IBinder>& who __unused
     clearIoCache();
 
     reportError(DEAD_OBJECT);
+
+    gAudioFlingerDeathCount += 1;
 
     ALOGW("AudioFlinger server died!");
 }
@@ -2408,6 +2414,10 @@ int32_t AudioSystem::getAAudioHardwareBurstMinUsec() {
         return PERMISSION_DENIED;
     }
     return af->getAAudioHardwareBurstMinUsec();
+}
+
+int32_t AudioSystem::getAudioFlingerDeathCount() {
+    return gAudioFlingerDeathCount.load();
 }
 
 // ---------------------------------------------------------------------------
