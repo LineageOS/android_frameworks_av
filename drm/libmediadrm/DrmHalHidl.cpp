@@ -20,6 +20,7 @@
 #include <aidl/android/media/BnResourceManagerClient.h>
 #include <android/binder_manager.h>
 #include <android/hardware/drm/1.2/types.h>
+#include <android/hardware/drm/1.3/IDrmFactory.h>
 #include <android/hidl/manager/1.2/IServiceManager.h>
 #include <hidl/ServiceManagement.h>
 #include <media/EventMetric.h>
@@ -1512,6 +1513,25 @@ status_t DrmHalHidl::setPlaybackId(Vector<uint8_t> const& sessionId, const char*
 status_t DrmHalHidl::getLogMessages(Vector<drm::V1_4::LogMessage>& logs) const {
     Mutex::Autolock autoLock(mLock);
     return DrmUtils::GetLogMessages<drm::V1_4::IDrmPlugin>(mPlugin, logs);
+}
+
+status_t DrmHalHidl::getSupportedSchemes(std::vector<uint8_t> &schemes) const {
+    Mutex::Autolock autoLock(mLock);
+    for (auto &factory : mFactories) {
+        sp<drm::V1_3::IDrmFactory> factoryV1_3 = drm::V1_3::IDrmFactory::castFrom(factory);
+        if (factoryV1_3 == nullptr) {
+            continue;
+        }
+
+        factoryV1_3->getSupportedCryptoSchemes(
+            [&](const hardware::hidl_vec<hardware::hidl_array<uint8_t, 16>>& schemes_hidl) {
+                for (const auto &scheme : schemes_hidl) {
+                    schemes.insert(schemes.end(), scheme.data(), scheme.data() + scheme.size());
+                }
+            });
+    }
+
+    return OK;
 }
 
 }  // namespace android

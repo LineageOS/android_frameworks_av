@@ -105,6 +105,7 @@ struct DrmHalAidl : public IDrm{
                                            bool* required) const;
     virtual status_t setPlaybackId(Vector<uint8_t> const& sessionId, const char* playbackId);
     virtual status_t getLogMessages(Vector<drm::V1_4::LogMessage>& logs) const;
+    virtual status_t getSupportedSchemes(std::vector<uint8_t> &schemes) const;
 
     ::ndk::ScopedAStatus onEvent(EventTypeAidl in_eventType,
                                  const std::vector<uint8_t>& in_sessionId,

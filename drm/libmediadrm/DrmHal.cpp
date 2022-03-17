@@ -286,4 +286,11 @@ status_t DrmHal::getLogMessages(Vector<drm::V1_4::LogMessage>& logs) const {
     return mDrmHalHidl->getLogMessages(logs);
 }
 
+status_t DrmHal::getSupportedSchemes(std::vector<uint8_t> &schemes) const {
+    status_t statusResult;
+    statusResult = mDrmHalAidl->getSupportedSchemes(schemes);
+    if (statusResult == OK) return statusResult;
+    return mDrmHalHidl->getSupportedSchemes(schemes);
+}
+
 }  // namespace android
