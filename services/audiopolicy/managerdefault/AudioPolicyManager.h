@@ -768,6 +768,15 @@ protected:
                                           audio_channel_mask_t channelMask,
                                           audio_output_flags_t flags,
                                           bool directOnly);
+        /**
+        * Same as getProfileForOutput, but it looks for an MSD profile
+        */
+        sp<IOProfile> getMsdProfileForOutput(const DeviceVector &devices,
+                                           uint32_t samplingRate,
+                                           audio_format_t format,
+                                           audio_channel_mask_t channelMask,
+                                           audio_output_flags_t flags,
+                                           bool directOnly);
 
         audio_io_handle_t selectOutputForMusicEffects();
 
@@ -1201,6 +1210,21 @@ private:
         // without duplicating them if already present
         void addPortProfilesToVector(sp<IOProfile> outputProfile,
                                     AudioProfileVector& audioProfilesVector);
+
+        // Searches for a compatible profile with the sample rate, audio format and channel mask
+        // in the list of passed HwModule(s).
+        // returns a compatible profile if found, nullptr otherwise
+        sp<IOProfile> searchCompatibleProfileHwModules (
+                                            const HwModuleCollection& hwModules,
+                                            const DeviceVector& devices,
+                                            uint32_t samplingRate,
+                                            audio_format_t format,
+                                            audio_channel_mask_t channelMask,
+                                            audio_output_flags_t flags,
+                                            bool directOnly);
+
+        // Filters only the relevant flags for getProfileForOutput
+        audio_output_flags_t getRelevantFlags (audio_output_flags_t flags, bool directOnly);
 };
 
 };

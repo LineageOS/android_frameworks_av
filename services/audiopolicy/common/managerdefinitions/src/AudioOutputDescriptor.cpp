@@ -726,6 +726,14 @@ uint32_t SwAudioOutputDescriptor::getRecommendedMuteDurationMs() const
     return mProfile->recommendedMuteDurationMs;
 }
 
+void SwAudioOutputDescriptor::setTracksInvalidatedStatusByStrategy(product_strategy_t strategy) {
+    for (const auto &client : getClientIterable()) {
+        if (strategy == client->strategy()) {
+            client->setIsInvalid();
+        }
+    }
+}
+
 // HwAudioOutputDescriptor implementation
 HwAudioOutputDescriptor::HwAudioOutputDescriptor(const sp<SourceClientDescriptor>& source,
                                                  AudioPolicyClientInterface *clientInterface)
