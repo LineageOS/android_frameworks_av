@@ -699,6 +699,73 @@ TEST_P(AudioPolicyManagerTestMsd, GetDirectProfilesForAttributesWithMsd) {
     ASSERT_EQ(countDirectProfilesPrimary, getDirectProfilesForAttributes(attr).size());
 }
 
+TEST_P(AudioPolicyManagerTestMsd, IsDirectPlaybackSupportedWithMsd) {
+    const audio_attributes_t attr = {
+        AUDIO_CONTENT_TYPE_UNKNOWN, AUDIO_USAGE_UNKNOWN,
+        AUDIO_SOURCE_DEFAULT, AUDIO_FLAG_NONE, ""};
+
+    audio_config_base_t directConfig = AUDIO_CONFIG_BASE_INITIALIZER;
+    directConfig.format = AUDIO_FORMAT_DTS;
+    directConfig.sample_rate = 48000;
+    directConfig.channel_mask = AUDIO_CHANNEL_OUT_5POINT1;
+
+    audio_config_base_t nonDirectConfig = AUDIO_CONFIG_BASE_INITIALIZER;
+    nonDirectConfig.format = AUDIO_FORMAT_PCM_16_BIT;
+    nonDirectConfig.sample_rate = 48000;
+    nonDirectConfig.channel_mask = AUDIO_CHANNEL_OUT_STEREO;
+
+    audio_config_base_t nonExistentConfig = AUDIO_CONFIG_BASE_INITIALIZER;
+    nonExistentConfig.format = AUDIO_FORMAT_E_AC3;
+    nonExistentConfig.sample_rate = 48000;
+    nonExistentConfig.channel_mask = AUDIO_CHANNEL_OUT_STEREO;
+
+    audio_config_base_t msdDirectConfig1 = AUDIO_CONFIG_BASE_INITIALIZER;
+    msdDirectConfig1.format = AUDIO_FORMAT_AC3;
+    msdDirectConfig1.sample_rate = 48000;
+    msdDirectConfig1.channel_mask = AUDIO_CHANNEL_OUT_5POINT1;
+
+    audio_config_base_t msdDirectConfig2 = AUDIO_CONFIG_BASE_INITIALIZER;
+    msdDirectConfig2.format = AUDIO_FORMAT_IEC60958;
+    msdDirectConfig2.sample_rate = 48000;
+    msdDirectConfig2.channel_mask = AUDIO_CHANNEL_OUT_STEREO;
+
+    audio_config_base_t msdNonDirectConfig = AUDIO_CONFIG_BASE_INITIALIZER;
+    msdNonDirectConfig.format = AUDIO_FORMAT_PCM_16_BIT;
+    msdNonDirectConfig.sample_rate = 96000;
+    msdNonDirectConfig.channel_mask = AUDIO_CHANNEL_OUT_STEREO;
+
+    ASSERT_TRUE(mManager->isDirectOutputSupported(directConfig, attr));
+    ASSERT_FALSE(mManager->isDirectOutputSupported(nonDirectConfig, attr));
+    ASSERT_FALSE(mManager->isDirectOutputSupported(nonExistentConfig, attr));
+    // before setting MSD patches the direct MSD configs return false
+    ASSERT_FALSE(mManager->isDirectOutputSupported(msdDirectConfig1, attr));
+    ASSERT_FALSE(mManager->isDirectOutputSupported(msdDirectConfig2, attr));
+    ASSERT_FALSE(mManager->isDirectOutputSupported(msdNonDirectConfig, attr));
+
+    DeviceVector outputDevices = mManager->getAvailableOutputDevices();
+    // Remove MSD output device to avoid patching to itself
+    outputDevices.remove(mMsdOutputDevice);
+    mManager->setMsdOutputPatches(&outputDevices);
+
+    ASSERT_TRUE(mManager->isDirectOutputSupported(directConfig, attr));
+    ASSERT_FALSE(mManager->isDirectOutputSupported(nonDirectConfig, attr));
+    ASSERT_FALSE(mManager->isDirectOutputSupported(nonExistentConfig, attr));
+    // after setting MSD patches the direct MSD configs return true
+    ASSERT_TRUE(mManager->isDirectOutputSupported(msdDirectConfig1, attr));
+    ASSERT_TRUE(mManager->isDirectOutputSupported(msdDirectConfig2, attr));
+    ASSERT_FALSE(mManager->isDirectOutputSupported(msdNonDirectConfig, attr));
+
+    mManager->releaseMsdOutputPatches(outputDevices);
+
+    ASSERT_TRUE(mManager->isDirectOutputSupported(directConfig, attr));
+    ASSERT_FALSE(mManager->isDirectOutputSupported(nonDirectConfig, attr));
+    ASSERT_FALSE(mManager->isDirectOutputSupported(nonExistentConfig, attr));
+    // AFTER releasing MSD patches the direct MSD configs return false
+    ASSERT_FALSE(mManager->isDirectOutputSupported(msdDirectConfig1, attr));
+    ASSERT_FALSE(mManager->isDirectOutputSupported(msdDirectConfig2, attr));
+    ASSERT_FALSE(mManager->isDirectOutputSupported(msdNonDirectConfig, attr));
+}
+
 class AudioPolicyManagerTestWithConfigurationFile : public AudioPolicyManagerTest {
 protected:
     void SetUpManagerConfig() override;

@@ -935,6 +935,32 @@ void AudioPolicyManager::setSystemProperty(const char* property, const char* val
     ALOGV("setSystemProperty() property %s, value %s", property, value);
 }
 
+// Find an MSD output profile compatible with the parameters passed.
+// When "directOnly" is set, restrict search to profiles for direct outputs.
+sp<IOProfile> AudioPolicyManager::getMsdProfileForOutput(
+                                                   const DeviceVector& devices,
+                                                   uint32_t samplingRate,
+                                                   audio_format_t format,
+                                                   audio_channel_mask_t channelMask,
+                                                   audio_output_flags_t flags,
+                                                   bool directOnly)
+{
+    flags = getRelevantFlags(flags, directOnly);
+
+    sp<HwModule> msdModule = mHwModules.getModuleFromName(AUDIO_HARDWARE_MODULE_ID_MSD);
+    if (msdModule != nullptr) {
+        // for the msd module check if there are patches to the output devices
+        if (msdHasPatchesToAllDevices(devices.toTypeAddrVector())) {
+            HwModuleCollection modules;
+            modules.add(msdModule);
+            return searchCompatibleProfileHwModules(
+                    modules, getMsdAudioOutDevices(), samplingRate, format, channelMask,
+                    flags, directOnly);
+        }
+    }
+    return nullptr;
+}
+
 // Find an output profile compatible with the parameters passed. When "directOnly" is set, restrict
 // search to profiles for direct outputs.
 sp<IOProfile> AudioPolicyManager::getProfileForOutput(
@@ -945,45 +971,65 @@ sp<IOProfile> AudioPolicyManager::getProfileForOutput(
                                                    audio_output_flags_t flags,
                                                    bool directOnly)
 {
+    flags = getRelevantFlags(flags, directOnly);
+
+    return searchCompatibleProfileHwModules(
+            mHwModules, devices, samplingRate, format, channelMask, flags, directOnly);
+}
+
+audio_output_flags_t AudioPolicyManager::getRelevantFlags (
+                                            audio_output_flags_t flags, bool directOnly) {
     if (directOnly) {
-        // only retain flags that will drive the direct output profile selection
-        // if explicitly requested
-        static const uint32_t kRelevantFlags =
+         // only retain flags that will drive the direct output profile selection
+         // if explicitly requested
+         static const uint32_t kRelevantFlags =
                 (AUDIO_OUTPUT_FLAG_HW_AV_SYNC | AUDIO_OUTPUT_FLAG_COMPRESS_OFFLOAD |
-                 AUDIO_OUTPUT_FLAG_VOIP_RX | AUDIO_OUTPUT_FLAG_MMAP_NOIRQ);
-        flags =
-            (audio_output_flags_t)((flags & kRelevantFlags) | AUDIO_OUTPUT_FLAG_DIRECT);
+                AUDIO_OUTPUT_FLAG_VOIP_RX | AUDIO_OUTPUT_FLAG_MMAP_NOIRQ);
+         flags = (audio_output_flags_t)((flags & kRelevantFlags) | AUDIO_OUTPUT_FLAG_DIRECT);
     }
+    return flags;
+}
 
+sp<IOProfile> AudioPolicyManager::searchCompatibleProfileHwModules (
+                                        const HwModuleCollection& hwModules,
+                                        const DeviceVector& devices,
+                                        uint32_t samplingRate,
+                                        audio_format_t format,
+                                        audio_channel_mask_t channelMask,
+                                        audio_output_flags_t flags,
+                                        bool directOnly) {
     sp<IOProfile> profile;
-
-    for (const auto& hwModule : mHwModules) {
+    for (const auto& hwModule : hwModules) {
         for (const auto& curProfile : hwModule->getOutputProfiles()) {
-            if (!curProfile->isCompatibleProfile(devices,
-                    samplingRate, NULL /*updatedSamplingRate*/,
-                    format, NULL /*updatedFormat*/,
-                    channelMask, NULL /*updatedChannelMask*/,
-                    flags)) {
+             if (!curProfile->isCompatibleProfile(devices,
+                     samplingRate, NULL /*updatedSamplingRate*/,
+                     format, NULL /*updatedFormat*/,
+                     channelMask, NULL /*updatedChannelMask*/,
+                     flags)) {
+                 continue;
+             }
+             // reject profiles not corresponding to a device currently available
+             if (!mAvailableOutputDevices.containsAtLeastOne(curProfile->getSupportedDevices())) {
+                 continue;
+             }
+             // reject profiles if connected device does not support codec
+             if (!curProfile->devicesSupportEncodedFormats(devices.types())) {
+                 continue;
+             }
+             if (!directOnly) {
+                return curProfile;
+             }
+
+             // when searching for direct outputs, if several profiles are compatible, give priority
+             // to one with offload capability
+             if (profile != 0 && 
+                 ((curProfile->getFlags() & AUDIO_OUTPUT_FLAG_COMPRESS_OFFLOAD) == 0)) {
                 continue;
-            }
-            // reject profiles not corresponding to a device currently available
-            if (!mAvailableOutputDevices.containsAtLeastOne(curProfile->getSupportedDevices())) {
-                continue;
-            }
-            // reject profiles if connected device does not support codec
-            if (!curProfile->devicesSupportEncodedFormats(devices.types())) {
-                continue;
-            }
-            if (!directOnly) return curProfile;
-            // when searching for direct outputs, if several profiles are compatible, give priority
-            // to one with offload capability
-            if (profile != 0 && ((curProfile->getFlags() & AUDIO_OUTPUT_FLAG_COMPRESS_OFFLOAD) == 0)) {
-                continue;
-            }
-            profile = curProfile;
-            if ((profile->getFlags() & AUDIO_OUTPUT_FLAG_COMPRESS_OFFLOAD) != 0) {
-                break;
-            }
+             }
+             profile = curProfile;
+             if ((profile->getFlags() & AUDIO_OUTPUT_FLAG_COMPRESS_OFFLOAD) != 0) {
+                 break;
+             }
         }
     }
     return profile;
@@ -3820,7 +3866,22 @@ bool AudioPolicyManager::isDirectOutputSupported(const audio_config_base_t& conf
         __FUNCTION__, profile != 0 ? "" : "NOT ",
         (profile != 0 ? profile->getTagName().c_str() : "null"),
         config.sample_rate, config.format, config.channel_mask, output_flags);
-    return (profile != 0);
+
+    // also try the MSD module if compatible profile not found
+    if (profile == nullptr) {
+        profile = getMsdProfileForOutput(outputDevices,
+                                              config.sample_rate,
+                                              config.format,
+                                              config.channel_mask,
+                                              output_flags,
+                                              true /* directOnly */);
+        ALOGV("%s() MSD profile %sfound with name: %s, "
+            "sample rate: %u, format: 0x%x, channel_mask: 0x%x, output flags: 0x%x",
+            __FUNCTION__, profile != 0 ? "" : "NOT ",
+            (profile != 0 ? profile->getTagName().c_str() : "null"),
+            config.sample_rate, config.format, config.channel_mask, output_flags);
+    }
+    return (profile != nullptr);
 }
 
 bool AudioPolicyManager::isOffloadPossible(const audio_offload_info_t &offloadInfo,
@@ -6274,6 +6335,12 @@ void AudioPolicyManager::checkOutputForAttributes(const audio_attributes_t &attr
             for (auto stream :  mEngine->getStreamTypesForProductStrategy(psId)) {
                 mpClientInterface->invalidateStream(stream);
             }
+            for (audio_io_handle_t srcOut : srcOutputs) {
+                sp<SwAudioOutputDescriptor> desc = mPreviousOutputs.valueFor(srcOut);
+                if (desc == nullptr) continue;
+
+                desc->setTracksInvalidatedStatusByStrategy(psId);
+            }
         }
     }
 }
@@ -7599,7 +7666,10 @@ bool AudioPolicyManager::areAllActiveTracksRerouted(const sp<SwAudioOutputDescri
         routedDevices.add(device);
     }
     for (const auto& client : activeClients) {
-        // TODO: b/175343099 only travel the valid client
+        if (client->isInvalid()) {
+            // No need to take care about invalidated clients.
+            continue;
+        }
         sp<DeviceDescriptor> preferredDevice =
                 mAvailableOutputDevices.getDeviceFromId(client->preferredDeviceId());
         if (mEngine->getOutputDevicesForAttributes(
