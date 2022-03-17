@@ -301,7 +301,7 @@ void TunerFilter::getHidlIpSettings(
             break;
         }
         case TunerFilterSettings::isPassthrough: {
-            ip.filterSettings.bPassthrough(tunerSettings.isPassthrough);
+            ip.filterSettings.bPassthrough(tunerSettings.get<TunerFilterSettings::isPassthrough>());
             break;
         }
         default: {
@@ -345,7 +345,8 @@ void TunerFilter::getHidlTlvSettings(
             break;
         }
         case TunerFilterSettings::isPassthrough: {
-            tlv.filterSettings.bPassthrough(tunerSettings.isPassthrough);
+            tlv.filterSettings.bPassthrough(
+                    tunerSettings.get<TunerFilterSettings::isPassthrough>());
             break;
         }
         default: {
