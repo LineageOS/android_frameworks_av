@@ -70,6 +70,13 @@ using hardware::cas::native::V1_0::IDescrambler;
 using aidl::android::media::MediaResourceParcel;
 
 struct MediaCodec : public AHandler {
+    enum Domain {
+        DOMAIN_UNKNOWN = 0,
+        DOMAIN_VIDEO = 1,
+        DOMAIN_AUDIO = 2,
+        DOMAIN_IMAGE = 3
+    };
+
     enum ConfigureFlags {
         CONFIGURE_FLAG_ENCODE           = 1,
         CONFIGURE_FLAG_USE_BLOCK_MODEL  = 2,
@@ -437,10 +444,10 @@ private:
 
     sp<ResourceManagerServiceProxy> mResourceManagerProxy;
 
-    bool mIsVideo;
+    Domain mDomain;
     AString mLogSessionId;
-    int32_t mVideoWidth;
-    int32_t mVideoHeight;
+    int32_t mWidth;
+    int32_t mHeight;
     int32_t mRotationDegrees;
     int32_t mAllowFrameDroppingBySurface;
 
