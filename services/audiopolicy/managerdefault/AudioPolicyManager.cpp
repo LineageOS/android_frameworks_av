@@ -3962,8 +3962,16 @@ audio_direct_mode_t AudioPolicyManager::getDirectPlaybackSupport(const audio_att
     }
     flags = (audio_output_flags_t)((flags & relevantFlags) | AUDIO_OUTPUT_FLAG_DIRECT);
 
-    DeviceVector outputDevices = mEngine->getOutputDevicesForAttributes(*attr);
+    DeviceVector engineOutputDevices = mEngine->getOutputDevicesForAttributes(*attr);
     for (const auto& hwModule : mHwModules) {
+        DeviceVector outputDevices = engineOutputDevices;
+        // the MSD module checks for different conditions and output devices
+        if (strcmp(hwModule->getName(), AUDIO_HARDWARE_MODULE_ID_MSD) == 0) {
+            if (!msdHasPatchesToAllDevices(engineOutputDevices.toTypeAddrVector())) {
+                continue;
+            }
+            outputDevices = getMsdAudioOutDevices();
+        }
         for (const auto& curProfile : hwModule->getOutputProfiles()) {
             if (!curProfile->isCompatibleProfile(outputDevices,
                     config->sample_rate, nullptr /*updatedSamplingRate*/,
@@ -3990,11 +3998,10 @@ audio_direct_mode_t AudioPolicyManager::getDirectPlaybackSupport(const audio_att
                             ~AUDIO_DIRECT_OFFLOAD_SUPPORTED) |
                             AUDIO_DIRECT_OFFLOAD_GAPLESS_SUPPORTED);
                 } else {
-                    directMode = (audio_direct_mode_t)(directMode |AUDIO_DIRECT_OFFLOAD_SUPPORTED);
+                    directMode = (audio_direct_mode_t)(directMode | AUDIO_DIRECT_OFFLOAD_SUPPORTED);
                 }
             } else {
-                directMode = (audio_direct_mode_t) (directMode |
-                                                    AUDIO_DIRECT_BITSTREAM_SUPPORTED);
+                directMode = (audio_direct_mode_t) (directMode | AUDIO_DIRECT_BITSTREAM_SUPPORTED);
             }
         }
     }
