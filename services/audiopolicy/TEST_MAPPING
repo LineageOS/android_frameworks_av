@@ -12,5 +12,15 @@
         }
       ]
     }
+  ],
+  "postsubmit": [
+    {
+      "name": "CtsNativeMediaAAudioTestCases",
+      "options" : [
+        {
+          "include-filter": "android.nativemedia.aaudio.AAudioTests#AAudioBasic.*"
+        }
+      ]
+    }
   ]
 }
