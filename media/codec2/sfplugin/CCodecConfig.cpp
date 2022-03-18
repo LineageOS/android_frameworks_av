@@ -324,7 +324,8 @@ CCodecConfig::CCodecConfig()
     : mInputFormat(new AMessage),
       mOutputFormat(new AMessage),
       mUsingSurface(false),
-      mTunneled(false) { }
+      mTunneled(false),
+      mPushBlankBuffersOnStop(false) { }
 
 void CCodecConfig::initializeStandardParams() {
     typedef Domain D;
@@ -960,8 +961,6 @@ void CCodecConfig::initializeStandardParams() {
         .limitTo(D::ENCODER & D::VIDEO & D::READ));
 
     /* still to do
-    constexpr char KEY_PUSH_BLANK_BUFFERS_ON_STOP[] = "push-blank-buffers-on-shutdown";
-
        not yet used by MediaCodec, but defined as MediaFormat
     KEY_AUDIO_SESSION_ID // we use "audio-hw-sync"
     KEY_OUTPUT_REORDER_DEPTH

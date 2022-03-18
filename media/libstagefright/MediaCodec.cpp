@@ -4646,7 +4646,6 @@ status_t MediaCodec::queueCSDInputBuffer(size_t bufferIndex) {
     mCSD.erase(mCSD.begin());
     std::shared_ptr<C2Buffer> c2Buffer;
     sp<hardware::HidlMemory> memory;
-    size_t offset = 0;
 
     if (mFlags & kFlagUseBlockModel) {
         if (hasCryptoOrDescrambler()) {
@@ -4667,7 +4666,6 @@ status_t MediaCodec::queueCSDInputBuffer(size_t bufferIndex) {
             memcpy(mem->unsecurePointer(), csd->data(), csd->size());
             ssize_t heapOffset;
             memory = hardware::fromHeap(mem->getMemory(&heapOffset, nullptr));
-            offset += heapOffset;
         } else {
             std::shared_ptr<C2LinearBlock> block =
                 FetchLinearBlock(csd->size(), {std::string{mComponentName.c_str()}});
