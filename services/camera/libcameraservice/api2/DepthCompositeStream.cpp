@@ -297,7 +297,8 @@ status_t DepthCompositeStream::processInputFrame(nsecs_t ts, const InputFrame &i
     }
 
     sp<GraphicBuffer> gb = GraphicBuffer::from(anb);
-    res = gb->lockAsync(GRALLOC_USAGE_SW_WRITE_OFTEN, &dstBuffer, fenceFd);
+    GraphicBufferLocker gbLocker(gb);
+    res = gbLocker.lockAsync(&dstBuffer, fenceFd);
     if (res != OK) {
         ALOGE("%s: Error trying to lock output buffer fence: %s (%d)", __FUNCTION__,
                 strerror(-res), res);
