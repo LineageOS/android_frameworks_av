@@ -123,7 +123,7 @@ class C2SoftHevcEnc::IntfImpl : public SimpleInterface<void>::BaseParams {
         // matches size limits in codec library
         addParameter(
             DefineParam(mSize, C2_PARAMKEY_PICTURE_SIZE)
-                .withDefault(new C2StreamPictureSizeInfo::input(0u, 320, 240))
+                .withDefault(new C2StreamPictureSizeInfo::input(0u, 64, 64))
                 .withFields({
                     C2F(mSize, width).inRange(2, 1920, 2),
                     C2F(mSize, height).inRange(2, 1088, 2),
@@ -133,7 +133,7 @@ class C2SoftHevcEnc::IntfImpl : public SimpleInterface<void>::BaseParams {
 
         addParameter(
             DefineParam(mFrameRate, C2_PARAMKEY_FRAME_RATE)
-                .withDefault(new C2StreamFrameRateInfo::output(0u, 30.))
+                .withDefault(new C2StreamFrameRateInfo::output(0u, 1.))
                 .withFields({C2F(mFrameRate, value).greaterThan(0.)})
                 .withSetter(
                     Setter<decltype(*mFrameRate)>::StrictValueWithNoDeps)
