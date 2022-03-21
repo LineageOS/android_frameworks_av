@@ -1174,7 +1174,7 @@ status_t AudioPolicyService::onTransact(
     }
 
     std::string tag("IAudioPolicyService command " + std::to_string(code));
-    TimeCheck check(tag.c_str());
+    mediautils::TimeCheck check(tag.c_str());
 
     switch (code) {
         case SHELL_COMMAND_TRANSACTION: {

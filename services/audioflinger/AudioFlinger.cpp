@@ -276,7 +276,7 @@ AudioFlinger::AudioFlinger()
     mMediaLogNotifier->run("MediaLogNotifier");
     std::vector<pid_t> halPids;
     mDevicesFactoryHal->getHalPids(&halPids);
-    TimeCheck::setAudioHalPids(halPids);
+    mediautils::TimeCheck::setAudioHalPids(halPids);
 
     // Notify that we have started (also called when audioserver service restarts)
     mediametrics::LogItem(mMetricsId)
@@ -316,7 +316,7 @@ void AudioFlinger::onFirstRef()
 }
 
 status_t AudioFlinger::setAudioHalPids(const std::vector<pid_t>& pids) {
-  TimeCheck::setAudioHalPids(pids);
+  mediautils::TimeCheck::setAudioHalPids(pids);
   return NO_ERROR;
 }
 
@@ -4419,7 +4419,7 @@ status_t AudioFlinger::onTransactWrapper(TransactionCode code,
 
     std::string tag("IAudioFlinger command " +
                     std::to_string(static_cast<std::underlying_type_t<TransactionCode>>(code)));
-    TimeCheck check(tag.c_str());
+    mediautils::TimeCheck check(tag.c_str());
 
     // Make sure we connect to Audio Policy Service before calling into AudioFlinger:
     //  - AudioFlinger can call into Audio Policy Service with its global mutex held
