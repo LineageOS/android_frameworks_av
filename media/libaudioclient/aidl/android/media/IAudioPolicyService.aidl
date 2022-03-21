@@ -390,4 +390,8 @@ interface IAudioPolicyService {
      * for the specified audio attributes.
      */
     AudioProfile[] getDirectProfilesForAttributes(in AudioAttributesInternal attr);
+
+    // When adding a new method, please review and update
+    // AudioPolicyService.cpp AudioPolicyService::onTransact()
+    // AudioPolicyService.cpp IAUDIOPOLICYSERVICE_BINDER_METHOD_MACRO_LIST
 }

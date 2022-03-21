@@ -43,7 +43,7 @@ cc_library {
     ],
     shared_libs: [
         "libaudioclient_aidl_conversion",
-        "libaudioutils", // for clock.h
+        "libaudioutils", // for clock.h, Statistics.h
         "libbinder",
         "libcutils",
         "liblog",
