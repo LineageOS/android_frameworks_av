@@ -482,9 +482,9 @@ public:
      * Legacy server should implement this interface in order to be wrapped.
      */
     class Delegate : public IAudioFlinger {
-    protected:
         friend class AudioFlingerServerAdapter;
-
+    public:
+        // expose the TransactionCode enum for TimeCheck purposes.
         enum class TransactionCode {
             CREATE_TRACK = media::BnAudioFlingerService::TRANSACTION_createTrack,
             CREATE_RECORD = media::BnAudioFlingerService::TRANSACTION_createRecord,
@@ -553,6 +553,7 @@ public:
             SET_DEVICE_CONNECTED_STATE = media::BnAudioFlingerService::TRANSACTION_setDeviceConnectedState,
         };
 
+    protected:
         /**
          * And optional hook, called on every transaction, allowing additional operations to be
          * performed before/after the unparceling  ofthe data and dispatching to the respective
