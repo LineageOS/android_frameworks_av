@@ -50,9 +50,12 @@ TimerThread::Handle TimerThread::scheduleTaskAtDeadline(std::function<void()>&& 
     return deadline;
 }
 
-void TimerThread::cancelTask(Handle handle) {
+// Returns true if cancelled, false if handle doesn't exist.
+// Beware of lock inversion with cancelTask() as the callback
+// is called while holding mMutex.
+bool TimerThread::cancelTask(Handle handle) {
     std::lock_guard _l(mMutex);
-    mMonitorRequests.erase(handle);
+    return mMonitorRequests.erase(handle) != 0;
 }
 
 void TimerThread::threadFunc() {
