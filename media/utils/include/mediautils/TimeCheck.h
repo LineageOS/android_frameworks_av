@@ -20,27 +20,76 @@
 
 #include <mediautils/TimerThread.h>
 
-namespace android {
+namespace android::mediautils {
 
 // A class monitoring execution time for a code block (scoped variable) and causing an assert
 // if it exceeds a certain time
 
 class TimeCheck {
   public:
+    using OnTimerFunc = std::function<void(bool /* timeout */, float /* elapsedMs */ )>;
+
     // The default timeout is chosen to be less than system server watchdog timeout
     static constexpr uint32_t kDefaultTimeOutMs = 5000;
 
-    TimeCheck(const char* tag, uint32_t timeoutMs = kDefaultTimeOutMs);
+    /**
+     * TimeCheck is a RAII object which will notify a callback
+     * on timer expiration or when the object is deallocated.
+     *
+     * TimeCheck is used as a watchdog and aborts by default on timer expiration.
+     * When it aborts, it will also send a debugger signal to pids passed in through
+     * setAudioHalPids().
+     *
+     * If the callback function returns for timeout it will not be called again for
+     * the deallocation.
+     *
+     * \param tag       string associated with the TimeCheck object.
+     * \param onTimer   callback function with 2 parameters
+     *                      bool timeout  (which is true when the TimeCheck object
+     *                                    times out, false when the TimeCheck object is
+     *                                    destroyed or leaves scope before the timer expires.)
+     *                      float elapsedMs (the elapsed time to this event).
+     *                  The callback when timeout is true will be called on a different thread.
+     *                  Currently this is guaranteed to block the destructor
+     *                  (potential lock inversion warning here) nevertheless
+     *                  it would be safer not to depend on stack contents.
+     * \param timeoutMs timeout in milliseconds.
+     * \param crashOnTimeout true if the object issues an abort on timeout.
+     */
+    explicit TimeCheck(std::string tag, OnTimerFunc&& onTimer = {},
+            uint32_t timeoutMs = kDefaultTimeOutMs, bool crashOnTimeout = true);
+    // Remove copy constructors as there should only be one call to the destructor.
+    // Move is kept implicitly disabled, but would be logically consistent if enabled.
+    TimeCheck(const TimeCheck& other) = delete;
+    TimeCheck& operator=(const TimeCheck&) = delete;
+
     ~TimeCheck();
     static void setAudioHalPids(const std::vector<pid_t>& pids);
     static std::vector<pid_t> getAudioHalPids();
 
   private:
-    static TimerThread* getTimeCheckThread();
+    static TimerThread& getTimeCheckThread();
     static void accessAudioHalPids(std::vector<pid_t>* pids, bool update);
-    static void crash(const char* tag, std::chrono::system_clock::time_point startTime);
 
+    // Helper class for handling events.
+    // The usage here is const safe.
+    class TimeCheckHandler {
+    public:
+        const std::string tag;
+        const OnTimerFunc onTimer;
+        const bool crashOnTimeout;
+        const std::chrono::system_clock::time_point startTime;
+        const pid_t tid;
+
+        void onCancel(TimerThread::Handle handle) const;
+        void onTimeout() const;
+    };
+
+    // mTimeCheckHandler is immutable, prefer to be first initialized, last destroyed.
+    // Technically speaking, we do not need a shared_ptr here because TimerThread::cancelTask()
+    // is mutually exclusive of the callback, but the price paid for lifetime safety is minimal.
+    const std::shared_ptr<const TimeCheckHandler> mTimeCheckHandler;
     const TimerThread::Handle mTimerHandle;
 };
 
-};  // namespace android
+}  // namespace android::mediautils

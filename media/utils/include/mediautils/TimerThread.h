@@ -48,9 +48,9 @@ class TimerThread {
 
     /**
      * Cancel a task, previously scheduled with scheduleTask().
-     * If the task has already executed, this is a no-op.
+     * If the task has already executed, this is a no-op and returns false.
      */
-    void cancelTask(Handle handle);
+    bool cancelTask(Handle handle);
 
   private:
     using TimePoint = std::chrono::steady_clock::time_point;
