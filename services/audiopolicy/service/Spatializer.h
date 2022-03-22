@@ -276,7 +276,12 @@ private:
 
     void postFramesProcessedMsg(int frames);
 
-    void checkHeadSensor_l() REQUIRES(mLock);
+    /**
+     * Checks if head and screen sensors must be actively monitored based on
+     * spatializer state and playback activity and configures the pose controller
+     * accordingly.
+     */
+    void checkSensorsState_l() REQUIRES(mLock);
 
     /** Effect engine descriptor */
     const effect_descriptor_t mEngineDescriptor;

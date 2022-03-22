@@ -26,3 +26,30 @@ cc_test {
         "media_synchronization_tests.cpp",
     ],
 }
+
+cc_test {
+    name: "timecheck_tests",
+
+    cflags: [
+        "-Wall",
+        "-Werror",
+        "-Wextra",
+    ],
+
+    sanitize:{
+       address: true,
+       cfi: true,
+       integer_overflow: true,
+       memtag_heap: true,
+    },
+
+    shared_libs: [
+        "liblog",
+        "libmediautils",
+        "libutils",
+    ],
+
+    srcs: [
+        "timecheck_tests.cpp",
+    ],
+}

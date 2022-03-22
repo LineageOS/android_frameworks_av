@@ -300,7 +300,7 @@ Status Spatializer::setLevel(SpatializationLevel level) {
         if (levelChanged && mEngine != nullptr) {
             setEffectParameter_l(SPATIALIZER_PARAM_LEVEL, std::vector<SpatializationLevel>{level});
         }
-        checkHeadSensor_l();
+        checkSensorsState_l();
     }
 
     if (levelChanged) {
@@ -375,7 +375,7 @@ Status Spatializer::setDesiredHeadTrackingMode(SpatializerHeadTrackingMode mode)
 
     if (mPoseController != nullptr) {
         mPoseController->setDesiredMode(mDesiredHeadTrackingMode);
-        checkHeadSensor_l();
+        checkSensorsState_l();
     }
 
     return Status::ok();
@@ -449,9 +449,7 @@ Status Spatializer::setHeadSensor(int sensorHandle) {
     }
     std::lock_guard lock(mLock);
     mHeadSensor = sensorHandle;
-    if (mPoseController != nullptr) {
-        checkHeadSensor_l();
-    }
+    checkSensorsState_l();
     return Status::ok();
 }
 
@@ -462,9 +460,7 @@ Status Spatializer::setScreenSensor(int sensorHandle) {
     }
     std::lock_guard lock(mLock);
     mScreenSensor = sensorHandle;
-    if (mPoseController != nullptr) {
-        mPoseController->setScreenSensor(mScreenSensor);
-    }
+    checkSensorsState_l();
     return Status::ok();
 }
 
@@ -669,8 +665,7 @@ status_t Spatializer::attachOutput(audio_io_handle_t output, size_t numActiveTra
 
             mPoseController->setDesiredMode(mDesiredHeadTrackingMode);
             mNumActiveTracks = numActiveTracks;
-            checkHeadSensor_l();
-            mPoseController->setScreenSensor(mScreenSensor);
+            checkSensorsState_l();
             mPoseController->setDisplayOrientation(mDisplayOrientation);
             poseController = mPoseController;
         }
@@ -715,17 +710,19 @@ audio_io_handle_t Spatializer::detachOutput() {
 void Spatializer::updateActiveTracks(size_t numActiveTracks) {
     std::lock_guard lock(mLock);
     mNumActiveTracks = numActiveTracks;
-    checkHeadSensor_l();
+    checkSensorsState_l();
 }
 
-void Spatializer::checkHeadSensor_l() {
+void Spatializer::checkSensorsState_l() {
     if (mSupportsHeadTracking && mPoseController != nullptr) {
-        if(mNumActiveTracks > 0 && mLevel != SpatializationLevel::NONE
+        if (mNumActiveTracks > 0 && mLevel != SpatializationLevel::NONE
             && mDesiredHeadTrackingMode != HeadTrackingMode::STATIC
             && mHeadSensor != SpatializerPoseController::INVALID_SENSOR) {
             mPoseController->setHeadSensor(mHeadSensor);
+            mPoseController->setScreenSensor(mScreenSensor);
         } else {
             mPoseController->setHeadSensor(SpatializerPoseController::INVALID_SENSOR);
+            mPoseController->setScreenSensor(SpatializerPoseController::INVALID_SENSOR);
         }
     }
 }
@@ -746,11 +743,11 @@ void Spatializer::engineCallback(int32_t event, void *user, void *info) {
     switch (event) {
         case AudioEffect::EVENT_FRAMES_PROCESSED: {
             int frames = info == nullptr ? 0 : *(int*)info;
-            ALOGD("%s frames processed %d for me %p", __func__, frames, me);
+            ALOGV("%s frames processed %d for me %p", __func__, frames, me);
             me->postFramesProcessedMsg(frames);
         } break;
         default:
-            ALOGD("%s event %d", __func__, event);
+            ALOGV("%s event %d", __func__, event);
             break;
     }
 }
