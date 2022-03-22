@@ -1189,6 +1189,25 @@ std::string DrmHalAidl::reportFrameworkMetrics(const std::string& pluginMetrics)
     return serializedMetrics;
 }
 
+status_t DrmHalAidl::getSupportedSchemes(std::vector<uint8_t> &schemes) const {
+    Mutex::Autolock autoLock(mLock);
+
+    if (mFactories.empty()) return UNKNOWN_ERROR;
+    for (ssize_t i = mFactories.size() - 1; i >= 0; i--) {
+        CryptoSchemes curSchemes{};
+        auto err = mFactories[i]->getSupportedCryptoSchemes(&curSchemes);
+        if (!err.isOk()) {
+            continue;
+        }
+
+        for (auto uuidObj : curSchemes.uuids) {
+            schemes.insert(schemes.end(), uuidObj.uuid.begin(), uuidObj.uuid.end());
+        }
+    }
+
+    return OK;
+}
+
 void DrmHalAidl::cleanup() {
     closeOpenSessions();
 
