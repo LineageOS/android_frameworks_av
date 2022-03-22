@@ -99,8 +99,8 @@ void ConversionHelperHidl::parametersToHal(
     values->setTo(params.toString());
 }
 
-ConversionHelperHidl::ConversionHelperHidl(const char* className)
-        : mClassName(className) {
+ConversionHelperHidl::ConversionHelperHidl(std::string_view className)
+        : mClassName(className.begin(), className.end()) {
 }
 
 // static
@@ -125,7 +125,7 @@ status_t ConversionHelperHidl::analyzeResult(const Result& result) {
 }
 
 void ConversionHelperHidl::emitError(const char* funcName, const char* description) {
-    ALOGE("%s %p %s: %s (from rpc)", mClassName, this, funcName, description);
+    ALOGE("%s %p %s: %s (from rpc)", mClassName.c_str(), this, funcName, description);
 }
 
 }  // namespace android
