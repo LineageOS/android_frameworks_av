@@ -39,6 +39,7 @@
 #include <media/AidlConversion.h>
 #include <media/AudioEffect.h>
 #include <media/AudioParameter.h>
+#include <mediautils/MethodStatistics.h>
 #include <mediautils/ServiceUtilities.h>
 #include <mediautils/TimeCheck.h>
 #include <sensorprivacy/SensorPrivacyManager.h>
@@ -59,6 +60,120 @@ static const int kDumpLockTimeoutNs = 1 * NANOS_PER_SECOND;
 static const nsecs_t kAudioCommandTimeoutNs = seconds(3); // 3 seconds
 
 static const String16 sManageAudioPolicyPermission("android.permission.MANAGE_AUDIO_POLICY");
+
+// Creates an association between Binder code to name for IAudioPolicyService.
+#define IAUDIOPOLICYSERVICE_BINDER_METHOD_MACRO_LIST \
+BINDER_METHOD_ENTRY(onNewAudioModulesAvailable) \
+BINDER_METHOD_ENTRY(setDeviceConnectionState) \
+BINDER_METHOD_ENTRY(getDeviceConnectionState) \
+BINDER_METHOD_ENTRY(handleDeviceConfigChange) \
+BINDER_METHOD_ENTRY(setPhoneState) \
+BINDER_METHOD_ENTRY(setForceUse) \
+BINDER_METHOD_ENTRY(getForceUse) \
+BINDER_METHOD_ENTRY(getOutput) \
+BINDER_METHOD_ENTRY(getOutputForAttr) \
+BINDER_METHOD_ENTRY(startOutput) \
+BINDER_METHOD_ENTRY(stopOutput) \
+BINDER_METHOD_ENTRY(releaseOutput) \
+BINDER_METHOD_ENTRY(getInputForAttr) \
+BINDER_METHOD_ENTRY(startInput) \
+BINDER_METHOD_ENTRY(stopInput) \
+BINDER_METHOD_ENTRY(releaseInput) \
+BINDER_METHOD_ENTRY(initStreamVolume) \
+BINDER_METHOD_ENTRY(setStreamVolumeIndex) \
+BINDER_METHOD_ENTRY(getStreamVolumeIndex) \
+BINDER_METHOD_ENTRY(setVolumeIndexForAttributes) \
+BINDER_METHOD_ENTRY(getVolumeIndexForAttributes) \
+BINDER_METHOD_ENTRY(getMaxVolumeIndexForAttributes) \
+BINDER_METHOD_ENTRY(getMinVolumeIndexForAttributes) \
+BINDER_METHOD_ENTRY(getStrategyForStream) \
+BINDER_METHOD_ENTRY(getDevicesForAttributes) \
+BINDER_METHOD_ENTRY(getOutputForEffect) \
+BINDER_METHOD_ENTRY(registerEffect) \
+BINDER_METHOD_ENTRY(unregisterEffect) \
+BINDER_METHOD_ENTRY(setEffectEnabled) \
+BINDER_METHOD_ENTRY(moveEffectsToIo) \
+BINDER_METHOD_ENTRY(isStreamActive) \
+BINDER_METHOD_ENTRY(isStreamActiveRemotely) \
+BINDER_METHOD_ENTRY(isSourceActive) \
+BINDER_METHOD_ENTRY(queryDefaultPreProcessing) \
+BINDER_METHOD_ENTRY(addSourceDefaultEffect) \
+BINDER_METHOD_ENTRY(addStreamDefaultEffect) \
+BINDER_METHOD_ENTRY(removeSourceDefaultEffect) \
+BINDER_METHOD_ENTRY(removeStreamDefaultEffect) \
+BINDER_METHOD_ENTRY(setSupportedSystemUsages) \
+BINDER_METHOD_ENTRY(setAllowedCapturePolicy) \
+BINDER_METHOD_ENTRY(getOffloadSupport) \
+BINDER_METHOD_ENTRY(isDirectOutputSupported) \
+BINDER_METHOD_ENTRY(listAudioPorts) \
+BINDER_METHOD_ENTRY(getAudioPort) \
+BINDER_METHOD_ENTRY(createAudioPatch) \
+BINDER_METHOD_ENTRY(releaseAudioPatch) \
+BINDER_METHOD_ENTRY(listAudioPatches) \
+BINDER_METHOD_ENTRY(setAudioPortConfig) \
+BINDER_METHOD_ENTRY(registerClient) \
+BINDER_METHOD_ENTRY(setAudioPortCallbacksEnabled) \
+BINDER_METHOD_ENTRY(setAudioVolumeGroupCallbacksEnabled) \
+BINDER_METHOD_ENTRY(acquireSoundTriggerSession) \
+BINDER_METHOD_ENTRY(releaseSoundTriggerSession) \
+BINDER_METHOD_ENTRY(getPhoneState) \
+BINDER_METHOD_ENTRY(registerPolicyMixes) \
+BINDER_METHOD_ENTRY(setUidDeviceAffinities) \
+BINDER_METHOD_ENTRY(removeUidDeviceAffinities) \
+BINDER_METHOD_ENTRY(setUserIdDeviceAffinities) \
+BINDER_METHOD_ENTRY(removeUserIdDeviceAffinities) \
+BINDER_METHOD_ENTRY(startAudioSource) \
+BINDER_METHOD_ENTRY(stopAudioSource) \
+BINDER_METHOD_ENTRY(setMasterMono) \
+BINDER_METHOD_ENTRY(getMasterMono) \
+BINDER_METHOD_ENTRY(getStreamVolumeDB) \
+BINDER_METHOD_ENTRY(getSurroundFormats) \
+BINDER_METHOD_ENTRY(getReportedSurroundFormats) \
+BINDER_METHOD_ENTRY(getHwOffloadFormatsSupportedForBluetoothMedia) \
+BINDER_METHOD_ENTRY(setSurroundFormatEnabled) \
+BINDER_METHOD_ENTRY(setAssistantServicesUids) \
+BINDER_METHOD_ENTRY(setActiveAssistantServicesUids) \
+BINDER_METHOD_ENTRY(setA11yServicesUids) \
+BINDER_METHOD_ENTRY(setCurrentImeUid) \
+BINDER_METHOD_ENTRY(isHapticPlaybackSupported) \
+BINDER_METHOD_ENTRY(isUltrasoundSupported) \
+BINDER_METHOD_ENTRY(listAudioProductStrategies) \
+BINDER_METHOD_ENTRY(getProductStrategyFromAudioAttributes) \
+BINDER_METHOD_ENTRY(listAudioVolumeGroups) \
+BINDER_METHOD_ENTRY(getVolumeGroupFromAudioAttributes) \
+BINDER_METHOD_ENTRY(setRttEnabled) \
+BINDER_METHOD_ENTRY(isCallScreenModeSupported) \
+BINDER_METHOD_ENTRY(setDevicesRoleForStrategy) \
+BINDER_METHOD_ENTRY(removeDevicesRoleForStrategy) \
+BINDER_METHOD_ENTRY(getDevicesForRoleAndStrategy) \
+BINDER_METHOD_ENTRY(setDevicesRoleForCapturePreset) \
+BINDER_METHOD_ENTRY(addDevicesRoleForCapturePreset) \
+BINDER_METHOD_ENTRY(removeDevicesRoleForCapturePreset) \
+BINDER_METHOD_ENTRY(clearDevicesRoleForCapturePreset) \
+BINDER_METHOD_ENTRY(getDevicesForRoleAndCapturePreset) \
+BINDER_METHOD_ENTRY(registerSoundTriggerCaptureStateListener) \
+BINDER_METHOD_ENTRY(getSpatializer) \
+BINDER_METHOD_ENTRY(canBeSpatialized) \
+BINDER_METHOD_ENTRY(getDirectPlaybackSupport) \
+BINDER_METHOD_ENTRY(getDirectProfilesForAttributes) \
+
+// singleton for Binder Method Statistics for IAudioPolicyService
+static auto& getIAudioPolicyServiceStatistics() {
+    using Code = int;
+
+#pragma push_macro("BINDER_METHOD_ENTRY")
+#undef BINDER_METHOD_ENTRY
+#define BINDER_METHOD_ENTRY(ENTRY) \
+        {(Code)media::BnAudioPolicyService::TRANSACTION_##ENTRY, #ENTRY},
+
+    static mediautils::MethodStatistics<Code> methodStatistics{
+        IAUDIOPOLICYSERVICE_BINDER_METHOD_MACRO_LIST
+        METHOD_STATISTICS_BINDER_CODE_NAMES(Code)
+    };
+#pragma pop_macro("BINDER_METHOD_ENTRY")
+
+    return methodStatistics;
+}
 
 // ----------------------------------------------------------------------------
 
@@ -1068,6 +1183,12 @@ status_t AudioPolicyService::dump(int fd, const Vector<String16>& args __unused)
         mPackageManager.dump(fd);
 
         dumpReleaseLock(mLock, locked);
+
+        {
+            std::string timeCheckStats = getIAudioPolicyServiceStatistics().dump();
+            dprintf(fd, "\nIAudioPolicyService binder call profile\n");
+            write(fd, timeCheckStats.c_str(), timeCheckStats.size());
+        }
     }
     return NO_ERROR;
 }
@@ -1173,8 +1294,20 @@ status_t AudioPolicyService::onTransact(
             break;
     }
 
-    std::string tag("IAudioPolicyService command " + std::to_string(code));
-    mediautils::TimeCheck check(tag.c_str());
+    const std::string methodName = getIAudioPolicyServiceStatistics().getMethodForCode(code);
+    mediautils::TimeCheck check(
+            std::string("IAudioPolicyService::").append(methodName),
+            [code, methodName](bool timeout, float elapsedMs) { // don't move methodName.
+        if (timeout) {
+            mediametrics::LogItem(AMEDIAMETRICS_KEY_AUDIO_POLICY)
+                .set(AMEDIAMETRICS_PROP_EVENT, AMEDIAMETRICS_PROP_EVENT_VALUE_TIMEOUT)
+                .set(AMEDIAMETRICS_PROP_METHODCODE, int64_t(code))
+                .set(AMEDIAMETRICS_PROP_METHODNAME, methodName.c_str())
+                .record();
+        } else {
+            getIAudioPolicyServiceStatistics().event(code, elapsedMs);
+        }
+    });
 
     switch (code) {
         case SHELL_COMMAND_TRANSACTION: {

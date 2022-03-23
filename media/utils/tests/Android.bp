@@ -28,6 +28,27 @@ cc_test {
 }
 
 cc_test {
+    name: "methodstatistics_tests",
+
+    cflags: [
+        "-Wall",
+        "-Werror",
+        "-Wextra",
+    ],
+
+    shared_libs: [
+        "libaudioutils",
+        "liblog",
+        "libmediautils",
+        "libutils",
+    ],
+
+    srcs: [
+        "methodstatistics_tests.cpp",
+    ],
+}
+
+cc_test {
     name: "timecheck_tests",
 
     cflags: [
