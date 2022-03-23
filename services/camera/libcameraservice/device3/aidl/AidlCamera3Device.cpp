@@ -189,7 +189,6 @@ status_t AidlCamera3Device::initialize(sp<CameraProviderManager> manager,
         return res;
     }
     if (session == nullptr) {
-      ALOGE("JCLog: null session returned");
       SET_ERR("Session iface returned is null");
       return INVALID_OPERATION;
     }
