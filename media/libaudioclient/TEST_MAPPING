@@ -2,9 +2,7 @@
   "presubmit": [
     {
       "name": "audio_aidl_conversion_tests"
-    }
-  ],
-  "postsubmit": [
+    },
     {
       "name": "CtsNativeMediaAAudioTestCases",
       "options" : [

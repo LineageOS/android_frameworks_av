@@ -356,6 +356,8 @@ public:
             const sp<media::IEffectClient>& effectClient,
             int32_t priority, bool notifyFramesProcessed);
     virtual ~EffectHandle();
+    status_t onTransact(
+            uint32_t code, const Parcel& data, Parcel* reply, uint32_t flags) override;
     virtual status_t initCheck();
 
     // IEffect

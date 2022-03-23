@@ -227,4 +227,9 @@ interface IAudioFlingerService {
     int getAAudioHardwareBurstMinUsec();
 
     void setDeviceConnectedState(in AudioPort devicePort, boolean connected);
+
+    // When adding a new method, please review and update
+    // IAudioFlinger.h AudioFlingerServerAdapter::Delegate::TransactionCode
+    // AudioFlinger.cpp AudioFlinger::onTransactWrapper()
+    // AudioFlinger.cpp IAUDIOFLINGER_BINDER_METHOD_MACRO_LIST
 }
