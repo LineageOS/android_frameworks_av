@@ -364,8 +364,7 @@ aaudio_result_t AudioStreamRecord::requestStop_l() {
     return checkForDisconnectRequest(false);
 }
 
-aaudio_result_t AudioStreamRecord::updateStateMachine()
-{
+aaudio_result_t AudioStreamRecord::processCommands() {
     aaudio_result_t result = AAUDIO_OK;
     aaudio_wrapping_frames_t position;
     status_t err;

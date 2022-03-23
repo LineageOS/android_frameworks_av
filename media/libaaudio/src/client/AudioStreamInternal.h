@@ -48,7 +48,7 @@ public:
                                        int64_t *framePosition,
                                        int64_t *timeNanoseconds) override;
 
-    virtual aaudio_result_t updateStateMachine() override;
+    virtual aaudio_result_t processCommands() override;
 
     aaudio_result_t open(const AudioStreamBuilder &builder) override;
 
@@ -109,8 +109,6 @@ protected:
                             int64_t *wakeTimePtr) = 0;
 
     aaudio_result_t drainTimestampsFromService();
-
-    aaudio_result_t processCommands();
 
     aaudio_result_t stopCallback_l();
 
