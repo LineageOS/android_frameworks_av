@@ -184,6 +184,7 @@ struct DrmHalHidl : public IDrm,
             const char *playbackId);
 
     virtual status_t getLogMessages(Vector<drm::V1_4::LogMessage> &logs) const;
+    virtual status_t getSupportedSchemes(std::vector<uint8_t> &schemes) const;
 
     // Methods of IDrmPluginListener
     Return<void> sendEvent(EventType eventType,

@@ -2,9 +2,7 @@
   "presubmit": [
     {
       "name": "audiofoundation_parcelable_test"
-    }
-  ],
-  "postsubmit": [
+    },
     {
       "name": "CtsNativeMediaAAudioTestCases",
       "options" : [
