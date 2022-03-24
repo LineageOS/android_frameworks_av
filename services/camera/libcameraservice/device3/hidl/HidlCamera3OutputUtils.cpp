@@ -219,6 +219,7 @@ static void convertToHidl(
         tmpBuffers[i].buffer = convertToHidl(aBuf.buffer, handlesCreated);
         tmpBuffers[i].acquireFence = convertToHidl(aBuf.acquireFence, handlesCreated);
         tmpBuffers[i].releaseFence = convertToHidl(aBuf.releaseFence, handlesCreated);
+        i++;
     }
     hBuffersVal.buffers(std::move(tmpBuffers));
 }
