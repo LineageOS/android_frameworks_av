@@ -36,7 +36,6 @@ cc_test {
 
     static_libs: [
         "libstagefright_timedtext",
-        "libstagefright_foundation",
     ],
 
     include_dirs: [
@@ -47,6 +46,7 @@ cc_test {
         "liblog",
         "libmedia",
         "libbinder",
+        "libstagefright_foundation",
     ],
 
     cflags: [
