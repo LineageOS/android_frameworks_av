@@ -671,11 +671,11 @@ Status ResourceManagerService::reclaimResource(
         if (clients.size() == 0) {
             // if we are here, run the fourth pass to free one codec with the different type.
             if (secureCodec != NULL) {
-                MediaResource temp(MediaResource::Type::kNonSecureCodec, 1);
+                MediaResource temp(MediaResource::Type::kNonSecureCodec, secureCodec->subType, 1);
                 getClientForResource_l(callingPid, &temp, &clients);
             }
             if (nonSecureCodec != NULL) {
-                MediaResource temp(MediaResource::Type::kSecureCodec, 1);
+                MediaResource temp(MediaResource::Type::kSecureCodec, nonSecureCodec->subType, 1);
                 getClientForResource_l(callingPid, &temp, &clients);
             }
         }
