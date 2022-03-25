@@ -297,33 +297,35 @@ AudioAnalytics::AudioAnalytics(const std::shared_ptr<StatsdLog>& statsdLog)
     ALOGD("%s", __func__);
 
     // Add action to save AnalyticsState if audioserver is restarted.
-    // This triggers on an item of "audio.flinger"
-    // with a property "event" set to "AudioFlinger" (the constructor).
+    // This triggers on AudioFlinger or AudioPolicy ctors and onFirstRef,
+    // as well as TimeCheck events.
     mActions.addAction(
         AMEDIAMETRICS_KEY_AUDIO_FLINGER "." AMEDIAMETRICS_PROP_EVENT,
         std::string(AMEDIAMETRICS_PROP_EVENT_VALUE_CTOR),
         std::make_shared<AnalyticsActions::Function>(
             [this](const std::shared_ptr<const android::mediametrics::Item> &item){
-                ALOGW("(key=%s) Audioflinger constructor event detected", item->getKey().c_str());
-                mPreviousAnalyticsState.set(std::make_shared<AnalyticsState>(
-                        *mAnalyticsState.get()));
-                // Note: get returns shared_ptr temp, whose lifetime is extended
-                // to end of full expression.
-                mAnalyticsState->clear();  // TODO: filter the analytics state.
-                // Perhaps report this.
-
-                // Set up a timer to expire the previous audio state to save space.
-                // Use the transaction log size as a cookie to see if it is the
-                // same as before.  A benign race is possible where a state is cleared early.
-                const size_t size = mPreviousAnalyticsState->transactionLog().size();
-                mTimedAction.postIn(
-                        std::chrono::seconds(PREVIOUS_STATE_EXPIRE_SEC), [this, size](){
-                    if (mPreviousAnalyticsState->transactionLog().size() == size) {
-                        ALOGD("expiring previous audio state after %d seconds.",
-                                PREVIOUS_STATE_EXPIRE_SEC);
-                        mPreviousAnalyticsState->clear();  // removes data from the state.
-                    }
-                });
+                mHealth.onAudioServerStart(Health::Module::AUDIOFLINGER, item);
+            }));
+    mActions.addAction(
+        AMEDIAMETRICS_KEY_AUDIO_POLICY "." AMEDIAMETRICS_PROP_EVENT,
+        std::string(AMEDIAMETRICS_PROP_EVENT_VALUE_CTOR),
+        std::make_shared<AnalyticsActions::Function>(
+            [this](const std::shared_ptr<const android::mediametrics::Item> &item){
+                mHealth.onAudioServerStart(Health::Module::AUDIOPOLICY, item);
+            }));
+    mActions.addAction(
+        AMEDIAMETRICS_KEY_AUDIO_FLINGER "." AMEDIAMETRICS_PROP_EVENT,
+        std::string(AMEDIAMETRICS_PROP_EVENT_VALUE_TIMEOUT),
+        std::make_shared<AnalyticsActions::Function>(
+            [this](const std::shared_ptr<const android::mediametrics::Item> &item){
+                mHealth.onAudioServerTimeout(Health::Module::AUDIOFLINGER, item);
+            }));
+    mActions.addAction(
+        AMEDIAMETRICS_KEY_AUDIO_POLICY "." AMEDIAMETRICS_PROP_EVENT,
+        std::string(AMEDIAMETRICS_PROP_EVENT_VALUE_TIMEOUT),
+        std::make_shared<AnalyticsActions::Function>(
+            [this](const std::shared_ptr<const android::mediametrics::Item> &item){
+                mHealth.onAudioServerTimeout(Health::Module::AUDIOPOLICY, item);
             }));
 
     // Handle legacy aaudio playback stream statistics
@@ -1389,5 +1391,139 @@ void AudioAnalytics::AAudioStreamInfo::endAAudioStream(
         mAudioAnalytics.mStatsdLog->log(android::util::MEDIAMETRICS_AAUDIOSTREAM_REPORTED, str);
     }
 }
+
+// Create new state, typically occurs after an AudioFlinger ctor event.
+void AudioAnalytics::newState()
+{
+    mPreviousAnalyticsState.set(std::make_shared<AnalyticsState>(
+            *mAnalyticsState.get()));
+    // Note: get returns shared_ptr temp, whose lifetime is extended
+    // to end of full expression.
+    mAnalyticsState->clear();  // TODO: filter the analytics state.
+    // Perhaps report this.
+
+    // Set up a timer to expire the previous audio state to save space.
+    // Use the transaction log size as a cookie to see if it is the
+    // same as before.  A benign race is possible where a state is cleared early.
+    const size_t size = mPreviousAnalyticsState->transactionLog().size();
+    mTimedAction.postIn(
+            std::chrono::seconds(PREVIOUS_STATE_EXPIRE_SEC), [this, size](){
+        if (mPreviousAnalyticsState->transactionLog().size() == size) {
+            ALOGD("expiring previous audio state after %d seconds.",
+                    PREVIOUS_STATE_EXPIRE_SEC);
+            mPreviousAnalyticsState->clear();  // removes data from the state.
+        }
+    });
+}
+
+void AudioAnalytics::Health::onAudioServerStart(Module module,
+        const std::shared_ptr<const android::mediametrics::Item> &item)
+{
+    const auto nowTime = std::chrono::system_clock::now();
+    if (module == Module::AUDIOFLINGER) {
+       {
+            std::lock_guard lg(mLock);
+            // reset state on AudioFlinger construction.
+            // AudioPolicy is created after AudioFlinger.
+            mAudioFlingerCtorTime = nowTime;
+            mSimpleLog.log("AudioFlinger ctor");
+        }
+        mAudioAnalytics.newState();
+        return;
+    }
+    if (module == Module::AUDIOPOLICY) {
+        // A start event occurs when audioserver
+        //
+        // (1) Starts the first time
+        // (2) Restarts because of the TimeCheck watchdog
+        // (3) Restarts not because of the TimeCheck watchdog.
+        int64_t executionTimeNs = 0;
+        (void)item->get(AMEDIAMETRICS_PROP_EXECUTIONTIMENS, &executionTimeNs);
+        const float loadTimeMs = executionTimeNs * 1e-6f;
+        std::lock_guard lg(mLock);
+        const int64_t restarts = mStartCount;
+        if (mStopCount == mStartCount) {
+            mAudioPolicyCtorTime = nowTime;
+            ++mStartCount;
+            if (mStopCount == 0) {
+                // (1) First time initialization.
+                ALOGW("%s: (key=%s) AudioPolicy ctor, loadTimeMs:%f",
+                        __func__, item->getKey().c_str(), loadTimeMs);
+                mSimpleLog.log("AudioPolicy ctor, loadTimeMs:%f", loadTimeMs);
+            } else {
+                // (2) Previous failure caught due to TimeCheck.  We know how long restart takes.
+                const float restartMs =
+                        std::chrono::duration_cast<std::chrono::duration<float, std::milli>>(
+                                mAudioFlingerCtorTime - mStopTime).count();
+                ALOGW("%s: (key=%s) AudioPolicy ctor, "
+                        "restarts:%lld restartMs:%f loadTimeMs:%f",
+                        __func__, item->getKey().c_str(),
+                        (long long)restarts, restartMs, loadTimeMs);
+                mSimpleLog.log("AudioPolicy ctor restarts:%lld restartMs:%f loadTimeMs:%f",
+                        (long long)restarts, restartMs, loadTimeMs);
+            }
+        } else {
+            // (3) Previous failure is NOT due to TimeCheck, so we don't know the restart time.
+            // However we can estimate the uptime from the delta time from previous ctor.
+            const float uptimeMs =
+                    std::chrono::duration_cast<std::chrono::duration<float, std::milli>>(
+                            nowTime - mAudioFlingerCtorTime).count();
+            mStopCount = mStartCount;
+            mAudioPolicyCtorTime = nowTime;
+            ++mStartCount;
+
+            ALOGW("%s: (key=%s) AudioPolicy ctor after uncaught failure, "
+                    "mStartCount:%lld mStopCount:%lld uptimeMs:%f loadTimeMs:%f",
+                    __func__, item->getKey().c_str(),
+                    (long long)mStartCount, (long long)mStopCount, uptimeMs, loadTimeMs);
+            mSimpleLog.log("AudioPolicy ctor after uncaught failure, "
+                    "restarts:%lld uptimeMs:%f loadTimeMs:%f",
+                    (long long)restarts, uptimeMs, loadTimeMs);
+        }
+    }
+}
+
+void AudioAnalytics::Health::onAudioServerTimeout(Module module,
+        const std::shared_ptr<const android::mediametrics::Item> &item)
+{
+    std::string moduleName = getModuleName(module);
+    int64_t methodCode{};
+    std::string methodName;
+    (void)item->get(AMEDIAMETRICS_PROP_METHODCODE, &methodCode);
+    (void)item->get(AMEDIAMETRICS_PROP_METHODNAME, &methodName);
+
+    std::lock_guard lg(mLock);
+    if (mStopCount >= mStartCount) {
+        ALOGD("%s: (key=%s) %s timeout %s(%lld) "
+            "unmatched mStopCount(%lld) >= mStartCount(%lld), ignoring",
+            __func__, item->getKey().c_str(), moduleName.c_str(),
+            methodName.c_str(), (long long)methodCode,
+            (long long)mStopCount, (long long)mStartCount);
+        return;
+    }
+
+    const int64_t restarts = mStartCount - 1;
+    ++mStopCount;
+    mStopTime = std::chrono::system_clock::now();
+    const float uptimeMs = std::chrono::duration_cast<std::chrono::duration<float, std::milli>>(
+            mStopTime - mAudioFlingerCtorTime).count();
+    ALOGW("%s: (key=%s) %s timeout %s(%lld) restarts:%lld uptimeMs:%f",
+         __func__, item->getKey().c_str(), moduleName.c_str(),
+         methodName.c_str(), (long long)methodCode,
+         (long long)restarts, uptimeMs);
+    mSimpleLog.log("%s timeout %s(%lld) restarts:%lld uptimeMs:%f",
+            moduleName.c_str(), methodName.c_str(), (long long)methodCode,
+            (long long)restarts, uptimeMs);
+}
+
+std::pair<std::string, int32_t> AudioAnalytics::Health::dump(
+        int32_t lines, const char *prefix) const
+{
+    std::lock_guard lg(mLock);
+    std::string s = mSimpleLog.dumpToString(prefix == nullptr ? "" : prefix, lines);
+    size_t n = std::count(s.begin(), s.end(), '\n');
+    return { s, n };
+}
+
 
 } // namespace android::mediametrics

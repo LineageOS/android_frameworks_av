@@ -83,6 +83,15 @@ public:
         return mHeatMap.dump(lines);
     }
 
+    /**
+     * Returns a pair consisting of the dump string and the number of lines in the string.
+     *
+     * Health dump.
+     */
+    std::pair<std::string, int32_t> dumpHealth(int32_t lines = INT32_MAX) const {
+        return mHealth.dump(lines);
+    }
+
     void clear() {
         // underlying state is locked.
         mPreviousAnalyticsState->clear();
@@ -246,6 +255,67 @@ private:
 
         AudioAnalytics &mAudioAnalytics;
     } mAAudioStreamInfo{*this};
+
+    // Create new state, typically occurs after an AudioFlinger ctor event.
+    void newState();
+
+    // Health is a nested class that tracks audioserver health properties
+    class Health {
+    public:
+        explicit Health(AudioAnalytics &audioAnalytics)
+            : mAudioAnalytics(audioAnalytics) {}
+
+        enum class Module {
+            AUDIOFLINGER,
+            AUDIOPOLICY,
+        };
+
+        const char *getModuleName(Module module) {
+            switch (module) {
+                case Module::AUDIOFLINGER: return "AudioFlinger";
+                case Module::AUDIOPOLICY: return "AudioPolicy";
+            }
+            return "Unknown";
+        }
+
+        // Called when we believe audioserver starts (AudioFlinger ctor)
+        void onAudioServerStart(Module module,
+                const std::shared_ptr<const android::mediametrics::Item> &item);
+
+        // Called when we believe audioserver crashes (TimeCheck timeouts).
+        void onAudioServerTimeout(Module module,
+                const std::shared_ptr<const android::mediametrics::Item> &item);
+
+        std::pair<std::string, int32_t> dump(
+                int32_t lines = INT32_MAX, const char *prefix = nullptr) const;
+
+    private:
+        AudioAnalytics& mAudioAnalytics;
+
+        mutable std::mutex mLock;
+
+        // Life cycle of AudioServer
+        // mAudioFlingerCtorTime
+        // mAudioPolicyCtorTime
+        // mAudioPolicyCtorDoneTime
+        // ...
+        // possibly mStopTime  (if TimeCheck thread)
+        //
+        // UpTime is measured from mStopTime - mAudioFlingerCtorTime.
+        //
+        // The stop events come from TimeCheck timeout aborts.  There may be other
+        // uncaught signals, e.g. SIGSEGV, that cause missing stop events.
+        std::chrono::system_clock::time_point mAudioFlingerCtorTime GUARDED_BY(mLock);
+        std::chrono::system_clock::time_point mAudioPolicyCtorTime GUARDED_BY(mLock);
+        std::chrono::system_clock::time_point mAudioPolicyCtorDoneTime GUARDED_BY(mLock);
+        std::chrono::system_clock::time_point mStopTime GUARDED_BY(mLock);
+
+        // mStartCount and mStopCount track the audioserver start and stop events.
+        int64_t mStartCount GUARDED_BY(mLock) = 0;
+        int64_t mStopCount GUARDED_BY(mLock) = 0;
+
+        SimpleLog mSimpleLog GUARDED_BY(mLock) {64};
+    } mHealth{*this};
 
     AudioPowerUsage mAudioPowerUsage;
 };
