@@ -107,6 +107,7 @@ namespace camera3 {
         InflightRequestUpdateInterface& inflightIntf;
         BufferRecordsInterface& bufferRecordsIntf;
         bool legacyClient;
+        nsecs_t& minFrameDuration;
     };
 
     void processCaptureResult(CaptureOutputStates& states, const camera_capture_result *result);

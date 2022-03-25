@@ -21,13 +21,13 @@
 #include <utils/RefBase.h>
 #include <gui/IProducerListener.h>
 #include <gui/Surface.h>
+#include <gui/DisplayEventReceiver.h>
 
 #include "utils/LatencyHistogram.h"
 #include "Camera3Stream.h"
 #include "Camera3IOStreamBase.h"
 #include "Camera3OutputStreamInterface.h"
 #include "Camera3BufferManager.h"
-#include "PreviewFrameScheduler.h"
 
 namespace android {
 
@@ -240,12 +240,16 @@ class Camera3OutputStream :
     virtual status_t setBatchSize(size_t batchSize = 1) override;
 
     /**
+     * Notify the stream on change of min frame durations.
+     */
+    virtual void onMinDurationChanged(nsecs_t duration) override;
+
+    /**
      * Apply ZSL related consumer usage quirk.
      */
     static void applyZSLUsageQuirk(int format, uint64_t *consumerUsage /*inout*/);
 
     void setImageDumpMask(int mask) { mImageDumpMask = mask; }
-    bool shouldLogError(status_t res);
 
   protected:
     Camera3OutputStream(int id, camera_stream_type_t type,
@@ -278,7 +282,7 @@ class Camera3OutputStream :
 
     status_t getEndpointUsageForSurface(uint64_t *usage,
             const sp<Surface>& surface) const;
-    status_t configureConsumerQueueLocked(bool allowPreviewScheduler);
+    status_t configureConsumerQueueLocked(bool allowDisplaySync);
 
     // Consumer as the output of camera HAL
     sp<Surface> mConsumer;
@@ -392,13 +396,24 @@ class Camera3OutputStream :
 
     void returnPrefetchedBuffersLocked();
 
+    // Synchronize camera timestamp to display, and the return value
+    // can be used as presentation timestamp
+    nsecs_t syncTimestampToDisplayLocked(nsecs_t t);
+
     static const int32_t kDequeueLatencyBinSize = 5; // in ms
     CameraLatencyHistogram mDequeueBufferLatency;
 
     int mImageDumpMask = 0;
 
-    // The preview stream scheduler for re-timing frames
-    std::unique_ptr<PreviewFrameScheduler> mPreviewFrameScheduler;
+    nsecs_t mMinExpectedDuration = 0;
+    bool mSyncToDisplay = false;
+    DisplayEventReceiver mDisplayEventReceiver;
+    nsecs_t mLastCaptureTime = 0;
+    nsecs_t mLastPresentTime = 0;
+    nsecs_t mCaptureToPresentOffset = 0;
+    static constexpr size_t kDisplaySyncExtraBuffer = 2;
+    static constexpr nsecs_t kSpacingResetIntervalNs = 1000000000LL; // 1 second
+    static constexpr nsecs_t kTimelineThresholdNs = 1000000LL; // 1 millisecond
 }; // class Camera3OutputStream
 
 } // namespace camera3
