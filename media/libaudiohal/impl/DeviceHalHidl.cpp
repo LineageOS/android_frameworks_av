@@ -50,12 +50,12 @@ using namespace ::android::hardware::audio::CORE_TYPES_CPP_VERSION;
         mediautils::makeTimeCheckStatsForClassMethod(getClassName(), __func__)
 
 DeviceHalHidl::DeviceHalHidl(const sp<::android::hardware::audio::CPP_VERSION::IDevice>& device)
-        : ConversionHelperHidl("DeviceHalHidl"), mDevice(device) {
+        : CoreConversionHelperHidl("DeviceHalHidl"), mDevice(device) {
 }
 
 DeviceHalHidl::DeviceHalHidl(
         const sp<::android::hardware::audio::CPP_VERSION::IPrimaryDevice>& device)
-        : ConversionHelperHidl("DeviceHalHidl"),
+        : CoreConversionHelperHidl("DeviceHalHidl"),
 #if MAJOR_VERSION <= 6 || (MAJOR_VERSION == 7 && MINOR_VERSION == 0)
           mDevice(device),
 #endif

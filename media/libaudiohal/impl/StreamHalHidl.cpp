@@ -50,7 +50,7 @@ using namespace ::android::hardware::audio::CORE_TYPES_CPP_VERSION;
        mediautils::makeTimeCheckStatsForClassMethod(getClassName(), __func__)
 
 StreamHalHidl::StreamHalHidl(std::string_view className, IStream *stream)
-        : ConversionHelperHidl(className),
+        : CoreConversionHelperHidl(className),
           mStream(stream),
           mHalThreadPriority(HAL_THREAD_PRIORITY_DEFAULT),
           mCachedBufferSize(0){

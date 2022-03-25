@@ -21,8 +21,9 @@
 
 #include <UuidUtils.h>
 #include <util/EffectUtils.h>
+#include <utils/Log.h>
 
-#include "ConversionHelperHidl.h"
+#include "EffectConversionHelperHidl.h"
 #include "EffectBufferHalHidl.h"
 #include "EffectHalHidl.h"
 #include "EffectsFactoryHalHidl.h"
@@ -38,7 +39,7 @@ using namespace ::android::hardware::audio::common::CPP_VERSION;
 using namespace ::android::hardware::audio::effect::CPP_VERSION;
 
 EffectsFactoryHalHidl::EffectsFactoryHalHidl(sp<IEffectsFactory> effectsFactory)
-        : ConversionHelperHidl("EffectsFactory") {
+        : EffectConversionHelperHidl("EffectsFactory") {
     ALOG_ASSERT(effectsFactory != nullptr, "Provided IEffectsFactory service is NULL");
     mEffectsFactory = effectsFactory;
 }
@@ -205,7 +206,10 @@ status_t EffectsFactoryHalHidl::mirrorBuffer(void* external, size_t size,
 
 } // namespace effect
 
-extern "C" __attribute__((visibility("default"))) void* createIEffectsFactory() {
+// When a shared library is built from a static library, even explicit
+// exports from a static library are optimized out unless actually used by
+// the shared library. See EffectsFactoryHalHidlEntry.cpp.
+extern "C" void* createIEffectsFactoryImpl() {
     auto service = hardware::audio::effect::CPP_VERSION::IEffectsFactory::getService();
     return service ? new effect::EffectsFactoryHalHidl(service) : nullptr;
 }
