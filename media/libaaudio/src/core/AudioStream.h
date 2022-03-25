@@ -100,10 +100,17 @@ public:
                                        int64_t *timeNanoseconds) = 0;
 
     /**
-     * Update state machine.()
-     * @return
+     * Update state machine.
+     * @return result of the operation.
      */
-    virtual aaudio_result_t updateStateMachine() = 0;
+    aaudio_result_t updateStateMachine() {
+        if (isDataCallbackActive()) {
+            return AAUDIO_OK; // state is getting updated by the callback thread read/write call
+        }
+        return processCommands();
+    };
+
+    virtual aaudio_result_t processCommands() = 0;
 
     // =========== End ABSTRACT methods ===========================
 
@@ -184,7 +191,7 @@ public:
     // ============== Queries ===========================
 
     aaudio_stream_state_t getState() const {
-        return mState;
+        return mState.load();
     }
 
     virtual int32_t getBufferSize() const {
@@ -674,6 +681,8 @@ private:
 
     const android::sp<MyPlayerBase>   mPlayerBase;
 
+    std::atomic<aaudio_stream_state_t>          mState{AAUDIO_STREAM_STATE_UNINITIALIZED};
+
     // These do not change after open().
     int32_t                     mSamplesPerFrame = AAUDIO_UNSPECIFIED;
     aaudio_channel_mask_t       mChannelMask = AAUDIO_UNSPECIFIED;
@@ -682,7 +691,6 @@ private:
     aaudio_sharing_mode_t       mSharingMode = AAUDIO_SHARING_MODE_SHARED;
     bool                        mSharingModeMatchRequired = false; // must match sharing mode requested
     audio_format_t              mFormat = AUDIO_FORMAT_DEFAULT;
-    aaudio_stream_state_t       mState = AAUDIO_STREAM_STATE_UNINITIALIZED;
     aaudio_performance_mode_t   mPerformanceMode = AAUDIO_PERFORMANCE_MODE_NONE;
     int32_t                     mFramesPerBurst = 0;
     int32_t                     mBufferCapacity = 0;

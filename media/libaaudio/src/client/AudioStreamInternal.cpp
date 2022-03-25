@@ -605,13 +605,6 @@ aaudio_result_t AudioStreamInternal::getTimestamp(clockid_t /*clockId*/,
     return AAUDIO_ERROR_INVALID_STATE;
 }
 
-aaudio_result_t AudioStreamInternal::updateStateMachine() {
-    if (isDataCallbackActive()) {
-        return AAUDIO_OK; // state is getting updated by the callback thread read/write call
-    }
-    return processCommands();
-}
-
 void AudioStreamInternal::logTimestamp(AAudioServiceMessage &command) {
     static int64_t oldPosition = 0;
     static int64_t oldTime = 0;

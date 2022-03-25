@@ -127,7 +127,7 @@ size_t AudioStreamLegacy::onMoreData(const android::AudioTrack::Buffer& buffer) 
             mCallbackEnabled.store(false);
         }
 
-        if (updateStateMachine() != AAUDIO_OK) {
+        if (processCommands() != AAUDIO_OK) {
             forceDisconnect();
             mCallbackEnabled.store(false);
         }
@@ -192,7 +192,7 @@ size_t AudioStreamLegacy::onMoreData(const android::AudioRecord::Buffer& buffer)
             mCallbackEnabled.store(false);
         }
 
-        if (updateStateMachine() != AAUDIO_OK) {
+        if (processCommands() != AAUDIO_OK) {
             forceDisconnect();
             mCallbackEnabled.store(false);
         }
