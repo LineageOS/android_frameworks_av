@@ -23,6 +23,9 @@
 #include <utils/Log.h>
 
 using namespace android::mediautils;
+using namespace std::chrono_literals;
+
+namespace {
 
 TEST(timecheck_tests, success) {
     bool timeoutRegistered = false;
@@ -56,7 +59,7 @@ TEST(timecheck_tests, timeout) {
             elapsedMsRegistered = elapsedMs;
             event = true; // store-release, must be last.
         }, 1 /* msec */, false /* crash */);
-        usleep(100 * 1000 /* usec */);  // extra time as callback called by different thread.
+        std::this_thread::sleep_for(100ms);
     }
     ASSERT_TRUE(event); // load-acquire, must be first.
     ASSERT_TRUE(timeoutRegistered); // only called once on failure, not on dealloc.
@@ -65,3 +68,5 @@ TEST(timecheck_tests, timeout) {
 
 // Note: We do not test TimeCheck crash because TimeCheck is multithreaded and the
 // EXPECT_EXIT() signal catching is imperfect due to the gtest fork.
+
+} // namespace
