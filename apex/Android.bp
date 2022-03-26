@@ -56,6 +56,7 @@ apex_defaults {
     prebuilts: [
         "code_coverage.policy",
         "com.android.media-mediatranscoding.rc",
+        "com.android.media-mediatranscoding.32rc",
         "crash_dump.policy",
         "mediaextractor.policy",
         "media-linker-config",
@@ -177,6 +178,7 @@ apex_defaults {
     ],
     prebuilts: [
         "com.android.media.swcodec-mediaswcodec.rc",
+        "com.android.media.swcodec-mediaswcodec.32rc",
         "com.android.media.swcodec-ld.config.txt",
         "mediaswcodec.policy",
         "code_coverage.policy",
@@ -201,17 +203,34 @@ apex_defaults {
     compressible: true,
 }
 
+// install as mediatranscoding.* and mediaswcodec.* instead of init.*
+// so we are ready for day we have more than 1 *rc file within the apex.
+
 prebuilt_etc {
     name: "com.android.media-mediatranscoding.rc",
     src: "mediatranscoding.rc",
-    filename: "init.rc",
+    filename: "mediatranscoding.rc",
+    installable: false,
+}
+
+prebuilt_etc {
+    name: "com.android.media-mediatranscoding.32rc",
+    src: "mediatranscoding.32rc",
+    filename: "mediatranscoding.32rc",
     installable: false,
 }
 
 prebuilt_etc {
     name: "com.android.media.swcodec-mediaswcodec.rc",
     src: "mediaswcodec.rc",
-    filename: "init.rc",
+    filename: "mediaswcodec.rc",
+    installable: false,
+}
+
+prebuilt_etc {
+    name: "com.android.media.swcodec-mediaswcodec.32rc",
+    src: "mediaswcodec.32rc",
+    filename: "mediaswcodec.32rc",
     installable: false,
 }
 
