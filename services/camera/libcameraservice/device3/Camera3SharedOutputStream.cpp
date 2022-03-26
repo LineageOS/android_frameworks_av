@@ -251,7 +251,7 @@ status_t Camera3SharedOutputStream::configureQueueLocked() {
         return res;
     }
 
-    res = configureConsumerQueueLocked(false/*allowPreviewScheduler*/);
+    res = configureConsumerQueueLocked(false/*allowDisplaySync*/);
     if (res != OK) {
         ALOGE("Failed to configureConsumerQueueLocked: %s(%d)", strerror(-res), res);
         return res;

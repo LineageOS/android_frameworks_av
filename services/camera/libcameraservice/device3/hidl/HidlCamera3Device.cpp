@@ -369,7 +369,7 @@ hardware::Return<void> HidlCamera3Device::processCaptureResult_3_4(
         mNumPartialResults, mVendorTagId, mDeviceInfo, mPhysicalDeviceInfoMap,
         mDistortionMappers, mZoomRatioMappers, mRotateAndCropMappers,
         mTagMonitor, mInputStream, mOutputStreams, mSessionStatsBuilder, listener, *this, *this,
-        *mInterface, mLegacyClient}, mResultMetadataQueue
+        *mInterface, mLegacyClient, mMinExpectedDuration}, mResultMetadataQueue
     };
 
     //HidlCaptureOutputStates hidlStates {
@@ -431,7 +431,7 @@ hardware::Return<void> HidlCamera3Device::processCaptureResult(
         mNumPartialResults, mVendorTagId, mDeviceInfo, mPhysicalDeviceInfoMap,
         mDistortionMappers, mZoomRatioMappers, mRotateAndCropMappers,
         mTagMonitor, mInputStream, mOutputStreams, mSessionStatsBuilder, listener, *this, *this,
-        *mInterface, mLegacyClient}, mResultMetadataQueue
+        *mInterface, mLegacyClient, mMinExpectedDuration}, mResultMetadataQueue
     };
 
     for (const auto& result : results) {
@@ -483,7 +483,7 @@ hardware::Return<void> HidlCamera3Device::notifyHelper(
         mNumPartialResults, mVendorTagId, mDeviceInfo, mPhysicalDeviceInfoMap,
         mDistortionMappers, mZoomRatioMappers, mRotateAndCropMappers,
         mTagMonitor, mInputStream, mOutputStreams, mSessionStatsBuilder, listener, *this, *this,
-        *mInterface, mLegacyClient}, mResultMetadataQueue
+        *mInterface, mLegacyClient, mMinExpectedDuration}, mResultMetadataQueue
     };
     for (const auto& msg : msgs) {
         camera3::notify(states, msg);
