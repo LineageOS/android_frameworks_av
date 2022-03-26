@@ -1,3 +1,6 @@
+##  for SDK releases 29..31
+##  where writepid has not yet been replaced by task_profiles
+##
 service media.swcodec /apex/com.android.media.swcodec/bin/mediaswcodec
     class main
     user mediacodec
