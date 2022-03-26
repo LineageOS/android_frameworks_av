@@ -3192,9 +3192,10 @@ status_t AudioPolicyManager::registerEffect(const effect_descriptor_t *desc,
             }
         }
     }
-    return mEffects.registerEffect(desc, io, session, id,
-                                   (strategy == streamToStrategy(AUDIO_STREAM_MUSIC) ||
-                                   strategy == PRODUCT_STRATEGY_NONE));
+    bool isMusicEffect = (session != AUDIO_SESSION_OUTPUT_STAGE)
+                            && ((strategy == streamToStrategy(AUDIO_STREAM_MUSIC)
+                                    || strategy == PRODUCT_STRATEGY_NONE));
+    return mEffects.registerEffect(desc, io, session, id, isMusicEffect);
 }
 
 status_t AudioPolicyManager::unregisterEffect(int id)
