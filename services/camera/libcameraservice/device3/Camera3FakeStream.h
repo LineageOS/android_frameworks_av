@@ -100,6 +100,7 @@ class Camera3FakeStream :
 
     virtual status_t setBatchSize(size_t batchSize) override;
 
+    virtual void onMinDurationChanged(nsecs_t /*duration*/) {}
   protected:
 
     /**
