@@ -41,7 +41,8 @@ using namespace ::android::hardware::audio::common::CPP_VERSION;
 using namespace ::android::hardware::audio::effect::CPP_VERSION;
 
 EffectHalHidl::EffectHalHidl(const sp<IEffect>& effect, uint64_t effectId)
-        : mEffect(effect), mEffectId(effectId), mBuffersChanged(true), mEfGroup(nullptr) {
+        : EffectConversionHelperHidl("Effect"),
+          mEffect(effect), mEffectId(effectId), mBuffersChanged(true), mEfGroup(nullptr) {
     effect_descriptor_t halDescriptor{};
     if (EffectHalHidl::getDescriptor(&halDescriptor) == NO_ERROR) {
         mIsInput = (halDescriptor.flags & EFFECT_FLAG_TYPE_PRE_PROC) == EFFECT_FLAG_TYPE_PRE_PROC;
@@ -56,19 +57,6 @@ EffectHalHidl::~EffectHalHidl() {
     }
     if (mEfGroup) {
         EventFlag::deleteEventFlag(&mEfGroup);
-    }
-}
-
-// static
-status_t EffectHalHidl::analyzeResult(const Result& result) {
-    switch (result) {
-        case Result::OK: return OK;
-        case Result::INVALID_ARGUMENTS: return BAD_VALUE;
-        case Result::INVALID_STATE: return NOT_ENOUGH_DATA;
-        case Result::NOT_INITIALIZED: return NO_INIT;
-        case Result::NOT_SUPPORTED: return INVALID_OPERATION;
-        case Result::RESULT_TOO_BIG: return NO_MEMORY;
-        default: return NO_INIT;
     }
 }
 

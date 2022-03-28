@@ -1,5 +1,5 @@
 /*
- * Copyright (C) 2017 The Android Open Source Project
+ * Copyright (C) 2022 The Android Open Source Project
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -14,19 +14,8 @@
  * limitations under the License.
  */
 
-#include <string>
+extern "C" void* createIEffectsFactoryImpl();
 
-#include <media/audiohal/DevicesFactoryHalInterface.h>
-#include <media/audiohal/FactoryHalHidl.h>
-
-namespace android {
-
-// static
-sp<DevicesFactoryHalInterface> DevicesFactoryHalInterface::create() {
-    using namespace std::string_literals;
-    return createPreferredImpl<DevicesFactoryHalInterface>(
-            std::make_pair("android.hardware.audio"s, "IDevicesFactory"s),
-            std::make_pair("android.hardware.audio.effect"s, "IEffectsFactory"s));
+extern "C" __attribute__((visibility("default"))) void* createIEffectsFactory() {
+    return createIEffectsFactoryImpl();
 }
-
-} // namespace android
