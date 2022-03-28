@@ -23,7 +23,6 @@
 #include <hidlmemory/mapping.h>
 #include <utils/Log.h>
 
-#include "ConversionHelperHidl.h"
 #include "EffectBufferHalHidl.h"
 
 using ::android::hardware::Return;
