@@ -330,7 +330,8 @@ camera_status_t CameraDevice::updateOutputConfigurationLocked(ACaptureSessionOut
                 return ACAMERA_ERROR_UNKNOWN;
     }
 
-    mConfiguredOutputs[streamId] = std::make_pair(output->mWindow, outConfigW);
+    mConfiguredOutputs[streamId] =
+            std::move(std::make_pair(std::move(output->mWindow), std::move(outConfigW)));
 
     return ACAMERA_OK;
 }
@@ -623,7 +624,8 @@ CameraDevice::configureStreamsLocked(const ACaptureSessionOutputContainer* outpu
         outConfigInsert.windowHandles[0] = anw;
         outConfigInsert.physicalCameraId = outConfig.mPhysicalCameraId;
         native_handle_ptr_wrapper wrap(anw);
-        outputSet.insert(std::make_pair(anw, outConfigInsertW));
+
+        outputSet.emplace(std::make_pair(std::move(anw), std::move(outConfigInsertW)));
     }
     std::set<std::pair<native_handle_ptr_wrapper, OutputConfigurationWrapper>> addSet = outputSet;
     std::vector<int32_t> deleteList;
@@ -680,7 +682,7 @@ CameraDevice::configureStreamsLocked(const ACaptureSessionOutputContainer* outpu
     }
 
     // add new streams
-    for (auto outputPair : addSet) {
+    for (const auto &outputPair : addSet) {
         int streamId;
         Status status = Status::UNKNOWN_ERROR;
         auto ret = mRemote->createStream(outputPair.second,
@@ -845,12 +847,32 @@ CameraDevice::onCaptureErrorLocked(
             return;
         }
 
-        const auto& windowHandles = outputPairIt->second.second.mOutputConfiguration.windowHandles;
-        for (const auto& outHandle : windowHandles) {
-            for (auto streamAndWindowId : request->mCaptureRequest.streamAndWindowIds) {
-                int32_t windowId = streamAndWindowId.windowId;
-                if (utils::isWindowNativeHandleEqual(windowHandles[windowId],outHandle)) {
-                    const native_handle_t* anw = windowHandles[windowId].getNativeHandle();
+        // Get the surfaces corresponding to the error stream id, go through
+        // them and try to match the surfaces in the corresponding
+        // CaptureRequest.
+        const auto& errorWindowHandles =
+                outputPairIt->second.second.mOutputConfiguration.windowHandles;
+        for (const auto& errorWindowHandle : errorWindowHandles) {
+            for (const auto &requestStreamAndWindowId :
+                        request->mCaptureRequest.streamAndWindowIds) {
+                // Go through the surfaces in the capture request and see which
+                // ones match the surfaces in the error stream.
+                int32_t requestWindowId = requestStreamAndWindowId.windowId;
+                auto requestSurfacePairIt =
+                        mConfiguredOutputs.find(requestStreamAndWindowId.streamId);
+                if (requestSurfacePairIt == mConfiguredOutputs.end()) {
+                    ALOGE("%s: Error: request stream id %d does not exist", __FUNCTION__,
+                              requestStreamAndWindowId.streamId);
+                    setCameraDeviceErrorLocked(ACAMERA_ERROR_CAMERA_SERVICE);
+                    return;
+                }
+
+                const auto &requestWindowHandles =
+                        requestSurfacePairIt->second.second.mOutputConfiguration.windowHandles;
+                if (utils::isWindowNativeHandleEqual(
+                        requestWindowHandles[requestWindowId], errorWindowHandle)) {
+                    const native_handle_t* anw =
+                            requestWindowHandles[requestWindowId].getNativeHandle();
                     ALOGV("Camera %s Lost output buffer for ANW %p frame %" PRId64,
                             getId(), anw, frameNumber);
 
