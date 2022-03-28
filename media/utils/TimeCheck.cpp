@@ -17,8 +17,8 @@
 #define LOG_TAG "TimeCheck"
 
 #include <optional>
-#include <sstream>
 
+#include <audio_utils/clock.h>
 #include <mediautils/EventLog.h>
 #include <mediautils/TimeCheck.h>
 #include <utils/Log.h>
@@ -26,14 +26,68 @@
 
 namespace android::mediautils {
 
-namespace {
-
+/**
+ * Returns the std::string "HH:MM:SS.MSc" from a system_clock time_point.
+ */
 std::string formatTime(std::chrono::system_clock::time_point t) {
-    auto msSinceEpoch = std::chrono::round<std::chrono::milliseconds>(t.time_since_epoch());
-    return (std::ostringstream() << msSinceEpoch.count()).str();
+    auto time_string = audio_utils_time_string_from_ns(
+            std::chrono::nanoseconds(t.time_since_epoch()).count());
+
+    // The time string is 19 characters (including null termination).
+    // Example: "03-27 16:47:06.187"
+    //           MM DD HH MM SS MS
+    // We offset by 6 to get HH:MM:SS.MSc
+    //
+    return time_string.time + 6; // offset to remove month/day.
 }
 
-}  // namespace
+/**
+ * Finds the end of the common time prefix.
+ *
+ * This is as an option to remove the common time prefix to avoid
+ * unnecessary duplicated strings.
+ *
+ * \param time1 a time string
+ * \param time2 a time string
+ * \return      the position where the common time prefix ends. For abbreviated
+ *              printing of time2, offset the character pointer by this position.
+ */
+static size_t commonTimePrefixPosition(std::string_view time1, std::string_view time2) {
+    const size_t endPos = std::min(time1.size(), time2.size());
+    size_t i;
+
+    // Find location of the first mismatch between strings
+    for (i = 0; ; ++i) {
+        if (i == endPos) {
+            return i; // strings match completely to the length of one of the strings.
+        }
+        if (time1[i] != time2[i]) {
+            break;
+        }
+        if (time1[i] == '\0') {
+            return i; // "printed" strings match completely.  No need to check further.
+        }
+    }
+
+    // Go backwards until we find a delimeter or space.
+    for (; i > 0
+           && isdigit(time1[i]) // still a number
+           && time1[i - 1] != ' '
+         ; --i) {
+    }
+    return i;
+}
+
+/**
+ * Returns the unique suffix of time2 that isn't present in time1.
+ *
+ * If time2 is identical to time1, then an empty string_view is returned.
+ * This method is used to elide the common prefix when printing times.
+ */
+std::string_view timeSuffix(std::string_view time1, std::string_view time2) {
+    const size_t pos = commonTimePrefixPosition(time1, time2);
+    return time2.substr(pos);
+}
 
 // Audio HAL server pids vector used to generate audio HAL processes tombstone
 // when audioserver watchdog triggers.
@@ -75,23 +129,34 @@ TimerThread& TimeCheck::getTimeCheckThread() {
     return sTimeCheckThread;
 }
 
+/* static */
+std::string TimeCheck::toString() {
+    // note pending and retired are individually locked for maximum concurrency,
+    // snapshot is not instantaneous at a single time.
+    return getTimeCheckThread().toString();
+}
+
 TimeCheck::TimeCheck(std::string tag, OnTimerFunc&& onTimer, uint32_t timeoutMs,
         bool crashOnTimeout)
     : mTimeCheckHandler(new TimeCheckHandler{
             std::move(tag), std::move(onTimer), crashOnTimeout,
             std::chrono::system_clock::now(), gettid()})
-    , mTimerHandle(getTimeCheckThread().scheduleTask(
-              // Pass in all the arguments by value to this task for safety.
-              // The thread could call the callback before the constructor is finished.
-              // The destructor will be blocked on the callback, but that is implementation
-              // dependent.
-              [ timeCheckHandler = mTimeCheckHandler ] {
-                  timeCheckHandler->onTimeout();
-              },
-              std::chrono::milliseconds(timeoutMs))) {}
+    , mTimerHandle(timeoutMs == 0
+              ? getTimeCheckThread().trackTask(mTimeCheckHandler->tag)
+              : getTimeCheckThread().scheduleTask(
+                      mTimeCheckHandler->tag,
+                      // Pass in all the arguments by value to this task for safety.
+                      // The thread could call the callback before the constructor is finished.
+                      // The destructor is not blocked on callback.
+                      [ timeCheckHandler = mTimeCheckHandler ] {
+                          timeCheckHandler->onTimeout();
+                      },
+                      std::chrono::milliseconds(timeoutMs))) {}
 
 TimeCheck::~TimeCheck() {
-    mTimeCheckHandler->onCancel(mTimerHandle);
+    if (mTimeCheckHandler) {
+        mTimeCheckHandler->onCancel(mTimerHandle);
+    }
 }
 
 void TimeCheck::TimeCheckHandler::onCancel(TimerThread::Handle timerHandle) const
@@ -115,6 +180,10 @@ void TimeCheck::TimeCheckHandler::onTimeout() const
 
     if (!crashOnTimeout) return;
 
+    // Generate the TimerThread summary string early before sending signals to the
+    // HAL processes which can affect thread behavior.
+    const std::string summary = getTimeCheckThread().toString(4 /* retiredCount */);
+
     // Generate audio HAL processes tombstones and allow time to complete
     // before forcing restart
     std::vector<pid_t> pids = TimeCheck::getAudioHalPids();
@@ -128,8 +197,8 @@ void TimeCheck::TimeCheckHandler::onTimeout() const
         ALOGI("No HAL process pid available, skipping tombstones");
     }
     LOG_EVENT_STRING(LOGTAG_AUDIO_BINDER_TIMEOUT, tag.c_str());
-    LOG_ALWAYS_FATAL("TimeCheck timeout for %s on thread %d (start=%s, end=%s)",
-            tag.c_str(), tid, formatTime(startTime).c_str(), formatTime(endTime).c_str());
+    LOG_ALWAYS_FATAL("TimeCheck timeout for %s scheduled %s on thread %d\n%s",
+            tag.c_str(), formatTime(startTime).c_str(), tid, summary.c_str());
 }
 
 }  // namespace android::mediautils
