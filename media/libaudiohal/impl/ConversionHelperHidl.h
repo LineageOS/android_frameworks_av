@@ -40,7 +40,7 @@ class ConversionHelperHidl {
     static void parametersToHal(const hidl_vec<ParameterValue>& parameters, String8 *values);
     static void argsFromHal(const Vector<String16>& args, hidl_vec<hidl_string> *hidlArgs);
 
-    ConversionHelperHidl(const char* className);
+    ConversionHelperHidl(std::string_view className);
 
     template<typename R, typename T>
     status_t processReturn(const char* funcName, const Return<R>& ret, T *retval) {
@@ -76,8 +76,12 @@ class ConversionHelperHidl {
         return ret.isOk() ? analyzeResult(retval) : FAILED_TRANSACTION;
     }
 
+    const std::string& getClassName() const {
+        return mClassName;
+    }
+
   private:
-    const char* mClassName;
+    const std::string mClassName;
 
     static status_t analyzeResult(const CoreResult& result);
 
