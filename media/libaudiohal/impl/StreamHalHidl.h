@@ -97,7 +97,7 @@ class StreamHalHidl : public virtual StreamHalInterface, public ConversionHelper
 
   protected:
     // Subclasses can not be constructed directly by clients.
-    explicit StreamHalHidl(IStream *stream);
+    StreamHalHidl(std::string_view className, IStream *stream);
 
     ~StreamHalHidl() override;
 

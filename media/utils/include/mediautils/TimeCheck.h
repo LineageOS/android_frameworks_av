@@ -99,4 +99,9 @@ class TimeCheck {
     const TimerThread::Handle mTimerHandle = TimerThread::INVALID_HANDLE;
 };
 
+// Returns a TimeCheck object that sends info to MethodStatistics
+// obtained from getStatisticsForClass(className).
+TimeCheck makeTimeCheckStatsForClassMethod(
+        std::string_view className, std::string_view methodName);
+
 }  // namespace android::mediautils
