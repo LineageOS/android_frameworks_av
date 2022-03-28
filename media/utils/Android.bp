@@ -49,6 +49,7 @@ cc_library {
         "libcutils",
         "liblog",
         "libutils",
+        "libutilscallstack",
         "libhidlbase",
         "libpermission",
         "android.hardware.graphics.bufferqueue@1.0",

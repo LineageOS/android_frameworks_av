@@ -22,6 +22,7 @@
 #include <vector>
 
 #include <mediautils/TimerThread.h>
+#include <utils/CallStack.h>
 #include <utils/ThreadDefs.h>
 
 namespace android::mediautils {
@@ -68,6 +69,19 @@ std::string TimerThread::toString(size_t retiredCount) const {
     if (!analysis.summary.empty()) {
         analysisSummary = std::string("\nanalysis [ ").append(analysis.summary).append(" ]");
     }
+    std::string timeoutStack;
+    if (analysis.timeoutTid != -1) {
+        timeoutStack = std::string("\ntimeout(")
+                .append(std::to_string(analysis.timeoutTid)).append(") callstack [\n")
+                .append(tidCallStackString(analysis.timeoutTid)).append("]");
+    }
+    std::string blockedStack;
+    if (analysis.HALBlockedTid != -1) {
+        blockedStack = std::string("\nblocked(")
+                .append(std::to_string(analysis.HALBlockedTid)).append(")  callstack [\n")
+                .append(tidCallStackString(analysis.HALBlockedTid)).append("]");
+    }
+
     return std::string("now ")
             .append(formatTime(std::chrono::system_clock::now()))
             .append(analysisSummary)
@@ -77,7 +91,9 @@ std::string TimerThread::toString(size_t retiredCount) const {
             .append(requestsToString(pendingRequests))
             .append(" ]\nretired [ ")
             .append(requestsToString(retiredRequests))
-            .append(" ]");
+            .append(" ]")
+            .append(timeoutStack)
+            .append(blockedStack);
 }
 
 // A HAL method is where the substring "Hidl" is in the class name.
@@ -195,6 +211,13 @@ std::string TimerThread::timeoutToString(size_t n) const {
 
     // Dump to string
     return requestsToString(timeoutRequests);
+}
+
+/* static */
+std::string TimerThread::tidCallStackString(pid_t tid) {
+    CallStack cs{};
+    cs.update(0 /* ignoreDepth */, tid);
+    return cs.toString().c_str();
 }
 
 std::string TimerThread::Request::toString() const {
