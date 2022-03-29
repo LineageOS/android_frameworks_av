@@ -26,7 +26,6 @@
 #include <media/audiohal/hidl/HalDeathHandler.h>
 #include <utils/Log.h>
 
-#include "ConversionHelperHidl.h"
 #include "DeviceHalHidl.h"
 #include "DevicesFactoryHalHidl.h"
 

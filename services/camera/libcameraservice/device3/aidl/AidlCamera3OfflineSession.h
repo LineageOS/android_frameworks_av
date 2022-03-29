@@ -75,7 +75,7 @@ class AidlCamera3OfflineSession :
     // See explanation for why we need a separate class for this in
     // AidlCamera3Device::AidlCameraDeviceCallbacks in AidlCamera3Device.h
     class AidlCameraDeviceCallbacks :
-            virtual public aidl::android::hardware::camera::device::BnCameraDeviceCallback {
+            public aidl::android::hardware::camera::device::BnCameraDeviceCallback {
       public:
 
         AidlCameraDeviceCallbacks(wp<AidlCamera3OfflineSession> parent) : mParent(parent)  { }
@@ -112,7 +112,9 @@ class AidlCamera3OfflineSession :
                     offlineSession) :
       Camera3OfflineSession(id, inputStream, offlineStreamSet, std::move(bufferRecords),
               offlineReqs, offlineStates),
-      mSession(offlineSession) { mCallbacks = std::make_shared<AidlCameraDeviceCallbacks>(this);};
+      mSession(offlineSession) {
+        mCallbacks = ndk::SharedRefBase::make<AidlCameraDeviceCallbacks>(this);
+      };
 
     /**
      * End of CameraOfflineSessionBase interface

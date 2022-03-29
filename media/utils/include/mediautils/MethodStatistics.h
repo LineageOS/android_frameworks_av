@@ -19,6 +19,7 @@
 #include <map>
 #include <mutex>
 #include <string>
+#include <vector>
 
 #include <android-base/thread_annotations.h>
 #include <audio_utils/Statistics.h>
@@ -91,9 +92,16 @@ public:
     std::string dump() const {
         std::stringstream ss;
         std::lock_guard lg(mLock);
-        for (const auto &[code, stats] : mStatisticsMap) {
-            ss << int(code) << " " << getMethodForCode(code) <<
-                    " n=" << stats.getN() << " " << stats.toString() << "\n";
+        if constexpr (std::is_same_v<Code, std::string>) {
+            for (const auto &[code, stats] : mStatisticsMap) {
+                ss << code <<
+                        " n=" << stats.getN() << " " << stats.toString() << "\n";
+            }
+        } else /* constexpr */ {
+            for (const auto &[code, stats] : mStatisticsMap) {
+                ss << int(code) << " " << getMethodForCode(code) <<
+                        " n=" << stats.getN() << " " << stats.toString() << "\n";
+            }
         }
         return ss.str();
     }
@@ -103,6 +111,18 @@ private:
     mutable std::mutex mLock;
     std::map<Code, StatsType> mStatisticsMap GUARDED_BY(mLock);
 };
+
+// Managed Statistics support.
+// Supported Modules
+#define METHOD_STATISTICS_MODULE_NAME_AUDIO_HIDL "AudioHidl"
+
+// Returns a vector of class names for the module, or a nullptr if module not found.
+std::shared_ptr<std::vector<std::string>>
+getStatisticsClassesForModule(std::string_view moduleName);
+
+// Returns a statistics object for that class, or a nullptr if class not found.
+std::shared_ptr<MethodStatistics<std::string>>
+getStatisticsForClass(std::string_view className);
 
 // Only if used, requires IBinder.h to be included at the location of invocation.
 #define METHOD_STATISTICS_BINDER_CODE_NAMES(CODE_TYPE) \

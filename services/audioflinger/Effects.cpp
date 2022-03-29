@@ -41,6 +41,7 @@
 #include <media/audiohal/EffectsFactoryHalInterface.h>
 #include <mediautils/MethodStatistics.h>
 #include <mediautils/ServiceUtilities.h>
+#include <mediautils/TimeCheck.h>
 
 #include "AudioFlinger.h"
 
@@ -1780,13 +1781,16 @@ mediautils::MethodStatistics<int>& getIEffectStatistics() {
 
 status_t AudioFlinger::EffectHandle::onTransact(
         uint32_t code, const Parcel& data, Parcel* reply, uint32_t flags) {
-    std::chrono::system_clock::time_point startTime = std::chrono::system_clock::now();
-    mediametrics::Defer defer([startTime, code] {
-        std::chrono::system_clock::time_point endTime = std::chrono::system_clock::now();
-        getIEffectStatistics().event(code,
-                std::chrono::duration_cast<std::chrono::duration<float, std::milli>>(
-                        endTime - startTime).count());
-    });
+    const std::string methodName = getIEffectStatistics().getMethodForCode(code);
+    mediautils::TimeCheck check(
+            std::string("IEffect::").append(methodName),
+            [code](bool timeout, float elapsedMs) {
+        if (timeout) {
+            ; // we don't timeout right now on the effect interface.
+        } else {
+            getIEffectStatistics().event(code, elapsedMs);
+        }
+    }, 0 /* timeoutMs */);
     return BnEffect::onTransact(code, data, reply, flags);
 }
 
