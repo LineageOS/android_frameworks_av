@@ -50,27 +50,31 @@ class TimeCheck {
      *                                    destroyed or leaves scope before the timer expires.)
      *                      float elapsedMs (the elapsed time to this event).
      *                  The callback when timeout is true will be called on a different thread.
-     *                  Currently this is guaranteed to block the destructor
-     *                  (potential lock inversion warning here) nevertheless
-     *                  it would be safer not to depend on stack contents.
+     *                  This will cancel the callback on the destructor but is not guaranteed
+     *                  to block for callback completion if it is already in progress
+     *                  (for maximum concurrency and reduced deadlock potential), so use proper
+     *                  lifetime analysis (e.g. shared or weak pointers).
      * \param timeoutMs timeout in milliseconds.
+     *                  A zero timeout means no timeout is set -
+     *                  the callback is called only when
+     *                  the TimeCheck object is destroyed or leaves scope.
      * \param crashOnTimeout true if the object issues an abort on timeout.
      */
     explicit TimeCheck(std::string tag, OnTimerFunc&& onTimer = {},
             uint32_t timeoutMs = kDefaultTimeOutMs, bool crashOnTimeout = true);
+
+    TimeCheck() = default;
     // Remove copy constructors as there should only be one call to the destructor.
     // Move is kept implicitly disabled, but would be logically consistent if enabled.
     TimeCheck(const TimeCheck& other) = delete;
     TimeCheck& operator=(const TimeCheck&) = delete;
 
     ~TimeCheck();
+    static std::string toString();
     static void setAudioHalPids(const std::vector<pid_t>& pids);
     static std::vector<pid_t> getAudioHalPids();
 
   private:
-    static TimerThread& getTimeCheckThread();
-    static void accessAudioHalPids(std::vector<pid_t>* pids, bool update);
-
     // Helper class for handling events.
     // The usage here is const safe.
     class TimeCheckHandler {
@@ -85,11 +89,19 @@ class TimeCheck {
         void onTimeout() const;
     };
 
+    static TimerThread& getTimeCheckThread();
+    static void accessAudioHalPids(std::vector<pid_t>* pids, bool update);
+
     // mTimeCheckHandler is immutable, prefer to be first initialized, last destroyed.
     // Technically speaking, we do not need a shared_ptr here because TimerThread::cancelTask()
     // is mutually exclusive of the callback, but the price paid for lifetime safety is minimal.
     const std::shared_ptr<const TimeCheckHandler> mTimeCheckHandler;
-    const TimerThread::Handle mTimerHandle;
+    const TimerThread::Handle mTimerHandle = TimerThread::INVALID_HANDLE;
 };
+
+// Returns a TimeCheck object that sends info to MethodStatistics
+// obtained from getStatisticsForClass(className).
+TimeCheck makeTimeCheckStatsForClassMethod(
+        std::string_view className, std::string_view methodName);
 
 }  // namespace android::mediautils

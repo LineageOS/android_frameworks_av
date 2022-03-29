@@ -21,7 +21,7 @@
 #include <media/AudioParameter.h>
 #include <utils/Log.h>
 
-#include "ConversionHelperHidl.h"
+#include "CoreConversionHelperHidl.h"
 
 namespace android {
 
@@ -29,7 +29,8 @@ using namespace ::android::hardware::audio::common::COMMON_TYPES_CPP_VERSION;
 using namespace ::android::hardware::audio::CORE_TYPES_CPP_VERSION;
 
 // static
-status_t ConversionHelperHidl::keysFromHal(const String8& keys, hidl_vec<hidl_string> *hidlKeys) {
+status_t CoreConversionHelperHidl::keysFromHal(
+        const String8& keys, hidl_vec<hidl_string> *hidlKeys) {
     AudioParameter halKeys(keys);
     if (halKeys.size() == 0) return BAD_VALUE;
     hidlKeys->resize(halKeys.size());
@@ -74,7 +75,7 @@ status_t ConversionHelperHidl::keysFromHal(const String8& keys, hidl_vec<hidl_st
 }
 
 // static
-status_t ConversionHelperHidl::parametersFromHal(
+status_t CoreConversionHelperHidl::parametersFromHal(
         const String8& kvPairs, hidl_vec<ParameterValue> *hidlParams) {
     AudioParameter params(kvPairs);
     if (params.size() == 0) return BAD_VALUE;
@@ -90,7 +91,7 @@ status_t ConversionHelperHidl::parametersFromHal(
 }
 
 // static
-void ConversionHelperHidl::parametersToHal(
+void CoreConversionHelperHidl::parametersToHal(
         const hidl_vec<ParameterValue>& parameters, String8 *values) {
     AudioParameter params;
     for (size_t i = 0; i < parameters.size(); ++i) {
@@ -99,12 +100,11 @@ void ConversionHelperHidl::parametersToHal(
     values->setTo(params.toString());
 }
 
-ConversionHelperHidl::ConversionHelperHidl(const char* className)
-        : mClassName(className) {
-}
+CoreConversionHelperHidl::CoreConversionHelperHidl(std::string_view className)
+        : ConversionHelperHidl<CoreResult>(className, analyzeResult) {}
 
 // static
-void ConversionHelperHidl::argsFromHal(
+void CoreConversionHelperHidl::argsFromHal(
         const Vector<String16>& args, hidl_vec<hidl_string> *hidlArgs) {
     hidlArgs->resize(args.size());
     for (size_t i = 0; i < args.size(); ++i) {
@@ -113,19 +113,15 @@ void ConversionHelperHidl::argsFromHal(
 }
 
 // static
-status_t ConversionHelperHidl::analyzeResult(const Result& result) {
+status_t CoreConversionHelperHidl::analyzeResult(const CoreResult& result) {
     switch (result) {
         case Result::OK: return OK;
         case Result::INVALID_ARGUMENTS: return BAD_VALUE;
         case Result::INVALID_STATE: return NOT_ENOUGH_DATA;
         case Result::NOT_INITIALIZED: return NO_INIT;
         case Result::NOT_SUPPORTED: return INVALID_OPERATION;
-        default: return NO_INIT;
     }
-}
-
-void ConversionHelperHidl::emitError(const char* funcName, const char* description) {
-    ALOGE("%s %p %s: %s (from rpc)", mClassName, this, funcName, description);
+    return NO_INIT;
 }
 
 }  // namespace android
