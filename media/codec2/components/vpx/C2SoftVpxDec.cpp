@@ -19,7 +19,6 @@
 #include <log/log.h>
 
 #include <algorithm>
-
 #include <media/stagefright/foundation/AUtils.h>
 #include <media/stagefright/foundation/MediaDefs.h>
 
@@ -218,11 +217,20 @@ public:
                 .build());
 
         // TODO: support more formats?
+        std::vector<uint32_t> pixelFormats = {HAL_PIXEL_FORMAT_YCBCR_420_888};
+#ifdef VP9
+        if (isAtLeastT()) {
+            pixelFormats.push_back(HAL_PIXEL_FORMAT_YCBCR_P010);
+        }
+#endif
         addParameter(
                 DefineParam(mPixelFormat, C2_PARAMKEY_PIXEL_FORMAT)
-                .withConstValue(new C2StreamPixelFormatInfo::output(
-                                     0u, HAL_PIXEL_FORMAT_YCBCR_420_888))
+                .withDefault(new C2StreamPixelFormatInfo::output(
+                                  0u, HAL_PIXEL_FORMAT_YCBCR_420_888))
+                .withFields({C2F(mPixelFormat, value).oneOf(pixelFormats)})
+                .withSetter((Setter<decltype(*mPixelFormat)>::StrictValueWithNoDeps))
                 .build());
+
     }
 
     static C2R SizeSetter(bool mayBlock, const C2P<C2StreamPictureSizeInfo::output> &oldMe,
@@ -424,7 +432,7 @@ status_t C2SoftVpxDec::initDecoder() {
 #else
     mMode = MODE_VP8;
 #endif
-
+    mHalPixelFormat = HAL_PIXEL_FORMAT_YV12;
     mWidth = 320;
     mHeight = 240;
     mFrameParallelMode = false;
@@ -690,6 +698,24 @@ status_t C2SoftVpxDec::outputBuffer(
         }
         format = getHalPixelFormatForBitDepth10(allowRGBA1010102);
     }
+
+    if (mHalPixelFormat != format) {
+        C2StreamPixelFormatInfo::output pixelFormat(0u, format);
+        std::vector<std::unique_ptr<C2SettingResult>> failures;
+        c2_status_t err = mIntf->config({&pixelFormat }, C2_MAY_BLOCK, &failures);
+        if (err == C2_OK) {
+            work->worklets.front()->output.configUpdate.push_back(
+                C2Param::Copy(pixelFormat));
+        } else {
+            ALOGE("Config update pixelFormat failed");
+            mSignalledError = true;
+            work->workletsProcessed = 1u;
+            work->result = C2_CORRUPTED;
+            return UNKNOWN_ERROR;
+        }
+        mHalPixelFormat = format;
+    }
+
     C2MemoryUsage usage = { C2MemoryUsage::CPU_READ, C2MemoryUsage::CPU_WRITE };
     c2_status_t err = pool->fetchGraphicBlock(align(mWidth, 16), mHeight, format, usage, &block);
     if (err != C2_OK) {

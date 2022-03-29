@@ -32,6 +32,13 @@ namespace android {
 constexpr uint8_t kNeutralUVBitDepth8 = 128;
 constexpr uint16_t kNeutralUVBitDepth10 = 512;
 
+bool isAtLeastT() {
+    char deviceCodeName[PROP_VALUE_MAX];
+    __system_property_get("ro.build.version.codename", deviceCodeName);
+    return android_get_device_api_level() >= __ANDROID_API_T__ ||
+           !strcmp(deviceCodeName, "Tiramisu");
+}
+
 void convertYUV420Planar8ToYV12(uint8_t *dstY, uint8_t *dstU, uint8_t *dstV, const uint8_t *srcY,
                                 const uint8_t *srcU, const uint8_t *srcV, size_t srcYStride,
                                 size_t srcUStride, size_t srcVStride, size_t dstYStride,
@@ -767,9 +774,9 @@ int SimpleC2Component::getHalPixelFormatForBitDepth10(bool allowRGBA1010102) {
     // Save supported hal pixel formats for bit depth of 10, the first time this is called
     if (!mBitDepth10HalPixelFormats.size()) {
         std::vector<int> halPixelFormats;
-        // TODO(b/178229371) Enable HAL_PIXEL_FORMAT_YCBCR_P010 once framework supports it
-        // halPixelFormats.push_back(HAL_PIXEL_FORMAT_YCBCR_P010);
-
+        if (isAtLeastT()) {
+            halPixelFormats.push_back(HAL_PIXEL_FORMAT_YCBCR_P010);
+        }
         // since allowRGBA1010102 can chance in each call, but mBitDepth10HalPixelFormats
         // is populated only once, allowRGBA1010102 is not considered at this stage.
         halPixelFormats.push_back(HAL_PIXEL_FORMAT_RGBA_1010102);
