@@ -3670,7 +3670,8 @@ void CameraService::UidPolicy::registerSelf() {
     status_t res = mAm.linkToDeath(this);
     mAm.registerUidObserver(this, ActivityManager::UID_OBSERVER_GONE
             | ActivityManager::UID_OBSERVER_IDLE
-            | ActivityManager::UID_OBSERVER_ACTIVE | ActivityManager::UID_OBSERVER_PROCSTATE,
+            | ActivityManager::UID_OBSERVER_ACTIVE | ActivityManager::UID_OBSERVER_PROCSTATE
+            | ActivityManager::UID_OBSERVER_PROC_OOM_ADJ,
             ActivityManager::PROCESS_STATE_UNKNOWN,
             String16("cameraserver"));
     if (res == OK) {
@@ -3719,9 +3720,9 @@ void CameraService::UidPolicy::onUidStateChanged(uid_t uid, int32_t procState,
     bool procStateChange = false;
     {
         Mutex::Autolock _l(mUidLock);
-        if ((mMonitoredUids.find(uid) != mMonitoredUids.end()) &&
-                (mMonitoredUids[uid].first != procState)) {
-            mMonitoredUids[uid].first = procState;
+        if (mMonitoredUids.find(uid) != mMonitoredUids.end() &&
+                mMonitoredUids[uid].procState != procState) {
+            mMonitoredUids[uid].procState = procState;
             procStateChange = true;
         }
     }
@@ -3734,15 +3735,33 @@ void CameraService::UidPolicy::onUidStateChanged(uid_t uid, int32_t procState,
     }
 }
 
+void CameraService::UidPolicy::onUidProcAdjChanged(uid_t uid) {
+    bool procAdjChange = false;
+    {
+        Mutex::Autolock _l(mUidLock);
+        if (mMonitoredUids.find(uid) != mMonitoredUids.end()) {
+            procAdjChange = true;
+        }
+    }
+
+    if (procAdjChange) {
+        sp<CameraService> service = mService.promote();
+        if (service != nullptr) {
+            service->notifyMonitoredUids();
+        }
+    }
+}
+
 void CameraService::UidPolicy::registerMonitorUid(uid_t uid) {
     Mutex::Autolock _l(mUidLock);
     auto it = mMonitoredUids.find(uid);
     if (it != mMonitoredUids.end()) {
-        it->second.second++;
+        it->second.refCount++;
     } else {
-        mMonitoredUids.emplace(
-                std::pair<uid_t, std::pair<int32_t, size_t>> (uid,
-                    std::pair<int32_t, size_t> (ActivityManager::PROCESS_STATE_NONEXISTENT, 1)));
+        MonitoredUid monitoredUid;
+        monitoredUid.procState = ActivityManager::PROCESS_STATE_NONEXISTENT;
+        monitoredUid.refCount = 1;
+        mMonitoredUids.emplace(std::pair<uid_t, MonitoredUid>(uid, monitoredUid));
     }
 }
 
@@ -3750,8 +3769,8 @@ void CameraService::UidPolicy::unregisterMonitorUid(uid_t uid) {
     Mutex::Autolock _l(mUidLock);
     auto it = mMonitoredUids.find(uid);
     if (it != mMonitoredUids.end()) {
-        it->second.second--;
-        if (it->second.second == 0) {
+        it->second.refCount--;
+        if (it->second.refCount == 0) {
             mMonitoredUids.erase(it);
         }
     } else {
@@ -3829,7 +3848,7 @@ int32_t CameraService::UidPolicy::getProcState(uid_t uid) {
 int32_t CameraService::UidPolicy::getProcStateLocked(uid_t uid) {
     int32_t procState = ActivityManager::PROCESS_STATE_UNKNOWN;
     if (mMonitoredUids.find(uid) != mMonitoredUids.end()) {
-        procState = mMonitoredUids[uid].first;
+        procState = mMonitoredUids[uid].procState;
     }
     return procState;
 }
