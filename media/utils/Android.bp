@@ -30,6 +30,7 @@ cc_library {
         "ISchedulingPolicyService.cpp",
         "LimitProcessMemory.cpp",
         "MemoryLeakTrackUtil.cpp",
+        "MethodStatistics.cpp",
         "ProcessInfo.cpp",
         "SchedulingPolicyService.cpp",
         "ServiceUtilities.cpp",

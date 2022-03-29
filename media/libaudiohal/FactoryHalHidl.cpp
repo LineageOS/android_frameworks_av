@@ -16,6 +16,10 @@
 
 #define LOG_TAG "FactoryHalHidl"
 
+#include <algorithm>
+#include <array>
+#include <utility>
+
 #include <media/audiohal/FactoryHalHidl.h>
 
 #include <dlfcn.h>
@@ -28,15 +32,16 @@
 namespace android::detail {
 
 namespace {
-/** Supported HAL versions, in order of preference.
+/** Supported HAL versions, from most recent to least recent.
  */
-const char* sAudioHALVersions[] = {
-    "7.1",
-    "7.0",
-    "6.0",
-    "5.0",
-    "4.0",
-    nullptr
+#define CONC_VERSION(maj, min) #maj "." #min
+#define DECLARE_VERSION(maj, min) std::make_pair(std::make_pair(maj, min), CONC_VERSION(maj, min))
+static constexpr std::array<std::pair<std::pair<int, int>, const char*>, 5> sAudioHALVersions = {
+    DECLARE_VERSION(7, 1),
+    DECLARE_VERSION(7, 0),
+    DECLARE_VERSION(6, 0),
+    DECLARE_VERSION(5, 0),
+    DECLARE_VERSION(4, 0)
 };
 
 bool createHalService(const std::string& version, const std::string& interface,
@@ -94,11 +99,22 @@ bool hasHalService(const std::string& package, const std::string& version,
 
 }  // namespace
 
-void* createPreferredImpl(const std::string& package, const std::string& interface) {
-    for (auto version = detail::sAudioHALVersions; *version != nullptr; ++version) {
-        void* rawInterface = nullptr;
-        if (hasHalService(package, *version, interface)
-                && createHalService(*version, interface, &rawInterface)) {
+void* createPreferredImpl(const InterfaceName& iface, const InterfaceName& siblingIface) {
+    auto findMostRecentVersion = [](const InterfaceName& iface) {
+        return std::find_if(detail::sAudioHALVersions.begin(), detail::sAudioHALVersions.end(),
+                [&](const auto& v) { return hasHalService(iface.first, v.second, iface.second); });
+    };
+    auto ifaceVersionIt = findMostRecentVersion(iface);
+    auto siblingVersionIt = findMostRecentVersion(siblingIface);
+    if (ifaceVersionIt != detail::sAudioHALVersions.end() &&
+            siblingVersionIt != detail::sAudioHALVersions.end() &&
+            // same major version
+            ifaceVersionIt->first.first == siblingVersionIt->first.first) {
+        std::string libraryVersion =
+                ifaceVersionIt->first >= siblingVersionIt->first ?
+                ifaceVersionIt->second : siblingVersionIt->second;
+        void* rawInterface;
+        if (createHalService(libraryVersion, iface.second, &rawInterface)) {
             return rawInterface;
         }
     }
