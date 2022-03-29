@@ -1629,6 +1629,9 @@ void AudioPolicyService::UidPolicy::onUidStateChanged(uid_t uid,
     }
 }
 
+void AudioPolicyService::UidPolicy::onUidProcAdjChanged(uid_t uid __unused) {
+}
+
 void AudioPolicyService::UidPolicy::updateOverrideUid(uid_t uid, bool active, bool insert) {
     updateUid(&mOverrideUids, uid, active, ActivityManager::PROCESS_STATE_UNKNOWN, insert);
 }
