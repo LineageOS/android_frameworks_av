@@ -197,6 +197,7 @@ void TimeCheck::TimeCheckHandler::onTimeout() const
     } else {
         ALOGI("No HAL process pid available, skipping tombstones");
     }
+
     LOG_EVENT_STRING(LOGTAG_AUDIO_BINDER_TIMEOUT, tag.c_str());
     LOG_ALWAYS_FATAL("TimeCheck timeout for %s scheduled %s on thread %d\n%s",
             tag.c_str(), formatTime(startTime).c_str(), tid, summary.c_str());
