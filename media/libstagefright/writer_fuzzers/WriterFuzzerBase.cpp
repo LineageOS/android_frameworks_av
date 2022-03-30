@@ -174,10 +174,13 @@ void WriterFuzzerBase::addWriterSource(int32_t trackIndex) {
             params.sampleRate = 16000;
         } else {
             params.sampleRate = max(1, params.sampleRate);
+            params.channelCount = max(0, params.channelCount);
         }
         format->setInt32("channel-count", params.channelCount);
         format->setInt32("sample-rate", params.sampleRate);
     } else if (!strncmp(params.mime, "video/", 6)) {
+        params.width = max(1, params.width);
+        params.height = max(1, params.height);
         format->setInt32("width", params.width);
         format->setInt32("height", params.height);
     }
