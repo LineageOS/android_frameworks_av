@@ -78,6 +78,7 @@ cc_library {
 
     export_shared_lib_headers: [
         "libbase",
+        "libdmabufheap",
         "android.hardware.media.bufferpool@2.0",
     ],
 
