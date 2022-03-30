@@ -37,6 +37,7 @@ namespace android {
 #define C2FUZZER_ALIGN(_sz, _align) (((_sz) + ((_align)-1)) & ~((_align)-1))
 
 constexpr std::chrono::milliseconds kC2FuzzerTimeOut = 5000ms;
+constexpr int32_t kMaxIterations = 100;
 constexpr int32_t kNumberOfC2WorkItems = 8;
 constexpr uint32_t kWidthOfVideo = 3840;
 constexpr uint32_t kHeightOfVideo = 2160;

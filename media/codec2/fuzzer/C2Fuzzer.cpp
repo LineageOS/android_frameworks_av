@@ -246,7 +246,8 @@ void Codec2Fuzzer::decodeFrames(const uint8_t* data, size_t size) {
   bufferSource->parse();
   c2_status_t status = C2_OK;
   size_t numFrames = 0;
-  while (!bufferSource->isEos()) {
+  int32_t iterationCount = 0;
+  while (!bufferSource->isEos() && ++iterationCount <= kMaxIterations) {
     uint8_t* frame = nullptr;
     size_t frameSize = 0;
     FrameData frameData = bufferSource->getFrame();
