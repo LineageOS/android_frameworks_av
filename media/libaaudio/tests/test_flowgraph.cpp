@@ -37,22 +37,69 @@ using namespace flowgraph;
 
 constexpr int kBytesPerI24Packed = 3;
 
+// Simple test that tries to reproduce a Clang compiler bug.
+__attribute__((noinline))
+void local_convert_float_to_int16(const float *input,
+                                  int16_t *output,
+                                  int count) {
+    for (int i = 0; i < count; i++) {
+        int32_t n = (int32_t) (*input++ * 32768.0f);
+        *output++ = std::min(INT16_MAX, std::max(INT16_MIN, n)); // clip
+    }
+}
+
+TEST(test_flowgraph, local_convert_float_int16) {
+    static constexpr int kNumSamples = 8;
+    static constexpr std::array<float, kNumSamples> input = {
+        1.0f, 0.5f, -0.25f, -1.0f,
+        0.0f, 53.9f, -87.2f, -1.02f};
+    static constexpr std::array<int16_t, kNumSamples>  expected = {
+        32767, 16384, -8192, -32768,
+        0, 32767, -32768, -32768};
+    std::array<int16_t, kNumSamples> output;
+
+    // Do it inline, which will probably work even with the buggy compiler.
+    // This validates the expected data.
+    const float *in = input.data();
+    int16_t *out = output.data();
+    output.fill(777);
+    for (int i = 0; i < kNumSamples; i++) {
+        int32_t n = (int32_t) (*in++ * 32768.0f);
+        *out++ = std::min(INT16_MAX, std::max(INT16_MIN, n)); // clip
+    }
+    for (int i = 0; i < kNumSamples; i++) {
+        EXPECT_EQ(expected.at(i), output.at(i)) << ", i = " << i;
+    }
+
+    // Convert audio signal using the function.
+    output.fill(777);
+    local_convert_float_to_int16(input.data(), output.data(), kNumSamples);
+    for (int i = 0; i < kNumSamples; i++) {
+        EXPECT_EQ(expected.at(i), output.at(i)) << ", i = " << i;
+    }
+}
+
 TEST(test_flowgraph, module_sinki16) {
-    static const float input[] = {1.0f, 0.5f, -0.25f, -1.0f, 0.0f, 53.9f, -87.2f};
-    static const int16_t expected[] = {32767, 16384, -8192, -32768, 0, 32767, -32768};
-    int16_t output[20];
+    static constexpr int kNumSamples = 8;
+    static constexpr std::array<float, kNumSamples> input = {
+        1.0f, 0.5f, -0.25f, -1.0f,
+        0.0f, 53.9f, -87.2f, -1.02f};
+    static constexpr std::array<int16_t, kNumSamples>  expected = {
+        32767, 16384, -8192, -32768,
+        0, 32767, -32768, -32768};
+    std::array<int16_t, kNumSamples + 10> output; // larger than input
+
     SourceFloat sourceFloat{1};
     SinkI16 sinkI16{1};
 
-    int numInputFrames = sizeof(input) / sizeof(input[0]);
-    sourceFloat.setData(input, numInputFrames);
+    sourceFloat.setData(input.data(), kNumSamples);
     sourceFloat.output.connect(&sinkI16.input);
 
-    int numOutputFrames = sizeof(output) / sizeof(int16_t);
-    int32_t numRead = sinkI16.read(output, numOutputFrames);
-    ASSERT_EQ(numInputFrames, numRead);
+    output.fill(777);
+    int32_t numRead = sinkI16.read(output.data(), output.size());
+    ASSERT_EQ(kNumSamples, numRead);
     for (int i = 0; i < numRead; i++) {
-        EXPECT_EQ(expected[i], output[i]);
+        EXPECT_EQ(expected.at(i), output.at(i)) << ", i = " << i;
     }
 }
 
