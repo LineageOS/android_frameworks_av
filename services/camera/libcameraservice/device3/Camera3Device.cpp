@@ -115,10 +115,6 @@ const String8& Camera3Device::getId() const {
 
 status_t Camera3Device::initializeCommonLocked() {
 
-    /** Start watchdog thread */
-    mCameraServiceWatchdog = new CameraServiceWatchdog();
-    mCameraServiceWatchdog->run("CameraServiceWatchdog");
-
     /** Start up status tracker thread */
     mStatusTracker = new StatusTracker(this);
     status_t res = mStatusTracker->run(String8::format("C3Dev-%s-Status", mId.string()).string());
@@ -231,6 +227,10 @@ status_t Camera3Device::initializeCommonLocked() {
 
     // Hidl/AidlCamera3DeviceInjectionMethods
     mInjectionMethods = createCamera3DeviceInjectionMethods(this);
+
+    /** Start watchdog thread */
+    mCameraServiceWatchdog = new CameraServiceWatchdog();
+    mCameraServiceWatchdog->run("CameraServiceWatchdog");
 
     return OK;
 }
@@ -4081,6 +4081,17 @@ void Camera3Device::RequestThread::cleanupPhysicalSettings(sp<CaptureRequest> re
             halRequest->physcam_settings = nullptr;
         }
     }
+}
+
+status_t Camera3Device::setCameraServiceWatchdog(bool enabled) {
+    Mutex::Autolock il(mInterfaceLock);
+    Mutex::Autolock l(mLock);
+
+    if (mCameraServiceWatchdog != NULL) {
+        mCameraServiceWatchdog->setEnabled(enabled);
+    }
+
+    return OK;
 }
 
 void Camera3Device::RequestThread::cleanUpFailedRequests(bool sendRequestError) {

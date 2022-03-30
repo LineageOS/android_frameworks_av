@@ -84,6 +84,8 @@ public:
     bool supportsCameraMute() override;
     status_t setCameraMute(bool enabled) override;
 
+    status_t setCameraServiceWatchdog(bool enabled) override;
+
     // permissions management
     status_t startCameraOps() override;
     status_t finishCameraOps() override;
