@@ -125,6 +125,11 @@ class TimerThread {
         return s;
     }
 
+    /**
+     * Returns callstack of tid as a string.
+     */
+    static std::string tidCallStackString(pid_t tid);
+
   private:
     // To minimize movement of data, we pass around shared_ptrs to Requests.
     // These are allocated and deallocated outside of the lock.
@@ -211,6 +216,36 @@ class TimerThread {
         std::shared_ptr<const Request> remove(Handle handle);
         void copyRequests(std::vector<std::shared_ptr<const Request>>& requests) const;
     };
+
+    // Analysis contains info deduced by analysisTimeout().
+    //
+    // Summary is the result string from checking timeoutRequests to see if
+    // any might be caused by blocked calls in pendingRequests.
+    //
+    // Summary string is empty if there is no automatic actionable info.
+    //
+    // timeoutTid is the tid selected from timeoutRequests (if any).
+    //
+    // HALBlockedTid is the tid that is blocked from pendingRequests believed
+    // to cause the timeout.
+    // HALBlockedTid may be INVALID_PID if no suspected tid is found,
+    // and if HALBlockedTid is valid, it will not be the same as timeoutTid.
+    //
+    static constexpr pid_t INVALID_PID = -1;
+    struct Analysis {
+        std::string summary;
+        pid_t timeoutTid = INVALID_PID;
+        pid_t HALBlockedTid = INVALID_PID;
+    };
+
+    // A HAL method is where the substring "Hidl" is in the class name.
+    // The tag should look like: ... Hidl ... :: ...
+    static bool isRequestFromHal(const std::shared_ptr<const Request>& request);
+
+    // Returns analysis from the requests.
+    static Analysis analyzeTimeout(
+        const std::vector<std::shared_ptr<const Request>>& timeoutRequests,
+        const std::vector<std::shared_ptr<const Request>>& pendingRequests);
 
     std::vector<std::shared_ptr<const Request>> getPendingRequests() const;
 
