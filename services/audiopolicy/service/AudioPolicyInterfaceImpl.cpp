@@ -90,13 +90,13 @@ status_t AudioPolicyService::validateUsage(const audio_attributes_t& attr,
             if (attr.usage == AUDIO_USAGE_CALL_ASSISTANT
                     && ((attr.flags & AUDIO_FLAG_CALL_REDIRECTION) != 0)) {
                 if (!callAudioInterceptionAllowed(attributionSource)) {
-                    ALOGE(("permission denied: modify audio routing not allowed "
-                           "for attributionSource %s"), attributionSource.toString().c_str());
+                    ALOGE("%s: call audio interception not allowed for attribution source: %s",
+                           __func__, attributionSource.toString().c_str());
                     return PERMISSION_DENIED;
                 }
             } else if (!modifyAudioRoutingAllowed(attributionSource)) {
-                ALOGE(("permission denied: modify audio routing not allowed "
-                       "for attributionSource %s"), attributionSource.toString().c_str());
+                ALOGE("%s: modify audio routing not allowed for attribution source: %s",
+                        __func__, attributionSource.toString().c_str());
                 return PERMISSION_DENIED;
             }
         } else {
