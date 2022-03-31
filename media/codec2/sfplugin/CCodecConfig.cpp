@@ -1893,7 +1893,9 @@ status_t CCodecConfig::querySupportedParameters(std::vector<std::string> *names)
     names->clear();
     // TODO: expand to standard params
     for (const auto &[key, desc] : mVendorParams) {
-        names->push_back(key);
+        if (desc->isVisible()) {
+            names->push_back(key);
+        }
     }
     return OK;
 }
