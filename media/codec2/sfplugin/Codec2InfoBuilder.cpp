@@ -281,6 +281,11 @@ void addSupportedColorFormats(
             }
         };
 
+        // The color format is ordered by preference. The intention here is to advertise:
+        //   c2.android.* codecs: YUV420s, Surface, <the rest>
+        //   all other codecs:    Surface, YUV420s, <the rest>
+        // TODO: get this preference via Codec2 API
+
         // vendor video codecs prefer opaque format
         if (trait.name.find("android") == std::string::npos) {
             addDefaultColorFormat(COLOR_FormatSurface);
@@ -290,9 +295,8 @@ void addSupportedColorFormats(
         addDefaultColorFormat(COLOR_FormatYUV420SemiPlanar);
         addDefaultColorFormat(COLOR_FormatYUV420PackedPlanar);
         addDefaultColorFormat(COLOR_FormatYUV420PackedSemiPlanar);
-        // framework video encoders must support surface format, though it is unclear
-        // that they will be able to map it if it is opaque
-        if (encoder && trait.name.find("android") != std::string::npos) {
+        // Android video codecs prefer CPU-readable formats
+        if (trait.name.find("android") != std::string::npos) {
             addDefaultColorFormat(COLOR_FormatSurface);
         }
         for (int32_t colorFormat : supportedColorFormats) {
