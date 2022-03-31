@@ -18,6 +18,7 @@
 
 #include <optional>
 
+#include <android-base/logging.h>
 #include <audio_utils/clock.h>
 #include <mediautils/EventLog.h>
 #include <mediautils/MethodStatistics.h>
@@ -197,9 +198,25 @@ void TimeCheck::TimeCheckHandler::onTimeout() const
     } else {
         ALOGI("No HAL process pid available, skipping tombstones");
     }
+
     LOG_EVENT_STRING(LOGTAG_AUDIO_BINDER_TIMEOUT, tag.c_str());
-    LOG_ALWAYS_FATAL("TimeCheck timeout for %s scheduled %s on thread %d\n%s",
-            tag.c_str(), formatTime(startTime).c_str(), tid, summary.c_str());
+
+    // Create abort message string - caution: this can be very large.
+    const std::string abortMessage = std::string("TimeCheck timeout for ")
+            .append(tag)
+            .append(" scheduled ").append(formatTime(startTime))
+            .append(" on thread ").append(std::to_string(tid)).append("\n")
+            .append(summary);
+
+    // Note: LOG_ALWAYS_FATAL limits the size of the string - per log/log.h:
+    // Log message text may be truncated to less than an
+    // implementation-specific limit (1023 bytes).
+    //
+    // Here, we send the string through android-base/logging.h LOG()
+    // to avoid the size limitation. LOG(FATAL) does an abort whereas
+    // LOG(FATAL_WITHOUT_ABORT) does not abort.
+
+    LOG(FATAL) << abortMessage;
 }
 
 // Automatically create a TimeCheck class for a class and method.

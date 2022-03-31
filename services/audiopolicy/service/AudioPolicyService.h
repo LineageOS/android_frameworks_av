@@ -450,7 +450,8 @@ private:
         void onUidGone(uid_t uid, bool disabled) override;
         void onUidIdle(uid_t uid, bool disabled) override;
         void onUidStateChanged(uid_t uid, int32_t procState, int64_t procStateSeq,
-                int32_t capability);
+                int32_t capability) override;
+        void onUidProcAdjChanged(uid_t uid) override;
 
         void addOverrideUid(uid_t uid, bool active) { updateOverrideUid(uid, active, true); }
         void removeOverrideUid(uid_t uid) { updateOverrideUid(uid, false, false); }

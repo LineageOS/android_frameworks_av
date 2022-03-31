@@ -22,6 +22,7 @@
 #include <vector>
 
 #include <mediautils/TimerThread.h>
+#include <utils/CallStack.h>
 #include <utils/ThreadDefs.h>
 
 namespace android::mediautils {
@@ -53,15 +54,125 @@ bool TimerThread::cancelTask(Handle handle) {
 }
 
 std::string TimerThread::toString(size_t retiredCount) const {
+    // Note: These request queues are snapshot very close together but
+    // not at "identical" times as we don't use a class-wide lock.
+
+    std::vector<std::shared_ptr<const Request>> timeoutRequests;
+    std::vector<std::shared_ptr<const Request>> retiredRequests;
+    mTimeoutQueue.copyRequests(timeoutRequests);
+    mRetiredQueue.copyRequests(retiredRequests, retiredCount);
+    std::vector<std::shared_ptr<const Request>> pendingRequests =
+        getPendingRequests();
+
+    struct Analysis analysis = analyzeTimeout(timeoutRequests, pendingRequests);
+    std::string analysisSummary;
+    if (!analysis.summary.empty()) {
+        analysisSummary = std::string("\nanalysis [ ").append(analysis.summary).append(" ]");
+    }
+    std::string timeoutStack;
+    if (analysis.timeoutTid != -1) {
+        timeoutStack = std::string("\ntimeout(")
+                .append(std::to_string(analysis.timeoutTid)).append(") callstack [\n")
+                .append(tidCallStackString(analysis.timeoutTid)).append("]");
+    }
+    std::string blockedStack;
+    if (analysis.HALBlockedTid != -1) {
+        blockedStack = std::string("\nblocked(")
+                .append(std::to_string(analysis.HALBlockedTid)).append(")  callstack [\n")
+                .append(tidCallStackString(analysis.HALBlockedTid)).append("]");
+    }
+
     return std::string("now ")
             .append(formatTime(std::chrono::system_clock::now()))
-            .append("\npending [ ")
-            .append(pendingToString())
-            .append(" ]\ntimeout [ ")
-            .append(timeoutToString())
+            .append(analysisSummary)
+            .append("\ntimeout [ ")
+            .append(requestsToString(timeoutRequests))
+            .append(" ]\npending [ ")
+            .append(requestsToString(pendingRequests))
             .append(" ]\nretired [ ")
-            .append(retiredToString(retiredCount))
-            .append(" ]");
+            .append(requestsToString(retiredRequests))
+            .append(" ]")
+            .append(timeoutStack)
+            .append(blockedStack);
+}
+
+// A HAL method is where the substring "Hidl" is in the class name.
+// The tag should look like: ... Hidl ... :: ...
+// When the audio HAL is updated to AIDL perhaps we will use instead
+// a global directory of HAL classes.
+//
+// See MethodStatistics.cpp:
+// mediautils::getStatisticsClassesForModule(METHOD_STATISTICS_MODULE_NAME_AUDIO_HIDL)
+//
+/* static */
+bool TimerThread::isRequestFromHal(const std::shared_ptr<const Request>& request) {
+    const size_t hidlPos = request->tag.find("Hidl");
+    if (hidlPos == std::string::npos) return false;
+    // should be a separator afterwards Hidl which indicates the string was in the class.
+    const size_t separatorPos = request->tag.find("::", hidlPos);
+    return separatorPos != std::string::npos;
+}
+
+/* static */
+struct TimerThread::Analysis TimerThread::analyzeTimeout(
+    const std::vector<std::shared_ptr<const Request>>& timeoutRequests,
+    const std::vector<std::shared_ptr<const Request>>& pendingRequests) {
+
+    if (timeoutRequests.empty() || pendingRequests.empty()) return {}; // nothing to say.
+
+    // for now look at last timeout (in our case, the only timeout)
+    const std::shared_ptr<const Request> timeout = timeoutRequests.back();
+
+    // pending Requests that are problematic.
+    std::vector<std::shared_ptr<const Request>> pendingExact;
+    std::vector<std::shared_ptr<const Request>> pendingPossible;
+
+    // We look at pending requests that were scheduled no later than kDuration
+    // after the timeout request. This prevents false matches with calls
+    // that naturally block for a short period of time
+    // such as HAL write() and read().
+    //
+    auto constexpr kDuration = std::chrono::milliseconds(1000);
+    for (const auto& pending : pendingRequests) {
+        // If the pending tid is the same as timeout tid, problem identified.
+        if (pending->tid == timeout->tid) {
+            pendingExact.emplace_back(pending);
+            continue;
+        }
+
+        // if the pending tid is scheduled within time limit
+        if (pending->scheduled - timeout->scheduled < kDuration) {
+            pendingPossible.emplace_back(pending);
+        }
+    }
+
+    struct Analysis analysis{};
+
+    analysis.timeoutTid = timeout->tid;
+    std::string& summary = analysis.summary;
+    if (!pendingExact.empty()) {
+        const auto& request = pendingExact.front();
+        const bool hal = isRequestFromHal(request);
+
+        if (hal) {
+            summary = std::string("Blocked directly due to HAL call: ")
+                .append(request->toString());
+        }
+    }
+    if (summary.empty() && !pendingPossible.empty()) {
+        for (const auto& request : pendingPossible) {
+            const bool hal = isRequestFromHal(request);
+            if (hal) {
+                // The first blocked call is the most likely one.
+                // Recent calls might be temporarily blocked
+                // calls such as write() or read() depending on kDuration.
+                summary = std::string("Blocked possibly due to HAL call: ")
+                    .append(request->toString());
+                analysis.HALBlockedTid = request->tid;
+            }
+       }
+    }
+    return analysis;
 }
 
 std::vector<std::shared_ptr<const TimerThread::Request>> TimerThread::getPendingRequests() const {
@@ -100,6 +211,13 @@ std::string TimerThread::timeoutToString(size_t n) const {
 
     // Dump to string
     return requestsToString(timeoutRequests);
+}
+
+/* static */
+std::string TimerThread::tidCallStackString(pid_t tid) {
+    CallStack cs{};
+    cs.update(0 /* ignoreDepth */, tid);
+    return cs.toString().c_str();
 }
 
 std::string TimerThread::Request::toString() const {
