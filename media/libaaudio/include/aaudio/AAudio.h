@@ -778,8 +778,16 @@ AAUDIO_API aaudio_result_t AAudio_createStreamBuilder(AAudioStreamBuilder** buil
         __INTRODUCED_IN(26);
 
 /**
- * Request an audio device identified device using an ID.
- * On Android, for example, the ID could be obtained from the Java AudioManager.
+ * Request an audio device identified by an ID.
+ *
+ * The ID could be obtained from the Java AudioManager.
+ * AudioManager.getDevices() returns an array of {@link AudioDeviceInfo},
+ * which contains a getId() method. That ID can be passed to this function.
+ *
+ * It is possible that you may not get the device that you requested.
+ * So if it is important to you, you should call
+ * AAudioStream_getDeviceId() after the stream is opened to
+ * verify the actual ID.
  *
  * The default, if you do not call this function, is {@link #AAUDIO_UNSPECIFIED},
  * in which case the primary device will be used.
