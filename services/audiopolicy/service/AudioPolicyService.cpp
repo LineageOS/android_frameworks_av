@@ -564,13 +564,20 @@ void AudioPolicyService::onUpdateActiveSpatializerTracks_l() {
 
 void AudioPolicyService::doOnUpdateActiveSpatializerTracks()
 {
-    Mutex::Autolock _l(mLock);
-    if (mSpatializer == nullptr) {
-        return;
+    sp<Spatializer> spatializer;
+    size_t activeClients;
+    {
+        Mutex::Autolock _l(mLock);
+        if (mSpatializer == nullptr) {
+            return;
+        }
+        spatializer = mSpatializer;
+        activeClients = countActiveClientsOnOutput_l(mSpatializer->getOutput());
     }
-    mSpatializer->updateActiveTracks(countActiveClientsOnOutput_l(mSpatializer->getOutput()));
+    if (spatializer != nullptr) {
+        spatializer->updateActiveTracks(activeClients);
+    }
 }
-
 
 status_t AudioPolicyService::clientCreateAudioPatch(const struct audio_patch *patch,
                                                 audio_patch_handle_t *handle,
