@@ -283,6 +283,12 @@ private:
      */
     void checkSensorsState_l() REQUIRES(mLock);
 
+    /**
+     * Checks if the spatializer effect should be enabled based on
+     * playback activity and requested level.
+     */
+    void checkEngineState_l() REQUIRES(mLock);
+
     /** Effect engine descriptor */
     const effect_descriptor_t mEngineDescriptor;
     /** Callback interface to parent audio policy service */
