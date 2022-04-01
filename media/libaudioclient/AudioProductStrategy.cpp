@@ -18,7 +18,7 @@
 //#define LOG_NDEBUG 0
 #include <utils/Log.h>
 #include <media/AudioProductStrategy.h>
-#include <media/AudioAttributes.h>
+#include <media/VolumeGroupAttributes.h>
 #include <media/PolicyAidlConversion.h>
 
 namespace android {
@@ -42,8 +42,8 @@ legacy2aidl_AudioProductStrategy(const AudioProductStrategy& legacy) {
     aidl.name = legacy.getName();
     aidl.audioAttributes = VALUE_OR_RETURN(
             convertContainer<std::vector<media::AudioAttributesEx>>(
-                    legacy.getAudioAttributes(),
-                    legacy2aidl_AudioAttributes_AudioAttributesEx));
+                    legacy.getVolumeGroupAttributes(),
+                    legacy2aidl_VolumeGroupAttributes_AudioAttributesEx));
     aidl.id = VALUE_OR_RETURN(legacy2aidl_product_strategy_t_int32_t(legacy.getId()));
     return aidl;
 }
@@ -53,9 +53,9 @@ aidl2legacy_AudioProductStrategy(const media::AudioProductStrategy& aidl) {
     return AudioProductStrategy(
             aidl.name,
             VALUE_OR_RETURN(
-                    convertContainer<std::vector<AudioAttributes>>(
+                    convertContainer<std::vector<VolumeGroupAttributes>>(
                             aidl.audioAttributes,
-                            aidl2legacy_AudioAttributesEx_AudioAttributes)),
+                            aidl2legacy_AudioAttributesEx_VolumeGroupAttributes)),
             VALUE_OR_RETURN(aidl2legacy_int32_t_product_strategy_t(aidl.id)));
 }
 

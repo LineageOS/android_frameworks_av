@@ -20,7 +20,7 @@
 #include <android/media/AudioProductStrategy.h>
 #include <media/AidlConversionUtil.h>
 #include <media/AudioCommonTypes.h>
-#include <media/AudioAttributes.h>
+#include <media/VolumeGroupAttributes.h>
 #include <system/audio.h>
 #include <system/audio_policy.h>
 #include <binder/Parcelable.h>
@@ -31,12 +31,15 @@ class AudioProductStrategy : public Parcelable
 {
 public:
     AudioProductStrategy() {}
-    AudioProductStrategy(const std::string &name, const std::vector<AudioAttributes> &attributes,
+    AudioProductStrategy(const std::string &name,
+                         const std::vector<VolumeGroupAttributes> &attributes,
                          product_strategy_t id) :
-        mName(name), mAudioAttributes(attributes), mId(id) {}
+        mName(name), mVolumeGroupAttributes(attributes), mId(id) {}
 
     const std::string &getName() const { return mName; }
-    std::vector<AudioAttributes> getAudioAttributes() const { return mAudioAttributes; }
+    std::vector<VolumeGroupAttributes> getVolumeGroupAttributes() const {
+        return mVolumeGroupAttributes;
+    }
     product_strategy_t getId() const { return mId; }
 
     status_t readFromParcel(const Parcel *parcel) override;
@@ -58,7 +61,7 @@ public:
                                   const audio_attributes_t clientAttritubes);
 private:
     std::string mName;
-    std::vector<AudioAttributes> mAudioAttributes;
+    std::vector<VolumeGroupAttributes> mVolumeGroupAttributes;
     product_strategy_t mId;
 };
 

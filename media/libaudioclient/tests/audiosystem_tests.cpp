@@ -332,7 +332,7 @@ TEST_F(AudioSystemTest, GetDirectProfilesForAttributes) {
 
 bool isPublicStrategy(const AudioProductStrategy& strategy) {
     bool result = true;
-    for (auto& attribute : strategy.getAudioAttributes()) {
+    for (auto& attribute : strategy.getVolumeGroupAttributes()) {
         if (attribute.getAttributes() == AUDIO_ATTRIBUTES_INITIALIZER &&
             (uint32_t(attribute.getStreamType()) >= AUDIO_STREAM_PUBLIC_CNT)) {
             result = false;
@@ -371,7 +371,7 @@ TEST_F(AudioSystemTest, DevicesForRoleAndStrategy) {
     for (const auto& strategy : strategies) {
         if (!isPublicStrategy(strategy)) continue;
 
-        for (const auto& att : strategy.getAudioAttributes()) {
+        for (const auto& att : strategy.getVolumeGroupAttributes()) {
             if (strategy.attributesMatches(att.getAttributes(), attributes)) {
                 hasStrategyForMedia = true;
                 mediaStrategy = strategy;

@@ -119,16 +119,17 @@ class SerializationTest : public FillAudioAttributes, public ::testing::Test {
 TEST_F(SerializationTest, AudioProductStrategyBinderization) {
     for (int j = 0; j < 512; j++) {
         const std::string name{"Test APSBinderization for seed::" + std::to_string(mSeed)};
-        std::vector<AudioAttributes> audioattributesvector;
+        std::vector<VolumeGroupAttributes> volumeGroupAttrVector;
         for (auto i = 0; i < 16; i++) {
             audio_attributes_t attributes;
             fillAudioAttributes(attributes);
-            AudioAttributes audioattributes{static_cast<volume_group_t>(rand()),
-                                            kStreamtypes[rand() % kStreamtypes.size()], attributes};
-            audioattributesvector.push_back(audioattributes);
+            VolumeGroupAttributes volumeGroupAttr{static_cast<volume_group_t>(rand()),
+                                                  kStreamtypes[rand() % kStreamtypes.size()],
+                                                  attributes};
+            volumeGroupAttrVector.push_back(volumeGroupAttr);
         }
         product_strategy_t psId = static_cast<product_strategy_t>(rand());
-        AudioProductStrategy aps{name, audioattributesvector, psId};
+        AudioProductStrategy aps{name, volumeGroupAttrVector, psId};
 
         Parcel p;
         EXPECT_EQ(NO_ERROR, aps.writeToParcel(&p)) << name;
@@ -138,12 +139,12 @@ TEST_F(SerializationTest, AudioProductStrategyBinderization) {
         EXPECT_EQ(NO_ERROR, apsCopy.readFromParcel(&p)) << name;
         EXPECT_EQ(apsCopy.getName(), name) << name;
         EXPECT_EQ(apsCopy.getId(), psId) << name;
-        auto avec = apsCopy.getAudioAttributes();
-        EXPECT_EQ(avec.size(), audioattributesvector.size()) << name;
-        for (int i = 0; i < audioattributesvector.size(); i++) {
-            EXPECT_EQ(avec[i].getGroupId(), audioattributesvector[i].getGroupId()) << name;
-            EXPECT_EQ(avec[i].getStreamType(), audioattributesvector[i].getStreamType()) << name;
-            EXPECT_TRUE(avec[i].getAttributes() == audioattributesvector[i].getAttributes())
+        auto avec = apsCopy.getVolumeGroupAttributes();
+        EXPECT_EQ(avec.size(), volumeGroupAttrVector.size()) << name;
+        for (int i = 0; i < volumeGroupAttrVector.size(); i++) {
+            EXPECT_EQ(avec[i].getGroupId(), volumeGroupAttrVector[i].getGroupId()) << name;
+            EXPECT_EQ(avec[i].getStreamType(), volumeGroupAttrVector[i].getStreamType()) << name;
+            EXPECT_TRUE(avec[i].getAttributes() == volumeGroupAttrVector[i].getAttributes())
                     << name;
         }
     }
@@ -293,17 +294,17 @@ TEST_P(AudioAttributesParameterizedTest, AudioAttributesBinderization) {
     audio_stream_type_t stream = mAudioStream;
     audio_attributes_t attributes;
     fillAudioAttributes(attributes);
-    AudioAttributes audioattributes{groupId, stream, attributes};
+    VolumeGroupAttributes volumeGroupAttr{groupId, stream, attributes};
 
     Parcel p;
-    EXPECT_EQ(NO_ERROR, audioattributes.writeToParcel(&p)) << msg;
+    EXPECT_EQ(NO_ERROR, volumeGroupAttr.writeToParcel(&p)) << msg;
 
-    AudioAttributes audioattributesCopy;
+    VolumeGroupAttributes volumeGroupAttrCopy;
     p.setDataPosition(0);
-    EXPECT_EQ(NO_ERROR, audioattributesCopy.readFromParcel(&p)) << msg;
-    EXPECT_EQ(audioattributesCopy.getGroupId(), audioattributes.getGroupId()) << msg;
-    EXPECT_EQ(audioattributesCopy.getStreamType(), audioattributes.getStreamType()) << msg;
-    EXPECT_TRUE(audioattributesCopy.getAttributes() == attributes) << msg;
+    EXPECT_EQ(NO_ERROR, volumeGroupAttrCopy.readFromParcel(&p)) << msg;
+    EXPECT_EQ(volumeGroupAttrCopy.getGroupId(), volumeGroupAttr.getGroupId()) << msg;
+    EXPECT_EQ(volumeGroupAttrCopy.getStreamType(), volumeGroupAttr.getStreamType()) << msg;
+    EXPECT_TRUE(volumeGroupAttrCopy.getAttributes() == attributes) << msg;
 }
 
 // audioStream

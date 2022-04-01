@@ -36,16 +36,16 @@ ProductStrategy::ProductStrategy(const std::string &name) :
 {
 }
 
-void ProductStrategy::addAttributes(const AudioAttributes &audioAttributes)
+void ProductStrategy::addAttributes(const VolumeGroupAttributes &volumeGroupAttributes)
 {
-    mAttributesVector.push_back(audioAttributes);
+    mAttributesVector.push_back(volumeGroupAttributes);
 }
 
-std::vector<android::AudioAttributes> ProductStrategy::listAudioAttributes() const
+std::vector<android::VolumeGroupAttributes> ProductStrategy::listVolumeGroupAttributes() const
 {
-    std::vector<android::AudioAttributes> androidAa;
+    std::vector<android::VolumeGroupAttributes> androidAa;
     for (const auto &attr : mAttributesVector) {
-        androidAa.push_back({attr.mVolumeGroup, attr.mStream, attr.mAttributes});
+        androidAa.push_back({attr.getGroupId(), attr.getStreamType(), attr.getAttributes()});
     }
     return androidAa;
 }
@@ -54,7 +54,7 @@ AttributesVector ProductStrategy::getAudioAttributes() const
 {
     AttributesVector attrVector;
     for (const auto &attrGroup : mAttributesVector) {
-        attrVector.push_back(attrGroup.mAttributes);
+        attrVector.push_back(attrGroup.getAttributes());
     }
     if (not attrVector.empty()) {
         return attrVector;
@@ -66,7 +66,7 @@ bool ProductStrategy::matches(const audio_attributes_t attr) const
 {
     return std::find_if(begin(mAttributesVector), end(mAttributesVector),
                         [&attr](const auto &supportedAttr) {
-        return AudioProductStrategy::attributesMatches(supportedAttr.mAttributes, attr);
+        return AudioProductStrategy::attributesMatches(supportedAttr.getAttributes(), attr);
     }) != end(mAttributesVector);
 }
 
@@ -75,11 +75,11 @@ audio_stream_type_t ProductStrategy::getStreamTypeForAttributes(
 {
     const auto &iter = std::find_if(begin(mAttributesVector), end(mAttributesVector),
                                    [&attr](const auto &supportedAttr) {
-        return AudioProductStrategy::attributesMatches(supportedAttr.mAttributes, attr); });
+        return AudioProductStrategy::attributesMatches(supportedAttr.getAttributes(), attr); });
     if (iter == end(mAttributesVector)) {
         return AUDIO_STREAM_DEFAULT;
     }
-    audio_stream_type_t streamType = iter->mStream;
+    audio_stream_type_t streamType = iter->getStreamType();
     ALOGW_IF(streamType == AUDIO_STREAM_DEFAULT,
              "%s: Strategy %s supporting attributes %s has not stream type associated"
              "fallback on MUSIC. Do not use stream volume API", __func__, mName.c_str(),
@@ -91,23 +91,23 @@ audio_attributes_t ProductStrategy::getAttributesForStreamType(audio_stream_type
 {
     const auto iter = std::find_if(begin(mAttributesVector), end(mAttributesVector),
                                    [&streamType](const auto &supportedAttr) {
-        return supportedAttr.mStream == streamType; });
-    return iter != end(mAttributesVector) ? iter->mAttributes : AUDIO_ATTRIBUTES_INITIALIZER;
+        return supportedAttr.getStreamType() == streamType; });
+    return iter != end(mAttributesVector) ? iter->getAttributes() : AUDIO_ATTRIBUTES_INITIALIZER;
 }
 
 bool ProductStrategy::isDefault() const
 {
     return std::find_if(begin(mAttributesVector), end(mAttributesVector), [](const auto &attr) {
-        return attr.mAttributes == defaultAttr; }) != end(mAttributesVector);
+        return attr.getAttributes() == defaultAttr; }) != end(mAttributesVector);
 }
 
 StreamTypeVector ProductStrategy::getSupportedStreams() const
 {
     StreamTypeVector streams;
     for (const auto &supportedAttr : mAttributesVector) {
-        if (std::find(begin(streams), end(streams), supportedAttr.mStream) == end(streams) &&
-                supportedAttr.mStream != AUDIO_STREAM_DEFAULT) {
-            streams.push_back(supportedAttr.mStream);
+        if (std::find(begin(streams), end(streams), supportedAttr.getStreamType())
+                == end(streams) && supportedAttr.getStreamType() != AUDIO_STREAM_DEFAULT) {
+            streams.push_back(supportedAttr.getStreamType());
         }
     }
     return streams;
@@ -117,14 +117,14 @@ bool ProductStrategy::supportStreamType(const audio_stream_type_t &streamType) c
 {
     return std::find_if(begin(mAttributesVector), end(mAttributesVector),
                         [&streamType](const auto &supportedAttr) {
-        return supportedAttr.mStream == streamType; }) != end(mAttributesVector);
+        return supportedAttr.getStreamType() == streamType; }) != end(mAttributesVector);
 }
 
 volume_group_t ProductStrategy::getVolumeGroupForAttributes(const audio_attributes_t &attr) const
 {
     for (const auto &supportedAttr : mAttributesVector) {
-        if (AudioProductStrategy::attributesMatches(supportedAttr.mAttributes, attr)) {
-            return supportedAttr.mVolumeGroup;
+        if (AudioProductStrategy::attributesMatches(supportedAttr.getAttributes(), attr)) {
+            return supportedAttr.getGroupId();
         }
     }
     return VOLUME_GROUP_NONE;
@@ -133,8 +133,8 @@ volume_group_t ProductStrategy::getVolumeGroupForAttributes(const audio_attribut
 volume_group_t ProductStrategy::getVolumeGroupForStreamType(audio_stream_type_t stream) const
 {
     for (const auto &supportedAttr : mAttributesVector) {
-        if (supportedAttr.mStream == stream) {
-            return supportedAttr.mVolumeGroup;
+        if (supportedAttr.getStreamType() == stream) {
+            return supportedAttr.getGroupId();
         }
     }
     return VOLUME_GROUP_NONE;
@@ -143,8 +143,10 @@ volume_group_t ProductStrategy::getVolumeGroupForStreamType(audio_stream_type_t 
 volume_group_t ProductStrategy::getDefaultVolumeGroup() const
 {
     const auto &iter = std::find_if(begin(mAttributesVector), end(mAttributesVector),
-                                    [](const auto &attr) {return attr.mAttributes == defaultAttr;});
-    return iter != end(mAttributesVector) ? iter->mVolumeGroup : VOLUME_GROUP_NONE;
+                                    [](const auto &attr) {
+        return attr.getAttributes() == defaultAttr;
+    });
+    return iter != end(mAttributesVector) ? iter->getGroupId() : VOLUME_GROUP_NONE;
 }
 
 void ProductStrategy::dump(String8 *dst, int spaces) const
@@ -155,11 +157,11 @@ void ProductStrategy::dump(String8 *dst, int spaces) const
                        deviceLiteral.c_str(), mDeviceAddress.c_str());
 
     for (const auto &attr : mAttributesVector) {
-        dst->appendFormat("%*sGroup: %d stream: %s\n", spaces + 3, "", attr.mVolumeGroup,
-                          android::toString(attr.mStream).c_str());
+        dst->appendFormat("%*sGroup: %d stream: %s\n", spaces + 3, "", attr.getGroupId(),
+                          android::toString(attr.getStreamType()).c_str());
         dst->appendFormat("%*s Attributes: ", spaces + 3, "");
-        std::string attStr =
-                attr.mAttributes == defaultAttr ? "{ Any }" : android::toString(attr.mAttributes);
+        std::string attStr = attr.getAttributes() == defaultAttr ?
+                "{ Any }" : android::toString(attr.getAttributes());
         dst->appendFormat("%s\n", attStr.c_str());
     }
 }
