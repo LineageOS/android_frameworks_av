@@ -1803,9 +1803,16 @@ void CCodec::start() {
     if (tryAndReportOnError(setRunning) != OK) {
         return;
     }
+
+    err2 = mChannel->requestInitialInputBuffers();
+
+    if (err2 != OK) {
+        ALOGE("Initial request for Input Buffers failed");
+        mCallback->onError(err2,ACTION_CODE_FATAL);
+        return;
+    }
     mCallback->onStartCompleted();
 
-    (void)mChannel->requestInitialInputBuffers();
 }
 
 void CCodec::initiateShutdown(bool keepComponentAllocated) {
