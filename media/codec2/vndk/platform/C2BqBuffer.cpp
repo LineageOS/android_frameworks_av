@@ -571,8 +571,8 @@ private:
 public:
     Impl(const std::shared_ptr<C2Allocator> &allocator)
         : mInit(C2_OK), mProducerId(0), mGeneration(0),
-          mDqFailure(0), mLastDqTs(0), mLastDqLogTs(0),
-          mAllocator(allocator) {
+          mConsumerUsage(0), mDqFailure(0), mLastDqTs(0),
+          mLastDqLogTs(0), mAllocator(allocator) {
     }
 
     ~Impl() {
@@ -747,6 +747,11 @@ public:
                   "bqId: %llu migrated buffers # %d",
                   generation, (unsigned long long)producerId, migrated);
         }
+        mConsumerUsage = usage;
+    }
+
+    void getConsumerUsage(uint64_t *consumeUsage) {
+        *consumeUsage = mConsumerUsage;
     }
 
 private:
@@ -755,6 +760,7 @@ private:
     c2_status_t mInit;
     uint64_t mProducerId;
     uint32_t mGeneration;
+    uint64_t mConsumerUsage;
     OnRenderCallback mRenderCallback;
 
     size_t mDqFailure;
@@ -1086,3 +1092,10 @@ void C2BufferQueueBlockPool::setRenderCallback(const OnRenderCallback &renderCal
         mImpl->setRenderCallback(renderCallback);
     }
 }
+
+void C2BufferQueueBlockPool::getConsumerUsage(uint64_t *consumeUsage) {
+    if (mImpl) {
+        mImpl->getConsumerUsage(consumeUsage);
+    }
+}
+
