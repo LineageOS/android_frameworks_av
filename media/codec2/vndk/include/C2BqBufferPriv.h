@@ -101,6 +101,8 @@ public:
             uint32_t generationId,
             uint64_t consumerUsage);
 
+    virtual void getConsumerUsage(uint64_t *consumerUsage);
+
 private:
     const std::shared_ptr<C2Allocator> mAllocator;
     const local_id_t mLocalId;
@@ -138,7 +140,6 @@ public:
                 uint32_t toGeneration, uint64_t toUsage, uint64_t toBqId,
                 android::sp<android::GraphicBuffer>& graphicBuffer, uint32_t oldGeneration,
                 std::shared_ptr<C2SurfaceSyncMemory> syncMem);
-
 private:
     friend struct _C2BlockFactory;
 
