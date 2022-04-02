@@ -72,6 +72,7 @@ cc_library {
         "media_plugin_headers",
         "libmediautils_headers",
         "libstagefright_rtsp_headers",
+        "libstagefright_webm_headers",
     ],
 
     static_libs: [
@@ -79,9 +80,6 @@ cc_library {
         "libstagefright_nuplayer",
         "libstagefright_rtsp",
         "libstagefright_timedtext",
-        // this needs it, but it can get it transitively through libstagefright.
-        // i'm going to leave it here.
-        "libstagefright_webm",
         "framework-permission-aidl-cpp",
     ],
 
