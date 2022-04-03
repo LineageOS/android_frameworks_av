@@ -55,6 +55,7 @@ namespace android {
 
 // for audio_track_cblk_t::mState, to match TrackBase.h
 static inline constexpr int CBLK_STATE_IDLE = 0;
+static inline constexpr int CBLK_STATE_ACTIVE = 6;
 static inline constexpr int CBLK_STATE_PAUSING = 7;
 
 /**

@@ -973,7 +973,15 @@ bool AudioTrack::pauseAndWait(const std::chrono::milliseconds& timeout)
 {
     using namespace std::chrono_literals;
 
+    // We use atomic access here for state variables - these are used as hints
+    // to ensure we have ramped down audio.
+    const int priorState = mProxy->getState();
+    const uint32_t priorPosition = mProxy->getPosition().unsignedValue();
+
     pause();
+
+    // Only if we were previously active, do we wait to ramp down the audio.
+    if (priorState != CBLK_STATE_ACTIVE) return true;
 
     AutoMutex lock(mLock);
     // offload and direct tracks do not wait because pause volume ramp is handled by hardware.
@@ -982,16 +990,25 @@ bool AudioTrack::pauseAndWait(const std::chrono::milliseconds& timeout)
     // Wait for the track state to be anything besides pausing.
     // This ensures that the volume has ramped down.
     constexpr auto SLEEP_INTERVAL_MS = 10ms;
+    constexpr auto POSITION_TIMEOUT_MS = 40ms; // don't wait longer than this for position change.
     auto begin = std::chrono::steady_clock::now();
     while (true) {
-        // wait for state to change
+        // Wait for state and position to change.
+        // After pause() the server state should be PAUSING, but that may immediately
+        // convert to PAUSED by prepareTracks before data is read into the mixer.
+        // Hence we check that the state is not PAUSING and that the server position
+        // has advanced to be a more reliable estimate that the volume ramp has completed.
         const int state = mProxy->getState();
+        const uint32_t position = mProxy->getPosition().unsignedValue();
 
         mLock.unlock(); // only local variables accessed until lock.
         auto elapsed = std::chrono::duration_cast<std::chrono::milliseconds>(
                 std::chrono::steady_clock::now() - begin);
-        if (state != CBLK_STATE_PAUSING) {
-            ALOGV("%s: success state:%d after %lld ms", __func__, state, elapsed.count());
+        if (state != CBLK_STATE_PAUSING &&
+                (elapsed >= POSITION_TIMEOUT_MS || position != priorPosition)) {
+            ALOGV("%s: success state:%d, position:%u after %lld ms"
+                    " (prior state:%d  prior position:%u)",
+                    __func__, state, position, elapsed.count(), priorState, priorPosition);
             return true;
         }
         std::chrono::milliseconds remaining = timeout - elapsed;
