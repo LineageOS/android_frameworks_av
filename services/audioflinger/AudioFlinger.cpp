@@ -654,6 +654,7 @@ int AudioFlinger::onExternalVibrationStart(const sp<os::ExternalVibration>& exte
 void AudioFlinger::onExternalVibrationStop(const sp<os::ExternalVibration>& externalVibration) {
     sp<os::IExternalVibratorService> evs = getExternalVibratorService();
     if (evs != 0) {
+        ALOGD("%s, stopping external vibration", __func__);
         evs->onExternalVibrationStop(*externalVibration);
     }
 }
@@ -765,6 +766,11 @@ void AudioFlinger::dumpInternals(int fd, const Vector<String16>& args __unused)
                             (uint32_t)(mStandbyTimeInNsecs / 1000000));
     result.append(buffer);
     write(fd, result.string(), result.size());
+
+    dprintf(fd, "Vibrator infos(size=%zu):\n", mAudioVibratorInfos.size());
+    for (const auto& vibratorInfo : mAudioVibratorInfos) {
+        dprintf(fd, "  - %s\n", vibratorInfo.toString().c_str());
+    }
 }
 
 void AudioFlinger::dumpPermissionDenial(int fd, const Vector<String16>& args __unused)
