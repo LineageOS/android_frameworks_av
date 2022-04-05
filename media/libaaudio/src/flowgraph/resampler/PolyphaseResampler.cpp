@@ -19,7 +19,7 @@
 #include "IntegerRatio.h"
 #include "PolyphaseResampler.h"
 
-using namespace resampler;
+using namespace RESAMPLER_OUTER_NAMESPACE::resampler;
 
 PolyphaseResampler::PolyphaseResampler(const MultiChannelResampler::Builder &builder)
         : MultiChannelResampler(builder)
@@ -42,7 +42,7 @@ void PolyphaseResampler::readFrame(float *frame) {
 
     // Multiply input times windowed sinc function.
     float *coefficients = &mCoefficients[mCoefficientCursor];
-    float *xFrame = &mX[mCursor * getChannelCount()];
+    float *xFrame = &mX[static_cast<size_t>(mCursor) * static_cast<size_t>(getChannelCount())];
     for (int i = 0; i < mNumTaps; i++) {
         float coefficient = *coefficients++;
         for (int channel = 0; channel < getChannelCount(); channel++) {

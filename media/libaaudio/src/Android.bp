@@ -93,7 +93,6 @@ cc_library {
         "-Wno-unused-parameter",
         "-Wall",
         "-Werror",
-
         // By default, all symbols are hidden.
         // "-fvisibility=hidden",
         // AAUDIO_API is used to explicitly export a function or a variable as a visible symbol.
