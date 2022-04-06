@@ -82,7 +82,8 @@ public:
                                 /** default behaviour is to start when there are as many frames
                                   * ready as possible (aka. Buffer is full). */
                                 size_t frameCountToBeReady = SIZE_MAX,
-                                float speed = 1.0f);
+                                float speed = 1.0f,
+                                bool isSpatialized = false);
     virtual             ~Track();
     virtual status_t    initCheck() const;
 
@@ -201,6 +202,7 @@ public:
 
     audio_output_flags_t getOutputFlags() const { return mFlags; }
     float getSpeed() const { return mSpeed; }
+    bool isSpatialized() const override { return mIsSpatialized; }
 
 protected:
     // for numerous
@@ -351,6 +353,7 @@ private:
     audio_output_flags_t mFlags;
     TeePatches  mTeePatches;
     const float         mSpeed;
+    const bool          mIsSpatialized;
 };  // end of Track
 
 

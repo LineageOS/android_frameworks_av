@@ -971,12 +971,14 @@ private:
                 AudioPlaybackClient(const audio_attributes_t attributes,
                       const audio_io_handle_t io, AttributionSourceState attributionSource,
                             const audio_session_t session, audio_port_handle_t portId,
-                            audio_port_handle_t deviceId, audio_stream_type_t stream) :
+                            audio_port_handle_t deviceId, audio_stream_type_t stream,
+                            bool isSpatialized) :
                     AudioClient(attributes, io, attributionSource, session, portId,
-                        deviceId), stream(stream) {}
+                        deviceId), stream(stream), isSpatialized(isSpatialized)  {}
                 ~AudioPlaybackClient() override = default;
 
         const audio_stream_type_t stream;
+        const bool isSpatialized;
     };
 
     void getPlaybackClientAndEffects(audio_port_handle_t portId,

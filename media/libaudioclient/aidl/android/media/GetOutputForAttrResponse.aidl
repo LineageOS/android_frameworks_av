@@ -31,4 +31,6 @@ parcelable GetOutputForAttrResponse {
     int portId;
     /** Interpreted as audio_io_handle_t[]. */
     int[] secondaryOutputs;
+    /** True if the track is connected to a spatializer mixer and actually spatialized */
+    boolean isSpatialized;
 }
