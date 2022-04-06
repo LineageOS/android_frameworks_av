@@ -13,11 +13,13 @@ LIBMEDIANDK {
     AImageReader_getWindow; # introduced=24
     AImageReader_new; # introduced=24
     AImageReader_newWithUsage; # introduced=26
+    AImageReader_newWithDataSpace; # introduced=Tiramisu
     AImageReader_setBufferRemovedListener; # introduced=26
     AImageReader_setImageListener; # introduced=24
     AImage_delete; # introduced=24
     AImage_deleteAsync; # introduced=26
     AImage_getCropRect; # introduced=24
+    AImage_getDataSpace; # introduced=Tiramisu
     AImage_getFormat; # introduced=24
     AImage_getHardwareBuffer; # introduced=26
     AImage_getHeight; # introduced=24
