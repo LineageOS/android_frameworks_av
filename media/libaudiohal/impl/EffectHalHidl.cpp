@@ -21,6 +21,7 @@
 #include <cutils/native_handle.h>
 #include <hwbinder/IPCThreadState.h>
 #include <media/EffectsFactoryApi.h>
+#include <mediautils/TimeCheck.h>
 #include <utils/Log.h>
 
 #include <util/EffectUtils.h>
@@ -40,8 +41,11 @@ namespace effect {
 using namespace ::android::hardware::audio::common::CPP_VERSION;
 using namespace ::android::hardware::audio::effect::CPP_VERSION;
 
+#define TIME_CHECK() auto timeCheck = \
+        mediautils::makeTimeCheckStatsForClassMethod(getClassName(), __func__)
+
 EffectHalHidl::EffectHalHidl(const sp<IEffect>& effect, uint64_t effectId)
-        : EffectConversionHelperHidl("Effect"),
+        : EffectConversionHelperHidl("EffectHalHidl"),
           mEffect(effect), mEffectId(effectId), mBuffersChanged(true), mEfGroup(nullptr) {
     effect_descriptor_t halDescriptor{};
     if (EffectHalHidl::getDescriptor(&halDescriptor) == NO_ERROR) {
@@ -61,6 +65,8 @@ EffectHalHidl::~EffectHalHidl() {
 }
 
 status_t EffectHalHidl::setInBuffer(const sp<EffectBufferHalInterface>& buffer) {
+    TIME_CHECK();
+
     if (!mBuffersChanged) {
         if (buffer.get() == nullptr || mInBuffer.get() == nullptr) {
             mBuffersChanged = buffer.get() != mInBuffer.get();
@@ -73,6 +79,8 @@ status_t EffectHalHidl::setInBuffer(const sp<EffectBufferHalInterface>& buffer) 
 }
 
 status_t EffectHalHidl::setOutBuffer(const sp<EffectBufferHalInterface>& buffer) {
+    TIME_CHECK();
+
     if (!mBuffersChanged) {
         if (buffer.get() == nullptr || mOutBuffer.get() == nullptr) {
             mBuffersChanged = buffer.get() != mOutBuffer.get();
@@ -85,10 +93,14 @@ status_t EffectHalHidl::setOutBuffer(const sp<EffectBufferHalInterface>& buffer)
 }
 
 status_t EffectHalHidl::process() {
+    TIME_CHECK();
+
     return processImpl(static_cast<uint32_t>(MessageQueueFlagBits::REQUEST_PROCESS));
 }
 
 status_t EffectHalHidl::processReverse() {
+    TIME_CHECK();
+
     return processImpl(static_cast<uint32_t>(MessageQueueFlagBits::REQUEST_PROCESS_REVERSE));
 }
 
@@ -171,6 +183,8 @@ status_t EffectHalHidl::setProcessBuffers() {
 
 status_t EffectHalHidl::command(uint32_t cmdCode, uint32_t cmdSize, void *pCmdData,
         uint32_t *replySize, void *pReplyData) {
+    TIME_CHECK();
+
     if (mEffect == 0) return NO_INIT;
 
     // Special cases.
@@ -202,6 +216,8 @@ status_t EffectHalHidl::command(uint32_t cmdCode, uint32_t cmdSize, void *pCmdDa
 }
 
 status_t EffectHalHidl::getDescriptor(effect_descriptor_t *pDescriptor) {
+    TIME_CHECK();
+
     if (mEffect == 0) return NO_INIT;
     Result retval = Result::NOT_INITIALIZED;
     Return<void> ret = mEffect->getDescriptor(
@@ -215,12 +231,16 @@ status_t EffectHalHidl::getDescriptor(effect_descriptor_t *pDescriptor) {
 }
 
 status_t EffectHalHidl::close() {
+    TIME_CHECK();
+
     if (mEffect == 0) return NO_INIT;
     Return<Result> ret = mEffect->close();
     return ret.isOk() ? analyzeResult(ret) : FAILED_TRANSACTION;
 }
 
 status_t EffectHalHidl::dump(int fd) {
+    TIME_CHECK();
+
     if (mEffect == 0) return NO_INIT;
     native_handle_t* hidlHandle = native_handle_create(1, 0);
     hidlHandle->data[0] = fd;
