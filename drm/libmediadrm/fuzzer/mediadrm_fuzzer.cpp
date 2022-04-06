@@ -20,6 +20,7 @@
 
 #include <binder/MemoryDealer.h>
 #include <hidlmemory/FrameworkUtils.h>
+#include <media/stagefright/foundation/AString.h>
 #include <mediadrm/CryptoHal.h>
 #include <mediadrm/DrmHal.h>
 #include <utils/String8.h>
@@ -401,7 +402,7 @@ void DrmFuzzer::invokeCryptoDecrypt(const uint8_t *data) {
         .secureMemory = nullptr};
 
     const uint64_t offset = 0;
-    AString *errorDetailMsg = nullptr;
+    AString errorDetailMsg;
     CryptoPlugin::Mode mode;
     bool shouldPassRandomCryptoMode = mFuzzedDataProvider->ConsumeBool();
     if (shouldPassRandomCryptoMode) {
@@ -411,7 +412,7 @@ void DrmFuzzer::invokeCryptoDecrypt(const uint8_t *data) {
             kCryptoMode[mFuzzedDataProvider->ConsumeIntegralInRange<size_t>(0, kNumCryptoMode - 1)];
     }
     mCrypto->decrypt(keyId, iv, mode, pattern, sourceBuffer, offset, subSamples, numSubSamples,
-                     destBuffer, errorDetailMsg);
+                     destBuffer, &errorDetailMsg);
 
     if (heapSeqNum >= 0) {
         mCrypto->unsetHeap(heapSeqNum);

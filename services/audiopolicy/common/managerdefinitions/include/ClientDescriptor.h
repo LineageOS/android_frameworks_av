@@ -157,6 +157,14 @@ public:
     }
     uint32_t getActivityCount() const { return mActivityCount; }
 
+    bool isInvalid() const {
+        return mIsInvalid;
+    }
+
+    void setIsInvalid() {
+        mIsInvalid = true;
+    }
+
 private:
     const audio_stream_type_t mStream;
     const product_strategy_t mStrategy;
@@ -169,6 +177,7 @@ private:
      * involved in a duplication.
      */
     uint32_t mActivityCount = 0;
+    bool mIsInvalid = false;
 };
 
 class RecordClientDescriptor: public ClientDescriptor

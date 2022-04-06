@@ -28,8 +28,11 @@ cc_library {
         "AImageReaderUtils.cpp",
         "BatteryNotifier.cpp",
         "ISchedulingPolicyService.cpp",
+        "Library.cpp",
         "LimitProcessMemory.cpp",
+        "MediaUtilsDelayed.cpp",
         "MemoryLeakTrackUtil.cpp",
+        "MethodStatistics.cpp",
         "ProcessInfo.cpp",
         "SchedulingPolicyService.cpp",
         "ServiceUtilities.cpp",
@@ -43,7 +46,7 @@ cc_library {
     ],
     shared_libs: [
         "libaudioclient_aidl_conversion",
-        "libaudioutils", // for clock.h
+        "libaudioutils", // for clock.h, Statistics.h
         "libbinder",
         "libcutils",
         "liblog",
@@ -75,12 +78,33 @@ cc_library {
         "libpermission",
     ],
 
+    required: [
+        "libmediautils_delayed",  // lazy loaded
+    ],
+
     include_dirs: [
         // For DEBUGGER_SIGNAL
         "system/core/debuggerd/include",
     ],
     local_include_dirs: ["include"],
     export_include_dirs: ["include"],
+}
+
+cc_library {
+    name: "libmediautils_delayed", // match with MEDIAUTILS_DELAYED_LIBRARY_NAME
+    srcs: [
+        "MediaUtilsDelayedLibrary.cpp",
+    ],
+    cflags: [
+        "-Wall",
+        "-Werror",
+        "-Wextra",
+    ],
+    shared_libs: [
+        "liblog",
+        "libutils",
+        "libutilscallstack",
+    ],
 }
 
 cc_library {

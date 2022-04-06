@@ -52,6 +52,12 @@ status_t CameraStreamStats::readFromParcel(const android::Parcel* parcel) {
         return err;
     }
 
+    float maxPreviewFps = 0;
+    if ((err = parcel->readFloat(&maxPreviewFps)) != OK) {
+        ALOGE("%s: Failed to read maxPreviewFps from parcel", __FUNCTION__);
+        return err;
+    }
+
     int dataSpace = 0;
     if ((err = parcel->readInt32(&dataSpace)) != OK) {
         ALOGE("%s: Failed to read dataSpace from parcel", __FUNCTION__);
@@ -112,14 +118,14 @@ status_t CameraStreamStats::readFromParcel(const android::Parcel* parcel) {
         return err;
     }
 
-    int dynamicRangeProfile = ANDROID_REQUEST_AVAILABLE_DYNAMIC_RANGE_PROFILES_MAP_STANDARD;
-    if ((err = parcel->readInt32(&dynamicRangeProfile)) != OK) {
+    int64_t dynamicRangeProfile = ANDROID_REQUEST_AVAILABLE_DYNAMIC_RANGE_PROFILES_MAP_STANDARD;
+    if ((err = parcel->readInt64(&dynamicRangeProfile)) != OK) {
         ALOGE("%s: Failed to read dynamic range profile type from parcel", __FUNCTION__);
         return err;
     }
 
-    int streamUseCase = ANDROID_SCALER_AVAILABLE_STREAM_USE_CASES_DEFAULT;
-    if ((err = parcel->readInt32(&streamUseCase)) != OK) {
+    int64_t streamUseCase = ANDROID_SCALER_AVAILABLE_STREAM_USE_CASES_DEFAULT;
+    if ((err = parcel->readInt64(&streamUseCase)) != OK) {
         ALOGE("%s: Failed to read stream use case from parcel", __FUNCTION__);
         return err;
     }
@@ -127,6 +133,7 @@ status_t CameraStreamStats::readFromParcel(const android::Parcel* parcel) {
     mWidth = width;
     mHeight = height;
     mFormat = format;
+    mMaxPreviewFps = maxPreviewFps;
     mDataSpace = dataSpace;
     mUsage = usage;
     mRequestCount = requestCount;
@@ -163,6 +170,11 @@ status_t CameraStreamStats::writeToParcel(android::Parcel* parcel) const {
 
     if ((err = parcel->writeInt32(mFormat)) != OK) {
         ALOGE("%s: Failed to write stream format!", __FUNCTION__);
+        return err;
+    }
+
+    if ((err = parcel->writeFloat(mMaxPreviewFps)) != OK) {
+        ALOGE("%s: Failed to write stream maxPreviewFps!", __FUNCTION__);
         return err;
     }
 
@@ -216,12 +228,12 @@ status_t CameraStreamStats::writeToParcel(android::Parcel* parcel) const {
         return err;
     }
 
-    if ((err = parcel->writeInt32(mDynamicRangeProfile)) != OK) {
+    if ((err = parcel->writeInt64(mDynamicRangeProfile)) != OK) {
         ALOGE("%s: Failed to write dynamic range profile type", __FUNCTION__);
         return err;
     }
 
-    if ((err = parcel->writeInt32(mStreamUseCase)) != OK) {
+    if ((err = parcel->writeInt64(mStreamUseCase)) != OK) {
         ALOGE("%s: Failed to write stream use case!", __FUNCTION__);
         return err;
     }
@@ -247,6 +259,7 @@ CameraSessionStats::CameraSessionStats() :
         mApiLevel(0),
         mIsNdk(false),
         mLatencyMs(-1),
+        mMaxPreviewFps(0),
         mSessionType(0),
         mInternalReconfigure(0),
         mRequestCount(0),
@@ -263,6 +276,7 @@ CameraSessionStats::CameraSessionStats(const String16& cameraId,
                 mApiLevel(apiLevel),
                 mIsNdk(isNdk),
                 mLatencyMs(latencyMs),
+                mMaxPreviewFps(0),
                 mSessionType(0),
                 mInternalReconfigure(0),
                 mRequestCount(0),
@@ -319,6 +333,12 @@ status_t CameraSessionStats::readFromParcel(const android::Parcel* parcel) {
         return err;
     }
 
+    float maxPreviewFps;
+    if ((err = parcel->readFloat(&maxPreviewFps)) != OK) {
+        ALOGE("%s: Failed to read maxPreviewFps from parcel", __FUNCTION__);
+        return err;
+    }
+
     int32_t sessionType;
     if ((err = parcel->readInt32(&sessionType)) != OK) {
         ALOGE("%s: Failed to read session type from parcel", __FUNCTION__);
@@ -362,6 +382,7 @@ status_t CameraSessionStats::readFromParcel(const android::Parcel* parcel) {
     mApiLevel = apiLevel;
     mIsNdk = isNdk;
     mLatencyMs = latencyMs;
+    mMaxPreviewFps = maxPreviewFps;
     mSessionType = sessionType;
     mInternalReconfigure = internalReconfigure;
     mRequestCount = requestCount;
@@ -412,6 +433,11 @@ status_t CameraSessionStats::writeToParcel(android::Parcel* parcel) const {
 
     if ((err = parcel->writeInt32(mLatencyMs)) != OK) {
         ALOGE("%s: Failed to write latency in Ms!", __FUNCTION__);
+        return err;
+    }
+
+    if ((err = parcel->writeFloat(mMaxPreviewFps)) != OK) {
+        ALOGE("%s: Failed to write maxPreviewFps!", __FUNCTION__);
         return err;
     }
 

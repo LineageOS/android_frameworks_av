@@ -122,7 +122,8 @@ public:
                                   audio_port_handle_t *selectedDeviceId,
                                   audio_port_handle_t *portId,
                                   std::vector<audio_io_handle_t> *secondaryOutputs,
-                                  output_type_t *outputType) override;
+                                  output_type_t *outputType,
+                                  bool *isSpatialized) override;
         virtual status_t startOutput(audio_port_handle_t portId);
         virtual status_t stopOutput(audio_port_handle_t portId);
         virtual bool releaseOutput(audio_port_handle_t portId);
@@ -768,6 +769,15 @@ protected:
                                           audio_channel_mask_t channelMask,
                                           audio_output_flags_t flags,
                                           bool directOnly);
+        /**
+        * Same as getProfileForOutput, but it looks for an MSD profile
+        */
+        sp<IOProfile> getMsdProfileForOutput(const DeviceVector &devices,
+                                           uint32_t samplingRate,
+                                           audio_format_t format,
+                                           audio_channel_mask_t channelMask,
+                                           audio_output_flags_t flags,
+                                           bool directOnly);
 
         audio_io_handle_t selectOutputForMusicEffects();
 
@@ -1032,7 +1042,8 @@ private:
                 audio_port_handle_t *selectedDeviceId,
                 bool *isRequestedDeviceForExclusiveUse,
                 std::vector<sp<AudioPolicyMix>> *secondaryMixes,
-                output_type_t *outputType);
+                output_type_t *outputType,
+                bool *isSpatialized);
         // internal method to return the output handle for the given device and format
         audio_io_handle_t getOutputForDevices(
                 const DeviceVector &devices,
@@ -1040,6 +1051,7 @@ private:
                 const audio_attributes_t *attr,
                 const audio_config_t *config,
                 audio_output_flags_t *flags,
+                bool *isSpatialized,
                 bool forceMutingHaptic = false);
 
         // Internal method checking if a direct output can be opened matching the requested
@@ -1201,6 +1213,21 @@ private:
         // without duplicating them if already present
         void addPortProfilesToVector(sp<IOProfile> outputProfile,
                                     AudioProfileVector& audioProfilesVector);
+
+        // Searches for a compatible profile with the sample rate, audio format and channel mask
+        // in the list of passed HwModule(s).
+        // returns a compatible profile if found, nullptr otherwise
+        sp<IOProfile> searchCompatibleProfileHwModules (
+                                            const HwModuleCollection& hwModules,
+                                            const DeviceVector& devices,
+                                            uint32_t samplingRate,
+                                            audio_format_t format,
+                                            audio_channel_mask_t channelMask,
+                                            audio_output_flags_t flags,
+                                            bool directOnly);
+
+        // Filters only the relevant flags for getProfileForOutput
+        audio_output_flags_t getRelevantFlags (audio_output_flags_t flags, bool directOnly);
 };
 
 };

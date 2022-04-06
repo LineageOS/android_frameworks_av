@@ -261,7 +261,7 @@ c2_status_t Gralloc4Mapper_lock(native_handle_t *handle, uint64_t usage, const R
     for (const ui::PlaneLayout &plane : planes) {
         layout->rootPlanes++;
         uint32_t lastOffsetInBits = 0;
-        uint32_t rootIx = 0;
+        uint32_t rootIx = layout->numPlanes;
 
         for (const PlaneLayoutComponent &component : plane.components) {
             if (!gralloc4::isStandardPlaneLayoutComponentType(component.type)) {
@@ -309,7 +309,6 @@ c2_status_t Gralloc4Mapper_lock(native_handle_t *handle, uint64_t usage, const R
 
             layout->numPlanes++;
             lastOffsetInBits = component.offsetInBits + component.sizeInBits;
-            rootIx++;
         }
     }
     return C2_OK;
@@ -699,17 +698,6 @@ c2_status_t C2AllocationGralloc::map(
                 C2PlanarLayout::PLANE_V,          // rootIx
                 0,                                // offset
             };
-            // handle interleaved formats
-            intptr_t uvOffset = addr[C2PlanarLayout::PLANE_V] - addr[C2PlanarLayout::PLANE_U];
-            if (uvOffset > 0 && uvOffset < (intptr_t)ycbcrLayout.chroma_step) {
-                layout->rootPlanes = 2;
-                layout->planes[C2PlanarLayout::PLANE_V].rootIx = C2PlanarLayout::PLANE_U;
-                layout->planes[C2PlanarLayout::PLANE_V].offset = uvOffset;
-            } else if (uvOffset < 0 && uvOffset > -(intptr_t)ycbcrLayout.chroma_step) {
-                layout->rootPlanes = 2;
-                layout->planes[C2PlanarLayout::PLANE_U].rootIx = C2PlanarLayout::PLANE_V;
-                layout->planes[C2PlanarLayout::PLANE_U].offset = -uvOffset;
-            }
             break;
         }
 
@@ -830,17 +818,6 @@ c2_status_t C2AllocationGralloc::map(
                     C2PlanarLayout::PLANE_V,          // rootIx
                     0,                                // offset
                 };
-                // handle interleaved formats
-                intptr_t uvOffset = addr[C2PlanarLayout::PLANE_V] - addr[C2PlanarLayout::PLANE_U];
-                if (uvOffset > 0 && uvOffset < (intptr_t)ycbcrLayout.chroma_step) {
-                    layout->rootPlanes = 2;
-                    layout->planes[C2PlanarLayout::PLANE_V].rootIx = C2PlanarLayout::PLANE_U;
-                    layout->planes[C2PlanarLayout::PLANE_V].offset = uvOffset;
-                } else if (uvOffset < 0 && uvOffset > -(intptr_t)ycbcrLayout.chroma_step) {
-                    layout->rootPlanes = 2;
-                    layout->planes[C2PlanarLayout::PLANE_U].rootIx = C2PlanarLayout::PLANE_V;
-                    layout->planes[C2PlanarLayout::PLANE_U].offset = -uvOffset;
-                }
                 break;
             }
 
@@ -885,6 +862,29 @@ c2_status_t C2AllocationGralloc::map(
         }
     }
     mLocked = true;
+
+    // handle interleaved formats
+    if (layout->type == C2PlanarLayout::TYPE_YUV && layout->rootPlanes == 3) {
+        intptr_t uvOffset = addr[C2PlanarLayout::PLANE_V] - addr[C2PlanarLayout::PLANE_U];
+        intptr_t uvColInc = layout->planes[C2PlanarLayout::PLANE_U].colInc;
+        if (uvOffset > 0 && uvOffset < uvColInc) {
+            layout->rootPlanes = 2;
+            layout->planes[C2PlanarLayout::PLANE_V].rootIx = C2PlanarLayout::PLANE_U;
+            layout->planes[C2PlanarLayout::PLANE_V].offset = uvOffset;
+        } else if (uvOffset < 0 && uvOffset > -uvColInc) {
+            layout->rootPlanes = 2;
+            layout->planes[C2PlanarLayout::PLANE_U].rootIx = C2PlanarLayout::PLANE_V;
+            layout->planes[C2PlanarLayout::PLANE_U].offset = -uvOffset;
+        }
+    }
+
+    ALOGV("C2AllocationGralloc::map: layout: type=%d numPlanes=%d rootPlanes=%d",
+          layout->type, layout->numPlanes, layout->rootPlanes);
+    for (int i = 0; i < layout->numPlanes; ++i) {
+        const C2PlaneInfo &plane = layout->planes[i];
+        ALOGV("C2AllocationGralloc::map: plane[%d]: colInc=%d rowInc=%d rootIx=%u offset=%u",
+              i, plane.colInc, plane.rowInc, plane.rootIx, plane.offset);
+    }
 
     return C2_OK;
 }

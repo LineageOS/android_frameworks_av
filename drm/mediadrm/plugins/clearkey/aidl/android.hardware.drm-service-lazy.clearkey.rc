@@ -1,4 +1,5 @@
-service vendor.drm-clearkey-service /vendor/bin/hw/android.hardware.drm-service.clearkey
+service vendor.drm-clearkey-service /vendor/bin/hw/android.hardware.drm-service-lazy.clearkey
+    oneshot
     disabled
     class hal
     user media
@@ -6,4 +7,3 @@ service vendor.drm-clearkey-service /vendor/bin/hw/android.hardware.drm-service.
     ioprio rt 4
     task_profiles ProcessCapacityHigh
     interface aidl android.hardware.drm.IDrmFactory/clearkey
-    interface aidl android.hardware.drm.ICryptoFactory/clearkey

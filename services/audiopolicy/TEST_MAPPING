@@ -11,6 +11,14 @@
           "include-filter": "com.google.android.gts.audio.AudioHostTest#testTwoChannelCapturing"
         }
       ]
+    },
+    {
+      "name": "CtsNativeMediaAAudioTestCases",
+      "options" : [
+        {
+          "include-filter": "android.nativemedia.aaudio.AAudioTests#AAudioBasic.*"
+        }
+      ]
     }
   ]
 }

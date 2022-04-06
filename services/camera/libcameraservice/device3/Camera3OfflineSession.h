@@ -246,6 +246,9 @@ class Camera3OfflineSession :
     // For client methods such as disconnect/dump
     std::mutex mInterfaceLock;
 
+    // The current minimum expected frame duration based on AE_TARGET_FPS_RANGE
+    nsecs_t mMinExpectedDuration = 0;
+
     // SetErrorInterface
     void setErrorState(const char *fmt, ...) override;
     void setErrorStateLocked(const char *fmt, ...) override;

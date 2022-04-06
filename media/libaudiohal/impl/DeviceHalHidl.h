@@ -22,11 +22,11 @@
 #include <media/audiohal/DeviceHalInterface.h>
 #include <media/audiohal/EffectHalInterface.h>
 
-#include "ConversionHelperHidl.h"
+#include "CoreConversionHelperHidl.h"
 
 namespace android {
 
-class DeviceHalHidl : public DeviceHalInterface, public ConversionHelperHidl
+class DeviceHalHidl : public DeviceHalInterface, public CoreConversionHelperHidl
 {
   public:
     // Sets the value of 'devices' to a bitmask of 1 or more values of audio_devices_t.

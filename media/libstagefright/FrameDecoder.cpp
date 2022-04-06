@@ -50,7 +50,7 @@ static const int64_t kDefaultSampleDurationUs = 33333LL; // 33ms
 
 sp<IMemory> allocVideoFrame(const sp<MetaData>& trackMeta,
         int32_t width, int32_t height, int32_t tileWidth, int32_t tileHeight,
-        int32_t dstBpp, bool allocRotated, bool metaOnly) {
+        int32_t dstBpp, uint32_t bitDepth, bool allocRotated, bool metaOnly) {
     int32_t rotationAngle;
     if (!trackMeta->findInt32(kKeyRotation, &rotationAngle)) {
         rotationAngle = 0;  // By default, no rotation
@@ -105,7 +105,7 @@ sp<IMemory> allocVideoFrame(const sp<MetaData>& trackMeta,
     }
 
     VideoFrame frame(width, height, displayWidth, displayHeight,
-            tileWidth, tileHeight, rotationAngle, dstBpp, !metaOnly, iccSize);
+            tileWidth, tileHeight, rotationAngle, dstBpp, bitDepth, !metaOnly, iccSize);
 
     size_t size = frame.getFlattenedSize();
     sp<MemoryHeapBase> heap = new MemoryHeapBase(size, 0, "MetadataRetrieverClient");
@@ -126,15 +126,15 @@ sp<IMemory> allocVideoFrame(const sp<MetaData>& trackMeta,
 
 sp<IMemory> allocVideoFrame(const sp<MetaData>& trackMeta,
         int32_t width, int32_t height, int32_t tileWidth, int32_t tileHeight,
-        int32_t dstBpp, bool allocRotated = false) {
-    return allocVideoFrame(trackMeta, width, height, tileWidth, tileHeight, dstBpp,
+        int32_t dstBpp, uint8_t bitDepth, bool allocRotated = false) {
+    return allocVideoFrame(trackMeta, width, height, tileWidth, tileHeight, dstBpp, bitDepth,
             allocRotated, false /*metaOnly*/);
 }
 
 sp<IMemory> allocMetaFrame(const sp<MetaData>& trackMeta,
         int32_t width, int32_t height, int32_t tileWidth, int32_t tileHeight,
-        int32_t dstBpp) {
-    return allocVideoFrame(trackMeta, width, height, tileWidth, tileHeight, dstBpp,
+        int32_t dstBpp, uint8_t bitDepth) {
+    return allocVideoFrame(trackMeta, width, height, tileWidth, tileHeight, dstBpp, bitDepth,
             false /*allocRotated*/, true /*metaOnly*/);
 }
 
@@ -211,7 +211,7 @@ bool getDstColorFormat(
 
 //static
 sp<IMemory> FrameDecoder::getMetadataOnly(
-        const sp<MetaData> &trackMeta, int colorFormat, bool thumbnail) {
+        const sp<MetaData> &trackMeta, int colorFormat, bool thumbnail, uint32_t bitDepth) {
     OMX_COLOR_FORMATTYPE dstFormat;
     ui::PixelFormat captureFormat;
     int32_t dstBpp;
@@ -235,7 +235,8 @@ sp<IMemory> FrameDecoder::getMetadataOnly(
         }
     }
 
-    sp<IMemory> metaMem = allocMetaFrame(trackMeta, width, height, tileWidth, tileHeight, dstBpp);
+    sp<IMemory> metaMem =
+            allocMetaFrame(trackMeta, width, height, tileWidth, tileHeight, dstBpp, bitDepth);
 
     // try to fill sequence meta's duration based on average frame rate,
     // default to 33ms if frame rate is unavailable.
@@ -534,7 +535,6 @@ sp<AMessage> VideoFrameDecoder::onGetFormatAndSeekOptions(
     if (dstFormat() == COLOR_Format32bitABGR2101010) {
         videoFormat->setInt32("color-format", COLOR_FormatYUVP010);
     } else {
-        // TODO: Use Flexible color instead
         videoFormat->setInt32("color-format", OMX_COLOR_FormatYUV420Planar);
     }
 
@@ -649,6 +649,11 @@ status_t VideoFrameDecoder::onOutputReceived(
         height = slice_height;
     }
 
+    uint32_t bitDepth = 8;
+    if (COLOR_FormatYUVP010 == srcFormat) {
+        bitDepth = 10;
+    }
+
     if (mFrame == NULL) {
         sp<IMemory> frameMem = allocVideoFrame(
                 trackMeta(),
@@ -657,6 +662,7 @@ status_t VideoFrameDecoder::onOutputReceived(
                 0,
                 0,
                 dstBpp(),
+                bitDepth,
                 mCaptureLayer != nullptr /*allocRotated*/);
         if (frameMem == nullptr) {
             return NO_MEMORY;
@@ -851,7 +857,6 @@ sp<AMessage> MediaImageDecoder::onGetFormatAndSeekOptions(
     if (dstFormat() == COLOR_Format32bitABGR2101010) {
         videoFormat->setInt32("color-format", COLOR_FormatYUVP010);
     } else {
-        // TODO: Use Flexible color instead
         videoFormat->setInt32("color-format", OMX_COLOR_FormatYUV420Planar);
     }
 
@@ -908,7 +913,7 @@ status_t MediaImageDecoder::onOutputReceived(
         return ERROR_MALFORMED;
     }
 
-    int32_t width, height, stride;
+    int32_t width, height, stride, srcFormat;
     if (outputFormat->findInt32("width", &width) == false) {
         ALOGE("MediaImageDecoder::onOutputReceived:width is missing in outputFormat");
         return ERROR_MALFORMED;
@@ -921,10 +926,19 @@ status_t MediaImageDecoder::onOutputReceived(
         ALOGE("MediaImageDecoder::onOutputReceived:stride is missing in outputFormat");
         return ERROR_MALFORMED;
     }
+    if (outputFormat->findInt32("color-format", &srcFormat) == false) {
+        ALOGE("MediaImageDecoder::onOutputReceived: color format is missing in outputFormat");
+        return ERROR_MALFORMED;
+    }
+
+    uint32_t bitDepth = 8;
+    if (COLOR_FormatYUVP010 == srcFormat) {
+        bitDepth = 10;
+    }
 
     if (mFrame == NULL) {
         sp<IMemory> frameMem = allocVideoFrame(
-                trackMeta(), mWidth, mHeight, mTileWidth, mTileHeight, dstBpp());
+                trackMeta(), mWidth, mHeight, mTileWidth, mTileHeight, dstBpp(), bitDepth);
 
         if (frameMem == nullptr) {
             return NO_MEMORY;
@@ -934,9 +948,6 @@ status_t MediaImageDecoder::onOutputReceived(
 
         setFrame(frameMem);
     }
-
-    int32_t srcFormat;
-    CHECK(outputFormat->findInt32("color-format", &srcFormat));
 
     ColorConverter converter((OMX_COLOR_FORMATTYPE)srcFormat, dstFormat());
 

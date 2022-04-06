@@ -1,7 +1,15 @@
 {
   "presubmit": [
     {
-       "name": "audiofoundation_parcelable_test"
+      "name": "audiofoundation_parcelable_test"
+    },
+    {
+      "name": "CtsNativeMediaAAudioTestCases",
+      "options" : [
+        {
+          "include-filter": "android.nativemedia.aaudio.AAudioTests#AAudioBasic.*"
+        }
+      ]
     }
   ]
 }

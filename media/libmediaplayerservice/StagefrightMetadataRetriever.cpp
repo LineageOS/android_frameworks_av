@@ -28,6 +28,7 @@
 #include <datasource/PlayerServiceDataSourceFactory.h>
 #include <datasource/PlayerServiceFileSource.h>
 #include <media/IMediaHTTPService.h>
+#include <media/stagefright/MediaCodecConstants.h>
 #include <media/stagefright/foundation/ADebug.h>
 #include <media/stagefright/foundation/AMessage.h>
 #include <media/stagefright/MediaCodecList.h>
@@ -194,17 +195,6 @@ sp<IMemory> StagefrightMetadataRetriever::getImageInternal(
         return NULL;
     }
 
-    if (metaOnly) {
-        return FrameDecoder::getMetadataOnly(trackMeta, colorFormat, thumbnail);
-    }
-
-    sp<IMediaSource> source = mExtractor->getTrack(i);
-
-    if (source.get() == NULL) {
-        ALOGE("unable to instantiate image track.");
-        return NULL;
-    }
-
     const char *mime;
     bool isHeif = false;
     if (!trackMeta->findCString(kKeyMIMEType, &mime)) {
@@ -223,15 +213,46 @@ sp<IMemory> StagefrightMetadataRetriever::getImageInternal(
         trackMeta->setCString(kKeyMIMEType, mime);
     }
 
-    bool preferhw = property_get_bool(
-            "media.stagefright.thumbnail.prefer_hw_codecs", false);
-    uint32_t flags = preferhw ? 0 : MediaCodecList::kPreferSoftwareCodecs;
-    Vector<AString> matchingCodecs;
     sp<AMessage> format = new AMessage;
     status_t err = convertMetaDataToMessage(trackMeta, &format);
     if (err != OK) {
         format = NULL;
     }
+
+    uint32_t bitDepth = 8;
+    if (!strcasecmp(mime, MEDIA_MIMETYPE_VIDEO_HEVC)) {
+        int32_t profile;
+        if (format->findInt32("profile", &profile)) {
+            if (HEVCProfileMain10 == profile || HEVCProfileMain10HDR10 == profile ||
+                    HEVCProfileMain10HDR10Plus == profile) {
+                  bitDepth = 10;
+            }
+        }
+    } else if (!strcasecmp(mime, MEDIA_MIMETYPE_VIDEO_AV1)) {
+        int32_t profile;
+        if (format->findInt32("profile", &profile)) {
+            if (AV1ProfileMain10 == profile || AV1ProfileMain10HDR10 == profile ||
+                    AV1ProfileMain10HDR10Plus == profile) {
+                  bitDepth = 10;
+            }
+        }
+    }
+
+    if (metaOnly) {
+        return FrameDecoder::getMetadataOnly(trackMeta, colorFormat, thumbnail, bitDepth);
+    }
+
+    sp<IMediaSource> source = mExtractor->getTrack(i);
+
+    if (source.get() == NULL) {
+        ALOGE("unable to instantiate image track.");
+        return NULL;
+    }
+
+    bool preferhw = property_get_bool(
+            "media.stagefright.thumbnail.prefer_hw_codecs", false);
+    uint32_t flags = preferhw ? 0 : MediaCodecList::kPreferSoftwareCodecs;
+    Vector<AString> matchingCodecs;
 
     // If decoding thumbnail check decoder supports thumbnail dimensions instead
     int32_t thumbHeight, thumbWidth;

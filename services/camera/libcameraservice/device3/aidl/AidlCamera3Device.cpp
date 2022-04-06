@@ -189,7 +189,6 @@ status_t AidlCamera3Device::initialize(sp<CameraProviderManager> manager,
         return res;
     }
     if (session == nullptr) {
-      ALOGE("JCLog: null session returned");
       SET_ERR("Session iface returned is null");
       return INVALID_OPERATION;
     }
@@ -372,7 +371,7 @@ status_t AidlCamera3Device::initialize(sp<CameraProviderManager> manager,
         mNumPartialResults, mVendorTagId, mDeviceInfo, mPhysicalDeviceInfoMap,
         mDistortionMappers, mZoomRatioMappers, mRotateAndCropMappers,
         mTagMonitor, mInputStream, mOutputStreams, mSessionStatsBuilder, listener, *this,
-        *this, *(mInterface), mLegacyClient}, mResultMetadataQueue
+        *this, *(mInterface), mLegacyClient, mMinExpectedDuration}, mResultMetadataQueue
     };
 
     for (const auto& result : results) {
@@ -413,7 +412,7 @@ status_t AidlCamera3Device::initialize(sp<CameraProviderManager> manager,
         mNumPartialResults, mVendorTagId, mDeviceInfo, mPhysicalDeviceInfoMap,
         mDistortionMappers, mZoomRatioMappers, mRotateAndCropMappers,
         mTagMonitor, mInputStream, mOutputStreams, mSessionStatsBuilder, listener, *this,
-        *this, *(mInterface), mLegacyClient}, mResultMetadataQueue
+        *this, *(mInterface), mLegacyClient, mMinExpectedDuration}, mResultMetadataQueue
     };
     for (const auto& msg : msgs) {
         camera3::notify(states, msg);

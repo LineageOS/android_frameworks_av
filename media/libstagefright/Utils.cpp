@@ -243,6 +243,39 @@ static void parseAvcProfileLevelFromAvcc(const uint8_t *ptr, size_t size, sp<AMe
     }
 }
 
+static const ALookup<uint8_t, int32_t>&  getDolbyVisionProfileTable() {
+    static const ALookup<uint8_t, int32_t> profileTable = {
+        {1, DolbyVisionProfileDvavPen},
+        {3, DolbyVisionProfileDvheDen},
+        {4, DolbyVisionProfileDvheDtr},
+        {5, DolbyVisionProfileDvheStn},
+        {6, DolbyVisionProfileDvheDth},
+        {7, DolbyVisionProfileDvheDtb},
+        {8, DolbyVisionProfileDvheSt},
+        {9, DolbyVisionProfileDvavSe},
+        {10, DolbyVisionProfileDvav110},
+    };
+    return profileTable;
+}
+
+static const ALookup<uint8_t, int32_t>&  getDolbyVisionLevelsTable() {
+    static const ALookup<uint8_t, int32_t> levelsTable = {
+        {0, DolbyVisionLevelUnknown},
+        {1, DolbyVisionLevelHd24},
+        {2, DolbyVisionLevelHd30},
+        {3, DolbyVisionLevelFhd24},
+        {4, DolbyVisionLevelFhd30},
+        {5, DolbyVisionLevelFhd60},
+        {6, DolbyVisionLevelUhd24},
+        {7, DolbyVisionLevelUhd30},
+        {8, DolbyVisionLevelUhd48},
+        {9, DolbyVisionLevelUhd60},
+        {10, DolbyVisionLevelUhd120},
+        {11, DolbyVisionLevel8k30},
+        {12, DolbyVisionLevel8k60},
+    };
+    return levelsTable;
+}
 static void parseDolbyVisionProfileLevelFromDvcc(const uint8_t *ptr, size_t size, sp<AMessage> &format) {
     // dv_major.dv_minor Should be 1.0 or 2.1
     if (size != 24 || ((ptr[0] != 1 || ptr[1] != 0) && (ptr[0] != 2 || ptr[1] != 1))) {
@@ -262,33 +295,9 @@ static void parseDolbyVisionProfileLevelFromDvcc(const uint8_t *ptr, size_t size
 
     // All Dolby Profiles will have profile and level info in MediaFormat
     // Profile 8 and 9 will have bl_compatibility_id too.
-    const static ALookup<uint8_t, int32_t> profiles{
-        {1, DolbyVisionProfileDvavPen},
-        {3, DolbyVisionProfileDvheDen},
-        {4, DolbyVisionProfileDvheDtr},
-        {5, DolbyVisionProfileDvheStn},
-        {6, DolbyVisionProfileDvheDth},
-        {7, DolbyVisionProfileDvheDtb},
-        {8, DolbyVisionProfileDvheSt},
-        {9, DolbyVisionProfileDvavSe},
-        {10, DolbyVisionProfileDvav110},
-    };
+    const ALookup<uint8_t, int32_t> &profiles = getDolbyVisionProfileTable();
+    const ALookup<uint8_t, int32_t> &levels = getDolbyVisionLevelsTable();
 
-    const static ALookup<uint8_t, int32_t> levels{
-        {0, DolbyVisionLevelUnknown},
-        {1, DolbyVisionLevelHd24},
-        {2, DolbyVisionLevelHd30},
-        {3, DolbyVisionLevelFhd24},
-        {4, DolbyVisionLevelFhd30},
-        {5, DolbyVisionLevelFhd60},
-        {6, DolbyVisionLevelUhd24},
-        {7, DolbyVisionLevelUhd30},
-        {8, DolbyVisionLevelUhd48},
-        {9, DolbyVisionLevelUhd60},
-        {10, DolbyVisionLevelUhd120},
-        {11, DolbyVisionLevel8k30},
-        {12, DolbyVisionLevel8k60},
-    };
     // set rpuAssoc
     if (rpu_present_flag && el_present_flag && !bl_present_flag) {
         format->setInt32("rpuAssoc", 1);
@@ -1516,30 +1525,18 @@ status_t convertMetaDataToMessage(
     if (meta->findData(kKeyDVCC, &type, &data, &size)
             || meta->findData(kKeyDVVC, &type, &data, &size)
             || meta->findData(kKeyDVWC, &type, &data, &size)) {
-        sp<ABuffer> buffer, csdOrg;
-        if (msg->findBuffer("csd-0", &csdOrg)) {
-            buffer = new (std::nothrow) ABuffer(size + csdOrg->size());
-            if (buffer.get() == NULL || buffer->base() == NULL) {
-                return NO_MEMORY;
-            }
-
-            memcpy(buffer->data(), csdOrg->data(), csdOrg->size());
-            memcpy(buffer->data() + csdOrg->size(), data, size);
-        } else {
-            buffer = new (std::nothrow) ABuffer(size);
-            if (buffer.get() == NULL || buffer->base() == NULL) {
-                return NO_MEMORY;
-            }
-            memcpy(buffer->data(), data, size);
-        }
-
-        buffer->meta()->setInt32("csd", true);
-        buffer->meta()->setInt64("timeUs", 0);
-        msg->setBuffer("csd-0", buffer);
-
         const uint8_t *ptr = (const uint8_t *)data;
         ALOGV("DV: calling parseDolbyVisionProfileLevelFromDvcc with data size %zu", size);
         parseDolbyVisionProfileLevelFromDvcc(ptr, size, msg);
+        sp<ABuffer> buffer = new (std::nothrow) ABuffer(size);
+        if (buffer.get() == nullptr || buffer->base() == nullptr) {
+            return NO_MEMORY;
+        }
+        memcpy(buffer->data(), data, size);
+
+        buffer->meta()->setInt32("csd", true);
+        buffer->meta()->setInt64("timeUs", 0);
+        msg->setBuffer("csd-2", buffer);
     }
 
     *format = msg;
@@ -2041,133 +2038,146 @@ status_t convertMessageToMetaData(const sp<AMessage> &msg, sp<MetaData> &meta) {
                    mime == MEDIA_MIMETYPE_IMAGE_AVIF) {
             meta->setData(kKeyAV1C, 0, csd0->data(), csd0->size());
         } else if (mime == MEDIA_MIMETYPE_VIDEO_DOLBY_VISION) {
-            int32_t needCreateDoviCSD = 0;
-            int32_t profile = 0;
-            uint8_t bl_compatibility = 0;
-            if (msg->findInt32("profile", &profile)) {
-                if (profile == DolbyVisionProfileDvheSt) {
-                    profile = 8;
-                    bl_compatibility = 4;
-                } else if (profile == DolbyVisionProfileDvavSe) {
-                    profile = 9;
-                    bl_compatibility = 2;
-                }
-                if (profile == 8 || profile == 9) {
-                    needCreateDoviCSD = 1;
-                }
-            } else {
-                ALOGW("did not find dolby vision profile");
-            }
-            // No dovi csd data, need to create it
-            if (needCreateDoviCSD) {
-                uint8_t dvcc[24];
-                int32_t level = 0;
-                uint8_t level_val = 0;
+            int32_t profile = -1;
+            uint8_t blCompatibilityId = -1;
+            int32_t level = 0;
+            uint8_t profileVal = -1;
+            uint8_t profileVal1 = -1;
+            uint8_t profileVal2 = -1;
+            constexpr size_t dvccSize = 24;
 
-                if (msg->findInt32("level", &level)) {
-                    const static ALookup<int32_t, uint8_t> levels {
-                        {DolbyVisionLevelUnknown, 0},
-                        {DolbyVisionLevelHd24, 1},
-                        {DolbyVisionLevelHd30, 2},
-                        {DolbyVisionLevelFhd24, 3},
-                        {DolbyVisionLevelFhd30, 4},
-                        {DolbyVisionLevelFhd60, 5},
-                        {DolbyVisionLevelUhd24, 6},
-                        {DolbyVisionLevelUhd30, 7},
-                        {DolbyVisionLevelUhd48, 8},
-                        {DolbyVisionLevelUhd60, 9},
-                        {DolbyVisionLevelUhd120, 10},
-                        {DolbyVisionLevel8k30, 11},
-                        {DolbyVisionLevel8k60, 12},
-                    };
-                    levels.map(level, &level_val);
-                    ALOGV("found dolby vision level: %d, value: %d", level, level_val);
+            const ALookup<uint8_t, int32_t> &profiles =
+                getDolbyVisionProfileTable();
+            const ALookup<uint8_t, int32_t> &levels =
+                getDolbyVisionLevelsTable();
+
+            if (!msg->findBuffer("csd-2", &csd2)) {
+                // MP4 extractors are expected to generate csd buffer
+                // some encoders might not be generating it, in which
+                // case we populate the track metadata dv (cc|vc|wc)
+                // from the 'profile' and 'level' info.
+                // This is done according to Dolby Vision ISOBMFF spec
+
+                if (!msg->findInt32("profile", &profile)) {
+                    ALOGE("Dolby Vision profile not found");
+                    return BAD_VALUE;
                 }
+                msg->findInt32("level", &level);
+
+                if (profile == DolbyVisionProfileDvheSt) {
+                    if (!profiles.rlookup(DolbyVisionProfileDvheSt, &profileVal)) { // dvhe.08
+                        ALOGE("Dolby Vision profile lookup error");
+                        return BAD_VALUE;
+                    }
+                    blCompatibilityId = 4;
+                } else if (profile == DolbyVisionProfileDvavSe) {
+                    if (!profiles.rlookup(DolbyVisionProfileDvavSe, &profileVal)) { // dvav.09
+                        ALOGE("Dolby Vision profile lookup error");
+                        return BAD_VALUE;
+                    }
+                    blCompatibilityId = 2;
+                } else {
+                    ALOGE("Dolby Vision profile look up error");
+                    return BAD_VALUE;
+                }
+
+                profile = (int32_t) profileVal;
+
+                uint8_t level_val = 0;
+                if (!levels.map(level, &level_val)) {
+                    ALOGE("Dolby Vision level lookup error");
+                    return BAD_VALUE;
+                }
+
+                std::vector<uint8_t> dvcc(dvccSize);
 
                 dvcc[0] = 1; // major version
                 dvcc[1] = 0; // minor version
-                dvcc[2] = (uint8_t)((profile & 0x7f) << 1);// dolby vision profile
+                dvcc[2] = (uint8_t)((profile & 0x7f) << 1); // dolby vision profile
                 dvcc[2] = (uint8_t)((dvcc[2] | (uint8_t)((level_val >> 5) & 0x1)) & 0xff);
                 dvcc[3] = (uint8_t)((level_val & 0x1f) << 3); // dolby vision level
                 dvcc[3] = (uint8_t)(dvcc[3] | (1 << 2)); // rpu_present_flag
                 dvcc[3] = (uint8_t)(dvcc[3] | (1)); // bl_present_flag
-                dvcc[4] = (uint8_t)(bl_compatibility << 4);// bl_compatibility id
+                dvcc[4] = (uint8_t)(blCompatibilityId << 4); // bl_compatibility id
 
-                std::vector<uint8_t> dvcc_data(24);
-                memcpy(dvcc_data.data(), dvcc, 24);
-                if (profile > 10) {
-                    meta->setData(kKeyDVWC, kTypeDVWC, dvcc_data.data(), 24);
-                } else if (profile > 7) {
-                    meta->setData(kKeyDVVC, kTypeDVVC, dvcc_data.data(), 24);
+                profiles.rlookup(DolbyVisionProfileDvav110, &profileVal);
+                profiles.rlookup(DolbyVisionProfileDvheDtb, &profileVal1);
+                if (profile > (int32_t) profileVal) {
+                    meta->setData(kKeyDVWC, kTypeDVWC, dvcc.data(), dvccSize);
+                } else if (profile > (int32_t) profileVal1) {
+                    meta->setData(kKeyDVVC, kTypeDVVC, dvcc.data(), dvccSize);
                 } else {
-                    meta->setData(kKeyDVCC, kTypeDVCC, dvcc_data.data(), 24);
+                    meta->setData(kKeyDVCC, kTypeDVCC, dvcc.data(), dvccSize);
                 }
-            } else if (csd0size >= 24) { // have dovi csd, just send it out...
-                uint8_t *dvconfig = csd0->data() + (csd0size -24);
-                profile = dvconfig[2] >> 1;
-                if (profile > 10) {
-                    meta->setData(kKeyDVWC, kTypeDVWC, dvconfig, 24);
-                } else if (profile > 7) {
-                    meta->setData(kKeyDVVC, kTypeDVVC, dvconfig, 24);
-                } else {
-                    meta->setData(kKeyDVCC, kTypeDVCC, dvconfig, 24);
-                }
+
             } else {
-                return BAD_VALUE;
+                // we have csd-2, just use that to populate dvcc
+                if (csd2->size() == dvccSize) {
+                    uint8_t *dvcc = csd2->data();
+                    profile = dvcc[2] >> 1;
+
+                    profiles.rlookup(DolbyVisionProfileDvav110, &profileVal);
+                    profiles.rlookup(DolbyVisionProfileDvheDtb, &profileVal1);
+                    if (profile > (int32_t) profileVal) {
+                        meta->setData(kKeyDVWC, kTypeDVWC, csd2->data(), csd2->size());
+                    } else if (profile > (int32_t) profileVal1) {
+                        meta->setData(kKeyDVVC, kTypeDVVC, csd2->data(), csd2->size());
+                    } else {
+                         meta->setData(kKeyDVCC, kTypeDVCC, csd2->data(), csd2->size());
+                    }
+
+                } else {
+                    ALOGE("Convert MessageToMetadata csd-2 is present but not valid");
+                    return BAD_VALUE;
+                }
             }
-
-            // Send the avc/hevc/av1 csd data...
-            if (csd0size >= 24) {
-                sp<ABuffer> csd;
-                if ( profile > 1 && profile < 9) {
-                    if (msg->findBuffer("csd-hevc", &csd)) {
-                        meta->setData(kKeyHVCC, kTypeHVCC, csd->data(), csd->size());
-                    } else if (csd0size > 24) {
-                        std::vector<uint8_t> hvcc(csd0size + 1024);
-                        size_t outsize = reassembleHVCC(csd0, hvcc.data(), hvcc.size(), 4);
-                        meta->setData(kKeyHVCC, kTypeHVCC, hvcc.data(), outsize);
-                    }
-                } else if (profile == 9) {
-                    sp<ABuffer> csd1;
-                    if (msg->findBuffer("csd-avc", &csd)) {
-                        meta->setData(kKeyAVCC, kTypeAVCC, csd->data(), csd->size());
-                    } else if (msg->findBuffer("csd-1", &csd1)) {
-                        std::vector<char> avcc(csd0size + csd1->size() + 1024);
-                        size_t outsize = reassembleAVCC(csd0, csd1, avcc.data());
-                        meta->setData(kKeyAVCC, kTypeAVCC, avcc.data(), outsize);
-                    } else { // for dolby vision avc, csd0 also holds csd1
-                        size_t i = 0;
-                        int csd0realsize = 0;
-                        do {
-                            i = findNextNalStartCode(csd0->data() + i,
-                                            csd0->size() - i) - csd0->data();
-                            if (i > 0) {
-                                csd0realsize = i;
-                                break;
-                            }
-                            i += 4;
-                        } while(i < csd0->size());
-                        // buffer0 -> csd0
-                        sp<ABuffer> buffer0 = new (std::nothrow) ABuffer(csd0realsize);
-                        if (buffer0.get() == NULL || buffer0->base() == NULL) {
-                            return NO_MEMORY;
+            profiles.rlookup(DolbyVisionProfileDvavPen, &profileVal);
+            profiles.rlookup(DolbyVisionProfileDvavSe, &profileVal1);
+            profiles.rlookup(DolbyVisionProfileDvav110, &profileVal2);
+            if ((profile > (int32_t) profileVal) && (profile < (int32_t) profileVal1)) {
+                std::vector<uint8_t> hvcc(csd0size + 1024);
+                size_t outsize = reassembleHVCC(csd0, hvcc.data(), hvcc.size(), 4);
+                meta->setData(kKeyHVCC, kTypeHVCC, hvcc.data(), outsize);
+            } else if (profile == (int32_t) profileVal2) {
+                meta->setData(kKeyAV1C, 0, csd0->data(), csd0->size());
+            } else {
+                sp<ABuffer> csd1;
+                if (msg->findBuffer("csd-1", &csd1)) {
+                    std::vector<char> avcc(csd0size + csd1->size() + 1024);
+                    size_t outsize = reassembleAVCC(csd0, csd1, avcc.data());
+                    meta->setData(kKeyAVCC, kTypeAVCC, avcc.data(), outsize);
+                }
+                else {
+                    // for dolby vision avc, csd0 also holds csd1
+                    size_t i = 0;
+                    int csd0realsize = 0;
+                    do {
+                        i = findNextNalStartCode(csd0->data() + i,
+                                        csd0->size() - i) - csd0->data();
+                        if (i > 0) {
+                            csd0realsize = i;
+                            break;
                         }
-                        memcpy(buffer0->data(), csd0->data(), csd0realsize);
-                        // buffer1 -> csd1
-                        sp<ABuffer> buffer1 = new (std::nothrow)
-                                ABuffer(csd0->size() - csd0realsize);
-                        if (buffer1.get() == NULL || buffer1->base() == NULL) {
-                            return NO_MEMORY;
-                        }
-                        memcpy(buffer1->data(), csd0->data()+csd0realsize,
-                                    csd0->size() - csd0realsize);
-
-                        std::vector<char> avcc(csd0->size() + 1024);
-                        size_t outsize = reassembleAVCC(buffer0, buffer1, avcc.data());
-                        meta->setData(kKeyAVCC, kTypeAVCC, avcc.data(), outsize);
+                        i += 4;
+                    } while(i < csd0->size());
+                    // buffer0 -> csd0
+                    sp<ABuffer> buffer0 = new (std::nothrow) ABuffer(csd0realsize);
+                    if (buffer0.get() == NULL || buffer0->base() == NULL) {
+                        return NO_MEMORY;
                     }
-                } else if (profile == 10) {
-                    meta->setData(kKeyAV1C, 0, csd0->data(), csd0->size() - 24);
+                    memcpy(buffer0->data(), csd0->data(), csd0realsize);
+                    // buffer1 -> csd1
+                    sp<ABuffer> buffer1 = new (std::nothrow)
+                            ABuffer(csd0->size() - csd0realsize);
+                    if (buffer1.get() == NULL || buffer1->base() == NULL) {
+                        return NO_MEMORY;
+                    }
+                    memcpy(buffer1->data(), csd0->data()+csd0realsize,
+                                csd0->size() - csd0realsize);
+
+                    std::vector<char> avcc(csd0->size() + 1024);
+                    size_t outsize = reassembleAVCC(buffer0, buffer1, avcc.data());
+                    meta->setData(kKeyAVCC, kTypeAVCC, avcc.data(), outsize);
                 }
             }
         } else if (mime == MEDIA_MIMETYPE_VIDEO_VP9) {
@@ -2216,6 +2226,17 @@ status_t convertMessageToMetaData(const sp<AMessage> &msg, sp<MetaData> &meta) {
         meta->setData(kKeyStreamHeader, 'mdat', csd0->data(), csd0->size());
     } else if (msg->findBuffer("d263", &csd0)) {
         meta->setData(kKeyD263, kTypeD263, csd0->data(), csd0->size());
+    } else if (mime == MEDIA_MIMETYPE_VIDEO_DOLBY_VISION && msg->findBuffer("csd-2", &csd2)) {
+        meta->setData(kKeyDVCC, kTypeDVCC, csd2->data(), csd2->size());
+
+        // Remove CSD-2 from the data here to avoid duplicate data in meta
+        meta->remove(kKeyOpaqueCSD2);
+
+        if (msg->findBuffer("csd-avc", &csd0)) {
+            meta->setData(kKeyAVCC, kTypeAVCC, csd0->data(), csd0->size());
+        } else if (msg->findBuffer("csd-hevc", &csd0)) {
+            meta->setData(kKeyHVCC, kTypeHVCC, csd0->data(), csd0->size());
+        }
     }
     // XXX TODO add whatever other keys there are
 

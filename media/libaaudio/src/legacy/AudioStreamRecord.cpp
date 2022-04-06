@@ -96,29 +96,8 @@ aaudio_result_t AudioStreamRecord::open(const AudioStreamBuilder& builder)
         setFormat(AUDIO_FORMAT_PCM_FLOAT);
     }
 
-    // Maybe change device format to get a FAST path.
-    // AudioRecord does not support FAST mode for FLOAT data.
-    // TODO AudioRecord should allow FLOAT data paths for FAST tracks.
-    // So IF the user asks for low latency FLOAT
-    // AND the sampleRate is likely to be compatible with FAST
-    // THEN request I16 and convert to FLOAT when passing to user.
-    // Note that hard coding 48000 Hz is not ideal because the sampleRate
-    // for a FAST path might not be 48000 Hz.
-    // It normally is but there is a chance that it is not.
-    // And there is no reliable way to know that in advance.
-    // Luckily the consequences of a wrong guess are minor.
-    // We just may not get a FAST track.
-    // But we wouldn't have anyway without this hack.
-    constexpr int32_t kMostLikelySampleRateForFast = 48000;
-    if (getFormat() == AUDIO_FORMAT_PCM_FLOAT
-            && perfMode == AAUDIO_PERFORMANCE_MODE_LOW_LATENCY
-            && (audio_channel_count_from_in_mask(channelMask) <= 2) // FAST only for mono and stereo
-            && (getSampleRate() == kMostLikelySampleRateForFast
-                || getSampleRate() == AAUDIO_UNSPECIFIED)) {
-        setDeviceFormat(AUDIO_FORMAT_PCM_16_BIT);
-    } else {
-        setDeviceFormat(getFormat());
-    }
+
+    setDeviceFormat(getFormat());
 
     // To avoid glitching, let AudioFlinger pick the optimal burst size.
     uint32_t notificationFrames = 0;

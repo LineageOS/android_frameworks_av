@@ -79,6 +79,7 @@
 #include <media/nbaio/PipeReader.h>
 #include <mediautils/BatteryNotifier.h>
 #include <mediautils/MemoryLeakTrackUtil.h>
+#include <mediautils/MethodStatistics.h>
 #include <mediautils/ServiceUtilities.h>
 #include <mediautils/TimeCheck.h>
 #include <private/android_filesystem_config.h>
@@ -156,6 +157,92 @@ static sp<os::IExternalVibratorService> getExternalVibratorService() {
         }
     }
     return sExternalVibratorService;
+}
+
+// Creates association between Binder code to name for IAudioFlinger.
+#define IAUDIOFLINGER_BINDER_METHOD_MACRO_LIST \
+BINDER_METHOD_ENTRY(createTrack) \
+BINDER_METHOD_ENTRY(createRecord) \
+BINDER_METHOD_ENTRY(sampleRate) \
+BINDER_METHOD_ENTRY(format) \
+BINDER_METHOD_ENTRY(frameCount) \
+BINDER_METHOD_ENTRY(latency) \
+BINDER_METHOD_ENTRY(setMasterVolume) \
+BINDER_METHOD_ENTRY(setMasterMute) \
+BINDER_METHOD_ENTRY(masterVolume) \
+BINDER_METHOD_ENTRY(masterMute) \
+BINDER_METHOD_ENTRY(setStreamVolume) \
+BINDER_METHOD_ENTRY(setStreamMute) \
+BINDER_METHOD_ENTRY(streamVolume) \
+BINDER_METHOD_ENTRY(streamMute) \
+BINDER_METHOD_ENTRY(setMode) \
+BINDER_METHOD_ENTRY(setMicMute) \
+BINDER_METHOD_ENTRY(getMicMute) \
+BINDER_METHOD_ENTRY(setRecordSilenced) \
+BINDER_METHOD_ENTRY(setParameters) \
+BINDER_METHOD_ENTRY(getParameters) \
+BINDER_METHOD_ENTRY(registerClient) \
+BINDER_METHOD_ENTRY(getInputBufferSize) \
+BINDER_METHOD_ENTRY(openOutput) \
+BINDER_METHOD_ENTRY(openDuplicateOutput) \
+BINDER_METHOD_ENTRY(closeOutput) \
+BINDER_METHOD_ENTRY(suspendOutput) \
+BINDER_METHOD_ENTRY(restoreOutput) \
+BINDER_METHOD_ENTRY(openInput) \
+BINDER_METHOD_ENTRY(closeInput) \
+BINDER_METHOD_ENTRY(invalidateStream) \
+BINDER_METHOD_ENTRY(setVoiceVolume) \
+BINDER_METHOD_ENTRY(getRenderPosition) \
+BINDER_METHOD_ENTRY(getInputFramesLost) \
+BINDER_METHOD_ENTRY(newAudioUniqueId) \
+BINDER_METHOD_ENTRY(acquireAudioSessionId) \
+BINDER_METHOD_ENTRY(releaseAudioSessionId) \
+BINDER_METHOD_ENTRY(queryNumberEffects) \
+BINDER_METHOD_ENTRY(queryEffect) \
+BINDER_METHOD_ENTRY(getEffectDescriptor) \
+BINDER_METHOD_ENTRY(createEffect) \
+BINDER_METHOD_ENTRY(moveEffects) \
+BINDER_METHOD_ENTRY(loadHwModule) \
+BINDER_METHOD_ENTRY(getPrimaryOutputSamplingRate) \
+BINDER_METHOD_ENTRY(getPrimaryOutputFrameCount) \
+BINDER_METHOD_ENTRY(setLowRamDevice) \
+BINDER_METHOD_ENTRY(getAudioPort) \
+BINDER_METHOD_ENTRY(createAudioPatch) \
+BINDER_METHOD_ENTRY(releaseAudioPatch) \
+BINDER_METHOD_ENTRY(listAudioPatches) \
+BINDER_METHOD_ENTRY(setAudioPortConfig) \
+BINDER_METHOD_ENTRY(getAudioHwSyncForSession) \
+BINDER_METHOD_ENTRY(systemReady) \
+BINDER_METHOD_ENTRY(audioPolicyReady) \
+BINDER_METHOD_ENTRY(frameCountHAL) \
+BINDER_METHOD_ENTRY(getMicrophones) \
+BINDER_METHOD_ENTRY(setMasterBalance) \
+BINDER_METHOD_ENTRY(getMasterBalance) \
+BINDER_METHOD_ENTRY(setEffectSuspended) \
+BINDER_METHOD_ENTRY(setAudioHalPids) \
+BINDER_METHOD_ENTRY(setVibratorInfos) \
+BINDER_METHOD_ENTRY(updateSecondaryOutputs) \
+BINDER_METHOD_ENTRY(getMmapPolicyInfos) \
+BINDER_METHOD_ENTRY(getAAudioMixerBurstCount) \
+BINDER_METHOD_ENTRY(getAAudioHardwareBurstMinUsec) \
+BINDER_METHOD_ENTRY(setDeviceConnectedState) \
+
+// singleton for Binder Method Statistics for IAudioFlinger
+static auto& getIAudioFlingerStatistics() {
+    using Code = android::AudioFlingerServerAdapter::Delegate::TransactionCode;
+
+#pragma push_macro("BINDER_METHOD_ENTRY")
+#undef BINDER_METHOD_ENTRY
+#define BINDER_METHOD_ENTRY(ENTRY) \
+    {(Code)media::BnAudioFlingerService::TRANSACTION_##ENTRY, #ENTRY},
+
+    static mediautils::MethodStatistics<Code> methodStatistics{
+        IAUDIOFLINGER_BINDER_METHOD_MACRO_LIST
+        METHOD_STATISTICS_BINDER_CODE_NAMES(Code)
+    };
+#pragma pop_macro("BINDER_METHOD_ENTRY")
+
+    return methodStatistics;
 }
 
 class DevicesFactoryHalCallbackImpl : public DevicesFactoryHalCallback {
@@ -276,7 +363,7 @@ AudioFlinger::AudioFlinger()
     mMediaLogNotifier->run("MediaLogNotifier");
     std::vector<pid_t> halPids;
     mDevicesFactoryHal->getHalPids(&halPids);
-    TimeCheck::setAudioHalPids(halPids);
+    mediautils::TimeCheck::setAudioHalPids(halPids);
 
     // Notify that we have started (also called when audioserver service restarts)
     mediametrics::LogItem(mMetricsId)
@@ -316,7 +403,7 @@ void AudioFlinger::onFirstRef()
 }
 
 status_t AudioFlinger::setAudioHalPids(const std::vector<pid_t>& pids) {
-  TimeCheck::setAudioHalPids(pids);
+  mediautils::TimeCheck::setAudioHalPids(pids);
   return NO_ERROR;
 }
 
@@ -498,14 +585,14 @@ status_t AudioFlinger::openMmapStream(MmapStreamInterface::stream_direction_t di
         fullConfig.channel_mask = config->channel_mask;
         fullConfig.format = config->format;
         std::vector<audio_io_handle_t> secondaryOutputs;
-
+        bool isSpatialized;
         ret = AudioSystem::getOutputForAttr(&localAttr, &io,
                                             actualSessionId,
                                             &streamType, client.attributionSource,
                                             &fullConfig,
                                             (audio_output_flags_t)(AUDIO_OUTPUT_FLAG_MMAP_NOIRQ |
                                                     AUDIO_OUTPUT_FLAG_DIRECT),
-                                            deviceId, &portId, &secondaryOutputs);
+                                            deviceId, &portId, &secondaryOutputs, &isSpatialized);
         ALOGW_IF(!secondaryOutputs.empty(),
                  "%s does not support secondary outputs, ignoring them", __func__);
     } else {
@@ -828,6 +915,36 @@ status_t AudioFlinger::dump(int fd, const Vector<String16>& args)
             std::string s = GetUnreachableMemoryString(true /* contents */, 100 /* limit */);
             write(fd, s.c_str(), s.size());
         }
+        {
+            std::string timeCheckStats = getIAudioFlingerStatistics().dump();
+            dprintf(fd, "\nIAudioFlinger binder call profile:\n");
+            write(fd, timeCheckStats.c_str(), timeCheckStats.size());
+
+            extern mediautils::MethodStatistics<int>& getIEffectStatistics();
+            timeCheckStats = getIEffectStatistics().dump();
+            dprintf(fd, "\nIEffect binder call profile:\n");
+            write(fd, timeCheckStats.c_str(), timeCheckStats.size());
+
+            // Automatically fetch HIDL statistics.
+            std::shared_ptr<std::vector<std::string>> hidlClassNames =
+                    mediautils::getStatisticsClassesForModule(
+                            METHOD_STATISTICS_MODULE_NAME_AUDIO_HIDL);
+            if (hidlClassNames) {
+                for (const auto& className : *hidlClassNames) {
+                    auto stats = mediautils::getStatisticsForClass(className);
+                    if (stats) {
+                        timeCheckStats = stats->dump();
+                        dprintf(fd, "\n%s binder call profile:\n", className.c_str());
+                        write(fd, timeCheckStats.c_str(), timeCheckStats.size());
+                    }
+                }
+            }
+
+            timeCheckStats = mediautils::TimeCheck::toString();
+            dprintf(fd, "\nTimeCheck:\n");
+            write(fd, timeCheckStats.c_str(), timeCheckStats.size());
+            dprintf(fd, "\n");
+        }
     }
     return NO_ERROR;
 }
@@ -917,6 +1034,7 @@ status_t AudioFlinger::createTrack(const media::CreateTrackRequest& _input,
     audio_stream_type_t streamType;
     audio_port_handle_t portId = AUDIO_PORT_HANDLE_NONE;
     std::vector<audio_io_handle_t> secondaryOutputs;
+    bool isSpatialized = false;;
 
     // TODO b/182392553: refactor or make clearer
     pid_t clientPid =
@@ -960,7 +1078,8 @@ status_t AudioFlinger::createTrack(const media::CreateTrackRequest& _input,
     output.selectedDeviceId = input.selectedDeviceId;
     lStatus = AudioSystem::getOutputForAttr(&localAttr, &output.outputId, sessionId, &streamType,
                                             adjAttributionSource, &input.config, input.flags,
-                                            &output.selectedDeviceId, &portId, &secondaryOutputs);
+                                            &output.selectedDeviceId, &portId, &secondaryOutputs,
+                                            &isSpatialized);
 
     if (lStatus != NO_ERROR || output.outputId == AUDIO_IO_HANDLE_NONE) {
         ALOGE("createTrack() getOutputForAttr() return error %d or invalid output handle", lStatus);
@@ -1026,7 +1145,7 @@ status_t AudioFlinger::createTrack(const media::CreateTrackRequest& _input,
                                       input.notificationsPerBuffer, input.speed,
                                       input.sharedBuffer, sessionId, &output.flags,
                                       callingPid, adjAttributionSource, input.clientInfo.clientTid,
-                                      &lStatus, portId, input.audioTrackCallback);
+                                      &lStatus, portId, input.audioTrackCallback, isSpatialized);
         LOG_ALWAYS_FATAL_IF((lStatus == NO_ERROR) && (track == 0));
         // we don't abort yet if lStatus != NO_ERROR; there is still work to be done regardless
 
@@ -4417,9 +4536,20 @@ status_t AudioFlinger::onTransactWrapper(TransactionCode code,
             break;
     }
 
-    std::string tag("IAudioFlinger command " +
-                    std::to_string(static_cast<std::underlying_type_t<TransactionCode>>(code)));
-    TimeCheck check(tag.c_str());
+    const std::string methodName = getIAudioFlingerStatistics().getMethodForCode(code);
+    mediautils::TimeCheck check(
+            std::string("IAudioFlinger::").append(methodName),
+            [code, methodName](bool timeout, float elapsedMs) { // don't move methodName.
+        if (timeout) {
+            mediametrics::LogItem(mMetricsId)
+                .set(AMEDIAMETRICS_PROP_EVENT, AMEDIAMETRICS_PROP_EVENT_VALUE_TIMEOUT)
+                .set(AMEDIAMETRICS_PROP_METHODCODE, int64_t(code))
+                .set(AMEDIAMETRICS_PROP_METHODNAME, methodName.c_str())
+                .record();
+        } else {
+            getIAudioFlingerStatistics().event(code, elapsedMs);
+        }
+    });
 
     // Make sure we connect to Audio Policy Service before calling into AudioFlinger:
     //  - AudioFlinger can call into Audio Policy Service with its global mutex held

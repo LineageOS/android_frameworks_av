@@ -369,7 +369,7 @@ hardware::Return<void> HidlCamera3Device::processCaptureResult_3_4(
         mNumPartialResults, mVendorTagId, mDeviceInfo, mPhysicalDeviceInfoMap,
         mDistortionMappers, mZoomRatioMappers, mRotateAndCropMappers,
         mTagMonitor, mInputStream, mOutputStreams, mSessionStatsBuilder, listener, *this, *this,
-        *mInterface, mLegacyClient}, mResultMetadataQueue
+        *mInterface, mLegacyClient, mMinExpectedDuration}, mResultMetadataQueue
     };
 
     //HidlCaptureOutputStates hidlStates {
@@ -431,7 +431,7 @@ hardware::Return<void> HidlCamera3Device::processCaptureResult(
         mNumPartialResults, mVendorTagId, mDeviceInfo, mPhysicalDeviceInfoMap,
         mDistortionMappers, mZoomRatioMappers, mRotateAndCropMappers,
         mTagMonitor, mInputStream, mOutputStreams, mSessionStatsBuilder, listener, *this, *this,
-        *mInterface, mLegacyClient}, mResultMetadataQueue
+        *mInterface, mLegacyClient, mMinExpectedDuration}, mResultMetadataQueue
     };
 
     for (const auto& result : results) {
@@ -483,7 +483,7 @@ hardware::Return<void> HidlCamera3Device::notifyHelper(
         mNumPartialResults, mVendorTagId, mDeviceInfo, mPhysicalDeviceInfoMap,
         mDistortionMappers, mZoomRatioMappers, mRotateAndCropMappers,
         mTagMonitor, mInputStream, mOutputStreams, mSessionStatsBuilder, listener, *this, *this,
-        *mInterface, mLegacyClient}, mResultMetadataQueue
+        *mInterface, mLegacyClient, mMinExpectedDuration}, mResultMetadataQueue
     };
     for (const auto& msg : msgs) {
         camera3::notify(states, msg);
@@ -972,7 +972,7 @@ status_t HidlCamera3Device::HidlHalInterface::configureStreams(
         }
         if (src->use_case != ANDROID_SCALER_AVAILABLE_STREAM_USE_CASES_DEFAULT &&
                 mHidlSession_3_8 == nullptr) {
-            ALOGE("%s: Camera device doesn't support non-default stream use case %d!",
+            ALOGE("%s: Camera device doesn't support non-default stream use case %" PRId64 "!",
                     __FUNCTION__, src->use_case);
             return BAD_VALUE;
         }

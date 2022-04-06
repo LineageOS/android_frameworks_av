@@ -36,6 +36,7 @@
 #include <media/stagefright/MediaSource.h>
 #include <media/stagefright/foundation/ADebug.h>
 #include <media/stagefright/foundation/AMessage.h>
+#include <media/stagefright/foundation/ALookup.h>
 #include <media/stagefright/foundation/AUtils.h>
 #include <media/stagefright/foundation/ByteUtils.h>
 #include <media/stagefright/foundation/ColorUtils.h>
@@ -44,6 +45,7 @@
 #include <media/stagefright/MediaBuffer.h>
 #include <media/stagefright/MetaData.h>
 #include <media/stagefright/MediaDefs.h>
+#include <media/stagefright/MediaCodecConstants.h>
 #include <media/stagefright/MediaErrors.h>
 #include <media/stagefright/Utils.h>
 #include <media/mediarecorder.h>
@@ -372,9 +374,7 @@ private:
     uint8_t mProfileCompatible;
     uint8_t mLevelIdc;
 
-    uint8_t mDoviProfile;
-    void *mDoviConfigData;
-    size_t mDoviConfigDataSize;
+    int32_t mDoviProfile;
 
     void *mCodecSpecificData;
     size_t mCodecSpecificDataSize;
@@ -428,7 +428,7 @@ private:
     status_t parseHEVCCodecSpecificData(
             const uint8_t *data, size_t size, HevcParameterSets &paramSets);
 
-    status_t makeDoviCodecSpecificData();
+    status_t getDolbyVisionProfile();
 
     // Track authoring progress status
     void trackProgressStatus(int64_t timeUs, status_t err = OK);
@@ -628,14 +628,14 @@ status_t MPEG4Writer::Track::dump(
 }
 
 const char *MPEG4Writer::Track::getDoviFourCC() const {
-    if (mDoviProfile == 5) {
+    if (mDoviProfile == DolbyVisionProfileDvheStn) {
         return "dvh1";
-    } else if (mDoviProfile == 8) {
+    } else if (mDoviProfile == DolbyVisionProfileDvheSt) {
         return "hvc1";
-    } else if (mDoviProfile == 9 || mDoviProfile == 32) {
+    } else if (mDoviProfile == DolbyVisionProfileDvavSe) {
         return "avc1";
     }
-    return (const char*)NULL;
+    return nullptr;
 }
 
 // static
@@ -693,6 +693,11 @@ status_t MPEG4Writer::addSource(const sp<MediaSource> &source) {
     }
 
     if (!strcmp(mime, MEDIA_MIMETYPE_VIDEO_DOLBY_VISION)) {
+        // For MEDIA_MIMETYPE_VIDEO_DOLBY_VISION,
+        // getFourCCForMime() requires profile information
+        // to decide the final FourCC codes.
+        // So we let the creation of the new track now and
+        // assign FourCC codes later using getDoviFourCC()
         ALOGV("Add source mime '%s'", mime);
     } else if (Track::getFourCCForMime(mime) == NULL) {
         ALOGE("Unsupported mime '%s'", mime);
@@ -2173,8 +2178,7 @@ MPEG4Writer::Track::Track(
       mMinCttsOffsetTimeUs(0),
       mMinCttsOffsetTicks(0),
       mMaxCttsOffsetTicks(0),
-      mDoviConfigData(NULL),
-      mDoviConfigDataSize(0),
+      mDoviProfile(0),
       mCodecSpecificData(NULL),
       mCodecSpecificDataSize(0),
       mGotAllCodecSpecificData(false),
@@ -2636,7 +2640,7 @@ void MPEG4Writer::Track::getCodecSpecificDataFromInputFormatIfPossible() {
                !strcasecmp(mime, MEDIA_MIMETYPE_IMAGE_ANDROID_HEIC)) {
         mMeta->findData(kKeyHVCC, &type, &data, &size);
     } else if (!strcasecmp(mime, MEDIA_MIMETYPE_VIDEO_DOLBY_VISION)) {
-        makeDoviCodecSpecificData();
+        getDolbyVisionProfile();
         if (!mMeta->findData(kKeyAVCC, &type, &data, &size) &&
                 !mMeta->findData(kKeyHVCC, &type, &data, &size)) {
             ALOGE("Failed: No HVCC/AVCC for Dolby Vision ..\n");
@@ -2683,10 +2687,6 @@ MPEG4Writer::Track::~Track() {
         mCodecSpecificData = NULL;
     }
 
-    if (mDoviConfigData != NULL) {
-        free(mDoviConfigData);
-        mDoviConfigData = NULL;
-    }
 }
 
 void MPEG4Writer::Track::initTrackingProgressStatus(MetaData *params) {
@@ -3365,34 +3365,37 @@ status_t MPEG4Writer::Track::makeHEVCCodecSpecificData(
     return OK;
 }
 
-status_t MPEG4Writer::Track::makeDoviCodecSpecificData() {
+status_t MPEG4Writer::Track::getDolbyVisionProfile() {
     uint32_t type;
     const void *data = NULL;
     size_t size = 0;
 
-    if (mDoviConfigData != NULL) {
-        ALOGE("Already have Dolby Vision codec specific data");
-        return OK;
+    if (!mMeta->findData(kKeyDVCC, &type, &data, &size) &&
+        !mMeta->findData(kKeyDVVC, &type, &data, &size) &&
+        !mMeta->findData(kKeyDVWC, &type, &data, &size)) {
+            ALOGE("Failed getting Dovi config for Dolby Vision %d", (int)size);
+            return ERROR_MALFORMED;
     }
+    static const ALookup<uint8_t, int32_t> dolbyVisionProfileMap = {
+        {1, DolbyVisionProfileDvavPen},
+        {3, DolbyVisionProfileDvheDen},
+        {4, DolbyVisionProfileDvheDtr},
+        {5, DolbyVisionProfileDvheStn},
+        {6, DolbyVisionProfileDvheDth},
+        {7, DolbyVisionProfileDvheDtb},
+        {8, DolbyVisionProfileDvheSt},
+        {9, DolbyVisionProfileDvavSe},
+        {10, DolbyVisionProfileDvav110}
+    };
 
-    if (!mMeta->findData(kKeyDVCC, &type, &data, &size)
-             && !mMeta->findData(kKeyDVVC, &type, &data, &size)
-             && !mMeta->findData(kKeyDVWC, &type, &data, &size)) {
-        ALOGE("Failed getting Dovi config for Dolby Vision %d", (int)size);
-        return ERROR_MALFORMED;
+    // Dolby Vision profile information is extracted as per
+    // https://dolby.my.salesforce.com/sfc/p/#700000009YuG/a/4u000000l6FB/076wHYEmyEfz09m0V1bo85_25hlUJjaiWTbzorNmYY4
+    uint8_t dv_profile = ((((uint8_t *)data)[2] >> 1) & 0x7f);
+
+    if (!dolbyVisionProfileMap.map(dv_profile, &mDoviProfile)) {
+      ALOGE("Failed to get Dolby Profile from DV Config data");
+      return ERROR_MALFORMED;
     }
-
-    mDoviConfigData = malloc(size);
-    if (mDoviConfigData == NULL) {
-        ALOGE("Failed allocating Dolby Vision config data");
-        return ERROR_MALFORMED;
-    }
-
-    mDoviConfigDataSize = size;
-    memcpy(mDoviConfigData, data, size);
-
-    mDoviProfile = (((char *)data)[2] >> 1) & 0x7f; //getting profile info
-
     return OK;
 }
 
@@ -3542,24 +3545,26 @@ status_t MPEG4Writer::Track::threadEntry() {
                             buffer->range_length());
                 }
                 if (mIsDovi) {
-                    err = makeDoviCodecSpecificData();
-
-                    const void *data = NULL;
-                    size_t size = 0;
-
-                    uint32_t type = 0;
-                    if (mDoviProfile == 9){
-                        mMeta->findData(kKeyAVCC, &type, &data, &size);
-                    } else if (mDoviProfile < 9)  {
-                        mMeta->findData(kKeyHVCC, &type, &data, &size);
-                    }
-
-                    if (data != NULL && copyCodecSpecificData((uint8_t *)data, size) == OK) {
-                        mGotAllCodecSpecificData = true;
+                    err = getDolbyVisionProfile();
+                    if(err == OK) {
+                        const void *data = NULL;
+                        size_t size = 0;
+                        uint32_t type = 0;
+                        if (mDoviProfile == DolbyVisionProfileDvavSe) {
+                            mMeta->findData(kKeyAVCC, &type, &data, &size);
+                        } else if (mDoviProfile < DolbyVisionProfileDvavSe) {
+                            mMeta->findData(kKeyHVCC, &type, &data, &size);
+                        } else {
+                            ALOGW("DV Profiles > DolbyVisionProfileDvavSe are not supported");
+                            err = ERROR_MALFORMED;
+                        }
+                        if (err == OK && data != NULL &&
+                            copyCodecSpecificData((uint8_t *)data, size) == OK) {
+                                mGotAllCodecSpecificData = true;
+                        }
                     }
                 }
             }
-
             buffer->release();
             buffer = NULL;
             if (OK != err) {
@@ -4429,10 +4434,12 @@ void MPEG4Writer::Track::writeVideoFourCCBox() {
     } else if (!strcasecmp(MEDIA_MIMETYPE_VIDEO_HEVC, mime)) {
         writeHvccBox();
     } else if (!strcasecmp(MEDIA_MIMETYPE_VIDEO_DOLBY_VISION, mime)) {
-        if (mDoviProfile <= 8) {
+        if (mDoviProfile <= DolbyVisionProfileDvheSt) {
             writeHvccBox();
-        } else if (mDoviProfile == 9 || mDoviProfile == 32) {
+        } else if (mDoviProfile == DolbyVisionProfileDvavSe) {
             writeAvccBox();
+        } else {
+          TRESPASS("Unsupported Dolby Vision profile");
         }
         writeDoviConfigBox();
     }
@@ -4482,45 +4489,48 @@ void MPEG4Writer::Track::writeMdcvAndClliBoxes() {
     size_t size;
     bool found =
             meta->findData(kKeyHdrStaticInfo, &type, reinterpret_cast<const void**>(&data), &size);
-    if (found && size == 25) {
-        uint16_t displayPrimariesRX = U16LE_AT(&data[1]);
-        uint16_t displayPrimariesRY = U16LE_AT(&data[3]);
-
-        uint16_t displayPrimariesGX = U16LE_AT(&data[5]);
-        uint16_t displayPrimariesGY = U16LE_AT(&data[7]);
-
-        uint16_t displayPrimariesBX = U16LE_AT(&data[9]);
-        uint16_t displayPrimariesBY = U16LE_AT(&data[11]);
-
-        uint16_t whitePointX = U16LE_AT(&data[13]);
-        uint16_t whitePointY = U16LE_AT(&data[15]);
-
-        uint16_t maxDisplayMasteringLuminance = U16LE_AT(&data[17]);
-        uint16_t minDisplayMasteringLuminance = U16LE_AT(&data[19]);
-
-        uint16_t maxContentLightLevel = U16LE_AT(&data[21]);
-        uint16_t maxPicAverageLightLevel = U16LE_AT(&data[23]);
-
-        mOwner->beginBox("mdcv");
-        mOwner->writeInt16(displayPrimariesGX);
-        mOwner->writeInt16(displayPrimariesGY);
-        mOwner->writeInt16(displayPrimariesBX);
-        mOwner->writeInt16(displayPrimariesBY);
-        mOwner->writeInt16(displayPrimariesRX);
-        mOwner->writeInt16(displayPrimariesRY);
-        mOwner->writeInt16(whitePointX);
-        mOwner->writeInt16(whitePointY);
-        mOwner->writeInt32(maxDisplayMasteringLuminance * 10000);
-        mOwner->writeInt32(minDisplayMasteringLuminance * 10000);
-        mOwner->endBox();  // mdcv.
-
-        mOwner->beginBox("clli");
-        mOwner->writeInt16(maxContentLightLevel);
-        mOwner->writeInt16(maxPicAverageLightLevel);
-        mOwner->endBox();  // clli.
-    } else {
-        ALOGW("Ignoring HDR static info with unexpected size %d", (int)size);
+    if (!found) {
+        return; // Nothing to encode.
     }
+    if (size != 25) {
+        ALOGW("Ignoring HDR static info with unexpected size %d", (int)size);
+        return;
+    }
+    uint16_t displayPrimariesRX = U16LE_AT(&data[1]);
+    uint16_t displayPrimariesRY = U16LE_AT(&data[3]);
+
+    uint16_t displayPrimariesGX = U16LE_AT(&data[5]);
+    uint16_t displayPrimariesGY = U16LE_AT(&data[7]);
+
+    uint16_t displayPrimariesBX = U16LE_AT(&data[9]);
+    uint16_t displayPrimariesBY = U16LE_AT(&data[11]);
+
+    uint16_t whitePointX = U16LE_AT(&data[13]);
+    uint16_t whitePointY = U16LE_AT(&data[15]);
+
+    uint16_t maxDisplayMasteringLuminance = U16LE_AT(&data[17]);
+    uint16_t minDisplayMasteringLuminance = U16LE_AT(&data[19]);
+
+    uint16_t maxContentLightLevel = U16LE_AT(&data[21]);
+    uint16_t maxPicAverageLightLevel = U16LE_AT(&data[23]);
+
+    mOwner->beginBox("mdcv");
+    mOwner->writeInt16(displayPrimariesGX);
+    mOwner->writeInt16(displayPrimariesGY);
+    mOwner->writeInt16(displayPrimariesBX);
+    mOwner->writeInt16(displayPrimariesBY);
+    mOwner->writeInt16(displayPrimariesRX);
+    mOwner->writeInt16(displayPrimariesRY);
+    mOwner->writeInt16(whitePointX);
+    mOwner->writeInt16(whitePointY);
+    mOwner->writeInt32(maxDisplayMasteringLuminance * 10000);
+    mOwner->writeInt32(minDisplayMasteringLuminance * 10000);
+    mOwner->endBox();  // mdcv.
+
+    mOwner->beginBox("clli");
+    mOwner->writeInt16(maxContentLightLevel);
+    mOwner->writeInt16(maxPicAverageLightLevel);
+    mOwner->endBox();  // clli.
 }
 
 void MPEG4Writer::Track::writeAudioFourCCBox() {
@@ -4991,21 +5001,29 @@ void MPEG4Writer::Track::writeHvccBox() {
 }
 
 void MPEG4Writer::Track::writeDoviConfigBox() {
-    CHECK(mDoviConfigData);
-    CHECK_EQ(mDoviConfigDataSize, 24u);
+    CHECK_NE(mDoviProfile, 0u);
 
-    uint8_t *ptr = (uint8_t *)mDoviConfigData;
-    uint8_t profile = (ptr[2] >> 1) & 0x7f;
+    uint32_t type = 0;
+    const void *data = nullptr;
+    size_t size = 0;
+    // check to see which key has the configuration box.
+    if (mMeta->findData(kKeyDVCC, &type, &data, &size) ||
+        mMeta->findData(kKeyDVVC, &type, &data, &size) ||
+        mMeta->findData(kKeyDVWC, &type, &data, &size)) {
 
-    if (profile > 10) {
-        mOwner->beginBox("dvwC");
-    } else if (profile > 7) {
-        mOwner->beginBox("dvvC");
-    } else {
-        mOwner->beginBox("dvcC");
+       // if this box is present we write the box, or
+       // this mp4 will be interpreted as a backward
+       // compatible stream.
+        if (mDoviProfile > DolbyVisionProfileDvav110) {
+            mOwner->beginBox("dvwC");
+        } else if (mDoviProfile > DolbyVisionProfileDvheDtb) {
+            mOwner->beginBox("dvvC");
+        } else {
+            mOwner->beginBox("dvcC");
+        }
+        mOwner->write(data, size);
+        mOwner->endBox();  // dvwC/dvvC/dvcC
     }
-    mOwner->write(mDoviConfigData, mDoviConfigDataSize);
-    mOwner->endBox();  // dvwC/dvvC/dvcC
 }
 
 void MPEG4Writer::Track::writeD263Box() {

@@ -204,7 +204,7 @@ struct AUHeader {
 };
 
 bool AMPEG4ElementaryAssembler::initCheck() {
-    if(mSizeLength == 0 || mIndexLength == 0 || mIndexDeltaLength == 0) {
+    if(mIsGeneric && (mSizeLength == 0 || mIndexLength == 0 || mIndexDeltaLength == 0)) {
         android_errorWriteLog(0x534e4554, "124777537");
         return false;
     }

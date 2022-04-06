@@ -39,7 +39,9 @@
 #include <media/ShmemCompat.h>
 #include <media/audiohal/EffectHalInterface.h>
 #include <media/audiohal/EffectsFactoryHalInterface.h>
+#include <mediautils/MethodStatistics.h>
 #include <mediautils/ServiceUtilities.h>
+#include <mediautils/TimeCheck.h>
 
 #include "AudioFlinger.h"
 
@@ -1749,6 +1751,47 @@ AudioFlinger::EffectHandle::~EffectHandle()
 {
     ALOGV("Destructor %p", this);
     disconnect(false);
+}
+
+// Creates an association between Binder code to name for IEffect.
+#define IEFFECT_BINDER_METHOD_MACRO_LIST \
+BINDER_METHOD_ENTRY(enable) \
+BINDER_METHOD_ENTRY(disable) \
+BINDER_METHOD_ENTRY(command) \
+BINDER_METHOD_ENTRY(disconnect) \
+BINDER_METHOD_ENTRY(getCblk) \
+
+// singleton for Binder Method Statistics for IEffect
+mediautils::MethodStatistics<int>& getIEffectStatistics() {
+    using Code = int;
+
+#pragma push_macro("BINDER_METHOD_ENTRY")
+#undef BINDER_METHOD_ENTRY
+#define BINDER_METHOD_ENTRY(ENTRY) \
+        {(Code)media::BnEffect::TRANSACTION_##ENTRY, #ENTRY},
+
+    static mediautils::MethodStatistics<Code> methodStatistics{
+        IEFFECT_BINDER_METHOD_MACRO_LIST
+        METHOD_STATISTICS_BINDER_CODE_NAMES(Code)
+    };
+#pragma pop_macro("BINDER_METHOD_ENTRY")
+
+    return methodStatistics;
+}
+
+status_t AudioFlinger::EffectHandle::onTransact(
+        uint32_t code, const Parcel& data, Parcel* reply, uint32_t flags) {
+    const std::string methodName = getIEffectStatistics().getMethodForCode(code);
+    mediautils::TimeCheck check(
+            std::string("IEffect::").append(methodName),
+            [code](bool timeout, float elapsedMs) {
+        if (timeout) {
+            ; // we don't timeout right now on the effect interface.
+        } else {
+            getIEffectStatistics().event(code, elapsedMs);
+        }
+    }, 0 /* timeoutMs */);
+    return BnEffect::onTransact(code, data, reply, flags);
 }
 
 status_t AudioFlinger::EffectHandle::initCheck()

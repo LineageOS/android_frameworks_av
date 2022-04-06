@@ -37,6 +37,7 @@ public:
     int mWidth;
     int mHeight;
     int mFormat;
+    float mMaxPreviewFps;
     int mDataSpace;
     int64_t mUsage;
 
@@ -65,20 +66,20 @@ public:
     // Dynamic range profile
     int64_t mDynamicRangeProfile;
     // Stream use case
-    int mStreamUseCase;
+    int64_t mStreamUseCase;
 
     CameraStreamStats() :
-            mWidth(0), mHeight(0), mFormat(0), mDataSpace(0), mUsage(0),
+            mWidth(0), mHeight(0), mFormat(0), mMaxPreviewFps(0), mDataSpace(0), mUsage(0),
             mRequestCount(0), mErrorCount(0), mStartLatencyMs(0),
             mMaxHalBuffers(0), mMaxAppBuffers(0), mHistogramType(HISTOGRAM_TYPE_UNKNOWN),
             mDynamicRangeProfile(ANDROID_REQUEST_AVAILABLE_DYNAMIC_RANGE_PROFILES_MAP_STANDARD),
             mStreamUseCase(ANDROID_SCALER_AVAILABLE_STREAM_USE_CASES_DEFAULT) {}
-    CameraStreamStats(int width, int height, int format, int dataSpace, int64_t usage,
-            int maxHalBuffers, int maxAppBuffers, int dynamicRangeProfile,
+    CameraStreamStats(int width, int height, int format, float maxPreviewFps, int dataSpace,
+            int64_t usage, int maxHalBuffers, int maxAppBuffers, int dynamicRangeProfile,
             int streamUseCase)
-            : mWidth(width), mHeight(height), mFormat(format), mDataSpace(dataSpace),
-              mUsage(usage), mRequestCount(0), mErrorCount(0), mStartLatencyMs(0),
-              mMaxHalBuffers(maxHalBuffers), mMaxAppBuffers(maxAppBuffers),
+            : mWidth(width), mHeight(height), mFormat(format), mMaxPreviewFps(maxPreviewFps),
+              mDataSpace(dataSpace), mUsage(usage), mRequestCount(0), mErrorCount(0),
+              mStartLatencyMs(0), mMaxHalBuffers(maxHalBuffers), mMaxAppBuffers(maxAppBuffers),
               mHistogramType(HISTOGRAM_TYPE_UNKNOWN),
               mDynamicRangeProfile(dynamicRangeProfile),
               mStreamUseCase(streamUseCase) {}
@@ -123,6 +124,7 @@ public:
     bool mIsNdk;
     // latency in ms for camera open, close, or session creation.
     int mLatencyMs;
+    float mMaxPreviewFps;
 
     // Session info and statistics
     int mSessionType;
