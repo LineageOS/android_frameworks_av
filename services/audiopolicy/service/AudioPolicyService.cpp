@@ -505,6 +505,8 @@ void AudioPolicyService::doOnCheckSpatializer()
 {
     Mutex::Autolock _l(mLock);
 
+    ALOGI("%s mSpatializer %p level %d", __func__, mSpatializer.get(), (int)mSpatializer->getLevel());
+
     if (mSpatializer != nullptr) {
         // Note: mSpatializer != nullptr =>  mAudioPolicyManager != nullptr
         if (mSpatializer->getLevel() != media::SpatializationLevel::NONE) {
