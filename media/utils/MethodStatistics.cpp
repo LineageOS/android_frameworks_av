@@ -28,6 +28,7 @@ getStatisticsClassesForModule(std::string_view moduleName) {
             std::shared_ptr<std::vector<std::string>>(
                 new std::vector<std::string>{
                 "DeviceHalHidl",
+                "EffectHalHidl",
                 "StreamInHalHidl",
                 "StreamOutHalHidl",
               })
