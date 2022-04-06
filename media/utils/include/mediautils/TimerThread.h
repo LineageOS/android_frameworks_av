@@ -125,11 +125,6 @@ class TimerThread {
         return s;
     }
 
-    /**
-     * Returns callstack of tid as a string.
-     */
-    static std::string tidCallStackString(pid_t tid);
-
   private:
     // To minimize movement of data, we pass around shared_ptrs to Requests.
     // These are allocated and deallocated outside of the lock.
