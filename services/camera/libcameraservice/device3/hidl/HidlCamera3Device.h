@@ -102,7 +102,7 @@ class HidlCamera3Device :
                      std::shared_ptr<RequestMetadataQueue> queue,
                      bool useHalBufManager, bool supportOfflineProcessing);
 
-        virtual IPCTransport getTransportType() override { return IPCTransport::HIDL; }
+        virtual IPCTransport getTransportType() const override { return IPCTransport::HIDL; }
         // Returns true if constructed with a valid device or session, and not yet cleared
         virtual bool valid() override;
 

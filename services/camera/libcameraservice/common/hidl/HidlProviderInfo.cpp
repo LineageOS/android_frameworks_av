@@ -23,7 +23,7 @@
 #include <camera_metadata_hidden.h>
 
 #include "device3/ZoomRatioMapper.h"
-#include <utils/SessionConfigurationUtils.h>
+#include <utils/SessionConfigurationUtilsHidl.h>
 #include <utils/Trace.h>
 
 #include <android/hardware/camera/device/3.7/ICameraDevice.h>
