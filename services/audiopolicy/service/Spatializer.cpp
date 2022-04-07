@@ -373,10 +373,8 @@ Status Spatializer::setDesiredHeadTrackingMode(SpatializerHeadTrackingMode mode)
             break;
     }
 
-    if (mPoseController != nullptr) {
-        mPoseController->setDesiredMode(mDesiredHeadTrackingMode);
-        checkSensorsState_l();
-    }
+    checkPoseController_l();
+    checkSensorsState_l();
 
     return Status::ok();
 }
@@ -449,6 +447,7 @@ Status Spatializer::setHeadSensor(int sensorHandle) {
     }
     std::lock_guard lock(mLock);
     mHeadSensor = sensorHandle;
+    checkPoseController_l();
     checkSensorsState_l();
     return Status::ok();
 }
@@ -460,7 +459,9 @@ Status Spatializer::setScreenSensor(int sensorHandle) {
     }
     std::lock_guard lock(mLock);
     mScreenSensor = sensorHandle;
-    checkSensorsState_l();
+    if (mPoseController != nullptr) {
+        mPoseController->setScreenSensor(mScreenSensor);
+    }
     return Status::ok();
 }
 
@@ -654,25 +655,20 @@ status_t Spatializer::attachOutput(audio_io_handle_t output, size_t numActiveTra
             return status;
         }
 
-        checkEngineState_l();
         outputChanged = mOutput != output;
         mOutput = output;
+        mNumActiveTracks = numActiveTracks;
 
+        checkEngineState_l();
         if (mSupportsHeadTracking) {
-            mPoseController = std::make_shared<SpatializerPoseController>(
-                    static_cast<SpatializerPoseController::Listener*>(this), 10ms, 1000ms);
-            LOG_ALWAYS_FATAL_IF(mPoseController == nullptr,
-                                "%s could not allocate pose controller", __func__);
-
-            mPoseController->setDesiredMode(mDesiredHeadTrackingMode);
-            mNumActiveTracks = numActiveTracks;
+            checkPoseController_l();
             checkSensorsState_l();
-            mPoseController->setDisplayOrientation(mDisplayOrientation);
             poseController = mPoseController;
         }
         callback = mSpatializerCallback;
     }
     if (poseController != nullptr) {
+        poseController->calculateAsync();
         poseController->waitUntilCalculated();
     }
 
@@ -744,6 +740,25 @@ void Spatializer::checkEngineState_l() {
                     std::vector<SpatializationLevel>{SpatializationLevel::NONE});
             mEngine->setEnabled(false);
         }
+    }
+}
+
+void Spatializer::checkPoseController_l() {
+    bool isControllerNeeded = mDesiredHeadTrackingMode != HeadTrackingMode::STATIC
+            && mHeadSensor != SpatializerPoseController::INVALID_SENSOR;
+
+    if (isControllerNeeded && mPoseController == nullptr) {
+        mPoseController = std::make_shared<SpatializerPoseController>(
+                static_cast<SpatializerPoseController::Listener*>(this),
+                10ms, std::chrono::microseconds::max());
+        LOG_ALWAYS_FATAL_IF(mPoseController == nullptr,
+                            "%s could not allocate pose controller", __func__);
+        mPoseController->setDisplayOrientation(mDisplayOrientation);
+    } else if (!isControllerNeeded && mPoseController != nullptr) {
+        mPoseController.reset();
+    }
+    if (mPoseController != nullptr) {
+        mPoseController->setDesiredMode(mDesiredHeadTrackingMode);
     }
 }
 

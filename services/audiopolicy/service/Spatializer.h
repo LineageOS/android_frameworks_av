@@ -284,6 +284,12 @@ private:
     void checkSensorsState_l() REQUIRES(mLock);
 
     /**
+     * Checks if the head pose controller should be created or destroyed according
+     * to desired head tracking mode.
+     */
+    void checkPoseController_l() REQUIRES(mLock);
+
+    /**
      * Checks if the spatializer effect should be enabled based on
      * playback activity and requested level.
      */
