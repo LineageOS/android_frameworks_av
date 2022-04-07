@@ -483,7 +483,7 @@ public:
                             if (track->isFastTrack()) {
                                 result |= FAST_SESSION;  // caution, only represents first track.
                             }
-                            if (track->canBeSpatialized()) {
+                            if (track->isSpatialized()) {
                                 result |= SPATIALIZED_SESSION;  // caution, only first track.
                             }
                             break;
@@ -960,7 +960,8 @@ public:
                                 pid_t tid,
                                 status_t *status /*non-NULL*/,
                                 audio_port_handle_t portId,
-                                const sp<media::IAudioTrackCallback>& callback);
+                                const sp<media::IAudioTrackCallback>& callback,
+                                bool isSpatialized);
 
                 AudioStreamOut* getOutput() const;
                 AudioStreamOut* clearOutput();

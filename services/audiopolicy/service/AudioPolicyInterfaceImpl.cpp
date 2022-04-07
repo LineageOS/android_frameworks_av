@@ -383,13 +383,15 @@ Status AudioPolicyService::getOutputForAttr(const media::AudioAttributesInternal
 
     AutoCallerClear acc;
     AudioPolicyInterface::output_type_t outputType;
+    bool isSpatialized = false;
     status_t result = mAudioPolicyManager->getOutputForAttr(&attr, &output, session,
                                                             &stream,
                                                             adjAttributionSource,
                                                             &config,
                                                             &flags, &selectedDeviceId, &portId,
                                                             &secondaryOutputs,
-                                                            &outputType);
+                                                            &outputType,
+                                                            &isSpatialized);
 
     // FIXME: Introduce a way to check for the the telephony device before opening the output
     if (result == NO_ERROR) {
@@ -426,7 +428,7 @@ Status AudioPolicyService::getOutputForAttr(const media::AudioAttributesInternal
     if (result == NO_ERROR) {
         sp<AudioPlaybackClient> client =
                 new AudioPlaybackClient(attr, output, adjAttributionSource, session,
-                    portId, selectedDeviceId, stream);
+                    portId, selectedDeviceId, stream, isSpatialized);
         mAudioPlaybackClients.add(portId, client);
 
         _aidl_return->output = VALUE_OR_RETURN_BINDER_STATUS(
@@ -440,6 +442,7 @@ Status AudioPolicyService::getOutputForAttr(const media::AudioAttributesInternal
         _aidl_return->secondaryOutputs = VALUE_OR_RETURN_BINDER_STATUS(
                 convertContainer<std::vector<int32_t>>(secondaryOutputs,
                                                        legacy2aidl_audio_io_handle_t_int32_t));
+        _aidl_return->isSpatialized = isSpatialized;
     }
     return binderStatusFromStatusT(result);
 }

@@ -218,13 +218,14 @@ void AudioPolicyManagerTest::getOutputForAttr(
     if (!portId) portId = &localPortId;
     *portId = AUDIO_PORT_HANDLE_NONE;
     AudioPolicyInterface::output_type_t outputType;
+    bool isSpatialized;
     // TODO b/182392769: use attribution source util
     AttributionSourceState attributionSource = AttributionSourceState();
     attributionSource.uid = 0;
     attributionSource.token = sp<BBinder>::make();
     ASSERT_EQ(OK, mManager->getOutputForAttr(
                     &attr, output, AUDIO_SESSION_NONE, &stream, attributionSource, &config, &flags,
-                    selectedDeviceId, portId, {}, &outputType));
+                    selectedDeviceId, portId, {}, &outputType, &isSpatialized));
     ASSERT_NE(AUDIO_PORT_HANDLE_NONE, *portId);
     ASSERT_NE(AUDIO_IO_HANDLE_NONE, *output);
 }

@@ -971,12 +971,14 @@ private:
                 AudioPlaybackClient(const audio_attributes_t attributes,
                       const audio_io_handle_t io, AttributionSourceState attributionSource,
                             const audio_session_t session, audio_port_handle_t portId,
-                            audio_port_handle_t deviceId, audio_stream_type_t stream) :
+                            audio_port_handle_t deviceId, audio_stream_type_t stream,
+                            bool isSpatialized) :
                     AudioClient(attributes, io, attributionSource, session, portId,
-                        deviceId), stream(stream) {}
+                        deviceId), stream(stream), isSpatialized(isSpatialized)  {}
                 ~AudioPlaybackClient() override = default;
 
         const audio_stream_type_t stream;
+        const bool isSpatialized;
     };
 
     void getPlaybackClientAndEffects(audio_port_handle_t portId,
@@ -1006,7 +1008,16 @@ private:
     void loadAudioPolicyManager();
     void unloadAudioPolicyManager();
 
-    size_t countActiveClientsOnOutput_l(audio_io_handle_t output) REQUIRES(mLock);
+    /**
+     * Returns the number of active audio tracks on the specified output mixer.
+     * The query can be specified to only include spatialized audio tracks or consider
+     * all tracks.
+     * @param output the I/O handle of the output mixer to consider
+     * @param spatializedOnly true if only spatialized tracks should be considered
+     * @return the number of active tracks.
+     */
+    size_t countActiveClientsOnOutput_l(
+        audio_io_handle_t output, bool spatializedOnly = true) REQUIRES(mLock);
 
     mutable Mutex mLock;    // prevents concurrent access to AudioPolicy manager functions changing
                             // device connection state  or routing
