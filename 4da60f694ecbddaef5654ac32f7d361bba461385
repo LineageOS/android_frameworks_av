@@ -1,0 +1,21 @@
+{
+  "comments": [
+    {
+      "unresolved": false,
+      "key": {
+        "uuid": "b0bd49d1_fb70d8a3",
+        "filename": "/PATCHSET_LEVEL",
+        "patchSetId": 1
+      },
+      "lineNbr": 0,
+      "author": {
+        "id": 24080
+      },
+      "writtenOn": "2022-04-07T19:14:04Z",
+      "side": 1,
+      "message": "Topic Q_asb_2022-04 builds OK for sargo \u0026 hammerhead.",
+      "revId": "4da60f694ecbddaef5654ac32f7d361bba461385",
+      "serverId": "1ec6b3db-b2c1-4fa4-84a2-4c7efe89ba71"
+    }
+  ]
+}
