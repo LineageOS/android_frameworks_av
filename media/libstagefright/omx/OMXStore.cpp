@@ -99,6 +99,15 @@ void OMXStore::addPlugin(const char *libname) {
     }
 }
 
+static int getFirstApiLevel() {
+    int boardApiLevel = android::base::GetIntProperty("ro.board.first_api_level", 0);
+    if (boardApiLevel != 0) {
+        return boardApiLevel;
+    }
+
+    return android::base::GetIntProperty("ro.product.first_api_level", __ANDROID_API_T__);
+}
+
 void OMXStore::addPlugin(OMXPluginBase *plugin) {
     Mutex::Autolock autoLock(mLock);
 
@@ -109,6 +118,29 @@ void OMXStore::addPlugin(OMXPluginBase *plugin) {
     while ((err = plugin->enumerateComponents(
                     name, sizeof(name), index++)) == OMX_ErrorNone) {
         String8 name8(name);
+
+        Vector<String8> roles;
+        OMX_ERRORTYPE err = plugin->getRolesOfComponent(name, &roles);
+        if (err == OMX_ErrorNone) {
+            bool skip = false;
+            for (String8 role : roles) {
+                if (role.find("video_decoder") != -1 || role.find("video_encoder") != -1) {
+                    if (getFirstApiLevel() >= __ANDROID_API_S__) {
+                        skip = true;
+                        break;
+                    }
+                }
+                if (role.find("audio_decoder") != -1 || role.find("audio_encoder") != -1) {
+                    if (getFirstApiLevel() >= __ANDROID_API_T__) {
+                        skip = true;
+                        break;
+                    }
+                }
+            }
+            if (skip) {
+                continue;
+            }
+        }
 
         if (mPluginByComponentName.indexOfKey(name8) >= 0) {
             ALOGE("A component of name '%s' already exists, ignoring this one.",
