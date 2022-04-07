@@ -959,7 +959,8 @@ status_t AudioSystem::getOutputForAttr(audio_attributes_t* attr,
                                        audio_output_flags_t flags,
                                        audio_port_handle_t* selectedDeviceId,
                                        audio_port_handle_t* portId,
-                                       std::vector<audio_io_handle_t>* secondaryOutputs) {
+                                       std::vector<audio_io_handle_t>* secondaryOutputs,
+                                       bool *isSpatialized) {
     if (attr == nullptr) {
         ALOGE("%s NULL audio attributes", __func__);
         return BAD_VALUE;
@@ -1012,6 +1013,7 @@ status_t AudioSystem::getOutputForAttr(audio_attributes_t* attr,
     *portId = VALUE_OR_RETURN_STATUS(aidl2legacy_int32_t_audio_port_handle_t(responseAidl.portId));
     *secondaryOutputs = VALUE_OR_RETURN_STATUS(convertContainer<std::vector<audio_io_handle_t>>(
             responseAidl.secondaryOutputs, aidl2legacy_int32_t_audio_io_handle_t));
+    *isSpatialized = responseAidl.isSpatialized;
 
     return OK;
 }
