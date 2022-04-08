@@ -389,7 +389,7 @@ void CCodecConfig::initializeStandardParams() {
             // read back always as int
             float value;
             if (v.get(&value)) {
-                return (int32_t)value;
+                return (int32_t) (value + 0.5);
             }
             return C2Value();
         }));
