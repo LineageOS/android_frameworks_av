@@ -231,7 +231,7 @@ bool statsd_codec(const std::shared_ptr<const mediametrics::Item>& item,
         sessionId = mediametrics::ValidateId::get()->validateId(sessionId);
         metrics_proto.set_log_session_id(sessionId);
     }
-    AStatsEvent_writeString(event, codec.c_str());
+    AStatsEvent_writeString(event, sessionId.c_str());
 
     int32_t channelCount = -1;
     if (item->getInt32("android.media.mediacodec.channelCount", &channelCount)) {
