@@ -40,7 +40,6 @@ cc_fuzz {
         "libdatasource",
         "libmedia",
         "libstagefright",
-        "libutils",
     ],
     header_libs: [
         "libbase_headers",
@@ -53,6 +52,7 @@ cc_fuzz {
         "libstagefright_foundation",
         "libhidlbase",
         "libhidlmemory",
+        "libutils",
         "android.hidl.allocator@1.0",
     ],
     corpus: ["corpus/*"],
