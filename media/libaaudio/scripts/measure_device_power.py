@@ -225,13 +225,13 @@ def measureEnergyForCommands(fileName):
         line = fp.readline()
         while line:
             command = line.strip()
-            if command.endswith('\\'):
-                command = command[:-1].strip() # remove \\:
-                runCommand(command)
-            elif command.startswith("#"):
+            if command.startswith("#"):
                 # ignore comment
                 print((command + "\n"))
-                comment = command
+                comment = command[1:].strip() # remove leading '#'
+            elif command.endswith('\\'):
+                command = command[:-1].strip() # remove \\
+                runCommand(command)
             elif command:
                 report = averageEnergyForCommand(command, DEFAULT_NUM_ITERATIONS)
                 finalReport += comment + ", " + command + ", " + formatEnergyData(report) + "\n"
