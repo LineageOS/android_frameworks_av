@@ -4450,8 +4450,9 @@ status_t CameraService::dump(int fd, const Vector<String16>& args) {
 void CameraService::dumpOpenSessionClientLogs(int fd,
         const Vector<String16>& args, const String8& cameraId) {
     auto clientDescriptor = mActiveClientManager.get(cameraId);
-    dprintf(fd, "  Device %s is open. Client instance dump:\n",
-        cameraId.string());
+    dprintf(fd, "  %s : Device %s is open. Client instance dump:\n",
+            getFormattedCurrentTime().string(),
+            cameraId.string());
     dprintf(fd, "    Client priority score: %d state: %d\n",
         clientDescriptor->getPriority().getScore(),
         clientDescriptor->getPriority().getState());
