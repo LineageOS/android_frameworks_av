@@ -166,8 +166,10 @@ private:
     void removeProcessInfoOverride(int pid);
 
     void removeProcessInfoOverride_l(int pid);
-    uintptr_t addCookieAndLink_l(::ndk::SpAIBinder binder, const sp<DeathNotifier>& notifier);
-    void removeCookieAndUnlink_l(::ndk::SpAIBinder binder, uintptr_t cookie);
+    uintptr_t addCookieAndLink_l(const std::shared_ptr<IResourceManagerClient>& client,
+                                 const sp<DeathNotifier>& notifier);
+    void removeCookieAndUnlink_l(const std::shared_ptr<IResourceManagerClient>& client,
+                                 uintptr_t cookie);
 
     mutable Mutex mLock;
     sp<ProcessInfoInterface> mProcessInfo;
