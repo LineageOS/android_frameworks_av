@@ -25,7 +25,6 @@
 
 #include <aaudio/AAudio.h>
 #include <aaudio/AAudioTesting.h>
-#include <media/AudioSystem.h>
 #include "AudioClock.h"
 #include "AudioGlobal.h"
 #include "AudioStreamBuilder.h"
@@ -604,8 +603,4 @@ AAUDIO_API aaudio_channel_mask_t AAudioStream_getChannelMask(AAudioStream* strea
     const aaudio_channel_mask_t channelMask = audioStream->getChannelMask();
     // Do not return channel index masks as they are not public.
     return AAudio_isChannelIndexMask(channelMask) ? AAUDIO_UNSPECIFIED : channelMask;
-}
-
-AAUDIO_API int AAudio_getAudioServerDeathCount() {
-    return android::AudioSystem::getAudioFlingerDeathCount();
 }
