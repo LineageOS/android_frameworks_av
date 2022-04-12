@@ -379,8 +379,6 @@ status_t Camera3OutputStream::returnBufferCheckedLocked(
         nsecs_t captureTime = (mSyncToDisplay ? readoutTimestamp : timestamp) - mTimestampOffset;
         nsecs_t presentTime = mSyncToDisplay ?
                 syncTimestampToDisplayLocked(captureTime) : captureTime;
-        mLastCaptureTime = captureTime;
-        mLastPresentTime = presentTime;
 
         setTransform(transform, true/*mayChangeMirror*/);
         res = native_window_set_buffers_timestamp(mConsumer.get(), presentTime);
@@ -1267,6 +1265,8 @@ nsecs_t Camera3OutputStream::syncTimestampToDisplayLocked(nsecs_t t) {
     if (res != OK) {
         ALOGE("%s: Stream %d: Error getting latest vsync event data: %s (%d)",
                 __FUNCTION__, mId, strerror(-res), res);
+        mLastCaptureTime = t;
+        mLastPresentTime = t;
         return t;
     }
 
@@ -1286,7 +1286,7 @@ nsecs_t Camera3OutputStream::syncTimestampToDisplayLocked(nsecs_t t) {
     }
 
     nsecs_t idealPresentT = t + mCaptureToPresentOffset;
-    nsecs_t expectedPresentT = 0;
+    nsecs_t expectedPresentT = mLastPresentTime;
     nsecs_t minDiff = INT64_MAX;
     // Derive minimum intervals between presentation times based on minimal
     // expected duration.
@@ -1306,7 +1306,14 @@ nsecs_t Camera3OutputStream::syncTimestampToDisplayLocked(nsecs_t t) {
             minDiff = std::abs(vsyncTime.expectedPresentationTime - idealPresentT);
         }
     }
-    return expectedPresentT;
+    mLastCaptureTime = t;
+    mLastPresentTime = expectedPresentT;
+
+    // Move the expected presentation time back by 1/3 of frame interval to
+    // mitigate the time drift. Due to time drift, if we directly use the
+    // expected presentation time, often times 2 expected presentation time
+    // falls into the same VSYNC interval.
+    return expectedPresentT - vsyncEventData.frameInterval/3;
 }
 
 }; // namespace camera3
