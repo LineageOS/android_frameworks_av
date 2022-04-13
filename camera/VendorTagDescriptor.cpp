@@ -760,7 +760,7 @@ int vendor_tag_descriptor_cache_get_tag_type(uint32_t tag,
     Mutex::Autolock al(sLock);
     if (sGlobalVendorTagDescriptorCache == NULL) {
         ALOGE("%s: Vendor tag descriptor cache not initialized.", __FUNCTION__);
-        return VENDOR_TAG_NAME_ERR;
+        return VENDOR_TAG_TYPE_ERR;
     }
     return sGlobalVendorTagDescriptorCache->getTagType(tag, id);
 }
