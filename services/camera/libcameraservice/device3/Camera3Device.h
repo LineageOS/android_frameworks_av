@@ -982,6 +982,8 @@ class Camera3Device :
 
         Mutex              mRequestLock;
         Condition          mRequestSignal;
+        bool               mRequestClearing;
+
         Condition          mRequestSubmittedSignal;
         RequestList        mRequestQueue;
         RequestList        mRepeatingRequests;
