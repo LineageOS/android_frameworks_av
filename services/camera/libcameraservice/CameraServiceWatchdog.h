@@ -21,10 +21,12 @@
  * expected duration has exceeded.
  * Notes on multi-threaded behaviors:
  *    - The threadloop is blocked/paused when there are no calls being
- *   monitored.
+ *   monitored (when the TID cycle to counter map is empty).
  *   - The start and stop functions handle simultaneous call monitoring
  *   and single call monitoring differently. See function documentation for
  *   more details.
+ * To disable/enable:
+ *   - adb shell cmd media.camera set-cameraservice-watchdog [0/1]
  */
 
 #include <chrono>
@@ -49,14 +51,18 @@ class CameraServiceWatchdog : public Thread {
 
 public:
     explicit CameraServiceWatchdog() : mPause(true), mMaxCycles(kMaxCycles),
-            mCycleLengthMs(kCycleLengthMs) {};
+            mCycleLengthMs(kCycleLengthMs), mEnabled(true) {};
 
-    explicit CameraServiceWatchdog (size_t maxCycles, uint32_t cycleLengthMs) :
-            mPause(true), mMaxCycles(maxCycles), mCycleLengthMs(cycleLengthMs) {};
+    explicit CameraServiceWatchdog (size_t maxCycles, uint32_t cycleLengthMs, bool enabled) :
+            mPause(true), mMaxCycles(maxCycles), mCycleLengthMs(cycleLengthMs), mEnabled(enabled)
+                    {};
 
     virtual ~CameraServiceWatchdog() {};
 
     virtual void requestExit();
+
+    /** Enables/disables the watchdog */
+    void setEnabled(bool enable);
 
     /** Used to wrap monitored calls in start and stop functions using custom timer values */
     template<typename T>
@@ -66,8 +72,13 @@ public:
         if (cycles != mMaxCycles || cycleLength != mCycleLengthMs) {
             // Create another instance of the watchdog to prevent disruption
             // of timer for current monitored calls
+
+            // Lock for mEnabled
+            mEnabledLock.lock();
             sp<CameraServiceWatchdog> tempWatchdog =
-                    new CameraServiceWatchdog(cycles, cycleLength);
+                    new CameraServiceWatchdog(cycles, cycleLength, mEnabled);
+            mEnabledLock.unlock();
+
             tempWatchdog->run("CameraServiceWatchdog");
             res = tempWatchdog->watchThread(func, tid);
             tempWatchdog->requestExit();
@@ -84,11 +95,17 @@ public:
     /** Used to wrap monitored calls in start and stop functions using class timer values */
     template<typename T>
     auto watchThread(T func, uint32_t tid) {
+        AutoMutex _l(mEnabledLock);
+
         auto res = NULL;
 
-        start(tid);
-        res = func();
-        stop(tid);
+        if (mEnabled) {
+            start(tid);
+            res = func();
+            stop(tid);
+        } else {
+            res = func();
+        }
 
         return res;
     }
@@ -109,11 +126,13 @@ private:
 
     virtual bool    threadLoop();
 
-    Mutex           mWatchdogLock;        // Lock for condition variable
-    Condition       mWatchdogCondition;   // Condition variable for stop/start
-    bool            mPause;               // True if thread is currently paused
-    uint32_t        mMaxCycles;           // Max cycles
-    uint32_t        mCycleLengthMs;       // Length of time elapsed per cycle
+    Mutex           mWatchdogLock;      // Lock for condition variable
+    Mutex           mEnabledLock;       // Lock for enabled status
+    Condition       mWatchdogCondition; // Condition variable for stop/start
+    bool            mPause;             // True if tid map is empty
+    uint32_t        mMaxCycles;         // Max cycles
+    uint32_t        mCycleLengthMs;     // Length of time elapsed per cycle
+    bool            mEnabled;           // True if watchdog is enabled
 
     std::unordered_map<uint32_t, uint32_t> tidToCycleCounterMap; // Thread Id to cycle counter map
 };

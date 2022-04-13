@@ -90,6 +90,8 @@ public:
     virtual bool            supportsCameraMute();
     virtual status_t        setCameraMute(bool enabled);
 
+    virtual status_t        setCameraServiceWatchdog(bool enabled);
+
     /**
      * Interface used by CameraService
      */

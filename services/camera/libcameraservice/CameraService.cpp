@@ -1883,6 +1883,9 @@ Status CameraService::connectHelper(const sp<CALLBACK>& cameraCb, const String8&
             }
         }
 
+        // Enable/disable camera service watchdog
+        client->setCameraServiceWatchdog(mCameraServiceWatchdogEnabled);
+
         // Set rotate-and-crop override behavior
         if (mOverrideRotateAndCropMode != ANDROID_SCALER_ROTATE_AND_CROP_AUTO) {
             client->setRotateAndCropOverride(mOverrideRotateAndCropMode);
@@ -4822,6 +4825,8 @@ status_t CameraService::shellCommand(int in, int out, int err, const Vector<Stri
         return handleSetCameraMute(args);
     } else if (args.size() >= 2 && args[0] == String16("watch")) {
         return handleWatchCommand(args, in, out);
+    } else if (args.size() >= 2 && args[0] == String16("set-watchdog")) {
+        return handleSetCameraServiceWatchdog(args);
     } else if (args.size() == 1 && args[0] == String16("help")) {
         printHelp(out);
         return OK;
@@ -4908,6 +4913,28 @@ status_t CameraService::handleSetRotateAndCrop(const Vector<String16>& args) {
             const auto basicClient = current->getValue();
             if (basicClient.get() != nullptr) {
                 basicClient->setRotateAndCropOverride(rotateValue);
+            }
+        }
+    }
+
+    return OK;
+}
+
+status_t CameraService::handleSetCameraServiceWatchdog(const Vector<String16>& args) {
+    int enableWatchdog = atoi(String8(args[1]));
+
+    if (enableWatchdog < 0 || enableWatchdog > 1) return BAD_VALUE;
+
+    Mutex::Autolock lock(mServiceLock);
+
+    mCameraServiceWatchdogEnabled = enableWatchdog;
+
+    const auto clients = mActiveClientManager.getAll();
+    for (auto& current : clients) {
+        if (current != nullptr) {
+            const auto basicClient = current->getValue();
+            if (basicClient.get() != nullptr) {
+                basicClient->setCameraServiceWatchdog(enableWatchdog);
             }
         }
     }
