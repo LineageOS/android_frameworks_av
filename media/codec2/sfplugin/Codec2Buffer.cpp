@@ -16,7 +16,9 @@
 
 //#define LOG_NDEBUG 0
 #define LOG_TAG "Codec2Buffer"
+#define ATRACE_TAG  ATRACE_TAG_VIDEO
 #include <utils/Log.h>
+#include <utils/Trace.h>
 
 #include <aidl/android/hardware/graphics/common/Cta861_3.h>
 #include <aidl/android/hardware/graphics/common/Smpte2086.h>
@@ -229,6 +231,7 @@ public:
           mAllocatedDepth(0),
           mBackBufferSize(0),
           mMediaImage(new ABuffer(sizeof(MediaImage2))) {
+        ATRACE_CALL();
         if (!format->findInt32(KEY_COLOR_FORMAT, &mClientColorFormat)) {
             mClientColorFormat = COLOR_FormatYUV420Flexible;
         }
@@ -581,6 +584,7 @@ public:
      * Copy C2GraphicView to MediaImage2.
      */
     status_t copyToMediaImage() {
+        ATRACE_CALL();
         if (mInitCheck != OK) {
             return mInitCheck;
         }
@@ -619,7 +623,9 @@ sp<GraphicBlockBuffer> GraphicBlockBuffer::Allocate(
         const sp<AMessage> &format,
         const std::shared_ptr<C2GraphicBlock> &block,
         std::function<sp<ABuffer>(size_t)> alloc) {
+    ATRACE_BEGIN("GraphicBlockBuffer::Allocate block->map()");
     C2GraphicView view(block->map().get());
+    ATRACE_END();
     if (view.error() != C2_OK) {
         ALOGD("C2GraphicBlock::map failed: %d", view.error());
         return nullptr;
@@ -664,6 +670,7 @@ GraphicBlockBuffer::GraphicBlockBuffer(
 }
 
 std::shared_ptr<C2Buffer> GraphicBlockBuffer::asC2Buffer() {
+    ATRACE_CALL();
     uint32_t width = mView.width();
     uint32_t height = mView.height();
     if (!mWrapped) {
@@ -752,8 +759,10 @@ sp<ConstGraphicBlockBuffer> ConstGraphicBlockBuffer::Allocate(
         ALOGD("C2Buffer precond fail");
         return nullptr;
     }
+    ATRACE_BEGIN("ConstGraphicBlockBuffer::Allocate block->map()");
     std::unique_ptr<const C2GraphicView> view(std::make_unique<const C2GraphicView>(
             buffer->data().graphicBlocks()[0].map().get()));
+    ATRACE_END();
     std::unique_ptr<const C2GraphicView> holder;
 
     GraphicView2MediaImageConverter converter(*view, format, false /* copy */);
@@ -854,11 +863,13 @@ bool ConstGraphicBlockBuffer::canCopy(const std::shared_ptr<C2Buffer> &buffer) c
         return false;
     }
 
+    ATRACE_BEGIN("ConstGraphicBlockBuffer::canCopy block->map()");
     GraphicView2MediaImageConverter converter(
             buffer->data().graphicBlocks()[0].map().get(),
             // FIXME: format() is not const, but we cannot change it, so do a const cast here
             const_cast<ConstGraphicBlockBuffer *>(this)->format(),
             true /* copy */);
+    ATRACE_END();
     if (converter.initCheck() != OK) {
         ALOGD("ConstGraphicBlockBuffer::canCopy: converter init failed: %d", converter.initCheck());
         return false;
