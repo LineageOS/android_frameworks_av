@@ -521,6 +521,14 @@ typedef enum acamera_metadata_tag {
      * region and output only the intersection rectangle as the metering region in the result
      * metadata.  If the region is entirely outside the crop region, it will be ignored and
      * not reported in the result metadata.</p>
+     * <p>When setting the AE metering regions, the application must consider the additional
+     * crop resulted from the aspect ratio differences between the preview stream and
+     * ACAMERA_SCALER_CROP_REGION. For example, if the ACAMERA_SCALER_CROP_REGION is the full
+     * active array size with 4:3 aspect ratio, and the preview stream is 16:9,
+     * the boundary of AE regions will be [0, y_crop] and
+     * [active_width, active_height - 2 * y_crop] rather than [0, 0] and
+     * [active_width, active_height], where y_crop is the additional crop due to aspect ratio
+     * mismatch.</p>
      * <p>Starting from API level 30, the coordinate system of activeArraySize or
      * preCorrectionActiveArraySize is used to represent post-zoomRatio field of view, not
      * pre-zoom field of view. This means that the same aeRegions values at different
@@ -722,6 +730,14 @@ typedef enum acamera_metadata_tag {
      * region and output only the intersection rectangle as the metering region in the result
      * metadata. If the region is entirely outside the crop region, it will be ignored and
      * not reported in the result metadata.</p>
+     * <p>When setting the AF metering regions, the application must consider the additional
+     * crop resulted from the aspect ratio differences between the preview stream and
+     * ACAMERA_SCALER_CROP_REGION. For example, if the ACAMERA_SCALER_CROP_REGION is the full
+     * active array size with 4:3 aspect ratio, and the preview stream is 16:9,
+     * the boundary of AF regions will be [0, y_crop] and
+     * [active_width, active_height - 2 * y_crop] rather than [0, 0] and
+     * [active_width, active_height], where y_crop is the additional crop due to aspect ratio
+     * mismatch.</p>
      * <p>Starting from API level 30, the coordinate system of activeArraySize or
      * preCorrectionActiveArraySize is used to represent post-zoomRatio field of view, not
      * pre-zoom field of view. This means that the same afRegions values at different
@@ -917,6 +933,14 @@ typedef enum acamera_metadata_tag {
      * region and output only the intersection rectangle as the metering region in the result
      * metadata.  If the region is entirely outside the crop region, it will be ignored and
      * not reported in the result metadata.</p>
+     * <p>When setting the AWB metering regions, the application must consider the additional
+     * crop resulted from the aspect ratio differences between the preview stream and
+     * ACAMERA_SCALER_CROP_REGION. For example, if the ACAMERA_SCALER_CROP_REGION is the full
+     * active array size with 4:3 aspect ratio, and the preview stream is 16:9,
+     * the boundary of AWB regions will be [0, y_crop] and
+     * [active_width, active_height - 2 * y_crop] rather than [0, 0] and
+     * [active_width, active_height], where y_crop is the additional crop due to aspect ratio
+     * mismatch.</p>
      * <p>Starting from API level 30, the coordinate system of activeArraySize or
      * preCorrectionActiveArraySize is used to represent post-zoomRatio field of view, not
      * pre-zoom field of view. This means that the same awbRegions values at different
