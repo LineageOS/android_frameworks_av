@@ -26,6 +26,8 @@
 #include <media/IMediaRecorder.h>
 #include <media/IRemoteDisplay.h>
 #include <media/IRemoteDisplayClient.h>
+#include <media/MediaHTTPConnection.h>
+#include <media/MediaHTTPService.h>
 #include <media/stagefright/RemoteDataSource.h>
 #include <media/stagefright/foundation/base64.h>
 #include <thread>
@@ -102,6 +104,42 @@ struct TestStreamSource : public IStreamSource {
     IBinder *onAsBinder() { return nullptr; };
 };
 
+struct TestMediaHTTPConnection : public MediaHTTPConnection {
+  public:
+    TestMediaHTTPConnection() {}
+    virtual ~TestMediaHTTPConnection() {}
+
+    virtual bool connect(const char* /*uri*/, const KeyedVector<String8, String8>* /*headers*/) {
+        return true;
+    }
+
+    virtual void disconnect() { return; }
+
+    virtual ssize_t readAt(off64_t /*offset*/, void* /*data*/, size_t size) { return size; }
+
+    virtual off64_t getSize() { return 0; }
+    virtual status_t getMIMEType(String8* /*mimeType*/) { return NO_ERROR; }
+    virtual status_t getUri(String8* /*uri*/) { return NO_ERROR; }
+
+  private:
+    DISALLOW_EVIL_CONSTRUCTORS(TestMediaHTTPConnection);
+};
+
+struct TestMediaHTTPService : public BnInterface<IMediaHTTPService> {
+  public:
+    TestMediaHTTPService() {}
+    ~TestMediaHTTPService(){};
+
+    virtual sp<MediaHTTPConnection> makeHTTPConnection() {
+        mMediaHTTPConnection = sp<TestMediaHTTPConnection>::make();
+        return mMediaHTTPConnection;
+    }
+
+  private:
+    sp<TestMediaHTTPConnection> mMediaHTTPConnection = nullptr;
+    DISALLOW_EVIL_CONSTRUCTORS(TestMediaHTTPService);
+};
+
 class BinderDeathNotifier : public IBinder::DeathRecipient {
    public:
     void binderDied(const wp<IBinder> &) { abort(); }
@@ -140,7 +178,9 @@ bool MediaPlayerServiceFuzzer::setDataSource(const uint8_t *data, size_t size) {
             AString out;
             encodeBase64(uriSuffix.data(), uriSuffix.size(), &out);
             uri += out.c_str();
-            status = mMediaPlayer->setDataSource(nullptr /*httpService*/, uri.c_str(), &headers);
+            sp<TestMediaHTTPService> testService = sp<TestMediaHTTPService>::make();
+            status =
+                    mMediaPlayer->setDataSource(testService /*httpService*/, uri.c_str(), &headers);
             break;
         }
         case fd: {
