@@ -22,7 +22,6 @@
 
 #include <media/stagefright/foundation/ADebug.h>
 #include <media/stagefright/foundation/MediaDefs.h>
-#include <media/stagefright/MediaCodec.h>
 #include <media/stagefright/MediaCodecConstants.h>
 #include <media/stagefright/SkipCutBuffer.h>
 #include <mediadrm/ICrypto.h>
@@ -33,6 +32,8 @@
 namespace android {
 
 namespace {
+
+constexpr uint32_t PIXEL_FORMAT_UNKNOWN = 0;
 
 sp<GraphicBlockBuffer> AllocateGraphicBuffer(
         const std::shared_ptr<C2BlockPool> &pool,
@@ -288,7 +289,7 @@ void OutputBuffers::pushToStash(
         int32_t flags,
         const sp<AMessage>& format,
         const C2WorkOrdinalStruct& ordinal) {
-    bool eos = flags & MediaCodec::BUFFER_FLAG_EOS;
+    bool eos = flags & BUFFER_FLAG_END_OF_STREAM;
     if (!buffer && eos) {
         // TRICKY: we may be violating ordering of the stash here. Because we
         // don't expect any more emplace() calls after this, the ordering should
@@ -296,7 +297,7 @@ void OutputBuffers::pushToStash(
         mReorderStash.emplace_back(
                 buffer, notify, timestamp, flags, format, ordinal);
     } else {
-        flags = flags & ~MediaCodec::BUFFER_FLAG_EOS;
+        flags = flags & ~BUFFER_FLAG_END_OF_STREAM;
         auto it = mReorderStash.begin();
         for (; it != mReorderStash.end(); ++it) {
             if (less(ordinal, it->ordinal)) {
@@ -307,7 +308,7 @@ void OutputBuffers::pushToStash(
                 buffer, notify, timestamp, flags, format, ordinal);
         if (eos) {
             mReorderStash.back().flags =
-                mReorderStash.back().flags | MediaCodec::BUFFER_FLAG_EOS;
+                mReorderStash.back().flags | BUFFER_FLAG_END_OF_STREAM;
         }
     }
     while (!mReorderStash.empty() && mReorderStash.size() > mDepth) {
@@ -344,7 +345,7 @@ OutputBuffers::BufferAction OutputBuffers::popFromStashAndRegister(
 
     // Flushing mReorderStash because no other buffers should come after output
     // EOS.
-    if (entry.flags & MediaCodec::BUFFER_FLAG_EOS) {
+    if (entry.flags & BUFFER_FLAG_END_OF_STREAM) {
         // Flush reorder stash
         setReorderDepth(0);
     }
