@@ -2857,6 +2857,7 @@ Camera3Device::RequestThread::RequestThread(wp<Camera3Device> parent,
         mInterface(interface),
         mListener(nullptr),
         mId(getId(parent)),
+        mRequestClearing(false),
         mFirstRepeating(false),
         mReconfigured(false),
         mDoPause(false),
@@ -3090,6 +3091,7 @@ status_t Camera3Device::RequestThread::clear(
         *lastFrameNumber = mRepeatingLastFrameNumber;
     }
     mRepeatingLastFrameNumber = hardware::camera2::ICameraDeviceUser::NO_IN_FLIGHT_REPEATING_FRAMES;
+    mRequestClearing = true;
     mRequestSignal.signal();
     return OK;
 }
@@ -4218,7 +4220,9 @@ sp<Camera3Device::CaptureRequest>
             break;
         }
 
-        res = mRequestSignal.waitRelative(mRequestLock, kRequestTimeout);
+        if (!mRequestClearing) {
+            res = mRequestSignal.waitRelative(mRequestLock, kRequestTimeout);
+        }
 
         if ((mRequestQueue.empty() && mRepeatingRequests.empty()) ||
                 exitPending()) {
@@ -4240,6 +4244,7 @@ sp<Camera3Device::CaptureRequest>
                 if (parent != nullptr) {
                     parent->mRequestBufferSM.onRequestThreadPaused();
                 }
+                mRequestClearing = false;
             }
             // Stop waiting for now and let thread management happen
             return NULL;
