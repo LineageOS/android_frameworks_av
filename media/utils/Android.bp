@@ -33,6 +33,7 @@ cc_library {
         "MediaUtilsDelayed.cpp",
         "MemoryLeakTrackUtil.cpp",
         "MethodStatistics.cpp",
+        "Process.cpp",
         "ProcessInfo.cpp",
         "SchedulingPolicyService.cpp",
         "ServiceUtilities.cpp",
