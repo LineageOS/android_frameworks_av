@@ -40,11 +40,9 @@ bool IOProfile::isCompatibleProfile(const DeviceVector &devices,
     const bool isRecordThread =
             getType() == AUDIO_PORT_TYPE_MIX && getRole() == AUDIO_PORT_ROLE_SINK;
     ALOG_ASSERT(isPlaybackThread != isRecordThread);
-
-    if (!devices.isEmpty()) {
-        if (!mSupportedDevices.containsAllDevices(devices)) {
-            return false;
-        }
+    if (!areAllDevicesSupported(devices) ||
+            !isCompatibleProfileForFlags(flags, exactMatchRequiredForInputFlags)) {
+        return false;
     }
 
     if (!audio_is_valid_format(format) ||
@@ -78,6 +76,33 @@ bool IOProfile::isCompatibleProfile(const DeviceVector &devices,
         }
     }
 
+    if (updatedSamplingRate != NULL) {
+        *updatedSamplingRate = myUpdatedSamplingRate;
+    }
+    if (updatedFormat != NULL) {
+        *updatedFormat = myUpdatedFormat;
+    }
+    if (updatedChannelMask != NULL) {
+        *updatedChannelMask = myUpdatedChannelMask;
+    }
+    return true;
+}
+
+bool IOProfile::areAllDevicesSupported(const DeviceVector &devices) const {
+    if (devices.empty()) {
+        return true;
+    }
+    return mSupportedDevices.containsAllDevices(devices);
+}
+
+bool IOProfile::isCompatibleProfileForFlags(uint32_t flags,
+                                            bool exactMatchRequiredForInputFlags) const {
+    const bool isPlaybackThread =
+            getType() == AUDIO_PORT_TYPE_MIX && getRole() == AUDIO_PORT_ROLE_SOURCE;
+    const bool isRecordThread =
+            getType() == AUDIO_PORT_TYPE_MIX && getRole() == AUDIO_PORT_ROLE_SINK;
+    ALOG_ASSERT(isPlaybackThread != isRecordThread);
+
     const uint32_t mustMatchOutputFlags =
             AUDIO_OUTPUT_FLAG_DIRECT|AUDIO_OUTPUT_FLAG_HW_AV_SYNC|AUDIO_OUTPUT_FLAG_MMAP_NOIRQ;
     if (isPlaybackThread && (((getFlags() ^ flags) & mustMatchOutputFlags)
@@ -93,15 +118,6 @@ bool IOProfile::isCompatibleProfile(const DeviceVector &devices,
         return false;
     }
 
-    if (updatedSamplingRate != NULL) {
-        *updatedSamplingRate = myUpdatedSamplingRate;
-    }
-    if (updatedFormat != NULL) {
-        *updatedFormat = myUpdatedFormat;
-    }
-    if (updatedChannelMask != NULL) {
-        *updatedChannelMask = myUpdatedChannelMask;
-    }
     return true;
 }
 

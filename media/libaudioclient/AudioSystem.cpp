@@ -1015,7 +1015,7 @@ status_t AudioSystem::getOutputForAttr(audio_attributes_t* attr,
                                        audio_session_t session,
                                        audio_stream_type_t* stream,
                                        const AttributionSourceState& attributionSource,
-                                       const audio_config_t* config,
+                                       audio_config_t* config,
                                        audio_output_flags_t flags,
                                        audio_port_handle_t* selectedDeviceId,
                                        audio_port_handle_t* portId,
@@ -1057,9 +1057,18 @@ status_t AudioSystem::getOutputForAttr(audio_attributes_t* attr,
 
     media::GetOutputForAttrResponse responseAidl;
 
-    RETURN_STATUS_IF_ERROR(statusTFromBinderStatus(
+    status_t status = statusTFromBinderStatus(
             aps->getOutputForAttr(attrAidl, sessionAidl, attributionSource, configAidl, flagsAidl,
-                                  selectedDeviceIdAidl, &responseAidl)));
+                                  selectedDeviceIdAidl, &responseAidl));
+    if (status != NO_ERROR) {
+        config->format = VALUE_OR_RETURN_STATUS(
+            aidl2legacy_AudioFormatDescription_audio_format_t(responseAidl.configBase.format));
+        config->channel_mask = VALUE_OR_RETURN_STATUS(
+            aidl2legacy_AudioChannelLayout_audio_channel_mask_t(
+                    responseAidl.configBase.channelMask, false /*isInput*/));
+        config->sample_rate = responseAidl.configBase.sampleRate;
+        return status;
+    }
 
     *output = VALUE_OR_RETURN_STATUS(
             aidl2legacy_int32_t_audio_io_handle_t(responseAidl.output));
@@ -1114,7 +1123,7 @@ status_t AudioSystem::getInputForAttr(const audio_attributes_t* attr,
                                       audio_unique_id_t riid,
                                       audio_session_t session,
                                       const AttributionSourceState &attributionSource,
-                                      const audio_config_base_t* config,
+                                      audio_config_base_t* config,
                                       audio_input_flags_t flags,
                                       audio_port_handle_t* selectedDeviceId,
                                       audio_port_handle_t* portId) {
@@ -1151,9 +1160,14 @@ status_t AudioSystem::getInputForAttr(const audio_attributes_t* attr,
 
     media::GetInputForAttrResponse response;
 
-    RETURN_STATUS_IF_ERROR(statusTFromBinderStatus(
+    status_t status = statusTFromBinderStatus(
             aps->getInputForAttr(attrAidl, inputAidl, riidAidl, sessionAidl, attributionSource,
-                configAidl, flagsAidl, selectedDeviceIdAidl, &response)));
+                configAidl, flagsAidl, selectedDeviceIdAidl, &response));
+    if (status != NO_ERROR) {
+        *config = VALUE_OR_RETURN_STATUS(
+                aidl2legacy_AudioConfigBase_audio_config_base_t(response.config, true /*isInput*/));
+        return status;
+    }
 
     *input = VALUE_OR_RETURN_STATUS(aidl2legacy_int32_t_audio_io_handle_t(response.input));
     *selectedDeviceId = VALUE_OR_RETURN_STATUS(
