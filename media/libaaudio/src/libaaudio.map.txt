@@ -3,7 +3,6 @@ LIBAAUDIO {
     AAudio_convertResultToText;
     AAudio_convertStreamStateToText;
     AAudio_createStreamBuilder;
-    AAudio_getAudioServerDeathCount;    # introduced=33
     AAudio_getMMapPolicy;
     AAudio_setMMapPolicy;
     AAudioStreamBuilder_setPerformanceMode;

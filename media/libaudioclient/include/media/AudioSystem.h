@@ -566,11 +566,6 @@ public:
     static status_t getDirectProfilesForAttributes(const audio_attributes_t* attr,
                                             std::vector<audio_profile>* audioProfiles);
 
-    /**
-     * @return count of AudioFlinger death.
-     */
-    static int32_t getAudioFlingerDeathCount();
-
     // A listener for capture state changes.
     class CaptureStateListener : public virtual RefBase {
     public:
