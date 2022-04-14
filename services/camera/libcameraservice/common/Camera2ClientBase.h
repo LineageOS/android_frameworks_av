@@ -75,9 +75,9 @@ public:
                                       const CaptureResultExtras& resultExtras);
     // Returns errors on app ops permission failures
     virtual status_t      notifyActive(float maxPreviewFps);
-    virtual void          notifyIdle(int64_t requestCount, int64_t resultErrorCount,
-                                     bool deviceError,
-                                     const std::vector<hardware::CameraStreamStats>& streamStats);
+    virtual void          notifyIdle(int64_t /*requestCount*/, int64_t /*resultErrorCount*/,
+                                     bool /*deviceError*/,
+                                     const std::vector<hardware::CameraStreamStats>&) {}
     virtual void          notifyShutter(const CaptureResultExtras& resultExtras,
                                         nsecs_t timestamp);
     virtual void          notifyAutoFocus(uint8_t newState, int triggerId);
@@ -87,6 +87,11 @@ public:
     virtual void          notifyPrepared(int streamId);
     virtual void          notifyRequestQueueEmpty();
     virtual void          notifyRepeatingRequestError(long lastFrameNumber);
+
+    void                  notifyIdleWithUserTag(int64_t requestCount, int64_t resultErrorCount,
+                                     bool deviceError,
+                                     const std::vector<hardware::CameraStreamStats>& streamStats,
+                                     const std::string& userTag);
 
     int                   getCameraId() const;
     const sp<CameraDeviceBase>&
