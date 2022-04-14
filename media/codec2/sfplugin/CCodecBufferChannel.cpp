@@ -16,7 +16,9 @@
 
 //#define LOG_NDEBUG 0
 #define LOG_TAG "CCodecBufferChannel"
+#define ATRACE_TAG  ATRACE_TAG_VIDEO
 #include <utils/Log.h>
+#include <utils/Trace.h>
 
 #include <algorithm>
 #include <atomic>
@@ -326,6 +328,8 @@ status_t CCodecBufferChannel::queueInputBufferInternal(
     }
     c2_status_t err = C2_OK;
     if (!items.empty()) {
+        ScopedTrace trace(ATRACE_TAG, android::base::StringPrintf(
+                "CCodecBufferChannel::queue(%s@ts=%lld)", mName, (long long)timeUs).c_str());
         {
             Mutexed<PipelineWatcher>::Locked watcher(mPipelineWatcher);
             PipelineWatcher::Clock::time_point now = PipelineWatcher::Clock::now();
@@ -922,6 +926,11 @@ status_t CCodecBufferChannel::renderOutputBuffer(
                 };
                 hdr.validTypes |= HdrMetadata::CTA861_3;
                 hdr.cta8613 = cta861_meta;
+            }
+
+            // does not have valid info
+            if (!(hdr.validTypes & (HdrMetadata::SMPTE2086 | HdrMetadata::CTA861_3))) {
+                hdrStaticInfo.reset();
             }
         }
         if (hdrDynamicInfo
@@ -1908,6 +1917,8 @@ bool CCodecBufferChannel::handleWork(
         // When using input surface we need to restore the original input timestamp.
         timestamp = work->input.ordinal.customOrdinal;
     }
+    ScopedTrace trace(ATRACE_TAG, android::base::StringPrintf(
+            "CCodecBufferChannel::onWorkDone(%s@ts=%lld)", mName, timestamp.peekll()).c_str());
     ALOGV("[%s] onWorkDone: input %lld, codec %lld => output %lld => %lld",
           mName,
           work->input.ordinal.customOrdinal.peekll(),
