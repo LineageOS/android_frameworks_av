@@ -37,6 +37,7 @@ cc_library {
         "ProcessInfo.cpp",
         "SchedulingPolicyService.cpp",
         "ServiceUtilities.cpp",
+        "ThreadSnapshot.cpp",
         "TimeCheck.cpp",
         "TimerThread.cpp",
     ],
