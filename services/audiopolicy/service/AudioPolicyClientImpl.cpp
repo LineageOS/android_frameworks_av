@@ -277,6 +277,11 @@ void AudioPolicyService::AudioPolicyClient::onRoutingUpdated()
     mAudioPolicyService->onRoutingUpdated();
 }
 
+void AudioPolicyService::AudioPolicyClient::onVolumeRangeInitRequest()
+{
+    mAudioPolicyService->onVolumeRangeInitRequest();
+}
+
 audio_unique_id_t AudioPolicyService::AudioPolicyClient::newAudioUniqueId(audio_unique_id_use_t use)
 {
     return AudioSystem::newAudioUniqueId(use);
