@@ -1,5 +1,5 @@
 /*
- * Copyright 2015 The Android Open Source Project
+ * Copyright 2021 The Android Open Source Project
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -22,7 +22,7 @@
 
 #include "FlowGraphNode.h"
 
-namespace flowgraph {
+namespace FLOWGRAPH_OUTER_NAMESPACE::flowgraph {
 
 /**
  * Convert a multi-channel interleaved stream to multiple mono-channel
@@ -44,6 +44,6 @@ namespace flowgraph {
         flowgraph::FlowGraphPortFloatInput input;
     };
 
-} /* namespace flowgraph */
+} /* namespace FLOWGRAPH_OUTER_NAMESPACE::flowgraph */
 
 #endif //FLOWGRAPH_MULTI_TO_MANY_CONVERTER_H

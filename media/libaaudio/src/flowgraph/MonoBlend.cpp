@@ -18,7 +18,7 @@
 
 #include "MonoBlend.h"
 
-using namespace flowgraph;
+using namespace FLOWGRAPH_OUTER_NAMESPACE::flowgraph;
 
 MonoBlend::MonoBlend(int32_t channelCount)
         : FlowGraphFilter(channelCount)
