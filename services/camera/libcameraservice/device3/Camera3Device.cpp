@@ -468,6 +468,24 @@ ssize_t Camera3Device::getJpegBufferSize(const CameraMetadata &info, uint32_t wi
     }
     maxJpegBufferSize = jpegBufMaxSize.data.i32[0];
 
+    ssize_t jpegDebugSize = 0;
+
+    sp<VendorTagDescriptorCache> vtCache = VendorTagDescriptorCache::getGlobalVendorTagCache();
+    sp<VendorTagDescriptor> vTags = nullptr;
+    if (vtCache.get() != nullptr) {
+        vtCache->getVendorTagDescriptor(info.getVendorId(), &vTags);
+    }
+
+    uint32_t tag;
+    status_t res = CameraMetadata::getTagFromName("org.quic.camera.jpegdebugdata.size",
+        vTags.get(), &tag);
+    if (res == OK) {
+        camera_metadata_ro_entry entry = info.find(tag);
+        if (entry.count > 0) {
+            jpegDebugSize = entry.data.i32[0];
+            ALOGE("%s: Camera %s: Jpeg debug data size %zd", __FUNCTION__, mId.c_str(), jpegDebugSize);
+        }
+    }
     camera3::Size chosenMaxJpegResolution = maxDefaultJpegResolution;
     if (useMaxSensorPixelModeThreshold) {
         maxJpegBufferSize =
@@ -478,10 +496,11 @@ ssize_t Camera3Device::getJpegBufferSize(const CameraMetadata &info, uint32_t wi
     assert(kMinJpegBufferSize < maxJpegBufferSize);
 
     // Calculate final jpeg buffer size for the given resolution.
+    ssize_t minJpegBufferSize = kMinJpegBufferSize + jpegDebugSize;
     float scaleFactor = ((float) (width * height)) /
             (chosenMaxJpegResolution.width * chosenMaxJpegResolution.height);
-    ssize_t jpegBufferSize = scaleFactor * (maxJpegBufferSize - kMinJpegBufferSize) +
-            kMinJpegBufferSize;
+    ssize_t jpegBufferSize = scaleFactor * (maxJpegBufferSize - minJpegBufferSize) +
+            minJpegBufferSize;
     if (!mPrivilegedClient && jpegBufferSize > maxJpegBufferSize) {
         ALOGI("%s: jpeg buffer size calculated is > maxJpeg bufferSize(%zd), clamping",
                   __FUNCTION__, maxJpegBufferSize);
