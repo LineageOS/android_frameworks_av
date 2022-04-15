@@ -375,6 +375,12 @@ status_t CameraSessionStats::readFromParcel(const android::Parcel* parcel) {
         return err;
     }
 
+    String16 userTag;
+    if ((err = parcel->readString16(&userTag)) != OK) {
+        ALOGE("%s: Failed to read user tag!", __FUNCTION__);
+        return BAD_VALUE;
+    }
+
     mCameraId = id;
     mFacing = facing;
     mNewCameraState = newCameraState;
@@ -389,6 +395,7 @@ status_t CameraSessionStats::readFromParcel(const android::Parcel* parcel) {
     mResultErrorCount = resultErrorCount;
     mDeviceError = deviceError;
     mStreamStats = std::move(streamStats);
+    mUserTag = userTag;
 
     return OK;
 }
@@ -471,6 +478,10 @@ status_t CameraSessionStats::writeToParcel(android::Parcel* parcel) const {
         return err;
     }
 
+    if ((err = parcel->writeString16(mUserTag)) != OK) {
+        ALOGE("%s: Failed to write user tag!", __FUNCTION__);
+        return err;
+    }
     return OK;
 }
 

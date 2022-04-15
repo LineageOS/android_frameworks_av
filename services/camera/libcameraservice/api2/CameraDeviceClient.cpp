@@ -518,6 +518,10 @@ binder::Status CameraDeviceClient::submitRequestList(
 
         metadataRequestList.push_back(physicalSettingsList);
         surfaceMapList.push_back(surfaceMap);
+
+        if (!request.mUserTag.empty()) {
+            mUserTag = request.mUserTag;
+        }
     }
     mRequestIdCounter++;
 
@@ -1968,7 +1972,8 @@ void CameraDeviceClient::notifyIdle(
     if (remoteCb != 0) {
         remoteCb->onDeviceIdle();
     }
-    Camera2ClientBase::notifyIdle(requestCount, resultErrorCount, deviceError, streamStats);
+    Camera2ClientBase::notifyIdleWithUserTag(requestCount, resultErrorCount, deviceError,
+            streamStats, mUserTag);
 }
 
 void CameraDeviceClient::notifyShutter(const CaptureResultExtras& resultExtras,
