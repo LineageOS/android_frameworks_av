@@ -32,18 +32,15 @@
 
 namespace android {
 
-int testTrack(FILE *inputFile, int outputFileFd)
-{
+int testTrack(FILE* inputFile, int outputFileFd) {
     char line[MAX_INPUT_FILE_LINE_LENGTH];
     uint32_t testCount = 0;
     Vector<String16> args;
     int ret = 0;
 
     if (inputFile == nullptr) {
-        sp<AudioTrack> track = new AudioTrack(AUDIO_STREAM_DEFAULT,
-                                              0 /* sampleRate */,
-                                              AUDIO_FORMAT_DEFAULT,
-                                              AUDIO_CHANNEL_OUT_STEREO);
+        sp<AudioTrack> track = new AudioTrack(AUDIO_STREAM_DEFAULT, 0 /* sampleRate */,
+                                              AUDIO_FORMAT_DEFAULT, AUDIO_CHANNEL_OUT_STEREO);
         if (track == 0 || track->initCheck() != NO_ERROR) {
             write(outputFileFd, "Error creating AudioTrack\n",
                   sizeof("Error creating AudioTrack\n"));
@@ -78,11 +75,10 @@ int testTrack(FILE *inputFile, int outputFileFd)
         bool offload = false;
         bool fast = false;
 
-        if (sscanf(line, " %u %x %x %zu %d %u %x %u %u %u",
-                   &sampleRate, &format, &channelMask,
-                   &frameCount, &notificationFrames, &useSharedBuffer,
-                   &flags, &sessionId, &usage, &contentType) != NUM_ARGUMENTS) {
-            fprintf(stderr, "Malformed line for test #%u in input file\n", testCount+1);
+        if (sscanf(line, " %u %x %x %zu %d %u %x %u %u %u", &sampleRate, &format, &channelMask,
+                   &frameCount, &notificationFrames, &useSharedBuffer, &flags, &sessionId, &usage,
+                   &contentType) != NUM_ARGUMENTS) {
+            fprintf(stderr, "Malformed line for test #%u in input file\n", testCount + 1);
             ret = 1;
             continue;
         }
@@ -90,7 +86,7 @@ int testTrack(FILE *inputFile, int outputFileFd)
 
         if (useSharedBuffer != 0) {
             size_t heapSize = audio_channel_count_from_out_mask(channelMask) *
-                    audio_bytes_per_sample(format) * frameCount;
+                              audio_bytes_per_sample(format) * frameCount;
             heap = new MemoryDealer(heapSize, "AudioTrack Heap Base");
             sharedBuffer = heap->allocate(heapSize);
             frameCount = 0;
@@ -111,25 +107,13 @@ int testTrack(FILE *inputFile, int outputFileFd)
         attributes.usage = usage;
         sp<AudioTrack> track = new AudioTrack();
         const auto emptyCallback = sp<AudioTrack::IAudioTrackCallback>::make();
-        track->set(AUDIO_STREAM_DEFAULT,
-                   sampleRate,
-                   format,
-                   channelMask,
-                   frameCount,
-                   flags,
-                   (fast || offload) ? emptyCallback : nullptr,
-                   notificationFrames,
-                   sharedBuffer,
-                   false,
-                   sessionId,
-                   ((fast && sharedBuffer == 0) || offload) ?
-                           AudioTrack::TRANSFER_CALLBACK : AudioTrack::TRANSFER_DEFAULT,
-                   offload ? &offloadInfo : nullptr,
-                   AttributionSourceState(),
-                   &attributes,
-                   false,
-                   1.0f,
-                   AUDIO_PORT_HANDLE_NONE);
+        track->set(AUDIO_STREAM_DEFAULT, sampleRate, format, channelMask, frameCount, flags,
+                   (fast || offload) ? emptyCallback : nullptr, notificationFrames, sharedBuffer,
+                   false, sessionId,
+                   ((fast && sharedBuffer == 0) || offload) ? AudioTrack::TRANSFER_CALLBACK
+                                                            : AudioTrack::TRANSFER_DEFAULT,
+                   offload ? &offloadInfo : nullptr, AttributionSourceState(), &attributes, false,
+                   1.0f, AUDIO_PORT_HANDLE_NONE);
         status = track->initCheck();
         sprintf(statusStr, "\n#### Test %u status %d\n", testCount, status);
         write(outputFileFd, statusStr, strlen(statusStr));
@@ -141,11 +125,8 @@ int testTrack(FILE *inputFile, int outputFileFd)
     return ret;
 }
 
-}; // namespace android
+};  // namespace android
 
-
-int main(int argc, char **argv)
-{
+int main(int argc, char** argv) {
     return android::main(argc, argv, android::testTrack);
 }
-

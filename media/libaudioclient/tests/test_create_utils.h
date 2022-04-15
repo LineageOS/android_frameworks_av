@@ -27,13 +27,12 @@
 
 namespace android {
 
-int readLine(FILE *inputFile, char *line, int size);
+int readLine(FILE* inputFile, char* line, int size);
 
-bool checkVersion(FILE *inputFile, const char *version);
+bool checkVersion(FILE* inputFile, const char* version);
 
+typedef int (*test_func_t)(FILE* inputFile, int outputFileFd);
 
-typedef int (*test_func_t)(FILE *inputFile, int outputFileFd);
+int main(int argc, char** argv, test_func_t testFunc);
 
-int main(int argc, char **argv, test_func_t testFunc);
-
-}; // namespace android
+};  // namespace android
