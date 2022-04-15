@@ -23,10 +23,10 @@
 
 namespace android {
 
-int readLine(FILE *inputFile, char *line, int size) {
+int readLine(FILE* inputFile, char* line, int size) {
     int ret = 0;
     while (true) {
-        char *str = fgets(line, size, inputFile);
+        char* str = fgets(line, size, inputFile);
         if (str == nullptr) {
             ret = -1;
             break;
@@ -42,8 +42,7 @@ int readLine(FILE *inputFile, char *line, int size) {
     return ret;
 }
 
-bool checkVersion(FILE *inputFile, const char *version)
-{
+bool checkVersion(FILE* inputFile, const char* version) {
     char line[MAX_INPUT_FILE_LINE_LENGTH];
     char versionKey[MAX_INPUT_FILE_LINE_LENGTH];
     char versionValue[MAX_INPUT_FILE_LINE_LENGTH];
@@ -68,9 +67,8 @@ bool checkVersion(FILE *inputFile, const char *version)
     return true;
 }
 
-int main(int argc, char **argv, test_func_t testFunc)
-{
-    FILE *inputFile = nullptr;
+int main(int argc, char** argv, test_func_t testFunc) {
+    FILE* inputFile = nullptr;
     int outputFileFd = STDOUT_FILENO;
     mode_t mode = S_IRUSR | S_IWUSR | S_IRGRP | S_IROTH;
     int ret = 0;
@@ -96,7 +94,7 @@ int main(int argc, char **argv, test_func_t testFunc)
         if (strcmp(*argv, "-o") == 0) {
             argv++;
             if (*argv) {
-                outputFileFd = open(*argv, O_WRONLY|O_CREAT, mode);
+                outputFileFd = open(*argv, O_WRONLY | O_CREAT, mode);
                 if (outputFileFd < 0) {
                     ret = 1;
                 }
@@ -126,5 +124,4 @@ int main(int argc, char **argv, test_func_t testFunc)
     return ret;
 }
 
-}; // namespace android
-
+};  // namespace android
