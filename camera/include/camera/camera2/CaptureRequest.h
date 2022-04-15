@@ -63,6 +63,8 @@ struct CaptureRequest : public Parcelable {
 
     void*                   mContext; // arbitrary user context from NDK apps, null for java apps
 
+    std::string             mUserTag; // The string representation of object passed into setTag.
+
     /**
      * Keep impl up-to-date with CaptureRequest.java in frameworks/base
      */
