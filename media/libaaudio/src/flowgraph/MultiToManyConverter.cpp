@@ -1,5 +1,5 @@
 /*
- * Copyright 2015 The Android Open Source Project
+ * Copyright 2021 The Android Open Source Project
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -18,7 +18,7 @@
 #include "FlowGraphNode.h"
 #include "MultiToManyConverter.h"
 
-using namespace flowgraph;
+using namespace FLOWGRAPH_OUTER_NAMESPACE::flowgraph;
 
 MultiToManyConverter::MultiToManyConverter(int32_t channelCount)
         : outputs(channelCount)
@@ -45,4 +45,3 @@ int32_t MultiToManyConverter::onProcess(int32_t numFrames) {
 
     return numFrames;
 }
-

@@ -22,7 +22,7 @@
 
 #include "FlowGraphNode.h"
 
-namespace flowgraph {
+namespace FLOWGRAPH_OUTER_NAMESPACE::flowgraph {
 
 /**
  * Combine data between multiple channels so each channel is an average
@@ -43,6 +43,6 @@ private:
     const float mInvChannelCount;
 };
 
-} /* namespace flowgraph */
+} /* namespace FLOWGRAPH_OUTER_NAMESPACE::flowgraph */
 
 #endif //FLOWGRAPH_MONO_BLEND
