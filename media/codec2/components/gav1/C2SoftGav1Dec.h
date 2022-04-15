@@ -54,6 +54,7 @@ struct C2SoftGav1Dec : public SimpleC2Component {
   std::shared_ptr<IntfImpl> mIntf;
   std::unique_ptr<libgav1::Decoder> mCodecCtx;
 
+  uint32_t mHalPixelFormat;
   uint32_t mWidth;
   uint32_t mHeight;
   bool mSignalledOutputEos;
