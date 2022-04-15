@@ -104,6 +104,26 @@ cc_test {
 }
 
 cc_test {
+    name: "media_threadsnapshot_tests",
+
+    cflags: [
+        "-Wall",
+        "-Werror",
+        "-Wextra",
+    ],
+
+    shared_libs: [
+        "liblog",
+        "libmediautils",
+        "libutils",
+    ],
+
+    srcs: [
+        "media_threadsnapshot_tests.cpp",
+    ],
+}
+
+cc_test {
     name: "methodstatistics_tests",
 
     cflags: [
