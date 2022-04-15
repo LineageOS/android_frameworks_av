@@ -35,7 +35,7 @@
 #include <flowgraph/SourceI24.h>
 #include <flowgraph/SourceI32.h>
 
-using namespace flowgraph;
+using namespace FLOWGRAPH_OUTER_NAMESPACE::flowgraph;
 
 aaudio_result_t AAudioFlowGraph::configure(audio_format_t sourceFormat,
                           int32_t sourceChannelCount,
