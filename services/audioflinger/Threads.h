@@ -687,6 +687,9 @@ protected:
                 int64_t                 mLastIoBeginNs = -1;
                 int64_t                 mLastIoEndNs = -1;
 
+                // ThreadSnapshot is thread-safe (internally locked)
+                mediautils::ThreadSnapshot mThreadSnapshot;
+
                 // This should be read under ThreadBase lock (if not on the threadLoop thread).
                 audio_utils::Statistics<double> mIoJitterMs{0.995 /* alpha */};
                 audio_utils::Statistics<double> mProcessTimeMs{0.995 /* alpha */};

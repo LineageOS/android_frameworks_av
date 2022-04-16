@@ -14,15 +14,17 @@
  * limitations under the License.
  */
 
-#ifndef OBOE_LINEAR_RESAMPLER_H
-#define OBOE_LINEAR_RESAMPLER_H
+#ifndef RESAMPLER_LINEAR_RESAMPLER_H
+#define RESAMPLER_LINEAR_RESAMPLER_H
 
 #include <memory>
 #include <sys/types.h>
 #include <unistd.h>
-#include "MultiChannelResampler.h"
 
-namespace resampler {
+#include "MultiChannelResampler.h"
+#include "ResamplerDefinitions.h"
+
+namespace RESAMPLER_OUTER_NAMESPACE::resampler {
 
 /**
  * Simple resampler that uses bi-linear interpolation.
@@ -40,5 +42,6 @@ private:
     std::unique_ptr<float[]> mCurrentFrame;
 };
 
-} // namespace resampler
-#endif //OBOE_LINEAR_RESAMPLER_H
+} /* namespace RESAMPLER_OUTER_NAMESPACE::resampler */
+
+#endif //RESAMPLER_LINEAR_RESAMPLER_H

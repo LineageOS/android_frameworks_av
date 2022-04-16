@@ -22,7 +22,7 @@
 
 #include "FlowGraphNode.h"
 
-namespace flowgraph {
+namespace FLOWGRAPH_OUTER_NAMESPACE::flowgraph {
 
 /**
  * AudioSink that lets you read data as 16-bit signed integers.
@@ -38,6 +38,6 @@ public:
     }
 };
 
-} /* namespace flowgraph */
+} /* namespace FLOWGRAPH_OUTER_NAMESPACE::flowgraph */
 
 #endif //FLOWGRAPH_SINK_I16_H

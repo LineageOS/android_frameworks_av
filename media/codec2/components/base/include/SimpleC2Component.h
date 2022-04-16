@@ -27,7 +27,7 @@
 #include <media/stagefright/foundation/Mutexed.h>
 
 namespace android {
-
+bool isAtLeastT();
 void convertYUV420Planar8ToYV12(uint8_t *dstY, uint8_t *dstU, uint8_t *dstV, const uint8_t *srcY,
                                 const uint8_t *srcU, const uint8_t *srcV, size_t srcYStride,
                                 size_t srcUStride, size_t srcVStride, size_t dstYStride,

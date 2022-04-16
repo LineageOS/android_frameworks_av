@@ -67,6 +67,7 @@ struct C2SoftVpxDec : public SimpleC2Component {
     vpx_codec_ctx_t *mCodecCtx;
     bool mFrameParallelMode;  // Frame parallel is only supported by VP9 decoder.
 
+    uint32_t mHalPixelFormat;
     uint32_t mWidth;
     uint32_t mHeight;
     bool mSignalledOutputEos;
