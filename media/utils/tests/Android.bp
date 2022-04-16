@@ -64,6 +64,26 @@ cc_test {
 }
 
 cc_test {
+    name: "media_process_tests",
+
+    cflags: [
+        "-Wall",
+        "-Werror",
+        "-Wextra",
+    ],
+
+    shared_libs: [
+        "liblog",
+        "libmediautils",
+        "libutils",
+    ],
+
+    srcs: [
+        "media_process_tests.cpp",
+    ],
+}
+
+cc_test {
     name: "media_synchronization_tests",
 
     cflags: [
@@ -80,6 +100,26 @@ cc_test {
 
     srcs: [
         "media_synchronization_tests.cpp",
+    ],
+}
+
+cc_test {
+    name: "media_threadsnapshot_tests",
+
+    cflags: [
+        "-Wall",
+        "-Werror",
+        "-Wextra",
+    ],
+
+    shared_libs: [
+        "liblog",
+        "libmediautils",
+        "libutils",
+    ],
+
+    srcs: [
+        "media_threadsnapshot_tests.cpp",
     ],
 }
 

@@ -65,6 +65,7 @@
 #include <media/nbaio/PipeReader.h>
 #include <media/nbaio/SourceAudioBufferProvider.h>
 #include <mediautils/BatteryNotifier.h>
+#include <mediautils/Process.h>
 
 #include <audiomanager/AudioManager.h>
 #include <powermanager/PowerManager.h>
@@ -923,6 +924,20 @@ void AudioFlinger::ThreadBase::dump(int fd, const Vector<String16>& args)
 
     dprintf(fd, "  Local log:\n");
     mLocalLog.dump(fd, "   " /* prefix */, 40 /* lines */);
+
+    // --all does the statistics
+    bool dumpAll = false;
+    for (const auto &arg : args) {
+        if (arg == String16("--all")) {
+            dumpAll = true;
+        }
+    }
+    if (dumpAll || type() == SPATIALIZER) {
+        const std::string sched = mThreadSnapshot.toString();
+        if (!sched.empty()) {
+            (void)write(fd, sched.c_str(), sched.size());
+        }
+    }
 }
 
 void AudioFlinger::ThreadBase::dumpBase_l(int fd, const Vector<String16>& args __unused)
@@ -2098,6 +2113,7 @@ void AudioFlinger::PlaybackThread::onFirstRef()
         }
     }
     run(mThreadName, ANDROID_PRIORITY_URGENT_AUDIO);
+    mThreadSnapshot.setTid(getTid());
 }
 
 // ThreadBase virtuals
@@ -3339,6 +3355,7 @@ ssize_t AudioFlinger::PlaybackThread::threadLoop_write()
     mInWrite = false;
     if (mStandby) {
         mThreadMetrics.logBeginInterval();
+        mThreadSnapshot.onBegin();
         mStandby = false;
     }
     return bytesWritten;
@@ -3824,6 +3841,7 @@ bool AudioFlinger::PlaybackThread::threadLoop()
                     if (!mStandby) {
                         LOG_AUDIO_STATE();
                         mThreadMetrics.logEndInterval();
+                        mThreadSnapshot.onEnd();
                         mStandby = true;
                     }
                     sendStatistics(false /* force */);
@@ -5959,6 +5977,7 @@ bool AudioFlinger::MixerThread::checkForNewParameter_l(const String8& keyValuePa
             mOutput->standby();
             if (!mStandby) {
                 mThreadMetrics.logEndInterval();
+                mThreadSnapshot.onEnd();
                 mStandby = true;
             }
             mBytesWritten = 0;
@@ -6480,6 +6499,7 @@ bool AudioFlinger::DirectOutputThread::checkForNewParameter_l(const String8& key
             mOutput->standby();
             if (!mStandby) {
                 mThreadMetrics.logEndInterval();
+                mThreadSnapshot.onEnd();
                 mStandby = true;
             }
             mBytesWritten = 0;
@@ -7066,6 +7086,7 @@ ssize_t AudioFlinger::DuplicatingThread::threadLoop_write()
     }
     if (mStandby) {
         mThreadMetrics.logBeginInterval();
+        mThreadSnapshot.onBegin();
         mStandby = false;
     }
     return (ssize_t)mSinkBufferSize;
@@ -7591,6 +7612,7 @@ reacquire_wakelock:
                     doBroadcast = true;
                     if (mStandby) {
                         mThreadMetrics.logBeginInterval();
+                        mThreadSnapshot.onBegin();
                         mStandby = false;
                     }
                     activeTrack->mState = TrackBase::ACTIVE;
@@ -8072,6 +8094,7 @@ void AudioFlinger::RecordThread::standbyIfNotAlreadyInStandby()
     if (!mStandby) {
         inputStandBy();
         mThreadMetrics.logEndInterval();
+        mThreadSnapshot.onEnd();
         mStandby = true;
     }
 }
@@ -9457,6 +9480,7 @@ status_t AudioFlinger::MmapThread::exitStandby()
     }
     if (mStandby) {
         mThreadMetrics.logBeginInterval();
+        mThreadSnapshot.onBegin();
         mStandby = false;
     }
     return NO_ERROR;
@@ -9653,6 +9677,7 @@ status_t AudioFlinger::MmapThread::standby()
     mHalStream->standby();
     if (!mStandby) {
         mThreadMetrics.logEndInterval();
+        mThreadSnapshot.onEnd();
         mStandby = true;
     }
     releaseWakeLock();

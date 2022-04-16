@@ -76,6 +76,7 @@
 #include <media/VolumeShaper.h>
 #include <mediautils/ServiceUtilities.h>
 #include <mediautils/Synchronization.h>
+#include <mediautils/ThreadSnapshot.h>
 
 #include <audio_utils/clock.h>
 #include <audio_utils/FdToString.h>

@@ -19,7 +19,7 @@
 #include <sys/types.h>
 #include "FlowGraphNode.h"
 
-using namespace flowgraph;
+using namespace FLOWGRAPH_OUTER_NAMESPACE::flowgraph;
 
 /***************************************************************************/
 int32_t FlowGraphNode::pullData(int32_t numFrames, int64_t callCount) {
@@ -68,7 +68,7 @@ FlowGraphPortFloat::FlowGraphPortFloat(FlowGraphNode &parent,
         : FlowGraphPort(parent, samplesPerFrame)
         , mFramesPerBuffer(framesPerBuffer)
         , mBuffer(nullptr) {
-    size_t numFloats = framesPerBuffer * getSamplesPerFrame();
+    size_t numFloats = static_cast<size_t>(framesPerBuffer) * getSamplesPerFrame();
     mBuffer = std::make_unique<float[]>(numFloats);
 }
 

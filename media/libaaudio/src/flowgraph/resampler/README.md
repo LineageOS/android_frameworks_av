@@ -5,6 +5,17 @@ This folder contains a sample rate converter, or "resampler".
 The converter is based on a sinc function that has been windowed by a hyperbolic cosine.
 We found this had fewer artifacts than the more traditional Kaiser window.
 
+## Building the Resampler
+
+It is part of [Oboe](https://github.com/google/oboe) but has no dependencies on Oboe.
+So the contents of this folder can be used outside of Oboe.
+
+To build it for use outside of Oboe:
+
+1. Copy the "resampler" folder to a folder in your project that is in the include path.
+2. Add all of the \*.cpp files in the resampler folder to your project IDE or Makefile.
+3. In ResamplerDefinitions.h, define RESAMPLER_OUTER_NAMESPACE with your own project name. Alternatively, use -DRESAMPLER_OUTER_NAMESPACE=mynamespace when compiling to avoid modifying the resampler code.
+
 ## Creating a Resampler
 
 Include the [main header](MultiChannelResampler.h) for the resampler.
@@ -88,4 +99,3 @@ Assume you start with these variables:
 When you are done, you should delete the Resampler to avoid a memory leak.
 
     delete resampler;
-
