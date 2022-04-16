@@ -14,15 +14,15 @@
  * limitations under the License.
  */
 
-#if FLOWGRAPH_ANDROID_INTERNAL
-#include <audio_utils/primitives.h>
-#endif
-
 #include "FlowGraphNode.h"
 #include "FlowgraphUtilities.h"
 #include "SinkI32.h"
 
-using namespace flowgraph;
+#if FLOWGRAPH_ANDROID_INTERNAL
+#include <audio_utils/primitives.h>
+#endif
+
+using namespace FLOWGRAPH_OUTER_NAMESPACE::flowgraph;
 
 SinkI32::SinkI32(int32_t channelCount)
         : FlowGraphSink(channelCount) {}

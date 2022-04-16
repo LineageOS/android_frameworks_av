@@ -72,17 +72,19 @@ public:
     void setRampLengthInFrames(int32_t numFrames);
 
 private:
-    std::unique_ptr<flowgraph::FlowGraphSourceBuffered>     mSource;
-    std::unique_ptr<flowgraph::MonoBlend>                   mMonoBlend;
-    std::unique_ptr<flowgraph::ClipToRange>                 mClipper;
-    std::unique_ptr<flowgraph::MonoToMultiConverter>        mChannelConverter;
-    std::unique_ptr<flowgraph::ManyToMultiConverter>        mManyToMultiConverter;
-    std::unique_ptr<flowgraph::MultiToManyConverter>        mMultiToManyConverter;
-    std::vector<std::unique_ptr<flowgraph::RampLinear>>     mVolumeRamps;
-    std::vector<float>                                      mPanningVolumes;
-    float                                                   mTargetVolume = 1.0f;
-    android::audio_utils::Balance                           mBalance;
-    std::unique_ptr<flowgraph::FlowGraphSink>               mSink;
+    std::unique_ptr<FLOWGRAPH_OUTER_NAMESPACE::flowgraph::FlowGraphSourceBuffered> mSource;
+    std::unique_ptr<FLOWGRAPH_OUTER_NAMESPACE::flowgraph::MonoBlend> mMonoBlend;
+    std::unique_ptr<FLOWGRAPH_OUTER_NAMESPACE::flowgraph::ClipToRange> mClipper;
+    std::unique_ptr<FLOWGRAPH_OUTER_NAMESPACE::flowgraph::MonoToMultiConverter> mChannelConverter;
+    std::unique_ptr<FLOWGRAPH_OUTER_NAMESPACE::flowgraph::ManyToMultiConverter>
+            mManyToMultiConverter;
+    std::unique_ptr<FLOWGRAPH_OUTER_NAMESPACE::flowgraph::MultiToManyConverter>
+            mMultiToManyConverter;
+    std::vector<std::unique_ptr<FLOWGRAPH_OUTER_NAMESPACE::flowgraph::RampLinear>> mVolumeRamps;
+    std::vector<float> mPanningVolumes;
+    float mTargetVolume = 1.0f;
+    android::audio_utils::Balance mBalance;
+    std::unique_ptr<FLOWGRAPH_OUTER_NAMESPACE::flowgraph::FlowGraphSink> mSink;
 };
 
 
