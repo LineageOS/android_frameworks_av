@@ -256,8 +256,8 @@ void CodecHandler::onMessageReceived(const sp<AMessage> &msg) {
                          break;
                      }
                      msg->findString("detail", &detail);
-                     ALOGE("Codec reported error(0x%x), actionCode(%d), detail(%s)",
-                           err, actionCode, detail.c_str());
+                     ALOGE("Codec reported error(0x%x/%s), actionCode(%d), detail(%s)",
+                           err, StrMediaError(err).c_str(), actionCode, detail.c_str());
 
                      Mutex::Autolock _l(mCodec->mAsyncCallbackLock);
                      if (mCodec->mAsyncCallback.onAsyncError != NULL) {
