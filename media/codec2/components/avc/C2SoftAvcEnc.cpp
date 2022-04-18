@@ -656,8 +656,7 @@ void  C2SoftAvcEnc::initEncParams() {
     mEntropyMode = DEFAULT_ENTROPY_MODE;
     mBframes = DEFAULT_B_FRAMES;
 
-    gettimeofday(&mTimeStart, nullptr);
-    gettimeofday(&mTimeEnd, nullptr);
+    mTimeStart = mTimeEnd = systemTime();
 }
 
 c2_status_t C2SoftAvcEnc::setDimensions() {
@@ -1650,8 +1649,7 @@ void C2SoftAvcEnc::process(
     work->worklets.front()->output.flags = work->input.flags;
 
     IV_STATUS_T status;
-    WORD32 timeDelay = 0;
-    WORD32 timeTaken = 0;
+    nsecs_t timeDelay = 0;
     uint64_t workIndex = work->input.ordinal.frameIndex.peekull();
 
     // Initialize encoder if not already initialized
@@ -1817,10 +1815,10 @@ void C2SoftAvcEnc::process(
         //         mInFile, s_encode_ip.s_inp_buf.apv_bufs[0],
         //         (mHeight * mStride * 3 / 2));
 
-        GETTIME(&mTimeStart, nullptr);
         /* Compute time elapsed between end of previous decode()
          * to start of current decode() */
-        TIME_DIFF(mTimeEnd, mTimeStart, timeDelay);
+        mTimeStart = systemTime();
+        timeDelay = mTimeStart - mTimeEnd;
         status = ive_api_function(mCodecCtx, &s_video_encode_ip, &s_video_encode_op);
 
         if (IV_SUCCESS != status) {
@@ -1844,11 +1842,11 @@ void C2SoftAvcEnc::process(
         mBuffers[ps_encode_ip->s_inp_buf.apv_bufs[0]] = inputBuffer;
     }
 
-    GETTIME(&mTimeEnd, nullptr);
     /* Compute time taken for decode() */
-    TIME_DIFF(mTimeStart, mTimeEnd, timeTaken);
+    mTimeEnd = systemTime();
+    nsecs_t timeTaken = mTimeEnd - mTimeStart;
 
-    ALOGV("timeTaken=%6d delay=%6d numBytes=%6d", timeTaken, timeDelay,
+    ALOGV("timeTaken=%" PRId64 "d delay=%" PRId64 " numBytes=%6d", timeTaken, timeDelay,
             ps_encode_op->s_out_buf.u4_bytes);
 
     void *freed = ps_encode_op->s_inp_buf.apv_bufs[0];
