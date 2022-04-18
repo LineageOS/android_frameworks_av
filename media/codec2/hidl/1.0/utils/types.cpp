@@ -26,6 +26,7 @@
 #include <C2BlockInternal.h>
 #include <C2Buffer.h>
 #include <C2Component.h>
+#include <C2FenceFactory.h>
 #include <C2Param.h>
 #include <C2ParamInternal.h>
 #include <C2PlatformSupport.h>
@@ -759,17 +760,14 @@ bool addBaseBlock(
 // Note: File descriptors are not duplicated. The original file descriptor must
 // not be closed before the transaction is complete.
 bool objcpy(hidl_handle* d, const C2Fence& s) {
-    (void)s; // TODO: implement s.fd()
-    int fenceFd = -1;
     d->setTo(nullptr);
-    if (fenceFd >= 0) {
-        native_handle_t *handle = native_handle_create(1, 0);
-        if (!handle) {
-            LOG(ERROR) << "Failed to create a native handle.";
-            return false;
-        }
-        handle->data[0] = fenceFd;
+    native_handle_t* handle = _C2FenceFactory::CreateNativeHandle(s);
+    if (handle) {
         d->setTo(handle, true /* owns */);
+//  } else if (!s.ready()) {
+//      // TODO: we should wait for unmarshallable fences but this may not be
+//      // the best place for it. We can safely ignore here as at this time
+//      // all fences used here are marshallable.
     }
     return true;
 }
@@ -1184,9 +1182,8 @@ struct C2BaseBlock {
 // Note: File descriptors are not duplicated. The original file descriptor must
 // not be closed before the transaction is complete.
 bool objcpy(C2Fence* d, const hidl_handle& s) {
-    // TODO: Implement.
-    (void)s;
-    *d = C2Fence();
+    const native_handle_t* handle = s.getNativeHandle();
+    *d = _C2FenceFactory::CreateFromNativeHandle(handle);
     return true;
 }
 
