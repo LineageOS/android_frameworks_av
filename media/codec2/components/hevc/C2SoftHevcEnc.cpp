@@ -591,8 +591,7 @@ C2SoftHevcEnc::C2SoftHevcEnc(const char* name, c2_node_id_t id,
     CREATE_DUMP_FILE(mInFile);
     CREATE_DUMP_FILE(mOutFile);
 
-    gettimeofday(&mTimeStart, nullptr);
-    gettimeofday(&mTimeEnd, nullptr);
+    mTimeStart = mTimeEnd = systemTime();
 }
 
 C2SoftHevcEnc::~C2SoftHevcEnc() {
@@ -1203,11 +1202,11 @@ void C2SoftHevcEnc::process(const std::unique_ptr<C2Work>& work,
         }
     }
 
-    uint64_t timeDelay = 0;
-    uint64_t timeTaken = 0;
+    nsecs_t timeDelay = 0;
+    nsecs_t timeTaken = 0;
     memset(&s_encode_op, 0, sizeof(s_encode_op));
-    GETTIME(&mTimeStart, nullptr);
-    TIME_DIFF(mTimeEnd, mTimeStart, timeDelay);
+    mTimeStart = systemTime();
+    timeDelay = mTimeStart - mTimeEnd;
 
     if (inputBuffer) {
         err = ihevce_encode(mCodecCtx, &s_encode_ip, &s_encode_op);
@@ -1222,12 +1221,12 @@ void C2SoftHevcEnc::process(const std::unique_ptr<C2Work>& work,
         fillEmptyWork(work);
     }
 
-    GETTIME(&mTimeEnd, nullptr);
     /* Compute time taken for decode() */
-    TIME_DIFF(mTimeStart, mTimeEnd, timeTaken);
+    mTimeEnd = systemTime();
+    timeTaken = mTimeEnd - mTimeStart;
 
-    ALOGV("timeTaken=%6d delay=%6d numBytes=%6d", (int)timeTaken,
-          (int)timeDelay, s_encode_op.i4_bytes_generated);
+    ALOGV("timeTaken=%6" PRId64 " delay=%6" PRId64 " numBytes=%6d", timeTaken,
+          timeDelay, s_encode_op.i4_bytes_generated);
 
     if (s_encode_op.i4_bytes_generated) {
         finishWork(s_encode_op.u8_pts, work, pool, &s_encode_op);
