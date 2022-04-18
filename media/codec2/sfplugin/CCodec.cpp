@@ -1526,6 +1526,9 @@ sp<PersistentSurface> CCodec::CreateOmxInputSurface() {
     using namespace android::hardware::graphics::bufferqueue::V1_0::utils;
     typedef android::hardware::media::omx::V1_0::Status OmxStatus;
     android::sp<IOmx> omx = IOmx::getService();
+    if (omx == nullptr) {
+        return nullptr;
+    }
     typedef android::hardware::graphics::bufferqueue::V1_0::
             IGraphicBufferProducer HGraphicBufferProducer;
     typedef android::hardware::media::omx::V1_0::
