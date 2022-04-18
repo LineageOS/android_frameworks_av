@@ -670,8 +670,7 @@ status_t C2SoftAvcDec::resetDecoder() {
 
 void C2SoftAvcDec::resetPlugin() {
     mSignalledOutputEos = false;
-    gettimeofday(&mTimeStart, nullptr);
-    gettimeofday(&mTimeEnd, nullptr);
+    mTimeStart = mTimeEnd = systemTime();
 }
 
 status_t C2SoftAvcDec::deleteDecoder() {
@@ -866,14 +865,13 @@ void C2SoftAvcDec::process(
                 setParams(mStride, IVD_DECODE_HEADER);
             }
 
-            WORD32 delay;
-            GETTIME(&mTimeStart, nullptr);
-            TIME_DIFF(mTimeEnd, mTimeStart, delay);
+            mTimeStart = systemTime();
+            nsecs_t delay = mTimeStart - mTimeEnd;
             (void) ivdec_api_function(mDecHandle, &s_h264d_decode_ip, &s_h264d_decode_op);
-            WORD32 decodeTime;
-            GETTIME(&mTimeEnd, nullptr);
-            TIME_DIFF(mTimeStart, mTimeEnd, decodeTime);
-            ALOGV("decodeTime=%6d delay=%6d numBytes=%6d", decodeTime, delay,
+
+            mTimeEnd = systemTime();
+            nsecs_t decodeTime = mTimeEnd - mTimeStart;
+            ALOGV("decodeTime=%" PRId64 " delay=%" PRId64 " numBytes=%6d", decodeTime, delay,
                   ps_decode_op->u4_num_bytes_consumed);
         }
         if (IVD_MEM_ALLOC_FAILED == (ps_decode_op->u4_error_code & IVD_ERROR_MASK)) {
