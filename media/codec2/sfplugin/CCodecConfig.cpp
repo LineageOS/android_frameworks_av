@@ -20,6 +20,8 @@
 #include <log/log.h>
 #include <utils/NativeHandle.h>
 
+#include <android-base/properties.h>
+
 #include <C2Component.h>
 #include <C2Param.h>
 #include <util/C2InterfaceHelper.h>
@@ -1109,15 +1111,21 @@ status_t CCodecConfig::subscribeToConfigUpdate(
         const std::shared_ptr<Codec2Client::Configurable> &configurable,
         const std::vector<C2Param::Index> &indices,
         c2_blocking_t blocking) {
+    static const int32_t kProductFirstApiLevel =
+        base::GetIntProperty<int32_t>("ro.product.first_api_level", 0);
+    static const int32_t kBoardApiLevel =
+        base::GetIntProperty<int32_t>("ro.board.first_api_level", 0);
+    static const int32_t kFirstApiLevel =
+        (kBoardApiLevel != 0) ? kBoardApiLevel : kProductFirstApiLevel;
     mSubscribedIndices.insert(indices.begin(), indices.end());
-    // TODO: enable this when components no longer crash on this config
-    if (mSubscribedIndices.size() != mSubscribedIndicesSize && false) {
-        std::vector<uint32_t> indices;
+    if (mSubscribedIndices.size() != mSubscribedIndicesSize
+            && kFirstApiLevel >= __ANDROID_API_T__) {
+        std::vector<uint32_t> indicesVector;
         for (C2Param::Index ix : mSubscribedIndices) {
-            indices.push_back(ix);
+            indicesVector.push_back(ix);
         }
         std::unique_ptr<C2SubscribedParamIndicesTuning> subscribeTuning =
-            C2SubscribedParamIndicesTuning::AllocUnique(indices);
+            C2SubscribedParamIndicesTuning::AllocUnique(indicesVector);
         std::vector<std::unique_ptr<C2SettingResult>> results;
         c2_status_t c2Err = configurable->config({ subscribeTuning.get() }, blocking, &results);
         if (c2Err != C2_OK && c2Err != C2_BAD_INDEX) {
