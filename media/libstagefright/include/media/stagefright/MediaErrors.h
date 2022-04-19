@@ -163,11 +163,28 @@ static inline bool isCryptoError(status_t err) {
             || (ERROR_DRM_VENDOR_MIN <= err && err <= ERROR_DRM_VENDOR_MAX);
 }
 
-static inline std::string StrCryptoError(status_t err) {
 #define STATUS_CASE(STATUS) \
     case STATUS:            \
         return #STATUS
 
+static inline std::string StrMediaError(status_t err) {
+    switch(err) {
+        STATUS_CASE(ERROR_ALREADY_CONNECTED);
+        STATUS_CASE(ERROR_NOT_CONNECTED);
+        STATUS_CASE(ERROR_UNKNOWN_HOST);
+        STATUS_CASE(ERROR_CANNOT_CONNECT);
+        STATUS_CASE(ERROR_IO);
+        STATUS_CASE(ERROR_CONNECTION_LOST);
+        STATUS_CASE(ERROR_MALFORMED);
+        STATUS_CASE(ERROR_OUT_OF_RANGE);
+        STATUS_CASE(ERROR_BUFFER_TOO_SMALL);
+        STATUS_CASE(ERROR_UNSUPPORTED);
+        STATUS_CASE(ERROR_END_OF_STREAM);
+    }
+    return statusToString(err);
+}
+
+static inline std::string StrCryptoError(status_t err) {
     switch (err) {
         STATUS_CASE(ERROR_DRM_UNKNOWN);
         STATUS_CASE(ERROR_DRM_NO_LICENSE);
@@ -209,10 +226,10 @@ static inline std::string StrCryptoError(status_t err) {
         STATUS_CASE(ERROR_DRM_STORAGE_READ);
         STATUS_CASE(ERROR_DRM_STORAGE_WRITE);
         STATUS_CASE(ERROR_DRM_ZERO_SUBSAMPLES);
-#undef STATUS_CASE
     }
     return statusToString(err);
 }
+#undef STATUS_CASE
 
 }  // namespace android
 

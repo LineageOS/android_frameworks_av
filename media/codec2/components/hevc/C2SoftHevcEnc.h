@@ -19,6 +19,7 @@
 
 #include <SimpleC2Component.h>
 #include <algorithm>
+#include <inttypes.h>
 #include <map>
 #include <media/stagefright/foundation/ColorUtils.h>
 #include <utils/Vector.h>
@@ -26,14 +27,6 @@
 #include "ihevc_typedefs.h"
 
 namespace android {
-
-/** Get time */
-#define GETTIME(a, b) gettimeofday(a, b)
-
-/** Compute difference between start and end */
-#define TIME_DIFF(start, end, diff)                      \
-    diff = (((end).tv_sec - (start).tv_sec) * 1000000) + \
-           ((end).tv_usec - (start).tv_usec);
 
 #define CODEC_MAX_CORES  4
 #define MAX_B_FRAMES     1
@@ -102,8 +95,8 @@ struct C2SoftHevcEnc : public SimpleC2Component {
 #endif /* FILE_DUMP_ENABLE */
 
     // profile
-    struct timeval mTimeStart;
-    struct timeval mTimeEnd;
+    nsecs_t mTimeStart = 0;
+    nsecs_t mTimeEnd = 0;
 
     c2_status_t initEncParams();
     c2_status_t initEncoder();
@@ -127,14 +120,12 @@ struct C2SoftHevcEnc : public SimpleC2Component {
 #define OUTPUT_DUMP_EXT "h265"
 #define GENERATE_FILE_NAMES()                                             \
 {                                                                         \
-    GETTIME(&mTimeStart, NULL);                                           \
-    strcpy(mInFile, "");                                                  \
+    nsecs_t now = systemTime();                                           \
     ALOGD("GENERATE_FILE_NAMES");                                         \
-    sprintf(mInFile, "%s_%ld.%ld.%s", INPUT_DUMP_PATH, mTimeStart.tv_sec, \
-            mTimeStart.tv_usec, INPUT_DUMP_EXT);                          \
-    strcpy(mOutFile, "");                                                 \
-    sprintf(mOutFile, "%s_%ld.%ld.%s", OUTPUT_DUMP_PATH,                  \
-            mTimeStart.tv_sec, mTimeStart.tv_usec, OUTPUT_DUMP_EXT);      \
+    sprintf(mInFile, "%s_%" PRId64 ".%s", INPUT_DUMP_PATH,                \
+            mTimeStart, INPUT_DUMP_EXT);                                  \
+    sprintf(mutFile, "%s_%" PRId64 ".%s", OUTPUT_DUMP_PATH,               \
+            mTimeStart, OUTPUT_DUMP_EXT);                                 \
 }
 
 #define CREATE_DUMP_FILE(m_filename)                 \
