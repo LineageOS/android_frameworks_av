@@ -29,14 +29,13 @@
 
 #define NUM_ARGUMENTS 8
 #define VERSION_VALUE "1.0"
-#define PACKAGE_NAME  "AudioRecord test"
+#define PACKAGE_NAME "AudioRecord test"
 
 namespace android {
 
 using android::content::AttributionSourceState;
 
-int testRecord(FILE *inputFile, int outputFileFd)
-{
+int testRecord(FILE* inputFile, int outputFileFd) {
     char line[MAX_INPUT_FILE_LINE_LENGTH];
     uint32_t testCount = 0;
     Vector<String16> args;
@@ -47,11 +46,9 @@ int testRecord(FILE *inputFile, int outputFileFd)
     attributionSource.token = sp<BBinder>::make();
 
     if (inputFile == nullptr) {
-        sp<AudioRecord> record = new AudioRecord(AUDIO_SOURCE_DEFAULT,
-                                              0 /* sampleRate */,
-                                              AUDIO_FORMAT_DEFAULT,
-                                              AUDIO_CHANNEL_IN_MONO,
-                                              attributionSource);
+        sp<AudioRecord> record =
+                new AudioRecord(AUDIO_SOURCE_DEFAULT, 0 /* sampleRate */, AUDIO_FORMAT_DEFAULT,
+                                AUDIO_CHANNEL_IN_MONO, attributionSource);
         if (record == 0 || record->initCheck() != NO_ERROR) {
             write(outputFileFd, "Error creating AudioRecord\n",
                   sizeof("Error creating AudioRecord\n"));
@@ -80,11 +77,10 @@ int testRecord(FILE *inputFile, int outputFileFd)
         char statusStr[MAX_OUTPUT_FILE_LINE_LENGTH];
         bool fast = false;
 
-        if (sscanf(line, " %u %x %x %zu %d %x %u %u",
-                   &sampleRate, &format, &channelMask,
-                   &frameCount, &notificationFrames,
-                   &flags, &sessionId, &inputSource) != NUM_ARGUMENTS) {
-            fprintf(stderr, "Malformed line for test #%u in input file\n", testCount+1);
+        if (sscanf(line, " %u %x %x %zu %d %x %u %u", &sampleRate, &format, &channelMask,
+                   &frameCount, &notificationFrames, &flags, &sessionId,
+                   &inputSource) != NUM_ARGUMENTS) {
+            fprintf(stderr, "Malformed line for test #%u in input file\n", testCount + 1);
             ret = 1;
             continue;
         }
@@ -100,21 +96,10 @@ int testRecord(FILE *inputFile, int outputFileFd)
         sp<AudioRecord> record = new AudioRecord(attributionSource);
         const auto emptyCallback = sp<AudioRecord::IAudioRecordCallback>::make();
 
-        record->set(AUDIO_SOURCE_DEFAULT,
-                   sampleRate,
-                   format,
-                   channelMask,
-                   frameCount,
-                   fast ? emptyCallback : nullptr,
-                   notificationFrames,
-                   false,
-                   sessionId,
-                   fast ? AudioRecord::TRANSFER_CALLBACK : AudioRecord::TRANSFER_DEFAULT,
-                   flags,
-                   getuid(),
-                   getpid(),
-                   &attributes,
-                   AUDIO_PORT_HANDLE_NONE);
+        record->set(AUDIO_SOURCE_DEFAULT, sampleRate, format, channelMask, frameCount,
+                    fast ? emptyCallback : nullptr, notificationFrames, false, sessionId,
+                    fast ? AudioRecord::TRANSFER_CALLBACK : AudioRecord::TRANSFER_DEFAULT, flags,
+                    getuid(), getpid(), &attributes, AUDIO_PORT_HANDLE_NONE);
         status = record->initCheck();
         sprintf(statusStr, "\n#### Test %u status %d\n", testCount, status);
         write(outputFileFd, statusStr, strlen(statusStr));
@@ -126,11 +111,8 @@ int testRecord(FILE *inputFile, int outputFileFd)
     return ret;
 }
 
-}; // namespace android
+};  // namespace android
 
-
-int main(int argc, char **argv)
-{
+int main(int argc, char** argv) {
     return android::main(argc, argv, android::testRecord);
 }
-
