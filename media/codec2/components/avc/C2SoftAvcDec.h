@@ -18,6 +18,7 @@
 #define ANDROID_C2_SOFT_AVC_DEC_H_
 
 #include <sys/time.h>
+#include <inttypes.h>
 
 #include <media/stagefright/foundation/ColorUtils.h>
 
@@ -43,19 +44,15 @@ namespace android {
 #define IVDEXT_CMD_CTL_SET_NUM_CORES    \
         (IVD_CONTROL_API_COMMAND_TYPE_T)IH264D_CMD_CTL_SET_NUM_CORES
 #define MIN(a, b)                       (((a) < (b)) ? (a) : (b))
-#define GETTIME(a, b)                   gettimeofday(a, b);
-#define TIME_DIFF(start, end, diff)     \
-    diff = (((end).tv_sec - (start).tv_sec) * 1000000) + \
-            ((end).tv_usec - (start).tv_usec);
 
 #ifdef FILE_DUMP_ENABLE
     #define INPUT_DUMP_PATH     "/sdcard/clips/avcd_input"
     #define INPUT_DUMP_EXT      "h264"
     #define GENERATE_FILE_NAMES() {                         \
-        GETTIME(&mTimeStart, NULL);                         \
+        nsecs_t now = systemTime();                         \
         strcpy(mInFile, "");                                \
-        sprintf(mInFile, "%s_%ld.%ld.%s", INPUT_DUMP_PATH,  \
-                mTimeStart.tv_sec, mTimeStart.tv_usec,      \
+        sprintf(mInFile, "%s_%" PRId64 "d.%s",              \
+                INPUT_DUMP_PATH, now,                       \
                 INPUT_DUMP_EXT);                            \
     }
     #define CREATE_DUMP_FILE(m_filename) {                  \
@@ -183,8 +180,8 @@ private:
     } mBitstreamColorAspects;
 
     // profile
-    struct timeval mTimeStart;
-    struct timeval mTimeEnd;
+    nsecs_t mTimeStart = 0;
+    nsecs_t mTimeEnd = 0;
 #ifdef FILE_DUMP_ENABLE
     char mInFile[200];
 #endif /* FILE_DUMP_ENABLE */
