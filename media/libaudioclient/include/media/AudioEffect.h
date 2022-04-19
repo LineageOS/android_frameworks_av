@@ -577,6 +577,25 @@ public:
                               uint32_t *replySize,
                               void *replyData);
 
+    /* Retrieves the configuration of the effect.
+     *
+     * Parameters:
+     *      inputCfg:  pointer to audio_config_base_t structure receiving input
+     *          configuration of the effect
+     *      outputCfg: pointer to audio_config_base_t structure receiving output
+     *          configuration of the effect
+     *
+     * Channel masks of the returned configs are "input" or "output" depending
+     * on the direction of the stream that the effect is attached to.
+     *
+     * Returned status (from utils/Errors.h) can be:
+     *  - NO_ERROR: successful operation.
+     *  - INVALID_OPERATION: the AudioEffect was not successfully initialized.
+     *  - BAD_VALUE: null config pointers
+     *  - DEAD_OBJECT: the effect engine has been deleted.
+     */
+     virtual status_t   getConfigs(audio_config_base_t *inputCfg,
+                                   audio_config_base_t *outputCfg);
 
      /*
       * Utility functions.
