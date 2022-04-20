@@ -93,3 +93,106 @@ cc_test {
     ],
     data: ["record_test_input_*.txt"],
 }
+
+cc_defaults {
+    name: "libaudioclient_gtests_defaults",
+    cflags: [
+        "-Wall",
+        "-Werror",
+    ],
+    shared_libs: [
+        "capture_state_listener-aidl-cpp",
+        "framework-permission-aidl-cpp",
+        "libbase",
+        "libbinder",
+        "libcgrouprc",
+        "libcutils",
+        "libdl",
+        "liblog",
+        "libmedia",
+        "libmediametrics",
+        "libmediautils",
+        "libmedia_helper",
+        "libnblog",
+        "libprocessgroup",
+        "libshmemcompat",
+        "libstagefright_foundation",
+        "libutils",
+        "libvibrator",
+        "mediametricsservice-aidl-cpp",
+        "packagemanager_aidl-cpp",
+        "shared-file-region-aidl-cpp",
+    ],
+    static_libs: [
+        "android.hardware.audio.common@7.0-enums",
+        "android.media.audio.common.types-V1-cpp",
+        "audioclient-types-aidl-cpp",
+        "audioflinger-aidl-cpp",
+        "audiopolicy-aidl-cpp",
+        "audiopolicy-types-aidl-cpp",
+        "av-types-aidl-cpp",
+        "effect-aidl-cpp",
+        "libaudioclient",
+        "libaudioclient_aidl_conversion",
+        "libaudiofoundation",
+        "libaudiomanager",
+        "libaudiopolicy",
+        "libaudioutils",
+    ],
+    data: ["bbb*.raw"],
+    test_config_template: "audio_test_template.xml",
+}
+
+cc_test {
+    name: "audiorecord_tests",
+    defaults: ["libaudioclient_gtests_defaults"],
+    srcs: [
+        "audiorecord_tests.cpp",
+        "audio_test_utils.cpp",
+    ],
+}
+
+cc_test {
+    name: "audiotrack_tests",
+    defaults: ["libaudioclient_gtests_defaults"],
+    srcs: [
+        "audiotrack_tests.cpp",
+        "audio_test_utils.cpp",
+    ],
+}
+
+cc_test {
+    name: "audioeffect_tests",
+    defaults: ["libaudioclient_gtests_defaults"],
+    srcs: [
+        "audioeffect_tests.cpp",
+        "audio_test_utils.cpp",
+    ],
+}
+
+cc_test {
+    name: "audiorouting_tests",
+    defaults: ["libaudioclient_gtests_defaults"],
+    srcs: [
+        "audiorouting_tests.cpp",
+        "audio_test_utils.cpp",
+    ],
+    shared_libs: [
+        "libxml2",
+    ],
+}
+
+cc_test {
+    name: "audioclient_serialization_tests",
+    defaults: ["libaudioclient_gtests_defaults"],
+    srcs: [
+        "audioclient_serialization_tests.cpp",
+        "audio_test_utils.cpp",
+    ],
+}
+
+cc_test {
+    name: "trackplayerbase_tests",
+    defaults: ["libaudioclient_gtests_defaults"],
+    srcs: ["trackplayerbase_tests.cpp"],
+}

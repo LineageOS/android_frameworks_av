@@ -37,25 +37,10 @@ TEST(audio_aidl_status_tests, statusRoundTripSmallValues) {
 
 // Special status values are preserved on round trip.
 TEST(audio_aidl_status_tests, statusRoundTripSpecialValues) {
-    for (status_t status : {
-            OK,
-            UNKNOWN_ERROR,
-            NO_MEMORY,
-            INVALID_OPERATION,
-            BAD_VALUE,
-            BAD_TYPE,
-            NAME_NOT_FOUND,
-            PERMISSION_DENIED,
-            NO_INIT,
-            ALREADY_EXISTS,
-            DEAD_OBJECT,
-            FAILED_TRANSACTION,
-            BAD_INDEX,
-            NOT_ENOUGH_DATA,
-            WOULD_BLOCK,
-            TIMED_OUT,
-            UNKNOWN_TRANSACTION,
-            FDS_NOT_ALLOWED}) {
+    for (status_t status :
+         {OK, UNKNOWN_ERROR, NO_MEMORY, INVALID_OPERATION, BAD_VALUE, BAD_TYPE, NAME_NOT_FOUND,
+          PERMISSION_DENIED, NO_INIT, ALREADY_EXISTS, DEAD_OBJECT, FAILED_TRANSACTION, BAD_INDEX,
+          NOT_ENOUGH_DATA, WOULD_BLOCK, TIMED_OUT, UNKNOWN_TRANSACTION, FDS_NOT_ALLOWED}) {
         ASSERT_EQ(status, statusTFromBinderStatus(binderStatusFromStatusT(status)));
     }
 }
@@ -63,47 +48,29 @@ TEST(audio_aidl_status_tests, statusRoundTripSpecialValues) {
 // Binder exceptions show as an error (not fixed at this time); these come fromExceptionCode().
 TEST(audio_aidl_status_tests, binderStatusExceptions) {
     for (int exceptionCode : {
-            //Status::EX_NONE,
-            Status::EX_SECURITY,
-            Status::EX_BAD_PARCELABLE,
-            Status::EX_ILLEGAL_ARGUMENT,
-            Status::EX_NULL_POINTER,
-            Status::EX_ILLEGAL_STATE,
-            Status::EX_NETWORK_MAIN_THREAD,
-            Status::EX_UNSUPPORTED_OPERATION,
-            //Status::EX_SERVICE_SPECIFIC, -- tested fromServiceSpecificError()
-            Status::EX_PARCELABLE,
-            // This is special and Java specific; see Parcel.java.
-            Status::EX_HAS_REPLY_HEADER,
-            // This is special, and indicates to C++ binder proxies that the
-            // transaction has failed at a low level.
-            //Status::EX_TRANSACTION_FAILED, -- tested fromStatusT().
-            }) {
+                 // Status::EX_NONE,
+                 Status::EX_SECURITY, Status::EX_BAD_PARCELABLE, Status::EX_ILLEGAL_ARGUMENT,
+                 Status::EX_NULL_POINTER, Status::EX_ILLEGAL_STATE, Status::EX_NETWORK_MAIN_THREAD,
+                 Status::EX_UNSUPPORTED_OPERATION,
+                 // Status::EX_SERVICE_SPECIFIC, -- tested fromServiceSpecificError()
+                 Status::EX_PARCELABLE,
+                 // This is special and Java specific; see Parcel.java.
+                 Status::EX_HAS_REPLY_HEADER,
+                 // This is special, and indicates to C++ binder proxies that the
+                 // transaction has failed at a low level.
+                 // Status::EX_TRANSACTION_FAILED, -- tested fromStatusT().
+         }) {
         ASSERT_NE(OK, statusTFromBinderStatus(Status::fromExceptionCode(exceptionCode)));
     }
 }
 
 // Binder transaction errors show exactly in status_t; these come fromStatusT().
 TEST(audio_aidl_status_tests, binderStatusTransactionError) {
-    for (status_t status : {
-            OK, // Note: fromStatusT does check if this is 0, so this is no error.
-            UNKNOWN_ERROR,
-            NO_MEMORY,
-            INVALID_OPERATION,
-            BAD_VALUE,
-            BAD_TYPE,
-            NAME_NOT_FOUND,
-            PERMISSION_DENIED,
-            NO_INIT,
-            ALREADY_EXISTS,
-            DEAD_OBJECT,
-            FAILED_TRANSACTION,
-            BAD_INDEX,
-            NOT_ENOUGH_DATA,
-            WOULD_BLOCK,
-            TIMED_OUT,
-            UNKNOWN_TRANSACTION,
-            FDS_NOT_ALLOWED}) {
+    for (status_t status :
+         {OK,  // Note: fromStatusT does check if this is 0, so this is no error.
+          UNKNOWN_ERROR, NO_MEMORY, INVALID_OPERATION, BAD_VALUE, BAD_TYPE, NAME_NOT_FOUND,
+          PERMISSION_DENIED, NO_INIT, ALREADY_EXISTS, DEAD_OBJECT, FAILED_TRANSACTION, BAD_INDEX,
+          NOT_ENOUGH_DATA, WOULD_BLOCK, TIMED_OUT, UNKNOWN_TRANSACTION, FDS_NOT_ALLOWED}) {
         ASSERT_EQ(status, statusTFromBinderStatus(Status::fromStatusT(status)));
     }
 }
