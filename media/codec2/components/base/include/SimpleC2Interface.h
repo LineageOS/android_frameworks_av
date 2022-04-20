@@ -209,6 +209,7 @@ struct Setter {
         return me.F(me.v.value).validatePossible(me.v.value);
     }
 
+    // TODO(b/230146771): fix crash
     static C2R NonStrictValuesWithNoDeps(
             bool mayBlock, C2InterfaceHelper::C2P<type> &me) {
         (void)mayBlock;
