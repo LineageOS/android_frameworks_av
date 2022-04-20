@@ -44,7 +44,10 @@ cc_library {
         "-Wextra",
         "-Wall",
     ],
-    shared_libs: ["libutils", "liblog"],
+    shared_libs: [
+        "libutils",
+        "liblog",
+    ],
     header_libs: [
         "libmedia_helper_headers",
         "libaudio_system_headers",
@@ -52,7 +55,7 @@ cc_library {
     export_header_lib_headers: [
         "libmedia_helper_headers",
     ],
-    clang: true,
+
     host_supported: true,
     target: {
         darwin: {
