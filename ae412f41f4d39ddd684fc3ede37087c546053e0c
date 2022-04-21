@@ -33,6 +33,40 @@
       "message": "334020\n",
       "revId": "ae412f41f4d39ddd684fc3ede37087c546053e0c",
       "serverId": "1ec6b3db-b2c1-4fa4-84a2-4c7efe89ba71"
+    },
+    {
+      "unresolved": false,
+      "key": {
+        "uuid": "4d0638c4_9d683dcc",
+        "filename": "/PATCHSET_LEVEL",
+        "patchSetId": 1
+      },
+      "lineNbr": 0,
+      "author": {
+        "id": 30890
+      },
+      "writtenOn": "2022-04-21T15:14:32Z",
+      "side": 1,
+      "message": "Comment removed by: Michael Bestas; Reason: bad link",
+      "revId": "ae412f41f4d39ddd684fc3ede37087c546053e0c",
+      "serverId": "1ec6b3db-b2c1-4fa4-84a2-4c7efe89ba71"
+    },
+    {
+      "unresolved": false,
+      "key": {
+        "uuid": "2614da4f_f9b5f05a",
+        "filename": "services/camera/libcameraservice/common/CameraProviderManager.cpp",
+        "patchSetId": 1
+      },
+      "lineNbr": 1693,
+      "author": {
+        "id": 30890
+      },
+      "writtenOn": "2022-04-21T15:14:32Z",
+      "side": 1,
+      "message": "https://review.lineageos.org/c/LineageOS/android_frameworks_av/+/320525",
+      "revId": "ae412f41f4d39ddd684fc3ede37087c546053e0c",
+      "serverId": "1ec6b3db-b2c1-4fa4-84a2-4c7efe89ba71"
     }
   ]
 }
