@@ -5539,6 +5539,7 @@ status_t AudioPolicyManager::initialize() {
         return status;
     }
 
+    mEngine->updateDeviceSelectionCache();
     mCommunnicationStrategy = mEngine->getProductStrategyForAttributes(
         mEngine->getAttributesForStreamType(AUDIO_STREAM_VOICE_CALL));
 
@@ -6432,6 +6433,18 @@ bool AudioPolicyManager::isScoRequestedForComm() const {
     return false;
 }
 
+bool AudioPolicyManager::isHearingAidUsedForComm() const {
+    DeviceVector devices = mEngine->getOutputDevicesForStream(AUDIO_STREAM_VOICE_CALL,
+                                                       true /*fromCache*/);
+    for (const auto &device : devices) {
+        if (device->type() == AUDIO_DEVICE_OUT_HEARING_AID) {
+            return true;
+        }
+    }
+    return false;
+}
+
+
 void AudioPolicyManager::checkA2dpSuspend()
 {
     audio_io_handle_t a2dpOutput = mOutputs.getA2dpOutput();
@@ -7229,13 +7242,15 @@ status_t AudioPolicyManager::checkAndSetVolume(IVolumeCurves &curves,
     bool isBtScoVolSrc = (volumeSource != VOLUME_SOURCE_NONE) && (btScoVolSrc == volumeSource);
 
     bool isScoRequested = isScoRequestedForComm();
+    bool isHAUsed = isHearingAidUsedForComm();
+
     // do not change in call volume if bluetooth is connected and vice versa
     // if sco and call follow same curves, bypass forceUseForComm
     if ((callVolSrc != btScoVolSrc) &&
             ((isVoiceVolSrc && isScoRequested) ||
-             (isBtScoVolSrc && !isScoRequested))) {
+             (isBtScoVolSrc && !(isScoRequested || isHAUsed)))) {
         ALOGV("%s cannot set volume group %d volume when is%srequested for comm", __func__,
-             volumeSource, isScoRequested ? " " : "n ot ");
+             volumeSource, isScoRequested ? " " : " not ");
         // Do not return an error here as AudioService will always set both voice call
         // and bluetooth SCO volumes due to stream aliasing.
         return NO_ERROR;

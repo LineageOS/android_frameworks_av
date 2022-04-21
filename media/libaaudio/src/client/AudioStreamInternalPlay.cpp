@@ -202,10 +202,18 @@ aaudio_result_t AudioStreamInternalPlay::processDataNow(void *buffer, int32_t nu
                 break;
             case AAUDIO_STREAM_STATE_STARTED:
             {
-                // Sleep until the readCounter catches up and we only have
-                // the getBufferSize() frames of data sitting in the buffer.
-                int64_t nextReadPosition = mAudioEndpoint->getDataWriteCounter() - getBufferSize();
-                wakeTime = mClockModel.convertPositionToTime(nextReadPosition);
+                // Calculate when there will be room available to write to the buffer.
+                // If the appBufferSize is smaller than the endpointBufferSize then
+                // we will have room to write data beyond the appBufferSize.
+                // That is a technique used to reduce glitches without adding latency.
+                const int32_t appBufferSize = getBufferSize();
+                // The endpoint buffer size is set to the maximum that can be written.
+                // If we use it then we must carve out some room to write data when we wake up.
+                const int32_t endBufferSize = mAudioEndpoint->getBufferSizeInFrames()
+                        - getFramesPerBurst();
+                const int32_t bestBufferSize = std::min(appBufferSize, endBufferSize);
+                int64_t targetReadPosition = mAudioEndpoint->getDataWriteCounter() - bestBufferSize;
+                wakeTime = mClockModel.convertPositionToTime(targetReadPosition);
             }
                 break;
             default:

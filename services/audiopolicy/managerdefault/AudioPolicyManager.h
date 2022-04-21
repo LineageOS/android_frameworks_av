@@ -1189,6 +1189,8 @@ private:
 
         bool isScoRequestedForComm() const;
 
+        bool isHearingAidUsedForComm() const;
+
         bool areAllActiveTracksRerouted(const sp<SwAudioOutputDescriptor>& output);
 
         /**
