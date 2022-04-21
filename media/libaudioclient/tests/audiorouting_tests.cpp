@@ -177,9 +177,10 @@ TEST(AudioTrackTest, TestPerformanceMode) {
         attributes.usage = AUDIO_USAGE_MEDIA;
         attributes.content_type = AUDIO_CONTENT_TYPE_MUSIC;
         attributes.flags = flags[i];
-        std::unique_ptr<AudioPlayback> ap(new AudioPlayback(
-                0, AUDIO_FORMAT_PCM_16_BIT, AUDIO_CHANNEL_OUT_STEREO, AUDIO_OUTPUT_FLAG_NONE,
-                AUDIO_SESSION_NONE, AudioTrack::TRANSFER_OBTAIN, &attributes));
+        sp<AudioPlayback> ap = sp<AudioPlayback>::make(
+                0 /* sampleRate */, AUDIO_FORMAT_PCM_16_BIT, AUDIO_CHANNEL_OUT_STEREO,
+                AUDIO_OUTPUT_FLAG_NONE, AUDIO_SESSION_NONE, AudioTrack::TRANSFER_OBTAIN,
+                &attributes);
         ASSERT_NE(nullptr, ap);
         ASSERT_EQ(OK, ap->loadResource("/data/local/tmp/bbb_2ch_24kHz_s16le.raw"))
                 << "Unable to open Resource";
@@ -222,9 +223,9 @@ TEST(AudioTrackTest, TestRemoteSubmix) {
     ASSERT_NE(nullptr, capture);
     ASSERT_EQ(OK, capture->create()) << "record creation failed";
 
-    std::unique_ptr<AudioPlayback> playback = std::make_unique<AudioPlayback>(
-            48000, AUDIO_FORMAT_PCM_16_BIT, AUDIO_CHANNEL_OUT_STEREO, AUDIO_OUTPUT_FLAG_NONE,
-            AUDIO_SESSION_NONE);
+    sp<AudioPlayback> playback = sp<AudioPlayback>::make(
+            48000 /* sampleRate */, AUDIO_FORMAT_PCM_16_BIT, AUDIO_CHANNEL_OUT_STEREO,
+            AUDIO_OUTPUT_FLAG_NONE, AUDIO_SESSION_NONE);
     ASSERT_NE(nullptr, playback);
     ASSERT_EQ(OK, playback->loadResource("/data/local/tmp/bbb_2ch_24kHz_s16le.raw"))
             << "Unable to open Resource";

@@ -325,45 +325,6 @@ namespace {
         }
     };
 }
-
-AudioTrack::AudioTrack(
-        audio_stream_type_t streamType,
-        uint32_t sampleRate,
-        audio_format_t format,
-        audio_channel_mask_t channelMask,
-        size_t frameCount,
-        audio_output_flags_t flags,
-        legacy_callback_t callback,
-        void* user,
-        int32_t notificationFrames,
-        audio_session_t sessionId,
-        transfer_type transferType,
-        const audio_offload_info_t *offloadInfo,
-        const AttributionSourceState& attributionSource,
-        const audio_attributes_t* pAttributes,
-        bool doNotReconnect,
-        float maxRequiredSpeed,
-        audio_port_handle_t selectedDeviceId)
-    : mStatus(NO_INIT),
-      mState(STATE_STOPPED),
-      mPreviousPriority(ANDROID_PRIORITY_NORMAL),
-      mPreviousSchedulingGroup(SP_DEFAULT),
-      mPausedPosition(0),
-      mAudioTrackCallback(new AudioTrackCallback())
-{
-    mAttributes = AUDIO_ATTRIBUTES_INITIALIZER;
-    if (callback != nullptr) {
-        mLegacyCallbackWrapper = sp<LegacyCallbackWrapper>::make(callback, user);
-    } else if (user) {
-        LOG_ALWAYS_FATAL("Callback data provided without callback pointer!");
-    }
-    mSetParams = std::unique_ptr<SetParams>{new SetParams{
-            streamType, sampleRate, format, channelMask, frameCount, flags, mLegacyCallbackWrapper,
-            notificationFrames, 0 /*sharedBuffer*/, false /*threadCanCallJava*/, sessionId,
-            transferType, offloadInfo, attributionSource, pAttributes, doNotReconnect,
-            maxRequiredSpeed, selectedDeviceId}};
-}
-
 AudioTrack::AudioTrack(
         audio_stream_type_t streamType,
         uint32_t sampleRate,
@@ -395,44 +356,6 @@ AudioTrack::AudioTrack(
                           callback, notificationFrames, sharedBuffer, false /*threadCanCallJava*/,
                           sessionId, transferType, offloadInfo, attributionSource, pAttributes,
                           doNotReconnect, maxRequiredSpeed, AUDIO_PORT_HANDLE_NONE}};
-}
-
-AudioTrack::AudioTrack(
-        audio_stream_type_t streamType,
-        uint32_t sampleRate,
-        audio_format_t format,
-        audio_channel_mask_t channelMask,
-        const sp<IMemory>& sharedBuffer,
-        audio_output_flags_t flags,
-        legacy_callback_t callback,
-        void* user,
-        int32_t notificationFrames,
-        audio_session_t sessionId,
-        transfer_type transferType,
-        const audio_offload_info_t *offloadInfo,
-        const AttributionSourceState& attributionSource,
-        const audio_attributes_t* pAttributes,
-        bool doNotReconnect,
-        float maxRequiredSpeed)
-    : mStatus(NO_INIT),
-      mState(STATE_STOPPED),
-      mPreviousPriority(ANDROID_PRIORITY_NORMAL),
-      mPreviousSchedulingGroup(SP_DEFAULT),
-      mPausedPosition(0),
-      mSelectedDeviceId(AUDIO_PORT_HANDLE_NONE),
-      mAudioTrackCallback(new AudioTrackCallback())
-{
-    mAttributes = AUDIO_ATTRIBUTES_INITIALIZER;
-    if (callback) {
-        mLegacyCallbackWrapper = sp<LegacyCallbackWrapper>::make(callback, user);
-    } else if (user) {
-        LOG_ALWAYS_FATAL("Callback data provided without callback pointer!");
-    }
-    mSetParams = std::unique_ptr<SetParams>{new SetParams{
-            streamType, sampleRate, format, channelMask, 0 /*frameCount*/, flags,
-            mLegacyCallbackWrapper, notificationFrames, sharedBuffer, false /*threadCanCallJava*/,
-            sessionId, transferType, offloadInfo, attributionSource, pAttributes, doNotReconnect,
-            maxRequiredSpeed, AUDIO_PORT_HANDLE_NONE}};
 }
 
 void AudioTrack::onFirstRef() {
@@ -495,38 +418,6 @@ void AudioTrack::stopAndJoinCallbacks() {
         AudioSystem::removeAudioDeviceCallback(this, mOutput, mPortId);
         mDeviceCallback.clear();
     }
-}
-
-status_t AudioTrack::set(
-        audio_stream_type_t streamType,
-        uint32_t sampleRate,
-        audio_format_t format,
-        audio_channel_mask_t channelMask,
-        size_t frameCount,
-        audio_output_flags_t flags,
-        legacy_callback_t callback,
-        void * user,
-        int32_t notificationFrames,
-        const sp<IMemory>& sharedBuffer,
-        bool threadCanCallJava,
-        audio_session_t sessionId,
-        transfer_type transferType,
-        const audio_offload_info_t *offloadInfo,
-        const AttributionSourceState& attributionSource,
-        const audio_attributes_t* pAttributes,
-        bool doNotReconnect,
-        float maxRequiredSpeed,
-        audio_port_handle_t selectedDeviceId)
-{
-    if (callback) {
-        mLegacyCallbackWrapper = sp<LegacyCallbackWrapper>::make(callback, user);
-    } else if (user) {
-        LOG_ALWAYS_FATAL("Callback data provided without callback pointer!");
-    }
-    return set(streamType, sampleRate,format, channelMask, frameCount, flags,
-               mLegacyCallbackWrapper, notificationFrames, sharedBuffer, threadCanCallJava,
-               sessionId, transferType, offloadInfo, attributionSource, pAttributes,
-               doNotReconnect, maxRequiredSpeed, selectedDeviceId);
 }
 status_t AudioTrack::set(
         audio_stream_type_t streamType,
