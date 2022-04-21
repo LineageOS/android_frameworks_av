@@ -181,6 +181,11 @@ public:
 
     void setMetaMode(MetaMode mode);
 
+    /**
+     * Push a blank buffer to the configured native output surface.
+     */
+    status_t pushBlankBufferToOutputSurface();
+
 private:
     class QueueGuard;
 
