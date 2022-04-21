@@ -871,6 +871,11 @@ void CCodec::configure(const sp<AMessage> &msg) {
                         }
                         config->mTunneled = true;
                     }
+
+                    int32_t pushBlankBuffersOnStop = 0;
+                    if (msg->findInt32(KEY_PUSH_BLANK_BUFFERS_ON_STOP, &pushBlankBuffersOnStop)) {
+                        config->mPushBlankBuffersOnStop = pushBlankBuffersOnStop == 1;
+                    }
                 }
             }
             setSurface(surface);
@@ -1838,7 +1843,13 @@ void CCodec::initiateStop() {
         }
         state->set(STOPPING);
     }
-
+    {
+        Mutexed<std::unique_ptr<Config>>::Locked configLocked(mConfig);
+        const std::unique_ptr<Config> &config = *configLocked;
+        if (config->mPushBlankBuffersOnStop) {
+            mChannel->pushBlankBufferToOutputSurface();
+        }
+    }
     mChannel->reset();
     (new AMessage(kWhatStop, this))->post();
 }
@@ -1924,6 +1935,13 @@ void CCodec::initiateRelease(bool sendCallback /* = true */) {
             config->mInputSurface->disconnect();
             config->mInputSurface = nullptr;
             config->mInputSurfaceDataspace = HAL_DATASPACE_UNKNOWN;
+        }
+    }
+    {
+        Mutexed<std::unique_ptr<Config>>::Locked configLocked(mConfig);
+        const std::unique_ptr<Config> &config = *configLocked;
+        if (config->mPushBlankBuffersOnStop) {
+            mChannel->pushBlankBufferToOutputSurface();
         }
     }
 

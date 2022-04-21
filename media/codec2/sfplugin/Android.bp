@@ -61,6 +61,7 @@ cc_library_shared {
         "libstagefright_codecbase",
         "libstagefright_foundation",
         "libstagefright_omx",
+	"libstagefright_surface_utils",
         "libstagefright_xmlparser",
         "libui",
         "libutils",
