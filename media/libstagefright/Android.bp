@@ -253,6 +253,40 @@ cc_library_shared {
         ],
     },
 }
+
+cc_library_shared {
+    name: "libstagefright_surface_utils",
+
+    srcs: [
+        "SurfaceUtils.cpp",
+    ],
+
+    shared_libs: [
+        "libgui",
+        "liblog",
+        "libui",
+        "libutils",
+    ],
+
+    export_include_dirs: [
+        "include",
+    ],
+
+    cflags: [
+        "-Wno-multichar",
+        "-Werror",
+        "-Wall",
+    ],
+
+    sanitize: {
+        cfi: true,
+        misc_undefined: [
+            "unsigned-integer-overflow",
+            "signed-integer-overflow",
+        ],
+    },
+}
+
 cc_library {
     name: "libstagefright",
 
