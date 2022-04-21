@@ -144,7 +144,6 @@ cc_fuzz {
         "libclearkeydevicefiles-protos",
         "libjsmn",
         "libprotobuf-cpp-lite",
-        "libutils",
     ],
     shared_libs: [
         "android.hidl.allocator@1.0",
@@ -157,6 +156,7 @@ cc_fuzz {
         "libhidlbase",
         "libhidlmemory",
         "liblog",
+        "libutils",
     ],
     fuzz_config: {
         cc: [
