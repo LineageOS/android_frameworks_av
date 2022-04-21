@@ -79,8 +79,8 @@ constexpr auto kTicksPerSecond = Ticks::period::den;
 }  // namespace
 
 SpatializerPoseController::SpatializerPoseController(Listener* listener,
-                                                     std::chrono::microseconds sensorPeriod,
-                                                     std::chrono::microseconds maxUpdatePeriod)
+                                        std::chrono::microseconds sensorPeriod,
+                                        std::optional<std::chrono::microseconds> maxUpdatePeriod)
     : mListener(listener),
       mSensorPeriod(sensorPeriod),
       mProcessor(createHeadTrackingProcessor(HeadTrackingProcessor::Options{
@@ -102,8 +102,12 @@ SpatializerPoseController::SpatializerPoseController(Listener* listener,
               std::optional<HeadTrackingMode> modeIfChanged;
               {
                   std::unique_lock lock(mMutex);
-                  mCondVar.wait_for(lock, maxUpdatePeriod,
-                                    [this] { return mShouldExit || mShouldCalculate; });
+                  if (maxUpdatePeriod.has_value()) {
+                      mCondVar.wait_for(lock, maxUpdatePeriod.value(),
+                                        [this] { return mShouldExit || mShouldCalculate; });
+                  } else {
+                      mCondVar.wait(lock, [this] { return mShouldExit || mShouldCalculate; });
+                  }
                   if (mShouldExit) {
                       ALOGV("Exiting thread");
                       return;
