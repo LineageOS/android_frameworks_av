@@ -60,10 +60,10 @@ class SpatializerPoseController : private media::SensorPoseProvider::Listener {
      * Ctor.
      * sensorPeriod determines how often to receive updates from the sensors (input rate).
      * maxUpdatePeriod determines how often to produce an output when calculateAsync() isn't
-     * invoked.
+     * invoked; passing nullopt means an output is never produced.
      */
     SpatializerPoseController(Listener* listener, std::chrono::microseconds sensorPeriod,
-                               std::chrono::microseconds maxUpdatePeriod);
+                               std::optional<std::chrono::microseconds> maxUpdatePeriod);
 
     /** Dtor. */
     ~SpatializerPoseController();
