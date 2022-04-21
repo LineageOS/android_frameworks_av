@@ -24,6 +24,7 @@
 #include <Codec2CommonUtils.h>
 #include <Codec2Mapper.h>
 #include <SimpleC2Interface.h>
+#include <libyuv.h>
 #include <log/log.h>
 #include <media/stagefright/foundation/AUtils.h>
 #include <media/stagefright/foundation/MediaDefs.h>
@@ -771,14 +772,16 @@ bool C2SoftGav1Dec::outputBuffer(const std::shared_ptr<C2BlockPool> &pool,
   getHDRStaticParams(buffer, work);
   getHDR10PlusInfoData(buffer, work);
 
-  if (!(buffer->image_format == libgav1::kImageFormatYuv420 ||
+  if (buffer->bitdepth == 10 &&
+      !(buffer->image_format == libgav1::kImageFormatYuv420 ||
         buffer->image_format == libgav1::kImageFormatMonochrome400)) {
-    ALOGE("image_format %d not supported", buffer->image_format);
+    ALOGE("image_format %d not supported for 10bit", buffer->image_format);
     mSignalledError = true;
     work->workletsProcessed = 1u;
     work->result = C2_CORRUPTED;
     return false;
   }
+
   const bool isMonochrome =
       buffer->image_format == libgav1::kImageFormatMonochrome400;
 
@@ -884,9 +887,20 @@ bool C2SoftGav1Dec::outputBuffer(const std::shared_ptr<C2BlockPool> &pool,
     const uint8_t *srcY = (const uint8_t *)buffer->plane[0];
     const uint8_t *srcU = (const uint8_t *)buffer->plane[1];
     const uint8_t *srcV = (const uint8_t *)buffer->plane[2];
-    convertYUV420Planar8ToYV12(dstY, dstU, dstV, srcY, srcU, srcV, srcYStride, srcUStride,
-                               srcVStride, dstYStride, dstUStride, dstVStride, mWidth, mHeight,
-                               isMonochrome);
+
+    if (buffer->image_format == libgav1::kImageFormatYuv444) {
+        libyuv::I444ToI420(srcY, srcYStride, srcU, srcUStride, srcV, srcVStride,
+                           dstY, dstYStride, dstU, dstUStride, dstV, dstVStride,
+                           mWidth, mHeight);
+    } else if (buffer->image_format == libgav1::kImageFormatYuv422) {
+        libyuv::I422ToI420(srcY, srcYStride, srcU, srcUStride, srcV, srcVStride,
+                           dstY, dstYStride, dstU, dstUStride, dstV, dstVStride,
+                           mWidth, mHeight);
+    } else {
+        convertYUV420Planar8ToYV12(dstY, dstU, dstV, srcY, srcU, srcV, srcYStride, srcUStride,
+                                   srcVStride, dstYStride, dstUStride, dstVStride, mWidth, mHeight,
+                                   isMonochrome);
+    }
   }
   finishWork(buffer->user_private_data, work, std::move(block));
   block = nullptr;
