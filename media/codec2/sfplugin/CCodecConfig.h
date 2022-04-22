@@ -148,6 +148,8 @@ struct CCodecConfig {
     bool mTunneled;
     sp<NativeHandle> mSidebandHandle;
 
+    bool mPushBlankBuffersOnStop;
+
     CCodecConfig();
 
     /// initializes the members required to manage the format: descriptors, reflector,
@@ -396,4 +398,3 @@ DEFINE_ENUM_OPERATORS(CCodecConfig::Domain)
 }  // namespace android
 
 #endif  // C_CODEC_H_
-
