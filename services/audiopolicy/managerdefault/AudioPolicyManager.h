@@ -1097,6 +1097,16 @@ private:
         void checkVirtualizerClientRoutes();
 
         /**
+         * @brief Returns true if at least one device can only be reached via the output passed
+         * as argument. Always returns false for duplicated outputs.
+         * This can be used to decide if an output can be closed without forbidding
+         * playback to any given device.
+         * @param outputDesc the output to consider
+         * @return true if at least one device can only be reached via the output.
+         */
+        bool isOutputOnlyAvailableRouteToSomeDevice(const sp<SwAudioOutputDescriptor>& outputDesc);
+
+        /**
          * @brief getInputForDevice selects an input handle for a given input device and
          * requester context
          * @param device to be used by requester, selected by policy mix rules or engine
