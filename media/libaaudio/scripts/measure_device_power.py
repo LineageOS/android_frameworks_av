@@ -79,21 +79,33 @@ ENERGY_DICTIONARY = { \
 
 SORTED_ENERGY_LIST = sorted(ENERGY_DICTIONARY, key=ENERGY_DICTIONARY.get)
 
-# Sometimes "adb unroot" returns 1!
+# Sometimes adb returns 1 for no apparent reason.
 # So try several times.
 # @return 0 on success
-def adbUnroot():
+def adbTryMultiple(command):
     returnCode = 1
     count = 0
     limit = 5
     while count < limit and returnCode != 0:
-        print(('Try to adb unroot {} of {}'.format(count, limit)))
+        print(('Try to adb {} {} of {}'.format(command, count, limit)))
         subprocess.call(["adb", "wait-for-device"])
         time.sleep(PRE_DELAY_SECONDS)
-        returnCode = subprocess.call(["adb", "unroot"])
+        returnCode = subprocess.call(["adb", command])
         print(('returnCode = {}'.format(returnCode)))
         count += 1
     return returnCode
+
+# Sometimes "adb root" returns 1!
+# So try several times.
+# @return 0 on success
+def adbRoot():
+    return adbTryMultiple("root");
+
+# Sometimes "adb unroot" returns 1!
+# So try several times.
+# @return 0 on success
+def adbUnroot():
+    return adbTryMultiple("unroot");
 
 # @param commandString String containing shell command
 # @return Both the stdout and stderr of the commands run
@@ -101,6 +113,8 @@ def runCommand(commandString):
     print(commandString)
     if commandString == "adb unroot":
         result = adbUnroot()
+    elif commandString == "adb root":
+        result = adbRoot()
     else:
         commandArray = commandString.split(' ')
         result = subprocess.run(commandArray, check=True, capture_output=True).stdout
@@ -111,6 +125,8 @@ def runCommand(commandString):
 def adbCommand(commandString):
     if commandString == "unroot":
         result = adbUnroot()
+    elif commandString == "root":
+        result = adbRoot()
     else:
         print(("adb " + commandString))
         commandArray = ["adb"] + commandString.split(' ')
@@ -230,7 +246,7 @@ def measureEnergyForCommands(fileName):
                 print((command + "\n"))
                 comment = command[1:].strip() # remove leading '#'
             elif command.endswith('\\'):
-                command = command[:-1].strip() # remove \\
+                command = command[:-1].strip() # remove trailing '\'
                 runCommand(command)
             elif command:
                 report = averageEnergyForCommand(command, DEFAULT_NUM_ITERATIONS)
