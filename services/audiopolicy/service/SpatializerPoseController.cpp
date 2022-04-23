@@ -46,9 +46,8 @@ constexpr float kMaxRotationalVelocity = 8;
 // high will result in high prediction errors whenever the head accelerates (changes velocity).
 constexpr auto kPredictionDuration = 50ms;
 
-// After losing this many consecutive samples from either sensor, we would treat the measurement as
-// stale;
-constexpr auto kMaxLostSamples = 4;
+// After not getting a pose sample for this long, we would treat the measurement as stale.
+constexpr auto kFreshnessTimeout = 50ms;
 
 // Auto-recenter kicks in after the head has been still for this long.
 constexpr auto kAutoRecenterWindowDuration = 6s;
@@ -86,7 +85,7 @@ SpatializerPoseController::SpatializerPoseController(Listener* listener,
       mProcessor(createHeadTrackingProcessor(HeadTrackingProcessor::Options{
               .maxTranslationalVelocity = kMaxTranslationalVelocity / kTicksPerSecond,
               .maxRotationalVelocity = kMaxRotationalVelocity / kTicksPerSecond,
-              .freshnessTimeout = Ticks(sensorPeriod * kMaxLostSamples).count(),
+              .freshnessTimeout = Ticks(kFreshnessTimeout).count(),
               .predictionDuration = Ticks(kPredictionDuration).count(),
               .autoRecenterWindowDuration = Ticks(kAutoRecenterWindowDuration).count(),
               .autoRecenterTranslationalThreshold = kAutoRecenterTranslationThreshold,
