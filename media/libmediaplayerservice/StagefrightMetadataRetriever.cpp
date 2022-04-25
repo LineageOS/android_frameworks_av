@@ -216,7 +216,8 @@ sp<IMemory> StagefrightMetadataRetriever::getImageInternal(
     sp<AMessage> format = new AMessage;
     status_t err = convertMetaDataToMessage(trackMeta, &format);
     if (err != OK) {
-        format = NULL;
+        ALOGE("getImageInternal: convertMetaDataToMessage() failed, unable to extract image");
+        return NULL;
     }
 
     uint32_t bitDepth = 8;
@@ -400,7 +401,8 @@ sp<IMemory> StagefrightMetadataRetriever::getFrameInternal(
     sp<AMessage> format = new AMessage;
     status_t err = convertMetaDataToMessage(trackMeta, &format);
     if (err != OK) {
-        format = NULL;
+        ALOGE("getFrameInternal: convertMetaDataToMessage() failed, unable to extract frame");
+        return NULL;
     }
 
     Vector<AString> matchingCodecs;
