@@ -61,5 +61,24 @@
                 }
             ]
         }
+    ],
+    "staged-platinum-postsubmit": [
+        // runs every four hours
+        {
+            "name": "CtsMediaCodecTestCases",
+            "options": [
+                {
+                    "include-filter": "android.media.codec.cts.EncodeDecodeTest"
+                }
+            ]
+        },
+        {
+            "name": "CtsMediaCodecTestCases",
+            "options": [
+                {
+                    "include-filter": "android.media.codec.cts.DecodeEditEncodeTest"
+                }
+            ]
+        }
     ]
 }
