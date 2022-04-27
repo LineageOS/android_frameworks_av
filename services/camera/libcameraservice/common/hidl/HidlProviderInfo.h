@@ -105,7 +105,7 @@ struct HidlProviderInfo : public CameraProviderManager::ProviderInfo,
 
         virtual status_t isSessionConfigurationSupported(
                 const SessionConfiguration &/*configuration*/,
-                bool overrideForPerfClass,
+                bool overrideForPerfClass, camera3::metadataGetter getMetadata,
                 bool *status/*status*/);
         sp<hardware::camera::device::V3_2::ICameraDevice> startDeviceInterface();
     };
