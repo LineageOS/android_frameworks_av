@@ -125,7 +125,7 @@ void SourceClientDescriptor::dump(String8 *dst, int spaces) const
 
 void SourceClientCollection::dump(String8 *dst) const
 {
-    dst->append("\n Audio sources (%zu):\n", size());
+    dst->appendFormat("\n Audio sources (%zu):\n", size());
     for (size_t i = 0; i < size(); i++) {
         const std::string prefix = base::StringPrintf("  %zu. ", i + 1);
         dst->appendFormat("%s", prefix.c_str());
