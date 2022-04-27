@@ -49,7 +49,7 @@ namespace android {
     #define INPUT_DUMP_EXT      "m2v"
     #define GENERATE_FILE_NAMES() {                         \
         nsecs_t now = systemTime();                         \
-        sprintf(mInFile, "%s_%" PRId64 ".%s",
+        sprintf(mInFile, "%s_%" PRId64 ".%s",               \
                 INPUT_DUMP_PATH, now,                       \
                 INPUT_DUMP_EXT);                            \
     }
