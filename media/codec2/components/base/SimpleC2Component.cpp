@@ -774,7 +774,8 @@ int SimpleC2Component::getHalPixelFormatForBitDepth10(bool allowRGBA1010102) {
     // Save supported hal pixel formats for bit depth of 10, the first time this is called
     if (!mBitDepth10HalPixelFormats.size()) {
         std::vector<int> halPixelFormats;
-        if (isAtLeastT()) {
+        // TODO(b/229387180) Enable once P010 is fully supported
+        if (false && isAtLeastT()) {
             halPixelFormats.push_back(HAL_PIXEL_FORMAT_YCBCR_P010);
         }
         // since allowRGBA1010102 can chance in each call, but mBitDepth10HalPixelFormats
