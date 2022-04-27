@@ -40,7 +40,6 @@
 #include <android-base/logging.h>
 #include <cutils/properties.h>
 #include <hwbinder/IPCThreadState.h>
-#include <utils/SessionConfigurationUtils.h>
 #include <utils/Trace.h>
 
 #include "api2/HeicCompositeStream.h"
@@ -338,14 +337,15 @@ status_t CameraProviderManager::getCameraInfo(const std::string &id,
 
 status_t CameraProviderManager::isSessionConfigurationSupported(const std::string& id,
         const SessionConfiguration &configuration, bool overrideForPerfClass,
-        bool *status /*out*/) const {
+        metadataGetter getMetadata, bool *status /*out*/) const {
     std::lock_guard<std::mutex> lock(mInterfaceMutex);
     auto deviceInfo = findDeviceInfoLocked(id);
     if (deviceInfo == nullptr) {
         return NAME_NOT_FOUND;
     }
 
-    return deviceInfo->isSessionConfigurationSupported(configuration, overrideForPerfClass, status);
+    return deviceInfo->isSessionConfigurationSupported(configuration,
+            overrideForPerfClass, getMetadata, status);
 }
 
 status_t CameraProviderManager::getCameraIdIPCTransport(const std::string &id,
