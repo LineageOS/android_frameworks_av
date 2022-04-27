@@ -576,14 +576,7 @@ public:
     }
 
     ~Impl() {
-        bool noInit = false;
         for (int i = 0; i < NUM_BUFFER_SLOTS; ++i) {
-            if (!noInit && mProducer) {
-                Return<HStatus> transResult =
-                        mProducer->detachBuffer(static_cast<int32_t>(i));
-                noInit = !transResult.isOk() ||
-                         static_cast<HStatus>(transResult) == HStatus::NO_INIT;
-            }
             mBuffers[i].clear();
         }
     }
@@ -692,15 +685,6 @@ public:
         {
             sp<GraphicBuffer> buffers[NUM_BUFFER_SLOTS];
             std::scoped_lock<std::mutex> lock(mMutex);
-            bool noInit = false;
-            for (int i = 0; i < NUM_BUFFER_SLOTS; ++i) {
-                if (!noInit && mProducer) {
-                    Return<HStatus> transResult =
-                            mProducer->detachBuffer(static_cast<int32_t>(i));
-                    noInit = !transResult.isOk() ||
-                             static_cast<HStatus>(transResult) == HStatus::NO_INIT;
-                }
-            }
             int32_t oldGeneration = mGeneration;
             if (producer) {
                 mProducer = producer;
