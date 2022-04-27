@@ -693,15 +693,11 @@ status_t AidlProviderInfo::AidlDeviceInfo3::dumpState(int fd) {
 }
 
 status_t AidlProviderInfo::AidlDeviceInfo3::isSessionConfigurationSupported(
-        const SessionConfiguration &configuration, bool overrideForPerfClass, bool *status) {
+        const SessionConfiguration &configuration, bool overrideForPerfClass,
+        camera3::metadataGetter getMetadata, bool *status) {
 
     camera::device::StreamConfiguration streamConfiguration;
     bool earlyExit = false;
-    camera3::metadataGetter getMetadata = [this](const String8 &id, bool /*overrideForPerfClass*/) {
-          CameraMetadata physicalChars;
-          getPhysicalCameraCharacteristics(id.c_str(), &physicalChars);
-          return physicalChars;
-    };
     auto bRes = SessionConfigurationUtils::convertToHALStreamCombination(configuration,
             String8(mId.c_str()), mCameraCharacteristics, getMetadata, mPhysicalIds,
             streamConfiguration, overrideForPerfClass, &earlyExit);
