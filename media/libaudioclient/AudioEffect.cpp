@@ -529,6 +529,36 @@ status_t AudioEffect::getParameter(effect_param_t *param)
     return status;
 }
 
+status_t AudioEffect::getConfigs(
+        audio_config_base_t *inputCfg, audio_config_base_t *outputCfg)
+{
+    if (mProbe) {
+        return INVALID_OPERATION;
+    }
+    if (mStatus != NO_ERROR && mStatus != ALREADY_EXISTS) {
+        return mStatus;
+    }
+    if (inputCfg == NULL || outputCfg == NULL) {
+        return BAD_VALUE;
+    }
+    status_t status;
+    media::EffectConfig cfg;
+    Status bs = mIEffect->getConfig(&cfg, &status);
+    if (!bs.isOk()) {
+        status = statusTFromBinderStatus(bs);
+        ALOGW("%s received status %d from binder transaction", __func__, status);
+        return status;
+    }
+    if (status == NO_ERROR) {
+        *inputCfg = VALUE_OR_RETURN_STATUS(aidl2legacy_AudioConfigBase_audio_config_base_t(
+                        cfg.inputCfg, cfg.isOnInputStream));
+        *outputCfg = VALUE_OR_RETURN_STATUS(aidl2legacy_AudioConfigBase_audio_config_base_t(
+                        cfg.outputCfg, cfg.isOnInputStream));
+    } else {
+        ALOGW("%s received status %d from the effect", __func__, status);
+    }
+    return status;
+}
 
 // -------------------------------------------------------------------------
 

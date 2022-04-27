@@ -16,6 +16,7 @@
 
 package android.media;
 
+import android.media.EffectConfig;
 import android.media.SharedFileRegion;
 
 /**
@@ -62,6 +63,14 @@ interface IEffect {
      * TODO(ytai): Explain how this should be used exactly.
      */
     SharedFileRegion getCblk();
+
+    /**
+     * Provides audio configurations for effect's input and output,
+     * see EffectConfig parcelable for more details.
+     *
+     * @return a status_t code.
+     */
+    int getConfig(out EffectConfig config);
 
     // When adding a new method, please review and update
     // Effects.cpp AudioFlinger::EffectHandle::onTransact()
