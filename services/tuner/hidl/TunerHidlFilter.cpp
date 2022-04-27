@@ -390,7 +390,9 @@ TunerHidlFilter::~TunerHidlFilter() {
                 static_cast<int32_t>(Result::INVALID_STATE));
     }
 
-    HidlResult res = mFilter->releaseAvHandle(hidl_handle(makeFromAidl(in_handle)), in_avDataId);
+    hidl_handle handle;
+    handle.setTo(makeFromAidl(in_handle), true);
+    HidlResult res = mFilter->releaseAvHandle(handle, in_avDataId);
     if (res != HidlResult::SUCCESS) {
         return ::ndk::ScopedAStatus::fromServiceSpecificError(static_cast<int32_t>(res));
     }
