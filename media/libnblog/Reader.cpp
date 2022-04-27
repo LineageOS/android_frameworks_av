@@ -208,11 +208,14 @@ const uint8_t *Reader::findLastValidEntry(const uint8_t *front, const uint8_t *b
     }
     while (back + Entry::kPreviousLengthOffset >= front) {
         const uint8_t *prev = back - back[Entry::kPreviousLengthOffset] - Entry::kOverhead;
-        const Event type = (const Event)prev[offsetof(entry, type)];
         if (prev < front
-                || prev + prev[offsetof(entry, length)] + Entry::kOverhead != back
-                || type <= EVENT_RESERVED || type >= EVENT_UPPER_BOUND) {
-            // prev points to an out of limits or inconsistent entry
+                || prev + prev[offsetof(entry, length)] + Entry::kOverhead != back) {
+            // prev points to an out of limits entry
+            return nullptr;
+        }
+        const Event type = (const Event)prev[offsetof(entry, type)];
+        if (type <= EVENT_RESERVED || type >= EVENT_UPPER_BOUND) {
+            // prev points to an inconsistent entry
             return nullptr;
         }
         // if invalidTypes does not contain the type, then the type is valid.
