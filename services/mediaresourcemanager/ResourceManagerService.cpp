@@ -732,6 +732,7 @@ bool ResourceManagerService::reclaimUnconditionallyFrom(
         return true;
     }
 
+    int failedClientPid = -1;
     {
         Mutex::Autolock lock(mLock);
         bool found = false;
@@ -746,11 +747,14 @@ bool ResourceManagerService::reclaimUnconditionallyFrom(
                 }
             }
             if (found) {
+                failedClientPid = mMap.keyAt(i);
                 break;
             }
         }
-        if (!found) {
-            ALOGV("didn't find failed client");
+        if (found) {
+            ALOGW("Failed to reclaim resources from client with pid %d", failedClientPid);
+        } else {
+            ALOGW("Failed to reclaim resources from unlocateable client");
         }
     }
 
