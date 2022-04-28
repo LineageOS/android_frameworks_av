@@ -30,6 +30,7 @@
 #include <android/hardware/media/c2/1.0/IInputSurface.h>
 #include <android/hardware/media/omx/1.0/IGraphicBufferSource.h>
 #include <android/hardware/media/omx/1.0/IOmx.h>
+#include <android-base/properties.h>
 #include <android-base/stringprintf.h>
 #include <cutils/properties.h>
 #include <gui/IGraphicBufferProducer.h>
@@ -1006,7 +1007,9 @@ void CCodec::configure(const sp<AMessage> &msg) {
             // Query vendor format for Flexible YUV
             std::vector<std::unique_ptr<C2Param>> heapParams;
             C2StoreFlexiblePixelFormatDescriptorsInfo *pixelFormatInfo = nullptr;
-            if (mClient->query(
+            int vendorSdkVersion = base::GetIntProperty(
+                    "ro.vendor.build.version.sdk", android_get_device_api_level());
+            if (vendorSdkVersion >= __ANDROID_API_S__ && mClient->query(
                         {},
                         {C2StoreFlexiblePixelFormatDescriptorsInfo::PARAM_TYPE},
                         C2_MAY_BLOCK,
