@@ -48,7 +48,7 @@
 namespace android {
 namespace camera3 {
 
-typedef std::function<CameraMetadata (const String8 &, int targetSdkVersion)> metadataGetter;
+typedef std::function<CameraMetadata (const String8 &, bool overrideForPerfClass)> metadataGetter;
 
 class StreamConfiguration {
 public:
