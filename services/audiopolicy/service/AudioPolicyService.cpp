@@ -1938,12 +1938,16 @@ bool AudioPolicyService::AudioCommandThread::threadLoop()
     while (!exitPending())
     {
         sp<AudioPolicyService> svc;
+        int numTimesBecameEmpty = 0;
         while (!mAudioCommands.isEmpty() && !exitPending()) {
             nsecs_t curTime = systemTime();
             // commands are sorted by increasing time stamp: execute them from index 0 and up
             if (mAudioCommands[0]->mTime <= curTime) {
                 sp<AudioCommand> command = mAudioCommands[0];
                 mAudioCommands.removeAt(0);
+                if (mAudioCommands.isEmpty()) {
+                  ++numTimesBecameEmpty;
+                }
                 mLastCommand = command;
 
                 switch (command->mCommand) {
@@ -2180,8 +2184,9 @@ bool AudioPolicyService::AudioCommandThread::threadLoop()
             }
         }
 
-        // release delayed commands wake lock if the queue is empty
-        if (mAudioCommands.isEmpty()) {
+        // release delayed commands wake lock as many times as we made the  queue is
+        // empty during popping.
+        while (numTimesBecameEmpty--) {
             release_wake_lock(mName.string());
         }
 
