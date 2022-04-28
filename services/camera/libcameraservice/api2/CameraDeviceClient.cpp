@@ -721,8 +721,10 @@ binder::Status CameraDeviceClient::isSessionConfigurationSupported(
     }
 
     *status = false;
+    camera3::metadataGetter getMetadata = [this](const String8 &id, bool /*overrideForPerfClass*/) {
+          return mDevice->infoPhysical(id);};
     ret = mProviderManager->isSessionConfigurationSupported(mCameraIdStr.string(),
-            sessionConfiguration, mOverrideForPerfClass, status);
+            sessionConfiguration, mOverrideForPerfClass, getMetadata, status);
     switch (ret) {
         case OK:
             // Expected, do nothing.
