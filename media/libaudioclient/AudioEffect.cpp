@@ -94,7 +94,7 @@ status_t AudioEffect::set(const effect_uuid_t *type,
         return NO_INIT;
     }
 
-    if (type == NULL && uuid == NULL) {
+    if (type == nullptr && uuid == nullptr) {
         ALOGW("Must specify at least type or uuid");
         return BAD_VALUE;
     }
@@ -105,8 +105,8 @@ status_t AudioEffect::set(const effect_uuid_t *type,
     mSessionId = sessionId;
 
     memset(&mDescriptor, 0, sizeof(effect_descriptor_t));
-    mDescriptor.type = *(type != NULL ? type : EFFECT_UUID_NULL);
-    mDescriptor.uuid = *(uuid != NULL ? uuid : EFFECT_UUID_NULL);
+    mDescriptor.type = *(type != nullptr ? type : EFFECT_UUID_NULL);
+    mDescriptor.uuid = *(uuid != nullptr ? uuid : EFFECT_UUID_NULL);
 
     // TODO b/182392769: use attribution source util
     mIEffectClient = new EffectClient(this);
@@ -228,7 +228,7 @@ AudioEffect::~AudioEffect()
             AudioSystem::releaseAudioSessionId(mSessionId,
                 VALUE_OR_FATAL(aidl2legacy_int32_t_pid_t(mClientAttributionSource.pid)));
         }
-        if (mIEffect != NULL) {
+        if (mIEffect != nullptr) {
             mIEffect->disconnect();
             IInterface::asBinder(mIEffect)->unlinkToDeath(mIEffectClient);
         }
@@ -306,7 +306,7 @@ status_t AudioEffect::command(uint32_t cmdCode,
         if (mEnabled == (cmdCode == EFFECT_CMD_ENABLE)) {
             return NO_ERROR;
         }
-        if (replySize == NULL || *replySize != sizeof(status_t) || replyData == NULL) {
+        if (replySize == nullptr || *replySize != sizeof(status_t) || replyData == nullptr) {
             return BAD_VALUE;
         }
         mLock.lock();
@@ -349,7 +349,7 @@ status_t AudioEffect::setParameter(effect_param_t *param)
         return (mStatus == ALREADY_EXISTS) ? (status_t) INVALID_OPERATION : mStatus;
     }
 
-    if (param == NULL || param->psize == 0 || param->vsize == 0) {
+    if (param == nullptr || param->psize == 0 || param->vsize == 0) {
         return BAD_VALUE;
     }
 
@@ -384,8 +384,7 @@ status_t AudioEffect::setParameterDeferred(effect_param_t *param)
     if (mStatus != NO_ERROR) {
         return (mStatus == ALREADY_EXISTS) ? (status_t) INVALID_OPERATION : mStatus;
     }
-
-    if (param == NULL || param->psize == 0 || param->vsize == 0) {
+    if (param == nullptr || param->psize == 0 || param->vsize == 0) {
         return BAD_VALUE;
     }
 
@@ -440,8 +439,7 @@ status_t AudioEffect::getParameter(effect_param_t *param)
     if (mStatus != NO_ERROR && mStatus != ALREADY_EXISTS) {
         return mStatus;
     }
-
-    if (param == NULL || param->psize == 0 || param->vsize == 0) {
+    if (param == nullptr || param->psize == 0 || param->vsize == 0) {
         return BAD_VALUE;
     }
 
@@ -537,6 +535,9 @@ void AudioEffect::framesProcessed(int32_t frames)
 
 status_t AudioEffect::queryNumberEffects(uint32_t *numEffects)
 {
+    if (numEffects == nullptr) {
+        return BAD_VALUE;
+    }
     const sp<IAudioFlinger>& af = AudioSystem::get_audio_flinger();
     if (af == 0) return PERMISSION_DENIED;
     return af->queryNumberEffects(numEffects);
@@ -544,6 +545,9 @@ status_t AudioEffect::queryNumberEffects(uint32_t *numEffects)
 
 status_t AudioEffect::queryEffect(uint32_t index, effect_descriptor_t *descriptor)
 {
+    if (descriptor == nullptr) {
+        return BAD_VALUE;
+    }
     const sp<IAudioFlinger>& af = AudioSystem::get_audio_flinger();
     if (af == 0) return PERMISSION_DENIED;
     return af->queryEffect(index, descriptor);
@@ -554,6 +558,9 @@ status_t AudioEffect::getEffectDescriptor(const effect_uuid_t *uuid,
                                           uint32_t preferredTypeFlag,
                                           effect_descriptor_t *descriptor)
 {
+    if (uuid == nullptr || type == nullptr || descriptor == nullptr) {
+        return BAD_VALUE;
+    }
     const sp<IAudioFlinger>& af = AudioSystem::get_audio_flinger();
     if (af == 0) return PERMISSION_DENIED;
     return af->getEffectDescriptor(uuid, type, preferredTypeFlag, descriptor);
@@ -584,6 +591,9 @@ status_t AudioEffect::queryDefaultPreProcessing(audio_session_t audioSession,
 
 status_t AudioEffect::newEffectUniqueId(audio_unique_id_t* id)
 {
+    if (id == nullptr) {
+        return BAD_VALUE;
+    }
     const sp<IAudioFlinger>& af = AudioSystem::get_audio_flinger();
     if (af == 0) return PERMISSION_DENIED;
     *id = af->newAudioUniqueId(AUDIO_UNIQUE_ID_USE_EFFECT);
@@ -597,14 +607,15 @@ status_t AudioEffect::addSourceDefaultEffect(const char *typeStr,
                                              audio_source_t source,
                                              audio_unique_id_t *id)
 {
+    if ((typeStr == nullptr && uuidStr == nullptr) || id == nullptr) {
+        return BAD_VALUE;
+    }
     const sp<IAudioPolicyService>& aps = AudioSystem::get_audio_policy_service();
     if (aps == 0) return PERMISSION_DENIED;
 
-    if (typeStr == NULL && uuidStr == NULL) return BAD_VALUE;
-
     // Convert type & uuid from string to effect_uuid_t.
     effect_uuid_t type;
-    if (typeStr != NULL) {
+    if (typeStr != nullptr) {
         status_t res = stringToGuid(typeStr, &type);
         if (res != OK) return res;
     } else {
@@ -612,7 +623,7 @@ status_t AudioEffect::addSourceDefaultEffect(const char *typeStr,
     }
 
     effect_uuid_t uuid;
-    if (uuidStr != NULL) {
+    if (uuidStr != nullptr) {
         status_t res = stringToGuid(uuidStr, &uuid);
         if (res != OK) return res;
     } else {
@@ -640,14 +651,15 @@ status_t AudioEffect::addStreamDefaultEffect(const char *typeStr,
                                              audio_usage_t usage,
                                              audio_unique_id_t *id)
 {
+    if ((typeStr == nullptr && uuidStr == nullptr) || id == nullptr) {
+        return BAD_VALUE;
+    }
     const sp<IAudioPolicyService>& aps = AudioSystem::get_audio_policy_service();
     if (aps == 0) return PERMISSION_DENIED;
 
-    if (typeStr == NULL && uuidStr == NULL) return BAD_VALUE;
-
     // Convert type & uuid from string to effect_uuid_t.
     effect_uuid_t type;
-    if (typeStr != NULL) {
+    if (typeStr != nullptr) {
         status_t res = stringToGuid(typeStr, &type);
         if (res != OK) return res;
     } else {
@@ -655,7 +667,7 @@ status_t AudioEffect::addStreamDefaultEffect(const char *typeStr,
     }
 
     effect_uuid_t uuid;
-    if (uuidStr != NULL) {
+    if (uuidStr != nullptr) {
         status_t res = stringToGuid(uuidStr, &uuid);
         if (res != OK) return res;
     } else {
@@ -698,7 +710,7 @@ status_t AudioEffect::removeStreamDefaultEffect(audio_unique_id_t id)
 
 status_t AudioEffect::stringToGuid(const char *str, effect_uuid_t *guid)
 {
-    if (str == NULL || guid == NULL) {
+    if (str == nullptr || guid == nullptr) {
         return BAD_VALUE;
     }
 
@@ -724,7 +736,7 @@ status_t AudioEffect::stringToGuid(const char *str, effect_uuid_t *guid)
 
 status_t AudioEffect::guidToString(const effect_uuid_t *guid, char *str, size_t maxLen)
 {
-    if (guid == NULL || str == NULL) {
+    if (guid == nullptr || str == nullptr) {
         return BAD_VALUE;
     }
 
