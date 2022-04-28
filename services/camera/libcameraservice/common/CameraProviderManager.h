@@ -33,6 +33,7 @@
 #include <utils/Errors.h>
 #include <android/hardware/ICameraService.h>
 #include <utils/IPCTransport.h>
+#include <utils/SessionConfigurationUtils.h>
 #include <aidl/android/hardware/camera/provider/ICameraProvider.h>
 #include <android/hardware/camera/common/1.0/types.h>
 #include <android/hardware/camera/provider/2.5/ICameraProvider.h>
@@ -278,7 +279,7 @@ public:
      */
     status_t isSessionConfigurationSupported(const std::string& id,
             const SessionConfiguration &configuration,
-            bool overrideForPerfClass,
+            bool overrideForPerfClass, camera3::metadataGetter getMetadata,
             bool *status /*out*/) const;
 
     /**
@@ -587,6 +588,7 @@ private:
             virtual status_t isSessionConfigurationSupported(
                     const SessionConfiguration &/*configuration*/,
                     bool /*overrideForPerfClass*/,
+                    camera3::metadataGetter /*getMetadata*/,
                     bool * /*status*/) {
                 return INVALID_OPERATION;
             }
@@ -639,6 +641,7 @@ private:
                     CameraMetadata *characteristics) const override;
             virtual status_t isSessionConfigurationSupported(
                     const SessionConfiguration &configuration, bool /*overrideForPerfClass*/,
+                    camera3::metadataGetter /*getMetadata*/,
                     bool *status /*out*/) = 0;
             virtual status_t filterSmallJpegSizes() override;
             virtual void notifyDeviceStateChange(
@@ -658,6 +661,8 @@ private:
             // A copy of mCameraCharacteristics without performance class
             // override
             std::unique_ptr<CameraMetadata> mCameraCharNoPCOverride;
+            // Only contains characteristics for hidden physical cameras,
+            // not for public physical cameras.
             std::unordered_map<std::string, CameraMetadata> mPhysicalCameraCharacteristics;
             void queryPhysicalCameraIds();
             SystemCameraKind getSystemCameraKind();

@@ -45,11 +45,15 @@
     "platinum-postsubmit": [
         // runs regularly, independent of changes in this tree.
         // signals if changes elsewhere break media functionality
+        // @FlakyTest: in staged-postsubmit, but not postsubmit
         {
             "name": "CtsMediaCodecTestCases",
             "options": [
                 {
                     "include-filter": "android.media.codec.cts.EncodeDecodeTest"
+                },
+                {
+                    "exclude-annotation": "androidx.test.filters.FlakyTest"
                 }
             ]
         },
@@ -58,6 +62,9 @@
             "options": [
                 {
                     "include-filter": "android.media.codec.cts.DecodeEditEncodeTest"
+                },
+                {
+                    "exclude-annotation": "androidx.test.filters.FlakyTest"
                 }
             ]
         }
