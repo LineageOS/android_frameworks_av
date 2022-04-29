@@ -137,7 +137,118 @@ void convertYUV420Planar16ToY410(uint32_t *dst, const uint16_t *srcY, const uint
         dst += dstStride * 2;
     }
 }
+#define CLIP3(min, v, max) (((v) < (min)) ? (min) : (((max) > (v)) ? (v) : (max)))
+void convertYUV420Planar16ToRGBA1010102(uint32_t *dst, const uint16_t *srcY, const uint16_t *srcU,
+                                        const uint16_t *srcV, size_t srcYStride, size_t srcUStride,
+                                        size_t srcVStride, size_t dstStride, size_t width,
+                                        size_t height) {
+    // Converting two lines at a time, slightly faster
+    for (size_t y = 0; y < height; y += 2) {
+        uint32_t *dstTop = (uint32_t *)dst;
+        uint32_t *dstBot = (uint32_t *)(dst + dstStride);
+        uint16_t *ySrcTop = (uint16_t *)srcY;
+        uint16_t *ySrcBot = (uint16_t *)(srcY + srcYStride);
+        uint16_t *uSrc = (uint16_t *)srcU;
+        uint16_t *vSrc = (uint16_t *)srcV;
 
+        // BT.2020 Limited Range conversion
+
+        // B = 1.168  *(Y - 64) + 2.148  *(U - 512)
+        // G = 1.168  *(Y - 64) - 0.652  *(V - 512) - 0.188  *(U - 512)
+        // R = 1.168  *(Y - 64) + 1.683  *(V - 512)
+
+        // B = 1196/1024  *(Y - 64) + 2200/1024  *(U - 512)
+        // G = .................... -  668/1024  *(V - 512) - 192/1024  *(U - 512)
+        // R = .................... + 1723/1024  *(V - 512)
+
+        // min_B = (1196  *(- 64) + 2200  *(- 512)) / 1024 = -1175
+        // min_G = (1196  *(- 64) - 668  *(1023 - 512) - 192  *(1023 - 512)) / 1024 = -504
+        // min_R = (1196  *(- 64) + 1723  *(- 512)) / 1024 = -937
+
+        // max_B = (1196  *(1023 - 64) + 2200  *(1023 - 512)) / 1024 = 2218
+        // max_G = (1196  *(1023 - 64) - 668  *(- 512) - 192  *(- 512)) / 1024 = 1551
+        // max_R = (1196  *(1023 - 64) + 1723  *(1023 - 512)) / 1024 = 1980
+
+        int32_t mY = 1196, mU_B = 2200, mV_G = -668, mV_R = 1723, mU_G = -192;
+        for (size_t x = 0; x < width; x += 2) {
+            int32_t u, v, y00, y01, y10, y11;
+            u = *uSrc - 512;
+            uSrc += 1;
+            v = *vSrc - 512;
+            vSrc += 1;
+
+            y00 = *ySrcTop - 64;
+            ySrcTop += 1;
+            y01 = *ySrcTop - 64;
+            ySrcTop += 1;
+            y10 = *ySrcBot - 64;
+            ySrcBot += 1;
+            y11 = *ySrcBot - 64;
+            ySrcBot += 1;
+
+            int32_t u_b = u * mU_B;
+            int32_t u_g = u * mU_G;
+            int32_t v_g = v * mV_G;
+            int32_t v_r = v * mV_R;
+
+            int32_t yMult, b, g, r;
+            yMult = y00 * mY;
+            b = (yMult + u_b) / 1024;
+            g = (yMult + v_g + u_g) / 1024;
+            r = (yMult + v_r) / 1024;
+            b = CLIP3(0, b, 1023);
+            g = CLIP3(0, g, 1023);
+            r = CLIP3(0, r, 1023);
+            *dstTop++ = 3 << 30 | (b << 20) | (g << 10) | r;
+
+            yMult = y01 * mY;
+            b = (yMult + u_b) / 1024;
+            g = (yMult + v_g + u_g) / 1024;
+            r = (yMult + v_r) / 1024;
+            b = CLIP3(0, b, 1023);
+            g = CLIP3(0, g, 1023);
+            r = CLIP3(0, r, 1023);
+            *dstTop++ = 3 << 30 | (b << 20) | (g << 10) | r;
+
+            yMult = y10 * mY;
+            b = (yMult + u_b) / 1024;
+            g = (yMult + v_g + u_g) / 1024;
+            r = (yMult + v_r) / 1024;
+            b = CLIP3(0, b, 1023);
+            g = CLIP3(0, g, 1023);
+            r = CLIP3(0, r, 1023);
+            *dstBot++ = 3 << 30 | (b << 20) | (g << 10) | r;
+
+            yMult = y11 * mY;
+            b = (yMult + u_b) / 1024;
+            g = (yMult + v_g + u_g) / 1024;
+            r = (yMult + v_r) / 1024;
+            b = CLIP3(0, b, 1023);
+            g = CLIP3(0, g, 1023);
+            r = CLIP3(0, r, 1023);
+            *dstBot++ = 3 << 30 | (b << 20) | (g << 10) | r;
+        }
+
+        srcY += srcYStride * 2;
+        srcU += srcUStride;
+        srcV += srcVStride;
+        dst += dstStride * 2;
+    }
+}
+
+void convertYUV420Planar16ToY410OrRGBA1010102(uint32_t *dst, const uint16_t *srcY,
+                                              const uint16_t *srcU, const uint16_t *srcV,
+                                              size_t srcYStride, size_t srcUStride,
+                                              size_t srcVStride, size_t dstStride, size_t width,
+                                              size_t height) {
+    if (isAtLeastT()) {
+        convertYUV420Planar16ToRGBA1010102(dst, srcY, srcU, srcV, srcYStride, srcUStride,
+                                           srcVStride, dstStride, width, height);
+    } else {
+        convertYUV420Planar16ToY410(dst, srcY, srcU, srcV, srcYStride, srcUStride, srcVStride,
+                                    dstStride, width, height);
+    }
+}
 void convertYUV420Planar16ToYV12(uint8_t *dstY, uint8_t *dstU, uint8_t *dstV, const uint16_t *srcY,
                                  const uint16_t *srcU, const uint16_t *srcV, size_t srcYStride,
                                  size_t srcUStride, size_t srcVStride, size_t dstYStride,
@@ -799,10 +910,15 @@ int SimpleC2Component::getHalPixelFormatForBitDepth10(bool allowRGBA1010102) {
         // Add YV12 in the end as a fall-back option
         mBitDepth10HalPixelFormats.push_back(HAL_PIXEL_FORMAT_YV12);
     }
-    // When RGBA1010102 is not allowed and if the first supported hal pixel is format is
-    // HAL_PIXEL_FORMAT_RGBA_1010102, then return HAL_PIXEL_FORMAT_YV12
-    if (!allowRGBA1010102 && mBitDepth10HalPixelFormats[0] == HAL_PIXEL_FORMAT_RGBA_1010102) {
-        return HAL_PIXEL_FORMAT_YV12;
+    // From Android T onwards, HAL_PIXEL_FORMAT_RGBA_1010102 corresponds to true
+    // RGBA 1010102 format unlike earlier versions where it was used to represent
+    // YUVA 1010102 data
+    if (!isAtLeastT()) {
+        // When RGBA1010102 is not allowed and if the first supported hal pixel is format is
+        // HAL_PIXEL_FORMAT_RGBA_1010102, then return HAL_PIXEL_FORMAT_YV12
+        if (!allowRGBA1010102 && mBitDepth10HalPixelFormats[0] == HAL_PIXEL_FORMAT_RGBA_1010102) {
+            return HAL_PIXEL_FORMAT_YV12;
+        }
     }
     // Return the first entry from supported formats
     return mBitDepth10HalPixelFormats[0];
