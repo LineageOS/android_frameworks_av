@@ -128,6 +128,9 @@ const std::unordered_map<std::string, int64_t>& getAudioDeviceOutMap() {
         {"AUDIO_DEVICE_OUT_BLE_HEADSET",               1LL << 31},
         {"AUDIO_DEVICE_OUT_BLE_SPEAKER",               1LL << 32},
         {"AUDIO_DEVICE_OUT_HDMI_EARC",                 1LL << 33},
+        // S values above
+        {"AUDIO_DEVICE_OUT_BLE_BROADCAST",             1LL << 34},
+        // T values above
     };
     return map;
 }
@@ -145,6 +148,8 @@ const std::unordered_map<std::string, int32_t>& getAudioThreadTypeMap() {
         {"MMAP_PLAYBACK", 5},          // Thread class for MMAP playback stream
         {"MMAP_CAPTURE",  6},          // Thread class for MMAP capture stream
         // R values above.
+        {"SPATIALIZER",   7},          // Thread class for SpatializerThread
+        // S values above.
     };
     return map;
 }
