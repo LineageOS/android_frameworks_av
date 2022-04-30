@@ -60,7 +60,7 @@
         <MediaCodec name="c2.android.vp8.decoder" type="video/x-vnd.on2.vp8">
             <Alias name="OMX.google.vp8.decoder" />
             <Limit name="size" min="2x2" max="2048x2048" />
-            <Limit name="alignment" value="2x2" />
+            <Limit name="alignment" value="1x1" />
             <Limit name="block-size" value="16x16" />
             <Limit name="block-count" range="1-16384" />
             <Limit name="blocks-per-second" range="1-1000000" />
@@ -70,7 +70,7 @@
         <MediaCodec name="c2.android.vp9.decoder" type="video/x-vnd.on2.vp9">
             <Alias name="OMX.google.vp9.decoder" />
             <Limit name="size" min="2x2" max="2048x2048" />
-            <Limit name="alignment" value="2x2" />
+            <Limit name="alignment" value="1x1" />
             <Limit name="block-size" value="16x16" />
             <Limit name="block-count" range="1-16384" />
             <Limit name="blocks-per-second" range="1-500000" />
