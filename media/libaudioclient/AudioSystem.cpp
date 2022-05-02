@@ -70,6 +70,7 @@ std::set<audio_error_callback> AudioSystem::gAudioErrorCallbacks;
 dynamic_policy_callback AudioSystem::gDynPolicyCallback = NULL;
 record_config_callback AudioSystem::gRecordConfigCallback = NULL;
 routing_callback AudioSystem::gRoutingCallback = NULL;
+vol_range_init_req_callback AudioSystem::gVolRangeInitReqCallback = NULL;
 
 // Required to be held while calling into gSoundTriggerCaptureStateListener.
 class CaptureStateListenerImpl;
@@ -779,6 +780,11 @@ status_t AudioSystem::AudioFlingerClient::removeAudioDeviceCallback(
 /*static*/ void AudioSystem::setRoutingCallback(routing_callback cb) {
     Mutex::Autolock _l(gLock);
     gRoutingCallback = cb;
+}
+
+/*static*/ void AudioSystem::setVolInitReqCallback(vol_range_init_req_callback cb) {
+    Mutex::Autolock _l(gLock);
+    gVolRangeInitReqCallback = cb;
 }
 
 // client singleton for AudioPolicyService binder interface
@@ -2566,6 +2572,19 @@ Status AudioSystem::AudioPolicyServiceClient::onRoutingUpdated() {
     {
         Mutex::Autolock _l(AudioSystem::gLock);
         cb = gRoutingCallback;
+    }
+
+    if (cb != NULL) {
+        cb();
+    }
+    return Status::ok();
+}
+
+Status AudioSystem::AudioPolicyServiceClient::onVolumeRangeInitRequest() {
+    vol_range_init_req_callback cb = NULL;
+    {
+        Mutex::Autolock _l(AudioSystem::gLock);
+        cb = gVolRangeInitReqCallback;
     }
 
     if (cb != NULL) {
