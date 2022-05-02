@@ -136,7 +136,7 @@ public:
      *                      indicated by count.
      *      PERMISSION_DENIED could not get AudioFlinger interface
      *      NO_INIT         effect library failed to initialize
-     *      BAD_VALUE       invalid audio session or descriptor pointers
+     *      BAD_VALUE       invalid audio session, or invalid descriptor or count pointers
      *
      * Returned value
      *   *descriptor updated with descriptors of pre processings enabled by default
@@ -160,6 +160,7 @@ public:
      *      NO_ERROR        successful operation.
      *      PERMISSION_DENIED could not get AudioFlinger interface
      *                        or caller lacks required permissions.
+     *      BAD_VALUE       invalid pointer to id
      * Returned value
      *   *id:  The new unique system-wide effect id.
      */
@@ -194,7 +195,7 @@ public:
      *      PERMISSION_DENIED could not get AudioFlinger interface
      *                        or caller lacks required permissions.
      *      NO_INIT         effect library failed to initialize.
-     *      BAD_VALUE       invalid source, type uuid or implementation uuid.
+     *      BAD_VALUE       invalid source, type uuid or implementation uuid, or id pointer
      *      NAME_NOT_FOUND  no effect with this uuid or type found.
      *
      * Returned value
@@ -233,7 +234,7 @@ public:
      *      PERMISSION_DENIED could not get AudioFlinger interface
      *                        or caller lacks required permissions.
      *      NO_INIT         effect library failed to initialize.
-     *      BAD_VALUE       invalid type uuid or implementation uuid.
+     *      BAD_VALUE       invalid type uuid or implementation uuid, or id pointer
      *      NAME_NOT_FOUND  no effect with this uuid or type found.
      *
      * Returned value
@@ -517,7 +518,7 @@ public:
      * Returned status (from utils/Errors.h) can be:
      *  - NO_ERROR: successful operation.
      *  - INVALID_OPERATION: the application does not have control of the effect engine.
-     *  - BAD_VALUE: invalid parameter identifier or value.
+     *  - BAD_VALUE: invalid parameter structure pointer, or invalid identifier or value.
      *  - DEAD_OBJECT: the effect engine has been deleted.
      */
      virtual status_t   setParameter(effect_param_t *param);
@@ -562,7 +563,7 @@ public:
      * Returned status (from utils/Errors.h) can be:
      *  - NO_ERROR: successful operation.
      *  - INVALID_OPERATION: the AudioEffect was not successfully initialized.
-     *  - BAD_VALUE: invalid parameter identifier.
+     *  - BAD_VALUE: invalid parameter structure pointer, or invalid parameter identifier.
      *  - DEAD_OBJECT: the effect engine has been deleted.
      */
      virtual status_t   getParameter(effect_param_t *param);
