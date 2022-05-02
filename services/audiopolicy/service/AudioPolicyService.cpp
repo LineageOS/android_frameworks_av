@@ -488,6 +488,19 @@ void AudioPolicyService::doOnRoutingUpdated()
     }
 }
 
+void AudioPolicyService::onVolumeRangeInitRequest()
+{
+    mOutputCommandThread->volRangeInitReqCommand();
+}
+
+void AudioPolicyService::doOnVolumeRangeInitRequest()
+{
+    Mutex::Autolock _l(mNotificationClientsLock);
+    for (size_t i = 0; i < mNotificationClients.size(); i++) {
+        mNotificationClients.valueAt(i)->onVolumeRangeInitRequest();
+    }
+}
+
 void AudioPolicyService::onCheckSpatializer()
 {
     Mutex::Autolock _l(mLock);
@@ -718,6 +731,13 @@ void AudioPolicyService::NotificationClient::onRoutingUpdated()
 {
     if (mAudioPolicyServiceClient != 0 && isServiceUid(mUid)) {
         mAudioPolicyServiceClient->onRoutingUpdated();
+    }
+}
+
+void AudioPolicyService::NotificationClient::onVolumeRangeInitRequest()
+{
+    if (mAudioPolicyServiceClient != 0 && isServiceUid(mUid)) {
+        mAudioPolicyServiceClient->onVolumeRangeInitRequest();
     }
 }
 
@@ -2161,6 +2181,17 @@ bool AudioPolicyService::AudioCommandThread::threadLoop()
                     mLock.lock();
                     } break;
 
+                case VOL_RANGE_INIT_REQUEST: {
+                    ALOGV("AudioCommandThread() processing volume range init request");
+                    svc = mService.promote();
+                    if (svc == 0) {
+                        break;
+                    }
+                    mLock.unlock();
+                    svc->doOnVolumeRangeInitRequest();
+                    mLock.lock();
+                    } break;
+
                 default:
                     ALOGW("AudioCommandThread() unknown command %d", command->mCommand);
                 }
@@ -2485,6 +2516,14 @@ void AudioPolicyService::AudioCommandThread::updateActiveSpatializerTracksComman
     sendCommand(command);
 }
 
+void AudioPolicyService::AudioCommandThread::volRangeInitReqCommand()
+{
+    sp<AudioCommand>command = new AudioCommand();
+    command->mCommand = VOL_RANGE_INIT_REQUEST;
+    ALOGV("AudioCommandThread() adding volume range init request");
+    sendCommand(command);
+}
+
 status_t AudioPolicyService::AudioCommandThread::sendCommand(sp<AudioCommand>& command, int delayMs)
 {
     {
@@ -2650,6 +2689,10 @@ void AudioPolicyService::AudioCommandThread::insertCommand_l(sp<AudioCommand>& c
 
         case ROUTING_UPDATED: {
 
+        } break;
+
+        case VOL_RANGE_INIT_REQUEST: {
+            // command may come from different requests, do not filter
         } break;
 
         default:
