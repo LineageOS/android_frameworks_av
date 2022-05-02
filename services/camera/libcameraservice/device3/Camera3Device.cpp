@@ -1549,13 +1549,22 @@ status_t Camera3Device::waitUntilStateThenRelock(bool active, nsecs_t timeout) {
     }
 
     bool stateSeen = false;
+    nsecs_t startTime = systemTime();
     do {
         if (active == (mStatus == STATUS_ACTIVE)) {
             // Desired state is current
             break;
         }
 
-        res = mStatusChanged.waitRelative(mLock, timeout);
+        nsecs_t timeElapsed = systemTime() - startTime;
+        nsecs_t timeToWait = timeout - timeElapsed;
+        if (timeToWait <= 0) {
+            // Thread woke up spuriously but has timed out since.
+            // Force out of loop with TIMED_OUT result.
+            res = TIMED_OUT;
+            break;
+        }
+        res = mStatusChanged.waitRelative(mLock, timeToWait);
         if (res != OK) break;
 
         // This is impossible, but if not, could result in subtle deadlocks and invalid state
