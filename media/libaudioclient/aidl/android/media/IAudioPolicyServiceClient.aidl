@@ -46,4 +46,7 @@ oneway interface IAudioPolicyServiceClient {
                                         AudioSource source);
      /** Notifies a change of audio routing */
      void onRoutingUpdated();
+     /** Notifies a request for volume index ranges to be reset after they were observed as invalid
+      */
+     void onVolumeRangeInitRequest();
 }
