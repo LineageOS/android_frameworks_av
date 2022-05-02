@@ -533,6 +533,10 @@ public:
 
     virtual void onRoutingUpdated() = 0;
 
+    // Used to notify AudioService that an error was encountering when reading
+    // the volume ranges, and that they should be re-initialized
+    virtual void onVolumeRangeInitRequest() = 0;
+
     // Used to notify the sound trigger module that an audio capture is about to
     // take place. This should typically result in any active recognition
     // sessions to be preempted on modules that do not support sound trigger
