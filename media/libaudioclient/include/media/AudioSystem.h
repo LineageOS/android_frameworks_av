@@ -77,6 +77,7 @@ typedef void (*record_config_callback)(int event,
                                        audio_patch_handle_t patchHandle,
                                        audio_source_t source);
 typedef void (*routing_callback)();
+typedef void (*vol_range_init_req_callback)();
 
 class IAudioFlinger;
 class String8;
@@ -154,6 +155,7 @@ public:
     static void setDynPolicyCallback(dynamic_policy_callback cb);
     static void setRecordConfigCallback(record_config_callback);
     static void setRoutingCallback(routing_callback cb);
+    static void setVolInitReqCallback(vol_range_init_req_callback cb);
 
     // Sets the binder to use for accessing the AudioFlinger service. This enables the system server
     // to grant specific isolated processes access to the audio system. Currently used only for the
@@ -736,6 +738,7 @@ private:
                 int32_t patchHandle,
                 media::audio::common::AudioSource source) override;
         binder::Status onRoutingUpdated();
+        binder::Status onVolumeRangeInitRequest();
 
     private:
         Mutex                               mLock;
@@ -763,6 +766,7 @@ private:
     static dynamic_policy_callback gDynPolicyCallback;
     static record_config_callback gRecordConfigCallback;
     static routing_callback gRoutingCallback;
+    static vol_range_init_req_callback gVolRangeInitReqCallback;
 
     static size_t gInBuffSize;
     // previous parameters for recording buffer size queries

@@ -138,7 +138,12 @@ public:
     }
 
     size_t getRoutingUpdatedCounter() const {
-        return mRoutingUpdatedUpdateCount; }
+        return mRoutingUpdatedUpdateCount;
+    }
+
+    void onVolumeRangeInitRequest() override {
+
+    }
 
     status_t updateSecondaryOutputs(
             const TrackSecondaryOutputsMap& trackSecondaryOutputs __unused) override {
