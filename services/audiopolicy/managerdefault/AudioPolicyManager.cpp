@@ -2118,11 +2118,15 @@ status_t AudioPolicyManager::startSource(const sp<SwAudioOutputDescriptor>& outp
 
         // apply volume rules for current stream and device if necessary
         auto &curves = getVolumeCurves(client->attributes());
-        checkAndSetVolume(curves, client->volumeSource(),
+        if (NO_ERROR != checkAndSetVolume(curves, client->volumeSource(),
                           curves.getVolumeIndex(outputDesc->devices().types()),
                           outputDesc,
                           outputDesc->devices().types(), 0 /*delay*/,
-                          outputDesc->useHwGain() /*force*/);
+                          outputDesc->useHwGain() /*force*/)) {
+            // request AudioService to reinitialize the volume curves asynchronously
+            ALOGE("checkAndSetVolume failed, requesting volume range init");
+            mpClientInterface->onVolumeRangeInitRequest();
+        };
 
         // update the outputs if starting an output with a stream that can affect notification
         // routing
@@ -7288,6 +7292,11 @@ status_t AudioPolicyManager::checkAndSetVolume(IVolumeCurves &curves,
     }
     if (deviceTypes.empty()) {
         deviceTypes = outputDesc->devices().types();
+    }
+
+    if (curves.getVolumeIndexMin() < 0 || curves.getVolumeIndexMax() < 0) {
+        ALOGE("invalid volume index range");
+        return BAD_VALUE;
     }
 
     float volumeDb = computeVolume(curves, volumeSource, index, deviceTypes);
