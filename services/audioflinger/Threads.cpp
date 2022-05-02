@@ -978,7 +978,8 @@ void AudioFlinger::ThreadBase::dumpBase_l(int fd, const Vector<String16>& args _
             || mType == MIXER
             || mType == DUPLICATING
             || mType == DIRECT
-            || mType == OFFLOAD) {
+            || mType == OFFLOAD
+            || mType == SPATIALIZER) {
         dprintf(fd, "  Timestamp stats: %s\n", mTimestampVerifier.toString().c_str());
         dprintf(fd, "  Timestamp corrected: %s\n", isTimestampCorrectionEnabled() ? "yes" : "no");
     }
@@ -4295,13 +4296,6 @@ bool AudioFlinger::PlaybackThread::threadLoop()
 
 void AudioFlinger::PlaybackThread::collectTimestamps_l()
 {
-    // Collect timestamp statistics for the Playback Thread types that support it.
-    if (mType != MIXER
-            && mType != DUPLICATING
-            && mType != DIRECT
-            && mType != OFFLOAD) {
-        return;
-    }
     if (mStandby) {
         mTimestampVerifier.discontinuity(discontinuityForStandbyOrFlush());
         return;
