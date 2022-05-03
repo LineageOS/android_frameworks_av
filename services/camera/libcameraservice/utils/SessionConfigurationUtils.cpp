@@ -322,6 +322,10 @@ bool isStreamUseCaseSupported(int64_t streamUseCase,
             streamUseCase == ANDROID_SCALER_AVAILABLE_STREAM_USE_CASES_DEFAULT) {
         return true;
     }
+    // Allow vendor stream use case unconditionally.
+    if (streamUseCase >= ANDROID_SCALER_AVAILABLE_STREAM_USE_CASES_VENDOR_START) {
+        return true;
+    }
 
     for (size_t i = 0; i < availableStreamUseCases.count; i++) {
         if (availableStreamUseCases.data.i64[i] == streamUseCase) {

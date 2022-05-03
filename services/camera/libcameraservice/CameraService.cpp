@@ -1688,6 +1688,13 @@ Status CameraService::connectDevice(
         return STATUS_ERROR(ERROR_ILLEGAL_ARGUMENT, msg.string());
     }
 
+    if (CameraServiceProxyWrapper::isCameraDisabled()) {
+        String8 msg =
+                String8::format("Camera disabled by device policy");
+        ALOGE("%s: %s", __FUNCTION__, msg.string());
+        return STATUS_ERROR(ERROR_DISABLED, msg.string());
+    }
+
     // enforce system camera permissions
     if (oomScoreOffset > 0 &&
             !hasPermissionsForSystemCamera(callingPid, CameraThreadState::getCallingUid())) {
@@ -3717,21 +3724,10 @@ void CameraService::UidPolicy::onUidIdle(uid_t uid, bool /* disabled */) {
 
 void CameraService::UidPolicy::onUidStateChanged(uid_t uid, int32_t procState,
         int64_t procStateSeq __unused, int32_t capability __unused) {
-    bool procStateChange = false;
-    {
-        Mutex::Autolock _l(mUidLock);
-        if (mMonitoredUids.find(uid) != mMonitoredUids.end() &&
-                mMonitoredUids[uid].procState != procState) {
-            mMonitoredUids[uid].procState = procState;
-            procStateChange = true;
-        }
-    }
-
-    if (procStateChange) {
-        sp<CameraService> service = mService.promote();
-        if (service != nullptr) {
-            service->notifyMonitoredUids();
-        }
+    Mutex::Autolock _l(mUidLock);
+    if (mMonitoredUids.find(uid) != mMonitoredUids.end() &&
+            mMonitoredUids[uid].procState != procState) {
+        mMonitoredUids[uid].procState = procState;
     }
 }
 
