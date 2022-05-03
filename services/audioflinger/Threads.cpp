@@ -978,7 +978,8 @@ void AudioFlinger::ThreadBase::dumpBase_l(int fd, const Vector<String16>& args _
             || mType == MIXER
             || mType == DUPLICATING
             || mType == DIRECT
-            || mType == OFFLOAD) {
+            || mType == OFFLOAD
+            || mType == SPATIALIZER) {
         dprintf(fd, "  Timestamp stats: %s\n", mTimestampVerifier.toString().c_str());
         dprintf(fd, "  Timestamp corrected: %s\n", isTimestampCorrectionEnabled() ? "yes" : "no");
     }
@@ -3007,6 +3008,7 @@ void AudioFlinger::PlaybackThread::readOutputParameters_l()
 
     // Calculate size of normal sink buffer relative to the HAL output buffer size
     double multiplier = 1.0;
+    // Note: mType == SPATIALIZER does not support FastMixer.
     if (mType == MIXER && (kUseFastMixer == FastMixer_Static ||
             kUseFastMixer == FastMixer_Dynamic)) {
         size_t minNormalFrameCount = (kMinNormalSinkBufferSizeMs * mSampleRate) / 1000;
@@ -3468,7 +3470,7 @@ status_t AudioFlinger::PlaybackThread::addEffectChain_l(const sp<EffectChain>& c
     sp<EffectBufferHalInterface> halInBuffer, halOutBuffer;
     effect_buffer_t *buffer = nullptr; // only used for non global sessions
 
-    if (mType == SPATIALIZER ) {
+    if (mType == SPATIALIZER) {
         if (!audio_is_global_session(session)) {
             // player sessions on a spatializer output will use a dedicated input buffer and
             // will either output multi channel to mEffectBuffer if the track is spatilaized
@@ -3694,7 +3696,7 @@ bool AudioFlinger::PlaybackThread::threadLoop()
     cacheParameters_l();
     mSleepTimeUs = mIdleSleepTimeUs;
 
-    if (mType == MIXER) {
+    if (mType == MIXER || mType == SPATIALIZER) {
         sleepTimeShift = 0;
     }
 
@@ -3872,7 +3874,7 @@ bool AudioFlinger::PlaybackThread::threadLoop()
 
                     mStandbyTimeNs = systemTime() + mStandbyDelayNs;
                     mSleepTimeUs = mIdleSleepTimeUs;
-                    if (mType == MIXER) {
+                    if (mType == MIXER || mType == SPATIALIZER) {
                         sleepTimeShift = 0;
                     }
 
@@ -4149,7 +4151,8 @@ bool AudioFlinger::PlaybackThread::threadLoop()
 
                             // write blocked detection
                             const int64_t deltaWriteNs = lastIoEndNs - lastIoBeginNs;
-                            if (mType == MIXER && deltaWriteNs > maxPeriod) {
+                            if ((mType == MIXER || mType == SPATIALIZER)
+                                    && deltaWriteNs > maxPeriod) {
                                 mNumDelayedWrites++;
                                 if ((lastIoEndNs - lastWarning) > kWarningThrottleNs) {
                                     ATRACE_NAME("underrun");
@@ -4170,7 +4173,7 @@ bool AudioFlinger::PlaybackThread::threadLoop()
                         (mMixerStatus == MIXER_DRAIN_ALL)) {
                     threadLoop_drain();
                 }
-                if (mType == MIXER && !mStandby) {
+                if ((mType == MIXER || mType == SPATIALIZER) && !mStandby) {
 
                     if (mThreadThrottle
                             && mMixerStatus == MIXER_TRACKS_READY // we are mixing (active tracks)
@@ -4295,13 +4298,6 @@ bool AudioFlinger::PlaybackThread::threadLoop()
 
 void AudioFlinger::PlaybackThread::collectTimestamps_l()
 {
-    // Collect timestamp statistics for the Playback Thread types that support it.
-    if (mType != MIXER
-            && mType != DUPLICATING
-            && mType != DIRECT
-            && mType != OFFLOAD) {
-        return;
-    }
     if (mStandby) {
         mTimestampVerifier.discontinuity(discontinuityForStandbyOrFlush());
         return;
