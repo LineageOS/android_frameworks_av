@@ -95,6 +95,9 @@ public:
 
     // Return the current top activity rotate and crop override.
     static int getRotateAndCropOverride(String16 packageName, int lensFacing, int userId);
+
+    // Detect if the camera is disabled by device policy.
+    static bool isCameraDisabled();
 };
 
 } // android
