@@ -2086,12 +2086,13 @@ status_t CCodecBufferChannel::setSurface(const sp<Surface> &newSurface) {
 }
 
 PipelineWatcher::Clock::duration CCodecBufferChannel::elapsed() {
-    // When client pushed EOS, we want all the work to be done quickly.
     // Otherwise, component may have stalled work due to input starvation up to
     // the sum of the delay in the pipeline.
+    // TODO(b/231253301): When client pushed EOS, the pipeline could have less
+    //                    number of frames.
     size_t n = 0;
-    if (!mInputMetEos) {
-        size_t outputDelay = mOutput.lock()->outputDelay;
+    size_t outputDelay = mOutput.lock()->outputDelay;
+    {
         Mutexed<Input>::Locked input(mInput);
         n = input->inputDelay + input->pipelineDelay + outputDelay;
     }
