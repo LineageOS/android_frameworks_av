@@ -3388,4 +3388,24 @@ ConversionResult<int32_t> legacy2aidl_audio_direct_mode_t_int32_t_mask(audio_dir
             enumToMask_index<int32_t, media::AudioDirectMode>);
 }
 
+ConversionResult<audio_latency_mode_t>
+aidl2legacy_LatencyMode_audio_latency_mode_t(media::LatencyMode aidl) {
+    switch (aidl) {
+        case media::LatencyMode::FREE:
+            return AUDIO_LATENCY_MODE_FREE;
+        case media::LatencyMode::LOW:
+            return AUDIO_LATENCY_MODE_LOW;
+    }
+    return unexpected(BAD_VALUE);
+}
+ConversionResult<media::LatencyMode>
+legacy2aidl_audio_latency_mode_t_LatencyMode(audio_latency_mode_t legacy) {
+    switch (legacy) {
+        case AUDIO_LATENCY_MODE_FREE:
+            return media::LatencyMode::FREE;
+        case AUDIO_LATENCY_MODE_LOW:
+            return media::LatencyMode::LOW;
+    }
+    return unexpected(BAD_VALUE);
+}
 }  // namespace android
