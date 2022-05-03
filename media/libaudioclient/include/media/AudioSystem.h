@@ -569,6 +569,12 @@ public:
     static status_t getDirectProfilesForAttributes(const audio_attributes_t* attr,
                                             std::vector<audio_profile>* audioProfiles);
 
+    static status_t setRequestedLatencyMode(
+            audio_io_handle_t output, audio_latency_mode_t mode);
+
+    static status_t getSupportedLatencyModes(audio_io_handle_t output,
+            std::vector<audio_latency_mode_t>* modes);
+
     // A listener for capture state changes.
     class CaptureStateListener : public virtual RefBase {
     public:
@@ -644,6 +650,22 @@ public:
                                               audio_io_handle_t audioIo,
                                               audio_port_handle_t portId);
 
+    class SupportedLatencyModesCallback : public virtual RefBase
+    {
+    public:
+
+                SupportedLatencyModesCallback() = default;
+        virtual ~SupportedLatencyModesCallback() = default;
+
+        virtual void onSupportedLatencyModesChanged(
+                audio_io_handle_t output, const std::vector<audio_latency_mode_t>& modes) = 0;
+    };
+
+    static status_t addSupportedLatencyModesCallback(
+            const sp<SupportedLatencyModesCallback>& callback);
+    static status_t removeSupportedLatencyModesCallback(
+            const sp<SupportedLatencyModesCallback>& callback);
+
     static audio_port_handle_t getDeviceIdForIo(audio_io_handle_t audioIo);
 
     static status_t setVibratorInfos(const std::vector<media::AudioVibratorInfo>& vibratorInfos);
@@ -682,12 +704,20 @@ private:
                 media::AudioIoConfigEvent event,
                 const media::AudioIoDescriptor& ioDesc) override;
 
+        binder::Status onSupportedLatencyModesChanged(
+                int output, const std::vector<media::LatencyMode>& latencyModes) override;
+
         status_t addAudioDeviceCallback(const wp<AudioDeviceCallback>& callback,
                                                audio_io_handle_t audioIo,
                                                audio_port_handle_t portId);
         status_t removeAudioDeviceCallback(const wp<AudioDeviceCallback>& callback,
                                            audio_io_handle_t audioIo,
                                            audio_port_handle_t portId);
+
+        status_t addSupportedLatencyModesCallback(
+                        const sp<SupportedLatencyModesCallback>& callback);
+        status_t removeSupportedLatencyModesCallback(
+                        const sp<SupportedLatencyModesCallback>& callback);
 
         audio_port_handle_t getDeviceIdForIo(audio_io_handle_t audioIo);
 
@@ -697,6 +727,10 @@ private:
 
         std::map<audio_io_handle_t, std::map<audio_port_handle_t, wp<AudioDeviceCallback>>>
                 mAudioDeviceCallbacks;
+
+        std::vector<wp<SupportedLatencyModesCallback>>
+                mSupportedLatencyModesCallbacks GUARDED_BY(mLock);
+
         // cached values for recording getInputBufferSize() queries
         size_t                              mInBuffSize;    // zero indicates cache is invalid
         uint32_t                            mInSamplingRate;
