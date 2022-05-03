@@ -145,6 +145,11 @@ interface ICameraService
     VendorTagDescriptor getCameraVendorTagDescriptor();
 
     /**
+     * Setup vendor tags for camera providers
+     */
+    void setUpVendorTags();
+
+    /**
      * Retrieve the vendor tag descriptor cache which can have multiple vendor
      * providers.
      * Intended to be used by the native code of CameraMetadataNative to correctly
