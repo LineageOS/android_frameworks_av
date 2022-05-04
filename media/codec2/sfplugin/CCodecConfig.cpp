@@ -1072,6 +1072,13 @@ status_t CCodecConfig::initialize(
                     C2_PARAMKEY_SURFACE_SCALING_MODE);
         } else {
             addLocalParam(new C2StreamColorAspectsInfo::input(0u), C2_PARAMKEY_COLOR_ASPECTS);
+
+            if (domain.value == C2Component::DOMAIN_VIDEO) {
+                addLocalParam(new C2AndroidStreamAverageBlockQuantizationInfo::output(0u, 0),
+                              C2_PARAMKEY_AVERAGE_QP);
+                addLocalParam(new C2StreamPictureTypeMaskInfo::output(0u, 0),
+                              C2_PARAMKEY_PICTURE_TYPE);
+            }
         }
     }
 
