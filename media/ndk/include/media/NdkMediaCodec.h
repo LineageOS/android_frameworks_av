@@ -437,18 +437,28 @@ void AMediaCodec_releaseName(AMediaCodec*, char* name) __INTRODUCED_IN(28);
 
 /**
  * Set an asynchronous callback for actionable AMediaCodec events.
- * When asynchronous callback is enabled, the client should not call
+ * When asynchronous callback is enabled, it is an error for the client to call
  * AMediaCodec_getInputBuffers(), AMediaCodec_getOutputBuffers(),
  * AMediaCodec_dequeueInputBuffer() or AMediaCodec_dequeueOutputBuffer().
  *
- * Also, AMediaCodec_flush() behaves differently in asynchronous mode.
- * After calling AMediaCodec_flush(), you must call AMediaCodec_start() to
- * "resume" receiving input buffers, even if an input surface was created.
+ * AMediaCodec_flush() behaves differently in asynchronous mode.
+ * After calling AMediaCodec_flush(), the client must call AMediaCodec_start() to
+ * "resume" receiving input buffers. Even if the client does not receive
+ * AMediaCodecOnAsyncInputAvailable callbacks from video encoders configured
+ * with an input surface, the client still needs to call AMediaCodec_start()
+ * to resume the input surface to send buffers to the encoders.
+ *
+ * When called with null callback, this method unregisters any previously set callback.
  *
  * Refer to the definition of AMediaCodecOnAsyncNotifyCallback on how each
  * callback function is called and what are specified.
- * The specified userdata is the pointer used when those callback functions are
- * called.
+ * The specified userdata is opaque data which will be passed along
+ * when the callback functions are called. MediaCodec does not look at or alter the
+ * value of userdata. Often it is a pointer to a client-owned object,
+ * and client manages the lifecycle of the object in that case.
+ *
+ * Once the callback is unregistered or the codec is reset / released, the
+ * previously registered callback will not be called.
  *
  * All callbacks are fired on one NDK internal thread.
  * AMediaCodec_setAsyncNotifyCallback should not be called on the callback thread.
@@ -471,10 +481,17 @@ media_status_t AMediaCodec_setAsyncNotifyCallback(
  * render timing samples, and can be significantly delayed and batched. Some frames may have
  * been rendered even if there was no callback generated.
  *
+ * When called with null callback, this method unregisters any previously set callback.
+ *
  * Refer to the definition of AMediaCodecOnFrameRendered on how each
  * callback function is called and what are specified.
- * The specified userdata is the pointer used when those callback functions are
- * called.
+ * The specified userdata is opaque data which will be passed along
+ * when the callback functions are called. MediaCodec does not look at or alter the
+ * value of userdata. Often it is a pointer to a client-owned object,
+ * and client manages the lifecycle of the object in that case.
+ *
+ * Once the callback is unregistered or the codec is reset / released, the
+ * previously registered callback will not be called.
  *
  * All callbacks are fired on one NDK internal thread.
  * AMediaCodec_setOnFrameRenderedCallback should not be called on the callback thread.
