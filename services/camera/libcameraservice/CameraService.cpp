@@ -1688,6 +1688,13 @@ Status CameraService::connectDevice(
         return STATUS_ERROR(ERROR_ILLEGAL_ARGUMENT, msg.string());
     }
 
+    if (CameraServiceProxyWrapper::isCameraDisabled()) {
+        String8 msg =
+                String8::format("Camera disabled by device policy");
+        ALOGE("%s: %s", __FUNCTION__, msg.string());
+        return STATUS_ERROR(ERROR_DISABLED, msg.string());
+    }
+
     // enforce system camera permissions
     if (oomScoreOffset > 0 &&
             !hasPermissionsForSystemCamera(callingPid, CameraThreadState::getCallingUid())) {
