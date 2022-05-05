@@ -87,10 +87,17 @@ public:
 
     status_t listAudioVolumeGroups(AudioVolumeGroupVector &groups) const override;
 
+    /**
+     * Get the list of currently connected removable device types ordered from most recently
+     * connected to least recently connected.
+     * @param group the device group to consider: wired, a2dp... If none, consider all groups.
+     * @param excludedDevices list of device types to ignore
+     * @return a potentially empty ordered list of connected removable devices.
+     */
     std::vector<audio_devices_t> getLastRemovableMediaDevices(
-            device_out_group_t group = GROUP_NONE) const
-    {
-        return mLastRemovableMediaDevices.getLastRemovableMediaDevices(group);
+            device_out_group_t group = GROUP_NONE,
+            std::vector<audio_devices_t> excludedDevices = {}) const {
+        return mLastRemovableMediaDevices.getLastRemovableMediaDevices(group, excludedDevices);
     }
 
     void dump(String8 *dst) const override;
