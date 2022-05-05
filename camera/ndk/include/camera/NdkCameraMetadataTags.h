@@ -858,7 +858,7 @@ typedef enum acamera_metadata_tag {
      * routine is enabled, overriding the application's selected
      * ACAMERA_COLOR_CORRECTION_TRANSFORM, ACAMERA_COLOR_CORRECTION_GAINS and
      * ACAMERA_COLOR_CORRECTION_MODE. Note that when ACAMERA_CONTROL_AE_MODE
-     * is OFF, the behavior of AWB is device dependent. It is recommened to
+     * is OFF, the behavior of AWB is device dependent. It is recommended to
      * also set AWB mode to OFF or lock AWB by using ACAMERA_CONTROL_AWB_LOCK before
      * setting AE mode to OFF.</p>
      * <p>When set to the OFF mode, the camera device's auto-white balance
@@ -989,13 +989,15 @@ typedef enum acamera_metadata_tag {
      *
      * <p>This control (except for MANUAL) is only effective if
      * <code>ACAMERA_CONTROL_MODE != OFF</code> and any 3A routine is active.</p>
-     * <p>All intents are supported by all devices, except that:
-     *   * ZERO_SHUTTER_LAG will be supported if ACAMERA_REQUEST_AVAILABLE_CAPABILITIES contains
-     * PRIVATE_REPROCESSING or YUV_REPROCESSING.
-     *   * MANUAL will be supported if ACAMERA_REQUEST_AVAILABLE_CAPABILITIES contains
-     * MANUAL_SENSOR.
-     *   * MOTION_TRACKING will be supported if ACAMERA_REQUEST_AVAILABLE_CAPABILITIES contains
-     * MOTION_TRACKING.</p>
+     * <p>All intents are supported by all devices, except that:</p>
+     * <ul>
+     * <li>ZERO_SHUTTER_LAG will be supported if ACAMERA_REQUEST_AVAILABLE_CAPABILITIES contains
+     * PRIVATE_REPROCESSING or YUV_REPROCESSING.</li>
+     * <li>MANUAL will be supported if ACAMERA_REQUEST_AVAILABLE_CAPABILITIES contains
+     * MANUAL_SENSOR.</li>
+     * <li>MOTION_TRACKING will be supported if ACAMERA_REQUEST_AVAILABLE_CAPABILITIES contains
+     * MOTION_TRACKING.</li>
+     * </ul>
      *
      * @see ACAMERA_CONTROL_MODE
      * @see ACAMERA_REQUEST_AVAILABLE_CAPABILITIES
@@ -1486,7 +1488,7 @@ typedef enum acamera_metadata_tag {
      * Any state (excluding LOCKED) | ACAMERA_CONTROL_AE_PRECAPTURE_TRIGGER is START, sequence done | FLASH_REQUIRED | Converged but too dark w/o flash after a precapture sequence, transient states are skipped by camera device.
      * Any state (excluding LOCKED) | ACAMERA_CONTROL_AE_PRECAPTURE_TRIGGER is START, sequence done | CONVERGED      | Converged after a precapture sequence, transient states are skipped by camera device.
      * Any state (excluding LOCKED) | ACAMERA_CONTROL_AE_PRECAPTURE_TRIGGER is CANCEL, converged    | FLASH_REQUIRED | Converged but too dark w/o flash after a precapture sequence is canceled, transient states are skipped by camera device.
-     * Any state (excluding LOCKED) | ACAMERA_CONTROL_AE_PRECAPTURE_TRIGGER is CANCEL, converged    | CONVERGED      | Converged after a precapture sequenceis canceled, transient states are skipped by camera device.
+     * Any state (excluding LOCKED) | ACAMERA_CONTROL_AE_PRECAPTURE_TRIGGER is CANCEL, converged    | CONVERGED      | Converged after a precapture sequences canceled, transient states are skipped by camera device.
      * CONVERGED      | Camera device finished AE scan                              | FLASH_REQUIRED | Converged but too dark w/o flash after a new scan, transient states are skipped by camera device.
      * FLASH_REQUIRED | Camera device finished AE scan                              | CONVERGED      | Converged after a new scan, transient states are skipped by camera device.</p>
      *
@@ -1722,7 +1724,7 @@ typedef enum acamera_metadata_tag {
      * </ul></p>
      *
      * <p>Devices support post RAW sensitivity boost  will advertise
-     * ACAMERA_CONTROL_POST_RAW_SENSITIVITY_BOOST key for controling
+     * ACAMERA_CONTROL_POST_RAW_SENSITIVITY_BOOST key for controlling
      * post RAW sensitivity boost.</p>
      * <p>This key will be <code>null</code> for devices that do not support any RAW format
      * outputs. For devices that do support RAW format outputs, this key will always
@@ -2193,7 +2195,7 @@ typedef enum acamera_metadata_tag {
      *
      * <p>If this value is greater than 1, then the device supports controlling the
      * flashlight brightness level via
-     * {android.hardware.camera2.CameraManager#turnOnTorchWithStrengthLevel}.
+     * <a href="https://developer.android.com/reference/android/hardware/camera2/CameraManager.html#turnOnTorchWithStrengthLevel">CameraManager#turnOnTorchWithStrengthLevel</a>.
      * If this value is equal to 1, flashlight brightness control is not supported.
      * The value for this key will be null for devices with no flash unit.</p>
      */
@@ -2201,7 +2203,7 @@ typedef enum acamera_metadata_tag {
             ACAMERA_FLASH_INFO_START + 2,
     /**
      * <p>Default flashlight brightness level to be set via
-     * {android.hardware.camera2.CameraManager#turnOnTorchWithStrengthLevel}.</p>
+     * <a href="https://developer.android.com/reference/android/hardware/camera2/CameraManager.html#turnOnTorchWithStrengthLevel">CameraManager#turnOnTorchWithStrengthLevel</a>.</p>
      *
      * <p>Type: int32</p>
      *
@@ -2423,7 +2425,7 @@ typedef enum acamera_metadata_tag {
      *   and keep jpeg and thumbnail image data unrotated.</li>
      * <li>Rotate the jpeg and thumbnail image data and not set
      *   <a href="https://developer.android.com/reference/android/media/ExifInterface.html#TAG_ORIENTATION">EXIF orientation flag</a>. In this
-     *   case, LIMITED or FULL hardware level devices will report rotated thumnail size in
+     *   case, LIMITED or FULL hardware level devices will report rotated thumbnail size in
      *   capture result, so the width and height will be interchanged if 90 or 270 degree
      *   orientation is requested. LEGACY device will always report unrotated thumbnail
      *   size.</li>
@@ -2452,7 +2454,7 @@ typedef enum acamera_metadata_tag {
      *
      * <p>This list will include at least one non-zero resolution, plus <code>(0,0)</code> for indicating no
      * thumbnail should be generated.</p>
-     * <p>Below condiditions will be satisfied for this size list:</p>
+     * <p>Below conditions will be satisfied for this size list:</p>
      * <ul>
      * <li>The sizes will be sorted by increasing pixel area (width x height).
      * If several resolutions have the same area, they will be sorted by increasing width.</li>
@@ -2766,7 +2768,7 @@ typedef enum acamera_metadata_tag {
      * <p>When the state is STATIONARY, the lens parameters are not changing. This could be
      * either because the parameters are all fixed, or because the lens has had enough
      * time to reach the most recently-requested values.
-     * If all these lens parameters are not changable for a camera device, as listed below:</p>
+     * If all these lens parameters are not changeable for a camera device, as listed below:</p>
      * <ul>
      * <li>Fixed focus (<code>ACAMERA_LENS_INFO_MINIMUM_FOCUS_DISTANCE == 0</code>), which means
      * ACAMERA_LENS_FOCUS_DISTANCE parameter will always be 0.</li>
@@ -3218,7 +3220,7 @@ typedef enum acamera_metadata_tag {
      * the camera device. Using more streams simultaneously may require more hardware and
      * CPU resources that will consume more power. The image format for an output stream can
      * be any supported format provided by ACAMERA_SCALER_AVAILABLE_STREAM_CONFIGURATIONS.
-     * The formats defined in ACAMERA_SCALER_AVAILABLE_STREAM_CONFIGURATIONS can be catergorized
+     * The formats defined in ACAMERA_SCALER_AVAILABLE_STREAM_CONFIGURATIONS can be categorized
      * into the 3 stream types as below:</p>
      * <ul>
      * <li>Processed (but stalling): any non-RAW format with a stallDurations &gt; 0.
@@ -3445,7 +3447,7 @@ typedef enum acamera_metadata_tag {
      * but clients should be aware and expect delays during their application.
      * An example usage scenario could look like this:</p>
      * <ul>
-     * <li>The camera client starts by quering the session parameter key list via
+     * <li>The camera client starts by querying the session parameter key list via
      *   {@link ACameraManager_getCameraCharacteristics }.</li>
      * <li>Before triggering the capture session create sequence, a capture request
      *   must be built via
@@ -3711,7 +3713,7 @@ typedef enum acamera_metadata_tag {
      * IMPLEMENTATION_DEFINED | same as YUV_420_888                  | Any            |</p>
      * <p>For applications targeting SDK version 31 or newer, if the mobile device declares to be
      * media performance class 12 or higher by setting
-     * <a href="https://developer.android.com/reference/android/os/Build/VERSION_CDOES/MEDIA_PERFORMANCE_CLASS.html">MEDIA_PERFORMANCE_CLASS</a> to be 31 or larger,
+     * <a href="https://developer.android.com/reference/android/os/Build/VERSION_CODES/MEDIA_PERFORMANCE_CLASS.html">MEDIA_PERFORMANCE_CLASS</a> to be 31 or larger,
      * the primary camera devices (first rear/front camera in the camera ID list) will not
      * support JPEG sizes smaller than 1080p. If the application configures a JPEG stream
      * smaller than 1080p, the camera device will round up the JPEG image size to at least
@@ -3730,7 +3732,7 @@ typedef enum acamera_metadata_tag {
      * IMPLEMENTATION_DEFINED | same as YUV_420_888                  | Any            |</p>
      * <p>For applications targeting SDK version 31 or newer, if the mobile device doesn't declare
      * to be media performance class 12 or better by setting
-     * <a href="https://developer.android.com/reference/android/os/Build/VERSION_CDOES/MEDIA_PERFORMANCE_CLASS.html">MEDIA_PERFORMANCE_CLASS</a> to be 31 or larger,
+     * <a href="https://developer.android.com/reference/android/os/Build/VERSION_CODES/MEDIA_PERFORMANCE_CLASS.html">MEDIA_PERFORMANCE_CLASS</a> to be 31 or larger,
      * or if the camera device isn't a primary rear/front camera, the minimum required output
      * stream configurations are the same as for applications targeting SDK version older than
      * 31.</p>
@@ -4224,14 +4226,16 @@ typedef enum acamera_metadata_tag {
      * to output different resolution images depending on the current active physical camera or
      * pixel mode. With multi-resolution input streams, the camera device can reprocess images
      * of different resolutions from different physical cameras or sensor pixel modes.</p>
-     * <p>When set to TRUE:
-     * * For a logical multi-camera, the camera framework derives
+     * <p>When set to TRUE:</p>
+     * <ul>
+     * <li>For a logical multi-camera, the camera framework derives
      * android.scaler.multiResolutionStreamConfigurationMap by combining the
      * ACAMERA_SCALER_PHYSICAL_CAMERA_MULTI_RESOLUTION_STREAM_CONFIGURATIONS from its physical
-     * cameras.
-     * * For an ultra-high resolution sensor camera, the camera framework directly copies
+     * cameras.</li>
+     * <li>For an ultra-high resolution sensor camera, the camera framework directly copies
      * the value of ACAMERA_SCALER_PHYSICAL_CAMERA_MULTI_RESOLUTION_STREAM_CONFIGURATIONS to
-     * android.scaler.multiResolutionStreamConfigurationMap.</p>
+     * android.scaler.multiResolutionStreamConfigurationMap.</li>
+     * </ul>
      *
      * @see ACAMERA_SCALER_PHYSICAL_CAMERA_MULTI_RESOLUTION_STREAM_CONFIGURATIONS
      */
@@ -4253,7 +4257,7 @@ typedef enum acamera_metadata_tag {
      * capture, video record for encoding the camera output for the purpose of future playback,
      * and video call for live realtime video conferencing.</p>
      * <p>With this flag, the camera device can optimize the image processing pipeline
-     * parameters, such as tuning, sensor mode, and ISP settings, indepedent of
+     * parameters, such as tuning, sensor mode, and ISP settings, independent of
      * the properties of the immediate camera output surface. For example, if the output
      * surface is a SurfaceTexture, the stream use case flag can be used to indicate whether
      * the camera frames eventually go to display, video encoder,
@@ -4275,7 +4279,7 @@ typedef enum acamera_metadata_tag {
      * <a href="https://developer.android.com/reference/android/hardware/camera2/CameraCharacteristics.html#REQUEST_AVAILABLE_CAPABILITIES_STREAM_USE_CASE">CameraCharacteristics#REQUEST_AVAILABLE_CAPABILITIES_STREAM_USE_CASE</a>
      * capability is documented in the camera device
      * <a href="https://developer.android.com/reference/android/hardware/camera2/CameraDevice.html#createCaptureSession">guideline</a>. The
-     * application is strongly recommended to use one of the guaranteed stream combintations.
+     * application is strongly recommended to use one of the guaranteed stream combinations.
      * If the application creates a session with a stream combination not in the guaranteed
      * list, or with mixed DEFAULT and non-DEFAULT use cases within the same session,
      * the camera device may ignore some stream use cases due to hardware constraints
@@ -4839,7 +4843,7 @@ typedef enum acamera_metadata_tag {
      * noise model used here is:</p>
      * <p>N(x) = sqrt(Sx + O)</p>
      * <p>Where x represents the recorded signal of a CFA channel normalized to
-     * the range [0, 1], and S and O are the noise model coeffiecients for
+     * the range [0, 1], and S and O are the noise model coefficients for
      * that channel.</p>
      * <p>A more detailed description of the noise model can be found in the
      * Adobe DNG specification for the NoiseProfile tag.</p>
@@ -4888,7 +4892,7 @@ typedef enum acamera_metadata_tag {
      * <li>1.20 &lt;= R &gt;= 1.03 will require some software
      * correction to avoid demosaic errors (3-20% divergence).</li>
      * <li>R &gt; 1.20 will require strong software correction to produce
-     * a usuable image (&gt;20% divergence).</li>
+     * a usable image (&gt;20% divergence).</li>
      * </ul>
      * <p>Starting from Android Q, this key will not be present for a MONOCHROME camera, even if
      * the camera device has RAW capability.</p>
@@ -5145,7 +5149,7 @@ typedef enum acamera_metadata_tag {
      *   <li>ACameraMetadata from ACameraCaptureSession_captureCallback_result callbacks</li>
      * </ul></p>
      *
-     * <p>This key will only be present in devices advertisting the
+     * <p>This key will only be present in devices advertising the
      * <a href="https://developer.android.com/reference/android/hardware/camera2/CameraMetadata.html#REQUEST_AVAILABLE_CAPABILITIES_ULTRA_HIGH_RESOLUTION_SENSOR">CameraMetadata#REQUEST_AVAILABLE_CAPABILITIES_ULTRA_HIGH_RESOLUTION_SENSOR</a>
      * capability which also advertise <code>REMOSAIC_REPROCESSING</code> capability. On all other devices
      * RAW targets will have a regular bayer pattern.</p>
@@ -6330,9 +6334,11 @@ typedef enum acamera_metadata_tag {
      *   <li>ACaptureRequest</li>
      * </ul></p>
      *
-     * <p>The tonemap curve will be defined the following formula:
-     * * OUT = pow(IN, 1.0 / gamma)
-     * where IN and OUT is the input pixel value scaled to range [0.0, 1.0],
+     * <p>The tonemap curve will be defined the following formula:</p>
+     * <ul>
+     * <li>OUT = pow(IN, 1.0 / gamma)</li>
+     * </ul>
+     * <p>where IN and OUT is the input pixel value scaled to range [0.0, 1.0],
      * pow is the power function and gamma is the gamma value specified by this
      * key.</p>
      * <p>The same curve will be applied to all color channels. The camera device
@@ -7294,7 +7300,7 @@ typedef enum acamera_metadata_tag {
      * EXTERIOR_* value.</p>
      * <p>If a camera has INTERIOR_OTHER or EXTERIOR_OTHER, or more than one camera is at the
      * same location and facing the same direction, their static metadata will list the
-     * following entries, so that applications can determain their lenses' exact facing
+     * following entries, so that applications can determine their lenses' exact facing
      * directions:</p>
      * <ul>
      * <li>ACAMERA_LENS_POSE_REFERENCE</li>
@@ -8705,7 +8711,7 @@ typedef enum acamera_metadata_enum_acamera_lens_pose_reference {
 
     /**
      * <p>The value of ACAMERA_LENS_POSE_TRANSLATION is relative to the origin of the
-     * automotive sensor coodinate system, which is at the center of the rear axle.</p>
+     * automotive sensor coordinate system, which is at the center of the rear axle.</p>
      *
      * @see ACAMERA_LENS_POSE_TRANSLATION
      */
@@ -9024,7 +9030,7 @@ typedef enum acamera_metadata_enum_acamera_request_available_capabilities {
      * for the largest YUV_420_888 size.</p>
      * <p>If the device supports the {@link AIMAGE_FORMAT_RAW10 }, {@link AIMAGE_FORMAT_RAW12 }, {@link AIMAGE_FORMAT_Y8 }, then those can also be
      * captured at the same rate as the maximum-size YUV_420_888 resolution is.</p>
-     * <p>In addition, the ACAMERA_SYNC_MAX_LATENCY field is guaranted to have a value between 0
+     * <p>In addition, the ACAMERA_SYNC_MAX_LATENCY field is guaranteed to have a value between 0
      * and 4, inclusive. ACAMERA_CONTROL_AE_LOCK_AVAILABLE and ACAMERA_CONTROL_AWB_LOCK_AVAILABLE
      * are also guaranteed to be <code>true</code> so burst capture with these two locks ON yields
      * consistent image output.</p>
@@ -9190,7 +9196,7 @@ typedef enum acamera_metadata_enum_acamera_request_available_capabilities {
      * non-active physical cameras. For example, if the logical camera has a wide-ultrawide
      * configuration where the wide lens is the default, when the crop region is set to the
      * logical camera's active array size, (and the zoom ratio set to 1.0 starting from
-     * Android 11), a physical stream for the ultrawide camera may prefer outputing images
+     * Android 11), a physical stream for the ultrawide camera may prefer outputting images
      * with larger field-of-view than that of the wide camera for better stereo matching
      * margin or more robust motion tracking. At the same time, the physical non-RAW streams'
      * field of view must not be smaller than the requested crop region and zoom ratio, as
@@ -9316,22 +9322,26 @@ typedef enum acamera_metadata_enum_acamera_request_available_capabilities {
      * <a href="https://developer.android.com/reference/android/hardware/camera2/params/OutputConfiguration.html#setStreamUseCase">OutputConfiguration#setStreamUseCase</a>
      * so that the device can optimize camera pipeline parameters such as tuning, sensor
      * mode, or ISP settings for a specific user scenario.
-     * Some sample usages of this capability are:
-     * * Distinguish high quality YUV captures from a regular YUV stream where
-     *   the image quality may not be as good as the JPEG stream, or
-     * * Use one stream to serve multiple purposes: viewfinder, video recording and
+     * Some sample usages of this capability are:</p>
+     * <ul>
+     * <li>Distinguish high quality YUV captures from a regular YUV stream where
+     *   the image quality may not be as good as the JPEG stream, or</li>
+     * <li>Use one stream to serve multiple purposes: viewfinder, video recording and
      *   still capture. This is common with applications that wish to apply edits equally
-     *   to preview, saved images, and saved videos.</p>
+     *   to preview, saved images, and saved videos.</li>
+     * </ul>
      * <p>This capability requires the camera device to support the following
-     * stream use cases:
-     * * DEFAULT for backward compatibility where the application doesn't set
-     *   a stream use case
-     * * PREVIEW for live viewfinder and in-app image analysis
-     * * STILL_CAPTURE for still photo capture
-     * * VIDEO_RECORD for recording video clips
-     * * PREVIEW_VIDEO_STILL for one single stream used for viewfinder, video
-     *   recording, and still capture.
-     * * VIDEO_CALL for long running video calls</p>
+     * stream use cases:</p>
+     * <ul>
+     * <li>DEFAULT for backward compatibility where the application doesn't set
+     *   a stream use case</li>
+     * <li>PREVIEW for live viewfinder and in-app image analysis</li>
+     * <li>STILL_CAPTURE for still photo capture</li>
+     * <li>VIDEO_RECORD for recording video clips</li>
+     * <li>PREVIEW_VIDEO_STILL for one single stream used for viewfinder, video
+     *   recording, and still capture.</li>
+     * <li>VIDEO_CALL for long running video calls</li>
+     * </ul>
      * <p><a href="https://developer.android.com/reference/android/hardware/camera2/CameraCharacteristics.html#SCALER_AVAILABLE_STREAM_USE_CASES">CameraCharacteristics#SCALER_AVAILABLE_STREAM_USE_CASES</a>
      * lists all of the supported stream use cases.</p>
      * <p>Refer to <a href="https://developer.android.com/reference/android/hardware/camera2/CameraDevice.html#createCaptureSession">CameraDevice#createCaptureSession</a> for the
@@ -9632,10 +9642,10 @@ typedef enum acamera_metadata_enum_acamera_scaler_available_stream_use_cases {
      * <p>Live stream shown to the user.</p>
      * <p>Optimized for performance and usability as a viewfinder, but not necessarily for
      * image quality. The output is not meant to be persisted as saved images or video.</p>
-     * <p>No stall if android.control.<em> are set to FAST; may have stall if android.control.</em>
-     * are set to HIGH_QUALITY. This use case has the same behavior as the default
-     * SurfaceView and SurfaceTexture targets. Additionally, this use case can be used for
-     * in-app image analysis.</p>
+     * <p>No stall if ACAMERA_CONTROL_* are set to FAST. There may be stall if
+     * they are set to HIGH_QUALITY. This use case has the same behavior as the
+     * default SurfaceView and SurfaceTexture targets. Additionally, this use case can be
+     * used for in-app image analysis.</p>
      */
     ACAMERA_SCALER_AVAILABLE_STREAM_USE_CASES_PREVIEW                = 0x1,
 
@@ -9678,7 +9688,7 @@ typedef enum acamera_metadata_enum_acamera_scaler_available_stream_use_cases {
     ACAMERA_SCALER_AVAILABLE_STREAM_USE_CASES_PREVIEW_VIDEO_STILL    = 0x4,
 
     /**
-     * <p>Long-running video call optimized for both power efficienty and video quality.</p>
+     * <p>Long-running video call optimized for both power efficiency and video quality.</p>
      * <p>The camera sensor may run in a lower-resolution mode to reduce power consumption
      * at the cost of some image and digital zoom quality. Unlike VIDEO_RECORD, VIDEO_CALL
      * outputs are expected to work in dark conditions, so are usually accompanied with
@@ -10105,7 +10115,7 @@ typedef enum acamera_metadata_enum_acamera_tonemap_mode {
     ACAMERA_TONEMAP_MODE_HIGH_QUALITY                                = 2,
 
     /**
-     * <p>Use the gamma value specified in ACAMERA_TONEMAP_GAMMA to peform
+     * <p>Use the gamma value specified in ACAMERA_TONEMAP_GAMMA to perform
      * tonemapping.</p>
      * <p>All color enhancement and tonemapping must be disabled, except
      * for applying the tonemapping curve specified by ACAMERA_TONEMAP_GAMMA.</p>
@@ -10117,7 +10127,7 @@ typedef enum acamera_metadata_enum_acamera_tonemap_mode {
 
     /**
      * <p>Use the preset tonemapping curve specified in
-     * ACAMERA_TONEMAP_PRESET_CURVE to peform tonemapping.</p>
+     * ACAMERA_TONEMAP_PRESET_CURVE to perform tonemapping.</p>
      * <p>All color enhancement and tonemapping must be disabled, except
      * for applying the tonemapping curve specified by
      * ACAMERA_TONEMAP_PRESET_CURVE.</p>
