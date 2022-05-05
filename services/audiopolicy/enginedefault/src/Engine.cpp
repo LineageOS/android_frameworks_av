@@ -270,7 +270,7 @@ DeviceVector Engine::getDevicesForStrategyInt(legacy_strategy strategy,
         devices = availableOutputDevices.getDevicesFromType(AUDIO_DEVICE_OUT_HEARING_AID);
         if (!devices.isEmpty()) break;
         devices = availableOutputDevices.getFirstDevicesFromTypes(
-                                          getLastRemovableMediaDevices());
+                        getLastRemovableMediaDevices(GROUP_NONE, {AUDIO_DEVICE_OUT_BLE_HEADSET}));
         if (!devices.isEmpty()) break;
         devices = availableOutputDevices.getFirstDevicesFromTypes({
                 AUDIO_DEVICE_OUT_DGTL_DOCK_HEADSET, AUDIO_DEVICE_OUT_EARPIECE});
