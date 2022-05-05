@@ -411,6 +411,10 @@ struct Codec2Client::Component : public Codec2Client::Configurable {
     // Set max dequeue count for output surface.
     void setOutputSurfaceMaxDequeueCount(int maxDequeueCount);
 
+    // Stop using the current output surface.
+    void stopUsingOutputSurface(
+            C2BlockPool::local_id_t blockPoolId);
+
     // Connect to a given InputSurface.
     c2_status_t connectToInputSurface(
             const std::shared_ptr<InputSurface>& inputSurface,

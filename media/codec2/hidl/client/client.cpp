@@ -1586,6 +1586,23 @@ void Codec2Client::Component::setOutputSurfaceMaxDequeueCount(
     mOutputBufferQueue->updateMaxDequeueBufferCount(maxDequeueCount);
 }
 
+void Codec2Client::Component::stopUsingOutputSurface(
+        C2BlockPool::local_id_t blockPoolId) {
+    mOutputBufferQueue->stop();
+    Return<Status> transStatus = mBase1_0->setOutputSurface(
+            static_cast<uint64_t>(blockPoolId), nullptr);
+    if (!transStatus.isOk()) {
+        LOG(ERROR) << "setOutputSurface(stopUsingOutputSurface) -- transaction failed.";
+    } else {
+        c2_status_t status =
+                static_cast<c2_status_t>(static_cast<Status>(transStatus));
+        if (status != C2_OK) {
+            LOG(DEBUG) << "setOutputSurface(stopUsingOutputSurface) -- call failed: "
+                       << status << ".";
+        }
+    }
+}
+
 c2_status_t Codec2Client::Component::connectToInputSurface(
         const std::shared_ptr<InputSurface>& inputSurface,
         std::shared_ptr<InputSurfaceConnection>* connection) {
