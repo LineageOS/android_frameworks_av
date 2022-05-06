@@ -72,9 +72,12 @@ status_t EngineBase::setDeviceConnectionState(const sp<DeviceDescriptor> devDesc
 {
     audio_devices_t deviceType = devDesc->type();
     if ((deviceType != AUDIO_DEVICE_NONE) && audio_is_output_device(deviceType)
-            && deviceType != AUDIO_DEVICE_OUT_DGTL_DOCK_HEADSET) {
+            && deviceType != AUDIO_DEVICE_OUT_DGTL_DOCK_HEADSET
+            && deviceType != AUDIO_DEVICE_OUT_BLE_BROADCAST) {
         // USB dock does not follow the rule of last removable device connected wins.
         // It is only used if no removable device is connected or if set as preferred device
+        // LE audio broadcast device has a specific policy depending on active strategies and
+        // devices and does not follow the rule of last connected removable device.
         mLastRemovableMediaDevices.setRemovableMediaDevices(devDesc, state);
     }
 

@@ -518,6 +518,14 @@ public:
                                       uint32_t inPastMs = 0, nsecs_t sysTime = 0) const;
 
     /**
+     * @brief isStrategyActive checks if the given strategy is active
+     * on the given output
+     * @param ps product strategy to be checked upon activity status
+     * @return true if an output following the strategy is active, false otherwise
+     */
+    bool isStrategyActive(product_strategy_t ps) const;
+
+    /**
      * @brief clearSessionRoutesForDevice: when a device is disconnected, and if this device has
      * been chosen as the preferred device by any client, the policy manager shall
      * prevent from using this device any more by clearing all the session routes involving this
@@ -561,6 +569,11 @@ public:
     audio_devices_t getSupportedDevices(audio_io_handle_t handle) const;
 
     sp<SwAudioOutputDescriptor> getOutputForClient(audio_port_handle_t portId);
+
+    /**
+     * return whether any output is active and routed to any of the specified devices
+     */
+    bool isAnyDeviceTypeActive(const DeviceTypeSet& deviceTypes) const;
 
     void dump(String8 *dst) const;
 };
