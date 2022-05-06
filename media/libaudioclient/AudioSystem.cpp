@@ -832,6 +832,11 @@ const sp<IAudioPolicyService> AudioSystem::get_audio_policy_service() {
     return ap;
 }
 
+void AudioSystem::clearAudioPolicyService() {
+    Mutex::Autolock _l(gLockAPS);
+    gAudioPolicyService.clear();
+}
+
 // ---------------------------------------------------------------------------
 
 void AudioSystem::onNewAudioModulesAvailable() {
@@ -1150,8 +1155,15 @@ status_t AudioSystem::initStreamVolume(audio_stream_type_t stream,
             legacy2aidl_audio_stream_type_t_AudioStreamType(stream));
     int32_t indexMinAidl = VALUE_OR_RETURN_STATUS(convertIntegral<int32_t>(indexMin));
     int32_t indexMaxAidl = VALUE_OR_RETURN_STATUS(convertIntegral<int32_t>(indexMax));
-    return statusTFromBinderStatus(
+    status_t status = statusTFromBinderStatus(
             aps->initStreamVolume(streamAidl, indexMinAidl, indexMaxAidl));
+    if (status == DEAD_OBJECT) {
+        // This is a critical operation since w/o proper stream volumes no audio
+        // will be heard. Make sure we recover from a failure in any case.
+        ALOGE("Received DEAD_OBJECT from APS, clearing the client");
+        clearAudioPolicyService();
+    }
+    return status;
 }
 
 status_t AudioSystem::setStreamVolumeIndex(audio_stream_type_t stream,
@@ -1412,10 +1424,7 @@ void AudioSystem::clearAudioConfigCache() {
         }
         gAudioFlinger.clear();
     }
-    {
-        Mutex::Autolock _l(gLockAPS);
-        gAudioPolicyService.clear();
-    }
+    clearAudioPolicyService();
 }
 
 status_t AudioSystem::setSupportedSystemUsages(const std::vector<audio_usage_t>& systemUsages) {
@@ -2603,10 +2612,7 @@ void AudioSystem::AudioPolicyServiceClient::binderDied(const wp<IBinder>& who __
             mAudioVolumeGroupCallback[i]->onServiceDied();
         }
     }
-    {
-        Mutex::Autolock _l(gLockAPS);
-        AudioSystem::gAudioPolicyService.clear();
-    }
+    AudioSystem::clearAudioPolicyService();
 
     ALOGW("AudioPolicyService server died!");
 }
