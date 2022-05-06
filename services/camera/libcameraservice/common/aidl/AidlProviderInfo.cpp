@@ -538,6 +538,13 @@ AidlProviderInfo::AidlDeviceInfo3::AidlDeviceInfo3(
     if (flashAvailable.count == 1 &&
             flashAvailable.data.u8[0] == ANDROID_FLASH_INFO_AVAILABLE_TRUE) {
         mHasFlashUnit = true;
+        // Fix up flash strength tags for devices without these keys.
+        res = fixupTorchStrengthTags();
+        if (OK != res) {
+            ALOGE("%s: Unable to add default ANDROID_FLASH_INFO_STRENGTH_DEFAULT_LEVEL and"
+                    "ANDROID_FLASH_INFO_STRENGTH_MAXIMUM_LEVEL tags: %s (%d)", __FUNCTION__,
+                    strerror(-res), res);
+        }
     } else {
         mHasFlashUnit = false;
     }
