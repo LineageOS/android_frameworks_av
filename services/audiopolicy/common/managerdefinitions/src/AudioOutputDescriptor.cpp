@@ -841,6 +841,16 @@ bool SwAudioOutputCollection::isStrategyActiveOnSameModule(product_strategy_t ps
     return false;
 }
 
+bool SwAudioOutputCollection::isStrategyActive(product_strategy_t ps) const
+{
+    for (size_t i = 0; i < size(); i++) {
+        if (valueAt(i)->isStrategyActive(ps)) {
+            return true;
+        }
+    }
+    return false;
+}
+
 audio_io_handle_t SwAudioOutputCollection::getA2dpOutput() const
 {
     for (size_t i = 0; i < size(); i++) {
@@ -915,6 +925,16 @@ void SwAudioOutputCollection::clearSessionRoutesForDevice(
             }
         }
     }
+}
+bool SwAudioOutputCollection::isAnyDeviceTypeActive(const DeviceTypeSet& deviceTypes) const {
+    for (size_t i = 0; i < size(); i++) {
+        const sp<SwAudioOutputDescriptor> outputDesc = valueAt(i);
+        if (outputDesc->isActive()
+                && outputDesc->devices().containsDeviceAmongTypes(deviceTypes)) {
+            return true;
+        }
+    }
+    return false;
 }
 
 void SwAudioOutputCollection::dump(String8 *dst) const
