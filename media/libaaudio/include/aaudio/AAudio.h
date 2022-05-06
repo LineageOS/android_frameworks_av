@@ -40,7 +40,7 @@ extern "C" {
 /**
  * This is used to represent a value that has not been specified.
  * For example, an application could use {@link #AAUDIO_UNSPECIFIED} to indicate
- * that is did not not care what the specific value of a parameter was
+ * that it did not care what the specific value of a parameter was
  * and would accept whatever it was given.
  */
 #define AAUDIO_UNSPECIFIED           0
