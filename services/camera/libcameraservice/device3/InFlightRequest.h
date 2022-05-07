@@ -65,6 +65,7 @@ typedef struct camera_capture_result {
 typedef struct camera_shutter_msg {
     uint32_t frame_number;
     uint64_t timestamp;
+    bool readout_timestamp_valid;
     uint64_t readout_timestamp;
 } camera_shutter_msg_t;
 
@@ -104,8 +105,6 @@ typedef enum {
 struct InFlightRequest {
     // Set by notify() SHUTTER call.
     nsecs_t shutterTimestamp;
-    // Set by notify() SHUTTER call with readout time.
-    nsecs_t shutterReadoutTimestamp;
     // Set by process_capture_result().
     nsecs_t sensorTimestamp;
     int     requestStatus;
