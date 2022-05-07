@@ -852,22 +852,6 @@ String8 CameraService::getFormattedCurrentTime() {
     return String8(formattedTime);
 }
 
-Status CameraService::setUpVendorTags() {
-    ATRACE_CALL();
-
-    Mutex::Autolock lock(mServiceLock);
-
-    Status ret = Status::ok();
-
-    if (mCameraProviderManager != nullptr) {
-        mCameraProviderManager->setUpVendorTags();
-    } else {
-        ret = STATUS_ERROR(ERROR_DISCONNECTED, "CameraProviderManager is NULL");
-    }
-
-    return ret;
-}
-
 Status CameraService::getCameraVendorTagDescriptor(
         /*out*/
         hardware::camera2::params::VendorTagDescriptor* desc) {

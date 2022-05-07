@@ -350,6 +350,7 @@ public:
     static void clearAudioConfigCache();
 
     static const sp<media::IAudioPolicyService> get_audio_policy_service();
+    static void clearAudioPolicyService();
 
     // helpers for android.media.AudioManager.getProperty(), see description there for meaning
     static uint32_t getPrimaryOutputSamplingRate();

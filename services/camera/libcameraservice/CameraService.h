@@ -136,7 +136,6 @@ public:
     virtual binder::Status     getCameraVendorTagCache(
             /*out*/
             hardware::camera2::params::VendorTagDescriptorCache* cache);
-    virtual binder::Status     setUpVendorTags();
 
     virtual binder::Status     connect(const sp<hardware::ICameraClient>& cameraClient,
             int32_t cameraId, const String16& clientPackageName,
