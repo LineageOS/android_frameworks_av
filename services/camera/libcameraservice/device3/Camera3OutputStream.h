@@ -334,6 +334,11 @@ class Camera3OutputStream :
     nsecs_t mTimestampOffset;
 
     /**
+     * If camera readout time is used rather than the start-of-exposure time.
+     */
+    bool mUseReadoutTime;
+
+    /**
      * Consumer end point usage flag set by the constructor for the deferred
      * consumer case.
      */
