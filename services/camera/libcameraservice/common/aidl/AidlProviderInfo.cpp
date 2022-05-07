@@ -532,6 +532,11 @@ AidlProviderInfo::AidlDeviceInfo3::AidlDeviceInfo3(
         ALOGE("%s: Unable to override zoomRatio related tags: %s (%d)",
                 __FUNCTION__, strerror(-res), res);
     }
+    res = addReadoutTimestampTag();
+    if (OK != res) {
+        ALOGE("%s: Unable to add sensorReadoutTimestamp tag: %s (%d)",
+                __FUNCTION__, strerror(-res), res);
+    }
 
     camera_metadata_entry flashAvailable =
             mCameraCharacteristics.find(ANDROID_FLASH_INFO_AVAILABLE);
