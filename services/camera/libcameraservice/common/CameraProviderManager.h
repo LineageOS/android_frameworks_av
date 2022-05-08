@@ -672,6 +672,7 @@ private:
             status_t deriveHeicTags(bool maxResolution = false);
             status_t addRotateCropTags();
             status_t addPreCorrectionActiveArraySize();
+            status_t addReadoutTimestampTag();
 
             static void getSupportedSizes(const CameraMetadata& ch, uint32_t tag,
                     android_pixel_format_t format,
