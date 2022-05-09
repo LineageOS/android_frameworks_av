@@ -491,6 +491,7 @@ CameraDevice::disconnectLocked(sp<ACameraCaptureSession>& session) {
     }
 
     if (mRemote != nullptr) {
+        ALOGD("%s: binder disconnect reached", __FUNCTION__);
         auto ret = mRemote->disconnect();
         if (!ret.isOk()) {
             ALOGE("%s: Transaction error while disconnecting device %s", __FUNCTION__,
