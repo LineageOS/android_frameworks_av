@@ -243,20 +243,23 @@ status_t Camera2ClientBase<TClientBase>::dumpDevice(
 template <typename TClientBase>
 binder::Status Camera2ClientBase<TClientBase>::disconnect() {
     ATRACE_CALL();
+    ALOGD("Camera %s: start to disconnect", TClientBase::mCameraIdStr.string());
     Mutex::Autolock icl(mBinderSerializationLock);
 
+    ALOGD("Camera %s: serializationLock acquired", TClientBase::mCameraIdStr.string());
     binder::Status res = binder::Status::ok();
     // Allow both client and the media server to disconnect at all times
     int callingPid = CameraThreadState::getCallingPid();
     if (callingPid != TClientBase::mClientPid &&
         callingPid != TClientBase::mServicePid) return res;
 
-    ALOGV("Camera %s: Shutting down", TClientBase::mCameraIdStr.string());
+    ALOGD("Camera %s: Shutting down", TClientBase::mCameraIdStr.string());
 
     // Before detaching the device, cache the info from current open session.
     // The disconnected check avoids duplication of info and also prevents
     // deadlock while acquiring service lock in cacheDump.
     if (!TClientBase::mDisconnected) {
+        ALOGD("Camera %s: start to cacheDump", TClientBase::mCameraIdStr.string());
         Camera2ClientBase::getCameraService()->cacheDump();
     }
 
