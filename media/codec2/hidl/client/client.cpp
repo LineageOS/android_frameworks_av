@@ -1502,6 +1502,7 @@ c2_status_t Codec2Client::Component::setOutputSurface(
         igbp = new B2HGraphicBufferProducer2(surface);
     }
 
+    std::scoped_lock lock(mOutputMutex);
     std::shared_ptr<SurfaceSyncObj> syncObj;
 
     if (!surface) {
@@ -1588,6 +1589,7 @@ void Codec2Client::Component::setOutputSurfaceMaxDequeueCount(
 
 void Codec2Client::Component::stopUsingOutputSurface(
         C2BlockPool::local_id_t blockPoolId) {
+    std::scoped_lock lock(mOutputMutex);
     mOutputBufferQueue->stop();
     Return<Status> transStatus = mBase1_0->setOutputSurface(
             static_cast<uint64_t>(blockPoolId), nullptr);

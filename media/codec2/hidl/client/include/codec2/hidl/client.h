@@ -445,6 +445,11 @@ protected:
     struct OutputBufferQueue;
     std::unique_ptr<OutputBufferQueue> mOutputBufferQueue;
 
+    // (b/202903117) Sometimes MediaCodec::setSurface races between normal
+    // setSurface and setSurface with ReleaseSurface due to timing issues.
+    // In order to prevent the race condition mutex is added.
+    std::mutex mOutputMutex;
+
     static c2_status_t setDeathListener(
             const std::shared_ptr<Component>& component,
             const std::shared_ptr<Listener>& listener);
