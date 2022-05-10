@@ -48,14 +48,15 @@ status_t OnAudioDeviceUpdateNotifier::waitForAudioDeviceCb() {
 AudioPlayback::AudioPlayback(uint32_t sampleRate, audio_format_t format,
                              audio_channel_mask_t channelMask, audio_output_flags_t flags,
                              audio_session_t sessionId, AudioTrack::transfer_type transferType,
-                             audio_attributes_t* attributes)
+                             audio_attributes_t* attributes, audio_offload_info_t* info)
     : mSampleRate(sampleRate),
       mFormat(format),
       mChannelMask(channelMask),
       mFlags(flags),
       mSessionId(sessionId),
       mTransferType(transferType),
-      mAttributes(attributes) {
+      mAttributes(attributes),
+      mOffloadInfo(info) {
     mStopPlaying = false;
     mBytesUsedSoFar = 0;
     mState = PLAY_NO_INIT;
@@ -81,13 +82,14 @@ status_t AudioPlayback::create() {
         mTrack->set(AUDIO_STREAM_MUSIC, mSampleRate, mFormat, mChannelMask, 0 /* frameCount */,
                     mFlags, nullptr /* callback */, 0 /* notificationFrames */,
                     nullptr /* sharedBuffer */, false /*canCallJava */, mSessionId, mTransferType,
-                    nullptr /* offloadInfo */, attributionSource, mAttributes);
+                    mOffloadInfo, attributionSource, mAttributes);
     } else if (mTransferType == AudioTrack::TRANSFER_SHARED) {
         mTrack = new AudioTrack(AUDIO_STREAM_MUSIC, mSampleRate, mFormat, mChannelMask, mMemory,
                                 mFlags, wp<AudioTrack::IAudioTrackCallback>::fromExisting(this), 0,
                                 mSessionId, mTransferType, nullptr, attributionSource, mAttributes);
     } else {
-        ALOGE("Required Transfer type not existed");
+        ALOGE("Test application is not handling transfer type %s",
+              AudioTrack::convertTransferToText(mTransferType));
         return INVALID_OPERATION;
     }
     mTrack->setCallerName(packageName);
@@ -229,9 +231,15 @@ void AudioPlayback::stop() {
     std::unique_lock<std::mutex> lock{mMutex};
     mStopPlaying = true;
     if (mState != PLAY_STOPPED) {
+        int32_t msec = 0;
+        (void)mTrack->pendingDuration(&msec);
         mTrack->stopAndJoinCallbacks();
         LOG_FATAL_IF(true != mTrack->stopped());
         mState = PLAY_STOPPED;
+        if (msec > 0) {
+            ALOGD("deleting recycled track, waiting for data drain (%d msec)", msec);
+            usleep(msec * 1000LL);
+        }
     }
 }
 
