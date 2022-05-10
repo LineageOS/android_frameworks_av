@@ -30,8 +30,8 @@ static constexpr int kDefaultOutputEffectPriority = 0;
 
 static const char* gPackageName = "AudioEffectTest";
 
-static bool isEffectExistsOnAudioSession(const effect_uuid_t* type, int priority,
-                                         audio_session_t sessionId) {
+bool isEffectExistsOnAudioSession(const effect_uuid_t* type, int priority,
+                                  audio_session_t sessionId) {
     std::string packageName{gPackageName};
     AttributionSourceState attributionSource;
     attributionSource.packageName = packageName;
@@ -43,7 +43,7 @@ static bool isEffectExistsOnAudioSession(const effect_uuid_t* type, int priority
     return effect->initCheck() == ALREADY_EXISTS;
 }
 
-static bool isEffectDefaultOnRecord(const effect_uuid_t* type, const sp<AudioRecord>& audioRecord) {
+bool isEffectDefaultOnRecord(const effect_uuid_t* type, const sp<AudioRecord>& audioRecord) {
     effect_descriptor_t descriptors[AudioEffect::kMaxPreProcessing];
     uint32_t numEffects = AudioEffect::kMaxPreProcessing;
     status_t ret = AudioEffect::queryDefaultPreProcessing(audioRecord->getSessionId(), descriptors,
@@ -59,35 +59,68 @@ static bool isEffectDefaultOnRecord(const effect_uuid_t* type, const sp<AudioRec
     return false;
 }
 
+void listEffectsAvailable(std::vector<effect_descriptor_t>& descriptors) {
+    uint32_t numEffects = 0;
+    if (NO_ERROR == AudioEffect::queryNumberEffects(&numEffects)) {
+        for (auto i = 0; i < numEffects; i++) {
+            effect_descriptor_t des;
+            if (NO_ERROR == AudioEffect::queryEffect(i, &des)) descriptors.push_back(des);
+        }
+    }
+}
+
+bool isPreprocessing(effect_descriptor_t& descriptor) {
+    return ((descriptor.flags & EFFECT_FLAG_TYPE_MASK) == EFFECT_FLAG_TYPE_PRE_PROC);
+}
+
+bool isInsert(effect_descriptor_t& descriptor) {
+    return ((descriptor.flags & EFFECT_FLAG_TYPE_MASK) == EFFECT_FLAG_TYPE_INSERT);
+}
+
+bool isAux(effect_descriptor_t& descriptor) {
+    return ((descriptor.flags & EFFECT_FLAG_TYPE_MASK) == EFFECT_FLAG_TYPE_AUXILIARY);
+}
+
+bool isFastCompatible(effect_descriptor_t& descriptor) {
+    return !(((descriptor.flags & EFFECT_FLAG_HW_ACC_MASK) == 0) &&
+             ((descriptor.flags & EFFECT_FLAG_NO_PROCESS) == 0));
+}
+
 // UNIT TESTS
 TEST(AudioEffectTest, getEffectDescriptor) {
     effect_uuid_t randomType = {
             0x81781c08, 0x93dd, 0x11ec, 0xb909, {0x02, 0x42, 0xac, 0x12, 0x00, 0x02}};
     effect_uuid_t randomUuid = {
             0x653730e1, 0x1be1, 0x438e, 0xa35a, {0xfc, 0x9b, 0xa1, 0x2a, 0x5e, 0xc9}};
+    effect_uuid_t empty = EFFECT_UUID_INITIALIZER;
 
     effect_descriptor_t descriptor;
     EXPECT_EQ(NAME_NOT_FOUND, AudioEffect::getEffectDescriptor(&randomUuid, &randomType,
                                                                EFFECT_FLAG_TYPE_MASK, &descriptor));
-    uint32_t numEffects = 0;
 
-    // Enumerate all effects
-    EXPECT_EQ(NO_ERROR, AudioEffect::queryNumberEffects(&numEffects))
-            << "queryNumberEffects() failed";
-    EXPECT_GT(numEffects, 0) << "No effects available";
+    std::vector<effect_descriptor_t> descriptors;
+    listEffectsAvailable(descriptors);
 
-    effect_descriptor_t descriptors[numEffects];
-    for (auto i = 0; i < numEffects; i++) {
-        EXPECT_EQ(NO_ERROR, AudioEffect::queryEffect(i, &descriptors[i]))
-                << "queryEffect at index " << i << " failed";
-    }
-
-    for (auto i = 0; i < numEffects; i++) {
+    for (auto i = 0; i < descriptors.size(); i++) {
         EXPECT_EQ(NO_ERROR,
                   AudioEffect::getEffectDescriptor(&descriptors[i].uuid, &descriptors[i].type,
                                                    EFFECT_FLAG_TYPE_MASK, &descriptor));
         EXPECT_EQ(0, memcmp(&descriptor, &descriptors[i], sizeof(effect_uuid_t)));
     }
+    // negative tests
+    if (descriptors.size() > 0) {
+        EXPECT_EQ(BAD_VALUE,
+                  AudioEffect::getEffectDescriptor(&descriptors[0].uuid, &descriptors[0].type,
+                                                   EFFECT_FLAG_TYPE_MASK, nullptr));
+    }
+    EXPECT_EQ(BAD_VALUE, AudioEffect::getEffectDescriptor(nullptr, nullptr,
+                                                          EFFECT_FLAG_TYPE_PRE_PROC, &descriptor));
+    EXPECT_EQ(BAD_VALUE, AudioEffect::getEffectDescriptor(&empty, &randomType,
+                                                          EFFECT_FLAG_TYPE_MASK, nullptr));
+    EXPECT_EQ(BAD_VALUE, AudioEffect::getEffectDescriptor(nullptr, &randomType,
+                                                          EFFECT_FLAG_TYPE_POST_PROC, &descriptor));
+    EXPECT_EQ(BAD_VALUE, AudioEffect::getEffectDescriptor(&randomUuid, nullptr,
+                                                          EFFECT_FLAG_TYPE_INSERT, &descriptor));
 }
 
 TEST(AudioEffectTest, DISABLED_GetSetParameterForEffect) {
@@ -154,37 +187,29 @@ TEST(AudioEffectTest, DISABLED_GetSetParameterForEffect) {
 }
 
 TEST(AudioEffectTest, ManageSourceDefaultEffects) {
-    uint32_t numEffects = 0;
     int32_t selectedEffect = -1;
 
-    // Enumerate all effects
-    EXPECT_EQ(NO_ERROR, AudioEffect::queryNumberEffects(&numEffects))
-            << "queryNumberEffects() failed";
-    EXPECT_GT(numEffects, 0) << "No effects available";
-
-    effect_descriptor_t descriptor[numEffects];
-    for (auto i = 0; i < numEffects; i++) {
-        EXPECT_EQ(NO_ERROR, AudioEffect::queryEffect(i, &descriptor[i]))
-                << "queryEffect at index " << i << " failed";
-    }
     const uint32_t sampleRate = 44100;
     const audio_format_t format = AUDIO_FORMAT_PCM_16_BIT;
     const audio_channel_mask_t channelMask = AUDIO_CHANNEL_IN_STEREO;
     sp<AudioCapture> capture = nullptr;
-    for (auto i = 0; i < numEffects; i++) {
-        if ((descriptor[i].flags & EFFECT_FLAG_TYPE_MASK) == EFFECT_FLAG_TYPE_PRE_PROC) {
+
+    std::vector<effect_descriptor_t> descriptors;
+    listEffectsAvailable(descriptors);
+    for (auto i = 0; i < descriptors.size(); i++) {
+        if (isPreprocessing(descriptors[i])) {
             capture = new AudioCapture(AUDIO_SOURCE_MIC, sampleRate, format, channelMask);
             ASSERT_NE(capture, nullptr) << "Unable to create Record Application";
             EXPECT_EQ(NO_ERROR, capture->create());
             EXPECT_EQ(NO_ERROR, capture->start());
-            if (!isEffectDefaultOnRecord(&descriptor[i].type, capture->getAudioRecordHandle())) {
+            if (!isEffectDefaultOnRecord(&descriptors[i].type, capture->getAudioRecordHandle())) {
                 selectedEffect = i;
                 break;
             }
         }
     }
-    ASSERT_NE(selectedEffect, -1) << "expected at least one preprocessing effect";
-    effect_uuid_t selectedEffectType = descriptor[selectedEffect].type;
+    if (selectedEffect == -1) GTEST_SKIP() << " expected at least one preprocessing effect";
+    effect_uuid_t selectedEffectType = descriptors[selectedEffect].type;
 
     char type[512];
     AudioEffect::guidToString(&selectedEffectType, type, sizeof(type));
@@ -235,27 +260,18 @@ TEST(AudioEffectTest, ManageSourceDefaultEffects) {
 }
 
 TEST(AudioEffectTest, ManageStreamDefaultEffects) {
-    uint32_t numEffects = 0;
     int32_t selectedEffect = -1;
 
-    // Enumerate all effects
-    EXPECT_EQ(NO_ERROR, AudioEffect::queryNumberEffects(&numEffects))
-            << "queryNumberEffects failed";
-    EXPECT_GT(numEffects, 0) << "No effects available";
-
-    effect_descriptor_t descriptor[numEffects];
-    for (auto i = 0; i < numEffects; i++) {
-        EXPECT_EQ(NO_ERROR, AudioEffect::queryEffect(i, &descriptor[i]))
-                << "queryEffect at index " << i << " failed";
-    }
-    for (auto i = 0; i < numEffects; i++) {
-        if ((descriptor[i].flags & EFFECT_FLAG_TYPE_MASK) == EFFECT_FLAG_TYPE_AUXILIARY) {
+    std::vector<effect_descriptor_t> descriptors;
+    listEffectsAvailable(descriptors);
+    for (auto i = 0; i < descriptors.size(); i++) {
+        if (isAux(descriptors[i])) {
             selectedEffect = i;
             break;
         }
     }
-    ASSERT_NE(selectedEffect, -1) << "expected at least one Aux effect";
-    effect_uuid_t* selectedEffectType = &descriptor[selectedEffect].type;
+    if (selectedEffect == -1) GTEST_SKIP() << " expected at least one Aux effect";
+    effect_uuid_t* selectedEffectType = &descriptors[selectedEffect].type;
 
     char type[512];
     AudioEffect::guidToString(selectedEffectType, type, sizeof(type));
@@ -289,11 +305,15 @@ TEST(AudioEffectTest, ManageStreamDefaultEffects) {
     ASSERT_NE(nullptr, playback);
     ASSERT_EQ(NO_ERROR, playback->loadResource("/data/local/tmp/bbb_2ch_24kHz_s16le.raw"));
     EXPECT_EQ(NO_ERROR, playback->create());
+    float level = 0.2f, levelGot;
+    playback->getAudioTrackHandle()->setAuxEffectSendLevel(level);
     EXPECT_EQ(NO_ERROR, playback->start());
     EXPECT_TRUE(isEffectExistsOnAudioSession(selectedEffectType, kDefaultOutputEffectPriority - 1,
                                              playback->getAudioTrackHandle()->getSessionId()))
             << "Effect should have been added. " << type;
     EXPECT_EQ(NO_ERROR, playback->waitForConsumption());
+    playback->getAudioTrackHandle()->getAuxEffectSendLevel(&levelGot);
+    EXPECT_EQ(level, levelGot);
     playback->stop();
     playback.reset();
 
