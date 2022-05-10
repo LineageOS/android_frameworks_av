@@ -11,17 +11,7 @@
                      channelMasks="AUDIO_CHANNEL_OUT_STEREO"/>
         </mixPort>
         <!-- Le Audio Audio Ports -->
-        <mixPort name="le audio output" role="source">
-            <profile name="" format="AUDIO_FORMAT_PCM_16_BIT"
-                     samplingRates="8000 16000 24000 32000 44100 48000"
-                     channelMasks="AUDIO_CHANNEL_OUT_MONO AUDIO_CHANNEL_OUT_STEREO"/>
-            <profile name="" format="AUDIO_FORMAT_PCM_24_BIT_PACKED"
-                     samplingRates="8000 16000 24000 32000 44100 48000"
-                     channelMasks="AUDIO_CHANNEL_OUT_MONO AUDIO_CHANNEL_OUT_STEREO"/>
-            <profile name="" format="AUDIO_FORMAT_PCM_32_BIT"
-                     samplingRates="8000 16000 24000 32000 44100 48000"
-                     channelMasks="AUDIO_CHANNEL_OUT_MONO AUDIO_CHANNEL_OUT_STEREO"/>
-        </mixPort>
+        <mixPort name="le audio output" role="source" />
         <mixPort name="le audio input" role="sink">
             <profile name="" format="AUDIO_FORMAT_PCM_16_BIT"
                      samplingRates="8000 16000 24000 32000 44100 48000"
