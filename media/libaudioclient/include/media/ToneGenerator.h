@@ -287,11 +287,10 @@ private:
     static const ToneDescriptor sToneDescriptors[];
 
     bool mThreadCanCallJava;
-    unsigned int mTotalSmp;  // Total number of audio samples played (gives current time)
+    uint64_t mTotalSmp;  // Total number of audio samples played (gives current time)
+    // Since these types are 32 bit, we may have issues with aborting on
+    // overflow now that we have integer overflow sanitization enabled globally.
     unsigned int mNextSegSmp;  // Position of next segment transition expressed in samples
-    // NOTE: because mTotalSmp, mNextSegSmp are stored on 32 bit, current design will operate properly
-    // only if tone duration is less than about 27 Hours(@44100Hz sampling rate). If this time is exceeded,
-    // no crash will occur but tone sequence will show a glitch.
     unsigned int mMaxSmp;  // Maximum number of audio samples played (maximun tone duration)
     int mDurationMs;  // Maximum tone duration in ms
 
