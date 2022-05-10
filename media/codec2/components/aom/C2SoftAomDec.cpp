@@ -585,10 +585,9 @@ bool C2SoftAomDec::outputBuffer(
         const uint16_t *srcV = (const uint16_t *)img->planes[AOM_PLANE_V];
 
         if (format == HAL_PIXEL_FORMAT_RGBA_1010102) {
-            convertYUV420Planar16ToY410((uint32_t *)dstY, srcY, srcU, srcV, srcYStride / 2,
-                                    srcUStride / 2, srcVStride / 2,
-                                    dstYStride / sizeof(uint32_t),
-                                    mWidth, mHeight);
+            convertYUV420Planar16ToY410OrRGBA1010102(
+                    (uint32_t *)dstY, srcY, srcU, srcV, srcYStride / 2, srcUStride / 2,
+                    srcVStride / 2, dstYStride / sizeof(uint32_t), mWidth, mHeight);
         } else {
             convertYUV420Planar16ToYV12(dstY, dstU, dstV, srcY, srcU, srcV, srcYStride / 2,
                                         srcUStride / 2, srcVStride / 2, dstYStride, dstUVStride,
