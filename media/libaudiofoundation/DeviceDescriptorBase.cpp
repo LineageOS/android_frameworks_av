@@ -126,7 +126,14 @@ void DeviceDescriptorBase::dump(std::string *dst, int spaces,
                     "%*sEncapsulation modes: %u, metadata types: %u\n", spaces, "",
                     mEncapsulationModes, mEncapsulationMetadataTypes));
 
-    AudioPort::dump(dst, spaces, nullptr, verbose);
+    std::string portStr;
+    AudioPort::dump(&portStr, spaces, nullptr, verbose);
+    if (!portStr.empty()) {
+        if (!mName.empty()) {
+            dst->append(base::StringPrintf("%*s", spaces, ""));
+        }
+        dst->append(portStr);
+    }
 }
 
 std::string DeviceDescriptorBase::toString(bool includeSensitiveInfo) const
