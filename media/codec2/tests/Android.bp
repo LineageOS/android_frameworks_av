@@ -39,6 +39,8 @@ cc_test {
 cc_test {
     name: "codec2_vndk_test",
     test_suites: ["device-tests"],
+    // This test doesn't seem to support isolated with current assumption
+    isolated: false,
 
     srcs: [
         "C2_test.cpp",
