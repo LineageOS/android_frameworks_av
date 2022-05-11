@@ -714,9 +714,9 @@ bool C2SoftGav1Dec::outputBuffer(const std::shared_ptr<C2BlockPool> &pool,
     const uint16_t *srcV = (const uint16_t *)buffer->plane[2];
 
     if (format == HAL_PIXEL_FORMAT_RGBA_1010102) {
-        convertYUV420Planar16ToY410((uint32_t *)dstY, srcY, srcU, srcV, srcYStride / 2,
-                                    srcUStride / 2, srcVStride / 2, dstYStride / sizeof(uint32_t),
-                                    mWidth, mHeight);
+        convertYUV420Planar16ToY410OrRGBA1010102((uint32_t *)dstY, srcY, srcU, srcV, srcYStride / 2,
+                                                 srcUStride / 2, srcVStride / 2,
+                                                 dstYStride / sizeof(uint32_t), mWidth, mHeight);
     } else if (format == HAL_PIXEL_FORMAT_YCBCR_P010) {
         convertYUV420Planar16ToP010((uint16_t *)dstY, (uint16_t *)dstU, srcY, srcU, srcV,
                                     srcYStride / 2, srcUStride / 2, srcVStride / 2, dstYStride / 2,
