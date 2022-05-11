@@ -377,8 +377,8 @@ status_t Camera3OutputStream::returnBufferCheckedLocked(
         }
 
         if (mPreviewFrameSpacer != nullptr) {
-            res = mPreviewFrameSpacer->queuePreviewBuffer(timestamp - mTimestampOffset, transform,
-                    anwBuffer, anwReleaseFence);
+            res = mPreviewFrameSpacer->queuePreviewBuffer(timestamp - mTimestampOffset,
+                    readoutTimestamp - mTimestampOffset, transform, anwBuffer, anwReleaseFence);
             if (res != OK) {
                 ALOGE("%s: Stream %d: Error queuing buffer to preview buffer spacer: %s (%d)",
                         __FUNCTION__, mId, strerror(-res), res);
@@ -597,12 +597,15 @@ status_t Camera3OutputStream::configureConsumerQueueLocked(bool allowPreviewResp
         bool forceChoreographer = (timestampBase ==
                 OutputConfiguration::TIMESTAMP_BASE_CHOREOGRAPHER_SYNCED);
         bool defaultToChoreographer = (isDefaultTimeBase &&
-                isConsumedByHWComposer() &&
-                !property_get_bool("camera.disable_preview_scheduler", false));
+                isConsumedByHWComposer());
+        bool defaultToSpacer = (isDefaultTimeBase &&
+                isConsumedByHWTexture() &&
+                !isConsumedByCPU() &&
+                !isVideoStream());
         if (forceChoreographer || defaultToChoreographer) {
             mSyncToDisplay = true;
             mTotalBufferCount += kDisplaySyncExtraBuffer;
-        } else if (isConsumedByHWTexture() && !isVideoStream()) {
+        } else if (defaultToSpacer) {
             mPreviewFrameSpacer = new PreviewFrameSpacer(*this, mConsumer);
             mTotalBufferCount ++;
             res = mPreviewFrameSpacer->run(String8::format("PreviewSpacer-%d", mId).string());
@@ -1175,6 +1178,17 @@ bool Camera3OutputStream::isConsumedByHWTexture() const {
     }
 
     return (usage & GRALLOC_USAGE_HW_TEXTURE) != 0;
+}
+
+bool Camera3OutputStream::isConsumedByCPU() const {
+    uint64_t usage = 0;
+    status_t res = getEndpointUsage(&usage);
+    if (res != OK) {
+        ALOGE("%s: getting end point usage failed: %s (%d).", __FUNCTION__, strerror(-res), res);
+        return false;
+    }
+
+    return (usage & GRALLOC_USAGE_SW_READ_MASK) != 0;
 }
 
 void Camera3OutputStream::dumpImageToDisk(nsecs_t timestamp,
