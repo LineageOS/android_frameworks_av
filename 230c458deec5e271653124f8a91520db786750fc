@@ -16,6 +16,23 @@
       "message": "Cherry pick for some devices also in Lineage-19.1",
       "revId": "230c458deec5e271653124f8a91520db786750fc",
       "serverId": "1ec6b3db-b2c1-4fa4-84a2-4c7efe89ba71"
+    },
+    {
+      "unresolved": false,
+      "key": {
+        "uuid": "7a6972c0_4f5b5e8d",
+        "filename": "/PATCHSET_LEVEL",
+        "patchSetId": 1
+      },
+      "lineNbr": 0,
+      "author": {
+        "id": 28837
+      },
+      "writtenOn": "2022-05-11T14:53:46Z",
+      "side": 1,
+      "message": "Tested on Surya, seems to be working",
+      "revId": "230c458deec5e271653124f8a91520db786750fc",
+      "serverId": "1ec6b3db-b2c1-4fa4-84a2-4c7efe89ba71"
     }
   ]
 }
