@@ -1093,21 +1093,14 @@ private:
          * @param attr audio attributes describing the playback use case
          * @param config audio configuration describing the audio format, channels, sample rate...
          * @param devices the sink audio device selected for playback
-         * @param allowCurrentOutputReconfig if true, the result will be considering it is possible
-         *      to close and reopen an existing spatializer output stream to match the requested
-         *      criteria. If false, the criteria must be compatible with the opened sptializer
-         *      output.
          * @return true if spatialization is possible for this context, false otherwise.
          */
         virtual bool canBeSpatializedInt(const audio_attributes_t *attr,
                                       const audio_config_t *config,
-                                      const AudioDeviceTypeAddrVector &devices,
-                                      bool allowCurrentOutputReconfig = true) const;
+                                      const AudioDeviceTypeAddrVector &devices) const;
 
         sp<IOProfile> getSpatializerOutputProfile(const audio_config_t *config,
                                                   const AudioDeviceTypeAddrVector &devices) const;
-
-        static bool isChannelMaskSpatialized(audio_channel_mask_t channels);
 
         void checkVirtualizerClientRoutes();
 
