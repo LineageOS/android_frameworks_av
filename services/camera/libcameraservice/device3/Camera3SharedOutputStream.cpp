@@ -32,15 +32,15 @@ Camera3SharedOutputStream::Camera3SharedOutputStream(int id,
         uint64_t consumerUsage, android_dataspace dataSpace,
         camera_stream_rotation_t rotation,
         nsecs_t timestampOffset, const String8& physicalCameraId,
-        const std::unordered_set<int32_t> &sensorPixelModesUsed,
+        const std::unordered_set<int32_t> &sensorPixelModesUsed, IPCTransport transport,
         int setId, bool useHalBufManager, int64_t dynamicProfile,
         int64_t streamUseCase, bool deviceTimeBaseIsRealtime, int timestampBase,
         int mirrorMode) :
         Camera3OutputStream(id, CAMERA_STREAM_OUTPUT, width, height,
                             format, dataSpace, rotation, physicalCameraId, sensorPixelModesUsed,
-                            consumerUsage, timestampOffset, setId, /*isMultiResolution*/false,
-                            dynamicProfile, streamUseCase, deviceTimeBaseIsRealtime, timestampBase,
-                            mirrorMode),
+                            transport, consumerUsage, timestampOffset, setId,
+                            /*isMultiResolution*/false, dynamicProfile, streamUseCase,
+                            deviceTimeBaseIsRealtime, timestampBase, mirrorMode),
         mUseHalBufManager(useHalBufManager) {
     size_t consumerCount = std::min(surfaces.size(), kMaxOutputs);
     if (surfaces.size() > consumerCount) {

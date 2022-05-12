@@ -84,7 +84,7 @@ class AidlCamera3Device :
                 std::shared_ptr<AidlRequestMetadataQueue> queue,
                 bool useHalBufManager, bool supportOfflineProcessing);
 
-        virtual IPCTransport getTransportType() {return IPCTransport::AIDL; }
+        virtual IPCTransport getTransportType() const override {return IPCTransport::AIDL; }
 
 
         // Returns true if constructed with a valid device or session, and not yet cleared
