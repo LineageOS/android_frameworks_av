@@ -6316,9 +6316,13 @@ AudioFlinger::PlaybackThread::mixer_state AudioFlinger::DirectOutputThread::prep
                     track->isStopping_2() || track->isPaused()) {
                 // We have consumed all the buffers of this track.
                 // Remove it from the list of active tracks.
+                bool presComplete = false;
                 if (mStandby || !last ||
-                        track->presentationComplete(latency_l()) ||
+                        (presComplete = track->presentationComplete(latency_l())) ||
                         track->isPaused() || mHwPaused) {
+                    if (presComplete) {
+                        mOutput->presentationComplete();
+                    }
                     if (track->isStopping_2()) {
                         track->mState = TrackBase::STOPPED;
                     }
@@ -6897,7 +6901,8 @@ AudioFlinger::PlaybackThread::mixer_state AudioFlinger::OffloadThread::prepareTr
                 // Drain has completed or we are in standby, signal presentation complete
                 if (!(mDrainSequence & 1) || !last || mStandby) {
                     track->mState = TrackBase::STOPPED;
-                    track->presentationComplete(latency_l());
+                    mOutput->presentationComplete();
+                    track->presentationComplete(latency_l()); // always returns true
                     track->reset();
                     tracksToRemove->add(track);
                     // OFFLOADED stop resets frame counts.
