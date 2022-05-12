@@ -400,10 +400,10 @@ void CCodecConfig::initializeStandardParams() {
     // Rotation
     // Note: SDK rotation is clock-wise, while C2 rotation is counter-clock-wise
     add(ConfigMapper(KEY_ROTATION, C2_PARAMKEY_VUI_ROTATION, "value")
-        .limitTo(D::VIDEO & D::CODED)
+        .limitTo((D::VIDEO | D::IMAGE) & D::CODED)
         .withMappers(negate, negate));
     add(ConfigMapper(KEY_ROTATION, C2_PARAMKEY_ROTATION, "value")
-        .limitTo(D::VIDEO & D::RAW)
+        .limitTo((D::VIDEO | D::IMAGE) & D::RAW)
         .withMappers(negate, negate));
 
     // android 'video-scaling'
