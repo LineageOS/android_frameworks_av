@@ -342,12 +342,7 @@ Status Spatializer::getSupportedHeadTrackingModes(
 
     modes->push_back(SpatializerHeadTrackingMode::DISABLED);
     if (mSupportsHeadTracking) {
-        if (mHeadSensor != SpatializerPoseController::INVALID_SENSOR) {
-            modes->push_back(SpatializerHeadTrackingMode::RELATIVE_WORLD);
-            if (mScreenSensor != SpatializerPoseController::INVALID_SENSOR) {
-                modes->push_back(SpatializerHeadTrackingMode::RELATIVE_SCREEN);
-            }
-        }
+        modes->push_back(SpatializerHeadTrackingMode::RELATIVE_WORLD);
     }
     return Status::ok();
 }
