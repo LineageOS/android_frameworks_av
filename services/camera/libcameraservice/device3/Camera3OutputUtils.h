@@ -26,8 +26,6 @@
 
 #include <common/CameraDeviceBase.h>
 
-#include <android/hardware/camera/device/3.8/ICameraDeviceCallback.h>
-
 #include "device3/BufferUtils.h"
 #include "device3/DistortionMapper.h"
 #include "device3/ZoomRatioMapper.h"

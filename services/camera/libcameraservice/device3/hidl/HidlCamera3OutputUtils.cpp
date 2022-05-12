@@ -63,29 +63,7 @@ void processOneCaptureResultLocked(
 }
 
 void notify(CaptureOutputStates& states,
-        const hardware::camera::device::V3_8::NotifyMsg& msg) {
-    using android::hardware::camera::device::V3_2::MsgType;
-
-    hardware::camera::device::V3_2::NotifyMsg msg_3_2;
-    msg_3_2.type = msg.type;
-    bool hasReadoutTime = false;
-    uint64_t readoutTime = 0;
-    switch (msg.type) {
-        case MsgType::ERROR:
-            msg_3_2.msg.error = msg.msg.error;
-            break;
-        case MsgType::SHUTTER:
-            msg_3_2.msg.shutter = msg.msg.shutter.v3_2;
-            hasReadoutTime = true;
-            readoutTime = msg.msg.shutter.readoutTimestamp;
-            break;
-    }
-    notify(states, msg_3_2, hasReadoutTime, readoutTime);
-}
-
-void notify(CaptureOutputStates& states,
-        const hardware::camera::device::V3_2::NotifyMsg& msg,
-        bool hasReadoutTime, uint64_t readoutTime) {
+        const hardware::camera::device::V3_2::NotifyMsg& msg) {
 
     using android::hardware::camera::device::V3_2::MsgType;
     using android::hardware::camera::device::V3_2::ErrorCode;
@@ -127,8 +105,7 @@ void notify(CaptureOutputStates& states,
             m.type = CAMERA_MSG_SHUTTER;
             m.message.shutter.frame_number = msg.msg.shutter.frameNumber;
             m.message.shutter.timestamp = msg.msg.shutter.timestamp;
-            m.message.shutter.readout_timestamp = hasReadoutTime ?
-                    readoutTime : m.message.shutter.timestamp;
+            m.message.shutter.readout_timestamp = 0LL;
             break;
     }
     notify(states, &m);
