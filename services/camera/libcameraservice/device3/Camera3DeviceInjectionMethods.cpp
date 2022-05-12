@@ -26,8 +26,6 @@
 
 namespace android {
 
-using hardware::camera::device::V3_2::ICameraDeviceSession;
-
 Camera3Device::Camera3DeviceInjectionMethods::Camera3DeviceInjectionMethods(
         wp<Camera3Device> parent)
         : mParent(parent) {

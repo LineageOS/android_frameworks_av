@@ -1485,8 +1485,11 @@ size_t ToneGenerator::onMoreData(const AudioTrack::Buffer& buffer) {
             }
 
             // Update next segment transition position. No harm to do it also for last segment as
-            // mNextSegSmp won't be used any more
-            mNextSegSmp += (mpToneDesc->segments[mCurSegment].duration * mSamplingRate) / 1000;
+            // mNextSegSmp won't be used any more.
+            // Handle 32 bit wraparound gracefully.
+            const uint64_t res = static_cast<uint64_t>(mNextSegSmp) +
+                    (mpToneDesc->segments[mCurSegment].duration * mSamplingRate) / 1000;
+            mNextSegSmp = static_cast<uint32_t>(std::min<uint64_t>(TONEGEN_INF, res));
 
         } else {
             // Inside a segment keep tone ON or OFF
