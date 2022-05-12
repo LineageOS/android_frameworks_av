@@ -1504,8 +1504,7 @@ audio_io_handle_t AudioPolicyManager::getOutputForDevices(
 
     *isSpatialized = false;
     if (mSpatializerOutput != nullptr
-            && canBeSpatializedInt(attr, config,
-                    devices.toTypeAddrVector(), false /* allowCurrentOutputReconfig */)) {
+            && canBeSpatializedInt(attr, config, devices.toTypeAddrVector())) {
         *isSpatialized = true;
         return mSpatializerOutput->mIoHandle;
     }
@@ -5337,25 +5336,9 @@ sp<SourceClientDescriptor> AudioPolicyManager::getSourceForAttributesOnOutput(
     return source;
 }
 
-/* static */
-bool AudioPolicyManager::isChannelMaskSpatialized(audio_channel_mask_t channels) {
-    switch (channels) {
-        case AUDIO_CHANNEL_OUT_5POINT1:
-        case AUDIO_CHANNEL_OUT_5POINT1POINT2:
-        case AUDIO_CHANNEL_OUT_5POINT1POINT4:
-        case AUDIO_CHANNEL_OUT_7POINT1:
-        case AUDIO_CHANNEL_OUT_7POINT1POINT2:
-        case AUDIO_CHANNEL_OUT_7POINT1POINT4:
-            return true;
-        default:
-            return false;
-    }
-}
-
 bool AudioPolicyManager::canBeSpatializedInt(const audio_attributes_t *attr,
                                       const audio_config_t *config,
-                                      const AudioDeviceTypeAddrVector &devices,
-                                      bool allowCurrentOutputReconfig)  const
+                                      const AudioDeviceTypeAddrVector &devices)  const
 {
     // The caller can have the audio attributes criteria ignored by either passing a null ptr or
     // the AUDIO_ATTRIBUTES_INITIALIZER value.
@@ -5384,19 +5367,10 @@ bool AudioPolicyManager::canBeSpatializedInt(const audio_attributes_t *attr,
     // the AUDIO_CONFIG_INITIALIZER value.
     // If an audio config is specified, current policy is to only allow spatialization for
     // some positional channel masks.
-    // If the spatializer output is already opened, only channel masks included in the
-    // spatializer output mixer channel mask are allowed.
 
     if (config != nullptr && *config != AUDIO_CONFIG_INITIALIZER) {
-        if (!isChannelMaskSpatialized(config->channel_mask)) {
+        if (!audio_is_channel_mask_spatialized(config->channel_mask)) {
             return false;
-        }
-        if (!allowCurrentOutputReconfig && mSpatializerOutput != nullptr
-                && mSpatializerOutput->mProfile == profile) {
-            if ((config->channel_mask & mSpatializerOutput->mMixerChannelMask)
-                    != config->channel_mask) {
-                return false;
-            }
         }
     }
     return true;
@@ -5413,8 +5387,7 @@ void AudioPolicyManager::checkVirtualizerClientRoutes() {
             audio_config_base_t clientConfig = client->config();
             audio_config_t config = audio_config_initializer(&clientConfig);
             if (desc != mSpatializerOutput
-                    && canBeSpatializedInt(&attr, &config,
-                            devicesTypeAddress, false /* allowCurrentOutputReconfig */)) {
+                    && canBeSpatializedInt(&attr, &config, devicesTypeAddress)) {
                 streamsToInvalidate.insert(client->stream());
             }
         }
@@ -5461,8 +5434,7 @@ status_t AudioPolicyManager::getSpatializerOutput(const audio_config_base_t *mix
         config = audio_config_initializer(mixerConfig);
         configPtr = &config;
     }
-    if (!canBeSpatializedInt(
-            attr, configPtr, devicesTypeAddress)) {
+    if (!canBeSpatializedInt(attr, configPtr, devicesTypeAddress)) {
         ALOGV("%s provided attributes or mixer config cannot be spatialized", __func__);
         return BAD_VALUE;
     }
