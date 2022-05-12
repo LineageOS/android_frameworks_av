@@ -35,6 +35,7 @@
 #include "device3/StatusTracker.h"
 #include "binder/Status.h"
 #include "FrameProducer.h"
+#include "utils/IPCTransport.h"
 
 #include "CameraOfflineSessionBase.h"
 
@@ -59,6 +60,9 @@ typedef enum camera_stream_configuration_mode {
     CAMERA_VENDOR_STREAM_CONFIGURATION_MODE_START = 0x8000
 } camera_stream_configuration_mode_t;
 
+// Matches definition of camera3_jpeg_blob in camera3.h and HIDL definition
+// device@3.2:types.hal, needs to stay around till HIDL support is removed (for
+// HIDL -> AIDL cameraBlob translation)
 typedef struct camera_jpeg_blob {
     uint16_t jpeg_blob_id;
     uint32_t jpeg_size;
@@ -87,6 +91,8 @@ typedef std::unordered_map<int, std::vector<size_t> > SurfaceMap;
 class CameraDeviceBase : public virtual FrameProducer {
   public:
     virtual ~CameraDeviceBase();
+
+    virtual IPCTransport getTransportType() const = 0;
 
     /**
      * The device vendor tag ID

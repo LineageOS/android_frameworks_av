@@ -52,7 +52,7 @@
 
 #include "device3/hidl/HidlCamera3OutputUtils.h"
 #include "device3/hidl/HidlCamera3OfflineSession.h"
-#include "utils/SessionConfigurationUtils.h"
+#include "utils/SessionConfigurationUtilsHidl.h"
 #include "utils/TraceHFR.h"
 
 #include "../../common/hidl/HidlProviderInfo.h"
