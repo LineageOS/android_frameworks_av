@@ -28,6 +28,7 @@
 #include <android/hardware/camera/device/3.8/ICameraDeviceSession.h>
 
 #include <device3/Camera3StreamInterface.h>
+#include <utils/IPCTransport.h>
 
 #include <set>
 #include <stdint.h>
@@ -101,10 +102,6 @@ binder::Status createSurfaceFromGbp(
         const std::vector<int32_t> &sensorPixelModesUsed,  int64_t dynamicRangeProfile,
         int64_t streamUseCase, int timestampBase, int mirrorMode);
 
-void mapStreamInfo(const camera3::OutputStreamInfo &streamInfo,
-        camera3::camera_stream_rotation_t rotation, String8 physicalId, int32_t groupId,
-        hardware::camera::device::V3_8::Stream *stream /*out*/);
-
 //check if format is 10-bit output compatible
 bool is10bitCompatibleFormat(int32_t format);
 
@@ -132,24 +129,6 @@ bool deferredConsumer, int surfaceType);
 binder::Status checkOperatingMode(int operatingMode,
 const CameraMetadata &staticInfo, const String8 &cameraId);
 
-// utility function to convert AIDL SessionConfiguration to HIDL
-// streamConfiguration. Also checks for validity of SessionConfiguration and
-// returns a non-ok binder::Status if the passed in session configuration
-// isn't valid.
-binder::Status
-convertToHALStreamCombination(const SessionConfiguration& sessionConfiguration,
-        const String8 &cameraId, const CameraMetadata &deviceInfo,
-        metadataGetter getMetadata, const std::vector<std::string> &physicalCameraIds,
-        hardware::camera::device::V3_8::StreamConfiguration &streamConfiguration,
-        bool overrideForPerfClass, bool *earlyExit);
-
-// Utility function to convert a V3_8::StreamConfiguration to
-// V3_7::StreamConfiguration. Return false if the original V3_8 configuration cannot
-// be used by older version HAL.
-bool convertHALStreamCombinationFromV38ToV37(
-        hardware::camera::device::V3_7::StreamConfiguration &streamConfigV37,
-        const hardware::camera::device::V3_8::StreamConfiguration &streamConfigV38);
-
 binder::Status
 convertToHALStreamCombination(
     const SessionConfiguration& sessionConfiguration,
@@ -157,13 +136,6 @@ convertToHALStreamCombination(
     metadataGetter getMetadata, const std::vector<std::string> &physicalCameraIds,
     aidl::android::hardware::camera::device::StreamConfiguration &streamConfiguration,
     bool overrideForPerfClass, bool *earlyExit);
-
-// Utility function to convert a V3_7::StreamConfiguration to
-// V3_4::StreamConfiguration. Return false if the original V3_7 configuration cannot
-// be used by older version HAL.
-bool convertHALStreamCombinationFromV37ToV34(
-        hardware::camera::device::V3_4::StreamConfiguration &streamConfigV34,
-        const hardware::camera::device::V3_7::StreamConfiguration &streamConfigV37);
 
 StreamConfigurationPair getStreamConfigurationPair(const CameraMetadata &metadata);
 
