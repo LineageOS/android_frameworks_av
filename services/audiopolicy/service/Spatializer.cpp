@@ -214,21 +214,79 @@ status_t Spatializer::loadEngineConfiguration(sp<EffectHalInterface> effect) {
     status_t status = getHalParameter<false>(effect, SPATIALIZER_PARAM_HEADTRACKING_SUPPORTED,
                                          &supportsHeadTracking);
     if (status != NO_ERROR) {
+        ALOGW("%s: cannot get SPATIALIZER_PARAM_HEADTRACKING_SUPPORTED", __func__);
         return status;
     }
     mSupportsHeadTracking = supportsHeadTracking[0];
 
-    status = getHalParameter<true>(effect, SPATIALIZER_PARAM_SUPPORTED_LEVELS, &mLevels);
+    std::vector<media::SpatializationLevel> spatializationLevels;
+    status = getHalParameter<true>(effect, SPATIALIZER_PARAM_SUPPORTED_LEVELS,
+            &spatializationLevels);
     if (status != NO_ERROR) {
+        ALOGW("%s: cannot get SPATIALIZER_PARAM_SUPPORTED_LEVELS", __func__);
         return status;
     }
+    bool noneLevelFound = false;
+    bool activeLevelFound = false;
+    for (const auto spatializationLevel : spatializationLevels) {
+        if (!aidl_utils::isValidEnum(spatializationLevel)) {
+            ALOGW("%s: ignoring spatializationLevel:%d", __func__, (int)spatializationLevel);
+            continue;
+        }
+        if (spatializationLevel == media::SpatializationLevel::NONE) {
+            noneLevelFound = true;
+        } else {
+            activeLevelFound = true;
+        }
+        // we don't detect duplicates.
+        mLevels.emplace_back(spatializationLevel);
+    }
+    if (!noneLevelFound || !activeLevelFound) {
+        ALOGW("%s: SPATIALIZER_PARAM_SUPPORTED_LEVELS must include NONE"
+                " and another valid level",  __func__);
+        return BAD_VALUE;
+    }
+
+    std::vector<media::SpatializationMode> spatializationModes;
     status = getHalParameter<true>(effect, SPATIALIZER_PARAM_SUPPORTED_SPATIALIZATION_MODES,
-                                &mSpatializationModes);
+            &spatializationModes);
     if (status != NO_ERROR) {
+        ALOGW("%s: cannot get SPATIALIZER_PARAM_SUPPORTED_SPATIALIZATION_MODES", __func__);
         return status;
     }
-    return getHalParameter<true>(effect, SPATIALIZER_PARAM_SUPPORTED_CHANNEL_MASKS,
-                                 &mChannelMasks);
+    for (const auto spatializationMode : spatializationModes) {
+        if (!aidl_utils::isValidEnum(spatializationMode)) {
+            ALOGW("%s: ignoring spatializationMode:%d", __func__, (int)spatializationMode);
+            continue;
+        }
+        // we don't detect duplicates.
+        mSpatializationModes.emplace_back(spatializationMode);
+    }
+    if (mSpatializationModes.empty()) {
+        ALOGW("%s: SPATIALIZER_PARAM_SUPPORTED_SPATIALIZATION_MODES reports empty", __func__);
+        return BAD_VALUE;
+    }
+
+    std::vector<audio_channel_mask_t> channelMasks;
+    status = getHalParameter<true>(effect, SPATIALIZER_PARAM_SUPPORTED_CHANNEL_MASKS,
+                                 &channelMasks);
+    if (status != NO_ERROR) {
+        ALOGW("%s: cannot get SPATIALIZER_PARAM_SUPPORTED_CHANNEL_MASKS", __func__);
+        return status;
+    }
+    for (const auto channelMask : channelMasks) {
+        if (!audio_is_channel_mask_spatialized(channelMask)) {
+            ALOGW("%s: ignoring channelMask:%#x", __func__, channelMask);
+            continue;
+        }
+        // we don't detect duplicates.
+        mChannelMasks.emplace_back(channelMask);
+    }
+    if (mChannelMasks.empty()) {
+        ALOGW("%s: SPATIALIZER_PARAM_SUPPORTED_CHANNEL_MASKS reports empty", __func__);
+        return BAD_VALUE;
+    }
+    return NO_ERROR;
 }
 
 /** Gets the channel mask, sampling rate and format set for the spatializer input. */
@@ -238,8 +296,10 @@ audio_config_base_t Spatializer::getAudioInConfig() const {
     // For now use highest supported channel count
     uint32_t maxCount = 0;
     for ( auto mask : mChannelMasks) {
-        if (audio_channel_count_from_out_mask(mask) > maxCount) {
+        const size_t count = audio_channel_count_from_out_mask(mask);
+        if (count > maxCount) {
             config.channel_mask = mask;
+            maxCount = count;
         }
     }
     return config;
