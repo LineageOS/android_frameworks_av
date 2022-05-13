@@ -572,11 +572,13 @@ status_t AudioTrack::set(
     //  (b) we can support re-creation of offloaded tracks
     if (offloadInfo != NULL) {
         mOffloadInfoCopy = *offloadInfo;
-        mOffloadInfo = &mOffloadInfoCopy;
     } else {
-        mOffloadInfo = NULL;
         memset(&mOffloadInfoCopy, 0, sizeof(audio_offload_info_t));
         mOffloadInfoCopy = AUDIO_INFO_INITIALIZER;
+        mOffloadInfoCopy.format = format;
+        mOffloadInfoCopy.sample_rate = sampleRate;
+        mOffloadInfoCopy.channel_mask = channelMask;
+        mOffloadInfoCopy.stream_type = streamType;
     }
 
     mVolume[AUDIO_INTERLEAVE_LEFT] = 1.0f;
