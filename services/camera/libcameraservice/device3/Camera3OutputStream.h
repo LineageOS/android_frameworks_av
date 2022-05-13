@@ -23,6 +23,7 @@
 #include <gui/Surface.h>
 #include <gui/DisplayEventReceiver.h>
 
+#include "utils/IPCTransport.h"
 #include "utils/LatencyHistogram.h"
 #include "Camera3Stream.h"
 #include "Camera3IOStreamBase.h"
@@ -89,7 +90,7 @@ class Camera3OutputStream :
             uint32_t width, uint32_t height, int format,
             android_dataspace dataSpace, camera_stream_rotation_t rotation,
             nsecs_t timestampOffset, const String8& physicalCameraId,
-            const std::unordered_set<int32_t> &sensorPixelModesUsed,
+            const std::unordered_set<int32_t> &sensorPixelModesUsed, IPCTransport transport,
             int setId = CAMERA3_STREAM_SET_ID_INVALID, bool isMultiResolution = false,
             int64_t dynamicProfile = ANDROID_REQUEST_AVAILABLE_DYNAMIC_RANGE_PROFILES_MAP_STANDARD,
             int64_t streamUseCase = ANDROID_SCALER_AVAILABLE_STREAM_USE_CASES_DEFAULT,
@@ -106,7 +107,7 @@ class Camera3OutputStream :
             uint32_t width, uint32_t height, size_t maxSize, int format,
             android_dataspace dataSpace, camera_stream_rotation_t rotation,
             nsecs_t timestampOffset, const String8& physicalCameraId,
-            const std::unordered_set<int32_t> &sensorPixelModesUsed,
+            const std::unordered_set<int32_t> &sensorPixelModesUsed, IPCTransport transport,
             int setId = CAMERA3_STREAM_SET_ID_INVALID, bool isMultiResolution = false,
             int64_t dynamicProfile = ANDROID_REQUEST_AVAILABLE_DYNAMIC_RANGE_PROFILES_MAP_STANDARD,
             int64_t streamUseCase = ANDROID_SCALER_AVAILABLE_STREAM_USE_CASES_DEFAULT,
@@ -122,7 +123,7 @@ class Camera3OutputStream :
             uint64_t consumerUsage, android_dataspace dataSpace,
             camera_stream_rotation_t rotation, nsecs_t timestampOffset,
             const String8& physicalCameraId,
-            const std::unordered_set<int32_t> &sensorPixelModesUsed,
+            const std::unordered_set<int32_t> &sensorPixelModesUsed, IPCTransport transport,
             int setId = CAMERA3_STREAM_SET_ID_INVALID, bool isMultiResolution = false,
             int64_t dynamicProfile = ANDROID_REQUEST_AVAILABLE_DYNAMIC_RANGE_PROFILES_MAP_STANDARD,
             int64_t streamUseCase = ANDROID_SCALER_AVAILABLE_STREAM_USE_CASES_DEFAULT,
@@ -258,7 +259,7 @@ class Camera3OutputStream :
             uint32_t width, uint32_t height, int format,
             android_dataspace dataSpace, camera_stream_rotation_t rotation,
             const String8& physicalCameraId,
-            const std::unordered_set<int32_t> &sensorPixelModesUsed,
+            const std::unordered_set<int32_t> &sensorPixelModesUsed, IPCTransport transport,
             uint64_t consumerUsage = 0, nsecs_t timestampOffset = 0,
             int setId = CAMERA3_STREAM_SET_ID_INVALID, bool isMultiResolution = false,
             int64_t dynamicProfile = ANDROID_REQUEST_AVAILABLE_DYNAMIC_RANGE_PROFILES_MAP_STANDARD,
@@ -281,6 +282,7 @@ class Camera3OutputStream :
             sp<Fence> *releaseFenceOut);
 
     virtual status_t disconnectLocked();
+    status_t fixUpHidlJpegBlobHeader(ANativeWindowBuffer* anwBuffer, int fence);
 
     status_t getEndpointUsageForSurface(uint64_t *usage,
             const sp<Surface>& surface) const;
@@ -406,6 +408,7 @@ class Camera3OutputStream :
 
     static const int32_t kDequeueLatencyBinSize = 5; // in ms
     CameraLatencyHistogram mDequeueBufferLatency;
+    IPCTransport mIPCTransport = IPCTransport::INVALID;
 
     int mImageDumpMask = 0;
 
