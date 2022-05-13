@@ -130,6 +130,43 @@ class OutputStreamInfo {
             streamUseCase(_streamUseCase), timestampBase(_timestampBase), mirrorMode(_mirrorMode) {}
 };
 
+// Utility class to lock and unlock a GraphicBuffer
+class GraphicBufferLocker {
+public:
+    GraphicBufferLocker(sp<GraphicBuffer> buffer) : _buffer(buffer) {}
+
+    status_t lockAsync(uint32_t usage, void** dstBuffer, int fenceFd) {
+        if (_buffer == nullptr) return BAD_VALUE;
+
+        status_t res = OK;
+        if (!_locked) {
+            status_t res =  _buffer->lockAsync(usage, dstBuffer, fenceFd);
+            if (res == OK) {
+                _locked = true;
+            }
+        }
+        return res;
+    }
+
+    status_t lockAsync(void** dstBuffer, int fenceFd) {
+        return lockAsync(GRALLOC_USAGE_SW_WRITE_OFTEN, dstBuffer, fenceFd);
+    }
+
+    ~GraphicBufferLocker() {
+        if (_locked && _buffer != nullptr) {
+            auto res = _buffer->unlock();
+            if (res != OK) {
+                ALOGE("%s: Error trying to unlock buffer: %s (%d)", __FUNCTION__,
+                        strerror(-res), res);
+            }
+        }
+    }
+
+private:
+    sp<GraphicBuffer> _buffer;
+    bool _locked = false;
+};
+
 /**
  * An interface for managing a single stream of input and/or output data from
  * the camera device.
