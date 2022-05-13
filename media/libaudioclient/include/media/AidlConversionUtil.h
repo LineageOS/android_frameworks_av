@@ -20,6 +20,7 @@
 #include <type_traits>
 #include <utility>
 
+#include <binder/Enums.h>
 #include <binder/Status.h>
 #include <error/Result.h>
 
@@ -268,6 +269,15 @@ ConversionResult<UnionFieldType<T, tag>> unionGetField(const T& u) {
     (u).set<std::decay_t<decltype(u)>::Tag::field>(value)
 
 namespace aidl_utils {
+
+/**
+ * Return true if the value is valid for the AIDL enumeration.
+ */
+template <typename T>
+bool isValidEnum(T value) {
+    constexpr android::enum_range<T> er{};
+    return std::find(er.begin(), er.end(), value) != er.end();
+}
 
 /**
  * Return the equivalent Android status_t from a binder exception code.
