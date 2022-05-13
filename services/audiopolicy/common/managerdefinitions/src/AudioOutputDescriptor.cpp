@@ -571,12 +571,6 @@ status_t SwAudioOutputDescriptor::open(const audio_config_t *halConfig,
         lHalConfig.offload_info.channel_mask = lHalConfig.channel_mask;
         lHalConfig.offload_info.format = lHalConfig.format;
         lHalConfig.offload_info.stream_type = stream;
-        lHalConfig.offload_info.duration_us = -1;
-        lHalConfig.offload_info.has_video = true; // conservative
-        lHalConfig.offload_info.is_streaming = true; // likely
-        lHalConfig.offload_info.encapsulation_mode = lHalConfig.offload_info.encapsulation_mode;
-        lHalConfig.offload_info.content_id = lHalConfig.offload_info.content_id;
-        lHalConfig.offload_info.sync_id = lHalConfig.offload_info.sync_id;
     }
 
     audio_config_base_t lMixerConfig;
