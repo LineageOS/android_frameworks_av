@@ -89,9 +89,10 @@ void Camera3IOStreamBase::dump(int fd, const Vector<String16> &args) const {
     if (strlen(camera_stream::physical_camera_id) > 0) {
         lines.appendFormat("      Physical camera id: %s\n", camera_stream::physical_camera_id);
     }
-    lines.appendFormat("      Dynamic Range Profile: 0x%" PRIx64,
+    lines.appendFormat("      Dynamic Range Profile: 0x%" PRIx64 "\n",
             camera_stream::dynamic_range_profile);
     lines.appendFormat("      Stream use case: %" PRId64 "\n", camera_stream::use_case);
+    lines.appendFormat("      Timestamp base: %d\n", getTimestampBase());
     lines.appendFormat("      Frames produced: %d, last timestamp: %" PRId64 " ns\n",
             mFrameCount, mLastTimestamp);
     lines.appendFormat("      Total buffers: %zu, currently dequeued: %zu\n",
