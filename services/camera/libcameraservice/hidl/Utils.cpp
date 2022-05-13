@@ -14,7 +14,8 @@
  * limitations under the License.
  */
 
-#include <hidl/Convert.h>
+#include <hidl/Utils.h>
+#include <hidl/VndkVersionMetadataTags.h>
 #include <gui/bufferqueue/1.0/H2BGraphicBufferProducer.h>
 #include <cutils/native_handle.h>
 #include <mediautils/AImageReaderUtils.h>
@@ -295,6 +296,31 @@ hidl_vec<HPhysicalCaptureResultInfo> convertToHidl(
                                                          captureResultMetadataQueue);
     }
     return hPhysicalCaptureResultInfos;
+}
+
+status_t filterVndkKeys(int vndkVersion, CameraMetadata &metadata, bool isStatic) {
+    if (vndkVersion == __ANDROID_API_FUTURE__) {
+        // VNDK version in ro.vndk.version is a version code-name that
+        // corresponds to the current version.
+        return OK;
+    }
+    const auto &apiLevelToKeys =
+            isStatic ? static_api_level_to_keys : dynamic_api_level_to_keys;
+    // Find the vndk versions above the given vndk version. All the vndk
+    // versions above the given one, need to have their keys filtered from the
+    // metadata in order to avoid metadata invalidation.
+    auto it = apiLevelToKeys.upper_bound(vndkVersion);
+    while (it != apiLevelToKeys.end()) {
+        for (const auto &key : it->second) {
+            status_t res = metadata.erase(key);
+            if (res != OK) {
+                ALOGE("%s metadata key %d could not be erased", __FUNCTION__, key);
+                return res;
+            }
+        }
+        it++;
+    }
+    return OK;
 }
 
 } //conversion
