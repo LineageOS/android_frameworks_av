@@ -169,7 +169,7 @@ bool getBufferQueueAssignment(const C2ConstGraphicBlock& block,
 } // unnamed namespace
 
 OutputBufferQueue::OutputBufferQueue()
-      : mGeneration{0}, mBqId{0} {
+      : mGeneration{0}, mBqId{0}, mStopped{false} {
 }
 
 OutputBufferQueue::~OutputBufferQueue() {
@@ -219,6 +219,8 @@ bool OutputBufferQueue::configure(const sp<IGraphicBufferProducer>& igbp,
             poolDatas[BufferQueueDefs::NUM_BUFFER_SLOTS];
     {
         std::scoped_lock<std::mutex> l(mMutex);
+        bool stopped = mStopped;
+        mStopped = false;
         if (generation == mGeneration) {
             // case of old BlockPool destruction
             C2SyncVariables *var = mSyncMem ? mSyncMem->mem() : nullptr;
@@ -258,7 +260,7 @@ bool OutputBufferQueue::configure(const sp<IGraphicBufferProducer>& igbp,
             return false;
         }
         for (int i = 0; i < BufferQueueDefs::NUM_BUFFER_SLOTS; ++i) {
-            if (mBqId == 0 || !mBuffers[i]) {
+            if (mBqId == 0 || !mBuffers[i] || stopped) {
                 continue;
             }
             std::shared_ptr<_C2BlockPoolData> data = mPoolDatas[i].lock();
@@ -317,6 +319,12 @@ bool OutputBufferQueue::configure(const sp<IGraphicBufferProducer>& igbp,
     return true;
 }
 
+void OutputBufferQueue::stop() {
+    std::scoped_lock<std::mutex> l(mMutex);
+    mStopped = true;
+    mOwner.reset(); // destructor of the block will not triger IGBP::cancel()
+}
+
 bool OutputBufferQueue::registerBuffer(const C2ConstGraphicBlock& block) {
     std::shared_ptr<_C2BlockPoolData> data =
             _C2BlockFactory::GetGraphicBlockPoolData(block);
@@ -325,7 +333,7 @@ bool OutputBufferQueue::registerBuffer(const C2ConstGraphicBlock& block) {
     }
     std::scoped_lock<std::mutex> l(mMutex);
 
-    if (!mIgbp) {
+    if (!mIgbp || mStopped) {
         return false;
     }
 
@@ -371,10 +379,16 @@ status_t OutputBufferQueue::outputBuffer(
 
         std::shared_ptr<C2SurfaceSyncMemory> syncMem;
         mMutex.lock();
+        bool stopped = mStopped;
         sp<IGraphicBufferProducer> outputIgbp = mIgbp;
         uint32_t outputGeneration = mGeneration;
         syncMem = mSyncMem;
         mMutex.unlock();
+
+        if (stopped) {
+            LOG(INFO) << "outputBuffer -- already stopped.";
+            return DEAD_OBJECT;
+        }
 
         status_t status = attachToBufferQueue(
                 block, outputIgbp, outputGeneration, &bqSlot, syncMem);
@@ -408,11 +422,17 @@ status_t OutputBufferQueue::outputBuffer(
 
     std::shared_ptr<C2SurfaceSyncMemory> syncMem;
     mMutex.lock();
+    bool stopped = mStopped;
     sp<IGraphicBufferProducer> outputIgbp = mIgbp;
     uint32_t outputGeneration = mGeneration;
     uint64_t outputBqId = mBqId;
     syncMem = mSyncMem;
     mMutex.unlock();
+
+    if (stopped) {
+        LOG(INFO) << "outputBuffer -- already stopped.";
+        return DEAD_OBJECT;
+    }
 
     if (!outputIgbp) {
         LOG(VERBOSE) << "outputBuffer -- output surface is null.";
@@ -467,7 +487,7 @@ void OutputBufferQueue::updateMaxDequeueBufferCount(int maxDequeueBufferCount) {
     mMutex.lock();
     mMaxDequeueBufferCount = maxDequeueBufferCount;
     auto syncVar = mSyncMem ? mSyncMem->mem() : nullptr;
-    if (syncVar) {
+    if (syncVar && !mStopped) {
         syncVar->lock();
         syncVar->updateMaxDequeueCountLocked(maxDequeueBufferCount);
         syncVar->unlock();
