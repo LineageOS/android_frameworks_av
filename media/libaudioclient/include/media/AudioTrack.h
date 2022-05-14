@@ -1344,7 +1344,6 @@ public:
     sp<IMemory>             mSharedBuffer;
     transfer_type           mTransfer;
     audio_offload_info_t    mOffloadInfoCopy;
-    const audio_offload_info_t* mOffloadInfo;
     audio_attributes_t      mAttributes;
 
     size_t                  mFrameSize;             // frame size in bytes
