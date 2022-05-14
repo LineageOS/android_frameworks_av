@@ -42,8 +42,8 @@ class Camera3OutputStream;
  *
  * The PreviewFrameSpacer improves the viewfinder user experience by:
  * - Cache the frame buffers if the intervals between queueBuffer is shorter
- *   than the camera capture intervals.
- * - Queue frame buffers in the same cadence as the camera capture time.
+ *   than the camera readout intervals.
+ * - Queue frame buffers in the same cadence as the camera readout time.
  * - Maintain at most 1 queue-able buffer. If the 2nd preview buffer becomes
  *   available, queue the oldest cached buffer to the buffer queue.
  */
@@ -53,8 +53,8 @@ class PreviewFrameSpacer : public Thread {
     virtual ~PreviewFrameSpacer();
 
     // Queue preview buffer locally
-    status_t queuePreviewBuffer(nsecs_t timestamp, int32_t transform,
-            ANativeWindowBuffer* anwBuffer, int releaseFence);
+    status_t queuePreviewBuffer(nsecs_t timestamp, nsecs_t readoutTimestamp,
+            int32_t transform, ANativeWindowBuffer* anwBuffer, int releaseFence);
 
     bool threadLoop() override;
     void requestExit() override;
@@ -63,12 +63,14 @@ class PreviewFrameSpacer : public Thread {
     // structure holding cached preview buffer info
     struct BufferHolder {
         nsecs_t timestamp;
+        nsecs_t readoutTimestamp;
         int32_t transform;
         sp<ANativeWindowBuffer> anwBuffer;
         int releaseFence;
 
-        BufferHolder(nsecs_t t, int32_t tr, ANativeWindowBuffer* anwb, int rf) :
-                timestamp(t), transform(tr), anwBuffer(anwb), releaseFence(rf) {}
+        BufferHolder(nsecs_t t, nsecs_t readoutT, int32_t tr, ANativeWindowBuffer* anwb, int rf) :
+                timestamp(t), readoutTimestamp(readoutT), transform(tr), anwBuffer(anwb),
+                releaseFence(rf) {}
     };
 
     void queueBufferToClientLocked(const BufferHolder& bufferHolder, nsecs_t currentTime);
@@ -80,7 +82,7 @@ class PreviewFrameSpacer : public Thread {
     Condition mBufferCond;
 
     std::queue<BufferHolder> mPendingBuffers;
-    nsecs_t mLastCameraCaptureTime = 0;
+    nsecs_t mLastCameraReadoutTime = 0;
     nsecs_t mLastCameraPresentTime = 0;
     static constexpr nsecs_t kWaitDuration = 5000000LL; // 50ms
     static constexpr nsecs_t kFrameIntervalThreshold = 80000000LL; // 80ms
