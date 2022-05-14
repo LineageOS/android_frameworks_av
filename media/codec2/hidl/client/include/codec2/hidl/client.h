@@ -411,6 +411,10 @@ struct Codec2Client::Component : public Codec2Client::Configurable {
     // Set max dequeue count for output surface.
     void setOutputSurfaceMaxDequeueCount(int maxDequeueCount);
 
+    // Stop using the current output surface.
+    void stopUsingOutputSurface(
+            C2BlockPool::local_id_t blockPoolId);
+
     // Connect to a given InputSurface.
     c2_status_t connectToInputSurface(
             const std::shared_ptr<InputSurface>& inputSurface,
@@ -440,6 +444,11 @@ protected:
 
     struct OutputBufferQueue;
     std::unique_ptr<OutputBufferQueue> mOutputBufferQueue;
+
+    // (b/202903117) Sometimes MediaCodec::setSurface races between normal
+    // setSurface and setSurface with ReleaseSurface due to timing issues.
+    // In order to prevent the race condition mutex is added.
+    std::mutex mOutputMutex;
 
     static c2_status_t setDeathListener(
             const std::shared_ptr<Component>& component,
