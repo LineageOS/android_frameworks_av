@@ -129,8 +129,9 @@ public:
     // Create a local BlockPoolData.
     C2BufferQueueBlockPoolData(
             uint32_t generation, uint64_t bqId, int32_t bqSlot,
+            const std::shared_ptr<int> &owner,
             const android::sp<HGraphicBufferProducer>& producer,
-            std::shared_ptr<C2SurfaceSyncMemory>, int noUse);
+            std::shared_ptr<C2SurfaceSyncMemory>);
 
     virtual ~C2BufferQueueBlockPoolData() override;
 
