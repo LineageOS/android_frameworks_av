@@ -349,6 +349,10 @@ status_t FrameDecoder::extractInternal() {
     status_t err = OK;
     bool done = false;
     size_t retriesLeft = kRetryCount;
+    if (!mDecoder) {
+        ALOGE("decoder is not initialized");
+        return NO_INIT;
+    }
     do {
         size_t index;
         int64_t ptsUs = 0LL;

@@ -14,13 +14,13 @@
  * limitations under the License.
  */
 
-#include <hidl/Convert.h>
+#include <android-base/properties.h>
 
-#include <hidl/HidlCameraService.h>
-
-#include <hidl/HidlCameraDeviceUser.h>
 #include <hidl/AidlCameraDeviceCallbacks.h>
 #include <hidl/AidlCameraServiceListener.h>
+#include <hidl/HidlCameraService.h>
+#include <hidl/HidlCameraDeviceUser.h>
+#include <hidl/Utils.h>
 
 #include <hidl/HidlTransportSupport.h>
 
@@ -34,6 +34,7 @@ namespace implementation {
 using frameworks::cameraservice::service::V2_0::implementation::HidlCameraService;
 using hardware::hidl_vec;
 using hardware::cameraservice::utils::conversion::convertToHidl;
+using hardware::cameraservice::utils::conversion::filterVndkKeys;
 using hardware::cameraservice::utils::conversion::B2HStatus;
 using hardware::Void;
 
@@ -52,6 +53,10 @@ sp<HidlCameraService> HidlCameraService::getInstance(android::CameraService *cs)
     gHidlCameraService = new HidlCameraService(cs);
     return gHidlCameraService;
 }
+
+HidlCameraService::HidlCameraService(android::CameraService *cs) : mAidlICameraService(cs) {
+    mVndkVersion = base::GetIntProperty("ro.vndk.version", __ANDROID_API_FUTURE__);
+};
 
 Return<void>
 HidlCameraService::getCameraCharacteristics(const hidl_string& cameraId,
@@ -77,6 +82,11 @@ HidlCameraService::getCameraCharacteristics(const hidl_string& cameraId,
         _hidl_cb(status, hidlMetadata);
         return Void();
     }
+    if (filterVndkKeys(mVndkVersion, cameraMetadata) != OK) {
+        ALOGE("%s: Unable to filter vndk metadata keys for version %d", __FUNCTION__, mVndkVersion);
+        _hidl_cb(HStatus::UNKNOWN_ERROR, hidlMetadata);
+        return Void();
+    }
     const camera_metadata_t *rawMetadata = cameraMetadata.getAndLock();
     convertToHidl(rawMetadata, &hidlMetadata);
     _hidl_cb(status, hidlMetadata);
@@ -97,7 +107,7 @@ Return<void> HidlCameraService::connectDevice(const sp<HCameraDeviceCallback>& h
     // Create a hardware::camera2::ICameraDeviceCallback object which internally
     // calls callback functions passed through hCallback.
     sp<H2BCameraDeviceCallbacks> hybridCallbacks = new H2BCameraDeviceCallbacks(hCallback);
-    if (!hybridCallbacks->initializeLooper()) {
+    if (!hybridCallbacks->initializeLooper(mVndkVersion)) {
         ALOGE("Unable to handle callbacks on device, cannot connect");
         _hidl_cb(HStatus::UNKNOWN_ERROR, nullptr);
         return Void();
