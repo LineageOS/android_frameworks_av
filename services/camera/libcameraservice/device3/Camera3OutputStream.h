@@ -160,6 +160,11 @@ class Camera3OutputStream :
     bool isConsumedByHWTexture() const;
 
     /**
+     * Return if this output stream is consumed by CPU.
+     */
+    bool isConsumedByCPU() const;
+
+    /**
      * Return if the consumer configuration of this stream is deferred.
      */
     virtual bool isConsumerConfigurationDeferred(size_t surface_id) const;
