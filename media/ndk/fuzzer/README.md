@@ -6,6 +6,7 @@
 + [ndk_extractor_fuzzer](#NdkExtractor)
 + [ndk_mediaformat_fuzzer](#NdkMediaFormat)
 + [ndk_drm_fuzzer](#NdkDrm)
++ [ndk_mediamuxer_fuzzer](#NdkMediaMuxer)
 
 # <a name="NdkCrypto"></a> Fuzzer for NdkCrypto
 
@@ -75,6 +76,7 @@ NdkExtractor supports the following parameters:
   $ adb shell /data/fuzz/arm64/ndk_extractor_fuzzer/ndk_extractor_fuzzer /data/fuzz/${TARGET_ARCH}/ndk_extractor_fuzzer/corpus
 ```
 
+
 # <a name="NdkMediaFormat"></a>Fuzzer for NdkMediaFormat
 
 NdkMediaFormat supports the following parameters:
@@ -117,4 +119,26 @@ NdkDrm supports the following parameters:
 ```
   $ adb sync data
   $ adb shell /data/fuzz/arm64/ndk_drm_fuzzer/ndk_drm_fuzzer
+```
+
+# <a name="NdkMediaMuxer"></a>Fuzzer for NdkMediaMuxer
+
+NdkMediaMuxer supports the following parameters:
+1. OutputFormat (parameter name: "outputFormat")
+2. AppendMode (parameter name: "appendMode")
+
+| Parameter| Valid Values |Configured Value|
+|-------------|----------|----- |
+|`outputFormat`|0.`AMEDIAMUXER_OUTPUT_FORMAT_MPEG_4`,<br/>1.`AMEDIAMUXER_OUTPUT_FORMAT_WEBM`,<br/>2.`AMEDIAMUXER_OUTPUT_FORMAT_THREE_GPP`| Value obtained from FuzzedDataProvider|
+|`appendMode`|0.`AMEDIAMUXER_APPEND_IGNORE_LAST_VIDEO_GOP`,<br/>1.`AMEDIAMUXER_APPEND_TO_EXISTING_DATA`| Value obtained from FuzzedDataProvider|
+
+#### Steps to run
+1. Build the fuzzer
+```
+  $ mm -j$(nproc) ndk_mediamuxer_fuzzer
+```
+2. Run on device
+```
+  $ adb sync data
+  $ adb shell /data/fuzz/arm64/ndk_mediamuxer_fuzzer/ndk_mediamuxer_fuzzer
 ```

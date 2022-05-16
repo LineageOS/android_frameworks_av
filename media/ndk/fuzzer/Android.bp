@@ -90,3 +90,10 @@ cc_fuzz {
     srcs: ["ndk_drm_fuzzer.cpp"],
     defaults: ["libmediandk_fuzzer_defaults",],
 }
+
+cc_fuzz {
+    name: "ndk_mediamuxer_fuzzer",
+    srcs: ["ndk_mediamuxer_fuzzer.cpp"],
+    defaults: ["libmediandk_fuzzer_defaults"],
+    shared_libs: ["libbinder_ndk",],
+}
