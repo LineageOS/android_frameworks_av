@@ -148,7 +148,6 @@ public:
      *          - EVENT_NEW_TIMESTAMP: pointer to const AudioTimestamp.
      */
 
-    typedef void (*legacy_callback_t)(int event, void* user, void* info);
     class IAudioTrackCallback : public virtual RefBase {
       friend AudioTrack;
       protected:
@@ -343,26 +342,6 @@ public:
                                     float maxRequiredSpeed = 1.0f,
                                     audio_port_handle_t selectedDeviceId = AUDIO_PORT_HANDLE_NONE);
 
-
-                        AudioTrack( audio_stream_type_t streamType,
-                                    uint32_t sampleRate,
-                                    audio_format_t format,
-                                    audio_channel_mask_t channelMask,
-                                    size_t frameCount,
-                                    audio_output_flags_t flags,
-                                    legacy_callback_t cbf,
-                                    void* user = nullptr,
-                                    int32_t notificationFrames = 0,
-                                    audio_session_t sessionId  = AUDIO_SESSION_ALLOCATE,
-                                    transfer_type transferType = TRANSFER_DEFAULT,
-                                    const audio_offload_info_t *offloadInfo = nullptr,
-                                    const AttributionSourceState& attributionSource =
-                                        AttributionSourceState(),
-                                    const audio_attributes_t* pAttributes = nullptr,
-                                    bool doNotReconnect = false,
-                                    float maxRequiredSpeed = 1.0f,
-                                    audio_port_handle_t selectedDeviceId = AUDIO_PORT_HANDLE_NONE);
-
     /* Creates an audio track and registers it with AudioFlinger.
      * With this constructor, the track is configured for static buffer mode.
      * Data to be rendered is passed in a shared memory buffer
@@ -381,25 +360,6 @@ public:
                                     const sp<IMemory>& sharedBuffer,
                                     audio_output_flags_t flags = AUDIO_OUTPUT_FLAG_NONE,
                                     const wp<IAudioTrackCallback>& callback = nullptr,
-                                    int32_t notificationFrames = 0,
-                                    audio_session_t sessionId   = AUDIO_SESSION_ALLOCATE,
-                                    transfer_type transferType = TRANSFER_DEFAULT,
-                                    const audio_offload_info_t *offloadInfo = nullptr,
-                                    const AttributionSourceState& attributionSource =
-                                        AttributionSourceState(),
-                                    const audio_attributes_t* pAttributes = nullptr,
-                                    bool doNotReconnect = false,
-                                    float maxRequiredSpeed = 1.0f);
-
-
-                        AudioTrack( audio_stream_type_t streamType,
-                                    uint32_t sampleRate,
-                                    audio_format_t format,
-                                    audio_channel_mask_t channelMask,
-                                    const sp<IMemory>& sharedBuffer,
-                                    audio_output_flags_t flags,
-                                    legacy_callback_t cbf,
-                                    void* user          = nullptr,
                                     int32_t notificationFrames = 0,
                                     audio_session_t sessionId   = AUDIO_SESSION_ALLOCATE,
                                     transfer_type transferType = TRANSFER_DEFAULT,
@@ -490,28 +450,8 @@ public:
                         }
             void       onFirstRef() override;
         public:
-            status_t    set(audio_stream_type_t streamType,
-                            uint32_t sampleRate,
-                            audio_format_t format,
-                            audio_channel_mask_t channelMask,
-                            size_t frameCount,
-                            audio_output_flags_t flags,
-                            legacy_callback_t callback,
-                            void * user = nullptr,
-                            int32_t notificationFrames = 0,
-                            const sp<IMemory>& sharedBuffer = 0,
-                            bool threadCanCallJava = false,
-                            audio_session_t sessionId  = AUDIO_SESSION_ALLOCATE,
-                            transfer_type transferType = TRANSFER_DEFAULT,
-                            const audio_offload_info_t *offloadInfo = nullptr,
-                            const AttributionSourceState& attributionSource =
-                                AttributionSourceState(),
-                            const audio_attributes_t* pAttributes = nullptr,
-                            bool doNotReconnect = false,
-                            float maxRequiredSpeed = 1.0f,
-                            audio_port_handle_t selectedDeviceId = AUDIO_PORT_HANDLE_NONE);
-
-    // FIXME(b/169889714): Vendor code depends on the old method signature at link time
+            typedef void (*legacy_callback_t)(int event, void* user, void* info);
+            // FIXME(b/169889714): Vendor code depends on the old method signature at link time
             status_t    set(audio_stream_type_t streamType,
                             uint32_t sampleRate,
                             audio_format_t format,
