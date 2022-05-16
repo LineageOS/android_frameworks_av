@@ -465,7 +465,8 @@ TEST_P(Codec2AudioDecDecodeTest, DecodeTest) {
     if (mMime.find("raw") != std::string::npos) {
         bitStreamInfo[0] = 8000;
         bitStreamInfo[1] = 1;
-    } else if (mCompName == g711alaw || mCompName == g711mlaw) {
+    } else if ((mMime.find("g711-alaw") != std::string::npos) ||
+               (mMime.find("g711-mlaw") != std::string::npos)) {
         // g711 test data is all 1-channel and has no embedded config info.
         bitStreamInfo[0] = 8000;
         bitStreamInfo[1] = 1;
