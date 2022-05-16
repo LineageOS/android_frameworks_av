@@ -219,6 +219,7 @@ status_t CryptoHalAidl::destroyPlugin() {
     }
 
     mPlugin.reset();
+    mInitCheck = NO_INIT;
     return OK;
 }
 
@@ -371,6 +372,10 @@ int32_t CryptoHalAidl::setHeap(const sp<HidlMemory>& heap) {
     }
 
     Mutex::Autolock autoLock(mLock);
+
+    if (mInitCheck != OK) {
+        return -1;
+    }
 
     int32_t seqNum = mHeapSeqNum++;
     uint32_t bufferId = static_cast<uint32_t>(seqNum);
