@@ -269,7 +269,10 @@ void CameraService::broadcastTorchModeStatus(const String8& cameraId, TorchModeS
                     cameraId.c_str());
             continue;
         }
-        i->getListener()->onTorchStatusChanged(mapToInterface(status), String16{cameraId});
+        auto ret = i->getListener()->onTorchStatusChanged(mapToInterface(status),
+                String16{cameraId});
+        i->handleBinderStatus(ret, "%s: Failed to trigger onTorchStatusChanged for %d:%d: %d",
+                __FUNCTION__, i->getListenerUid(), i->getListenerPid(), ret.exceptionCode());
     }
 }
 
@@ -538,8 +541,12 @@ void CameraService::onDeviceStatusChanged(const String8& id,
                         id.c_str());
                 continue;
             }
-            listener->getListener()->onPhysicalCameraStatusChanged(mapToInterface(newStatus),
-                    id16, physicalId16);
+            auto ret = listener->getListener()->onPhysicalCameraStatusChanged(
+                    mapToInterface(newStatus), id16, physicalId16);
+            listener->handleBinderStatus(ret,
+                    "%s: Failed to trigger onPhysicalCameraStatusChanged for %d:%d: %d",
+                    __FUNCTION__, listener->getListenerUid(), listener->getListenerPid(),
+                    ret.exceptionCode());
         }
     }
 }
@@ -580,8 +587,11 @@ void CameraService::broadcastTorchStrengthLevel(const String8& cameraId,
         int32_t newStrengthLevel) {
     Mutex::Autolock lock(mStatusListenerLock);
     for (auto& i : mListenerList) {
-        i->getListener()->onTorchStrengthLevelChanged(String16{cameraId},
+        auto ret = i->getListener()->onTorchStrengthLevelChanged(String16{cameraId},
                 newStrengthLevel);
+        i->handleBinderStatus(ret,
+                "%s: Failed to trigger onTorchStrengthLevelChanged for %d:%d: %d", __FUNCTION__,
+                i->getListenerUid(), i->getListenerPid(), ret.exceptionCode());
     }
 }
 
@@ -2374,10 +2384,8 @@ void CameraService::notifyMonitoredUids() {
 
     for (const auto& it : mListenerList) {
         auto ret = it->getListener()->onCameraAccessPrioritiesChanged();
-        if (!ret.isOk()) {
-            ALOGE("%s: Failed to trigger permission callback: %d", __FUNCTION__,
-                    ret.exceptionCode());
-        }
+        it->handleBinderStatus(ret, "%s: Failed to trigger permission callback for %d:%d: %d",
+                __FUNCTION__, it->getListenerUid(), it->getListenerPid(), ret.exceptionCode());
     }
 }
 
@@ -4636,8 +4644,12 @@ void CameraService::updateStatus(StatusInternal status, const String8& cameraId,
                             cameraId.c_str());
                     continue;
                 }
-                listener->getListener()->onStatusChanged(mapToInterface(status),
+                auto ret = listener->getListener()->onStatusChanged(mapToInterface(status),
                         String16(cameraId));
+                listener->handleBinderStatus(ret,
+                        "%s: Failed to trigger onStatusChanged callback for %d:%d: %d",
+                        __FUNCTION__, listener->getListenerUid(), listener->getListenerPid(),
+                        ret.exceptionCode());
             }
         });
 }
@@ -4670,10 +4682,10 @@ void CameraService::updateOpenCloseStatus(const String8& cameraId, bool open,
         } else {
             ret = it->getListener()->onCameraClosed(cameraId64);
         }
-        if (!ret.isOk()) {
-            ALOGE("%s: Failed to trigger onCameraOpened/onCameraClosed callback: %d", __FUNCTION__,
-                    ret.exceptionCode());
-        }
+
+        it->handleBinderStatus(ret,
+                "%s: Failed to trigger onCameraOpened/onCameraClosed callback for %d:%d: %d",
+                __FUNCTION__, it->getListenerUid(), it->getListenerPid(), ret.exceptionCode());
     }
 }
 
@@ -4774,8 +4786,12 @@ void CameraService::notifyPhysicalCameraStatusLocked(int32_t status,
                         String8(physicalCameraId).c_str());
                 continue;
             }
-            listener->getListener()->onPhysicalCameraStatusChanged(status,
+            auto ret = listener->getListener()->onPhysicalCameraStatusChanged(status,
                     logicalCameraId, physicalCameraId);
+            listener->handleBinderStatus(ret,
+                    "%s: Failed to trigger onPhysicalCameraStatusChanged for %d:%d: %d",
+                    __FUNCTION__, listener->getListenerUid(), listener->getListenerPid(),
+                    ret.exceptionCode());
         }
     }
 }

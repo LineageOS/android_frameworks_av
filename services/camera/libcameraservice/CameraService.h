@@ -1057,6 +1057,29 @@ private:
                 return IInterface::asBinder(mListener)->linkToDeath(this);
             }
 
+            template<typename... args_t>
+            void handleBinderStatus(const binder::Status &ret, const char *logOnError,
+                    args_t... args) {
+                if (!ret.isOk() &&
+                        (ret.exceptionCode() != binder::Status::Exception::EX_TRANSACTION_FAILED
+                        || !mLastTransactFailed)) {
+                    ALOGE(logOnError, args...);
+                }
+
+                // If the transaction failed, the process may have died (or other things, see
+                // b/28321379). Mute consecutive errors from this listener to avoid log spam.
+                if (ret.exceptionCode() == binder::Status::Exception::EX_TRANSACTION_FAILED) {
+                    if (!mLastTransactFailed) {
+                        ALOGE("%s: Muting similar errors from listener %d:%d", __FUNCTION__,
+                                mListenerUid, mListenerPid);
+                    }
+                    mLastTransactFailed = true;
+                } else {
+                    // Reset mLastTransactFailed when binder becomes healthy again.
+                    mLastTransactFailed = false;
+                }
+            }
+
             virtual void binderDied(const wp<IBinder> &/*who*/) {
                 auto parent = mParent.promote();
                 if (parent.get() != nullptr) {
@@ -1077,6 +1100,9 @@ private:
             int mListenerPid = -1;
             bool mIsVendorListener = false;
             bool mOpenCloseCallbackAllowed = false;
+
+            // Flag for preventing log spam when binder becomes unhealthy
+            bool mLastTransactFailed = false;
     };
 
     // Guarded by mStatusListenerMutex
