@@ -695,7 +695,7 @@ status_t Camera3OutputStream::configureConsumerQueueLocked(bool allowPreviewResp
             mSyncToDisplay = true;
             mTotalBufferCount += kDisplaySyncExtraBuffer;
         } else if (defaultToSpacer) {
-            mPreviewFrameSpacer = new PreviewFrameSpacer(*this, mConsumer);
+            mPreviewFrameSpacer = new PreviewFrameSpacer(this, mConsumer);
             mTotalBufferCount ++;
             res = mPreviewFrameSpacer->run(String8::format("PreviewSpacer-%d", mId).string());
             if (res != OK) {
@@ -979,6 +979,10 @@ status_t Camera3OutputStream::disconnectLocked() {
     }
 
     returnPrefetchedBuffersLocked();
+
+    if (mPreviewFrameSpacer != nullptr) {
+        mPreviewFrameSpacer->requestExit();
+    }
 
     ALOGV("%s: disconnecting stream %d from native window", __FUNCTION__, getId());
 

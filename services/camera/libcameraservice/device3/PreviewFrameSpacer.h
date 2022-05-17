@@ -49,7 +49,7 @@ class Camera3OutputStream;
  */
 class PreviewFrameSpacer : public Thread {
   public:
-    explicit PreviewFrameSpacer(Camera3OutputStream& parent, sp<Surface> consumer);
+    explicit PreviewFrameSpacer(wp<Camera3OutputStream> parent, sp<Surface> consumer);
     virtual ~PreviewFrameSpacer();
 
     // Queue preview buffer locally
@@ -75,8 +75,7 @@ class PreviewFrameSpacer : public Thread {
 
     void queueBufferToClientLocked(const BufferHolder& bufferHolder, nsecs_t currentTime);
 
-
-    Camera3OutputStream& mParent;
+    wp<Camera3OutputStream> mParent;
     sp<ANativeWindow> mConsumer;
     mutable Mutex mLock;
     Condition mBufferCond;
