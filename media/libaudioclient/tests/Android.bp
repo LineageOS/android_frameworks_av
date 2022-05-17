@@ -141,6 +141,7 @@ cc_defaults {
     ],
     data: ["bbb*.raw"],
     test_config_template: "audio_test_template.xml",
+    test_suites: ["device-tests"],
 }
 
 cc_test {
