@@ -620,6 +620,10 @@ convertToHALStreamCombination(
         stream.bufferSize = 0;
         stream.groupId = -1;
         stream.sensorPixelModesUsed = defaultSensorPixelModes;
+        using DynamicRangeProfile =
+            aidl::android::hardware::camera::metadata::RequestAvailableDynamicRangeProfilesMap;
+        stream.dynamicRangeProfile =
+            DynamicRangeProfile::ANDROID_REQUEST_AVAILABLE_DYNAMIC_RANGE_PROFILES_MAP_STANDARD;
         streamConfiguration.streams[streamIdx++] = stream;
         streamConfiguration.multiResolutionInputImage =
                 sessionConfiguration.inputIsMultiResolution();
