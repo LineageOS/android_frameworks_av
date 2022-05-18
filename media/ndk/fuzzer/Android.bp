@@ -78,3 +78,9 @@ cc_fuzz {
     shared_libs: ["libbinder_ndk",],
     corpus: ["corpus/*"],
 }
+
+cc_fuzz {
+    name: "ndk_mediaformat_fuzzer",
+    srcs: ["ndk_mediaformat_fuzzer.cpp"],
+    defaults: ["libmediandk_fuzzer_defaults",],
+}
