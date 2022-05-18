@@ -63,14 +63,14 @@ class OnAudioDeviceUpdateNotifier : public AudioSystem::AudioDeviceCallback {
 };
 
 // Simple AudioPlayback class.
-class AudioPlayback {
-  public:
+class AudioPlayback : public AudioTrack::IAudioTrackCallback {
+  friend sp<AudioPlayback>;
     AudioPlayback(uint32_t sampleRate, audio_format_t format, audio_channel_mask_t channelMask,
                   audio_output_flags_t flags = AUDIO_OUTPUT_FLAG_NONE,
                   audio_session_t sessionId = AUDIO_SESSION_NONE,
                   AudioTrack::transfer_type transferType = AudioTrack::TRANSFER_SHARED,
                   audio_attributes_t* attributes = nullptr);
-    ~AudioPlayback();
+  public:
     status_t loadResource(const char* name);
     status_t create();
     sp<AudioTrack> getAudioTrackHandle();
@@ -78,6 +78,7 @@ class AudioPlayback {
     status_t waitForConsumption(bool testSeek = false);
     status_t fillBuffer();
     status_t onProcess(bool testSeek = false);
+    virtual void onBufferEnd() override;
     void stop();
 
     bool mStopPlaying;
@@ -92,6 +93,7 @@ class AudioPlayback {
     };
 
   private:
+    ~AudioPlayback();
     const uint32_t mSampleRate;
     const audio_format_t mFormat;
     const audio_channel_mask_t mChannelMask;

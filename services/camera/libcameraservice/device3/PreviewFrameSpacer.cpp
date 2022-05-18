@@ -27,13 +27,12 @@ namespace android {
 
 namespace camera3 {
 
-PreviewFrameSpacer::PreviewFrameSpacer(Camera3OutputStream& parent, sp<Surface> consumer) :
+PreviewFrameSpacer::PreviewFrameSpacer(wp<Camera3OutputStream> parent, sp<Surface> consumer) :
         mParent(parent),
         mConsumer(consumer) {
 }
 
 PreviewFrameSpacer::~PreviewFrameSpacer() {
-    Thread::requestExitAndWait();
 }
 
 status_t PreviewFrameSpacer::queuePreviewBuffer(nsecs_t timestamp, nsecs_t readoutTimestamp,
@@ -51,7 +50,11 @@ bool PreviewFrameSpacer::threadLoop() {
     Mutex::Autolock l(mLock);
     if (mPendingBuffers.size() == 0) {
         mBufferCond.waitRelative(mLock, kWaitDuration);
-        return true;
+        if (exitPending()) {
+            return false;
+        } else {
+            return true;
+        }
     }
 
     nsecs_t currentTime = systemTime();
@@ -71,7 +74,7 @@ bool PreviewFrameSpacer::threadLoop() {
     if (frameWaitTime > 0 && mPendingBuffers.size() < 2) {
         mBufferCond.waitRelative(mLock, frameWaitTime);
         if (exitPending()) {
-            return true;
+            return false;
         }
         currentTime = systemTime();
     }
@@ -92,7 +95,13 @@ void PreviewFrameSpacer::requestExit() {
 
 void PreviewFrameSpacer::queueBufferToClientLocked(
         const BufferHolder& bufferHolder, nsecs_t currentTime) {
-    mParent.setTransform(bufferHolder.transform, true/*mayChangeMirror*/);
+    sp<Camera3OutputStream> parent = mParent.promote();
+    if (parent == nullptr) {
+        ALOGV("%s: Parent camera3 output stream was destroyed", __FUNCTION__);
+        return;
+    }
+
+    parent->setTransform(bufferHolder.transform, true/*mayChangeMirror*/);
 
     status_t res = native_window_set_buffers_timestamp(mConsumer.get(), bufferHolder.timestamp);
     if (res != OK) {
@@ -101,13 +110,13 @@ void PreviewFrameSpacer::queueBufferToClientLocked(
     }
 
     Camera3Stream::queueHDRMetadata(bufferHolder.anwBuffer.get()->handle, mConsumer,
-            mParent.getDynamicRangeProfile());
+            parent->getDynamicRangeProfile());
 
     res = mConsumer->queueBuffer(mConsumer.get(), bufferHolder.anwBuffer.get(),
             bufferHolder.releaseFence);
     if (res != OK) {
         close(bufferHolder.releaseFence);
-        if (mParent.shouldLogError(res)) {
+        if (parent->shouldLogError(res)) {
             ALOGE("%s: Failed to queue buffer to client: %s(%d)", __FUNCTION__,
                     strerror(-res), res);
         }
