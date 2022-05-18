@@ -55,3 +55,18 @@ cc_fuzz {
     srcs: ["ndk_crypto_fuzzer.cpp"],
     defaults: ["libmediandk_fuzzer_defaults"],
 }
+
+cc_fuzz {
+     name: "ndk_image_reader_fuzzer",
+     srcs: [
+        "ndk_image_reader_fuzzer.cpp",
+     ],
+     shared_libs: [
+        "android.hidl.token@1.0-utils",
+        "android.hardware.graphics.bufferqueue@1.0",
+     ],
+     cflags: [
+        "-D__ANDROID_VNDK__",
+     ],
+     defaults: ["libmediandk_fuzzer_defaults"],
+}

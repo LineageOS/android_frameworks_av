@@ -2,6 +2,7 @@
 
 ## Table of contents
 + [ndk_crypto_fuzzer](#NdkCrypto)
++ [ndk_image_reader_fuzzer](#NdkImageReader)
 
 # <a name="NdkCrypto"></a> Fuzzer for NdkCrypto
 
@@ -21,4 +22,32 @@ NdkCrypto supports the following parameters:
 ```
   $ adb sync data
   $ adb shell /data/fuzz/arm64/ndk_crypto_fuzzer/ndk_crypto_fuzzer
+```
+
+# <a name="NdkImageReader"></a> Fuzzer for NdkImageReader
+
+NdkImageReader supports the following parameters:
+1. Width (parameter name: "imageWidth")
+2. Height (parameter name: "imageHeight")
+3. Format (parameter name: "imageFormat")
+4. Usage (parameter name: "imageUsage")
+5. Max images (parameter name: "imageMaxCount")
+
+| Parameter| Valid Values |Configured Value|
+|-------------|----------|----- |
+| `width`| `1 to INT_MAX`| Value obtained from FuzzedDataProvider|
+| `height`| `1 to INT_MAX`| Value obtained from FuzzedDataProvider|
+| `format`| `1 to INT_MAX`| Value obtained from FuzzedDataProvider|
+| `usage`| `1 to INT_MAX`| Value obtained from FuzzedDataProvider|
+| `maxImages`| `1 to android::BufferQueue::MAX_MAX_ACQUIRED_BUFFERS`| Value obtained from FuzzedDataProvider|
+
+#### Steps to run
+1. Build the fuzzer
+```
+  $ mm -j$(nproc) ndk_image_reader_fuzzer
+```
+2. Run on device
+```
+  $ adb sync data
+  $ adb shell /data/fuzz/arm64/ndk_image_reader_fuzzer/ndk_image_reader_fuzzer
 ```
