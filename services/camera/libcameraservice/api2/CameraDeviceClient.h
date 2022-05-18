@@ -354,6 +354,8 @@ private:
 
     // The string representation of object passed into CaptureRequest.setTag.
     std::string mUserTag;
+    // The last set video stabilization mode
+    int mVideoStabilizationMode = -1;
 };
 
 }; // namespace android
