@@ -137,6 +137,7 @@ public:
     bool mDeviceError;
     std::vector<CameraStreamStats> mStreamStats;
     String16 mUserTag;
+    int mVideoStabilizationMode;
 
     // Constructors
     CameraSessionStats();
