@@ -277,6 +277,9 @@ enum C2ParamIndexKind : C2Param::type_index_t {
 
     // encoding statistics, average block qp of a frame
     kParamIndexAverageBlockQuantization, // int32
+
+    // channel mask for decoded audio
+    kParamIndexAndroidChannelMask, // uint32
 };
 
 }
@@ -1979,6 +1982,14 @@ constexpr char C2_PARAMKEY_CODED_CHANNEL_COUNT[] = "coded.channel-count";
 typedef C2StreamParam<C2Info, C2Uint32Value, kParamIndexMaxChannelCount> C2StreamMaxChannelCountInfo;
 constexpr char C2_PARAMKEY_MAX_CHANNEL_COUNT[] = "raw.max-channel-count";
 constexpr char C2_PARAMKEY_MAX_CODED_CHANNEL_COUNT[] = "coded.max-channel-count";
+
+/**
+ * Audio channel mask. Used by decoder to express audio channel mask of decoded content.
+ * Channel representation is specified according to the Java android.media.AudioFormat
+ * CHANNEL_OUT_* constants.
+ */
+ typedef C2StreamParam<C2Info, C2Uint32Value, kParamIndexAndroidChannelMask> C2StreamChannelMaskInfo;
+ const char C2_PARAMKEY_CHANNEL_MASK[] = "raw.channel-mask";
 
 /**
  * Audio sample format (PCM encoding)
