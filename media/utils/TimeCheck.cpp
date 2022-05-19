@@ -189,15 +189,18 @@ void TimeCheck::TimeCheckHandler::onTimeout() const
     // Generate audio HAL processes tombstones and allow time to complete
     // before forcing restart
     std::vector<pid_t> pids = TimeCheck::getAudioHalPids();
+    std::string halPids = "HAL pids [ ";
     if (pids.size() != 0) {
         for (const auto& pid : pids) {
             ALOGI("requesting tombstone for pid: %d", pid);
+            halPids.append(std::to_string(pid)).append(" ");
             sigqueue(pid, DEBUGGER_SIGNAL, {.sival_int = 0});
         }
         sleep(1);
     } else {
         ALOGI("No HAL process pid available, skipping tombstones");
     }
+    halPids.append("]");
 
     LOG_EVENT_STRING(LOGTAG_AUDIO_BINDER_TIMEOUT, tag.c_str());
 
@@ -206,6 +209,7 @@ void TimeCheck::TimeCheckHandler::onTimeout() const
             .append(tag)
             .append(" scheduled ").append(formatTime(startTime))
             .append(" on thread ").append(std::to_string(tid)).append("\n")
+            .append(halPids).append("\n")
             .append(summary);
 
     // Note: LOG_ALWAYS_FATAL limits the size of the string - per log/log.h:
