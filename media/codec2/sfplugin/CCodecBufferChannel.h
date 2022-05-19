@@ -301,6 +301,7 @@ private:
     std::shared_ptr<C2BlockPool> mInputAllocator;
     QueueSync mQueueSync;
     std::vector<std::unique_ptr<C2Param>> mParamsToBeSet;
+    sp<AMessage> mOutputFormat;
 
     struct Input {
         Input();
