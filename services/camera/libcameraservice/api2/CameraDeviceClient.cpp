@@ -519,8 +519,15 @@ binder::Status CameraDeviceClient::submitRequestList(
         metadataRequestList.push_back(physicalSettingsList);
         surfaceMapList.push_back(surfaceMap);
 
+        // Save certain CaptureRequest settings
         if (!request.mUserTag.empty()) {
             mUserTag = request.mUserTag;
+        }
+        camera_metadata_entry entry =
+                physicalSettingsList.begin()->metadata.find(
+                        ANDROID_CONTROL_VIDEO_STABILIZATION_MODE);
+        if (entry.count == 1) {
+            mVideoStabilizationMode = entry.data.u8[0];
         }
     }
     mRequestIdCounter++;
@@ -1975,7 +1982,7 @@ void CameraDeviceClient::notifyIdle(
         remoteCb->onDeviceIdle();
     }
     Camera2ClientBase::notifyIdleWithUserTag(requestCount, resultErrorCount, deviceError,
-            streamStats, mUserTag);
+            streamStats, mUserTag, mVideoStabilizationMode);
 }
 
 void CameraDeviceClient::notifyShutter(const CaptureResultExtras& resultExtras,
