@@ -15,11 +15,11 @@ cc_test_library {
         "-Wextra",
     ],
 
-    sanitize:{
-       address: true,
-       cfi: true,
-       integer_overflow: true,
-       memtag_heap: true,
+    sanitize: {
+        address: true,
+        cfi: true,
+        integer_overflow: true,
+        memtag_heap: true,
     },
 
     shared_libs: [
@@ -28,7 +28,7 @@ cc_test_library {
 
     srcs: [
         "sharedtest.cpp",
-    ]
+    ],
 }
 
 cc_test {
@@ -40,11 +40,11 @@ cc_test {
         "-Wextra",
     ],
 
-    sanitize:{
-       address: true,
-       cfi: true,
-       integer_overflow: true,
-       memtag_heap: true,
+    sanitize: {
+        address: true,
+        cfi: true,
+        integer_overflow: true,
+        memtag_heap: true,
     },
 
     shared_libs: [
@@ -174,11 +174,11 @@ cc_test {
         "-Wextra",
     ],
 
-    sanitize:{
-       address: true,
-       cfi: true,
-       integer_overflow: true,
-       memtag_heap: true,
+    sanitize: {
+        address: true,
+        cfi: true,
+        integer_overflow: true,
+        memtag_heap: true,
     },
 
     shared_libs: [
@@ -189,5 +189,32 @@ cc_test {
 
     srcs: [
         "timecheck_tests.cpp",
+    ],
+}
+
+cc_test {
+    name: "extended_accumulator_tests",
+    cflags: [
+        "-Wall",
+        "-Werror",
+        "-Wextra",
+    ],
+
+    sanitize: {
+        address: true,
+        cfi: true,
+        integer_overflow: true,
+        memtag_heap: true,
+    },
+
+    shared_libs: [
+        "libbase",
+        "liblog",
+        "libmediautils",
+        "libutils",
+    ],
+
+    srcs: [
+        "extended_accumulator_tests.cpp",
     ],
 }
