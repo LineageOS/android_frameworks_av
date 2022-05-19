@@ -84,6 +84,7 @@ public:
  * spatializer mixer thread is destroyed.
  */
 class Spatializer : public media::BnSpatializer,
+                    public AudioEffect::IAudioEffectCallback,
                     public IBinder::DeathRecipient,
                     private SpatializerPoseController::Listener {
   public:
@@ -274,7 +275,7 @@ private:
         return NO_ERROR;
     }
 
-    void postFramesProcessedMsg(int frames);
+    virtual void onFramesProcessed(int32_t framesProcessed) override;
 
     /**
      * Checks if head and screen sensors must be actively monitored based on
