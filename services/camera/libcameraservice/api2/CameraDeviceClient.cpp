@@ -168,9 +168,8 @@ status_t CameraDeviceClient::initializeImpl(TProviderPtr providerPtr, const Stri
                                 __FUNCTION__, mCameraIdStr.c_str(), entry.data.i64[i]);
                     }
                 }
-                mDynamicProfileMap.emplace(
-                        ANDROID_REQUEST_AVAILABLE_DYNAMIC_RANGE_PROFILES_MAP_STANDARD,
-                        standardBitmap);
+                mDynamicProfileMap[ANDROID_REQUEST_AVAILABLE_DYNAMIC_RANGE_PROFILES_MAP_STANDARD] =
+                        standardBitmap;
             } else {
                 ALOGE("%s: Device %s supports 10-bit output but doesn't include a dynamic range"
                         " profile map!", __FUNCTION__, mCameraIdStr.c_str());
