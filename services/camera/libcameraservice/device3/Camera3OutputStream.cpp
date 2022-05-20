@@ -1406,9 +1406,13 @@ nsecs_t Camera3OutputStream::syncTimestampToDisplayLocked(nsecs_t t) {
     nsecs_t expectedPresentT = mLastPresentTime;
     nsecs_t minDiff = INT64_MAX;
     // Derive minimum intervals between presentation times based on minimal
-    // expected duration.
-    size_t minVsyncs = (mMinExpectedDuration + vsyncEventData.frameInterval - 1) /
-            vsyncEventData.frameInterval - 1;
+    // expected duration. The minimum number of Vsyncs is:
+    // - 0 if minFrameDuration in (0, 1.5] * vSyncInterval,
+    // - 1 if minFrameDuration in (1.5, 2.5] * vSyncInterval,
+    // - and so on.
+    int minVsyncs = (mMinExpectedDuration - vsyncEventData.frameInterval / 2) /
+            vsyncEventData.frameInterval;
+    if (minVsyncs < 0) minVsyncs = 0;
     nsecs_t minInterval = minVsyncs * vsyncEventData.frameInterval + kTimelineThresholdNs;
     // Find best timestamp in the vsync timeline:
     // - closest to the ideal present time,
