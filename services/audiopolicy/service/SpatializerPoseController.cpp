@@ -149,6 +149,10 @@ SpatializerPoseController::~SpatializerPoseController() {
 
 void SpatializerPoseController::setHeadSensor(int32_t sensor) {
     std::lock_guard lock(mMutex);
+    if (sensor == mHeadSensor) return;
+    ALOGV("%s: new sensor:%d  mHeadSensor:%d  mScreenSensor:%d",
+            __func__, sensor, mHeadSensor, mScreenSensor);
+
     // Stop current sensor, if valid and different from the other sensor.
     if (mHeadSensor != INVALID_SENSOR && mHeadSensor != mScreenSensor) {
         mPoseProvider->stopSensor(mHeadSensor);
@@ -179,11 +183,15 @@ void SpatializerPoseController::setHeadSensor(int32_t sensor) {
         mHeadSensor = INVALID_SENSOR;
     }
 
-    mProcessor->recenter(true, false);
+    mProcessor->recenter(true /* recenterHead */, false /* recenterScreen */);
 }
 
 void SpatializerPoseController::setScreenSensor(int32_t sensor) {
     std::lock_guard lock(mMutex);
+    if (sensor == mScreenSensor) return;
+    ALOGV("%s: new sensor:%d  mHeadSensor:%d  mScreenSensor:%d",
+            __func__, sensor, mHeadSensor, mScreenSensor);
+
     // Stop current sensor, if valid and different from the other sensor.
     if (mScreenSensor != INVALID_SENSOR && mScreenSensor != mHeadSensor) {
         mPoseProvider->stopSensor(mScreenSensor);
@@ -212,7 +220,7 @@ void SpatializerPoseController::setScreenSensor(int32_t sensor) {
         mScreenSensor = INVALID_SENSOR;
     }
 
-    mProcessor->recenter(false, true);
+    mProcessor->recenter(false /* recenterHead */, true /* recenterScreen */);
 }
 
 void SpatializerPoseController::setDesiredMode(HeadTrackingMode mode) {
