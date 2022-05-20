@@ -39,7 +39,7 @@ bool isEffectExistsOnAudioSession(const effect_uuid_t* type, int priority,
     attributionSource.pid = VALUE_OR_FATAL(legacy2aidl_pid_t_int32_t(getpid()));
     attributionSource.token = sp<BBinder>::make();
     sp<AudioEffect> effect = new AudioEffect(attributionSource);
-    effect->set(type, nullptr, priority, nullptr, nullptr, sessionId);
+    effect->set(type, nullptr /* uid */, priority, nullptr /* callback */, sessionId);
     return effect->initCheck() == ALREADY_EXISTS;
 }
 
