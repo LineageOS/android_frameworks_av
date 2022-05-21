@@ -34,6 +34,16 @@ namespace android {
             virtual bool mapProfile(int32_t, C2Config::profile_t*) = 0;
             virtual bool mapLevel(C2Config::level_t, int32_t*) = 0;
             virtual bool mapLevel(int32_t, C2Config::level_t*) = 0;
+
+            /**
+             * Mapper method that maps a MediaCodec profile to the supported
+             * HDR format for that profile. Since 10-bit profiles are used for
+             * HLG, this method will return HLG for all 10-bit profiles, but
+             * the caller should also verify that the transfer function is
+             * indeed HLG.
+             */
+            // not an abstract method as we have a default implementation for SDR
+            virtual bool mapHdrFormat(int32_t, C2Config::hdr_format_t *hdr);
             virtual ~ProfileLevelMapper() = default;
         };
 
