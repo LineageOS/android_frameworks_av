@@ -60,6 +60,7 @@ struct C2Config {
     enum drc_effect_type_t : int32_t;       ///< DRC effect type
     enum drc_album_mode_t : int32_t;        ///< DRC album mode
     enum hdr_dynamic_metadata_type_t : uint32_t;  ///< HDR dynamic metadata type
+    enum hdr_format_t : uint32_t;           ///< HDR format
     enum intra_refresh_mode_t : uint32_t;   ///< intra refresh modes
     enum level_t : uint32_t;                ///< coding level
     enum ordinal_key_t : uint32_t;          ///< work ordering keys
@@ -192,10 +193,9 @@ enum C2ParamIndexKind : C2Param::type_index_t {
     kParamIndexPictureType,
     // deprecated
     kParamIndexHdr10PlusMetadata,
-
     kParamIndexPictureQuantization,
-
     kParamIndexHdrDynamicMetadata,
+    kParamIndexHdrFormat,
 
     /* ------------------------------------ video components ------------------------------------ */
 
@@ -1666,6 +1666,34 @@ typedef C2StreamParam<C2Info, C2HdrDynamicMetadataStruct, kParamIndexHdrDynamicM
         C2StreamHdrDynamicMetadataInfo;
 constexpr char C2_PARAMKEY_INPUT_HDR_DYNAMIC_INFO[] = "input.hdr-dynamic-info";
 constexpr char C2_PARAMKEY_OUTPUT_HDR_DYNAMIC_INFO[] = "output.hdr-dynamic-info";
+
+/**
+ * HDR Format
+ */
+C2ENUM(C2Config::hdr_format_t, uint32_t,
+    UNKNOWN,     ///< HDR format not known (default)
+    SDR,         ///< not HDR (SDR)
+    HLG,         ///< HLG
+    HDR10,       ///< HDR10
+    HDR10_PLUS,  ///< HDR10+
+);
+
+/**
+ * HDR Format Info
+ *
+ * This information may be present during configuration to allow encoders to
+ * prepare encoding certain HDR formats. When this information is not present
+ * before start, encoders should determine the HDR format based on the available
+ * HDR metadata on the first input frame.
+ *
+ * While this information is optional, it is not a hint. When present, encoders
+ * that do not support dynamic reconfiguration do not need to switch to the HDR
+ * format based on the metadata on the first input frame.
+ */
+typedef C2StreamParam<C2Info, C2SimpleValueStruct<C2EasyEnum<C2Config::hdr_format_t>>,
+                kParamIndexHdrFormat>
+        C2StreamHdrFormatInfo;
+constexpr char C2_PARAMKEY_HDR_FORMAT[] = "coded.hdr-format";
 
 /* ------------------------------------ block-based coding ----------------------------------- */
 
