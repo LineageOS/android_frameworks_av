@@ -16,6 +16,9 @@
 
 /*
  * Test FlowGraph
+ *
+ * This file also tests a few different conversion techniques because
+ * sometimes that have caused compiler bugs.
  */
 
 #include <iostream>
@@ -30,12 +33,29 @@
 #include "flowgraph/SinkFloat.h"
 #include "flowgraph/SinkI16.h"
 #include "flowgraph/SinkI24.h"
+#include "flowgraph/SinkI32.h"
 #include "flowgraph/SourceI16.h"
 #include "flowgraph/SourceI24.h"
 
 using namespace FLOWGRAPH_OUTER_NAMESPACE::flowgraph;
 
 constexpr int kBytesPerI24Packed = 3;
+
+constexpr int kNumSamples = 8;
+constexpr std::array<float, kNumSamples> kInputFloat = {
+    1.0f, 0.5f, -0.25f, -1.0f,
+    0.0f, 53.9f, -87.2f, -1.02f};
+
+// Corresponding PCM values  as integers.
+constexpr std::array<int16_t, kNumSamples>  kExpectedI16 = {
+    INT16_MAX, 1 << 14, INT16_MIN / 4, INT16_MIN,
+    0, INT16_MAX, INT16_MIN, INT16_MIN};
+
+constexpr std::array<int32_t, kNumSamples>  kExpectedI32 = {
+    INT32_MAX, 1 << 30, INT32_MIN / 4, INT32_MIN,
+    0, INT32_MAX, INT32_MIN, INT32_MIN};
+
+// =================================== FLOAT to I16 ==============
 
 // Simple test that tries to reproduce a Clang compiler bug.
 __attribute__((noinline))
@@ -49,18 +69,11 @@ void local_convert_float_to_int16(const float *input,
 }
 
 TEST(test_flowgraph, local_convert_float_int16) {
-    static constexpr int kNumSamples = 8;
-    static constexpr std::array<float, kNumSamples> input = {
-        1.0f, 0.5f, -0.25f, -1.0f,
-        0.0f, 53.9f, -87.2f, -1.02f};
-    static constexpr std::array<int16_t, kNumSamples>  expected = {
-        32767, 16384, -8192, -32768,
-        0, 32767, -32768, -32768};
     std::array<int16_t, kNumSamples> output;
 
     // Do it inline, which will probably work even with the buggy compiler.
     // This validates the expected data.
-    const float *in = input.data();
+    const float *in = kInputFloat.data();
     int16_t *out = output.data();
     output.fill(777);
     for (int i = 0; i < kNumSamples; i++) {
@@ -68,38 +81,106 @@ TEST(test_flowgraph, local_convert_float_int16) {
         *out++ = std::min(INT16_MAX, std::max(INT16_MIN, n)); // clip
     }
     for (int i = 0; i < kNumSamples; i++) {
-        EXPECT_EQ(expected.at(i), output.at(i)) << ", i = " << i;
+        EXPECT_EQ(kExpectedI16.at(i), output.at(i)) << ", i = " << i;
     }
 
     // Convert audio signal using the function.
     output.fill(777);
-    local_convert_float_to_int16(input.data(), output.data(), kNumSamples);
+    local_convert_float_to_int16(kInputFloat.data(), output.data(), kNumSamples);
     for (int i = 0; i < kNumSamples; i++) {
-        EXPECT_EQ(expected.at(i), output.at(i)) << ", i = " << i;
+        EXPECT_EQ(kExpectedI16.at(i), output.at(i)) << ", i = " << i;
     }
 }
 
 TEST(test_flowgraph, module_sinki16) {
     static constexpr int kNumSamples = 8;
-    static constexpr std::array<float, kNumSamples> input = {
-        1.0f, 0.5f, -0.25f, -1.0f,
-        0.0f, 53.9f, -87.2f, -1.02f};
-    static constexpr std::array<int16_t, kNumSamples>  expected = {
-        32767, 16384, -8192, -32768,
-        0, 32767, -32768, -32768};
     std::array<int16_t, kNumSamples + 10> output; // larger than input
 
     SourceFloat sourceFloat{1};
     SinkI16 sinkI16{1};
 
-    sourceFloat.setData(input.data(), kNumSamples);
+    sourceFloat.setData(kInputFloat.data(), kNumSamples);
     sourceFloat.output.connect(&sinkI16.input);
 
     output.fill(777);
     int32_t numRead = sinkI16.read(output.data(), output.size());
     ASSERT_EQ(kNumSamples, numRead);
     for (int i = 0; i < numRead; i++) {
-        EXPECT_EQ(expected.at(i), output.at(i)) << ", i = " << i;
+        EXPECT_EQ(kExpectedI16.at(i), output.at(i)) << ", i = " << i;
+    }
+}
+
+// =================================== FLOAT to I32 ==============
+// Simple test that tries to reproduce a Clang compiler bug.
+__attribute__((noinline))
+static int32_t clamp32FromFloat(float f)
+{
+    static const float scale = (float)(1UL << 31);
+    static const float limpos = 1.;
+    static const float limneg = -1.;
+
+    if (f <= limneg) {
+        return INT32_MIN;
+    } else if (f >= limpos) {
+        return INT32_MAX;
+    }
+    f *= scale;
+    /* integer conversion is through truncation (though int to float is not).
+     * ensure that we round to nearest, ties away from 0.
+     */
+    return f > 0 ? f + 0.5 : f - 0.5;
+}
+
+void local_convert_float_to_int32(const float *input,
+                                  int32_t *output,
+                                  int count) {
+    for (int i = 0; i < count; i++) {
+        *output++ = clamp32FromFloat(*input++);
+    }
+}
+
+TEST(test_flowgraph, simple_convert_float_int32) {
+    std::array<int32_t, kNumSamples> output;
+
+    // Do it inline, which will probably work even with a buggy compiler.
+    // This validates the expected data.
+    const float *in = kInputFloat.data();
+    output.fill(777);
+    int32_t *out = output.data();
+    for (int i = 0; i < kNumSamples; i++) {
+        int64_t n = (int64_t) (*in++ * 2147483648.0f);
+        *out++ = (int32_t)std::min((int64_t)INT32_MAX,
+                                   std::max((int64_t)INT32_MIN, n)); // clip
+    }
+    for (int i = 0; i < kNumSamples; i++) {
+        EXPECT_EQ(kExpectedI32.at(i), output.at(i)) << ", i = " << i;
+    }
+}
+
+TEST(test_flowgraph, local_convert_float_int32) {
+    std::array<int32_t, kNumSamples> output;
+    // Convert audio signal using the function.
+    output.fill(777);
+    local_convert_float_to_int32(kInputFloat.data(), output.data(), kNumSamples);
+    for (int i = 0; i < kNumSamples; i++) {
+        EXPECT_EQ(kExpectedI32.at(i), output.at(i)) << ", i = " << i;
+    }
+}
+
+TEST(test_flowgraph, module_sinki32) {
+    std::array<int32_t, kNumSamples + 10> output; // larger than input
+
+    SourceFloat sourceFloat{1};
+    SinkI32 sinkI32{1};
+
+    sourceFloat.setData(kInputFloat.data(), kNumSamples);
+    sourceFloat.output.connect(&sinkI32.input);
+
+    output.fill(777);
+    int32_t numRead = sinkI32.read(output.data(), output.size());
+    ASSERT_EQ(kNumSamples, numRead);
+    for (int i = 0; i < numRead; i++) {
+        EXPECT_EQ(kExpectedI32.at(i), output.at(i)) << ", i = " << i;
     }
 }
 
