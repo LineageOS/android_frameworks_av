@@ -276,6 +276,13 @@ ALookup<C2Config::profile_t, int32_t> sHevcHdr10PlusProfiles = {
     { C2Config::PROFILE_HEVC_MAIN_10, HEVCProfileMain10HDR10Plus },
 };
 
+ALookup<C2Config::hdr_format_t, int32_t> sHevcHdrFormats = {
+    { C2Config::hdr_format_t::SDR, HEVCProfileMain },
+    { C2Config::hdr_format_t::HLG, HEVCProfileMain10 },
+    { C2Config::hdr_format_t::HDR10, HEVCProfileMain10HDR10 },
+    { C2Config::hdr_format_t::HDR10_PLUS, HEVCProfileMain10HDR10Plus },
+};
+
 ALookup<C2Config::level_t, int32_t> sMpeg2Levels = {
     { C2Config::LEVEL_MP2V_LOW,         MPEG2LevelLL },
     { C2Config::LEVEL_MP2V_MAIN,        MPEG2LevelML },
@@ -365,6 +372,17 @@ ALookup<C2Config::profile_t, int32_t> sVp9Hdr10PlusProfiles = {
     { C2Config::PROFILE_VP9_3, VP9Profile3HDR10Plus },
 };
 
+ALookup<C2Config::hdr_format_t, int32_t> sVp9HdrFormats = {
+    { C2Config::hdr_format_t::SDR, VP9Profile0 },
+    { C2Config::hdr_format_t::SDR, VP9Profile1 },
+    { C2Config::hdr_format_t::HLG, VP9Profile2 },
+    { C2Config::hdr_format_t::HLG, VP9Profile3 },
+    { C2Config::hdr_format_t::HDR10, VP9Profile2HDR },
+    { C2Config::hdr_format_t::HDR10, VP9Profile3HDR },
+    { C2Config::hdr_format_t::HDR10_PLUS, VP9Profile2HDR10Plus },
+    { C2Config::hdr_format_t::HDR10_PLUS, VP9Profile3HDR10Plus },
+};
+
 ALookup<C2Config::level_t, int32_t> sAv1Levels = {
     { C2Config::LEVEL_AV1_2,    AV1Level2  },
     { C2Config::LEVEL_AV1_2_1,  AV1Level21 },
@@ -409,6 +427,13 @@ ALookup<C2Config::profile_t, int32_t> sAv1HdrProfiles = {
 
 ALookup<C2Config::profile_t, int32_t> sAv1Hdr10PlusProfiles = {
     { C2Config::PROFILE_AV1_0, AV1ProfileMain10HDR10Plus },
+};
+
+ALookup<C2Config::hdr_format_t, int32_t> sAv1HdrFormats = {
+    { C2Config::hdr_format_t::SDR, AV1ProfileMain8 },
+    { C2Config::hdr_format_t::HLG, AV1ProfileMain10 },
+    { C2Config::hdr_format_t::HDR10, AV1ProfileMain10HDR10 },
+    { C2Config::hdr_format_t::HDR10_PLUS, AV1ProfileMain10HDR10Plus },
 };
 
 // HAL_PIXEL_FORMAT_* -> COLOR_Format*
@@ -487,6 +512,10 @@ struct AacProfileLevelMapper : ProfileLevelMapperHelper {
     virtual bool simpleMap(int32_t from, C2Config::profile_t *to) {
         return sAacProfiles.map(from, to);
     }
+    // AAC does not have HDR format
+    virtual bool mapHdrFormat(int32_t, C2Config::hdr_format_t*) override {
+        return false;
+    }
 };
 
 struct AvcProfileLevelMapper : ProfileLevelMapperHelper {
@@ -516,6 +545,12 @@ struct DolbyVisionProfileLevelMapper : ProfileLevelMapperHelper {
     }
     virtual bool simpleMap(int32_t from, C2Config::profile_t *to) {
         return sDolbyVisionProfiles.map(from, to);
+    }
+    // Dolby Vision is always HDR and the profile is fully expressive so use unknown
+    // HDR format
+    virtual bool mapHdrFormat(int32_t, C2Config::hdr_format_t *to) override {
+        *to = C2Config::hdr_format_t::UNKNOWN;
+        return true;
     }
 };
 
@@ -554,6 +589,9 @@ struct HevcProfileLevelMapper : ProfileLevelMapperHelper {
         return mIsHdr10Plus ? sHevcHdr10PlusProfiles.map(from, to) :
                      mIsHdr ? sHevcHdrProfiles.map(from, to) :
                               sHevcProfiles.map(from, to);
+    }
+    virtual bool mapHdrFormat(int32_t from, C2Config::hdr_format_t *to) override {
+        return sHevcHdrFormats.map(from, to);
     }
 
 private:
@@ -633,6 +671,9 @@ struct Vp9ProfileLevelMapper : ProfileLevelMapperHelper {
                      mIsHdr ? sVp9HdrProfiles.map(from, to) :
                               sVp9Profiles.map(from, to);
     }
+    virtual bool mapHdrFormat(int32_t from, C2Config::hdr_format_t *to) override {
+        return sVp9HdrFormats.map(from, to);
+    }
 
 private:
     bool mIsHdr;
@@ -662,6 +703,9 @@ struct Av1ProfileLevelMapper : ProfileLevelMapperHelper {
                           mIsHdr ? sAv1HdrProfiles.map(from, to) :
                                    sAv1Profiles.map(from, to);
     }
+    virtual bool mapHdrFormat(int32_t from, C2Config::hdr_format_t *to) override {
+        return sAv1HdrFormats.map(from, to);
+    }
 
 private:
     bool mIsHdr;
@@ -670,6 +714,13 @@ private:
 };
 
 } // namespace
+
+// the default mapper is used for media types that do not support HDR
+bool C2Mapper::ProfileLevelMapper::mapHdrFormat(int32_t, C2Config::hdr_format_t *to) {
+    // by default map all (including vendor) profiles to SDR
+    *to = C2Config::hdr_format_t::SDR;
+    return true;
+}
 
 // static
 std::shared_ptr<C2Mapper::ProfileLevelMapper>

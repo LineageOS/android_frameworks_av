@@ -611,26 +611,39 @@ status_t MediaPlayerService::dump(int fd, const Vector<String16>& args)
                 IPCThreadState::self()->getCallingUid());
         result.append(buffer);
     } else {
-        Mutex::Autolock lock(mLock);
-        for (int i = 0, n = mClients.size(); i < n; ++i) {
-            sp<Client> c = mClients[i].promote();
-            if (c != 0) c->dump(fd, args);
-            clients.add(c);
-        }
-        if (mMediaRecorderClients.size() == 0) {
-                result.append(" No media recorder client\n\n");
-        } else {
+        {
+            // capture clients under lock
+            Mutex::Autolock lock(mLock);
+            for (int i = 0, n = mClients.size(); i < n; ++i) {
+                sp<Client> c = mClients[i].promote();
+                if (c != nullptr) {
+                    clients.add(c);
+                }
+            }
+
             for (int i = 0, n = mMediaRecorderClients.size(); i < n; ++i) {
                 sp<MediaRecorderClient> c = mMediaRecorderClients[i].promote();
-                if (c != 0) {
-                    snprintf(buffer, 255, " MediaRecorderClient pid(%d)\n",
-                            c->mAttributionSource.pid);
-                    result.append(buffer);
-                    write(fd, result.string(), result.size());
-                    result = "\n";
-                    c->dump(fd, args);
+                if (c != nullptr) {
                     mediaRecorderClients.add(c);
                 }
+            }
+        }
+
+        // dump clients outside of lock
+        for (const sp<Client> &c : clients) {
+            c->dump(fd, args);
+        }
+        if (mediaRecorderClients.size() == 0) {
+            result.append(" No media recorder client\n\n");
+        } else {
+            for (const sp<MediaRecorderClient> &c : mediaRecorderClients) {
+                snprintf(buffer, 255, " MediaRecorderClient pid(%d)\n",
+                        c->mAttributionSource.pid);
+                result.append(buffer);
+                write(fd, result.string(), result.size());
+                result = "\n";
+                c->dump(fd, args);
+
             }
         }
 
