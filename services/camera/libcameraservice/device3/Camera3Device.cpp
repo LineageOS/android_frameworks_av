@@ -4265,8 +4265,8 @@ sp<Camera3Device::CaptureRequest>
                 if (parent != nullptr) {
                     parent->mRequestBufferSM.onRequestThreadPaused();
                 }
-                mRequestClearing = false;
             }
+            mRequestClearing = false;
             // Stop waiting for now and let thread management happen
             return NULL;
         }
