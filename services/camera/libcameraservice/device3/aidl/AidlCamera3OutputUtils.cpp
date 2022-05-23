@@ -244,6 +244,8 @@ void requestStreamBuffers(RequestBufferStates& states,
                             __FUNCTION__, streamId, strerror(-res), res);
                     if (res == TIMED_OUT || res == NO_MEMORY) {
                         bufRet.val.set<Tag::error>(StreamBufferRequestError::NO_BUFFER_AVAILABLE);
+                    } else if (res == INVALID_OPERATION) {
+                        bufRet.val.set<Tag::error>(StreamBufferRequestError::MAX_BUFFER_EXCEEDED);
                     } else {
                         bufRet.val.set<Tag::error>(StreamBufferRequestError::UNKNOWN_ERROR);
                     }
