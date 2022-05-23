@@ -29,29 +29,29 @@ namespace android {
 using hardware::ICameraServiceProxy;
 using hardware::CameraSessionStats;
 
-Mutex CameraServiceProxyWrapper::sProxyMutex;
-sp<hardware::ICameraServiceProxy> CameraServiceProxyWrapper::sCameraServiceProxy;
-
-Mutex CameraServiceProxyWrapper::mLock;
-std::map<String8, std::shared_ptr<CameraServiceProxyWrapper::CameraSessionStatsWrapper>>
-        CameraServiceProxyWrapper::mSessionStatsMap;
-
 /**
  * CameraSessionStatsWrapper functions
  */
 
-void CameraServiceProxyWrapper::CameraSessionStatsWrapper::onOpen() {
-    Mutex::Autolock l(mLock);
-
-    updateProxyDeviceState(mSessionStats);
+void CameraServiceProxyWrapper::CameraSessionStatsWrapper::updateProxyDeviceState(
+        sp<hardware::ICameraServiceProxy>& proxyBinder) {
+    if (proxyBinder == nullptr) return;
+    proxyBinder->notifyCameraState(mSessionStats);
 }
 
-void CameraServiceProxyWrapper::CameraSessionStatsWrapper::onClose(int32_t latencyMs) {
+void CameraServiceProxyWrapper::CameraSessionStatsWrapper::onOpen(
+        sp<hardware::ICameraServiceProxy>& proxyBinder) {
+    Mutex::Autolock l(mLock);
+    updateProxyDeviceState(proxyBinder);
+}
+
+void CameraServiceProxyWrapper::CameraSessionStatsWrapper::onClose(
+    sp<hardware::ICameraServiceProxy>& proxyBinder, int32_t latencyMs) {
     Mutex::Autolock l(mLock);
 
     mSessionStats.mNewCameraState = CameraSessionStats::CAMERA_STATE_CLOSED;
     mSessionStats.mLatencyMs = latencyMs;
-    updateProxyDeviceState(mSessionStats);
+    updateProxyDeviceState(proxyBinder);
 }
 
 void CameraServiceProxyWrapper::CameraSessionStatsWrapper::onStreamConfigured(
@@ -66,12 +66,13 @@ void CameraServiceProxyWrapper::CameraSessionStatsWrapper::onStreamConfigured(
     }
 }
 
-void CameraServiceProxyWrapper::CameraSessionStatsWrapper::onActive(float maxPreviewFps) {
+void CameraServiceProxyWrapper::CameraSessionStatsWrapper::onActive(
+    sp<hardware::ICameraServiceProxy>& proxyBinder, float maxPreviewFps) {
     Mutex::Autolock l(mLock);
 
     mSessionStats.mNewCameraState = CameraSessionStats::CAMERA_STATE_ACTIVE;
     mSessionStats.mMaxPreviewFps = maxPreviewFps;
-    updateProxyDeviceState(mSessionStats);
+    updateProxyDeviceState(proxyBinder);
 
     // Reset mCreationDuration to -1 to distinguish between 1st session
     // after configuration, and all other sessions after configuration.
@@ -79,6 +80,7 @@ void CameraServiceProxyWrapper::CameraSessionStatsWrapper::onActive(float maxPre
 }
 
 void CameraServiceProxyWrapper::CameraSessionStatsWrapper::onIdle(
+        sp<hardware::ICameraServiceProxy>& proxyBinder,
         int64_t requestCount, int64_t resultErrorCount, bool deviceError,
         const std::string& userTag, int32_t videoStabilizationMode,
         const std::vector<hardware::CameraStreamStats>& streamStats) {
@@ -91,7 +93,7 @@ void CameraServiceProxyWrapper::CameraSessionStatsWrapper::onIdle(
     mSessionStats.mUserTag = String16(userTag.c_str());
     mSessionStats.mVideoStabilizationMode = videoStabilizationMode;
     mSessionStats.mStreamStats = streamStats;
-    updateProxyDeviceState(mSessionStats);
+    updateProxyDeviceState(proxyBinder);
 
     mSessionStats.mInternalReconfigure = 0;
     mSessionStats.mStreamStats.clear();
@@ -103,19 +105,26 @@ void CameraServiceProxyWrapper::CameraSessionStatsWrapper::onIdle(
 
 sp<ICameraServiceProxy> CameraServiceProxyWrapper::getCameraServiceProxy() {
 #ifndef __BRILLO__
-    Mutex::Autolock al(sProxyMutex);
-    if (sCameraServiceProxy == nullptr) {
-        sp<IServiceManager> sm = defaultServiceManager();
-        // Use checkService because cameraserver normally starts before the
-        // system server and the proxy service. So the long timeout that getService
-        // has before giving up is inappropriate.
-        sp<IBinder> binder = sm->checkService(String16("media.camera.proxy"));
-        if (binder != nullptr) {
-            sCameraServiceProxy = interface_cast<ICameraServiceProxy>(binder);
-        }
+    Mutex::Autolock al(mProxyMutex);
+    if (mCameraServiceProxy == nullptr) {
+        mCameraServiceProxy = getDefaultCameraServiceProxy();
     }
 #endif
-    return sCameraServiceProxy;
+    return mCameraServiceProxy;
+}
+
+sp<hardware::ICameraServiceProxy> CameraServiceProxyWrapper::getDefaultCameraServiceProxy() {
+#ifndef __BRILLO__
+    sp<IServiceManager> sm = defaultServiceManager();
+    // Use checkService because cameraserver normally starts before the
+    // system server and the proxy service. So the long timeout that getService
+    // has before giving up is inappropriate.
+    sp<IBinder> binder = sm->checkService(String16("media.camera.proxy"));
+    if (binder != nullptr) {
+        return interface_cast<ICameraServiceProxy>(binder);
+    }
+#endif
+    return nullptr;
 }
 
 void CameraServiceProxyWrapper::pingCameraServiceProxy() {
@@ -136,12 +145,6 @@ int CameraServiceProxyWrapper::getRotateAndCropOverride(String16 packageName, in
     }
 
     return ret;
-}
-
-void CameraServiceProxyWrapper::updateProxyDeviceState(const CameraSessionStats& sessionStats) {
-    sp<ICameraServiceProxy> proxyBinder = getCameraServiceProxy();
-    if (proxyBinder == nullptr) return;
-    proxyBinder->notifyCameraState(sessionStats);
 }
 
 void CameraServiceProxyWrapper::logStreamConfigured(const String8& id,
@@ -175,7 +178,8 @@ void CameraServiceProxyWrapper::logActive(const String8& id, float maxPreviewFps
     }
 
     ALOGV("%s: id %s", __FUNCTION__, id.c_str());
-    sessionStats->onActive(maxPreviewFps);
+    sp<hardware::ICameraServiceProxy> proxyBinder = getCameraServiceProxy();
+    sessionStats->onActive(proxyBinder, maxPreviewFps);
 }
 
 void CameraServiceProxyWrapper::logIdle(const String8& id,
@@ -205,7 +209,8 @@ void CameraServiceProxyWrapper::logIdle(const String8& id,
                 streamStats[i].mStartLatencyMs);
     }
 
-    sessionStats->onIdle(requestCount, resultErrorCount, deviceError, userTag,
+    sp<hardware::ICameraServiceProxy> proxyBinder = getCameraServiceProxy();
+    sessionStats->onIdle(proxyBinder, requestCount, resultErrorCount, deviceError, userTag,
             videoStabilizationMode, streamStats);
 }
 
@@ -235,7 +240,8 @@ void CameraServiceProxyWrapper::logOpen(const String8& id, int facing,
 
     ALOGV("%s: id %s, facing %d, effectiveApiLevel %d, isNdk %d, latencyMs %d",
             __FUNCTION__, id.c_str(), facing, effectiveApiLevel, isNdk, latencyMs);
-    sessionStats->onOpen();
+    sp<hardware::ICameraServiceProxy> proxyBinder = getCameraServiceProxy();
+    sessionStats->onOpen(proxyBinder);
 }
 
 void CameraServiceProxyWrapper::logClose(const String8& id, int32_t latencyMs) {
@@ -259,7 +265,8 @@ void CameraServiceProxyWrapper::logClose(const String8& id, int32_t latencyMs) {
     }
 
     ALOGV("%s: id %s, latencyMs %d", __FUNCTION__, id.c_str(), latencyMs);
-    sessionStats->onClose(latencyMs);
+    sp<hardware::ICameraServiceProxy> proxyBinder = getCameraServiceProxy();
+    sessionStats->onClose(proxyBinder, latencyMs);
 }
 
 bool CameraServiceProxyWrapper::isCameraDisabled() {

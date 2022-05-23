@@ -52,6 +52,7 @@ using namespace camera2;
 
 Camera2Client::Camera2Client(const sp<CameraService>& cameraService,
         const sp<hardware::ICameraClient>& cameraClient,
+        std::shared_ptr<CameraServiceProxyWrapper> cameraServiceProxyWrapper,
         const String16& clientPackageName,
         const std::optional<String16>& clientFeatureId,
         const String8& cameraDeviceId,
@@ -62,7 +63,7 @@ Camera2Client::Camera2Client(const sp<CameraService>& cameraService,
         uid_t clientUid,
         int servicePid,
         bool overrideForPerfClass):
-        Camera2ClientBase(cameraService, cameraClient, clientPackageName,
+        Camera2ClientBase(cameraService, cameraClient, cameraServiceProxyWrapper, clientPackageName,
                 false/*systemNativeClient - since no ndk for api1*/, clientFeatureId,
                 cameraDeviceId, api1CameraId, cameraFacing, sensorOrientation, clientPid,
                 clientUid, servicePid, overrideForPerfClass, /*legacyClient*/ true),
@@ -478,7 +479,7 @@ binder::Status Camera2Client::disconnect() {
     CameraService::Client::disconnect();
 
     int32_t closeLatencyMs = ns2ms(systemTime() - startTime);
-    CameraServiceProxyWrapper::logClose(mCameraIdStr, closeLatencyMs);
+    mCameraServiceProxyWrapper->logClose(mCameraIdStr, closeLatencyMs);
 
     return res;
 }

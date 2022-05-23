@@ -161,9 +161,11 @@ uint64_t AidlCamera3Device::mapProducerToFrameworkUsage(
     return (uint64_t)usage;
 }
 
-AidlCamera3Device::AidlCamera3Device(const String8& id, bool overrideForPerfClass,
-            bool legacyClient) : Camera3Device(id, overrideForPerfClass, legacyClient) {
-        mCallbacks = ndk::SharedRefBase::make<AidlCameraDeviceCallbacks>(this);
+AidlCamera3Device::AidlCamera3Device(
+        std::shared_ptr<CameraServiceProxyWrapper>& cameraServiceProxyWrapper,
+        const String8& id, bool overrideForPerfClass, bool legacyClient) :
+        Camera3Device(cameraServiceProxyWrapper, id, overrideForPerfClass, legacyClient) {
+    mCallbacks = ndk::SharedRefBase::make<AidlCameraDeviceCallbacks>(this);
 }
 
 status_t AidlCamera3Device::initialize(sp<CameraProviderManager> manager,

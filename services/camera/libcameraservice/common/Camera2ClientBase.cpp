@@ -37,7 +37,6 @@
 #include "device3/aidl/AidlCamera3Device.h"
 #include "device3/hidl/HidlCamera3Device.h"
 #include "utils/CameraThreadState.h"
-#include "utils/CameraServiceProxyWrapper.h"
 
 namespace android {
 using namespace camera2;
@@ -48,6 +47,7 @@ template <typename TClientBase>
 Camera2ClientBase<TClientBase>::Camera2ClientBase(
         const sp<CameraService>& cameraService,
         const sp<TCamCallbacks>& remoteCallback,
+        std::shared_ptr<CameraServiceProxyWrapper> cameraServiceProxyWrapper,
         const String16& clientPackageName,
         bool systemNativeClient,
         const std::optional<String16>& clientFeatureId,
@@ -64,6 +64,7 @@ Camera2ClientBase<TClientBase>::Camera2ClientBase(
                 clientFeatureId, cameraId, api1CameraId, cameraFacing, sensorOrientation, clientPid,
                 clientUid, servicePid),
         mSharedCameraCallbacks(remoteCallback),
+        mCameraServiceProxyWrapper(cameraServiceProxyWrapper),
         mDeviceActive(false), mApi1CameraId(api1CameraId)
 {
     ALOGI("Camera %s: Opened. Client: %s (PID %d, UID %d)", cameraId.string(),
@@ -115,13 +116,13 @@ status_t Camera2ClientBase<TClientBase>::initializeImpl(TProviderPtr providerPtr
     switch (providerTransport) {
         case IPCTransport::HIDL:
             mDevice =
-                    new HidlCamera3Device(TClientBase::mCameraIdStr, mOverrideForPerfClass,
-                            mLegacyClient);
+                    new HidlCamera3Device(mCameraServiceProxyWrapper,
+                            TClientBase::mCameraIdStr, mOverrideForPerfClass, mLegacyClient);
             break;
         case IPCTransport::AIDL:
             mDevice =
-                    new AidlCamera3Device(TClientBase::mCameraIdStr, mOverrideForPerfClass,
-                            mLegacyClient);
+                    new AidlCamera3Device(mCameraServiceProxyWrapper,
+                            TClientBase::mCameraIdStr, mOverrideForPerfClass, mLegacyClient);
              break;
         default:
             ALOGE("%s Invalid transport for camera id %s", __FUNCTION__,
@@ -325,7 +326,7 @@ status_t Camera2ClientBase<TClientBase>::notifyActive(float maxPreviewFps) {
                     TClientBase::mCameraIdStr.string(), res);
             return res;
         }
-        CameraServiceProxyWrapper::logActive(TClientBase::mCameraIdStr, maxPreviewFps);
+        mCameraServiceProxyWrapper->logActive(TClientBase::mCameraIdStr, maxPreviewFps);
     }
     mDeviceActive = true;
 
@@ -344,7 +345,7 @@ void Camera2ClientBase<TClientBase>::notifyIdleWithUserTag(
             ALOGE("%s: Camera %s: Error finishing streaming ops: %d", __FUNCTION__,
                     TClientBase::mCameraIdStr.string(), res);
         }
-        CameraServiceProxyWrapper::logIdle(TClientBase::mCameraIdStr,
+        mCameraServiceProxyWrapper->logIdle(TClientBase::mCameraIdStr,
                 requestCount, resultErrorCount, deviceError, userTag, videoStabilizationMode,
                 streamStats);
     }

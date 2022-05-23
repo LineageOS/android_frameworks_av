@@ -48,6 +48,7 @@
 #include "utils/AutoConditionLock.h"
 #include "utils/ClientManager.h"
 #include "utils/IPCTransport.h"
+#include "utils/CameraServiceProxyWrapper.h"
 
 #include <set>
 #include <string>
@@ -100,7 +101,10 @@ public:
     // Implementation of BinderService<T>
     static char const* getServiceName() { return "media.camera"; }
 
-                        CameraService();
+                        // Non-null arguments for cameraServiceProxyWrapper should be provided for
+                        // testing purposes only.
+                        CameraService(std::shared_ptr<CameraServiceProxyWrapper>
+                                cameraServiceProxyWrapper = nullptr);
     virtual             ~CameraService();
 
     /////////////////////////////////////////////////////////////////////
@@ -771,6 +775,8 @@ private:
     sp<UidPolicy> mUidPolicy;
 
     sp<SensorPrivacyPolicy> mSensorPrivacyPolicy;
+
+    std::shared_ptr<CameraServiceProxyWrapper> mCameraServiceProxyWrapper;
 
     // Delay-load the Camera HAL module
     virtual void onFirstRef();
