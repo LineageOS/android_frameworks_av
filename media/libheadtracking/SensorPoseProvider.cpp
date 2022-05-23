@@ -26,7 +26,6 @@
 
 #include <android-base/thread_annotations.h>
 #include <log/log_main.h>
-#include <sensor/Sensor.h>
 #include <sensor/SensorEventQueue.h>
 #include <sensor/SensorManager.h>
 #include <utils/Looper.h>
@@ -285,7 +284,7 @@ class SensorPoseProviderImpl : public SensorPoseProvider {
         return DataFormat::kUnknown;
     }
 
-    std::optional<const Sensor> getSensorByHandle(int32_t handle) {
+    std::optional<const Sensor> getSensorByHandle(int32_t handle) override {
         const Sensor* const* list;
         ssize_t size;
 

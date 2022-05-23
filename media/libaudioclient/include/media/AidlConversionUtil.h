@@ -279,6 +279,20 @@ bool isValidEnum(T value) {
     return std::find(er.begin(), er.end(), value) != er.end();
 }
 
+// T is a "container" of enum binder types with a toString().
+template <typename T>
+std::string enumsToString(const T& t) {
+    std::string s;
+    for (const auto item : t) {
+        if (s.empty()) {
+            s = toString(item);
+        } else {
+            s.append("|").append(toString(item));
+        }
+    }
+    return s;
+}
+
 /**
  * Return the equivalent Android status_t from a binder exception code.
  *

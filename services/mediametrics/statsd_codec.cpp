@@ -390,47 +390,59 @@ bool statsd_codec(const std::shared_ptr<const mediametrics::Item>& item,
     }
     AStatsEvent_writeInt32(event, qpBMaxOri);
 
-    // int32_t configColorStandard = -1;
-    // if (item->getInt32("android.media.mediacodec.config-color-standard", &configColorStandard)) {
-    //     metrics_proto.set_config_color_standard(configColorStandard);
-    // }
-    // AStatsEvent_writeInt32(event, configColorStandard);
+    int32_t configColorStandard = -1;
+    if (item->getInt32("android.media.mediacodec.config-color-standard", &configColorStandard)) {
+        metrics_proto.set_config_color_standard(configColorStandard);
+    }
+    AStatsEvent_writeInt32(event, configColorStandard);
 
-    // int32_t configColorRange = -1;
-    // if (item->getInt32("android.media.mediacodec.config-color-range", &configColorRange)) {
-    //     metrics_proto.set_config_color_range(configColorRange);
-    // }
-    // AStatsEvent_writeInt32(event, configColorRange);
+    int32_t configColorRange = -1;
+    if (item->getInt32("android.media.mediacodec.config-color-range", &configColorRange)) {
+        metrics_proto.set_config_color_range(configColorRange);
+    }
+    AStatsEvent_writeInt32(event, configColorRange);
 
-    // int32_t configColorTransfer = -1;
-    // if (item->getInt32("android.media.mediacodec.config-color-transfer", &configColorTransfer)) {
-    //     metrics_proto.set_config_color_transfer(configColorTransfer);
-    // }
-    // AStatsEvent_writeInt32(event, configColorTransfer);
+    int32_t configColorTransfer = -1;
+    if (item->getInt32("android.media.mediacodec.config-color-transfer", &configColorTransfer)) {
+        metrics_proto.set_config_color_transfer(configColorTransfer);
+    }
+    AStatsEvent_writeInt32(event, configColorTransfer);
 
-    // int32_t parsedColorStandard = -1;
-    // if (item->getInt32("android.media.mediacodec.parsed-color-standard", &parsedColorStandard)) {
-    //     metrics_proto.set_parsed_color_standard(parsedColorStandard);
-    // }
-    // AStatsEvent_writeInt32(event, parsedColorStandard);
+    int32_t parsedColorStandard = -1;
+    if (item->getInt32("android.media.mediacodec.parsed-color-standard", &parsedColorStandard)) {
+        metrics_proto.set_parsed_color_standard(parsedColorStandard);
+    }
+    AStatsEvent_writeInt32(event, parsedColorStandard);
 
-    // int32_t parsedColorRange = -1;
-    // if (item->getInt32("android.media.mediacodec.parsed-color-range", &parsedColorRange)) {
-    //     metrics_proto.set_parsed_color_range(parsedColorRange);
-    // }
-    // AStatsEvent_writeInt32(event, parsedColorRange);
+    int32_t parsedColorRange = -1;
+    if (item->getInt32("android.media.mediacodec.parsed-color-range", &parsedColorRange)) {
+        metrics_proto.set_parsed_color_range(parsedColorRange);
+    }
+    AStatsEvent_writeInt32(event, parsedColorRange);
 
-    // int32_t parsedColorTransfer = -1;
-    // if (item->getInt32("android.media.mediacodec.parsed-color-transfer", &parsedColorTransfer)) {
-    //     metrics_proto.set_parsed_color_transfer(parsedColorTransfer);
-    // }
-    // AStatsEvent_writeInt32(event, parsedColorTransfer);
+    int32_t parsedColorTransfer = -1;
+    if (item->getInt32("android.media.mediacodec.parsed-color-transfer", &parsedColorTransfer)) {
+        metrics_proto.set_parsed_color_transfer(parsedColorTransfer);
+    }
+    AStatsEvent_writeInt32(event, parsedColorTransfer);
 
-    // int32_t hdrMetadataFlags = -1;
-    // if (item->getInt32("android.media.mediacodec.hdr-metadata-flags", &hdrMetadataFlags)) {
-    //     metrics_proto.set_hdr_metadata_flags(hdrMetadataFlags);
-    // }
-    // AStatsEvent_writeInt32(event, hdrMetadataFlags);
+    int32_t hdrStaticInfo = -1;
+    if (item->getInt32("android.media.mediacodec.hdr-static-info", &hdrStaticInfo)) {
+        metrics_proto.set_hdr_static_info(hdrStaticInfo);
+    }
+    AStatsEvent_writeInt32(event, hdrStaticInfo);
+
+    int32_t hdr10PlusInfo = -1;
+    if (item->getInt32("android.media.mediacodec.hdr10-plus-info", &hdr10PlusInfo)) {
+        metrics_proto.set_hdr10_plus_info(hdr10PlusInfo);
+    }
+    AStatsEvent_writeInt32(event, hdr10PlusInfo);
+
+    int32_t hdrFormat= -1;
+    if (item->getInt32("android.media.mediacodec.hdr-format", &hdrFormat)) {
+        metrics_proto.set_hdr_format(hdrFormat);
+    }
+    AStatsEvent_writeInt32(event, hdrFormat);
 
     int err = AStatsEvent_write(event);
     if (err < 0) {
