@@ -519,9 +519,11 @@ Status Spatializer::setHeadSensor(int sensorHandle) {
         return binderStatusFromStatusT(INVALID_OPERATION);
     }
     std::lock_guard lock(mLock);
-    mHeadSensor = sensorHandle;
-    checkPoseController_l();
-    checkSensorsState_l();
+    if (mHeadSensor != sensorHandle) {
+        mHeadSensor = sensorHandle;
+        checkPoseController_l();
+        checkSensorsState_l();
+    }
     return Status::ok();
 }
 
@@ -531,8 +533,13 @@ Status Spatializer::setScreenSensor(int sensorHandle) {
         return binderStatusFromStatusT(INVALID_OPERATION);
     }
     std::lock_guard lock(mLock);
-    mScreenSensor = sensorHandle;
-    checkSensorsState_l();
+    if (mScreenSensor != sensorHandle) {
+        mScreenSensor = sensorHandle;
+        // TODO: consider a new method setHeadAndScreenSensor()
+        // because we generally set both at the same time.
+        // This will avoid duplicated work and recentering.
+        checkSensorsState_l();
+    }
     return Status::ok();
 }
 
