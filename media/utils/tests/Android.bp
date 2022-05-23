@@ -7,8 +7,11 @@ package {
     default_applicable_licenses: ["frameworks_av_license"],
 }
 
-cc_test_library {
-    name: "libsharedtest",
+cc_defaults {
+    name: "libmediautils_tests_defaults",
+
+    host_supported: true,
+
     cflags: [
         "-Wall",
         "-Werror",
@@ -24,7 +27,28 @@ cc_test_library {
 
     shared_libs: [
         "liblog",
+        "libmediautils_core",
+        "libutils",
     ],
+
+}
+
+cc_defaults {
+    name: "libmediautils_tests_host_unavail",
+
+    defaults: ["libmediautils_tests_defaults"],
+
+    host_supported: false,
+
+    shared_libs: [
+        "libmediautils",
+    ],
+}
+
+cc_test_library {
+    name: "libsharedtest",
+
+    defaults: ["libmediautils_tests_defaults"],
 
     srcs: [
         "sharedtest.cpp",
@@ -34,28 +58,14 @@ cc_test_library {
 cc_test {
     name: "library_tests",
 
-    cflags: [
-        "-Wall",
-        "-Werror",
-        "-Wextra",
-    ],
-
-    sanitize: {
-        address: true,
-        cfi: true,
-        integer_overflow: true,
-        memtag_heap: true,
-    },
-
-    shared_libs: [
-        "libbase",
-        "liblog",
-        "libmediautils",
-        "libutils",
-    ],
+    defaults: ["libmediautils_tests_defaults"],
 
     data_libs: [
         "libsharedtest",
+    ],
+
+    shared_libs: [
+        "libbase",
     ],
 
     srcs: [
@@ -64,19 +74,24 @@ cc_test {
 }
 
 cc_test {
-    name: "media_process_tests",
+    name: "libmediautils_test",
 
-    cflags: [
-        "-Wall",
-        "-Werror",
-        "-Wextra",
-    ],
+    defaults: ["libmediautils_tests_host_unavail"],
 
     shared_libs: [
-        "liblog",
         "libmediautils",
-        "libutils",
     ],
+
+    srcs: [
+        "memory-test.cpp",
+        "TimerThread-test.cpp",
+    ],
+}
+
+cc_test {
+    name: "media_process_tests",
+
+    defaults: ["libmediautils_tests_host_unavail"],
 
     srcs: [
         "media_process_tests.cpp",
@@ -86,17 +101,7 @@ cc_test {
 cc_test {
     name: "media_synchronization_tests",
 
-    cflags: [
-        "-Wall",
-        "-Werror",
-        "-Wextra",
-    ],
-
-    shared_libs: [
-        "liblog",
-        "libmediautils",
-        "libutils",
-    ],
+    defaults: ["libmediautils_tests_host_unavail"],
 
     srcs: [
         "media_synchronization_tests.cpp",
@@ -106,17 +111,7 @@ cc_test {
 cc_test {
     name: "media_threadsnapshot_tests",
 
-    cflags: [
-        "-Wall",
-        "-Werror",
-        "-Wextra",
-    ],
-
-    shared_libs: [
-        "liblog",
-        "libmediautils",
-        "libutils",
-    ],
+    defaults: ["libmediautils_tests_host_unavail"],
 
     srcs: [
         "media_threadsnapshot_tests.cpp",
@@ -126,17 +121,10 @@ cc_test {
 cc_test {
     name: "mediautils_scopedstatistics_tests",
 
-    cflags: [
-        "-Wall",
-        "-Werror",
-        "-Wextra",
-    ],
+    defaults: ["libmediautils_tests_defaults"],
 
     shared_libs: [
         "libaudioutils",
-        "liblog",
-        "libmediautils",
-        "libutils",
     ],
 
     srcs: [
@@ -147,17 +135,10 @@ cc_test {
 cc_test {
     name: "methodstatistics_tests",
 
-    cflags: [
-        "-Wall",
-        "-Werror",
-        "-Wextra",
-    ],
+    defaults: ["libmediautils_tests_defaults"],
 
     shared_libs: [
         "libaudioutils",
-        "liblog",
-        "libmediautils",
-        "libutils",
     ],
 
     srcs: [
@@ -168,24 +149,7 @@ cc_test {
 cc_test {
     name: "timecheck_tests",
 
-    cflags: [
-        "-Wall",
-        "-Werror",
-        "-Wextra",
-    ],
-
-    sanitize: {
-        address: true,
-        cfi: true,
-        integer_overflow: true,
-        memtag_heap: true,
-    },
-
-    shared_libs: [
-        "liblog",
-        "libmediautils",
-        "libutils",
-    ],
+    defaults: ["libmediautils_tests_host_unavail"],
 
     srcs: [
         "timecheck_tests.cpp",
@@ -194,25 +158,8 @@ cc_test {
 
 cc_test {
     name: "extended_accumulator_tests",
-    cflags: [
-        "-Wall",
-        "-Werror",
-        "-Wextra",
-    ],
 
-    sanitize: {
-        address: true,
-        cfi: true,
-        integer_overflow: true,
-        memtag_heap: true,
-    },
-
-    shared_libs: [
-        "libbase",
-        "liblog",
-        "libmediautils",
-        "libutils",
-    ],
+    defaults: ["libmediautils_tests_defaults"],
 
     srcs: [
         "extended_accumulator_tests.cpp",
