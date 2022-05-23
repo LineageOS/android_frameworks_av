@@ -20,6 +20,7 @@
 #include <optional>
 
 #include <android/sensor.h>
+#include <sensor/Sensor.h>
 
 #include "Pose.h"
 #include "Twist.h"
@@ -91,6 +92,14 @@ class SensorPoseProvider {
      * @param handle The sensor handle, as provided to startSensor().
      */
     virtual void stopSensor(int32_t handle) = 0;
+
+    /**
+     * Returns the sensor or nullopt if it does not exist.
+     *
+     * The Sensor object has const methods that can be used to
+     * discover properties of the sensor.
+     */
+    virtual std::optional<const Sensor> getSensorByHandle(int32_t handle) = 0;
 };
 
 }  // namespace media

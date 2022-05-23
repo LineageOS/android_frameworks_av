@@ -298,7 +298,10 @@ private:
     /** Effect engine descriptor */
     const effect_descriptor_t mEngineDescriptor;
     /** Callback interface to parent audio policy service */
-    SpatializerPolicyCallback* mPolicyCallback;
+    SpatializerPolicyCallback* const mPolicyCallback;
+
+    /** Currently there is only one version of the spatializer running */
+    const std::string mMetricsId = AMEDIAMETRICS_KEY_PREFIX_AUDIO_SPATIALIZER "0";
 
     /** Mutex protecting internal state */
     mutable std::mutex mLock;
@@ -339,6 +342,7 @@ private:
     float mDisplayOrientation GUARDED_BY(mLock) = kDisplayOrientationInvalid;
 
     std::vector<media::SpatializationLevel> mLevels;
+    std::vector<media::SpatializerHeadTrackingMode> mHeadTrackingModes;
     std::vector<media::SpatializationMode> mSpatializationModes;
     std::vector<audio_channel_mask_t> mChannelMasks;
     bool mSupportsHeadTracking;

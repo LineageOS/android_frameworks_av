@@ -18,6 +18,7 @@
 #define LOG_TAG "SpatializerPoseController"
 //#define LOG_NDEBUG 0
 #include <sensor/Sensor.h>
+#include <media/MediaMetricsItem.h>
 #include <utils/Log.h>
 #include <utils/SystemClock.h>
 
@@ -74,6 +75,10 @@ using Ticks = std::chrono::nanoseconds;
 
 // How many ticks in a second.
 constexpr auto kTicksPerSecond = Ticks::period::den;
+
+std::string getSensorMetricsId(int32_t sensorId) {
+    return std::string(AMEDIAMETRICS_KEY_PREFIX_AUDIO_SENSOR).append(std::to_string(sensorId));
+}
 
 }  // namespace
 
@@ -144,9 +149,16 @@ SpatializerPoseController::~SpatializerPoseController() {
 
 void SpatializerPoseController::setHeadSensor(int32_t sensor) {
     std::lock_guard lock(mMutex);
+    if (sensor == mHeadSensor) return;
+    ALOGV("%s: new sensor:%d  mHeadSensor:%d  mScreenSensor:%d",
+            __func__, sensor, mHeadSensor, mScreenSensor);
+
     // Stop current sensor, if valid and different from the other sensor.
     if (mHeadSensor != INVALID_SENSOR && mHeadSensor != mScreenSensor) {
         mPoseProvider->stopSensor(mHeadSensor);
+        mediametrics::LogItem(getSensorMetricsId(mHeadSensor))
+            .set(AMEDIAMETRICS_PROP_EVENT, AMEDIAMETRICS_PROP_EVENT_VALUE_STOP)
+            .record();
     }
 
     if (sensor != INVALID_SENSOR) {
@@ -154,6 +166,15 @@ void SpatializerPoseController::setHeadSensor(int32_t sensor) {
             // Start new sensor.
             mHeadSensor =
                     mPoseProvider->startSensor(sensor, mSensorPeriod) ? sensor : INVALID_SENSOR;
+            if (mHeadSensor != INVALID_SENSOR) {
+                auto sensor = mPoseProvider->getSensorByHandle(mHeadSensor);
+                std::string stringType = sensor ? sensor->getStringType().c_str() : "";
+                mediametrics::LogItem(getSensorMetricsId(mHeadSensor))
+                    .set(AMEDIAMETRICS_PROP_EVENT, AMEDIAMETRICS_PROP_EVENT_VALUE_START)
+                    .set(AMEDIAMETRICS_PROP_MODE, AMEDIAMETRICS_PROP_MODE_VALUE_HEAD)
+                    .set(AMEDIAMETRICS_PROP_TYPE, stringType)
+                    .record();
+            }
         } else {
             // Sensor is already enabled.
             mHeadSensor = mScreenSensor;
@@ -162,14 +183,21 @@ void SpatializerPoseController::setHeadSensor(int32_t sensor) {
         mHeadSensor = INVALID_SENSOR;
     }
 
-    mProcessor->recenter(true, false);
+    mProcessor->recenter(true /* recenterHead */, false /* recenterScreen */);
 }
 
 void SpatializerPoseController::setScreenSensor(int32_t sensor) {
     std::lock_guard lock(mMutex);
+    if (sensor == mScreenSensor) return;
+    ALOGV("%s: new sensor:%d  mHeadSensor:%d  mScreenSensor:%d",
+            __func__, sensor, mHeadSensor, mScreenSensor);
+
     // Stop current sensor, if valid and different from the other sensor.
     if (mScreenSensor != INVALID_SENSOR && mScreenSensor != mHeadSensor) {
         mPoseProvider->stopSensor(mScreenSensor);
+        mediametrics::LogItem(getSensorMetricsId(mScreenSensor))
+            .set(AMEDIAMETRICS_PROP_EVENT, AMEDIAMETRICS_PROP_EVENT_VALUE_STOP)
+            .record();
     }
 
     if (sensor != INVALID_SENSOR) {
@@ -177,6 +205,13 @@ void SpatializerPoseController::setScreenSensor(int32_t sensor) {
             // Start new sensor.
             mScreenSensor =
                     mPoseProvider->startSensor(sensor, mSensorPeriod) ? sensor : INVALID_SENSOR;
+            auto sensor = mPoseProvider->getSensorByHandle(mScreenSensor);
+            std::string stringType = sensor ? sensor->getStringType().c_str() : "";
+            mediametrics::LogItem(getSensorMetricsId(mScreenSensor))
+                .set(AMEDIAMETRICS_PROP_EVENT, AMEDIAMETRICS_PROP_EVENT_VALUE_START)
+                .set(AMEDIAMETRICS_PROP_MODE, AMEDIAMETRICS_PROP_MODE_VALUE_SCREEN)
+                .set(AMEDIAMETRICS_PROP_TYPE, stringType)
+                .record();
         } else {
             // Sensor is already enabled.
             mScreenSensor = mHeadSensor;
@@ -185,7 +220,7 @@ void SpatializerPoseController::setScreenSensor(int32_t sensor) {
         mScreenSensor = INVALID_SENSOR;
     }
 
-    mProcessor->recenter(false, true);
+    mProcessor->recenter(false /* recenterHead */, true /* recenterScreen */);
 }
 
 void SpatializerPoseController::setDesiredMode(HeadTrackingMode mode) {
