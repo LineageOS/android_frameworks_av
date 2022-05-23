@@ -1435,7 +1435,7 @@ void CCodec::configure(const sp<AMessage> &msg) {
                 int64_t blockUsage =
                     usage.value | C2MemoryUsage::CPU_READ | C2MemoryUsage::CPU_WRITE;
                 std::shared_ptr<C2GraphicBlock> block = FetchGraphicBlock(
-                        width, height, pixelFormat, blockUsage, {comp->getName()});
+                        width, height, componentColorFormat, blockUsage, {comp->getName()});
                 sp<GraphicBlockBuffer> buffer;
                 if (block) {
                     buffer = GraphicBlockBuffer::Allocate(
