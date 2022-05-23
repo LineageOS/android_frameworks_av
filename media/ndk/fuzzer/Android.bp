@@ -84,3 +84,9 @@ cc_fuzz {
     srcs: ["ndk_mediaformat_fuzzer.cpp"],
     defaults: ["libmediandk_fuzzer_defaults",],
 }
+
+cc_fuzz {
+    name: "ndk_drm_fuzzer",
+    srcs: ["ndk_drm_fuzzer.cpp"],
+    defaults: ["libmediandk_fuzzer_defaults",],
+}

@@ -5,6 +5,7 @@
 + [ndk_image_reader_fuzzer](#NdkImageReader)
 + [ndk_extractor_fuzzer](#NdkExtractor)
 + [ndk_mediaformat_fuzzer](#NdkMediaFormat)
++ [ndk_drm_fuzzer](#NdkDrm)
 
 # <a name="NdkCrypto"></a> Fuzzer for NdkCrypto
 
@@ -92,4 +93,28 @@ NdkMediaFormat supports the following parameters:
 ```
   $ adb sync data
   $ adb shell /data/fuzz/${TARGET_ARCH}/ndk_mediaformat_fuzzer/ndk_mediaformat_fuzzer /data/fuzz/${TARGET_ARCH}/ndk_mediaformat_fuzzer/corpus
+```
+
+# <a name="NdkDrm"></a> Fuzzer for NdkDrm
+
+NdkDrm supports the following parameters:
+1. ValidUUID(parameter name: "kCommonPsshBoxUUID" and "kClearKeyUUID")
+2. MimeType(parameter name: "kMimeType")
+3. MediaUUID(parameter name: "MediaUUID")
+
+| Parameter| Valid Values| Configured Value|
+|------------- |-------------| ----- |
+|`ValidUUID`| 0.`kCommonPsshBoxUUID`,<br/> 1.`kClearKeyUUID`,<br/> 2.`kInvalidUUID`|Value obtained from FuzzedDataProvider|
+|`kMimeType`| 0.`video/mp4`,<br/> 1.`audio/mp4`|Value obtained from FuzzedDataProvider|
+|`MediaUUID`| 0.`INVALID_UUID`,<br/> 1.`PSSH_BOX_UUID`,<br/> 2.`CLEARKEY_UUID`|Value obtained from FuzzedDataProvider|
+
+#### Steps to run
+1. Build the fuzzer
+```
+  $ mm -j$(nproc) ndk_drm_fuzzer
+```
+2. Run on device
+```
+  $ adb sync data
+  $ adb shell /data/fuzz/arm64/ndk_drm_fuzzer/ndk_drm_fuzzer
 ```
