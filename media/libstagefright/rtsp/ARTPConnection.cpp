@@ -18,6 +18,7 @@
 #define LOG_TAG "ARTPConnection"
 #include <utils/Log.h>
 
+#include <media/stagefright/rtsp/ARTPAssembler.h>
 #include <media/stagefright/rtsp/ARTPConnection.h>
 #include <media/stagefright/rtsp/ARTPSource.h>
 #include <media/stagefright/rtsp/ASessionDescription.h>
@@ -39,6 +40,10 @@ static const size_t kMaxUDPSize = 1500;
 
 static uint16_t u16at(const uint8_t *data) {
     return data[0] << 8 | data[1];
+}
+
+static uint32_t u24at(const uint8_t *data) {
+    return u16at(data) << 16 | data[2];
 }
 
 static uint32_t u32at(const uint8_t *data) {
@@ -877,11 +882,15 @@ status_t ARTPConnection::parseRTCP(StreamInfo *s, const sp<ABuffer> &buffer) {
         switch (data[1]) {
             case 200:
             {
-                parseSR(s, data, headerLength);
+                parseSenderReport(s, data, headerLength);
                 break;
             }
 
             case 201:  // RR
+            {
+                parseReceiverReport(s, data, headerLength);
+                break;
+            }
             case 202:  // SDES
             case 204:  // APP
                 break;
@@ -940,18 +949,44 @@ status_t ARTPConnection::parseBYE(
     return OK;
 }
 
-status_t ARTPConnection::parseSR(
+status_t ARTPConnection::parseSenderReport(
         StreamInfo *s, const uint8_t *data, size_t size) {
-    size_t RC = data[0] & 0x1f;
-
-    if (size < (7 + RC * 6) * 4) {
-        // Packet too short for the minimal SR header.
+    ALOG_ASSERT(size >= 1, "parseSenderReport: invalid packet size.");
+    size_t receptionReportCount = data[0] & 0x1f;
+    if (size < (7 + (receptionReportCount * 6)) * 4) {
+        // Packet too short for the minimal sender report header.
         return -1;
     }
 
-    uint32_t id = u32at(&data[4]);
+    int64_t recvTimeUs = ALooper::GetNowUs();
+    uint32_t senderId = u32at(&data[4]);
     uint64_t ntpTime = u64at(&data[8]);
     uint32_t rtpTime = u32at(&data[16]);
+    uint32_t pktCount = u32at(&data[20]);
+    uint32_t octCount = u32at(&data[24]);
+
+    ALOGD("SR received: ssrc=0x%08x, rtpTime%u == ntpTime %llu, pkt=%u, oct=%u",
+            senderId, rtpTime, (unsigned long long)ntpTime, pktCount, octCount);
+
+    sp<ARTPSource> source = findSource(s, senderId);
+    source->timeUpdate(recvTimeUs, rtpTime, ntpTime);
+
+    for (int32_t i = 0; i < receptionReportCount; i++) {
+        int32_t offset = 28 + (i * 24);
+        parseReceptionReportBlock(s, recvTimeUs, senderId, data + offset, size - offset);
+    }
+
+    return 0;
+}
+
+status_t ARTPConnection::parseReceiverReport(
+        StreamInfo *s, const uint8_t *data, size_t size) {
+    ALOG_ASSERT(size >= 1, "parseReceiverReport: invalid packet size.");
+    size_t receptionReportCount = data[0] & 0x1f;
+    if (size < (2 + (receptionReportCount * 6)) * 4) {
+        // Packet too short for the minimal receiver report header.
+        return -1;
+    }
 
 #if 0
     ALOGI("XXX timeUpdate: ssrc=0x%08x, rtpTime %u == ntpTime %.3f",
@@ -959,10 +994,40 @@ status_t ARTPConnection::parseSR(
          rtpTime,
          (ntpTime >> 32) + (double)(ntpTime & 0xffffffff) / (1ll << 32));
 #endif
+    int64_t recvTimeUs = ALooper::GetNowUs();
+    uint32_t senderId = u32at(&data[4]);
 
-    sp<ARTPSource> source = findSource(s, id);
+    for (int i = 0; i < receptionReportCount; i++) {
+        int32_t offset = 8 + (i * 24);
+        parseReceptionReportBlock(s, recvTimeUs, senderId, data + offset, size - offset);
+    }
 
-    source->timeUpdate(rtpTime, ntpTime);
+    return 0;
+}
+
+status_t ARTPConnection::parseReceptionReportBlock(
+        StreamInfo *s, int64_t recvTimeUs, uint32_t senderId, const uint8_t *data, size_t size) {
+    ALOG_ASSERT(size >= 24, "parseReceptionReportBlock: invalid packet size.");
+    if (size < 24) {
+        // remaining size is smaller than reception report block size.
+        return -1;
+    }
+
+    uint32_t rbId = u32at(&data[0]);
+    uint32_t fLost = data[4];
+    int32_t cumLost = u24at(&data[5]);
+    uint32_t ehSeq = u32at(&data[8]);
+    uint32_t jitter = u32at(&data[12]);
+    uint32_t lsr = u32at(&data[16]);
+    uint32_t dlsr = u32at(&data[20]);
+
+    ALOGD("Reception Report Block: t:%llu sid:%u rid:%u fl:%u cl:%u hs:%u jt:%u lsr:%u dlsr:%u",
+            (unsigned long long)recvTimeUs, senderId, rbId, fLost, cumLost,
+            ehSeq, jitter, lsr, dlsr);
+    sp<ARTPSource> source = findSource(s, senderId);
+    sp<ReceptionReportBlock> rrb = new ReceptionReportBlock(
+            rbId, fLost, cumLost, ehSeq, jitter, lsr, dlsr);
+    source->processReceptionReportBlock(recvTimeUs, senderId, rrb);
 
     return 0;
 }
