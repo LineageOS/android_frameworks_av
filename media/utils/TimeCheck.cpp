@@ -24,8 +24,20 @@
 #include <mediautils/FixedString.h>
 #include <mediautils/MethodStatistics.h>
 #include <mediautils/TimeCheck.h>
+#include <mediautils/TidWrapper.h>
 #include <utils/Log.h>
+
+#if defined(__BIONIC__)
 #include "debuggerd/handler.h"
+#endif
+
+// This function appropriately signals a pid to dump a backtrace if we are
+// running on device.
+static inline void signalAudioHAL([[maybe_unused]] pid_t pid) {
+#if defined(__BIONIC__)
+    sigqueue(pid, DEBUGGER_SIGNAL, {.sival_int = 0});
+#endif
+}
 
 namespace android::mediautils {
 
@@ -143,7 +155,7 @@ TimeCheck::TimeCheck(std::string_view tag, OnTimerFunc&& onTimer, Duration reque
         Duration secondChanceDuration, bool crashOnTimeout)
     : mTimeCheckHandler{ std::make_shared<TimeCheckHandler>(
             tag, std::move(onTimer), crashOnTimeout, requestedTimeoutDuration,
-            secondChanceDuration, std::chrono::system_clock::now(), gettid()) }
+            secondChanceDuration, std::chrono::system_clock::now(), getThreadIdWrapper()) }
     , mTimerHandle(requestedTimeoutDuration.count() == 0
               /* for TimeCheck we don't consider a non-zero secondChanceDuration here */
               ? getTimeCheckThread().trackTask(mTimeCheckHandler->tag)
@@ -251,7 +263,7 @@ void TimeCheck::TimeCheckHandler::onTimeout(TimerThread::Handle timerHandle) con
         for (const auto& pid : pids) {
             ALOGI("requesting tombstone for pid: %d", pid);
             halPids.append(std::to_string(pid)).append(" ");
-            sigqueue(pid, DEBUGGER_SIGNAL, {.sival_int = 0});
+            signalAudioHAL(pid);
         }
         sleep(1);
     } else {

@@ -18,8 +18,7 @@
 
 #define PROCESS_INFO_H_
 
-#include <media/stagefright/foundation/ABase.h>
-#include <media/stagefright/ProcessInfoInterface.h>
+#include <mediautils/ProcessInfoInterface.h>
 #include <map>
 #include <mutex>
 #include <utils/Condition.h>
@@ -46,7 +45,8 @@ private:
     std::mutex mOverrideLock;
     std::map<int, ProcessInfoOverride> mOverrideMap GUARDED_BY(mOverrideLock);
 
-    DISALLOW_EVIL_CONSTRUCTORS(ProcessInfo);
+    ProcessInfo(const ProcessInfo&) = delete;
+    ProcessInfo& operator=(const ProcessInfo&) = delete;
 };
 
 }  // namespace android

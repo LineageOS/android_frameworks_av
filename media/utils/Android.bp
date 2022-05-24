@@ -28,19 +28,35 @@ cc_defaults {
         "-Werror",
         "-Wextra",
     ],
+    sanitize: {
+        cfi: true,
+        integer_overflow: true,
+    },
+    target: {
+        host: {
+            sanitize: {
+                cfi: false,
+            },
+        },
+    },
 }
 
 filegroup {
     name: "libmediautils_core_srcs",
     srcs: [
         "AImageReaderUtils.cpp",
+        "BatteryNotifier.cpp",
         "ISchedulingPolicyService.cpp",
         "Library.cpp",
         "MediaUtilsDelayed.cpp",
         "MethodStatistics.cpp",
         "Process.cpp",
+        "ProcessInfo.cpp",
         "SchedulingPolicyService.cpp",
+        "ServiceUtilities.cpp",
         "ThreadSnapshot.cpp",
+        "TimeCheck.cpp",
+        "TimerThread.cpp",
     ],
 }
 
@@ -55,47 +71,15 @@ cc_library_headers {
     export_include_dirs: ["include"],
 }
 
-cc_library {
-    name: "libmediautils_core",
-    defaults: ["libmediautils_defaults"],
-    host_supported: true,
-    srcs: [":libmediautils_core_srcs"],
-    shared_libs: [
-        "libaudioutils", // for clock.h, Statistics.h
-        "libbase",
-        "libbinder",
-        "libhidlbase",
-        "liblog",
-        "libpermission",
-        "libutils",
-        "android.hardware.graphics.bufferqueue@1.0",
-        "android.hidl.token@1.0-utils",
-        "packagemanager_aidl-cpp",
-    ],
-
-    export_shared_lib_headers: [
-        "libpermission",
-    ],
-
-    local_include_dirs: ["include"],
-    export_include_dirs: ["include"],
-}
 
 cc_library {
     name: "libmediautils",
+    host_supported: true,
     defaults: ["libmediautils_defaults"],
     srcs: [
         ":libmediautils_core_srcs",
-        "BatteryNotifier.cpp",
-        "MemoryLeakTrackUtil.cpp",
-        "LimitProcessMemory.cpp",
-        "ProcessInfo.cpp",
-        "ServiceUtilities.cpp",
-        "TimeCheck.cpp",
-        "TimerThread.cpp",
     ],
     static_libs: [
-        "libc_malloc_debug_backtrace",
         "libbatterystats_aidl",
         "libprocessinfoservice_aidl",
     ],
@@ -119,11 +103,6 @@ cc_library {
 
     logtags: ["EventLogTags.logtags"],
 
-    header_libs: [
-        "bionic_libc_platform_headers",
-        "libmedia_headers",
-    ],
-
     export_shared_lib_headers: [
         "libpermission",
     ],
@@ -132,16 +111,32 @@ cc_library {
         "libmediautils_delayed", // lazy loaded
     ],
 
-    include_dirs: [
-        // For DEBUGGER_SIGNAL
-        "system/core/debuggerd/include",
-    ],
+    target: {
+        android: {
+            srcs: [
+                "LimitProcessMemory.cpp",
+                "MemoryLeakTrackUtil.cpp",
+            ],
+            static_libs: [
+                "libc_malloc_debug_backtrace",
+            ],
+            include_dirs: [
+                // For DEBUGGER_SIGNAL
+                "system/core/debuggerd/include",
+            ],
+            header_libs: [
+                "bionic_libc_platform_headers",
+            ],
+        },
+    },
+
     local_include_dirs: ["include"],
     export_include_dirs: ["include"],
 }
 
 cc_library {
     name: "libmediautils_delayed", // match with MEDIAUTILS_DELAYED_LIBRARY_NAME
+    host_supported: true,
     defaults: ["libmediautils_defaults"],
     srcs: [
         "MediaUtilsDelayedLibrary.cpp",

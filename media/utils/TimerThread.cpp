@@ -22,6 +22,7 @@
 #include <vector>
 
 #include <mediautils/MediaUtilsDelayed.h>
+#include <mediautils/TidWrapper.h>
 #include <mediautils/TimerThread.h>
 #include <utils/Log.h>
 #include <utils/ThreadDefs.h>
@@ -39,14 +40,14 @@ TimerThread::Handle TimerThread::scheduleTask(
     const auto now = std::chrono::system_clock::now();
     auto request = std::make_shared<const Request>(now, now +
             std::chrono::duration_cast<std::chrono::system_clock::duration>(timeoutDuration),
-            secondChanceDuration, gettid(), tag);
+            secondChanceDuration, getThreadIdWrapper(), tag);
     return mMonitorThread.add(std::move(request), std::move(func), timeoutDuration);
 }
 
 TimerThread::Handle TimerThread::trackTask(std::string_view tag) {
     const auto now = std::chrono::system_clock::now();
     auto request = std::make_shared<const Request>(now, now,
-            Duration{} /* secondChanceDuration */, gettid(), tag);
+            Duration{} /* secondChanceDuration */, getThreadIdWrapper(), tag);
     return mNoTimeoutMap.add(std::move(request));
 }
 

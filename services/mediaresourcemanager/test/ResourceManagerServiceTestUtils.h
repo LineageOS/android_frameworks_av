@@ -21,7 +21,7 @@
 #include <media/MediaResource.h>
 #include <media/MediaResourcePolicy.h>
 #include <media/stagefright/foundation/ADebug.h>
-#include <media/stagefright/ProcessInfoInterface.h>
+#include <mediautils/ProcessInfoInterface.h>
 
 namespace android {
 

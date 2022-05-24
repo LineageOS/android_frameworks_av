@@ -40,6 +40,7 @@ cc_fuzz {
         "libbinder",
         "libbinder_ndk",
         "libmedia",
+        "libmediautils",
         "libutils",
     ],
     fuzz_config: {

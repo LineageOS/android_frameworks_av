@@ -110,6 +110,11 @@ cc_defaults {
                 "-DNO_IMEMORY",
             ],
         },
+        host: {
+            sanitize: {
+                cfi: false,
+            },
+        },
         apex: {
             exclude_shared_libs: [
                 "libbinder",
