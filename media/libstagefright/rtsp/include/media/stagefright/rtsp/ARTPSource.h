@@ -36,6 +36,7 @@ const uint32_t kStaticJitterTimeMs = 100;   // 100ms
 struct ABuffer;
 struct AMessage;
 struct ARTPAssembler;
+struct ReceptionReportBlock;
 struct ASessionDescription;
 
 struct ARTPSource : public RefBase {
@@ -59,8 +60,10 @@ struct ARTPSource : public RefBase {
 
     void processRTPPacket(const sp<ABuffer> &buffer);
     void processRTPPacket();
+    void processReceptionReportBlock(
+            int64_t recvTimeUs, uint32_t senderId, sp<ReceptionReportBlock> rrb);
     void timeReset();
-    void timeUpdate(uint32_t rtpTime, uint64_t ntpTime);
+    void timeUpdate(int64_t recvTimeUs, uint32_t rtpTime, uint64_t ntpTime);
     void byeReceived();
 
     List<sp<ABuffer> > *queue() { return &mQueue; }
@@ -134,6 +137,8 @@ private:
     uint32_t mLastSrRtpTime;
     uint64_t mLastSrNtpTime;
     int64_t mLastSrUpdateTimeUs;
+
+    int64_t mLastRrUpdateTimeUs;
 
     bool mIsFirstRtpRtcpGap;
     double mAvgRtpRtcpGapMs;
