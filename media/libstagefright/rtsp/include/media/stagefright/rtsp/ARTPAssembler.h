@@ -105,6 +105,27 @@ inline void ARTPAssembler::printRTPTime(int64_t rtp, int64_t play, int64_t exp, 
             (long long)rtp, (long long)play, (long long)exp, isExp);
 }
 
+struct ReceptionReportBlock : public RefBase {
+    uint32_t ssrc;       // ssrc of data source being reported
+    uint32_t fraction;   // fraction lost since last SR/RR
+    int32_t lost;        // cumul. no. pkts lost (signed!)
+    uint32_t lastSeq;    // extended last seq. no. received
+    uint32_t jitter;     // interarrival jitter
+    uint32_t lsr;        // last SR packet from this source
+    uint32_t dlsr;       // delay since last SR packet
+
+    ReceptionReportBlock(uint32_t ssrc, uint32_t fraction, int32_t lost, uint32_t lastSeq,
+            uint32_t jitter, uint32_t lsr, uint32_t dlsr) {
+        this->ssrc = ssrc;
+        this->fraction = fraction;
+        this->lost = lost;
+        this->lastSeq = lastSeq;
+        this->jitter = jitter;
+        this->lsr = lsr;
+        this->dlsr = dlsr;
+    }
+};
+
 }  // namespace android
 
 #endif  // A_RTP_ASSEMBLER_H_
