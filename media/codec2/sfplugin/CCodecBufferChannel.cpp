@@ -432,6 +432,10 @@ status_t CCodecBufferChannel::attachEncryptedBuffer(
     for (size_t i = 0; i < numSubSamples; ++i) {
         size += subSamples[i].mNumBytesOfClearData + subSamples[i].mNumBytesOfEncryptedData;
     }
+    if (size == 0) {
+        buffer->setRange(0, 0);
+        return OK;
+    }
     std::shared_ptr<C2BlockPool> pool = mBlockPools.lock()->inputPool;
     std::shared_ptr<C2LinearBlock> block;
     c2_status_t err = pool->fetchLinearBlock(
@@ -439,6 +443,8 @@ status_t CCodecBufferChannel::attachEncryptedBuffer(
             secure ? kSecureUsage : kDefaultReadWriteUsage,
             &block);
     if (err != C2_OK) {
+        ALOGI("[%s] attachEncryptedBuffer: fetchLinearBlock failed: size = %zu (%s) err = %d",
+              mName, size, secure ? "secure" : "non-secure", err);
         return NO_MEMORY;
     }
     if (!secure) {
@@ -463,17 +469,8 @@ status_t CCodecBufferChannel::attachEncryptedBuffer(
                 key, iv, mode, pattern, src, 0, subSamples, numSubSamples,
                 dst, &errorDetailMsg);
         if (result < 0) {
+            ALOGI("[%s] attachEncryptedBuffer: decrypt failed: result = %zd", mName, result);
             return result;
-        }
-        if (dst.type == DrmBufferType::SHARED_MEMORY) {
-            C2WriteView view = block->map().get();
-            if (view.error() != C2_OK) {
-                return false;
-            }
-            if (view.size() < result) {
-                return false;
-            }
-            memcpy(view.data(), mDecryptDestination->unsecurePointer(), result);
         }
     } else {
         // Here we cast CryptoPlugin::SubSample to hardware::cas::native::V1_0::SubSample
@@ -523,16 +520,22 @@ status_t CCodecBufferChannel::attachEncryptedBuffer(
         }
 
         if (result < codecDataOffset) {
-            ALOGD("invalid codec data offset: %zd, result %zd", codecDataOffset, result);
+            ALOGD("[%s] invalid codec data offset: %zd, result %zd",
+                  mName, codecDataOffset, result);
             return BAD_VALUE;
         }
     }
     if (!secure) {
         C2WriteView view = block->map().get();
         if (view.error() != C2_OK) {
+            ALOGI("[%s] attachEncryptedBuffer: block map error: %d (non-secure)",
+                  mName, view.error());
             return UNKNOWN_ERROR;
         }
         if (view.size() < result) {
+            ALOGI("[%s] attachEncryptedBuffer: block size too small: size=%u result=%zd "
+                  "(non-secure)",
+                  mName, view.size(), result);
             return UNKNOWN_ERROR;
         }
         memcpy(view.data(), mDecryptDestination->unsecurePointer(), result);
@@ -540,6 +543,7 @@ status_t CCodecBufferChannel::attachEncryptedBuffer(
     std::shared_ptr<C2Buffer> c2Buffer{C2Buffer::CreateLinearBuffer(
             block->share(codecDataOffset, result - codecDataOffset, C2Fence{}))};
     if (!buffer->copy(c2Buffer)) {
+        ALOGI("[%s] attachEncryptedBuffer: buffer copy failed", mName);
         return -ENOSYS;
     }
     return OK;
