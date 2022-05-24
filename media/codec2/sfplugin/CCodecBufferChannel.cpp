@@ -1470,54 +1470,47 @@ status_t CCodecBufferChannel::start(
     return OK;
 }
 
-status_t CCodecBufferChannel::requestInitialInputBuffers() {
+status_t CCodecBufferChannel::prepareInitialInputBuffers(
+        std::map<size_t, sp<MediaCodecBuffer>> *clientInputBuffers) {
     if (mInputSurface) {
         return OK;
     }
 
+    size_t numInputSlots = mInput.lock()->numSlots;
+
+    {
+        Mutexed<Input>::Locked input(mInput);
+        while (clientInputBuffers->size() < numInputSlots) {
+            size_t index;
+            sp<MediaCodecBuffer> buffer;
+            if (!input->buffers->requestNewBuffer(&index, &buffer)) {
+                break;
+            }
+            clientInputBuffers->emplace(index, buffer);
+        }
+    }
+    if (clientInputBuffers->empty()) {
+        ALOGW("[%s] start: cannot allocate memory at all", mName);
+        return NO_MEMORY;
+    } else if (clientInputBuffers->size() < numInputSlots) {
+        ALOGD("[%s] start: cannot allocate memory for all slots, "
+              "only %zu buffers allocated",
+              mName, clientInputBuffers->size());
+    } else {
+        ALOGV("[%s] %zu initial input buffers available",
+              mName, clientInputBuffers->size());
+    }
+    return OK;
+}
+
+status_t CCodecBufferChannel::requestInitialInputBuffers(
+        std::map<size_t, sp<MediaCodecBuffer>> &&clientInputBuffers) {
     C2StreamBufferTypeSetting::output oStreamFormat(0u);
     C2PrependHeaderModeSetting prepend(PREPEND_HEADER_TO_NONE);
     c2_status_t err = mComponent->query({ &oStreamFormat, &prepend }, {}, C2_DONT_BLOCK, nullptr);
     if (err != C2_OK && err != C2_BAD_INDEX) {
         return UNKNOWN_ERROR;
     }
-    size_t numInputSlots = mInput.lock()->numSlots;
-
-    struct ClientInputBuffer {
-        size_t index;
-        sp<MediaCodecBuffer> buffer;
-        size_t capacity;
-    };
-    std::list<ClientInputBuffer> clientInputBuffers;
-
-    {
-        Mutexed<Input>::Locked input(mInput);
-        while (clientInputBuffers.size() < numInputSlots) {
-            ClientInputBuffer clientInputBuffer;
-            if (!input->buffers->requestNewBuffer(&clientInputBuffer.index,
-                                                  &clientInputBuffer.buffer)) {
-                break;
-            }
-            clientInputBuffer.capacity = clientInputBuffer.buffer->capacity();
-            clientInputBuffers.emplace_back(std::move(clientInputBuffer));
-        }
-    }
-    if (clientInputBuffers.empty()) {
-        ALOGW("[%s] start: cannot allocate memory at all", mName);
-        return NO_MEMORY;
-    } else if (clientInputBuffers.size() < numInputSlots) {
-        ALOGD("[%s] start: cannot allocate memory for all slots, "
-              "only %zu buffers allocated",
-              mName, clientInputBuffers.size());
-    } else {
-        ALOGV("[%s] %zu initial input buffers available",
-              mName, clientInputBuffers.size());
-    }
-    // Sort input buffers by their capacities in increasing order.
-    clientInputBuffers.sort(
-            [](const ClientInputBuffer& a, const ClientInputBuffer& b) {
-                return a.capacity < b.capacity;
-            });
 
     std::list<std::unique_ptr<C2Work>> flushedConfigs;
     mFlushedConfigs.lock()->swap(flushedConfigs);
@@ -1539,25 +1532,31 @@ status_t CCodecBufferChannel::requestInitialInputBuffers() {
         }
     }
     if (oStreamFormat.value == C2BufferData::LINEAR &&
-            (!prepend || prepend.value == PREPEND_HEADER_TO_NONE)) {
-        sp<MediaCodecBuffer> buffer = clientInputBuffers.front().buffer;
+            (!prepend || prepend.value == PREPEND_HEADER_TO_NONE) &&
+            !clientInputBuffers.empty()) {
+        size_t minIndex = clientInputBuffers.begin()->first;
+        sp<MediaCodecBuffer> minBuffer = clientInputBuffers.begin()->second;
+        for (const auto &[index, buffer] : clientInputBuffers) {
+            if (minBuffer->capacity() > buffer->capacity()) {
+                minIndex = index;
+                minBuffer = buffer;
+            }
+        }
         // WORKAROUND: Some apps expect CSD available without queueing
         //             any input. Queue an empty buffer to get the CSD.
-        buffer->setRange(0, 0);
-        buffer->meta()->clear();
-        buffer->meta()->setInt64("timeUs", 0);
-        if (queueInputBufferInternal(buffer) != OK) {
+        minBuffer->setRange(0, 0);
+        minBuffer->meta()->clear();
+        minBuffer->meta()->setInt64("timeUs", 0);
+        if (queueInputBufferInternal(minBuffer) != OK) {
             ALOGW("[%s] Error while queueing an empty buffer to get CSD",
                   mName);
             return UNKNOWN_ERROR;
         }
-        clientInputBuffers.pop_front();
+        clientInputBuffers.erase(minIndex);
     }
 
-    for (const ClientInputBuffer& clientInputBuffer: clientInputBuffers) {
-        mCallback->onInputBufferAvailable(
-                clientInputBuffer.index,
-                clientInputBuffer.buffer);
+    for (const auto &[index, buffer] : clientInputBuffers) {
+        mCallback->onInputBufferAvailable(index, buffer);
     }
 
     return OK;
