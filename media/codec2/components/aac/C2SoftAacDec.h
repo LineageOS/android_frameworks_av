@@ -101,6 +101,7 @@ private:
     int32_t outputDelayRingBufferGetSamples(INT_PCM *samples, int numSamples);
     int32_t outputDelayRingBufferSamplesAvailable();
     int32_t outputDelayRingBufferSpaceLeft();
+    uint32_t maskFromCount(uint32_t channelCount);
 
     C2_DO_NOT_COPY(C2SoftAacDec);
 };
