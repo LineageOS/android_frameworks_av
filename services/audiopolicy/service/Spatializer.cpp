@@ -31,6 +31,7 @@
 #include <media/audiohal/EffectsFactoryHalInterface.h>
 #include <media/stagefright/foundation/AHandler.h>
 #include <media/stagefright/foundation/AMessage.h>
+#include <media/MediaMetricsItem.h>
 #include <media/ShmemCompat.h>
 #include <mediautils/ServiceUtilities.h>
 #include <utils/Thread.h>
@@ -56,6 +57,19 @@ using namespace std::chrono_literals;
     ({ auto _tmp = (x); \
        if (!_tmp.ok()) return aidl_utils::binderStatusFromStatusT(_tmp.error()); \
        std::move(_tmp.value()); })
+
+audio_channel_mask_t getMaxChannelMask(std::vector<audio_channel_mask_t> masks) {
+    uint32_t maxCount = 0;
+    audio_channel_mask_t maxMask = AUDIO_CHANNEL_NONE;
+    for (auto mask : masks) {
+        const size_t count = audio_channel_count_from_out_mask(mask);
+        if (count > maxCount) {
+            maxMask = mask;
+            maxCount = count;
+        }
+    }
+    return maxMask;
+}
 
 // ---------------------------------------------------------------------------
 
@@ -286,6 +300,21 @@ status_t Spatializer::loadEngineConfiguration(sp<EffectHalInterface> effect) {
         ALOGW("%s: SPATIALIZER_PARAM_SUPPORTED_CHANNEL_MASKS reports empty", __func__);
         return BAD_VALUE;
     }
+
+    // Currently we expose only RELATIVE_WORLD.
+    // This is a limitation of the head tracking library based on a UX choice.
+    mHeadTrackingModes.push_back(SpatializerHeadTrackingMode::DISABLED);
+    if (mSupportsHeadTracking) {
+        mHeadTrackingModes.push_back(SpatializerHeadTrackingMode::RELATIVE_WORLD);
+    }
+    mediametrics::LogItem(mMetricsId)
+        .set(AMEDIAMETRICS_PROP_EVENT, AMEDIAMETRICS_PROP_EVENT_VALUE_CREATE)
+        .set(AMEDIAMETRICS_PROP_CHANNELMASK, (int32_t)getMaxChannelMask(mChannelMasks))
+        .set(AMEDIAMETRICS_PROP_LEVELS, aidl_utils::enumsToString(mLevels))
+        .set(AMEDIAMETRICS_PROP_MODES, aidl_utils::enumsToString(mSpatializationModes))
+        .set(AMEDIAMETRICS_PROP_HEADTRACKINGMODES, aidl_utils::enumsToString(mHeadTrackingModes))
+        .set(AMEDIAMETRICS_PROP_STATUS, (int32_t)status)
+        .record();
     return NO_ERROR;
 }
 
@@ -294,14 +323,7 @@ audio_config_base_t Spatializer::getAudioInConfig() const {
     std::lock_guard lock(mLock);
     audio_config_base_t config = AUDIO_CONFIG_BASE_INITIALIZER;
     // For now use highest supported channel count
-    uint32_t maxCount = 0;
-    for ( auto mask : mChannelMasks) {
-        const size_t count = audio_channel_count_from_out_mask(mask);
-        if (count > maxCount) {
-            config.channel_mask = mask;
-            maxCount = count;
-        }
-    }
+    config.channel_mask = getMaxChannelMask(mChannelMasks);
     return config;
 }
 
@@ -338,7 +360,7 @@ Status Spatializer::getSupportedLevels(std::vector<SpatializationLevel> *levels)
     if (levels == nullptr) {
         return binderStatusFromStatusT(BAD_VALUE);
     }
-    levels->push_back(SpatializationLevel::NONE);
+    // SpatializationLevel::NONE is already required from the effect or we don't load it.
     levels->insert(levels->end(), mLevels.begin(), mLevels.end());
     return Status::ok();
 }
@@ -399,11 +421,7 @@ Status Spatializer::getSupportedHeadTrackingModes(
     if (modes == nullptr) {
         return binderStatusFromStatusT(BAD_VALUE);
     }
-
-    modes->push_back(SpatializerHeadTrackingMode::DISABLED);
-    if (mSupportsHeadTracking) {
-        modes->push_back(SpatializerHeadTrackingMode::RELATIVE_WORLD);
-    }
+    modes->insert(modes->end(), mHeadTrackingModes.begin(), mHeadTrackingModes.end());
     return Status::ok();
 }
 
@@ -501,9 +519,11 @@ Status Spatializer::setHeadSensor(int sensorHandle) {
         return binderStatusFromStatusT(INVALID_OPERATION);
     }
     std::lock_guard lock(mLock);
-    mHeadSensor = sensorHandle;
-    checkPoseController_l();
-    checkSensorsState_l();
+    if (mHeadSensor != sensorHandle) {
+        mHeadSensor = sensorHandle;
+        checkPoseController_l();
+        checkSensorsState_l();
+    }
     return Status::ok();
 }
 
@@ -513,8 +533,13 @@ Status Spatializer::setScreenSensor(int sensorHandle) {
         return binderStatusFromStatusT(INVALID_OPERATION);
     }
     std::lock_guard lock(mLock);
-    mScreenSensor = sensorHandle;
-    checkSensorsState_l();
+    if (mScreenSensor != sensorHandle) {
+        mScreenSensor = sensorHandle;
+        // TODO: consider a new method setHeadAndScreenSensor()
+        // because we generally set both at the same time.
+        // This will avoid duplicated work and recentering.
+        checkSensorsState_l();
+    }
     return Status::ok();
 }
 
