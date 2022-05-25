@@ -47,6 +47,7 @@
 #include "media/RingBuffer.h"
 #include "utils/AutoConditionLock.h"
 #include "utils/ClientManager.h"
+#include "utils/IPCTransport.h"
 
 #include <set>
 #include <string>
@@ -242,7 +243,7 @@ public:
 
     /////////////////////////////////////////////////////////////////////
     // CameraDeviceFactory functionality
-    int                 getDeviceVersion(const String8& cameraId, int* facing = nullptr,
+    std::pair<int, IPCTransport>    getDeviceVersion(const String8& cameraId, int* facing = nullptr,
             int* orientation = nullptr);
 
     /////////////////////////////////////////////////////////////////////
@@ -1240,8 +1241,9 @@ private:
             const sp<IInterface>& cameraCb, const String16& packageName,
             bool systemNativeClient, const std::optional<String16>& featureId,
             const String8& cameraId, int api1CameraId, int facing, int sensorOrientation,
-            int clientPid, uid_t clientUid, int servicePid, int deviceVersion,
-            apiLevel effectiveApiLevel, bool overrideForPerfClass, /*out*/sp<BasicClient>* client);
+            int clientPid, uid_t clientUid, int servicePid,
+            std::pair<int, IPCTransport> deviceVersionAndIPCTransport, apiLevel effectiveApiLevel,
+            bool overrideForPerfClass, /*out*/sp<BasicClient>* client);
 
     status_t checkCameraAccess(const String16& opPackageName);
 

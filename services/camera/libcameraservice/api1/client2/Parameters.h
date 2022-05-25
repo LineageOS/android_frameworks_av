@@ -269,7 +269,7 @@ struct Parameters {
     ~Parameters();
 
     // Sets up default parameters
-    status_t initialize(CameraDeviceBase *device, int deviceVersion);
+    status_t initialize(CameraDeviceBase *device);
 
     // Build fast-access device static info from static info
     status_t buildFastInfo(CameraDeviceBase *device);
@@ -459,7 +459,6 @@ private:
     // Helper function to get the suggested video sizes
     Vector<Size> getPreferredVideoSizes() const;
 
-    int mDeviceVersion;
     uint8_t mDefaultSceneMode;
 };
 

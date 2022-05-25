@@ -21,11 +21,9 @@
 #include <camera/camera2/OutputConfiguration.h>
 #include <camera/camera2/SessionConfiguration.h>
 #include <camera/camera2/SubmitInfo.h>
-#include <android/hardware/camera/device/3.8/types.h>
 #include <aidl/android/hardware/camera/device/ICameraDevice.h>
 #include <android/hardware/camera/device/3.4/ICameraDeviceSession.h>
 #include <android/hardware/camera/device/3.7/ICameraDeviceSession.h>
-#include <android/hardware/camera/device/3.8/ICameraDeviceSession.h>
 
 #include <device3/Camera3StreamInterface.h>
 #include <utils/IPCTransport.h>
