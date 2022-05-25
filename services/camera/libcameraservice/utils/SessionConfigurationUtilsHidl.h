@@ -16,10 +16,8 @@
 #ifndef ANDROID_SERVERS_CAMERA_SESSION_CONFIGURATION_UTILS_HIDL_H
 #define ANDROID_SERVERS_CAMERA_SESSION_CONFIGURATION_UTILS_HIDL_H
 
-#include <android/hardware/camera/device/3.8/types.h>
 #include <android/hardware/camera/device/3.4/ICameraDeviceSession.h>
 #include <android/hardware/camera/device/3.7/ICameraDeviceSession.h>
-#include <android/hardware/camera/device/3.8/ICameraDeviceSession.h>
 
 #include <utils/SessionConfigurationUtils.h>
 
@@ -30,10 +28,6 @@ namespace camera3 {
 
 namespace SessionConfigurationUtils {
 
-void mapStreamInfo(const camera3::OutputStreamInfo &streamInfo,
-        camera3::camera_stream_rotation_t rotation, String8 physicalId, int32_t groupId,
-        hardware::camera::device::V3_8::Stream *stream /*out*/);
-
 // utility function to convert AIDL SessionConfiguration to HIDL
 // streamConfiguration. Also checks for validity of SessionConfiguration and
 // returns a non-ok binder::Status if the passed in session configuration
@@ -42,15 +36,8 @@ binder::Status
 convertToHALStreamCombination(const SessionConfiguration& sessionConfiguration,
         const String8 &cameraId, const CameraMetadata &deviceInfo,
         metadataGetter getMetadata, const std::vector<std::string> &physicalCameraIds,
-        hardware::camera::device::V3_8::StreamConfiguration &streamConfiguration,
+        hardware::camera::device::V3_7::StreamConfiguration &streamConfiguration,
         bool overrideForPerfClass, bool *earlyExit);
-
-// Utility function to convert a V3_8::StreamConfiguration to
-// V3_7::StreamConfiguration. Return false if the original V3_8 configuration cannot
-// be used by older version HAL.
-bool convertHALStreamCombinationFromV38ToV37(
-        hardware::camera::device::V3_7::StreamConfiguration &streamConfigV37,
-        const hardware::camera::device::V3_8::StreamConfiguration &streamConfigV38);
 
 // Utility function to convert a V3_7::StreamConfiguration to
 // V3_4::StreamConfiguration. Return false if the original V3_7 configuration cannot
