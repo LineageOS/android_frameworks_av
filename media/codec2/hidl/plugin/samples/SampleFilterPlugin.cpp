@@ -807,7 +807,8 @@ const FilterPlugin_V1::Descriptor SampleToneMappingFilter::Interface::DESCRIPTOR
     // affectedParams
     {
         C2StreamHdrStaticInfo::output::PARAM_TYPE,
-        C2StreamHdr10PlusInfo::output::PARAM_TYPE,
+        C2StreamHdr10PlusInfo::output::PARAM_TYPE,  // will be deprecated
+        C2StreamHdrDynamicMetadataInfo::output::PARAM_TYPE,
         C2StreamColorAspectsInfo::output::PARAM_TYPE,
     },
 };
