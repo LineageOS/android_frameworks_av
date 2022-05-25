@@ -861,4 +861,57 @@ INSTANTIATE_TEST_SUITE_P(
                     + std::to_string(std::get<3>(info.param));
         });
 
+TEST(LinearOutputBuffersTest, PcmConvertFormat) {
+    // Prepare LinearOutputBuffers
+    std::shared_ptr<LinearOutputBuffers> buffers =
+        std::make_shared<LinearOutputBuffers>("test");
+    sp<AMessage> format{new AMessage};
+    format->setInt32(KEY_CHANNEL_COUNT, 1);
+    format->setInt32(KEY_SAMPLE_RATE, 8000);
+    format->setInt32(KEY_PCM_ENCODING, kAudioEncodingPcmFloat);
+    format->setInt32("android._config-pcm-encoding", kAudioEncodingPcm16bit);
+    format->setInt32("android._codec-pcm-encoding", kAudioEncodingPcmFloat);
+    buffers->setFormat(format);
+
+    // Prepare a linear C2Buffer
+    std::shared_ptr<C2BlockPool> pool;
+    ASSERT_EQ(OK, GetCodec2BlockPool(C2BlockPool::BASIC_LINEAR, nullptr, &pool));
+
+    std::shared_ptr<C2LinearBlock> block;
+    ASSERT_EQ(OK, pool->fetchLinearBlock(
+            1024, C2MemoryUsage{C2MemoryUsage::CPU_READ, C2MemoryUsage::CPU_WRITE}, &block));
+    std::shared_ptr<C2Buffer> c2Buffer =
+        C2Buffer::CreateLinearBuffer(block->share(0, 1024, C2Fence()));
+
+    // Test regular buffer convert
+    size_t index;
+    sp<MediaCodecBuffer> clientBuffer;
+    ASSERT_EQ(OK, buffers->registerBuffer(c2Buffer, &index, &clientBuffer));
+    int32_t pcmEncoding = 0;
+    ASSERT_TRUE(clientBuffer->format()->findInt32(KEY_PCM_ENCODING, &pcmEncoding));
+    EXPECT_EQ(kAudioEncodingPcm16bit, pcmEncoding);
+    ASSERT_TRUE(buffers->releaseBuffer(clientBuffer, &c2Buffer));
+
+    // Test null buffer convert
+    ASSERT_EQ(OK, buffers->registerBuffer(nullptr, &index, &clientBuffer));
+    ASSERT_TRUE(clientBuffer->format()->findInt32(KEY_PCM_ENCODING, &pcmEncoding));
+    EXPECT_EQ(kAudioEncodingPcm16bit, pcmEncoding);
+    ASSERT_TRUE(buffers->releaseBuffer(clientBuffer, &c2Buffer));
+
+    // Do the same test in the array mode
+    std::shared_ptr<OutputBuffersArray> array = buffers->toArrayMode(8);
+
+    // Test regular buffer convert
+    ASSERT_EQ(OK, buffers->registerBuffer(c2Buffer, &index, &clientBuffer));
+    ASSERT_TRUE(clientBuffer->format()->findInt32(KEY_PCM_ENCODING, &pcmEncoding));
+    EXPECT_EQ(kAudioEncodingPcm16bit, pcmEncoding);
+    ASSERT_TRUE(buffers->releaseBuffer(clientBuffer, &c2Buffer));
+
+    // Test null buffer convert
+    ASSERT_EQ(OK, buffers->registerBuffer(nullptr, &index, &clientBuffer));
+    ASSERT_TRUE(clientBuffer->format()->findInt32(KEY_PCM_ENCODING, &pcmEncoding));
+    EXPECT_EQ(kAudioEncodingPcm16bit, pcmEncoding);
+    ASSERT_TRUE(buffers->releaseBuffer(clientBuffer, &c2Buffer));
+}
+
 } // namespace android
