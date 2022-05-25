@@ -112,7 +112,7 @@ status_t Camera2Client::initializeImpl(TProviderPtr providerPtr, const String8& 
     {
         SharedParameters::Lock l(mParameters);
 
-        res = l.mParameters.initialize(mDevice.get(), mDeviceVersion);
+        res = l.mParameters.initialize(mDevice.get());
         if (res != OK) {
             ALOGE("%s: Camera %d: unable to build defaults: %s (%d)",
                     __FUNCTION__, mCameraId, strerror(-res), res);

@@ -49,7 +49,6 @@ cc_test {
         "android.hardware.camera.device@3.2",
         "android.hardware.camera.device@3.4",
         "android.hardware.camera.device@3.7",
-        "android.hardware.camera.device@3.8",
         "android.hidl.token@1.0-utils",
     ],
 
