@@ -163,7 +163,6 @@ cc_library_shared {
         "android.hardware.camera.device@3.5",
         "android.hardware.camera.device@3.6",
         "android.hardware.camera.device@3.7",
-        "android.hardware.camera.device@3.8",
         "android.hardware.camera.device-V1-ndk",
         "media_permission-aidl-cpp",
     ],
