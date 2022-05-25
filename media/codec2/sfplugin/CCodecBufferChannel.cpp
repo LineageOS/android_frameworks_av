@@ -880,6 +880,19 @@ status_t CCodecBufferChannel::renderOutputBuffer(
         return UNKNOWN_ERROR;
     }
     const C2ConstGraphicBlock &block = blocks.front();
+    C2Fence c2fence = block.fence();
+    sp<Fence> fence = Fence::NO_FENCE;
+    // TODO: it's not sufficient to just check isHW() and then construct android::fence from it.
+    // Once C2Fence::type() is added, check the exact C2Fence type
+    if (c2fence.isHW()) {
+        int fenceFd = c2fence.fd();
+        fence = sp<Fence>::make(fenceFd);
+        if (!fence) {
+            ALOGE("[%s] Failed to allocate a fence", mName);
+            close(fenceFd);
+            return NO_MEMORY;
+        }
+    }
 
     // TODO: revisit this after C2Fence implementation.
     android::IGraphicBufferProducer::QueueBufferInput qbi(
@@ -892,7 +905,7 @@ status_t CCodecBufferChannel::renderOutputBuffer(
                  blocks.front().crop().bottom()),
             videoScalingMode,
             transform,
-            Fence::NO_FENCE, 0);
+            fence, 0);
     if (hdrStaticInfo || hdrDynamicInfo) {
         HdrMetadata hdr;
         if (hdrStaticInfo) {
