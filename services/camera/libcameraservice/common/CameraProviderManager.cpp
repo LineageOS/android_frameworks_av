@@ -442,9 +442,10 @@ int32_t CameraProviderManager::getTorchDefaultStrengthLevel(const std::string &i
 bool CameraProviderManager::supportSetTorchMode(const std::string &id) const {
     std::lock_guard<std::mutex> lock(mInterfaceMutex);
     for (auto& provider : mProviders) {
-        auto deviceInfo = findDeviceInfoLocked(id);
-        if (deviceInfo != nullptr) {
-            return provider->mSetTorchModeSupported;
+        for (auto& deviceInfo : provider->mDevices) {
+            if (deviceInfo->mId == id) {
+                return provider->mSetTorchModeSupported;
+            }
         }
     }
     return false;
