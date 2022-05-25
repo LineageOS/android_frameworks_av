@@ -136,7 +136,9 @@ bool addSupportedProfileLevels(
                 continue;
             }
             switch (type.coreIndex()) {
-            case C2StreamHdr10PlusInfo::CORE_INDEX:
+            case C2StreamHdrDynamicMetadataInfo::CORE_INDEX:
+                [[fallthrough]];
+            case C2StreamHdr10PlusInfo::CORE_INDEX:  // will be deprecated
                 supportsHdr10Plus = true;
                 break;
             case C2StreamHdrStaticInfo::CORE_INDEX:
