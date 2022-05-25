@@ -1689,12 +1689,15 @@ status_t Camera2Client::commandSetDisplayOrientationL(int degrees) {
                 __FUNCTION__, mCameraId, degrees);
         return BAD_VALUE;
     }
-    SharedParameters::Lock l(mParameters);
-    if (mRotateAndCropMode != ANDROID_SCALER_ROTATE_AND_CROP_NONE) {
-        ALOGI("%s: Rotate and crop set to: %d, skipping display orientation!", __FUNCTION__,
-                mRotateAndCropMode);
-        transform = mRotateAndCropPreviewTransform;
+    {
+        Mutex::Autolock icl(mRotateAndCropLock);
+        if (mRotateAndCropMode != ANDROID_SCALER_ROTATE_AND_CROP_NONE) {
+            ALOGI("%s: Rotate and crop set to: %d, skipping display orientation!", __FUNCTION__,
+                    mRotateAndCropMode);
+            transform = mRotateAndCropPreviewTransform;
+        }
     }
+    SharedParameters::Lock l(mParameters);
     if (transform != l.mParameters.previewTransform &&
             getPreviewStreamId() != NO_STREAM) {
         mDevice->setStreamTransform(getPreviewStreamId(), transform);
@@ -2321,7 +2324,7 @@ status_t Camera2Client::setRotateAndCropOverride(uint8_t rotateAndCrop) {
     if (rotateAndCrop > ANDROID_SCALER_ROTATE_AND_CROP_AUTO) return BAD_VALUE;
 
     {
-        Mutex::Autolock icl(mBinderSerializationLock);
+        Mutex::Autolock icl(mRotateAndCropLock);
         if (mRotateAndCropIsSupported) {
             mRotateAndCropMode = rotateAndCrop;
         } else {
