@@ -240,6 +240,8 @@ private:
     bool isZslEnabledInStillTemplate();
     // The current rotate & crop mode passed by camera service
     uint8_t mRotateAndCropMode;
+    // Synchronize access to 'mRotateAndCropMode'
+    mutable Mutex mRotateAndCropLock;
     // Contains the preview stream transformation that would normally be applied
     // when the display rotation is 0
     int mRotateAndCropPreviewTransform;
