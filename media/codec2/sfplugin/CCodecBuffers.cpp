@@ -208,7 +208,7 @@ void OutputBuffers::setSkipCutBuffer(int32_t skip, int32_t cut) {
 
 bool OutputBuffers::convert(
         const std::shared_ptr<C2Buffer> &src, sp<Codec2Buffer> *dst) {
-    if (!src || src->data().type() != C2BufferData::LINEAR) {
+    if (src && src->data().type() != C2BufferData::LINEAR) {
         return false;
     }
     int32_t configEncoding = kAudioEncodingPcm16bit;
@@ -237,7 +237,12 @@ bool OutputBuffers::convert(
     if (!mDataConverter) {
         return false;
     }
-    sp<MediaCodecBuffer> srcBuffer = ConstLinearBlockBuffer::Allocate(mFormat, src);
+    sp<MediaCodecBuffer> srcBuffer;
+    if (src) {
+        srcBuffer = ConstLinearBlockBuffer::Allocate(mFormat, src);
+    } else {
+        srcBuffer = new MediaCodecBuffer(mFormat, new ABuffer(0));
+    }
     if (!srcBuffer) {
         return false;
     }
@@ -1259,8 +1264,8 @@ status_t FlexOutputBuffers::registerBuffer(
         if (newBuffer == nullptr) {
             return NO_MEMORY;
         }
+        newBuffer->setFormat(mFormat);
     }
-    newBuffer->setFormat(mFormat);
     *index = mImpl.assignSlot(newBuffer);
     handleImageData(newBuffer);
     *clientBuffer = newBuffer;
