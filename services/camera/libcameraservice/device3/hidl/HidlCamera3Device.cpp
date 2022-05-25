@@ -65,15 +65,8 @@ using namespace android::camera3;
 using namespace android::hardware::camera;
 using namespace android::hardware::camera::device::V3_2;
 using android::hardware::camera::metadata::V3_6::CameraMetadataEnumAndroidSensorPixelMode;
-using android::hardware::camera::metadata::V3_8::CameraMetadataEnumAndroidScalerAvailableStreamUseCases;
 
 namespace android {
-
-CameraMetadataEnumAndroidRequestAvailableDynamicRangeProfilesMap
-HidlCamera3Device::mapToHidlDynamicProfile(int64_t dynamicRangeProfile) {
-    return static_cast<CameraMetadataEnumAndroidRequestAvailableDynamicRangeProfilesMap>(
-            dynamicRangeProfile);
-}
 
 hardware::graphics::common::V1_0::PixelFormat HidlCamera3Device::mapToPixelFormat(
         int frameworkFormat) {
@@ -285,7 +278,8 @@ status_t HidlCamera3Device::initialize(sp<CameraProviderManager> manager,
     // Metadata tags needs fixup for monochrome camera device version less
     // than 3.5.
     hardware::hidl_version maxVersion{0,0};
-    res = manager->getHighestSupportedVersion(mId.string(), &maxVersion);
+    IPCTransport transport = IPCTransport::HIDL;
+    res = manager->getHighestSupportedVersion(mId.string(), &maxVersion, &transport);
     if (res != OK) {
         ALOGE("%s: Error in getting camera device version id: %s (%d)",
                 __FUNCTION__, strerror(-res), res);
@@ -444,11 +438,6 @@ hardware::Return<void> HidlCamera3Device::processCaptureResult(
 hardware::Return<void> HidlCamera3Device::notify(
         const hardware::hidl_vec<hardware::camera::device::V3_2::NotifyMsg>& msgs) {
     return notifyHelper<hardware::camera::device::V3_2::NotifyMsg>(msgs);
-}
-
-hardware::Return<void> HidlCamera3Device::notify_3_8(
-        const hardware::hidl_vec<hardware::camera::device::V3_8::NotifyMsg>& msgs) {
-    return notifyHelper<hardware::camera::device::V3_8::NotifyMsg>(msgs);
 }
 
 template<typename NotifyMsgType>
@@ -735,10 +724,6 @@ HidlCamera3Device::HidlHalInterface::HidlHalInterface(
         mRequestMetadataQueue(queue) {
     // Check with hardware service manager if we can downcast these interfaces
     // Somewhat expensive, so cache the results at startup
-    auto castResult_3_8 = device::V3_8::ICameraDeviceSession::castFrom(mHidlSession);
-    if (castResult_3_8.isOk()) {
-        mHidlSession_3_8 = castResult_3_8;
-    }
     auto castResult_3_7 = device::V3_7::ICameraDeviceSession::castFrom(mHidlSession);
     if (castResult_3_7.isOk()) {
         mHidlSession_3_7 = castResult_3_7;
@@ -766,7 +751,6 @@ bool HidlCamera3Device::HidlHalInterface::valid() {
 }
 
 void HidlCamera3Device::HidlHalInterface::clear() {
-    mHidlSession_3_8.clear();
     mHidlSession_3_7.clear();
     mHidlSession_3_6.clear();
     mHidlSession_3_5.clear();
@@ -905,16 +889,13 @@ status_t HidlCamera3Device::HidlHalInterface::configureStreams(
     device::V3_2::StreamConfiguration requestedConfiguration3_2;
     device::V3_4::StreamConfiguration requestedConfiguration3_4;
     device::V3_7::StreamConfiguration requestedConfiguration3_7;
-    device::V3_8::StreamConfiguration requestedConfiguration3_8;
     requestedConfiguration3_2.streams.resize(config->num_streams);
     requestedConfiguration3_4.streams.resize(config->num_streams);
     requestedConfiguration3_7.streams.resize(config->num_streams);
-    requestedConfiguration3_8.streams.resize(config->num_streams);
     for (size_t i = 0; i < config->num_streams; i++) {
         device::V3_2::Stream &dst3_2 = requestedConfiguration3_2.streams[i];
         device::V3_4::Stream &dst3_4 = requestedConfiguration3_4.streams[i];
         device::V3_7::Stream &dst3_7 = requestedConfiguration3_7.streams[i];
-        device::V3_8::Stream &dst3_8 = requestedConfiguration3_8.streams[i];
         camera3::camera_stream_t *src = config->streams[i];
 
         Camera3Stream* cam3stream = Camera3Stream::cast(src);
@@ -963,23 +944,17 @@ status_t HidlCamera3Device::HidlHalInterface::configureStreams(
             dst3_7.sensorPixelModesUsed[j++] =
                     static_cast<CameraMetadataEnumAndroidSensorPixelMode>(mode);
         }
-        if ((src->dynamic_range_profile !=
-                    ANDROID_REQUEST_AVAILABLE_DYNAMIC_RANGE_PROFILES_MAP_STANDARD) &&
-                (mHidlSession_3_8 == nullptr)) {
+        if (src->dynamic_range_profile !=
+                    ANDROID_REQUEST_AVAILABLE_DYNAMIC_RANGE_PROFILES_MAP_STANDARD) {
             ALOGE("%s: Camera device doesn't support non-standard dynamic range profiles: %" PRIx64,
                     __FUNCTION__, src->dynamic_range_profile);
             return BAD_VALUE;
         }
-        if (src->use_case != ANDROID_SCALER_AVAILABLE_STREAM_USE_CASES_DEFAULT &&
-                mHidlSession_3_8 == nullptr) {
+        if (src->use_case != ANDROID_SCALER_AVAILABLE_STREAM_USE_CASES_DEFAULT) {
             ALOGE("%s: Camera device doesn't support non-default stream use case %" PRId64 "!",
                     __FUNCTION__, src->use_case);
             return BAD_VALUE;
         }
-        dst3_8.v3_7 = dst3_7;
-        dst3_8.dynamicRangeProfile = mapToHidlDynamicProfile(src->dynamic_range_profile);
-        dst3_8.useCase =
-                static_cast<CameraMetadataEnumAndroidScalerAvailableStreamUseCases>(src->use_case);
         activeStreams.insert(streamId);
         // Create Buffer ID map if necessary
         mBufferRecords.tryCreateBufferCache(streamId);
@@ -1002,10 +977,6 @@ status_t HidlCamera3Device::HidlHalInterface::configureStreams(
             reinterpret_cast<uint8_t*>(const_cast<camera_metadata_t*>(sessionParams)),
             sessionParamSize);
     requestedConfiguration3_7.sessionParams.setToExternal(
-            reinterpret_cast<uint8_t*>(const_cast<camera_metadata_t*>(sessionParams)),
-            sessionParamSize);
-    requestedConfiguration3_8.operationMode = operationMode;
-    requestedConfiguration3_8.sessionParams.setToExternal(
             reinterpret_cast<uint8_t*>(const_cast<camera_metadata_t*>(sessionParams)),
             sessionParamSize);
 
@@ -1053,18 +1024,7 @@ status_t HidlCamera3Device::HidlHalInterface::configureStreams(
                 return OK;
             };
 
-    // See which version of HAL we have
-    if (mHidlSession_3_8 != nullptr) {
-        ALOGV("%s: v3.8 device found", __FUNCTION__);
-        requestedConfiguration3_8.streamConfigCounter = mNextStreamConfigCounter++;
-        requestedConfiguration3_8.multiResolutionInputImage = config->input_is_multi_resolution;
-        auto err = mHidlSession_3_8->configureStreams_3_8(requestedConfiguration3_8,
-                configStream36Cb);
-        res = postprocConfigStream36(err);
-        if (res != OK) {
-            return res;
-        }
-    } else if (mHidlSession_3_7 != nullptr) {
+    if (mHidlSession_3_7 != nullptr) {
         ALOGV("%s: v3.7 device found", __FUNCTION__);
         requestedConfiguration3_7.streamConfigCounter = mNextStreamConfigCounter++;
         requestedConfiguration3_7.multiResolutionInputImage = config->input_is_multi_resolution;
@@ -1474,15 +1434,10 @@ status_t HidlCamera3Device::HidlHalInterface::dump(int /*fd*/) {
     return OK;
 }
 
-status_t HidlCamera3Device::HidlHalInterface::repeatingRequestEnd(uint32_t frameNumber,
-        const std::vector<int32_t> &streamIds) {
+status_t HidlCamera3Device::HidlHalInterface::repeatingRequestEnd(uint32_t /*frameNumber*/,
+        const std::vector<int32_t> &/*streamIds*/) {
     ATRACE_NAME("CameraHal::repeatingRequestEnd");
-    if (!valid()) return INVALID_OPERATION;
-
-    if (mHidlSession_3_8.get() != nullptr) {
-        mHidlSession_3_8->repeatingRequestEnd(frameNumber, streamIds);
-    }
-    return OK;
+    return INVALID_OPERATION;
 }
 
 status_t HidlCamera3Device::HidlHalInterface::close() {

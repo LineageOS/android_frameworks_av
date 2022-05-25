@@ -26,18 +26,12 @@
 
 #include <common/CameraDeviceBase.h>
 
-#include <android/hardware/camera/device/3.8/ICameraDeviceCallback.h>
+#include <android/hardware/camera/device/3.5/ICameraDeviceCallback.h>
 
 #include "device3/BufferUtils.h"
-//#include "device3/DistortionMapper.h"
-//#include "device3/ZoomRatioMapper.h"
-//#include "device3/RotateAndCropMapper.h"
 #include "device3/InFlightRequest.h"
 #include "device3/Camera3Stream.h"
-//#include "device3/Camera3OutputStreamInterface.h"
 #include "device3/Camera3OutputUtils.h"
-//#include "utils/SessionStatsBuilder.h"
-//#include "utils/TagMonitor.h"
 
 namespace android {
 
@@ -65,11 +59,7 @@ namespace camera3 {
 
     // Handle one notify message
     void notify(CaptureOutputStates& states,
-            const hardware::camera::device::V3_2::NotifyMsg& msg,
-            bool hasReadoutTime = false, uint64_t readoutTime = 0LL);
-    void notify(CaptureOutputStates& states,
-            const hardware::camera::device::V3_8::NotifyMsg& msg);
-
+            const hardware::camera::device::V3_2::NotifyMsg& msg);
     void requestStreamBuffers(RequestBufferStates& states,
             const hardware::hidl_vec<hardware::camera::device::V3_5::BufferRequest>& bufReqs,
             hardware::camera::device::V3_5::ICameraDeviceCallback::requestStreamBuffers_cb

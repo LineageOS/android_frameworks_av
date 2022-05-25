@@ -50,7 +50,7 @@ Parameters::Parameters(int cameraId,
 Parameters::~Parameters() {
 }
 
-status_t Parameters::initialize(CameraDeviceBase *device, int deviceVersion) {
+status_t Parameters::initialize(CameraDeviceBase *device) {
     status_t res;
     if (device == nullptr) {
         ALOGE("%s: device is null!", __FUNCTION__);
@@ -63,7 +63,6 @@ status_t Parameters::initialize(CameraDeviceBase *device, int deviceVersion) {
         return BAD_VALUE;
     }
     Parameters::info = &info;
-    mDeviceVersion = deviceVersion;
 
     res = buildFastInfo(device);
     if (res != OK) return res;
