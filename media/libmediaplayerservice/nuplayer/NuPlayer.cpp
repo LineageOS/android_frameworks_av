@@ -2893,6 +2893,38 @@ void NuPlayer::sendIMSRxNotice(const sp<AMessage> &msg) {
             in.writeInt32(recvTimeUs & 0xFFFFFFFF);
             break;
         }
+        case ARTPSource::RTCP_RR:
+        {
+            int64_t recvTimeUs;
+            int32_t senderId;
+            int32_t ssrc;
+            int32_t fraction;
+            int32_t lost;
+            int32_t lastSeq;
+            int32_t jitter;
+            int32_t lsr;
+            int32_t dlsr;
+            CHECK(msg->findInt64("recv-time-us", &recvTimeUs));
+            CHECK(msg->findInt32("rtcp-rr-ssrc", &senderId));
+            CHECK(msg->findInt32("rtcp-rrb-ssrc", &ssrc));
+            CHECK(msg->findInt32("rtcp-rrb-fraction", &fraction));
+            CHECK(msg->findInt32("rtcp-rrb-lost", &lost));
+            CHECK(msg->findInt32("rtcp-rrb-lastSeq", &lastSeq));
+            CHECK(msg->findInt32("rtcp-rrb-jitter", &jitter));
+            CHECK(msg->findInt32("rtcp-rrb-lsr", &lsr));
+            CHECK(msg->findInt32("rtcp-rrb-dlsr", &dlsr));
+            in.writeInt32(recvTimeUs >> 32);
+            in.writeInt32(recvTimeUs & 0xFFFFFFFF);
+            in.writeInt32(senderId);
+            in.writeInt32(ssrc);
+            in.writeInt32(fraction);
+            in.writeInt32(lost);
+            in.writeInt32(lastSeq);
+            in.writeInt32(jitter);
+            in.writeInt32(lsr);
+            in.writeInt32(dlsr);
+            break;
+        }
         case ARTPSource::RTCP_TSFB:   // RTCP TSFB
         case ARTPSource::RTCP_PSFB:   // RTCP PSFB
         case ARTPSource::RTP_AUTODOWN:
