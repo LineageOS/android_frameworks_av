@@ -760,7 +760,7 @@ status_t C2SoftVpxDec::outputBuffer(
                         [dstY, srcY, srcU, srcV,
                          srcYStride, srcUStride, srcVStride, dstYStride,
                          width = mWidth, height = std::min(mHeight - i, kHeight)] {
-                            convertYUV420Planar16ToY410(
+                            convertYUV420Planar16ToY410OrRGBA1010102(
                                     (uint32_t *)dstY, srcY, srcU, srcV, srcYStride / 2,
                                     srcUStride / 2, srcVStride / 2, dstYStride / sizeof(uint32_t),
                                     width, height);
