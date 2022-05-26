@@ -21,7 +21,6 @@
 #include "CameraProviderManager.h"
 
 #include <aidl/android/hardware/camera/device/ICameraDevice.h>
-#include <android/hardware/camera/device/3.8/ICameraDevice.h>
 
 #include <algorithm>
 #include <chrono>
@@ -60,11 +59,6 @@ const std::string kExternalProviderName = "external/0";
 } // anonymous namespace
 
 const float CameraProviderManager::kDepthARTolerance = .1f;
-
-// AIDL Devices start with major version 1, offset added to bring them up to HIDL.
-const uint16_t kAidlDeviceMajorOffset = 2;
-// AIDL Devices start with minor version 1, offset added to bring them up to HIDL.
-const uint16_t kAidlDeviceMinorOffset = 7;
 
 CameraProviderManager::HidlServiceInteractionProxyImpl
 CameraProviderManager::sHidlServiceInteractionProxy{};
@@ -280,15 +274,13 @@ std::vector<std::string> CameraProviderManager::getAPI1CompatibleCameraDeviceIds
     return deviceIds;
 }
 
-bool CameraProviderManager::isValidDevice(const std::string &id, uint16_t majorVersion) const {
-    std::lock_guard<std::mutex> lock(mInterfaceMutex);
-    return isValidDeviceLocked(id, majorVersion);
-}
-
-bool CameraProviderManager::isValidDeviceLocked(const std::string &id, uint16_t majorVersion) const {
+bool CameraProviderManager::isValidDeviceLocked(const std::string &id, uint16_t majorVersion,
+        IPCTransport transport) const {
     for (auto& provider : mProviders) {
+        IPCTransport providerTransport = provider->getIPCTransport();
         for (auto& deviceInfo : provider->mDevices) {
-            if (deviceInfo->mId == id && deviceInfo->mVersion.get_major() == majorVersion) {
+            if (deviceInfo->mId == id && deviceInfo->mVersion.get_major() == majorVersion &&
+                    transport == providerTransport) {
                 return true;
             }
         }
@@ -369,29 +361,32 @@ status_t CameraProviderManager::getCameraCharacteristics(const std::string &id,
     return getCameraCharacteristicsLocked(id, overrideForPerfClass, characteristics);
 }
 
-// Till hidl is removed from the android source tree, we use this for aidl as
-// well. We artificially give aidl camera device version 1 a major version 3 and minor
-// version 8.
 status_t CameraProviderManager::getHighestSupportedVersion(const std::string &id,
-        hardware::hidl_version *v) {
+        hardware::hidl_version *v, IPCTransport *transport) {
+    if (v == nullptr || transport == nullptr) {
+        return BAD_VALUE;
+    }
     std::lock_guard<std::mutex> lock(mInterfaceMutex);
 
     hardware::hidl_version maxVersion{0,0};
     bool found = false;
+    IPCTransport providerTransport = IPCTransport::INVALID;
     for (auto& provider : mProviders) {
         for (auto& deviceInfo : provider->mDevices) {
             if (deviceInfo->mId == id) {
                 if (deviceInfo->mVersion > maxVersion) {
                     maxVersion = deviceInfo->mVersion;
+                    providerTransport = provider->getIPCTransport();
                     found = true;
                 }
             }
         }
     }
-    if (!found) {
+    if (!found || providerTransport == IPCTransport::INVALID) {
         return NAME_NOT_FOUND;
     }
     *v = maxVersion;
+    *transport = providerTransport;
     return OK;
 }
 
@@ -442,9 +437,10 @@ int32_t CameraProviderManager::getTorchDefaultStrengthLevel(const std::string &i
 bool CameraProviderManager::supportSetTorchMode(const std::string &id) const {
     std::lock_guard<std::mutex> lock(mInterfaceMutex);
     for (auto& provider : mProviders) {
-        auto deviceInfo = findDeviceInfoLocked(id);
-        if (deviceInfo != nullptr) {
-            return provider->mSetTorchModeSupported;
+        for (auto& deviceInfo : provider->mDevices) {
+            if (deviceInfo->mId == id) {
+                return provider->mSetTorchModeSupported;
+            }
         }
     }
     return false;
@@ -613,8 +609,7 @@ status_t CameraProviderManager::openAidlSession(const std::string &id,
 
     std::lock_guard<std::mutex> lock(mInterfaceMutex);
 
-    auto deviceInfo = findDeviceInfoLocked(id,
-            /*minVersion*/ {3,0}, /*maxVersion*/ {4,0});
+    auto deviceInfo = findDeviceInfoLocked(id);
     if (deviceInfo == nullptr) return NAME_NOT_FOUND;
 
     auto *aidlDeviceInfo3 = static_cast<AidlProviderInfo::AidlDeviceInfo3*>(deviceInfo);
@@ -695,8 +690,7 @@ status_t CameraProviderManager::openHidlSession(const std::string &id,
 
     std::lock_guard<std::mutex> lock(mInterfaceMutex);
 
-    auto deviceInfo = findDeviceInfoLocked(id,
-            /*minVersion*/ {3,0}, /*maxVersion*/ {4,0});
+    auto deviceInfo = findDeviceInfoLocked(id);
     if (deviceInfo == nullptr) return NAME_NOT_FOUND;
 
     auto *hidlDeviceInfo3 = static_cast<HidlProviderInfo::HidlDeviceInfo3*>(deviceInfo);
@@ -897,9 +891,16 @@ void CameraProviderManager::ProviderInfo::initializeProviderInfoCommon(
 }
 
 CameraProviderManager::ProviderInfo::DeviceInfo* CameraProviderManager::findDeviceInfoLocked(
-        const std::string& id,
-        hardware::hidl_version minVersion, hardware::hidl_version maxVersion) const {
+        const std::string& id) const {
     for (auto& provider : mProviders) {
+        using hardware::hidl_version;
+        IPCTransport transport = provider->getIPCTransport();
+        // AIDL min version starts at major: 1 minor: 1
+        hidl_version minVersion =
+                (transport == IPCTransport::HIDL) ? hidl_version{3, 2} : hidl_version{1, 1} ;
+        hidl_version maxVersion =
+                (transport == IPCTransport::HIDL) ? hidl_version{3, 7} : hidl_version{1000, 0};
+
         for (auto& deviceInfo : provider->mDevices) {
             if (deviceInfo->mId == id &&
                     minVersion <= deviceInfo->mVersion && maxVersion >= deviceInfo->mVersion) {
@@ -911,16 +912,13 @@ CameraProviderManager::ProviderInfo::DeviceInfo* CameraProviderManager::findDevi
 }
 
 metadata_vendor_id_t CameraProviderManager::getProviderTagIdLocked(
-        const std::string& id, hardware::hidl_version minVersion,
-        hardware::hidl_version maxVersion) const {
+        const std::string& id) const {
     metadata_vendor_id_t ret = CAMERA_METADATA_INVALID_VENDOR_ID;
 
     std::lock_guard<std::mutex> lock(mInterfaceMutex);
     for (auto& provider : mProviders) {
         for (auto& deviceInfo : provider->mDevices) {
-            if (deviceInfo->mId == id &&
-                    minVersion <= deviceInfo->mVersion &&
-                    maxVersion >= deviceInfo->mVersion) {
+            if (deviceInfo->mId == id) {
                 return provider->mProviderTagid;
             }
         }
@@ -1274,9 +1272,14 @@ status_t CameraProviderManager::ProviderInfo::DeviceInfo3::fixupTorchStrengthTag
 status_t CameraProviderManager::ProviderInfo::DeviceInfo3::fixupMonochromeTags() {
     status_t res = OK;
     auto& c = mCameraCharacteristics;
-
+    sp<ProviderInfo> parentProvider = mParentProvider.promote();
+    if (parentProvider == nullptr) {
+        return DEAD_OBJECT;
+    }
+    IPCTransport ipcTransport = parentProvider->getIPCTransport();
     // Override static metadata for MONOCHROME camera with older device version
-    if (mVersion.get_major() == 3 && mVersion.get_minor() < 5) {
+    if (ipcTransport == IPCTransport::HIDL &&
+            (mVersion.get_major() == 3 && mVersion.get_minor() < 5)) {
         camera_metadata_entry cap = c.find(ANDROID_REQUEST_AVAILABLE_CAPABILITIES);
         for (size_t i = 0; i < cap.count; i++) {
             if (cap.data.u8[i] == ANDROID_REQUEST_AVAILABLE_CAPABILITIES_MONOCHROME) {
@@ -1636,6 +1639,7 @@ CameraProviderManager::isHiddenPhysicalCameraInternal(const std::string& cameraI
     }
 
     for (auto& provider : mProviders) {
+        IPCTransport transport = provider->getIPCTransport();
         for (auto& deviceInfo : provider->mDevices) {
             std::vector<std::string> physicalIds;
             if (deviceInfo->mIsLogicalCamera) {
@@ -1643,7 +1647,8 @@ CameraProviderManager::isHiddenPhysicalCameraInternal(const std::string& cameraI
                         cameraId) != deviceInfo->mPhysicalIds.end()) {
                     int deviceVersion = HARDWARE_DEVICE_API_VERSION(
                             deviceInfo->mVersion.get_major(), deviceInfo->mVersion.get_minor());
-                    if (deviceVersion < CAMERA_DEVICE_API_VERSION_3_5) {
+                    if (transport == IPCTransport::HIDL &&
+                            deviceVersion < CAMERA_DEVICE_API_VERSION_3_5) {
                         ALOGE("%s: Wrong deviceVersion %x for hiddenPhysicalCameraId %s",
                                 __FUNCTION__, deviceVersion, cameraId.c_str());
                         return falseRet;
@@ -1861,16 +1866,11 @@ status_t CameraProviderManager::ProviderInfo::addDevice(
 
     uint16_t major, minor;
     std::string type, id;
+    IPCTransport transport = getIPCTransport();
 
     status_t res = parseDeviceName(name, &major, &minor, &type, &id);
     if (res != OK) {
         return res;
-    }
-    if (getIPCTransport() == IPCTransport::AIDL) {
-        // Till HIDL support exists, map AIDL versions to HIDL.
-        // TODO:b/196432585 Explore if we can get rid of this.
-        major += kAidlDeviceMajorOffset;
-        minor += kAidlDeviceMinorOffset;
     }
 
     if (type != mType) {
@@ -1878,22 +1878,37 @@ status_t CameraProviderManager::ProviderInfo::addDevice(
                 type.c_str(), mType.c_str());
         return BAD_VALUE;
     }
-    if (mManager->isValidDeviceLocked(id, major)) {
+    if (mManager->isValidDeviceLocked(id, major, transport)) {
         ALOGE("%s: Device %s: ID %s is already in use for device major version %d", __FUNCTION__,
                 name.c_str(), id.c_str(), major);
         return BAD_VALUE;
     }
 
     std::unique_ptr<DeviceInfo> deviceInfo;
-    switch (major) {
-        case 3:
-            deviceInfo = initializeDeviceInfo(name, mProviderTagid, id, minor);
+    switch (transport) {
+        case IPCTransport::HIDL:
+            switch (major) {
+                case 3:
+                    break;
+                default:
+                    ALOGE("%s: Device %s: Unsupported HIDL device HAL major version %d:",
+                          __FUNCTION__,  name.c_str(), major);
+                    return BAD_VALUE;
+            }
+            break;
+        case IPCTransport::AIDL:
+            if (major != 1) {
+                ALOGE("%s: Device %s: Unsupported AIDL device HAL major version %d:", __FUNCTION__,
+                        name.c_str(), major);
+                return BAD_VALUE;
+            }
             break;
         default:
-            ALOGE("%s: Device %s: Unsupported IDL device HAL major version %d:", __FUNCTION__,
-                    name.c_str(), major);
+            ALOGE("%s Invalid transport %d", __FUNCTION__, transport);
             return BAD_VALUE;
     }
+
+    deviceInfo = initializeDeviceInfo(name, mProviderTagid, id, minor);
     if (deviceInfo == nullptr) return BAD_VALUE;
     deviceInfo->notifyDeviceStateChange(getDeviceState());
     deviceInfo->mStatus = initialStatus;
@@ -2675,7 +2690,7 @@ status_t CameraProviderManager::isConcurrentSessionConfigurationSupported(
 
 status_t CameraProviderManager::getCameraCharacteristicsLocked(const std::string &id,
         bool overrideForPerfClass, CameraMetadata* characteristics) const {
-    auto deviceInfo = findDeviceInfoLocked(id, /*minVersion*/ {3, 0}, /*maxVersion*/ {5, 0});
+    auto deviceInfo = findDeviceInfoLocked(id);
     if (deviceInfo != nullptr) {
         return deviceInfo->getCameraCharacteristics(overrideForPerfClass, characteristics);
     }
