@@ -460,6 +460,13 @@ ALookup<uint32_t, int32_t> sPixelFormats = {
     { HAL_PIXEL_FORMAT_RGBA_FP16,              COLOR_Format64bitABGRFloat },
 };
 
+ALookup<C2Config::picture_type_t, int32_t> sPictureType = {
+    { C2Config::picture_type_t::SYNC_FRAME,     PICTURE_TYPE_I },
+    { C2Config::picture_type_t::I_FRAME,        PICTURE_TYPE_I },
+    { C2Config::picture_type_t::P_FRAME,        PICTURE_TYPE_P },
+    { C2Config::picture_type_t::B_FRAME,        PICTURE_TYPE_B },
+};
+
 /**
  * A helper that passes through vendor extension profile and level values.
  */
@@ -1074,4 +1081,14 @@ bool C2Mapper::mapPixelFormatCodecToFramework(
         *frameworkValue = int32_t(c2Value);
     }
     return true;
+}
+
+// static
+bool C2Mapper::map(C2Config::picture_type_t from, int32_t *to) {
+    return sPictureType.map(from, to);
+}
+
+// static
+bool C2Mapper::map(int32_t from, C2Config::picture_type_t *to) {
+    return sPictureType.map(from, to);
 }
