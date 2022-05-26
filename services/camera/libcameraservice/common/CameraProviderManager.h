@@ -41,7 +41,6 @@
 #include <android/hardware/camera/provider/2.6/ICameraProvider.h>
 #include <android/hardware/camera/provider/2.7/ICameraProvider.h>
 #include <android/hardware/camera/device/3.7/types.h>
-#include <android/hardware/camera/device/3.8/types.h>
 #include <android/hidl/manager/1.0/IServiceNotification.h>
 #include <binder/IServiceManager.h>
 #include <camera/VendorTagDescriptor.h>
@@ -96,7 +95,6 @@ enum SystemCameraKind {
 #define CAMERA_DEVICE_API_VERSION_3_5 HARDWARE_DEVICE_API_VERSION(3, 5)
 #define CAMERA_DEVICE_API_VERSION_3_6 HARDWARE_DEVICE_API_VERSION(3, 6)
 #define CAMERA_DEVICE_API_VERSION_3_7 HARDWARE_DEVICE_API_VERSION(3, 7)
-#define CAMERA_DEVICE_API_VERSION_3_8 HARDWARE_DEVICE_API_VERSION(3, 8)
 
 /**
  * The vendor tag descriptor class that takes HIDL/AIDL vendor tag information as
@@ -233,11 +231,6 @@ public:
     std::vector<std::string> getAPI1CompatibleCameraDeviceIds() const;
 
     /**
-     * Return true if a device with a given ID and major version exists
-     */
-    bool isValidDevice(const std::string &id, uint16_t majorVersion) const;
-
-    /**
      * Return true if a device with a given ID has a flash unit. Returns false
      * for devices that are unknown.
      */
@@ -286,7 +279,7 @@ public:
      * Return the highest supported device interface version for this ID
      */
     status_t getHighestSupportedVersion(const std::string &id,
-            hardware::hidl_version *v);
+            hardware::hidl_version *v, IPCTransport *transport);
 
     /**
      * Check if a given camera device support setTorchMode API.
@@ -392,9 +385,7 @@ public:
     /*
      * Return provider type for a specific device.
      */
-    metadata_vendor_id_t getProviderTagIdLocked(const std::string& id,
-            hardware::hidl_version minVersion = hardware::hidl_version{0,0},
-            hardware::hidl_version maxVersion = hardware::hidl_version{1000,0}) const;
+    metadata_vendor_id_t getProviderTagIdLocked(const std::string& id) const;
 
     /*
      * Check if a camera is a logical camera. And if yes, return
@@ -796,12 +787,8 @@ private:
 
     // Utility to find a DeviceInfo by ID; pointer is only valid while mInterfaceMutex is held
     // and the calling code doesn't mutate the list of providers or their lists of devices.
-    // Finds the first device of the given ID that falls within the requested version range
-    //   minVersion <= deviceVersion < maxVersion
     // No guarantees on the order of traversal
-    ProviderInfo::DeviceInfo* findDeviceInfoLocked(const std::string& id,
-            hardware::hidl_version minVersion = hardware::hidl_version{0,0},
-            hardware::hidl_version maxVersion = hardware::hidl_version{1000,0}) const;
+    ProviderInfo::DeviceInfo* findDeviceInfoLocked(const std::string& id) const;
 
     // Map external providers to USB devices in order to handle USB hotplug
     // events for lazy HALs
@@ -828,7 +815,8 @@ private:
     status_t removeProvider(const std::string& provider);
     sp<StatusListener> getStatusListener() const;
 
-    bool isValidDeviceLocked(const std::string &id, uint16_t majorVersion) const;
+    bool isValidDeviceLocked(const std::string &id, uint16_t majorVersion,
+            IPCTransport transport) const;
 
     size_t mProviderInstanceId = 0;
     std::vector<sp<ProviderInfo>> mProviders;
