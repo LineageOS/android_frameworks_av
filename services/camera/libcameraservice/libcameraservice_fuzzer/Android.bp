@@ -60,7 +60,6 @@ cc_fuzz {
         "android.hardware.camera.device@3.5",
         "android.hardware.camera.device@3.6",
         "android.hardware.camera.device@3.7",
-        "android.hardware.camera.device@3.8",
     ],
     fuzz_config: {
         cc: [
