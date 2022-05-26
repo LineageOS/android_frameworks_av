@@ -19,7 +19,6 @@
 #include "SessionConfigurationUtils.h"
 #include "../api2/DepthCompositeStream.h"
 #include "../api2/HeicCompositeStream.h"
-#include "android/hardware/camera/metadata/3.8/types.h"
 #include "common/CameraDeviceBase.h"
 #include "common/HalConversionsTemplated.h"
 #include "../CameraService.h"

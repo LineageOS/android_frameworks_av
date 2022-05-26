@@ -152,8 +152,6 @@ protected:
 
     /** CameraDeviceBase instance wrapping HAL3+ entry */
 
-    const int mDeviceVersion;
-
     // Note: This was previously set to const to avoid mDevice being updated -
     // b/112639939 (update of sp<> is racy) during dumpDevice (which is important to be lock free
     // for debugging purpose). The const has been removed since CameraDeviceBase

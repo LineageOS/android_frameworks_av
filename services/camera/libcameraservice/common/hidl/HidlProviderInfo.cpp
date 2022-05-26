@@ -27,7 +27,6 @@
 #include <utils/Trace.h>
 
 #include <android/hardware/camera/device/3.7/ICameraDevice.h>
-#include <android/hardware/camera/device/3.8/ICameraDevice.h>
 
 namespace {
 const bool kEnableLazyHal(property_get_bool("ro.camera.enableLazyHal", false));
@@ -766,74 +765,14 @@ status_t HidlProviderInfo::HidlDeviceInfo3::setTorchMode(bool enabled) {
 }
 
 status_t HidlProviderInfo::HidlDeviceInfo3::turnOnTorchWithStrengthLevel(
-        int32_t torchStrength) {
-    const sp<hardware::camera::device::V3_2::ICameraDevice> interface = startDeviceInterface();
-    if (interface == nullptr) {
-        return DEAD_OBJECT;
-    }
-    sp<hardware::camera::device::V3_8::ICameraDevice> interface_3_8 = nullptr;
-    auto castResult_3_8 = device::V3_8::ICameraDevice::castFrom(interface);
-    if (castResult_3_8.isOk()) {
-        interface_3_8 = castResult_3_8;
-    }
-
-    if (interface_3_8 == nullptr) {
-        return INVALID_OPERATION;
-    }
-
-    Status s = interface_3_8->turnOnTorchWithStrengthLevel(torchStrength);
-    if (s == Status::OK) {
-        mTorchStrengthLevel = torchStrength;
-    }
-    return mapToStatusT(s);
+        int32_t /*torchStrengthLevel*/) {
+    ALOGE("%s HIDL does not support turning on torch with variable strength", __FUNCTION__);
+    return INVALID_OPERATION;
 }
 
-status_t HidlProviderInfo::HidlDeviceInfo3::getTorchStrengthLevel(int32_t *torchStrength) {
-    if (torchStrength == nullptr) {
-        return BAD_VALUE;
-    }
-    const sp<hardware::camera::device::V3_2::ICameraDevice> interface = startDeviceInterface();
-    if (interface == nullptr) {
-        return DEAD_OBJECT;
-    }
-    auto castResult_3_8 = device::V3_8::ICameraDevice::castFrom(interface);
-    sp<hardware::camera::device::V3_8::ICameraDevice> interface_3_8 = nullptr;
-    if (castResult_3_8.isOk()) {
-        interface_3_8 = castResult_3_8;
-    }
-
-    if (interface_3_8 == nullptr) {
-        return INVALID_OPERATION;
-    }
-
-    Status callStatus;
-    status_t res;
-    hardware::Return<void> ret = interface_3_8->getTorchStrengthLevel([&callStatus, &torchStrength]
-        (Status status, const int32_t& torchStrengthLevel) {
-        callStatus = status;
-        if (status == Status::OK) {
-             *torchStrength = torchStrengthLevel;
-        } });
-
-    if (ret.isOk()) {
-        switch (callStatus) {
-            case Status::OK:
-                // Expected case, do nothing.
-                res = OK;
-                break;
-            case Status::METHOD_NOT_SUPPORTED:
-                res = INVALID_OPERATION;
-                break;
-            default:
-                ALOGE("%s: Get torch strength level failed: %d", __FUNCTION__, callStatus);
-                res = UNKNOWN_ERROR;
-        }
-    } else {
-        ALOGE("%s: Unexpected binder error: %s", __FUNCTION__, ret.description().c_str());
-        res = UNKNOWN_ERROR;
-    }
-
-    return res;
+status_t HidlProviderInfo::HidlDeviceInfo3::getTorchStrengthLevel(int32_t * /*torchStrength*/) {
+    ALOGE("%s HIDL does not support variable torch strength level", __FUNCTION__);
+    return INVALID_OPERATION;
 }
 
 sp<hardware::camera::device::V3_2::ICameraDevice>
@@ -888,11 +827,11 @@ status_t HidlProviderInfo::HidlDeviceInfo3::isSessionConfigurationSupported(
         const SessionConfiguration &configuration, bool overrideForPerfClass,
         metadataGetter getMetadata, bool *status) {
 
-    hardware::camera::device::V3_8::StreamConfiguration streamConfiguration;
+    hardware::camera::device::V3_7::StreamConfiguration configuration_3_7;
     bool earlyExit = false;
     auto bRes = SessionConfigurationUtils::convertToHALStreamCombination(configuration,
             String8(mId.c_str()), mCameraCharacteristics, getMetadata, mPhysicalIds,
-            streamConfiguration, overrideForPerfClass, &earlyExit);
+            configuration_3_7, overrideForPerfClass, &earlyExit);
 
     if (!bRes.isOk()) {
         return UNKNOWN_ERROR;
@@ -914,8 +853,6 @@ status_t HidlProviderInfo::HidlDeviceInfo3::isSessionConfigurationSupported(
     sp<hardware::camera::device::V3_5::ICameraDevice> interface_3_5 = castResult_3_5;
     auto castResult_3_7 = device::V3_7::ICameraDevice::castFrom(interface);
     sp<hardware::camera::device::V3_7::ICameraDevice> interface_3_7 = castResult_3_7;
-    auto castResult_3_8 = device::V3_8::ICameraDevice::castFrom(interface);
-    sp<hardware::camera::device::V3_8::ICameraDevice> interface_3_8 = castResult_3_8;
 
     status_t res;
     Status callStatus;
@@ -925,27 +862,11 @@ status_t HidlProviderInfo::HidlDeviceInfo3::isSessionConfigurationSupported(
                 callStatus = s;
                 *status = combStatus;
             };
-    if (interface_3_8 != nullptr) {
-        ret = interface_3_8->isStreamCombinationSupported_3_8(streamConfiguration, halCb);
-    } else if (interface_3_7 != nullptr) {
-        hardware::camera::device::V3_7::StreamConfiguration configuration_3_7;
-        bool success = SessionConfigurationUtils::convertHALStreamCombinationFromV38ToV37(
-                configuration_3_7, streamConfiguration);
-        if (!success) {
-            *status = false;
-            return OK;
-        }
+    if (interface_3_7 != nullptr) {
         ret = interface_3_7->isStreamCombinationSupported_3_7(configuration_3_7, halCb);
     } else if (interface_3_5 != nullptr) {
-        hardware::camera::device::V3_7::StreamConfiguration configuration_3_7;
-        bool success = SessionConfigurationUtils::convertHALStreamCombinationFromV38ToV37(
-                configuration_3_7, streamConfiguration);
-        if (!success) {
-            *status = false;
-            return OK;
-        }
         hardware::camera::device::V3_4::StreamConfiguration configuration_3_4;
-        success = SessionConfigurationUtils::convertHALStreamCombinationFromV37ToV34(
+        bool success = SessionConfigurationUtils::convertHALStreamCombinationFromV37ToV34(
                 configuration_3_4, configuration_3_7);
         if (!success) {
             *status = false;
@@ -988,7 +909,7 @@ status_t HidlProviderInfo::convertToHALStreamCombinationAndCameraIdsLocked(
     status_t res = OK;
     for (auto &cameraIdAndSessionConfig : cameraIdsAndSessionConfigs) {
         const std::string& cameraId = cameraIdAndSessionConfig.mCameraId;
-        hardware::camera::device::V3_8::StreamConfiguration streamConfiguration;
+        hardware::camera::device::V3_7::StreamConfiguration streamConfiguration;
         CameraMetadata deviceInfo;
         bool overrideForPerfClass =
                 SessionConfigurationUtils::targetPerfClassPrimaryCamera(
@@ -1022,8 +943,7 @@ status_t HidlProviderInfo::convertToHALStreamCombinationAndCameraIdsLocked(
         }
         CameraIdAndStreamCombination halCameraIdAndStream;
         halCameraIdAndStream.cameraId = cameraId;
-        SessionConfigurationUtils::convertHALStreamCombinationFromV38ToV37(
-                halCameraIdAndStream.streamConfiguration, streamConfiguration);
+        halCameraIdAndStream.streamConfiguration = streamConfiguration;
         halCameraIdsAndStreamsV.push_back(halCameraIdAndStream);
     }
     *halCameraIdsAndStreamCombinations = halCameraIdsAndStreamsV;
