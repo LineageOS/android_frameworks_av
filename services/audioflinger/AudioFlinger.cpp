@@ -3889,15 +3889,22 @@ status_t AudioFlinger::createEffect(const media::CreateEffectRequest& request,
             goto Exit;
         }
     } else if (sessionId == AUDIO_SESSION_OUTPUT_STAGE) {
-        if (!isAudioServerUid(callingUid)) {
-            ALOGE("%s: only APM can create using AUDIO_SESSION_OUTPUT_STAGE", __func__);
-            lStatus = PERMISSION_DENIED;
-            goto Exit;
-        }
-
         if (io == AUDIO_IO_HANDLE_NONE) {
             ALOGE("%s: APM must specify output when using AUDIO_SESSION_OUTPUT_STAGE", __func__);
             lStatus = BAD_VALUE;
+            goto Exit;
+        }
+        PlaybackThread *thread = checkPlaybackThread_l(io);
+        if (thread == nullptr) {
+            ALOGE("%s: invalid output %d specified for AUDIO_SESSION_OUTPUT_STAGE", __func__, io);
+            lStatus = BAD_VALUE;
+            goto Exit;
+        }
+        if (!modifyDefaultAudioEffectsAllowed(adjAttributionSource)
+                && !isAudioServerUid(callingUid)) {
+            ALOGE("%s: effect on AUDIO_SESSION_OUTPUT_STAGE not granted for uid %d",
+                    __func__, callingUid);
+            lStatus = PERMISSION_DENIED;
             goto Exit;
         }
     } else if (sessionId == AUDIO_SESSION_DEVICE) {
