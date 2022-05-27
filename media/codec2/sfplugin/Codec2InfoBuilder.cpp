@@ -136,7 +136,9 @@ bool addSupportedProfileLevels(
                 continue;
             }
             switch (type.coreIndex()) {
-            case C2StreamHdr10PlusInfo::CORE_INDEX:
+            case C2StreamHdrDynamicMetadataInfo::CORE_INDEX:
+                [[fallthrough]];
+            case C2StreamHdr10PlusInfo::CORE_INDEX:  // will be deprecated
                 supportsHdr10Plus = true;
                 break;
             case C2StreamHdrStaticInfo::CORE_INDEX:
@@ -148,9 +150,10 @@ bool addSupportedProfileLevels(
         }
     }
 
-    // For VP9/AV1, the static info is always propagated by framework.
+    // VP9 does not support HDR metadata in the bitstream and static metadata
+    // can always be carried by the framework. (The framework does not propagate
+    // dynamic metadata as that needs to be frame accurate.)
     supportsHdr |= (mediaType == MIMETYPE_VIDEO_VP9);
-    supportsHdr |= (mediaType == MIMETYPE_VIDEO_AV1);
 
     // HDR support implies 10-bit support.
     // TODO: directly check this from the component interface

@@ -22,13 +22,12 @@
 
 namespace android {
 
-using android::hardware::camera::metadata::V3_8::CameraMetadataEnumAndroidRequestAvailableDynamicRangeProfilesMap;
 
 /**
  * CameraDevice for HIDL HAL devices with version CAMERA_DEVICE_API_VERSION_3_0 or higher.
  */
 class HidlCamera3Device :
-            virtual public hardware::camera::device::V3_8::ICameraDeviceCallback,
+            virtual public hardware::camera::device::V3_5::ICameraDeviceCallback,
             public Camera3Device {
   public:
 
@@ -44,8 +43,6 @@ class HidlCamera3Device :
     static hardware::camera::device::V3_2::DataspaceFlags mapToHidlDataspace(
             android_dataspace dataSpace);
     static hardware::camera::device::V3_2::BufferUsageFlags mapToConsumerUsage(uint64_t usage);
-    static CameraMetadataEnumAndroidRequestAvailableDynamicRangeProfilesMap mapToHidlDynamicProfile(
-                    int64_t dynamicRangeProfile);
     static hardware::camera::device::V3_2::StreamRotation mapToStreamRotation(
             camera_stream_rotation_t rotation);
     // Returns a negative error code if the passed-in operation mode is not valid.
@@ -83,10 +80,6 @@ class HidlCamera3Device :
     hardware::Return<void> returnStreamBuffers(
             const hardware::hidl_vec<
                     hardware::camera::device::V3_2::StreamBuffer>& buffers) override;
-
-    hardware::Return<void> notify_3_8(
-            const hardware::hidl_vec<
-                    hardware::camera::device::V3_8::NotifyMsg>& msgs) override;
 
     // Handle one notify message
     void notify(const hardware::camera::device::V3_2::NotifyMsg& msg);
@@ -164,8 +157,6 @@ class HidlCamera3Device :
         sp<hardware::camera::device::V3_6::ICameraDeviceSession> mHidlSession_3_6;
         // Valid if ICameraDeviceSession is @3.7 or newer
         sp<hardware::camera::device::V3_7::ICameraDeviceSession> mHidlSession_3_7;
-        // Valid if ICameraDeviceSession is @3.7 or newer
-        sp<hardware::camera::device::V3_8::ICameraDeviceSession> mHidlSession_3_8;
 
         std::shared_ptr<RequestMetadataQueue> mRequestMetadataQueue;
 

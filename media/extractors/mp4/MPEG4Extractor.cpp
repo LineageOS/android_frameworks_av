@@ -4775,7 +4775,7 @@ status_t MPEG4Extractor::updateAudioTrackInfoFromESDS_MPEG4Audio(
         if (len2 == 0) {
             return ERROR_MALFORMED;
         }
-        if (offset >= csd_size || csd[offset] != 0x01) {
+        if (offset + len1 > csd_size || csd[offset] != 0x01) {
             return ERROR_MALFORMED;
         }
 
