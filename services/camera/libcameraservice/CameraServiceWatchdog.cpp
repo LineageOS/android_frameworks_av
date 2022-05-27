@@ -41,8 +41,10 @@ bool CameraServiceWatchdog::threadLoop()
             tidToCycleCounterMap[currentThreadId]++;
 
             if (tidToCycleCounterMap[currentThreadId] >= mMaxCycles) {
-                ALOGW("CameraServiceWatchdog triggering kill for pid: %d", getpid());
-                kill(getpid(), SIGKILL);
+                ALOGW("CameraServiceWatchdog triggering abort for pid: %d", getpid());
+                // We use abort here so we can get a tombstone for better
+                // debugging.
+                abort();
             }
         }
     }
