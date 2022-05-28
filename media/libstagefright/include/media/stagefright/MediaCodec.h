@@ -398,6 +398,7 @@ private:
     // <all states>     -> EnabledNoBuffer  when flush
     // <all states>     -> EnabledNoBuffer  when stop then configure then start
     enum struct TunnelPeekState {
+        kLegacyMode,
         kDisabledNoBuffer,
         kEnabledNoBuffer,
         kDisabledQueued,
