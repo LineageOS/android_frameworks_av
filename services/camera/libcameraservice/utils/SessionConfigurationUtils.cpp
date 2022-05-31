@@ -87,7 +87,7 @@ namespace SessionConfigurationUtils {
 int32_t PERF_CLASS_LEVEL =
         property_get_int32("ro.odm.build.media_performance_class", 0);
 
-bool IS_PERF_CLASS = (PERF_CLASS_LEVEL == SDK_VERSION_S);
+bool IS_PERF_CLASS = (PERF_CLASS_LEVEL >= SDK_VERSION_S);
 
 camera3::Size getMaxJpegResolution(const CameraMetadata &metadata,
         bool ultraHighResolution) {
