@@ -248,8 +248,12 @@ status_t Camera2ClientBase<TClientBase>::dumpDevice(
 
 template <typename TClientBase>
 binder::Status Camera2ClientBase<TClientBase>::disconnect() {
-    return mCameraServiceWatchdog->WATCH_CUSTOM_TIMER(disconnectImpl(),
-            kDisconnectTimeoutMs / kCycleLengthMs, kCycleLengthMs);
+    if (mCameraServiceWatchdog != nullptr) {
+        // Initialization from hal succeeded, time disconnect.
+        return mCameraServiceWatchdog->WATCH_CUSTOM_TIMER(disconnectImpl(),
+                kDisconnectTimeoutMs / kCycleLengthMs, kCycleLengthMs);
+    }
+    return disconnectImpl();
 }
 
 template <typename TClientBase>
