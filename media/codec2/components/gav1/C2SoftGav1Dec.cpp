@@ -21,6 +21,7 @@
 #include <C2Debug.h>
 #include <C2PlatformSupport.h>
 #include <Codec2BufferUtils.h>
+#include <Codec2CommonUtils.h>
 #include <Codec2Mapper.h>
 #include <SimpleC2Interface.h>
 #include <log/log.h>
@@ -190,7 +191,7 @@ class C2SoftGav1Dec::IntfImpl : public SimpleInterface<void>::BaseParams {
               .build());
 
     std::vector<uint32_t> pixelFormats = {HAL_PIXEL_FORMAT_YCBCR_420_888};
-    if (isAtLeastT()) {
+    if (isHalPixelFormatSupported((AHardwareBuffer_Format)HAL_PIXEL_FORMAT_YCBCR_P010)) {
         pixelFormats.push_back(HAL_PIXEL_FORMAT_YCBCR_P010);
     }
     // TODO: support more formats?
