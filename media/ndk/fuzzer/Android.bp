@@ -70,3 +70,11 @@ cc_fuzz {
      ],
      defaults: ["libmediandk_fuzzer_defaults"],
 }
+
+cc_fuzz {
+    name: "ndk_extractor_fuzzer",
+    srcs: ["ndk_extractor_fuzzer.cpp"],
+    defaults: ["libmediandk_fuzzer_defaults"],
+    shared_libs: ["libbinder_ndk",],
+    corpus: ["corpus/*"],
+}
