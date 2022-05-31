@@ -3974,7 +3974,7 @@ void MediaCodec::onMessageReceived(const sp<AMessage> &msg) {
             if (mTunneled && (mTunnelPeekState == TunnelPeekState::kLegacyMode)) {
                 sp<AMessage> params = new AMessage;
                 params->setInt32("android._tunnel-peek-set-legacy", 1);
-                setParameters(params);
+                onSetParameters(params);
             }
 
             int32_t background = 0;
