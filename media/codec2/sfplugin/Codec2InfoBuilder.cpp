@@ -33,6 +33,7 @@
 #include <OMX_Video.h>
 #include <OMX_VideoExt.h>
 #include <OMX_AsString.h>
+#include <SurfaceFlingerProperties.sysprop.h>
 
 #include <android/hardware/media/omx/1.0/IOmx.h>
 #include <android/hardware/media/omx/1.0/IOmxObserver.h>
@@ -159,6 +160,12 @@ bool addSupportedProfileLevels(
     // TODO: directly check this from the component interface
     supports10Bit = (supportsHdr || supportsHdr10Plus);
 
+    // If the device doesn't support HDR display, then no codec on the device
+    // can advertise support for HDR profiles.
+    // Default to true to maintain backward compatibility
+    auto ret = sysprop::SurfaceFlingerProperties::has_HDR_display();
+    bool hasHDRDisplay = ret.has_value() ? *ret : true;
+
     bool added = false;
 
     for (C2Value::Primitive profile : profileQuery[0].values.values) {
@@ -184,8 +191,8 @@ bool addSupportedProfileLevels(
         if (mapper && mapper->mapProfile(pl.profile, &sdkProfile)
                 && mapper->mapLevel(pl.level, &sdkLevel)) {
             caps->addProfileLevel((uint32_t)sdkProfile, (uint32_t)sdkLevel);
-            // also list HDR profiles if component supports HDR
-            if (supportsHdr) {
+            // also list HDR profiles if component supports HDR and device has HDR display
+            if (supportsHdr && hasHDRDisplay) {
                 auto hdrMapper = C2Mapper::GetHdrProfileLevelMapper(trait.mediaType);
                 if (hdrMapper && hdrMapper->mapProfile(pl.profile, &sdkProfile)) {
                     caps->addProfileLevel((uint32_t)sdkProfile, (uint32_t)sdkLevel);

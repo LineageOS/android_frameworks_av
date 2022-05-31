@@ -615,10 +615,30 @@ void CCodecConfig::initializeStandardParams() {
     add(ConfigMapper("csd-0",           C2_PARAMKEY_INIT_DATA,       "value")
         .limitTo(D::OUTPUT & D::READ));
 
-    add(ConfigMapper(KEY_HDR10_PLUS_INFO, C2_PARAMKEY_INPUT_HDR10_PLUS_INFO, "value")
+    deprecated(ConfigMapper(KEY_HDR10_PLUS_INFO, C2_PARAMKEY_INPUT_HDR10_PLUS_INFO, "value")
         .limitTo(D::VIDEO & D::PARAM & D::INPUT));
 
-    add(ConfigMapper(KEY_HDR10_PLUS_INFO, C2_PARAMKEY_OUTPUT_HDR10_PLUS_INFO, "value")
+    deprecated(ConfigMapper(KEY_HDR10_PLUS_INFO, C2_PARAMKEY_OUTPUT_HDR10_PLUS_INFO, "value")
+        .limitTo(D::VIDEO & D::OUTPUT));
+
+    add(ConfigMapper(
+            std::string(C2_PARAMKEY_INPUT_HDR_DYNAMIC_INFO) + ".type",
+            C2_PARAMKEY_INPUT_HDR_DYNAMIC_INFO, "type")
+        .limitTo(D::VIDEO & D::PARAM & D::INPUT));
+
+    add(ConfigMapper(
+            std::string(C2_PARAMKEY_INPUT_HDR_DYNAMIC_INFO) + ".data",
+            C2_PARAMKEY_INPUT_HDR_DYNAMIC_INFO, "data")
+        .limitTo(D::VIDEO & D::PARAM & D::INPUT));
+
+    add(ConfigMapper(
+            std::string(C2_PARAMKEY_OUTPUT_HDR_DYNAMIC_INFO) + ".type",
+            C2_PARAMKEY_OUTPUT_HDR_DYNAMIC_INFO, "type")
+        .limitTo(D::VIDEO & D::OUTPUT));
+
+    add(ConfigMapper(
+            std::string(C2_PARAMKEY_OUTPUT_HDR_DYNAMIC_INFO) + ".data",
+            C2_PARAMKEY_OUTPUT_HDR_DYNAMIC_INFO, "data")
         .limitTo(D::VIDEO & D::OUTPUT));
 
     add(ConfigMapper(C2_PARAMKEY_TEMPORAL_LAYERING, C2_PARAMKEY_TEMPORAL_LAYERING, "")
@@ -1570,6 +1590,22 @@ sp<AMessage> CCodecConfig::getFormatForDomain(
             msg->removeEntryAt(msg->findEntryByName("cta861.max-cll"));
             msg->removeEntryAt(msg->findEntryByName("cta861.max-fall"));
         }
+
+        // HDR dynamic info
+        std::string keyPrefix = input ? C2_PARAMKEY_INPUT_HDR_DYNAMIC_INFO
+                                      : C2_PARAMKEY_OUTPUT_HDR_DYNAMIC_INFO;
+        std::string typeKey = keyPrefix + ".type";
+        std::string dataKey = keyPrefix + ".data";
+        int32_t type;
+        sp<ABuffer> data;
+        if (msg->findInt32(typeKey.c_str(), &type)
+                && msg->findBuffer(dataKey.c_str(), &data)) {
+            if (type == HDR_DYNAMIC_METADATA_TYPE_SMPTE_2094_40) {
+                msg->setBuffer(KEY_HDR10_PLUS_INFO, data);
+                msg->removeEntryAt(msg->findEntryByName(typeKey.c_str()));
+                msg->removeEntryAt(msg->findEntryByName(dataKey.c_str()));
+            }
+        }
     }
 
     ALOGV("converted to SDK values as %s", msg->debugString().c_str());
@@ -1769,6 +1805,16 @@ ReflectedParamUpdater::Dict CCodecConfig::getReflectedFormat(
                 params->setFloat("smpte2086.min-luminance", meta->sType1.mMinDisplayLuminance * 0.0001);
                 params->setFloat("cta861.max-cll", meta->sType1.mMaxContentLightLevel);
                 params->setFloat("cta861.max-fall", meta->sType1.mMaxFrameAverageLightLevel);
+            }
+        }
+
+        sp<ABuffer> hdrDynamicInfo;
+        if (params->findBuffer(KEY_HDR10_PLUS_INFO, &hdrDynamicInfo)) {
+            for (const std::string &prefix : { C2_PARAMKEY_INPUT_HDR_DYNAMIC_INFO,
+                                               C2_PARAMKEY_OUTPUT_HDR_DYNAMIC_INFO }) {
+                params->setInt32((prefix + ".type").c_str(),
+                                 HDR_DYNAMIC_METADATA_TYPE_SMPTE_2094_40);
+                params->setBuffer((prefix + ".data").c_str(), hdrDynamicInfo);
             }
         }
     }
