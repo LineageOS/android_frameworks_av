@@ -43,6 +43,10 @@ cc_library_shared {
         "media_ndk_headers",
     ],
 
+    static_libs: [
+        "SurfaceFlingerProperties",
+    ],
+
     shared_libs: [
         "android.hardware.cas.native@1.0",
         "android.hardware.drm@1.0",
