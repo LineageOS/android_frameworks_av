@@ -64,12 +64,13 @@ class OnAudioDeviceUpdateNotifier : public AudioSystem::AudioDeviceCallback {
 
 // Simple AudioPlayback class.
 class AudioPlayback : public AudioTrack::IAudioTrackCallback {
-  friend sp<AudioPlayback>;
+    friend sp<AudioPlayback>;
     AudioPlayback(uint32_t sampleRate, audio_format_t format, audio_channel_mask_t channelMask,
                   audio_output_flags_t flags = AUDIO_OUTPUT_FLAG_NONE,
                   audio_session_t sessionId = AUDIO_SESSION_NONE,
                   AudioTrack::transfer_type transferType = AudioTrack::TRANSFER_SHARED,
-                  audio_attributes_t* attributes = nullptr);
+                  audio_attributes_t* attributes = nullptr, audio_offload_info_t* info = nullptr);
+
   public:
     status_t loadResource(const char* name);
     status_t create();
@@ -101,6 +102,7 @@ class AudioPlayback : public AudioTrack::IAudioTrackCallback {
     const audio_session_t mSessionId;
     const AudioTrack::transfer_type mTransferType;
     const audio_attributes_t* mAttributes;
+    const audio_offload_info_t* mOffloadInfo;
 
     size_t mBytesUsedSoFar;
     State mState;

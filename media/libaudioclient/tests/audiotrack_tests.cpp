@@ -47,6 +47,78 @@ TEST(AudioTrackTest, TestSeek) {
     ap->stop();
 }
 
+TEST(AudioTrackTest, OffloadOrDirectPlayback) {
+    audio_offload_info_t info = AUDIO_INFO_INITIALIZER;
+    info.sample_rate = 44100;
+    info.channel_mask = AUDIO_CHANNEL_OUT_STEREO;
+    info.format = AUDIO_FORMAT_MP3;
+    info.stream_type = AUDIO_STREAM_MUSIC;
+    info.bit_rate = 192;
+    info.duration_us = 120 * 1000000;  // 120 sec
+
+    audio_config_base_t config = {/* .sample_rate = */ info.sample_rate,
+                                  /* .channel_mask = */ info.channel_mask,
+                                  /* .format = */ AUDIO_FORMAT_PCM_16_BIT};
+    audio_attributes_t attributes = AUDIO_ATTRIBUTES_INITIALIZER;
+    attributes.content_type = AUDIO_CONTENT_TYPE_MUSIC;
+    attributes.usage = AUDIO_USAGE_MEDIA;
+    attributes.flags = AUDIO_FLAG_NONE;
+
+    if (!AudioTrack::isDirectOutputSupported(config, attributes) &&
+        AUDIO_OFFLOAD_NOT_SUPPORTED == AudioSystem::getOffloadSupport(info)) {
+        GTEST_SKIP() << "offload or direct playback is not supported";
+    }
+    sp<AudioPlayback> ap = nullptr;
+    if (AUDIO_OFFLOAD_NOT_SUPPORTED != AudioSystem::getOffloadSupport(info)) {
+        ap = sp<AudioPlayback>::make(info.sample_rate, info.format, info.channel_mask,
+                                     AUDIO_OUTPUT_FLAG_COMPRESS_OFFLOAD, AUDIO_SESSION_NONE,
+                                     AudioTrack::TRANSFER_OBTAIN, nullptr, &info);
+    } else {
+        ap = sp<AudioPlayback>::make(config.sample_rate, config.format, config.channel_mask,
+                                     AUDIO_OUTPUT_FLAG_DIRECT, AUDIO_SESSION_NONE,
+                                     AudioTrack::TRANSFER_OBTAIN);
+    }
+    ASSERT_NE(nullptr, ap);
+    EXPECT_EQ(OK, ap->create()) << "track creation failed";
+    audio_dual_mono_mode_t mode;
+    if (OK != ap->getAudioTrackHandle()->getDualMonoMode(&mode)) {
+        std::cerr << "no dual mono presentation is available" << std::endl;
+    }
+    if (OK != ap->getAudioTrackHandle()->setDualMonoMode(AUDIO_DUAL_MONO_MODE_LR)) {
+        std::cerr << "no dual mono presentation is available" << std::endl;
+    } else {
+        EXPECT_EQ(OK, ap->getAudioTrackHandle()->getDualMonoMode(&mode));
+        EXPECT_EQ(AUDIO_DUAL_MONO_MODE_LR, mode);
+    }
+    float leveldB;
+    if (OK != ap->getAudioTrackHandle()->getAudioDescriptionMixLevel(&leveldB)) {
+        std::cerr << "Audio Description mixing is unavailable" << std::endl;
+    }
+    if (OK != ap->getAudioTrackHandle()->setAudioDescriptionMixLevel(3.14f)) {
+        std::cerr << "Audio Description mixing is unavailable" << std::endl;
+    } else {
+        EXPECT_EQ(OK, ap->getAudioTrackHandle()->getAudioDescriptionMixLevel(&leveldB));
+        EXPECT_EQ(3.14f, leveldB);
+    }
+    AudioPlaybackRate audioRate;
+    audioRate = ap->getAudioTrackHandle()->getPlaybackRate();
+    std::cerr << "playback speed :: " << audioRate.mSpeed << std::endl
+              << "playback pitch :: " << audioRate.mPitch << std::endl;
+    audioRate.mSpeed = 2.0f;
+    audioRate.mPitch = 2.0f;
+    audioRate.mStretchMode = AUDIO_TIMESTRETCH_STRETCH_VOICE;
+    audioRate.mFallbackMode = AUDIO_TIMESTRETCH_FALLBACK_MUTE;
+    EXPECT_TRUE(isAudioPlaybackRateValid(audioRate));
+    if (OK != ap->getAudioTrackHandle()->setPlaybackRate(audioRate)) {
+        std::cerr << "unable to set playback rate parameters" << std::endl;
+    } else {
+        AudioPlaybackRate audioRateLocal;
+        audioRateLocal = ap->getAudioTrackHandle()->getPlaybackRate();
+        EXPECT_TRUE(isAudioPlaybackRateEqual(audioRate, audioRateLocal));
+    }
+    ap->stop();
+}
+
 TEST(AudioTrackTest, TestAudioCbNotifier) {
     const auto ap = sp<AudioPlayback>::make(0 /* sampleRate */, AUDIO_FORMAT_PCM_16_BIT,
                                             AUDIO_CHANNEL_OUT_STEREO, AUDIO_OUTPUT_FLAG_FAST,
@@ -68,6 +140,13 @@ TEST(AudioTrackTest, TestAudioCbNotifier) {
     EXPECT_EQ(AUDIO_PORT_HANDLE_NONE, cbOld->mDeviceId);
     EXPECT_NE(AUDIO_IO_HANDLE_NONE, cb->mAudioIo);
     EXPECT_NE(AUDIO_PORT_HANDLE_NONE, cb->mDeviceId);
+    EXPECT_EQ(cb->mAudioIo, ap->getAudioTrackHandle()->getOutput());
+    EXPECT_EQ(cb->mDeviceId, ap->getAudioTrackHandle()->getRoutedDeviceId());
+    String8 keys;
+    keys = ap->getAudioTrackHandle()->getParameters(keys);
+    if (!keys.isEmpty()) {
+        std::cerr << "track parameters :: " << keys << std::endl;
+    }
     EXPECT_TRUE(checkPatchPlayback(cb->mAudioIo, cb->mDeviceId));
     EXPECT_EQ(BAD_VALUE, ap->getAudioTrackHandle()->removeAudioDeviceCallback(nullptr));
     EXPECT_EQ(INVALID_OPERATION, ap->getAudioTrackHandle()->removeAudioDeviceCallback(cbOld));
