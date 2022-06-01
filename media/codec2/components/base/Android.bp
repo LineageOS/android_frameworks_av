@@ -37,6 +37,11 @@ cc_library {
         "libsfplugin_ccodec_utils",
     ],
 
+    header_libs: [
+        "libarect_headers",
+        "libnativewindow_headers",
+    ],
+
     shared_libs: [
         "libcutils", // for properties
         "liblog", // for ALOG
@@ -75,6 +80,11 @@ cc_defaults {
     version_script: ":codec2_soft_exports",
     export_shared_lib_headers: [
         "libsfplugin_ccodec_utils",
+    ],
+
+    header_libs: [
+        "libarect_headers",
+        "libnativewindow_headers",
     ],
 
     shared_libs: [
