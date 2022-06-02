@@ -1411,7 +1411,7 @@ public:
 
     audio_session_t         mSessionId;
     int                     mAuxEffectId;
-    audio_port_handle_t     mPortId;                    // Id from Audio Policy Manager
+    audio_port_handle_t     mPortId = AUDIO_PORT_HANDLE_NONE; // Id from Audio Policy Manager
 
     /**
      * mPlayerIId is the player id of the AudioTrack used by AudioManager.

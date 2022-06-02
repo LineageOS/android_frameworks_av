@@ -397,6 +397,8 @@ protected:
     int64_t             mLogStartFrames = 0;    // Timestamp frames at start()
     double              mLogLatencyMs = 0.;     // Track the last log latency
 
+    bool                mLogForceVolumeUpdate = true; // force volume update to TrackMetrics.
+
     TrackMetrics        mTrackMetrics;
 
     bool                mServerLatencySupported = false;
