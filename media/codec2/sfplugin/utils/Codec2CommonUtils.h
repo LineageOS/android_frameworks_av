@@ -23,6 +23,8 @@ namespace android {
 
 bool isAtLeastT();
 
+bool isVendorApiOrFirstApiAtLeastT();
+
 /**
  * Check if a given pixel format is supported.
  * enums listed in android_pixel_format_t, android_pixel_format_v1_1_t
