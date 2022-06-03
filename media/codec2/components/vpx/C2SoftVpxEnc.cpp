@@ -733,14 +733,8 @@ void C2SoftVpxEnc::process(
     switch (layout.type) {
         case C2PlanarLayout::TYPE_RGB:
         case C2PlanarLayout::TYPE_RGBA: {
-            std::shared_ptr<C2StreamColorAspectsInfo::output> colorAspects;
-            {
-                IntfImpl::Lock lock = mIntf->lock();
-                colorAspects = mIntf->getCodedColorAspects_l();
-            }
             ConvertRGBToPlanarYUV(mConversionBuffer.data(), stride, vstride,
-                                  mConversionBuffer.size(), *rView.get(),
-                                  colorAspects->matrix, colorAspects->range);
+                                  mConversionBuffer.size(), *rView.get());
             vpx_img_wrap(&raw_frame, VPX_IMG_FMT_I420, width, height,
                          mStrideAlign, mConversionBuffer.data());
             break;

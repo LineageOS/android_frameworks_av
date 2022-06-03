@@ -1515,8 +1515,7 @@ c2_status_t C2SoftAvcEnc::setEncodeArgs(
             vPlane = uPlane + yPlaneSize / 4;
             yStride = width;
             uStride = vStride = yStride / 2;
-            ConvertRGBToPlanarYUV(yPlane, yStride, height, conversionBuffer.size(), *input,
-                                  mColorAspects->matrix, mColorAspects->range);
+            ConvertRGBToPlanarYUV(yPlane, yStride, height, conversionBuffer.size(), *input);
             break;
         }
         case C2PlanarLayout::TYPE_YUV: {
