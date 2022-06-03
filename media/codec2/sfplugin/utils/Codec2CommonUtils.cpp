@@ -20,6 +20,7 @@
 #include <utils/Log.h>
 
 #include <android/hardware_buffer.h>
+#include <android-base/properties.h>
 #include <cutils/properties.h>
 #include <media/hardware/HardwareAPI.h>
 #include <system/graphics.h>
@@ -37,9 +38,36 @@ bool isAtLeastT() {
            !strcmp(deviceCodeName, "Tiramisu");
 }
 
+bool isVendorApiOrFirstApiAtLeastT() {
+    // The first SDK the device shipped with.
+    static const int32_t kProductFirstApiLevel =
+        base::GetIntProperty<int32_t>("ro.product.first_api_level", 0);
+
+    // GRF devices (introduced in Android 11) list the first and possibly the current api levels
+    // to signal which VSR requirements they conform to even if the first device SDK was higher.
+    static const int32_t kBoardFirstApiLevel =
+        base::GetIntProperty<int32_t>("ro.board.first_api_level", 0);
+    static const int32_t kBoardApiLevel =
+        base::GetIntProperty<int32_t>("ro.board.api_level", 0);
+
+    // For non-GRF devices, use the first SDK version by the product.
+    static const int32_t kFirstApiLevel =
+        kBoardApiLevel != 0 ? kBoardApiLevel :
+        kBoardFirstApiLevel != 0 ? kBoardFirstApiLevel :
+        kProductFirstApiLevel;
+
+    return kFirstApiLevel >= __ANDROID_API_T__;
+}
+
 bool isHalPixelFormatSupported(AHardwareBuffer_Format format) {
-    // HAL_PIXEL_FORMAT_YCBCR_P010 was added in Android T, return false for older versions
-    if (format == (AHardwareBuffer_Format)HAL_PIXEL_FORMAT_YCBCR_P010 && !isAtLeastT()) {
+    // HAL_PIXEL_FORMAT_YCBCR_P010 requirement was added in T VSR, although it could have been
+    // supported prior to this.
+    //
+    // Unfortunately, we cannot detect if P010 is properly supported using AHardwareBuffer
+    // API alone. For now limit P010 to devices that launched with Android T or known to conform
+    // to Android T VSR (as opposed to simply limiting to a T vendor image).
+    if (format == (AHardwareBuffer_Format)HAL_PIXEL_FORMAT_YCBCR_P010 &&
+            !isVendorApiOrFirstApiAtLeastT()) {
         return false;
     }
 
@@ -48,8 +76,10 @@ bool isHalPixelFormatSupported(AHardwareBuffer_Format format) {
             .height = 240,
             .format = format,
             .layers = 1,
-            .usage = AHARDWAREBUFFER_USAGE_CPU_READ_RARELY | AHARDWAREBUFFER_USAGE_CPU_WRITE_OFTEN |
-                     AHARDWAREBUFFER_USAGE_GPU_SAMPLED_IMAGE,
+            .usage = AHARDWAREBUFFER_USAGE_CPU_READ_RARELY |
+                     AHARDWAREBUFFER_USAGE_CPU_WRITE_OFTEN |
+                     AHARDWAREBUFFER_USAGE_GPU_SAMPLED_IMAGE |
+                     AHARDWAREBUFFER_USAGE_COMPOSER_OVERLAY,
             .stride = 0,
             .rfu0 = 0,
             .rfu1 = 0,
