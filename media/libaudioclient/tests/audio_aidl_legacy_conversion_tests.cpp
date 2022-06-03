@@ -22,11 +22,17 @@
 using namespace android;
 using namespace android::aidl_utils;
 
+using android::media::AudioDirectMode;
 using media::audio::common::AudioChannelLayout;
 using media::audio::common::AudioDeviceDescription;
 using media::audio::common::AudioDeviceType;
+using media::audio::common::AudioEncapsulationMetadataType;
+using media::audio::common::AudioEncapsulationType;
 using media::audio::common::AudioFormatDescription;
 using media::audio::common::AudioFormatType;
+using media::audio::common::AudioGainMode;
+using media::audio::common::AudioStandard;
+using media::audio::common::ExtraAudioDescriptor;
 using media::audio::common::PcmType;
 
 namespace {
@@ -152,6 +158,22 @@ AudioFormatDescription make_AFD_Encap_with_Enc() {
     return afd;
 }
 
+android::media::TrackSecondaryOutputInfo make_TrackSecondaryOutputInfo() {
+    android::media::TrackSecondaryOutputInfo result;
+    result.portId = 1;
+    result.secondaryOutputIds = {0, 5, 7};
+    return result;
+}
+
+ExtraAudioDescriptor make_ExtraAudioDescriptor(AudioStandard audioStandard,
+                                               AudioEncapsulationType audioEncapsulationType) {
+    ExtraAudioDescriptor result;
+    result.standard = audioStandard;
+    result.audioDescriptor = {0xb4, 0xaf, 0x98, 0x1a};
+    result.encapsulationType = audioEncapsulationType;
+    return result;
+}
+
 }  // namespace
 
 // Verify that two independently constructed ADDs/AFDs have the same hash.
@@ -204,17 +226,79 @@ TEST_P(AudioChannelLayoutRoundTripTest, Aidl2Legacy2Aidl) {
     ASSERT_TRUE(convBack.ok());
     EXPECT_EQ(initial, convBack.value());
 }
-INSTANTIATE_TEST_SUITE_P(AudioChannelLayoutRoundTrip, AudioChannelLayoutRoundTripTest,
-                         testing::Combine(testing::Values(AudioChannelLayout{}, make_ACL_Invalid(),
-                                                          make_ACL_Stereo(),
-                                                          make_ACL_LayoutArbitrary(),
-                                                          make_ACL_ChannelIndex2(),
-                                                          make_ACL_ChannelIndexArbitrary()),
-                                          testing::Values(false, true)));
+
+INSTANTIATE_TEST_SUITE_P(
+        AudioChannelLayoutRoundTrip, AudioChannelLayoutRoundTripTest,
+        testing::Combine(
+                testing::Values(AudioChannelLayout{}, make_ACL_Invalid(), make_ACL_Stereo(),
+                                make_ACL_LayoutArbitrary(), make_ACL_ChannelIndex2(),
+                                make_ACL_ChannelIndexArbitrary(),
+                                AudioChannelLayout::make<AudioChannelLayout::Tag::layoutMask>(
+                                        AudioChannelLayout::CHANNEL_FRONT_LEFT),
+                                AudioChannelLayout::make<AudioChannelLayout::Tag::layoutMask>(
+                                        AudioChannelLayout::CHANNEL_FRONT_RIGHT),
+                                AudioChannelLayout::make<AudioChannelLayout::Tag::layoutMask>(
+                                        AudioChannelLayout::CHANNEL_BACK_CENTER),
+                                AudioChannelLayout::make<AudioChannelLayout::Tag::layoutMask>(
+                                        AudioChannelLayout::CHANNEL_BACK_LEFT),
+                                AudioChannelLayout::make<AudioChannelLayout::Tag::layoutMask>(
+                                        AudioChannelLayout::CHANNEL_BACK_RIGHT),
+                                AudioChannelLayout::make<AudioChannelLayout::Tag::layoutMask>(
+                                        AudioChannelLayout::CHANNEL_FRONT_CENTER),
+                                AudioChannelLayout::make<AudioChannelLayout::Tag::layoutMask>(
+                                        AudioChannelLayout::CHANNEL_LOW_FREQUENCY),
+                                AudioChannelLayout::make<AudioChannelLayout::Tag::layoutMask>(
+                                        AudioChannelLayout::CHANNEL_TOP_SIDE_LEFT),
+                                AudioChannelLayout::make<AudioChannelLayout::Tag::layoutMask>(
+                                        AudioChannelLayout::CHANNEL_TOP_SIDE_RIGHT)),
+                testing::Values(false, true)));
 INSTANTIATE_TEST_SUITE_P(AudioChannelVoiceRoundTrip, AudioChannelLayoutRoundTripTest,
                          // In legacy constants the voice call is only defined for input.
                          testing::Combine(testing::Values(make_ACL_VoiceCall()),
                                           testing::Values(true)));
+
+INSTANTIATE_TEST_SUITE_P(
+        OutAudioChannelLayoutLayoutRoundTrip, AudioChannelLayoutRoundTripTest,
+        testing::Combine(
+                testing::Values(AudioChannelLayout::make<AudioChannelLayout::Tag::layoutMask>(
+                                        AudioChannelLayout::CHANNEL_FRONT_LEFT_OF_CENTER),
+                                AudioChannelLayout::make<AudioChannelLayout::Tag::layoutMask>(
+                                        AudioChannelLayout::CHANNEL_FRONT_RIGHT_OF_CENTER),
+                                AudioChannelLayout::make<AudioChannelLayout::Tag::layoutMask>(
+                                        AudioChannelLayout::CHANNEL_SIDE_LEFT),
+                                AudioChannelLayout::make<AudioChannelLayout::Tag::layoutMask>(
+                                        AudioChannelLayout::CHANNEL_SIDE_RIGHT),
+                                AudioChannelLayout::make<AudioChannelLayout::Tag::layoutMask>(
+                                        AudioChannelLayout::CHANNEL_TOP_CENTER),
+                                AudioChannelLayout::make<AudioChannelLayout::Tag::layoutMask>(
+                                        AudioChannelLayout::CHANNEL_TOP_FRONT_LEFT),
+                                AudioChannelLayout::make<AudioChannelLayout::Tag::layoutMask>(
+                                        AudioChannelLayout::CHANNEL_TOP_FRONT_CENTER),
+                                AudioChannelLayout::make<AudioChannelLayout::Tag::layoutMask>(
+                                        AudioChannelLayout::CHANNEL_TOP_FRONT_RIGHT),
+                                AudioChannelLayout::make<AudioChannelLayout::Tag::layoutMask>(
+                                        AudioChannelLayout::CHANNEL_TOP_BACK_LEFT),
+                                AudioChannelLayout::make<AudioChannelLayout::Tag::layoutMask>(
+                                        AudioChannelLayout::CHANNEL_TOP_BACK_CENTER),
+                                AudioChannelLayout::make<AudioChannelLayout::Tag::layoutMask>(
+                                        AudioChannelLayout::CHANNEL_TOP_BACK_RIGHT),
+                                AudioChannelLayout::make<AudioChannelLayout::Tag::layoutMask>(
+                                        AudioChannelLayout::CHANNEL_BOTTOM_FRONT_LEFT),
+                                AudioChannelLayout::make<AudioChannelLayout::Tag::layoutMask>(
+                                        AudioChannelLayout::CHANNEL_BOTTOM_FRONT_CENTER),
+                                AudioChannelLayout::make<AudioChannelLayout::Tag::layoutMask>(
+                                        AudioChannelLayout::CHANNEL_BOTTOM_FRONT_RIGHT),
+                                AudioChannelLayout::make<AudioChannelLayout::Tag::layoutMask>(
+                                        AudioChannelLayout::CHANNEL_LOW_FREQUENCY_2),
+                                AudioChannelLayout::make<AudioChannelLayout::Tag::layoutMask>(
+                                        AudioChannelLayout::CHANNEL_FRONT_WIDE_LEFT),
+                                AudioChannelLayout::make<AudioChannelLayout::Tag::layoutMask>(
+                                        AudioChannelLayout::CHANNEL_FRONT_WIDE_RIGHT),
+                                AudioChannelLayout::make<AudioChannelLayout::Tag::layoutMask>(
+                                        AudioChannelLayout::CHANNEL_HAPTIC_A),
+                                AudioChannelLayout::make<AudioChannelLayout::Tag::layoutMask>(
+                                        AudioChannelLayout::CHANNEL_HAPTIC_B)),
+                testing::Values(false)));
 
 using ChannelLayoutEdgeCaseParam = std::tuple<int /*legacy*/, bool /*isInput*/, bool /*isValid*/>;
 class AudioChannelLayoutEdgeCaseTest : public testing::TestWithParam<ChannelLayoutEdgeCaseParam> {};
@@ -282,3 +366,97 @@ TEST_P(AudioFormatDescriptionRoundTripTest, Aidl2Legacy2Aidl) {
 INSTANTIATE_TEST_SUITE_P(AudioFormatDescriptionRoundTrip, AudioFormatDescriptionRoundTripTest,
                          testing::Values(make_AFD_Invalid(), AudioFormatDescription{},
                                          make_AFD_Pcm16Bit()));
+
+class AudioDirectModeRoundTripTest : public testing::TestWithParam<AudioDirectMode> {};
+TEST_P(AudioDirectModeRoundTripTest, Aidl2Legacy2Aidl) {
+    const auto initial = GetParam();
+    auto conv = aidl2legacy_AudioDirectMode_audio_direct_mode_t(initial);
+    ASSERT_TRUE(conv.ok());
+    auto convBack = legacy2aidl_audio_direct_mode_t_AudioDirectMode(conv.value());
+    ASSERT_TRUE(convBack.ok());
+    EXPECT_EQ(initial, convBack.value());
+}
+INSTANTIATE_TEST_SUITE_P(AudioDirectMode, AudioDirectModeRoundTripTest,
+                         testing::Values(AudioDirectMode::NONE, AudioDirectMode::OFFLOAD,
+                                         AudioDirectMode::OFFLOAD_GAPLESS,
+                                         AudioDirectMode::BITSTREAM));
+
+class AudioStandardRoundTripTest : public testing::TestWithParam<AudioStandard> {};
+TEST_P(AudioStandardRoundTripTest, Aidl2Legacy2Aidl) {
+    const auto initial = GetParam();
+    auto conv = aidl2legacy_AudioStandard_audio_standard_t(initial);
+    ASSERT_TRUE(conv.ok());
+    auto convBack = legacy2aidl_audio_standard_t_AudioStandard(conv.value());
+    ASSERT_TRUE(convBack.ok());
+    EXPECT_EQ(initial, convBack.value());
+}
+INSTANTIATE_TEST_SUITE_P(AudioStandard, AudioStandardRoundTripTest,
+                         testing::Values(AudioStandard::NONE, AudioStandard::EDID));
+
+class AudioEncapsulationMetadataTypeRoundTripTest
+    : public testing::TestWithParam<AudioEncapsulationMetadataType> {};
+TEST_P(AudioEncapsulationMetadataTypeRoundTripTest, Aidl2Legacy2Aidl) {
+    const auto initial = GetParam();
+    auto conv =
+            aidl2legacy_AudioEncapsulationMetadataType_audio_encapsulation_metadata_type_t(initial);
+    ASSERT_TRUE(conv.ok());
+    auto convBack = legacy2aidl_audio_encapsulation_metadata_type_t_AudioEncapsulationMetadataType(
+            conv.value());
+    ASSERT_TRUE(convBack.ok());
+    EXPECT_EQ(initial, convBack.value());
+}
+INSTANTIATE_TEST_SUITE_P(AudioEncapsulationMetadataType,
+                         AudioEncapsulationMetadataTypeRoundTripTest,
+                         testing::Values(AudioEncapsulationMetadataType::NONE,
+                                         AudioEncapsulationMetadataType::FRAMEWORK_TUNER,
+                                         AudioEncapsulationMetadataType::DVB_AD_DESCRIPTOR));
+
+class AudioGainModeRoundTripTest : public testing::TestWithParam<AudioGainMode> {};
+TEST_P(AudioGainModeRoundTripTest, Aidl2Legacy2Aidl) {
+    const auto initial = GetParam();
+    auto conv = aidl2legacy_AudioGainMode_audio_gain_mode_t(initial);
+    ASSERT_TRUE(conv.ok());
+    auto convBack = legacy2aidl_audio_gain_mode_t_AudioGainMode(conv.value());
+    ASSERT_TRUE(convBack.ok());
+    EXPECT_EQ(initial, convBack.value());
+}
+INSTANTIATE_TEST_SUITE_P(AudioGainMode, AudioGainModeRoundTripTest,
+                         testing::Values(AudioGainMode::JOINT, AudioGainMode::CHANNELS,
+                                         AudioGainMode::RAMP));
+
+TEST(AudioTrackSecondaryOutputInfoRoundTripTest, Aidl2Legacy2Aidl) {
+    const auto initial = make_TrackSecondaryOutputInfo();
+    auto conv = aidl2legacy_TrackSecondaryOutputInfo_TrackSecondaryOutputInfoPair(initial);
+    ASSERT_TRUE(conv.ok());
+    auto convBack = legacy2aidl_TrackSecondaryOutputInfoPair_TrackSecondaryOutputInfo(conv.value());
+    ASSERT_TRUE(convBack.ok());
+    EXPECT_EQ(initial, convBack.value());
+}
+
+using ExtraAudioDescriptorParam = std::tuple<AudioStandard, AudioEncapsulationType>;
+class ExtraAudioDescriptorRoundTripTest : public testing::TestWithParam<ExtraAudioDescriptorParam> {
+};
+TEST_P(ExtraAudioDescriptorRoundTripTest, Aidl2Legacy2Aidl) {
+    ExtraAudioDescriptor initial =
+            make_ExtraAudioDescriptor(std::get<0>(GetParam()), std::get<1>(GetParam()));
+    auto conv = aidl2legacy_ExtraAudioDescriptor_audio_extra_audio_descriptor(initial);
+    ASSERT_TRUE(conv.ok());
+    auto convBack = legacy2aidl_audio_extra_audio_descriptor_ExtraAudioDescriptor(conv.value());
+    ASSERT_TRUE(convBack.ok());
+    EXPECT_EQ(initial, convBack.value());
+}
+
+INSTANTIATE_TEST_SUITE_P(
+        ExtraAudioDescriptor, ExtraAudioDescriptorRoundTripTest,
+        testing::Values(std::make_tuple(AudioStandard::NONE, AudioEncapsulationType::NONE),
+                        std::make_tuple(AudioStandard::EDID, AudioEncapsulationType::NONE),
+                        std::make_tuple(AudioStandard::EDID, AudioEncapsulationType::IEC61937)));
+
+TEST(AudioPortSessionExtRoundTripTest, Aidl2Legacy2Aidl) {
+    const int32_t initial = 7;
+    auto conv = aidl2legacy_int32_t_audio_port_session_ext(initial);
+    ASSERT_TRUE(conv.ok());
+    auto convBack = legacy2aidl_audio_port_session_ext_int32_t(conv.value());
+    ASSERT_TRUE(convBack.ok());
+    EXPECT_EQ(initial, convBack.value());
+}
