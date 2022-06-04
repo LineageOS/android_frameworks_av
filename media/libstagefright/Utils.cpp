@@ -126,14 +126,10 @@ static void convertMetaDataToMessageColorAspects(const MetaDataBase *meta, sp<AM
     }
 }
 
-static bool isHdr(const sp<AMessage> &format) {
-    // if CSD specifies HDR transfer(s), we assume HDR. Otherwise, if it specifies non-HDR
-    // transfers, we must assume non-HDR. This is because CSD trumps any color-transfer key
-    // in the format.
-    int32_t isHdr;
-    if (format->findInt32("android._is-hdr", &isHdr)) {
-        return isHdr;
-    }
+/**
+ * Returns true if, and only if, the given format corresponds to HDR10 or HDR10+.
+ */
+static bool isHdr10or10Plus(const sp<AMessage> &format) {
 
     // if user/container supplied HDR static info without transfer set, assume true
     if ((format->contains("hdr-static-info") || format->contains("hdr10-plus-info"))
@@ -143,8 +139,7 @@ static bool isHdr(const sp<AMessage> &format) {
     // otherwise, verify that an HDR transfer function is set
     int32_t transfer;
     if (format->findInt32("color-transfer", &transfer)) {
-        return transfer == ColorUtils::kColorTransferST2084
-                || transfer == ColorUtils::kColorTransferHLG;
+        return transfer == ColorUtils::kColorTransferST2084;
     }
     return false;
 }
@@ -419,8 +414,12 @@ static void parseHevcProfileLevelFromHvcc(const uint8_t *ptr, size_t size, sp<AM
     }
 
     // bump to HDR profile
-    if (isHdr(format) && codecProfile == HEVCProfileMain10) {
-        codecProfile = HEVCProfileMain10HDR10;
+    if (isHdr10or10Plus(format) && codecProfile == HEVCProfileMain10) {
+        if (format->contains("hdr10-plus-info")) {
+            codecProfile = HEVCProfileMain10HDR10Plus;
+        } else {
+            codecProfile = HEVCProfileMain10HDR10;
+        }
     }
 
     format->setInt32("profile", codecProfile);
@@ -615,16 +614,25 @@ static void parseVp9ProfileLevelFromCsd(const sp<ABuffer> &csd, sp<AMessage> &fo
                         { 3, VP9Profile3 },
                     };
 
-                    const static ALookup<int32_t, int32_t> toHdr {
+                    const static ALookup<int32_t, int32_t> toHdr10 {
                         { VP9Profile2, VP9Profile2HDR },
                         { VP9Profile3, VP9Profile3HDR },
+                    };
+
+                    const static ALookup<int32_t, int32_t> toHdr10Plus {
+                        { VP9Profile2, VP9Profile2HDR10Plus },
+                        { VP9Profile3, VP9Profile3HDR10Plus },
                     };
 
                     int32_t profile;
                     if (profiles.map(data[0], &profile)) {
                         // convert to HDR profile
-                        if (isHdr(format)) {
-                            toHdr.lookup(profile, &profile);
+                        if (isHdr10or10Plus(format)) {
+                            if (format->contains("hdr10-plus-info")) {
+                                toHdr10Plus.lookup(profile, &profile);
+                            } else {
+                                toHdr10.lookup(profile, &profile);
+                            }
                         }
 
                         format->setInt32("profile", profile);
@@ -684,7 +692,7 @@ static void parseAV1ProfileLevelFromCsd(const sp<ABuffer> &csd, sp<AMessage> &fo
     int32_t profile;
     if (profiles.map(std::make_pair(highBitDepth, profileData), &profile)) {
         // bump to HDR profile
-        if (isHdr(format) && profile == AV1ProfileMain10) {
+        if (isHdr10or10Plus(format) && profile == AV1ProfileMain10) {
             if (format->contains("hdr10-plus-info")) {
                 profile = AV1ProfileMain10HDR10Plus;
             } else {
