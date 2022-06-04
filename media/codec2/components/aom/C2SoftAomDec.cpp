@@ -536,9 +536,10 @@ bool C2SoftAomDec::outputBuffer(
 
     std::shared_ptr<C2GraphicBlock> block;
     uint32_t format = HAL_PIXEL_FORMAT_YV12;
+    std::shared_ptr<C2StreamColorAspectsTuning::output> defaultColorAspects;
     if (img->fmt == AOM_IMG_FMT_I42016) {
         IntfImpl::Lock lock = mIntf->lock();
-        std::shared_ptr<C2StreamColorAspectsTuning::output> defaultColorAspects = mIntf->getDefaultColorAspects_l();
+        defaultColorAspects = mIntf->getDefaultColorAspects_l();
 
         if (defaultColorAspects->primaries == C2Color::PRIMARIES_BT2020 &&
             defaultColorAspects->matrix == C2Color::MATRIX_BT2020 &&
@@ -587,7 +588,8 @@ bool C2SoftAomDec::outputBuffer(
         if (format == HAL_PIXEL_FORMAT_RGBA_1010102) {
             convertYUV420Planar16ToY410OrRGBA1010102(
                     (uint32_t *)dstY, srcY, srcU, srcV, srcYStride / 2, srcUStride / 2,
-                    srcVStride / 2, dstYStride / sizeof(uint32_t), mWidth, mHeight);
+                    srcVStride / 2, dstYStride / sizeof(uint32_t), mWidth, mHeight,
+                    std::static_pointer_cast<const C2ColorAspectsStruct>(defaultColorAspects));
         } else {
             convertYUV420Planar16ToYV12(dstY, dstU, dstV, srcY, srcU, srcV, srcYStride / 2,
                                         srcUStride / 2, srcVStride / 2, dstYStride, dstUVStride,
