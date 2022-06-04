@@ -1721,7 +1721,8 @@ Status CameraService::connectDevice(
 
     // enforce system camera permissions
     if (oomScoreOffset > 0 &&
-            !hasPermissionsForSystemCamera(callingPid, CameraThreadState::getCallingUid())) {
+            !hasPermissionsForSystemCamera(callingPid, CameraThreadState::getCallingUid()) &&
+            !isTrustedCallingUid(CameraThreadState::getCallingUid())) {
         String8 msg =
                 String8::format("Cannot change the priority of a client %s pid %d for "
                         "camera id %s without SYSTEM_CAMERA permissions",
