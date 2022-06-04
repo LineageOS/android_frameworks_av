@@ -28,6 +28,7 @@ cc_library {
 
     srcs: [
         "Codec2BufferUtils.cpp",
+        "Codec2CommonUtils.cpp",
         "Codec2Mapper.cpp",
     ],
 
