@@ -133,11 +133,126 @@ void convertYUV420Planar16ToY410(uint32_t *dst, const uint16_t *srcY, const uint
         dst += dstStride * 2;
     }
 }
+
+namespace {
+
+static C2ColorAspectsStruct FillMissingColorAspects(
+        std::shared_ptr<const C2ColorAspectsStruct> aspects,
+        int32_t width, int32_t height) {
+    C2ColorAspectsStruct _aspects;
+    if (aspects) {
+        _aspects = *aspects;
+    }
+
+    // use matrix for conversion
+    if (_aspects.matrix == C2Color::MATRIX_UNSPECIFIED) {
+        // if not specified, deduce matrix from primaries
+        if (_aspects.primaries == C2Color::PRIMARIES_UNSPECIFIED) {
+            // if those are also not specified, deduce primaries first from transfer, then from
+            // width and height
+            if (_aspects.transfer == C2Color::TRANSFER_ST2084
+                    || _aspects.transfer == C2Color::TRANSFER_HLG) {
+                _aspects.primaries = C2Color::PRIMARIES_BT2020;
+            } else if (width >= 3840 || height >= 3840 || width * (int64_t)height >= 3840 * 1634) {
+                // TODO: stagefright defaults to BT.2020 for UHD, but perhaps we should default to
+                // BT.709 for non-HDR 10-bit UHD content
+                // (see media/libstagefright/foundation/ColorUtils.cpp)
+                _aspects.primaries = C2Color::PRIMARIES_BT2020;
+            } else if ((width <= 720 && height <= 576)
+                    || (height <= 720 && width <= 576)) {
+                // note: it does not actually matter whether to use 525 or 625 here as the
+                // conversion is the same
+                _aspects.primaries = C2Color::PRIMARIES_BT601_625;
+            } else {
+                _aspects.primaries = C2Color::PRIMARIES_BT709;
+            }
+        }
+
+        switch (_aspects.primaries) {
+        case C2Color::PRIMARIES_BT601_525:
+        case C2Color::PRIMARIES_BT601_625:
+            _aspects.matrix = C2Color::MATRIX_BT601;
+            break;
+
+        case C2Color::PRIMARIES_BT709:
+            _aspects.matrix = C2Color::MATRIX_BT709;
+            break;
+
+        case C2Color::PRIMARIES_BT2020:
+        default:
+            _aspects.matrix = C2Color::MATRIX_BT2020;
+        }
+    }
+
+    return _aspects;
+}
+
+// matrix conversion coefficients
+// (see media/libstagefright/colorconverter/ColorConverter.cpp for more details)
+struct Coeffs {
+    int32_t _y, _b_u, _g_u, _g_v, _r_v, _c16;
+};
+
+static const struct Coeffs GetCoeffsForAspects(const C2ColorAspectsStruct &aspects) {
+    bool isFullRange = aspects.range == C2Color::RANGE_FULL;
+
+    switch (aspects.matrix) {
+    case C2Color::MATRIX_BT601:
+        /**
+         * BT.601:  K_R = 0.299;  K_B = 0.114
+         */
+        if (isFullRange) {
+            return Coeffs { 1024, 1436, 352, 731, 1815, 0 };
+        } else {
+            return Coeffs { 1196, 1639, 402, 835, 2072, 64 };
+        }
+        break;
+
+    case C2Color::MATRIX_BT709:
+        /**
+         * BT.709:  K_R = 0.2126;  K_B = 0.0722
+         */
+        if (isFullRange) {
+            return Coeffs { 1024, 1613, 192, 479, 1900, 0 };
+        } else {
+            return Coeffs { 1196, 1841, 219, 547, 2169, 64 };
+        }
+        break;
+
+    case C2Color::MATRIX_BT2020:
+    default:
+        /**
+         * BT.2020:  K_R = 0.2627;  K_B = 0.0593
+         */
+        if (isFullRange) {
+            return Coeffs { 1024, 1510, 169, 585, 1927, 0 };
+        } else {
+            return Coeffs { 1196, 1724, 192, 668, 2200, 64 };
+        }
+    }
+}
+
+}
+
 #define CLIP3(min, v, max) (((v) < (min)) ? (min) : (((max) > (v)) ? (v) : (max)))
-void convertYUV420Planar16ToRGBA1010102(uint32_t *dst, const uint16_t *srcY, const uint16_t *srcU,
-                                        const uint16_t *srcV, size_t srcYStride, size_t srcUStride,
-                                        size_t srcVStride, size_t dstStride, size_t width,
-                                        size_t height) {
+void convertYUV420Planar16ToRGBA1010102(
+        uint32_t *dst, const uint16_t *srcY, const uint16_t *srcU,
+        const uint16_t *srcV, size_t srcYStride, size_t srcUStride,
+        size_t srcVStride, size_t dstStride, size_t width,
+        size_t height,
+        std::shared_ptr<const C2ColorAspectsStruct> aspects) {
+
+    C2ColorAspectsStruct _aspects = FillMissingColorAspects(aspects, width, height);
+
+    struct Coeffs coeffs = GetCoeffsForAspects(_aspects);
+
+    int32_t _y = coeffs._y;
+    int32_t _b_u = coeffs._b_u;
+    int32_t _neg_g_u = -coeffs._g_u;
+    int32_t _neg_g_v = -coeffs._g_v;
+    int32_t _r_v = coeffs._r_v;
+    int32_t _c16 = coeffs._c16;
+
     // Converting two lines at a time, slightly faster
     for (size_t y = 0; y < height; y += 2) {
         uint32_t *dstTop = (uint32_t *)dst;
@@ -147,25 +262,6 @@ void convertYUV420Planar16ToRGBA1010102(uint32_t *dst, const uint16_t *srcY, con
         uint16_t *uSrc = (uint16_t *)srcU;
         uint16_t *vSrc = (uint16_t *)srcV;
 
-        // BT.2020 Limited Range conversion
-
-        // B = 1.168  *(Y - 64) + 2.148  *(U - 512)
-        // G = 1.168  *(Y - 64) - 0.652  *(V - 512) - 0.188  *(U - 512)
-        // R = 1.168  *(Y - 64) + 1.683  *(V - 512)
-
-        // B = 1196/1024  *(Y - 64) + 2200/1024  *(U - 512)
-        // G = .................... -  668/1024  *(V - 512) - 192/1024  *(U - 512)
-        // R = .................... + 1723/1024  *(V - 512)
-
-        // min_B = (1196  *(- 64) + 2200  *(- 512)) / 1024 = -1175
-        // min_G = (1196  *(- 64) - 668  *(1023 - 512) - 192  *(1023 - 512)) / 1024 = -504
-        // min_R = (1196  *(- 64) + 1723  *(- 512)) / 1024 = -937
-
-        // max_B = (1196  *(1023 - 64) + 2200  *(1023 - 512)) / 1024 = 2218
-        // max_G = (1196  *(1023 - 64) - 668  *(- 512) - 192  *(- 512)) / 1024 = 1551
-        // max_R = (1196  *(1023 - 64) + 1723  *(1023 - 512)) / 1024 = 1980
-
-        int32_t mY = 1196, mU_B = 2200, mV_G = -668, mV_R = 1723, mU_G = -192;
         for (size_t x = 0; x < width; x += 2) {
             int32_t u, v, y00, y01, y10, y11;
             u = *uSrc - 512;
@@ -173,22 +269,22 @@ void convertYUV420Planar16ToRGBA1010102(uint32_t *dst, const uint16_t *srcY, con
             v = *vSrc - 512;
             vSrc += 1;
 
-            y00 = *ySrcTop - 64;
+            y00 = *ySrcTop - _c16;
             ySrcTop += 1;
-            y01 = *ySrcTop - 64;
+            y01 = *ySrcTop - _c16;
             ySrcTop += 1;
-            y10 = *ySrcBot - 64;
+            y10 = *ySrcBot - _c16;
             ySrcBot += 1;
-            y11 = *ySrcBot - 64;
+            y11 = *ySrcBot - _c16;
             ySrcBot += 1;
 
-            int32_t u_b = u * mU_B;
-            int32_t u_g = u * mU_G;
-            int32_t v_g = v * mV_G;
-            int32_t v_r = v * mV_R;
+            int32_t u_b = u * _b_u;
+            int32_t u_g = u * _neg_g_u;
+            int32_t v_g = v * _neg_g_v;
+            int32_t v_r = v * _r_v;
 
             int32_t yMult, b, g, r;
-            yMult = y00 * mY;
+            yMult = y00 * _y + 512;
             b = (yMult + u_b) / 1024;
             g = (yMult + v_g + u_g) / 1024;
             r = (yMult + v_r) / 1024;
@@ -197,7 +293,7 @@ void convertYUV420Planar16ToRGBA1010102(uint32_t *dst, const uint16_t *srcY, con
             r = CLIP3(0, r, 1023);
             *dstTop++ = 3 << 30 | (b << 20) | (g << 10) | r;
 
-            yMult = y01 * mY;
+            yMult = y01 * _y + 512;
             b = (yMult + u_b) / 1024;
             g = (yMult + v_g + u_g) / 1024;
             r = (yMult + v_r) / 1024;
@@ -206,7 +302,7 @@ void convertYUV420Planar16ToRGBA1010102(uint32_t *dst, const uint16_t *srcY, con
             r = CLIP3(0, r, 1023);
             *dstTop++ = 3 << 30 | (b << 20) | (g << 10) | r;
 
-            yMult = y10 * mY;
+            yMult = y10 * _y + 512;
             b = (yMult + u_b) / 1024;
             g = (yMult + v_g + u_g) / 1024;
             r = (yMult + v_r) / 1024;
@@ -215,7 +311,7 @@ void convertYUV420Planar16ToRGBA1010102(uint32_t *dst, const uint16_t *srcY, con
             r = CLIP3(0, r, 1023);
             *dstBot++ = 3 << 30 | (b << 20) | (g << 10) | r;
 
-            yMult = y11 * mY;
+            yMult = y11 * _y + 512;
             b = (yMult + u_b) / 1024;
             g = (yMult + v_g + u_g) / 1024;
             r = (yMult + v_r) / 1024;
@@ -232,19 +328,21 @@ void convertYUV420Planar16ToRGBA1010102(uint32_t *dst, const uint16_t *srcY, con
     }
 }
 
-void convertYUV420Planar16ToY410OrRGBA1010102(uint32_t *dst, const uint16_t *srcY,
-                                              const uint16_t *srcU, const uint16_t *srcV,
-                                              size_t srcYStride, size_t srcUStride,
-                                              size_t srcVStride, size_t dstStride, size_t width,
-                                              size_t height) {
+void convertYUV420Planar16ToY410OrRGBA1010102(
+        uint32_t *dst, const uint16_t *srcY,
+        const uint16_t *srcU, const uint16_t *srcV,
+        size_t srcYStride, size_t srcUStride,
+        size_t srcVStride, size_t dstStride, size_t width, size_t height,
+        std::shared_ptr<const C2ColorAspectsStruct> aspects) {
     if (isAtLeastT()) {
         convertYUV420Planar16ToRGBA1010102(dst, srcY, srcU, srcV, srcYStride, srcUStride,
-                                           srcVStride, dstStride, width, height);
+                                           srcVStride, dstStride, width, height, aspects);
     } else {
         convertYUV420Planar16ToY410(dst, srcY, srcU, srcV, srcYStride, srcUStride, srcVStride,
                                     dstStride, width, height);
     }
 }
+
 void convertYUV420Planar16ToYV12(uint8_t *dstY, uint8_t *dstU, uint8_t *dstV, const uint16_t *srcY,
                                  const uint16_t *srcU, const uint16_t *srcV, size_t srcYStride,
                                  size_t srcUStride, size_t srcVStride, size_t dstYStride,
