@@ -32,72 +32,80 @@ namespace android {
 class CameraServiceProxyWrapper {
 private:
     // Guard mCameraServiceProxy
-    static Mutex sProxyMutex;
+    Mutex mProxyMutex;
     // Cached interface to the camera service proxy in system service
-    static sp<hardware::ICameraServiceProxy> sCameraServiceProxy;
+    sp<hardware::ICameraServiceProxy> mCameraServiceProxy;
 
-    struct CameraSessionStatsWrapper {
+    class CameraSessionStatsWrapper {
+    private:
         hardware::CameraSessionStats mSessionStats;
         Mutex mLock; // lock for per camera session stats
 
+        /**
+         * Update the session stats of a given camera device (open/close/active/idle) with
+         * the camera proxy service in the system service
+         */
+        void updateProxyDeviceState(sp<hardware::ICameraServiceProxy>& proxyBinder);
+
+    public:
         CameraSessionStatsWrapper(const String16& cameraId, int facing, int newCameraState,
                 const String16& clientName, int apiLevel, bool isNdk, int32_t latencyMs) :
             mSessionStats(cameraId, facing, newCameraState, clientName, apiLevel, isNdk, latencyMs)
-            {}
+            { }
 
-        void onOpen();
-        void onClose(int32_t latencyMs);
+        void onOpen(sp<hardware::ICameraServiceProxy>& proxyBinder);
+        void onClose(sp<hardware::ICameraServiceProxy>& proxyBinder, int32_t latencyMs);
         void onStreamConfigured(int operatingMode, bool internalReconfig, int32_t latencyMs);
-        void onActive(float maxPreviewFps);
-        void onIdle(int64_t requestCount, int64_t resultErrorCount, bool deviceError,
+        void onActive(sp<hardware::ICameraServiceProxy>& proxyBinder, float maxPreviewFps);
+        void onIdle(sp<hardware::ICameraServiceProxy>& proxyBinder,
+                int64_t requestCount, int64_t resultErrorCount, bool deviceError,
                 const std::string& userTag, int32_t videoStabilizationMode,
                 const std::vector<hardware::CameraStreamStats>& streamStats);
     };
 
     // Lock for camera session stats map
-    static Mutex mLock;
+    Mutex mLock;
     // Map from camera id to the camera's session statistics
-    static std::map<String8, std::shared_ptr<CameraSessionStatsWrapper>> mSessionStatsMap;
+    std::map<String8, std::shared_ptr<CameraSessionStatsWrapper>> mSessionStatsMap;
 
-    /**
-     * Update the session stats of a given camera device (open/close/active/idle) with
-     * the camera proxy service in the system service
-     */
-    static void updateProxyDeviceState(
-            const hardware::CameraSessionStats& sessionStats);
-
-    static sp<hardware::ICameraServiceProxy> getCameraServiceProxy();
+    sp<hardware::ICameraServiceProxy> getCameraServiceProxy();
 
 public:
+    CameraServiceProxyWrapper(sp<hardware::ICameraServiceProxy> serviceProxy = nullptr) :
+            mCameraServiceProxy(serviceProxy)
+    { }
+
+    static sp<hardware::ICameraServiceProxy> getDefaultCameraServiceProxy();
+
     // Open
-    static void logOpen(const String8& id, int facing,
+    void logOpen(const String8& id, int facing,
             const String16& clientPackageName, int apiLevel, bool isNdk,
             int32_t latencyMs);
 
     // Close
-    static void logClose(const String8& id, int32_t latencyMs);
+    void logClose(const String8& id, int32_t latencyMs);
 
     // Stream configuration
-    static void logStreamConfigured(const String8& id, int operatingMode, bool internalReconfig,
+    void logStreamConfigured(const String8& id, int operatingMode, bool internalReconfig,
             int32_t latencyMs);
 
     // Session state becomes active
-    static void logActive(const String8& id, float maxPreviewFps);
+    void logActive(const String8& id, float maxPreviewFps);
 
     // Session state becomes idle
-    static void logIdle(const String8& id,
+    void logIdle(const String8& id,
             int64_t requestCount, int64_t resultErrorCount, bool deviceError,
             const std::string& userTag, int32_t videoStabilizationMode,
             const std::vector<hardware::CameraStreamStats>& streamStats);
 
     // Ping camera service proxy for user update
-    static void pingCameraServiceProxy();
+    void pingCameraServiceProxy();
 
     // Return the current top activity rotate and crop override.
-    static int getRotateAndCropOverride(String16 packageName, int lensFacing, int userId);
+    int getRotateAndCropOverride(String16 packageName, int lensFacing, int userId);
 
     // Detect if the camera is disabled by device policy.
-    static bool isCameraDisabled();
+    bool isCameraDisabled();
 };
 
 } // android

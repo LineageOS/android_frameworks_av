@@ -142,7 +142,10 @@ const String16 CameraService::kWatchAllClientsFlag("all");
 // Set to keep track of logged service error events.
 static std::set<String8> sServiceErrorEventSet;
 
-CameraService::CameraService() :
+CameraService::CameraService(
+        std::shared_ptr<CameraServiceProxyWrapper> cameraServiceProxyWrapper) :
+        mCameraServiceProxyWrapper(cameraServiceProxyWrapper == nullptr ?
+                std::make_shared<CameraServiceProxyWrapper>() : cameraServiceProxyWrapper),
         mEventLog(DEFAULT_EVENT_LOG_LENGTH),
         mNumberOfCameras(0),
         mNumberOfCamerasWithoutSystemCamera(0),
@@ -195,7 +198,7 @@ void CameraService::onFirstRef()
 
     // This needs to be last call in this function, so that it's as close to
     // ServiceManager::addService() as possible.
-    CameraServiceProxyWrapper::pingCameraServiceProxy();
+    mCameraServiceProxyWrapper->pingCameraServiceProxy();
     ALOGI("CameraService pinged cameraservice proxy");
 }
 
@@ -983,15 +986,16 @@ Status CameraService::makeClient(const sp<CameraService>& cameraService,
     }
     if (effectiveApiLevel == API_1) { // Camera1 API route
         sp<ICameraClient> tmp = static_cast<ICameraClient*>(cameraCb.get());
-        *client = new Camera2Client(cameraService, tmp, packageName, featureId,
-                cameraId, api1CameraId, facing, sensorOrientation, clientPid, clientUid,
-                servicePid, overrideForPerfClass);
+        *client = new Camera2Client(cameraService, tmp, cameraService->mCameraServiceProxyWrapper,
+                packageName, featureId, cameraId, api1CameraId, facing, sensorOrientation,
+                clientPid, clientUid, servicePid, overrideForPerfClass);
     } else { // Camera2 API route
         sp<hardware::camera2::ICameraDeviceCallbacks> tmp =
                 static_cast<hardware::camera2::ICameraDeviceCallbacks*>(cameraCb.get());
-        *client = new CameraDeviceClient(cameraService, tmp, packageName,
-                systemNativeClient, featureId, cameraId, facing, sensorOrientation,
-                clientPid, clientUid, servicePid, overrideForPerfClass);
+        *client = new CameraDeviceClient(cameraService, tmp,
+                cameraService->mCameraServiceProxyWrapper, packageName, systemNativeClient,
+                featureId, cameraId, facing, sensorOrientation, clientPid, clientUid, servicePid,
+                overrideForPerfClass);
     }
     return Status::ok();
 }
@@ -1708,7 +1712,7 @@ Status CameraService::connectDevice(
         return STATUS_ERROR(ERROR_ILLEGAL_ARGUMENT, msg.string());
     }
 
-    if (CameraServiceProxyWrapper::isCameraDisabled()) {
+    if (mCameraServiceProxyWrapper->isCameraDisabled()) {
         String8 msg =
                 String8::format("Camera disabled by device policy");
         ALOGE("%s: %s", __FUNCTION__, msg.string());
@@ -1919,7 +1923,7 @@ Status CameraService::connectHelper(const sp<CALLBACK>& cameraCb, const String8&
             client->setRotateAndCropOverride(mOverrideRotateAndCropMode);
         } else {
           client->setRotateAndCropOverride(
-              CameraServiceProxyWrapper::getRotateAndCropOverride(
+              mCameraServiceProxyWrapper->getRotateAndCropOverride(
                   clientPackageName, facing, multiuser_get_user_id(clientUid)));
         }
 
@@ -1969,7 +1973,7 @@ Status CameraService::connectHelper(const sp<CALLBACK>& cameraCb, const String8&
     device = client;
 
     int32_t openLatencyMs = ns2ms(systemTime() - openTimeNs);
-    CameraServiceProxyWrapper::logOpen(cameraId, facing, clientPackageName,
+    mCameraServiceProxyWrapper->logOpen(cameraId, facing, clientPackageName,
             effectiveApiLevel, isNonSystemNdk, openLatencyMs);
 
     {
@@ -2455,7 +2459,7 @@ Status CameraService::notifyDisplayConfigurationChange() {
             const auto basicClient = current->getValue();
             if (basicClient.get() != nullptr) {
               basicClient->setRotateAndCropOverride(
-                  CameraServiceProxyWrapper::getRotateAndCropOverride(
+                  mCameraServiceProxyWrapper->getRotateAndCropOverride(
                       basicClient->getPackageName(),
                       basicClient->getCameraFacing(),
                       multiuser_get_user_id(basicClient->getClientUid())));

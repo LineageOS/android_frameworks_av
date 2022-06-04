@@ -31,7 +31,6 @@
 #include "device3/Camera3Device.h"
 #include "device3/Camera3OutputStream.h"
 #include "api2/CameraDeviceClient.h"
-#include "utils/CameraServiceProxyWrapper.h"
 
 #include <camera_metadata_hidden.h>
 
@@ -87,6 +86,7 @@ CameraDeviceClientBase::CameraDeviceClientBase(
 
 CameraDeviceClient::CameraDeviceClient(const sp<CameraService>& cameraService,
         const sp<hardware::camera2::ICameraDeviceCallbacks>& remoteCallback,
+        std::shared_ptr<CameraServiceProxyWrapper> cameraServiceProxyWrapper,
         const String16& clientPackageName,
         bool systemNativeClient,
         const std::optional<String16>& clientFeatureId,
@@ -97,9 +97,9 @@ CameraDeviceClient::CameraDeviceClient(const sp<CameraService>& cameraService,
         uid_t clientUid,
         int servicePid,
         bool overrideForPerfClass) :
-    Camera2ClientBase(cameraService, remoteCallback, clientPackageName, systemNativeClient,
-                clientFeatureId, cameraId, /*API1 camera ID*/ -1, cameraFacing, sensorOrientation,
-                clientPid, clientUid, servicePid, overrideForPerfClass),
+    Camera2ClientBase(cameraService, remoteCallback, cameraServiceProxyWrapper, clientPackageName,
+            systemNativeClient, clientFeatureId, cameraId, /*API1 camera ID*/ -1, cameraFacing,
+            sensorOrientation, clientPid, clientUid, servicePid, overrideForPerfClass),
     mInputStream(),
     mStreamingRequestId(REQUEST_ID_NONE),
     mRequestIdCounter(0),
@@ -692,7 +692,7 @@ binder::Status CameraDeviceClient::endConfigure(int operatingMode,
 
         nsecs_t configureEnd = systemTime();
         int32_t configureDurationMs = ns2ms(configureEnd) - startTimeMs;
-        CameraServiceProxyWrapper::logStreamConfigured(mCameraIdStr, operatingMode,
+        mCameraServiceProxyWrapper->logStreamConfigured(mCameraIdStr, operatingMode,
                 false /*internalReconfig*/, configureDurationMs);
     }
 
@@ -2061,7 +2061,7 @@ void CameraDeviceClient::detachDevice() {
     Camera2ClientBase::detachDevice();
 
     int32_t closeLatencyMs = ns2ms(systemTime() - startTime);
-    CameraServiceProxyWrapper::logClose(mCameraIdStr, closeLatencyMs);
+    mCameraServiceProxyWrapper->logClose(mCameraIdStr, closeLatencyMs);
 }
 
 /** Device-related methods */

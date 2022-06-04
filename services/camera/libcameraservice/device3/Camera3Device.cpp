@@ -63,7 +63,6 @@
 #include "utils/CameraThreadState.h"
 #include "utils/SessionConfigurationUtils.h"
 #include "utils/TraceHFR.h"
-#include "utils/CameraServiceProxyWrapper.h"
 
 #include <algorithm>
 #include <tuple>
@@ -73,7 +72,9 @@ using namespace android::hardware::camera;
 
 namespace android {
 
-Camera3Device::Camera3Device(const String8 &id, bool overrideForPerfClass, bool legacyClient):
+Camera3Device::Camera3Device(std::shared_ptr<CameraServiceProxyWrapper>& cameraServiceProxyWrapper,
+        const String8 &id, bool overrideForPerfClass, bool legacyClient):
+        mCameraServiceProxyWrapper(cameraServiceProxyWrapper),
         mId(id),
         mLegacyClient(legacyClient),
         mOperatingMode(NO_MODE),
@@ -2257,7 +2258,7 @@ bool Camera3Device::reconfigureCamera(const CameraMetadata& sessionParams, int c
         ALOGE("%s: Failed to pause streaming: %d", __FUNCTION__, rc);
     }
 
-    CameraServiceProxyWrapper::logStreamConfigured(mId, mOperatingMode, true /*internalReconfig*/,
+    mCameraServiceProxyWrapper->logStreamConfigured(mId, mOperatingMode, true /*internalReconfig*/,
         ns2ms(systemTime() - startTime));
 
     if (markClientActive) {

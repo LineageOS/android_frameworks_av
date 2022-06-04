@@ -98,6 +98,7 @@ public:
 
     Camera2Client(const sp<CameraService>& cameraService,
             const sp<hardware::ICameraClient>& cameraClient,
+            std::shared_ptr<CameraServiceProxyWrapper> cameraServiceProxyWrapper,
             const String16& clientPackageName,
             const std::optional<String16>& clientFeatureId,
             const String8& cameraDeviceId,
