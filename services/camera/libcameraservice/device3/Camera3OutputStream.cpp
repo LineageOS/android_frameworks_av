@@ -375,9 +375,11 @@ status_t Camera3OutputStream::fixUpHidlJpegBlobHeader(ANativeWindowBuffer* anwBu
     }
 
     // Fill in JPEG header
-    CameraBlob *aidlBlobHeader = reinterpret_cast<CameraBlob *>(aidlHeaderStart);
-    aidlBlobHeader->blobId = blobId;
-    aidlBlobHeader->blobSizeBytes = blobSizeBytes;
+    CameraBlob aidlHeader = {
+            .blobId = blobId,
+            .blobSizeBytes = static_cast<int32_t>(blobSizeBytes)
+    };
+    memcpy(aidlHeaderStart, &aidlHeader, sizeof(CameraBlob));
     graphicBuffer->unlock();
     return OK;
 }
