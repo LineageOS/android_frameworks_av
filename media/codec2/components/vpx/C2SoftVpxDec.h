@@ -63,6 +63,10 @@ struct C2SoftVpxDec : public SimpleC2Component {
         std::shared_ptr<Mutexed<ConversionQueue>> mQueue;
     };
 
+    // configurations used by component in process
+    // (TODO: keep this in intf but make them internal only)
+    std::shared_ptr<C2StreamPixelFormatInfo::output> mPixelFormatInfo;
+
     std::shared_ptr<IntfImpl> mIntf;
     vpx_codec_ctx_t *mCodecCtx;
     bool mFrameParallelMode;  // Frame parallel is only supported by VP9 decoder.
