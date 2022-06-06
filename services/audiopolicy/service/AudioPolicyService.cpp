@@ -392,7 +392,8 @@ void AudioPolicyService::doOnCheckSpatializer()
             audio_config_base_t config = mSpatializer->getAudioInConfig();
             status_t status =
                     mAudioPolicyManager->getSpatializerOutput(&config, &attr, &newOutput);
-
+            ALOGV("%s currentOutput %d newOutput %d channel_mask %#x",
+                    __func__, currentOutput, newOutput, config.channel_mask);
             if (status == NO_ERROR && currentOutput == newOutput) {
                 return;
             }

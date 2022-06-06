@@ -1372,7 +1372,8 @@ audio_io_handle_t AudioPolicyManager::getOutputForDevices(
     }
 
     if (mSpatializerOutput != nullptr
-            && canBeSpatialized(attr, config, devices.toTypeAddrVector())) {
+            && canBeSpatializedInt(attr, config,
+                    devices.toTypeAddrVector(), false /* allowCurrentOutputReconfig */)) {
         return mSpatializerOutput->mIoHandle;
     }
 
@@ -3011,9 +3012,10 @@ status_t AudioPolicyManager::registerEffect(const effect_descriptor_t *desc,
             }
         }
     }
-    return mEffects.registerEffect(desc, io, session, id,
-                                   (strategy == streamToStrategy(AUDIO_STREAM_MUSIC) ||
-                                   strategy == PRODUCT_STRATEGY_NONE));
+    bool isMusicEffect = (session != AUDIO_SESSION_OUTPUT_STAGE)
+                            && ((strategy == streamToStrategy(AUDIO_STREAM_MUSIC)
+                                    || strategy == PRODUCT_STRATEGY_NONE));
+    return mEffects.registerEffect(desc, io, session, id, isMusicEffect);
 }
 
 status_t AudioPolicyManager::unregisterEffect(int id)
@@ -4852,9 +4854,10 @@ bool AudioPolicyManager::isChannelMaskSpatialized(audio_channel_mask_t channels)
     }
 }
 
-bool AudioPolicyManager::canBeSpatialized(const audio_attributes_t *attr,
+bool AudioPolicyManager::canBeSpatializedInt(const audio_attributes_t *attr,
                                       const audio_config_t *config,
-                                      const AudioDeviceTypeAddrVector &devices)  const
+                                      const AudioDeviceTypeAddrVector &devices,
+                                      bool allowCurrentOutputReconfig)  const
 {
     // The caller can have the audio attributes criteria ignored by either passing a null ptr or
     // the AUDIO_ATTRIBUTES_INITIALIZER value.
@@ -4890,7 +4893,8 @@ bool AudioPolicyManager::canBeSpatialized(const audio_attributes_t *attr,
         if (!isChannelMaskSpatialized(config->channel_mask)) {
             return false;
         }
-        if (mSpatializerOutput != nullptr && mSpatializerOutput->mProfile == profile) {
+        if (!allowCurrentOutputReconfig && mSpatializerOutput != nullptr
+                && mSpatializerOutput->mProfile == profile) {
             if ((config->channel_mask & mSpatializerOutput->mMixerChannelMask)
                     != config->channel_mask) {
                 return false;
@@ -4911,7 +4915,8 @@ void AudioPolicyManager::checkVirtualizerClientRoutes() {
             audio_config_base_t clientConfig = client->config();
             audio_config_t config = audio_config_initializer(&clientConfig);
             if (desc != mSpatializerOutput
-                    && canBeSpatialized(&attr, &config, devicesTypeAddress)) {
+                    && canBeSpatializedInt(&attr, &config,
+                            devicesTypeAddress, false /* allowCurrentOutputReconfig */)) {
                 streamsToInvalidate.insert(client->stream());
             }
         }
@@ -4935,7 +4940,8 @@ status_t AudioPolicyManager::getSpatializerOutput(const audio_config_base_t *mix
         config = audio_config_initializer(mixerConfig);
         configPtr = &config;
     }
-    if (!canBeSpatialized(attr, configPtr, devicesTypeAddress)) {
+    if (!canBeSpatializedInt(
+            attr, configPtr, devicesTypeAddress)) {
         ALOGW("%s provided attributes or mixer config cannot be spatialized", __func__);
         return BAD_VALUE;
     }
@@ -4958,6 +4964,7 @@ status_t AudioPolicyManager::getSpatializerOutput(const audio_config_base_t *mix
     for (size_t i = 0; i < mOutputs.size(); i++) {
         sp<SwAudioOutputDescriptor> desc = mOutputs.valueAt(i);
         if (!desc->isDuplicated() && desc->mProfile == profile) {
+            ALOGV("%s found output %d for spatializer profile", __func__, desc->mIoHandle);
             mSpatializerOutput = desc;
             break;
         }
@@ -4977,39 +4984,29 @@ status_t AudioPolicyManager::getSpatializerOutput(const audio_config_base_t *mix
         };
         DeviceVector savedDevices = mSpatializerOutput->devices();
 
-        closeOutput(mSpatializerOutput->mIoHandle);
-        mSpatializerOutput.clear();
+        ALOGV("%s reopening spatializer output to match channel mask %#x (current mask %#x)",
+            __func__, configPtr->channel_mask, mSpatializerOutput->mMixerChannelMask);
 
-        const sp<SwAudioOutputDescriptor> desc =
-                new SwAudioOutputDescriptor(profile, mpClientInterface);
-        status_t status = desc->open(nullptr, mixerConfig, devices,
-                                                    mEngine->getStreamTypeForAttributes(*attr),
-                                                    AUDIO_OUTPUT_FLAG_SPATIALIZER, output);
-        if (status != NO_ERROR) {
-            ALOGW("%s failed opening output: status %d, output %d", __func__, status, *output);
-            if (*output != AUDIO_IO_HANDLE_NONE) {
-                desc->close();
-            }
+        closeOutput(mSpatializerOutput->mIoHandle);
+        //from now on mSpatializerOutput is null
+
+        sp<SwAudioOutputDescriptor> desc =
+                openOutputWithProfileAndDevice(profile, devices, mixerConfig);
+        if (desc == nullptr) {
             // re open the spatializer output with previous channel mask
-            status_t newStatus = desc->open(nullptr, &savedMixerConfig, savedDevices,
-                                mEngine->getStreamTypeForAttributes(*attr),
-                                AUDIO_OUTPUT_FLAG_SPATIALIZER, output);
-            if (newStatus != NO_ERROR) {
-                if (*output != AUDIO_IO_HANDLE_NONE) {
-                    desc->close();
-                }
-                ALOGE("%s failed to re-open mSpatializerOutput, status %d", __func__, newStatus);
+            desc = openOutputWithProfileAndDevice(profile, savedDevices, &savedMixerConfig);
+            if (desc == nullptr) {
+                ALOGE("%s failed to restore mSpatializerOutput with previous config", __func__);
             } else {
                 mSpatializerOutput = desc;
-                addOutput(*output, desc);
             }
             mPreviousOutputs = mOutputs;
             mpClientInterface->onAudioPortListUpdate();
             *output = AUDIO_IO_HANDLE_NONE;
-            return status;
+            ALOGW("%s could not open spatializer output with requested config", __func__);
+            return BAD_VALUE;
         }
         mSpatializerOutput = desc;
-        addOutput(*output, desc);
         mPreviousOutputs = mOutputs;
         mpClientInterface->onAudioPortListUpdate();
     }
@@ -5682,6 +5679,9 @@ void AudioPolicyManager::closeOutput(audio_io_handle_t output)
 
     removeOutput(output);
     mPreviousOutputs = mOutputs;
+    if (closingOutput == mSpatializerOutput) {
+        mSpatializerOutput.clear();
+    }
 
     // MSD patches may have been released to support a non-MSD direct output. Reset MSD patch if
     // no direct outputs are open.
@@ -7222,7 +7222,8 @@ bool AudioPolicyManager::areAllActiveTracksRerouted(const sp<SwAudioOutputDescri
 }
 
 sp<SwAudioOutputDescriptor> AudioPolicyManager::openOutputWithProfileAndDevice(
-        const sp<IOProfile>& profile, const DeviceVector& devices)
+        const sp<IOProfile>& profile, const DeviceVector& devices,
+        const audio_config_base_t *mixerConfig)
 {
     for (const auto& device : devices) {
         // TODO: This should be checking if the profile supports the device combo.
@@ -7232,7 +7233,7 @@ sp<SwAudioOutputDescriptor> AudioPolicyManager::openOutputWithProfileAndDevice(
     }
     sp<SwAudioOutputDescriptor> desc = new SwAudioOutputDescriptor(profile, mpClientInterface);
     audio_io_handle_t output = AUDIO_IO_HANDLE_NONE;
-    status_t status = desc->open(nullptr /* halConfig */, nullptr /* mixerConfig */, devices,
+    status_t status = desc->open(nullptr /* halConfig */, mixerConfig, devices,
             AUDIO_STREAM_DEFAULT, AUDIO_OUTPUT_FLAG_NONE, &output);
     if (status != NO_ERROR) {
         return nullptr;
@@ -7262,7 +7263,7 @@ sp<SwAudioOutputDescriptor> AudioPolicyManager::openOutputWithProfileAndDevice(
         config.offload_info.channel_mask = config.channel_mask;
         config.offload_info.format = config.format;
 
-        status = desc->open(&config, nullptr /* mixerConfig */, devices,
+        status = desc->open(&config, mixerConfig, devices,
                             AUDIO_STREAM_DEFAULT, AUDIO_OUTPUT_FLAG_NONE, &output);
         if (status != NO_ERROR) {
             return nullptr;
@@ -7270,6 +7271,7 @@ sp<SwAudioOutputDescriptor> AudioPolicyManager::openOutputWithProfileAndDevice(
     }
 
     addOutput(output, desc);
+
     if (audio_is_remote_submix_device(deviceType) && address != "0") {
         sp<AudioPolicyMix> policyMix;
         if (mPolicyMixes.getAudioPolicyMix(deviceType, address, policyMix) == NO_ERROR) {
@@ -7280,9 +7282,13 @@ sp<SwAudioOutputDescriptor> AudioPolicyManager::openOutputWithProfileAndDevice(
                     address.string());
         }
 
-    } else if (((desc->mFlags & AUDIO_OUTPUT_FLAG_DIRECT) == 0) && hasPrimaryOutput()) {
-        // no duplicated output for direct outputs and
-        // outputs used by dynamic policy mixes
+    } else if (hasPrimaryOutput() && profile->getModule()
+                != mHwModules.getModuleFromName(AUDIO_HARDWARE_MODULE_ID_PRIMARY)
+            && ((desc->mFlags & AUDIO_OUTPUT_FLAG_DIRECT) == 0)) {
+        // no duplicated output for:
+        // - direct outputs
+        // - outputs used by dynamic policy mixes
+        // - outputs opened on the primary HW module
         audio_io_handle_t duplicatedOutput = AUDIO_IO_HANDLE_NONE;
 
         //TODO: configure audio effect output stage here
