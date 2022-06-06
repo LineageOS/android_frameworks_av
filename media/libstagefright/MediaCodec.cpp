@@ -2495,7 +2495,9 @@ status_t MediaCodec::queueBuffer(
     msg->setObject("c2buffer", obj);
     msg->setInt64("timeUs", presentationTimeUs);
     msg->setInt32("flags", flags);
-    msg->setMessage("tunings", tunings);
+    if (tunings && tunings->countEntries() > 0) {
+        msg->setMessage("tunings", tunings);
+    }
     msg->setPointer("errorDetailMsg", errorDetailMsg);
 
     sp<AMessage> response;
@@ -2537,7 +2539,9 @@ status_t MediaCodec::queueEncryptedBuffer(
     msg->setInt32("skipBlocks", pattern.mSkipBlocks);
     msg->setInt64("timeUs", presentationTimeUs);
     msg->setInt32("flags", flags);
-    msg->setMessage("tunings", tunings);
+    if (tunings && tunings->countEntries() > 0) {
+        msg->setMessage("tunings", tunings);
+    }
     msg->setPointer("errorDetailMsg", errorDetailMsg);
 
     sp<AMessage> response;
@@ -4718,12 +4722,10 @@ status_t MediaCodec::queueCSDInputBuffer(size_t bufferIndex) {
         sp<WrapperObject<std::shared_ptr<C2Buffer>>> obj{
             new WrapperObject<std::shared_ptr<C2Buffer>>{c2Buffer}};
         msg->setObject("c2buffer", obj);
-        msg->setMessage("tunings", new AMessage);
     } else if (memory) {
         sp<WrapperObject<sp<hardware::HidlMemory>>> obj{
             new WrapperObject<sp<hardware::HidlMemory>>{memory}};
         msg->setObject("memory", obj);
-        msg->setMessage("tunings", new AMessage);
     }
 
     return onQueueInputBuffer(msg);
@@ -4905,9 +4907,10 @@ status_t MediaCodec::onQueueInputBuffer(const sp<AMessage> &msg) {
     sp<MediaCodecBuffer> buffer = info->mData;
 
     if (c2Buffer || memory) {
-        sp<AMessage> tunings;
-        CHECK(msg->findMessage("tunings", &tunings));
-        onSetParameters(tunings);
+        sp<AMessage> tunings = NULL;
+        if (msg->findMessage("tunings", &tunings) && tunings != NULL) {
+            onSetParameters(tunings);
+        }
 
         status_t err = OK;
         if (c2Buffer) {
