@@ -789,6 +789,7 @@ constexpr char KEY_MAX_BIT_RATE[] = "max-bitrate";
 constexpr char KEY_MAX_FPS_TO_ENCODER[] = "max-fps-to-encoder";
 constexpr char KEY_MAX_HEIGHT[] = "max-height";
 constexpr char KEY_MAX_INPUT_SIZE[] = "max-input-size";
+constexpr char KEY_MAX_OUTPUT_CHANNEL_COUNT[] = "max-output-channel-count";
 constexpr char KEY_MAX_PTS_GAP_TO_ENCODER[] = "max-pts-gap-to-encoder";
 constexpr char KEY_MAX_WIDTH[] = "max-width";
 constexpr char KEY_MIME[] = "mime";

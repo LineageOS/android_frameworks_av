@@ -549,6 +549,11 @@ status_t SwAudioOutputDescriptor::open(const audio_config_t *halConfig,
     audio_output_flags_t halFlags = mFlags;
     if ((mFlags & AUDIO_OUTPUT_FLAG_SPATIALIZER) != 0) {
         halFlags = (audio_output_flags_t)(AUDIO_OUTPUT_FLAG_FAST | AUDIO_OUTPUT_FLAG_DEEP_BUFFER);
+        // If no mixer config is specified for a spatializer output, default to 5.1 for proper
+        // configuration of the final downmixer or spatializer
+        if (mixerConfig == nullptr) {
+            lMixerConfig.channel_mask = AUDIO_CHANNEL_OUT_5POINT1;
+        }
     }
 
     ALOGV("opening output for device %s profile %p name %s",
