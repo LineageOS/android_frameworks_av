@@ -392,14 +392,16 @@ void CameraFuzzer::invokeCameraAPIs() {
                 String8("Test Surface"), previewWidth, previewHeight,
                 CameraParameters::previewFormatToEnum(params.getPreviewFormat()), layerMetaData);
 
-        if (surfaceControl.get() != nullptr) {
+        if (surfaceControl.get()) {
             SurfaceComposerClient::Transaction{}
                     .setLayer(surfaceControl, 0x7fffffff)
                     .show(surfaceControl)
                     .apply();
 
             previewSurface = surfaceControl->getSurface();
-            cameraDevice->setPreviewTarget(previewSurface->getIGraphicBufferProducer());
+            if (previewSurface.get()) {
+                cameraDevice->setPreviewTarget(previewSurface->getIGraphicBufferProducer());
+            }
         }
         cameraDevice->setPreviewCallbackFlag(CAMERA_FRAME_CALLBACK_FLAG_CAMCORDER);
 
@@ -442,7 +444,20 @@ void CameraFuzzer::invokeCameraAPIs() {
             waitForPreviewStart();
             cameraDevice->setVideoBufferMode(
                     android::hardware::BnCamera::VIDEO_BUFFER_MODE_BUFFER_QUEUE);
-            cameraDevice->setVideoTarget(previewSurface->getIGraphicBufferProducer());
+            sp<SurfaceControl> surfaceControlVideo = mComposerClient->createSurface(
+                    String8("Test Surface Video"), previewWidth, previewHeight,
+                    CameraParameters::previewFormatToEnum(params.getPreviewFormat()),
+                    layerMetaData);
+            if (surfaceControlVideo.get()) {
+                SurfaceComposerClient::Transaction{}
+                        .setLayer(surfaceControlVideo, 0x7fffffff)
+                        .show(surfaceControlVideo)
+                        .apply();
+                sp<Surface> previewSurfaceVideo = surfaceControlVideo->getSurface();
+                if (previewSurfaceVideo.get()) {
+                    cameraDevice->setVideoTarget(previewSurfaceVideo->getIGraphicBufferProducer());
+                }
+            }
             cameraDevice->stopPreview();
             cameraDevice->startRecording();
             waitForEvent(mRecordingLock, mRecordingCondition, mRecordingNotification);
