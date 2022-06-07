@@ -356,7 +356,11 @@ status_t CameraProviderManager::notifyDeviceStateChange(
     std::lock_guard<std::mutex> lock(mInterfaceMutex);
     mDeviceState = newState;
     status_t res = OK;
-    for (auto& provider : mProviders) {
+    // Make a copy of mProviders because we unlock mInterfaceMutex temporarily
+    // within the loop. It's possible that during the time mInterfaceMutex is
+    // unlocked, mProviders has changed.
+    auto providers = mProviders;
+    for (auto& provider : providers) {
         ALOGV("%s: Notifying %s for new state 0x%" PRIx64,
                 __FUNCTION__, provider->mProviderName.c_str(), newState);
         // b/199240726 Camera providers can for example try to add/remove
