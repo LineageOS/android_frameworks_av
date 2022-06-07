@@ -120,7 +120,7 @@ class CameraServiceProxyOverride : public ::android::hardware::BnCameraServicePr
 public:
     CameraServiceProxyOverride() :
             mCameraServiceProxy(CameraServiceProxyWrapper::getDefaultCameraServiceProxy()),
-            mCameraDisabled(false)
+            mCameraDisabled(false), mOverrideCameraDisabled(false)
     { }
 
     virtual binder::Status getRotateAndCropOverride(const String16& packageName, int lensFacing,
