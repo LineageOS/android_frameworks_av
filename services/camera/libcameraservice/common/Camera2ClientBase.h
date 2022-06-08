@@ -20,6 +20,7 @@
 #include "common/CameraDeviceBase.h"
 #include "camera/CaptureResult.h"
 #include "utils/CameraServiceProxyWrapper.h"
+#include "CameraServiceWatchdog.h"
 
 namespace android {
 
@@ -176,6 +177,12 @@ protected:
 private:
     template<typename TProviderPtr>
     status_t              initializeImpl(TProviderPtr providerPtr, const String8& monitorTags);
+
+    binder::Status disconnectImpl();
+
+    // Watchdog thread
+    sp<CameraServiceWatchdog> mCameraServiceWatchdog;
+
 };
 
 }; // namespace android
