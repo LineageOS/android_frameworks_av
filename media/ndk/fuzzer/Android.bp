@@ -97,3 +97,13 @@ cc_fuzz {
     defaults: ["libmediandk_fuzzer_defaults"],
     shared_libs: ["libbinder_ndk",],
 }
+
+cc_fuzz {
+    name: "ndk_sync_codec_fuzzer",
+    srcs: [
+            "ndk_sync_codec_fuzzer.cpp",
+             "NdkMediaCodecFuzzerBase.cpp",
+          ],
+    header_libs: ["libnativewindow_headers",],
+    defaults: ["libmediandk_fuzzer_defaults",],
+}
