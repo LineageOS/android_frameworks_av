@@ -127,7 +127,12 @@ status_t CameraDeviceClient::initializeImpl(TProviderPtr providerPtr, const Stri
     String8 threadName;
     mFrameProcessor = new FrameProcessorBase(mDevice);
     threadName = String8::format("CDU-%s-FrameProc", mCameraIdStr.string());
-    mFrameProcessor->run(threadName.string());
+    res = mFrameProcessor->run(threadName.string());
+    if (res != OK) {
+        ALOGE("%s: Unable to start frame processor thread: %s (%d)",
+                __FUNCTION__, strerror(-res), res);
+        return res;
+    }
 
     mFrameProcessor->registerListener(camera2::FrameProcessorBase::FRAME_PROCESSOR_LISTENER_MIN_ID,
                                       camera2::FrameProcessorBase::FRAME_PROCESSOR_LISTENER_MAX_ID,
