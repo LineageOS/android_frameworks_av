@@ -17,6 +17,7 @@
 #ifndef ANDROID_AUDIOTRACK_H
 #define ANDROID_AUDIOTRACK_H
 
+#include <audiomanager/IAudioManager.h>
 #include <binder/IMemory.h>
 #include <cutils/sched_policy.h>
 #include <media/AudioSystem.h>
@@ -1145,6 +1146,8 @@ public:
             void setAudioTrackCallback(const sp<media::IAudioTrackCallback>& callback) {
                 mAudioTrackCallback->setAudioTrackCallback(callback);
             }
+ private:
+            void triggerPortIdUpdate_l();
 
  protected:
     /* copying audio tracks is not allowed */
@@ -1418,6 +1421,9 @@ public:
      * For an AudioTrack created by the Java interface, this is generally set once.
      */
     int                     mPlayerIId = -1;  // AudioManager.h PLAYER_PIID_INVALID
+
+    /** Interface for interacting with the AudioService. */
+    sp<IAudioManager>       mAudioManager;
 
     /**
      * mLogSessionId is a string identifying this AudioTrack for the metrics service.
