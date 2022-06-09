@@ -192,6 +192,11 @@ aaudio_result_t AudioStreamBuilder::build(AudioStream** streamPtr) {
         allowMMap = false;
     }
 
+    if (getFormat() == AUDIO_FORMAT_IEC61937) {
+        ALOGD("%s IEC61937 format is selected, do not allow MMAP in this case.", __func__);
+        allowMMap = false;
+    }
+
     if (!allowMMap && !allowLegacy) {
         ALOGE("%s() no backend available: neither MMAP nor legacy path are allowed", __func__);
         return AAUDIO_ERROR_ILLEGAL_ARGUMENT;
