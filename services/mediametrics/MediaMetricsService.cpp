@@ -72,6 +72,7 @@ nsecs_t MediaMetricsService::roundTime(nsecs_t timeNs)
 bool MediaMetricsService::useUidForPackage(
         const std::string& package, const std::string& installer)
 {
+    // NOLINTBEGIN(bugprone-branch-clone)
     if (strchr(package.c_str(), '.') == nullptr) {
         return false;  // not of form 'com.whatever...'; assume internal and ok
     } else if (strncmp(package.c_str(), "android.", 8) == 0) {
@@ -85,6 +86,7 @@ bool MediaMetricsService::useUidForPackage(
     } else {
         return true;  // we're not sure where it came from, use uid only.
     }
+    // NOLINTEND(bugprone-branch-clone)
 }
 
 /* static */
