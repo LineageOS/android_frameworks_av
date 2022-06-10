@@ -195,6 +195,11 @@ class C2SoftGav1Dec::IntfImpl : public SimpleInterface<void>::BaseParams {
     if (isHalPixelFormatSupported((AHardwareBuffer_Format)HAL_PIXEL_FORMAT_YCBCR_P010)) {
         pixelFormats.push_back(HAL_PIXEL_FORMAT_YCBCR_P010);
     }
+    // If color format surface isn't added to supported formats, there is no way to know
+    // when the color-format is configured to surface. This is necessary to be able to
+    // choose 10-bit format while decoding 10-bit clips in surface mode.
+    pixelFormats.push_back(HAL_PIXEL_FORMAT_IMPLEMENTATION_DEFINED);
+
     // TODO: support more formats?
     addParameter(
             DefineParam(mPixelFormat, C2_PARAMKEY_PIXEL_FORMAT)
@@ -323,6 +328,9 @@ class C2SoftGav1Dec::IntfImpl : public SimpleInterface<void>::BaseParams {
     return C2R::Ok();
   }
 
+  // unsafe getters
+  std::shared_ptr<C2StreamPixelFormatInfo::output> getPixelFormat_l() const { return mPixelFormat; }
+
  private:
   std::shared_ptr<C2StreamProfileLevelInfo::input> mProfileLevel;
   std::shared_ptr<C2StreamPictureSizeInfo::output> mSize;
@@ -411,6 +419,10 @@ bool C2SoftGav1Dec::initDecoder() {
   mSignalledError = false;
   mSignalledOutputEos = false;
   mHalPixelFormat = HAL_PIXEL_FORMAT_YV12;
+  {
+      IntfImpl::Lock lock = mIntf->lock();
+      mPixelFormatInfo = mIntf->getPixelFormat_l();
+  }
   mCodecCtx.reset(new libgav1::Decoder());
 
   if (mCodecCtx == nullptr) {
@@ -635,7 +647,7 @@ bool C2SoftGav1Dec::outputBuffer(const std::shared_ptr<C2BlockPool> &pool,
   std::shared_ptr<C2GraphicBlock> block;
   uint32_t format = HAL_PIXEL_FORMAT_YV12;
   std::shared_ptr<C2StreamColorAspectsInfo::output> codedColorAspects;
-  if (buffer->bitdepth == 10) {
+  if (buffer->bitdepth == 10 && mPixelFormatInfo->value != HAL_PIXEL_FORMAT_YCBCR_420_888) {
     IntfImpl::Lock lock = mIntf->lock();
     codedColorAspects = mIntf->getColorAspects_l();
     bool allowRGBA1010102 = false;
