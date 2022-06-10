@@ -181,10 +181,14 @@ void finishRecording(const AttributionSourceState& attributionSource, audio_sour
 
 bool captureAudioOutputAllowed(const AttributionSourceState& attributionSource) {
     uid_t uid = VALUE_OR_FATAL(aidl2legacy_int32_t_uid_t(attributionSource.uid));
-    pid_t pid = VALUE_OR_FATAL(aidl2legacy_int32_t_pid_t(attributionSource.pid));
     if (isAudioServerOrRootUid(uid)) return true;
     static const String16 sCaptureAudioOutput("android.permission.CAPTURE_AUDIO_OUTPUT");
-    bool ok = PermissionCache::checkPermission(sCaptureAudioOutput, pid, uid);
+    // Use PermissionChecker, which includes some logic for allowing the isolated
+    // HotwordDetectionService to hold certain permissions.
+    permission::PermissionChecker permissionChecker;
+    bool ok = (permissionChecker.checkPermissionForPreflight(
+            sCaptureAudioOutput, attributionSource, String16(),
+            AppOpsManager::OP_NONE) != permission::PermissionChecker::PERMISSION_HARD_DENIED);
     if (!ok) ALOGV("Request requires android.permission.CAPTURE_AUDIO_OUTPUT");
     return ok;
 }
