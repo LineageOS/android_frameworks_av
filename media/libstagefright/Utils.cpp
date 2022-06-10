@@ -1911,10 +1911,10 @@ status_t convertMessageToMetaData(const sp<AMessage> &msg, sp<MetaData> &meta) {
         if (msg->findString("ts-schema", &tsSchema)) {
             unsigned int numLayers = 0;
             unsigned int numBLayers = 0;
-            char dummy;
+            char placeholder;
             int tags = sscanf(tsSchema.c_str(), "android.generic.%u%c%u%c",
-                    &numLayers, &dummy, &numBLayers, &dummy);
-            if ((tags == 1 || (tags == 3 && dummy == '+'))
+                    &numLayers, &placeholder, &numBLayers, &placeholder);
+            if ((tags == 1 || (tags == 3 && placeholder == '+'))
                     && numLayers > 0 && numLayers < UINT32_MAX - numBLayers
                     && numLayers + numBLayers <= INT32_MAX) {
                 meta->setInt32(kKeyTemporalLayerCount, numLayers + numBLayers);
