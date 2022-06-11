@@ -16,6 +16,9 @@
 
 //#define LOG_NDEBUG 0
 #define LOG_TAG "CCodecConfig"
+
+#include <initializer_list>
+
 #include <cutils/properties.h>
 #include <log/log.h>
 #include <utils/NativeHandle.h>
@@ -1128,7 +1131,7 @@ status_t CCodecConfig::initialize(
             if (domain.value == C2Component::DOMAIN_VIDEO) {
                 addLocalParam(new C2AndroidStreamAverageBlockQuantizationInfo::output(0u, 0),
                               C2_PARAMKEY_AVERAGE_QP);
-                addLocalParam(new C2StreamPictureTypeMaskInfo::output(0u, 0),
+                addLocalParam(new C2StreamPictureTypeInfo::output(0u, 0),
                               C2_PARAMKEY_PICTURE_TYPE);
             }
         }
@@ -1165,6 +1168,17 @@ status_t CCodecConfig::initialize(
         }
     }
 
+    // Parameters that are not subscribed initially, but can be subscribed
+    // upon explicit request.
+    static const std::initializer_list<C2Param::Index> kOptionalParams = {
+        C2AndroidStreamAverageBlockQuantizationInfo::output::PARAM_TYPE,
+        C2StreamPictureTypeInfo::output::PARAM_TYPE,
+    };
+    for (const C2Param::Index &index : kOptionalParams) {
+        mSubscribedIndices.erase(index);
+    }
+    subscribeToConfigUpdate(configurable, {}, C2_MAY_BLOCK);
+
     return OK;
 }
 
@@ -1196,6 +1210,20 @@ status_t CCodecConfig::subscribeToConfigUpdate(
         ALOGV("Subscribed to %zu params", mSubscribedIndices.size());
         mSubscribedIndicesSize = mSubscribedIndices.size();
     }
+#if defined(LOG_NDEBUG) && !LOG_NDEBUG
+    ALOGV("subscribed to %zu params:", mSubscribedIndices.size());
+    std::stringstream ss;
+    for (const C2Param::Index &index : mSubscribedIndices) {
+        ss << index << " ";
+        if (ss.str().length() > 70) {
+            ALOGV("%s", ss.str().c_str());
+            std::stringstream().swap(ss);
+        }
+    }
+    if (!ss.str().empty()) {
+        ALOGV("%s", ss.str().c_str());
+    }
+#endif
     return OK;
 }
 
@@ -1220,6 +1248,12 @@ bool CCodecConfig::updateConfiguration(
     bool changed = false;
     for (std::unique_ptr<C2Param> &p : configUpdate) {
         if (p && *p) {
+            // Allow unsubscribed vendor parameters to go through --- it may be
+            // later handled by the format shaper.
+            if (!p->isVendor() && mSubscribedIndices.count(p->index()) == 0) {
+                ALOGV("updateConfiguration: skipped unsubscribed param %08x", p->index());
+                continue;
+            }
             auto insertion = mCurrentConfig.emplace(p->index(), nullptr);
             if (insertion.second || *insertion.first->second != *p) {
                 if (mSupportedIndices.count(p->index()) || mLocalParams.count(p->index())) {

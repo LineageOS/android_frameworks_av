@@ -51,6 +51,10 @@ struct C2SoftGav1Dec : public SimpleC2Component {
   std::shared_ptr<IntfImpl> mIntf;
   std::unique_ptr<libgav1::Decoder> mCodecCtx;
 
+  // configurations used by component in process
+  // (TODO: keep this in intf but make them internal only)
+  std::shared_ptr<C2StreamPixelFormatInfo::output> mPixelFormatInfo;
+
   uint32_t mHalPixelFormat;
   uint32_t mWidth;
   uint32_t mHeight;
