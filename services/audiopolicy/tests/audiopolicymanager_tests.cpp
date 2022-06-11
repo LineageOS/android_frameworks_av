@@ -1700,6 +1700,45 @@ TEST_P(AudioPolicyManagerTestDeviceConnection, ExplicitlyRoutingAfterConnection)
             address.c_str(), name.c_str(), AUDIO_FORMAT_DEFAULT));
 }
 
+android::media::audio::common::ExtraAudioDescriptor make_ExtraAudioDescriptor(
+        android::media::audio::common::AudioStandard audioStandard,
+        android::media::audio::common::AudioEncapsulationType audioEncapsulationType) {
+    android::media::audio::common::ExtraAudioDescriptor result;
+    result.standard = audioStandard;
+    result.audioDescriptor = {0xb4, 0xaf, 0x98, 0x1a};
+    result.encapsulationType = audioEncapsulationType;
+    return result;
+}
+
+TEST_P(AudioPolicyManagerTestDeviceConnection, PassingExtraAudioDescriptors) {
+    const audio_devices_t type = std::get<0>(GetParam());
+    if (!audio_device_is_digital(type)) {
+        // EADs are used only for HDMI devices.
+        GTEST_SKIP() << "Not a digital device type: " << audio_device_to_string(type);
+    }
+    const std::string name = std::get<1>(GetParam());
+    const std::string address = std::get<2>(GetParam());
+    android::media::AudioPort audioPort;
+    ASSERT_EQ(NO_ERROR,
+            mManager->deviceToAudioPort(type, address.c_str(), name.c_str(), &audioPort));
+    android::media::audio::common::AudioPort& port = audioPort.hal;
+    port.extraAudioDescriptors.push_back(make_ExtraAudioDescriptor(
+                    android::media::audio::common::AudioStandard::EDID,
+                    android::media::audio::common::AudioEncapsulationType::IEC61937));
+    const size_t lastConnectedDevicePortCount = mClient->getConnectedDevicePortCount();
+    const size_t lastDisconnectedDevicePortCount = mClient->getDisconnectedDevicePortCount();
+    EXPECT_EQ(NO_ERROR, mManager->setDeviceConnectionState(
+                    AUDIO_POLICY_DEVICE_STATE_AVAILABLE, port, AUDIO_FORMAT_DEFAULT));
+    EXPECT_EQ(lastConnectedDevicePortCount + 1, mClient->getConnectedDevicePortCount());
+    EXPECT_EQ(lastDisconnectedDevicePortCount, mClient->getDisconnectedDevicePortCount());
+    const audio_port_v7* devicePort = mClient->getLastConnectedDevicePort();
+    EXPECT_EQ(port.extraAudioDescriptors.size(), devicePort->num_extra_audio_descriptors);
+    EXPECT_EQ(AUDIO_STANDARD_EDID, devicePort->extra_audio_descriptors[0].standard);
+    EXPECT_EQ(AUDIO_ENCAPSULATION_TYPE_IEC61937,
+            devicePort->extra_audio_descriptors[0].encapsulation_type);
+    EXPECT_NE(0, devicePort->extra_audio_descriptors[0].descriptor[0]);
+}
+
 INSTANTIATE_TEST_CASE_P(
         DeviceConnectionState,
         AudioPolicyManagerTestDeviceConnection,

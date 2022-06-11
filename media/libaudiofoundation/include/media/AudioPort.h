@@ -72,7 +72,7 @@ public:
     AudioProfileVector &getAudioProfiles() { return mProfiles; }
 
     void setExtraAudioDescriptors(
-            const std::vector<media::audio::common::ExtraAudioDescriptor> extraAudioDescriptors) {
+            const std::vector<media::audio::common::ExtraAudioDescriptor>& extraAudioDescriptors) {
         mExtraAudioDescriptors = extraAudioDescriptors;
     }
     std::vector<media::audio::common::ExtraAudioDescriptor> &getExtraAudioDescriptors() {
