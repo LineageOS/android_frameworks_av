@@ -103,8 +103,12 @@ public:
         ++mAudioPortListUpdateCount;
     }
 
-    status_t setDeviceConnectedState(
-            const struct audio_port_v7 *port __unused, bool connected __unused) override {
+    status_t setDeviceConnectedState(const struct audio_port_v7 *port, bool connected) override {
+        if (connected) {
+            mConnectedDevicePorts.push_back(*port);
+        } else {
+            mDisconnectedDevicePorts.push_back(*port);
+        }
         return NO_ERROR;
     }
 
@@ -150,6 +154,30 @@ public:
         return NO_ERROR;
     }
 
+    size_t getConnectedDevicePortCount() const {
+        return mConnectedDevicePorts.size();
+    }
+
+    const struct audio_port_v7 *getLastConnectedDevicePort() const {
+        if (mConnectedDevicePorts.empty()) {
+            return nullptr;
+        }
+        auto it = --mConnectedDevicePorts.end();
+        return &(*it);
+    }
+
+    size_t getDisconnectedDevicePortCount() const {
+        return mDisconnectedDevicePorts.size();
+    }
+
+    const struct audio_port_v7 *getLastDisconnectedDevicePort() const {
+        if (mDisconnectedDevicePorts.empty()) {
+            return nullptr;
+        }
+        auto it = --mDisconnectedDevicePorts.end();
+        return &(*it);
+    }
+
 private:
     audio_module_handle_t mNextModuleHandle = AUDIO_MODULE_HANDLE_NONE + 1;
     audio_io_handle_t mNextIoHandle = AUDIO_IO_HANDLE_NONE + 1;
@@ -158,6 +186,8 @@ private:
     std::set<std::string> mAllowedModuleNames;
     size_t mAudioPortListUpdateCount = 0;
     size_t mRoutingUpdatedUpdateCount = 0;
+    std::vector<struct audio_port_v7> mConnectedDevicePorts;
+    std::vector<struct audio_port_v7> mDisconnectedDevicePorts;
 };
 
 } // namespace android
