@@ -25,16 +25,20 @@
 #include <mediautils/TimerThread.h>
 #include <utils/ThreadDefs.h>
 
+using namespace std::chrono_literals;
+
 namespace android::mediautils {
 
 extern std::string formatTime(std::chrono::system_clock::time_point t);
 extern std::string_view timeSuffix(std::string_view time1, std::string_view time2);
 
 TimerThread::Handle TimerThread::scheduleTask(
-        std::string_view tag, std::function<void()>&& func, std::chrono::milliseconds timeout) {
+        std::string_view tag, TimerCallback&& func, Duration timeoutDuration) {
     const auto now = std::chrono::system_clock::now();
-    auto request = std::make_shared<const Request>(now, now + timeout, gettid(), tag);
-    return mMonitorThread.add(std::move(request), std::move(func), timeout);
+    auto request = std::make_shared<const Request>(now, now +
+            std::chrono::duration_cast<std::chrono::system_clock::duration>(timeoutDuration),
+            gettid(), tag);
+    return mMonitorThread.add(std::move(request), std::move(func), timeoutDuration);
 }
 
 TimerThread::Handle TimerThread::trackTask(std::string_view tag) {
@@ -44,7 +48,7 @@ TimerThread::Handle TimerThread::trackTask(std::string_view tag) {
 }
 
 bool TimerThread::cancelTask(Handle handle) {
-    std::shared_ptr<const Request> request = mNoTimeoutMap.isValidHandle(handle) ?
+    std::shared_ptr<const Request> request = isNoTimeoutHandle(handle) ?
              mNoTimeoutMap.remove(handle) : mMonitorThread.remove(handle);
     if (!request) return false;
     mRetiredQueue.add(std::move(request));
@@ -125,12 +129,12 @@ struct TimerThread::Analysis TimerThread::analyzeTimeout(
     std::vector<std::shared_ptr<const Request>> pendingExact;
     std::vector<std::shared_ptr<const Request>> pendingPossible;
 
-    // We look at pending requests that were scheduled no later than kDuration
+    // We look at pending requests that were scheduled no later than kPendingDuration
     // after the timeout request. This prevents false matches with calls
     // that naturally block for a short period of time
     // such as HAL write() and read().
     //
-    auto constexpr kDuration = std::chrono::milliseconds(1000);
+    constexpr Duration kPendingDuration = 1000ms;
     for (const auto& pending : pendingRequests) {
         // If the pending tid is the same as timeout tid, problem identified.
         if (pending->tid == timeout->tid) {
@@ -139,7 +143,7 @@ struct TimerThread::Analysis TimerThread::analyzeTimeout(
         }
 
         // if the pending tid is scheduled within time limit
-        if (pending->scheduled - timeout->scheduled < kDuration) {
+        if (pending->scheduled - timeout->scheduled < kPendingDuration) {
             pendingPossible.emplace_back(pending);
         }
     }
@@ -239,15 +243,11 @@ void TimerThread::RequestQueue::copyRequests(
     }
 }
 
-bool TimerThread::NoTimeoutMap::isValidHandle(Handle handle) const {
-    return handle > getIndexedHandle(mNoTimeoutRequests);
-}
-
 TimerThread::Handle TimerThread::NoTimeoutMap::add(std::shared_ptr<const Request> request) {
     std::lock_guard lg(mNTMutex);
     // A unique handle is obtained by mNoTimeoutRequests.fetch_add(1),
     // This need not be under a lock, but we do so anyhow.
-    const Handle handle = getIndexedHandle(mNoTimeoutRequests++);
+    const Handle handle = getUniqueHandle_l();
     mMap[handle] = request;
     return handle;
 }
@@ -267,16 +267,6 @@ void TimerThread::NoTimeoutMap::copyRequests(
     for (const auto &[handle, request] : mMap) {
         requests.emplace_back(request);
     }
-}
-
-TimerThread::Handle TimerThread::MonitorThread::getUniqueHandle_l(
-        std::chrono::milliseconds timeout) {
-    // To avoid key collisions, advance by 1 tick until the key is unique.
-    auto deadline = std::chrono::steady_clock::now() + timeout;
-    for (; mMonitorRequests.find(deadline) != mMonitorRequests.end();
-         deadline += std::chrono::steady_clock::duration(1))
-        ;
-    return deadline;
 }
 
 TimerThread::MonitorThread::MonitorThread(RequestQueue& timeoutQueue)
@@ -307,10 +297,12 @@ void TimerThread::MonitorThread::threadFunc() {
                     _l.unlock();
                     // We add Request to retired queue early so that it can be dumped out.
                     mTimeoutQueue.add(std::move(node.mapped().first));
-                    node.mapped().second(); // Caution: we don't hold lock here - but do we care?
-                                            // this is the timeout case!  We will crash soon,
-                                            // maybe before returning.
-                    // anything left over is released here outside lock.
+                    node.mapped().second(nextDeadline);
+                    // Caution: we don't hold lock when we call TimerCallback.
+                    // This is benign issue - we permit concurrent operations
+                    // while in the callback to the MonitorQueue.
+                    //
+                    // Anything left over is released here outside lock.
                 }
                 // reacquire the lock - if something was added, we loop immediately to check.
                 _l.lock();
@@ -324,8 +316,7 @@ void TimerThread::MonitorThread::threadFunc() {
 }
 
 TimerThread::Handle TimerThread::MonitorThread::add(
-        std::shared_ptr<const Request> request, std::function<void()>&& func,
-        std::chrono::milliseconds timeout) {
+        std::shared_ptr<const Request> request, TimerCallback&& func, Duration timeout) {
     std::lock_guard _l(mMutex);
     const Handle handle = getUniqueHandle_l(timeout);
     mMonitorRequests.emplace(handle, std::make_pair(std::move(request), std::move(func)));
@@ -340,7 +331,7 @@ std::shared_ptr<const TimerThread::Request> TimerThread::MonitorThread::remove(H
         return {};
     }
     std::shared_ptr<const TimerThread::Request> request = std::move(it->second.first);
-    std::function<void()> func = std::move(it->second.second);
+    TimerCallback func = std::move(it->second.second);
     mMonitorRequests.erase(it);
     ul.unlock();  // manually release lock here so func is released outside of lock.
     return request;
