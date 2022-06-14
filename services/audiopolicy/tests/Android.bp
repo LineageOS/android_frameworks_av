@@ -30,6 +30,8 @@ cc_test {
     ],
 
     static_libs: [
+        "android.media.audio.common.types-V1-cpp",
+        "audioclient-types-aidl-cpp",
         "libaudiopolicycomponents",
         "libgmock",
     ],
