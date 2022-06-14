@@ -3486,10 +3486,11 @@ typedef enum acamera_metadata_tag {
      * </ul></p>
      *
      * <p>This is a subset of ACAMERA_REQUEST_AVAILABLE_REQUEST_KEYS which contains a list
-     * of keys that can be overridden using <a href="https://developer.android.com/reference/CaptureRequest/Builder.html#setPhysicalCameraKey">Builder#setPhysicalCameraKey</a>.
+     * of keys that can be overridden using
+     * <a href="https://developer.android.com/reference/android/hardware/camera2/CaptureRequest.Builder.html#setPhysicalCameraKey">Builder#setPhysicalCameraKey</a>.
      * The respective value of such request key can be obtained by calling
-     * <a href="https://developer.android.com/reference/CaptureRequest/Builder.html#getPhysicalCameraKey">Builder#getPhysicalCameraKey</a>. Capture requests that contain
-     * individual physical device requests must be built via
+     * <a href="https://developer.android.com/reference/android/hardware/camera2/CaptureRequest.Builder.html#getPhysicalCameraKey">Builder#getPhysicalCameraKey</a>.
+     * Capture requests that contain individual physical device requests must be built via
      * <a href="https://developer.android.com/reference/android/hardware/camera2/CameraDevice.html#createCaptureRequest(int,">Set)</a>.</p>
      *
      * @see ACAMERA_REQUEST_AVAILABLE_REQUEST_KEYS
@@ -3713,7 +3714,7 @@ typedef enum acamera_metadata_tag {
      * IMPLEMENTATION_DEFINED | same as YUV_420_888                  | Any            |</p>
      * <p>For applications targeting SDK version 31 or newer, if the mobile device declares to be
      * media performance class 12 or higher by setting
-     * <a href="https://developer.android.com/reference/android/os/Build/VERSION_CODES/MEDIA_PERFORMANCE_CLASS.html">MEDIA_PERFORMANCE_CLASS</a> to be 31 or larger,
+     * <a href="https://developer.android.com/reference/android/os/Build.VERSION.html#MEDIA_PERFORMANCE_CLASS">VERSION#MEDIA_PERFORMANCE_CLASS</a> to be 31 or larger,
      * the primary camera devices (first rear/front camera in the camera ID list) will not
      * support JPEG sizes smaller than 1080p. If the application configures a JPEG stream
      * smaller than 1080p, the camera device will round up the JPEG image size to at least
@@ -3732,7 +3733,7 @@ typedef enum acamera_metadata_tag {
      * IMPLEMENTATION_DEFINED | same as YUV_420_888                  | Any            |</p>
      * <p>For applications targeting SDK version 31 or newer, if the mobile device doesn't declare
      * to be media performance class 12 or better by setting
-     * <a href="https://developer.android.com/reference/android/os/Build/VERSION_CODES/MEDIA_PERFORMANCE_CLASS.html">MEDIA_PERFORMANCE_CLASS</a> to be 31 or larger,
+     * <a href="https://developer.android.com/reference/android/os/Build.VERSION.html#MEDIA_PERFORMANCE_CLASS">VERSION#MEDIA_PERFORMANCE_CLASS</a> to be 31 or larger,
      * or if the camera device isn't a primary rear/front camera, the minimum required output
      * stream configurations are the same as for applications targeting SDK version older than
      * 31.</p>
@@ -10225,7 +10226,7 @@ typedef enum acamera_metadata_enum_acamera_info_supported_hardware_level {
      * fire the flash for flash power metering during precapture, and then fire the flash
      * for the final capture, if a flash is available on the device and the AE mode is set to
      * enable the flash.</p>
-     * <p>Devices that initially shipped with Android version <a href="https://developer.android.com/reference/android/os/Build/VERSION_CODES.html#Q">Q</a> or newer will not include any LEGACY-level devices.</p>
+     * <p>Devices that initially shipped with Android version <a href="https://developer.android.com/reference/android/os/Build.VERSION_CODES.html#Q">Q</a> or newer will not include any LEGACY-level devices.</p>
      *
      * @see ACAMERA_CONTROL_AE_PRECAPTURE_TRIGGER
      * @see ACAMERA_REQUEST_AVAILABLE_CAPABILITIES
