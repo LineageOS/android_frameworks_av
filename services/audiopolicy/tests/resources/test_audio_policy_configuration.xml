@@ -71,6 +71,9 @@
                 <devicePort tagName="BT SCO Headset Mic" type="AUDIO_DEVICE_IN_BLUETOOTH_SCO_HEADSET"
                             role="source" address="hfp_client_in">
                 </devicePort>
+                <devicePort tagName="BT A2DP Out" type="AUDIO_DEVICE_OUT_BLUETOOTH_A2DP" role="sink"
+                            encodedFormats="AUDIO_FORMAT_LDAC AUDIO_FORMAT_APTX AUDIO_FORMAT_APTX_HD AUDIO_FORMAT_AAC AUDIO_FORMAT_SBC">
+                </devicePort>
             </devicePorts>
             <routes>
                 <route type="mix" sink="Speaker"
@@ -85,6 +88,8 @@
                        sources="mixport_bt_hfp_output,voip_rx"/>
                 <route type="mix" sink="mixport_bt_hfp_input"
                        sources="BT SCO Headset Mic"/>
+                <route type="mix" sink="BT A2DP Out"
+                       sources="primary output"/>
             </routes>
         </module>
 
