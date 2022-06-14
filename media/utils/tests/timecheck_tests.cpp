@@ -39,7 +39,7 @@ TEST(timecheck_tests, success) {
             timeoutRegistered = timeout;
             elapsedMsRegistered = elapsedMs;
             event = true;
-        }, 1000 /* msec */, false /* crash */);
+        }, 1000ms /* timeoutDuration */, {} /* secondChanceDuration */, false /* crash */);
     }
     ASSERT_TRUE(event);
     ASSERT_FALSE(timeoutRegistered);
@@ -58,7 +58,7 @@ TEST(timecheck_tests, timeout) {
             timeoutRegistered = timeout;
             elapsedMsRegistered = elapsedMs;
             event = true; // store-release, must be last.
-        }, 1 /* msec */, false /* crash */);
+        }, 1ms /* timeoutDuration */, {} /* secondChanceDuration */, false /* crash */);
         std::this_thread::sleep_for(100ms);
     }
     ASSERT_TRUE(event); // load-acquire, must be first.

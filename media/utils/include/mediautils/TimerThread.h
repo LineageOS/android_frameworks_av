@@ -130,7 +130,8 @@ class TimerThread {
      * \returns       a handle that can be used for cancellation.
      */
     Handle scheduleTask(
-            std::string_view tag, TimerCallback&& func, Duration timeoutDuration);
+            std::string_view tag, TimerCallback&& func,
+            Duration timeoutDuration, Duration secondChanceDuration);
 
     /**
      * Tracks a task that shows up on toString() until cancelled.
@@ -204,24 +205,30 @@ class TimerThread {
   private:
     // To minimize movement of data, we pass around shared_ptrs to Requests.
     // These are allocated and deallocated outside of the lock.
+    // TODO(b/243839867) consider options to merge Request with the
+    // TimeCheck::TimeCheckHandler struct.
     struct Request {
         Request(std::chrono::system_clock::time_point _scheduled,
                 std::chrono::system_clock::time_point _deadline,
+                Duration _secondChanceDuration,
                 pid_t _tid,
                 std::string_view _tag)
             : scheduled(_scheduled)
             , deadline(_deadline)
+            , secondChanceDuration(_secondChanceDuration)
             , tid(_tid)
             , tag(_tag)
             {}
 
         const std::chrono::system_clock::time_point scheduled;
-        const std::chrono::system_clock::time_point deadline; // deadline := scheduled + timeout
+        const std::chrono::system_clock::time_point deadline; // deadline := scheduled
+                                                              // + timeoutDuration
+                                                              // + secondChanceDuration
                                                               // if deadline == scheduled, no
                                                               // timeout, task not executed.
+        Duration secondChanceDuration;
         const pid_t tid;
         const FixedString62 tag;
-
         std::string toString() const;
     };
 
@@ -270,6 +277,7 @@ class TimerThread {
     // call on timeout.
     // This class is thread-safe.
     class MonitorThread {
+        std::atomic<size_t> mSecondChanceCount{};
         mutable std::mutex mMutex;
         mutable std::condition_variable mCond GUARDED_BY(mMutex);
 
@@ -277,6 +285,17 @@ class TimerThread {
         //
         std::map<Handle, std::pair<std::shared_ptr<const Request>, TimerCallback>>
                 mMonitorRequests GUARDED_BY(mMutex);
+
+        // Due to monotonic/steady clock inaccuracies during suspend,
+        // we allow an additional second chance waiting time to prevent
+        // false removal.
+
+        // This mSecondChanceRequests queue is almost always empty.
+        // Using a pair with the original handle allows lookup and keeps
+        // the Key unique.
+        std::map<std::pair<Handle /* new */, Handle /* original */>,
+                std::pair<std::shared_ptr<const Request>, TimerCallback>>
+                        mSecondChanceRequests GUARDED_BY(mMutex);
 
         RequestQueue& mTimeoutQueue; // locked internally, added to when request times out.
 
@@ -302,6 +321,9 @@ class TimerThread {
                 Duration timeout);
         std::shared_ptr<const Request> remove(Handle handle);
         void copyRequests(std::vector<std::shared_ptr<const Request>>& requests) const;
+        size_t getSecondChanceCount() const {
+            return mSecondChanceCount.load(std::memory_order_relaxed);
+        }
     };
 
     // Analysis contains info deduced by analysisTimeout().
