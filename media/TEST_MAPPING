@@ -1,24 +1,7 @@
 // for frameworks/av/media
 {
-    "presubmit-large": [
-        // runs whenever we change something in this tree
-        {
-            "name": "CtsMediaCodecTestCases",
-            "options": [
-                {
-                    "include-filter": "android.media.codec.cts.EncodeDecodeTest"
-                }
-            ]
-        },
-        {
-            "name": "CtsMediaCodecTestCases",
-            "options": [
-                {
-                    "include-filter": "android.media.codec.cts.DecodeEditEncodeTest"
-                }
-            ]
-        }
-    ],
+    // TODO (b/229286407) Add EncodeDecodeTest and DecodeEditEncodeTest to
+    // presubmit-large once issues in cuttlefish are fixed
     "presubmit": [
         {
             "name": "GtsMediaTestCases",
@@ -40,26 +23,8 @@
         {
             "path": "frameworks/av/drm/mediadrm/plugins"
         }
-    ],
-
-    "platinum-postsubmit": [
-        // runs regularly, independent of changes in this tree.
-        // signals if changes elsewhere break media functionality
-        {
-            "name": "CtsMediaCodecTestCases",
-            "options": [
-                {
-                    "include-filter": "android.media.codec.cts.EncodeDecodeTest"
-                }
-            ]
-        },
-        {
-            "name": "CtsMediaCodecTestCases",
-            "options": [
-                {
-                    "include-filter": "android.media.codec.cts.DecodeEditEncodeTest"
-                }
-            ]
-        }
     ]
+
+    // TODO (b/229286407) Add EncodeDecodeTest and DecodeEditEncodeTest to
+    // platinum-postsubmit once issues in cuttlefish are fixed
 }
