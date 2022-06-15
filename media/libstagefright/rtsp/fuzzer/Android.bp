@@ -62,3 +62,13 @@ cc_fuzz {
         "libcutils",
     ],
 }
+
+cc_fuzz {
+    name: "packet_source_fuzzer",
+    srcs: [
+        "packet_source_fuzzer.cpp",
+    ],
+    defaults: [
+        "libstagefright_rtsp_fuzzer_defaults",
+    ],
+}
