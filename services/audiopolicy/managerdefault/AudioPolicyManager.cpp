@@ -3141,7 +3141,7 @@ status_t AudioPolicyManager::getVolumeIndexForAttributes(const audio_attributes_
     // stream by the engine.
     DeviceTypeSet deviceTypes = {device};
     if (device == AUDIO_DEVICE_OUT_DEFAULT_FOR_VOLUME) {
-        DeviceTypeSet deviceTypes = mEngine->getOutputDevicesForAttributes(
+        deviceTypes = mEngine->getOutputDevicesForAttributes(
                 attr, nullptr, true /*fromCache*/).types();
     }
     return getVolumeIndex(getVolumeCurves(attr), index, deviceTypes);
@@ -3151,7 +3151,7 @@ status_t AudioPolicyManager::getVolumeIndex(const IVolumeCurves &curves,
                                             int &index,
                                             const DeviceTypeSet& deviceTypes) const
 {
-    if (isSingleDeviceType(deviceTypes, audio_is_output_device)) {
+    if (!isSingleDeviceType(deviceTypes, audio_is_output_device)) {
         return BAD_VALUE;
     }
     index = curves.getVolumeIndex(deviceTypes);
