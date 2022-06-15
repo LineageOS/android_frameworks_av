@@ -460,3 +460,43 @@ TEST(AudioPortSessionExtRoundTripTest, Aidl2Legacy2Aidl) {
     ASSERT_TRUE(convBack.ok());
     EXPECT_EQ(initial, convBack.value());
 }
+
+class AudioGainTest : public testing::TestWithParam<bool> {};
+TEST_P(AudioGainTest, Legacy2Aidl2Legacy) {
+    audio_port_v7 port;
+    port.num_gains = 2;
+    port.gains[0] = {.mode = AUDIO_GAIN_MODE_JOINT,
+                     .channel_mask = AUDIO_CHANNEL_IN_STEREO,
+                     .min_value = -3200,
+                     .max_value = 600,
+                     .default_value = 0,
+                     .step_value = 100,
+                     .min_ramp_ms = 10,
+                     .max_ramp_ms = 20};
+    port.gains[1] = {.mode = AUDIO_GAIN_MODE_JOINT,
+                     .channel_mask = AUDIO_CHANNEL_IN_MONO,
+                     .min_value = -8800,
+                     .max_value = 4000,
+                     .default_value = 0,
+                     .step_value = 100,
+                     .min_ramp_ms = 192,
+                     .max_ramp_ms = 224};
+
+    const auto isInput = GetParam();
+    for (int i = 0; i < port.num_gains; i++) {
+        auto initial = port.gains[i];
+        auto conv = legacy2aidl_audio_gain_AudioGain(initial, isInput);
+        ASSERT_TRUE(conv.ok());
+        auto convBack = aidl2legacy_AudioGain_audio_gain(conv.value(), isInput);
+        ASSERT_TRUE(convBack.ok());
+        EXPECT_EQ(initial.mode, convBack.value().mode);
+        EXPECT_EQ(initial.channel_mask, convBack.value().channel_mask);
+        EXPECT_EQ(initial.min_value, convBack.value().min_value);
+        EXPECT_EQ(initial.max_value, convBack.value().max_value);
+        EXPECT_EQ(initial.default_value, convBack.value().default_value);
+        EXPECT_EQ(initial.step_value, convBack.value().step_value);
+        EXPECT_EQ(initial.min_ramp_ms, convBack.value().min_ramp_ms);
+        EXPECT_EQ(initial.max_ramp_ms, convBack.value().max_ramp_ms);
+    }
+}
+INSTANTIATE_TEST_SUITE_P(AudioGain, AudioGainTest, testing::Values(true, false));
