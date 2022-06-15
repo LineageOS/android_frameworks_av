@@ -901,7 +901,8 @@ c2_status_t C2SoftHevcEnc::setEncodeArgs(ihevce_inp_buf_t* ps_encode_ip,
             yStride = width;
             uStride = vStride = yStride / 2;
             ConvertRGBToPlanarYUV(yPlane, yStride, height,
-                                  conversionBuffer.size(), *input);
+                                  conversionBuffer.size(), *input,
+                                  mColorAspects->matrix, mColorAspects->range);
             break;
         }
         case C2PlanarLayout::TYPE_YUV: {
