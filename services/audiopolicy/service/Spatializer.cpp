@@ -216,7 +216,9 @@ status_t Spatializer::loadEngineConfiguration(sp<EffectHalInterface> effect) {
     if (status != NO_ERROR) {
         return status;
     }
-    mSupportsHeadTracking = supportsHeadTracking[0];
+// Disable head tracking until head sensor activity is properly controlled.
+//    mSupportsHeadTracking = supportsHeadTracking[0];
+    mSupportsHeadTracking = false;
 
     status = getHalParameter<true>(effect, SPATIALIZER_PARAM_SUPPORTED_LEVELS, &mLevels);
     if (status != NO_ERROR) {
@@ -227,12 +229,8 @@ status_t Spatializer::loadEngineConfiguration(sp<EffectHalInterface> effect) {
     if (status != NO_ERROR) {
         return status;
     }
-    status = getHalParameter<true>(effect, SPATIALIZER_PARAM_SUPPORTED_CHANNEL_MASKS,
+    return getHalParameter<true>(effect, SPATIALIZER_PARAM_SUPPORTED_CHANNEL_MASKS,
                                  &mChannelMasks);
-    if (status != NO_ERROR) {
-        return status;
-    }
-    return NO_ERROR;
 }
 
 /** Gets the channel mask, sampling rate and format set for the spatializer input. */
@@ -727,7 +725,7 @@ void Spatializer::engineCallback(int32_t event, void *user, void *info) {
     switch (event) {
         case AudioEffect::EVENT_FRAMES_PROCESSED: {
             int frames = info == nullptr ? 0 : *(int*)info;
-            ALOGD("%s frames processed %d for me %p", __func__, frames, me);
+            // ALOGD("%s frames processed %d for me %p", __func__, frames, me);
             me->postFramesProcessedMsg(frames);
         } break;
         default:
