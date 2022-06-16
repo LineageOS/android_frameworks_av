@@ -86,7 +86,6 @@ aaudio_result_t AAudioStreamParameters::validate() const {
     switch (mSessionId) {
         case AAUDIO_SESSION_ID_NONE:
         case AAUDIO_SESSION_ID_ALLOCATE:
-            break;
         default:
             break;
     }
