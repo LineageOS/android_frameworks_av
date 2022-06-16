@@ -566,9 +566,7 @@ AAUDIO_API aaudio_result_t AAudioStream_getTimestamp(AAudioStream* stream,
                                       int64_t *timeNanoseconds)
 {
     AudioStream *audioStream = convertAAudioStreamToAudioStream(stream);
-    if (framePosition == nullptr) {
-        return AAUDIO_ERROR_NULL;
-    } else if (timeNanoseconds == nullptr) {
+    if (framePosition == nullptr || timeNanoseconds == nullptr) {
         return AAUDIO_ERROR_NULL;
     } else if (clockid != CLOCK_MONOTONIC && clockid != CLOCK_BOOTTIME) {
         return AAUDIO_ERROR_ILLEGAL_ARGUMENT;
