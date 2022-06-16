@@ -4,6 +4,7 @@
 + [mtp_fuzzer](#MtpServer)
 + [mtp_host_property_fuzzer](#MtpHostProperty)
 + [mtp_device_property_fuzzer](#MtpDeviceProperty)
++ [mtp_handle_fuzzer](#MtpHandle)
 
 # <a name="MtpServer"></a> Fuzzer for MtpServer
 
@@ -65,4 +66,17 @@ MtpDeviceProperty supports the following parameters:
 ```
   $ adb sync data
   $ adb shell /data/fuzz/arm64/mtp_device_property_fuzzer/mtp_device_property_fuzzer
+```
+
+# <a name="MtpHandle"></a>Fuzzer for MtpHandle
+
+#### Steps to run
+1. Build the fuzzer
+```
+  $ mm -j$(nproc) mtp_handle_fuzzer
+```
+2. Run on device
+```
+  $ adb sync data
+  $ adb shell /data/fuzz/arm64/mtp_handle_fuzzer/mtp_handle_fuzzer
 ```

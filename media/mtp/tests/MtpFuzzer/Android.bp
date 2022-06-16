@@ -84,3 +84,11 @@ cc_fuzz {
          "-DMTP_HOST",
      ],
 }
+
+cc_fuzz {
+    name: "mtp_handle_fuzzer",
+    srcs: ["mtp_handle_fuzzer.cpp"],
+    shared_libs: ["libmtp_fuzz"],
+    defaults: ["mtp_fuzzer_defaults"],
+    cflags: ["-DMTP_FUZZER"],
+}
