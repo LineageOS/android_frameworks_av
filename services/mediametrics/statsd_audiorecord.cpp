@@ -99,16 +99,14 @@ bool statsd_audiorecord(const std::shared_ptr<const mediametrics::Item>& item,
     }
 
     int32_t error_code = -1;
-    if (item->getInt32("android.media.audiorecord.errcode", &error_code)) {
-        metrics_proto.set_error_code(error_code);
-    } else if (item->getInt32("android.media.audiorecord.lastError.code", &error_code)) {
+    if (item->getInt32("android.media.audiorecord.errcode", &error_code) ||
+        item->getInt32("android.media.audiorecord.lastError.code", &error_code)) {
         metrics_proto.set_error_code(error_code);
     }
 
     std::string error_function;
-    if (item->getString("android.media.audiorecord.errfunc", &error_function)) {
-        metrics_proto.set_error_function(error_function);
-    } else if (item->getString("android.media.audiorecord.lastError.at", &error_function)) {
+    if (item->getString("android.media.audiorecord.errfunc", &error_function) ||
+        item->getString("android.media.audiorecord.lastError.at", &error_function)) {
         metrics_proto.set_error_function(error_function);
     }
 
