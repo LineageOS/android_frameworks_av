@@ -1,0 +1,45 @@
+package {
+    // See: http://go/android-license-faq
+    // A large-scale-change added 'default_applicable_licenses' to import
+    // all of the 'license_kinds' from "frameworks_av_license"
+    // to get the below license kinds:
+    //   SPDX-license-identifier-Apache-2.0
+    default_applicable_licenses: ["frameworks_av_license"],
+}
+
+filegroup {
+    name: "libeffects-test-helper-srcs",
+    srcs: [
+        "EffectTestHelper.cpp",
+    ],
+}
+
+cc_library_headers {
+    name: "libeffects-test-helper-headers",
+    vendor: true,
+    host_supported: true,
+    export_include_dirs: [
+        ".",
+    ],
+}
+
+cc_defaults {
+    name: "libeffects-test-defaults",
+    vendor: true,
+    gtest: true,
+    host_supported: true,
+    test_suites: ["device-tests"],
+    static_libs: [
+        "libaudioutils",
+    ],
+    srcs: [
+        ":libeffects-test-helper-srcs",
+    ],
+    header_libs: [
+        "libeffects-test-helper-headers",
+        "libhardware_headers",
+    ],
+    shared_libs: [
+        "liblog",
+    ],
+}
