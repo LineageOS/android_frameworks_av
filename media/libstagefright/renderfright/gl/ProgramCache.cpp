@@ -299,8 +299,8 @@ void ProgramCache::generateToneMappingProcess(Formatter& fs, const Key& needs) {
                 highp vec3 ScaleLuminance(highp vec3 color) {
                     // The formula is:
                     // alpha * pow(Y, gamma - 1.0) * color + beta;
-                    // where alpha is 1000.0, gamma is 1.2, beta is 0.0.
-                    return color * 1000.0 * pow(color.y, 0.2);
+                    // where alpha is displayMaxLuminance, gamma is 1.2, beta is 0.0.
+                    return color * displayMaxLuminance * pow(color.y, 0.2);
                 }
             )__SHADER__";
             break;
@@ -316,7 +316,6 @@ void ProgramCache::generateToneMappingProcess(Formatter& fs, const Key& needs) {
     // Tone map absolute light to display luminance range.
     switch (needs.getInputTF()) {
         case Key::INPUT_TF_ST2084:
-        case Key::INPUT_TF_HLG:
             switch (needs.getOutputTF()) {
                 case Key::OUTPUT_TF_HLG:
                     // Right now when mixed PQ and HLG contents are presented,
@@ -395,6 +394,14 @@ void ProgramCache::generateToneMappingProcess(Formatter& fs, const Key& needs) {
                     )__SHADER__";
                     break;
             }
+            break;
+        case Key::INPUT_TF_HLG:
+            // HLG OOTF is already applied as part of ScaleLuminance
+            fs << R"__SHADER__(
+                 highp vec3 ToneMap(highp vec3 color) {
+                     return color;
+                 }
+             )__SHADER__";
             break;
         default:
             // inverse tone map; the output luminance can be up to maxOutLumi.
