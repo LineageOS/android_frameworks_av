@@ -168,8 +168,8 @@ Camera2ClientBase<TClientBase>::~Camera2ClientBase() {
         mCameraServiceWatchdog.clear();
     }
 
-    ALOGI("Closed Camera %s. Client was: %s (PID %d, UID %u)",
-            TClientBase::mCameraIdStr.string(),
+    ALOGI("%s: Client object's dtor for Camera Id %s completed. Client was: %s (PID %d, UID %u)",
+            __FUNCTION__, TClientBase::mCameraIdStr.string(),
             String8(TClientBase::mClientPackageName).string(),
             mInitialClientPid, TClientBase::mClientUid);
 }
