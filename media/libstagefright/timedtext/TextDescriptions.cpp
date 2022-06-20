@@ -466,6 +466,10 @@ status_t TextDescriptions::extract3GPPGlobalDescriptions(
 
                 if (subChunkType == FOURCC('f', 't', 'a', 'b'))
                 {
+                    if(subChunkSize < 8) {
+                        return OK;
+                    }
+
                     tmpData += 8;
                     size_t subChunkRemaining = subChunkSize - 8;
 
