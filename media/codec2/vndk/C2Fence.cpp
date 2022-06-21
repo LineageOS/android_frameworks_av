@@ -186,7 +186,7 @@ using namespace android;
 class _C2FenceFactory::SyncFenceImpl : public C2Fence::Impl {
 public:
     virtual c2_status_t wait(c2_nsecs_t timeoutNs) {
-        c2_nsecs_t timeoutMs = timeoutNs / 1000;
+        int64_t timeoutMs = timeoutNs / 1000000;
         if (timeoutMs > INT_MAX) {
             timeoutMs = INT_MAX;
         }
