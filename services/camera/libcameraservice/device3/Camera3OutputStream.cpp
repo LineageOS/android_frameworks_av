@@ -1432,16 +1432,27 @@ nsecs_t Camera3OutputStream::syncTimestampToDisplayLocked(nsecs_t t) {
     int minVsyncs = (mMinExpectedDuration - vsyncEventData.frameInterval / 2) /
             vsyncEventData.frameInterval;
     if (minVsyncs < 0) minVsyncs = 0;
-    nsecs_t minInterval = minVsyncs * vsyncEventData.frameInterval + kTimelineThresholdNs;
-    // Find best timestamp in the vsync timeline:
+    nsecs_t minInterval = minVsyncs * vsyncEventData.frameInterval;
+    // Find best timestamp in the vsync timelines:
+    // - Only use at most 3 timelines to avoid long latency
     // - closest to the ideal present time,
     // - deadline timestamp is greater than the current time, and
     // - the candidate present time is at least minInterval in the future
     //   compared to last present time.
-    for (const auto& vsyncTime : vsyncEventData.frameTimelines) {
+    int maxTimelines = std::min(kMaxTimelines, (int)VsyncEventData::kFrameTimelinesLength);
+    float biasForShortDelay = 1.0f;
+    for (int i = 0; i < maxTimelines; i ++) {
+        const auto& vsyncTime = vsyncEventData.frameTimelines[i];
+        if (minVsyncs > 0) {
+            // Bias towards using smaller timeline index:
+            //   i = 0:                bias = 1
+            //   i = maxTimelines-1:   bias = -1
+            biasForShortDelay = 1.0 - 2.0 * i / (maxTimelines - 1);
+        }
         if (std::abs(vsyncTime.expectedPresentationTime - idealPresentT) < minDiff &&
                 vsyncTime.deadlineTimestamp >= currentTime &&
-                vsyncTime.expectedPresentationTime > mLastPresentTime + minInterval) {
+                vsyncTime.expectedPresentationTime >
+                mLastPresentTime + minInterval + biasForShortDelay * kTimelineThresholdNs) {
             expectedPresentT = vsyncTime.expectedPresentationTime;
             minDiff = std::abs(vsyncTime.expectedPresentationTime - idealPresentT);
         }
