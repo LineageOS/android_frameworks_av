@@ -140,6 +140,9 @@ audio_format_t AAudioConvert_aaudioToAndroidDataFormat(aaudio_format_t aaudioFor
     case AAUDIO_FORMAT_PCM_I32:
         androidFormat = AUDIO_FORMAT_PCM_32_BIT;
         break;
+    case AAUDIO_FORMAT_IEC61937:
+        androidFormat = AUDIO_FORMAT_IEC61937;
+        break;
     default:
         androidFormat = AUDIO_FORMAT_INVALID;
         ALOGE("%s() 0x%08X unrecognized", __func__, aaudioFormat);
@@ -165,6 +168,9 @@ aaudio_format_t AAudioConvert_androidToAAudioDataFormat(audio_format_t androidFo
         break;
     case AUDIO_FORMAT_PCM_32_BIT:
         aaudioFormat = AAUDIO_FORMAT_PCM_I32;
+        break;
+    case AUDIO_FORMAT_IEC61937:
+        aaudioFormat = AAUDIO_FORMAT_IEC61937;
         break;
     default:
         aaudioFormat = AAUDIO_FORMAT_INVALID;
