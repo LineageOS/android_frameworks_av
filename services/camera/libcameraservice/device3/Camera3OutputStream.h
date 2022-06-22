@@ -423,6 +423,7 @@ class Camera3OutputStream :
     static constexpr size_t kDisplaySyncExtraBuffer = 2;
     static constexpr nsecs_t kSpacingResetIntervalNs = 1000000000LL; // 1 second
     static constexpr nsecs_t kTimelineThresholdNs = 1000000LL; // 1 millisecond
+    static constexpr float kMaxIntervalRatioDeviation = 0.05f;
     nsecs_t syncTimestampToDisplayLocked(nsecs_t t);
 
     // Re-space frames by delaying queueBuffer so that frame delivery has

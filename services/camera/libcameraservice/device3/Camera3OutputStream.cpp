@@ -18,6 +18,7 @@
 #define ATRACE_TAG ATRACE_TAG_CAMERA
 //#define LOG_NDEBUG 0
 
+#include <algorithm>
 #include <ctime>
 #include <fstream>
 
@@ -1392,14 +1393,30 @@ nsecs_t Camera3OutputStream::syncTimestampToDisplayLocked(nsecs_t t) {
     const VsyncEventData& vsyncEventData = parcelableVsyncEventData.vsync;
     nsecs_t currentTime = systemTime();
 
-    // Reset capture to present time offset if more than 1 second
-    // between frames.
-    if (t - mLastCaptureTime > kSpacingResetIntervalNs) {
+    // Reset capture to present time offset if:
+    // - More than 1 second between frames.
+    // - The frame duration deviates from multiples of vsync frame intervals.
+    nsecs_t captureInterval = t - mLastCaptureTime;
+    float captureToVsyncIntervalRatio = 1.0f * captureInterval / vsyncEventData.frameInterval;
+    float ratioDeviation = std::fabs(
+            captureToVsyncIntervalRatio - std::roundf(captureToVsyncIntervalRatio));
+    if (captureInterval > kSpacingResetIntervalNs ||
+            ratioDeviation >= kMaxIntervalRatioDeviation) {
+        nsecs_t minPresentT = mLastPresentTime + vsyncEventData.frameInterval / 2;
         for (size_t i = 0; i < VsyncEventData::kFrameTimelinesLength; i++) {
-            if (vsyncEventData.frameTimelines[i].deadlineTimestamp >= currentTime) {
-                mCaptureToPresentOffset =
-                    vsyncEventData.frameTimelines[i].expectedPresentationTime - t;
-                break;
+            const auto& timeline = vsyncEventData.frameTimelines[i];
+            if (timeline.deadlineTimestamp >= currentTime &&
+                    timeline.expectedPresentationTime > minPresentT) {
+                nsecs_t presentT = vsyncEventData.frameTimelines[i].expectedPresentationTime;
+                mCaptureToPresentOffset = presentT - t;
+                mLastCaptureTime = t;
+                mLastPresentTime = presentT;
+
+                // Move the expected presentation time back by 1/3 of frame interval to
+                // mitigate the time drift. Due to time drift, if we directly use the
+                // expected presentation time, often times 2 expected presentation time
+                // falls into the same VSYNC interval.
+                return presentT - vsyncEventData.frameInterval/3;
             }
         }
     }
