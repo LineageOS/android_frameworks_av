@@ -18,6 +18,7 @@
 #define ATRACE_TAG ATRACE_TAG_CAMERA
 //#define LOG_NDEBUG 0
 
+#include <algorithm>
 #include <ctime>
 #include <fstream>
 
@@ -1392,14 +1393,30 @@ nsecs_t Camera3OutputStream::syncTimestampToDisplayLocked(nsecs_t t) {
     const VsyncEventData& vsyncEventData = parcelableVsyncEventData.vsync;
     nsecs_t currentTime = systemTime();
 
-    // Reset capture to present time offset if more than 1 second
-    // between frames.
-    if (t - mLastCaptureTime > kSpacingResetIntervalNs) {
+    // Reset capture to present time offset if:
+    // - More than 1 second between frames.
+    // - The frame duration deviates from multiples of vsync frame intervals.
+    nsecs_t captureInterval = t - mLastCaptureTime;
+    float captureToVsyncIntervalRatio = 1.0f * captureInterval / vsyncEventData.frameInterval;
+    float ratioDeviation = std::fabs(
+            captureToVsyncIntervalRatio - std::roundf(captureToVsyncIntervalRatio));
+    if (captureInterval > kSpacingResetIntervalNs ||
+            ratioDeviation >= kMaxIntervalRatioDeviation) {
+        nsecs_t minPresentT = mLastPresentTime + vsyncEventData.frameInterval / 2;
         for (size_t i = 0; i < VsyncEventData::kFrameTimelinesLength; i++) {
-            if (vsyncEventData.frameTimelines[i].deadlineTimestamp >= currentTime) {
-                mCaptureToPresentOffset =
-                    vsyncEventData.frameTimelines[i].expectedPresentationTime - t;
-                break;
+            const auto& timeline = vsyncEventData.frameTimelines[i];
+            if (timeline.deadlineTimestamp >= currentTime &&
+                    timeline.expectedPresentationTime > minPresentT) {
+                nsecs_t presentT = vsyncEventData.frameTimelines[i].expectedPresentationTime;
+                mCaptureToPresentOffset = presentT - t;
+                mLastCaptureTime = t;
+                mLastPresentTime = presentT;
+
+                // Move the expected presentation time back by 1/3 of frame interval to
+                // mitigate the time drift. Due to time drift, if we directly use the
+                // expected presentation time, often times 2 expected presentation time
+                // falls into the same VSYNC interval.
+                return presentT - vsyncEventData.frameInterval/3;
             }
         }
     }
@@ -1415,16 +1432,27 @@ nsecs_t Camera3OutputStream::syncTimestampToDisplayLocked(nsecs_t t) {
     int minVsyncs = (mMinExpectedDuration - vsyncEventData.frameInterval / 2) /
             vsyncEventData.frameInterval;
     if (minVsyncs < 0) minVsyncs = 0;
-    nsecs_t minInterval = minVsyncs * vsyncEventData.frameInterval + kTimelineThresholdNs;
-    // Find best timestamp in the vsync timeline:
+    nsecs_t minInterval = minVsyncs * vsyncEventData.frameInterval;
+    // Find best timestamp in the vsync timelines:
+    // - Only use at most 3 timelines to avoid long latency
     // - closest to the ideal present time,
     // - deadline timestamp is greater than the current time, and
     // - the candidate present time is at least minInterval in the future
     //   compared to last present time.
-    for (const auto& vsyncTime : vsyncEventData.frameTimelines) {
+    int maxTimelines = std::min(kMaxTimelines, (int)VsyncEventData::kFrameTimelinesLength);
+    float biasForShortDelay = 1.0f;
+    for (int i = 0; i < maxTimelines; i ++) {
+        const auto& vsyncTime = vsyncEventData.frameTimelines[i];
+        if (minVsyncs > 0) {
+            // Bias towards using smaller timeline index:
+            //   i = 0:                bias = 1
+            //   i = maxTimelines-1:   bias = -1
+            biasForShortDelay = 1.0 - 2.0 * i / (maxTimelines - 1);
+        }
         if (std::abs(vsyncTime.expectedPresentationTime - idealPresentT) < minDiff &&
                 vsyncTime.deadlineTimestamp >= currentTime &&
-                vsyncTime.expectedPresentationTime > mLastPresentTime + minInterval) {
+                vsyncTime.expectedPresentationTime >
+                mLastPresentTime + minInterval + biasForShortDelay * kTimelineThresholdNs) {
             expectedPresentT = vsyncTime.expectedPresentationTime;
             minDiff = std::abs(vsyncTime.expectedPresentationTime - idealPresentT);
         }
