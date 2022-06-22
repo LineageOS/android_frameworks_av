@@ -2291,6 +2291,9 @@ status_t Camera3Device::configureStreamsLocked(int operatingMode,
         mOperatingMode = operatingMode;
     }
 
+    // Reset min expected duration when session is reconfigured.
+    mMinExpectedDuration = 0;
+
     // In case called from configureStreams, abort queued input buffers not belonging to
     // any pending requests.
     if (mInputStream != NULL && notifyRequestThread) {
