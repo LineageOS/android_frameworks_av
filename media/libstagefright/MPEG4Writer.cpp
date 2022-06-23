@@ -155,6 +155,7 @@ public:
     void bufferChunk(int64_t timestampUs);
     bool isAvc() const { return mIsAvc; }
     bool isHevc() const { return mIsHevc; }
+    bool isAv1() const { return mIsAv1; }
     bool isHeic() const { return mIsHeic; }
     bool isAudio() const { return mIsAudio; }
     bool isMPEG4() const { return mIsMPEG4; }
@@ -319,6 +320,7 @@ private:
     volatile bool mStarted;
     bool mIsAvc;
     bool mIsHevc;
+    bool mIsAv1;
     bool mIsDovi;
     bool mIsAudio;
     bool mIsVideo;
@@ -467,6 +469,7 @@ private:
     void writePaspBox();
     void writeAvccBox();
     void writeHvccBox();
+    void writeAv1cBox();
     void writeDoviConfigBox();
     void writeUrlBox();
     void writeDrefBox();
@@ -660,6 +663,8 @@ const char *MPEG4Writer::Track::getFourCCForMime(const char *mime) {
             return "avc1";
         } else if (!strcasecmp(MEDIA_MIMETYPE_VIDEO_HEVC, mime)) {
             return "hvc1";
+        } else if (!strcasecmp(MEDIA_MIMETYPE_VIDEO_AV1, mime)) {
+            return "av01";
         }
     } else if (!strncasecmp(mime, "application/", 12)) {
         return "mett";
@@ -1541,6 +1546,15 @@ void MPEG4Writer::writeFtypBox(MetaData *param) {
             writeFourcc("isom");
             writeFourcc("mp42");
         }
+        // If an AV1 video track is present, write "av01" as one of the
+        // compatible brands.
+        for (List<Track *>::iterator it = mTracks.begin(); it != mTracks.end();
+             ++it) {
+            if ((*it)->isAv1()) {
+                writeFourcc("av01");
+                break;
+            }
+        }
     }
 
     endBox();
@@ -2205,6 +2219,7 @@ MPEG4Writer::Track::Track(
     mMeta->findCString(kKeyMIMEType, &mime);
     mIsAvc = !strcasecmp(mime, MEDIA_MIMETYPE_VIDEO_AVC);
     mIsHevc = !strcasecmp(mime, MEDIA_MIMETYPE_VIDEO_HEVC);
+    mIsAv1 = !strcasecmp(mime, MEDIA_MIMETYPE_VIDEO_AV1);
     mIsDovi = !strcasecmp(mime, MEDIA_MIMETYPE_VIDEO_DOLBY_VISION);
     mIsAudio = !strncasecmp(mime, "audio/", 6);
     mIsVideo = !strncasecmp(mime, "video/", 6);
@@ -2639,6 +2654,8 @@ void MPEG4Writer::Track::getCodecSpecificDataFromInputFormatIfPossible() {
     } else if (!strcasecmp(mime, MEDIA_MIMETYPE_VIDEO_HEVC) ||
                !strcasecmp(mime, MEDIA_MIMETYPE_IMAGE_ANDROID_HEIC)) {
         mMeta->findData(kKeyHVCC, &type, &data, &size);
+    } else if (!strcasecmp(mime, MEDIA_MIMETYPE_VIDEO_AV1)) {
+        mMeta->findData(kKeyAV1C, &type, &data, &size);
     } else if (!strcasecmp(mime, MEDIA_MIMETYPE_VIDEO_DOLBY_VISION)) {
         getDolbyVisionProfile();
         if (!mMeta->findData(kKeyAVCC, &type, &data, &size) &&
@@ -4262,6 +4279,7 @@ status_t MPEG4Writer::Track::checkCodecSpecificData() const {
         !strcasecmp(MEDIA_MIMETYPE_VIDEO_MPEG4, mime) ||
         !strcasecmp(MEDIA_MIMETYPE_VIDEO_AVC, mime) ||
         !strcasecmp(MEDIA_MIMETYPE_VIDEO_HEVC, mime) ||
+        !strcasecmp(MEDIA_MIMETYPE_VIDEO_AV1, mime) ||
         !strcasecmp(MEDIA_MIMETYPE_VIDEO_DOLBY_VISION, mime) ||
         !strcasecmp(MEDIA_MIMETYPE_IMAGE_ANDROID_HEIC, mime)) {
         if (!mCodecSpecificData ||
@@ -4433,6 +4451,8 @@ void MPEG4Writer::Track::writeVideoFourCCBox() {
         writeAvccBox();
     } else if (!strcasecmp(MEDIA_MIMETYPE_VIDEO_HEVC, mime)) {
         writeHvccBox();
+    } else if (!strcasecmp(MEDIA_MIMETYPE_VIDEO_AV1, mime)) {
+        writeAv1cBox();
     } else if (!strcasecmp(MEDIA_MIMETYPE_VIDEO_DOLBY_VISION, mime)) {
         if (mDoviProfile <= DolbyVisionProfileDvheSt) {
             writeHvccBox();
@@ -4998,6 +5018,15 @@ void MPEG4Writer::Track::writeHvccBox() {
     mOwner->beginBox("hvcC");
     mOwner->write(mCodecSpecificData, mCodecSpecificDataSize);
     mOwner->endBox();  // hvcC
+}
+
+void MPEG4Writer::Track::writeAv1cBox() {
+    CHECK(mCodecSpecificData);
+    CHECK_GE(mCodecSpecificDataSize, 4u);
+
+    mOwner->beginBox("av1C");
+    mOwner->write(mCodecSpecificData, mCodecSpecificDataSize);
+    mOwner->endBox();  // av1C
 }
 
 void MPEG4Writer::Track::writeDoviConfigBox() {
