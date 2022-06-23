@@ -24,6 +24,14 @@
 using namespace android;
 using namespace android::mediautils;
 
+// Disables false-positives from base::Split()
+//
+// See mismatched sanitized libraries here:
+// https://github.com/google/sanitizers/wiki/AddressSanitizerContainerOverflow
+extern "C" const char* __asan_default_options() {
+  return "detect_container_overflow=0";
+}
+
 TEST(media_process_tests, basic) {
   const std::string schedString = getThreadSchedAsString(gettid());
 
