@@ -46,3 +46,19 @@ cc_fuzz {
         "libstagefright_rtsp_fuzzer_defaults",
     ]
 }
+
+cc_fuzz {
+    name: "rtp_writer_fuzzer",
+    srcs: [
+        "rtp_writer_fuzzer.cpp",
+    ],
+    defaults: [
+        "libstagefright_rtsp_fuzzer_defaults",
+    ],
+    shared_libs:[
+        "libandroid_net",
+        "libbase",
+        "libstagefright",
+        "libcutils",
+    ],
+}
