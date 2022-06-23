@@ -103,7 +103,23 @@ enum {
      *
      * Available since API level 31.
      */
-    AAUDIO_FORMAT_PCM_I32
+    AAUDIO_FORMAT_PCM_I32,
+
+    /**
+     * This format is used for compressed audio wrapped in IEC61937 for HDMI
+     * or S/PDIF passthrough.
+     *
+     * Unlike PCM playback, the Android framework is not able to do format
+     * conversion for IEC61937. In that case, when IEC61937 is requested, sampling
+     * rate and channel count or channel mask must be specified. Otherwise, it may
+     * fail when opening the stream. Apps are able to get the correct configuration
+     * for the playback by calling
+     * <a href="/reference/android/media/AudioManager#getDevices(int)">
+     *   AudioManager#getDevices(int)</a>.
+     *
+     * Available since API level 34.
+     */
+    AAUDIO_FORMAT_IEC61937
 
 };
 typedef int32_t aaudio_format_t;

@@ -11,47 +11,32 @@ package {
 
 cc_test {
     name: "EffectReverbTest",
-    vendor: true,
-    gtest: true,
-    host_supported: true,
+    defaults: [
+      "libeffects-test-defaults",
+    ],
     srcs: [
         "EffectReverbTest.cpp",
-        "EffectTestHelper.cpp",
     ],
     static_libs: [
-        "libaudioutils",
         "libreverb",
         "libreverbwrapper",
     ],
-    shared_libs: [
-        "liblog",
-    ],
     header_libs: [
         "libaudioeffects",
-        "libhardware_headers",
     ],
 }
 
 cc_test {
     name: "EffectBundleTest",
-    vendor: true,
-    gtest: true,
-    host_supported: true,
-    test_suites: ["device-tests"],
+    defaults: [
+      "libeffects-test-defaults",
+    ],
     srcs: [
         "EffectBundleTest.cpp",
-        "EffectTestHelper.cpp",
     ],
     static_libs: [
-        "libaudioutils",
         "libbundlewrapper",
         "libmusicbundle",
-    ],
-    shared_libs: [
-        "liblog",
-    ],
-    header_libs: [
-        "libhardware_headers",
     ],
 }
 
