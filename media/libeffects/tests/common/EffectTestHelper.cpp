@@ -15,7 +15,6 @@
  */
 
 #include "EffectTestHelper.h"
-extern audio_effect_library_t AUDIO_EFFECT_LIBRARY_INFO_SYM;
 
 namespace android {
 
