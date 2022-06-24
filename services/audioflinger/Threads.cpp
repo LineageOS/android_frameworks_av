@@ -3967,19 +3967,24 @@ bool AudioFlinger::PlaybackThread::threadLoop()
                 void *buffer = mEffectBufferValid ? mEffectBuffer : mSinkBuffer;
                 audio_format_t format = mEffectBufferValid ? mEffectBufferFormat : mFormat;
 
-                // mono blend occurs for mixer threads only (not direct or offloaded)
-                // and is handled here if we're going directly to the sink.
-                if (requireMonoBlend() && !mEffectBufferValid) {
-                    mono_blend(mMixerBuffer, mMixerBufferFormat, mChannelCount, mNormalFrameCount,
-                               true /*limit*/);
-                }
+                // Apply mono blending and balancing if the effect buffer is not valid. Otherwise,
+                // do these processes after effects are applied.
+                if (!mEffectBufferValid) {
+                    // mono blend occurs for mixer threads only (not direct or offloaded)
+                    // and is handled here if we're going directly to the sink.
+                    if (requireMonoBlend()) {
+                        mono_blend(mMixerBuffer, mMixerBufferFormat, mChannelCount,
+                                mNormalFrameCount, true /*limit*/);
+                    }
 
-                if (!hasFastMixer()) {
-                    // Balance must take effect after mono conversion.
-                    // We do it here if there is no FastMixer.
-                    // mBalance detects zero balance within the class for speed (not needed here).
-                    mBalance.setBalance(mMasterBalance.load());
-                    mBalance.process((float *)mMixerBuffer, mNormalFrameCount);
+                    if (!hasFastMixer()) {
+                        // Balance must take effect after mono conversion.
+                        // We do it here if there is no FastMixer.
+                        // mBalance detects zero balance within the class for speed
+                        // (not needed here).
+                        mBalance.setBalance(mMasterBalance.load());
+                        mBalance.process((float *)mMixerBuffer, mNormalFrameCount);
+                    }
                 }
 
                 memcpy_by_audio_format(buffer, format, mMixerBuffer, mMixerBufferFormat,
