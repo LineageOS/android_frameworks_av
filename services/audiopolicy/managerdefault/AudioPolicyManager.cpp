@@ -1058,12 +1058,12 @@ sp<IOProfile> AudioPolicyManager::getSpatializerOutputProfile(
             if (curProfile->getFlags() != AUDIO_OUTPUT_FLAG_SPATIALIZER) {
                 continue;
             }
-            // reject profiles not corresponding to a device currently available
-            DeviceVector supportedDevices = curProfile->getSupportedDevices();
-            if (!mAvailableOutputDevices.containsAtLeastOne(supportedDevices)) {
-                continue;
-            }
             if (!devices.empty()) {
+                // reject profiles not corresponding to a device currently available
+                DeviceVector supportedDevices = curProfile->getSupportedDevices();
+                if (!mAvailableOutputDevices.containsAtLeastOne(supportedDevices)) {
+                    continue;
+                }
                 if (supportedDevices.getDevicesFromDeviceTypeAddrVec(devices).size()
                         != devices.size()) {
                     continue;
@@ -5369,10 +5369,6 @@ bool AudioPolicyManager::canBeSpatializedInt(const audio_attributes_t *attr,
         }
     }
 
-    // The caller can have the devices criteria ignored by passing and empty vector, and
-    // getSpatializerOutputProfile() will ignore the devices when looking for a match.
-    // Otherwise an output profile supporting a spatializer effect that can be routed
-    // to the specified devices must exist.
     sp<IOProfile> profile =
             getSpatializerOutputProfile(config, devices);
     if (profile == nullptr) {
