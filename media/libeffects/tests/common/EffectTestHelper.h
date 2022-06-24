@@ -21,6 +21,7 @@
 #include <audio_utils/primitives.h>
 #include <climits>
 #include <cstdlib>
+#include <dlfcn.h>
 #include <gtest/gtest.h>
 #include <hardware/audio_effect.h>
 #include <log/log.h>
@@ -29,7 +30,9 @@
 #include <system/audio.h>
 #include <vector>
 
+extern audio_effect_library_t AUDIO_EFFECT_LIBRARY_INFO_SYM;
 namespace android {
+
 template <typename T>
 static float computeSnr(const T* ref, const T* tst, size_t count) {
     double signal{};
@@ -82,6 +85,7 @@ class EffectTestHelper {
     void createEffect();
     void releaseEffect();
     void setConfig();
+
     template <typename VALUE_DTYPE>
     void setParam(uint32_t type, VALUE_DTYPE const value) {
         int reply = 0;
@@ -101,6 +105,76 @@ class EffectTestHelper {
         ASSERT_EQ(status, 0) << "set_param returned an error " << status;
         ASSERT_EQ(reply, 0) << "set_param reply non zero " << reply;
     };
+
+    template <bool MULTI_VALUES, typename T>
+    int32_t getParam(uint32_t type, std::vector<T>& values) {
+        const int kMaxEffectParamValues = 10;
+        uint32_t cmd[sizeof(effect_param_t) / sizeof(uint32_t) + 1];
+        uint32_t reply[sizeof(effect_param_t) / sizeof(uint32_t) + 1 + 1 + kMaxEffectParamValues];
+
+        effect_param_t* p = (effect_param_t*)cmd;
+        p->psize = sizeof(uint32_t);
+        if (MULTI_VALUES) {
+            p->vsize = (kMaxEffectParamValues + 1) * sizeof(T);
+        } else {
+            p->vsize = sizeof(T);
+        }
+        *(uint32_t*)p->data = type;
+        uint32_t replySize = sizeof(effect_param_t) + p->psize + p->vsize;
+
+        int32_t status = (*mEffectHandle)
+                                 ->command(mEffectHandle, EFFECT_CMD_GET_PARAM,
+                                           sizeof(effect_param_t) + sizeof(uint32_t), cmd,
+                                           &replySize, reply);
+        if (status) {
+            return status;
+        }
+        if (p->status) {
+            return p->status;
+        }
+        if (replySize <
+            sizeof(effect_param_t) + sizeof(uint32_t) + (MULTI_VALUES ? 2 : 1) * sizeof(T)) {
+            return -EINVAL;
+        }
+
+        T* params = (T*)((uint8_t*)reply + sizeof(effect_param_t) + sizeof(uint32_t));
+        int numParams = 1;
+        if (MULTI_VALUES) {
+            numParams = (int)*params++;
+        }
+        if (numParams > kMaxEffectParamValues) {
+            return -EINVAL;
+        }
+        values.clear();
+        std::copy(&params[0], &params[numParams], back_inserter(values));
+        return 0;
+    }
+
+    template <typename T>
+    int setParam(uint32_t type, const std::vector<T>& values) {
+        int reply = 0;
+        uint32_t replySize = sizeof(reply);
+
+        uint32_t cmd[sizeof(effect_param_t) / sizeof(uint32_t) + 1 + values.size()];
+        effect_param_t* p = (effect_param_t*)cmd;
+        p->psize = sizeof(uint32_t);
+        p->vsize = sizeof(T) * values.size();
+        *(uint32_t*)p->data = type;
+        memcpy((uint32_t*)p->data + 1, values.data(), sizeof(T) * values.size());
+
+        int status = (*mEffectHandle)
+                             ->command(mEffectHandle, EFFECT_CMD_SET_PARAM,
+                                       sizeof(effect_param_t) + p->psize + p->vsize, p, &replySize,
+                                       &reply);
+        if (status) {
+            return status;
+        }
+        if (reply) {
+            return reply;
+        }
+        return 0;
+    }
+
     void process(float* input, float* output);
 
     // Corresponds to SNR for 1 bit difference between two int16_t signals
