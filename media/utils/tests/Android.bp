@@ -7,8 +7,9 @@ package {
     default_applicable_licenses: ["frameworks_av_license"],
 }
 
+// general test config
 cc_defaults {
-    name: "libmediautils_tests_defaults",
+    name: "libmediautils_tests_config",
 
     host_supported: true,
 
@@ -24,24 +25,36 @@ cc_defaults {
         integer_overflow: true,
         memtag_heap: true,
     },
+}
+
+cc_defaults {
+    name: "libmediautils_tests_defaults",
+
+    defaults: ["libmediautils_tests_config"],
+
+    host_supported: true,
 
     shared_libs: [
         "liblog",
-        "libmediautils_core",
         "libutils",
     ],
 
+    static_libs: [
+        "libmediautils_core",
+    ],
 }
 
 cc_defaults {
     name: "libmediautils_tests_host_unavail",
 
-    defaults: ["libmediautils_tests_defaults"],
+    defaults: ["libmediautils_tests_config"],
 
     host_supported: false,
 
-    shared_libs: [
+   shared_libs: [
+        "liblog",
         "libmediautils",
+        "libutils",
     ],
 }
 
