@@ -1405,6 +1405,11 @@ void AudioFlinger::PlaybackThread::Track::setFinalVolume(float volume)
 
 void AudioFlinger::PlaybackThread::Track::copyMetadataTo(MetadataInserter& backInserter) const
 {
+    // Do not forward metadata for PatchTrack with unspecified stream type
+    if (mStreamType == AUDIO_STREAM_PATCH) {
+        return;
+    }
+
     playback_track_metadata_v7_t metadata;
     metadata.base = {
             .usage = mAttr.usage,
