@@ -112,3 +112,16 @@ cc_fuzz {
      srcs: ["mtp_packet_fuzzer.cpp"],
      defaults: ["mtp_packet_defaults"],
 }
+
+cc_fuzz {
+     name: "mtp_device_fuzzer",
+     srcs: ["mtp_device_fuzzer.cpp"],
+     shared_libs: [
+        "libmtp",
+        "libusbhost",
+     ],
+     defaults: ["mtp_fuzzer_defaults"],
+     cflags: [
+         "-DMTP_DEVICE",
+     ],
+}
