@@ -20,10 +20,13 @@
 
 #include <binder/MemoryDealer.h>
 #include <hidlmemory/FrameworkUtils.h>
+#include <media/stagefright/foundation/AString.h>
 #include <mediadrm/CryptoHal.h>
 #include <mediadrm/DrmHal.h>
 #include <utils/String8.h>
 #include "fuzzer/FuzzedDataProvider.h"
+#include <binder/PersistableBundle.h>
+#include <android/hardware/drm/1.0/types.h>
 
 #define AES_BLOCK_SIZE 16
 #define UNUSED_PARAM __attribute__((unused))
@@ -33,6 +36,7 @@ using namespace android;
 using android::hardware::fromHeap;
 using ::android::os::PersistableBundle;
 using drm::V1_0::BufferType;
+using ::android::hardware::drm::V1_0::DestinationBuffer;
 
 enum {
     INVALID_UUID = 0,
@@ -398,7 +402,7 @@ void DrmFuzzer::invokeCryptoDecrypt(const uint8_t *data) {
         .secureMemory = nullptr};
 
     const uint64_t offset = 0;
-    AString *errorDetailMsg = nullptr;
+    AString errorDetailMsg;
     CryptoPlugin::Mode mode;
     bool shouldPassRandomCryptoMode = mFuzzedDataProvider->ConsumeBool();
     if (shouldPassRandomCryptoMode) {
@@ -408,7 +412,7 @@ void DrmFuzzer::invokeCryptoDecrypt(const uint8_t *data) {
             kCryptoMode[mFuzzedDataProvider->ConsumeIntegralInRange<size_t>(0, kNumCryptoMode - 1)];
     }
     mCrypto->decrypt(keyId, iv, mode, pattern, sourceBuffer, offset, subSamples, numSubSamples,
-                     destBuffer, errorDetailMsg);
+                     destBuffer, &errorDetailMsg);
 
     if (heapSeqNum >= 0) {
         mCrypto->unsetHeap(heapSeqNum);

@@ -17,10 +17,12 @@
 #define LOG_TAG "APM::HwModule"
 //#define LOG_NDEBUG 0
 
-#include "HwModule.h"
-#include "IOProfile.h"
+#include <android-base/stringprintf.h>
 #include <policy.h>
 #include <system/audio.h>
+
+#include "HwModule.h"
+#include "IOProfile.h"
 
 namespace android {
 
@@ -247,28 +249,28 @@ bool HwModule::supportsPatch(const sp<PolicyAudioPort> &srcPort,
     return false;
 }
 
-void HwModule::dump(String8 *dst) const
+void HwModule::dump(String8 *dst, int spaces) const
 {
-    dst->appendFormat("  - name: %s\n", getName());
-    dst->appendFormat("  - handle: %d\n", mHandle);
-    dst->appendFormat("  - version: %u.%u\n", getHalVersionMajor(), getHalVersionMinor());
+    dst->appendFormat("Handle: %d; \"%s\"\n", mHandle, getName());
     if (mOutputProfiles.size()) {
-        dst->append("  - outputs:\n");
+        dst->appendFormat("%*s- Output MixPorts (%zu):\n", spaces - 2, "", mOutputProfiles.size());
         for (size_t i = 0; i < mOutputProfiles.size(); i++) {
-            dst->appendFormat("    output %zu:\n", i);
-            mOutputProfiles[i]->dump(dst);
+            const std::string prefix = base::StringPrintf("%*s %zu. ", spaces, "", i + 1);
+            dst->append(prefix.c_str());
+            mOutputProfiles[i]->dump(dst, prefix.size());
         }
     }
     if (mInputProfiles.size()) {
-        dst->append("  - inputs:\n");
+        dst->appendFormat("%*s- Input MixPorts (%zu):\n", spaces - 2, "", mInputProfiles.size());
         for (size_t i = 0; i < mInputProfiles.size(); i++) {
-            dst->appendFormat("    input %zu:\n", i);
-            mInputProfiles[i]->dump(dst);
+            const std::string prefix = base::StringPrintf("%*s %zu. ", spaces, "", i + 1);
+            dst->append(prefix.c_str());
+            mInputProfiles[i]->dump(dst, prefix.size());
         }
     }
-    mDeclaredDevices.dump(dst, String8("Declared"), 2, true);
-    mDynamicDevices.dump(dst, String8("Dynamic"),  2, true);
-    dumpAudioRouteVector(mRoutes, dst, 2);
+    mDeclaredDevices.dump(dst, String8("- Declared"), spaces - 2, true);
+    mDynamicDevices.dump(dst, String8("- Dynamic"),  spaces - 2, true);
+    dumpAudioRouteVector(mRoutes, dst, spaces);
 }
 
 sp <HwModule> HwModuleCollection::getModuleFromName(const char *name) const
@@ -462,10 +464,11 @@ void HwModuleCollection::cleanUpForDevice(const sp<DeviceDescriptor> &device)
 
 void HwModuleCollection::dump(String8 *dst) const
 {
-    dst->append("\nHW Modules dump:\n");
+    dst->appendFormat("\n Hardware modules (%zu):\n", size());
     for (size_t i = 0; i < size(); i++) {
-        dst->appendFormat("- HW Module %zu:\n", i + 1);
-        itemAt(i)->dump(dst);
+        const std::string prefix = base::StringPrintf("  %zu. ", i + 1);
+        dst->append(prefix.c_str());
+        itemAt(i)->dump(dst, prefix.size());
     }
 }
 

@@ -26,7 +26,6 @@
 #include <media/audiohal/hidl/HalDeathHandler.h>
 #include <utils/Log.h>
 
-#include "ConversionHelperHidl.h"
 #include "DeviceHalHidl.h"
 #include "DevicesFactoryHalHidl.h"
 
@@ -225,6 +224,12 @@ std::vector<sp<::android::hardware::audio::CPP_VERSION::IDevicesFactory>>
         DevicesFactoryHalHidl::copyDeviceFactories() {
     std::lock_guard<std::mutex> lock(mLock);
     return mDeviceFactories;
+}
+
+// Main entry-point to the shared library.
+extern "C" __attribute__((visibility("default"))) void* createIDevicesFactory() {
+    auto service = hardware::audio::CPP_VERSION::IDevicesFactory::getService();
+    return service ? new DevicesFactoryHalHidl(service) : nullptr;
 }
 
 } // namespace android

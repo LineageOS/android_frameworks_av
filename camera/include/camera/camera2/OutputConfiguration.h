@@ -38,16 +38,34 @@ public:
         SURFACE_TYPE_SURFACE_VIEW = 0,
         SURFACE_TYPE_SURFACE_TEXTURE = 1
     };
+    enum TimestampBaseType {
+        TIMESTAMP_BASE_DEFAULT = 0,
+        TIMESTAMP_BASE_SENSOR = 1,
+        TIMESTAMP_BASE_MONOTONIC = 2,
+        TIMESTAMP_BASE_REALTIME = 3,
+        TIMESTAMP_BASE_CHOREOGRAPHER_SYNCED = 4
+    };
+    enum MirrorModeType {
+        MIRROR_MODE_AUTO = 0,
+        MIRROR_MODE_NONE = 1,
+        MIRROR_MODE_H = 2,
+        MIRROR_MODE_V = 3,
+    };
+
     const std::vector<sp<IGraphicBufferProducer>>& getGraphicBufferProducers() const;
     int                        getRotation() const;
     int                        getSurfaceSetID() const;
     int                        getSurfaceType() const;
     int                        getWidth() const;
     int                        getHeight() const;
+    int64_t                    getDynamicRangeProfile() const;
     bool                       isDeferred() const;
     bool                       isShared() const;
     String16                   getPhysicalCameraId() const;
     bool                       isMultiResolution() const;
+    int64_t                    getStreamUseCase() const;
+    int                        getTimestampBase() const;
+    int                        getMirrorMode() const;
 
     // set of sensor pixel mode resolutions allowed {MAX_RESOLUTION, DEFAULT_MODE};
     const std::vector<int32_t>&            getSensorPixelModesUsed() const;
@@ -89,7 +107,11 @@ public:
                 gbpsEqual(other) &&
                 mPhysicalCameraId == other.mPhysicalCameraId &&
                 mIsMultiResolution == other.mIsMultiResolution &&
-                sensorPixelModesUsedEqual(other));
+                sensorPixelModesUsedEqual(other) &&
+                mDynamicRangeProfile == other.mDynamicRangeProfile &&
+                mStreamUseCase == other.mStreamUseCase &&
+                mTimestampBase == other.mTimestampBase &&
+                mMirrorMode == other.mMirrorMode);
     }
     bool operator != (const OutputConfiguration& other) const {
         return !(*this == other);
@@ -126,6 +148,18 @@ public:
         if (!sensorPixelModesUsedEqual(other)) {
             return sensorPixelModesUsedLessThan(other);
         }
+        if (mDynamicRangeProfile != other.mDynamicRangeProfile) {
+            return mDynamicRangeProfile < other.mDynamicRangeProfile;
+        }
+        if (mStreamUseCase != other.mStreamUseCase) {
+            return mStreamUseCase < other.mStreamUseCase;
+        }
+        if (mTimestampBase != other.mTimestampBase) {
+            return mTimestampBase < other.mTimestampBase;
+        }
+        if (mMirrorMode != other.mMirrorMode) {
+            return mMirrorMode < other.mMirrorMode;
+        }
         return gbpsLessThan(other);
     }
 
@@ -150,6 +184,10 @@ private:
     String16                   mPhysicalCameraId;
     bool                       mIsMultiResolution;
     std::vector<int32_t>       mSensorPixelModesUsed;
+    int64_t                    mDynamicRangeProfile;
+    int64_t                    mStreamUseCase;
+    int                        mTimestampBase;
+    int                        mMirrorMode;
 };
 } // namespace params
 } // namespace camera2

@@ -17,6 +17,8 @@
 #ifndef ANDROID_AAUDIO_AUDIO_ENDPOINT_H
 #define ANDROID_AAUDIO_AUDIO_ENDPOINT_H
 
+#include <mutex>
+
 #include <aaudio/AAudio.h>
 
 #include "binding/AAudioServiceMessage.h"
@@ -34,13 +36,16 @@ namespace aaudio {
 class AudioEndpoint {
 
 public:
-    AudioEndpoint();
+    AudioEndpoint() = default;
 
     /**
      * Configure based on the EndPointDescriptor_t.
      */
     aaudio_result_t configure(const EndpointDescriptor *pEndpointDescriptor,
                               aaudio_direction_t direction);
+
+    aaudio_result_t configureDataQueue(const RingBufferDescriptor &descriptor,
+                            aaudio_direction_t direction);
 
     /**
      * Read from a command passed up from the Server.
@@ -55,6 +60,10 @@ public:
     int32_t getFullFramesAvailable(android::WrappingBuffer *wrappingBuffer);
 
     int32_t getFullFramesAvailable();
+
+    android::fifo_frames_t read(void* buffer, android::fifo_frames_t numFrames);
+
+    android::fifo_frames_t write(void* buffer, android::fifo_frames_t numFrames);
 
     void advanceReadIndex(int32_t deltaFrames);
 
@@ -85,19 +94,31 @@ public:
 
     int32_t getBufferCapacityInFrames() const;
 
+    void setThreshold(int32_t frames) {
+        mDataQueue->setThreshold(frames);
+    }
+
+    int32_t getThreshold() {
+        return mDataQueue->getThreshold();
+    }
+
     /**
      * Write zeros to the data queue memory.
      */
     void eraseDataMemory();
+
+    void freeDataQueue();
 
     void dump() const;
 
 private:
     std::unique_ptr<android::FifoBufferIndirect> mUpCommandQueue;
     std::unique_ptr<android::FifoBufferIndirect> mDataQueue;
-    bool                    mFreeRunning;
-    android::fifo_counter_t mDataReadCounter; // only used if free-running
-    android::fifo_counter_t mDataWriteCounter; // only used if free-running
+    bool                    mFreeRunning{false};
+    android::fifo_counter_t mDataReadCounter{0}; // only used if free-running
+    android::fifo_counter_t mDataWriteCounter{0}; // only used if free-running
+
+    std::mutex mDataQueueLock;
 };
 
 } // namespace aaudio

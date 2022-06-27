@@ -25,8 +25,8 @@
 #include "LiveSession.h"
 #include "M3UParser.h"
 #include <ID3.h>
-#include <AnotherPacketSource.h>
-#include <HlsSampleDecryptor.h>
+#include <mpeg2ts/AnotherPacketSource.h>
+#include <mpeg2ts/HlsSampleDecryptor.h>
 
 #include <datasource/DataURISource.h>
 #include <media/stagefright/foundation/ABitReader.h>

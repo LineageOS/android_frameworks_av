@@ -28,6 +28,7 @@
 #include <datasource/PlayerServiceDataSourceFactory.h>
 #include <datasource/PlayerServiceFileSource.h>
 #include <media/IMediaHTTPService.h>
+#include <media/stagefright/MediaCodecConstants.h>
 #include <media/stagefright/foundation/ADebug.h>
 #include <media/stagefright/foundation/AMessage.h>
 #include <media/stagefright/MediaCodecList.h>
@@ -194,18 +195,8 @@ sp<IMemory> StagefrightMetadataRetriever::getImageInternal(
         return NULL;
     }
 
-    if (metaOnly) {
-        return FrameDecoder::getMetadataOnly(trackMeta, colorFormat, thumbnail);
-    }
-
-    sp<IMediaSource> source = mExtractor->getTrack(i);
-
-    if (source.get() == NULL) {
-        ALOGE("unable to instantiate image track.");
-        return NULL;
-    }
-
     const char *mime;
+    bool isHeif = false;
     if (!trackMeta->findCString(kKeyMIMEType, &mime)) {
         ALOGE("image track has no mime type");
         return NULL;
@@ -215,21 +206,54 @@ sp<IMemory> StagefrightMetadataRetriever::getImageInternal(
         mime = MEDIA_MIMETYPE_VIDEO_HEVC;
         trackMeta = new MetaData(*trackMeta);
         trackMeta->setCString(kKeyMIMEType, mime);
+        isHeif = true;
     } else if (!strcasecmp(mime, MEDIA_MIMETYPE_IMAGE_AVIF)) {
         mime = MEDIA_MIMETYPE_VIDEO_AV1;
         trackMeta = new MetaData(*trackMeta);
         trackMeta->setCString(kKeyMIMEType, mime);
     }
 
+    sp<AMessage> format = new AMessage;
+    status_t err = convertMetaDataToMessage(trackMeta, &format);
+    if (err != OK) {
+        ALOGE("getImageInternal: convertMetaDataToMessage() failed, unable to extract image");
+        return NULL;
+    }
+
+    uint32_t bitDepth = 8;
+    if (!strcasecmp(mime, MEDIA_MIMETYPE_VIDEO_HEVC)) {
+        int32_t profile;
+        if (format->findInt32("profile", &profile)) {
+            if (HEVCProfileMain10 == profile || HEVCProfileMain10HDR10 == profile ||
+                    HEVCProfileMain10HDR10Plus == profile) {
+                  bitDepth = 10;
+            }
+        }
+    } else if (!strcasecmp(mime, MEDIA_MIMETYPE_VIDEO_AV1)) {
+        int32_t profile;
+        if (format->findInt32("profile", &profile)) {
+            if (AV1ProfileMain10 == profile || AV1ProfileMain10HDR10 == profile ||
+                    AV1ProfileMain10HDR10Plus == profile) {
+                  bitDepth = 10;
+            }
+        }
+    }
+
+    if (metaOnly) {
+        return FrameDecoder::getMetadataOnly(trackMeta, colorFormat, thumbnail, bitDepth);
+    }
+
+    sp<IMediaSource> source = mExtractor->getTrack(i);
+
+    if (source.get() == NULL) {
+        ALOGE("unable to instantiate image track.");
+        return NULL;
+    }
+
     bool preferhw = property_get_bool(
             "media.stagefright.thumbnail.prefer_hw_codecs", false);
     uint32_t flags = preferhw ? 0 : MediaCodecList::kPreferSoftwareCodecs;
     Vector<AString> matchingCodecs;
-    sp<AMessage> format = new AMessage;
-    status_t err = convertMetaDataToMessage(trackMeta, &format);
-    if (err != OK) {
-        format = NULL;
-    }
 
     // If decoding thumbnail check decoder supports thumbnail dimensions instead
     int32_t thumbHeight, thumbWidth;
@@ -238,6 +262,16 @@ sp<IMemory> StagefrightMetadataRetriever::getImageInternal(
             && trackMeta->findInt32(kKeyThumbnailWidth, &thumbWidth)) {
         format->setInt32("height", thumbHeight);
         format->setInt32("width", thumbWidth);
+    }
+
+    // If decoding tiled HEIF check decoder supports tile dimensions instead
+    if (!thumbnail && isHeif && format != NULL) {
+        int32_t tileWidth, tileHeight;
+        if (trackMeta->findInt32(kKeyTileWidth, &tileWidth) && tileWidth > 0
+                && trackMeta->findInt32(kKeyTileHeight, &tileHeight) && tileHeight > 0) {
+            format->setInt32("height", tileHeight);
+            format->setInt32("width", tileWidth);
+        }
     }
 
     MediaCodecList::findMatchingCodecs(
@@ -367,7 +401,8 @@ sp<IMemory> StagefrightMetadataRetriever::getFrameInternal(
     sp<AMessage> format = new AMessage;
     status_t err = convertMetaDataToMessage(trackMeta, &format);
     if (err != OK) {
-        format = NULL;
+        ALOGE("getFrameInternal: convertMetaDataToMessage() failed, unable to extract frame");
+        return NULL;
     }
 
     Vector<AString> matchingCodecs;

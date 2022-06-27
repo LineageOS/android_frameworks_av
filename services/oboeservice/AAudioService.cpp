@@ -280,6 +280,22 @@ Status AAudioService::unregisterAudioThread(int32_t streamHandle, int32_t client
     AIDL_RETURN(serviceStream->unregisterAudioThread(clientThreadId));
 }
 
+Status AAudioService::exitStandby(int32_t streamHandle, Endpoint* endpoint, int32_t *_aidl_return) {
+    static_assert(std::is_same_v<aaudio_result_t, std::decay_t<typeof(*_aidl_return)>>);
+
+    sp<AAudioServiceStreamBase> serviceStream = convertHandleToServiceStream(streamHandle);
+    if (serviceStream.get() == nullptr) {
+        ALOGE("getStreamDescription(), illegal stream handle = 0x%0x", streamHandle);
+        AIDL_RETURN(AAUDIO_ERROR_INVALID_HANDLE);
+    }
+    AudioEndpointParcelable endpointParcelable;
+    aaudio_result_t result = serviceStream->exitStandby(&endpointParcelable);
+    if (result == AAUDIO_OK) {
+        *endpoint = std::move(endpointParcelable).parcelable();
+    }
+    AIDL_RETURN(result);
+}
+
 bool AAudioService::isCallerInService() {
     pid_t clientPid = VALUE_OR_FATAL(aidl2legacy_int32_t_pid_t(mAudioClient.attributionSource.pid));
     uid_t clientUid = VALUE_OR_FATAL(aidl2legacy_int32_t_uid_t(mAudioClient.attributionSource.uid));

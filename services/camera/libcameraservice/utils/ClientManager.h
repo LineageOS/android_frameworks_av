@@ -527,12 +527,7 @@ ClientManager<KEY, VALUE, LISTENER>::wouldEvictLocked(
         if (!returnIncompatibleClients) {
             // Find evicted clients
 
-            if (conflicting && curPriority < priority) {
-                // Pre-existing conflicting client with higher priority exists
-                evictList.clear();
-                evictList.push_back(client);
-                return evictList;
-            } else if (conflicting && owner == curOwner) {
+            if (conflicting && owner == curOwner) {
                 // Pre-existing conflicting client with the same client owner exists
                 // Open the same device twice -> most recent open wins
                 // Otherwise let the existing client wins to avoid behaviors difference
@@ -546,6 +541,11 @@ ClientManager<KEY, VALUE, LISTENER>::wouldEvictLocked(
                     evictList.push_back(client);
                     return evictList;
                 }
+            } else if (conflicting && curPriority < priority) {
+                // Pre-existing conflicting client with higher priority exists
+                evictList.clear();
+                evictList.push_back(client);
+                return evictList;
             } else if (conflicting || ((totalCost > mMaxCost && curCost > 0) &&
                     (curPriority >= priority) &&
                     !(highestPriorityOwner == owner && owner == curOwner))) {

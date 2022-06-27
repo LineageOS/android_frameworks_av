@@ -32,6 +32,7 @@ public:
     enum {
         TYPE_VIDEO_CODEC = 0,
         TYPE_AUDIO_CODEC = 1,
+        TYPE_IMAGE_CODEC = 2,
     };
 
     virtual void notifyResourceGranted(/*in*/ int32_t pid, /*in*/ const int32_t type) = 0;

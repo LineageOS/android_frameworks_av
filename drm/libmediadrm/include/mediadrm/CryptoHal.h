@@ -15,24 +15,11 @@
  */
 
 #ifndef CRYPTO_HAL_H_
-
 #define CRYPTO_HAL_H_
-
-#include <android/hardware/drm/1.0/ICryptoFactory.h>
-#include <android/hardware/drm/1.0/ICryptoPlugin.h>
-#include <android/hardware/drm/1.1/ICryptoFactory.h>
-#include <android/hardware/drm/1.2/ICryptoPlugin.h>
-#include <android/hardware/drm/1.4/ICryptoPlugin.h>
 
 #include <mediadrm/ICrypto.h>
 #include <utils/KeyedVector.h>
 #include <utils/threads.h>
-
-namespace drm = ::android::hardware::drm;
-using drm::V1_0::ICryptoFactory;
-using drm::V1_0::ICryptoPlugin;
-using drm::V1_0::SharedBuffer;
-using drm::V1_0::DestinationBuffer;
 
 using ::android::hardware::HidlMemory;
 
@@ -43,64 +30,27 @@ namespace android {
 struct CryptoHal : public ICrypto {
     CryptoHal();
     virtual ~CryptoHal();
-
     virtual status_t initCheck() const;
-
     virtual bool isCryptoSchemeSupported(const uint8_t uuid[16]);
-
     virtual status_t createPlugin(
             const uint8_t uuid[16], const void *data, size_t size);
-
     virtual status_t destroyPlugin();
-
     virtual bool requiresSecureDecoderComponent(
             const char *mime) const;
-
     virtual void notifyResolution(uint32_t width, uint32_t height);
-
     virtual status_t setMediaDrmSession(const Vector<uint8_t> &sessionId);
-
     virtual ssize_t decrypt(const uint8_t key[16], const uint8_t iv[16],
             CryptoPlugin::Mode mode, const CryptoPlugin::Pattern &pattern,
-            const ::SharedBuffer &source, size_t offset,
+            const drm::V1_0::SharedBuffer &source, size_t offset,
             const CryptoPlugin::SubSample *subSamples, size_t numSubSamples,
-            const ::DestinationBuffer &destination,
+            const drm::V1_0::DestinationBuffer &destination,
             AString *errorDetailMsg);
-
-    virtual int32_t setHeap(const sp<HidlMemory>& heap) {
-        return setHeapBase(heap);
-    }
-    virtual void unsetHeap(int32_t seqNum) { clearHeapBase(seqNum); }
-
+    virtual int32_t setHeap(const sp<HidlMemory>& heap);
+    virtual void unsetHeap(int32_t seqNum);
     virtual status_t getLogMessages(Vector<drm::V1_4::LogMessage> &logs) const;
-
 private:
-    mutable Mutex mLock;
-
-    const Vector<sp<ICryptoFactory>> mFactories;
-    sp<ICryptoPlugin> mPlugin;
-    sp<drm::V1_2::ICryptoPlugin> mPluginV1_2;
-
-    /**
-     * mInitCheck is:
-     *   NO_INIT if a plugin hasn't been created yet
-     *   ERROR_UNSUPPORTED if a plugin can't be created for the uuid
-     *   OK after a plugin has been created and mPlugin is valid
-     */
-    status_t mInitCheck;
-
-    KeyedVector<int32_t, size_t> mHeapSizes;
-    int32_t mHeapSeqNum;
-
-    Vector<sp<ICryptoFactory>> makeCryptoFactories();
-    sp<ICryptoPlugin> makeCryptoPlugin(const sp<ICryptoFactory>& factory,
-            const uint8_t uuid[16], const void *initData, size_t size);
-
-    int32_t setHeapBase(const sp<HidlMemory>& heap);
-    void clearHeapBase(int32_t seqNum);
-
-    status_t checkSharedBuffer(const ::SharedBuffer& buffer);
-
+    sp<ICrypto> mCryptoHalHidl;
+    sp<ICrypto> mCryptoHalAidl;
     DISALLOW_EVIL_CONSTRUCTORS(CryptoHal);
 };
 

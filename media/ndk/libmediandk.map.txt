@@ -203,6 +203,7 @@ LIBMEDIANDK {
     AMediaCodec_releaseOutputBuffer;
     AMediaCodec_releaseOutputBufferAtTime;
     AMediaCodec_setAsyncNotifyCallback; # introduced=28
+    AMediaCodec_setOnFrameRenderedCallback; # introduced=Tiramisu
     AMediaCodec_setOutputSurface; # introduced=24
     AMediaCodec_setParameters; # introduced=26
     AMediaCodec_setInputSurface; # introduced=26
@@ -229,6 +230,7 @@ LIBMEDIANDK {
     AMediaDrm_decrypt;
     AMediaDrm_encrypt;
     AMediaDrm_getKeyRequest;
+    AMediaDrm_getKeyRequestWithDefaultUrlAndType; # introduced=Tiramisu
     AMediaDrm_getPropertyByteArray;
     AMediaDrm_getPropertyString;
     AMediaDrm_getProvisionRequest;

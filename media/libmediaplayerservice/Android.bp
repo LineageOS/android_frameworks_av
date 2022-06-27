@@ -70,6 +70,9 @@ cc_library {
 
     header_libs: [
         "media_plugin_headers",
+        "libmediautils_headers",
+        "libstagefright_rtsp_headers",
+        "libstagefright_webm_headers",
     ],
 
     static_libs: [
@@ -85,12 +88,15 @@ cc_library {
         "framework-permission-aidl-cpp",
     ],
 
-    include_dirs: [
-        "frameworks/av/media/libstagefright/rtsp",
-        "frameworks/av/media/libstagefright/webm",
+    export_header_lib_headers: [
+        "libmediautils_headers",
     ],
 
     local_include_dirs: ["include"],
+
+    export_include_dirs: [
+        ".",
+    ],
 
     cflags: [
         "-Werror",

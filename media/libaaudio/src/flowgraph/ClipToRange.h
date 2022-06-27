@@ -21,22 +21,22 @@
 #include <unistd.h>
 #include <sys/types.h>
 
-#include "AudioProcessorBase.h"
+#include "FlowGraphNode.h"
 
-namespace flowgraph {
+namespace FLOWGRAPH_OUTER_NAMESPACE::flowgraph {
 
 // This is 3 dB, (10^(3/20)), to match the maximum headroom in AudioTrack for float data.
 // It is designed to allow occasional transient peaks.
 constexpr float kDefaultMaxHeadroom = 1.41253754f;
 constexpr float kDefaultMinHeadroom = -kDefaultMaxHeadroom;
 
-class ClipToRange : public AudioProcessorBase {
+class ClipToRange : public FlowGraphFilter {
 public:
     explicit ClipToRange(int32_t channelCount);
 
     virtual ~ClipToRange() = default;
 
-    int32_t onProcess(int64_t framePosition, int32_t numFrames) override;
+    int32_t onProcess(int32_t numFrames) override;
 
     void setMinimum(float min) {
         mMinimum = min;
@@ -54,14 +54,15 @@ public:
         return mMaximum;
     }
 
-    AudioFloatInputPort input;
-    AudioFloatOutputPort output;
+    const char *getName() override {
+        return "ClipToRange";
+    }
 
 private:
     float mMinimum = kDefaultMinHeadroom;
     float mMaximum = kDefaultMaxHeadroom;
 };
 
-} /* namespace flowgraph */
+} /* namespace FLOWGRAPH_OUTER_NAMESPACE::flowgraph */
 
 #endif //FLOWGRAPH_CLIP_TO_RANGE_H

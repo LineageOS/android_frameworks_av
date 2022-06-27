@@ -30,9 +30,10 @@
 using namespace aaudio;
 
 RingBufferParcelable::RingBufferParcelable(const RingBuffer& parcelable)
-        : mReadCounterParcelable(std::move(parcelable.readCounterParcelable)),
-          mWriteCounterParcelable(std::move(parcelable.writeCounterParcelable)),
-          mDataParcelable(std::move(parcelable.dataParcelable)),
+        : mReadCounterParcelable(parcelable.readCounterParcelable),
+          mWriteCounterParcelable(parcelable.writeCounterParcelable),
+          mDataParcelable(parcelable.dataParcelable),
+          mSharedMemoryIndex(parcelable.sharedMemoryIndex),
           mBytesPerFrame(parcelable.bytesPerFrame),
           mFramesPerBurst(parcelable.framesPerBurst),
           mCapacityInFrames(parcelable.capacityInFrames),
@@ -42,9 +43,10 @@ RingBufferParcelable::RingBufferParcelable(const RingBuffer& parcelable)
 
 RingBuffer RingBufferParcelable::parcelable() const {
     RingBuffer result;
-    result.readCounterParcelable = std::move(mReadCounterParcelable).parcelable();
-    result.writeCounterParcelable = std::move(mWriteCounterParcelable).parcelable();
-    result.dataParcelable = std::move(mDataParcelable).parcelable();
+    result.readCounterParcelable = mReadCounterParcelable.parcelable();
+    result.writeCounterParcelable = mWriteCounterParcelable.parcelable();
+    result.dataParcelable = mDataParcelable.parcelable();
+    result.sharedMemoryIndex = mSharedMemoryIndex;
     result.bytesPerFrame = mBytesPerFrame;
     result.framesPerBurst = mFramesPerBurst;
     result.capacityInFrames = mCapacityInFrames;
@@ -60,6 +62,7 @@ void RingBufferParcelable::setupMemory(int32_t sharedMemoryIndex,
                  int32_t readCounterOffset,
                  int32_t writeCounterOffset,
                  int32_t counterSizeBytes) {
+    mSharedMemoryIndex = sharedMemoryIndex;
     mReadCounterParcelable.setup(sharedMemoryIndex, readCounterOffset, counterSizeBytes);
     mWriteCounterParcelable.setup(sharedMemoryIndex, writeCounterOffset, counterSizeBytes);
     mDataParcelable.setup(sharedMemoryIndex, dataMemoryOffset, dataSizeInBytes);
@@ -68,12 +71,13 @@ void RingBufferParcelable::setupMemory(int32_t sharedMemoryIndex,
 void RingBufferParcelable::setupMemory(int32_t sharedMemoryIndex,
                  int32_t dataMemoryOffset,
                  int32_t dataSizeInBytes) {
+    mSharedMemoryIndex = sharedMemoryIndex;
     mReadCounterParcelable.setup(sharedMemoryIndex, 0, 0);
     mWriteCounterParcelable.setup(sharedMemoryIndex, 0, 0);
     mDataParcelable.setup(sharedMemoryIndex, dataMemoryOffset, dataSizeInBytes);
 }
 
-int32_t RingBufferParcelable::getBytesPerFrame() {
+int32_t RingBufferParcelable::getBytesPerFrame() const {
     return mBytesPerFrame;
 }
 
@@ -81,7 +85,7 @@ void RingBufferParcelable::setBytesPerFrame(int32_t bytesPerFrame) {
     mBytesPerFrame = bytesPerFrame;
 }
 
-int32_t RingBufferParcelable::getFramesPerBurst() {
+int32_t RingBufferParcelable::getFramesPerBurst() const {
     return mFramesPerBurst;
 }
 
@@ -89,7 +93,7 @@ void RingBufferParcelable::setFramesPerBurst(int32_t framesPerBurst) {
     mFramesPerBurst = framesPerBurst;
 }
 
-int32_t RingBufferParcelable::getCapacityInFrames() {
+int32_t RingBufferParcelable::getCapacityInFrames() const {
     return mCapacityInFrames;
 }
 
@@ -122,6 +126,14 @@ aaudio_result_t RingBufferParcelable::resolve(SharedMemoryParcelable *memoryParc
     descriptor->capacityInFrames = mCapacityInFrames;
     descriptor->flags = mFlags;
     return AAUDIO_OK;
+}
+
+void RingBufferParcelable::updateMemory(const RingBufferParcelable& parcelable) {
+    setupMemory(mSharedMemoryIndex, 0,
+                parcelable.getCapacityInFrames() * parcelable.getBytesPerFrame());
+    setBytesPerFrame(parcelable.getBytesPerFrame());
+    setFramesPerBurst(parcelable.getFramesPerBurst());
+    setCapacityInFrames(parcelable.getCapacityInFrames());
 }
 
 aaudio_result_t RingBufferParcelable::validate() const {

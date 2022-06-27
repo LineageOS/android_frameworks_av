@@ -128,6 +128,9 @@ const std::unordered_map<std::string, int64_t>& getAudioDeviceOutMap() {
         {"AUDIO_DEVICE_OUT_BLE_HEADSET",               1LL << 31},
         {"AUDIO_DEVICE_OUT_BLE_SPEAKER",               1LL << 32},
         {"AUDIO_DEVICE_OUT_HDMI_EARC",                 1LL << 33},
+        // S values above
+        {"AUDIO_DEVICE_OUT_BLE_BROADCAST",             1LL << 34},
+        // T values above
     };
     return map;
 }
@@ -145,6 +148,8 @@ const std::unordered_map<std::string, int32_t>& getAudioThreadTypeMap() {
         {"MMAP_PLAYBACK", 5},          // Thread class for MMAP playback stream
         {"MMAP_CAPTURE",  6},          // Thread class for MMAP capture stream
         // R values above.
+        {"SPATIALIZER",   7},          // Thread class for SpatializerThread
+        // S values above.
     };
     return map;
 }
@@ -188,6 +193,31 @@ const std::unordered_map<std::string, int32_t>& getAAudioSharingMode() {
         // UNKNOWN is 0
         {"AAUDIO_SHARING_MODE_EXCLUSIVE",    1 /* AAUDIO_SHARING_MODE_EXCLUSIVE + 1 */},
         {"AAUDIO_SHARING_MODE_SHARED",       2 /* AAUDIO_SHARING_MODE_SHARED + 1 */},
+    };
+    return map;
+}
+
+const std::unordered_map<std::string, int32_t>& getStatusMap() {
+    // DO NOT MODIFY VALUES(OK to add new ones).
+    static std::unordered_map<std::string, int32_t> map {
+        {"",
+            util::MEDIAMETRICS_AUDIO_TRACK_STATUS_REPORTED__STATUS__NO_ERROR},
+        {AMEDIAMETRICS_PROP_STATUS_VALUE_OK,
+            util::MEDIAMETRICS_AUDIO_TRACK_STATUS_REPORTED__STATUS__NO_ERROR},
+        {AMEDIAMETRICS_PROP_STATUS_VALUE_ARGUMENT,
+            util::MEDIAMETRICS_AUDIO_TRACK_STATUS_REPORTED__STATUS__ERROR_ARGUMENT},
+        {AMEDIAMETRICS_PROP_STATUS_VALUE_IO,
+            util::MEDIAMETRICS_AUDIO_TRACK_STATUS_REPORTED__STATUS__ERROR_IO},
+        {AMEDIAMETRICS_PROP_STATUS_VALUE_MEMORY,
+            util::MEDIAMETRICS_AUDIO_TRACK_STATUS_REPORTED__STATUS__ERROR_MEMORY},
+        {AMEDIAMETRICS_PROP_STATUS_VALUE_SECURITY,
+            util::MEDIAMETRICS_AUDIO_TRACK_STATUS_REPORTED__STATUS__ERROR_SECURITY},
+        {AMEDIAMETRICS_PROP_STATUS_VALUE_STATE,
+            util::MEDIAMETRICS_AUDIO_TRACK_STATUS_REPORTED__STATUS__ERROR_STATE},
+        {AMEDIAMETRICS_PROP_STATUS_VALUE_TIMEOUT,
+            util::MEDIAMETRICS_AUDIO_TRACK_STATUS_REPORTED__STATUS__ERROR_TIMEOUT},
+        {AMEDIAMETRICS_PROP_STATUS_VALUE_UNKNOWN,
+            util::MEDIAMETRICS_AUDIO_TRACK_STATUS_REPORTED__STATUS__ERROR_UNKNOWN},
     };
     return map;
 }
@@ -430,6 +460,17 @@ std::string lookup<CALLER_NAME>(const std::string &callerName)
         return "";
     }
     return callerName;
+}
+
+template <>
+int32_t lookup<STATUS>(const std::string &status)
+{
+    auto& map = getStatusMap();
+    auto it = map.find(status);
+    if (it == map.end()) {
+        return util::MEDIAMETRICS_AUDIO_TRACK_STATUS_REPORTED__STATUS__ERROR_UNKNOWN;
+    }
+    return it->second;
 }
 
 template <>

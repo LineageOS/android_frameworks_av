@@ -17,52 +17,55 @@
 #ifndef ANDROID_MEDIA_TUNERDEMUX_H
 #define ANDROID_MEDIA_TUNERDEMUX_H
 
+#include <aidl/android/hardware/tv/tuner/IDemux.h>
 #include <aidl/android/media/tv/tuner/BnTunerDemux.h>
-#include <android/hardware/tv/tuner/1.0/ITuner.h>
 
-using Status = ::ndk::ScopedAStatus;
-using ::aidl::android::media::tv::tuner::BnTunerDemux;
-using ::aidl::android::media::tv::tuner::ITunerDvr;
-using ::aidl::android::media::tv::tuner::ITunerDvrCallback;
-using ::aidl::android::media::tv::tuner::ITunerFilter;
-using ::aidl::android::media::tv::tuner::ITunerFilterCallback;
-using ::aidl::android::media::tv::tuner::ITunerFrontend;
-using ::aidl::android::media::tv::tuner::ITunerTimeFilter;
-using ::android::hardware::tv::tuner::V1_0::IDemux;
-using ::android::hardware::tv::tuner::V1_0::IDvr;
-using ::android::hardware::tv::tuner::V1_0::IDvrCallback;
-using ::android::hardware::tv::tuner::V1_0::ITimeFilter;
+using ::aidl::android::hardware::tv::tuner::DemuxFilterType;
+using ::aidl::android::hardware::tv::tuner::DvrType;
+using ::aidl::android::hardware::tv::tuner::IDemux;
 
 using namespace std;
 
+namespace aidl {
 namespace android {
+namespace media {
+namespace tv {
+namespace tuner {
 
 class TunerDemux : public BnTunerDemux {
 
 public:
-    TunerDemux(sp<IDemux> demux, int demuxId);
+    TunerDemux(shared_ptr<IDemux> demux, int demuxId);
     virtual ~TunerDemux();
-    Status setFrontendDataSource(const shared_ptr<ITunerFrontend>& frontend) override;
-    Status openFilter(
-        int mainType, int subtype, int bufferSize, const shared_ptr<ITunerFilterCallback>& cb,
-        shared_ptr<ITunerFilter>* _aidl_return) override;
-    Status openTimeFilter(shared_ptr<ITunerTimeFilter>* _aidl_return) override;
-    Status getAvSyncHwId(const shared_ptr<ITunerFilter>& tunerFilter, int* _aidl_return) override;
-    Status getAvSyncTime(int avSyncHwId, int64_t* _aidl_return) override;
-    Status openDvr(
-        int dvbType, int bufferSize, const shared_ptr<ITunerDvrCallback>& cb,
-        shared_ptr<ITunerDvr>* _aidl_return) override;
-    Status connectCiCam(int ciCamId) override;
-    Status disconnectCiCam() override;
-    Status close() override;
+
+    ::ndk::ScopedAStatus setFrontendDataSource(
+            const shared_ptr<ITunerFrontend>& in_frontend) override;
+    ::ndk::ScopedAStatus setFrontendDataSourceById(int frontendId) override;
+    ::ndk::ScopedAStatus openFilter(const DemuxFilterType& in_type, int32_t in_bufferSize,
+                                    const shared_ptr<ITunerFilterCallback>& in_cb,
+                                    shared_ptr<ITunerFilter>* _aidl_return) override;
+    ::ndk::ScopedAStatus openTimeFilter(shared_ptr<ITunerTimeFilter>* _aidl_return) override;
+    ::ndk::ScopedAStatus getAvSyncHwId(const shared_ptr<ITunerFilter>& in_tunerFilter,
+                                       int32_t* _aidl_return) override;
+    ::ndk::ScopedAStatus getAvSyncTime(int32_t in_avSyncHwId, int64_t* _aidl_return) override;
+    ::ndk::ScopedAStatus openDvr(DvrType in_dvbType, int32_t in_bufferSize,
+                                 const shared_ptr<ITunerDvrCallback>& in_cb,
+                                 shared_ptr<ITunerDvr>* _aidl_return) override;
+    ::ndk::ScopedAStatus connectCiCam(int32_t in_ciCamId) override;
+    ::ndk::ScopedAStatus disconnectCiCam() override;
+    ::ndk::ScopedAStatus close() override;
 
     int getId() { return mDemuxId; }
 
 private:
-    sp<IDemux> mDemux;
+    shared_ptr<IDemux> mDemux;
     int mDemuxId;
 };
 
-} // namespace android
+}  // namespace tuner
+}  // namespace tv
+}  // namespace media
+}  // namespace android
+}  // namespace aidl
 
 #endif // ANDROID_MEDIA_TUNERDEMUX_H

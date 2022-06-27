@@ -21,12 +21,14 @@ cc_binary {
 
     header_libs: [
         "libaudiohal_headers",
+        "libmedia_headers",
         "libmediametrics_headers",
     ],
 
     shared_libs: [
         "packagemanager_aidl-cpp",
         "libaaudioservice",
+        "libaudioclient",
         "libaudioflinger",
         "libaudiopolicyservice",
         "libaudioprocessing",
@@ -50,7 +52,6 @@ cc_binary {
         "frameworks/av/media/libaaudio/include",
         "frameworks/av/media/libaaudio/src",
         "frameworks/av/media/libaaudio/src/binding",
-        "frameworks/av/media/libmedia/include",
         "frameworks/av/services/audioflinger",
         "frameworks/av/services/audiopolicy",
         "frameworks/av/services/audiopolicy/common/include",

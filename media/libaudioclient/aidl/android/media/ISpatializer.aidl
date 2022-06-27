@@ -57,8 +57,10 @@ interface ISpatializer {
     boolean isHeadTrackingSupported();
 
     /** Reports the list of supported head tracking modes (see SpatializerHeadTrackingMode.aidl).
-     * The list can be empty if the spatializer implementation does not support head tracking or if
-     * no head tracking sensor is registered (see setHeadSensor() and setScreenSensor()).
+     * The list always contains SpatializerHeadTrackingMode.DISABLED and can include other modes
+     * if the spatializer effect implementation supports head tracking.
+     * The result does not depend on currently connected sensors but reflects the capabilities
+     * when sensors are available.
      */
     SpatializerHeadTrackingMode[] getSupportedHeadTrackingModes();
 

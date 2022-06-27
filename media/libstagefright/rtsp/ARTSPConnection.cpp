@@ -18,8 +18,8 @@
 #define LOG_TAG "ARTSPConnection"
 #include <utils/Log.h>
 
-#include "ARTSPConnection.h"
-#include "NetworkUtils.h"
+#include <media/stagefright/rtsp/ARTSPConnection.h>
+#include <media/stagefright/rtsp/NetworkUtils.h>
 
 #include <datasource/HTTPBase.h>
 #include <media/stagefright/foundation/ABuffer.h>

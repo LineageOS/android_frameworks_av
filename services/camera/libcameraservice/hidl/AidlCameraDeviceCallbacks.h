@@ -61,7 +61,7 @@ struct H2BCameraDeviceCallbacks :
 
     ~H2BCameraDeviceCallbacks();
 
-    bool initializeLooper();
+    bool initializeLooper(int vndkVersion);
 
     virtual binder::Status onDeviceError(int32_t errorCode,
                                          const CaptureResultExtras& resultExtras) override;
@@ -103,10 +103,12 @@ struct H2BCameraDeviceCallbacks :
     struct CallbackHandler : public AHandler {
         public:
             void onMessageReceived(const sp<AMessage> &msg) override;
-            CallbackHandler(H2BCameraDeviceCallbacks *converter) : mConverter(converter) { }
+            CallbackHandler(H2BCameraDeviceCallbacks *converter, int vndkVersion) :
+                    mConverter(converter), mVndkVersion(vndkVersion) { }
         private:
             void processResultMessage(sp<ResultWrapper> &resultWrapper);
             wp<H2BCameraDeviceCallbacks> mConverter = nullptr;
+            int mVndkVersion = -1;
             Mutex mMetadataQueueLock;
     };
 

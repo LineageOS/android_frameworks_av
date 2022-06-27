@@ -123,20 +123,19 @@ status_t MediaDrmMetrics::GetSerializedMetrics(std::string *serializedMetrics) {
         });
 
     mKeyStatusChangeCounter.ExportValues(
-        [&](const KeyStatusType key_status_type, const int64_t value) {
+        [&](const uint32_t key_status_type, const int64_t value) {
             DrmFrameworkMetrics::Counter *counter =
                 metrics.add_key_status_change_counter();
             counter->set_count(value);
-            counter->mutable_attributes()->set_key_status_type(
-                (uint32_t)key_status_type);
+            counter->mutable_attributes()->set_key_status_type(key_status_type);
         });
 
     mEventCounter.ExportValues(
-        [&](const EventType event_type, const int64_t value) {
+        [&](const uint32_t event_type, const int64_t value) {
             DrmFrameworkMetrics::Counter *counter =
                 metrics.add_event_callback_counter();
             counter->set_count(value);
-            counter->mutable_attributes()->set_event_type((uint32_t)event_type);
+            counter->mutable_attributes()->set_event_type(event_type);
         });
 
     mGetDeviceUniqueIdCounter.ExportValues(

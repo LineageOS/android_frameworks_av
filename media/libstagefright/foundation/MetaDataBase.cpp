@@ -521,9 +521,64 @@ status_t MetaDataBase::updateFromParcel(const Parcel &parcel) {
                 }
                 setData(key, type, blob.data(), size);
                 blob.release();
+            } else if (type == TYPE_C_STRING) {
+                // copy data directly from Parcel storage, then advance position
+                // NB: readInplace() bumps position, it is NOT idempotent.
+                const void *src = parcel.readInplace(size);
+                char *str = (char *) src;
+                if (src == nullptr || size == 0 || str[size-1] != '\0') {
+                    char ccKey[5];
+                    MakeFourCCString(key, ccKey);
+                    if (src == nullptr) {
+                        ALOGW("ignoring key '%s' string with no data (expected %d)", ccKey, size);
+                    } else {
+                        ALOGW("ignoring key '%s': unterminated string of %d bytes", ccKey, size);
+                    }
+                } else {
+                    setData(key, type, src, size);
+                }
             } else {
                 // copy data directly from Parcel storage, then advance position
-                setData(key, type, parcel.readInplace(size), size);
+                // verify that the received size is enough
+                uint32_t needed = 0;
+                switch (type) {
+                    case TYPE_INT32:
+                        needed = sizeof(int32_t);
+                        break;
+                    case TYPE_INT64:
+                        needed = sizeof(int64_t);
+                        break;
+                    case TYPE_FLOAT:
+                        needed = sizeof(float);
+                        break;
+                    case TYPE_POINTER:
+                        // NB: this rejects passing between 32-bit and 64-bit space.
+                        needed = sizeof(void*);
+                        break;
+                    case TYPE_RECT:
+                        needed = sizeof(Rect);
+                        break;
+                    default:
+                        // non-standard entities can be any size >= 0
+                        needed = 0;
+                        break;
+                }
+                const void *src = parcel.readInplace(size);
+                if (src == nullptr || (needed != 0 && size != needed)) {
+                    char ccKey[5];
+                    MakeFourCCString(key, ccKey);
+                    char ccType[5];
+                    MakeFourCCString(type, ccType);
+                    if (src == nullptr) {
+                        ALOGW("ignoring key '%s' type '%s' missing data (expected %d)",
+                              ccKey, ccType, size);
+                    } else {
+                        ALOGW("ignoring key '%s': type '%s' bytes: expected %d != %d received",
+                               ccKey, ccType, needed, size);
+                    }
+                } else {
+                    setData(key, type, src, size);
+                }
             }
          }
 

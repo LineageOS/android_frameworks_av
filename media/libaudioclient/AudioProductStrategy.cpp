@@ -21,9 +21,6 @@
 #include <media/AudioAttributes.h>
 #include <media/PolicyAidlConversion.h>
 
-#define RETURN_STATUS_IF_ERROR(x) \
-    { auto _tmp = (x); if (_tmp != OK) return _tmp; }
-
 namespace android {
 
 status_t AudioProductStrategy::readFromParcel(const Parcel* parcel) {

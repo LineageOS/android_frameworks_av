@@ -18,6 +18,7 @@
 #define LOG_TAG "SpatializerPoseController"
 //#define LOG_NDEBUG 0
 #include <sensor/Sensor.h>
+#include <media/MediaMetricsItem.h>
 #include <utils/Log.h>
 #include <utils/SystemClock.h>
 
@@ -35,34 +36,38 @@ using namespace std::chrono_literals;
 namespace {
 
 // This is how fast, in m/s, we allow position to shift during rate-limiting.
-constexpr auto kMaxTranslationalVelocity = 2;
+constexpr float kMaxTranslationalVelocity = 2;
 
 // This is how fast, in rad/s, we allow rotation angle to shift during rate-limiting.
-constexpr auto kMaxRotationalVelocity = 4 * M_PI;
-
-// This should be set to the typical time scale that the translation sensors used drift in. This
-// means, loosely, for how long we can trust the reading to be "accurate enough". This would
-// determine the time constants used for high-pass filtering those readings. If the value is set
-// too high, we may experience drift. If it is set too low, we may experience poses tending toward
-// identity too fast.
-constexpr auto kTranslationalDriftTimeConstant = 20s;
-
-// This should be set to the typical time scale that the rotation sensors used drift in. This
-// means, loosely, for how long we can trust the reading to be "accurate enough". This would
-// determine the time constants used for high-pass filtering those readings. If the value is set
-// too high, we may experience drift. If it is set too low, we may experience poses tending toward
-// identity too fast.
-constexpr auto kRotationalDriftTimeConstant = 20s;
+constexpr float kMaxRotationalVelocity = 8;
 
 // This is how far into the future we predict the head pose, using linear extrapolation based on
 // twist (velocity). It should be set to a value that matches the characteristic durations of moving
 // one's head. The higher we set this, the more latency we are able to reduce, but setting this too
 // high will result in high prediction errors whenever the head accelerates (changes velocity).
-constexpr auto kPredictionDuration = 10ms;
+constexpr auto kPredictionDuration = 50ms;
 
-// After losing this many consecutive samples from either sensor, we would treat the measurement as
-// stale;
-constexpr auto kMaxLostSamples = 4;
+// After not getting a pose sample for this long, we would treat the measurement as stale.
+constexpr auto kFreshnessTimeout = 50ms;
+
+// Auto-recenter kicks in after the head has been still for this long.
+constexpr auto kAutoRecenterWindowDuration = 6s;
+
+// Auto-recenter considers head not still if translated by this much (in meters, approx).
+constexpr float kAutoRecenterTranslationThreshold = 0.1f;
+
+// Auto-recenter considers head not still if rotated by this much (in radians, approx).
+constexpr float kAutoRecenterRotationThreshold = 10.5f / 180 * M_PI;
+
+// Screen is considered to be unstable (not still) if it has moved significantly within the last
+// time window of this duration.
+constexpr auto kScreenStillnessWindowDuration = 3s;
+
+// Screen is considered to have moved significantly if translated by this much (in meter, approx).
+constexpr float kScreenStillnessTranslationThreshold = 0.1f;
+
+// Screen is considered to have moved significantly if rotated by this much (in radians, approx).
+constexpr float kScreenStillnessRotationThreshold = 7.0f / 180 * M_PI;
 
 // Time units for system clock ticks. This is what the Sensor Framework timestamps represent and
 // what we use for pose filtering.
@@ -71,20 +76,28 @@ using Ticks = std::chrono::nanoseconds;
 // How many ticks in a second.
 constexpr auto kTicksPerSecond = Ticks::period::den;
 
+std::string getSensorMetricsId(int32_t sensorId) {
+    return std::string(AMEDIAMETRICS_KEY_PREFIX_AUDIO_SENSOR).append(std::to_string(sensorId));
+}
+
 }  // namespace
 
 SpatializerPoseController::SpatializerPoseController(Listener* listener,
-                                                     std::chrono::microseconds sensorPeriod,
-                                                     std::chrono::microseconds maxUpdatePeriod)
+                                        std::chrono::microseconds sensorPeriod,
+                                        std::optional<std::chrono::microseconds> maxUpdatePeriod)
     : mListener(listener),
       mSensorPeriod(sensorPeriod),
       mProcessor(createHeadTrackingProcessor(HeadTrackingProcessor::Options{
               .maxTranslationalVelocity = kMaxTranslationalVelocity / kTicksPerSecond,
               .maxRotationalVelocity = kMaxRotationalVelocity / kTicksPerSecond,
-              .translationalDriftTimeConstant = Ticks(kTranslationalDriftTimeConstant).count(),
-              .rotationalDriftTimeConstant = Ticks(kRotationalDriftTimeConstant).count(),
-              .freshnessTimeout = Ticks(sensorPeriod * kMaxLostSamples).count(),
+              .freshnessTimeout = Ticks(kFreshnessTimeout).count(),
               .predictionDuration = Ticks(kPredictionDuration).count(),
+              .autoRecenterWindowDuration = Ticks(kAutoRecenterWindowDuration).count(),
+              .autoRecenterTranslationalThreshold = kAutoRecenterTranslationThreshold,
+              .autoRecenterRotationalThreshold = kAutoRecenterRotationThreshold,
+              .screenStillnessWindowDuration = Ticks(kScreenStillnessWindowDuration).count(),
+              .screenStillnessTranslationalThreshold = kScreenStillnessTranslationThreshold,
+              .screenStillnessRotationalThreshold = kScreenStillnessRotationThreshold,
       })),
       mPoseProvider(SensorPoseProvider::create("headtracker", this)),
       mThread([this, maxUpdatePeriod] {
@@ -93,8 +106,12 @@ SpatializerPoseController::SpatializerPoseController(Listener* listener,
               std::optional<HeadTrackingMode> modeIfChanged;
               {
                   std::unique_lock lock(mMutex);
-                  mCondVar.wait_for(lock, maxUpdatePeriod,
-                                    [this] { return mShouldExit || mShouldCalculate; });
+                  if (maxUpdatePeriod.has_value()) {
+                      mCondVar.wait_for(lock, maxUpdatePeriod.value(),
+                                        [this] { return mShouldExit || mShouldCalculate; });
+                  } else {
+                      mCondVar.wait(lock, [this] { return mShouldExit || mShouldCalculate; });
+                  }
                   if (mShouldExit) {
                       ALOGV("Exiting thread");
                       return;
@@ -132,9 +149,16 @@ SpatializerPoseController::~SpatializerPoseController() {
 
 void SpatializerPoseController::setHeadSensor(int32_t sensor) {
     std::lock_guard lock(mMutex);
+    if (sensor == mHeadSensor) return;
+    ALOGV("%s: new sensor:%d  mHeadSensor:%d  mScreenSensor:%d",
+            __func__, sensor, mHeadSensor, mScreenSensor);
+
     // Stop current sensor, if valid and different from the other sensor.
     if (mHeadSensor != INVALID_SENSOR && mHeadSensor != mScreenSensor) {
         mPoseProvider->stopSensor(mHeadSensor);
+        mediametrics::LogItem(getSensorMetricsId(mHeadSensor))
+            .set(AMEDIAMETRICS_PROP_EVENT, AMEDIAMETRICS_PROP_EVENT_VALUE_STOP)
+            .record();
     }
 
     if (sensor != INVALID_SENSOR) {
@@ -142,6 +166,15 @@ void SpatializerPoseController::setHeadSensor(int32_t sensor) {
             // Start new sensor.
             mHeadSensor =
                     mPoseProvider->startSensor(sensor, mSensorPeriod) ? sensor : INVALID_SENSOR;
+            if (mHeadSensor != INVALID_SENSOR) {
+                auto sensor = mPoseProvider->getSensorByHandle(mHeadSensor);
+                std::string stringType = sensor ? sensor->getStringType().c_str() : "";
+                mediametrics::LogItem(getSensorMetricsId(mHeadSensor))
+                    .set(AMEDIAMETRICS_PROP_EVENT, AMEDIAMETRICS_PROP_EVENT_VALUE_START)
+                    .set(AMEDIAMETRICS_PROP_MODE, AMEDIAMETRICS_PROP_MODE_VALUE_HEAD)
+                    .set(AMEDIAMETRICS_PROP_TYPE, stringType)
+                    .record();
+            }
         } else {
             // Sensor is already enabled.
             mHeadSensor = mScreenSensor;
@@ -150,14 +183,21 @@ void SpatializerPoseController::setHeadSensor(int32_t sensor) {
         mHeadSensor = INVALID_SENSOR;
     }
 
-    mProcessor->recenter(true, false);
+    mProcessor->recenter(true /* recenterHead */, false /* recenterScreen */);
 }
 
 void SpatializerPoseController::setScreenSensor(int32_t sensor) {
     std::lock_guard lock(mMutex);
+    if (sensor == mScreenSensor) return;
+    ALOGV("%s: new sensor:%d  mHeadSensor:%d  mScreenSensor:%d",
+            __func__, sensor, mHeadSensor, mScreenSensor);
+
     // Stop current sensor, if valid and different from the other sensor.
     if (mScreenSensor != INVALID_SENSOR && mScreenSensor != mHeadSensor) {
         mPoseProvider->stopSensor(mScreenSensor);
+        mediametrics::LogItem(getSensorMetricsId(mScreenSensor))
+            .set(AMEDIAMETRICS_PROP_EVENT, AMEDIAMETRICS_PROP_EVENT_VALUE_STOP)
+            .record();
     }
 
     if (sensor != INVALID_SENSOR) {
@@ -165,6 +205,13 @@ void SpatializerPoseController::setScreenSensor(int32_t sensor) {
             // Start new sensor.
             mScreenSensor =
                     mPoseProvider->startSensor(sensor, mSensorPeriod) ? sensor : INVALID_SENSOR;
+            auto sensor = mPoseProvider->getSensorByHandle(mScreenSensor);
+            std::string stringType = sensor ? sensor->getStringType().c_str() : "";
+            mediametrics::LogItem(getSensorMetricsId(mScreenSensor))
+                .set(AMEDIAMETRICS_PROP_EVENT, AMEDIAMETRICS_PROP_EVENT_VALUE_START)
+                .set(AMEDIAMETRICS_PROP_MODE, AMEDIAMETRICS_PROP_MODE_VALUE_SCREEN)
+                .set(AMEDIAMETRICS_PROP_TYPE, stringType)
+                .record();
         } else {
             // Sensor is already enabled.
             mScreenSensor = mHeadSensor;
@@ -173,7 +220,7 @@ void SpatializerPoseController::setScreenSensor(int32_t sensor) {
         mScreenSensor = INVALID_SENSOR;
     }
 
-    mProcessor->recenter(false, true);
+    mProcessor->recenter(false /* recenterHead */, true /* recenterScreen */);
 }
 
 void SpatializerPoseController::setDesiredMode(HeadTrackingMode mode) {
@@ -227,7 +274,8 @@ void SpatializerPoseController::onPose(int64_t timestamp, int32_t sensor, const 
                                        const std::optional<Twist3f>& twist, bool isNewReference) {
     std::lock_guard lock(mMutex);
     if (sensor == mHeadSensor) {
-        mProcessor->setWorldToHeadPose(timestamp, pose, twist.value_or(Twist3f()));
+        mProcessor->setWorldToHeadPose(timestamp, pose,
+                                       twist.value_or(Twist3f()) / kTicksPerSecond);
         if (isNewReference) {
             mProcessor->recenter(true, false);
         }

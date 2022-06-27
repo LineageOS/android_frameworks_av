@@ -432,6 +432,10 @@ status_t CCodecBufferChannel::attachEncryptedBuffer(
     for (size_t i = 0; i < numSubSamples; ++i) {
         size += subSamples[i].mNumBytesOfClearData + subSamples[i].mNumBytesOfEncryptedData;
     }
+    if (size == 0) {
+        buffer->setRange(0, 0);
+        return OK;
+    }
     std::shared_ptr<C2BlockPool> pool = mBlockPools.lock()->inputPool;
     std::shared_ptr<C2LinearBlock> block;
     c2_status_t err = pool->fetchLinearBlock(
@@ -439,6 +443,8 @@ status_t CCodecBufferChannel::attachEncryptedBuffer(
             secure ? kSecureUsage : kDefaultReadWriteUsage,
             &block);
     if (err != C2_OK) {
+        ALOGI("[%s] attachEncryptedBuffer: fetchLinearBlock failed: size = %zu (%s) err = %d",
+              mName, size, secure ? "secure" : "non-secure", err);
         return NO_MEMORY;
     }
     if (!secure) {
@@ -463,17 +469,8 @@ status_t CCodecBufferChannel::attachEncryptedBuffer(
                 key, iv, mode, pattern, src, 0, subSamples, numSubSamples,
                 dst, &errorDetailMsg);
         if (result < 0) {
+            ALOGI("[%s] attachEncryptedBuffer: decrypt failed: result = %zd", mName, result);
             return result;
-        }
-        if (dst.type == DrmBufferType::SHARED_MEMORY) {
-            C2WriteView view = block->map().get();
-            if (view.error() != C2_OK) {
-                return false;
-            }
-            if (view.size() < result) {
-                return false;
-            }
-            memcpy(view.data(), mDecryptDestination->unsecurePointer(), result);
         }
     } else {
         // Here we cast CryptoPlugin::SubSample to hardware::cas::native::V1_0::SubSample
@@ -523,16 +520,22 @@ status_t CCodecBufferChannel::attachEncryptedBuffer(
         }
 
         if (result < codecDataOffset) {
-            ALOGD("invalid codec data offset: %zd, result %zd", codecDataOffset, result);
+            ALOGD("[%s] invalid codec data offset: %zd, result %zd",
+                  mName, codecDataOffset, result);
             return BAD_VALUE;
         }
     }
     if (!secure) {
         C2WriteView view = block->map().get();
         if (view.error() != C2_OK) {
+            ALOGI("[%s] attachEncryptedBuffer: block map error: %d (non-secure)",
+                  mName, view.error());
             return UNKNOWN_ERROR;
         }
         if (view.size() < result) {
+            ALOGI("[%s] attachEncryptedBuffer: block size too small: size=%u result=%zd "
+                  "(non-secure)",
+                  mName, view.size(), result);
             return UNKNOWN_ERROR;
         }
         memcpy(view.data(), mDecryptDestination->unsecurePointer(), result);
@@ -540,6 +543,7 @@ status_t CCodecBufferChannel::attachEncryptedBuffer(
     std::shared_ptr<C2Buffer> c2Buffer{C2Buffer::CreateLinearBuffer(
             block->share(codecDataOffset, result - codecDataOffset, C2Fence{}))};
     if (!buffer->copy(c2Buffer)) {
+        ALOGI("[%s] attachEncryptedBuffer: buffer copy failed", mName);
         return -ENOSYS;
     }
     return OK;
@@ -1012,6 +1016,10 @@ void CCodecBufferChannel::getInputBufferArray(Vector<sp<MediaCodecBuffer>> *arra
     array->clear();
     Mutexed<Input>::Locked input(mInput);
 
+    if (!input->buffers) {
+        ALOGE("getInputBufferArray: No Input Buffers allocated");
+        return;
+    }
     if (!input->buffers->isArrayMode()) {
         input->buffers = input->buffers->toArrayMode(input->numSlots);
     }
@@ -1022,7 +1030,10 @@ void CCodecBufferChannel::getInputBufferArray(Vector<sp<MediaCodecBuffer>> *arra
 void CCodecBufferChannel::getOutputBufferArray(Vector<sp<MediaCodecBuffer>> *array) {
     array->clear();
     Mutexed<Output>::Locked output(mOutput);
-
+    if (!output->buffers) {
+        ALOGE("getOutputBufferArray: No Output Buffers allocated");
+        return;
+    }
     if (!output->buffers->isArrayMode()) {
         output->buffers = output->buffers->toArrayMode(output->numSlots);
     }
@@ -1470,54 +1481,47 @@ status_t CCodecBufferChannel::start(
     return OK;
 }
 
-status_t CCodecBufferChannel::requestInitialInputBuffers() {
+status_t CCodecBufferChannel::prepareInitialInputBuffers(
+        std::map<size_t, sp<MediaCodecBuffer>> *clientInputBuffers) {
     if (mInputSurface) {
         return OK;
     }
 
+    size_t numInputSlots = mInput.lock()->numSlots;
+
+    {
+        Mutexed<Input>::Locked input(mInput);
+        while (clientInputBuffers->size() < numInputSlots) {
+            size_t index;
+            sp<MediaCodecBuffer> buffer;
+            if (!input->buffers->requestNewBuffer(&index, &buffer)) {
+                break;
+            }
+            clientInputBuffers->emplace(index, buffer);
+        }
+    }
+    if (clientInputBuffers->empty()) {
+        ALOGW("[%s] start: cannot allocate memory at all", mName);
+        return NO_MEMORY;
+    } else if (clientInputBuffers->size() < numInputSlots) {
+        ALOGD("[%s] start: cannot allocate memory for all slots, "
+              "only %zu buffers allocated",
+              mName, clientInputBuffers->size());
+    } else {
+        ALOGV("[%s] %zu initial input buffers available",
+              mName, clientInputBuffers->size());
+    }
+    return OK;
+}
+
+status_t CCodecBufferChannel::requestInitialInputBuffers(
+        std::map<size_t, sp<MediaCodecBuffer>> &&clientInputBuffers) {
     C2StreamBufferTypeSetting::output oStreamFormat(0u);
     C2PrependHeaderModeSetting prepend(PREPEND_HEADER_TO_NONE);
     c2_status_t err = mComponent->query({ &oStreamFormat, &prepend }, {}, C2_DONT_BLOCK, nullptr);
     if (err != C2_OK && err != C2_BAD_INDEX) {
         return UNKNOWN_ERROR;
     }
-    size_t numInputSlots = mInput.lock()->numSlots;
-
-    struct ClientInputBuffer {
-        size_t index;
-        sp<MediaCodecBuffer> buffer;
-        size_t capacity;
-    };
-    std::list<ClientInputBuffer> clientInputBuffers;
-
-    {
-        Mutexed<Input>::Locked input(mInput);
-        while (clientInputBuffers.size() < numInputSlots) {
-            ClientInputBuffer clientInputBuffer;
-            if (!input->buffers->requestNewBuffer(&clientInputBuffer.index,
-                                                  &clientInputBuffer.buffer)) {
-                break;
-            }
-            clientInputBuffer.capacity = clientInputBuffer.buffer->capacity();
-            clientInputBuffers.emplace_back(std::move(clientInputBuffer));
-        }
-    }
-    if (clientInputBuffers.empty()) {
-        ALOGW("[%s] start: cannot allocate memory at all", mName);
-        return NO_MEMORY;
-    } else if (clientInputBuffers.size() < numInputSlots) {
-        ALOGD("[%s] start: cannot allocate memory for all slots, "
-              "only %zu buffers allocated",
-              mName, clientInputBuffers.size());
-    } else {
-        ALOGV("[%s] %zu initial input buffers available",
-              mName, clientInputBuffers.size());
-    }
-    // Sort input buffers by their capacities in increasing order.
-    clientInputBuffers.sort(
-            [](const ClientInputBuffer& a, const ClientInputBuffer& b) {
-                return a.capacity < b.capacity;
-            });
 
     std::list<std::unique_ptr<C2Work>> flushedConfigs;
     mFlushedConfigs.lock()->swap(flushedConfigs);
@@ -1539,25 +1543,31 @@ status_t CCodecBufferChannel::requestInitialInputBuffers() {
         }
     }
     if (oStreamFormat.value == C2BufferData::LINEAR &&
-            (!prepend || prepend.value == PREPEND_HEADER_TO_NONE)) {
-        sp<MediaCodecBuffer> buffer = clientInputBuffers.front().buffer;
+            (!prepend || prepend.value == PREPEND_HEADER_TO_NONE) &&
+            !clientInputBuffers.empty()) {
+        size_t minIndex = clientInputBuffers.begin()->first;
+        sp<MediaCodecBuffer> minBuffer = clientInputBuffers.begin()->second;
+        for (const auto &[index, buffer] : clientInputBuffers) {
+            if (minBuffer->capacity() > buffer->capacity()) {
+                minIndex = index;
+                minBuffer = buffer;
+            }
+        }
         // WORKAROUND: Some apps expect CSD available without queueing
         //             any input. Queue an empty buffer to get the CSD.
-        buffer->setRange(0, 0);
-        buffer->meta()->clear();
-        buffer->meta()->setInt64("timeUs", 0);
-        if (queueInputBufferInternal(buffer) != OK) {
+        minBuffer->setRange(0, 0);
+        minBuffer->meta()->clear();
+        minBuffer->meta()->setInt64("timeUs", 0);
+        if (queueInputBufferInternal(minBuffer) != OK) {
             ALOGW("[%s] Error while queueing an empty buffer to get CSD",
                   mName);
             return UNKNOWN_ERROR;
         }
-        clientInputBuffers.pop_front();
+        clientInputBuffers.erase(minIndex);
     }
 
-    for (const ClientInputBuffer& clientInputBuffer: clientInputBuffers) {
-        mCallback->onInputBufferAvailable(
-                clientInputBuffer.index,
-                clientInputBuffer.buffer);
+    for (const auto &[index, buffer] : clientInputBuffers) {
+        mCallback->onInputBufferAvailable(index, buffer);
     }
 
     return OK;
@@ -1582,6 +1592,14 @@ void CCodecBufferChannel::reset() {
     {
         Mutexed<Output>::Locked output(mOutput);
         output->buffers.reset();
+    }
+    if (mOutputSurface.lock()->surface) {
+        C2BlockPool::local_id_t outputPoolId;
+        {
+            Mutexed<BlockPools>::Locked pools(mBlockPools);
+            outputPoolId = pools->outputPoolId;
+        }
+        mComponent->stopUsingOutputSurface(outputPoolId);
     }
 }
 
@@ -2023,6 +2041,9 @@ void CCodecBufferChannel::sendOutputBuffers() {
     sp<MediaCodecBuffer> outBuffer;
     std::shared_ptr<C2Buffer> c2Buffer;
 
+    constexpr int kMaxReallocTry = 5;
+    int reallocTryNum = 0;
+
     while (true) {
         Mutexed<Output>::Locked output(mOutput);
         if (!output->buffers) {
@@ -2030,6 +2051,9 @@ void CCodecBufferChannel::sendOutputBuffers() {
         }
         action = output->buffers->popFromStashAndRegister(
                 &c2Buffer, &index, &outBuffer);
+        if (action != OutputBuffers::REALLOCATE) {
+            reallocTryNum = 0;
+        }
         switch (action) {
         case OutputBuffers::SKIP:
             return;
@@ -2040,6 +2064,13 @@ void CCodecBufferChannel::sendOutputBuffers() {
             mCallback->onOutputBufferAvailable(index, outBuffer);
             break;
         case OutputBuffers::REALLOCATE:
+            if (++reallocTryNum > kMaxReallocTry) {
+                output.unlock();
+                ALOGE("[%s] sendOutputBuffers: tried %d realloc and failed",
+                          mName, kMaxReallocTry);
+                mCCodecCallback->onError(UNKNOWN_ERROR, ACTION_CODE_FATAL);
+                return;
+            }
             if (!output->buffers->isArrayMode()) {
                 output->buffers =
                     output->buffers->toArrayMode(output->numSlots);

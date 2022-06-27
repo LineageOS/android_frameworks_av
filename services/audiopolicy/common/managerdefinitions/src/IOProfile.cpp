@@ -116,27 +116,30 @@ bool IOProfile::containsSingleDeviceSupportingEncodedFormats(
                 return device == deviceDesc && deviceDesc->hasCurrentEncodedFormat(); }) == 1;
 }
 
-void IOProfile::dump(String8 *dst) const
+void IOProfile::dump(String8 *dst, int spaces) const
 {
-    std::string portStr;
-    AudioPort::dump(&portStr, 4);
-    dst->append(portStr.c_str());
-
-    dst->appendFormat("    - flags: 0x%04x", getFlags());
+    String8 extraInfo;
+    extraInfo.appendFormat("0x%04x", getFlags());
     std::string flagsLiteral =
             getRole() == AUDIO_PORT_ROLE_SINK ?
             toString(static_cast<audio_input_flags_t>(getFlags())) :
             getRole() == AUDIO_PORT_ROLE_SOURCE ?
             toString(static_cast<audio_output_flags_t>(getFlags())) : "";
     if (!flagsLiteral.empty()) {
-        dst->appendFormat(" (%s)", flagsLiteral.c_str());
+        extraInfo.appendFormat(" (%s)", flagsLiteral.c_str());
     }
-    dst->append("\n");
-    mSupportedDevices.dump(dst, String8("Supported"), 4, false);
-    dst->appendFormat("\n    - maxOpenCount: %u - curOpenCount: %u\n",
-             maxOpenCount, curOpenCount);
-    dst->appendFormat("    - maxActiveCount: %u - curActiveCount: %u\n",
-             maxActiveCount, curActiveCount);
+
+    std::string portStr;
+    AudioPort::dump(&portStr, spaces, extraInfo.c_str());
+    dst->append(portStr.c_str());
+
+    mSupportedDevices.dump(dst, String8("- Supported"), spaces - 2, false);
+    dst->appendFormat("%*s- maxOpenCount: %u; curOpenCount: %u\n",
+            spaces - 2, "", maxOpenCount, curOpenCount);
+    dst->appendFormat("%*s- maxActiveCount: %u; curActiveCount: %u\n",
+            spaces - 2, "", maxActiveCount, curActiveCount);
+    dst->appendFormat("%*s- recommendedMuteDurationMs: %u ms\n",
+            spaces - 2, "", recommendedMuteDurationMs);
 }
 
 void IOProfile::log()

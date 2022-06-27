@@ -28,7 +28,7 @@
 class FixedBlockWriter : public FixedBlockAdapter
 {
 public:
-    FixedBlockWriter(FixedBlockProcessor &fixedBlockProcessor);
+    explicit FixedBlockWriter(FixedBlockProcessor &fixedBlockProcessor);
 
     virtual ~FixedBlockWriter() = default;
 

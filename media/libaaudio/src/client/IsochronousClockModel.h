@@ -149,16 +149,16 @@ private:
     static constexpr int32_t   kHistogramBinWidthMicros = 50;
     static constexpr int32_t   kHistogramBinCount = 128;
 
-    int64_t             mMarkerFramePosition; // Estimated HW position.
-    int64_t             mMarkerNanoTime;      // Estimated HW time.
-    int32_t             mSampleRate;
-    int32_t             mFramesPerBurst;      // number of frames transferred at one time.
-    int32_t             mBurstPeriodNanos;    // Time between HW bursts.
+    int64_t             mMarkerFramePosition{0}; // Estimated HW position.
+    int64_t             mMarkerNanoTime{0};      // Estimated HW time.
+    int32_t             mSampleRate{48000};
+    int32_t             mFramesPerBurst{48};     // number of frames transferred at one time.
+    int32_t             mBurstPeriodNanos{0};    // Time between HW bursts.
     // Includes mBurstPeriodNanos because we sample randomly over time.
-    int32_t             mMaxMeasuredLatenessNanos;
+    int32_t             mMaxMeasuredLatenessNanos{0};
     // Threshold for lateness that triggers a drift later in time.
     int32_t             mLatenessForDriftNanos;
-    clock_model_state_t mState;               // State machine handles startup sequence.
+    clock_model_state_t mState{STATE_STOPPED};   // State machine handles startup sequence.
 
     int32_t             mTimestampCount = 0;  // For logging.
 

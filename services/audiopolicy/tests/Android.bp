@@ -25,13 +25,13 @@ cc_test {
         "libmedia_helper",
         "libutils",
         "libxml2",
-        "libpermission",
+        "framework-permission-aidl-cpp",
         "libbinder",
     ],
 
     static_libs: [
         "libaudiopolicycomponents",
-        "libgmock"
+        "libgmock",
     ],
 
     header_libs: [
@@ -65,6 +65,12 @@ cc_test {
         "liblog",
         "libmedia_helper",
         "libutils",
+        "android.media.audio.common.types-V1-cpp",
+        "libaudioclient_aidl_conversion",
+        "libstagefright_foundation",
+        "libshmemcompat",
+        "libshmemutil",
+        "audioclient-types-aidl-cpp",
     ],
 
     static_libs: ["libaudiopolicycomponents"],

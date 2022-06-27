@@ -1,0 +1,5 @@
+adb root &&
+m cameraservice_test &&
+adb push $ANDROID_PRODUCT_OUT/data/nativetest/cameraservice_test/cameraservice_test \
+    /data/nativetest/cameraservice_test/arm64/cameraservice_test &&
+adb shell /data/nativetest/cameraservice_test/arm64/cameraservice_test

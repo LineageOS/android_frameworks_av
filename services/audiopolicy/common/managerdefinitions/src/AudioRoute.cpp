@@ -25,15 +25,16 @@ namespace android
 
 void AudioRoute::dump(String8 *dst, int spaces) const
 {
-    dst->appendFormat("%*s- Type: %s\n", spaces, "", mType == AUDIO_ROUTE_MUX ? "Mux" : "Mix");
-    dst->appendFormat("%*s- Sink: %s\n", spaces, "", mSink->getTagName().c_str());
+    dst->appendFormat("%s; Sink: \"%s\"\n",
+            mType == AUDIO_ROUTE_MUX ? "Mux" : "Mix", mSink->getTagName().c_str());
     if (mSources.size() != 0) {
-        dst->appendFormat("%*s- Sources: \n", spaces, "");
+        dst->appendFormat("%*sSources: ", spaces, "");
         for (size_t i = 0; i < mSources.size(); i++) {
-            dst->appendFormat("%*s%s \n", spaces + 4, "", mSources[i]->getTagName().c_str());
+            dst->appendFormat("\"%s\"", mSources[i]->getTagName().c_str());
+            if (i + 1 < mSources.size()) dst->append(", ");
         }
+        dst->append("\n");
     }
-    dst->append("\n");
 }
 
 bool AudioRoute::supportsPatch(const sp<PolicyAudioPort> &srcPort,

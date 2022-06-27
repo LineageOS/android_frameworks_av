@@ -265,6 +265,9 @@ class C2SoftVpxEnc::IntfImpl : public SimpleInterface<void>::BaseParams {
     std::shared_ptr<C2StreamTemporalLayeringTuning::output> getTemporalLayers_l() const {
         return mLayering;
     }
+    std::shared_ptr<C2StreamColorAspectsInfo::output> getCodedColorAspects_l() const {
+        return mCodedColorAspects;
+    }
     uint32_t getSyncFramePeriod() const;
     static C2R ColorAspectsSetter(bool mayBlock, C2P<C2StreamColorAspectsInfo::input> &me);
     static C2R CodedColorAspectsSetter(bool mayBlock, C2P<C2StreamColorAspectsInfo::output> &me,

@@ -9,6 +9,16 @@ package {
     default_applicable_licenses: ["frameworks_av_license"],
 }
 
+cc_library_headers {
+    name: "libcodec2_soft_common_headers",
+    defaults: ["libcodec2-impl-defaults"],
+    vendor_available: true,
+
+    export_include_dirs: [
+        "include",
+    ],
+}
+
 cc_library {
     name: "libcodec2_soft_common",
     defaults: ["libcodec2-impl-defaults"],
@@ -37,6 +47,12 @@ cc_library {
         "liblog", // for ALOG
         "libsfplugin_ccodec_utils", // for ImageCopy
         "libstagefright_foundation", // for Mutexed
+    ],
+
+    min_sdk_version: "29",
+    apex_available: [
+        "//apex_available:platform",
+        "com.android.media.swcodec",
     ],
 
     sanitize: {
@@ -85,6 +101,12 @@ cc_defaults {
     ],
 
     ldflags: ["-Wl,-Bsymbolic"],
+
+    min_sdk_version: "29",
+    apex_available: [
+        "//apex_available:platform",
+        "com.android.media.swcodec",
+    ],
 }
 
 // public dependency for software codec implementation

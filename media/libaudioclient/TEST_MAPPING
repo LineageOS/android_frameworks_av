@@ -1,0 +1,15 @@
+{
+  "presubmit": [
+    {
+      "name": "audio_aidl_conversion_tests"
+    },
+    {
+      "name": "CtsNativeMediaAAudioTestCases",
+      "options" : [
+        {
+          "include-filter": "android.nativemedia.aaudio.AAudioTests#AAudioBasic.*"
+        }
+      ]
+    }
+  ]
+}

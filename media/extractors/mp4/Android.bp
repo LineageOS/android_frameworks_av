@@ -15,6 +15,15 @@ license {
     ],
 }
 
+cc_library_headers {
+    name: "libmp4extractor_headers",
+    host_supported: true,
+
+    export_include_dirs: [
+        "include",
+    ],
+}
+
 cc_library {
     name: "libmp4extractor",
     defaults: ["extractor-defaults"],
@@ -25,6 +34,10 @@ cc_library {
         "MPEG4Extractor.cpp",
         "SampleIterator.cpp",
         "SampleTable.cpp",
+    ],
+
+    export_include_dirs: [
+        "include",
     ],
 
     static_libs: [

@@ -18,8 +18,8 @@ package android.media.tv.tuner;
 
 import android.hardware.common.fmq.MQDescriptor;
 import android.hardware.common.fmq.SynchronizedReadWrite;
+import android.hardware.tv.tuner.DvrSettings;
 import android.media.tv.tuner.ITunerFilter;
-import android.media.tv.tuner.TunerDvrSettings;
 
 /**
  * Tuner Dvr interface handles tuner related operations.
@@ -35,7 +35,7 @@ interface ITunerDvr {
     /**
      * Configure the DVR.
      */
-    void configure(in TunerDvrSettings settings);
+    void configure(in DvrSettings settings);
 
     /**
      * Attach one filter to DVR interface for recording.

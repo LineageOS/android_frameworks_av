@@ -77,6 +77,16 @@ public:
         return AAUDIO_ERROR_UNAVAILABLE;
     }
 
+    virtual aaudio_result_t standby() {
+        ALOGD("AAudioServiceEndpoint::standby() AAUDIO_ERROR_UNAVAILABLE");
+        return AAUDIO_ERROR_UNAVAILABLE;
+    }
+
+    virtual aaudio_result_t exitStandby(AudioEndpointParcelable* parcelable) {
+        ALOGD("AAudioServiceEndpoint::exitStandby() AAUDIO_ERROR_UNAVAILABLE");
+        return AAUDIO_ERROR_UNAVAILABLE;
+    }
+
     /**
      * @param positionFrames
      * @param timeNanos

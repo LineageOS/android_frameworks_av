@@ -17,9 +17,10 @@
 #include "media/HeadTrackingProcessor.h"
 
 #include "ModeSelector.h"
-#include "PoseDriftCompensator.h"
+#include "PoseBias.h"
 #include "QuaternionUtil.h"
 #include "ScreenHeadFusion.h"
+#include "StillnessDetector.h"
 
 namespace android {
 namespace media {
@@ -32,13 +33,17 @@ class HeadTrackingProcessorImpl : public HeadTrackingProcessor {
   public:
     HeadTrackingProcessorImpl(const Options& options, HeadTrackingMode initialMode)
         : mOptions(options),
-          mHeadPoseDriftCompensator(PoseDriftCompensator::Options{
-                  .translationalDriftTimeConstant = options.translationalDriftTimeConstant,
-                  .rotationalDriftTimeConstant = options.rotationalDriftTimeConstant,
+          mHeadStillnessDetector(StillnessDetector::Options{
+                  .defaultValue = false,
+                  .windowDuration = options.autoRecenterWindowDuration,
+                  .translationalThreshold = options.autoRecenterTranslationalThreshold,
+                  .rotationalThreshold = options.autoRecenterRotationalThreshold,
           }),
-          mScreenPoseDriftCompensator(PoseDriftCompensator::Options{
-                  .translationalDriftTimeConstant = options.translationalDriftTimeConstant,
-                  .rotationalDriftTimeConstant = options.rotationalDriftTimeConstant,
+          mScreenStillnessDetector(StillnessDetector::Options{
+                  .defaultValue = true,
+                  .windowDuration = options.screenStillnessWindowDuration,
+                  .translationalThreshold = options.screenStillnessTranslationalThreshold,
+                  .rotationalThreshold = options.screenStillnessRotationalThreshold,
           }),
           mModeSelector(ModeSelector::Options{.freshnessTimeout = options.freshnessTimeout},
                         initialMode),
@@ -52,7 +57,8 @@ class HeadTrackingProcessorImpl : public HeadTrackingProcessor {
                             const Twist3f& headTwist) override {
         Pose3f predictedWorldToHead =
                 worldToHead * integrate(headTwist, mOptions.predictionDuration);
-        mHeadPoseDriftCompensator.setInput(timestamp, predictedWorldToHead);
+        mHeadPoseBias.setInput(predictedWorldToHead);
+        mHeadStillnessDetector.setInput(timestamp, predictedWorldToHead);
         mWorldToHeadTimestamp = timestamp;
     }
 
@@ -63,8 +69,9 @@ class HeadTrackingProcessorImpl : public HeadTrackingProcessor {
             mPhysicalToLogicalAngle = mPendingPhysicalToLogicalAngle;
         }
 
-        mScreenPoseDriftCompensator.setInput(
-                timestamp, worldToScreen * Pose3f(rotateY(-mPhysicalToLogicalAngle)));
+        Pose3f worldToLogicalScreen = worldToScreen * Pose3f(rotateY(-mPhysicalToLogicalAngle));
+        mScreenPoseBias.setInput(worldToLogicalScreen);
+        mScreenStillnessDetector.setInput(timestamp, worldToLogicalScreen);
         mWorldToScreenTimestamp = timestamp;
     }
 
@@ -77,16 +84,30 @@ class HeadTrackingProcessorImpl : public HeadTrackingProcessor {
     }
 
     void calculate(int64_t timestamp) override {
-        if (mWorldToHeadTimestamp.has_value()) {
-            const Pose3f worldToHead = mHeadPoseDriftCompensator.getOutput();
-            mScreenHeadFusion.setWorldToHeadPose(mWorldToHeadTimestamp.value(), worldToHead);
-            mModeSelector.setWorldToHeadPose(mWorldToHeadTimestamp.value(), worldToHead);
-        }
-
+        // Handle the screen first, since it might trigger a recentering of the head.
         if (mWorldToScreenTimestamp.has_value()) {
-            const Pose3f worldToLogicalScreen = mScreenPoseDriftCompensator.getOutput();
+            const Pose3f worldToLogicalScreen = mScreenPoseBias.getOutput();
+            bool screenStable = mScreenStillnessDetector.calculate(timestamp);
+            mModeSelector.setScreenStable(mWorldToScreenTimestamp.value(), screenStable);
+            // Whenever the screen is unstable, recenter the head pose.
+            if (!screenStable) {
+                recenter(true, false);
+            }
             mScreenHeadFusion.setWorldToScreenPose(mWorldToScreenTimestamp.value(),
                                                    worldToLogicalScreen);
+        }
+
+        // Handle head.
+        if (mWorldToHeadTimestamp.has_value()) {
+            Pose3f worldToHead = mHeadPoseBias.getOutput();
+            // Auto-recenter.
+            if (mHeadStillnessDetector.calculate(timestamp)) {
+                recenter(true, false);
+                worldToHead = mHeadPoseBias.getOutput();
+            }
+
+            mScreenHeadFusion.setWorldToHeadPose(mWorldToHeadTimestamp.value(), worldToHead);
+            mModeSelector.setWorldToHeadPose(mWorldToHeadTimestamp.value(), worldToHead);
         }
 
         auto maybeScreenToHead = mScreenHeadFusion.calculate();
@@ -113,10 +134,12 @@ class HeadTrackingProcessorImpl : public HeadTrackingProcessor {
 
     void recenter(bool recenterHead, bool recenterScreen) override {
         if (recenterHead) {
-            mHeadPoseDriftCompensator.recenter();
+            mHeadPoseBias.recenter();
+            mHeadStillnessDetector.reset();
         }
         if (recenterScreen) {
-            mScreenPoseDriftCompensator.recenter();
+            mScreenPoseBias.recenter();
+            mScreenStillnessDetector.reset();
         }
 
         // If a sensor being recentered is included in the current mode, apply rate limiting to
@@ -138,8 +161,10 @@ class HeadTrackingProcessorImpl : public HeadTrackingProcessor {
     std::optional<int64_t> mWorldToHeadTimestamp;
     std::optional<int64_t> mWorldToScreenTimestamp;
     Pose3f mHeadToStagePose;
-    PoseDriftCompensator mHeadPoseDriftCompensator;
-    PoseDriftCompensator mScreenPoseDriftCompensator;
+    PoseBias mHeadPoseBias;
+    PoseBias mScreenPoseBias;
+    StillnessDetector mHeadStillnessDetector;
+    StillnessDetector mScreenStillnessDetector;
     ScreenHeadFusion mScreenHeadFusion;
     ModeSelector mModeSelector;
     PoseRateLimiter mRateLimiter;

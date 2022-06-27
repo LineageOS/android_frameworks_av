@@ -18,6 +18,9 @@
 #define ATRACE_TAG ATRACE_TAG_CAMERA
 //#define LOG_NDEBUG 0
 
+#include <aidl/android/hardware/camera/device/CameraBlob.h>
+#include <aidl/android/hardware/camera/device/CameraBlobId.h>
+
 #include "api1/client2/JpegProcessor.h"
 #include "common/CameraProviderManager.h"
 #include "utils/SessionConfigurationUtils.h"
@@ -29,6 +32,9 @@
 
 namespace android {
 namespace camera3 {
+
+using aidl::android::hardware::camera::device::CameraBlob;
+using aidl::android::hardware::camera::device::CameraBlobId;
 
 DepthCompositeStream::DepthCompositeStream(sp<CameraDeviceBase> device,
         wp<hardware::camera2::ICameraDeviceCallbacks> cb) :
@@ -367,7 +373,7 @@ status_t DepthCompositeStream::processInputFrame(nsecs_t ts, const InputFrame &i
         return res;
     }
 
-    size_t finalJpegSize = actualJpegSize + sizeof(struct camera_jpeg_blob);
+    size_t finalJpegSize = actualJpegSize + sizeof(CameraBlob);
     if (finalJpegSize > finalJpegBufferSize) {
         ALOGE("%s: Final jpeg buffer not large enough for the jpeg blob header", __FUNCTION__);
         outputANW->cancelBuffer(mOutputSurface.get(), anb, /*fence*/ -1);
@@ -383,10 +389,10 @@ status_t DepthCompositeStream::processInputFrame(nsecs_t ts, const InputFrame &i
 
     ALOGV("%s: Final jpeg size: %zu", __func__, finalJpegSize);
     uint8_t* header = static_cast<uint8_t *> (dstBuffer) +
-        (gb->getWidth() - sizeof(struct camera_jpeg_blob));
-    struct camera_jpeg_blob *blob = reinterpret_cast<struct camera_jpeg_blob*> (header);
-    blob->jpeg_blob_id = CAMERA_JPEG_BLOB_ID;
-    blob->jpeg_size = actualJpegSize;
+        (gb->getWidth() - sizeof(CameraBlob));
+    CameraBlob *blob = reinterpret_cast<CameraBlob*> (header);
+    blob->blobId = CameraBlobId::JPEG;
+    blob->blobSizeBytes = actualJpegSize;
     outputANW->queueBuffer(mOutputSurface.get(), anb, /*fence*/ -1);
 
     return res;

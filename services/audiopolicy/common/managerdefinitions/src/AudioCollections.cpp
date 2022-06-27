@@ -17,6 +17,8 @@
 #define LOG_TAG "APM::AudioCollections"
 //#define LOG_NDEBUG 0
 
+#include <android-base/stringprintf.h>
+
 #include "AudioCollections.h"
 #include "AudioRoute.h"
 #include "HwModule.h"
@@ -40,10 +42,11 @@ void dumpAudioRouteVector(const AudioRouteVector& audioRouteVector, String8 *dst
     if (audioRouteVector.isEmpty()) {
         return;
     }
-    dst->appendFormat("\n%*sAudio Routes (%zu):\n", spaces, "", audioRouteVector.size());
+    dst->appendFormat("%*s- Audio Routes (%zu):\n", spaces - 2, "", audioRouteVector.size());
     for (size_t i = 0; i < audioRouteVector.size(); i++) {
-        dst->appendFormat("%*s- Route %zu:\n", spaces, "", i + 1);
-        audioRouteVector.itemAt(i)->dump(dst, 4);
+        const std::string prefix = base::StringPrintf("%*s %zu. ", spaces, "", i + 1);
+        dst->append(prefix.c_str());
+        audioRouteVector.itemAt(i)->dump(dst, prefix.size());
     }
 }
 

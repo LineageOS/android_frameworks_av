@@ -23,8 +23,8 @@ cc_library {
 
     srcs: ["FLACExtractor.cpp"],
 
-    include_dirs: [
-        "external/flac/include",
+    export_include_dirs: [
+        "include",
     ],
 
     shared_libs: [
