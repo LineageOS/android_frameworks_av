@@ -100,7 +100,10 @@ SpatializerPoseController::SpatializerPoseController(Listener* listener,
               .screenStillnessRotationalThreshold = kScreenStillnessRotationThreshold,
       })),
       mPoseProvider(SensorPoseProvider::create("headtracker", this)),
-      mThread([this, maxUpdatePeriod] {
+      mThread([this, maxUpdatePeriod] { // It's important that mThread is initialized after
+                                        // everything else because it runs a member
+                                        // function that may use any member
+                                        // of this class.
           while (true) {
               Pose3f headToStage;
               std::optional<HeadTrackingMode> modeIfChanged;
