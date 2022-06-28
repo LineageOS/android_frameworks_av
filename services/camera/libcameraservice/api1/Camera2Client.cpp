@@ -140,28 +140,53 @@ status_t Camera2Client::initializeImpl(TProviderPtr providerPtr, const String8& 
     mFrameProcessor = new FrameProcessor(mDevice, this);
     threadName = String8::format("C2-%d-FrameProc",
             mCameraId);
-    mFrameProcessor->run(threadName.string());
+    res = mFrameProcessor->run(threadName.string());
+    if (res != OK) {
+        ALOGE("%s: Unable to start frame processor thread: %s (%d)",
+                __FUNCTION__, strerror(-res), res);
+        return res;
+    }
 
     mCaptureSequencer = new CaptureSequencer(this);
     threadName = String8::format("C2-%d-CaptureSeq",
             mCameraId);
-    mCaptureSequencer->run(threadName.string());
+    res = mCaptureSequencer->run(threadName.string());
+    if (res != OK) {
+        ALOGE("%s: Unable to start capture sequencer thread: %s (%d)",
+                __FUNCTION__, strerror(-res), res);
+        return res;
+    }
 
     mJpegProcessor = new JpegProcessor(this, mCaptureSequencer);
     threadName = String8::format("C2-%d-JpegProc",
             mCameraId);
-    mJpegProcessor->run(threadName.string());
+    res = mJpegProcessor->run(threadName.string());
+    if (res != OK) {
+        ALOGE("%s: Unable to start jpeg processor thread: %s (%d)",
+                __FUNCTION__, strerror(-res), res);
+        return res;
+    }
 
     mZslProcessor = new ZslProcessor(this, mCaptureSequencer);
 
     threadName = String8::format("C2-%d-ZslProc",
             mCameraId);
-    mZslProcessor->run(threadName.string());
+    res = mZslProcessor->run(threadName.string());
+    if (res != OK) {
+        ALOGE("%s: Unable to start zsl processor thread: %s (%d)",
+                __FUNCTION__, strerror(-res), res);
+        return res;
+    }
 
     mCallbackProcessor = new CallbackProcessor(this);
     threadName = String8::format("C2-%d-CallbkProc",
             mCameraId);
-    mCallbackProcessor->run(threadName.string());
+    res = mCallbackProcessor->run(threadName.string());
+    if (res != OK) {
+        ALOGE("%s: Unable to start callback processor thread: %s (%d)",
+                __FUNCTION__, strerror(-res), res);
+        return res;
+    }
 
     if (gLogLevel >= 1) {
         SharedParameters::Lock l(mParameters);

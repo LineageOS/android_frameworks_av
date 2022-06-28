@@ -702,7 +702,8 @@ status_t Camera3OutputStream::configureConsumerQueueLocked(bool allowPreviewResp
             mTotalBufferCount ++;
             res = mPreviewFrameSpacer->run(String8::format("PreviewSpacer-%d", mId).string());
             if (res != OK) {
-                ALOGE("%s: Unable to start preview spacer", __FUNCTION__);
+                ALOGE("%s: Unable to start preview spacer: %s (%d)", __FUNCTION__,
+                        strerror(-res), res);
                 return res;
             }
         }

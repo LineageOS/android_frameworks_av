@@ -79,7 +79,13 @@ public:
                     new CameraServiceWatchdog(cycles, cycleLength, mEnabled);
             mEnabledLock.unlock();
 
-            tempWatchdog->run("CameraServiceWatchdog");
+            status_t status = tempWatchdog->run("CameraServiceWatchdog");
+            if (status != OK) {
+                ALOGE("Unable to watch thread: %s (%d)", strerror(-status), status);
+                res = watchThread(func, tid);
+                return res;
+            }
+
             res = tempWatchdog->watchThread(func, tid);
             tempWatchdog->requestExit();
             tempWatchdog.clear();
