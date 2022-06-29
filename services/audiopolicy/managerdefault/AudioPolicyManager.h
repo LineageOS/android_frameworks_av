@@ -1099,6 +1099,18 @@ private:
                                       const audio_config_t *config,
                                       const AudioDeviceTypeAddrVector &devices) const;
 
+
+        /**
+         * @brief Gets an IOProfile for a spatializer output with the best match with
+         * provided arguments.
+         * The caller can have the devices criteria ignored by passing and empty vector, and
+         * getSpatializerOutputProfile() will ignore the devices when looking for a match.
+         * Otherwise an output profile supporting a spatializer effect that can be routed
+         * to the specified devices must exist.
+         * @param config audio configuration describing the audio format, channels, sample rate...
+         * @param devices the sink audio device selected for playback
+         * @return an IOProfile that canbe used to open a spatializer output.
+         */
         sp<IOProfile> getSpatializerOutputProfile(const audio_config_t *config,
                                                   const AudioDeviceTypeAddrVector &devices) const;
 
