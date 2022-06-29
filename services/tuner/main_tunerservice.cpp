@@ -40,6 +40,7 @@ int main() {
         CHECK(status == STATUS_OK);
     }
 
+    ProcessState::self()->setThreadPoolMaxThreadCount(8);
     ProcessState::self()->startThreadPool();
     IPCThreadState::self()->joinThreadPool();
     return EXIT_FAILURE;  // should not reached
