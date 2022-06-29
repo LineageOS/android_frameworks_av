@@ -147,10 +147,20 @@ status_t Camera2ClientBase<TClientBase>::initializeImpl(TProviderPtr providerPtr
 
     wp<NotificationListener> weakThis(this);
     res = mDevice->setNotifyCallback(weakThis);
+    if (res != OK) {
+        ALOGE("%s: Camera %s: Unable to set notify callback: %s (%d)",
+                __FUNCTION__, TClientBase::mCameraIdStr.string(), strerror(-res), res);
+        return res;
+    }
 
     /** Start watchdog thread */
     mCameraServiceWatchdog = new CameraServiceWatchdog();
-    mCameraServiceWatchdog->run("Camera2ClientBaseWatchdog");
+    res = mCameraServiceWatchdog->run("Camera2ClientBaseWatchdog");
+    if (res != OK) {
+        ALOGE("%s: Unable to start camera service watchdog thread: %s (%d)",
+                __FUNCTION__, strerror(-res), res);
+        return res;
+    }
 
     return OK;
 }

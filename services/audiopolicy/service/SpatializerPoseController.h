@@ -123,11 +123,14 @@ class SpatializerPoseController : private media::SensorPoseProvider::Listener {
     int32_t mHeadSensor = media::SensorPoseProvider::INVALID_HANDLE;
     int32_t mScreenSensor = media::SensorPoseProvider::INVALID_HANDLE;
     std::optional<media::HeadTrackingMode> mActualMode;
-    std::thread mThread;
     std::condition_variable mCondVar;
     bool mShouldCalculate = true;
     bool mShouldExit = false;
     bool mCalculated = false;
+
+    // It's important that mThread is the last variable in this class
+    // since we starts mThread in initializer list
+    std::thread mThread;
 
     void onPose(int64_t timestamp, int32_t sensor, const media::Pose3f& pose,
                 const std::optional<media::Twist3f>& twist, bool isNewReference) override;

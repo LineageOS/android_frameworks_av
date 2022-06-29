@@ -1026,7 +1026,8 @@ static void usage() {
         "    Add additional information, such as a timestamp overlay, that is helpful\n"
         "    in videos captured to illustrate bugs.\n"
         "--time-limit TIME\n"
-        "    Set the maximum recording time, in seconds.  Default / maximum is %d.\n"
+        "    Set the maximum recording time, in seconds.  Default is %d. Set to 0\n"
+        "    to remove the time limit.\n"
         "--display-id ID\n"
         "    specify the physical display ID to record. Default is the primary display.\n"
         "    see \"dumpsys SurfaceFlinger --display-id\" for valid display IDs.\n"
@@ -1113,14 +1114,27 @@ int main(int argc, char* const argv[]) {
             }
             break;
         case 't':
-            gTimeLimitSec = atoi(optarg);
-            if (gTimeLimitSec == 0 || gTimeLimitSec > kMaxTimeLimitSec) {
-                fprintf(stderr,
-                        "Time limit %ds outside acceptable range [1,%d]\n",
-                        gTimeLimitSec, kMaxTimeLimitSec);
+        {
+            char *next;
+            const int64_t timeLimitSec = strtol(optarg, &next, 10);
+            if (next == optarg || (*next != '\0' && *next != ' ')) {
+                fprintf(stderr, "Error parsing time limit argument\n");
                 return 2;
             }
+            if (timeLimitSec > std::numeric_limits<uint32_t>::max() || timeLimitSec < 0) {
+                fprintf(stderr,
+                        "Time limit %" PRIi64 "s outside acceptable range [0,%u] seconds\n",
+                        timeLimitSec, std::numeric_limits<uint32_t>::max());
+                return 2;
+            }
+            gTimeLimitSec = (timeLimitSec == 0) ?
+                    std::numeric_limits<uint32_t>::max() : timeLimitSec;
+            if (gVerbose) {
+                printf("Time limit set to %u seconds\n", gTimeLimitSec);
+                fflush(stdout);
+            }
             break;
+        }
         case 'u':
             gWantInfoScreen = true;
             gWantFrameTime = true;
