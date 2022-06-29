@@ -33,8 +33,10 @@
 #include "utility/AAudioUtilities.h"
 #include "utility/AudioClock.h"
 
-#include "SharedRingBuffer.h"
+#include "AAudioCommandQueue.h"
 #include "AAudioThread.h"
+#include "SharedRingBuffer.h"
+#include "TimestampScheduler.h"
 
 namespace android {
     class AAudioService;
@@ -113,6 +115,11 @@ public:
      * An AAUDIO_SERVICE_EVENT_FLUSHED will be sent to the client when complete.
      */
     aaudio_result_t flush() EXCLUDES(mLock);
+
+    /**
+     * Exit standby mode. The MMAP buffer will be reallocated.
+     */
+    aaudio_result_t exitStandby(AudioEndpointParcelable *parcelable) EXCLUDES(mLock);
 
     virtual aaudio_result_t startClient(const android::AudioClient& client,
                                         const audio_attributes_t *attr __unused,
@@ -235,10 +242,46 @@ protected:
     aaudio_result_t open(const aaudio::AAudioStreamRequest &request,
                          aaudio_sharing_mode_t sharingMode);
 
+    aaudio_result_t start_l() REQUIRES(mLock);
     virtual aaudio_result_t close_l() REQUIRES(mLock);
     virtual aaudio_result_t pause_l() REQUIRES(mLock);
     virtual aaudio_result_t stop_l() REQUIRES(mLock);
     void disconnect_l() REQUIRES(mLock);
+    aaudio_result_t flush_l() REQUIRES(mLock);
+
+    class RegisterAudioThreadParam : public AAudioCommandParam {
+    public:
+        RegisterAudioThreadParam(pid_t ownerPid, pid_t clientThreadId, int priority)
+                : AAudioCommandParam(), mOwnerPid(ownerPid),
+                  mClientThreadId(clientThreadId), mPriority(priority) { }
+        ~RegisterAudioThreadParam() = default;
+
+        pid_t mOwnerPid;
+        pid_t mClientThreadId;
+        int mPriority;
+    };
+    aaudio_result_t registerAudioThread_l(
+            pid_t ownerPid, pid_t clientThreadId, int priority) REQUIRES(mLock);
+
+    class UnregisterAudioThreadParam : public AAudioCommandParam {
+    public:
+        UnregisterAudioThreadParam(pid_t clientThreadId)
+                : AAudioCommandParam(), mClientThreadId(clientThreadId) { }
+        ~UnregisterAudioThreadParam() = default;
+
+        pid_t mClientThreadId;
+    };
+    aaudio_result_t unregisterAudioThread_l(pid_t clientThreadId) REQUIRES(mLock);
+
+    class GetDescriptionParam : public AAudioCommandParam {
+    public:
+        GetDescriptionParam(AudioEndpointParcelable* parcelable)
+                : AAudioCommandParam(), mParcelable(parcelable) { }
+        ~GetDescriptionParam() = default;
+
+        AudioEndpointParcelable* mParcelable;
+    };
+    aaudio_result_t getDescription_l(AudioEndpointParcelable* parcelable) REQUIRES(mLock);
 
     void setState(aaudio_stream_state_t state);
 
@@ -250,7 +293,7 @@ protected:
 
     aaudio_result_t writeUpMessageQueue(AAudioServiceMessage *command);
 
-    aaudio_result_t sendCurrentTimestamp() EXCLUDES(mLock);
+    aaudio_result_t sendCurrentTimestamp_l() REQUIRES(mLock);
 
     aaudio_result_t sendXRunCount(int32_t xRunCount);
 
@@ -259,11 +302,13 @@ protected:
      * @param timeNanos
      * @return AAUDIO_OK or AAUDIO_ERROR_UNAVAILABLE or other negative error
      */
-    virtual aaudio_result_t getFreeRunningPosition(int64_t *positionFrames, int64_t *timeNanos) = 0;
+    virtual aaudio_result_t getFreeRunningPosition_l(
+            int64_t *positionFrames, int64_t *timeNanos) = 0;
 
-    virtual aaudio_result_t getHardwareTimestamp(int64_t *positionFrames, int64_t *timeNanos) = 0;
+    virtual aaudio_result_t getHardwareTimestamp_l(int64_t *positionFrames, int64_t *timeNanos) = 0;
 
-    virtual aaudio_result_t getAudioDataDescription(AudioEndpointParcelable &parcelable) = 0;
+    virtual aaudio_result_t getAudioDataDescription_l(AudioEndpointParcelable* parcelable) = 0;
+
 
     aaudio_stream_state_t   mState = AAUDIO_STREAM_STATE_UNINITIALIZED;
 
@@ -274,14 +319,53 @@ protected:
         mDisconnected = flag;
     }
 
+    virtual aaudio_result_t standby_l() REQUIRES(mLock) {
+        return AAUDIO_ERROR_UNAVAILABLE;
+    }
+    class ExitStandbyParam : public AAudioCommandParam {
+    public:
+        ExitStandbyParam(AudioEndpointParcelable* parcelable)
+                : AAudioCommandParam(), mParcelable(parcelable) { }
+        ~ExitStandbyParam() = default;
+
+        AudioEndpointParcelable* mParcelable;
+    };
+    virtual aaudio_result_t exitStandby_l(
+            AudioEndpointParcelable* parcelable __unused) REQUIRES(mLock) {
+        return AAUDIO_ERROR_UNAVAILABLE;
+    }
+    bool isStandby_l() const REQUIRES(mLock) {
+        return mStandby;
+    }
+    void setStandby_l(bool standby) REQUIRES(mLock) {
+        mStandby = standby;
+    }
+
+    bool isIdle_l() const REQUIRES(mLock) {
+        return mState == AAUDIO_STREAM_STATE_OPEN || mState == AAUDIO_STREAM_STATE_PAUSED
+                || mState == AAUDIO_STREAM_STATE_STOPPED;
+    }
+
     pid_t                   mRegisteredClientThread = ILLEGAL_THREAD_ID;
 
     std::mutex              mUpMessageQueueLock;
     std::shared_ptr<SharedRingBuffer> mUpMessageQueue;
 
-    AAudioThread            mTimestampThread;
-    // This is used by one thread to tell another thread to exit. So it must be atomic.
+    enum : int32_t {
+        START,
+        PAUSE,
+        STOP,
+        FLUSH,
+        CLOSE,
+        DISCONNECT,
+        REGISTER_AUDIO_THREAD,
+        UNREGISTER_AUDIO_THREAD,
+        GET_DESCRIPTION,
+        EXIT_STANDBY,
+    };
+    AAudioThread            mCommandThread;
     std::atomic<bool>       mThreadEnabled{false};
+    AAudioCommandQueue      mCommandQueue;
 
     int32_t                 mFramesPerBurst = 0;
     android::AudioClient    mMmapClient; // set in open, used in MMAP start()
@@ -315,6 +399,13 @@ private:
     aaudio_result_t sendServiceEvent(aaudio_service_event_t event,
                                      double dataDouble);
 
+    aaudio_result_t sendCommand(aaudio_command_opcode opCode,
+                                std::shared_ptr<AAudioCommandParam> param = nullptr,
+                                bool waitForReply = false,
+                                int64_t timeoutNanos = 0);
+
+    aaudio_result_t closeAndClear();
+
     /**
      * @return true if the queue is getting full.
      */
@@ -333,9 +424,13 @@ private:
 
     bool                    mDisconnected GUARDED_BY(mLock) {false};
 
+    bool                    mStandby GUARDED_BY(mLock) = false;
+
 protected:
     // Locking order is important.
     // Acquire mLock before acquiring AAudioServiceEndpoint::mLockStreams
+    // The lock will be held by the command thread. All operations needing the lock must run from
+    // the command thread.
     std::mutex              mLock; // Prevent start/stop/close etcetera from colliding
 };
 

@@ -388,9 +388,11 @@ AMediaCodecCryptoInfo *AMediaExtractor_getSampleCryptoInfo(AMediaExtractor *ex) 
         mode = CryptoPlugin::kMode_AES_CTR;
     }
 
+    sp<ABuffer> clearbuf;
+    sp<ABuffer> cryptedbuf;
     if (sizeof(uint32_t) != sizeof(size_t)) {
-        sp<ABuffer> clearbuf   = U32ArrayToSizeBuf(numSubSamples, (uint32_t *)cleardata);
-        sp<ABuffer> cryptedbuf = U32ArrayToSizeBuf(numSubSamples, (uint32_t *)crypteddata);
+        clearbuf   = U32ArrayToSizeBuf(numSubSamples, (uint32_t *)cleardata);
+        cryptedbuf = U32ArrayToSizeBuf(numSubSamples, (uint32_t *)crypteddata);
         cleardata   = clearbuf    == NULL ? NULL : clearbuf->data();
         crypteddata = crypteddata == NULL ? NULL : cryptedbuf->data();
         if(crypteddata == NULL || cleardata == NULL) {

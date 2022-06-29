@@ -52,7 +52,7 @@ class Camera3FakeStream :
 
     virtual void     dump(int fd, const Vector<String16> &args) const;
 
-    status_t         setTransform(int transform);
+    status_t         setTransform(int transform, bool mayChangeMirror);
 
     virtual status_t detachBuffer(sp<GraphicBuffer>* buffer, int* fenceFd);
 
@@ -100,6 +100,7 @@ class Camera3FakeStream :
 
     virtual status_t setBatchSize(size_t batchSize) override;
 
+    virtual void onMinDurationChanged(nsecs_t /*duration*/) {}
   protected:
 
     /**
@@ -108,6 +109,7 @@ class Camera3FakeStream :
     virtual status_t returnBufferCheckedLocked(
             const camera_stream_buffer &buffer,
             nsecs_t timestamp,
+            nsecs_t readoutTimestamp,
             bool output,
             int32_t transform,
             const std::vector<size_t>& surface_ids,
@@ -135,7 +137,8 @@ class Camera3FakeStream :
             const std::vector<size_t>& surface_ids = std::vector<size_t>());
     virtual status_t returnBufferLocked(
             const camera_stream_buffer &buffer,
-            nsecs_t timestamp, int32_t transform, const std::vector<size_t>& surface_ids);
+            nsecs_t timestamp, nsecs_t readoutTimestamp, int32_t transform,
+            const std::vector<size_t>& surface_ids);
 
     virtual status_t configureQueueLocked();
 

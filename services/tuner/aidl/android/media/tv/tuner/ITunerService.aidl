@@ -1,5 +1,5 @@
 /**
- * Copyright (c) 2020, The Android Open Source Project
+ * Copyright (c) 2021, The Android Open Source Project
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -16,16 +16,15 @@
 
 package android.media.tv.tuner;
 
-import android.hardware.common.fmq.MQDescriptor;
-import android.hardware.common.fmq.SynchronizedReadWrite;
-import android.hardware.common.fmq.UnsynchronizedWrite;
+import android.hardware.tv.tuner.DemuxCapabilities;
+import android.hardware.tv.tuner.FrontendInfo;
+import android.hardware.tv.tuner.FrontendType;
 import android.media.tv.tuner.ITunerDemux;
 import android.media.tv.tuner.ITunerDescrambler;
+import android.media.tv.tuner.ITunerFilter;
+import android.media.tv.tuner.ITunerFilterCallback;
 import android.media.tv.tuner.ITunerFrontend;
 import android.media.tv.tuner.ITunerLnb;
-import android.media.tv.tuner.TunerDemuxCapabilities;
-import android.media.tv.tuner.TunerFrontendDtmbCapabilities;
-import android.media.tv.tuner.TunerFrontendInfo;
 
 /**
  * TunerService interface handles tuner related operations.
@@ -33,8 +32,8 @@ import android.media.tv.tuner.TunerFrontendInfo;
  * {@hide}
  */
 //@VintfStability
+@SuppressWarnings(value={"out-array"})
 interface ITunerService {
-
     /**
      * Gets frontend IDs.
      */
@@ -43,15 +42,10 @@ interface ITunerService {
     /**
      * Retrieve the frontend's information.
      *
-     * @param frontendHandle the handle of the frontend granted by TRM.
+     * @param frontendId the ID of the frontend.
      * @return the information of the frontend.
      */
-    TunerFrontendInfo getFrontendInfo(in int frontendHandle);
-
-    /**
-     * Get Dtmb Frontend Capabilities.
-     */
-    TunerFrontendDtmbCapabilities getFrontendDtmbCapabilities(in int id);
+    FrontendInfo getFrontendInfo(in int frontendId);
 
     /**
      * Open a Tuner Frontend interface.
@@ -87,7 +81,7 @@ interface ITunerService {
      *
      * @return the demux’s capabilities.
      */
-    TunerDemuxCapabilities getDemuxCaps();
+    DemuxCapabilities getDemuxCaps();
 
     /* Open a new interface of ITunerDescrambler given a descramblerHandle.
      *
@@ -102,4 +96,38 @@ interface ITunerService {
      * value is unknown version 0.
      */
     int getTunerHalVersion();
+
+    /**
+     * Open a new SharedFilter instance of ITunerFilter.
+     *
+     * @param filterToken the SharedFilter token created by ITunerFilter.
+     * @param cb the ITunerFilterCallback used to receive callback events
+     * @return a newly created ITunerFilter interface.
+     */
+    ITunerFilter openSharedFilter(in String filterToken, in ITunerFilterCallback cb);
+
+    /**
+     * Enable or Disable Low Noise Amplifier (LNA).
+     *
+     * @param bEnable enable Lna or not.
+     */
+    void setLna(in boolean bEnable);
+
+    /**
+     * Set the maximum usable frontends number of a given frontend type. It's used by client
+     * to enable or disable frontends when cable connection status is changed by user.
+     *
+     * @param frontendType the frontend type which the maximum usable number will be set.
+     * @param maxNumber the new maximum usable number.
+     */
+    void setMaxNumberOfFrontends(in FrontendType frontendType, in int maxNumber);
+
+    /**
+     * Get the maximum usable frontends number of a given frontend type.
+     *
+     * @param frontendType the frontend type which the maximum usable number will be queried.
+     *
+     * @return the maximum usable number of the queried frontend type.
+     */
+    int getMaxNumberOfFrontends(in FrontendType frontendType);
 }

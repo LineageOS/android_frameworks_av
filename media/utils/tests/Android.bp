@@ -7,6 +7,82 @@ package {
     default_applicable_licenses: ["frameworks_av_license"],
 }
 
+cc_test_library {
+    name: "libsharedtest",
+    cflags: [
+        "-Wall",
+        "-Werror",
+        "-Wextra",
+    ],
+
+    sanitize:{
+       address: true,
+       cfi: true,
+       integer_overflow: true,
+       memtag_heap: true,
+    },
+
+    shared_libs: [
+        "liblog",
+    ],
+
+    srcs: [
+        "sharedtest.cpp",
+    ]
+}
+
+cc_test {
+    name: "library_tests",
+
+    cflags: [
+        "-Wall",
+        "-Werror",
+        "-Wextra",
+    ],
+
+    sanitize:{
+       address: true,
+       cfi: true,
+       integer_overflow: true,
+       memtag_heap: true,
+    },
+
+    shared_libs: [
+        "libbase",
+        "liblog",
+        "libmediautils",
+        "libutils",
+    ],
+
+    data_libs: [
+        "libsharedtest",
+    ],
+
+    srcs: [
+        "library_tests.cpp",
+    ],
+}
+
+cc_test {
+    name: "media_process_tests",
+
+    cflags: [
+        "-Wall",
+        "-Werror",
+        "-Wextra",
+    ],
+
+    shared_libs: [
+        "liblog",
+        "libmediautils",
+        "libutils",
+    ],
+
+    srcs: [
+        "media_process_tests.cpp",
+    ],
+}
+
 cc_test {
     name: "media_synchronization_tests",
 
@@ -24,5 +100,94 @@ cc_test {
 
     srcs: [
         "media_synchronization_tests.cpp",
+    ],
+}
+
+cc_test {
+    name: "media_threadsnapshot_tests",
+
+    cflags: [
+        "-Wall",
+        "-Werror",
+        "-Wextra",
+    ],
+
+    shared_libs: [
+        "liblog",
+        "libmediautils",
+        "libutils",
+    ],
+
+    srcs: [
+        "media_threadsnapshot_tests.cpp",
+    ],
+}
+
+cc_test {
+    name: "mediautils_scopedstatistics_tests",
+
+    cflags: [
+        "-Wall",
+        "-Werror",
+        "-Wextra",
+    ],
+
+    shared_libs: [
+        "libaudioutils",
+        "liblog",
+        "libmediautils",
+        "libutils",
+    ],
+
+    srcs: [
+        "mediautils_scopedstatistics_tests.cpp",
+    ],
+}
+
+cc_test {
+    name: "methodstatistics_tests",
+
+    cflags: [
+        "-Wall",
+        "-Werror",
+        "-Wextra",
+    ],
+
+    shared_libs: [
+        "libaudioutils",
+        "liblog",
+        "libmediautils",
+        "libutils",
+    ],
+
+    srcs: [
+        "methodstatistics_tests.cpp",
+    ],
+}
+
+cc_test {
+    name: "timecheck_tests",
+
+    cflags: [
+        "-Wall",
+        "-Werror",
+        "-Wextra",
+    ],
+
+    sanitize:{
+       address: true,
+       cfi: true,
+       integer_overflow: true,
+       memtag_heap: true,
+    },
+
+    shared_libs: [
+        "liblog",
+        "libmediautils",
+        "libutils",
+    ],
+
+    srcs: [
+        "timecheck_tests.cpp",
     ],
 }

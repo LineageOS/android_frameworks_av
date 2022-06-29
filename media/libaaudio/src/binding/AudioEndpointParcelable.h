@@ -43,7 +43,7 @@ public:
     // Ctor/assignment from a parcelable representation.
     // Since the parcelable object owns unique FDs (for shared memory blocks), move semantics are
     // provided to avoid the need to dupe.
-    AudioEndpointParcelable(Endpoint&& parcelable);
+    explicit AudioEndpointParcelable(Endpoint&& parcelable);
     AudioEndpointParcelable& operator=(Endpoint&& parcelable);
 
     /**
@@ -52,7 +52,20 @@ public:
      */
     int32_t addFileDescriptor(const android::base::unique_fd& fd, int32_t sizeInBytes);
 
+    /**
+     * Close current data file descriptor. The duplicated file descriptor will be close.
+     */
+    void closeDataFileDescriptor();
+
+    /**
+     * Update current data file descriptor with given endpoint parcelable.
+     * @param endpointParcelable an endpoint parcelable that contains new data file
+     *                           descriptor information
+     */
+    void updateDataFileDescriptor(AudioEndpointParcelable* endpointParcelable);
+
     aaudio_result_t resolve(EndpointDescriptor *descriptor);
+    aaudio_result_t resolveDataQueue(RingBufferDescriptor *descriptor);
 
     aaudio_result_t close();
 

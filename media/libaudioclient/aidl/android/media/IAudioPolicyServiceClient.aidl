@@ -16,10 +16,10 @@
 
 package android.media;
 
-import android.media.AudioConfigBase;
-import android.media.AudioSourceType;
 import android.media.EffectDescriptor;
 import android.media.RecordClientInfo;
+import android.media.audio.common.AudioConfigBase;
+import android.media.audio.common.AudioSource;
 
 /**
  * {@hide}
@@ -43,7 +43,10 @@ oneway interface IAudioPolicyServiceClient {
                                         in AudioConfigBase deviceConfig,
                                         in EffectDescriptor[] effects,
                                         int /* audio_patch_handle_t */ patchHandle,
-                                        AudioSourceType source);
+                                        AudioSource source);
      /** Notifies a change of audio routing */
      void onRoutingUpdated();
+     /** Notifies a request for volume index ranges to be reset after they were observed as invalid
+      */
+     void onVolumeRangeInitRequest();
 }

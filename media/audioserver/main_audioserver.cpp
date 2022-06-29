@@ -17,11 +17,17 @@
 #define LOG_TAG "audioserver"
 //#define LOG_NDEBUG 0
 
+#include <algorithm>
+
 #include <fcntl.h>
 #include <sys/prctl.h>
 #include <sys/wait.h>
 #include <cutils/properties.h>
 
+#include <android/media/audio/common/AudioMMapPolicy.h>
+#include <android/media/audio/common/AudioMMapPolicyInfo.h>
+#include <android/media/audio/common/AudioMMapPolicyType.h>
+#include <android/media/IAudioFlingerService.h>
 #include <binder/IPCThreadState.h>
 #include <binder/ProcessState.h>
 #include <binder/IServiceManager.h>
@@ -30,7 +36,6 @@
 #include <utils/Log.h>
 
 // from include_dirs
-#include "aaudio/AAudioTesting.h" // aaudio_policy_t, AAUDIO_PROP_MMAP_POLICY, AAUDIO_POLICY_*
 #include "AudioFlinger.h"
 #include "AudioPolicyService.h"
 #include "AAudioService.h"
@@ -38,6 +43,10 @@
 #include "MediaLogService.h"
 
 using namespace android;
+
+using android::media::audio::common::AudioMMapPolicy;
+using android::media::audio::common::AudioMMapPolicyInfo;
+using android::media::audio::common::AudioMMapPolicyType;
 
 int main(int argc __unused, char **argv)
 {
@@ -144,10 +153,24 @@ int main(int argc __unused, char **argv)
         // AAudioService should only be used in OC-MR1 and later.
         // And only enable the AAudioService if the system MMAP policy explicitly allows it.
         // This prevents a client from misusing AAudioService when it is not supported.
-        aaudio_policy_t mmapPolicy = property_get_int32(AAUDIO_PROP_MMAP_POLICY,
-                                                        AAUDIO_POLICY_NEVER);
-        if (mmapPolicy == AAUDIO_POLICY_AUTO || mmapPolicy == AAUDIO_POLICY_ALWAYS) {
+        // If we cannot get audio flinger here, there must be some serious problems. In that case,
+        // attempting to call audio flinger on a null pointer could make the process crash
+        // and attract attentions.
+        sp<IAudioFlinger> af = AudioSystem::get_audio_flinger();
+        std::vector<AudioMMapPolicyInfo> policyInfos;
+        status_t status = af->getMmapPolicyInfos(
+                AudioMMapPolicyType::DEFAULT, &policyInfos);
+        // Initialize aaudio service when querying mmap policy succeeds and
+        // any of the policy supports MMAP.
+        if (status == NO_ERROR &&
+            std::any_of(policyInfos.begin(), policyInfos.end(), [](const auto& info) {
+                    return info.mmapPolicy == AudioMMapPolicy::AUTO ||
+                           info.mmapPolicy == AudioMMapPolicy::ALWAYS;
+            })) {
             AAudioService::instantiate();
+        } else {
+            ALOGD("Do not init aaudio service, status %d, policy info size %zu",
+                  status, policyInfos.size());
         }
 
         ProcessState::self()->startThreadPool();

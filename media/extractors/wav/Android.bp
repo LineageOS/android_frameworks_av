@@ -22,8 +22,8 @@ cc_library {
 
     srcs: ["WAVExtractor.cpp"],
 
-    include_dirs: [
-        "frameworks/av/media/libstagefright/include",
+    export_include_dirs: [
+        "include",
     ],
 
     shared_libs: [

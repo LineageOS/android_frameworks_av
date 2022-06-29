@@ -44,4 +44,9 @@ interface ICameraServiceProxy
      * {@link android.hardware.camera2.CameraMetadata#SCALER_ROTATE_AND_CROP_270}).
      */
     int getRotateAndCropOverride(String packageName, int lensFacing, int userId);
+
+    /**
+     * Checks if the camera has been disabled via device policy.
+     */
+    boolean isCameraDisabled();
 }

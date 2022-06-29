@@ -20,8 +20,8 @@
 #include <gui/bufferqueue/1.0/H2BGraphicBufferProducer.h>
 
 #include <hidl/AidlCameraDeviceCallbacks.h>
-#include <hidl/Convert.h>
 #include <hidl/HidlCameraDeviceUser.h>
+#include <hidl/Utils.h>
 #include <android/hardware/camera/device/3.2/types.h>
 
 namespace android {

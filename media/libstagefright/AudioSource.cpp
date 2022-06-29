@@ -36,21 +36,9 @@ namespace android {
 
 using content::AttributionSourceState;
 
-static void AudioRecordCallbackFunction(int event, void *user, void *info) {
-    AudioSource *source = (AudioSource *) user;
-    switch (event) {
-        case AudioRecord::EVENT_MORE_DATA: {
-            source->dataCallback(*((AudioRecord::Buffer *) info));
-            break;
-        }
-        case AudioRecord::EVENT_OVERRUN: {
-            ALOGW("AudioRecord reported overrun!");
-            break;
-        }
-        default:
-            // does nothing
-            break;
-    }
+
+void AudioSource::onOverrun() {
+    ALOGW("AudioRecord reported overrun!");
 }
 
 AudioSource::AudioSource(
@@ -129,8 +117,7 @@ void AudioSource::set(
         audio_channel_in_mask_from_count(channelCount),
         attributionSource,
         (size_t) (bufCount * frameCount),
-        AudioRecordCallbackFunction,
-        this,
+        wp<AudioRecord::IAudioRecordCallback>{this},
         frameCount /*notificationFrames*/,
         AUDIO_SESSION_ALLOCATE,
         AudioRecord::TRANSFER_DEFAULT,
@@ -359,7 +346,7 @@ void AudioSource::signalBufferReturned(MediaBufferBase *buffer) {
     return;
 }
 
-status_t AudioSource::dataCallback(const AudioRecord::Buffer& audioBuffer) {
+size_t AudioSource::onMoreData(const AudioRecord::Buffer& audioBuffer) {
     int64_t timeUs, position, timeNs;
     ExtendedTimestamp ts;
     ExtendedTimestamp::Location location;
@@ -384,21 +371,21 @@ status_t AudioSource::dataCallback(const AudioRecord::Buffer& audioBuffer) {
 
     ALOGV("dataCallbackTimestamp: %" PRId64 " us", timeUs);
     Mutex::Autolock autoLock(mLock);
+
     if (!mStarted) {
         ALOGW("Spurious callback from AudioRecord. Drop the audio data.");
-        return OK;
+        return audioBuffer.size();
     }
 
-    const size_t bufferSize = audioBuffer.size;
 
     // Drop retrieved and previously lost audio data.
     if (mNumFramesReceived == 0 && timeUs < mStartTimeUs) {
         (void) mRecord->getInputFramesLost();
-        int64_t receievedFrames = bufferSize / mRecord->frameSize();
+        int64_t receievedFrames = audioBuffer.size() / mRecord->frameSize();
         ALOGV("Drop audio data(%" PRId64 " frames) at %" PRId64 "/%" PRId64 " us",
                 receievedFrames, timeUs, mStartTimeUs);
         mNumFramesSkipped += receievedFrames;
-        return OK;
+        return audioBuffer.size();
     }
 
     if (mStopSystemTimeUs != -1 && timeUs >= mStopSystemTimeUs) {
@@ -406,7 +393,7 @@ status_t AudioSource::dataCallback(const AudioRecord::Buffer& audioBuffer) {
                 (long long)timeUs, (long long)mStopSystemTimeUs);
         mNoMoreFramesToRead = true;
         mFrameAvailableCondition.signal();
-        return OK;
+        return audioBuffer.size();
     }
 
     if (mNumFramesReceived == 0 && mPrevSampleTimeUs == 0) {
@@ -427,7 +414,7 @@ status_t AudioSource::dataCallback(const AudioRecord::Buffer& audioBuffer) {
     }
 
     CHECK_EQ(numLostBytes & 1, 0u);
-    CHECK_EQ(audioBuffer.size & 1, 0u);
+    CHECK_EQ(audioBuffer.size() & 1, 0u);
     if (numLostBytes > 0) {
         // Loss of audio frames should happen rarely; thus the LOGW should
         // not cause a logging spam
@@ -449,17 +436,17 @@ status_t AudioSource::dataCallback(const AudioRecord::Buffer& audioBuffer) {
         queueInputBuffer_l(lostAudioBuffer, timeUs);
     }
 
-    if (audioBuffer.size == 0) {
+    if (audioBuffer.size() == 0) {
         ALOGW("Nothing is available from AudioRecord callback buffer");
-        return OK;
+        return audioBuffer.size();
     }
 
-    MediaBuffer *buffer = new MediaBuffer(bufferSize);
+    MediaBuffer *buffer = new MediaBuffer(audioBuffer.size());
     memcpy((uint8_t *) buffer->data(),
-            audioBuffer.i16, audioBuffer.size);
-    buffer->set_range(0, bufferSize);
+            audioBuffer.data(), audioBuffer.size());
+    buffer->set_range(0, audioBuffer.size());
     queueInputBuffer_l(buffer, timeUs);
-    return OK;
+    return audioBuffer.size();
 }
 
 void AudioSource::queueInputBuffer_l(MediaBuffer *buffer, int64_t timeUs) {

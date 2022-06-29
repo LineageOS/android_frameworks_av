@@ -20,17 +20,24 @@
 #include <unistd.h>
 #include <sys/types.h>
 
-#include "AudioProcessorBase.h"
+#include "FlowGraphNode.h"
 
-namespace flowgraph {
+namespace FLOWGRAPH_OUTER_NAMESPACE::flowgraph {
 
-class SinkI16 : public AudioSink {
+/**
+ * AudioSink that lets you read data as 16-bit signed integers.
+ */
+class SinkI16 : public FlowGraphSink {
 public:
     explicit SinkI16(int32_t channelCount);
 
     int32_t read(void *data, int32_t numFrames) override;
+
+    const char *getName() override {
+        return "SinkI16";
+    }
 };
 
-} /* namespace flowgraph */
+} /* namespace FLOWGRAPH_OUTER_NAMESPACE::flowgraph */
 
 #endif //FLOWGRAPH_SINK_I16_H

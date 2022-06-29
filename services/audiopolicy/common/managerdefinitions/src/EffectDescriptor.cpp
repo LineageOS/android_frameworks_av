@@ -17,6 +17,7 @@
 #define LOG_TAG "APM::EffectDescriptor"
 //#define LOG_NDEBUG 0
 
+#include <android-base/stringprintf.h>
 #include "EffectDescriptor.h"
 #include <utils/String8.h>
 
@@ -24,13 +25,11 @@ namespace android {
 
 void EffectDescriptor::dump(String8 *dst, int spaces) const
 {
-    dst->appendFormat("%*sID: %d\n", spaces, "", mId);
-    dst->appendFormat("%*sI/O: %d\n", spaces, "", mIo);
-    dst->appendFormat("%*sMusic Effect: %s\n", spaces, "", isMusicEffect()? "yes" : "no");
-    dst->appendFormat("%*sSession: %d\n", spaces, "", mSession);
-    dst->appendFormat("%*sName: %s\n", spaces, "",  mDesc.name);
-    dst->appendFormat("%*s%s\n", spaces, "",  mEnabled ? "Enabled" : "Disabled");
-    dst->appendFormat("%*s%s\n", spaces, "",  mSuspended ? "Suspended" : "Active");
+    dst->appendFormat("Effect ID: %d; Attached to I/O handle: %d; Session: %d;\n",
+            mId, mIo, mSession);
+    dst->appendFormat("%*sMusic Effect? %s; \"%s\"; %s; %s\n", spaces, "",
+            isMusicEffect()? "yes" : "no", mDesc.name,
+            mEnabled ? "Enabled" : "Disabled", mSuspended ? "Suspended" : "Active");
 }
 
 EffectDescriptorCollection::EffectDescriptorCollection() :
@@ -237,10 +236,14 @@ void EffectDescriptorCollection::dump(String8 *dst, int spaces, bool verbose) co
             mTotalEffectsMemory,
             mTotalEffectsMemoryMaxUsed);
     }
-    dst->appendFormat("%*sEffects:\n", spaces, "");
-    for (size_t i = 0; i < size(); i++) {
-        dst->appendFormat("%*s- Effect %d:\n", spaces, "", keyAt(i));
-        valueAt(i)->dump(dst, spaces + 2);
+    if (size() > 0) {
+        if (spaces > 1) spaces -= 2;
+        dst->appendFormat("%*s- Effects (%zu):\n", spaces, "", size());
+        for (size_t i = 0; i < size(); i++) {
+            const std::string prefix = base::StringPrintf("%*s %zu. ", spaces, "", i + 1);
+            dst->appendFormat("%s", prefix.c_str());
+            valueAt(i)->dump(dst, prefix.size());
+        }
     }
 }
 

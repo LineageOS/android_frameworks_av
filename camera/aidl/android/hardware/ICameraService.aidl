@@ -173,6 +173,13 @@ interface ICameraService
 
     void setTorchMode(String cameraId, boolean enabled, IBinder clientBinder);
 
+    // Change the brightness level of the flash unit associated with cameraId to strengthLevel.
+    // If the torch is in OFF state and strengthLevel > 0 then the torch will also be turned ON.
+    void turnOnTorchWithStrengthLevel(String cameraId, int strengthLevel, IBinder clientBinder);
+
+    // Get the brightness level of the flash unit associated with cameraId.
+    int getTorchStrengthLevel(String cameraId);
+
     /**
      * Notify the camera service of a system event.  Should only be called from system_server.
      *
@@ -180,6 +187,8 @@ interface ICameraService
      */
     const int EVENT_NONE = 0;
     const int EVENT_USER_SWITCHED = 1; // The argument is the set of new foreground user IDs.
+    const int EVENT_USB_DEVICE_ATTACHED = 2; // The argument is the deviceId and vendorId
+    const int EVENT_USB_DEVICE_DETACHED = 3; // The argument is the deviceId and vendorId
     oneway void notifySystemEvent(int eventId, in int[] args);
 
     /**

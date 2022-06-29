@@ -26,6 +26,7 @@
 #include <unordered_map>
 
 #include <binder/Parcel.h>
+#include <cutils/multiuser.h>
 #include <cutils/properties.h>
 #include <utils/Errors.h>
 #include <utils/Log.h>
@@ -343,7 +344,8 @@ bool BaseItem::isEnabled() {
         // now.
         // TODO(b/190151205): Either allow the HotwordDetectionService to access MediaMetrics or
         // make this disabling specific to that process.
-        if (uid >= AID_ISOLATED_START && uid <= AID_ISOLATED_END) {
+        uid_t appid = multiuser_get_app_id(uid);
+        if (appid >= AID_ISOLATED_START && appid <= AID_ISOLATED_END) {
             return false;
         }
         break;

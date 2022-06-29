@@ -18,10 +18,9 @@
 #define LOG_TAG "APacketSource"
 #include <utils/Log.h>
 
-#include "APacketSource.h"
-
-#include "ARawAudioAssembler.h"
-#include "ASessionDescription.h"
+#include <media/stagefright/rtsp/APacketSource.h>
+#include <media/stagefright/rtsp/ARawAudioAssembler.h>
+#include <media/stagefright/rtsp/ASessionDescription.h>
 
 #include <ctype.h>
 

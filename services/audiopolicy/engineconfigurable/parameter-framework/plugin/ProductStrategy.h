@@ -32,7 +32,7 @@ private:
 
     struct Device
     {
-        audio_devices_t applicableDevice; /**< applicable device for this strategy. */
+        uint64_t applicableDevice; /**< applicable device for this strategy. */
         char deviceAddress[mMaxStringSize]; /**< device address associated with this strategy. */
     } __attribute__((packed));
 

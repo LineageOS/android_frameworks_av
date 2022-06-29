@@ -45,6 +45,7 @@ using content::AttributionSourceState;
 static const String16 sAndroidPermissionRecordAudio("android.permission.RECORD_AUDIO");
 static const String16 sModifyPhoneState("android.permission.MODIFY_PHONE_STATE");
 static const String16 sModifyAudioRouting("android.permission.MODIFY_AUDIO_ROUTING");
+static const String16 sCallAudioInterception("android.permission.CALL_AUDIO_INTERCEPTION");
 
 static String16 resolveCallingPackage(PermissionController& permissionController,
         const std::optional<String16> opPackageName, uid_t uid) {
@@ -71,6 +72,7 @@ int32_t getOpForSource(audio_source_t source) {
   switch (source) {
     case AUDIO_SOURCE_HOTWORD:
       return AppOpsManager::OP_RECORD_AUDIO_HOTWORD;
+    case AUDIO_SOURCE_ECHO_REFERENCE: // fallthrough
     case AUDIO_SOURCE_REMOTE_SUBMIX:
       return AppOpsManager::OP_RECORD_AUDIO_OUTPUT;
     case AUDIO_SOURCE_VOICE_DOWNLINK:
@@ -179,10 +181,14 @@ void finishRecording(const AttributionSourceState& attributionSource, audio_sour
 
 bool captureAudioOutputAllowed(const AttributionSourceState& attributionSource) {
     uid_t uid = VALUE_OR_FATAL(aidl2legacy_int32_t_uid_t(attributionSource.uid));
-    pid_t pid = VALUE_OR_FATAL(aidl2legacy_int32_t_pid_t(attributionSource.pid));
     if (isAudioServerOrRootUid(uid)) return true;
     static const String16 sCaptureAudioOutput("android.permission.CAPTURE_AUDIO_OUTPUT");
-    bool ok = PermissionCache::checkPermission(sCaptureAudioOutput, pid, uid);
+    // Use PermissionChecker, which includes some logic for allowing the isolated
+    // HotwordDetectionService to hold certain permissions.
+    permission::PermissionChecker permissionChecker;
+    bool ok = (permissionChecker.checkPermissionForPreflight(
+            sCaptureAudioOutput, attributionSource, String16(),
+            AppOpsManager::OP_NONE) != permission::PermissionChecker::PERMISSION_HARD_DENIED);
     if (!ok) ALOGV("Request requires android.permission.CAPTURE_AUDIO_OUTPUT");
     return ok;
 }
@@ -215,6 +221,17 @@ bool captureVoiceCommunicationOutputAllowed(const AttributionSourceState& attrib
         "android.permission.CAPTURE_VOICE_COMMUNICATION_OUTPUT");
     bool ok = PermissionCache::checkPermission(sCaptureVoiceCommOutput, pid, uid);
     if (!ok) ALOGE("Request requires android.permission.CAPTURE_VOICE_COMMUNICATION_OUTPUT");
+    return ok;
+}
+
+bool accessUltrasoundAllowed(const AttributionSourceState& attributionSource) {
+    uid_t uid = VALUE_OR_FATAL(aidl2legacy_int32_t_uid_t(attributionSource.uid));
+    uid_t pid = VALUE_OR_FATAL(aidl2legacy_int32_t_pid_t(attributionSource.pid));
+    if (isAudioServerOrRootUid(uid)) return true;
+    static const String16 sAccessUltrasound(
+        "android.permission.ACCESS_ULTRASOUND");
+    bool ok = PermissionCache::checkPermission(sAccessUltrasound, pid, uid);
+    if (!ok) ALOGE("Request requires android.permission.ACCESS_ULTRASOUND");
     return ok;
 }
 
@@ -305,6 +322,17 @@ bool bypassInterruptionPolicyAllowed(const AttributionSourceState& attributionSo
         || PermissionCache::checkPermission(sModifyAudioRouting, pid, uid);
     ALOGE_IF(!ok, "Request requires %s or %s",
              String8(sModifyPhoneState).c_str(), String8(sWriteSecureSettings).c_str());
+    return ok;
+}
+
+bool callAudioInterceptionAllowed(const AttributionSourceState& attributionSource) {
+    uid_t uid = VALUE_OR_FATAL(aidl2legacy_int32_t_uid_t(attributionSource.uid));
+    pid_t pid = VALUE_OR_FATAL(aidl2legacy_int32_t_pid_t(attributionSource.pid));
+
+    // IMPORTANT: Use PermissionCache - not a runtime permission and may not change.
+    bool ok = PermissionCache::checkPermission(sCallAudioInterception, pid, uid);
+    if (!ok) ALOGV("%s(): android.permission.CALL_AUDIO_INTERCEPTION denied for uid %d",
+        __func__, uid);
     return ok;
 }
 

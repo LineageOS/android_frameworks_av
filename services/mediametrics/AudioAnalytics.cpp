@@ -66,16 +66,7 @@ auto ENUM_EXTRACT(const T& x) {
 }
 
 // The status variable contains status_t codes which are used by
-// the core audio framework.
-//
-// We also consider AAudio status codes as they are non-overlapping with status_t
-// and compiler checked here.
-//
-// Caution: As AAUDIO_ERROR codes have a unique range (AAUDIO_ERROR_BASE = -900),
-// overlap with status_t should not present an issue.
-//
-// See: system/core/libutils/include/utils/Errors.h
-//      frameworks/av/media/libaaudio/include/aaudio/AAudio.h
+// the core audio framework. We also consider AAudio status codes.
 //
 // Compare with mediametrics::statusToStatusString
 //
@@ -184,6 +175,39 @@ static constexpr const char * const AudioTrackDeviceUsageFields[] = {
     "log_session_id",
 };
 
+static constexpr const char * const AudioRecordStatusFields[] {
+    "mediametrics_audiorecordstatus_reported",
+    "status",
+    "debug_message",
+    "status_subcode",
+    "uid",
+    "event",
+    "input_flags",
+    "source",
+    "encoding",
+    "channel_mask",
+    "buffer_frame_count",
+    "sample_rate",
+};
+
+static constexpr const char * const AudioTrackStatusFields[] {
+    "mediametrics_audiotrackstatus_reported",
+    "status",
+    "debug_message",
+    "status_subcode",
+    "uid",
+    "event",
+    "output_flags",
+    "content_type",
+    "usage",
+    "encoding",
+    "channel_mask",
+    "buffer_frame_count",
+    "sample_rate",
+    "speed",
+    "pitch",
+};
+
 static constexpr const char * const AudioDeviceConnectionFields[] = {
     "mediametrics_audiodeviceconnection_reported",
     "input_devices",
@@ -273,33 +297,35 @@ AudioAnalytics::AudioAnalytics(const std::shared_ptr<StatsdLog>& statsdLog)
     ALOGD("%s", __func__);
 
     // Add action to save AnalyticsState if audioserver is restarted.
-    // This triggers on an item of "audio.flinger"
-    // with a property "event" set to "AudioFlinger" (the constructor).
+    // This triggers on AudioFlinger or AudioPolicy ctors and onFirstRef,
+    // as well as TimeCheck events.
     mActions.addAction(
         AMEDIAMETRICS_KEY_AUDIO_FLINGER "." AMEDIAMETRICS_PROP_EVENT,
         std::string(AMEDIAMETRICS_PROP_EVENT_VALUE_CTOR),
         std::make_shared<AnalyticsActions::Function>(
             [this](const std::shared_ptr<const android::mediametrics::Item> &item){
-                ALOGW("(key=%s) Audioflinger constructor event detected", item->getKey().c_str());
-                mPreviousAnalyticsState.set(std::make_shared<AnalyticsState>(
-                        *mAnalyticsState.get()));
-                // Note: get returns shared_ptr temp, whose lifetime is extended
-                // to end of full expression.
-                mAnalyticsState->clear();  // TODO: filter the analytics state.
-                // Perhaps report this.
-
-                // Set up a timer to expire the previous audio state to save space.
-                // Use the transaction log size as a cookie to see if it is the
-                // same as before.  A benign race is possible where a state is cleared early.
-                const size_t size = mPreviousAnalyticsState->transactionLog().size();
-                mTimedAction.postIn(
-                        std::chrono::seconds(PREVIOUS_STATE_EXPIRE_SEC), [this, size](){
-                    if (mPreviousAnalyticsState->transactionLog().size() == size) {
-                        ALOGD("expiring previous audio state after %d seconds.",
-                                PREVIOUS_STATE_EXPIRE_SEC);
-                        mPreviousAnalyticsState->clear();  // removes data from the state.
-                    }
-                });
+                mHealth.onAudioServerStart(Health::Module::AUDIOFLINGER, item);
+            }));
+    mActions.addAction(
+        AMEDIAMETRICS_KEY_AUDIO_POLICY "." AMEDIAMETRICS_PROP_EVENT,
+        std::string(AMEDIAMETRICS_PROP_EVENT_VALUE_CTOR),
+        std::make_shared<AnalyticsActions::Function>(
+            [this](const std::shared_ptr<const android::mediametrics::Item> &item){
+                mHealth.onAudioServerStart(Health::Module::AUDIOPOLICY, item);
+            }));
+    mActions.addAction(
+        AMEDIAMETRICS_KEY_AUDIO_FLINGER "." AMEDIAMETRICS_PROP_EVENT,
+        std::string(AMEDIAMETRICS_PROP_EVENT_VALUE_TIMEOUT),
+        std::make_shared<AnalyticsActions::Function>(
+            [this](const std::shared_ptr<const android::mediametrics::Item> &item){
+                mHealth.onAudioServerTimeout(Health::Module::AUDIOFLINGER, item);
+            }));
+    mActions.addAction(
+        AMEDIAMETRICS_KEY_AUDIO_POLICY "." AMEDIAMETRICS_PROP_EVENT,
+        std::string(AMEDIAMETRICS_PROP_EVENT_VALUE_TIMEOUT),
+        std::make_shared<AnalyticsActions::Function>(
+            [this](const std::shared_ptr<const android::mediametrics::Item> &item){
+                mHealth.onAudioServerTimeout(Health::Module::AUDIOPOLICY, item);
             }));
 
     // Handle legacy aaudio playback stream statistics
@@ -525,6 +551,172 @@ void AudioAnalytics::processStatus(const std::shared_ptr<const mediametrics::Ite
     // Add to the heat map - we automatically track every item's status to see
     // the types of errors and the frequency of errors.
     mHeatMap.add(prefixKey, suffixKey, eventStr, statusString, uid, message, subCode);
+
+    // Certain keys/event pairs are sent to statsd.  If we get a match (true) we return early.
+    if (reportAudioRecordStatus(item, key, eventStr, statusString, uid, message, subCode)) return;
+    if (reportAudioTrackStatus(item, key, eventStr, statusString, uid, message, subCode)) return;
+}
+
+bool AudioAnalytics::reportAudioRecordStatus(
+        const std::shared_ptr<const mediametrics::Item>& item,
+        const std::string& key, const std::string& eventStr,
+        const std::string& statusString, uid_t uid, const std::string& message,
+        int32_t subCode) const
+{
+    // Note that the prefixes often end with a '.' so we use startsWith.
+    if (!startsWith(key, AMEDIAMETRICS_KEY_PREFIX_AUDIO_RECORD)) return false;
+    if (eventStr == AMEDIAMETRICS_PROP_EVENT_VALUE_CREATE) {
+        const int atom_status = types::lookup<types::STATUS, int32_t>(statusString);
+
+        // currently we only send create status events.
+        const int32_t event = android::util::
+                MEDIAMETRICS_AUDIO_RECORD_STATUS_REPORTED__EVENT__AUDIO_RECORD_EVENT_CREATE;
+
+        // The following fields should all be present in a create event.
+        std::string flagsStr;
+        ALOGD_IF(!item->get(AMEDIAMETRICS_PROP_ORIGINALFLAGS, &flagsStr),
+                "%s: %s missing %s field", __func__,
+                AMEDIAMETRICS_KEY_PREFIX_AUDIO_RECORD, AMEDIAMETRICS_PROP_ORIGINALFLAGS);
+        const auto flags = types::lookup<types::INPUT_FLAG, int32_t>(flagsStr);
+
+        // AMEDIAMETRICS_PROP_SESSIONID omitted from atom
+
+        std::string sourceStr;
+        ALOGD_IF(!item->get(AMEDIAMETRICS_PROP_SOURCE, &sourceStr),
+                "%s: %s missing %s field",
+                __func__, AMEDIAMETRICS_KEY_PREFIX_AUDIO_RECORD, AMEDIAMETRICS_PROP_SOURCE);
+        const int32_t source = types::lookup<types::SOURCE_TYPE, int32_t>(sourceStr);
+
+        // AMEDIAMETRICS_PROP_SELECTEDDEVICEID omitted from atom
+
+        std::string encodingStr;
+        ALOGD_IF(!item->get(AMEDIAMETRICS_PROP_ENCODING, &encodingStr),
+                "%s: %s missing %s field",
+                __func__, AMEDIAMETRICS_KEY_PREFIX_AUDIO_RECORD, AMEDIAMETRICS_PROP_ENCODING);
+        const auto encoding = types::lookup<types::ENCODING, int32_t>(encodingStr);
+
+        int32_t channelMask = 0;
+        ALOGD_IF(!item->get(AMEDIAMETRICS_PROP_CHANNELMASK, &channelMask),
+                "%s: %s missing %s field",
+                __func__, AMEDIAMETRICS_KEY_PREFIX_AUDIO_RECORD, AMEDIAMETRICS_PROP_CHANNELMASK);
+        int32_t frameCount = 0;
+        ALOGD_IF(!item->get(AMEDIAMETRICS_PROP_FRAMECOUNT, &frameCount),
+                "%s: %s missing %s field",
+                __func__, AMEDIAMETRICS_KEY_PREFIX_AUDIO_RECORD, AMEDIAMETRICS_PROP_FRAMECOUNT);
+        int32_t sampleRate = 0;
+        ALOGD_IF(!item->get(AMEDIAMETRICS_PROP_SAMPLERATE, &sampleRate),
+                "%s: %s missing %s field",
+                __func__, AMEDIAMETRICS_KEY_PREFIX_AUDIO_RECORD, AMEDIAMETRICS_PROP_SAMPLERATE);
+
+        const auto [ result, str ] = sendToStatsd(AudioRecordStatusFields,
+                CONDITION(android::util::MEDIAMETRICS_AUDIORECORDSTATUS_REPORTED)
+                , atom_status
+                , message.c_str()
+                , subCode
+                , uid
+                , event
+                , flags
+                , source
+                , encoding
+                , (int64_t)channelMask
+                , frameCount
+                , sampleRate
+                );
+        ALOGV("%s: statsd %s", __func__, str.c_str());
+        mStatsdLog->log(android::util::MEDIAMETRICS_AUDIORECORDSTATUS_REPORTED, str);
+        return true;
+    }
+    return false;
+}
+
+bool AudioAnalytics::reportAudioTrackStatus(
+        const std::shared_ptr<const mediametrics::Item>& item,
+        const std::string& key, const std::string& eventStr,
+        const std::string& statusString, uid_t uid, const std::string& message,
+        int32_t subCode) const
+{
+    // Note that the prefixes often end with a '.' so we use startsWith.
+    if (!startsWith(key, AMEDIAMETRICS_KEY_PREFIX_AUDIO_TRACK)) return false;
+    if (eventStr == AMEDIAMETRICS_PROP_EVENT_VALUE_CREATE) {
+        const int atom_status = types::lookup<types::STATUS, int32_t>(statusString);
+
+        // currently we only send create status events.
+        const int32_t event = android::util::
+                MEDIAMETRICS_AUDIO_TRACK_STATUS_REPORTED__EVENT__AUDIO_TRACK_EVENT_CREATE;
+
+        // The following fields should all be present in a create event.
+        std::string flagsStr;
+        ALOGD_IF(!item->get(AMEDIAMETRICS_PROP_ORIGINALFLAGS, &flagsStr),
+                "%s: %s missing %s field",
+                __func__, AMEDIAMETRICS_KEY_PREFIX_AUDIO_TRACK, AMEDIAMETRICS_PROP_ORIGINALFLAGS);
+        const auto flags = types::lookup<types::OUTPUT_FLAG, int32_t>(flagsStr);
+
+        // AMEDIAMETRICS_PROP_SESSIONID omitted from atom
+
+        std::string contentTypeStr;
+        ALOGD_IF(!item->get(AMEDIAMETRICS_PROP_CONTENTTYPE, &contentTypeStr),
+                "%s: %s missing %s field",
+                __func__, AMEDIAMETRICS_KEY_PREFIX_AUDIO_TRACK, AMEDIAMETRICS_PROP_CONTENTTYPE);
+        const auto contentType = types::lookup<types::CONTENT_TYPE, int32_t>(contentTypeStr);
+
+        std::string usageStr;
+        ALOGD_IF(!item->get(AMEDIAMETRICS_PROP_USAGE, &usageStr),
+                "%s: %s missing %s field",
+                __func__, AMEDIAMETRICS_KEY_PREFIX_AUDIO_TRACK, AMEDIAMETRICS_PROP_USAGE);
+        const auto usage = types::lookup<types::USAGE, int32_t>(usageStr);
+
+        // AMEDIAMETRICS_PROP_SELECTEDDEVICEID omitted from atom
+
+        std::string encodingStr;
+        ALOGD_IF(!item->get(AMEDIAMETRICS_PROP_ENCODING, &encodingStr),
+                "%s: %s missing %s field",
+                __func__, AMEDIAMETRICS_KEY_PREFIX_AUDIO_TRACK, AMEDIAMETRICS_PROP_ENCODING);
+        const auto encoding = types::lookup<types::ENCODING, int32_t>(encodingStr);
+
+        int32_t channelMask = 0;
+        ALOGD_IF(!item->get(AMEDIAMETRICS_PROP_CHANNELMASK, &channelMask),
+                "%s: %s missing %s field",
+                __func__, AMEDIAMETRICS_KEY_PREFIX_AUDIO_TRACK, AMEDIAMETRICS_PROP_CHANNELMASK);
+        int32_t frameCount = 0;
+        ALOGD_IF(!item->get(AMEDIAMETRICS_PROP_FRAMECOUNT, &frameCount),
+                "%s: %s missing %s field",
+                __func__, AMEDIAMETRICS_KEY_PREFIX_AUDIO_TRACK, AMEDIAMETRICS_PROP_FRAMECOUNT);
+        int32_t sampleRate = 0;
+        ALOGD_IF(!item->get(AMEDIAMETRICS_PROP_SAMPLERATE, &sampleRate),
+                "%s: %s missing %s field",
+                __func__, AMEDIAMETRICS_KEY_PREFIX_AUDIO_TRACK, AMEDIAMETRICS_PROP_SAMPLERATE);
+        double speed = 0.f;  // default is 1.f
+        ALOGD_IF(!item->get(AMEDIAMETRICS_PROP_PLAYBACK_SPEED, &speed),
+                "%s: %s missing %s field",
+                __func__,
+                AMEDIAMETRICS_KEY_PREFIX_AUDIO_TRACK, AMEDIAMETRICS_PROP_PLAYBACK_SPEED);
+        double pitch = 0.f;  // default is 1.f
+        ALOGD_IF(!item->get(AMEDIAMETRICS_PROP_PLAYBACK_PITCH, &pitch),
+                "%s: %s missing %s field",
+                __func__,
+                AMEDIAMETRICS_KEY_PREFIX_AUDIO_TRACK, AMEDIAMETRICS_PROP_PLAYBACK_PITCH);
+        const auto [ result, str ] = sendToStatsd(AudioTrackStatusFields,
+                CONDITION(android::util::MEDIAMETRICS_AUDIOTRACKSTATUS_REPORTED)
+                , atom_status
+                , message.c_str()
+                , subCode
+                , uid
+                , event
+                , flags
+                , contentType
+                , usage
+                , encoding
+                , (int64_t)channelMask
+                , frameCount
+                , sampleRate
+                , (float)speed
+                , (float)pitch
+                );
+        ALOGV("%s: statsd %s", __func__, str.c_str());
+        mStatsdLog->log(android::util::MEDIAMETRICS_AUDIOTRACKSTATUS_REPORTED, str);
+        return true;
+    }
+    return false;
 }
 
 // HELPER METHODS
@@ -1199,5 +1391,139 @@ void AudioAnalytics::AAudioStreamInfo::endAAudioStream(
         mAudioAnalytics.mStatsdLog->log(android::util::MEDIAMETRICS_AAUDIOSTREAM_REPORTED, str);
     }
 }
+
+// Create new state, typically occurs after an AudioFlinger ctor event.
+void AudioAnalytics::newState()
+{
+    mPreviousAnalyticsState.set(std::make_shared<AnalyticsState>(
+            *mAnalyticsState.get()));
+    // Note: get returns shared_ptr temp, whose lifetime is extended
+    // to end of full expression.
+    mAnalyticsState->clear();  // TODO: filter the analytics state.
+    // Perhaps report this.
+
+    // Set up a timer to expire the previous audio state to save space.
+    // Use the transaction log size as a cookie to see if it is the
+    // same as before.  A benign race is possible where a state is cleared early.
+    const size_t size = mPreviousAnalyticsState->transactionLog().size();
+    mTimedAction.postIn(
+            std::chrono::seconds(PREVIOUS_STATE_EXPIRE_SEC), [this, size](){
+        if (mPreviousAnalyticsState->transactionLog().size() == size) {
+            ALOGD("expiring previous audio state after %d seconds.",
+                    PREVIOUS_STATE_EXPIRE_SEC);
+            mPreviousAnalyticsState->clear();  // removes data from the state.
+        }
+    });
+}
+
+void AudioAnalytics::Health::onAudioServerStart(Module module,
+        const std::shared_ptr<const android::mediametrics::Item> &item)
+{
+    const auto nowTime = std::chrono::system_clock::now();
+    if (module == Module::AUDIOFLINGER) {
+       {
+            std::lock_guard lg(mLock);
+            // reset state on AudioFlinger construction.
+            // AudioPolicy is created after AudioFlinger.
+            mAudioFlingerCtorTime = nowTime;
+            mSimpleLog.log("AudioFlinger ctor");
+        }
+        mAudioAnalytics.newState();
+        return;
+    }
+    if (module == Module::AUDIOPOLICY) {
+        // A start event occurs when audioserver
+        //
+        // (1) Starts the first time
+        // (2) Restarts because of the TimeCheck watchdog
+        // (3) Restarts not because of the TimeCheck watchdog.
+        int64_t executionTimeNs = 0;
+        (void)item->get(AMEDIAMETRICS_PROP_EXECUTIONTIMENS, &executionTimeNs);
+        const float loadTimeMs = executionTimeNs * 1e-6f;
+        std::lock_guard lg(mLock);
+        const int64_t restarts = mStartCount;
+        if (mStopCount == mStartCount) {
+            mAudioPolicyCtorTime = nowTime;
+            ++mStartCount;
+            if (mStopCount == 0) {
+                // (1) First time initialization.
+                ALOGW("%s: (key=%s) AudioPolicy ctor, loadTimeMs:%f",
+                        __func__, item->getKey().c_str(), loadTimeMs);
+                mSimpleLog.log("AudioPolicy ctor, loadTimeMs:%f", loadTimeMs);
+            } else {
+                // (2) Previous failure caught due to TimeCheck.  We know how long restart takes.
+                const float restartMs =
+                        std::chrono::duration_cast<std::chrono::duration<float, std::milli>>(
+                                mAudioFlingerCtorTime - mStopTime).count();
+                ALOGW("%s: (key=%s) AudioPolicy ctor, "
+                        "restarts:%lld restartMs:%f loadTimeMs:%f",
+                        __func__, item->getKey().c_str(),
+                        (long long)restarts, restartMs, loadTimeMs);
+                mSimpleLog.log("AudioPolicy ctor restarts:%lld restartMs:%f loadTimeMs:%f",
+                        (long long)restarts, restartMs, loadTimeMs);
+            }
+        } else {
+            // (3) Previous failure is NOT due to TimeCheck, so we don't know the restart time.
+            // However we can estimate the uptime from the delta time from previous ctor.
+            const float uptimeMs =
+                    std::chrono::duration_cast<std::chrono::duration<float, std::milli>>(
+                            nowTime - mAudioFlingerCtorTime).count();
+            mStopCount = mStartCount;
+            mAudioPolicyCtorTime = nowTime;
+            ++mStartCount;
+
+            ALOGW("%s: (key=%s) AudioPolicy ctor after uncaught failure, "
+                    "mStartCount:%lld mStopCount:%lld uptimeMs:%f loadTimeMs:%f",
+                    __func__, item->getKey().c_str(),
+                    (long long)mStartCount, (long long)mStopCount, uptimeMs, loadTimeMs);
+            mSimpleLog.log("AudioPolicy ctor after uncaught failure, "
+                    "restarts:%lld uptimeMs:%f loadTimeMs:%f",
+                    (long long)restarts, uptimeMs, loadTimeMs);
+        }
+    }
+}
+
+void AudioAnalytics::Health::onAudioServerTimeout(Module module,
+        const std::shared_ptr<const android::mediametrics::Item> &item)
+{
+    std::string moduleName = getModuleName(module);
+    int64_t methodCode{};
+    std::string methodName;
+    (void)item->get(AMEDIAMETRICS_PROP_METHODCODE, &methodCode);
+    (void)item->get(AMEDIAMETRICS_PROP_METHODNAME, &methodName);
+
+    std::lock_guard lg(mLock);
+    if (mStopCount >= mStartCount) {
+        ALOGD("%s: (key=%s) %s timeout %s(%lld) "
+            "unmatched mStopCount(%lld) >= mStartCount(%lld), ignoring",
+            __func__, item->getKey().c_str(), moduleName.c_str(),
+            methodName.c_str(), (long long)methodCode,
+            (long long)mStopCount, (long long)mStartCount);
+        return;
+    }
+
+    const int64_t restarts = mStartCount - 1;
+    ++mStopCount;
+    mStopTime = std::chrono::system_clock::now();
+    const float uptimeMs = std::chrono::duration_cast<std::chrono::duration<float, std::milli>>(
+            mStopTime - mAudioFlingerCtorTime).count();
+    ALOGW("%s: (key=%s) %s timeout %s(%lld) restarts:%lld uptimeMs:%f",
+         __func__, item->getKey().c_str(), moduleName.c_str(),
+         methodName.c_str(), (long long)methodCode,
+         (long long)restarts, uptimeMs);
+    mSimpleLog.log("%s timeout %s(%lld) restarts:%lld uptimeMs:%f",
+            moduleName.c_str(), methodName.c_str(), (long long)methodCode,
+            (long long)restarts, uptimeMs);
+}
+
+std::pair<std::string, int32_t> AudioAnalytics::Health::dump(
+        int32_t lines, const char *prefix) const
+{
+    std::lock_guard lg(mLock);
+    std::string s = mSimpleLog.dumpToString(prefix == nullptr ? "" : prefix, lines);
+    size_t n = std::count(s.begin(), s.end(), '\n');
+    return { s, n };
+}
+
 
 } // namespace android::mediametrics

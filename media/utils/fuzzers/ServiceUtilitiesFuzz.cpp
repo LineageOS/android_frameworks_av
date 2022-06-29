@@ -17,7 +17,7 @@
 #include <fcntl.h>
 
 #include <functional>
-#include <type_traits>
+#include  <type_traits>
 
 #include <android/content/AttributionSourceState.h>
 #include "fuzzer/FuzzedDataProvider.h"

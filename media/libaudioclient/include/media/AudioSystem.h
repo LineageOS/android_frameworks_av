@@ -19,26 +19,31 @@
 
 #include <sys/types.h>
 
+#include <set>
+#include <vector>
+
+#include <android/content/AttributionSourceState.h>
 #include <android/media/AudioVibratorInfo.h>
 #include <android/media/BnAudioFlingerClient.h>
 #include <android/media/BnAudioPolicyServiceClient.h>
 #include <android/media/INativeSpatializerCallback.h>
 #include <android/media/ISpatializer.h>
-#include <android/content/AttributionSourceState.h>
+#include <android/media/audio/common/AudioMMapPolicyInfo.h>
+#include <android/media/audio/common/AudioMMapPolicyType.h>
+#include <android/media/audio/common/AudioPort.h>
 #include <media/AidlConversionUtil.h>
+#include <media/AudioContainers.h>
 #include <media/AudioDeviceTypeAddr.h>
 #include <media/AudioPolicy.h>
 #include <media/AudioProductStrategy.h>
 #include <media/AudioVolumeGroup.h>
 #include <media/AudioIoDescriptor.h>
 #include <media/MicrophoneInfo.h>
-#include <set>
 #include <system/audio.h>
 #include <system/audio_effect.h>
 #include <system/audio_policy.h>
 #include <utils/Errors.h>
 #include <utils/Mutex.h>
-#include <vector>
 
 using android::content::AttributionSourceState;
 
@@ -72,6 +77,7 @@ typedef void (*record_config_callback)(int event,
                                        audio_patch_handle_t patchHandle,
                                        audio_source_t source);
 typedef void (*routing_callback)();
+typedef void (*vol_range_init_req_callback)();
 
 class IAudioFlinger;
 class String8;
@@ -149,6 +155,7 @@ public:
     static void setDynPolicyCallback(dynamic_policy_callback cb);
     static void setRecordConfigCallback(record_config_callback);
     static void setRoutingCallback(routing_callback cb);
+    static void setVolInitReqCallback(vol_range_init_req_callback cb);
 
     // Sets the binder to use for accessing the AudioFlinger service. This enables the system server
     // to grant specific isolated processes access to the audio system. Currently used only for the
@@ -259,8 +266,8 @@ public:
     // IAudioPolicyService interface (see AudioPolicyInterface for method descriptions)
     //
     static void onNewAudioModulesAvailable();
-    static status_t setDeviceConnectionState(audio_devices_t device, audio_policy_dev_state_t state,
-                                             const char *device_address, const char *device_name,
+    static status_t setDeviceConnectionState(audio_policy_dev_state_t state,
+                                             const android::media::audio::common::AudioPort& port,
                                              audio_format_t encodedFormat);
     static audio_policy_dev_state_t getDeviceConnectionState(audio_devices_t device,
                                                                 const char *device_address);
@@ -281,7 +288,8 @@ public:
                                      audio_output_flags_t flags,
                                      audio_port_handle_t *selectedDeviceId,
                                      audio_port_handle_t *portId,
-                                     std::vector<audio_io_handle_t> *secondaryOutputs);
+                                     std::vector<audio_io_handle_t> *secondaryOutputs,
+                                     bool *isSpatialized);
     static status_t startOutput(audio_port_handle_t portId);
     static status_t stopOutput(audio_port_handle_t portId);
     static void releaseOutput(audio_port_handle_t portId);
@@ -323,9 +331,9 @@ public:
     static status_t getMinVolumeIndexForAttributes(const audio_attributes_t &attr, int &index);
 
     static product_strategy_t getStrategyForStream(audio_stream_type_t stream);
-    static audio_devices_t getDevicesForStream(audio_stream_type_t stream);
     static status_t getDevicesForAttributes(const AudioAttributes &aa,
-                                            AudioDeviceTypeAddrVector *devices);
+                                            AudioDeviceTypeAddrVector *devices,
+                                            bool forVolume);
 
     static audio_io_handle_t getOutputForEffect(const effect_descriptor_t *desc);
     static status_t registerEffect(const effect_descriptor_t *desc,
@@ -342,6 +350,7 @@ public:
     static void clearAudioConfigCache();
 
     static const sp<media::IAudioPolicyService> get_audio_policy_service();
+    static void clearAudioPolicyService();
 
     // helpers for android.media.AudioManager.getProperty(), see description there for meaning
     static uint32_t getPrimaryOutputSamplingRate();
@@ -369,7 +378,8 @@ public:
                                    struct audio_port_v7 *ports,
                                    unsigned int *generation);
 
-    /* Get attributes for a given audio port */
+    /* Get attributes for a given audio port. On input, the port
+     * only needs the 'id' field to be filled in. */
     static status_t getAudioPort(struct audio_port_v7 *port);
 
     /* Create an audio patch between several source and sink ports */
@@ -433,12 +443,15 @@ public:
                                                audio_format_t *surroundFormats);
     static status_t setSurroundFormatEnabled(audio_format_t audioFormat, bool enabled);
 
-    static status_t setAssistantUid(uid_t uid);
-    static status_t setHotwordDetectionServiceUid(uid_t uid);
+    static status_t setAssistantServicesUids(const std::vector<uid_t>& uids);
+    static status_t setActiveAssistantServicesUids(const std::vector<uid_t>& activeUids);
+
     static status_t setA11yServicesUids(const std::vector<uid_t>& uids);
     static status_t setCurrentImeUid(uid_t uid);
 
     static bool     isHapticPlaybackSupported();
+
+    static bool     isUltrasoundSupported();
 
     static status_t listAudioProductStrategies(AudioProductStrategyVector &strategies);
     static status_t getProductStrategyFromAudioAttributes(
@@ -532,9 +545,32 @@ public:
                                      const AudioDeviceTypeAddrVector &devices,
                                      bool *canBeSpatialized);
 
+    /**
+     * Query how the direct playback is currently supported on the device.
+     * @param attr audio attributes describing the playback use case
+     * @param config audio configuration for the playback
+     * @param directMode out: a set of flags describing how the direct playback is currently
+     *        supported on the device
+     * @return NO_ERROR in case of success, DEAD_OBJECT, NO_INIT, BAD_VALUE, PERMISSION_DENIED
+     *         in case of error.
+     */
+    static status_t getDirectPlaybackSupport(const audio_attributes_t *attr,
+                                             const audio_config_t *config,
+                                             audio_direct_mode_t *directMode);
+
+
+    /**
+     * Query which direct audio profiles are available for the specified audio attributes.
+     * @param attr audio attributes describing the playback use case
+     * @param audioProfiles out: a vector of audio profiles
+     * @return NO_ERROR in case of success, DEAD_OBJECT, NO_INIT, BAD_VALUE, PERMISSION_DENIED
+     *         in case of error.
+     */
+    static status_t getDirectProfilesForAttributes(const audio_attributes_t* attr,
+                                            std::vector<audio_profile>* audioProfiles);
 
     // A listener for capture state changes.
-    class CaptureStateListener : public RefBase {
+    class CaptureStateListener : public virtual RefBase {
     public:
         // Called whenever capture state changes.
         virtual void onStateChanged(bool active) = 0;
@@ -559,7 +595,7 @@ public:
 
     // ----------------------------------------------------------------------------
 
-    class AudioVolumeGroupCallback : public RefBase
+    class AudioVolumeGroupCallback : public virtual RefBase
     {
     public:
 
@@ -574,7 +610,7 @@ public:
     static status_t addAudioVolumeGroupCallback(const sp<AudioVolumeGroupCallback>& callback);
     static status_t removeAudioVolumeGroupCallback(const sp<AudioVolumeGroupCallback>& callback);
 
-    class AudioPortCallback : public RefBase
+    class AudioPortCallback : public virtual RefBase
     {
     public:
 
@@ -590,7 +626,7 @@ public:
     static status_t addAudioPortCallback(const sp<AudioPortCallback>& callback);
     static status_t removeAudioPortCallback(const sp<AudioPortCallback>& callback);
 
-    class AudioDeviceCallback : public RefBase
+    class AudioDeviceCallback : public virtual RefBase
     {
     public:
 
@@ -611,6 +647,14 @@ public:
     static audio_port_handle_t getDeviceIdForIo(audio_io_handle_t audioIo);
 
     static status_t setVibratorInfos(const std::vector<media::AudioVibratorInfo>& vibratorInfos);
+
+    static status_t getMmapPolicyInfo(
+            media::audio::common::AudioMMapPolicyType policyType,
+            std::vector<media::audio::common::AudioMMapPolicyInfo> *policyInfos);
+
+    static int32_t getAAudioMixerBurstCount();
+
+    static int32_t getAAudioHardwareBurstMinUsec();
 
 private:
 
@@ -688,13 +732,14 @@ private:
         binder::Status onRecordingConfigurationUpdate(
                 int32_t event,
                 const media::RecordClientInfo& clientInfo,
-                const media::AudioConfigBase& clientConfig,
+                const media::audio::common::AudioConfigBase& clientConfig,
                 const std::vector<media::EffectDescriptor>& clientEffects,
-                const media::AudioConfigBase& deviceConfig,
+                const media::audio::common::AudioConfigBase& deviceConfig,
                 const std::vector<media::EffectDescriptor>& effects,
                 int32_t patchHandle,
-                media::AudioSourceType source) override;
+                media::audio::common::AudioSource source) override;
         binder::Status onRoutingUpdated();
+        binder::Status onVolumeRangeInitRequest();
 
     private:
         Mutex                               mLock;
@@ -722,6 +767,7 @@ private:
     static dynamic_policy_callback gDynPolicyCallback;
     static record_config_callback gRecordConfigCallback;
     static routing_callback gRoutingCallback;
+    static vol_range_init_req_callback gVolRangeInitReqCallback;
 
     static size_t gInBuffSize;
     // previous parameters for recording buffer size queries

@@ -85,9 +85,9 @@ aaudio_result_t SharedRingBuffer::allocate(fifo_frames_t   bytesPerFrame,
     return AAUDIO_OK;
 }
 
-void SharedRingBuffer::fillParcelable(AudioEndpointParcelable &endpointParcelable,
+void SharedRingBuffer::fillParcelable(AudioEndpointParcelable* endpointParcelable,
                     RingBufferParcelable &ringBufferParcelable) {
-    int fdIndex = endpointParcelable.addFileDescriptor(mFileDescriptor, mSharedMemorySizeInBytes);
+    int fdIndex = endpointParcelable->addFileDescriptor(mFileDescriptor, mSharedMemorySizeInBytes);
     ringBufferParcelable.setupMemory(fdIndex,
                                      SHARED_RINGBUFFER_DATA_OFFSET,
                                      mDataMemorySizeInBytes,

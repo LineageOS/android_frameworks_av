@@ -17,7 +17,6 @@
 
 #include <arpa/inet.h>
 #include <stdint.h>
-#include <sys/types.h>
 
 #include <android/IDataSource.h>
 #include <binder/IPCThreadState.h>

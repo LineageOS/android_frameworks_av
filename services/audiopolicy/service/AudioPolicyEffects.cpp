@@ -345,7 +345,8 @@ status_t AudioPolicyEffects::addSourceDefaultEffect(const effect_uuid_t *type,
             (source > AUDIO_SOURCE_MAX &&
              source != AUDIO_SOURCE_HOTWORD &&
              source != AUDIO_SOURCE_FM_TUNER &&
-             source != AUDIO_SOURCE_ECHO_REFERENCE)) {
+             source != AUDIO_SOURCE_ECHO_REFERENCE &&
+             source != AUDIO_SOURCE_ULTRASOUND)) {
         ALOGE("addSourceDefaultEffect(): Unsupported source type %d", source);
         return BAD_VALUE;
     }
@@ -386,7 +387,7 @@ status_t AudioPolicyEffects::addSourceDefaultEffect(const effect_uuid_t *type,
         return res;
     }
     EffectDesc *effect = new EffectDesc(
-            descriptor.name, *type, opPackageName, *uuid, priority, *id);
+            descriptor.name, descriptor.type, opPackageName, descriptor.uuid, priority, *id);
     desc->mEffects.add(effect);
     // TODO(b/71813697): Support setting params as well.
 
@@ -451,7 +452,7 @@ status_t AudioPolicyEffects::addStreamDefaultEffect(const effect_uuid_t *type,
         return res;
     }
     EffectDesc *effect = new EffectDesc(
-            descriptor.name, *type, opPackageName, *uuid, priority, *id);
+            descriptor.name, descriptor.type, opPackageName, descriptor.uuid, priority, *id);
     desc->mEffects.add(effect);
     // TODO(b/71813697): Support setting params as well.
 
@@ -544,6 +545,7 @@ void AudioPolicyEffects::EffectVector::setProcessorEnabled(bool enabled)
     CAMCORDER_SRC_TAG,
     VOICE_REC_SRC_TAG,
     VOICE_COMM_SRC_TAG,
+    REMOTE_SUBMIX_SRC_TAG,
     UNPROCESSED_SRC_TAG,
     VOICE_PERFORMANCE_SRC_TAG
 };

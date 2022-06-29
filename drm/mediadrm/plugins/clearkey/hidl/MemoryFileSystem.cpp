@@ -24,13 +24,11 @@ std::string MemoryFileSystem::GetFileName(const std::string& path) {
 }
 
 bool MemoryFileSystem::FileExists(const std::string& fileName) const {
-    std::lock_guard<std::mutex> lock(mMemoryFileSystemLock);
     auto result = mMemoryFileSystem.find(fileName);
     return result != mMemoryFileSystem.end();
 }
 
 ssize_t MemoryFileSystem::GetFileSize(const std::string& fileName) const {
-    std::lock_guard<std::mutex> lock(mMemoryFileSystemLock);
     auto result = mMemoryFileSystem.find(fileName);
     if (result != mMemoryFileSystem.end()) {
         return static_cast<ssize_t>(result->second.getFileSize());
@@ -42,7 +40,6 @@ ssize_t MemoryFileSystem::GetFileSize(const std::string& fileName) const {
 
 std::vector<std::string> MemoryFileSystem::ListFiles() const {
     std::vector<std::string> list;
-    std::lock_guard<std::mutex> lock(mMemoryFileSystemLock);
     for (const auto& filename : mMemoryFileSystem) {
         list.push_back(filename.first);
     }
@@ -51,7 +48,6 @@ std::vector<std::string> MemoryFileSystem::ListFiles() const {
 
 size_t MemoryFileSystem::Read(const std::string& path, std::string* buffer) {
     std::string key = GetFileName(path);
-    std::lock_guard<std::mutex> lock(mMemoryFileSystemLock);
     auto result = mMemoryFileSystem.find(key);
     if (result != mMemoryFileSystem.end()) {
         std::string serializedHashFile = result->second.getContent();
@@ -65,7 +61,6 @@ size_t MemoryFileSystem::Read(const std::string& path, std::string* buffer) {
 
 size_t MemoryFileSystem::Write(const std::string& path, const MemoryFile& memoryFile) {
     std::string key = GetFileName(path);
-    std::lock_guard<std::mutex> lock(mMemoryFileSystemLock);
     auto result = mMemoryFileSystem.find(key);
     if (result != mMemoryFileSystem.end()) {
         mMemoryFileSystem.erase(key);
@@ -75,7 +70,6 @@ size_t MemoryFileSystem::Write(const std::string& path, const MemoryFile& memory
 }
 
 bool MemoryFileSystem::RemoveFile(const std::string& fileName) {
-    std::lock_guard<std::mutex> lock(mMemoryFileSystemLock);
     auto result = mMemoryFileSystem.find(fileName);
     if (result != mMemoryFileSystem.end()) {
         mMemoryFileSystem.erase(result);
@@ -87,7 +81,6 @@ bool MemoryFileSystem::RemoveFile(const std::string& fileName) {
 }
 
 bool MemoryFileSystem::RemoveAllFiles() {
-    std::lock_guard<std::mutex> lock(mMemoryFileSystemLock);
     mMemoryFileSystem.clear();
     return mMemoryFileSystem.empty();
 }

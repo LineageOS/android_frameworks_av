@@ -17,176 +17,108 @@
 #ifndef ANDROID_MEDIA_TUNERFILTER_H
 #define ANDROID_MEDIA_TUNERFILTER_H
 
+#include <aidl/android/hardware/tv/tuner/AvStreamType.h>
+#include <aidl/android/hardware/tv/tuner/BnFilterCallback.h>
+#include <aidl/android/hardware/tv/tuner/DemuxFilterEvent.h>
+#include <aidl/android/hardware/tv/tuner/DemuxFilterSettings.h>
+#include <aidl/android/hardware/tv/tuner/DemuxFilterStatus.h>
+#include <aidl/android/hardware/tv/tuner/DemuxFilterType.h>
+#include <aidl/android/hardware/tv/tuner/FilterDelayHint.h>
+#include <aidl/android/hardware/tv/tuner/IFilter.h>
 #include <aidl/android/media/tv/tuner/BnTunerFilter.h>
 #include <aidl/android/media/tv/tuner/ITunerFilterCallback.h>
-#include <aidlcommonsupport/NativeHandle.h>
-#include <android/hardware/tv/tuner/1.0/ITuner.h>
-#include <android/hardware/tv/tuner/1.1/IFilter.h>
-#include <android/hardware/tv/tuner/1.1/IFilterCallback.h>
-#include <android/hardware/tv/tuner/1.1/types.h>
-#include <media/stagefright/foundation/ADebug.h>
-#include <fmq/ConvertMQDescriptors.h>
-#include <fmq/MessageQueue.h>
+#include <utils/Mutex.h>
 
-using Status = ::ndk::ScopedAStatus;
+using ::aidl::android::hardware::common::NativeHandle;
 using ::aidl::android::hardware::common::fmq::MQDescriptor;
 using ::aidl::android::hardware::common::fmq::SynchronizedReadWrite;
+using ::aidl::android::hardware::tv::tuner::AvStreamType;
+using ::aidl::android::hardware::tv::tuner::BnFilterCallback;
+using ::aidl::android::hardware::tv::tuner::DemuxFilterEvent;
+using ::aidl::android::hardware::tv::tuner::DemuxFilterSettings;
+using ::aidl::android::hardware::tv::tuner::DemuxFilterStatus;
+using ::aidl::android::hardware::tv::tuner::DemuxFilterType;
+using ::aidl::android::hardware::tv::tuner::FilterDelayHint;
+using ::aidl::android::hardware::tv::tuner::IFilter;
 using ::aidl::android::media::tv::tuner::BnTunerFilter;
-using ::aidl::android::media::tv::tuner::ITunerFilterCallback;
-using ::aidl::android::media::tv::tuner::TunerDemuxIpAddress;
-using ::aidl::android::media::tv::tuner::TunerFilterConfiguration;
-using ::aidl::android::media::tv::tuner::TunerFilterDownloadEvent;
-using ::aidl::android::media::tv::tuner::TunerFilterIpPayloadEvent;
-using ::aidl::android::media::tv::tuner::TunerFilterEvent;
-using ::aidl::android::media::tv::tuner::TunerFilterMediaEvent;
-using ::aidl::android::media::tv::tuner::TunerFilterMmtpRecordEvent;
-using ::aidl::android::media::tv::tuner::TunerFilterMonitorEvent;
-using ::aidl::android::media::tv::tuner::TunerFilterPesEvent;
-using ::aidl::android::media::tv::tuner::TunerFilterScIndexMask;
-using ::aidl::android::media::tv::tuner::TunerFilterSectionEvent;
-using ::aidl::android::media::tv::tuner::TunerFilterSharedHandleInfo;
-using ::aidl::android::media::tv::tuner::TunerFilterSettings;
-using ::aidl::android::media::tv::tuner::TunerFilterTemiEvent;
-using ::aidl::android::media::tv::tuner::TunerFilterTsRecordEvent;
-using ::android::hardware::MQDescriptorSync;
-using ::android::hardware::Return;
-using ::android::hardware::Void;
-using ::android::hardware::hidl_array;
-using ::android::hardware::tv::tuner::V1_0::DemuxAlpFilterSettings;
-using ::android::hardware::tv::tuner::V1_0::DemuxFilterAvSettings;
-using ::android::hardware::tv::tuner::V1_0::DemuxFilterDownloadEvent;
-using ::android::hardware::tv::tuner::V1_0::DemuxFilterDownloadSettings;
-using ::android::hardware::tv::tuner::V1_0::DemuxFilterIpPayloadEvent;
-using ::android::hardware::tv::tuner::V1_0::DemuxFilterEvent;
-using ::android::hardware::tv::tuner::V1_0::DemuxFilterMediaEvent;
-using ::android::hardware::tv::tuner::V1_0::DemuxFilterMmtpRecordEvent;
-using ::android::hardware::tv::tuner::V1_0::DemuxFilterPesDataSettings;
-using ::android::hardware::tv::tuner::V1_0::DemuxFilterPesEvent;
-using ::android::hardware::tv::tuner::V1_0::DemuxFilterRecordSettings;
-using ::android::hardware::tv::tuner::V1_0::DemuxFilterSectionEvent;
-using ::android::hardware::tv::tuner::V1_0::DemuxFilterSectionSettings;
-using ::android::hardware::tv::tuner::V1_0::DemuxFilterSettings;
-using ::android::hardware::tv::tuner::V1_0::DemuxFilterStatus;
-using ::android::hardware::tv::tuner::V1_0::DemuxFilterTemiEvent;
-using ::android::hardware::tv::tuner::V1_0::DemuxFilterTsRecordEvent;
-using ::android::hardware::tv::tuner::V1_0::DemuxIpFilterSettings;
-using ::android::hardware::tv::tuner::V1_0::DemuxMmtpFilterSettings;
-using ::android::hardware::tv::tuner::V1_0::DemuxTlvFilterSettings;
-using ::android::hardware::tv::tuner::V1_0::DemuxTsFilterSettings;
-using ::android::hardware::tv::tuner::V1_0::DemuxPid;
-using ::android::hardware::tv::tuner::V1_0::IFilter;
-using ::android::hardware::tv::tuner::V1_1::AvStreamType;
-using ::android::hardware::tv::tuner::V1_1::DemuxFilterEventExt;
-using ::android::hardware::tv::tuner::V1_1::DemuxFilterMonitorEvent;
-using ::android::hardware::tv::tuner::V1_1::DemuxFilterTsRecordEventExt;
-using ::android::hardware::tv::tuner::V1_1::IFilterCallback;
+using ::android::Mutex;
 
+using namespace std;
+
+namespace aidl {
 namespace android {
+namespace media {
+namespace tv {
+namespace tuner {
 
-using MQDesc = MQDescriptorSync<uint8_t>;
 using AidlMQDesc = MQDescriptor<int8_t, SynchronizedReadWrite>;
-
-const static int IP_V4_LENGTH = 4;
-const static int IP_V6_LENGTH = 16;
 
 class TunerFilter : public BnTunerFilter {
 
 public:
-    TunerFilter(sp<IFilter> filter, int mainType, int subTyp);
-    virtual ~TunerFilter();
-    Status getId(int32_t* _aidl_return) override;
-    Status getId64Bit(int64_t* _aidl_return) override;
-    Status getQueueDesc(AidlMQDesc* _aidl_return) override;
-    Status configure(const TunerFilterConfiguration& config) override;
-    Status configureMonitorEvent(int monitorEventType) override;
-    Status configureIpFilterContextId(int cid) override;
-    Status configureAvStreamType(int avStreamType) override;
-    Status getAvSharedHandleInfo(TunerFilterSharedHandleInfo* _aidl_return) override;
-    Status releaseAvHandle(const ::aidl::android::hardware::common::NativeHandle& handle,
-            int64_t avDataId) override;
-    Status setDataSource(const std::shared_ptr<ITunerFilter>& filter) override;
-    Status start() override;
-    Status stop() override;
-    Status flush() override;
-    Status close() override;
-    sp<IFilter> getHalFilter();
+    class FilterCallback : public BnFilterCallback {
+    public:
+        FilterCallback(const shared_ptr<ITunerFilterCallback>& tunerFilterCallback)
+              : mTunerFilterCallback(tunerFilterCallback), mOriginalCallback(nullptr){};
 
-    struct FilterCallback : public IFilterCallback {
-        FilterCallback(const std::shared_ptr<ITunerFilterCallback> tunerFilterCallback)
-                : mTunerFilterCallback(tunerFilterCallback) {};
+        ::ndk::ScopedAStatus onFilterEvent(const vector<DemuxFilterEvent>& events) override;
+        ::ndk::ScopedAStatus onFilterStatus(DemuxFilterStatus status) override;
 
-        virtual Return<void> onFilterEvent(const DemuxFilterEvent& filterEvent);
-        virtual Return<void> onFilterEvent_1_1(const DemuxFilterEvent& filterEvent,
-                const DemuxFilterEventExt& filterEventExt);
-        virtual Return<void> onFilterStatus(DemuxFilterStatus status);
+        void sendSharedFilterStatus(int32_t status);
+        void attachSharedFilterCallback(const shared_ptr<ITunerFilterCallback>& in_cb);
+        void detachSharedFilterCallback();
+        void detachCallbacks();
 
-        void getAidlFilterEvent(std::vector<DemuxFilterEvent::Event>& events,
-                std::vector<DemuxFilterEventExt::Event>& eventsExt,
-                std::vector<TunerFilterEvent>& tunerEvent);
-
-        void getMediaEvent(
-                std::vector<DemuxFilterEvent::Event>& events, std::vector<TunerFilterEvent>& res);
-        void getSectionEvent(
-                std::vector<DemuxFilterEvent::Event>& events, std::vector<TunerFilterEvent>& res);
-        void getPesEvent(
-                std::vector<DemuxFilterEvent::Event>& events, std::vector<TunerFilterEvent>& res);
-        void getTsRecordEvent(
-                std::vector<DemuxFilterEvent::Event>& events,
-                std::vector<DemuxFilterEventExt::Event>& eventsExt,
-                std::vector<TunerFilterEvent>& res);
-        void getMmtpRecordEvent(
-                std::vector<DemuxFilterEvent::Event>& events,
-                std::vector<DemuxFilterEventExt::Event>& eventsExt,
-                std::vector<TunerFilterEvent>& res);
-        void getDownloadEvent(
-                std::vector<DemuxFilterEvent::Event>& events, std::vector<TunerFilterEvent>& res);
-        void getIpPayloadEvent(
-                std::vector<DemuxFilterEvent::Event>& events, std::vector<TunerFilterEvent>& res);
-        void getTemiEvent(
-                std::vector<DemuxFilterEvent::Event>& events, std::vector<TunerFilterEvent>& res);
-        void getMonitorEvent(
-                std::vector<DemuxFilterEventExt::Event>& eventsExt,
-                std::vector<TunerFilterEvent>& res);
-        void getRestartEvent(
-                std::vector<DemuxFilterEventExt::Event>& eventsExt,
-                std::vector<TunerFilterEvent>& res);
-
-        std::shared_ptr<ITunerFilterCallback> mTunerFilterCallback;
+    private:
+        shared_ptr<ITunerFilterCallback> mTunerFilterCallback;
+        shared_ptr<ITunerFilterCallback> mOriginalCallback;
+        Mutex mCallbackLock;
     };
 
+    TunerFilter(shared_ptr<IFilter> filter, shared_ptr<FilterCallback> cb, DemuxFilterType type);
+    virtual ~TunerFilter();
+
+    ::ndk::ScopedAStatus getId(int32_t* _aidl_return) override;
+    ::ndk::ScopedAStatus getId64Bit(int64_t* _aidl_return) override;
+    ::ndk::ScopedAStatus getQueueDesc(AidlMQDesc* _aidl_return) override;
+    ::ndk::ScopedAStatus configure(const DemuxFilterSettings& in_settings) override;
+    ::ndk::ScopedAStatus configureMonitorEvent(int32_t in_monitorEventTypes) override;
+    ::ndk::ScopedAStatus configureIpFilterContextId(int32_t in_cid) override;
+    ::ndk::ScopedAStatus configureAvStreamType(const AvStreamType& in_avStreamType) override;
+    ::ndk::ScopedAStatus getAvSharedHandle(NativeHandle* out_avMemory,
+                                           int64_t* _aidl_return) override;
+    ::ndk::ScopedAStatus releaseAvHandle(const NativeHandle& in_handle,
+                                         int64_t in_avDataId) override;
+    ::ndk::ScopedAStatus setDataSource(const shared_ptr<ITunerFilter>& in_filter) override;
+    ::ndk::ScopedAStatus start() override;
+    ::ndk::ScopedAStatus stop() override;
+    ::ndk::ScopedAStatus flush() override;
+    ::ndk::ScopedAStatus close() override;
+    ::ndk::ScopedAStatus acquireSharedFilterToken(string* _aidl_return) override;
+    ::ndk::ScopedAStatus freeSharedFilterToken(const string& in_filterToken) override;
+    ::ndk::ScopedAStatus getFilterType(DemuxFilterType* _aidl_return) override;
+    ::ndk::ScopedAStatus setDelayHint(const FilterDelayHint& in_hint) override;
+
+    bool isSharedFilterAllowed(int32_t pid);
+    void attachSharedFilterCallback(const shared_ptr<ITunerFilterCallback>& in_cb);
+    shared_ptr<IFilter> getHalFilter();
+
 private:
-    DemuxFilterAvSettings getAvSettings(const TunerFilterSettings& settings);
-    DemuxFilterSectionSettings getSectionSettings(const TunerFilterSettings& settings);
-    DemuxFilterPesDataSettings getPesDataSettings(const TunerFilterSettings& settings);
-    DemuxFilterRecordSettings getRecordSettings(const TunerFilterSettings& settings);
-    DemuxFilterDownloadSettings getDownloadSettings(const TunerFilterSettings& settings);
-
-    bool isAudioFilter();
-    bool isVideoFilter();
-    bool getHidlAvStreamType(int avStreamType, AvStreamType& type);
-
-    void getHidlTsSettings(
-        const TunerFilterConfiguration& config, DemuxFilterSettings& settings);
-    void getHidlMmtpSettings(
-        const TunerFilterConfiguration& config, DemuxFilterSettings& settings);
-    void getHidlIpSettings(
-        const TunerFilterConfiguration& config, DemuxFilterSettings& settings);
-    void getHidlTlvSettings(
-        const TunerFilterConfiguration& config, DemuxFilterSettings& settings);
-    void getHidlAlpSettings(
-        const TunerFilterConfiguration& config, DemuxFilterSettings& settings);
-
-    hidl_array<uint8_t, IP_V4_LENGTH> getIpV4Address(TunerDemuxIpAddress addr);
-    hidl_array<uint8_t, IP_V6_LENGTH> getIpV6Address(TunerDemuxIpAddress addr);
-
-    sp<IFilter> mFilter;
-    sp<::android::hardware::tv::tuner::V1_1::IFilter> mFilter_1_1;
+    shared_ptr<IFilter> mFilter;
     int32_t mId;
     int64_t mId64Bit;
-    int mMainType;
-    int mSubType;
+    DemuxFilterType mType;
+    bool mStarted;
+    bool mShared;
+    int32_t mClientPid;
+    shared_ptr<FilterCallback> mFilterCallback;
+    Mutex mLock;
 };
 
-} // namespace android
+}  // namespace tuner
+}  // namespace tv
+}  // namespace media
+}  // namespace android
+}  // namespace aidl
 
 #endif // ANDROID_MEDIA_TUNERFILTER_H

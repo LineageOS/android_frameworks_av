@@ -432,8 +432,7 @@ private:
         mMockError = Status_V1_2::OK;
     }
 
-    DeviceFiles mFileHandle GUARDED_BY(mFileHandleLock);
-    Mutex mFileHandleLock;
+    DeviceFiles mFileHandle;
     Mutex mSecureStopLock;
 
     CLEARKEY_DISALLOW_COPY_AND_ASSIGN_AND_NEW(DrmPlugin);

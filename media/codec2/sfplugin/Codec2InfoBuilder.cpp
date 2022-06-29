@@ -309,8 +309,13 @@ void addSupportedColorFormats(
         if (trait.name.find("android") != std::string::npos) {
             addDefaultColorFormat(COLOR_FormatSurface);
         }
-        for (int32_t colorFormat : supportedColorFormats) {
-            caps->addColorFormat(colorFormat);
+
+        static const int kVendorSdkVersion = ::android::base::GetIntProperty(
+                "ro.vendor.build.version.sdk", android_get_device_api_level());
+        if (kVendorSdkVersion >= __ANDROID_API_T__) {
+            for (int32_t colorFormat : supportedColorFormats) {
+                caps->addColorFormat(colorFormat);
+            }
         }
     }
 }

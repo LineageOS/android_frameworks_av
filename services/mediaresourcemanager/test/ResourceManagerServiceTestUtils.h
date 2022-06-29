@@ -46,7 +46,11 @@ struct TestProcessInfo : public ProcessInfoInterface {
         return true;
     }
 
-    virtual bool isValidPid(int /* pid */) {
+    virtual bool isPidTrusted(int /* pid */) {
+        return true;
+    }
+
+    virtual bool isPidUidTrusted(int /* pid */, int /* uid */) {
         return true;
     }
 
@@ -119,11 +123,11 @@ private:
 
 struct TestClient : public BnResourceManagerClient {
     TestClient(int pid, const std::shared_ptr<ResourceManagerService> &service)
-        : mReclaimed(false), mPid(pid), mService(service) {}
+        : mPid(pid), mService(service) {}
 
     Status reclaimResource(bool* _aidl_return) override {
         mService->removeClient(mPid, getId(ref<TestClient>()));
-        mReclaimed = true;
+        mWasReclaimResourceCalled = true;
         *_aidl_return = true;
         return Status::ok();
     }
@@ -133,18 +137,16 @@ struct TestClient : public BnResourceManagerClient {
         return Status::ok();
     }
 
-    bool reclaimed() const {
-        return mReclaimed;
-    }
-
-    void reset() {
-        mReclaimed = false;
+    bool checkIfReclaimedAndReset() {
+        bool wasReclaimResourceCalled = mWasReclaimResourceCalled;
+        mWasReclaimResourceCalled = false;
+        return wasReclaimResourceCalled;
     }
 
     virtual ~TestClient() {}
 
 private:
-    bool mReclaimed;
+    bool mWasReclaimResourceCalled = false;
     int mPid;
     std::shared_ptr<ResourceManagerService> mService;
     DISALLOW_EVIL_CONSTRUCTORS(TestClient);
@@ -166,14 +168,30 @@ bool operator== (const EventEntry& lhs, const EventEntry& rhs) {
     return lhs.type == rhs.type && lhs.arg == rhs.arg;
 }
 
-#define CHECK_STATUS_TRUE(condition) \
-    EXPECT_TRUE((condition).isOk() && (result))
+// The condition is expected to return a status but also update the local
+// result variable.
+#define CHECK_STATUS_TRUE(conditionThatUpdatesResult) \
+    do { \
+        bool result = false; \
+        EXPECT_TRUE((conditionThatUpdatesResult).isOk()); \
+        EXPECT_TRUE(result); \
+    } while(false)
 
-#define CHECK_STATUS_FALSE(condition) \
-    EXPECT_TRUE((condition).isOk() && !(result))
+// The condition is expected to return a status but also update the local
+// result variable.
+#define CHECK_STATUS_FALSE(conditionThatUpdatesResult) \
+    do { \
+        bool result = true; \
+        EXPECT_TRUE((conditionThatUpdatesResult).isOk()); \
+        EXPECT_FALSE(result); \
+    } while(false)
 
 class ResourceManagerServiceTestBase : public ::testing::Test {
 public:
+    static TestClient* toTestClient(std::shared_ptr<IResourceManagerClient> testClient) {
+        return static_cast<TestClient*>(testClient.get());
+    }
+
     ResourceManagerServiceTestBase()
         : mSystemCB(new TestSystemCallback()),
           mService(::ndk::SharedRefBase::make<ResourceManagerService>(
@@ -181,6 +199,10 @@ public:
           mTestClient1(::ndk::SharedRefBase::make<TestClient>(kTestPid1, mService)),
           mTestClient2(::ndk::SharedRefBase::make<TestClient>(kTestPid2, mService)),
           mTestClient3(::ndk::SharedRefBase::make<TestClient>(kTestPid2, mService)) {
+    }
+
+    std::shared_ptr<IResourceManagerClient> createTestClient(int pid) {
+        return ::ndk::SharedRefBase::make<TestClient>(pid, mService);
     }
 
     sp<TestSystemCallback> mSystemCB;

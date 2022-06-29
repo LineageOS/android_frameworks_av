@@ -41,6 +41,7 @@ cc_library_shared {
         "FastThreadState.cpp",
         "NBAIO_Tee.cpp",
         "PatchPanel.cpp",
+        "PropertyUtils.cpp",
         "SpdifStreamOut.cpp",
         "StateQueue.cpp",
         "Threads.cpp",
@@ -54,6 +55,7 @@ cc_library_shared {
     ],
 
     shared_libs: [
+        "android.media.audio.common.types-V1-cpp",
         "audioflinger-aidl-cpp",
         "audioclient-types-aidl-cpp",
         "av-types-aidl-cpp",
@@ -91,6 +93,7 @@ cc_library_shared {
     ],
 
     header_libs: [
+        "libaaudio_headers",
         "libaudioclient_headers",
         "libaudiohal_headers",
         "libmedia_headers",

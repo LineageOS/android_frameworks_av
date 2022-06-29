@@ -26,7 +26,5 @@ cc_library_shared {
         "-Wall",
     ],
 
-    include_dirs: [],
-
     export_include_dirs: ["include"],
 }

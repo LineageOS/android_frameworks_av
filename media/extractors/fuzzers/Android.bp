@@ -80,11 +80,6 @@ cc_defaults {
     defaults: ["extractor-fuzzer-defaults"],
     host_supported: true,
 
-    include_dirs: [
-        "frameworks/av/media/extractors/mpeg2",
-        "frameworks/av/media/libstagefright",
-    ],
-
     static_libs: [
         "libstagefright_foundation_without_imemory",
         "libstagefright_mpeg2support",
@@ -124,14 +119,6 @@ cc_fuzz {
         "mp4_extractor_fuzzer.cpp",
     ],
 
-    include_dirs: [
-        "frameworks/av/media/extractors/mp4",
-    ],
-
-    header_libs: [
-        "libaudioclient_headers",
-    ],
-
     static_libs: [
         "libstagefright_id3",
         "libstagefright_esds",
@@ -148,10 +135,6 @@ cc_fuzz {
 
     srcs: [
         "wav_extractor_fuzzer.cpp",
-    ],
-
-    include_dirs: [
-        "frameworks/av/media/extractors/wav",
     ],
 
     static_libs: [
@@ -173,10 +156,6 @@ cc_fuzz {
         "amr_extractor_fuzzer.cpp",
     ],
 
-    include_dirs: [
-        "frameworks/av/media/extractors/amr",
-    ],
-
     static_libs: [
         "libamrextractor",
     ],
@@ -191,10 +170,6 @@ cc_fuzz {
 
     srcs: [
         "mkv_extractor_fuzzer.cpp",
-    ],
-
-    include_dirs: [
-        "frameworks/av/media/extractors/mkv",
     ],
 
     static_libs: [
@@ -217,9 +192,6 @@ cc_fuzz {
         "ogg_extractor_fuzzer.cpp",
     ],
 
-    include_dirs: [
-        "frameworks/av/media/extractors/ogg",
-    ],
 
     static_libs: [
         "libstagefright_metadatautils",
@@ -265,10 +237,6 @@ cc_fuzz {
         "mp3_extractor_fuzzer.cpp",
     ],
 
-    include_dirs: [
-        "frameworks/av/media/extractors/mp3",
-    ],
-
     static_libs: [
         "libfifo",
         "libmp3extractor",
@@ -285,10 +253,6 @@ cc_fuzz {
         "aac_extractor_fuzzer.cpp",
     ],
 
-    include_dirs: [
-        "frameworks/av/media/extractors/aac",
-    ],
-
     static_libs: [
         "libaacextractor",
         "libstagefright_metadatautils",
@@ -302,10 +266,6 @@ cc_fuzz {
 
     srcs: [
         "flac_extractor_fuzzer.cpp",
-    ],
-
-    include_dirs: [
-        "frameworks/av/media/extractors/flac",
     ],
 
     static_libs: [
@@ -327,10 +287,6 @@ cc_fuzz {
 
     srcs: [
         "midi_extractor_fuzzer.cpp",
-    ],
-
-    include_dirs: [
-        "frameworks/av/media/extractors/midi",
     ],
 
     static_libs: [

@@ -126,8 +126,13 @@ status_t MediaRecorderClient::setAudioSource(int as)
     }
 
     if ((as == AUDIO_SOURCE_FM_TUNER
-            && !(captureAudioOutputAllowed(mAttributionSource)
+                && !(captureAudioOutputAllowed(mAttributionSource)
                     || captureTunerAudioInputAllowed(mAttributionSource)))
+            || (as == AUDIO_SOURCE_REMOTE_SUBMIX
+                && !(captureAudioOutputAllowed(mAttributionSource)
+                    || modifyAudioRoutingAllowed(mAttributionSource)))
+            || (as == AUDIO_SOURCE_ECHO_REFERENCE
+                && !captureAudioOutputAllowed(mAttributionSource))
             || !recordingAllowed(mAttributionSource, (audio_source_t)as)) {
         return PERMISSION_DENIED;
     }

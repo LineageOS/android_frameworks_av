@@ -443,7 +443,4 @@ static int ReverbReadInPresets(reverb_object_t* pReverbData);
 */
 static int ReverbUpdateRoom(reverb_object_t* pReverbData, bool fullUpdate);
 
-
-static int ReverbComputeConstants(reverb_object_t *pReverbData, uint32_t samplingRate);
-
 #endif /*ANDROID_EFFECTREVERB_H_*/

@@ -28,8 +28,8 @@ public:
     explicit TrackPlayerBase();
     virtual ~TrackPlayerBase();
 
-            void init(AudioTrack* pat, player_type_t playerType, audio_usage_t usage,
-                    audio_session_t sessionId);
+    void init(const sp<AudioTrack>& pat, const sp<AudioTrack::IAudioTrackCallback>& callback,
+              player_type_t playerType, audio_usage_t usage, audio_session_t sessionId);
     virtual void destroy();
 
     //IPlayer implementation
@@ -66,8 +66,8 @@ private:
 
     // volume coming from the player volume API
     float mPlayerVolumeL, mPlayerVolumeR;
-
-   sp<SelfAudioDeviceCallback> mSelfAudioDeviceCallback;
+    sp<AudioTrack::IAudioTrackCallback> mCallbackHandle;
+    sp<SelfAudioDeviceCallback> mSelfAudioDeviceCallback;
 };
 
 } // namespace android

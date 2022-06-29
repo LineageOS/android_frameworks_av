@@ -35,7 +35,7 @@ namespace {
 
 constexpr uint32_t PIXEL_FORMAT_UNKNOWN = 0;
 
-sp<GraphicBlockBuffer> AllocateGraphicBuffer(
+sp<GraphicBlockBuffer> AllocateInputGraphicBuffer(
         const std::shared_ptr<C2BlockPool> &pool,
         const sp<AMessage> &format,
         uint32_t pixelFormat,
@@ -47,9 +47,13 @@ sp<GraphicBlockBuffer> AllocateGraphicBuffer(
         return nullptr;
     }
 
+    int64_t usageValue = 0;
+    (void)format->findInt64("android._C2MemoryUsage", &usageValue);
+    C2MemoryUsage fullUsage{usageValue | usage.expected};
+
     std::shared_ptr<C2GraphicBlock> block;
     c2_status_t err = pool->fetchGraphicBlock(
-            width, height, pixelFormat, usage, &block);
+            width, height, pixelFormat, fullUsage, &block);
     if (err != C2_OK) {
         ALOGD("fetch graphic block failed: %d", err);
         return nullptr;
@@ -945,6 +949,10 @@ sp<Codec2Buffer> EncryptedLinearInputBuffers::Alloc(
         return nullptr;
     }
 
+    int64_t usageValue = 0;
+    (void)format->findInt64("android._C2MemoryUsage", &usageValue);
+    usage = C2MemoryUsage(usage.expected | usageValue);
+
     std::shared_ptr<C2LinearBlock> block;
     c2_status_t err = pool->fetchLinearBlock(capacity, usage, &block);
     if (err != C2_OK || block == nullptr) {
@@ -1089,7 +1097,7 @@ std::unique_ptr<InputBuffers> GraphicInputBuffers::toArrayMode(size_t size) {
             [pool = mPool, format = mFormat, lbp = mLocalBufferPool, pixelFormat]()
                     -> sp<Codec2Buffer> {
                 C2MemoryUsage usage = { C2MemoryUsage::CPU_READ, C2MemoryUsage::CPU_WRITE };
-                return AllocateGraphicBuffer(
+                return AllocateInputGraphicBuffer(
                         pool, format, pixelFormat, usage, lbp);
             });
     return std::move(array);
@@ -1100,10 +1108,8 @@ size_t GraphicInputBuffers::numActiveSlots() const {
 }
 
 sp<Codec2Buffer> GraphicInputBuffers::createNewBuffer() {
-    int64_t usageValue = 0;
-    (void)mFormat->findInt64("android._C2MemoryUsage", &usageValue);
-    C2MemoryUsage usage{usageValue | C2MemoryUsage::CPU_READ | C2MemoryUsage::CPU_WRITE};
-    return AllocateGraphicBuffer(
+    C2MemoryUsage usage = { C2MemoryUsage::CPU_READ, C2MemoryUsage::CPU_WRITE };
+    return AllocateInputGraphicBuffer(
             mPool, mFormat, extractPixelFormat(mFormat), usage, mLocalBufferPool);
 }
 

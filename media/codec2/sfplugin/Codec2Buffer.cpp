@@ -268,6 +268,39 @@ public:
                     mInitCheck = BAD_VALUE;
                     return;
                 }
+                std::optional<int> clientBitDepth = {};
+                switch (mClientColorFormat) {
+                    case COLOR_FormatYUVP010:
+                        clientBitDepth = 10;
+                        break;
+                    case COLOR_FormatYUV411PackedPlanar:
+                    case COLOR_FormatYUV411Planar:
+                    case COLOR_FormatYUV420Flexible:
+                    case COLOR_FormatYUV420PackedPlanar:
+                    case COLOR_FormatYUV420PackedSemiPlanar:
+                    case COLOR_FormatYUV420Planar:
+                    case COLOR_FormatYUV420SemiPlanar:
+                    case COLOR_FormatYUV422Flexible:
+                    case COLOR_FormatYUV422PackedPlanar:
+                    case COLOR_FormatYUV422PackedSemiPlanar:
+                    case COLOR_FormatYUV422Planar:
+                    case COLOR_FormatYUV422SemiPlanar:
+                    case COLOR_FormatYUV444Flexible:
+                    case COLOR_FormatYUV444Interleaved:
+                        clientBitDepth = 8;
+                        break;
+                    default:
+                        // no-op; used with optional
+                        break;
+
+                }
+                // conversion fails if client bit-depth and the component bit-depth differs
+                if ((clientBitDepth) && (bitDepth != clientBitDepth.value())) {
+                    ALOGD("Bit depth of client: %d and component: %d differs",
+                        *clientBitDepth, bitDepth);
+                    mInitCheck = BAD_VALUE;
+                    return;
+                }
                 C2PlaneInfo yPlane = layout.planes[C2PlanarLayout::PLANE_Y];
                 C2PlaneInfo uPlane = layout.planes[C2PlanarLayout::PLANE_U];
                 C2PlaneInfo vPlane = layout.planes[C2PlanarLayout::PLANE_V];

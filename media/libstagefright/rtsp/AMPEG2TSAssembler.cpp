@@ -18,10 +18,10 @@
 #define LOG_TAG "AMPEG2TSAssembler"
 #include <utils/Log.h>
 
-#include "AMPEG2TSAssembler.h"
+#include <media/stagefright/rtsp/AMPEG2TSAssembler.h>
 
-#include "ARTPSource.h"
-#include "ASessionDescription.h"
+#include <media/stagefright/rtsp/ARTPSource.h>
+#include <media/stagefright/rtsp/ASessionDescription.h>
 
 #include <media/stagefright/foundation/ABuffer.h>
 #include <media/stagefright/foundation/ADebug.h>

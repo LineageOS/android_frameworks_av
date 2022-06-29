@@ -17,9 +17,75 @@
 
 #pragma once
 
+#include <functional>
+
+#include <android/media/audio/common/AudioChannelLayout.h>
+#include <android/media/audio/common/AudioDeviceDescription.h>
+#include <android/media/audio/common/AudioFormatDescription.h>
+#include <binder/Parcelable.h>
 #include <system/audio.h>
 #include <system/audio_policy.h>
-#include <binder/Parcelable.h>
+
+namespace {
+// see boost::hash_combine
+#if defined(__clang__)
+__attribute__((no_sanitize("unsigned-integer-overflow")))
+#endif
+static size_t hash_combine(size_t seed, size_t v) {
+    return std::hash<size_t>{}(v) + 0x9e3779b9 + (seed << 6) + (seed >> 2);
+}
+}
+
+namespace std {
+
+// Note: when extending the types hashed below we need to account for the
+// possibility of processing types belonging to different versions of the type,
+// e.g. a HAL may be using a previous version of the AIDL interface.
+
+template<> struct hash<android::media::audio::common::AudioChannelLayout>
+{
+    std::size_t operator()(
+            const android::media::audio::common::AudioChannelLayout& acl) const noexcept {
+        using Tag = android::media::audio::common::AudioChannelLayout::Tag;
+        const size_t seed = std::hash<Tag>{}(acl.getTag());
+        switch (acl.getTag()) {
+            case Tag::none:
+                return hash_combine(seed, std::hash<int32_t>{}(acl.get<Tag::none>()));
+            case Tag::invalid:
+                return hash_combine(seed, std::hash<int32_t>{}(acl.get<Tag::invalid>()));
+            case Tag::indexMask:
+                return hash_combine(seed, std::hash<int32_t>{}(acl.get<Tag::indexMask>()));
+            case Tag::layoutMask:
+                return hash_combine(seed, std::hash<int32_t>{}(acl.get<Tag::layoutMask>()));
+            case Tag::voiceMask:
+                return hash_combine(seed, std::hash<int32_t>{}(acl.get<Tag::voiceMask>()));
+        }
+        return seed;
+    }
+};
+
+template<> struct hash<android::media::audio::common::AudioDeviceDescription>
+{
+    std::size_t operator()(
+            const android::media::audio::common::AudioDeviceDescription& add) const noexcept {
+        return hash_combine(
+                std::hash<android::media::audio::common::AudioDeviceType>{}(add.type),
+                std::hash<std::string>{}(add.connection));
+    }
+};
+
+template<> struct hash<android::media::audio::common::AudioFormatDescription>
+{
+    std::size_t operator()(
+            const android::media::audio::common::AudioFormatDescription& afd) const noexcept {
+        return hash_combine(
+                std::hash<android::media::audio::common::AudioFormatType>{}(afd.type),
+                hash_combine(
+                        std::hash<android::media::audio::common::PcmType>{}(afd.pcm),
+                        std::hash<std::string>{}(afd.encoding)));
+    }
+};
+}  // namespace std
 
 namespace android {
 
@@ -81,4 +147,3 @@ enum volume_group_t : uint32_t;
 static const volume_group_t VOLUME_GROUP_NONE = static_cast<volume_group_t>(-1);
 
 } // namespace android
-

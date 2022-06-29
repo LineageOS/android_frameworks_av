@@ -181,15 +181,22 @@ cc_library {
         "libstatssocket",
     ],
 
+    // within the library, we use "xxx.h"
+    local_include_dirs: [
+        "include/mediametricsservice",
+    ],
+
+    // external parties use <mediametricsservice/xxx.h>
+    export_include_dirs: [
+        "include",
+    ],
+
     static_libs: [
         "libplatformprotos",
     ],
 
     header_libs: [
         "libaaudio_headers",
-    ],
-
-    include_dirs: [
-        "system/media/audio_utils/include",
+        "libaudioutils_headers",
     ],
 }

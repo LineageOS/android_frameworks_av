@@ -59,9 +59,8 @@ cc_fuzz {
         "packagemanager_aidl-cpp",
     ],
 
-    include_dirs: [
-        "frameworks/av/services/mediametrics",
-        "system/media/audio_utils/include",
+    header_libs: [
+        "libaudioutils_headers",
     ],
 
     fuzz_config: {

@@ -17,14 +17,11 @@
 #ifndef ANDROID_C2_SOFT_AV1_DEC_H_
 #define ANDROID_C2_SOFT_AV1_DEC_H_
 
+#include <inttypes.h>
+
 #include <SimpleC2Component.h>
 #include "aom/aom_decoder.h"
 #include "aom/aomdx.h"
-
-#define GETTIME(a, b) gettimeofday(a, b);
-#define TIME_DIFF(start, end, diff)     \
-    diff = (((end).tv_sec - (start).tv_sec) * 1000000) + \
-            ((end).tv_usec - (start).tv_usec);
 
 namespace android {
 
@@ -60,8 +57,8 @@ struct C2SoftAomDec : public SimpleC2Component {
     char mOutFile[200];
     #endif /* FILE_DUMP_ENABLE */
 
-    struct timeval mTimeStart;   // Time at the start of decode()
-    struct timeval mTimeEnd;     // Time at the end of decode()
+    nsecs_t mTimeStart = 0;   // Time at the start of decode()
+    nsecs_t mTimeEnd = 0;     // Time at the end of decode()
 
     status_t initDecoder();
     status_t destroyDecoder();
@@ -85,14 +82,13 @@ struct C2SoftAomDec : public SimpleC2Component {
 #define OUTPUT_DUMP_EXT "av1"
 #define GENERATE_FILE_NAMES()                                                 \
     {                                                                         \
-        GETTIME(&mTimeStart, NULL);                                           \
-        strcpy(mInFile, "");                                                  \
+        nsecs_t now = systemTime();                                           \
         ALOGD("GENERATE_FILE_NAMES");                                         \
-        sprintf(mInFile, "%s_%ld.%ld.%s", INPUT_DUMP_PATH, mTimeStart.tv_sec, \
-                mTimeStart.tv_usec, INPUT_DUMP_EXT);                          \
+        sprintf(mInFile, "%s_%" PRId64 ".%s", INPUT_DUMP_PATH,                \
+                now, INPUT_DUMP_EXT);                                         \
         strcpy(mOutFile, "");                                                 \
-        sprintf(mOutFile, "%s_%ld.%ld.%s", OUTPUT_DUMP_PATH,                  \
-                mTimeStart.tv_sec, mTimeStart.tv_usec, OUTPUT_DUMP_EXT);      \
+        sprintf(mOutFile, "%s_%" PRId64 ".%s", OUTPUT_DUMP_PATH,              \
+                now, OUTPUT_DUMP_EXT);                                        \
     }
 
 #define CREATE_DUMP_FILE(m_filename)                     \

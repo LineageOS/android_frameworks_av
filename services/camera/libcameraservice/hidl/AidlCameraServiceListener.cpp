@@ -15,7 +15,7 @@
  */
 
 #include <hidl/AidlCameraServiceListener.h>
-#include <hidl/Convert.h>
+#include <hidl/Utils.h>
 
 namespace android {
 namespace frameworks {
@@ -67,6 +67,11 @@ binder::Status H2BCameraServiceListener::onPhysicalCameraStatusChanged(
 ::android::binder::Status H2BCameraServiceListener::onTorchStatusChanged(
     int32_t, const ::android::String16&) {
   // We don't implement onTorchStatusChanged
+  return binder::Status::ok();
+}
+
+::android::binder::Status H2BCameraServiceListener::onTorchStrengthLevelChanged(
+    const ::android::String16&, int32_t) {
   return binder::Status::ok();
 }
 

@@ -30,7 +30,7 @@
 class FixedBlockReader : public FixedBlockAdapter
 {
 public:
-    FixedBlockReader(FixedBlockProcessor &fixedBlockProcessor);
+    explicit FixedBlockReader(FixedBlockProcessor &fixedBlockProcessor);
 
     virtual ~FixedBlockReader() = default;
 

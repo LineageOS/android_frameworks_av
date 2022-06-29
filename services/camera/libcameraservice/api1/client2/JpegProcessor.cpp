@@ -20,6 +20,9 @@
 
 #include <netinet/in.h>
 
+#include <aidl/android/hardware/camera/device/CameraBlob.h>
+#include <aidl/android/hardware/camera/device/CameraBlobId.h>
+
 #include <binder/MemoryBase.h>
 #include <binder/MemoryHeapBase.h>
 #include <utils/Log.h>
@@ -36,6 +39,8 @@ namespace android {
 namespace camera2 {
 
 using android::camera3::CAMERA_STREAM_ROTATION_0;
+using aidl::android::hardware::camera::device::CameraBlob;
+using aidl::android::hardware::camera::device::CameraBlobId;
 
 JpegProcessor::JpegProcessor(
     sp<Camera2Client> client,
@@ -350,11 +355,11 @@ size_t JpegProcessor::findJpegSize(uint8_t* jpegBuffer, size_t maxSize) {
     size_t size;
 
     // First check for JPEG transport header at the end of the buffer
-    uint8_t *header = jpegBuffer + (maxSize - sizeof(struct camera2_jpeg_blob));
-    struct camera2_jpeg_blob *blob = (struct camera2_jpeg_blob*)(header);
-    if (blob->jpeg_blob_id == CAMERA2_JPEG_BLOB_ID) {
-        size = blob->jpeg_size;
-        if (size > 0 && size <= maxSize - sizeof(struct camera2_jpeg_blob)) {
+    uint8_t *header = jpegBuffer + (maxSize - sizeof(CameraBlob));
+    CameraBlob *blob = (CameraBlob*)(header);
+    if (blob->blobId == CameraBlobId::JPEG) {
+        size = blob->blobSizeBytes;
+        if (size > 0 && size <= maxSize - sizeof(CameraBlob)) {
             // Verify SOI and EOI markers
             size_t offset = size - MARKER_LENGTH;
             uint8_t *end = jpegBuffer + offset;

@@ -17,9 +17,4 @@ cc_library {
     srcs: ["C2SoftMpeg2Dec.cpp"],
 
     static_libs: ["libmpeg2dec"],
-
-    include_dirs: [
-        "external/libmpeg2/decoder",
-        "external/libmpeg2/common",
-    ],
 }

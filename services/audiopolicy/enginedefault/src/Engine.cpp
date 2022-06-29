@@ -270,9 +270,10 @@ DeviceVector Engine::getDevicesForStrategyInt(legacy_strategy strategy,
         devices = availableOutputDevices.getDevicesFromType(AUDIO_DEVICE_OUT_HEARING_AID);
         if (!devices.isEmpty()) break;
         devices = availableOutputDevices.getFirstDevicesFromTypes(
-                                          getLastRemovableMediaDevices());
+                        getLastRemovableMediaDevices(GROUP_NONE, {AUDIO_DEVICE_OUT_BLE_HEADSET}));
         if (!devices.isEmpty()) break;
-        devices = availableOutputDevices.getDevicesFromType(AUDIO_DEVICE_OUT_EARPIECE);
+        devices = availableOutputDevices.getFirstDevicesFromTypes({
+                AUDIO_DEVICE_OUT_DGTL_DOCK_HEADSET, AUDIO_DEVICE_OUT_EARPIECE});
     } break;
 
     case STRATEGY_SONIFICATION:
@@ -343,6 +344,30 @@ DeviceVector Engine::getDevicesForStrategyInt(legacy_strategy strategy,
             (getForceUse(AUDIO_POLICY_FORCE_FOR_MEDIA) == AUDIO_POLICY_FORCE_SPEAKER)) {
             devices2 = availableOutputDevices.getDevicesFromType(AUDIO_DEVICE_OUT_SPEAKER);
         }
+
+        // LE audio broadcast device is only used if:
+        // - No call is active
+        // - either MEDIA or SONIFICATION_RESPECTFUL is the highest priority active strategy
+        //   OR the LE audio unicast device is not active
+        if (devices2.isEmpty() && !isInCall()
+                && (strategy == STRATEGY_MEDIA || strategy == STRATEGY_SONIFICATION_RESPECTFUL)) {
+            legacy_strategy topActiveStrategy = STRATEGY_NONE;
+            for (const auto &ps : getOrderedProductStrategies()) {
+                if (outputs.isStrategyActive(ps)) {
+                    topActiveStrategy =  mLegacyStrategyMap.find(ps) != end(mLegacyStrategyMap) ?
+                            mLegacyStrategyMap.at(ps) : STRATEGY_NONE;
+                    break;
+                }
+            }
+
+            if (topActiveStrategy == STRATEGY_NONE || topActiveStrategy == STRATEGY_MEDIA
+                    || topActiveStrategy == STRATEGY_SONIFICATION_RESPECTFUL
+                    || !outputs.isAnyDeviceTypeActive(getAudioDeviceOutLeAudioUnicastSet())) {
+                devices2 =
+                        availableOutputDevices.getDevicesFromType(AUDIO_DEVICE_OUT_BLE_BROADCAST);
+            }
+        }
+
         if (devices2.isEmpty() && (getLastRemovableMediaDevices().size() > 0)) {
             if ((getForceUse(AUDIO_POLICY_FORCE_FOR_MEDIA) != AUDIO_POLICY_FORCE_NO_BT_A2DP)) {
                 // Get the last connected device of wired and bluetooth a2dp
@@ -364,7 +389,8 @@ DeviceVector Engine::getDevicesForStrategyInt(legacy_strategy strategy,
                     AUDIO_DEVICE_OUT_ANLG_DOCK_HEADSET);
         }
         if (devices2.isEmpty()) {
-            devices2 = availableOutputDevices.getDevicesFromType(AUDIO_DEVICE_OUT_SPEAKER);
+            devices2 = availableOutputDevices.getFirstDevicesFromTypes({
+                        AUDIO_DEVICE_OUT_DGTL_DOCK_HEADSET, AUDIO_DEVICE_OUT_SPEAKER});
         }
         DeviceVector devices3;
         if (strategy == STRATEGY_MEDIA) {
@@ -460,6 +486,7 @@ sp<DeviceDescriptor> Engine::getDeviceForInputSource(audio_source_t inputSource)
         case AUDIO_SOURCE_HOTWORD:
         case AUDIO_SOURCE_CAMCORDER:
         case AUDIO_SOURCE_VOICE_PERFORMANCE:
+        case AUDIO_SOURCE_ULTRASOUND:
             inputSource = AUDIO_SOURCE_VOICE_COMMUNICATION;
             break;
         default:
@@ -482,7 +509,7 @@ sp<DeviceDescriptor> Engine::getDeviceForInputSource(audio_source_t inputSource)
             if (device != nullptr) break;
         }
         device = availableDevices.getFirstExistingDevice({
-                AUDIO_DEVICE_IN_BLE_HEADSET, AUDIO_DEVICE_IN_WIRED_HEADSET,
+                AUDIO_DEVICE_IN_WIRED_HEADSET,
                 AUDIO_DEVICE_IN_USB_HEADSET, AUDIO_DEVICE_IN_USB_DEVICE,
                 AUDIO_DEVICE_IN_BLUETOOTH_BLE, AUDIO_DEVICE_IN_BUILTIN_MIC});
         break;
@@ -536,7 +563,7 @@ sp<DeviceDescriptor> Engine::getDeviceForInputSource(audio_source_t inputSource)
         // because sometimes user want to do voice search by bt remote
         // even if BUILDIN_MIC is available.
         device = availableDevices.getFirstExistingDevice({
-                AUDIO_DEVICE_IN_BLE_HEADSET, AUDIO_DEVICE_IN_WIRED_HEADSET,
+                AUDIO_DEVICE_IN_WIRED_HEADSET,
                 AUDIO_DEVICE_IN_USB_HEADSET, AUDIO_DEVICE_IN_USB_DEVICE,
                 AUDIO_DEVICE_IN_BLUETOOTH_BLE, AUDIO_DEVICE_IN_BUILTIN_MIC});
 
@@ -552,7 +579,7 @@ sp<DeviceDescriptor> Engine::getDeviceForInputSource(audio_source_t inputSource)
             if (device != nullptr) break;
         }
         device = availableDevices.getFirstExistingDevice({
-                AUDIO_DEVICE_IN_BLE_HEADSET, AUDIO_DEVICE_IN_WIRED_HEADSET,
+                AUDIO_DEVICE_IN_WIRED_HEADSET,
                 AUDIO_DEVICE_IN_USB_HEADSET, AUDIO_DEVICE_IN_USB_DEVICE,
                 AUDIO_DEVICE_IN_BUILTIN_MIC});
         break;
@@ -585,6 +612,10 @@ sp<DeviceDescriptor> Engine::getDeviceForInputSource(audio_source_t inputSource)
     case AUDIO_SOURCE_ECHO_REFERENCE:
         device = availableDevices.getDevice(
                 AUDIO_DEVICE_IN_ECHO_REFERENCE, String8(""), AUDIO_FORMAT_DEFAULT);
+        break;
+    case AUDIO_SOURCE_ULTRASOUND:
+        device = availableDevices.getFirstExistingDevice({
+                AUDIO_DEVICE_IN_BUILTIN_MIC, AUDIO_DEVICE_IN_BACK_MIC});
         break;
     default:
         ALOGW("getDeviceForInputSource() invalid input source %d", inputSource);
@@ -645,7 +676,7 @@ DeviceVector Engine::getPreferredAvailableDevicesForProductStrategy(
         // there is a preferred device, is it available?
         preferredAvailableDevVec =
                 availableOutputDevices.getDevicesFromDeviceTypeAddrVec(preferredStrategyDevices);
-        if (preferredAvailableDevVec.size() == preferredAvailableDevVec.size()) {
+        if (preferredAvailableDevVec.size() == preferredStrategyDevices.size()) {
             ALOGVV("%s using pref device %s for strategy %u",
                    __func__, preferredAvailableDevVec.toString().c_str(), strategy);
             return preferredAvailableDevVec;

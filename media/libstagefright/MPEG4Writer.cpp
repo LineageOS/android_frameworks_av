@@ -479,6 +479,7 @@ private:
     void writeHdlrBox();
     void writeTkhdBox(uint32_t now);
     void writeColrBox();
+    void writeMdcvAndClliBoxes();
     void writeMp4aEsdsBox();
     void writeMp4vEsdsBox();
     void writeAudioFourCCBox();
@@ -4445,6 +4446,7 @@ void MPEG4Writer::Track::writeVideoFourCCBox() {
 
     writePaspBox();
     writeColrBox();
+    writeMdcvAndClliBoxes();
     mOwner->endBox();  // mp4v, s263 or avc1
 }
 
@@ -4478,6 +4480,57 @@ void MPEG4Writer::Track::writeColrBox() {
     mOwner->writeInt16(coeffs);
     mOwner->writeInt8(int8_t(fullRange ? 0x80 : 0x0));
     mOwner->endBox(); // colr
+}
+
+void MPEG4Writer::Track::writeMdcvAndClliBoxes() {
+    sp<MetaData> meta = mSource->getFormat();
+    uint32_t type;
+    const uint8_t* data;
+    size_t size;
+    bool found =
+            meta->findData(kKeyHdrStaticInfo, &type, reinterpret_cast<const void**>(&data), &size);
+    if (!found) {
+        return; // Nothing to encode.
+    }
+    if (size != 25) {
+        ALOGW("Ignoring HDR static info with unexpected size %d", (int)size);
+        return;
+    }
+    uint16_t displayPrimariesRX = U16LE_AT(&data[1]);
+    uint16_t displayPrimariesRY = U16LE_AT(&data[3]);
+
+    uint16_t displayPrimariesGX = U16LE_AT(&data[5]);
+    uint16_t displayPrimariesGY = U16LE_AT(&data[7]);
+
+    uint16_t displayPrimariesBX = U16LE_AT(&data[9]);
+    uint16_t displayPrimariesBY = U16LE_AT(&data[11]);
+
+    uint16_t whitePointX = U16LE_AT(&data[13]);
+    uint16_t whitePointY = U16LE_AT(&data[15]);
+
+    uint16_t maxDisplayMasteringLuminance = U16LE_AT(&data[17]);
+    uint16_t minDisplayMasteringLuminance = U16LE_AT(&data[19]);
+
+    uint16_t maxContentLightLevel = U16LE_AT(&data[21]);
+    uint16_t maxPicAverageLightLevel = U16LE_AT(&data[23]);
+
+    mOwner->beginBox("mdcv");
+    mOwner->writeInt16(displayPrimariesGX);
+    mOwner->writeInt16(displayPrimariesGY);
+    mOwner->writeInt16(displayPrimariesBX);
+    mOwner->writeInt16(displayPrimariesBY);
+    mOwner->writeInt16(displayPrimariesRX);
+    mOwner->writeInt16(displayPrimariesRY);
+    mOwner->writeInt16(whitePointX);
+    mOwner->writeInt16(whitePointY);
+    mOwner->writeInt32(maxDisplayMasteringLuminance * 10000);
+    mOwner->writeInt32(minDisplayMasteringLuminance * 10000);
+    mOwner->endBox();  // mdcv.
+
+    mOwner->beginBox("clli");
+    mOwner->writeInt16(maxContentLightLevel);
+    mOwner->writeInt16(maxPicAverageLightLevel);
+    mOwner->endBox();  // clli.
 }
 
 void MPEG4Writer::Track::writeAudioFourCCBox() {

@@ -29,17 +29,15 @@
 #include "binding/AudioEndpointParcelable.h"
 
 using android::base::unique_fd;
-using android::media::SharedFileRegion;
-using android::NO_ERROR;
 using android::status_t;
 
 using namespace aaudio;
 
 AudioEndpointParcelable::AudioEndpointParcelable(Endpoint&& parcelable)
-        : mUpMessageQueueParcelable(std::move(parcelable.upMessageQueueParcelable)),
-          mDownMessageQueueParcelable(std::move(parcelable.downMessageQueueParcelable)),
-          mUpDataQueueParcelable(std::move(parcelable.upDataQueueParcelable)),
-          mDownDataQueueParcelable(std::move(parcelable.downDataQueueParcelable)),
+        : mUpMessageQueueParcelable(parcelable.upMessageQueueParcelable),
+          mDownMessageQueueParcelable(parcelable.downMessageQueueParcelable),
+          mUpDataQueueParcelable(parcelable.upDataQueueParcelable),
+          mDownDataQueueParcelable(parcelable.downDataQueueParcelable),
           mNumSharedMemories(parcelable.sharedMemories.size()) {
     for (size_t i = 0; i < parcelable.sharedMemories.size() && i < MAX_SHARED_MEMORIES; ++i) {
         // Re-construct.
@@ -56,10 +54,10 @@ AudioEndpointParcelable& AudioEndpointParcelable::operator=(Endpoint&& parcelabl
 
 Endpoint AudioEndpointParcelable::parcelable()&& {
     Endpoint result;
-    result.upMessageQueueParcelable = std::move(mUpMessageQueueParcelable).parcelable();
-    result.downMessageQueueParcelable = std::move(mDownMessageQueueParcelable).parcelable();
-    result.upDataQueueParcelable = std::move(mUpDataQueueParcelable).parcelable();
-    result.downDataQueueParcelable = std::move(mDownDataQueueParcelable).parcelable();
+    result.upMessageQueueParcelable = mUpMessageQueueParcelable.parcelable();
+    result.downMessageQueueParcelable = mDownMessageQueueParcelable.parcelable();
+    result.upDataQueueParcelable = mUpDataQueueParcelable.parcelable();
+    result.downDataQueueParcelable = mDownDataQueueParcelable.parcelable();
     result.sharedMemories.reserve(std::min(mNumSharedMemories, MAX_SHARED_MEMORIES));
     for (size_t i = 0; i < mNumSharedMemories && i < MAX_SHARED_MEMORIES; ++i) {
         result.sharedMemories.emplace_back(std::move(mSharedMemories[i]).parcelable());
@@ -81,6 +79,22 @@ int32_t AudioEndpointParcelable::addFileDescriptor(const unique_fd& fd,
     return index;
 }
 
+void AudioEndpointParcelable::closeDataFileDescriptor() {
+    const int32_t curDataMemoryIndex = mDownDataQueueParcelable.getSharedMemoryIndex();
+    mSharedMemories[curDataMemoryIndex].closeAndReleaseFd();
+}
+
+void AudioEndpointParcelable::updateDataFileDescriptor(
+        AudioEndpointParcelable* endpointParcelable) {
+    const int32_t curDataMemoryIndex = mDownDataQueueParcelable.getSharedMemoryIndex();
+    const int32_t newDataMemoryIndex =
+            endpointParcelable->mDownDataQueueParcelable.getSharedMemoryIndex();
+    mSharedMemories[curDataMemoryIndex].close();
+    mSharedMemories[curDataMemoryIndex].setup(
+            endpointParcelable->mSharedMemories[newDataMemoryIndex]);
+    mDownDataQueueParcelable.updateMemory(endpointParcelable->mDownDataQueueParcelable);
+}
+
 aaudio_result_t AudioEndpointParcelable::resolve(EndpointDescriptor *descriptor) {
     aaudio_result_t result = mUpMessageQueueParcelable.resolve(mSharedMemories,
                                                            &descriptor->upMessageQueueDescriptor);
@@ -92,6 +106,10 @@ aaudio_result_t AudioEndpointParcelable::resolve(EndpointDescriptor *descriptor)
     result = mDownDataQueueParcelable.resolve(mSharedMemories,
                                               &descriptor->dataQueueDescriptor);
     return result;
+}
+
+aaudio_result_t AudioEndpointParcelable::resolveDataQueue(RingBufferDescriptor *descriptor) {
+    return mDownDataQueueParcelable.resolve(mSharedMemories, descriptor);
 }
 
 aaudio_result_t AudioEndpointParcelable::close() {

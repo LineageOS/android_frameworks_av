@@ -701,7 +701,7 @@ static status_t recordScreen(const char* fileName) {
         printf("Display is %dx%d @%.2ffps (orientation=%s), layerStack=%u\n",
                 layerStackSpaceRect.getWidth(), layerStackSpaceRect.getHeight(),
                 displayMode.refreshRate, toCString(displayState.orientation),
-                displayState.layerStack);
+                displayState.layerStack.id);
         fflush(stdout);
     }
 
@@ -1067,7 +1067,7 @@ int main(int argc, char* const argv[]) {
 
     std::optional<PhysicalDisplayId> displayId = SurfaceComposerClient::getInternalDisplayId();
     if (!displayId) {
-        fprintf(stderr, "Failed to get token for internal display\n");
+        fprintf(stderr, "Failed to get ID for internal display\n");
         return 1;
     }
 
@@ -1168,17 +1168,14 @@ int main(int argc, char* const argv[]) {
             }
             break;
         case 'd':
-            gPhysicalDisplayId = PhysicalDisplayId(atoll(optarg));
-            if (gPhysicalDisplayId.value == 0) {
-                fprintf(stderr, "Please specify a valid physical display id\n");
-                return 2;
-            } else if (SurfaceComposerClient::
-                    getPhysicalDisplayToken(gPhysicalDisplayId) == nullptr) {
-                fprintf(stderr, "Invalid physical display id: %s\n",
-                        to_string(gPhysicalDisplayId).c_str());
-                return 2;
+            if (const auto id = android::DisplayId::fromValue<PhysicalDisplayId>(atoll(optarg));
+                id && SurfaceComposerClient::getPhysicalDisplayToken(*id)) {
+                gPhysicalDisplayId = *id;
+                break;
             }
-            break;
+
+            fprintf(stderr, "Invalid physical display ID\n");
+            return 2;
         default:
             if (ic != '?') {
                 fprintf(stderr, "getopt_long returned unexpected value 0x%x\n", ic);

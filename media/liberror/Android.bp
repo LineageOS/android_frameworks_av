@@ -1,0 +1,67 @@
+package {
+    // See: http://go/android-license-faq
+    // A large-scale-change added 'default_applicable_licenses' to import
+    // all of the 'license_kinds' from "frameworks_av_license"
+    // to get the below license kinds:
+    //   SPDX-license-identifier-Apache-2.0
+    default_applicable_licenses: ["frameworks_av_license"],
+}
+
+cc_library_headers {
+    name: "libexpectedutils_headers",
+    host_supported: true,
+    vendor_available: true,
+    min_sdk_version: "29",
+    export_include_dirs: [
+        "include",
+    ],
+    header_libs: [
+        "libbase_headers",
+        "libutils_headers",
+    ],
+    export_header_lib_headers: [
+        "libbase_headers",
+        "libutils_headers",
+    ],
+    apex_available: [
+        "//apex_available:platform",
+        "com.android.bluetooth",
+        "com.android.media",
+        "com.android.media.swcodec",
+    ],
+}
+
+cc_test_host {
+    name: "libexpectedutils_test",
+    srcs: [
+        "expected_utils_test.cpp",
+    ],
+    shared_libs: [
+        "liblog",
+    ],
+    header_libs: [
+        "libexpectedutils_headers",
+    ],
+}
+
+cc_library_headers {
+    name: "liberror_headers",
+    host_supported: true,
+    vendor_available: true,
+    min_sdk_version: "29",
+    apex_available: [
+        "//apex_available:platform",
+        "com.android.bluetooth",
+        "com.android.media",
+        "com.android.media.swcodec",
+    ],
+    export_include_dirs: [
+        "include",
+    ],
+    header_libs: [
+        "libexpectedutils_headers",
+    ],
+    export_header_lib_headers: [
+        "libexpectedutils_headers",
+    ],
+}

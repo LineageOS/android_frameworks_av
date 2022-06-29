@@ -18,123 +18,116 @@
 
 #include "TunerLnb.h"
 
-using ::android::hardware::tv::tuner::V1_0::LnbPosition;
-using ::android::hardware::tv::tuner::V1_0::LnbTone;
-using ::android::hardware::tv::tuner::V1_0::LnbVoltage;
-using ::android::hardware::tv::tuner::V1_0::Result;
+#include <aidl/android/hardware/tv/tuner/ILnbCallback.h>
+#include <aidl/android/hardware/tv/tuner/Result.h>
 
+using ::aidl::android::hardware::tv::tuner::ILnbCallback;
+using ::aidl::android::hardware::tv::tuner::Result;
+
+namespace aidl {
 namespace android {
+namespace media {
+namespace tv {
+namespace tuner {
 
-TunerLnb::TunerLnb(sp<ILnb> lnb, int id) {
+TunerLnb::TunerLnb(shared_ptr<ILnb> lnb, int id) {
     mLnb = lnb;
     mId = id;
 }
 
 TunerLnb::~TunerLnb() {
-    mLnb = NULL;
+    mLnb = nullptr;
     mId = -1;
 }
 
-Status TunerLnb::setCallback(
-        const shared_ptr<ITunerLnbCallback>& tunerLnbCallback) {
-    if (mLnb == NULL) {
+::ndk::ScopedAStatus TunerLnb::setCallback(
+        const shared_ptr<ITunerLnbCallback>& in_tunerLnbCallback) {
+    if (mLnb == nullptr) {
         ALOGE("ILnb is not initialized");
-        return Status::fromServiceSpecificError(static_cast<int32_t>(Result::UNAVAILABLE));
+        return ::ndk::ScopedAStatus::fromServiceSpecificError(
+                static_cast<int32_t>(Result::UNAVAILABLE));
     }
 
-    if (tunerLnbCallback == NULL) {
-        return Status::fromServiceSpecificError(static_cast<int32_t>(Result::INVALID_ARGUMENT));
+    if (in_tunerLnbCallback == nullptr) {
+        return ::ndk::ScopedAStatus::fromServiceSpecificError(
+                static_cast<int32_t>(Result::INVALID_ARGUMENT));
     }
 
-    sp<ILnbCallback> lnbCallback = new LnbCallback(tunerLnbCallback);
-    Result status = mLnb->setCallback(lnbCallback);
-    if (status != Result::SUCCESS) {
-        return Status::fromServiceSpecificError(static_cast<int32_t>(status));
-    }
-    return Status::ok();
+    shared_ptr<ILnbCallback> lnbCallback =
+            ::ndk::SharedRefBase::make<LnbCallback>(in_tunerLnbCallback);
+    return mLnb->setCallback(lnbCallback);
 }
 
-Status TunerLnb::setVoltage(int voltage) {
-    if (mLnb == NULL) {
+::ndk::ScopedAStatus TunerLnb::setVoltage(LnbVoltage in_voltage) {
+    if (mLnb == nullptr) {
         ALOGE("ILnb is not initialized");
-        return Status::fromServiceSpecificError(static_cast<int32_t>(Result::UNAVAILABLE));
+        return ::ndk::ScopedAStatus::fromServiceSpecificError(
+                static_cast<int32_t>(Result::UNAVAILABLE));
     }
 
-    Result status = mLnb->setVoltage(static_cast<LnbVoltage>(voltage));
-    if (status != Result::SUCCESS) {
-        return Status::fromServiceSpecificError(static_cast<int32_t>(status));
-    }
-    return Status::ok();
+    return mLnb->setVoltage(in_voltage);
 }
 
-Status TunerLnb::setTone(int tone) {
-    if (mLnb == NULL) {
+::ndk::ScopedAStatus TunerLnb::setTone(LnbTone in_tone) {
+    if (mLnb == nullptr) {
         ALOGE("ILnb is not initialized");
-        return Status::fromServiceSpecificError(static_cast<int32_t>(Result::UNAVAILABLE));
+        return ::ndk::ScopedAStatus::fromServiceSpecificError(
+                static_cast<int32_t>(Result::UNAVAILABLE));
     }
 
-    Result status = mLnb->setTone(static_cast<LnbTone>(tone));
-    if (status != Result::SUCCESS) {
-        return Status::fromServiceSpecificError(static_cast<int32_t>(status));
-    }
-    return Status::ok();
+    return mLnb->setTone(in_tone);
 }
 
-Status TunerLnb::setSatellitePosition(int position) {
-    if (mLnb == NULL) {
+::ndk::ScopedAStatus TunerLnb::setSatellitePosition(LnbPosition in_position) {
+    if (mLnb == nullptr) {
         ALOGE("ILnb is not initialized");
-        return Status::fromServiceSpecificError(static_cast<int32_t>(Result::UNAVAILABLE));
+        return ::ndk::ScopedAStatus::fromServiceSpecificError(
+                static_cast<int32_t>(Result::UNAVAILABLE));
     }
 
-    Result status = mLnb->setSatellitePosition(static_cast<LnbPosition>(position));
-    if (status != Result::SUCCESS) {
-        return Status::fromServiceSpecificError(static_cast<int32_t>(status));
-    }
-    return Status::ok();
+    return mLnb->setSatellitePosition(in_position);
 }
 
-Status TunerLnb::sendDiseqcMessage(const vector<uint8_t>& diseqcMessage) {
-    if (mLnb == NULL) {
+::ndk::ScopedAStatus TunerLnb::sendDiseqcMessage(const vector<uint8_t>& in_diseqcMessage) {
+    if (mLnb == nullptr) {
         ALOGE("ILnb is not initialized");
-        return Status::fromServiceSpecificError(static_cast<int32_t>(Result::UNAVAILABLE));
+        return ::ndk::ScopedAStatus::fromServiceSpecificError(
+                static_cast<int32_t>(Result::UNAVAILABLE));
     }
 
-    Result status = mLnb->sendDiseqcMessage(diseqcMessage);
-    if (status != Result::SUCCESS) {
-        return Status::fromServiceSpecificError(static_cast<int32_t>(status));
-    }
-    return Status::ok();
+    return mLnb->sendDiseqcMessage(in_diseqcMessage);
 }
 
-Status TunerLnb::close() {
-    if (mLnb == NULL) {
+::ndk::ScopedAStatus TunerLnb::close() {
+    if (mLnb == nullptr) {
         ALOGE("ILnb is not initialized");
-        return Status::fromServiceSpecificError(static_cast<int32_t>(Result::UNAVAILABLE));
+        return ::ndk::ScopedAStatus::fromServiceSpecificError(
+                static_cast<int32_t>(Result::UNAVAILABLE));
     }
 
-    Result res = mLnb->close();
-    mLnb = NULL;
+    auto res = mLnb->close();
+    mLnb = nullptr;
 
-    if (res != Result::SUCCESS) {
-        return Status::fromServiceSpecificError(static_cast<int32_t>(res));
-    }
-    return Status::ok();
+    return res;
 }
 
 /////////////// ILnbCallback ///////////////////////
-
-Return<void> TunerLnb::LnbCallback::onEvent(const LnbEventType lnbEventType) {
-    if (mTunerLnbCallback != NULL) {
-        mTunerLnbCallback->onEvent((int)lnbEventType);
+::ndk::ScopedAStatus TunerLnb::LnbCallback::onEvent(const LnbEventType lnbEventType) {
+    if (mTunerLnbCallback != nullptr) {
+        mTunerLnbCallback->onEvent(lnbEventType);
     }
-    return Void();
+    return ndk::ScopedAStatus::ok();
 }
 
-Return<void> TunerLnb::LnbCallback::onDiseqcMessage(const hidl_vec<uint8_t>& diseqcMessage) {
-    if (mTunerLnbCallback != NULL && diseqcMessage != NULL) {
-        vector<uint8_t> msg(begin(diseqcMessage), end(diseqcMessage));
-        mTunerLnbCallback->onDiseqcMessage(msg);
+::ndk::ScopedAStatus TunerLnb::LnbCallback::onDiseqcMessage(const vector<uint8_t>& diseqcMessage) {
+    if (mTunerLnbCallback != nullptr) {
+        mTunerLnbCallback->onDiseqcMessage(diseqcMessage);
     }
-    return Void();
+    return ndk::ScopedAStatus::ok();
 }
+
+}  // namespace tuner
+}  // namespace tv
+}  // namespace media
 }  // namespace android
+}  // namespace aidl

@@ -16,6 +16,9 @@
 
 package android.media.tv.tuner;
 
+import android.hardware.tv.tuner.LnbPosition;
+import android.hardware.tv.tuner.LnbTone;
+import android.hardware.tv.tuner.LnbVoltage;
 import android.media.tv.tuner.ITunerLnbCallback;
 
 /**
@@ -32,17 +35,17 @@ interface ITunerLnb {
     /**
      * Set the lnb's power voltage.
      */
-    void setVoltage(in int voltage);
+    void setVoltage(in LnbVoltage voltage);
 
     /**
      * Set the lnb's tone mode.
      */
-    void setTone(in int tone);
+    void setTone(in LnbTone tone);
 
     /**
      * Select the lnb's position.
      */
-    void setSatellitePosition(in int position);
+    void setSatellitePosition(in LnbPosition position);
 
     /**
      * Sends DiSEqC (Digital Satellite Equipment Control) message.

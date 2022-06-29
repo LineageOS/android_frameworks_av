@@ -931,6 +931,9 @@ void CCodecConfig::initializeStandardParams() {
     add(ConfigMapper(KEY_MAX_OUTPUT_CHANNEL_COUNT, C2_PARAMKEY_MAX_CHANNEL_COUNT, "value")
         .limitTo(D::AUDIO & (D::CONFIG | D::PARAM | D::READ)));
 
+    add(ConfigMapper(KEY_CHANNEL_MASK, C2_PARAMKEY_CHANNEL_MASK, "value")
+        .limitTo(D::AUDIO & D::DECODER & D::READ));
+
     add(ConfigMapper(KEY_AAC_SBR_MODE, C2_PARAMKEY_AAC_SBR_MODE, "value")
         .limitTo(D::AUDIO & D::ENCODER & (D::CONFIG | D::PARAM | D::READ))
         .withMapper([](C2Value v) -> C2Value {
@@ -983,6 +986,16 @@ void CCodecConfig::initializeStandardParams() {
             int32_t value = 0;
             (void)v.get(&value);
             return value == 0 ? C2_FALSE : C2_TRUE;
+        }));
+
+    add(ConfigMapper("android._tunnel-peek-set-legacy", C2_PARAMKEY_TUNNEL_PEEK_MODE, "value")
+        .limitTo(D::PARAM & D::VIDEO & D::DECODER)
+        .withMapper([](C2Value v) -> C2Value {
+          int32_t value = 0;
+          (void)v.get(&value);
+          return value == 0
+              ? C2Value(C2PlatformConfig::SPECIFIED_PEEK)
+              : C2Value(C2PlatformConfig::UNSPECIFIED_PEEK);
         }));
 
     add(ConfigMapper(KEY_VIDEO_QP_AVERAGE, C2_PARAMKEY_AVERAGE_QP, "value")

@@ -18,9 +18,9 @@ package android.media;
 
 import android.media.AudioAttributesInternal;
 import android.media.AudioClient;
-import android.media.AudioConfig;
 import android.media.IAudioTrackCallback;
 import android.media.SharedFileRegion;
+import android.media.audio.common.AudioConfig;
 
 /**
  * CreateTrackInput contains all input arguments sent by AudioTrack to AudioFlinger

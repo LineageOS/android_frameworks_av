@@ -42,7 +42,7 @@ public:
      *
      * <p>Each line is indented by DUMP_INDENT spaces.</p>
      */
-    static status_t dump(int fd, const Vector<String16>& args);
+    static status_t dump(int fd);
 
 private:
     enum {

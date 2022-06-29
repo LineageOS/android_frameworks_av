@@ -1673,23 +1673,17 @@ void NuPlayer::Renderer::onFlush(const sp<AMessage> &msg) {
 
         mDrainAudioQueuePending = false;
 
-        if (offloadingAudio()) {
-            mAudioSink->pause();
-            mAudioSink->flush();
-            if (!mPaused) {
-                mAudioSink->start();
-            }
-        } else {
-            mAudioSink->pause();
-            mAudioSink->flush();
+        mAudioSink->pause();
+        mAudioSink->flush();
+        if (!offloadingAudio()) {
             // Call stop() to signal to the AudioSink to completely fill the
             // internal buffer before resuming playback.
             // FIXME: this is ignored after flush().
             mAudioSink->stop();
-            if (!mPaused) {
-                mAudioSink->start();
-            }
             mNumFramesWritten = 0;
+        }
+        if (!mPaused) {
+            mAudioSink->start();
         }
         mNextAudioClockUpdateTimeUs = -1;
     } else {

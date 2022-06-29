@@ -36,7 +36,7 @@ public:
     , mWriteCounter(0)
     {}
 
-    virtual ~FifoController() {}
+    virtual ~FifoController() = default;
 
     // TODO review use of memory barriers, probably incorrect
     virtual fifo_counter_t getReadCounter() override {
@@ -57,6 +57,6 @@ private:
     std::atomic<fifo_counter_t> mWriteCounter;
 };
 
-}  // android
+}  // namespace android
 
 #endif //FIFO_FIFO_CONTROLLER_H

@@ -56,17 +56,18 @@ status_t AudioPolicyService::AudioPolicyClient::openOutput(audio_module_handle_t
     media::OpenOutputResponse response;
 
     request.module = VALUE_OR_RETURN_STATUS(legacy2aidl_audio_module_handle_t_int32_t(module));
-    request.halConfig = VALUE_OR_RETURN_STATUS(legacy2aidl_audio_config_t_AudioConfig(*halConfig));
-    request.mixerConfig =
-            VALUE_OR_RETURN_STATUS(legacy2aidl_audio_config_base_t_AudioConfigBase(*mixerConfig));
+    request.halConfig = VALUE_OR_RETURN_STATUS(
+            legacy2aidl_audio_config_t_AudioConfig(*halConfig, false /*isInput*/));
+    request.mixerConfig = VALUE_OR_RETURN_STATUS(
+            legacy2aidl_audio_config_base_t_AudioConfigBase(*mixerConfig, false /*isInput*/));
     request.device = VALUE_OR_RETURN_STATUS(legacy2aidl_DeviceDescriptorBase(device));
     request.flags = VALUE_OR_RETURN_STATUS(legacy2aidl_audio_output_flags_t_int32_t_mask(flags));
 
     status_t status = af->openOutput(request, &response);
     if (status == OK) {
         *output = VALUE_OR_RETURN_STATUS(aidl2legacy_int32_t_audio_io_handle_t(response.output));
-        *halConfig =
-                VALUE_OR_RETURN_STATUS(aidl2legacy_AudioConfig_audio_config_t(response.config));
+        *halConfig = VALUE_OR_RETURN_STATUS(
+                aidl2legacy_AudioConfig_audio_config_t(response.config, false /*isInput*/));
         *latencyMs = VALUE_OR_RETURN_STATUS(convertIntegral<uint32_t>(response.latencyMs));
     }
     return status;
@@ -135,9 +136,10 @@ status_t AudioPolicyService::AudioPolicyClient::openInput(audio_module_handle_t 
     media::OpenInputRequest request;
     request.module = VALUE_OR_RETURN_STATUS(legacy2aidl_audio_module_handle_t_int32_t(module));
     request.input = VALUE_OR_RETURN_STATUS(legacy2aidl_audio_io_handle_t_int32_t(*input));
-    request.config = VALUE_OR_RETURN_STATUS(legacy2aidl_audio_config_t_AudioConfig(*config));
+    request.config = VALUE_OR_RETURN_STATUS(
+            legacy2aidl_audio_config_t_AudioConfig(*config, true /*isInput*/));
     request.device = VALUE_OR_RETURN_STATUS(legacy2aidl_AudioDeviceTypeAddress(deviceTypeAddr));
-    request.source = VALUE_OR_RETURN_STATUS(legacy2aidl_audio_source_t_AudioSourceType(source));
+    request.source = VALUE_OR_RETURN_STATUS(legacy2aidl_audio_source_t_AudioSource(source));
     request.flags = VALUE_OR_RETURN_STATUS(legacy2aidl_audio_input_flags_t_int32_t_mask(flags));
 
     media::OpenInputResponse response;
@@ -273,6 +275,11 @@ void AudioPolicyService::AudioPolicyClient::onAudioVolumeGroupChanged(volume_gro
 void AudioPolicyService::AudioPolicyClient::onRoutingUpdated()
 {
     mAudioPolicyService->onRoutingUpdated();
+}
+
+void AudioPolicyService::AudioPolicyClient::onVolumeRangeInitRequest()
+{
+    mAudioPolicyService->onVolumeRangeInitRequest();
 }
 
 audio_unique_id_t AudioPolicyService::AudioPolicyClient::newAudioUniqueId(audio_unique_id_use_t use)

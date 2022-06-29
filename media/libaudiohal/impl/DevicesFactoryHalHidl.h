@@ -45,6 +45,8 @@ class DevicesFactoryHalHidl : public DevicesFactoryHalInterface
 
     status_t setCallbackOnce(sp<DevicesFactoryHalCallback> callback) override;
 
+    float getHalVersion() const override { return MAJOR_VERSION + (float)MINOR_VERSION / 10; }
+
   private:
     friend class ServiceNotificationListener;
     void addDeviceFactory(sp<IDevicesFactory> factory, bool needToNotify);

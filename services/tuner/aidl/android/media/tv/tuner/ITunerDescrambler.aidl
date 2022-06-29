@@ -16,9 +16,9 @@
 
 package android.media.tv.tuner;
 
+import android.hardware.tv.tuner.DemuxPid;
 import android.media.tv.tuner.ITunerDemux;
 import android.media.tv.tuner.ITunerFilter;
-import android.media.tv.tuner.TunerDemuxPid;
 
 /**
  * Tuner Demux interface handles tuner related operations.
@@ -39,12 +39,12 @@ interface ITunerDescrambler {
     /**
      * Add packets' PID to the descrambler for descrambling.
      */
-    void addPid(in TunerDemuxPid pid, in ITunerFilter optionalSourceFilter);
+    void addPid(in DemuxPid pid, in ITunerFilter optionalSourceFilter);
 
     /**
      * Remove packets' PID from the descrambler.
      */
-    void removePid(in TunerDemuxPid pid, in ITunerFilter optionalSourceFilter);
+    void removePid(in DemuxPid pid, in ITunerFilter optionalSourceFilter);
 
     /**
      * Close a new interface of ITunerDescrambler.

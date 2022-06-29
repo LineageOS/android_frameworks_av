@@ -48,23 +48,23 @@ void convertYUV420Planar8ToYV12(uint8_t *dstY, uint8_t *dstU, uint8_t *dstV, con
 
     if (isMonochrome) {
         // Fill with neutral U/V values.
-        for (size_t i = 0; i < height / 2; ++i) {
-            memset(dstV, kNeutralUVBitDepth8, width / 2);
-            memset(dstU, kNeutralUVBitDepth8, width / 2);
+        for (size_t i = 0; i < (height + 1) / 2; ++i) {
+            memset(dstV, kNeutralUVBitDepth8, (width + 1) / 2);
+            memset(dstU, kNeutralUVBitDepth8, (width + 1) / 2);
             dstV += dstUVStride;
             dstU += dstUVStride;
         }
         return;
     }
 
-    for (size_t i = 0; i < height / 2; ++i) {
-        memcpy(dstV, srcV, width / 2);
+    for (size_t i = 0; i < (height + 1) / 2; ++i) {
+        memcpy(dstV, srcV, (width + 1) / 2);
         srcV += srcVStride;
         dstV += dstUVStride;
     }
 
-    for (size_t i = 0; i < height / 2; ++i) {
-        memcpy(dstU, srcU, width / 2);
+    for (size_t i = 0; i < (height + 1) / 2; ++i) {
+        memcpy(dstU, srcU, (width + 1) / 2);
         srcU += srcUStride;
         dstU += dstUVStride;
     }

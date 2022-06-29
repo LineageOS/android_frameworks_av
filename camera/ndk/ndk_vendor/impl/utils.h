@@ -109,8 +109,30 @@ struct OutputConfigurationWrapper {
         mOutputConfiguration.windowGroupId = -1;
     };
 
-    OutputConfigurationWrapper(OutputConfiguration &outputConfiguration)
-            : mOutputConfiguration((outputConfiguration)) { }
+    OutputConfigurationWrapper(const OutputConfigurationWrapper &other) {
+        *this = other;
+    }
+
+    // Needed to make sure that OutputConfiguration in
+    // OutputConfigurationWrapper, when copied doesn't call hidl_handle's
+    // assignment operator / copy constructor, which will lead to native handle
+    // cloning, which is not what we want for app callbacks which have the native
+    // handle as parameter.
+    OutputConfigurationWrapper &operator=(const OutputConfigurationWrapper &other) {
+        const OutputConfiguration &outputConfiguration = other.mOutputConfiguration;
+        mOutputConfiguration.rotation = outputConfiguration.rotation;
+        mOutputConfiguration.isDeferred = outputConfiguration.isDeferred;
+        mOutputConfiguration.width = outputConfiguration.width;
+        mOutputConfiguration.height = outputConfiguration.height;
+        mOutputConfiguration.windowGroupId = outputConfiguration.windowGroupId;
+        mOutputConfiguration.windowHandles.resize(outputConfiguration.windowHandles.size());
+        mOutputConfiguration.physicalCameraId = outputConfiguration.physicalCameraId;
+        size_t i = 0;
+        for (const auto &handle : outputConfiguration.windowHandles) {
+            mOutputConfiguration.windowHandles[i++] = handle.getNativeHandle();
+        }
+        return *this;
+    }
 
     bool operator ==(const OutputConfiguration &other) const {
         const OutputConfiguration &self = mOutputConfiguration;

@@ -54,7 +54,7 @@ public:
     DeviceVector supportedDevices() const  {
         return mProfile != nullptr ? mProfile->getSupportedDevices() :  DeviceVector(); }
 
-    void dump(String8 *dst) const override;
+    void dump(String8 *dst, int spaces, const char* extraInfo) const override;
 
     audio_io_handle_t   mIoHandle = AUDIO_IO_HANDLE_NONE; // input handle
     wp<AudioPolicyMix>  mPolicyMix;                   // non NULL when used by a dynamic policy
@@ -93,8 +93,10 @@ public:
     audio_patch_handle_t getPatchHandle() const override;
     void setPatchHandle(audio_patch_handle_t handle) override;
     bool isMmap() override {
-        if (getPolicyAudioPort() != nullptr) {
-            return getPolicyAudioPort()->isMmap();
+        if (const auto policyPort = getPolicyAudioPort(); policyPort != nullptr) {
+            if (const auto port = policyPort->asAudioPort(); port != nullptr) {
+                return port->isMmap();
+            }
         }
         return false;
     }
@@ -142,6 +144,7 @@ public:
     AudioPolicyClientInterface * const mClientInterface;
     int32_t mGlobalActiveCount = 0;  // non-client-specific activity ref count
     EffectDescriptorCollection mEnabledEffects;
+    audio_input_flags_t& mFlags = AudioPortConfig::mFlags.input;
 };
 
 class AudioInputCollection :

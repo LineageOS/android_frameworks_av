@@ -37,10 +37,12 @@
 #include <string>
 #include <vector>
 
+#include <android/content/AttributionSourceState.h>
 #include <android/media/AudioVibratorInfo.h>
 #include <android/media/BnAudioFlingerService.h>
 #include <android/media/BpAudioFlingerService.h>
-#include <android/content/AttributionSourceState.h>
+#include <android/media/audio/common/AudioMMapPolicyInfo.h>
+#include <android/media/audio/common/AudioMMapPolicyType.h>
 #include "android/media/CreateEffectRequest.h"
 #include "android/media/CreateEffectResponse.h"
 #include "android/media/CreateRecordRequest.h"
@@ -63,7 +65,7 @@ namespace android {
 
 // ----------------------------------------------------------------------------
 
-class IAudioFlinger : public RefBase {
+class IAudioFlinger : public virtual RefBase {
 public:
     static constexpr char DEFAULT_SERVICE_NAME[] = "media.audio_flinger";
 
@@ -166,6 +168,7 @@ public:
         sp<IMemory> buffers;
         audio_port_handle_t portId;
         sp<media::IAudioRecord> audioRecord;
+        audio_config_base_t serverConfig;
 
         ConversionResult<media::CreateRecordResponse> toAidl() const;
         static ConversionResult<CreateRecordOutput>
@@ -348,6 +351,14 @@ public:
     virtual status_t updateSecondaryOutputs(
             const TrackSecondaryOutputsMap& trackSecondaryOutputs) = 0;
 
+    virtual status_t getMmapPolicyInfos(
+            media::audio::common::AudioMMapPolicyType policyType,
+            std::vector<media::audio::common::AudioMMapPolicyInfo> *policyInfos) = 0;
+
+    virtual int32_t getAAudioMixerBurstCount() = 0;
+
+    virtual int32_t getAAudioHardwareBurstMinUsec() = 0;
+
     virtual status_t setDeviceConnectedState(const struct audio_port_v7 *port, bool connected) = 0;
 };
 
@@ -445,6 +456,11 @@ public:
     status_t setVibratorInfos(const std::vector<media::AudioVibratorInfo>& vibratorInfos) override;
     status_t updateSecondaryOutputs(
             const TrackSecondaryOutputsMap& trackSecondaryOutputs) override;
+    status_t getMmapPolicyInfos(
+            media::audio::common::AudioMMapPolicyType policyType,
+            std::vector<media::audio::common::AudioMMapPolicyInfo> *policyInfos) override;
+    int32_t getAAudioMixerBurstCount() override;
+    int32_t getAAudioHardwareBurstMinUsec() override;
     status_t setDeviceConnectedState(const struct audio_port_v7 *port, bool connected) override;
 
 private:
@@ -466,9 +482,9 @@ public:
      * Legacy server should implement this interface in order to be wrapped.
      */
     class Delegate : public IAudioFlinger {
-    protected:
         friend class AudioFlingerServerAdapter;
-
+    public:
+        // expose the TransactionCode enum for TimeCheck purposes.
         enum class TransactionCode {
             CREATE_TRACK = media::BnAudioFlingerService::TRANSACTION_createTrack,
             CREATE_RECORD = media::BnAudioFlingerService::TRANSACTION_createRecord,
@@ -531,9 +547,13 @@ public:
             SET_AUDIO_HAL_PIDS = media::BnAudioFlingerService::TRANSACTION_setAudioHalPids,
             SET_VIBRATOR_INFOS = media::BnAudioFlingerService::TRANSACTION_setVibratorInfos,
             UPDATE_SECONDARY_OUTPUTS = media::BnAudioFlingerService::TRANSACTION_updateSecondaryOutputs,
+            GET_MMAP_POLICY_INFOS = media::BnAudioFlingerService::TRANSACTION_getMmapPolicyInfos,
+            GET_AAUDIO_MIXER_BURST_COUNT = media::BnAudioFlingerService::TRANSACTION_getAAudioMixerBurstCount,
+            GET_AAUDIO_HARDWARE_BURST_MIN_USEC = media::BnAudioFlingerService::TRANSACTION_getAAudioHardwareBurstMinUsec,
             SET_DEVICE_CONNECTED_STATE = media::BnAudioFlingerService::TRANSACTION_setDeviceConnectedState,
         };
 
+    protected:
         /**
          * And optional hook, called on every transaction, allowing additional operations to be
          * performed before/after the unparceling  ofthe data and dispatching to the respective
@@ -573,7 +593,8 @@ public:
     Status createRecord(const media::CreateRecordRequest& request,
                         media::CreateRecordResponse* _aidl_return) override;
     Status sampleRate(int32_t ioHandle, int32_t* _aidl_return) override;
-    Status format(int32_t output, media::audio::common::AudioFormat* _aidl_return) override;
+    Status format(int32_t output,
+                  media::audio::common::AudioFormatDescription* _aidl_return) override;
     Status frameCount(int32_t ioHandle, int64_t* _aidl_return) override;
     Status latency(int32_t output, int32_t* _aidl_return) override;
     Status setMasterVolume(float value) override;
@@ -582,12 +603,13 @@ public:
     Status masterMute(bool* _aidl_return) override;
     Status setMasterBalance(float balance) override;
     Status getMasterBalance(float* _aidl_return) override;
-    Status setStreamVolume(media::AudioStreamType stream, float value, int32_t output) override;
-    Status setStreamMute(media::AudioStreamType stream, bool muted) override;
-    Status
-    streamVolume(media::AudioStreamType stream, int32_t output, float* _aidl_return) override;
-    Status streamMute(media::AudioStreamType stream, bool* _aidl_return) override;
-    Status setMode(media::AudioMode mode) override;
+    Status setStreamVolume(media::audio::common::AudioStreamType stream,
+                           float value, int32_t output) override;
+    Status setStreamMute(media::audio::common::AudioStreamType stream, bool muted) override;
+    Status streamVolume(media::audio::common::AudioStreamType stream,
+                        int32_t output, float* _aidl_return) override;
+    Status streamMute(media::audio::common::AudioStreamType stream, bool* _aidl_return) override;
+    Status setMode(media::audio::common::AudioMode mode) override;
     Status setMicMute(bool state) override;
     Status getMicMute(bool* _aidl_return) override;
     Status setRecordSilenced(int32_t portId, bool silenced) override;
@@ -595,8 +617,10 @@ public:
     Status
     getParameters(int32_t ioHandle, const std::string& keys, std::string* _aidl_return) override;
     Status registerClient(const sp<media::IAudioFlingerClient>& client) override;
-    Status getInputBufferSize(int32_t sampleRate, media::audio::common::AudioFormat format,
-                              int32_t channelMask, int64_t* _aidl_return) override;
+    Status getInputBufferSize(int32_t sampleRate,
+                              const media::audio::common::AudioFormatDescription& format,
+                              const media::audio::common::AudioChannelLayout& channelMask,
+                              int64_t* _aidl_return) override;
     Status openOutput(const media::OpenOutputRequest& request,
                       media::OpenOutputResponse* _aidl_return) override;
     Status openDuplicateOutput(int32_t output1, int32_t output2, int32_t* _aidl_return) override;
@@ -606,7 +630,7 @@ public:
     Status openInput(const media::OpenInputRequest& request,
                      media::OpenInputResponse* _aidl_return) override;
     Status closeInput(int32_t input) override;
-    Status invalidateStream(media::AudioStreamType stream) override;
+    Status invalidateStream(media::audio::common::AudioStreamType stream) override;
     Status setVoiceVolume(float volume) override;
     Status getRenderPosition(int32_t output, media::RenderPosition* _aidl_return) override;
     Status getInputFramesLost(int32_t ioHandle, int32_t* _aidl_return) override;
@@ -615,7 +639,8 @@ public:
     Status releaseAudioSessionId(int32_t audioSession, int32_t pid) override;
     Status queryNumberEffects(int32_t* _aidl_return) override;
     Status queryEffect(int32_t index, media::EffectDescriptor* _aidl_return) override;
-    Status getEffectDescriptor(const media::AudioUuid& effectUUID, const media::AudioUuid& typeUUID,
+    Status getEffectDescriptor(const media::audio::common::AudioUuid& effectUUID,
+                               const media::audio::common::AudioUuid& typeUUID,
                                int32_t preferredTypeFlag,
                                media::EffectDescriptor* _aidl_return) override;
     Status createEffect(const media::CreateEffectRequest& request,
@@ -641,6 +666,11 @@ public:
     Status setVibratorInfos(const std::vector<media::AudioVibratorInfo>& vibratorInfos) override;
     Status updateSecondaryOutputs(
             const std::vector<media::TrackSecondaryOutputInfo>& trackSecondaryOutputInfos) override;
+    Status getMmapPolicyInfos(
+            media::audio::common::AudioMMapPolicyType policyType,
+            std::vector<media::audio::common::AudioMMapPolicyInfo> *_aidl_return) override;
+    Status getAAudioMixerBurstCount(int32_t* _aidl_return) override;
+    Status getAAudioHardwareBurstMinUsec(int32_t* _aidl_return) override;
     Status setDeviceConnectedState(const media::AudioPort& port, bool connected) override;
 
 private:

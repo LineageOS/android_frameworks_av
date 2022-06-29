@@ -1,0 +1,50 @@
+# Measure energy consumption with synthmark.
+
+# None
+adb shell synthmark -tj -n1 -N50 -B2 -z0
+adb shell synthmark -tj -n1 -N75 -B2 -z0
+adb shell synthmark -tj -n1 -N100 -B2 -z0
+
+# ADPF PID
+adb shell synthmark -tj -n1 -N50 -B2 -z1
+adb shell synthmark -tj -n1 -N75 -B2 -z1
+adb shell synthmark -tj -n1 -N100 -B2 -z1
+
+# ADPF <400 RR
+# adb root \
+# adb shell setprop vendor.powerhal.adpf.uclamp_min.high_limit 400 \
+# adb shell synthmark -tj -n1 -N50 -B2 -z1
+# adb shell synthmark -tj -n1 -N75 -B2 -z1
+# adb shell synthmark -tj -n1 -N100 -B2 -z1
+
+# ADPF <500 RR
+# adb root \
+# adb shell setprop vendor.powerhal.adpf.uclamp_min.high_limit 500 \
+# adb shell synthmark -tj -n1 -N50 -B2 -z1
+# adb shell synthmark -tj -n1 -N75 -B2 -z1
+# adb shell synthmark -tj -n1 -N100 -B2 -z1
+
+# ADPF <600 RR
+# adb root \
+# adb shell setprop vendor.powerhal.adpf.uclamp_min.high_limit 600 \
+# adb shell synthmark -tj -n1 -N50 -B2 -z1
+# adb shell synthmark -tj -n1 -N75 -B2 -z1
+# adb shell synthmark -tj -n1 -N100 -B2 -z1
+
+# uclamp
+# adb root \
+# adb shell synthmark -tj -n1 -N75 -B2 -u1
+
+# steady
+# adb shell synthmark -tj -n75 -B2 -u0
+
+# CPU affinity
+# adb shell synthmark -tj -n1 -N75 -B2 -u0 -c1
+# adb shell synthmark -tj -n1 -N75 -B2 -u0 -c4
+# adb shell synthmark -tj -n1 -N75 -B2 -u0 -c6
+
+# steady + affinity
+# adb shell synthmark -tj -n75 -B2 -u0 -c1
+# adb shell synthmark -tj -n75 -B2 -u0 -c4
+# adb shell synthmark -tj -n75 -B2 -u0 -c6
+

@@ -150,12 +150,8 @@ volume_group_t ProductStrategy::getDefaultVolumeGroup() const
 void ProductStrategy::dump(String8 *dst, int spaces) const
 {
     dst->appendFormat("\n%*s-%s (id: %d)\n", spaces, "", mName.c_str(), mId);
-    std::string deviceLiteral;
-    if (!deviceTypesToString(mApplicableDevices, deviceLiteral)) {
-        ALOGE("%s: failed to convert device %s",
-              __FUNCTION__, dumpDeviceTypes(mApplicableDevices).c_str());
-    }
-    dst->appendFormat("%*sSelected Device: {type:%s, @:%s}\n", spaces + 2, "",
+    std::string deviceLiteral = deviceTypesToString(mApplicableDevices);
+    dst->appendFormat("%*sSelected Device: {%s, @:%s}\n", spaces + 2, "",
                        deviceLiteral.c_str(), mDeviceAddress.c_str());
 
     for (const auto &attr : mAttributesVector) {
@@ -333,4 +329,3 @@ void dumpProductStrategyDevicesRoleMap(
     dst->appendFormat("\n");
 }
 }
-

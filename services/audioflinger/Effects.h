@@ -356,6 +356,8 @@ public:
             const sp<media::IEffectClient>& effectClient,
             int32_t priority, bool notifyFramesProcessed);
     virtual ~EffectHandle();
+    status_t onTransact(
+            uint32_t code, const Parcel& data, Parcel* reply, uint32_t flags) override;
     virtual status_t initCheck();
 
     // IEffect
@@ -766,8 +768,8 @@ private:
         void resetVolume() override {}
         product_strategy_t strategy() const override  { return static_cast<product_strategy_t>(0); }
         int32_t activeTrackCnt() const override { return 0; }
-        void onEffectEnable(const sp<EffectBase>& effect __unused) override {}
-        void onEffectDisable(const sp<EffectBase>& effect __unused) override {}
+        void onEffectEnable(const sp<EffectBase>& effect __unused) override;
+        void onEffectDisable(const sp<EffectBase>& effect __unused) override;
 
         wp<EffectChain> chain() const override { return nullptr; }
 
