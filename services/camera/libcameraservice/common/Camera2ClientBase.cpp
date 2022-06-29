@@ -41,8 +41,6 @@
 
 namespace android {
 
-const static size_t kDisconnectTimeoutMs = 2500;
-
 using namespace camera2;
 
 // Interface used by CameraService
@@ -252,10 +250,16 @@ status_t Camera2ClientBase<TClientBase>::dumpDevice(
 
 template <typename TClientBase>
 binder::Status Camera2ClientBase<TClientBase>::disconnect() {
-    if (mCameraServiceWatchdog != nullptr) {
+    if (mCameraServiceWatchdog != nullptr && mDevice != nullptr) {
+        // Timer for the disconnect call should be greater than getExpectedInFlightDuration
+        // since this duration is used to error handle methods in the disconnect sequence
+        // thus allowing existing error handling methods to execute first
+        uint64_t maxExpectedDuration =
+                ns2ms(mDevice->getExpectedInFlightDuration() + kBufferTimeDisconnectNs);
+
         // Initialization from hal succeeded, time disconnect.
         return mCameraServiceWatchdog->WATCH_CUSTOM_TIMER(disconnectImpl(),
-                kDisconnectTimeoutMs / kCycleLengthMs, kCycleLengthMs);
+                maxExpectedDuration / kCycleLengthMs, kCycleLengthMs);
     }
     return disconnectImpl();
 }
