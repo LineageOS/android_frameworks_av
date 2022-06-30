@@ -54,7 +54,7 @@
 #include <cutils/properties.h>
 
 #include <system/audio.h>
-#include <audiomanager/AudioManager.h>
+#include <audiomanager/IAudioManager.h>
 
 #include "AudioFlinger.h"
 #include "NBAIO_Tee.h"
@@ -114,11 +114,12 @@ using media::audio::common::AudioMMapPolicyInfo;
 using media::audio::common::AudioMMapPolicyType;
 using android::content::AttributionSourceState;
 
-static const char kDeadlockedString[] = "AudioFlinger may be deadlocked\n";
-static const char kHardwareLockedString[] = "Hardware lock is taken\n";
-static const char kClientLockedString[] = "Client lock is taken\n";
-static const char kNoEffectsFactory[] = "Effects Factory is absent\n";
+static constexpr char kDeadlockedString[] = "AudioFlinger may be deadlocked\n";
+static constexpr char kHardwareLockedString[] = "Hardware lock is taken\n";
+static constexpr char kClientLockedString[] = "Client lock is taken\n";
+static constexpr char kNoEffectsFactory[] = "Effects Factory is absent\n";
 
+static constexpr char kAudioServiceName[] = "audio";
 
 nsecs_t AudioFlinger::mStandbyTimeInNsecs = kDefaultStandbyTimeInNsecs;
 
@@ -2722,7 +2723,26 @@ status_t AudioFlinger::systemReady()
         ThreadBase *thread = (ThreadBase *)mMmapThreads.valueAt(i).get();
         thread->systemReady();
     }
+
+    // Java services are ready, so we can create a reference to AudioService
+    getOrCreateAudioManager();
+
     return NO_ERROR;
+}
+
+sp<IAudioManager> AudioFlinger::getOrCreateAudioManager()
+{
+    if (mAudioManager.load() == nullptr) {
+        // use checkService() to avoid blocking
+        sp<IBinder> binder =
+            defaultServiceManager()->checkService(String16(kAudioServiceName));
+        if (binder != nullptr) {
+            mAudioManager = interface_cast<IAudioManager>(binder);
+        } else {
+            ALOGE("%s(): binding to audio service failed.", __func__);
+        }
+    }
+    return mAudioManager.load();
 }
 
 status_t AudioFlinger::getMicrophones(std::vector<media::MicrophoneInfo> *microphones)

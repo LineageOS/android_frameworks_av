@@ -31,6 +31,7 @@
 #include <sys/syscall.h>
 #include <cutils/bitops.h>
 #include <cutils/properties.h>
+#include <binder/PersistableBundle.h>
 #include <media/AudioContainers.h>
 #include <media/AudioDeviceTypeAddr.h>
 #include <media/AudioParameter.h>
@@ -5375,6 +5376,12 @@ AudioFlinger::PlaybackThread::mixer_state AudioFlinger::MixerThread::prepareTrac
                     volume = masterVolume * mStreamTypes[track->streamType()].volume;
                 }
 
+                track->processMuteEvent_l(mAudioFlinger->getOrCreateAudioManager(),
+                    /*muteState=*/{masterVolume == 0.f,
+                                   mStreamTypes[track->streamType()].volume == 0.f,
+                                   mStreamTypes[track->streamType()].mute,
+                                   track->isPlaybackRestricted()});
+
                 handleVoipVolume_l(&volume);
 
                 // cache the combined master volume and stream type volume for fast mixer; this
@@ -5538,6 +5545,12 @@ AudioFlinger::PlaybackThread::mixer_state AudioFlinger::MixerThread::prepareTrac
             if (mStreamTypes[track->streamType()].mute || track->isPlaybackRestricted()) {
                 v = 0;
             }
+
+            track->processMuteEvent_l(mAudioFlinger->getOrCreateAudioManager(),
+                /*muteState=*/{masterVolume == 0.f,
+                               mStreamTypes[track->streamType()].volume == 0.f,
+                               mStreamTypes[track->streamType()].mute,
+                               track->isPlaybackRestricted()});
 
             handleVoipVolume_l(&v);
 
@@ -6168,6 +6181,12 @@ void AudioFlinger::DirectOutputThread::processVolume_l(Track *track, bool lastTr
         }
         right *= v * mMasterBalanceRight;
     }
+
+    track->processMuteEvent_l(mAudioFlinger->getOrCreateAudioManager(),
+        /*muteState=*/{mMasterMute,
+                       mStreamTypes[track->streamType()].volume == 0.f,
+                       mStreamTypes[track->streamType()].mute,
+                       track->isPlaybackRestricted()});
 
     if (lastTrack) {
         track->setFinalVolume((left + right) / 2.f);
