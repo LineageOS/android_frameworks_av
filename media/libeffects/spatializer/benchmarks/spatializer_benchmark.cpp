@@ -69,18 +69,18 @@ constexpr float kMaxAmplitude = 1.0f;
  * 0: 44100, 1: 48000, 2: 96000
  * The second parameter indicates the duration in ms.
  * 0: 2, 1: 5, 2: 10
- *-------------------------------------------------------------
- *Benchmark                   Time             CPU   Iterations
- *-------------------------------------------------------------
- *BM_SPATIALIZER/0/0    2108308 ns      2102841 ns          308
- *BM_SPATIALIZER/0/1    3779324 ns      3769180 ns          182
- *BM_SPATIALIZER/0/2    7283784 ns      7260581 ns           73
- *BM_SPATIALIZER/1/0    2256171 ns      2250618 ns          298
- *BM_SPATIALIZER/1/1    4085380 ns      4075370 ns          167
- *BM_SPATIALIZER/1/2    8005652 ns      7974261 ns           67
- *BM_SPATIALIZER/2/0    4294597 ns      4283184 ns          153
- *BM_SPATIALIZER/2/1    8141776 ns      8120468 ns           83
- *BM_SPATIALIZER/2/2   16450758 ns     16375285 ns           35
+ * -------------------------------------------------------------
+ * Benchmark                   Time             CPU   Iterations
+ * -------------------------------------------------------------
+ * BM_SPATIALIZER/0/0     739848 ns       738497 ns          934
+ * BM_SPATIALIZER/0/1    1250503 ns      1248337 ns          480
+ * BM_SPATIALIZER/0/2    2094092 ns      2090092 ns          310
+ * BM_SPATIALIZER/1/0     783114 ns       781626 ns          683
+ * BM_SPATIALIZER/1/1    1332951 ns      1330473 ns          452
+ * BM_SPATIALIZER/1/2    2258313 ns      2254022 ns          289
+ * BM_SPATIALIZER/2/0    1210332 ns      1207957 ns          477
+ * BM_SPATIALIZER/2/1    2356259 ns      2351764 ns          269
+ * BM_SPATIALIZER/2/2    4267814 ns      4259567 ns          155
  *******************************************************************/
 
 static void BM_SPATIALIZER(benchmark::State& state) {
