@@ -1593,21 +1593,29 @@ status_t AudioFlinger::setStreamVolume(audio_stream_type_t stream, float value,
 }
 
 status_t AudioFlinger::setRequestedLatencyMode(
-        audio_io_handle_t output, audio_latency_mode_t mode __unused) {
+        audio_io_handle_t output, audio_latency_mode_t mode) {
     if (output == AUDIO_IO_HANDLE_NONE) {
         return BAD_VALUE;
     }
-    //TODO b/218273231: implement
-    return INVALID_OPERATION;
+    AutoMutex lock(mLock);
+    PlaybackThread *thread = checkPlaybackThread_l(output);
+    if (thread == nullptr) {
+        return BAD_VALUE;
+    }
+    return thread->setRequestedLatencyMode(mode);
 }
 
 status_t AudioFlinger::getSupportedLatencyModes(audio_io_handle_t output,
-            std::vector<audio_latency_mode_t>* modes __unused) {
+            std::vector<audio_latency_mode_t>* modes) {
     if (output == AUDIO_IO_HANDLE_NONE) {
         return BAD_VALUE;
     }
-    //TODO b/218273231: implement
-    return INVALID_OPERATION;
+    AutoMutex lock(mLock);
+    PlaybackThread *thread = checkPlaybackThread_l(output);
+    if (thread == nullptr) {
+        return BAD_VALUE;
+    }
+    return thread->getSupportedLatencyModes(modes);
 }
 
 status_t AudioFlinger::setStreamMute(audio_stream_type_t stream, bool muted)
