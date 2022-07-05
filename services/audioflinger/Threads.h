@@ -55,7 +55,8 @@ public:
         CFG_EVENT_RELEASE_AUDIO_PATCH,
         CFG_EVENT_UPDATE_OUT_DEVICE,
         CFG_EVENT_RESIZE_BUFFER,
-        CFG_EVENT_CHECK_OUTPUT_STAGE_EFFECTS
+        CFG_EVENT_CHECK_OUTPUT_STAGE_EFFECTS,
+        CFG_EVENT_HAL_LATENCY_MODES_CHANGED,
     };
 
     class ConfigEventData: public RefBase {
@@ -282,6 +283,15 @@ public:
         virtual ~CheckOutputStageEffectsEvent() {}
     };
 
+    class HalLatencyModesChangedEvent : public ConfigEvent {
+    public:
+        HalLatencyModesChangedEvent() :
+            ConfigEvent(CFG_EVENT_HAL_LATENCY_MODES_CHANGED) {
+        }
+
+        virtual ~HalLatencyModesChangedEvent() {}
+    };
+
 
     class PMDeathRecipient : public IBinder::DeathRecipient {
     public:
@@ -353,6 +363,7 @@ public:
                 void        sendResizeBufferConfigEvent_l(int32_t maxSharedAudioHistoryMs);
                 void        sendCheckOutputStageEffectsEvent();
                 void        sendCheckOutputStageEffectsEvent_l();
+                void        sendHalLatencyModesChangedEvent_l();
 
                 void        processConfigEvents_l();
     virtual     void        setCheckOutputStageEffects() {}
@@ -364,7 +375,7 @@ public:
     virtual     void        toAudioPortConfig(struct audio_port_config *config) = 0;
 
     virtual     void        resizeInputBuffer_l(int32_t maxSharedAudioHistoryMs);
-
+    virtual     void        onHalLatencyModesChanged_l() {}
 
 
                 // see note at declaration of mStandby, mOutDevice and mInDevice
@@ -921,6 +932,8 @@ protected:
                             }
 
     virtual     void        checkOutputStageEffects() {}
+    virtual     void        setHalLatencyMode_l() {}
+
 
                 void        dumpInternals_l(int fd, const Vector<String16>& args) override;
                 void        dumpTracks_l(int fd, const Vector<String16>& args) override;
@@ -1064,6 +1077,15 @@ public:
                 bool hasMixer() const {
                     return mType == MIXER || mType == DUPLICATING || mType == SPATIALIZER;
                 }
+
+    virtual     status_t setRequestedLatencyMode(
+            audio_latency_mode_t mode __unused) { return INVALID_OPERATION; }
+
+    virtual     status_t getSupportedLatencyModes(
+                        std::vector<audio_latency_mode_t>* modes __unused) {
+                    return INVALID_OPERATION;
+                }
+
 protected:
     // updated by readOutputParameters_l()
     size_t                          mNormalFrameCount;  // normal mixer and effects
@@ -1682,7 +1704,8 @@ public:
     }
 };
 
-class SpatializerThread : public MixerThread {
+class SpatializerThread : public MixerThread,
+        public StreamOutHalInterfaceLatencyModeCallback {
 public:
     SpatializerThread(const sp<AudioFlinger>& audioFlinger,
                            AudioStreamOut* output,
@@ -1693,10 +1716,35 @@ public:
 
             bool hasFastMixer() const override { return false; }
 
+            status_t    createAudioPatch_l(const struct audio_patch *patch,
+                                   audio_patch_handle_t *handle) override;
+
+            // RefBase
+            virtual void        onFirstRef();
+
+            // StreamOutHalInterfaceLatencyModeCallback
+            void onRecommendedLatencyModeChanged(std::vector<audio_latency_mode_t> modes) override;
+
+            status_t setRequestedLatencyMode(audio_latency_mode_t mode) override;
+            status_t getSupportedLatencyModes(std::vector<audio_latency_mode_t>* modes) override;
+
 protected:
             void checkOutputStageEffects() override;
+            void onHalLatencyModesChanged_l() override;
+            void setHalLatencyMode_l() override;
 
 private:
+            void updateHalSupportedLatencyModes_l();
+
+            // Support low latency mode by default as unless explicitly indicated by the audio HAL
+            // we assume the audio path is compatible with the head tracking latency requirements
+            std::vector<audio_latency_mode_t> mSupportedLatencyModes = {AUDIO_LATENCY_MODE_LOW};
+            // default to invalid value to force first update to the audio HAL
+            audio_latency_mode_t mSetLatencyMode =
+                    (audio_latency_mode_t)AUDIO_LATENCY_MODE_INVALID;
+            // Do not request a specific mode by default
+            audio_latency_mode_t mRequestedLatencyMode = AUDIO_LATENCY_MODE_FREE;
+
             sp<EffectHandle> mFinalDownMixer;
 };
 
