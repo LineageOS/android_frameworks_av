@@ -35,6 +35,7 @@
 #include <android/media/AudioTimestampInternal.h>
 #include <android/media/AudioUniqueIdUse.h>
 #include <android/media/EffectDescriptor.h>
+#include <android/media/LatencyMode.h>
 #include <android/media/TrackSecondaryOutputInfo.h>
 #include <android/media/audio/common/AudioChannelLayout.h>
 #include <android/media/audio/common/AudioConfig.h>
@@ -454,5 +455,9 @@ legacy2aidl_audio_direct_mode_t_AudioDirectMode(audio_direct_mode_t legacy);
 ConversionResult<audio_direct_mode_t> aidl2legacy_int32_t_audio_direct_mode_t_mask(int32_t aidl);
 ConversionResult<int32_t> legacy2aidl_audio_direct_mode_t_int32_t_mask(audio_direct_mode_t legacy);
 
+ConversionResult<audio_latency_mode_t>
+aidl2legacy_LatencyMode_audio_latency_mode_t(media::LatencyMode aidl);
+ConversionResult<media::LatencyMode>
+legacy2aidl_audio_latency_mode_t_LatencyMode(audio_latency_mode_t legacy);
 
 }  // namespace android
