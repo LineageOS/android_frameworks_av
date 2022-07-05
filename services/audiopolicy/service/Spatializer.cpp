@@ -714,7 +714,9 @@ status_t Spatializer::attachOutput(audio_io_handle_t output, size_t numActiveTra
             mEngine->setEnabled(false);
             mEngine.clear();
             mPoseController.reset();
+            AudioSystem::removeSupportedLatencyModesCallback(this);
         }
+
         // create FX instance on output
         AttributionSourceState attributionSource = AttributionSourceState();
         mEngine = new AudioEffect(attributionSource);
@@ -730,6 +732,13 @@ status_t Spatializer::attachOutput(audio_io_handle_t output, size_t numActiveTra
         outputChanged = mOutput != output;
         mOutput = output;
         mNumActiveTracks = numActiveTracks;
+        AudioSystem::addSupportedLatencyModesCallback(this);
+
+        std::vector<audio_latency_mode_t> latencyModes;
+        status = AudioSystem::getSupportedLatencyModes(mOutput, &latencyModes);
+        if (status == OK) {
+            mSupportedLatencyModes = latencyModes;
+        }
 
         checkEngineState_l();
         if (mSupportsHeadTracking) {
@@ -759,6 +768,7 @@ audio_io_handle_t Spatializer::detachOutput() {
         // remove FX instance
         mEngine->setEnabled(false);
         mEngine.clear();
+        AudioSystem::removeSupportedLatencyModesCallback(this);
         output = mOutput;
         mOutput = AUDIO_IO_HANDLE_NONE;
         mPoseController.reset();
@@ -771,6 +781,15 @@ audio_io_handle_t Spatializer::detachOutput() {
     return output;
 }
 
+void Spatializer::onSupportedLatencyModesChanged(
+        audio_io_handle_t output, const std::vector<audio_latency_mode_t>& modes) {
+    std::lock_guard lock(mLock);
+    if (output == mOutput) {
+        mSupportedLatencyModes = modes;
+        checkSensorsState_l();
+    }
+}
+
 void Spatializer::updateActiveTracks(size_t numActiveTracks) {
     std::lock_guard lock(mLock);
     if (mNumActiveTracks != numActiveTracks) {
@@ -781,16 +800,24 @@ void Spatializer::updateActiveTracks(size_t numActiveTracks) {
 }
 
 void Spatializer::checkSensorsState_l() {
-    if (mSupportsHeadTracking && mPoseController != nullptr) {
+    audio_latency_mode_t requestedLatencyMode = AUDIO_LATENCY_MODE_FREE;
+    bool lowLatencySupported = mSupportedLatencyModes.empty()
+            || (std::find(mSupportedLatencyModes.begin(), mSupportedLatencyModes.end(),
+                    AUDIO_LATENCY_MODE_LOW) != mSupportedLatencyModes.end());
+    if (mSupportsHeadTracking && mPoseController != nullptr && lowLatencySupported) {
         if (mNumActiveTracks > 0 && mLevel != SpatializationLevel::NONE
             && mDesiredHeadTrackingMode != HeadTrackingMode::STATIC
             && mHeadSensor != SpatializerPoseController::INVALID_SENSOR) {
             mPoseController->setHeadSensor(mHeadSensor);
             mPoseController->setScreenSensor(mScreenSensor);
+            requestedLatencyMode = AUDIO_LATENCY_MODE_LOW;
         } else {
             mPoseController->setHeadSensor(SpatializerPoseController::INVALID_SENSOR);
             mPoseController->setScreenSensor(SpatializerPoseController::INVALID_SENSOR);
         }
+    }
+    if (mOutput != AUDIO_IO_HANDLE_NONE) {
+        AudioSystem::setRequestedLatencyMode(mOutput, requestedLatencyMode);
     }
 }
 
