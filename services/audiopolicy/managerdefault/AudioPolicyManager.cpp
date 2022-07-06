@@ -4519,7 +4519,11 @@ status_t AudioPolicyManager::createAudioPatchInternal(const struct audio_patch *
                     audio_attributes_t resultAttr;
                     audio_config_t config = AUDIO_CONFIG_INITIALIZER;
                     config.sample_rate = sourceDesc->config().sample_rate;
-                    config.channel_mask = sourceDesc->config().channel_mask;
+                    audio_channel_mask_t sourceMask = sourceDesc->config().channel_mask;
+                    config.channel_mask =
+                            (audio_channel_mask_get_representation(sourceMask)
+                                == AUDIO_CHANNEL_REPRESENTATION_INDEX) ? sourceMask
+                                    : audio_channel_mask_in_to_out(sourceMask);
                     config.format = sourceDesc->config().format;
                     audio_output_flags_t flags = AUDIO_OUTPUT_FLAG_NONE;
                     audio_port_handle_t selectedDeviceId = AUDIO_PORT_HANDLE_NONE;
