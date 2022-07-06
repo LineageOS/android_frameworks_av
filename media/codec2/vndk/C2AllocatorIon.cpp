@@ -31,6 +31,7 @@
 #include <C2HandleIonInternal.h>
 
 #include <android-base/properties.h>
+#include <media/stagefright/foundation/Mutexed.h>
 
 namespace android {
 
@@ -180,7 +181,7 @@ public:
     c2_status_t map(size_t offset, size_t size, C2MemoryUsage usage, C2Fence *fence, void **addr) {
         (void)fence; // TODO: wait for fence
         *addr = nullptr;
-        if (!mMappings.empty()) {
+        if (!mMappings.lock()->empty()) {
             ALOGV("multiple map");
             // TODO: technically we should return DUPLICATE here, but our block views don't
             // actually unmap, so we end up remapping an ion buffer multiple times.
@@ -207,47 +208,44 @@ public:
 
         c2_status_t err = mapInternal(mapSize, mapOffset, alignmentBytes, prot, flags, &(map.addr), addr);
         if (map.addr) {
-            std::lock_guard<std::mutex> guard(mMutexMappings);
-            mMappings.push_back(map);
+            mMappings.lock()->push_back(map);
         }
         return err;
     }
 
     c2_status_t unmap(void *addr, size_t size, C2Fence *fence) {
-        if (mMappings.empty()) {
+        Mutexed<std::list<Mapping>>::Locked mappings(mMappings);
+        if (mappings->empty()) {
             ALOGD("tried to unmap unmapped buffer");
             return C2_NOT_FOUND;
         }
-        { // Scope for the lock_guard of mMutexMappings.
-            std::lock_guard<std::mutex> guard(mMutexMappings);
-            for (auto it = mMappings.begin(); it != mMappings.end(); ++it) {
-                if (addr != (uint8_t *)it->addr + it->alignmentBytes ||
-                        size + it->alignmentBytes != it->size) {
-                    continue;
-                }
-                int err = munmap(it->addr, it->size);
-                if (err != 0) {
-                    ALOGD("munmap failed");
-                    return c2_map_errno<EINVAL>(errno);
-                }
-                if (fence) {
-                    *fence = C2Fence(); // not using fences
-                }
-                (void)mMappings.erase(it);
-                ALOGV("successfully unmapped: addr=%p size=%zu fd=%d", addr, size,
-                          mHandle.bufferFd());
-                return C2_OK;
+        for (auto it = mappings->begin(); it != mappings->end(); ++it) {
+            if (addr != (uint8_t *)it->addr + it->alignmentBytes ||
+                    size + it->alignmentBytes != it->size) {
+                continue;
             }
+            int err = munmap(it->addr, it->size);
+            if (err != 0) {
+                ALOGD("munmap failed");
+                return c2_map_errno<EINVAL>(errno);
+            }
+            if (fence) {
+                *fence = C2Fence(); // not using fences
+            }
+            (void)mappings->erase(it);
+            ALOGV("successfully unmapped: addr=%p size=%zu fd=%d", addr, size,
+                      mHandle.bufferFd());
+            return C2_OK;
         }
         ALOGD("unmap failed to find specified map");
         return C2_BAD_VALUE;
     }
 
     virtual ~Impl() {
-        if (!mMappings.empty()) {
+        Mutexed<std::list<Mapping>>::Locked mappings(mMappings);
+        if (!mappings->empty()) {
             ALOGD("Dangling mappings!");
-            std::lock_guard<std::mutex> guard(mMutexMappings);
-            for (const Mapping &map : mMappings) {
+            for (const Mapping &map : *mappings) {
                 (void)munmap(map.addr, map.size);
             }
         }
@@ -325,8 +323,7 @@ protected:
         size_t alignmentBytes;
         size_t size;
     };
-    std::list<Mapping> mMappings;
-    std::mutex mMutexMappings;
+    Mutexed<std::list<Mapping>> mMappings;
 };
 
 class C2AllocationIon::ImplV2 : public C2AllocationIon::Impl {
