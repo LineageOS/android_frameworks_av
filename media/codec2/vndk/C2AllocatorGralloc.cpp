@@ -706,6 +706,14 @@ c2_status_t C2AllocationGralloc::map(
         }
 
         case static_cast<uint32_t>(PixelFormat4::YCBCR_P010): {
+            // In Android T, P010 is relaxed to allow arbitrary stride for the Y and UV planes,
+            // try locking with the gralloc4 mapper first.
+            c2_status_t status = Gralloc4Mapper_lock(
+                    const_cast<native_handle_t*>(mBuffer), grallocUsage, rect, layout, addr);
+            if (status == C2_OK) {
+                break;
+            }
+
             void *pointer = nullptr;
             status_t err = GraphicBufferMapper::get().lock(
                     const_cast<native_handle_t *>(mBuffer), grallocUsage, rect, &pointer);
