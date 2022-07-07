@@ -516,8 +516,6 @@ void AudioPolicyService::onCheckSpatializer_l()
 
 void AudioPolicyService::doOnCheckSpatializer()
 {
-    Mutex::Autolock _l(mLock);
-
     ALOGI("%s mSpatializer %p level %d", __func__, mSpatializer.get(), (int)mSpatializer->getLevel());
 
     if (mSpatializer != nullptr) {
@@ -527,6 +525,8 @@ void AudioPolicyService::doOnCheckSpatializer()
             audio_io_handle_t newOutput;
             const audio_attributes_t attr = attributes_initializer(AUDIO_USAGE_MEDIA);
             audio_config_base_t config = mSpatializer->getAudioInConfig();
+
+            Mutex::Autolock _l(mLock);
             status_t status =
                     mAudioPolicyManager->getSpatializerOutput(&config, &attr, &newOutput);
             ALOGV("%s currentOutput %d newOutput %d channel_mask %#x",
@@ -538,21 +538,19 @@ void AudioPolicyService::doOnCheckSpatializer()
             mLock.unlock();
             // It is OK to call detachOutput() is none is already attached.
             mSpatializer->detachOutput();
-            if (status != NO_ERROR || newOutput == AUDIO_IO_HANDLE_NONE) {
-                mLock.lock();
-                return;
+            if (status == NO_ERROR && newOutput != AUDIO_IO_HANDLE_NONE) {
+                status = mSpatializer->attachOutput(newOutput, numActiveTracks);
             }
-            status = mSpatializer->attachOutput(newOutput, numActiveTracks);
             mLock.lock();
             if (status != NO_ERROR) {
                 mAudioPolicyManager->releaseSpatializerOutput(newOutput);
             }
         } else if (mSpatializer->getLevel() == media::SpatializationLevel::NONE
                                && mSpatializer->getOutput() != AUDIO_IO_HANDLE_NONE) {
-            mLock.unlock();
             audio_io_handle_t output = mSpatializer->detachOutput();
-            mLock.lock();
+
             if (output != AUDIO_IO_HANDLE_NONE) {
+                Mutex::Autolock _l(mLock);
                 mAudioPolicyManager->releaseSpatializerOutput(output);
             }
         }
@@ -581,19 +579,16 @@ void AudioPolicyService::onUpdateActiveSpatializerTracks_l() {
 
 void AudioPolicyService::doOnUpdateActiveSpatializerTracks()
 {
-    sp<Spatializer> spatializer;
+    if (mSpatializer == nullptr) {
+        return;
+    }
+    audio_io_handle_t output = mSpatializer->getOutput();
     size_t activeClients;
     {
         Mutex::Autolock _l(mLock);
-        if (mSpatializer == nullptr) {
-            return;
-        }
-        spatializer = mSpatializer;
-        activeClients = countActiveClientsOnOutput_l(mSpatializer->getOutput());
+        activeClients = countActiveClientsOnOutput_l(output);
     }
-    if (spatializer != nullptr) {
-        spatializer->updateActiveTracks(activeClients);
-    }
+    mSpatializer->updateActiveTracks(activeClients);
 }
 
 status_t AudioPolicyService::clientCreateAudioPatch(const struct audio_patch *patch,
