@@ -85,12 +85,8 @@ class TagMonitor {
     // function.
     void dumpMonitoredTagEventsToVectorLocked(std::vector<std::string> &out);
 
-    static String8 getEventDataString(const uint8_t *data_ptr,
-                                       uint32_t tag, int type,
-                                       int count,
-                                       int indentation,
-                                       const std::unordered_set<int32_t> &outputStreamIds,
-                                       int32_t inputStreamId);
+    static String8 getEventDataString(const uint8_t* data_ptr, uint32_t tag, int type, int count,
+                                      int indentation);
 
     void monitorSingleMetadata(TagMonitor::eventSource source, int64_t frameNumber,
             nsecs_t timestamp, const std::string& cameraId, uint32_t tag,
@@ -128,12 +124,15 @@ class TagMonitor {
         eventSource source;
         uint32_t frameNumber;
         nsecs_t timestamp;
+        std::string cameraId;
         uint32_t tag;
         uint8_t type;
         std::vector<uint8_t> newData;
-        std::string cameraId;
+        // NOTE: We want to print changes to outputStreamIds and inputStreamId in their own lines.
+        // So any MonitorEvent where these fields are not the default value will have garbage
+        // values for all fields other than source, frameNumber, timestamp, and cameraId.
         std::unordered_set<int32_t> outputStreamIds;
-        int32_t inputStreamId = 1;
+        int32_t inputStreamId = -1;
     };
 
     // A ring buffer for tracking the last kMaxMonitorEvents metadata changes
