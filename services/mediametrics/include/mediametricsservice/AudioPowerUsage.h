@@ -50,7 +50,7 @@ public:
      */
     std::pair<std::string, int32_t> dump(int32_t lines = INT32_MAX) const;
 
-    // align with message AudioUsageDataReported in frameworks/base/cmds/statsd/src/atoms.proto
+    // align with message AudioPowerUsageDataReported in frameworks/proto_logging/stats/atoms.proto
     enum AudioType {
         UNKNOWN_TYPE = 0,
         VOICE_CALL_TYPE = 1,            // voice call
