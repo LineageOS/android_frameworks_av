@@ -804,8 +804,8 @@ void Spatializer::checkSensorsState_l() {
     bool lowLatencySupported = mSupportedLatencyModes.empty()
             || (std::find(mSupportedLatencyModes.begin(), mSupportedLatencyModes.end(),
                     AUDIO_LATENCY_MODE_LOW) != mSupportedLatencyModes.end());
-    if (mSupportsHeadTracking && mPoseController != nullptr && lowLatencySupported) {
-        if (mNumActiveTracks > 0 && mLevel != SpatializationLevel::NONE
+    if (mSupportsHeadTracking && mPoseController != nullptr) {
+        if (lowLatencySupported && mNumActiveTracks > 0 && mLevel != SpatializationLevel::NONE
             && mDesiredHeadTrackingMode != HeadTrackingMode::STATIC
             && mHeadSensor != SpatializerPoseController::INVALID_SENSOR) {
             mPoseController->setHeadSensor(mHeadSensor);
