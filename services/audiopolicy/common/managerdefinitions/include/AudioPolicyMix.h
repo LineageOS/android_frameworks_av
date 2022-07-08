@@ -70,8 +70,9 @@ public:
      * @return OK if the request is valid
      *         otherwise if the request is not supported
      */
-    status_t getOutputForAttr(const audio_attributes_t& attributes, uid_t uid,
-                              audio_output_flags_t flags,
+    status_t getOutputForAttr(const audio_attributes_t& attributes,
+                              const audio_config_base_t& config,
+                              uid_t uid, audio_output_flags_t flags,
                               sp<AudioPolicyMix> &primaryMix,
                               std::vector<sp<AudioPolicyMix>> *secondaryMixes);
 
@@ -126,6 +127,7 @@ private:
     enum class MixMatchStatus { MATCH, NO_MATCH, INVALID_MIX };
     MixMatchStatus mixMatch(const AudioMix* mix, size_t mixIndex,
                             const audio_attributes_t& attributes,
+                            const audio_config_base_t& config,
                             uid_t uid);
 };
 
