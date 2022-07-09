@@ -169,6 +169,22 @@ void TagMonitor::monitorSingleMetadata(eventSource source, int64_t frameNumber, 
 
     camera_metadata_entry lastEntry = lastValues.find(tag);
 
+    // Monitor when the stream ids change, this helps visually see what
+    // monitored metadata values are for capture requests with different
+    // stream ids.
+    if (source == REQUEST) {
+        if (inputStreamId != mLastInputStreamId) {
+            mMonitoringEvents.emplace(source, frameNumber, timestamp, camera_metadata_ro_entry_t{},
+                                      cameraId, std::unordered_set<int>(), inputStreamId);
+            mLastInputStreamId = inputStreamId;
+        }
+
+        if (outputStreamIds != mLastStreamIds) {
+            mMonitoringEvents.emplace(source, frameNumber, timestamp, camera_metadata_ro_entry_t{},
+                                      cameraId, outputStreamIds, -1);
+            mLastStreamIds = outputStreamIds;
+        }
+    }
     if (entry.count > 0) {
         bool isDifferent = false;
         if (lastEntry.count > 0) {
@@ -190,22 +206,14 @@ void TagMonitor::monitorSingleMetadata(eventSource source, int64_t frameNumber, 
             // No last entry, so always consider to be different
             isDifferent = true;
         }
-        // Also monitor when the stream ids change, this helps visually see what
-        // monitored metadata values are for capture requests with different
-        // stream ids.
-        if (source == REQUEST &&
-                (inputStreamId != mLastInputStreamId || outputStreamIds != mLastStreamIds)) {
-            mLastInputStreamId = inputStreamId;
-            mLastStreamIds = outputStreamIds;
-            isDifferent = true;
-        }
+
         if (isDifferent) {
             ALOGV("%s: Tag %s changed", __FUNCTION__,
                   get_local_camera_metadata_tag_name_vendor_id(
                           tag, mVendorTagId));
             lastValues.update(entry);
             mMonitoringEvents.emplace(source, frameNumber, timestamp, entry, cameraId,
-                    outputStreamIds, inputStreamId);
+                                      std::unordered_set<int>(), -1);
         }
     } else if (lastEntry.count > 0) {
         // Value has been removed
@@ -219,8 +227,8 @@ void TagMonitor::monitorSingleMetadata(eventSource source, int64_t frameNumber, 
         entry.count = 0;
         mLastInputStreamId = inputStreamId;
         mLastStreamIds = outputStreamIds;
-        mMonitoringEvents.emplace(source, frameNumber, timestamp, entry, cameraId, outputStreamIds,
-                inputStreamId);
+        mMonitoringEvents.emplace(source, frameNumber, timestamp, entry, cameraId,
+                                  std::unordered_set<int>(), -1);
     }
 }
 
@@ -261,23 +269,39 @@ void TagMonitor::dumpMonitoredTagEventsToVectorLocked(std::vector<std::string> &
 
     for (const auto& event : mMonitoringEvents) {
         int indentation = (event.source == REQUEST) ? 15 : 30;
-        String8 eventString = String8::format("f%d:%" PRId64 "ns:%*s%*s%s.%s: ",
+        String8 eventString = String8::format("f%d:%" PRId64 "ns:%*s%*s",
                 event.frameNumber, event.timestamp,
                 2, event.cameraId.c_str(),
                 indentation,
-                event.source == REQUEST ? "REQ:" : "RES:",
+                event.source == REQUEST ? "REQ:" : "RES:");
+
+        if (!event.outputStreamIds.empty()) {
+            eventString += " output stream ids:";
+            for (const auto& id : event.outputStreamIds) {
+                eventString.appendFormat(" %d", id);
+            }
+            eventString += "\n";
+            vec.emplace_back(eventString.string());
+            continue;
+        }
+
+        if (event.inputStreamId != -1) {
+            eventString.appendFormat(" input stream id: %d\n", event.inputStreamId);
+            vec.emplace_back(eventString.string());
+            continue;
+        }
+
+        eventString += String8::format(
+                "%s.%s: ",
                 get_local_camera_metadata_section_name_vendor_id(event.tag, mVendorTagId),
                 get_local_camera_metadata_tag_name_vendor_id(event.tag, mVendorTagId));
-        if (event.newData.size() == 0) {
-            eventString += " (Removed)";
+
+        if (event.newData.empty()) {
+            eventString += " (Removed)\n";
         } else {
-            eventString += getEventDataString(event.newData.data(),
-                                    event.tag,
-                                    event.type,
-                                    event.newData.size() / camera_metadata_type_size[event.type],
-                                    indentation + 18,
-                                    event.outputStreamIds,
-                                    event.inputStreamId);
+            eventString += getEventDataString(
+                    event.newData.data(), event.tag, event.type,
+                    event.newData.size() / camera_metadata_type_size[event.type], indentation + 18);
         }
         vec.emplace_back(eventString.string());
     }
@@ -285,13 +309,8 @@ void TagMonitor::dumpMonitoredTagEventsToVectorLocked(std::vector<std::string> &
 
 #define CAMERA_METADATA_ENUM_STRING_MAX_SIZE 29
 
-String8 TagMonitor::getEventDataString(const uint8_t* data_ptr,
-                                    uint32_t tag,
-                                    int type,
-                                    int count,
-                                    int indentation,
-                                    const std::unordered_set<int32_t>& outputStreamIds,
-                                    int32_t inputStreamId) {
+String8 TagMonitor::getEventDataString(const uint8_t* data_ptr, uint32_t tag, int type, int count,
+                                       int indentation) {
     static int values_per_line[NUM_TYPES] = {
         [TYPE_BYTE]     = 16,
         [TYPE_INT32]    = 8,
@@ -362,17 +381,7 @@ String8 TagMonitor::getEventDataString(const uint8_t* data_ptr,
                     returnStr += "??? ";
             }
         }
-        returnStr += "] ";
-        if (!outputStreamIds.empty()) {
-            returnStr += "output stream ids: ";
-            for (const auto &id : outputStreamIds) {
-                returnStr.appendFormat(" %d ", id);
-            }
-        }
-        if (inputStreamId != -1) {
-            returnStr.appendFormat("input stream id: %d", inputStreamId);
-        }
-        returnStr += "\n";
+        returnStr += "]\n";
     }
     return returnStr;
 }
@@ -385,11 +394,12 @@ TagMonitor::MonitorEvent::MonitorEvent(eventSource src, uint32_t frameNumber, ns
         source(src),
         frameNumber(frameNumber),
         timestamp(timestamp),
+        cameraId(cameraId),
         tag(value.tag),
         type(value.type),
         newData(value.data.u8, value.data.u8 + camera_metadata_type_size[value.type] * value.count),
-        cameraId(cameraId), outputStreamIds(outputStreamIds), inputStreamId(inputStreamId) {
-}
+        outputStreamIds(outputStreamIds),
+        inputStreamId(inputStreamId) {}
 
 TagMonitor::MonitorEvent::~MonitorEvent() {
 }
