@@ -619,6 +619,8 @@ Return<void> DrmPlugin::getSecurityLevel(const hidl_vec<uint8_t>& sessionId,
         return Void();
     }
 
+    android_errorWriteLog(0x534e4554, "235601882");
+    Mutex::Autolock lock(mSecurityLevelLock);
     std::map<std::vector<uint8_t>, SecurityLevel>::iterator itr =
             mSecurityLevel.find(sid);
     if (itr == mSecurityLevel.end()) {
@@ -691,6 +693,8 @@ Return<Status> DrmPlugin::setSecurityLevel(const hidl_vec<uint8_t>& sessionId,
         return Status::ERROR_DRM_SESSION_NOT_OPENED;
     }
 
+    android_errorWriteLog(0x534e4554, "235601882");
+    Mutex::Autolock lock(mSecurityLevelLock);
     std::map<std::vector<uint8_t>, SecurityLevel>::iterator itr =
             mSecurityLevel.find(sid);
     if (itr != mSecurityLevel.end()) {
