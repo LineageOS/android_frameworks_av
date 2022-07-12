@@ -4630,6 +4630,9 @@ status_t AudioFlinger::PlaybackThread::createAudioPatch_l(const struct audio_pat
     if (configChanged) {
         sendIoConfigEvent_l(AUDIO_OUTPUT_CONFIG_CHANGED);
     }
+    // Force meteadata update after a route change
+    mActiveTracks.setHasChanged();
+
     return status;
 }
 
@@ -4660,6 +4663,9 @@ status_t AudioFlinger::PlaybackThread::releaseAudioPatch_l(const audio_patch_han
     } else {
         status = mOutput->stream->legacyReleaseAudioPatch();
     }
+    // Force meteadata update after a route change
+    mActiveTracks.setHasChanged();
+
     return status;
 }
 
@@ -9271,6 +9277,9 @@ status_t AudioFlinger::RecordThread::createAudioPatch_l(const struct audio_patch
         track->logEndInterval();
         track->logBeginInterval(pathSourcesAsString);
     }
+    // Force meteadata update after a route change
+    mActiveTracks.setHasChanged();
+
     return status;
 }
 
@@ -9287,6 +9296,9 @@ status_t AudioFlinger::RecordThread::releaseAudioPatch_l(const audio_patch_handl
     } else {
         status = mInput->stream->legacyReleaseAudioPatch();
     }
+    // Force meteadata update after a route change
+    mActiveTracks.setHasChanged();
+
     return status;
 }
 
@@ -9583,8 +9595,10 @@ status_t AudioFlinger::MmapThread::getMmapPosition(struct audio_mmap_position *p
     return mHalStream->getMmapPosition(position);
 }
 
-status_t AudioFlinger::MmapThread::exitStandby()
+status_t AudioFlinger::MmapThread::exitStandby_l()
 {
+    // The HAL must receive track metadata before starting the stream
+    updateMetadata_l();
     status_t ret = mHalStream->start();
     if (ret != NO_ERROR) {
         ALOGE("%s: error mHalStream->start() = %d for first track", __FUNCTION__, ret);
@@ -9610,13 +9624,10 @@ status_t AudioFlinger::MmapThread::start(const AudioClient& client,
 
     status_t ret;
 
+    // For the first track, reuse portId and session allocated when the stream was opened.
     if (*handle == mPortId) {
-        // For the first track, reuse portId and session allocated when the stream was opened.
-        ret = exitStandby();
-        if (ret == NO_ERROR) {
-            acquireWakeLock();
-        }
-        return ret;
+        acquireWakeLock();
+        return NO_ERROR;
     }
 
     audio_port_handle_t portId = AUDIO_PORT_HANDLE_NONE;
@@ -9718,7 +9729,6 @@ status_t AudioFlinger::MmapThread::start(const AudioClient& client,
         }
     }
 
-
     mActiveTracks.add(track);
     sp<EffectChain> chain = getEffectChain_l(mSessionId);
     if (chain != 0) {
@@ -9729,11 +9739,16 @@ status_t AudioFlinger::MmapThread::start(const AudioClient& client,
 
     track->logBeginInterval(patchSinksToString(&mPatch)); // log to MediaMetrics
     *handle = portId;
+
+    if (mActiveTracks.size() == 1) {
+        ret = exitStandby_l();
+    }
+
     broadcast_l();
 
-    ALOGV("%s DONE handle %d stream %p", __FUNCTION__, *handle, mHalStream.get());
+    ALOGV("%s DONE status %d handle %d stream %p", __FUNCTION__, ret, *handle, mHalStream.get());
 
-    return NO_ERROR;
+    return ret;
 }
 
 status_t AudioFlinger::MmapThread::stop(audio_port_handle_t handle)
@@ -9745,7 +9760,6 @@ status_t AudioFlinger::MmapThread::stop(audio_port_handle_t handle)
     }
 
     if (handle == mPortId) {
-        mHalStream->stop();
         releaseWakeLock();
         return NO_ERROR;
     }
@@ -9780,6 +9794,10 @@ status_t AudioFlinger::MmapThread::stop(audio_port_handle_t handle)
     if (chain != 0) {
         chain->decActiveTrackCnt();
         chain->decTrackCnt();
+    }
+
+    if (mActiveTracks.isEmpty()) {
+        mHalStream->stop();
     }
 
     broadcast_l();
@@ -10052,6 +10070,9 @@ status_t AudioFlinger::MmapThread::createAudioPatch_l(const struct audio_patch *
         mPatch = *patch;
         mDeviceId = deviceId;
     }
+    // Force meteadata update after a route change
+    mActiveTracks.setHasChanged();
+
     return status;
 }
 
@@ -10071,6 +10092,9 @@ status_t AudioFlinger::MmapThread::releaseAudioPatch_l(const audio_patch_handle_
     } else {
         status = mHalStream->legacyReleaseAudioPatch();
     }
+    // Force meteadata update after a route change
+    mActiveTracks.setHasChanged();
+
     return status;
 }
 
@@ -10468,16 +10492,15 @@ AudioFlinger::MmapCaptureThread::MmapCaptureThread(
     mChannelCount = audio_channel_count_from_in_mask(mChannelMask);
 }
 
-status_t AudioFlinger::MmapCaptureThread::exitStandby()
+status_t AudioFlinger::MmapCaptureThread::exitStandby_l()
 {
     {
         // mInput might have been cleared by clearInput()
-        Mutex::Autolock _l(mLock);
         if (mInput != nullptr && mInput->stream != nullptr) {
             mInput->stream->setGain(1.0f);
         }
     }
-    return MmapThread::exitStandby();
+    return MmapThread::exitStandby_l();
 }
 
 AudioFlinger::AudioStreamIn* AudioFlinger::MmapCaptureThread::clearInput()
