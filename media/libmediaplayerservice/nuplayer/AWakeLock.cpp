@@ -59,11 +59,10 @@ bool AWakeLock::acquire() {
         if (mPowerManager != NULL) {
             sp<IBinder> binder = new BBinder();
             int64_t token = IPCThreadState::self()->clearCallingIdentity();
-            binder::Status status = mPowerManager->acquireWakeLock(
+            binder::Status status = mPowerManager->acquireWakeLockAsync(
                     binder, POWERMANAGER_PARTIAL_WAKE_LOCK,
                     String16("AWakeLock"), String16("media"),
-                    {} /* workSource */, {} /* historyTag */, -1 /* displayId */,
-                    nullptr /* callback */);
+                    {} /* workSource */, {} /* historyTag */);
             IPCThreadState::self()->restoreCallingIdentity(token);
             if (status.isOk()) {
                 mWakeLockToken = binder;
