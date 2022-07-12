@@ -195,6 +195,12 @@ void Engine::filterOutputDevicesForStrategy(legacy_strategy strategy,
                     AUDIO_DEVICE_OUT_BLUETOOTH_A2DP, AUDIO_DEVICE_OUT_BLUETOOTH_A2DP_HEADPHONES,
                     AUDIO_DEVICE_OUT_BLUETOOTH_A2DP_SPEAKER, }));
         }
+        // If connected to a dock, never use the device speaker for calls
+        if (!availableOutputDevices.getDevicesFromTypes({AUDIO_DEVICE_OUT_DGTL_DOCK_HEADSET})
+                .isEmpty()) {
+            availableOutputDevices.remove(
+                    availableOutputDevices.getDevicesFromTypes({AUDIO_DEVICE_OUT_SPEAKER}));
+        }
         } break;
     case STRATEGY_ACCESSIBILITY: {
         // do not route accessibility prompts to a digital output currently configured with a
