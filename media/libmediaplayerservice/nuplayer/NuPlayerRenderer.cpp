@@ -73,6 +73,10 @@ static inline int32_t getAudioSinkPcmMsSetting() {
 // is closed to allow the audio DSP to power down.
 static const int64_t kOffloadPauseMaxUs = 10000000LL;
 
+// Additional delay after teardown before releasing the wake lock to allow time for the audio path
+// to be completely released
+static const int64_t kWakelockReleaseDelayUs = 2000000LL;
+
 // Maximum allowed delay from AudioSink, 1.5 seconds.
 static const int64_t kMaxAllowedAudioSinkDelayUs = 1500000LL;
 
@@ -793,6 +797,20 @@ void NuPlayer::Renderer::onMessageReceived(const sp<AMessage> &msg) {
             }
             ALOGV("Audio Offload tear down due to pause timeout.");
             onAudioTearDown(kDueToTimeout);
+            sp<AMessage> newMsg = new AMessage(kWhatReleaseWakeLock, this);
+            newMsg->setInt32("drainGeneration", generation);
+            newMsg->post(kWakelockReleaseDelayUs);
+            break;
+        }
+
+        case kWhatReleaseWakeLock:
+        {
+            int32_t generation;
+            CHECK(msg->findInt32("drainGeneration", &generation));
+            if (generation != mAudioOffloadPauseTimeoutGeneration) {
+                break;
+            }
+            ALOGV("releasing audio offload pause wakelock.");
             mWakeLock->release();
             break;
         }
@@ -1785,6 +1803,8 @@ void NuPlayer::Renderer::onPause() {
         return;
     }
 
+    startAudioOffloadPauseTimeout();
+
     {
         Mutex::Autolock autoLock(mLock);
         // we do not increment audio drain generation so that we fill audio buffer during pause.
@@ -1799,7 +1819,6 @@ void NuPlayer::Renderer::onPause() {
 
     // Note: audio data may not have been decoded, and the AudioSink may not be opened.
     mAudioSink->pause();
-    startAudioOffloadPauseTimeout();
 
     ALOGV("now paused audio queue has %zu entries, video has %zu entries",
           mAudioQueue.size(), mVideoQueue.size());
@@ -1927,12 +1946,27 @@ status_t NuPlayer::Renderer::onOpenAudioSink(
     int32_t numChannels;
     CHECK(format->findInt32("channel-count", &numChannels));
 
-    int32_t rawChannelMask;
-    audio_channel_mask_t channelMask =
-            format->findInt32("channel-mask", &rawChannelMask) ?
-                    static_cast<audio_channel_mask_t>(rawChannelMask)
-                    // signal to the AudioSink to derive the mask from count.
-                    : CHANNEL_MASK_USE_CHANNEL_ORDER;
+    // channel mask info as read from the audio format
+    int32_t channelMaskFromFormat;
+    // channel mask to use for native playback
+    audio_channel_mask_t channelMask;
+    if (format->findInt32("channel-mask", &channelMaskFromFormat)) {
+        // KEY_CHANNEL_MASK follows the android.media.AudioFormat java mask
+        // which is left-bitshifted by 2 relative to the native mask
+        if ((channelMaskFromFormat & 0b11) != 0) {
+            // received an unexpected mask (supposed to follow AudioFormat constants
+            // for output masks with the 2 least-significant bits at 0), but
+            // it may come from an extractor that uses native masks: keeping
+            // the mask as given is ok as it contains at least mono or stereo
+            // and potentially the haptic channels
+            channelMask = static_cast<audio_channel_mask_t>(channelMaskFromFormat);
+        } else {
+            channelMask = static_cast<audio_channel_mask_t>(channelMaskFromFormat >> 2);
+        }
+    } else {
+        // no mask found: the mask will be derived from the channel count
+        channelMask = CHANNEL_MASK_USE_CHANNEL_ORDER;
+    }
 
     int32_t sampleRate;
     CHECK(format->findInt32("sample-rate", &sampleRate));
