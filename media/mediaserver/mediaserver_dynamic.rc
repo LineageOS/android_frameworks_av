@@ -1,0 +1,4 @@
+on property:init.svc.media=*
+    setprop init.svc.mediadrm ${init.svc.media}
+
+import /system/etc/init/hw/mediaserver.${ro.zygote}.rc
