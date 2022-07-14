@@ -190,7 +190,7 @@ static C2ColorAspectsStruct FillMissingColorAspects(
 // matrix conversion coefficients
 // (see media/libstagefright/colorconverter/ColorConverter.cpp for more details)
 struct Coeffs {
-    int32_t _y, _b_u, _g_u, _g_v, _r_v, _c16;
+    int32_t _y, _r_v, _g_u, _g_v, _b_u, _c16;
 };
 
 static const struct Coeffs GetCoeffsForAspects(const C2ColorAspectsStruct &aspects) {
