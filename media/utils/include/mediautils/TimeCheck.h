@@ -60,7 +60,7 @@ class TimeCheck {
      *                  the TimeCheck object is destroyed or leaves scope.
      * \param crashOnTimeout true if the object issues an abort on timeout.
      */
-    explicit TimeCheck(std::string tag, OnTimerFunc&& onTimer = {},
+    explicit TimeCheck(std::string_view tag, OnTimerFunc&& onTimer = {},
             uint32_t timeoutMs = kDefaultTimeOutMs, bool crashOnTimeout = true);
 
     TimeCheck() = default;
@@ -79,7 +79,17 @@ class TimeCheck {
     // The usage here is const safe.
     class TimeCheckHandler {
     public:
-        const std::string tag;
+        template <typename S, typename F>
+        TimeCheckHandler(S&& _tag, F&& _onTimer, bool _crashOnTimeout,
+            const std::chrono::system_clock::time_point& _startTime,
+            pid_t _tid)
+            : tag(std::forward<S>(_tag))
+            , onTimer(std::forward<F>(_onTimer))
+            , crashOnTimeout(_crashOnTimeout)
+            , startTime(_startTime)
+            , tid(_tid)
+            {}
+        const FixedString62 tag;
         const OnTimerFunc onTimer;
         const bool crashOnTimeout;
         const std::chrono::system_clock::time_point startTime;
