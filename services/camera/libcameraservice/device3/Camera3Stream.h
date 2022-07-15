@@ -167,6 +167,7 @@ class Camera3Stream :
     uint32_t          getHeight() const;
     int               getFormat() const;
     android_dataspace getDataSpace() const;
+    int32_t           getColorSpace() const;
     uint64_t          getUsage() const;
     void              setUsage(uint64_t usage);
     void              setFormatOverride(bool formatOverriden);
@@ -509,7 +510,8 @@ class Camera3Stream :
             const String8& physicalCameraId,
             const std::unordered_set<int32_t> &sensorPixelModesUsed,
             int setId, bool isMultiResolution, int64_t dynamicRangeProfile,
-            int64_t streamUseCase, bool deviceTimeBaseIsRealtime, int timestampBase);
+            int64_t streamUseCase, bool deviceTimeBaseIsRealtime, int timestampBase,
+            int32_t colorSpace);
 
     wp<Camera3StreamBufferFreedListener> mBufferFreedListener;
 

@@ -41,7 +41,8 @@ class Camera3IOStreamBase :
             int64_t dynamicProfile = ANDROID_REQUEST_AVAILABLE_DYNAMIC_RANGE_PROFILES_MAP_STANDARD,
             int64_t streamUseCase = ANDROID_SCALER_AVAILABLE_STREAM_USE_CASES_DEFAULT,
             bool deviceTimeBaseIsRealtime = false,
-            int timestampBase = OutputConfiguration::TIMESTAMP_BASE_DEFAULT);
+            int timestampBase = OutputConfiguration::TIMESTAMP_BASE_DEFAULT,
+            int32_t colorSpace = ANDROID_REQUEST_AVAILABLE_COLOR_SPACE_PROFILES_MAP_UNSPECIFIED);
 
   public:
 

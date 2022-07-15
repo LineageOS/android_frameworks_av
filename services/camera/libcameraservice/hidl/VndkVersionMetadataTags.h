@@ -73,6 +73,9 @@ std::map<int, std::vector<camera_metadata_tag>> static_api_level_to_keys{
           ANDROID_REQUEST_RECOMMENDED_TEN_BIT_DYNAMIC_RANGE_PROFILE,
           ANDROID_SCALER_AVAILABLE_STREAM_USE_CASES,
         } },
+      {34, {
+          ANDROID_REQUEST_AVAILABLE_COLOR_SPACE_PROFILES_MAP,
+        } },
 };
 
 /**

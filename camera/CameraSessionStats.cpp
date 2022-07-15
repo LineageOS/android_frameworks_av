@@ -130,6 +130,12 @@ status_t CameraStreamStats::readFromParcel(const android::Parcel* parcel) {
         return err;
     }
 
+    int32_t colorSpace = ANDROID_REQUEST_AVAILABLE_COLOR_SPACE_PROFILES_MAP_UNSPECIFIED;
+    if ((err = parcel->readInt32(&colorSpace)) != OK) {
+        ALOGE("%s: Failed to read color space from parcel", __FUNCTION__);
+        return err;
+    }
+
     mWidth = width;
     mHeight = height;
     mFormat = format;
@@ -146,6 +152,7 @@ status_t CameraStreamStats::readFromParcel(const android::Parcel* parcel) {
     mHistogramCounts = std::move(histogramCounts);
     mDynamicRangeProfile = dynamicRangeProfile;
     mStreamUseCase = streamUseCase;
+    mColorSpace = colorSpace;
 
     return OK;
 }
@@ -235,6 +242,11 @@ status_t CameraStreamStats::writeToParcel(android::Parcel* parcel) const {
 
     if ((err = parcel->writeInt64(mStreamUseCase)) != OK) {
         ALOGE("%s: Failed to write stream use case!", __FUNCTION__);
+        return err;
+    }
+
+    if ((err = parcel->writeInt32(mColorSpace)) != OK) {
+        ALOGE("%s: Failed to write color space", __FUNCTION__);
         return err;
     }
 

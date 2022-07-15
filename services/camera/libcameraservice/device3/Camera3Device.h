@@ -151,7 +151,9 @@ class Camera3Device :
             ANDROID_REQUEST_AVAILABLE_DYNAMIC_RANGE_PROFILES_MAP_STANDARD,
             int64_t streamUseCase = ANDROID_SCALER_AVAILABLE_STREAM_USE_CASES_DEFAULT,
             int timestampBase = OutputConfiguration::TIMESTAMP_BASE_DEFAULT,
-            int mirrorMode = OutputConfiguration::MIRROR_MODE_AUTO) override;
+            int mirrorMode = OutputConfiguration::MIRROR_MODE_AUTO,
+            int32_t colorSpace = ANDROID_REQUEST_AVAILABLE_COLOR_SPACE_PROFILES_MAP_UNSPECIFIED)
+            override;
 
     status_t createStream(const std::vector<sp<Surface>>& consumers,
             bool hasDeferredConsumer, uint32_t width, uint32_t height, int format,
@@ -166,7 +168,9 @@ class Camera3Device :
             ANDROID_REQUEST_AVAILABLE_DYNAMIC_RANGE_PROFILES_MAP_STANDARD,
             int64_t streamUseCase = ANDROID_SCALER_AVAILABLE_STREAM_USE_CASES_DEFAULT,
             int timestampBase = OutputConfiguration::TIMESTAMP_BASE_DEFAULT,
-            int mirrorMode = OutputConfiguration::MIRROR_MODE_AUTO) override;
+            int mirrorMode = OutputConfiguration::MIRROR_MODE_AUTO,
+            int32_t colorSpace = ANDROID_REQUEST_AVAILABLE_COLOR_SPACE_PROFILES_MAP_UNSPECIFIED)
+            override;
 
     status_t createInputStream(
             uint32_t width, uint32_t height, int format, bool isMultiResolution,

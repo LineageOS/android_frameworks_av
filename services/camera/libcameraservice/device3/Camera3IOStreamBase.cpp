@@ -35,11 +35,12 @@ Camera3IOStreamBase::Camera3IOStreamBase(int id, camera_stream_type_t type,
         const String8& physicalCameraId,
         const std::unordered_set<int32_t> &sensorPixelModesUsed,
         int setId, bool isMultiResolution, int64_t dynamicRangeProfile, int64_t streamUseCase,
-        bool deviceTimeBaseIsRealtime, int timestampBase) :
+        bool deviceTimeBaseIsRealtime, int timestampBase, int32_t colorSpace) :
         Camera3Stream(id, type,
                 width, height, maxSize, format, dataSpace, rotation,
                 physicalCameraId, sensorPixelModesUsed, setId, isMultiResolution,
-                dynamicRangeProfile, streamUseCase, deviceTimeBaseIsRealtime, timestampBase),
+                dynamicRangeProfile, streamUseCase, deviceTimeBaseIsRealtime, timestampBase,
+                colorSpace),
         mTotalBufferCount(0),
         mMaxCachedBufferCount(0),
         mHandoutTotalBufferCount(0),
@@ -93,6 +94,7 @@ void Camera3IOStreamBase::dump(int fd, const Vector<String16> &args) const {
     }
     lines.appendFormat("      Dynamic Range Profile: 0x%" PRIx64 "\n",
             camera_stream::dynamic_range_profile);
+    lines.appendFormat("      Color Space: %d\n", camera_stream::color_space);
     lines.appendFormat("      Stream use case: %" PRId64 "\n", camera_stream::use_case);
     lines.appendFormat("      Timestamp base: %d\n", getTimestampBase());
     lines.appendFormat("      Frames produced: %d, last timestamp: %" PRId64 " ns\n",
