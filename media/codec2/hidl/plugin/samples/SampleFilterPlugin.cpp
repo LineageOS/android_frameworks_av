@@ -417,6 +417,7 @@ public:
         }
         std::unique_lock lock(mQueueMutex);
         mQueue.splice(mQueue.end(), *items);
+        mQueueCondition.notify_all();
         return C2_OK;
     }
 
