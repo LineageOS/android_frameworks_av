@@ -14,12 +14,15 @@
  * limitations under the License.
  */
 
+#include <android-base/properties.h>
 #include <android-base/unique_fd.h>
+#include <fuzzer/FuzzedDataProvider.h>
 #include <stddef.h>
 #include <stdint.h>
 #include <stdlib.h>
 #include <unistd.h>
-
+#include <filesystem>
+#include <fstream>
 #include <string>
 
 #define LOG_TAG "MtpFuzzer"
@@ -32,38 +35,40 @@
 #include "MtpStorage.h"
 #include "MtpUtils.h"
 
-const char* storage_desc = "Fuzz Storage";
+constexpr int32_t kMinFiles = 0;
+constexpr int32_t kMaxFiles = 5;
+constexpr int32_t kMaxBytes = 128;
+constexpr float kMinDataSizeFactor = 0.8;
 // prefer tmpfs for file operations to avoid wearing out flash
 const char* storage_path = "/storage/fuzzer/0";
-const char* source_database = "srcdb/";
+const char* source_database = "/data/local/tmp/srcdb/";
+const std::string test_path = std::string(source_database) + "TestDir/";
+const std::string kPropertyKey = "sys.fuse.transcode_mtp";
 
 namespace android {
 class MtpMockServer {
-public:
-    std::unique_ptr<MtpMockHandle> mHandle;
-    std::unique_ptr<MtpStorage> mStorage;
-    std::unique_ptr<MtpMockDatabase> mDatabase;
-    std::unique_ptr<MtpServer> mMtp;
-    int mStorageId;
-
-    MtpMockServer(const char* storage_path) : mStorageId(0) {
-        bool ptp = false;
-        const char* manu = "Google";
-        const char* model = "Pixel 3XL";
-        const char* version = "1.0";
-        const char* serial = "ABDEF1231";
-
+  public:
+    MtpMockServer(const uint8_t* data, size_t size) : mFdp(data, size) {
         // This is unused in our harness
         int controlFd = -1;
 
         mHandle = std::make_unique<MtpMockHandle>();
-        mStorage = std::make_unique<MtpStorage>(mStorageId, storage_path, storage_desc, true,
-                                                0x200000000L);
+        mStorage = std::make_unique<MtpStorage>(
+                mFdp.ConsumeIntegral<uint32_t>() /* storageId */, storage_path,
+                mFdp.ConsumeRandomLengthString(kMaxBytes).c_str() /* descriptor */,
+                mFdp.ConsumeBool() /* removable */,
+                mFdp.ConsumeIntegral<uint64_t>() /* maxFileSize */);
         mDatabase = std::make_unique<MtpMockDatabase>();
         mDatabase->addStorage(mStorage.get());
 
-        mMtp = std::make_unique<MtpServer>(mDatabase.get(), controlFd, ptp, manu, model, version,
-                                           serial);
+        init(data, size);
+
+        mMtp = std::make_unique<MtpServer>(
+                mDatabase.get(), controlFd, mFdp.ConsumeBool() /* ptp */,
+                mFdp.ConsumeRandomLengthString(kMaxBytes).c_str() /* manu */,
+                mFdp.ConsumeRandomLengthString(kMaxBytes).c_str() /* model */,
+                mFdp.ConsumeRandomLengthString(kMaxBytes).c_str() /* version */,
+                mFdp.ConsumeRandomLengthString(kMaxBytes).c_str() /* serial */);
         mMtp->addStorage(mStorage.get());
 
         // clear the old handle first, so we don't leak memory
@@ -71,7 +76,76 @@ public:
         mMtp->mHandle = mHandle.get();
     }
 
-    void run() { mMtp->run(); }
+    void process() {
+        if (mFdp.ConsumeBool()) {
+            createDatabaseFromSourceDir(source_database, storage_path, MTP_PARENT_ROOT);
+        }
+
+        while (mFdp.remaining_bytes()) {
+            MtpStorage storage(mFdp.ConsumeIntegral<uint32_t>() /* id */,
+                               mFdp.ConsumeRandomLengthString(kMaxBytes).c_str() /* filePath */,
+                               mFdp.ConsumeRandomLengthString(kMaxBytes).c_str() /* description */,
+                               mFdp.ConsumeBool() /* removable */,
+                               mFdp.ConsumeIntegral<uint64_t>() /* maxFileSize */);
+
+            auto invokeMtpServerAPI = mFdp.PickValueInArray<const std::function<void()>>({
+                    [&]() { mMtp->run(); },
+                    [&]() { mMtp->sendObjectAdded(mFdp.ConsumeIntegral<uint32_t>()); },
+                    [&]() { mMtp->sendObjectRemoved(mFdp.ConsumeIntegral<uint32_t>()); },
+                    [&]() { mMtp->sendObjectInfoChanged(mFdp.ConsumeIntegral<uint32_t>()); },
+                    [&]() { mMtp->sendDevicePropertyChanged(mFdp.ConsumeIntegral<uint16_t>()); },
+                    [&]() { mMtp->addStorage(&storage); },
+                    [&]() { mMtp->removeStorage(&storage); },
+            });
+
+            invokeMtpServerAPI();
+        }
+
+        std::filesystem::remove_all(source_database);
+    }
+
+  private:
+    void createFiles(std::string path, size_t fileCount) {
+        std::ofstream file;
+        for (size_t idx = 0; idx < fileCount; ++idx) {
+            file.open(path.append(std::to_string(idx)));
+            file.close();
+        }
+    }
+
+    void addPackets(const uint8_t* data, size_t size) {
+        size_t off = 0;
+        for (size_t i = 0; i < size; ++i) {
+            // A longer delimiter could be used, but this worked in practice
+            if (data[i] == '@') {
+                size_t pktsz = i - off;
+                if (pktsz > 0) {
+                    packet_t pkt = packet_t((unsigned char*)data + off, (unsigned char*)data + i);
+                    // insert into packet buffer
+                    mHandle->add_packet(pkt);
+                    off = i;
+                }
+            }
+        }
+    }
+
+    void init(const uint8_t* data, size_t size) {
+        std::vector<uint8_t> packetData = mFdp.ConsumeBytes<uint8_t>(
+                mFdp.ConsumeIntegralInRange<int32_t>(kMinDataSizeFactor * size, size));
+
+        // Packetize the input stream
+        addPackets(packetData.data(), packetData.size());
+
+        // Setting the property to true/false to randomly fuzz the PoC depended on it
+        base::SetProperty(kPropertyKey, mFdp.ConsumeBool() ? "true" : "false");
+
+        std::filesystem::create_directories(source_database);
+        if (mFdp.ConsumeBool()) {
+            std::filesystem::create_directories(test_path);
+            createFiles(test_path, mFdp.ConsumeIntegralInRange<size_t>(kMinFiles, kMaxFiles));
+        }
+        createFiles(source_database, mFdp.ConsumeIntegralInRange<size_t>(kMinFiles, kMaxFiles));
+    }
 
     int createDatabaseFromSourceDir(const char* fromPath, const char* toPath,
                                     MtpObjectHandle parentHandle) {
@@ -130,8 +204,14 @@ public:
         closedir(dir);
         return ret;
     }
+
+    FuzzedDataProvider mFdp;
+    std::unique_ptr<MtpMockHandle> mHandle;
+    std::unique_ptr<MtpStorage> mStorage;
+    std::unique_ptr<MtpMockDatabase> mDatabase;
+    std::unique_ptr<MtpServer> mMtp;
 };
-}; // namespace android
+};  // namespace android
 
 extern "C" int LLVMFuzzerTestOneInput(const uint8_t* data, size_t size) __attribute__((optnone)) {
     // reset our storage (from MtpUtils.h)
@@ -140,26 +220,9 @@ extern "C" int LLVMFuzzerTestOneInput(const uint8_t* data, size_t size) __attrib
     android::makeFolder(storage_path);
 
     std::unique_ptr<android::MtpMockServer> mtp =
-            std::make_unique<android::MtpMockServer>(storage_path);
+            std::make_unique<android::MtpMockServer>(data, size);
+    mtp->process();
 
-    size_t off = 0;
-
-    // Packetize the input stream
-    for (size_t i = 0; i < size; i++) {
-        // A longer delimiter could be used, but this worked in practice
-        if (data[i] == '@') {
-            size_t pktsz = i - off;
-            if (pktsz > 0) {
-                packet_t pkt = packet_t((unsigned char*)data + off, (unsigned char*)data + i);
-                // insert into packet buffer
-                mtp->mHandle->add_packet(pkt);
-                off = i;
-            }
-        }
-    }
-
-    mtp->createDatabaseFromSourceDir(source_database, storage_path, MTP_PARENT_ROOT);
-    mtp->run();
-
+    std::filesystem::remove_all("/storage/fuzzer");
     return 0;
 }
