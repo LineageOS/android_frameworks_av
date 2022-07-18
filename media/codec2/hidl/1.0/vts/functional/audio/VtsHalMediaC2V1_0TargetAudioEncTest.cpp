@@ -372,9 +372,8 @@ void encodeNFrames(const std::shared_ptr<android::Codec2Client::Component>& comp
             ULock l(queueLock);
             flushedIndices.emplace_back(frameID);
         }
-        char* data = (char*)malloc(bytesCount);
-        ASSERT_NE(data, nullptr);
-        eleStream.read(data, bytesCount);
+        std::vector<char> eleData(bytesCount);
+        eleStream.read(eleData.data(), bytesCount);
         // if we have reached at the end of input stream, signal eos
         if (eleStream.gcount() < bytesCount) {
             bytesCount = eleStream.gcount();
@@ -396,12 +395,11 @@ void encodeNFrames(const std::shared_ptr<android::Codec2Client::Component>& comp
         ASSERT_EQ(0u, view.offset());
         ASSERT_EQ((size_t)bytesCount, view.size());
 
-        memcpy(view.base(), data, bytesCount);
+        memcpy(view.base(), eleData.data(), bytesCount);
         work->input.buffers.clear();
         work->input.buffers.emplace_back(new LinearBuffer(block));
         work->worklets.clear();
         work->worklets.emplace_back(new C2Worklet);
-        free(data);
 
         std::list<std::unique_ptr<C2Work>> items;
         items.push_back(std::move(work));
