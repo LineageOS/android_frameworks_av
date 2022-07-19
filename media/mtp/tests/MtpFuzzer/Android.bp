@@ -1,3 +1,19 @@
+/*
+ * Copyright (C) 2022 The Android Open Source Project
+ *
+ * Licensed under the Apache License, Version 2.0 (the "License");
+ * you may not use this file except in compliance with the License.
+ * You may obtain a copy of the License at
+ *
+ *      http://www.apache.org/licenses/LICENSE-2.0
+ *
+ * Unless required by applicable law or agreed to in writing, software
+ * distributed under the License is distributed on an "AS IS" BASIS,
+ * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+ * See the License for the specific language governing permissions and
+ * limitations under the License.
+ */
+
 package {
     // See: http://go/android-license-faq
     // A large-scale-change added 'default_applicable_licenses' to import
@@ -6,29 +22,20 @@ package {
     //   SPDX-license-identifier-Apache-2.0
     default_applicable_licenses: ["frameworks_av_media_mtp_license"],
 }
-
-cc_fuzz {
-    name: "mtp_fuzzer",
-    srcs: [
-        "mtp_fuzzer.cpp",
-        "MtpMockDatabase.cpp",
-    ],
+cc_defaults {
+    name: "mtp_fuzzer_defaults",
     shared_libs: [
-	"libmtp",
-	"libbase",
-	"liblog",
-	"libutils",
+        "libbase",
+        "liblog",
+        "libutils",
     ],
+    static_libs: ["libc++fs",],
     cflags: [
         "-Wall",
         "-Wextra",
         "-Werror",
-        "-DMTP_DEVICE",
         "-Wno-unused-parameter",
     ],
-    dictionary: "mtp_fuzzer.dict",
-    corpus: ["corpus/*"],
-
     fuzz_config: {
 
         cc: ["jameswei@google.com"],
@@ -37,4 +44,16 @@ cc_fuzz {
             "Grant Hernandez of Google",
         ],
     },
+}
+cc_fuzz {
+    name: "mtp_fuzzer",
+    srcs: [
+        "mtp_fuzzer.cpp",
+        "MtpMockDatabase.cpp",
+    ],
+    cflags: ["-DMTP_DEVICE",],
+    shared_libs: ["libmtp",],
+    defaults: ["mtp_fuzzer_defaults"],
+    dictionary: "mtp_fuzzer.dict",
+    corpus: ["corpus/*"],
 }
