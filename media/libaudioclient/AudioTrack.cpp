@@ -559,7 +559,7 @@ status_t AudioTrack::set(
     std::string errorMessage;
     // Note mPortId is not valid until the track is created, so omit mPortId in ALOG for set.
     ALOGV("%s(): streamType %d, sampleRate %u, format %#x, channelMask %#x, frameCount %zu, "
-          "flags #%x, notificationFrames %d, sessionId %d, transferType %d, uid %d, pid %d",
+          "flags %#x, notificationFrames %d, sessionId %d, transferType %d, uid %d, pid %d",
           __func__,
           streamType, sampleRate, format, channelMask, frameCount, flags, notificationFrames,
           sessionId, transferType, attributionSource.uid, attributionSource.pid);
