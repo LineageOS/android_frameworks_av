@@ -5,6 +5,7 @@
 + [mtp_host_property_fuzzer](#MtpHostProperty)
 + [mtp_device_property_fuzzer](#MtpDeviceProperty)
 + [mtp_handle_fuzzer](#MtpHandle)
++ [mtp_packet_fuzzer](#MtpPacket)
 
 # <a name="MtpServer"></a> Fuzzer for MtpServer
 
@@ -79,4 +80,24 @@ MtpDeviceProperty supports the following parameters:
 ```
   $ adb sync data
   $ adb shell /data/fuzz/arm64/mtp_handle_fuzzer/mtp_handle_fuzzer
+```
+
+# <a name="MtpPacket"></a> Fuzzer for MtpPacket
+
+MtpPacket supports the following parameters:
+1. bufferSize (parameter name: "size")
+
+| Parameter| Valid Values |Configured Value|
+|-------------|----------|----- |
+|`bufferSize`| Integer `1` to `1000`, |Value obtained from FuzzedDataProvider|
+
+#### Steps to run
+1. Build the fuzzer
+```
+  $ mm -j$(nproc) mtp_packet_fuzzer
+```
+2. Run on device
+```
+  $ adb sync data
+  $ adb shell /data/fuzz/arm64/mtp_packet_fuzzer/mtp_packet_fuzzer
 ```

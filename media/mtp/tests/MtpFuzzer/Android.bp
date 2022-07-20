@@ -92,3 +92,23 @@ cc_fuzz {
     defaults: ["mtp_fuzzer_defaults"],
     cflags: ["-DMTP_FUZZER"],
 }
+
+cc_defaults  {
+     name: "mtp_packet_defaults",
+     shared_libs: [
+        "libmtp",
+        "libasyncio",
+        "libusbhost",
+     ],
+     defaults: ["mtp_fuzzer_defaults"],
+     cflags: [
+         "-DMTP_HOST",
+         "-DMTP_DEVICE",
+     ],
+}
+
+cc_fuzz {
+     name: "mtp_packet_fuzzer",
+     srcs: ["mtp_packet_fuzzer.cpp"],
+     defaults: ["mtp_packet_defaults"],
+}
