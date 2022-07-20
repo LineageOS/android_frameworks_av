@@ -55,6 +55,12 @@
                              samplingRates="48000"
                              channelMasks="AUDIO_CHANNEL_OUT_STEREO,AUDIO_CHANNEL_OUT_5POINT1"/>
                 </mixPort>
+                <mixPort name="mixport_bus0_media_out_atmos_pcm" role="source"
+                        flags="AUDIO_OUTPUT_FLAG_DIRECT">
+                    <profile name="" format="AUDIO_FORMAT_PCM_16_BIT"
+                             samplingRates="48000"
+                             channelMasks="AUDIO_CHANNEL_OUT_7POINT1POINT4"/>
+                </mixPort>
                 <mixPort name="mixport_bus1_navigation_out" role="source">
                     <profile name="" format="AUDIO_FORMAT_PCM_16_BIT"
                              samplingRates="48000"
@@ -129,6 +135,8 @@
                     <profile name="" format="AUDIO_FORMAT_E_AC3_JOC"
                             samplingRates="48000"
                             channelMasks="AUDIO_CHANNEL_OUT_STEREO,AUDIO_CHANNEL_OUT_5POINT1"/>
+                    <profile name="" format="AUDIO_FORMAT_PCM_16_BIT"
+                            samplingRates="48000" channelMasks="AUDIO_CHANNEL_OUT_7POINT1POINT4"/>
                     <gains>
                         <gain name="" mode="AUDIO_GAIN_MODE_JOINT"
                                 minValueMB="-3200" maxValueMB="600" defaultValueMB="0"
@@ -276,7 +284,7 @@
             <!-- route declaration, i.e. list all available sources for a given sink -->
             <routes>
                 <route type="mix" sink="bus0_media_out"
-                        sources="mixport_bus0_media_out,mixport_bus0_media_out_atmos"/>
+                        sources="mixport_bus0_media_out,mixport_bus0_media_out_atmos,mixport_bus0_media_out_atmos_pcm"/>
                 <route type="mix" sink="bus1_navigation_out" sources="mixport_bus1_navigation_out"/>
                 <route type="mix" sink="bus2_voice_command_out"
                         sources="mixport_bus2_voice_command_out"/>
