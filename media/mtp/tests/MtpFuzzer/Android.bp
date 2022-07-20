@@ -131,3 +131,9 @@ cc_fuzz {
      srcs: ["mtp_request_packet_fuzzer.cpp"],
      defaults: ["mtp_packet_defaults"],
 }
+
+cc_fuzz {
+     name: "mtp_event_packet_fuzzer",
+     srcs: ["mtp_event_packet_fuzzer.cpp"],
+     defaults: ["mtp_packet_defaults"],
+}
