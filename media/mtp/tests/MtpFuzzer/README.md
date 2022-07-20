@@ -10,6 +10,7 @@
 + [mtp_request_packet_fuzzer](#MtpRequestPacket)
 + [mtp_event_packet_fuzzer](#MtpEventPacket)
 + [mtp_response_packet_fuzzer](#MtpResponsePacket)
++ [mtp_data_packet_fuzzer](#MtpDataPacket)
 
 # <a name="MtpServer"></a> Fuzzer for MtpServer
 
@@ -184,4 +185,26 @@ MtpResponsePacket supports the following parameters:
 ```
   $ adb sync data
   $ adb shell /data/fuzz/arm64/mtp_response_packet_fuzzer/mtp_response_packet_fuzzer
+```
+
+# <a name="MtpDataPacket"></a> Fuzzer for MtpDataPacket
+
+MtpDataPacket supports the following parameters:
+1. UrbPacket Division Mode (parameter name: "kUrbPacketDivisionModes")
+2. Size (parameter name: "size")
+
+| Parameter| Valid Values |Configured Value|
+|-------------|----------|----- |
+|`kUrbPacketDivisionMode`| 1. `FIRST_PACKET_ONLY_HEADER`, 2. `FIRST_PACKET_HAS_PAYLOAD`, |Value obtained from FuzzedDataProvider|
+|`size`| Integer `1` to `1000`, |Value obtained from FuzzedDataProvider|
+
+#### Steps to run
+1. Build the fuzzer
+```
+  $ mm -j$(nproc) mtp_data_packet_fuzzer
+```
+2. Run on device
+```
+  $ adb sync data
+  $ adb shell /data/fuzz/arm64/mtp_data_packet_fuzzer/mtp_data_packet_fuzzer
 ```

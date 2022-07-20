@@ -143,3 +143,9 @@ cc_fuzz {
      srcs: ["mtp_response_packet_fuzzer.cpp"],
      defaults: ["mtp_packet_defaults"],
 }
+
+cc_fuzz {
+     name: "mtp_data_packet_fuzzer",
+     srcs: ["mtp_data_packet_fuzzer.cpp"],
+     defaults: ["mtp_packet_defaults"],
+}
