@@ -9,6 +9,7 @@
  + [mtp_device_fuzzer](#MtpDevice)
 + [mtp_request_packet_fuzzer](#MtpRequestPacket)
 + [mtp_event_packet_fuzzer](#MtpEventPacket)
++ [mtp_response_packet_fuzzer](#MtpResponsePacket)
 
 # <a name="MtpServer"></a> Fuzzer for MtpServer
 
@@ -163,4 +164,24 @@ MtpEventPacket supports the following parameters:
 ```
   $ adb sync data
   $ adb shell /data/fuzz/arm64/mtp_event_packet_fuzzer/mtp_event_packet_fuzzer
+```
+
+# <a name="MtpResponsePacket"></a> Fuzzer for MtpResponsePacket
+
+MtpResponsePacket supports the following parameters:
+1. Size (parameter name: "size")
+
+| Parameter| Valid Values |Configured Value|
+|-------------|----------|----- |
+|`size`| Integer `1` to `1000`, |Value obtained from FuzzedDataProvider|
+
+#### Steps to run
+1. Build the fuzzer
+```
+  $ mm -j$(nproc) mtp_response_packet_fuzzer
+```
+2. Run on device
+```
+  $ adb sync data
+  $ adb shell /data/fuzz/arm64/mtp_response_packet_fuzzer/mtp_response_packet_fuzzer
 ```
