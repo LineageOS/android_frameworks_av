@@ -183,7 +183,7 @@ void DrmListener::sendEvent(
     AMediaDrmSessionId asid = {sessionId.data(), sessionId.size()};
     int32_t dataSize = data.size();
     const uint8_t *dataPtr = data.data();
-    if (dataSize > 0) {
+    if (dataSize >= 0) {
         (*mEventListener)(mObj, &asid, ndkEventType, 0, dataPtr, dataSize);
     } else {
         ALOGE("invalid event data size=%d", dataSize);
