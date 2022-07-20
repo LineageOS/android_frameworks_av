@@ -125,3 +125,9 @@ cc_fuzz {
          "-DMTP_DEVICE",
      ],
 }
+
+cc_fuzz {
+     name: "mtp_request_packet_fuzzer",
+     srcs: ["mtp_request_packet_fuzzer.cpp"],
+     defaults: ["mtp_packet_defaults"],
+}

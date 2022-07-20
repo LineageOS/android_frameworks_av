@@ -7,6 +7,7 @@
 + [mtp_handle_fuzzer](#MtpHandle)
 + [mtp_packet_fuzzer](#MtpPacket)
  + [mtp_device_fuzzer](#MtpDevice)
++ [mtp_request_packet_fuzzer](#MtpRequestPacket)
 
 # <a name="MtpServer"></a> Fuzzer for MtpServer
 
@@ -121,4 +122,24 @@ MtpDevice supports the following parameters:
 ```
   $ adb sync data
   $ adb shell /data/fuzz/arm64/mtp_device_fuzzer/mtp_device_fuzzer
+```
+
+# <a name="MtpRequestPacket"></a> Fuzzer for MtpRequestPacket
+
+MtpRequestPacket supports the following parameters:
+1. Data (parameter name: "data")
+
+| Parameter| Valid Values |Configured Value|
+|-------------|----------|----- |
+|`data`| Vector of positive Integer |Value obtained from FuzzedDataProvider|
+
+#### Steps to run
+1. Build the fuzzer
+```
+  $ mm -j$(nproc) mtp_request_packet_fuzzer
+```
+2. Run on device
+```
+  $ adb sync data
+  $ adb shell /data/fuzz/arm64/mtp_request_packet_fuzzer/mtp_request_packet_fuzzer
 ```
