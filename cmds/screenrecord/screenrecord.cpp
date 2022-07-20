@@ -85,6 +85,7 @@ using android::SurfaceComposerClient;
 using android::Vector;
 using android::sp;
 using android::status_t;
+using android::SurfaceControl;
 
 using android::INVALID_OPERATION;
 using android::NAME_NOT_FOUND;
@@ -339,13 +340,20 @@ static status_t setDisplayProjection(
 static status_t prepareVirtualDisplay(
         const ui::DisplayState& displayState,
         const sp<IGraphicBufferProducer>& bufferProducer,
-        sp<IBinder>* pDisplayHandle) {
+        sp<IBinder>* pDisplayHandle, sp<SurfaceControl>* mirrorRoot) {
     sp<IBinder> dpy = SurfaceComposerClient::createDisplay(
             String8("ScreenRecorder"), false /*secure*/);
     SurfaceComposerClient::Transaction t;
     t.setDisplaySurface(dpy, bufferProducer);
     setDisplayProjection(t, dpy, displayState);
-    t.setDisplayLayerStack(dpy, displayState.layerStack);
+    ui::LayerStack layerStack = ui::LayerStack::fromValue(std::rand());
+    t.setDisplayLayerStack(dpy, layerStack);
+    *mirrorRoot = SurfaceComposerClient::getDefault()->mirrorDisplay(gPhysicalDisplayId);
+    if (*mirrorRoot == nullptr) {
+        ALOGE("Failed to create a mirror for screenrecord");
+        return UNKNOWN_ERROR;
+    }
+    t.setLayerStack(*mirrorRoot, layerStack);
     t.apply();
 
     *pDisplayHandle = dpy;
@@ -656,6 +664,23 @@ static inline uint32_t floorToEven(uint32_t num) {
     return num & ~1;
 }
 
+struct RecordingData {
+    sp<MediaCodec> encoder;
+    // Configure virtual display.
+    sp<IBinder> dpy;
+
+    sp<Overlay> overlay;
+
+    ~RecordingData() {
+        if (dpy != nullptr) SurfaceComposerClient::destroyDisplay(dpy);
+        if (overlay != nullptr) overlay->stop();
+        if (encoder != nullptr) {
+            encoder->stop();
+            encoder->release();
+        }
+    }
+};
+
 /*
  * Main "do work" start point.
  *
@@ -713,12 +738,12 @@ static status_t recordScreen(const char* fileName) {
         gVideoHeight = floorToEven(layerStackSpaceRect.getHeight());
     }
 
+    RecordingData recordingData = RecordingData();
     // Configure and start the encoder.
-    sp<MediaCodec> encoder;
     sp<FrameOutput> frameOutput;
     sp<IGraphicBufferProducer> encoderInputSurface;
     if (gOutputFormat != FORMAT_FRAMES && gOutputFormat != FORMAT_RAW_FRAMES) {
-        err = prepareEncoder(displayMode.refreshRate, &encoder, &encoderInputSurface);
+        err = prepareEncoder(displayMode.refreshRate, &recordingData.encoder, &encoderInputSurface);
 
         if (err != NO_ERROR && !gSizeSpecified) {
             // fallback is defined for landscape; swap if we're in portrait
@@ -731,7 +756,8 @@ static status_t recordScreen(const char* fileName) {
                         gVideoWidth, gVideoHeight, newWidth, newHeight);
                 gVideoWidth = newWidth;
                 gVideoHeight = newHeight;
-                err = prepareEncoder(displayMode.refreshRate, &encoder, &encoderInputSurface);
+                err = prepareEncoder(displayMode.refreshRate, &recordingData.encoder,
+                                      &encoderInputSurface);
             }
         }
         if (err != NO_ERROR) return err;
@@ -758,13 +784,11 @@ static status_t recordScreen(const char* fileName) {
 
     // Configure optional overlay.
     sp<IGraphicBufferProducer> bufferProducer;
-    sp<Overlay> overlay;
     if (gWantFrameTime) {
         // Send virtual display frames to an external texture.
-        overlay = new Overlay(gMonotonicTime);
-        err = overlay->start(encoderInputSurface, &bufferProducer);
+        recordingData.overlay = new Overlay(gMonotonicTime);
+        err = recordingData.overlay->start(encoderInputSurface, &bufferProducer);
         if (err != NO_ERROR) {
-            if (encoder != NULL) encoder->release();
             return err;
         }
         if (gVerbose) {
@@ -776,11 +800,13 @@ static status_t recordScreen(const char* fileName) {
         bufferProducer = encoderInputSurface;
     }
 
+    // We need to hold a reference to mirrorRoot during the entire recording to ensure it's not
+    // cleaned up by SurfaceFlinger. When the reference is dropped, SurfaceFlinger will delete
+    // the resource.
+    sp<SurfaceControl> mirrorRoot;
     // Configure virtual display.
-    sp<IBinder> dpy;
-    err = prepareVirtualDisplay(displayState, bufferProducer, &dpy);
+    err = prepareVirtualDisplay(displayState, bufferProducer, &recordingData.dpy, &mirrorRoot);
     if (err != NO_ERROR) {
-        if (encoder != NULL) encoder->release();
         return err;
     }
 
@@ -820,7 +846,6 @@ static status_t recordScreen(const char* fileName) {
         case FORMAT_RAW_FRAMES: {
             rawFp = prepareRawOutput(fileName);
             if (rawFp == NULL) {
-                if (encoder != NULL) encoder->release();
                 return -1;
             }
             break;
@@ -861,7 +886,8 @@ static status_t recordScreen(const char* fileName) {
         }
     } else {
         // Main encoder loop.
-        err = runEncoder(encoder, muxer, rawFp, display, dpy, displayState.orientation);
+        err = runEncoder(recordingData.encoder, muxer, rawFp, display, recordingData.dpy,
+                         displayState.orientation);
         if (err != NO_ERROR) {
             fprintf(stderr, "Encoder failed (err=%d)\n", err);
             // fall through to cleanup
@@ -875,9 +901,6 @@ static status_t recordScreen(const char* fileName) {
 
     // Shut everything down, starting with the producer side.
     encoderInputSurface = NULL;
-    SurfaceComposerClient::destroyDisplay(dpy);
-    if (overlay != NULL) overlay->stop();
-    if (encoder != NULL) encoder->stop();
     if (muxer != NULL) {
         // If we don't stop muxer explicitly, i.e. let the destructor run,
         // it may hang (b/11050628).
@@ -885,7 +908,6 @@ static status_t recordScreen(const char* fileName) {
     } else if (rawFp != stdout) {
         fclose(rawFp);
     }
-    if (encoder != NULL) encoder->release();
 
     return err;
 }
