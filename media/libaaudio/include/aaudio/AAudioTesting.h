@@ -87,7 +87,7 @@ AAUDIO_API aaudio_policy_t AAudio_getMMapPolicy();
  * @note This is only for testing. Do not use this in an application.
  * It may change or be removed at any time.
  *
- * @return true if the stream uses ther MMAP data path
+ * @return true if the stream uses the MMAP data path
  */
 AAUDIO_API bool AAudioStream_isMMapUsed(AAudioStream* stream);
 
