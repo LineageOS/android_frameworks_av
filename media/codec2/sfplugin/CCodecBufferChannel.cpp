@@ -956,9 +956,9 @@ status_t CCodecBufferChannel::renderOutputBuffer(
                     hdrDynamicInfo->m.data + hdrDynamicInfo->flexCount());
         }
         qbi.setHdrMetadata(hdr);
-
-        SetHdrMetadataToGralloc4Handle(hdrStaticInfo, hdrDynamicInfo, block.handle());
     }
+    SetMetadataToGralloc4Handle(dataSpace, hdrStaticInfo, hdrDynamicInfo, block.handle());
+
     // we don't have dirty regions
     qbi.setSurfaceDamage(Region::INVALID_REGION);
     android::IGraphicBufferProducer::QueueBufferOutput qbo;
