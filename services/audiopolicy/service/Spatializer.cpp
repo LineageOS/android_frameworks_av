@@ -84,6 +84,7 @@ public:
         kWhatOnFramesProcessed,    // AudioEffect::EVENT_FRAMES_PROCESSED
         kWhatOnHeadToStagePose,    // SpatializerPoseController::Listener::onHeadToStagePose
         kWhatOnActualModeChange,   // SpatializerPoseController::Listener::onActualModeChange
+        kWhatOnLatencyModesChanged, // Spatializer::onSupportedLatencyModesChanged
     };
     static constexpr const char *kNumFramesKey = "numFrames";
     static constexpr const char *kModeKey = "mode";
@@ -93,15 +94,27 @@ public:
     static constexpr const char *kRotation0Key = "rotation0";
     static constexpr const char *kRotation1Key = "rotation1";
     static constexpr const char *kRotation2Key = "rotation2";
+    static constexpr const char *kLatencyModesKey = "latencyModes";
+
+    class LatencyModes : public RefBase {
+    public:
+        LatencyModes(audio_io_handle_t output,
+                const std::vector<audio_latency_mode_t>& latencyModes)
+            : mOutput(output), mLatencyModes(latencyModes) {}
+        ~LatencyModes() = default;
+
+        audio_io_handle_t mOutput;
+        std::vector<audio_latency_mode_t> mLatencyModes;
+    };
 
     void onMessageReceived(const sp<AMessage> &msg) override {
+        sp<Spatializer> spatializer = mSpatializer.promote();
+        if (spatializer == nullptr) {
+            ALOGW("%s: Cannot promote spatializer", __func__);
+            return;
+        }
         switch (msg->what()) {
             case kWhatOnFramesProcessed: {
-                sp<Spatializer> spatializer = mSpatializer.promote();
-                if (spatializer == nullptr) {
-                    ALOGW("%s: Cannot promote spatializer", __func__);
-                    return;
-                }
                 int numFrames;
                 if (!msg->findInt32(kNumFramesKey, &numFrames)) {
                     ALOGE("%s: Cannot find num frames!", __func__);
@@ -112,11 +125,6 @@ public:
                 }
                 } break;
             case kWhatOnHeadToStagePose: {
-                sp<Spatializer> spatializer = mSpatializer.promote();
-                if (spatializer == nullptr) {
-                    ALOGW("%s: Cannot promote spatializer", __func__);
-                    return;
-                }
                 std::vector<float> headToStage(sHeadPoseKeys.size());
                 for (size_t i = 0 ; i < sHeadPoseKeys.size(); i++) {
                     if (!msg->findFloat(sHeadPoseKeys[i], &headToStage[i])) {
@@ -127,18 +135,25 @@ public:
                 spatializer->onHeadToStagePoseMsg(headToStage);
                 } break;
             case kWhatOnActualModeChange: {
-                sp<Spatializer> spatializer = mSpatializer.promote();
-                if (spatializer == nullptr) {
-                    ALOGW("%s: Cannot promote spatializer", __func__);
-                    return;
-                }
                 int mode;
-                if (!msg->findInt32(EngineCallbackHandler::kModeKey, &mode)) {
+                if (!msg->findInt32(kModeKey, &mode)) {
                     ALOGE("%s: Cannot find actualMode!", __func__);
                     return;
                 }
                 spatializer->onActualModeChangeMsg(static_cast<HeadTrackingMode>(mode));
                 } break;
+
+            case kWhatOnLatencyModesChanged: {
+                sp<RefBase> object;
+                if (!msg->findObject(kLatencyModesKey, &object)) {
+                    ALOGE("%s: Cannot find latency modes!", __func__);
+                    return;
+                }
+                sp<LatencyModes> latencyModes = static_cast<LatencyModes*>(object.get());
+                spatializer->onSupportedLatencyModesChangedMsg(
+                    latencyModes->mOutput, std::move(latencyModes->mLatencyModes));
+                } break;
+
             default:
                 LOG_ALWAYS_FATAL("Invalid callback message %d", msg->what());
         }
@@ -783,9 +798,21 @@ audio_io_handle_t Spatializer::detachOutput() {
 
 void Spatializer::onSupportedLatencyModesChanged(
         audio_io_handle_t output, const std::vector<audio_latency_mode_t>& modes) {
+    ALOGV("%s output %d num modes %zu", __func__, (int)output, modes.size());
+    sp<AMessage> msg =
+            new AMessage(EngineCallbackHandler::kWhatOnLatencyModesChanged, mHandler);
+    msg->setObject(EngineCallbackHandler::kLatencyModesKey,
+        sp<EngineCallbackHandler::LatencyModes>::make(output, modes));
+    msg->post();
+}
+
+void Spatializer::onSupportedLatencyModesChangedMsg(
+        audio_io_handle_t output, std::vector<audio_latency_mode_t>&& modes) {
     std::lock_guard lock(mLock);
+    ALOGV("%s output %d mOutput %d num modes %zu",
+            __func__, (int)output, (int)mOutput, modes.size());
     if (output == mOutput) {
-        mSupportedLatencyModes = modes;
+        mSupportedLatencyModes = std::move(modes);
         checkSensorsState_l();
     }
 }
