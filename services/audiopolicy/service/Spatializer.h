@@ -167,6 +167,8 @@ private:
 
     void onHeadToStagePoseMsg(const std::vector<float>& headToStage);
     void onActualModeChangeMsg(media::HeadTrackingMode mode);
+    void onSupportedLatencyModesChangedMsg(
+            audio_io_handle_t output, std::vector<audio_latency_mode_t>&& modes);
 
     static constexpr int kMaxEffectParamValues = 10;
     /**
