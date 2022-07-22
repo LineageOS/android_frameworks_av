@@ -829,6 +829,10 @@ sp<ConstGraphicBlockBuffer> ConstGraphicBlockBuffer::AllocateEmpty(
     }
     // NOTE: we currently only support YUV420 formats for byte-buffer mode.
     sp<ABuffer> aBuffer(alloc(align(width, 16) * align(height, 16) * 3 / 2));
+    if (aBuffer == nullptr) {
+        ALOGD("%s: failed to allocate buffer", __func__);
+        return nullptr;
+    }
     return new ConstGraphicBlockBuffer(
             format,
             aBuffer,

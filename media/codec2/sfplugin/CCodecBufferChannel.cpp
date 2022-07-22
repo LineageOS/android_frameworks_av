@@ -14,7 +14,7 @@
  * limitations under the License.
  */
 
-//#define LOG_NDEBUG 0
+#define LOG_NDEBUG 0
 #define LOG_TAG "CCodecBufferChannel"
 #include <utils/Log.h>
 
@@ -78,6 +78,7 @@ constexpr size_t kRenderingDepth = 3;
 // This is for keeping IGBP's buffer dropping logic in legacy mode other
 // than making it non-blocking. Do not change this value.
 const static size_t kDequeueTimeoutNs = 0;
+
 // If app goes into background, decoding paused. we have WA logic in HAL to sleep some actions.
 // This value is to monitor if decoding is paused then we can signal a new empty work to HAL
 // after app resume to foreground to notify HAL something
@@ -718,7 +719,6 @@ void CCodecBufferChannel::feedInputBufferIfAvailable() {
         ALOGV("[%s] We're not running --- no input buffer reported", mName);
         return;
     }
-
     feedInputBufferIfAvailableInternal();
 
     // limit this WA to qc hw decoder only
@@ -729,7 +729,7 @@ void CCodecBufferChannel::feedInputBufferIfAvailable() {
         uint64_t now = std::chrono::duration_cast<std::chrono::milliseconds>(
                 PipelineWatcher::Clock::now().time_since_epoch()).count();
         if (now - mLastInputBufferAvailableTs > kPipelinePausedTimeoutMs) {
-            ALOGV("long time elapsed since last input available, let's queue a specific work to "
+            ALOGV("[WA] long time elapsed since last input queued, let's queue a specific work to "
                     "HAL to notify something");
             queueDummyWork();
         }
@@ -766,7 +766,7 @@ void CCodecBufferChannel::feedInputBufferIfAvailableInternal() {
                 pipelineRoom = SIZE_MAX;
             }
             if (pipelineRoom <= input->buffers->numClientBuffers()) {
-                ALOGI("pipelineRoom(%zu) is <= numClientBuffers(%zu). "
+                ALOGV("pipelineRoom(%zu) is <= numClientBuffers(%zu). "
                     "Not signalling any more buffers to client",
                     pipelineRoom, input->buffers->numClientBuffers());
                 break;
@@ -1260,9 +1260,13 @@ status_t CCodecBufferChannel::start(
             Mutexed<OutputSurface>::Locked output(mOutputSurface);
             maxDequeueCount = output->maxDequeueBuffers = numOutputSlots +
                     reorderDepth.value + kRenderingDepth;
+            if (!secure) {
+                output->maxDequeueBuffers += numInputSlots;
+            }
             outputSurface = output->surface ?
                     output->surface->getIGraphicBufferProducer() : nullptr;
             if (outputSurface) {
+                ALOGD("[%s] start: max output delay %u", mName, output->maxDequeueBuffers);
                 output->surface->setMaxDequeuedBufferCount(output->maxDequeueBuffers);
             }
             outputGeneration = output->generation;
@@ -1459,8 +1463,8 @@ status_t CCodecBufferChannel::start(
     // mOutputBuffers are initialized to make sure that lingering callbacks
     // about buffers from the previous generation do not interfere with the
     // newly initialized pipeline capacity.
-
-    if (inputFormat || outputFormat) {
+    {
+        ALOGD("[%s] start: updating output delay %u", mName, outputDelayValue);
         Mutexed<PipelineWatcher>::Locked watcher(mPipelineWatcher);
         watcher->inputDelay(inputDelayValue)
                 .pipelineDelay(pipelineDelayValue)
@@ -1559,11 +1563,9 @@ status_t CCodecBufferChannel::requestInitialInputBuffers() {
     }
 
     if (!clientInputBuffers.empty()) {
-        {
-            std::lock_guard<std::mutex> tsLock(mTsLock);
-            mLastInputBufferAvailableTs = std::chrono::duration_cast<std::chrono::milliseconds>(
-                    PipelineWatcher::Clock::now().time_since_epoch()).count();
-        }
+        std::lock_guard<std::mutex> tsLock(mTsLock);
+        mLastInputBufferAvailableTs = std::chrono::duration_cast<std::chrono::milliseconds>(
+                PipelineWatcher::Clock::now().time_since_epoch()).count();
     }
 
     for (const ClientInputBuffer& clientInputBuffer: clientInputBuffers) {
@@ -1829,7 +1831,7 @@ bool CCodecBufferChannel::handleWork(
                 if (param->forOutput()) {
                     C2PortActualDelayTuning::output outputDelay;
                     if (outputDelay.updateFrom(*param)) {
-                        ALOGV("[%s] onWorkDone: updating output delay %u",
+                        ALOGD("[%s] onWorkDone: updating output delay %u",
                               mName, outputDelay.value);
                         (void)mPipelineWatcher.lock()->outputDelay(outputDelay.value);
                         newOutputDelay = outputDelay.value;
@@ -1926,6 +1928,8 @@ bool CCodecBufferChannel::handleWork(
             maxDequeueCount = output->maxDequeueBuffers =
                     numOutputSlots + reorderDepth + kRenderingDepth;
             if (output->surface) {
+                ALOGI("[%s] onWorkDone: updating max output delay %u",
+                        mName, output->maxDequeueBuffers);
                 output->surface->setMaxDequeuedBufferCount(output->maxDequeueBuffers);
             }
         }
@@ -1976,7 +1980,10 @@ bool CCodecBufferChannel::handleWork(
             outBuffer->meta()->setInt64("timeUs", timestamp.peek());
             outBuffer->meta()->setInt32("flags", MediaCodec::BUFFER_FLAG_CODECCONFIG);
             ALOGV("[%s] onWorkDone: csd index = %zu [%p]", mName, index, outBuffer.get());
-
+            if (outputFormat) {
+                ALOGD("[%s] sending CSD : output format changed to %s",
+                      mName, outputFormat->debugString().c_str());
+            }
             output.unlock();
             mCallback->onOutputBufferAvailable(index, outBuffer);
         } else {
@@ -1985,6 +1992,12 @@ bool CCodecBufferChannel::handleWork(
             mCCodecCallback->onError(UNKNOWN_ERROR, ACTION_CODE_FATAL);
             return false;
         }
+    }
+
+    if (worklet->output.flags & C2FrameData::FLAG_DROP_FRAME) {
+        ALOGV("[%s] onWorkDone: drop output buffer (%lld)",
+              mName, work->input.ordinal.frameIndex.peekull());
+        notifyClient = false;
     }
 
     if (notifyClient && !buffer && !flags) {
@@ -2018,7 +2031,7 @@ bool CCodecBufferChannel::handleWork(
                 notifyClient,
                 timestamp.peek(),
                 flags,
-                outputFormat,
+                (initData == nullptr ? outputFormat : nullptr),
                 worklet->output.ordinal);
     }
     sendOutputBuffers();
@@ -2126,7 +2139,9 @@ PipelineWatcher::Clock::duration CCodecBufferChannel::elapsed() {
     if (!mInputMetEos) {
         size_t outputDelay = mOutput.lock()->outputDelay;
         Mutexed<Input>::Locked input(mInput);
-        n = input->inputDelay + input->pipelineDelay + outputDelay;
+        n = input->inputDelay + input->pipelineDelay + outputDelay + kSmoothnessFactor;
+        ALOGD("[%s] DEBUG: elapsed: n=%zu [in=%u pipeline=%u out=%zu]", mName, n,
+                input->inputDelay, input->pipelineDelay, outputDelay);
     }
     return mPipelineWatcher.lock()->elapsed(PipelineWatcher::Clock::now(), n);
 }

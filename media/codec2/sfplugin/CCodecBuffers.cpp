@@ -14,7 +14,7 @@
  * limitations under the License.
  */
 
-//#define LOG_NDEBUG 0
+#define LOG_NDEBUG 0
 #define LOG_TAG "CCodecBuffers"
 #include <utils/Log.h>
 
@@ -236,7 +236,7 @@ bool OutputBuffers::convert(
     if (!srcBuffer) {
         return false;
     }
-    if (!dst) {
+    if (!*dst) {
         *dst = new Codec2Buffer(
                 mFormat,
                 new ABuffer(mDataConverter->targetSize(srcBuffer->size())));
@@ -331,7 +331,7 @@ OutputBuffers::BufferAction OutputBuffers::popFromStashAndRegister(
     *c2Buffer = entry.buffer;
     sp<AMessage> outputFormat = entry.format;
 
-    if (entry.notify && mFormat != outputFormat) {
+    if (entry.notify && outputFormat && mFormat != outputFormat) {
         updateSkipCutBuffer(outputFormat);
         // Trigger image data processing to the new format
         mLastImageData.clear();
