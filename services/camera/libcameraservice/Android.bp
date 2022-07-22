@@ -241,7 +241,10 @@ cc_library {
         "-Wextra",
         "-Werror",
         "-Wno-ignored-qualifiers",
-    ],
+    ] + select(soong_config_variable("camera", "package_name"), {
+        any @ flag_val: ["-DCAMERA_PACKAGE_NAME=\"" + flag_val + "\""],
+        default: [],
+    }),
 }
 
 cc_library_static {

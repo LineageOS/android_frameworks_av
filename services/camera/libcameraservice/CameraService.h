@@ -345,6 +345,8 @@ public:
      */
     bool isAutomotiveExteriorSystemCamera(const std::string& cameraId) const;
 
+    static std::string getCurrPackageName();
+
     /////////////////////////////////////////////////////////////////////
     // CameraClient functionality
 
