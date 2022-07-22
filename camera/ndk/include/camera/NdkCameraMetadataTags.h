@@ -2197,7 +2197,8 @@ typedef enum acamera_metadata_tag {
      * flashlight brightness level via
      * <a href="https://developer.android.com/reference/android/hardware/camera2/CameraManager.html#turnOnTorchWithStrengthLevel">CameraManager#turnOnTorchWithStrengthLevel</a>.
      * If this value is equal to 1, flashlight brightness control is not supported.
-     * The value for this key will be null for devices with no flash unit.</p>
+     * The value for this key will be null for devices with no flash unit.
+     * This level must be set to a safe value to prevent any burn out issues.</p>
      */
     ACAMERA_FLASH_INFO_STRENGTH_MAXIMUM_LEVEL =                 // int32
             ACAMERA_FLASH_INFO_START + 2,
