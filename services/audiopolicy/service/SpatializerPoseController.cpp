@@ -14,6 +14,10 @@
  * limitations under the License.
  */
 #include "SpatializerPoseController.h"
+#include <android-base/stringprintf.h>
+#include <chrono>
+#include <cstdint>
+#include <string>
 
 #define LOG_TAG "SpatializerPoseController"
 //#define LOG_NDEBUG 0
@@ -289,6 +293,60 @@ void SpatializerPoseController::onPose(int64_t timestamp, int32_t sensor, const 
             mProcessor->recenter(false, true);
         }
     }
+}
+
+std::string SpatializerPoseController::toString(unsigned level) const {
+    std::string prefixSpace;
+    prefixSpace.append(level, ' ');
+    std::string ss = prefixSpace + "SpatializerPoseController:\n";
+    bool needUnlock = false;
+
+    prefixSpace += ' ';
+    auto now = std::chrono::steady_clock::now();
+    if (!mMutex.try_lock_until(now + media::kSpatializerDumpSysTimeOutInSecond)) {
+        ss.append(prefixSpace).append("try_lock failed, dumpsys maybe INACCURATE!\n");
+    } else {
+        needUnlock = true;
+    }
+
+    ss += prefixSpace;
+    if (mHeadSensor == media::SensorPoseProvider::INVALID_HANDLE) {
+        ss.append("HeadSensor: INVALID\n");
+    } else {
+        base::StringAppendF(&ss, "HeadSensor: 0x%08x\n", mHeadSensor);
+    }
+
+    ss += prefixSpace;
+    if (mScreenSensor == media::SensorPoseProvider::INVALID_HANDLE) {
+        ss += "ScreenSensor: INVALID\n";
+    } else {
+        base::StringAppendF(&ss, "ScreenSensor: 0x%08x\n", mScreenSensor);
+    }
+
+    ss += prefixSpace;
+    if (mActualMode.has_value()) {
+        base::StringAppendF(&ss, "ActualMode: %s", toString(mActualMode.value()).c_str());
+    } else {
+        ss += "ActualMode NOTEXIST\n";
+    }
+
+    if (mProcessor) {
+        ss += mProcessor->toString_l(level + 1);
+    } else {
+        ss.append(prefixSpace.c_str()).append("HeadTrackingProcessor not exist\n");
+    }
+
+    if (mPoseProvider) {
+        ss += mPoseProvider->toString(level + 1);
+    } else {
+        ss.append(prefixSpace.c_str()).append("SensorPoseProvider not exist\n");
+    }
+
+    if (needUnlock) {
+        mMutex.unlock();
+    }
+    // TODO: 233092747 add history sensor info with SimpleLog.
+    return ss;
 }
 
 }  // namespace android
