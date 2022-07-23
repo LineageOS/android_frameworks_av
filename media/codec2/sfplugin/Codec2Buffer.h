@@ -410,14 +410,16 @@ c2_status_t GetHdrMetadataFromGralloc4Handle(
         std::shared_ptr<C2StreamHdrDynamicMetadataInfo::input> *dynamicInfo);
 
 /**
- * Set HDR metadata to Gralloc4 handle.
+ * Set metadata to Gralloc4 handle.
  *
+ * \param[in]   dataSpace   Dataspace to set.
  * \param[in]   staticInfo  HDR static info to set. Ignored if null or invalid.
  * \param[in]   dynamicInfo HDR dynamic info to set. Ignored if null or invalid.
  * \param[out]  handle      handle of the allocation.
  * \return C2_OK if successful
  */
-c2_status_t SetHdrMetadataToGralloc4Handle(
+c2_status_t SetMetadataToGralloc4Handle(
+        const android_dataspace_t dataSpace,
         const std::shared_ptr<const C2StreamHdrStaticMetadataInfo::output> &staticInfo,
         const std::shared_ptr<const C2StreamHdrDynamicMetadataInfo::output> &dynamicInfo,
         const C2Handle *const handle);

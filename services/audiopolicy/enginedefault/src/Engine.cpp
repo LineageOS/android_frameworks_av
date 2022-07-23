@@ -78,7 +78,7 @@ status_t Engine::setForceUse(audio_policy_force_use_t usage, audio_policy_forced
     case AUDIO_POLICY_FORCE_FOR_COMMUNICATION:
         if (config != AUDIO_POLICY_FORCE_SPEAKER && config != AUDIO_POLICY_FORCE_BT_SCO &&
             config != AUDIO_POLICY_FORCE_NONE) {
-            ALOGW("setForceUse() invalid config %d for FOR_COMMUNICATION", config);
+            ALOGW("setForceUse() invalid config %d for COMMUNICATION", config);
             return BAD_VALUE;
         }
         break;
@@ -88,14 +88,14 @@ status_t Engine::setForceUse(audio_policy_force_use_t usage, audio_policy_forced
             config != AUDIO_POLICY_FORCE_ANALOG_DOCK &&
             config != AUDIO_POLICY_FORCE_DIGITAL_DOCK && config != AUDIO_POLICY_FORCE_NONE &&
             config != AUDIO_POLICY_FORCE_NO_BT_A2DP && config != AUDIO_POLICY_FORCE_SPEAKER ) {
-            ALOGW("setForceUse() invalid config %d for FOR_MEDIA", config);
+            ALOGW("setForceUse() invalid config %d for MEDIA", config);
             return BAD_VALUE;
         }
         break;
     case AUDIO_POLICY_FORCE_FOR_RECORD:
         if (config != AUDIO_POLICY_FORCE_BT_SCO && config != AUDIO_POLICY_FORCE_WIRED_ACCESSORY &&
             config != AUDIO_POLICY_FORCE_NONE) {
-            ALOGW("setForceUse() invalid config %d for FOR_RECORD", config);
+            ALOGW("setForceUse() invalid config %d for RECORD", config);
             return BAD_VALUE;
         }
         break;
@@ -105,19 +105,22 @@ status_t Engine::setForceUse(audio_policy_force_use_t usage, audio_policy_forced
             config != AUDIO_POLICY_FORCE_WIRED_ACCESSORY &&
             config != AUDIO_POLICY_FORCE_ANALOG_DOCK &&
             config != AUDIO_POLICY_FORCE_DIGITAL_DOCK) {
-            ALOGW("setForceUse() invalid config %d for FOR_DOCK", config);
+            ALOGW("setForceUse() invalid config %d for DOCK", config);
+            return BAD_VALUE;
         }
         break;
     case AUDIO_POLICY_FORCE_FOR_SYSTEM:
         if (config != AUDIO_POLICY_FORCE_NONE &&
             config != AUDIO_POLICY_FORCE_SYSTEM_ENFORCED) {
-            ALOGW("setForceUse() invalid config %d for FOR_SYSTEM", config);
+            ALOGW("setForceUse() invalid config %d for SYSTEM", config);
+            return BAD_VALUE;
         }
         break;
     case AUDIO_POLICY_FORCE_FOR_HDMI_SYSTEM_AUDIO:
         if (config != AUDIO_POLICY_FORCE_NONE &&
             config != AUDIO_POLICY_FORCE_HDMI_SYSTEM_AUDIO_ENFORCED) {
             ALOGW("setForceUse() invalid config %d for HDMI_SYSTEM_AUDIO", config);
+            return BAD_VALUE;
         }
         break;
     case AUDIO_POLICY_FORCE_FOR_ENCODED_SURROUND:
@@ -131,13 +134,13 @@ status_t Engine::setForceUse(audio_policy_force_use_t usage, audio_policy_forced
         break;
     case AUDIO_POLICY_FORCE_FOR_VIBRATE_RINGING:
         if (config != AUDIO_POLICY_FORCE_BT_SCO && config != AUDIO_POLICY_FORCE_NONE) {
-            ALOGW("setForceUse() invalid config %d for FOR_VIBRATE_RINGING", config);
+            ALOGW("setForceUse() invalid config %d for VIBRATE_RINGING", config);
             return BAD_VALUE;
         }
         break;
     default:
         ALOGW("setForceUse() invalid usage %d", usage);
-        break; // TODO return BAD_VALUE?
+        return BAD_VALUE;
     }
     return EngineBase::setForceUse(usage, config);
 }
