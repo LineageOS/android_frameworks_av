@@ -12,6 +12,7 @@
         </mixPort>
         <!-- Le Audio Audio Ports -->
         <mixPort name="le audio output" role="source" />
+        <mixPort name="le audio broadcast output" role="source" />
         <mixPort name="le audio input" role="sink">
             <profile name="" format="AUDIO_FORMAT_PCM_16_BIT"
                      samplingRates="8000 16000 24000 32000 44100 48000"
@@ -65,6 +66,6 @@
         <route type="mix" sink="BLE Speaker Out"
                sources="le audio output"/>
         <route type="mix" sink="BLE Broadcast Out"
-               sources="le audio output"/>
+               sources="le audio broadcast output"/>
     </routes>
 </module>
