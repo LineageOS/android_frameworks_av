@@ -35,7 +35,6 @@ using AttributesVector = std::vector<audio_attributes_t>;
 using StreamVector = std::vector<audio_stream_type_t>;
 
 struct AttributesGroup {
-    std::string name;
     audio_stream_type_t stream;
     std::string volumeGroup;
     AttributesVector attributesVect;
