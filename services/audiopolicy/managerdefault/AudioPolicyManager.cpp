@@ -7331,6 +7331,9 @@ sp<SwAudioOutputDescriptor> AudioPolicyManager::openOutputWithProfileAndDevice(
 
     addOutput(output, desc);
 
+    sp<DeviceDescriptor> speaker = mAvailableOutputDevices.getDevice(
+            AUDIO_DEVICE_OUT_SPEAKER, String8(""), AUDIO_FORMAT_DEFAULT);
+
     if (audio_is_remote_submix_device(deviceType) && address != "0") {
         sp<AudioPolicyMix> policyMix;
         if (mPolicyMixes.getAudioPolicyMix(deviceType, address, policyMix) == NO_ERROR) {
@@ -7341,13 +7344,13 @@ sp<SwAudioOutputDescriptor> AudioPolicyManager::openOutputWithProfileAndDevice(
                     address.string());
         }
 
-    } else if (hasPrimaryOutput() && profile->getModule()
-                != mHwModules.getModuleFromName(AUDIO_HARDWARE_MODULE_ID_PRIMARY)
+    } else if (hasPrimaryOutput() && speaker != nullptr
+            && mPrimaryOutput->supportsDevice(speaker) && !desc->supportsDevice(speaker)
             && ((desc->mFlags & AUDIO_OUTPUT_FLAG_DIRECT) == 0)) {
         // no duplicated output for:
         // - direct outputs
         // - outputs used by dynamic policy mixes
-        // - outputs opened on the primary HW module
+        // - outputs that supports SPEAKER while the primary output does not.
         audio_io_handle_t duplicatedOutput = AUDIO_IO_HANDLE_NONE;
 
         //TODO: configure audio effect output stage here
