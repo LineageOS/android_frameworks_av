@@ -264,12 +264,12 @@ void ARTPSource::adjustAnchorTimeIfRequired(int64_t nowUs) {
 
 bool ARTPSource::queuePacket(const sp<ABuffer> &buffer) {
     int64_t nowUs = ALooper::GetNowUs();
+    int64_t rtpTime = 0;
     uint32_t seqNum = (uint32_t)buffer->int32Data();
-    int32_t ssrc = 0, rtpTime = 0;
+    int32_t ssrc = 0;
 
     buffer->meta()->findInt32("ssrc", &ssrc);
     CHECK(buffer->meta()->findInt32("rtp-time", (int32_t *)&rtpTime));
-    mLatestRtpTime = rtpTime;
 
     if (mNumBuffersReceived++ == 0 && mFirstSysTime == 0) {
         mFirstSysTime = nowUs;
@@ -277,7 +277,7 @@ bool ARTPSource::queuePacket(const sp<ABuffer> &buffer) {
         mLastSysAnchorTimeUpdatedUs = nowUs;
         mHighestSeqNumber = seqNum;
         mBaseSeqNumber = seqNum;
-        mFirstRtpTime = rtpTime;
+        mFirstRtpTime = (uint32_t)rtpTime;
         mFirstSsrc = ssrc;
         ALOGD("first-rtp arrived: first-rtp-time=%u, sys-time=%lld, seq-num=%u, ssrc=%d",
                 mFirstRtpTime, (long long)mFirstSysTime, mHighestSeqNumber, mFirstSsrc);
@@ -351,6 +351,18 @@ bool ARTPSource::queuePacket(const sp<ABuffer> &buffer) {
     }
 
     mQueue.insert(it, buffer);
+
+    /**
+     * RFC3550 calculates the interarrival jitter time for 'ALL packets'.
+     * We calculate anothor jitter only for all 'Head NAL units'
+     */
+    ALOGV("<======== Insert %d", seqNum);
+    rtpTime = mAssembler->findRTPTime(mFirstRtpTime, buffer);
+    if (rtpTime != mLatestRtpTime) {
+        mJitterCalc->putBaseData(rtpTime, nowUs);
+    }
+    mJitterCalc->putInterArrivalData(rtpTime, nowUs);
+    mLatestRtpTime = rtpTime;
 
     return true;
 }
@@ -678,14 +690,6 @@ int32_t ARTPSource::getInterArrivalJitterTimeMs() {
 
 void ARTPSource::setStaticJitterTimeMs(const uint32_t jbTimeMs) {
     mStaticJbTimeMs = jbTimeMs;
-}
-
-void ARTPSource::putBaseJitterData(uint32_t timeStamp, int64_t arrivalTime) {
-    mJitterCalc->putBaseData(timeStamp, arrivalTime);
-}
-
-void ARTPSource::putInterArrivalJitterData(uint32_t timeStamp, int64_t arrivalTime) {
-    mJitterCalc->putInterArrivalData(timeStamp, arrivalTime);
 }
 
 void ARTPSource::setJbTimer(const sp<AMessage> timer) {
