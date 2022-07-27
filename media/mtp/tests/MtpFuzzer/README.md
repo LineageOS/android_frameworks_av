@@ -2,6 +2,8 @@
 
 ## Table of contents
 + [mtp_fuzzer](#MtpServer)
++ [mtp_host_property_fuzzer](#MtpHostProperty)
++ [mtp_device_property_fuzzer](#MtpDeviceProperty)
 
 # <a name="MtpServer"></a> Fuzzer for MtpServer
 
@@ -21,4 +23,46 @@ MtpServer supports the following parameters:
 ```
   $ adb sync data
   $ adb shell /data/fuzz/arm64/mtp_fuzzer/mtp_fuzzer corpus/ -dict=mtp_fuzzer.dict
+```
+
+# <a name="MtpHostProperty"></a> Fuzzer for MtpHostProperty
+
+MtpHostProperty supports the following parameters:
+1. Feasible Type (parameter name: "kFeasibleTypes")
+2. UrbPacket Division Mode (parameter name: "kUrbPacketDivisionModes")
+
+| Parameter| Valid Values |Configured Value|
+|-------------|----------|----- |
+| `kFeasibleType`| 1. `MTP_TYPE_UNDEFINED`, 2. `MTP_TYPE_INT8`, 3.`MTP_TYPE_UINT8`, 4.`MTP_TYPE_INT16`, 5.`MTP_TYPE_UINT16`, 6.`MTP_TYPE_INT32`, 7.`MTP_TYPE_UINT32`, 8.`MTP_TYPE_INT64`, 9.`MTP_TYPE_UINT64`, 10.`MTP_TYPE_INT128`, 11.`MTP_TYPE_UINT128`, 12.`MTP_TYPE_AINT8`, 13.`MTP_TYPE_AUINT8`, 14.`MTP_TYPE_AINT16`, 15.`MTP_TYPE_AUINT16`, 16.`MTP_TYPE_AINT32`, 17.`MTP_TYPE_AUINT32`, 18.`MTP_TYPE_AINT64`, 19.`MTP_TYPE_AUINT64`, 20.`MTP_TYPE_AINT128`, 21.`MTP_TYPE_AUINT128`, 22.`MTP_TYPE_STR`,| Value obtained from FuzzedDataProvider|
+|`kUrbPacketDivisionMode`| 1. `FIRST_PACKET_ONLY_HEADER`, 2. `FIRST_PACKET_HAS_PAYLOAD`, |Value obtained from FuzzedDataProvider|
+
+#### Steps to run
+1. Build the fuzzer
+```
+  $ mm -j$(nproc) mtp_host_property_fuzzer
+```
+2. Run on device
+```
+  $ adb sync data
+  $ adb shell /data/fuzz/arm64/mtp_host_property_fuzzer/mtp_host_property_fuzzer
+```
+
+# <a name="MtpDeviceProperty"></a> Fuzzer for MtpDeviceProperty
+
+MtpDeviceProperty supports the following parameters:
+1. Feasible Type (parameter name: "kFeasibleType")
+
+| Parameter| Valid Values |Configured Value|
+|-------------|----------|----- |
+| `kFeasibleType`| 1. `MTP_TYPE_UNDEFINED`, 2. `MTP_TYPE_INT8`, 3.`MTP_TYPE_UINT8`, 4.`MTP_TYPE_INT16`, 5.`MTP_TYPE_UINT16`, 6.`MTP_TYPE_INT32`, 7.`MTP_TYPE_UINT32`, 8.`MTP_TYPE_INT64`, 9.`MTP_TYPE_UINT64`, 10.`MTP_TYPE_INT128`, 11.`MTP_TYPE_UINT128`, 12.`MTP_TYPE_AINT8`, 13.`MTP_TYPE_AUINT8`, 14.`MTP_TYPE_AINT16`, 15.`MTP_TYPE_AUINT16`, 16.`MTP_TYPE_AINT32`, 17.`MTP_TYPE_AUINT32`, 18.`MTP_TYPE_AINT64`, 19.`MTP_TYPE_AUINT64`, 20.`MTP_TYPE_AINT128`, 21.`MTP_TYPE_AUINT128`, 22.`MTP_TYPE_STR`,| Value obtained from FuzzedDataProvider|
+
+#### Steps to run
+1. Build the fuzzer
+```
+  $ mm -j$(nproc) mtp_device_property_fuzzer
+```
+2. Run on device
+```
+  $ adb sync data
+  $ adb shell /data/fuzz/arm64/mtp_device_property_fuzzer/mtp_device_property_fuzzer
 ```

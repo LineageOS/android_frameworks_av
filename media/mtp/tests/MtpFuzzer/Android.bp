@@ -57,3 +57,30 @@ cc_fuzz {
     dictionary: "mtp_fuzzer.dict",
     corpus: ["corpus/*"],
 }
+
+cc_defaults {
+    name: "mtp_property_fuzzer_defaults",
+    srcs: ["mtp_property_fuzzer.cpp"],
+    shared_libs: [
+        "libmtp",
+        "libasyncio",
+        "libusbhost",
+    ],
+    defaults: ["mtp_fuzzer_defaults"],
+}
+
+cc_fuzz {
+     name: "mtp_device_property_fuzzer",
+     defaults: ["mtp_property_fuzzer_defaults"],
+     cflags: [
+         "-DMTP_DEVICE",
+     ],
+}
+
+cc_fuzz {
+     name: "mtp_host_property_fuzzer",
+     defaults: ["mtp_property_fuzzer_defaults"],
+     cflags: [
+         "-DMTP_HOST",
+     ],
+}
