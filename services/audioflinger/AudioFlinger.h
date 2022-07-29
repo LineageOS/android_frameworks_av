@@ -117,6 +117,7 @@ class DevicesFactoryHalCallback;
 class DevicesFactoryHalInterface;
 class EffectsFactoryHalInterface;
 class FastMixer;
+class IAudioManager;
 class PassthruBufferProvider;
 class RecordBufferConverter;
 class ServerProxy;
@@ -988,6 +989,8 @@ private:
                                       size_t rejectedKVPSize, const String8& rejectedKVPs,
                                       uid_t callingUid);
 
+    sp<IAudioManager> getOrCreateAudioManager();
+
 public:
     // These methods read variables atomically without mLock,
     // though the variables are updated with mLock.
@@ -1029,6 +1032,9 @@ private:
              std::vector<media::audio::common::AudioMMapPolicyInfo>> mPolicyInfos;
     int32_t mAAudioBurstsPerBuffer = 0;
     int32_t mAAudioHwBurstMinMicros = 0;
+
+    /** Interface for interacting with the AudioService. */
+    mediautils::atomic_sp<IAudioManager>       mAudioManager;
 };
 
 #undef INCLUDING_FROM_AUDIOFLINGER_H

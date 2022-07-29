@@ -1494,6 +1494,39 @@ void AudioFlinger::PlaybackThread::Track::setTeePatches(TeePatches teePatches) {
     }
 }
 
+// must be called with player thread lock held
+void AudioFlinger::PlaybackThread::Track::processMuteEvent_l(const sp<
+    IAudioManager>& audioManager, mute_state_t muteState)
+{
+    if (mMuteState == muteState) {
+        // mute state did not change, do nothing
+        return;
+    }
+
+    status_t result = UNKNOWN_ERROR;
+    if (audioManager && mPortId != AUDIO_PORT_HANDLE_NONE) {
+        if (mMuteEventExtras == nullptr) {
+            mMuteEventExtras = std::make_unique<os::PersistableBundle>();
+        }
+        mMuteEventExtras->putInt(String16(kExtraPlayerEventMuteKey),
+                                 static_cast<int>(muteState));
+
+        result = audioManager->portEvent(mPortId,
+                                         PLAYER_UPDATE_MUTED,
+                                         mMuteEventExtras);
+    }
+
+    if (result == OK) {
+        mMuteState = muteState;
+    } else {
+        ALOGW("%s(%d): cannot process mute state for port ID %d, status error %d",
+              __func__,
+              id(),
+              mPortId,
+              result);
+    }
+}
+
 status_t AudioFlinger::PlaybackThread::Track::getTimestamp(AudioTimestamp& timestamp)
 {
     if (!isOffloaded() && !isDirect()) {
