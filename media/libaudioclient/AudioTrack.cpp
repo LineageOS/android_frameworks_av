@@ -1398,6 +1398,10 @@ status_t AudioTrack::setPlaybackRate(const AudioPlaybackRate &playbackRate)
                         legacy2aidl_audio_playback_rate_t_AudioPlaybackRate(playbackRate))));
         if (status == NO_ERROR) {
             mPlaybackRate = playbackRate;
+        } else if (status == INVALID_OPERATION
+                && playbackRate.mSpeed == 1.0f && mPlaybackRate.mPitch == 1.0f) {
+            mPlaybackRate = playbackRate;
+            return NO_ERROR;
         }
         return status;
     }
