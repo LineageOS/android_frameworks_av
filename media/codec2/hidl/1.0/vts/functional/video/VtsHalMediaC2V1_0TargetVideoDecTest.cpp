@@ -214,10 +214,8 @@ class Codec2VideoDecHidlTestBase : public ::testing::Test {
             calc_md5_cksum(uPlane, uvStride, cropWidth / 2, cropHeight / 2, au1_u_chksum);
             calc_md5_cksum(vPlane, uvStride, cropWidth / 2, cropHeight / 2, au1_v_chksum);
         } else if (bitDepth == 8 && layoutType == C2PlanarLayout::TYPE_YUV && colInc == 2) {
-            uint8_t* cbPlane = (uint8_t*)malloc(cropWidth * cropHeight / 4);
-            uint8_t* crPlane = (uint8_t*)malloc(cropWidth * cropHeight / 4);
-            ASSERT_NE(cbPlane, nullptr);
-            ASSERT_NE(crPlane, nullptr);
+            std::vector<uint8_t> cbPlane(cropWidth * cropHeight / 4);
+            std::vector<uint8_t> crPlane(cropWidth * cropHeight / 4);
             size_t count = 0;
             for (size_t k = 0; k < (cropHeight / 2); k++) {
                 for (size_t l = 0; l < (cropWidth); l = l + 2) {
@@ -227,10 +225,10 @@ class Codec2VideoDecHidlTestBase : public ::testing::Test {
                 }
             }
             calc_md5_cksum(yPlane, yStride, cropWidth, cropHeight, au1_y_chksum);
-            calc_md5_cksum(cbPlane, cropWidth / 2, cropWidth / 2, cropHeight / 2, au1_u_chksum);
-            calc_md5_cksum(crPlane, cropWidth / 2, cropWidth / 2, cropHeight / 2, au1_v_chksum);
-            free(cbPlane);
-            free(crPlane);
+            calc_md5_cksum(cbPlane.data(), cropWidth / 2, cropWidth / 2, cropHeight / 2,
+                           au1_u_chksum);
+            calc_md5_cksum(crPlane.data(), cropWidth / 2, cropWidth / 2, cropHeight / 2,
+                           au1_v_chksum);
         } else {
             mMd5Enable = false;
             ALOGV("Disabling MD5 chksm flag");
