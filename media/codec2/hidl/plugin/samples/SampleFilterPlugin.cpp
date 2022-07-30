@@ -666,6 +666,7 @@ private:
                         grallocHandle, GraphicBuffer::CLONE_HANDLE,
                         width, height, format, 1, usage, stride);
 
+                native_handle_delete(grallocHandle);
                 std::shared_ptr<C2GraphicBlock> dstBlock;
                 C2BlockPool::local_id_t poolId = mIntf->getPoolId();
                 std::shared_ptr<C2BlockPool> pool;
@@ -684,6 +685,7 @@ private:
                         grallocHandle, GraphicBuffer::CLONE_HANDLE,
                         width, height, format, 1, usage, stride);
 
+                native_handle_delete(grallocHandle);
                 Rect sourceCrop(0, 0, width, height);
 
                 renderengine::DisplaySettings clientCompositionDisplay;
