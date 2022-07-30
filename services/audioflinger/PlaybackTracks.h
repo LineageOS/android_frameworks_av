@@ -204,6 +204,12 @@ public:
     float getSpeed() const { return mSpeed; }
     bool isSpatialized() const override { return mIsSpatialized; }
 
+    /**
+     * Updates the mute state and notifies the audio service. Call this only when holding player
+     * thread lock.
+     */
+    void processMuteEvent_l(const sp<IAudioManager>& audioManager, mute_state_t muteState);
+
 protected:
     // for numerous
     friend class PlaybackThread;
@@ -354,6 +360,11 @@ private:
     TeePatches  mTeePatches;
     const float         mSpeed;
     const bool          mIsSpatialized;
+
+    // TODO: replace PersistableBundle with own struct
+    // access these two variables only when holding player thread lock.
+    std::unique_ptr<os::PersistableBundle> mMuteEventExtras;
+    mute_state_t        mMuteState;
 };  // end of Track
 
 

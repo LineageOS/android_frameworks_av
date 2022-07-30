@@ -624,7 +624,7 @@ protected:
     virtual     void        dumpTracks_l(int fd __unused, const Vector<String16>& args __unused) { }
 
 
-    friend class AudioFlinger;      // for mEffectChains
+    friend class AudioFlinger;      // for mEffectChains and mAudioManager
 
                 const type_t            mType;
 
