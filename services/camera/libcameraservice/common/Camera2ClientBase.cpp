@@ -105,11 +105,6 @@ status_t Camera2ClientBase<TClientBase>::initializeImpl(TProviderPtr providerPtr
           TClientBase::mCameraIdStr.string());
     status_t res;
 
-    // Verify ops permissions
-    res = TClientBase::startCameraOps();
-    if (res != OK) {
-        return res;
-    }
     IPCTransport providerTransport = IPCTransport::INVALID;
     res = providerPtr->getCameraIdIPCTransport(TClientBase::mCameraIdStr.string(),
             &providerTransport);
@@ -142,6 +137,14 @@ status_t Camera2ClientBase<TClientBase>::initializeImpl(TProviderPtr providerPtr
     if (res != OK) {
         ALOGE("%s: Camera %s: unable to initialize device: %s (%d)",
                 __FUNCTION__, TClientBase::mCameraIdStr.string(), strerror(-res), res);
+        return res;
+    }
+
+    // Verify ops permissions
+    res = TClientBase::startCameraOps();
+    if (res != OK) {
+        TClientBase::finishCameraOps();
+        mDevice.clear();
         return res;
     }
 
