@@ -985,7 +985,7 @@ MtpResponseCode MtpServer::doSendObjectInfo() {
 
     int type = storage->getType();
     if (type == MTP_STORAGE_REMOVABLE_RAM) {
-        std::string str = android::base::Trim((const char*)name);
+        std::string str = android::base::Trim(name);
         name.set(str.c_str());
     }
     ALOGV("name: %s format: 0x%04X (%s)\n", (const char*)name, format,
