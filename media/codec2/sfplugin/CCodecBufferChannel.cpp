@@ -1578,6 +1578,17 @@ void CCodecBufferChannel::stop() {
     mFirstValidFrameIndex = mFrameIndex.load(std::memory_order_relaxed);
 }
 
+void CCodecBufferChannel::stopUseOutputSurface() {
+    if (mOutputSurface.lock()->surface) {
+        C2BlockPool::local_id_t outputPoolId;
+        {
+            Mutexed<BlockPools>::Locked pools(mBlockPools);
+            outputPoolId = pools->outputPoolId;
+        }
+        if (mComponent) mComponent->stopUsingOutputSurface(outputPoolId);
+    }
+}
+
 void CCodecBufferChannel::reset() {
     stop();
     if (mInputSurface != nullptr) {
@@ -1592,14 +1603,6 @@ void CCodecBufferChannel::reset() {
     {
         Mutexed<Output>::Locked output(mOutput);
         output->buffers.reset();
-    }
-    if (mOutputSurface.lock()->surface) {
-        C2BlockPool::local_id_t outputPoolId;
-        {
-            Mutexed<BlockPools>::Locked pools(mBlockPools);
-            outputPoolId = pools->outputPoolId;
-        }
-        mComponent->stopUsingOutputSurface(outputPoolId);
     }
 }
 
