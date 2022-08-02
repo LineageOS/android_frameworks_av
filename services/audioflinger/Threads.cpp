@@ -5393,7 +5393,8 @@ AudioFlinger::PlaybackThread::mixer_state AudioFlinger::MixerThread::prepareTrac
                                    mStreamTypes[track->streamType()].volume == 0.f,
                                    mStreamTypes[track->streamType()].mute,
                                    track->isPlaybackRestricted(),
-                                   vlf == 0.f && vrf == 0.f});
+                                   vlf == 0.f && vrf == 0.f,
+                                   vh == 0.f});
 
                 vlf *= volume;
                 vrf *= volume;
@@ -5575,7 +5576,8 @@ AudioFlinger::PlaybackThread::mixer_state AudioFlinger::MixerThread::prepareTrac
                                    mStreamTypes[track->streamType()].volume == 0.f,
                                    mStreamTypes[track->streamType()].mute,
                                    track->isPlaybackRestricted(),
-                                   vlf == 0.f && vrf == 0.f});
+                                   vlf == 0.f && vrf == 0.f,
+                                   vh == 0.f});
 
                 // now apply the master volume and stream type volume and shaper volume
                 vlf *= v * vh;
@@ -6198,7 +6200,8 @@ void AudioFlinger::DirectOutputThread::processVolume_l(Track *track, bool lastTr
                        mStreamTypes[track->streamType()].volume == 0.f,
                        mStreamTypes[track->streamType()].mute,
                        track->isPlaybackRestricted(),
-                       clientVolumeMute});
+                       clientVolumeMute,
+                       shaperVolume == 0.f});
 
     if (lastTrack) {
         track->setFinalVolume((left + right) / 2.f);
