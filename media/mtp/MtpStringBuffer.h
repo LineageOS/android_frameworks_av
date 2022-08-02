@@ -20,6 +20,7 @@
 #include <log/log.h>
 #include <stdint.h>
 #include <string>
+#include <string_view>
 
 // Max Character number of a MTP String
 #define MTP_STRING_MAX_CHARACTER_NUMBER             255
@@ -55,6 +56,7 @@ public:
     inline int      size() const { return mString.length(); }
 
     inline operator const char*() const { return mString.c_str(); }
+    operator std::string_view() const { return mString; }
 };
 
 inline void MtpStringBuffer::append(const char* other) {
