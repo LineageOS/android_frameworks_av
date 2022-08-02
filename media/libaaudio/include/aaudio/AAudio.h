@@ -1173,7 +1173,10 @@ typedef int32_t aaudio_data_callback_result_t;
  * in the streams current data format to the audioData buffer.
  *
  * For an input stream, this function should read and process numFrames of data
- * from the audioData buffer.
+ * from the audioData buffer. The data in the audioData buffer must not be modified
+ * directly. Instead, it should be copied to another buffer before doing any modification.
+ * In many cases, writing to the audioData buffer of an input stream will result in a
+ * native exception.
  *
  * The audio data is passed through the buffer. So do NOT call AAudioStream_read() or
  * AAudioStream_write() on the stream that is making the callback.
