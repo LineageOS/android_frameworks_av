@@ -70,7 +70,7 @@ TEST_F(RenderEngineThreadedTest, bindExternalBuffer_nullptrBuffer) {
 }
 
 TEST_F(RenderEngineThreadedTest, bindExternalBuffer_withBuffer) {
-    sp<GraphicBuffer> buf = new GraphicBuffer();
+    sp<GraphicBuffer> buf = sp<GraphicBuffer>::make();
     EXPECT_CALL(*mRenderEngine, bindExternalTextureBuffer(0, buf, Eq(nullptr)))
             .WillOnce(Return(NO_ERROR));
     status_t result = mThreadedRE->bindExternalTextureBuffer(0, buf, nullptr);
@@ -83,7 +83,7 @@ TEST_F(RenderEngineThreadedTest, cacheExternalTextureBuffer_nullptr) {
 }
 
 TEST_F(RenderEngineThreadedTest, cacheExternalTextureBuffer_withBuffer) {
-    sp<GraphicBuffer> buf = new GraphicBuffer();
+    sp<GraphicBuffer> buf = sp<GraphicBuffer>::make();
     EXPECT_CALL(*mRenderEngine, cacheExternalTextureBuffer(buf));
     mThreadedRE->cacheExternalTextureBuffer(buf);
 }
@@ -198,7 +198,7 @@ TEST_F(RenderEngineThreadedTest, cleanupPostRender_returnsTrue) {
 TEST_F(RenderEngineThreadedTest, drawLayers) {
     renderengine::DisplaySettings settings;
     std::vector<const renderengine::LayerSettings*> layers;
-    sp<GraphicBuffer> buffer = new GraphicBuffer();
+    sp<GraphicBuffer> buffer = sp<GraphicBuffer>::make();
     base::unique_fd bufferFence;
     base::unique_fd drawFence;
 
