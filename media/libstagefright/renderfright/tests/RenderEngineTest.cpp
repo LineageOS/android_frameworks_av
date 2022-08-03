@@ -60,7 +60,7 @@ struct RenderEngineTest : public ::testing::Test {
     }
 
     static sp<GraphicBuffer> allocateDefaultBuffer() {
-        return new GraphicBuffer(DEFAULT_DISPLAY_WIDTH, DEFAULT_DISPLAY_HEIGHT,
+        return sp<GraphicBuffer>::make(DEFAULT_DISPLAY_WIDTH, DEFAULT_DISPLAY_HEIGHT,
                                  HAL_PIXEL_FORMAT_RGBA_8888, 1,
                                  GRALLOC_USAGE_SW_READ_OFTEN | GRALLOC_USAGE_SW_WRITE_OFTEN |
                                          GRALLOC_USAGE_HW_RENDER,
@@ -69,7 +69,7 @@ struct RenderEngineTest : public ::testing::Test {
 
     // Allocates a 1x1 buffer to fill with a solid color
     static sp<GraphicBuffer> allocateSourceBuffer(uint32_t width, uint32_t height) {
-        return new GraphicBuffer(width, height, HAL_PIXEL_FORMAT_RGBA_8888, 1,
+        return sp<GraphicBuffer>::make(width, height, HAL_PIXEL_FORMAT_RGBA_8888, 1,
                                  GRALLOC_USAGE_SW_READ_OFTEN | GRALLOC_USAGE_SW_WRITE_OFTEN |
                                          GRALLOC_USAGE_HW_TEXTURE,
                                  "input");
@@ -275,7 +275,7 @@ struct RenderEngineTest : public ::testing::Test {
         renderengine::DisplaySettings settings;
         std::vector<const renderengine::LayerSettings*> layers;
         // Meaningless buffer since we don't do any drawing
-        sp<GraphicBuffer> buffer = new GraphicBuffer();
+        sp<GraphicBuffer> buffer = sp<GraphicBuffer>::make();
         invokeDraw(settings, layers, buffer);
     }
 
