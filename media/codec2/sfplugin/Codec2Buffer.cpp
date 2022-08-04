@@ -843,6 +843,10 @@ sp<ConstGraphicBlockBuffer> ConstGraphicBlockBuffer::AllocateEmpty(
         }
     }
     sp<ABuffer> aBuffer(alloc(align(width, 16) * align(height, 16) * bpp / 8));
+    if (aBuffer == nullptr) {
+        ALOGD("%s: failed to allocate buffer", __func__);
+        return nullptr;
+    }
     return new ConstGraphicBlockBuffer(
             format,
             aBuffer,
