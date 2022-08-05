@@ -106,8 +106,8 @@ namespace android {
                 uint8_t key[kBlockSize],
                 uint8_t iv[kBlockSize],
                 CryptoPlugin::Mode mode,
-                size_t *clearbytes,
-                size_t *encryptedbytes);
+                uint32_t *clearbytes,
+                uint32_t *encryptedbytes);
 
         static CryptoInfo *getSampleCryptoInfo(MetaDataBase &meta);
 
