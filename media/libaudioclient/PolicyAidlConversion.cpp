@@ -158,6 +158,11 @@ aidl2legacy_AudioMixMatchCriterionValue(
                     convertIntegral<int>(UNION_GET(aidl, userId).value()));
             *rule |= RULE_MATCH_USERID;
             return legacy;
+        case media::AudioMixMatchCriterionValue::audioSessionId:
+            legacy.mAudioSessionId = VALUE_OR_RETURN(
+                    aidl2legacy_int32_t_audio_session_t(UNION_GET(aidl, audioSessionId).value()));
+            *rule |= RULE_MATCH_AUDIO_SESSION_ID;
+            return legacy;
     }
     return unexpected(BAD_VALUE);
 }
@@ -185,7 +190,10 @@ legacy2aidl_AudioMixMatchCriterionValue(
         case RULE_MATCH_USERID:
             UNION_SET(aidl, userId, VALUE_OR_RETURN(convertReinterpret<uint32_t>(legacy.mUserId)));
             break;
-
+        case RULE_MATCH_AUDIO_SESSION_ID:
+            UNION_SET(aidl, audioSessionId,
+                VALUE_OR_RETURN(legacy2aidl_audio_session_t_int32_t(legacy.mAudioSessionId)));
+            break;
         default:
             return unexpected(BAD_VALUE);
     }
