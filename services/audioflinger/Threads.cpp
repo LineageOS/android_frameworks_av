@@ -5376,12 +5376,6 @@ AudioFlinger::PlaybackThread::mixer_state AudioFlinger::MixerThread::prepareTrac
                     volume = masterVolume * mStreamTypes[track->streamType()].volume;
                 }
 
-                track->processMuteEvent_l(mAudioFlinger->getOrCreateAudioManager(),
-                    /*muteState=*/{masterVolume == 0.f,
-                                   mStreamTypes[track->streamType()].volume == 0.f,
-                                   mStreamTypes[track->streamType()].mute,
-                                   track->isPlaybackRestricted()});
-
                 handleVoipVolume_l(&volume);
 
                 // cache the combined master volume and stream type volume for fast mixer; this
@@ -5391,8 +5385,19 @@ AudioFlinger::PlaybackThread::mixer_state AudioFlinger::MixerThread::prepareTrac
                 volume *= vh;
                 track->mCachedVolume = volume;
                 gain_minifloat_packed_t vlr = proxy->getVolumeLR();
-                float vlf = volume * float_from_gain(gain_minifloat_unpack_left(vlr));
-                float vrf = volume * float_from_gain(gain_minifloat_unpack_right(vlr));
+                float vlf = float_from_gain(gain_minifloat_unpack_left(vlr));
+                float vrf = float_from_gain(gain_minifloat_unpack_right(vlr));
+
+                track->processMuteEvent_l(mAudioFlinger->getOrCreateAudioManager(),
+                    /*muteState=*/{masterVolume == 0.f,
+                                   mStreamTypes[track->streamType()].volume == 0.f,
+                                   mStreamTypes[track->streamType()].mute,
+                                   track->isPlaybackRestricted(),
+                                   vlf == 0.f && vrf == 0.f,
+                                   vh == 0.f});
+
+                vlf *= volume;
+                vrf *= volume;
 
                 track->setFinalVolume((vlf + vrf) / 2.f);
                 ++fastTracks;
@@ -5546,12 +5551,6 @@ AudioFlinger::PlaybackThread::mixer_state AudioFlinger::MixerThread::prepareTrac
                 v = 0;
             }
 
-            track->processMuteEvent_l(mAudioFlinger->getOrCreateAudioManager(),
-                /*muteState=*/{masterVolume == 0.f,
-                               mStreamTypes[track->streamType()].volume == 0.f,
-                               mStreamTypes[track->streamType()].mute,
-                               track->isPlaybackRestricted()});
-
             handleVoipVolume_l(&v);
 
             if (track->isPausing()) {
@@ -5571,6 +5570,15 @@ AudioFlinger::PlaybackThread::mixer_state AudioFlinger::MixerThread::prepareTrac
                     ALOGV("Track right volume out of range: %.3g", vrf);
                     vrf = GAIN_FLOAT_UNITY;
                 }
+
+                track->processMuteEvent_l(mAudioFlinger->getOrCreateAudioManager(),
+                    /*muteState=*/{masterVolume == 0.f,
+                                   mStreamTypes[track->streamType()].volume == 0.f,
+                                   mStreamTypes[track->streamType()].mute,
+                                   track->isPlaybackRestricted(),
+                                   vlf == 0.f && vrf == 0.f,
+                                   vh == 0.f});
+
                 // now apply the master volume and stream type volume and shaper volume
                 vlf *= v * vh;
                 vrf *= v * vh;
@@ -6157,11 +6165,18 @@ void AudioFlinger::DirectOutputThread::processVolume_l(Track *track, bool lastTr
 {
     float left, right;
 
+
     // Ensure volumeshaper state always advances even when muted.
     const sp<AudioTrackServerProxy> proxy = track->mAudioTrackServerProxy;
     const auto [shaperVolume, shaperActive] = track->getVolumeHandler()->getVolume(
             proxy->framesReleased());
     mVolumeShaperActive = shaperActive;
+
+    gain_minifloat_packed_t vlr = proxy->getVolumeLR();
+    left = float_from_gain(gain_minifloat_unpack_left(vlr));
+    right = float_from_gain(gain_minifloat_unpack_right(vlr));
+
+    const bool clientVolumeMute = (left == 0.f && right == 0.f);
 
     if (mMasterMute || mStreamTypes[track->streamType()].mute || track->isPlaybackRestricted()) {
         left = right = 0;
@@ -6169,16 +6184,14 @@ void AudioFlinger::DirectOutputThread::processVolume_l(Track *track, bool lastTr
         float typeVolume = mStreamTypes[track->streamType()].volume;
         const float v = mMasterVolume * typeVolume * shaperVolume;
 
-        gain_minifloat_packed_t vlr = proxy->getVolumeLR();
-        left = float_from_gain(gain_minifloat_unpack_left(vlr));
         if (left > GAIN_FLOAT_UNITY) {
             left = GAIN_FLOAT_UNITY;
         }
-        left *= v * mMasterBalanceLeft; // DirectOutputThread balance applied as track volume
-        right = float_from_gain(gain_minifloat_unpack_right(vlr));
         if (right > GAIN_FLOAT_UNITY) {
             right = GAIN_FLOAT_UNITY;
         }
+
+        left *= v * mMasterBalanceLeft; // DirectOutputThread balance applied as track volume
         right *= v * mMasterBalanceRight;
     }
 
@@ -6186,7 +6199,9 @@ void AudioFlinger::DirectOutputThread::processVolume_l(Track *track, bool lastTr
         /*muteState=*/{mMasterMute,
                        mStreamTypes[track->streamType()].volume == 0.f,
                        mStreamTypes[track->streamType()].mute,
-                       track->isPlaybackRestricted()});
+                       track->isPlaybackRestricted(),
+                       clientVolumeMute,
+                       shaperVolume == 0.f});
 
     if (lastTrack) {
         track->setFinalVolume((left + right) / 2.f);
