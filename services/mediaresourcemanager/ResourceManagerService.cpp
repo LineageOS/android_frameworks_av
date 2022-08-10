@@ -271,10 +271,9 @@ binder_status_t ResourceManagerService::dump(int fd, const char** /*args*/, uint
             snprintf(buffer, SIZE, "        Id: %lld\n", (long long)infos[j].clientId);
             result.append(buffer);
 
-            std::string clientName;
-            Status status = infos[j].client->getName(&clientName);
-            if (!status.isOk()) {
-                clientName = "<unknown client>";
+            std::string clientName = "<unknown client>";
+            if (infos[j].client != nullptr) {
+                Status status = infos[j].client->getName(&clientName);
             }
             snprintf(buffer, SIZE, "        Name: %s\n", clientName.c_str());
             result.append(buffer);
