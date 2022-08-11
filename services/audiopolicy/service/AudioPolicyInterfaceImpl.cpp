@@ -443,6 +443,13 @@ Status AudioPolicyService::getOutputForAttr(const media::AudioAttributesInternal
                 convertContainer<std::vector<int32_t>>(secondaryOutputs,
                                                        legacy2aidl_audio_io_handle_t_int32_t));
         _aidl_return->isSpatialized = isSpatialized;
+    } else {
+        _aidl_return->configBase.format = VALUE_OR_RETURN_BINDER_STATUS(
+                legacy2aidl_audio_format_t_AudioFormatDescription(config.format));
+        _aidl_return->configBase.channelMask = VALUE_OR_RETURN_BINDER_STATUS(
+                legacy2aidl_audio_channel_mask_t_AudioChannelLayout(
+                        config.channel_mask, false /*isInput*/));
+        _aidl_return->configBase.sampleRate = config.sample_rate;
     }
     return binderStatusFromStatusT(result);
 }
@@ -755,6 +762,9 @@ Status AudioPolicyService::getInputForAttr(const media::AudioAttributesInternal&
             if (status == PERMISSION_DENIED) {
                 AutoCallerClear acc;
                 mAudioPolicyManager->releaseInput(portId);
+            } else {
+                _aidl_return->config = VALUE_OR_RETURN_BINDER_STATUS(
+                        legacy2aidl_audio_config_base_t_AudioConfigBase(config, true /*isInput*/));
             }
             return binderStatusFromStatusT(status);
         }
