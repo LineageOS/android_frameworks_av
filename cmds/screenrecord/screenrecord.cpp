@@ -13,6 +13,9 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
+#include <algorithm>
+#include <string_view>
+#include <type_traits>
 
 #include <assert.h>
 #include <ctype.h>
@@ -85,6 +88,7 @@ using android::SurfaceComposerClient;
 using android::Vector;
 using android::sp;
 using android::status_t;
+using android::SurfaceControl;
 
 using android::INVALID_OPERATION;
 using android::NAME_NOT_FOUND;
@@ -100,7 +104,6 @@ static const uint32_t kFallbackWidth = 1280;        // 720p
 static const uint32_t kFallbackHeight = 720;
 static const char* kMimeTypeAvc = "video/avc";
 static const char* kMimeTypeApplicationOctetstream = "application/octet-stream";
-static const char* kWinscopeMagicString = "#VV1NSC0PET1ME!#";
 
 // Command-line parameters.
 static bool gVerbose = false;           // chatty on stdout
@@ -339,13 +342,20 @@ static status_t setDisplayProjection(
 static status_t prepareVirtualDisplay(
         const ui::DisplayState& displayState,
         const sp<IGraphicBufferProducer>& bufferProducer,
-        sp<IBinder>* pDisplayHandle) {
+        sp<IBinder>* pDisplayHandle, sp<SurfaceControl>* mirrorRoot) {
     sp<IBinder> dpy = SurfaceComposerClient::createDisplay(
             String8("ScreenRecorder"), false /*secure*/);
     SurfaceComposerClient::Transaction t;
     t.setDisplaySurface(dpy, bufferProducer);
     setDisplayProjection(t, dpy, displayState);
-    t.setDisplayLayerStack(dpy, displayState.layerStack);
+    ui::LayerStack layerStack = ui::LayerStack::fromValue(std::rand());
+    t.setDisplayLayerStack(dpy, layerStack);
+    *mirrorRoot = SurfaceComposerClient::getDefault()->mirrorDisplay(gPhysicalDisplayId);
+    if (*mirrorRoot == nullptr) {
+        ALOGE("Failed to create a mirror for screenrecord");
+        return UNKNOWN_ERROR;
+    }
+    t.setLayerStack(*mirrorRoot, layerStack);
     t.apply();
 
     *pDisplayHandle = dpy;
@@ -354,14 +364,15 @@ static status_t prepareVirtualDisplay(
 }
 
 /*
- * Writes an unsigned integer byte-by-byte in little endian order regardless
+ * Writes an unsigned/signed integer byte-by-byte in little endian order regardless
  * of the platform endianness.
  */
-template <typename UINT>
-static void writeValueLE(UINT value, uint8_t* buffer) {
-    for (int i = 0; i < sizeof(UINT); ++i) {
-        buffer[i] = static_cast<uint8_t>(value);
-        value >>= 8;
+template <typename T>
+static void writeValueLE(T value, uint8_t* buffer) {
+    std::remove_const_t<T> temp = value;
+    for (int i = 0; i < sizeof(T); ++i) {
+        buffer[i] = static_cast<std::uint8_t>(temp & 0xff);
+        temp >>= 8;
     }
 }
 
@@ -377,16 +388,18 @@ static void writeValueLE(UINT value, uint8_t* buffer) {
  * - for every frame its presentation time relative to the elapsed realtime clock in microseconds
  *   (as little endian uint64).
  */
-static status_t writeWinscopeMetadata(const Vector<int64_t>& timestamps,
+static status_t writeWinscopeMetadataLegacy(const Vector<int64_t>& timestamps,
         const ssize_t metaTrackIdx, AMediaMuxer *muxer) {
-    ALOGV("Writing metadata");
+    static constexpr auto kWinscopeMagicStringLegacy = "#VV1NSC0PET1ME!#";
+
+    ALOGV("Writing winscope metadata legacy");
     int64_t systemTimeToElapsedTimeOffsetMicros = (android::elapsedRealtimeNano()
         - systemTime(SYSTEM_TIME_MONOTONIC)) / 1000;
     sp<ABuffer> buffer = new ABuffer(timestamps.size() * sizeof(int64_t)
-        + sizeof(uint32_t) + strlen(kWinscopeMagicString));
+        + sizeof(uint32_t) + strlen(kWinscopeMagicStringLegacy));
     uint8_t* pos = buffer->data();
-    strcpy(reinterpret_cast<char*>(pos), kWinscopeMagicString);
-    pos += strlen(kWinscopeMagicString);
+    strcpy(reinterpret_cast<char*>(pos), kWinscopeMagicStringLegacy);
+    pos += strlen(kWinscopeMagicStringLegacy);
     writeValueLE<uint32_t>(timestamps.size(), pos);
     pos += sizeof(uint32_t);
     for (size_t idx = 0; idx < timestamps.size(); ++idx) {
@@ -395,10 +408,68 @@ static status_t writeWinscopeMetadata(const Vector<int64_t>& timestamps,
         pos += sizeof(uint64_t);
     }
     AMediaCodecBufferInfo bufferInfo = {
-        0,
+        0 /* offset */,
         static_cast<int32_t>(buffer->size()),
-        timestamps[0],
-        0
+        timestamps[0] /* presentationTimeUs */,
+        0 /* flags */
+    };
+    return AMediaMuxer_writeSampleData(muxer, metaTrackIdx, buffer->data(), &bufferInfo);
+}
+
+/*
+ * Saves metadata needed by Winscope to synchronize the screen recording playback with other traces.
+ *
+ * The metadata (version 1) is written as a binary array with the following format:
+ * - winscope magic string (#VV1NSC0PET1ME2#, 16B).
+ * - the metadata version number (4B).
+ * - Realtime-to-monotonic time offset in nanoseconds (8B).
+ * - the recorded frames count (8B)
+ * - for each recorded frame:
+ *     - System time in monotonic clock timebase in nanoseconds (8B).
+ *
+ * All numbers are Little Endian encoded.
+ */
+static status_t writeWinscopeMetadata(const Vector<std::int64_t>& timestampsMonotonicUs,
+        const ssize_t metaTrackIdx, AMediaMuxer *muxer) {
+    ALOGV("Writing winscope metadata");
+
+    static constexpr auto kWinscopeMagicString = std::string_view {"#VV1NSC0PET1ME2#"};
+    static constexpr std::uint32_t metadataVersion = 1;
+    const std::int64_t realToMonotonicTimeOffsetNs =
+            systemTime(SYSTEM_TIME_REALTIME) - systemTime(SYSTEM_TIME_MONOTONIC);
+    const std::uint32_t framesCount = static_cast<std::uint32_t>(timestampsMonotonicUs.size());
+
+    sp<ABuffer> buffer = new ABuffer(
+        kWinscopeMagicString.size() +
+        sizeof(decltype(metadataVersion)) +
+        sizeof(decltype(realToMonotonicTimeOffsetNs)) +
+        sizeof(decltype(framesCount)) +
+        framesCount * sizeof(std::uint64_t)
+    );
+    std::uint8_t* pos = buffer->data();
+
+    std::copy(kWinscopeMagicString.cbegin(), kWinscopeMagicString.cend(), pos);
+    pos += kWinscopeMagicString.size();
+
+    writeValueLE(metadataVersion, pos);
+    pos += sizeof(decltype(metadataVersion));
+
+    writeValueLE(realToMonotonicTimeOffsetNs, pos);
+    pos += sizeof(decltype(realToMonotonicTimeOffsetNs));
+
+    writeValueLE(framesCount, pos);
+    pos += sizeof(decltype(framesCount));
+
+    for (const auto timestampMonotonicUs : timestampsMonotonicUs) {
+        writeValueLE<std::uint64_t>(timestampMonotonicUs * 1000, pos);
+        pos += sizeof(std::uint64_t);
+    }
+
+    AMediaCodecBufferInfo bufferInfo = {
+        0 /* offset */,
+        static_cast<std::int32_t>(buffer->size()),
+        timestampsMonotonicUs[0] /* presentationTimeUs */,
+        0 /* flags */
     };
     return AMediaMuxer_writeSampleData(muxer, metaTrackIdx, buffer->data(), &bufferInfo);
 }
@@ -418,11 +489,12 @@ static status_t runEncoder(const sp<MediaCodec>& encoder,
     static int kTimeout = 250000;   // be responsive on signal
     status_t err;
     ssize_t trackIdx = -1;
+    ssize_t metaLegacyTrackIdx = -1;
     ssize_t metaTrackIdx = -1;
     uint32_t debugNumFrames = 0;
     int64_t startWhenNsec = systemTime(CLOCK_MONOTONIC);
     int64_t endWhenNsec = startWhenNsec + seconds_to_nanoseconds(gTimeLimitSec);
-    Vector<int64_t> timestamps;
+    Vector<int64_t> timestampsMonotonicUs;
     bool firstFrame = true;
 
     assert((rawFp == NULL && muxer != NULL) || (rawFp != NULL && muxer == NULL));
@@ -520,9 +592,9 @@ static status_t runEncoder(const sp<MediaCodec>& encoder,
                     sp<ABuffer> buffer = new ABuffer(
                             buffers[bufIndex]->data(), buffers[bufIndex]->size());
                     AMediaCodecBufferInfo bufferInfo = {
-                        0,
+                        0 /* offset */,
                         static_cast<int32_t>(buffer->size()),
-                        ptsUsec,
+                        ptsUsec /* presentationTimeUs */,
                         flags
                     };
                     err = AMediaMuxer_writeSampleData(muxer, trackIdx, buffer->data(), &bufferInfo);
@@ -532,7 +604,7 @@ static status_t runEncoder(const sp<MediaCodec>& encoder,
                         return err;
                     }
                     if (gOutputFormat == FORMAT_MP4) {
-                        timestamps.add(ptsUsec);
+                        timestampsMonotonicUs.add(ptsUsec);
                     }
                 }
                 debugNumFrames++;
@@ -565,6 +637,7 @@ static status_t runEncoder(const sp<MediaCodec>& encoder,
                     if (gOutputFormat == FORMAT_MP4) {
                         AMediaFormat *metaFormat = AMediaFormat_new();
                         AMediaFormat_setString(metaFormat, AMEDIAFORMAT_KEY_MIME, kMimeTypeApplicationOctetstream);
+                        metaLegacyTrackIdx = AMediaMuxer_addTrack(muxer, metaFormat);
                         metaTrackIdx = AMediaMuxer_addTrack(muxer, metaFormat);
                         AMediaFormat_delete(metaFormat);
                     }
@@ -604,10 +677,16 @@ static status_t runEncoder(const sp<MediaCodec>& encoder,
                         systemTime(CLOCK_MONOTONIC) - startWhenNsec));
         fflush(stdout);
     }
-    if (metaTrackIdx >= 0 && !timestamps.isEmpty()) {
-        err = writeWinscopeMetadata(timestamps, metaTrackIdx, muxer);
+    if (metaLegacyTrackIdx >= 0 && metaTrackIdx >= 0 && !timestampsMonotonicUs.isEmpty()) {
+        err = writeWinscopeMetadataLegacy(timestampsMonotonicUs, metaLegacyTrackIdx, muxer);
         if (err != NO_ERROR) {
-            fprintf(stderr, "Failed writing metadata to muxer (err=%d)\n", err);
+            fprintf(stderr, "Failed writing legacy winscope metadata to muxer (err=%d)\n", err);
+            return err;
+        }
+
+        err = writeWinscopeMetadata(timestampsMonotonicUs, metaTrackIdx, muxer);
+        if (err != NO_ERROR) {
+            fprintf(stderr, "Failed writing winscope metadata to muxer (err=%d)\n", err);
             return err;
         }
     }
@@ -655,6 +734,23 @@ static FILE* prepareRawOutput(const char* fileName) {
 static inline uint32_t floorToEven(uint32_t num) {
     return num & ~1;
 }
+
+struct RecordingData {
+    sp<MediaCodec> encoder;
+    // Configure virtual display.
+    sp<IBinder> dpy;
+
+    sp<Overlay> overlay;
+
+    ~RecordingData() {
+        if (dpy != nullptr) SurfaceComposerClient::destroyDisplay(dpy);
+        if (overlay != nullptr) overlay->stop();
+        if (encoder != nullptr) {
+            encoder->stop();
+            encoder->release();
+        }
+    }
+};
 
 /*
  * Main "do work" start point.
@@ -713,12 +809,12 @@ static status_t recordScreen(const char* fileName) {
         gVideoHeight = floorToEven(layerStackSpaceRect.getHeight());
     }
 
+    RecordingData recordingData = RecordingData();
     // Configure and start the encoder.
-    sp<MediaCodec> encoder;
     sp<FrameOutput> frameOutput;
     sp<IGraphicBufferProducer> encoderInputSurface;
     if (gOutputFormat != FORMAT_FRAMES && gOutputFormat != FORMAT_RAW_FRAMES) {
-        err = prepareEncoder(displayMode.refreshRate, &encoder, &encoderInputSurface);
+        err = prepareEncoder(displayMode.refreshRate, &recordingData.encoder, &encoderInputSurface);
 
         if (err != NO_ERROR && !gSizeSpecified) {
             // fallback is defined for landscape; swap if we're in portrait
@@ -731,7 +827,8 @@ static status_t recordScreen(const char* fileName) {
                         gVideoWidth, gVideoHeight, newWidth, newHeight);
                 gVideoWidth = newWidth;
                 gVideoHeight = newHeight;
-                err = prepareEncoder(displayMode.refreshRate, &encoder, &encoderInputSurface);
+                err = prepareEncoder(displayMode.refreshRate, &recordingData.encoder,
+                                      &encoderInputSurface);
             }
         }
         if (err != NO_ERROR) return err;
@@ -758,13 +855,11 @@ static status_t recordScreen(const char* fileName) {
 
     // Configure optional overlay.
     sp<IGraphicBufferProducer> bufferProducer;
-    sp<Overlay> overlay;
     if (gWantFrameTime) {
         // Send virtual display frames to an external texture.
-        overlay = new Overlay(gMonotonicTime);
-        err = overlay->start(encoderInputSurface, &bufferProducer);
+        recordingData.overlay = new Overlay(gMonotonicTime);
+        err = recordingData.overlay->start(encoderInputSurface, &bufferProducer);
         if (err != NO_ERROR) {
-            if (encoder != NULL) encoder->release();
             return err;
         }
         if (gVerbose) {
@@ -776,11 +871,13 @@ static status_t recordScreen(const char* fileName) {
         bufferProducer = encoderInputSurface;
     }
 
+    // We need to hold a reference to mirrorRoot during the entire recording to ensure it's not
+    // cleaned up by SurfaceFlinger. When the reference is dropped, SurfaceFlinger will delete
+    // the resource.
+    sp<SurfaceControl> mirrorRoot;
     // Configure virtual display.
-    sp<IBinder> dpy;
-    err = prepareVirtualDisplay(displayState, bufferProducer, &dpy);
+    err = prepareVirtualDisplay(displayState, bufferProducer, &recordingData.dpy, &mirrorRoot);
     if (err != NO_ERROR) {
-        if (encoder != NULL) encoder->release();
         return err;
     }
 
@@ -820,7 +917,6 @@ static status_t recordScreen(const char* fileName) {
         case FORMAT_RAW_FRAMES: {
             rawFp = prepareRawOutput(fileName);
             if (rawFp == NULL) {
-                if (encoder != NULL) encoder->release();
                 return -1;
             }
             break;
@@ -861,7 +957,8 @@ static status_t recordScreen(const char* fileName) {
         }
     } else {
         // Main encoder loop.
-        err = runEncoder(encoder, muxer, rawFp, display, dpy, displayState.orientation);
+        err = runEncoder(recordingData.encoder, muxer, rawFp, display, recordingData.dpy,
+                         displayState.orientation);
         if (err != NO_ERROR) {
             fprintf(stderr, "Encoder failed (err=%d)\n", err);
             // fall through to cleanup
@@ -875,9 +972,6 @@ static status_t recordScreen(const char* fileName) {
 
     // Shut everything down, starting with the producer side.
     encoderInputSurface = NULL;
-    SurfaceComposerClient::destroyDisplay(dpy);
-    if (overlay != NULL) overlay->stop();
-    if (encoder != NULL) encoder->stop();
     if (muxer != NULL) {
         // If we don't stop muxer explicitly, i.e. let the destructor run,
         // it may hang (b/11050628).
@@ -885,7 +979,6 @@ static status_t recordScreen(const char* fileName) {
     } else if (rawFp != stdout) {
         fclose(rawFp);
     }
-    if (encoder != NULL) encoder->release();
 
     return err;
 }
