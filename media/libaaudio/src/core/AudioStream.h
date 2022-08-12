@@ -410,7 +410,7 @@ public:
      * This should only be called for client streams and not for streams
      * that run in the service.
      */
-    void registerPlayerBase() {
+    virtual void registerPlayerBase() {
         if (getDirection() == AAUDIO_DIRECTION_OUTPUT) {
             mPlayerBase->registerWithAudioManager(this);
         }
@@ -664,6 +664,8 @@ protected:
 
     std::mutex                 mStreamLock;
 
+    const android::sp<MyPlayerBase>   mPlayerBase;
+
 private:
 
     aaudio_result_t safeStop_l() REQUIRES(mStreamLock);
@@ -678,8 +680,6 @@ private:
         }
         close_l();
     }
-
-    const android::sp<MyPlayerBase>   mPlayerBase;
 
     std::atomic<aaudio_stream_state_t>          mState{AAUDIO_STREAM_STATE_UNINITIALIZED};
 
