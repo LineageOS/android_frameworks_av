@@ -92,7 +92,7 @@ public:
 
 private:
 
-    aaudio_result_t openWithFormat(audio_format_t audioFormat);
+    aaudio_result_t openWithFormat(audio_format_t audioFormat, audio_format_t* nextFormatToTry);
 
     aaudio_result_t createMmapBuffer(android::base::unique_fd* fileDescriptor);
 

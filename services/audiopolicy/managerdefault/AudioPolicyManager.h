@@ -117,7 +117,7 @@ public:
                                   audio_session_t session,
                                   audio_stream_type_t *stream,
                                   const AttributionSourceState& attributionSource,
-                                  const audio_config_t *config,
+                                  audio_config_t *config,
                                   audio_output_flags_t *flags,
                                   audio_port_handle_t *selectedDeviceId,
                                   audio_port_handle_t *portId,
@@ -132,7 +132,7 @@ public:
                                          audio_unique_id_t riid,
                                          audio_session_t session,
                                          const AttributionSourceState& attributionSource,
-                                         const audio_config_base_t *config,
+                                         audio_config_base_t *config,
                                          audio_input_flags_t flags,
                                          audio_port_handle_t *selectedDeviceId,
                                          input_type_t *inputType,
@@ -1052,7 +1052,7 @@ private:
                 const audio_attributes_t *attr,
                 audio_stream_type_t *stream,
                 uid_t uid,
-                const audio_config_t *config,
+                audio_config_t *config,
                 audio_output_flags_t *flags,
                 audio_port_handle_t *selectedDeviceId,
                 bool *isRequestedDeviceForExclusiveUse,
@@ -1133,7 +1133,9 @@ private:
          * @param session requester session id
          * @param uid requester uid
          * @param attributes requester audio attributes (e.g. input source and tags matter)
-         * @param config requester audio configuration (e.g. sample rate, format, channel mask).
+         * @param config requested audio configuration (e.g. sample rate, format, channel mask),
+         *               will be updated if current configuration doesn't support but another
+         *               one does
          * @param flags requester input flags
          * @param policyMix may be null, policy rules to be followed by the requester
          * @return input io handle aka unique input identifier selected for this device.
@@ -1141,7 +1143,7 @@ private:
         audio_io_handle_t getInputForDevice(const sp<DeviceDescriptor> &device,
                 audio_session_t session,
                 const audio_attributes_t &attributes,
-                const audio_config_base_t *config,
+                audio_config_base_t *config,
                 audio_input_flags_t flags,
                 const sp<AudioPolicyMix> &policyMix);
 
@@ -1260,6 +1262,15 @@ private:
 
         // Filters only the relevant flags for getProfileForOutput
         audio_output_flags_t getRelevantFlags (audio_output_flags_t flags, bool directOnly);
+
+        status_t getDevicesForAttributes(const audio_attributes_t &attr,
+                                         DeviceVector &devices,
+                                         bool forVolume);
+
+        status_t getProfilesForDevices(const DeviceVector& devices,
+                                       AudioProfileVector& audioProfiles,
+                                       uint32_t flags,
+                                       bool isInput);
 };
 
 };

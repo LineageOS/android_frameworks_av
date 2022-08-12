@@ -597,6 +597,11 @@ status_t AudioFlinger::openMmapStream(MmapStreamInterface::stream_direction_t di
                                             (audio_output_flags_t)(AUDIO_OUTPUT_FLAG_MMAP_NOIRQ |
                                                     AUDIO_OUTPUT_FLAG_DIRECT),
                                             deviceId, &portId, &secondaryOutputs, &isSpatialized);
+        if (ret != NO_ERROR) {
+            config->sample_rate = fullConfig.sample_rate;
+            config->channel_mask = fullConfig.channel_mask;
+            config->format = fullConfig.format;
+        }
         ALOGW_IF(!secondaryOutputs.empty(),
                  "%s does not support secondary outputs, ignoring them", __func__);
     } else {

@@ -134,17 +134,17 @@ public:
     // request an output appropriate for playback of the supplied stream type and parameters
     virtual audio_io_handle_t getOutput(audio_stream_type_t stream) = 0;
     virtual status_t getOutputForAttr(const audio_attributes_t *attr,
-                                        audio_io_handle_t *output,
-                                        audio_session_t session,
-                                        audio_stream_type_t *stream,
-                                        const AttributionSourceState& attributionSouce,
-                                        const audio_config_t *config,
-                                        audio_output_flags_t *flags,
-                                        audio_port_handle_t *selectedDeviceId,
-                                        audio_port_handle_t *portId,
-                                        std::vector<audio_io_handle_t> *secondaryOutputs,
-                                        output_type_t *outputType,
-                                        bool *isSpatialized) = 0;
+                                      audio_io_handle_t *output,
+                                      audio_session_t session,
+                                      audio_stream_type_t *stream,
+                                      const AttributionSourceState& attributionSouce,
+                                      audio_config_t *config,
+                                      audio_output_flags_t *flags,
+                                      audio_port_handle_t *selectedDeviceId,
+                                      audio_port_handle_t *portId,
+                                      std::vector<audio_io_handle_t> *secondaryOutputs,
+                                      output_type_t *outputType,
+                                      bool *isSpatialized) = 0;
     // indicates to the audio policy manager that the output starts being used by corresponding
     // stream.
     virtual status_t startOutput(audio_port_handle_t portId) = 0;
@@ -160,7 +160,7 @@ public:
                                      audio_unique_id_t riid,
                                      audio_session_t session,
                                      const AttributionSourceState& attributionSouce,
-                                     const audio_config_base_t *config,
+                                     audio_config_base_t *config,
                                      audio_input_flags_t flags,
                                      audio_port_handle_t *selectedDeviceId,
                                      input_type_t *inputType,

@@ -22,6 +22,7 @@
 #include <assert.h>
 #include <map>
 #include <mutex>
+#include <set>
 #include <sstream>
 #include <thread>
 #include <utils/Singleton.h>
@@ -68,6 +69,24 @@ std::string AAudioServiceEndpointMMAP::dump() const {
     return result.str();
 }
 
+namespace {
+
+const static std::map<audio_format_t, audio_format_t> NEXT_FORMAT_TO_TRY = {
+        {AUDIO_FORMAT_PCM_FLOAT,         AUDIO_FORMAT_PCM_32_BIT},
+        {AUDIO_FORMAT_PCM_32_BIT,        AUDIO_FORMAT_PCM_24_BIT_PACKED},
+        {AUDIO_FORMAT_PCM_24_BIT_PACKED, AUDIO_FORMAT_PCM_16_BIT}
+};
+
+audio_format_t getNextFormatToTry(audio_format_t curFormat, audio_format_t returnedFromAPM) {
+    if (returnedFromAPM != AUDIO_FORMAT_DEFAULT) {
+        return returnedFromAPM;
+    }
+    const auto it = NEXT_FORMAT_TO_TRY.find(curFormat);
+    return it != NEXT_FORMAT_TO_TRY.end() ? it->second : AUDIO_FORMAT_DEFAULT;
+}
+
+}
+
 aaudio_result_t AAudioServiceEndpointMMAP::open(const aaudio::AAudioStreamRequest &request) {
     aaudio_result_t result = AAUDIO_OK;
     copyFrom(request.getConstantConfiguration());
@@ -79,36 +98,38 @@ aaudio_result_t AAudioServiceEndpointMMAP::open(const aaudio::AAudioStreamReques
         legacy2aidl_pid_t_int32_t(IPCThreadState::self()->getCallingPid()));
 
     audio_format_t audioFormat = getFormat();
+    std::set<audio_format_t> formatsTried;
+    while (true) {
+        if (formatsTried.find(audioFormat) != formatsTried.end()) {
+            // APM returning something that has already tried.
+            ALOGW("Have already tried to open #x, but failed before");
+            break;
+        }
+        formatsTried.insert(audioFormat);
 
-    result = openWithFormat(audioFormat);
-    if (result == AAUDIO_OK) return result;
+        audio_format_t nextFormatToTry = AUDIO_FORMAT_DEFAULT;
+        result = openWithFormat(audioFormat, &nextFormatToTry);
+        if (result == AAUDIO_OK || result != AAUDIO_ERROR_UNAVAILABLE) {
+            // Return if it is successful or there is an error that is not
+            // AAUDIO_ERROR_UNAVAILABLE happens.
+            ALOGI("Opened format=%#x with result=%d", audioFormat, result);
+            break;
+        }
 
-    if (result == AAUDIO_ERROR_UNAVAILABLE && audioFormat == AUDIO_FORMAT_PCM_FLOAT) {
-        ALOGD("%s() FLOAT failed, perhaps due to format. Try again with 32_BIT", __func__);
-        audioFormat = AUDIO_FORMAT_PCM_32_BIT;
-        result = openWithFormat(audioFormat);
-    }
-    if (result == AAUDIO_OK) return result;
-
-    if (result == AAUDIO_ERROR_UNAVAILABLE && audioFormat == AUDIO_FORMAT_PCM_32_BIT) {
-        ALOGD("%s() 32_BIT failed, perhaps due to format. Try again with 24_BIT_PACKED", __func__);
-        audioFormat = AUDIO_FORMAT_PCM_24_BIT_PACKED;
-        result = openWithFormat(audioFormat);
-    }
-    if (result == AAUDIO_OK) return result;
-
-    // TODO The HAL and AudioFlinger should be recommending a format if the open fails.
-    //      But that recommendation is not propagating back from the HAL.
-    //      So for now just try something very likely to work.
-    if (result == AAUDIO_ERROR_UNAVAILABLE && audioFormat == AUDIO_FORMAT_PCM_24_BIT_PACKED) {
-        ALOGD("%s() 24_BIT failed, perhaps due to format. Try again with 16_BIT", __func__);
-        audioFormat = AUDIO_FORMAT_PCM_16_BIT;
-        result = openWithFormat(audioFormat);
+        nextFormatToTry = getNextFormatToTry(audioFormat, nextFormatToTry);
+        ALOGD("%s() %#x failed, perhaps due to format. Try again with %#x",
+              __func__, audioFormat, nextFormatToTry);
+        audioFormat = nextFormatToTry;
+        if (audioFormat == AUDIO_FORMAT_DEFAULT) {
+            // Nothing else to try
+            break;
+        }
     }
     return result;
 }
 
-aaudio_result_t AAudioServiceEndpointMMAP::openWithFormat(audio_format_t audioFormat) {
+aaudio_result_t AAudioServiceEndpointMMAP::openWithFormat(
+        audio_format_t audioFormat, audio_format_t* nextFormatToTry) {
     aaudio_result_t result = AAUDIO_OK;
     audio_config_base_t config;
     audio_port_handle_t deviceId;
@@ -151,6 +172,8 @@ aaudio_result_t AAudioServiceEndpointMMAP::openWithFormat(audio_format_t audioFo
     audio_session_t sessionId = AAudioConvert_aaudioToAndroidSessionId(requestedSessionId);
 
     // Open HAL stream. Set mMmapStream
+    ALOGD("%s trying to open MMAP stream with format=%#x, sample_rate=%u, channel_mask=%#x",
+          __func__, config.format, config.sample_rate, config.channel_mask);
     status_t status = MmapStreamInterface::openMmapStream(streamDirection,
                                                           &attributes,
                                                           &config,
@@ -165,7 +188,11 @@ aaudio_result_t AAudioServiceEndpointMMAP::openWithFormat(audio_format_t audioFo
     if (status != OK) {
         // This can happen if the resource is busy or the config does
         // not match the hardware.
-        ALOGD("%s() - openMmapStream() returned status %d",  __func__, status);
+        ALOGD("%s() - openMmapStream() returned status=%d, suggested format=%#x, sample_rate=%u, "
+              "channel_mask=%#x",
+              __func__, status, config.format, config.sample_rate, config.format);
+        *nextFormatToTry = config.format != audioFormat ? config.format
+                                                        : *nextFormatToTry;
         return AAUDIO_ERROR_UNAVAILABLE;
     }
 

@@ -26,8 +26,11 @@
 #include <android/media/AudioVibratorInfo.h>
 #include <android/media/BnAudioFlingerClient.h>
 #include <android/media/BnAudioPolicyServiceClient.h>
+#include <android/media/EffectDescriptor.h>
 #include <android/media/INativeSpatializerCallback.h>
 #include <android/media/ISpatializer.h>
+#include <android/media/RecordClientInfo.h>
+#include <android/media/audio/common/AudioConfigBase.h>
 #include <android/media/audio/common/AudioMMapPolicyInfo.h>
 #include <android/media/audio/common/AudioMMapPolicyType.h>
 #include <android/media/audio/common/AudioPort.h>
@@ -279,12 +282,31 @@ public:
     static status_t setForceUse(audio_policy_force_use_t usage, audio_policy_forced_cfg_t config);
     static audio_policy_forced_cfg_t getForceUse(audio_policy_force_use_t usage);
 
+    /**
+     * Get output stream for given parameters.
+     *
+     * @param[in] attr the requested audio attributes
+     * @param[in|out] output the io handle of the output for the playback. It is specified when
+     *                       starting mmap thread.
+     * @param[in] session the session id for the client
+     * @param[in|out] stream the stream type used for the playback
+     * @param[in] attributionSource a source to which access to permission protected data
+     * @param[in|out] config the requested configuration client, the suggested configuration will
+     *                       be returned if no proper output is found for requested configuration
+     * @param[in] flags the requested output flag from client
+     * @param[in|out] selectedDeviceId the requested device id for playback, the actual device id
+     *                                 for playback will be returned
+     * @param[out] portId the generated port id to identify the client
+     * @param[out] secondaryOutputs collection of io handle for secondary outputs
+     * @param[out] isSpatialized true if the playback will be spatialized
+     * @return if the call is successful or not
+     */
     static status_t getOutputForAttr(audio_attributes_t *attr,
                                      audio_io_handle_t *output,
                                      audio_session_t session,
                                      audio_stream_type_t *stream,
                                      const AttributionSourceState& attributionSource,
-                                     const audio_config_t *config,
+                                     audio_config_t *config,
                                      audio_output_flags_t flags,
                                      audio_port_handle_t *selectedDeviceId,
                                      audio_port_handle_t *portId,
@@ -294,14 +316,31 @@ public:
     static status_t stopOutput(audio_port_handle_t portId);
     static void releaseOutput(audio_port_handle_t portId);
 
-    // Client must successfully hand off the handle reference to AudioFlinger via createRecord(),
-    // or release it with releaseInput().
+    /**
+     * Get input stream for given parameters.
+     * Client must successfully hand off the handle reference to AudioFlinger via createRecord(),
+     * or release it with releaseInput().
+     *
+     * @param[in] attr the requested audio attributes
+     * @param[in|out] input the io handle of the input for the capture. It is specified when
+     *                      starting mmap thread.
+     * @param[in] riid an unique id to identify the record client
+     * @param[in] session the session id for the client
+     * @param[in] attributionSource a source to which access to permission protected data
+     * @param[in|out] config the requested configuration client, the suggested configuration will
+     *                       be returned if no proper input is found for requested configuration
+     * @param[in] flags the requested input flag from client
+     * @param[in|out] selectedDeviceId the requested device id for playback, the actual device id
+     *                                 for playback will be returned
+     * @param[out] portId the generated port id to identify the client
+     * @return if the call is successful or not
+     */
     static status_t getInputForAttr(const audio_attributes_t *attr,
                                     audio_io_handle_t *input,
                                     audio_unique_id_t riid,
                                     audio_session_t session,
-                                     const AttributionSourceState& attributionSource,
-                                    const audio_config_base_t *config,
+                                    const AttributionSourceState& attributionSource,
+                                    audio_config_base_t *config,
                                     audio_input_flags_t flags,
                                     audio_port_handle_t *selectedDeviceId,
                                     audio_port_handle_t *portId);
