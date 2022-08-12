@@ -10,6 +10,10 @@ package {
 cc_library_shared {
     name: "libaudiopolicymanagerdefault",
 
+    defaults: [
+        "latest_android_media_audio_common_types_cpp_shared",
+    ],
+
     srcs: [
         "AudioPolicyManager.cpp",
         "EngineLibrary.cpp",
@@ -36,7 +40,6 @@ cc_library_shared {
         "libaudiopolicyenginedefault",
         "framework-permission-aidl-cpp",
         "libaudioclient_aidl_conversion",
-        "android.media.audio.common.types-V1-cpp",
         "audioclient-types-aidl-cpp",
     ],
 

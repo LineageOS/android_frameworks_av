@@ -54,8 +54,10 @@ cc_library {
         "AudioVolumeGroup.cpp",
         "PolicyAidlConversion.cpp"
     ],
+    defaults: [
+        "latest_android_media_audio_common_types_cpp_export_shared",
+    ],
     shared_libs: [
-        "android.media.audio.common.types-V1-cpp",
         "audioclient-types-aidl-cpp",
         "audioflinger-aidl-cpp",
         "audiopolicy-aidl-cpp",
@@ -76,7 +78,6 @@ cc_library {
     include_dirs: ["system/media/audio_utils/include"],
     export_include_dirs: ["include"],
     export_shared_lib_headers: [
-        "android.media.audio.common.types-V1-cpp",
         "audioclient-types-aidl-cpp",
         "audioflinger-aidl-cpp",
         "audiopolicy-aidl-cpp",
@@ -116,8 +117,10 @@ cc_library {
         "RecordingActivityTracker.cpp",
         "TrackPlayerBase.cpp",
     ],
+    defaults: [
+        "latest_android_media_audio_common_types_cpp_shared",
+    ],
     shared_libs: [
-        "android.media.audio.common.types-V1-cpp",
         "audioclient-types-aidl-cpp",
         "audioflinger-aidl-cpp",
         "audiopolicy-aidl-cpp",
@@ -237,8 +240,10 @@ cc_library {
     export_header_lib_headers: [
         "libaudioclient_aidl_conversion_util",
     ],
+    defaults: [
+        "latest_android_media_audio_common_types_cpp_export_shared",
+    ],
     shared_libs: [
-        "android.media.audio.common.types-V1-cpp",
         "audioclient-types-aidl-cpp",
         "libbase",
         "libbinder",
@@ -250,7 +255,6 @@ cc_library {
         "framework-permission-aidl-cpp",
     ],
     export_shared_lib_headers: [
-        "android.media.audio.common.types-V1-cpp",
         "audioclient-types-aidl-cpp",
         "libbase",
         "shared-file-region-aidl-cpp",
@@ -307,7 +311,7 @@ aidl_interface {
         "aidl/android/media/IEffectClient.aidl",
     ],
     imports: [
-        "android.media.audio.common.types-V1",
+        "android.media.audio.common.types",
         "shared-file-region-aidl",
     ],
     backend: {
@@ -359,7 +363,7 @@ aidl_interface {
         "aidl/android/media/TrackSecondaryOutputInfo.aidl",
     ],
     imports: [
-        "android.media.audio.common.types-V1",
+        "android.media.audio.common.types",
         "framework-permission-aidl",
     ],
     backend: {
@@ -403,7 +407,7 @@ aidl_interface {
         "aidl/android/media/SpatializerHeadTrackingMode.aidl",
     ],
     imports: [
-        "android.media.audio.common.types-V1",
+        "android.media.audio.common.types",
         "audioclient-types-aidl",
     ],
     backend: {
@@ -446,7 +450,7 @@ aidl_interface {
         "aidl/android/media/IAudioTrackCallback.aidl",
     ],
     imports: [
-        "android.media.audio.common.types-V1",
+        "android.media.audio.common.types",
         "audioclient-types-aidl",
         "av-types-aidl",
         "effect-aidl",
@@ -483,7 +487,7 @@ aidl_interface {
         "aidl/android/media/IAudioPolicyServiceClient.aidl",
     ],
     imports: [
-        "android.media.audio.common.types-V1",
+        "android.media.audio.common.types",
         "audioclient-types-aidl",
         "audiopolicy-types-aidl",
         "capture_state_listener-aidl",
