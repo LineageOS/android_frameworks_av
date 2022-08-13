@@ -552,6 +552,16 @@ status_t AudioStreamTrack::doSetVolume() {
     return status;
 }
 
+void AudioStreamTrack::registerPlayerBase() {
+    AudioStream::registerPlayerBase();
+
+    if (mAudioTrack == nullptr) {
+        ALOGW("%s: cannot set piid, AudioTrack is null", __func__);
+        return;
+    }
+    mAudioTrack->setPlayerIId(mPlayerBase->getPlayerIId());
+}
+
 #if AAUDIO_USE_VOLUME_SHAPER
 
 using namespace android::media::VolumeShaper;
