@@ -97,6 +97,25 @@ public:
                              uint32_t flags,
                              bool exactMatchRequiredForInputFlags = false) const;
 
+    /**
+     * @brief areAllDevicesSupported: Checks if the given devices are supported by the IO profile.
+     *
+     * @param devices vector of devices to be checked for compatibility
+     * @return true if all devices are supported, false otherwise.
+     */
+    bool areAllDevicesSupported(const DeviceVector &devices) const;
+
+    /**
+     * @brief isCompatibleProfileForFlags: Checks if the IO profile is compatible with
+     * specified flags.
+     *
+     * @param flags to be checked for compatibility
+     * @param exactMatchRequiredForInputFlags true if exact match is required on flags
+     * @return true if the profile is compatible, false otherwise.
+     */
+    bool isCompatibleProfileForFlags(uint32_t flags,
+                                     bool exactMatchRequiredForInputFlags = false) const;
+
     void dump(String8 *dst, int spaces) const;
     void log();
 

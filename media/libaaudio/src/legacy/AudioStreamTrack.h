@@ -87,6 +87,8 @@ public:
 
     android::status_t doSetVolume() override;
 
+    void registerPlayerBase() override;
+
 #if AAUDIO_USE_VOLUME_SHAPER
     virtual android::binder::Status applyVolumeShaper(
             const android::media::VolumeShaper::Configuration& configuration,
