@@ -1512,6 +1512,7 @@ status_t Camera3Device::internalPauseAndWaitLocked(nsecs_t maxExpectedDuration) 
           maxExpectedDuration);
     status_t res = waitUntilStateThenRelock(/*active*/ false, maxExpectedDuration);
     if (res != OK) {
+        mStatusTracker->dumpActiveComponents();
         SET_ERR_L("Can't idle device in %f seconds!",
                 maxExpectedDuration/1e9);
     }
