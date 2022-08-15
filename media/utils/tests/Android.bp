@@ -160,6 +160,16 @@ cc_test {
 }
 
 cc_test {
+    name: "static_string_tests",
+
+    defaults: ["libmediautils_tests_defaults"],
+
+    srcs: [
+        "static_string_view_tests.cpp",
+    ],
+}
+
+cc_test {
     name: "timecheck_tests",
 
     defaults: ["libmediautils_tests_host_unavail"],
