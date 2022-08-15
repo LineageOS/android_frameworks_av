@@ -406,7 +406,6 @@ aaudio_result_t AudioStreamTrack::processCommands() {
             if (err != OK) {
                 return AAudioConvert_androidToAAudioResult(err);
             } else if (position == 0) {
-                // TODO Advance frames read to match written.
                 setState(AAUDIO_STREAM_STATE_FLUSHED);
             }
         }
