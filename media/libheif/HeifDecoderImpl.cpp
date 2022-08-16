@@ -47,6 +47,7 @@ void initFrameInfo(HeifFrameInfo *info, const VideoFrame *videoFrame) {
     info->mRotationAngle = videoFrame->mRotationAngle;
     info->mBytesPerPixel = videoFrame->mBytesPerPixel;
     info->mDurationUs = videoFrame->mDurationUs;
+    info->mBitDepth = videoFrame->mBitDepth;
     if (videoFrame->mIccSize > 0) {
         info->mIccData.assign(
                 videoFrame->getFlattenedIccData(),
@@ -377,13 +378,14 @@ bool HeifDecoderImpl::reinit(HeifFrameInfo* frameInfo) {
         //       issue (e.g. by copying).
         VideoFrame* videoFrame = static_cast<VideoFrame*>(sharedMem->unsecurePointer());
 
-        ALOGV("Image dimension %dx%d, display %dx%d, angle %d, iccSize %d",
+        ALOGV("Image dimension %dx%d, display %dx%d, angle %d, iccSize %d, bitDepth %d",
                 videoFrame->mWidth,
                 videoFrame->mHeight,
                 videoFrame->mDisplayWidth,
                 videoFrame->mDisplayHeight,
                 videoFrame->mRotationAngle,
-                videoFrame->mIccSize);
+                videoFrame->mIccSize,
+                videoFrame->mBitDepth);
 
         initFrameInfo(&mImageInfo, videoFrame);
 
@@ -490,6 +492,11 @@ bool HeifDecoderImpl::setOutputColor(HeifColorFormat heifColor) {
         case kHeifColorFormat_BGRA_8888:
         {
             mOutputColor = HAL_PIXEL_FORMAT_BGRA_8888;
+            break;
+        }
+        case kHeifColorFormat_RGBA_1010102:
+        {
+            mOutputColor = HAL_PIXEL_FORMAT_RGBA_1010102;
             break;
         }
         default:
@@ -722,6 +729,15 @@ size_t HeifDecoderImpl::skipScanlines(size_t count) {
         mCurScanline = mTotalScanline;
     }
     return (mCurScanline > oldScanline) ? (mCurScanline - oldScanline) : 0;
+}
+
+uint32_t HeifDecoderImpl::getColorDepth() {
+    HeifFrameInfo* info = &mImageInfo;
+    if (info != nullptr) {
+        return mImageInfo.mBitDepth;
+    }
+
+    return 0;
 }
 
 } // namespace android

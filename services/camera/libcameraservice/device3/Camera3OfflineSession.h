@@ -131,7 +131,6 @@ struct Camera3OfflineStates {
  */
 class Camera3OfflineSession :
             public CameraOfflineSessionBase,
-            virtual public hardware::camera::device::V3_5::ICameraDeviceCallback,
             public camera3::SetErrorInterface,
             public camera3::InflightRequestUpdateInterface,
             public camera3::RequestBufferInterface,
@@ -144,12 +143,11 @@ class Camera3OfflineSession :
             const camera3::StreamSet& offlineStreamSet,
             camera3::BufferRecords&& bufferRecords,
             const camera3::InFlightRequestMap& offlineReqs,
-            const Camera3OfflineStates& offlineStates,
-            sp<hardware::camera::device::V3_6::ICameraOfflineSession> offlineSession);
+            const Camera3OfflineStates& offlineStates);
 
     virtual ~Camera3OfflineSession();
 
-    virtual status_t initialize(wp<NotificationListener> listener) override;
+    virtual status_t initialize(wp<NotificationListener> /*listener*/) = 0;
 
     /**
      * CameraOfflineSessionBase interface
@@ -171,38 +169,7 @@ class Camera3OfflineSession :
      * End of CameraOfflineSessionBase interface
      */
 
-    /**
-     * HIDL ICameraDeviceCallback interface
-     */
-
-    /**
-     * Implementation of android::hardware::camera::device::V3_5::ICameraDeviceCallback
-     */
-
-    hardware::Return<void> processCaptureResult_3_4(
-            const hardware::hidl_vec<
-                    hardware::camera::device::V3_4::CaptureResult>& results) override;
-    hardware::Return<void> processCaptureResult(
-            const hardware::hidl_vec<
-                    hardware::camera::device::V3_2::CaptureResult>& results) override;
-    hardware::Return<void> notify(
-            const hardware::hidl_vec<
-                    hardware::camera::device::V3_2::NotifyMsg>& msgs) override;
-
-    hardware::Return<void> requestStreamBuffers(
-            const hardware::hidl_vec<
-                    hardware::camera::device::V3_5::BufferRequest>& bufReqs,
-            requestStreamBuffers_cb _hidl_cb) override;
-
-    hardware::Return<void> returnStreamBuffers(
-            const hardware::hidl_vec<
-                    hardware::camera::device::V3_2::StreamBuffer>& buffers) override;
-
-    /**
-     * End of CameraOfflineSessionBase interface
-     */
-
-  private:
+  protected:
     // Camera device ID
     const String8 mId;
     sp<camera3::Camera3Stream> mInputStream;
@@ -212,8 +179,6 @@ class Camera3OfflineSession :
 
     std::mutex mOfflineReqsLock;
     camera3::InFlightRequestMap mOfflineReqs;
-
-    sp<hardware::camera::device::V3_6::ICameraOfflineSession> mSession;
 
     TagMonitor mTagMonitor;
     const metadata_vendor_id_t mVendorTagId;
@@ -269,8 +234,6 @@ class Camera3OfflineSession :
     // End of mLock protect scope
 
     std::mutex mProcessCaptureResultLock;
-    // FMQ to write result on. Must be guarded by mProcessCaptureResultLock.
-    std::unique_ptr<ResultMetadataQueue> mResultMetadataQueue;
 
     // Tracking cause of fatal errors when in STATUS_ERROR
     String8 mErrorCause;
@@ -282,6 +245,9 @@ class Camera3OfflineSession :
 
     // For client methods such as disconnect/dump
     std::mutex mInterfaceLock;
+
+    // The current minimum expected frame duration based on AE_TARGET_FPS_RANGE
+    nsecs_t mMinExpectedDuration = 0;
 
     // SetErrorInterface
     void setErrorState(const char *fmt, ...) override;
@@ -305,6 +271,8 @@ class Camera3OfflineSession :
     void setErrorStateLockedV(const char *fmt, va_list args);
 
     status_t disconnectImpl();
+    virtual void disconnectSession() = 0;
+
 }; // class Camera3OfflineSession
 
 }; // namespace android

@@ -7,6 +7,24 @@ package {
     default_applicable_licenses: ["frameworks_av_license"],
 }
 
+cc_library_headers {
+    name: "libcodec2_client_headers",
+    export_include_dirs: ["include"],
+    vendor_available: true,
+    apex_available: [
+        "//apex_available:platform",
+        "com.android.media",
+        "com.android.media.swcodec",
+    ],
+    min_sdk_version: "29",
+    host_supported: true,
+    target: {
+        darwin: {
+            enabled: false,
+        },
+    },
+}
+
 cc_library {
     name: "libcodec2_client",
 

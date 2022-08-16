@@ -23,8 +23,8 @@ cc_test {
         "libcodec2-internal-defaults",
     ],
 
-    include_dirs: [
-        "frameworks/av/media/codec2/sfplugin",
+    header_libs: [
+        "libsfplugin_ccodec_internal_headers",
     ],
 
     shared_libs: [
@@ -60,13 +60,10 @@ cc_test {
         "MediaCodec_sanity_test.cpp",
     ],
 
-    include_dirs: [
-        "frameworks/av/media/codec2/sfplugin",
-    ],
-
     header_libs: [
         "libmediadrm_headers",
         "libmediametrics_headers",
+        "libsfplugin_ccodec_internal_headers",
     ],
 
     shared_libs: [

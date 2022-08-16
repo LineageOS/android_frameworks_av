@@ -53,7 +53,7 @@ public:
 
 AudioGains getAudioGainsForTest() {
     AudioGains audioGains;
-    sp<AudioGain> audioGain = new AudioGain(0 /*index*/, false /*useInChannelMask*/);
+    sp<AudioGain> audioGain = new AudioGain(0 /*index*/, false /*isInput*/);
     audioGain->setMode(AUDIO_GAIN_MODE_JOINT);
     audioGain->setChannelMask(AUDIO_CHANNEL_OUT_STEREO);
     audioGain->setMinValueInMb(-3200);
@@ -75,57 +75,74 @@ AudioProfileVector getAudioProfileVectorForTest() {
     return audioProfiles;
 }
 
-TEST(AudioFoundationParcelableTest, ParcelingAudioGain) {
-    Parcel data;
-    AudioGains audioGains = getAudioGainsForTest();
-
-    ASSERT_EQ(data.writeParcelable(audioGains), NO_ERROR);
-    data.setDataPosition(0);
-    AudioGains audioGainsFromParcel;
-    ASSERT_EQ(data.readParcelable(&audioGainsFromParcel), NO_ERROR);
-    ASSERT_TRUE(audioGainsFromParcel.equals(audioGains));
+TEST(AudioFoundationParcelableTest, ParcelingAudioProfile) {
+    sp<AudioProfile> profile = getAudioProfileVectorForTest()[0];
+    auto conv = legacy2aidl_AudioProfile(profile, false /*isInput*/);
+    ASSERT_TRUE(conv.ok());
+    auto convBack = aidl2legacy_AudioProfile(conv.value(), false /*isInput*/);
+    ASSERT_TRUE(convBack.ok());
+    ASSERT_TRUE(profile->equals(convBack.value()));
 }
 
 TEST(AudioFoundationParcelableTest, ParcelingAudioProfileVector) {
-    Parcel data;
-    AudioProfileVector audioProfiles = getAudioProfileVectorForTest();
+    AudioProfileVector profiles = getAudioProfileVectorForTest();
+    auto conv = legacy2aidl_AudioProfileVector(profiles, false /*isInput*/);
+    ASSERT_TRUE(conv.ok());
+    auto convBack = aidl2legacy_AudioProfileVector(conv.value(), false /*isInput*/);
+    ASSERT_TRUE(convBack.ok());
+    ASSERT_TRUE(profiles.equals(convBack.value()));
+}
 
-    ASSERT_EQ(data.writeParcelable(audioProfiles), NO_ERROR);
-    data.setDataPosition(0);
-    AudioProfileVector audioProfilesFromParcel;
-    ASSERT_EQ(data.readParcelable(&audioProfilesFromParcel), NO_ERROR);
-    ASSERT_TRUE(audioProfilesFromParcel.equals(audioProfiles));
+TEST(AudioFoundationParcelableTest, ParcelingAudioGain) {
+    sp<AudioGain> audioGain = getAudioGainsForTest()[0];
+    auto conv = legacy2aidl_AudioGain(audioGain);
+    ASSERT_TRUE(conv.ok());
+    auto convBack = aidl2legacy_AudioGain(conv.value());
+    ASSERT_TRUE(convBack.ok());
+    ASSERT_TRUE(audioGain->equals(convBack.value()));
+}
+
+TEST(AudioFoundationParcelableTest, ParcelingAudioGains) {
+    AudioGains audioGains = getAudioGainsForTest();
+    auto conv = legacy2aidl_AudioGains(audioGains);
+    ASSERT_TRUE(conv.ok());
+    auto convBack = aidl2legacy_AudioGains(conv.value());
+    ASSERT_TRUE(convBack.ok());
+    ASSERT_TRUE(audioGains.equals(convBack.value()));
 }
 
 TEST(AudioFoundationParcelableTest, ParcelingAudioPort) {
-    Parcel data;
     sp<AudioPort> audioPort = new AudioPort(
             "AudioPortName", AUDIO_PORT_TYPE_DEVICE, AUDIO_PORT_ROLE_SINK);
     audioPort->setGains(getAudioGainsForTest());
     audioPort->setAudioProfiles(getAudioProfileVectorForTest());
 
-    ASSERT_EQ(data.writeParcelable(*audioPort), NO_ERROR);
-    data.setDataPosition(0);
+    media::AudioPort parcelable;
+    ASSERT_EQ(NO_ERROR, audioPort->writeToParcelable(&parcelable));
     sp<AudioPort> audioPortFromParcel = new AudioPort(
             "", AUDIO_PORT_TYPE_NONE, AUDIO_PORT_ROLE_NONE);
-    ASSERT_EQ(data.readParcelable(audioPortFromParcel.get()), NO_ERROR);
+    ASSERT_EQ(NO_ERROR, audioPortFromParcel->readFromParcelable(parcelable));
     ASSERT_TRUE(audioPortFromParcel->equals(audioPort));
 }
 
 TEST(AudioFoundationParcelableTest, ParcelingAudioPortConfig) {
+    const bool isInput = false;
     Parcel data;
     sp<AudioPortConfig> audioPortConfig = new AudioPortConfigTestStub();
     audioPortConfig->applyAudioPortConfig(&TEST_AUDIO_PORT_CONFIG);
-
-    ASSERT_EQ(data.writeParcelable(*audioPortConfig), NO_ERROR);
+    media::audio::common::AudioPortConfig parcelable{};
+    ASSERT_EQ(NO_ERROR, audioPortConfig->writeToParcelable(&parcelable, isInput));
+    ASSERT_EQ(NO_ERROR, data.writeParcelable(parcelable));
     data.setDataPosition(0);
+    media::audio::common::AudioPortConfig parcelableFromParcel{};
+    ASSERT_EQ(NO_ERROR, data.readParcelable(&parcelableFromParcel));
     sp<AudioPortConfig> audioPortConfigFromParcel = new AudioPortConfigTestStub();
-    ASSERT_EQ(data.readParcelable(audioPortConfigFromParcel.get()), NO_ERROR);
-    ASSERT_TRUE(audioPortConfigFromParcel->equals(audioPortConfig));
+    ASSERT_EQ(NO_ERROR, audioPortConfigFromParcel->readFromParcelable(
+                    parcelableFromParcel, isInput));
+    ASSERT_TRUE(audioPortConfigFromParcel->equals(audioPortConfig, isInput));
 }
 
 TEST(AudioFoundationParcelableTest, ParcelingDeviceDescriptorBase) {
-    Parcel data;
     sp<DeviceDescriptorBase> desc = new DeviceDescriptorBase(AUDIO_DEVICE_OUT_SPEAKER);
     desc->setGains(getAudioGainsForTest());
     desc->setAudioProfiles(getAudioProfileVectorForTest());
@@ -135,10 +152,10 @@ TEST(AudioFoundationParcelableTest, ParcelingDeviceDescriptorBase) {
     ASSERT_EQ(desc->setEncapsulationMetadataTypes(
             AUDIO_ENCAPSULATION_METADATA_TYPE_ALL_POSITION_BITS), NO_ERROR);
 
-    ASSERT_EQ(data.writeParcelable(*desc), NO_ERROR);
-    data.setDataPosition(0);
+    media::AudioPort parcelable;
+    ASSERT_EQ(NO_ERROR, desc->writeToParcelable(&parcelable));
     sp<DeviceDescriptorBase> descFromParcel = new DeviceDescriptorBase(AUDIO_DEVICE_NONE);
-    ASSERT_EQ(data.readParcelable(descFromParcel.get()), NO_ERROR);
+    ASSERT_EQ(NO_ERROR, descFromParcel->readFromParcelable(parcelable));
     ASSERT_TRUE(descFromParcel->equals(desc));
 }
 

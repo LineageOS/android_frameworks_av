@@ -28,7 +28,7 @@
 #include <media/audiohal/StreamHalInterface.h>
 #include <mediautils/Synchronization.h>
 
-#include "ConversionHelperHidl.h"
+#include "CoreConversionHelperHidl.h"
 #include "StreamPowerLog.h"
 
 using ::android::hardware::audio::CORE_TYPES_CPP_VERSION::IStream;
@@ -45,7 +45,7 @@ namespace android {
 
 class DeviceHalHidl;
 
-class StreamHalHidl : public virtual StreamHalInterface, public ConversionHelperHidl
+class StreamHalHidl : public virtual StreamHalInterface, public CoreConversionHelperHidl
 {
   public:
     // Return size of input/output buffer in bytes for this stream - eg. 4800.
@@ -89,9 +89,15 @@ class StreamHalHidl : public virtual StreamHalInterface, public ConversionHelper
     // (must match the priority of the audioflinger's thread that calls 'read' / 'write')
     virtual status_t setHalThreadPriority(int priority);
 
+    status_t legacyCreateAudioPatch(const struct audio_port_config& port,
+                                            std::optional<audio_source_t> source,
+                                            audio_devices_t type) override;
+
+    status_t legacyReleaseAudioPatch() override;
+
   protected:
     // Subclasses can not be constructed directly by clients.
-    explicit StreamHalHidl(IStream *stream);
+    StreamHalHidl(std::string_view className, IStream *stream);
 
     ~StreamHalHidl() override;
 
@@ -196,6 +202,8 @@ class StreamOutHalHidl : public StreamOutHalInterface, public StreamHalHidl {
             const sp<StreamOutHalInterfaceLatencyModeCallback>& callback) override;
 
     void onRecommendedLatencyModeChanged(const std::vector<audio_latency_mode_t>& modes);
+
+    status_t exit() override;
 
   private:
     friend class DeviceHalHidl;

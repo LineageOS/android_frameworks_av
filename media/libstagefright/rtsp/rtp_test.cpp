@@ -27,9 +27,9 @@
 #include <media/stagefright/MediaBuffer.h>
 #include <media/stagefright/SimpleDecodingSource.h>
 
-#include "ARTPSession.h"
-#include "ASessionDescription.h"
-#include "UDPPusher.h"
+#include <media/stagefright/rtsp/ARTPSession.h>
+#include <media/stagefright/rtsp/ASessionDescription.h>
+#include <media/stagefright/rtsp/UDPPusher.h>
 
 using namespace android;
 
@@ -182,7 +182,7 @@ int main(int argc, char **argv) {
     CHECK_EQ(decoder->start(), (status_t)OK);
 
     for (;;) {
-        MediaBuffer *buffer;
+        MediaBufferBase *buffer;
         status_t err = decoder->read(&buffer);
 
         if (err != OK) {
@@ -201,7 +201,7 @@ int main(int argc, char **argv) {
 #if 1
         if (buffer->range_length() != 0) {
             int64_t timeUs;
-            CHECK(buffer->meta_data()->findInt64(kKeyTime, &timeUs));
+            CHECK(buffer->meta_data().findInt64(kKeyTime, &timeUs));
 
             printf("decoder returned frame of size %zu at time %.2f secs\n",
                    buffer->range_length(), timeUs / 1E6);

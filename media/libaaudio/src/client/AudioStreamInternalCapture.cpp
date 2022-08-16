@@ -46,8 +46,6 @@ AudioStreamInternalCapture::AudioStreamInternalCapture(AAudioServiceInterface  &
 
 }
 
-AudioStreamInternalCapture::~AudioStreamInternalCapture() {}
-
 void AudioStreamInternalCapture::advanceClientToMatchServerPosition(int32_t serverMargin) {
     int64_t readCounter = mAudioEndpoint->getDataReadCounter();
     int64_t writeCounter = mAudioEndpoint->getDataWriteCounter() + serverMargin;
@@ -109,7 +107,7 @@ aaudio_result_t AudioStreamInternalCapture::processDataNow(void *buffer, int32_t
     if (mNeedCatchUp.isRequested()) {
         // Catch an MMAP pointer that is already advancing.
         // This will avoid initial underruns caused by a slow cold start.
-        advanceClientToMatchServerPosition();
+        advanceClientToMatchServerPosition(0 /*serverMargin*/);
         mNeedCatchUp.acknowledge();
     }
 
@@ -228,7 +226,7 @@ int64_t AudioStreamInternalCapture::getFramesRead() {
 void *AudioStreamInternalCapture::callbackLoop() {
     aaudio_result_t result = AAUDIO_OK;
     aaudio_data_callback_result_t callbackResult = AAUDIO_CALLBACK_RESULT_CONTINUE;
-    if (!isDataCallbackSet()) return NULL;
+    if (!isDataCallbackSet()) return nullptr;
 
     // result might be a frame count
     while (mCallbackEnabled.load() && isActive() && (result >= 0)) {
@@ -260,5 +258,5 @@ void *AudioStreamInternalCapture::callbackLoop() {
 
     ALOGD("callbackLoop() exiting, result = %d, isActive() = %d",
           result, (int) isActive());
-    return NULL;
+    return nullptr;
 }

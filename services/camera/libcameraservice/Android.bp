@@ -42,13 +42,15 @@ cc_library_shared {
 
     srcs: [
         "CameraService.cpp",
+        "CameraServiceWatchdog.cpp",
         "CameraFlashlight.cpp",
         "common/Camera2ClientBase.cpp",
         "common/CameraDeviceBase.cpp",
         "common/CameraOfflineSessionBase.cpp",
         "common/CameraProviderManager.cpp",
-        "common/DepthPhotoProcessor.cpp",
         "common/FrameProcessorBase.cpp",
+        "common/hidl/HidlProviderInfo.cpp",
+        "common/aidl/AidlProviderInfo.cpp",
         "api1/Camera2Client.cpp",
         "api1/client2/Parameters.cpp",
         "api1/client2/FrameProcessor.cpp",
@@ -76,32 +78,37 @@ cc_library_shared {
         "device3/StatusTracker.cpp",
         "device3/Camera3BufferManager.cpp",
         "device3/Camera3StreamSplitter.cpp",
-        "device3/CoordinateMapper.cpp",
-        "device3/DistortionMapper.cpp",
-        "device3/ZoomRatioMapper.cpp",
-        "device3/RotateAndCropMapper.cpp",
         "device3/Camera3OutputStreamInterface.cpp",
         "device3/Camera3OutputUtils.cpp",
         "device3/Camera3DeviceInjectionMethods.cpp",
         "device3/UHRCropAndMeteringRegionMapper.cpp",
+        "device3/PreviewFrameSpacer.cpp",
+        "device3/hidl/HidlCamera3Device.cpp",
+        "device3/hidl/HidlCamera3OfflineSession.cpp",
+        "device3/hidl/HidlCamera3OutputUtils.cpp",
+        "device3/aidl/AidlCamera3Device.cpp",
+        "device3/aidl/AidlCamera3OutputUtils.cpp",
+        "device3/aidl/AidlCamera3OfflineSession.cpp",
         "gui/RingBufferConsumer.cpp",
         "hidl/AidlCameraDeviceCallbacks.cpp",
         "hidl/AidlCameraServiceListener.cpp",
-        "hidl/Convert.cpp",
         "hidl/HidlCameraDeviceUser.cpp",
         "hidl/HidlCameraService.cpp",
+        "hidl/Utils.cpp",
         "utils/CameraServiceProxyWrapper.cpp",
         "utils/CameraThreadState.cpp",
         "utils/CameraTraces.cpp",
         "utils/AutoConditionLock.cpp",
-        "utils/ExifUtils.cpp",
         "utils/SessionConfigurationUtils.cpp",
+        "utils/SessionConfigurationUtilsHidl.cpp",
         "utils/SessionStatsBuilder.cpp",
         "utils/TagMonitor.cpp",
         "utils/LatencyHistogram.cpp",
     ],
 
     header_libs: [
+        "libdynamic_depth-internal_headers",
+        "libdynamic_depth-public_headers",
         "libmediadrm_headers",
         "libmediametrics_headers",
     ],
@@ -115,6 +122,7 @@ cc_library_shared {
         "libutilscallstack",
         "libutils",
         "libbinder",
+        "libbinder_ndk",
         "libactivitymanager_aidl",
         "libpermission",
         "libcutils",
@@ -148,19 +156,23 @@ cc_library_shared {
         "android.hardware.camera.provider@2.5",
         "android.hardware.camera.provider@2.6",
         "android.hardware.camera.provider@2.7",
+        "android.hardware.camera.provider-V1-ndk",
         "android.hardware.camera.device@3.2",
         "android.hardware.camera.device@3.3",
         "android.hardware.camera.device@3.4",
         "android.hardware.camera.device@3.5",
         "android.hardware.camera.device@3.6",
         "android.hardware.camera.device@3.7",
+        "android.hardware.camera.device-V1-ndk",
         "media_permission-aidl-cpp",
     ],
 
     static_libs: [
+        "libaidlcommonsupport",
         "libprocessinfoservice_aidl",
         "libbinderthreadstateutils",
         "media_permission-aidl-cpp",
+        "libcameraservice_device_independent",
     ],
 
     export_shared_lib_headers: [
@@ -175,9 +187,55 @@ cc_library_shared {
     include_dirs: [
         "system/media/private/camera/include",
         "frameworks/native/include/media/openmax",
-        "frameworks/av/media/ndk",
-        "external/dynamic_depth/includes",
-        "external/dynamic_depth/internal",
+    ],
+
+    export_include_dirs: ["."],
+
+    cflags: [
+        "-Wall",
+        "-Wextra",
+        "-Werror",
+        "-Wno-ignored-qualifiers",
+    ],
+
+}
+
+cc_library_static {
+    name: "libcameraservice_device_independent",
+    host_supported: true,
+
+    // Camera service source
+
+    srcs: [
+        "common/DepthPhotoProcessor.cpp",
+        "device3/CoordinateMapper.cpp",
+        "device3/DistortionMapper.cpp",
+        "device3/RotateAndCropMapper.cpp",
+        "device3/ZoomRatioMapper.cpp",
+        "utils/ExifUtils.cpp",
+        "utils/SessionConfigurationUtilsHost.cpp",
+    ],
+
+    header_libs: [
+        "libdynamic_depth-internal_headers",
+        "libdynamic_depth-public_headers",
+    ],
+
+    shared_libs: [
+        "libbase",
+        "libbinder",
+        "libcamera_metadata",
+        "libdynamic_depth",
+        "libexif",
+        "libjpeg",
+        "liblog",
+        "libutils",
+        "libxml2",
+    ],
+
+    include_dirs: [
+        "frameworks/av/camera/include",
+        "frameworks/av/camera/include/camera",
     ],
 
     export_include_dirs: ["."],

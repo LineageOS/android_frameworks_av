@@ -261,8 +261,7 @@ C2SoftAomDec::C2SoftAomDec(const char* name, c2_node_id_t id,
     CREATE_DUMP_FILE(mInFile);
     CREATE_DUMP_FILE(mOutFile);
 
-    gettimeofday(&mTimeStart, nullptr);
-    gettimeofday(&mTimeEnd, nullptr);
+    mTimeStart = mTimeEnd = systemTime();
 }
 
 C2SoftAomDec::~C2SoftAomDec() {
@@ -463,19 +462,17 @@ void C2SoftAomDec::process(const std::unique_ptr<C2Work>& work,
     int64_t frameIndex = work->input.ordinal.frameIndex.peekll();
     if (inSize) {
         uint8_t* bitstream = const_cast<uint8_t*>(rView.data() + inOffset);
-        int32_t decodeTime = 0;
-        int32_t delay = 0;
 
         DUMP_TO_FILE(mOutFile, bitstream, inSize);
-        GETTIME(&mTimeStart, nullptr);
-        TIME_DIFF(mTimeEnd, mTimeStart, delay);
+        mTimeStart = systemTime();
+        nsecs_t delay = mTimeStart - mTimeEnd;
 
         aom_codec_err_t err =
             aom_codec_decode(mCodecCtx, bitstream, inSize, &frameIndex);
 
-        GETTIME(&mTimeEnd, nullptr);
-        TIME_DIFF(mTimeStart, mTimeEnd, decodeTime);
-        ALOGV("decodeTime=%4d delay=%4d\n", decodeTime, delay);
+        mTimeEnd = systemTime();
+        nsecs_t decodeTime = mTimeEnd - mTimeStart;
+        ALOGV("decodeTime=%4" PRId64 " delay=%4" PRId64 "\n", decodeTime, delay);
 
         if (err != AOM_CODEC_OK) {
             ALOGE("av1 decoder failed to decode frame err: %d", err);

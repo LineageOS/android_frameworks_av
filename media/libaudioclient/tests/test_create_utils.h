@@ -31,7 +31,6 @@ int readLine(FILE *inputFile, char *line, int size);
 
 bool checkVersion(FILE *inputFile, const char *version);
 
-void callback(int event, void* user, void *info);
 
 typedef int (*test_func_t)(FILE *inputFile, int outputFileFd);
 

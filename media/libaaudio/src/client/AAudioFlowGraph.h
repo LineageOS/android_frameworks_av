@@ -23,8 +23,12 @@
 #include <system/audio.h>
 
 #include <aaudio/AAudio.h>
+#include <audio_utils/Balance.h>
 #include <flowgraph/ClipToRange.h>
+#include <flowgraph/ManyToMultiConverter.h>
+#include <flowgraph/MonoBlend.h>
 #include <flowgraph/MonoToMultiConverter.h>
+#include <flowgraph/MultiToManyConverter.h>
 #include <flowgraph/RampLinear.h>
 
 class AAudioFlowGraph {
@@ -36,12 +40,19 @@ public:
      * @param sourceChannelCount
      * @param sinkFormat
      * @param sinkChannelCount
+     * @param useMonoBlend
+     * @param audioBalance
+     * @param channelMask
+     * @param isExclusive
      * @return
      */
     aaudio_result_t configure(audio_format_t sourceFormat,
                               int32_t sourceChannelCount,
                               audio_format_t sinkFormat,
-                              int32_t sinkChannelCount);
+                              int32_t sinkChannelCount,
+                              bool useMonoBlend,
+                              float audioBalance,
+                              bool isExclusive);
 
     void process(const void *source, void *destination, int32_t numFrames);
 
@@ -50,14 +61,30 @@ public:
      */
     void setTargetVolume(float volume);
 
+    /**
+     * @param audioBalance between -1.0 and 1.0
+     */
+    void setAudioBalance(float audioBalance);
+
+    /**
+     * @param numFrames to slowly adjust for volume changes
+     */
     void setRampLengthInFrames(int32_t numFrames);
 
 private:
-    std::unique_ptr<flowgraph::AudioSource>          mSource;
-    std::unique_ptr<flowgraph::RampLinear>           mVolumeRamp;
-    std::unique_ptr<flowgraph::ClipToRange>          mClipper;
-    std::unique_ptr<flowgraph::MonoToMultiConverter> mChannelConverter;
-    std::unique_ptr<flowgraph::AudioSink>            mSink;
+    std::unique_ptr<FLOWGRAPH_OUTER_NAMESPACE::flowgraph::FlowGraphSourceBuffered> mSource;
+    std::unique_ptr<FLOWGRAPH_OUTER_NAMESPACE::flowgraph::MonoBlend> mMonoBlend;
+    std::unique_ptr<FLOWGRAPH_OUTER_NAMESPACE::flowgraph::ClipToRange> mClipper;
+    std::unique_ptr<FLOWGRAPH_OUTER_NAMESPACE::flowgraph::MonoToMultiConverter> mChannelConverter;
+    std::unique_ptr<FLOWGRAPH_OUTER_NAMESPACE::flowgraph::ManyToMultiConverter>
+            mManyToMultiConverter;
+    std::unique_ptr<FLOWGRAPH_OUTER_NAMESPACE::flowgraph::MultiToManyConverter>
+            mMultiToManyConverter;
+    std::vector<std::unique_ptr<FLOWGRAPH_OUTER_NAMESPACE::flowgraph::RampLinear>> mVolumeRamps;
+    std::vector<float> mPanningVolumes;
+    float mTargetVolume = 1.0f;
+    android::audio_utils::Balance mBalance;
+    std::unique_ptr<FLOWGRAPH_OUTER_NAMESPACE::flowgraph::FlowGraphSink> mSink;
 };
 
 

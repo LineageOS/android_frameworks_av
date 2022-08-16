@@ -21,6 +21,10 @@ cc_library {
 
     srcs: ["AMRExtractor.cpp"],
 
+    export_include_dirs: [
+        "include",
+    ],
+
     static_libs: [
         "libstagefright_foundation",
     ],

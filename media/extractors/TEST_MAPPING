@@ -1,6 +1,9 @@
 {
   "presubmit": [
 
+        {
+            "name": "CtsMediaTranscodingTestCases"
+        }
     // TODO(b/153661591) enable test once the bug is fixed
     // This tests the extractor path
     // {

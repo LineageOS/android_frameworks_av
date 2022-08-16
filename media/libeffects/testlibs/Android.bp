@@ -1,0 +1,77 @@
+// Test Reverb library
+package {
+    default_applicable_licenses: [
+        "frameworks_av_media_libeffects_testlibs_license",
+    ],
+}
+
+license {
+    name: "frameworks_av_media_libeffects_testlibs_license",
+    visibility: [":__subpackages__"],
+    license_kinds: [
+        "SPDX-license-identifier-Apache-2.0",
+    ],
+    license_text: [
+        "NOTICE",
+    ],
+}
+
+cc_library {
+    name: "libreverbtest",
+    host_supported: true,
+    vendor: true,
+    srcs: [
+        "EffectReverb.c",
+        "EffectsMath.c",
+    ],
+
+    shared_libs: [
+        "libcutils",
+        "liblog",
+    ],
+
+    relative_install_path: "soundfx",
+
+    cflags: [
+        "-fvisibility=hidden",
+        "-Wall",
+        "-Werror",
+        "-Wno-address-of-packed-member",
+    ],
+
+    header_libs: [
+        "libaudioeffects",
+    ],
+}
+
+cc_library {
+    name: "libequalizertest",
+    host_supported: true,
+    vendor: true,
+    srcs: [
+        "AudioBiquadFilter.cpp",
+        "AudioCoefInterpolator.cpp",
+        "AudioEqualizer.cpp",
+        "AudioPeakingFilter.cpp",
+        "AudioShelvingFilter.cpp",
+        "EffectEqualizer.cpp",
+        "EffectsMath.c",
+    ],
+
+    shared_libs: [
+        "libcutils",
+        "liblog",
+    ],
+
+    relative_install_path: "soundfx",
+
+    cflags: [
+        "-fvisibility=hidden",
+        "-Wall",
+        "-Werror",
+    ],
+
+    header_libs: [
+        "libaudioeffects",
+    ],
+}

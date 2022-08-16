@@ -36,6 +36,8 @@ cc_library_shared {
         "libaudiopolicyenginedefault",
         "framework-permission-aidl-cpp",
         "libaudioclient_aidl_conversion",
+        "android.media.audio.common.types-V1-cpp",
+        "audioclient-types-aidl-cpp",
     ],
 
     header_libs: [

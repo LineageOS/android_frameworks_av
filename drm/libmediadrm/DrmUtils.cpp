@@ -17,6 +17,7 @@
 //#define LOG_NDEBUG 0
 #define LOG_TAG "DrmUtils"
 
+#include <android/binder_manager.h>
 #include <android/hardware/drm/1.0/ICryptoFactory.h>
 #include <android/hardware/drm/1.0/ICryptoPlugin.h>
 #include <android/hardware/drm/1.0/IDrmFactory.h>
@@ -32,10 +33,10 @@
 #include <android/hidl/manager/1.2/IServiceManager.h>
 #include <hidl/HidlSupport.h>
 
+#include <cutils/properties.h>
 #include <utils/Errors.h>
 #include <utils/Log.h>
 #include <utils/String16.h>
-#include <cutils/properties.h>
 
 #include <mediadrm/CryptoHal.h>
 #include <mediadrm/DrmHal.h>
@@ -57,10 +58,10 @@ namespace DrmUtils {
 
 namespace {
 
-template<typename Hal>
-Hal *MakeObject(status_t *pstatus) {
+template <typename Hal>
+Hal* MakeObject(status_t* pstatus) {
     status_t err = OK;
-    status_t &status = pstatus ? *pstatus : err;
+    status_t& status = pstatus ? *pstatus : err;
     auto obj = new Hal();
     status = obj->initCheck();
     if (status != OK && status != NO_INIT) {
@@ -70,43 +71,44 @@ Hal *MakeObject(status_t *pstatus) {
 }
 
 template <typename Hal, typename V, typename M>
-void MakeHidlFactories(const uint8_t uuid[16], V &factories, M& instances) {
+void MakeHidlFactories(const uint8_t uuid[16], V& factories, M& instances) {
     sp<HServiceManager> serviceManager = HServiceManager::getService();
     if (serviceManager == nullptr) {
         LOG2BE("Failed to get service manager");
         return;
     }
 
-    serviceManager->listManifestByInterface(Hal::descriptor, [&](const hidl_vec<hidl_string> &registered) {
-        for (const auto &instance : registered) {
-            auto factory = Hal::getService(instance);
-            if (factory != nullptr) {
-                instances[instance.c_str()] = Hal::descriptor;
-                if (!uuid) {
-                    factories.push_back(factory);
-                    continue;
+    serviceManager->listManifestByInterface(
+            Hal::descriptor, [&](const hidl_vec<hidl_string>& registered) {
+                for (const auto& instance : registered) {
+                    auto factory = Hal::getService(instance);
+                    if (factory != nullptr) {
+                        instances[instance.c_str()] = Hal::descriptor;
+                        if (!uuid) {
+                            factories.push_back(factory);
+                            continue;
+                        }
+                        auto supported = factory->isCryptoSchemeSupported(uuid);
+                        if (!supported.isOk()) {
+                            LOG2BE(uuid, "isCryptoSchemeSupported txn failed: %s",
+                                   supported.description().c_str());
+                            continue;
+                        }
+                        if (supported) {
+                            factories.push_back(factory);
+                        }
+                    }
                 }
-                auto supported = factory->isCryptoSchemeSupported(uuid);
-                if (!supported.isOk()) {
-                    LOG2BE(uuid, "isCryptoSchemeSupported txn failed: %s",
-                           supported.description().c_str());
-                    continue;
-                }
-                if (supported) {
-                    factories.push_back(factory);
-                }
-            }
-        }
-    });
+            });
 }
 
 template <typename Hal, typename V>
-void MakeHidlFactories(const uint8_t uuid[16], V &factories) {
+void MakeHidlFactories(const uint8_t uuid[16], V& factories) {
     std::map<std::string, std::string> instances;
     MakeHidlFactories<Hal>(uuid, factories, instances);
 }
 
-hidl_vec<uint8_t> toHidlVec(const void *ptr, size_t size) {
+hidl_vec<uint8_t> toHidlVec(const void* ptr, size_t size) {
     hidl_vec<uint8_t> vec(size);
     if (ptr != nullptr) {
         memcpy(vec.data(), ptr, size);
@@ -114,19 +116,19 @@ hidl_vec<uint8_t> toHidlVec(const void *ptr, size_t size) {
     return vec;
 }
 
-hidl_array<uint8_t, 16> toHidlArray16(const uint8_t *ptr) {
+hidl_array<uint8_t, 16> toHidlArray16(const uint8_t* ptr) {
     if (ptr == nullptr) {
         return hidl_array<uint8_t, 16>();
     }
     return hidl_array<uint8_t, 16>(ptr);
 }
 
-sp<::V1_0::IDrmPlugin> MakeDrmPlugin(const sp<::V1_0::IDrmFactory> &factory,
-                                     const uint8_t uuid[16], const char *appPackageName) {
+sp<::V1_0::IDrmPlugin> MakeDrmPlugin(const sp<::V1_0::IDrmFactory>& factory, const uint8_t uuid[16],
+                                     const char* appPackageName) {
     sp<::V1_0::IDrmPlugin> plugin;
     auto err = factory->createPlugin(
             toHidlArray16(uuid), hidl_string(appPackageName),
-            [&](::V1_0::Status status, const sp<::V1_0::IDrmPlugin> &hPlugin) {
+            [&](::V1_0::Status status, const sp<::V1_0::IDrmPlugin>& hPlugin) {
                 if (status != ::V1_0::Status::OK) {
                     LOG2BE(uuid, "MakeDrmPlugin failed: %d", status);
                     return;
@@ -141,13 +143,13 @@ sp<::V1_0::IDrmPlugin> MakeDrmPlugin(const sp<::V1_0::IDrmFactory> &factory,
     }
 }
 
-sp<::V1_0::ICryptoPlugin> MakeCryptoPlugin(const sp<::V1_0::ICryptoFactory> &factory,
-                                           const uint8_t uuid[16], const void *initData,
+sp<::V1_0::ICryptoPlugin> MakeCryptoPlugin(const sp<::V1_0::ICryptoFactory>& factory,
+                                           const uint8_t uuid[16], const void* initData,
                                            size_t initDataSize) {
     sp<::V1_0::ICryptoPlugin> plugin;
     auto err = factory->createPlugin(
             toHidlArray16(uuid), toHidlVec(initData, initDataSize),
-            [&](::V1_0::Status status, const sp<::V1_0::ICryptoPlugin> &hPlugin) {
+            [&](::V1_0::Status status, const sp<::V1_0::ICryptoPlugin>& hPlugin) {
                 if (status != ::V1_0::Status::OK) {
                     LOG2BE(uuid, "MakeCryptoPlugin failed: %d", status);
                     return;
@@ -162,17 +164,38 @@ sp<::V1_0::ICryptoPlugin> MakeCryptoPlugin(const sp<::V1_0::ICryptoFactory> &fac
     }
 }
 
-} // namespace
+}  // namespace
 
 bool UseDrmService() {
     return property_get_bool("mediadrm.use_mediadrmserver", true);
 }
 
-sp<IDrm> MakeDrm(status_t *pstatus) {
+std::vector<std::shared_ptr<IDrmFactoryAidl>> makeDrmFactoriesAidl() {
+    std::vector<std::shared_ptr<IDrmFactoryAidl>> factories;
+    AServiceManager_forEachDeclaredInstance(
+        IDrmFactoryAidl::descriptor, static_cast<void*>(&factories),
+        [](const char* instance, void* context) {
+            auto fullName = std::string(IDrmFactoryAidl::descriptor) + "/" + std::string(instance);
+            auto factory = IDrmFactoryAidl::fromBinder(
+                    ::ndk::SpAIBinder(AServiceManager_waitForService(fullName.c_str())));
+            if (factory == nullptr) {
+                ALOGE("not found IDrmFactory. Instance name:[%s]", fullName.c_str());
+                return;
+            }
+
+            ALOGI("found IDrmFactory. Instance name:[%s]", fullName.c_str());
+            static_cast<std::vector<std::shared_ptr<IDrmFactoryAidl>>*>(context)->emplace_back(
+                    factory);
+        });
+
+    return factories;
+}
+
+sp<IDrm> MakeDrm(status_t* pstatus) {
     return MakeObject<DrmHal>(pstatus);
 }
 
-sp<ICrypto> MakeCrypto(status_t *pstatus) {
+sp<ICrypto> MakeCrypto(status_t* pstatus) {
     return MakeObject<CryptoHal>(pstatus);
 }
 
@@ -191,9 +214,9 @@ std::vector<sp<::V1_0::IDrmFactory>> MakeDrmFactories(const uint8_t uuid[16]) {
 }
 
 std::vector<sp<::V1_0::IDrmPlugin>> MakeDrmPlugins(const uint8_t uuid[16],
-                                              const char *appPackageName) {
+                                                   const char* appPackageName) {
     std::vector<sp<::V1_0::IDrmPlugin>> plugins;
-    for (const auto &factory : MakeDrmFactories(uuid)) {
+    for (const auto& factory : MakeDrmFactories(uuid)) {
         plugins.push_back(MakeDrmPlugin(factory, uuid, appPackageName));
     }
     return plugins;
@@ -209,10 +232,11 @@ std::vector<sp<::V1_0::ICryptoFactory>> MakeCryptoFactories(const uint8_t uuid[1
     return cryptoFactories;
 }
 
-std::vector<sp<ICryptoPlugin>> MakeCryptoPlugins(const uint8_t uuid[16], const void *initData,
-                                                 size_t initDataSize) {
-    std::vector<sp<ICryptoPlugin>> plugins;
-    for (const auto &factory : MakeCryptoFactories(uuid)) {
+std::vector<sp<::V1_0::ICryptoPlugin>> MakeCryptoPlugins(const uint8_t uuid[16],
+                                                         const void* initData,
+                                                         size_t initDataSize) {
+    std::vector<sp<::V1_0::ICryptoPlugin>> plugins;
+    for (const auto& factory : MakeCryptoFactories(uuid)) {
         plugins.push_back(MakeCryptoPlugin(factory, uuid, initData, initDataSize));
     }
     return plugins;
@@ -220,90 +244,90 @@ std::vector<sp<ICryptoPlugin>> MakeCryptoPlugins(const uint8_t uuid[16], const v
 
 status_t toStatusT_1_4(::V1_4::Status status) {
     switch (status) {
-    case ::V1_4::Status::OK:
-        return OK;
-    case ::V1_4::Status::BAD_VALUE:
-        return BAD_VALUE;
-    case ::V1_4::Status::ERROR_DRM_CANNOT_HANDLE:
-        return ERROR_DRM_CANNOT_HANDLE;
-    case ::V1_4::Status::ERROR_DRM_DECRYPT:
-        return ERROR_DRM_DECRYPT;
-    case ::V1_4::Status::ERROR_DRM_DEVICE_REVOKED:
-        return ERROR_DRM_DEVICE_REVOKED;
-    case ::V1_4::Status::ERROR_DRM_FRAME_TOO_LARGE:
-        return ERROR_DRM_FRAME_TOO_LARGE;
-    case ::V1_4::Status::ERROR_DRM_INSUFFICIENT_OUTPUT_PROTECTION:
-        return ERROR_DRM_INSUFFICIENT_OUTPUT_PROTECTION;
-    case ::V1_4::Status::ERROR_DRM_INSUFFICIENT_SECURITY:
-        return ERROR_DRM_INSUFFICIENT_SECURITY;
-    case ::V1_4::Status::ERROR_DRM_INVALID_STATE:
-        return ERROR_DRM_INVALID_STATE;
-    case ::V1_4::Status::ERROR_DRM_LICENSE_EXPIRED:
-        return ERROR_DRM_LICENSE_EXPIRED;
-    case ::V1_4::Status::ERROR_DRM_NO_LICENSE:
-        return ERROR_DRM_NO_LICENSE;
-    case ::V1_4::Status::ERROR_DRM_NOT_PROVISIONED:
-        return ERROR_DRM_NOT_PROVISIONED;
-    case ::V1_4::Status::ERROR_DRM_RESOURCE_BUSY:
-        return ERROR_DRM_RESOURCE_BUSY;
-    case ::V1_4::Status::ERROR_DRM_RESOURCE_CONTENTION:
-        return ERROR_DRM_RESOURCE_CONTENTION;
-    case ::V1_4::Status::ERROR_DRM_SESSION_LOST_STATE:
-        return ERROR_DRM_SESSION_LOST_STATE;
-    case ::V1_4::Status::ERROR_DRM_SESSION_NOT_OPENED:
-        return ERROR_DRM_SESSION_NOT_OPENED;
+        case ::V1_4::Status::OK:
+            return OK;
+        case ::V1_4::Status::BAD_VALUE:
+            return BAD_VALUE;
+        case ::V1_4::Status::ERROR_DRM_CANNOT_HANDLE:
+            return ERROR_DRM_CANNOT_HANDLE;
+        case ::V1_4::Status::ERROR_DRM_DECRYPT:
+            return ERROR_DRM_DECRYPT;
+        case ::V1_4::Status::ERROR_DRM_DEVICE_REVOKED:
+            return ERROR_DRM_DEVICE_REVOKED;
+        case ::V1_4::Status::ERROR_DRM_FRAME_TOO_LARGE:
+            return ERROR_DRM_FRAME_TOO_LARGE;
+        case ::V1_4::Status::ERROR_DRM_INSUFFICIENT_OUTPUT_PROTECTION:
+            return ERROR_DRM_INSUFFICIENT_OUTPUT_PROTECTION;
+        case ::V1_4::Status::ERROR_DRM_INSUFFICIENT_SECURITY:
+            return ERROR_DRM_INSUFFICIENT_SECURITY;
+        case ::V1_4::Status::ERROR_DRM_INVALID_STATE:
+            return ERROR_DRM_INVALID_STATE;
+        case ::V1_4::Status::ERROR_DRM_LICENSE_EXPIRED:
+            return ERROR_DRM_LICENSE_EXPIRED;
+        case ::V1_4::Status::ERROR_DRM_NO_LICENSE:
+            return ERROR_DRM_NO_LICENSE;
+        case ::V1_4::Status::ERROR_DRM_NOT_PROVISIONED:
+            return ERROR_DRM_NOT_PROVISIONED;
+        case ::V1_4::Status::ERROR_DRM_RESOURCE_BUSY:
+            return ERROR_DRM_RESOURCE_BUSY;
+        case ::V1_4::Status::ERROR_DRM_RESOURCE_CONTENTION:
+            return ERROR_DRM_RESOURCE_CONTENTION;
+        case ::V1_4::Status::ERROR_DRM_SESSION_LOST_STATE:
+            return ERROR_DRM_SESSION_LOST_STATE;
+        case ::V1_4::Status::ERROR_DRM_SESSION_NOT_OPENED:
+            return ERROR_DRM_SESSION_NOT_OPENED;
 
-    // New in S / drm@1.4:
-    case ::V1_4::Status::CANNOT_DECRYPT_ZERO_SUBSAMPLES:
-        return ERROR_DRM_ZERO_SUBSAMPLES;
-    case ::V1_4::Status::CRYPTO_LIBRARY_ERROR:
-        return ERROR_DRM_CRYPTO_LIBRARY;
-    case ::V1_4::Status::GENERAL_OEM_ERROR:
-        return ERROR_DRM_GENERIC_OEM;
-    case ::V1_4::Status::GENERAL_PLUGIN_ERROR:
-        return ERROR_DRM_GENERIC_PLUGIN;
-    case ::V1_4::Status::INIT_DATA_INVALID:
-        return ERROR_DRM_INIT_DATA;
-    case ::V1_4::Status::KEY_NOT_LOADED:
-        return ERROR_DRM_KEY_NOT_LOADED;
-    case ::V1_4::Status::LICENSE_PARSE_ERROR:
-        return ERROR_DRM_LICENSE_PARSE;
-    case ::V1_4::Status::LICENSE_POLICY_ERROR:
-        return ERROR_DRM_LICENSE_POLICY;
-    case ::V1_4::Status::LICENSE_RELEASE_ERROR:
-        return ERROR_DRM_LICENSE_RELEASE;
-    case ::V1_4::Status::LICENSE_REQUEST_REJECTED:
-        return ERROR_DRM_LICENSE_REQUEST_REJECTED;
-    case ::V1_4::Status::LICENSE_RESTORE_ERROR:
-        return ERROR_DRM_LICENSE_RESTORE;
-    case ::V1_4::Status::LICENSE_STATE_ERROR:
-        return ERROR_DRM_LICENSE_STATE;
-    case ::V1_4::Status::MALFORMED_CERTIFICATE:
-        return ERROR_DRM_CERTIFICATE_MALFORMED;
-    case ::V1_4::Status::MEDIA_FRAMEWORK_ERROR:
-        return ERROR_DRM_MEDIA_FRAMEWORK;
-    case ::V1_4::Status::MISSING_CERTIFICATE:
-        return ERROR_DRM_CERTIFICATE_MISSING;
-    case ::V1_4::Status::PROVISIONING_CERTIFICATE_ERROR:
-        return ERROR_DRM_PROVISIONING_CERTIFICATE;
-    case ::V1_4::Status::PROVISIONING_CONFIGURATION_ERROR:
-        return ERROR_DRM_PROVISIONING_CONFIG;
-    case ::V1_4::Status::PROVISIONING_PARSE_ERROR:
-        return ERROR_DRM_PROVISIONING_PARSE;
-    case ::V1_4::Status::PROVISIONING_REQUEST_REJECTED:
-        return ERROR_DRM_PROVISIONING_REQUEST_REJECTED;
-    case ::V1_4::Status::RETRYABLE_PROVISIONING_ERROR:
-        return ERROR_DRM_PROVISIONING_RETRY;
-    case ::V1_4::Status::SECURE_STOP_RELEASE_ERROR:
-        return ERROR_DRM_SECURE_STOP_RELEASE;
-    case ::V1_4::Status::STORAGE_READ_FAILURE:
-        return ERROR_DRM_STORAGE_READ;
-    case ::V1_4::Status::STORAGE_WRITE_FAILURE:
-        return ERROR_DRM_STORAGE_WRITE;
+        // New in S / drm@1.4:
+        case ::V1_4::Status::CANNOT_DECRYPT_ZERO_SUBSAMPLES:
+            return ERROR_DRM_ZERO_SUBSAMPLES;
+        case ::V1_4::Status::CRYPTO_LIBRARY_ERROR:
+            return ERROR_DRM_CRYPTO_LIBRARY;
+        case ::V1_4::Status::GENERAL_OEM_ERROR:
+            return ERROR_DRM_GENERIC_OEM;
+        case ::V1_4::Status::GENERAL_PLUGIN_ERROR:
+            return ERROR_DRM_GENERIC_PLUGIN;
+        case ::V1_4::Status::INIT_DATA_INVALID:
+            return ERROR_DRM_INIT_DATA;
+        case ::V1_4::Status::KEY_NOT_LOADED:
+            return ERROR_DRM_KEY_NOT_LOADED;
+        case ::V1_4::Status::LICENSE_PARSE_ERROR:
+            return ERROR_DRM_LICENSE_PARSE;
+        case ::V1_4::Status::LICENSE_POLICY_ERROR:
+            return ERROR_DRM_LICENSE_POLICY;
+        case ::V1_4::Status::LICENSE_RELEASE_ERROR:
+            return ERROR_DRM_LICENSE_RELEASE;
+        case ::V1_4::Status::LICENSE_REQUEST_REJECTED:
+            return ERROR_DRM_LICENSE_REQUEST_REJECTED;
+        case ::V1_4::Status::LICENSE_RESTORE_ERROR:
+            return ERROR_DRM_LICENSE_RESTORE;
+        case ::V1_4::Status::LICENSE_STATE_ERROR:
+            return ERROR_DRM_LICENSE_STATE;
+        case ::V1_4::Status::MALFORMED_CERTIFICATE:
+            return ERROR_DRM_CERTIFICATE_MALFORMED;
+        case ::V1_4::Status::MEDIA_FRAMEWORK_ERROR:
+            return ERROR_DRM_MEDIA_FRAMEWORK;
+        case ::V1_4::Status::MISSING_CERTIFICATE:
+            return ERROR_DRM_CERTIFICATE_MISSING;
+        case ::V1_4::Status::PROVISIONING_CERTIFICATE_ERROR:
+            return ERROR_DRM_PROVISIONING_CERTIFICATE;
+        case ::V1_4::Status::PROVISIONING_CONFIGURATION_ERROR:
+            return ERROR_DRM_PROVISIONING_CONFIG;
+        case ::V1_4::Status::PROVISIONING_PARSE_ERROR:
+            return ERROR_DRM_PROVISIONING_PARSE;
+        case ::V1_4::Status::PROVISIONING_REQUEST_REJECTED:
+            return ERROR_DRM_PROVISIONING_REQUEST_REJECTED;
+        case ::V1_4::Status::RETRYABLE_PROVISIONING_ERROR:
+            return ERROR_DRM_PROVISIONING_RETRY;
+        case ::V1_4::Status::SECURE_STOP_RELEASE_ERROR:
+            return ERROR_DRM_SECURE_STOP_RELEASE;
+        case ::V1_4::Status::STORAGE_READ_FAILURE:
+            return ERROR_DRM_STORAGE_READ;
+        case ::V1_4::Status::STORAGE_WRITE_FAILURE:
+            return ERROR_DRM_STORAGE_WRITE;
 
-    case ::V1_4::Status::ERROR_DRM_UNKNOWN:
-    default:
-        return ERROR_DRM_UNKNOWN;
+        case ::V1_4::Status::ERROR_DRM_UNKNOWN:
+        default:
+            return ERROR_DRM_UNKNOWN;
     }
     return ERROR_DRM_UNKNOWN;
 }
@@ -312,20 +336,34 @@ namespace {
 char logPriorityToChar(::V1_4::LogPriority priority) {
     char p = 'U';
     switch (priority) {
-        case ::V1_4::LogPriority::VERBOSE:  p = 'V'; break;
-        case ::V1_4::LogPriority::DEBUG:    p = 'D'; break;
-        case ::V1_4::LogPriority::INFO:     p = 'I'; break;
-        case ::V1_4::LogPriority::WARN:     p = 'W'; break;
-        case ::V1_4::LogPriority::ERROR:    p = 'E'; break;
-        case ::V1_4::LogPriority::FATAL:    p = 'F'; break;
-        default: p = 'U'; break;
+        case ::V1_4::LogPriority::VERBOSE:
+            p = 'V';
+            break;
+        case ::V1_4::LogPriority::DEBUG:
+            p = 'D';
+            break;
+        case ::V1_4::LogPriority::INFO:
+            p = 'I';
+            break;
+        case ::V1_4::LogPriority::WARN:
+            p = 'W';
+            break;
+        case ::V1_4::LogPriority::ERROR:
+            p = 'E';
+            break;
+        case ::V1_4::LogPriority::FATAL:
+            p = 'F';
+            break;
+        default:
+            p = 'U';
+            break;
     }
     return p;
 }
 }  // namespace
 
-std::string GetExceptionMessage(status_t err, const char *msg,
-                                const Vector<::V1_4::LogMessage> &logs) {
+std::string GetExceptionMessage(status_t err, const char* msg,
+                                const Vector<::V1_4::LogMessage>& logs) {
     std::string ruler("==============================");
     std::string header("Beginning of DRM Plugin Log");
     std::string footer("End of DRM Plugin Log");
@@ -355,7 +393,7 @@ std::string GetExceptionMessage(status_t err, const char *msg,
     return msg8.c_str();
 }
 
-void LogBuffer::addLog(const ::V1_4::LogMessage &log) {
+void LogBuffer::addLog(const ::V1_4::LogMessage& log) {
     std::unique_lock<std::mutex> lock(mMutex);
     mBuffer.push_back(log);
     while (mBuffer.size() > MAX_CAPACITY) {

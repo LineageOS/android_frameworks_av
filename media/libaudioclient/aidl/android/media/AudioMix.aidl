@@ -16,12 +16,12 @@
 
 package android.media;
 
-import android.media.AudioConfig;
-import android.media.AudioDevice;
 import android.media.AudioMixCallbackFlag;
 import android.media.AudioMixMatchCriterion;
 import android.media.AudioMixRouteFlag;
 import android.media.AudioMixType;
+import android.media.audio.common.AudioConfig;
+import android.media.audio.common.AudioDevice;
 
 /**
  * {@hide}

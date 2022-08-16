@@ -44,12 +44,15 @@ void LastRemovableMediaDevices::setRemovableMediaDevices(sp<DeviceDescriptor> de
 }
 
 std::vector<audio_devices_t> LastRemovableMediaDevices::getLastRemovableMediaDevices(
-        device_out_group_t group) const
+        device_out_group_t group, std::vector<audio_devices_t> excludedDevices) const
 {
     std::vector<audio_devices_t> ret;
     for (auto iter = mMediaDevices.begin(); iter != mMediaDevices.end(); ++iter) {
-        if ((group == GROUP_NONE) || (group == getDeviceOutGroup((iter->desc)->type()))) {
-            ret.push_back((iter->desc)->type());
+        audio_devices_t type = (iter->desc)->type();
+        if ((group == GROUP_NONE || group == getDeviceOutGroup(type))
+                && std::find(excludedDevices.begin(), excludedDevices.end(), type) ==
+                                       excludedDevices.end()) {
+            ret.push_back(type);
         }
     }
     return ret;

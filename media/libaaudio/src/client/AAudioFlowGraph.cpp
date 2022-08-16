@@ -21,7 +21,10 @@
 #include "AAudioFlowGraph.h"
 
 #include <flowgraph/ClipToRange.h>
+#include <flowgraph/ManyToMultiConverter.h>
+#include <flowgraph/MonoBlend.h>
 #include <flowgraph/MonoToMultiConverter.h>
+#include <flowgraph/MultiToManyConverter.h>
 #include <flowgraph/RampLinear.h>
 #include <flowgraph/SinkFloat.h>
 #include <flowgraph/SinkI16.h>
@@ -32,17 +35,22 @@
 #include <flowgraph/SourceI24.h>
 #include <flowgraph/SourceI32.h>
 
-using namespace flowgraph;
+using namespace FLOWGRAPH_OUTER_NAMESPACE::flowgraph;
 
 aaudio_result_t AAudioFlowGraph::configure(audio_format_t sourceFormat,
                           int32_t sourceChannelCount,
                           audio_format_t sinkFormat,
-                          int32_t sinkChannelCount) {
-    AudioFloatOutputPort *lastOutput = nullptr;
+                          int32_t sinkChannelCount,
+                          bool useMonoBlend,
+                          float audioBalance,
+                          bool isExclusive) {
+    FlowGraphPortFloatOutput *lastOutput = nullptr;
 
     // TODO change back to ALOGD
-    ALOGI("%s() source format = 0x%08x, channels = %d, sink format = 0x%08x, channels = %d",
-          __func__, sourceFormat, sourceChannelCount, sinkFormat, sinkChannelCount);
+    ALOGI("%s() source format = 0x%08x, channels = %d, sink format = 0x%08x, channels = %d, "
+          "useMonoBlend = %d, audioBalance = %f, isExclusive %d",
+          __func__, sourceFormat, sourceChannelCount, sinkFormat, sinkChannelCount,
+          useMonoBlend, audioBalance, isExclusive);
 
     switch (sourceFormat) {
         case AUDIO_FORMAT_PCM_FLOAT:
@@ -63,10 +71,11 @@ aaudio_result_t AAudioFlowGraph::configure(audio_format_t sourceFormat,
     }
     lastOutput = &mSource->output;
 
-    // Apply volume as a ramp to avoid pops.
-    mVolumeRamp = std::make_unique<RampLinear>(sourceChannelCount);
-    lastOutput->connect(&mVolumeRamp->input);
-    lastOutput = &mVolumeRamp->output;
+    if (useMonoBlend) {
+        mMonoBlend = std::make_unique<MonoBlend>(sourceChannelCount);
+        lastOutput->connect(&mMonoBlend->input);
+        lastOutput = &mMonoBlend->output;
+    }
 
     // For a pure float graph, there is chance that the data range may be very large.
     // So we should clip to a reasonable value that allows a little headroom.
@@ -84,6 +93,26 @@ aaudio_result_t AAudioFlowGraph::configure(audio_format_t sourceFormat,
     } else if (sourceChannelCount != sinkChannelCount) {
         ALOGE("%s() Channel reduction not supported.", __func__);
         return AAUDIO_ERROR_UNIMPLEMENTED;
+    }
+
+    // Apply volume ramps for only exclusive streams.
+    if (isExclusive) {
+        // Apply volume ramps to set the left/right audio balance and target volumes.
+        // The signals will be decoupled, volume ramps will be applied, before the signals are
+        // combined again.
+        mMultiToManyConverter = std::make_unique<MultiToManyConverter>(sinkChannelCount);
+        mManyToMultiConverter = std::make_unique<ManyToMultiConverter>(sinkChannelCount);
+        lastOutput->connect(&mMultiToManyConverter->input);
+        for (int i = 0; i < sinkChannelCount; i++) {
+            mVolumeRamps.emplace_back(std::make_unique<RampLinear>(1));
+            mPanningVolumes.emplace_back(1.0f);
+            lastOutput = mMultiToManyConverter->outputs[i].get();
+            lastOutput->connect(&(mVolumeRamps[i].get()->input));
+            lastOutput = &(mVolumeRamps[i].get()->output);
+            lastOutput->connect(mManyToMultiConverter->inputs[i].get());
+        }
+        lastOutput = &mManyToMultiConverter->output;
+        setAudioBalance(audioBalance);
     }
 
     switch (sinkFormat) {
@@ -117,9 +146,32 @@ void AAudioFlowGraph::process(const void *source, void *destination, int32_t num
  * @param volume between 0.0 and 1.0
  */
 void AAudioFlowGraph::setTargetVolume(float volume) {
-    mVolumeRamp->setTarget(volume);
+    for (int i = 0; i < mVolumeRamps.size(); i++) {
+        mVolumeRamps[i]->setTarget(volume * mPanningVolumes[i]);
+    }
+    mTargetVolume = volume;
 }
 
+/**
+ * @param audioBalance between -1.0 and 1.0
+ */
+void AAudioFlowGraph::setAudioBalance(float audioBalance) {
+    if (mPanningVolumes.size() >= 2) {
+        float leftMultiplier = 0;
+        float rightMultiplier = 0;
+        mBalance.computeStereoBalance(audioBalance, &leftMultiplier, &rightMultiplier);
+        mPanningVolumes[0] = leftMultiplier;
+        mPanningVolumes[1] = rightMultiplier;
+        mVolumeRamps[0]->setTarget(mTargetVolume * leftMultiplier);
+        mVolumeRamps[1]->setTarget(mTargetVolume * rightMultiplier);
+    }
+}
+
+/**
+ * @param numFrames to slowly adjust for volume changes
+ */
 void AAudioFlowGraph::setRampLengthInFrames(int32_t numFrames) {
-    mVolumeRamp->setLengthInFrames(numFrames);
+    for (auto& ramp : mVolumeRamps) {
+        ramp->setLengthInFrames(numFrames);
+    }
 }

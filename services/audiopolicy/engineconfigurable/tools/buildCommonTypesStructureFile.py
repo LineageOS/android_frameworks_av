@@ -55,7 +55,7 @@ def findBitPos(decimal):
     while i < decimal:
         i = i << 1
         pos = pos + 1
-        if pos == 32:
+        if pos == 64:
             return -1
 
     # TODO: b/168065706. This is just to fix the build. That the problem of devices with
@@ -132,6 +132,9 @@ def parseAndroidAudioFile(androidaudiobaseheaderFile):
 
     logging.info("Checking Android Header file {}".format(androidaudiobaseheaderFile))
 
+    multi_bit_output_device_shift = 32
+    multi_bit_input_device_shift = 32
+
     for line_number, line in enumerate(androidaudiobaseheaderFile):
         match = criteria_pattern.match(line)
         if match:
@@ -143,15 +146,35 @@ def parseAndroidAudioFile(androidaudiobaseheaderFile):
 
             component_type_numerical_value = match.groupdict()['values']
 
-            # for AUDIO_DEVICE_IN: need to remove sign bit / rename default to stub
+            # for AUDIO_DEVICE_IN: rename default to stub
             if component_type_name == "InputDevicesMask":
-                component_type_numerical_value = str(int(component_type_numerical_value, 0) & ~2147483648)
+                component_type_numerical_value = str(int(component_type_numerical_value, 0))
                 if component_type_literal == "default":
                     component_type_literal = "stub"
+
+                string_int = int(component_type_numerical_value, 0)
+                num_bits = bin(string_int).count("1")
+                if num_bits > 1:
+                    logging.info("The value {} is for criterion {} binary rep {} has {} bits sets"
+                        .format(component_type_numerical_value, component_type_name, bin(string_int), num_bits))
+                    string_int = 2**multi_bit_input_device_shift
+                    logging.info("new val assigned is {} {}" .format(string_int, bin(string_int)))
+                    multi_bit_input_device_shift += 1
+                    component_type_numerical_value = str(string_int)
 
             if component_type_name == "OutputDevicesMask":
                 if component_type_literal == "default":
                     component_type_literal = "stub"
+
+                string_int = int(component_type_numerical_value, 0)
+                num_bits = bin(string_int).count("1")
+                if num_bits > 1:
+                    logging.info("The value {} is for criterion {} binary rep {} has {} bits sets"
+                        .format(component_type_numerical_value, component_type_name, bin(string_int), num_bits))
+                    string_int = 2**multi_bit_output_device_shift
+                    logging.info("new val assigned is {} {}" .format(string_int, bin(string_int)))
+                    multi_bit_output_device_shift += 1
+                    component_type_numerical_value = str(string_int)
 
             # Remove duplicated numerical values
             if int(component_type_numerical_value, 0) in all_component_types[component_type_name].values():

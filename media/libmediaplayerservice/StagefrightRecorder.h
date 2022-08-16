@@ -26,6 +26,7 @@
 #include <system/audio.h>
 
 #include <media/hardware/MetadataBufferType.h>
+#include <media/stagefright/foundation/AString.h>
 #include <android/content/AttributionSourceState.h>
 
 namespace android {

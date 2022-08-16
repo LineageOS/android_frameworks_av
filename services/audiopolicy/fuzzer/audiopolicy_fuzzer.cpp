@@ -30,6 +30,7 @@
 #include <libxml/parser.h>
 #include <libxml/xinclude.h>
 #include <media/AudioPolicy.h>
+#include <media/AudioProfile.h>
 #include <media/PatchBuilder.h>
 #include <media/RecordingActivityTracker.h>
 
@@ -126,13 +127,20 @@ static const std::vector<audio_usage_t> kAudioUsages = [] {
     return result;
 }();
 
+/**
+ * AudioSource - AUDIO_SOURCE_VOICE_COMMUNICATION and AUDIO_SOURCE_HOTWORD
+ * are excluded from kAudioSources[] in order to avoid the abort triggered
+ * for these two types of AudioSource in Engine::getDeviceForInputSource()
+ */
 static const std::vector<audio_source_t> kAudioSources = [] {
     std::vector<audio_source_t> result;
     for (const auto enumVal : xsdc_enum_range<xsd::AudioSource>{}) {
         audio_source_t audioSourceHal;
         std::string audioSource = toString(enumVal);
-        if (audio_source_from_string(audioSource.c_str(), &audioSourceHal)) {
-            result.push_back(audioSourceHal);
+        if (enumVal != xsd::AudioSource::AUDIO_SOURCE_VOICE_COMMUNICATION &&
+            enumVal != xsd::AudioSource::AUDIO_SOURCE_HOTWORD &&
+            audio_source_from_string(audioSource.c_str(), &audioSourceHal)) {
+          result.push_back(audioSourceHal);
         }
     }
     return result;
@@ -250,13 +258,14 @@ bool AudioPolicyManagerFuzzer::getOutputForAttr(
     if (!portId) portId = &localPortId;
     *portId = AUDIO_PORT_HANDLE_NONE;
     AudioPolicyInterface::output_type_t outputType;
+    bool isSpatialized;
 
     // TODO b/182392769: use attribution source util
     AttributionSourceState attributionSource;
     attributionSource.uid = 0;
     attributionSource.token = sp<BBinder>::make();
     if (mManager->getOutputForAttr(&attr, output, AUDIO_SESSION_NONE, &stream, attributionSource,
-            &config, &flags, selectedDeviceId, portId, {}, &outputType) != OK) {
+            &config, &flags, selectedDeviceId, portId, {}, &outputType, &isSpatialized) != OK) {
         return false;
     }
     if (*output == AUDIO_IO_HANDLE_NONE || *portId == AUDIO_PORT_HANDLE_NONE) {
@@ -841,6 +850,9 @@ class AudioPolicyManagerFuzzerDeviceConnection
         : AudioPolicyManagerFuzzerWithConfigurationFile(fdp){};
     void process() override;
 
+    void fuzzGetDirectPlaybackSupport();
+    void fuzzGetDirectProfilesForAttributes();
+
    protected:
     void setDeviceConnectionState();
     void explicitlyRoutingAfterConnection();
@@ -891,10 +903,41 @@ void AudioPolicyManagerFuzzerDeviceConnection::explicitlyRoutingAfterConnection(
     }
 }
 
+void AudioPolicyManagerFuzzerDeviceConnection::fuzzGetDirectPlaybackSupport() {
+    const uint32_t numTestCases = mFdp->ConsumeIntegralInRange<uint32_t>(1, 10);
+    for (int i = 0; i < numTestCases; ++i) {
+        audio_attributes_t attr = AUDIO_ATTRIBUTES_INITIALIZER;
+        attr.content_type = getValueFromVector<audio_content_type_t>(mFdp, kAudioContentTypes);
+        attr.usage = getValueFromVector<audio_usage_t>(mFdp, kAudioUsages);
+        attr.source = getValueFromVector<audio_source_t>(mFdp, kAudioSources);
+        attr.flags = getValueFromVector<audio_flags_mask_t>(mFdp, kAudioFlagMasks);
+        audio_config_t config = AUDIO_CONFIG_INITIALIZER;
+        config.channel_mask = getValueFromVector<audio_channel_mask_t>(mFdp, kAudioChannelOutMasks);
+        config.format = getValueFromVector<audio_format_t>(mFdp, kAudioFormats);
+        config.sample_rate = getValueFromVector<uint32_t>(mFdp, kSamplingRates);
+        mManager->getDirectPlaybackSupport(&attr, &config);
+    }
+}
+
+void AudioPolicyManagerFuzzerDeviceConnection::fuzzGetDirectProfilesForAttributes() {
+    const uint32_t numTestCases = mFdp->ConsumeIntegralInRange<uint32_t>(1, 10);
+    for (int i = 0; i < numTestCases; ++i) {
+        AudioProfileVector audioProfiles;
+        audio_attributes_t attr = AUDIO_ATTRIBUTES_INITIALIZER;
+        attr.content_type = getValueFromVector<audio_content_type_t>(mFdp, kAudioContentTypes);
+        attr.usage = getValueFromVector<audio_usage_t>(mFdp, kAudioUsages);
+        attr.source = getValueFromVector<audio_source_t>(mFdp, kAudioSources);
+        attr.flags = getValueFromVector<audio_flags_mask_t>(mFdp, kAudioFlagMasks);
+        mManager->getDirectProfilesForAttributes(&attr, audioProfiles);
+    }
+}
+
 void AudioPolicyManagerFuzzerDeviceConnection::process() {
     if (initialize()) {
         setDeviceConnectionState();
         explicitlyRoutingAfterConnection();
+        fuzzGetDirectPlaybackSupport();
+        fuzzGetDirectProfilesForAttributes();
         fuzzPatchCreation();
     }
 }

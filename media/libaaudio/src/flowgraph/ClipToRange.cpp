@@ -16,25 +16,23 @@
 
 #include <algorithm>
 #include <unistd.h>
-#include "AudioProcessorBase.h"
+#include "FlowGraphNode.h"
 #include "ClipToRange.h"
 
-using namespace flowgraph;
+using namespace FLOWGRAPH_OUTER_NAMESPACE::flowgraph;
 
 ClipToRange::ClipToRange(int32_t channelCount)
-        : input(*this, channelCount)
-        , output(*this, channelCount) {
+        : FlowGraphFilter(channelCount) {
 }
 
-int32_t ClipToRange::onProcess(int64_t framePosition, int32_t numFrames) {
-    int32_t framesToProcess = input.pullData(framePosition, numFrames);
-    const float *inputBuffer = input.getBlock();
-    float *outputBuffer = output.getBlock();
+int32_t ClipToRange::onProcess(int32_t numFrames) {
+    const float *inputBuffer = input.getBuffer();
+    float *outputBuffer = output.getBuffer();
 
-    int32_t numSamples = framesToProcess * output.getSamplesPerFrame();
+    int32_t numSamples = numFrames * output.getSamplesPerFrame();
     for (int32_t i = 0; i < numSamples; i++) {
         *outputBuffer++ = std::min(mMaximum, std::max(mMinimum, *inputBuffer++));
     }
 
-    return framesToProcess;
+    return numFrames;
 }

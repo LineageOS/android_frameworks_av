@@ -26,8 +26,8 @@ namespace aaudio {
 
 class AAudioStreamParameters {
 public:
-    AAudioStreamParameters();
-    virtual ~AAudioStreamParameters();
+    AAudioStreamParameters() = default;
+    virtual ~AAudioStreamParameters() = default;
 
     int32_t getDeviceId() const {
         return mDeviceId;
@@ -150,7 +150,7 @@ public:
     }
 
     // TODO b/182392769: reexamine if Identity can be used
-    void setOpPackageName(const std::optional<std::string> opPackageName) {
+    void setOpPackageName(const std::optional<std::string>& opPackageName) {
         mOpPackageName = opPackageName;
     }
 
@@ -158,7 +158,7 @@ public:
         return mAttributionTag;
     }
 
-    void setAttributionTag(const std::optional<std::string> attributionTag) {
+    void setAttributionTag(const std::optional<std::string>& attributionTag) {
         mAttributionTag = attributionTag;
     }
 

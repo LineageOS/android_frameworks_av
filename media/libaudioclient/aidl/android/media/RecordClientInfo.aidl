@@ -16,7 +16,7 @@
 
 package android.media;
 
-import android.media.AudioSourceType;
+import android.media.audio.common.AudioSource;
 
 /**
  * {@hide}
@@ -28,7 +28,7 @@ parcelable RecordClientInfo {
     int uid;
     /** Interpreted as audio_session_t. */
     int session;
-    AudioSourceType source;
+    AudioSource source;
     /** Interpreted as audio_port_handle_t. */
     int portId;
     boolean silenced;

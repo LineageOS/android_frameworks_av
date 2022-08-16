@@ -14,7 +14,7 @@
  * limitations under the License.
  */
 
-#include "include/FrameDecoder.h"
+#include <FrameDecoder.h>
 #include <fuzzer/FuzzedDataProvider.h>
 #include <media/IMediaSource.h>
 #include <media/stagefright/MetaData.h>
@@ -46,12 +46,15 @@ extern "C" int LLVMFuzzerTestOneInput(const uint8_t *data, size_t size) {
     }
 
     while (fdp.remaining_bytes()) {
-        switch (fdp.ConsumeIntegralInRange<uint8_t>(0, 3)) {
-            case 0:
-                decoder->init(/*frameTimeUs*/ fdp.ConsumeIntegral<int64_t>(),
-                              /*option*/ fdp.ConsumeIntegral<int>(),
-                              /*colorFormat*/ fdp.ConsumeIntegral<int>());
+        uint8_t switchCase = fdp.ConsumeIntegralInRange<uint8_t>(0, 3);
+        switch (switchCase) {
+            case 0: {
+                int64_t frameTimeUs = fdp.ConsumeIntegral<int64_t>();
+                int option = fdp.ConsumeIntegral<int>();
+                int colorFormat = fdp.ConsumeIntegral<int>();
+                decoder->init(frameTimeUs, option, colorFormat);
                 break;
+            }
             case 1:
                 decoder->extractFrame();
                 break;

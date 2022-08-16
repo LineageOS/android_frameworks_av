@@ -24,7 +24,7 @@ package android.media;
 @Backing(type="byte")
 enum SpatializationMode {
     /** The spatializer supports binaural mode (over headphones type devices). */
-    SPATIALIZATER_BINAURAL = 0,
+    SPATIALIZER_BINAURAL = 0,
     /** The spatializer supports transaural mode (over speaker type devices). */
-    SPATIALIZATER_TRANSAURAL = 1,
+    SPATIALIZER_TRANSAURAL = 1,
 }

@@ -13,6 +13,11 @@ cc_defaults {
         "-Wall",
         "-Werror",
     ],
+
+    sanitize: {
+        integer_overflow: true,
+        misc_undefined: ["bounds"],
+    },
 }
 
 cc_test {
@@ -48,7 +53,7 @@ cc_test {
     shared_libs: ["libaaudio_internal"],
 }
 
-cc_test {
+cc_binary {
     name: "test_timestamps",
     defaults: ["libaaudio_tests_defaults"],
     srcs: ["test_timestamps.cpp"],
@@ -60,121 +65,71 @@ cc_test {
     name: "test_open_params",
     defaults: ["libaaudio_tests_defaults"],
     srcs: ["test_open_params.cpp"],
-    shared_libs: [
-        "libaaudio",
-        "libbinder",
-        "libcutils",
-        "libutils",
-    ],
+    shared_libs: ["libaaudio"],
 }
 
-cc_test {
+cc_binary {
     name: "test_no_close",
     defaults: ["libaaudio_tests_defaults"],
     srcs: ["test_no_close.cpp"],
-    shared_libs: [
-        "libaaudio",
-        "libbinder",
-        "libcutils",
-        "libutils",
-    ],
+    shared_libs: ["libaaudio"],
 }
 
-cc_test {
+cc_binary {
     name: "test_aaudio_recovery",
     defaults: ["libaaudio_tests_defaults"],
     srcs: ["test_recovery.cpp"],
-    shared_libs: [
-        "libaaudio",
-        "libbinder",
-        "libcutils",
-        "libutils",
-    ],
+    shared_libs: ["libaaudio"],
 }
 
-cc_test {
+cc_binary {
     name: "test_n_streams",
     defaults: ["libaaudio_tests_defaults"],
     srcs: ["test_n_streams.cpp"],
-    shared_libs: [
-        "libaaudio",
-        "libbinder",
-        "libcutils",
-        "libutils",
-    ],
+    shared_libs: ["libaaudio"],
 }
 
-cc_test {
+cc_binary {
     name: "test_bad_disconnect",
     defaults: ["libaaudio_tests_defaults"],
     srcs: ["test_bad_disconnect.cpp"],
-    shared_libs: [
-        "libaaudio",
-        "libbinder",
-        "libcutils",
-        "libutils",
-    ],
+    shared_libs: ["libaaudio"],
 }
 
 cc_test {
     name: "test_various",
     defaults: ["libaaudio_tests_defaults"],
     srcs: ["test_various.cpp"],
-    shared_libs: [
-        "libaaudio",
-        "libbinder",
-        "libcutils",
-        "libutils",
-    ],
+    shared_libs: ["libaaudio"],
 }
 
 cc_test {
     name: "test_session_id",
     defaults: ["libaaudio_tests_defaults"],
     srcs: ["test_session_id.cpp"],
-    shared_libs: [
-        "libaaudio",
-        "libbinder",
-        "libcutils",
-        "libutils",
-    ],
+    shared_libs: ["libaaudio"],
 }
 
-cc_test {
+cc_binary {
     name: "test_aaudio_monkey",
     defaults: ["libaaudio_tests_defaults"],
     srcs: ["test_aaudio_monkey.cpp"],
     header_libs: ["libaaudio_example_utils"],
-    shared_libs: [
-        "libaaudio",
-        "libbinder",
-        "libcutils",
-        "libutils",
-    ],
+    shared_libs: ["libaaudio"],
 }
 
 cc_test {
     name: "test_attributes",
     defaults: ["libaaudio_tests_defaults"],
     srcs: ["test_attributes.cpp"],
-    shared_libs: [
-        "libaaudio",
-        "libbinder",
-        "libcutils",
-        "libutils",
-    ],
+    shared_libs: ["libaaudio"],
 }
 
 cc_test {
     name: "test_interference",
     defaults: ["libaaudio_tests_defaults"],
     srcs: ["test_interference.cpp"],
-    shared_libs: [
-        "libaaudio",
-        "libbinder",
-        "libcutils",
-        "libutils",
-    ],
+    shared_libs: ["libaaudio"],
 }
 
 cc_test {
@@ -197,27 +152,29 @@ cc_test {
 }
 
 cc_test {
-    name: "test_return_stop",
+    name: "test_monotonic_counter",
     defaults: ["libaaudio_tests_defaults"],
-    srcs: ["test_return_stop.cpp"],
+    srcs: ["test_monotonic_counter.cpp"],
     shared_libs: [
-        "libaaudio",
+        "libaaudio_internal",
         "libbinder",
         "libcutils",
         "libutils",
     ],
 }
 
+cc_binary {
+    name: "test_return_stop",
+    defaults: ["libaaudio_tests_defaults"],
+    srcs: ["test_return_stop.cpp"],
+    shared_libs: ["libaaudio"],
+}
+
 cc_test {
     name: "test_callback_race",
     defaults: ["libaaudio_tests_defaults"],
     srcs: ["test_callback_race.cpp"],
-    shared_libs: [
-        "libaaudio",
-        "libbinder",
-        "libcutils",
-        "libutils",
-    ],
+    shared_libs: ["libaaudio"],
 }
 
 cc_test {
@@ -238,7 +195,7 @@ cc_test {
     ],
 }
 
-cc_test {
+cc_binary {
     name: "test_steal_exclusive",
     defaults: ["libaaudio_tests_defaults"],
     srcs: ["test_steal_exclusive.cpp"],
@@ -251,15 +208,9 @@ cc_test {
     ],
 }
 
-
-cc_test {
+cc_binary {
     name: "test_disconnect_race",
     defaults: ["libaaudio_tests_defaults"],
     srcs: ["test_disconnect_race.cpp"],
-    shared_libs: [
-        "libaaudio",
-        "libbinder",
-        "libcutils",
-        "libutils",
-    ],
+    shared_libs: ["libaaudio"],
 }

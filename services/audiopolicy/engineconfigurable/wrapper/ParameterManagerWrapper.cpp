@@ -23,6 +23,7 @@
 #include <SelectionCriterionInterface.h>
 #include <media/convert.h>
 #include <algorithm>
+#include <cutils/bitops.h>
 #include <cutils/config_utils.h>
 #include <cutils/misc.h>
 #include <fstream>
@@ -31,6 +32,7 @@
 #include <string>
 #include <vector>
 #include <stdint.h>
+#include <cinttypes>
 #include <cmath>
 #include <utils/Log.h>
 
@@ -124,9 +126,22 @@ status_t ParameterManagerWrapper::addCriterion(const std::string &name, bool isI
 
     for (auto pair : pairs) {
         std::string error;
-        ALOGV("%s: Adding pair %d,%s for criterionType %s", __FUNCTION__, pair.first,
-              pair.second.c_str(), name.c_str());
-        criterionType->addValuePair(pair.first, pair.second, error);
+        ALOGV("%s: Adding pair %" PRIu64", %s for criterionType %s", __func__, std::get<0>(pair),
+              std::get<2>(pair).c_str(), name.c_str());
+        criterionType->addValuePair(std::get<0>(pair), std::get<2>(pair), error);
+
+        if (name == gOutputDeviceCriterionName) {
+            ALOGV("%s: Adding mOutputDeviceToCriterionTypeMap %d %" PRIu64" for criterionType %s",
+                  __func__, std::get<1>(pair), std::get<0>(pair), name.c_str());
+            audio_devices_t androidType = static_cast<audio_devices_t>(std::get<1>(pair));
+            mOutputDeviceToCriterionTypeMap[androidType] = std::get<0>(pair);
+        }
+        if (name == gInputDeviceCriterionName) {
+            ALOGV("%s: Adding mInputDeviceToCriterionTypeMap %d %" PRIu64" for criterionType %s",
+                  __func__, std::get<1>(pair), std::get<0>(pair), name.c_str());
+            audio_devices_t androidType = static_cast<audio_devices_t>(std::get<1>(pair));
+            mInputDeviceToCriterionTypeMap[androidType] = std::get<0>(pair);
+        }
     }
     ALOG_ASSERT(mPolicyCriteria.find(name) == mPolicyCriteria.end(),
                 "%s: Criterion %s already added", __FUNCTION__, name.c_str());
@@ -135,7 +150,7 @@ status_t ParameterManagerWrapper::addCriterion(const std::string &name, bool isI
     mPolicyCriteria[name] = criterion;
 
     if (not defaultValue.empty()) {
-        int numericalValue = 0;
+        uint64_t numericalValue = 0;
         if (not criterionType->getNumericalValue(defaultValue.c_str(), numericalValue)) {
             ALOGE("%s; trying to apply invalid default literal value (%s)", __FUNCTION__,
                   defaultValue.c_str());
@@ -263,7 +278,7 @@ bool ParameterManagerWrapper::isValueValidForCriterion(ISelectionCriterionInterf
 }
 
 status_t ParameterManagerWrapper::setDeviceConnectionState(
-        audio_devices_t type, const std::string address, audio_policy_dev_state_t state)
+        audio_devices_t type, const std::string &address, audio_policy_dev_state_t state)
 {
     std::string criterionName = audio_is_output_device(type) ?
                 gOutputDeviceAddressCriterionName : gInputDeviceAddressCriterionName;
@@ -279,7 +294,7 @@ status_t ParameterManagerWrapper::setDeviceConnectionState(
     }
 
     auto criterionType = criterion->getCriterionType();
-    int deviceAddressId;
+    uint64_t deviceAddressId;
     if (not criterionType->getNumericalValue(address.c_str(), deviceAddressId)) {
         ALOGW("%s: unknown device address reported (%s) for criterion %s", __FUNCTION__,
               address.c_str(), criterionName.c_str());
@@ -296,28 +311,28 @@ status_t ParameterManagerWrapper::setDeviceConnectionState(
     return NO_ERROR;
 }
 
-status_t ParameterManagerWrapper::setAvailableInputDevices(audio_devices_t inputDevices)
+status_t ParameterManagerWrapper::setAvailableInputDevices(const DeviceTypeSet &types)
 {
     ISelectionCriterionInterface *criterion =
             getElement<ISelectionCriterionInterface>(gInputDeviceCriterionName, mPolicyCriteria);
     if (criterion == NULL) {
-        ALOGE("%s: no criterion found for %s", __FUNCTION__, gInputDeviceCriterionName);
+        ALOGE("%s: no criterion found for %s", __func__, gInputDeviceCriterionName);
         return DEAD_OBJECT;
     }
-    criterion->setCriterionState(inputDevices & ~AUDIO_DEVICE_BIT_IN);
+    criterion->setCriterionState(convertDeviceTypesToCriterionValue(types));
     applyPlatformConfiguration();
     return NO_ERROR;
 }
 
-status_t ParameterManagerWrapper::setAvailableOutputDevices(audio_devices_t outputDevices)
+status_t ParameterManagerWrapper::setAvailableOutputDevices(const DeviceTypeSet &types)
 {
     ISelectionCriterionInterface *criterion =
             getElement<ISelectionCriterionInterface>(gOutputDeviceCriterionName, mPolicyCriteria);
     if (criterion == NULL) {
-        ALOGE("%s: no criterion found for %s", __FUNCTION__, gOutputDeviceCriterionName);
+        ALOGE("%s: no criterion found for %s", __func__, gOutputDeviceCriterionName);
         return DEAD_OBJECT;
     }
-    criterion->setCriterionState(outputDevices);
+    criterion->setCriterionState(convertDeviceTypesToCriterionValue(types));
     applyPlatformConfiguration();
     return NO_ERROR;
 }
@@ -325,6 +340,46 @@ status_t ParameterManagerWrapper::setAvailableOutputDevices(audio_devices_t outp
 void ParameterManagerWrapper::applyPlatformConfiguration()
 {
     mPfwConnector->applyConfigurations();
+}
+
+uint64_t ParameterManagerWrapper::convertDeviceTypeToCriterionValue(audio_devices_t type) const {
+    bool isOut = audio_is_output_devices(type);
+    uint32_t typeMask = isOut ? type : (type & ~AUDIO_DEVICE_BIT_IN);
+
+    const auto &adapters = isOut ? mOutputDeviceToCriterionTypeMap : mInputDeviceToCriterionTypeMap;
+    // Only multibit devices need adaptation.
+    if (popcount(typeMask) > 1) {
+        const auto &adapter = adapters.find(type);
+        if (adapter != adapters.end()) {
+            ALOGV("%s: multibit device %d converted to criterion %" PRIu64, __func__, type,
+                  adapter->second);
+            return adapter->second;
+        }
+        ALOGE("%s: failed to find map for multibit device %d", __func__, type);
+        return 0;
+    }
+    return typeMask;
+}
+
+uint64_t ParameterManagerWrapper::convertDeviceTypesToCriterionValue(
+        const DeviceTypeSet &types) const {
+    uint64_t criterionValue = 0;
+    for (const auto &type : types) {
+        criterionValue += convertDeviceTypeToCriterionValue(type);
+    }
+    return criterionValue;
+}
+
+DeviceTypeSet ParameterManagerWrapper::convertDeviceCriterionValueToDeviceTypes(
+        uint64_t criterionValue, bool isOut) const {
+    DeviceTypeSet deviceTypes;
+    const auto &adapters = isOut ? mOutputDeviceToCriterionTypeMap : mInputDeviceToCriterionTypeMap;
+    for (const auto &adapter : adapters) {
+        if ((adapter.second & criterionValue) == adapter.second) {
+            deviceTypes.insert(adapter.first);
+        }
+    }
+    return deviceTypes;
 }
 
 } // namespace audio_policy

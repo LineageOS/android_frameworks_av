@@ -28,10 +28,6 @@ cc_library {
         "PlaylistFetcher.cpp",
     ],
 
-    include_dirs: [
-        "frameworks/native/include/media/openmax",
-    ],
-
     cflags: [
         "-Werror",
         "-Wall",

@@ -123,6 +123,7 @@ struct MixPortTraits : public AndroidCollectionTraits<IOProfile, IOProfileCollec
         static constexpr const char *flags = "flags";
         static constexpr const char *maxOpenCount = "maxOpenCount";
         static constexpr const char *maxActiveCount = "maxActiveCount";
+        static constexpr const char *recommendedMuteDurationMs = "recommendedMuteDurationMs";
     };
 
     // Children: GainTraits
@@ -482,7 +483,14 @@ std::variant<status_t, MixPortTraits::Element> PolicySerializer::deserialize<Mix
     if (!flags.empty()) {
         // Source role
         if (portRole == AUDIO_PORT_ROLE_SOURCE) {
-            mixPort->setFlags(OutputFlagConverter::maskFromString(flags, mFlagsSeparator.c_str()));
+            //TODO: b/193496180 use spatializer flag at audio HAL when available until then,
+            // use DEEP_BUFFER+FAST flag combo to indicate the spatializer output profile
+            uint32_t intFlags =
+                    OutputFlagConverter::maskFromString(flags, mFlagsSeparator.c_str());
+            if (intFlags == (AUDIO_OUTPUT_FLAG_FAST | AUDIO_OUTPUT_FLAG_DEEP_BUFFER)) {
+                intFlags = AUDIO_OUTPUT_FLAG_SPATIALIZER;
+            }
+            mixPort->setFlags(intFlags);
         } else {
             // Sink role
             mixPort->setFlags(InputFlagConverter::maskFromString(flags, mFlagsSeparator.c_str()));
@@ -496,6 +504,13 @@ std::variant<status_t, MixPortTraits::Element> PolicySerializer::deserialize<Mix
     if (!maxActiveCount.empty()) {
         convertTo(maxActiveCount, mixPort->maxActiveCount);
     }
+
+    std::string recommendedmuteDurationMsLiteral =
+            getXmlAttribute(child, Attributes::recommendedMuteDurationMs);
+    if (!recommendedmuteDurationMsLiteral.empty()) {
+        convertTo(recommendedmuteDurationMsLiteral, mixPort->recommendedMuteDurationMs);
+    }
+
     // Deserialize children
     AudioGainTraits::Collection gains;
     status = deserializeCollection<AudioGainTraits>(child, &gains, NULL);

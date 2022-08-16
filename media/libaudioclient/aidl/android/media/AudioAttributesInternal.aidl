@@ -16,9 +16,9 @@
 
 package android.media;
 
-import android.media.AudioContentType;
-import android.media.AudioSourceType;
-import android.media.AudioUsage;
+import android.media.audio.common.AudioContentType;
+import android.media.audio.common.AudioSource;
+import android.media.audio.common.AudioUsage;
 
 /**
  * The "Internal" suffix of this type name is to disambiguate it from the
@@ -28,7 +28,7 @@ import android.media.AudioUsage;
 parcelable AudioAttributesInternal {
     AudioContentType contentType;
     AudioUsage usage;
-    AudioSourceType source;
+    AudioSource source;
     // Bitmask, indexed by AudioFlag.
     int flags;
     @utf8InCpp String tags; /* UTF8 */

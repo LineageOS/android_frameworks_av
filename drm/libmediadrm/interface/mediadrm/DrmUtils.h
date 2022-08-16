@@ -39,11 +39,19 @@
 #include <mutex>
 #include <string>
 #include <vector>
-
+#include <aidl/android/hardware/drm/LogMessage.h>
+#include <aidl/android/hardware/drm/Status.h>
+#include <aidl/android/hardware/drm/IDrmFactory.h>
 
 using namespace ::android::hardware::drm;
 using ::android::hardware::hidl_vec;
 using ::android::hardware::Return;
+
+using ::aidl::android::hardware::drm::LogPriority;
+using ::aidl::android::hardware::drm::LogMessage;
+using ::aidl::android::hardware::drm::Uuid;
+using StatusAidl = ::aidl::android::hardware::drm::Status;
+using IDrmFactoryAidl = ::aidl::android::hardware::drm::IDrmFactory;
 
 namespace android {
 
@@ -157,6 +165,14 @@ void WriteKeysChange(
     obj.writeInt32(hasNewUsableKey);
 }
 
+inline Uuid toAidlUuid(const uint8_t uuid[16]) {
+    Uuid uuidAidl;
+    for (int i = 0; i < 16; ++i) uuidAidl.uuid[i] = uuid[i];
+    return uuidAidl;
+}
+
+std::vector<std::shared_ptr<IDrmFactoryAidl>> makeDrmFactoriesAidl();
+
 std::vector<sp<::V1_0::IDrmFactory>> MakeDrmFactories(const uint8_t uuid[16] = nullptr);
 
 std::vector<sp<::V1_0::IDrmPlugin>> MakeDrmPlugins(const uint8_t uuid[16],
@@ -180,6 +196,138 @@ inline status_t toStatusT(const android::hardware::Return<T> &status) {
     auto t = static_cast<T>(status);
     auto err = static_cast<::V1_4::Status>(t);
     return toStatusT_1_4(err);
+}
+
+inline status_t statusAidlToStatusT(::ndk::ScopedAStatus &statusAidl) {
+    if (statusAidl.isOk()) return OK;
+    if (statusAidl.getExceptionCode() != EX_SERVICE_SPECIFIC) return DEAD_OBJECT;
+    auto status = static_cast<StatusAidl>(statusAidl.getServiceSpecificError());
+    switch (status) {
+    case StatusAidl::OK:
+        return OK;
+    case StatusAidl::BAD_VALUE:
+        return BAD_VALUE;
+    case StatusAidl::ERROR_DRM_CANNOT_HANDLE:
+        return ERROR_DRM_CANNOT_HANDLE;
+    case StatusAidl::ERROR_DRM_DECRYPT:
+        return ERROR_DRM_DECRYPT;
+    case StatusAidl::ERROR_DRM_DEVICE_REVOKED:
+        return ERROR_DRM_DEVICE_REVOKED;
+    case StatusAidl::ERROR_DRM_FRAME_TOO_LARGE:
+        return ERROR_DRM_FRAME_TOO_LARGE;
+    case StatusAidl::ERROR_DRM_INSUFFICIENT_OUTPUT_PROTECTION:
+        return ERROR_DRM_INSUFFICIENT_OUTPUT_PROTECTION;
+    case StatusAidl::ERROR_DRM_INSUFFICIENT_SECURITY:
+        return ERROR_DRM_INSUFFICIENT_SECURITY;
+    case StatusAidl::ERROR_DRM_INVALID_STATE:
+        return ERROR_DRM_INVALID_STATE;
+    case StatusAidl::ERROR_DRM_LICENSE_EXPIRED:
+        return ERROR_DRM_LICENSE_EXPIRED;
+    case StatusAidl::ERROR_DRM_NO_LICENSE:
+        return ERROR_DRM_NO_LICENSE;
+    case StatusAidl::ERROR_DRM_NOT_PROVISIONED:
+        return ERROR_DRM_NOT_PROVISIONED;
+    case StatusAidl::ERROR_DRM_RESOURCE_BUSY:
+        return ERROR_DRM_RESOURCE_BUSY;
+    case StatusAidl::ERROR_DRM_RESOURCE_CONTENTION:
+        return ERROR_DRM_RESOURCE_CONTENTION;
+    case StatusAidl::ERROR_DRM_SESSION_LOST_STATE:
+        return ERROR_DRM_SESSION_LOST_STATE;
+    case StatusAidl::ERROR_DRM_SESSION_NOT_OPENED:
+        return ERROR_DRM_SESSION_NOT_OPENED;
+
+    // New in S / drm@1.4:
+    case StatusAidl::CANNOT_DECRYPT_ZERO_SUBSAMPLES:
+        return ERROR_DRM_ZERO_SUBSAMPLES;
+    case StatusAidl::CRYPTO_LIBRARY_ERROR:
+        return ERROR_DRM_CRYPTO_LIBRARY;
+    case StatusAidl::GENERAL_OEM_ERROR:
+        return ERROR_DRM_GENERIC_OEM;
+    case StatusAidl::GENERAL_PLUGIN_ERROR:
+        return ERROR_DRM_GENERIC_PLUGIN;
+    case StatusAidl::INIT_DATA_INVALID:
+        return ERROR_DRM_INIT_DATA;
+    case StatusAidl::KEY_NOT_LOADED:
+        return ERROR_DRM_KEY_NOT_LOADED;
+    case StatusAidl::LICENSE_PARSE_ERROR:
+        return ERROR_DRM_LICENSE_PARSE;
+    case StatusAidl::LICENSE_POLICY_ERROR:
+        return ERROR_DRM_LICENSE_POLICY;
+    case StatusAidl::LICENSE_RELEASE_ERROR:
+        return ERROR_DRM_LICENSE_RELEASE;
+    case StatusAidl::LICENSE_REQUEST_REJECTED:
+        return ERROR_DRM_LICENSE_REQUEST_REJECTED;
+    case StatusAidl::LICENSE_RESTORE_ERROR:
+        return ERROR_DRM_LICENSE_RESTORE;
+    case StatusAidl::LICENSE_STATE_ERROR:
+        return ERROR_DRM_LICENSE_STATE;
+    case StatusAidl::MALFORMED_CERTIFICATE:
+        return ERROR_DRM_CERTIFICATE_MALFORMED;
+    case StatusAidl::MEDIA_FRAMEWORK_ERROR:
+        return ERROR_DRM_MEDIA_FRAMEWORK;
+    case StatusAidl::MISSING_CERTIFICATE:
+        return ERROR_DRM_CERTIFICATE_MISSING;
+    case StatusAidl::PROVISIONING_CERTIFICATE_ERROR:
+        return ERROR_DRM_PROVISIONING_CERTIFICATE;
+    case StatusAidl::PROVISIONING_CONFIGURATION_ERROR:
+        return ERROR_DRM_PROVISIONING_CONFIG;
+    case StatusAidl::PROVISIONING_PARSE_ERROR:
+        return ERROR_DRM_PROVISIONING_PARSE;
+    case StatusAidl::PROVISIONING_REQUEST_REJECTED:
+        return ERROR_DRM_PROVISIONING_REQUEST_REJECTED;
+    case StatusAidl::RETRYABLE_PROVISIONING_ERROR:
+        return ERROR_DRM_PROVISIONING_RETRY;
+    case StatusAidl::SECURE_STOP_RELEASE_ERROR:
+        return ERROR_DRM_SECURE_STOP_RELEASE;
+    case StatusAidl::STORAGE_READ_FAILURE:
+        return ERROR_DRM_STORAGE_READ;
+    case StatusAidl::STORAGE_WRITE_FAILURE:
+        return ERROR_DRM_STORAGE_WRITE;
+
+    case StatusAidl::ERROR_DRM_UNKNOWN:
+    default:
+        return ERROR_DRM_UNKNOWN;
+    }
+    return ERROR_DRM_UNKNOWN;
+}
+
+template<typename T, typename U>
+status_t GetLogMessagesAidl(const std::shared_ptr<U> &obj, Vector<::V1_4::LogMessage> &logs) {
+    std::shared_ptr<T> plugin = obj;
+    if (obj == NULL) {
+        LOG2BW("%s obj is null", U::descriptor);
+    } else if (plugin == NULL) {
+        LOG2BW("Cannot cast %s obj to %s plugin", U::descriptor, T::descriptor);
+    }
+
+    std::vector<LogMessage> pluginLogsAidl;
+    if (plugin != NULL) {
+        if(!plugin->getLogMessages(&pluginLogsAidl).isOk()) {
+            LOG2BW("%s::getLogMessages remote call failed", T::descriptor);
+        }
+    }
+
+    std::vector<::V1_4::LogMessage> pluginLogs;
+    for (LogMessage log : pluginLogsAidl) {
+        ::V1_4::LogMessage logHidl;
+        logHidl.timeMs = log.timeMs;
+        // skip negative convert check as count of enum elements is 7
+        logHidl.priority =  static_cast<::V1_4::LogPriority>((int32_t)log.priority);
+        logHidl.message = log.message;
+        pluginLogs.push_back(logHidl);
+    }
+
+    auto allLogs(gLogBuf.getLogs());
+    LOG2BD("framework logs size %zu; plugin logs size %zu",
+           allLogs.size(), pluginLogs.size());
+    std::copy(pluginLogs.begin(), pluginLogs.end(), std::back_inserter(allLogs));
+    std::sort(allLogs.begin(), allLogs.end(),
+              [](const ::V1_4::LogMessage &a, const ::V1_4::LogMessage &b) {
+                  return a.timeMs < b.timeMs;
+              });
+
+    logs.appendVector(allLogs);
+    return OK;
 }
 
 template<typename T, typename U>

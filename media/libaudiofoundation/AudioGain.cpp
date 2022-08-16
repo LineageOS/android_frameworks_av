@@ -24,22 +24,18 @@
 #define ALOGVV(a...) do { } while(0)
 #endif
 
+#include <math.h>
+
 #include <algorithm>
 
 #include <android-base/stringprintf.h>
 #include <media/AudioGain.h>
 #include <utils/Log.h>
 
-#include <math.h>
-
 namespace android {
 
-AudioGain::AudioGain(int index, bool useInChannelMask)
-{
-    mIndex = index;
-    mUseInChannelMask = useInChannelMask;
-    memset(&mGain, 0, sizeof(struct audio_gain));
-}
+AudioGain::AudioGain(int index, bool isInput)
+        : mIndex(index), mIsInput(isInput) {}
 
 void AudioGain::getDefaultConfig(struct audio_gain_config *config)
 {
@@ -49,12 +45,9 @@ void AudioGain::getDefaultConfig(struct audio_gain_config *config)
     if ((mGain.mode & AUDIO_GAIN_MODE_JOINT) == AUDIO_GAIN_MODE_JOINT) {
         config->values[0] = mGain.default_value;
     } else {
-        uint32_t numValues;
-        if (mUseInChannelMask) {
-            numValues = audio_channel_count_from_in_mask(mGain.channel_mask);
-        } else {
-            numValues = audio_channel_count_from_out_mask(mGain.channel_mask);
-        }
+        const uint32_t numValues = mIsInput ?
+                audio_channel_count_from_in_mask(mGain.channel_mask) :
+                audio_channel_count_from_out_mask(mGain.channel_mask);
         for (size_t i = 0; i < numValues; i++) {
             config->values[i] = mGain.default_value;
         }
@@ -78,12 +71,9 @@ status_t AudioGain::checkConfig(const struct audio_gain_config *config)
         if ((config->channel_mask & ~mGain.channel_mask) != 0) {
             return BAD_VALUE;
         }
-        uint32_t numValues;
-        if (mUseInChannelMask) {
-            numValues = audio_channel_count_from_in_mask(config->channel_mask);
-        } else {
-            numValues = audio_channel_count_from_out_mask(config->channel_mask);
-        }
+        const uint32_t numValues = mIsInput ?
+                audio_channel_count_from_in_mask(config->channel_mask) :
+                audio_channel_count_from_out_mask(config->channel_mask);
         for (size_t i = 0; i < numValues; i++) {
             if ((config->values[i] < mGain.min_value) ||
                     (config->values[i] > mGain.max_value)) {
@@ -116,7 +106,7 @@ void AudioGain::dump(std::string *dst, int spaces, int index) const
 bool AudioGain::equals(const sp<AudioGain>& other) const
 {
     return other != nullptr &&
-           mUseInChannelMask == other->mUseInChannelMask &&
+           mIsInput == other->mIsInput &&
            mUseForVolume == other->mUseForVolume &&
            // Compare audio gain
            mGain.mode == other->mGain.mode &&
@@ -129,51 +119,24 @@ bool AudioGain::equals(const sp<AudioGain>& other) const
            mGain.max_ramp_ms == other->mGain.max_ramp_ms;
 }
 
-status_t AudioGain::writeToParcel(android::Parcel *parcel) const {
-    media::AudioGain parcelable;
-    return writeToParcelable(&parcelable)
-        ?: parcelable.writeToParcel(parcel);
+ConversionResult<AudioGain::Aidl> AudioGain::toParcelable() const {
+    media::audio::common::AudioGain aidl = VALUE_OR_RETURN(
+            legacy2aidl_audio_gain_AudioGain(mGain, mIsInput));
+    aidl.useForVolume = mUseForVolume;
+    media::AudioGainSys aidlSys;
+    aidlSys.index = VALUE_OR_RETURN(convertIntegral<int32_t>(mIndex));
+    aidlSys.isInput = mIsInput;
+    return std::make_pair(aidl, aidlSys);
 }
 
-status_t AudioGain::writeToParcelable(media::AudioGain* parcelable) const {
-    parcelable->index = VALUE_OR_RETURN_STATUS(convertIntegral<int32_t>(mIndex));
-    parcelable->useInChannelMask = mUseInChannelMask;
-    parcelable->useForVolume = mUseForVolume;
-    parcelable->mode = VALUE_OR_RETURN_STATUS(
-            legacy2aidl_audio_gain_mode_t_int32_t_mask(mGain.mode));
-    parcelable->channelMask = VALUE_OR_RETURN_STATUS(
-            legacy2aidl_audio_channel_mask_t_int32_t(mGain.channel_mask));
-    parcelable->minValue = VALUE_OR_RETURN_STATUS(convertIntegral<int32_t>(mGain.min_value));
-    parcelable->maxValue = VALUE_OR_RETURN_STATUS(convertIntegral<int32_t>(mGain.max_value));
-    parcelable->defaultValue = VALUE_OR_RETURN_STATUS(
-            convertIntegral<int32_t>(mGain.default_value));
-    parcelable->stepValue = VALUE_OR_RETURN_STATUS(convertIntegral<int32_t>(mGain.step_value));
-    parcelable->minRampMs = VALUE_OR_RETURN_STATUS(convertIntegral<int32_t>(mGain.min_ramp_ms));
-    parcelable->maxRampMs = VALUE_OR_RETURN_STATUS(convertIntegral<int32_t>(mGain.max_ramp_ms));
-    return OK;
-}
-
-status_t AudioGain::readFromParcel(const android::Parcel *parcel) {
-    media::AudioGain parcelable;
-    return parcelable.readFromParcel(parcel)
-        ?: readFromParcelable(parcelable);
-}
-
-status_t AudioGain::readFromParcelable(const media::AudioGain& parcelable) {
-    mIndex = VALUE_OR_RETURN_STATUS(convertIntegral<int>(parcelable.index));
-    mUseInChannelMask = parcelable.useInChannelMask;
-    mUseForVolume = parcelable.useForVolume;
-    mGain.mode = VALUE_OR_RETURN_STATUS(
-            aidl2legacy_int32_t_audio_gain_mode_t_mask(parcelable.mode));
-    mGain.channel_mask = VALUE_OR_RETURN_STATUS(
-            aidl2legacy_int32_t_audio_channel_mask_t(parcelable.channelMask));
-    mGain.min_value = VALUE_OR_RETURN_STATUS(convertIntegral<int>(parcelable.minValue));
-    mGain.max_value = VALUE_OR_RETURN_STATUS(convertIntegral<int>(parcelable.maxValue));
-    mGain.default_value = VALUE_OR_RETURN_STATUS(convertIntegral<int>(parcelable.defaultValue));
-    mGain.step_value = VALUE_OR_RETURN_STATUS(convertIntegral<unsigned int>(parcelable.stepValue));
-    mGain.min_ramp_ms = VALUE_OR_RETURN_STATUS(convertIntegral<unsigned int>(parcelable.minRampMs));
-    mGain.max_ramp_ms = VALUE_OR_RETURN_STATUS(convertIntegral<unsigned int>(parcelable.maxRampMs));
-    return OK;
+ConversionResult<sp<AudioGain>> AudioGain::fromParcelable(const AudioGain::Aidl& aidl) {
+    const media::audio::common::AudioGain& hal = aidl.first;
+    const media::AudioGainSys& sys = aidl.second;
+    auto index = VALUE_OR_RETURN(convertIntegral<int>(sys.index));
+    sp<AudioGain> legacy = sp<AudioGain>::make(index, sys.isInput);
+    legacy->mGain = VALUE_OR_RETURN(aidl2legacy_AudioGain_audio_gain(hal, sys.isInput));
+    legacy->mUseForVolume = hal.useForVolume;
+    return legacy;
 }
 
 bool AudioGains::equals(const AudioGains &other) const
@@ -184,59 +147,30 @@ bool AudioGains::equals(const AudioGains &other) const
                       });
 }
 
-status_t AudioGains::writeToParcel(android::Parcel *parcel) const {
-    status_t status = NO_ERROR;
-    if ((status = parcel->writeVectorSize(*this)) != NO_ERROR) return status;
-    for (const auto &audioGain : *this) {
-        if ((status = parcel->writeParcelable(*audioGain)) != NO_ERROR) {
-            break;
-        }
-    }
-    return status;
-}
-
-status_t AudioGains::readFromParcel(const android::Parcel *parcel) {
-    status_t status = NO_ERROR;
-    this->clear();
-    if ((status = parcel->resizeOutVector(this)) != NO_ERROR) return status;
-    for (size_t i = 0; i < this->size(); i++) {
-        this->at(i) = new AudioGain(0, false);
-        if ((status = parcel->readParcelable(this->at(i).get())) != NO_ERROR) {
-            this->clear();
-            break;
-        }
-    }
-    return status;
-}
-
 ConversionResult<sp<AudioGain>>
-aidl2legacy_AudioGain(const media::AudioGain& aidl) {
-    sp<AudioGain> legacy = new AudioGain(0, false);
-    status_t status = legacy->readFromParcelable(aidl);
-    if (status != OK) {
-        return base::unexpected(status);
-    }
-    return legacy;
+aidl2legacy_AudioGain(const AudioGain::Aidl& aidl) {
+    return AudioGain::fromParcelable(aidl);
 }
 
-ConversionResult<media::AudioGain>
+ConversionResult<AudioGain::Aidl>
 legacy2aidl_AudioGain(const sp<AudioGain>& legacy) {
-    media::AudioGain aidl;
-    status_t status = legacy->writeToParcelable(&aidl);
-    if (status != OK) {
-        return base::unexpected(status);
-    }
-    return aidl;
+    return legacy->toParcelable();
 }
 
 ConversionResult<AudioGains>
-aidl2legacy_AudioGains(const std::vector<media::AudioGain>& aidl) {
-    return convertContainer<AudioGains>(aidl, aidl2legacy_AudioGain);
+aidl2legacy_AudioGains(const AudioGains::Aidl& aidl) {
+    return convertContainers<AudioGains>(aidl.first, aidl.second,
+            [](const media::audio::common::AudioGain& g,
+               const media::AudioGainSys& gs) {
+                return aidl2legacy_AudioGain(std::make_pair(g, gs));
+            });
 }
 
-ConversionResult<std::vector<media::AudioGain>>
+ConversionResult<AudioGains::Aidl>
 legacy2aidl_AudioGains(const AudioGains& legacy) {
-    return convertContainer<std::vector<media::AudioGain>>(legacy, legacy2aidl_AudioGain);
+    return convertContainerSplit<
+            std::vector<media::audio::common::AudioGain>,
+            std::vector<media::AudioGainSys>>(legacy, legacy2aidl_AudioGain);
 }
 
 } // namespace android

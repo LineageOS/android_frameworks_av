@@ -58,7 +58,8 @@ constexpr audio_unique_id_use_t kUniqueIds[] = {
 
 constexpr audio_mode_t kModes[] = {
     AUDIO_MODE_INVALID, AUDIO_MODE_CURRENT,          AUDIO_MODE_NORMAL,     AUDIO_MODE_RINGTONE,
-    AUDIO_MODE_IN_CALL, AUDIO_MODE_IN_COMMUNICATION, AUDIO_MODE_CALL_SCREEN};
+    AUDIO_MODE_IN_CALL, AUDIO_MODE_IN_COMMUNICATION, AUDIO_MODE_CALL_SCREEN,
+    AUDIO_MODE_CALL_REDIRECT, AUDIO_MODE_COMMUNICATION_REDIRECT};
 
 constexpr audio_session_t kSessionId[] = {AUDIO_SESSION_NONE, AUDIO_SESSION_OUTPUT_STAGE,
                                           AUDIO_SESSION_DEVICE};
@@ -231,7 +232,7 @@ void AudioFlingerFuzzer::invokeAudioTrack() {
     attributionSource.pid = VALUE_OR_FATAL(legacy2aidl_pid_t_int32_t(getpid()));
     attributionSource.token = sp<BBinder>::make();
     track->set(AUDIO_STREAM_DEFAULT, sampleRate, format, channelMask, frameCount, flags, nullptr,
-               nullptr, notificationFrames, sharedBuffer, false, sessionId,
+               notificationFrames, sharedBuffer, false, sessionId,
                ((fast && sharedBuffer == 0) || offload) ? AudioTrack::TRANSFER_CALLBACK
                                                         : AudioTrack::TRANSFER_DEFAULT,
                offload ? &offloadInfo : nullptr, attributionSource, &attributes, false, 1.0f,
@@ -314,7 +315,7 @@ void AudioFlingerFuzzer::invokeAudioRecord() {
     attributionSource.packageName = std::string(mFdp.ConsumeRandomLengthString().c_str());
     attributionSource.token = sp<BBinder>::make();
     sp<AudioRecord> record = new AudioRecord(attributionSource);
-    record->set(AUDIO_SOURCE_DEFAULT, sampleRate, format, channelMask, frameCount, nullptr, nullptr,
+    record->set(AUDIO_SOURCE_DEFAULT, sampleRate, format, channelMask, frameCount, nullptr,
                 notificationFrames, false, sessionId,
                 fast ? AudioRecord::TRANSFER_CALLBACK : AudioRecord::TRANSFER_DEFAULT, flags,
                 getuid(), getpid(), &attributes, AUDIO_PORT_HANDLE_NONE);
@@ -354,7 +355,7 @@ void AudioFlingerFuzzer::invokeAudioRecord() {
     audioBuffer.frameCount = static_cast<size_t>(mFdp.ConsumeIntegral<uint32_t>());
     record->obtainBuffer(&audioBuffer, waitCount, &nonContig);
     bool blocking = false;
-    record->read(audioBuffer.raw, audioBuffer.size, blocking);
+    record->read(audioBuffer.data(), audioBuffer.size(), blocking);
     record->getInputFramesLost();
     record->getFlags();
 
@@ -601,9 +602,10 @@ status_t AudioFlingerFuzzer::invokeAudioInputDevice() {
     media::OpenInputRequest request{};
     request.module = VALUE_OR_RETURN_STATUS(legacy2aidl_audio_module_handle_t_int32_t(module));
     request.input = VALUE_OR_RETURN_STATUS(legacy2aidl_audio_io_handle_t_int32_t(input));
-    request.config = VALUE_OR_RETURN_STATUS(legacy2aidl_audio_config_t_AudioConfig(config));
+    request.config = VALUE_OR_RETURN_STATUS(
+            legacy2aidl_audio_config_t_AudioConfig(config, true /*isInput*/));
     request.device = VALUE_OR_RETURN_STATUS(legacy2aidl_AudioDeviceTypeAddress(deviceTypeAddr));
-    request.source = VALUE_OR_RETURN_STATUS(legacy2aidl_audio_source_t_AudioSourceType(source));
+    request.source = VALUE_OR_RETURN_STATUS(legacy2aidl_audio_source_t_AudioSource(source));
     request.flags = VALUE_OR_RETURN_STATUS(legacy2aidl_audio_input_flags_t_int32_t_mask(flags));
 
     media::OpenInputResponse response{};
@@ -658,9 +660,10 @@ status_t AudioFlingerFuzzer::invokeAudioOutputDevice() {
     media::OpenOutputResponse response{};
 
     request.module = VALUE_OR_RETURN_STATUS(legacy2aidl_audio_module_handle_t_int32_t(module));
-    request.halConfig = VALUE_OR_RETURN_STATUS(legacy2aidl_audio_config_t_AudioConfig(config));
-    request.mixerConfig =
-            VALUE_OR_RETURN_STATUS(legacy2aidl_audio_config_base_t_AudioConfigBase(mixerConfig));
+    request.halConfig = VALUE_OR_RETURN_STATUS(
+            legacy2aidl_audio_config_t_AudioConfig(config, false /*isInput*/));
+    request.mixerConfig = VALUE_OR_RETURN_STATUS(
+            legacy2aidl_audio_config_base_t_AudioConfigBase(mixerConfig, false /*isInput*/));
     request.device = VALUE_OR_RETURN_STATUS(legacy2aidl_DeviceDescriptorBase(device));
     request.flags = VALUE_OR_RETURN_STATUS(legacy2aidl_audio_output_flags_t_int32_t_mask(flags));
 

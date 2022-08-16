@@ -44,11 +44,11 @@ extern "C" int LLVMFuzzerTestOneInput(const uint8_t* data, size_t size) {
 
     // 2. We also have setAudioHalPids, which is populated with the pids set
     // above.
-    android::TimeCheck::setAudioHalPids(pids);
+    android::mediautils::TimeCheck::setAudioHalPids(pids);
     std::string name = data_provider.ConsumeRandomLengthString(kMaxStringLen);
 
     // 3. The constructor, which is fuzzed here:
-    android::TimeCheck timeCheck(name.c_str(), timeoutMs);
+    android::mediautils::TimeCheck timeCheck(name.c_str(), {} /* onTimer */, timeoutMs);
     // We will leave some buffer to avoid sleeping too long
     uint8_t sleep_amount_ms = data_provider.ConsumeIntegralInRange<uint8_t>(0, timeoutMs / 2);
 

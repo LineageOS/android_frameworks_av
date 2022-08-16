@@ -65,7 +65,9 @@ public:
     }
 
     // This is public so it can be called from the C callback function.
-    void processCallback(int event, void *info) override;
+    void processCallback(int event, void *info);
+
+    void processCallbackRecord(aaudio_callback_operation_t opcode, void *info);
 
     int64_t incrementClientFrameCounter(int32_t frames) override {
         return incrementFramesRead(frames);

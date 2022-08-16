@@ -121,7 +121,10 @@ static status_t _ImageCopy(View &view, const MediaImage2 *img, ImagePixel *imgBa
 }  // namespace
 
 status_t ImageCopy(uint8_t *imgBase, const MediaImage2 *img, const C2GraphicView &view) {
-    if (view.crop().width != img->mWidth || view.crop().height != img->mHeight) {
+    if (img == nullptr
+        || imgBase == nullptr
+        || view.crop().width != img->mWidth
+        || view.crop().height != img->mHeight) {
         return BAD_VALUE;
     }
     const uint8_t* src_y = view.data()[0];
@@ -203,7 +206,10 @@ status_t ImageCopy(uint8_t *imgBase, const MediaImage2 *img, const C2GraphicView
 }
 
 status_t ImageCopy(C2GraphicView &view, const uint8_t *imgBase, const MediaImage2 *img) {
-    if (view.crop().width != img->mWidth || view.crop().height != img->mHeight) {
+    if (img == nullptr
+        || imgBase == nullptr
+        || view.crop().width != img->mWidth
+        || view.crop().height != img->mHeight) {
         return BAD_VALUE;
     }
     const uint8_t* src_y = imgBase + img->mPlane[0].mOffset;
@@ -532,12 +538,14 @@ MediaImage2 CreateYUV420SemiPlanarMediaImage2(
 // Matrix coefficient to convert RGB to Planar YUV data.
 // Each sub-array represents the 3X3 coeff used with R, G and B
 static const int16_t bt601Matrix[2][3][3] = {
-    { { 76, 150, 29 }, { -43, -85, 128 }, { 128, -107, -21 } }, /* RANGE_FULL */
+    { { 77, 150, 29 }, { -43, -85, 128 }, { 128, -107, -21 } }, /* RANGE_FULL */
     { { 66, 129, 25 }, { -38, -74, 112 }, { 112, -94, -18 } },  /* RANGE_LIMITED */
 };
 
 static const int16_t bt709Matrix[2][3][3] = {
-    { { 54, 183, 18 }, { -29, -99, 128 }, { 128, -116, -12 } }, /* RANGE_FULL */
+    // TRICKY: 18 is adjusted to 19 so that sum of row 1 is 256
+    { { 54, 183, 19 }, { -29, -99, 128 }, { 128, -116, -12 } }, /* RANGE_FULL */
+    // TRICKY: -87 is adjusted to -86 so that sum of row 2 is 0
     { { 47, 157, 16 }, { -26, -86, 112 }, { 112, -102, -10 } }, /* RANGE_LIMITED */
 };
 

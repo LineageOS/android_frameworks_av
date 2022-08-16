@@ -61,7 +61,11 @@ struct FakeProcessInfo : public ProcessInfoInterface {
         return true;
     }
 
-    virtual bool isValidPid(int /* pid */) {
+    virtual bool isPidTrusted(int /* pid */) {
+        return true;
+    }
+
+    virtual bool isPidUidTrusted(int /* pid */, int /* uid */) {
         return true;
     }
 

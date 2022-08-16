@@ -23,10 +23,8 @@
 
 #include <android/media/AudioMix.h>
 #include <android/media/AudioMixCallbackFlag.h>
-#include <android/media/AudioMixLatencyClass.h>
 #include <android/media/AudioMixRouteFlag.h>
 #include <android/media/AudioMixType.h>
-#include <android/media/AudioMode.h>
 #include <android/media/AudioOffloadMode.h>
 #include <android/media/AudioPolicyForceUse.h>
 #include <android/media/AudioPolicyForcedConfig.h>

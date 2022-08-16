@@ -105,6 +105,7 @@ status_t Camera3InputStream::getInputBufferLocked(
 status_t Camera3InputStream::returnBufferCheckedLocked(
             const camera_stream_buffer &buffer,
             nsecs_t timestamp,
+            nsecs_t readoutTimestamp,
             bool output,
             int32_t /*transform*/,
             const std::vector<size_t>&,
@@ -112,6 +113,7 @@ status_t Camera3InputStream::returnBufferCheckedLocked(
             sp<Fence> *releaseFenceOut) {
 
     (void)timestamp;
+    (void)readoutTimestamp;
     (void)output;
     ALOG_ASSERT(!output, "Expected output to be false");
 
@@ -176,7 +178,8 @@ status_t Camera3InputStream::returnInputBufferLocked(
         const camera_stream_buffer &buffer) {
     ATRACE_CALL();
 
-    return returnAnyBufferLocked(buffer, /*timestamp*/0, /*output*/false, /*transform*/ -1);
+    return returnAnyBufferLocked(buffer, /*timestamp*/0, /*readoutTimestamp*/0,
+                                 /*output*/false, /*transform*/ -1);
 }
 
 status_t Camera3InputStream::getInputBufferProducerLocked(

@@ -16,17 +16,27 @@
 
 #define LOG_TAG "TunerDescrambler"
 
-#include "TunerFilter.h"
-#include "TunerDemux.h"
 #include "TunerDescrambler.h"
 
-using ::android::hardware::tv::tuner::V1_0::Result;
+#include <aidl/android/hardware/tv/tuner/IFilter.h>
+#include <aidl/android/hardware/tv/tuner/Result.h>
+#include <utils/Log.h>
+
+#include "TunerDemux.h"
+#include "TunerFilter.h"
+
+using ::aidl::android::hardware::tv::tuner::IFilter;
+using ::aidl::android::hardware::tv::tuner::Result;
 
 using namespace std;
 
+namespace aidl {
 namespace android {
+namespace media {
+namespace tv {
+namespace tuner {
 
-TunerDescrambler::TunerDescrambler(sp<IDescrambler> descrambler) {
+TunerDescrambler::TunerDescrambler(shared_ptr<IDescrambler> descrambler) {
     mDescrambler = descrambler;
 }
 
@@ -34,91 +44,74 @@ TunerDescrambler::~TunerDescrambler() {
     mDescrambler = nullptr;
 }
 
-Status TunerDescrambler::setDemuxSource(const std::shared_ptr<ITunerDemux>& demux) {
+::ndk::ScopedAStatus TunerDescrambler::setDemuxSource(
+        const shared_ptr<ITunerDemux>& in_tunerDemux) {
     if (mDescrambler == nullptr) {
         ALOGE("IDescrambler is not initialized");
-        return Status::fromServiceSpecificError(static_cast<int32_t>(Result::UNAVAILABLE));
+        return ::ndk::ScopedAStatus::fromServiceSpecificError(
+                static_cast<int32_t>(Result::UNAVAILABLE));
     }
 
-    Result res = mDescrambler->setDemuxSource(static_cast<TunerDemux*>(demux.get())->getId());
-    if (res != Result::SUCCESS) {
-        return ::ndk::ScopedAStatus::fromServiceSpecificError(static_cast<int32_t>(res));
-    }
-    return Status::ok();
+    return mDescrambler->setDemuxSource((static_cast<TunerDemux*>(in_tunerDemux.get()))->getId());
 }
 
-Status TunerDescrambler::setKeyToken(const vector<uint8_t>& keyToken) {
+::ndk::ScopedAStatus TunerDescrambler::setKeyToken(const vector<uint8_t>& in_keyToken) {
     if (mDescrambler == nullptr) {
         ALOGE("IDescrambler is not initialized");
-        return Status::fromServiceSpecificError(static_cast<int32_t>(Result::UNAVAILABLE));
+        return ::ndk::ScopedAStatus::fromServiceSpecificError(
+                static_cast<int32_t>(Result::UNAVAILABLE));
     }
 
-    Result res = mDescrambler->setKeyToken(keyToken);
-    if (res != Result::SUCCESS) {
-        return ::ndk::ScopedAStatus::fromServiceSpecificError(static_cast<int32_t>(res));
-    }
-    return Status::ok();
+    return mDescrambler->setKeyToken(in_keyToken);
 }
 
-Status TunerDescrambler::addPid(const TunerDemuxPid& pid,
-        const shared_ptr<ITunerFilter>& optionalSourceFilter) {
+::ndk::ScopedAStatus TunerDescrambler::addPid(
+        const DemuxPid& in_pid, const shared_ptr<ITunerFilter>& in_optionalSourceFilter) {
     if (mDescrambler == nullptr) {
         ALOGE("IDescrambler is not initialized");
-        return Status::fromServiceSpecificError(static_cast<int32_t>(Result::UNAVAILABLE));
+        return ::ndk::ScopedAStatus::fromServiceSpecificError(
+                static_cast<int32_t>(Result::UNAVAILABLE));
     }
 
-    sp<IFilter> halFilter = (optionalSourceFilter == NULL)
-            ? NULL : static_cast<TunerFilter*>(optionalSourceFilter.get())->getHalFilter();
-    Result res = mDescrambler->addPid(getHidlDemuxPid(pid), halFilter);
-    if (res != Result::SUCCESS) {
-        return ::ndk::ScopedAStatus::fromServiceSpecificError(static_cast<int32_t>(res));
-    }
-    return Status::ok();
+    shared_ptr<IFilter> halFilter =
+            (in_optionalSourceFilter == nullptr)
+                    ? nullptr
+                    : static_cast<TunerFilter*>(in_optionalSourceFilter.get())->getHalFilter();
+
+    return mDescrambler->addPid(in_pid, halFilter);
 }
 
-Status TunerDescrambler::removePid(const TunerDemuxPid& pid,
-        const shared_ptr<ITunerFilter>& optionalSourceFilter) {
+::ndk::ScopedAStatus TunerDescrambler::removePid(
+        const DemuxPid& in_pid, const shared_ptr<ITunerFilter>& in_optionalSourceFilter) {
     if (mDescrambler == nullptr) {
         ALOGE("IDescrambler is not initialized");
-        return Status::fromServiceSpecificError(static_cast<int32_t>(Result::UNAVAILABLE));
+        return ::ndk::ScopedAStatus::fromServiceSpecificError(
+                static_cast<int32_t>(Result::UNAVAILABLE));
     }
 
-    sp<IFilter> halFilter = (optionalSourceFilter == NULL)
-            ? NULL : static_cast<TunerFilter*>(optionalSourceFilter.get())->getHalFilter();
-    Result res = mDescrambler->removePid(getHidlDemuxPid(pid), halFilter);
-    if (res != Result::SUCCESS) {
-        return ::ndk::ScopedAStatus::fromServiceSpecificError(static_cast<int32_t>(res));
-    }
-    return Status::ok();
+    shared_ptr<IFilter> halFilter =
+            (in_optionalSourceFilter == nullptr)
+                    ? nullptr
+                    : static_cast<TunerFilter*>(in_optionalSourceFilter.get())->getHalFilter();
+
+    return mDescrambler->removePid(in_pid, halFilter);
 }
 
-Status TunerDescrambler::close() {
+::ndk::ScopedAStatus TunerDescrambler::close() {
     if (mDescrambler == nullptr) {
         ALOGE("IDescrambler is not initialized.");
-        return Status::fromServiceSpecificError(static_cast<int32_t>(Result::UNAVAILABLE));
+        return ::ndk::ScopedAStatus::fromServiceSpecificError(
+                static_cast<int32_t>(Result::UNAVAILABLE));
     }
 
-    Result res = mDescrambler->close();
-    mDescrambler = NULL;
+    auto res = mDescrambler->close();
+    mDescrambler = nullptr;
 
-    if (res != Result::SUCCESS) {
-        return Status::fromServiceSpecificError(static_cast<int32_t>(res));
-    }
-    return Status::ok();
+    return res;
 }
 
-DemuxPid TunerDescrambler::getHidlDemuxPid(const TunerDemuxPid& pid) {
-    DemuxPid hidlPid;
-    switch (pid.getTag()) {
-        case TunerDemuxPid::tPid: {
-            hidlPid.tPid((uint16_t)pid.get<TunerDemuxPid::tPid>());
-            break;
-        }
-        case TunerDemuxPid::mmtpPid: {
-            hidlPid.mmtpPid((uint16_t)pid.get<TunerDemuxPid::mmtpPid>());
-            break;
-        }
-    }
-    return hidlPid;
-}
+}  // namespace tuner
+}  // namespace tv
+}  // namespace media
 }  // namespace android
+}  // namespace aidl

@@ -16,35 +16,13 @@
 
 package android.media;
 
-import android.media.AudioGain;
-import android.media.AudioPortConfig;
-import android.media.AudioPortExt;
-import android.media.AudioPortRole;
-import android.media.AudioPortType;
-import android.media.AudioProfile;
-import android.media.ExtraAudioDescriptor;
+import android.media.AudioPortSys;
+import android.media.audio.common.AudioPort;
 
 /**
  * {@hide}
  */
 parcelable AudioPort {
-    /** Port unique ID. Interpreted as audio_port_handle_t. */
-    int id;
-    /** Sink or source. */
-    AudioPortRole role;
-    /** Device, mix ... */
-    AudioPortType type;
-    @utf8InCpp String name;
-    /** AudioProfiles supported by this port (format, Rates, Channels). */
-    AudioProfile[] profiles;
-    /**
-     * ExtraAudioDescriptors supported by this port. The format is not unrecognized to the
-     * platform. The audio capability is described by a hardware descriptor.
-     */
-    ExtraAudioDescriptor[] extraAudioDescriptors;
-    /** Gain controllers. */
-    AudioGain[] gains;
-    /** Current audio port configuration. */
-    AudioPortConfig activeConfig;
-    AudioPortExt ext;
+    AudioPort hal;
+    AudioPortSys sys;
 }

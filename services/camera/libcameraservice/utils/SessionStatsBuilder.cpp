@@ -60,6 +60,7 @@ void SessionStatsBuilder::buildAndReset(int64_t* requestCount,
     mErrorResultCount = 0;
     mCounterStopped = false;
     mDeviceError = false;
+    mUserTag.clear();
     for (auto& streamStats : mStatsMap) {
         StreamStats& streamStat = streamStats.second;
         streamStat.mRequestedFrameCount = 0;

@@ -28,7 +28,7 @@
 
 namespace android {
 
-class ToneGenerator {
+class ToneGenerator : public AudioTrack::IAudioTrackCallback {
 public:
 
     // List of all available tones
@@ -156,6 +156,9 @@ public:
 
     ToneGenerator(audio_stream_type_t streamType, float volume, bool threadCanCallJava = false,
             std::string opPackageName = {});
+
+    void onFirstRef() override;
+
     ~ToneGenerator();
 
     bool startTone(tone_type toneType, int durationMs = -1);
@@ -222,7 +225,11 @@ private:
         TONE_INDIA_CONGESTION,      // Congestion tone: 400 Hz, 250ms ON, 250ms OFF...
         TONE_INDIA_CALL_WAITING,    // Call waiting tone: 400 Hz, tone repeated in a 0.2s on, 0.1s off, 0.2s on, 7.5s off pattern.
         TONE_INDIA_RINGTONE,        // Ring tone: 400 Hz tone modulated with 25Hz, 0.4 on 0.2 off 0.4 on 2..0 off
+         // TAIWAN supervisory tones
         TONE_TW_RINGTONE,           // Ring Tone: 440 Hz + 480 Hz repeated with pattern 1s on, 3s off.
+         // NEW ZEALAND supervisory tones
+        TONE_NZ_CALL_WAITING,       // Call waiting tone: 400 Hz,  0.2s ON, 3s OFF,
+                                    //        0.2s ON, 3s OFF, 0.2s ON, 3s OFF, 0.2s ON
         NUM_ALTERNATE_TONES
     };
 
@@ -236,6 +243,7 @@ private:
         IRELAND,
         INDIA,
         TAIWAN,
+        NZ,
         CEPT,
         NUM_REGIONS
     };
@@ -284,11 +292,10 @@ private:
     static const ToneDescriptor sToneDescriptors[];
 
     bool mThreadCanCallJava;
-    unsigned int mTotalSmp;  // Total number of audio samples played (gives current time)
+    uint64_t mTotalSmp;  // Total number of audio samples played (gives current time)
+    // Since these types are 32 bit, we may have issues with aborting on
+    // overflow now that we have integer overflow sanitization enabled globally.
     unsigned int mNextSegSmp;  // Position of next segment transition expressed in samples
-    // NOTE: because mTotalSmp, mNextSegSmp are stored on 32 bit, current design will operate properly
-    // only if tone duration is less than about 27 Hours(@44100Hz sampling rate). If this time is exceeded,
-    // no crash will occur but tone sequence will show a glitch.
     unsigned int mMaxSmp;  // Maximum number of audio samples played (maximun tone duration)
     int mDurationMs;  // Maximum tone duration in ms
 
@@ -311,6 +318,7 @@ private:
     unsigned int mProcessSize;  // Size of audio blocks generated at a time by audioCallback() (in PCM frames).
     struct timespec mStartTime; // tone start time: needed to guaranty actual tone duration
 
+    size_t onMoreData(const AudioTrack::Buffer& buffer) override;
     bool initAudioTrack();
     static void audioCallback(int event, void* user, void *info);
     bool prepareWave();

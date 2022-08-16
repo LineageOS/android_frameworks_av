@@ -14,20 +14,15 @@
  * limitations under the License.
  */
 
-#define LOG_TAG "RampLinear"
-//#define LOG_NDEBUG 0
-#include <utils/Log.h>
-
 #include <algorithm>
 #include <unistd.h>
-#include "AudioProcessorBase.h"
+#include "FlowGraphNode.h"
 #include "RampLinear.h"
 
-using namespace flowgraph;
+using namespace FLOWGRAPH_OUTER_NAMESPACE::flowgraph;
 
 RampLinear::RampLinear(int32_t channelCount)
-        : input(*this, channelCount)
-        , output(*this, channelCount) {
+        : FlowGraphFilter(channelCount) {
     mTarget.store(1.0f);
 }
 
@@ -37,16 +32,19 @@ void RampLinear::setLengthInFrames(int32_t frames) {
 
 void RampLinear::setTarget(float target) {
     mTarget.store(target);
+    // If the ramp has not been used then start immediately at this level.
+    if (mLastCallCount == kInitialCallCount) {
+        forceCurrent(target);
+    }
 }
 
 float RampLinear::interpolateCurrent() {
     return mLevelTo - (mRemaining * mScaler);
 }
 
-int32_t RampLinear::onProcess(int64_t framePosition, int32_t numFrames) {
-    int32_t framesToProcess = input.pullData(framePosition, numFrames);
-    const float *inputBuffer = input.getBlock();
-    float *outputBuffer = output.getBlock();
+int32_t RampLinear::onProcess(int32_t numFrames) {
+    const float *inputBuffer = input.getBuffer();
+    float *outputBuffer = output.getBuffer();
     int32_t channelCount = output.getSamplesPerFrame();
 
     float target = getTarget();
@@ -55,12 +53,10 @@ int32_t RampLinear::onProcess(int64_t framePosition, int32_t numFrames) {
         mLevelFrom = interpolateCurrent();
         mLevelTo = target;
         mRemaining = mLengthInFrames;
-        ALOGV("%s() mLevelFrom = %f, mLevelTo = %f, mRemaining = %d, mScaler = %f",
-              __func__, mLevelFrom, mLevelTo, mRemaining, mScaler);
         mScaler = (mLevelTo - mLevelFrom) / mLengthInFrames; // for interpolation
     }
 
-    int32_t framesLeft = framesToProcess;
+    int32_t framesLeft = numFrames;
 
     if (mRemaining > 0) { // Ramping? This doesn't happen very often.
         int32_t framesToRamp = std::min(framesLeft, mRemaining);
@@ -81,5 +77,5 @@ int32_t RampLinear::onProcess(int64_t framePosition, int32_t numFrames) {
         *outputBuffer++ = *inputBuffer++ * mLevelTo;
     }
 
-    return framesToProcess;
+    return numFrames;
 }

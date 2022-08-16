@@ -20,12 +20,14 @@
 #define LOG_TAG "MediaProfiles"
 
 #include <stdlib.h>
+#include <utils/misc.h>
 #include <utils/Log.h>
 #include <utils/Vector.h>
 #include <cutils/properties.h>
 #include <expat.h>
 #include <media/MediaProfiles.h>
 #include <media/stagefright/foundation/ADebug.h>
+#include <media/stagefright/MediaCodecConstants.h>
 #include <OMX_Video.h>
 #include <sys/stat.h>
 
@@ -86,7 +88,24 @@ const MediaProfiles::NameToTagMap MediaProfiles::sVideoEncoderNameMap[] = {
     {"h263", VIDEO_ENCODER_H263},
     {"h264", VIDEO_ENCODER_H264},
     {"m4v",  VIDEO_ENCODER_MPEG_4_SP},
-    {"hevc", VIDEO_ENCODER_HEVC}
+    {"vp8",  VIDEO_ENCODER_VP8},
+    {"hevc", VIDEO_ENCODER_HEVC},
+    {"vp9",  VIDEO_ENCODER_VP9},
+    {"dolbyvision", VIDEO_ENCODER_DOLBY_VISION},
+};
+
+const MediaProfiles::NameToTagMap MediaProfiles::sChromaSubsamplingNameMap[] = {
+    {"yuv 4:2:0", CHROMA_SUBSAMPLING_YUV_420},
+    {"yuv 4:2:2", CHROMA_SUBSAMPLING_YUV_422},
+    {"yuv 4:4:4", CHROMA_SUBSAMPLING_YUV_444},
+};
+
+const MediaProfiles::NameToTagMap MediaProfiles::sHdrFormatNameMap[] = {
+    {"sdr", HDR_FORMAT_NONE},
+    {"hlg", HDR_FORMAT_HLG},
+    {"hdr10", HDR_FORMAT_HDR10},
+    {"hdr10+", HDR_FORMAT_HDR10PLUS},
+    {"dolbyvision", HDR_FORMAT_DOLBY_VISION},
 };
 
 const MediaProfiles::NameToTagMap MediaProfiles::sAudioEncoderNameMap[] = {
@@ -164,12 +183,18 @@ const MediaProfiles::NameToTagMap MediaProfiles::sCamcorderQualityNameMap[] = {
 MediaProfiles::logVideoCodec(const MediaProfiles::VideoCodec& codec UNUSED)
 {
     ALOGV("video codec:");
-    ALOGV("codec = %d", codec.mCodec);
+    ALOGV("codec = %d (%s)", codec.mCodec,
+            findNameForTag(sVideoEncoderNameMap, NELEM(sVideoEncoderNameMap), codec.mCodec));
     ALOGV("bit rate: %d", codec.mBitRate);
     ALOGV("frame width: %d", codec.mFrameWidth);
     ALOGV("frame height: %d", codec.mFrameHeight);
     ALOGV("frame rate: %d", codec.mFrameRate);
     ALOGV("profile: %d", codec.mProfile);
+    ALOGV("chroma: %s", findNameForTag(sChromaSubsamplingNameMap, NELEM(sChromaSubsamplingNameMap),
+                                       codec.mChromaSubsampling));
+    ALOGV("bit depth: %d", codec.mBitDepth);
+    ALOGV("hdr format: %s", findNameForTag(sHdrFormatNameMap, NELEM(sHdrFormatNameMap),
+                                           codec.mHdrFormat));
 }
 
 /*static*/ void
@@ -232,6 +257,155 @@ MediaProfiles::findTagForName(const MediaProfiles::NameToTagMap *map, size_t nMa
     return tag;
 }
 
+/*static*/ const char *
+MediaProfiles::findNameForTag(
+        const MediaProfiles::NameToTagMap *map, size_t nMappings, int tag, const char *def_)
+{
+    for (size_t i = 0; i < nMappings; ++i) {
+        if (map[i].tag == tag) {
+            return map[i].name;
+        }
+    }
+    return def_;
+}
+
+/*static*/ bool
+MediaProfiles::detectAdvancedVideoProfile(
+        video_encoder codec, int profile,
+        chroma_subsampling *chroma, int *bitDepth, hdr_format *hdr)
+{
+    // default values
+    *chroma = CHROMA_SUBSAMPLING_YUV_420;
+    *bitDepth = 8;
+    *hdr = HDR_FORMAT_NONE;
+
+    switch (codec) {
+    case VIDEO_ENCODER_H263:
+    case VIDEO_ENCODER_MPEG_4_SP:
+    case VIDEO_ENCODER_VP8:
+        // these are always 4:2:0 SDR 8-bit
+        return true;
+
+    case VIDEO_ENCODER_H264:
+        switch (profile) {
+        case AVCProfileBaseline:
+        case AVCProfileConstrainedBaseline:
+        case AVCProfileMain:
+        case AVCProfileExtended:
+        case AVCProfileHigh:
+        case AVCProfileConstrainedHigh:
+            return true;
+        case AVCProfileHigh10:
+            // returning false here as this could be an HLG stream
+            *bitDepth = 10;
+            return false;
+        case AVCProfileHigh422:
+            *chroma = CHROMA_SUBSAMPLING_YUV_422;
+            // returning false here as bit-depth could be 8 or 10
+            return false;
+        case AVCProfileHigh444:
+            *chroma = CHROMA_SUBSAMPLING_YUV_444;
+            // returning false here as bit-depth could be 8 or 10
+            return false;
+        default:
+            return false;
+        }
+        // flow does not get here
+
+    case VIDEO_ENCODER_HEVC:
+        switch (profile) {
+        case HEVCProfileMain:
+            return true;
+        case HEVCProfileMain10:
+            *bitDepth = 10;
+            // returning false here as this could be an HLG stream
+            return false;
+        case HEVCProfileMain10HDR10:
+            *bitDepth = 10;
+            *hdr = HDR_FORMAT_HDR10;
+            return true;
+        case HEVCProfileMain10HDR10Plus:
+            *bitDepth = 10;
+            *hdr = HDR_FORMAT_HDR10PLUS;
+            return true;
+        default:
+            return false;
+        }
+        // flow does not get here
+
+    case VIDEO_ENCODER_VP9:
+        switch (profile) {
+        case VP9Profile0:
+            return true;
+        case VP9Profile2:
+            // this is always 10-bit on Android */
+            *bitDepth = 10;
+            // returning false here as this could be an HLG stream
+            return false;
+        case VP9Profile2HDR:
+            // this is always 10-bit on Android */
+            *bitDepth = 10;
+            *hdr = HDR_FORMAT_HDR10;
+            return true;
+        case VP9Profile2HDR10Plus:
+            *bitDepth = 10;
+            *hdr = HDR_FORMAT_HDR10PLUS;
+            return true;
+        default:
+            return false;
+        }
+        // flow does not get here
+
+    case VIDEO_ENCODER_DOLBY_VISION:
+    {
+        // for Dolby Vision codec we always assume 10-bit DV
+        *bitDepth = 10;
+        *hdr = HDR_FORMAT_DOLBY_VISION;
+
+        switch (profile) {
+        case DolbyVisionProfileDvheDer /* profile 2 deprecated */:
+        case DolbyVisionProfileDvheDen /* profile 3 deprecated */:
+        case DolbyVisionProfileDvavPer /* profile 0 deprecated */:
+        case DolbyVisionProfileDvavPen /* profile 1 deprecated */:
+        case DolbyVisionProfileDvheDtr /* dvhe.04 */:
+        case DolbyVisionProfileDvheStn /* dvhe.05 */:
+        case DolbyVisionProfileDvheDth /* profile 6 deprecated */:
+        case DolbyVisionProfileDvheDtb /* dvhe.07 */:
+        case DolbyVisionProfileDvheSt  /* dvhe.08 */:
+        case DolbyVisionProfileDvavSe  /* dvav.09 */:
+        case DolbyVisionProfileDvav110 /* dvav1.10 */:
+            return true;
+        default:
+            return false;
+        }
+        // flow does not get here
+    }
+
+    case VIDEO_ENCODER_AV1:
+        switch (profile) {
+        case AV1ProfileMain10:
+            *bitDepth = 10;
+            // returning false here as this could be an HLG stream
+            return false;
+        case AV1ProfileMain10HDR10:
+            *bitDepth = 10;
+            *hdr = HDR_FORMAT_HDR10;
+            return true;
+        case AV1ProfileMain10HDR10Plus:
+            *bitDepth = 10;
+            *hdr = HDR_FORMAT_HDR10PLUS;
+            return true;
+        default:
+            return false;
+        }
+        // flow does not get here
+
+    default:
+        return false;
+    }
+    // flow does not get here
+}
+
 /*static*/ void
 MediaProfiles::createVideoCodec(const char **atts, size_t natts, MediaProfiles *profiles)
 {
@@ -250,13 +424,56 @@ MediaProfiles::createVideoCodec(const char **atts, size_t natts, MediaProfiles *
     }
 
     int profile = -1;
-    if (natts >= 12 && !strcmp("profile", atts[10])) {
-        profile = atoi(atts[11]);
+    chroma_subsampling chroma = CHROMA_SUBSAMPLING_YUV_420;
+    int bitDepth = 8;
+    hdr_format hdr = HDR_FORMAT_NONE;
+    if (codec == VIDEO_ENCODER_DOLBY_VISION) {
+        bitDepth = 10;
+        hdr = HDR_FORMAT_DOLBY_VISION;
     }
 
-    VideoCodec videoCodec {
+    if (natts >= 12 && !strcmp("profile", atts[10])) {
+        profile = atoi(atts[11]);
+        if (!detectAdvancedVideoProfile(
+                (video_encoder)codec, profile, &chroma, &bitDepth, &hdr)) {
+            // if not detected read values from the attributes
+            for (size_t ix = 12; natts >= ix + 2; ix += 2) {
+                if (!strcmp("chroma", atts[ix])) {
+                    int chromaTag = findTagForName(sChromaSubsamplingNameMap,
+                                         NELEM(sChromaSubsamplingNameMap), atts[ix + 1]);
+                    if (chromaTag == -1) {
+                        ALOGE("MediaProfiles::createVideoCodec invalid chroma %s", atts[ix + 1]);
+                        return;
+                    } else {
+                        chroma = (chroma_subsampling)chromaTag;
+                    }
+                } else if (!strcmp("bitDepth", atts[ix])) {
+                    bitDepth = atoi(atts[ix + 1]);
+                    if (bitDepth < 8 || bitDepth > 16) {
+                        ALOGE("MediaProfiles::createVideoCodec invalid bidDepth %s", atts[ix + 1]);
+                        return;
+                    }
+                } else if (!strcmp("hdr", atts[ix])) {
+                    int hdrTag = findTagForName(sHdrFormatNameMap,
+                                                NELEM(sHdrFormatNameMap), atts[ix + 1]);
+                    if (hdrTag == -1) {
+                        ALOGE("MediaProfiles::createVideoCodec invalid hdr %s", atts[ix + 1]);
+                        return;
+                    } else {
+                        hdr = (hdr_format)hdrTag;
+                    }
+                } else {
+                    // ignoring here. TODO: rewrite this whole file to ignore invalid attrs
+                    ALOGD("MediaProfiles::createVideoCodec ignoring invalid attr %s", atts[ix]);
+                }
+            }
+        }
+    }
+
+    VideoCodec videoCodec{
             static_cast<video_encoder>(codec),
-            atoi(atts[3]), atoi(atts[5]), atoi(atts[7]), atoi(atts[9]), profile };
+            atoi(atts[3]) /* bitRate */, atoi(atts[5]) /* width */, atoi(atts[7]) /* height */,
+            atoi(atts[9]) /* frameRate */, profile, chroma, bitDepth, hdr };
     logVideoCodec(videoCodec);
 
     size_t nCamcorderProfiles;

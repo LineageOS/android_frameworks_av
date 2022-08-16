@@ -34,6 +34,7 @@ namespace {
 constexpr char COMPONENT_NAME[] = "c2.android.hevc.decoder";
 constexpr uint32_t kDefaultOutputDelay = 8;
 constexpr uint32_t kMaxOutputDelay = 16;
+constexpr size_t kMinInputBufferSize = 2 * 1024 * 1024;
 }  // namespace
 
 class C2SoftHevcDec::IntfImpl : public SimpleInterface<void>::BaseParams {
@@ -108,7 +109,7 @@ public:
 
         addParameter(
                 DefineParam(mMaxInputSize, C2_PARAMKEY_INPUT_MAX_BUFFER_SIZE)
-                .withDefault(new C2StreamMaxBufferSizeInfo::input(0u, 320 * 240 * 3 / 4))
+                .withDefault(new C2StreamMaxBufferSizeInfo::input(0u, kMinInputBufferSize))
                 .withFields({
                     C2F(mMaxInputSize, value).any(),
                 })
@@ -220,8 +221,9 @@ public:
     static C2R MaxInputSizeSetter(bool mayBlock, C2P<C2StreamMaxBufferSizeInfo::input> &me,
                                   const C2P<C2StreamMaxPictureSizeTuning::output> &maxSize) {
         (void)mayBlock;
-        // assume compression ratio of 2
-        me.set().value = (((maxSize.v.width + 63) / 64) * ((maxSize.v.height + 63) / 64) * 3072);
+        // assume compression ratio of 2, but enforce a floor
+        me.set().value = c2_max((((maxSize.v.width + 63) / 64)
+                    * ((maxSize.v.height + 63) / 64) * 3072), kMinInputBufferSize);
         return C2R::Ok();
     }
 
@@ -661,8 +663,7 @@ status_t C2SoftHevcDec::resetDecoder() {
 
 void C2SoftHevcDec::resetPlugin() {
     mSignalledOutputEos = false;
-    gettimeofday(&mTimeStart, nullptr);
-    gettimeofday(&mTimeEnd, nullptr);
+    mTimeStart = mTimeEnd = systemTime();
 }
 
 status_t C2SoftHevcDec::deleteDecoder() {
@@ -856,14 +857,13 @@ void C2SoftHevcDec::process(
             /* Decode header and get dimensions */
             setParams(mStride, IVD_DECODE_HEADER);
         }
-        WORD32 delay;
-        GETTIME(&mTimeStart, nullptr);
-        TIME_DIFF(mTimeEnd, mTimeStart, delay);
+
+        mTimeStart = systemTime();
+        nsecs_t delay = mTimeStart - mTimeEnd;
         (void) ivdec_api_function(mDecHandle, ps_decode_ip, ps_decode_op);
-        WORD32 decodeTime;
-        GETTIME(&mTimeEnd, nullptr);
-        TIME_DIFF(mTimeStart, mTimeEnd, decodeTime);
-        ALOGV("decodeTime=%6d delay=%6d numBytes=%6d", decodeTime, delay,
+        mTimeEnd = systemTime();
+        nsecs_t decodeTime = mTimeEnd - mTimeStart;
+        ALOGV("decodeTime=%6" PRId64 " delay=%6" PRId64 " numBytes=%6d", decodeTime, delay,
               ps_decode_op->u4_num_bytes_consumed);
         if (IVD_MEM_ALLOC_FAILED == (ps_decode_op->u4_error_code & IVD_ERROR_MASK)) {
             ALOGE("allocation failure in decoder");

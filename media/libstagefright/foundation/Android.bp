@@ -23,6 +23,11 @@ cc_library_headers {
     vendor_available: true,
     host_supported: true,
     min_sdk_version: "29",
+    apex_available: [
+        "//apex_available:platform",
+        "com.android.media",
+        "com.android.media.swcodec",
+    ],
 }
 
 cc_defaults {
@@ -33,18 +38,13 @@ cc_defaults {
     },
     host_supported: true,
     double_loadable: true,
-    include_dirs: [
-        "frameworks/av/include",
-        "frameworks/native/include",
-        "frameworks/native/libs/arect/include",
-        "frameworks/native/libs/nativebase/include",
-    ],
 
     local_include_dirs: [
         "include/media/stagefright/foundation",
     ],
 
     header_libs: [
+        "av-headers",
         // this is only needed for the vendor variant that removes libbinder, but vendor
         // target below does not allow adding header_libs.
         "libbinder_headers",
@@ -133,12 +133,19 @@ cc_library {
     name: "libstagefright_foundation",
     defaults: ["libstagefright_foundation_defaults"],
     min_sdk_version: "29",
+    apex_available: [
+        "//apex_available:platform",
+        "com.android.media",
+        "com.android.media.swcodec",
+    ],
 }
 
 cc_library_static {
     name: "libstagefright_foundation_without_imemory",
     defaults: ["libstagefright_foundation_defaults"],
     min_sdk_version: "29",
+    apex_available: ["com.android.media"],
+
 
     cflags: [
         "-Wno-multichar",

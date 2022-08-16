@@ -25,7 +25,6 @@
 #include <android_media_Utils.h>
 #include <private/android/AHardwareBufferHelpers.h>
 #include <utils/Log.h>
-#include "hardware/camera3.h"
 
 using namespace android;
 
@@ -375,8 +374,8 @@ AImage::getJpegSize() const {
     uint8_t* jpegBuffer = mLockedBuffer->data;
 
     // First check for JPEG transport header at the end of the buffer
-    uint8_t* header = jpegBuffer + (width - sizeof(struct camera3_jpeg_blob));
-    struct camera3_jpeg_blob* blob = (struct camera3_jpeg_blob*)(header);
+    uint8_t* header = jpegBuffer + (width - sizeof(struct camera3_jpeg_blob_v2));
+    struct camera3_jpeg_blob_v2* blob = (struct camera3_jpeg_blob_v2*)(header);
     if (blob->jpeg_blob_id == CAMERA3_JPEG_BLOB_ID) {
         size = blob->jpeg_size;
         ALOGV("%s: Jpeg size = %d", __FUNCTION__, size);

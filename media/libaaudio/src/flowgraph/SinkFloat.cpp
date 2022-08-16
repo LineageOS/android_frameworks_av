@@ -16,31 +16,31 @@
 
 #include <algorithm>
 #include <unistd.h>
-#include "AudioProcessorBase.h"
+#include "FlowGraphNode.h"
 #include "SinkFloat.h"
 
-using namespace flowgraph;
+using namespace FLOWGRAPH_OUTER_NAMESPACE::flowgraph;
 
 SinkFloat::SinkFloat(int32_t channelCount)
-        : AudioSink(channelCount) {
+        : FlowGraphSink(channelCount) {
 }
 
 int32_t SinkFloat::read(void *data, int32_t numFrames) {
     float *floatData = (float *) data;
-    int32_t channelCount = input.getSamplesPerFrame();
+    const int32_t channelCount = input.getSamplesPerFrame();
 
     int32_t framesLeft = numFrames;
     while (framesLeft > 0) {
         // Run the graph and pull data through the input port.
-        int32_t framesRead = pull(framesLeft);
-        if (framesRead <= 0) {
+        int32_t framesPulled = pullData(framesLeft);
+        if (framesPulled <= 0) {
             break;
         }
-        const float *signal = input.getBlock();
-        int32_t numSamples = framesRead * channelCount;
+        const float *signal = input.getBuffer();
+        int32_t numSamples = framesPulled * channelCount;
         memcpy(floatData, signal, numSamples * sizeof(float));
         floatData += numSamples;
-        framesLeft -= framesRead;
+        framesLeft -= framesPulled;
     }
     return numFrames - framesLeft;
 }

@@ -15,7 +15,7 @@
  */
 
 #define LOG_TAG "ARTPAssembler"
-#include "ARTPAssembler.h"
+#include <media/stagefright/rtsp/ARTPAssembler.h>
 
 #include <media/stagefright/foundation/ABuffer.h>
 #include <media/stagefright/foundation/ADebug.h>

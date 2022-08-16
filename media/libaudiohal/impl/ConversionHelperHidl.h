@@ -17,33 +17,25 @@
 #ifndef ANDROID_HARDWARE_CONVERSION_HELPER_HIDL_H
 #define ANDROID_HARDWARE_CONVERSION_HELPER_HIDL_H
 
-#include PATH(android/hardware/audio/CORE_TYPES_FILE_VERSION/types.h)
+#include <functional>
+
 #include <hidl/HidlSupport.h>
 #include <system/audio.h>
-#include <utils/String8.h>
-#include <utils/String16.h>
-#include <utils/Vector.h>
-
-using ::android::hardware::audio::CORE_TYPES_CPP_VERSION::ParameterValue;
-using CoreResult = ::android::hardware::audio::CORE_TYPES_CPP_VERSION::Result;
-
-using ::android::hardware::Return;
-using ::android::hardware::hidl_string;
-using ::android::hardware::hidl_vec;
 
 namespace android {
 
+template<typename HalResult>
 class ConversionHelperHidl {
   protected:
-    static status_t keysFromHal(const String8& keys, hidl_vec<hidl_string> *hidlKeys);
-    static status_t parametersFromHal(const String8& kvPairs, hidl_vec<ParameterValue> *hidlParams);
-    static void parametersToHal(const hidl_vec<ParameterValue>& parameters, String8 *values);
-    static void argsFromHal(const Vector<String16>& args, hidl_vec<hidl_string> *hidlArgs);
+    using HalResultConverter = std::function<status_t(const HalResult&)>;
+    const std::string mClassName;
 
-    ConversionHelperHidl(const char* className);
+    ConversionHelperHidl(std::string_view className, HalResultConverter resultConv)
+            : mClassName(className), mResultConverter(resultConv) {}
 
     template<typename R, typename T>
-    status_t processReturn(const char* funcName, const Return<R>& ret, T *retval) {
+    status_t processReturn(const char* funcName,
+            const ::android::hardware::Return<R>& ret, T *retval) {
         if (ret.isOk()) {
             // This way it also works for enum class to unscoped enum conversion.
             *retval = static_cast<T>(static_cast<R>(ret));
@@ -53,35 +45,40 @@ class ConversionHelperHidl {
     }
 
     template<typename T>
-    status_t processReturn(const char* funcName, const Return<T>& ret) {
+    status_t processReturn(const char* funcName, const ::android::hardware::Return<T>& ret) {
         if (!ret.isOk()) {
             emitError(funcName, ret.description().c_str());
         }
         return ret.isOk() ? OK : FAILED_TRANSACTION;
     }
 
-    status_t processReturn(const char* funcName, const Return<CoreResult>& ret) {
+    status_t processReturn(const char* funcName,
+            const ::android::hardware::Return<HalResult>& ret) {
         if (!ret.isOk()) {
             emitError(funcName, ret.description().c_str());
         }
-        return ret.isOk() ? analyzeResult(ret) : FAILED_TRANSACTION;
+        return ret.isOk() ? mResultConverter(ret) : FAILED_TRANSACTION;
     }
 
     template<typename T>
     status_t processReturn(
-            const char* funcName, const Return<T>& ret, CoreResult retval) {
+            const char* funcName, const ::android::hardware::Return<T>& ret, HalResult retval) {
         if (!ret.isOk()) {
             emitError(funcName, ret.description().c_str());
         }
-        return ret.isOk() ? analyzeResult(retval) : FAILED_TRANSACTION;
+        return ret.isOk() ? mResultConverter(retval) : FAILED_TRANSACTION;
+    }
+
+    const std::string& getClassName() const {
+        return mClassName;
     }
 
   private:
-    const char* mClassName;
+    HalResultConverter mResultConverter;
 
-    static status_t analyzeResult(const CoreResult& result);
-
-    void emitError(const char* funcName, const char* description);
+    void emitError(const char* funcName, const char* description) {
+        ALOGE("%s %p %s: %s (from rpc)", mClassName.c_str(), this, funcName, description);
+    }
 };
 
 }  // namespace android

@@ -23,6 +23,7 @@
 #include <camera/camera2/OutputConfiguration.h>
 #include <binder/Parcel.h>
 #include <gui/view/Surface.h>
+#include <system/camera_metadata.h>
 #include <utils/String8.h>
 
 namespace android {
@@ -76,6 +77,22 @@ const std::vector<int32_t> &OutputConfiguration::getSensorPixelModesUsed() const
     return mSensorPixelModesUsed;
 }
 
+int64_t OutputConfiguration::getDynamicRangeProfile() const {
+    return mDynamicRangeProfile;
+}
+
+int64_t OutputConfiguration::getStreamUseCase() const {
+    return mStreamUseCase;
+}
+
+int OutputConfiguration::getTimestampBase() const {
+    return mTimestampBase;
+}
+
+int OutputConfiguration::getMirrorMode() const {
+    return mMirrorMode;
+}
+
 OutputConfiguration::OutputConfiguration() :
         mRotation(INVALID_ROTATION),
         mSurfaceSetID(INVALID_SET_ID),
@@ -84,7 +101,11 @@ OutputConfiguration::OutputConfiguration() :
         mHeight(0),
         mIsDeferred(false),
         mIsShared(false),
-        mIsMultiResolution(false) {
+        mIsMultiResolution(false),
+        mDynamicRangeProfile(ANDROID_REQUEST_AVAILABLE_DYNAMIC_RANGE_PROFILES_MAP_STANDARD),
+        mStreamUseCase(ANDROID_SCALER_AVAILABLE_STREAM_USE_CASES_DEFAULT),
+        mTimestampBase(TIMESTAMP_BASE_DEFAULT),
+        mMirrorMode(MIRROR_MODE_AUTO) {
 }
 
 OutputConfiguration::OutputConfiguration(const android::Parcel& parcel) :
@@ -165,6 +186,30 @@ status_t OutputConfiguration::readFromParcel(const android::Parcel* parcel) {
         ALOGE("%s: Failed to read sensor pixel mode(s) from parcel", __FUNCTION__);
         return err;
     }
+    int64_t dynamicProfile;
+    if ((err = parcel->readInt64(&dynamicProfile)) != OK) {
+        ALOGE("%s: Failed to read surface dynamic range profile flag from parcel", __FUNCTION__);
+        return err;
+    }
+
+    int64_t streamUseCase = ANDROID_SCALER_AVAILABLE_STREAM_USE_CASES_DEFAULT;
+    if ((err = parcel->readInt64(&streamUseCase)) != OK) {
+        ALOGE("%s: Failed to read stream use case from parcel", __FUNCTION__);
+        return err;
+    }
+
+    int timestampBase = TIMESTAMP_BASE_DEFAULT;
+    if ((err = parcel->readInt32(&timestampBase)) != OK) {
+        ALOGE("%s: Failed to read timestamp base from parcel", __FUNCTION__);
+        return err;
+    }
+
+    int mirrorMode = MIRROR_MODE_AUTO;
+    if ((err = parcel->readInt32(&mirrorMode)) != OK) {
+        ALOGE("%s: Failed to read mirroring mode from parcel", __FUNCTION__);
+        return err;
+    }
+
     mRotation = rotation;
     mSurfaceSetID = setID;
     mSurfaceType = surfaceType;
@@ -173,6 +218,9 @@ status_t OutputConfiguration::readFromParcel(const android::Parcel* parcel) {
     mIsDeferred = isDeferred != 0;
     mIsShared = isShared != 0;
     mIsMultiResolution = isMultiResolution != 0;
+    mStreamUseCase = streamUseCase;
+    mTimestampBase = timestampBase;
+    mMirrorMode = mirrorMode;
     for (auto& surface : surfaceShims) {
         ALOGV("%s: OutputConfiguration: %p, name %s", __FUNCTION__,
                 surface.graphicBufferProducer.get(),
@@ -181,10 +229,14 @@ status_t OutputConfiguration::readFromParcel(const android::Parcel* parcel) {
     }
 
     mSensorPixelModesUsed = std::move(sensorPixelModesUsed);
+    mDynamicRangeProfile = dynamicProfile;
 
     ALOGV("%s: OutputConfiguration: rotation = %d, setId = %d, surfaceType = %d,"
-          " physicalCameraId = %s, isMultiResolution = %d", __FUNCTION__, mRotation,
-          mSurfaceSetID, mSurfaceType, String8(mPhysicalCameraId).string(), mIsMultiResolution);
+          " physicalCameraId = %s, isMultiResolution = %d, streamUseCase = %" PRId64
+          ", timestampBase = %d, mirrorMode = %d",
+          __FUNCTION__, mRotation, mSurfaceSetID, mSurfaceType,
+          String8(mPhysicalCameraId).string(), mIsMultiResolution, mStreamUseCase, timestampBase,
+          mMirrorMode);
 
     return err;
 }
@@ -199,6 +251,10 @@ OutputConfiguration::OutputConfiguration(sp<IGraphicBufferProducer>& gbp, int ro
     mIsShared = isShared;
     mPhysicalCameraId = physicalId;
     mIsMultiResolution = false;
+    mDynamicRangeProfile = ANDROID_REQUEST_AVAILABLE_DYNAMIC_RANGE_PROFILES_MAP_STANDARD;
+    mStreamUseCase = ANDROID_SCALER_AVAILABLE_STREAM_USE_CASES_DEFAULT;
+    mTimestampBase = TIMESTAMP_BASE_DEFAULT;
+    mMirrorMode = MIRROR_MODE_AUTO;
 }
 
 OutputConfiguration::OutputConfiguration(
@@ -207,7 +263,11 @@ OutputConfiguration::OutputConfiguration(
     int width, int height, bool isShared)
   : mGbps(gbps), mRotation(rotation), mSurfaceSetID(surfaceSetID), mSurfaceType(surfaceType),
     mWidth(width), mHeight(height), mIsDeferred(false), mIsShared(isShared),
-    mPhysicalCameraId(physicalCameraId), mIsMultiResolution(false) { }
+    mPhysicalCameraId(physicalCameraId), mIsMultiResolution(false),
+    mDynamicRangeProfile(ANDROID_REQUEST_AVAILABLE_DYNAMIC_RANGE_PROFILES_MAP_STANDARD),
+    mStreamUseCase(ANDROID_SCALER_AVAILABLE_STREAM_USE_CASES_DEFAULT),
+    mTimestampBase(TIMESTAMP_BASE_DEFAULT),
+    mMirrorMode(MIRROR_MODE_AUTO) { }
 
 status_t OutputConfiguration::writeToParcel(android::Parcel* parcel) const {
 
@@ -252,6 +312,18 @@ status_t OutputConfiguration::writeToParcel(android::Parcel* parcel) const {
     if (err != OK) return err;
 
     err = parcel->writeParcelableVector(mSensorPixelModesUsed);
+    if (err != OK) return err;
+
+    err = parcel->writeInt64(mDynamicRangeProfile);
+    if (err != OK) return err;
+
+    err = parcel->writeInt64(mStreamUseCase);
+    if (err != OK) return err;
+
+    err = parcel->writeInt32(mTimestampBase);
+    if (err != OK) return err;
+
+    err = parcel->writeInt32(mMirrorMode);
     if (err != OK) return err;
 
     return OK;

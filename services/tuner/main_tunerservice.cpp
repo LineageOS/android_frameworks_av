@@ -1,5 +1,5 @@
 /*
- * Copyright (C) 2020 The Android Open Source Project
+ * Copyright (C) 2021 The Android Open Source Project
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -14,30 +14,33 @@
  * limitations under the License.
  */
 
-#include <utils/Log.h>
+#include <android-base/logging.h>
 #include <binder/IPCThreadState.h>
 #include <binder/IServiceManager.h>
-#include <binder/ProcessState.h>
-#include <hidl/HidlTransportSupport.h>
+#include <utils/Log.h>
 
 #include "TunerService.h"
+#include "hidl/TunerHidlService.h"
+
+using ::aidl::android::media::tv::tuner::TunerHidlService;
+using ::aidl::android::media::tv::tuner::TunerService;
 
 using namespace android;
 
-int main(int argc __unused, char** argv) {
+int main() {
     ALOGD("Tuner service starting");
 
-    strcpy(argv[0], "media.tuner");
     sp<ProcessState> proc(ProcessState::self());
     sp<IServiceManager> sm = defaultServiceManager();
-    ALOGD("ServiceManager: %p", sm.get());
 
-    binder_status_t status = TunerService::instantiate();
+    // Check legacy HIDL HAL first. If it's not existed, use AIDL HAL.
+    binder_status_t status = TunerHidlService::instantiate();
     if (status != STATUS_OK) {
-        ALOGD("Failed to add tuner service as AIDL interface");
-        return -1;
+        status = TunerService::instantiate();
+        CHECK(status == STATUS_OK);
     }
 
     ProcessState::self()->startThreadPool();
     IPCThreadState::self()->joinThreadPool();
+    return EXIT_FAILURE;  // should not reached
 }

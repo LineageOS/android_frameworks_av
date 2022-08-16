@@ -19,7 +19,7 @@
 #include <assert.h>
 #include <stdlib.h>
 #include <new>
-#include <utils/Log.h>
+#include <log/log.h>
 
 #include "AudioEqualizer.h"
 #include "AudioPeakingFilter.h"

@@ -39,7 +39,9 @@
 #include <media/ShmemCompat.h>
 #include <media/audiohal/EffectHalInterface.h>
 #include <media/audiohal/EffectsFactoryHalInterface.h>
+#include <mediautils/MethodStatistics.h>
 #include <mediautils/ServiceUtilities.h>
+#include <mediautils/TimeCheck.h>
 
 #include "AudioFlinger.h"
 
@@ -1751,6 +1753,47 @@ AudioFlinger::EffectHandle::~EffectHandle()
     disconnect(false);
 }
 
+// Creates an association between Binder code to name for IEffect.
+#define IEFFECT_BINDER_METHOD_MACRO_LIST \
+BINDER_METHOD_ENTRY(enable) \
+BINDER_METHOD_ENTRY(disable) \
+BINDER_METHOD_ENTRY(command) \
+BINDER_METHOD_ENTRY(disconnect) \
+BINDER_METHOD_ENTRY(getCblk) \
+
+// singleton for Binder Method Statistics for IEffect
+mediautils::MethodStatistics<int>& getIEffectStatistics() {
+    using Code = int;
+
+#pragma push_macro("BINDER_METHOD_ENTRY")
+#undef BINDER_METHOD_ENTRY
+#define BINDER_METHOD_ENTRY(ENTRY) \
+        {(Code)media::BnEffect::TRANSACTION_##ENTRY, #ENTRY},
+
+    static mediautils::MethodStatistics<Code> methodStatistics{
+        IEFFECT_BINDER_METHOD_MACRO_LIST
+        METHOD_STATISTICS_BINDER_CODE_NAMES(Code)
+    };
+#pragma pop_macro("BINDER_METHOD_ENTRY")
+
+    return methodStatistics;
+}
+
+status_t AudioFlinger::EffectHandle::onTransact(
+        uint32_t code, const Parcel& data, Parcel* reply, uint32_t flags) {
+    const std::string methodName = getIEffectStatistics().getMethodForCode(code);
+    mediautils::TimeCheck check(
+            std::string("IEffect::").append(methodName),
+            [code](bool timeout, float elapsedMs) {
+        if (timeout) {
+            ; // we don't timeout right now on the effect interface.
+        } else {
+            getIEffectStatistics().event(code, elapsedMs);
+        }
+    }, 0 /* timeoutMs */);
+    return BnEffect::onTransact(code, data, reply, flags);
+}
+
 status_t AudioFlinger::EffectHandle::initCheck()
 {
     return mClient == 0 || mCblkMemory != 0 ? OK : NO_MEMORY;
@@ -3260,6 +3303,8 @@ status_t AudioFlinger::DeviceEffectProxy::checkPort(const PatchPanel::Patch& pat
         } else {
             mHalEffect->setDevices({mDevice});
         }
+        mHalEffect->configure();
+
         *handle = new EffectHandle(mHalEffect, nullptr, nullptr, 0 /*priority*/,
                                    mNotifyFramesProcessed);
         status = (*handle)->initCheck();
@@ -3308,8 +3353,14 @@ status_t AudioFlinger::DeviceEffectProxy::checkPort(const PatchPanel::Patch& pat
 }
 
 void AudioFlinger::DeviceEffectProxy::onReleasePatch(audio_patch_handle_t patchHandle) {
-    Mutex::Autolock _l(mProxyLock);
-    mEffectHandles.erase(patchHandle);
+    sp<EffectHandle> effect;
+    {
+        Mutex::Autolock _l(mProxyLock);
+        if (mEffectHandles.find(patchHandle) != mEffectHandles.end()) {
+            effect = mEffectHandles.at(patchHandle);
+            mEffectHandles.erase(patchHandle);
+        }
+    }
 }
 
 
@@ -3317,6 +3368,7 @@ size_t AudioFlinger::DeviceEffectProxy::removeEffect(const sp<EffectModule>& eff
 {
     Mutex::Autolock _l(mProxyLock);
     if (effect == mHalEffect) {
+        mHalEffect->release_l();
         mHalEffect.clear();
         mDevicePort.id = AUDIO_PORT_HANDLE_NONE;
     }
@@ -3464,7 +3516,7 @@ status_t AudioFlinger::DeviceEffectProxy::ProxyCallback::removeEffectFromHal(
     if (proxy == nullptr) {
         return NO_INIT;
     }
-    return proxy->addEffectToHal(effect);
+    return proxy->removeEffectFromHal(effect);
 }
 
 bool AudioFlinger::DeviceEffectProxy::ProxyCallback::isOutput() const {
@@ -3514,6 +3566,24 @@ uint32_t AudioFlinger::DeviceEffectProxy::ProxyCallback::outChannelCount() const
         return 2;
     }
     return proxy->channelCount();
+}
+
+void AudioFlinger::DeviceEffectProxy::ProxyCallback::onEffectEnable(
+        const sp<EffectBase>& effectBase) {
+    sp<EffectModule> effect = effectBase->asEffectModule();
+    if (effect == nullptr) {
+        return;
+    }
+    effect->start();
+}
+
+void AudioFlinger::DeviceEffectProxy::ProxyCallback::onEffectDisable(
+        const sp<EffectBase>& effectBase) {
+    sp<EffectModule> effect = effectBase->asEffectModule();
+    if (effect == nullptr) {
+        return;
+    }
+    effect->stop();
 }
 
 } // namespace android

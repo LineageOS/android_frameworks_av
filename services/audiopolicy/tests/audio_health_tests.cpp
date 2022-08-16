@@ -111,16 +111,17 @@ TEST(AudioHealthTest, ConnectSupportedDevice) {
             continue;
         }
         std::string address = "11:22:33:44:55:66";
+        media::AudioPort aidlPort;
+        ASSERT_EQ(OK, manager.deviceToAudioPort(device->type(), address.c_str(), "" /*name*/,
+                                                 &aidlPort));
         ASSERT_EQ(AUDIO_POLICY_DEVICE_STATE_UNAVAILABLE,
                 AudioSystem::getDeviceConnectionState(device->type(), address.c_str()));
         ASSERT_EQ(NO_ERROR, AudioSystem::setDeviceConnectionState(
-                device->type(), AUDIO_POLICY_DEVICE_STATE_AVAILABLE, address.c_str(),
-                "" /*device_name*/, AUDIO_FORMAT_DEFAULT));
+                AUDIO_POLICY_DEVICE_STATE_AVAILABLE, aidlPort.hal, AUDIO_FORMAT_DEFAULT));
         ASSERT_EQ(AUDIO_POLICY_DEVICE_STATE_AVAILABLE,
                 AudioSystem::getDeviceConnectionState(device->type(), address.c_str()));
         ASSERT_EQ(NO_ERROR, AudioSystem::setDeviceConnectionState(
-                device->type(), AUDIO_POLICY_DEVICE_STATE_UNAVAILABLE, address.c_str(),
-                "" /*device_name*/, AUDIO_FORMAT_DEFAULT));
+                AUDIO_POLICY_DEVICE_STATE_UNAVAILABLE, aidlPort.hal, AUDIO_FORMAT_DEFAULT));
         ASSERT_EQ(AUDIO_POLICY_DEVICE_STATE_UNAVAILABLE,
                 AudioSystem::getDeviceConnectionState(device->type(), address.c_str()));
     }

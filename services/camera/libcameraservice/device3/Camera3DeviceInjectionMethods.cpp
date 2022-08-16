@@ -26,8 +26,6 @@
 
 namespace android {
 
-using hardware::camera::device::V3_2::ICameraDeviceSession;
-
 Camera3Device::Camera3DeviceInjectionMethods::Camera3DeviceInjectionMethods(
         wp<Camera3Device> parent)
         : mParent(parent) {
@@ -39,98 +37,10 @@ Camera3Device::Camera3DeviceInjectionMethods::~Camera3DeviceInjectionMethods() {
     injectionDisconnectImpl();
 }
 
-status_t Camera3Device::Camera3DeviceInjectionMethods::injectionInitialize(
-        const String8& injectedCamId, sp<CameraProviderManager> manager,
-        const sp<android::hardware::camera::device::V3_2::ICameraDeviceCallback>&
-                callback) {
-    ATRACE_CALL();
-    Mutex::Autolock lock(mInjectionLock);
-
-    if (manager == nullptr) {
-        ALOGE("%s: manager does not exist!", __FUNCTION__);
-        return INVALID_OPERATION;
-    }
-
-    sp<Camera3Device> parent = mParent.promote();
-    if (parent == nullptr) {
-        ALOGE("%s: parent does not exist!", __FUNCTION__);
-        return INVALID_OPERATION;
-    }
-
-    mInjectedCamId = injectedCamId;
-    sp<ICameraDeviceSession> session;
-    ATRACE_BEGIN("Injection CameraHal::openSession");
-    status_t res = manager->openSession(injectedCamId.string(), callback,
-                                          /*out*/ &session);
-    ATRACE_END();
-    if (res != OK) {
-        ALOGE("Injection camera could not open camera session: %s (%d)",
-                strerror(-res), res);
-        return res;
-    }
-
-    std::shared_ptr<RequestMetadataQueue> queue;
-    auto requestQueueRet =
-        session->getCaptureRequestMetadataQueue([&queue](const auto& descriptor) {
-            queue = std::make_shared<RequestMetadataQueue>(descriptor);
-            if (!queue->isValid() || queue->availableToWrite() <= 0) {
-                ALOGE("Injection camera HAL returns empty request metadata fmq, not "
-                        "use it");
-                queue = nullptr;
-                // don't use the queue onwards.
-            }
-        });
-    if (!requestQueueRet.isOk()) {
-        ALOGE("Injection camera transaction error when getting request metadata fmq: "
-                "%s, not use it", requestQueueRet.description().c_str());
-        return DEAD_OBJECT;
-    }
-
-    std::unique_ptr<ResultMetadataQueue>& resQueue = parent->mResultMetadataQueue;
-    auto resultQueueRet = session->getCaptureResultMetadataQueue(
-        [&resQueue](const auto& descriptor) {
-            resQueue = std::make_unique<ResultMetadataQueue>(descriptor);
-            if (!resQueue->isValid() || resQueue->availableToWrite() <= 0) {
-                ALOGE("Injection camera HAL returns empty result metadata fmq, not use "
-                        "it");
-                resQueue = nullptr;
-                // Don't use the resQueue onwards.
-            }
-        });
-    if (!resultQueueRet.isOk()) {
-        ALOGE("Injection camera transaction error when getting result metadata queue "
-                "from camera session: %s", resultQueueRet.description().c_str());
-        return DEAD_OBJECT;
-    }
-    IF_ALOGV() {
-        session->interfaceChain(
-                [](::android::hardware::hidl_vec<::android::hardware::hidl_string>
-                        interfaceChain) {
-                        ALOGV("Injection camera session interface chain:");
-                        for (const auto& iface : interfaceChain) {
-                            ALOGV("  %s", iface.c_str());
-                        }
-                });
-    }
-
-    ALOGV("%s: Injection camera interface = new HalInterface()", __FUNCTION__);
-    mInjectedCamHalInterface =
-            new HalInterface(session, queue, parent->mUseHalBufManager,
-                       parent->mSupportOfflineProcessing);
-    if (mInjectedCamHalInterface == nullptr) {
-        ALOGE("%s: mInjectedCamHalInterface does not exist!", __FUNCTION__);
-        return DEAD_OBJECT;
-    }
-
-    return OK;
-}
-
 status_t Camera3Device::Camera3DeviceInjectionMethods::injectCamera(
         camera3::camera_stream_configuration& injectionConfig,
-        std::vector<uint32_t>& injectionBufferSizes) {
+        const std::vector<uint32_t>& injectionBufferSizes) {
     status_t res = NO_ERROR;
-    mInjectionConfig = injectionConfig;
-    mInjectionBufferSizes = injectionBufferSizes;
 
     if (mInjectedCamHalInterface == nullptr) {
         ALOGE("%s: mInjectedCamHalInterface does not exist!", __FUNCTION__);
@@ -148,7 +58,6 @@ status_t Camera3Device::Camera3DeviceInjectionMethods::injectCamera(
     if (parent->mStatus == STATUS_ACTIVE) {
         ALOGV("%s: Let the device be IDLE and the request thread is paused",
                 __FUNCTION__);
-        parent->mPauseStateNotify = true;
         res = parent->internalPauseAndWaitLocked(maxExpectedDuration);
         if (res != OK) {
             ALOGE("%s: Can't pause captures to inject camera!", __FUNCTION__);
@@ -188,7 +97,7 @@ status_t Camera3Device::Camera3DeviceInjectionMethods::injectCamera(
         ALOGV("%s: Restarting activity to inject camera", __FUNCTION__);
         // Reuse current operating mode and session parameters for new stream
         // config.
-        parent->internalUpdateStatusLocked(STATUS_ACTIVE);
+        parent->internalResumeLocked();
     }
 
     return OK;
@@ -208,7 +117,6 @@ status_t Camera3Device::Camera3DeviceInjectionMethods::stopInjection() {
     if (parent->mStatus == STATUS_ACTIVE) {
         ALOGV("%s: Let the device be IDLE and the request thread is paused",
                 __FUNCTION__);
-        parent->mPauseStateNotify = true;
         res = parent->internalPauseAndWaitLocked(maxExpectedDuration);
         if (res != OK) {
             ALOGE("%s: Can't pause captures to stop injection!", __FUNCTION__);
@@ -229,7 +137,7 @@ status_t Camera3Device::Camera3DeviceInjectionMethods::stopInjection() {
         ALOGV("%s: Restarting activity to stop injection", __FUNCTION__);
         // Reuse current operating mode and session parameters for new stream
         // config.
-        parent->internalUpdateStatusLocked(STATUS_ACTIVE);
+        parent->internalResumeLocked();
     }
 
     return OK;
@@ -241,6 +149,10 @@ bool Camera3Device::Camera3DeviceInjectionMethods::isInjecting() {
     } else {
         return true;
     }
+}
+
+bool Camera3Device::Camera3DeviceInjectionMethods::isStreamConfigCompleteButNotInjected() {
+    return mIsStreamConfigCompleteButNotInjected;
 }
 
 const String8& Camera3Device::Camera3DeviceInjectionMethods::getInjectedCamId()
@@ -260,10 +172,22 @@ void Camera3Device::Camera3DeviceInjectionMethods::getInjectionConfig(
     *injectionBufferSizes = mInjectionBufferSizes;
 }
 
+void Camera3Device::Camera3DeviceInjectionMethods::storeInjectionConfig(
+        const camera3::camera_stream_configuration& injectionConfig,
+        const std::vector<uint32_t>& injectionBufferSizes) {
+    mIsStreamConfigCompleteButNotInjected = true;
+    mInjectionConfig = injectionConfig;
+    mInjectionStreams.clear();
+    for (size_t i = 0; i < injectionConfig.num_streams; i++) {
+        mInjectionStreams.push_back(injectionConfig.streams[i]);
+    }
+    mInjectionConfig.streams = mInjectionStreams.editArray();
+    mInjectionBufferSizes = injectionBufferSizes;
+}
 
 status_t Camera3Device::Camera3DeviceInjectionMethods::injectionConfigureStreams(
         camera3::camera_stream_configuration& injectionConfig,
-        std::vector<uint32_t>& injectionBufferSizes) {
+        const std::vector<uint32_t>& injectionBufferSizes) {
     ATRACE_CALL();
     status_t res = NO_ERROR;
 
@@ -326,7 +250,6 @@ status_t Camera3Device::Camera3DeviceInjectionMethods::injectionConfigureStreams
             mInjectedCamId.string());
 
     auto rc = parent->mPreparerThread->resume();
-
     if (rc != OK) {
         ALOGE("%s: Injection camera %s: Preparer thread failed to resume!",
                  __FUNCTION__, mInjectedCamId.string());
@@ -339,6 +262,9 @@ status_t Camera3Device::Camera3DeviceInjectionMethods::injectionConfigureStreams
 void Camera3Device::Camera3DeviceInjectionMethods::injectionDisconnectImpl() {
     ATRACE_CALL();
     ALOGI("%s: Injection camera disconnect", __FUNCTION__);
+    mIsStreamConfigCompleteButNotInjected = false;
+    mInjectionStreams.clear();
+    mInjectionConfig.streams = nullptr;
 
     mBackupHalInterface = nullptr;
     HalInterface* interface = nullptr;
@@ -363,31 +289,6 @@ void Camera3Device::Camera3DeviceInjectionMethods::injectionDisconnectImpl() {
             mInjectedCamHalInterface = nullptr;
         }
     }
-}
-
-status_t Camera3Device::Camera3DeviceInjectionMethods::replaceHalInterface(
-        sp<HalInterface> newHalInterface, bool keepBackup) {
-    Mutex::Autolock lock(mInjectionLock);
-    if (newHalInterface.get() == nullptr) {
-        ALOGE("%s: The newHalInterface does not exist, to stop replacing.",
-                __FUNCTION__);
-        return DEAD_OBJECT;
-    }
-
-    sp<Camera3Device> parent = mParent.promote();
-    if (parent == nullptr) {
-        ALOGE("%s: parent does not exist!", __FUNCTION__);
-        return INVALID_OPERATION;
-    }
-
-    if (keepBackup && mBackupHalInterface == nullptr) {
-        mBackupHalInterface = parent->mInterface;
-    } else if (!keepBackup) {
-        mBackupHalInterface = nullptr;
-    }
-    parent->mInterface = newHalInterface;
-
-    return OK;
 }
 
 };  // namespace android

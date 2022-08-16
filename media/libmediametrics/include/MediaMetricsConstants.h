@@ -25,6 +25,9 @@
  * 2) Consistent behavior and documentation.
  */
 
+#define AMEDIAMETRICS_INITIAL_MAX_VOLUME (0.f)
+#define AMEDIAMETRICS_INITIAL_MIN_VOLUME (1.f)
+
 /*
  * Taxonomy of audio keys
  *
@@ -48,6 +51,12 @@
 // The AudioRecord key appends the "trackId" to the prefix.
 #define AMEDIAMETRICS_KEY_PREFIX_AUDIO_RECORD AMEDIAMETRICS_KEY_PREFIX_AUDIO "record."
 
+// The Audio Sensor key appends the sensor handle integer.
+#define AMEDIAMETRICS_KEY_PREFIX_AUDIO_SENSOR AMEDIAMETRICS_KEY_PREFIX_AUDIO "sensor."
+
+// The Audio Spatializer key appends the spatializerId (currently 0)
+#define AMEDIAMETRICS_KEY_PREFIX_AUDIO_SPATIALIZER AMEDIAMETRICS_KEY_PREFIX_AUDIO "spatializer."
+
 // The AudioStream key appends the "streamId" to the prefix.
 #define AMEDIAMETRICS_KEY_PREFIX_AUDIO_STREAM  AMEDIAMETRICS_KEY_PREFIX_AUDIO "stream."
 
@@ -63,6 +72,7 @@
 
 // Error keys
 #define AMEDIAMETRICS_KEY_AUDIO_TRACK_ERROR   AMEDIAMETRICS_KEY_PREFIX_AUDIO_TRACK "error"
+#define AMEDIAMETRICS_KEY_AUDIO_RECORD_ERROR  AMEDIAMETRICS_KEY_PREFIX_AUDIO_RECORD "error"
 
 /*
  * MediaMetrics Properties are unified space for consistency and readability.
@@ -115,6 +125,11 @@
 #define AMEDIAMETRICS_PROP_DEVICETIMENS   "deviceTimeNs"   // int64_t playback/record time
 #define AMEDIAMETRICS_PROP_DEVICEVOLUME   "deviceVolume"   // double - average device volume
 
+#define AMEDIAMETRICS_PROP_DEVICEMAXVOLUMEDURATIONNS "deviceMaxVolumeDurationNs" // int64_t
+#define AMEDIAMETRICS_PROP_DEVICEMAXVOLUME "deviceMaxVolume" // double - maximum device volume
+#define AMEDIAMETRICS_PROP_DEVICEMINVOLUMEDURATIONNS "deviceMinVolumeDurationNs" // int64_t
+#define AMEDIAMETRICS_PROP_DEVICEMINVOLUME "deviceMinVolume" // double - minimum device volume
+
 #define AMEDIAMETRICS_PROP_DIRECTION      "direction"      // string AAudio input or output
 #define AMEDIAMETRICS_PROP_DURATIONNS     "durationNs"     // int64 duration time span
 #define AMEDIAMETRICS_PROP_ENCODING       "encoding"       // string value of format
@@ -126,11 +141,17 @@
 #define AMEDIAMETRICS_PROP_FLAGS          "flags"
 
 #define AMEDIAMETRICS_PROP_FRAMECOUNT     "frameCount"     // int32
+#define AMEDIAMETRICS_PROP_HEADTRACKINGMODES "headTrackingModes" // string |, like modes.
 #define AMEDIAMETRICS_PROP_INPUTDEVICES   "inputDevices"   // string value
 #define AMEDIAMETRICS_PROP_INTERNALTRACKID "internalTrackId" // int32
 #define AMEDIAMETRICS_PROP_INTERVALCOUNT  "intervalCount"  // int32
 #define AMEDIAMETRICS_PROP_LATENCYMS      "latencyMs"      // double value
+#define AMEDIAMETRICS_PROP_LEVELS         "levels"          // string | with levels
 #define AMEDIAMETRICS_PROP_LOGSESSIONID   "logSessionId"   // hex string, "" none
+#define AMEDIAMETRICS_PROP_METHODCODE     "methodCode"     // int64_t an int indicating method
+#define AMEDIAMETRICS_PROP_METHODNAME     "methodName"     // string method name
+#define AMEDIAMETRICS_PROP_MODE           "mode"           // string
+#define AMEDIAMETRICS_PROP_MODES          "modes"          // string | with modes
 #define AMEDIAMETRICS_PROP_NAME           "name"           // string value
 #define AMEDIAMETRICS_PROP_ORIGINALFLAGS  "originalFlags"  // int32
 #define AMEDIAMETRICS_PROP_OUTPUTDEVICES  "outputDevices"  // string value
@@ -215,6 +236,7 @@
 #define AMEDIAMETRICS_PROP_EVENT_VALUE_SETVOLUME  "setVolume"  // AudioTrack
 #define AMEDIAMETRICS_PROP_EVENT_VALUE_START      "start"  // AudioTrack, AudioRecord
 #define AMEDIAMETRICS_PROP_EVENT_VALUE_STOP       "stop"   // AudioTrack, AudioRecord
+#define AMEDIAMETRICS_PROP_EVENT_VALUE_TIMEOUT    "timeout"  // AudioFlinger, AudioPolicy
 #define AMEDIAMETRICS_PROP_EVENT_VALUE_UNDERRUN   "underrun" // from Thread
 
 // Possible values for AMEDIAMETRICS_PROP_CALLERNAME
@@ -228,6 +250,11 @@
 #define AMEDIAMETRICS_PROP_CALLERNAME_VALUE_SOUNDPOOL     "soundpool"      // SoundPool
 #define AMEDIAMETRICS_PROP_CALLERNAME_VALUE_TONEGENERATOR "tonegenerator"  // dial tones
 #define AMEDIAMETRICS_PROP_CALLERNAME_VALUE_UNKNOWN       "unknown"        // callerName not set
+
+// Many properties are available for the sensor.
+// The mode is how the sensor is being currently used.
+#define AMEDIAMETRICS_PROP_MODE_VALUE_HEAD          "head"        // used for head tracking
+#define AMEDIAMETRICS_PROP_MODE_VALUE_SCREEN        "screen"      // used for screen
 
 // MediaMetrics errors are expected to cover the following sources:
 // https://docs.oracle.com/javase/7/docs/api/java/lang/RuntimeException.html

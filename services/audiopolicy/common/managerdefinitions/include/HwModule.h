@@ -115,7 +115,7 @@ public:
                        const sp<PolicyAudioPort> &dstPort) const;
 
     // TODO remove from here (split serialization)
-    void dump(String8 *dst) const;
+    void dump(String8 *dst, int spaces) const;
 
 private:
     void refreshSupportedDevices();

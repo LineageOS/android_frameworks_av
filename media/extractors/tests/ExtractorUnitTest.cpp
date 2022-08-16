@@ -27,18 +27,18 @@
 #include <media/stagefright/MetaDataUtils.h>
 #include <media/stagefright/foundation/OpusHeader.h>
 
-#include "aac/AACExtractor.h"
-#include "amr/AMRExtractor.h"
-#include "flac/FLACExtractor.h"
-#include "midi/MidiExtractor.h"
-#include "mkv/MatroskaExtractor.h"
-#include "mp3/MP3Extractor.h"
-#include "mp4/MPEG4Extractor.h"
-#include "mp4/SampleTable.h"
-#include "mpeg2/MPEG2PSExtractor.h"
-#include "mpeg2/MPEG2TSExtractor.h"
-#include "ogg/OggExtractor.h"
-#include "wav/WAVExtractor.h"
+#include <AACExtractor.h>
+#include <AMRExtractor.h>
+#include <FLACExtractor.h>
+#include <MidiExtractor.h>
+#include <MatroskaExtractor.h>
+#include <MP3Extractor.h>
+#include <MPEG4Extractor.h>
+#include <SampleTable.h>
+#include <MPEG2PSExtractor.h>
+#include <MPEG2TSExtractor.h>
+#include <OggExtractor.h>
+#include <WAVExtractor.h>
 
 #include "ExtractorUnitTestEnvironment.h"
 

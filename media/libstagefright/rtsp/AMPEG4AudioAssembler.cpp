@@ -17,9 +17,9 @@
 //#define LOG_NDEBUG 0
 #define LOG_TAG "AMPEG4AudioAssembler"
 
-#include "AMPEG4AudioAssembler.h"
+#include <media/stagefright/rtsp/AMPEG4AudioAssembler.h>
 
-#include "ARTPSource.h"
+#include <media/stagefright/rtsp/ARTPSource.h>
 
 #include <media/stagefright/foundation/hexdump.h>
 #include <media/stagefright/foundation/ABitReader.h>

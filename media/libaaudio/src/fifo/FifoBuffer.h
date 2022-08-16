@@ -38,7 +38,7 @@ struct WrappingBuffer {
 
 class FifoBuffer {
 public:
-    FifoBuffer(int32_t bytesPerFrame);
+    explicit FifoBuffer(int32_t bytesPerFrame);
 
     virtual ~FifoBuffer() = default;
 
@@ -162,6 +162,6 @@ private:
     uint8_t *mExternalStorage = nullptr;
 };
 
-}  // android
+}  // namespace android
 
 #endif //FIFO_FIFO_BUFFER_H
