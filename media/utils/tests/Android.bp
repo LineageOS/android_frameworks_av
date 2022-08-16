@@ -178,3 +178,13 @@ cc_test {
         "extended_accumulator_tests.cpp",
     ],
 }
+
+cc_test {
+    name: "inplace_function_tests",
+
+    defaults: ["libmediautils_tests_defaults"],
+
+    srcs: [
+        "inplace_function_tests.cpp"
+    ],
+}
