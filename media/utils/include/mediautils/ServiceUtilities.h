@@ -61,6 +61,7 @@ static inline bool isAudioServerOrRootUid(uid_t uid) {
 
 // Used for calls that should come from system server or internal.
 // Note: system server is multiprocess for multiple users.  audioserver is not.
+// Note: if this method is modified, also update the same method in SensorService.h.
 static inline bool isAudioServerOrSystemServerUid(uid_t uid) {
     return multiuser_get_app_id(uid) == AID_SYSTEM || uid == AID_AUDIOSERVER;
 }
@@ -95,6 +96,7 @@ bool captureAudioOutputAllowed(const AttributionSourceState& attributionSource);
 bool captureMediaOutputAllowed(const AttributionSourceState& attributionSource);
 bool captureTunerAudioInputAllowed(const AttributionSourceState& attributionSource);
 bool captureVoiceCommunicationOutputAllowed(const AttributionSourceState& attributionSource);
+bool accessUltrasoundAllowed(const AttributionSourceState& attributionSource);
 bool captureHotwordAllowed(const AttributionSourceState& attributionSource);
 bool settingsAllowed();
 bool modifyAudioRoutingAllowed();
@@ -104,6 +106,7 @@ bool modifyDefaultAudioEffectsAllowed(const AttributionSourceState& attributionS
 bool dumpAllowed();
 bool modifyPhoneStateAllowed(const AttributionSourceState& attributionSource);
 bool bypassInterruptionPolicyAllowed(const AttributionSourceState& attributionSource);
+bool callAudioInterceptionAllowed(const AttributionSourceState& attributionSource);
 void purgePermissionCache();
 int32_t getOpForSource(audio_source_t source);
 

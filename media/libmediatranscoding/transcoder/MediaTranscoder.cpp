@@ -55,8 +55,8 @@ static std::shared_ptr<AMediaFormat> createVideoTrackFormat(AMediaFormat* srcFor
     AMediaFormat_getString(srcFormat, AMEDIAFORMAT_KEY_MIME, &srcMime);
     if (!AMediaFormat_getString(options, AMEDIAFORMAT_KEY_MIME, &dstMime) ||
         strcmp(srcMime, dstMime) == 0) {
-        srcParamsToCopy.push_back(ENTRY_COPIER(AMEDIAFORMAT_KEY_PROFILE, String));
-        srcParamsToCopy.push_back(ENTRY_COPIER(AMEDIAFORMAT_KEY_LEVEL, String));
+        srcParamsToCopy.push_back(ENTRY_COPIER(AMEDIAFORMAT_KEY_PROFILE, Int32));
+        srcParamsToCopy.push_back(ENTRY_COPIER(AMEDIAFORMAT_KEY_LEVEL, Int32));
     }
 
     // ------- Define parameters to copy from the caller's options -------

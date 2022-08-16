@@ -30,7 +30,7 @@
 using namespace aaudio;
 
 AAudioStreamRequest::AAudioStreamRequest(const StreamRequest& parcelable) :
-        mConfiguration(std::move(parcelable.params)),
+        mConfiguration(parcelable.params),
         mAttributionSource(parcelable.attributionSource),
         mSharingModeMatchRequired(parcelable.sharingModeMatchRequired),
         mInService(parcelable.inService) {
@@ -38,7 +38,7 @@ AAudioStreamRequest::AAudioStreamRequest(const StreamRequest& parcelable) :
 
 StreamRequest AAudioStreamRequest::parcelable() const {
     StreamRequest result;
-    result.params = std::move(mConfiguration).parcelable();
+    result.params = mConfiguration.parcelable();
     result.attributionSource = mAttributionSource;
     result.sharingModeMatchRequired = mSharingModeMatchRequired;
     result.inService = mInService;

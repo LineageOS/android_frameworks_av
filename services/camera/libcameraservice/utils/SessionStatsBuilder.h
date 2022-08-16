@@ -84,6 +84,7 @@ private:
     int64_t mErrorResultCount;
     bool mCounterStopped;
     bool mDeviceError;
+    std::string mUserTag;
     // Map from stream id to stream statistics
     std::map<int, StreamStats> mStatsMap;
 };

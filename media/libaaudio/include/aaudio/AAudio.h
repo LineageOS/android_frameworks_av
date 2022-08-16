@@ -20,7 +20,7 @@
  */
 
 /**
- * @file AAudio.h
+ * @file aaudio/AAudio.h
  */
 
 /**
@@ -778,8 +778,16 @@ AAUDIO_API aaudio_result_t AAudio_createStreamBuilder(AAudioStreamBuilder** buil
         __INTRODUCED_IN(26);
 
 /**
- * Request an audio device identified device using an ID.
- * On Android, for example, the ID could be obtained from the Java AudioManager.
+ * Request an audio device identified by an ID.
+ *
+ * The ID could be obtained from the Java AudioManager.
+ * AudioManager.getDevices() returns an array of {@link AudioDeviceInfo},
+ * which contains a getId() method. That ID can be passed to this function.
+ *
+ * It is possible that you may not get the device that you requested.
+ * So if it is important to you, you should call
+ * AAudioStream_getDeviceId() after the stream is opened to
+ * verify the actual ID.
  *
  * The default, if you do not call this function, is {@link #AAUDIO_UNSPECIFIED},
  * in which case the primary device will be used.
@@ -798,8 +806,11 @@ AAUDIO_API void AAudioStreamBuilder_setDeviceId(AAudioStreamBuilder* builder,
  * This is usually {@code Context#getPackageName()}.
  *
  * The default, if you do not call this function, is a random package in the calling uid.
- * The vast majority of apps have only one package per calling UID. If the package
- * name does not match the calling UID, then requests will be rejected.
+ * The vast majority of apps have only one package per calling UID.
+ * If an invalid package name is set, input streams may not be given permission to
+ * record when started.
+ *
+ * The package name is usually the applicationId in your app's build.gradle file.
  *
  * Available since API level 31.
  *

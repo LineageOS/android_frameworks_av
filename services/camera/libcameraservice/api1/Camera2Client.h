@@ -238,6 +238,15 @@ private:
     status_t initializeImpl(TProviderPtr providerPtr, const String8& monitorTags);
 
     bool isZslEnabledInStillTemplate();
+    // The current rotate & crop mode passed by camera service
+    uint8_t mRotateAndCropMode;
+    // Synchronize access to 'mRotateAndCropMode'
+    mutable Mutex mRotateAndCropLock;
+    // Contains the preview stream transformation that would normally be applied
+    // when the display rotation is 0
+    int mRotateAndCropPreviewTransform;
+    // Flag indicating camera device support for the rotate & crop interface
+    bool mRotateAndCropIsSupported;
 
     mutable Mutex mLatestRequestMutex;
     Condition mLatestRequestSignal;

@@ -221,6 +221,12 @@ public:
                 .withFields({C2F(mDrcOutputLoudness, value).inRange(-57.75, 0.25)})
                 .withSetter(Setter<decltype(*mDrcOutputLoudness)>::StrictValueWithNoDeps)
                 .build());
+
+        addParameter(DefineParam(mChannelMask, C2_PARAMKEY_CHANNEL_MASK)
+                .withDefault(new C2StreamChannelMaskInfo::output(0u, 0))
+                .withFields({C2F(mChannelMask, value).inRange(0, 4294967292)})
+                .withSetter(Setter<decltype(*mChannelMask)>::StrictValueWithNoDeps)
+                .build());
     }
 
     bool isAdts() const { return mAacFormat->value == C2Config::AAC_PACKAGING_ADTS; }
@@ -255,6 +261,7 @@ private:
     std::shared_ptr<C2StreamDrcAlbumModeTuning::input> mDrcAlbumMode;
     std::shared_ptr<C2StreamMaxChannelCountInfo::input> mMaxChannelCount;
     std::shared_ptr<C2StreamDrcOutputLoudnessTuning::output> mDrcOutputLoudness;
+    std::shared_ptr<C2StreamChannelMaskInfo::output> mChannelMask;
     // TODO Add : C2StreamAacSbrModeTuning
 };
 
@@ -829,9 +836,11 @@ void C2SoftAacDec::process(
 
                 C2StreamSampleRateInfo::output sampleRateInfo(0u, mStreamInfo->sampleRate);
                 C2StreamChannelCountInfo::output channelCountInfo(0u, mStreamInfo->numChannels);
+                C2StreamChannelMaskInfo::output channelMaskInfo(0u,
+                        maskFromCount(mStreamInfo->numChannels));
                 std::vector<std::unique_ptr<C2SettingResult>> failures;
                 c2_status_t err = mIntf->config(
-                        { &sampleRateInfo, &channelCountInfo },
+                        { &sampleRateInfo, &channelCountInfo, &channelMaskInfo },
                         C2_MAY_BLOCK,
                         &failures);
                 if (err == OK) {
@@ -840,6 +849,7 @@ void C2SoftAacDec::process(
                     C2FrameData &output = work->worklets.front()->output;
                     output.configUpdate.push_back(C2Param::Copy(sampleRateInfo));
                     output.configUpdate.push_back(C2Param::Copy(channelCountInfo));
+                    output.configUpdate.push_back(C2Param::Copy(channelMaskInfo));
                 } else {
                     ALOGE("Config Update failed");
                     mSignalledError = true;
@@ -1053,6 +1063,47 @@ void C2SoftAacDec::drainDecoder() {
         outputDelayRingBufferPutSamples(tmpOutBuffer, tmpOutBufferSamples);
 
         mOutputDelayCompensated -= tmpOutBufferSamples;
+    }
+}
+
+// definitions based on android.media.AudioFormat.CHANNEL_OUT_*
+#define CHANNEL_OUT_FL  0x4
+#define CHANNEL_OUT_FR  0x8
+#define CHANNEL_OUT_FC  0x10
+#define CHANNEL_OUT_LFE 0x20
+#define CHANNEL_OUT_BL  0x40
+#define CHANNEL_OUT_BR  0x80
+#define CHANNEL_OUT_SL  0x800
+#define CHANNEL_OUT_SR  0x1000
+
+uint32_t C2SoftAacDec::maskFromCount(uint32_t channelCount) {
+    // KEY_CHANNEL_MASK expects masks formatted according to Java android.media.AudioFormat
+    // where the two left-most bits are 0 for output channel mask
+    switch (channelCount) {
+        case 1: // mono is front left
+            return (CHANNEL_OUT_FL);
+        case 2: // stereo
+            return (CHANNEL_OUT_FL | CHANNEL_OUT_FR);
+        case 4: // 4.0 = stereo with backs
+            return (CHANNEL_OUT_FL | CHANNEL_OUT_FC
+                    | CHANNEL_OUT_BL | CHANNEL_OUT_BR);
+        case 5: // 5.0
+            return (CHANNEL_OUT_FL | CHANNEL_OUT_FC | CHANNEL_OUT_FR
+                    | CHANNEL_OUT_BL | CHANNEL_OUT_BR);
+        case 6: // 5.1 = 5.0 + LFE
+            return (CHANNEL_OUT_FL | CHANNEL_OUT_FC | CHANNEL_OUT_FR
+                    | CHANNEL_OUT_BL | CHANNEL_OUT_BR
+                    | CHANNEL_OUT_LFE);
+        case 7: // 7.0 = 5.0 + Sides
+            return (CHANNEL_OUT_FL | CHANNEL_OUT_FC | CHANNEL_OUT_FR
+                    | CHANNEL_OUT_BL | CHANNEL_OUT_BR
+                    | CHANNEL_OUT_SL | CHANNEL_OUT_SR);
+        case 8: // 7.1 = 7.0 + LFE
+            return (CHANNEL_OUT_FL | CHANNEL_OUT_FC | CHANNEL_OUT_FR
+                    | CHANNEL_OUT_BL | CHANNEL_OUT_BR | CHANNEL_OUT_SL | CHANNEL_OUT_SR
+                    | CHANNEL_OUT_LFE);
+        default:
+            return 0;
     }
 }
 

@@ -18,6 +18,7 @@ package android.media;
 
 import android.media.IAudioRecord;
 import android.media.SharedFileRegion;
+import android.media.audio.common.AudioConfigBase;
 
 /**
  * CreateRecordResponse contains all output arguments returned by AudioFlinger to AudioRecord
@@ -43,4 +44,5 @@ parcelable CreateRecordResponse {
     int portId;
     /** The newly created record. */
     @nullable IAudioRecord audioRecord;
+    AudioConfigBase serverConfig;
 }

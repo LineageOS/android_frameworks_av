@@ -87,9 +87,9 @@ void AudioPeakingFilter::setBandwidth(uint32_t cents) {
 void AudioPeakingFilter::commit(bool immediate) {
     audio_coef_t coefs[5];
     int intCoord[3] = {
-        mFrequency >> FREQ_PRECISION_BITS,
+        (int)(mFrequency >> FREQ_PRECISION_BITS),
         mGain >> GAIN_PRECISION_BITS,
-        mBandwidth >> BANDWIDTH_PRECISION_BITS
+        (int)(mBandwidth >> BANDWIDTH_PRECISION_BITS)
     };
     uint32_t fracCoord[3] = {
         mFrequency << (32 - FREQ_PRECISION_BITS),

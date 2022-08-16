@@ -17,55 +17,61 @@
 #ifndef ANDROID_MEDIA_TUNERFLNB_H
 #define ANDROID_MEDIA_TUNERFLNB_H
 
+#include <aidl/android/hardware/tv/tuner/BnLnbCallback.h>
+#include <aidl/android/hardware/tv/tuner/ILnb.h>
 #include <aidl/android/media/tv/tuner/BnTunerLnb.h>
-#include <android/hardware/tv/tuner/1.0/ILnb.h>
-#include <android/hardware/tv/tuner/1.0/ILnbCallback.h>
-#include <media/stagefright/foundation/ADebug.h>
 #include <utils/Log.h>
 
-using Status = ::ndk::ScopedAStatus;
-using ::aidl::android::media::tv::tuner::BnTunerLnb;
-using ::aidl::android::media::tv::tuner::ITunerLnbCallback;
-using ::android::hardware::Return;
-using ::android::hardware::Void;
-using ::android::hardware::hidl_vec;
-using ::android::hardware::tv::tuner::V1_0::ILnb;
-using ::android::hardware::tv::tuner::V1_0::ILnbCallback;
-using ::android::hardware::tv::tuner::V1_0::LnbEventType;
+using ::aidl::android::hardware::tv::tuner::BnLnbCallback;
+using ::aidl::android::hardware::tv::tuner::ILnb;
+using ::aidl::android::hardware::tv::tuner::LnbEventType;
+using ::aidl::android::hardware::tv::tuner::LnbPosition;
+using ::aidl::android::hardware::tv::tuner::LnbTone;
+using ::aidl::android::hardware::tv::tuner::LnbVoltage;
 
 using namespace std;
 
+namespace aidl {
 namespace android {
+namespace media {
+namespace tv {
+namespace tuner {
 
 class TunerLnb : public BnTunerLnb {
 
 public:
-    TunerLnb(sp<ILnb> lnb, int id);
+    TunerLnb(shared_ptr<ILnb> lnb, int id);
     virtual ~TunerLnb();
-    Status setCallback(const shared_ptr<ITunerLnbCallback>& tunerLnbCallback) override;
-    Status setVoltage(int voltage) override;
-    Status setTone(int tone) override;
-    Status setSatellitePosition(int position) override;
-    Status sendDiseqcMessage(const vector<uint8_t>& diseqcMessage) override;
-    Status close() override;
+
+    ::ndk::ScopedAStatus setCallback(
+            const shared_ptr<ITunerLnbCallback>& in_tunerLnbCallback) override;
+    ::ndk::ScopedAStatus setVoltage(LnbVoltage in_voltage) override;
+    ::ndk::ScopedAStatus setTone(LnbTone in_tone) override;
+    ::ndk::ScopedAStatus setSatellitePosition(LnbPosition in_position) override;
+    ::ndk::ScopedAStatus sendDiseqcMessage(const vector<uint8_t>& in_diseqcMessage) override;
+    ::ndk::ScopedAStatus close() override;
 
     int getId() { return mId; }
 
-    struct LnbCallback : public ILnbCallback {
+    struct LnbCallback : public BnLnbCallback {
         LnbCallback(const shared_ptr<ITunerLnbCallback> tunerLnbCallback)
-                : mTunerLnbCallback(tunerLnbCallback) {};
+              : mTunerLnbCallback(tunerLnbCallback){};
 
-        virtual Return<void> onEvent(const LnbEventType lnbEventType);
-        virtual Return<void> onDiseqcMessage(const hidl_vec<uint8_t>& diseqcMessage);
+        ::ndk::ScopedAStatus onEvent(const LnbEventType lnbEventType) override;
+        ::ndk::ScopedAStatus onDiseqcMessage(const vector<uint8_t>& diseqcMessage) override;
 
         shared_ptr<ITunerLnbCallback> mTunerLnbCallback;
     };
 
 private:
     int mId;
-    sp<ILnb> mLnb;
+    shared_ptr<ILnb> mLnb;
 };
 
-} // namespace android
+}  // namespace tuner
+}  // namespace tv
+}  // namespace media
+}  // namespace android
+}  // namespace aidl
 
 #endif // ANDROID_MEDIA_TUNERFLNB_H

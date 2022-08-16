@@ -33,6 +33,8 @@ namespace android {
 // codecname set and passed in as a compile flag from Android.bp
 constexpr char COMPONENT_NAME[] = CODECNAME;
 
+constexpr size_t kMinInputBufferSize = 2 * 1024 * 1024;
+
 class C2SoftGav1Dec::IntfImpl : public SimpleInterface<void>::BaseParams {
  public:
   explicit IntfImpl(const std::shared_ptr<C2ReflectorHelper> &helper)
@@ -54,8 +56,8 @@ class C2SoftGav1Dec::IntfImpl : public SimpleInterface<void>::BaseParams {
         DefineParam(mSize, C2_PARAMKEY_PICTURE_SIZE)
             .withDefault(new C2StreamPictureSizeInfo::output(0u, 320, 240))
             .withFields({
-                C2F(mSize, width).inRange(2, 4096, 2),
-                C2F(mSize, height).inRange(2, 4096, 2),
+                C2F(mSize, width).inRange(2, 4096),
+                C2F(mSize, height).inRange(2, 4096),
             })
             .withSetter(SizeSetter)
             .build());
@@ -134,8 +136,7 @@ class C2SoftGav1Dec::IntfImpl : public SimpleInterface<void>::BaseParams {
             .build());
 
     addParameter(DefineParam(mMaxInputSize, C2_PARAMKEY_INPUT_MAX_BUFFER_SIZE)
-                     .withDefault(new C2StreamMaxBufferSizeInfo::input(
-                         0u, 320 * 240 * 3 / 4))
+                     .withDefault(new C2StreamMaxBufferSizeInfo::input(0u, kMinInputBufferSize))
                      .withFields({
                          C2F(mMaxInputSize, value).any(),
                      })
@@ -263,9 +264,9 @@ class C2SoftGav1Dec::IntfImpl : public SimpleInterface<void>::BaseParams {
       bool mayBlock, C2P<C2StreamMaxBufferSizeInfo::input> &me,
       const C2P<C2StreamMaxPictureSizeTuning::output> &maxSize) {
     (void)mayBlock;
-    // assume compression ratio of 2
-    me.set().value =
-        (((maxSize.v.width + 63) / 64) * ((maxSize.v.height + 63) / 64) * 3072);
+    // assume compression ratio of 2, but enforce a floor
+    me.set().value = c2_max((((maxSize.v.width + 63) / 64)
+                * ((maxSize.v.height + 63) / 64) * 3072), kMinInputBufferSize);
     return C2R::Ok();
   }
 
@@ -415,8 +416,7 @@ C2SoftGav1Dec::C2SoftGav1Dec(const char *name, c2_node_id_t id,
           std::make_shared<SimpleInterface<IntfImpl>>(name, id, intfImpl)),
       mIntf(intfImpl),
       mCodecCtx(nullptr) {
-  gettimeofday(&mTimeStart, nullptr);
-  gettimeofday(&mTimeEnd, nullptr);
+  mTimeStart = mTimeEnd = systemTime();
 }
 
 C2SoftGav1Dec::~C2SoftGav1Dec() { onRelease(); }
@@ -591,19 +591,17 @@ void C2SoftGav1Dec::process(const std::unique_ptr<C2Work> &work,
   int64_t frameIndex = work->input.ordinal.frameIndex.peekll();
   if (inSize) {
     uint8_t *bitstream = const_cast<uint8_t *>(rView.data() + inOffset);
-    int32_t decodeTime = 0;
-    int32_t delay = 0;
 
-    GETTIME(&mTimeStart, nullptr);
-    TIME_DIFF(mTimeEnd, mTimeStart, delay);
+    mTimeStart = systemTime();
+    nsecs_t delay = mTimeStart - mTimeEnd;
 
     const Libgav1StatusCode status =
         mCodecCtx->EnqueueFrame(bitstream, inSize, frameIndex,
                                 /*buffer_private_data=*/nullptr);
 
-    GETTIME(&mTimeEnd, nullptr);
-    TIME_DIFF(mTimeStart, mTimeEnd, decodeTime);
-    ALOGV("decodeTime=%4d delay=%4d\n", decodeTime, delay);
+    mTimeEnd = systemTime();
+    nsecs_t decodeTime = mTimeEnd - mTimeStart;
+    ALOGV("decodeTime=%4" PRId64 " delay=%4" PRId64 "\n", decodeTime, delay);
 
     if (status != kLibgav1StatusOk) {
       ALOGE("av1 decoder failed to decode frame. status: %d.", status);
@@ -826,8 +824,12 @@ bool C2SoftGav1Dec::outputBuffer(const std::shared_ptr<C2BlockPool> &pool,
 
   C2MemoryUsage usage = {C2MemoryUsage::CPU_READ, C2MemoryUsage::CPU_WRITE};
 
-  c2_status_t err = pool->fetchGraphicBlock(align(mWidth, 16), mHeight, format,
-                                            usage, &block);
+  // We always create a graphic block that is width aligned to 16 and height
+  // aligned to 2. We set the correct "crop" value of the image in the call to
+  // createGraphicBuffer() by setting the correct image dimensions.
+  c2_status_t err = pool->fetchGraphicBlock(align(mWidth, 16),
+                                            align(mHeight, 2), format, usage,
+                                            &block);
 
   if (err != C2_OK) {
     ALOGE("fetchGraphicBlock for Output failed with status %d", err);

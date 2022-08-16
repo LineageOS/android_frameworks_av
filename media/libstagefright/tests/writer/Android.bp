@@ -52,10 +52,6 @@ cc_test {
         "libogg",
     ],
 
-    include_dirs: [
-        "frameworks/av/media/libstagefright",
-    ],
-
     cflags: [
         "-Werror",
         "-Wall",

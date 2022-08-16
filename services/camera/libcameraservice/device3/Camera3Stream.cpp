@@ -14,6 +14,8 @@
  * limitations under the License.
  */
 
+#include <vector>
+#include "system/window.h"
 #define LOG_TAG "Camera3-Stream"
 #define ATRACE_TAG ATRACE_TAG_CAMERA
 //#define LOG_NDEBUG 0
@@ -23,6 +25,7 @@
 #include "device3/Camera3Stream.h"
 #include "device3/StatusTracker.h"
 #include "utils/TraceHFR.h"
+#include "ui/GraphicBufferMapper.h"
 
 #include <cutils/properties.h>
 
@@ -51,7 +54,8 @@ Camera3Stream::Camera3Stream(int id,
         android_dataspace dataSpace, camera_stream_rotation_t rotation,
         const String8& physicalCameraId,
         const std::unordered_set<int32_t> &sensorPixelModesUsed,
-        int setId, bool isMultiResolution) :
+        int setId, bool isMultiResolution, int64_t dynamicRangeProfile,
+        int64_t streamUseCase, bool deviceTimeBaseIsRealtime, int timestampBase) :
     camera_stream(),
     mId(id),
     mSetId(setId),
@@ -76,7 +80,9 @@ Camera3Stream::Camera3Stream(int id,
     mOriginalDataSpace(dataSpace),
     mPhysicalCameraId(physicalCameraId),
     mLastTimestamp(0),
-    mIsMultiResolution(isMultiResolution) {
+    mIsMultiResolution(isMultiResolution),
+    mDeviceTimeBaseIsRealtime(deviceTimeBaseIsRealtime),
+    mTimestampBase(timestampBase) {
 
     camera_stream::stream_type = type;
     camera_stream::width = width;
@@ -87,6 +93,8 @@ Camera3Stream::Camera3Stream(int id,
     camera_stream::max_buffers = 0;
     camera_stream::physical_camera_id = mPhysicalCameraId.string();
     camera_stream::sensor_pixel_modes_used = sensorPixelModesUsed;
+    camera_stream::dynamic_range_profile = dynamicRangeProfile;
+    camera_stream::use_case = streamUseCase;
 
     if ((format == HAL_PIXEL_FORMAT_BLOB || format == HAL_PIXEL_FORMAT_RAW_OPAQUE) &&
             maxSize == 0) {
@@ -147,6 +155,10 @@ int Camera3Stream::getOriginalFormat() const {
     return mOriginalFormat;
 }
 
+int64_t Camera3Stream::getDynamicRangeProfile() const {
+    return camera_stream::dynamic_range_profile;
+}
+
 void Camera3Stream::setDataSpaceOverride(bool dataSpaceOverridden) {
     mDataSpaceOverridden = dataSpaceOverridden;
 }
@@ -165,6 +177,18 @@ const String8& Camera3Stream::physicalCameraId() const {
 
 int Camera3Stream::getMaxHalBuffers() const {
     return camera_stream::max_buffers;
+}
+
+int64_t Camera3Stream::getStreamUseCase() const {
+    return camera_stream::use_case;
+}
+
+int Camera3Stream::getTimestampBase() const {
+    return mTimestampBase;
+}
+
+bool Camera3Stream::isDeviceTimeBaseRealtime() const {
+    return mDeviceTimeBaseIsRealtime;
 }
 
 void Camera3Stream::setOfflineProcessingSupport(bool support) {
@@ -557,7 +581,8 @@ status_t Camera3Stream::cancelPrepareLocked() {
     for (size_t i = 0; i < mPreparedBufferIdx; i++) {
         mPreparedBuffers.editItemAt(i).release_fence = -1;
         mPreparedBuffers.editItemAt(i).status = CAMERA_BUFFER_STATUS_ERROR;
-        returnBufferLocked(mPreparedBuffers[i], 0, /*transform*/ -1);
+        returnBufferLocked(mPreparedBuffers[i], /*timestamp*/0, /*readoutTimestamp*/0,
+                /*transform*/ -1);
     }
     mPreparedBuffers.clear();
     mPreparedBufferIdx = 0;
@@ -713,7 +738,7 @@ void Camera3Stream::removeOutstandingBuffer(const camera_stream_buffer &buffer) 
 }
 
 status_t Camera3Stream::returnBuffer(const camera_stream_buffer &buffer,
-        nsecs_t timestamp, bool timestampIncreasing,
+        nsecs_t timestamp, nsecs_t readoutTimestamp, bool timestampIncreasing,
          const std::vector<size_t>& surface_ids, uint64_t frameNumber, int32_t transform) {
     ATRACE_HFR_CALL();
     Mutex::Autolock l(mLock);
@@ -743,7 +768,7 @@ status_t Camera3Stream::returnBuffer(const camera_stream_buffer &buffer,
      *
      * Do this for getBuffer as well.
      */
-    status_t res = returnBufferLocked(b, timestamp, transform, surface_ids);
+    status_t res = returnBufferLocked(b, timestamp, readoutTimestamp, transform, surface_ids);
     if (res == OK) {
         fireBufferListenersLocked(b, /*acquired*/false, /*output*/true, timestamp, frameNumber);
     }
@@ -931,7 +956,7 @@ status_t Camera3Stream::getBuffersLocked(std::vector<OutstandingBuffer>*) {
 }
 
 status_t Camera3Stream::returnBufferLocked(const camera_stream_buffer &,
-                                           nsecs_t, int32_t, const std::vector<size_t>&) {
+                                           nsecs_t, nsecs_t, int32_t, const std::vector<size_t>&) {
     ALOGE("%s: This type of stream does not support output", __FUNCTION__);
     return INVALID_OPERATION;
 }
@@ -1076,6 +1101,52 @@ status_t Camera3Stream::getBuffers(std::vector<OutstandingBuffer>* buffers,
 
     return res;
 }
+
+void Camera3Stream::queueHDRMetadata(buffer_handle_t buffer, sp<ANativeWindow>& anw,
+        int64_t dynamicRangeProfile) {
+    auto& mapper = GraphicBufferMapper::get();
+    switch (dynamicRangeProfile) {
+        case ANDROID_REQUEST_AVAILABLE_DYNAMIC_RANGE_PROFILES_MAP_HDR10: {
+            std::optional<ui::Smpte2086> smpte2086;
+            auto res = mapper.getSmpte2086(buffer, &smpte2086);
+            if ((res == OK) && smpte2086.has_value()) {
+                const auto& metaValue = smpte2086.value();
+                android_smpte2086_metadata meta = {
+                    .displayPrimaryRed.x = metaValue.primaryRed.x,
+                    .displayPrimaryRed.y = metaValue.primaryRed.y,
+                    .displayPrimaryGreen.x = metaValue.primaryGreen.x,
+                    .displayPrimaryGreen.y = metaValue.primaryGreen.y,
+                    .displayPrimaryBlue.x = metaValue.primaryBlue.x,
+                    .displayPrimaryBlue.y = metaValue.primaryBlue.y,
+                    .whitePoint.x = metaValue.whitePoint.x,
+                    .whitePoint.y = metaValue.whitePoint.y,
+                    .maxLuminance = metaValue.maxLuminance,
+                    .minLuminance = metaValue.minLuminance};
+                native_window_set_buffers_smpte2086_metadata(anw.get(), &meta);
+            } else {
+                ALOGE("%s Couldn't retrieve Smpte2086 metadata %s (%d)",
+                        __FUNCTION__, strerror(-res), res);
+            }
+            break;
+        }
+        case ANDROID_REQUEST_AVAILABLE_DYNAMIC_RANGE_PROFILES_MAP_HDR10_PLUS: {
+            std::optional<std::vector<uint8_t>> smpte2094_40;
+            auto res = mapper.getSmpte2094_40(buffer, &smpte2094_40);
+            if ((res == OK) && smpte2094_40.has_value()) {
+                native_window_set_buffers_hdr10_plus_metadata(anw.get(),
+                        smpte2094_40.value().size(), smpte2094_40.value().data());
+            } else {
+                ALOGE("%s Couldn't retrieve Smpte2094_40 metadata %s (%d)",
+                        __FUNCTION__, strerror(-res), res);
+            }
+            break;
+        }
+        default:
+            // No-op
+            break;
+    }
+}
+
 
 }; // namespace camera3
 

@@ -82,15 +82,12 @@ public:
     bool setVolumeProfileForStream(const audio_stream_type_t &stream,
                                    const audio_stream_type_t &volumeProfile) override;
 
-    bool setDeviceForInputSource(const audio_source_t &inputSource, audio_devices_t device) override
-    {
-        return setPropertyForKey<audio_devices_t, audio_source_t>(device, inputSource);
-    }
+    bool setDeviceForInputSource(const audio_source_t &inputSource, uint64_t device) override;
+
     void setDeviceAddressForProductStrategy(product_strategy_t strategy,
                                                     const std::string &address) override;
 
-    bool setDeviceTypesForProductStrategy(product_strategy_t strategy,
-                                                  audio_devices_t devices) override;
+    bool setDeviceTypesForProductStrategy(product_strategy_t strategy, uint64_t devices) override;
 
     product_strategy_t getProductStrategyByName(const std::string &name) override
     {

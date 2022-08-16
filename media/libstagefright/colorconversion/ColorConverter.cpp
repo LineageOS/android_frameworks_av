@@ -56,18 +56,159 @@ static bool isRGB(OMX_COLOR_FORMATTYPE colorFormat) {
             || colorFormat == COLOR_Format32bitABGR2101010;
 }
 
-bool ColorConverter::ColorSpace::isBt709() {
-    return (mStandard == ColorUtils::kColorStandardBT709);
-}
-
-bool ColorConverter::ColorSpace::isBt2020() {
+bool ColorConverter::ColorSpace::isBt2020() const {
     return (mStandard == ColorUtils::kColorStandardBT2020);
 }
 
-bool ColorConverter::ColorSpace::isJpeg() {
+bool ColorConverter::ColorSpace::isH420() const {
+    return (mStandard == ColorUtils::kColorStandardBT709)
+            && (mRange == ColorUtils::kColorRangeLimited);
+}
+
+// the matrix coefficients are the same for both 601.625 and 601.525 standards
+bool ColorConverter::ColorSpace::isI420() const {
+    return ((mStandard == ColorUtils::kColorStandardBT601_625)
+            || (mStandard == ColorUtils::kColorStandardBT601_525))
+            && (mRange == ColorUtils::kColorRangeLimited);
+}
+
+bool ColorConverter::ColorSpace::isJ420() const {
     return ((mStandard == ColorUtils::kColorStandardBT601_625)
             || (mStandard == ColorUtils::kColorStandardBT601_525))
             && (mRange == ColorUtils::kColorRangeFull);
+}
+
+/**
+ * This class approximates the standard YUV to RGB conversions by factoring the matrix
+ * coefficients to 1/256th-s (as dividing by 256 is easy to do with right shift). The chosen value
+ * of 256 is somewhat arbitrary and was not dependent on the bit-depth, but it does limit the
+ * precision of the matrix coefficients (KR & KB).
+ *
+ * The maximum color error after clipping from using 256 is a distance of:
+ *   0.4 (8-bit) / 1.4 (10-bit) for greens in BT.601
+ *   0.5 (8-bit) / 1.9 (10-bit) for cyans in BT.709, and
+ *   0.3 (8-bit) / 1.3 (10-bit) for violets in BT.2020 (it is 0.4 for 10-bit BT.2020 limited)
+ *
+ * Note for reference: libyuv is using a divisor of 64 instead of 256 to ensure no overflow in
+ * 16-bit math. The maximum color error for libyuv is 3.5 / 14.
+ *
+ * The clamping is done using a lookup vector where negative indices are mapped to 0
+ * and indices > 255 are mapped to 255. (For 10-bit these are clamped to 0 to 1023)
+ *
+ * The matrices are assumed to be of the following format (note the sign on the 2nd row):
+ *
+ * [ R ]     [ _y     0    _r_v ]   [ Y -  C16 ]
+ * [ G ]  =  [ _y  -_g_u  -_g_v ] * [ U - C128 ]
+ * [ B ]     [ _y   _b_u     0  ]   [ V - C128 ]
+ *
+ * C16 is 1 << (bitdepth - 4) for limited range, and 0 for full range
+ * C128 is 1 << (bitdepth - 1)
+ * C255 is (1 << bitdepth) - 1
+ *
+ * The min and max values from these equations determine the clip range needed for clamping:
+ *
+ * min = - (_y * C16 + max((_g_u + _g_v) * (C255-C128), max(_r_v, _b_u) * C128)) / 256
+ * max = (_y * (C255 - C16) + max((_g_u + _g_v) * C128, max(_r_v, _b_u) * (C255-C128)) + 128) / 256
+ */
+
+struct ColorConverter::Coeffs {
+    int32_t _y;
+    int32_t _r_v;
+    int32_t _g_u;
+    int32_t _g_v;
+    int32_t _b_u;
+};
+
+/*
+
+Color conversion rules are dictated by ISO (e.g. ISO:IEC 23008:2)
+
+Limited range means Y is in [16, 235], U and V are in [16, 224] corresponding to [-0.5 to 0.5].
+
+Full range means Y is in [0, 255], U and V are in [0.5, 255.5] corresponding to [-0.5 to .5].
+
+RGB is always in full range ([0, 255])
+
+The color primaries determine the KR and KB values:
+
+
+For full range (assuming 8-bits) ISO defines:
+
+(   Y   )   (  KR      1-KR-KB       KB  )
+(       )   (                            )   (R)
+(       )   (-KR/2   -(1-KR-KB)/2        )   ( )
+(U - 128) = (-----   ------------    0.5 ) * (G)
+(       )   ((1-KB)     (1-KB)           )   ( )
+(       )   (                            )   (B)
+(       )   (        -(1-KR-KB)/2  -KB/2 )
+(V - 128)   ( 0.5    ------------  ----- )
+            (           (1-KR)     (1-KR))
+
+(the math is rounded, 128 is (1 << (bitdepth - 1)) )
+
+From this
+
+(R)      ( 1       0        2*(1-KR)   )   (   Y   )
+( )      (                             )   (       )
+( )      (    2*KB*(KB-1)  2*KR*(KR-1) )   (       )
+(G)  =   ( 1  -----------  ----------- ) * (U - 128)
+( )      (      1-KR-KB      1-KR-KB   )   (       )
+( )      (                             )   (       )
+(B)      ( 1   2*(1-KB)         0      )   (V - 128)
+
+For limited range, this becomes
+
+(R)      ( 1       0        2*(1-KR)   )   (255/219  0  0)   (Y -  16)
+( )      (                             )   (             )   (       )
+( )      (    2*KB*(KB-1)  2*KR*(KR-1) )   (             )   (       )
+(G)  =   ( 1  -----------  ----------- ) * (0  255/224  0) * (U - 128)
+( )      (      1-KR-KB      1-KR-KB   )   (             )   (       )
+( )      (                             )   (             )   (       )
+(B)      ( 1   2*(1-KB)         0      )   (0  0  255/224)   (V - 128)
+
+( For non-8-bit, 16 is (1 << (bitdepth - 4)), 128 is (1 << (bitdepth - 1)),
+  255 is ((1 << bitdepth) - 1), 219 is (219 << (bitdepth - 8)) and
+  224 is (224 << (bitdepth - 8)), so the matrix coefficients slightly change. )
+
+*/
+
+namespace {
+
+/**
+ * BT.601:  K_R = 0.299;  K_B = 0.114
+ *
+ * clip range 8-bit: [-277, 535], 10-bit: [-1111, 2155]
+ */
+const struct ColorConverter::Coeffs BT601_FULL      = { 256, 359,  88, 183, 454 };
+const struct ColorConverter::Coeffs BT601_LIMITED   = { 298, 409, 100, 208, 516 };
+const struct ColorConverter::Coeffs BT601_LTD_10BIT = { 299, 410, 101, 209, 518 };
+
+/**
+ * BT.709:  K_R = 0.2126; K_B = 0.0722
+ *
+ * clip range 8-bit: [-289, 547], 10-bit: [-1159, 2202]
+ */
+const struct ColorConverter::Coeffs BT709_FULL      = { 256, 403,  48, 120, 475 };
+const struct ColorConverter::Coeffs BT709_LIMITED   = { 298, 459,  55, 136, 541 };
+const struct ColorConverter::Coeffs BT709_LTD_10BIT = { 290, 460,  55, 137, 542 };
+
+/**
+ * BT.2020:  K_R = 0.2627; K_B = 0.0593
+ *
+ * clip range 8-bit: [-294, 552], 10-bit: [-1175, 2218]
+ *
+ * This is the largest clip range.
+ */
+const struct ColorConverter::Coeffs BT2020_FULL      = { 256, 377,  42, 146, 482 };
+const struct ColorConverter::Coeffs BT2020_LIMITED   = { 298, 430,  48, 167, 548 };
+const struct ColorConverter::Coeffs BT2020_LTD_10BIT = { 299, 431,  48, 167, 550 };
+
+constexpr int CLIP_RANGE_MIN_8BIT = -294;
+constexpr int CLIP_RANGE_MAX_8BIT = 552;
+
+constexpr int CLIP_RANGE_MIN_10BIT = -1175;
+constexpr int CLIP_RANGE_MAX_10BIT = 2218;
+
 }
 
 ColorConverter::ColorConverter(
@@ -106,7 +247,8 @@ bool ColorConverter::isValid() const {
         case OMX_COLOR_FormatYUV420SemiPlanar:
 #ifdef USE_LIBYUV
             return mDstFormat == OMX_COLOR_Format16bitRGB565
-                    || mDstFormat == OMX_COLOR_Format32BitRGBA8888;
+                    || mDstFormat == OMX_COLOR_Format32BitRGBA8888
+                    || mDstFormat == OMX_COLOR_Format32bitBGRA8888;
 #else
             return mDstFormat == OMX_COLOR_Format16bitRGB565;
 #endif
@@ -290,9 +432,52 @@ status_t ColorConverter::convert(
     return err;
 }
 
+const struct ColorConverter::Coeffs *ColorConverter::getMatrix() const {
+    const bool isFullRange = mSrcColorSpace.mRange == ColorUtils::kColorRangeFull;
+    const bool is10Bit = (mSrcFormat == COLOR_FormatYUVP010
+            || mSrcFormat == OMX_COLOR_FormatYUV420Planar16);
+
+    switch (mSrcColorSpace.mStandard) {
+    case ColorUtils::kColorStandardBT601_525:
+    case ColorUtils::kColorStandardBT601_625:
+        return (isFullRange ? &BT601_FULL :
+                is10Bit ? &BT601_LTD_10BIT : &BT601_LIMITED);
+
+    case ColorUtils::kColorStandardBT709:
+        return (isFullRange ? &BT709_FULL :
+                is10Bit ? &BT709_LTD_10BIT : &BT709_LIMITED);
+
+    case ColorUtils::kColorStandardBT2020:
+        return (isFullRange ? &BT2020_FULL :
+                is10Bit ? &BT2020_LTD_10BIT : &BT2020_LIMITED);
+
+    default:
+        // for now use the default matrices for unhandled color spaces
+        // TODO: fail?
+        // return nullptr;
+        [[fallthrough]];
+
+    case ColorUtils::kColorStandardUnspecified:
+        return is10Bit ? &BT2020_LTD_10BIT : &BT601_LIMITED;
+
+    }
+}
+
 status_t ColorConverter::convertCbYCrY(
         const BitmapParams &src, const BitmapParams &dst) {
     // XXX Untested
+
+    const struct Coeffs *matrix = getMatrix();
+    if (!matrix) {
+        return ERROR_UNSUPPORTED;
+    }
+
+    signed _b_u = matrix->_b_u;
+    signed _neg_g_u = -matrix->_g_u;
+    signed _neg_g_v = -matrix->_g_v;
+    signed _r_v = matrix->_r_v;
+    signed _y = matrix->_y;
+    signed _c16 = mSrcColorSpace.mRange == ColorUtils::kColorRangeLimited ? 16 : 0;
 
     uint8_t *kAdjustedClip = initClip();
 
@@ -304,22 +489,22 @@ status_t ColorConverter::convertCbYCrY(
 
     for (size_t y = 0; y < src.cropHeight(); ++y) {
         for (size_t x = 0; x < src.cropWidth(); x += 2) {
-            signed y1 = (signed)src_ptr[2 * x + 1] - 16;
-            signed y2 = (signed)src_ptr[2 * x + 3] - 16;
+            signed y1 = (signed)src_ptr[2 * x + 1] - _c16;
+            signed y2 = (signed)src_ptr[2 * x + 3] - _c16;
             signed u = (signed)src_ptr[2 * x] - 128;
             signed v = (signed)src_ptr[2 * x + 2] - 128;
 
-            signed u_b = u * 517;
-            signed u_g = -u * 100;
-            signed v_g = -v * 208;
-            signed v_r = v * 409;
+            signed u_b = u * _b_u;
+            signed u_g = u * _neg_g_u;
+            signed v_g = v * _neg_g_v;
+            signed v_r = v * _r_v;
 
-            signed tmp1 = y1 * 298;
+            signed tmp1 = y1 * _y + 128;
             signed b1 = (tmp1 + u_b) / 256;
             signed g1 = (tmp1 + v_g + u_g) / 256;
             signed r1 = (tmp1 + v_r) / 256;
 
-            signed tmp2 = y2 * 298;
+            signed tmp2 = y2 * _y + 128;
             signed b2 = (tmp2 + u_b) / 256;
             signed g2 = (tmp2 + v_g + u_g) / 256;
             signed r2 = (tmp2 + v_r) / 256;
@@ -348,15 +533,32 @@ status_t ColorConverter::convertCbYCrY(
     return OK;
 }
 
+/*
+    libyuv supports the following color spaces:
+
+    I420: BT.601 limited range
+    J420: BT.601 full range (jpeg)
+    H420: BT.709 limited range
+
+*/
+
 #define DECLARE_YUV2RGBFUNC(func, rgb) int (*func)(     \
-        const uint8_t*, int, const uint8_t*, int,           \
-        const uint8_t*, int, uint8_t*, int, int, int)       \
-        = mSrcColorSpace.isBt709() ? libyuv::H420To##rgb \
-        : mSrcColorSpace.isJpeg() ? libyuv::J420To##rgb  \
+        const uint8_t*, int, const uint8_t*, int,       \
+        const uint8_t*, int, uint8_t*, int, int, int)   \
+        = mSrcColorSpace.isH420() ? libyuv::H420To##rgb \
+        : mSrcColorSpace.isJ420() ? libyuv::J420To##rgb \
         : libyuv::I420To##rgb
 
 status_t ColorConverter::convertYUV420PlanarUseLibYUV(
         const BitmapParams &src, const BitmapParams &dst) {
+    // Fall back to our conversion if libyuv does not support the color space.
+    // I420 (BT.601 limited) is default, so don't fall back if we end up using it anyway.
+    if (!mSrcColorSpace.isH420() && !mSrcColorSpace.isJ420()
+            // && !mSrcColorSpace.isI420() /* same as line below */
+            && getMatrix() != &BT601_LIMITED) {
+        return convertYUV420Planar(src, dst);
+    }
+
     uint8_t *dst_ptr = (uint8_t *)dst.mBits
         + dst.mCropTop * dst.mStride + dst.mCropLeft * dst.mBpp;
 
@@ -404,6 +606,13 @@ status_t ColorConverter::convertYUV420PlanarUseLibYUV(
 
 status_t ColorConverter::convertYUV420SemiPlanarUseLibYUV(
         const BitmapParams &src, const BitmapParams &dst) {
+    // Fall back to our conversion if libyuv does not support the color space.
+    // libyuv only supports BT.601 limited range NV12. Don't fall back if we end up using it anyway.
+    if (// !mSrcColorSpace.isI420() && /* same as below */
+        getMatrix() != &BT601_LIMITED) {
+        return convertYUV420SemiPlanar(src, dst);
+    }
+
     uint8_t *dst_ptr = (uint8_t *)dst.mBits
         + dst.mCropTop * dst.mStride + dst.mCropLeft * dst.mBpp;
 
@@ -444,16 +653,16 @@ getReadFromSrc(OMX_COLOR_FORMATTYPE srcFormat) {
     case OMX_COLOR_FormatYUV420Planar:
         return [](void *src_y, void *src_u, void *src_v, size_t x,
                   signed *y1, signed *y2, signed *u, signed *v) {
-            *y1 = ((uint8_t*)src_y)[x] - 16;
-            *y2 = ((uint8_t*)src_y)[x + 1] - 16;
+            *y1 = ((uint8_t*)src_y)[x];
+            *y2 = ((uint8_t*)src_y)[x + 1];
             *u = ((uint8_t*)src_u)[x / 2] - 128;
             *v = ((uint8_t*)src_v)[x / 2] - 128;
         };
     case OMX_COLOR_FormatYUV420Planar16:
         return [](void *src_y, void *src_u, void *src_v, size_t x,
                 signed *y1, signed *y2, signed *u, signed *v) {
-            *y1 = (signed)(((uint16_t*)src_y)[x] >> 2) - 16;
-            *y2 = (signed)(((uint16_t*)src_y)[x + 1] >> 2) - 16;
+            *y1 = (signed)(((uint16_t*)src_y)[x] >> 2);
+            *y2 = (signed)(((uint16_t*)src_y)[x + 1] >> 2);
             *u = (signed)(((uint16_t*)src_u)[x / 2] >> 2) - 128;
             *v = (signed)(((uint16_t*)src_v)[x / 2] >> 2) - 128;
         };
@@ -463,6 +672,8 @@ getReadFromSrc(OMX_COLOR_FORMATTYPE srcFormat) {
     return nullptr;
 }
 
+// TRICKY: this method only supports RGBA_1010102 output for 10-bit sources, and all other outputs
+// for 8-bit sources as the type of kAdjustedClip is hardcoded based on output, not input.
 std::function<void (void *, bool, signed, signed, signed, signed, signed, signed)>
 getWriteToDst(OMX_COLOR_FORMATTYPE dstFormat, void *kAdjustedClip) {
     switch ((int)dstFormat) {
@@ -557,6 +768,18 @@ getWriteToDst(OMX_COLOR_FORMATTYPE dstFormat, void *kAdjustedClip) {
 
 status_t ColorConverter::convertYUV420Planar(
         const BitmapParams &src, const BitmapParams &dst) {
+    const struct Coeffs *matrix = getMatrix();
+    if (!matrix) {
+        return ERROR_UNSUPPORTED;
+    }
+
+    signed _b_u = matrix->_b_u;
+    signed _neg_g_u = -matrix->_g_u;
+    signed _neg_g_v = -matrix->_g_v;
+    signed _r_v = matrix->_r_v;
+    signed _y = matrix->_y;
+    signed _c16 = mSrcColorSpace.mRange == ColorUtils::kColorRangeLimited ? 16 : 0;
+
     uint8_t *kAdjustedClip = initClip();
 
     auto readFromSrc = getReadFromSrc(mSrcFormat);
@@ -575,38 +798,20 @@ status_t ColorConverter::convertYUV420Planar(
 
     for (size_t y = 0; y < src.cropHeight(); ++y) {
         for (size_t x = 0; x < src.cropWidth(); x += 2) {
-            // B = 1.164 * (Y - 16) + 2.018 * (U - 128)
-            // G = 1.164 * (Y - 16) - 0.813 * (V - 128) - 0.391 * (U - 128)
-            // R = 1.164 * (Y - 16) + 1.596 * (V - 128)
-
-            // B = 298/256 * (Y - 16) + 517/256 * (U - 128)
-            // G = .................. - 208/256 * (V - 128) - 100/256 * (U - 128)
-            // R = .................. + 409/256 * (V - 128)
-
-            // min_B = (298 * (- 16) + 517 * (- 128)) / 256 = -277
-            // min_G = (298 * (- 16) - 208 * (255 - 128) - 100 * (255 - 128)) / 256 = -172
-            // min_R = (298 * (- 16) + 409 * (- 128)) / 256 = -223
-
-            // max_B = (298 * (255 - 16) + 517 * (255 - 128)) / 256 = 534
-            // max_G = (298 * (255 - 16) - 208 * (- 128) - 100 * (- 128)) / 256 = 432
-            // max_R = (298 * (255 - 16) + 409 * (255 - 128)) / 256 = 481
-
-            // clip range -278 .. 535
-
             signed y1, y2, u, v;
             readFromSrc(src_y, src_u, src_v, x, &y1, &y2, &u, &v);
 
-            signed u_b = u * 517;
-            signed u_g = -u * 100;
-            signed v_g = -v * 208;
-            signed v_r = v * 409;
+            signed u_b = u * _b_u;
+            signed u_g = u * _neg_g_u;
+            signed v_g = v * _neg_g_v;
+            signed v_r = v * _r_v;
 
-            signed tmp1 = y1 * 298;
+            signed tmp1 = (y1 - _c16) * _y + 128;
             signed b1 = (tmp1 + u_b) / 256;
             signed g1 = (tmp1 + v_g + u_g) / 256;
             signed r1 = (tmp1 + v_r) / 256;
 
-            signed tmp2 = y2 * 298;
+            signed tmp2 = (y2 - _c16) * _y + 128;
             signed b2 = (tmp2 + u_b) / 256;
             signed g2 = (tmp2 + v_g + u_g) / 256;
             signed r2 = (tmp2 + v_r) / 256;
@@ -648,6 +853,18 @@ status_t ColorConverter::convertYUVP010(
 
 status_t ColorConverter::convertYUVP010ToRGBA1010102(
         const BitmapParams &src, const BitmapParams &dst) {
+    const struct Coeffs *matrix = getMatrix();
+    if (!matrix) {
+        return ERROR_UNSUPPORTED;
+    }
+
+    signed _b_u = matrix->_b_u;
+    signed _neg_g_u = -matrix->_g_u;
+    signed _neg_g_v = -matrix->_g_v;
+    signed _r_v = matrix->_r_v;
+    signed _y = matrix->_y;
+    signed _c16 = mSrcColorSpace.mRange == ColorUtils::kColorRangeLimited ? 64 : 0;
+
     uint16_t *kAdjustedClip10bit = initClip10Bit();
 
 //    auto readFromSrc = getReadFromSrc(mSrcFormat);
@@ -663,72 +880,28 @@ status_t ColorConverter::convertYUVP010ToRGBA1010102(
             + src.mStride * src.mHeight
             + (src.mCropTop / 2) * src.mStride + src.mCropLeft * src.mBpp);
 
-    // BT.2020 Limited Range conversion
-
-    // B = 1.168  *(Y - 64) + 2.148  *(U - 512)
-    // G = 1.168  *(Y - 64) - 0.652  *(V - 512) - 0.188  *(U - 512)
-    // R = 1.168  *(Y - 64) + 1.683  *(V - 512)
-
-    // B = 1196/1024  *(Y - 64) + 2200/1024  *(U - 512)
-    // G = .................... -  668/1024  *(V - 512) - 192/1024  *(U - 512)
-    // R = .................... + 1723/1024  *(V - 512)
-
-    // min_B = (1196  *(- 64) + 2200  *(- 512)) / 1024 = -1175
-    // min_G = (1196  *(- 64) - 668  *(1023 - 512) - 192  *(1023 - 512)) / 1024 = -504
-    // min_R = (1196  *(- 64) + 1723  *(- 512)) / 1024 = -937
-
-    // max_B = (1196  *(1023 - 64) + 2200  *(1023 - 512)) / 1024 = 2218
-    // max_G = (1196  *(1023 - 64) - 668  *(- 512) - 192  *(- 512)) / 1024 = 1551
-    // max_R = (1196  *(1023 - 64) + 1723  *(1023 - 512)) / 1024 = 1980
-
-    // clip range -1175 .. 2218
-
-    // BT.709 Limited Range conversion
-
-    // B = 1.164 * (Y - 64) + 2.018 * (U - 512)
-    // G = 1.164 * (Y - 64) - 0.813 * (V - 512) - 0.391 * (U - 512)
-    // R = 1.164 * (Y - 64) + 1.596 * (V - 512)
-
-    // B = 1192/1024 * (Y - 64) + 2068/1024 * (U - 512)
-    // G = .................... -  832/1024 * (V - 512) - 400/1024 * (U - 512)
-    // R = .................... + 1636/1024 * (V - 512)
-
-    // min_B = (1192 * (- 64) + 2068 * (- 512)) / 1024 = -1108
-
-    // max_B = (1192 * (1023 - 64) + 517 * (1023 - 512)) / 1024 = 2148
-
-    // clip range -1108 .. 2148
-
-    signed mY = 1196, mU_B = 2200, mV_G = -668, mV_R = 1723, mU_G = -192;
-    if (!mSrcColorSpace.isBt2020()) {
-        mY = 1192;
-        mU_B = 2068;
-        mV_G = -832;
-        mV_R = 1636;
-        mU_G = -400;
-    }
     for (size_t y = 0; y < src.cropHeight(); ++y) {
         for (size_t x = 0; x < src.cropWidth(); x += 2) {
             signed y1, y2, u, v;
-            y1 = (src_y[x] >> 6) - 64;
-            y2 = (src_y[x + 1] >> 6) - 64;
+            y1 = (src_y[x] >> 6) - _c16;
+            y2 = (src_y[x + 1] >> 6) - _c16;
             u = int(src_uv[x] >> 6) - 512;
             v = int(src_uv[x + 1] >> 6) - 512;
 
-            signed u_b = u * mU_B;
-            signed u_g = u * mU_G;
-            signed v_g = v * mV_G;
-            signed v_r = v * mV_R;
+            signed u_b = u * _b_u;
+            signed u_g = u * _neg_g_u;
+            signed v_g = v * _neg_g_v;
+            signed v_r = v * _r_v;
 
-            signed tmp1 = y1 * mY;
-            signed b1 = (tmp1 + u_b) / 1024;
-            signed g1 = (tmp1 + v_g + u_g) / 1024;
-            signed r1 = (tmp1 + v_r) / 1024;
+            signed tmp1 = y1 * _y + 128;
+            signed b1 = (tmp1 + u_b) / 256;
+            signed g1 = (tmp1 + v_g + u_g) / 256;
+            signed r1 = (tmp1 + v_r) / 256;
 
-            signed tmp2 = y2 * mY;
-            signed b2 = (tmp2 + u_b) / 1024;
-            signed g2 = (tmp2 + v_g + u_g) / 1024;
-            signed r2 = (tmp2 + v_r) / 1024;
+            signed tmp2 = y2 * _y + 128;
+            signed b2 = (tmp2 + u_b) / 256;
+            signed g2 = (tmp2 + v_g + u_g) / 256;
+            signed r2 = (tmp2 + v_r) / 256;
 
             bool uncropped = x + 1 < src.cropWidth();
 
@@ -949,11 +1122,6 @@ status_t ColorConverter::convertYUV420Planar16ToY410(
 
 status_t ColorConverter::convertQCOMYUV420SemiPlanar(
         const BitmapParams &src, const BitmapParams &dst) {
-    uint8_t *kAdjustedClip = initClip();
-
-    uint16_t *dst_ptr = (uint16_t *)dst.mBits
-        + dst.mCropTop * dst.mWidth + dst.mCropLeft;
-
     const uint8_t *src_y =
         (const uint8_t *)src.mBits + src.mCropTop * src.mWidth + src.mCropLeft;
 
@@ -961,67 +1129,25 @@ status_t ColorConverter::convertQCOMYUV420SemiPlanar(
         (const uint8_t *)src_y + src.mWidth * src.mHeight
         + src.mCropTop * src.mWidth + src.mCropLeft;
 
-    for (size_t y = 0; y < src.cropHeight(); ++y) {
-        for (size_t x = 0; x < src.cropWidth(); x += 2) {
-            signed y1 = (signed)src_y[x] - 16;
-            signed y2 = (signed)src_y[x + 1] - 16;
+    /* QCOMYUV420SemiPlanar is NV21, while MediaCodec uses NV12 */
+    return convertYUV420SemiPlanarBase(
+            src, dst, src_y, src_u, src.mWidth /* row_inc */, true /* isNV21 */);
+}
 
-            signed u = (signed)src_u[x & ~1] - 128;
-            signed v = (signed)src_u[(x & ~1) + 1] - 128;
+status_t ColorConverter::convertTIYUV420PackedSemiPlanar(
+        const BitmapParams &src, const BitmapParams &dst) {
+    const uint8_t *src_y =
+        (const uint8_t *)src.mBits + src.mCropTop * src.mWidth + src.mCropLeft;
 
-            signed u_b = u * 517;
-            signed u_g = -u * 100;
-            signed v_g = -v * 208;
-            signed v_r = v * 409;
+    const uint8_t *src_u =
+        (const uint8_t *)src_y + src.mWidth * (src.mHeight - src.mCropTop / 2);
 
-            signed tmp1 = y1 * 298;
-            signed b1 = (tmp1 + u_b) / 256;
-            signed g1 = (tmp1 + v_g + u_g) / 256;
-            signed r1 = (tmp1 + v_r) / 256;
-
-            signed tmp2 = y2 * 298;
-            signed b2 = (tmp2 + u_b) / 256;
-            signed g2 = (tmp2 + v_g + u_g) / 256;
-            signed r2 = (tmp2 + v_r) / 256;
-
-            uint32_t rgb1 =
-                ((kAdjustedClip[b1] >> 3) << 11)
-                | ((kAdjustedClip[g1] >> 2) << 5)
-                | (kAdjustedClip[r1] >> 3);
-
-            uint32_t rgb2 =
-                ((kAdjustedClip[b2] >> 3) << 11)
-                | ((kAdjustedClip[g2] >> 2) << 5)
-                | (kAdjustedClip[r2] >> 3);
-
-            if (x + 1 < src.cropWidth()) {
-                *(uint32_t *)(&dst_ptr[x]) = (rgb2 << 16) | rgb1;
-            } else {
-                dst_ptr[x] = rgb1;
-            }
-        }
-
-        src_y += src.mWidth;
-
-        if (y & 1) {
-            src_u += src.mWidth;
-        }
-
-        dst_ptr += dst.mWidth;
-    }
-
-    return OK;
+    return convertYUV420SemiPlanarBase(
+            src, dst, src_y, src_u, src.mWidth /* row_inc */);
 }
 
 status_t ColorConverter::convertYUV420SemiPlanar(
         const BitmapParams &src, const BitmapParams &dst) {
-    // XXX Untested
-
-    uint8_t *kAdjustedClip = initClip();
-
-    uint16_t *dst_ptr = (uint16_t *)((uint8_t *)
-            dst.mBits + dst.mCropTop * dst.mStride + dst.mCropLeft * dst.mBpp);
-
     const uint8_t *src_y =
         (const uint8_t *)src.mBits + src.mCropTop * src.mStride + src.mCropLeft;
 
@@ -1029,90 +1155,49 @@ status_t ColorConverter::convertYUV420SemiPlanar(
         (const uint8_t *)src.mBits + src.mHeight * src.mStride +
         (src.mCropTop / 2) * src.mStride + src.mCropLeft;
 
-    for (size_t y = 0; y < src.cropHeight(); ++y) {
-        for (size_t x = 0; x < src.cropWidth(); x += 2) {
-            signed y1 = (signed)src_y[x] - 16;
-            signed y2 = (signed)src_y[x + 1] - 16;
-
-            signed v = (signed)src_u[x & ~1] - 128;
-            signed u = (signed)src_u[(x & ~1) + 1] - 128;
-
-            signed u_b = u * 517;
-            signed u_g = -u * 100;
-            signed v_g = -v * 208;
-            signed v_r = v * 409;
-
-            signed tmp1 = y1 * 298;
-            signed b1 = (tmp1 + u_b) / 256;
-            signed g1 = (tmp1 + v_g + u_g) / 256;
-            signed r1 = (tmp1 + v_r) / 256;
-
-            signed tmp2 = y2 * 298;
-            signed b2 = (tmp2 + u_b) / 256;
-            signed g2 = (tmp2 + v_g + u_g) / 256;
-            signed r2 = (tmp2 + v_r) / 256;
-
-            uint32_t rgb1 =
-                ((kAdjustedClip[b1] >> 3) << 11)
-                | ((kAdjustedClip[g1] >> 2) << 5)
-                | (kAdjustedClip[r1] >> 3);
-
-            uint32_t rgb2 =
-                ((kAdjustedClip[b2] >> 3) << 11)
-                | ((kAdjustedClip[g2] >> 2) << 5)
-                | (kAdjustedClip[r2] >> 3);
-
-            if (x + 1 < src.cropWidth()) {
-                *(uint32_t *)(&dst_ptr[x]) = (rgb2 << 16) | rgb1;
-            } else {
-                dst_ptr[x] = rgb1;
-            }
-        }
-
-        src_y += src.mStride;
-
-        if (y & 1) {
-            src_u += src.mStride;
-        }
-
-        dst_ptr = (uint16_t*)((uint8_t*)dst_ptr + dst.mStride);
-    }
-
-    return OK;
+    return convertYUV420SemiPlanarBase(
+            src, dst, src_y, src_u, src.mStride /* row_inc */);
 }
 
-status_t ColorConverter::convertTIYUV420PackedSemiPlanar(
-        const BitmapParams &src, const BitmapParams &dst) {
+status_t ColorConverter::convertYUV420SemiPlanarBase(
+        const BitmapParams &src, const BitmapParams &dst,
+        const uint8_t *src_y, const uint8_t *src_u, size_t row_inc, bool isNV21) {
+    const struct Coeffs *matrix = getMatrix();
+    if (!matrix) {
+        return ERROR_UNSUPPORTED;
+    }
+
+    signed _b_u = matrix->_b_u;
+    signed _neg_g_u = -matrix->_g_u;
+    signed _neg_g_v = -matrix->_g_v;
+    signed _r_v = matrix->_r_v;
+    signed _y = matrix->_y;
+    signed _c16 = mSrcColorSpace.mRange == ColorUtils::kColorRangeLimited ? 16 : 0;
+
     uint8_t *kAdjustedClip = initClip();
 
-    uint16_t *dst_ptr = (uint16_t *)dst.mBits
-        + dst.mCropTop * dst.mWidth + dst.mCropLeft;
-
-    const uint8_t *src_y =
-        (const uint8_t *)src.mBits + src.mCropTop * src.mWidth + src.mCropLeft;
-
-    const uint8_t *src_u =
-        (const uint8_t *)src_y + src.mWidth * (src.mHeight - src.mCropTop / 2);
+    uint16_t *dst_ptr = (uint16_t *)((uint8_t *)
+            dst.mBits + dst.mCropTop * dst.mStride + dst.mCropLeft * dst.mBpp);
 
     for (size_t y = 0; y < src.cropHeight(); ++y) {
         for (size_t x = 0; x < src.cropWidth(); x += 2) {
-            signed y1 = (signed)src_y[x] - 16;
-            signed y2 = (signed)src_y[x + 1] - 16;
+            signed y1 = (signed)src_y[x] - _c16;
+            signed y2 = (signed)src_y[x + 1] - _c16;
 
-            signed u = (signed)src_u[x & ~1] - 128;
-            signed v = (signed)src_u[(x & ~1) + 1] - 128;
+            signed u = (signed)src_u[(x & ~1) + isNV21] - 128;
+            signed v = (signed)src_u[(x & ~1) + !isNV21] - 128;
 
-            signed u_b = u * 517;
-            signed u_g = -u * 100;
-            signed v_g = -v * 208;
-            signed v_r = v * 409;
+            signed u_b = u * _b_u;
+            signed u_g = u * _neg_g_u;
+            signed v_g = v * _neg_g_v;
+            signed v_r = v * _r_v;
 
-            signed tmp1 = y1 * 298;
+            signed tmp1 = y1 * _y + 128;
             signed b1 = (tmp1 + u_b) / 256;
             signed g1 = (tmp1 + v_g + u_g) / 256;
             signed r1 = (tmp1 + v_r) / 256;
 
-            signed tmp2 = y2 * 298;
+            signed tmp2 = y2 * _y + 128;
             signed b2 = (tmp2 + u_b) / 256;
             signed g2 = (tmp2 + v_g + u_g) / 256;
             signed r2 = (tmp2 + v_r) / 256;
@@ -1134,46 +1219,40 @@ status_t ColorConverter::convertTIYUV420PackedSemiPlanar(
             }
         }
 
-        src_y += src.mWidth;
+        src_y += row_inc;
 
         if (y & 1) {
-            src_u += src.mWidth;
+            src_u += row_inc;
         }
 
-        dst_ptr += dst.mWidth;
+        dst_ptr = (uint16_t*)((uint8_t*)dst_ptr + dst.mStride);
     }
 
     return OK;
 }
 
 uint8_t *ColorConverter::initClip() {
-    static const signed kClipMin = -278;
-    static const signed kClipMax = 535;
-
     if (mClip == NULL) {
-        mClip = new uint8_t[kClipMax - kClipMin + 1];
+        mClip = new uint8_t[CLIP_RANGE_MAX_8BIT - CLIP_RANGE_MIN_8BIT + 1];
 
-        for (signed i = kClipMin; i <= kClipMax; ++i) {
-            mClip[i - kClipMin] = (i < 0) ? 0 : (i > 255) ? 255 : (uint8_t)i;
+        for (signed i = CLIP_RANGE_MIN_8BIT; i <= CLIP_RANGE_MAX_8BIT; ++i) {
+            mClip[i - CLIP_RANGE_MIN_8BIT] = (i < 0) ? 0 : (i > 255) ? 255 : (uint8_t)i;
         }
     }
 
-    return &mClip[-kClipMin];
+    return &mClip[-CLIP_RANGE_MIN_8BIT];
 }
 
 uint16_t *ColorConverter::initClip10Bit() {
-    static const signed kClipMin = -1176;
-    static const signed kClipMax = 2219;
-
     if (mClip10Bit == NULL) {
-        mClip10Bit = new uint16_t[kClipMax - kClipMin + 1];
+        mClip10Bit = new uint16_t[CLIP_RANGE_MAX_10BIT - CLIP_RANGE_MIN_10BIT + 1];
 
-        for (signed i = kClipMin; i <= kClipMax; ++i) {
-            mClip10Bit[i - kClipMin] = (i < 0) ? 0 : (i > 1023) ? 1023 : (uint16_t)i;
+        for (signed i = CLIP_RANGE_MIN_10BIT; i <= CLIP_RANGE_MAX_10BIT; ++i) {
+            mClip10Bit[i - CLIP_RANGE_MIN_10BIT] = (i < 0) ? 0 : (i > 1023) ? 1023 : (uint16_t)i;
         }
     }
 
-    return &mClip10Bit[-kClipMin];
+    return &mClip10Bit[-CLIP_RANGE_MIN_10BIT];
 }
 
 }  // namespace android

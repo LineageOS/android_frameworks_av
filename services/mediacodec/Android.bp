@@ -19,6 +19,7 @@ cc_binary {
     name: "mediaswcodec",
     vendor_available: true,
     min_sdk_version: "29",
+    apex_available: ["com.android.media.swcodec"],
 
     srcs: [
         "main_swcodecservice.cpp",

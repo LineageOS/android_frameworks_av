@@ -137,6 +137,8 @@ class AudioPolicyManagerTest : public testing::Test {
             audio_port_handle_t *portId = nullptr);
     PatchCountCheck snapshotPatchCount() { return PatchCountCheck(mClient.get()); }
 
+    void getAudioPorts(audio_port_type_t type, audio_port_role_t role,
+            std::vector<audio_port_v7>* ports);
     // Tries to find a device port. If 'foundPort' isn't nullptr,
     // will generate a failure if the port hasn't been found.
     bool findDevicePort(audio_port_role_t role, audio_devices_t deviceType,
@@ -153,7 +155,7 @@ class AudioPolicyManagerTest : public testing::Test {
 void AudioPolicyManagerTest::SetUp() {
     mClient.reset(getClient());
     mManager.reset(new AudioPolicyTestManager(mClient.get()));
-    SetUpManagerConfig();  // Subclasses may want to customize the config.
+    ASSERT_NO_FATAL_FAILURE(SetUpManagerConfig());  // Subclasses may want to customize the config.
     ASSERT_EQ(NO_ERROR, mManager->initialize());
     ASSERT_EQ(NO_ERROR, mManager->initCheck());
 }
@@ -218,13 +220,14 @@ void AudioPolicyManagerTest::getOutputForAttr(
     if (!portId) portId = &localPortId;
     *portId = AUDIO_PORT_HANDLE_NONE;
     AudioPolicyInterface::output_type_t outputType;
+    bool isSpatialized;
     // TODO b/182392769: use attribution source util
     AttributionSourceState attributionSource = AttributionSourceState();
     attributionSource.uid = 0;
     attributionSource.token = sp<BBinder>::make();
     ASSERT_EQ(OK, mManager->getOutputForAttr(
                     &attr, output, AUDIO_SESSION_NONE, &stream, attributionSource, &config, &flags,
-                    selectedDeviceId, portId, {}, &outputType));
+                    selectedDeviceId, portId, {}, &outputType, &isSpatialized));
     ASSERT_NE(AUDIO_PORT_HANDLE_NONE, *portId);
     ASSERT_NE(AUDIO_IO_HANDLE_NONE, *output);
 }
@@ -257,21 +260,26 @@ void AudioPolicyManagerTest::getInputForAttr(
     ASSERT_NE(AUDIO_PORT_HANDLE_NONE, *portId);
 }
 
-bool AudioPolicyManagerTest::findDevicePort(audio_port_role_t role,
-        audio_devices_t deviceType, const std::string &address, audio_port_v7 *foundPort) {
+void AudioPolicyManagerTest::getAudioPorts(audio_port_type_t type, audio_port_role_t role,
+        std::vector<audio_port_v7>* ports) {
     uint32_t numPorts = 0;
     uint32_t generation1;
     status_t ret;
 
-    ret = mManager->listAudioPorts(role, AUDIO_PORT_TYPE_DEVICE, &numPorts, nullptr, &generation1);
-    EXPECT_EQ(NO_ERROR, ret) << "mManager->listAudioPorts returned error";
-    if (HasFailure()) return false;
+    ret = mManager->listAudioPorts(role, type, &numPorts, nullptr, &generation1);
+    ASSERT_EQ(NO_ERROR, ret) << "mManager->listAudioPorts returned error";
 
     uint32_t generation2;
-    struct audio_port_v7 ports[numPorts];
-    ret = mManager->listAudioPorts(role, AUDIO_PORT_TYPE_DEVICE, &numPorts, ports, &generation2);
-    EXPECT_EQ(NO_ERROR, ret) << "mManager->listAudioPorts returned error";
-    EXPECT_EQ(generation1, generation2) << "Generations changed during ports retrieval";
+    ports->resize(numPorts);
+    ret = mManager->listAudioPorts(role, type, &numPorts, ports->data(), &generation2);
+    ASSERT_EQ(NO_ERROR, ret) << "mManager->listAudioPorts returned error";
+    ASSERT_EQ(generation1, generation2) << "Generations changed during ports retrieval";
+}
+
+bool AudioPolicyManagerTest::findDevicePort(audio_port_role_t role,
+        audio_devices_t deviceType, const std::string &address, audio_port_v7 *foundPort) {
+    std::vector<audio_port_v7> ports;
+    getAudioPorts(AUDIO_PORT_TYPE_DEVICE, role, &ports);
     if (HasFailure()) return false;
 
     for (const auto &port : ports) {
@@ -375,6 +383,7 @@ class AudioPolicyManagerTestMsd : public AudioPolicyManagerTest,
   protected:
     void SetUpManagerConfig() override;
     void TearDown() override;
+    AudioProfileVector getDirectProfilesForAttributes(const audio_attributes_t& attr);
 
     sp<DeviceDescriptor> mMsdOutputDevice;
     sp<DeviceDescriptor> mMsdInputDevice;
@@ -403,7 +412,7 @@ INSTANTIATE_TEST_CASE_P(
 
 void AudioPolicyManagerTestMsd::SetUpManagerConfig() {
     // TODO: Consider using Serializer to load part of the config from a string.
-    AudioPolicyManagerTest::SetUpManagerConfig();
+    ASSERT_NO_FATAL_FAILURE(AudioPolicyManagerTest::SetUpManagerConfig());
     AudioPolicyConfig& config = mManager->getConfig();
     mMsdOutputDevice = new DeviceDescriptor(AUDIO_DEVICE_OUT_BUS);
     sp<AudioProfile> pcmOutputProfile = new AudioProfile(
@@ -502,6 +511,13 @@ void AudioPolicyManagerTestMsd::TearDown() {
     mSpdifDevice.clear();
     mHdmiInputDevice.clear();
     AudioPolicyManagerTest::TearDown();
+}
+
+AudioProfileVector AudioPolicyManagerTestMsd::getDirectProfilesForAttributes(
+                                                    const audio_attributes_t& attr) {
+    AudioProfileVector audioProfilesVector;
+    mManager->getDirectProfilesForAttributes(&attr, audioProfilesVector);
+    return audioProfilesVector;
 }
 
 TEST_P(AudioPolicyManagerTestMsd, InitSuccess) {
@@ -642,6 +658,200 @@ TEST_P(AudioPolicyManagerTestMsd, PatchCreationFromHdmiInToMsd) {
     ASSERT_EQ(1, patchCount.deltaFromSnapshot());
 }
 
+TEST_P(AudioPolicyManagerTestMsd, GetDirectProfilesForAttributesWithMsd) {
+    const audio_attributes_t attr = {
+        AUDIO_CONTENT_TYPE_UNKNOWN, AUDIO_USAGE_UNKNOWN,
+        AUDIO_SOURCE_DEFAULT, AUDIO_FLAG_NONE, ""};
+
+    // count expected direct profiles for the default device
+    int countDirectProfilesPrimary = 0;
+    const auto& primary = mManager->getConfig().getHwModules()
+            .getModuleFromName(AUDIO_HARDWARE_MODULE_ID_PRIMARY);
+    for (const auto outputProfile : primary->getOutputProfiles()) {
+        if (outputProfile->asAudioPort()->isDirectOutput()) {
+            countDirectProfilesPrimary += outputProfile->asAudioPort()->getAudioProfiles().size();
+        }
+    }
+
+    // count expected direct profiles for the msd device
+    int countDirectProfilesMsd = 0;
+    const auto& msd = mManager->getConfig().getHwModules()
+            .getModuleFromName(AUDIO_HARDWARE_MODULE_ID_MSD);
+    for (const auto outputProfile : msd->getOutputProfiles()) {
+        if (outputProfile->asAudioPort()->isDirectOutput()) {
+            countDirectProfilesMsd += outputProfile->asAudioPort()->getAudioProfiles().size();
+        }
+    }
+
+    // before setting up MSD audio patches we only have the primary hal direct profiles
+    ASSERT_EQ(countDirectProfilesPrimary, getDirectProfilesForAttributes(attr).size());
+
+    DeviceVector outputDevices = mManager->getAvailableOutputDevices();
+    // Remove MSD output device to avoid patching to itself
+    outputDevices.remove(mMsdOutputDevice);
+    mManager->setMsdOutputPatches(&outputDevices);
+
+    // after setting up MSD audio patches the MSD direct profiles are added
+    ASSERT_EQ(countDirectProfilesPrimary + countDirectProfilesMsd,
+                getDirectProfilesForAttributes(attr).size());
+
+    mManager->releaseMsdOutputPatches(outputDevices);
+    // releasing the MSD audio patches gets us back to the primary hal direct profiles only
+    ASSERT_EQ(countDirectProfilesPrimary, getDirectProfilesForAttributes(attr).size());
+}
+
+TEST_P(AudioPolicyManagerTestMsd, IsDirectPlaybackSupportedWithMsd) {
+    const audio_attributes_t attr = {
+        AUDIO_CONTENT_TYPE_UNKNOWN, AUDIO_USAGE_UNKNOWN,
+        AUDIO_SOURCE_DEFAULT, AUDIO_FLAG_NONE, ""};
+
+    audio_config_base_t directConfig = AUDIO_CONFIG_BASE_INITIALIZER;
+    directConfig.format = AUDIO_FORMAT_DTS;
+    directConfig.sample_rate = 48000;
+    directConfig.channel_mask = AUDIO_CHANNEL_OUT_5POINT1;
+
+    audio_config_base_t nonDirectConfig = AUDIO_CONFIG_BASE_INITIALIZER;
+    nonDirectConfig.format = AUDIO_FORMAT_PCM_16_BIT;
+    nonDirectConfig.sample_rate = 48000;
+    nonDirectConfig.channel_mask = AUDIO_CHANNEL_OUT_STEREO;
+
+    audio_config_base_t nonExistentConfig = AUDIO_CONFIG_BASE_INITIALIZER;
+    nonExistentConfig.format = AUDIO_FORMAT_E_AC3;
+    nonExistentConfig.sample_rate = 48000;
+    nonExistentConfig.channel_mask = AUDIO_CHANNEL_OUT_STEREO;
+
+    audio_config_base_t msdDirectConfig1 = AUDIO_CONFIG_BASE_INITIALIZER;
+    msdDirectConfig1.format = AUDIO_FORMAT_AC3;
+    msdDirectConfig1.sample_rate = 48000;
+    msdDirectConfig1.channel_mask = AUDIO_CHANNEL_OUT_5POINT1;
+
+    audio_config_base_t msdDirectConfig2 = AUDIO_CONFIG_BASE_INITIALIZER;
+    msdDirectConfig2.format = AUDIO_FORMAT_IEC60958;
+    msdDirectConfig2.sample_rate = 48000;
+    msdDirectConfig2.channel_mask = AUDIO_CHANNEL_OUT_STEREO;
+
+    audio_config_base_t msdNonDirectConfig = AUDIO_CONFIG_BASE_INITIALIZER;
+    msdNonDirectConfig.format = AUDIO_FORMAT_PCM_16_BIT;
+    msdNonDirectConfig.sample_rate = 96000;
+    msdNonDirectConfig.channel_mask = AUDIO_CHANNEL_OUT_STEREO;
+
+    ASSERT_TRUE(mManager->isDirectOutputSupported(directConfig, attr));
+    ASSERT_FALSE(mManager->isDirectOutputSupported(nonDirectConfig, attr));
+    ASSERT_FALSE(mManager->isDirectOutputSupported(nonExistentConfig, attr));
+    // before setting MSD patches the direct MSD configs return false
+    ASSERT_FALSE(mManager->isDirectOutputSupported(msdDirectConfig1, attr));
+    ASSERT_FALSE(mManager->isDirectOutputSupported(msdDirectConfig2, attr));
+    ASSERT_FALSE(mManager->isDirectOutputSupported(msdNonDirectConfig, attr));
+
+    DeviceVector outputDevices = mManager->getAvailableOutputDevices();
+    // Remove MSD output device to avoid patching to itself
+    outputDevices.remove(mMsdOutputDevice);
+    mManager->setMsdOutputPatches(&outputDevices);
+
+    ASSERT_TRUE(mManager->isDirectOutputSupported(directConfig, attr));
+    ASSERT_FALSE(mManager->isDirectOutputSupported(nonDirectConfig, attr));
+    ASSERT_FALSE(mManager->isDirectOutputSupported(nonExistentConfig, attr));
+    // after setting MSD patches the direct MSD configs return true
+    ASSERT_TRUE(mManager->isDirectOutputSupported(msdDirectConfig1, attr));
+    ASSERT_TRUE(mManager->isDirectOutputSupported(msdDirectConfig2, attr));
+    ASSERT_FALSE(mManager->isDirectOutputSupported(msdNonDirectConfig, attr));
+
+    mManager->releaseMsdOutputPatches(outputDevices);
+
+    ASSERT_TRUE(mManager->isDirectOutputSupported(directConfig, attr));
+    ASSERT_FALSE(mManager->isDirectOutputSupported(nonDirectConfig, attr));
+    ASSERT_FALSE(mManager->isDirectOutputSupported(nonExistentConfig, attr));
+    // AFTER releasing MSD patches the direct MSD configs return false
+    ASSERT_FALSE(mManager->isDirectOutputSupported(msdDirectConfig1, attr));
+    ASSERT_FALSE(mManager->isDirectOutputSupported(msdDirectConfig2, attr));
+    ASSERT_FALSE(mManager->isDirectOutputSupported(msdNonDirectConfig, attr));
+}
+
+TEST_P(AudioPolicyManagerTestMsd, GetDirectPlaybackSupportWithMsd) {
+    const audio_attributes_t attr = {
+        AUDIO_CONTENT_TYPE_UNKNOWN, AUDIO_USAGE_UNKNOWN,
+        AUDIO_SOURCE_DEFAULT, AUDIO_FLAG_NONE, ""};
+
+    audio_config_t directConfig = AUDIO_CONFIG_INITIALIZER;
+    directConfig.format = AUDIO_FORMAT_DTS;
+    directConfig.sample_rate = 48000;
+    directConfig.channel_mask = AUDIO_CHANNEL_OUT_5POINT1;
+
+    audio_config_t nonDirectConfig = AUDIO_CONFIG_INITIALIZER;
+    nonDirectConfig.format = AUDIO_FORMAT_PCM_16_BIT;
+    nonDirectConfig.sample_rate = 48000;
+    nonDirectConfig.channel_mask = AUDIO_CHANNEL_OUT_STEREO;
+
+    audio_config_t nonExistentConfig = AUDIO_CONFIG_INITIALIZER;
+    nonExistentConfig.format = AUDIO_FORMAT_E_AC3;
+    nonExistentConfig.sample_rate = 48000;
+    nonExistentConfig.channel_mask = AUDIO_CHANNEL_OUT_STEREO;
+
+    audio_config_t msdDirectConfig1 = AUDIO_CONFIG_INITIALIZER;
+    msdDirectConfig1.format = AUDIO_FORMAT_AC3;
+    msdDirectConfig1.sample_rate = 48000;
+    msdDirectConfig1.channel_mask = AUDIO_CHANNEL_OUT_5POINT1;
+
+    audio_config_t msdDirectConfig2 = AUDIO_CONFIG_INITIALIZER;
+    msdDirectConfig2.format = AUDIO_FORMAT_IEC60958;
+    msdDirectConfig2.sample_rate = 48000;
+    msdDirectConfig2.channel_mask = AUDIO_CHANNEL_OUT_STEREO;
+
+    audio_config_t msdNonDirectConfig = AUDIO_CONFIG_INITIALIZER;
+    msdNonDirectConfig.format = AUDIO_FORMAT_PCM_16_BIT;
+    msdNonDirectConfig.sample_rate = 96000;
+    msdNonDirectConfig.channel_mask = AUDIO_CHANNEL_OUT_STEREO;
+
+    ASSERT_EQ(AUDIO_DIRECT_BITSTREAM_SUPPORTED,
+                mManager->getDirectPlaybackSupport(&attr, &directConfig));
+    ASSERT_EQ(AUDIO_DIRECT_NOT_SUPPORTED,
+                mManager->getDirectPlaybackSupport(&attr, &nonDirectConfig));
+    ASSERT_EQ(AUDIO_DIRECT_NOT_SUPPORTED,
+                mManager->getDirectPlaybackSupport(&attr, &nonExistentConfig));
+    // before setting MSD patches the direct MSD configs return AUDIO_DIRECT_NOT_SUPPORTED
+    ASSERT_EQ(AUDIO_DIRECT_NOT_SUPPORTED,
+                mManager->getDirectPlaybackSupport(&attr, &msdDirectConfig1));
+    ASSERT_EQ(AUDIO_DIRECT_NOT_SUPPORTED,
+                mManager->getDirectPlaybackSupport(&attr, &msdDirectConfig2));
+    ASSERT_EQ(AUDIO_DIRECT_NOT_SUPPORTED,
+                mManager->getDirectPlaybackSupport(&attr, &msdNonDirectConfig));
+
+    DeviceVector outputDevices = mManager->getAvailableOutputDevices();
+    // Remove MSD output device to avoid patching to itself
+    outputDevices.remove(mMsdOutputDevice);
+    mManager->setMsdOutputPatches(&outputDevices);
+
+    ASSERT_EQ(AUDIO_DIRECT_BITSTREAM_SUPPORTED,
+                mManager->getDirectPlaybackSupport(&attr, &directConfig));
+    ASSERT_EQ(AUDIO_DIRECT_NOT_SUPPORTED,
+                mManager->getDirectPlaybackSupport(&attr, &nonDirectConfig));
+    ASSERT_EQ(AUDIO_DIRECT_NOT_SUPPORTED,
+                mManager->getDirectPlaybackSupport(&attr, &nonExistentConfig));
+    // after setting MSD patches the direct MSD configs return values according to their flags
+    ASSERT_EQ(AUDIO_DIRECT_OFFLOAD_SUPPORTED,
+                mManager->getDirectPlaybackSupport(&attr, &msdDirectConfig1));
+    ASSERT_EQ(AUDIO_DIRECT_BITSTREAM_SUPPORTED,
+                mManager->getDirectPlaybackSupport(&attr, &msdDirectConfig2));
+    ASSERT_EQ(AUDIO_DIRECT_NOT_SUPPORTED,
+                mManager->getDirectPlaybackSupport(&attr, &msdNonDirectConfig));
+
+    mManager->releaseMsdOutputPatches(outputDevices);
+
+    ASSERT_EQ(AUDIO_DIRECT_BITSTREAM_SUPPORTED,
+                mManager->getDirectPlaybackSupport(&attr, &directConfig));
+    ASSERT_EQ(AUDIO_DIRECT_NOT_SUPPORTED,
+                mManager->getDirectPlaybackSupport(&attr, &nonDirectConfig));
+    ASSERT_EQ(AUDIO_DIRECT_NOT_SUPPORTED,
+                mManager->getDirectPlaybackSupport(&attr, &nonExistentConfig));
+    // after releasing MSD patches the direct MSD configs return AUDIO_DIRECT_NOT_SUPPORTED
+    ASSERT_EQ(AUDIO_DIRECT_NOT_SUPPORTED,
+                mManager->getDirectPlaybackSupport(&attr, &msdDirectConfig1));
+    ASSERT_EQ(AUDIO_DIRECT_NOT_SUPPORTED,
+                mManager->getDirectPlaybackSupport(&attr, &msdDirectConfig2));
+    ASSERT_EQ(AUDIO_DIRECT_NOT_SUPPORTED,
+                mManager->getDirectPlaybackSupport(&attr, &msdNonDirectConfig));
+}
+
 class AudioPolicyManagerTestWithConfigurationFile : public AudioPolicyManagerTest {
 protected:
     void SetUpManagerConfig() override;
@@ -660,6 +870,7 @@ const std::string AudioPolicyManagerTestWithConfigurationFile::sDefaultConfig =
 void AudioPolicyManagerTestWithConfigurationFile::SetUpManagerConfig() {
     status_t status = deserializeAudioPolicyFile(getConfigFile().c_str(), &mManager->getConfig());
     ASSERT_EQ(NO_ERROR, status);
+    mManager->getConfig().setSource(getConfigFile());
 }
 
 TEST_F(AudioPolicyManagerTestWithConfigurationFile, InitSuccess) {
@@ -668,6 +879,44 @@ TEST_F(AudioPolicyManagerTestWithConfigurationFile, InitSuccess) {
 
 TEST_F(AudioPolicyManagerTestWithConfigurationFile, Dump) {
     dumpToLog();
+}
+
+TEST_F(AudioPolicyManagerTestWithConfigurationFile, ListAudioPortsHasFlags) {
+    // Create an input for VOIP TX because it's not opened automatically like outputs are.
+    audio_port_handle_t selectedDeviceId = AUDIO_PORT_HANDLE_NONE;
+    audio_port_handle_t mixPortId = AUDIO_PORT_HANDLE_NONE;
+    audio_source_t source = AUDIO_SOURCE_VOICE_COMMUNICATION;
+    audio_attributes_t attr = {
+        AUDIO_CONTENT_TYPE_UNKNOWN, AUDIO_USAGE_UNKNOWN, source, AUDIO_FLAG_NONE, ""};
+    ASSERT_NO_FATAL_FAILURE(getInputForAttr(attr, 1, &selectedDeviceId, AUDIO_FORMAT_PCM_16_BIT,
+                    AUDIO_CHANNEL_IN_MONO, 8000, AUDIO_INPUT_FLAG_VOIP_TX, &mixPortId));
+
+    std::vector<audio_port_v7> ports;
+    ASSERT_NO_FATAL_FAILURE(
+            getAudioPorts(AUDIO_PORT_TYPE_MIX, AUDIO_PORT_ROLE_NONE, &ports));
+    EXPECT_NE(0, ports.size());
+    bool hasFlags = false, foundPrimary = false, foundVoipRx = false, foundVoipTx = false;
+    for (const auto& port : ports) {
+        if ((port.active_config.config_mask & AUDIO_PORT_CONFIG_FLAGS) != 0) {
+            hasFlags = true;
+            if (port.role == AUDIO_PORT_ROLE_SOURCE) {
+                if ((port.active_config.flags.output & AUDIO_OUTPUT_FLAG_PRIMARY) != 0) {
+                    foundPrimary = true;
+                }
+                if ((port.active_config.flags.output & AUDIO_OUTPUT_FLAG_VOIP_RX) != 0) {
+                    foundVoipRx = true;
+                }
+            } else if (port.role == AUDIO_PORT_ROLE_SINK) {
+                if ((port.active_config.flags.input & AUDIO_INPUT_FLAG_VOIP_TX) != 0) {
+                    foundVoipTx = true;
+                }
+            }
+        }
+    }
+    EXPECT_TRUE(hasFlags);
+    EXPECT_TRUE(foundPrimary);
+    EXPECT_TRUE(foundVoipRx);
+    EXPECT_TRUE(foundVoipTx);
 }
 
 using PolicyMixTuple = std::tuple<audio_usage_t, audio_source_t, uint32_t>;
@@ -803,7 +1052,8 @@ TEST_F(AudioPolicyManagerTestDynamicPolicy, UnregisterPolicyMixes) {
 }
 
 class AudioPolicyManagerTestForHdmi
-        : public AudioPolicyManagerTestWithConfigurationFile {
+        : public AudioPolicyManagerTestWithConfigurationFile,
+          public testing::WithParamInterface<audio_format_t> {
 protected:
     void SetUp() override;
     std::string getConfigFile() override { return sTvConfig; }
@@ -824,7 +1074,8 @@ const std::string AudioPolicyManagerTestForHdmi::sTvConfig =
         "test_settop_box_surround_configuration.xml";
 
 void AudioPolicyManagerTestForHdmi::SetUp() {
-    AudioPolicyManagerTest::SetUp();
+    ASSERT_NO_FATAL_FAILURE(AudioPolicyManagerTest::SetUp());
+    mClient->addSupportedFormat(AUDIO_FORMAT_AC3);
     mClient->addSupportedFormat(AUDIO_FORMAT_E_AC3);
     mManager->setDeviceConnectionState(
             AUDIO_DEVICE_OUT_HDMI, AUDIO_POLICY_DEVICE_STATE_AVAILABLE,
@@ -914,75 +1165,89 @@ std::unordered_set<audio_format_t>
     return formats;
 }
 
-TEST_F(AudioPolicyManagerTestForHdmi, GetSurroundFormatsReturnsSupportedFormats) {
+TEST_P(AudioPolicyManagerTestForHdmi, GetSurroundFormatsReturnsSupportedFormats) {
     mManager->setForceUse(
             AUDIO_POLICY_FORCE_FOR_ENCODED_SURROUND, AUDIO_POLICY_FORCE_ENCODED_SURROUND_ALWAYS);
     auto surroundFormats = getSurroundFormatsHelper();
-    ASSERT_EQ(1, surroundFormats.count(AUDIO_FORMAT_E_AC3));
+    ASSERT_EQ(1, surroundFormats.count(GetParam()));
 }
 
-TEST_F(AudioPolicyManagerTestForHdmi,
+TEST_P(AudioPolicyManagerTestForHdmi,
         GetSurroundFormatsReturnsManipulatedFormats) {
     mManager->setForceUse(
             AUDIO_POLICY_FORCE_FOR_ENCODED_SURROUND, AUDIO_POLICY_FORCE_ENCODED_SURROUND_MANUAL);
 
     status_t ret =
-            mManager->setSurroundFormatEnabled(AUDIO_FORMAT_E_AC3, false /*enabled*/);
+            mManager->setSurroundFormatEnabled(GetParam(), false /*enabled*/);
     ASSERT_EQ(NO_ERROR, ret);
     auto surroundFormats = getSurroundFormatsHelper();
-    ASSERT_EQ(1, surroundFormats.count(AUDIO_FORMAT_E_AC3));
-    ASSERT_FALSE(surroundFormats[AUDIO_FORMAT_E_AC3]);
+    ASSERT_EQ(1, surroundFormats.count(GetParam()));
+    ASSERT_FALSE(surroundFormats[GetParam()]);
 
-    ret = mManager->setSurroundFormatEnabled(AUDIO_FORMAT_E_AC3, true /*enabled*/);
+    ret = mManager->setSurroundFormatEnabled(GetParam(), true /*enabled*/);
     ASSERT_EQ(NO_ERROR, ret);
     surroundFormats = getSurroundFormatsHelper();
-    ASSERT_EQ(1, surroundFormats.count(AUDIO_FORMAT_E_AC3));
-    ASSERT_TRUE(surroundFormats[AUDIO_FORMAT_E_AC3]);
+    ASSERT_EQ(1, surroundFormats.count(GetParam()));
+    ASSERT_TRUE(surroundFormats[GetParam()]);
 
-    ret = mManager->setSurroundFormatEnabled(AUDIO_FORMAT_E_AC3, false /*enabled*/);
+    ret = mManager->setSurroundFormatEnabled(GetParam(), false /*enabled*/);
     ASSERT_EQ(NO_ERROR, ret);
     surroundFormats = getSurroundFormatsHelper();
-    ASSERT_EQ(1, surroundFormats.count(AUDIO_FORMAT_E_AC3));
-    ASSERT_FALSE(surroundFormats[AUDIO_FORMAT_E_AC3]);
+    ASSERT_EQ(1, surroundFormats.count(GetParam()));
+    ASSERT_FALSE(surroundFormats[GetParam()]);
 }
 
-TEST_F(AudioPolicyManagerTestForHdmi,
+TEST_P(AudioPolicyManagerTestForHdmi,
         ListAudioPortsReturnManipulatedHdmiFormats) {
     mManager->setForceUse(
             AUDIO_POLICY_FORCE_FOR_ENCODED_SURROUND, AUDIO_POLICY_FORCE_ENCODED_SURROUND_MANUAL);
 
-    ASSERT_EQ(NO_ERROR, mManager->setSurroundFormatEnabled(AUDIO_FORMAT_E_AC3, false /*enabled*/));
+    ASSERT_EQ(NO_ERROR, mManager->setSurroundFormatEnabled(GetParam(), false /*enabled*/));
     auto formats = getFormatsFromPorts();
-    ASSERT_EQ(0, formats.count(AUDIO_FORMAT_E_AC3));
+    ASSERT_EQ(0, formats.count(GetParam()));
 
-    ASSERT_EQ(NO_ERROR, mManager->setSurroundFormatEnabled(AUDIO_FORMAT_E_AC3, true /*enabled*/));
+    ASSERT_EQ(NO_ERROR, mManager->setSurroundFormatEnabled(GetParam(), true /*enabled*/));
     formats = getFormatsFromPorts();
-    ASSERT_EQ(1, formats.count(AUDIO_FORMAT_E_AC3));
+    ASSERT_EQ(1, formats.count(GetParam()));
 }
 
-TEST_F(AudioPolicyManagerTestForHdmi,
+TEST_P(AudioPolicyManagerTestForHdmi,
         GetReportedSurroundFormatsReturnsHdmiReportedFormats) {
     mManager->setForceUse(
             AUDIO_POLICY_FORCE_FOR_ENCODED_SURROUND, AUDIO_POLICY_FORCE_ENCODED_SURROUND_ALWAYS);
     auto surroundFormats = getReportedSurroundFormatsHelper();
-    ASSERT_EQ(1, std::count(surroundFormats.begin(), surroundFormats.end(), AUDIO_FORMAT_E_AC3));
+    ASSERT_EQ(1, std::count(surroundFormats.begin(), surroundFormats.end(), GetParam()));
 }
 
-TEST_F(AudioPolicyManagerTestForHdmi,
+TEST_P(AudioPolicyManagerTestForHdmi,
         GetReportedSurroundFormatsReturnsNonManipulatedHdmiReportedFormats) {
     mManager->setForceUse(
             AUDIO_POLICY_FORCE_FOR_ENCODED_SURROUND, AUDIO_POLICY_FORCE_ENCODED_SURROUND_MANUAL);
 
-    status_t ret = mManager->setSurroundFormatEnabled(AUDIO_FORMAT_E_AC3, false /*enabled*/);
+    status_t ret = mManager->setSurroundFormatEnabled(GetParam(), false /*enabled*/);
     ASSERT_EQ(NO_ERROR, ret);
     auto surroundFormats = getReportedSurroundFormatsHelper();
-    ASSERT_EQ(1, std::count(surroundFormats.begin(), surroundFormats.end(), AUDIO_FORMAT_E_AC3));
+    ASSERT_EQ(1, std::count(surroundFormats.begin(), surroundFormats.end(), GetParam()));
 
-    ret = mManager->setSurroundFormatEnabled(AUDIO_FORMAT_E_AC3, true /*enabled*/);
+    ret = mManager->setSurroundFormatEnabled(GetParam(), true /*enabled*/);
     ASSERT_EQ(NO_ERROR, ret);
     surroundFormats = getReportedSurroundFormatsHelper();
-    ASSERT_EQ(1, std::count(surroundFormats.begin(), surroundFormats.end(), AUDIO_FORMAT_E_AC3));
+    ASSERT_EQ(1, std::count(surroundFormats.begin(), surroundFormats.end(), GetParam()));
 }
+
+TEST_P(AudioPolicyManagerTestForHdmi, GetSurroundFormatsIgnoresSupportedFormats) {
+    mManager->setForceUse(
+            AUDIO_POLICY_FORCE_FOR_ENCODED_SURROUND, AUDIO_POLICY_FORCE_ENCODED_SURROUND_NEVER);
+    auto surroundFormats = getSurroundFormatsHelper();
+    ASSERT_EQ(1, surroundFormats.count(GetParam()));
+    ASSERT_FALSE(surroundFormats[GetParam()]);
+}
+
+INSTANTIATE_TEST_SUITE_P(SurroundFormatSupport, AudioPolicyManagerTestForHdmi,
+        testing::Values(AUDIO_FORMAT_AC3, AUDIO_FORMAT_E_AC3),
+        [](const ::testing::TestParamInfo<AudioPolicyManagerTestForHdmi::ParamType>& info) {
+            return audio_format_to_string(info.param);
+        });
 
 class AudioPolicyManagerTestDPNoRemoteSubmixModule : public AudioPolicyManagerTestDynamicPolicy {
 protected:
@@ -1035,7 +1300,7 @@ protected:
 };
 
 void AudioPolicyManagerTestDPPlaybackReRouting::SetUp() {
-    AudioPolicyManagerTestDynamicPolicy::SetUp();
+    ASSERT_NO_FATAL_FAILURE(AudioPolicyManagerTestDynamicPolicy::SetUp());
 
     mTracker.reset(new RecordingActivityTracker());
 
@@ -1221,7 +1486,7 @@ protected:
 };
 
 void AudioPolicyManagerTestDPMixRecordInjection::SetUp() {
-    AudioPolicyManagerTestDynamicPolicy::SetUp();
+    ASSERT_NO_FATAL_FAILURE(AudioPolicyManagerTestDynamicPolicy::SetUp());
 
     mTracker.reset(new RecordingActivityTracker());
 
@@ -1571,7 +1836,7 @@ protected:
 };
 
 void AudioPolicyManagerDynamicHwModulesTest::SetUpManagerConfig() {
-    AudioPolicyManagerTestWithConfigurationFile::SetUpManagerConfig();
+    ASSERT_NO_FATAL_FAILURE(AudioPolicyManagerTestWithConfigurationFile::SetUpManagerConfig());
     // Only allow successful opening of "primary" hw module during APM initialization.
     mClient->swapAllowedModuleNames({"primary"});
 }

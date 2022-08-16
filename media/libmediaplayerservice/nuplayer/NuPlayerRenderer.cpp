@@ -73,6 +73,10 @@ static inline int32_t getAudioSinkPcmMsSetting() {
 // is closed to allow the audio DSP to power down.
 static const int64_t kOffloadPauseMaxUs = 10000000LL;
 
+// Additional delay after teardown before releasing the wake lock to allow time for the audio path
+// to be completely released
+static const int64_t kWakelockReleaseDelayUs = 2000000LL;
+
 // Maximum allowed delay from AudioSink, 1.5 seconds.
 static const int64_t kMaxAllowedAudioSinkDelayUs = 1500000LL;
 
@@ -793,6 +797,20 @@ void NuPlayer::Renderer::onMessageReceived(const sp<AMessage> &msg) {
             }
             ALOGV("Audio Offload tear down due to pause timeout.");
             onAudioTearDown(kDueToTimeout);
+            sp<AMessage> newMsg = new AMessage(kWhatReleaseWakeLock, this);
+            newMsg->setInt32("drainGeneration", generation);
+            newMsg->post(kWakelockReleaseDelayUs);
+            break;
+        }
+
+        case kWhatReleaseWakeLock:
+        {
+            int32_t generation;
+            CHECK(msg->findInt32("drainGeneration", &generation));
+            if (generation != mAudioOffloadPauseTimeoutGeneration) {
+                break;
+            }
+            ALOGV("releasing audio offload pause wakelock.");
             mWakeLock->release();
             break;
         }
@@ -1673,23 +1691,17 @@ void NuPlayer::Renderer::onFlush(const sp<AMessage> &msg) {
 
         mDrainAudioQueuePending = false;
 
-        if (offloadingAudio()) {
-            mAudioSink->pause();
-            mAudioSink->flush();
-            if (!mPaused) {
-                mAudioSink->start();
-            }
-        } else {
-            mAudioSink->pause();
-            mAudioSink->flush();
+        mAudioSink->pause();
+        mAudioSink->flush();
+        if (!offloadingAudio()) {
             // Call stop() to signal to the AudioSink to completely fill the
             // internal buffer before resuming playback.
             // FIXME: this is ignored after flush().
             mAudioSink->stop();
-            if (!mPaused) {
-                mAudioSink->start();
-            }
             mNumFramesWritten = 0;
+        }
+        if (!mPaused) {
+            mAudioSink->start();
         }
         mNextAudioClockUpdateTimeUs = -1;
     } else {
@@ -1791,6 +1803,8 @@ void NuPlayer::Renderer::onPause() {
         return;
     }
 
+    startAudioOffloadPauseTimeout();
+
     {
         Mutex::Autolock autoLock(mLock);
         // we do not increment audio drain generation so that we fill audio buffer during pause.
@@ -1805,7 +1819,6 @@ void NuPlayer::Renderer::onPause() {
 
     // Note: audio data may not have been decoded, and the AudioSink may not be opened.
     mAudioSink->pause();
-    startAudioOffloadPauseTimeout();
 
     ALOGV("now paused audio queue has %zu entries, video has %zu entries",
           mAudioQueue.size(), mVideoQueue.size());

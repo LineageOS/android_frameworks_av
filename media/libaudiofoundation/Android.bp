@@ -11,6 +11,10 @@ cc_library_headers {
     name: "libaudiofoundation_headers",
     vendor_available: true,
     min_sdk_version: "29",
+    apex_available: [
+        "//apex_available:platform",
+        "com.android.media",
+    ],
 
     export_include_dirs: ["include"],
     header_libs: [
@@ -24,9 +28,11 @@ cc_library_headers {
         "libmedia_helper_headers",
     ],
     static_libs: [
+        "android.media.audio.common.types-V1-cpp",
         "audioclient-types-aidl-cpp",
     ],
     export_static_lib_headers: [
+        "android.media.audio.common.types-V1-cpp",
         "audioclient-types-aidl-cpp",
     ],
     host_supported: true,
@@ -52,6 +58,7 @@ cc_library {
     ],
 
     shared_libs: [
+        "android.media.audio.common.types-V1-cpp",
         "audioclient-types-aidl-cpp",
         "libaudioclient_aidl_conversion",
         "libaudioutils",
@@ -63,6 +70,7 @@ cc_library {
     ],
 
     export_shared_lib_headers: [
+        "android.media.audio.common.types-V1-cpp",
         "audioclient-types-aidl-cpp",
         "libaudioclient_aidl_conversion",
     ],

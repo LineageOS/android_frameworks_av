@@ -22,11 +22,11 @@
 #include <media/audiohal/DeviceHalInterface.h>
 #include <media/audiohal/EffectHalInterface.h>
 
-#include "ConversionHelperHidl.h"
+#include "CoreConversionHelperHidl.h"
 
 namespace android {
 
-class DeviceHalHidl : public DeviceHalInterface, public ConversionHelperHidl
+class DeviceHalHidl : public DeviceHalInterface, public CoreConversionHelperHidl
 {
   public:
     // Sets the value of 'devices' to a bitmask of 1 or more values of audio_devices_t.
@@ -115,7 +115,26 @@ class DeviceHalHidl : public DeviceHalInterface, public ConversionHelperHidl
     status_t addDeviceEffect(audio_port_handle_t device, sp<EffectHalInterface> effect) override;
     status_t removeDeviceEffect(audio_port_handle_t device, sp<EffectHalInterface> effect) override;
 
+    status_t getMmapPolicyInfos(
+            media::audio::common::AudioMMapPolicyType policyType __unused,
+            std::vector<media::audio::common::AudioMMapPolicyInfo> *policyInfos __unused) override {
+        // TODO: Implement the HAL query when moving to AIDL HAL.
+        return INVALID_OPERATION;
+    }
+
+    int32_t getAAudioMixerBurstCount() override {
+        // TODO: Implement the HAL query when moving to AIDL HAL.
+        return INVALID_OPERATION;
+    }
+
+    int32_t getAAudioHardwareBurstMinUsec() override {
+        // TODO: Implement the HAL query when moving to AIDL HAL.
+        return INVALID_OPERATION;
+    }
+
     status_t setConnectedState(const struct audio_port_v7 *port, bool connected) override;
+
+    error::Result<audio_hw_sync_t> getHwAvSync() override;
 
     status_t dump(int fd, const Vector<String16>& args) override;
 

@@ -633,7 +633,8 @@ AudioFlinger::PlaybackThread::Track::Track(
             track_type type,
             audio_port_handle_t portId,
             size_t frameCountToBeReady,
-            float speed)
+            float speed,
+            bool isSpatialized)
     :   TrackBase(thread, client, attr, sampleRate, format, channelMask, frameCount,
                   // TODO: Using unsecurePointer() has some associated security pitfalls
                   //       (see declaration for details).
@@ -667,7 +668,8 @@ AudioFlinger::PlaybackThread::Track::Track(
     mResumeToStopping(false),
     mFlushHwPending(false),
     mFlags(flags),
-    mSpeed(speed)
+    mSpeed(speed),
+    mIsSpatialized(isSpatialized)
 {
     // client == 0 implies sharedBuffer == 0
     ALOG_ASSERT(!(client == 0 && sharedBuffer != 0));
@@ -2635,6 +2637,8 @@ void AudioFlinger::RecordThread::RecordTrack::updateTrackFrameInfo(
     // ALOGD("FrameTime: %lld %lld", (long long)ft.frames, (long long)ft.timeNs);
     mKernelFrameTime.store(ft);
     if (!audio_is_linear_pcm(mFormat)) {
+        // Stream is direct, return provided timestamp with no conversion
+        mServerProxy->setTimestamp(timestamp);
         return;
     }
 

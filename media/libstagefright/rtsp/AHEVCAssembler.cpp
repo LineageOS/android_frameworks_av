@@ -18,14 +18,14 @@
 #define LOG_TAG "AHEVCAssembler"
 #include <utils/Log.h>
 
-#include "AHEVCAssembler.h"
+#include <media/stagefright/rtsp/AHEVCAssembler.h>
 
-#include "ARTPSource.h"
+#include <media/stagefright/rtsp/ARTPSource.h>
 
+#include <HevcUtils.h>
 #include <media/stagefright/foundation/ABuffer.h>
 #include <media/stagefright/foundation/ADebug.h>
 #include <media/stagefright/foundation/AMessage.h>
-#include <include/HevcUtils.h>
 #include <media/stagefright/foundation/hexdump.h>
 
 #include <stdint.h>

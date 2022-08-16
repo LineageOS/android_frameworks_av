@@ -31,13 +31,6 @@ using namespace aaudio;
 #define RIDICULOUSLY_LARGE_BUFFER_CAPACITY   (256 * 1024)
 #define RIDICULOUSLY_LARGE_FRAME_SIZE        4096
 
-AudioEndpoint::AudioEndpoint()
-    : mFreeRunning(false)
-    , mDataReadCounter(0)
-    , mDataWriteCounter(0)
-{
-}
-
 // TODO Consider moving to a method in RingBufferDescriptor
 static aaudio_result_t AudioEndpoint_validateQueueDescriptor(const char *type,
                                                   const RingBufferDescriptor *descriptor) {
@@ -146,38 +139,49 @@ aaudio_result_t AudioEndpoint::configure(const EndpointDescriptor *pEndpointDesc
     );
 
     // ============================ data queue =============================
-    descriptor = &pEndpointDescriptor->dataQueueDescriptor;
-    ALOGV("configure() data framesPerBurst = %d", descriptor->framesPerBurst);
+    result = configureDataQueue(pEndpointDescriptor->dataQueueDescriptor, direction);
+
+    return result;
+}
+
+aaudio_result_t AudioEndpoint::configureDataQueue(const RingBufferDescriptor& descriptor,
+                                                  aaudio_direction_t direction) {
+    aaudio_result_t result = AudioEndpoint_validateQueueDescriptor("data", &descriptor);
+    if (result != AAUDIO_OK) {
+        return result;
+    }
+
+    ALOGV("configure() data framesPerBurst = %d", descriptor.framesPerBurst);
     ALOGV("configure() data readCounterAddress = %p",
-          descriptor->readCounterAddress);
+          descriptor.readCounterAddress);
 
     // An example of free running is when the other side is read or written by hardware DMA
     // or a DSP. It does not update its counter so we have to update it.
     int64_t *remoteCounter = (direction == AAUDIO_DIRECTION_OUTPUT)
-                             ? descriptor->readCounterAddress // read by other side
-                             : descriptor->writeCounterAddress; // written by other side
+                             ? descriptor.readCounterAddress // read by other side
+                             : descriptor.writeCounterAddress; // written by other side
     mFreeRunning = (remoteCounter == nullptr);
     ALOGV("configure() mFreeRunning = %d", mFreeRunning ? 1 : 0);
 
-    int64_t *readCounterAddress = (descriptor->readCounterAddress == nullptr)
+    int64_t *readCounterAddress = (descriptor.readCounterAddress == nullptr)
                                   ? &mDataReadCounter
-                                  : descriptor->readCounterAddress;
-    int64_t *writeCounterAddress = (descriptor->writeCounterAddress == nullptr)
+                                  : descriptor.readCounterAddress;
+    int64_t *writeCounterAddress = (descriptor.writeCounterAddress == nullptr)
                                   ? &mDataWriteCounter
-                                  : descriptor->writeCounterAddress;
+                                  : descriptor.writeCounterAddress;
 
     // Clear buffer to avoid an initial glitch on some devices.
-    size_t bufferSizeBytes = descriptor->capacityInFrames * descriptor->bytesPerFrame;
-    memset(descriptor->dataAddress, 0, bufferSizeBytes);
+    size_t bufferSizeBytes = descriptor.capacityInFrames * descriptor.bytesPerFrame;
+    memset(descriptor.dataAddress, 0, bufferSizeBytes);
 
     mDataQueue = std::make_unique<FifoBufferIndirect>(
-            descriptor->bytesPerFrame,
-            descriptor->capacityInFrames,
+            descriptor.bytesPerFrame,
+            descriptor.capacityInFrames,
             readCounterAddress,
             writeCounterAddress,
-            descriptor->dataAddress
+            descriptor.dataAddress
     );
-    uint32_t threshold = descriptor->capacityInFrames / 2;
+    uint32_t threshold = descriptor.capacityInFrames / 2;
     mDataQueue->setThreshold(threshold);
     return result;
 }
@@ -188,47 +192,66 @@ aaudio_result_t AudioEndpoint::readUpCommand(AAudioServiceMessage *commandPtr)
 }
 
 int32_t AudioEndpoint::getEmptyFramesAvailable(WrappingBuffer *wrappingBuffer) {
-    return mDataQueue->getEmptyRoomAvailable(wrappingBuffer);
+    return mDataQueue == nullptr ? 0 : mDataQueue->getEmptyRoomAvailable(wrappingBuffer);
 }
 
 int32_t AudioEndpoint::getEmptyFramesAvailable() {
-    return mDataQueue->getEmptyFramesAvailable();
+    return mDataQueue == nullptr ? 0 : mDataQueue->getEmptyFramesAvailable();
 }
 
 int32_t AudioEndpoint::getFullFramesAvailable(WrappingBuffer *wrappingBuffer) {
-    return mDataQueue->getFullDataAvailable(wrappingBuffer);
+    return mDataQueue == nullptr ? 0 : mDataQueue->getFullDataAvailable(wrappingBuffer);
 }
 
 int32_t AudioEndpoint::getFullFramesAvailable() {
-    return mDataQueue->getFullFramesAvailable();
+    return mDataQueue == nullptr ? 0 : mDataQueue->getFullFramesAvailable();
+}
+
+android::fifo_frames_t AudioEndpoint::read(void *buffer, android::fifo_frames_t numFrames) {
+    return mDataQueue == nullptr ? 0 : mDataQueue->read(buffer, numFrames);
+}
+
+android::fifo_frames_t AudioEndpoint::write(void *buffer, android::fifo_frames_t numFrames) {
+    return mDataQueue == nullptr ? 0 : mDataQueue->write(buffer, numFrames);
 }
 
 void AudioEndpoint::advanceWriteIndex(int32_t deltaFrames) {
-    mDataQueue->advanceWriteIndex(deltaFrames);
+    if (mDataQueue != nullptr) {
+        mDataQueue->advanceWriteIndex(deltaFrames);
+    }
 }
 
 void AudioEndpoint::advanceReadIndex(int32_t deltaFrames) {
-    mDataQueue->advanceReadIndex(deltaFrames);
+    if (mDataQueue != nullptr) {
+        mDataQueue->advanceReadIndex(deltaFrames);
+    }
 }
 
 void AudioEndpoint::setDataReadCounter(fifo_counter_t framesRead) {
-    mDataQueue->setReadCounter(framesRead);
+    if (mDataQueue != nullptr) {
+        mDataQueue->setReadCounter(framesRead);
+    }
 }
 
 fifo_counter_t AudioEndpoint::getDataReadCounter() const {
-    return mDataQueue->getReadCounter();
+    return mDataQueue == nullptr ? 0 : mDataQueue->getReadCounter();
 }
 
 void AudioEndpoint::setDataWriteCounter(fifo_counter_t framesRead) {
-    mDataQueue->setWriteCounter(framesRead);
+    if (mDataQueue != nullptr) {
+        mDataQueue->setWriteCounter(framesRead);
+    }
 }
 
 fifo_counter_t AudioEndpoint::getDataWriteCounter() const {
-    return mDataQueue->getWriteCounter();
+    return mDataQueue == nullptr ? 0 : mDataQueue->getWriteCounter();
 }
 
 int32_t AudioEndpoint::setBufferSizeInFrames(int32_t requestedFrames,
                                             int32_t *actualFrames) {
+    if (mDataQueue == nullptr) {
+        return AAUDIO_ERROR_INVALID_STATE;
+    }
     if (requestedFrames < ENDPOINT_DATA_QUEUE_SIZE_MIN) {
         requestedFrames = ENDPOINT_DATA_QUEUE_SIZE_MIN;
     }
@@ -238,11 +261,11 @@ int32_t AudioEndpoint::setBufferSizeInFrames(int32_t requestedFrames,
 }
 
 int32_t AudioEndpoint::getBufferSizeInFrames() const {
-    return mDataQueue->getThreshold();
+    return mDataQueue == nullptr ? 0 : mDataQueue->getThreshold();
 }
 
 int32_t AudioEndpoint::getBufferCapacityInFrames() const {
-    return (int32_t)mDataQueue->getBufferCapacityInFrames();
+    return mDataQueue == nullptr ? 0 : (int32_t)mDataQueue->getBufferCapacityInFrames();
 }
 
 void AudioEndpoint::dump() const {
@@ -251,5 +274,7 @@ void AudioEndpoint::dump() const {
 }
 
 void AudioEndpoint::eraseDataMemory() {
-    mDataQueue->eraseMemory();
+    if (mDataQueue != nullptr) {
+        mDataQueue->eraseMemory();
+    }
 }

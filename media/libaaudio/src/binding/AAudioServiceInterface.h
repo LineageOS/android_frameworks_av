@@ -37,7 +37,7 @@ namespace aaudio {
 class AAudioServiceInterface {
 public:
 
-    AAudioServiceInterface() {};
+    AAudioServiceInterface() = default;
     virtual ~AAudioServiceInterface() = default;
 
     virtual void registerClient(const android::sp<IAAudioClient>& client) = 0;
@@ -95,6 +95,16 @@ public:
 
     virtual aaudio_result_t stopClient(aaudio_handle_t streamHandle,
                                        audio_port_handle_t clientHandle) = 0;
+
+    /**
+     * Exit the standby mode.
+     *
+     * @param streamHandle the stream handle
+     * @param parcelable contains new data queue information
+     * @return the result of the execution
+     */
+    virtual aaudio_result_t exitStandby(aaudio_handle_t streamHandle,
+                                        AudioEndpointParcelable &parcelable) = 0;
 };
 
 } /* namespace aaudio */

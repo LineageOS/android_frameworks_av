@@ -37,9 +37,7 @@ class IOProfile : public AudioPort, public PolicyAudioPort
 public:
     IOProfile(const std::string &name, audio_port_role_t role)
         : AudioPort(name, AUDIO_PORT_TYPE_MIX, role),
-          maxOpenCount(1),
           curOpenCount(0),
-          maxActiveCount(1),
           curActiveCount(0) {}
 
     virtual ~IOProfile() = default;
@@ -59,11 +57,12 @@ public:
     // Once capture clients are tracked individually and not per session this can be removed
     // MMAP no IRQ input streams do not have the default limitation of one active client
     // max as they can be used in shared mode by the same application.
+    // NOTE: Please consider moving to AudioPort when addressing the FIXME
     // NOTE: this works for explicit values set in audio_policy_configuration.xml because
     // flags are parsed before maxActiveCount by the serializer.
     void setFlags(uint32_t flags) override
     {
-        PolicyAudioPort::setFlags(flags);
+        AudioPort::setFlags(flags);
         if (getRole() == AUDIO_PORT_ROLE_SINK && (flags & AUDIO_INPUT_FLAG_MMAP_NOIRQ) != 0) {
             maxActiveCount = 0;
         }
@@ -98,7 +97,7 @@ public:
                              uint32_t flags,
                              bool exactMatchRequiredForInputFlags = false) const;
 
-    void dump(String8 *dst) const;
+    void dump(String8 *dst, int spaces) const;
     void log();
 
     bool hasSupportedDevices() const { return !mSupportedDevices.isEmpty(); }
@@ -194,16 +193,8 @@ public:
         return false;
     }
 
-    // Maximum number of input or output streams that can be simultaneously opened for this profile.
-    // By convention 0 means no limit. To respect legacy behavior, initialized to 1 for output
-    // profiles and 0 for input profiles
-    uint32_t     maxOpenCount;
     // Number of streams currently opened for this profile.
     uint32_t     curOpenCount;
-    // Maximum number of input or output streams that can be simultaneously active for this profile.
-    // By convention 0 means no limit. To respect legacy behavior, initialized to 0 for output
-    // profiles and 1 for input profiles
-    uint32_t     maxActiveCount;
     // Number of streams currently active for this profile. This is not the number of active clients
     // (AudioTrack or AudioRecord) but the number of active HAL streams.
     uint32_t     curActiveCount;

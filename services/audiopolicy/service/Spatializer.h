@@ -135,13 +135,15 @@ class Spatializer : public media::BnSpatializer,
     /** Called by audio policy service when the special output mixer dedicated to spatialization
      * is opened and the spatializer engine must be created.
      */
-    status_t attachOutput(audio_io_handle_t output);
+    status_t attachOutput(audio_io_handle_t output, size_t numActiveTracks);
     /** Called by audio policy service when the special output mixer dedicated to spatialization
      * is closed and the spatializer engine must be release.
      */
     audio_io_handle_t detachOutput();
     /** Returns the output stream the spatializer is attached to. */
     audio_io_handle_t getOutput() const { std::lock_guard lock(mLock); return mOutput; }
+
+    void updateActiveTracks(size_t numActiveTracks);
 
     /** Gets the channel mask, sampling rate and format set for the spatializer input. */
     audio_config_base_t getAudioInConfig() const;
@@ -274,10 +276,32 @@ private:
 
     void postFramesProcessedMsg(int frames);
 
+    /**
+     * Checks if head and screen sensors must be actively monitored based on
+     * spatializer state and playback activity and configures the pose controller
+     * accordingly.
+     */
+    void checkSensorsState_l() REQUIRES(mLock);
+
+    /**
+     * Checks if the head pose controller should be created or destroyed according
+     * to desired head tracking mode.
+     */
+    void checkPoseController_l() REQUIRES(mLock);
+
+    /**
+     * Checks if the spatializer effect should be enabled based on
+     * playback activity and requested level.
+     */
+    void checkEngineState_l() REQUIRES(mLock);
+
     /** Effect engine descriptor */
     const effect_descriptor_t mEngineDescriptor;
     /** Callback interface to parent audio policy service */
-    SpatializerPolicyCallback* mPolicyCallback;
+    SpatializerPolicyCallback* const mPolicyCallback;
+
+    /** Currently there is only one version of the spatializer running */
+    const std::string mMetricsId = AMEDIAMETRICS_KEY_PREFIX_AUDIO_SPATIALIZER "0";
 
     /** Mutex protecting internal state */
     mutable std::mutex mLock;
@@ -318,6 +342,7 @@ private:
     float mDisplayOrientation GUARDED_BY(mLock) = kDisplayOrientationInvalid;
 
     std::vector<media::SpatializationLevel> mLevels;
+    std::vector<media::SpatializerHeadTrackingMode> mHeadTrackingModes;
     std::vector<media::SpatializationMode> mSpatializationModes;
     std::vector<audio_channel_mask_t> mChannelMasks;
     bool mSupportsHeadTracking;
@@ -327,6 +352,8 @@ private:
 
     sp<ALooper> mLooper;
     sp<EngineCallbackHandler> mHandler;
+
+    size_t mNumActiveTracks GUARDED_BY(mLock) = 0;
 
     static const std::vector<const char *> sHeadPoseKeys;
 };

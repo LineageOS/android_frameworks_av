@@ -55,12 +55,6 @@ cc_binary {
         "libGLESv2",
     ],
 
-    include_dirs: [
-        "frameworks/av/media/libstagefright",
-        "frameworks/av/media/libstagefright/include",
-        "frameworks/native/include/media/openmax",
-    ],
-
     cflags: [
         "-Werror",
         "-Wall",

@@ -208,7 +208,11 @@ void DrmManager::removeUniqueId(int uniqueId) {
 }
 
 status_t DrmManager::loadPlugIns() {
+#if __LP64__
+    String8 pluginDirPath("/system/lib64/drm");
+#else
     String8 pluginDirPath("/system/lib/drm");
+#endif
     loadPlugIns(pluginDirPath);
     return DRM_NO_ERROR;
 }

@@ -150,6 +150,7 @@ const channel_config_t sDualMicConfigs[CHANNEL_CFG_CNT] = {
 
 bool sHasAuxChannels[PREPROC_NUM_EFFECTS] = {
         false,  // PREPROC_AGC
+        false,  // PREPROC_AGC2
         true,   // PREPROC_AEC
         true,   // PREPROC_NS
 };

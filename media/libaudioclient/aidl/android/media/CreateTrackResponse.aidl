@@ -16,7 +16,7 @@
 
 package android.media;
 
-import android.media.AudioStreamType;
+import android.media.audio.common.AudioStreamType;
 import android.media.IAudioTrack;
 
 /**

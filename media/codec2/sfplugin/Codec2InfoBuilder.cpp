@@ -156,9 +156,10 @@ bool addSupportedProfileLevels(
     // dynamic metadata as that needs to be frame accurate.)
     supportsHdr |= (mediaType == MIMETYPE_VIDEO_VP9);
 
-    // HDR support implies 10-bit support.
+    // HDR support implies 10-bit support. AV1 codecs are also required to
+    // support 10-bit per CDD.
     // TODO: directly check this from the component interface
-    supports10Bit = (supportsHdr || supportsHdr10Plus);
+    supports10Bit = (supportsHdr || supportsHdr10Plus) || (mediaType == MIMETYPE_VIDEO_AV1);
 
     // If the device doesn't support HDR display, then no codec on the device
     // can advertise support for HDR profiles.
@@ -309,8 +310,13 @@ void addSupportedColorFormats(
         if (trait.name.find("android") != std::string::npos) {
             addDefaultColorFormat(COLOR_FormatSurface);
         }
-        for (int32_t colorFormat : supportedColorFormats) {
-            caps->addColorFormat(colorFormat);
+
+        static const int kVendorSdkVersion = ::android::base::GetIntProperty(
+                "ro.vendor.build.version.sdk", android_get_device_api_level());
+        if (kVendorSdkVersion >= __ANDROID_API_T__) {
+            for (int32_t colorFormat : supportedColorFormats) {
+                caps->addColorFormat(colorFormat);
+            }
         }
     }
 }

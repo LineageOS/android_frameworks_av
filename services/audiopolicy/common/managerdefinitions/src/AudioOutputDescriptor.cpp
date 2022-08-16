@@ -17,6 +17,8 @@
 #define LOG_TAG "APM::AudioOutputDescriptor"
 //#define LOG_NDEBUG 0
 
+#include <android-base/stringprintf.h>
+
 #include <AudioPolicyInterface.h>
 #include "AudioOutputDescriptor.h"
 #include "AudioPolicyMix.h"
@@ -188,7 +190,6 @@ status_t AudioOutputDescriptor::applyAudioPortConfig(const struct audio_port_con
     toAudioPortConfig(&localBackupConfig);
     if ((status = validationBeforeApplyConfig(config)) == NO_ERROR) {
         AudioPortConfig::applyAudioPortConfig(config, backupConfig);
-        applyPolicyAudioPortConfig(config);
     }
 
     if (backupConfig != NULL) {
@@ -201,13 +202,11 @@ status_t AudioOutputDescriptor::applyAudioPortConfig(const struct audio_port_con
 void AudioOutputDescriptor::toAudioPortConfig(struct audio_port_config *dstConfig,
                                               const struct audio_port_config *srcConfig) const
 {
-    dstConfig->config_mask = AUDIO_PORT_CONFIG_SAMPLE_RATE|AUDIO_PORT_CONFIG_CHANNEL_MASK|
-                            AUDIO_PORT_CONFIG_FORMAT|AUDIO_PORT_CONFIG_GAIN;
+    dstConfig->config_mask = AUDIO_PORT_CONFIG_ALL;
     if (srcConfig != NULL) {
         dstConfig->config_mask |= srcConfig->config_mask;
     }
     AudioPortConfig::toAudioPortConfig(dstConfig, srcConfig);
-    toPolicyAudioPortConfig(dstConfig, srcConfig);
 
     dstConfig->role = AUDIO_PORT_ROLE_SOURCE;
     dstConfig->type = AUDIO_PORT_TYPE_MIX;
@@ -245,32 +244,45 @@ bool AudioOutputDescriptor::isAnyActive(VolumeSource volumeSourceToIgnore) const
         return client->volumeSource() != volumeSourceToIgnore; }) != end(mActiveClients);
 }
 
-void AudioOutputDescriptor::dump(String8 *dst) const
+void AudioOutputDescriptor::dump(String8 *dst, int spaces, const char* extraInfo) const
 {
-    dst->appendFormat(" ID: %d\n", mId);
-    dst->appendFormat(" Sampling rate: %d\n", mSamplingRate);
-    dst->appendFormat(" Format: %08x\n", mFormat);
-    dst->appendFormat(" Channels: %08x\n", mChannelMask);
-    dst->appendFormat(" Devices: %s\n", devices().toString(true /*includeSensitiveInfo*/).c_str());
-    dst->appendFormat(" Global active count: %u\n", mGlobalActiveCount);
-    for (const auto &iter : mRoutingActivities) {
-        dst->appendFormat(" Product Strategy id: %d", iter.first);
-        iter.second.dump(dst, 4);
+    dst->appendFormat("Port ID: %d%s%s\n",
+            mId, extraInfo != nullptr ? "; " : "", extraInfo != nullptr ? extraInfo : "");
+    dst->appendFormat("%*s%s; %d; Channel mask: 0x%x\n", spaces, "",
+            audio_format_to_string(mFormat), mSamplingRate, mChannelMask);
+    dst->appendFormat("%*sDevices: %s\n", spaces, "",
+            devices().toString(true /*includeSensitiveInfo*/).c_str());
+    dst->appendFormat("%*sGlobal active count: %u\n", spaces, "", mGlobalActiveCount);
+    if (!mRoutingActivities.empty()) {
+        dst->appendFormat("%*s- Product Strategies (%zu):\n", spaces - 2, "",
+                mRoutingActivities.size());
+        for (const auto &iter : mRoutingActivities) {
+            dst->appendFormat("%*sid %d: ", spaces + 1, "", iter.first);
+            iter.second.dump(dst, 0);
+        }
     }
-    for (const auto &iter : mVolumeActivities) {
-        dst->appendFormat(" Volume Activities id: %d", iter.first);
-        iter.second.dump(dst, 4);
+    if (!mVolumeActivities.empty()) {
+        dst->appendFormat("%*s- Volume Activities (%zu):\n", spaces - 2, "",
+                mVolumeActivities.size());
+        for (const auto &iter : mVolumeActivities) {
+            dst->appendFormat("%*sid %d: ", spaces + 1, "", iter.first);
+            iter.second.dump(dst, 0);
+        }
     }
-    dst->append(" AudioTrack Clients:\n");
-    ClientMapHandler<TrackClientDescriptor>::dump(dst);
-    dst->append("\n");
+    if (getClientCount() != 0) {
+        dst->appendFormat("%*s- AudioTrack clients (%zu):\n", spaces - 2, "", getClientCount());
+        ClientMapHandler<TrackClientDescriptor>::dump(dst, spaces);
+    }
     if (!mActiveClients.empty()) {
-        dst->append(" AudioTrack active (stream) clients:\n");
+        dst->appendFormat("%*s- AudioTrack active (stream) clients (%zu):\n", spaces - 2, "",
+                mActiveClients.size());
         size_t index = 0;
         for (const auto& client : mActiveClients) {
-            client->dump(dst, 2, index++);
+            const std::string prefix = base::StringPrintf(
+                    "%*sid %zu: ", spaces + 1, "", index + 1);
+            dst->appendFormat("%s", prefix.c_str());
+            client->dump(dst, prefix.size());
         }
-        dst->append(" \n");
     }
 }
 
@@ -285,7 +297,6 @@ SwAudioOutputDescriptor::SwAudioOutputDescriptor(const sp<IOProfile>& profile,
                                                  AudioPolicyClientInterface *clientInterface)
     : AudioOutputDescriptor(profile, clientInterface),
     mProfile(profile), mIoHandle(AUDIO_IO_HANDLE_NONE), mLatency(0),
-    mFlags((audio_output_flags_t)0),
     mOutput1(0), mOutput2(0), mDirectOpenCount(0),
     mDirectClientSession(AUDIO_SESSION_NONE)
 {
@@ -294,11 +305,18 @@ SwAudioOutputDescriptor::SwAudioOutputDescriptor(const sp<IOProfile>& profile,
     }
 }
 
-void SwAudioOutputDescriptor::dump(String8 *dst) const
+void SwAudioOutputDescriptor::dump(String8 *dst, int spaces, const char* extraInfo) const
 {
-    dst->appendFormat(" Latency: %d\n", mLatency);
-    dst->appendFormat(" Flags %08x\n", mFlags);
-    AudioOutputDescriptor::dump(dst);
+    String8 allExtraInfo;
+    if (extraInfo != nullptr) {
+        allExtraInfo.appendFormat("%s; ", extraInfo);
+    }
+    std::string flagsLiteral = toString(mFlags);
+    allExtraInfo.appendFormat("Latency: %d; 0x%04x", mLatency, mFlags);
+    if (!flagsLiteral.empty()) {
+        allExtraInfo.appendFormat(" (%s)", flagsLiteral.c_str());
+    }
+    AudioOutputDescriptor::dump(dst, spaces, allExtraInfo.c_str());
 }
 
 DeviceVector SwAudioOutputDescriptor::devices() const
@@ -553,12 +571,6 @@ status_t SwAudioOutputDescriptor::open(const audio_config_t *halConfig,
         lHalConfig.offload_info.channel_mask = lHalConfig.channel_mask;
         lHalConfig.offload_info.format = lHalConfig.format;
         lHalConfig.offload_info.stream_type = stream;
-        lHalConfig.offload_info.duration_us = -1;
-        lHalConfig.offload_info.has_video = true; // conservative
-        lHalConfig.offload_info.is_streaming = true; // likely
-        lHalConfig.offload_info.encapsulation_mode = lHalConfig.offload_info.encapsulation_mode;
-        lHalConfig.offload_info.content_id = lHalConfig.offload_info.content_id;
-        lHalConfig.offload_info.sync_id = lHalConfig.offload_info.sync_id;
     }
 
     audio_config_base_t lMixerConfig;
@@ -573,15 +585,11 @@ status_t SwAudioOutputDescriptor::open(const audio_config_t *halConfig,
 
     mFlags = (audio_output_flags_t)(mFlags | flags);
 
-    //TODO: b/193496180 use spatializer flag at audio HAL when available
-    audio_output_flags_t halFlags = mFlags;
-    if ((mFlags & AUDIO_OUTPUT_FLAG_SPATIALIZER) != 0) {
-        halFlags = (audio_output_flags_t)(AUDIO_OUTPUT_FLAG_FAST | AUDIO_OUTPUT_FLAG_DEEP_BUFFER);
-        // If no mixer config is specified for a spatializer output, default to 5.1 for proper
-        // configuration of the final downmixer or spatializer
-        if (mixerConfig == nullptr) {
-            lMixerConfig.channel_mask = AUDIO_CHANNEL_OUT_5POINT1;
-        }
+    // If no mixer config is specified for a spatializer output, default to 5.1 for proper
+    // configuration of the final downmixer or spatializer
+    if ((mFlags & AUDIO_OUTPUT_FLAG_SPATIALIZER) != 0
+            && mixerConfig == nullptr) {
+        lMixerConfig.channel_mask = AUDIO_CHANNEL_OUT_5POINT1;
     }
 
     ALOGV("opening output for device %s profile %p name %s",
@@ -593,7 +601,7 @@ status_t SwAudioOutputDescriptor::open(const audio_config_t *halConfig,
                                                    &lMixerConfig,
                                                    device,
                                                    &mLatency,
-                                                   halFlags);
+                                                   mFlags);
 
     if (status == NO_ERROR) {
         LOG_ALWAYS_FATAL_IF(*output == AUDIO_IO_HANDLE_NONE,
@@ -703,6 +711,23 @@ status_t SwAudioOutputDescriptor::openDuplicating(const sp<SwAudioOutputDescript
     return NO_ERROR;
 }
 
+uint32_t SwAudioOutputDescriptor::getRecommendedMuteDurationMs() const
+{
+    if (isDuplicated()) {
+        return std::max(mOutput1->getRecommendedMuteDurationMs(),
+                mOutput2->getRecommendedMuteDurationMs());
+    }
+    return mProfile->recommendedMuteDurationMs;
+}
+
+void SwAudioOutputDescriptor::setTracksInvalidatedStatusByStrategy(product_strategy_t strategy) {
+    for (const auto &client : getClientIterable()) {
+        if (strategy == client->strategy()) {
+            client->setIsInvalid();
+        }
+    }
+}
+
 // HwAudioOutputDescriptor implementation
 HwAudioOutputDescriptor::HwAudioOutputDescriptor(const sp<SourceClientDescriptor>& source,
                                                  AudioPolicyClientInterface *clientInterface)
@@ -711,11 +736,11 @@ HwAudioOutputDescriptor::HwAudioOutputDescriptor(const sp<SourceClientDescriptor
 {
 }
 
-void HwAudioOutputDescriptor::dump(String8 *dst) const
+void HwAudioOutputDescriptor::dump(String8 *dst, int spaces, const char* extraInfo) const
 {
-    AudioOutputDescriptor::dump(dst);
-    dst->append("Source:\n");
-    mSource->dump(dst, 0, 0);
+    AudioOutputDescriptor::dump(dst, spaces, extraInfo);
+    dst->appendFormat("%*sSource:\n", spaces, "");
+    mSource->dump(dst, spaces);
 }
 
 void HwAudioOutputDescriptor::toAudioPortConfig(
@@ -810,6 +835,16 @@ bool SwAudioOutputCollection::isStrategyActiveOnSameModule(product_strategy_t ps
     return false;
 }
 
+bool SwAudioOutputCollection::isStrategyActive(product_strategy_t ps) const
+{
+    for (size_t i = 0; i < size(); i++) {
+        if (valueAt(i)->isStrategyActive(ps)) {
+            return true;
+        }
+    }
+    return false;
+}
+
 audio_io_handle_t SwAudioOutputCollection::getA2dpOutput() const
 {
     for (size_t i = 0; i < size(); i++) {
@@ -885,13 +920,25 @@ void SwAudioOutputCollection::clearSessionRoutesForDevice(
         }
     }
 }
+bool SwAudioOutputCollection::isAnyDeviceTypeActive(const DeviceTypeSet& deviceTypes) const {
+    for (size_t i = 0; i < size(); i++) {
+        const sp<SwAudioOutputDescriptor> outputDesc = valueAt(i);
+        if (outputDesc->isActive()
+                && outputDesc->devices().containsDeviceAmongTypes(deviceTypes)) {
+            return true;
+        }
+    }
+    return false;
+}
 
 void SwAudioOutputCollection::dump(String8 *dst) const
 {
-    dst->append("\nOutputs dump:\n");
+    dst->appendFormat("\n Outputs (%zu):\n", size());
     for (size_t i = 0; i < size(); i++) {
-        dst->appendFormat("- Output %d dump:\n", keyAt(i));
-        valueAt(i)->dump(dst);
+        const std::string prefix = base::StringPrintf("  %zu. ", i + 1);
+        const std::string extraInfo = base::StringPrintf("I/O handle: %d", keyAt(i));
+        dst->appendFormat("%s", prefix.c_str());
+        valueAt(i)->dump(dst, prefix.size(), extraInfo.c_str());
     }
 }
 
@@ -910,10 +957,12 @@ bool HwAudioOutputCollection::isActive(VolumeSource volumeSource, uint32_t inPas
 
 void HwAudioOutputCollection::dump(String8 *dst) const
 {
-    dst->append("\nOutputs dump:\n");
+    dst->appendFormat("\n Outputs (%zu):\n", size());
     for (size_t i = 0; i < size(); i++) {
-        dst->appendFormat("- Output %d dump:\n", keyAt(i));
-        valueAt(i)->dump(dst);
+        const std::string prefix = base::StringPrintf("  %zu. ", i + 1);
+        const std::string extraInfo = base::StringPrintf("I/O handle: %d", keyAt(i));
+        dst->appendFormat("%s", prefix.c_str());
+        valueAt(i)->dump(dst, prefix.size(), extraInfo.c_str());
     }
 }
 

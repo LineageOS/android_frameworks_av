@@ -17,38 +17,40 @@
 #ifndef ANDROID_MEDIA_TUNERFTIMEFILTER_H
 #define ANDROID_MEDIA_TUNERFTIMEFILTER_H
 
+#include <aidl/android/hardware/tv/tuner/ITimeFilter.h>
 #include <aidl/android/media/tv/tuner/BnTunerTimeFilter.h>
-#include <android/hardware/tv/tuner/1.0/ITimeFilter.h>
-#include <android/hardware/tv/tuner/1.1/types.h>
-#include <media/stagefright/foundation/ADebug.h>
 #include <utils/Log.h>
 
-using Status = ::ndk::ScopedAStatus;
-using ::aidl::android::media::tv::tuner::BnTunerTimeFilter;
-using ::android::hardware::Return;
-using ::android::hardware::Void;
-using ::android::hardware::hidl_vec;
-using ::android::hardware::tv::tuner::V1_0::ITimeFilter;
+using ::aidl::android::hardware::tv::tuner::ITimeFilter;
 
 using namespace std;
 
+namespace aidl {
 namespace android {
+namespace media {
+namespace tv {
+namespace tuner {
 
 class TunerTimeFilter : public BnTunerTimeFilter {
 
 public:
-    TunerTimeFilter(sp<ITimeFilter> timeFilter);
+    TunerTimeFilter(shared_ptr<ITimeFilter> timeFilter);
     virtual ~TunerTimeFilter();
-    Status setTimeStamp(int64_t timeStamp) override;
-    Status clearTimeStamp() override;
-    Status getSourceTime(int64_t* _aidl_return) override;
-    Status getTimeStamp(int64_t* _aidl_return) override;
-    Status close() override;
+
+    ::ndk::ScopedAStatus setTimeStamp(int64_t in_timeStamp) override;
+    ::ndk::ScopedAStatus clearTimeStamp() override;
+    ::ndk::ScopedAStatus getSourceTime(int64_t* _aidl_return) override;
+    ::ndk::ScopedAStatus getTimeStamp(int64_t* _aidl_return) override;
+    ::ndk::ScopedAStatus close() override;
 
 private:
-    sp<ITimeFilter> mTimeFilter;
+    shared_ptr<ITimeFilter> mTimeFilter;
 };
 
-} // namespace android
+}  // namespace tuner
+}  // namespace tv
+}  // namespace media
+}  // namespace android
+}  // namespace aidl
 
 #endif // ANDROID_MEDIA_TUNERFTIMEFILTER_H

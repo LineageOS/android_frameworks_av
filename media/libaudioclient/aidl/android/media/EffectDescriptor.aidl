@@ -16,7 +16,7 @@
 
 package android.media;
 
-import android.media.AudioUuid;
+import android.media.audio.common.AudioUuid;
 
 /**
  * {@hide}

@@ -15,25 +15,25 @@
  */
 
 #include <algorithm>
-#include <stdint.h>
+#include <unistd.h>
 
-#ifdef __ANDROID__
+#include "FlowGraphNode.h"
+#include "SourceI24.h"
+
+#if FLOWGRAPH_ANDROID_INTERNAL
 #include <audio_utils/primitives.h>
 #endif
 
-#include "AudioProcessorBase.h"
-#include "SourceI24.h"
-
-using namespace flowgraph;
+using namespace FLOWGRAPH_OUTER_NAMESPACE::flowgraph;
 
 constexpr int kBytesPerI24Packed = 3;
 
 SourceI24::SourceI24(int32_t channelCount)
-        : AudioSource(channelCount) {
+        : FlowGraphSourceBuffered(channelCount) {
 }
 
-int32_t SourceI24::onProcess(int64_t framePosition, int32_t numFrames) {
-    float *floatData = output.getBlock();
+int32_t SourceI24::onProcess(int32_t numFrames) {
+    float *floatData = output.getBuffer();
     int32_t channelCount = output.getSamplesPerFrame();
 
     int32_t framesLeft = mSizeInFrames - mFrameIndex;
@@ -43,7 +43,7 @@ int32_t SourceI24::onProcess(int64_t framePosition, int32_t numFrames) {
     const uint8_t *byteBase = (uint8_t *) mData;
     const uint8_t *byteData = &byteBase[mFrameIndex * channelCount * kBytesPerI24Packed];
 
-#ifdef __ANDROID__
+#if FLOWGRAPH_ANDROID_INTERNAL
     memcpy_to_float_from_p24(floatData, byteData, numSamples);
 #else
     static const float scale = 1. / (float)(1UL << 31);

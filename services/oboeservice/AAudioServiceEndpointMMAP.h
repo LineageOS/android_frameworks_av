@@ -64,6 +64,10 @@ public:
 
     aaudio_result_t stopClient(audio_port_handle_t clientHandle)  override;
 
+    aaudio_result_t standby() override;
+
+    aaudio_result_t exitStandby(AudioEndpointParcelable* parcelable) override;
+
     aaudio_result_t getFreeRunningPosition(int64_t *positionFrames, int64_t *timeNanos) override;
 
     aaudio_result_t getTimestamp(int64_t *positionFrames, int64_t *timeNanos) override;
@@ -79,7 +83,7 @@ public:
     void onRoutingChanged(audio_port_handle_t portHandle) override;
     // ------------------------------------------------------------------------------
 
-    aaudio_result_t getDownDataDescription(AudioEndpointParcelable &parcelable);
+    aaudio_result_t getDownDataDescription(AudioEndpointParcelable* parcelable);
 
     int64_t getHardwareTimeOffsetNanos() const {
         return mHardwareTimeOffsetNanos;
@@ -90,6 +94,8 @@ public:
 private:
 
     aaudio_result_t openWithFormat(audio_format_t audioFormat);
+
+    aaudio_result_t createMmapBuffer(android::base::unique_fd* fileDescriptor);
 
     MonotonicCounter                          mFramesTransferred;
 
@@ -106,7 +112,12 @@ private:
 
     int64_t                                   mHardwareTimeOffsetNanos = 0; // TODO get from HAL
 
-    bool                                      mExternalPositionSupported = true;
+    aaudio_result_t                           mHalExternalPositionStatus = AAUDIO_OK;
+    uint64_t                                  mLastPositionFrames = 0;
+    int64_t                                   mTimestampNanosForLastPosition = 0;
+    int32_t                                   mTimestampGracePeriodMs;
+    int32_t                                   mFrozenPositionCount = 0;
+    int32_t                                   mFrozenTimestampCount = 0;
 
 };
 

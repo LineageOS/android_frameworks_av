@@ -115,11 +115,9 @@ have a positive Z.
 #### World
 
 It is sometimes convenient to use an intermediate frame when dealing with
-head-to-screen transforms. The “world” frame is an arbitrary frame of reference
-in the physical world, relative to which we can measure the head pose and screen
-pose. In (very common) cases when we can’t establish such an absolute frame, we
-can take each measurement relative to a separate, arbitrary frame and high-pass
-the result.
+head-to-screen transforms. The “world” frame is a frame of reference in the
+physical world, relative to which we can measure the head pose and screen pose.
+It is arbitrary, but expected to be stable (fixed).
 
 ## Processing Description
 
@@ -133,15 +131,10 @@ the outputs.
 The Predictor block gets pose + twist (pose derivative) and extrapolates to
 obtain a predicted head pose (w/ given latency).
 
-### Drift / Bias Compensator
+### Bias
 
-The Drift / Bias Compensator blocks serve two purposes:
-
-- Compensate for floating reference axes by applying a high-pass filter, which
-  slowly pulls the pose toward identity.
-- Establish the reference frame for the poses by having the ability to set the
-  current pose as the reference for future poses (recentering). Effectively,
-  this is resetting the filter state to identity.
+The Bias blocks establish the reference frame for the poses by having the
+ability to set the current pose as the reference for future poses (recentering).
 
 ### Orientation Compensation
 
@@ -157,6 +150,14 @@ and estimates the pose of the head relative to the screen. Optionally, this
 module may indicate that the user is likely not in front of the screen via the
 “valid” output.
 
+### Stillness Detector
+
+The stillness detector blocks detect when their incoming pose stream has been
+stable for a given amount of time (allowing for a configurable amount of error).
+When the head is considered still, we would trigger a recenter operation
+(“auto-recentering”) and when the screen is considered not still, the mode
+selector would use this information to force static mode.
+
 ### Mode Selector
 
 The Mode Selector block aggregates the various sources of pose information into
@@ -168,7 +169,8 @@ The actual mode may diverge from the desired mode. It is determined as follows:
 
 - If the desired mode is static, the actual mode is static.
 - If the desired mode is world-relative:
-    - If head poses are fresh, the actual mode is world-relative.
+    - If head and screen poses are fresh and the screen is stable (stillness
+      detector output is true), the actual mode is world-relative.
     - Otherwise the actual mode is static.
 - If the desired mode is screen-relative:
     - If head and screen poses are fresh and the ‘valid’ signal is asserted, the

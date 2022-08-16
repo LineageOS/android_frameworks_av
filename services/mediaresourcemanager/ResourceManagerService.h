@@ -77,26 +77,19 @@ public:
             int /*fd*/, const char** /*args*/, uint32_t /*numArgs*/);
 
     ResourceManagerService();
-    explicit ResourceManagerService(
-            const sp<ProcessInfoInterface> &processInfo,
+    explicit ResourceManagerService(const sp<ProcessInfoInterface> &processInfo,
             const sp<SystemCallbackInterface> &systemResource);
     virtual ~ResourceManagerService();
-    void setObserverService(
-            const std::shared_ptr<ResourceObserverService>& observerService);
+    void setObserverService(const std::shared_ptr<ResourceObserverService>& observerService);
 
     // IResourceManagerService interface
     Status config(const std::vector<MediaResourcePolicyParcel>& policies) override;
 
-    Status addResource(
-            int32_t pid,
-            int32_t uid,
-            int64_t clientId,
+    Status addResource(int32_t pid, int32_t uid, int64_t clientId,
             const std::shared_ptr<IResourceManagerClient>& client,
             const std::vector<MediaResourceParcel>& resources) override;
 
-    Status removeResource(
-            int32_t pid,
-            int64_t clientId,
+    Status removeResource(int32_t pid, int64_t clientId,
             const std::vector<MediaResourceParcel>& resources) override;
 
     Status removeClient(int32_t pid, int64_t clientId) override;
@@ -104,20 +97,13 @@ public:
     // Tries to reclaim resource from processes with lower priority than the calling process
     // according to the requested resources.
     // Returns true if any resource has been reclaimed, otherwise returns false.
-    Status reclaimResource(
-            int32_t callingPid,
-            const std::vector<MediaResourceParcel>& resources,
+    Status reclaimResource(int32_t callingPid, const std::vector<MediaResourceParcel>& resources,
             bool* _aidl_return) override;
 
-    Status overridePid(
-            int originalPid,
-            int newPid) override;
+    Status overridePid(int originalPid, int newPid) override;
 
-    Status overrideProcessInfo(
-            const std::shared_ptr<IResourceManagerClient>& client,
-            int pid,
-            int procState,
-            int oomScore) override;
+    Status overrideProcessInfo(const std::shared_ptr<IResourceManagerClient>& client, int pid,
+            int procState, int oomScore) override;
 
     Status markClientForPendingRemoval(int32_t pid, int64_t clientId) override;
 
@@ -132,30 +118,34 @@ private:
 
     // Reclaims resources from |clients|. Returns true if reclaim succeeded
     // for all clients.
-    bool reclaimInternal(
-            const Vector<std::shared_ptr<IResourceManagerClient>> &clients);
+    bool reclaimUnconditionallyFrom(const Vector<std::shared_ptr<IResourceManagerClient>> &clients);
 
     // Gets the list of all the clients who own the specified resource type.
     // Returns false if any client belongs to a process with higher priority than the
     // calling process. The clients will remain unchanged if returns false.
-    bool getAllClients_l(int callingPid, MediaResource::Type type,
+    bool getAllClients_l(int callingPid, MediaResource::Type type, MediaResource::SubType subType,
             Vector<std::shared_ptr<IResourceManagerClient>> *clients);
 
     // Gets the client who owns specified resource type from lowest possible priority process.
     // Returns false if the calling process priority is not higher than the lowest process
     // priority. The client will remain unchanged if returns false.
     bool getLowestPriorityBiggestClient_l(int callingPid, MediaResource::Type type,
-            std::shared_ptr<IResourceManagerClient> *client);
+            MediaResource::SubType subType, std::shared_ptr<IResourceManagerClient> *client);
 
     // Gets lowest priority process that has the specified resource type.
     // Returns false if failed. The output parameters will remain unchanged if failed.
-    bool getLowestPriorityPid_l(MediaResource::Type type, int *pid, int *priority);
+    bool getLowestPriorityPid_l(MediaResource::Type type, MediaResource::SubType subType, int *pid,
+                int *priority);
 
     // Gets the client who owns biggest piece of specified resource type from pid.
-    // Returns false if failed. The client will remain unchanged if failed.
-    bool getBiggestClient_l(int pid, MediaResource::Type type,
+    // Returns false with no change to client if there are no clients holdiing resources of thisi
+    // type.
+    bool getBiggestClient_l(int pid, MediaResource::Type type, MediaResource::SubType subType,
             std::shared_ptr<IResourceManagerClient> *client,
             bool pendingRemovalOnly = false);
+    // Same method as above, but with pendingRemovalOnly as true.
+    bool getBiggestClientPendingRemoval_l(int pid, MediaResource::Type type,
+            MediaResource::SubType subType, std::shared_ptr<IResourceManagerClient> *client);
 
     bool isCallingPriorityHigher_l(int callingPid, int pid);
 
@@ -176,8 +166,10 @@ private:
     void removeProcessInfoOverride(int pid);
 
     void removeProcessInfoOverride_l(int pid);
-    uintptr_t addCookieAndLink_l(::ndk::SpAIBinder binder, const sp<DeathNotifier>& notifier);
-    void removeCookieAndUnlink_l(::ndk::SpAIBinder binder, uintptr_t cookie);
+    uintptr_t addCookieAndLink_l(const std::shared_ptr<IResourceManagerClient>& client,
+                                 const sp<DeathNotifier>& notifier);
+    void removeCookieAndUnlink_l(const std::shared_ptr<IResourceManagerClient>& client,
+                                 uintptr_t cookie);
 
     mutable Mutex mLock;
     sp<ProcessInfoInterface> mProcessInfo;

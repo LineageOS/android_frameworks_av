@@ -93,13 +93,21 @@ public:
     virtual status_t flush();
     virtual status_t standby();
 
+    // Avoid suppressing retrograde motion in mRenderPosition for gapless offload/direct when
+    // transitioning between tracks.
+    // The HAL resets the frame position without flush/stop being called, but calls back prior to
+    // this event. So, on the next occurrence of retrograde motion, we permit backwards movement of
+    // mRenderPosition.
+    virtual void presentationComplete() { mExpectRetrograde = true; }
+
 protected:
     uint64_t             mFramesWritten; // reset by flush
     uint64_t             mFramesWrittenAtStandby;
-    uint64_t             mRenderPosition; // reset by flush or standby
+    uint64_t             mRenderPosition; // reset by flush, standby, or presentation complete
     int                  mRateMultiplier;
     bool                 mHalFormatHasProportionalFrames;
     size_t               mHalFrameSize;
+    bool                 mExpectRetrograde; // see presentationComplete
 };
 
 } // namespace android

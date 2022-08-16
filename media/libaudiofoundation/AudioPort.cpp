@@ -18,12 +18,27 @@
 #include <algorithm>
 #include <utility>
 
-#include <android/media/ExtraAudioDescriptor.h>
 #include <android-base/stringprintf.h>
 #include <media/AudioPort.h>
 #include <utils/Log.h>
 
 namespace android {
+
+void AudioPort::setFlags(uint32_t flags)
+{
+    // force direct flag if offload flag is set: offloading implies a direct output stream
+    // and all common behaviors are driven by checking only the direct flag
+    // this should normally be set appropriately in the policy configuration file
+    if (mRole == AUDIO_PORT_ROLE_SOURCE &&
+            (flags & AUDIO_OUTPUT_FLAG_COMPRESS_OFFLOAD) != 0) {
+        flags |= AUDIO_OUTPUT_FLAG_DIRECT;
+    }
+    if (useInputChannelMask()) {
+        mFlags.input = static_cast<audio_input_flags_t>(flags);
+    } else {
+        mFlags.output = static_cast<audio_output_flags_t>(flags);
+    }
+}
 
 void AudioPort::importAudioPort(const sp<AudioPort>& port, bool force __unused)
 {
@@ -147,9 +162,16 @@ void AudioPort::toAudioPort(struct audio_port_v7 *port) const {
     }
 }
 
-void AudioPort::dump(std::string *dst, int spaces, bool verbose) const {
+void AudioPort::dump(std::string *dst, int spaces, const char* extraInfo, bool verbose) const {
     if (!mName.empty()) {
-        dst->append(base::StringPrintf("%*s- name: %s\n", spaces, "", mName.c_str()));
+        dst->append(base::StringPrintf("\"%s\"%s", mName.c_str(),
+                        extraInfo != nullptr ? "; " : ""));
+    }
+    if (extraInfo != nullptr) {
+        dst->append(base::StringPrintf("%s", extraInfo));
+    }
+    if (!mName.empty() || extraInfo != nullptr) {
+        dst->append("\n");
     }
     if (verbose) {
         std::string profilesStr;
@@ -196,39 +218,59 @@ bool AudioPort::equals(const sp<AudioPort> &other) const
            mType == other->getType() &&
            mRole == other->getRole() &&
            mProfiles.equals(other->getAudioProfiles()) &&
+           getFlags() == other->getFlags() &&
            mExtraAudioDescriptors == other->getExtraAudioDescriptors();
 }
 
-status_t AudioPort::writeToParcel(Parcel *parcel) const
-{
-    media::AudioPort parcelable;
-    return writeToParcelable(&parcelable)
-        ?: parcelable.writeToParcel(parcel);
-}
-
 status_t AudioPort::writeToParcelable(media::AudioPort* parcelable) const {
-    parcelable->name = mName;
-    parcelable->type = VALUE_OR_RETURN_STATUS(legacy2aidl_audio_port_type_t_AudioPortType(mType));
-    parcelable->role = VALUE_OR_RETURN_STATUS(legacy2aidl_audio_port_role_t_AudioPortRole(mRole));
-    parcelable->profiles = VALUE_OR_RETURN_STATUS(legacy2aidl_AudioProfileVector(mProfiles));
-    parcelable->extraAudioDescriptors = mExtraAudioDescriptors;
-    parcelable->gains = VALUE_OR_RETURN_STATUS(legacy2aidl_AudioGains(mGains));
+    parcelable->hal.name = mName;
+    parcelable->sys.type = VALUE_OR_RETURN_STATUS(
+            legacy2aidl_audio_port_type_t_AudioPortType(mType));
+    parcelable->sys.role = VALUE_OR_RETURN_STATUS(
+            legacy2aidl_audio_port_role_t_AudioPortRole(mRole));
+    auto aidlProfiles = VALUE_OR_RETURN_STATUS(
+            legacy2aidl_AudioProfileVector(mProfiles, useInputChannelMask()));
+    parcelable->hal.profiles = aidlProfiles.first;
+    parcelable->sys.profiles = aidlProfiles.second;
+    parcelable->hal.flags = VALUE_OR_RETURN_STATUS(
+            legacy2aidl_audio_io_flags_AudioIoFlags(mFlags, useInputChannelMask()));
+    parcelable->hal.extraAudioDescriptors = mExtraAudioDescriptors;
+    auto aidlGains = VALUE_OR_RETURN_STATUS(legacy2aidl_AudioGains(mGains));
+    parcelable->hal.gains = aidlGains.first;
+    parcelable->sys.gains = aidlGains.second;
+    if (mType == AUDIO_PORT_TYPE_MIX) {
+        media::audio::common::AudioPortMixExt mixExt{};
+        mixExt.maxOpenStreamCount = maxOpenCount;
+        mixExt.maxActiveStreamCount = maxActiveCount;
+        mixExt.recommendedMuteDurationMs = recommendedMuteDurationMs;
+        parcelable->hal.ext = media::audio::common::AudioPortExt::make<
+                media::audio::common::AudioPortExt::mix>(mixExt);
+    }
     return OK;
 }
 
-status_t AudioPort::readFromParcel(const Parcel *parcel) {
-    media::AudioPort parcelable;
-    return parcelable.readFromParcel(parcel)
-        ?: readFromParcelable(parcelable);
-}
-
 status_t AudioPort::readFromParcelable(const media::AudioPort& parcelable) {
-    mName = parcelable.name;
-    mType = VALUE_OR_RETURN_STATUS(aidl2legacy_AudioPortType_audio_port_type_t(parcelable.type));
-    mRole = VALUE_OR_RETURN_STATUS(aidl2legacy_AudioPortRole_audio_port_role_t(parcelable.role));
-    mProfiles = VALUE_OR_RETURN_STATUS(aidl2legacy_AudioProfileVector(parcelable.profiles));
-    mExtraAudioDescriptors = parcelable.extraAudioDescriptors;
-    mGains = VALUE_OR_RETURN_STATUS(aidl2legacy_AudioGains(parcelable.gains));
+    mName = parcelable.hal.name;
+    mType = VALUE_OR_RETURN_STATUS(
+            aidl2legacy_AudioPortType_audio_port_type_t(parcelable.sys.type));
+    mRole = VALUE_OR_RETURN_STATUS(
+            aidl2legacy_AudioPortRole_audio_port_role_t(parcelable.sys.role));
+    mProfiles = VALUE_OR_RETURN_STATUS(
+            aidl2legacy_AudioProfileVector(
+                    std::make_pair(parcelable.hal.profiles, parcelable.sys.profiles),
+                    useInputChannelMask()));
+    mFlags = VALUE_OR_RETURN_STATUS(
+            aidl2legacy_AudioIoFlags_audio_io_flags(parcelable.hal.flags, useInputChannelMask()));
+    mExtraAudioDescriptors = parcelable.hal.extraAudioDescriptors;
+    mGains = VALUE_OR_RETURN_STATUS(
+            aidl2legacy_AudioGains(std::make_pair(parcelable.hal.gains, parcelable.sys.gains)));
+    if (mType == AUDIO_PORT_TYPE_MIX) {
+        const media::audio::common::AudioPortMixExt& mixExt =
+                parcelable.hal.ext.get<media::audio::common::AudioPortExt::mix>();
+        maxOpenCount = mixExt.maxOpenStreamCount;
+        maxActiveCount = mixExt.maxActiveStreamCount;
+        recommendedMuteDurationMs = mixExt.recommendedMuteDurationMs;
+    }
     return OK;
 }
 
@@ -249,6 +291,9 @@ status_t AudioPortConfig::applyAudioPortConfig(
     }
     if (config->config_mask & AUDIO_PORT_CONFIG_GAIN) {
         mGain = config->gain;
+    }
+    if (config->config_mask & AUDIO_PORT_CONFIG_FLAGS) {
+        mFlags = config->flags;
     }
 
     return NO_ERROR;
@@ -303,6 +348,9 @@ void AudioPortConfig::toAudioPortConfig(
     } else {
         dstConfig->config_mask &= ~AUDIO_PORT_CONFIG_GAIN;
     }
+
+    updateField(mFlags, &audio_port_config::flags,
+            dstConfig, srcConfig, AUDIO_PORT_CONFIG_FLAGS, { AUDIO_INPUT_FLAG_NONE });
 }
 
 bool AudioPortConfig::hasGainController(bool canUseForVolume) const
@@ -315,12 +363,14 @@ bool AudioPortConfig::hasGainController(bool canUseForVolume) const
                            : audioport->getGains().size() > 0;
 }
 
-bool AudioPortConfig::equals(const sp<AudioPortConfig> &other) const
+bool AudioPortConfig::equals(const sp<AudioPortConfig> &other, bool isInput) const
 {
     return other != nullptr &&
            mSamplingRate == other->getSamplingRate() &&
            mFormat == other->getFormat() &&
            mChannelMask == other->getChannelMask() &&
+           (isInput ? mFlags.input == other->getFlags().input :
+                   mFlags.output == other->getFlags().output )&&
            // Compare audio gain config
            mGain.index == other->mGain.index &&
            mGain.mode == other->mGain.mode &&
@@ -330,54 +380,47 @@ bool AudioPortConfig::equals(const sp<AudioPortConfig> &other) const
            mGain.ramp_duration_ms == other->mGain.ramp_duration_ms;
 }
 
-status_t AudioPortConfig::writeToParcel(Parcel *parcel) const {
-    media::AudioPortConfig parcelable;
-    return writeToParcelable(&parcelable)
-        ?: parcelable.writeToParcel(parcel);
-}
-
-status_t AudioPortConfig::writeToParcelable(media::AudioPortConfig* parcelable) const {
-    parcelable->sampleRate = VALUE_OR_RETURN_STATUS(convertIntegral<int32_t>(mSamplingRate));
-    parcelable->format = VALUE_OR_RETURN_STATUS(legacy2aidl_audio_format_t_AudioFormat(mFormat));
+status_t AudioPortConfig::writeToParcelable(
+        media::audio::common::AudioPortConfig* parcelable, bool isInput) const {
+    media::audio::common::Int aidl_sampleRate;
+    aidl_sampleRate.value = VALUE_OR_RETURN_STATUS(convertIntegral<int32_t>(mSamplingRate));
+    parcelable->sampleRate = aidl_sampleRate;
+    parcelable->format = VALUE_OR_RETURN_STATUS(
+            legacy2aidl_audio_format_t_AudioFormatDescription(mFormat));
     parcelable->channelMask = VALUE_OR_RETURN_STATUS(
-            legacy2aidl_audio_channel_mask_t_int32_t(mChannelMask));
+            legacy2aidl_audio_channel_mask_t_AudioChannelLayout(mChannelMask, isInput));
     parcelable->id = VALUE_OR_RETURN_STATUS(legacy2aidl_audio_port_handle_t_int32_t(mId));
-    parcelable->gain.index = VALUE_OR_RETURN_STATUS(convertIntegral<int32_t>(mGain.index));
-    parcelable->gain.mode = VALUE_OR_RETURN_STATUS(
-            legacy2aidl_audio_gain_mode_t_int32_t_mask(mGain.mode));
-    parcelable->gain.channelMask = VALUE_OR_RETURN_STATUS(
-            legacy2aidl_audio_channel_mask_t_int32_t(mGain.channel_mask));
-    parcelable->gain.rampDurationMs = VALUE_OR_RETURN_STATUS(
-            convertIntegral<int32_t>(mGain.ramp_duration_ms));
-    parcelable->gain.values = VALUE_OR_RETURN_STATUS(convertContainer<std::vector<int32_t>>(
-            mGain.values, convertIntegral<int32_t, int>));
+    media::audio::common::AudioGainConfig aidl_gain = VALUE_OR_RETURN_STATUS(
+            legacy2aidl_audio_gain_config_AudioGainConfig(mGain, isInput));
+    parcelable->gain = aidl_gain;
+    parcelable->flags = VALUE_OR_RETURN_STATUS(
+            legacy2aidl_audio_io_flags_AudioIoFlags(mFlags, isInput));
     return OK;
 }
 
-status_t AudioPortConfig::readFromParcel(const Parcel *parcel) {
-    media::AudioPortConfig parcelable;
-    return parcelable.readFromParcel(parcel)
-        ?: readFromParcelable(parcelable);
-}
-
-status_t AudioPortConfig::readFromParcelable(const media::AudioPortConfig& parcelable) {
-    mSamplingRate = VALUE_OR_RETURN_STATUS(convertIntegral<unsigned int>(parcelable.sampleRate));
-    mFormat = VALUE_OR_RETURN_STATUS(aidl2legacy_AudioFormat_audio_format_t(parcelable.format));
-    mChannelMask = VALUE_OR_RETURN_STATUS(
-            aidl2legacy_int32_t_audio_channel_mask_t(parcelable.channelMask));
-    mId = VALUE_OR_RETURN_STATUS(aidl2legacy_int32_t_audio_port_handle_t(parcelable.id));
-    mGain.index = VALUE_OR_RETURN_STATUS(convertIntegral<int>(parcelable.gain.index));
-    mGain.mode = VALUE_OR_RETURN_STATUS(
-            aidl2legacy_int32_t_audio_gain_mode_t_mask(parcelable.gain.mode));
-    mGain.channel_mask = VALUE_OR_RETURN_STATUS(
-            aidl2legacy_int32_t_audio_channel_mask_t(parcelable.gain.channelMask));
-    mGain.ramp_duration_ms = VALUE_OR_RETURN_STATUS(
-            convertIntegral<unsigned int>(parcelable.gain.rampDurationMs));
-    if (parcelable.gain.values.size() > std::size(mGain.values)) {
-        return BAD_VALUE;
+status_t AudioPortConfig::readFromParcelable(
+        const media::audio::common::AudioPortConfig& parcelable, bool isInput) {
+    if (parcelable.sampleRate.has_value()) {
+        mSamplingRate = VALUE_OR_RETURN_STATUS(
+                convertIntegral<unsigned int>(parcelable.sampleRate.value().value));
     }
-    for (size_t i = 0; i < parcelable.gain.values.size(); ++i) {
-        mGain.values[i] = VALUE_OR_RETURN_STATUS(convertIntegral<int>(parcelable.gain.values[i]));
+    if (parcelable.format.has_value()) {
+        mFormat = VALUE_OR_RETURN_STATUS(
+                aidl2legacy_AudioFormatDescription_audio_format_t(parcelable.format.value()));
+    }
+    if (parcelable.channelMask.has_value()) {
+        mChannelMask = VALUE_OR_RETURN_STATUS(
+                aidl2legacy_AudioChannelLayout_audio_channel_mask_t(
+                        parcelable.channelMask.value(), isInput));
+    }
+    mId = VALUE_OR_RETURN_STATUS(aidl2legacy_int32_t_audio_port_handle_t(parcelable.id));
+    if (parcelable.gain.has_value()) {
+        mGain = VALUE_OR_RETURN_STATUS(
+                aidl2legacy_AudioGainConfig_audio_gain_config(parcelable.gain.value(), isInput));
+    }
+    if (parcelable.flags.has_value()) {
+        mFlags = VALUE_OR_RETURN_STATUS(
+                aidl2legacy_AudioIoFlags_audio_io_flags(parcelable.flags.value(), isInput));
     }
     return OK;
 }

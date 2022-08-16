@@ -32,9 +32,6 @@ cc_defaults {
         "liblog",
         "media_permission-aidl-cpp",
     ],
-    include_dirs: [
-        "frameworks/av/media/libstagefright",
-    ],
 }
 
 cc_fuzz {
@@ -74,6 +71,7 @@ cc_fuzz {
     srcs: [
         "FrameDecoderFuzzer.cpp",
     ],
+    corpus: ["corpus/*"],
     defaults: ["libstagefright_fuzzer_defaults"],
 }
 
@@ -85,6 +83,9 @@ cc_fuzz {
     ],
     dictionary: "dictionaries/formats.dict",
     defaults: ["libstagefright_fuzzer_defaults"],
+    header_libs: [
+        "libstagefright_webm_headers",
+    ],
     static_libs: [
         "libdatasource",
     ],

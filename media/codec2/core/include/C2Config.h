@@ -79,6 +79,7 @@ struct C2Config {
 
 struct C2PlatformConfig {
     enum encoding_quality_level_t : uint32_t; ///< encoding quality level
+    enum tunnel_peek_mode_t: uint32_t;      ///< tunnel peek mode
 };
 
 namespace {
@@ -277,6 +278,12 @@ enum C2ParamIndexKind : C2Param::type_index_t {
 
     // encoding statistics, average block qp of a frame
     kParamIndexAverageBlockQuantization, // int32
+
+    // channel mask for decoded audio
+    kParamIndexAndroidChannelMask, // uint32
+
+    // allow tunnel peek behavior to be unspecified for app compatibility
+    kParamIndexTunnelPeekMode, // tunnel mode, enum
 };
 
 }
@@ -2009,6 +2016,14 @@ constexpr char C2_PARAMKEY_MAX_CHANNEL_COUNT[] = "raw.max-channel-count";
 constexpr char C2_PARAMKEY_MAX_CODED_CHANNEL_COUNT[] = "coded.max-channel-count";
 
 /**
+ * Audio channel mask. Used by decoder to express audio channel mask of decoded content.
+ * Channel representation is specified according to the Java android.media.AudioFormat
+ * CHANNEL_OUT_* constants.
+ */
+ typedef C2StreamParam<C2Info, C2Uint32Value, kParamIndexAndroidChannelMask> C2StreamChannelMaskInfo;
+ const char C2_PARAMKEY_CHANNEL_MASK[] = "raw.channel-mask";
+
+/**
  * Audio sample format (PCM encoding)
  */
 C2ENUM(C2Config::pcm_encoding_t, uint32_t,
@@ -2470,6 +2485,28 @@ constexpr char C2_PARAMKEY_TUNNEL_HOLD_RENDER[] = "output.tunnel-hold-render";
 typedef C2StreamParam<C2Info, C2EasyBoolValue, kParamIndexTunnelStartRender>
         C2StreamTunnelStartRender;
 constexpr char C2_PARAMKEY_TUNNEL_START_RENDER[] = "output.tunnel-start-render";
+
+/** Tunnel Peek Mode. */
+C2ENUM(C2PlatformConfig::tunnel_peek_mode_t, uint32_t,
+    UNSPECIFIED_PEEK = 0,
+    SPECIFIED_PEEK = 1
+);
+
+/**
+ * Tunnel Peek Mode Tuning parameter.
+ *
+ * If set to UNSPECIFIED_PEEK_MODE, the decoder is free to ignore the
+ * C2StreamTunnelHoldRender and C2StreamTunnelStartRender flags and associated
+ * features. Additionally, it becomes up to the decoder to display any frame
+ * before receiving synchronization information.
+ *
+ * Note: This parameter allows a decoder to ignore the video peek machinery and
+ * to revert to its preferred behavior.
+ */
+typedef C2StreamParam<C2Tuning, C2EasyEnum<C2PlatformConfig::tunnel_peek_mode_t>,
+        kParamIndexTunnelPeekMode> C2StreamTunnelPeekModeTuning;
+constexpr char C2_PARAMKEY_TUNNEL_PEEK_MODE[] =
+        "output.tunnel-peek-mode";
 
 /**
  * Encoding quality level signaling.

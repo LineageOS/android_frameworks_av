@@ -60,7 +60,8 @@ std::string AAudioServiceEndpoint::dump() const NO_THREAD_SAFETY_ANALYSIS {
     result << "    Sample Rate:          " << getSampleRate() << "\n";
     result << "    Channel Count:        " << getSamplesPerFrame() << "\n";
     result << "    Channel Mask:         0x" << std::hex << getChannelMask() << std::dec << "\n";
-    result << "    Format:               " << getFormat() << "\n";
+    result << "    Format:               " << getFormat()
+                                           << " (" << audio_format_to_string(getFormat()) << ")\n";
     result << "    Frames Per Burst:     " << mFramesPerBurst << "\n";
     result << "    Usage:                " << getUsage() << "\n";
     result << "    ContentType:          " << getContentType() << "\n";
