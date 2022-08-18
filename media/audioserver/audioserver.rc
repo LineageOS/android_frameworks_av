@@ -8,6 +8,7 @@ service audioserver /system/bin/audioserver
     task_profiles ProcessCapacityHigh HighPerformance
     onrestart restart vendor.audio-hal
     onrestart restart vendor.audio-hal-aidl
+    onrestart restart vendor.audio-effect-hal-aidl
     onrestart restart vendor.audio-hal-4-0-msd
     onrestart restart audio_proxy_service
 
@@ -19,6 +20,7 @@ on property:vts.native_server.on=0
 on property:init.svc.audioserver=stopped
     stop vendor.audio-hal
     stop vendor.audio-hal-aidl
+    stop vendor.audio-effect-hal-aidl
     stop vendor.audio-hal-4-0-msd
     stop audio_proxy_service
     # See b/155364397. Need to have HAL service running for VTS.
@@ -26,12 +28,14 @@ on property:init.svc.audioserver=stopped
     # audioserver bringing it back into running state.
     start vendor.audio-hal
     start vendor.audio-hal-aidl
+    start vendor.audio-effect-hal-aidl
     start vendor.audio-hal-4-0-msd
     start audio_proxy_service
 
 on property:init.svc.audioserver=running
     start vendor.audio-hal
     start vendor.audio-hal-aidl
+    start vendor.audio-effect-hal-aidl
     start vendor.audio-hal-4-0-msd
     start audio_proxy_service
 
@@ -40,10 +44,12 @@ on property:sys.audio.restart.hal=1
     # Keep the original service names for backward compatibility
     stop vendor.audio-hal
     stop vendor.audio-hal-aidl
+    stop vendor.audio-effect-hal-aidl
     stop vendor.audio-hal-4-0-msd
     stop audio_proxy_service
     start vendor.audio-hal
     start vendor.audio-hal-aidl
+    start vendor.audio-effect-hal-aidl
     start vendor.audio-hal-4-0-msd
     start audio_proxy_service
     # reset the property
