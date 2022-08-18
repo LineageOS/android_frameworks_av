@@ -72,6 +72,7 @@ public:
     status_t readFromParcel(Parcel *parcel);
     status_t writeToParcel(Parcel *parcel) const;
 
+    bool isExcludeCriterion() const;
     union {
         audio_usage_t   mUsage;
         audio_source_t  mSource;
