@@ -111,6 +111,7 @@
 // of suppressed in the Time Machine.
 #define AMEDIAMETRICS_PROP_SUFFIX_CHAR_DUPLICATES_ALLOWED '#'
 
+#define AMEDIAMETRICS_PROP_ADDRESS        "address"        // string, for example MAC address
 #define AMEDIAMETRICS_PROP_ALLOWUID       "_allowUid"      // int32_t, allow client uid to post
 #define AMEDIAMETRICS_PROP_AUDIOMODE      "audioMode"      // string (audio.flinger)
 #define AMEDIAMETRICS_PROP_AUXEFFECTID    "auxEffectId"    // int32 (AudioTrack)
@@ -120,6 +121,8 @@
 #define AMEDIAMETRICS_PROP_CALLERNAME     "callerName"     // string, eg. "aaudio"
 #define AMEDIAMETRICS_PROP_CHANNELCOUNT   "channelCount"   // int32
 #define AMEDIAMETRICS_PROP_CHANNELMASK    "channelMask"    // int32
+#define AMEDIAMETRICS_PROP_CHANNELMASKS   "channelMasks"   // string with channelMask values
+                                                           // separated by |.
 #define AMEDIAMETRICS_PROP_CONTENTTYPE    "contentType"    // string attributes (AudioTrack)
 #define AMEDIAMETRICS_PROP_CUMULATIVETIMENS "cumulativeTimeNs" // int64_t playback/record time
                                                            // since start

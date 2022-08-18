@@ -349,8 +349,9 @@ private:
         };
 
         AudioAnalytics& mAudioAnalytics;
-
+        static constexpr int64_t kBootDurationThreshold = 120 /* seconds */ * 1e9;
         mutable std::mutex mLock;
+        int64_t mFirstCreateTimeNs GUARDED_BY(mLock) = 0;
         std::map<std::string, DeviceState> mDeviceStateMap GUARDED_BY(mLock);
         SimpleLog mSimpleLog GUARDED_BY(mLock) {64};
     } mSpatializer{*this};
