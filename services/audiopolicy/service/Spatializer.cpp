@@ -274,6 +274,16 @@ Spatializer::~Spatializer() {
     mHandler.clear();
 }
 
+static std::string channelMaskVectorToString(
+        const std::vector<audio_channel_mask_t>& masks) {
+    std::stringstream ss;
+    for (const auto &mask : masks) {
+        if (ss.tellp() != 0) ss << "|";
+        ss << mask;
+    }
+    return ss.str();
+}
+
 status_t Spatializer::loadEngineConfiguration(sp<EffectHalInterface> effect) {
     ALOGV("%s", __func__);
 
@@ -363,7 +373,7 @@ status_t Spatializer::loadEngineConfiguration(sp<EffectHalInterface> effect) {
     }
     mediametrics::LogItem(mMetricsId)
         .set(AMEDIAMETRICS_PROP_EVENT, AMEDIAMETRICS_PROP_EVENT_VALUE_CREATE)
-        .set(AMEDIAMETRICS_PROP_CHANNELMASK, (int32_t)getMaxChannelMask(mChannelMasks))
+        .set(AMEDIAMETRICS_PROP_CHANNELMASKS, channelMaskVectorToString(mChannelMasks))
         .set(AMEDIAMETRICS_PROP_LEVELS, aidl_utils::enumsToString(mLevels))
         .set(AMEDIAMETRICS_PROP_MODES, aidl_utils::enumsToString(mSpatializationModes))
         .set(AMEDIAMETRICS_PROP_HEADTRACKINGMODES, aidl_utils::enumsToString(mHeadTrackingModes))
