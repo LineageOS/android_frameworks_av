@@ -1966,6 +1966,10 @@ status_t StagefrightRecorder::setupVideoEncoder(
             format->setString("mime", MEDIA_MIMETYPE_VIDEO_HEVC);
             break;
 
+        case VIDEO_ENCODER_DOLBY_VISION:
+            format->setString("mime", MEDIA_MIMETYPE_VIDEO_DOLBY_VISION);
+            break;
+
         default:
             CHECK(!"Should not be here, unsupported video encoding.");
             break;
