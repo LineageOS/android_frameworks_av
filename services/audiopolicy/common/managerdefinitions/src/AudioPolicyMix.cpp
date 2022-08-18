@@ -17,6 +17,7 @@
 #define LOG_TAG "APM_AudioPolicyMix"
 //#define LOG_NDEBUG 0
 
+#include <algorithm>
 #include "AudioPolicyMix.h"
 #include "TypeConverter.h"
 #include "HwModule.h"
@@ -25,8 +26,26 @@
 #include <AudioOutputDescriptor.h>
 
 namespace android {
-
 namespace {
+
+// Consistency checks: for each "dimension" of rules (usage, uid...), we can
+// only have MATCH rules, or EXCLUDE rules in each dimension, not a combination.
+bool areMixCriteriaConsistent(const std::vector<AudioMixMatchCriterion>& criteria) {
+    std::set<uint32_t> positiveCriteria;
+    for (const AudioMixMatchCriterion& c : criteria) {
+        if (c.isExcludeCriterion()) {
+            continue;
+        }
+        positiveCriteria.insert(c.mRule);
+    }
+
+    auto isConflictingCriterion = [&positiveCriteria](const AudioMixMatchCriterion& c) {
+        uint32_t ruleWithoutExclusion = c.mRule & ~RULE_EXCLUSION_MASK;
+        return c.isExcludeCriterion() &&
+               (positiveCriteria.find(ruleWithoutExclusion) != positiveCriteria.end());
+    };
+    return std::none_of(criteria.begin(), criteria.end(), isConflictingCriterion);
+}
 
 template <typename Predicate>
 void EraseCriteriaIf(std::vector<AudioMixMatchCriterion>& v,
@@ -99,6 +118,11 @@ status_t AudioPolicyMixCollection::registerMix(const AudioMix& mix,
                     mix.mDeviceType, mix.mDeviceAddress.string());
             return BAD_VALUE;
         }
+    }
+    if (!areMixCriteriaConsistent(mix.mCriteria)) {
+        ALOGE("registerMix(): Mix contains inconsistent criteria "
+              "(MATCH & EXCLUDE criteria of the same type)");
+        return BAD_VALUE;
     }
     sp<AudioPolicyMix> policyMix = sp<AudioPolicyMix>::make(mix);
     add(policyMix);
@@ -188,15 +212,9 @@ status_t AudioPolicyMixCollection::getOutputForAttr(
             continue; // Primary output already found
         }
 
-        switch (mixMatch(policyMix.get(), i, attributes, config, uid)) {
-            case MixMatchStatus::INVALID_MIX:
-                // The mix has contradictory rules, ignore it
-                // TODO: reject invalid mix at registration
-                continue;
-            case MixMatchStatus::NO_MATCH:
-                ALOGV("%s: Mix %zu: does not match", __func__, i);
-                continue; // skip the mix
-            case MixMatchStatus::MATCH:;
+        if(mixMatch(policyMix.get(), i, attributes, config, uid) == MixMatchStatus::NO_MATCH) {
+            ALOGV("%s: Mix %zu: does not match", __func__, i);
+            continue; // skip the mix
         }
 
         if (primaryOutputMix) {
@@ -342,23 +360,6 @@ AudioPolicyMixCollection::MixMatchStatus AudioPolicyMixCollection::mixMatch(
                 break;
             }
 
-            // consistency checks: for each "dimension" of rules (usage, uid...), we can
-            // only have MATCH rules, or EXCLUDE rules in each dimension, not a combination
-            if (hasUsageMatchRules && hasUsageExcludeRules) {
-                ALOGE("getOutputForAttr: invalid combination of RULE_MATCH_ATTRIBUTE_USAGE"
-                        " and RULE_EXCLUDE_ATTRIBUTE_USAGE in mix %zu", mixIndex);
-                return MixMatchStatus::INVALID_MIX;
-            }
-            if (hasUidMatchRules && hasUidExcludeRules) {
-                ALOGE("getOutputForAttr: invalid combination of RULE_MATCH_UID"
-                        " and RULE_EXCLUDE_UID in mix %zu", mixIndex);
-                return MixMatchStatus::INVALID_MIX;
-            }
-            if (hasUserIdMatchRules && hasUserIdExcludeRules) {
-                ALOGE("getOutputForAttr: invalid combination of RULE_MATCH_USERID"
-                        " and RULE_EXCLUDE_USERID in mix %zu", mixIndex);
-                    return MixMatchStatus::INVALID_MIX;
-            }
 
             if ((hasUsageExcludeRules && usageExclusionFound)
                     || (hasUidExcludeRules && uidExclusionFound)
