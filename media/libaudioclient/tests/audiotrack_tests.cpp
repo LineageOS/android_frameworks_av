@@ -68,6 +68,7 @@ TEST(AudioTrackTest, TestAudioCbNotifier) {
     EXPECT_EQ(AUDIO_PORT_HANDLE_NONE, cbOld->mDeviceId);
     EXPECT_NE(AUDIO_IO_HANDLE_NONE, cb->mAudioIo);
     EXPECT_NE(AUDIO_PORT_HANDLE_NONE, cb->mDeviceId);
+    EXPECT_TRUE(checkPatchPlayback(cb->mAudioIo, cb->mDeviceId));
     EXPECT_EQ(BAD_VALUE, ap->getAudioTrackHandle()->removeAudioDeviceCallback(nullptr));
     EXPECT_EQ(INVALID_OPERATION, ap->getAudioTrackHandle()->removeAudioDeviceCallback(cbOld));
     EXPECT_EQ(OK, ap->getAudioTrackHandle()->removeAudioDeviceCallback(cb));
