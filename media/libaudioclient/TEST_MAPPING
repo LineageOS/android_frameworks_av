@@ -4,12 +4,32 @@
       "name": "audio_aidl_conversion_tests"
     },
     {
+      "name": "audio_aidl_status_tests"
+    },
+    {
       "name": "CtsNativeMediaAAudioTestCases",
       "options" : [
         {
           "include-filter": "android.nativemedia.aaudio.AAudioTests#AAudioBasic.*"
         }
       ]
+    }
+  ],
+  "postsubmit": [
+    {
+      "name": "audieorecord_tests"
+    },
+    {
+      "name": "audioeffect_tests"
+    },
+    {
+      "name": "audiorouting_tests"
+    },
+    {
+      "name": "audioclient_serialization_tests"
+    },
+    {
+      "name": "trackplayerbase_tests"
     }
   ]
 }
