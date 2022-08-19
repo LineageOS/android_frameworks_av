@@ -16,8 +16,8 @@
 
 #include <gtest/gtest.h>
 
-#include <media/AudioCommonTypes.h>
 #include <media/AidlConversion.h>
+#include <media/AudioCommonTypes.h>
 
 using namespace android;
 using namespace android::aidl_utils;
@@ -31,7 +31,8 @@ using media::audio::common::PcmType;
 
 namespace {
 
-template<typename T> size_t hash(const T& t) {
+template <typename T>
+size_t hash(const T& t) {
     return std::hash<T>{}(t);
 }
 
@@ -52,10 +53,8 @@ AudioChannelLayout make_ACL_LayoutArbitrary() {
     return AudioChannelLayout::make<AudioChannelLayout::Tag::layoutMask>(
             // Use channels that exist both for input and output,
             // but doesn't form a known layout mask.
-            AudioChannelLayout::CHANNEL_FRONT_LEFT |
-            AudioChannelLayout::CHANNEL_FRONT_RIGHT |
-            AudioChannelLayout::CHANNEL_TOP_SIDE_LEFT |
-            AudioChannelLayout::CHANNEL_TOP_SIDE_RIGHT);
+            AudioChannelLayout::CHANNEL_FRONT_LEFT | AudioChannelLayout::CHANNEL_FRONT_RIGHT |
+            AudioChannelLayout::CHANNEL_TOP_SIDE_LEFT | AudioChannelLayout::CHANNEL_TOP_SIDE_RIGHT);
 }
 
 AudioChannelLayout make_ACL_ChannelIndex2() {
@@ -74,7 +73,7 @@ AudioChannelLayout make_ACL_VoiceCall() {
 }
 
 AudioDeviceDescription make_AudioDeviceDescription(AudioDeviceType type,
-        const std::string& connection = "") {
+                                                   const std::string& connection = "") {
     AudioDeviceDescription result;
     result.type = type;
     result.connection = connection;
@@ -95,12 +94,12 @@ AudioDeviceDescription make_ADD_DefaultOut() {
 
 AudioDeviceDescription make_ADD_WiredHeadset() {
     return make_AudioDeviceDescription(AudioDeviceType::OUT_HEADSET,
-            AudioDeviceDescription::CONNECTION_ANALOG());
+                                       AudioDeviceDescription::CONNECTION_ANALOG());
 }
 
 AudioDeviceDescription make_ADD_BtScoHeadset() {
     return make_AudioDeviceDescription(AudioDeviceType::OUT_HEADSET,
-            AudioDeviceDescription::CONNECTION_BT_SCO());
+                                       AudioDeviceDescription::CONNECTION_BT_SCO());
 }
 
 AudioFormatDescription make_AudioFormatDescription(AudioFormatType type) {
@@ -121,8 +120,7 @@ AudioFormatDescription make_AudioFormatDescription(const std::string& encoding) 
     return result;
 }
 
-AudioFormatDescription make_AudioFormatDescription(PcmType transport,
-        const std::string& encoding) {
+AudioFormatDescription make_AudioFormatDescription(PcmType transport, const std::string& encoding) {
     auto result = make_AudioFormatDescription(encoding);
     result.pcm = transport;
     return result;
@@ -163,7 +161,8 @@ AudioFormatDescription make_AFD_Encap_with_Enc() {
 // is identical to the same format description constructed by the framework.
 class HashIdentityTest : public ::testing::Test {
   public:
-    template<typename T> void verifyHashIdentity(const std::vector<std::function<T()>>& valueGens) {
+    template <typename T>
+    void verifyHashIdentity(const std::vector<std::function<T()>>& valueGens) {
         for (size_t i = 0; i < valueGens.size(); ++i) {
             for (size_t j = 0; j < valueGens.size(); ++j) {
                 if (i == j) {
@@ -177,27 +176,25 @@ class HashIdentityTest : public ::testing::Test {
 };
 
 TEST_F(HashIdentityTest, AudioChannelLayoutHashIdentity) {
-    verifyHashIdentity<AudioChannelLayout>({
-            make_ACL_None, make_ACL_Invalid, make_ACL_Stereo,
-            make_ACL_LayoutArbitrary, make_ACL_ChannelIndex2,
-            make_ACL_ChannelIndexArbitrary, make_ACL_VoiceCall});
+    verifyHashIdentity<AudioChannelLayout>({make_ACL_None, make_ACL_Invalid, make_ACL_Stereo,
+                                            make_ACL_LayoutArbitrary, make_ACL_ChannelIndex2,
+                                            make_ACL_ChannelIndexArbitrary, make_ACL_VoiceCall});
 }
 
 TEST_F(HashIdentityTest, AudioDeviceDescriptionHashIdentity) {
-    verifyHashIdentity<AudioDeviceDescription>({
-            make_ADD_None, make_ADD_DefaultIn, make_ADD_DefaultOut, make_ADD_WiredHeadset,
-            make_ADD_BtScoHeadset});
+    verifyHashIdentity<AudioDeviceDescription>({make_ADD_None, make_ADD_DefaultIn,
+                                                make_ADD_DefaultOut, make_ADD_WiredHeadset,
+                                                make_ADD_BtScoHeadset});
 }
 
 TEST_F(HashIdentityTest, AudioFormatDescriptionHashIdentity) {
-    verifyHashIdentity<AudioFormatDescription>({
-            make_AFD_Default, make_AFD_Invalid, make_AFD_Pcm16Bit, make_AFD_Bitstream,
-            make_AFD_Encap, make_AFD_Encap_with_Enc});
+    verifyHashIdentity<AudioFormatDescription>({make_AFD_Default, make_AFD_Invalid,
+                                                make_AFD_Pcm16Bit, make_AFD_Bitstream,
+                                                make_AFD_Encap, make_AFD_Encap_with_Enc});
 }
 
 using ChannelLayoutParam = std::tuple<AudioChannelLayout, bool /*isInput*/>;
-class AudioChannelLayoutRoundTripTest :
-        public testing::TestWithParam<ChannelLayoutParam> {};
+class AudioChannelLayoutRoundTripTest : public testing::TestWithParam<ChannelLayoutParam> {};
 TEST_P(AudioChannelLayoutRoundTripTest, Aidl2Legacy2Aidl) {
     const auto initial = std::get<0>(GetParam());
     const bool isInput = std::get<1>(GetParam());
@@ -207,21 +204,20 @@ TEST_P(AudioChannelLayoutRoundTripTest, Aidl2Legacy2Aidl) {
     ASSERT_TRUE(convBack.ok());
     EXPECT_EQ(initial, convBack.value());
 }
-INSTANTIATE_TEST_SUITE_P(AudioChannelLayoutRoundTrip,
-        AudioChannelLayoutRoundTripTest,
-        testing::Combine(
-                testing::Values(AudioChannelLayout{}, make_ACL_Invalid(), make_ACL_Stereo(),
-                        make_ACL_LayoutArbitrary(), make_ACL_ChannelIndex2(),
-                        make_ACL_ChannelIndexArbitrary()),
-                testing::Values(false, true)));
-INSTANTIATE_TEST_SUITE_P(AudioChannelVoiceRoundTrip,
-        AudioChannelLayoutRoundTripTest,
-        // In legacy constants the voice call is only defined for input.
-        testing::Combine(testing::Values(make_ACL_VoiceCall()), testing::Values(true)));
+INSTANTIATE_TEST_SUITE_P(AudioChannelLayoutRoundTrip, AudioChannelLayoutRoundTripTest,
+                         testing::Combine(testing::Values(AudioChannelLayout{}, make_ACL_Invalid(),
+                                                          make_ACL_Stereo(),
+                                                          make_ACL_LayoutArbitrary(),
+                                                          make_ACL_ChannelIndex2(),
+                                                          make_ACL_ChannelIndexArbitrary()),
+                                          testing::Values(false, true)));
+INSTANTIATE_TEST_SUITE_P(AudioChannelVoiceRoundTrip, AudioChannelLayoutRoundTripTest,
+                         // In legacy constants the voice call is only defined for input.
+                         testing::Combine(testing::Values(make_ACL_VoiceCall()),
+                                          testing::Values(true)));
 
 using ChannelLayoutEdgeCaseParam = std::tuple<int /*legacy*/, bool /*isInput*/, bool /*isValid*/>;
-class AudioChannelLayoutEdgeCaseTest :
-        public testing::TestWithParam<ChannelLayoutEdgeCaseParam> {};
+class AudioChannelLayoutEdgeCaseTest : public testing::TestWithParam<ChannelLayoutEdgeCaseParam> {};
 TEST_P(AudioChannelLayoutEdgeCaseTest, Legacy2Aidl) {
     const audio_channel_mask_t legacy = static_cast<audio_channel_mask_t>(std::get<0>(GetParam()));
     const bool isInput = std::get<1>(GetParam());
@@ -229,8 +225,8 @@ TEST_P(AudioChannelLayoutEdgeCaseTest, Legacy2Aidl) {
     auto conv = legacy2aidl_audio_channel_mask_t_AudioChannelLayout(legacy, isInput);
     EXPECT_EQ(isValid, conv.ok());
 }
-INSTANTIATE_TEST_SUITE_P(AudioChannelLayoutEdgeCase,
-        AudioChannelLayoutEdgeCaseTest,
+INSTANTIATE_TEST_SUITE_P(
+        AudioChannelLayoutEdgeCase, AudioChannelLayoutEdgeCaseTest,
         testing::Values(
                 // Valid legacy input masks.
                 std::make_tuple(AUDIO_CHANNEL_IN_VOICE_UPLINK_MONO, true, true),
@@ -240,25 +236,26 @@ INSTANTIATE_TEST_SUITE_P(AudioChannelLayoutEdgeCase,
                 std::make_tuple(
                         // This has the same numerical representation as Mask 'A' below
                         AUDIO_CHANNEL_OUT_FRONT_CENTER | AUDIO_CHANNEL_OUT_LOW_FREQUENCY |
-                        AUDIO_CHANNEL_OUT_TOP_FRONT_RIGHT, false, true),
+                                AUDIO_CHANNEL_OUT_TOP_FRONT_RIGHT,
+                        false, true),
                 std::make_tuple(
                         // This has the same numerical representation as Mask 'B' below
                         AUDIO_CHANNEL_OUT_FRONT_CENTER | AUDIO_CHANNEL_OUT_LOW_FREQUENCY |
-                        AUDIO_CHANNEL_OUT_TOP_BACK_LEFT, false, true),
+                                AUDIO_CHANNEL_OUT_TOP_BACK_LEFT,
+                        false, true),
                 // Invalid legacy input masks.
                 std::make_tuple(AUDIO_CHANNEL_IN_6, true, false),
-                std::make_tuple(
-                        AUDIO_CHANNEL_IN_6 | AUDIO_CHANNEL_IN_FRONT_PROCESSED, true, false),
-                std::make_tuple(
-                        AUDIO_CHANNEL_IN_PRESSURE | AUDIO_CHANNEL_IN_X_AXIS |
-                        AUDIO_CHANNEL_IN_Y_AXIS | AUDIO_CHANNEL_IN_Z_AXIS, true, false),
+                std::make_tuple(AUDIO_CHANNEL_IN_6 | AUDIO_CHANNEL_IN_FRONT_PROCESSED, true, false),
+                std::make_tuple(AUDIO_CHANNEL_IN_PRESSURE | AUDIO_CHANNEL_IN_X_AXIS |
+                                        AUDIO_CHANNEL_IN_Y_AXIS | AUDIO_CHANNEL_IN_Z_AXIS,
+                                true, false),
                 std::make_tuple(  // Mask 'A'
                         AUDIO_CHANNEL_IN_STEREO | AUDIO_CHANNEL_IN_VOICE_UPLINK, true, false),
                 std::make_tuple(  // Mask 'B'
                         AUDIO_CHANNEL_IN_STEREO | AUDIO_CHANNEL_IN_VOICE_DNLINK, true, false)));
 
-class AudioDeviceDescriptionRoundTripTest :
-        public testing::TestWithParam<AudioDeviceDescription> {};
+class AudioDeviceDescriptionRoundTripTest : public testing::TestWithParam<AudioDeviceDescription> {
+};
 TEST_P(AudioDeviceDescriptionRoundTripTest, Aidl2Legacy2Aidl) {
     const auto initial = GetParam();
     auto conv = aidl2legacy_AudioDeviceDescription_audio_devices_t(initial);
@@ -267,13 +264,13 @@ TEST_P(AudioDeviceDescriptionRoundTripTest, Aidl2Legacy2Aidl) {
     ASSERT_TRUE(convBack.ok());
     EXPECT_EQ(initial, convBack.value());
 }
-INSTANTIATE_TEST_SUITE_P(AudioDeviceDescriptionRoundTrip,
-        AudioDeviceDescriptionRoundTripTest,
-        testing::Values(AudioDeviceDescription{}, make_ADD_DefaultIn(),
-                make_ADD_DefaultOut(), make_ADD_WiredHeadset(), make_ADD_BtScoHeadset()));
+INSTANTIATE_TEST_SUITE_P(AudioDeviceDescriptionRoundTrip, AudioDeviceDescriptionRoundTripTest,
+                         testing::Values(AudioDeviceDescription{}, make_ADD_DefaultIn(),
+                                         make_ADD_DefaultOut(), make_ADD_WiredHeadset(),
+                                         make_ADD_BtScoHeadset()));
 
-class AudioFormatDescriptionRoundTripTest :
-        public testing::TestWithParam<AudioFormatDescription> {};
+class AudioFormatDescriptionRoundTripTest : public testing::TestWithParam<AudioFormatDescription> {
+};
 TEST_P(AudioFormatDescriptionRoundTripTest, Aidl2Legacy2Aidl) {
     const auto initial = GetParam();
     auto conv = aidl2legacy_AudioFormatDescription_audio_format_t(initial);
@@ -282,6 +279,6 @@ TEST_P(AudioFormatDescriptionRoundTripTest, Aidl2Legacy2Aidl) {
     ASSERT_TRUE(convBack.ok());
     EXPECT_EQ(initial, convBack.value());
 }
-INSTANTIATE_TEST_SUITE_P(AudioFormatDescriptionRoundTrip,
-        AudioFormatDescriptionRoundTripTest,
-        testing::Values(make_AFD_Invalid(), AudioFormatDescription{}, make_AFD_Pcm16Bit()));
+INSTANTIATE_TEST_SUITE_P(AudioFormatDescriptionRoundTrip, AudioFormatDescriptionRoundTripTest,
+                         testing::Values(make_AFD_Invalid(), AudioFormatDescription{},
+                                         make_AFD_Pcm16Bit()));
