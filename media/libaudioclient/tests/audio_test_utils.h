@@ -28,6 +28,8 @@
 #include <thread>
 
 #include <binder/MemoryDealer.h>
+#include <libxml/parser.h>
+#include <libxml/xinclude.h>
 #include <media/AidlConversion.h>
 #include <media/AudioRecord.h>
 #include <media/AudioTrack.h>
@@ -36,6 +38,21 @@
 
 using namespace android;
 
+struct MixPort {
+    std::string name;
+    std::string role;
+    std::string flags;
+};
+
+struct Route {
+    std::string name;
+    std::string sources;
+    std::string sink;
+};
+
+status_t parse_audio_policy_configuration_xml(std::vector<std::string>& attachedDevices,
+                                              std::vector<MixPort>& mixPorts,
+                                              std::vector<Route>& routes);
 void CreateRandomFile(int& fd);
 status_t listAudioPorts(std::vector<audio_port_v7>& portsVec);
 status_t listAudioPatches(std::vector<struct audio_patch>& patchesVec);
