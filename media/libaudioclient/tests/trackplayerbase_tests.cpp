@@ -44,9 +44,9 @@ class TrackPlayerBaseTest
     virtual void SetUp() override {
         mFrameCount = mDuration * mSampleRate;
         audio_channel_mask_t channelMask = audio_channel_out_mask_from_count(mChannelCount);
-        sp<AudioTrack> track =
-                new AudioTrack(mStreamType, mSampleRate, mFormat, channelMask, mFrameCount, mFlags,
-                               NULL, nullptr, 0, AUDIO_SESSION_NONE);
+        sp<AudioTrack> track = new AudioTrack(mStreamType, mSampleRate, mFormat, channelMask,
+                                              mFrameCount, mFlags, nullptr /* callback */,
+                                              0 /* notificationFrames */, AUDIO_SESSION_NONE);
         ASSERT_EQ(track->initCheck(), NO_ERROR);
 
         mPlayer = new TrackPlayer();

@@ -23,9 +23,9 @@
 using namespace android;
 
 TEST(AudioTrackTest, TestPlayTrack) {
-    std::unique_ptr<AudioPlayback> ap(new AudioPlayback(
-            44100, AUDIO_FORMAT_PCM_16_BIT, AUDIO_CHANNEL_OUT_STEREO, AUDIO_OUTPUT_FLAG_NONE,
-            AUDIO_SESSION_NONE, AudioTrack::TRANSFER_OBTAIN));
+    const auto ap = sp<AudioPlayback>::make(44100 /* sampleRate */, AUDIO_FORMAT_PCM_16_BIT,
+                                            AUDIO_CHANNEL_OUT_STEREO, AUDIO_OUTPUT_FLAG_NONE,
+                                            AUDIO_SESSION_NONE, AudioTrack::TRANSFER_OBTAIN);
     ASSERT_NE(nullptr, ap);
     ASSERT_EQ(OK, ap->loadResource("/data/local/tmp/bbb_2ch_24kHz_s16le.raw"))
             << "Unable to open Resource";
@@ -36,8 +36,8 @@ TEST(AudioTrackTest, TestPlayTrack) {
 }
 
 TEST(AudioTrackTest, TestSeek) {
-    std::unique_ptr<AudioPlayback> ap(
-            new AudioPlayback(44100, AUDIO_FORMAT_PCM_16_BIT, AUDIO_CHANNEL_OUT_STEREO));
+    const auto ap = sp<AudioPlayback>::make(
+            44100 /* sampleRate */, AUDIO_FORMAT_PCM_16_BIT, AUDIO_CHANNEL_OUT_STEREO);
     ASSERT_NE(nullptr, ap);
     ASSERT_EQ(OK, ap->loadResource("/data/local/tmp/bbb_2ch_24kHz_s16le.raw"))
             << "Unable to open Resource";
@@ -48,9 +48,9 @@ TEST(AudioTrackTest, TestSeek) {
 }
 
 TEST(AudioTrackTest, TestAudioCbNotifier) {
-    std::unique_ptr<AudioPlayback> ap(new AudioPlayback(
-            0, AUDIO_FORMAT_PCM_16_BIT, AUDIO_CHANNEL_OUT_STEREO, AUDIO_OUTPUT_FLAG_FAST,
-            AUDIO_SESSION_NONE, AudioTrack::TRANSFER_SHARED));
+    const auto ap = sp<AudioPlayback>::make(0 /* sampleRate */, AUDIO_FORMAT_PCM_16_BIT,
+                                            AUDIO_CHANNEL_OUT_STEREO, AUDIO_OUTPUT_FLAG_FAST,
+                                            AUDIO_SESSION_NONE, AudioTrack::TRANSFER_SHARED);
     ASSERT_NE(nullptr, ap);
     ASSERT_EQ(OK, ap->loadResource("/data/local/tmp/bbb_2ch_24kHz_s16le.raw"))
             << "Unable to open Resource";
@@ -92,10 +92,10 @@ class AudioTrackCreateTest
     const audio_output_flags_t mFlags;
     const audio_session_t mSessionId;
 
-    std::unique_ptr<AudioPlayback> mAP;
+    sp<AudioPlayback> mAP;
 
     virtual void SetUp() override {
-        mAP = std::make_unique<AudioPlayback>(mSampleRate, mFormat, mChannelMask, mFlags,
+        mAP = sp<AudioPlayback>::make(mSampleRate, mFormat, mChannelMask, mFlags,
                                               mSessionId);
         ASSERT_NE(nullptr, mAP);
         ASSERT_EQ(OK, mAP->loadResource("/data/local/tmp/bbb_2ch_24kHz_s16le.raw"))
