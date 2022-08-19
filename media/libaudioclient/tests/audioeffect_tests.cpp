@@ -279,9 +279,9 @@ TEST(AudioEffectTest, ManageStreamDefaultEffects) {
     audio_attributes_t attributes;
     attributes.usage = AUDIO_USAGE_MEDIA;
     attributes.content_type = AUDIO_CONTENT_TYPE_MUSIC;
-    std::unique_ptr<AudioPlayback> playback = std::make_unique<AudioPlayback>(
-            44100, AUDIO_FORMAT_PCM_16_BIT, AUDIO_CHANNEL_OUT_STEREO, AUDIO_OUTPUT_FLAG_NONE,
-            AUDIO_SESSION_NONE, AudioTrack::TRANSFER_SHARED, &attributes);
+    auto playback = sp<AudioPlayback>::make(
+            44100 /* sampleRate */, AUDIO_FORMAT_PCM_16_BIT, AUDIO_CHANNEL_OUT_STEREO,
+            AUDIO_OUTPUT_FLAG_NONE, AUDIO_SESSION_NONE, AudioTrack::TRANSFER_SHARED, &attributes);
     ASSERT_NE(nullptr, playback);
     ASSERT_EQ(NO_ERROR, playback->loadResource("/data/local/tmp/bbb_2ch_24kHz_s16le.raw"));
     EXPECT_EQ(NO_ERROR, playback->create());
@@ -291,7 +291,7 @@ TEST(AudioEffectTest, ManageStreamDefaultEffects) {
             << "Effect should not have been added. " << type;
     EXPECT_EQ(NO_ERROR, playback->waitForConsumption());
     playback->stop();
-    playback.reset();
+    playback.clear();
 
     String16 name{gPackageName};
     audio_unique_id_t id;
@@ -299,9 +299,9 @@ TEST(AudioEffectTest, ManageStreamDefaultEffects) {
             type, name, nullptr, kDefaultOutputEffectPriority, AUDIO_USAGE_MEDIA, &id);
     EXPECT_EQ(NO_ERROR, status) << "Adding default effect failed: " << type;
 
-    playback = std::make_unique<AudioPlayback>(
-            44100, AUDIO_FORMAT_PCM_16_BIT, AUDIO_CHANNEL_OUT_STEREO, AUDIO_OUTPUT_FLAG_NONE,
-            AUDIO_SESSION_NONE, AudioTrack::TRANSFER_SHARED, &attributes);
+    playback = sp<AudioPlayback>::make(
+            44100 /* sampleRate */, AUDIO_FORMAT_PCM_16_BIT, AUDIO_CHANNEL_OUT_STEREO,
+            AUDIO_OUTPUT_FLAG_NONE, AUDIO_SESSION_NONE, AudioTrack::TRANSFER_SHARED, &attributes);
     ASSERT_NE(nullptr, playback);
     ASSERT_EQ(NO_ERROR, playback->loadResource("/data/local/tmp/bbb_2ch_24kHz_s16le.raw"));
     EXPECT_EQ(NO_ERROR, playback->create());
@@ -315,13 +315,13 @@ TEST(AudioEffectTest, ManageStreamDefaultEffects) {
     playback->getAudioTrackHandle()->getAuxEffectSendLevel(&levelGot);
     EXPECT_EQ(level, levelGot);
     playback->stop();
-    playback.reset();
+    playback.clear();
 
     status = AudioEffect::removeStreamDefaultEffect(id);
     EXPECT_EQ(NO_ERROR, status);
-    playback = std::make_unique<AudioPlayback>(
-            44100, AUDIO_FORMAT_PCM_16_BIT, AUDIO_CHANNEL_OUT_STEREO, AUDIO_OUTPUT_FLAG_NONE,
-            AUDIO_SESSION_NONE, AudioTrack::TRANSFER_SHARED, &attributes);
+    playback = sp<AudioPlayback>::make(
+            44100 /*sampleRate */, AUDIO_FORMAT_PCM_16_BIT, AUDIO_CHANNEL_OUT_STEREO,
+            AUDIO_OUTPUT_FLAG_NONE, AUDIO_SESSION_NONE, AudioTrack::TRANSFER_SHARED, &attributes);
     ASSERT_NE(nullptr, playback);
     ASSERT_EQ(NO_ERROR, playback->loadResource("/data/local/tmp/bbb_2ch_24kHz_s16le.raw"));
     EXPECT_EQ(NO_ERROR, playback->create());
@@ -331,5 +331,5 @@ TEST(AudioEffectTest, ManageStreamDefaultEffects) {
             << "Effect should not have been added. " << type;
     EXPECT_EQ(NO_ERROR, playback->waitForConsumption());
     playback->stop();
-    playback.reset();
+    playback.clear();
 }
