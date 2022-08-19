@@ -24,6 +24,7 @@
 #include <map>
 #include <thread>
 
+#include <android-base/stringprintf.h>
 #include <android-base/thread_annotations.h>
 #include <log/log_main.h>
 #include <sensor/SensorEventQueue.h>
@@ -35,6 +36,8 @@
 namespace android {
 namespace media {
 namespace {
+
+using android::base::StringAppendF;
 
 // Identifier to use for our event queue on the loop.
 // The number 19 is arbitrary, only useful if using multiple objects on the same looper.
@@ -153,6 +156,38 @@ class SensorPoseProviderImpl : public SensorPoseProvider {
         mEnabledSensorsExtra.erase(handle);
     }
 
+    std::string toString(unsigned level) override {
+        std::string prefixSpace(level, ' ');
+        std::string ss = prefixSpace + "SensorPoseProvider:\n";
+        bool needUnlock = false;
+
+        prefixSpace += " ";
+        auto now = std::chrono::steady_clock::now();
+        if (!mMutex.try_lock_until(now + media::kSpatializerDumpSysTimeOutInSecond)) {
+            ss.append(prefixSpace).append("try_lock failed, dumpsys below maybe INACCURATE!\n");
+        } else {
+            needUnlock = true;
+        }
+
+        // Enabled sensor information
+        StringAppendF(&ss, "%sSensors total number %zu:\n", prefixSpace.c_str(),
+                      mEnabledSensorsExtra.size());
+        for (auto sensor : mEnabledSensorsExtra) {
+            StringAppendF(&ss, "%s[Handle: 0x%08x, Format %s", prefixSpace.c_str(), sensor.first,
+                          toString(sensor.second.format).c_str());
+            if (sensor.second.discontinuityCount.has_value()) {
+                StringAppendF(&ss, ", DiscontinuityCount: %d",
+                              sensor.second.discontinuityCount.value());
+            }
+            ss += "]\n";
+        }
+
+        if (needUnlock) {
+            mMutex.unlock();
+        }
+        return ss;
+    }
+
   private:
     enum DataFormat {
         kUnknown,
@@ -174,7 +209,7 @@ class SensorPoseProviderImpl : public SensorPoseProvider {
     sp<Looper> mLooper;
     Listener* const mListener;
     SensorManager* const mSensorManager;
-    std::mutex mMutex;
+    std::timed_mutex mMutex;
     std::map<int32_t, SensorEnableGuard> mEnabledSensors;
     std::map<int32_t, SensorExtra> mEnabledSensorsExtra GUARDED_BY(mMutex);
     sp<SensorEventQueue> mQueue;
@@ -193,7 +228,6 @@ class SensorPoseProviderImpl : public SensorPoseProvider {
           mSensorManager(&SensorManager::getInstanceForPackage(String16(packageName))) {
         mThread = std::thread([this] { threadFunc(); });
     }
-
     void initFinished(bool success) { mInitPromise.set_value(success); }
 
     bool waitInitFinished() { return mInitPromise.get_future().get(); }
@@ -344,6 +378,19 @@ class SensorPoseProviderImpl : public SensorPoseProvider {
 
             default:
                 LOG_ALWAYS_FATAL("Unexpected sensor type: %d", static_cast<int>(format));
+        }
+    }
+
+    const std::string toString(DataFormat format) {
+        switch (format) {
+            case DataFormat::kUnknown:
+                return "kUnknown";
+            case DataFormat::kQuaternion:
+                return "kQuaternion";
+            case DataFormat::kRotationVectorsAndDiscontinuityCount:
+                return "kRotationVectorsAndDiscontinuityCount";
+            default:
+                return "NotImplemented";
         }
     }
 };
