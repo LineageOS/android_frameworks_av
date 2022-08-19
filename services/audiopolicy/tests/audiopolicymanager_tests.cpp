@@ -919,6 +919,30 @@ TEST_F(AudioPolicyManagerTestWithConfigurationFile, ListAudioPortsHasFlags) {
     EXPECT_TRUE(foundVoipTx);
 }
 
+TEST_F(AudioPolicyManagerTestWithConfigurationFile, HandleDeviceConfigChange) {
+    {
+        const auto prevCounter = mClient->getRoutingUpdatedCounter();
+
+        EXPECT_EQ(NO_ERROR, mManager->setDeviceConnectionState(AUDIO_DEVICE_OUT_BLUETOOTH_A2DP,
+                                                               AUDIO_POLICY_DEVICE_STATE_AVAILABLE,
+                                                               "", "", AUDIO_FORMAT_LDAC));
+        const auto currCounter = mClient->getRoutingUpdatedCounter();
+        EXPECT_GT(currCounter, prevCounter);
+    }
+    {
+        const auto prevCounter = mClient->getRoutingUpdatedCounter();
+        // Update device configuration
+        EXPECT_EQ(NO_ERROR, mManager->handleDeviceConfigChange(AUDIO_DEVICE_OUT_BLUETOOTH_A2DP,
+                                                               "" /*address*/, "" /*name*/,
+                                                               AUDIO_FORMAT_AAC));
+
+        // As mClient marks isReconfigA2dpSupported to false, device state needs to be toggled for
+        // config changes to take effect
+        const auto currCounter = mClient->getRoutingUpdatedCounter();
+        EXPECT_GT(currCounter, prevCounter);
+    }
+}
+
 using PolicyMixTuple = std::tuple<audio_usage_t, audio_source_t, uint32_t>;
 
 class AudioPolicyManagerTestDynamicPolicy : public AudioPolicyManagerTestWithConfigurationFile {
