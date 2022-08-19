@@ -162,20 +162,6 @@ TEST_F(AudioRecordTest, TestGetSetMarkerPeriodical) {
             << "configured marker and received cb marker are different";
 }
 
-TEST_F(AudioRecordTest, TestMicDirectionConfiguration) {
-    EXPECT_EQ(OK, mAC->getAudioRecordHandle()->setPreferredMicrophoneDirection(MIC_DIRECTION_FRONT))
-            << "setPreferredMicrophoneDirection() Failed";
-    EXPECT_EQ(OK, mAC->start()) << "start recording failed";
-    EXPECT_EQ(OK, mAC->audioProcess()) << "audioProcess failed";
-}
-
-TEST_F(AudioRecordTest, TestMicFieldConfiguration) {
-    EXPECT_EQ(OK, mAC->getAudioRecordHandle()->setPreferredMicrophoneFieldDimension(0.5f))
-            << "setPreferredMicrophoneFieldDimension() Failed";
-    EXPECT_EQ(OK, mAC->start()) << "start recording failed";
-    EXPECT_EQ(OK, mAC->audioProcess()) << "audioProcess failed";
-}
-
 TEST_F(AudioRecordTest, TestGetPosition) {
     uint32_t position;
     EXPECT_EQ(OK, mAC->getAudioRecordHandle()->getPosition(&position)) << "getPosition() failed";
@@ -220,6 +206,18 @@ INSTANTIATE_TEST_SUITE_P(AudioRecordPrimaryInput, AudioRecordCreateTest,
                                                               AUDIO_CHANNEL_IN_STEREO,
                                                               AUDIO_CHANNEL_IN_FRONT_BACK),
                                             ::testing::Values(AUDIO_INPUT_FLAG_NONE),
+                                            ::testing::Values(AUDIO_SESSION_NONE),
+                                            ::testing::Values(AUDIO_SOURCE_DEFAULT)));
+
+// for port fast input
+INSTANTIATE_TEST_SUITE_P(AudioRecordFastInput, AudioRecordCreateTest,
+                         ::testing::Combine(::testing::Values(8000, 11025, 12000, 16000, 22050,
+                                                              24000, 32000, 44100, 48000),
+                                            ::testing::Values(AUDIO_FORMAT_PCM_8_24_BIT),
+                                            ::testing::Values(AUDIO_CHANNEL_IN_MONO,
+                                                              AUDIO_CHANNEL_IN_STEREO,
+                                                              AUDIO_CHANNEL_IN_FRONT_BACK),
+                                            ::testing::Values(AUDIO_INPUT_FLAG_FAST),
                                             ::testing::Values(AUDIO_SESSION_NONE),
                                             ::testing::Values(AUDIO_SOURCE_DEFAULT)));
 
