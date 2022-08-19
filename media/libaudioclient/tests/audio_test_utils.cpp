@@ -548,3 +548,246 @@ status_t AudioCapture::audioProcess() {
         }
     }
 }
+
+status_t listAudioPorts(std::vector<audio_port_v7>& portsVec) {
+    int attempts = 5;
+    status_t status;
+    unsigned int generation1, generation;
+    unsigned int numPorts = 0;
+    do {
+        if (attempts-- < 0) {
+            status = TIMED_OUT;
+            break;
+        }
+        status = AudioSystem::listAudioPorts(AUDIO_PORT_ROLE_NONE, AUDIO_PORT_TYPE_NONE, &numPorts,
+                                             nullptr, &generation1);
+        if (status != NO_ERROR) {
+            ALOGE("AudioSystem::listAudioPorts returned error %d", status);
+            break;
+        }
+        portsVec.resize(numPorts);
+        status = AudioSystem::listAudioPorts(AUDIO_PORT_ROLE_NONE, AUDIO_PORT_TYPE_NONE, &numPorts,
+                                             portsVec.data(), &generation);
+    } while (generation1 != generation && status == NO_ERROR);
+    if (status != NO_ERROR) {
+        numPorts = 0;
+        portsVec.clear();
+    }
+    return status;
+}
+
+status_t getPortById(const audio_port_handle_t portId, audio_port_v7& port) {
+    std::vector<struct audio_port_v7> ports;
+    status_t status = listAudioPorts(ports);
+    if (status != OK) return status;
+    for (auto i = 0; i < ports.size(); i++) {
+        if (ports[i].id == portId) {
+            port = ports[i];
+            return OK;
+        }
+    }
+    return BAD_VALUE;
+}
+
+status_t getPortByAttributes(audio_port_role_t role, audio_port_type_t type,
+                             audio_devices_t deviceType, audio_port_v7& port) {
+    std::vector<struct audio_port_v7> ports;
+    status_t status = listAudioPorts(ports);
+    if (status != OK) return status;
+    for (auto i = 0; i < ports.size(); i++) {
+        if (ports[i].role == role && ports[i].type == type &&
+            ports[i].ext.device.type == deviceType) {
+            port = ports[i];
+            return OK;
+        }
+    }
+    return BAD_VALUE;
+}
+
+status_t listAudioPatches(std::vector<struct audio_patch>& patchesVec) {
+    int attempts = 5;
+    status_t status;
+    unsigned int generation1, generation;
+    unsigned int numPatches = 0;
+    do {
+        if (attempts-- < 0) {
+            status = TIMED_OUT;
+            break;
+        }
+        status = AudioSystem::listAudioPatches(&numPatches, nullptr, &generation1);
+        if (status != NO_ERROR) {
+            ALOGE("AudioSystem::listAudioPatches returned error %d", status);
+            break;
+        }
+        patchesVec.resize(numPatches);
+        status = AudioSystem::listAudioPatches(&numPatches, patchesVec.data(), &generation);
+    } while (generation1 != generation && status == NO_ERROR);
+    if (status != NO_ERROR) {
+        numPatches = 0;
+        patchesVec.clear();
+    }
+    return status;
+}
+
+status_t getPatchForOutputMix(audio_io_handle_t audioIo, audio_patch& patch) {
+    std::vector<struct audio_patch> patches;
+    status_t status = listAudioPatches(patches);
+    if (status != OK) return status;
+
+    for (auto i = 0; i < patches.size(); i++) {
+        for (auto j = 0; j < patches[i].num_sources; j++) {
+            if (patches[i].sources[j].type == AUDIO_PORT_TYPE_MIX &&
+                patches[i].sources[j].ext.mix.handle == audioIo) {
+                patch = patches[i];
+                return OK;
+            }
+        }
+    }
+    return BAD_VALUE;
+}
+
+status_t getPatchForInputMix(audio_io_handle_t audioIo, audio_patch& patch) {
+    std::vector<struct audio_patch> patches;
+    status_t status = listAudioPatches(patches);
+    if (status != OK) return status;
+
+    for (auto i = 0; i < patches.size(); i++) {
+        for (auto j = 0; j < patches[i].num_sinks; j++) {
+            if (patches[i].sinks[j].type == AUDIO_PORT_TYPE_MIX &&
+                patches[i].sinks[j].ext.mix.handle == audioIo) {
+                patch = patches[i];
+                return OK;
+            }
+        }
+    }
+    return BAD_VALUE;
+}
+
+bool patchContainsOutputDevice(audio_port_handle_t deviceId, audio_patch patch) {
+    for (auto j = 0; j < patch.num_sinks; j++) {
+        if (patch.sinks[j].type == AUDIO_PORT_TYPE_DEVICE && patch.sinks[j].id == deviceId) {
+            return true;
+        }
+    }
+    return false;
+}
+
+bool patchContainsInputDevice(audio_port_handle_t deviceId, audio_patch patch) {
+    for (auto j = 0; j < patch.num_sources; j++) {
+        if (patch.sources[j].type == AUDIO_PORT_TYPE_DEVICE && patch.sources[j].id == deviceId) {
+            return true;
+        }
+    }
+    return false;
+}
+
+bool checkPatchPlayback(audio_io_handle_t audioIo, audio_port_handle_t deviceId) {
+    struct audio_patch patch;
+    if (getPatchForOutputMix(audioIo, patch) == OK) {
+        return patchContainsOutputDevice(deviceId, patch);
+    }
+    return false;
+}
+
+bool checkPatchCapture(audio_io_handle_t audioIo, audio_port_handle_t deviceId) {
+    struct audio_patch patch;
+    if (getPatchForInputMix(audioIo, patch) == OK) {
+        return patchContainsInputDevice(deviceId, patch);
+    }
+    return false;
+}
+
+std::string dumpPortConfig(const audio_port_config& port) {
+    std::ostringstream result;
+    std::string deviceInfo;
+    if (port.type == AUDIO_PORT_TYPE_DEVICE) {
+        if (port.ext.device.type & AUDIO_DEVICE_BIT_IN) {
+            InputDeviceConverter::maskToString(port.ext.device.type, deviceInfo);
+        } else {
+            OutputDeviceConverter::maskToString(port.ext.device.type, deviceInfo);
+        }
+        deviceInfo += std::string(", address = ") + port.ext.device.address;
+    }
+    result << "audio_port_handle_t = " << port.id << ", "
+           << "Role = " << (port.role == AUDIO_PORT_ROLE_SOURCE ? "source" : "sink") << ", "
+           << "Type = " << (port.type == AUDIO_PORT_TYPE_DEVICE ? "device" : "mix") << ", "
+           << "deviceInfo = " << (port.type == AUDIO_PORT_TYPE_DEVICE ? deviceInfo : "") << ", "
+           << "config_mask = 0x" << std::hex << port.config_mask << std::dec << ", ";
+    if (port.config_mask & AUDIO_PORT_CONFIG_SAMPLE_RATE) {
+        result << "sample rate = " << port.sample_rate << ", ";
+    }
+    if (port.config_mask & AUDIO_PORT_CONFIG_CHANNEL_MASK) {
+        result << "channel mask = " << port.channel_mask << ", ";
+    }
+    if (port.config_mask & AUDIO_PORT_CONFIG_FORMAT) {
+        result << "format = " << port.format << ", ";
+    }
+    result << "input flags = " << port.flags.input << ", ";
+    result << "output flags = " << port.flags.output << ", ";
+    result << "mix io handle = " << (port.type == AUDIO_PORT_TYPE_DEVICE ? 0 : port.ext.mix.handle)
+           << "\n";
+    return result.str();
+}
+
+std::string dumpPatch(const audio_patch& patch) {
+    std::ostringstream result;
+    result << "----------------- Dumping Patch ------------ \n";
+    result << "Patch Handle: " << patch.id << ", sources: " << patch.num_sources
+           << ", sink: " << patch.num_sinks << "\n";
+    audio_port_v7 port;
+    for (uint32_t i = 0; i < patch.num_sources; i++) {
+        result << "----------------- Dumping Source Port Config @ index " << i
+               << " ------------ \n";
+        result << dumpPortConfig(patch.sources[i]);
+        result << "----------------- Dumping Source Port for id " << patch.sources[i].id
+               << " ------------ \n";
+        getPortById(patch.sources[i].id, port);
+        result << dumpPort(port);
+    }
+    for (uint32_t i = 0; i < patch.num_sinks; i++) {
+        result << "----------------- Dumping Sink Port Config @ index " << i << " ------------ \n";
+        result << dumpPortConfig(patch.sinks[i]);
+        result << "----------------- Dumping Sink Port for id " << patch.sinks[i].id
+               << " ------------ \n";
+        getPortById(patch.sinks[i].id, port);
+        result << dumpPort(port);
+    }
+    return result.str();
+}
+
+std::string dumpPort(const audio_port_v7& port) {
+    std::ostringstream result;
+    std::string deviceInfo;
+    if (port.type == AUDIO_PORT_TYPE_DEVICE) {
+        if (port.ext.device.type & AUDIO_DEVICE_BIT_IN) {
+            InputDeviceConverter::maskToString(port.ext.device.type, deviceInfo);
+        } else {
+            OutputDeviceConverter::maskToString(port.ext.device.type, deviceInfo);
+        }
+        deviceInfo += std::string(", address = ") + port.ext.device.address;
+    }
+    result << "audio_port_handle_t = " << port.id << ", "
+           << "Role = " << (port.role == AUDIO_PORT_ROLE_SOURCE ? "source" : "sink") << ", "
+           << "Type = " << (port.type == AUDIO_PORT_TYPE_DEVICE ? "device" : "mix") << ", "
+           << "deviceInfo = " << (port.type == AUDIO_PORT_TYPE_DEVICE ? deviceInfo : "") << ", "
+           << "Name = " << port.name << ", "
+           << "num profiles = " << port.num_audio_profiles << ", "
+           << "mix io handle = " << (port.type == AUDIO_PORT_TYPE_DEVICE ? 0 : port.ext.mix.handle)
+           << ", ";
+    for (int i = 0; i < port.num_audio_profiles; i++) {
+        result << "AudioProfile = " << i << " {";
+        result << "format = " << port.audio_profiles[i].format << ", ";
+        result << "samplerates = ";
+        for (int j = 0; j < port.audio_profiles[i].num_sample_rates; j++) {
+            result << port.audio_profiles[i].sample_rates[j] << ", ";
+        }
+        result << "channelmasks = ";
+        for (int j = 0; j < port.audio_profiles[i].num_channel_masks; j++) {
+            result << "0x" << std::hex << port.audio_profiles[i].channel_masks[j] << std::dec
+                   << ", ";
+        }
+        result << "} ";
+    }
+    result << dumpPortConfig(port.active_config);
+    return result.str();
+}
