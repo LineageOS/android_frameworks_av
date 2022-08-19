@@ -29,6 +29,12 @@ const std::unordered_map<std::string, int64_t>& getAudioDeviceInMap();
 const std::unordered_map<std::string, int64_t>& getAudioDeviceOutMap();
 const std::unordered_map<std::string, int32_t>& getAudioThreadTypeMap();
 const std::unordered_map<std::string, int32_t>& getAudioTrackTraitsMap();
+const std::unordered_map<std::string, int32_t>& getHeadTrackingModeMap();
+const std::unordered_map<std::string, int32_t>& getSpatializerLevelMap();
+const std::unordered_map<std::string, int32_t>& getSpatializerModeMap();
+
+std::vector<int32_t> vectorFromMap(
+        const std::string &str, const std::unordered_map<std::string, int32_t>& map);
 
 // Enumeration for the device connection results.
 enum DeviceConnectionResult : int32_t {
@@ -50,11 +56,14 @@ enum AudioEnumCategory {
     CALLER_NAME,
     CONTENT_TYPE,
     ENCODING,
+    HEAD_TRACKING_MODE,
     INPUT_DEVICE,  // int64_t
     INPUT_FLAG,
     OUTPUT_DEVICE, // int64_t
     OUTPUT_FLAG,
     SOURCE_TYPE,
+    SPATIALIZER_LEVEL,
+    SPATIALIZER_MODE,
     STATUS,
     STREAM_TYPE,
     THREAD_TYPE,
