@@ -62,9 +62,9 @@ class AudioPlayback {
     status_t create();
     sp<AudioTrack> getAudioTrackHandle();
     status_t start();
-    status_t waitForConsumption();
+    status_t waitForConsumption(bool testSeek = false);
     status_t fillBuffer();
-    status_t onProcess();
+    status_t onProcess(bool testSeek = false);
     void stop();
 
     bool mStopPlaying;

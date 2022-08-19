@@ -188,11 +188,36 @@ status_t AudioPlayback::fillBuffer() {
     return OK;
 }
 
-status_t AudioPlayback::waitForConsumption() {
+status_t AudioPlayback::waitForConsumption(bool testSeek) {
     if (PLAY_STARTED != mState) return INVALID_OPERATION;
     // in static buffer mode, lets not play clips with duration > 30 sec
     int retry = 30;
+    // Total number of frames in the input file.
+    size_t totalFrameCount = mMemCapacity / mTrack->frameSize();
     while (!mStopPlaying && retry > 0) {
+        // Get the total numbers of frames played.
+        uint32_t currPosition;
+        mTrack->getPosition(&currPosition);
+        if (testSeek && (currPosition > totalFrameCount * 0.6)) {
+            testSeek = false;
+            if (!mTrack->hasStarted()) return BAD_VALUE;
+            mTrack->pauseAndWait(std::chrono::seconds(2));
+            if (mTrack->hasStarted()) return BAD_VALUE;
+            mTrack->reload();
+            mTrack->getPosition(&currPosition);
+            if (currPosition != 0) return BAD_VALUE;
+            mTrack->start();
+            while (currPosition < totalFrameCount * 0.3) {
+                mTrack->getPosition(&currPosition);
+            }
+            mTrack->pauseAndWait(std::chrono::seconds(2));
+            uint32_t setPosition = totalFrameCount * 0.9;
+            mTrack->setPosition(setPosition);
+            uint32_t bufferPosition;
+            mTrack->getBufferPosition(&bufferPosition);
+            if (bufferPosition != setPosition) return BAD_VALUE;
+            mTrack->start();
+        }
         std::this_thread::sleep_for(std::chrono::milliseconds(300));
         retry--;
     }
@@ -200,9 +225,9 @@ status_t AudioPlayback::waitForConsumption() {
     return OK;
 }
 
-status_t AudioPlayback::onProcess() {
+status_t AudioPlayback::onProcess(bool testSeek) {
     if (mTransferType == AudioTrack::TRANSFER_SHARED)
-        return waitForConsumption();
+        return waitForConsumption(testSeek);
     else if (mTransferType == AudioTrack::TRANSFER_OBTAIN)
         return fillBuffer();
     else
