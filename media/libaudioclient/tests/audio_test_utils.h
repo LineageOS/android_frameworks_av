@@ -37,6 +37,19 @@
 using namespace android;
 
 void CreateRandomFile(int& fd);
+status_t listAudioPorts(std::vector<audio_port_v7>& portsVec);
+status_t listAudioPatches(std::vector<struct audio_patch>& patchesVec);
+status_t getPortByAttributes(audio_port_role_t role, audio_port_type_t type,
+                             audio_devices_t deviceType, audio_port_v7& port);
+status_t getPatchForOutputMix(audio_io_handle_t audioIo, audio_patch& patch);
+status_t getPatchForInputMix(audio_io_handle_t audioIo, audio_patch& patch);
+bool patchContainsOutputDevice(audio_port_handle_t deviceId, audio_patch patch);
+bool patchContainsInputDevice(audio_port_handle_t deviceId, audio_patch patch);
+bool checkPatchPlayback(audio_io_handle_t audioIo, audio_port_handle_t deviceId);
+bool checkPatchCapture(audio_io_handle_t audioIo, audio_port_handle_t deviceId);
+std::string dumpPort(const audio_port_v7& port);
+std::string dumpPortConfig(const audio_port_config& port);
+std::string dumpPatch(const audio_patch& patch);
 
 class OnAudioDeviceUpdateNotifier : public AudioSystem::AudioDeviceCallback {
   public:
