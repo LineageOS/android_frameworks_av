@@ -2232,7 +2232,6 @@ bool Camera3Device::reconfigureCamera(const CameraMetadata& sessionParams, int c
     if (mStatus == STATUS_ACTIVE) {
         markClientActive = true;
         mPauseStateNotify = true;
-        mStatusTracker->markComponentIdle(clientStatusId, Fence::NO_FENCE);
 
         rc = internalPauseAndWaitLocked(maxExpectedDuration);
     }
@@ -3449,6 +3448,10 @@ bool Camera3Device::RequestThread::threadLoop() {
         if (res == OK) {
             sp<Camera3Device> parent = mParent.promote();
             if (parent != nullptr) {
+                sp<StatusTracker> statusTracker = mStatusTracker.promote();
+                if (statusTracker != nullptr) {
+                    statusTracker->markComponentIdle(mStatusId, Fence::NO_FENCE);
+                }
                 mReconfigured |= parent->reconfigureCamera(mLatestSessionParams, mStatusId);
             }
             setPaused(false);
