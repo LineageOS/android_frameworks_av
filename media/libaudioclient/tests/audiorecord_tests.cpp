@@ -99,8 +99,8 @@ TEST_F(AudioRecordTest, TestAudioCbNotifier) {
 }
 
 TEST_F(AudioRecordTest, TestEventRecordTrackPause) {
-    std::unique_ptr<AudioPlayback> playback{
-            new AudioPlayback(8000, AUDIO_FORMAT_PCM_16_BIT, AUDIO_CHANNEL_OUT_MONO)};
+    const auto playback = sp<AudioPlayback>::make(
+            8000 /* sampleRate */, AUDIO_FORMAT_PCM_16_BIT, AUDIO_CHANNEL_OUT_MONO);
     ASSERT_EQ(OK, playback->loadResource("/data/local/tmp/bbb_1ch_8kHz_s16le.raw"))
             << "Unable to open Resource";
     EXPECT_EQ(OK, playback->create()) << "AudioTrack Creation failed";
@@ -117,8 +117,8 @@ TEST_F(AudioRecordTest, TestEventRecordTrackPause) {
 }
 
 TEST_F(AudioRecordTest, TestEventRecordTrackStop) {
-    std::unique_ptr<AudioPlayback> playback{
-            new AudioPlayback(8000, AUDIO_FORMAT_PCM_16_BIT, AUDIO_CHANNEL_OUT_MONO)};
+    const auto playback = sp<AudioPlayback>::make(
+            8000 /* sampleRate */, AUDIO_FORMAT_PCM_16_BIT, AUDIO_CHANNEL_OUT_MONO);
     ASSERT_EQ(OK, playback->loadResource("/data/local/tmp/bbb_1ch_8kHz_s16le.raw"))
             << "Unable to open Resource";
     EXPECT_EQ(OK, playback->create()) << "AudioTrack Creation failed";
