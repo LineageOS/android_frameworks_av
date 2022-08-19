@@ -402,11 +402,8 @@ status_t AudioCapture::create() {
     }
     if (mFlags & AUDIO_INPUT_FLAG_FAST) {
         ALOGW("Overriding all previous computations");
-        const uint32_t kMinNormalCaptureBufferSizeMs = 12;
-        size_t maxFrameCount = kMinNormalCaptureBufferSizeMs * mSampleRate / 1000;
-        mMaxBytesPerCallback = maxFrameCount * samplesPerFrame * bytesPerSample / 2;
-        mNotificationFrames = maxFrameCount / 2;
-        mFrameCount = 2 * mNotificationFrames;
+        mFrameCount = 0;
+        mNotificationFrames = 0;
     }
     mNumFramesToRecord = (mSampleRate * 0.25);  // record .25 sec
     std::string packageName{"AudioCapture"};
@@ -416,10 +413,16 @@ status_t AudioCapture::create() {
     attributionSource.pid = VALUE_OR_FATAL(legacy2aidl_pid_t_int32_t(getpid()));
     attributionSource.token = sp<BBinder>::make();
     if (mTransferType == AudioRecord::TRANSFER_OBTAIN) {
-        mRecord = new AudioRecord(attributionSource);
-        status = mRecord->set(mInputSource, mSampleRate, mFormat, mChannelMask, mFrameCount,
-                              nullptr, nullptr, 0, false, mSessionId, mTransferType, mFlags,
-                              attributionSource.uid, attributionSource.pid);
+        if (mSampleRate == 48000) {  // test all available constructors
+            mRecord = new AudioRecord(mInputSource, mSampleRate, mFormat, mChannelMask,
+                                      attributionSource, mFrameCount, nullptr, nullptr,
+                                      mNotificationFrames, mSessionId, mTransferType, mFlags);
+        } else {
+            mRecord = new AudioRecord(attributionSource);
+            status = mRecord->set(mInputSource, mSampleRate, mFormat, mChannelMask, mFrameCount,
+                                  nullptr, nullptr, 0, false, mSessionId, mTransferType, mFlags,
+                                  attributionSource.uid, attributionSource.pid);
+        }
         if (NO_ERROR != status) return status;
     } else if (mTransferType == AudioRecord::TRANSFER_CALLBACK) {
         mRecord = new AudioRecord(mInputSource, mSampleRate, mFormat, mChannelMask,
@@ -433,6 +436,11 @@ status_t AudioCapture::create() {
     mRecord->setCallerName(packageName);
     status = mRecord->initCheck();
     if (NO_ERROR == status) mState = REC_READY;
+    if (mFlags & AUDIO_INPUT_FLAG_FAST) {
+        mFrameCount = mRecord->frameCount();
+        mNotificationFrames = mRecord->getNotificationPeriodInFrames();
+        mMaxBytesPerCallback = mNotificationFrames * samplesPerFrame * bytesPerSample;
+    }
     return status;
 }
 
@@ -458,12 +466,6 @@ status_t AudioCapture::stop() {
     status_t status = OK;
     mStopRecording = true;
     if (mState != REC_STOPPED) {
-        uint32_t position;
-        status = mRecord->getPosition(&position);
-        if (OK == status && mTransferType == AudioRecord::TRANSFER_CALLBACK) {
-            if (position - mNumFramesToRecord > mFrameCount)
-                if (mBufferOverrun == false) status = BAD_VALUE;
-        }
         mRecord->stopAndJoinCallbacks();
         mState = REC_STOPPED;
         LOG_FATAL_IF(true != mRecord->stopped());
