@@ -128,8 +128,8 @@ TEST(AudioTrackTest, TestAudioCbNotifier) {
             << "Unable to open Resource";
     EXPECT_EQ(OK, ap->create()) << "track creation failed";
     EXPECT_EQ(BAD_VALUE, ap->getAudioTrackHandle()->addAudioDeviceCallback(nullptr));
-    sp<OnAudioDeviceUpdateNotifier> cb = new OnAudioDeviceUpdateNotifier();
-    sp<OnAudioDeviceUpdateNotifier> cbOld = new OnAudioDeviceUpdateNotifier();
+    sp<OnAudioDeviceUpdateNotifier> cb = sp<OnAudioDeviceUpdateNotifier>::make();
+    sp<OnAudioDeviceUpdateNotifier> cbOld = sp<OnAudioDeviceUpdateNotifier>::make();
     EXPECT_EQ(OK, ap->getAudioTrackHandle()->addAudioDeviceCallback(cbOld));
     EXPECT_EQ(INVALID_OPERATION, ap->getAudioTrackHandle()->addAudioDeviceCallback(cbOld));
     EXPECT_EQ(OK, ap->getAudioTrackHandle()->addAudioDeviceCallback(cb));
