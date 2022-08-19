@@ -81,8 +81,8 @@ TEST_F(AudioRecordTest, TestSimpleRecord) {
 
 TEST_F(AudioRecordTest, TestAudioCbNotifier) {
     EXPECT_EQ(BAD_VALUE, mAC->getAudioRecordHandle()->addAudioDeviceCallback(nullptr));
-    sp<OnAudioDeviceUpdateNotifier> cb = new OnAudioDeviceUpdateNotifier();
-    sp<OnAudioDeviceUpdateNotifier> cbOld = new OnAudioDeviceUpdateNotifier();
+    sp<OnAudioDeviceUpdateNotifier> cb = sp<OnAudioDeviceUpdateNotifier>::make();
+    sp<OnAudioDeviceUpdateNotifier> cbOld = sp<OnAudioDeviceUpdateNotifier>::make();
     EXPECT_EQ(OK, mAC->getAudioRecordHandle()->addAudioDeviceCallback(cbOld));
     EXPECT_EQ(INVALID_OPERATION, mAC->getAudioRecordHandle()->addAudioDeviceCallback(cbOld));
     EXPECT_EQ(OK, mAC->getAudioRecordHandle()->addAudioDeviceCallback(cb));
