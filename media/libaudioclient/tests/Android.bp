@@ -160,3 +160,12 @@ cc_test {
         "audio_test_utils.cpp",
     ],
 }
+
+cc_test {
+    name: "audioeffect_tests",
+    defaults: ["libaudioclient_gtests_defaults"],
+    srcs: [
+        "audioeffect_tests.cpp",
+        "audio_test_utils.cpp",
+    ],
+}
