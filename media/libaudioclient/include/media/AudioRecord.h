@@ -46,27 +46,6 @@ class AudioRecord : public AudioSystem::AudioDeviceCallback
 {
 public:
 
-    /* Events used by AudioRecord callback function (legacy_callback_t).
-     * Keep in sync with frameworks/base/media/java/android/media/AudioRecord.java NATIVE_EVENT_*.
-     */
-    enum event_type {
-        EVENT_MORE_DATA = 0,        // Request to read available data from buffer.
-                                    // If this event is delivered but the callback handler
-                                    // does not want to read the available data, the handler must
-                                    // explicitly ignore the event by setting frameCount to zero.
-        EVENT_OVERRUN = 1,          // Buffer overrun occurred.
-        EVENT_MARKER = 2,           // Record head is at the specified marker position
-                                    // (See setMarkerPosition()).
-        EVENT_NEW_POS = 3,          // Record head is at a new position
-                                    // (See setPositionUpdatePeriod()).
-        EVENT_NEW_IAUDIORECORD = 4, // IAudioRecord was re-created, either due to re-routing and
-                                    // voluntary invalidation by mediaserver, or mediaserver crash.
-    };
-
-    /* Client should declare a Buffer and pass address to obtainBuffer()
-     * and releaseBuffer().  See also legacy_callback_t for EVENT_MORE_DATA.
-     */
-
     class Buffer
     {
       friend AudioRecord;
@@ -122,7 +101,6 @@ public:
      *          - EVENT_NEW_IAUDIORECORD: unused.
      */
 
-    typedef void (*legacy_callback_t)(int event, void* user, void *info);
 
     class IAudioRecordCallback : public virtual RefBase {
         friend AudioRecord;
@@ -226,24 +204,6 @@ public:
                                     float selectedMicFieldDimension = MIC_FIELD_DIMENSION_DEFAULT);
 
 
-                        AudioRecord(audio_source_t inputSource,
-                                    uint32_t sampleRate,
-                                    audio_format_t format,
-                                    audio_channel_mask_t channelMask,
-                                    const android::content::AttributionSourceState& client,
-                                    size_t frameCount,
-                                    legacy_callback_t callback,
-                                    void* user,
-                                    uint32_t notificationFrames = 0,
-                                    audio_session_t sessionId = AUDIO_SESSION_ALLOCATE,
-                                    transfer_type transferType = TRANSFER_DEFAULT,
-                                    audio_input_flags_t flags = AUDIO_INPUT_FLAG_NONE,
-                                    const audio_attributes_t* pAttributes = nullptr,
-                                    audio_port_handle_t selectedDeviceId = AUDIO_PORT_HANDLE_NONE,
-                                    audio_microphone_direction_t
-                                        selectedMicDirection = MIC_DIRECTION_UNSPECIFIED,
-                                    float selectedMicFieldDimension = MIC_FIELD_DIMENSION_DEFAULT);
-
     /* Terminates the AudioRecord and unregisters it from AudioFlinger.
      * Also destroys all resources associated with the AudioRecord.
      */
@@ -272,27 +232,6 @@ public:
                             audio_channel_mask_t channelMask,
                             size_t frameCount = 0,
                             const wp<IAudioRecordCallback> &callback = nullptr,
-                            uint32_t notificationFrames = 0,
-                            bool threadCanCallJava = false,
-                            audio_session_t sessionId = AUDIO_SESSION_ALLOCATE,
-                            transfer_type transferType = TRANSFER_DEFAULT,
-                            audio_input_flags_t flags = AUDIO_INPUT_FLAG_NONE,
-                            uid_t uid = AUDIO_UID_INVALID,
-                            pid_t pid = -1,
-                            const audio_attributes_t* pAttributes = nullptr,
-                            audio_port_handle_t selectedDeviceId = AUDIO_PORT_HANDLE_NONE,
-                            audio_microphone_direction_t
-                                selectedMicDirection = MIC_DIRECTION_UNSPECIFIED,
-                            float selectedMicFieldDimension = MIC_FIELD_DIMENSION_DEFAULT,
-                            int32_t maxSharedAudioHistoryMs = 0);
-
-           status_t    set(audio_source_t inputSource,
-                            uint32_t sampleRate,
-                            audio_format_t format,
-                            audio_channel_mask_t channelMask,
-                            size_t frameCount,
-                            legacy_callback_t callback,
-                            void* user,
                             uint32_t notificationFrames = 0,
                             bool threadCanCallJava = false,
                             audio_session_t sessionId = AUDIO_SESSION_ALLOCATE,
