@@ -64,3 +64,55 @@ cc_fuzz {
     srcs: ["ndk_crypto_fuzzer.cpp"],
     defaults: ["libmediandk_fuzzer_defaults"],
 }
+
+cc_fuzz {
+     name: "ndk_image_reader_fuzzer",
+     srcs: [
+        "ndk_image_reader_fuzzer.cpp",
+     ],
+     shared_libs: [
+        "android.hidl.token@1.0-utils",
+        "android.hardware.graphics.bufferqueue@1.0",
+     ],
+     cflags: [
+        "-D__ANDROID_VNDK__",
+     ],
+     defaults: ["libmediandk_fuzzer_defaults"],
+}
+
+cc_fuzz {
+    name: "ndk_extractor_fuzzer",
+    srcs: ["ndk_extractor_fuzzer.cpp"],
+    defaults: ["libmediandk_fuzzer_defaults"],
+    shared_libs: ["libbinder_ndk",],
+    corpus: ["corpus/*"],
+}
+
+cc_fuzz {
+    name: "ndk_mediaformat_fuzzer",
+    srcs: ["ndk_mediaformat_fuzzer.cpp"],
+    defaults: ["libmediandk_fuzzer_defaults",],
+}
+
+cc_fuzz {
+    name: "ndk_drm_fuzzer",
+    srcs: ["ndk_drm_fuzzer.cpp"],
+    defaults: ["libmediandk_fuzzer_defaults",],
+}
+
+cc_fuzz {
+    name: "ndk_mediamuxer_fuzzer",
+    srcs: ["ndk_mediamuxer_fuzzer.cpp"],
+    defaults: ["libmediandk_fuzzer_defaults"],
+    shared_libs: ["libbinder_ndk",],
+}
+
+cc_fuzz {
+    name: "ndk_sync_codec_fuzzer",
+    srcs: [
+            "ndk_sync_codec_fuzzer.cpp",
+             "NdkMediaCodecFuzzerBase.cpp",
+          ],
+    header_libs: ["libnativewindow_headers",],
+    defaults: ["libmediandk_fuzzer_defaults",],
+}

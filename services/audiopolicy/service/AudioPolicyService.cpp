@@ -1210,6 +1210,14 @@ status_t AudioPolicyService::dump(int fd, const Vector<String16>& args __unused)
 
         dumpReleaseLock(mLock, locked);
 
+        if (mSpatializer != nullptr) {
+            std::string dumpString = mSpatializer->toString(1 /* level */);
+            write(fd, dumpString.c_str(), dumpString.size());
+        } else {
+            String8 spatializerPtr = String8::format("Spatializer no supportted on this device\n");
+            write(fd, spatializerPtr.c_str(), spatializerPtr.size());
+        }
+
         {
             std::string timeCheckStats = getIAudioPolicyServiceStatistics().dump();
             dprintf(fd, "\nIAudioPolicyService binder call profile\n");
