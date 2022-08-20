@@ -57,6 +57,10 @@
 // The Audio Spatializer key appends the spatializerId (currently 0)
 #define AMEDIAMETRICS_KEY_PREFIX_AUDIO_SPATIALIZER AMEDIAMETRICS_KEY_PREFIX_AUDIO "spatializer."
 
+// The Audio Spatializer device key appends the device type.
+#define AMEDIAMETRICS_KEY_PREFIX_AUDIO_SPATIALIZER_DEVICE \
+        AMEDIAMETRICS_KEY_PREFIX_AUDIO_SPATIALIZER "device."
+
 // The AudioStream key appends the "streamId" to the prefix.
 #define AMEDIAMETRICS_KEY_PREFIX_AUDIO_STREAM  AMEDIAMETRICS_KEY_PREFIX_AUDIO "stream."
 
@@ -132,6 +136,7 @@
 
 #define AMEDIAMETRICS_PROP_DIRECTION      "direction"      // string AAudio input or output
 #define AMEDIAMETRICS_PROP_DURATIONNS     "durationNs"     // int64 duration time span
+#define AMEDIAMETRICS_PROP_ENABLED        "enabled"        // string true/false.
 #define AMEDIAMETRICS_PROP_ENCODING       "encoding"       // string value of format
 
 #define AMEDIAMETRICS_PROP_EVENT          "event#"         // string value (often func name)
@@ -141,6 +146,8 @@
 #define AMEDIAMETRICS_PROP_FLAGS          "flags"
 
 #define AMEDIAMETRICS_PROP_FRAMECOUNT     "frameCount"     // int32
+#define AMEDIAMETRICS_PROP_HASHEADTRACKER  "hasHeadTracker" // string true/false
+#define AMEDIAMETRICS_PROP_HEADTRACKERENABLED "headTrackerEnabled" // string true/false
 #define AMEDIAMETRICS_PROP_HEADTRACKINGMODES "headTrackingModes" // string |, like modes.
 #define AMEDIAMETRICS_PROP_INPUTDEVICES   "inputDevices"   // string value
 #define AMEDIAMETRICS_PROP_INTERNALTRACKID "internalTrackId" // int32

@@ -28,6 +28,9 @@
 namespace android {
 namespace media {
 
+// Timeout for Spatializer dumpsys trylock, don't block for more than 3 seconds.
+constexpr auto kSpatializerDumpSysTimeOutInSecond = std::chrono::seconds(3);
+
 /**
  * A utility providing streaming of pose data from motion sensors provided by the Sensor Framework.
  *
@@ -100,6 +103,11 @@ class SensorPoseProvider {
      * discover properties of the sensor.
      */
     virtual std::optional<const Sensor> getSensorByHandle(int32_t handle) = 0;
+
+    /**
+     * Dump SensorPoseProvider parameters and history data.
+     */
+    virtual std::string toString(unsigned level) = 0;
 };
 
 }  // namespace media
