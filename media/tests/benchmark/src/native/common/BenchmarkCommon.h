@@ -50,7 +50,7 @@ class CallBackQueue {
         {
             lock_guard<mutex> lock(mMutex);
             needsNotify = mQueue.empty();
-            mQueue.push(move(elem));
+            mQueue.push(std::move(elem));
         }
         if (needsNotify) mQueueNotEmptyCondition.notify_one();
     }
