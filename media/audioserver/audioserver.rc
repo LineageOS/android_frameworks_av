@@ -7,11 +7,9 @@ service audioserver /system/bin/audioserver
     ioprio rt 4
     task_profiles ProcessCapacityHigh HighPerformance
     onrestart restart vendor.audio-hal
+    onrestart restart vendor.audio-hal-aidl
     onrestart restart vendor.audio-hal-4-0-msd
     onrestart restart audio_proxy_service
-    # Keep the original service names for backward compatibility
-    onrestart restart vendor.audio-hal-2-0
-    onrestart restart audio-hal-2-0
 
 on property:vts.native_server.on=1
     stop audioserver
@@ -20,42 +18,34 @@ on property:vts.native_server.on=0
 
 on property:init.svc.audioserver=stopped
     stop vendor.audio-hal
+    stop vendor.audio-hal-aidl
     stop vendor.audio-hal-4-0-msd
     stop audio_proxy_service
-    # Keep the original service names for backward compatibility
-    stop vendor.audio-hal-2-0
-    stop audio-hal-2-0
     # See b/155364397. Need to have HAL service running for VTS.
     # Can't use 'restart' because then HAL service would restart
     # audioserver bringing it back into running state.
     start vendor.audio-hal
+    start vendor.audio-hal-aidl
     start vendor.audio-hal-4-0-msd
     start audio_proxy_service
-    # Keep the original service names for backward compatibility
-    start vendor.audio-hal-2-0
-    start audio-hal-2-0
 
 on property:init.svc.audioserver=running
     start vendor.audio-hal
+    start vendor.audio-hal-aidl
     start vendor.audio-hal-4-0-msd
     start audio_proxy_service
-    # Keep the original service names for backward compatibility
-    start vendor.audio-hal-2-0
-    start audio-hal-2-0
 
 on property:sys.audio.restart.hal=1
     # See b/159966243. Avoid restart loop between audioserver and HAL.
     # Keep the original service names for backward compatibility
     stop vendor.audio-hal
+    stop vendor.audio-hal-aidl
     stop vendor.audio-hal-4-0-msd
     stop audio_proxy_service
-    stop vendor.audio-hal-2-0
-    stop audio-hal-2-0
     start vendor.audio-hal
+    start vendor.audio-hal-aidl
     start vendor.audio-hal-4-0-msd
     start audio_proxy_service
-    start vendor.audio-hal-2-0
-    start audio-hal-2-0
     # reset the property
     setprop sys.audio.restart.hal 0
 
