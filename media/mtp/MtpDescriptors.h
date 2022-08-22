@@ -23,6 +23,17 @@
 
 namespace android {
 
+#ifdef MTP_FUZZER
+constexpr char FFS_MTP_EP0[] = "/data/local/tmp/usb-ffs/mtp/ep0";
+constexpr char FFS_MTP_EP_IN[] = "/data/local/tmp/usb-ffs/mtp/ep1";
+constexpr char FFS_MTP_EP_OUT[] = "/data/local/tmp/usb-ffs/mtp/ep2";
+constexpr char FFS_MTP_EP_INTR[] = "/data/local/tmp/usb-ffs/mtp/ep3";
+
+constexpr char FFS_PTP_EP0[] = "/data/local/tmp/usb-ffs/ptp/ep0";
+constexpr char FFS_PTP_EP_IN[] = "/data/local/tmp/usb-ffs/ptp/ep1";
+constexpr char FFS_PTP_EP_OUT[] = "/data/local/tmp/usb-ffs/ptp/ep2";
+constexpr char FFS_PTP_EP_INTR[] = "/data/local/tmp/usb-ffs/ptp/ep3";
+#else
 constexpr char FFS_MTP_EP0[] = "/dev/usb-ffs/mtp/ep0";
 constexpr char FFS_MTP_EP_IN[] = "/dev/usb-ffs/mtp/ep1";
 constexpr char FFS_MTP_EP_OUT[] = "/dev/usb-ffs/mtp/ep2";
@@ -32,6 +43,7 @@ constexpr char FFS_PTP_EP0[] = "/dev/usb-ffs/ptp/ep0";
 constexpr char FFS_PTP_EP_IN[] = "/dev/usb-ffs/ptp/ep1";
 constexpr char FFS_PTP_EP_OUT[] = "/dev/usb-ffs/ptp/ep2";
 constexpr char FFS_PTP_EP_INTR[] = "/dev/usb-ffs/ptp/ep3";
+#endif
 
 constexpr int MAX_PACKET_SIZE_FS = 64;
 constexpr int MAX_PACKET_SIZE_HS = 512;

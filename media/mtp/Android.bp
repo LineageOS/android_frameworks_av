@@ -31,8 +31,8 @@ license {
     ],
 }
 
-cc_library_shared {
-    name: "libmtp",
+cc_defaults {
+    name: "libmtp_defaults",
     srcs: [
         "MtpDataPacket.cpp",
         "MtpDebug.cpp",
@@ -70,4 +70,15 @@ cc_library_shared {
         "libusbhost",
     ],
     header_libs: ["libcutils_headers"],
+}
+
+cc_library_shared {
+    name: "libmtp",
+    defaults: ["libmtp_defaults"],
+}
+
+cc_library_shared {
+    name: "libmtp_fuzz",
+    defaults: ["libmtp_defaults"],
+    cflags: ["-DMTP_FUZZER"],
 }

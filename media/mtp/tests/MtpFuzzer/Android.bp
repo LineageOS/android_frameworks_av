@@ -57,3 +57,95 @@ cc_fuzz {
     dictionary: "mtp_fuzzer.dict",
     corpus: ["corpus/*"],
 }
+
+cc_defaults {
+    name: "mtp_property_fuzzer_defaults",
+    srcs: ["mtp_property_fuzzer.cpp"],
+    shared_libs: [
+        "libmtp",
+        "libasyncio",
+        "libusbhost",
+    ],
+    defaults: ["mtp_fuzzer_defaults"],
+}
+
+cc_fuzz {
+     name: "mtp_device_property_fuzzer",
+     defaults: ["mtp_property_fuzzer_defaults"],
+     cflags: [
+         "-DMTP_DEVICE",
+     ],
+}
+
+cc_fuzz {
+     name: "mtp_host_property_fuzzer",
+     defaults: ["mtp_property_fuzzer_defaults"],
+     cflags: [
+         "-DMTP_HOST",
+     ],
+}
+
+cc_fuzz {
+    name: "mtp_handle_fuzzer",
+    srcs: ["mtp_handle_fuzzer.cpp"],
+    shared_libs: ["libmtp_fuzz"],
+    defaults: ["mtp_fuzzer_defaults"],
+    cflags: ["-DMTP_FUZZER"],
+}
+
+cc_defaults  {
+     name: "mtp_packet_defaults",
+     shared_libs: [
+        "libmtp",
+        "libasyncio",
+        "libusbhost",
+     ],
+     defaults: ["mtp_fuzzer_defaults"],
+     cflags: [
+         "-DMTP_HOST",
+         "-DMTP_DEVICE",
+     ],
+}
+
+cc_fuzz {
+     name: "mtp_packet_fuzzer",
+     srcs: ["mtp_packet_fuzzer.cpp"],
+     defaults: ["mtp_packet_defaults"],
+}
+
+cc_fuzz {
+     name: "mtp_device_fuzzer",
+     srcs: ["mtp_device_fuzzer.cpp"],
+     shared_libs: [
+        "libmtp",
+        "libusbhost",
+     ],
+     defaults: ["mtp_fuzzer_defaults"],
+     cflags: [
+         "-DMTP_DEVICE",
+     ],
+}
+
+cc_fuzz {
+     name: "mtp_request_packet_fuzzer",
+     srcs: ["mtp_request_packet_fuzzer.cpp"],
+     defaults: ["mtp_packet_defaults"],
+}
+
+cc_fuzz {
+     name: "mtp_event_packet_fuzzer",
+     srcs: ["mtp_event_packet_fuzzer.cpp"],
+     defaults: ["mtp_packet_defaults"],
+}
+
+cc_fuzz {
+     name: "mtp_response_packet_fuzzer",
+     srcs: ["mtp_response_packet_fuzzer.cpp"],
+     defaults: ["mtp_packet_defaults"],
+}
+
+cc_fuzz {
+     name: "mtp_data_packet_fuzzer",
+     srcs: ["mtp_data_packet_fuzzer.cpp"],
+     defaults: ["mtp_packet_defaults"],
+}
