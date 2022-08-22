@@ -807,7 +807,6 @@ aaudio_result_t AudioStreamInternal::processData(void *buffer, int32_t numFrames
 
             if (wakeTimeNanos > deadlineNanos) {
                 // If we time out, just return the framesWritten so far.
-                // TODO remove after we fix the deadline bug
                 ALOGW("processData(): entered at %lld nanos, currently %lld",
                       (long long) entryTimeNanos, (long long) currentTimeNanos);
                 ALOGW("processData(): TIMEOUT after %lld nanos",
