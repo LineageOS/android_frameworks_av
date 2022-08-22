@@ -174,7 +174,6 @@ class SensorPoseProviderImpl : public SensorPoseProvider {
     sp<Looper> mLooper;
     Listener* const mListener;
     SensorManager* const mSensorManager;
-    std::thread mThread;
     std::mutex mMutex;
     std::map<int32_t, SensorEnableGuard> mEnabledSensors;
     std::map<int32_t, SensorExtra> mEnabledSensorsExtra GUARDED_BY(mMutex);
@@ -187,11 +186,13 @@ class SensorPoseProviderImpl : public SensorPoseProvider {
     // the worker thread and that thread would notify, via the promise below whenever initialization
     // is finished, and whether it was successful.
     std::promise<bool> mInitPromise;
+    std::thread mThread;
 
     SensorPoseProviderImpl(const char* packageName, Listener* listener)
         : mListener(listener),
-          mSensorManager(&SensorManager::getInstanceForPackage(String16(packageName))),
-          mThread([this] { threadFunc(); }) {}
+          mSensorManager(&SensorManager::getInstanceForPackage(String16(packageName))) {
+        mThread = std::thread([this] { threadFunc(); });
+    }
 
     void initFinished(bool success) { mInitPromise.set_value(success); }
 
