@@ -1,7 +1,12 @@
-# Bug component: 1344
+## Media team top-level OWNERS, bug component: 1344
+## Only contact for camera changes as a fallback
 elaurent@google.com
-etalvala@google.com
 lajos@google.com
 
 # go/android-fwk-media-solutions for info on areas of ownership.
 include platform/frameworks/av:/media/janitors/media_solutions_OWNERS
+
+## Camera team top-level OWNERS, bug component: 41727
+## Only contact for media changes as a fallback
+etalvala@google.com
+shuzhenwang@google.com
