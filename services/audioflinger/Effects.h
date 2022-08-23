@@ -302,6 +302,8 @@ private:
                 ? EFFECT_BUFFER_ACCESS_WRITE : EFFECT_BUFFER_ACCESS_ACCUMULATE;
     }
 
+    status_t setVolumeInternal(uint32_t *left, uint32_t *right, bool controller);
+
 
     effect_config_t     mConfig;    // input and output audio configuration
     sp<EffectHalInterface> mEffectInterface; // Effect module HAL
