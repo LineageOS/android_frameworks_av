@@ -459,6 +459,15 @@ AudioAnalytics::AudioAnalytics(const std::shared_ptr<StatsdLog>& statsdLog)
             [this](const std::shared_ptr<const android::mediametrics::Item> &item){
                 mAudioPowerUsage.checkCreatePatch(item);
             }));
+
+    // Handle Spatializer - these keys are prefixed by "audio.spatializer."
+    mActions.addAction(
+        AMEDIAMETRICS_KEY_PREFIX_AUDIO_SPATIALIZER "*." AMEDIAMETRICS_PROP_EVENT,
+        std::monostate{}, /* match any event */
+        std::make_shared<AnalyticsActions::Function>(
+            [this](const std::shared_ptr<const android::mediametrics::Item> &item){
+                mSpatializer.onEvent(item);
+            }));
 }
 
 AudioAnalytics::~AudioAnalytics()
@@ -1525,5 +1534,109 @@ std::pair<std::string, int32_t> AudioAnalytics::Health::dump(
     return { s, n };
 }
 
+void AudioAnalytics::Spatializer::onEvent(
+        const std::shared_ptr<const android::mediametrics::Item> &item)
+{
+    const auto key = item->getKey();
+
+    if (!startsWith(key, AMEDIAMETRICS_KEY_PREFIX_AUDIO_SPATIALIZER)) return;
+
+    const std::string suffix =
+            key.substr(std::size(AMEDIAMETRICS_KEY_PREFIX_AUDIO_SPATIALIZER) - 1);
+
+    std::string eventStr; // optional - find the actual event string.
+    (void)item->get(AMEDIAMETRICS_PROP_EVENT, &eventStr);
+
+    const size_t delim = suffix.find('.'); // note could use split.
+    if (delim == suffix.npos) {
+        // on create with suffix == "0" for the first spatializer effect.
+
+        std::string headTrackingModes;
+        (void)item->get(AMEDIAMETRICS_PROP_HEADTRACKINGMODES, &headTrackingModes);
+
+        std::string levels;
+        (void)item->get(AMEDIAMETRICS_PROP_LEVELS, &levels);
+
+        std::string modes;
+        (void)item->get(AMEDIAMETRICS_PROP_MODES, &modes);
+
+        int32_t channelMask = 0;
+        (void)item->get(AMEDIAMETRICS_PROP_CHANNELMASK, &channelMask);
+
+        LOG(LOG_LEVEL) << "key:" << key
+                << " headTrackingModes:" << headTrackingModes
+                << " levels:" << levels
+                << " modes:" << modes
+                << " channelMask:" << channelMask
+                ;
+
+        const std::vector<int32_t> headTrackingModesVector =
+                types::vectorFromMap(headTrackingModes, types::getHeadTrackingModeMap());
+        const std::vector<int32_t> levelsVector =
+                types::vectorFromMap(levels, types::getSpatializerLevelMap());
+        const std::vector<int32_t> modesVector =
+                types::vectorFromMap(modes, types::getSpatializerModeMap());
+
+        // TODO: send to statsd
+
+        std::lock_guard lg(mLock);
+        mSimpleLog.log("%s suffix: %s item: %s",
+                __func__, suffix.c_str(), item->toString().c_str());
+    } else {
+        std::string subtype = suffix.substr(0, delim);
+        if (subtype != "device") return; // not a device.
+
+        std::string deviceType = suffix.substr(std::size("device.") - 1);
+
+        std::string enabled;
+        (void)item->get(AMEDIAMETRICS_PROP_ENABLED, &enabled);
+        std::string hasHeadTracker;
+        (void)item->get(AMEDIAMETRICS_PROP_HASHEADTRACKER, &hasHeadTracker);
+        std::string headTrackerEnabled;
+        (void)item->get(AMEDIAMETRICS_PROP_HEADTRACKERENABLED, &headTrackerEnabled);
+
+        std::lock_guard lg(mLock);
+
+        // Validate from our cached state
+        DeviceState& deviceState = mDeviceStateMap[deviceType];
+
+        if (!enabled.empty()) {
+            if (enabled != deviceState.enabled) {
+                deviceState.enabled = enabled;
+                const bool enabledStatsd = enabled == "true";
+                // TODO: send to statsd
+                (void)mAudioAnalytics;
+                (void)enabledStatsd;
+            }
+        }
+        if (!hasHeadTracker.empty()) {
+            if (hasHeadTracker != deviceState.hasHeadTracker) {
+                deviceState.hasHeadTracker = hasHeadTracker;
+                const bool supportedStatsd = hasHeadTracker == "true";
+                // TODO: send to statsd
+                (void)supportedStatsd;
+            }
+        }
+        if (!headTrackerEnabled.empty()) {
+            if (headTrackerEnabled != deviceState.headTrackerEnabled) {
+                deviceState.headTrackerEnabled = headTrackerEnabled;
+                const bool enabledStatsd = headTrackerEnabled == "true";
+                // TODO: send to statsd
+                (void)enabledStatsd;
+            }
+        }
+        mSimpleLog.log("%s deviceType: %s item: %s",
+                __func__, deviceType.c_str(), item->toString().c_str());
+    }
+}
+
+std::pair<std::string, int32_t> AudioAnalytics::Spatializer::dump(
+        int32_t lines, const char *prefix) const
+{
+    std::lock_guard lg(mLock);
+    std::string s = mSimpleLog.dumpToString(prefix == nullptr ? "" : prefix, lines);
+    size_t n = std::count(s.begin(), s.end(), '\n');
+    return { s, n };
+}
 
 } // namespace android::mediametrics
