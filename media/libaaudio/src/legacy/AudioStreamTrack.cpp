@@ -248,7 +248,7 @@ aaudio_result_t AudioStreamTrack::open(const AudioStreamBuilder& builder)
 
     if (getState() != AAUDIO_STREAM_STATE_UNINITIALIZED) {
         ALOGE("%s - Open canceled since state = %d", __func__, getState());
-        if (getState() == AAUDIO_STREAM_STATE_DISCONNECTED)
+        if (isDisconnected())
         {
             ALOGE("%s - Opening while state is disconnected", __func__);
             safeReleaseClose();
@@ -432,7 +432,7 @@ aaudio_result_t AudioStreamTrack::write(const void *buffer,
         return result;
     }
 
-    if (getState() == AAUDIO_STREAM_STATE_DISCONNECTED) {
+    if (isDisconnected()) {
         return AAUDIO_ERROR_DISCONNECTED;
     }
 
@@ -446,7 +446,7 @@ aaudio_result_t AudioStreamTrack::write(const void *buffer,
         // in this context, a DEAD_OBJECT is more likely to be a disconnect notification due to
         // AudioTrack invalidation
         if (bytesWritten == DEAD_OBJECT) {
-            setState(AAUDIO_STREAM_STATE_DISCONNECTED);
+            setDisconnected();
             return AAUDIO_ERROR_DISCONNECTED;
         }
         return AAudioConvert_androidToAAudioResult(bytesWritten);
