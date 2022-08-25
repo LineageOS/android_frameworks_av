@@ -10,6 +10,10 @@ package {
 cc_library_shared {
     name: "libaudiopolicyservice",
 
+    defaults: [
+        "latest_android_media_audio_common_types_cpp_shared",
+    ],
+
     srcs: [
         "AudioPolicyClientImpl.cpp",
         "AudioPolicyEffects.cpp",
@@ -49,7 +53,6 @@ cc_library_shared {
         "libshmemcompat",
         "libutils",
         "libstagefright_foundation",
-        "android.media.audio.common.types-V1-cpp",
         "audioclient-types-aidl-cpp",
         "audioflinger-aidl-cpp",
         "audiopolicy-aidl-cpp",
