@@ -13,11 +13,9 @@
           "include-filter": "android.nativemedia.aaudio.AAudioTests#AAudioBasic.*"
         }
       ]
-    }
-  ],
-  "postsubmit": [
+    },
     {
-      "name": "audieorecord_tests"
+      "name": "audiorecord_tests"
     },
     {
       "name": "audioeffect_tests"
@@ -30,9 +28,7 @@
     },
     {
       "name": "trackplayerbase_tests"
-    }
-  ],
-  "postsubmit": [
+    },
     {
       "name": "audiosystem_tests"
     }
