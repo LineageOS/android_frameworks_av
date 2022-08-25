@@ -25,7 +25,7 @@ cc_library_headers {
     ],
     apex_available: [
         "//apex_available:platform",
-        "com.android.bluetooth",
+        "com.android.btservices",
         "com.android.media",
         "com.android.media.swcodec",
     ],
@@ -51,7 +51,7 @@ cc_library_headers {
     min_sdk_version: "29",
     apex_available: [
         "//apex_available:platform",
-        "com.android.bluetooth",
+        "com.android.btservices",
         "com.android.media",
         "com.android.media.swcodec",
     ],
