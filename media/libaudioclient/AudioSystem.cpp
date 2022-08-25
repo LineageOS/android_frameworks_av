@@ -2384,7 +2384,7 @@ status_t AudioSystem::getDirectPlaybackSupport(const audio_attributes_t *attr,
 
 status_t AudioSystem::getDirectProfilesForAttributes(const audio_attributes_t* attr,
                                                 std::vector<audio_profile>* audioProfiles) {
-    if (attr == nullptr) {
+    if (attr == nullptr || audioProfiles == nullptr) {
         return BAD_VALUE;
     }
 
