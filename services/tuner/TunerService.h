@@ -86,10 +86,7 @@ public:
     string addFilterToShared(const shared_ptr<TunerFilter>& sharedFilter);
     void removeSharedFilter(const shared_ptr<TunerFilter>& sharedFilter);
 
-    static shared_ptr<TunerService> getTunerService();
-
 private:
-    bool hasITuner();
     void updateTunerResources();
     vector<TunerFrontendInfo> getTRMFrontendInfos();
     vector<int32_t> getTRMLnbHandles();
@@ -98,8 +95,6 @@ private:
     int mTunerVersion = TUNER_HAL_VERSION_UNKNOWN;
     Mutex mSharedFiltersLock;
     map<string, shared_ptr<TunerFilter>> mSharedFilters;
-
-    static shared_ptr<TunerService> sTunerService;
 };
 
 }  // namespace tuner

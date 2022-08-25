@@ -39,33 +39,14 @@ TunerTimeFilter::~TunerTimeFilter() {
 }
 
 ::ndk::ScopedAStatus TunerTimeFilter::setTimeStamp(int64_t timeStamp) {
-    if (mTimeFilter == nullptr) {
-        ALOGE("ITimeFilter is not initialized");
-        return ::ndk::ScopedAStatus::fromServiceSpecificError(
-                static_cast<int32_t>(Result::UNAVAILABLE));
-    }
-
     return mTimeFilter->setTimeStamp(timeStamp);
 }
 
 ::ndk::ScopedAStatus TunerTimeFilter::clearTimeStamp() {
-    if (mTimeFilter == nullptr) {
-        ALOGE("ITimeFilter is not initialized");
-        return ::ndk::ScopedAStatus::fromServiceSpecificError(
-                static_cast<int32_t>(Result::UNAVAILABLE));
-    }
-
     return mTimeFilter->clearTimeStamp();
 }
 
 ::ndk::ScopedAStatus TunerTimeFilter::getSourceTime(int64_t* _aidl_return) {
-    if (mTimeFilter == nullptr) {
-        *_aidl_return = (int64_t)Constant64Bit::INVALID_PRESENTATION_TIME_STAMP;
-        ALOGE("ITimeFilter is not initialized");
-        return ::ndk::ScopedAStatus::fromServiceSpecificError(
-                static_cast<int32_t>(Result::UNAVAILABLE));
-    }
-
     auto status = mTimeFilter->getSourceTime(_aidl_return);
     if (!status.isOk()) {
         *_aidl_return = (int64_t)Constant64Bit::INVALID_PRESENTATION_TIME_STAMP;
@@ -74,13 +55,6 @@ TunerTimeFilter::~TunerTimeFilter() {
 }
 
 ::ndk::ScopedAStatus TunerTimeFilter::getTimeStamp(int64_t* _aidl_return) {
-    if (mTimeFilter == nullptr) {
-        *_aidl_return = (int64_t)Constant64Bit::INVALID_PRESENTATION_TIME_STAMP;
-        ALOGE("ITimeFilter is not initialized");
-        return ::ndk::ScopedAStatus::fromServiceSpecificError(
-                static_cast<int32_t>(Result::UNAVAILABLE));
-    }
-
     auto status = mTimeFilter->getTimeStamp(_aidl_return);
     if (!status.isOk()) {
         *_aidl_return = (int64_t)Constant64Bit::INVALID_PRESENTATION_TIME_STAMP;
@@ -89,16 +63,7 @@ TunerTimeFilter::~TunerTimeFilter() {
 }
 
 ::ndk::ScopedAStatus TunerTimeFilter::close() {
-    if (mTimeFilter == nullptr) {
-        ALOGE("ITimeFilter is not initialized");
-        return ::ndk::ScopedAStatus::fromServiceSpecificError(
-                static_cast<int32_t>(Result::UNAVAILABLE));
-    }
-
-    auto status = mTimeFilter->close();
-    mTimeFilter = nullptr;
-
-    return status;
+    return mTimeFilter->close();
 }
 
 }  // namespace tuner
