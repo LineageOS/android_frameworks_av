@@ -17,7 +17,7 @@
   ],
   "postsubmit": [
     {
-      "name": "audieorecord_tests"
+      "name": "audiorecord_tests"
     },
     {
       "name": "audioeffect_tests"
