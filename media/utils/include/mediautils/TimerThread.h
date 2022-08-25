@@ -27,6 +27,8 @@
 
 #include <android-base/thread_annotations.h>
 
+#include <mediautils/FixedString.h>
+
 namespace android::mediautils {
 
 /**
@@ -54,7 +56,7 @@ class TimerThread {
      * \returns       a handle that can be used for cancellation.
      */
     Handle scheduleTask(
-            std::string tag, std::function<void()>&& func, std::chrono::milliseconds timeout);
+            std::string_view tag, std::function<void()>&& func, std::chrono::milliseconds timeout);
 
     /**
      * Tracks a task that shows up on toString() until cancelled.
@@ -62,7 +64,7 @@ class TimerThread {
      * \param tag     string associated with the task.
      * \returns       a handle that can be used for cancellation.
      */
-    Handle trackTask(std::string tag);
+    Handle trackTask(std::string_view tag);
 
     /**
      * Cancels a task previously scheduled with scheduleTask()
@@ -129,12 +131,22 @@ class TimerThread {
     // To minimize movement of data, we pass around shared_ptrs to Requests.
     // These are allocated and deallocated outside of the lock.
     struct Request {
+        Request(const std::chrono::system_clock::time_point& _scheduled,
+                const std::chrono::system_clock::time_point& _deadline,
+                pid_t _tid,
+                std::string_view _tag)
+            : scheduled(_scheduled)
+            , deadline(_deadline)
+            , tid(_tid)
+            , tag(_tag)
+            {}
+
         const std::chrono::system_clock::time_point scheduled;
         const std::chrono::system_clock::time_point deadline; // deadline := scheduled + timeout
                                                               // if deadline == scheduled, no
                                                               // timeout, task not executed.
         const pid_t tid;
-        const std::string tag;
+        const FixedString62 tag;
 
         std::string toString() const;
     };
