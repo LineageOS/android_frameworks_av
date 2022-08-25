@@ -31,17 +31,15 @@ extern std::string formatTime(std::chrono::system_clock::time_point t);
 extern std::string_view timeSuffix(std::string_view time1, std::string_view time2);
 
 TimerThread::Handle TimerThread::scheduleTask(
-        std::string tag, std::function<void()>&& func, std::chrono::milliseconds timeout) {
+        std::string_view tag, std::function<void()>&& func, std::chrono::milliseconds timeout) {
     const auto now = std::chrono::system_clock::now();
-    std::shared_ptr<const Request> request{
-            new Request{ now, now + timeout, gettid(), std::move(tag) }};
+    auto request = std::make_shared<const Request>(now, now + timeout, gettid(), tag);
     return mMonitorThread.add(std::move(request), std::move(func), timeout);
 }
 
-TimerThread::Handle TimerThread::trackTask(std::string tag) {
+TimerThread::Handle TimerThread::trackTask(std::string_view tag) {
     const auto now = std::chrono::system_clock::now();
-    std::shared_ptr<const Request> request{
-            new Request{ now, now, gettid(), std::move(tag) }};
+    auto request = std::make_shared<const Request>(now, now, gettid(), tag);
     return mNoTimeoutMap.add(std::move(request));
 }
 
@@ -106,10 +104,10 @@ std::string TimerThread::toString(size_t retiredCount) const {
 //
 /* static */
 bool TimerThread::isRequestFromHal(const std::shared_ptr<const Request>& request) {
-    const size_t hidlPos = request->tag.find("Hidl");
+    const size_t hidlPos = request->tag.asStringView().find("Hidl");
     if (hidlPos == std::string::npos) return false;
     // should be a separator afterwards Hidl which indicates the string was in the class.
-    const size_t separatorPos = request->tag.find("::", hidlPos);
+    const size_t separatorPos = request->tag.asStringView().find("::", hidlPos);
     return separatorPos != std::string::npos;
 }
 
