@@ -147,38 +147,80 @@ const char* AMediaFormat_toString(AMediaFormat *mData) {
 
 EXPORT
 bool AMediaFormat_getInt32(AMediaFormat* format, const char *name, int32_t *out) {
+    if (format == nullptr) {
+        return false;
+    }
+    if (name == nullptr) {
+        return false;
+    }
     return format->mFormat->findInt32(name, out);
 }
 
 EXPORT
 bool AMediaFormat_getInt64(AMediaFormat* format, const char *name, int64_t *out) {
+    if (format == nullptr) {
+        return false;
+    }
+    if (name == nullptr) {
+        return false;
+    }
     return format->mFormat->findInt64(name, out);
 }
 
 EXPORT
 bool AMediaFormat_getFloat(AMediaFormat* format, const char *name, float *out) {
+    if (format == nullptr) {
+        return false;
+    }
+    if (name == nullptr) {
+        return false;
+    }
     return format->mFormat->findFloat(name, out);
 }
 
 EXPORT
 bool AMediaFormat_getDouble(AMediaFormat* format, const char *name, double *out) {
+    if (format == nullptr) {
+        return false;
+    }
+    if (name == nullptr) {
+        return false;
+    }
     return format->mFormat->findDouble(name, out);
 }
 
 EXPORT
 bool AMediaFormat_getSize(AMediaFormat* format, const char *name, size_t *out) {
+    if (format == nullptr) {
+        return false;
+    }
+    if (name == nullptr) {
+        return false;
+    }
     return format->mFormat->findSize(name, out);
 }
 
 EXPORT
 bool AMediaFormat_getRect(AMediaFormat* format, const char *name,
                           int32_t *left, int32_t *top, int32_t *right, int32_t *bottom) {
+    if (format == nullptr) {
+        return false;
+    }
+    if (name == nullptr) {
+        return false;
+    }
     return format->mFormat->findRect(name, left, top, right, bottom);
 }
 
 EXPORT
 bool AMediaFormat_getBuffer(AMediaFormat* format, const char *name, void** data, size_t *outsize) {
     sp<ABuffer> buf;
+    if (format == nullptr) {
+        return false;
+    }
+    if (name == nullptr) {
+        return false;
+    }
     if (format->mFormat->findBuffer(name, &buf)) {
         *data = buf->data() + buf->offset();
         *outsize = buf->size();
@@ -189,7 +231,12 @@ bool AMediaFormat_getBuffer(AMediaFormat* format, const char *name, void** data,
 
 EXPORT
 bool AMediaFormat_getString(AMediaFormat* mData, const char *name, const char **out) {
-
+    if (mData == nullptr) {
+        return false;
+    }
+    if (name == nullptr) {
+        return false;
+    }
     for (size_t i = 0; i < mData->mStringCache.size(); i++) {
         if (strcmp(mData->mStringCache.keyAt(i).string(), name) == 0) {
             mData->mStringCache.removeItemsAt(i, 1);
@@ -212,43 +259,91 @@ bool AMediaFormat_getString(AMediaFormat* mData, const char *name, const char **
 
 EXPORT
 void AMediaFormat_setInt32(AMediaFormat* format, const char *name, int32_t value) {
+    if (format == nullptr) {
+        return;
+    }
+    if (name == nullptr) {
+        return;
+    }
     format->mFormat->setInt32(name, value);
 }
 
 EXPORT
 void AMediaFormat_setInt64(AMediaFormat* format, const char *name, int64_t value) {
+    if (format == nullptr) {
+        return;
+    }
+    if (name == nullptr) {
+        return;
+    }
     format->mFormat->setInt64(name, value);
 }
 
 EXPORT
 void AMediaFormat_setFloat(AMediaFormat* format, const char* name, float value) {
+    if (format == nullptr) {
+        return;
+    }
+    if (name == nullptr) {
+        return;
+    }
     format->mFormat->setFloat(name, value);
 }
 
 EXPORT
 void AMediaFormat_setDouble(AMediaFormat* format, const char* name, double value) {
+    if (format == nullptr) {
+        return;
+    }
+    if (name == nullptr) {
+        return;
+    }
     format->mFormat->setDouble(name, value);
 }
 
 EXPORT
 void AMediaFormat_setSize(AMediaFormat* format, const char* name, size_t value) {
+    if (format == nullptr) {
+        return;
+    }
+    if (name == nullptr) {
+        return;
+    }
     format->mFormat->setSize(name, value);
 }
 
 EXPORT
 void AMediaFormat_setRect(AMediaFormat* format, const char *name,
                           int32_t left, int32_t top, int32_t right, int32_t bottom) {
+    if (format == nullptr) {
+        return;
+    }
+    if (name == nullptr) {
+        return;
+    }
     format->mFormat->setRect(name, left, top, right, bottom);
 }
 
 EXPORT
 void AMediaFormat_setString(AMediaFormat* format, const char* name, const char* value) {
+    if (format == nullptr) {
+        return;
+    }
+    if (name == nullptr) {
+        return;
+    }
     // AMessage::setString() makes a copy of the string
     format->mFormat->setString(name, value, strlen(value));
 }
 
 EXPORT
 void AMediaFormat_setBuffer(AMediaFormat* format, const char* name, const void* data, size_t size) {
+    if (format == nullptr) {
+        return;
+    }
+    if (name == nullptr) {
+        return;
+    }
     // the ABuffer(void*, size_t) constructor doesn't take ownership of the data, so create
     // a new buffer and copy the data into it
     sp<ABuffer> buf = new ABuffer(size);
