@@ -51,6 +51,13 @@ TEST(NdkMediaFormat_tests, test_int32) {
    EXPECT_FALSE(AMediaFormat_getInt64(fmt1, "five", &i64));
    EXPECT_EQ(i32, 5);
 
+   // verify detecting some bad parameters.
+   AMediaFormat_setInt32(nullptr, "whatever", 6);
+   AMediaFormat_setInt32(fmt1, nullptr, 6);
+
+   EXPECT_FALSE(AMediaFormat_getInt32(nullptr, "whatever", &i32));
+   EXPECT_FALSE(AMediaFormat_getInt32(fmt1, nullptr, &i32));
+
    AMediaFormat_delete(fmt1);
 }
 
@@ -67,6 +74,13 @@ TEST(NdkMediaFormat_tests, test_int64) {
    EXPECT_FALSE(AMediaFormat_getInt64(fmt1, "five", &i64));
    EXPECT_EQ(i64, -1);
 
+   // verify detecting some bad parameters.
+   AMediaFormat_setInt64(nullptr, "whatever", 6);
+   AMediaFormat_setInt64(fmt1, nullptr, 6);
+
+   EXPECT_FALSE(AMediaFormat_getInt64(nullptr, "whatever", &i64));
+   EXPECT_FALSE(AMediaFormat_getInt64(fmt1, nullptr, &i64));
+
    AMediaFormat_delete(fmt1);
 }
 
@@ -80,6 +94,13 @@ TEST(NdkMediaFormat_tests, test_size) {
    EXPECT_TRUE(AMediaFormat_getSize(fmt1, "medium", &size));
    EXPECT_EQ(size, 10);
 
+   // verify detecting some bad parameters.
+   AMediaFormat_setSize(nullptr, "whatever", 6);
+   AMediaFormat_setSize(fmt1, nullptr, 6);
+
+   EXPECT_FALSE(AMediaFormat_getSize(nullptr, "whatever", &size));
+   EXPECT_FALSE(AMediaFormat_getSize(fmt1, nullptr, &size));
+
    AMediaFormat_delete(fmt1);
 }
 
@@ -90,6 +111,14 @@ TEST(NdkMediaFormat_tests, test_float) {
    AMediaFormat_setFloat(fmt1, "ship", 0.5);
    EXPECT_TRUE(AMediaFormat_getFloat(fmt1, "boat", &f));
    EXPECT_EQ(f, 1.5);
+
+   // verify detecting some bad parameters.
+   AMediaFormat_setFloat(nullptr, "whatever", 1.5);
+   AMediaFormat_setFloat(fmt1, nullptr, 1.5);
+
+   EXPECT_FALSE(AMediaFormat_getFloat(nullptr, "whatever", &f));
+   EXPECT_FALSE(AMediaFormat_getFloat(fmt1, nullptr, &f));
+
    AMediaFormat_delete(fmt1);
 }
 
@@ -100,6 +129,14 @@ TEST(NdkMediaFormat_tests, test_double) {
    AMediaFormat_setDouble(fmt1, "dip", 0.5);
    EXPECT_TRUE(AMediaFormat_getDouble(fmt1, "trouble", &d));
    EXPECT_EQ(d, 100.5);
+
+   // verify detecting some bad parameters.
+   AMediaFormat_setDouble(nullptr, "whatever", 1.5);
+   AMediaFormat_setDouble(fmt1, nullptr, 1.5);
+
+   EXPECT_FALSE(AMediaFormat_getDouble(nullptr, "whatever", &d));
+   EXPECT_FALSE(AMediaFormat_getDouble(fmt1, nullptr, &d));
+
    AMediaFormat_delete(fmt1);
 }
 
@@ -111,7 +148,15 @@ TEST(NdkMediaFormat_tests, test_string) {
    AMediaFormat_setString(fmt1, "stringtheory", content);
    EXPECT_TRUE(AMediaFormat_getString(fmt1, "stringtheory", &out));
    EXPECT_NE(out, nullptr);
+   EXPECT_NE(out, content);     // should not be the original
    EXPECT_EQ(strcmp(out,content), 0);
+
+   // verify detecting some bad parameters.
+   AMediaFormat_setString(nullptr, "whatever", content);
+   AMediaFormat_setString(fmt1, nullptr, content);
+
+   EXPECT_FALSE(AMediaFormat_getString(nullptr, "whatever", &out));
+   EXPECT_FALSE(AMediaFormat_getString(fmt1, nullptr, &out));
 
    AMediaFormat_delete(fmt1);
 }

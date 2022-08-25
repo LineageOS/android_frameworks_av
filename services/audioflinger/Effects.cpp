@@ -1058,6 +1058,13 @@ status_t AudioFlinger::EffectModule::configure()
                     &size,
                     &cmdStatus);
         }
+
+        if (isVolumeControl()) {
+            // Force initializing the volume as 0 for volume control effect for safer ramping
+            uint32_t left = 0;
+            uint32_t right = 0;
+            setVolumeInternal(&left, &right, true /*controller*/);
+        }
     }
 
     // mConfig.outputCfg.buffer.frameCount cannot be zero.
@@ -1431,23 +1438,24 @@ status_t AudioFlinger::EffectModule::setVolume(uint32_t *left, uint32_t *right, 
             ((mDescriptor.flags & EFFECT_FLAG_VOLUME_MASK) == EFFECT_FLAG_VOLUME_CTRL ||
              (mDescriptor.flags & EFFECT_FLAG_VOLUME_MASK) == EFFECT_FLAG_VOLUME_IND ||
              (mDescriptor.flags & EFFECT_FLAG_VOLUME_MASK) == EFFECT_FLAG_VOLUME_MONITOR)) {
-        uint32_t volume[2];
-        uint32_t *pVolume = NULL;
-        uint32_t size = sizeof(volume);
-        volume[0] = *left;
-        volume[1] = *right;
-        if (controller) {
-            pVolume = volume;
-        }
-        status = mEffectInterface->command(EFFECT_CMD_SET_VOLUME,
-                                           size,
-                                           volume,
-                                           &size,
-                                           pVolume);
-        if (controller && status == NO_ERROR && size == sizeof(volume)) {
-            *left = volume[0];
-            *right = volume[1];
-        }
+        status = setVolumeInternal(left, right, controller);
+    }
+    return status;
+}
+
+status_t AudioFlinger::EffectModule::setVolumeInternal(
+        uint32_t *left, uint32_t *right, bool controller) {
+    uint32_t volume[2] = {*left, *right};
+    uint32_t *pVolume = controller ? volume : nullptr;
+    uint32_t size = sizeof(volume);
+    status_t status = mEffectInterface->command(EFFECT_CMD_SET_VOLUME,
+                                                size,
+                                                volume,
+                                                &size,
+                                                pVolume);
+    if (controller && status == NO_ERROR && size == sizeof(volume)) {
+        *left = volume[0];
+        *right = volume[1];
     }
     return status;
 }

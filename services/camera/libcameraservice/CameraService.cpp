@@ -1712,7 +1712,13 @@ Status CameraService::connectDevice(
         return STATUS_ERROR(ERROR_ILLEGAL_ARGUMENT, msg.string());
     }
 
-    if (mCameraServiceProxyWrapper->isCameraDisabled()) {
+    userid_t clientUserId = multiuser_get_user_id(clientUid);
+    int callingUid = CameraThreadState::getCallingUid();
+    if (clientUid == USE_CALLING_UID) {
+        clientUserId = multiuser_get_user_id(callingUid);
+    }
+
+    if (mCameraServiceProxyWrapper->isCameraDisabled(clientUserId)) {
         String8 msg =
                 String8::format("Camera disabled by device policy");
         ALOGE("%s: %s", __FUNCTION__, msg.string());
