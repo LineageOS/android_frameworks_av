@@ -53,8 +53,9 @@ namespace tuner {
 
 using AidlMQDesc = MQDescriptor<int8_t, SynchronizedReadWrite>;
 
-class TunerFilter : public BnTunerFilter {
+class TunerService;
 
+class TunerFilter : public BnTunerFilter {
 public:
     class FilterCallback : public BnFilterCallback {
     public:
@@ -75,7 +76,8 @@ public:
         Mutex mCallbackLock;
     };
 
-    TunerFilter(shared_ptr<IFilter> filter, shared_ptr<FilterCallback> cb, DemuxFilterType type);
+    TunerFilter(const shared_ptr<IFilter> filter, const shared_ptr<FilterCallback> cb,
+                const DemuxFilterType type, const shared_ptr<TunerService> tuner);
     virtual ~TunerFilter();
 
     ::ndk::ScopedAStatus getId(int32_t* _aidl_return) override;
@@ -113,6 +115,7 @@ private:
     int32_t mClientPid;
     shared_ptr<FilterCallback> mFilterCallback;
     Mutex mLock;
+    shared_ptr<TunerService> mTunerService;
 };
 
 }  // namespace tuner

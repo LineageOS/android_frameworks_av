@@ -45,12 +45,6 @@ TunerHidlDescrambler::~TunerHidlDescrambler() {
 
 ::ndk::ScopedAStatus TunerHidlDescrambler::setDemuxSource(
         const shared_ptr<ITunerDemux>& in_tunerDemux) {
-    if (mDescrambler == nullptr) {
-        ALOGE("IDescrambler is not initialized");
-        return ::ndk::ScopedAStatus::fromServiceSpecificError(
-                static_cast<int32_t>(Result::UNAVAILABLE));
-    }
-
     HidlResult res = mDescrambler->setDemuxSource(
             static_cast<TunerHidlDemux*>(in_tunerDemux.get())->getId());
     if (res != HidlResult::SUCCESS) {
@@ -60,12 +54,6 @@ TunerHidlDescrambler::~TunerHidlDescrambler() {
 }
 
 ::ndk::ScopedAStatus TunerHidlDescrambler::setKeyToken(const vector<uint8_t>& in_keyToken) {
-    if (mDescrambler == nullptr) {
-        ALOGE("IDescrambler is not initialized");
-        return ::ndk::ScopedAStatus::fromServiceSpecificError(
-                static_cast<int32_t>(Result::UNAVAILABLE));
-    }
-
     HidlResult res = mDescrambler->setKeyToken(in_keyToken);
     if (res != HidlResult::SUCCESS) {
         return ::ndk::ScopedAStatus::fromServiceSpecificError(static_cast<int32_t>(res));
@@ -75,12 +63,6 @@ TunerHidlDescrambler::~TunerHidlDescrambler() {
 
 ::ndk::ScopedAStatus TunerHidlDescrambler::addPid(
         const DemuxPid& in_pid, const shared_ptr<ITunerFilter>& in_optionalSourceFilter) {
-    if (mDescrambler == nullptr) {
-        ALOGE("IDescrambler is not initialized");
-        return ::ndk::ScopedAStatus::fromServiceSpecificError(
-                static_cast<int32_t>(Result::UNAVAILABLE));
-    }
-
     sp<HidlIFilter> halFilter =
             (in_optionalSourceFilter == nullptr)
                     ? nullptr
@@ -94,12 +76,6 @@ TunerHidlDescrambler::~TunerHidlDescrambler() {
 
 ::ndk::ScopedAStatus TunerHidlDescrambler::removePid(
         const DemuxPid& in_pid, const shared_ptr<ITunerFilter>& in_optionalSourceFilter) {
-    if (mDescrambler == nullptr) {
-        ALOGE("IDescrambler is not initialized");
-        return ::ndk::ScopedAStatus::fromServiceSpecificError(
-                static_cast<int32_t>(Result::UNAVAILABLE));
-    }
-
     sp<HidlIFilter> halFilter =
             (in_optionalSourceFilter == nullptr)
                     ? nullptr
@@ -112,15 +88,7 @@ TunerHidlDescrambler::~TunerHidlDescrambler() {
 }
 
 ::ndk::ScopedAStatus TunerHidlDescrambler::close() {
-    if (mDescrambler == nullptr) {
-        ALOGE("IDescrambler is not initialized.");
-        return ::ndk::ScopedAStatus::fromServiceSpecificError(
-                static_cast<int32_t>(Result::UNAVAILABLE));
-    }
-
     HidlResult res = mDescrambler->close();
-    mDescrambler = nullptr;
-
     if (res != HidlResult::SUCCESS) {
         return ::ndk::ScopedAStatus::fromServiceSpecificError(static_cast<int32_t>(res));
     }

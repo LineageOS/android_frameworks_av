@@ -138,12 +138,12 @@ public:
         return mCameraServiceProxy->notifyCameraState(cameraSessionStats);
     }
 
-    virtual binder::Status isCameraDisabled(bool *ret) override {
+    virtual binder::Status isCameraDisabled(int userId, bool *ret) override {
         if (mOverrideCameraDisabled) {
             *ret = mCameraDisabled;
             return binder::Status::ok();
         }
-        return mCameraServiceProxy->isCameraDisabled(ret);
+        return mCameraServiceProxy->isCameraDisabled(userId, ret);
     }
 
     void setCameraDisabled(bool cameraDisabled) {
@@ -167,7 +167,7 @@ public:
     { }
 
     ~AutoDisconnectDevice() {
-        if (mDevice != nullptr) { 
+        if (mDevice != nullptr) {
             mDevice->disconnect();
         }
     }
