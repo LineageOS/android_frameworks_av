@@ -17,7 +17,6 @@ aidl_interface {
         "android.hardware.common.fmq-V1",
         "android.hardware.tv.tuner-V1",
     ],
-
     backend: {
         java: {
             enabled: false,

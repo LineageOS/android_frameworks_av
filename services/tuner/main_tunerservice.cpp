@@ -32,6 +32,7 @@ int main() {
 
     sp<ProcessState> proc(ProcessState::self());
     sp<IServiceManager> sm = defaultServiceManager();
+    ProcessState::self()->setThreadPoolMaxThreadCount(8);
 
     // Check legacy HIDL HAL first. If it's not existed, use AIDL HAL.
     binder_status_t status = TunerHidlService::instantiate();
@@ -40,7 +41,6 @@ int main() {
         CHECK(status == STATUS_OK);
     }
 
-    ProcessState::self()->setThreadPoolMaxThreadCount(8);
     ProcessState::self()->startThreadPool();
     IPCThreadState::self()->joinThreadPool();
     return EXIT_FAILURE;  // should not reached

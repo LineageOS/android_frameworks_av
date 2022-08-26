@@ -99,11 +99,7 @@ public:
     void removeSharedFilter(const shared_ptr<TunerHidlFilter>& sharedFilter);
     void removeFrontend(const shared_ptr<TunerHidlFrontend>& frontend);
 
-    static shared_ptr<TunerHidlService> getTunerService();
-
 private:
-    bool hasITuner();
-    bool hasITuner_1_1();
     void updateTunerResources();
     vector<TunerFrontendInfo> getTRMFrontendInfos();
     vector<int32_t> getTRMLnbHandles();
@@ -121,8 +117,6 @@ private:
     Mutex mOpenedFrontendsLock;
     unordered_set<shared_ptr<TunerHidlFrontend>> mOpenedFrontends;
     int mLnaStatus = -1;
-
-    static shared_ptr<TunerHidlService> sTunerService;
 };
 
 }  // namespace tuner
