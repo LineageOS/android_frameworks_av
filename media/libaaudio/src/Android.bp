@@ -212,6 +212,7 @@ cc_library {
         "flowgraph/ChannelCountConverter.cpp",
         "flowgraph/ClipToRange.cpp",
         "flowgraph/FlowGraphNode.cpp",
+        "flowgraph/Limiter.cpp",
         "flowgraph/ManyToMultiConverter.cpp",
         "flowgraph/MonoBlend.cpp",
         "flowgraph/MonoToMultiConverter.cpp",
