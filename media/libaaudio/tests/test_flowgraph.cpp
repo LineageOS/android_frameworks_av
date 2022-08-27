@@ -26,6 +26,7 @@
 #include <gtest/gtest.h>
 
 #include "flowgraph/ClipToRange.h"
+#include "flowgraph/Limiter.h"
 #include "flowgraph/MonoBlend.h"
 #include "flowgraph/MonoToMultiConverter.h"
 #include "flowgraph/SourceFloat.h"
@@ -319,3 +320,77 @@ TEST(test_flowgraph, module_mono_blend) {
     }
 }
 
+TEST(test_flowgraph, module_limiter) {
+    constexpr int kNumSamples = 101;
+    constexpr float kLastSample = 3.0f;
+    constexpr float kFirstSample = -kLastSample;
+    constexpr float kDeltaBetweenSamples = (kLastSample - kFirstSample) / (kNumSamples - 1);
+    constexpr float kTolerance = 0.00001f;
+
+    float input[kNumSamples];
+    float output[kNumSamples];
+    SourceFloat sourceFloat{1};
+    Limiter limiter{1};
+    SinkFloat sinkFloat{1};
+
+    for (int i = 0; i < kNumSamples; i++) {
+        input[i] = kFirstSample + i * kDeltaBetweenSamples;
+    }
+
+    const int numInputFrames = std::size(input);
+    sourceFloat.setData(input, numInputFrames);
+
+    sourceFloat.output.connect(&limiter.input);
+    limiter.output.connect(&sinkFloat.input);
+
+    const int numOutputFrames = std::size(output);
+    int32_t numRead = sinkFloat.read(output, numOutputFrames);
+    ASSERT_EQ(numInputFrames, numRead);
+
+    for (int i = 0; i < numRead; i++) {
+        // limiter must be symmetric wrt 0.
+        EXPECT_NEAR(output[i], -output[kNumSamples - i - 1], kTolerance);
+        if (i > 0) {
+            EXPECT_GE(output[i], output[i - 1]); // limiter must be monotonic
+        }
+        if (input[i] == 0.f) {
+            EXPECT_EQ(0.f, output[i]);
+        } else if (input[i] > 0.0f) {
+            EXPECT_GE(output[i], 0.0f);
+            EXPECT_LE(output[i], M_SQRT2); // limiter actually limits
+            EXPECT_LE(output[i], input[i]); // a limiter, gain <= 1
+        } else {
+            EXPECT_LE(output[i], 0.0f);
+            EXPECT_GE(output[i], -M_SQRT2); // limiter actually limits
+            EXPECT_GE(output[i], input[i]); // a limiter, gain <= 1
+        }
+        if (-1.f <= input[i] && input[i] <= 1.f) {
+            EXPECT_EQ(input[i], output[i]);
+        }
+    }
+}
+
+TEST(test_flowgraph, module_limiter_nan) {
+    constexpr int kArbitraryOutputSize = 100;
+    static const float input[] = {NAN, 0.5f, NAN, NAN, -10.0f, NAN};
+    static const float expected[] = {0.0f, 0.5f, 0.5f, 0.5f, -M_SQRT2, -M_SQRT2};
+    constexpr float tolerance = 0.00001f;
+    float output[kArbitraryOutputSize];
+    SourceFloat sourceFloat{1};
+    Limiter limiter{1};
+    SinkFloat sinkFloat{1};
+
+    const int numInputFrames = std::size(input);
+    sourceFloat.setData(input, numInputFrames);
+
+    sourceFloat.output.connect(&limiter.input);
+    limiter.output.connect(&sinkFloat.input);
+
+    const int numOutputFrames = std::size(output);
+    int32_t numRead = sinkFloat.read(output, numOutputFrames);
+    ASSERT_EQ(numInputFrames, numRead);
+
+    for (int i = 0; i < numRead; i++) {
+        EXPECT_NEAR(expected[i], output[i], tolerance);
+    }
+}

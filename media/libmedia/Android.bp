@@ -304,6 +304,10 @@ cc_library_shared {
 cc_library {
     name: "libmedia",
 
+    defaults: [
+        "latest_android_media_audio_common_types_cpp_shared",
+    ],
+
     srcs: [
         ":mediaextractorservice_aidl",
         "IDataSource.cpp",
@@ -356,7 +360,6 @@ cc_library {
 
     shared_libs: [
         "android.hidl.token@1.0-utils",
-        "android.media.audio.common.types-V1-cpp",
         "audioclient-types-aidl-cpp",
         "av-types-aidl-cpp",
         "liblog",

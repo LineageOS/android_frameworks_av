@@ -134,6 +134,10 @@ cc_library {
 cc_library {
     name: "libaaudio_internal",
 
+    defaults: [
+        "latest_android_media_audio_common_types_cpp_shared",
+    ],
+
     local_include_dirs: [
         "binding",
         "client",
@@ -167,7 +171,6 @@ cc_library {
         "libbinder",
         "framework-permission-aidl-cpp",
         "aaudio-aidl-cpp",
-        "android.media.audio.common.types-V1-cpp",
         "audioclient-types-aidl-cpp",
         "libaudioclient_aidl_conversion",
     ],
@@ -209,6 +212,7 @@ cc_library {
         "flowgraph/ChannelCountConverter.cpp",
         "flowgraph/ClipToRange.cpp",
         "flowgraph/FlowGraphNode.cpp",
+        "flowgraph/Limiter.cpp",
         "flowgraph/ManyToMultiConverter.cpp",
         "flowgraph/MonoBlend.cpp",
         "flowgraph/MonoToMultiConverter.cpp",
@@ -260,7 +264,7 @@ aidl_interface {
         "binding/aidl/aaudio/IAAudioService.aidl",
     ],
     imports: [
-        "android.media.audio.common.types-V1",
+        "android.media.audio.common.types",
         "audioclient-types-aidl",
         "shared-file-region-aidl",
         "framework-permission-aidl",

@@ -24,7 +24,7 @@
 
 #include <aaudio/AAudio.h>
 #include <audio_utils/Balance.h>
-#include <flowgraph/ClipToRange.h>
+#include <flowgraph/Limiter.h>
 #include <flowgraph/ManyToMultiConverter.h>
 #include <flowgraph/MonoBlend.h>
 #include <flowgraph/MonoToMultiConverter.h>
@@ -74,7 +74,7 @@ public:
 private:
     std::unique_ptr<FLOWGRAPH_OUTER_NAMESPACE::flowgraph::FlowGraphSourceBuffered> mSource;
     std::unique_ptr<FLOWGRAPH_OUTER_NAMESPACE::flowgraph::MonoBlend> mMonoBlend;
-    std::unique_ptr<FLOWGRAPH_OUTER_NAMESPACE::flowgraph::ClipToRange> mClipper;
+    std::unique_ptr<FLOWGRAPH_OUTER_NAMESPACE::flowgraph::Limiter> mLimiter;
     std::unique_ptr<FLOWGRAPH_OUTER_NAMESPACE::flowgraph::MonoToMultiConverter> mChannelConverter;
     std::unique_ptr<FLOWGRAPH_OUTER_NAMESPACE::flowgraph::ManyToMultiConverter>
             mManyToMultiConverter;

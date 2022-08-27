@@ -25,6 +25,7 @@
 #include "client/AudioStreamInternalCapture.h"
 #include "utility/AudioClock.h"
 
+#undef ATRACE_TAG
 #define ATRACE_TAG ATRACE_TAG_AUDIO
 #include <utils/Trace.h>
 
