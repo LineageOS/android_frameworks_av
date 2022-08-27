@@ -175,13 +175,13 @@ const std::vector<const char *> Spatializer::sHeadPoseKeys = {
 // ---------------------------------------------------------------------------
 
 // Convert recorded sensor data to string with level indentation.
-std::string Spatializer::HeadToStagePoseRecorder::toString_l(unsigned level) const {
+std::string Spatializer::HeadToStagePoseRecorder::toString(unsigned level) const {
     std::string prefixSpace(level, ' ');
     return mPoseRecordLog.dumpToString((prefixSpace + " ").c_str(), Spatializer::mMaxLocalLogLine);
 }
 
 // Compute sensor data, record into local log when it is time.
-void Spatializer::HeadToStagePoseRecorder::record_l(const std::vector<float>& headToStage) {
+void Spatializer::HeadToStagePoseRecorder::record(const std::vector<float>& headToStage) {
     if (headToStage.size() != mPoseVectorSize) return;
 
     if (mNumOfSampleSinceLastRecord++ == 0) {
@@ -191,12 +191,12 @@ void Spatializer::HeadToStagePoseRecorder::record_l(const std::vector<float>& he
     if (shouldRecordLog()) {
         poseSumToAverage();
         mPoseRecordLog.log(
-                "mean: %s, min: %s, max %s, calculated %d samples",
+                "mean: %s, min: %s, max %s, calculated %d samples in %0.4f second(s)",
                 Spatializer::toString<double>(mPoseRadianSum, true /* radianToDegree */).c_str(),
                 Spatializer::toString<float>(mMinPoseAngle, true /* radianToDegree */).c_str(),
                 Spatializer::toString<float>(mMaxPoseAngle, true /* radianToDegree */).c_str(),
-                mNumOfSampleSinceLastRecord);
-        resetRecord(headToStage);
+                mNumOfSampleSinceLastRecord, mNumOfSecondsSinceLastRecord.count());
+        resetRecord();
     }
     // update stream average.
     for (int i = 0; i < mPoseVectorSize; i++) {
@@ -541,7 +541,7 @@ Status Spatializer::setGlobalTransform(const std::vector<float>& screenToStage) 
     }
     std::lock_guard lock(mLock);
     if (mPoseController != nullptr) {
-        mLocalLog.log("%s with %s", __func__, toString<float>(screenToStage).c_str());
+        mLocalLog.log("%s with screenToStage %s", __func__, toString<float>(screenToStage).c_str());
         mPoseController->setScreenToStagePose(maybePose.value());
     }
     return Status::ok();
@@ -711,7 +711,8 @@ void Spatializer::onHeadToStagePoseMsg(const std::vector<float>& headToStage) {
         callback = mHeadTrackingCallback;
         if (mEngine != nullptr) {
             setEffectParameter_l(SPATIALIZER_PARAM_HEAD_TO_STAGE, headToStage);
-            mPoseRecorder.record_l(headToStage);
+            mPoseRecorder.record(headToStage);
+            mPoseDurableRecorder.record(headToStage);
         }
     }
 
@@ -1026,12 +1027,17 @@ std::string Spatializer::toString(unsigned level) const {
 
     ss.append(prefixSpace + "CommandLog:\n");
     ss += mLocalLog.dumpToString((prefixSpace + " ").c_str(), mMaxLocalLogLine);
-    ss.append(prefixSpace + "SensorLog:\n");
-    ss += mPoseRecorder.toString_l(level + 1);
 
     // PostController dump.
     if (mPoseController != nullptr) {
         ss += mPoseController->toString(level + 1);
+        ss.append(prefixSpace +
+                  "Sensor data format - [rx, ry, rz, vx, vy, vz] (units-degree, "
+                  "r-transform, v-angular velocity, x-pitch, y-roll, z-yaw):\n");
+        ss.append(prefixSpace + "PerMinuteHistory:\n");
+        ss += mPoseDurableRecorder.toString(level + 1);
+        ss.append(prefixSpace + "PerSecondHistory:\n");
+        ss += mPoseRecorder.toString(level + 1);
     } else {
         ss.append(prefixSpace).append("SpatializerPoseController not exist\n");
     }

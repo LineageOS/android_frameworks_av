@@ -184,15 +184,17 @@ class Spatializer : public media::BnSpatializer,
         }
 
         std::string ss = "[";
-        for (const auto& f : vec) {
+        for (auto f = vec.begin(); f != vec.end(); ++f) {
+            if (f != vec.begin()) {
+                ss .append(", ");
+            }
             if (radianToDegree) {
-                base::StringAppendF(&ss, "%0.2f, ",
-                                    HeadToStagePoseRecorder::getDegreeWithRadian(f));
+                base::StringAppendF(&ss, "%0.2f", HeadToStagePoseRecorder::getDegreeWithRadian(*f));
             } else {
-                base::StringAppendF(&ss, "%f, ", f);
+                base::StringAppendF(&ss, "%f", *f);
             }
         }
-        ss.replace(ss.end() - 2, ss.end(), "]");
+        ss.append("]");
         return ss;
     };
 
@@ -413,18 +415,23 @@ private:
     /**
      * @brief Calculate and record sensor data.
      * Dump to local log with max/average pose angle every mPoseRecordThreshold.
-     * TODO: log azimuth/elevation angles obtained for debugging actual orientation.
      */
     class HeadToStagePoseRecorder {
       public:
+        HeadToStagePoseRecorder(std::chrono::duration<double> threshold, int maxLogLine)
+            : mPoseRecordThreshold(threshold), mPoseRecordLog(maxLogLine) {
+            resetRecord();
+        }
+
         /** Convert recorded sensor data to string with level indentation */
-        std::string toString_l(unsigned level) const;
+        std::string toString(unsigned level) const;
+
         /**
          * @brief Calculate sensor data, record into local log when it is time.
          *
          * @param headToStage The vector from Pose3f::toVector().
          */
-        void record_l(const std::vector<float>& headToStage);
+        void record(const std::vector<float>& headToStage);
 
         static constexpr float getDegreeWithRadian(const float radian) {
             float radianToDegreeRatio = (180 / PI);
@@ -435,11 +442,11 @@ private:
         static constexpr float PI = M_PI;
         /**
          * Pose recorder time threshold to record sensor data in local log.
-         * Sensor data will be recorded at least every mPoseRecordThreshold.
+         * Sensor data will be recorded into log at least every mPoseRecordThreshold.
          */
-        // TODO: add another history log to record longer period of sensor data.
-        static constexpr std::chrono::duration<double> mPoseRecordThreshold =
-                std::chrono::seconds(1);
+        std::chrono::duration<double> mPoseRecordThreshold;
+        // Number of seconds pass since last record.
+        std::chrono::duration<double> mNumOfSecondsSinceLastRecord;
         /**
          * According to frameworks/av/media/libheadtracking/include/media/Pose.h
          * "The vector will have exactly 6 elements, where the first three are a translation vector
@@ -450,8 +457,6 @@ private:
          * Timestamp of last sensor data record in local log.
          */
         std::chrono::time_point<std::chrono::steady_clock> mFirstSampleTimestamp;
-        // Last pose recorded, vector obtained from Pose3f::toVector().
-        std::vector<float> mLastPoseRecorded{mPoseVectorSize};
         /**
          * Number of sensor samples received since last record, sample rate is ~100Hz which produce
          * ~6k samples/minute.
@@ -461,24 +466,24 @@ private:
          * mNumOfSampleSinceLastRecord to get arithmetic mean. Largest possible value: 2PI * 100Hz *
          * mPoseRecordThreshold.
          */
-        std::vector<double> mPoseRadianSum{mPoseVectorSize};
-        std::vector<float> mMaxPoseAngle{mPoseVectorSize};
-        std::vector<float> mMinPoseAngle{mPoseVectorSize};
+        std::vector<double> mPoseRadianSum;
+        std::vector<float> mMaxPoseAngle;
+        std::vector<float> mMinPoseAngle;
         // Local log for history sensor data.
         SimpleLog mPoseRecordLog{mMaxLocalLogLine};
 
-        bool shouldRecordLog() const {
-            return std::chrono::duration_cast<std::chrono::seconds>(
-                           std::chrono::steady_clock::now() - mFirstSampleTimestamp) >=
-                   mPoseRecordThreshold;
+        bool shouldRecordLog() {
+            mNumOfSecondsSinceLastRecord = std::chrono::duration_cast<std::chrono::seconds>(
+                    std::chrono::steady_clock::now() - mFirstSampleTimestamp);
+            return mNumOfSecondsSinceLastRecord >= mPoseRecordThreshold;
         }
 
-        void resetRecord(const std::vector<float>& headToStage) {
+        void resetRecord() {
             mPoseRadianSum.assign(mPoseVectorSize, 0);
-            mMaxPoseAngle.assign(mPoseVectorSize, 0);
-            mMinPoseAngle.assign(mPoseVectorSize, 0);
+            mMaxPoseAngle.assign(mPoseVectorSize, -PI);
+            mMinPoseAngle.assign(mPoseVectorSize, PI);
             mNumOfSampleSinceLastRecord = 0;
-            mLastPoseRecorded = headToStage;
+            mNumOfSecondsSinceLastRecord = std::chrono::seconds(0);
         }
 
         // Add each sample to sum and only calculate when record.
@@ -490,7 +495,13 @@ private:
             }
         }
     };  // HeadToStagePoseRecorder
-    HeadToStagePoseRecorder mPoseRecorder;
+
+    // Record one log line per second (up to mMaxLocalLogLine) to capture most recent sensor data.
+    HeadToStagePoseRecorder mPoseRecorder GUARDED_BY(mLock) =
+            HeadToStagePoseRecorder(std::chrono::seconds(1), mMaxLocalLogLine);
+    // Record one log line per minute (up to mMaxLocalLogLine) to capture durable sensor data.
+    HeadToStagePoseRecorder mPoseDurableRecorder GUARDED_BY(mLock) =
+            HeadToStagePoseRecorder(std::chrono::minutes(1), mMaxLocalLogLine);
 };  // Spatializer
 
 }; // namespace android

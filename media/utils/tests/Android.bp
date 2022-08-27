@@ -124,6 +124,27 @@ cc_test {
 }
 
 cc_test {
+    name: "mediautils_fixedstring_tests",
+
+    cflags: [
+        "-Wall",
+        "-Werror",
+        "-Wextra",
+    ],
+
+    shared_libs: [
+        "libaudioutils",
+        "liblog",
+        "libmediautils",
+        "libutils",
+    ],
+
+    srcs: [
+        "mediautils_fixedstring_tests.cpp",
+    ],
+}
+
+cc_test {
     name: "mediautils_scopedstatistics_tests",
 
     cflags: [
