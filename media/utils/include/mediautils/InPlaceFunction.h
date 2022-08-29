@@ -30,7 +30,7 @@ struct ICallableTable {
     // Destroy the erased type
     void (*destroy)(void* storage) = nullptr;
     // Call the erased object
-    Ret (*invoke)(void* storage, Args...) = nullptr;
+    Ret (*invoke)(void* storage, Args&&...) = nullptr;
     // **Note** the next two functions only copy object data, not the vptr
     // Copy the erased object to a new InPlaceFunction buffer
     void (*copy_to)(const void* storage, void* other) = nullptr;
@@ -43,7 +43,7 @@ struct ICallableTable {
 // allocate, and always holds the type erased functional object in an in-line small buffer of
 // templated size. If the object is too large to hold, the type will fail to instantiate.
 //
-// Two notable differences are:
+// Some notable differences are:
 // - operator() is not const (unlike std::function where the call operator is
 // const even if the erased type is not const callable). This retains const
 // correctness by default. A workaround is keeping InPlaceFunction mutable.
@@ -54,6 +54,21 @@ struct ICallableTable {
 // (and/or ensure safety), clearing the object is recommended:
 //      func1 = std::move(func2); // func2 still valid (and moved-from) after this line
 //      func2 = nullptr; // calling func2 will now abort
+// - Unsafe implicit conversions of the return value to a reference type are
+// prohibited due to the risk of dangling references (some of this safety was
+// added to std::function in c++23). Only converting a reference to a reference to base class is
+// permitted:
+//      std::function<Base&()> = []() -> Derived& {...}
+// - Some (current libc++ implementation) implementations of std::function
+// incorrectly fail to handle returning non-moveable types which is valid given
+// mandatory copy elision.
+//
+// Additionally, the stored functional will use the typical rules of overload
+// resolution to disambiguate the correct call, except, the target class will
+// always be implicitly a non-const lvalue when called. If a different overload
+// is preferred, wrapping the target class in a lambda with explicit casts is
+// recommended (or using inheritance, mixins or CRTP). This avoids the
+// complexity of utilizing abonimable function types as template params.
 template <typename, size_t BufferSize = 32>
 class InPlaceFunction;
 // We partially specialize to match types which are spelled like functions
@@ -99,8 +114,12 @@ class InPlaceFunction<Ret(Args...), BufferSize> {
         constexpr static detail::ICallableTable<Ret, Args...> table = {
                 // Stateless lambdas are convertible to function ptrs
                 .destroy = [](void* storage) { getRef(storage).~T(); },
-                .invoke = [](void* storage, Args... args) -> Ret {
-                    return std::invoke(getRef(storage), args...);
+                .invoke = [](void* storage, Args&&... args) -> Ret {
+                    if constexpr (std::is_void_v<Ret>) {
+                        std::invoke(getRef(storage), std::forward<Args>(args)...);
+                    } else {
+                        return std::invoke(getRef(storage), std::forward<Args>(args)...);
+                    }
                 },
                 .copy_to = [](const void* storage,
                               void* other) { ::new (other) T(getRef(storage)); },
@@ -109,37 +128,89 @@ class InPlaceFunction<Ret(Args...), BufferSize> {
         };
     };
 
-    // Check size/align requirements for the T in Buffer_t. We use a templated
-    // struct to enable std::conjunction (see below).
+    // Check size/align requirements for the T in Buffer_t.
     template <typename T>
-    struct WillFit : std::integral_constant<bool, sizeof(T) <= Size && alignof(T) <= Alignment> {};
+    static constexpr bool WillFit_v = sizeof(T) <= Size && alignof(T) <= Alignment;
 
     // Check size/align requirements for a function to function conversion
     template <typename T>
-    struct ConversionWillFit
-        : std::integral_constant<bool, (T::Size < Size) && (T::Alignment <= Alignment)> {};
+    static constexpr bool ConversionWillFit_v = (T::Size < Size) && (T::Alignment <= Alignment);
+
     template <typename T>
     struct IsInPlaceFunction : std::false_type {};
 
     template <size_t BufferSize_>
     struct IsInPlaceFunction<InPlaceFunction<Ret(Args...), BufferSize_>> : std::true_type {};
 
-    // Pred is true iff T is a valid type to construct an InPlaceFunction with
-    // We use std::conjunction for readability and short-circuit behavior
-    // (checks are ordered).
-    // The actual target type is the decay of T.
     template <typename T>
-    static constexpr bool Pred = std::conjunction_v<
-            std::negation<IsInPlaceFunction<std::decay_t<T>>>,   // T is not also an InPlaceFunction
-                                                                 // of the same signature.
-            std::is_invocable_r<Ret, std::decay_t<T>, Args...>,  // correct signature callable
-            WillFit<std::decay_t<T>>  // The target type fits in local storage
-            >;
+    static T BetterDeclval();
+    template <typename T>
+    static void CheckImplicitConversion(T);
+
+    template <class T, class U, class = void>
+    struct CanImplicitConvert : std::false_type {};
+
+    // std::is_convertible/std::invokeable has a bug (in libc++) regarding
+    // mandatory copy elision for non-moveable types. So, we roll our own.
+    // https://github.com/llvm/llvm-project/issues/55346
+    template <class From, class To>
+    struct CanImplicitConvert<From, To,
+                              decltype(CheckImplicitConversion<To>(BetterDeclval<From>()))>
+        : std::true_type {};
+
+    // Check if the provided type is a valid functional to be type-erased.
+    // if constexpr utilized for short-circuit behavior
+    template <typename T>
+    static constexpr bool isValidFunctional() {
+        using Target = std::decay_t<T>;
+        if constexpr (IsInPlaceFunction<Target>::value || std::is_same_v<Target, std::nullptr_t>) {
+            // Other overloads handle these cases
+            return false;
+        } else if constexpr (std::is_invocable_v<Target, Args...>) {
+            // The target type is a callable (with some unknown return value)
+            if constexpr (std::is_void_v<Ret>) {
+                // Any return value can be dropped to model a void returning
+                // function.
+                return WillFit_v<Target>;
+            } else {
+                using RawRet = std::invoke_result_t<Target, Args...>;
+                if constexpr (CanImplicitConvert<RawRet, Ret>::value) {
+                    if constexpr (std::is_reference_v<Ret>) {
+                        // If the return type is a reference, in order to
+                        // avoid dangling references, we only permit functionals
+                        // which return a reference to the exact type, or a base
+                        // type.
+                        if constexpr (std::is_reference_v<RawRet> &&
+                                      (std::is_same_v<std::decay_t<Ret>, std::decay_t<RawRet>> ||
+                                       std::is_base_of_v<std::decay_t<Ret>,
+                                                         std::decay_t<RawRet>>)) {
+                            return WillFit_v<Target>;
+                        }
+                        return false;
+                    }
+                    return WillFit_v<Target>;
+                }
+                // If we can't convert the raw return type, the functional is invalid.
+                return false;
+            }
+        }
+        return false;
+    }
 
     template <typename T>
-    static constexpr bool ConvertibleFunc =
-            std::conjunction_v<IsInPlaceFunction<std::decay_t<T>>,  // implies correctly invokable
-                               ConversionWillFit<std::decay_t<T>>>;
+    static constexpr bool IsValidFunctional_v = isValidFunctional<T>();
+    // Check if the type is a strictly smaller sized InPlaceFunction
+    template <typename T>
+    static constexpr bool isConvertibleFunc() {
+        using Target = std::decay_t<T>;
+        if constexpr (IsInPlaceFunction<Target>::value) {
+            return ConversionWillFit_v<Target>;
+        }
+        return false;
+    }
+
+    template <typename T>
+    static constexpr bool IsConvertibleFunc_v = isConvertibleFunc<T>();
 
     // Members below
     // This must come first for alignment
@@ -170,23 +241,23 @@ class InPlaceFunction<Ret(Args...), BufferSize> {
         static_assert(Target::Size < Size && Target::Alignment <= Alignment);
         if constexpr (std::is_lvalue_reference_v<T>) {
             smallerFunc.vptr_->copy_to(std::addressof(smallerFunc.storage_),
-                                         std::addressof(storage_));
+                                       std::addressof(storage_));
         } else {
             smallerFunc.vptr_->move_to(std::addressof(smallerFunc.storage_),
-                                         std::addressof(storage_));
+                                       std::addressof(storage_));
         }
         vptr_ = smallerFunc.vptr_;
     }
 
   public:
     // Public interface
-    template <typename T, std::enable_if_t<Pred<T>>* = nullptr>
+    template <typename T, std::enable_if_t<IsValidFunctional_v<T>>* = nullptr>
     constexpr InPlaceFunction(T&& t) {
         genericInit(std::forward<T>(t));
     }
 
     // Conversion from smaller functions.
-    template <typename T, std::enable_if_t<ConvertibleFunc<T>>* = nullptr>
+    template <typename T, std::enable_if_t<IsConvertibleFunc_v<T>>* = nullptr>
     constexpr InPlaceFunction(T&& t) {
         convertingInit(std::forward<T>(t));
     }
@@ -200,10 +271,12 @@ class InPlaceFunction<Ret(Args...), BufferSize> {
     constexpr InPlaceFunction() : InPlaceFunction(BadCallable{}) {}
 
     constexpr InPlaceFunction(std::nullptr_t) : InPlaceFunction(BadCallable{}) {}
+
 #if __cplusplus >= 202002L
-    constexpr
-#endif
+    constexpr ~InPlaceFunction() {
+#else
     ~InPlaceFunction() {
+#endif
         destroy();
     }
 
@@ -211,7 +284,11 @@ class InPlaceFunction<Ret(Args...), BufferSize> {
     // correctness. We deviate from the standard and do not mark the operator as
     // const. Collections of InPlaceFunctions should probably be mutable.
     constexpr Ret operator()(Args... args) {
-        return vptr_->invoke(std::addressof(storage_), args...);
+        if constexpr (std::is_void_v<Ret>) {
+            vptr_->invoke(std::addressof(storage_), std::forward<Args>(args)...);
+        } else {
+            return vptr_->invoke(std::addressof(storage_), std::forward<Args>(args)...);
+        }
     }
 
     constexpr InPlaceFunction& operator=(const InPlaceFunction& other) {
@@ -228,7 +305,7 @@ class InPlaceFunction<Ret(Args...), BufferSize> {
         return *this;
     }
 
-    template <typename T, std::enable_if_t<Pred<T>>* = nullptr>
+    template <typename T, std::enable_if_t<IsValidFunctional_v<T>>* = nullptr>
     constexpr InPlaceFunction& operator=(T&& t) {
         // We can't assign to ourselves, since T is a different type
         destroy();
@@ -237,7 +314,7 @@ class InPlaceFunction<Ret(Args...), BufferSize> {
     }
 
     // Explicitly defining this function saves a move/dtor
-    template <typename T, std::enable_if_t<ConvertibleFunc<T>>* = nullptr>
+    template <typename T, std::enable_if_t<IsConvertibleFunc_v<T>>* = nullptr>
     constexpr InPlaceFunction& operator=(T&& t) {
         // We can't assign to ourselves, since T is different type
         destroy();
@@ -264,4 +341,4 @@ class InPlaceFunction<Ret(Args...), BufferSize> {
     friend constexpr void swap(InPlaceFunction& lhs, InPlaceFunction& rhs) { lhs.swap(rhs); }
 };
 
-}   // namespace android::mediautils
+}  // namespace android::mediautils
