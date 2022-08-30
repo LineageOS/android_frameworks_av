@@ -15,6 +15,8 @@
  */
 #pragma once
 
+#include <string>
+
 namespace android {
 namespace media {
 
@@ -29,6 +31,8 @@ enum class HeadTrackingMode {
     /** Full screen-to-head tracking enabled. */
     SCREEN_RELATIVE,
 };
+
+std::string toString(HeadTrackingMode mode);
 
 }  // namespace media
 }  // namespace android
