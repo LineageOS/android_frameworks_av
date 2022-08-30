@@ -13,6 +13,7 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
+#include <android-base/stringprintf.h>
 
 #include "media/Pose.h"
 #include "media/Twist.h"
@@ -21,6 +22,7 @@
 namespace android {
 namespace media {
 
+using android::base::StringAppendF;
 using Eigen::Vector3f;
 
 std::optional<Pose3f> Pose3f::fromVector(const std::vector<float>& vec) {
@@ -33,6 +35,19 @@ std::optional<Pose3f> Pose3f::fromVector(const std::vector<float>& vec) {
 std::vector<float> Pose3f::toVector() const {
     Eigen::Vector3f rot = quaternionToRotationVector(mRotation);
     return {mTranslation[0], mTranslation[1], mTranslation[2], rot[0], rot[1], rot[2]};
+}
+
+std::string Pose3f::toString() const {
+    const auto& vec = this->toVector();
+    std::string ss = "[";
+    for (auto f = vec.begin(); f != vec.end(); ++f) {
+        if (f != vec.begin()) {
+            ss.append(", ");
+        }
+        StringAppendF(&ss, "%0.2f", *f);
+    }
+    ss.append("]");
+    return ss;
 }
 
 std::tuple<Pose3f, bool> moveWithRateLimit(const Pose3f& from, const Pose3f& to, float t,

@@ -164,29 +164,30 @@ class HeadTrackingProcessorImpl : public HeadTrackingProcessor {
     std::string toString_l(unsigned level) const override {
         std::string prefixSpace(level, ' ');
         std::string ss = prefixSpace + "HeadTrackingProcessor:\n";
-        StringAppendF(&ss, "%smaxTranslationalVelocity: %f\n", prefixSpace.c_str(),
+        StringAppendF(&ss, "%s maxTranslationalVelocity: %f meter/second\n", prefixSpace.c_str(),
                       mOptions.maxTranslationalVelocity);
-        StringAppendF(&ss, "%smaxRotationalVelocity: %f\n", prefixSpace.c_str(),
+        StringAppendF(&ss, "%s maxRotationalVelocity: %f rad/second\n", prefixSpace.c_str(),
                       mOptions.maxRotationalVelocity);
-        StringAppendF(&ss, "%sfreshnessTimeout: %" PRId64 "\n", prefixSpace.c_str(),
-                      mOptions.freshnessTimeout);
-        StringAppendF(&ss, "%spredictionDuration: %f\n", prefixSpace.c_str(),
-                      mOptions.predictionDuration);
-        StringAppendF(&ss, "%sautoRecenterWindowDuration: %" PRId64 "\n", prefixSpace.c_str(),
-                      mOptions.autoRecenterWindowDuration);
-        StringAppendF(&ss, "%sautoRecenterTranslationalThreshold: %f\n", prefixSpace.c_str(),
+        StringAppendF(&ss, "%s freshnessTimeout: %0.4f ms\n", prefixSpace.c_str(),
+                      media::nsToFloatMs(mOptions.freshnessTimeout));
+        StringAppendF(&ss, "%s predictionDuration: %0.4f ms\n", prefixSpace.c_str(),
+                      media::nsToFloatMs(mOptions.predictionDuration));
+        StringAppendF(&ss, "%s autoRecenterWindowDuration: %0.4f ms\n", prefixSpace.c_str(),
+                      media::nsToFloatMs(mOptions.autoRecenterWindowDuration));
+        StringAppendF(&ss, "%s autoRecenterTranslationalThreshold: %f meter\n", prefixSpace.c_str(),
                       mOptions.autoRecenterTranslationalThreshold);
-        StringAppendF(&ss, "%sautoRecenterRotationalThreshold: %f\n", prefixSpace.c_str(),
+        StringAppendF(&ss, "%s autoRecenterRotationalThreshold: %f radians\n", prefixSpace.c_str(),
                       mOptions.autoRecenterRotationalThreshold);
-        StringAppendF(&ss, "%sscreenStillnessWindowDuration: %" PRId64 "\n", prefixSpace.c_str(),
-                      mOptions.screenStillnessWindowDuration);
-        StringAppendF(&ss, "%sscreenStillnessTranslationalThreshold: %f\n", prefixSpace.c_str(),
-                      mOptions.screenStillnessTranslationalThreshold);
-        StringAppendF(&ss, "%sscreenStillnessRotationalThreshold: %f\n", prefixSpace.c_str(),
-                      mOptions.screenStillnessRotationalThreshold);
+        StringAppendF(&ss, "%s screenStillnessWindowDuration: %0.4f ms\n", prefixSpace.c_str(),
+                      media::nsToFloatMs(mOptions.screenStillnessWindowDuration));
+        StringAppendF(&ss, "%s screenStillnessTranslationalThreshold: %f meter\n",
+                      prefixSpace.c_str(), mOptions.screenStillnessTranslationalThreshold);
+        StringAppendF(&ss, "%s screenStillnessRotationalThreshold: %f radians\n",
+                      prefixSpace.c_str(), mOptions.screenStillnessRotationalThreshold);
+        ss += mModeSelector.toString(level + 1);
+        ss += mRateLimiter.toString(level + 1);
         ss.append(prefixSpace + "ReCenterHistory:\n");
         ss += mLocalLog.dumpToString((prefixSpace + " ").c_str(), mMaxLocalLogLine);
-        // TODO: 233092747 add string from PoseRateLimiter/PoseRateLimiter etc...
         return ss;
     }
 
@@ -216,6 +217,18 @@ std::unique_ptr<HeadTrackingProcessor> createHeadTrackingProcessor(
         const HeadTrackingProcessor::Options& options, HeadTrackingMode initialMode) {
     return std::make_unique<HeadTrackingProcessorImpl>(options, initialMode);
 }
+
+std::string toString(HeadTrackingMode mode) {
+    switch (mode) {
+        case HeadTrackingMode::STATIC:
+            return "STATIC";
+        case HeadTrackingMode::WORLD_RELATIVE:
+            return "WORLD_RELATIVE";
+        case HeadTrackingMode::SCREEN_RELATIVE:
+            return "SCREEN_RELATIVE";
+    }
+    return "EnumNotImplemented";
+};
 
 }  // namespace media
 }  // namespace android
