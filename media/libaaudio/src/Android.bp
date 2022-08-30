@@ -264,7 +264,7 @@ aidl_interface {
         "binding/aidl/aaudio/IAAudioService.aidl",
     ],
     imports: [
-        "android.media.audio.common.types",
+        "android.media.audio.common.types-V2",
         "audioclient-types-aidl",
         "shared-file-region-aidl",
         "framework-permission-aidl",
