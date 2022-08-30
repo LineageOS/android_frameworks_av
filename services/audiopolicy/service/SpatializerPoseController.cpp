@@ -65,13 +65,13 @@ constexpr float kAutoRecenterRotationThreshold = 10.5f / 180 * M_PI;
 
 // Screen is considered to be unstable (not still) if it has moved significantly within the last
 // time window of this duration.
-constexpr auto kScreenStillnessWindowDuration = 3s;
+constexpr auto kScreenStillnessWindowDuration = 750ms;
 
 // Screen is considered to have moved significantly if translated by this much (in meter, approx).
 constexpr float kScreenStillnessTranslationThreshold = 0.1f;
 
 // Screen is considered to have moved significantly if rotated by this much (in radians, approx).
-constexpr float kScreenStillnessRotationThreshold = 7.0f / 180 * M_PI;
+constexpr float kScreenStillnessRotationThreshold = 15.0f / 180 * M_PI;
 
 // Time units for system clock ticks. This is what the Sensor Framework timestamps represent and
 // what we use for pose filtering.
