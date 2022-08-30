@@ -31,7 +31,6 @@ public:
                   mPlaybackThreadHandle(playbackThreadHandle),
                   mRecordThreadHandle(recordThreadHandle) {}
         SoftwarePatch(const SoftwarePatch&) = default;
-        SoftwarePatch& operator=(const SoftwarePatch&) = default;
 
         // Must be called under AudioFlinger::mLock
         status_t getLatencyMs_l(double *latencyMs) const;
