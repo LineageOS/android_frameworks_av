@@ -83,6 +83,7 @@ cc_test_host {
         "Twist-test.cpp",
     ],
     shared_libs: [
+        "libaudioutils",
         "libheadtracking",
     ],
 }

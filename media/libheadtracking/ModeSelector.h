@@ -16,6 +16,7 @@
 #pragma once
 
 #include <optional>
+#include <audio_utils/SimpleLog.h>
 
 #include "media/HeadTrackingMode.h"
 #include "media/Pose.h"
@@ -114,6 +115,8 @@ class ModeSelector {
      */
     HeadTrackingMode getActualMode() const;
 
+    std::string toString(unsigned level) const;
+
   private:
     const Options mOptions;
 
@@ -128,6 +131,9 @@ class ModeSelector {
 
     HeadTrackingMode mActualMode;
     Pose3f mHeadToStage;
+
+    static constexpr std::size_t sMaxLocalLogLine = 10;
+    SimpleLog mLocalLog{sMaxLocalLogLine};
 
     void calculateActualMode(int64_t timestamp);
 };
