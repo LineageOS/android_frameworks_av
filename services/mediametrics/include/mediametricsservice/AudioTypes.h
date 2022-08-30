@@ -36,6 +36,8 @@ const std::unordered_map<std::string, int32_t>& getSpatializerModeMap();
 std::vector<int32_t> vectorFromMap(
         const std::string &str, const std::unordered_map<std::string, int32_t>& map);
 
+std::vector<int64_t> channelMaskVectorFromString(const std::string &s);
+
 // Enumeration for the device connection results.
 enum DeviceConnectionResult : int32_t {
     DEVICE_CONNECTION_RESULT_SUCCESS = 0,              // Audio delivered
@@ -53,6 +55,7 @@ enum AudioEnumCategory {
     AAUDIO_DIRECTION,
     AAUDIO_PERFORMANCE_MODE,
     AAUDIO_SHARING_MODE,
+    AUDIO_DEVICE_INFO_TYPE,
     CALLER_NAME,
     CONTENT_TYPE,
     ENCODING,
