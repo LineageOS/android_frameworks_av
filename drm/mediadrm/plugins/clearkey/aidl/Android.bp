@@ -112,31 +112,11 @@ cc_fuzz {
     name: "android.hardware.drm-service.clearkey.aidl_fuzzer",
     defaults: [
         "fuzz_aidl_clearkey_service_defaults",
+        "service_fuzzer_defaults",
     ],
     static_libs: [
-        "libbase",
-        "libbinder_random_parcel",
-        "libcutils",
         "liblog",
-        "libutils",
     ],
-    target: {
-        android: {
-            shared_libs: [
-                "libbinder_ndk",
-                "libbinder",
-            ],
-        },
-        host: {
-            static_libs: [
-                "libbinder_ndk",
-                "libbinder",
-            ],
-        },
-        darwin: {
-            enabled: false,
-        },
-    },
     srcs: ["fuzzer.cpp"],
     fuzz_config: {
         cc: [
