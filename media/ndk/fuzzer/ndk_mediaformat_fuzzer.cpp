@@ -182,8 +182,9 @@ extern "C" int LLVMFuzzerTestOneInput(const uint8_t* data, size_t size) {
     AMediaFormat* mediaFormat = AMediaFormat_new();
     while (fdp.remaining_bytes()) {
         const char* name = nullptr;
+        std::string nameString;
         if (fdp.ConsumeBool()) {
-            std::string nameString =
+            nameString =
                     fdp.ConsumeBool()
                             ? fdp.PickValueInArray(kValidKeys)
                             : fdp.ConsumeRandomLengthString(
