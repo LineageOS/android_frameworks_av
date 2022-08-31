@@ -1703,13 +1703,16 @@ status_t AudioTrack::getPosition(uint32_t *position)
     }
 
     AutoMutex lock(mLock);
+    // IAudioTrack::stop() isn't synchronous; we don't know when presentation completes
+    if (mState == STATE_STOPPED || mState == STATE_FLUSHED) {
+        *position = 0;
+        return NO_ERROR;
+    }
     // FIXME: offloaded and direct tracks call into the HAL for render positions
     // for compressed/synced data; however, we use proxy position for pure linear pcm data
     // as we do not know the capability of the HAL for pcm position support and standby.
     // There may be some latency differences between the HAL position and the proxy position.
     if (isOffloadedOrDirect_l() && !isPurePcmData_l()) {
-        uint32_t dspFrames = 0;
-
         if (isOffloaded_l() && ((mState == STATE_PAUSED) || (mState == STATE_PAUSED_STOPPING))) {
             ALOGV("%s(%d): called in paused state, return cached position %u",
                 __func__, mPortId, mPausedPosition);
@@ -1717,13 +1720,15 @@ status_t AudioTrack::getPosition(uint32_t *position)
             return NO_ERROR;
         }
 
+        uint32_t dspFrames = 0;
         if (mOutput != AUDIO_IO_HANDLE_NONE) {
             uint32_t halFrames; // actually unused
-            (void) AudioSystem::getRenderPosition(mOutput, &halFrames, &dspFrames);
             // FIXME: on getRenderPosition() error, we return OK with frame position 0.
+            if (AudioSystem::getRenderPosition(mOutput, &halFrames, &dspFrames) != NO_ERROR) {
+                *position = 0;
+                return NO_ERROR;
+            }
         }
-        // FIXME: dspFrames may not be zero in (mState == STATE_STOPPED || mState == STATE_FLUSHED)
-        // due to hardware latency. We leave this behavior for now.
         *position = dspFrames;
     } else {
         if (mCblk->mFlags & CBLK_INVALID) {
@@ -1731,11 +1736,9 @@ status_t AudioTrack::getPosition(uint32_t *position)
             // FIXME: for compatibility with the Java API we ignore the restoreTrack_l()
             // error here (e.g. DEAD_OBJECT) and return OK with the last recorded server position.
         }
-
-        // IAudioTrack::stop() isn't synchronous; we don't know when presentation completes
-        *position = (mState == STATE_STOPPED || mState == STATE_FLUSHED) ?
-                0 : updateAndGetPosition_l().value();
+        *position = updateAndGetPosition_l().value();
     }
+
     return NO_ERROR;
 }
 
