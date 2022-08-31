@@ -1721,6 +1721,7 @@ void AudioPolicyService::UidPolicy::updateUidLocked(std::unordered_map<uid_t,
 }
 
 bool AudioPolicyService::UidPolicy::isA11yOnTop() {
+    Mutex::Autolock _l(mLock);
     for (const auto &uid : mCachedUids) {
         if (!isA11yUid(uid.first)) {
             continue;
