@@ -475,8 +475,8 @@ private:
         Mutex mLock;
         ActivityManager mAm;
         bool mObserverRegistered = false;
-        std::unordered_map<uid_t, std::pair<bool, int>> mOverrideUids;
-        std::unordered_map<uid_t, std::pair<bool, int>> mCachedUids;
+        std::unordered_map<uid_t, std::pair<bool, int>> mOverrideUids GUARDED_BY(mLock);
+        std::unordered_map<uid_t, std::pair<bool, int>> mCachedUids GUARDED_BY(mLock);
         std::vector<uid_t> mAssistantUids;
         std::vector<uid_t> mActiveAssistantUids;
         std::vector<uid_t> mA11yUids;
