@@ -403,6 +403,17 @@ status_t Spatializer::registerCallback(
         return BAD_VALUE;
     }
 
+    if (mSpatializerCallback != nullptr) {
+        if (IInterface::asBinder(callback) == IInterface::asBinder(mSpatializerCallback)) {
+            ALOGW("%s: Registering callback %p again",
+                __func__, mSpatializerCallback.get());
+            return NO_ERROR;
+        }
+        ALOGE("%s: Already one client registered with callback %p",
+            __func__, mSpatializerCallback.get());
+        return INVALID_OPERATION;
+    }
+
     sp<IBinder> binder = IInterface::asBinder(callback);
     status_t status = binder->linkToDeath(this);
     if (status == NO_ERROR) {
