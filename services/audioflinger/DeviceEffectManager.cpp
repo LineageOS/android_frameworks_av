@@ -106,8 +106,13 @@ sp<AudioFlinger::EffectHandle> AudioFlinger::DeviceEffectManager::createEffect_l
         if (lStatus == NO_ERROR) {
             lStatus = effect->addHandle(handle.get());
             if (lStatus == NO_ERROR) {
-                effect->init(patches);
-                mDeviceEffects.emplace(device, effect);
+                lStatus = effect->init(patches);
+                if (lStatus == NAME_NOT_FOUND) {
+                    lStatus = NO_ERROR;
+                }
+                if (lStatus == NO_ERROR || lStatus == ALREADY_EXISTS) {
+                    mDeviceEffects.emplace(device, effect);
+                }
             }
         }
     }
