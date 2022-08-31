@@ -97,6 +97,7 @@ private:
     int32_t mOutputDelayRingBufferWritePos;
     int32_t mOutputDelayRingBufferReadPos;
     int32_t mOutputDelayRingBufferFilled;
+    int mDeviceApiLevel;
     bool outputDelayRingBufferPutSamples(INT_PCM *samples, int numSamples);
     int32_t outputDelayRingBufferGetSamples(INT_PCM *samples, int numSamples);
     int32_t outputDelayRingBufferSamplesAvailable();
