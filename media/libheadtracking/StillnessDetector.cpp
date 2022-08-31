@@ -26,6 +26,9 @@ void StillnessDetector::reset() {
     mFifo.clear();
     mWindowFull = false;
     mSuppressionDeadline.reset();
+    // A "true" state indicates stillness is detected (default = true)
+    mCurrentState = true;
+    mPreviousState = true;
 }
 
 void StillnessDetector::setInput(int64_t timestamp, const Pose3f& input) {
@@ -33,7 +36,15 @@ void StillnessDetector::setInput(int64_t timestamp, const Pose3f& input) {
     discardOld(timestamp);
 }
 
+bool StillnessDetector::getPreviousState() const {
+    return mPreviousState;
+}
+
 bool StillnessDetector::calculate(int64_t timestamp) {
+    // Move the current stillness state to the previous state.
+    // This allows us to detect transitions into and out of stillness.
+    mPreviousState = mCurrentState;
+
     discardOld(timestamp);
 
     // Check whether all the poses in the queue are in the proximity of the new one. We want to do
@@ -60,15 +71,17 @@ bool StillnessDetector::calculate(int64_t timestamp) {
 
     // If the window has not been full, return the default value.
     if (!mWindowFull) {
-        return mOptions.defaultValue;
+        mCurrentState = mOptions.defaultValue;
     }
-
     // Force "in motion" while the suppression deadline is active.
-    if (mSuppressionDeadline.has_value()) {
-        return false;
+    else if (mSuppressionDeadline.has_value()) {
+        mCurrentState = false;
+    }
+    else {
+        mCurrentState = !moved;
     }
 
-    return !moved;
+    return mCurrentState;
 }
 
 void StillnessDetector::discardOld(int64_t timestamp) {
