@@ -97,6 +97,10 @@ class AidlCamera3OfflineSession :
         ::ndk::ScopedAStatus returnStreamBuffers(
                 const std::vector<
                         aidl::android::hardware::camera::device::StreamBuffer>& buffers) override;
+        protected:
+
+        ::ndk::SpAIBinder createBinder() override;
+
         private:
             wp<AidlCamera3OfflineSession> mParent = nullptr;
     };
