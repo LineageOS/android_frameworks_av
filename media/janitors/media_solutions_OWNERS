@@ -2,9 +2,9 @@
 # go/android-fwk-media-solutions for info on areas of ownership.
 
 # Main owners:
+adadukin@google.com
 aquilescanta@google.com
-krocard@google.com
+ivanbuper@google.com
 
 # In case of emergency:
 andrewlewis@google.com #{LAST_RESORT_SUGGESTION}
-olly@google.com #{LAST_RESORT_SUGGESTION}
