@@ -2339,6 +2339,9 @@ status_t AudioSystem::canBeSpatialized(const audio_attributes_t *attr,
                                     const AudioDeviceTypeAddrVector &devices,
                                     bool *canBeSpatialized) {
     const sp<IAudioPolicyService>& aps = AudioSystem::get_audio_policy_service();
+    if (canBeSpatialized == nullptr) {
+        return BAD_VALUE;
+    }
     if (aps == 0) {
         return PERMISSION_DENIED;
     }
