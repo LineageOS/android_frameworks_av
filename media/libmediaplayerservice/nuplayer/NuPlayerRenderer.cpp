@@ -1947,22 +1947,12 @@ status_t NuPlayer::Renderer::onOpenAudioSink(
     CHECK(format->findInt32("channel-count", &numChannels));
 
     // channel mask info as read from the audio format
-    int32_t channelMaskFromFormat;
+    int32_t mediaFormatChannelMask;
     // channel mask to use for native playback
     audio_channel_mask_t channelMask;
-    if (format->findInt32("channel-mask", &channelMaskFromFormat)) {
+    if (format->findInt32("channel-mask", &mediaFormatChannelMask)) {
         // KEY_CHANNEL_MASK follows the android.media.AudioFormat java mask
-        // which is left-bitshifted by 2 relative to the native mask
-        if ((channelMaskFromFormat & 0b11) != 0) {
-            // received an unexpected mask (supposed to follow AudioFormat constants
-            // for output masks with the 2 least-significant bits at 0), but
-            // it may come from an extractor that uses native masks: keeping
-            // the mask as given is ok as it contains at least mono or stereo
-            // and potentially the haptic channels
-            channelMask = static_cast<audio_channel_mask_t>(channelMaskFromFormat);
-        } else {
-            channelMask = static_cast<audio_channel_mask_t>(channelMaskFromFormat >> 2);
-        }
+        channelMask = audio_channel_mask_from_media_format_mask(mediaFormatChannelMask);
     } else {
         // no mask found: the mask will be derived from the channel count
         channelMask = CHANNEL_MASK_USE_CHANNEL_ORDER;
