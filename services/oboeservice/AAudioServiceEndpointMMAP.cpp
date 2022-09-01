@@ -71,6 +71,8 @@ std::string AAudioServiceEndpointMMAP::dump() const {
 aaudio_result_t AAudioServiceEndpointMMAP::open(const aaudio::AAudioStreamRequest &request) {
     aaudio_result_t result = AAUDIO_OK;
     copyFrom(request.getConstantConfiguration());
+    mRequestedDeviceId = getDeviceId();
+
     mMmapClient.attributionSource = request.getAttributionSource();
     // TODO b/182392769: use attribution source util
     mMmapClient.attributionSource.uid = VALUE_OR_FATAL(
@@ -115,7 +117,7 @@ aaudio_result_t AAudioServiceEndpointMMAP::openWithFormat(audio_format_t audioFo
 
     const audio_attributes_t attributes = getAudioAttributesFrom(this);
 
-    mRequestedDeviceId = deviceId = getDeviceId();
+    deviceId = mRequestedDeviceId;
 
     // Fill in config
     config.format = audioFormat;
@@ -151,6 +153,10 @@ aaudio_result_t AAudioServiceEndpointMMAP::openWithFormat(audio_format_t audioFo
     audio_session_t sessionId = AAudioConvert_aaudioToAndroidSessionId(requestedSessionId);
 
     // Open HAL stream. Set mMmapStream
+    ALOGD("%s trying to open MMAP stream with format=%#x, "
+          "sample_rate=%u, channel_mask=%#x, device=%d",
+          __func__, config.format, config.sample_rate,
+          config.channel_mask, deviceId);
     status_t status = MmapStreamInterface::openMmapStream(streamDirection,
                                                           &attributes,
                                                           &config,
@@ -221,6 +227,9 @@ aaudio_result_t AAudioServiceEndpointMMAP::openWithFormat(audio_format_t audioFo
 
 error:
     close();
+    // restore original requests
+    setDeviceId(mRequestedDeviceId);
+    setSessionId(requestedSessionId);
     return result;
 }
 
