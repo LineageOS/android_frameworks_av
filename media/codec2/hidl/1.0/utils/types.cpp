@@ -1447,6 +1447,10 @@ bool objcpy(C2FrameData* d, const FrameData& s,
 bool objcpy(C2BaseBlock* d, const BaseBlock& s) {
     switch (s.getDiscriminator()) {
     case BaseBlock::hidl_discriminator::nativeBlock: {
+            if (s.nativeBlock() == nullptr) {
+                LOG(ERROR) << "Null BaseBlock::nativeBlock handle";
+                return false;
+            }
             native_handle_t* sHandle =
                     native_handle_clone(s.nativeBlock());
             if (sHandle == nullptr) {
