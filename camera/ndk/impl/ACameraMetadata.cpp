@@ -537,6 +537,7 @@ ACameraMetadata::isCaptureRequestTag(const uint32_t tag) {
         case ACAMERA_CONTROL_ENABLE_ZSL:
         case ACAMERA_CONTROL_EXTENDED_SCENE_MODE:
         case ACAMERA_CONTROL_ZOOM_RATIO:
+        case ACAMERA_CONTROL_SETTINGS_OVERRIDE:
         case ACAMERA_EDGE_MODE:
         case ACAMERA_FLASH_MODE:
         case ACAMERA_HOT_PIXEL_MODE:
