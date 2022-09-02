@@ -10465,6 +10465,14 @@ void AudioFlinger::MmapPlaybackThread::processVolume_l()
         }
         for (const sp<MmapTrack> &track : mActiveTracks) {
             track->setMetadataHasChanged();
+            track->processMuteEvent_l(mAudioFlinger->getOrCreateAudioManager(),
+                /*muteState=*/{mMasterMute,
+                               mStreamVolume == 0.f,
+                               mStreamMute,
+                               // TODO(b/241533526): adjust logic to include mute from AppOps
+                               false /*muteFromPlaybackRestricted*/,
+                               false /*muteFromClientVolume*/,
+                               false /*muteFromVolumeShaper*/});
         }
     }
 }

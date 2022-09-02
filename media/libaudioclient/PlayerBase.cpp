@@ -58,6 +58,20 @@ void PlayerBase::init(player_type_t playerType, audio_usage_t usage, audio_sessi
     }
 }
 
+void PlayerBase::triggerPortIdUpdate(audio_port_handle_t portId) const {
+    if (mAudioManager == nullptr) {
+        ALOGE("%s: no audio service, player %d will not update portId %d",
+              __func__,
+              mPIId,
+              portId);
+        return;
+    }
+
+    if (mPIId != PLAYER_PIID_INVALID && portId != AUDIO_PORT_HANDLE_NONE) {
+        mAudioManager->playerEvent(mPIId, android::PLAYER_UPDATE_PORT_ID, portId);
+    }
+}
+
 void PlayerBase::baseDestroy() {
     serviceReleasePlayer();
     if (mAudioManager != 0) {
