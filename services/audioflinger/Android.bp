@@ -117,3 +117,8 @@ cc_library_shared {
     },
 
 }
+
+cc_library_headers {
+    name: "libaudioflinger_headers",
+    export_include_dirs: ["."],
+}
