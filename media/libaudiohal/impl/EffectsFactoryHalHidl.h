@@ -17,6 +17,8 @@
 #ifndef ANDROID_HARDWARE_EFFECTS_FACTORY_HAL_HIDL_H
 #define ANDROID_HARDWARE_EFFECTS_FACTORY_HAL_HIDL_H
 
+#include <memory>
+
 #include PATH(android/hardware/audio/effect/FILE_VERSION/IEffectsFactory.h)
 #include <media/audiohal/EffectsFactoryHalInterface.h>
 
@@ -27,6 +29,8 @@ namespace effect {
 
 using ::android::hardware::hidl_vec;
 using namespace ::android::hardware::audio::effect::CPP_VERSION;
+
+class EffectDescriptorCache;
 
 class EffectsFactoryHalHidl : public EffectsFactoryHalInterface, public EffectConversionHelperHidl
 {
@@ -63,9 +67,7 @@ class EffectsFactoryHalHidl : public EffectsFactoryHalInterface, public EffectCo
 
   private:
     sp<IEffectsFactory> mEffectsFactory;
-    hidl_vec<EffectDescriptor> mLastDescriptors;
-
-    status_t queryAllDescriptors();
+    std::unique_ptr<EffectDescriptorCache> mCache;
 };
 
 } // namespace effect
