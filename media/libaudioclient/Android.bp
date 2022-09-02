@@ -302,12 +302,26 @@ aidl_interface {
     double_loadable: true,
     vendor_available: true,
     srcs: [
+        "aidl/android/media/EffectConfig.aidl",
         "aidl/android/media/IEffect.aidl",
         "aidl/android/media/IEffectClient.aidl",
     ],
     imports: [
+        "android.media.audio.common.types-V1",
         "shared-file-region-aidl",
     ],
+    backend: {
+        cpp: {
+            min_sdk_version: "29",
+            apex_available: [
+                "//apex_available:platform",
+                "com.android.media",
+            ],
+        },
+        java: {
+            sdk_version: "module_current",
+        },
+    },
 }
 
 aidl_interface {
