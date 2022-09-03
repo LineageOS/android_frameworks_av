@@ -278,7 +278,7 @@ aaudio_result_t AAudioServiceStreamBase::start_l() {
     if (result != AAUDIO_OK) goto error;
 
     // This should happen at the end of the start.
-    sendServiceEvent(AAUDIO_SERVICE_EVENT_STARTED);
+    sendServiceEvent(AAUDIO_SERVICE_EVENT_STARTED, static_cast<int64_t>(mClientHandle));
     setState(AAUDIO_STREAM_STATE_STARTED);
 
     return result;
