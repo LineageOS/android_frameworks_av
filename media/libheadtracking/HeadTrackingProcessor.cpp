@@ -13,7 +13,10 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
+#include <inttypes.h>
 
+#include <android-base/stringprintf.h>
+#include <audio_utils/SimpleLog.h>
 #include "media/HeadTrackingProcessor.h"
 
 #include "ModeSelector.h"
@@ -26,6 +29,7 @@ namespace android {
 namespace media {
 namespace {
 
+using android::base::StringAppendF;
 using Eigen::Quaternionf;
 using Eigen::Vector3f;
 
@@ -136,10 +140,12 @@ class HeadTrackingProcessorImpl : public HeadTrackingProcessor {
         if (recenterHead) {
             mHeadPoseBias.recenter();
             mHeadStillnessDetector.reset();
+            mLocalLog.log("recenter Head");
         }
         if (recenterScreen) {
             mScreenPoseBias.recenter();
             mScreenStillnessDetector.reset();
+            mLocalLog.log("recenter Screen");
         }
 
         // If a sensor being recentered is included in the current mode, apply rate limiting to
@@ -150,6 +156,35 @@ class HeadTrackingProcessorImpl : public HeadTrackingProcessor {
             (recenterScreen && mode == HeadTrackingMode::SCREEN_RELATIVE)) {
             mRateLimiter.enable();
         }
+    }
+
+    std::string toString_l(unsigned level) const override {
+        std::string prefixSpace(level, ' ');
+        std::string ss = prefixSpace + "HeadTrackingProcessor:\n";
+        StringAppendF(&ss, "%smaxTranslationalVelocity: %f\n", prefixSpace.c_str(),
+                      mOptions.maxTranslationalVelocity);
+        StringAppendF(&ss, "%smaxRotationalVelocity: %f\n", prefixSpace.c_str(),
+                      mOptions.maxRotationalVelocity);
+        StringAppendF(&ss, "%sfreshnessTimeout: %" PRId64 "\n", prefixSpace.c_str(),
+                      mOptions.freshnessTimeout);
+        StringAppendF(&ss, "%spredictionDuration: %f\n", prefixSpace.c_str(),
+                      mOptions.predictionDuration);
+        StringAppendF(&ss, "%sautoRecenterWindowDuration: %" PRId64 "\n", prefixSpace.c_str(),
+                      mOptions.autoRecenterWindowDuration);
+        StringAppendF(&ss, "%sautoRecenterTranslationalThreshold: %f\n", prefixSpace.c_str(),
+                      mOptions.autoRecenterTranslationalThreshold);
+        StringAppendF(&ss, "%sautoRecenterRotationalThreshold: %f\n", prefixSpace.c_str(),
+                      mOptions.autoRecenterRotationalThreshold);
+        StringAppendF(&ss, "%sscreenStillnessWindowDuration: %" PRId64 "\n", prefixSpace.c_str(),
+                      mOptions.screenStillnessWindowDuration);
+        StringAppendF(&ss, "%sscreenStillnessTranslationalThreshold: %f\n", prefixSpace.c_str(),
+                      mOptions.screenStillnessTranslationalThreshold);
+        StringAppendF(&ss, "%sscreenStillnessRotationalThreshold: %f\n", prefixSpace.c_str(),
+                      mOptions.screenStillnessRotationalThreshold);
+        ss.append(prefixSpace + "ReCenterHistory:\n");
+        ss += mLocalLog.dumpToString((prefixSpace + " ").c_str(), mMaxLocalLogLine);
+        // TODO: 233092747 add string from PoseRateLimiter/PoseRateLimiter etc...
+        return ss;
     }
 
   private:
@@ -168,6 +203,8 @@ class HeadTrackingProcessorImpl : public HeadTrackingProcessor {
     ScreenHeadFusion mScreenHeadFusion;
     ModeSelector mModeSelector;
     PoseRateLimiter mRateLimiter;
+    static constexpr std::size_t mMaxLocalLogLine = 10;
+    SimpleLog mLocalLog{mMaxLocalLogLine};
 };
 
 }  // namespace
