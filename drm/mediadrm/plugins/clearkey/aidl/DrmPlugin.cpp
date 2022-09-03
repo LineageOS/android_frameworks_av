@@ -474,6 +474,7 @@ void DrmPlugin::installSecureStop(const std::vector<uint8_t>& sessionId) {
         return toNdkScopedAStatus(Status::ERROR_DRM_SESSION_NOT_OPENED);
     }
 
+    Mutex::Autolock lock(mSecurityLevelLock);
     std::map<std::vector<uint8_t>, ::aidl::android::hardware::drm::SecurityLevel>::iterator itr =
             mSecurityLevel.find(sid);
     if (itr == mSecurityLevel.end()) {
@@ -1009,6 +1010,7 @@ Status DrmPlugin::setSecurityLevel(const std::vector<uint8_t>& sessionId, Securi
         return Status::ERROR_DRM_SESSION_NOT_OPENED;
     }
 
+    Mutex::Autolock lock(mSecurityLevelLock);
     std::map<std::vector<uint8_t>, SecurityLevel>::iterator itr = mSecurityLevel.find(sid);
     if (itr != mSecurityLevel.end()) {
         mSecurityLevel[sid] = level;

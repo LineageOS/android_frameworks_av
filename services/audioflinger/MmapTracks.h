@@ -54,6 +54,14 @@ public:
             bool        getAndSetSilencedNotified_l() { bool silencedNotified = mSilencedNotified;
                                                         mSilencedNotified = true;
                                                         return silencedNotified; }
+
+    /**
+     * Updates the mute state and notifies the audio service. Call this only when holding player
+     * thread lock.
+     */
+    void processMuteEvent_l(const sp<IAudioManager>& audioManager,
+                            mute_state_t muteState)
+                            REQUIRES(AudioFlinger::MmapPlaybackThread::mLock);
 private:
     friend class MmapThread;
 
@@ -71,5 +79,12 @@ private:
     pid_t mPid;
     bool  mSilenced;            // protected by MMapThread::mLock
     bool  mSilencedNotified;    // protected by MMapThread::mLock
+
+    // TODO: replace PersistableBundle with own struct
+    // access these two variables only when holding player thread lock.
+    std::unique_ptr<os::PersistableBundle> mMuteEventExtras
+            GUARDED_BY(AudioFlinger::MmapPlaybackThread::mLock);
+    mute_state_t mMuteState
+            GUARDED_BY(AudioFlinger::MmapPlaybackThread::mLock);
 };  // end of Track
 

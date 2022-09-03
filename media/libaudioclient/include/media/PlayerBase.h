@@ -53,6 +53,10 @@ public:
 
             void baseUpdateDeviceId(audio_port_handle_t deviceId);
 
+            /**
+             * Updates the mapping in the AudioService between portId and piid
+             */
+            void triggerPortIdUpdate(audio_port_handle_t portId) const;
 protected:
 
             void init(player_type_t playerType, audio_usage_t usage, audio_session_t sessionId);
@@ -74,7 +78,6 @@ protected:
     // player interface ID, uniquely identifies the player in the system
     // effectively const after PlayerBase::init().
     audio_unique_id_t mPIId;
-
 private:
             // report events to AudioService
             void servicePlayerEvent(player_state_t event, audio_port_handle_t deviceId);

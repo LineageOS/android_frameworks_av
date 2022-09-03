@@ -647,6 +647,8 @@ aaudio_result_t AudioStreamInternal::onEventFromServer(AAudioServiceMessage *mes
             if (getState() == AAUDIO_STREAM_STATE_STARTING) {
                 setState(AAUDIO_STREAM_STATE_STARTED);
             }
+            mPlayerBase->triggerPortIdUpdate(static_cast<audio_port_handle_t>(
+                                                 message->event.dataLong));
             break;
         case AAUDIO_SERVICE_EVENT_PAUSED:
             ALOGD("%s - got AAUDIO_SERVICE_EVENT_PAUSED", __func__);
