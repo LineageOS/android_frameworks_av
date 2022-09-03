@@ -36,6 +36,17 @@ cc_library_shared {
     export_include_dirs: ["."],
 }
 
+// By adding "vendor_available: true" to "libavservices_minijail", we don't
+// need to have "libavservices_minijail_vendor" any longer.
+// "libavservices_minijail_vendor" will be removed, once we replace it with
+// "libavservices_minijail" in all vendor modules. (b/146313710)
+cc_library_shared {
+    name: "libavservices_minijail_vendor",
+    vendor: true,
+    defaults: ["libavservices_minijail_defaults"],
+    export_include_dirs: ["."],
+}
+
 // Unit tests.
 cc_test {
     name: "libavservices_minijail_unittest",
