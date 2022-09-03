@@ -17,15 +17,19 @@
 #ifndef ANDROID_MEDIA_SPATIALIZER_H
 #define ANDROID_MEDIA_SPATIALIZER_H
 
+#include <android-base/stringprintf.h>
 #include <android/media/BnEffect.h>
 #include <android/media/BnSpatializer.h>
 #include <android/media/SpatializationLevel.h>
 #include <android/media/SpatializationMode.h>
 #include <android/media/SpatializerHeadTrackingMode.h>
+#include <audio_utils/SimpleLog.h>
+#include <math.h>
+#include <media/AudioEffect.h>
 #include <media/audiohal/EffectHalInterface.h>
 #include <media/stagefright/foundation/ALooper.h>
-#include <media/AudioEffect.h>
 #include <system/audio_effects/effect_spatializer.h>
+#include <string>
 
 #include "SpatializerPoseController.h"
 
@@ -149,6 +153,43 @@ class Spatializer : public media::BnSpatializer,
     audio_config_base_t getAudioInConfig() const;
 
     void calculateHeadPose();
+
+    /** Convert fields in Spatializer and sub-modules to a string. Disable thread-safety-analysis
+     * here because we want to dump mutex guarded members even try_lock failed to provide as much
+     * information as possible for debugging purpose. */
+    std::string toString(unsigned level) const NO_THREAD_SAFETY_ANALYSIS;
+
+    static std::string toString(audio_latency_mode_t mode) {
+        switch (mode) {
+            case AUDIO_LATENCY_MODE_FREE:
+                return "LATENCY_MODE_FREE";
+            case AUDIO_LATENCY_MODE_LOW:
+                return "LATENCY_MODE_LOW";
+        }
+        return "EnumNotImplemented";
+    };
+
+    /**
+     * Format head to stage vector to a string, [0.00, 0.00, 0.00, -1.29, -0.50, 15.27].
+     */
+    template <typename T>
+    static std::string toString(const std::vector<T>& vec, bool radianToDegree = false) {
+        if (vec.size() == 0) {
+            return "[]";
+        }
+
+        std::string ss = "[";
+        for (const auto& f : vec) {
+            if (radianToDegree) {
+                base::StringAppendF(&ss, "%0.2f, ",
+                                    HeadToStagePoseRecorder::getDegreeWithRadian(f));
+            } else {
+                base::StringAppendF(&ss, "%f, ", f);
+            }
+        }
+        ss.replace(ss.end() - 2, ss.end(), "]");
+        return ss;
+    };
 
 private:
     Spatializer(effect_descriptor_t engineDescriptor,
@@ -355,9 +396,94 @@ private:
 
     size_t mNumActiveTracks GUARDED_BY(mLock) = 0;
 
-    static const std::vector<const char *> sHeadPoseKeys;
-};
+    static const std::vector<const char*> sHeadPoseKeys;
 
+    // Local log for command messages.
+    static constexpr int mMaxLocalLogLine = 10;
+    SimpleLog mLocalLog{mMaxLocalLogLine};
+
+    /**
+     * @brief Calculate and record sensor data.
+     * Dump to local log with max/average pose angle every mPoseRecordThreshold.
+     * TODO: log azimuth/elevation angles obtained for debugging actual orientation.
+     */
+    class HeadToStagePoseRecorder {
+      public:
+        /** Convert recorded sensor data to string with level indentation */
+        std::string toString_l(unsigned level) const;
+        /**
+         * @brief Calculate sensor data, record into local log when it is time.
+         *
+         * @param headToStage The vector from Pose3f::toVector().
+         */
+        void record_l(const std::vector<float>& headToStage);
+
+        static constexpr float getDegreeWithRadian(const float radian) {
+            float radianToDegreeRatio = (180 / PI);
+            return (radian * radianToDegreeRatio);
+        }
+
+      private:
+        static constexpr float PI = M_PI;
+        /**
+         * Pose recorder time threshold to record sensor data in local log.
+         * Sensor data will be recorded at least every mPoseRecordThreshold.
+         */
+        // TODO: add another history log to record longer period of sensor data.
+        static constexpr std::chrono::duration<double> mPoseRecordThreshold =
+                std::chrono::seconds(1);
+        /**
+         * According to frameworks/av/media/libheadtracking/include/media/Pose.h
+         * "The vector will have exactly 6 elements, where the first three are a translation vector
+         * and the last three are a rotation vector."
+         */
+        static constexpr size_t mPoseVectorSize = 6;
+        /**
+         * Timestamp of last sensor data record in local log.
+         */
+        std::chrono::time_point<std::chrono::steady_clock> mFirstSampleTimestamp;
+        // Last pose recorded, vector obtained from Pose3f::toVector().
+        std::vector<float> mLastPoseRecorded{mPoseVectorSize};
+        /**
+         * Number of sensor samples received since last record, sample rate is ~100Hz which produce
+         * ~6k samples/minute.
+         */
+        uint32_t mNumOfSampleSinceLastRecord = 0;
+        /* The sum of pose angle represented by radian since last dump, div
+         * mNumOfSampleSinceLastRecord to get arithmetic mean. Largest possible value: 2PI * 100Hz *
+         * mPoseRecordThreshold.
+         */
+        std::vector<double> mPoseRadianSum{mPoseVectorSize};
+        std::vector<float> mMaxPoseAngle{mPoseVectorSize};
+        std::vector<float> mMinPoseAngle{mPoseVectorSize};
+        // Local log for history sensor data.
+        SimpleLog mPoseRecordLog{mMaxLocalLogLine};
+
+        bool shouldRecordLog() const {
+            return std::chrono::duration_cast<std::chrono::seconds>(
+                           std::chrono::steady_clock::now() - mFirstSampleTimestamp) >=
+                   mPoseRecordThreshold;
+        }
+
+        void resetRecord(const std::vector<float>& headToStage) {
+            mPoseRadianSum.assign(mPoseVectorSize, 0);
+            mMaxPoseAngle.assign(mPoseVectorSize, 0);
+            mMinPoseAngle.assign(mPoseVectorSize, 0);
+            mNumOfSampleSinceLastRecord = 0;
+            mLastPoseRecorded = headToStage;
+        }
+
+        // Add each sample to sum and only calculate when record.
+        void poseSumToAverage() {
+            if (mNumOfSampleSinceLastRecord == 0) return;
+            for (auto& p : mPoseRadianSum) {
+                const float reciprocal = 1.f / mNumOfSampleSinceLastRecord;
+                p *= reciprocal;
+            }
+        }
+    };  // HeadToStagePoseRecorder
+    HeadToStagePoseRecorder mPoseRecorder;
+};  // Spatializer
 
 }; // namespace android
 
