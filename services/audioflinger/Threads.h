@@ -924,6 +924,10 @@ public:
         mTracks.add(track);
     }
 
+    status_t setAppVolume(const String8& packageName, const float value) final;
+    status_t setAppMute(const String8& packageName, const bool muted) final;
+    void listAppVolumes(std::set<media::AppVolume> &container) final;
+
 protected:
     // Code snippets that were lifted up out of threadLoop()
     virtual void threadLoop_mix() REQUIRES(ThreadBase_ThreadLoop) = 0;

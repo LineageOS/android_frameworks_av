@@ -793,6 +793,20 @@ Track::Track(
     ALOGV_IF(sharedBuffer != 0, "%s(%d): sharedBuffer: %p, size: %zu",
             __func__, mId, sharedBuffer->unsecurePointer(), sharedBuffer->size());
 
+    /* get package name */
+    PermissionController permissionController;
+    Vector<String16> packages;
+    permissionController.getPackagesForUid(uid(), packages);
+    if (!packages.isEmpty()) {
+        mPackageName = String8(packages[0]);
+    } else {
+        mPackageName = "";
+    }
+
+    /* init app volume */
+    mAppMuted = false;
+    mAppVolume = 1.0f;
+
     if (mCblk == NULL) {
         return;
     }
@@ -1558,6 +1572,16 @@ void Track::setFinalVolume(float volumeLeft, float volumeRight)
         mLogForceVolumeUpdate = false;
         mTrackMetrics.logVolume(mFinalVolume);
     }
+}
+
+void Track::setAppVolume(float volume)
+{
+    mAppVolume = volume;
+}
+
+void Track::setAppMute(bool val)
+{
+    mAppMuted = val;
 }
 
 void Track::copyMetadataTo(MetadataInserter& backInserter) const

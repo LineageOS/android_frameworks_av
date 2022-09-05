@@ -41,6 +41,7 @@
 #include <android/media/audio/common/AudioMMapPolicyType.h>
 #include <android/media/audio/common/AudioPort.h>
 #include <media/AidlConversionUtil.h>
+#include <media/AppVolume.h>
 #include <media/AudioContainers.h>
 #include <media/AudioDeviceTypeAddr.h>
 #include <media/AudioPolicy.h>
@@ -790,6 +791,14 @@ public:
 
     static int32_t getAAudioHardwareBurstMinUsec();
 
+    static status_t setAppVolume(const String8& packageName, const float value);
+    static status_t setAppMute(const String8& packageName, const bool value);
+    static status_t listAppVolumes(std::vector<media::AppVolume> *vols);
+
+private:
+   std::map<String8, media::AppVolume> mAppVolumeConfigs;
+
+public:
     class AudioFlingerClient: public IBinder::DeathRecipient, public media::BnAudioFlingerClient
     {
     public:

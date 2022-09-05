@@ -2671,6 +2671,27 @@ status_t AudioSystem::registerSoundTriggerCaptureStateListener(
     return NO_ERROR;
 }
 
+status_t AudioSystem::setAppVolume(const String8& packageName, const float volume)
+{
+    const sp<IAudioFlinger>& af = AudioSystem::get_audio_flinger();
+    if (af == 0) return PERMISSION_DENIED;
+    return af->setAppVolume(packageName, volume);
+}
+
+status_t AudioSystem::setAppMute(const String8& packageName, const bool mute)
+{
+    const sp<IAudioFlinger>& af = AudioSystem::get_audio_flinger();
+    if (af == 0) return PERMISSION_DENIED;
+    return af->setAppMute(packageName, mute);
+}
+
+status_t AudioSystem::listAppVolumes(std::vector<media::AppVolume> *vols)
+{
+    const sp<IAudioFlinger>& af = AudioSystem::get_audio_flinger();
+    if (af == 0) return PERMISSION_DENIED;
+    return af->listAppVolumes(vols);
+}
+
 status_t AudioSystem::setVibratorInfos(
         const std::vector<media::AudioVibratorInfo>& vibratorInfos) {
     const sp<IAudioFlinger> af = get_audio_flinger();
