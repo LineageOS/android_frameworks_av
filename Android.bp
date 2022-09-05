@@ -42,6 +42,7 @@ aidl_interface {
     double_loadable: true,
     local_include_dir: "aidl",
     srcs: [
+        "aidl/android/media/AppVolumeData.aidl",
         "aidl/android/media/InterpolatorConfig.aidl",
         "aidl/android/media/InterpolatorType.aidl",
         "aidl/android/media/MicrophoneInfoFw.aidl",

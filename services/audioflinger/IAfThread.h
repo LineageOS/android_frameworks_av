@@ -26,6 +26,7 @@
 #include <datapath/AudioStreamOut.h>
 #include <datapath/VolumeInterface.h>
 #include <fastpath/FastMixerDumpState.h>
+#include <media/AppVolume.h>
 #include <media/DeviceDescriptorBase.h>
 #include <media/MmapStreamInterface.h>
 #include <media/audiohal/StreamHalInterface.h>
@@ -463,6 +464,10 @@ public:
     virtual bool destroyTrack_l(const sp<IAfTrack>& track) REQUIRES(mutex()) = 0;
     virtual bool isTrackActive(const sp<IAfTrack>& track) const REQUIRES(mutex()) = 0;
     virtual void addOutputTrack_l(const sp<IAfTrack>& track) REQUIRES(mutex()) = 0;
+
+    virtual status_t setAppVolume(const String8& packageName, const float value) = 0;
+    virtual status_t setAppMute(const String8& packageName, const bool muted) = 0;
+    virtual void listAppVolumes(std::set<media::AppVolume> &container) = 0;
 
     virtual AudioStreamOut* getOutput_l() const REQUIRES(mutex()) = 0;
     virtual AudioStreamOut* getOutput() const EXCLUDES_ThreadBase_Mutex = 0;

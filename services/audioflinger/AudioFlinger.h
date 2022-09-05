@@ -406,6 +406,14 @@ private:
     sp<EffectsFactoryHalInterface> getEffectsFactory();
 
 public:
+    status_t setAppVolume(const String8& packageName, const float value);
+    status_t setAppMute(const String8& packageName, const bool value);
+    status_t listAppVolumes(std::vector<media::AppVolume> *vols);
+
+private:
+    std::map<String8, media::AppVolume> mAppVolumeConfigs;
+
+public:
     // TODO(b/292281786): Remove this when Oboeservice can get access to
     // openMmapStream through an IAudioFlinger handle directly.
     static inline std::atomic<AudioFlinger*> gAudioFlinger = nullptr;
