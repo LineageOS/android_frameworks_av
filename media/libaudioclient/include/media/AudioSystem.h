@@ -41,6 +41,7 @@
 #include <android/media/audio/common/AudioMMapPolicyType.h>
 #include <android/media/audio/common/AudioPort.h>
 #include <media/AidlConversionUtil.h>
+#include <media/AppVolume.h>
 #include <media/AudioContainers.h>
 #include <media/AudioDeviceTypeAddr.h>
 #include <media/AudioPolicy.h>
@@ -808,6 +809,10 @@ public:
     static status_t getMmapPolicyForDevice(
             media::audio::common::AudioMMapPolicyType policyType, audio_devices_t device,
             media::audio::common::AudioMMapPolicyInfo *policyInfo);
+
+    static status_t setAppVolume(const String8& packageName, const float value);
+    static status_t setAppMute(const String8& packageName, const bool value);
+    static status_t listAppVolumes(std::vector<media::AppVolume> *vols);
 
     class AudioFlingerClient: public media::BnAudioFlingerClient
     {
