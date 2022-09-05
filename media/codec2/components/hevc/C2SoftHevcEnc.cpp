@@ -1109,14 +1109,14 @@ void C2SoftHevcEnc::process(const std::unique_ptr<C2Work>& work,
         }
     }
 
-    std::shared_ptr<const C2GraphicView> view;
+    std::shared_ptr<C2GraphicView> view;
     std::shared_ptr<C2Buffer> inputBuffer = nullptr;
     bool eos = ((work->input.flags & C2FrameData::FLAG_END_OF_STREAM) != 0);
     if (eos) mSignalledEos = true;
 
     if (!work->input.buffers.empty()) {
         inputBuffer = work->input.buffers[0];
-        view = std::make_shared<const C2GraphicView>(
+        view = std::make_shared<C2GraphicView>(
             inputBuffer->data().graphicBlocks().front().map().get());
         if (view->error() != C2_OK) {
             ALOGE("graphic view map err = %d", view->error());
@@ -1125,6 +1125,9 @@ void C2SoftHevcEnc::process(const std::unique_ptr<C2Work>& work,
             work->workletsProcessed = 1u;
             return;
         }
+        //(b/232396154)
+        //workaround for incorrect crop size in view when using surface mode
+        view->setCrop_be(C2Rect(mSize->width, mSize->height));
     }
     IHEVCE_PLUGIN_STATUS_T err = IHEVCE_EOK;
 
