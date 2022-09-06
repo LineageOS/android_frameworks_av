@@ -46,6 +46,11 @@ class NdkMediaCodecFuzzerBase {
     AMediaCodec* createCodec(bool isEncoder, bool isCodecForClient);
     AMediaFormat* getCodecFormat() { return mFormat; };
     void setFdp(FuzzedDataProvider* fdp) { mFdp = fdp; }
+    ~NdkMediaCodecFuzzerBase() {
+        if (mFormat) {
+            AMediaFormat_delete(mFormat);
+        }
+    }
 
   private:
     AMediaCodec* createAMediaCodecByname(bool isEncoder, bool isCodecForClient);

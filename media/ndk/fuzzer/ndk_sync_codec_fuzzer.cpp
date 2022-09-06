@@ -41,14 +41,13 @@ class NdkSyncCodecFuzzer : public NdkMediaCodecFuzzerBase {
 
 void NdkSyncCodecFuzzer::invokekSyncCodecAPIs(bool isEncoder) {
     ANativeWindow* nativeWindow = nullptr;
-    AMediaFormat* format = getCodecFormat();
     int32_t numOfFrames = mFdp.ConsumeIntegralInRange<size_t>(kMinIterations, kMaxIterations);
     int32_t count = 0;
     while (++count <= numOfFrames) {
         int32_t ndkcodecAPI = mFdp.ConsumeIntegralInRange<size_t>(kMinAPICase, kMaxNdkCodecAPIs);
         switch (ndkcodecAPI) {
             case 0: {  // configure the codec
-                AMediaCodec_configure(mCodec, format, nativeWindow, nullptr /* crypto */,
+                AMediaCodec_configure(mCodec, getCodecFormat(), nativeWindow, nullptr /* crypto */,
                                       (isEncoder ? AMEDIACODEC_CONFIGURE_FLAG_ENCODE : 0));
                 break;
             }
@@ -118,9 +117,6 @@ void NdkSyncCodecFuzzer::invokekSyncCodecAPIs(bool isEncoder) {
     }
     if (nativeWindow) {
         ANativeWindow_release(nativeWindow);
-    }
-    if (format) {
-        AMediaFormat_delete(format);
     }
 }
 
