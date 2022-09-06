@@ -37,7 +37,7 @@ python_defaults {
 // Tools for audio policy engine criterion type configuration file
 //
 python_binary_host {
-    name: "buildPolicyCriterionTypes.py",
+    name: "buildPolicyCriterionTypes",
     main: "buildPolicyCriterionTypes.py",
     srcs: [
         "buildPolicyCriterionTypes.py",
@@ -47,10 +47,10 @@ python_binary_host {
 
 genrule_defaults {
     name: "buildpolicycriteriontypesrule",
-    tools: ["buildPolicyCriterionTypes.py"],
+    tools: ["buildPolicyCriterionTypes"],
     cmd: "cp $(locations :audio_policy_configuration_files) $(genDir)/. && " +
          "cp $(location :audio_policy_configuration_top_file) $(genDir)/audio_policy_configuration.xml && " +
-         "$(location buildPolicyCriterionTypes.py) " +
+         "$(location buildPolicyCriterionTypes) " +
          " --androidaudiobaseheader $(location :libaudio_system_audio_base) " +
          " --androidaudiocommonbaseheader $(location :libaudio_system_audio_common_base) " +
          "--audiopolicyconfigurationfile $(genDir)/audio_policy_configuration.xml " +
@@ -72,7 +72,7 @@ genrule_defaults {
 // Tools for audio policy engine parameter framework configurable domains
 //
 python_binary_host {
-    name: "domainGeneratorPolicy.py",
+    name: "domainGeneratorPolicy",
     main: "domainGeneratorPolicy.py",
     srcs: [
         "domainGeneratorPolicy.py",
@@ -91,13 +91,13 @@ python_binary_host {
 genrule_defaults {
     name: "domaingeneratorpolicyrule",
     tools: [
-        "domainGeneratorPolicy.py",
+        "domainGeneratorPolicy",
         "domainGeneratorConnector",
     ],
     cmd: "mkdir -p $(genDir)/Structure/Policy && " +
          "cp $(locations :audio_policy_pfw_structure_files) $(genDir)/Structure/Policy && " +
          "cp $(location :audio_policy_pfw_toplevel) $(genDir)/top_level && " +
-         "$(location domainGeneratorPolicy.py) " +
+         "$(location domainGeneratorPolicy) " +
          "--validate " +
          "--domain-generator-tool $(location domainGeneratorConnector) " +
          "--toplevel-config $(genDir)/top_level " +
@@ -121,7 +121,7 @@ genrule_defaults {
 // Tools for policy parameter-framework product strategies structure file generation
 //
 python_binary_host {
-    name: "buildStrategiesStructureFile.py",
+    name: "buildStrategiesStructureFile",
     main: "buildStrategiesStructureFile.py",
     srcs: [
         "buildStrategiesStructureFile.py",
@@ -131,9 +131,9 @@ python_binary_host {
 
 genrule_defaults {
     name: "buildstrategiesstructurerule",
-    tools: ["buildStrategiesStructureFile.py"],
+    tools: ["buildStrategiesStructureFile"],
     cmd: "cp $(locations :audio_policy_engine_configuration_files) $(genDir) && ls -l $(genDir) &&"+
-         "$(location buildStrategiesStructureFile.py) " +
+         "$(location buildStrategiesStructureFile) " +
          "--audiopolicyengineconfigurationfile $(genDir)/audio_policy_engine_configuration.xml "+
          "--productstrategiesstructurefile $(location :product_strategies_structure_template) " +
          "--outputfile $(out)",
@@ -149,7 +149,7 @@ genrule_defaults {
 // Tools for policy parameter-framework common type structure file generation
 //
 python_binary_host {
-    name: "buildCommonTypesStructureFile.py",
+    name: "buildCommonTypesStructureFile",
     main: "buildCommonTypesStructureFile.py",
     srcs: [
         "buildCommonTypesStructureFile.py",
@@ -159,8 +159,8 @@ python_binary_host {
 
 genrule_defaults {
     name: "buildcommontypesstructurerule",
-    tools: ["buildCommonTypesStructureFile.py"],
-    cmd: "$(location buildCommonTypesStructureFile.py) " +
+    tools: ["buildCommonTypesStructureFile"],
+    cmd: "$(location buildCommonTypesStructureFile) " +
          "--androidaudiobaseheader $(location :libaudio_system_audio_base) " +
          "--commontypesstructure $(location :common_types_structure_template) " +
          "--outputfile $(out)",
