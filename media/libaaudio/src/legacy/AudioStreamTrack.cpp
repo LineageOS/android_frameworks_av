@@ -202,6 +202,10 @@ aaudio_result_t AudioStreamTrack::open(const AudioStreamBuilder& builder)
     setBufferCapacity(getBufferCapacityFromDevice());
     setFramesPerBurst(getFramesPerBurstFromDevice());
 
+    setHardwareSamplesPerFrame(mAudioTrack->getHalChannelCount());
+    setHardwareSampleRate(mAudioTrack->getHalSampleRate());
+    setHardwareFormat(mAudioTrack->getHalFormat());
+
     // We may need to pass the data through a block size adapter to guarantee constant size.
     if (mCallbackBufferSize != AAUDIO_UNSPECIFIED) {
         // This may need to change if we add format conversion before

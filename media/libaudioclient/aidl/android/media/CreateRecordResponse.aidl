@@ -45,4 +45,5 @@ parcelable CreateRecordResponse {
     /** The newly created record. */
     @nullable IAudioRecord audioRecord;
     AudioConfigBase serverConfig;
+    AudioConfigBase halConfig;
 }

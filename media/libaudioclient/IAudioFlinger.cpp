@@ -112,6 +112,10 @@ IAudioFlinger::CreateTrackOutput::toAidl() const {
     aidl.afFrameCount = VALUE_OR_RETURN(convertIntegral<int64_t>(afFrameCount));
     aidl.afSampleRate = VALUE_OR_RETURN(convertIntegral<int32_t>(afSampleRate));
     aidl.afLatencyMs = VALUE_OR_RETURN(convertIntegral<int32_t>(afLatencyMs));
+    aidl.afChannelMask = VALUE_OR_RETURN(
+            legacy2aidl_audio_channel_mask_t_AudioChannelLayout(afChannelMask, false /*isInput*/));
+    aidl.afFormat = VALUE_OR_RETURN(
+            legacy2aidl_audio_format_t_AudioFormatDescription(afFormat));
     aidl.outputId = VALUE_OR_RETURN(legacy2aidl_audio_io_handle_t_int32_t(outputId));
     aidl.portId = VALUE_OR_RETURN(legacy2aidl_audio_port_handle_t_int32_t(portId));
     aidl.audioTrack = audioTrack;
@@ -135,6 +139,11 @@ IAudioFlinger::CreateTrackOutput::fromAidl(
     legacy.afFrameCount = VALUE_OR_RETURN(convertIntegral<size_t>(aidl.afFrameCount));
     legacy.afSampleRate = VALUE_OR_RETURN(convertIntegral<uint32_t>(aidl.afSampleRate));
     legacy.afLatencyMs = VALUE_OR_RETURN(convertIntegral<uint32_t>(aidl.afLatencyMs));
+    legacy.afChannelMask = VALUE_OR_RETURN(
+            aidl2legacy_AudioChannelLayout_audio_channel_mask_t(aidl.afChannelMask,
+                                                                false /*isInput*/));
+    legacy.afFormat = VALUE_OR_RETURN(
+            aidl2legacy_AudioFormatDescription_audio_format_t(aidl.afFormat));
     legacy.outputId = VALUE_OR_RETURN(aidl2legacy_int32_t_audio_io_handle_t(aidl.outputId));
     legacy.portId = VALUE_OR_RETURN(aidl2legacy_int32_t_audio_port_handle_t(aidl.portId));
     legacy.audioTrack = aidl.audioTrack;
@@ -199,6 +208,8 @@ IAudioFlinger::CreateRecordOutput::toAidl() const {
     aidl.audioRecord = audioRecord;
     aidl.serverConfig = VALUE_OR_RETURN(
             legacy2aidl_audio_config_base_t_AudioConfigBase(serverConfig, true /*isInput*/));
+    aidl.halConfig = VALUE_OR_RETURN(
+        legacy2aidl_audio_config_base_t_AudioConfigBase(halConfig, true /*isInput*/));
     return aidl;
 }
 
@@ -221,6 +232,8 @@ IAudioFlinger::CreateRecordOutput::fromAidl(
     legacy.audioRecord = aidl.audioRecord;
     legacy.serverConfig = VALUE_OR_RETURN(
             aidl2legacy_AudioConfigBase_audio_config_base_t(aidl.serverConfig, true /*isInput*/));
+    legacy.halConfig = VALUE_OR_RETURN(
+        aidl2legacy_AudioConfigBase_audio_config_base_t(aidl.halConfig, true /*isInput*/));
     return legacy;
 }
 

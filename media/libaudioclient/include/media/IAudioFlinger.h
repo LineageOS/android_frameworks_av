@@ -116,6 +116,8 @@ public:
         size_t   afFrameCount;
         uint32_t afSampleRate;
         uint32_t afLatencyMs;
+        audio_channel_mask_t afChannelMask;
+        audio_format_t afFormat;
         audio_io_handle_t outputId;
         audio_port_handle_t portId;
         sp<media::IAudioTrack> audioTrack;
@@ -169,6 +171,7 @@ public:
         audio_port_handle_t portId;
         sp<media::IAudioRecord> audioRecord;
         audio_config_base_t serverConfig;
+        audio_config_base_t halConfig;
 
         ConversionResult<media::CreateRecordResponse> toAidl() const;
         static ConversionResult<CreateRecordOutput>
