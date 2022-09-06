@@ -59,39 +59,29 @@ bool TimerThread::cancelTask(Handle handle) {
     return true;
 }
 
-std::string TimerThread::toString(size_t retiredCount) const {
+
+std::string TimerThread::SnapshotAnalysis::toString() const {
     // Note: These request queues are snapshot very close together but
     // not at "identical" times as we don't use a class-wide lock.
-
-    std::vector<std::shared_ptr<const Request>> timeoutRequests;
-    std::vector<std::shared_ptr<const Request>> retiredRequests;
-    mTimeoutQueue.copyRequests(timeoutRequests);
-    mRetiredQueue.copyRequests(retiredRequests, retiredCount);
-    std::vector<std::shared_ptr<const Request>> pendingRequests =
-        getPendingRequests();
-
-    struct Analysis analysis = analyzeTimeout(timeoutRequests, pendingRequests);
-    std::string analysisSummary;
-    if (!analysis.summary.empty()) {
-        analysisSummary = std::string("\nanalysis [ ").append(analysis.summary).append(" ]");
-    }
+    std::string analysisSummary = std::string("\nanalysis [ ").append(description).append(" ]");
     std::string timeoutStack;
-    if (analysis.timeoutTid != -1) {
-        timeoutStack = std::string("\ntimeout(")
-                .append(std::to_string(analysis.timeoutTid)).append(") callstack [\n")
-                .append(getCallStackStringForTid(analysis.timeoutTid)).append("]");
-    }
     std::string blockedStack;
-    if (analysis.HALBlockedTid != -1) {
+    if (timeoutTid != -1) {
+        timeoutStack = std::string(suspectTid == timeoutTid ? "\ntimeout/blocked(" : "\ntimeout(")
+                .append(std::to_string(timeoutTid)).append(") callstack [\n")
+                .append(getCallStackStringForTid(timeoutTid)).append("]");
+    }
+
+    if (suspectTid != -1 && suspectTid != timeoutTid) {
         blockedStack = std::string("\nblocked(")
-                .append(std::to_string(analysis.HALBlockedTid)).append(")  callstack [\n")
-                .append(getCallStackStringForTid(analysis.HALBlockedTid)).append("]");
+                .append(std::to_string(suspectTid)).append(")  callstack [\n")
+                .append(getCallStackStringForTid(suspectTid)).append("]");
     }
 
     return std::string("now ")
             .append(formatTime(std::chrono::system_clock::now()))
             .append("\nsecondChanceCount ")
-            .append(std::to_string(mMonitorThread.getSecondChanceCount()))
+            .append(std::to_string(secondChanceCount))
             .append(analysisSummary)
             .append("\ntimeout [ ")
             .append(requestsToString(timeoutRequests))
@@ -121,16 +111,23 @@ bool TimerThread::isRequestFromHal(const std::shared_ptr<const Request>& request
     return separatorPos != std::string::npos;
 }
 
-/* static */
-struct TimerThread::Analysis TimerThread::analyzeTimeout(
-    const std::vector<std::shared_ptr<const Request>>& timeoutRequests,
-    const std::vector<std::shared_ptr<const Request>>& pendingRequests) {
-
-    if (timeoutRequests.empty() || pendingRequests.empty()) return {}; // nothing to say.
-
+struct TimerThread::SnapshotAnalysis TimerThread::getSnapshotAnalysis(size_t retiredCount) const {
+    struct SnapshotAnalysis analysis{};
+    // The following snapshot of the TimerThread state will be utilized for
+    // analysis. Note, there is no lock around these calls, so there could be
+    // a state update between them.
+    mTimeoutQueue.copyRequests(analysis.timeoutRequests);
+    mRetiredQueue.copyRequests(analysis.retiredRequests, retiredCount);
+    analysis.pendingRequests = getPendingRequests();
+    analysis.secondChanceCount = mMonitorThread.getSecondChanceCount();
+    // No call has timed out, so there is no analysis to be done.
+    if (analysis.timeoutRequests.empty())
+        return analysis;
     // for now look at last timeout (in our case, the only timeout)
-    const std::shared_ptr<const Request> timeout = timeoutRequests.back();
-
+    const std::shared_ptr<const Request> timeout = analysis.timeoutRequests.back();
+    analysis.timeoutTid = timeout->tid;
+    if (analysis.pendingRequests.empty())
+      return analysis;
     // pending Requests that are problematic.
     std::vector<std::shared_ptr<const Request>> pendingExact;
     std::vector<std::shared_ptr<const Request>> pendingPossible;
@@ -141,7 +138,7 @@ struct TimerThread::Analysis TimerThread::analyzeTimeout(
     // such as HAL write() and read().
     //
     constexpr Duration kPendingDuration = 1000ms;
-    for (const auto& pending : pendingRequests) {
+    for (const auto& pending : analysis.pendingRequests) {
         // If the pending tid is the same as timeout tid, problem identified.
         if (pending->tid == timeout->tid) {
             pendingExact.emplace_back(pending);
@@ -154,29 +151,27 @@ struct TimerThread::Analysis TimerThread::analyzeTimeout(
         }
     }
 
-    struct Analysis analysis{};
-
-    analysis.timeoutTid = timeout->tid;
-    std::string& summary = analysis.summary;
+    std::string& description = analysis.description;
     if (!pendingExact.empty()) {
         const auto& request = pendingExact.front();
         const bool hal = isRequestFromHal(request);
 
         if (hal) {
-            summary = std::string("Blocked directly due to HAL call: ")
+            description = std::string("Blocked directly due to HAL call: ")
                 .append(request->toString());
+            analysis.suspectTid= request->tid;
         }
     }
-    if (summary.empty() && !pendingPossible.empty()) {
+    if (description.empty() && !pendingPossible.empty()) {
         for (const auto& request : pendingPossible) {
             const bool hal = isRequestFromHal(request);
             if (hal) {
                 // The first blocked call is the most likely one.
                 // Recent calls might be temporarily blocked
                 // calls such as write() or read() depending on kDuration.
-                summary = std::string("Blocked possibly due to HAL call: ")
+                description = std::string("Blocked possibly due to HAL call: ")
                     .append(request->toString());
-                analysis.HALBlockedTid = request->tid;
+                analysis.suspectTid= request->tid;
             }
        }
     }

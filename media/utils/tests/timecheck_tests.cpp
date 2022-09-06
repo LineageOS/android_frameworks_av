@@ -26,7 +26,6 @@ using namespace android::mediautils;
 using namespace std::chrono_literals;
 
 namespace {
-
 TEST(timecheck_tests, success) {
     bool timeoutRegistered = false;
     float elapsedMsRegistered = 0.f;
@@ -69,4 +68,33 @@ TEST(timecheck_tests, timeout) {
 // Note: We do not test TimeCheck crash because TimeCheck is multithreaded and the
 // EXPECT_EXIT() signal catching is imperfect due to the gtest fork.
 
+// Note, the following test is to manually verify the correct thread is aborted.
+// Due to difficulties with gtest and EXPECT_EXIT, this is difficult to verify
+// automatically. TODO(b/246446561) Attempt to use EXPECT_EXIT
+
+#if 0
+void threadFunction() {
+    bool timeoutRegistered = false;
+    float elapsedMsRegistered = 0.f;
+    std::atomic_bool event = false;  // seq-cst implies acquire-release
+    {
+        TimeCheck timeCheck("timeout",
+                [&event, &timeoutRegistered, &elapsedMsRegistered]
+                        (bool timeout, float elapsedMs) {
+            timeoutRegistered = timeout;
+            elapsedMsRegistered = elapsedMs;
+            event = true; // store-release, must be last.
+        }, 1ms /* timeoutDuration */, {} /* secondChanceDuration */, true /* crash */);
+        std::this_thread::sleep_for(100ms);
+        ADD_FAILURE();
+    }
+}
+
+TEST(timecheck_tests, death) {
+  std::thread mthread{threadFunction};
+  mthread.join();
+}
+#endif
+
 } // namespace
+
