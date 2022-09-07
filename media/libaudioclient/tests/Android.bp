@@ -24,7 +24,10 @@ cc_defaults {
 
 cc_test {
     name: "audio_aidl_conversion_tests",
-    defaults: ["libaudioclient_tests_defaults"],
+    defaults: [
+        "libaudioclient_tests_defaults",
+        "latest_android_media_audio_common_types_cpp_static",
+    ],
     srcs: ["audio_aidl_legacy_conversion_tests.cpp"],
     shared_libs: [
         "libbinder",
@@ -33,7 +36,6 @@ cc_test {
         "libutils",
     ],
     static_libs: [
-        "android.media.audio.common.types-V1-cpp",
         "audioclient-types-aidl-cpp",
         "libaudioclient_aidl_conversion",
         "libstagefright_foundation",
@@ -100,6 +102,9 @@ cc_defaults {
         "-Wall",
         "-Werror",
     ],
+    defaults: [
+        "latest_android_media_audio_common_types_cpp_static",
+    ],
     shared_libs: [
         "capture_state_listener-aidl-cpp",
         "framework-permission-aidl-cpp",
@@ -125,7 +130,6 @@ cc_defaults {
     ],
     static_libs: [
         "android.hardware.audio.common@7.0-enums",
-        "android.media.audio.common.types-V1-cpp",
         "audioclient-types-aidl-cpp",
         "audioflinger-aidl-cpp",
         "audiopolicy-aidl-cpp",
