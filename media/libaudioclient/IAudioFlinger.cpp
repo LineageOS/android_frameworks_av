@@ -810,6 +810,33 @@ status_t AudioFlingerClientAdapter::setDeviceConnectedState(
     return statusTFromBinderStatus(mDelegate->setDeviceConnectedState(aidlPort, connected));
 }
 
+status_t AudioFlingerClientAdapter::setRequestedLatencyMode(
+        audio_io_handle_t output, audio_latency_mode_t mode) {
+    int32_t outputAidl = VALUE_OR_RETURN_STATUS(legacy2aidl_audio_io_handle_t_int32_t(output));
+    media::LatencyMode modeAidl  = VALUE_OR_RETURN_STATUS(
+            legacy2aidl_audio_latency_mode_t_LatencyMode(mode));
+    return statusTFromBinderStatus(mDelegate->setRequestedLatencyMode(outputAidl, modeAidl));
+}
+
+status_t AudioFlingerClientAdapter::getSupportedLatencyModes(
+        audio_io_handle_t output, std::vector<audio_latency_mode_t>* modes) {
+    if (modes == nullptr) {
+        return BAD_VALUE;
+    }
+
+    int32_t outputAidl = VALUE_OR_RETURN_STATUS(legacy2aidl_audio_io_handle_t_int32_t(output));
+    std::vector<media::LatencyMode> modesAidl;
+
+    RETURN_STATUS_IF_ERROR(statusTFromBinderStatus(
+            mDelegate->getSupportedLatencyModes(outputAidl, &modesAidl)));
+
+    *modes = VALUE_OR_RETURN_STATUS(
+            convertContainer<std::vector<audio_latency_mode_t>>(modesAidl,
+                     aidl2legacy_LatencyMode_audio_latency_mode_t));
+
+    return NO_ERROR;
+}
+
 ////////////////////////////////////////////////////////////////////////////////////////////////////
 // AudioFlingerServerAdapter
 AudioFlingerServerAdapter::AudioFlingerServerAdapter(
@@ -1302,6 +1329,30 @@ Status AudioFlingerServerAdapter::setDeviceConnectedState(
         const media::AudioPort& port, bool connected) {
     audio_port_v7 portLegacy = VALUE_OR_RETURN_BINDER(aidl2legacy_AudioPort_audio_port_v7(port));
     return Status::fromStatusT(mDelegate->setDeviceConnectedState(&portLegacy, connected));
+}
+
+Status AudioFlingerServerAdapter::setRequestedLatencyMode(
+        int32_t output, media::LatencyMode modeAidl) {
+    audio_io_handle_t outputLegacy = VALUE_OR_RETURN_BINDER(
+            aidl2legacy_int32_t_audio_io_handle_t(output));
+    audio_latency_mode_t modeLegacy = VALUE_OR_RETURN_BINDER(
+            aidl2legacy_LatencyMode_audio_latency_mode_t(modeAidl));
+    return Status::fromStatusT(mDelegate->setRequestedLatencyMode(
+            outputLegacy, modeLegacy));
+}
+
+Status AudioFlingerServerAdapter::getSupportedLatencyModes(
+        int output, std::vector<media::LatencyMode>* _aidl_return) {
+    audio_io_handle_t outputLegacy = VALUE_OR_RETURN_BINDER(
+            aidl2legacy_int32_t_audio_io_handle_t(output));
+    std::vector<audio_latency_mode_t> modesLegacy;
+
+    RETURN_BINDER_IF_ERROR(mDelegate->getSupportedLatencyModes(outputLegacy, &modesLegacy));
+
+    *_aidl_return = VALUE_OR_RETURN_BINDER(
+            convertContainer<std::vector<media::LatencyMode>>(
+                    modesLegacy, legacy2aidl_audio_latency_mode_t_LatencyMode));
+    return Status::ok();
 }
 
 } // namespace android
