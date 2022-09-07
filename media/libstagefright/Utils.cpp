@@ -794,6 +794,8 @@ static std::vector<std::pair<const char *, uint32_t>> int32Mappings {
         { "thumbnail-height", kKeyThumbnailHeight },
         { "track-id", kKeyTrackID },
         { "valid-samples", kKeyValidSamples },
+        { "dvb-component-tag", kKeyDvbComponentTag},
+        { "dvb-audio-description", kKeyDvbAudioDescription},
     }
 };
 
@@ -1000,6 +1002,16 @@ status_t convertMetaDataToMessage(
     int32_t isSync;
     if (meta->findInt32(kKeyIsSyncFrame, &isSync) && isSync != 0) {
         msg->setInt32("is-sync-frame", 1);
+    }
+
+    int32_t dvbComponentTag = 0;
+    if (meta->findInt32(kKeyDvbComponentTag, &dvbComponentTag)) {
+        msg->setInt32("dvb-component-tag", dvbComponentTag);
+    }
+
+    int32_t dvbAudioDescription = 0;
+    if (meta->findInt32(kKeyDvbAudioDescription, &dvbAudioDescription)) {
+        msg->setInt32("dvb-audio-description", dvbAudioDescription);
     }
 
     const char *lang;
@@ -1786,6 +1798,16 @@ status_t convertMessageToMetaData(const sp<AMessage> &msg, sp<MetaData> &meta) {
     }
     if (msg->findInt32("max-bitrate", &maxBitrate) && maxBitrate > 0 && maxBitrate >= avgBitrate) {
         meta->setInt32(kKeyMaxBitRate, maxBitrate);
+    }
+
+    int32_t dvbComponentTag = 0;
+    if (msg->findInt32("dvb-component-tag", &dvbComponentTag) && dvbComponentTag > 0) {
+        meta->setInt32(kKeyDvbComponentTag, dvbComponentTag);
+    }
+
+    int32_t dvbAudioDescription = 0;
+    if (msg->findInt32("dvb-audio-description", &dvbAudioDescription)) {
+        meta->setInt32(kKeyDvbAudioDescription, dvbAudioDescription);
     }
 
     AString lang;
