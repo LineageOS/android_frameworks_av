@@ -278,8 +278,8 @@ status_t AudioFlinger::EffectBase::updatePolicyState()
         if (!doRegister && !(registered && doEnable)) {
             return NO_ERROR;
         }
-        mPolicyLock.lock();
     }
+    mPolicyLock.lock();
     ALOGV("%s name %s id %d session %d doRegister %d registered %d doEnable %d enabled %d",
         __func__, mDescriptor.name, mId, mSessionId, doRegister, registered, doEnable, enabled);
     if (doRegister) {
