@@ -10,6 +10,9 @@ package {
 cc_test {
     name: "audiofoundation_parcelable_test",
 
+    defaults: [
+        "latest_android_media_audio_common_types_cpp_static",
+    ],
     shared_libs: [
         "libbase",
         "libbinder",
@@ -18,7 +21,6 @@ cc_test {
     ],
 
     static_libs: [
-        "android.media.audio.common.types-V1-cpp",
         "audioclient-types-aidl-cpp",
         "libaudioclient_aidl_conversion",
         "libaudiofoundation",

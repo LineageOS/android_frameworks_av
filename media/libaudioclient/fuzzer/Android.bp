@@ -25,6 +25,9 @@ package {
 
 cc_fuzz {
     name: "audioflinger_fuzzer",
+    defaults: [
+        "latest_android_media_audio_common_types_cpp_shared",
+    ],
     srcs: [
         "audioflinger_fuzzer.cpp",
     ],
@@ -46,7 +49,6 @@ cc_fuzz {
     ],
     shared_libs: [
         "android.hardware.audio.common-util",
-        "android.media.audio.common.types-V1-cpp",
         "audioclient-types-aidl-cpp",
         "audioflinger-aidl-cpp",
         "audiopolicy-aidl-cpp",
