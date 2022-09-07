@@ -360,6 +360,13 @@ public:
     virtual int32_t getAAudioHardwareBurstMinUsec() = 0;
 
     virtual status_t setDeviceConnectedState(const struct audio_port_v7 *port, bool connected) = 0;
+
+    virtual status_t setRequestedLatencyMode(
+            audio_io_handle_t output, audio_latency_mode_t mode) = 0;
+
+    virtual status_t getSupportedLatencyModes(audio_io_handle_t output,
+            std::vector<audio_latency_mode_t>* modes) = 0;
+
 };
 
 /**
@@ -462,6 +469,10 @@ public:
     int32_t getAAudioMixerBurstCount() override;
     int32_t getAAudioHardwareBurstMinUsec() override;
     status_t setDeviceConnectedState(const struct audio_port_v7 *port, bool connected) override;
+    status_t setRequestedLatencyMode(audio_io_handle_t output,
+            audio_latency_mode_t mode) override;
+    status_t getSupportedLatencyModes(
+            audio_io_handle_t output, std::vector<audio_latency_mode_t>* modes) override;
 
 private:
     const sp<media::IAudioFlingerService> mDelegate;
@@ -551,6 +562,8 @@ public:
             GET_AAUDIO_MIXER_BURST_COUNT = media::BnAudioFlingerService::TRANSACTION_getAAudioMixerBurstCount,
             GET_AAUDIO_HARDWARE_BURST_MIN_USEC = media::BnAudioFlingerService::TRANSACTION_getAAudioHardwareBurstMinUsec,
             SET_DEVICE_CONNECTED_STATE = media::BnAudioFlingerService::TRANSACTION_setDeviceConnectedState,
+            SET_REQUESTED_LATENCY_MODE = media::BnAudioFlingerService::TRANSACTION_setRequestedLatencyMode,
+            GET_SUPPORTED_LATENCY_MODES = media::BnAudioFlingerService::TRANSACTION_getSupportedLatencyModes,
         };
 
     protected:
@@ -672,7 +685,9 @@ public:
     Status getAAudioMixerBurstCount(int32_t* _aidl_return) override;
     Status getAAudioHardwareBurstMinUsec(int32_t* _aidl_return) override;
     Status setDeviceConnectedState(const media::AudioPort& port, bool connected) override;
-
+    Status setRequestedLatencyMode(int output, media::LatencyMode mode) override;
+    Status getSupportedLatencyModes(int output,
+            std::vector<media::LatencyMode>* _aidl_return) override;
 private:
     const sp<AudioFlingerServerAdapter::Delegate> mDelegate;
 };
