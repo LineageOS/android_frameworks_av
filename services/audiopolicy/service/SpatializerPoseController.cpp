@@ -52,7 +52,9 @@ constexpr float kMaxRotationalVelocity = 8;
 constexpr auto kPredictionDuration = 50ms;
 
 // After not getting a pose sample for this long, we would treat the measurement as stale.
-constexpr auto kFreshnessTimeout = 50ms;
+// The max connection interval is 50ms, and HT sensor event interval can differ depending on the
+// sampling rate, scheduling, sensor eventQ FIFO etc. 120 (2 * 50 + 20) ms seems reasonable for now.
+constexpr auto kFreshnessTimeout = 120ms;
 
 // Auto-recenter kicks in after the head has been still for this long.
 constexpr auto kAutoRecenterWindowDuration = 6s;
