@@ -22,7 +22,7 @@
 #include <string.h>
 #include <fstream>
 
-#include <ESDS.h>
+#include <media/esds/ESDS.h>
 #include <binder/ProcessState.h>
 #include <datasource/FileSource.h>
 #include <media/stagefright/MediaExtractorFactory.h>
