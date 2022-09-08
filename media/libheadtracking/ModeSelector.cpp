@@ -13,11 +13,13 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
+#include <android-base/stringprintf.h>
 
 #include "ModeSelector.h"
 
 namespace android {
 namespace media {
+using android::base::StringAppendF;
 
 ModeSelector::ModeSelector(const Options& options, HeadTrackingMode initialMode)
     : mOptions(options), mDesiredMode(initialMode), mActualMode(initialMode) {}
@@ -47,12 +49,15 @@ void ModeSelector::setScreenStable(int64_t timestamp, bool stable) {
 }
 
 void ModeSelector::calculateActualMode(int64_t timestamp) {
-    bool isValidScreenToHead = mScreenToHead.has_value() &&
-                               timestamp - mScreenToHeadTimestamp < mOptions.freshnessTimeout;
-    bool isValidWorldToHead = mWorldToHead.has_value() &&
-                              timestamp - mWorldToHeadTimestamp < mOptions.freshnessTimeout;
-    bool isValidScreenStable = mScreenStable.has_value() &&
-                              timestamp - mScreenStableTimestamp < mOptions.freshnessTimeout;
+    int64_t screenToHeadGap = timestamp - mScreenToHeadTimestamp;
+    int64_t worldToHeadGap = timestamp - mWorldToHeadTimestamp;
+    int64_t screenStableGap = timestamp - mScreenStableTimestamp;
+    bool isValidScreenToHead =
+            mScreenToHead.has_value() && screenToHeadGap < mOptions.freshnessTimeout;
+    bool isValidWorldToHead =
+            mWorldToHead.has_value() && worldToHeadGap < mOptions.freshnessTimeout;
+    bool isValidScreenStable =
+            mScreenStable.has_value() && screenStableGap < mOptions.freshnessTimeout;
 
     HeadTrackingMode mode = mDesiredMode;
 
@@ -70,7 +75,17 @@ void ModeSelector::calculateActualMode(int64_t timestamp) {
         }
     }
 
-    mActualMode = mode;
+    if (mode != mActualMode) {
+        mLocalLog.log(
+                "HT mode change from %s to %s, this ts %0.4f ms, lastTs+gap [ScreenToHead %0.4f + "
+                "%0.4f, WorldToHead %0.4f + %0.4f, ScreenStable %0.4f + %0.4f] ms",
+                media::toString(mActualMode).c_str(), media::toString(mode).c_str(),
+                media::nsToFloatMs(timestamp), media::nsToFloatMs(mScreenToHeadTimestamp),
+                media::nsToFloatMs(screenToHeadGap), media::nsToFloatMs(mWorldToHeadTimestamp),
+                media::nsToFloatMs(worldToHeadGap), media::nsToFloatMs(mScreenStableTimestamp),
+                media::nsToFloatMs(screenStableGap));
+        mActualMode = mode;
+    }
 }
 
 void ModeSelector::calculate(int64_t timestamp) {
@@ -97,6 +112,16 @@ Pose3f ModeSelector::getHeadToStagePose() const {
 
 HeadTrackingMode ModeSelector::getActualMode() const {
     return mActualMode;
+}
+
+std::string ModeSelector::toString(unsigned level) const {
+    std::string prefixSpace(level, ' ');
+    std::string ss(prefixSpace);
+    StringAppendF(&ss, "ModeSelector: ScreenToStage %s\n",
+                    mScreenToStage.toString().c_str());
+    ss.append(prefixSpace + "Mode downgrade history:\n");
+    ss += mLocalLog.dumpToString((prefixSpace + " ").c_str(), sMaxLocalLogLine);
+    return ss;
 }
 
 }  // namespace media

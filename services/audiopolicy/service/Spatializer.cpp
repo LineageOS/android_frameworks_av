@@ -748,11 +748,9 @@ void Spatializer::onHeadToStagePoseMsg(const std::vector<float>& headToStage) {
 }
 
 void Spatializer::onActualModeChange(HeadTrackingMode mode) {
-    std::string modeStr = SpatializerPoseController::toString(mode);
+    std::string modeStr = media::toString(mode);
     ALOGV("%s(%s)", __func__, modeStr.c_str());
-    mLocalLog.log("%s with %s", __func__, modeStr.c_str());
-    sp<AMessage> msg =
-            new AMessage(EngineCallbackHandler::kWhatOnActualModeChange, mHandler);
+    sp<AMessage> msg = new AMessage(EngineCallbackHandler::kWhatOnActualModeChange, mHandler);
     msg->setInt32(EngineCallbackHandler::kModeKey, static_cast<int>(mode));
     msg->post();
 }
@@ -786,8 +784,7 @@ void Spatializer::onActualModeChangeMsg(HeadTrackingMode mode) {
                                  std::vector<SpatializerHeadTrackingMode>{spatializerMode});
         }
         callback = mHeadTrackingCallback;
-        mLocalLog.log("%s: %s, spatializerMode %s", __func__,
-                      SpatializerPoseController::toString(mode).c_str(),
+        mLocalLog.log("%s: %s, spatializerMode %s", __func__, media::toString(mode).c_str(),
                       media::toString(spatializerMode).c_str());
     }
     if (callback != nullptr) {
@@ -1025,7 +1022,7 @@ std::string Spatializer::toString(unsigned level) const {
         base::StringAppendF(&ss, " %s", media::toString(mode).c_str());
     }
     base::StringAppendF(&ss, "], Desired: %s, Actual %s\n",
-                        SpatializerPoseController::toString(mDesiredHeadTrackingMode).c_str(),
+                        media::toString(mDesiredHeadTrackingMode).c_str(),
                         media::toString(mActualHeadTrackingMode).c_str());
 
     base::StringAppendF(&ss, "%smSpatializationModes: [", prefixSpace.c_str());
@@ -1060,9 +1057,9 @@ std::string Spatializer::toString(unsigned level) const {
         ss.append(prefixSpace +
                   "Sensor data format - [rx, ry, rz, vx, vy, vz] (units-degree, "
                   "r-transform, v-angular velocity, x-pitch, y-roll, z-yaw):\n");
-        ss.append(prefixSpace + "PerMinuteHistory:\n");
+        ss.append(prefixSpace + " PerMinuteHistory:\n");
         ss += mPoseDurableRecorder.toString(level + 1);
-        ss.append(prefixSpace + "PerSecondHistory:\n");
+        ss.append(prefixSpace + " PerSecondHistory:\n");
         ss += mPoseRecorder.toString(level + 1);
     } else {
         ss.append(prefixSpace).append("SpatializerPoseController not exist\n");
