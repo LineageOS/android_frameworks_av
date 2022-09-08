@@ -371,7 +371,8 @@ status_t AidlCamera3Device::initialize(sp<CameraProviderManager> manager,
         mNumPartialResults, mVendorTagId, mDeviceInfo, mPhysicalDeviceInfoMap,
         mDistortionMappers, mZoomRatioMappers, mRotateAndCropMappers,
         mTagMonitor, mInputStream, mOutputStreams, mSessionStatsBuilder, listener, *this,
-        *this, *(mInterface), mLegacyClient, mMinExpectedDuration}, mResultMetadataQueue
+        *this, *(mInterface), mLegacyClient, mMinExpectedDuration, mIsFixedFps},
+        mResultMetadataQueue
     };
 
     for (const auto& result : results) {
@@ -412,7 +413,8 @@ status_t AidlCamera3Device::initialize(sp<CameraProviderManager> manager,
         mNumPartialResults, mVendorTagId, mDeviceInfo, mPhysicalDeviceInfoMap,
         mDistortionMappers, mZoomRatioMappers, mRotateAndCropMappers,
         mTagMonitor, mInputStream, mOutputStreams, mSessionStatsBuilder, listener, *this,
-        *this, *(mInterface), mLegacyClient, mMinExpectedDuration}, mResultMetadataQueue
+        *this, *(mInterface), mLegacyClient, mMinExpectedDuration, mIsFixedFps},
+        mResultMetadataQueue
     };
     for (const auto& msg : msgs) {
         camera3::notify(states, msg);
