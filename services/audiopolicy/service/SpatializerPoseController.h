@@ -116,18 +116,6 @@ class SpatializerPoseController : private media::SensorPoseProvider::Listener {
     // convert fields to a printable string
     std::string toString(unsigned level) const;
 
-    static std::string toString(media::HeadTrackingMode mode) {
-        switch (mode) {
-            case media::HeadTrackingMode::STATIC:
-                return "STATIC";
-            case media::HeadTrackingMode::WORLD_RELATIVE:
-                return "WORLD_RELATIVE";
-            case media::HeadTrackingMode::SCREEN_RELATIVE:
-                return "SCREEN_RELATIVE";
-        }
-        return "EnumNotImplemented";
-    };
-
   private:
     mutable std::timed_mutex mMutex;
     Listener* const mListener;
