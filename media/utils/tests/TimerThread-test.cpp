@@ -52,7 +52,7 @@ static void testBasic() {
     std::atomic<bool> taskRan = false;
     TimerThread thread;
     TimerThread::Handle handle =
-            thread.scheduleTask("Basic", [&taskRan](TimerThread::Handle handle __unused) {
+            thread.scheduleTask("Basic", [&taskRan](TimerThread::Handle) {
                     taskRan = true; }, DISTRIBUTE_TIMEOUT_SECONDCHANCE_MS_FRAC(100, frac));
     ASSERT_TRUE(TimerThread::isTimeoutHandle(handle));
     std::this_thread::sleep_for(100ms - kJitter);
@@ -70,7 +70,7 @@ static void testCancel() {
     std::atomic<bool> taskRan = false;
     TimerThread thread;
     TimerThread::Handle handle =
-            thread.scheduleTask("Cancel", [&taskRan](TimerThread::Handle handle __unused) {
+            thread.scheduleTask("Cancel", [&taskRan](TimerThread::Handle) {
                     taskRan = true; }, DISTRIBUTE_TIMEOUT_SECONDCHANCE_MS_FRAC(100, frac));
     ASSERT_TRUE(TimerThread::isTimeoutHandle(handle));
     std::this_thread::sleep_for(100ms - kJitter);
@@ -90,7 +90,7 @@ static void testCancelAfterRun() {
     TimerThread thread;
     TimerThread::Handle handle =
             thread.scheduleTask("CancelAfterRun",
-                    [&taskRan](TimerThread::Handle handle __unused) {
+                    [&taskRan](TimerThread::Handle) {
                             taskRan = true; },
                             DISTRIBUTE_TIMEOUT_SECONDCHANCE_MS_FRAC(100, frac));
     ASSERT_TRUE(TimerThread::isTimeoutHandle(handle));
@@ -110,17 +110,17 @@ static void testMultipleTasks() {
 
     auto startTime = std::chrono::steady_clock::now();
 
-    thread.scheduleTask("0", [&taskRan](TimerThread::Handle handle __unused) {
+    thread.scheduleTask("0", [&taskRan](TimerThread::Handle) {
             taskRan[0] = true; }, DISTRIBUTE_TIMEOUT_SECONDCHANCE_MS_FRAC(300, frac));
-    thread.scheduleTask("1", [&taskRan](TimerThread::Handle handle __unused) {
+    thread.scheduleTask("1", [&taskRan](TimerThread::Handle) {
             taskRan[1] = true; }, DISTRIBUTE_TIMEOUT_SECONDCHANCE_MS_FRAC(100, frac));
-    thread.scheduleTask("2", [&taskRan](TimerThread::Handle handle __unused) {
+    thread.scheduleTask("2", [&taskRan](TimerThread::Handle) {
             taskRan[2] = true; }, DISTRIBUTE_TIMEOUT_SECONDCHANCE_MS_FRAC(200, frac));
-    thread.scheduleTask("3", [&taskRan](TimerThread::Handle handle __unused) {
+    thread.scheduleTask("3", [&taskRan](TimerThread::Handle) {
             taskRan[3] = true; }, DISTRIBUTE_TIMEOUT_SECONDCHANCE_MS_FRAC(400, frac));
-    auto handle4 = thread.scheduleTask("4", [&taskRan](TimerThread::Handle handle __unused) {
+    auto handle4 = thread.scheduleTask("4", [&taskRan](TimerThread::Handle) {
             taskRan[4] = true; }, DISTRIBUTE_TIMEOUT_SECONDCHANCE_MS_FRAC(200, frac));
-    thread.scheduleTask("5", [&taskRan](TimerThread::Handle handle __unused) {
+    thread.scheduleTask("5", [&taskRan](TimerThread::Handle) {
             taskRan[5] = true; }, DISTRIBUTE_TIMEOUT_SECONDCHANCE_MS_FRAC(200, frac));
 
     // 6 tasks pending
