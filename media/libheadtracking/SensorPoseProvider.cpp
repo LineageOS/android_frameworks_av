@@ -18,9 +18,10 @@
 
 #define LOG_TAG "SensorPoseProvider"
 
-#include <inttypes.h>
-
+#include <algorithm>
 #include <future>
+#include <inttypes.h>
+#include <limits>
 #include <map>
 #include <thread>
 
@@ -135,7 +136,10 @@ class SensorPoseProviderImpl : public SensorPoseProvider {
 
         {
             std::lock_guard lock(mMutex);
-            mEnabledSensorsExtra.emplace(sensor, SensorExtra{ .format = format });
+            mEnabledSensorsExtra.emplace(
+                    sensor,
+                    SensorExtra{.format = format,
+                                .samplingPeriod = static_cast<int32_t>(samplingPeriod.count())});
         }
 
         // Enable the sensor.
@@ -173,8 +177,11 @@ class SensorPoseProviderImpl : public SensorPoseProvider {
         StringAppendF(&ss, "%sSensors total number %zu:\n", prefixSpace.c_str(),
                       mEnabledSensorsExtra.size());
         for (auto sensor : mEnabledSensorsExtra) {
-            StringAppendF(&ss, "%s[Handle: 0x%08x, Format %s", prefixSpace.c_str(), sensor.first,
-                          toString(sensor.second.format).c_str());
+            StringAppendF(&ss,
+                          "%s[Handle: 0x%08x, Format %s Period (set %d max %0.4f min %0.4f) ms",
+                          prefixSpace.c_str(), sensor.first, toString(sensor.second.format).c_str(),
+                          sensor.second.samplingPeriod, media::nsToFloatMs(sensor.second.maxPeriod),
+                          media::nsToFloatMs(sensor.second.minPeriod));
             if (sensor.second.discontinuityCount.has_value()) {
                 StringAppendF(&ss, ", DiscontinuityCount: %d",
                               sensor.second.discontinuityCount.value());
@@ -202,7 +209,11 @@ class SensorPoseProviderImpl : public SensorPoseProvider {
     };
 
     struct SensorExtra {
-        DataFormat format;
+        DataFormat format = DataFormat::kUnknown;
+        int32_t samplingPeriod = 0;
+        int64_t latestTimestamp = 0;
+        int64_t maxPeriod = 0;
+        int64_t minPeriod = std::numeric_limits<int64_t>::max();
         std::optional<int32_t> discontinuityCount;
     };
 
@@ -296,6 +307,7 @@ class SensorPoseProviderImpl : public SensorPoseProvider {
                 return;
             }
             value = parseEvent(event, iter->second.format, &iter->second.discontinuityCount);
+            updateEventTimestamp(event, iter->second);
         }
         mListener->onPose(event.timestamp, event.sensor, value.pose, value.twist,
                           value.isNewReference);
@@ -351,6 +363,15 @@ class SensorPoseProviderImpl : public SensorPoseProvider {
         return std::nullopt;
     }
 
+    void updateEventTimestamp(const ASensorEvent& event, SensorExtra& extra) {
+        if (extra.latestTimestamp != 0) {
+            int64_t gap = event.timestamp - extra.latestTimestamp;
+            extra.maxPeriod = std::max(gap, extra.maxPeriod);
+            extra.minPeriod = std::min(gap, extra.minPeriod);
+        }
+        extra.latestTimestamp = event.timestamp;
+    }
+
     static PoseEvent parseEvent(const ASensorEvent& event, DataFormat format,
                                 std::optional<int32_t>* discontinutyCount) {
         switch (format) {
@@ -381,7 +402,7 @@ class SensorPoseProviderImpl : public SensorPoseProvider {
         }
     }
 
-    const std::string toString(DataFormat format) {
+    const static std::string toString(DataFormat format) {
         switch (format) {
             case DataFormat::kUnknown:
                 return "kUnknown";
