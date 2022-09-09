@@ -262,11 +262,11 @@ void CameraServiceProxyWrapper::logClose(const String8& id, int32_t latencyMs) {
     sessionStats->onClose(latencyMs);
 }
 
-bool CameraServiceProxyWrapper::isCameraDisabled() {
+bool CameraServiceProxyWrapper::isCameraDisabled(int userId) {
     sp<ICameraServiceProxy> proxyBinder = getCameraServiceProxy();
     if (proxyBinder == nullptr) return true;
     bool ret = false;
-    auto status = proxyBinder->isCameraDisabled(&ret);
+    auto status = proxyBinder->isCameraDisabled(userId, &ret);
     if (!status.isOk()) {
         ALOGE("%s: Failed during camera disabled query: %s", __FUNCTION__,
                 status.exceptionMessage().c_str());
