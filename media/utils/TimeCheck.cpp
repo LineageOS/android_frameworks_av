@@ -139,22 +139,24 @@ std::string TimeCheck::toString() {
     return getTimeCheckThread().toString();
 }
 
-TimeCheck::TimeCheck(std::string_view tag, OnTimerFunc&& onTimer, uint32_t timeoutMs,
-        bool crashOnTimeout)
+TimeCheck::TimeCheck(std::string_view tag, OnTimerFunc&& onTimer, Duration requestedTimeoutDuration,
+        Duration secondChanceDuration, bool crashOnTimeout)
     : mTimeCheckHandler{ std::make_shared<TimeCheckHandler>(
-            tag, std::move(onTimer), crashOnTimeout,
-            std::chrono::system_clock::now(), gettid()) }
-    , mTimerHandle(timeoutMs == 0
+            tag, std::move(onTimer), crashOnTimeout, requestedTimeoutDuration,
+            secondChanceDuration, std::chrono::system_clock::now(), gettid()) }
+    , mTimerHandle(requestedTimeoutDuration.count() == 0
+              /* for TimeCheck we don't consider a non-zero secondChanceDuration here */
               ? getTimeCheckThread().trackTask(mTimeCheckHandler->tag)
               : getTimeCheckThread().scheduleTask(
                       mTimeCheckHandler->tag,
                       // Pass in all the arguments by value to this task for safety.
                       // The thread could call the callback before the constructor is finished.
                       // The destructor is not blocked on callback.
-                      [ timeCheckHandler = mTimeCheckHandler ] {
-                          timeCheckHandler->onTimeout();
+                      [ timeCheckHandler = mTimeCheckHandler ](TimerThread::Handle timerHandle) {
+                          timeCheckHandler->onTimeout(timerHandle);
                       },
-                      std::chrono::milliseconds(timeoutMs))) {}
+                      requestedTimeoutDuration,
+                      secondChanceDuration)) {}
 
 TimeCheck::~TimeCheck() {
     if (mTimeCheckHandler) {
@@ -162,23 +164,77 @@ TimeCheck::~TimeCheck() {
     }
 }
 
+/* static */
+std::string TimeCheck::analyzeTimeouts(
+        float requestedTimeoutMs, float elapsedSteadyMs, float elapsedSystemMs) {
+    // Track any OS clock issues with suspend.
+    // It is possible that the elapsedSystemMs is much greater than elapsedSteadyMs if
+    // a suspend occurs; however, we always expect the timeout ms should always be slightly
+    // less than the elapsed steady ms regardless of whether a suspend occurs or not.
+
+    std::string s("Timeout ms ");
+    s.append(std::to_string(requestedTimeoutMs))
+        .append(" elapsed steady ms ").append(std::to_string(elapsedSteadyMs))
+        .append(" elapsed system ms ").append(std::to_string(elapsedSystemMs));
+
+    // Is there something unusual?
+    static constexpr float TOLERANCE_CONTEXT_SWITCH_MS = 200.f;
+
+    if (requestedTimeoutMs > elapsedSteadyMs || requestedTimeoutMs > elapsedSystemMs) {
+        s.append("\nError: early expiration - "
+                "requestedTimeoutMs should be less than elapsed time");
+    }
+
+    if (elapsedSteadyMs > elapsedSystemMs + TOLERANCE_CONTEXT_SWITCH_MS) {
+        s.append("\nWarning: steady time should not advance faster than system time");
+    }
+
+    // This has been found in suspend stress testing.
+    if (elapsedSteadyMs > requestedTimeoutMs + TOLERANCE_CONTEXT_SWITCH_MS) {
+        s.append("\nWarning: steady time significantly exceeds timeout "
+                "- possible thread stall or aborted suspend");
+    }
+
+    // This has been found in suspend stress testing.
+    if (elapsedSystemMs > requestedTimeoutMs + TOLERANCE_CONTEXT_SWITCH_MS) {
+        s.append("\nInformation: system time significantly exceeds timeout "
+                "- possible suspend");
+    }
+    return s;
+}
+
+// To avoid any potential race conditions, the timer handle
+// (expiration = clock steady start + timeout) is passed into the callback.
 void TimeCheck::TimeCheckHandler::onCancel(TimerThread::Handle timerHandle) const
 {
     if (TimeCheck::getTimeCheckThread().cancelTask(timerHandle) && onTimer) {
-        const std::chrono::system_clock::time_point endTime = std::chrono::system_clock::now();
-        onTimer(false /* timeout */,
-                std::chrono::duration_cast<std::chrono::duration<float, std::milli>>(
-                        endTime - startTime).count());
+        const std::chrono::steady_clock::time_point endSteadyTime =
+                std::chrono::steady_clock::now();
+        const float elapsedSteadyMs = std::chrono::duration_cast<FloatMs>(
+                endSteadyTime - timerHandle + timeoutDuration).count();
+        // send the elapsed steady time for statistics.
+        onTimer(false /* timeout */, elapsedSteadyMs);
     }
 }
 
-void TimeCheck::TimeCheckHandler::onTimeout() const
+// To avoid any potential race conditions, the timer handle
+// (expiration = clock steady start + timeout) is passed into the callback.
+void TimeCheck::TimeCheckHandler::onTimeout(TimerThread::Handle timerHandle) const
 {
-    const std::chrono::system_clock::time_point endTime = std::chrono::system_clock::now();
+    const std::chrono::steady_clock::time_point endSteadyTime = std::chrono::steady_clock::now();
+    const std::chrono::system_clock::time_point endSystemTime = std::chrono::system_clock::now();
+    // timerHandle incorporates the timeout
+    const float elapsedSteadyMs = std::chrono::duration_cast<FloatMs>(
+            endSteadyTime - (timerHandle - timeoutDuration)).count();
+    const float elapsedSystemMs = std::chrono::duration_cast<FloatMs>(
+            endSystemTime - startSystemTime).count();
+    const float requestedTimeoutMs = std::chrono::duration_cast<FloatMs>(
+            timeoutDuration).count();
+    const float secondChanceMs = std::chrono::duration_cast<FloatMs>(
+            secondChanceDuration).count();
+
     if (onTimer) {
-        onTimer(true /* timeout */,
-                std::chrono::duration_cast<std::chrono::duration<float, std::milli>>(
-                        endTime - startTime).count());
+        onTimer(true /* timeout */, elapsedSteadyMs);
     }
 
     if (!crashOnTimeout) return;
@@ -208,8 +264,10 @@ void TimeCheck::TimeCheckHandler::onTimeout() const
     // Create abort message string - caution: this can be very large.
     const std::string abortMessage = std::string("TimeCheck timeout for ")
             .append(tag)
-            .append(" scheduled ").append(formatTime(startTime))
+            .append(" scheduled ").append(formatTime(startSystemTime))
             .append(" on thread ").append(std::to_string(tid)).append("\n")
+            .append(analyzeTimeouts(requestedTimeoutMs + secondChanceMs,
+                    elapsedSteadyMs, elapsedSystemMs)).append("\n")
             .append(halPids).append("\n")
             .append(summary);
 
@@ -241,7 +299,7 @@ mediautils::TimeCheck makeTimeCheckStatsForClassMethod(
                     } else {
                         stats->event(safeMethodName.asStringView(), elapsedMs);
                     }
-            }, 0 /* timeoutMs */);
+            }, {} /* timeoutDuration */, {} /* secondChanceDuration */, false /* crashOnTimeout */);
 }
 
 }  // namespace android::mediautils
