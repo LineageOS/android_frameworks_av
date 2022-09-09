@@ -36,7 +36,10 @@ inline size_t countChars(std::string_view s, char c) {
 TEST(TimerThread, Basic) {
     std::atomic<bool> taskRan = false;
     TimerThread thread;
-    thread.scheduleTask("Basic", [&taskRan] { taskRan = true; }, 100ms);
+    TimerThread::Handle handle =
+            thread.scheduleTask("Basic", [&taskRan](TimerThread::Handle handle __unused) {
+                    taskRan = true; }, 100ms);
+    ASSERT_TRUE(TimerThread::isTimeoutHandle(handle));
     std::this_thread::sleep_for(100ms - kJitter);
     ASSERT_FALSE(taskRan);
     std::this_thread::sleep_for(2 * kJitter);
@@ -48,7 +51,9 @@ TEST(TimerThread, Cancel) {
     std::atomic<bool> taskRan = false;
     TimerThread thread;
     TimerThread::Handle handle =
-            thread.scheduleTask("Cancel", [&taskRan] { taskRan = true; }, 100ms);
+            thread.scheduleTask("Cancel", [&taskRan](TimerThread::Handle handle __unused) {
+                    taskRan = true; }, 100ms);
+    ASSERT_TRUE(TimerThread::isTimeoutHandle(handle));
     std::this_thread::sleep_for(100ms - kJitter);
     ASSERT_FALSE(taskRan);
     ASSERT_TRUE(thread.cancelTask(handle));
@@ -61,7 +66,10 @@ TEST(TimerThread, CancelAfterRun) {
     std::atomic<bool> taskRan = false;
     TimerThread thread;
     TimerThread::Handle handle =
-            thread.scheduleTask("CancelAfterRun", [&taskRan] { taskRan = true; }, 100ms);
+            thread.scheduleTask("CancelAfterRun",
+                    [&taskRan](TimerThread::Handle handle __unused) {
+                            taskRan = true; }, 100ms);
+    ASSERT_TRUE(TimerThread::isTimeoutHandle(handle));
     std::this_thread::sleep_for(100ms + kJitter);
     ASSERT_TRUE(taskRan);
     ASSERT_FALSE(thread.cancelTask(handle));
@@ -74,12 +82,18 @@ TEST(TimerThread, MultipleTasks) {
 
     auto startTime = std::chrono::steady_clock::now();
 
-    thread.scheduleTask("0", [&taskRan] { taskRan[0] = true; }, 300ms);
-    thread.scheduleTask("1", [&taskRan] { taskRan[1] = true; }, 100ms);
-    thread.scheduleTask("2", [&taskRan] { taskRan[2] = true; }, 200ms);
-    thread.scheduleTask("3", [&taskRan] { taskRan[3] = true; }, 400ms);
-    auto handle4 = thread.scheduleTask("4", [&taskRan] { taskRan[4] = true; }, 200ms);
-    thread.scheduleTask("5", [&taskRan] { taskRan[5] = true; }, 200ms);
+    thread.scheduleTask("0", [&taskRan](TimerThread::Handle handle __unused) {
+            taskRan[0] = true; }, 300ms);
+    thread.scheduleTask("1", [&taskRan](TimerThread::Handle handle __unused) {
+            taskRan[1] = true; }, 100ms);
+    thread.scheduleTask("2", [&taskRan](TimerThread::Handle handle __unused) {
+            taskRan[2] = true; }, 200ms);
+    thread.scheduleTask("3", [&taskRan](TimerThread::Handle handle __unused) {
+            taskRan[3] = true; }, 400ms);
+    auto handle4 = thread.scheduleTask("4", [&taskRan](TimerThread::Handle handle __unused) {
+            taskRan[4] = true; }, 200ms);
+    thread.scheduleTask("5", [&taskRan](TimerThread::Handle handle __unused) {
+            taskRan[5] = true; }, 200ms);
 
     // 6 tasks pending
     ASSERT_EQ(6, countChars(thread.pendingToString(), REQUEST_START));
@@ -178,6 +192,10 @@ TEST(TimerThread, TrackedTasks) {
     auto handle1 = thread.trackTask("1");
     auto handle2 = thread.trackTask("2");
 
+    ASSERT_TRUE(TimerThread::isNoTimeoutHandle(handle0));
+    ASSERT_TRUE(TimerThread::isNoTimeoutHandle(handle1));
+    ASSERT_TRUE(TimerThread::isNoTimeoutHandle(handle2));
+
     // 3 tasks pending
     ASSERT_EQ(3, countChars(thread.pendingToString(), REQUEST_START));
     // 0 tasks retired
@@ -201,6 +219,7 @@ TEST(TimerThread, TrackedTasks) {
 
     // Add another tracked task.
     auto handle3 = thread.trackTask("3");
+    ASSERT_TRUE(TimerThread::isNoTimeoutHandle(handle3));
 
     // 2 tasks pending
     ASSERT_EQ(2, countChars(thread.pendingToString(), REQUEST_START));
