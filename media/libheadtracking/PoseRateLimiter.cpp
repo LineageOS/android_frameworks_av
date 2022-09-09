@@ -13,11 +13,13 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
+#include <android-base/stringprintf.h>
 
 #include "PoseRateLimiter.h"
 
 namespace android {
 namespace media {
+using android::base::StringAppendF;
 
 PoseRateLimiter::PoseRateLimiter(const Options& options) : mOptions(options), mLimiting(false) {}
 
@@ -48,5 +50,15 @@ Pose3f PoseRateLimiter::calculatePose(int64_t timestamp) {
     return pose;
 }
 
+std::string PoseRateLimiter::toString(unsigned level) const {
+    std::string ss(level, ' ');
+    if (mLimiting) {
+        StringAppendF(&ss, "PoseRateLimiter: enabled with target: %s\n",
+                      mTargetPose.has_value() ? mTargetPose.value().toString().c_str() : "NULL");
+    } else {
+        StringAppendF(&ss, "PoseRateLimiter: disabled\n");
+    }
+    return ss;
+}
 }  // namespace media
 }  // namespace android

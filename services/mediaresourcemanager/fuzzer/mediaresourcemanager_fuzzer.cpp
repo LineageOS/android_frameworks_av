@@ -22,8 +22,8 @@
 #include <aidl/android/media/BnResourceManagerClient.h>
 #include <media/MediaResource.h>
 #include <media/MediaResourcePolicy.h>
-#include <media/stagefright/ProcessInfoInterface.h>
 #include <media/stagefright/foundation/ADebug.h>
+#include <mediautils/ProcessInfoInterface.h>
 #include "ResourceManagerService.h"
 #include "fuzzer/FuzzedDataProvider.h"
 

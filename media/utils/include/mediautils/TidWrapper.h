@@ -1,5 +1,5 @@
 /*
- * Copyright (C) 2021 The Android Open Source Project
+ * Copyright (C) 2022 The Android Open Source Project
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -13,26 +13,22 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
+
 #pragma once
 
-#include <string>
+#include <sys/syscall.h>
+#include <unistd.h>
 
-namespace android {
-namespace media {
+namespace android::mediautils {
 
-/**
- * Mode of head-tracking.
- */
-enum class HeadTrackingMode {
-    /** No head-tracking - screen-to-head pose is assumed to be identity. */
-    STATIC,
-    /** Head tracking enabled - world-to-screen pose is assumed to be identity. */
-    WORLD_RELATIVE,
-    /** Full screen-to-head tracking enabled. */
-    SCREEN_RELATIVE,
-};
+// The library wrapper for gettid is only available on bionic. If we don't link
+// against it, we syscall directly.
+inline pid_t getThreadIdWrapper() {
+#if defined(__BIONIC__)
+    return ::gettid();
+#else
+    return syscall(SYS_gettid);
+#endif
+}
 
-std::string toString(HeadTrackingMode mode);
-
-}  // namespace media
-}  // namespace android
+}

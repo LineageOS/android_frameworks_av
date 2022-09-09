@@ -15,6 +15,7 @@
  */
 
 #include <mediautils/ThreadSnapshot.h>
+#include <mediautils/TidWrapper.h>
 
 #define LOG_TAG "media_threadsnapshot_tests"
 
@@ -38,7 +39,7 @@ extern "C" const char* __asan_default_options() {
 TEST(media_threadsnapshot_tests, basic) {
   using namespace std::chrono_literals;
 
-  ThreadSnapshot threadSnapshot(gettid());
+  ThreadSnapshot threadSnapshot(getThreadIdWrapper());
 
   threadSnapshot.onBegin();
 

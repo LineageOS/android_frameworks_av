@@ -312,14 +312,14 @@ std::string SpatializerPoseController::toString(unsigned level) const {
     }
 
     ss += prefixSpace;
-    if (mHeadSensor == media::SensorPoseProvider::INVALID_HANDLE) {
-        ss.append("HeadSensor: INVALID\n");
+    if (mHeadSensor == INVALID_SENSOR) {
+        ss += "HeadSensor: INVALID\n";
     } else {
         base::StringAppendF(&ss, "HeadSensor: 0x%08x\n", mHeadSensor);
     }
 
     ss += prefixSpace;
-    if (mScreenSensor == media::SensorPoseProvider::INVALID_HANDLE) {
+    if (mScreenSensor == INVALID_SENSOR) {
         ss += "ScreenSensor: INVALID\n";
     } else {
         base::StringAppendF(&ss, "ScreenSensor: 0x%08x\n", mScreenSensor);
@@ -327,7 +327,7 @@ std::string SpatializerPoseController::toString(unsigned level) const {
 
     ss += prefixSpace;
     if (mActualMode.has_value()) {
-        base::StringAppendF(&ss, "ActualMode: %s", toString(mActualMode.value()).c_str());
+        base::StringAppendF(&ss, "ActualMode: %s\n", media::toString(mActualMode.value()).c_str());
     } else {
         ss += "ActualMode NOTEXIST\n";
     }

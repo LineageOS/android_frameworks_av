@@ -14,7 +14,7 @@ cc_defaults {
         "libbinder",
         "liblog",
         "libcutils",
-        "libmediautils_core",
+        "libmediautils",
         "libutils",
         "framework-permission-aidl-cpp",
         "packagemanager_aidl-cpp",
@@ -30,32 +30,24 @@ cc_defaults {
 
 cc_fuzz {
     name: "libmediautils_fuzzer_battery_notifier",
-    host_supported: false,
-    shared_libs: ["libmediautils"],
     defaults: ["libmediautils_fuzzer_defaults"],
     srcs: ["BatteryNotifierFuzz.cpp"],
 }
 
 cc_fuzz {
     name: "libmediautils_fuzzer_scheduling_policy_service",
-    host_supported: false,
-    shared_libs: ["libmediautils"],
     defaults: ["libmediautils_fuzzer_defaults"],
     srcs: ["SchedulingPolicyServiceFuzz.cpp"],
 }
 
 cc_fuzz {
     name: "libmediautils_fuzzer_service_utilities",
-    host_supported: false,
-    shared_libs: ["libmediautils"],
     defaults: ["libmediautils_fuzzer_defaults"],
     srcs: ["ServiceUtilitiesFuzz.cpp"],
 }
 
 cc_fuzz {
     name: "libmediautils_fuzzer_time_check",
-    host_supported: false,
-    shared_libs: ["libmediautils"],
     defaults: ["libmediautils_fuzzer_defaults"],
     srcs: ["TimeCheckFuzz.cpp"],
 }
