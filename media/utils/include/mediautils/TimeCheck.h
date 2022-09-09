@@ -16,6 +16,7 @@
 
 #pragma once
 
+#include <chrono>
 #include <vector>
 
 #include <mediautils/TimerThread.h>
@@ -44,7 +45,16 @@ class TimeCheck {
     // The default timeout is chosen to be less than system server watchdog timeout
     // Note: kDefaultTimeOutMs should be no less than 2 seconds, otherwise spurious timeouts
     // may occur with system suspend.
-    static constexpr uint32_t kDefaultTimeOutMs = 5000;
+    static constexpr TimeCheck::Duration kDefaultTimeoutDuration = std::chrono::milliseconds(3000);
+
+    // Due to suspend abort not incrementing the monotonic clock,
+    // we allow another second chance timeout after the first timeout expires.
+    //
+    // The total timeout is therefore kDefaultTimeoutDuration + kDefaultSecondChanceDuration,
+    // and the result is more stable when the monotonic clock increments during suspend.
+    //
+    static constexpr TimeCheck::Duration kDefaultSecondChanceDuration =
+            std::chrono::milliseconds(2000);
 
     /**
      * TimeCheck is a RAII object which will notify a callback
@@ -64,14 +74,18 @@ class TimeCheck {
      *                  to block for callback completion if it is already in progress
      *                  (for maximum concurrency and reduced deadlock potential), so use proper
      *                  lifetime analysis (e.g. shared or weak pointers).
-     * \param requestedTimeoutMs timeout in milliseconds.
+     * \param requestedTimeoutDuration timeout in milliseconds.
      *                  A zero timeout means no timeout is set -
      *                  the callback is called only when
      *                  the TimeCheck object is destroyed or leaves scope.
+     * \param secondChanceDuration additional milliseconds to wait if the first timeout expires.
+     *                  This is used to prevent false timeouts if the steady (monotonic)
+     *                  clock advances on aborted suspend.
      * \param crashOnTimeout true if the object issues an abort on timeout.
      */
-    explicit TimeCheck(std::string_view tag, OnTimerFunc&& onTimer = {},
-            uint32_t requestedTimeoutMs = kDefaultTimeOutMs, bool crashOnTimeout = true);
+    explicit TimeCheck(std::string_view tag, OnTimerFunc&& onTimer,
+            Duration requestedTimeoutDuration, Duration secondChanceDuration,
+            bool crashOnTimeout);
 
     TimeCheck() = default;
     // Remove copy constructors as there should only be one call to the destructor.
@@ -91,13 +105,14 @@ class TimeCheck {
     public:
         template <typename S, typename F>
         TimeCheckHandler(S&& _tag, F&& _onTimer, bool _crashOnTimeout,
-            Duration _timeoutDuration,
+            Duration _timeoutDuration, Duration _secondChanceDuration,
             std::chrono::system_clock::time_point _startSystemTime,
             pid_t _tid)
             : tag(std::forward<S>(_tag))
             , onTimer(std::forward<F>(_onTimer))
             , crashOnTimeout(_crashOnTimeout)
             , timeoutDuration(_timeoutDuration)
+            , secondChanceDuration(_secondChanceDuration)
             , startSystemTime(_startSystemTime)
             , tid(_tid)
             {}
@@ -105,6 +120,7 @@ class TimeCheck {
         const OnTimerFunc onTimer;
         const bool crashOnTimeout;
         const Duration timeoutDuration;
+        const Duration secondChanceDuration;
         const std::chrono::system_clock::time_point startSystemTime;
         const pid_t tid;
 

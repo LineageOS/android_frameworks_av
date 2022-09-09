@@ -139,12 +139,13 @@ std::string TimeCheck::toString() {
     return getTimeCheckThread().toString();
 }
 
-TimeCheck::TimeCheck(std::string_view tag, OnTimerFunc&& onTimer, uint32_t requestedTimeoutMs,
-        bool crashOnTimeout)
+TimeCheck::TimeCheck(std::string_view tag, OnTimerFunc&& onTimer, Duration requestedTimeoutDuration,
+        Duration secondChanceDuration, bool crashOnTimeout)
     : mTimeCheckHandler{ std::make_shared<TimeCheckHandler>(
-            tag, std::move(onTimer), crashOnTimeout, std::chrono::milliseconds(requestedTimeoutMs),
-            std::chrono::system_clock::now(), gettid()) }
-    , mTimerHandle(requestedTimeoutMs == 0
+            tag, std::move(onTimer), crashOnTimeout, requestedTimeoutDuration,
+            secondChanceDuration, std::chrono::system_clock::now(), gettid()) }
+    , mTimerHandle(requestedTimeoutDuration.count() == 0
+              /* for TimeCheck we don't consider a non-zero secondChanceDuration here */
               ? getTimeCheckThread().trackTask(mTimeCheckHandler->tag)
               : getTimeCheckThread().scheduleTask(
                       mTimeCheckHandler->tag,
@@ -154,7 +155,8 @@ TimeCheck::TimeCheck(std::string_view tag, OnTimerFunc&& onTimer, uint32_t reque
                       [ timeCheckHandler = mTimeCheckHandler ](TimerThread::Handle timerHandle) {
                           timeCheckHandler->onTimeout(timerHandle);
                       },
-                      std::chrono::milliseconds(requestedTimeoutMs))) {}
+                      requestedTimeoutDuration,
+                      secondChanceDuration)) {}
 
 TimeCheck::~TimeCheck() {
     if (mTimeCheckHandler) {
@@ -228,6 +230,8 @@ void TimeCheck::TimeCheckHandler::onTimeout(TimerThread::Handle timerHandle) con
             endSystemTime - startSystemTime).count();
     const float requestedTimeoutMs = std::chrono::duration_cast<FloatMs>(
             timeoutDuration).count();
+    const float secondChanceMs = std::chrono::duration_cast<FloatMs>(
+            secondChanceDuration).count();
 
     if (onTimer) {
         onTimer(true /* timeout */, elapsedSteadyMs);
@@ -262,8 +266,8 @@ void TimeCheck::TimeCheckHandler::onTimeout(TimerThread::Handle timerHandle) con
             .append(tag)
             .append(" scheduled ").append(formatTime(startSystemTime))
             .append(" on thread ").append(std::to_string(tid)).append("\n")
-            .append(analyzeTimeouts(
-                    requestedTimeoutMs, elapsedSteadyMs, elapsedSystemMs)).append("\n")
+            .append(analyzeTimeouts(requestedTimeoutMs + secondChanceMs,
+                    elapsedSteadyMs, elapsedSystemMs)).append("\n")
             .append(halPids).append("\n")
             .append(summary);
 
@@ -295,7 +299,7 @@ mediautils::TimeCheck makeTimeCheckStatsForClassMethod(
                     } else {
                         stats->event(safeMethodName.asStringView(), elapsedMs);
                     }
-            }, 0 /* requestedTimeoutMs */);
+            }, {} /* timeoutDuration */, {} /* secondChanceDuration */, false /* crashOnTimeout */);
 }
 
 }  // namespace android::mediautils

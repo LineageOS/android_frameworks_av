@@ -23,6 +23,7 @@
 
 #include <mediautils/MediaUtilsDelayed.h>
 #include <mediautils/TimerThread.h>
+#include <utils/Log.h>
 #include <utils/ThreadDefs.h>
 
 using namespace std::chrono_literals;
@@ -33,17 +34,19 @@ extern std::string formatTime(std::chrono::system_clock::time_point t);
 extern std::string_view timeSuffix(std::string_view time1, std::string_view time2);
 
 TimerThread::Handle TimerThread::scheduleTask(
-        std::string_view tag, TimerCallback&& func, Duration timeoutDuration) {
+        std::string_view tag, TimerCallback&& func,
+        Duration timeoutDuration, Duration secondChanceDuration) {
     const auto now = std::chrono::system_clock::now();
     auto request = std::make_shared<const Request>(now, now +
             std::chrono::duration_cast<std::chrono::system_clock::duration>(timeoutDuration),
-            gettid(), tag);
+            secondChanceDuration, gettid(), tag);
     return mMonitorThread.add(std::move(request), std::move(func), timeoutDuration);
 }
 
 TimerThread::Handle TimerThread::trackTask(std::string_view tag) {
     const auto now = std::chrono::system_clock::now();
-    auto request = std::make_shared<const Request>(now, now, gettid(), tag);
+    auto request = std::make_shared<const Request>(now, now,
+            Duration{} /* secondChanceDuration */, gettid(), tag);
     return mNoTimeoutMap.add(std::move(request));
 }
 
@@ -86,6 +89,8 @@ std::string TimerThread::toString(size_t retiredCount) const {
 
     return std::string("now ")
             .append(formatTime(std::chrono::system_clock::now()))
+            .append("\nsecondChanceCount ")
+            .append(std::to_string(mMonitorThread.getSecondChanceCount()))
             .append(analysisSummary)
             .append("\ntimeout [ ")
             .append(requestsToString(timeoutRequests))
@@ -288,16 +293,60 @@ TimerThread::MonitorThread::~MonitorThread() {
 void TimerThread::MonitorThread::threadFunc() {
     std::unique_lock _l(mMutex);
     while (!mShouldExit) {
+        Handle nextDeadline = INVALID_HANDLE;
+        Handle now = INVALID_HANDLE;
         if (!mMonitorRequests.empty()) {
-            Handle nextDeadline = mMonitorRequests.begin()->first;
-            if (nextDeadline < std::chrono::steady_clock::now()) {
+            nextDeadline = mMonitorRequests.begin()->first;
+            now = std::chrono::steady_clock::now();
+            if (nextDeadline < now) {
+                auto node = mMonitorRequests.extract(mMonitorRequests.begin());
                 // Deadline has expired, handle the request.
+                auto secondChanceDuration = node.mapped().first->secondChanceDuration;
+                if (secondChanceDuration.count() != 0) {
+                    // We now apply the second chance duration to find the clock
+                    // monotonic second deadline.  The unique key is then the
+                    // pair<second_deadline, first_deadline>.
+                    //
+                    // The second chance prevents a false timeout should there be
+                    // any clock monotonic advancement during suspend.
+                    auto newHandle = now + secondChanceDuration;
+                    ALOGD("%s: TimeCheck second chance applied for %s",
+                            __func__, node.mapped().first->tag.c_str()); // should be rare event.
+                    mSecondChanceRequests.emplace_hint(mSecondChanceRequests.end(),
+                            std::make_pair(newHandle, nextDeadline),
+                            std::move(node.mapped()));
+                    // increment second chance counter.
+                    mSecondChanceCount.fetch_add(1 /* arg */, std::memory_order_relaxed);
+                } else {
+                    {
+                        _l.unlock();
+                        // We add Request to retired queue early so that it can be dumped out.
+                        mTimeoutQueue.add(std::move(node.mapped().first));
+                        node.mapped().second(nextDeadline);
+                        // Caution: we don't hold lock when we call TimerCallback,
+                        // but this is the timeout case!  We will crash soon,
+                        // maybe before returning.
+                        // anything left over is released here outside lock.
+                    }
+                    // reacquire the lock - if something was added, we loop immediately to check.
+                    _l.lock();
+                }
+                // always process expiring monitor requests first.
+                continue;
+            }
+        }
+        // now process any second chance requests.
+        if (!mSecondChanceRequests.empty()) {
+            Handle secondDeadline = mSecondChanceRequests.begin()->first.first;
+            if (now == INVALID_HANDLE) now = std::chrono::steady_clock::now();
+            if (secondDeadline < now) {
+                auto node = mSecondChanceRequests.extract(mSecondChanceRequests.begin());
                 {
-                    auto node = mMonitorRequests.extract(mMonitorRequests.begin());
                     _l.unlock();
                     // We add Request to retired queue early so that it can be dumped out.
                     mTimeoutQueue.add(std::move(node.mapped().first));
-                    node.mapped().second(nextDeadline);
+                    const Handle originalHandle = node.key().second;
+                    node.mapped().second(originalHandle);
                     // Caution: we don't hold lock when we call TimerCallback.
                     // This is benign issue - we permit concurrent operations
                     // while in the callback to the MonitorQueue.
@@ -308,6 +357,14 @@ void TimerThread::MonitorThread::threadFunc() {
                 _l.lock();
                 continue;
             }
+            // update the deadline.
+            if (nextDeadline == INVALID_HANDLE) {
+                nextDeadline = secondDeadline;
+            } else {
+                nextDeadline = std::min(nextDeadline, secondDeadline);
+            }
+        }
+        if (nextDeadline != INVALID_HANDLE) {
             mCond.wait_until(_l, nextDeadline);
         } else {
             mCond.wait(_l);
@@ -319,28 +376,49 @@ TimerThread::Handle TimerThread::MonitorThread::add(
         std::shared_ptr<const Request> request, TimerCallback&& func, Duration timeout) {
     std::lock_guard _l(mMutex);
     const Handle handle = getUniqueHandle_l(timeout);
-    mMonitorRequests.emplace(handle, std::make_pair(std::move(request), std::move(func)));
+    mMonitorRequests.emplace_hint(mMonitorRequests.end(),
+            handle, std::make_pair(std::move(request), std::move(func)));
     mCond.notify_all();
     return handle;
 }
 
 std::shared_ptr<const TimerThread::Request> TimerThread::MonitorThread::remove(Handle handle) {
+    std::pair<std::shared_ptr<const Request>, TimerCallback> data;
     std::unique_lock ul(mMutex);
-    const auto it = mMonitorRequests.find(handle);
-    if (it == mMonitorRequests.end()) {
-        return {};
+    if (const auto it = mMonitorRequests.find(handle);
+        it != mMonitorRequests.end()) {
+        data = std::move(it->second);
+        mMonitorRequests.erase(it);
+        ul.unlock();  // manually release lock here so func (data.second)
+                      // is released outside of lock.
+        return data.first;  // request
     }
-    std::shared_ptr<const TimerThread::Request> request = std::move(it->second.first);
-    TimerCallback func = std::move(it->second.second);
-    mMonitorRequests.erase(it);
-    ul.unlock();  // manually release lock here so func is released outside of lock.
-    return request;
+
+    // this check is O(N), but since the second chance requests are ordered
+    // in terms of earliest expiration time, we would expect better than average results.
+    for (auto it = mSecondChanceRequests.begin(); it != mSecondChanceRequests.end(); ++it) {
+        if (it->first.second == handle) {
+            data = std::move(it->second);
+            mSecondChanceRequests.erase(it);
+            ul.unlock();  // manually release lock here so func (data.second)
+                          // is released outside of lock.
+            return data.first; // request
+        }
+    }
+    return {};
 }
 
 void TimerThread::MonitorThread::copyRequests(
         std::vector<std::shared_ptr<const Request>>& requests) const {
     std::lock_guard lg(mMutex);
     for (const auto &[deadline, monitorpair] : mMonitorRequests) {
+        requests.emplace_back(monitorpair.first);
+    }
+    // we combine the second map with the first map - this is
+    // everything that is pending on the monitor thread.
+    // The second map will be older than the first map so this
+    // is in order.
+    for (const auto &[deadline, monitorpair] : mSecondChanceRequests) {
         requests.emplace_back(monitorpair.first);
     }
 }
