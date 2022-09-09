@@ -277,6 +277,12 @@ enum {
     kKeyLastSampleIndexInChunk = 'lsic',  //int64_t, index of last sample in a chunk.
     kKeySampleTimeBeforeAppend = 'lsba', // int64_t, timestamp of last sample of a track.
 
+    // DVB component tag
+    kKeyDvbComponentTag = 'copt', // int32_t, component tag for DVB video/audio/subtitle
+
+    // DVB audio description
+    kKeyDvbAudioDescription = 'addt', // bool (int32_t), DVB audio description only defined for
+                                      // audio component
 };
 
 enum {

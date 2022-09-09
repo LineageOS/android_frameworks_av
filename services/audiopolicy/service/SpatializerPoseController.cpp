@@ -52,7 +52,9 @@ constexpr float kMaxRotationalVelocity = 8;
 constexpr auto kPredictionDuration = 50ms;
 
 // After not getting a pose sample for this long, we would treat the measurement as stale.
-constexpr auto kFreshnessTimeout = 50ms;
+// The max connection interval is 50ms, and HT sensor event interval can differ depending on the
+// sampling rate, scheduling, sensor eventQ FIFO etc. 120 (2 * 50 + 20) ms seems reasonable for now.
+constexpr auto kFreshnessTimeout = 120ms;
 
 // Auto-recenter kicks in after the head has been still for this long.
 constexpr auto kAutoRecenterWindowDuration = 6s;
@@ -310,14 +312,14 @@ std::string SpatializerPoseController::toString(unsigned level) const {
     }
 
     ss += prefixSpace;
-    if (mHeadSensor == media::SensorPoseProvider::INVALID_HANDLE) {
-        ss.append("HeadSensor: INVALID\n");
+    if (mHeadSensor == INVALID_SENSOR) {
+        ss += "HeadSensor: INVALID\n";
     } else {
         base::StringAppendF(&ss, "HeadSensor: 0x%08x\n", mHeadSensor);
     }
 
     ss += prefixSpace;
-    if (mScreenSensor == media::SensorPoseProvider::INVALID_HANDLE) {
+    if (mScreenSensor == INVALID_SENSOR) {
         ss += "ScreenSensor: INVALID\n";
     } else {
         base::StringAppendF(&ss, "ScreenSensor: 0x%08x\n", mScreenSensor);
@@ -325,7 +327,7 @@ std::string SpatializerPoseController::toString(unsigned level) const {
 
     ss += prefixSpace;
     if (mActualMode.has_value()) {
-        base::StringAppendF(&ss, "ActualMode: %s", toString(mActualMode.value()).c_str());
+        base::StringAppendF(&ss, "ActualMode: %s\n", media::toString(mActualMode.value()).c_str());
     } else {
         ss += "ActualMode NOTEXIST\n";
     }
