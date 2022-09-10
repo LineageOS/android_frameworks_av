@@ -1342,7 +1342,9 @@ status_t AudioPolicyService::onTransact(
         } else {
             getIAudioPolicyServiceStatistics().event(code, elapsedMs);
         }
-    });
+    }, mediautils::TimeCheck::kDefaultTimeoutDuration,
+    mediautils::TimeCheck::kDefaultSecondChanceDuration,
+    true /* crashOnTimeout */);
 
     switch (code) {
         case SHELL_COMMAND_TRANSACTION: {
