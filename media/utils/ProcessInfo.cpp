@@ -18,7 +18,7 @@
 #define LOG_TAG "ProcessInfo"
 #include <utils/Log.h>
 
-#include <media/stagefright/ProcessInfo.h>
+#include <mediautils/ProcessInfo.h>
 
 #include <binder/IPCThreadState.h>
 #include <binder/IServiceManager.h>

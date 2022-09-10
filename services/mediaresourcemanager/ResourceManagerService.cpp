@@ -26,8 +26,9 @@
 #include <cutils/sched_policy.h>
 #include <dirent.h>
 #include <media/MediaResourcePolicy.h>
-#include <media/stagefright/ProcessInfo.h>
+#include <media/stagefright/foundation/ABase.h>
 #include <mediautils/BatteryNotifier.h>
+#include <mediautils/ProcessInfo.h>
 #include <mediautils/SchedulingPolicyService.h>
 #include <string.h>
 #include <sys/types.h>

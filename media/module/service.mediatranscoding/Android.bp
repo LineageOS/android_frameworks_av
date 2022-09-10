@@ -26,6 +26,10 @@ cc_library {
         "SimulatedTranscoder.cpp",
     ],
 
+    export_include_dirs: [
+        ".",
+    ],
+
     min_sdk_version: "29",
     apex_available: [
         "com.android.media",
