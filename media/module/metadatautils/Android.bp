@@ -1,0 +1,37 @@
+cc_library_static {
+    name: "libstagefright_metadatautils",
+    apex_available: [
+        "//apex_available:platform",
+        "com.android.media",
+    ],
+    min_sdk_version: "29",
+
+    srcs: ["MetaDataUtils.cpp"],
+
+    cflags: [
+        "-Werror",
+        "-Wall",
+    ],
+    sanitize: {
+        misc_undefined: [
+            "signed-integer-overflow",
+        ],
+        cfi: true,
+    },
+
+    header_libs: [
+        "libaudioclient_headers",
+        "libstagefright_headers",
+        "libstagefright_foundation_headers",
+        "media_ndk_headers",
+    ],
+
+    host_supported: true,
+    target: {
+        darwin: {
+            enabled: false,
+        },
+    },
+
+    export_include_dirs: ["include"],
+}
