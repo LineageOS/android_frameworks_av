@@ -20,31 +20,27 @@ package {
     // all of the 'license_kinds' from "frameworks_av_media_libstagefright_tests_license"
     // to get the below license kinds:
     //   SPDX-license-identifier-Apache-2.0
-    default_applicable_licenses: [
-        "frameworks_av_media_libstagefright_tests_license",
-    ],
 }
 
 cc_test {
-    name: "ESDSTest",
+    name: "MetaDataUtilsTest",
     gtest: true,
 
     srcs: [
-        "ESDSTest.cpp",
-    ],
-
-    shared_libs: [
-        "libbinder",
-        "libdatasource",
-        "liblog",
-        "libmedia",
-        "libstagefright",
-        "libstagefright_foundation",
-        "libutils",
+        "MetaDataUtilsTest.cpp",
     ],
 
     static_libs: [
+        "libstagefright_metadatautils",
         "libstagefright_esds",
+    ],
+
+    shared_libs: [
+        "liblog",
+        "libutils",
+        "libmediandk",
+        "libstagefright",
+        "libstagefright_foundation",
     ],
 
     cflags: [

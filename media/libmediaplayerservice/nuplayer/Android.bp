@@ -17,6 +17,14 @@ license {
     ],
 }
 
+cc_library_headers {
+    name: "libstagefright_nuplayer_headers",
+
+    export_include_dirs: [
+        "include",
+    ],
+}
+
 cc_library_static {
 
     srcs: [
@@ -81,6 +89,7 @@ cc_library_static {
 
     static_libs: [
         "libplayerservice_datasource",
+        "libstagefright_esds",
         "libstagefright_timedtext",
     ],
 

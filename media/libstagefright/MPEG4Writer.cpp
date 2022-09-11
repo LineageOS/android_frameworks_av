@@ -51,7 +51,7 @@
 #include <media/mediarecorder.h>
 #include <cutils/properties.h>
 
-#include "include/ESDS.h"
+#include <media/esds/ESDS.h>
 #include "include/HevcUtils.h"
 
 #ifndef __predict_false
