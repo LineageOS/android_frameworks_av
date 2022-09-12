@@ -240,6 +240,35 @@ static constexpr const char * const AAudioStreamFields[] {
     "sharing_requested",
 };
 
+static constexpr const char * HeadTrackerDeviceEnabledFields[] {
+    "mediametrics_headtrackerdeviceenabled_reported",
+    "type",
+    "event",
+    "enabled",
+};
+
+static constexpr const char * HeadTrackerDeviceSupportedFields[] {
+    "mediametrics_headtrackerdevicesupported_reported",
+    "type",
+    "event",
+    "supported",
+};
+
+static constexpr const char * SpatializerCapabilitiesFields[] {
+    "mediametrics_spatializer_reported",
+    "head_tracking_modes",
+    "spatializer_levels",
+    "spatializer_modes",
+    "channel_masks",
+};
+
+static constexpr const char * SpatializerDeviceEnabledFields[] {
+    "mediametrics_spatializerdeviceenabled_reported",
+    "type",
+    "event",
+    "enabled",
+};
+
 /**
  * printFields is a helper method that prints the fields and corresponding values
  * in a human readable style.
@@ -1534,6 +1563,17 @@ std::pair<std::string, int32_t> AudioAnalytics::Health::dump(
     return { s, n };
 }
 
+// Classifies the setting event for statsd (use generated statsd enums.proto constants).
+static int32_t classifySettingEvent(bool isSetAlready, bool withinBoot) {
+    if (isSetAlready) {
+        return util::MEDIAMETRICS_SPATIALIZER_DEVICE_ENABLED_REPORTED__EVENT__SPATIALIZER_SETTING_EVENT_NORMAL;
+    }
+    if (withinBoot) {
+        return util::MEDIAMETRICS_SPATIALIZER_DEVICE_ENABLED_REPORTED__EVENT__SPATIALIZER_SETTING_EVENT_BOOT;
+    }
+    return util::MEDIAMETRICS_SPATIALIZER_DEVICE_ENABLED_REPORTED__EVENT__SPATIALIZER_SETTING_EVENT_FIRST;
+}
+
 void AudioAnalytics::Spatializer::onEvent(
         const std::shared_ptr<const android::mediametrics::Item> &item)
 {
@@ -1560,14 +1600,14 @@ void AudioAnalytics::Spatializer::onEvent(
         std::string modes;
         (void)item->get(AMEDIAMETRICS_PROP_MODES, &modes);
 
-        int32_t channelMask = 0;
-        (void)item->get(AMEDIAMETRICS_PROP_CHANNELMASK, &channelMask);
+        std::string channelMasks;
+        (void)item->get(AMEDIAMETRICS_PROP_CHANNELMASKS, &channelMasks);
 
         LOG(LOG_LEVEL) << "key:" << key
                 << " headTrackingModes:" << headTrackingModes
                 << " levels:" << levels
                 << " modes:" << modes
-                << " channelMask:" << channelMask
+                << " channelMasks:" << channelMasks
                 ;
 
         const std::vector<int32_t> headTrackingModesVector =
@@ -1576,18 +1616,39 @@ void AudioAnalytics::Spatializer::onEvent(
                 types::vectorFromMap(levels, types::getSpatializerLevelMap());
         const std::vector<int32_t> modesVector =
                 types::vectorFromMap(modes, types::getSpatializerModeMap());
+        const std::vector<int64_t> channelMasksVector =
+                types::channelMaskVectorFromString(channelMasks);
 
-        // TODO: send to statsd
+        const auto [ result, str ] = sendToStatsd(SpatializerCapabilitiesFields,
+                CONDITION(android::util::MEDIAMETRICS_SPATIALIZERCAPABILITIES_REPORTED)
+                , headTrackingModesVector
+                , levelsVector
+                , modesVector
+                , channelMasksVector
+                );
+
+        mAudioAnalytics.mStatsdLog->log(
+                android::util::MEDIAMETRICS_SPATIALIZERCAPABILITIES_REPORTED, str);
 
         std::lock_guard lg(mLock);
+        if (mFirstCreateTimeNs == 0) {
+            // Only update the create time once to prevent audioserver restart
+            // from looking like a boot.
+            mFirstCreateTimeNs = item->getTimestamp();
+        }
         mSimpleLog.log("%s suffix: %s item: %s",
                 __func__, suffix.c_str(), item->toString().c_str());
     } else {
         std::string subtype = suffix.substr(0, delim);
         if (subtype != "device") return; // not a device.
 
-        std::string deviceType = suffix.substr(std::size("device.") - 1);
+        const std::string deviceType = suffix.substr(std::size("device.") - 1);
 
+        const int32_t deviceTypeStatsd =
+                types::lookup<types::AUDIO_DEVICE_INFO_TYPE, int32_t>(deviceType);
+
+        std::string address;
+        (void)item->get(AMEDIAMETRICS_PROP_ADDRESS, &address);
         std::string enabled;
         (void)item->get(AMEDIAMETRICS_PROP_ENABLED, &enabled);
         std::string hasHeadTracker;
@@ -1598,35 +1659,67 @@ void AudioAnalytics::Spatializer::onEvent(
         std::lock_guard lg(mLock);
 
         // Validate from our cached state
-        DeviceState& deviceState = mDeviceStateMap[deviceType];
+
+        // Our deviceKey takes the device type and appends the address if any.
+        // This distinguishes different wireless devices for the purposes of tracking.
+        std::string deviceKey(deviceType);
+        deviceKey.append("_").append(address);
+        DeviceState& deviceState = mDeviceStateMap[deviceKey];
+
+        // check whether the settings event is within a certain time of spatializer creation.
+        const bool withinBoot =
+                item->getTimestamp() - mFirstCreateTimeNs < kBootDurationThreshold;
 
         if (!enabled.empty()) {
             if (enabled != deviceState.enabled) {
+                const int32_t settingEventStatsd =
+                        classifySettingEvent(!deviceState.enabled.empty(), withinBoot);
                 deviceState.enabled = enabled;
                 const bool enabledStatsd = enabled == "true";
-                // TODO: send to statsd
-                (void)mAudioAnalytics;
-                (void)enabledStatsd;
+                const auto [ result, str ] = sendToStatsd(SpatializerDeviceEnabledFields,
+                        CONDITION(android::util::MEDIAMETRICS_SPATIALIZERDEVICEENABLED_REPORTED)
+                        , deviceTypeStatsd
+                        , settingEventStatsd
+                        , enabledStatsd
+                        );
+                mAudioAnalytics.mStatsdLog->log(
+                        android::util::MEDIAMETRICS_SPATIALIZERDEVICEENABLED_REPORTED, str);
             }
         }
         if (!hasHeadTracker.empty()) {
             if (hasHeadTracker != deviceState.hasHeadTracker) {
+                const int32_t settingEventStatsd =
+                        classifySettingEvent(!deviceState.hasHeadTracker.empty(), withinBoot);
                 deviceState.hasHeadTracker = hasHeadTracker;
                 const bool supportedStatsd = hasHeadTracker == "true";
-                // TODO: send to statsd
-                (void)supportedStatsd;
+                const auto [ result, str ] = sendToStatsd(HeadTrackerDeviceSupportedFields,
+                        CONDITION(android::util::MEDIAMETRICS_HEADTRACKERDEVICESUPPORTED_REPORTED)
+                        , deviceTypeStatsd
+                        , settingEventStatsd
+                        , supportedStatsd
+                        );
+                mAudioAnalytics.mStatsdLog->log(
+                        android::util::MEDIAMETRICS_HEADTRACKERDEVICESUPPORTED_REPORTED, str);
             }
         }
         if (!headTrackerEnabled.empty()) {
             if (headTrackerEnabled != deviceState.headTrackerEnabled) {
+                const int32_t settingEventStatsd =
+                        classifySettingEvent(!deviceState.headTrackerEnabled.empty(), withinBoot);
                 deviceState.headTrackerEnabled = headTrackerEnabled;
                 const bool enabledStatsd = headTrackerEnabled == "true";
-                // TODO: send to statsd
-                (void)enabledStatsd;
+                const auto [ result, str ] = sendToStatsd(HeadTrackerDeviceEnabledFields,
+                        CONDITION(android::util::MEDIAMETRICS_HEADTRACKERDEVICEENABLED_REPORTED)
+                        , deviceTypeStatsd
+                        , settingEventStatsd
+                        , enabledStatsd
+                        );
+                mAudioAnalytics.mStatsdLog->log(
+                        android::util::MEDIAMETRICS_HEADTRACKERDEVICEENABLED_REPORTED, str);
             }
         }
-        mSimpleLog.log("%s deviceType: %s item: %s",
-                __func__, deviceType.c_str(), item->toString().c_str());
+        mSimpleLog.log("%s deviceKey: %s item: %s",
+                __func__, deviceKey.c_str(), item->toString().c_str());
     }
 }
 
