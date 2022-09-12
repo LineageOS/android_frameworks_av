@@ -51,6 +51,7 @@ cc_defaults {
         "libmedia_datasource_headers",
         "libaudioclient_headers",
         "media_ndk_headers",
+        "libstagefright_headers",
         "libstagefright_foundation_headers",
     ],
 

@@ -34,7 +34,7 @@
 #include "SampleTable.h"
 #include "ItemTable.h"
 
-#include <ESDS.h>
+#include <media/esds/ESDS.h>
 #include <ID3.h>
 #include <media/stagefright/DataSourceBase.h>
 #include <media/ExtractorUtils.h>
