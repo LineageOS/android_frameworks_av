@@ -20,7 +20,7 @@
 
 #include <media/stagefright/foundation/ByteUtils.h>
 
-#include "include/ESDS.h"
+#include <media/esds/ESDS.h>
 
 #include <string.h>
 

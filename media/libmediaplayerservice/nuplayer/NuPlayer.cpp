@@ -60,7 +60,7 @@
 #include <gui/Surface.h>
 
 
-#include "ESDS.h"
+#include <media/esds/ESDS.h>
 #include <media/stagefright/Utils.h>
 
 namespace android {
