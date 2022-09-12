@@ -24,7 +24,7 @@
 #include <utility>
 #include <vector>
 
-#include "include/ESDS.h"
+#include <media/esds/ESDS.h>
 #include "include/HevcUtils.h"
 
 #include <cutils/properties.h>

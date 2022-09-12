@@ -21,7 +21,7 @@
 #include <fstream>
 #include <string>
 
-#include <ESDS.h>
+#include <media/esds/ESDS.h>
 #include <media/NdkMediaFormat.h>
 #include <media/stagefright/MediaCodecConstants.h>
 #include <media/stagefright/MediaDefs.h>
