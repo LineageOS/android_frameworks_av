@@ -30,7 +30,7 @@
 #include <media/stagefright/MetaData.h>
 #include <arpa/inet.h>
 
-#include "include/ESDS.h"
+#include <media/esds/ESDS.h>
 
 namespace android {
 

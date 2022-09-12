@@ -20,7 +20,7 @@
 
 #include <media/stagefright/NuMediaExtractor.h>
 
-#include "include/ESDS.h"
+#include <media/esds/ESDS.h>
 
 #include <datasource/DataSourceFactory.h>
 #include <datasource/FileSource.h>

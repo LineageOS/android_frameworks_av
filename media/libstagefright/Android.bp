@@ -34,38 +34,6 @@ cc_library_headers {
 }
 
 cc_library_static {
-    name: "libstagefright_esds",
-    apex_available: [
-        "//apex_available:platform",
-        "com.android.media",
-    ],
-    min_sdk_version: "29",
-
-    srcs: ["ESDS.cpp"],
-
-    cflags: [
-        "-Werror",
-        "-Wall",
-    ],
-    sanitize: {
-        misc_undefined: [
-            "signed-integer-overflow",
-        ],
-        cfi: true,
-    },
-    shared_libs: [
-        "libstagefright_foundation",
-        "libutils"
-    ],
-    host_supported: true,
-    target: {
-        darwin: {
-            enabled: false,
-        },
-    },
-}
-
-cc_library_static {
     name: "libstagefright_metadatautils",
     apex_available: [
         "//apex_available:platform",
@@ -164,6 +132,10 @@ cc_library_static {
 
     shared_libs: [
         "liblog",
+    ],
+
+    static_libs: [
+        "libstagefright_esds",
     ],
 
     export_include_dirs: [
