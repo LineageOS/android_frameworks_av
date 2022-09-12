@@ -20,10 +20,6 @@ cc_defaults {
         "-Wextra",
     ],
 
-    include_dirs: [
-        "frameworks/av/services/mediatranscoding",
-    ],
-
     shared_libs: [
         "libactivitymanager_aidl",
         "libbinder",
