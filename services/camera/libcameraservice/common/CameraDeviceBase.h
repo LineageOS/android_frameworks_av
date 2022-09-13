@@ -449,6 +449,11 @@ class CameraDeviceBase : public virtual FrameProducer {
     virtual status_t setCameraMute(bool enabled) = 0;
 
     /**
+     * Enable/disable camera service watchdog
+     */
+    virtual status_t setCameraServiceWatchdog(bool enabled) = 0;
+
+    /**
      * Get the status tracker of the camera device
      */
     virtual wp<camera3::StatusTracker> getStatusTracker() = 0;
