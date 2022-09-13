@@ -736,10 +736,10 @@ void AudioFlinger::dumpClients(int fd, const Vector<String16>& args __unused)
     for (size_t i = 0; i < mClients.size(); ++i) {
         sp<Client> client = mClients.valueAt(i).promote();
         if (client != 0) {
-            result.appendFormat("%6d %12zu\n", client->pid(),
-                    client->heap()->getMemoryHeap()->getSize());
+          result.append("Client: %d\n", client->pid());
+          result.append(client->allocator().dump().c_str());
         }
-    }
+   }
 
     result.append("Notification Clients:\n");
     result.append("   pid    uid  name\n");
@@ -2186,12 +2186,8 @@ sp<AudioFlinger::ThreadBase> AudioFlinger::getEffectThread_l(audio_session_t ses
 AudioFlinger::Client::Client(const sp<AudioFlinger>& audioFlinger, pid_t pid)
     :   RefBase(),
         mAudioFlinger(audioFlinger),
-        mPid(pid)
-{
-    mMemoryDealer = new MemoryDealer(
-            audioFlinger->getClientSharedHeapSize(),
-            (std::string("AudioFlinger::Client(") + std::to_string(pid) + ")").c_str());
-}
+        mPid(pid),
+        mClientAllocator(AllocatorFactory::getClientAllocator()) {}
 
 // Client destructor must be called with AudioFlinger::mClientLock held
 AudioFlinger::Client::~Client()
@@ -2199,9 +2195,9 @@ AudioFlinger::Client::~Client()
     mAudioFlinger->removeClient_l(mPid);
 }
 
-sp<MemoryDealer> AudioFlinger::Client::heap() const
+AllocatorFactory::ClientAllocator& AudioFlinger::Client::allocator()
 {
-    return mMemoryDealer;
+    return mClientAllocator;
 }
 
 // ----------------------------------------------------------------------------
