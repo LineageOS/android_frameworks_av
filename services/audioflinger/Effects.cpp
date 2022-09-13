@@ -1761,7 +1761,14 @@ AudioFlinger::EffectHandle::EffectHandle(const sp<EffectBase>& effect,
         return;
     }
     int bufOffset = ((sizeof(effect_param_cblk_t) - 1) / sizeof(int) + 1) * sizeof(int);
-    mCblkMemory = client->heap()->allocate(EFFECT_PARAM_BUFFER_SIZE + bufOffset);
+    mCblkMemory = client->allocator().allocate(mediautils::NamedAllocRequest{
+            {static_cast<size_t>(EFFECT_PARAM_BUFFER_SIZE + bufOffset)},
+            std::string("Effect ID: ")
+                    .append(std::to_string(effect->id()))
+                    .append(" Session ID: ")
+                    .append(std::to_string(static_cast<int>(effect->sessionId())))
+                    .append(" \n")
+            });
     if (mCblkMemory == 0 ||
             (mCblk = static_cast<effect_param_cblk_t *>(mCblkMemory->unsecurePointer())) == NULL) {
         ALOGE("not enough memory for Effect size=%zu", EFFECT_PARAM_BUFFER_SIZE +

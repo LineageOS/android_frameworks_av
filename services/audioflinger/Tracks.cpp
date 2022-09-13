@@ -162,11 +162,12 @@ AudioFlinger::ThreadBase::TrackBase::TrackBase(
     }
 
     if (client != 0) {
-        mCblkMemory = client->heap()->allocate(size);
+        mCblkMemory = client->allocator().allocate(mediautils::NamedAllocRequest{{size},
+                std::string("Track ID: ").append(std::to_string(mId))});
         if (mCblkMemory == 0 ||
                 (mCblk = static_cast<audio_track_cblk_t *>(mCblkMemory->unsecurePointer())) == NULL) {
             ALOGE("%s(%d): not enough memory for AudioTrack size=%zu", __func__, mId, size);
-            client->heap()->dump("AudioTrack");
+            ALOGE("%s", client->allocator().dump().c_str());
             mCblkMemory.clear();
             return;
         }
