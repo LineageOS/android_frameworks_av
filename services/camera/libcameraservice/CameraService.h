@@ -339,6 +339,9 @@ public:
         // Set/reset camera mute
         virtual status_t setCameraMute(bool enabled) = 0;
 
+        // Set Camera service watchdog
+        virtual status_t setCameraServiceWatchdog(bool enabled) = 0;
+
         // The injection camera session to replace the internal camera
         // session.
         virtual status_t injectCamera(const String8& injectedCamId,
@@ -1198,6 +1201,9 @@ private:
     // Handle 'watch' command as passed through 'cmd'
     status_t handleWatchCommand(const Vector<String16> &args, int inFd, int outFd);
 
+    // Set the camera service watchdog
+    status_t handleSetCameraServiceWatchdog(const Vector<String16>& args);
+
     // Enable tag monitoring of the given tags in provided clients
     status_t startWatchingTags(const Vector<String16> &args, int outFd);
 
@@ -1283,6 +1289,9 @@ private:
 
     // Current camera mute mode
     bool mOverrideCameraMuteMode = false;
+
+    // Camera Service watchdog flag
+    bool mCameraServiceWatchdogEnabled = true;
 
     /**
      * A listener class that implements the IBinder::DeathRecipient interface
