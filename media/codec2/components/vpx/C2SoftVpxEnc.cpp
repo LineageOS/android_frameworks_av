@@ -683,17 +683,20 @@ void C2SoftVpxEnc::process(
         return;
     }
 
-    std::shared_ptr<const C2GraphicView> rView;
+    std::shared_ptr<C2GraphicView> rView;
     std::shared_ptr<C2Buffer> inputBuffer;
     if (!work->input.buffers.empty()) {
         inputBuffer = work->input.buffers[0];
-        rView = std::make_shared<const C2GraphicView>(
+        rView = std::make_shared<C2GraphicView>(
                     inputBuffer->data().graphicBlocks().front().map().get());
         if (rView->error() != C2_OK) {
             ALOGE("graphic view map err = %d", rView->error());
             work->result = C2_CORRUPTED;
             return;
         }
+        //(b/232396154)
+        //workaround for incorrect crop size in view when using surface mode
+        rView->setCrop_be(C2Rect(mSize->width, mSize->height));
     } else {
         ALOGV("Empty input Buffer");
         uint32_t flags = 0;
