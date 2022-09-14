@@ -387,6 +387,18 @@ status_t Spatializer::loadEngineConfiguration(sp<EffectHalInterface> effect) {
     return NO_ERROR;
 }
 
+/* static */
+void Spatializer::sendEmptyCreateSpatializerMetricWithStatus(status_t status) {
+    mediametrics::LogItem(kDefaultMetricsId)
+        .set(AMEDIAMETRICS_PROP_EVENT, AMEDIAMETRICS_PROP_EVENT_VALUE_CREATE)
+        .set(AMEDIAMETRICS_PROP_CHANNELMASKS, "")
+        .set(AMEDIAMETRICS_PROP_LEVELS, "")
+        .set(AMEDIAMETRICS_PROP_MODES, "")
+        .set(AMEDIAMETRICS_PROP_HEADTRACKINGMODES, "")
+        .set(AMEDIAMETRICS_PROP_STATUS, (int32_t)status)
+        .record();
+}
+
 /** Gets the channel mask, sampling rate and format set for the spatializer input. */
 audio_config_base_t Spatializer::getAudioInConfig() const {
     std::lock_guard lock(mLock);
