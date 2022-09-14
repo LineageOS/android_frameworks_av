@@ -53,7 +53,7 @@ public:
 
     // AudioPortConfig
     virtual sp<AudioPort> getAudioPort() const {
-        return static_cast<AudioPort*>(const_cast<DeviceDescriptorBase*>(this));
+        return sp<AudioPort>::fromExisting(const_cast<DeviceDescriptorBase*>(this));
     }
     virtual void toAudioPortConfig(struct audio_port_config *dstConfig,
             const struct audio_port_config *srcConfig = NULL) const;
