@@ -161,6 +161,13 @@ private:
      */
     std::string getThreadFromTrack(const std::string& track) const;
 
+    /**
+     * return the device name, if present.
+     *
+     * This is currently enabled only for Bluetooth output devices.
+     */
+    std::string getDeviceNamesFromOutputDevices(std::string_view devices) const;
+
     const bool mDeliverStatistics;
 
     // Actions is individually locked
