@@ -403,7 +403,7 @@ aaudio_result_t AudioStreamRecord::read(void *buffer,
         return result;
     }
 
-    if (getState() == AAUDIO_STREAM_STATE_DISCONNECTED) {
+    if (isDisconnected()) {
         return AAUDIO_ERROR_DISCONNECTED;
     }
 
@@ -446,7 +446,7 @@ aaudio_result_t AudioStreamRecord::read(void *buffer,
         // In this context, a DEAD_OBJECT is more likely to be a disconnect notification due to
         // AudioRecord invalidation.
         if (bytesActuallyRead == DEAD_OBJECT) {
-            setState(AAUDIO_STREAM_STATE_DISCONNECTED);
+            setDisconnected();
             return AAUDIO_ERROR_DISCONNECTED;
         }
         return AAudioConvert_androidToAAudioResult(bytesActuallyRead);

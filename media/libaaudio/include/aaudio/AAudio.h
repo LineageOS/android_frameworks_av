@@ -277,6 +277,7 @@ enum
     AAUDIO_STREAM_STATE_CLOSED,
     /**
      * The stream is disconnected from audio device.
+     * @deprecated
      */
     AAUDIO_STREAM_STATE_DISCONNECTED
 };

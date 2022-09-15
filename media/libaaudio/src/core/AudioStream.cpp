@@ -61,10 +61,9 @@ AudioStream::~AudioStream() {
     // If the stream is deleted when OPEN or in use then audio resources will leak.
     // This would indicate an internal error. So we want to find this ASAP.
     LOG_ALWAYS_FATAL_IF(!(getState() == AAUDIO_STREAM_STATE_CLOSED
-                          || getState() == AAUDIO_STREAM_STATE_UNINITIALIZED
-                          || getState() == AAUDIO_STREAM_STATE_DISCONNECTED),
-                        "~AudioStream() - still in use, state = %s",
-                        AudioGlobal_convertStreamStateToText(getState()));
+                          || getState() == AAUDIO_STREAM_STATE_UNINITIALIZED),
+                        "~AudioStream() - still in use, state = %s disconnected = %d",
+                        AudioGlobal_convertStreamStateToText(getState()), isDisconnected());
 }
 
 aaudio_result_t AudioStream::open(const AudioStreamBuilder& builder)
@@ -158,6 +157,11 @@ aaudio_result_t AudioStream::systemStart() {
 
     std::lock_guard<std::mutex> lock(mStreamLock);
 
+    if (isDisconnected()) {
+        ALOGW("%s() stream is disconnected", __func__);
+        return AAUDIO_ERROR_INVALID_STATE;
+    }
+
     switch (getState()) {
         // Is this a good time to start?
         case AAUDIO_STREAM_STATE_OPEN:
@@ -176,8 +180,13 @@ aaudio_result_t AudioStream::systemStart() {
                   AudioGlobal_convertStreamStateToText(getState()));
             return AAUDIO_ERROR_INVALID_STATE;
 
-        // Don't start when the stream is dead!
         case AAUDIO_STREAM_STATE_DISCONNECTED:
+            // This must not happen after deprecating AAUDIO_STREAM_STATE_DISCONNECTED, trying to
+            // start will finally return ERROR_DISCONNECTED.
+            ALOGE("%s, unexpected state = AAUDIO_STREAM_STATE_DISCONNECTED", __func__);
+            return AAUDIO_ERROR_INTERNAL;
+
+        // Don't start when the stream is dead!
         case AAUDIO_STREAM_STATE_CLOSING:
         case AAUDIO_STREAM_STATE_CLOSED:
         default:
@@ -210,7 +219,11 @@ aaudio_result_t AudioStream::systemPause() {
         // Proceed with pausing.
         case AAUDIO_STREAM_STATE_STARTING:
         case AAUDIO_STREAM_STATE_STARTED:
+            break;
+
         case AAUDIO_STREAM_STATE_DISCONNECTED:
+            // This must not happen after deprecating AAUDIO_STREAM_STATE_DISCONNECTED
+            ALOGE("%s, unexpected state = AAUDIO_STREAM_STATE_DISCONNECTED", __func__);
             break;
 
             // Transition from one inactive state to another.
@@ -289,7 +302,10 @@ aaudio_result_t AudioStream::safeStop_l() {
         // Proceed with stopping.
         case AAUDIO_STREAM_STATE_STARTING:
         case AAUDIO_STREAM_STATE_STARTED:
+            break;
         case AAUDIO_STREAM_STATE_DISCONNECTED:
+            // This must not happen after deprecating AAUDIO_STREAM_STATE_DISCONNECTED
+            ALOGE("%s, unexpected state = AAUDIO_STREAM_STATE_DISCONNECTED", __func__);
             break;
 
         // Transition from one inactive state to another.
@@ -369,13 +385,8 @@ void AudioStream::setState(aaudio_stream_state_t state) {
     if (state == oldState) {
         return; // no change
     }
-    // Track transition to DISCONNECTED state.
-    if (state == AAUDIO_STREAM_STATE_DISCONNECTED) {
-        android::mediametrics::LogItem(mMetricsId)
-                .set(AMEDIAMETRICS_PROP_EVENT, AMEDIAMETRICS_PROP_EVENT_VALUE_DISCONNECT)
-                .set(AMEDIAMETRICS_PROP_STATE, AudioGlobal_convertStreamStateToText(oldState))
-                .record();
-    }
+    LOG_ALWAYS_FATAL_IF(state == AAUDIO_STREAM_STATE_DISCONNECTED,
+                        "Disconnected state must be separated from mState");
     // CLOSED is a final state
     if (oldState == AAUDIO_STREAM_STATE_CLOSED) {
         ALOGW("%s(%d) tried to set to %d but already CLOSED", __func__, getId(), state);
@@ -385,17 +396,26 @@ void AudioStream::setState(aaudio_stream_state_t state) {
                && state != AAUDIO_STREAM_STATE_CLOSED) {
         ALOGW("%s(%d) tried to set to %d but already CLOSING", __func__, getId(), state);
 
-    // Once DISCONNECTED, we can only move to CLOSING or CLOSED state.
-    } else if (oldState == AAUDIO_STREAM_STATE_DISCONNECTED
-               && !(state == AAUDIO_STREAM_STATE_CLOSING
-                   || state == AAUDIO_STREAM_STATE_CLOSED)) {
-        ALOGW("%s(%d) tried to set to %d but already DISCONNECTED", __func__, getId(), state);
-
     } else {
         mState.store(state);
         // Wake up a wakeForStateChange thread if it exists.
         syscall(SYS_futex, &mState, FUTEX_WAKE_PRIVATE, INT_MAX, NULL, NULL, 0);
     }
+}
+
+void AudioStream::setDisconnected() {
+    const bool old = isDisconnected();
+    ALOGD("%s setting disconnected, current disconnected: %d, current state: %d",
+          __func__, old, getState());
+    if (old) {
+        return; // no change, the stream is already disconnected
+    }
+    mDisconnected.store(true);
+    // Track transition to DISCONNECTED state.
+    android::mediametrics::LogItem(mMetricsId)
+            .set(AMEDIAMETRICS_PROP_EVENT, AMEDIAMETRICS_PROP_EVENT_VALUE_DISCONNECT)
+            .set(AMEDIAMETRICS_PROP_STATE, AudioGlobal_convertStreamStateToText(getState()))
+            .record();
 }
 
 aaudio_result_t AudioStream::waitForStateChange(aaudio_stream_state_t currentState,
