@@ -72,6 +72,37 @@ NuMediaExtractor::~NuMediaExtractor() {
     }
 }
 
+status_t NuMediaExtractor::initMediaExtractor(const sp<DataSource>& dataSource) {
+    status_t err = OK;
+
+    mImpl = MediaExtractorFactory::Create(dataSource);
+    if (mImpl == NULL) {
+        ALOGE("%s: failed to create MediaExtractor", __FUNCTION__);
+        return ERROR_UNSUPPORTED;
+    }
+
+    setEntryPointToRemoteMediaExtractor();
+
+    if (!mCasToken.empty()) {
+        err = mImpl->setMediaCas(mCasToken);
+        if (err != OK) {
+            ALOGE("%s: failed to setMediaCas (%d)", __FUNCTION__, err);
+            return err;
+        }
+    }
+
+    // Get the name of the implementation.
+    mName = mImpl->name();
+
+    // Update the duration and bitrate
+    err = updateDurationAndBitrate();
+    if (err == OK) {
+        mDataSource = dataSource;
+    }
+
+    return OK;
+}
+
 status_t NuMediaExtractor::setDataSource(
         const sp<MediaHTTPService> &httpService,
         const char *path,
@@ -89,27 +120,8 @@ status_t NuMediaExtractor::setDataSource(
         return -ENOENT;
     }
 
-    mImpl = MediaExtractorFactory::Create(dataSource);
-
-    if (mImpl == NULL) {
-        return ERROR_UNSUPPORTED;
-    }
-    setEntryPointToRemoteMediaExtractor();
-
-    status_t err = OK;
-    if (!mCasToken.empty()) {
-        err = mImpl->setMediaCas(mCasToken);
-        if (err != OK) {
-            ALOGE("%s: failed to setMediaCas (%d)", __FUNCTION__, err);
-            return err;
-        }
-    }
-
-    err = updateDurationAndBitrate();
-    if (err == OK) {
-        mDataSource = dataSource;
-    }
-
+    // Initialize MediaExtractor using the data source
+    initMediaExtractor(dataSource);
     return OK;
 }
 
@@ -131,26 +143,8 @@ status_t NuMediaExtractor::setDataSource(int fd, off64_t offset, off64_t size) {
         return err;
     }
 
-    mImpl = MediaExtractorFactory::Create(fileSource);
-
-    if (mImpl == NULL) {
-        return ERROR_UNSUPPORTED;
-    }
-    setEntryPointToRemoteMediaExtractor();
-
-    if (!mCasToken.empty()) {
-        err = mImpl->setMediaCas(mCasToken);
-        if (err != OK) {
-            ALOGE("%s: failed to setMediaCas (%d)", __FUNCTION__, err);
-            return err;
-        }
-    }
-
-    err = updateDurationAndBitrate();
-    if (err == OK) {
-        mDataSource = fileSource;
-    }
-
+    // Initialize MediaExtractor using the file source
+    initMediaExtractor(fileSource);
     return OK;
 }
 
@@ -166,32 +160,14 @@ status_t NuMediaExtractor::setDataSource(const sp<DataSource> &source) {
         return err;
     }
 
-    mImpl = MediaExtractorFactory::Create(source);
-
-    if (mImpl == NULL) {
-        return ERROR_UNSUPPORTED;
-    }
-    setEntryPointToRemoteMediaExtractor();
-
-    if (!mCasToken.empty()) {
-        err = mImpl->setMediaCas(mCasToken);
-        if (err != OK) {
-            ALOGE("%s: failed to setMediaCas (%d)", __FUNCTION__, err);
-            return err;
-        }
-    }
-
-    err = updateDurationAndBitrate();
-    if (err == OK) {
-        mDataSource = source;
-    }
-
+    // Initialize MediaExtractor using the given data source
+    initMediaExtractor(source);
     return err;
 }
 
 const char* NuMediaExtractor::getName() const {
     Mutex::Autolock autoLock(mLock);
-    return mImpl == nullptr ? nullptr : mImpl->name().string();
+    return mImpl == nullptr ? nullptr : mName.string();
 }
 
 static String8 arrayToString(const std::vector<uint8_t> &array) {
