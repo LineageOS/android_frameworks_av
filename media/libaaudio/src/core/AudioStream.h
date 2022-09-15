@@ -558,6 +558,11 @@ protected:
 
     void setState(aaudio_stream_state_t state);
 
+    bool isDisconnected() const {
+        return mDisconnected.load();
+    }
+    void setDisconnected();
+
     void setDeviceId(int32_t deviceId) {
         mDeviceId = deviceId;
     }
@@ -682,6 +687,8 @@ private:
     }
 
     std::atomic<aaudio_stream_state_t>          mState{AAUDIO_STREAM_STATE_UNINITIALIZED};
+
+    std::atomic_bool            mDisconnected{false};
 
     // These do not change after open().
     int32_t                     mSamplesPerFrame = AAUDIO_UNSPECIFIED;
