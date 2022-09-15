@@ -94,6 +94,21 @@ TunerDvr::~TunerDvr() {
     return mDvr->close();
 }
 
+::ndk::ScopedAStatus TunerDvr::setStatusCheckIntervalHint(const int64_t milliseconds) {
+    if (milliseconds < 0L) {
+        return ::ndk::ScopedAStatus::fromServiceSpecificError(
+                static_cast<int32_t>(Result::INVALID_ARGUMENT));
+    }
+
+    ::ndk::ScopedAStatus s = mDvr->setStatusCheckIntervalHint(milliseconds);
+    if (s.getStatus() == STATUS_UNKNOWN_TRANSACTION) {
+        return ::ndk::ScopedAStatus::fromServiceSpecificError(
+                static_cast<int32_t>(Result::UNAVAILABLE));
+    }
+
+    return s;
+}
+
 /////////////// IDvrCallback ///////////////////////
 ::ndk::ScopedAStatus TunerDvr::DvrCallback::onRecordStatus(const RecordStatus status) {
     if (mTunerDvrCallback != nullptr) {
