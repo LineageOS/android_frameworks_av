@@ -189,12 +189,13 @@ TEST_F(SerializationTest, AudioVolumeGroupBinderization) {
 TEST_F(SerializationTest, AudioMixBinderization) {
     for (int j = 0; j < 512; j++) {
         const std::string msg{"Test AMBinderization for seed::" + std::to_string(mSeed)};
-        Vector<AudioMixMatchCriterion> criteria;
+        std::vector<AudioMixMatchCriterion> criteria;
+        criteria.reserve(16);
         for (int i = 0; i < 16; i++) {
             AudioMixMatchCriterion ammc{kUsages[rand() % kUsages.size()],
                                         kInputSources[rand() % kInputSources.size()],
                                         kMixMatchRules[rand() % kMixMatchRules.size()]};
-            criteria.add(ammc);
+            criteria.push_back(ammc);
         }
         audio_config_t config{};
         config.sample_rate = 48000;

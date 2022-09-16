@@ -71,6 +71,10 @@ status_t AudioMixMatchCriterion::writeToParcel(Parcel *parcel) const
     return NO_ERROR;
 }
 
+bool AudioMixMatchCriterion::isExcludeCriterion() const {
+    return mRule & RULE_EXCLUSION_MASK;
+}
+
 //
 //  AudioMix implementation
 //
@@ -91,10 +95,11 @@ status_t AudioMix::readFromParcel(Parcel *parcel)
     if (size > MAX_CRITERIA_PER_MIX) {
         size = MAX_CRITERIA_PER_MIX;
     }
+    mCriteria.reserve(size);
     for (size_t i = 0; i < size; i++) {
         AudioMixMatchCriterion criterion;
         if (criterion.readFromParcel(parcel) == NO_ERROR) {
-            mCriteria.add(criterion);
+            mCriteria.push_back(criterion);
         }
     }
     return NO_ERROR;
@@ -135,18 +140,18 @@ status_t AudioMix::writeToParcel(Parcel *parcel) const
     return NO_ERROR;
 }
 
-void AudioMix::setExcludeUid(uid_t uid) const {
+void AudioMix::setExcludeUid(uid_t uid) {
     AudioMixMatchCriterion crit;
     crit.mRule = RULE_EXCLUDE_UID;
     crit.mValue.mUid = uid;
-    mCriteria.add(crit);
+    mCriteria.push_back(crit);
 }
 
-void AudioMix::setMatchUid(uid_t uid) const {
+void AudioMix::setMatchUid(uid_t uid) {
     AudioMixMatchCriterion crit;
     crit.mRule = RULE_MATCH_UID;
     crit.mValue.mUid = uid;
-    mCriteria.add(crit);
+    mCriteria.push_back(crit);
 }
 
 bool AudioMix::hasUidRule(bool match, uid_t uid) const {
@@ -169,18 +174,18 @@ bool AudioMix::hasMatchUidRule() const {
     return false;
 }
 
-void AudioMix::setExcludeUserId(int userId) const {
+void AudioMix::setExcludeUserId(int userId) {
     AudioMixMatchCriterion crit;
     crit.mRule = RULE_EXCLUDE_USERID;
     crit.mValue.mUserId = userId;
-    mCriteria.add(crit);
+    mCriteria.push_back(crit);
 }
 
-void AudioMix::setMatchUserId(int userId) const {
+void AudioMix::setMatchUserId(int userId) {
     AudioMixMatchCriterion crit;
     crit.mRule = RULE_MATCH_USERID;
     crit.mValue.mUserId = userId;
-    mCriteria.add(crit);
+    mCriteria.push_back(crit);
 }
 
 bool AudioMix::hasUserIdRule(bool match, int userId) const {

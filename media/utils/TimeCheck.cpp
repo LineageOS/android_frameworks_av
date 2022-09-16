@@ -14,11 +14,14 @@
  * limitations under the License.
  */
 
+#include <csignal>
+#include "mediautils/TimerThread.h"
 #define LOG_TAG "TimeCheck"
 
 #include <optional>
 
 #include <android-base/logging.h>
+#include <android-base/strings.h>
 #include <audio_utils/clock.h>
 #include <mediautils/EventLog.h>
 #include <mediautils/FixedString.h>
@@ -27,19 +30,20 @@
 #include <mediautils/TidWrapper.h>
 #include <utils/Log.h>
 
-#if defined(__BIONIC__)
+#if defined(__ANDROID__)
 #include "debuggerd/handler.h"
 #endif
 
+
+namespace android::mediautils {
 // This function appropriately signals a pid to dump a backtrace if we are
-// running on device.
+// running on device (and the HAL exists). If we are not running on an Android
+// device, there is no HAL to signal (so we do nothing).
 static inline void signalAudioHAL([[maybe_unused]] pid_t pid) {
-#if defined(__BIONIC__)
+#if defined(__ANDROID__)
     sigqueue(pid, DEBUGGER_SIGNAL, {.sival_int = 0});
 #endif
 }
-
-namespace android::mediautils {
 
 /**
  * Returns the std::string "HH:MM:SS.MSc" from a system_clock time_point.
@@ -148,7 +152,7 @@ TimerThread& TimeCheck::getTimeCheckThread() {
 std::string TimeCheck::toString() {
     // note pending and retired are individually locked for maximum concurrency,
     // snapshot is not instantaneous at a single time.
-    return getTimeCheckThread().toString();
+    return getTimeCheckThread().getSnapshotAnalysis().toString();
 }
 
 TimeCheck::TimeCheck(std::string_view tag, OnTimerFunc&& onTimer, Duration requestedTimeoutDuration,
@@ -253,7 +257,7 @@ void TimeCheck::TimeCheckHandler::onTimeout(TimerThread::Handle timerHandle) con
 
     // Generate the TimerThread summary string early before sending signals to the
     // HAL processes which can affect thread behavior.
-    const std::string summary = getTimeCheckThread().toString(4 /* retiredCount */);
+    const auto snapshotAnalysis = getTimeCheckThread().getSnapshotAnalysis(4 /* retiredCount */);
 
     // Generate audio HAL processes tombstones and allow time to complete
     // before forcing restart
@@ -281,7 +285,7 @@ void TimeCheck::TimeCheckHandler::onTimeout(TimerThread::Handle timerHandle) con
             .append(analyzeTimeouts(requestedTimeoutMs + secondChanceMs,
                     elapsedSteadyMs, elapsedSystemMs)).append("\n")
             .append(halPids).append("\n")
-            .append(summary);
+            .append(snapshotAnalysis.toString());
 
     // Note: LOG_ALWAYS_FATAL limits the size of the string - per log/log.h:
     // Log message text may be truncated to less than an
@@ -291,7 +295,20 @@ void TimeCheck::TimeCheckHandler::onTimeout(TimerThread::Handle timerHandle) con
     // to avoid the size limitation. LOG(FATAL) does an abort whereas
     // LOG(FATAL_WITHOUT_ABORT) does not abort.
 
-    LOG(FATAL) << abortMessage;
+    static constexpr pid_t invalidPid = TimerThread::SnapshotAnalysis::INVALID_PID;
+    pid_t tidToAbort = invalidPid;
+    if (snapshotAnalysis.suspectTid != invalidPid) {
+        tidToAbort = snapshotAnalysis.suspectTid;
+    } else if (snapshotAnalysis.timeoutTid != invalidPid) {
+        tidToAbort = snapshotAnalysis.timeoutTid;
+    }
+
+    LOG(FATAL_WITHOUT_ABORT) << abortMessage;
+    const auto ret = abortTid(tidToAbort);
+    if (ret < 0) {
+        LOG(FATAL) << "TimeCheck thread signal failed, aborting process. "
+                       "errno: " << errno << base::ErrnoNumberAsString(errno);
+    }
 }
 
 // Automatically create a TimeCheck class for a class and method.

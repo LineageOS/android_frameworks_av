@@ -16,8 +16,11 @@
 
 #pragma once
 
+#if defined(__linux__)
+#include <signal.h>
 #include <sys/syscall.h>
 #include <unistd.h>
+#endif
 
 namespace android::mediautils {
 
@@ -28,6 +31,22 @@ inline pid_t getThreadIdWrapper() {
     return ::gettid();
 #else
     return syscall(SYS_gettid);
+#endif
+}
+
+// Send an abort signal to a (linux) thread id.
+inline int abortTid(int tid) {
+#if defined(__linux__)
+    const pid_t pid = getpid();
+    siginfo_t siginfo = {
+        .si_code = SI_QUEUE,
+        .si_pid = pid,
+        .si_uid = getuid(),
+    };
+    return syscall(SYS_rt_tgsigqueueinfo, pid, tid, SIGABRT, &siginfo);
+#else
+  errno = ENODEV;
+  return -1;
 #endif
 }
 

@@ -123,7 +123,6 @@ class TimeCheck {
         const Duration secondChanceDuration;
         const std::chrono::system_clock::time_point startSystemTime;
         const pid_t tid;
-
         void onCancel(TimerThread::Handle handle) const;
         void onTimeout(TimerThread::Handle handle) const;
     };

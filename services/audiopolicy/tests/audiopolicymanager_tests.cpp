@@ -42,6 +42,32 @@ using namespace android;
 using testing::UnorderedElementsAre;
 using android::content::AttributionSourceState;
 
+namespace {
+
+AudioMixMatchCriterion createUidCriterion(uint32_t uid, bool exclude = false) {
+    AudioMixMatchCriterion criterion;
+    criterion.mValue.mUid = uid;
+    criterion.mRule = exclude ? RULE_EXCLUDE_UID : RULE_MATCH_UID;
+    return criterion;
+}
+
+AudioMixMatchCriterion createUsageCriterion(audio_usage_t usage, bool exclude = false) {
+    AudioMixMatchCriterion criterion;
+    criterion.mValue.mUsage = usage;
+    criterion.mRule = exclude ? RULE_EXCLUDE_ATTRIBUTE_USAGE : RULE_MATCH_ATTRIBUTE_USAGE;
+    return criterion;
+}
+
+AudioMixMatchCriterion createCapturePresetCriterion(audio_source_t source, bool exclude = false) {
+    AudioMixMatchCriterion criterion;
+    criterion.mValue.mSource = source;
+    criterion.mRule = exclude ?
+        RULE_EXCLUDE_ATTRIBUTE_CAPTURE_PRESET : RULE_MATCH_ATTRIBUTE_CAPTURE_PRESET;
+    return criterion;
+}
+
+} // namespace
+
 TEST(AudioPolicyManagerTestInit, EngineFailure) {
     AudioPolicyTestClient client;
     AudioPolicyTestManager manager(&client);
@@ -943,15 +969,13 @@ TEST_F(AudioPolicyManagerTestWithConfigurationFile, HandleDeviceConfigChange) {
     }
 }
 
-using PolicyMixTuple = std::tuple<audio_usage_t, audio_source_t, uint32_t>;
-
 class AudioPolicyManagerTestDynamicPolicy : public AudioPolicyManagerTestWithConfigurationFile {
 protected:
     void TearDown() override;
 
     status_t addPolicyMix(int mixType, int mixFlag, audio_devices_t deviceType,
             std::string mixAddress, const audio_config_t& audioConfig,
-            const std::vector<PolicyMixTuple>& rules);
+            const std::vector<AudioMixMatchCriterion>& matchCriteria);
     void clearPolicyMix();
 
     Vector<AudioMix> mAudioMixes;
@@ -965,15 +989,8 @@ void AudioPolicyManagerTestDynamicPolicy::TearDown() {
 
 status_t AudioPolicyManagerTestDynamicPolicy::addPolicyMix(int mixType, int mixFlag,
         audio_devices_t deviceType, std::string mixAddress, const audio_config_t& audioConfig,
-        const std::vector<PolicyMixTuple>& rules) {
-    Vector<AudioMixMatchCriterion> myMixMatchCriteria;
-
-    for(const auto &rule: rules) {
-        myMixMatchCriteria.add(AudioMixMatchCriterion(
-                std::get<0>(rule), std::get<1>(rule), std::get<2>(rule)));
-    }
-
-    AudioMix myAudioMix(myMixMatchCriteria, mixType, audioConfig, mixFlag,
+        const std::vector<AudioMixMatchCriterion>& matchCriteria = {}) {
+    AudioMix myAudioMix(matchCriteria, mixType, audioConfig, mixFlag,
             String8(mixAddress.c_str()), 0);
     myAudioMix.mDeviceType = deviceType;
     // Clear mAudioMix before add new one to make sure we don't add already exist mixes.
@@ -1007,13 +1024,13 @@ TEST_F(AudioPolicyManagerTestDynamicPolicy, RegisterPolicyMixes) {
 
     // Only capture of playback is allowed in LOOP_BACK &RENDER mode
     ret = addPolicyMix(MIX_TYPE_RECORDERS, MIX_ROUTE_FLAG_LOOP_BACK_AND_RENDER,
-            AUDIO_DEVICE_OUT_REMOTE_SUBMIX, "", audioConfig, std::vector<PolicyMixTuple>());
+            AUDIO_DEVICE_OUT_REMOTE_SUBMIX, "", audioConfig);
     ASSERT_EQ(INVALID_OPERATION, ret);
 
     // Fail due to the device is already connected.
     clearPolicyMix();
     ret = addPolicyMix(MIX_TYPE_PLAYERS, MIX_ROUTE_FLAG_LOOP_BACK,
-            AUDIO_DEVICE_OUT_REMOTE_SUBMIX, "", audioConfig, std::vector<PolicyMixTuple>());
+            AUDIO_DEVICE_OUT_REMOTE_SUBMIX, "", audioConfig);
     ASSERT_EQ(INVALID_OPERATION, ret);
 
     // The first time to register policy mixes with valid parameter should succeed.
@@ -1022,8 +1039,7 @@ TEST_F(AudioPolicyManagerTestDynamicPolicy, RegisterPolicyMixes) {
     audioConfig.format = AUDIO_FORMAT_PCM_16_BIT;
     audioConfig.sample_rate = k48000SamplingRate;
     ret = addPolicyMix(MIX_TYPE_PLAYERS, MIX_ROUTE_FLAG_LOOP_BACK,
-            AUDIO_DEVICE_OUT_REMOTE_SUBMIX, mMixAddress, audioConfig,
-            std::vector<PolicyMixTuple>());
+            AUDIO_DEVICE_OUT_REMOTE_SUBMIX, mMixAddress, audioConfig);
     ASSERT_EQ(NO_ERROR, ret);
     // Registering the same policy mixes should fail.
     ret = mManager->registerPolicyMixes(mAudioMixes);
@@ -1034,19 +1050,19 @@ TEST_F(AudioPolicyManagerTestDynamicPolicy, RegisterPolicyMixes) {
     // This will need to be updated if earpiece is added in the test configuration file.
     clearPolicyMix();
     ret = addPolicyMix(MIX_TYPE_PLAYERS, MIX_ROUTE_FLAG_RENDER,
-            AUDIO_DEVICE_OUT_EARPIECE, "", audioConfig, std::vector<PolicyMixTuple>());
+            AUDIO_DEVICE_OUT_EARPIECE, "", audioConfig);
     ASSERT_EQ(INVALID_OPERATION, ret);
 
     // Registration should fail due to output not found.
     clearPolicyMix();
     ret = addPolicyMix(MIX_TYPE_PLAYERS, MIX_ROUTE_FLAG_RENDER,
-            AUDIO_DEVICE_OUT_REMOTE_SUBMIX, "", audioConfig, std::vector<PolicyMixTuple>());
+            AUDIO_DEVICE_OUT_REMOTE_SUBMIX, "", audioConfig);
     ASSERT_EQ(INVALID_OPERATION, ret);
 
     // The first time to register valid policy mixes should succeed.
     clearPolicyMix();
     ret = addPolicyMix(MIX_TYPE_PLAYERS, MIX_ROUTE_FLAG_RENDER,
-            AUDIO_DEVICE_OUT_SPEAKER, "", audioConfig, std::vector<PolicyMixTuple>());
+            AUDIO_DEVICE_OUT_SPEAKER, "", audioConfig);
     ASSERT_EQ(NO_ERROR, ret);
     // Registering the same policy mixes should fail.
     ret = mManager->registerPolicyMixes(mAudioMixes);
@@ -1061,8 +1077,7 @@ TEST_F(AudioPolicyManagerTestDynamicPolicy, UnregisterPolicyMixes) {
     audioConfig.format = AUDIO_FORMAT_PCM_16_BIT;
     audioConfig.sample_rate = k48000SamplingRate;
     ret = addPolicyMix(MIX_TYPE_PLAYERS, MIX_ROUTE_FLAG_LOOP_BACK,
-            AUDIO_DEVICE_OUT_REMOTE_SUBMIX, mMixAddress, audioConfig,
-            std::vector<PolicyMixTuple>());
+            AUDIO_DEVICE_OUT_REMOTE_SUBMIX, mMixAddress, audioConfig);
     ASSERT_EQ(NO_ERROR, ret);
 
     // After successfully registering policy mixes, it should be able to unregister.
@@ -1072,6 +1087,37 @@ TEST_F(AudioPolicyManagerTestDynamicPolicy, UnregisterPolicyMixes) {
     // After unregistering policy mixes successfully, it should fail unregistering
     // the same policy mixes as they are not registered.
     ret = mManager->unregisterPolicyMixes(mAudioMixes);
+    ASSERT_EQ(INVALID_OPERATION, ret);
+}
+
+TEST_F(AudioPolicyManagerTestDynamicPolicy, RegisterPolicyWithConsistentMixSucceeds) {
+    audio_config_t audioConfig = AUDIO_CONFIG_INITIALIZER;
+    audioConfig.channel_mask = AUDIO_CHANNEL_OUT_STEREO;
+    audioConfig.format = AUDIO_FORMAT_PCM_16_BIT;
+    audioConfig.sample_rate = k48000SamplingRate;
+
+    std::vector<AudioMixMatchCriterion> mixMatchCriteria = {
+        createUidCriterion(/*uid=*/42),
+        createUsageCriterion(AUDIO_USAGE_MEDIA, /*exclude=*/true)};
+    status_t ret = addPolicyMix(MIX_TYPE_PLAYERS, MIX_ROUTE_FLAG_LOOP_BACK,
+                                AUDIO_DEVICE_OUT_REMOTE_SUBMIX, mMixAddress, audioConfig,
+                                mixMatchCriteria);
+    ASSERT_EQ(NO_ERROR, ret);
+}
+
+TEST_F(AudioPolicyManagerTestDynamicPolicy, RegisterPolicyWithInconsistentMixFails) {
+    audio_config_t audioConfig = AUDIO_CONFIG_INITIALIZER;
+    audioConfig.channel_mask = AUDIO_CHANNEL_OUT_STEREO;
+    audioConfig.format = AUDIO_FORMAT_PCM_16_BIT;
+    audioConfig.sample_rate = k48000SamplingRate;
+
+    std::vector<AudioMixMatchCriterion> mixMatchCriteria = {
+        createUidCriterion(/*uid=*/42),
+        createUidCriterion(/*uid=*/1235, /*exclude=*/true),
+        createUsageCriterion(AUDIO_USAGE_MEDIA, /*exclude=*/true)};
+    status_t ret = addPolicyMix(MIX_TYPE_PLAYERS, MIX_ROUTE_FLAG_LOOP_BACK,
+                                AUDIO_DEVICE_OUT_REMOTE_SUBMIX, mMixAddress, audioConfig,
+                                mixMatchCriteria);
     ASSERT_EQ(INVALID_OPERATION, ret);
 }
 
@@ -1299,7 +1345,7 @@ TEST_F(AudioPolicyManagerTestDPNoRemoteSubmixModule, RegistrationFailure) {
     audioConfig.format = AUDIO_FORMAT_PCM_16_BIT;
     audioConfig.sample_rate = k48000SamplingRate;
     ret = addPolicyMix(MIX_TYPE_PLAYERS, MIX_ROUTE_FLAG_LOOP_BACK,
-            AUDIO_DEVICE_OUT_REMOTE_SUBMIX, "", audioConfig, std::vector<PolicyMixTuple>());
+            AUDIO_DEVICE_OUT_REMOTE_SUBMIX, "", audioConfig);
     ASSERT_EQ(INVALID_OPERATION, ret);
 
     ret = mManager->unregisterPolicyMixes(mAudioMixes);
@@ -1314,9 +1360,9 @@ protected:
 
     std::unique_ptr<RecordingActivityTracker> mTracker;
 
-    std::vector<PolicyMixTuple> mUsageRules = {
-            {AUDIO_USAGE_MEDIA, AUDIO_SOURCE_DEFAULT, RULE_MATCH_ATTRIBUTE_USAGE},
-            {AUDIO_USAGE_ALARM, AUDIO_SOURCE_DEFAULT, RULE_MATCH_ATTRIBUTE_USAGE}
+    std::vector<AudioMixMatchCriterion> mUsageRules = {
+            createUsageCriterion(AUDIO_USAGE_MEDIA),
+            createUsageCriterion(AUDIO_USAGE_ALARM)
     };
 
     struct audio_port_v7 mInjectionPort;
@@ -1376,9 +1422,10 @@ TEST_P(AudioPolicyManagerTestDPPlaybackReRouting, PlaybackReRouting) {
     getOutputForAttr(&playbackRoutedPortId, AUDIO_FORMAT_PCM_16_BIT, AUDIO_CHANNEL_OUT_STEREO,
             k48000SamplingRate, AUDIO_OUTPUT_FLAG_NONE, nullptr /*output*/, nullptr /*portId*/,
             attr);
-    if (std::find_if(begin(mUsageRules), end(mUsageRules), [&usage](const auto &usageRule) {
-            return (std::get<0>(usageRule) == usage) &&
-            (std::get<2>(usageRule) == RULE_MATCH_ATTRIBUTE_USAGE);}) != end(mUsageRules) ||
+    if (std::find_if(begin(mUsageRules), end(mUsageRules),
+                [&usage](const AudioMixMatchCriterion &c) {
+                              return c.mRule == RULE_MATCH_ATTRIBUTE_USAGE &&
+                                     c.mValue.mUsage == usage;}) != end(mUsageRules) ||
             (strncmp(attr.tags, "addr=", strlen("addr=")) == 0 &&
                     strncmp(attr.tags + strlen("addr="), mMixAddress.c_str(),
                     AUDIO_ATTRIBUTES_TAGS_MAX_SIZE - strlen("addr=") - 1) == 0)) {
@@ -1499,10 +1546,10 @@ protected:
 
     std::unique_ptr<RecordingActivityTracker> mTracker;
 
-    std::vector<PolicyMixTuple> mSourceRules = {
-        {AUDIO_USAGE_UNKNOWN, AUDIO_SOURCE_CAMCORDER, RULE_MATCH_ATTRIBUTE_CAPTURE_PRESET},
-        {AUDIO_USAGE_UNKNOWN, AUDIO_SOURCE_MIC, RULE_MATCH_ATTRIBUTE_CAPTURE_PRESET},
-        {AUDIO_USAGE_UNKNOWN, AUDIO_SOURCE_VOICE_COMMUNICATION, RULE_MATCH_ATTRIBUTE_CAPTURE_PRESET}
+    std::vector<AudioMixMatchCriterion> mSourceRules = {
+        createCapturePresetCriterion(AUDIO_SOURCE_CAMCORDER),
+        createCapturePresetCriterion(AUDIO_SOURCE_MIC),
+        createCapturePresetCriterion(AUDIO_SOURCE_VOICE_COMMUNICATION)
     };
 
     struct audio_port_v7 mExtractionPort;
@@ -1562,9 +1609,10 @@ TEST_P(AudioPolicyManagerTestDPMixRecordInjection, RecordingInjection) {
     audio_port_handle_t portId = AUDIO_PORT_HANDLE_NONE;
     getInputForAttr(attr, mTracker->getRiid(), &captureRoutedPortId, AUDIO_FORMAT_PCM_16_BIT,
             AUDIO_CHANNEL_IN_STEREO, k48000SamplingRate, AUDIO_INPUT_FLAG_NONE, &portId);
-    if (std::find_if(begin(mSourceRules), end(mSourceRules), [&source](const auto &sourceRule) {
-            return (std::get<1>(sourceRule) == source) &&
-            (std::get<2>(sourceRule) == RULE_MATCH_ATTRIBUTE_CAPTURE_PRESET);})
+    if (std::find_if(begin(mSourceRules), end(mSourceRules),
+               [&source](const AudioMixMatchCriterion &c) {
+            return c.mRule == RULE_MATCH_ATTRIBUTE_CAPTURE_PRESET &&
+                   c.mValue.mSource == source;})
             != end(mSourceRules)) {
         EXPECT_EQ(mExtractionPort.id, captureRoutedPortId);
     } else {
@@ -1801,7 +1849,7 @@ TEST_F(AudioPolicyManagerCarTest, GetOutputForAttrAtmosOutputAfterRegisteringPol
     audio_config_t audioConfig = AUDIO_CONFIG_INITIALIZER;
     const std::string kTestBusMediaOutput = "bus0_media_out";
     ret = addPolicyMix(MIX_TYPE_PLAYERS, MIX_ROUTE_FLAG_RENDER,
-            AUDIO_DEVICE_OUT_BUS, kTestBusMediaOutput, audioConfig, std::vector<PolicyMixTuple>());
+            AUDIO_DEVICE_OUT_BUS, kTestBusMediaOutput, audioConfig);
     ASSERT_EQ(NO_ERROR, ret);
 
     audio_port_handle_t selectedDeviceId = AUDIO_PORT_HANDLE_NONE;

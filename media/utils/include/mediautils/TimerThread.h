@@ -21,9 +21,11 @@
 #include <deque>
 #include <functional>
 #include <map>
+#include <memory>
 #include <mutex>
 #include <string>
 #include <thread>
+#include <vector>
 
 #include <android-base/thread_annotations.h>
 
@@ -151,7 +153,15 @@ class TimerThread {
      */
     bool cancelTask(Handle handle);
 
-    std::string toString(size_t retiredCount = SIZE_MAX) const;
+    struct SnapshotAnalysis;
+    /**
+     * Take a snapshot of the current state of the TimerThread and determine the
+     * potential cause of a deadlock.
+     * \param retiredCount The number of successfully retired calls to capture
+     *                      (may be many).
+     * \return See below for a description of a SnapShotAnalysis object
+     */
+    SnapshotAnalysis getSnapshotAnalysis(size_t retiredCount = SIZE_MAX) const;
 
     /**
      * Returns a string representation of the TimerThread queue.
@@ -202,7 +212,6 @@ class TimerThread {
         return s;
     }
 
-  private:
     // To minimize movement of data, we pass around shared_ptrs to Requests.
     // These are allocated and deallocated outside of the lock.
     // TODO(b/243839867) consider options to merge Request with the
@@ -232,6 +241,40 @@ class TimerThread {
         std::string toString() const;
     };
 
+
+    // SnapshotAnalysis contains info deduced by analysisTimeout().
+
+    struct SnapshotAnalysis {
+        // If we were unable to determine any applicable thread ids,
+        // we leave their value as INVALID_PID.
+        // Note, we use the linux thread id (not pthread), so its type is pid_t.
+        static constexpr pid_t INVALID_PID = -1;
+        // Description of likely issue and/or blocked method.
+        // Empty if no actionable info.
+        std::string description;
+        // Tid of the (latest) monitored thread which has timed out.
+        // This is the thread which the suspect is deduced with respect to.
+        // Most often, this is the thread which an abort is being triggered
+        // from.
+        pid_t timeoutTid = INVALID_PID;
+        // Tid of the (HAL) thread which has likely halted progress, selected
+        // from pendingRequests. May be the same as timeoutTid, if the timed-out
+        // thread directly called into the HAL.
+        pid_t suspectTid = INVALID_PID;
+        // Number of second chances given by the timer thread
+        size_t secondChanceCount;
+        // List of pending requests
+        std::vector<std::shared_ptr<const Request>> pendingRequests;
+        // List of timed-out requests
+        std::vector<std::shared_ptr<const Request>> timeoutRequests;
+        // List of retired requests
+        std::vector<std::shared_ptr<const Request>> retiredRequests;
+        // Dumps the information contained above as well as additional call
+        // stacks where applicable.
+        std::string toString() const;
+    };
+
+  private:
     // Deque of requests, in order of add().
     // This class is thread-safe.
     class RequestQueue {
@@ -326,35 +369,10 @@ class TimerThread {
         }
     };
 
-    // Analysis contains info deduced by analysisTimeout().
-    //
-    // Summary is the result string from checking timeoutRequests to see if
-    // any might be caused by blocked calls in pendingRequests.
-    //
-    // Summary string is empty if there is no automatic actionable info.
-    //
-    // timeoutTid is the tid selected from timeoutRequests (if any).
-    //
-    // HALBlockedTid is the tid that is blocked from pendingRequests believed
-    // to cause the timeout.
-    // HALBlockedTid may be INVALID_PID if no suspected tid is found,
-    // and if HALBlockedTid is valid, it will not be the same as timeoutTid.
-    //
-    static constexpr pid_t INVALID_PID = -1;
-    struct Analysis {
-        std::string summary;
-        pid_t timeoutTid = INVALID_PID;
-        pid_t HALBlockedTid = INVALID_PID;
-    };
 
     // A HAL method is where the substring "Hidl" is in the class name.
     // The tag should look like: ... Hidl ... :: ...
     static bool isRequestFromHal(const std::shared_ptr<const Request>& request);
-
-    // Returns analysis from the requests.
-    static Analysis analyzeTimeout(
-        const std::vector<std::shared_ptr<const Request>>& timeoutRequests,
-        const std::vector<std::shared_ptr<const Request>>& pendingRequests);
 
     std::vector<std::shared_ptr<const Request>> getPendingRequests() const;
 
