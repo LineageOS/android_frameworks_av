@@ -72,6 +72,7 @@ public:
     status_t readFromParcel(Parcel *parcel);
     status_t writeToParcel(Parcel *parcel) const;
 
+    bool isExcludeCriterion() const;
     union {
         audio_usage_t   mUsage;
         audio_source_t  mSource;
@@ -88,23 +89,24 @@ public:
     static const uint32_t kCbFlagNotifyActivity = 0x1;
 
     AudioMix() {}
-    AudioMix(Vector<AudioMixMatchCriterion> criteria, uint32_t mixType, audio_config_t format,
-             uint32_t routeFlags, String8 registrationId, uint32_t flags) :
+    AudioMix(const std::vector<AudioMixMatchCriterion> &criteria, uint32_t mixType,
+             audio_config_t format, uint32_t routeFlags,const String8 &registrationId,
+             uint32_t flags) :
         mCriteria(criteria), mMixType(mixType), mFormat(format),
         mRouteFlags(routeFlags), mDeviceAddress(registrationId), mCbFlags(flags){}
 
     status_t readFromParcel(Parcel *parcel);
     status_t writeToParcel(Parcel *parcel) const;
 
-    void setExcludeUid(uid_t uid) const;
-    void setMatchUid(uid_t uid) const;
+    void setExcludeUid(uid_t uid);
+    void setMatchUid(uid_t uid);
     /** returns true if this mix has a rule to match or exclude the given uid */
     bool hasUidRule(bool match, uid_t uid) const;
     /** returns true if this mix has a rule for uid match (any uid) */
     bool hasMatchUidRule() const;
 
-    void setExcludeUserId(int userId) const;
-    void setMatchUserId(int userId) const;
+    void setExcludeUserId(int userId);
+    void setMatchUserId(int userId);
     /** returns true if this mix has a rule to match or exclude the given userId */
     bool hasUserIdRule(bool match, int userId) const;
     /** returns true if this mix has a rule for userId match (any userId) */
@@ -112,7 +114,7 @@ public:
     /** returns true if this mix can be used for uid-device affinity routing */
     bool isDeviceAffinityCompatible() const;
 
-    mutable Vector<AudioMixMatchCriterion> mCriteria;
+    std::vector<AudioMixMatchCriterion> mCriteria;
     uint32_t        mMixType;
     audio_config_t  mFormat;
     uint32_t        mRouteFlags;
@@ -135,6 +137,11 @@ public:
 static inline bool is_mix_loopback_render(uint32_t routeFlags) {
     return (routeFlags & MIX_ROUTE_FLAG_LOOP_BACK_AND_RENDER)
            == MIX_ROUTE_FLAG_LOOP_BACK_AND_RENDER;
+}
+
+static inline bool is_mix_loopback(uint32_t routeFlags) {
+    return (routeFlags & MIX_ROUTE_FLAG_LOOP_BACK)
+           == MIX_ROUTE_FLAG_LOOP_BACK;
 }
 
 }; // namespace android

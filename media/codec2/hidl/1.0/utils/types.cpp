@@ -1613,6 +1613,7 @@ bool parseParamsBlob(std::vector<C2Param*> *params, const hidl_vec<uint8_t> &blo
     // assuming blob is const here
     size_t size = blob.size();
     size_t ix = 0;
+    size_t old_ix = 0;
     const uint8_t *data = blob.data();
     C2Param *p = nullptr;
 
@@ -1620,8 +1621,13 @@ bool parseParamsBlob(std::vector<C2Param*> *params, const hidl_vec<uint8_t> &blo
         p = C2ParamUtils::ParseFirst(data + ix, size - ix);
         if (p) {
             params->emplace_back(p);
+            old_ix = ix;
             ix += p->size();
             ix = align(ix, PARAMS_ALIGNMENT);
+            if (ix <= old_ix || ix > size) {
+                android_errorWriteLog(0x534e4554, "238083570");
+                break;
+            }
         }
     } while (p);
 

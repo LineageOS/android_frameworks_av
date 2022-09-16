@@ -55,7 +55,7 @@ public:
     status_t getAudioPolicyMix(audio_devices_t deviceType,
             const String8& address, sp<AudioPolicyMix> &policyMix) const;
 
-    status_t registerMix(AudioMix mix, sp<SwAudioOutputDescriptor> desc);
+    status_t registerMix(const AudioMix& mix, const sp<SwAudioOutputDescriptor>& desc);
 
     status_t unregisterMix(const AudioMix& mix);
 
@@ -124,7 +124,7 @@ public:
     void dump(String8 *dst) const;
 
 private:
-    enum class MixMatchStatus { MATCH, NO_MATCH, INVALID_MIX };
+    enum class MixMatchStatus { MATCH, NO_MATCH };
     MixMatchStatus mixMatch(const AudioMix* mix, size_t mixIndex,
                             const audio_attributes_t& attributes,
                             const audio_config_base_t& config,
