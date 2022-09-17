@@ -140,8 +140,11 @@ private:
     sp<ALooper> mLooper;
     const sp<MediaClock> mMediaClock;
     const sp<NuPlayer> mPlayer;
-    sp<AudioSink> mAudioSink;
     uint32_t mPlayerFlags;
+
+    mutable Mutex mAudioSinkLock;
+    sp<AudioSink> mAudioSink GUARDED_BY(mAudioSinkLock);
+    int32_t mCachedPlayerIId GUARDED_BY(mAudioSinkLock);
 
     mediametrics::Item *mMetricsItem;
     mutable Mutex mMetricsLock;

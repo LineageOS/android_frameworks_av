@@ -113,6 +113,8 @@ class MediaPlayerService : public BnMediaPlayerService
                 bool doNotReconnect = false,
                 uint32_t suggestedFrameCount = 0);
 
+        virtual void            setPlayerIId(int32_t playerIId);
+
         virtual status_t        start();
         virtual ssize_t         write(const void* buffer, size_t size, bool blocking = true);
         virtual void            stop();
@@ -160,6 +162,7 @@ class MediaPlayerService : public BnMediaPlayerService
         sp<AudioTrack>          mTrack;
         sp<AudioTrack>          mRecycledTrack;
         sp<AudioOutput>         mNextOutput;
+        int                     mCachedPlayerIId;
         AudioCallback           mCallback;
         void *                  mCallbackCookie;
         sp<CallbackData>        mCallbackData;
