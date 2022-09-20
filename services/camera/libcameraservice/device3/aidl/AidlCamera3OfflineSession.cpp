@@ -30,6 +30,7 @@
 #include <utils/Trace.h>
 
 #include <android/hardware/camera2/ICameraDeviceCallbacks.h>
+#include <android/binder_ibinder_platform.h>
 
 #include "device3/aidl/AidlCamera3OfflineSession.h"
 #include "device3/Camera3OutputStream.h"
@@ -216,6 +217,12 @@ status_t AidlCamera3OfflineSession::initialize(wp<NotificationListener> listener
         return ::ndk::ScopedAStatus::ok();
     }
     return p->returnStreamBuffers(buffers);
+}
+
+::ndk::SpAIBinder AidlCamera3OfflineSession::AidlCameraDeviceCallbacks::createBinder() {
+    auto binder = BnCameraDeviceCallback::createBinder();
+    AIBinder_setInheritRt(binder.get(), /*inheritRt*/ true);
+    return binder;
 }
 
 ::ndk::ScopedAStatus AidlCamera3OfflineSession::returnStreamBuffers(
