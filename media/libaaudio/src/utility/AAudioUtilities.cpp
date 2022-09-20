@@ -16,23 +16,27 @@
 
 #define LOG_TAG "AAudio"
 //#define LOG_NDEBUG 0
-#include <utils/Log.h>
 
-#include <cutils/properties.h>
+#include <assert.h>
+#include <math.h>
 #include <stdint.h>
+
+#include <aaudio/AAudioTesting.h>
+#include <android/media/audio/common/AudioMMapPolicy.h>
+#include <cutils/properties.h>
 #include <sys/types.h>
+#include <system/audio.h>
 #include <utils/Errors.h>
+#include <utils/Log.h>
 
 #include "aaudio/AAudio.h"
 #include "core/AudioGlobal.h"
-#include <aaudio/AAudioTesting.h>
-#include <math.h>
-#include <system/audio.h>
-#include <assert.h>
-
 #include "utility/AAudioUtilities.h"
 
 using namespace android;
+
+using android::media::audio::common::AudioMMapPolicy;
+using android::media::audio::common::AudioMMapPolicyInfo;
 
 status_t AAudioConvert_aaudioToAndroidStatus(aaudio_result_t result) {
     // This covers the case for AAUDIO_OK and for positive results.
@@ -637,4 +641,32 @@ aaudio_result_t AAudio_isFlushAllowed(aaudio_stream_state_t state) {
             break;
     }
     return result;
+}
+
+namespace {
+
+aaudio_policy_t aidl2legacy_aaudio_policy(AudioMMapPolicy aidl) {
+    switch (aidl) {
+        case AudioMMapPolicy::NEVER:
+            return AAUDIO_POLICY_NEVER;
+        case AudioMMapPolicy::AUTO:
+            return AAUDIO_POLICY_AUTO;
+        case AudioMMapPolicy::ALWAYS:
+            return AAUDIO_POLICY_ALWAYS;
+        case AudioMMapPolicy::UNSPECIFIED:
+        default:
+            return AAUDIO_UNSPECIFIED;
+    }
+}
+
+} // namespace
+
+aaudio_policy_t AAudio_getAAudioPolicy(const std::vector<AudioMMapPolicyInfo>& policyInfos) {
+    if (policyInfos.empty()) return AAUDIO_POLICY_AUTO;
+    for (size_t i = 1; i < policyInfos.size(); ++i) {
+        if (policyInfos.at(i).mmapPolicy != policyInfos.at(0).mmapPolicy) {
+            return AAUDIO_POLICY_AUTO;
+        }
+    }
+    return aidl2legacy_aaudio_policy(policyInfos.at(0).mmapPolicy);
 }
