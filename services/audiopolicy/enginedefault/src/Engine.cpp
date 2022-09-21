@@ -463,7 +463,7 @@ DeviceVector Engine::getDevicesForStrategyInt(legacy_strategy strategy,
     }
 
     if (devices.isEmpty()) {
-        ALOGV("%s no device found for strategy %d", __func__, strategy);
+        ALOGI("%s no device found for strategy %d", __func__, strategy);
         sp<DeviceDescriptor> defaultOutputDevice = getApmObserver()->getDefaultOutputDevice();
         if (defaultOutputDevice != nullptr) {
             devices.add(defaultOutputDevice);
@@ -699,6 +699,18 @@ DeviceVector Engine::getPreferredAvailableDevicesForProductStrategy(
     return preferredAvailableDevVec;
 }
 
+DeviceVector Engine::getDisabledDevicesForProductStrategy(
+        const DeviceVector &availableOutputDevices, product_strategy_t strategy) const {
+    DeviceVector disabledDevices = {};
+    AudioDeviceTypeAddrVector disabledDevicesTypeAddr;
+    const status_t status = getDevicesForRoleAndStrategy(
+            strategy, DEVICE_ROLE_DISABLED, disabledDevicesTypeAddr);
+    if (status == NO_ERROR) {
+        disabledDevices =
+                availableOutputDevices.getDevicesFromDeviceTypeAddrVec(disabledDevicesTypeAddr);
+    }
+    return disabledDevices;
+}
 
 DeviceVector Engine::getDevicesForProductStrategy(product_strategy_t strategy) const {
     const SwAudioOutputCollection& outputs = getApmObserver()->getOutputs();
@@ -721,6 +733,11 @@ DeviceVector Engine::getDevicesForProductStrategy(product_strategy_t strategy) c
     if (!preferredAvailableDevVec.isEmpty()) {
         return preferredAvailableDevVec;
     }
+
+    // Remove all disabled devices from the available device list.
+    DeviceVector disabledDevVec =
+            getDisabledDevicesForProductStrategy(availableOutputDevices, strategy);
+    availableOutputDevices.remove(disabledDevVec);
 
     return getDevicesForStrategyInt(legacyStrategy,
                                     availableOutputDevices,

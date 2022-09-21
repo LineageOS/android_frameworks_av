@@ -51,6 +51,7 @@
 
 #include <aidl/android/hardware/camera/device/ICameraInjectionSession.h>
 #include <aidlcommonsupport/NativeHandle.h>
+#include <android/binder_ibinder_platform.h>
 #include <android/hardware/camera2/ICameraDeviceUser.h>
 
 #include "utils/CameraTraces.h"
@@ -669,6 +670,12 @@ status_t AidlCamera3Device::switchToOffline(
         return ::ndk::ScopedAStatus::ok();
     }
     return p->returnStreamBuffers(buffers);
+}
+
+::ndk::SpAIBinder AidlCamera3Device::AidlCameraDeviceCallbacks::createBinder() {
+    auto binder = BnCameraDeviceCallback::createBinder();
+    AIBinder_setInheritRt(binder.get(), /*inheritRt*/ true);
+    return binder;
 }
 
 ::ndk::ScopedAStatus AidlCamera3Device::returnStreamBuffers(
