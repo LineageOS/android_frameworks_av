@@ -43,7 +43,7 @@ namespace {
 constexpr float kMaxTranslationalVelocity = 2;
 
 // This is how fast, in rad/s, we allow rotation angle to shift during rate-limiting.
-constexpr float kMaxRotationalVelocity = 8;
+constexpr float kMaxRotationalVelocity = 0.8f;
 
 // This is how far into the future we predict the head pose, using linear extrapolation based on
 // twist (velocity). It should be set to a value that matches the characteristic durations of moving
