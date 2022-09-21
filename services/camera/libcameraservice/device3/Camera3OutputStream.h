@@ -247,9 +247,10 @@ class Camera3OutputStream :
     virtual status_t setBatchSize(size_t batchSize = 1) override;
 
     /**
-     * Notify the stream on change of min frame durations.
+     * Notify the stream on change of min frame durations or variable/fixed
+     * frame rate.
      */
-    virtual void onMinDurationChanged(nsecs_t duration) override;
+    virtual void onMinDurationChanged(nsecs_t duration, bool fixedFps) override;
 
     /**
      * Apply ZSL related consumer usage quirk.
@@ -419,6 +420,7 @@ class Camera3OutputStream :
 
     // Re-space frames by overriding timestamp to align with display Vsync.
     // Default is on for SurfaceView bound streams.
+    bool    mFixedFps = false;
     nsecs_t mMinExpectedDuration = 0;
     bool mSyncToDisplay = false;
     DisplayEventReceiver mDisplayEventReceiver;
