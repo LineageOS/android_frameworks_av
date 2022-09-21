@@ -46,80 +46,76 @@ struct C2SoftAomEnc : public SimpleC2Component {
                  const std::shared_ptr<C2BlockPool>& pool) override final;
     c2_status_t drain(uint32_t drainMode, const std::shared_ptr<C2BlockPool>& pool) override final;
 
-protected:
+  protected:
     virtual ~C2SoftAomEnc();
 
-private:
-  std::shared_ptr<IntfImpl> mIntf;
+  private:
+    std::shared_ptr<IntfImpl> mIntf;
 
-  // Initializes aom encoder with available settings.
-  status_t initEncoder();
+    // Initializes aom encoder with available settings.
+    status_t initEncoder();
 
-  // aom specific opaque data structure that
-  // stores encoder state
-  aom_codec_ctx_t* mCodecContext;
+    // aom specific opaque data structure that
+    // stores encoder state
+    aom_codec_ctx_t* mCodecContext;
 
-  // aom specific data structure that
-  // stores encoder configuration
-  aom_codec_enc_cfg_t* mCodecConfiguration;
+    // aom specific data structure that
+    // stores encoder configuration
+    aom_codec_enc_cfg_t* mCodecConfiguration;
 
-  // aom specific read-only data structure
-  // that specifies algorithm interface
-  aom_codec_iface_t* mCodecInterface;
+    // aom specific read-only data structure
+    // that specifies algorithm interface
+    aom_codec_iface_t* mCodecInterface;
 
-  // align stride to the power of 2
-  int32_t mStrideAlign;
+    // align stride to the power of 2
+    int32_t mStrideAlign;
 
+    aom_rc_mode mBitrateControlMode;
 
-  aom_rc_mode mBitrateControlMode;
+    // Minimum (best quality) quantizer
+    uint32_t mMinQuantizer;
 
-  // Minimum (best quality) quantizer
-  uint32_t mMinQuantizer;
+    // Maximum (worst quality) quantizer
+    uint32_t mMaxQuantizer;
 
-  // Maximum (worst quality) quantizer
-  uint32_t mMaxQuantizer;
+    // Last input buffer timestamp
+    uint64_t mLastTimestamp;
 
-  // Last input buffer timestamp
-  uint64_t mLastTimestamp;
+    // Number of input frames
+    int64_t mNumInputFrames;
 
-  // Number of input frames
-  int64_t mNumInputFrames;
+    // Conversion buffer is needed to input to
+    // yuv420 planar format.
+    MemoryBlock mConversionBuffer;
 
-  // Conversion buffer is needed to input to
-  // yuv420 planar format.
-  MemoryBlock mConversionBuffer;
+    // Signalled End Of Stream
+    bool mSignalledOutputEos;
 
-  // Signalled End Of Stream
-  bool mSignalledOutputEos;
+    // Signalled Error
+    bool mSignalledError;
 
-  // Signalled Error
-  bool mSignalledError;
+    bool mHeadersReceived;
 
-  bool mHeadersReceived;
+    std::shared_ptr<C2StreamPictureSizeInfo::input> mSize;
+    std::shared_ptr<C2StreamIntraRefreshTuning::output> mIntraRefresh;
+    std::shared_ptr<C2StreamFrameRateInfo::output> mFrameRate;
+    std::shared_ptr<C2StreamBitrateInfo::output> mBitrate;
+    std::shared_ptr<C2StreamBitrateModeTuning::output> mBitrateMode;
+    std::shared_ptr<C2StreamRequestSyncFrameTuning::output> mRequestSync;
 
-  std::shared_ptr<C2StreamPictureSizeInfo::input> mSize;
-  std::shared_ptr<C2StreamIntraRefreshTuning::output> mIntraRefresh;
-  std::shared_ptr<C2StreamFrameRateInfo::output> mFrameRate;
-  std::shared_ptr<C2StreamBitrateInfo::output> mBitrate;
-  std::shared_ptr<C2StreamBitrateModeTuning::output> mBitrateMode;
-  std::shared_ptr<C2StreamRequestSyncFrameTuning::output> mRequestSync;
-
-  aom_codec_err_t setupCodecParameters();
+    aom_codec_err_t setupCodecParameters();
 };
 
 class C2SoftAomEnc::IntfImpl : public SimpleInterface<void>::BaseParams {
-public:
-    explicit IntfImpl(const std::shared_ptr<C2ReflectorHelper> &helper);
+  public:
+    explicit IntfImpl(const std::shared_ptr<C2ReflectorHelper>& helper);
 
-    static C2R BitrateSetter(bool mayBlock, C2P<C2StreamBitrateInfo::output> &me);
+    static C2R BitrateSetter(bool mayBlock, C2P<C2StreamBitrateInfo::output>& me);
 
-    static C2R SizeSetter(bool mayBlock, const C2P<C2StreamPictureSizeInfo::input> &oldMe,
-                          C2P<C2StreamPictureSizeInfo::input> &me);
+    static C2R SizeSetter(bool mayBlock, const C2P<C2StreamPictureSizeInfo::input>& oldMe,
+                          C2P<C2StreamPictureSizeInfo::input>& me);
 
-    static C2R ProfileLevelSetter(
-            bool mayBlock,
-            C2P<C2StreamProfileLevelInfo::output> &me);
-
+    static C2R ProfileLevelSetter(bool mayBlock, C2P<C2StreamProfileLevelInfo::output>& me);
 
     // unsafe getters
     std::shared_ptr<C2StreamPictureSizeInfo::input> getSize_l() const { return mSize; }
@@ -138,22 +134,22 @@ public:
         return mCodedColorAspects;
     }
     uint32_t getSyncFramePeriod() const;
-    static C2R ColorAspectsSetter(bool mayBlock, C2P<C2StreamColorAspectsInfo::input> &me);
-    static C2R CodedColorAspectsSetter(bool mayBlock, C2P<C2StreamColorAspectsInfo::output> &me,
-                                       const C2P<C2StreamColorAspectsInfo::input> &coded);
+    static C2R ColorAspectsSetter(bool mayBlock, C2P<C2StreamColorAspectsInfo::input>& me);
+    static C2R CodedColorAspectsSetter(bool mayBlock, C2P<C2StreamColorAspectsInfo::output>& me,
+                                       const C2P<C2StreamColorAspectsInfo::input>& coded);
 
-private:
-  std::shared_ptr<C2StreamUsageTuning::input> mUsage;
-  std::shared_ptr<C2StreamPictureSizeInfo::input> mSize;
-  std::shared_ptr<C2StreamFrameRateInfo::output> mFrameRate;
-  std::shared_ptr<C2StreamIntraRefreshTuning::output> mIntraRefresh;
-  std::shared_ptr<C2StreamRequestSyncFrameTuning::output> mRequestSync;
-  std::shared_ptr<C2StreamSyncFrameIntervalTuning::output> mSyncFramePeriod;
-  std::shared_ptr<C2StreamBitrateInfo::output> mBitrate;
-  std::shared_ptr<C2StreamBitrateModeTuning::output> mBitrateMode;
-  std::shared_ptr<C2StreamProfileLevelInfo::output> mProfileLevel;
-  std::shared_ptr<C2StreamColorAspectsInfo::input> mColorAspects;
-  std::shared_ptr<C2StreamColorAspectsInfo::output> mCodedColorAspects;
+  private:
+    std::shared_ptr<C2StreamUsageTuning::input> mUsage;
+    std::shared_ptr<C2StreamPictureSizeInfo::input> mSize;
+    std::shared_ptr<C2StreamFrameRateInfo::output> mFrameRate;
+    std::shared_ptr<C2StreamIntraRefreshTuning::output> mIntraRefresh;
+    std::shared_ptr<C2StreamRequestSyncFrameTuning::output> mRequestSync;
+    std::shared_ptr<C2StreamSyncFrameIntervalTuning::output> mSyncFramePeriod;
+    std::shared_ptr<C2StreamBitrateInfo::output> mBitrate;
+    std::shared_ptr<C2StreamBitrateModeTuning::output> mBitrateMode;
+    std::shared_ptr<C2StreamProfileLevelInfo::output> mProfileLevel;
+    std::shared_ptr<C2StreamColorAspectsInfo::input> mColorAspects;
+    std::shared_ptr<C2StreamColorAspectsInfo::output> mCodedColorAspects;
 };
 
 }  // namespace android
