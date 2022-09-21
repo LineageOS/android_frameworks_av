@@ -96,6 +96,8 @@ private:
         const DeviceVector& availableOutputDevices, legacy_strategy legacyStrategy) const;
     DeviceVector getPreferredAvailableDevicesForProductStrategy(
         const DeviceVector& availableOutputDevices, product_strategy_t strategy) const;
+    DeviceVector getDisabledDevicesForProductStrategy(
+        const DeviceVector& availableOutputDevices, product_strategy_t strategy) const;
 
     DeviceStrategyMap mDevicesForStrategies;
 
