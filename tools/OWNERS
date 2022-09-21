@@ -1,0 +1,5 @@
+# Bug component: 1344
+essick@google.com
+
+# reliability builds mainline trains, so needs to manage these scripts
+include platform/frameworks/av/:/media/janitors/reliability_mainline_OWNERS
