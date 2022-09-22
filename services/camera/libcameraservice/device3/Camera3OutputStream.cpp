@@ -419,6 +419,7 @@ status_t Camera3OutputStream::returnBufferCheckedLocked(
     mLock.unlock();
 
     ANativeWindowBuffer *anwBuffer = container_of(buffer.buffer, ANativeWindowBuffer, handle);
+    bool bufferDeferred = false;
     /**
      * Return buffer back to ANativeWindow
      */
@@ -478,6 +479,7 @@ status_t Camera3OutputStream::returnBufferCheckedLocked(
                         __FUNCTION__, mId, strerror(-res), res);
                 return res;
             }
+            bufferDeferred = true;
         } else {
             nsecs_t presentTime = mSyncToDisplay ?
                     syncTimestampToDisplayLocked(captureTime) : captureTime;
@@ -500,6 +502,10 @@ status_t Camera3OutputStream::returnBufferCheckedLocked(
         }
     }
     mLock.lock();
+
+    if (bufferDeferred) {
+        mCachedOutputBufferCount++;
+    }
 
     // Once a valid buffer has been returned to the queue, can no longer
     // dequeue all buffers for preallocation.
@@ -696,10 +702,15 @@ status_t Camera3OutputStream::configureConsumerQueueLocked(bool allowPreviewResp
                 !isVideoStream());
         if (forceChoreographer || defaultToChoreographer) {
             mSyncToDisplay = true;
+            // For choreographer synced stream, extra buffers aren't kept by
+            // camera service. So no need to update mMaxCachedBufferCount.
             mTotalBufferCount += kDisplaySyncExtraBuffer;
         } else if (defaultToSpacer) {
             mPreviewFrameSpacer = new PreviewFrameSpacer(this, mConsumer);
-            mTotalBufferCount ++;
+            // For preview frame spacer, the extra buffer is kept by camera
+            // service. So update mMaxCachedBufferCount.
+            mMaxCachedBufferCount = 1;
+            mTotalBufferCount += mMaxCachedBufferCount;
             res = mPreviewFrameSpacer->run(String8::format("PreviewSpacer-%d", mId).string());
             if (res != OK) {
                 ALOGE("%s: Unable to start preview spacer", __FUNCTION__);
@@ -966,6 +977,14 @@ bool Camera3OutputStream::shouldLogError(status_t res, StreamState state) {
         return false;
     }
     return true;
+}
+
+void Camera3OutputStream::onCachedBufferQueued() {
+    Mutex::Autolock l(mLock);
+    mCachedOutputBufferCount--;
+    // Signal whoever is waiting for the buffer to be returned to the buffer
+    // queue.
+    mOutputBufferReturnedSignal.signal();
 }
 
 status_t Camera3OutputStream::disconnectLocked() {
