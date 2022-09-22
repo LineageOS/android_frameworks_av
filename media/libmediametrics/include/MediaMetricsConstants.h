@@ -87,6 +87,7 @@
 #define AMEDIAMETRICS_PROP_PREFIX_EFFECTIVE "effective."
 #define AMEDIAMETRICS_PROP_PREFIX_HAL       "hal."
 #define AMEDIAMETRICS_PROP_PREFIX_HAPTIC    "haptic."
+#define AMEDIAMETRICS_PROP_PREFIX_LAST      "last."
 #define AMEDIAMETRICS_PROP_PREFIX_SERVER    "server."
 
 // Properties within mediametrics are string constants denoted by
