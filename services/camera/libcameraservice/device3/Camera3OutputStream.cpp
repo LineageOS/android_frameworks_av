@@ -1367,9 +1367,10 @@ status_t Camera3OutputStream::setBatchSize(size_t batchSize) {
     return OK;
 }
 
-void Camera3OutputStream::onMinDurationChanged(nsecs_t duration) {
+void Camera3OutputStream::onMinDurationChanged(nsecs_t duration, bool fixedFps) {
     Mutex::Autolock l(mLock);
     mMinExpectedDuration = duration;
+    mFixedFps = fixedFps;
 }
 
 void Camera3OutputStream::returnPrefetchedBuffersLocked() {
@@ -1402,17 +1403,21 @@ nsecs_t Camera3OutputStream::syncTimestampToDisplayLocked(nsecs_t t) {
 
     const VsyncEventData& vsyncEventData = parcelableVsyncEventData.vsync;
     nsecs_t currentTime = systemTime();
+    nsecs_t minPresentT = mLastPresentTime + vsyncEventData.frameInterval / 2;
 
-    // Reset capture to present time offset if:
-    // - More than 1 second between frames.
-    // - The frame duration deviates from multiples of vsync frame intervals.
+    // Find the best presentation time without worrying about previous frame's
+    // presentation time if capture interval is more than kSpacingResetIntervalNs.
+    //
+    // When frame interval is more than 50 ms apart (3 vsyncs for 60hz refresh rate),
+    // there is little risk in starting over and finding the earliest vsync to latch onto.
+    // - Update captureToPresentTime offset to be used for later frames.
+    // - Example use cases:
+    //   - when frame rate drops down to below 20 fps, or
+    //   - A new streaming session starts (stopPreview followed by
+    //   startPreview)
+    //
     nsecs_t captureInterval = t - mLastCaptureTime;
-    float captureToVsyncIntervalRatio = 1.0f * captureInterval / vsyncEventData.frameInterval;
-    float ratioDeviation = std::fabs(
-            captureToVsyncIntervalRatio - std::roundf(captureToVsyncIntervalRatio));
-    if (captureInterval > kSpacingResetIntervalNs ||
-            ratioDeviation >= kMaxIntervalRatioDeviation) {
-        nsecs_t minPresentT = mLastPresentTime + vsyncEventData.frameInterval / 2;
+    if (captureInterval > kSpacingResetIntervalNs) {
         for (size_t i = 0; i < VsyncEventData::kFrameTimelinesLength; i++) {
             const auto& timeline = vsyncEventData.frameTimelines[i];
             if (timeline.deadlineTimestamp >= currentTime &&
@@ -1434,21 +1439,54 @@ nsecs_t Camera3OutputStream::syncTimestampToDisplayLocked(nsecs_t t) {
     nsecs_t idealPresentT = t + mCaptureToPresentOffset;
     nsecs_t expectedPresentT = mLastPresentTime;
     nsecs_t minDiff = INT64_MAX;
-    // Derive minimum intervals between presentation times based on minimal
+
+    // In fixed FPS case, when frame durations are close to multiples of display refresh
+    // rate, derive minimum intervals between presentation times based on minimal
     // expected duration. The minimum number of Vsyncs is:
     // - 0 if minFrameDuration in (0, 1.5] * vSyncInterval,
     // - 1 if minFrameDuration in (1.5, 2.5] * vSyncInterval,
     // - and so on.
+    //
+    // This spaces out the displaying of the frames so that the frame
+    // presentations are roughly in sync with frame captures.
     int minVsyncs = (mMinExpectedDuration - vsyncEventData.frameInterval / 2) /
             vsyncEventData.frameInterval;
     if (minVsyncs < 0) minVsyncs = 0;
     nsecs_t minInterval = minVsyncs * vsyncEventData.frameInterval;
+
+    // In fixed FPS case, if the frame duration deviates from multiples of
+    // display refresh rate, find the closest Vsync without requiring a minimum
+    // number of Vsync.
+    //
+    // Example: (24fps camera, 60hz refresh):
+    //   capture readout:  |  t1  |  t1  | .. |  t1  | .. |  t1  | .. |  t1  |
+    //   display VSYNC:      | t2 | t2 | ... | t2 | ... | t2 | ... | t2 |
+    //   |  : 1 frame
+    //   t1 : 41.67ms
+    //   t2 : 16.67ms
+    //   t1/t2 = 2.5
+    //
+    //   24fps is a commonly used video frame rate. Because the capture
+    //   interval is 2.5 times of display refresh interval, the minVsyncs
+    //   calculation will directly fall at the boundary condition. In this case,
+    //   we should fall back to the basic logic of finding closest vsync
+    //   timestamp without worrying about minVsyncs.
+    float captureToVsyncIntervalRatio = 1.0f * mMinExpectedDuration / vsyncEventData.frameInterval;
+    float ratioDeviation = std::fabs(
+            captureToVsyncIntervalRatio - std::roundf(captureToVsyncIntervalRatio));
+    bool captureDeviateFromVsync = ratioDeviation >= kMaxIntervalRatioDeviation;
+    bool cameraDisplayInSync = (mFixedFps && !captureDeviateFromVsync);
+
     // Find best timestamp in the vsync timelines:
-    // - Only use at most 3 timelines to avoid long latency
-    // - closest to the ideal present time,
+    // - Only use at most kMaxTimelines timelines to avoid long latency
+    // - closest to the ideal presentation time,
     // - deadline timestamp is greater than the current time, and
-    // - the candidate present time is at least minInterval in the future
-    //   compared to last present time.
+    // - For fixed FPS, if the capture interval doesn't deviate too much from refresh interval,
+    //   the candidate presentation time is at least minInterval in the future compared to last
+    //   presentation time.
+    // - For variable FPS, or if the capture interval deviates from refresh
+    //   interval for more than 5%, find a presentation time closest to the
+    //   (lastPresentationTime + captureToPresentOffset) instead.
     int maxTimelines = std::min(kMaxTimelines, (int)VsyncEventData::kFrameTimelinesLength);
     float biasForShortDelay = 1.0f;
     for (int i = 0; i < maxTimelines; i ++) {
@@ -1461,12 +1499,50 @@ nsecs_t Camera3OutputStream::syncTimestampToDisplayLocked(nsecs_t t) {
         }
         if (std::abs(vsyncTime.expectedPresentationTime - idealPresentT) < minDiff &&
                 vsyncTime.deadlineTimestamp >= currentTime &&
-                vsyncTime.expectedPresentationTime >
-                mLastPresentTime + minInterval + biasForShortDelay * kTimelineThresholdNs) {
+                ((!cameraDisplayInSync && vsyncTime.expectedPresentationTime > minPresentT) ||
+                 (cameraDisplayInSync && vsyncTime.expectedPresentationTime >
+                mLastPresentTime + minInterval + biasForShortDelay * kTimelineThresholdNs))) {
             expectedPresentT = vsyncTime.expectedPresentationTime;
             minDiff = std::abs(vsyncTime.expectedPresentationTime - idealPresentT);
         }
     }
+
+    if (expectedPresentT == mLastPresentTime && expectedPresentT <=
+            vsyncEventData.frameTimelines[maxTimelines].expectedPresentationTime) {
+        // Couldn't find a reasonable presentation time. Using last frame's
+        // presentation time would cause a frame drop. The best option now
+        // is to use the next VSync as long as the last presentation time
+        // doesn't already has the maximum latency, in which case dropping the
+        // buffer is more desired than increasing latency.
+        //
+        // Example: (60fps camera, 59.9hz refresh):
+        //   capture readout:  | t1 | t1 | .. | t1 | .. | t1 | .. | t1 |
+        //                      \    \    \     \    \    \    \     \   \
+        //   queue to BQ:       |    |    |     |    |    |    |      |    |
+        //                      \    \    \     \    \     \    \      \    \
+        //   display VSYNC:      | t2 | t2 | ... | t2 | ... | t2 | ... | t2 |
+        //
+        //   |: 1 frame
+        //   t1 : 16.67ms
+        //   t2 : 16.69ms
+        //
+        // It takes 833 frames for capture readout count and display VSYNC count to be off
+        // by 1.
+        //  - At frames [0, 832], presentationTime is set to timeline[0]
+        //  - At frames [833, 833*2-1], presentationTime is set to timeline[1]
+        //  - At frames [833*2, 833*3-1] presentationTime is set to timeline[2]
+        //  - At frame 833*3, no presentation time is found because we only
+        //    search for timeline[0..2].
+        //  - Drop one buffer is better than further extend the presentation
+        //    time.
+        //
+        // However, if frame 833*2 arrives 16.67ms early (right after frame
+        // 833*2-1), no presentation time can be found because
+        // getLatestVsyncEventData is called early. In that case, it's better to
+        // set presentation time by offseting last presentation time.
+        expectedPresentT += vsyncEventData.frameInterval;
+    }
+
     mLastCaptureTime = t;
     mLastPresentTime = expectedPresentT;
 
