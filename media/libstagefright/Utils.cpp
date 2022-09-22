@@ -796,6 +796,8 @@ static std::vector<std::pair<const char *, uint32_t>> int32Mappings {
         { "valid-samples", kKeyValidSamples },
         { "dvb-component-tag", kKeyDvbComponentTag},
         { "dvb-audio-description", kKeyDvbAudioDescription},
+        { "dvb-teletext-magazine-number", kKeyDvbTeletextMagazineNumber},
+        { "dvb-teletext-page-number", kKeyDvbTeletextPageNumber},
     }
 };
 
@@ -1012,6 +1014,16 @@ status_t convertMetaDataToMessage(
     int32_t dvbAudioDescription = 0;
     if (meta->findInt32(kKeyDvbAudioDescription, &dvbAudioDescription)) {
         msg->setInt32("dvb-audio-description", dvbAudioDescription);
+    }
+
+    int32_t dvbTeletextMagazineNumber = 0;
+    if (meta->findInt32(kKeyDvbTeletextMagazineNumber, &dvbTeletextMagazineNumber)) {
+        msg->setInt32("dvb-teletext-magazine-number", dvbTeletextMagazineNumber);
+    }
+
+    int32_t dvbTeletextPageNumber = 0;
+    if (meta->findInt32(kKeyDvbTeletextPageNumber, &dvbTeletextPageNumber)) {
+        msg->setInt32("dvb-teletext-page-number", dvbTeletextPageNumber);
     }
 
     const char *lang;
@@ -1808,6 +1820,16 @@ status_t convertMessageToMetaData(const sp<AMessage> &msg, sp<MetaData> &meta) {
     int32_t dvbAudioDescription = 0;
     if (msg->findInt32("dvb-audio-description", &dvbAudioDescription)) {
         meta->setInt32(kKeyDvbAudioDescription, dvbAudioDescription);
+    }
+
+    int32_t dvbTeletextMagazineNumber = 0;
+    if (msg->findInt32("dvb-teletext-magazine-number", &dvbTeletextMagazineNumber)) {
+        meta->setInt32(kKeyDvbTeletextMagazineNumber, dvbTeletextMagazineNumber);
+    }
+
+    int32_t dvbTeletextPageNumber = 0;
+    if (msg->findInt32("dvb-teletext-page-number", &dvbTeletextPageNumber)) {
+        meta->setInt32(kKeyDvbTeletextPageNumber, dvbTeletextPageNumber);
     }
 
     AString lang;
