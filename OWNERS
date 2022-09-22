@@ -10,3 +10,7 @@ include platform/frameworks/av:/media/janitors/media_solutions_OWNERS
 ## Only contact for media changes as a fallback
 etalvala@google.com
 shuzhenwang@google.com
+
+# mainline related
+per-file MainlineFiles.cfg=essick@google.com
+per-file MainlineFiles.cfg=file:/media/janitors/reliability_mainline_OWNERS
