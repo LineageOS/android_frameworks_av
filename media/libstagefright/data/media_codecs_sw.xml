@@ -321,5 +321,13 @@
             <Limit name="bitrate" range="1-40000000" />
             <Feature name="bitrate-modes" value="VBR,CBR" />
         </MediaCodec>
+        <MediaCodec name="c2.android.av1.encoder" type="video/av01" variant="!slow-cpu">
+            <Limit name="size" min="2x2" max="2048x2048" />
+            <Limit name="alignment" value="2x2" />
+            <Limit name="block-size" value="16x16" />
+            <Limit name="block-count" range="1-3600" />
+            <Limit name="bitrate" range="1-40000000" />
+            <Feature name="bitrate-modes" value="VBR,CBR" />
+        </MediaCodec>
     </Encoders>
 </MediaCodecs>
