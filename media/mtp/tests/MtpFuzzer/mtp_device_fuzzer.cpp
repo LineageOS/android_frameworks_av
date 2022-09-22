@@ -79,8 +79,6 @@ extern "C" int LLVMFuzzerTestOneInput(const uint8_t* data, size_t size) {
     usb_device* device = usb_device_new(deviceName.c_str(), fd);
     MtpDevice mtpDevice(device, fdp.ConsumeIntegral<int32_t>(), &descriptor.ep[0],
                         &descriptor.ep[1], &descriptor.ep[2]);
-    MtpObjectInfo objectinfo(fdp.ConsumeIntegral<uint32_t>());
-    MtpStorageInfo storageInfo(fdp.ConsumeIntegral<uint32_t>());
     while (fdp.remaining_bytes()) {
         auto mtpDeviceFunction = fdp.PickValueInArray<const std::function<void()>>(
                 {[&]() { mtpDevice.getStorageIDs(); },
@@ -190,6 +188,7 @@ extern "C" int LLVMFuzzerTestOneInput(const uint8_t* data, size_t size) {
                  },
                  [&]() { MtpDevice::open(deviceName.c_str(), fd); },
                  [&]() {
+                     MtpObjectInfo objectinfo(fdp.ConsumeIntegral<uint32_t>() /* handle */);
                      MtpDataPacket mtpDataPacket;
                      MtpDevHandle devHandle;
                      std::vector<uint8_t> packet = fdp.ConsumeBytes<uint8_t>(kMaxBytes);
@@ -198,6 +197,7 @@ extern "C" int LLVMFuzzerTestOneInput(const uint8_t* data, size_t size) {
                      objectinfo.print();
                  },
                  [&]() {
+                     MtpStorageInfo storageInfo(fdp.ConsumeIntegral<uint32_t>() /* id */);
                      MtpDataPacket mtpDataPacket;
                      MtpDevHandle devHandle;
                      std::vector<uint8_t> packet = fdp.ConsumeBytes<uint8_t>(kMaxBytes);
