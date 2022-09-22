@@ -264,11 +264,11 @@ AMediaCodec* NdkMediaCodecFuzzerBase::createAMediaCodecByType(bool isEncoder,
     }
 }
 
-AMediaFormat* NdkMediaCodecFuzzerBase::getSampleCodecFormat() {
-    AMediaFormat* format = AMediaFormat_new();
+void NdkMediaCodecFuzzerBase::setCodecFormat() {
     std::string value;
     int32_t count = 0;
     int32_t maxFormatKeys = 0;
+    AMediaFormat_clear(mFormat);
 
     /*set mimeType*/
     if (mFdp->ConsumeBool()) {
@@ -277,37 +277,36 @@ AMediaFormat* NdkMediaCodecFuzzerBase::getSampleCodecFormat() {
         value = mFdp->PickValueInArray(kMimeTypes);
     }
     if (mFdp->ConsumeBool()) {
-        AMediaFormat_setString(format, AMEDIAFORMAT_KEY_MIME, value.c_str());
+        AMediaFormat_setString(mFormat, AMEDIAFORMAT_KEY_MIME, value.c_str());
     }
 
     maxFormatKeys = mFdp->ConsumeIntegralInRange<int32_t>(0, std::size(kFormatStringKeys));
     for (count = 0; count < maxFormatKeys; ++count) {
         std::string formatKey = mFdp->PickValueInArray(kFormatStringKeys);
-        formatSetString(format, formatKey.c_str(), mFdp);
+        formatSetString(mFormat, formatKey.c_str(), mFdp);
     }
 
     maxFormatKeys = mFdp->ConsumeIntegralInRange<int32_t>(0, std::size(kFormatIntKeys));
     for (count = 0; count < maxFormatKeys; ++count) {
         std::string formatKey = mFdp->PickValueInArray(kFormatIntKeys);
-        formatSetInt(format, formatKey.c_str(), mFdp);
+        formatSetInt(mFormat, formatKey.c_str(), mFdp);
     }
 
     maxFormatKeys = mFdp->ConsumeIntegralInRange<int32_t>(0, std::size(kFormatFloatKeys));
     for (count = 0; count < maxFormatKeys; ++count) {
         std::string formatKey = mFdp->PickValueInArray(kFormatFloatKeys);
-        formatSetFloat(format, formatKey.c_str(), mFdp);
+        formatSetFloat(mFormat, formatKey.c_str(), mFdp);
     }
 
     maxFormatKeys = mFdp->ConsumeIntegralInRange<int32_t>(0, std::size(kFormatBufferKeys));
     for (count = 0; count < maxFormatKeys; ++count) {
         std::string formatKey = mFdp->PickValueInArray(kFormatBufferKeys);
-        formatSetBuffer(format, formatKey.c_str(), mFdp);
+        formatSetBuffer(mFormat, formatKey.c_str(), mFdp);
     }
-    return format;
 }
 
 AMediaCodec* NdkMediaCodecFuzzerBase::createCodec(bool isEncoder, bool isCodecForClient) {
-    mFormat = getSampleCodecFormat();
+    setCodecFormat();
     return (mFdp->ConsumeBool() ? createAMediaCodecByname(isEncoder, isCodecForClient)
                                 : createAMediaCodecByType(isEncoder, isCodecForClient));
 }
