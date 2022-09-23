@@ -272,6 +272,11 @@ void AudioPolicyService::onFirstRef()
         if (hasSpatializer) {
             mSpatializer = Spatializer::create(this);
         }
+        if (mSpatializer == nullptr) {
+            // No spatializer created, signal the reason: NO_INIT a failure, OK means intended.
+            const status_t createStatus = hasSpatializer ? NO_INIT : OK;
+            Spatializer::sendEmptyCreateSpatializerMetricWithStatus(createStatus);
+        }
     }
     AudioSystem::audioPolicyReady();
 }
