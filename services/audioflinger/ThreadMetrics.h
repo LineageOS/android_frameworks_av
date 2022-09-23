@@ -148,7 +148,14 @@ private:
             item.set(AMEDIAMETRICS_PROP_CUMULATIVETIMENS, mCumulativeTimeNs)
                 .set(AMEDIAMETRICS_PROP_DEVICETIMENS, mDeviceTimeNs)
                 .set(AMEDIAMETRICS_PROP_EVENT, eventName)
-                .set(AMEDIAMETRICS_PROP_INTERVALCOUNT, (int32_t)mIntervalCount);
+                .set(AMEDIAMETRICS_PROP_INTERVALCOUNT, (int32_t)mIntervalCount)
+                // we set "last" device to indicate the device the group was
+                // associated with (because a createPatch which is logged in ThreadMetrics
+                // could have changed the device).
+                .set(mIsOut
+                        ? AMEDIAMETRICS_PROP_PREFIX_LAST AMEDIAMETRICS_PROP_OUTPUTDEVICES
+                        : AMEDIAMETRICS_PROP_PREFIX_LAST AMEDIAMETRICS_PROP_INPUTDEVICES,
+                        mDevices.c_str());
             if (mDeviceLatencyMs.getN() > 0) {
                 item.set(AMEDIAMETRICS_PROP_DEVICELATENCYMS, mDeviceLatencyMs.getMean());
             }
