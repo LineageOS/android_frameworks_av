@@ -217,4 +217,14 @@ inline std::pair<std::string /* prefix */,
     return { key, "" };
 }
 
+std::pair<std::string /* external statsd */, std::string /* internal */>
+parseOutputDevicePairs(const std::string& outputDevicePairs);
+
+std::pair<std::string /* external statsd */, std::string /* internal */>
+parseInputDevicePairs(const std::string& inputDevicePairs);
+
+inline bool hasBluetoothOutputDevice(std::string_view devices) {
+    return devices.find("AUDIO_DEVICE_OUT_BLUETOOTH") != std::string::npos;
+}
+
 } // namespace android::mediametrics::stringutils
