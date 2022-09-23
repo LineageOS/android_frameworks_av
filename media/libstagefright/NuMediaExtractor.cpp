@@ -121,8 +121,7 @@ status_t NuMediaExtractor::setDataSource(
     }
 
     // Initialize MediaExtractor using the data source
-    initMediaExtractor(dataSource);
-    return OK;
+    return initMediaExtractor(dataSource);
 }
 
 status_t NuMediaExtractor::setDataSource(int fd, off64_t offset, off64_t size) {
@@ -144,8 +143,7 @@ status_t NuMediaExtractor::setDataSource(int fd, off64_t offset, off64_t size) {
     }
 
     // Initialize MediaExtractor using the file source
-    initMediaExtractor(fileSource);
-    return OK;
+    return initMediaExtractor(fileSource);
 }
 
 status_t NuMediaExtractor::setDataSource(const sp<DataSource> &source) {
@@ -161,8 +159,7 @@ status_t NuMediaExtractor::setDataSource(const sp<DataSource> &source) {
     }
 
     // Initialize MediaExtractor using the given data source
-    initMediaExtractor(source);
-    return err;
+    return initMediaExtractor(source);
 }
 
 const char* NuMediaExtractor::getName() const {

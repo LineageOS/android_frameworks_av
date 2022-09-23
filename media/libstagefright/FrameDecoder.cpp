@@ -86,11 +86,14 @@ sp<IMemory> allocVideoFrame(const sp<MetaData>& trackMeta,
         displayHeight = height;
     }
 
-    if (allocRotated && (rotationAngle == 90 || rotationAngle == 270)) {
-        int32_t tmp;
-        tmp = width; width = height; height = tmp;
-        tmp = displayWidth; displayWidth = displayHeight; displayHeight = tmp;
-        tmp = tileWidth; tileWidth = tileHeight; tileHeight = tmp;
+    if (allocRotated) {
+        if (rotationAngle == 90 || rotationAngle == 270) {
+            // swap width and height for 90 & 270 degrees rotation
+            std::swap(width, height);
+            std::swap(displayWidth, displayHeight);
+            std::swap(tileWidth, tileHeight);
+        }
+        // Rotation is already applied.
         rotationAngle = 0;
     }
 
