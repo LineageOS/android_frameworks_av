@@ -51,7 +51,7 @@ cc_fuzz {
         "libprotobuf-cpp-lite",
         "libstagefright",
         "libstagefright_foundation",
-        "libstatslog",
+        "libstats_media_metrics",
         "libstatspull",
         "libstatssocket",
         "libutils",

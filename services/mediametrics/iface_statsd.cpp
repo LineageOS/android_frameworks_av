@@ -37,8 +37,6 @@
 #include "MediaMetricsService.h"
 #include "iface_statsd.h"
 
-#include <statslog.h>
-
 namespace android {
 
 // set of routines that crack a mediametrics::Item
