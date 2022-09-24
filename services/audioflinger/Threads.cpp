@@ -4102,10 +4102,19 @@ bool AudioFlinger::PlaybackThread::threadLoop()
                                        mEffectBufferFormat,
                                        mNormalFrameCount * mHapticChannelCount);
             }
-
-            memcpy_by_audio_format(mSinkBuffer, mFormat, effectBuffer, mEffectBufferFormat,
-                    mNormalFrameCount * (mChannelCount + mHapticChannelCount));
-
+            const size_t framesToCopy = mNormalFrameCount * (mChannelCount + mHapticChannelCount);
+            if (mFormat == AUDIO_FORMAT_PCM_FLOAT &&
+                    mEffectBufferFormat == AUDIO_FORMAT_PCM_FLOAT) {
+                // Clamp PCM float values more than this distance from 0 to insulate
+                // a HAL which doesn't handle NaN correctly.
+                static constexpr float HAL_FLOAT_SAMPLE_LIMIT = 2.0f;
+                memcpy_to_float_from_float_with_clamping(static_cast<float*>(mSinkBuffer),
+                        static_cast<const float*>(effectBuffer),
+                        framesToCopy, HAL_FLOAT_SAMPLE_LIMIT /* absMax */);
+            } else {
+                memcpy_by_audio_format(mSinkBuffer, mFormat,
+                        effectBuffer, mEffectBufferFormat, framesToCopy);
+            }
             // The sample data is partially interleaved when haptic channels exist,
             // we need to adjust channels here.
             if (mHapticChannelCount > 0) {
