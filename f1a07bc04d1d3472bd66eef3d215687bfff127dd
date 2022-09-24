@@ -1,0 +1,21 @@
+{
+  "comments": [
+    {
+      "unresolved": false,
+      "key": {
+        "uuid": "2434ce25_065dbd9f",
+        "filename": "/PATCHSET_LEVEL",
+        "patchSetId": 4
+      },
+      "lineNbr": 0,
+      "author": {
+        "id": 24262
+      },
+      "writtenOn": "2022-09-24T11:33:32Z",
+      "side": 1,
+      "message": "Below patch fixes an nasty bug for everyone who is using this ignoring the legal consequences:\n\nFrom d5f8e68ca74384f85264ba983b930266fe3d1eae Mon Sep 17 00:00:00 2001\nFrom: nift4 \u003cnift4@protonmail.com\u003e\nDate: Sat, 24 Sep 2022 09:08:35 +0200\nSubject: [PATCH] fixup! audiopolicy: add mtk FM support\n\n---\n services/audiopolicy/managerdefault/AudioPolicyManager.cpp | 4 ++--\n 1 file changed, 2 insertions(+), 2 deletions(-)\n\ndiff --git a/services/audiopolicy/managerdefault/AudioPolicyManager.cpp b/services/audiopolicy/managerdefault/AudioPolicyManager.cpp\nindex 68bf0cde02..aaa8406d09 100644\n--- a/services/audiopolicy/managerdefault/AudioPolicyManager.cpp\n+++ b/services/audiopolicy/managerdefault/AudioPolicyManager.cpp\n@@ -6873,7 +6873,7 @@ status_t AudioPolicyManager::checkAndSetVolume(IVolumeCurves \u0026curves,\n                 if (bOrignalDeviceRemoved \u003d\u003d true)\n                     newConfig.ext.device.type \u003d config-\u003eext.device.type;\n                 newConfig.config_mask \u003d AUDIO_PORT_CONFIG_GAIN | newConfig.config_mask;\n-                newConfig.gain.mode \u003d VALUE_OR_RETURN_STATUS(aidl2legacy_int32_t_audio_gain_mode_t_mask(AUDIO_GAIN_MODE_JOINT | newConfig.gain.mode));\n+                newConfig.gain.mode \u003d static_cast\u003caudio_gain_mode_t\u003e(AUDIO_GAIN_MODE_JOINT | newConfig.gain.mode);\n                 newConfig.gain.values[0] \u003d index;   // pass volume index directly\n                 if ((!(isSingleDeviceType(deviceTypes, newConfig.ext.device.type)) || bOrignalDeviceRemoved) \u0026\u0026 index !\u003d 0) // For switch and pop between hp and speaker\n                     newConfig.ext.device.type \u003d deviceTypesToBitMask(deviceTypes); // Device change, Don\u0027t un-mute, wait next createAudioPatch\n@@ -7462,7 +7462,7 @@ status_t AudioPolicyManager::addAudioPatch(audio_patch_handle_t handle, const sp\n             DeviceVector currentDevice \u003d getNewOutputDevices(outputDesc, false /*fromCache*/);\n             audio_devices_t patchDevice \u003d patch-\u003emPatch.sinks[0].ext.device.type;\n             if (patch-\u003emPatch.num_sinks \u003d\u003d 2) {\n-                patchDevice \u003d VALUE_OR_RETURN_STATUS(aidl2legacy_int32_t_audio_devices_t(patchDevice | patch-\u003emPatch.sinks[1].ext.device.type));\n+                patchDevice \u003d static_cast\u003caudio_devices_t\u003e(patchDevice | patch-\u003emPatch.sinks[1].ext.device.type);\n             }\n             // It will auto correct the right routing device. Alarm stop before 80002000-\u003e0x0a\n             setOutputDevices(outputDesc, currentDevice, !currentDevice.containsDeviceWithType(patchDevice));",
+      "revId": "f1a07bc04d1d3472bd66eef3d215687bfff127dd",
+      "serverId": "1ec6b3db-b2c1-4fa4-84a2-4c7efe89ba71"
+    }
+  ]
+}
