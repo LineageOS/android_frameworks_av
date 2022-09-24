@@ -23,3 +23,23 @@ cc_library {
     srcs: ["C2SoftAomDec.cpp"],
     static_libs: ["libaom"],
 }
+
+cc_library {
+    name: "libcodec2_soft_av1enc",
+    defaults: [
+        "libcodec2_soft-defaults",
+        "libcodec2_soft_sanitize_all-defaults",
+    ],
+
+    static_libs: ["libaom"],
+
+    srcs: ["C2SoftAomEnc.cpp"],
+
+    export_include_dirs: ["."],
+
+    apex_available: [
+        "//apex_available:platform",
+        "com.android.media.swcodec",
+    ],
+
+}
