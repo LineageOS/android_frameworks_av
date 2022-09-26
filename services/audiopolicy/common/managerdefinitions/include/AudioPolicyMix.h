@@ -134,4 +134,6 @@ private:
                             audio_session_t session);
 };
 
+std::optional<std::string> extractAddressFromAudioAttributes(const audio_attributes_t& attr);
+
 } // namespace android
