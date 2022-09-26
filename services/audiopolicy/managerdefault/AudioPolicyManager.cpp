@@ -4097,6 +4097,10 @@ audio_direct_mode_t AudioPolicyManager::getDirectPlaybackSupport(const audio_att
 
 status_t AudioPolicyManager::getDirectProfilesForAttributes(const audio_attributes_t* attr,
                                                 AudioProfileVector& audioProfilesVector) {
+    if (mEffects.isNonOffloadableEffectEnabled()) {
+        return OK;
+    }
+
     AudioDeviceTypeAddrVector devices;
     status_t status = getDevicesForAttributes(*attr, &devices, false /* forVolume */);
     if (status != OK) {
