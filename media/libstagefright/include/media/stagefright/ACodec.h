@@ -18,6 +18,7 @@
 #define A_CODEC_H_
 
 #include <stdint.h>
+#include <list>
 #include <android/native_window.h>
 #include <media/hardware/MetadataBufferType.h>
 #include <media/MediaCodecInfo.h>
@@ -269,7 +270,7 @@ private:
     bool mPortEOS[2];
     status_t mInputEOSResult;
 
-    List<sp<AMessage> > mDeferredQueue;
+    std::list<sp<AMessage>> mDeferredQueue;
 
     sp<AMessage> mLastOutputFormat;
     bool mIsVideo;
