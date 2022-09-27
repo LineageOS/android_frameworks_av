@@ -72,7 +72,7 @@ public:
     virtual void getArray(Vector<sp<MediaCodecBuffer>> *) const {}
 
     /**
-     * Return number of buffers the client owns.
+     * Return number of buffers owned by the client or the component.
      */
     virtual size_t numActiveSlots() const = 0;
 
@@ -595,8 +595,7 @@ public:
     void flush();
 
     /**
-     * Return the number of buffers that are sent to the client but not released
-     * yet.
+     * Return the number of buffers that are sent to the client or the component.
      */
     size_t numActiveSlots() const;
 
@@ -716,8 +715,7 @@ public:
     void grow(size_t newSize, std::function<sp<Codec2Buffer>()> alloc);
 
     /**
-     * Return the number of buffers that are sent to the client but not released
-     * yet.
+     * Return the number of buffers that are sent to the client or the component.
      */
     size_t numActiveSlots() const;
 
