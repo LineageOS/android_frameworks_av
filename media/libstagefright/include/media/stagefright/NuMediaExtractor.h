@@ -146,6 +146,7 @@ private:
     Vector<TrackInfo> mSelectedTracks;
     int64_t mTotalBitrate;  // in bits/sec
     int64_t mDurationUs;
+    String8 mName;
 
     void setEntryPointToRemoteMediaExtractor();
 
@@ -165,6 +166,7 @@ private:
     bool getTotalBitrate(int64_t *bitRate) const;
     status_t updateDurationAndBitrate();
     status_t appendVorbisNumPageSamples(MediaBufferBase *mbuf, const sp<ABuffer> &buffer);
+    status_t initMediaExtractor(const sp<DataSource>& dataSource);
 
     DISALLOW_EVIL_CONSTRUCTORS(NuMediaExtractor);
 };
