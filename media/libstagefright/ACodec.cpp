@@ -5928,19 +5928,17 @@ bool ACodec::BaseState::onMessageReceived(const sp<AMessage> &msg) {
 
         case ACodec::kWhatSetSurface:
         {
+            sp<AReplyToken> replyID;
+            CHECK(msg->senderAwaitsResponse(&replyID));
+
             sp<RefBase> obj;
             CHECK(msg->findObject("surface", &obj));
 
             status_t err = mCodec->handleSetSurface(static_cast<Surface *>(obj.get()));
 
-            sp<AReplyToken> replyID;
-            if (msg->senderAwaitsResponse(&replyID)) {
-                sp<AMessage> response = new AMessage;
-                response->setInt32("err", err);
-                response->postReply(replyID);
-            } else if (err != OK) {
-                mCodec->signalError(OMX_ErrorUndefined, err);
-            }
+            sp<AMessage> response = new AMessage;
+            response->setInt32("err", err);
+            response->postReply(replyID);
             break;
         }
 
@@ -8529,16 +8527,10 @@ bool ACodec::OutputPortSettingsChangedState::onMessageReceived(
 
         case kWhatSetSurface:
         {
-            ALOGV("[%s] Deferring setSurface", mCodec->mComponentName.c_str());
-
-            sp<AReplyToken> replyID;
-            CHECK(msg->senderAwaitsResponse(&replyID));
+            ALOGD("[%s] Deferring setSurface from OutputPortSettingsChangedState",
+                  mCodec->mComponentName.c_str());
 
             mCodec->deferMessage(msg);
-
-            sp<AMessage> response = new AMessage;
-            response->setInt32("err", OK);
-            response->postReply(replyID);
 
             handled = true;
             break;
