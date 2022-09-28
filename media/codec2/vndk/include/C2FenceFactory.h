@@ -20,6 +20,16 @@
 
 #include <C2Buffer.h>
 
+/*
+ * Create a list of fds from fence
+ *
+ * \param fence   C2Fence object from which associated
+ *                file descriptors need to be extracted
+ * \return a vector of fds otherwise return vector of size 0
+ */
+
+std::vector<int> ExtractFdsFromCodec2SyncFence(const C2Fence& fence);
+
 class C2SurfaceSyncMemory;
 
 /**
@@ -47,6 +57,14 @@ struct _C2FenceFactory {
      *                          It will be owned and closed by the returned fence object.
      */
     static C2Fence CreateSyncFence(int fenceFd);
+
+    /*
+     * Create C2Fence from list of fence file fds.
+     *
+     * \param fenceFds          Vector of file descriptor for fence.
+     *                          It will be owned and closed by the returned fence object.
+     */
+    static C2Fence CreateMultipleFdSyncFence(const std::vector<int>& fenceFds);
 
     /**
      * Create a native handle from fence for marshalling

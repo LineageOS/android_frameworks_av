@@ -101,6 +101,8 @@ public:
 
     /**
      * Returns a file descriptor that can be used to wait for this fence in a select system call.
+     * \note If there are multiple file descriptors in fence then a file descriptor for merged fence
+     *  would be returned
      * \note The returned file descriptor, if valid, must be closed by the caller.
      *
      * This can be used in e.g. poll() system calls. This file becomes readable (POLLIN) when the
@@ -129,6 +131,7 @@ private:
     std::shared_ptr<Impl> mImpl;
     C2Fence(std::shared_ptr<Impl> impl);
     friend struct _C2FenceFactory;
+    friend std::vector<int> ExtractFdsFromCodec2SyncFence(const C2Fence& fence);
 };
 
 /**
