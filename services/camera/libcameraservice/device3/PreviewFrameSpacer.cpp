@@ -68,7 +68,7 @@ bool PreviewFrameSpacer::threadLoop() {
         return true;
     }
 
-    // Cache the frame to match readout time interval, for up to 33ms
+    // Cache the frame to match readout time interval, for up to kMaxFrameWaitTime
     nsecs_t expectedQueueTime = mLastCameraPresentTime + readoutInterval;
     nsecs_t frameWaitTime = std::min(kMaxFrameWaitTime, expectedQueueTime - currentTime);
     if (frameWaitTime > 0 && mPendingBuffers.size() < 2) {

@@ -5289,7 +5289,7 @@ status_t MediaCodec::onReleaseOutputBuffer(const sp<AMessage> &msg) {
 MediaCodec::BufferInfo *MediaCodec::peekNextPortBuffer(int32_t portIndex) {
     CHECK(portIndex == kPortIndexInput || portIndex == kPortIndexOutput);
 
-    List<size_t> *availBuffers = &mAvailPortBuffers[portIndex];
+    std::list<size_t> *availBuffers = &mAvailPortBuffers[portIndex];
 
     if (availBuffers->empty()) {
         return nullptr;
@@ -5306,7 +5306,7 @@ ssize_t MediaCodec::dequeuePortBuffer(int32_t portIndex) {
         return -EAGAIN;
     }
 
-    List<size_t> *availBuffers = &mAvailPortBuffers[portIndex];
+    std::list<size_t> *availBuffers = &mAvailPortBuffers[portIndex];
     size_t index = *availBuffers->begin();
     CHECK_EQ(info, &mPortBuffers[portIndex][index]);
     availBuffers->erase(availBuffers->begin());
