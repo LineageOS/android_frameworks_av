@@ -1176,12 +1176,12 @@ Status AudioPolicyService::getStrategyForStream(AudioStreamType streamAidl,
     return Status::ok();
 }
 
-Status AudioPolicyService::getDevicesForAttributes(const media::AudioAttributesEx& attrAidl,
+Status AudioPolicyService::getDevicesForAttributes(const media::AudioAttributesInternal& attrAidl,
                                                    bool forVolume,
                                                    std::vector<AudioDevice>* _aidl_return)
 {
-    AudioAttributes aa = VALUE_OR_RETURN_BINDER_STATUS(
-            aidl2legacy_AudioAttributesEx_AudioAttributes(attrAidl));
+    audio_attributes_t aa = VALUE_OR_RETURN_BINDER_STATUS(
+            aidl2legacy_AudioAttributesInternal_audio_attributes_t(attrAidl));
     AudioDeviceTypeAddrVector devices;
 
     if (mAudioPolicyManager == NULL) {
@@ -1190,8 +1190,7 @@ Status AudioPolicyService::getDevicesForAttributes(const media::AudioAttributesE
     Mutex::Autolock _l(mLock);
     AutoCallerClear acc;
     RETURN_IF_BINDER_ERROR(binderStatusFromStatusT(
-            mAudioPolicyManager->getDevicesForAttributes(
-                    aa.getAttributes(), &devices, forVolume)));
+            mAudioPolicyManager->getDevicesForAttributes(aa, &devices, forVolume)));
     *_aidl_return = VALUE_OR_RETURN_BINDER_STATUS(
             convertContainer<std::vector<AudioDevice>>(devices,
                                                        legacy2aidl_AudioDeviceTypeAddress));
@@ -2084,9 +2083,10 @@ Status AudioPolicyService::listAudioProductStrategies(
 }
 
 Status AudioPolicyService::getProductStrategyFromAudioAttributes(
-        const media::AudioAttributesEx& aaAidl, bool fallbackOnDefault, int32_t* _aidl_return) {
-    AudioAttributes aa = VALUE_OR_RETURN_BINDER_STATUS(
-            aidl2legacy_AudioAttributesEx_AudioAttributes(aaAidl));
+        const media::AudioAttributesInternal& aaAidl,
+        bool fallbackOnDefault, int32_t* _aidl_return) {
+    audio_attributes_t aa = VALUE_OR_RETURN_BINDER_STATUS(
+            aidl2legacy_AudioAttributesInternal_audio_attributes_t(aaAidl));
     product_strategy_t productStrategy;
 
     if (mAudioPolicyManager == NULL) {
@@ -2117,9 +2117,10 @@ Status AudioPolicyService::listAudioVolumeGroups(std::vector<media::AudioVolumeG
 }
 
 Status AudioPolicyService::getVolumeGroupFromAudioAttributes(
-        const media::AudioAttributesEx& aaAidl, bool fallbackOnDefault, int32_t* _aidl_return) {
-    AudioAttributes aa = VALUE_OR_RETURN_BINDER_STATUS(
-            aidl2legacy_AudioAttributesEx_AudioAttributes(aaAidl));
+        const media::AudioAttributesInternal& aaAidl,
+        bool fallbackOnDefault, int32_t* _aidl_return) {
+    audio_attributes_t aa = VALUE_OR_RETURN_BINDER_STATUS(
+            aidl2legacy_AudioAttributesInternal_audio_attributes_t(aaAidl));
     volume_group_t volumeGroup;
 
     if (mAudioPolicyManager == NULL) {
