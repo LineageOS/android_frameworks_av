@@ -137,7 +137,7 @@ interface IAudioPolicyService {
 
     int /* product_strategy_t */ getStrategyForStream(AudioStreamType stream);
 
-    AudioDevice[] getDevicesForAttributes(in AudioAttributesEx attr, boolean forVolume);
+    AudioDevice[] getDevicesForAttributes(in AudioAttributesInternal attr, boolean forVolume);
 
     int /* audio_io_handle_t */ getOutputForEffect(in EffectDescriptor desc);
 
@@ -313,11 +313,11 @@ interface IAudioPolicyService {
     boolean isUltrasoundSupported();
 
     AudioProductStrategy[] listAudioProductStrategies();
-    int /* product_strategy_t */ getProductStrategyFromAudioAttributes(in AudioAttributesEx aa,
-                                                                       boolean fallbackOnDefault);
+    int /* product_strategy_t */ getProductStrategyFromAudioAttributes(
+            in AudioAttributesInternal aa, boolean fallbackOnDefault);
 
     AudioVolumeGroup[] listAudioVolumeGroups();
-    int /* volume_group_t */ getVolumeGroupFromAudioAttributes(in AudioAttributesEx aa,
+    int /* volume_group_t */ getVolumeGroupFromAudioAttributes(in AudioAttributesInternal aa,
                                                                boolean fallbackOnDefault);
 
     void setRttEnabled(boolean enabled);
