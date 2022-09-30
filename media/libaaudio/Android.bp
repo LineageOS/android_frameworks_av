@@ -36,6 +36,9 @@ ndk_library {
     symbol_file: "src/libaaudio.map.txt",
     first_version: "26",
     unversioned_until: "current",
+    export_header_libs: [
+        "libAAudio_headers",
+    ],
 }
 
 cc_library_headers {
