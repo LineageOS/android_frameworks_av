@@ -370,7 +370,7 @@ public:
     static status_t getMinVolumeIndexForAttributes(const audio_attributes_t &attr, int &index);
 
     static product_strategy_t getStrategyForStream(audio_stream_type_t stream);
-    static status_t getDevicesForAttributes(const AudioAttributes &aa,
+    static status_t getDevicesForAttributes(const audio_attributes_t &aa,
                                             AudioDeviceTypeAddrVector *devices,
                                             bool forVolume);
 
@@ -494,7 +494,7 @@ public:
 
     static status_t listAudioProductStrategies(AudioProductStrategyVector &strategies);
     static status_t getProductStrategyFromAudioAttributes(
-            const AudioAttributes &aa, product_strategy_t &productStrategy,
+            const audio_attributes_t &aa, product_strategy_t &productStrategy,
             bool fallbackOnDefault = true);
 
     static audio_attributes_t streamTypeToAttributes(audio_stream_type_t stream);
@@ -503,7 +503,8 @@ public:
     static status_t listAudioVolumeGroups(AudioVolumeGroupVector &groups);
 
     static status_t getVolumeGroupFromAudioAttributes(
-            const AudioAttributes &aa, volume_group_t &volumeGroup, bool fallbackOnDefault = true);
+            const audio_attributes_t &aa, volume_group_t &volumeGroup,
+            bool fallbackOnDefault = true);
 
     static status_t setRttEnabled(bool enabled);
 
