@@ -39,6 +39,7 @@ constexpr size_t kMaxBufferIndex = 128;
 
 class NdkMediaCodecFuzzerBase {
   public:
+    NdkMediaCodecFuzzerBase() { mFormat = AMediaFormat_new(); }
     void invokeCodecFormatAPI(AMediaCodec* codec);
     void invokeInputBufferOperationAPI(AMediaCodec* codec);
     void invokeOutputBufferOperationAPI(AMediaCodec* codec);
@@ -57,7 +58,7 @@ class NdkMediaCodecFuzzerBase {
     AMediaCodec* createAMediaCodecByType(bool isEncoder, bool isCodecForClient);
     AMediaFormat* getSampleAudioFormat();
     AMediaFormat* getSampleVideoFormat();
-    AMediaFormat* getSampleCodecFormat();
+    void setCodecFormat();
     AMediaFormat* mFormat = nullptr;
     FuzzedDataProvider* mFdp = nullptr;
 };
