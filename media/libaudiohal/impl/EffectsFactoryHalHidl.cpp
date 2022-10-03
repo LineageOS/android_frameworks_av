@@ -17,6 +17,9 @@
 #define LOG_TAG "EffectsFactoryHalHidl"
 //#define LOG_NDEBUG 0
 
+#include <optional>
+#include <tuple>
+
 #include <cutils/native_handle.h>
 
 #include <UuidUtils.h>
@@ -38,51 +41,71 @@ namespace effect {
 using namespace ::android::hardware::audio::common::CPP_VERSION;
 using namespace ::android::hardware::audio::effect::CPP_VERSION;
 
+class EffectDescriptorCache {
+  public:
+    using QueryResult = std::tuple<Return<void>, Result, hidl_vec<EffectDescriptor>>;
+    QueryResult queryAllDescriptors(IEffectsFactory* effectsFactory);
+  private:
+    std::mutex mLock;
+    std::optional<hidl_vec<EffectDescriptor>> mLastDescriptors;  // GUARDED_BY(mLock)
+};
+
+EffectDescriptorCache::QueryResult EffectDescriptorCache::queryAllDescriptors(
+        IEffectsFactory* effectsFactory) {
+    {
+        std::lock_guard l(mLock);
+        if (mLastDescriptors.has_value()) {
+            return {::android::hardware::Void(), Result::OK, mLastDescriptors.value()};
+        }
+    }
+    Result retval = Result::NOT_INITIALIZED;
+    hidl_vec<EffectDescriptor> descriptors;
+    Return<void> ret = effectsFactory->getAllDescriptors(
+            [&](Result r, const hidl_vec<EffectDescriptor>& result) {
+                retval = r;
+                if (retval == Result::OK) {
+                    descriptors = result;
+                }
+            });
+    if (ret.isOk() && retval == Result::OK) {
+        std::lock_guard l(mLock);
+        mLastDescriptors = descriptors;
+    }
+    return {std::move(ret), retval, std::move(descriptors)};
+}
+
 EffectsFactoryHalHidl::EffectsFactoryHalHidl(sp<IEffectsFactory> effectsFactory)
-        : EffectConversionHelperHidl("EffectsFactory") {
+        : EffectConversionHelperHidl("EffectsFactory"), mCache(new EffectDescriptorCache) {
     ALOG_ASSERT(effectsFactory != nullptr, "Provided IEffectsFactory service is NULL");
     mEffectsFactory = effectsFactory;
 }
 
-status_t EffectsFactoryHalHidl::queryAllDescriptors() {
-    if (mEffectsFactory == 0) return NO_INIT;
-    Result retval = Result::NOT_INITIALIZED;
-    Return<void> ret = mEffectsFactory->getAllDescriptors(
-            [&](Result r, const hidl_vec<EffectDescriptor>& result) {
-                retval = r;
-                if (retval == Result::OK) {
-                    mLastDescriptors = result;
-                }
-            });
-    if (ret.isOk()) {
-        return retval == Result::OK ? OK : NO_INIT;
-    }
-    mLastDescriptors.resize(0);
-    return processReturn(__FUNCTION__, ret);
-}
-
 status_t EffectsFactoryHalHidl::queryNumberEffects(uint32_t *pNumEffects) {
-    status_t queryResult = queryAllDescriptors();
-    if (queryResult == OK) {
-        *pNumEffects = mLastDescriptors.size();
+    if (mEffectsFactory == 0) return NO_INIT;
+    auto [ret, retval, descriptors] = mCache->queryAllDescriptors(mEffectsFactory.get());
+    if (ret.isOk() && retval == Result::OK) {
+        *pNumEffects = descriptors.size();
+        return OK;
+    } else if (ret.isOk()) {
+        return NO_INIT;
     }
-    return queryResult;
+    return processReturn(__FUNCTION__, ret);
 }
 
 status_t EffectsFactoryHalHidl::getDescriptor(
         uint32_t index, effect_descriptor_t *pDescriptor) {
-    // TODO: We need somehow to track the changes on the server side
-    // or figure out how to convert everybody to query all the descriptors at once.
     if (pDescriptor == nullptr) {
         return BAD_VALUE;
     }
-    if (mLastDescriptors.size() == 0) {
-        status_t queryResult = queryAllDescriptors();
-        if (queryResult != OK) return queryResult;
+    if (mEffectsFactory == 0) return NO_INIT;
+    auto [ret, retval, descriptors] = mCache->queryAllDescriptors(mEffectsFactory.get());
+    if (ret.isOk() && retval == Result::OK) {
+        if (index >= descriptors.size()) return NAME_NOT_FOUND;
+        EffectUtils::effectDescriptorToHal(descriptors[index], pDescriptor);
+    } else if (ret.isOk()) {
+        return NO_INIT;
     }
-    if (index >= mLastDescriptors.size()) return NAME_NOT_FOUND;
-    EffectUtils::effectDescriptorToHal(mLastDescriptors[index], pDescriptor);
-    return OK;
+    return processReturn(__FUNCTION__, ret);
 }
 
 status_t EffectsFactoryHalHidl::getDescriptor(
@@ -114,21 +137,15 @@ status_t EffectsFactoryHalHidl::getDescriptors(const effect_uuid_t *pEffectType,
     if (pEffectType == nullptr || descriptors == nullptr) {
         return BAD_VALUE;
     }
+    if (mEffectsFactory == 0) return NO_INIT;
 
-    uint32_t numEffects = 0;
-    status_t status = queryNumberEffects(&numEffects);
-    if (status != NO_ERROR) {
-        ALOGW("%s error %d from FactoryHal queryNumberEffects", __func__, status);
-        return status;
+    auto [ret, retval, hidlDescs] = mCache->queryAllDescriptors(mEffectsFactory.get());
+    if (!ret.isOk() || retval != Result::OK) {
+        return processReturn(__FUNCTION__, ret, retval);
     }
-
-    for (uint32_t i = 0; i < numEffects; i++) {
+    for (const auto& hidlDesc : hidlDescs) {
         effect_descriptor_t descriptor;
-        status = getDescriptor(i, &descriptor);
-        if (status != NO_ERROR) {
-            ALOGW("%s error %d from FactoryHal getDescriptor", __func__, status);
-            continue;
-        }
+        EffectUtils::effectDescriptorToHal(hidlDesc, &descriptor);
         if (memcmp(&descriptor.type, pEffectType, sizeof(effect_uuid_t)) == 0) {
             descriptors->push_back(descriptor);
         }

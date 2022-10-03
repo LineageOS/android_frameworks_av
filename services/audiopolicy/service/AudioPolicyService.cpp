@@ -272,6 +272,11 @@ void AudioPolicyService::onFirstRef()
         if (hasSpatializer) {
             mSpatializer = Spatializer::create(this);
         }
+        if (mSpatializer == nullptr) {
+            // No spatializer created, signal the reason: NO_INIT a failure, OK means intended.
+            const status_t createStatus = hasSpatializer ? NO_INIT : OK;
+            Spatializer::sendEmptyCreateSpatializerMetricWithStatus(createStatus);
+        }
     }
     AudioSystem::audioPolicyReady();
 }
@@ -516,7 +521,8 @@ void AudioPolicyService::onCheckSpatializer_l()
 
 void AudioPolicyService::doOnCheckSpatializer()
 {
-    ALOGI("%s mSpatializer %p level %d", __func__, mSpatializer.get(), (int)mSpatializer->getLevel());
+    ALOGV("%s mSpatializer %p level %d",
+        __func__, mSpatializer.get(), (int)mSpatializer->getLevel());
 
     if (mSpatializer != nullptr) {
         // Note: mSpatializer != nullptr =>  mAudioPolicyManager != nullptr
@@ -1210,6 +1216,14 @@ status_t AudioPolicyService::dump(int fd, const Vector<String16>& args __unused)
 
         dumpReleaseLock(mLock, locked);
 
+        if (mSpatializer != nullptr) {
+            std::string dumpString = mSpatializer->toString(1 /* level */);
+            write(fd, dumpString.c_str(), dumpString.size());
+        } else {
+            String8 spatializerPtr = String8::format("Spatializer no supportted on this device\n");
+            write(fd, spatializerPtr.c_str(), spatializerPtr.size());
+        }
+
         {
             std::string timeCheckStats = getIAudioPolicyServiceStatistics().dump();
             dprintf(fd, "\nIAudioPolicyService binder call profile\n");
@@ -1333,7 +1347,9 @@ status_t AudioPolicyService::onTransact(
         } else {
             getIAudioPolicyServiceStatistics().event(code, elapsedMs);
         }
-    });
+    }, mediautils::TimeCheck::kDefaultTimeoutDuration,
+    mediautils::TimeCheck::kDefaultSecondChanceDuration,
+    true /* crashOnTimeout */);
 
     switch (code) {
         case SHELL_COMMAND_TRANSACTION: {

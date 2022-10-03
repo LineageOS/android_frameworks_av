@@ -1790,7 +1790,7 @@ status_t AudioFlinger::EffectHandle::onTransact(
         } else {
             getIEffectStatistics().event(code, elapsedMs);
         }
-    }, 0 /* timeoutMs */);
+    }, {} /* timeoutDuration */, {} /* secondChanceDuration */, false /* crashOnTimeout */);
     return BnEffect::onTransact(code, data, reply, flags);
 }
 
