@@ -325,8 +325,8 @@ class SnoopingAllocator {
                 continue;
             }
             const auto heap = handle->getMemory();
-            dump << std::setw(8) << heap->getHeapID() << std::setw(8) << heap->getOffset()
-                 << std::setw(8) << heap->getSize() << std::setw(8) << value.allocation_number
+            dump << std::setw(8) << heap->getHeapID() << std::setw(8) << heap->getSize()
+                 << std::setw(8) << heap->getOffset() << std::setw(8) << value.allocation_number
                  << "   " << value.name << "\n";
         }
         return dump.str();
