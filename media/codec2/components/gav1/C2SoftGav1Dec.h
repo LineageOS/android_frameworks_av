@@ -23,8 +23,8 @@
 
 #include <SimpleC2Component.h>
 #include <C2Config.h>
-#include "libgav1/src/gav1/decoder.h"
-#include "libgav1/src/gav1/decoder_settings.h"
+#include <gav1/decoder.h>
+#include <gav1/decoder_settings.h>
 
 namespace android {
 
