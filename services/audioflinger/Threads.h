@@ -1787,6 +1787,35 @@ class MmapThread : public ThreadBase
                 // Sets the UID records silence
     virtual     void        setRecordSilenced(uid_t uid __unused, bool silenced __unused) {}
 
+                void        setClientSilencedStateIfNotExist_l(uid_t uid, bool silenced) {
+                                if (mClientSilencedStates.count(uid) == 0) {
+                                    mClientSilencedStates[uid] = silenced;
+                                }
+                            }
+
+                size_t      eraseClientSilenceStateIfNoActiveClient_l(uid_t uid) {
+                                bool found = false;
+                                for (const auto& t : mActiveTracks) {
+                                    if (t->uid() == uid) {
+                                        found = true;
+                                    }
+                                }
+                                // Only erase when there is no active client for the given uid.
+                                return found ? 0 : mClientSilencedStates.erase(uid);
+                            }
+
+                bool        isClientSilenced_l(uid_t uid) const {
+                                const auto it = mClientSilencedStates.find(uid);
+                                return it != mClientSilencedStates.end() ? it->second : false;
+                            }
+
+                void        setClientSilencedIfExists_l(uid_t uid, bool silenced) {
+                                const auto it = mClientSilencedStates.find(uid);
+                                if (it != mClientSilencedStates.end()) {
+                                    it->second = silenced;
+                                }
+                            }
+
  protected:
                 void        dumpInternals_l(int fd, const Vector<String16>& args) override;
                 void        dumpTracks_l(int fd, const Vector<String16>& args) override;
@@ -1801,6 +1830,7 @@ class MmapThread : public ThreadBase
                 AudioHwDevice* const    mAudioHwDev;
                 ActiveTracks<MmapTrack> mActiveTracks;
                 float                   mHalVolFloat;
+                std::map<uid_t, bool>   mClientSilencedStates;
 
                 int32_t                 mNoCallbackWarningCount;
      static     constexpr int32_t       kMaxNoCallbackWarnings = 5;
