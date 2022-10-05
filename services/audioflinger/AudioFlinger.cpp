@@ -731,12 +731,11 @@ void AudioFlinger::dumpClients(int fd, const Vector<String16>& args __unused)
 {
     String8 result;
 
-    result.append("Clients:\n");
-    result.append("   pid    heap_size\n");
+    result.append("Client Allocators:\n");
     for (size_t i = 0; i < mClients.size(); ++i) {
         sp<Client> client = mClients.valueAt(i).promote();
         if (client != 0) {
-          result.append("Client: %d\n", client->pid());
+          result.appendFormat("Client: %d\n", client->pid());
           result.append(client->allocator().dump().c_str());
         }
    }
