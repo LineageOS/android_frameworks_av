@@ -55,7 +55,7 @@ public:
     status_t getAudioPolicyMix(audio_devices_t deviceType,
             const String8& address, sp<AudioPolicyMix> &policyMix) const;
 
-    status_t registerMix(AudioMix mix, sp<SwAudioOutputDescriptor> desc);
+    status_t registerMix(const AudioMix& mix, const sp<SwAudioOutputDescriptor>& desc);
 
     status_t unregisterMix(const AudioMix& mix);
 
