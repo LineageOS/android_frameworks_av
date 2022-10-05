@@ -544,10 +544,11 @@ AudioPolicyManagerFuzzerDynamicPolicy::~AudioPolicyManagerFuzzerDynamicPolicy() 
 status_t AudioPolicyManagerFuzzerDynamicPolicy::addPolicyMix(
     int mixType, int mixFlag, audio_devices_t deviceType, std::string mixAddress,
     const audio_config_t &audioConfig, const std::vector<PolicyMixTuple> &rules) {
-    Vector<AudioMixMatchCriterion> myMixMatchCriteria;
+    std::vector<AudioMixMatchCriterion> myMixMatchCriteria;
 
+    myMixMatchCriteria.reserve(rules.size());
     for (const auto &rule : rules) {
-        myMixMatchCriteria.add(
+        myMixMatchCriteria.push_back(
             AudioMixMatchCriterion(std::get<0>(rule), std::get<1>(rule), std::get<2>(rule)));
     }
 
