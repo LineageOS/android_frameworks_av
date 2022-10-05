@@ -26,6 +26,16 @@
 
 namespace android {
 
+namespace {
+
+template <typename Predicate>
+void EraseCriteriaIf(std::vector<AudioMixMatchCriterion>& v,
+                     const Predicate& predicate) {
+    v.erase(std::remove_if(v.begin(), v.end(), predicate), v.end());
+}
+
+} // namespace
+
 void AudioPolicyMix::dump(String8 *dst, int spaces, int index) const
 {
     dst->appendFormat("%*sAudio Policy Mix %d (%p):\n", spaces, "", index + 1, this);
@@ -78,7 +88,8 @@ void AudioPolicyMix::dump(String8 *dst, int spaces, int index) const
     }
 }
 
-status_t AudioPolicyMixCollection::registerMix(AudioMix mix, sp<SwAudioOutputDescriptor> desc)
+status_t AudioPolicyMixCollection::registerMix(const AudioMix& mix,
+                                               const sp<SwAudioOutputDescriptor>& desc)
 {
     for (size_t i = 0; i < size(); i++) {
         const sp<AudioPolicyMix>& registeredMix = itemAt(i);
@@ -89,12 +100,12 @@ status_t AudioPolicyMixCollection::registerMix(AudioMix mix, sp<SwAudioOutputDes
             return BAD_VALUE;
         }
     }
-    sp<AudioPolicyMix> policyMix = new AudioPolicyMix(mix);
+    sp<AudioPolicyMix> policyMix = sp<AudioPolicyMix>::make(mix);
     add(policyMix);
     ALOGD("registerMix(): adding mix for dev=0x%x addr=%s",
             policyMix->mDeviceType, policyMix->mDeviceAddress.string());
 
-    if (desc != 0) {
+    if (desc != nullptr) {
         desc->mPolicyMix = policyMix;
         policyMix->setOutput(desc);
     }
@@ -500,7 +511,7 @@ status_t AudioPolicyMixCollection::setUidDeviceAffinities(uid_t uid,
     //     AND it doesn't have a "match uid" rule
     //   THEN add a rule to exclude the uid
     for (size_t i = 0; i < size(); i++) {
-        const AudioPolicyMix *mix = itemAt(i).get();
+        AudioPolicyMix *mix = itemAt(i).get();
         if (!mix->isDeviceAffinityCompatible()) {
             continue;
         }
@@ -530,27 +541,16 @@ status_t AudioPolicyMixCollection::setUidDeviceAffinities(uid_t uid,
 status_t AudioPolicyMixCollection::removeUidDeviceAffinities(uid_t uid) {
     // for each player mix: remove existing rules that match or exclude this uid
     for (size_t i = 0; i < size(); i++) {
-        bool foundUidRule = false;
-        const AudioPolicyMix *mix = itemAt(i).get();
+        AudioPolicyMix *mix = itemAt(i).get();
         if (!mix->isDeviceAffinityCompatible()) {
             continue;
         }
-        std::vector<size_t> criteriaToRemove;
-        for (size_t j = 0; j < mix->mCriteria.size(); j++) {
-            const uint32_t rule = mix->mCriteria[j].mRule;
-            // is this rule excluding the uid? (not considering uid match rules
-            // as those are not used for uid-device affinity)
-            if (rule == RULE_EXCLUDE_UID
-                    && uid == mix->mCriteria[j].mValue.mUid) {
-                foundUidRule = true;
-                criteriaToRemove.insert(criteriaToRemove.begin(), j);
-            }
-        }
-        if (foundUidRule) {
-            for (size_t j = 0; j < criteriaToRemove.size(); j++) {
-                mix->mCriteria.removeAt(criteriaToRemove[j]);
-            }
-        }
+
+        // is this rule excluding the uid? (not considering uid match rules
+        // as those are not used for uid-device affinity)
+        EraseCriteriaIf(mix->mCriteria, [uid](const AudioMixMatchCriterion& c) {
+            return c.mRule == RULE_EXCLUDE_UID && c.mValue.mUid == uid;
+        });
     }
     return NO_ERROR;
 }
@@ -585,7 +585,7 @@ status_t AudioPolicyMixCollection::setUserIdDeviceAffinities(int userId,
     //    "match userId" rule for this userId, return an error
     //    (adding a userId-device affinity would result in contradictory rules)
     for (size_t i = 0; i < size(); i++) {
-        const AudioPolicyMix* mix = itemAt(i).get();
+        AudioPolicyMix* mix = itemAt(i).get();
         if (!mix->isDeviceAffinityCompatible()) {
             continue;
         }
@@ -602,7 +602,7 @@ status_t AudioPolicyMixCollection::setUserIdDeviceAffinities(int userId,
     //     AND it doesn't have a "match userId" rule
     //   THEN add a rule to exclude the userId
     for (size_t i = 0; i < size(); i++) {
-        const AudioPolicyMix *mix = itemAt(i).get();
+        AudioPolicyMix *mix = itemAt(i).get();
         if (!mix->isDeviceAffinityCompatible()) {
             continue;
         }
@@ -632,27 +632,16 @@ status_t AudioPolicyMixCollection::setUserIdDeviceAffinities(int userId,
 status_t AudioPolicyMixCollection::removeUserIdDeviceAffinities(int userId) {
     // for each player mix: remove existing rules that match or exclude this userId
     for (size_t i = 0; i < size(); i++) {
-        bool foundUserIdRule = false;
-        const AudioPolicyMix *mix = itemAt(i).get();
+        AudioPolicyMix *mix = itemAt(i).get();
         if (!mix->isDeviceAffinityCompatible()) {
             continue;
         }
-        std::vector<size_t> criteriaToRemove;
-        for (size_t j = 0; j < mix->mCriteria.size(); j++) {
-            const uint32_t rule = mix->mCriteria[j].mRule;
-            // is this rule excluding the userId? (not considering userId match rules
-            // as those are not used for userId-device affinity)
-            if (rule == RULE_EXCLUDE_USERID
-                    && userId == mix->mCriteria[j].mValue.mUserId) {
-                foundUserIdRule = true;
-                criteriaToRemove.insert(criteriaToRemove.begin(), j);
-            }
-        }
-        if (foundUserIdRule) {
-            for (size_t j = 0; j < criteriaToRemove.size(); j++) {
-                mix->mCriteria.removeAt(criteriaToRemove[j]);
-            }
-        }
+
+        // is this rule excluding the userId? (not considering userId match rules
+        // as those are not used for userId-device affinity)
+        EraseCriteriaIf(mix->mCriteria, [userId](const AudioMixMatchCriterion& c) {
+            return c.mRule == RULE_EXCLUDE_USERID && c.mValue.mUserId == userId;
+        });
     }
     return NO_ERROR;
 }
