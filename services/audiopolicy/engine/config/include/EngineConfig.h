@@ -25,6 +25,12 @@
 struct _xmlNode;
 struct _xmlDoc;
 
+/**
+ * AudioAttributes custom tag to identify internal strategies, whose volumes are exclusively
+ * controlled by AudioPolicyManager
+ */
+#define AUDIO_TAG_APM_RESERVED_INTERNAL "reserved_internal_strategy"
+
 namespace android {
 namespace engineConfig {
 

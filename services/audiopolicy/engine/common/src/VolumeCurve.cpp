@@ -52,7 +52,7 @@ float VolumeCurve::volIndexToDb(int indexInUi, int volIndexMin, int volIndexMax)
             volIdx = volIndexMin;
         } else {
             // This would result in a divide-by-zero below
-            ALOG_ASSERT(volIndexmin != volIndexMax, "Invalid volume index range & value: 0");
+            ALOG_ASSERT(volIndexMin != volIndexMax, "Invalid volume index range & value: 0");
             return NAN;
         }
     } else {
