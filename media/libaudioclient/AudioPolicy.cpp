@@ -71,6 +71,10 @@ status_t AudioMixMatchCriterion::writeToParcel(Parcel *parcel) const
     return NO_ERROR;
 }
 
+bool AudioMixMatchCriterion::isExcludeCriterion() const {
+    return mRule & RULE_EXCLUSION_MASK;
+}
+
 //
 //  AudioMix implementation
 //
