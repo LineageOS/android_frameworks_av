@@ -8885,6 +8885,12 @@ status_t AudioFlinger::MmapThread::start(const AudioClient& client,
     if (isOutput()) {
         ret = AudioSystem::startOutput(portId);
     } else {
+        {
+            // Add the track record before starting input so that the silent status for the
+            // client can be cached.
+            Mutex::Autolock _l(mLock);
+            setClientSilencedState_l(portId, false /*silenced*/);
+        }
         ret = AudioSystem::startInput(portId);
     }
 
@@ -8903,6 +8909,7 @@ status_t AudioFlinger::MmapThread::start(const AudioClient& client,
         } else {
             mHalStream->stop();
         }
+        eraseClientSilencedState_l(portId);
         return PERMISSION_DENIED;
     }
 
@@ -8911,6 +8918,9 @@ status_t AudioFlinger::MmapThread::start(const AudioClient& client,
                                         mChannelMask, mSessionId, isOutput(), client.clientUid,
                                         client.clientPid, IPCThreadState::self()->getCallingPid(),
                                         portId);
+    if (!isOutput()) {
+        track->setSilenced_l(isClientSilenced_l(portId));
+    }
 
     if (isOutput()) {
         // force volume update when a new track is added
@@ -8967,6 +8977,7 @@ status_t AudioFlinger::MmapThread::stop(audio_port_handle_t handle)
     }
 
     mActiveTracks.remove(track);
+    eraseClientSilencedState_l(track->portId());
 
     mLock.unlock();
     if (isOutput()) {
@@ -9746,6 +9757,7 @@ void AudioFlinger::MmapCaptureThread::setRecordSilenced(audio_port_handle_t port
             broadcast_l();
         }
     }
+    setClientSilencedIfExists_l(portId, silenced);
 }
 
 void AudioFlinger::MmapCaptureThread::toAudioPortConfig(struct audio_port_config *config)

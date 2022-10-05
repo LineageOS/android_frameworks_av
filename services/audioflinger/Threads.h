@@ -1843,6 +1843,26 @@ class MmapThread : public ThreadBase
     virtual     void        setRecordSilenced(audio_port_handle_t portId __unused,
                                               bool silenced __unused) {}
 
+                void        setClientSilencedState_l(audio_port_handle_t portId, bool silenced) {
+                                mClientSilencedStates[portId] = silenced;
+                            }
+
+                size_t      eraseClientSilencedState_l(audio_port_handle_t portId) {
+                                return mClientSilencedStates.erase(portId);
+                            }
+
+                bool        isClientSilenced_l(audio_port_handle_t portId) const {
+                                const auto it = mClientSilencedStates.find(portId);
+                                return it != mClientSilencedStates.end() ? it->second : false;
+                            }
+
+                void        setClientSilencedIfExists_l(audio_port_handle_t portId, bool silenced) {
+                                const auto it = mClientSilencedStates.find(portId);
+                                if (it != mClientSilencedStates.end()) {
+                                    it->second = silenced;
+                                }
+                            }
+
  protected:
                 void        dumpInternals_l(int fd, const Vector<String16>& args) override;
                 void        dumpTracks_l(int fd, const Vector<String16>& args) override;
@@ -1862,6 +1882,7 @@ class MmapThread : public ThreadBase
                 AudioHwDevice* const    mAudioHwDev;
                 ActiveTracks<MmapTrack> mActiveTracks;
                 float                   mHalVolFloat;
+                std::map<audio_port_handle_t, bool> mClientSilencedStates;
 
                 int32_t                 mNoCallbackWarningCount;
      static     constexpr int32_t       kMaxNoCallbackWarnings = 5;
