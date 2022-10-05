@@ -33,7 +33,7 @@
 #include <mediautils/MemoryLeakTrackUtil.h>
 #include <memunreachable/memunreachable.h>
 #include <private/android_filesystem_config.h> // UID
-#include <statslog.h>
+#include <stats_media_metrics.h>
 
 #include <set>
 
@@ -546,7 +546,7 @@ void MediaMetricsService::registerStatsdCallbacksIfNeeded()
     if (mStatsdRegistered.test_and_set()) {
         return;
     }
-    auto tag = android::util::MEDIA_DRM_ACTIVITY_INFO;
+    auto tag = stats::media_metrics::MEDIA_DRM_ACTIVITY_INFO;
     auto cb = MediaMetricsService::pullAtomCallback;
     AStatsManager_setPullAtomCallback(tag, /* metadata */ nullptr, cb, this);
 }
@@ -564,7 +564,7 @@ bool MediaMetricsService::isPullable(const std::string &key)
 std::string MediaMetricsService::atomTagToKey(int32_t atomTag)
 {
     switch (atomTag) {
-    case android::util::MEDIA_DRM_ACTIVITY_INFO:
+    case stats::media_metrics::MEDIA_DRM_ACTIVITY_INFO:
         return "mediadrm";
     }
     return {};
