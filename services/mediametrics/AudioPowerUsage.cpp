@@ -26,7 +26,7 @@
 #include <string>
 #include <audio_utils/clock.h>
 #include <cutils/properties.h>
-#include <statslog.h>
+#include <stats_media_metrics.h>
 #include <sys/timerfd.h>
 #include <system/audio.h>
 
@@ -164,7 +164,7 @@ void AudioPowerUsage::sendItem(const std::shared_ptr<const mediametrics::Item>& 
     const int32_t duration_secs = (int32_t)(duration_ns / NANOS_PER_SECOND);
     const int32_t min_volume_duration_secs = (int32_t)(min_volume_duration_ns / NANOS_PER_SECOND);
     const int32_t max_volume_duration_secs = (int32_t)(max_volume_duration_ns / NANOS_PER_SECOND);
-    const int result = android::util::stats_write(android::util::AUDIO_POWER_USAGE_DATA_REPORTED,
+    const int result = stats::media_metrics::stats_write(stats::media_metrics::AUDIO_POWER_USAGE_DATA_REPORTED,
                                          audio_device,
                                          duration_secs,
                                          (float)volume,
@@ -177,7 +177,7 @@ void AudioPowerUsage::sendItem(const std::shared_ptr<const mediametrics::Item>& 
     std::stringstream log;
     log << "result:" << result << " {"
             << " mediametrics_audio_power_usage_data_reported:"
-            << android::util::AUDIO_POWER_USAGE_DATA_REPORTED
+            << stats::media_metrics::AUDIO_POWER_USAGE_DATA_REPORTED
             << " audio_device:" << audio_device
             << " duration_secs:" << duration_secs
             << " average_volume:" << (float)volume
@@ -187,7 +187,7 @@ void AudioPowerUsage::sendItem(const std::shared_ptr<const mediametrics::Item>& 
             << " max_volume_duration_secs:" << max_volume_duration_secs
             << " max_volume:" << (float)max_volume
             << " }";
-    mStatsdLog->log(android::util::AUDIO_POWER_USAGE_DATA_REPORTED, log.str());
+    mStatsdLog->log(stats::media_metrics::AUDIO_POWER_USAGE_DATA_REPORTED, log.str());
 }
 
 void AudioPowerUsage::updateMinMaxVolumeAndDuration(
