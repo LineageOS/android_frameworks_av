@@ -23,9 +23,7 @@
     },
     {
       "name": "audiosystem_tests"
-    }
-  ],
-  "postsubmit": [
+    },
     {
       "name": "CtsNativeMediaAAudioTestCases",
       "options" : [
