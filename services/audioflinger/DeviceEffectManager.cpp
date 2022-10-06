@@ -145,7 +145,9 @@ status_t AudioFlinger::DeviceEffectManager::createEffectHal(
     return status;
 }
 
-void AudioFlinger::DeviceEffectManager::dump(int fd) {
+void AudioFlinger::DeviceEffectManager::dump(int fd)
+NO_THREAD_SAFETY_ANALYSIS  // conditional try lock
+{
     const bool locked = dumpTryLock(mLock);
     if (!locked) {
         String8 result("DeviceEffectManager may be deadlocked\n");
