@@ -56,7 +56,9 @@ void AudioFlinger::PatchCommandThread::releaseAudioPatch(audio_patch_handle_t ha
     releaseAudioPatchCommand(handle);
 }
 
-bool AudioFlinger::PatchCommandThread::threadLoop() {
+bool AudioFlinger::PatchCommandThread::threadLoop()
+NO_THREAD_SAFETY_ANALYSIS  // bug in clang compiler.
+{
     std::unique_lock _l(mLock);
 
     while (!exitPending()) {

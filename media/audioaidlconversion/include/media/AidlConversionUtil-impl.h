@@ -58,15 +58,15 @@ template<typename To, typename From>
 ConversionResult<To> convertIntegral(From from) {
     // Special handling is required for signed / vs. unsigned comparisons, since otherwise we may
     // have the signed converted to unsigned and produce wrong results.
-    if (std::is_signed_v<From> && !std::is_signed_v<To>) {
+    if constexpr (std::is_signed_v<From> && !std::is_signed_v<To>) {
         if (from < 0 || from > std::numeric_limits<To>::max()) {
             return ::android::base::unexpected(::android::BAD_VALUE);
         }
-    } else if (std::is_signed_v<To> && !std::is_signed_v<From>) {
+    } else if constexpr (std::is_signed_v<To> && !std::is_signed_v<From>) {
         if (from > std::numeric_limits<To>::max()) {
             return ::android::base::unexpected(::android::BAD_VALUE);
         }
-    } else {
+    } else /* constexpr */ {
         if (from < std::numeric_limits<To>::min() || from > std::numeric_limits<To>::max()) {
             return ::android::base::unexpected(::android::BAD_VALUE);
         }

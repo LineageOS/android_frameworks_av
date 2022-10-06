@@ -92,6 +92,6 @@ protected:
 
 };  // class FastThread
 
-}   // android
+}  // namespace android
 
 #endif  // ANDROID_AUDIO_FAST_THREAD_H
