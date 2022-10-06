@@ -140,7 +140,7 @@ const engineConfig::ProductStrategies gOrderedStrategies = {
  * For compatibility reason why apm volume config file, volume group name is the stream type.
  */
 const engineConfig::ProductStrategies gOrderedSystemStrategies = {
-    {"rerouting",
+    {"STRATEGY_REROUTING",
      {
          {AUDIO_STREAM_REROUTING, "AUDIO_STREAM_REROUTING",
           {{AUDIO_CONTENT_TYPE_UNKNOWN, AUDIO_USAGE_VIRTUAL_SOURCE, AUDIO_SOURCE_DEFAULT,
@@ -148,7 +148,7 @@ const engineConfig::ProductStrategies gOrderedSystemStrategies = {
          }
      },
     },
-    {"patch",
+    {"STRATEGY_PATCH",
      {
          {AUDIO_STREAM_PATCH, "AUDIO_STREAM_PATCH",
           {{AUDIO_CONTENT_TYPE_UNKNOWN, AUDIO_USAGE_UNKNOWN, AUDIO_SOURCE_DEFAULT,
