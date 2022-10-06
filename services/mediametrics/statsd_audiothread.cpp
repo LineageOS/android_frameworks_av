@@ -29,7 +29,7 @@
 #include <sys/types.h>
 #include <unistd.h>
 
-#include <statslog.h>
+#include <stats_media_metrics.h>
 
 #include "MediaMetricsService.h"
 #include "frameworks/proto_logging/stats/message/mediametrics_message.pb.h"
@@ -188,15 +188,16 @@ bool statsd_audiothread(const std::shared_ptr<const mediametrics::Item>& item,
         return false;
     }
 
-    android::util::BytesField bf_serialized( serialized.c_str(), serialized.size());
-    int result = android::util::stats_write(android::util::MEDIAMETRICS_AUDIOTHREAD_REPORTED,
+    const stats::media_metrics::BytesField bf_serialized( serialized.c_str(), serialized.size());
+    const int result = stats::media_metrics::stats_write(
+        stats::media_metrics::MEDIAMETRICS_AUDIOTHREAD_REPORTED,
         timestamp_nanos, package_name.c_str(), package_version_code,
         media_apex_version,
         bf_serialized);
     std::stringstream log;
     log << "result:" << result << " {"
             << " mediametrics_audiothread_reported:"
-            << android::util::MEDIAMETRICS_AUDIOTHREAD_REPORTED
+            << stats::media_metrics::MEDIAMETRICS_AUDIOTHREAD_REPORTED
             << " timestamp_nanos:" << timestamp_nanos
             << " package_name:" << package_name
             << " package_version_code:" << package_version_code
@@ -231,7 +232,7 @@ bool statsd_audiothread(const std::shared_ptr<const mediametrics::Item>& item,
             << " latency_mean_millis:" << latency_mean_millis
             << " latency_stddev_millis:" << latency_stddev_millis
             << " }";
-    statsdLog->log(android::util::MEDIAMETRICS_AUDIOTHREAD_REPORTED, log.str());
+    statsdLog->log(stats::media_metrics::MEDIAMETRICS_AUDIOTHREAD_REPORTED, log.str());
     return true;
 }
 
