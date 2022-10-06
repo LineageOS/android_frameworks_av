@@ -120,7 +120,8 @@ status_t HeicCompositeStream::createInternalStreams(const std::vector<sp<Surface
         camera_stream_rotation_t rotation, int *id, const String8& physicalCameraId,
         const std::unordered_set<int32_t> &sensorPixelModesUsed,
         std::vector<int> *surfaceIds,
-        int /*streamSetId*/, bool /*isShared*/) {
+        int /*streamSetId*/, bool /*isShared*/, int32_t /*colorSpace*/,
+        int64_t /*dynamicProfile*/, int64_t /*streamUseCase*/) {
 
     sp<CameraDeviceBase> device = mDevice.promote();
     if (!device.get()) {

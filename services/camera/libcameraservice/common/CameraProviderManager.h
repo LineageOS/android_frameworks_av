@@ -407,7 +407,11 @@ public:
 
     status_t notifyUsbDeviceEvent(int32_t eventId, const std::string &usbDeviceId);
 
+    static bool isConcurrentDynamicRangeCaptureSupported(const CameraMetadata& deviceInfo,
+            int64_t profile, int64_t concurrentProfile);
+
     static const float kDepthARTolerance;
+    static const bool kFrameworkJpegRDisabled;
 private:
     // All private members, unless otherwise noted, expect mInterfaceMutex to be locked before use
     mutable std::mutex mInterfaceMutex;
@@ -675,6 +679,7 @@ private:
             status_t fixupTorchStrengthTags();
             status_t addDynamicDepthTags(bool maxResolution = false);
             status_t deriveHeicTags(bool maxResolution = false);
+            status_t deriveJpegRTags(bool maxResolution = false);
             status_t addRotateCropTags();
             status_t addAutoframingTags();
             status_t addPreCorrectionActiveArraySize();
