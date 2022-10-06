@@ -47,11 +47,11 @@ public:
            int32_t sessionId, int32_t deviceId,
            sp<EffectHalInterface> *effect);
     status_t addEffectToHal(audio_port_handle_t deviceId, audio_module_handle_t hwModuleId,
-            sp<EffectHalInterface> effect) {
+            const sp<EffectHalInterface>& effect) {
         return mAudioFlinger.addEffectToHal(deviceId, hwModuleId, effect);
     };
     status_t removeEffectFromHal(audio_port_handle_t deviceId, audio_module_handle_t hwModuleId,
-            sp<EffectHalInterface> effect) {
+            const sp<EffectHalInterface>& effect) {
         return mAudioFlinger.removeEffectFromHal(deviceId, hwModuleId, effect);
     };
 
@@ -73,7 +73,7 @@ private:
             RELEASE_AUDIO_PATCH,
         };
 
-        CommandThread(DeviceEffectManager& manager)
+        explicit CommandThread(DeviceEffectManager& manager)
             : Thread(false), mManager(manager) {}
         ~CommandThread() override;
 
@@ -94,7 +94,7 @@ private:
         class Command: public RefBase {
         public:
             Command() = default;
-            Command(int command, sp<CommandData> data)
+            Command(int command, const sp<CommandData>& data)
                 : mCommand(command), mData(data) {}
 
             int mCommand = -1;
@@ -117,13 +117,13 @@ private:
 
         class ReleaseAudioPatchData : public CommandData {
         public:
-            ReleaseAudioPatchData(audio_patch_handle_t handle)
+            explicit ReleaseAudioPatchData(audio_patch_handle_t handle)
                 :   mHandle(handle) {}
 
             audio_patch_handle_t mHandle;
         };
 
-        void sendCommand(sp<Command> command);
+        void sendCommand(const sp<Command>& command);
 
         Mutex   mLock;
         Condition mWaitWorkCV;
@@ -145,7 +145,7 @@ private:
 
 class DeviceEffectManagerCallback :  public EffectCallbackInterface {
 public:
-            DeviceEffectManagerCallback(DeviceEffectManager *manager)
+    explicit DeviceEffectManagerCallback(DeviceEffectManager *manager)
                 : mManager(*manager) {}
 
     status_t createEffectHal(const effect_uuid_t *pEffectUuid,
@@ -176,10 +176,10 @@ public:
     size_t    frameCount() const override  { return 0; }
     uint32_t  latency() const override  { return 0; }
 
-    status_t addEffectToHal(sp<EffectHalInterface> effect __unused) override {
+    status_t addEffectToHal(const sp<EffectHalInterface>& /* effect */) override {
         return NO_ERROR;
     }
-    status_t removeEffectFromHal(sp<EffectHalInterface> effect __unused) override {
+    status_t removeEffectFromHal(const sp<EffectHalInterface>& /* effect */) override {
         return NO_ERROR;
     }
 
@@ -204,11 +204,11 @@ public:
     int newEffectId() { return mManager.audioFlinger().nextUniqueId(AUDIO_UNIQUE_ID_USE_EFFECT); }
 
     status_t addEffectToHal(audio_port_handle_t deviceId,
-            audio_module_handle_t hwModuleId, sp<EffectHalInterface> effect) {
+            audio_module_handle_t hwModuleId, const sp<EffectHalInterface>& effect) {
         return mManager.addEffectToHal(deviceId, hwModuleId, effect);
     }
     status_t removeEffectFromHal(audio_port_handle_t deviceId,
-            audio_module_handle_t hwModuleId, sp<EffectHalInterface> effect) {
+            audio_module_handle_t hwModuleId, const sp<EffectHalInterface>& effect) {
         return mManager.removeEffectFromHal(deviceId, hwModuleId, effect);
     }
 private:

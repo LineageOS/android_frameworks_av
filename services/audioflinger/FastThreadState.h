@@ -50,6 +50,6 @@ struct FastThreadState {
     static const char *commandToString(Command command);
 };  // struct FastThreadState
 
-}   // android
+}  // namespace android
 
 #endif  // ANDROID_AUDIO_FAST_THREAD_STATE_H

@@ -51,4 +51,4 @@ void FastCaptureDumpState::dump(int fd) const
                 periodSec * 1e3, mSilenced ? "true" : "false");
 }
 
-}   // android
+}  // namespace android
