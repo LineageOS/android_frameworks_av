@@ -76,7 +76,7 @@ public:
                               sp<AudioPolicyMix> &primaryMix,
                               std::vector<sp<AudioPolicyMix>> *secondaryMixes);
 
-    sp<DeviceDescriptor> getDeviceAndMixForInputSource(audio_source_t inputSource,
+    sp<DeviceDescriptor> getDeviceAndMixForInputSource(const audio_attributes_t& attributes,
                                                        const DeviceVector &availableDeviceTypes,
                                                        uid_t uid,
                                                        sp<AudioPolicyMix> *policyMix) const;
