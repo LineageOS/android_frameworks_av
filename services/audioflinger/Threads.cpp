@@ -10287,28 +10287,22 @@ status_t AudioFlinger::MmapThread::checkEffectCompatibility_l(
 
 void AudioFlinger::MmapThread::checkInvalidTracks_l()
 {
-    std::vector<audio_port_handle_t> invalidPortIds;
+    sp<MmapStreamCallback> callback;
     for (const sp<MmapTrack> &track : mActiveTracks) {
         if (track->isInvalid()) {
-            invalidPortIds.push_back(track->portId());
+            callback = mCallback.promote();
+            if (callback == nullptr &&  mNoCallbackWarningCount < kMaxNoCallbackWarnings) {
+                ALOGW("Could not notify MMAP stream tear down: no onRoutingChanged callback!");
+                mNoCallbackWarningCount++;
+            }
+            break;
         }
     }
-    if (invalidPortIds.empty()) {
-        return;
+    if (callback != 0) {
+        mLock.unlock();
+        callback->onRoutingChanged(AUDIO_PORT_HANDLE_NONE);
+        mLock.lock();
     }
-    sp<MmapStreamCallback> callback = mCallback.promote();
-    if (callback == nullptr) {
-        if (mNoCallbackWarningCount < kMaxNoCallbackWarnings) {
-            ALOGW("Could not notify MMAP stream tear down: no onTearDown callback!");
-            mNoCallbackWarningCount++;
-        }
-        return;
-    }
-    mLock.unlock();
-    for (const auto invalidPortId : invalidPortIds) {
-        callback->onTearDown(invalidPortId);
-    }
-    mLock.lock();
 }
 
 void AudioFlinger::MmapThread::dumpInternals_l(int fd, const Vector<String16>& args __unused)
