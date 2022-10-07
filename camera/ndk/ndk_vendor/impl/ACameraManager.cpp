@@ -165,7 +165,10 @@ CameraManagerGlobal::~CameraManagerGlobal() {
     Mutex::Autolock _l(mLock);
     if (mCameraService != nullptr) {
         mCameraService->unlinkToDeath(mDeathNotifier);
-        mCameraService->removeListener(mCameraServiceListener);
+        auto stat = mCameraService->removeListener(mCameraServiceListener);
+        if (!stat.isOk()) {
+            ALOGE("Failed to remove listener to camera service %s", stat.description().c_str());
+        }
     }
     mDeathNotifier.clear();
     if (mCbLooper != nullptr) {
@@ -473,6 +476,10 @@ void CameraManagerGlobal::CallbackHandler::onMessageReceivedInternal(
             bool found = msg->findPointer(kCallbackFpKey, (void**) &cb);
             if (!found) {
                 ALOGE("%s: Cannot find camera callback fp!", __FUNCTION__);
+                return;
+            }
+            if (cb == nullptr) {
+                // Physical camera callback is null
                 return;
             }
             found = msg->findPointer(kContextKey, &context);
