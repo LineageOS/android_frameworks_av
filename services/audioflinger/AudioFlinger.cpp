@@ -2869,13 +2869,15 @@ sp<AudioFlinger::ThreadBase> AudioFlinger::openOutput_l(audio_module_handle_t mo
                 ALOGV("openOutput_l() created spatializer output: ID %d thread %p",
                       *output, thread.get());
             } else if (flags & AUDIO_OUTPUT_FLAG_COMPRESS_OFFLOAD) {
-                thread = new OffloadThread(this, outputStream, *output, mSystemReady);
+                thread = new OffloadThread(this, outputStream, *output,
+                        mSystemReady, halConfig->offload_info);
                 ALOGV("openOutput_l() created offload output: ID %d thread %p",
                       *output, thread.get());
             } else if ((flags & AUDIO_OUTPUT_FLAG_DIRECT)
                     || !isValidPcmSinkFormat(halConfig->format)
                     || !isValidPcmSinkChannelMask(halConfig->channel_mask)) {
-                thread = new DirectOutputThread(this, outputStream, *output, mSystemReady);
+                thread = new DirectOutputThread(this, outputStream, *output,
+                        mSystemReady, halConfig->offload_info);
                 ALOGV("openOutput_l() created direct output: ID %d thread %p",
                       *output, thread.get());
             } else {
