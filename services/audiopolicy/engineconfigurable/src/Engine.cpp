@@ -333,7 +333,7 @@ sp<DeviceDescriptor> Engine::getInputDeviceForAttributes(const audio_attributes_
         return device;
     }
 
-    device = policyMixes.getDeviceAndMixForInputSource(attr.source,
+    device = policyMixes.getDeviceAndMixForInputSource(attr,
                                                        availableInputDevices,
                                                        uid,
                                                        mix);
