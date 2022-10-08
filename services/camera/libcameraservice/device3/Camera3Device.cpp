@@ -1742,7 +1742,7 @@ status_t Camera3Device::flush(int64_t *frameNumber) {
     }
 
     // Calculate expected duration for flush with additional buffer time in ms for watchdog
-    uint64_t maxExpectedDuration = (getExpectedInFlightDuration() + kBaseGetBufferWait) / 1e6;
+    uint64_t maxExpectedDuration = ns2ms(getExpectedInFlightDuration() + kBaseGetBufferWait);
     status_t res = mCameraServiceWatchdog->WATCH_CUSTOM_TIMER(mRequestThread->flush(),
             maxExpectedDuration / kCycleLengthMs, kCycleLengthMs);
 
