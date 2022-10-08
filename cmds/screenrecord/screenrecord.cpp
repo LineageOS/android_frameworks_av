@@ -1159,13 +1159,13 @@ int main(int argc, char* const argv[]) {
         { NULL,                 0,                  NULL, 0 }
     };
 
-    std::optional<PhysicalDisplayId> displayId = SurfaceComposerClient::getInternalDisplayId();
-    if (!displayId) {
-        fprintf(stderr, "Failed to get ID for internal display\n");
+    const std::vector<PhysicalDisplayId> ids = SurfaceComposerClient::getPhysicalDisplayIds();
+    if (ids.empty()) {
+        fprintf(stderr, "Failed to get ID for any displays\n");
         return 1;
     }
 
-    gPhysicalDisplayId = *displayId;
+    gPhysicalDisplayId = ids.front();
 
     while (true) {
         int optionIndex = 0;
