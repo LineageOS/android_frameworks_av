@@ -1,0 +1,21 @@
+{
+  "comments": [
+    {
+      "unresolved": false,
+      "key": {
+        "uuid": "4eb30b18_102f184c",
+        "filename": "/PATCHSET_LEVEL",
+        "patchSetId": 1
+      },
+      "lineNbr": 0,
+      "author": {
+        "id": 19165
+      },
+      "writtenOn": "2022-10-09T19:15:56Z",
+      "side": 1,
+      "message": "Without this, the pictures taken in \"Ultra-Res\" mode in the Motorola Camera app are saved as 1920x1080 instead of 12000x9000 on berlin.\n",
+      "revId": "174e52d2ae094c470b1abbabf2038227c7f4981b",
+      "serverId": "1ec6b3db-b2c1-4fa4-84a2-4c7efe89ba71"
+    }
+  ]
+}
