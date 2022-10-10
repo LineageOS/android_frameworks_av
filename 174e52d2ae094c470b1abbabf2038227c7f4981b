@@ -33,6 +33,23 @@
       "message": "works for kiev",
       "revId": "174e52d2ae094c470b1abbabf2038227c7f4981b",
       "serverId": "1ec6b3db-b2c1-4fa4-84a2-4c7efe89ba71"
+    },
+    {
+      "unresolved": false,
+      "key": {
+        "uuid": "d6d235a1_591a3e64",
+        "filename": "/PATCHSET_LEVEL",
+        "patchSetId": 1
+      },
+      "lineNbr": 0,
+      "author": {
+        "id": 30475
+      },
+      "writtenOn": "2022-10-10T17:38:38Z",
+      "side": 1,
+      "message": "Nice catch... I have tested this on MiCamera on Pyxis and in 48MP mode the photo has correct size 8000x6000. Without this patch just 1920x1440.",
+      "revId": "174e52d2ae094c470b1abbabf2038227c7f4981b",
+      "serverId": "1ec6b3db-b2c1-4fa4-84a2-4c7efe89ba71"
     }
   ]
 }
