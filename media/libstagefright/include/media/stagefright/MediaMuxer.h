@@ -48,6 +48,14 @@ struct NuMediaExtractor;
 // deleting the output file after stop.
 struct MediaMuxer : public MediaMuxerBase {
 public:
+    /**
+     * Creates the muxer for a given output format.
+     * @param fd : file descriptor of the output file.
+     * @param format : output format of the muxer. e.g.: webm/mp4/ogg
+     * @return writer's object or nullptr if error.
+     */
+    static MediaMuxer* create(int fd, OutputFormat format);
+
     // Construct the muxer with the file descriptor. Note that the MediaMuxer
     // will close this file at stop().
     MediaMuxer(int fd, OutputFormat format);

@@ -46,7 +46,7 @@ AMediaMuxer* AMediaMuxer_new(int fd, OutputFormat format) {
     if (mData == nullptr) {
         return nullptr;
     }
-    mData->mImpl = new (std::nothrow) MediaMuxer(fd, (android::MediaMuxer::OutputFormat)format);
+    mData->mImpl = MediaMuxer::create(fd, (MediaMuxer::OutputFormat)format);
     if (mData->mImpl == nullptr) {
         delete mData;
         return nullptr;

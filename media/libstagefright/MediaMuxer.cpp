@@ -46,6 +46,30 @@ static bool isMp4Format(MediaMuxer::OutputFormat format) {
            format == MediaMuxer::OUTPUT_FORMAT_HEIF;
 }
 
+MediaMuxer* MediaMuxer::create(int fd, OutputFormat format) {
+    bool isInputValid = true;
+    if (isMp4Format(format)) {
+        isInputValid = MPEG4Writer::isFdOpenModeValid(fd);
+    } else if (format == OUTPUT_FORMAT_WEBM) {
+        isInputValid = WebmWriter::isFdOpenModeValid(fd);
+    } else if (format == OUTPUT_FORMAT_OGG) {
+        isInputValid = OggWriter::isFdOpenModeValid(fd);
+    } else {
+        ALOGE("MediaMuxer does not support output format %d", format);
+        return nullptr;
+    }
+    if (!isInputValid) {
+        ALOGE("File descriptor is not suitable for format %d", format);
+        return nullptr;
+    }
+
+    MediaMuxer *muxer = new (std::nothrow) MediaMuxer(fd, (MediaMuxer::OutputFormat)format);
+    if (muxer == nullptr) {
+        ALOGE("Failed to create writer object");
+    }
+    return muxer;
+}
+
 MediaMuxer::MediaMuxer(int fd, OutputFormat format)
     : mFormat(format),
       mState(UNINITIALIZED) {
