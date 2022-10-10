@@ -88,10 +88,12 @@ class HeadTrackingProcessorImpl : public HeadTrackingProcessor {
     }
 
     void calculate(int64_t timestamp) override {
-        // Handle the screen first, since it might trigger a recentering of the head.
+        bool screenStable = true;
+
+        // Handle the screen first, since it might: trigger a recentering of the head.
         if (mWorldToScreenTimestamp.has_value()) {
             const Pose3f worldToLogicalScreen = mScreenPoseBias.getOutput();
-            bool screenStable = mScreenStillnessDetector.calculate(timestamp);
+            screenStable = mScreenStillnessDetector.calculate(timestamp);
             mModeSelector.setScreenStable(mWorldToScreenTimestamp.value(), screenStable);
             // Whenever the screen is unstable, recenter the head pose.
             if (!screenStable) {
@@ -105,7 +107,8 @@ class HeadTrackingProcessorImpl : public HeadTrackingProcessor {
         if (mWorldToHeadTimestamp.has_value()) {
             Pose3f worldToHead = mHeadPoseBias.getOutput();
             // Auto-recenter.
-            if (mHeadStillnessDetector.calculate(timestamp)) {
+            bool headStable = mHeadStillnessDetector.calculate(timestamp);
+            if (headStable || !screenStable) {
                 recenter(true, false);
                 worldToHead = mHeadPoseBias.getOutput();
             }

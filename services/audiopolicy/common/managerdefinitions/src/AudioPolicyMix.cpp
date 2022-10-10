@@ -316,7 +316,8 @@ AudioPolicyMixCollection::MixMatchStatus AudioPolicyMixCollection::mixMatch(
 
         // Permit match only if requested format and mix format are PCM and can be format
         // adapted by the mixer, or are the same (compressed) format.
-        if (!((audio_is_linear_pcm(config.format) && audio_is_linear_pcm(mix->mFormat.format)) ||
+        if (!is_mix_loopback(mix->mRouteFlags) &&
+            !((audio_is_linear_pcm(config.format) && audio_is_linear_pcm(mix->mFormat.format)) ||
               (config.format == mix->mFormat.format)) &&
               config.format != AUDIO_CONFIG_BASE_INITIALIZER.format) {
             return MixMatchStatus::NO_MATCH;

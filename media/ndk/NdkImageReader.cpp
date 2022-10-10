@@ -73,6 +73,7 @@ AImageReader::isSupportedFormatAndUsage(int32_t format, uint64_t usage) {
         case AIMAGE_FORMAT_HEIC:
         case AIMAGE_FORMAT_DEPTH_JPEG:
         case AIMAGE_FORMAT_RAW_DEPTH10:
+        case HAL_PIXEL_FORMAT_YCBCR_P010:
             return true;
         case AIMAGE_FORMAT_PRIVATE:
             // For private format, cpu usage is prohibited.
@@ -86,6 +87,7 @@ int
 AImageReader::getNumPlanesForFormat(int32_t format) {
     switch (format) {
         case AIMAGE_FORMAT_YUV_420_888:
+        case HAL_PIXEL_FORMAT_YCBCR_P010:
             return 3;
         case AIMAGE_FORMAT_RGBA_8888:
         case AIMAGE_FORMAT_RGBX_8888:
