@@ -931,7 +931,7 @@ status_t HeicCompositeStream::startMuxerForInputFrame(int64_t frameNumber, Input
                 tempOutputFile.str().c_str(), errno);
         return NO_INIT;
     }
-    inputFrame.muxer = new MediaMuxer(inputFrame.fileFd, MediaMuxer::OUTPUT_FORMAT_HEIF);
+    inputFrame.muxer = MediaMuxer::create(inputFrame.fileFd, MediaMuxer::OUTPUT_FORMAT_HEIF);
     if (inputFrame.muxer == nullptr) {
         ALOGE("%s: Failed to create MediaMuxer for file fd %d",
                 __FUNCTION__, inputFrame.fileFd);

@@ -52,7 +52,10 @@ extern "C" int LLVMFuzzerTestOneInput(const uint8_t *data, size_t size) {
 
   MediaMuxer::OutputFormat format =
       (MediaMuxer::OutputFormat)fdp.ConsumeIntegralInRange<int32_t>(0, 4);
-  sp<MediaMuxer> mMuxer(new MediaMuxer(fd, format));
+  sp<MediaMuxer> mMuxer = MediaMuxer::create(fd, format);
+  if (mMuxer == nullptr) {
+    return 0;
+  }
 
   while (fdp.remaining_bytes() > 1) {
     switch (fdp.ConsumeIntegralInRange<uint8_t>(0, 4)) {
