@@ -1541,8 +1541,9 @@ class DirectOutputThread : public PlaybackThread {
 public:
 
     DirectOutputThread(const sp<AudioFlinger>& audioFlinger, AudioStreamOut* output,
-                       audio_io_handle_t id, bool systemReady)
-        : DirectOutputThread(audioFlinger, output, id, DIRECT, systemReady) { }
+                       audio_io_handle_t id, bool systemReady,
+                       const audio_offload_info_t& offloadInfo)
+        : DirectOutputThread(audioFlinger, output, id, DIRECT, systemReady, offloadInfo) { }
 
     virtual                 ~DirectOutputThread();
 
@@ -1574,11 +1575,14 @@ protected:
 
     virtual     void        onAddNewTrack_l();
 
+    const       audio_offload_info_t mOffloadInfo;
     bool mVolumeShaperActive = false;
 
     DirectOutputThread(const sp<AudioFlinger>& audioFlinger, AudioStreamOut* output,
-                       audio_io_handle_t id, ThreadBase::type_t type, bool systemReady);
+                       audio_io_handle_t id, ThreadBase::type_t type, bool systemReady,
+                       const audio_offload_info_t& offloadInfo);
     void processVolume_l(Track *track, bool lastTrack);
+    bool isTunerStream() const { return (mOffloadInfo.content_id > 0); }
 
     // prepareTracks_l() tells threadLoop_mix() the name of the single active track
     sp<Track>               mActiveTrack;
@@ -1616,7 +1620,8 @@ class OffloadThread : public DirectOutputThread {
 public:
 
     OffloadThread(const sp<AudioFlinger>& audioFlinger, AudioStreamOut* output,
-                  audio_io_handle_t id, bool systemReady);
+                  audio_io_handle_t id, bool systemReady,
+                  const audio_offload_info_t& offloadInfo);
     virtual                 ~OffloadThread() {};
                 void        flushHw_l() override;
 
