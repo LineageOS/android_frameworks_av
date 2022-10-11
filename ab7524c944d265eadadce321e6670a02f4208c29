@@ -16,6 +16,24 @@
       "message": "Why squash? The other features we pick are usually unsquashed",
       "revId": "ab7524c944d265eadadce321e6670a02f4208c29",
       "serverId": "1ec6b3db-b2c1-4fa4-84a2-4c7efe89ba71"
+    },
+    {
+      "unresolved": false,
+      "key": {
+        "uuid": "61e7073b_0236a4f5",
+        "filename": "/PATCHSET_LEVEL",
+        "patchSetId": 2
+      },
+      "lineNbr": 0,
+      "author": {
+        "id": 21290
+      },
+      "writtenOn": "2022-10-11T21:46:23Z",
+      "side": 1,
+      "message": "The initial commit is 4 years old and changes a file that was removed later and hence doesn\u0027t make much sense standalone anymore.\nThe commits also partially revert themselves and hence touch code that doesn\u0027t have to be touched. I think this helps to keep a simple overview about what is actually changed.",
+      "parentUuid": "3953a085_66154196",
+      "revId": "ab7524c944d265eadadce321e6670a02f4208c29",
+      "serverId": "1ec6b3db-b2c1-4fa4-84a2-4c7efe89ba71"
     }
   ]
 }
