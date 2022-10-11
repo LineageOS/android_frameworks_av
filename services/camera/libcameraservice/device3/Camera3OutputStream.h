@@ -247,9 +247,10 @@ class Camera3OutputStream :
     virtual status_t setBatchSize(size_t batchSize = 1) override;
 
     /**
-     * Notify the stream on change of min frame durations.
+     * Notify the stream on change of min frame durations or variable/fixed
+     * frame rate.
      */
-    virtual void onMinDurationChanged(nsecs_t duration) override;
+    virtual void onMinDurationChanged(nsecs_t duration, bool fixedFps) override;
 
     /**
      * Apply ZSL related consumer usage quirk.
@@ -258,6 +259,7 @@ class Camera3OutputStream :
 
     void setImageDumpMask(int mask) { mImageDumpMask = mask; }
     bool shouldLogError(status_t res);
+    void onCachedBufferQueued();
 
   protected:
     Camera3OutputStream(int id, camera_stream_type_t type,
@@ -341,6 +343,11 @@ class Camera3OutputStream :
     nsecs_t mTimestampOffset;
 
     /**
+     * If camera readout time is used rather than the start-of-exposure time.
+     */
+    bool mUseReadoutTime;
+
+    /**
      * Consumer end point usage flag set by the constructor for the deferred
      * consumer case.
      */
@@ -414,6 +421,7 @@ class Camera3OutputStream :
 
     // Re-space frames by overriding timestamp to align with display Vsync.
     // Default is on for SurfaceView bound streams.
+    bool    mFixedFps = false;
     nsecs_t mMinExpectedDuration = 0;
     bool mSyncToDisplay = false;
     DisplayEventReceiver mDisplayEventReceiver;
@@ -424,7 +432,7 @@ class Camera3OutputStream :
     static constexpr nsecs_t kSpacingResetIntervalNs = 50000000LL; // 50 millisecond
     static constexpr nsecs_t kTimelineThresholdNs = 1000000LL; // 1 millisecond
     static constexpr float kMaxIntervalRatioDeviation = 0.05f;
-    static constexpr int kMaxTimelines = 3;
+    static constexpr int kMaxTimelines = 2;
     nsecs_t syncTimestampToDisplayLocked(nsecs_t t);
 
     // Re-space frames by delaying queueBuffer so that frame delivery has

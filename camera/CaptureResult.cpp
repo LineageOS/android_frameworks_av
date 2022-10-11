@@ -52,7 +52,10 @@ status_t CaptureResultExtras::readFromParcel(const android::Parcel *parcel) {
     parcel->readInt64(&lastCompletedRegularFrameNumber);
     parcel->readInt64(&lastCompletedReprocessFrameNumber);
     parcel->readInt64(&lastCompletedZslFrameNumber);
-
+    parcel->readBool(&hasReadoutTimestamp);
+    if (hasReadoutTimestamp) {
+        parcel->readInt64(&readoutTimestamp);
+    }
     return OK;
 }
 
@@ -82,6 +85,10 @@ status_t CaptureResultExtras::writeToParcel(android::Parcel *parcel) const {
     parcel->writeInt64(lastCompletedRegularFrameNumber);
     parcel->writeInt64(lastCompletedReprocessFrameNumber);
     parcel->writeInt64(lastCompletedZslFrameNumber);
+    parcel->writeBool(hasReadoutTimestamp);
+    if (hasReadoutTimestamp) {
+        parcel->writeInt64(readoutTimestamp);
+    }
 
     return OK;
 }

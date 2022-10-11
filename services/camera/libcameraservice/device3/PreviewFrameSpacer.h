@@ -85,7 +85,7 @@ class PreviewFrameSpacer : public Thread {
     nsecs_t mLastCameraPresentTime = 0;
     static constexpr nsecs_t kWaitDuration = 5000000LL; // 50ms
     static constexpr nsecs_t kFrameIntervalThreshold = 80000000LL; // 80ms
-    static constexpr nsecs_t kMaxFrameWaitTime = 33333333LL; // 33ms
+    static constexpr nsecs_t kMaxFrameWaitTime = 10000000LL; // 10ms
 };
 
 }; //namespace camera3

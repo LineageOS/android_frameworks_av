@@ -3534,6 +3534,17 @@ void MediaCodec::onMessageReceived(const sp<AMessage> &msg) {
                     }
                     setState(STARTED);
                     postPendingRepliesAndDeferredMessages("kWhatStartCompleted");
+
+                    // Now that the codec has started, configure, by default, the peek behavior to
+                    // be undefined for backwards compatibility with older releases. Later, if an
+                    // app explicitly enables or disables peek, the parameter will be turned off and
+                    // the legacy undefined behavior is disallowed.
+                    // See updateTunnelPeek called in onSetParameters for more details.
+                    if (mTunneled && mTunnelPeekState == TunnelPeekState::kLegacyMode) {
+                        sp<AMessage> params = new AMessage;
+                        params->setInt32("android._tunnel-peek-set-legacy", 1);
+                        mCodec->signalSetParameters(params);
+                    }
                     break;
                 }
 
@@ -3971,14 +3982,6 @@ void MediaCodec::onMessageReceived(const sp<AMessage> &msg) {
                 mTunneled = true;
             } else {
                 mTunneled = false;
-            }
-
-            // If mTunnelPeekState is still in kLegacyMode at this point,
-            // configure the codec in legacy mode
-            if (mTunneled && (mTunnelPeekState == TunnelPeekState::kLegacyMode)) {
-                sp<AMessage> params = new AMessage;
-                params->setInt32("android._tunnel-peek-set-legacy", 1);
-                onSetParameters(params);
             }
 
             int32_t background = 0;

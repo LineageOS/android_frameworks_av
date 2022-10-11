@@ -339,6 +339,9 @@ public:
         // Set/reset camera mute
         virtual status_t setCameraMute(bool enabled) = 0;
 
+        // Set Camera service watchdog
+        virtual status_t setCameraServiceWatchdog(bool enabled) = 0;
+
         // The injection camera session to replace the internal camera
         // session.
         virtual status_t injectCamera(const String8& injectedCamId,
@@ -825,10 +828,19 @@ private:
     // sorted in alpha-numeric order.
     void filterAPI1SystemCameraLocked(const std::vector<std::string> &normalDeviceIds);
 
+    // In some cases the calling code has no access to the package it runs under.
+    // For example, NDK camera API.
+    // In this case we will get the packages for the calling UID and pick the first one
+    // for attributing the app op. This will work correctly for runtime permissions
+    // as for legacy apps we will toggle the app op for all packages in the UID.
+    // The caveat is that the operation may be attributed to the wrong package and
+    // stats based on app ops may be slightly off.
+    String16 getPackageNameFromUid(int clientUid);
+
     // Single implementation shared between the various connect calls
     template<class CALLBACK, class CLIENT>
     binder::Status connectHelper(const sp<CALLBACK>& cameraCb, const String8& cameraId,
-            int api1CameraId, const String16& clientPackageName, bool systemNativeClient,
+            int api1CameraId, const String16& clientPackageNameMaybe, bool systemNativeClient,
             const std::optional<String16>& clientFeatureId, int clientUid, int clientPid,
             apiLevel effectiveApiLevel, bool shimUpdateOnly, int scoreOffset, int targetSdkVersion,
             /*out*/sp<CLIENT>& device);
@@ -1198,6 +1210,9 @@ private:
     // Handle 'watch' command as passed through 'cmd'
     status_t handleWatchCommand(const Vector<String16> &args, int inFd, int outFd);
 
+    // Set the camera service watchdog
+    status_t handleSetCameraServiceWatchdog(const Vector<String16>& args);
+
     // Enable tag monitoring of the given tags in provided clients
     status_t startWatchingTags(const Vector<String16> &args, int outFd);
 
@@ -1283,6 +1298,9 @@ private:
 
     // Current camera mute mode
     bool mOverrideCameraMuteMode = false;
+
+    // Camera Service watchdog flag
+    bool mCameraServiceWatchdogEnabled = true;
 
     /**
      * A listener class that implements the IBinder::DeathRecipient interface
