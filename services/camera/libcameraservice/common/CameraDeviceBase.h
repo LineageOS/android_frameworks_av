@@ -616,8 +616,15 @@ class CameraDeviceBase : public virtual FrameProducer {
     // Lock to synchronize onDeviceActive and onDeviceIdle callbacks when camera
     // has been opened in shared mode.
     mutable Mutex mSharedDeviceActiveLock;
+
+    /**
+     * Set whether camera client is privileged or not
+     */
+    void setPrivilegedClient(bool privilegedClient) { mPrivilegedClient = privilegedClient; }
+
 protected:
     bool mImageDumpMask = 0;
+    bool mPrivilegedClient = false;
     std::vector<int64_t> mStreamUseCaseOverrides;
 };
 
