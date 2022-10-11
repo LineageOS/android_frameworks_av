@@ -460,7 +460,7 @@ ssize_t Camera3Device::getJpegBufferSize(const CameraMetadata &info, uint32_t wi
             (chosenMaxJpegResolution.width * chosenMaxJpegResolution.height);
     ssize_t jpegBufferSize = scaleFactor * (maxJpegBufferSize - kMinJpegBufferSize) +
             kMinJpegBufferSize;
-    if (jpegBufferSize > maxJpegBufferSize) {
+    if (!mPrivilegedClient && jpegBufferSize > maxJpegBufferSize) {
         ALOGI("%s: jpeg buffer size calculated is > maxJpeg bufferSize(%zd), clamping",
                   __FUNCTION__, maxJpegBufferSize);
         jpegBufferSize = maxJpegBufferSize;

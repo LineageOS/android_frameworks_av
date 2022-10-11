@@ -513,8 +513,14 @@ class CameraDeviceBase : public virtual FrameProducer {
     virtual status_t injectSessionParams(
         const CameraMetadata& sessionParams) = 0;
 
+    /**
+     * Set whether camera client is privileged or not
+     */
+    void setPrivilegedClient(bool privilegedClient) { mPrivilegedClient = privilegedClient; }
+
 protected:
     bool mImageDumpMask = 0;
+    bool mPrivilegedClient = false;
     std::vector<int64_t> mStreamUseCaseOverrides;
 };
 

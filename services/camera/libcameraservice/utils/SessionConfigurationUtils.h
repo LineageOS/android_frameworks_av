@@ -99,7 +99,7 @@ int64_t euclidDistSquare(int32_t x0, int32_t y0, int32_t x1, int32_t y1);
 // a width <= ROUNDING_WIDTH_CAP
 bool roundBufferDimensionNearest(int32_t width, int32_t height, int32_t format,
         android_dataspace dataSpace, const CameraMetadata& info, bool maxResolution,
-        /*out*/int32_t* outWidth, /*out*/int32_t* outHeight);
+        /*out*/int32_t* outWidth, /*out*/int32_t* outHeight, bool isPriviledgedClient);
 
 // check if format is not custom format
 bool isPublicFormat(int32_t format);
@@ -112,7 +112,7 @@ binder::Status createSurfaceFromGbp(
         const std::string &logicalCameraId, const CameraMetadata &physicalCameraMetadata,
         const std::vector<int32_t> &sensorPixelModesUsed,  int64_t dynamicRangeProfile,
         int64_t streamUseCase, int timestampBase, int mirrorMode,
-        int32_t colorSpace, bool respectSurfaceSize);
+        int32_t colorSpace, bool respectSurfaceSize, bool isPriviledgedClient=false);
 
 //check if format is 10-bit output compatible
 bool is10bitCompatibleFormat(int32_t format, android_dataspace_t dataSpace);
@@ -157,7 +157,7 @@ convertToHALStreamCombination(
     aidl::android::hardware::camera::device::StreamConfiguration &streamConfiguration,
     bool overrideForPerfClass, metadata_vendor_id_t vendorTagId,
     bool checkSessionParams, const std::vector<int32_t>& additionalKeys,
-    bool *earlyExit);
+    bool *earlyExit, bool isPriviledgedClient = false);
 
 StreamConfigurationPair getStreamConfigurationPair(const CameraMetadata &metadata);
 
