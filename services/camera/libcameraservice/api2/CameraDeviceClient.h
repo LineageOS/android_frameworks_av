@@ -417,6 +417,7 @@ private:
     static const int32_t REQUEST_ID_NONE = -1;
 
     int32_t mRequestIdCounter;
+    bool mPrivilegedClient;
 
     // Metadata queue to write the result metadata to.
     std::unique_ptr<MetadataQueue> mResultMetadataQueue;
