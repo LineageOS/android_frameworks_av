@@ -95,7 +95,11 @@ C2SoftAomEnc::IntfImpl::IntfImpl(const std::shared_ptr<C2ReflectorHelper>& helpe
                                                                            LEVEL_AV1_4_1))
                          .withFields({
                                  C2F(mProfileLevel, profile).equalTo(PROFILE_AV1_0),
-                                 C2F(mProfileLevel, level).equalTo(LEVEL_AV1_4_1),
+                                 C2F(mProfileLevel, level)
+                                    .oneOf({LEVEL_AV1_2, LEVEL_AV1_2_1, LEVEL_AV1_2_2,
+                                            LEVEL_AV1_2_3, LEVEL_AV1_3, LEVEL_AV1_3_1,
+                                            LEVEL_AV1_3_2, LEVEL_AV1_3_3, LEVEL_AV1_4,
+                                            LEVEL_AV1_4_1}),
                          })
                          .withSetter(ProfileLevelSetter)
                          .build());

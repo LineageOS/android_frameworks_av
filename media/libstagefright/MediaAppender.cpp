@@ -308,7 +308,11 @@ status_t MediaAppender::start() {
         ALOGE("MediaAppender::start() is called in invalid state %d", mState);
         return INVALID_OPERATION;
     }
-    mMuxer = new (std::nothrow) MediaMuxer(mFd, mFormat);
+    mMuxer = MediaMuxer::create(mFd, mFormat);
+    if (mMuxer == nullptr) {
+        ALOGE("MediaMuxer::create failed");
+        return INVALID_OPERATION;
+    }
     for (const auto& n : mFmtIndexMap) {
         ssize_t muxIndex = mMuxer->addTrack(n.second);
         if (muxIndex < 0) {
