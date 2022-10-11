@@ -313,6 +313,7 @@ private:
     static const int32_t REQUEST_ID_NONE = -1;
 
     int32_t mRequestIdCounter;
+    bool mPrivilegedClient;
 
     std::vector<std::string> mPhysicalCameraIds;
 
