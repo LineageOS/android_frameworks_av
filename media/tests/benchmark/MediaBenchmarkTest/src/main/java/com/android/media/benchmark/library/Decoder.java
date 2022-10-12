@@ -49,7 +49,7 @@ public class Decoder {
     private FileOutputStream mOutputStream;
 
     public Decoder() { mStats = new Stats(); }
-
+    public Stats getStats() { return mStats; };
     /**
      * Setup of decoder
      *
