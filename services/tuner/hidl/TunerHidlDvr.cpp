@@ -148,6 +148,11 @@ TunerHidlDvr::~TunerHidlDvr() {
     return ::ndk::ScopedAStatus::ok();
 }
 
+::ndk::ScopedAStatus TunerHidlDvr::setStatusCheckIntervalHint(int64_t /* in_milliseconds */) {
+    HidlResult res = HidlResult::UNAVAILABLE;
+    return ::ndk::ScopedAStatus::fromServiceSpecificError(static_cast<int32_t>(res));
+}
+
 HidlDvrSettings TunerHidlDvr::getHidlDvrSettings(const DvrSettings& settings) {
     HidlDvrSettings s;
     switch (mType) {
