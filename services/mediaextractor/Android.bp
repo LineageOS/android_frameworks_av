@@ -74,6 +74,9 @@ prebuilt_etc {
         arm64: {
             src: "seccomp_policy/mediaextractor-arm64.policy",
         },
+        riscv64: {
+            src: "seccomp_policy/mediaextractor-riscv64.policy",
+        },
         x86: {
             src: "seccomp_policy/mediaextractor-x86.policy",
         },
