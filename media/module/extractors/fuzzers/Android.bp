@@ -173,7 +173,7 @@ cc_fuzz {
     ],
 
     static_libs: [
-        "libwebm",
+        "libwebm_mkvparser",
         "libstagefright_flacdec",
         "libstagefright_metadatautils",
         "libmkvextractor",

@@ -55,7 +55,7 @@ cc_test {
         "libmedia_midiiowrapper",
         "libsonivoxwithoutjet",
         "libvorbisidec",
-        "libwebm",
+        "libwebm_mkvparser",
         "libFLAC",
     ],
 
