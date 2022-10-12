@@ -34,6 +34,24 @@
       "parentUuid": "3953a085_66154196",
       "revId": "ab7524c944d265eadadce321e6670a02f4208c29",
       "serverId": "1ec6b3db-b2c1-4fa4-84a2-4c7efe89ba71"
+    },
+    {
+      "unresolved": false,
+      "key": {
+        "uuid": "4f00f158_eb6eefd0",
+        "filename": "/PATCHSET_LEVEL",
+        "patchSetId": 2
+      },
+      "lineNbr": 0,
+      "author": {
+        "id": 30475
+      },
+      "writtenOn": "2022-10-12T04:44:49Z",
+      "side": 1,
+      "message": "Although I don\u0027t like squashing and big patches, in this case I have to agree with Arian.",
+      "parentUuid": "61e7073b_0236a4f5",
+      "revId": "ab7524c944d265eadadce321e6670a02f4208c29",
+      "serverId": "1ec6b3db-b2c1-4fa4-84a2-4c7efe89ba71"
     }
   ]
 }
