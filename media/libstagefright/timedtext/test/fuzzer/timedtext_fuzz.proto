@@ -1,0 +1,142 @@
+/*
+ * Copyright (C) 2022 The Android Open Source Project
+ *
+ * Licensed under the Apache License, Version 2.0 (the "License");
+ * you may not use this file except in compliance with the License.
+ * You may obtain a copy of the License at:
+ *
+ * http://www.apache.org/licenses/LICENSE-2.0
+ *
+ * Unless required by applicable law or agreed to in writing, software
+ * distributed under the License is distributed on an "AS IS" BASIS,
+ * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+ * See the License for the specific language governing permissions and
+ * limitations under the License.
+ */
+
+/*
+ * proto files are used for Structure Aware fuzzing so that fuzzing can be
+ * made more effective.
+ * timedtext_fuzz.proto is used to declare structures, which are used
+ * purely inside timedtext_fuzzer.
+ */
+
+syntax = "proto3";
+
+enum Flag {
+    flag3gppglobal = 0;
+    flag3gpplocal = 1;
+    flagsrtlocal = 2;
+}
+
+enum ChunkType {
+    default = 0;
+    tx3g = 1954034535;
+    styl = 1937013100;
+    krok = 1802661739;
+    hlit = 1751935348;
+    hclr = 1751346290;
+    dlay = 1684824441;
+    href = 1752327526;
+    tbox = 1952608120;
+    blnk = 1651273323;
+    txrp = 1953985136;
+}
+
+message FontRecord {
+    uint32 fontId = 1;
+    repeated uint32 font = 2;
+}
+
+message SRTLocal {
+    repeated uint32 data = 1;
+}
+
+message GPPGlobal {
+    uint64 reservedBytes = 1;
+    uint32 displayFlags = 2;
+    int32 horizontal_vertical_justification = 3;
+    uint32 rgba = 4;
+    int32 textBox = 5;
+    uint32 styleRecordStart = 6;
+    uint32 fontId = 7;
+    uint32 fontStyle = 8;
+    uint32 entryCount = 9;
+    repeated FontRecord fontEntry = 10;
+    uint32 defaultDisparity = 11;
+}
+
+message StyleRecord {
+    uint32 startchar = 1;
+    uint32 font = 2;
+    uint32 rgba = 3;
+}
+
+message TextStyleBox {
+    uint32 count = 1;
+    repeated StyleRecord record = 2;
+}
+
+message HighlightBox {
+    uint32 start = 1;
+    uint32 end = 2;
+}
+
+message HighlightColor {
+    uint32 rgba = 1;
+}
+
+message TextKaraokeBox {
+    uint32 highlightStartTime = 1;
+    uint32 entryCount = 2;
+    repeated uint64 highlightData = 3;
+}
+
+message BoxRecord {
+    uint32 topleft = 1;
+    uint32 bottomright = 2;
+}
+
+message BlinkBox {
+    uint32 charoffset = 1;
+}
+
+message HyperTextBox {
+    uint32 charoffset = 1;
+    uint32 urlLength = 2;
+    repeated uint32 url = 3;
+    uint32 altLength = 4;
+    repeated uint32 altString = 5;
+}
+
+message GPPLocalText {
+    string text = 1;
+}
+
+message GPPLocalFormat {
+    uint64 reservedBytes = 1;
+    oneof formatStyle {
+        TextStyleBox textbox = 2;
+        HighlightBox hltbox = 3;
+        HighlightColor hltcolor = 4;
+        TextKaraokeBox krokbox = 5;
+        uint32 scrollDelay = 6;
+        HyperTextBox hrefBox = 7;
+        BoxRecord boxrecord = 8;
+        BlinkBox blinkBox = 9;
+        uint32 wrapFlag = 10;
+    }
+}
+
+message GPPLocal {
+    GPPLocalText localtext = 1;
+    GPPLocalFormat format = 2;
+}
+
+message TimedText {
+    Flag handle = 1;
+    int32 timeMs = 2;
+    SRTLocal srt = 3;
+    GPPGlobal global = 4;
+    GPPLocal local = 5;
+}
