@@ -264,23 +264,20 @@ C2R C2SoftVpxEnc::IntfImpl::ProfileLevelSetter(bool mayBlock,
     // the requirements.
     bool needsUpdate = false;
     for (const LevelLimits& limit : kLimits) {
-        if (samples > limit.samples) continue;
-        if (samplesPerSec > limit.samplesPerSec) continue;
-        if (bitrate.v.value > limit.bitrate) continue;
-        if (dimension > limit.dimension) continue;
-
-        // This is the lowest level that meets the requirements, and if
-        // we haven't seen the supplied level yet, that means we don't
-        // need the update.
-        if (needsUpdate) {
-            ALOGD("Given level %x does not cover current configuration: "
-                    "adjusting to %x",
-                    me.v.level, limit.level);
-            me.set().level = limit.level;
+        if (samples <= limit.samples && samplesPerSec <= limit.samplesPerSec &&
+            bitrate.v.value <= limit.bitrate && dimension <= limit.dimension) {
+            // This is the lowest level that meets the requirements, and if
+            // we haven't seen the supplied level yet, that means we don't
+            // need the update.
+            if (needsUpdate) {
+                ALOGD("Given level %x does not cover current configuration: "
+                        "adjusting to %x",
+                        me.v.level, limit.level);
+                me.set().level = limit.level;
+            }
+            found = true;
+            break;
         }
-        found = true;
-        break;
-
         if (me.v.level == limit.level) {
             // We break out of the loop when the lowest feasible level is
             // found. The fact that we're here means that our level doesn't
