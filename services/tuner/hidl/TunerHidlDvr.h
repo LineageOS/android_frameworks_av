@@ -63,6 +63,7 @@ public:
     ::ndk::ScopedAStatus stop() override;
     ::ndk::ScopedAStatus flush() override;
     ::ndk::ScopedAStatus close() override;
+    ::ndk::ScopedAStatus setStatusCheckIntervalHint(int64_t in_milliseconds) override;
 
     struct DvrCallback : public HidlIDvrCallback {
         DvrCallback(const shared_ptr<ITunerDvrCallback> tunerDvrCallback)
