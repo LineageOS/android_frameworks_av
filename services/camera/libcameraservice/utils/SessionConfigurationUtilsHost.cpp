@@ -55,6 +55,10 @@ int32_t getAppropriateModeTag(int32_t defaultTag, bool maxResolution) {
             return ANDROID_LENS_INTRINSIC_CALIBRATION_MAXIMUM_RESOLUTION;
         case ANDROID_LENS_DISTORTION:
             return ANDROID_LENS_DISTORTION_MAXIMUM_RESOLUTION;
+        case ANDROID_SENSOR_INFO_PRE_CORRECTION_ACTIVE_ARRAY_SIZE:
+            return ANDROID_SENSOR_INFO_PRE_CORRECTION_ACTIVE_ARRAY_SIZE_MAXIMUM_RESOLUTION;
+        case ANDROID_SENSOR_INFO_ACTIVE_ARRAY_SIZE:
+            return ANDROID_SENSOR_INFO_ACTIVE_ARRAY_SIZE_MAXIMUM_RESOLUTION;
         default:
             ALOGE("%s: Tag %d doesn't have a maximum resolution counterpart", __FUNCTION__,
                     defaultTag);
