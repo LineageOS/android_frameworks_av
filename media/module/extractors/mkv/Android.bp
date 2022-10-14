@@ -33,7 +33,7 @@ cc_library {
         "libstagefright_foundation_colorutils_ndk",   // for mainline-safe ColorUtils
         "libstagefright_foundation",
         "libstagefright_metadatautils",
-        "libwebm",
+        "libwebm_mkvparser",
         "libutils",
     ],
 
