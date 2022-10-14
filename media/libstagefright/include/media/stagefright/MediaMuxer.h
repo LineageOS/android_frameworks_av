@@ -56,10 +56,6 @@ public:
      */
     static MediaMuxer* create(int fd, OutputFormat format);
 
-    // Construct the muxer with the file descriptor. Note that the MediaMuxer
-    // will close this file at stop().
-    MediaMuxer(int fd, OutputFormat format);
-
     virtual ~MediaMuxer();
 
     /**
@@ -135,6 +131,11 @@ public:
     sp<AMessage> getTrackFormat(size_t idx);
 
 private:
+    // Construct the muxer with the file descriptor. Note that the MediaMuxer
+    // will close this file at stop().
+    // This constructor is made private to ensure that MediaMuxer::create() is used instead.
+    MediaMuxer(int fd, OutputFormat format);
+
     const OutputFormat mFormat;
     sp<MediaWriter> mWriter;
     Vector< sp<MediaAdapter> > mTrackList;  // Each track has its MediaAdapter.
