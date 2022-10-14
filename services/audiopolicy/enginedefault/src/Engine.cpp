@@ -778,6 +778,7 @@ DeviceVector Engine::getOutputDevicesForStream(audio_stream_type_t stream, bool 
 
 sp<DeviceDescriptor> Engine::getInputDeviceForAttributes(const audio_attributes_t &attr,
                                                          uid_t uid,
+                                                         audio_session_t session,
                                                          sp<AudioPolicyMix> *mix) const
 {
     const auto &policyMixes = getApmObserver()->getAudioPolicyMixCollection();
@@ -800,6 +801,7 @@ sp<DeviceDescriptor> Engine::getInputDeviceForAttributes(const audio_attributes_
     device = policyMixes.getDeviceAndMixForInputSource(attr,
                                                        availableInputDevices,
                                                        uid,
+                                                       session,
                                                        mix);
     if (device != nullptr) {
         return device;

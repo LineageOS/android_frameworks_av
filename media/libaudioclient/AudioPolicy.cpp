@@ -57,6 +57,10 @@ status_t AudioMixMatchCriterion::readFromParcel(Parcel *parcel)
     case RULE_EXCLUDE_USERID:
         mValue.mUserId = (int) parcel->readInt32();
         break;
+    case RULE_MATCH_AUDIO_SESSION_ID:
+    case RULE_EXCLUDE_AUDIO_SESSION_ID:
+        mValue.mAudioSessionId = (audio_session_t) parcel->readInt32();
+        break;
     default:
         ALOGE("Trying to build AudioMixMatchCriterion from unknown rule %d", mRule);
         return BAD_VALUE;

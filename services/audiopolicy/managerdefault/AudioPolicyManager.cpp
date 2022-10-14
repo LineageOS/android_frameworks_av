@@ -1169,8 +1169,8 @@ status_t AudioPolicyManager::getOutputForAttrInt(
         .channel_mask = config->channel_mask,
         .format = config->format,
     };
-    status = mPolicyMixes.getOutputForAttr(*resultAttr, clientConfig, uid, *flags, primaryMix,
-                                           secondaryMixes);
+    status = mPolicyMixes.getOutputForAttr(*resultAttr, clientConfig, uid, session, *flags,
+                                           primaryMix, secondaryMixes);
     if (status != OK) {
         return status;
     }
@@ -2532,7 +2532,7 @@ status_t AudioPolicyManager::getInputForAttr(const audio_attributes_t *attr,
         } else {
             // Prevent from storing invalid requested device id in clients
             requestedDeviceId = AUDIO_PORT_HANDLE_NONE;
-            device = mEngine->getInputDeviceForAttributes(attributes, uid, &policyMix);
+            device = mEngine->getInputDeviceForAttributes(attributes, uid, session, &policyMix);
             ALOGV_IF(device != nullptr, "%s found device type is 0x%X",
                 __FUNCTION__, device->type());
         }
@@ -2939,7 +2939,8 @@ void AudioPolicyManager::checkCloseInputs() {
             bool close = false;
             for (const auto& client : input->clientsList()) {
                 sp<DeviceDescriptor> device =
-                    mEngine->getInputDeviceForAttributes(client->attributes(), client->uid());
+                    mEngine->getInputDeviceForAttributes(client->attributes(), client->uid(),
+                                                         client->session());
                 if (!input->supportedDevices().contains(device)) {
                     close = true;
                     break;
@@ -6334,7 +6335,7 @@ void AudioPolicyManager::checkOutputForAttributes(const audio_attributes_t &attr
             }
             sp<AudioPolicyMix> primaryMix;
             status_t status = mPolicyMixes.getOutputForAttr(client->attributes(), client->config(),
-                    client->uid(), client->flags(), primaryMix, nullptr);
+                    client->uid(), client->session(), client->flags(), primaryMix, nullptr);
             if (status != OK) {
                 continue;
             }
@@ -6447,7 +6448,7 @@ void AudioPolicyManager::checkSecondaryOutputs() {
             sp<AudioPolicyMix> primaryMix;
             std::vector<sp<AudioPolicyMix>> secondaryMixes;
             status_t status = mPolicyMixes.getOutputForAttr(client->attributes(), client->config(),
-                    client->uid(), client->flags(), primaryMix, &secondaryMixes);
+                    client->uid(), client->session(), client->flags(), primaryMix, &secondaryMixes);
             std::vector<sp<SwAudioOutputDescriptor>> secondaryDescs;
             for (auto &secondaryMix : secondaryMixes) {
                 sp<SwAudioOutputDescriptor> outputDesc = secondaryMix->getOutput();
@@ -6655,20 +6656,23 @@ sp<DeviceDescriptor> AudioPolicyManager::getNewInputDevice(
     // a null sp<>, causing the patch on the input stream to be released.
     audio_attributes_t attributes;
     uid_t uid;
+    audio_session_t session;
     sp<RecordClientDescriptor> topClient = inputDesc->getHighestPriorityClient();
     if (topClient != nullptr) {
         attributes = topClient->attributes();
         uid = topClient->uid();
+        session = topClient->session();
     } else {
         attributes = { .source = AUDIO_SOURCE_DEFAULT };
         uid = 0;
+        session = AUDIO_SESSION_NONE;
     }
 
     if (attributes.source == AUDIO_SOURCE_DEFAULT && isInCall()) {
         attributes.source = AUDIO_SOURCE_VOICE_COMMUNICATION;
     }
     if (attributes.source != AUDIO_SOURCE_DEFAULT) {
-        device = mEngine->getInputDeviceForAttributes(attributes, uid);
+        device = mEngine->getInputDeviceForAttributes(attributes, uid, session);
     }
 
     return device;
@@ -7863,7 +7867,7 @@ status_t AudioPolicyManager::getDevicesForAttributes(
     // audio routing, only used for duplication for playback capture)
     sp<AudioPolicyMix> policyMix;
     status_t status = mPolicyMixes.getOutputForAttr(attr, AUDIO_CONFIG_BASE_INITIALIZER,
-            0 /*uid unknown here*/, AUDIO_OUTPUT_FLAG_NONE, policyMix,
+            0 /*uid unknown here*/, AUDIO_SESSION_NONE, AUDIO_OUTPUT_FLAG_NONE, policyMix,
             nullptr /* secondaryMixes */);
     if (status != OK) {
         return status;
