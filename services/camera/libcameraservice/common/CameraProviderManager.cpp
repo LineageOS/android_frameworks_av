@@ -1408,6 +1408,27 @@ status_t CameraProviderManager::ProviderInfo::DeviceInfo3::addPreCorrectionActiv
     return res;
 }
 
+status_t CameraProviderManager::ProviderInfo::DeviceInfo3::addReadoutTimestampTag(
+        bool readoutTimestampSupported) {
+    status_t res = OK;
+    auto& c = mCameraCharacteristics;
+
+    auto entry = c.find(ANDROID_SENSOR_READOUT_TIMESTAMP);
+    if (entry.count != 0) {
+        ALOGE("%s: CameraCharacteristics must not contain ANDROID_SENSOR_READOUT_TIMESTAMP!",
+                __FUNCTION__);
+    }
+
+    uint8_t readoutTimestamp = ANDROID_SENSOR_READOUT_TIMESTAMP_NOT_SUPPORTED;
+    if (readoutTimestampSupported) {
+        readoutTimestamp = ANDROID_SENSOR_READOUT_TIMESTAMP_HARDWARE;
+    }
+
+    res = c.update(ANDROID_SENSOR_READOUT_TIMESTAMP, &readoutTimestamp, 1);
+
+    return res;
+}
+
 status_t CameraProviderManager::ProviderInfo::DeviceInfo3::removeAvailableKeys(
         CameraMetadata& c, const std::vector<uint32_t>& keys, uint32_t keyTag) {
     status_t res = OK;
