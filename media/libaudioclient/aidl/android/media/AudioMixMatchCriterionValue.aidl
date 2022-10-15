@@ -28,4 +28,6 @@ union AudioMixMatchCriterionValue {
     /** Interpreted as uid_t. */
     int uid;
     int userId;
+    /** Interpreted as audio_session_t. */
+    int audioSessionId;
 }

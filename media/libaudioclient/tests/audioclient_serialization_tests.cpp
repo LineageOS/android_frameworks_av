@@ -66,16 +66,16 @@ static const std::vector<audio_stream_type_t> kStreamtypes =
                  decltype(audio_stream_type_from_string)>(xsdc_enum_range<xsd::AudioStreamType>{},
                                                           audio_stream_type_from_string);
 
-static const std::vector<uint32_t> kMixMatchRules = {
-        RULE_MATCH_ATTRIBUTE_USAGE,
-        RULE_EXCLUDE_ATTRIBUTE_USAGE,
-        RULE_MATCH_ATTRIBUTE_CAPTURE_PRESET,
-        RULE_EXCLUDE_ATTRIBUTE_CAPTURE_PRESET,
-        RULE_MATCH_UID,
-        RULE_EXCLUDE_UID,
-        RULE_MATCH_USERID,
-        RULE_EXCLUDE_USERID,
-};
+static const std::vector<uint32_t> kMixMatchRules = {RULE_MATCH_ATTRIBUTE_USAGE,
+                                                     RULE_EXCLUDE_ATTRIBUTE_USAGE,
+                                                     RULE_MATCH_ATTRIBUTE_CAPTURE_PRESET,
+                                                     RULE_EXCLUDE_ATTRIBUTE_CAPTURE_PRESET,
+                                                     RULE_MATCH_UID,
+                                                     RULE_EXCLUDE_UID,
+                                                     RULE_MATCH_USERID,
+                                                     RULE_EXCLUDE_USERID,
+                                                     RULE_MATCH_AUDIO_SESSION_ID,
+                                                     RULE_EXCLUDE_AUDIO_SESSION_ID};
 
 // Generates a random string.
 std::string CreateRandomString(size_t n) {
