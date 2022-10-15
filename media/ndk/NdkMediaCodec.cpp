@@ -64,6 +64,10 @@ static media_status_t translate_error(status_t err) {
 
         if (untranslated.find(err) == untranslated.end()) {
             ALOGE("untranslated sf error code: %d", err);
+            char err_as_string[32];
+            snprintf(err_as_string, sizeof(err_as_string), "%d", err);
+            android_errorWriteWithInfoLog(0x534e4554, "224869524", -1,
+                                          err_as_string, strlen(err_as_string));
             untranslated.insert(err);
         }
     }
