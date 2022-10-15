@@ -34,11 +34,13 @@ namespace android {
 #define RULE_MATCH_ATTRIBUTE_CAPTURE_PRESET (0x1 << 1)
 #define RULE_MATCH_UID                      (0x1 << 2)
 #define RULE_MATCH_USERID                   (0x1 << 3)
+#define RULE_MATCH_AUDIO_SESSION_ID         (0x1 << 4)
 #define RULE_EXCLUDE_ATTRIBUTE_USAGE  (RULE_EXCLUSION_MASK|RULE_MATCH_ATTRIBUTE_USAGE)
 #define RULE_EXCLUDE_ATTRIBUTE_CAPTURE_PRESET \
                                       (RULE_EXCLUSION_MASK|RULE_MATCH_ATTRIBUTE_CAPTURE_PRESET)
 #define RULE_EXCLUDE_UID              (RULE_EXCLUSION_MASK|RULE_MATCH_UID)
 #define RULE_EXCLUDE_USERID           (RULE_EXCLUSION_MASK|RULE_MATCH_USERID)
+#define RULE_EXCLUDE_AUDIO_SESSION_ID       (RULE_EXCLUSION_MASK|RULE_MATCH_AUDIO_SESSION_ID)
 
 #define MIX_TYPE_INVALID (-1)
 #define MIX_TYPE_PLAYERS 0
@@ -78,6 +80,7 @@ public:
         audio_source_t  mSource;
         uid_t           mUid;
         int        mUserId;
+        audio_session_t  mAudioSessionId;
     } mValue;
     uint32_t        mRule;
 };
