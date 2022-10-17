@@ -60,14 +60,12 @@ public class MuxerTest {
     private static final String mStatsFile =
             mContext.getExternalFilesDir(null) + "/Muxer." + System.currentTimeMillis() + ".csv";
     private static final String TAG = "MuxerTest";
-    private static final Map<String, Integer> mMapFormat = new Hashtable<String, Integer>() {
-        {
-            put("mp4", MediaMuxer.OutputFormat.MUXER_OUTPUT_MPEG_4);
-            put("webm", MediaMuxer.OutputFormat.MUXER_OUTPUT_WEBM);
-            put("3gpp", MediaMuxer.OutputFormat.MUXER_OUTPUT_3GPP);
-            put("ogg", MediaMuxer.OutputFormat.MUXER_OUTPUT_OGG);
-        }
-    };
+    private static final Map<String, Integer> mMapFormat = Map.of(
+            "mp4", MediaMuxer.OutputFormat.MUXER_OUTPUT_MPEG_4,
+            "webm", MediaMuxer.OutputFormat.MUXER_OUTPUT_WEBM,
+            "3gpp", MediaMuxer.OutputFormat.MUXER_OUTPUT_3GPP,
+            "ogg", MediaMuxer.OutputFormat.MUXER_OUTPUT_OGG);
+
     private String mInputFileName;
     private String mFormat;
 
