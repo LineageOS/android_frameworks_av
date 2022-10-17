@@ -2742,7 +2742,7 @@ status_t AudioFlinger::PlaybackThread::addTrack_l(const sp<Track>& track)
             // Unlock due to VibratorService will lock for this call and will
             // call Tracks.mute/unmute which also require thread's lock.
             mLock.unlock();
-            const int intensity = AudioFlinger::onExternalVibrationStart(
+            const os::HapticScale intensity = AudioFlinger::onExternalVibrationStart(
                     track->getExternalVibration());
             std::optional<media::AudioVibratorInfo> vibratorInfo;
             {
@@ -2752,7 +2752,7 @@ status_t AudioFlinger::PlaybackThread::addTrack_l(const sp<Track>& track)
                 vibratorInfo = std::move(mAudioFlinger->getDefaultVibratorInfo_l());
             }
             mLock.lock();
-            track->setHapticIntensity(static_cast<os::HapticScale>(intensity));
+            track->setHapticIntensity(intensity);
             if (vibratorInfo) {
                 track->setHapticMaxAmplitude(vibratorInfo->maxAmplitude);
             }
@@ -4497,7 +4497,7 @@ void AudioFlinger::PlaybackThread::removeTracks_l(const Vector< sp<Track> >& tra
             // When the track is stop, set the haptic intensity as MUTE
             // for the HapticGenerator effect.
             if (chain != nullptr) {
-                chain->setHapticIntensity_l(track->id(), static_cast<int>(os::HapticScale::MUTE));
+                chain->setHapticIntensity_l(track->id(), os::HapticScale::MUTE);
             }
         }
     }
