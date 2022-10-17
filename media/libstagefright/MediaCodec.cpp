@@ -3355,8 +3355,8 @@ void MediaCodec::onMessageReceived(const sp<AMessage> &msg) {
                     MediaCodecInfo::Attributes attr = mCodecInfo
                             ? mCodecInfo->getAttributes()
                             : MediaCodecInfo::Attributes(0);
-                    if (!(attr & MediaCodecInfo::kFlagIsSoftwareOnly)) {
-                        // software codec is currently ignored.
+                    if (mDomain == DOMAIN_VIDEO || !(attr & MediaCodecInfo::kFlagIsSoftwareOnly)) {
+                        // software audio codecs are currently ignored.
                         mResourceManagerProxy->addResource(MediaResource::CodecResource(
                             mFlags & kFlagIsSecure, toMediaResourceSubType(mDomain)));
                     }
