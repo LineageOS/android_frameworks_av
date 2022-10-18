@@ -200,7 +200,7 @@ status_t AudioPlayback::fillBuffer() {
 status_t AudioPlayback::waitForConsumption(bool testSeek) {
     if (PLAY_STARTED != mState) return INVALID_OPERATION;
     // in static buffer mode, lets not play clips with duration > 30 sec
-    int retry = 30;
+    int retry = 300;
     // Total number of frames in the input file.
     size_t totalFrameCount = mMemCapacity / mTrack->frameSize();
     while (!mStopPlaying && retry > 0) {
@@ -227,7 +227,7 @@ status_t AudioPlayback::waitForConsumption(bool testSeek) {
             if (bufferPosition != setPosition) return BAD_VALUE;
             mTrack->start();
         }
-        std::this_thread::sleep_for(std::chrono::milliseconds(300));
+        std::this_thread::sleep_for(std::chrono::milliseconds(100));
         retry--;
     }
     if (!mStopPlaying) return TIMED_OUT;
