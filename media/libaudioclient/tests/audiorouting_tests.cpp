@@ -26,31 +26,18 @@ using namespace android;
 
 // UNIT TEST
 TEST(AudioTrackTest, TestPerformanceMode) {
-    std::vector<std::string> attachedDevices;
-    std::vector<MixPort> mixPorts;
-    std::vector<Route> routes;
-    EXPECT_EQ(OK, parse_audio_policy_configuration_xml(attachedDevices, mixPorts, routes));
-    std::string output_flags_string[] = {"AUDIO_OUTPUT_FLAG_FAST", "AUDIO_OUTPUT_FLAG_DEEP_BUFFER"};
+    std::vector<struct audio_port_v7> ports;
+    ASSERT_EQ(OK, listAudioPorts(ports));
     audio_output_flags_t output_flags[] = {AUDIO_OUTPUT_FLAG_FAST, AUDIO_OUTPUT_FLAG_DEEP_BUFFER};
     audio_flags_mask_t flags[] = {AUDIO_FLAG_LOW_LATENCY, AUDIO_FLAG_DEEP_BUFFER};
     bool hasFlag = false;
     for (int i = 0; i < sizeof(flags) / sizeof(flags[0]); i++) {
         hasFlag = false;
-        for (int j = 0; j < mixPorts.size() && !hasFlag; j++) {
-            MixPort port = mixPorts[j];
-            if (port.role == "source" && port.flags.find(output_flags_string[i]) != -1) {
-                for (int k = 0; k < routes.size() && !hasFlag; k++) {
-                    if (routes[k].sources.find(port.name) != -1 &&
-                        std::find(attachedDevices.begin(), attachedDevices.end(), routes[k].sink) !=
-                                attachedDevices.end()) {
-                        hasFlag = true;
-                        std::cerr << "found port with flag " << output_flags_string[i] << "@ "
-                                  << " port :: name : " << port.name << " role : " << port.role
-                                  << " port :: flags : " << port.flags
-                                  << " connected via route name : " << routes[k].name
-                                  << " route sources : " << routes[k].sources
-                                  << " route sink : " << routes[k].sink << std::endl;
-                    }
+        for (const auto& port : ports) {
+            if (port.role == AUDIO_PORT_ROLE_SOURCE && port.type == AUDIO_PORT_TYPE_MIX) {
+                if ((port.active_config.flags.output & output_flags[i]) != 0) {
+                    hasFlag = true;
+                    break;
                 }
             }
         }
