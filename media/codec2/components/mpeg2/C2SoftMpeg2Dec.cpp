@@ -732,6 +732,9 @@ status_t C2SoftMpeg2Dec::resetDecoder() {
 void C2SoftMpeg2Dec::resetPlugin() {
     mSignalledOutputEos = false;
     mTimeStart = mTimeEnd = systemTime();
+    if (mOutBlock) {
+        mOutBlock.reset();
+    }
 }
 
 status_t C2SoftMpeg2Dec::deleteDecoder() {
