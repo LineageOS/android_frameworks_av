@@ -1527,6 +1527,8 @@ ConversionResult<audio_output_flags_t> aidl2legacy_AudioOutputFlags_audio_output
             return AUDIO_OUTPUT_FLAG_ULTRASOUND;
         case AudioOutputFlags::SPATIALIZER:
             return AUDIO_OUTPUT_FLAG_SPATIALIZER;
+        case AudioOutputFlags::BIT_PERFECT:
+            return AUDIO_OUTPUT_FLAG_BIT_PERFECT;
     }
     return unexpected(BAD_VALUE);
 }
@@ -1572,6 +1574,8 @@ ConversionResult<AudioOutputFlags> legacy2aidl_audio_output_flags_t_AudioOutputF
             return AudioOutputFlags::ULTRASOUND;
         case AUDIO_OUTPUT_FLAG_SPATIALIZER:
             return AudioOutputFlags::SPATIALIZER;
+        case AUDIO_OUTPUT_FLAG_BIT_PERFECT:
+            return AudioOutputFlags::BIT_PERFECT;
     }
     return unexpected(BAD_VALUE);
 }
