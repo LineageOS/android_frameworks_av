@@ -529,7 +529,10 @@ AudioFlinger::PlaybackThread::OpPlayAudioMonitor::createIfNeeded(
             id, attr.flags);
         return nullptr;
     }
-    return new OpPlayAudioMonitor(attributionSource, attr.usage, id);
+
+    AttributionSourceState checkedAttributionSource = AudioFlinger::checkAttributionSourcePackage(
+            attributionSource);
+    return new OpPlayAudioMonitor(checkedAttributionSource, attr.usage, id);
 }
 
 AudioFlinger::PlaybackThread::OpPlayAudioMonitor::OpPlayAudioMonitor(
