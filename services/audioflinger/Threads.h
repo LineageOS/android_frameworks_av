@@ -33,6 +33,7 @@ public:
         MMAP_PLAYBACK,      // Thread class for MMAP playback stream
         MMAP_CAPTURE,       // Thread class for MMAP capture stream
         SPATIALIZER,  //
+        BIT_PERFECT,        // Thread class for BitPerfectThread
         // If you add any values here, also update ThreadBase::threadTypeToString()
     };
 
@@ -430,8 +431,10 @@ public:
                                             // track
                     FAST_SESSION = 0x4,     // the audio session corresponds to at least one
                                             // fast track
-                    SPATIALIZED_SESSION = 0x8 // the audio session corresponds to at least one
-                                              // spatialized track
+                    SPATIALIZED_SESSION = 0x8, // the audio session corresponds to at least one
+                                               // spatialized track
+                    BIT_PERFECT_SESSION = 0x10 // the audio session corresponds to at least one
+                                               // bit-perfect track
                 };
 
                 // get effect chain corresponding to session Id.
@@ -496,6 +499,9 @@ public:
                             }
                             if (track->isSpatialized()) {
                                 result |= SPATIALIZED_SESSION;  // caution, only first track.
+                            }
+                            if (track->isBitPerfect()) {
+                                result |= BIT_PERFECT_SESSION;
                             }
                             break;
                         }
@@ -982,7 +988,8 @@ public:
                                 status_t *status /*non-NULL*/,
                                 audio_port_handle_t portId,
                                 const sp<media::IAudioTrackCallback>& callback,
-                                bool isSpatialized);
+                                bool isSpatialized,
+                                bool isBitPerfect);
 
                 AudioStreamOut* getOutput() const;
                 AudioStreamOut* clearOutput();
@@ -1162,6 +1169,9 @@ protected:
     // When this is set, all mixer data is routed into the effects buffer
     // for any processing (including output processing).
     bool                            mEffectBufferValid;
+
+    // Set to "true" to enable when data has already copied to sink
+    bool                            mHasDataCopiedToSinkBuffer = false;
 
     // Frame size aligned buffer used as input and output to all post processing effects
     // except the Spatializer in a SPATIALIZER thread. Non spatialized tracks are mixed into
@@ -2272,4 +2282,17 @@ public:
 protected:
 
                 AudioStreamIn*  mInput;
+};
+
+class BitPerfectThread : public MixerThread {
+public:
+    BitPerfectThread(const sp<AudioFlinger>& audioflinger, AudioStreamOut *output,
+                     audio_io_handle_t id, bool systemReady);
+
+protected:
+    mixer_state prepareTracks_l(Vector<sp<Track>> *tracksToRemove) override;
+    void threadLoop_mix() override;
+
+private:
+    bool mIsBitPerfect;
 };

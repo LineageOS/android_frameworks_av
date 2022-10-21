@@ -96,7 +96,10 @@ private:
         void        unprepareForReformat();
         status_t    prepareForAdjustChannels(size_t frames);
         void        unprepareForAdjustChannels();
+        void        unprepareForTee();
+        status_t    prepareForTee();
         void        clearContractedBuffer();
+        void        clearTeeFrameCopied();
         bool        setPlaybackRate(const AudioPlaybackRate &playbackRate);
         void        reconfigureBufferProviders();
 
@@ -108,20 +111,22 @@ private:
          * all pre-mixer track buffer conversions outside the AudioMixer class.
          *
          * 1) mInputBufferProvider: The AudioTrack buffer provider.
-         * 2) mAdjustChannelsBufferProvider: Expands or contracts sample data from one interleaved
+         * 2) mTeeBufferProvider: If not NULL, copy the data to tee buffer.
+         * 3) mAdjustChannelsBufferProvider: Expands or contracts sample data from one interleaved
          *    channel format to another. Expanded channels are filled with zeros and put at the end
          *    of each audio frame. Contracted channels are copied to the end of the buffer.
-         * 3) mReformatBufferProvider: If not NULL, performs the audio reformat to
+         * 4) mReformatBufferProvider: If not NULL, performs the audio reformat to
          *    match either mMixerInFormat or mDownmixRequiresFormat, if the downmixer
          *    requires reformat. For example, it may convert floating point input to
          *    PCM_16_bit if that's required by the downmixer.
-         * 4) mDownmixerBufferProvider: If not NULL, performs the channel remixing to match
+         * 5) mDownmixerBufferProvider: If not NULL, performs the channel remixing to match
          *    the number of channels required by the mixer sink.
-         * 5) mPostDownmixReformatBufferProvider: If not NULL, performs reformatting from
+         * 6) mPostDownmixReformatBufferProvider: If not NULL, performs reformatting from
          *    the downmixer requirements to the mixer engine input requirements.
-         * 6) mTimestretchBufferProvider: Adds timestretching for playback rate
+         * 7) mTimestretchBufferProvider: Adds timestretching for playback rate
          */
         AudioBufferProvider* mInputBufferProvider;    // externally provided buffer provider.
+        std::unique_ptr<PassthruBufferProvider> mTeeBufferProvider;
         std::unique_ptr<PassthruBufferProvider> mAdjustChannelsBufferProvider;
         std::unique_ptr<PassthruBufferProvider> mReformatBufferProvider;
         std::unique_ptr<PassthruBufferProvider> mDownmixerBufferProvider;

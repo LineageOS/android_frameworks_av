@@ -302,7 +302,9 @@ SwAudioOutputDescriptor::SwAudioOutputDescriptor(const sp<IOProfile>& profile,
     mDirectClientSession(AUDIO_SESSION_NONE)
 {
     if (profile != NULL) {
-        mFlags = (audio_output_flags_t)profile->getFlags();
+        // By default, opening the output without immutable flags, the bit-perfect flags should be
+        // applied when the apps explicitly request.
+        mFlags = (audio_output_flags_t)(profile->getFlags() & (~AUDIO_OUTPUT_FLAG_BIT_PERFECT));
     }
 }
 

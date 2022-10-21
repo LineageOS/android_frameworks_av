@@ -297,6 +297,27 @@ status_t AudioMixer::Track::prepareForAdjustChannels(size_t frames)
     return NO_ERROR;
 }
 
+void AudioMixer::Track::unprepareForTee() {
+    ALOGV("AudioMixer::%s", __func__);
+    if (mTeeBufferProvider.get() != nullptr) {
+        mTeeBufferProvider.reset(nullptr);
+        reconfigureBufferProviders();
+    }
+}
+
+status_t AudioMixer::Track::prepareForTee() {
+    ALOGV("AudioMixer::%s(%p) teeBuffer=%p", __func__, this, teeBuffer);
+    unprepareForTee();
+    if (teeBuffer != nullptr) {
+        const size_t frameSize = audio_bytes_per_frame(channelCount + mHapticChannelCount, mFormat);
+        mTeeBufferProvider.reset(new TeeBufferProvider(
+                frameSize, frameSize, kCopyBufferFrameCount,
+                (uint8_t*)teeBuffer, mTeeBufferFrameCount));
+        reconfigureBufferProviders();
+    }
+    return NO_ERROR;
+}
+
 void AudioMixer::Track::clearContractedBuffer()
 {
     if (mAdjustChannelsBufferProvider.get() != nullptr) {
@@ -305,10 +326,20 @@ void AudioMixer::Track::clearContractedBuffer()
     }
 }
 
+void AudioMixer::Track::clearTeeFrameCopied() {
+    if (mTeeBufferProvider.get() != nullptr) {
+        static_cast<TeeBufferProvider*>(mTeeBufferProvider.get())->clearFramesCopied();
+    }
+}
+
 void AudioMixer::Track::reconfigureBufferProviders()
 {
     // configure from upstream to downstream buffer providers.
     bufferProvider = mInputBufferProvider;
+    if (mTeeBufferProvider != nullptr) {
+        mTeeBufferProvider->setBufferProvider(bufferProvider);
+        bufferProvider = mTeeBufferProvider.get();
+    }
     if (mAdjustChannelsBufferProvider.get() != nullptr) {
         mAdjustChannelsBufferProvider->setBufferProvider(bufferProvider);
         bufferProvider = mAdjustChannelsBufferProvider.get();
@@ -420,6 +451,20 @@ void AudioMixer::setParameter(int name, int target, int param, void *value)
                 track->mHapticMaxAmplitude = hapticMaxAmplitude;
             }
             } break;
+        case TEE_BUFFER:
+            if (track->teeBuffer != valueBuf) {
+                track->teeBuffer = valueBuf;
+                ALOGV("setParameter(TRACK, TEE_BUFFER, %p)", valueBuf);
+                track->prepareForTee();
+            }
+            break;
+        case TEE_BUFFER_FRAME_COUNT:
+            if (track->mTeeBufferFrameCount != valueInt) {
+                track->mTeeBufferFrameCount = valueInt;
+                ALOGV("setParameter(TRACK, TEE_BUFFER_FRAME_COUNT, %i)", valueInt);
+                track->prepareForTee();
+            }
+            break;
         default:
             LOG_ALWAYS_FATAL("setParameter track: bad param %d", param);
         }
@@ -500,6 +545,8 @@ void AudioMixer::setBufferProvider(int name, AudioBufferProvider* bufferProvider
         track->mReformatBufferProvider->reset();
     } else if (track->mAdjustChannelsBufferProvider.get() != nullptr) {
         track->mAdjustChannelsBufferProvider->reset();
+    } else if (track->mTeeBufferProvider.get() != nullptr) {
+        track->mTeeBufferProvider->reset();
     }
 
     track->mInputBufferProvider = bufferProvider;
@@ -565,6 +612,7 @@ void AudioMixer::preProcess()
         if (t->mKeepContractedChannels) {
             t->clearContractedBuffer();
         }
+        t->clearTeeFrameCopied();
     }
 }
 
