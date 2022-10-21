@@ -256,7 +256,9 @@ c2_status_t C2SoftMpeg4Dec::onStop() {
     mFramesConfigured = false;
     mSignalledOutputEos = false;
     mSignalledError = false;
-
+    if (mOutBlock) {
+        mOutBlock.reset();
+    }
     return C2_OK;
 }
 

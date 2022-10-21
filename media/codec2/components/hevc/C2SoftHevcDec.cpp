@@ -664,6 +664,9 @@ status_t C2SoftHevcDec::resetDecoder() {
 void C2SoftHevcDec::resetPlugin() {
     mSignalledOutputEos = false;
     mTimeStart = mTimeEnd = systemTime();
+    if (mOutBlock) {
+        mOutBlock.reset();
+    }
 }
 
 status_t C2SoftHevcDec::deleteDecoder() {
