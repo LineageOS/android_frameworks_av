@@ -671,6 +671,9 @@ status_t C2SoftAvcDec::resetDecoder() {
 void C2SoftAvcDec::resetPlugin() {
     mSignalledOutputEos = false;
     mTimeStart = mTimeEnd = systemTime();
+    if (mOutBlock) {
+        mOutBlock.reset();
+    }
 }
 
 status_t C2SoftAvcDec::deleteDecoder() {
