@@ -935,12 +935,15 @@ void Spatializer::updateActiveTracks(size_t numActiveTracks) {
 
 void Spatializer::checkSensorsState_l() {
     audio_latency_mode_t requestedLatencyMode = AUDIO_LATENCY_MODE_FREE;
-    bool lowLatencySupported = mSupportedLatencyModes.empty()
-            || (std::find(mSupportedLatencyModes.begin(), mSupportedLatencyModes.end(),
-                    AUDIO_LATENCY_MODE_LOW) != mSupportedLatencyModes.end());
+    const bool supportsSetLatencyMode = !mSupportedLatencyModes.empty();
+    const bool supportsLowLatencyMode = supportsSetLatencyMode && std::find(
+            mSupportedLatencyModes.begin(), mSupportedLatencyModes.end(),
+            AUDIO_LATENCY_MODE_LOW) != mSupportedLatencyModes.end();
     if (mSupportsHeadTracking) {
         if (mPoseController != nullptr) {
-            if (lowLatencySupported && mNumActiveTracks > 0 && mLevel != SpatializationLevel::NONE
+            // TODO(b/253297301, b/255433067) reenable low latency condition check
+            // for Head Tracking after Bluetooth HAL supports it correctly.
+            if (mNumActiveTracks > 0 && mLevel != SpatializationLevel::NONE
                 && mDesiredHeadTrackingMode != HeadTrackingMode::STATIC
                 && mHeadSensor != SpatializerPoseController::INVALID_SENSOR) {
                 if (mEngine != nullptr) {
@@ -949,7 +952,7 @@ void Spatializer::checkSensorsState_l() {
                 }
                 mPoseController->setHeadSensor(mHeadSensor);
                 mPoseController->setScreenSensor(mScreenSensor);
-                requestedLatencyMode = AUDIO_LATENCY_MODE_LOW;
+                if (supportsLowLatencyMode) requestedLatencyMode = AUDIO_LATENCY_MODE_LOW;
             } else {
                 mPoseController->setHeadSensor(SpatializerPoseController::INVALID_SENSOR);
                 mPoseController->setScreenSensor(SpatializerPoseController::INVALID_SENSOR);
@@ -959,7 +962,7 @@ void Spatializer::checkSensorsState_l() {
             resetEngineHeadPose_l();
         }
     }
-    if (mOutput != AUDIO_IO_HANDLE_NONE) {
+    if (mOutput != AUDIO_IO_HANDLE_NONE && supportsSetLatencyMode) {
         AudioSystem::setRequestedLatencyMode(mOutput, requestedLatencyMode);
     }
 }
