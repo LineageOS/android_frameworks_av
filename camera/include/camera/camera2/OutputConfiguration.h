@@ -61,6 +61,7 @@ public:
     int                        getWidth() const;
     int                        getHeight() const;
     int64_t                    getDynamicRangeProfile() const;
+    int32_t                    getColorSpace() const;
     bool                       isDeferred() const;
     bool                       isShared() const;
     String16                   getPhysicalCameraId() const;
@@ -111,6 +112,7 @@ public:
                 mIsMultiResolution == other.mIsMultiResolution &&
                 sensorPixelModesUsedEqual(other) &&
                 mDynamicRangeProfile == other.mDynamicRangeProfile &&
+                mColorSpace == other.mColorSpace &&
                 mStreamUseCase == other.mStreamUseCase &&
                 mTimestampBase == other.mTimestampBase &&
                 mMirrorMode == other.mMirrorMode);
@@ -153,6 +155,9 @@ public:
         if (mDynamicRangeProfile != other.mDynamicRangeProfile) {
             return mDynamicRangeProfile < other.mDynamicRangeProfile;
         }
+        if (mColorSpace != other.mColorSpace) {
+            return mColorSpace < other.mColorSpace;
+        }
         if (mStreamUseCase != other.mStreamUseCase) {
             return mStreamUseCase < other.mStreamUseCase;
         }
@@ -187,6 +192,7 @@ private:
     bool                       mIsMultiResolution;
     std::vector<int32_t>       mSensorPixelModesUsed;
     int64_t                    mDynamicRangeProfile;
+    int32_t                    mColorSpace;
     int64_t                    mStreamUseCase;
     int                        mTimestampBase;
     int                        mMirrorMode;
