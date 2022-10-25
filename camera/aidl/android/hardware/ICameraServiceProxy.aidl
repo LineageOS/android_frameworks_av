@@ -46,6 +46,13 @@ interface ICameraServiceProxy
     int getRotateAndCropOverride(String packageName, int lensFacing, int userId);
 
     /**
+     * Returns the necessary autoframing override for the top activity which
+     * will be one of ({@link android.hardware.camera2.CameraMetadata#AUTOFRAMING_FALSE},
+     * {@link android.hardware.camera2.CameraMetadata#AUTOFRAMING_TRUE}).
+     */
+    int getAutoframingOverride(String packageName);
+
+    /**
      * Checks if the camera has been disabled via device policy.
      */
     boolean isCameraDisabled(int userId);

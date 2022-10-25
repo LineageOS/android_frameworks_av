@@ -104,6 +104,9 @@ public:
     // Return the current top activity rotate and crop override.
     int getRotateAndCropOverride(String16 packageName, int lensFacing, int userId);
 
+    // Return the current top activity autoframing.
+    int getAutoframingOverride(const String16& packageName);
+
     // Detect if the camera is disabled by device policy.
     bool isCameraDisabled(int userId);
 };

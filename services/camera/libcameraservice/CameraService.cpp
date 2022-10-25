@@ -1984,9 +1984,18 @@ Status CameraService::connectHelper(const sp<CALLBACK>& cameraCb, const String8&
         if (mOverrideRotateAndCropMode != ANDROID_SCALER_ROTATE_AND_CROP_AUTO) {
             client->setRotateAndCropOverride(mOverrideRotateAndCropMode);
         } else {
-          client->setRotateAndCropOverride(
-              mCameraServiceProxyWrapper->getRotateAndCropOverride(
-                  clientPackageName, facing, multiuser_get_user_id(clientUid)));
+            client->setRotateAndCropOverride(
+                mCameraServiceProxyWrapper->getRotateAndCropOverride(
+                    clientPackageName, facing, multiuser_get_user_id(clientUid)));
+        }
+
+        // Set autoframing override behaviour
+        if (mOverrideAutoframingMode != ANDROID_CONTROL_AUTOFRAMING_AUTO) {
+            client->setAutoframingOverride(mOverrideAutoframingMode);
+        } else {
+            client->setAutoframingOverride(
+                mCameraServiceProxyWrapper->getAutoframingOverride(
+                    clientPackageName));
         }
 
         // Set camera muting behavior
@@ -4892,6 +4901,10 @@ status_t CameraService::shellCommand(int in, int out, int err, const Vector<Stri
         return handleSetRotateAndCrop(args);
     } else if (args.size() >= 1 && args[0] == String16("get-rotate-and-crop")) {
         return handleGetRotateAndCrop(out);
+    } else if (args.size() >= 2 && args[0] == String16("set-autoframing")) {
+        return handleSetAutoframing(args);
+    } else if (args.size() >= 1 && args[0] == String16("get-autoframing")) {
+        return handleGetAutoframing(out);
     } else if (args.size() >= 2 && args[0] == String16("set-image-dump-mask")) {
         return handleSetImageDumpMask(args);
     } else if (args.size() >= 1 && args[0] == String16("get-image-dump-mask")) {
@@ -4995,6 +5008,34 @@ status_t CameraService::handleSetRotateAndCrop(const Vector<String16>& args) {
     return OK;
 }
 
+status_t CameraService::handleSetAutoframing(const Vector<String16>& args) {
+    char* end;
+    int autoframingValue = (int) strtol(String8(args[1]), &end, /*base=*/10);
+    if ((*end != '\0') ||
+            (autoframingValue != ANDROID_CONTROL_AUTOFRAMING_OFF &&
+             autoframingValue != ANDROID_CONTROL_AUTOFRAMING_ON &&
+             autoframingValue != ANDROID_CONTROL_AUTOFRAMING_AUTO)) {
+        return BAD_VALUE;
+    }
+
+    Mutex::Autolock lock(mServiceLock);
+    mOverrideAutoframingMode = autoframingValue;
+
+    if (autoframingValue == ANDROID_CONTROL_AUTOFRAMING_AUTO) return OK;
+
+    const auto clients = mActiveClientManager.getAll();
+    for (auto& current : clients) {
+        if (current != nullptr) {
+            const auto basicClient = current->getValue();
+            if (basicClient.get() != nullptr) {
+                basicClient->setAutoframingOverride(autoframingValue);
+            }
+        }
+    }
+
+    return OK;
+}
+
 status_t CameraService::handleSetCameraServiceWatchdog(const Vector<String16>& args) {
     int enableWatchdog = atoi(String8(args[1]));
 
@@ -5021,6 +5062,12 @@ status_t CameraService::handleGetRotateAndCrop(int out) {
     Mutex::Autolock lock(mServiceLock);
 
     return dprintf(out, "rotateAndCrop override: %d\n", mOverrideRotateAndCropMode);
+}
+
+status_t CameraService::handleGetAutoframing(int out) {
+    Mutex::Autolock lock(mServiceLock);
+
+    return dprintf(out, "autoframing override: %d\n", mOverrideAutoframingMode);
 }
 
 status_t CameraService::handleSetImageDumpMask(const Vector<String16>& args) {
@@ -5420,6 +5467,9 @@ status_t CameraService::printHelp(int out) {
         "  set-rotate-and-crop <ROTATION> overrides the rotate-and-crop value for AUTO backcompat\n"
         "      Valid values 0=0 deg, 1=90 deg, 2=180 deg, 3=270 deg, 4=No override\n"
         "  get-rotate-and-crop returns the current override rotate-and-crop value\n"
+        "  set-autoframing <VALUE> overrides the autoframing value for AUTO\n"
+        "      Valid values 0=false, 1=true, 2=auto\n"
+        "  get-autoframing returns the current override autoframing value\n"
         "  set-image-dump-mask <MASK> specifies the formats to be saved to disk\n"
         "      Valid values 0=OFF, 1=ON for JPEG\n"
         "  get-image-dump-mask returns the current image-dump-mask value\n"

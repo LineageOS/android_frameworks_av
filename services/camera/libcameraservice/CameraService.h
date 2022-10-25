@@ -337,6 +337,9 @@ public:
         // Override rotate-and-crop AUTO behavior
         virtual status_t setRotateAndCropOverride(uint8_t rotateAndCrop) = 0;
 
+        // Override autoframing AUTO behaviour
+        virtual status_t setAutoframingOverride(uint8_t autoframingValue) = 0;
+
         // Whether the client supports camera muting (black only output)
         virtual bool supportsCameraMute() = 0;
 
@@ -1230,6 +1233,12 @@ private:
     // Get the rotate-and-crop AUTO override behavior
     status_t handleGetRotateAndCrop(int out);
 
+    // Set the autoframing AUTO override behaviour.
+    status_t handleSetAutoframing(const Vector<String16>& args);
+
+    // Get the autoframing AUTO override behaviour
+    status_t handleGetAutoframing(int out);
+
     // Set the mask for image dump to disk
     status_t handleSetImageDumpMask(const Vector<String16>& args);
 
@@ -1324,6 +1333,9 @@ private:
 
     // Current override cmd rotate-and-crop mode; AUTO means no override
     uint8_t mOverrideRotateAndCropMode = ANDROID_SCALER_ROTATE_AND_CROP_AUTO;
+
+    // Current autoframing mode
+    uint8_t mOverrideAutoframingMode = ANDROID_CONTROL_AUTOFRAMING_AUTO;
 
     // Current image dump mask
     uint8_t mImageDumpMask = 0;
