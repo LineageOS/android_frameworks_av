@@ -67,22 +67,26 @@ public:
     int64_t mDynamicRangeProfile;
     // Stream use case
     int64_t mStreamUseCase;
+    // Color space
+    int32_t mColorSpace;
 
     CameraStreamStats() :
             mWidth(0), mHeight(0), mFormat(0), mMaxPreviewFps(0), mDataSpace(0), mUsage(0),
             mRequestCount(0), mErrorCount(0), mStartLatencyMs(0),
             mMaxHalBuffers(0), mMaxAppBuffers(0), mHistogramType(HISTOGRAM_TYPE_UNKNOWN),
             mDynamicRangeProfile(ANDROID_REQUEST_AVAILABLE_DYNAMIC_RANGE_PROFILES_MAP_STANDARD),
-            mStreamUseCase(ANDROID_SCALER_AVAILABLE_STREAM_USE_CASES_DEFAULT) {}
+            mStreamUseCase(ANDROID_SCALER_AVAILABLE_STREAM_USE_CASES_DEFAULT),
+            mColorSpace(ANDROID_REQUEST_AVAILABLE_COLOR_SPACE_PROFILES_MAP_UNSPECIFIED) {}
     CameraStreamStats(int width, int height, int format, float maxPreviewFps, int dataSpace,
             int64_t usage, int maxHalBuffers, int maxAppBuffers, int dynamicRangeProfile,
-            int streamUseCase)
+            int streamUseCase, int32_t colorSpace)
             : mWidth(width), mHeight(height), mFormat(format), mMaxPreviewFps(maxPreviewFps),
               mDataSpace(dataSpace), mUsage(usage), mRequestCount(0), mErrorCount(0),
               mStartLatencyMs(0), mMaxHalBuffers(maxHalBuffers), mMaxAppBuffers(maxAppBuffers),
               mHistogramType(HISTOGRAM_TYPE_UNKNOWN),
               mDynamicRangeProfile(dynamicRangeProfile),
-              mStreamUseCase(streamUseCase) {}
+              mStreamUseCase(streamUseCase),
+              mColorSpace(colorSpace) {}
 
     virtual status_t readFromParcel(const android::Parcel* parcel) override;
     virtual status_t writeToParcel(android::Parcel* parcel) const override;

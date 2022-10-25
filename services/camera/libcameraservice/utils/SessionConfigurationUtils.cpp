@@ -282,6 +282,61 @@ bool is10bitDynamicRangeProfile(int64_t dynamicRangeProfile) {
     }
 }
 
+bool deviceReportsColorSpaces(const CameraMetadata& staticInfo) {
+    camera_metadata_ro_entry_t entry = staticInfo.find(ANDROID_REQUEST_AVAILABLE_CAPABILITIES);
+    for (size_t i = 0; i < entry.count; ++i) {
+        uint8_t capability = entry.data.u8[i];
+        if (capability == ANDROID_REQUEST_AVAILABLE_CAPABILITIES_COLOR_SPACE_PROFILES) {
+            return true;
+        }
+    }
+
+    return false;
+}
+
+bool isColorSpaceSupported(int32_t colorSpace, int32_t format, android_dataspace dataSpace,
+        int64_t dynamicRangeProfile, const CameraMetadata& staticInfo) {
+    int64_t colorSpace64 = colorSpace;
+    int64_t format64 = format;
+
+    // Translate HAL format + data space to public format
+    if (format == HAL_PIXEL_FORMAT_BLOB && dataSpace == HAL_DATASPACE_V0_JFIF) {
+        format64 = 0x100; // JPEG
+    } else if (format == HAL_PIXEL_FORMAT_BLOB
+            && dataSpace == static_cast<android_dataspace>(HAL_DATASPACE_HEIF)) {
+        format64 = 0x48454946; // HEIC
+    } else if (format == HAL_PIXEL_FORMAT_BLOB
+            && dataSpace == static_cast<android_dataspace>(HAL_DATASPACE_DYNAMIC_DEPTH)) {
+        format64 = 0x69656963; // DEPTH_JPEG
+    } else if (format == HAL_PIXEL_FORMAT_BLOB && dataSpace == HAL_DATASPACE_DEPTH) {
+        return false; // DEPTH_POINT_CLOUD, not applicable
+    } else if (format == HAL_PIXEL_FORMAT_Y16 && dataSpace == HAL_DATASPACE_DEPTH) {
+        return false; // DEPTH16, not applicable
+    } else if (format == HAL_PIXEL_FORMAT_RAW16 && dataSpace == HAL_DATASPACE_DEPTH) {
+        return false; // RAW_DEPTH, not applicable
+    } else if (format == HAL_PIXEL_FORMAT_RAW10 && dataSpace == HAL_DATASPACE_DEPTH) {
+        return false; // RAW_DEPTH10, not applicable
+    }
+
+    camera_metadata_ro_entry_t entry =
+            staticInfo.find(ANDROID_REQUEST_AVAILABLE_COLOR_SPACE_PROFILES_MAP);
+    for (size_t i = 0; i < entry.count; i += 3) {
+        bool isFormatCompatible = (format64 == entry.data.i64[i + 1]);
+        bool isDynamicProfileCompatible =
+                (dynamicRangeProfile & entry.data.i64[i + 2]) != 0;
+
+        if (colorSpace64 == entry.data.i64[i]
+                && isFormatCompatible
+                && isDynamicProfileCompatible) {
+            return true;
+        }
+    }
+
+    ALOGE("Color space %d, image format %" PRId64 ", and dynamic range 0x%" PRIx64
+            " combination not found", colorSpace, format64, dynamicRangeProfile);
+    return false;
+}
+
 bool isPublicFormat(int32_t format)
 {
     switch(format) {
@@ -336,7 +391,8 @@ binder::Status createSurfaceFromGbp(
         sp<Surface>& surface, const sp<IGraphicBufferProducer>& gbp,
         const String8 &logicalCameraId, const CameraMetadata &physicalCameraMetadata,
         const std::vector<int32_t> &sensorPixelModesUsed, int64_t dynamicRangeProfile,
-        int64_t streamUseCase, int timestampBase, int mirrorMode) {
+        int64_t streamUseCase, int timestampBase, int mirrorMode,
+        int32_t colorSpace) {
     // bufferProducer must be non-null
     if (gbp == nullptr) {
         String8 msg = String8::format("Camera %s: Surface is NULL", logicalCameraId.string());
@@ -450,6 +506,16 @@ binder::Status createSurfaceFromGbp(
         ALOGE("%s: %s", __FUNCTION__, msg.string());
         return STATUS_ERROR(CameraService::ERROR_ILLEGAL_ARGUMENT, msg.string());
     }
+    if (colorSpace != ANDROID_REQUEST_AVAILABLE_COLOR_SPACE_PROFILES_MAP_UNSPECIFIED &&
+            SessionConfigurationUtils::deviceReportsColorSpaces(physicalCameraMetadata) &&
+            !SessionConfigurationUtils::isColorSpaceSupported(colorSpace, format, dataSpace,
+                    dynamicRangeProfile, physicalCameraMetadata)) {
+        String8 msg = String8::format("Camera %s: Color space %d not supported, failed to "
+                "create output stream (pixel format %d dynamic range profile %" PRId64 ")",
+                logicalCameraId.string(), colorSpace, format, dynamicRangeProfile);
+        ALOGE("%s: %s", __FUNCTION__, msg.string());
+        return STATUS_ERROR(CameraService::ERROR_ILLEGAL_ARGUMENT, msg.string());
+    }
     if (!SessionConfigurationUtils::isStreamUseCaseSupported(streamUseCase,
             physicalCameraMetadata)) {
         String8 msg = String8::format("Camera %s: stream use case %" PRId64 " not supported,"
@@ -483,6 +549,7 @@ binder::Status createSurfaceFromGbp(
         streamInfo.streamUseCase = streamUseCase;
         streamInfo.timestampBase = timestampBase;
         streamInfo.mirrorMode = mirrorMode;
+        streamInfo.colorSpace = colorSpace;
         return binder::Status::ok();
     }
     if (width != streamInfo.width) {
@@ -538,6 +605,7 @@ void mapStreamInfo(const OutputStreamInfo &streamInfo,
     camera3::Camera3OutputStream::applyZSLUsageQuirk(streamInfo.format, &u);
     stream->usage = AidlCamera3Device::mapToAidlConsumerUsage(u);
     stream->dataSpace = AidlCamera3Device::mapToAidlDataspace(streamInfo.dataSpace);
+    stream->colorSpace = streamInfo.colorSpace;
     stream->rotation = AidlCamera3Device::mapToAidlStreamRotation(rotation);
     stream->id = -1; // Invalid stream id
     stream->physicalCameraId = std::string(physicalId.string());
@@ -635,6 +703,7 @@ convertToHALStreamCombination(
         String8 physicalCameraId = String8(it.getPhysicalCameraId());
 
         int64_t dynamicRangeProfile = it.getDynamicRangeProfile();
+        int32_t colorSpace = it.getColorSpace();
         std::vector<int32_t> sensorPixelModesUsed = it.getSensorPixelModesUsed();
         const CameraMetadata &physicalDeviceInfo = getMetadata(physicalCameraId,
                 overrideForPerfClass);
@@ -693,7 +762,7 @@ convertToHALStreamCombination(
             sp<Surface> surface;
             res = createSurfaceFromGbp(streamInfo, isStreamInfoValid, surface, bufferProducer,
                     logicalCameraId, metadataChosen, sensorPixelModesUsed, dynamicRangeProfile,
-                    streamUseCase, timestampBase, mirrorMode);
+                    streamUseCase, timestampBase, mirrorMode, colorSpace);
 
             if (!res.isOk())
                 return res;

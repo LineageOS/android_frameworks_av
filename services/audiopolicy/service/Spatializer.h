@@ -351,6 +351,12 @@ private:
      */
     void checkEngineState_l() REQUIRES(mLock);
 
+    /**
+     * Reset head tracking mode and recenter pose in engine: Called when the head tracking
+     * is disabled.
+     */
+    void resetEngineHeadPose_l() REQUIRES(mLock);
+
     /** Effect engine descriptor */
     const effect_descriptor_t mEngineDescriptor;
     /** Callback interface to parent audio policy service */

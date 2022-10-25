@@ -884,6 +884,7 @@ binder::Status CameraDeviceClient::createStream(
     int64_t streamUseCase = outputConfiguration.getStreamUseCase();
     int timestampBase = outputConfiguration.getTimestampBase();
     int mirrorMode = outputConfiguration.getMirrorMode();
+    int32_t colorSpace = outputConfiguration.getColorSpace();
 
     res = SessionConfigurationUtils::checkSurfaceType(numBufferProducers, deferredConsumer,
             outputConfiguration.getSurfaceType());
@@ -928,7 +929,7 @@ binder::Status CameraDeviceClient::createStream(
         res = SessionConfigurationUtils::createSurfaceFromGbp(streamInfo,
                 isStreamInfoValid, surface, bufferProducer, mCameraIdStr,
                 mDevice->infoPhysical(physicalCameraId), sensorPixelModesUsed, dynamicRangeProfile,
-                streamUseCase, timestampBase, mirrorMode);
+                streamUseCase, timestampBase, mirrorMode, colorSpace);
 
         if (!res.isOk())
             return res;
@@ -975,7 +976,7 @@ binder::Status CameraDeviceClient::createStream(
                 &streamId, physicalCameraId, streamInfo.sensorPixelModesUsed, &surfaceIds,
                 outputConfiguration.getSurfaceSetID(), isShared, isMultiResolution,
                 /*consumerUsage*/0, streamInfo.dynamicRangeProfile, streamInfo.streamUseCase,
-                streamInfo.timestampBase, streamInfo.mirrorMode);
+                streamInfo.timestampBase, streamInfo.mirrorMode, streamInfo.colorSpace);
     }
 
     if (err != OK) {
@@ -1027,6 +1028,7 @@ binder::Status CameraDeviceClient::createDeferredSurfaceStreamLocked(
     int width, height, format, surfaceType;
     uint64_t consumerUsage;
     android_dataspace dataSpace;
+    int32_t colorSpace;
     status_t err;
     binder::Status res;
 
@@ -1040,6 +1042,7 @@ binder::Status CameraDeviceClient::createDeferredSurfaceStreamLocked(
     surfaceType = outputConfiguration.getSurfaceType();
     format = HAL_PIXEL_FORMAT_IMPLEMENTATION_DEFINED;
     dataSpace = android_dataspace_t::HAL_DATASPACE_UNKNOWN;
+    colorSpace = ANDROID_REQUEST_AVAILABLE_COLOR_SPACE_PROFILES_MAP_UNSPECIFIED;
     // Hardcode consumer usage flags: SurfaceView--0x900, SurfaceTexture--0x100.
     consumerUsage = GraphicBuffer::USAGE_HW_TEXTURE;
     if (surfaceType == OutputConfiguration::SURFACE_TYPE_SURFACE_VIEW) {
@@ -1089,7 +1092,8 @@ binder::Status CameraDeviceClient::createDeferredSurfaceStreamLocked(
                         outputConfiguration.getDynamicRangeProfile(),
                         outputConfiguration.getStreamUseCase(),
                         outputConfiguration.getTimestampBase(),
-                        outputConfiguration.getMirrorMode()));
+                        outputConfiguration.getMirrorMode(),
+                        colorSpace));
 
         ALOGV("%s: Camera %s: Successfully created a new stream ID %d for a deferred surface"
                 " (%d x %d) stream with format 0x%x.",
@@ -1280,6 +1284,7 @@ binder::Status CameraDeviceClient::updateOutputConfiguration(int streamId,
     int64_t streamUseCase = outputConfiguration.getStreamUseCase();
     int timestampBase = outputConfiguration.getTimestampBase();
     int64_t dynamicRangeProfile = outputConfiguration.getDynamicRangeProfile();
+    int32_t colorSpace = outputConfiguration.getColorSpace();
     int mirrorMode = outputConfiguration.getMirrorMode();
 
     for (size_t i = 0; i < newOutputsMap.size(); i++) {
@@ -1288,7 +1293,7 @@ binder::Status CameraDeviceClient::updateOutputConfiguration(int streamId,
         res = SessionConfigurationUtils::createSurfaceFromGbp(outInfo,
                 /*isStreamInfoValid*/ false, surface, newOutputsMap.valueAt(i), mCameraIdStr,
                 mDevice->infoPhysical(physicalCameraId), sensorPixelModesUsed, dynamicRangeProfile,
-                streamUseCase, timestampBase, mirrorMode);
+                streamUseCase, timestampBase, mirrorMode, colorSpace);
         if (!res.isOk())
             return res;
 
@@ -1646,7 +1651,8 @@ binder::Status CameraDeviceClient::finalizeOutputConfigurations(int32_t streamId
     const std::vector<int32_t> &sensorPixelModesUsed =
             outputConfiguration.getSensorPixelModesUsed();
     int64_t dynamicRangeProfile = outputConfiguration.getDynamicRangeProfile();
-    int64_t streamUseCase= outputConfiguration.getStreamUseCase();
+    int32_t colorSpace = outputConfiguration.getColorSpace();
+    int64_t streamUseCase = outputConfiguration.getStreamUseCase();
     int timestampBase = outputConfiguration.getTimestampBase();
     int mirrorMode = outputConfiguration.getMirrorMode();
     for (auto& bufferProducer : bufferProducers) {
@@ -1662,7 +1668,7 @@ binder::Status CameraDeviceClient::finalizeOutputConfigurations(int32_t streamId
         res = SessionConfigurationUtils::createSurfaceFromGbp(mStreamInfoMap[streamId],
                 true /*isStreamInfoValid*/, surface, bufferProducer, mCameraIdStr,
                 mDevice->infoPhysical(physicalId), sensorPixelModesUsed, dynamicRangeProfile,
-                streamUseCase, timestampBase, mirrorMode);
+                streamUseCase, timestampBase, mirrorMode, colorSpace);
 
         if (!res.isOk())
             return res;
