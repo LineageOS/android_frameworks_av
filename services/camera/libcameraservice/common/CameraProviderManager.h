@@ -23,7 +23,6 @@
 #include <set>
 #include <string>
 #include <mutex>
-#include <future>
 
 #include <camera/camera2/ConcurrentCamera.h>
 #include <camera/CameraParameters2.h>
@@ -220,7 +219,14 @@ public:
      */
     std::pair<int, int> getCameraCount() const;
 
-    std::vector<std::string> getCameraDeviceIds() const;
+    /**
+     * Upon the function return, if unavailablePhysicalIds is not nullptr, it
+     * will contain all of the unavailable physical camera Ids represented in
+     * the form of:
+     * {[logicalCamera, {physicalCamera1, physicalCamera2, ...}], ...}.
+     */
+    std::vector<std::string> getCameraDeviceIds(std::unordered_map<
+            std::string, std::set<std::string>>* unavailablePhysicalIds = nullptr) const;
 
     /**
      * Retrieve the number of API1 compatible cameras; these are internal and
@@ -607,6 +613,7 @@ private:
         };
         std::vector<std::unique_ptr<DeviceInfo>> mDevices;
         std::unordered_set<std::string> mUniqueCameraIds;
+        std::unordered_map<std::string, std::set<std::string>> mUnavailablePhysicalCameras;
         int mUniqueDeviceCount;
         std::vector<std::string> mUniqueAPI1CompatibleCameraIds;
         // The initial public camera IDs published by the camera provider.
@@ -715,17 +722,12 @@ private:
         std::vector<CameraStatusInfoT> mCachedStatus;
         // End of scope for mInitLock
 
-        std::future<void> mInitialStatusCallbackFuture;
-
         std::unique_ptr<ProviderInfo::DeviceInfo>
         virtual initializeDeviceInfo(
                 const std::string &name, const metadata_vendor_id_t tagId,
                 const std::string &id, uint16_t minorVersion) = 0;
 
         virtual status_t reCacheConcurrentStreamingCameraIdsLocked() = 0;
-
-        void notifyInitialStatusChange(sp<StatusListener> listener,
-                std::unique_ptr<std::vector<CameraStatusInfoT>> cachedStatus);
 
         std::vector<std::unordered_set<std::string>> mConcurrentCameraIdCombinations;
 

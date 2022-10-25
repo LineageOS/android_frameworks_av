@@ -203,6 +203,7 @@ status_t CameraService::enumerateProviders() {
     status_t res;
 
     std::vector<std::string> deviceIds;
+    std::unordered_map<std::string, std::set<std::string>> unavailPhysicalIds;
     {
         Mutex::Autolock l(mServiceLock);
 
@@ -233,7 +234,7 @@ status_t CameraService::enumerateProviders() {
             ALOGE("Failed to enumerate flash units: %s (%d)", strerror(-res), res);
         }
 
-        deviceIds = mCameraProviderManager->getCameraDeviceIds();
+        deviceIds = mCameraProviderManager->getCameraDeviceIds(&unavailPhysicalIds);
     }
 
 
@@ -241,6 +242,12 @@ status_t CameraService::enumerateProviders() {
         String8 id8 = String8(cameraId.c_str());
         if (getCameraState(id8) == nullptr) {
             onDeviceStatusChanged(id8, CameraDeviceStatus::PRESENT);
+        }
+        if (unavailPhysicalIds.count(cameraId) > 0) {
+            for (const auto& physicalId : unavailPhysicalIds[cameraId]) {
+                String8 physicalId8 = String8(physicalId.c_str());
+                onDeviceStatusChanged(id8, physicalId8, CameraDeviceStatus::NOT_PRESENT);
+            }
         }
     }
 
@@ -495,7 +502,7 @@ void CameraService::onDeviceStatusChanged(const String8& id,
 
     if (state == nullptr) {
         ALOGE("%s: Physical camera id %s status change on a non-present ID %s",
-                __FUNCTION__, id.string(), physicalId.string());
+                __FUNCTION__, physicalId.string(), id.string());
         return;
     }
 
