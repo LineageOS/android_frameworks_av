@@ -913,6 +913,7 @@ status_t AidlCamera3Device::AidlHalInterface::configureStreams(
                     cam3stream->getOriginalFormat() : src->format);
         dst.dataSpace = mapToAidlDataspace(cam3stream->isDataSpaceOverridden() ?
                     cam3stream->getOriginalDataSpace() : src->data_space);
+        dst.colorSpace = src->color_space;
 
         dst.bufferSize = bufferSizes[i];
         if (src->physical_camera_id != nullptr) {

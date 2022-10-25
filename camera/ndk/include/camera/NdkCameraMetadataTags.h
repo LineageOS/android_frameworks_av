@@ -3520,6 +3520,26 @@ typedef enum acamera_metadata_tag {
      */
     ACAMERA_REQUEST_AVAILABLE_DYNAMIC_RANGE_PROFILES_MAP =      // int64[n*3] (acamera_metadata_enum_android_request_available_dynamic_range_profiles_map_t)
             ACAMERA_REQUEST_START + 19,
+    /**
+     * <p>A list of all possible color space profiles supported by a camera device.</p>
+     *
+     * <p>Type: int64[n*3] (acamera_metadata_enum_android_request_available_color_space_profiles_map_t)</p>
+     *
+     * <p>This tag may appear in:
+     * <ul>
+     *   <li>ACameraMetadata from ACameraManager_getCameraCharacteristics</li>
+     * </ul></p>
+     *
+     * <p>A color space profile is a combination of a color space, an image format, and a dynamic range
+     * profile. If a camera does not support the
+     * <a href="https://developer.android.com/reference/android/hardware/camera2/CameraCharacteristics.html#REQUEST_AVAILABLE_CAPABILITIES_DYNAMIC_RANGE_TEN_BIT">CameraCharacteristics#REQUEST_AVAILABLE_CAPABILITIES_DYNAMIC_RANGE_TEN_BIT</a>
+     * capability, the dynamic range profile will always be
+     * <a href="https://developer.android.com/reference/android/hardware/camera2/params/DynamicRangeProfiles.html#STANDARD">DynamicRangeProfiles#STANDARD</a>. Camera clients can
+     * use <a href="https://developer.android.com/reference/android/hardware/camera2/params/SessionConfiguration.html#setColorSpace">SessionConfiguration#setColorSpace</a> to select
+     * a color space.</p>
+     */
+    ACAMERA_REQUEST_AVAILABLE_COLOR_SPACE_PROFILES_MAP =        // int64[n*3] (acamera_metadata_enum_android_request_available_color_space_profiles_map_t)
+            ACAMERA_REQUEST_START + 21,
     ACAMERA_REQUEST_END,
 
     /**
@@ -9447,6 +9467,99 @@ typedef enum acamera_metadata_enum_acamera_request_available_dynamic_range_profi
     ACAMERA_REQUEST_AVAILABLE_DYNAMIC_RANGE_PROFILES_MAP_MAX         = 0x1000,
 
 } acamera_metadata_enum_android_request_available_dynamic_range_profiles_map_t;
+
+// ACAMERA_REQUEST_AVAILABLE_COLOR_SPACE_PROFILES_MAP
+typedef enum acamera_metadata_enum_acamera_request_available_color_space_profiles_map {
+    /**
+     * <p>Default value, when not explicitly specified. The Camera device will choose the color
+     * space to employ.</p>
+     */
+    ACAMERA_REQUEST_AVAILABLE_COLOR_SPACE_PROFILES_MAP_UNSPECIFIED   = -1,
+
+    /**
+     * <p>RGB color space sRGB standardized as IEC 61966-2.1:1999.</p>
+     */
+    ACAMERA_REQUEST_AVAILABLE_COLOR_SPACE_PROFILES_MAP_SRGB          = 0,
+
+    /**
+     * <p>RGB color space sRGB standardized as IEC 61966-2.1:1999.</p>
+     */
+    ACAMERA_REQUEST_AVAILABLE_COLOR_SPACE_PROFILES_MAP_LINEAR_SRGB   = 1,
+
+    /**
+     * <p>RGB color space scRGB-nl standardized as IEC 61966-2-2:2003.</p>
+     */
+    ACAMERA_REQUEST_AVAILABLE_COLOR_SPACE_PROFILES_MAP_EXTENDED_SRGB = 2,
+
+    /**
+     * <p>RGB color space scRGB standardized as IEC 61966-2-2:2003.</p>
+     */
+    ACAMERA_REQUEST_AVAILABLE_COLOR_SPACE_PROFILES_MAP_LINEAR_EXTENDED_SRGB
+                                                                      = 3,
+
+    /**
+     * <p>RGB color space BT.709 standardized as Rec. ITU-R BT.709-5.</p>
+     */
+    ACAMERA_REQUEST_AVAILABLE_COLOR_SPACE_PROFILES_MAP_BT709         = 4,
+
+    /**
+     * <p>RGB color space BT.2020 standardized as Rec. ITU-R BT.2020-1.</p>
+     */
+    ACAMERA_REQUEST_AVAILABLE_COLOR_SPACE_PROFILES_MAP_BT2020        = 5,
+
+    /**
+     * <p>RGB color space DCI-P3 standardized as SMPTE RP 431-2-2007.</p>
+     */
+    ACAMERA_REQUEST_AVAILABLE_COLOR_SPACE_PROFILES_MAP_DCI_P3        = 6,
+
+    /**
+     * <p>RGB color space Display P3 based on SMPTE RP 431-2-2007 and IEC 61966-2.1:1999.</p>
+     */
+    ACAMERA_REQUEST_AVAILABLE_COLOR_SPACE_PROFILES_MAP_DISPLAY_P3    = 7,
+
+    /**
+     * <p>RGB color space NTSC, 1953 standard.</p>
+     */
+    ACAMERA_REQUEST_AVAILABLE_COLOR_SPACE_PROFILES_MAP_NTSC_1953     = 8,
+
+    /**
+     * <p>RGB color space SMPTE C.</p>
+     */
+    ACAMERA_REQUEST_AVAILABLE_COLOR_SPACE_PROFILES_MAP_SMPTE_C       = 9,
+
+    /**
+     * <p>RGB color space Adobe RGB (1998).</p>
+     */
+    ACAMERA_REQUEST_AVAILABLE_COLOR_SPACE_PROFILES_MAP_ADOBE_RGB     = 10,
+
+    /**
+     * <p>RGB color space ProPhoto RGB standardized as ROMM RGB ISO 22028-2:2013.</p>
+     */
+    ACAMERA_REQUEST_AVAILABLE_COLOR_SPACE_PROFILES_MAP_PRO_PHOTO_RGB = 11,
+
+    /**
+     * <p>RGB color space ACES standardized as SMPTE ST 2065-1:2012.</p>
+     */
+    ACAMERA_REQUEST_AVAILABLE_COLOR_SPACE_PROFILES_MAP_ACES          = 12,
+
+    /**
+     * <p>RGB color space ACEScg standardized as Academy S-2014-004.</p>
+     */
+    ACAMERA_REQUEST_AVAILABLE_COLOR_SPACE_PROFILES_MAP_ACESCG        = 13,
+
+    /**
+     * <p>XYZ color space CIE XYZ. This color space assumes standard illuminant D50 as its white
+     * point.</p>
+     */
+    ACAMERA_REQUEST_AVAILABLE_COLOR_SPACE_PROFILES_MAP_CIE_XYZ       = 14,
+
+    /**
+     * <p>Lab color space CIE L<em>a</em>b*. This color space uses CIE XYZ D50 as a profile conversion
+     * space.</p>
+     */
+    ACAMERA_REQUEST_AVAILABLE_COLOR_SPACE_PROFILES_MAP_CIE_LAB       = 15,
+
+} acamera_metadata_enum_android_request_available_color_space_profiles_map_t;
 
 
 // ACAMERA_SCALER_AVAILABLE_STREAM_CONFIGURATIONS

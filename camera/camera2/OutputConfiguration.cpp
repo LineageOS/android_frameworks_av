@@ -26,8 +26,8 @@
 #include <system/camera_metadata.h>
 #include <utils/String8.h>
 
-namespace android {
 
+namespace android {
 
 const int OutputConfiguration::INVALID_ROTATION = -1;
 const int OutputConfiguration::INVALID_SET_ID = -1;
@@ -81,6 +81,10 @@ int64_t OutputConfiguration::getDynamicRangeProfile() const {
     return mDynamicRangeProfile;
 }
 
+int32_t OutputConfiguration::getColorSpace() const {
+    return mColorSpace;
+}
+
 int64_t OutputConfiguration::getStreamUseCase() const {
     return mStreamUseCase;
 }
@@ -103,6 +107,7 @@ OutputConfiguration::OutputConfiguration() :
         mIsShared(false),
         mIsMultiResolution(false),
         mDynamicRangeProfile(ANDROID_REQUEST_AVAILABLE_DYNAMIC_RANGE_PROFILES_MAP_STANDARD),
+        mColorSpace(ANDROID_REQUEST_AVAILABLE_COLOR_SPACE_PROFILES_MAP_UNSPECIFIED),
         mStreamUseCase(ANDROID_SCALER_AVAILABLE_STREAM_USE_CASES_DEFAULT),
         mTimestampBase(TIMESTAMP_BASE_DEFAULT),
         mMirrorMode(MIRROR_MODE_AUTO) {
@@ -191,6 +196,11 @@ status_t OutputConfiguration::readFromParcel(const android::Parcel* parcel) {
         ALOGE("%s: Failed to read surface dynamic range profile flag from parcel", __FUNCTION__);
         return err;
     }
+    int32_t colorSpace;
+    if ((err = parcel->readInt32(&colorSpace)) != OK) {
+        ALOGE("%s: Failed to read surface color space flag from parcel", __FUNCTION__);
+        return err;
+    }
 
     int64_t streamUseCase = ANDROID_SCALER_AVAILABLE_STREAM_USE_CASES_DEFAULT;
     if ((err = parcel->readInt64(&streamUseCase)) != OK) {
@@ -230,6 +240,7 @@ status_t OutputConfiguration::readFromParcel(const android::Parcel* parcel) {
 
     mSensorPixelModesUsed = std::move(sensorPixelModesUsed);
     mDynamicRangeProfile = dynamicProfile;
+    mColorSpace = colorSpace;
 
     ALOGV("%s: OutputConfiguration: rotation = %d, setId = %d, surfaceType = %d,"
           " physicalCameraId = %s, isMultiResolution = %d, streamUseCase = %" PRId64
@@ -252,6 +263,7 @@ OutputConfiguration::OutputConfiguration(sp<IGraphicBufferProducer>& gbp, int ro
     mPhysicalCameraId = physicalId;
     mIsMultiResolution = false;
     mDynamicRangeProfile = ANDROID_REQUEST_AVAILABLE_DYNAMIC_RANGE_PROFILES_MAP_STANDARD;
+    mColorSpace = ANDROID_REQUEST_AVAILABLE_COLOR_SPACE_PROFILES_MAP_UNSPECIFIED;
     mStreamUseCase = ANDROID_SCALER_AVAILABLE_STREAM_USE_CASES_DEFAULT;
     mTimestampBase = TIMESTAMP_BASE_DEFAULT;
     mMirrorMode = MIRROR_MODE_AUTO;
@@ -265,6 +277,7 @@ OutputConfiguration::OutputConfiguration(
     mWidth(width), mHeight(height), mIsDeferred(false), mIsShared(isShared),
     mPhysicalCameraId(physicalCameraId), mIsMultiResolution(false),
     mDynamicRangeProfile(ANDROID_REQUEST_AVAILABLE_DYNAMIC_RANGE_PROFILES_MAP_STANDARD),
+    mColorSpace(ANDROID_REQUEST_AVAILABLE_COLOR_SPACE_PROFILES_MAP_UNSPECIFIED),
     mStreamUseCase(ANDROID_SCALER_AVAILABLE_STREAM_USE_CASES_DEFAULT),
     mTimestampBase(TIMESTAMP_BASE_DEFAULT),
     mMirrorMode(MIRROR_MODE_AUTO) { }
@@ -315,6 +328,9 @@ status_t OutputConfiguration::writeToParcel(android::Parcel* parcel) const {
     if (err != OK) return err;
 
     err = parcel->writeInt64(mDynamicRangeProfile);
+    if (err != OK) return err;
+
+    err = parcel->writeInt32(mColorSpace);
     if (err != OK) return err;
 
     err = parcel->writeInt64(mStreamUseCase);

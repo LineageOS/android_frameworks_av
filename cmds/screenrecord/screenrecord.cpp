@@ -419,30 +419,39 @@ static status_t writeWinscopeMetadataLegacy(const Vector<int64_t>& timestamps,
 /*
  * Saves metadata needed by Winscope to synchronize the screen recording playback with other traces.
  *
- * The metadata (version 1) is written as a binary array with the following format:
+ * The metadata (version 2) is written as a binary array with the following format:
  * - winscope magic string (#VV1NSC0PET1ME2#, 16B).
- * - the metadata version number (4B).
- * - Realtime-to-monotonic time offset in nanoseconds (8B).
- * - the recorded frames count (8B)
+ * - the metadata version number (4B little endian).
+ * - Realtime-to-elapsed time offset in nanoseconds (8B little endian).
+ * - the recorded frames count (8B little endian)
  * - for each recorded frame:
- *     - System time in monotonic clock timebase in nanoseconds (8B).
+ *     - System time in elapsed clock timebase in nanoseconds (8B little endian).
  *
- * All numbers are Little Endian encoded.
+ *
+ * Metadata version 2 changes
+ *
+ * Use elapsed time for compatibility with other UI traces (most of them):
+ * - Realtime-to-elapsed time offset (instead of realtime-to-monotonic)
+ * - Frame timestamps in elapsed clock timebase (instead of monotonic)
  */
 static status_t writeWinscopeMetadata(const Vector<std::int64_t>& timestampsMonotonicUs,
         const ssize_t metaTrackIdx, AMediaMuxer *muxer) {
     ALOGV("Writing winscope metadata");
 
     static constexpr auto kWinscopeMagicString = std::string_view {"#VV1NSC0PET1ME2#"};
-    static constexpr std::uint32_t metadataVersion = 1;
-    const std::int64_t realToMonotonicTimeOffsetNs =
-            systemTime(SYSTEM_TIME_REALTIME) - systemTime(SYSTEM_TIME_MONOTONIC);
+    static constexpr std::uint32_t metadataVersion = 2;
+
+    const auto elapsedTimeNs = android::elapsedRealtimeNano();
+    const std::int64_t elapsedToMonotonicTimeOffsetNs =
+            elapsedTimeNs - systemTime(SYSTEM_TIME_MONOTONIC);
+    const std::int64_t realToElapsedTimeOffsetNs =
+            systemTime(SYSTEM_TIME_REALTIME) - elapsedTimeNs;
     const std::uint32_t framesCount = static_cast<std::uint32_t>(timestampsMonotonicUs.size());
 
     sp<ABuffer> buffer = new ABuffer(
         kWinscopeMagicString.size() +
         sizeof(decltype(metadataVersion)) +
-        sizeof(decltype(realToMonotonicTimeOffsetNs)) +
+        sizeof(decltype(realToElapsedTimeOffsetNs)) +
         sizeof(decltype(framesCount)) +
         framesCount * sizeof(std::uint64_t)
     );
@@ -454,14 +463,16 @@ static status_t writeWinscopeMetadata(const Vector<std::int64_t>& timestampsMono
     writeValueLE(metadataVersion, pos);
     pos += sizeof(decltype(metadataVersion));
 
-    writeValueLE(realToMonotonicTimeOffsetNs, pos);
-    pos += sizeof(decltype(realToMonotonicTimeOffsetNs));
+    writeValueLE(realToElapsedTimeOffsetNs, pos);
+    pos += sizeof(decltype(realToElapsedTimeOffsetNs));
 
     writeValueLE(framesCount, pos);
     pos += sizeof(decltype(framesCount));
 
     for (const auto timestampMonotonicUs : timestampsMonotonicUs) {
-        writeValueLE<std::uint64_t>(timestampMonotonicUs * 1000, pos);
+        const auto timestampElapsedNs =
+                elapsedToMonotonicTimeOffsetNs + timestampMonotonicUs * 1000;
+        writeValueLE<std::uint64_t>(timestampElapsedNs, pos);
         pos += sizeof(std::uint64_t);
     }
 

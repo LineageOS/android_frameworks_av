@@ -79,10 +79,14 @@ extern "C" int LLVMFuzzerTestOneInput(const uint8_t* data, size_t size) {
         if (fdp.ConsumeBool()) {
             parcelCamStreamStats.writeInt32(streamUseCase);
         }
+        int32_t colorSpace = fdp.ConsumeIntegral<int32_t>();
+        if (fdp.ConsumeBool()) {
+            parcelCamStreamStats.writeInt32(colorSpace);
+        }
 
         cameraStreamStats = new CameraStreamStats(width, height, format, maxPreviewFps, dataSpace,
                                                   usage, maxHalBuffers, maxAppBuffers,
-                                                  dynamicRangeProfile, streamUseCase);
+                                                  dynamicRangeProfile, streamUseCase, colorSpace);
     }
 
     parcelCamStreamStats.setDataPosition(0);
