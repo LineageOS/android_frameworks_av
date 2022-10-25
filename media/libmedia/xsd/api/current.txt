@@ -47,7 +47,9 @@ package media.profiles {
     method public java.util.List<media.profiles.EncoderProfile> getEncoderProfile_optional();
     method public java.util.List<media.profiles.CamcorderProfiles.ImageDecodingOptional> getImageDecoding_optional();
     method public java.util.List<media.profiles.CamcorderProfiles.ImageEncodingOptional> getImageEncoding_optional();
+    method public int getStartOffsetMs();
     method public void setCameraId(int);
+    method public void setStartOffsetMs(int);
   }
 
   public static class CamcorderProfiles.ImageDecodingOptional {
