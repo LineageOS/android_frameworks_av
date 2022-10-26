@@ -38,7 +38,7 @@ bool isAtLeastT() {
            !strcmp(deviceCodeName, "Tiramisu");
 }
 
-bool isVendorApiOrFirstApiAtLeastT() {
+static bool isP010Allowed() {
     // The first SDK the device shipped with.
     static const int32_t kProductFirstApiLevel =
         base::GetIntProperty<int32_t>("ro.product.first_api_level", 0);
@@ -47,6 +47,17 @@ bool isVendorApiOrFirstApiAtLeastT() {
     // to signal which VSR requirements they conform to even if the first device SDK was higher.
     static const int32_t kBoardFirstApiLevel =
         base::GetIntProperty<int32_t>("ro.board.first_api_level", 0);
+
+    // Some devices that launched prior to Android S may not support P010 correctly, even
+    // though they may advertise it as supported.
+    if (kProductFirstApiLevel != 0 && kProductFirstApiLevel < __ANDROID_API_S__) {
+        return false;
+    }
+
+    if (kBoardFirstApiLevel != 0 && kBoardFirstApiLevel < __ANDROID_API_S__) {
+        return false;
+    }
+
     static const int32_t kBoardApiLevel =
         base::GetIntProperty<int32_t>("ro.board.api_level", 0);
 
@@ -67,7 +78,7 @@ bool isHalPixelFormatSupported(AHardwareBuffer_Format format) {
     // API alone. For now limit P010 to devices that launched with Android T or known to conform
     // to Android T VSR (as opposed to simply limiting to a T vendor image).
     if (format == (AHardwareBuffer_Format)HAL_PIXEL_FORMAT_YCBCR_P010 &&
-            !isVendorApiOrFirstApiAtLeastT()) {
+            !isP010Allowed()) {
         return false;
     }
 
