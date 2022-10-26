@@ -2044,6 +2044,105 @@ typedef enum acamera_metadata_tag {
      */
     ACAMERA_CONTROL_ZOOM_RATIO =                                // float
             ACAMERA_CONTROL_START + 47,
+    /**
+     * <p>The desired CaptureRequest settings override with which certain keys are
+     * applied earlier so that they can take effect sooner.</p>
+     *
+     * <p>Type: int32 (acamera_metadata_enum_android_control_settings_override_t)</p>
+     *
+     * <p>This tag may appear in:
+     * <ul>
+     *   <li>ACameraMetadata from ACameraCaptureSession_captureCallback_result callbacks</li>
+     *   <li>ACaptureRequest</li>
+     * </ul></p>
+     *
+     * <p>There are some CaptureRequest keys which can be applied earlier than others
+     * when controls within a CaptureRequest aren't required to take effect at the same time.
+     * One such example is zoom. Zoom can be applied at a later stage of the camera pipeline.
+     * As soon as the camera device receives the CaptureRequest, it can apply the requested
+     * zoom value onto an earlier request that's already in the pipeline, thus improves zoom
+     * latency.</p>
+     * <p>This key's value in the capture result reflects whether the controls for this capture
+     * are overridden "by" a newer request. This means that if a capture request turns on
+     * settings override, the capture result of an earlier request will contain the key value
+     * of ZOOM. On the other hand, if a capture request has settings override turned on,
+     * but all newer requests have it turned off, the key's value in the capture result will
+     * be OFF because this capture isn't overridden by a newer capture. In the two examples
+     * below, the capture results columns illustrate the settingsOverride values in different
+     * scenarios.</p>
+     * <p>Assuming the zoom settings override can speed up by 1 frame, below example illustrates
+     * the speed-up at the start of capture session:</p>
+     * <pre><code>Camera session created
+     * Request 1 (zoom=1.0x, override=ZOOM) -&gt;
+     * Request 2 (zoom=1.2x, override=ZOOM) -&gt;
+     * Request 3 (zoom=1.4x, override=ZOOM) -&gt;  Result 1 (zoom=1.2x, override=ZOOM)
+     * Request 4 (zoom=1.6x, override=ZOOM) -&gt;  Result 2 (zoom=1.4x, override=ZOOM)
+     * Request 5 (zoom=1.8x, override=ZOOM) -&gt;  Result 3 (zoom=1.6x, override=ZOOM)
+     *                                      -&gt;  Result 4 (zoom=1.8x, override=ZOOM)
+     *                                      -&gt;  Result 5 (zoom=1.8x, override=OFF)
+     * </code></pre>
+     * <p>The application can turn on settings override and use zoom as normal. The example
+     * shows that the later zoom values (1.2x, 1.4x, 1.6x, and 1.8x) overwrite the zoom
+     * values (1.0x, 1.2x, 1.4x, and 1.8x) of earlier requests (#1, #2, #3, and #4).</p>
+     * <p>The application must make sure the settings override doesn't interfere with user
+     * journeys requiring simultaneous application of all controls in CaptureRequest on the
+     * requested output targets. For example, if the application takes a still capture using
+     * CameraCaptureSession#capture, and the repeating request immediately sets a different
+     * zoom value using override, the inflight still capture could have its zoom value
+     * overwritten unexpectedly.</p>
+     * <p>So the application is strongly recommended to turn off settingsOverride when taking
+     * still/burst captures, and turn it back on when there is only repeating viewfinder
+     * request and no inflight still/burst captures.</p>
+     * <p>Below is the example demonstrating the transitions in and out of the
+     * settings override:</p>
+     * <pre><code>Request 1 (zoom=1.0x, override=OFF)
+     * Request 2 (zoom=1.2x, override=OFF)
+     * Request 3 (zoom=1.4x, override=ZOOM)  -&gt; Result 1 (zoom=1.0x, override=OFF)
+     * Request 4 (zoom=1.6x, override=ZOOM)  -&gt; Result 2 (zoom=1.4x, override=ZOOM)
+     * Request 5 (zoom=1.8x, override=OFF)   -&gt; Result 3 (zoom=1.6x, override=ZOOM)
+     *                                       -&gt; Result 4 (zoom=1.6x, override=OFF)
+     *                                       -&gt; Result 5 (zoom=1.8x, override=OFF)
+     * </code></pre>
+     * <p>This example shows that:</p>
+     * <ul>
+     * <li>The application "ramps in" settings override by setting the control to ZOOM.
+     * In the example, request #3 enables zoom settings override. Because the camera device
+     * can speed up applying zoom by 1 frame, the outputs of request #2 has 1.4x zoom, the
+     * value specified in request #3.</li>
+     * <li>The application "ramps out" of settings override by setting the control to OFF. In
+     * the example, request #5 changes the override to OFF. Because request #4's zoom
+     * takes effect in result #3, result #4's zoom remains the same until new value takes
+     * effect in result #5.</li>
+     * </ul>
+     */
+    ACAMERA_CONTROL_SETTINGS_OVERRIDE =                         // int32 (acamera_metadata_enum_android_control_settings_override_t)
+            ACAMERA_CONTROL_START + 49,
+    /**
+     * <p>List of available settings overrides supported by the camera device that can
+     * be used to speed up certain controls.</p>
+     *
+     * <p>Type: int32[n]</p>
+     *
+     * <p>This tag may appear in:
+     * <ul>
+     *   <li>ACameraMetadata from ACameraManager_getCameraCharacteristics</li>
+     * </ul></p>
+     *
+     * <p>When not all controls within a CaptureRequest are required to take effect
+     * at the same time on the outputs, the camera device may apply certain request keys sooner
+     * to improve latency. This list contains such supported settings overrides. Each settings
+     * override corresponds to a set of CaptureRequest keys that can be sped up when applying.</p>
+     * <p>A supported settings override can be passed in via
+     * <a href="https://developer.android.com/reference/android/hardware/camera2/CaptureRequest.html#CONTROL_SETTINGS_OVERRIDE">CaptureRequest#CONTROL_SETTINGS_OVERRIDE</a>, and the
+     * CaptureRequest keys corresponding to the override are applied as soon as possible, not
+     * bound by per-frame synchronization. See ACAMERA_CONTROL_SETTINGS_OVERRIDE for the
+     * CaptureRequest keys for each override.</p>
+     * <p>OFF is always included in this list.</p>
+     *
+     * @see ACAMERA_CONTROL_SETTINGS_OVERRIDE
+     */
+    ACAMERA_CONTROL_AVAILABLE_SETTINGS_OVERRIDES =              // int32[n]
+            ACAMERA_CONTROL_START + 50,
     ACAMERA_CONTROL_END,
 
     /**
@@ -8494,6 +8593,40 @@ typedef enum acamera_metadata_enum_acamera_control_extended_scene_mode {
     ACAMERA_CONTROL_EXTENDED_SCENE_MODE_BOKEH_CONTINUOUS             = 2,
 
 } acamera_metadata_enum_android_control_extended_scene_mode_t;
+
+// ACAMERA_CONTROL_SETTINGS_OVERRIDE
+typedef enum acamera_metadata_enum_acamera_control_settings_override {
+    /**
+     * <p>No keys are applied sooner than the other keys when applying CaptureRequest
+     * settings to the camera device. This is the default value.</p>
+     */
+    ACAMERA_CONTROL_SETTINGS_OVERRIDE_OFF                            = 0,
+
+    /**
+     * <p>Zoom related keys are applied sooner than the other keys in the CaptureRequest. The
+     * zoom related keys are:</p>
+     * <ul>
+     * <li>ACAMERA_CONTROL_ZOOM_RATIO</li>
+     * <li>ACAMERA_SCALER_CROP_REGION</li>
+     * <li>ACAMERA_CONTROL_AE_REGIONS</li>
+     * <li>ACAMERA_CONTROL_AWB_REGIONS</li>
+     * <li>ACAMERA_CONTROL_AF_REGIONS</li>
+     * </ul>
+     * <p>Even though ACAMERA_CONTROL_AE_REGIONS, ACAMERA_CONTROL_AWB_REGIONS,
+     * and ACAMERA_CONTROL_AF_REGIONS are not directly zoom related, applications
+     * typically scale these regions together with ACAMERA_SCALER_CROP_REGION to have a
+     * consistent mapping within the current field of view. In this aspect, they are
+     * related to ACAMERA_SCALER_CROP_REGION and ACAMERA_CONTROL_ZOOM_RATIO.</p>
+     *
+     * @see ACAMERA_CONTROL_AE_REGIONS
+     * @see ACAMERA_CONTROL_AF_REGIONS
+     * @see ACAMERA_CONTROL_AWB_REGIONS
+     * @see ACAMERA_CONTROL_ZOOM_RATIO
+     * @see ACAMERA_SCALER_CROP_REGION
+     */
+    ACAMERA_CONTROL_SETTINGS_OVERRIDE_ZOOM                           = 1,
+
+} acamera_metadata_enum_android_control_settings_override_t;
 
 
 
