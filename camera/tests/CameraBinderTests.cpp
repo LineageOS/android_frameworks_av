@@ -370,7 +370,7 @@ TEST(CameraServiceBinderTest, CheckBinderCameraService) {
         // Check metadata binder call
         CameraMetadata metadata;
         res = service->getCameraCharacteristics(cameraId,
-                /*targetSdkVersion*/__ANDROID_API_FUTURE__, &metadata);
+                /*targetSdkVersion*/__ANDROID_API_FUTURE__, /*overrideToPortrait*/false, &metadata);
         EXPECT_TRUE(res.isOk()) << res;
         EXPECT_FALSE(metadata.isEmpty());
 
@@ -386,7 +386,8 @@ TEST(CameraServiceBinderTest, CheckBinderCameraService) {
         sp<hardware::camera2::ICameraDeviceUser> device;
         res = service->connectDevice(callbacks, cameraId, String16("meeeeeeeee!"),
                 {}, hardware::ICameraService::USE_CALLING_UID, /*oomScoreOffset*/ 0,
-                /*targetSdkVersion*/__ANDROID_API_FUTURE__, /*out*/&device);
+                /*targetSdkVersion*/__ANDROID_API_FUTURE__,
+                /*overrideToPortrait*/false, /*out*/&device);
         EXPECT_TRUE(res.isOk()) << res;
         ASSERT_NE(nullptr, device.get());
         device->disconnect();
@@ -429,7 +430,8 @@ protected:
             SCOPED_TRACE("openNewDevice");
             binder::Status res = service->connectDevice(callbacks, deviceId, String16("meeeeeeeee!"),
                     {}, hardware::ICameraService::USE_CALLING_UID, /*oomScoreOffset*/ 0,
-                    /*targetSdkVersion*/__ANDROID_API_FUTURE__, /*out*/&device);
+                    /*targetSdkVersion*/__ANDROID_API_FUTURE__,
+                    /*overrideToPortrait*/false, /*out*/&device);
             EXPECT_TRUE(res.isOk()) << res;
         }
         auto p = std::make_pair(callbacks, device);
