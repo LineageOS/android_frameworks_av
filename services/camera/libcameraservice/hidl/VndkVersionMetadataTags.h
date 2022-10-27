@@ -74,6 +74,7 @@ std::map<int, std::vector<camera_metadata_tag>> static_api_level_to_keys{
           ANDROID_SCALER_AVAILABLE_STREAM_USE_CASES,
         } },
       {34, {
+          ANDROID_CONTROL_AVAILABLE_SETTINGS_OVERRIDES,
           ANDROID_REQUEST_AVAILABLE_COLOR_SPACE_PROFILES_MAP,
         } },
 };
@@ -91,5 +92,8 @@ std::map<int, std::vector<camera_metadata_tag>> dynamic_api_level_to_keys{
       {31, {
           ANDROID_SENSOR_PIXEL_MODE,
           ANDROID_SENSOR_RAW_BINNING_FACTOR_USED,
+        }  },
+      {34, {
+          ANDROID_CONTROL_SETTINGS_OVERRIDE,
         }  },
 };
