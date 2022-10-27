@@ -33,6 +33,7 @@
 #include <android/hardware/ICamera.h>
 #include <android/hardware/ICameraClient.h>
 
+#include <aidl/AidlCameraService.h>
 #include <android-base/macros.h>
 #include <android-base/parseint.h>
 #include <android-base/stringprintf.h>
@@ -88,6 +89,7 @@ using base::StringPrintf;
 using binder::Status;
 using namespace camera3;
 using frameworks::cameraservice::service::V2_0::implementation::HidlCameraService;
+using frameworks::cameraservice::service::implementation::AidlCameraService;
 using hardware::ICamera;
 using hardware::ICameraClient;
 using hardware::ICameraServiceListener;
@@ -194,6 +196,10 @@ void CameraService::onFirstRef()
     if (hcs->registerAsService() != android::OK) {
         ALOGE("%s: Failed to register default android.frameworks.cameraservice.service@1.0",
               __FUNCTION__);
+    }
+
+    if (!AidlCameraService::registerService(this)) {
+        ALOGE("%s: Failed to register default AIDL VNDK CameraService", __FUNCTION__);
     }
 
     // This needs to be last call in this function, so that it's as close to
