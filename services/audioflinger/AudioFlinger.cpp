@@ -1067,8 +1067,6 @@ status_t AudioFlinger::createTrack(const media::CreateTrackRequest& _input,
         clientPid = callingPid;
         adjAttributionSource.pid = VALUE_OR_RETURN_STATUS(legacy2aidl_pid_t_int32_t(callingPid));
     }
-    adjAttributionSource = AudioFlinger::checkAttributionSourcePackage(
-            adjAttributionSource);
 
     audio_session_t sessionId = input.sessionId;
     if (sessionId == AUDIO_SESSION_ALLOCATE) {
@@ -2291,8 +2289,7 @@ status_t AudioFlinger::createRecord(const media::CreateRecordRequest& _input,
                  __func__, callingUid, callingPid, currentPid);
         adjAttributionSource.pid = VALUE_OR_RETURN_STATUS(legacy2aidl_pid_t_int32_t(callingPid));
     }
-    adjAttributionSource = AudioFlinger::checkAttributionSourcePackage(
-            adjAttributionSource);
+
     // we don't yet support anything other than linear PCM
     if (!audio_is_valid_format(input.config.format) || !audio_is_linear_pcm(input.config.format)) {
         ALOGE("createRecord() invalid format %#x", input.config.format);
@@ -3917,7 +3914,6 @@ status_t AudioFlinger::createEffect(const media::CreateEffectRequest& request,
         adjAttributionSource.pid = VALUE_OR_RETURN_STATUS(legacy2aidl_pid_t_int32_t(callingPid));
         currentPid = callingPid;
     }
-    adjAttributionSource = AudioFlinger::checkAttributionSourcePackage(adjAttributionSource);
 
     ALOGV("createEffect pid %d, effectClient %p, priority %d, sessionId %d, io %d, factory %p",
           adjAttributionSource.pid, effectClient.get(), priority, sessionId, io,
