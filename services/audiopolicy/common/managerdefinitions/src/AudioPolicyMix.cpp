@@ -18,6 +18,9 @@
 //#define LOG_NDEBUG 0
 
 #include <algorithm>
+#include <iterator>
+#include <optional>
+#include <regex>
 #include "AudioPolicyMix.h"
 #include "TypeConverter.h"
 #include "HwModule.h"
@@ -27,6 +30,11 @@
 
 namespace android {
 namespace {
+
+bool matchAddressToTags(const audio_attributes_t& attr, const String8& addr) {
+    std::optional<std::string> tagAddress = extractAddressFromAudioAttributes(attr);
+    return tagAddress.has_value() && tagAddress->compare(addr.c_str()) == 0;
+}
 
 // Returns true if the criterion matches.
 // The exclude criteria are handled in the same way as positive
@@ -332,24 +340,14 @@ bool AudioPolicyMixCollection::mixMatch(const AudioMix* mix, size_t mixIndex,
         }
 
         // if there is an address match, prioritize that match
-        if (strncmp(attributes.tags, "addr=", strlen("addr=")) == 0 &&
-                strncmp(attributes.tags + strlen("addr="),
-                        mix->mDeviceAddress.string(),
-                        AUDIO_ATTRIBUTES_TAGS_MAX_SIZE - strlen("addr=") - 1) == 0) {
-            ALOGV("\tgetOutputForAttr will use mix %zu", mixIndex);
-            return true;
-        }
-
-        if (areMixCriteriaMatched(mix->mCriteria, attributes, uid, session)) {
-            ALOGV("\tgetOutputForAttr will use mix %zu", mixIndex);
-            return true;
+        if (matchAddressToTags(attributes, mix->mDeviceAddress)
+            || areMixCriteriaMatched(mix->mCriteria, attributes, uid, session)) {
+                ALOGV("\tgetOutputForAttr will use mix %zu", mixIndex);
+                return true;
         }
     } else if (mix->mMixType == MIX_TYPE_RECORDERS) {
         if (attributes.usage == AUDIO_USAGE_VIRTUAL_SOURCE &&
-                strncmp(attributes.tags, "addr=", strlen("addr=")) == 0 &&
-                strncmp(attributes.tags + strlen("addr="),
-                        mix->mDeviceAddress.string(),
-                        AUDIO_ATTRIBUTES_TAGS_MAX_SIZE - strlen("addr=") - 1) == 0) {
+            matchAddressToTags(attributes, mix->mDeviceAddress)) {
             return true;
         }
     }
@@ -404,14 +402,14 @@ sp<DeviceDescriptor> AudioPolicyMixCollection::getDeviceAndMixForInputSource(
 status_t AudioPolicyMixCollection::getInputMixForAttr(
         audio_attributes_t attr, sp<AudioPolicyMix> *policyMix)
 {
-    if (strncmp(attr.tags, "addr=", strlen("addr=")) != 0) {
+    std::optional<std::string> address = extractAddressFromAudioAttributes(attr);
+    if (!address.has_value()) {
         return BAD_VALUE;
     }
-    String8 address(attr.tags + strlen("addr="));
 
 #ifdef LOG_NDEBUG
     ALOGV("getInputMixForAttr looking for address %s for source %d\n  mixes available:",
-            address.string(), attr.source);
+            address->c_str(), attr.source);
     for (size_t i = 0; i < size(); i++) {
         const sp<AudioPolicyMix> audioPolicyMix = itemAt(i);
         ALOGV("\tmix %zu address=%s", i, audioPolicyMix->mDeviceAddress.string());
@@ -421,20 +419,20 @@ status_t AudioPolicyMixCollection::getInputMixForAttr(
     size_t index;
     for (index = 0; index < size(); index++) {
         const sp<AudioPolicyMix>& registeredMix = itemAt(index);
-        if (registeredMix->mDeviceAddress.compare(address) == 0) {
+        if (address->compare(registeredMix->mDeviceAddress.c_str()) == 0) {
             ALOGD("getInputMixForAttr found addr=%s dev=0x%x",
                     registeredMix->mDeviceAddress.string(), registeredMix->mDeviceType);
             break;
         }
     }
     if (index == size()) {
-        ALOGW("getInputMixForAttr() no policy for address %s", address.string());
+        ALOGW("getInputMixForAttr() no policy for address %s", address->c_str());
         return BAD_VALUE;
     }
     const sp<AudioPolicyMix> audioPolicyMix = itemAt(index);
 
     if (audioPolicyMix->mMixType != MIX_TYPE_PLAYERS) {
-        ALOGW("getInputMixForAttr() bad policy mix type for address %s", address.string());
+        ALOGW("getInputMixForAttr() bad policy mix type for address %s", address->c_str());
         return BAD_VALUE;
     }
     if (policyMix != nullptr) {
@@ -632,6 +630,16 @@ void AudioPolicyMixCollection::dump(String8 *dst) const
     for (size_t i = 0; i < size(); i++) {
         itemAt(i)->dump(dst, 2, i);
     }
+}
+
+std::optional<std::string> extractAddressFromAudioAttributes(const audio_attributes_t& attr) {
+    static const std::regex addrTagRegex("addr=([^;]+)");
+
+    std::cmatch match;
+    if (std::regex_search(attr.tags, match, addrTagRegex)) {
+        return match[1].str();
+    }
+    return std::nullopt;
 }
 
 }; //namespace android
