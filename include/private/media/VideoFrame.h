@@ -49,6 +49,7 @@ public:
             mSize = __builtin_mul_overflow(multVal, height, &multVal) ? 0 : multVal;
             if (hasData && (mRowBytes == 0 || mSize == 0)) {
                 ALOGE("Frame rowBytes/ size overflow %dx%d bpp %d", width, height, bpp);
+                android_errorWriteLog(0x534e4554, "233006499");
             }
     }
 
