@@ -42,9 +42,15 @@ public:
         mWidth(width), mHeight(height),
         mDisplayWidth(displayWidth), mDisplayHeight(displayHeight),
         mTileWidth(tileWidth), mTileHeight(tileHeight), mDurationUs(0),
-        mRotationAngle(angle), mBytesPerPixel(bpp), mRowBytes(bpp * width),
-        mSize(hasData ? (bpp * width * height) : 0),
-        mIccSize(iccSize), mBitDepth(bitDepth) {
+        mRotationAngle(angle), mBytesPerPixel(bpp), mIccSize(iccSize),
+        mBitDepth(bitDepth) {
+            uint32_t multVal;
+            mRowBytes = __builtin_mul_overflow(bpp, width, &multVal) ? 0 : multVal;
+            mSize = __builtin_mul_overflow(multVal, height, &multVal) ? 0 : multVal;
+            if (hasData && (mRowBytes == 0 || mSize == 0)) {
+                ALOGE("Frame rowBytes/ size overflow %dx%d bpp %d", width, height, bpp);
+                android_errorWriteLog(0x534e4554, "233006499");
+            }
     }
 
     void init(const VideoFrame& copy, const void* iccData, size_t iccSize) {
