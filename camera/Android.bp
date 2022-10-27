@@ -93,6 +93,7 @@ cc_library_shared {
         "libgui",
         "libcamera_metadata",
         "libnativewindow",
+        "lib-platform-compat-native-api",
     ],
 
     include_dirs: [

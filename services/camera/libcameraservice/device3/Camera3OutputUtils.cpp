@@ -521,7 +521,7 @@ void processCaptureResult(CaptureOutputStates& states, const camera_capture_resu
         if (result->partial_result != 0)
             request.resultExtras.partialResultCount = result->partial_result;
 
-        if ((result->result != nullptr) && !states.legacyClient) {
+        if ((result->result != nullptr) && !states.legacyClient && !states.overrideToPortrait) {
             camera_metadata_ro_entry entry;
             auto ret = find_camera_metadata_ro_entry(result->result,
                     ANDROID_LOGICAL_MULTI_CAMERA_ACTIVE_PHYSICAL_ID, &entry);

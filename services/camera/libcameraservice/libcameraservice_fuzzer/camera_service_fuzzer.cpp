@@ -229,11 +229,11 @@ void CameraFuzzer::getCameraInformation(int32_t cameraId) {
     mCameraService->getCameraVendorTagCache(&cache);
 
     CameraInfo cameraInfo;
-    mCameraService->getCameraInfo(cameraId, &cameraInfo);
+    mCameraService->getCameraInfo(cameraId, /*overrideToPortrait*/false, &cameraInfo);
 
     CameraMetadata metadata;
     mCameraService->getCameraCharacteristics(cameraIdStr,
-            /*targetSdkVersion*/__ANDROID_API_FUTURE__, &metadata);
+            /*targetSdkVersion*/__ANDROID_API_FUTURE__, /*overrideToPortrait*/false, &metadata);
 }
 
 void CameraFuzzer::invokeCameraSound() {
@@ -320,7 +320,8 @@ void CameraFuzzer::invokeCameraAPIs() {
 
         rc = mCameraService->connect(this, cameraId, String16(),
                 android::CameraService::USE_CALLING_UID, android::CameraService::USE_CALLING_PID,
-                /*targetSdkVersion*/__ANDROID_API_FUTURE__, &cameraDevice);
+                /*targetSdkVersion*/__ANDROID_API_FUTURE__, /*overrideToPortrait*/true,
+                &cameraDevice);
         if (!rc.isOk()) {
             // camera not connected
             return;
@@ -534,7 +535,8 @@ void Camera2Fuzzer::process() {
         sp<hardware::camera2::ICameraDeviceUser> device;
         mCameraService->connectDevice(callbacks, String16(s.cameraId), String16(), {},
                 android::CameraService::USE_CALLING_UID, 0/*oomScoreDiff*/,
-                /*targetSdkVersion*/__ANDROID_API_FUTURE__, &device);
+                /*targetSdkVersion*/__ANDROID_API_FUTURE__, /*overrideToPortrait*/true,
+                &device);
         if (device == nullptr) {
             continue;
         }
