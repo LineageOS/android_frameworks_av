@@ -1554,7 +1554,16 @@ INSTANTIATE_TEST_SUITE_P(
             .withTags("addr=remote_submix_media"),
         DPTestParam(USAGE_MEDIA_ALARM_CRITERIA, /*expected_match=*/ true)
             .withUsage(AUDIO_USAGE_ASSISTANT)
-            .withTags("addr=remote_submix_media")));
+            .withTags("addr=remote_submix_media"),
+        DPTestParam(USAGE_MEDIA_ALARM_CRITERIA, /*expected_match=*/ true)
+            .withUsage(AUDIO_USAGE_ASSISTANT)
+            .withTags("sometag;addr=remote_submix_media;othertag=somevalue"),
+        DPTestParam(USAGE_MEDIA_ALARM_CRITERIA, /*expected_match=*/ true)
+            .withUsage(AUDIO_USAGE_ASSISTANT)
+            .withTags("addr=remote_submix_media;othertag"),
+        DPTestParam(USAGE_MEDIA_ALARM_CRITERIA, /*expected_match=*/ true)
+            .withUsage(AUDIO_USAGE_ASSISTANT)
+            .withTags("sometag;othertag;addr=remote_submix_media")));
 
 static constexpr audio_session_t TEST_SESSION_ID = static_cast<audio_session_t>(42);
 static constexpr audio_session_t OTHER_SESSION_ID = static_cast<audio_session_t>(77);

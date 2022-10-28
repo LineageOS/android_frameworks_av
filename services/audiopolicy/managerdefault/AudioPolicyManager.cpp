@@ -2504,7 +2504,7 @@ status_t AudioPolicyManager::getInputForAttr(const audio_attributes_t *attr,
     *inputType = API_INPUT_INVALID;
 
     if (attributes.source == AUDIO_SOURCE_REMOTE_SUBMIX &&
-            strncmp(attributes.tags, "addr=", strlen("addr=")) == 0) {
+            extractAddressFromAudioAttributes(attributes).has_value()) {
         status = mPolicyMixes.getInputMixForAttr(attributes, &policyMix);
         if (status != NO_ERROR) {
             ALOGW("%s could not find input mix for attr %s",
