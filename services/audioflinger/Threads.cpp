@@ -8775,21 +8775,9 @@ void AudioFlinger::RecordThread::updateMetadata_l()
         return; // nothing to do
     }
     StreamInHalInterface::SinkMetadata metadata;
+    auto backInserter = std::back_inserter(metadata.tracks);
     for (const sp<RecordTrack> &track : mActiveTracks) {
-        // Do not forward PatchRecord metadata to audio HAL
-        if (track->isPatchTrack()) {
-            continue;
-        }
-        // No track is invalid as this is called after prepareTrack_l in the same critical section
-        record_track_metadata_v7_t trackMetadata;
-        trackMetadata.base = {
-                .source = track->attributes().source,
-                .gain = 1, // capture tracks do not have volumes
-        };
-        trackMetadata.channel_mask = track->channelMask(),
-        strncpy(trackMetadata.tags, track->attributes().tags, AUDIO_ATTRIBUTES_TAGS_MAX_SIZE);
-
-        metadata.tracks.push_back(trackMetadata);
+        track->copyMetadataTo(backInserter);
     }
     mInput->stream->updateSinkMetadata(metadata);
 }

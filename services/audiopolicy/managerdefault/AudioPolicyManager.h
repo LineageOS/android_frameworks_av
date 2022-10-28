@@ -639,6 +639,10 @@ protected:
             return mCallRxSourceClient != nullptr && source == mCallRxSourceClient;
         }
 
+        bool isCallTxAudioSource(const sp<SourceClientDescriptor> &source) {
+            return mCallTxSourceClient != nullptr && source == mCallTxSourceClient;
+        }
+
         void connectTelephonyRxAudioSource();
 
         void disconnectTelephonyAudioSource(sp<SourceClientDescriptor> &clientDesc);
