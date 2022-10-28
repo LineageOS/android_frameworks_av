@@ -313,12 +313,19 @@ status_t AudioFlinger::PatchPanel::createAudioPatch(const struct audio_patch *pa
                         patch->sources[0].config_mask & AUDIO_PORT_CONFIG_FLAGS ?
                         patch->sources[0].flags.input : AUDIO_INPUT_FLAG_NONE;
                 audio_io_handle_t input = AUDIO_IO_HANDLE_NONE;
+                audio_source_t source = AUDIO_SOURCE_MIC;
+                // For telephony patches, propagate voice communication use case to record side
+                if (patch->num_sources == 2
+                        && patch->sources[1].ext.mix.usecase.stream
+                                == AUDIO_STREAM_VOICE_CALL) {
+                    source = AUDIO_SOURCE_VOICE_COMMUNICATION;
+                }
                 sp<ThreadBase> thread = mAudioFlinger.openInput_l(srcModule,
                                                                     &input,
                                                                     &config,
                                                                     device,
                                                                     address,
-                                                                    AUDIO_SOURCE_MIC,
+                                                                    source,
                                                                     flags,
                                                                     outputDevice,
                                                                     outputDeviceAddress);
@@ -516,9 +523,14 @@ status_t AudioFlinger::PatchPanel::Patch::createConnections(PatchPanel *panel)
     audio_output_flags_t outputFlags = mAudioPatch.sinks[0].config_mask & AUDIO_PORT_CONFIG_FLAGS ?
             mAudioPatch.sinks[0].flags.output : AUDIO_OUTPUT_FLAG_NONE;
     audio_stream_type_t streamType = AUDIO_STREAM_PATCH;
+    audio_source_t source = AUDIO_SOURCE_DEFAULT;
     if (mAudioPatch.num_sources == 2 && mAudioPatch.sources[1].type == AUDIO_PORT_TYPE_MIX) {
         // "reuse one existing output mix" case
         streamType = mAudioPatch.sources[1].ext.mix.usecase.stream;
+        // For telephony patches, propagate voice communication use case to record side
+        if (streamType == AUDIO_STREAM_VOICE_CALL) {
+            source = AUDIO_SOURCE_VOICE_COMMUNICATION;
+        }
     }
     if (mPlayback.thread()->hasFastMixer()) {
         // Create a fast track if the playback thread has fast mixer to get better performance.
@@ -546,7 +558,8 @@ status_t AudioFlinger::PatchPanel::Patch::createConnections(PatchPanel *panel)
                                                  inChannelMask,
                                                  format,
                                                  frameCount,
-                                                 inputFlags);
+                                                 inputFlags,
+                                                 source);
     } else {
         // use a pseudo LCM between input and output framecount
         int playbackShift = __builtin_ctz(playbackFrameCount);
@@ -566,7 +579,9 @@ status_t AudioFlinger::PatchPanel::Patch::createConnections(PatchPanel *panel)
                                                  frameCount,
                                                  nullptr,
                                                  (size_t)0 /* bufferSize */,
-                                                 inputFlags);
+                                                 inputFlags,
+                                                 {} /* timeout */,
+                                                 source);
     }
     status = mRecord.checkTrack(tempRecordTrack.get());
     if (status != NO_ERROR) {
