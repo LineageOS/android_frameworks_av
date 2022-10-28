@@ -791,6 +791,7 @@ void AudioFlinger::ThreadBase::processConfigEvents_l()
                                             (CreateAudioPatchConfigEventData *)event->mData.get();
             event->mStatus = createAudioPatch_l(&data->mPatch, &data->mHandle);
             const DeviceTypeSet newDevices = getDeviceTypes();
+            configChanged = oldDevices != newDevices;
             mLocalLog.log("CFG_EVENT_CREATE_AUDIO_PATCH: old device %s (%s) new device %s (%s)",
                     dumpDeviceTypes(oldDevices).c_str(), toString(oldDevices).c_str(),
                     dumpDeviceTypes(newDevices).c_str(), toString(newDevices).c_str());
@@ -801,6 +802,7 @@ void AudioFlinger::ThreadBase::processConfigEvents_l()
                                             (ReleaseAudioPatchConfigEventData *)event->mData.get();
             event->mStatus = releaseAudioPatch_l(data->mHandle);
             const DeviceTypeSet newDevices = getDeviceTypes();
+            configChanged = oldDevices != newDevices;
             mLocalLog.log("CFG_EVENT_RELEASE_AUDIO_PATCH: old device %s (%s) new device %s (%s)",
                     dumpDeviceTypes(oldDevices).c_str(), toString(oldDevices).c_str(),
                     dumpDeviceTypes(newDevices).c_str(), toString(newDevices).c_str());
@@ -3435,9 +3437,15 @@ void AudioFlinger::PlaybackThread::cacheParameters_l()
     mActiveSleepTimeUs = activeSleepTimeUs();
     mIdleSleepTimeUs = idleSleepTimeUs();
 
+    mStandbyDelayNs = AudioFlinger::mStandbyTimeInNsecs;
+    // Shorten standby delay on VOIP RX output to avoid delayed routing updates
+    // after a call due to call end tone.
+    if (mOutput != nullptr && (mOutput->flags & AUDIO_OUTPUT_FLAG_VOIP_RX) != 0) {
+        const nsecs_t NS_PER_MS = 1000000;
+        mStandbyDelayNs = std::min(mStandbyDelayNs, latency_l() * NS_PER_MS);
+    }
     // make sure standby delay is not too short when connected to an A2DP sink to avoid
     // truncating audio when going to standby.
-    mStandbyDelayNs = AudioFlinger::mStandbyTimeInNsecs;
     if (!Intersection(outDeviceTypes(),  getAudioDeviceOutAllA2dpSet()).empty()) {
         if (mStandbyDelayNs < kDefaultStandbyTimeInNsecs) {
             mStandbyDelayNs = kDefaultStandbyTimeInNsecs;
