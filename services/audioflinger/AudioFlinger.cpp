@@ -642,21 +642,22 @@ status_t AudioFlinger::openMmapStream(MmapStreamInterface::stream_direction_t di
 }
 
 /* static */
-int AudioFlinger::onExternalVibrationStart(const sp<os::ExternalVibration>& externalVibration) {
+os::HapticScale AudioFlinger::onExternalVibrationStart(
+        const sp<os::ExternalVibration>& externalVibration) {
     sp<os::IExternalVibratorService> evs = getExternalVibratorService();
     if (evs != nullptr) {
         int32_t ret;
         binder::Status status = evs->onExternalVibrationStart(*externalVibration, &ret);
         if (status.isOk()) {
             ALOGD("%s, start external vibration with intensity as %d", __func__, ret);
-            return ret;
+            return os::ExternalVibration::externalVibrationScaleToHapticScale(ret);
         }
     }
     ALOGD("%s, start external vibration with intensity as MUTE due to %s",
             __func__,
             evs == nullptr ? "external vibration service not found"
                            : "error when querying intensity");
-    return static_cast<int>(os::HapticScale::MUTE);
+    return os::HapticScale::MUTE;
 }
 
 /* static */
