@@ -320,7 +320,8 @@ public:
                             sp<MmapStreamInterface>& interface,
                             audio_port_handle_t *handle);
 
-    static int onExternalVibrationStart(const sp<os::ExternalVibration>& externalVibration);
+    static os::HapticScale onExternalVibrationStart(
+        const sp<os::ExternalVibration>& externalVibration);
     static void onExternalVibrationStop(const sp<os::ExternalVibration>& externalVibration);
 
     status_t addEffectToHal(audio_port_handle_t deviceId,

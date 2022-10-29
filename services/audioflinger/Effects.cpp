@@ -1597,7 +1597,7 @@ bool AudioFlinger::EffectModule::isHapticGenerator() const {
     return isHapticGenerator(&mDescriptor.type);
 }
 
-status_t AudioFlinger::EffectModule::setHapticIntensity(int id, int intensity)
+status_t AudioFlinger::EffectModule::setHapticIntensity(int id, os::HapticScale intensity)
 {
     if (mStatus != NO_ERROR) {
         return mStatus;
@@ -1613,7 +1613,7 @@ status_t AudioFlinger::EffectModule::setHapticIntensity(int id, int intensity)
     param->vsize = sizeof(int32_t) * 2;
     *(int32_t*)param->data = HG_PARAM_HAPTIC_INTENSITY;
     *((int32_t*)param->data + 1) = id;
-    *((int32_t*)param->data + 2) = intensity;
+    *((int32_t*)param->data + 2) = static_cast<int32_t>(intensity);
     std::vector<uint8_t> response;
     status_t status = command(EFFECT_CMD_SET_PARAM, request, sizeof(int32_t), &response);
     if (status == NO_ERROR) {
@@ -2676,7 +2676,7 @@ bool AudioFlinger::EffectChain::containsHapticGeneratingEffect_l()
     return false;
 }
 
-void AudioFlinger::EffectChain::setHapticIntensity_l(int id, int intensity)
+void AudioFlinger::EffectChain::setHapticIntensity_l(int id, os::HapticScale intensity)
 {
     Mutex::Autolock _l(mLock);
     for (size_t i = 0; i < mEffects.size(); ++i) {
