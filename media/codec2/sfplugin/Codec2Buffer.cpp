@@ -101,6 +101,13 @@ void Codec2Buffer::setImageData(const sp<ABuffer> &imageData) {
 }
 
 // LocalLinearBuffer
+std::shared_ptr<C2Buffer> LocalLinearMetadataBuffer::asC2Buffer() {
+    return mBufferRef;
+}
+
+void LocalLinearMetadataBuffer::clearC2BufferRefs() {
+    mBufferRef.reset();
+}
 
 bool LocalLinearBuffer::canCopy(const std::shared_ptr<C2Buffer> &buffer) const {
     return canCopyLinear(buffer);
@@ -108,6 +115,36 @@ bool LocalLinearBuffer::canCopy(const std::shared_ptr<C2Buffer> &buffer) const {
 
 bool LocalLinearBuffer::copy(const std::shared_ptr<C2Buffer> &buffer) {
     return copyLinear(buffer);
+}
+
+// LocalLinearMetadataBuffer
+
+bool LocalLinearMetadataBuffer::canCopy(const std::shared_ptr<C2Buffer> &buffer) const {
+    return canCopyLinear(buffer);
+}
+
+bool LocalLinearMetadataBuffer::copy(const std::shared_ptr<C2Buffer> &buffer) {
+    // We assume that all canCopyLinear() checks passed.
+    if (!buffer || buffer->data().linearBlocks().size() == 0u
+            || buffer->data().linearBlocks()[0].size() == 0u
+            || !buffer->data().linearBlocks()[0].handle()) {
+        setRange(0, 0);
+        return true;
+    }
+
+    size_t range = buffer->data().linearBlocks()[0].size();
+    // assume capacity check is done in canCopyLinear()
+    memset(base(), 0x0, range);
+
+    auto handle = (native_handle_t *)buffer->data().linearBlocks()[0].handle();
+    size_t handleSize = sizeof(native_handle_t) + (handle->numFds + handle->numInts) * sizeof(int);
+    memcpy(base(), handle, handleSize);
+
+    // TODO(PC): [Security concern] embed size in payload. Keep the handle-size in buffer's range
+    // indicate size filled in the backing buffer rather than the metadata size
+    setRange(0, range);
+    mBufferRef = buffer;
+    return true;
 }
 
 // DummyContainerBuffer
@@ -259,6 +296,9 @@ public:
         uint32_t vStride = align(view.crop().height, 2);
 
         bool tryWrapping = !copy;
+
+        // Temporarily disable wrapping
+        tryWrapping = false;
 
         switch (layout.type) {
             case C2PlanarLayout::TYPE_YUV: {
@@ -843,6 +883,10 @@ sp<ConstGraphicBlockBuffer> ConstGraphicBlockBuffer::AllocateEmpty(
         }
     }
     sp<ABuffer> aBuffer(alloc(align(width, 16) * align(height, 16) * bpp / 8));
+    if (aBuffer == nullptr) {
+        ALOGD("%s: failed to allocate buffer", __func__);
+        return nullptr;
+    }
     return new ConstGraphicBlockBuffer(
             format,
             aBuffer,

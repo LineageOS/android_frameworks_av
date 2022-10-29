@@ -120,6 +120,14 @@ public:
     bool isHW() const;
 
     /**
+     * Returns a native handle that can be used to send this fence
+     * \note The returned handle, if valid, must be closed and deleted by the caller.
+     *
+     * \return a native handle representing this fence, or nullptr if this fence cannot be marshalled.
+     */
+    C2Handle *handle() const;
+
+    /**
      * Null-fence. A fence that has fired.
      */
     constexpr C2Fence() : mImpl(nullptr) { }

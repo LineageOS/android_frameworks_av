@@ -265,6 +265,9 @@ Codec2ConfigurableClient::Codec2ConfigurableClient(
         const sp<IConfigurable>& base)
       : mBase{base},
         mName{[base]() -> C2String {
+                if (base == nullptr) {
+                    return "";
+                }
                 C2String outName;
                 Return<void> transStatus = base->getName(
                         [&outName](const hidl_string& name) {

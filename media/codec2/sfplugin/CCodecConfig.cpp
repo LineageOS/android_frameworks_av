@@ -1377,6 +1377,13 @@ sp<AMessage> CCodecConfig::getFormatForDomain(
         if (it == mVendorParams.end()) {
             continue;
         }
+        if (!input && key.find("vendor.qti-ext-vpp") == 0) {
+            // these vendor params are only used for configuration, no need to be
+            // saved in mOutputFormat. the mOutputFormat(AMessage) has max size
+            // limitation of 64, saving too many items will trigger assertion fail
+            ALOGV("Skip %s", key.c_str());
+            continue;
+        }
         C2Param::Index index = it->second->index();
         if (mSubscribedIndices.count(index) == 0) {
             continue;
@@ -1550,20 +1557,35 @@ sp<AMessage> CCodecConfig::getFormatForDomain(
         }
 
         if (mInputSurface) {
-            android_dataspace dataspace = mInputSurface->getDataspace();
-            ColorUtils::convertDataSpaceToV0(dataspace);
-            int32_t standard;
-            ColorUtils::getColorConfigFromDataSpace(dataspace, &range, &standard, &transfer);
-            if (range != 0) {
-                msg->setInt32(KEY_COLOR_RANGE, range);
+            bool useDataspace = true;
+            if((mDomain & IS_ENCODER) && (portDomain & IS_OUTPUT)) {
+                int32_t standard,transfer,range;
+                //if get valid color aspect info from hal, use them set output message
+                //if color aspect from hal is invalid, still use dataspace
+                if(msg->findInt32(KEY_COLOR_STANDARD, &standard)
+                        && msg->findInt32(KEY_COLOR_TRANSFER, &transfer)
+                        && msg->findInt32(KEY_COLOR_RANGE, &range)) {
+                    if(standard && transfer && range) {
+                        useDataspace = false;
+                    }
+                }
             }
-            if (standard != 0) {
-                msg->setInt32(KEY_COLOR_STANDARD, standard);
+            if(useDataspace) {
+                android_dataspace dataspace = mInputSurface->getDataspace();
+                ColorUtils::convertDataSpaceToV0(dataspace);
+                int32_t standard;
+                ColorUtils::getColorConfigFromDataSpace(dataspace, &range, &standard, &transfer);
+                if (range != 0) {
+                    msg->setInt32(KEY_COLOR_RANGE, range);
+                }
+                if (standard != 0) {
+                    msg->setInt32(KEY_COLOR_STANDARD, standard);
+                }
+                if (transfer != 0) {
+                    msg->setInt32(KEY_COLOR_TRANSFER, transfer);
+                }
+                msg->setInt32("android._dataspace", dataspace);
             }
-            if (transfer != 0) {
-                msg->setInt32(KEY_COLOR_TRANSFER, transfer);
-            }
-            msg->setInt32("android._dataspace", dataspace);
         }
 
         // HDR static info

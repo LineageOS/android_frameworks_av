@@ -2140,7 +2140,10 @@ void CCodec::signalResume() {
     std::map<size_t, sp<MediaCodecBuffer>> clientInputBuffers;
     status_t err = mChannel->prepareInitialInputBuffers(&clientInputBuffers);
     if (err != OK) {
-        ALOGE("Resume request for Input Buffers failed");
+        if (err == WOULD_BLOCK) {
+            return;
+        }
+        ALOGW("Resume request for Input Buffers failed");
         mCallback->onError(err, ACTION_CODE_FATAL);
         return;
     }
@@ -2541,17 +2544,6 @@ status_t CCodec::configureTunneledVideoPlayback(
 }
 
 void CCodec::initiateReleaseIfStuck() {
-    std::string name;
-    bool pendingDeadline = false;
-    {
-        Mutexed<NamedTimePoint>::Locked deadline(mDeadline);
-        if (deadline->get() < std::chrono::steady_clock::now()) {
-            name = deadline->getName();
-        }
-        if (deadline->get() != TimePoint::max()) {
-            pendingDeadline = true;
-        }
-    }
     bool tunneled = false;
     bool isMediaTypeKnown = false;
     {
@@ -2588,6 +2580,17 @@ void CCodec::initiateReleaseIfStuck() {
         const std::unique_ptr<Config> &config = *configLocked;
         tunneled = config->mTunneled;
         isMediaTypeKnown = (kKnownMediaTypes.count(config->mCodingMediaType) != 0);
+    }
+    std::string name;
+    bool pendingDeadline = false;
+    {
+        Mutexed<NamedTimePoint>::Locked deadline(mDeadline);
+        if (deadline->get() < std::chrono::steady_clock::now()) {
+            name = deadline->getName();
+        }
+        if (deadline->get() != TimePoint::max()) {
+            pendingDeadline = true;
+        }
     }
     if (!tunneled && isMediaTypeKnown && name.empty()) {
         constexpr std::chrono::steady_clock::duration kWorkDurationThreshold = 3s;

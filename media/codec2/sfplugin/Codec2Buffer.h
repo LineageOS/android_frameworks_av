@@ -108,6 +108,23 @@ public:
 };
 
 /**
+ * MediaCodecBuffer implementation that wraps a raw handle (native-handle). This cannot
+ * cross process boundary so asC2Buffer() returns only nullptr.
+ */
+class LocalLinearMetadataBuffer : public Codec2Buffer {
+public:
+    using Codec2Buffer::Codec2Buffer;
+
+    std::shared_ptr<C2Buffer> asC2Buffer() override;
+    bool canCopy(const std::shared_ptr<C2Buffer> &buffer) const override;
+    void clearC2BufferRefs() override;
+    bool copy(const std::shared_ptr<C2Buffer> &buffer) override;
+
+private:
+    std::shared_ptr<C2Buffer> mBufferRef;
+};
+
+/**
  * MediaCodecBuffer implementation to be used only as a dummy wrapper around a
  * C2Buffer object.
  */
