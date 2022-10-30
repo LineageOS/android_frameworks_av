@@ -1,0 +1,21 @@
+{
+  "comments": [
+    {
+      "unresolved": false,
+      "key": {
+        "uuid": "dc2d6b33_3ede2b1c",
+        "filename": "/PATCHSET_LEVEL",
+        "patchSetId": 1
+      },
+      "lineNbr": 0,
+      "author": {
+        "id": 21290
+      },
+      "writtenOn": "2022-10-30T19:56:40Z",
+      "side": 1,
+      "message": "i don\u0027t have a device on 18.1 to test this on anymore",
+      "revId": "e493ad926c4786f7ed8a19b35abc2f4406826ffc",
+      "serverId": "1ec6b3db-b2c1-4fa4-84a2-4c7efe89ba71"
+    }
+  ]
+}
