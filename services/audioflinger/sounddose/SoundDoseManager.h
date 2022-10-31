@@ -21,60 +21,76 @@
 #include <audio_utils/MelAggregator.h>
 #include <mutex>
 #include <unordered_map>
+#include <utils/Errors.h>
 
 namespace android {
 
-/** CSD is computed with a rolling window of 7 days. */
-constexpr int64_t kCsdWindowSeconds = 604800;  // 60 * 60 * 24 * 7
-
-class SoundDoseManager {
+class SoundDoseManager : public audio_utils::MelProcessor::MelCallback {
 public:
-    SoundDoseManager() : mMelAggregator(kCsdWindowSeconds) {};
+    /** CSD is computed with a rolling window of 7 days. */
+    static constexpr int64_t kCsdWindowSeconds = 604800;  // 60s * 60m * 24h * 7d
+    /** Default RS2 value in dBA as defined in IEC 62368-1 3rd edition. */
+    static constexpr float kDefaultRs2Value = 100.f;
+
+    SoundDoseManager()
+        : mMelAggregator(sp<audio_utils::MelAggregator>::make(kCsdWindowSeconds)),
+          mRs2Value(kDefaultRs2Value) {};
 
     /**
-     * \brief Creates or gets the callback assigned to the streamHandle
+     * \brief Creates or gets the MelProcessor assigned to the streamHandle
      *
      * \param deviceId          id for the devices where the stream is active.
      * \param streanHandle      handle to the stream
+     * \param sampleRate        sample rate for the processor
+     * \param channelCount      number of channels to be processed.
+     * \param format            format of the input samples.
+     *
+     * \return MelProcessor assigned to the stream and device id.
      */
-    sp<audio_utils::MelProcessor::MelCallback> getOrCreateCallbackForDevice(
+    sp<audio_utils::MelProcessor> getOrCreateProcessorForDevice(
         audio_port_handle_t deviceId,
-        audio_io_handle_t streamHandle);
+        audio_io_handle_t streamHandle,
+        uint32_t sampleRate,
+        size_t channelCount,
+        audio_format_t format);
 
     /**
-     * \brief Removes stream callback when MEL computation is not needed anymore
+     * \brief Removes stream processor when MEL computation is not needed anymore
      *
      * \param streanHandle      handle to the stream
      */
-    void removeStreamCallback(audio_io_handle_t streamHandle);
+    void removeStreamProcessor(audio_io_handle_t streamHandle);
+
+    /**
+     * Sets the output RS2 value for momentary exposure warnings. Must not be
+     * higher than 100dBA and not lower than 80dBA.
+     *
+     * \param rs2Value value to use for momentary exposure
+     */
+    void setOutputRs2(float rs2Value);
 
     std::string dump() const;
 
     // used for testing
     size_t getCachedMelRecordsSize() const;
+
+    // ------ Override audio_utils::MelProcessor::MelCallback ------
+    void onNewMelValues(const std::vector<float>& mels,
+                        size_t offset,
+                        size_t length,
+                        audio_port_handle_t deviceId) const override;
+
+    void onMomentaryExposure(float currentMel, audio_port_handle_t deviceId) const override;
 private:
-    /**
-     * An implementation of the MelProcessor::MelCallback that is assigned to a
-     * specific device.
-     */
-    class Callback : public audio_utils::MelProcessor::MelCallback {
-    public:
-        Callback(SoundDoseManager& soundDoseManager, audio_port_handle_t deviceHandle)
-            : mSoundDoseManager(soundDoseManager), mDeviceHandle(deviceHandle) {}
-
-        void onNewMelValues(const std::vector<float>& mels,
-                            size_t offset,
-                            size_t length) const override;
-
-        SoundDoseManager& mSoundDoseManager;
-        audio_port_handle_t mDeviceHandle;
-    };
+    mutable std::mutex mLock;
 
     // no need for lock since MelAggregator is thread-safe
-    audio_utils::MelAggregator mMelAggregator;
+    const sp<audio_utils::MelAggregator> mMelAggregator;
 
-    std::mutex mLock;
-    std::unordered_map<audio_io_handle_t, sp<Callback>> mActiveCallbacks GUARDED_BY(mLock);
+    std::unordered_map<audio_io_handle_t,
+                       wp<audio_utils::MelProcessor>> mActiveProcessors GUARDED_BY(mLock);
+
+    float mRs2Value GUARDED_BY(mLock);
 };
 
 }  // namespace android

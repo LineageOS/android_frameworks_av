@@ -10,9 +10,7 @@ package {
 cc_library {
     name: "libsounddose",
 
-    product_available: true,
     double_loadable: true,
-    host_supported: true,
 
     srcs: [
         "SoundDoseManager.cpp",

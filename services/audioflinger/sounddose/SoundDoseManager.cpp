@@ -40,58 +40,95 @@ int64_t getMonotonicSecond() {
 
 }  // namespace
 
-sp<audio_utils::MelProcessor::MelCallback> SoundDoseManager::getOrCreateCallbackForDevice(
+sp<audio_utils::MelProcessor> SoundDoseManager::getOrCreateProcessorForDevice(
         audio_port_handle_t deviceId,
-        audio_io_handle_t streamHandle)
+        audio_io_handle_t streamHandle,
+        uint32_t sampleRate,
+        size_t channelCount,
+        audio_format_t format)
 {
     std::lock_guard _l(mLock);
 
-    auto streamHandleCallback = mActiveCallbacks.find(streamHandle);
-    if (streamHandleCallback != mActiveCallbacks.end()) {
+    auto streamProcessor = mActiveProcessors.find(streamHandle);
+    sp<audio_utils::MelProcessor> processor;
+    if (streamProcessor != mActiveProcessors.end()
+            && (processor = streamProcessor->second.promote())) {
         ALOGV("%s: found callback for stream %d", __func__, streamHandle);
-        auto callback = streamHandleCallback->second;
-        callback->mDeviceHandle = deviceId;
-        return callback;
+        processor->setDeviceId(deviceId);
+        return processor;
     } else {
         ALOGV("%s: creating new callback for device %d", __func__, streamHandle);
-        sp<Callback> melCallback = sp<Callback>::make(*this, deviceId);
-        mActiveCallbacks[streamHandle] = melCallback;
-        return melCallback;
+        sp<audio_utils::MelProcessor> melProcessor =
+            sp<audio_utils::MelProcessor>::make(sampleRate,
+                                                channelCount,
+                                                format,
+                                                *this,
+                                                deviceId,
+                                                mRs2Value);
+        mActiveProcessors[streamHandle] = melProcessor;
+        return melProcessor;
     }
 }
 
-void SoundDoseManager::removeStreamCallback(audio_io_handle_t streamHandle)
-{
-    std::unordered_map<audio_io_handle_t, sp<Callback>>::iterator callbackToRemove;
 
-    std::lock_guard _l(mLock);
-    callbackToRemove = mActiveCallbacks.find(streamHandle);
-    if (callbackToRemove != mActiveCallbacks.end()) {
-        mActiveCallbacks.erase(callbackToRemove);
-    }
-}
-
-void SoundDoseManager::Callback::onNewMelValues(const std::vector<float>& mels,
-                                                size_t offset,
-                                                size_t length) const
+void SoundDoseManager::setOutputRs2(float rs2Value)
 {
     ALOGV("%s", __func__);
-    std::lock_guard _l(mSoundDoseManager.mLock);
+    std::lock_guard _l(mLock);
+
+    for (auto& streamProcessor : mActiveProcessors) {
+        sp<audio_utils::MelProcessor> processor = streamProcessor.second.promote();
+        if (processor != nullptr) {
+            status_t result = processor->setOutputRs2(rs2Value);
+            if (result != NO_ERROR) {
+                ALOGW("%s: could not set RS2 value %f for stream %d",
+                      __func__,
+                      rs2Value,
+                      streamProcessor.first);
+            }
+        }
+    }
+}
+
+void SoundDoseManager::removeStreamProcessor(audio_io_handle_t streamHandle)
+{
+    std::lock_guard _l(mLock);
+    auto callbackToRemove = mActiveProcessors.find(streamHandle);
+    if(callbackToRemove != mActiveProcessors.end()) {
+        mActiveProcessors.erase(callbackToRemove);
+    }
+}
+
+void SoundDoseManager::onNewMelValues(const std::vector<float>& mels,
+                                      size_t offset,
+                                      size_t length,
+                                      audio_port_handle_t deviceId) const
+{
+    ALOGV("%s", __func__);
+    std::lock_guard _l(mLock);
 
     int64_t timestampSec = getMonotonicSecond();
 
     // only for internal callbacks
-    mSoundDoseManager.mMelAggregator.aggregateAndAddNewMelRecord(
-        audio_utils::MelRecord(mDeviceHandle, std::vector<float>(
+    mMelAggregator->aggregateAndAddNewMelRecord(
+        audio_utils::MelRecord(deviceId, std::vector<float>(
                                    mels.begin() + offset,
                                    mels.begin() + offset + length),
                                timestampSec - length));
 }
 
+void SoundDoseManager::onMomentaryExposure(float currentMel,
+                                           audio_port_handle_t deviceId) const {
+    ALOGV("%s: Momentary exposure for device %d triggered: %f MEL",
+          __func__,
+          deviceId,
+          currentMel);
+}
+
 std::string SoundDoseManager::dump() const
 {
     std::string output;
-    mMelAggregator.foreachCsd([&output](audio_utils::CsdRecord csdRecord) {
+    mMelAggregator->foreachCsd([&output](audio_utils::CsdRecord csdRecord) {
         base::StringAppendF(&output,
                             "CSD %f with average MEL %f in interval [%" PRId64 ", %" PRId64 "]",
                             csdRecord.value,
@@ -102,7 +139,7 @@ std::string SoundDoseManager::dump() const
     });
 
     base::StringAppendF(&output, "\nCached Mel Records:\n");
-    mMelAggregator.foreachCachedMel([&output](const audio_utils::MelRecord& melRecord) {
+    mMelAggregator->foreachCachedMel([&output](const audio_utils::MelRecord& melRecord) {
         base::StringAppendF(&output, "Continuous MELs for portId=%d, ", melRecord.portId);
         base::StringAppendF(&output, "starting at timestamp %" PRId64 ": ", melRecord.timestamp);
 
@@ -116,7 +153,7 @@ std::string SoundDoseManager::dump() const
 }
 
 size_t SoundDoseManager::getCachedMelRecordsSize() const {
-    return mMelAggregator.getCachedMelRecordsSize();
+    return mMelAggregator->getCachedMelRecordsSize();
 }
 
 }  // namespace android

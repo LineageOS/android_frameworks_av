@@ -3405,14 +3405,11 @@ ssize_t AudioFlinger::PlaybackThread::threadLoop_write()
     return bytesWritten;
 }
 
-void AudioFlinger::PlaybackThread::startMelComputation(const sp<
-        audio_utils::MelProcessor::MelCallback>& callback)
+void AudioFlinger::PlaybackThread::startMelComputation(
+        const sp<audio_utils::MelProcessor>& processor)
 {
-    ALOGV("%s: creating new mel processor for thread %d", __func__, id());
-    mMelProcessor = sp<audio_utils::MelProcessor>::make(mSampleRate,
-                                                        mChannelCount,
-                                                        mFormat,
-                                                        callback);
+    ALOGV("%s: starting mel processor for thread %d", __func__, id());
+    mMelProcessor = processor;
 }
 
 void AudioFlinger::PlaybackThread::stopMelComputation() {

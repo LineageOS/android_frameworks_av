@@ -9,7 +9,6 @@ package {
 
 cc_test {
     name: "sounddosemanager_tests",
-    host_supported: true,
 
     srcs: [
         "sounddosemanager_tests.cpp"

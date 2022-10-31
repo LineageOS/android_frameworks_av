@@ -1091,8 +1091,7 @@ public:
                     return INVALID_OPERATION;
                 }
 
-                void startMelComputation(const sp
-                             <audio_utils::MelProcessor::MelCallback>& callback);
+                void startMelComputation(const sp<audio_utils::MelProcessor>& processor);
                 void stopMelComputation();
 
 protected:

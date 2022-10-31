@@ -65,9 +65,12 @@ void AudioFlinger::MelReporter::onCreateAudioPatch(audio_patch_handle_t handle,
             std::lock_guard _lAf(mAudioFlinger.mLock);
             auto thread = mAudioFlinger.checkPlaybackThread_l(streamHandle);
             if (thread != nullptr) {
-                thread->startMelComputation(mSoundDoseManager.getOrCreateCallbackForDevice(
+                thread->startMelComputation(mSoundDoseManager.getOrCreateProcessorForDevice(
                     deviceId,
-                    newPatch.streamHandle));
+                    newPatch.streamHandle,
+                    thread->mSampleRate,
+                    thread->mChannelCount,
+                    thread->mFormat));
             }
         }
     }
@@ -97,11 +100,11 @@ void AudioFlinger::MelReporter::onReleaseAudioPatch(audio_patch_handle_t handle)
 
     // Stop MEL calculation for the PlaybackThread
     std::lock_guard _lAf(mAudioFlinger.mLock);
+    mSoundDoseManager.removeStreamProcessor(melPatch.streamHandle);
     auto thread = mAudioFlinger.checkPlaybackThread_l(melPatch.streamHandle);
     if (thread != nullptr) {
         thread->stopMelComputation();
     }
-    mSoundDoseManager.removeStreamCallback(melPatch.streamHandle);
 }
 
 std::string AudioFlinger::MelReporter::dump() {
