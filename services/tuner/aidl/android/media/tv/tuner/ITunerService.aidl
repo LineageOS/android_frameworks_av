@@ -107,6 +107,13 @@ interface ITunerService {
     ITunerFilter openSharedFilter(in String filterToken, in ITunerFilterCallback cb);
 
     /**
+     * Is Low Noise Amplifier (LNA) supported by the Tuner.
+     *
+     * @return {@code true} if supported, otherwise {@code false}.
+     */
+    boolean isLnaSupported();
+
+    /**
      * Enable or Disable Low Noise Amplifier (LNA).
      *
      * @param bEnable enable Lna or not.
