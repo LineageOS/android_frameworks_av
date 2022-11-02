@@ -2094,6 +2094,10 @@ status_t CameraService::addOfflineClient(String8 cameraId, sp<BasicClient> offli
                 onlineClientDesc->getOwnerId(), onlinePriority.getState(),
                 // native clients don't have offline processing support.
                 /*ommScoreOffset*/ 0, /*systemNativeClient*/false);
+        if (offlineClientDesc == nullptr) {
+            ALOGE("%s: Offline client descriptor was NULL", __FUNCTION__);
+            return BAD_VALUE;
+        }
 
         // Allow only one offline device per camera
         auto incompatibleClients = mActiveClientManager.getIncompatibleClients(offlineClientDesc);
