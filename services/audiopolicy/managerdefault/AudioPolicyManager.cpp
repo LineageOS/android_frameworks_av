@@ -4564,7 +4564,8 @@ status_t AudioPolicyManager::createAudioPatchInternal(const struct audio_patch *
                         ALOGE("%s output is duplicated", __func__);
                         return INVALID_OPERATION;
                     }
-                    sourceDesc->setSwOutput(outputDesc);
+                    bool closeOutput = outputDesc->mDirectOpenCount != 0;
+                    sourceDesc->setSwOutput(outputDesc, closeOutput);
                 } else {
                     // Same for "raw patches" aka created from createAudioPatch API
                     SortedVector<audio_io_handle_t> outputs =
@@ -4583,7 +4584,7 @@ status_t AudioPolicyManager::createAudioPatchInternal(const struct audio_patch *
                               __func__, sinkDevice->toString().c_str());
                         return INVALID_OPERATION;
                     }
-                    sourceDesc->setSwOutput(outputDesc);
+                    sourceDesc->setSwOutput(outputDesc, /* closeOutput= */ false);
                 }
                 // create a software bridge in PatchPanel if:
                 // - source and sink devices are on different HW modules OR
@@ -4713,17 +4714,29 @@ status_t AudioPolicyManager::releaseAudioPatchInternal(audio_patch_handle_t hand
                 // releaseOutput has already called closeOutput in case of direct output
                 return NO_ERROR;
             }
-            if (!outputDesc->isActive() && !sourceDesc->useSwBridge()) {
-                resetOutputDevice(outputDesc);
-            } else {
-                // Reuse patch handle if still valid / do not force rerouting if still routed
-                patchHandle = outputDesc->getPatchHandle();
-                setOutputDevices(outputDesc,
-                                 getNewOutputDevices(outputDesc, true /*fromCache*/),
-                                 patchHandle == AUDIO_PATCH_HANDLE_NONE, /*force*/
-                                 0,
-                                 patchHandle == AUDIO_PATCH_HANDLE_NONE ? nullptr : &patchHandle);
-            }
+            patchHandle = outputDesc->getPatchHandle();
+            // When a Sw bridge is released, the mixer used by this bridge will release its
+            // patch at AudioFlinger side. Hence, the mixer audio patch must be recreated
+            // Reuse patch handle to force audio flinger removing initial mixer patch removal
+            // updating hal patch handle (prevent leaks).
+            // While using a HwBridge, force reconsidering device only if not reusing an existing
+            // output and no more activity on output (will force to close).
+            bool force = sourceDesc->useSwBridge() ||
+                    (sourceDesc->canCloseOutput() && !outputDesc->isActive());
+            // APM pattern is to have always outputs opened / patch realized for reachable devices.
+            // Update device may result to NONE (empty), coupled with force, it releases the patch.
+            // Reconsider device only for cases:
+            //      1 / Active Output
+            //      2 / Inactive Output previously hosting HwBridge
+            //      3 / Inactive Output previously hosting SwBridge that can be closed.
+            bool updateDevice = outputDesc->isActive() || !sourceDesc->useSwBridge() ||
+                    sourceDesc->canCloseOutput();
+            setOutputDevices(outputDesc,
+                             updateDevice ? getNewOutputDevices(outputDesc, true /*fromCache*/) :
+                                            outputDesc->devices(),
+                             force,
+                             0,
+                             patchHandle == AUDIO_PATCH_HANDLE_NONE ? nullptr : &patchHandle);
         } else {
             return BAD_VALUE;
         }
