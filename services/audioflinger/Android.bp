@@ -44,6 +44,7 @@ cc_library_shared {
         "FastThreadDumpState.cpp",
         "FastThreadState.cpp",
         "NBAIO_Tee.cpp",
+        "PatchCommandThread.cpp",
         "PatchPanel.cpp",
         "PropertyUtils.cpp",
         "SpdifStreamOut.cpp",

@@ -449,7 +449,7 @@ exit:
     if (status == NO_ERROR) {
         *handle = (audio_patch_handle_t) mAudioFlinger.nextUniqueId(AUDIO_UNIQUE_ID_USE_PATCH);
         newPatch.mHalHandle = halHandle;
-        mAudioFlinger.mDeviceEffectManager.createAudioPatch(*handle, newPatch);
+        mAudioFlinger.mPatchCommandThread->createAudioPatch(*handle, newPatch);
         if (insertedModule != AUDIO_MODULE_HANDLE_NONE) {
             addSoftwarePatchToInsertedModules(insertedModule, *handle, &newPatch.mAudioPatch);
         }
@@ -800,7 +800,7 @@ status_t AudioFlinger::PatchPanel::releaseAudioPatch(audio_patch_handle_t handle
 void AudioFlinger::PatchPanel::erasePatch(audio_patch_handle_t handle) {
     mPatches.erase(handle);
     removeSoftwarePatchFromInsertedModules(handle);
-    mAudioFlinger.mDeviceEffectManager.releaseAudioPatch(handle);
+    mAudioFlinger.mPatchCommandThread->releaseAudioPatch(handle);
 }
 
 /* List connected audio ports and they attributes */

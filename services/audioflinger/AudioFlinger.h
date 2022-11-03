@@ -634,6 +634,8 @@ using effect_buffer_t = int16_t;
 
 #include "Effects.h"
 
+#include "PatchCommandThread.h"
+
 #include "DeviceEffectManager.h"
 
     // Find io handle by session id.
@@ -1012,7 +1014,8 @@ private:
     PatchPanel mPatchPanel;
     sp<EffectsFactoryHalInterface> mEffectsFactoryHal;
 
-    DeviceEffectManager mDeviceEffectManager;
+    const sp<PatchCommandThread> mPatchCommandThread;
+    sp<DeviceEffectManager> mDeviceEffectManager;
 
     bool       mSystemReady;
     std::atomic_bool mAudioPolicyReady{};
