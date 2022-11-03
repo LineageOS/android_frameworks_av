@@ -197,12 +197,17 @@ std::pair<int, int> CameraProviderManager::getCameraCount() const {
     return std::make_pair(systemCameraCount, publicCameraCount);
 }
 
-std::vector<std::string> CameraProviderManager::getCameraDeviceIds() const {
+std::vector<std::string> CameraProviderManager::getCameraDeviceIds(std::unordered_map<
+            std::string, std::set<std::string>>* unavailablePhysicalIds) const {
     std::lock_guard<std::mutex> lock(mInterfaceMutex);
     std::vector<std::string> deviceIds;
     for (auto& provider : mProviders) {
         for (auto& id : provider->mUniqueCameraIds) {
             deviceIds.push_back(id);
+            if (unavailablePhysicalIds != nullptr &&
+                    provider->mUnavailablePhysicalCameras.count(id) > 0) {
+                (*unavailablePhysicalIds)[id] = provider->mUnavailablePhysicalCameras.at(id);
+            }
         }
     }
     return deviceIds;
@@ -843,9 +848,6 @@ status_t CameraProviderManager::dump(int fd, const Vector<String16>& args) {
 
 void CameraProviderManager::ProviderInfo::initializeProviderInfoCommon(
         const std::vector<std::string> &devices) {
-
-    sp<StatusListener> listener = mManager->getStatusListener();
-
     for (auto& device : devices) {
         std::string id;
         status_t res = addDevice(device, CameraDeviceStatus::PRESENT, &id);
@@ -860,37 +862,21 @@ void CameraProviderManager::ProviderInfo::initializeProviderInfoCommon(
             mProviderName.c_str(), mDevices.size());
 
     // Process cached status callbacks
-    std::unique_ptr<std::vector<CameraStatusInfoT>> cachedStatus =
-            std::make_unique<std::vector<CameraStatusInfoT>>();
     {
         std::lock_guard<std::mutex> lock(mInitLock);
 
         for (auto& statusInfo : mCachedStatus) {
             std::string id, physicalId;
-            status_t res = OK;
             if (statusInfo.isPhysicalCameraStatus) {
-                res = physicalCameraDeviceStatusChangeLocked(&id, &physicalId,
+                physicalCameraDeviceStatusChangeLocked(&id, &physicalId,
                     statusInfo.cameraId, statusInfo.physicalCameraId, statusInfo.status);
             } else {
-                res = cameraDeviceStatusChangeLocked(&id, statusInfo.cameraId, statusInfo.status);
-            }
-            if (res == OK) {
-                cachedStatus->emplace_back(statusInfo.isPhysicalCameraStatus,
-                        id.c_str(), physicalId.c_str(), statusInfo.status);
+                cameraDeviceStatusChangeLocked(&id, statusInfo.cameraId, statusInfo.status);
             }
         }
         mCachedStatus.clear();
 
         mInitialized = true;
-    }
-
-    // The cached status change callbacks cannot be fired directly from this
-    // function, due to same-thread deadlock trying to acquire mInterfaceMutex
-    // twice.
-    if (listener != nullptr) {
-        mInitialStatusCallbackFuture = std::async(std::launch::async,
-                &CameraProviderManager::ProviderInfo::notifyInitialStatusChange, this,
-                listener, std::move(cachedStatus));
     }
 }
 
@@ -1961,6 +1947,7 @@ void CameraProviderManager::ProviderInfo::removeDevice(std::string id) {
     for (auto it = mDevices.begin(); it != mDevices.end(); it++) {
         if ((*it)->mId == id) {
             mUniqueCameraIds.erase(id);
+            mUnavailablePhysicalCameras.erase(id);
             if ((*it)->isAPI1Compatible()) {
                 mUniqueAPI1CompatibleCameraIds.erase(std::remove(
                     mUniqueAPI1CompatibleCameraIds.begin(),
@@ -2228,6 +2215,15 @@ status_t CameraProviderManager::ProviderInfo::physicalCameraDeviceStatusChangeLo
         return BAD_VALUE;
     }
 
+    if (mUnavailablePhysicalCameras.count(cameraId) == 0) {
+        mUnavailablePhysicalCameras.emplace(cameraId, std::set<std::string>{});
+    }
+    if (newStatus != CameraDeviceStatus::PRESENT) {
+        mUnavailablePhysicalCameras[cameraId].insert(physicalCameraDeviceName);
+    } else {
+        mUnavailablePhysicalCameras[cameraId].erase(physicalCameraDeviceName);
+    }
+
     *id = cameraId;
     *physicalId = physicalCameraDeviceName.c_str();
     return OK;
@@ -2283,20 +2279,6 @@ void CameraProviderManager::ProviderInfo::notifyDeviceInfoStateChangeLocked(
     std::lock_guard<std::mutex> lock(mLock);
     for (auto it = mDevices.begin(); it != mDevices.end(); it++) {
         (*it)->notifyDeviceStateChange(newDeviceState);
-    }
-}
-
-void CameraProviderManager::ProviderInfo::notifyInitialStatusChange(
-        sp<StatusListener> listener,
-        std::unique_ptr<std::vector<CameraStatusInfoT>> cachedStatus) {
-    for (auto& statusInfo : *cachedStatus) {
-        if (statusInfo.isPhysicalCameraStatus) {
-            listener->onDeviceStatusChanged(String8(statusInfo.cameraId.c_str()),
-                    String8(statusInfo.physicalCameraId.c_str()), statusInfo.status);
-        } else {
-            listener->onDeviceStatusChanged(
-                    String8(statusInfo.cameraId.c_str()), statusInfo.status);
-        }
     }
 }
 
@@ -2649,9 +2631,6 @@ status_t CameraProviderManager::ProviderInfo::parseDeviceName(const std::string&
 }
 
 CameraProviderManager::ProviderInfo::~ProviderInfo() {
-    if (mInitialStatusCallbackFuture.valid()) {
-        mInitialStatusCallbackFuture.wait();
-    }
     // Destruction of ProviderInfo is only supposed to happen when the respective
     // CameraProvider interface dies, so do not unregister callbacks.
 }
