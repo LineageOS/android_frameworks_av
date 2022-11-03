@@ -550,6 +550,11 @@ AidlProviderInfo::AidlDeviceInfo3::AidlDeviceInfo3(
                     "ANDROID_FLASH_INFO_STRENGTH_MAXIMUM_LEVEL tags: %s (%d)", __FUNCTION__,
                     strerror(-res), res);
         }
+
+        // b/247038031: In case of system_server crash, camera_server is
+        // restarted as well. If flashlight is turned on before the crash, it
+        // may be stuck to be on. As a workaround, set torch mode to be OFF.
+        interface->setTorchMode(false);
     } else {
         mHasFlashUnit = false;
     }
