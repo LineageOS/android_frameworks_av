@@ -17,7 +17,7 @@
 
 
 #define LOG_TAG "AudioFlinger"
-//#define LOG_NDEBUG 0
+// #define LOG_NDEBUG 0
 #define ATRACE_TAG ATRACE_TAG_AUDIO
 
 #include "Configuration.h"
@@ -44,6 +44,7 @@
 #include <private/media/AudioTrackShared.h>
 #include <private/android_filesystem_config.h>
 #include <audio_utils/Balance.h>
+#include <audio_utils/MelProcessor.h>
 #include <audio_utils/Metadata.h>
 #include <audio_utils/channels.h>
 #include <audio_utils/mono_blend.h>
@@ -3335,6 +3336,7 @@ ssize_t AudioFlinger::PlaybackThread::threadLoop_write()
         }
         ssize_t framesWritten = mNormalSink->write((char *)mSinkBuffer + offset, count);
         ATRACE_END();
+
         if (framesWritten > 0) {
             bytesWritten = framesWritten * mFrameSize;
 #ifdef TEE_SINK
@@ -3342,6 +3344,11 @@ ssize_t AudioFlinger::PlaybackThread::threadLoop_write()
 #endif
         } else {
             bytesWritten = framesWritten;
+        }
+
+        auto processor = mMelProcessor.load();
+        if (processor) {
+            processor->process((char *)mSinkBuffer + offset, bytesWritten);
         }
     // otherwise use the HAL / AudioStreamOut directly
     } else {
@@ -3377,6 +3384,21 @@ ssize_t AudioFlinger::PlaybackThread::threadLoop_write()
         mStandby = false;
     }
     return bytesWritten;
+}
+
+void AudioFlinger::PlaybackThread::startMelComputation(const sp<
+        audio_utils::MelProcessor::MelCallback>& callback)
+{
+    ALOGV("%s: creating new mel processor for thread %d", __func__, id());
+    mMelProcessor = sp<audio_utils::MelProcessor>::make(mSampleRate,
+                                                        mChannelCount,
+                                                        mFormat,
+                                                        callback);
+}
+
+void AudioFlinger::PlaybackThread::stopMelComputation() {
+    ALOGV("%s: stopping mel processor for thread %d", __func__, id());
+    mMelProcessor = nullptr;
 }
 
 void AudioFlinger::PlaybackThread::threadLoop_drain()

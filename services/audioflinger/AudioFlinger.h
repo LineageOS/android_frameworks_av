@@ -82,6 +82,8 @@
 #include <audio_utils/clock.h>
 #include <audio_utils/FdToString.h>
 #include <audio_utils/LinearMap.h>
+#include <audio_utils/MelAggregator.h>
+#include <audio_utils/MelProcessor.h>
 #include <audio_utils/SimpleLog.h>
 #include <audio_utils/TimestampVerifier.h>
 
@@ -632,11 +634,13 @@ using effect_buffer_t = int16_t;
 
 #include "PatchPanel.h"
 
-#include "Effects.h"
-
 #include "PatchCommandThread.h"
 
+#include "Effects.h"
+
 #include "DeviceEffectManager.h"
+
+#include "MelReporter.h"
 
     // Find io handle by session id.
     // Preference is given to an io handle with a matching effect chain to session id.
@@ -1016,6 +1020,7 @@ private:
 
     const sp<PatchCommandThread> mPatchCommandThread;
     sp<DeviceEffectManager> mDeviceEffectManager;
+    sp<MelReporter> mMelReporter;
 
     bool       mSystemReady;
     std::atomic_bool mAudioPolicyReady{};
