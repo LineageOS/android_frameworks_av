@@ -36,6 +36,7 @@ cc_library_shared {
         "libaudiohal",
         "libaudiopolicy",
         "libaudiopolicymanagerdefault",
+        "libaudiousecasevalidation",
         "libaudioutils",
         "libbinder",
         "libcutils",
@@ -85,6 +86,7 @@ cc_library_shared {
 
     export_shared_lib_headers: [
         "libactivitymanager_aidl",
+        "libaudiousecasevalidation",
         "libheadtracking",
         "libheadtracking-binding",
         "libsensorprivacy",
