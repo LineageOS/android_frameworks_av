@@ -323,7 +323,8 @@ AudioFlinger::AudioFlinger()
       mClientSharedHeapSize(kMinimumClientSharedHeapSizeBytes),
       mGlobalEffectEnableTime(0),
       mPatchPanel(this),
-      mDeviceEffectManager(this),
+      mPatchCommandThread(sp<PatchCommandThread>::make()),
+      mDeviceEffectManager(sp<DeviceEffectManager>::make(*this)),
       mSystemReady(false)
 {
     // Move the audio session unique ID generator start base as time passes to limit risk of
@@ -873,7 +874,7 @@ status_t AudioFlinger::dump(int fd, const Vector<String16>& args)
 
         mPatchPanel.dump(fd);
 
-        mDeviceEffectManager.dump(fd);
+        mDeviceEffectManager->dump(fd);
 
         // dump external setParameters
         auto dumpLogger = [fd](SimpleLog& logger, const char* name) {
@@ -4069,7 +4070,7 @@ status_t AudioFlinger::createEffect(const media::CreateEffectRequest& request,
         if (sessionId == AUDIO_SESSION_DEVICE) {
             sp<Client> client = registerPid(currentPid);
             ALOGV("%s device type %#x address %s", __func__, device.mType, device.getAddress());
-            handle = mDeviceEffectManager.createEffect_l(
+            handle = mDeviceEffectManager->createEffect_l(
                     &descOut, device, client, effectClient, mPatchPanel.patches_l(),
                     &enabledOut, &lStatus, probe, request.notifyFramesProcessed);
             if (lStatus != NO_ERROR && lStatus != ALREADY_EXISTS) {
