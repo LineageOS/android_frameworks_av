@@ -32,16 +32,6 @@ namespace android {
 
 using media::IEffectClient;
 
-void AudioFlinger::DeviceEffectManager::createAudioPatch(audio_patch_handle_t handle,
-        const PatchPanel::Patch& patch) {
-    ALOGV("%s handle %d mHalHandle %d num sinks %d device sink %08x",
-            __func__, handle, patch.mHalHandle,
-            patch.mAudioPatch.num_sinks,
-            patch.mAudioPatch.num_sinks > 0 ? patch.mAudioPatch.sinks[0].ext.device.type : 0);
-
-    mCommandThread->createAudioPatchCommand(handle, patch);
-}
-
 void AudioFlinger::DeviceEffectManager::onCreateAudioPatch(audio_patch_handle_t handle,
         const PatchPanel::Patch& patch) {
     ALOGV("%s handle %d mHalHandle %d device sink %08x",
@@ -53,11 +43,6 @@ void AudioFlinger::DeviceEffectManager::onCreateAudioPatch(audio_patch_handle_t 
         ALOGV("%s Effect onCreatePatch status %d", __func__, status);
         ALOGW_IF(status == BAD_VALUE, "%s onCreatePatch error %d", __func__, status);
     }
-}
-
-void AudioFlinger::DeviceEffectManager::releaseAudioPatch(audio_patch_handle_t handle) {
-    ALOGV("%s", __func__);
-    mCommandThread->releaseAudioPatchCommand(handle);
 }
 
 void AudioFlinger::DeviceEffectManager::onReleaseAudioPatch(audio_patch_handle_t handle) {
@@ -116,7 +101,7 @@ sp<AudioFlinger::EffectHandle> AudioFlinger::DeviceEffectManager::createEffect_l
             }
         }
     }
-    if (enabled != NULL) {
+    if (enabled != nullptr) {
         *enabled = (int)effect->isEnabled();
     }
     *status = lStatus;
@@ -206,93 +191,6 @@ bool AudioFlinger::DeviceEffectManagerCallback::disconnectEffectHandle(
         }
     }
     return true;
-}
-
-// -----------  DeviceEffectManager::CommandThread implementation ----------
-
-
-AudioFlinger::DeviceEffectManager::CommandThread::~CommandThread()
-{
-    Mutex::Autolock _l(mLock);
-    mCommands.clear();
-}
-
-void AudioFlinger::DeviceEffectManager::CommandThread::onFirstRef()
-{
-    run("DeviceEffectManage_CommandThread", ANDROID_PRIORITY_AUDIO);
-}
-
-bool AudioFlinger::DeviceEffectManager::CommandThread::threadLoop()
-{
-    mLock.lock();
-    while (!exitPending())
-    {
-        while (!mCommands.empty() && !exitPending()) {
-            sp<Command> command = mCommands.front();
-            mCommands.pop_front();
-            mLock.unlock();
-
-            switch (command->mCommand) {
-            case CREATE_AUDIO_PATCH: {
-                CreateAudioPatchData *data = (CreateAudioPatchData *)command->mData.get();
-                ALOGV("CommandThread() processing create audio patch handle %d", data->mHandle);
-                mManager.onCreateAudioPatch(data->mHandle, data->mPatch);
-                } break;
-            case RELEASE_AUDIO_PATCH: {
-                ReleaseAudioPatchData *data = (ReleaseAudioPatchData *)command->mData.get();
-                ALOGV("CommandThread() processing release audio patch handle %d", data->mHandle);
-                mManager.onReleaseAudioPatch(data->mHandle);
-                } break;
-            default:
-                ALOGW("CommandThread() unknown command %d", command->mCommand);
-            }
-            mLock.lock();
-        }
-
-        // At this stage we have either an empty command queue or the first command in the queue
-        // has a finite delay. So unless we are exiting it is safe to wait.
-        if (!exitPending()) {
-            ALOGV("CommandThread() going to sleep");
-            mWaitWorkCV.wait(mLock);
-        }
-    }
-    mLock.unlock();
-    return false;
-}
-
-void AudioFlinger::DeviceEffectManager::CommandThread::sendCommand(sp<Command> command) {
-    Mutex::Autolock _l(mLock);
-    mCommands.push_back(command);
-    mWaitWorkCV.signal();
-}
-
-void AudioFlinger::DeviceEffectManager::CommandThread::createAudioPatchCommand(
-        audio_patch_handle_t handle, const PatchPanel::Patch& patch)
-{
-    sp<Command> command = new Command(CREATE_AUDIO_PATCH, new CreateAudioPatchData(handle, patch));
-    ALOGV("CommandThread() adding create patch handle %d mHalHandle %d.", handle, patch.mHalHandle);
-    sendCommand(command);
-}
-
-void AudioFlinger::DeviceEffectManager::CommandThread::releaseAudioPatchCommand(
-        audio_patch_handle_t handle)
-{
-    sp<Command> command = new Command(RELEASE_AUDIO_PATCH, new ReleaseAudioPatchData(handle));
-    ALOGV("CommandThread() adding release patch");
-    sendCommand(command);
-}
-
-void AudioFlinger::DeviceEffectManager::CommandThread::exit()
-{
-    ALOGV("CommandThread::exit");
-    {
-        AutoMutex _l(mLock);
-        requestExit();
-        mWaitWorkCV.signal();
-    }
-    // Note that we can call it from the thread loop if all other references have been released
-    // but it will safely return WOULD_BLOCK in this case
-    requestExitAndWait();
 }
 
 } // namespace android
