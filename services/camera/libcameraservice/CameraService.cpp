@@ -4022,7 +4022,7 @@ binder::Status CameraService::SensorPrivacyPolicy::onSensorPrivacyChanged(
     int toggleType __unused, int sensor __unused, bool enabled) {
     {
         Mutex::Autolock _l(mSensorPrivacyLock);
-        mSensorPrivacyEnabled = mSpm.isToggleSensorPrivacyEnabled(SensorPrivacyManager::TOGGLE_SENSOR_CAMERA);
+        mSensorPrivacyEnabled = enabled;
     }
     // if sensor privacy is enabled then block all clients from accessing the camera
     if (enabled) {
