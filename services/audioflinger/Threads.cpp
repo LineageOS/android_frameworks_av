@@ -10233,18 +10233,21 @@ status_t AudioFlinger::MmapThread::checkEffectCompatibility_l(
 
 void AudioFlinger::MmapThread::checkInvalidTracks_l()
 {
+    sp<MmapStreamCallback> callback;
     for (const sp<MmapTrack> &track : mActiveTracks) {
         if (track->isInvalid()) {
-            sp<MmapStreamCallback> callback = mCallback.promote();
-            if (callback != 0) {
-                mLock.unlock();
-                callback->onTearDown(track->portId());
-                mLock.lock();
-            } else if (mNoCallbackWarningCount < kMaxNoCallbackWarnings) {
-                ALOGW("Could not notify MMAP stream tear down: no onTearDown callback!");
+            callback = mCallback.promote();
+            if (callback == nullptr &&  mNoCallbackWarningCount < kMaxNoCallbackWarnings) {
+                ALOGW("Could not notify MMAP stream tear down: no onRoutingChanged callback!");
                 mNoCallbackWarningCount++;
             }
+            break;
         }
+    }
+    if (callback != 0) {
+        mLock.unlock();
+        callback->onRoutingChanged(AUDIO_PORT_HANDLE_NONE);
+        mLock.lock();
     }
 }
 
