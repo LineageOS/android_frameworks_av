@@ -325,6 +325,7 @@ AudioFlinger::AudioFlinger()
       mPatchPanel(this),
       mPatchCommandThread(sp<PatchCommandThread>::make()),
       mDeviceEffectManager(sp<DeviceEffectManager>::make(*this)),
+      mMelReporter(sp<MelReporter>::make(*this)),
       mSystemReady(false)
 {
     // Move the audio session unique ID generator start base as time passes to limit risk of
@@ -875,6 +876,9 @@ status_t AudioFlinger::dump(int fd, const Vector<String16>& args)
         mPatchPanel.dump(fd);
 
         mDeviceEffectManager->dump(fd);
+
+        std::string melOutput = mMelReporter->dump();
+        write(fd, melOutput.c_str(), melOutput.size());
 
         // dump external setParameters
         auto dumpLogger = [fd](SimpleLog& logger, const char* name) {
