@@ -17,6 +17,7 @@
 
 #pragma once
 
+#include <android/media/ISoundDoseCallback.h>
 #include <audio_utils/MelProcessor.h>
 #include <audio_utils/MelAggregator.h>
 #include <mutex>
@@ -71,6 +72,9 @@ public:
 
     std::string dump() const;
 
+    /** \brief Registers the interface for passing callbacks to the AudioService. */
+    void registerSoundDoseCallback(const sp<media::ISoundDoseCallback>& callback);
+
     // used for testing
     size_t getCachedMelRecordsSize() const;
 
@@ -91,6 +95,8 @@ private:
                        wp<audio_utils::MelProcessor>> mActiveProcessors GUARDED_BY(mLock);
 
     float mRs2Value GUARDED_BY(mLock);
+
+    sp<media::ISoundDoseCallback> mSoundDoseCallback GUARDED_BY(mLock);
 };
 
 }  // namespace android

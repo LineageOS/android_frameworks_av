@@ -20,6 +20,7 @@
 
 #include "AudioFlinger.h"
 
+#include <android/media/ISoundDoseCallback.h>
 #include <audio_utils/power.h>
 #include <utils/Log.h>
 
@@ -105,6 +106,12 @@ void AudioFlinger::MelReporter::onReleaseAudioPatch(audio_patch_handle_t handle)
     if (thread != nullptr) {
         thread->stopMelComputation();
     }
+}
+
+void AudioFlinger::MelReporter::registerSoundDoseCallback(
+        const sp<media::ISoundDoseCallback>& callback) {
+    // no need to lock since registerSoundDoseCallback is synchronized
+    mSoundDoseManager.registerSoundDoseCallback(callback);
 }
 
 std::string AudioFlinger::MelReporter::dump() {

@@ -2374,6 +2374,15 @@ status_t AudioSystem::canBeSpatialized(const audio_attributes_t *attr,
     return OK;
 }
 
+status_t AudioSystem::registerSoundDoseCallback(const sp<media::ISoundDoseCallback>& callback) {
+    const sp<IAudioFlinger>& af = AudioSystem::get_audio_flinger();
+    if (af == nullptr) {
+        return PERMISSION_DENIED;
+    }
+
+    return af->registerSoundDoseCallback(callback);
+}
+
 status_t AudioSystem::getDirectPlaybackSupport(const audio_attributes_t *attr,
                                                const audio_config_t *config,
                                                audio_direct_mode_t* directMode) {

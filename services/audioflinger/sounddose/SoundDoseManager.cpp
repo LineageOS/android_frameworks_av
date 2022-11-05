@@ -123,6 +123,23 @@ void SoundDoseManager::onMomentaryExposure(float currentMel,
           __func__,
           deviceId,
           currentMel);
+
+    sp<media::ISoundDoseCallback> soundDoseCallback;
+    {
+        std::lock_guard _l(mLock);
+        soundDoseCallback = mSoundDoseCallback;
+    }
+
+    if (soundDoseCallback != nullptr) {
+        mSoundDoseCallback->onMomentaryExposure(currentMel, deviceId);
+    }
+}
+
+void SoundDoseManager::registerSoundDoseCallback(const sp<media::ISoundDoseCallback>& callback) {
+    ALOGV("%s: Register ISoundDoseCallback", __func__);
+
+    std::lock_guard _l(mLock);
+    mSoundDoseCallback = callback;
 }
 
 std::string SoundDoseManager::dump() const

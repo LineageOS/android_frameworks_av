@@ -17,6 +17,7 @@ cc_library {
     ],
 
     shared_libs: [
+        "audioflinger-aidl-cpp",
         "libaudioutils",
         "libbase",
         "liblog",
