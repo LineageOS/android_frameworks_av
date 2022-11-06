@@ -453,6 +453,7 @@ aidl_interface {
         "aidl/android/media/IAudioTrackCallback.aidl",
 
         "aidl/android/media/ISoundDoseCallback.aidl",
+        "aidl/android/media/SoundDoseRecord.aidl",
     ],
     imports: [
         "android.media.audio.common.types-V2",
@@ -551,6 +552,7 @@ aidl_interface {
     local_include_dir: "aidl",
     srcs: [
         "aidl/android/media/ISoundDoseCallback.aidl",
+        "aidl/android/media/SoundDoseRecord.aidl",
     ],
 
     double_loadable: true,

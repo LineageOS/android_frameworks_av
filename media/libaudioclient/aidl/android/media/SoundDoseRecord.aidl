@@ -16,20 +16,17 @@
 
 package android.media;
 
-import android.media.SoundDoseRecord;
-
-/**
- * Interface used to push the sound dose related information from the audio
- * server to the AudioService#SoundDoseHelper.
- */
-interface ISoundDoseCallback {
-    /** Called whenever the momentary exposure exceeds the RS2 value. */
-    oneway void onMomentaryExposure(float currentMel, int deviceId);
-
+/** Record containing information about the computed sound dose. */
+parcelable SoundDoseRecord {
     /**
-     * Notifies that the CSD value has changed. The currentCsd is normalized
-     * with value 1 representing 100% of sound dose. SoundDoseRecord represents
-     * the newest record that lead to the new currentCsd.
+     * Corresponds to the time in seconds when the CSD value is calculated from.
+     * Values should be consistent and referenced from the same clock (e.g.: monotonic)
      */
-    oneway void onNewCsdValue(float currentCsd, in SoundDoseRecord[] records);
+    long timestamp;
+    /** Corresponds to the duration that leads to the CSD value. */
+    int duration;
+    /** The actual contribution to the CSD computation normalized: 1.f is 100%CSD. */
+    float value;
+    /** The average MEL value in this time frame that lead to this CSD value. */
+    float averageMel;
 }
