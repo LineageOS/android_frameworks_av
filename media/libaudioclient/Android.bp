@@ -452,6 +452,7 @@ aidl_interface {
         "aidl/android/media/IAudioTrack.aidl",
         "aidl/android/media/IAudioTrackCallback.aidl",
 
+        "aidl/android/media/ISoundDose.aidl",
         "aidl/android/media/ISoundDoseCallback.aidl",
         "aidl/android/media/SoundDoseRecord.aidl",
     ],
@@ -551,6 +552,7 @@ aidl_interface {
     unstable: true,
     local_include_dir: "aidl",
     srcs: [
+        "aidl/android/media/ISoundDose.aidl",
         "aidl/android/media/ISoundDoseCallback.aidl",
         "aidl/android/media/SoundDoseRecord.aidl",
     ],

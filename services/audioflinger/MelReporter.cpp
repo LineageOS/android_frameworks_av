@@ -108,10 +108,10 @@ void AudioFlinger::MelReporter::onReleaseAudioPatch(audio_patch_handle_t handle)
     }
 }
 
-void AudioFlinger::MelReporter::registerSoundDoseCallback(
+sp<media::ISoundDose> AudioFlinger::MelReporter::getSoundDoseInterface(
         const sp<media::ISoundDoseCallback>& callback) {
-    // no need to lock since registerSoundDoseCallback is synchronized
-    mSoundDoseManager.registerSoundDoseCallback(callback);
+    // no need to lock since getSoundDoseInterface is synchronized
+    return mSoundDoseManager.getSoundDoseInterface(callback);
 }
 
 std::string AudioFlinger::MelReporter::dump() {

@@ -837,9 +837,10 @@ status_t AudioFlingerClientAdapter::getSupportedLatencyModes(
     return NO_ERROR;
 }
 
-status_t AudioFlingerClientAdapter::registerSoundDoseCallback(
-        const sp<media::ISoundDoseCallback> &callback) {
-    return statusTFromBinderStatus(mDelegate->registerSoundDoseCallback(callback));
+status_t AudioFlingerClientAdapter::getSoundDoseInterface(
+        const sp<media::ISoundDoseCallback> &callback,
+        sp<media::ISoundDose>* soundDose) {
+    return statusTFromBinderStatus(mDelegate->getSoundDoseInterface(callback, soundDose));
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////
@@ -1360,10 +1361,11 @@ Status AudioFlingerServerAdapter::getSupportedLatencyModes(
     return Status::ok();
 }
 
-Status AudioFlingerServerAdapter::registerSoundDoseCallback(
-        const sp<media::ISoundDoseCallback>& callback)
+Status AudioFlingerServerAdapter::getSoundDoseInterface(
+        const sp<media::ISoundDoseCallback>& callback,
+        sp<media::ISoundDose>* soundDose)
 {
-    return Status::fromStatusT(mDelegate->registerSoundDoseCallback(callback));
+    return Status::fromStatusT(mDelegate->getSoundDoseInterface(callback, soundDose));
 }
 
 } // namespace android

@@ -2374,13 +2374,18 @@ status_t AudioSystem::canBeSpatialized(const audio_attributes_t *attr,
     return OK;
 }
 
-status_t AudioSystem::registerSoundDoseCallback(const sp<media::ISoundDoseCallback>& callback) {
+status_t AudioSystem::getSoundDoseInterface(const sp<media::ISoundDoseCallback>& callback,
+                                            sp<media::ISoundDose>* soundDose) {
     const sp<IAudioFlinger>& af = AudioSystem::get_audio_flinger();
     if (af == nullptr) {
         return PERMISSION_DENIED;
     }
+    if (soundDose == nullptr) {
+        return BAD_VALUE;
+    }
 
-    return af->registerSoundDoseCallback(callback);
+    RETURN_STATUS_IF_ERROR(af->getSoundDoseInterface(callback, soundDose));
+    return OK;
 }
 
 status_t AudioSystem::getDirectPlaybackSupport(const audio_attributes_t *attr,
