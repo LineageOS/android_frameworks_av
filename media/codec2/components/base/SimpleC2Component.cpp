@@ -414,6 +414,44 @@ void convertYUV420Planar16ToP010(uint16_t *dstY, uint16_t *dstUV, const uint16_t
         dstUV += dstUVStride;
     }
 }
+
+void convertP010ToYUV420Planar16(uint16_t *dstY, uint16_t *dstU, uint16_t *dstV,
+                                 const uint16_t *srcY, const uint16_t *srcUV,
+                                 size_t srcYStride, size_t srcUVStride, size_t dstYStride,
+                                 size_t dstUStride, size_t dstVStride, size_t width,
+                                 size_t height, bool isMonochrome) {
+    for (size_t y = 0; y < height; ++y) {
+        for (size_t x = 0; x < width; ++x) {
+            dstY[x] = srcY[x] >> 6;
+        }
+        srcY += srcYStride;
+        dstY += dstYStride;
+    }
+
+    if (isMonochrome) {
+        // Fill with neutral U/V values.
+        for (size_t y = 0; y < (height + 1) / 2; ++y) {
+            for (size_t x = 0; x < (width + 1) / 2; ++x) {
+                dstU[x] = kNeutralUVBitDepth10;
+                dstV[x] = kNeutralUVBitDepth10;
+            }
+            dstU += dstUStride;
+            dstV += dstVStride;
+        }
+        return;
+    }
+
+    for (size_t y = 0; y < (height + 1) / 2; ++y) {
+        for (size_t x = 0; x < (width + 1) / 2; ++x) {
+            dstU[x] = srcUV[2 * x] >> 6;
+            dstV[x] = srcUV[2 * x + 1] >> 6;
+        }
+        dstU += dstUStride;
+        dstV += dstVStride;
+        srcUV += srcUVStride;
+    }
+}
+
 std::unique_ptr<C2Work> SimpleC2Component::WorkQueue::pop_front() {
     std::unique_ptr<C2Work> work = std::move(mQueue.front().work);
     mQueue.pop_front();

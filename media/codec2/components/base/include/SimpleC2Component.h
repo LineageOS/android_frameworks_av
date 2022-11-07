@@ -55,6 +55,12 @@ void convertYUV420Planar16ToP010(uint16_t *dstY, uint16_t *dstUV, const uint16_t
                                  size_t dstUVStride, size_t width, size_t height,
                                  bool isMonochrome = false);
 
+void convertP010ToYUV420Planar16(uint16_t *dstY, uint16_t *dstU, uint16_t *dstV,
+                                 const uint16_t *srcY, const uint16_t *srcUV,
+                                 size_t srcYStride, size_t srcUVStride, size_t dstYStride,
+                                 size_t dstUStride, size_t dstVStride, size_t width,
+                                 size_t height, bool isMonochrome = false);
+
 class SimpleC2Component
         : public C2Component, public std::enable_shared_from_this<SimpleC2Component> {
 public:
