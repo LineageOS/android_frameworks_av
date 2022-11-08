@@ -432,7 +432,7 @@ AAUDIO_API int32_t AAudioStream_getSamplesPerFrame(AAudioStream* stream)
 AAUDIO_API aaudio_stream_state_t AAudioStream_getState(AAudioStream* stream)
 {
     AudioStream *audioStream = convertAAudioStreamToAudioStream(stream);
-    return audioStream->getState();
+    return audioStream->getStateExternal();
 }
 
 AAUDIO_API aaudio_format_t AAudioStream_getFormat(AAudioStream* stream)
