@@ -494,6 +494,32 @@ bool erasePhysicalCameraIdSet(
     return found;
 }
 
+const std::set<std::string>& getCameraIdsWithZoomLocked(
+        const InFlightRequestMap& inflightMap, const CameraMetadata& metadata,
+        const std::set<std::string>& cameraIdsWithZoom) {
+    camera_metadata_ro_entry overrideEntry =
+            metadata.find(ANDROID_CONTROL_SETTINGS_OVERRIDE);
+    camera_metadata_ro_entry frameNumberEntry =
+            metadata.find(ANDROID_CONTROL_SETTINGS_OVERRIDING_FRAME_NUMBER);
+    if (overrideEntry.count != 1
+            || overrideEntry.data.i32[0] != ANDROID_CONTROL_SETTINGS_OVERRIDE_ZOOM
+            || frameNumberEntry.count != 1) {
+        // No valid overriding frame number, skip
+        return cameraIdsWithZoom;
+    }
+
+    uint32_t overridingFrameNumber = frameNumberEntry.data.i32[0];
+    ssize_t idx = inflightMap.indexOfKey(overridingFrameNumber);
+    if (idx < 0) {
+        ALOGE("%s: Failed to find pending request #%d in inflight map",
+                __FUNCTION__, overridingFrameNumber);
+        return cameraIdsWithZoom;
+    }
+
+    const InFlightRequest &r = inflightMap.valueFor(overridingFrameNumber);
+    return r.cameraIdsWithZoom;
+}
+
 void processCaptureResult(CaptureOutputStates& states, const camera_capture_result *result) {
     ATRACE_CALL();
 
@@ -682,10 +708,12 @@ void processCaptureResult(CaptureOutputStates& states, const camera_capture_resu
             } else if (request.hasCallback) {
                 CameraMetadata metadata;
                 metadata = result->result;
+                auto cameraIdsWithZoom = getCameraIdsWithZoomLocked(
+                        states.inflightMap, metadata, request.cameraIdsWithZoom);
                 sendCaptureResult(states, metadata, request.resultExtras,
                     collectedPartialResult, frameNumber,
                     hasInputBufferInRequest, request.zslCapture && request.stillCapture,
-                    request.rotateAndCropAuto, request.cameraIdsWithZoom,
+                    request.rotateAndCropAuto, cameraIdsWithZoom,
                     request.physicalMetadatas);
             }
         }
@@ -912,11 +940,13 @@ void notifyShutter(CaptureOutputStates& states, const camera_shutter_msg_t &msg)
                     states.listener->notifyShutter(r.resultExtras, msg.timestamp);
                 }
                 // send pending result and buffers
+                const auto& cameraIdsWithZoom = getCameraIdsWithZoomLocked(
+                        inflightMap, r.pendingMetadata, r.cameraIdsWithZoom);
                 sendCaptureResult(states,
                     r.pendingMetadata, r.resultExtras,
                     r.collectedPartialResult, msg.frame_number,
                     r.hasInputBuffer, r.zslCapture && r.stillCapture,
-                    r.rotateAndCropAuto, r.cameraIdsWithZoom, r.physicalMetadatas);
+                    r.rotateAndCropAuto, cameraIdsWithZoom, r.physicalMetadatas);
             }
             returnAndRemovePendingOutputBuffers(
                     states.useHalBufManager, states.listener, r, states.sessionStatsBuilder);
