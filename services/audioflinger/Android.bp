@@ -43,7 +43,6 @@ cc_library_shared {
         "FastThread.cpp",
         "FastThreadDumpState.cpp",
         "FastThreadState.cpp",
-        "MelReporter.cpp",
         "NBAIO_Tee.cpp",
         "PatchCommandThread.cpp",
         "PatchPanel.cpp",
@@ -101,7 +100,6 @@ cc_library_shared {
         "libaaudio_headers",
         "libaudioclient_headers",
         "libaudiohal_headers",
-        "libaudioutils_headers",
         "libmedia_headers",
     ],
 
