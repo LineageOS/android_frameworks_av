@@ -65,19 +65,6 @@ class EffectBundleAidl final : public EffectImpl {
     lvm::BundleEffectType mType = lvm::BundleEffectType::EQUALIZER;
     std::shared_ptr<BundleContext> mContext;
 
-    int mPreset = lvm::PRESET_CUSTOM;
-    size_t mInputFrameSize, mOutputFrameSize;
-
-    // Equalizer
-    int mCurPresetIdx = lvm::PRESET_CUSTOM; /* Current preset being used */
-    int32_t mBandGaindB[lvm::MAX_NUM_BANDS];
-
-    RetCode setEqPreset(const int& presetIdx);
-    int getEqPreset() const { return mCurPresetIdx; }
-
-    RetCode setEqBandLevels(const std::vector<Equalizer::BandLevel>& bandLevels);
-    std::vector<Equalizer::BandLevel> getEqBandLevels() const;
-
     IEffect::Status status(binder_status_t status, size_t consumed, size_t produced);
     ndk::ScopedAStatus getParameterEqualizer(const Equalizer::Tag& tag,
                                              Parameter::Specific* specific);
