@@ -1006,10 +1006,11 @@ void AudioPolicyService::updateUidStates_l()
         //     AND is on TOP or latest started
         //     AND there is no active privacy sensitive capture or call
         //             OR client has CAPTURE_AUDIO_OUTPUT privileged permission
+        bool allowSensitiveCapture =
+            !isSensitiveActive || isTopOrLatestSensitive || current->canCaptureOutput;
         bool allowCapture = !isAssistantOnTop
                 && (isTopOrLatestActive || isTopOrLatestSensitive)
-                && !(isSensitiveActive
-                    && !(isTopOrLatestSensitive || current->canCaptureOutput))
+                && allowSensitiveCapture
                 && canCaptureIfInCallOrCommunication(current);
 
         if (!current->hasOp()) {
@@ -1032,7 +1033,7 @@ void AudioPolicyService::updateUidStates_l()
                 if (source == AUDIO_SOURCE_HOTWORD || source == AUDIO_SOURCE_VOICE_RECOGNITION) {
                     allowCapture = true;
                 }
-            } else if (!(isSensitiveActive && !current->canCaptureOutput)
+            } else if (allowSensitiveCapture
                     && canCaptureIfInCallOrCommunication(current)) {
                 if (isTopOrLatestAssistant
                     && (source == AUDIO_SOURCE_VOICE_RECOGNITION
@@ -1053,7 +1054,7 @@ void AudioPolicyService::updateUidStates_l()
                 if (source == AUDIO_SOURCE_HOTWORD || source == AUDIO_SOURCE_VOICE_RECOGNITION) {
                     allowCapture = true;
                 }
-            } else if (!(isSensitiveActive && !current->canCaptureOutput)
+            } else if (allowSensitiveCapture
                         && canCaptureIfInCallOrCommunication(current)) {
                 if ((source == AUDIO_SOURCE_VOICE_RECOGNITION) || (source == AUDIO_SOURCE_HOTWORD))
                 {
@@ -1068,7 +1069,7 @@ void AudioPolicyService::updateUidStates_l()
             //     OR
             //         Is on TOP AND the source is VOICE_RECOGNITION or HOTWORD
             if (!isAssistantOnTop
-                    && !(isSensitiveActive && !current->canCaptureOutput)
+                    && allowSensitiveCapture
                     && canCaptureIfInCallOrCommunication(current)) {
                 allowCapture = true;
             }

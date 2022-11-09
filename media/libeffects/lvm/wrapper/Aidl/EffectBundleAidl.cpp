@@ -86,8 +86,8 @@ EffectBundleAidl::~EffectBundleAidl() {
 }
 
 ndk::ScopedAStatus EffectBundleAidl::getDescriptor(Descriptor* _aidl_return) {
-    LOG(DEBUG) << _aidl_return->toString();
     RETURN_IF(!_aidl_return, EX_ILLEGAL_ARGUMENT, "Parameter:nullptr");
+    LOG(DEBUG) << _aidl_return->toString();
     *_aidl_return = *mDescriptor;
     return ndk::ScopedAStatus::ok();
 }
@@ -157,6 +157,7 @@ ndk::ScopedAStatus EffectBundleAidl::setParameterSpecific(const Parameter::Speci
 
 ndk::ScopedAStatus EffectBundleAidl::getParameterSpecific(const Parameter::Id& id,
                                                           Parameter::Specific* specific) {
+    RETURN_IF(!specific, EX_NULL_POINTER, "nullPtr");
     auto tag = id.getTag();
     RETURN_IF(Parameter::Id::equalizerTag != tag, EX_ILLEGAL_ARGUMENT, "wrongIdTag");
     auto eqId = id.get<Parameter::Id::equalizerTag>();
