@@ -121,6 +121,8 @@ private:
         uint32_t mSelfID;
         /* extmap:<value> for CVO will be set to here */
         int32_t mCVOExtMap;
+        /* To check ECN is supported or not */
+        int32_t mRtpSockOptEcn;
 
         /* a copy of TrackInfo in RTSPSource */
         sp<AnotherPacketSource> mSource;

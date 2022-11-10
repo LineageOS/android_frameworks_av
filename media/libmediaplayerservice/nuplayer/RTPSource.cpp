@@ -115,7 +115,7 @@ void NuPlayer::RTPSource::prepareAsync() {
 
         int sockRtp, sockRtcp;
         ARTPConnection::MakeRTPSocketPair(&sockRtp, &sockRtcp, info->mLocalIp, info->mRemoteIp,
-                info->mLocalPort, info->mRemotePort, info->mSocketNetwork);
+                info->mLocalPort, info->mRemotePort, info->mSocketNetwork, info->mRtpSockOptEcn);
 
         sp<AMessage> notify = new AMessage('accu', this);
 
@@ -125,6 +125,8 @@ void NuPlayer::RTPSource::prepareAsync() {
         mRTPConn->addStream(sockRtp, sockRtcp, desc, i + 1, notify, false);
         mRTPConn->setSelfID(info->mSelfID);
         mRTPConn->setStaticJitterTimeMs(info->mJbTimeMs);
+        mRTPConn->setRtpSockOptEcn(info->mRtpSockOptEcn);
+        mRTPConn->setIsIPv6(info->mLocalIp);
 
         unsigned long PT;
         AString formatDesc, formatParams;
@@ -719,6 +721,8 @@ status_t NuPlayer::RTPSource::setParameter(const String8 &key, const String8 &va
     } else if (key == "rtp-param-set-socket-network") {
         int64_t networkHandle = atoll(value);
         setSocketNetwork(networkHandle);
+    } else if (key == "rtp-param-set-socket-ecn") {
+        info->mRtpSockOptEcn = atoi(value);
     } else if (key == "rtp-param-jitter-buffer-time") {
         // clamping min at 40, max at 3000
         info->mJbTimeMs = std::min(std::max(40, atoi(value)), 3000);
