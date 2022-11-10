@@ -194,6 +194,8 @@ public:
         return mState.load();
     }
 
+    aaudio_stream_state_t getStateExternal() const;
+
     virtual int32_t getBufferSize() const {
         return AAUDIO_ERROR_UNIMPLEMENTED;
     }
