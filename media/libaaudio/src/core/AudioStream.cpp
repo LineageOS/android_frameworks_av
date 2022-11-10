@@ -411,6 +411,8 @@ void AudioStream::setDisconnected() {
         return; // no change, the stream is already disconnected
     }
     mDisconnected.store(true);
+    // Wake up a wakeForStateChange thread if it exists.
+    syscall(SYS_futex, &mState, FUTEX_WAKE_PRIVATE, INT_MAX, NULL, NULL, 0);
     // Track transition to DISCONNECTED state.
     android::mediametrics::LogItem(mMetricsId)
             .set(AMEDIAMETRICS_PROP_EVENT, AMEDIAMETRICS_PROP_EVENT_VALUE_DISCONNECT)
@@ -428,7 +430,7 @@ aaudio_result_t AudioStream::waitForStateChange(aaudio_stream_state_t currentSta
     }
 
     int64_t durationNanos = 20 * AAUDIO_NANOS_PER_MILLISECOND; // arbitrary
-    aaudio_stream_state_t state = getState();
+    aaudio_stream_state_t state = getStateExternal();
     while (state == currentState && timeoutNanoseconds > 0) {
         if (durationNanos > timeoutNanoseconds) {
             durationNanos = timeoutNanoseconds;
@@ -447,7 +449,7 @@ aaudio_result_t AudioStream::waitForStateChange(aaudio_stream_state_t currentSta
             return result;
         }
 
-        state = getState();
+        state = getStateExternal();
     }
     if (nextState != nullptr) {
         *nextState = state;
@@ -636,6 +638,13 @@ void AudioStream::setDuckAndMuteVolume(float duckAndMuteVolume) {
     std::lock_guard<std::mutex> lock(mStreamLock);
     mDuckAndMuteVolume = duckAndMuteVolume;
     doSetVolume(); // apply this change
+}
+
+aaudio_stream_state_t AudioStream::getStateExternal() const {
+    if (isDisconnected()) {
+        return AAUDIO_STREAM_STATE_DISCONNECTED;
+    }
+    return getState();
 }
 
 void AudioStream::MyPlayerBase::registerWithAudioManager(const android::sp<AudioStream>& parent) {

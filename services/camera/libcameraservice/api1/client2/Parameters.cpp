@@ -953,6 +953,12 @@ status_t Parameters::initialize(CameraDeviceBase *device) {
                 false);
 
     if (availableVideoStabilizationModes.count > 1) {
+        for (size_t i = 0; i < availableVideoStabilizationModes.count; i++) {
+            if (availableVideoStabilizationModes.data.u8[i] ==
+                ANDROID_CONTROL_VIDEO_STABILIZATION_MODE_ON) {
+                videoStabilizationOnSupported = true;
+            }
+        }
         params.set(CameraParameters::KEY_VIDEO_STABILIZATION_SUPPORTED,
                 CameraParameters::TRUE);
     } else {
@@ -2373,9 +2379,11 @@ status_t Parameters::updateRequest(CameraMetadata *request) const {
             reqCropRegion, 4);
     if (res != OK) return res;
 
-    uint8_t reqVstabMode = videoStabilization ?
+    uint8_t reqVstabMode = videoStabilization ? videoStabilizationOnSupported ?
             ANDROID_CONTROL_VIDEO_STABILIZATION_MODE_ON :
+                    ANDROID_CONTROL_VIDEO_STABILIZATION_MODE_PREVIEW_STABILIZATION :
             ANDROID_CONTROL_VIDEO_STABILIZATION_MODE_OFF;
+
     res = request->update(ANDROID_CONTROL_VIDEO_STABILIZATION_MODE,
             &reqVstabMode, 1);
     if (res != OK) return res;
