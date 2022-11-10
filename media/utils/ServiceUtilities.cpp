@@ -101,7 +101,10 @@ std::optional<AttributionSourceState> resolveAttributionSource(
     AttributionSourceState myAttributionSource;
     myAttributionSource.uid = VALUE_OR_FATAL(android::legacy2aidl_uid_t_int32_t(getuid()));
     myAttributionSource.pid = VALUE_OR_FATAL(android::legacy2aidl_pid_t_int32_t(getpid()));
-    myAttributionSource.token = sp<BBinder>::make();
+    // Create a static token for audioserver requests, which identifies the
+    // audioserver to the app ops system
+    static sp<BBinder> appOpsToken = sp<BBinder>::make();
+    myAttributionSource.token = appOpsToken;
     myAttributionSource.next.push_back(nextAttributionSource);
 
     return std::optional<AttributionSourceState>{myAttributionSource};
