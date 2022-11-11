@@ -113,12 +113,28 @@ aaudio_result_t AudioStreamBuilder::build(AudioStream** streamPtr) {
     }
 
     std::vector<AudioMMapPolicyInfo> policyInfos;
-    // The API setting is the highest priority.
     aaudio_policy_t mmapPolicy = AudioGlobal_getMMapPolicy();
-    // If not specified then get from a system property.
-    if (mmapPolicy == AAUDIO_UNSPECIFIED && android::AudioSystem::getMmapPolicyInfo(
-                AudioMMapPolicyType::DEFAULT, &policyInfos) == NO_ERROR) {
-        mmapPolicy = AAudio_getAAudioPolicy(policyInfos);
+    if (android::AudioSystem::getMmapPolicyInfo(
+            AudioMMapPolicyType::DEFAULT, &policyInfos) == NO_ERROR) {
+        aaudio_policy_t systemMmapPolicy = AAudio_getAAudioPolicy(policyInfos);
+        if (mmapPolicy == AAUDIO_POLICY_ALWAYS && systemMmapPolicy == AAUDIO_POLICY_NEVER) {
+            // No need to try as AAudioService is not created and the client only wants MMAP path.
+            return AAUDIO_ERROR_NO_SERVICE;
+        }
+        // Use system property for mmap policy if
+        //    1. The API setting does not specify mmap policy or
+        //    2. The system property specifies MMAP policy as never. In this case, AAudioService
+        //       will not be started, no need to try mmap path.
+        if (mmapPolicy == AAUDIO_UNSPECIFIED || systemMmapPolicy == AAUDIO_POLICY_NEVER) {
+            mmapPolicy = systemMmapPolicy;
+        }
+    } else {
+        // If it fails querying mmap policy info, it is highly possible that the AAudioService is
+        // not created. In this case, we don't try mmap path.
+        if (mmapPolicy == AAUDIO_POLICY_ALWAYS) {
+            return AAUDIO_ERROR_NO_SERVICE;
+        }
+        mmapPolicy = AAUDIO_POLICY_NEVER;
     }
     // If still not specified then use the default.
     if (mmapPolicy == AAUDIO_UNSPECIFIED) {
