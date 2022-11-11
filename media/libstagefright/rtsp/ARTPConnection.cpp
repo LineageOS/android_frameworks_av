@@ -16,6 +16,12 @@
 
 //#define LOG_NDEBUG 0
 #define LOG_TAG "ARTPConnection"
+#define INET_ECN_NOT_ECT    0x00    /* ECN was not enabled */
+#define INET_ECN_ECT_1      0x01    /* ECN capable packet */
+#define INET_ECN_ECT_0      0x02    /* ECN capable packet */
+#define INET_ECN_CE         0x03    /* ECN congestion */
+#define INET_ECN_MASK       0x03    /* Mask of ECN bits */
+
 #include <utils/Log.h>
 
 #include <media/stagefright/rtsp/ARTPAssembler.h>
@@ -56,6 +62,7 @@ static uint64_t u64at(const uint8_t *data) {
 
 // static
 const int64_t ARTPConnection::kSelectTimeoutUs = 1000LL;
+const int64_t ARTPConnection::kMinOneSecondNotifyDelayUs = 100000ll;
 
 struct ARTPConnection::StreamInfo {
     bool isIPv6;
@@ -84,7 +91,10 @@ ARTPConnection::ARTPConnection(uint32_t flags)
       mPollEventPending(false),
       mLastReceiverReportTimeUs(-1),
       mLastBitrateReportTimeUs(-1),
+      mLastCongestionNotifyTimeUs(-1),
       mTargetBitrate(-1),
+      mRtpSockOptEcn(0),
+      mIsIPv6(false),
       mStaticJitterTimeMs(kStaticJitterTimeMs) {
 }
 
@@ -175,7 +185,7 @@ void ARTPConnection::MakePortPair(
 // static
 void ARTPConnection::MakeRTPSocketPair(
         int *rtpSocket, int *rtcpSocket, const char *localIp, const char *remoteIp,
-        unsigned localPort, unsigned remotePort, int64_t socketNetwork) {
+        unsigned localPort, unsigned remotePort, int64_t socketNetwork, int32_t sockOptEcn) {
     bool isIPv6 = false;
     if (strchr(localIp, ':') != NULL)
         isIPv6 = true;
@@ -201,6 +211,24 @@ void ARTPConnection::MakeRTPSocketPair(
         if (result != 0) {
             ALOGW("failed(%d) to bind rtcp socket(%d) to network(%llu)",
                     result, *rtcpSocket, (unsigned long long)socketNetwork);
+        }
+    }
+
+    if (sockOptEcn != 0) {
+        int sockOptForTOS = 1;
+        if (setsockopt(*rtpSocket, isIPv6 ? IPPROTO_IPV6 : IPPROTO_IP,
+               isIPv6 ? IPV6_RECVTCLASS : IP_RECVTOS,
+               (int *)&sockOptForTOS, sizeof(sockOptForTOS)) < 0) {
+            ALOGE("failed to set recv sockopt TOS on rtpsock(%d). err=%s", *rtpSocket,
+                strerror(errno));
+        } else {
+            ALOGD("successfully set recv sockopt TOS on rtpsock(%d)", *rtpSocket);
+            int result = setsockopt(*rtcpSocket, isIPv6 ? IPPROTO_IPV6 : IPPROTO_IP,
+                isIPv6 ? IPV6_RECVTCLASS : IP_RECVTOS,
+                (int *)&sockOptForTOS, sizeof(sockOptForTOS));
+            if (result >= 0) {
+                ALOGD("successfully set recv sockopt TOS on rtcpsock(%d).", *rtcpSocket);
+            }
         }
     }
 
@@ -593,32 +621,25 @@ status_t ARTPConnection::receive(StreamInfo *s, bool receiveRTP) {
 
     sp<ABuffer> buffer = new ABuffer(65536);
 
-    struct sockaddr *pRemoteRTCPAddr;
-    int sizeSockSt;
-    if (s->isIPv6) {
-        pRemoteRTCPAddr = (struct sockaddr *)&s->mRemoteRTCPAddr6;
-        sizeSockSt = sizeof(struct sockaddr_in6);
-    } else {
-        pRemoteRTCPAddr = (struct sockaddr *)&s->mRemoteRTCPAddr;
-        sizeSockSt = sizeof(struct sockaddr_in);
-    }
-    socklen_t remoteAddrLen =
-        (!receiveRTP && s->mNumRTCPPacketsReceived == 0)
-            ? sizeSockSt : 0;
+    struct msghdr sMsg = {};
+    struct iovec sIov[1] = {};
 
-    if (mFlags & kViLTEConnection) {
-        remoteAddrLen = 0;
-    }
+    sIov[0].iov_base = (char *) buffer->data();
+    sIov[0].iov_len = buffer->capacity();
+
+    sMsg.msg_iov = sIov;
+    sMsg.msg_iovlen = 1;
+
+    int cMsgSize = sizeof(struct cmsghdr) + sizeof(uint8_t);
+    char buf[CMSG_SPACE(cMsgSize)];
+    sMsg.msg_control = buf;
+    sMsg.msg_controllen = sizeof(buf);
+    sMsg.msg_flags = 0;
 
     ssize_t nbytes;
     do {
-        nbytes = recvfrom(
-            receiveRTP ? s->mRTPSocket : s->mRTCPSocket,
-            buffer->data(),
-            buffer->capacity(),
-            0,
-            remoteAddrLen > 0 ? pRemoteRTCPAddr : NULL,
-            remoteAddrLen > 0 ? &remoteAddrLen : NULL);
+        // Used recvmsg to get the TOS header of incoming packet
+        nbytes = recvmsg(receiveRTP ? s->mRTPSocket : s->mRTCPSocket, &sMsg, 0);
         mCumulativeBytes += nbytes;
     } while (nbytes < 0 && errno == EINTR);
 
@@ -631,6 +652,10 @@ status_t ARTPConnection::receive(StreamInfo *s, bool receiveRTP) {
         } else {
             return -ECONNRESET;
         }
+    }
+
+    if (nbytes > 0) {
+        handleIpHeadersIfReceived(s, sMsg);
     }
 
     buffer->setRange(0, nbytes);
@@ -647,13 +672,68 @@ status_t ARTPConnection::receive(StreamInfo *s, bool receiveRTP) {
     return err;
 }
 
+/* This function will check if TOS is present or not in received IP packet.
+ * After that if it is present then it will notify about congestion to upper
+ * layer if CE bit is set in TOS header.
+ **/
+void ARTPConnection::handleIpHeadersIfReceived(StreamInfo *s, struct msghdr sMsg) {
+    struct cmsghdr *cMsg;
+    cMsg = CMSG_FIRSTHDR(&sMsg);
+
+    if (cMsg == NULL) {
+        ALOGV("cmsg is null");
+    }
+
+    for (; cMsg != NULL; cMsg = CMSG_NXTHDR(&sMsg, cMsg)) {
+        bool isTOSHeader = ((cMsg->cmsg_level == (mIsIPv6 ? IPPROTO_IPV6 : IPPROTO_IP))
+                              && (cMsg->cmsg_type == (mIsIPv6 ? IPV6_TCLASS : IP_TOS))
+                              && (cMsg->cmsg_len));
+        if (isTOSHeader) {
+            uint8_t receivedTOS;
+            receivedTOS = *((uint8_t *) CMSG_DATA(cMsg));
+            // checking CE bit is set
+            bool isCEBitMarked = ((receivedTOS & INET_ECN_MASK) == INET_ECN_CE);
+
+            ALOGV("receivedTos(value -> %d)", receivedTOS);
+
+            if (isCEBitMarked) {
+                ALOGD("receivedTos(value -> %d), is ECN CE marked = %d",
+                    receivedTOS, isCEBitMarked);
+                notifyCongestionToUpperLayerIfNeeded(s);
+            }
+            break;
+        }
+    }
+}
+
+/* this function will be use to notify congestion in video call to upper layer */
+void ARTPConnection::notifyCongestionToUpperLayerIfNeeded(StreamInfo *s) {
+    int64_t nowUs = ALooper::GetNowUs();
+
+    if (mLastCongestionNotifyTimeUs <= 0) {
+        mLastCongestionNotifyTimeUs = nowUs;
+    }
+
+    bool isNeedToUpdate = (mLastCongestionNotifyTimeUs + kMinOneSecondNotifyDelayUs <= nowUs);
+    ALOGD("ECN info set by upper layer=%d, isNeedToUpdate=%d", mRtpSockOptEcn, isNeedToUpdate);
+
+    if ((mRtpSockOptEcn != 0) && (isNeedToUpdate)) {
+        sp<AMessage> notify = s->mNotifyMsg->dup();
+        notify->setInt32("rtcp-event", 1);
+        notify->setInt32("payload-type", ARTPSource::RTP_QUALITY_CD);
+        notify->post();
+        mLastCongestionNotifyTimeUs = nowUs;
+        ALOGD("Congestion detected in n/w, Notify upper layer");
+    }
+}
+
 ssize_t ARTPConnection::send(const StreamInfo *info, const sp<ABuffer> buffer) {
         struct sockaddr* pRemoteRTCPAddr;
         int sizeSockSt;
 
         /* It seems this isIPv6 variable is useless.
          * We should remove it to prevent confusion */
-        if (info->isIPv6) {
+        if (mIsIPv6) {
             pRemoteRTCPAddr = (struct sockaddr *)&info->mRemoteRTCPAddr6;
             sizeSockSt = sizeof(struct sockaddr_in6);
         } else {
@@ -1215,12 +1295,20 @@ void ARTPConnection::setTargetBitrate(int32_t targetBitrate) {
     mTargetBitrate = targetBitrate;
 }
 
+void ARTPConnection::setRtpSockOptEcn(int32_t sockOptEcn) {
+    mRtpSockOptEcn = sockOptEcn;
+}
+
+void ARTPConnection::setIsIPv6(const char *localIp) {
+    mIsIPv6 = (strchr(localIp, ':') != nullptr);
+}
+
 void ARTPConnection::checkRxBitrate(int64_t nowUs) {
     if (mLastBitrateReportTimeUs <= 0) {
         mCumulativeBytes = 0;
         mLastBitrateReportTimeUs = nowUs;
     }
-    else if (mLastEarlyNotifyTimeUs + 100000ll <= nowUs) {
+    else if (mLastEarlyNotifyTimeUs + kMinOneSecondNotifyDelayUs <= nowUs) {
         int32_t timeDiff = (nowUs - mLastBitrateReportTimeUs) / 1000000ll;
         int32_t bitrate = mCumulativeBytes * 8 / timeDiff;
         mLastEarlyNotifyTimeUs = nowUs;
