@@ -35,6 +35,7 @@ TunerTimeFilter::TunerTimeFilter(shared_ptr<ITimeFilter> timeFilter) {
 }
 
 TunerTimeFilter::~TunerTimeFilter() {
+    close();
     mTimeFilter = nullptr;
 }
 

@@ -36,6 +36,7 @@ TunerLnb::TunerLnb(shared_ptr<ILnb> lnb, int id) {
 }
 
 TunerLnb::~TunerLnb() {
+    close();
     mLnb = nullptr;
     mId = -1;
 }
