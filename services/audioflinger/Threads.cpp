@@ -8329,8 +8329,6 @@ sp<AudioFlinger::RecordThread::RecordTrack> AudioFlinger::RecordThread::createRe
     audio_input_flags_t inputFlags = mInput->flags;
     audio_input_flags_t requestedFlags = *flags;
     uint32_t sampleRate;
-    AttributionSourceState checkedAttributionSource = AudioFlinger::checkAttributionSourcePackage(
-            attributionSource);
 
     lStatus = initCheck();
     if (lStatus != NO_ERROR) {
@@ -8345,7 +8343,7 @@ sp<AudioFlinger::RecordThread::RecordTrack> AudioFlinger::RecordThread::createRe
     }
 
     if (maxSharedAudioHistoryMs != 0) {
-        if (!captureHotwordAllowed(checkedAttributionSource)) {
+        if (!captureHotwordAllowed(attributionSource)) {
             lStatus = PERMISSION_DENIED;
             goto Exit;
         }
@@ -8466,16 +8464,16 @@ sp<AudioFlinger::RecordThread::RecordTrack> AudioFlinger::RecordThread::createRe
         Mutex::Autolock _l(mLock);
         int32_t startFrames = -1;
         if (!mSharedAudioPackageName.empty()
-                && mSharedAudioPackageName == checkedAttributionSource.packageName
+                && mSharedAudioPackageName == attributionSource.packageName
                 && mSharedAudioSessionId == sessionId
-                && captureHotwordAllowed(checkedAttributionSource)) {
+                && captureHotwordAllowed(attributionSource)) {
             startFrames = mSharedAudioStartFrames;
         }
 
         track = new RecordTrack(this, client, attr, sampleRate,
                       format, channelMask, frameCount,
                       nullptr /* buffer */, (size_t)0 /* bufferSize */, sessionId, creatorPid,
-                      checkedAttributionSource, *flags, TrackBase::TYPE_DEFAULT, portId,
+                      attributionSource, *flags, TrackBase::TYPE_DEFAULT, portId,
                       startFrames);
 
         lStatus = track->initCheck();
