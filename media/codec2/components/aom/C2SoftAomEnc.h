@@ -96,6 +96,8 @@ struct C2SoftAomEnc : public SimpleC2Component {
 
     bool mHeadersReceived;
 
+    bool mIs10Bit;
+
     std::shared_ptr<C2StreamPictureSizeInfo::input> mSize;
     std::shared_ptr<C2StreamIntraRefreshTuning::output> mIntraRefresh;
     std::shared_ptr<C2StreamFrameRateInfo::output> mFrameRate;
@@ -133,6 +135,9 @@ class C2SoftAomEnc::IntfImpl : public SimpleInterface<void>::BaseParams {
     std::shared_ptr<C2StreamColorAspectsInfo::output> getCodedColorAspects_l() const {
         return mCodedColorAspects;
     }
+    std::shared_ptr<C2StreamPixelFormatInfo::output> getPixelFormat_l() const {
+        return mPixelFormat;
+    }
     uint32_t getSyncFramePeriod() const;
     static C2R ColorAspectsSetter(bool mayBlock, C2P<C2StreamColorAspectsInfo::input>& me);
     static C2R CodedColorAspectsSetter(bool mayBlock, C2P<C2StreamColorAspectsInfo::output>& me,
@@ -150,6 +155,8 @@ class C2SoftAomEnc::IntfImpl : public SimpleInterface<void>::BaseParams {
     std::shared_ptr<C2StreamProfileLevelInfo::output> mProfileLevel;
     std::shared_ptr<C2StreamColorAspectsInfo::input> mColorAspects;
     std::shared_ptr<C2StreamColorAspectsInfo::output> mCodedColorAspects;
+    std::shared_ptr<C2StreamPixelFormatInfo::output> mPixelFormat;
+
 };
 
 }  // namespace android
