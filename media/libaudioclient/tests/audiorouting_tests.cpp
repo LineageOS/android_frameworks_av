@@ -46,10 +46,10 @@ TEST(AudioTrackTest, TestPerformanceMode) {
         attributes.usage = AUDIO_USAGE_MEDIA;
         attributes.content_type = AUDIO_CONTENT_TYPE_MUSIC;
         attributes.flags = flags[i];
-        sp<AudioPlayback> ap = sp<AudioPlayback>::make(
-                0 /* sampleRate */, AUDIO_FORMAT_PCM_16_BIT, AUDIO_CHANNEL_OUT_STEREO,
-                AUDIO_OUTPUT_FLAG_NONE, AUDIO_SESSION_NONE, AudioTrack::TRANSFER_OBTAIN,
-                &attributes);
+        sp<AudioPlayback> ap = sp<AudioPlayback>::make(0 /* sampleRate */, AUDIO_FORMAT_PCM_16_BIT,
+                                                       AUDIO_CHANNEL_OUT_STEREO,
+                                                       AUDIO_OUTPUT_FLAG_NONE, AUDIO_SESSION_NONE,
+                                                       AudioTrack::TRANSFER_OBTAIN, &attributes);
         ASSERT_NE(nullptr, ap);
         ASSERT_EQ(OK, ap->loadResource("/data/local/tmp/bbb_2ch_24kHz_s16le.raw"))
                 << "Unable to open Resource";
@@ -77,46 +77,186 @@ TEST(AudioTrackTest, TestPerformanceMode) {
     }
 }
 
-TEST(AudioTrackTest, TestRemoteSubmix) {
-    std::vector<std::string> attachedDevices;
-    std::vector<MixPort> mixPorts;
-    std::vector<Route> routes;
-    EXPECT_EQ(OK, parse_audio_policy_configuration_xml(attachedDevices, mixPorts, routes));
-    bool hasFlag = false;
-    for (int j = 0; j < attachedDevices.size() && !hasFlag; j++) {
-        if (attachedDevices[j].find("Remote Submix") != -1) hasFlag = true;
+TEST(AudioTrackTest, DefaultRoutingTest) {
+    audio_port_v7 port;
+    if (OK != getPortByAttributes(AUDIO_PORT_ROLE_SOURCE, AUDIO_PORT_TYPE_DEVICE,
+                                  AUDIO_DEVICE_IN_REMOTE_SUBMIX, "0", port)) {
+        GTEST_SKIP() << "remote submix in device not connected";
     }
-    if (!hasFlag) GTEST_SKIP() << " Device does not have Remote Submix port.";
-    sp<AudioCapture> capture = new AudioCapture(AUDIO_SOURCE_REMOTE_SUBMIX, 48000,
-                                                AUDIO_FORMAT_PCM_16_BIT, AUDIO_CHANNEL_IN_STEREO);
-    ASSERT_NE(nullptr, capture);
-    ASSERT_EQ(OK, capture->create()) << "record creation failed";
 
+    // create record instance
+    sp<AudioCapture> capture = sp<AudioCapture>::make(
+            AUDIO_SOURCE_REMOTE_SUBMIX, 48000, AUDIO_FORMAT_PCM_16_BIT, AUDIO_CHANNEL_IN_STEREO);
+    ASSERT_NE(nullptr, capture);
+    EXPECT_EQ(OK, capture->create()) << "record creation failed";
+    sp<OnAudioDeviceUpdateNotifier> cbCapture = sp<OnAudioDeviceUpdateNotifier>::make();
+    EXPECT_EQ(OK, capture->getAudioRecordHandle()->addAudioDeviceCallback(cbCapture));
+
+    // create playback instance
     sp<AudioPlayback> playback = sp<AudioPlayback>::make(
             48000 /* sampleRate */, AUDIO_FORMAT_PCM_16_BIT, AUDIO_CHANNEL_OUT_STEREO,
             AUDIO_OUTPUT_FLAG_NONE, AUDIO_SESSION_NONE);
     ASSERT_NE(nullptr, playback);
     ASSERT_EQ(OK, playback->loadResource("/data/local/tmp/bbb_2ch_24kHz_s16le.raw"))
             << "Unable to open Resource";
-    ASSERT_EQ(OK, playback->create()) << "track creation failed";
+    EXPECT_EQ(OK, playback->create()) << "track creation failed";
+    sp<OnAudioDeviceUpdateNotifier> cbPlayback = sp<OnAudioDeviceUpdateNotifier>::make();
+    EXPECT_EQ(OK, playback->getAudioTrackHandle()->addAudioDeviceCallback(cbPlayback));
 
-    audio_port_v7 port;
-    status_t status = getPortByAttributes(AUDIO_PORT_ROLE_SOURCE, AUDIO_PORT_TYPE_DEVICE,
-                                          AUDIO_DEVICE_IN_REMOTE_SUBMIX, port);
-    EXPECT_EQ(OK, status) << "Could not find port";
-
+    // capture should be routed to submix in port
     EXPECT_EQ(OK, capture->start()) << "start recording failed";
+    EXPECT_EQ(OK, cbCapture->waitForAudioDeviceCb());
     EXPECT_EQ(port.id, capture->getAudioRecordHandle()->getRoutedDeviceId())
             << "Capture NOT routed on expected port";
 
-    status = getPortByAttributes(AUDIO_PORT_ROLE_SINK, AUDIO_PORT_TYPE_DEVICE,
-                                 AUDIO_DEVICE_OUT_REMOTE_SUBMIX, port);
+    // capture start should create submix out port
+    status_t status = getPortByAttributes(AUDIO_PORT_ROLE_SINK, AUDIO_PORT_TYPE_DEVICE,
+                                          AUDIO_DEVICE_OUT_REMOTE_SUBMIX, "0", port);
     EXPECT_EQ(OK, status) << "Could not find port";
 
+    // playback should be routed to submix out as long as capture is active
     EXPECT_EQ(OK, playback->start()) << "audio track start failed";
-    EXPECT_EQ(OK, playback->onProcess());
-    ASSERT_EQ(port.id, playback->getAudioTrackHandle()->getRoutedDeviceId())
+    EXPECT_EQ(OK, cbPlayback->waitForAudioDeviceCb());
+    EXPECT_EQ(port.id, playback->getAudioTrackHandle()->getRoutedDeviceId())
             << "Playback NOT routed on expected port";
+
     capture->stop();
+    playback->stop();
+}
+
+class AudioRoutingTest : public ::testing::Test {
+  public:
+    void SetUp() override {
+        audio_port_v7 port;
+        if (OK != getPortByAttributes(AUDIO_PORT_ROLE_SOURCE, AUDIO_PORT_TYPE_DEVICE,
+                                      AUDIO_DEVICE_IN_REMOTE_SUBMIX, "0", port)) {
+            GTEST_SKIP() << "remote submix in device not connected";
+        }
+        uint32_t mixType = MIX_TYPE_PLAYERS;
+        uint32_t mixFlag = MIX_ROUTE_FLAG_LOOP_BACK;
+        audio_devices_t deviceType = AUDIO_DEVICE_OUT_REMOTE_SUBMIX;
+        AudioMixMatchCriterion criterion(AUDIO_USAGE_MEDIA, AUDIO_SOURCE_DEFAULT,
+                                         RULE_MATCH_ATTRIBUTE_USAGE);
+        std::vector<AudioMixMatchCriterion> criteria{criterion};
+        audio_config_t config = AUDIO_CONFIG_INITIALIZER;
+        config.channel_mask = AUDIO_CHANNEL_OUT_STEREO;
+        config.format = AUDIO_FORMAT_PCM_16_BIT;
+        config.sample_rate = 48000;
+        AudioMix mix(criteria, mixType, config, mixFlag, String8{mAddress.c_str()}, 0);
+        mix.mDeviceType = deviceType;
+        mMixes.push(mix);
+        if (OK == AudioSystem::registerPolicyMixes(mMixes, true)) {
+            mPolicyMixRegistered = true;
+        }
+        ASSERT_TRUE(mPolicyMixRegistered) << "register policy mix failed";
+    }
+
+    void TearDown() override {
+        if (mPolicyMixRegistered) {
+            EXPECT_EQ(OK, AudioSystem::registerPolicyMixes(mMixes, false));
+        }
+    }
+
+    bool mPolicyMixRegistered{false};
+    std::string mAddress{"mix_1"};
+    Vector<AudioMix> mMixes;
+};
+
+TEST_F(AudioRoutingTest, ConcurrentDynamicRoutingTest) {
+    audio_port_v7 port, port_mix;
+    // expect legacy submix in port to be connected
+    status_t status = getPortByAttributes(AUDIO_PORT_ROLE_SOURCE, AUDIO_PORT_TYPE_DEVICE,
+                                          AUDIO_DEVICE_IN_REMOTE_SUBMIX, "0", port);
+    EXPECT_EQ(OK, status) << "Could not find port";
+
+    // as policy mix is registered, expect submix in port with mAddress to be connected
+    status = getPortByAttributes(AUDIO_PORT_ROLE_SOURCE, AUDIO_PORT_TYPE_DEVICE,
+                                 AUDIO_DEVICE_IN_REMOTE_SUBMIX, mAddress, port_mix);
+    EXPECT_EQ(OK, status) << "Could not find port";
+
+    // create playback instance
+    sp<AudioPlayback> playback = sp<AudioPlayback>::make(
+            48000 /* sampleRate */, AUDIO_FORMAT_PCM_16_BIT, AUDIO_CHANNEL_OUT_STEREO,
+            AUDIO_OUTPUT_FLAG_NONE, AUDIO_SESSION_NONE, AudioTrack::TRANSFER_OBTAIN);
+    ASSERT_NE(nullptr, playback);
+    ASSERT_EQ(OK, playback->loadResource("/data/local/tmp/bbb_2ch_24kHz_s16le.raw"))
+            << "Unable to open Resource";
+    EXPECT_EQ(OK, playback->create()) << "track creation failed";
+    sp<OnAudioDeviceUpdateNotifier> cbPlayback = sp<OnAudioDeviceUpdateNotifier>::make();
+    EXPECT_EQ(OK, playback->getAudioTrackHandle()->addAudioDeviceCallback(cbPlayback));
+
+    // create capture instances on different ports
+    sp<AudioCapture> captureA = sp<AudioCapture>::make(
+            AUDIO_SOURCE_REMOTE_SUBMIX, 48000, AUDIO_FORMAT_PCM_16_BIT, AUDIO_CHANNEL_IN_STEREO);
+    ASSERT_NE(nullptr, captureA);
+    EXPECT_EQ(OK, captureA->create()) << "record creation failed";
+    sp<OnAudioDeviceUpdateNotifier> cbCaptureA = sp<OnAudioDeviceUpdateNotifier>::make();
+    EXPECT_EQ(OK, captureA->getAudioRecordHandle()->addAudioDeviceCallback(cbCaptureA));
+
+    audio_attributes_t attr = AUDIO_ATTRIBUTES_INITIALIZER;
+    attr.source = AUDIO_SOURCE_REMOTE_SUBMIX;
+    sprintf(attr.tags, "addr=%s", mAddress.c_str());
+    sp<AudioCapture> captureB = sp<AudioCapture>::make(
+            AUDIO_SOURCE_REMOTE_SUBMIX, 48000, AUDIO_FORMAT_PCM_16_BIT, AUDIO_CHANNEL_IN_STEREO,
+            AUDIO_INPUT_FLAG_NONE, AUDIO_SESSION_ALLOCATE, AudioRecord::TRANSFER_CALLBACK, &attr);
+    ASSERT_NE(nullptr, captureB);
+    EXPECT_EQ(OK, captureB->create()) << "record creation failed";
+    sp<OnAudioDeviceUpdateNotifier> cbCaptureB = sp<OnAudioDeviceUpdateNotifier>::make();
+    EXPECT_EQ(OK, captureB->getAudioRecordHandle()->addAudioDeviceCallback(cbCaptureB));
+
+    // launch
+    EXPECT_EQ(OK, captureA->start()) << "start recording failed";
+    EXPECT_EQ(OK, cbCaptureA->waitForAudioDeviceCb());
+    EXPECT_EQ(port.id, captureA->getAudioRecordHandle()->getRoutedDeviceId())
+            << "Capture NOT routed on expected port";
+
+    EXPECT_EQ(OK, captureB->start()) << "start recording failed";
+    EXPECT_EQ(OK, cbCaptureB->waitForAudioDeviceCb());
+    EXPECT_EQ(port_mix.id, captureB->getAudioRecordHandle()->getRoutedDeviceId())
+            << "Capture NOT routed on expected port";
+
+    // as record started, expect submix out ports to be connected
+    status = getPortByAttributes(AUDIO_PORT_ROLE_SINK, AUDIO_PORT_TYPE_DEVICE,
+                                 AUDIO_DEVICE_OUT_REMOTE_SUBMIX, "0", port);
+    EXPECT_EQ(OK, status) << "unexpected submix out port found";
+
+    status = getPortByAttributes(AUDIO_PORT_ROLE_SINK, AUDIO_PORT_TYPE_DEVICE,
+                                 AUDIO_DEVICE_OUT_REMOTE_SUBMIX, mAddress, port_mix);
+    EXPECT_EQ(OK, status) << "Could not find port";
+
+    // check if playback routed to desired port
+    EXPECT_EQ(OK, playback->start());
+    EXPECT_EQ(OK, cbPlayback->waitForAudioDeviceCb());
+    EXPECT_EQ(port_mix.id, playback->getAudioTrackHandle()->getRoutedDeviceId())
+            << "Playback NOT routed on expected port";
+
+    captureB->stop();
+
+    // check if mAddress submix out is disconnected as capture session is stopped
+    status = getPortByAttributes(AUDIO_PORT_ROLE_SINK, AUDIO_PORT_TYPE_DEVICE,
+                                 AUDIO_DEVICE_OUT_REMOTE_SUBMIX, mAddress, port_mix);
+    EXPECT_NE(OK, status) << "unexpected submix in port found";
+
+    // check if legacy submix out is connected
+    status = getPortByAttributes(AUDIO_PORT_ROLE_SINK, AUDIO_PORT_TYPE_DEVICE,
+                                 AUDIO_DEVICE_OUT_REMOTE_SUBMIX, "0", port);
+    EXPECT_EQ(OK, status) << "port not found";
+
+    // unregister policy
+    EXPECT_EQ(OK, AudioSystem::registerPolicyMixes(mMixes, false));
+    mPolicyMixRegistered = false;
+
+    // as policy mix is unregistered, expect submix in port with mAddress to be disconnected
+    status = getPortByAttributes(AUDIO_PORT_ROLE_SOURCE, AUDIO_PORT_TYPE_DEVICE,
+                                 AUDIO_DEVICE_IN_REMOTE_SUBMIX, mAddress, port_mix);
+    EXPECT_NE(OK, status) << "unexpected submix in port found";
+
+    playback->onProcess();
+    // as captureA is active, it should re route to legacy submix
+    EXPECT_EQ(OK, cbPlayback->waitForAudioDeviceCb(port.id));
+    EXPECT_EQ(port.id, playback->getAudioTrackHandle()->getRoutedDeviceId())
+            << "Playback NOT routed on expected port";
+
+    captureA->stop();
     playback->stop();
 }

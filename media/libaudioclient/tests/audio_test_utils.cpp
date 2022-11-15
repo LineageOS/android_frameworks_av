@@ -617,13 +617,15 @@ status_t getPortById(const audio_port_handle_t portId, audio_port_v7& port) {
 }
 
 status_t getPortByAttributes(audio_port_role_t role, audio_port_type_t type,
-                             audio_devices_t deviceType, audio_port_v7& port) {
+                             audio_devices_t deviceType, const std::string& address,
+                             audio_port_v7& port) {
     std::vector<struct audio_port_v7> ports;
     status_t status = listAudioPorts(ports);
     if (status != OK) return status;
     for (auto i = 0; i < ports.size(); i++) {
         if (ports[i].role == role && ports[i].type == type &&
-            ports[i].ext.device.type == deviceType) {
+            ports[i].ext.device.type == deviceType &&
+            !strncmp(ports[i].ext.device.address, address.c_str(), AUDIO_DEVICE_MAX_ADDRESS_LEN)) {
             port = ports[i];
             return OK;
         }
