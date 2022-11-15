@@ -32,5 +32,10 @@
     {
       "name": "audiosystem_tests"
     }
+  ],
+  "postsubmit": [
+    {
+       "name": "audioeffect_analysis"
+    }
   ]
 }
