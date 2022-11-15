@@ -26,6 +26,7 @@
 
 #include "common/CameraProviderManager.h"
 #include <gui/Surface.h>
+#include <jpegrecoverymap/recoverymap.h>
 #include <utils/ExifUtils.h>
 #include <utils/Log.h>
 #include "utils/SessionConfigurationUtils.h"
@@ -225,19 +226,19 @@ status_t JpegRCompositeStream::processInputFrame(nsecs_t ts, const InputFrame &i
     int fenceFd;
     void *dstBuffer;
 
-    size_t maxJpegBufferSize = 0;
+    size_t maxJpegRBufferSize = 0;
     if (mMaxJpegBufferSize > 0) {
         // If this is an ultra high resolution sensor and the input frames size
         // is > default res jpeg.
         if (mUHRMaxJpegSize.width != 0 &&
                 inputFrame.jpegBuffer.width * inputFrame.jpegBuffer.height >
                 mDefaultMaxJpegSize.width * mDefaultMaxJpegSize.height) {
-            maxJpegBufferSize = mUHRMaxJpegBufferSize;
+            maxJpegRBufferSize = mUHRMaxJpegBufferSize;
         } else {
-            maxJpegBufferSize = mMaxJpegBufferSize;
+            maxJpegRBufferSize = mMaxJpegBufferSize;
         }
     } else {
-        maxJpegBufferSize = inputFrame.p010Buffer.width * inputFrame.p010Buffer.height;
+        maxJpegRBufferSize = inputFrame.p010Buffer.width * inputFrame.p010Buffer.height;
     }
 
     uint8_t jpegQuality = 100;
@@ -252,10 +253,10 @@ status_t JpegRCompositeStream::processInputFrame(nsecs_t ts, const InputFrame &i
         jpegOrientation = entry.data.i32[0];
     }
 
-    if ((res = native_window_set_buffers_dimensions(mOutputSurface.get(), maxJpegBufferSize, 1))
+    if ((res = native_window_set_buffers_dimensions(mOutputSurface.get(), maxJpegRBufferSize, 1))
             != OK) {
         ALOGE("%s: Unable to configure stream buffer dimensions"
-                " %zux%u for stream %d", __FUNCTION__, maxJpegBufferSize, 1U, mP010StreamId);
+                " %zux%u for stream %d", __FUNCTION__, maxJpegRBufferSize, 1U, mP010StreamId);
         return res;
     }
 
@@ -276,31 +277,68 @@ status_t JpegRCompositeStream::processInputFrame(nsecs_t ts, const InputFrame &i
         return res;
     }
 
-    if ((gb->getWidth() < maxJpegBufferSize) || (gb->getHeight() != 1)) {
+    if ((gb->getWidth() < maxJpegRBufferSize) || (gb->getHeight() != 1)) {
         ALOGE("%s: Blob buffer size mismatch, expected %zux%u received %dx%d", __FUNCTION__,
-                maxJpegBufferSize, 1, gb->getWidth(), gb->getHeight());
+                maxJpegRBufferSize, 1, gb->getWidth(), gb->getHeight());
         outputANW->cancelBuffer(mOutputSurface.get(), anb, /*fence*/ -1);
         return BAD_VALUE;
     }
 
-    if (mOutputColorSpace == ANDROID_REQUEST_AVAILABLE_COLOR_SPACE_PROFILES_MAP_DISPLAY_P3) {
-        // Configure Jpeg/R for P3 output and possibly input in case of concurrent SDR Jpeg support
-    } else {
-        // Configure Jpeg/R for SRGB output
-    }
-
-    size_t actualJpegSize = 0;
+    size_t actualJpegRSize = 0;
     if (mSupportInternalJpeg) {
-        actualJpegSize = android::camera2::JpegProcessor::findJpegSize(inputFrame.jpegBuffer.data,
+        recoverymap::jpegr_uncompressed_struct p010;
+        recoverymap::jpegr_compressed_struct jpeg;
+        recoverymap::jpegr_compressed_struct jpegR;
+
+        p010.height = inputFrame.p010Buffer.height;
+        p010.width = inputFrame.p010Buffer.width;
+        p010.colorGamut = recoverymap::jpegr_color_gamut::JPEGR_COLORGAMUT_BT2100;
+        size_t yChannelSizeInByte = p010.width * p010.height * 2;
+        size_t uvChannelSizeInByte = p010.width * p010.height;
+        p010.data = new uint8_t[yChannelSizeInByte + uvChannelSizeInByte];
+        std::unique_ptr<uint8_t[]> p010_data;
+        p010_data.reset(reinterpret_cast<uint8_t*>(p010.data));
+        memcpy((uint8_t*)p010.data, inputFrame.p010Buffer.data, yChannelSizeInByte);
+        memcpy((uint8_t*)p010.data + yChannelSizeInByte, inputFrame.p010Buffer.dataCb,
+               uvChannelSizeInByte);
+
+        jpeg.data = inputFrame.jpegBuffer.data;
+        jpeg.length = android::camera2::JpegProcessor::findJpegSize(inputFrame.jpegBuffer.data,
                 inputFrame.jpegBuffer.width);
-        if (actualJpegSize == 0) {
+        if (jpeg.length == 0) {
             ALOGW("%s: Failed to find input jpeg size, default to using entire buffer!",
                     __FUNCTION__);
-            actualJpegSize = inputFrame.jpegBuffer.width;
+            jpeg.length = inputFrame.jpegBuffer.width;
         }
-        if (actualJpegSize <= maxJpegBufferSize) {
-            memcpy(dstBuffer, inputFrame.jpegBuffer.data, actualJpegSize);
+
+        if (mOutputColorSpace == ANDROID_REQUEST_AVAILABLE_COLOR_SPACE_PROFILES_MAP_DISPLAY_P3) {
+            jpeg.colorGamut = recoverymap::jpegr_color_gamut::JPEGR_COLORGAMUT_P3;
+        } else {
+            jpeg.colorGamut = recoverymap::jpegr_color_gamut::JPEGR_COLORGAMUT_BT709;
         }
+
+        recoverymap::jpegr_transfer_function transferFunction;
+        switch (mP010DynamicRange) {
+            case ANDROID_REQUEST_AVAILABLE_DYNAMIC_RANGE_PROFILES_MAP_HDR10:
+            case ANDROID_REQUEST_AVAILABLE_DYNAMIC_RANGE_PROFILES_MAP_HDR10_PLUS:
+                transferFunction = recoverymap::jpegr_transfer_function::JPEGR_TF_PQ;
+                break;
+            default:
+                transferFunction = recoverymap::jpegr_transfer_function::JPEGR_TF_HLG;
+        }
+
+        jpegR.data = dstBuffer;
+        jpegR.maxLength = maxJpegRBufferSize;
+
+        recoverymap::RecoveryMap recoveryMap;
+        res = recoveryMap.encodeJPEGR(&p010, &jpeg, transferFunction, &jpegR);
+        if (res != OK) {
+            ALOGE("%s: Error trying to encode JPEG/R: %s (%d)", __FUNCTION__, strerror(-res), res);
+            return res;
+        }
+
+        actualJpegRSize = jpegR.length;
+        p010_data.release();
     } else {
         const uint8_t* exifBuffer = nullptr;
         size_t exifBufferSize = 0;
@@ -316,10 +354,8 @@ status_t JpegRCompositeStream::processInputFrame(nsecs_t ts, const InputFrame &i
         }
     }
 
-    //TODO: Process JpegR here and retrieve the final jpeg/r size
-
-    size_t finalJpegSize = actualJpegSize + sizeof(CameraBlob);
-    if (finalJpegSize > maxJpegBufferSize) {
+    size_t finalJpegRSize = actualJpegRSize + sizeof(CameraBlob);
+    if (finalJpegRSize > maxJpegRBufferSize) {
         ALOGE("%s: Final jpeg buffer not large enough for the jpeg blob header", __FUNCTION__);
         outputANW->cancelBuffer(mOutputSurface.get(), anb, /*fence*/ -1);
         return NO_MEMORY;
@@ -332,12 +368,12 @@ status_t JpegRCompositeStream::processInputFrame(nsecs_t ts, const InputFrame &i
         return res;
     }
 
-    ALOGV("%s: Final jpeg size: %zu", __func__, finalJpegSize);
+    ALOGV("%s: Final jpeg size: %zu", __func__, finalJpegRSize);
     uint8_t* header = static_cast<uint8_t *> (dstBuffer) +
         (gb->getWidth() - sizeof(CameraBlob));
     CameraBlob blobHeader = {
         .blobId = CameraBlobId::JPEG,
-        .blobSizeBytes = static_cast<int32_t>(actualJpegSize)
+        .blobSizeBytes = static_cast<int32_t>(actualJpegRSize)
     };
     memcpy(header, &blobHeader, sizeof(CameraBlob));
     outputANW->queueBuffer(mOutputSurface.get(), anb, /*fence*/ -1);

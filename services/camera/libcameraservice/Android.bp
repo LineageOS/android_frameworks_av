@@ -173,6 +173,9 @@ cc_library_shared {
         "libbinderthreadstateutils",
         "media_permission-aidl-cpp",
         "libcameraservice_device_independent",
+        "libjpegrecoverymap",
+        "libjpegencoder",
+        "libjpegdecoder",
     ],
 
     export_shared_lib_headers: [
