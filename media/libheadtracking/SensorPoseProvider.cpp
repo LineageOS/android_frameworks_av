@@ -122,6 +122,7 @@ class SensorPoseProviderImpl : public SensorPoseProvider {
     ~SensorPoseProviderImpl() override {
         // Disable all active sensors.
         mEnabledSensors.clear();
+        mQuit = true;
         mLooper->wake();
         mThread.join();
     }
@@ -217,6 +218,7 @@ class SensorPoseProviderImpl : public SensorPoseProvider {
         std::optional<int32_t> discontinuityCount;
     };
 
+    bool mQuit = false;
     sp<Looper> mLooper;
     Listener* const mListener;
     SensorManager* const mSensorManager;
@@ -260,13 +262,14 @@ class SensorPoseProviderImpl : public SensorPoseProvider {
 
         initFinished(true);
 
-        while (true) {
+        while (!mQuit) {
             int ret = mLooper->pollOnce(-1 /* no timeout */, nullptr, nullptr, nullptr);
 
             switch (ret) {
                 case ALOOPER_POLL_WAKE:
-                    // Normal way to exit.
-                    return;
+                    // Continue to see if mQuit flag is set.
+                    // This can be spurious (due to bugreport being taken).
+                    continue;
 
                 case kIdent:
                     // Possible events on our queue.
@@ -285,7 +288,8 @@ class SensorPoseProviderImpl : public SensorPoseProvider {
             ssize_t size = mQueue->filterEvents(&event, actual);
 
             if (size < 0 || size > 1) {
-                ALOGE("Unexpected return value from SensorEventQueue::filterEvents: %zd", size);
+                ALOGE("%s: Unexpected return value from SensorEventQueue::filterEvents: %zd",
+                        __func__, size);
                 break;
             }
             if (size == 0) {
@@ -295,6 +299,7 @@ class SensorPoseProviderImpl : public SensorPoseProvider {
 
             handleEvent(event);
         }
+        ALOGD("%s: Exiting sensor event loop", __func__);
     }
 
     void handleEvent(const ASensorEvent& event) {
