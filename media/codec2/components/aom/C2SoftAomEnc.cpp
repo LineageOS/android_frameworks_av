@@ -104,6 +104,19 @@ C2SoftAomEnc::IntfImpl::IntfImpl(const std::shared_ptr<C2ReflectorHelper>& helpe
                          .withSetter(ProfileLevelSetter)
                          .build());
 
+    addParameter(DefineParam(mPixelFormat, C2_PARAMKEY_PIXEL_FORMAT)
+                         .withDefault(new C2StreamPixelFormatInfo::output(
+                              0u, HAL_PIXEL_FORMAT_YCBCR_420_888))
+                         .withFields({C2F(mPixelFormat, value).oneOf({
+                                            HAL_PIXEL_FORMAT_IMPLEMENTATION_DEFINED,
+                                            HAL_PIXEL_FORMAT_YCBCR_420_888,
+                                            HAL_PIXEL_FORMAT_YCBCR_P010
+                                     })
+                         })
+                         .withSetter((Setter<decltype(*mPixelFormat)>::StrictValueWithNoDeps))
+                         .build());
+
+
     addParameter(DefineParam(mRequestSync, C2_PARAMKEY_REQUEST_SYNC_FRAME)
                          .withDefault(new C2StreamRequestSyncFrameTuning::output(0u, C2_FALSE))
                          .withFields({C2F(mRequestSync, value).oneOf({C2_FALSE, C2_TRUE})})
@@ -232,10 +245,11 @@ C2SoftAomEnc::C2SoftAomEnc(const char* name, c2_node_id_t id,
       mBitrateControlMode(AOM_VBR),
       mMinQuantizer(0),
       mMaxQuantizer(0),
-      mLastTimestamp(0x7FFFFFFFFFFFFFFFull),
+      mLastTimestamp(INT64_MAX),
       mSignalledOutputEos(false),
       mSignalledError(false),
-      mHeadersReceived(false) {
+      mHeadersReceived(false),
+      mIs10Bit(false) {
     ALOGV("Constructor");
 }
 
@@ -245,10 +259,7 @@ C2SoftAomEnc::~C2SoftAomEnc() {
 }
 
 c2_status_t C2SoftAomEnc::onInit() {
-    ALOGV("Init");
-
-    status_t err = initEncoder();
-    return err == OK ? C2_OK : C2_CORRUPTED;
+    return C2_OK;
 }
 
 c2_status_t C2SoftAomEnc::onStop() {
@@ -274,6 +285,7 @@ void C2SoftAomEnc::onRelease() {
 
     // this one is not allocated by us
     mCodecInterface = nullptr;
+    mHeadersReceived = false;
 }
 
 c2_status_t C2SoftAomEnc::onFlush_sm() {
@@ -396,6 +408,7 @@ status_t C2SoftAomEnc::initEncoder() {
         mRequestSync = mIntf->getRequestSync_l();
     }
 
+
     switch (mBitrateMode->value) {
         case C2Config::BITRATE_CONST:
             mBitrateControlMode = AOM_CBR;
@@ -410,8 +423,9 @@ status_t C2SoftAomEnc::initEncoder() {
     mCodecInterface = aom_codec_av1_cx();
     if (!mCodecInterface) goto CleanUp;
 
-    ALOGD("AOM: initEncoder. BRMode: %u. KF: %u. QP: %u - %u", (uint32_t)mBitrateControlMode,
-          mIntf->getSyncFramePeriod(), mMinQuantizer, mMaxQuantizer);
+    ALOGD("AOM: initEncoder. BRMode: %u. KF: %u. QP: %u - %u, 10Bit: %d",
+          (uint32_t)mBitrateControlMode,
+          mIntf->getSyncFramePeriod(), mMinQuantizer, mMaxQuantizer, mIs10Bit);
 
     mCodecConfiguration = new aom_codec_enc_cfg_t;
     if (!mCodecConfiguration) goto CleanUp;
@@ -425,6 +439,9 @@ status_t C2SoftAomEnc::initEncoder() {
 
     mCodecConfiguration->g_w = mSize->width;
     mCodecConfiguration->g_h = mSize->height;
+    mCodecConfiguration->g_bit_depth = mIs10Bit ? AOM_BITS_10 : AOM_BITS_8;
+    mCodecConfiguration->g_input_bit_depth = mIs10Bit ? 10 : 8;
+
 
     mCodecConfiguration->g_threads = 0;
     mCodecConfiguration->g_error_resilient = 0;
@@ -489,7 +506,7 @@ status_t C2SoftAomEnc::initEncoder() {
     mCodecContext = new aom_codec_ctx_t;
     if (!mCodecContext) goto CleanUp;
     codec_return = aom_codec_enc_init(mCodecContext, mCodecInterface, mCodecConfiguration,
-                                      0);  // flags
+                                      mIs10Bit ? AOM_CODEC_USE_HIGHBITDEPTH : 0);
     if (codec_return != AOM_CODEC_OK) {
         ALOGE("Error initializing aom encoder");
         goto CleanUp;
@@ -511,7 +528,7 @@ status_t C2SoftAomEnc::initEncoder() {
         } else {
             uint32_t stride = (width + mStrideAlign - 1) & ~(mStrideAlign - 1);
             uint32_t vstride = (height + mStrideAlign - 1) & ~(mStrideAlign - 1);
-            mConversionBuffer = MemoryBlock::Allocate(stride * vstride * 3 / 2);
+            mConversionBuffer = MemoryBlock::Allocate(stride * vstride * 3 / (mIs10Bit? 1 : 2));
             if (!mConversionBuffer.size()) {
                 ALOGE("Allocating conversion buffer failed.");
             } else {
@@ -537,7 +554,42 @@ void C2SoftAomEnc::process(const std::unique_ptr<C2Work>& work,
         work->result = C2_BAD_VALUE;
         return;
     }
-    // Initialize encoder if not already
+
+    std::shared_ptr<const C2GraphicView> rView;
+    std::shared_ptr<C2Buffer> inputBuffer;
+    if (!work->input.buffers.empty()) {
+        inputBuffer = work->input.buffers[0];
+        rView = std::make_shared<const C2GraphicView>(
+                inputBuffer->data().graphicBlocks().front().map().get());
+        if (rView->error() != C2_OK) {
+            ALOGE("graphic view map err = %d", rView->error());
+            work->result = C2_CORRUPTED;
+            return;
+        }
+    } else {
+        ALOGV("Empty input Buffer");
+        uint32_t flags = 0;
+        if (work->input.flags & C2FrameData::FLAG_END_OF_STREAM) {
+            flags |= C2FrameData::FLAG_END_OF_STREAM;
+        }
+        work->worklets.front()->output.flags = (C2FrameData::flags_t)flags;
+        work->worklets.front()->output.buffers.clear();
+        work->worklets.front()->output.ordinal = work->input.ordinal;
+        work->workletsProcessed = 1u;
+        return;
+    }
+
+    bool end_of_stream = ((work->input.flags & C2FrameData::FLAG_END_OF_STREAM) != 0);
+    aom_image_t raw_frame;
+    const C2PlanarLayout& layout = rView->layout();
+    if (!mHeadersReceived) {
+        mIs10Bit = (layout.planes[layout.PLANE_Y].bitDepth == 10);
+
+        // Re-Initialize encoder
+        if (mCodecContext){
+            onRelease();
+        }
+    }
     if (!mCodecContext && OK != initEncoder()) {
         ALOGE("Failed to initialize encoder");
         mSignalledError = true;
@@ -587,30 +639,6 @@ void C2SoftAomEnc::process(const std::unique_ptr<C2Work>& work,
         ALOGV("CSD Produced of size %zu bytes", header_bytes);
     }
 
-    std::shared_ptr<const C2GraphicView> rView;
-    std::shared_ptr<C2Buffer> inputBuffer;
-    if (!work->input.buffers.empty()) {
-        inputBuffer = work->input.buffers[0];
-        rView = std::make_shared<const C2GraphicView>(
-                inputBuffer->data().graphicBlocks().front().map().get());
-        if (rView->error() != C2_OK) {
-            ALOGE("graphic view map err = %d", rView->error());
-            work->result = C2_CORRUPTED;
-            return;
-        }
-    } else {
-        ALOGV("Empty input Buffer");
-        uint32_t flags = 0;
-        if (work->input.flags & C2FrameData::FLAG_END_OF_STREAM) {
-            flags |= C2FrameData::FLAG_END_OF_STREAM;
-        }
-        work->worklets.front()->output.flags = (C2FrameData::flags_t)flags;
-        work->worklets.front()->output.buffers.clear();
-        work->worklets.front()->output.ordinal = work->input.ordinal;
-        work->workletsProcessed = 1u;
-        return;
-    }
-
     const C2ConstGraphicBlock inBuffer = inputBuffer->data().graphicBlocks().front();
     if (inBuffer.width() < mSize->width || inBuffer.height() < mSize->height) {
         ALOGE("unexpected Input buffer attributes %d(%d) x %d(%d)", inBuffer.width(), mSize->width,
@@ -619,9 +647,8 @@ void C2SoftAomEnc::process(const std::unique_ptr<C2Work>& work,
         work->result = C2_BAD_VALUE;
         return;
     }
-    bool end_of_stream = ((work->input.flags & C2FrameData::FLAG_END_OF_STREAM) != 0);
-    aom_image_t raw_frame;
-    const C2PlanarLayout& layout = rView->layout();
+
+
     uint32_t width = mSize->width;
     uint32_t height = mSize->height;
     if (width > 0x8000 || height > 0x8000) {
@@ -647,39 +674,65 @@ void C2SoftAomEnc::process(const std::unique_ptr<C2Work>& work,
             break;
         }
         case C2PlanarLayout::TYPE_YUV: {
-            if (!IsYUV420(*rView)) {
+            const bool isYUV420_10bit = IsYUV420_10bit(*rView);
+            if (!IsYUV420(*rView) && !isYUV420_10bit) {
                 ALOGE("input is not YUV420");
                 work->result = C2_BAD_VALUE;
                 return;
             }
-
-            if (layout.planes[layout.PLANE_Y].colInc == 1 &&
-                layout.planes[layout.PLANE_U].colInc == 1 &&
-                layout.planes[layout.PLANE_V].colInc == 1) {
-                // I420 compatible - though with custom offset and stride
-                aom_img_wrap(&raw_frame, AOM_IMG_FMT_I420, width, height, mStrideAlign,
-                             (uint8_t*)rView->data()[0]);
-                raw_frame.planes[1] = (uint8_t*)rView->data()[1];
-                raw_frame.planes[2] = (uint8_t*)rView->data()[2];
-                raw_frame.stride[0] = layout.planes[layout.PLANE_Y].rowInc;
-                raw_frame.stride[1] = layout.planes[layout.PLANE_U].rowInc;
-                raw_frame.stride[2] = layout.planes[layout.PLANE_V].rowInc;
-            } else {
-                // copy to I420
-                MediaImage2 img = CreateYUV420PlanarMediaImage2(width, height, stride, vstride);
-                if (mConversionBuffer.size() >= stride * vstride * 3 / 2) {
-                    status_t err = ImageCopy(mConversionBuffer.data(), &img, *rView);
-                    if (err != OK) {
-                        ALOGE("Buffer conversion failed: %d", err);
+            if (!isYUV420_10bit) {
+                if (IsI420(*rView)) {
+                    // I420 compatible - though with custom offset and stride
+                    aom_img_wrap(&raw_frame, AOM_IMG_FMT_I420, width, height, mStrideAlign,
+                                 (uint8_t*)rView->data()[0]);
+                    raw_frame.planes[1] = (uint8_t*)rView->data()[1];
+                    raw_frame.planes[2] = (uint8_t*)rView->data()[2];
+                    raw_frame.stride[0] = layout.planes[layout.PLANE_Y].rowInc;
+                    raw_frame.stride[1] = layout.planes[layout.PLANE_U].rowInc;
+                    raw_frame.stride[2] = layout.planes[layout.PLANE_V].rowInc;
+                } else {
+                    // TODO(kyslov): Add image wrap for NV12
+                    // copy to I420
+                    MediaImage2 img = CreateYUV420PlanarMediaImage2(width, height, stride, vstride);
+                    if (mConversionBuffer.size() >= stride * vstride * 3 / 2) {
+                        status_t err = ImageCopy(mConversionBuffer.data(), &img, *rView);
+                        if (err != OK) {
+                            ALOGE("Buffer conversion failed: %d", err);
+                            work->result = C2_BAD_VALUE;
+                            return;
+                        }
+                        aom_img_wrap(&raw_frame, AOM_IMG_FMT_I420, stride, vstride, mStrideAlign,
+                                     mConversionBuffer.data());
+                        aom_img_set_rect(&raw_frame, 0, 0, width, height, 0);
+                    } else {
+                        ALOGE("Conversion buffer is too small: %u x %u for %zu", stride, vstride,
+                              mConversionBuffer.size());
                         work->result = C2_BAD_VALUE;
                         return;
                     }
-                    aom_img_wrap(&raw_frame, AOM_IMG_FMT_I420, stride, vstride, mStrideAlign,
-                                 mConversionBuffer.data());
-                    aom_img_set_rect(&raw_frame, 0, 0, width, height, 0);
+                }
+            } else {  // 10 bits
+                if (IsP010(*rView)) {
+                    if (mConversionBuffer.size() >= stride * vstride * 3) {
+                        uint16_t *dstY, *dstU, *dstV;
+                        dstY = (uint16_t*)mConversionBuffer.data();
+                        dstU = ((uint16_t*)mConversionBuffer.data()) + stride * vstride;
+                        dstV = ((uint16_t*)mConversionBuffer.data()) + (stride * vstride) / 4;
+                        convertP010ToYUV420Planar16(dstY, dstU, dstV, (uint16_t*)(rView->data()[0]),
+                                                    (uint16_t*)(rView->data()[1]), stride, stride,
+                                                    stride, stride / 2, stride / 2, stride,
+                                                    vstride);
+                        aom_img_wrap(&raw_frame, AOM_IMG_FMT_I42016, stride, vstride, mStrideAlign,
+                                     mConversionBuffer.data());
+                        aom_img_set_rect(&raw_frame, 0, 0, width, height, 0);
+                    } else {
+                        ALOGE("Conversion buffer is too small: %u x %u for %zu", stride, vstride,
+                              mConversionBuffer.size());
+                        work->result = C2_BAD_VALUE;
+                        return;
+                    }
                 } else {
-                    ALOGE("Conversion buffer is too small: %u x %u for %zu", stride, vstride,
-                          mConversionBuffer.size());
+                    ALOGE("Image format conversion is not supported.");
                     work->result = C2_BAD_VALUE;
                     return;
                 }
