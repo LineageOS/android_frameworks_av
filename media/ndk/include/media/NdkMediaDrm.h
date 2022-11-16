@@ -261,8 +261,8 @@ media_status_t AMediaDrm_setOnKeysChangeListener(AMediaDrm *,
 /**
  * Open a new session with the MediaDrm object.  A session ID is returned.
  *
- * Returns MEDIADRM_NOT_PROVISIONED_ERROR if provisioning is needed.
- * Returns MEDIADRM_RESOURCE_BUSY_ERROR if required resources are in use.
+ * Returns AMEDIA_DRM_NOT_PROVISIONED if provisioning is needed.
+ * Returns AMEDIA_DRM_RESOURCE_BUSY if required resources are in use.
  *
  * Available since API level 21.
  */
@@ -327,7 +327,7 @@ media_status_t AMediaDrm_closeSession(AMediaDrm *,
  *   2. keyRequestSize will be set to the size of the request
  *   If this does not return AMEDIA_OK, value of these parameters should not be used.
  *
- * Returns MEDIADRM_NOT_PROVISIONED_ERROR if reprovisioning is needed, due to a
+ * Returns AMEDIA_DRM_NOT_PROVISIONED if reprovisioning is needed, due to a
  * problem with the device certificate.
  *
  * Available since API level 21.
@@ -390,7 +390,7 @@ media_status_t AMediaDrm_getKeyRequest(AMediaDrm *, const AMediaDrmScope *scope,
  *   4. keyRequestType will be set to the key request type. Passing in NULL means
 *       you don't need it to be reported.
  *
- * Returns MEDIADRM_NOT_PROVISIONED_ERROR if reprovisioning is needed, due to a
+ * Returns AMEDIA_DRM_NOT_PROVISIONED if reprovisioning is needed, due to a
  * problem with the device certificate.
  *
  * Available since API level 33.
@@ -457,7 +457,7 @@ media_status_t AMediaDrm_removeKeys(AMediaDrm *,
  * On entry, numPairs should be set by the caller to the maximum number of pairs
  * that can be returned (the size of the array).  On exit, numPairs will be set
  * to the number of entries written to the array.  If the number of {key, value} pairs
- * to be returned is greater than *numPairs, MEDIADRM_SHORT_BUFFER will be returned
+ * to be returned is greater than *numPairs, AMEDIA_DRM_SHORT_BUFFER will be returned
  * and numPairs will be set to the number of pairs available.
  *
  * Available since API level 21.
@@ -495,7 +495,7 @@ media_status_t AMediaDrm_getProvisionRequest(AMediaDrm *, const uint8_t **provis
  *   DRM engine plugin.
  * responseSize is the length of the provisioning response in bytes.
  *
- * Returns MEDIADRM_DEVICE_REVOKED_ERROR if the response indicates that the
+ * Returns AMEDIA_DRM_DEVICE_REVOKED if the response indicates that the
  * server rejected the request
  *
  * Available since API level 21.
@@ -522,7 +522,7 @@ media_status_t AMediaDrm_provideProvisionResponse(AMediaDrm *,
  * numSecureStops is set by the caller to the maximum number of secure stops to
  * return.  On exit, *numSecureStops will be set to the number actually returned.
  * If *numSecureStops is too small for the number of secure stops available,
- * MEDIADRM_SHORT_BUFFER will be returned and *numSecureStops will be set to the
+ * AMEDIA_DRM_SHORT_BUFFER will be returned and *numSecureStops will be set to the
  * number required.
  *
  * Available since API level 21.
@@ -657,7 +657,7 @@ media_status_t AMediaDrm_decrypt(AMediaDrm *, const AMediaDrmSessionId *sessionI
  * Generate a signature using the specified macAlgorithm over the message data
  * referenced by message of size messageSize and store the signature in the
  * buffer referenced signature of max size *signatureSize.  If the buffer is not
- * large enough to hold the signature, MEDIADRM_SHORT_BUFFER is returned and
+ * large enough to hold the signature, AMEDIA_DRM_SHORT_BUFFER is returned and
  * *signatureSize is set to the buffer size required.  The key to use is identified
  * by the 16 byte keyId.  The key must have been loaded into the session using
  * provideKeyResponse.
@@ -670,7 +670,7 @@ media_status_t AMediaDrm_sign(AMediaDrm *, const AMediaDrmSessionId *sessionId,
 
 /*
  * Perform a signature verification using the specified macAlgorithm over the message
- * data referenced by the message parameter of size messageSize. Returns MEDIADRM_OK
+ * data referenced by the message parameter of size messageSize. Returns AMEDIA_OK
  * if the signature matches, otherwise MEDAIDRM_VERIFY_FAILED is returned. The key to
  * use is identified by the 16 byte keyId.  The key must have been loaded into the
  * session using provideKeyResponse.
