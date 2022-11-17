@@ -369,14 +369,31 @@ status_t setDevicesRoleForT(
     }
 
     switch (role) {
-    case DEVICE_ROLE_PREFERRED:
-    case DEVICE_ROLE_DISABLED: {
+    case DEVICE_ROLE_PREFERRED: {
         tDevicesRoleMap[std::make_pair(t, role)] = devices;
         // The preferred devices and disabled devices are mutually exclusive. Once a device is added
         // the a list, it must be removed from the other one.
-        const device_role_t roleToRemove = role == DEVICE_ROLE_PREFERRED ? DEVICE_ROLE_DISABLED
-                                                                         : DEVICE_ROLE_PREFERRED;
+        const device_role_t roleToRemove = DEVICE_ROLE_DISABLED;
         auto it = tDevicesRoleMap.find(std::make_pair(t, roleToRemove));
+        if (it != tDevicesRoleMap.end()) {
+            it->second = excludeDeviceTypeAddrsFrom(it->second, devices);
+            if (it->second.empty()) {
+                tDevicesRoleMap.erase(it);
+            }
+        }
+    } break;
+    case DEVICE_ROLE_DISABLED: {
+        auto it = tDevicesRoleMap.find(std::make_pair(t, role));
+        if (it != tDevicesRoleMap.end()) {
+            it->second = joinDeviceTypeAddrs(it->second, devices);
+        } else {
+            tDevicesRoleMap[std::make_pair(t, role)] = devices;
+        }
+
+        // The preferred devices and disabled devices are mutually exclusive. Once a device is added
+        // the a list, it must be removed from the other one.
+        const device_role_t roleToRemove = DEVICE_ROLE_PREFERRED;
+        it = tDevicesRoleMap.find(std::make_pair(t, roleToRemove));
         if (it != tDevicesRoleMap.end()) {
             it->second = excludeDeviceTypeAddrsFrom(it->second, devices);
             if (it->second.empty()) {
