@@ -856,6 +856,9 @@ class Camera3Device :
          */
         void     setPaused(bool paused);
 
+        // set mRequestClearing - no new requests are expected to be queued to RequestThread
+        void setRequestClearing();
+
         /**
          * Wait until thread processes the capture request with settings'
          * android.request.id == requestId.

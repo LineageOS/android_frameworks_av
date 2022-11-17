@@ -250,20 +250,28 @@ status_t Camera3Device::disconnectImpl() {
             Mutex::Autolock l(mLock);
             if (mStatus == STATUS_UNINITIALIZED) return res;
 
-            if (mStatus == STATUS_ACTIVE ||
-                    (mStatus == STATUS_ERROR && mRequestThread != NULL)) {
-                res = mRequestThread->clearRepeatingRequests();
-                if (res != OK) {
-                    SET_ERR_L("Can't stop streaming");
-                    // Continue to close device even in case of error
-                } else {
-                    res = waitUntilStateThenRelock(/*active*/ false, maxExpectedDuration);
+            if (mRequestThread != NULL) {
+                if (mStatus == STATUS_ACTIVE || mStatus == STATUS_ERROR) {
+                    res = mRequestThread->clear();
                     if (res != OK) {
-                        SET_ERR_L("Timeout waiting for HAL to drain (% " PRIi64 " ns)",
-                                maxExpectedDuration);
+                        SET_ERR_L("Can't stop streaming");
                         // Continue to close device even in case of error
+                    } else {
+                        res = waitUntilStateThenRelock(/*active*/ false, maxExpectedDuration);
+                        if (res != OK) {
+                            SET_ERR_L("Timeout waiting for HAL to drain (% " PRIi64 " ns)",
+                                    maxExpectedDuration);
+                            // Continue to close device even in case of error
+                        }
                     }
                 }
+                // Signal to request thread that we're not expecting any
+                // more requests. This will be true since once we're in
+                // disconnect and we've cleared off the request queue, the
+                // request thread can't receive any new requests through
+                // binder calls - since disconnect holds
+                // mBinderSerialization lock.
+                mRequestThread->setRequestClearing();
             }
 
             if (mStatus == STATUS_ERROR) {
@@ -3047,7 +3055,8 @@ status_t Camera3Device::RequestThread::clearRepeatingRequests(/*out*/int64_t *la
 
 }
 
-status_t Camera3Device::RequestThread::clearRepeatingRequestsLocked(/*out*/int64_t *lastFrameNumber) {
+status_t Camera3Device::RequestThread::clearRepeatingRequestsLocked(
+        /*out*/int64_t *lastFrameNumber) {
     std::vector<int32_t> streamIds;
     for (const auto& request : mRepeatingRequests) {
         for (const auto& stream : request->mOutputStreams) {
@@ -3071,8 +3080,6 @@ status_t Camera3Device::RequestThread::clear(
     ATRACE_CALL();
     Mutex::Autolock l(mRequestLock);
     ALOGV("RequestThread::%s:", __FUNCTION__);
-
-    mRepeatingRequests.clear();
 
     // Send errors for all requests pending in the request queue, including
     // pending repeating requests
@@ -3111,10 +3118,7 @@ status_t Camera3Device::RequestThread::clear(
 
     Mutex::Autolock al(mTriggerMutex);
     mTriggerMap.clear();
-    if (lastFrameNumber != NULL) {
-        *lastFrameNumber = mRepeatingLastFrameNumber;
-    }
-    mRepeatingLastFrameNumber = hardware::camera2::ICameraDeviceUser::NO_IN_FLIGHT_REPEATING_FRAMES;
+    clearRepeatingRequestsLocked(lastFrameNumber);
     mRequestClearing = true;
     mRequestSignal.signal();
     return OK;
@@ -4207,6 +4211,11 @@ void Camera3Device::RequestThread::waitForNextRequestBatch() {
     }
 
     return;
+}
+
+void Camera3Device::RequestThread::setRequestClearing() {
+    Mutex::Autolock l(mRequestLock);
+    mRequestClearing = true;
 }
 
 sp<Camera3Device::CaptureRequest>
