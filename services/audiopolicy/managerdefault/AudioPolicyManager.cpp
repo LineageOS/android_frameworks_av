@@ -6343,10 +6343,10 @@ void AudioPolicyManager::checkOutputForAttributes(const audio_attributes_t &attr
     SortedVector<audio_io_handle_t> dstOutputs = getOutputsForDevices(newDevices, mOutputs);
 
     uint32_t maxLatency = 0;
-    bool invalidate = false;
+    std::vector<sp<SwAudioOutputDescriptor>> invalidatedOutputs;
     // take into account dynamic audio policies related changes: if a client is now associated
     // to a different policy mix than at creation time, invalidate corresponding stream
-    for (size_t i = 0; i < mPreviousOutputs.size() && !invalidate; i++) {
+    for (size_t i = 0; i < mPreviousOutputs.size(); i++) {
         const sp<SwAudioOutputDescriptor>& desc = mPreviousOutputs.valueAt(i);
         if (desc->isDuplicated()) {
             continue;
@@ -6362,16 +6362,15 @@ void AudioPolicyManager::checkOutputForAttributes(const audio_attributes_t &attr
                 continue;
             }
             if (client->getPrimaryMix() != primaryMix || client->hasLostPrimaryMix()) {
-                invalidate = true;
-                if (desc->isStrategyActive(psId)) {
+                if (desc->isStrategyActive(psId) && maxLatency < desc->latency()) {
                     maxLatency = desc->latency();
                 }
-                break;
+                invalidatedOutputs.push_back(desc);
             }
         }
     }
 
-    if (srcOutputs != dstOutputs || invalidate) {
+    if (srcOutputs != dstOutputs || !invalidatedOutputs.empty()) {
         // get maximum latency of all source outputs to determine the minimum mute time guaranteeing
         // audio from invalidated tracks will be rendered when unmuting
         for (audio_io_handle_t srcOut : srcOutputs) {
@@ -6382,8 +6381,7 @@ void AudioPolicyManager::checkOutputForAttributes(const audio_attributes_t &attr
                 maxLatency = desc->latency();
             }
 
-            if (invalidate) continue;
-
+            bool invalidate = false;
             for (auto client : desc->clientsList(false /*activeOnly*/)) {
                 if (desc->isDuplicated() || !desc->mProfile->isDirectOutput()) {
                     // a client on a non direct outputs has necessarily a linear PCM format
@@ -6411,21 +6409,14 @@ void AudioPolicyManager::checkOutputForAttributes(const audio_attributes_t &attr
                     }
                 }
             }
-        }
-
-        ALOGV_IF(!(srcOutputs.isEmpty() || dstOutputs.isEmpty()),
-              "%s: strategy %d, moving from output %s to output %s", __func__, psId,
-              std::to_string(srcOutputs[0]).c_str(),
-              std::to_string(dstOutputs[0]).c_str());
-        // mute strategy while moving tracks from one output to another
-        for (audio_io_handle_t srcOut : srcOutputs) {
-            sp<SwAudioOutputDescriptor> desc = mPreviousOutputs.valueFor(srcOut);
-            if (desc == nullptr) continue;
-
-            if (desc->isStrategyActive(psId)) {
-                setStrategyMute(psId, true, desc);
-                setStrategyMute(psId, false, desc, maxLatency * LATENCY_MUTE_FACTOR,
-                                newDevices.types());
+            // mute strategy while moving tracks from one output to another
+            if (invalidate) {
+                invalidatedOutputs.push_back(desc);
+                if (desc->isStrategyActive(psId)) {
+                    setStrategyMute(psId, true, desc);
+                    setStrategyMute(psId, false, desc, maxLatency * LATENCY_MUTE_FACTOR,
+                                    newDevices.types());
+                }
             }
             sp<SourceClientDescriptor> source = getSourceForAttributesOnOutput(srcOut, attr);
             if (source != nullptr && !isCallRxAudioSource(source) && !source->isInternal()) {
@@ -6433,19 +6424,21 @@ void AudioPolicyManager::checkOutputForAttributes(const audio_attributes_t &attr
             }
         }
 
+        ALOGV_IF(!(srcOutputs.isEmpty() || dstOutputs.isEmpty()),
+              "%s: strategy %d, moving from output %s to output %s", __func__, psId,
+              std::to_string(srcOutputs[0]).c_str(),
+              std::to_string(dstOutputs[0]).c_str());
+
         // Move effects associated to this stream from previous output to new output
         if (followsSameRouting(attr, attributes_initializer(AUDIO_USAGE_MEDIA))) {
             selectOutputForMusicEffects();
         }
         // Move tracks associated to this stream (and linked) from previous output to new output
-        if (invalidate) {
+        if (!invalidatedOutputs.empty()) {
             for (auto stream :  mEngine->getStreamTypesForProductStrategy(psId)) {
                 mpClientInterface->invalidateStream(stream);
             }
-            for (audio_io_handle_t srcOut : srcOutputs) {
-                sp<SwAudioOutputDescriptor> desc = mPreviousOutputs.valueFor(srcOut);
-                if (desc == nullptr) continue;
-
+            for (sp<SwAudioOutputDescriptor> desc : invalidatedOutputs) {
                 desc->setTracksInvalidatedStatusByStrategy(psId);
             }
         }
