@@ -3339,16 +3339,18 @@ ssize_t AudioFlinger::PlaybackThread::threadLoop_write()
 
         if (framesWritten > 0) {
             bytesWritten = framesWritten * mFrameSize;
+
+            // Send to MelProcessor for sound dose measurement.
+            auto processor = mMelProcessor.load();
+            if (processor) {
+                processor->process((char *)mSinkBuffer + offset, bytesWritten);
+            }
+
 #ifdef TEE_SINK
             mTee.write((char *)mSinkBuffer + offset, framesWritten);
 #endif
         } else {
             bytesWritten = framesWritten;
-        }
-
-        auto processor = mMelProcessor.load();
-        if (processor) {
-            processor->process((char *)mSinkBuffer + offset, bytesWritten);
         }
     // otherwise use the HAL / AudioStreamOut directly
     } else {

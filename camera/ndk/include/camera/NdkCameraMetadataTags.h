@@ -2143,6 +2143,76 @@ typedef enum acamera_metadata_tag {
      */
     ACAMERA_CONTROL_AVAILABLE_SETTINGS_OVERRIDES =              // int32[n]
             ACAMERA_CONTROL_START + 50,
+    /**
+     * <p>Automatic crop, pan and zoom to keep objects in the center of the frame.</p>
+     *
+     * <p>Type: byte (acamera_metadata_enum_android_control_autoframing_t)</p>
+     *
+     * <p>This tag may appear in:
+     * <ul>
+     *   <li>ACameraMetadata from ACameraCaptureSession_captureCallback_result callbacks</li>
+     *   <li>ACaptureRequest</li>
+     * </ul></p>
+     *
+     * <p>Auto-framing is a special mode provided by the camera device to dynamically crop, zoom
+     * or pan the camera feed to try to ensure that the people in a scene occupy a reasonable
+     * portion of the viewport. It is primarily designed to support video calling in
+     * situations where the user isn't directly in front of the device, especially for
+     * wide-angle cameras.
+     * ACAMERA_SCALER_CROP_REGION and ACAMERA_CONTROL_ZOOM_RATIO in CaptureResult will be used
+     * to denote the coordinates of the auto-framed region.
+     * Zoom and video stabilization controls are disabled when auto-framing is enabled. The 3A
+     * regions must map the screen coordinates into the scaler crop returned from the capture
+     * result instead of using the active array sensor.</p>
+     *
+     * @see ACAMERA_CONTROL_ZOOM_RATIO
+     * @see ACAMERA_SCALER_CROP_REGION
+     */
+    ACAMERA_CONTROL_AUTOFRAMING =                               // byte (acamera_metadata_enum_android_control_autoframing_t)
+            ACAMERA_CONTROL_START + 51,
+    /**
+     * <p>Whether the camera device supports ACAMERA_CONTROL_AUTOFRAMING.</p>
+     *
+     * @see ACAMERA_CONTROL_AUTOFRAMING
+     *
+     * <p>Type: byte (acamera_metadata_enum_android_control_autoframing_available_t)</p>
+     *
+     * <p>This tag may appear in:
+     * <ul>
+     *   <li>ACameraMetadata from ACameraManager_getCameraCharacteristics</li>
+     * </ul></p>
+     *
+     * <p>Will be <code>false</code> if auto-framing is not available.</p>
+     */
+    ACAMERA_CONTROL_AUTOFRAMING_AVAILABLE =                     // byte (acamera_metadata_enum_android_control_autoframing_available_t)
+            ACAMERA_CONTROL_START + 52,
+    /**
+     * <p>Current state of auto-framing.</p>
+     *
+     * <p>Type: byte (acamera_metadata_enum_android_control_autoframing_state_t)</p>
+     *
+     * <p>This tag may appear in:
+     * <ul>
+     *   <li>ACameraMetadata from ACameraCaptureSession_captureCallback_result callbacks</li>
+     * </ul></p>
+     *
+     * <p>When the camera doesn't have auto-framing available (i.e
+     * <code>ACAMERA_CONTROL_AUTOFRAMING_AVAILABLE</code> == false) or it is not enabled (i.e
+     * <code>ACAMERA_CONTROL_AUTOFRAMING</code> == OFF), the state will always be INACTIVE.
+     * Other states indicate the current auto-framing state:</p>
+     * <ul>
+     * <li>When <code>ACAMERA_CONTROL_AUTOFRAMING</code> is set to ON, auto-framing will take
+     * place. While the frame is aligning itself to center the object (doing things like
+     * zooming in, zooming out or pan), the state will be FRAMING.</li>
+     * <li>When field of view is not being adjusted anymore and has reached a stable state, the
+     * state will be CONVERGED.</li>
+     * </ul>
+     *
+     * @see ACAMERA_CONTROL_AUTOFRAMING
+     * @see ACAMERA_CONTROL_AUTOFRAMING_AVAILABLE
+     */
+    ACAMERA_CONTROL_AUTOFRAMING_STATE =                         // byte (acamera_metadata_enum_android_control_autoframing_state_t)
+            ACAMERA_CONTROL_START + 53,
     ACAMERA_CONTROL_END,
 
     /**
@@ -8627,6 +8697,53 @@ typedef enum acamera_metadata_enum_acamera_control_settings_override {
     ACAMERA_CONTROL_SETTINGS_OVERRIDE_ZOOM                           = 1,
 
 } acamera_metadata_enum_android_control_settings_override_t;
+
+// ACAMERA_CONTROL_AUTOFRAMING
+typedef enum acamera_metadata_enum_acamera_control_autoframing {
+    /**
+     * <p>Disable autoframing.</p>
+     */
+    ACAMERA_CONTROL_AUTOFRAMING_OFF                                  = 0,
+
+    /**
+     * <p>Enable autoframing to keep people in the frame's field of view.</p>
+     */
+    ACAMERA_CONTROL_AUTOFRAMING_ON                                   = 1,
+
+    /**
+     * <p>Automatically select ON or OFF based on the system level preferences.</p>
+     */
+    ACAMERA_CONTROL_AUTOFRAMING_AUTO                                 = 2,
+
+} acamera_metadata_enum_android_control_autoframing_t;
+
+// ACAMERA_CONTROL_AUTOFRAMING_AVAILABLE
+typedef enum acamera_metadata_enum_acamera_control_autoframing_available {
+    ACAMERA_CONTROL_AUTOFRAMING_AVAILABLE_FALSE                      = 0,
+
+    ACAMERA_CONTROL_AUTOFRAMING_AVAILABLE_TRUE                       = 1,
+
+} acamera_metadata_enum_android_control_autoframing_available_t;
+
+// ACAMERA_CONTROL_AUTOFRAMING_STATE
+typedef enum acamera_metadata_enum_acamera_control_autoframing_state {
+    /**
+     * <p>Auto-framing is inactive.</p>
+     */
+    ACAMERA_CONTROL_AUTOFRAMING_STATE_INACTIVE                       = 0,
+
+    /**
+     * <p>Auto-framing is in process - either zooming in, zooming out or pan is taking place.</p>
+     */
+    ACAMERA_CONTROL_AUTOFRAMING_STATE_FRAMING                        = 1,
+
+    /**
+     * <p>Auto-framing has reached a stable state (frame/fov is not being adjusted). The state
+     * may transition back to FRAMING if the scene changes.</p>
+     */
+    ACAMERA_CONTROL_AUTOFRAMING_STATE_CONVERGED                      = 2,
+
+} acamera_metadata_enum_android_control_autoframing_state_t;
 
 
 
