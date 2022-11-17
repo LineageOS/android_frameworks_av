@@ -1014,7 +1014,7 @@ void CCodec::configure(const sp<AMessage> &msg) {
             C2StoreFlexiblePixelFormatDescriptorsInfo *pixelFormatInfo = nullptr;
             int vendorSdkVersion = base::GetIntProperty(
                     "ro.vendor.build.version.sdk", android_get_device_api_level());
-            if (vendorSdkVersion >= __ANDROID_API_S__ && mClient->query(
+            if (mClient->query(
                         {},
                         {C2StoreFlexiblePixelFormatDescriptorsInfo::PARAM_TYPE},
                         C2_MAY_BLOCK,
