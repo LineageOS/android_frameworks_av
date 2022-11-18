@@ -963,7 +963,10 @@ void Spatializer::checkSensorsState_l() {
         }
     }
     if (mOutput != AUDIO_IO_HANDLE_NONE && supportsSetLatencyMode) {
-        AudioSystem::setRequestedLatencyMode(mOutput, requestedLatencyMode);
+        const status_t status =
+                AudioSystem::setRequestedLatencyMode(mOutput, requestedLatencyMode);
+        ALOGD("%s: setRequestedLatencyMode for output thread(%d) to %s returned %d",
+                __func__, mOutput, toString(requestedLatencyMode).c_str(), status);
     }
 }
 

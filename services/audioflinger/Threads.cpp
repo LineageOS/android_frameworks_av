@@ -269,6 +269,23 @@ static std::string patchSourcesToString(const struct audio_patch *patch)
     return ss.str();
 }
 
+static std::string toString(audio_latency_mode_t mode) {
+    // We convert to the AIDL type to print (eventually the legacy type will be removed).
+    const auto result = legacy2aidl_audio_latency_mode_t_AudioLatencyMode(mode);
+    return result.has_value() ? media::audio::common::toString(*result) : "UNKNOWN";
+}
+
+// Could be made a template, but other toString overloads for std::vector are confused.
+static std::string toString(const std::vector<audio_latency_mode_t>& elements) {
+    std::string s("{ ");
+    for (const auto& e : elements) {
+        s.append(toString(e));
+        s.append(" ");
+    }
+    s.append("}");
+    return s;
+}
+
 static pthread_once_t sFastTrackMultiplierOnce = PTHREAD_ONCE_INIT;
 
 static void sFastTrackMultiplierInit()
@@ -7333,10 +7350,13 @@ status_t AudioFlinger::SpatializerThread::createAudioPatch_l(const struct audio_
 
 void AudioFlinger::SpatializerThread::updateHalSupportedLatencyModes_l() {
     std::vector<audio_latency_mode_t> latencyModes;
-    if (mOutput->stream->getRecommendedLatencyModes(&latencyModes) != NO_ERROR) {
+    const status_t status = mOutput->stream->getRecommendedLatencyModes(&latencyModes);
+    if (status != NO_ERROR) {
         latencyModes.clear();
     }
     if (latencyModes != mSupportedLatencyModes) {
+        ALOGD("%s: thread(%d) status %d supported latency modes: %s",
+            __func__, mId, status, toString(latencyModes).c_str());
         mSupportedLatencyModes.swap(latencyModes);
         sendHalLatencyModesChangedEvent_l();
     }
@@ -7376,6 +7396,8 @@ void AudioFlinger::SpatializerThread::setHalLatencyMode_l() {
 
     if (latencyMode != mSetLatencyMode) {
         status_t status = mOutput->stream->setLatencyMode(latencyMode);
+        ALOGD("%s: thread(%d) setLatencyMode(%s) returned %d",
+                __func__, mId, toString(latencyMode).c_str(), status);
         if (status == NO_ERROR) {
             mSetLatencyMode = latencyMode;
         }
