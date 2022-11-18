@@ -2169,7 +2169,7 @@ typedef enum acamera_metadata_tag {
      * @see ACAMERA_SCALER_CROP_REGION
      */
     ACAMERA_CONTROL_AUTOFRAMING =                               // byte (acamera_metadata_enum_android_control_autoframing_t)
-            ACAMERA_CONTROL_START + 51,
+            ACAMERA_CONTROL_START + 52,
     /**
      * <p>Whether the camera device supports ACAMERA_CONTROL_AUTOFRAMING.</p>
      *
@@ -2185,7 +2185,7 @@ typedef enum acamera_metadata_tag {
      * <p>Will be <code>false</code> if auto-framing is not available.</p>
      */
     ACAMERA_CONTROL_AUTOFRAMING_AVAILABLE =                     // byte (acamera_metadata_enum_android_control_autoframing_available_t)
-            ACAMERA_CONTROL_START + 52,
+            ACAMERA_CONTROL_START + 53,
     /**
      * <p>Current state of auto-framing.</p>
      *
@@ -2212,7 +2212,7 @@ typedef enum acamera_metadata_tag {
      * @see ACAMERA_CONTROL_AUTOFRAMING_AVAILABLE
      */
     ACAMERA_CONTROL_AUTOFRAMING_STATE =                         // byte (acamera_metadata_enum_android_control_autoframing_state_t)
-            ACAMERA_CONTROL_START + 53,
+            ACAMERA_CONTROL_START + 54,
     ACAMERA_CONTROL_END,
 
     /**
