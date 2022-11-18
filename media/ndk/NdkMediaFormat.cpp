@@ -332,6 +332,9 @@ void AMediaFormat_setString(AMediaFormat* format, const char* name, const char* 
     if (name == nullptr) {
         return;
     }
+    if (value == nullptr) {
+        return;
+    }
     // AMessage::setString() makes a copy of the string
     format->mFormat->setString(name, value, strlen(value));
 }
