@@ -282,6 +282,7 @@ filegroup {
     name: "libaudioclient_aidl",
     srcs: [
         "aidl/android/media/IPlayer.aidl",
+        "aidl/android/media/AudioHalVersion.aidl",
     ],
     path: "aidl",
 }
@@ -342,6 +343,7 @@ aidl_interface {
         "aidl/android/media/AudioDualMonoMode.aidl",
         "aidl/android/media/AudioFlag.aidl",
         "aidl/android/media/AudioGainSys.aidl",
+        "aidl/android/media/AudioHalVersion.aidl",
         "aidl/android/media/AudioIoConfigEvent.aidl",
         "aidl/android/media/AudioIoDescriptor.aidl",
         "aidl/android/media/AudioPatch.aidl",
