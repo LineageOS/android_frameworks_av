@@ -30,14 +30,14 @@
 #include <limits.h>
 
 using aidl::android::hardware::audio::effect::EffectBundleAidl;
-using aidl::android::hardware::audio::effect::EqualizerBundleImplUUID;
+using aidl::android::hardware::audio::effect::kEqualizerBundleImplUUID;
 using aidl::android::hardware::audio::effect::IEffect;
 using aidl::android::hardware::audio::effect::State;
 using aidl::android::media::audio::common::AudioUuid;
 
 extern "C" binder_exception_t createEffect(const AudioUuid* uuid,
                                            std::shared_ptr<IEffect>* instanceSpp) {
-    if (uuid == nullptr || *uuid != EqualizerBundleImplUUID) {
+    if (uuid == nullptr || *uuid != kEqualizerBundleImplUUID) {
         LOG(ERROR) << __func__ << "uuid not supported";
         return EX_ILLEGAL_ARGUMENT;
     }
@@ -71,7 +71,7 @@ namespace aidl::android::hardware::audio::effect {
 
 EffectBundleAidl::EffectBundleAidl(const AudioUuid& uuid) {
     LOG(DEBUG) << __func__ << uuid.toString();
-    if (uuid == EqualizerBundleImplUUID) {
+    if (uuid == kEqualizerBundleImplUUID) {
         mType = lvm::BundleEffectType::EQUALIZER;
         mDescriptor = &lvm::kEqualizerDesc;
     } else {
@@ -81,7 +81,7 @@ EffectBundleAidl::EffectBundleAidl(const AudioUuid& uuid) {
 }
 
 EffectBundleAidl::~EffectBundleAidl() {
-    releaseContext();
+    cleanUp();
     LOG(DEBUG) << __func__;
 }
 
