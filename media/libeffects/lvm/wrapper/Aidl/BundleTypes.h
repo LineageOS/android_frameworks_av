@@ -71,9 +71,9 @@ static const Equalizer::Capability kEqCap = {.bandFrequencies = kEqBandFrequency
                                              .presets = kEqPresets};
 
 static const Descriptor kEqualizerDesc = {
-        .common = {.id = {.type = EqualizerTypeUUID,
-                          .uuid = EqualizerBundleImplUUID,
-                          .proxy = std::nullopt},
+        .common = {.id = {.type = kEqualizerTypeUUID,
+                          .uuid = kEqualizerBundleImplUUID,
+                          .proxy = kEqualizerProxyUUID},
                    .flags = {.type = Flags::Type::INSERT,
                              .insert = Flags::Insert::FIRST,
                              .volume = Flags::Volume::CTRL},
