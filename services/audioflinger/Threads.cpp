@@ -7479,6 +7479,8 @@ void AudioFlinger::SpatializerThread::onRecommendedLatencyModeChanged(
         std::vector<audio_latency_mode_t> modes) {
     Mutex::Autolock _l(mLock);
     if (modes != mSupportedLatencyModes) {
+        ALOGD("%s: thread(%d) supported latency modes: %s",
+            __func__, mId, toString(modes).c_str());
         mSupportedLatencyModes.swap(modes);
         sendHalLatencyModesChangedEvent_l();
     }
