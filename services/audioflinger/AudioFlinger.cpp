@@ -3733,6 +3733,12 @@ void AudioFlinger::updateSecondaryOutputsForTrack_l(
 
         using namespace std::chrono_literals;
         auto inChannelMask = audio_channel_mask_out_to_in(track->channelMask());
+        if (inChannelMask == AUDIO_CHANNEL_INVALID) {
+            // The downstream PatchTrack has the proper output channel mask,
+            // so if there is no input channel mask equivalent, we can just
+            // use an index mask here to create the PatchRecord.
+            inChannelMask = audio_channel_mask_out_to_in_index_mask(track->channelMask());
+        }
         sp patchRecord = new RecordThread::PatchRecord(nullptr /* thread */,
                                                        track->sampleRate(),
                                                        inChannelMask,
