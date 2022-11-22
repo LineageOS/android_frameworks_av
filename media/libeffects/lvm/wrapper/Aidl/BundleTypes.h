@@ -70,6 +70,8 @@ static const std::vector<Equalizer::Preset> kEqPresets = {
 static const Equalizer::Capability kEqCap = {.bandFrequencies = kEqBandFrequency,
                                              .presets = kEqPresets};
 
+static const std::string kEqualizerEffectName = "EqualizerBundle";
+
 static const Descriptor kEqualizerDesc = {
         .common = {.id = {.type = kEqualizerTypeUUID,
                           .uuid = kEqualizerBundleImplUUID,
@@ -77,7 +79,7 @@ static const Descriptor kEqualizerDesc = {
                    .flags = {.type = Flags::Type::INSERT,
                              .insert = Flags::Insert::FIRST,
                              .volume = Flags::Volume::CTRL},
-                   .name = "EqualizerBundle",
+                   .name = kEqualizerEffectName,
                    .implementor = "NXP Software Ltd."},
         .capability = Capability::make<Capability::equalizer>(kEqCap)};
 
