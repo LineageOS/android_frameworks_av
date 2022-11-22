@@ -238,7 +238,12 @@ public:
     binder::Status setDevicesRoleForStrategy(
             int32_t strategy, media::DeviceRole role,
             const std::vector<AudioDevice>& devices) override;
-    binder::Status removeDevicesRoleForStrategy(int32_t strategy, media::DeviceRole role) override;
+    binder::Status removeDevicesRoleForStrategy(
+            int32_t strategy, media::DeviceRole role,
+            const std::vector<AudioDevice>& devices) override;
+    binder::Status clearDevicesRoleForStrategy(
+            int32_t strategy,
+            media::DeviceRole role) override;
     binder::Status getDevicesForRoleAndStrategy(
             int32_t strategy, media::DeviceRole role,
             std::vector<AudioDevice>* _aidl_return) override;

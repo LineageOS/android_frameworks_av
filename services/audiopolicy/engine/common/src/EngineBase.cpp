@@ -411,6 +411,36 @@ status_t setDevicesRoleForT(
 }
 
 template <typename T>
+status_t removeDevicesRoleForT(
+        std::map<std::pair<T, device_role_t>, AudioDeviceTypeAddrVector>& tDevicesRoleMap,
+        T t, device_role_t role, const AudioDeviceTypeAddrVector &devices,
+        const std::string& logStr, std::function<bool(T)> p) {
+    if (!p(t)) {
+        ALOGE("%s invalid %s %u", __func__, logStr.c_str(), t);
+        return BAD_VALUE;
+    }
+
+    switch (role) {
+    case DEVICE_ROLE_PREFERRED:
+    case DEVICE_ROLE_DISABLED: {
+        auto it = tDevicesRoleMap.find(std::make_pair(t, role));
+        if (it != tDevicesRoleMap.end()) {
+            it->second = excludeDeviceTypeAddrsFrom(it->second, devices);
+            if (it->second.empty()) {
+                tDevicesRoleMap.erase(it);
+            }
+        }
+    } break;
+    case DEVICE_ROLE_NONE:
+        // Intentionally fall-through as it is not needed to set device role as none for a strategy.
+    default:
+        ALOGE("%s invalid role %d", __func__, role);
+        return BAD_VALUE;
+    }
+    return NO_ERROR;
+}
+
+template <typename T>
 status_t removeAllDevicesRoleForT(
         std::map<std::pair<T, device_role_t>, AudioDeviceTypeAddrVector>& tDevicesRoleMap,
         T t, device_role_t role, const std::string& logStr, std::function<bool(T)> p) {
@@ -479,7 +509,18 @@ status_t EngineBase::setDevicesRoleForStrategy(product_strategy_t strategy, devi
             mProductStrategyDeviceRoleMap, strategy, role, devices, "strategy" /*logStr*/, p);
 }
 
-status_t EngineBase::removeDevicesRoleForStrategy(product_strategy_t strategy, device_role_t role)
+status_t EngineBase::removeDevicesRoleForStrategy(product_strategy_t strategy, device_role_t role,
+            const AudioDeviceTypeAddrVector &devices)
+{
+    std::function<bool(product_strategy_t)> p = [this](product_strategy_t strategy) {
+        return mProductStrategies.find(strategy) != mProductStrategies.end();
+    };
+    return removeDevicesRoleForT(
+            mProductStrategyDeviceRoleMap, strategy, role, devices, "strategy" /*logStr*/, p);
+}
+
+status_t EngineBase::clearDevicesRoleForStrategy(product_strategy_t strategy,
+            device_role_t role)
 {
     std::function<bool(product_strategy_t)> p = [this](product_strategy_t strategy) {
         return mProductStrategies.find(strategy) != mProductStrategies.end();
