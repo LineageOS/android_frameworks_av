@@ -316,6 +316,7 @@ protected:
         binder::Status unmute(/*out*/ bool *ret) override;
     private:
         Track* const mTrack;
+        bool setMute(bool muted);
     };
     sp<AudioVibrationController> mAudioVibrationController;
     sp<os::ExternalVibration>    mExternalVibration;
