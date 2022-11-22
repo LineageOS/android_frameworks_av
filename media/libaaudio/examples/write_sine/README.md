@@ -1,7 +1,10 @@
-# cd to this directory
-mkdir -p jni/include/aaudio
-ln -s $PLATFORM/frameworks/av/media/liboboe/include/aaudio/*.h jni/include/aaudio
-ln -s $PLATFORM/out/target/product/$TARGET_PRODUCT/symbols/out/soong/ndk/platforms/android-current/arch-arm64/usr/lib/liboboe.so jni
-$NDK/ndk-build
-adb push libs/arm64-v8a/write_sine_threaded /data
-adb shell /data/write_sine_threaded
+# to run write_sine examples from the command line
+{cd to top of the repo}
+mmma frameworks/av/media/libaaudio/examples/
+adb root
+adb remount -R
+adb push $OUT/data/nativetest/write_sine/write_sine /data/write_sine
+adb shell /data/write_sine -?
+
+adb push $OUT/data/nativetest/write_sine_callback/write_sine_callback /data/write_sine_callback
+adb shell /data/write_sine_callback -?
