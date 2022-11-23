@@ -16,6 +16,7 @@
 
 // Play silence and recover from dead servers or disconnected devices.
 
+#include <memory>
 #include <stdio.h>
 
 #include <aaudio/AAudio.h>
@@ -32,7 +33,6 @@ int main(int argc, char **argv) {
     int32_t triesLeft = 3;
     int32_t bufferCapacity;
     int32_t framesPerBurst = 0;
-    float *buffer = nullptr;
 
     int32_t actualChannelCount = 0;
     int32_t actualSampleRate = 0;
@@ -83,7 +83,7 @@ int main(int argc, char **argv) {
         bufferCapacity, framesPerBurst);
 
         int samplesPerBurst = framesPerBurst * actualChannelCount;
-        buffer = new float[samplesPerBurst];
+        std::unique_ptr<float[]> buffer(new float[samplesPerBurst]);
 
         result = AAudioStream_requestStart(aaudioStream);
         if (result != AAUDIO_OK) {
@@ -98,7 +98,7 @@ int main(int argc, char **argv) {
         int64_t printAt = actualSampleRate;
         while (result == AAUDIO_OK && framesTotal < framesMax) {
             int32_t framesWritten = AAudioStream_write(aaudioStream,
-                                                       buffer, framesPerBurst,
+                                                       buffer.get(), framesPerBurst,
                                                        DEFAULT_TIMEOUT_NANOS);
             if (framesWritten < 0) {
                 result = framesWritten;
@@ -134,6 +134,5 @@ finish:
         AAudioStream_close(aaudioStream);
     }
     AAudioStreamBuilder_delete(aaudioBuilder);
-    delete[] buffer;
     printf("          result = %d = %s\n", result, AAudio_convertResultToText(result));
 }
