@@ -19,6 +19,9 @@ cc_test {
         "liblog",
         "libmedia",
         "libutils",
+        "libstats_media_metrics",
+        "libstatspull",
+        "libstatssocket",
     ],
     include_dirs: [
         "frameworks/av/include",
@@ -64,6 +67,9 @@ cc_test {
         "liblog",
         "libmedia",
         "libutils",
+        "libstats_media_metrics",
+        "libstatspull",
+        "libstatssocket",
     ],
     include_dirs: [
         "frameworks/av/include",

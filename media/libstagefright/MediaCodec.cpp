@@ -88,6 +88,7 @@ using Status = ::ndk::ScopedAStatus;
 using aidl::android::media::BnResourceManagerClient;
 using aidl::android::media::IResourceManagerClient;
 using aidl::android::media::IResourceManagerService;
+using aidl::android::media::ClientInfoParcel;
 
 // key for media statistics
 static const char *kCodecKeyName = "codec";
@@ -209,8 +210,8 @@ static const C2MemoryUsage kDefaultReadWriteUsage{
 ////////////////////////////////////////////////////////////////////////////////
 
 struct ResourceManagerClient : public BnResourceManagerClient {
-    explicit ResourceManagerClient(MediaCodec* codec, int32_t pid) :
-            mMediaCodec(codec), mPid(pid) {}
+    explicit ResourceManagerClient(MediaCodec* codec, int32_t pid, int32_t uid) :
+            mMediaCodec(codec), mPid(pid), mUid(uid) {}
 
     Status reclaimResource(bool* _aidl_return) override {
         sp<MediaCodec> codec = mMediaCodec.promote();
@@ -222,7 +223,10 @@ struct ResourceManagerClient : public BnResourceManagerClient {
             if (service == nullptr) {
                 ALOGW("MediaCodec::ResourceManagerClient unable to find ResourceManagerService");
             }
-            service->removeClient(mPid, getId(this));
+            ClientInfoParcel clientInfo{.pid = static_cast<int32_t>(mPid),
+                                .uid = static_cast<int32_t>(mUid),
+                                .id = getId(this)};
+            service->removeClient(clientInfo);
             *_aidl_return = true;
             return Status::ok();
         }
@@ -260,6 +264,7 @@ struct ResourceManagerClient : public BnResourceManagerClient {
 private:
     wp<MediaCodec> mMediaCodec;
     int32_t mPid;
+    int32_t mUid;
 
     DISALLOW_EVIL_CONSTRUCTORS(ResourceManagerClient);
 };
@@ -285,10 +290,15 @@ struct MediaCodec::ResourceManagerServiceProxy : public RefBase {
     void markClientForPendingRemoval();
     bool reclaimResource(const std::vector<MediaResourceParcel> &resources);
 
+    inline void setCodecName(const char* name) {
+        mCodecName = name;
+    }
+
 private:
     Mutex mLock;
     pid_t mPid;
     uid_t mUid;
+    std::string mCodecName;
     std::shared_ptr<IResourceManagerService> mService;
     std::shared_ptr<IResourceManagerClient> mClient;
     ::ndk::ScopedAIBinder_DeathRecipient mDeathRecipient;
@@ -392,7 +402,11 @@ void MediaCodec::ResourceManagerServiceProxy::addResource(
     if (mService == nullptr) {
         return;
     }
-    mService->addResource(mPid, mUid, getId(mClient), mClient, resources);
+    ClientInfoParcel clientInfo{.pid = static_cast<int32_t>(mPid),
+                                .uid = static_cast<int32_t>(mUid),
+                                .id = getId(mClient),
+                                .name = mCodecName};
+    mService->addResource(clientInfo, mClient, resources);
 }
 
 void MediaCodec::ResourceManagerServiceProxy::removeResource(
@@ -404,7 +418,11 @@ void MediaCodec::ResourceManagerServiceProxy::removeResource(
     if (mService == nullptr) {
         return;
     }
-    mService->removeResource(mPid, getId(mClient), resources);
+    ClientInfoParcel clientInfo{.pid = static_cast<int32_t>(mPid),
+                                .uid = static_cast<int32_t>(mUid),
+                                .id = getId(mClient),
+                                .name = mCodecName};
+    mService->removeResource(clientInfo, resources);
 }
 
 void MediaCodec::ResourceManagerServiceProxy::removeClient() {
@@ -412,7 +430,11 @@ void MediaCodec::ResourceManagerServiceProxy::removeClient() {
     if (mService == nullptr) {
         return;
     }
-    mService->removeClient(mPid, getId(mClient));
+    ClientInfoParcel clientInfo{.pid = static_cast<int32_t>(mPid),
+                                .uid = static_cast<int32_t>(mUid),
+                                .id = getId(mClient),
+                                .name = mCodecName};
+    mService->removeClient(clientInfo);
 }
 
 void MediaCodec::ResourceManagerServiceProxy::markClientForPendingRemoval() {
@@ -420,7 +442,11 @@ void MediaCodec::ResourceManagerServiceProxy::markClientForPendingRemoval() {
     if (mService == nullptr) {
         return;
     }
-    mService->markClientForPendingRemoval(mPid, getId(mClient));
+    ClientInfoParcel clientInfo{.pid = static_cast<int32_t>(mPid),
+                                .uid = static_cast<int32_t>(mUid),
+                                .id = getId(mClient),
+                                .name = mCodecName};
+    mService->markClientForPendingRemoval(clientInfo);
 }
 
 bool MediaCodec::ResourceManagerServiceProxy::reclaimResource(
@@ -430,7 +456,11 @@ bool MediaCodec::ResourceManagerServiceProxy::reclaimResource(
         return false;
     }
     bool success;
-    Status status = mService->reclaimResource(mPid, resources, &success);
+    ClientInfoParcel clientInfo{.pid = static_cast<int32_t>(mPid),
+                                .uid = static_cast<int32_t>(mUid),
+                                .id = getId(mClient),
+                                .name = mCodecName};
+    Status status = mService->reclaimResource(clientInfo, resources, &success);
     return status.isOk() && success;
 }
 
@@ -835,7 +865,7 @@ MediaCodec::MediaCodec(
       mGetCodecBase(getCodecBase),
       mGetCodecInfo(getCodecInfo) {
     mResourceManagerProxy = new ResourceManagerServiceProxy(pid, uid,
-            ::ndk::SharedRefBase::make<ResourceManagerClient>(this, pid));
+            ::ndk::SharedRefBase::make<ResourceManagerClient>(this, pid, uid));
     if (!mGetCodecBase) {
         mGetCodecBase = [](const AString &name, const char *owner) {
             return GetCodecBase(name, owner);
@@ -1606,6 +1636,11 @@ status_t MediaCodec::init(const AString &name) {
 
     std::vector<MediaResourceParcel> resources;
     resources.push_back(MediaResource::CodecResource(secureCodec, toMediaResourceSubType(mDomain)));
+
+    // If the ComponentName is not set yet, use the name passed by the user.
+    if (mComponentName.empty()) {
+        mResourceManagerProxy->setCodecName(name.c_str());
+    }
     for (int i = 0; i <= kMaxRetry; ++i) {
         if (i > 0) {
             // Don't try to reclaim resource for the first time.
@@ -3387,6 +3422,8 @@ void MediaCodec::onMessageReceived(const sp<AMessage> &msg) {
                     if (mComponentName.c_str()) {
                         mediametrics_setCString(mMetricsHandle, kCodecCodec,
                                                 mComponentName.c_str());
+                        // Update the codec name.
+                        mResourceManagerProxy->setCodecName(mComponentName.c_str());
                     }
 
                     const char *owner = mCodecInfo ? mCodecInfo->getOwnerName() : "";
