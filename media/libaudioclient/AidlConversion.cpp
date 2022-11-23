@@ -839,6 +839,15 @@ const detail::AudioFormatPairs& getAudioFormatPairs() {
         {
             AUDIO_FORMAT_DTS_HD, make_AudioFormatDescription(MEDIA_MIMETYPE_AUDIO_DTS_HD)
         },
+        {
+            AUDIO_FORMAT_DTS_HD_MA, make_AudioFormatDescription(MEDIA_MIMETYPE_AUDIO_DTS_HD_MA)
+        },
+        {
+            AUDIO_FORMAT_DTS_UHD, make_AudioFormatDescription(MEDIA_MIMETYPE_AUDIO_DTS_UHD_P1)
+        },
+        {
+            AUDIO_FORMAT_DTS_UHD_P2, make_AudioFormatDescription(MEDIA_MIMETYPE_AUDIO_DTS_UHD_P2)
+        },
         // In the future, we would like to represent encapsulated bitstreams as
         // nested AudioFormatDescriptions. The legacy 'AUDIO_FORMAT_IEC61937' type doesn't
         // specify the format of the encapsulated bitstream.
@@ -1032,9 +1041,6 @@ const detail::AudioFormatPairs& getAudioFormatPairs() {
         {
             AUDIO_FORMAT_IEC60958,
             make_AudioFormatDescription(PcmType::INT_24_BIT, MEDIA_MIMETYPE_AUDIO_IEC60958)
-        },
-        {
-            AUDIO_FORMAT_DTS_UHD, make_AudioFormatDescription(MEDIA_MIMETYPE_AUDIO_DTS_UHD)
         },
         {
             AUDIO_FORMAT_DRA, make_AudioFormatDescription(MEDIA_MIMETYPE_AUDIO_DRA)
