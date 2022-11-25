@@ -410,6 +410,13 @@ private:
         kBufferRendered,
     };
 
+    enum class DequeueOutputResult {
+        kNoBuffer,
+        kDiscardedBuffer,
+        kRepliedWithError,
+        kSuccess,
+    };
+
     struct ResourceManagerServiceProxy;
 
     State mState;
@@ -556,7 +563,9 @@ private:
             sp<MediaCodecBuffer> *buffer, sp<AMessage> *format);
 
     bool handleDequeueInputBuffer(const sp<AReplyToken> &replyID, bool newRequest = false);
-    bool handleDequeueOutputBuffer(const sp<AReplyToken> &replyID, bool newRequest = false);
+    DequeueOutputResult handleDequeueOutputBuffer(
+            const sp<AReplyToken> &replyID,
+            bool newRequest = false);
     void cancelPendingDequeueOperations();
 
     void extractCSD(const sp<AMessage> &format);
@@ -640,6 +649,7 @@ private:
 
     void statsBufferSent(int64_t presentationUs, const sp<MediaCodecBuffer> &buffer);
     void statsBufferReceived(int64_t presentationUs, const sp<MediaCodecBuffer> &buffer);
+    bool discardDecodeOnlyOutputBuffer(size_t index);
 
     enum {
         // the default shape of our latency histogram buckets
