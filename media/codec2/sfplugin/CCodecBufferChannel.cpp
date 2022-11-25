@@ -1998,6 +1998,12 @@ bool CCodecBufferChannel::handleWork(
         drop = true;
     }
 
+    // Workaround: if C2FrameData::FLAG_DROP_FRAME is not implemented in
+    // HAL, the flag is then removed in the corresponding output buffer.
+    if (work->input.flags & C2FrameData::FLAG_DROP_FRAME) {
+        flags |= BUFFER_FLAG_DECODE_ONLY;
+    }
+
     if (notifyClient && !buffer && !flags) {
         if (mTunneled && drop && outputFormat) {
             ALOGV("[%s] onWorkDone: Keep tunneled, drop frame with format change (%lld)",

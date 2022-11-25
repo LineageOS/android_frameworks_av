@@ -642,6 +642,9 @@ void ACodecBufferChannel::drainThisBuffer(
     if (omxFlags & OMX_BUFFERFLAG_EOS) {
         flags |= MediaCodec::BUFFER_FLAG_EOS;
     }
+    if (omxFlags & OMX_BUFFERFLAG_DECODEONLY) {
+        flags |= MediaCodec::BUFFER_FLAG_DECODE_ONLY;
+    }
     it->mClientBuffer->meta()->setInt32("flags", flags);
 
     mCallback->onOutputBufferAvailable(
