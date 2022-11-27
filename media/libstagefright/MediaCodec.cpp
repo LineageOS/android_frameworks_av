@@ -4700,7 +4700,7 @@ void MediaCodec::handleOutputFormatChangeIfNeeded(const sp<MediaCodecBuffer> &bu
         // rendering.
         int32_t dataSpace;
         if (mOutputFormat->findInt32("android._dataspace", &dataSpace)) {
-            ALOGD("[%s] setting dataspace on output surface to #%x",
+            ALOGD("[%s] setting dataspace on output surface to %#x",
                     mComponentName.c_str(), dataSpace);
             int err = native_window_set_buffers_data_space(
                     mSurface.get(), (android_dataspace)dataSpace);

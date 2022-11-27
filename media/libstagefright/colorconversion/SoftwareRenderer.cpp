@@ -441,7 +441,7 @@ skip_copying:
                     ((dataSpace & ~HAL_DATASPACE_RANGE_MASK) | HAL_DATASPACE_RANGE_FULL);
         }
 
-        ALOGD("setting dataspace on output surface to #%x", dataSpace);
+        ALOGD("setting dataspace on output surface to %#x", dataSpace);
         if ((err = native_window_set_buffers_data_space(mNativeWindow.get(), dataSpace))) {
             ALOGW("failed to set dataspace on surface (%d)", err);
         }
