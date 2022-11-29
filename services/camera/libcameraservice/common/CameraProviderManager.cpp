@@ -1353,6 +1353,19 @@ status_t CameraProviderManager::ProviderInfo::DeviceInfo3::addRotateCropTags() {
     return res;
 }
 
+status_t CameraProviderManager::ProviderInfo::DeviceInfo3::addAutoframingTags() {
+    status_t res = OK;
+    auto& c = mCameraCharacteristics;
+
+    auto availableAutoframingEntry = c.find(ANDROID_CONTROL_AUTOFRAMING_AVAILABLE);
+    if (availableAutoframingEntry.count == 0) {
+        uint8_t  defaultAutoframingEntry = ANDROID_CONTROL_AUTOFRAMING_AVAILABLE_FALSE;
+        res = c.update(ANDROID_CONTROL_AUTOFRAMING_AVAILABLE,
+                &defaultAutoframingEntry, 1);
+    }
+    return res;
+}
+
 status_t CameraProviderManager::ProviderInfo::DeviceInfo3::addPreCorrectionActiveArraySize() {
     status_t res = OK;
     auto& c = mCameraCharacteristics;
