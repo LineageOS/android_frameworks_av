@@ -17,11 +17,13 @@
 //#define LOG_NDEBUG 0
 #define LOG_TAG "C2Encoder"
 
+#include <memory>
+
 #include "C2Encoder.h"
 
 int32_t C2Encoder::createCodec2Component(string compName, AMediaFormat *format) {
     ALOGV("In %s", __func__);
-    mListener.reset(new CodecListener(
+    mListener.reset(new (std::nothrow) CodecListener(
             [this](std::list<std::unique_ptr<C2Work>> &workItems) { handleWorkDone(workItems); }));
     if (!mListener) return -1;
 
@@ -125,7 +127,7 @@ int32_t C2Encoder::encodeFrames(ifstream &eleStream, size_t inputBufferSize) {
     }
     int32_t numFrames = (inputBufferSize + frameSize - 1) / frameSize;
     // Temporary buffer to read data from the input file
-    char *data = (char *)malloc(frameSize);
+    std::unique_ptr<char[]> data(new (std::nothrow) char[frameSize]);
     if (!data) {
         ALOGE("Insufficient memory to read from input file");
         return -1;
@@ -169,7 +171,7 @@ int32_t C2Encoder::encodeFrames(ifstream &eleStream, size_t inputBufferSize) {
         if (inputBufferSize - offset < frameSize) {
             frameSize = inputBufferSize - offset;
         }
-        eleStream.read(data, frameSize);
+        eleStream.read(data.get(), frameSize);
         if (eleStream.gcount() != frameSize) {
             ALOGE("read() from file failed. Incorrect bytes read");
             return -1;
@@ -191,8 +193,8 @@ int32_t C2Encoder::encodeFrames(ifstream &eleStream, size_t inputBufferSize) {
                     return view.error();
                 }
 
-                memcpy(view.base(), data, frameSize);
-                work->input.buffers.emplace_back(new LinearBuffer(block));
+                memcpy(view.base(), data.get(), frameSize);
+                work->input.buffers.emplace_back(new (std::nothrow) LinearBuffer(block));
             } else {
                 std::shared_ptr<C2GraphicBlock> block;
                 status = mGraphicPool->fetchGraphicBlock(
@@ -211,16 +213,16 @@ int32_t C2Encoder::encodeFrames(ifstream &eleStream, size_t inputBufferSize) {
                 uint8_t *pY = view.data()[C2PlanarLayout::PLANE_Y];
                 uint8_t *pU = view.data()[C2PlanarLayout::PLANE_U];
                 uint8_t *pV = view.data()[C2PlanarLayout::PLANE_V];
-                memcpy(pY, data, mWidth * mHeight);
-                memcpy(pU, data + mWidth * mHeight, (mWidth * mHeight >> 2));
-                memcpy(pV, data + (mWidth * mHeight * 5 >> 2), mWidth * mHeight >> 2);
-                work->input.buffers.emplace_back(new GraphicBuffer(block));
+                memcpy(pY, data.get(), mWidth * mHeight);
+                memcpy(pU, data.get() + mWidth * mHeight, (mWidth * mHeight >> 2));
+                memcpy(pV, data.get() + (mWidth * mHeight * 5 >> 2), mWidth * mHeight >> 2);
+                work->input.buffers.emplace_back(new (std::nothrow) GraphicBuffer(block));
             }
             mStats->addFrameSize(frameSize);
         }
 
         work->worklets.clear();
-        work->worklets.emplace_back(new C2Worklet);
+        work->worklets.emplace_back(new (std::nothrow) C2Worklet);
 
         std::list<std::unique_ptr<C2Work>> items;
         items.push_back(std::move(work));
@@ -234,7 +236,6 @@ int32_t C2Encoder::encodeFrames(ifstream &eleStream, size_t inputBufferSize) {
         numFrames--;
         mNumInputFrame++;
     }
-    free(data);
     return status;
 }
 
