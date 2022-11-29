@@ -19,6 +19,7 @@
 
 #include <jni.h>
 #include <fstream>
+#include <memory>
 #include <stdio.h>
 #include <string.h>
 #include <sys/stat.h>
@@ -42,7 +43,7 @@ extern "C" JNIEXPORT int JNICALL Java_com_android_media_benchmark_library_Native
         return -1;
     }
 
-    Decoder *decoder = new Decoder();
+    std::unique_ptr<Decoder> decoder(new (std::nothrow) Decoder());
     Extractor *extractor = decoder->getExtractor();
     if (!extractor) {
         ALOGE("Extractor creation failed");
@@ -125,6 +126,5 @@ extern "C" JNIEXPORT int JNICALL Java_com_android_media_benchmark_library_Native
         inputFp = nullptr;
     }
     extractor->deInitExtractor();
-    delete decoder;
     return 0;
 }

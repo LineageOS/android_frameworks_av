@@ -19,6 +19,7 @@
 
 #include <jni.h>
 #include <fstream>
+#include <memory>
 #include <string>
 #include <sys/stat.h>
 
@@ -47,7 +48,7 @@ extern "C" JNIEXPORT int32_t JNICALL Java_com_android_media_benchmark_library_Na
         return MUXER_OUTPUT_FORMAT_INVALID;
     }
 
-    Muxer *muxerObj = new Muxer();
+    std::unique_ptr<Muxer> muxerObj(new (std::nothrow) Muxer());
     Extractor *extractor = muxerObj->getExtractor();
     if (!extractor) {
         ALOGE("Extractor creation failed");
@@ -159,7 +160,6 @@ extern "C" JNIEXPORT int32_t JNICALL Java_com_android_media_benchmark_library_Na
     }
     env->ReleaseStringUTFChars(jFormat, fmt);
     extractor->deInitExtractor();
-    delete muxerObj;
 
     return 0;
 }
