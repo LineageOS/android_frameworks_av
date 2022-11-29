@@ -46,7 +46,6 @@ AAVCAssembler::AAVCAssembler(const sp<AMessage> &notify)
       mFirstIFrameProvided(false),
       mLastCvo(-1),
       mLastIFrameProvidedAtMs(0),
-      mLastRtpTimeJitterDataUs(0),
       mWidth(0),
       mHeight(0) {
 }
@@ -123,20 +122,11 @@ ARTPAssembler::AssemblyStatus AAVCAssembler::addNALUnit(
     }
 
     sp<ABuffer> buffer = *queue->begin();
+    uint32_t seqNum = (uint32_t)buffer->int32Data();
     buffer->meta()->setObject("source", source);
 
-    /**
-     * RFC3550 calculates the interarrival jitter time for 'ALL packets'.
-     * But that is not useful as an ingredient of buffering time.
-     * Instead, we calculates the time only for all 'NAL units'.
-     */
     int64_t rtpTime = findRTPTime(firstRTPTime, buffer);
     int64_t nowTimeUs = ALooper::GetNowUs();
-    if (rtpTime != mLastRtpTimeJitterDataUs) {
-        source->putBaseJitterData(rtpTime, nowTimeUs);
-        mLastRtpTimeJitterDataUs = rtpTime;
-    }
-    source->putInterArrivalJitterData(rtpTime, nowTimeUs);
 
     const int64_t startTimeMs = source->mSysAnchorTime / 1000;
     const int64_t nowTimeMs = nowTimeUs / 1000;
@@ -168,7 +158,7 @@ ARTPAssembler::AssemblyStatus AAVCAssembler::addNALUnit(
     const int32_t dynamicJbTimeMs = std::min(dynamicJitterTimeMs, 150);
     const int64_t dynamicJbTimeRtp = MsToRtp(dynamicJbTimeMs, clockRate);
     /* Fundamental jitter time */
-    const int32_t jitterTimeMs = baseJbTimeMs;
+    const int32_t jitterTimeMs = baseJbTimeMs + dynamicJbTimeMs;
     const int64_t jitterTimeRtp = MsToRtp(jitterTimeMs, clockRate);
 
     // Till (T), this assembler waits unconditionally to collect current NAL unit
@@ -177,7 +167,7 @@ ARTPAssembler::AssemblyStatus AAVCAssembler::addNALUnit(
     bool isExpired = (diffTimeRtp >= 0);                    // It's expired if T is passed away
 
     // From (T), this assembler tries to complete the NAL till (T + try)
-    int32_t tryJbTimeMs = baseJitterTimeMs / 2 + dynamicJbTimeMs;
+    int32_t tryJbTimeMs = dynamicJbTimeMs;
     int64_t tryJbTimeRtp = MsToRtp(tryJbTimeMs, clockRate);
     bool isFirstLineBroken = (diffTimeRtp > tryJbTimeRtp);
 
@@ -208,10 +198,10 @@ ARTPAssembler::AssemblyStatus AAVCAssembler::addNALUnit(
         String8 info;
         info.appendFormat("RTP diff from exp =%lld \t MS diff from stamp = %lld\t\t"
                     "Seq# %d \t ExpSeq# %d \t"
-                    "JitterMs %d + (%d + %d * %.3f)",
+                    "JitterMs [%d + (~%d~)] + %d * %.3f",
                     (long long)diffTimeRtp, (long long)totalDiffTimeMs,
-                    buffer->int32Data(), mNextExpectedSeqNo,
-                    jitterTimeMs, tryJbTimeMs, dynamicJbTimeMs, JITTER_MULTIPLE);
+                    seqNum, mNextExpectedSeqNo,
+                    baseJbTimeMs, dynamicJbTimeMs, tryJbTimeMs, JITTER_MULTIPLE);
         if (isSecondLineBroken) {
             ALOGE("%s", info.string());
             printNowTimeMs(startTimeMs, nowTimeMs, playedTimeMs);
@@ -223,6 +213,9 @@ ARTPAssembler::AssemblyStatus AAVCAssembler::addNALUnit(
     }
 
     if (mNextExpectedSeqNoValid) {
+        if (mNextExpectedSeqNo > seqNum) {
+            ALOGE("Reversed exp seq# %d \t current head %d", mNextExpectedSeqNo, seqNum);
+        }
         mNextExpectedSeqNo = pickStartSeq(queue, firstRTPTime, playedTimeRtp, jitterTimeRtp);
         int32_t cntRemove = deleteUnitUnderSeq(queue, mNextExpectedSeqNo);
 
@@ -241,10 +234,10 @@ ARTPAssembler::AssemblyStatus AAVCAssembler::addNALUnit(
 
     if (!mNextExpectedSeqNoValid) {
         mNextExpectedSeqNoValid = true;
-        mNextExpectedSeqNo = (uint32_t)buffer->int32Data();
-    } else if ((uint32_t)buffer->int32Data() != mNextExpectedSeqNo) {
-        ALOGV("Not the sequence number I expected");
-
+        mNextExpectedSeqNo = seqNum;
+    } else if (seqNum != mNextExpectedSeqNo) {
+        ALOGV("Not the sequence number(%d) I expected. Actual seq# is %d",
+                mNextExpectedSeqNo, seqNum);
         return WRONG_SEQUENCE_NUMBER;
     }
 

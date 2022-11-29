@@ -44,6 +44,13 @@ struct ARTPAssembler : public RefBase {
     virtual void onByeReceived() = 0;
     virtual bool initCheck() { return true; }
 
+    // Utility functions
+    inline int64_t findRTPTime(const uint32_t& firstRTPTime, const sp<ABuffer>& buffer);
+    inline int64_t MsToRtp(int64_t ms, int64_t clockRate);
+    inline int64_t RtpToMs(int64_t rtp, int64_t clockRate);
+    inline void printNowTimeMs(int64_t start, int64_t now, int64_t play);
+    inline void printRTPTime(int64_t rtp, int64_t play, int64_t exp, bool isExp);
+
 protected:
     virtual AssemblyStatus assembleMore(const sp<ARTPSource> &source) = 0;
     virtual void packetLost() = 0;
@@ -63,13 +70,6 @@ protected:
 
     bool mShowQueue;
     int32_t mShowQueueCnt;
-
-    // Utility functions
-    inline int64_t findRTPTime(const uint32_t& firstRTPTime, const sp<ABuffer>& buffer);
-    inline int64_t MsToRtp(int64_t ms, int64_t clockRate);
-    inline int64_t RtpToMs(int64_t rtp, int64_t clockRate);
-    inline void printNowTimeMs(int64_t start, int64_t now, int64_t play);
-    inline void printRTPTime(int64_t rtp, int64_t play, int64_t exp, bool isExp);
 
 private:
     int64_t mFirstFailureTimeUs;
