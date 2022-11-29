@@ -57,6 +57,9 @@ class FrameProcessor : public FrameProcessorBase {
     virtual bool processSingleFrame(CaptureResult &frame,
                                     const sp<FrameProducer> &device);
 
+    void processLensState(const CameraMetadata &frame,
+            const sp<Camera2Client> &client);
+
     status_t processFaceDetect(const CameraMetadata &frame,
             const sp<Camera2Client> &client);
 
@@ -110,6 +113,9 @@ class FrameProcessor : public FrameProcessorBase {
     // Emit FaceDetection event to java if faces changed
     void callbackFaceDetection(const sp<Camera2Client>& client,
                                const camera_frame_metadata &metadata);
+
+    // Track most recent focal length sent by the camera device
+    float mLastFocalLength;
 };
 
 
