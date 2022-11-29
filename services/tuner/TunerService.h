@@ -77,6 +77,7 @@ public:
     ::ndk::ScopedAStatus openSharedFilter(const string& in_filterToken,
                                           const shared_ptr<ITunerFilterCallback>& in_cb,
                                           shared_ptr<ITunerFilter>* _aidl_return) override;
+    ::ndk::ScopedAStatus isLnaSupported(bool* _aidl_return) override;
     ::ndk::ScopedAStatus setLna(bool in_bEnable) override;
     ::ndk::ScopedAStatus setMaxNumberOfFrontends(FrontendType in_frontendType,
                                                  int32_t in_maxNumber) override;
