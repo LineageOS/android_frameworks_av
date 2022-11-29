@@ -20,6 +20,7 @@
 #include <fstream>
 #include <iostream>
 #include <limits>
+#include <memory>
 
 #include <android/binder_process.h>
 
@@ -38,7 +39,7 @@ TEST_P(DecoderTest, Decode) {
     FILE *inputFp = fopen(inputFile.c_str(), "rb");
     ASSERT_NE(inputFp, nullptr) << "Unable to open " << inputFile << " file for reading";
 
-    Decoder *decoder = new Decoder();
+    std::unique_ptr<Decoder> decoder(new (std::nothrow) Decoder());
     ASSERT_NE(decoder, nullptr) << "Decoder creation failed";
 
     Extractor *extractor = decoder->getExtractor();
@@ -57,7 +58,7 @@ TEST_P(DecoderTest, Decode) {
         int32_t status = extractor->setupTrackFormat(curTrack);
         ASSERT_EQ(status, 0) << "Track Format invalid";
 
-        uint8_t *inputBuffer = (uint8_t *)malloc(kMaxBufferSize);
+        std::unique_ptr<uint8_t[]> inputBuffer(new (std::nothrow) uint8_t[kMaxBufferSize]);
         ASSERT_NE(inputBuffer, nullptr) << "Insufficient memory";
 
         vector<AMediaCodecBufferInfo> frameInfo;
@@ -72,7 +73,7 @@ TEST_P(DecoderTest, Decode) {
             ASSERT_LE(inputBufferOffset + info.size, kMaxBufferSize)
                     << "Memory allocated not sufficient";
 
-            memcpy(inputBuffer + inputBufferOffset, extractor->getFrameBuf(), info.size);
+            memcpy(inputBuffer.get() + inputBufferOffset, extractor->getFrameBuf(), info.size);
             frameInfo.push_back(info);
             inputBufferOffset += info.size;
         }
@@ -80,7 +81,7 @@ TEST_P(DecoderTest, Decode) {
         string codecName = get<1>(params);
         bool asyncMode = get<2>(params);
         decoder->setupDecoder();
-        status = decoder->decode(inputBuffer, frameInfo, codecName, asyncMode);
+        status = decoder->decode(inputBuffer.get(), frameInfo, codecName, asyncMode);
         ASSERT_EQ(status, AMEDIA_OK) << "Decoder failed for " << codecName;
 
         decoder->deInitCodec();
@@ -88,12 +89,10 @@ TEST_P(DecoderTest, Decode) {
         string inputReference = get<0>(params);
         decoder->dumpStatistics(inputReference, codecName, (asyncMode ? "async" : "sync"),
                                 gEnv->getStatsFile());
-        free(inputBuffer);
         decoder->resetDecoder();
     }
     fclose(inputFp);
     extractor->deInitExtractor();
-    delete decoder;
 }
 
 // TODO: (b/140549596)
@@ -178,7 +177,7 @@ INSTANTIATE_TEST_SUITE_P(VideoDecoderAsyncTest, DecoderTest,
 
 int main(int argc, char **argv) {
     ABinderProcess_startThreadPool();
-    gEnv = new BenchmarkTestEnvironment();
+    gEnv = new (std::nothrow) BenchmarkTestEnvironment();
     ::testing::AddGlobalTestEnvironment(gEnv);
     ::testing::InitGoogleTest(&argc, argv);
     int status = gEnv->initFromOptions(argc, argv);
