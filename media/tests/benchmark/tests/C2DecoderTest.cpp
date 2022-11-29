@@ -20,6 +20,7 @@
 #include <fstream>
 #include <iostream>
 #include <limits>
+#include <memory>
 
 #include "BenchmarkTestEnvironment.h"
 #include "C2Decoder.h"
@@ -50,7 +51,7 @@ class C2DecoderTest : public ::testing::TestWithParam<pair<string, string>> {
 };
 
 void C2DecoderTest::setupC2DecoderTest() {
-    mDecoder = new C2Decoder();
+    mDecoder = new (std::nothrow) C2Decoder();
     ASSERT_NE(mDecoder, nullptr) << "C2Decoder creation failed";
 
     int32_t status = mDecoder->setupCodec2();
@@ -66,7 +67,7 @@ TEST_P(C2DecoderTest, Codec2Decode) {
     FILE *inputFp = fopen(inputFile.c_str(), "rb");
     ASSERT_NE(inputFp, nullptr) << "Unable to open " << inputFile << " file for reading";
 
-    Extractor *extractor = new Extractor();
+    std::unique_ptr<Extractor> extractor(new (std::nothrow) Extractor());
     ASSERT_NE(extractor, nullptr) << "Extractor creation failed";
 
     // Read file properties
@@ -85,7 +86,7 @@ TEST_P(C2DecoderTest, Codec2Decode) {
         int32_t status = extractor->setupTrackFormat(curTrack);
         ASSERT_EQ(status, 0) << "Track Format invalid";
 
-        uint8_t *inputBuffer = (uint8_t *)malloc(fileSize);
+        std::unique_ptr<uint8_t[]> inputBuffer(new (std::nothrow) uint8_t[fileSize]);
         ASSERT_NE(inputBuffer, nullptr) << "Insufficient memory";
 
         vector<AMediaCodecBufferInfo> frameInfo;
@@ -100,7 +101,7 @@ TEST_P(C2DecoderTest, Codec2Decode) {
             // copy the meta data and buffer to be passed to decoder
             ASSERT_LE(inputBufferOffset + info.size, fileSize) << "Memory allocated not sufficient";
 
-            memcpy(inputBuffer + inputBufferOffset, csdBuffer, info.size);
+            memcpy(inputBuffer.get() + inputBufferOffset, csdBuffer, info.size);
             frameInfo.push_back(info);
             inputBufferOffset += info.size;
             idx++;
@@ -113,7 +114,7 @@ TEST_P(C2DecoderTest, Codec2Decode) {
             // copy the meta data and buffer to be passed to decoder
             ASSERT_LE(inputBufferOffset + info.size, fileSize) << "Memory allocated not sufficient";
 
-            memcpy(inputBuffer + inputBufferOffset, extractor->getFrameBuf(), info.size);
+            memcpy(inputBuffer.get() + inputBufferOffset, extractor->getFrameBuf(), info.size);
             frameInfo.push_back(info);
             inputBufferOffset += info.size;
         }
@@ -127,7 +128,7 @@ TEST_P(C2DecoderTest, Codec2Decode) {
                 ASSERT_EQ(status, 0) << "Create component failed for " << codecName;
 
                 // Send the inputs to C2 Decoder and wait till all buffers are returned.
-                status = mDecoder->decodeFrames(inputBuffer, frameInfo);
+                status = mDecoder->decodeFrames(inputBuffer.get(), frameInfo);
                 ASSERT_EQ(status, 0) << "Decoder failed for " << codecName;
 
                 mDecoder->waitOnInputConsumption();
@@ -141,10 +142,8 @@ TEST_P(C2DecoderTest, Codec2Decode) {
                 mDecoder->resetDecoder();
             }
         }
-        free(inputBuffer);
         fclose(inputFp);
         extractor->deInitExtractor();
-        delete extractor;
         delete mDecoder;
         mDecoder = nullptr;
     }
@@ -174,7 +173,7 @@ INSTANTIATE_TEST_SUITE_P(
                           make_pair("crowd_1920x1080_25fps_4000kbps_h265.mkv", "hevc")));
 
 int main(int argc, char **argv) {
-    gEnv = new BenchmarkTestEnvironment();
+    gEnv = new (std::nothrow) BenchmarkTestEnvironment();
     ::testing::AddGlobalTestEnvironment(gEnv);
     ::testing::InitGoogleTest(&argc, argv);
     int status = gEnv->initFromOptions(argc, argv);

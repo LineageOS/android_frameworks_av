@@ -18,6 +18,7 @@
 #define LOG_TAG "encoderTest"
 
 #include <fstream>
+#include <memory>
 
 #include "BenchmarkTestEnvironment.h"
 #include "Decoder.h"
@@ -39,7 +40,7 @@ TEST_P(EncoderTest, Encode) {
     FILE *inputFp = fopen(inputFile.c_str(), "rb");
     ASSERT_NE(inputFp, nullptr) << "Unable to open " << inputFile << " file for reading";
 
-    Decoder *decoder = new Decoder();
+    std::unique_ptr<Decoder> decoder(new (std::nothrow) Decoder());
     ASSERT_NE(decoder, nullptr) << "Decoder creation failed";
 
     Extractor *extractor = decoder->getExtractor();
@@ -54,14 +55,14 @@ TEST_P(EncoderTest, Encode) {
     int32_t trackCount = extractor->initExtractor(fd, fileSize);
     ASSERT_GT(trackCount, 0) << "initExtractor failed";
 
-    Encoder *encoder = new Encoder();
+    std::unique_ptr<Encoder> encoder(new (std::nothrow) Encoder());
     ASSERT_NE(encoder, nullptr) << "Decoder creation failed";
 
     for (int curTrack = 0; curTrack < trackCount; curTrack++) {
         int32_t status = extractor->setupTrackFormat(curTrack);
         ASSERT_EQ(status, 0) << "Track Format invalid";
 
-        uint8_t *inputBuffer = (uint8_t *)malloc(kMaxBufferSize);
+        std::unique_ptr<uint8_t[]> inputBuffer(new (std::nothrow) uint8_t[kMaxBufferSize]);
         ASSERT_NE(inputBuffer, nullptr) << "Insufficient memory";
 
         vector<AMediaCodecBufferInfo> frameInfo;
@@ -76,7 +77,7 @@ TEST_P(EncoderTest, Encode) {
             ASSERT_LE(inputBufferOffset + info.size, kMaxBufferSize)
                     << "Memory allocated not sufficient";
 
-            memcpy(inputBuffer + inputBufferOffset, extractor->getFrameBuf(), info.size);
+            memcpy(inputBuffer.get() + inputBufferOffset, extractor->getFrameBuf(), info.size);
             frameInfo.push_back(info);
             inputBufferOffset += info.size;
         }
@@ -88,7 +89,7 @@ TEST_P(EncoderTest, Encode) {
                                   << " for dumping decoder's output";
 
         decoder->setupDecoder();
-        status = decoder->decode(inputBuffer, frameInfo, decName, false /*asyncMode */, outFp);
+        status = decoder->decode(inputBuffer.get(), frameInfo, decName, false /*asyncMode */, outFp);
         ASSERT_EQ(status, AMEDIA_OK) << "Decode returned error : " << status;
         AMediaFormat *decoderFormat = decoder->getFormat();
 
@@ -154,13 +155,10 @@ TEST_P(EncoderTest, Encode) {
         }
         encoder->resetEncoder();
         decoder->deInitCodec();
-        free(inputBuffer);
         decoder->resetDecoder();
     }
-    delete encoder;
     fclose(inputFp);
     extractor->deInitExtractor();
-    delete decoder;
 }
 
 INSTANTIATE_TEST_SUITE_P(
@@ -220,7 +218,7 @@ INSTANTIATE_TEST_SUITE_P(VideoEncoderAsyncTest, EncoderTest,
                                             "c2.android.hevc.encoder", true)));
 
 int main(int argc, char **argv) {
-    gEnv = new BenchmarkTestEnvironment();
+    gEnv = new (std::nothrow) BenchmarkTestEnvironment();
     ::testing::AddGlobalTestEnvironment(gEnv);
     ::testing::InitGoogleTest(&argc, argv);
     int status = gEnv->initFromOptions(argc, argv);
