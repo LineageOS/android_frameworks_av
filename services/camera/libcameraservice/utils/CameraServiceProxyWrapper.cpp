@@ -147,6 +147,21 @@ int CameraServiceProxyWrapper::getRotateAndCropOverride(String16 packageName, in
     return ret;
 }
 
+int CameraServiceProxyWrapper::getAutoframingOverride(const String16& packageName) {
+    sp<ICameraServiceProxy> proxyBinder = getCameraServiceProxy();
+    if (proxyBinder == nullptr) {
+        return ANDROID_CONTROL_AUTOFRAMING_OFF;
+    }
+    int ret = 0;
+    auto status = proxyBinder->getAutoframingOverride(packageName, &ret);
+    if (!status.isOk()) {
+        ALOGE("%s: Failed during autoframing override query: %s", __FUNCTION__,
+                status.exceptionMessage().c_str());
+    }
+
+    return ret;
+}
+
 void CameraServiceProxyWrapper::logStreamConfigured(const String8& id,
         int operatingMode, bool internalConfig, int32_t latencyMs) {
     std::shared_ptr<CameraSessionStatsWrapper> sessionStats;
