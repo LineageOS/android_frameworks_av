@@ -18,6 +18,7 @@
 #include <stdio.h>
 #include <stdlib.h>
 #include <fcntl.h>
+#include <memory>
 #include <string.h>
 #include <sys/mman.h>
 #include <sys/stat.h>
@@ -474,7 +475,7 @@ int main(int argc, char* argv[]) {
     // mono takes left channel only (out of stereo output pair)
     // stereo and multichannel preserve all channels.
     int32_t* out = (int32_t*) output_vaddr;
-    int16_t* convert = (int16_t*) malloc(output_frames * channels * sizeof(int16_t));
+    std::unique_ptr<int16_t[]> convert(new int16_t[output_frames * channels]);
 
     const int volumeShift = 12; // shift requirement for Q4.27 to Q.15
     // round to half towards zero and saturate at int16 (non-dithered)
@@ -509,7 +510,7 @@ int main(int argc, char* argv[]) {
         perror(file_out);
         return EXIT_FAILURE;
     }
-    (void) sf_writef_short(sf, convert, output_frames);
+    (void) sf_writef_short(sf, convert.get(), output_frames);
     sf_close(sf);
 
     return EXIT_SUCCESS;
