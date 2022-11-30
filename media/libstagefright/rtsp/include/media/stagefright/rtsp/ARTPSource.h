@@ -82,8 +82,6 @@ struct ARTPSource : public RefBase {
     int32_t getBaseJitterTimeMs();
     int32_t getInterArrivalJitterTimeMs();
     void setStaticJitterTimeMs(const uint32_t jbTimeMs);
-    void putBaseJitterData(uint32_t timeStamp, int64_t arrivalTime);
-    void putInterArrivalJitterData(uint32_t timeStamp, int64_t arrivalTime);
     void setJbTimer(const sp<AMessage> timer);
     void setJbAlarmTime(int64_t nowTimeUs, int64_t alarmAfterUs);
 
