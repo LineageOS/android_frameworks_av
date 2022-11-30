@@ -41,7 +41,7 @@ using NativeHandleAidlCommon = ::aidl::android::hardware::common::NativeHandle;
 using ::aidl::android::hardware::drm::DecryptArgs;
 
 using ::android::sp;
-using ::android::DrmUtils::statusAidlToStatusT;
+using ::android::DrmUtils::statusAidlToDrmStatus;
 using ::android::hardware::hidl_array;
 using ::android::hardware::hidl_handle;
 using ::android::hardware::hidl_memory;
@@ -268,7 +268,7 @@ status_t CryptoHalAidl::setMediaDrmSession(const Vector<uint8_t>& sessionId) {
     }
 
     auto err = mPlugin->setMediaDrmSession(toStdVec(sessionId));
-    return statusAidlToStatusT(err);
+    return statusAidlToDrmStatus(err);
 }
 
 ssize_t CryptoHalAidl::decrypt(const uint8_t keyId[16], const uint8_t iv[16],
@@ -352,7 +352,7 @@ ssize_t CryptoHalAidl::decrypt(const uint8_t keyId[16], const uint8_t iv[16],
     int32_t result = 0;
     ::ndk::ScopedAStatus statusAidl = mPlugin->decrypt(args, &result);
 
-    err = statusAidlToStatusT(statusAidl);
+    err = statusAidlToDrmStatus(statusAidl);
     std::string msgStr(statusAidl.getMessage());
     if (errorDetailMsg != nullptr) {
         *errorDetailMsg = toString8(msgStr);
