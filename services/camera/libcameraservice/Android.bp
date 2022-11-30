@@ -57,7 +57,6 @@ cc_library_shared {
         "api1/client2/StreamingProcessor.cpp",
         "api1/client2/JpegProcessor.cpp",
         "api1/client2/CallbackProcessor.cpp",
-        "api1/client2/JpegCompressor.cpp",
         "api1/client2/CaptureSequencer.cpp",
         "api1/client2/ZslProcessor.cpp",
         "api2/CameraDeviceClient.cpp",
