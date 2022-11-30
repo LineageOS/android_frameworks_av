@@ -354,6 +354,29 @@ void sendCaptureResult(
         }
     }
 
+    // Fix up autoframing metadata
+    camera_metadata_entry autoframingEntry =
+            captureResult.mMetadata.find(ANDROID_CONTROL_AUTOFRAMING);
+    if (autoframingEntry.count == 0) {
+        const uint8_t defaultAutoframingEntry = ANDROID_CONTROL_AUTOFRAMING_OFF;
+        if (captureResult.mMetadata.update(ANDROID_CONTROL_AUTOFRAMING,
+                &defaultAutoframingEntry, 1) != OK) {
+            SET_ERR("Failed to set autoframing mode in metadata for frame %d", frameNumber);
+            return;
+        }
+    }
+
+    camera_metadata_entry autoframingStateEntry =
+            captureResult.mMetadata.find(ANDROID_CONTROL_AUTOFRAMING_STATE);
+    if (autoframingStateEntry.count == 0) {
+        const uint8_t defaultAutoframingStateEntry = ANDROID_CONTROL_AUTOFRAMING_STATE_INACTIVE;
+        if (captureResult.mMetadata.update(ANDROID_CONTROL_AUTOFRAMING_STATE,
+                &defaultAutoframingStateEntry, 1) != OK) {
+            SET_ERR("Failed to set autoframing state in metadata for frame %d", frameNumber);
+            return;
+        }
+    }
+
     for (auto& physicalMetadata : captureResult.mPhysicalMetadatas) {
         String8 cameraId8(physicalMetadata.mPhysicalCameraId);
         auto mapper = states.distortionMappers.find(cameraId8.c_str());

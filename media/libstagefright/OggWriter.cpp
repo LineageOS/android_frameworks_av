@@ -242,13 +242,15 @@ status_t OggWriter::reset() {
 
     mDone = true;
 
-    void* dummy;
-    pthread_join(mThread, &dummy);
+    status_t status = mSource->stop();
 
-    status_t err = static_cast<status_t>(reinterpret_cast<uintptr_t>(dummy));
+    void *pthread_res;
+    pthread_join(mThread, &pthread_res);
+
+    status_t err = static_cast<status_t>(reinterpret_cast<uintptr_t>(pthread_res));
     {
-        status_t status = mSource->stop();
-        if (err == OK && (status != OK && status != ERROR_END_OF_STREAM)) {
+        if (err == OK &&
+            (status != OK && status != ERROR_END_OF_STREAM)) {
             err = status;
         }
     }

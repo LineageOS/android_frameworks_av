@@ -302,6 +302,11 @@ binder_status_t TunerHidlService::instantiate() {
     return ::ndk::ScopedAStatus::ok();
 }
 
+::ndk::ScopedAStatus TunerHidlService::isLnaSupported(bool* /* _aidl_return */) {
+    return ::ndk::ScopedAStatus::fromServiceSpecificError(
+            static_cast<int32_t>(Result::UNAVAILABLE));
+}
+
 ::ndk::ScopedAStatus TunerHidlService::setLna(bool bEnable) {
     if (mTuner == nullptr) {
         ALOGE("get ITuner failed");

@@ -644,6 +644,11 @@ HidlProviderInfo::HidlDeviceInfo3::HidlDeviceInfo3(
         ALOGE("%s: Unable to add default SCALER_ROTATE_AND_CROP tags: %s (%d)", __FUNCTION__,
                 strerror(-res), res);
     }
+    res = addAutoframingTags();
+    if (OK != res) {
+        ALOGE("%s: Unable to add default AUTOFRAMING tags: %s (%d)", __FUNCTION__,
+                strerror(-res), res);
+    }
     res = addPreCorrectionActiveArraySize();
     if (OK != res) {
         ALOGE("%s: Unable to add PRE_CORRECTION_ACTIVE_ARRAY_SIZE: %s (%d)", __FUNCTION__,
