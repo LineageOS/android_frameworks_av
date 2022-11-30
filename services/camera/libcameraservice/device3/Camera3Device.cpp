@@ -1461,6 +1461,13 @@ status_t Camera3Device::createDefaultRequest(camera_request_template_t templateI
                     &kDefaultJpegQuality, 1);
         }
 
+        // Fill in AUTOFRAMING if not available
+        if (!mRequestTemplateCache[templateId].exists(ANDROID_CONTROL_AUTOFRAMING)) {
+            static const uint8_t kDefaultAutoframingMode = ANDROID_CONTROL_AUTOFRAMING_OFF;
+            mRequestTemplateCache[templateId].update(ANDROID_CONTROL_AUTOFRAMING,
+                    &kDefaultAutoframingMode, 1);
+        }
+
         *request = mRequestTemplateCache[templateId];
         mLastTemplateId = templateId;
     }

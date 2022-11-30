@@ -20,6 +20,7 @@
 
 #include <fstream>
 #include <iostream>
+#include <memory>
 
 #include "BenchmarkTestEnvironment.h"
 #include "Muxer.h"
@@ -59,7 +60,7 @@ TEST_P(MuxerTest, Mux) {
     MUXER_OUTPUT_T outputFormat = getMuxerOutFormat(fmt);
     ASSERT_NE(outputFormat, MUXER_OUTPUT_FORMAT_INVALID) << "Invalid muxer output format";
 
-    Muxer *muxerObj = new Muxer();
+    std::unique_ptr<Muxer> muxerObj(new (std::nothrow) Muxer());
     ASSERT_NE(muxerObj, nullptr) << "Muxer creation failed";
 
     Extractor *extractor = muxerObj->getExtractor();
@@ -78,7 +79,7 @@ TEST_P(MuxerTest, Mux) {
         int32_t status = extractor->setupTrackFormat(curTrack);
         ASSERT_EQ(status, 0) << "Track Format invalid";
 
-        uint8_t *inputBuffer = (uint8_t *)malloc(kMaxBufferSize);
+        std::unique_ptr<uint8_t[]> inputBuffer(new (std::nothrow) uint8_t[kMaxBufferSize]);
         ASSERT_NE(inputBuffer, nullptr) << "Insufficient memory";
 
         // AMediaCodecBufferInfo : <size of frame> <flags> <presentationTimeUs> <offset>
@@ -94,7 +95,7 @@ TEST_P(MuxerTest, Mux) {
             ASSERT_LE(inputBufferOffset + info.size, kMaxBufferSize)
                     << "Memory allocated not sufficient";
 
-            memcpy(inputBuffer + inputBufferOffset, extractor->getFrameBuf(), info.size);
+            memcpy(inputBuffer.get() + inputBufferOffset, extractor->getFrameBuf(), info.size);
             info.offset = inputBufferOffset;
             frameInfos.push_back(info);
             inputBufferOffset += info.size;
@@ -109,18 +110,16 @@ TEST_P(MuxerTest, Mux) {
         status = muxerObj->initMuxer(fd, outputFormat);
         ASSERT_EQ(status, 0) << "initMuxer failed";
 
-        status = muxerObj->mux(inputBuffer, frameInfos);
+        status = muxerObj->mux(inputBuffer.get(), frameInfos);
         ASSERT_EQ(status, 0) << "Mux failed";
 
         muxerObj->deInitMuxer();
         muxerObj->dumpStatistics(GetParam().first + "." + fmt.c_str(), fmt, gEnv->getStatsFile());
-        free(inputBuffer);
         fclose(outputFp);
         muxerObj->resetMuxer();
     }
     fclose(inputFp);
     extractor->deInitExtractor();
-    delete muxerObj;
 }
 
 INSTANTIATE_TEST_SUITE_P(
@@ -146,7 +145,7 @@ INSTANTIATE_TEST_SUITE_P(
                           make_pair("bbb_16000hz_1ch_9kbps_amrwb_5mins.3gp", "3gpp")));
 
 int main(int argc, char **argv) {
-    gEnv = new BenchmarkTestEnvironment();
+    gEnv = new (std::nothrow) BenchmarkTestEnvironment();
     ::testing::AddGlobalTestEnvironment(gEnv);
     ::testing::InitGoogleTest(&argc, argv);
     int status = gEnv->initFromOptions(argc, argv);

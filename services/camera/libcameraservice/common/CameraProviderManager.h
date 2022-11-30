@@ -669,6 +669,7 @@ private:
             status_t addDynamicDepthTags(bool maxResolution = false);
             status_t deriveHeicTags(bool maxResolution = false);
             status_t addRotateCropTags();
+            status_t addAutoframingTags();
             status_t addPreCorrectionActiveArraySize();
             status_t addReadoutTimestampTag(bool readoutTimestampSupported = true);
 

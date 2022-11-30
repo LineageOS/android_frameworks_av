@@ -194,6 +194,11 @@ binder_status_t TunerService::instantiate() {
     return ::ndk::ScopedAStatus::ok();
 }
 
+::ndk::ScopedAStatus TunerService::isLnaSupported(bool* _aidl_return) {
+    ALOGV("isLnaSupported");
+    return mTuner->isLnaSupported(_aidl_return);
+}
+
 ::ndk::ScopedAStatus TunerService::setLna(bool bEnable) {
     return mTuner->setLna(bEnable);
 }
