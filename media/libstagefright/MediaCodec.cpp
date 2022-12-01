@@ -808,6 +808,8 @@ MediaCodec::MediaCodec(
         };
     }
 
+    // we want an empty metrics record for any early getMetrics() call
+    // this should be the *only* initMediametrics() call that's not on the Looper thread
     initMediametrics();
 }
 
@@ -816,8 +818,17 @@ MediaCodec::~MediaCodec() {
     mResourceManagerProxy->removeClient();
 
     flushMediametrics();
+
+    // clean any saved metrics info we stored as part of configure()
+    if (mConfigureMsg != nullptr) {
+        mediametrics_handle_t metricsHandle;
+        if (mConfigureMsg->findInt64("metrics", &metricsHandle)) {
+            mediametrics_delete(metricsHandle);
+        }
+    }
 }
 
+// except for in constructor, called from the looper thread (and therefore mutexed)
 void MediaCodec::initMediametrics() {
     if (mMetricsHandle == 0) {
         mMetricsHandle = mediametrics_create(kCodecKeyName);
@@ -847,10 +858,11 @@ void MediaCodec::initMediametrics() {
 }
 
 void MediaCodec::updateMediametrics() {
-    ALOGV("MediaCodec::updateMediametrics");
     if (mMetricsHandle == 0) {
         return;
     }
+
+    Mutex::Autolock _lock(mMetricsLock);
 
     if (mLatencyHist.getCount() != 0 ) {
         mediametrics_setInt64(mMetricsHandle, kCodecLatencyMax, mLatencyHist.getMax());
@@ -904,6 +916,8 @@ void MediaCodec::updateMediametrics() {
 #endif
 }
 
+// called to update info being passed back via getMetrics(), which is a
+// unique copy for that call, no concurrent access worries.
 void MediaCodec::updateEphemeralMediametrics(mediametrics_handle_t item) {
     ALOGD("MediaCodec::updateEphemeralMediametrics()");
 
@@ -943,7 +957,13 @@ void MediaCodec::updateEphemeralMediametrics(mediametrics_handle_t item) {
 }
 
 void MediaCodec::flushMediametrics() {
+    ALOGD("flushMediametrics");
+
+    // update does its own mutex locking
     updateMediametrics();
+
+    // ensure mutex while we do our own work
+    Mutex::Autolock _lock(mMetricsLock);
     if (mMetricsHandle != 0) {
         if (mediametrics_count(mMetricsHandle) > 0) {
             mediametrics_selfRecord(mMetricsHandle);
@@ -1436,6 +1456,8 @@ status_t MediaCodec::init(const AString &name) {
     }
     msg->setString("name", name);
 
+    // initial naming setup covers the period before the first call to ::configure().
+    // after that, we manage this through ::configure() and the setup message.
     if (mMetricsHandle != 0) {
         mediametrics_setCString(mMetricsHandle, kCodecCodec, name.c_str());
         mediametrics_setCString(mMetricsHandle, kCodecMode,
@@ -1510,23 +1532,29 @@ status_t MediaCodec::configure(
         const sp<IDescrambler> &descrambler,
         uint32_t flags) {
     sp<AMessage> msg = new AMessage(kWhatConfigure, this);
+    mediametrics_handle_t nextMetricsHandle = mediametrics_create(kCodecKeyName);
 
     // TODO: validity check log-session-id: it should be a 32-hex-digit.
     format->findString("log-session-id", &mLogSessionId);
 
-    if (mMetricsHandle != 0) {
+    if (nextMetricsHandle != 0) {
         int32_t profile = 0;
         if (format->findInt32("profile", &profile)) {
-            mediametrics_setInt32(mMetricsHandle, kCodecProfile, profile);
+            mediametrics_setInt32(nextMetricsHandle, kCodecProfile, profile);
         }
         int32_t level = 0;
         if (format->findInt32("level", &level)) {
-            mediametrics_setInt32(mMetricsHandle, kCodecLevel, level);
+            mediametrics_setInt32(nextMetricsHandle, kCodecLevel, level);
         }
-        mediametrics_setInt32(mMetricsHandle, kCodecEncoder,
+        mediametrics_setInt32(nextMetricsHandle, kCodecEncoder,
                               (flags & CONFIGURE_FLAG_ENCODE) ? 1 : 0);
 
-        mediametrics_setCString(mMetricsHandle, kCodecLogSessionId, mLogSessionId.c_str());
+        mediametrics_setCString(nextMetricsHandle, kCodecLogSessionId, mLogSessionId.c_str());
+
+        // moved here from ::init()
+        mediametrics_setCString(nextMetricsHandle, kCodecCodec, mInitName.c_str());
+        mediametrics_setCString(nextMetricsHandle, kCodecMode,
+                                mIsVideo ? kCodecModeVideo : kCodecModeAudio);
     }
 
     if (mIsVideo) {
@@ -1536,37 +1564,37 @@ status_t MediaCodec::configure(
             mRotationDegrees = 0;
         }
 
-        if (mMetricsHandle != 0) {
-            mediametrics_setInt32(mMetricsHandle, kCodecWidth, mVideoWidth);
-            mediametrics_setInt32(mMetricsHandle, kCodecHeight, mVideoHeight);
-            mediametrics_setInt32(mMetricsHandle, kCodecRotation, mRotationDegrees);
+        if (nextMetricsHandle != 0) {
+            mediametrics_setInt32(nextMetricsHandle, kCodecWidth, mVideoWidth);
+            mediametrics_setInt32(nextMetricsHandle, kCodecHeight, mVideoHeight);
+            mediametrics_setInt32(nextMetricsHandle, kCodecRotation, mRotationDegrees);
             int32_t maxWidth = 0;
             if (format->findInt32("max-width", &maxWidth)) {
-                mediametrics_setInt32(mMetricsHandle, kCodecMaxWidth, maxWidth);
+                mediametrics_setInt32(nextMetricsHandle, kCodecMaxWidth, maxWidth);
             }
             int32_t maxHeight = 0;
             if (format->findInt32("max-height", &maxHeight)) {
-                mediametrics_setInt32(mMetricsHandle, kCodecMaxHeight, maxHeight);
+                mediametrics_setInt32(nextMetricsHandle, kCodecMaxHeight, maxHeight);
             }
             int32_t colorFormat = -1;
             if (format->findInt32("color-format", &colorFormat)) {
-                mediametrics_setInt32(mMetricsHandle, kCodecColorFormat, colorFormat);
+                mediametrics_setInt32(nextMetricsHandle, kCodecColorFormat, colorFormat);
             }
             float frameRate = -1.0;
             if (format->findFloat("frame-rate", &frameRate)) {
-                mediametrics_setDouble(mMetricsHandle, kCodecFrameRate, frameRate);
+                mediametrics_setDouble(nextMetricsHandle, kCodecFrameRate, frameRate);
             }
             float captureRate = -1.0;
             if (format->findFloat("capture-rate", &captureRate)) {
-                mediametrics_setDouble(mMetricsHandle, kCodecCaptureRate, captureRate);
+                mediametrics_setDouble(nextMetricsHandle, kCodecCaptureRate, captureRate);
             }
             float operatingRate = -1.0;
             if (format->findFloat("operating-rate", &operatingRate)) {
-                mediametrics_setDouble(mMetricsHandle, kCodecOperatingRate, operatingRate);
+                mediametrics_setDouble(nextMetricsHandle, kCodecOperatingRate, operatingRate);
             }
             int32_t priority = -1;
             if (format->findInt32("priority", &priority)) {
-                mediametrics_setInt32(mMetricsHandle, kCodecPriority, priority);
+                mediametrics_setInt32(nextMetricsHandle, kCodecPriority, priority);
             }
         }
 
@@ -1578,14 +1606,14 @@ status_t MediaCodec::configure(
         }
 
     } else {
-        if (mMetricsHandle != 0) {
+        if (nextMetricsHandle != 0) {
             int32_t channelCount;
             if (format->findInt32(KEY_CHANNEL_COUNT, &channelCount)) {
-                mediametrics_setInt32(mMetricsHandle, kCodecChannelCount, channelCount);
+                mediametrics_setInt32(nextMetricsHandle, kCodecChannelCount, channelCount);
             }
             int32_t sampleRate;
             if (format->findInt32(KEY_SAMPLE_RATE, &sampleRate)) {
-                mediametrics_setInt32(mMetricsHandle, kCodecSampleRate, sampleRate);
+                mediametrics_setInt32(nextMetricsHandle, kCodecSampleRate, sampleRate);
             }
         }
     }
@@ -1595,41 +1623,41 @@ status_t MediaCodec::configure(
                                                  enableMediaFormatShapingDefault);
         if (!enableShaping) {
             ALOGI("format shaping disabled, property '%s'", enableMediaFormatShapingProperty);
-            if (mMetricsHandle != 0) {
-                mediametrics_setInt32(mMetricsHandle, kCodecShapingEnhanced, -1);
+            if (nextMetricsHandle != 0) {
+                mediametrics_setInt32(nextMetricsHandle, kCodecShapingEnhanced, -1);
             }
         } else {
-            (void) shapeMediaFormat(format, flags);
+            (void) shapeMediaFormat(format, flags, nextMetricsHandle);
             // XXX: do we want to do this regardless of shaping enablement?
             mapFormat(mComponentName, format, nullptr, false);
         }
     }
 
     // push min/max QP to MediaMetrics after shaping
-    if (mIsVideo && mMetricsHandle != 0) {
+    if (mIsVideo && nextMetricsHandle != 0) {
         int32_t qpIMin = -1;
         if (format->findInt32("video-qp-i-min", &qpIMin)) {
-            mediametrics_setInt32(mMetricsHandle, kCodecRequestedVideoQPIMin, qpIMin);
+            mediametrics_setInt32(nextMetricsHandle, kCodecRequestedVideoQPIMin, qpIMin);
         }
         int32_t qpIMax = -1;
         if (format->findInt32("video-qp-i-max", &qpIMax)) {
-            mediametrics_setInt32(mMetricsHandle, kCodecRequestedVideoQPIMax, qpIMax);
+            mediametrics_setInt32(nextMetricsHandle, kCodecRequestedVideoQPIMax, qpIMax);
         }
         int32_t qpPMin = -1;
         if (format->findInt32("video-qp-p-min", &qpPMin)) {
-            mediametrics_setInt32(mMetricsHandle, kCodecRequestedVideoQPPMin, qpPMin);
+            mediametrics_setInt32(nextMetricsHandle, kCodecRequestedVideoQPPMin, qpPMin);
         }
         int32_t qpPMax = -1;
         if (format->findInt32("video-qp-p-max", &qpPMax)) {
-            mediametrics_setInt32(mMetricsHandle, kCodecRequestedVideoQPPMax, qpPMax);
+            mediametrics_setInt32(nextMetricsHandle, kCodecRequestedVideoQPPMax, qpPMax);
         }
         int32_t qpBMin = -1;
         if (format->findInt32("video-qp-b-min", &qpBMin)) {
-            mediametrics_setInt32(mMetricsHandle, kCodecRequestedVideoQPBMin, qpBMin);
+            mediametrics_setInt32(nextMetricsHandle, kCodecRequestedVideoQPBMin, qpBMin);
         }
         int32_t qpBMax = -1;
         if (format->findInt32("video-qp-b-max", &qpBMax)) {
-            mediametrics_setInt32(mMetricsHandle, kCodecRequestedVideoQPBMax, qpBMax);
+            mediametrics_setInt32(nextMetricsHandle, kCodecRequestedVideoQPBMax, qpBMax);
         }
     }
 
@@ -1645,12 +1673,22 @@ status_t MediaCodec::configure(
         } else {
             msg->setPointer("descrambler", descrambler.get());
         }
-        if (mMetricsHandle != 0) {
-            mediametrics_setInt32(mMetricsHandle, kCodecCrypto, 1);
+        if (nextMetricsHandle != 0) {
+            mediametrics_setInt32(nextMetricsHandle, kCodecCrypto, 1);
         }
     } else if (mFlags & kFlagIsSecure) {
         ALOGW("Crypto or descrambler should be given for secure codec");
     }
+
+    if (mConfigureMsg != nullptr) {
+        // if re-configuring, we have one of these from before.
+        // Recover the space before we discard the old mConfigureMsg
+        mediametrics_handle_t metricsHandle;
+        if (mConfigureMsg->findInt64("metrics", &metricsHandle)) {
+            mediametrics_delete(metricsHandle);
+        }
+    }
+    msg->setInt64("metrics", nextMetricsHandle);
 
     // save msg for reset
     mConfigureMsg = msg;
@@ -1977,7 +2015,8 @@ status_t MediaCodec::setupFormatShaper(AString mediaType) {
 
 status_t MediaCodec::shapeMediaFormat(
             const sp<AMessage> &format,
-            uint32_t flags) {
+            uint32_t flags,
+            mediametrics_handle_t metricsHandle) {
     ALOGV("shapeMediaFormat entry");
 
     if (!(flags & CONFIGURE_FLAG_ENCODE)) {
@@ -2033,39 +2072,39 @@ status_t MediaCodec::shapeMediaFormat(
         sp<AMessage> deltas = updatedFormat->changesFrom(format, false /* deep */);
         size_t changeCount = deltas->countEntries();
         ALOGD("shapeMediaFormat: deltas(%zu): %s", changeCount, deltas->debugString(2).c_str());
-        if (mMetricsHandle != 0) {
-            mediametrics_setInt32(mMetricsHandle, kCodecShapingEnhanced, changeCount);
+        if (metricsHandle != 0) {
+            mediametrics_setInt32(metricsHandle, kCodecShapingEnhanced, changeCount);
         }
         if (changeCount > 0) {
-            if (mMetricsHandle != 0) {
+            if (metricsHandle != 0) {
                 // save some old properties before we fold in the new ones
                 int32_t bitrate;
                 if (format->findInt32(KEY_BIT_RATE, &bitrate)) {
-                    mediametrics_setInt32(mMetricsHandle, kCodecOriginalBitrate, bitrate);
+                    mediametrics_setInt32(metricsHandle, kCodecOriginalBitrate, bitrate);
                 }
                 int32_t qpIMin = -1;
                 if (format->findInt32("original-video-qp-i-min", &qpIMin)) {
-                    mediametrics_setInt32(mMetricsHandle, kCodecOriginalVideoQPIMin, qpIMin);
+                    mediametrics_setInt32(metricsHandle, kCodecOriginalVideoQPIMin, qpIMin);
                 }
                 int32_t qpIMax = -1;
                 if (format->findInt32("original-video-qp-i-max", &qpIMax)) {
-                    mediametrics_setInt32(mMetricsHandle, kCodecOriginalVideoQPIMax, qpIMax);
+                    mediametrics_setInt32(metricsHandle, kCodecOriginalVideoQPIMax, qpIMax);
                 }
                 int32_t qpPMin = -1;
                 if (format->findInt32("original-video-qp-p-min", &qpPMin)) {
-                    mediametrics_setInt32(mMetricsHandle, kCodecOriginalVideoQPPMin, qpPMin);
+                    mediametrics_setInt32(metricsHandle, kCodecOriginalVideoQPPMin, qpPMin);
                 }
                 int32_t qpPMax = -1;
                 if (format->findInt32("original-video-qp-p-max", &qpPMax)) {
-                    mediametrics_setInt32(mMetricsHandle, kCodecOriginalVideoQPPMax, qpPMax);
+                    mediametrics_setInt32(metricsHandle, kCodecOriginalVideoQPPMax, qpPMax);
                 }
                  int32_t qpBMin = -1;
                 if (format->findInt32("original-video-qp-b-min", &qpBMin)) {
-                    mediametrics_setInt32(mMetricsHandle, kCodecOriginalVideoQPBMin, qpBMin);
+                    mediametrics_setInt32(metricsHandle, kCodecOriginalVideoQPBMin, qpBMin);
                 }
                 int32_t qpBMax = -1;
                 if (format->findInt32("original-video-qp-b-max", &qpBMax)) {
-                    mediametrics_setInt32(mMetricsHandle, kCodecOriginalVideoQPBMax, qpBMax);
+                    mediametrics_setInt32(metricsHandle, kCodecOriginalVideoQPBMax, qpBMax);
                 }
             }
             // NB: for any field in both format and deltas, the deltas copy wins
@@ -2646,24 +2685,42 @@ status_t MediaCodec::getCodecInfo(sp<MediaCodecInfo> *codecInfo) const {
     return OK;
 }
 
+// this is the user-callable entry point
 status_t MediaCodec::getMetrics(mediametrics_handle_t &reply) {
 
     reply = 0;
 
-    // shouldn't happen, but be safe
-    if (mMetricsHandle == 0) {
-        return UNKNOWN_ERROR;
+    sp<AMessage> msg = new AMessage(kWhatGetMetrics, this);
+    sp<AMessage> response;
+    status_t err;
+    if ((err = PostAndAwaitResponse(msg, &response)) != OK) {
+        return err;
     }
 
-    // update any in-flight data that's not carried within the record
-    updateMediametrics();
-
-    // send it back to the caller.
-    reply = mediametrics_dup(mMetricsHandle);
-
-    updateEphemeralMediametrics(reply);
+    CHECK(response->findInt64("metrics", &reply));
 
     return OK;
+}
+
+// runs on the looper thread (for mutex purposes)
+void MediaCodec::onGetMetrics(const sp<AMessage>& msg) {
+
+    mediametrics_handle_t results = 0;
+
+    sp<AReplyToken> replyID;
+    CHECK(msg->senderAwaitsResponse(&replyID));
+
+    if (mMetricsHandle != 0) {
+        updateMediametrics();
+        results = mediametrics_dup(mMetricsHandle);
+        updateEphemeralMediametrics(results);
+    } else {
+        results = mediametrics_dup(mMetricsHandle);
+    }
+
+    sp<AMessage> response = new AMessage;
+    response->setInt64("metrics", results);
+    response->postReply(replyID);
 }
 
 status_t MediaCodec::getInputBuffers(Vector<sp<MediaCodecBuffer> > *buffers) const {
@@ -3691,6 +3748,13 @@ void MediaCodec::onMessageReceived(const sp<AMessage> &msg) {
             break;
         }
 
+        case kWhatGetMetrics:
+        {
+            onGetMetrics(msg);
+            break;
+        }
+
+
         case kWhatConfigure:
         {
             if (mState != INITIALIZED) {
@@ -3710,6 +3774,18 @@ void MediaCodec::onMessageReceived(const sp<AMessage> &msg) {
 
             sp<AMessage> format;
             CHECK(msg->findMessage("format", &format));
+
+            // start with a copy of the passed metrics info for use in this run
+            mediametrics_handle_t handle;
+            CHECK(msg->findInt64("metrics", &handle));
+            if (handle != 0) {
+                if (mMetricsHandle != 0) {
+                    flushMediametrics();
+                }
+                mMetricsHandle = mediametrics_dup(handle);
+                // and set some additional metrics values
+                initMediametrics();
+            }
 
             int32_t push;
             if (msg->findInt32("push-blank-buffers-on-shutdown", &push) && push != 0) {
