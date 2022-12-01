@@ -37,6 +37,7 @@ TunerDvr::TunerDvr(shared_ptr<IDvr> dvr, DvrType type) {
 }
 
 TunerDvr::~TunerDvr() {
+    close();
     mDvr = nullptr;
 }
 
