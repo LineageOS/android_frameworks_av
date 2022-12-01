@@ -197,6 +197,8 @@ public:
 
     virtual status_t      setRotateAndCropOverride(uint8_t rotateAndCrop) override;
 
+    virtual status_t      setAutoframingOverride(uint8_t autoframingValue) override;
+
     virtual bool          supportsCameraMute();
     virtual status_t      setCameraMute(bool enabled);
 

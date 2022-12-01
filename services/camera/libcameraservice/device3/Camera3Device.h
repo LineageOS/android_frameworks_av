@@ -273,6 +273,14 @@ class Camera3Device :
             camera_metadata_enum_android_scaler_rotate_and_crop_t rotateAndCropValue);
 
     /**
+     * Set the current behavior for the AUTOFRAMING control when in AUTO.
+     *
+     * The value must be one of the AUTOFRAMING_* values besides AUTO.
+     */
+    status_t setAutoframingAutoBehavior(
+            camera_metadata_enum_android_control_autoframing_t autoframingValue);
+
+    /**
      * Whether camera muting (producing black-only output) is supported.
      *
      * Calling setCameraMute(true) when this returns false will return an
@@ -603,6 +611,9 @@ class Camera3Device :
         // overriding of ROTATE_AND_CROP value and adjustment of coordinates
         // in several other controls in both the request and the result
         bool                                mRotateAndCropAuto;
+        // Whether this request has AUTOFRAMING_AUTO set, so need to override the AUTOFRAMING value
+        // in the capture request.
+        bool                                mAutoframingAuto;
 
         // Whether this capture request has its zoom ratio set to 1.0x before
         // the framework overrides it for camera HAL consumption.
@@ -616,6 +627,8 @@ class Camera3Device :
         // Whether this capture request's rotation and crop update has been
         // done.
         bool                                mRotationAndCropUpdated = false;
+        // Whether this capture request's autoframing has been done.
+        bool                                mAutoframingUpdated = false;
         // Whether this capture request's zoom ratio update has been done.
         bool                                mZoomRatioUpdated = false;
         // Whether this max resolution capture request's  crop / metering region update has been
@@ -917,6 +930,10 @@ class Camera3Device :
 
         status_t setRotateAndCropAutoBehavior(
                 camera_metadata_enum_android_scaler_rotate_and_crop_t rotateAndCropValue);
+
+        status_t setAutoframingAutoBehaviour(
+                camera_metadata_enum_android_control_autoframing_t autoframingValue);
+
         status_t setComposerSurface(bool composerSurfacePresent);
 
         status_t setCameraMute(int32_t muteMode);
@@ -942,6 +959,9 @@ class Camera3Device :
 
         // Override rotate_and_crop control if needed; returns true if the current value was changed
         bool               overrideAutoRotateAndCrop(const sp<CaptureRequest> &request);
+
+        // Override autoframing control if needed; returns true if the current value was changed
+        bool               overrideAutoframing(const sp<CaptureRequest> &request);
 
         // Override test_pattern control if needed for camera mute; returns true
         // if the current value was changed
@@ -1077,6 +1097,7 @@ class Camera3Device :
         uint32_t           mCurrentAfTriggerId;
         uint32_t           mCurrentPreCaptureTriggerId;
         camera_metadata_enum_android_scaler_rotate_and_crop_t mRotateAndCropOverride;
+        camera_metadata_enum_android_control_autoframing_t mAutoframingOverride;
         bool               mComposerOutput;
         int32_t            mCameraMute; // 0 = no mute, otherwise the TEST_PATTERN_MODE to use
         bool               mCameraMuteChanged;
@@ -1126,7 +1147,7 @@ class Camera3Device :
             int32_t numBuffers, CaptureResultExtras resultExtras, bool hasInput,
             bool callback, nsecs_t minExpectedDuration, nsecs_t maxExpectedDuration,
             bool isFixedFps, const std::set<std::set<String8>>& physicalCameraIds,
-            bool isStillCapture, bool isZslCapture, bool rotateAndCropAuto,
+            bool isStillCapture, bool isZslCapture, bool rotateAndCropAuto, bool autoframingAuto,
             const std::set<std::string>& cameraIdsWithZoom, const SurfaceMap& outputSurfaces,
             nsecs_t requestTimeNs);
 

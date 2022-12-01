@@ -81,6 +81,8 @@ public:
 
     status_t setRotateAndCropOverride(uint8_t rotateAndCrop) override;
 
+    status_t setAutoframingOverride(uint8_t autoframingValue) override;
+
     bool supportsCameraMute() override;
     status_t setCameraMute(bool enabled) override;
 

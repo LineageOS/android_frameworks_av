@@ -2147,6 +2147,15 @@ sp<Camera3Device::CaptureRequest> Camera3Device::createCaptureRequest(
         newRequest->mRotateAndCropAuto = false;
     }
 
+    auto autoframingEntry =
+            newRequest->mSettingsList.begin()->metadata.find(ANDROID_CONTROL_AUTOFRAMING);
+    if (autoframingEntry.count > 0 &&
+            autoframingEntry.data.u8[0] == ANDROID_CONTROL_AUTOFRAMING_AUTO) {
+        newRequest->mAutoframingAuto = true;
+    } else {
+        newRequest->mAutoframingAuto = false;
+    }
+
     auto zoomRatioEntry =
             newRequest->mSettingsList.begin()->metadata.find(ANDROID_CONTROL_ZOOM_RATIO);
     if (zoomRatioEntry.count > 0 &&
@@ -2698,7 +2707,7 @@ status_t Camera3Device::registerInFlight(uint32_t frameNumber,
         int32_t numBuffers, CaptureResultExtras resultExtras, bool hasInput,
         bool hasAppCallback, nsecs_t minExpectedDuration, nsecs_t maxExpectedDuration,
         bool isFixedFps, const std::set<std::set<String8>>& physicalCameraIds,
-        bool isStillCapture, bool isZslCapture, bool rotateAndCropAuto,
+        bool isStillCapture, bool isZslCapture, bool rotateAndCropAuto, bool autoframingAuto,
         const std::set<std::string>& cameraIdsWithZoom,
         const SurfaceMap& outputSurfaces, nsecs_t requestTimeNs) {
     ATRACE_CALL();
@@ -2707,8 +2716,8 @@ status_t Camera3Device::registerInFlight(uint32_t frameNumber,
     ssize_t res;
     res = mInFlightMap.add(frameNumber, InFlightRequest(numBuffers, resultExtras, hasInput,
             hasAppCallback, minExpectedDuration, maxExpectedDuration, isFixedFps, physicalCameraIds,
-            isStillCapture, isZslCapture, rotateAndCropAuto, cameraIdsWithZoom, requestTimeNs,
-            outputSurfaces));
+            isStillCapture, isZslCapture, rotateAndCropAuto, autoframingAuto, cameraIdsWithZoom,
+            requestTimeNs, outputSurfaces));
     if (res < 0) return res;
 
     if (mInFlightMap.size() == 1) {
@@ -2915,6 +2924,7 @@ Camera3Device::RequestThread::RequestThread(wp<Camera3Device> parent,
         mCurrentAfTriggerId(0),
         mCurrentPreCaptureTriggerId(0),
         mRotateAndCropOverride(ANDROID_SCALER_ROTATE_AND_CROP_NONE),
+        mAutoframingOverride(ANDROID_CONTROL_AUTOFRAMING_ON),
         mComposerOutput(false),
         mCameraMute(ANDROID_SENSOR_TEST_PATTERN_MODE_OFF),
         mCameraMuteChanged(false),
@@ -3599,13 +3609,14 @@ status_t Camera3Device::RequestThread::prepareHalRequests() {
         // compensated by NATIVE_WINDOW_TRANSFORM_INVERSE_DISPLAY
         bool rotateAndCropChanged = mComposerOutput ? false :
             overrideAutoRotateAndCrop(captureRequest);
+        bool autoframingChanged = overrideAutoframing(captureRequest);
         bool testPatternChanged = overrideTestPattern(captureRequest);
 
         // If the request is the same as last, or we had triggers now or last time or
         // changing overrides this time
         bool newRequest =
-                (mPrevRequest != captureRequest || triggersMixedIn ||
-                        rotateAndCropChanged || testPatternChanged) &&
+                (mPrevRequest != captureRequest || triggersMixedIn || rotateAndCropChanged ||
+                         autoframingChanged || testPatternChanged) &&
                 // Request settings are all the same within one batch, so only treat the first
                 // request in a batch as new
                 !(batchedRequest && i > 0);
@@ -3934,7 +3945,8 @@ status_t Camera3Device::RequestThread::prepareHalRequests() {
                 expectedDurationInfo.maxDuration,
                 expectedDurationInfo.isFixedFps,
                 requestedPhysicalCameras, isStillCapture, isZslCapture,
-                captureRequest->mRotateAndCropAuto, mPrevCameraIdsWithZoom,
+                captureRequest->mRotateAndCropAuto, captureRequest->mAutoframingAuto,
+                mPrevCameraIdsWithZoom,
                 (mUseHalBufManager) ? uniqueSurfaceIdMap :
                                       SurfaceMap{}, captureRequest->mRequestTimeNs);
         ALOGVV("%s: registered in flight requestId = %" PRId32 ", frameNumber = %" PRId64
@@ -4072,6 +4084,17 @@ status_t Camera3Device::RequestThread::setRotateAndCropAutoBehavior(
         return BAD_VALUE;
     }
     mRotateAndCropOverride = rotateAndCropValue;
+    return OK;
+}
+
+status_t Camera3Device::RequestThread::setAutoframingAutoBehaviour(
+        camera_metadata_enum_android_control_autoframing_t autoframingValue) {
+    ATRACE_CALL();
+    Mutex::Autolock l(mTriggerMutex);
+    if (autoframingValue == ANDROID_CONTROL_AUTOFRAMING_AUTO) {
+        return BAD_VALUE;
+    }
+    mAutoframingOverride = autoframingValue;
     return OK;
 }
 
@@ -4665,6 +4688,31 @@ bool Camera3Device::RequestThread::overrideAutoRotateAndCrop(
     return false;
 }
 
+bool Camera3Device::RequestThread::overrideAutoframing(const sp<CaptureRequest> &request) {
+    ATRACE_CALL();
+
+    if (request->mAutoframingAuto) {
+        Mutex::Autolock l(mTriggerMutex);
+        CameraMetadata &metadata = request->mSettingsList.begin()->metadata;
+
+        auto autoframingEntry = metadata.find(ANDROID_CONTROL_AUTOFRAMING);
+        if (autoframingEntry.count > 0) {
+            if (autoframingEntry.data.u8[0] == mAutoframingOverride) {
+                return false;
+            } else {
+                autoframingEntry.data.u8[0] = mAutoframingOverride;
+                return true;
+            }
+        } else {
+            uint8_t autoframing_u8 = mAutoframingOverride;
+            metadata.update(ANDROID_CONTROL_AUTOFRAMING,
+                    &autoframing_u8, 1);
+            return true;
+        }
+    }
+    return false;
+}
+
 bool Camera3Device::RequestThread::overrideTestPattern(
         const sp<CaptureRequest> &request) {
     ATRACE_CALL();
@@ -5148,6 +5196,17 @@ status_t Camera3Device::setRotateAndCropAutoBehavior(
         return INVALID_OPERATION;
     }
     return mRequestThread->setRotateAndCropAutoBehavior(rotateAndCropValue);
+}
+
+status_t Camera3Device::setAutoframingAutoBehavior(
+    camera_metadata_enum_android_control_autoframing_t autoframingValue) {
+    ATRACE_CALL();
+    Mutex::Autolock il(mInterfaceLock);
+    Mutex::Autolock l(mLock);
+    if (mRequestThread == nullptr) {
+        return INVALID_OPERATION;
+    }
+    return mRequestThread->setAutoframingAutoBehaviour(autoframingValue);
 }
 
 bool Camera3Device::supportsCameraMute() {
