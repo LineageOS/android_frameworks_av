@@ -440,6 +440,14 @@ class CameraDeviceBase : public virtual FrameProducer {
             camera_metadata_enum_android_scaler_rotate_and_crop_t rotateAndCropValue) = 0;
 
     /**
+     * Set the current behavior for the AUTOFRAMING control when in AUTO.
+     *
+     * The value must be one of the AUTOFRAMING_* values besides AUTO.
+     */
+    virtual status_t setAutoframingAutoBehavior(
+            camera_metadata_enum_android_control_autoframing_t autoframingValue) = 0;
+
+    /**
      * Whether camera muting (producing black-only output) is supported.
      *
      * Calling setCameraMute(true) when this returns false will return an

@@ -1752,6 +1752,13 @@ status_t CameraDeviceClient::setRotateAndCropOverride(uint8_t rotateAndCrop) {
         static_cast<camera_metadata_enum_android_scaler_rotate_and_crop_t>(rotateAndCrop));
 }
 
+status_t CameraDeviceClient::setAutoframingOverride(uint8_t autoframingValue) {
+    if (autoframingValue > ANDROID_CONTROL_AUTOFRAMING_AUTO) return BAD_VALUE;
+
+    return mDevice->setAutoframingAutoBehavior(
+        static_cast<camera_metadata_enum_android_control_autoframing_t>(autoframingValue));
+}
+
 bool CameraDeviceClient::supportsCameraMute() {
     return mDevice->supportsCameraMute();
 }

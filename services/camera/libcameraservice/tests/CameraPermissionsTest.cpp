@@ -129,6 +129,10 @@ public:
                 userId, ret);
     }
 
+    virtual binder::Status getAutoframingOverride(const String16& packageName, int *ret) override {
+        return mCameraServiceProxy->getAutoframingOverride(packageName, ret);
+    }
+
     virtual binder::Status pingForUserUpdate() override {
         return mCameraServiceProxy->pingForUserUpdate();
     }

@@ -358,6 +358,7 @@
             <Limit name="block-count" range="1-3600" />
             <Limit name="bitrate" range="1-40000000" />
             <Feature name="bitrate-modes" value="VBR,CBR" />
+            <Attribute name="software-codec" />
         </MediaCodec>
     </Encoders>
 </MediaCodecs>
