@@ -41,6 +41,7 @@ TunerDescrambler::TunerDescrambler(shared_ptr<IDescrambler> descrambler) {
 }
 
 TunerDescrambler::~TunerDescrambler() {
+    close();
     mDescrambler = nullptr;
 }
 

@@ -37,6 +37,7 @@ TunerFrontend::TunerFrontend(shared_ptr<IFrontend> frontend, int id) {
 }
 
 TunerFrontend::~TunerFrontend() {
+    close();
     mFrontend = nullptr;
     mId = -1;
 }
