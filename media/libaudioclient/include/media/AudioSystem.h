@@ -619,6 +619,19 @@ public:
     static status_t getSupportedLatencyModes(audio_io_handle_t output,
             std::vector<audio_latency_mode_t>* modes);
 
+    static status_t getSupportedMixerAttributes(audio_port_handle_t portId,
+                                                std::vector<audio_mixer_attributes_t> *mixerAttrs);
+    static status_t setPreferredMixerAttributes(const audio_attributes_t *attr,
+                                                audio_port_handle_t portId,
+                                                uid_t uid,
+                                                const audio_mixer_attributes_t *mixerAttr);
+    static status_t getPreferredMixerAttributes(const audio_attributes_t* attr,
+                                                audio_port_handle_t portId,
+                                                std::optional<audio_mixer_attributes_t>* mixerAttr);
+    static status_t clearPreferredMixerAttributes(const audio_attributes_t* attr,
+                                                  audio_port_handle_t portId,
+                                                  uid_t uid);
+
     // A listener for capture state changes.
     class CaptureStateListener : public virtual RefBase {
     public:

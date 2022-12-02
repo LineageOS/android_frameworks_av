@@ -277,6 +277,22 @@ public:
     binder::Status getDirectProfilesForAttributes(const media::AudioAttributesInternal& attr,
                         std::vector<media::audio::common::AudioProfile>* _aidl_return) override;
 
+    binder::Status getSupportedMixerAttributes(
+            int32_t portId,
+            std::vector<media::AudioMixerAttributesInternal>* _aidl_return) override;
+    binder::Status setPreferredMixerAttributes(
+            const media::AudioAttributesInternal& attr,
+            int32_t portId,
+            int32_t uid,
+            const media::AudioMixerAttributesInternal& mixerAttr) override;
+    binder::Status getPreferredMixerAttributes(
+            const media::AudioAttributesInternal& attr,
+            int32_t portId,
+            std::optional<media::AudioMixerAttributesInternal>* _aidl_return) override;
+    binder::Status clearPreferredMixerAttributes(const media::AudioAttributesInternal& attr,
+                                                 int32_t portId,
+                                                 int32_t uid) override;
+
     status_t onTransact(uint32_t code, const Parcel& data, Parcel* reply, uint32_t flags) override;
 
     // IBinder::DeathRecipient

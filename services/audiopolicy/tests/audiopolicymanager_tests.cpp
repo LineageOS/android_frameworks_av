@@ -35,7 +35,6 @@
 
 #include "AudioPolicyInterface.h"
 #include "AudioPolicyManagerTestClient.h"
-#include "AudioPolicyManagerTestClientForHdmi.h"
 #include "AudioPolicyTestClient.h"
 #include "AudioPolicyTestManager.h"
 
@@ -982,6 +981,77 @@ TEST_F(AudioPolicyManagerTestWithConfigurationFile, HandleDeviceConfigChange) {
     }
 }
 
+TEST_F(AudioPolicyManagerTestWithConfigurationFile, PreferredMixerAttributes) {
+    mClient->addSupportedFormat(AUDIO_FORMAT_PCM_16_BIT);
+    mClient->addSupportedChannelMask(AUDIO_CHANNEL_OUT_STEREO);
+    ASSERT_EQ(NO_ERROR, mManager->setDeviceConnectionState(AUDIO_DEVICE_OUT_USB_DEVICE,
+                                                           AUDIO_POLICY_DEVICE_STATE_AVAILABLE,
+                                                           "", "", AUDIO_FORMAT_DEFAULT));
+    auto devices = mManager->getAvailableOutputDevices();
+    audio_port_handle_t maxPortId = 0;
+    audio_port_handle_t speakerPortId;
+    audio_port_handle_t usbPortId;
+    for (auto device : devices) {
+        maxPortId = std::max(maxPortId, device->getId());
+        if (device->type() == AUDIO_DEVICE_OUT_SPEAKER) {
+            speakerPortId = device->getId();
+        } else if (device->type() == AUDIO_DEVICE_OUT_USB_DEVICE) {
+            usbPortId = device->getId();
+        }
+    }
+
+    const uid_t uid = 1234;
+    const uid_t otherUid = 4321;
+    const audio_attributes_t mediaAttr = {
+            .content_type = AUDIO_CONTENT_TYPE_MUSIC,
+            .usage = AUDIO_USAGE_MEDIA,
+    };
+    const audio_attributes_t alarmAttr = {
+            .content_type = AUDIO_CONTENT_TYPE_SONIFICATION,
+            .usage = AUDIO_USAGE_ALARM,
+    };
+
+    std::vector<audio_mixer_attributes_t> mixerAttributes;
+    EXPECT_EQ(NO_ERROR, mManager->getSupportedMixerAttributes(usbPortId, mixerAttributes));
+    for (const auto attrToSet : mixerAttributes) {
+        audio_mixer_attributes_t attrFromQuery = AUDIO_MIXER_ATTRIBUTES_INITIALIZER;
+
+        // The given device is not available
+        EXPECT_EQ(BAD_VALUE,
+                  mManager->setPreferredMixerAttributes(
+                          &mediaAttr, maxPortId + 1, uid, &attrToSet));
+        // The only allowed device is USB
+        EXPECT_EQ(BAD_VALUE,
+                  mManager->setPreferredMixerAttributes(
+                          &mediaAttr, speakerPortId, uid, &attrToSet));
+        // The only allowed usage is media
+        EXPECT_EQ(BAD_VALUE,
+                  mManager->setPreferredMixerAttributes(&alarmAttr, usbPortId, uid, &attrToSet));
+        // Nothing set yet, must get null when query
+        EXPECT_EQ(NAME_NOT_FOUND,
+                  mManager->getPreferredMixerAttributes(&mediaAttr, usbPortId, &attrFromQuery));
+        EXPECT_EQ(NO_ERROR,
+                  mManager->setPreferredMixerAttributes(
+                          &mediaAttr, usbPortId, uid, &attrToSet));
+        EXPECT_EQ(NO_ERROR,
+                  mManager->getPreferredMixerAttributes(&mediaAttr, usbPortId, &attrFromQuery));
+        EXPECT_EQ(attrToSet.config.format, attrFromQuery.config.format);
+        EXPECT_EQ(attrToSet.config.sample_rate, attrFromQuery.config.sample_rate);
+        EXPECT_EQ(attrToSet.config.channel_mask, attrFromQuery.config.channel_mask);
+        EXPECT_EQ(attrToSet.mixer_behavior, attrFromQuery.mixer_behavior);
+        EXPECT_EQ(NAME_NOT_FOUND,
+                  mManager->clearPreferredMixerAttributes(&mediaAttr, speakerPortId, uid));
+        EXPECT_EQ(PERMISSION_DENIED,
+                  mManager->clearPreferredMixerAttributes(&mediaAttr, usbPortId, otherUid));
+        EXPECT_EQ(NO_ERROR,
+                  mManager->clearPreferredMixerAttributes(&mediaAttr, usbPortId, uid));
+    }
+
+    ASSERT_EQ(NO_ERROR, mManager->setDeviceConnectionState(AUDIO_DEVICE_OUT_USB_DEVICE,
+                                                           AUDIO_POLICY_DEVICE_STATE_UNAVAILABLE,
+                                                           "", "", AUDIO_FORMAT_LDAC));
+}
+
 class AudioPolicyManagerTestDynamicPolicy : public AudioPolicyManagerTestWithConfigurationFile {
 protected:
     void TearDown() override;
@@ -1143,9 +1213,6 @@ protected:
     std::map<audio_format_t, bool> getSurroundFormatsHelper();
     std::vector<audio_format_t> getReportedSurroundFormatsHelper();
     std::unordered_set<audio_format_t> getFormatsFromPorts();
-    AudioPolicyManagerTestClient* getClient() override {
-        return new AudioPolicyManagerTestClientForHdmi;
-    }
     void TearDown() override;
 
     static const std::string sTvConfig;

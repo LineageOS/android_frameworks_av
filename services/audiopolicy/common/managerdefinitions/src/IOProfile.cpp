@@ -24,6 +24,15 @@
 
 namespace android {
 
+IOProfile::IOProfile(const std::string &name, audio_port_role_t role)
+        : AudioPort(name, AUDIO_PORT_TYPE_MIX, role),
+          curOpenCount(0),
+          curActiveCount(0) {
+    if (role == AUDIO_PORT_ROLE_SOURCE) {
+        mMixerBehaviors.insert(AUDIO_MIXER_BEHAVIOR_DEFAULT);
+    }
+}
+
 bool IOProfile::isCompatibleProfile(const DeviceVector &devices,
                                     uint32_t samplingRate,
                                     uint32_t *updatedSamplingRate,
@@ -105,8 +114,10 @@ bool IOProfile::isCompatibleProfileForFlags(uint32_t flags,
 
     const uint32_t mustMatchOutputFlags =
             AUDIO_OUTPUT_FLAG_DIRECT|AUDIO_OUTPUT_FLAG_HW_AV_SYNC|AUDIO_OUTPUT_FLAG_MMAP_NOIRQ;
-    if (isPlaybackThread && (((getFlags() ^ flags) & mustMatchOutputFlags)
-                    || (getFlags() & flags) != flags)) {
+    if (isPlaybackThread &&
+        !audio_output_flags_is_subset((audio_output_flags_t)getFlags(),
+                                      (audio_output_flags_t)flags,
+                                      mustMatchOutputFlags)) {
         return false;
     }
     // The only input flag that is allowed to be different is the fast flag.
@@ -130,6 +141,34 @@ bool IOProfile::containsSingleDeviceSupportingEncodedFormats(
     return std::count_if(deviceList.begin(), deviceList.end(),
             [&device](sp<DeviceDescriptor> deviceDesc) {
                 return device == deviceDesc && deviceDesc->hasCurrentEncodedFormat(); }) == 1;
+}
+
+void IOProfile::toSupportedMixerAttributes(
+        std::vector<audio_mixer_attributes_t> *mixerAttributes) const {
+    if (!hasDynamicAudioProfile()) {
+        // The mixer attributes is only supported when there is a dynamic profile.
+        return;
+    }
+    for (const auto& profile : mProfiles) {
+        if (!profile->isValid()) {
+            continue;
+        }
+        for (const auto sampleRate : profile->getSampleRates()) {
+            for (const auto channelMask : profile->getChannels()) {
+                const audio_config_base_t config = {
+                        .format = profile->getFormat(),
+                        .sample_rate = sampleRate,
+                        .channel_mask = channelMask
+                };
+                for (const auto mixerBehavior : mMixerBehaviors) {
+                    mixerAttributes->push_back({
+                        .config = config,
+                        .mixer_behavior = mixerBehavior
+                    });
+                }
+            }
+        }
+    }
 }
 
 void IOProfile::dump(String8 *dst, int spaces) const
