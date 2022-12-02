@@ -40,6 +40,7 @@
 #include <media/IResourceManagerService.h>
 #include <media/MediaCodecBuffer.h>
 #include <media/MediaAnalyticsItem.h>
+// RBE do i need to add this? #include <media/MediaMetrics.h>         // RBE
 #include <media/stagefright/foundation/ABuffer.h>
 #include <media/stagefright/foundation/ADebug.h>
 #include <media/stagefright/foundation/AMessage.h>
@@ -546,6 +547,14 @@ MediaCodec::~MediaCodec() {
     mResourceManagerService->removeResource(getId(mResourceManagerClient));
 
     flushAnalyticsItem();
+
+    // clean up any saved AnalyticsItem stored in the configuration message
+    if (mConfigureMsg != nullptr) {
+        MediaAnalyticsItem *oldItem = nullptr;
+        if (mConfigureMsg->findPointer("metrics", (void**) &oldItem)) {
+            delete oldItem;
+        }
+    }
 }
 
 void MediaCodec::initAnalyticsItem() {
@@ -569,6 +578,8 @@ void MediaCodec::updateAnalyticsItem() {
     if (mAnalyticsItem == NULL) {
         return;
     }
+
+    Mutex::Autolock _lock(mMetricsLock);
 
     if (mLatencyHist.getCount() != 0 ) {
         mAnalyticsItem->setInt64(kCodecLatencyMax, mLatencyHist.getMax());
@@ -632,7 +643,10 @@ void MediaCodec::updateEphemeralAnalytics(MediaAnalyticsItem *item) {
 }
 
 void MediaCodec::flushAnalyticsItem() {
+    // update does its own mutex locking
     updateAnalyticsItem();
+
+    Mutex::Autolock _lock(mMetricsLock);
     if (mAnalyticsItem != NULL) {
         // don't log empty records
         if (mAnalyticsItem->count() > 0) {
@@ -1018,16 +1032,22 @@ status_t MediaCodec::configure(
         uint32_t flags) {
     sp<AMessage> msg = new AMessage(kWhatConfigure, this);
 
-    if (mAnalyticsItem != NULL) {
+    MediaAnalyticsItem *newItem = new MediaAnalyticsItem(kCodecKeyName);
+
+    if (newItem != NULL) {
         int32_t profile = 0;
         if (format->findInt32("profile", &profile)) {
-            mAnalyticsItem->setInt32(kCodecProfile, profile);
+            newItem->setInt32(kCodecProfile, profile);
         }
         int32_t level = 0;
         if (format->findInt32("level", &level)) {
-            mAnalyticsItem->setInt32(kCodecLevel, level);
+            newItem->setInt32(kCodecLevel, level);
         }
-        mAnalyticsItem->setInt32(kCodecEncoder, (flags & CONFIGURE_FLAG_ENCODE) ? 1 : 0);
+        newItem->setInt32(kCodecEncoder, (flags & CONFIGURE_FLAG_ENCODE) ? 1 : 0);
+
+        newItem->setCString(kCodecCodec, mInitName.c_str());
+        newItem->setCString(kCodecMode, mIsVideo ? kCodecModeVideo : kCodecModeAudio);
+
     }
 
     if (mIsVideo) {
@@ -1037,17 +1057,17 @@ status_t MediaCodec::configure(
             mRotationDegrees = 0;
         }
 
-        if (mAnalyticsItem != NULL) {
-            mAnalyticsItem->setInt32(kCodecWidth, mVideoWidth);
-            mAnalyticsItem->setInt32(kCodecHeight, mVideoHeight);
-            mAnalyticsItem->setInt32(kCodecRotation, mRotationDegrees);
+        if (newItem != NULL) {
+            newItem->setInt32(kCodecWidth, mVideoWidth);
+            newItem->setInt32(kCodecHeight, mVideoHeight);
+            newItem->setInt32(kCodecRotation, mRotationDegrees);
             int32_t maxWidth = 0;
             if (format->findInt32("max-width", &maxWidth)) {
-                mAnalyticsItem->setInt32(kCodecMaxWidth, maxWidth);
+                newItem->setInt32(kCodecMaxWidth, maxWidth);
             }
             int32_t maxHeight = 0;
             if (format->findInt32("max-height", &maxHeight)) {
-                mAnalyticsItem->setInt32(kCodecMaxHeight, maxHeight);
+                newItem->setInt32(kCodecMaxHeight, maxHeight);
             }
         }
 
@@ -1074,6 +1094,15 @@ status_t MediaCodec::configure(
     } else if (mFlags & kFlagIsSecure) {
         ALOGW("Crypto or descrambler should be given for secure codec");
     }
+
+    // recover space of any previous saved baseline analytics info
+    if (mConfigureMsg != nullptr) {
+        MediaAnalyticsItem *oldItem = nullptr;
+        if (mConfigureMsg->findPointer("metrics", (void **) &oldItem)) {
+            delete oldItem;
+        }
+    }
+    msg->setPointer("metrics", newItem);
 
     // save msg for reset
     mConfigureMsg = msg;
@@ -1530,20 +1559,36 @@ status_t MediaCodec::getMetrics(MediaAnalyticsItem * &reply) {
 
     reply = NULL;
 
-    // shouldn't happen, but be safe
-    if (mAnalyticsItem == NULL) {
-        return UNKNOWN_ERROR;
+    sp<AMessage> msg = new AMessage(kWhatGetMetrics, this);
+    sp<AMessage> response;
+    status_t err;
+    if ((err = PostAndAwaitResponse(msg, &response)) != OK) {
+        return err;
     }
 
-    // update any in-flight data that's not carried within the record
-    updateAnalyticsItem();
-
-    // send it back to the caller.
-    reply = mAnalyticsItem->dup();
-
-    updateEphemeralAnalytics(reply);
+    CHECK(response->findPointer("metrics", (void **) &reply));
 
     return OK;
+}
+
+// runs on the looper thread (for mutex purposes)
+void MediaCodec::onGetMetrics(const sp<AMessage>& msg) {
+
+    MediaAnalyticsItem *results = nullptr;
+
+    sp<AReplyToken> replyID;
+    CHECK(msg->senderAwaitsResponse(&replyID));
+
+    // RBE is it always non-null at this point?
+    if (mAnalyticsItem != nullptr) {
+        updateAnalyticsItem();
+        results = mAnalyticsItem->dup();
+        updateEphemeralAnalytics(results);
+    }
+
+    sp<AMessage> response = new AMessage;
+    response->setPointer("metrics", results);
+    response->postReply(replyID);
 }
 
 status_t MediaCodec::getInputBuffers(Vector<sp<MediaCodecBuffer> > *buffers) const {
@@ -2381,6 +2426,13 @@ void MediaCodec::onMessageReceived(const sp<AMessage> &msg) {
             break;
         }
 
+        case kWhatGetMetrics:
+        {
+            onGetMetrics(msg);
+            break;
+        }
+
+
         case kWhatConfigure:
         {
             sp<AReplyToken> replyID;
@@ -2396,6 +2448,18 @@ void MediaCodec::onMessageReceived(const sp<AMessage> &msg) {
 
             sp<AMessage> format;
             CHECK(msg->findMessage("format", &format));
+
+            // start with a copy of the passed metrics info for use in this run
+            MediaAnalyticsItem *handle;
+            CHECK(msg->findPointer("metrics", (void **) &handle));
+            if (handle != nullptr) {
+                if (mAnalyticsItem != nullptr) {
+                    flushAnalyticsItem();
+                }
+                mAnalyticsItem = handle->dup();
+                // and set some additional metrics values
+                initAnalyticsItem();
+            }
 
             int32_t push;
             if (msg->findInt32("push-blank-buffers-on-shutdown", &push) && push != 0) {
