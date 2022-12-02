@@ -50,6 +50,7 @@ TunerDemux::TunerDemux(const shared_ptr<IDemux> demux, const int id,
 }
 
 TunerDemux::~TunerDemux() {
+    close();
     mDemux = nullptr;
     mTunerService = nullptr;
 }

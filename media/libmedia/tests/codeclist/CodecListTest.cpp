@@ -18,6 +18,8 @@
 #define LOG_TAG "CodecListTest"
 #include <utils/Log.h>
 
+#include <memory>
+
 #include <gtest/gtest.h>
 
 #include <binder/Parcel.h>
@@ -194,16 +196,15 @@ TEST(CodecInfoTest, ListInfoTest) {
             }
         }
 
-        Parcel *codecInfoParcel = new Parcel();
+        std::unique_ptr<Parcel> codecInfoParcel(new Parcel());
         ASSERT_NE(codecInfoParcel, nullptr) << "Unable to create parcel";
 
-        status_t status = info->writeToParcel(codecInfoParcel);
+        status_t status = info->writeToParcel(codecInfoParcel.get());
         ASSERT_EQ(status, OK) << "Writing to parcel failed";
 
         codecInfoParcel->setDataPosition(0);
         sp<MediaCodecInfo> parcelCodecInfo = info->FromParcel(*codecInfoParcel);
         ASSERT_NE(parcelCodecInfo, nullptr) << "CodecInfo from parcel is null";
-        delete codecInfoParcel;
 
         EXPECT_STREQ(info->getCodecName(), parcelCodecInfo->getCodecName())
                 << "Returned codec name in info doesn't match";

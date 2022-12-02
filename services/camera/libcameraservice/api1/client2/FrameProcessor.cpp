@@ -59,6 +59,8 @@ FrameProcessor::FrameProcessor(wp<CameraDeviceBase> device,
         m3aState.aeState = ANDROID_CONTROL_AE_STATE_INACTIVE;
         m3aState.afState = ANDROID_CONTROL_AF_STATE_INACTIVE;
         m3aState.awbState = ANDROID_CONTROL_AWB_STATE_INACTIVE;
+
+        mLastFocalLength = l.mParameters.params.getFloat(CameraParameters::KEY_FOCAL_LENGTH);
     }
 }
 
@@ -92,7 +94,30 @@ bool FrameProcessor::processSingleFrame(CaptureResult &frame,
         client->notifyRequestId(mCurrentRequestId);
     }
 
+    processLensState(frame.mMetadata, client);
+
     return FrameProcessorBase::processSingleFrame(frame, device);
+}
+
+void FrameProcessor::processLensState(const CameraMetadata &frame,
+        const sp<Camera2Client> &client) {
+    ATRACE_CALL();
+    camera_metadata_ro_entry_t entry;
+
+    entry = frame.find(ANDROID_LENS_FOCAL_LENGTH);
+    if (entry.count == 0) {
+        return;
+    }
+
+    if (fabs(entry.data.f[0] - mLastFocalLength) > 0.001f) {
+        SharedParameters::Lock l(client->getParameters());
+        l.mParameters.params.setFloat(
+                CameraParameters::KEY_FOCAL_LENGTH,
+                entry.data.f[0]);
+        l.mParameters.paramsFlattened = l.mParameters.params.flatten();
+
+        mLastFocalLength = entry.data.f[0];
+    }
 }
 
 status_t FrameProcessor::processFaceDetect(const CameraMetadata &frame,
