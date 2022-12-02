@@ -1,5 +1,5 @@
 /*
- * Copyright (C) 2018 The Android Open Source Project
+ * Copyright (C) 2022 The Android Open Source Project
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -14,24 +14,19 @@
  * limitations under the License.
  */
 
-#ifndef ANDROID_HARDWARE_FACTORY_HAL_HIDL_H
-#define ANDROID_HARDWARE_FACTORY_HAL_HIDL_H
+#pragma once
 
 #include <string>
 #include <utility>
-
 #include <utils/StrongPointer.h>
+
+#include "AudioHalVersionInfo.h"
 
 namespace android {
 
-// The pair of the interface's package name and the interface name,
-// e.g. <"android.hardware.audio", "IDevicesFactory">.
-// Splitting is used for easier construction of versioned names (FQNs).
-using InterfaceName = std::pair<std::string, std::string>;
-
 namespace detail {
 
-void* createPreferredImpl(const InterfaceName& iface, const InterfaceName& siblingIface);
+void* createPreferredImpl(bool isCore);
 
 }  // namespace detail
 
@@ -45,17 +40,12 @@ void* createPreferredImpl(const InterfaceName& iface, const InterfaceName& sibli
  * shared libraries the loader function considers which interface among two has the most
  * recent version. Thus, a pair of interface names must be passed in.
  *
- * @param iface the interface that needs to be created.
- * @param siblingIface the interface which occupies the same shared library.
+ * @param isCore Indicating if this is audio Core HAL service interface.
  * @return the preferred available implementation or nullptr if none are available.
  */
+
 template <class Interface>
-static sp<Interface> createPreferredImpl(
-        const InterfaceName& iface, const InterfaceName& siblingIface) {
-    return sp<Interface>{
-        static_cast<Interface*>(detail::createPreferredImpl(iface, siblingIface))};
+static sp<Interface> createPreferredImpl(bool isCore) {
+    return sp<Interface>{static_cast<Interface*>(detail::createPreferredImpl(isCore))};
 }
-
 } // namespace android
-
-#endif // ANDROID_HARDWARE_FACTORY_HAL_HIDL_H

@@ -14,13 +14,15 @@
  * limitations under the License.
  */
 
-#ifndef ANDROID_HARDWARE_EFFECTS_FACTORY_HAL_INTERFACE_H
-#define ANDROID_HARDWARE_EFFECTS_FACTORY_HAL_INTERFACE_H
+#pragma once
 
 #include <media/audiohal/EffectHalInterface.h>
 #include <system/audio_effect.h>
 #include <utils/Errors.h>
 #include <utils/RefBase.h>
+
+#include "AudioHalVersionInfo.h"
+#include "FactoryHal.h"
 
 namespace android {
 
@@ -49,16 +51,16 @@ class EffectsFactoryHalInterface : public RefBase
 
     virtual status_t dumpEffects(int fd) = 0;
 
-    virtual float getHalVersion() = 0;
-
     static sp<EffectsFactoryHalInterface> create();
 
     virtual status_t allocateBuffer(size_t size, sp<EffectBufferHalInterface>* buffer) = 0;
     virtual status_t mirrorBuffer(void* external, size_t size,
                                   sp<EffectBufferHalInterface>* buffer) = 0;
 
+    virtual android::detail::AudioHalVersionInfo getHalVersion() const = 0;
+
     // Helper function to compare effect uuid to EFFECT_UUID_NULL.
-    static bool isNullUuid(const effect_uuid_t *pEffectUuid);
+    static bool isNullUuid(const effect_uuid_t* pEffectUuid);
 
   protected:
     // Subclasses can not be constructed directly by clients.
@@ -68,5 +70,3 @@ class EffectsFactoryHalInterface : public RefBase
 };
 
 } // namespace android
-
-#endif // ANDROID_HARDWARE_EFFECTS_FACTORY_HAL_INTERFACE_H
