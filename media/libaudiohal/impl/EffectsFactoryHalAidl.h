@@ -1,5 +1,5 @@
 /*
- * Copyright (C) 2016 The Android Open Source Project
+ * Copyright (C) 2022 The Android Open Source Project
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -16,25 +16,16 @@
 
 #pragma once
 
-#include <memory>
-
-#include PATH(android/hardware/audio/effect/FILE_VERSION/IEffectsFactory.h)
 #include <media/audiohal/EffectsFactoryHalInterface.h>
-
-#include "EffectConversionHelperHidl.h"
 
 namespace android {
 namespace effect {
 
-using ::android::hardware::hidl_vec;
-using namespace ::android::hardware::audio::effect::CPP_VERSION;
+using namespace aidl::android::hardware::audio::effect;
 
-class EffectDescriptorCache;
-
-class EffectsFactoryHalHidl final : public EffectsFactoryHalInterface,
-                                    public EffectConversionHelperHidl {
+class EffectsFactoryHalAidl final : public EffectsFactoryHalInterface {
   public:
-    EffectsFactoryHalHidl(sp<IEffectsFactory> effectsFactory);
+    explicit EffectsFactoryHalAidl(std::shared_ptr<IFactory> effectsFactory);
 
     // Returns the number of different effects in all loaded libraries.
     status_t queryNumberEffects(uint32_t *pNumEffects) override;
@@ -63,8 +54,8 @@ class EffectsFactoryHalHidl final : public EffectsFactoryHalInterface,
     android::detail::AudioHalVersionInfo getHalVersion() const override;
 
   private:
-    sp<IEffectsFactory> mEffectsFactory;
-    std::unique_ptr<EffectDescriptorCache> mCache;
+    std::shared_ptr<IFactory> mEffectsFactory;
+    virtual ~EffectsFactoryHalAidl() = default;
 };
 
 } // namespace effect
