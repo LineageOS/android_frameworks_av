@@ -30,13 +30,15 @@ extern statsd_pusher statsd_audiorecord;
 extern statsd_pusher statsd_audiothread;
 extern statsd_pusher statsd_audiotrack;
 extern statsd_pusher statsd_codec;
+extern statsd_pusher statsd_drmmanager;
 extern statsd_pusher statsd_extractor;
+extern statsd_pusher statsd_mediadrm;
+extern statsd_pusher statsd_mediadrm_created;
+extern statsd_pusher statsd_mediadrm_errored;
+extern statsd_pusher statsd_mediadrm_session_opened;
 extern statsd_pusher statsd_mediaparser;
-
 extern statsd_pusher statsd_nuplayer;
 extern statsd_pusher statsd_recorder;
-extern statsd_pusher statsd_mediadrm;
-extern statsd_pusher statsd_drmmanager;
 
 using statsd_puller = bool (const std::shared_ptr<const mediametrics::Item>& item,
         AStatsEventList *, const std::shared_ptr<mediametrics::StatsdLog>& statsdLog);

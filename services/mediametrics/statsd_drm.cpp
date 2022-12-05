@@ -18,8 +18,9 @@
 #define LOG_TAG "statsd_drm"
 #include <utils/Log.h>
 #include <media/stagefright/foundation/base64.h>
+#include <binder/IPCThreadState.h>
 
-#include <stdint.h>
+#include <cstdint>
 #include <inttypes.h>
 #include <sys/types.h>
 #include <sys/stat.h>
@@ -32,6 +33,7 @@
 #include <pwd.h>
 
 #include "MediaMetricsService.h"
+#include "MediaDrmStatsdHelper.h"
 #include "StringUtils.h"
 #include "iface_statsd.h"
 
@@ -228,6 +230,145 @@ bool statsd_mediadrm_puller(
             << " vendor_metrics:" <<  mediametrics::stringutils::bytesToString(plugin_raw, 8)
             << " }";
     statsdLog->log(android::util::MEDIA_DRM_ACTIVITY_INFO, log.str());
+    return true;
+}
+
+bool statsd_mediadrm_created(const std::shared_ptr<const mediametrics::Item>& item,
+        const std::shared_ptr<mediametrics::StatsdLog>& statsdLog)
+{
+    int64_t uuid_lsb = -1;
+    if (!item->getInt64("uuid_lsb", &uuid_lsb)) return false;
+    int64_t uuid_msb = -1;
+    if (!item->getInt64("uuid_msb", &uuid_msb)) return false;
+    const int32_t scheme = MediaDrmStatsdHelper::findDrmScheme(uuid_msb, uuid_lsb);
+    const int32_t uid = IPCThreadState::self()->getCallingUid();
+    int32_t frontend = 0;
+    if (!item->getInt32("frontend", &frontend)) return false;
+
+    // Optional to be included
+    int64_t apex_version = -1;
+    item->getInt64("apex_version", &apex_version);
+    const int result = stats_write(stats::media_metrics::MEDIA_DRM_CREATED,
+                    scheme, uuid_lsb, uuid_msb, uid, frontend, apex_version);
+
+    std::stringstream log;
+    log << "result:" << result << " {"
+            << " media_drm_created:"
+            << stats::media_metrics::MEDIA_DRM_CREATED
+            << " scheme:" << scheme
+            << " uuid_lsb:" << uuid_lsb
+            << " uuid_msb:" << uuid_msb
+            << " uid:" << uid
+            << " frontend:" << frontend
+            << " apex_version:" << apex_version
+            << " }";
+    statsdLog->log(stats::media_metrics::MEDIA_DRM_CREATED, log.str());
+    return true;
+}
+
+bool statsd_mediadrm_session_opened(const std::shared_ptr<const mediametrics::Item>& item,
+        const std::shared_ptr<mediametrics::StatsdLog>& statsdLog)
+{
+    int64_t uuid_lsb = -1;
+    if (!item->getInt64("uuid_lsb", &uuid_lsb)) return false;
+    int64_t uuid_msb = -1;
+    if (!item->getInt64("uuid_msb", &uuid_msb)) return false;
+    const int32_t scheme = MediaDrmStatsdHelper::findDrmScheme(uuid_msb, uuid_lsb);
+    std::string object_nonce = "";
+    if (!item->getString("object_nonce", &object_nonce)) return false;
+    const int32_t uid = IPCThreadState::self()->getCallingUid();
+    int32_t frontend = 0;
+    if (!item->getInt32("frontend", &frontend)) return false;
+    int32_t requested_security_level = -1;
+    if (!item->getInt32("requested_security_level", &requested_security_level)) return false;
+    int32_t opened_security_level = -1;
+    if (!item->getInt32("opened_security_level", &opened_security_level)) return false;
+
+    // Optional to be included
+    int64_t apex_version = -1;
+    item->getInt64("apex_version", &apex_version);
+    const int result = stats_write(stats::media_metrics::MEDIA_DRM_SESSION_OPENED,
+                        scheme, uuid_lsb, uuid_msb, uid, frontend, apex_version,
+                        object_nonce.c_str(), requested_security_level,
+                        opened_security_level);
+
+    std::stringstream log;
+    log << "result:" << result << " {"
+            << " media_drm_session_opened:"
+            << stats::media_metrics::MEDIA_DRM_SESSION_OPENED
+            << " scheme:" << scheme
+            << " uuid_lsb:" << uuid_lsb
+            << " uuid_msb:" << uuid_msb
+            << " uid:" << uid
+            << " frontend:" << frontend
+            << " apex_version:" << apex_version
+            << " object_nonce:" << object_nonce
+            << " requested_security_level:" << requested_security_level
+            << " opened_security_level:" << opened_security_level
+            << " }";
+    statsdLog->log(stats::media_metrics::MEDIA_DRM_SESSION_OPENED, log.str());
+    return true;
+}
+
+bool statsd_mediadrm_errored(const std::shared_ptr<const mediametrics::Item>& item,
+        const std::shared_ptr<mediametrics::StatsdLog>& statsdLog)
+{
+    int64_t uuid_lsb = -1;
+    if (!item->getInt64("uuid_lsb", &uuid_lsb)) return false;
+    int64_t uuid_msb = -1;
+    if (!item->getInt64("uuid_msb", &uuid_msb)) return false;
+    const int32_t scheme = MediaDrmStatsdHelper::findDrmScheme(uuid_msb, uuid_lsb);
+    const int32_t uid = IPCThreadState::self()->getCallingUid();
+    int32_t frontend = 0;
+    if (!item->getInt32("frontend", &frontend)) return false;
+    std::string object_nonce = "";
+    if (!item->getString("object_nonce", &object_nonce)) return false;
+    int32_t security_level = -1;
+    if (!item->getInt32("security_level", &security_level)) return false;
+    std::string api_str = "";
+    if (!item->getString("api", &api_str)) return false;
+    const int32_t api = MediaDrmStatsdHelper::findDrmApi(api_str);
+    int32_t error_code = -1;
+    if (!item->getInt32("error_code", &error_code)) return false;
+
+    // Optional to be included
+    int64_t apex_version = -1;
+    item->getInt64("apex_version", &apex_version);
+    std::string session_nonce = "";
+    item->getString("session_nonce", &session_nonce);
+
+    int32_t cdm_err = 0;
+    item->getInt32("cdm_err", &cdm_err);
+    int32_t oem_err = 0;
+    item->getInt32("oem_err", &oem_err);
+    int32_t error_context = -1;
+    item->getInt32("error_context", &error_context);
+
+    const int result = stats_write(stats::media_metrics::MEDIA_DRM_ERRORED, scheme, uuid_lsb,
+                        uuid_msb, uid, frontend, apex_version, object_nonce.c_str(),
+                        session_nonce.c_str(), security_level, api, error_code, cdm_err,
+                        oem_err, error_context);
+
+    std::stringstream log;
+    log << "result:" << result << " {"
+            << " media_drm_errored:"
+            << stats::media_metrics::MEDIA_DRM_ERRORED
+            << " scheme:" << scheme
+            << " uuid_lsb:" << uuid_lsb
+            << " uuid_msb:" << uuid_msb
+            << " uid:" << uid
+            << " frontend:" << frontend
+            << " apex_version:" << apex_version
+            << " object_nonce:" << object_nonce
+            << " session_nonce:" << session_nonce
+            << " security_level:" << security_level
+            << " api:" << api
+            << " error_code:" << error_code
+            << " cdm_err:" << cdm_err
+            << " oem_err:" << oem_err
+            << " error_context:" << error_context
+            << " }";
+    statsdLog->log(stats::media_metrics::MEDIA_DRM_ERRORED, log.str());
     return true;
 }
 

@@ -138,6 +138,7 @@ cc_library {
         "AudioTypes.cpp",
         "cleaner.cpp",
         "iface_statsd.cpp",
+        "MediaDrmStatsdHelper.cpp",
         "MediaMetricsService.cpp",
         "statsd_audiopolicy.cpp",
         "statsd_audiorecord.cpp",
