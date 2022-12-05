@@ -92,6 +92,10 @@ StreamParameters AAudioStreamConfiguration::parcelable() const {
     result.usage = getUsage();
     static_assert(sizeof(aaudio_content_type_t) == sizeof(result.contentType));
     result.contentType = getContentType();
+    static_assert(
+            sizeof(aaudio_spatialization_behavior_t) == sizeof(result.spatializationBehavior));
+    result.spatializationBehavior = getSpatializationBehavior();
+    result.isContentSpatialized = isContentSpatialized();
     static_assert(sizeof(aaudio_input_preset_t) == sizeof(result.inputPreset));
     result.inputPreset = getInputPreset();
     result.bufferCapacity = getBufferCapacity();
