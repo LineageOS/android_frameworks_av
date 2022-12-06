@@ -74,6 +74,8 @@ private:
         size_t cropWidth() const;
         size_t cropHeight() const;
 
+        bool isValid() const;
+
         void *mBits;
         OMX_COLOR_FORMATTYPE mColorFormat;
         size_t mWidth, mHeight;
@@ -121,7 +123,7 @@ private:
 
     status_t convertYUV420SemiPlanarBase(
             const BitmapParams &src, const BitmapParams &dst,
-            const uint8_t *src_y, const uint8_t *src_u, size_t row_inc, bool isNV21 = false);
+            size_t row_inc, bool isNV21 = false);
 
     status_t convertTIYUV420PackedSemiPlanar(
             const BitmapParams &src, const BitmapParams &dst);
