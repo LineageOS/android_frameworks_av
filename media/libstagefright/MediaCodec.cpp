@@ -69,6 +69,7 @@
 #include <media/stagefright/BatteryChecker.h>
 #include <media/stagefright/BufferProducerWrapper.h>
 #include <media/stagefright/CCodec.h>
+#include <media/stagefright/CryptoAsync.h>
 #include <media/stagefright/MediaCodec.h>
 #include <media/stagefright/MediaCodecConstants.h>
 #include <media/stagefright/MediaCodecList.h>
@@ -496,6 +497,7 @@ enum {
     kWhatReleaseCompleted    = 'rcom',
     kWhatFlushCompleted      = 'fcom',
     kWhatError               = 'erro',
+    kWhatCryptoError         = 'ercp',
     kWhatComponentAllocated  = 'cAll',
     kWhatComponentConfigured = 'cCon',
     kWhatInputSurfaceCreated = 'isfc',
@@ -504,6 +506,40 @@ enum {
     kWhatOutputFramesRendered = 'outR',
     kWhatOutputBuffersChanged = 'outC',
     kWhatFirstTunnelFrameReady = 'ftfR',
+};
+
+class CryptoAsyncCallback : public CryptoAsync::CryptoAsyncCallback {
+public:
+
+    explicit CryptoAsyncCallback(const sp<AMessage> & notify):mNotify(notify) {
+    }
+
+    ~CryptoAsyncCallback() {}
+
+    void onDecryptComplete(const sp<AMessage> &result) override {
+        (void)result;
+    }
+
+    void onDecryptError(const std::list<sp<AMessage>> &errorMsgs) override {
+        // This error may be decrypt/queue error.
+        status_t errorCode ;
+        for (auto &emsg : errorMsgs) {
+             sp<AMessage> notify(mNotify->dup());
+             if(emsg->findInt32("err", &errorCode)) {
+                 if (isCryptoError(errorCode)) {
+                     notify->setInt32("what", kWhatCryptoError);
+                 } else {
+                     notify->setInt32("what", kWhatError);
+                 }
+                 notify->extend(emsg);
+                 notify->post();
+             } else {
+                 ALOGW("Buffers with no errorCode are not expected");
+             }
+        }
+    }
+private:
+    const sp<AMessage> mNotify;
 };
 
 class BufferCallback : public CodecBase::BufferCallback {
@@ -1689,7 +1725,6 @@ status_t MediaCodec::init(const AString &name) {
     mBufferChannel->setCallback(
             std::unique_ptr<CodecBase::BufferCallback>(
                     new BufferCallback(new AMessage(kWhatCodecNotify, this))));
-
     sp<AMessage> msg = new AMessage(kWhatInit, this);
     if (mCodecInfo) {
         msg->setObject("codecInfo", mCodecInfo);
@@ -1802,7 +1837,6 @@ status_t MediaCodec::configure(
         if (!format->findInt32("rotation-degrees", &mRotationDegrees)) {
             mRotationDegrees = 0;
         }
-
         if (nextMetricsHandle != 0) {
             mediametrics_setInt32(nextMetricsHandle, kCodecWidth, mWidth);
             mediametrics_setInt32(nextMetricsHandle, kCodecHeight, mHeight);
@@ -3278,9 +3312,10 @@ void MediaCodec::onMessageReceived(const sp<AMessage> &msg) {
         {
             int32_t what;
             CHECK(msg->findInt32("what", &what));
-
+            AString codecErrorState;
             switch (what) {
                 case kWhatError:
+                case kWhatCryptoError:
                 {
                     int32_t err, actionCode;
                     CHECK(msg->findInt32("err", &err));
@@ -3293,11 +3328,20 @@ void MediaCodec::onMessageReceived(const sp<AMessage> &msg) {
                         mFlags |= kFlagSawMediaServerDie;
                         mFlags &= ~kFlagIsComponentAllocated;
                     }
-
                     bool sendErrorResponse = true;
-                    std::string origin{"kWhatError:"};
+                    std::string origin;
+                    if (what == kWhatCryptoError) {
+                        origin = "kWhatCryptoError:";
+                    } else {
+                        origin = "kWhatError:";
+                        //TODO: add a new error state
+                    }
+                    codecErrorState = kCodecErrorState;
                     origin += stateString(mState);
-
+                    if (mCryptoAsync) {
+                        //TODO: do some book keeping on the buffers
+                        mCryptoAsync->stop();
+                    }
                     switch (mState) {
                         case INITIALIZING:
                         {
@@ -3399,7 +3443,11 @@ void MediaCodec::onMessageReceived(const sp<AMessage> &msg) {
                             cancelPendingDequeueOperations();
 
                             if (mFlags & kFlagIsAsync) {
-                                onError(err, actionCode);
+                                if (what == kWhatError) {
+                                    onError(err, actionCode);
+                                } else if (what == kWhatCryptoError) {
+                                    onCryptoError(msg);
+                                }
                             }
                             switch (actionCode) {
                             case ACTION_CODE_TRANSIENT:
@@ -3431,7 +3479,11 @@ void MediaCodec::onMessageReceived(const sp<AMessage> &msg) {
                                 actionCode = ACTION_CODE_FATAL;
                             }
                             if (mFlags & kFlagIsAsync) {
-                                onError(err, actionCode);
+                                if (what == kWhatError) {
+                                    onError(err, actionCode);
+                                } else if (what == kWhatCryptoError) {
+                                    onCryptoError(msg);
+                                }
                             }
                             switch (actionCode) {
                             case ACTION_CODE_TRANSIENT:
@@ -4113,12 +4165,24 @@ void MediaCodec::onMessageReceived(const sp<AMessage> &msg) {
 
             uint32_t flags;
             CHECK(msg->findInt32("flags", (int32_t *)&flags));
-            if (flags & CONFIGURE_FLAG_USE_BLOCK_MODEL) {
+            if (flags & CONFIGURE_FLAG_USE_BLOCK_MODEL ||
+                flags & CONFIGURE_FLAG_USE_CRYPTO_ASYNC) {
                 if (!(mFlags & kFlagIsAsync)) {
+                    ALOGE("Error: configuration requires async operation");
                     PostReplyWithError(replyID, INVALID_OPERATION);
                     break;
                 }
-                mFlags |= kFlagUseBlockModel;
+                if (flags & CONFIGURE_FLAG_USE_BLOCK_MODEL) {
+                    mFlags |= kFlagUseBlockModel;
+                }
+                if (flags & CONFIGURE_FLAG_USE_CRYPTO_ASYNC) {
+                    // silently disable crytoasync with blockmodel
+                    if (!(mFlags & kFlagUseBlockModel)) {
+                        mFlags |= kFlagUseCryptoAsync;
+                    } else {
+                        ALOGW("CrytoAsync not yet enabled for block model, falling back to normal");
+                    }
+                }
             }
             mReplyID = replyID;
             setState(CONFIGURING);
@@ -4144,6 +4208,21 @@ void MediaCodec::onMessageReceived(const sp<AMessage> &msg) {
 
             mDescrambler = static_cast<IDescrambler *>(descrambler);
             mBufferChannel->setDescrambler(mDescrambler);
+            if ((mFlags & kFlagUseCryptoAsync) &&
+                mCrypto  && (mDomain == DOMAIN_VIDEO)) {
+                mCryptoAsync = new CryptoAsync(mBufferChannel);
+                mCryptoAsync->setCallback(
+                std::make_unique<CryptoAsyncCallback>(new AMessage(kWhatCodecNotify, this)));
+                mCryptoLooper = new ALooper();
+                mCryptoLooper->setName("CryptoAsyncLooper");
+                mCryptoLooper->registerHandler(mCryptoAsync);
+                status_t err = mCryptoLooper->start();
+                if (err != OK) {
+                    ALOGE("Crypto Looper failed to start");
+                    mCryptoAsync = nullptr;
+                    mCryptoLooper = nullptr;
+                }
+            }
 
             format->setInt32("flags", flags);
             if (flags & CONFIGURE_FLAG_ENCODE) {
@@ -4313,7 +4392,9 @@ void MediaCodec::onMessageReceived(const sp<AMessage> &msg) {
 
             sp<AReplyToken> replyID;
             CHECK(msg->senderAwaitsResponse(&replyID));
-
+            if (mCryptoAsync) {
+                mCryptoAsync->stop();
+            }
             sp<AMessage> asyncNotify;
             (void)msg->findMessage("async", &asyncNotify);
             // post asyncNotify if going out of scope.
@@ -4733,7 +4814,11 @@ void MediaCodec::onMessageReceived(const sp<AMessage> &msg) {
             mReplyID = replyID;
             // TODO: skip flushing if already FLUSHED
             setState(FLUSHING);
-
+            if (mCryptoAsync) {
+                std::list<sp<AMessage>> pendingBuffers;
+                mCryptoAsync->stop(&pendingBuffers);
+                //TODO: do something with these buffers
+            }
             mCodec->signalFlush();
             returnBuffersToCodec();
             TunnelPeekState previousState = mTunnelPeekState;
@@ -5171,7 +5256,7 @@ status_t MediaCodec::onQueueInputBuffer(const sp<AMessage> &msg) {
         CHECK(msg->findSize("offset", &offset));
     }
     const CryptoPlugin::SubSample *subSamples;
-    size_t numSubSamples;
+    size_t numSubSamples = 0;
     const uint8_t *key = NULL;
     const uint8_t *iv = NULL;
     CryptoPlugin::Mode mode = CryptoPlugin::kMode_Unencrypted;
@@ -5197,7 +5282,6 @@ status_t MediaCodec::onQueueInputBuffer(const sp<AMessage> &msg) {
                     mComponentName.c_str());
             return -EINVAL;
         }
-
         CHECK(msg->findPointer("subSamples", (void **)&subSamples));
         CHECK(msg->findSize("numSubSamples", &numSubSamples));
         CHECK(msg->findPointer("key", (void **)&key));
@@ -5223,13 +5307,83 @@ status_t MediaCodec::onQueueInputBuffer(const sp<AMessage> &msg) {
 
     BufferInfo *info = &mPortBuffers[kPortIndexInput][index];
     sp<MediaCodecBuffer> buffer = info->mData;
+    if (buffer == nullptr || !info->mOwnedByClient) {
+        return -EACCES;
+    }
+    auto setInputBufferParams = [this, &buffer]
+        (int64_t timeUs, uint32_t flags = 0) -> status_t {
+        status_t err = OK;
+        buffer->meta()->setInt64("timeUs", timeUs);
+        if (flags & BUFFER_FLAG_EOS) {
+            buffer->meta()->setInt32("eos", true);
+        }
 
+        if (flags & BUFFER_FLAG_CODECCONFIG) {
+            buffer->meta()->setInt32("csd", true);
+        }
+        bool isBufferDecodeOnly = ((flags & BUFFER_FLAG_DECODE_ONLY) != 0);
+        if (isBufferDecodeOnly) {
+            buffer->meta()->setInt32("decode-only", true);
+        }
+        if (mTunneled && !isBufferDecodeOnly) {
+            TunnelPeekState previousState = mTunnelPeekState;
+            switch(mTunnelPeekState){
+                case TunnelPeekState::kEnabledNoBuffer:
+                    buffer->meta()->setInt32("tunnel-first-frame", 1);
+                    mTunnelPeekState = TunnelPeekState::kEnabledQueued;
+                    ALOGV("TunnelPeekState: %s -> %s",
+                        asString(previousState),
+                        asString(mTunnelPeekState));
+                break;
+                case TunnelPeekState::kDisabledNoBuffer:
+                    buffer->meta()->setInt32("tunnel-first-frame", 1);
+                    mTunnelPeekState = TunnelPeekState::kDisabledQueued;
+                    ALOGV("TunnelPeekState: %s -> %s",
+                        asString(previousState),
+                        asString(mTunnelPeekState));
+                break;
+            default:
+                break;
+           }
+        }
+     return err;
+    };
+    auto buildCryptoInfoAMessage = [&](const sp<AMessage> & cryptoInfo, int32_t action) {
+        size_t key_len = (key != nullptr)? 16 : 0;
+        size_t iv_len = (iv != nullptr)? 16 : 0;
+        sp<ABuffer> shared_key;
+        sp<ABuffer> shared_iv;
+        if (key_len > 0) {
+            shared_key = ABuffer::CreateAsCopy((void*)key, key_len);
+        }
+        if (iv_len > 0) {
+            shared_iv = ABuffer::CreateAsCopy((void*)iv, iv_len);
+        }
+        sp<ABuffer> subSamples_buffer =
+            new ABuffer(sizeof(CryptoPlugin::SubSample) * numSubSamples);
+        CryptoPlugin::SubSample * samples =
+           (CryptoPlugin::SubSample *)(subSamples_buffer.get()->data());
+        for (int s = 0 ; s < numSubSamples ; s++) {
+            samples[s].mNumBytesOfClearData = subSamples[s].mNumBytesOfClearData;
+            samples[s].mNumBytesOfEncryptedData = subSamples[s].mNumBytesOfEncryptedData;
+        }
+        // set decrypt Action
+        cryptoInfo->setInt32("action", action);
+        cryptoInfo->setObject("buffer", buffer);
+        cryptoInfo->setInt32("secure", mFlags & kFlagIsSecure);
+        cryptoInfo->setBuffer("key", shared_key);
+        cryptoInfo->setBuffer("iv", shared_iv);
+        cryptoInfo->setInt32("mode", (int)mode);
+        cryptoInfo->setInt32("encryptBlocks", pattern.mEncryptBlocks);
+        cryptoInfo->setInt32("skipBlocks", pattern.mSkipBlocks);
+        cryptoInfo->setBuffer("subSamples", subSamples_buffer);
+        cryptoInfo->setSize("numSubSamples", numSubSamples);
+    };
     if (c2Buffer || memory) {
         sp<AMessage> tunings = NULL;
         if (msg->findMessage("tunings", &tunings) && tunings != NULL) {
             onSetParameters(tunings);
         }
-
         status_t err = OK;
         if (c2Buffer) {
             err = mBufferChannel->attachBuffer(c2Buffer, buffer);
@@ -5240,7 +5394,6 @@ status_t MediaCodec::onQueueInputBuffer(const sp<AMessage> &msg) {
         } else {
             err = UNKNOWN_ERROR;
         }
-
         if (err == OK && !buffer->asC2Buffer()
                 && c2Buffer && c2Buffer->data().type() == C2BufferData::LINEAR) {
             C2ConstLinearBlock block{c2Buffer->data().linearBlocks().front()};
@@ -5256,63 +5409,23 @@ status_t MediaCodec::onQueueInputBuffer(const sp<AMessage> &msg) {
                 flags &= ~BUFFER_FLAG_EOS;
             }
         }
-
         offset = buffer->offset();
         size = buffer->size();
         if (err != OK) {
             ALOGI("block model buffer attach failed: err = %s (%d)",
-                  StrMediaError(err).c_str(), err);
+                    StrMediaError(err).c_str(), err);
             return err;
         }
     }
-
-    if (buffer == nullptr || !info->mOwnedByClient) {
-        return -EACCES;
-    }
-
     if (offset + size > buffer->capacity()) {
         return -EINVAL;
     }
-
     buffer->setRange(offset, size);
-    buffer->meta()->setInt64("timeUs", timeUs);
-
-    if (flags & BUFFER_FLAG_EOS) {
-        buffer->meta()->setInt32("eos", true);
-    }
-
-    if (flags & BUFFER_FLAG_CODECCONFIG) {
-        buffer->meta()->setInt32("csd", true);
-    }
-
-    bool isBufferDecodeOnly = ((flags & BUFFER_FLAG_DECODE_ONLY) != 0);
-    if (isBufferDecodeOnly) {
-        buffer->meta()->setInt32("decode-only", true);
-    }
-
-    if (mTunneled && !isBufferDecodeOnly) {
-        TunnelPeekState previousState = mTunnelPeekState;
-        switch(mTunnelPeekState){
-            case TunnelPeekState::kEnabledNoBuffer:
-                buffer->meta()->setInt32("tunnel-first-frame", 1);
-                mTunnelPeekState = TunnelPeekState::kEnabledQueued;
-                ALOGV("TunnelPeekState: %s -> %s",
-                        asString(previousState),
-                        asString(mTunnelPeekState));
-                break;
-            case TunnelPeekState::kDisabledNoBuffer:
-                buffer->meta()->setInt32("tunnel-first-frame", 1);
-                mTunnelPeekState = TunnelPeekState::kDisabledQueued;
-                ALOGV("TunnelPeekState: %s -> %s",
-                        asString(previousState),
-                        asString(mTunnelPeekState));
-                break;
-            default:
-                break;
-        }
-    }
-
     status_t err = OK;
+    err = setInputBufferParams(timeUs, flags);
+    if (err != OK) {
+        return -EINVAL;
+    }
     if (hasCryptoOrDescrambler() && !c2Buffer && !memory) {
         AString *errorDetailMsg;
         CHECK(msg->findPointer("errorDetailMsg", (void **)&errorDetailMsg));
@@ -5328,7 +5441,13 @@ status_t MediaCodec::onQueueInputBuffer(const sp<AMessage> &msg) {
                 }
             }
         }
-        err = mBufferChannel->queueSecureInputBuffer(
+        if (mCryptoAsync) {
+            // prepare a message and enqueue
+            sp<AMessage> cryptoInfo = new AMessage();
+            buildCryptoInfoAMessage(cryptoInfo, CryptoAsync::kActionDecrypt);
+            mCryptoAsync->decrypt(cryptoInfo);
+        } else {
+            err = mBufferChannel->queueSecureInputBuffer(
                 buffer,
                 (mFlags & kFlagIsSecure),
                 key,
@@ -5338,6 +5457,7 @@ status_t MediaCodec::onQueueInputBuffer(const sp<AMessage> &msg) {
                 subSamples,
                 numSubSamples,
                 errorDetailMsg);
+        }
         if (err != OK) {
             mediametrics_setInt32(mMetricsHandle, kCodecQueueSecureInputBufferError, err);
             ALOGW("Log queueSecureInputBuffer error: %d", err);
@@ -5629,7 +5749,14 @@ void MediaCodec::onOutputBufferAvailable() {
         msg->post();
     }
 }
-
+void MediaCodec::onCryptoError(const sp<AMessage> & msg) {
+    if (mCallback != NULL) {
+        sp<AMessage> cb_msg = mCallback->dup();
+        cb_msg->setInt32("callbackID", CB_CRYPTO_ERROR);
+        cb_msg->extend(msg);
+        cb_msg->post();
+    }
+}
 void MediaCodec::onError(status_t err, int32_t actionCode, const char *detail) {
     if (mCallback != NULL) {
         sp<AMessage> msg = mCallback->dup();
