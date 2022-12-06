@@ -6712,7 +6712,7 @@ media_status_t MPEG4Source::fragmentedRead(
         const Sample *smpl = &mCurrentSamples[mCurrentSampleIndex];
         offset = smpl->offset;
         size = smpl->size;
-        cts = mCurrentTime + smpl->compositionOffset;
+        cts = (int64_t)mCurrentTime + (int64_t)smpl->compositionOffset;
 
         if (mElstInitialEmptyEditTicks > 0) {
             cts += mElstInitialEmptyEditTicks;
