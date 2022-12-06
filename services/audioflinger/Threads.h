@@ -55,7 +55,8 @@ public:
         CFG_EVENT_RELEASE_AUDIO_PATCH,
         CFG_EVENT_UPDATE_OUT_DEVICE,
         CFG_EVENT_RESIZE_BUFFER,
-        CFG_EVENT_CHECK_OUTPUT_STAGE_EFFECTS
+        CFG_EVENT_CHECK_OUTPUT_STAGE_EFFECTS,
+        CFG_EVENT_HAL_LATENCY_MODES_CHANGED,
     };
 
     class ConfigEventData: public RefBase {
@@ -282,6 +283,15 @@ public:
         virtual ~CheckOutputStageEffectsEvent() {}
     };
 
+    class HalLatencyModesChangedEvent : public ConfigEvent {
+    public:
+        HalLatencyModesChangedEvent() :
+            ConfigEvent(CFG_EVENT_HAL_LATENCY_MODES_CHANGED) {
+        }
+
+        virtual ~HalLatencyModesChangedEvent() {}
+    };
+
 
     class PMDeathRecipient : public IBinder::DeathRecipient {
     public:
@@ -353,6 +363,7 @@ public:
                 void        sendResizeBufferConfigEvent_l(int32_t maxSharedAudioHistoryMs);
                 void        sendCheckOutputStageEffectsEvent();
                 void        sendCheckOutputStageEffectsEvent_l();
+                void        sendHalLatencyModesChangedEvent_l();
 
                 void        processConfigEvents_l();
     virtual     void        setCheckOutputStageEffects() {}
@@ -364,7 +375,7 @@ public:
     virtual     void        toAudioPortConfig(struct audio_port_config *config) = 0;
 
     virtual     void        resizeInputBuffer_l(int32_t maxSharedAudioHistoryMs);
-
+    virtual     void        onHalLatencyModesChanged_l() {}
 
 
                 // see note at declaration of mStandby, mOutDevice and mInDevice
@@ -921,6 +932,8 @@ protected:
                             }
 
     virtual     void        checkOutputStageEffects() {}
+    virtual     void        setHalLatencyMode_l() {}
+
 
                 void        dumpInternals_l(int fd, const Vector<String16>& args) override;
                 void        dumpTracks_l(int fd, const Vector<String16>& args) override;
@@ -1064,6 +1077,15 @@ public:
                 bool hasMixer() const {
                     return mType == MIXER || mType == DUPLICATING || mType == SPATIALIZER;
                 }
+
+    virtual     status_t setRequestedLatencyMode(
+            audio_latency_mode_t mode __unused) { return INVALID_OPERATION; }
+
+    virtual     status_t getSupportedLatencyModes(
+                        std::vector<audio_latency_mode_t>* modes __unused) {
+                    return INVALID_OPERATION;
+                }
+
 protected:
     // updated by readOutputParameters_l()
     size_t                          mNormalFrameCount;  // normal mixer and effects
@@ -1150,7 +1172,7 @@ protected:
     volatile int32_t                mSuspended;
 
     int64_t                         mBytesWritten;
-    int64_t                         mFramesWritten; // not reset on standby
+    std::atomic<int64_t>            mFramesWritten; // not reset on standby
     int64_t                         mLastFramesWritten = -1; // track changes in timestamp
                                                              // server frames written.
     int64_t                         mSuspendedFrames; // not reset on standby
@@ -1364,6 +1386,7 @@ public:
     virtual     bool        hasFastMixer() const = 0;
     virtual     FastTrackUnderruns getFastTrackUnderruns(size_t fastIndex __unused) const
                                 { FastTrackUnderruns dummy; return dummy; }
+                const std::atomic<int64_t>& framesWritten() const { return mFramesWritten; }
 
 protected:
                 // accessed by both binder threads and within threadLoop(), lock on mutex needed
@@ -1381,13 +1404,38 @@ protected:
 
                 std::atomic_bool mCheckOutputStageEffects{};
 
-                // A differential check on the timestamps to see if there is a change in the
-                // timestamp frame position between the last call to checkRunningTimestamp.
-                uint64_t mLastCheckedTimestampPosition = ~0LL;
 
-                bool checkRunningTimestamp();
+                // Provides periodic checking for timestamp advancement for underrun detection.
+                class IsTimestampAdvancing {
+                public:
+                    // The timestamp will not be checked any faster than the specified time.
+                    IsTimestampAdvancing(nsecs_t minimumTimeBetweenChecksNs)
+                        :   mMinimumTimeBetweenChecksNs(minimumTimeBetweenChecksNs)
+                    {
+                        clear();
+                    }
+                    // Check if the presentation position has advanced in the last periodic time.
+                    bool check(AudioStreamOut * output);
+                    // Clear the internal state when the playback state changes for the output
+                    // stream.
+                    void clear();
+                private:
+                    // The minimum time between timestamp checks.
+                    const nsecs_t mMinimumTimeBetweenChecksNs;
+                    // Add differential check on the timestamps to see if there is a change in the
+                    // timestamp frame position between the last call to check.
+                    uint64_t mPreviousPosition;
+                    // The time at which the last check occurred, to ensure we don't check too
+                    // frequently, giving the Audio HAL enough time to update its timestamps.
+                    nsecs_t mPreviousNs;
+                    // The valued is latched so we don't check timestamps too frequently.
+                    bool mLatchedValue;
+                };
+                IsTimestampAdvancing mIsTimestampAdvancing;
 
-    virtual     void flushHw_l() { mLastCheckedTimestampPosition = ~0LL; }
+    virtual     void flushHw_l() {
+                    mIsTimestampAdvancing.clear();
+                }
 };
 
 class MixerThread : public PlaybackThread {
@@ -1682,7 +1730,8 @@ public:
     }
 };
 
-class SpatializerThread : public MixerThread {
+class SpatializerThread : public MixerThread,
+        public StreamOutHalInterfaceLatencyModeCallback {
 public:
     SpatializerThread(const sp<AudioFlinger>& audioFlinger,
                            AudioStreamOut* output,
@@ -1693,10 +1742,35 @@ public:
 
             bool hasFastMixer() const override { return false; }
 
+            status_t    createAudioPatch_l(const struct audio_patch *patch,
+                                   audio_patch_handle_t *handle) override;
+
+            // RefBase
+            virtual void        onFirstRef();
+
+            // StreamOutHalInterfaceLatencyModeCallback
+            void onRecommendedLatencyModeChanged(std::vector<audio_latency_mode_t> modes) override;
+
+            status_t setRequestedLatencyMode(audio_latency_mode_t mode) override;
+            status_t getSupportedLatencyModes(std::vector<audio_latency_mode_t>* modes) override;
+
 protected:
             void checkOutputStageEffects() override;
+            void onHalLatencyModesChanged_l() override;
+            void setHalLatencyMode_l() override;
 
 private:
+            void updateHalSupportedLatencyModes_l();
+
+            // Support low latency mode by default as unless explicitly indicated by the audio HAL
+            // we assume the audio path is compatible with the head tracking latency requirements
+            std::vector<audio_latency_mode_t> mSupportedLatencyModes = {AUDIO_LATENCY_MODE_LOW};
+            // default to invalid value to force first update to the audio HAL
+            audio_latency_mode_t mSetLatencyMode =
+                    (audio_latency_mode_t)AUDIO_LATENCY_MODE_INVALID;
+            // Do not request a specific mode by default
+            audio_latency_mode_t mRequestedLatencyMode = AUDIO_LATENCY_MODE_FREE;
+
             sp<EffectHandle> mFinalDownMixer;
 };
 

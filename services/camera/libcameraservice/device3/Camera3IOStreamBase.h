@@ -56,11 +56,18 @@ class Camera3IOStreamBase :
     int              getMaxTotalBuffers() const { return mTotalBufferCount; }
   protected:
     size_t            mTotalBufferCount;
+    // The maximum number of cached buffers allowed for this stream
+    size_t            mMaxCachedBufferCount;
+
     // sum of input and output buffers that are currently acquired by HAL
     size_t            mHandoutTotalBufferCount;
     // number of output buffers that are currently acquired by HAL. This will be
     // Redundant when camera3 streams are no longer bidirectional streams.
     size_t            mHandoutOutputBufferCount;
+    // number of cached output buffers that are currently queued in the camera
+    // server but not yet queued to the buffer queue.
+    size_t            mCachedOutputBufferCount;
+
     uint32_t          mFrameCount;
     // Last received output buffer's timestamp
     nsecs_t           mLastTimestamp;
@@ -96,6 +103,9 @@ class Camera3IOStreamBase :
     virtual size_t   getHandoutOutputBufferCountLocked() const;
 
     virtual size_t   getHandoutInputBufferCountLocked();
+
+    virtual size_t   getCachedOutputBufferCountLocked() const;
+    virtual size_t   getMaxCachedOutputBuffersLocked() const;
 
     virtual status_t getEndpointUsage(uint64_t *usage) const = 0;
 

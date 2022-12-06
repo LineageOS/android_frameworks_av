@@ -1,5 +1,5 @@
 /*
- * Copyright (C) 2021 The Android Open Source Project
+ * Copyright 2021 The Android Open Source Project
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -13,26 +13,17 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
-#pragma once
 
-#include <string>
-
-namespace android {
-namespace media {
+package android.media;
 
 /**
- * Mode of head-tracking.
+ * The latency mode currently used by the spatializer mixer.
+ * {@hide}
  */
-enum class HeadTrackingMode {
-    /** No head-tracking - screen-to-head pose is assumed to be identity. */
-    STATIC,
-    /** Head tracking enabled - world-to-screen pose is assumed to be identity. */
-    WORLD_RELATIVE,
-    /** Full screen-to-head tracking enabled. */
-    SCREEN_RELATIVE,
-};
-
-std::string toString(HeadTrackingMode mode);
-
-}  // namespace media
-}  // namespace android
+@Backing(type="byte")
+enum LatencyMode {
+    /** No specific constraint on the latency */
+    FREE = 0,
+    /** A relatively low latency compatible with head tracking operation (e.g less than 100ms) */
+    LOW = 1,
+}

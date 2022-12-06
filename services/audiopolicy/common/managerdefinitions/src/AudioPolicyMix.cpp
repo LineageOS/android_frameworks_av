@@ -151,7 +151,7 @@ void AudioPolicyMixCollection::closeOutput(sp<SwAudioOutputDescriptor> &desc)
 }
 
 status_t AudioPolicyMixCollection::getOutputForAttr(
-        const audio_attributes_t& attributes, uid_t uid,
+        const audio_attributes_t& attributes, const audio_config_base_t& config, uid_t uid,
         audio_output_flags_t flags,
         sp<AudioPolicyMix> &primaryMix,
         std::vector<sp<AudioPolicyMix>> *secondaryMixes)
@@ -177,7 +177,7 @@ status_t AudioPolicyMixCollection::getOutputForAttr(
             continue; // Primary output already found
         }
 
-        switch (mixMatch(policyMix.get(), i, attributes, uid)) {
+        switch (mixMatch(policyMix.get(), i, attributes, config, uid)) {
             case MixMatchStatus::INVALID_MIX:
                 // The mix has contradictory rules, ignore it
                 // TODO: reject invalid mix at registration
@@ -202,7 +202,8 @@ status_t AudioPolicyMixCollection::getOutputForAttr(
 }
 
 AudioPolicyMixCollection::MixMatchStatus AudioPolicyMixCollection::mixMatch(
-        const AudioMix* mix, size_t mixIndex, const audio_attributes_t& attributes, uid_t uid) {
+        const AudioMix* mix, size_t mixIndex, const audio_attributes_t& attributes,
+        const audio_config_base_t& config, uid_t uid) {
 
     if (mix->mMixType == MIX_TYPE_PLAYERS) {
         // Loopback render mixes are created from a public API and thus restricted
@@ -227,6 +228,15 @@ AudioPolicyMixCollection::MixMatchStatus AudioPolicyMixCollection::mixMatch(
                 hasFlag(attributes.flags, AUDIO_FLAG_NO_MEDIA_PROJECTION)) {
                 return MixMatchStatus::NO_MATCH;
             }
+        }
+
+        // Permit match only if requested format and mix format are PCM and can be format
+        // adapted by the mixer, or are the same (compressed) format.
+        if (!is_mix_loopback(mix->mRouteFlags) &&
+            !((audio_is_linear_pcm(config.format) && audio_is_linear_pcm(mix->mFormat.format)) ||
+              (config.format == mix->mFormat.format)) &&
+              config.format != AUDIO_CONFIG_BASE_INITIALIZER.format) {
+            return MixMatchStatus::NO_MATCH;
         }
 
         int userId = (int) multiuser_get_user_id(uid);

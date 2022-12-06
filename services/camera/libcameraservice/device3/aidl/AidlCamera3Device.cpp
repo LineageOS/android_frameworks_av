@@ -51,6 +51,7 @@
 
 #include <aidl/android/hardware/camera/device/ICameraInjectionSession.h>
 #include <aidlcommonsupport/NativeHandle.h>
+#include <android/binder_ibinder_platform.h>
 #include <android/hardware/camera2/ICameraDeviceUser.h>
 
 #include "utils/CameraTraces.h"
@@ -371,7 +372,8 @@ status_t AidlCamera3Device::initialize(sp<CameraProviderManager> manager,
         mNumPartialResults, mVendorTagId, mDeviceInfo, mPhysicalDeviceInfoMap,
         mDistortionMappers, mZoomRatioMappers, mRotateAndCropMappers,
         mTagMonitor, mInputStream, mOutputStreams, mSessionStatsBuilder, listener, *this,
-        *this, *(mInterface), mLegacyClient, mMinExpectedDuration}, mResultMetadataQueue
+        *this, *(mInterface), mLegacyClient, mMinExpectedDuration, mIsFixedFps},
+        mResultMetadataQueue
     };
 
     for (const auto& result : results) {
@@ -412,7 +414,8 @@ status_t AidlCamera3Device::initialize(sp<CameraProviderManager> manager,
         mNumPartialResults, mVendorTagId, mDeviceInfo, mPhysicalDeviceInfoMap,
         mDistortionMappers, mZoomRatioMappers, mRotateAndCropMappers,
         mTagMonitor, mInputStream, mOutputStreams, mSessionStatsBuilder, listener, *this,
-        *this, *(mInterface), mLegacyClient, mMinExpectedDuration}, mResultMetadataQueue
+        *this, *(mInterface), mLegacyClient, mMinExpectedDuration, mIsFixedFps},
+        mResultMetadataQueue
     };
     for (const auto& msg : msgs) {
         camera3::notify(states, msg);
@@ -667,6 +670,12 @@ status_t AidlCamera3Device::switchToOffline(
         return ::ndk::ScopedAStatus::ok();
     }
     return p->returnStreamBuffers(buffers);
+}
+
+::ndk::SpAIBinder AidlCamera3Device::AidlCameraDeviceCallbacks::createBinder() {
+    auto binder = BnCameraDeviceCallback::createBinder();
+    AIBinder_setInheritRt(binder.get(), /*inheritRt*/ true);
+    return binder;
 }
 
 ::ndk::ScopedAStatus AidlCamera3Device::returnStreamBuffers(

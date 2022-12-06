@@ -178,6 +178,11 @@ static const nsecs_t kOffloadStandbyDelayNs = seconds(1);
 // Direct output thread minimum sleep time in idle or active(underrun) state
 static const nsecs_t kDirectMinSleepTimeUs = 10000;
 
+// Minimum amount of time between checking to see if the timestamp is advancing
+// for underrun detection. If we check too frequently, we may not detect a
+// timestamp update and will falsely detect underrun.
+static const nsecs_t kMinimumTimeBetweenTimestampChecksNs = 150 /* ms */ * 1000;
+
 // The universal constant for ubiquitous 20ms value. The value of 20ms seems to provide a good
 // balance between power consumption and latency, and allows threads to be scheduled reliably
 // by the CFS scheduler.
@@ -741,6 +746,12 @@ void AudioFlinger::ThreadBase::sendCheckOutputStageEffectsEvent_l()
     sendConfigEvent_l(configEvent);
 }
 
+void AudioFlinger::ThreadBase::sendHalLatencyModesChangedEvent_l()
+{
+    sp<ConfigEvent> configEvent = sp<HalLatencyModesChangedEvent>::make();
+    sendConfigEvent_l(configEvent);
+}
+
 // post condition: mConfigEvents.isEmpty()
 void AudioFlinger::ThreadBase::processConfigEvents_l()
 {
@@ -806,6 +817,10 @@ void AudioFlinger::ThreadBase::processConfigEvents_l()
 
         case CFG_EVENT_CHECK_OUTPUT_STAGE_EFFECTS: {
             setCheckOutputStageEffects();
+        } break;
+
+        case CFG_EVENT_HAL_LATENCY_MODES_CHANGED: {
+            onHalLatencyModesChanged_l();
         } break;
 
         default:
@@ -2030,7 +2045,8 @@ AudioFlinger::PlaybackThread::PlaybackThread(const sp<AudioFlinger>& audioFlinge
         mFastTrackAvailMask(((1 << FastMixerState::sMaxFastTracks) - 1) & ~1),
         mHwSupportsPause(false), mHwPaused(false), mFlushPending(false),
         mLeftVolFloat(-1.0), mRightVolFloat(-1.0),
-        mDownStreamPatch{}
+        mDownStreamPatch{},
+        mIsTimestampAdvancing(kMinimumTimeBetweenTimestampChecksNs)
 {
     snprintf(mThreadName, kThreadNameLength, "AudioOut_%X", id);
     mNBLogWriter = audioFlinger->newWriter_l(kLogSize, mThreadName);
@@ -3136,10 +3152,7 @@ void AudioFlinger::PlaybackThread::updateMetadata_l()
     auto backInserter = std::back_inserter(metadata.tracks);
     for (const sp<Track> &track : mActiveTracks) {
         // No track is invalid as this is called after prepareTrack_l in the same critical section
-        // Do not forward metadata for PatchTrack with unspecified stream type
-        if (track->streamType() != AUDIO_STREAM_PATCH) {
-            track->copyMetadataTo(backInserter);
-        }
+        track->copyMetadataTo(backInserter);
     }
     sendMetadataToBackend_l(metadata);
 }
@@ -3922,6 +3935,8 @@ bool AudioFlinger::PlaybackThread::threadLoop()
             // stop(), pause(), etc.), but the threadLoop is entitled to call audio
             // data / buffer methods on tracks from activeTracks without the ThreadBase lock.
             activeTracks.insert(activeTracks.end(), mActiveTracks.begin(), mActiveTracks.end());
+
+            setHalLatencyMode_l();
         } // mLock scope ends
 
         if (mBytesRemaining == 0) {
@@ -4087,10 +4102,19 @@ bool AudioFlinger::PlaybackThread::threadLoop()
                                        mEffectBufferFormat,
                                        mNormalFrameCount * mHapticChannelCount);
             }
-
-            memcpy_by_audio_format(mSinkBuffer, mFormat, effectBuffer, mEffectBufferFormat,
-                    mNormalFrameCount * (mChannelCount + mHapticChannelCount));
-
+            const size_t framesToCopy = mNormalFrameCount * (mChannelCount + mHapticChannelCount);
+            if (mFormat == AUDIO_FORMAT_PCM_FLOAT &&
+                    mEffectBufferFormat == AUDIO_FORMAT_PCM_FLOAT) {
+                // Clamp PCM float values more than this distance from 0 to insulate
+                // a HAL which doesn't handle NaN correctly.
+                static constexpr float HAL_FLOAT_SAMPLE_LIMIT = 2.0f;
+                memcpy_to_float_from_float_with_clamping(static_cast<float*>(mSinkBuffer),
+                        static_cast<const float*>(effectBuffer),
+                        framesToCopy, HAL_FLOAT_SAMPLE_LIMIT /* absMax */);
+            } else {
+                memcpy_by_audio_format(mSinkBuffer, mFormat,
+                        effectBuffer, mEffectBufferFormat, framesToCopy);
+            }
             // The sample data is partially interleaved when haptic channels exist,
             // we need to adjust channels here.
             if (mHapticChannelCount > 0) {
@@ -5021,6 +5045,7 @@ void AudioFlinger::PlaybackThread::threadLoop_standby()
         mCallbackThread->setDraining(mDrainSequence);
     }
     mHwPaused = false;
+    setHalLatencyMode_l();
 }
 
 void AudioFlinger::PlaybackThread::onAddNewTrack_l()
@@ -5894,18 +5919,35 @@ uint32_t AudioFlinger::PlaybackThread::trackCountForUid_l(uid_t uid) const
     return trackCount;
 }
 
-bool AudioFlinger::PlaybackThread::checkRunningTimestamp()
+bool AudioFlinger::PlaybackThread::IsTimestampAdvancing::check(AudioStreamOut * output)
 {
+    // Check the timestamp to see if it's advancing once every 150ms. If we check too frequently, we
+    // could falsely detect that the frame position has stalled due to underrun because we haven't
+    // given the Audio HAL enough time to update.
+    const nsecs_t nowNs = systemTime();
+    if (nowNs - mPreviousNs < mMinimumTimeBetweenChecksNs) {
+        return mLatchedValue;
+    }
+    mPreviousNs = nowNs;
+    mLatchedValue = false;
+    // Determine if the presentation position is still advancing.
     uint64_t position = 0;
     struct timespec unused;
-    const status_t ret = mOutput->getPresentationPosition(&position, &unused);
+    const status_t ret = output->getPresentationPosition(&position, &unused);
     if (ret == NO_ERROR) {
-        if (position != mLastCheckedTimestampPosition) {
-            mLastCheckedTimestampPosition = position;
-            return true;
+        if (position != mPreviousPosition) {
+            mPreviousPosition = position;
+            mLatchedValue = true;
         }
     }
-    return false;
+    return mLatchedValue;
+}
+
+void AudioFlinger::PlaybackThread::IsTimestampAdvancing::clear()
+{
+    mLatchedValue = true;
+    mPreviousPosition = 0;
+    mPreviousNs = 0;
 }
 
 // isTrackAllowed_l() must be called with ThreadBase::mLock held
@@ -6340,9 +6382,9 @@ AudioFlinger::PlaybackThread::mixer_state AudioFlinger::DirectOutputThread::prep
                 // No buffers for this track. Give it a few chances to
                 // fill a buffer, then remove it from active list.
                 // Only consider last track started for mixer state control
+                bool isTimestampAdvancing = mIsTimestampAdvancing.check(mOutput);
                 if (--(track->mRetryCount) <= 0) {
-                    const bool running = checkRunningTimestamp();
-                    if (running) { // still running, give us more time.
+                    if (isTimestampAdvancing) { // HAL is still playing audio, give us more time.
                         track->mRetryCount = kMaxTrackRetriesOffload;
                     } else {
                         ALOGV("BUFFER TIMEOUT: remove track(%d) from active list", trackId);
@@ -6923,9 +6965,9 @@ AudioFlinger::PlaybackThread::mixer_state AudioFlinger::OffloadThread::prepareTr
             } else {
                 // No buffers for this track. Give it a few chances to
                 // fill a buffer, then remove it from active list.
+                bool isTimestampAdvancing = mIsTimestampAdvancing.check(mOutput);
                 if (--(track->mRetryCount) <= 0) {
-                    const bool running = checkRunningTimestamp();
-                    if (running) { // still running, give us more time.
+                    if (isTimestampAdvancing) { // HAL is still playing audio, give us more time.
                         track->mRetryCount = kMaxTrackRetriesOffload;
                     } else {
                         ALOGV("OffloadThread: BUFFER TIMEOUT: remove track(%d) from active list",
@@ -7264,6 +7306,94 @@ AudioFlinger::SpatializerThread::SpatializerThread(const sp<AudioFlinger>& audio
 {
 }
 
+void AudioFlinger::SpatializerThread::onFirstRef() {
+    PlaybackThread::onFirstRef();
+
+    Mutex::Autolock _l(mLock);
+    status_t status = mOutput->stream->setLatencyModeCallback(this);
+    if (status != INVALID_OPERATION) {
+        updateHalSupportedLatencyModes_l();
+    }
+}
+
+status_t AudioFlinger::SpatializerThread::createAudioPatch_l(const struct audio_patch *patch,
+                                                          audio_patch_handle_t *handle)
+{
+    status_t status = MixerThread::createAudioPatch_l(patch, handle);
+    updateHalSupportedLatencyModes_l();
+    return status;
+}
+
+void AudioFlinger::SpatializerThread::updateHalSupportedLatencyModes_l() {
+    std::vector<audio_latency_mode_t> latencyModes;
+    if (mOutput->stream->getRecommendedLatencyModes(&latencyModes) != NO_ERROR) {
+        latencyModes.clear();
+    }
+    if (latencyModes != mSupportedLatencyModes) {
+        mSupportedLatencyModes.swap(latencyModes);
+        sendHalLatencyModesChangedEvent_l();
+    }
+}
+
+void AudioFlinger::SpatializerThread::onHalLatencyModesChanged_l() {
+    mAudioFlinger->onSupportedLatencyModesChanged(mId, mSupportedLatencyModes);
+}
+
+void AudioFlinger::SpatializerThread::setHalLatencyMode_l() {
+    // if mSupportedLatencyModes is empty, the HAL stream does not support
+    // latency mode control and we can exit.
+    if (mSupportedLatencyModes.empty()) {
+        return;
+    }
+    audio_latency_mode_t latencyMode = AUDIO_LATENCY_MODE_FREE;
+    if (mSupportedLatencyModes.size() == 1) {
+        // If the HAL only support one latency mode currently, confirm the choice
+        latencyMode = mSupportedLatencyModes[0];
+    } else if (mSupportedLatencyModes.size() > 1) {
+        // Request low latency if:
+        // - The low latency mode is requested by the spatializer controller
+        //   (mRequestedLatencyMode = AUDIO_LATENCY_MODE_LOW)
+        //      AND
+        // - At least one active track is spatialized
+        bool hasSpatializedActiveTrack = false;
+        for (const auto& track : mActiveTracks) {
+            if (track->isSpatialized()) {
+                hasSpatializedActiveTrack = true;
+                break;
+            }
+        }
+        if (hasSpatializedActiveTrack && mRequestedLatencyMode == AUDIO_LATENCY_MODE_LOW) {
+            latencyMode = AUDIO_LATENCY_MODE_LOW;
+        }
+    }
+
+    if (latencyMode != mSetLatencyMode) {
+        status_t status = mOutput->stream->setLatencyMode(latencyMode);
+        if (status == NO_ERROR) {
+            mSetLatencyMode = latencyMode;
+        }
+    }
+}
+
+status_t AudioFlinger::SpatializerThread::setRequestedLatencyMode(audio_latency_mode_t mode) {
+    if (mode != AUDIO_LATENCY_MODE_LOW && mode != AUDIO_LATENCY_MODE_FREE) {
+        return BAD_VALUE;
+    }
+    Mutex::Autolock _l(mLock);
+    mRequestedLatencyMode = mode;
+    return NO_ERROR;
+}
+
+status_t AudioFlinger::SpatializerThread::getSupportedLatencyModes(
+        std::vector<audio_latency_mode_t>* modes) {
+    if (modes == nullptr) {
+        return BAD_VALUE;
+    }
+    Mutex::Autolock _l(mLock);
+    *modes = mSupportedLatencyModes;
+    return NO_ERROR;
+}
+
 void AudioFlinger::SpatializerThread::checkOutputStageEffects()
 {
     bool hasVirtualizer = false;
@@ -7316,6 +7446,14 @@ void AudioFlinger::SpatializerThread::checkOutputStageEffects()
     }
 }
 
+void AudioFlinger::SpatializerThread::onRecommendedLatencyModeChanged(
+        std::vector<audio_latency_mode_t> modes) {
+    Mutex::Autolock _l(mLock);
+    if (modes != mSupportedLatencyModes) {
+        mSupportedLatencyModes.swap(modes);
+        sendHalLatencyModesChangedEvent_l();
+    }
+}
 
 // ----------------------------------------------------------------------------
 //      Record

@@ -960,9 +960,9 @@ status_t CCodecBufferChannel::renderOutputBuffer(
                     hdrDynamicInfo->m.data + hdrDynamicInfo->flexCount());
         }
         qbi.setHdrMetadata(hdr);
-
-        SetHdrMetadataToGralloc4Handle(hdrStaticInfo, hdrDynamicInfo, block.handle());
     }
+    SetMetadataToGralloc4Handle(dataSpace, hdrStaticInfo, hdrDynamicInfo, block.handle());
+
     // we don't have dirty regions
     qbi.setSurfaceDamage(Region::INVALID_REGION);
     android::IGraphicBufferProducer::QueueBufferOutput qbo;
@@ -1578,6 +1578,17 @@ void CCodecBufferChannel::stop() {
     mFirstValidFrameIndex = mFrameIndex.load(std::memory_order_relaxed);
 }
 
+void CCodecBufferChannel::stopUseOutputSurface() {
+    if (mOutputSurface.lock()->surface) {
+        C2BlockPool::local_id_t outputPoolId;
+        {
+            Mutexed<BlockPools>::Locked pools(mBlockPools);
+            outputPoolId = pools->outputPoolId;
+        }
+        if (mComponent) mComponent->stopUsingOutputSurface(outputPoolId);
+    }
+}
+
 void CCodecBufferChannel::reset() {
     stop();
     if (mInputSurface != nullptr) {
@@ -1592,14 +1603,6 @@ void CCodecBufferChannel::reset() {
     {
         Mutexed<Output>::Locked output(mOutput);
         output->buffers.reset();
-    }
-    if (mOutputSurface.lock()->surface) {
-        C2BlockPool::local_id_t outputPoolId;
-        {
-            Mutexed<BlockPools>::Locked pools(mBlockPools);
-            outputPoolId = pools->outputPoolId;
-        }
-        mComponent->stopUsingOutputSurface(outputPoolId);
     }
 }
 

@@ -558,6 +558,10 @@ class Camera3Stream :
     // Get handout input buffer count.
     virtual size_t   getHandoutInputBufferCountLocked() = 0;
 
+    // Get cached output buffer count.
+    virtual size_t   getCachedOutputBufferCountLocked() const = 0;
+    virtual size_t   getMaxCachedOutputBuffersLocked() const = 0;
+
     // Get the usage flags for the other endpoint, or return
     // INVALID_OPERATION if they cannot be obtained.
     virtual status_t getEndpointUsage(uint64_t *usage) const = 0;
@@ -576,6 +580,8 @@ class Camera3Stream :
 
     uint64_t mUsage;
 
+    Condition mOutputBufferReturnedSignal;
+
   private:
     // Previously configured stream properties (post HAL override)
     uint64_t mOldUsage;
@@ -583,7 +589,6 @@ class Camera3Stream :
     int mOldFormat;
     android_dataspace mOldDataSpace;
 
-    Condition mOutputBufferReturnedSignal;
     Condition mInputBufferReturnedSignal;
     static const nsecs_t kWaitForBufferDuration = 3000000000LL; // 3000 ms
 

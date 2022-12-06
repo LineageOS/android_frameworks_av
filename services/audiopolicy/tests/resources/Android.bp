@@ -12,6 +12,7 @@ filegroup {
     srcs: [
         "test_audio_policy_configuration.xml",
         "test_audio_policy_primary_only_configuration.xml",
+        "test_car_ap_atmos_offload_configuration.xml",
         "test_invalid_audio_policy_configuration.xml",
         "test_tv_apm_configuration.xml",
         "test_settop_box_surround_configuration.xml",

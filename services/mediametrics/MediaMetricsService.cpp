@@ -336,6 +336,15 @@ status_t MediaMetricsService::dump(int fd, const Vector<String16>& args)
                 result << "-- some lines may be truncated --\n";
             }
 
+            const int32_t spatializerLinesToDump = all ? INT32_MAX : 15;
+            result << "\nSpatializer Message Log:";
+            const auto [ spatializerDumpString, spatializerLines ] =
+                    mAudioAnalytics.dumpSpatializer(spatializerLinesToDump);
+            result << "\n" << spatializerDumpString;
+            if (spatializerLines == spatializerLinesToDump) {
+                result << "-- some lines may be truncated --\n";
+            }
+
             result << "\nLogSessionId:\n"
                    << mediametrics::ValidateId::get()->dump();
 

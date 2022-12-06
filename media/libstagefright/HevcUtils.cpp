@@ -102,10 +102,11 @@ template <typename T>
 static bool findParam(uint32_t key, T *param,
         KeyedVector<uint32_t, uint64_t> &params) {
     CHECK(param);
-    if (params.indexOfKey(key) < 0) {
+    ssize_t index = params.indexOfKey(key);
+    if (index < 0) {
         return false;
     }
-    *param = (T) params[key];
+    *param = (T) params[index];
     return true;
 }
 

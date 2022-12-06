@@ -16,6 +16,7 @@
 #pragma once
 
 #include <optional>
+#include <string>
 #include <vector>
 #include <Eigen/Geometry>
 
@@ -62,6 +63,9 @@ class Pose3f {
      * the last three are a rotation vector.
      */
     std::vector<float> toVector() const;
+
+    // Convert instance to a string representation.
+    std::string toString() const;
 
     Pose3f& operator=(const Pose3f& other) {
         mTranslation = other.mTranslation;
@@ -127,6 +131,11 @@ std::ostream& operator<<(std::ostream& os, const Pose3f& pose);
 std::tuple<Pose3f, bool> moveWithRateLimit(const Pose3f& from, const Pose3f& to, float t,
                                            float maxTranslationalVelocity,
                                            float maxRotationalVelocity);
+
+template <typename T>
+static float nsToFloatMs(T ns) {
+    return ns * 1e-6f;
+}
 
 }  // namespace media
 }  // namespace android
