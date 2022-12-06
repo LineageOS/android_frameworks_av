@@ -263,7 +263,7 @@ void Spatializer::onFirstRef() {
     mLooper->start(
             /*runOnCallingThread*/false,
             /*canCallJava*/       false,
-            PRIORITY_URGENT_AUDIO);
+            PRIORITY_AUDIO);
 
     mHandler = new EngineCallbackHandler(this);
     mLooper->registerHandler(mHandler);

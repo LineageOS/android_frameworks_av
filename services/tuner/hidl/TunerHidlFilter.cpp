@@ -840,10 +840,6 @@ HidlDemuxFilterRecordSettings TunerHidlFilter::getHidlRecordSettings(
                 static_cast<uint32_t>(settings.scIndexMask.get<DemuxFilterScIndexMask::scHevc>()));
         break;
     }
-    case DemuxFilterScIndexMask::scVvc: {
-        // Shouldn't be here.
-        break;
-    }
     }
     return record;
 }
