@@ -135,6 +135,94 @@ const std::unordered_map<std::string, int64_t>& getAudioDeviceOutMap() {
     return map;
 }
 
+// A map for the Java AudioDeviceInfo types to internal (native) output devices.
+const std::unordered_map<std::string, int32_t>& getAudioDeviceOutCompactMap() {
+    // DO NOT MODIFY VALUES (OK to add new ones).
+    static std::unordered_map<std::string, int32_t> map{
+        // should "unknown" go to AUDIO_DEVICE_NONE?
+        {"earpiece", AUDIO_DEVICE_OUT_EARPIECE},
+        {"speaker", AUDIO_DEVICE_OUT_SPEAKER},
+        {"headset", AUDIO_DEVICE_OUT_WIRED_HEADSET},
+        {"headphone", AUDIO_DEVICE_OUT_WIRED_HEADPHONE},
+        {"bt_sco", AUDIO_DEVICE_OUT_BLUETOOTH_SCO},
+        {"bt_sco_hs", AUDIO_DEVICE_OUT_BLUETOOTH_SCO_HEADSET},
+        {"bt_sco_carkit", AUDIO_DEVICE_OUT_BLUETOOTH_SCO_CARKIT},
+        {"bt_a2dp", AUDIO_DEVICE_OUT_BLUETOOTH_A2DP},
+        {"bt_a2dp_hp", AUDIO_DEVICE_OUT_BLUETOOTH_A2DP_HEADPHONES},
+        {"bt_a2dp_spk", AUDIO_DEVICE_OUT_BLUETOOTH_A2DP_SPEAKER},
+        {"aux_digital", AUDIO_DEVICE_OUT_AUX_DIGITAL},
+        {"hdmi", AUDIO_DEVICE_OUT_HDMI},
+        {"analog_dock", AUDIO_DEVICE_OUT_ANLG_DOCK_HEADSET},
+        {"digital_dock", AUDIO_DEVICE_OUT_DGTL_DOCK_HEADSET},
+        {"usb_accessory", AUDIO_DEVICE_OUT_USB_ACCESSORY},
+        {"usb_device", AUDIO_DEVICE_OUT_USB_DEVICE},
+        {"remote_submix", AUDIO_DEVICE_OUT_REMOTE_SUBMIX},
+        {"telephony_tx", AUDIO_DEVICE_OUT_TELEPHONY_TX},
+        {"line", AUDIO_DEVICE_OUT_LINE},
+        {"hdmi_arc", AUDIO_DEVICE_OUT_HDMI_ARC},
+        {"hdmi_earc", AUDIO_DEVICE_OUT_HDMI_EARC},
+        {"spdif", AUDIO_DEVICE_OUT_SPDIF},
+        {"fm_transmitter", AUDIO_DEVICE_OUT_FM},
+        {"aux_line", AUDIO_DEVICE_OUT_AUX_LINE},
+        {"speaker_safe", AUDIO_DEVICE_OUT_SPEAKER_SAFE},
+        {"ip", AUDIO_DEVICE_OUT_IP},
+        {"bus", AUDIO_DEVICE_OUT_BUS},
+        {"proxy", AUDIO_DEVICE_OUT_PROXY},
+        {"usb_headset", AUDIO_DEVICE_OUT_USB_HEADSET},
+        {"hearing_aid_out", AUDIO_DEVICE_OUT_HEARING_AID},
+        {"echo_canceller", AUDIO_DEVICE_OUT_ECHO_CANCELLER},
+        // default does not exist
+        {"ble_headset", AUDIO_DEVICE_OUT_BLE_HEADSET},
+        {"ble_speaker", AUDIO_DEVICE_OUT_BLE_SPEAKER},
+        {"ble_broadcast", AUDIO_DEVICE_OUT_BLE_BROADCAST},
+    };
+    return map;
+}
+
+// A map for the Java AudioDeviceInfo types.
+// This uses generated statsd enums.proto constants.
+const std::unordered_map<std::string, int32_t>& getAudioDeviceInfoTypeMap() {
+    // DO NOT MODIFY VALUES (OK to add new ones).
+    static std::unordered_map<std::string, int32_t> map{
+        {"unknown", util::MEDIAMETRICS_SPATIALIZER_DEVICE_ENABLED_REPORTED__TYPE__AUDIO_DEVICE_INFO_TYPE_UNKNOWN},
+        {"earpiece", util::MEDIAMETRICS_SPATIALIZER_DEVICE_ENABLED_REPORTED__TYPE__AUDIO_DEVICE_INFO_TYPE_BUILTIN_EARPIECE},
+        {"speaker", util::MEDIAMETRICS_SPATIALIZER_DEVICE_ENABLED_REPORTED__TYPE__AUDIO_DEVICE_INFO_TYPE_BUILTIN_SPEAKER},
+        {"headset", util::MEDIAMETRICS_SPATIALIZER_DEVICE_ENABLED_REPORTED__TYPE__AUDIO_DEVICE_INFO_TYPE_WIRED_HEADSET},
+        {"headphone", util::MEDIAMETRICS_SPATIALIZER_DEVICE_ENABLED_REPORTED__TYPE__AUDIO_DEVICE_INFO_TYPE_WIRED_HEADPHONES}, // sic
+        {"bt_sco", util::MEDIAMETRICS_SPATIALIZER_DEVICE_ENABLED_REPORTED__TYPE__AUDIO_DEVICE_INFO_TYPE_BLUETOOTH_SCO},
+        {"bt_sco_hs", util::MEDIAMETRICS_SPATIALIZER_DEVICE_ENABLED_REPORTED__TYPE__AUDIO_DEVICE_INFO_TYPE_BLUETOOTH_SCO},
+        {"bt_sco_carkit", util::MEDIAMETRICS_SPATIALIZER_DEVICE_ENABLED_REPORTED__TYPE__AUDIO_DEVICE_INFO_TYPE_BLUETOOTH_SCO},
+        {"bt_a2dp", util::MEDIAMETRICS_SPATIALIZER_DEVICE_ENABLED_REPORTED__TYPE__AUDIO_DEVICE_INFO_TYPE_BLUETOOTH_A2DP},
+        {"bt_a2dp_hp", util::MEDIAMETRICS_SPATIALIZER_DEVICE_ENABLED_REPORTED__TYPE__AUDIO_DEVICE_INFO_TYPE_BLUETOOTH_A2DP},
+        {"bt_a2dp_spk", util::MEDIAMETRICS_SPATIALIZER_DEVICE_ENABLED_REPORTED__TYPE__AUDIO_DEVICE_INFO_TYPE_BLUETOOTH_A2DP},
+        {"aux_digital", util::MEDIAMETRICS_SPATIALIZER_DEVICE_ENABLED_REPORTED__TYPE__AUDIO_DEVICE_INFO_TYPE_HDMI},
+        {"hdmi", util::MEDIAMETRICS_SPATIALIZER_DEVICE_ENABLED_REPORTED__TYPE__AUDIO_DEVICE_INFO_TYPE_HDMI},
+        {"analog_dock", util::MEDIAMETRICS_SPATIALIZER_DEVICE_ENABLED_REPORTED__TYPE__AUDIO_DEVICE_INFO_TYPE_DOCK},
+        {"digital_dock", util::MEDIAMETRICS_SPATIALIZER_DEVICE_ENABLED_REPORTED__TYPE__AUDIO_DEVICE_INFO_TYPE_DOCK},
+        {"usb_accessory", util::MEDIAMETRICS_SPATIALIZER_DEVICE_ENABLED_REPORTED__TYPE__AUDIO_DEVICE_INFO_TYPE_USB_ACCESSORY},
+        {"usb_device", util::MEDIAMETRICS_SPATIALIZER_DEVICE_ENABLED_REPORTED__TYPE__AUDIO_DEVICE_INFO_TYPE_USB_DEVICE},
+        {"usb_headset", util::MEDIAMETRICS_SPATIALIZER_DEVICE_ENABLED_REPORTED__TYPE__AUDIO_DEVICE_INFO_TYPE_USB_HEADSET},
+        {"remote_submix", util::MEDIAMETRICS_SPATIALIZER_DEVICE_ENABLED_REPORTED__TYPE__AUDIO_DEVICE_INFO_TYPE_REMOTE_SUBMIX},
+        {"telephony_tx", util::MEDIAMETRICS_SPATIALIZER_DEVICE_ENABLED_REPORTED__TYPE__AUDIO_DEVICE_INFO_TYPE_TELEPHONY},
+        {"line", util::MEDIAMETRICS_SPATIALIZER_DEVICE_ENABLED_REPORTED__TYPE__AUDIO_DEVICE_INFO_TYPE_LINE_ANALOG},
+        {"hdmi_arc", util::MEDIAMETRICS_SPATIALIZER_DEVICE_ENABLED_REPORTED__TYPE__AUDIO_DEVICE_INFO_TYPE_HDMI_ARC},
+        {"hdmi_earc", util::MEDIAMETRICS_SPATIALIZER_DEVICE_ENABLED_REPORTED__TYPE__AUDIO_DEVICE_INFO_TYPE_HDMI_EARC},
+        {"spdif", util::MEDIAMETRICS_SPATIALIZER_DEVICE_ENABLED_REPORTED__TYPE__AUDIO_DEVICE_INFO_TYPE_LINE_DIGITAL},
+        {"fm_transmitter", util::MEDIAMETRICS_SPATIALIZER_DEVICE_ENABLED_REPORTED__TYPE__AUDIO_DEVICE_INFO_TYPE_FM},
+        {"aux_line", util::MEDIAMETRICS_SPATIALIZER_DEVICE_ENABLED_REPORTED__TYPE__AUDIO_DEVICE_INFO_TYPE_AUX_LINE},
+        {"speaker_safe", util::MEDIAMETRICS_SPATIALIZER_DEVICE_ENABLED_REPORTED__TYPE__AUDIO_DEVICE_INFO_TYPE_BUILTIN_SPEAKER_SAFE},
+        {"ip", util::MEDIAMETRICS_SPATIALIZER_DEVICE_ENABLED_REPORTED__TYPE__AUDIO_DEVICE_INFO_TYPE_IP},
+        {"bus", util::MEDIAMETRICS_SPATIALIZER_DEVICE_ENABLED_REPORTED__TYPE__AUDIO_DEVICE_INFO_TYPE_BUS},
+        {"proxy", util::MEDIAMETRICS_SPATIALIZER_DEVICE_ENABLED_REPORTED__TYPE__AUDIO_DEVICE_INFO_TYPE_UNKNOWN /* AUDIO_DEVICE_INFO_TYPE_PROXY */},
+        {"hearing_aid_out", util::MEDIAMETRICS_SPATIALIZER_DEVICE_ENABLED_REPORTED__TYPE__AUDIO_DEVICE_INFO_TYPE_HEARING_AID},
+        {"echo_canceller", util::MEDIAMETRICS_SPATIALIZER_DEVICE_ENABLED_REPORTED__TYPE__AUDIO_DEVICE_INFO_TYPE_ECHO_REFERENCE}, // sic
+        {"ble_headset", util::MEDIAMETRICS_SPATIALIZER_DEVICE_ENABLED_REPORTED__TYPE__AUDIO_DEVICE_INFO_TYPE_BLE_HEADSET},
+        {"ble_speaker", util::MEDIAMETRICS_SPATIALIZER_DEVICE_ENABLED_REPORTED__TYPE__AUDIO_DEVICE_INFO_TYPE_BLE_SPEAKER},
+        {"ble_broadcast", util::MEDIAMETRICS_SPATIALIZER_DEVICE_ENABLED_REPORTED__TYPE__AUDIO_DEVICE_INFO_TYPE_BLE_BROADCAST},
+    };
+    return map;
+}
+
 const std::unordered_map<std::string, int32_t>& getAudioThreadTypeMap() {
     // DO NOT MODIFY VALUES (OK to add new ones).
     // This may be found in frameworks/av/services/audioflinger/Threads.h
@@ -193,6 +281,41 @@ const std::unordered_map<std::string, int32_t>& getAAudioSharingMode() {
         // UNKNOWN is 0
         {"AAUDIO_SHARING_MODE_EXCLUSIVE",    1 /* AAUDIO_SHARING_MODE_EXCLUSIVE + 1 */},
         {"AAUDIO_SHARING_MODE_SHARED",       2 /* AAUDIO_SHARING_MODE_SHARED + 1 */},
+    };
+    return map;
+}
+
+const std::unordered_map<std::string, int32_t>& getHeadTrackingModeMap() {
+    // DO NOT MODIFY VALUES(OK to add new ones).
+    // frameworks/base/media/java/android/media/Spatializer.java
+    // frameworks/av/media/libaudioclient/aidl/android/media/SpatializerHeadTrackingMode.aidl
+    static std::unordered_map<std::string, int32_t> map {
+        {"OTHER", 0},
+        {"DISABLED", -1},
+        {"RELATIVE_WORLD", 1},
+        {"RELATIVE_SCREEN", 2},
+    };
+    return map;
+}
+
+const std::unordered_map<std::string, int32_t>& getSpatializerLevelMap() {
+    // DO NOT MODIFY VALUES(OK to add new ones).
+    // frameworks/base/media/java/android/media/Spatializer.java
+    // frameworks/av/media/libaudioclient/aidl/android/media/SpatializerHeadTrackingMode.aidl
+    static std::unordered_map<std::string, int32_t> map {
+        {"NONE", 0},
+        {"SPATIALIZER_MULTICHANNEL", 1},
+        {"SPATIALIZER_MCHAN_BED_PLUS_OBJECTS", 2},
+    };
+    return map;
+}
+
+const std::unordered_map<std::string, int32_t>& getSpatializerModeMap() {
+    // DO NOT MODIFY VALUES(OK to add new ones).
+    // frameworks/av/media/libaudioclient/aidl/android/media/SpatializationMode.aidl
+    static std::unordered_map<std::string, int32_t> map {
+        {"SPATIALIZER_BINAURAL", 0},
+        {"SPATIALIZER_TRANSAURAL", 1},
     };
     return map;
 }
@@ -284,6 +407,35 @@ typename M::mapped_type flagsFromMap(const std::string &str, const M& map)
         value |= it->second;
     }
     return value;
+}
+
+std::vector<int32_t> vectorFromMap(
+        const std::string &str, const std::unordered_map<std::string, int32_t>& map)
+{
+    std::vector<int32_t> v;
+
+    if (str.empty()) return v;
+
+    const auto result = stringutils::split(str, "|");
+    for (const auto &s : result) {
+        auto it = map.find(s);
+        if (it == map.end()) continue;
+        v.push_back(it->second);
+    }
+    return v;
+}
+
+std::vector<int64_t> channelMaskVectorFromString(const std::string &s)
+{
+    std::vector<int64_t> v;
+
+    const auto result = stringutils::split(s, "|");
+    for (const auto &mask : result) {
+        // 0 if undetected or if actually 0.
+        int64_t int64Mask = strtoll(mask.c_str(), nullptr, 0);
+        v.push_back(int64Mask);
+    }
+    return v;
 }
 
 template <>
@@ -441,6 +593,17 @@ std::string lookup<OUTPUT_DEVICE>(const std::string &outputDevice)
 }
 
 template <>
+int32_t lookup<AUDIO_DEVICE_INFO_TYPE>(const std::string& audioDeviceInfoType)
+{
+    auto& map = getAudioDeviceInfoTypeMap();
+    auto it = map.find(audioDeviceInfoType);
+    if (it == map.end()) {
+        return 0;
+    }
+    return it->second;
+}
+
+template <>
 int32_t lookup<CALLER_NAME>(const std::string &callerName)
 {
     auto& map = getAudioCallerNameMap();
@@ -460,6 +623,39 @@ std::string lookup<CALLER_NAME>(const std::string &callerName)
         return "";
     }
     return callerName;
+}
+
+template <>
+int32_t lookup<HEAD_TRACKING_MODE>(const std::string& headTrackingMode)
+{
+    auto& map = getHeadTrackingModeMap();
+    auto it = map.find(headTrackingMode);
+    if (it == map.end()) {
+        return 0;
+    }
+    return it->second;
+}
+
+template <>
+int32_t lookup<SPATIALIZER_LEVEL>(const std::string& spatializerLevel)
+{
+    auto& map = getSpatializerLevelMap();
+    auto it = map.find(spatializerLevel);
+    if (it == map.end()) {
+        return 0;
+    }
+    return it->second;
+}
+
+template <>
+int32_t lookup<SPATIALIZER_MODE>(const std::string& spatializerMode)
+{
+    auto& map = getSpatializerModeMap();
+    auto it = map.find(spatializerMode);
+    if (it == map.end()) {
+        return 0;
+    }
+    return it->second;
 }
 
 template <>

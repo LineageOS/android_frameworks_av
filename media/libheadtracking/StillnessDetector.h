@@ -80,7 +80,8 @@ class StillnessDetector {
     void setInput(int64_t timestamp, const Pose3f& input);
     /** Calculate whether the stream is still at the given timestamp. */
     bool calculate(int64_t timestamp);
-
+    /** Return the stillness state from the previous call to calculate() */
+    bool getPreviousState() const;
   private:
     struct TimestampedPose {
         int64_t timestamp;
@@ -92,6 +93,8 @@ class StillnessDetector {
     const float mCosHalfRotationalThreshold;
     std::deque<TimestampedPose> mFifo;
     bool mWindowFull = false;
+    bool mCurrentState = true;
+    bool mPreviousState = true;
     // As soon as motion is detected, this will be set for the time of detection + window duration,
     // and during this time we will always consider outselves in motion without checking. This is
     // used for hyteresis purposes, since because of the approximate method we use for determining

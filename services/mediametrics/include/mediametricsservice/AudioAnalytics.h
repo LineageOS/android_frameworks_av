@@ -92,6 +92,15 @@ public:
         return mHealth.dump(lines);
     }
 
+    /**
+     * Returns a pair consisting of the dump string and the number of lines in the string.
+     *
+     * Spatializer dump.
+     */
+    std::pair<std::string, int32_t> dumpSpatializer(int32_t lines = INT32_MAX) const {
+        return mSpatializer.dump(lines);
+    }
+
     void clear() {
         // underlying state is locked.
         mPreviousAnalyticsState->clear();
@@ -151,6 +160,13 @@ private:
      * threadId for the audio track is 10.
      */
     std::string getThreadFromTrack(const std::string& track) const;
+
+    /**
+     * return the device name, if present.
+     *
+     * This is currently enabled only for Bluetooth output devices.
+     */
+    std::string getDeviceNamesFromOutputDevices(std::string_view devices) const;
 
     const bool mDeliverStatistics;
 
@@ -316,6 +332,36 @@ private:
 
         SimpleLog mSimpleLog GUARDED_BY(mLock) {64};
     } mHealth{*this};
+
+    // Spatializer is a nested class that tracks related messages.
+    class Spatializer {
+    public:
+        explicit Spatializer(AudioAnalytics &audioAnalytics)
+            : mAudioAnalytics(audioAnalytics) {}
+
+        // an item that starts with "audio.spatializer"
+        void onEvent(const std::shared_ptr<const android::mediametrics::Item> &item);
+
+        std::pair<std::string, int32_t> dump(
+                int32_t lines = INT32_MAX, const char *prefix = nullptr) const;
+
+    private:
+
+        // Current device state as strings:
+        // "" means unknown, "true" or "false".
+        struct DeviceState {
+            std::string enabled;
+            std::string hasHeadTracker;
+            std::string headTrackerEnabled;
+        };
+
+        AudioAnalytics& mAudioAnalytics;
+        static constexpr int64_t kBootDurationThreshold = 120 /* seconds */ * 1e9;
+        mutable std::mutex mLock;
+        int64_t mFirstCreateTimeNs GUARDED_BY(mLock) = 0;
+        std::map<std::string, DeviceState> mDeviceStateMap GUARDED_BY(mLock);
+        SimpleLog mSimpleLog GUARDED_BY(mLock) {64};
+    } mSpatializer{*this};
 
     AudioPowerUsage mAudioPowerUsage;
 };

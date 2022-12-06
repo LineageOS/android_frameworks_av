@@ -77,6 +77,8 @@ class PoseRateLimiter {
 
     Pose3f calculatePose(int64_t timestamp);
 
+    std::string toString(unsigned level) const;
+
   private:
     struct Point {
         Pose3f pose;

@@ -342,6 +342,7 @@ aidl_interface {
         "aidl/android/media/AudioUniqueIdUse.aidl",
         "aidl/android/media/AudioVibratorInfo.aidl",
         "aidl/android/media/EffectDescriptor.aidl",
+        "aidl/android/media/LatencyMode.aidl",
         "aidl/android/media/TrackSecondaryOutputInfo.aidl",
     ],
     imports: [

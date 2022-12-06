@@ -137,6 +137,11 @@ static inline bool is_mix_loopback_render(uint32_t routeFlags) {
            == MIX_ROUTE_FLAG_LOOP_BACK_AND_RENDER;
 }
 
+static inline bool is_mix_loopback(uint32_t routeFlags) {
+    return (routeFlags & MIX_ROUTE_FLAG_LOOP_BACK)
+           == MIX_ROUTE_FLAG_LOOP_BACK;
+}
+
 }; // namespace android
 
 #endif  // ANDROID_AUDIO_POLICY_H

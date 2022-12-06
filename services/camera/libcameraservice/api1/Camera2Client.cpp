@@ -2316,6 +2316,10 @@ int32_t Camera2Client::getGlobalAudioRestriction() {
     return INVALID_OPERATION;
 }
 
+status_t Camera2Client::setCameraServiceWatchdog(bool enabled) {
+    return mDevice->setCameraServiceWatchdog(enabled);
+}
+
 status_t Camera2Client::setRotateAndCropOverride(uint8_t rotateAndCrop) {
     if (rotateAndCrop > ANDROID_SCALER_ROTATE_AND_CROP_AUTO) return BAD_VALUE;
 

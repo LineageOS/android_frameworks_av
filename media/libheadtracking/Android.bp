@@ -22,6 +22,10 @@ cc_library {
       "StillnessDetector.cpp",
       "Twist.cpp",
     ],
+    shared_libs: [
+        "libaudioutils",
+        "libbase",
+    ],
     export_include_dirs: [
         "include",
     ],
@@ -39,6 +43,7 @@ cc_library {
       "SensorPoseProvider.cpp",
     ],
     shared_libs: [
+        "libbase",
         "libheadtracking",
         "liblog",
         "libsensor",
@@ -78,6 +83,7 @@ cc_test_host {
         "Twist-test.cpp",
     ],
     shared_libs: [
+        "libaudioutils",
         "libheadtracking",
     ],
 }

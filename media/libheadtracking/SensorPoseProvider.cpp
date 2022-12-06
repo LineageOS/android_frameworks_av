@@ -18,12 +18,14 @@
 
 #define LOG_TAG "SensorPoseProvider"
 
-#include <inttypes.h>
-
+#include <algorithm>
 #include <future>
+#include <inttypes.h>
+#include <limits>
 #include <map>
 #include <thread>
 
+#include <android-base/stringprintf.h>
 #include <android-base/thread_annotations.h>
 #include <log/log_main.h>
 #include <sensor/SensorEventQueue.h>
@@ -35,6 +37,8 @@
 namespace android {
 namespace media {
 namespace {
+
+using android::base::StringAppendF;
 
 // Identifier to use for our event queue on the loop.
 // The number 19 is arbitrary, only useful if using multiple objects on the same looper.
@@ -132,7 +136,10 @@ class SensorPoseProviderImpl : public SensorPoseProvider {
 
         {
             std::lock_guard lock(mMutex);
-            mEnabledSensorsExtra.emplace(sensor, SensorExtra{ .format = format });
+            mEnabledSensorsExtra.emplace(
+                    sensor,
+                    SensorExtra{.format = format,
+                                .samplingPeriod = static_cast<int32_t>(samplingPeriod.count())});
         }
 
         // Enable the sensor.
@@ -153,6 +160,41 @@ class SensorPoseProviderImpl : public SensorPoseProvider {
         mEnabledSensorsExtra.erase(handle);
     }
 
+    std::string toString(unsigned level) override {
+        std::string prefixSpace(level, ' ');
+        std::string ss = prefixSpace + "SensorPoseProvider:\n";
+        bool needUnlock = false;
+
+        prefixSpace += " ";
+        auto now = std::chrono::steady_clock::now();
+        if (!mMutex.try_lock_until(now + media::kSpatializerDumpSysTimeOutInSecond)) {
+            ss.append(prefixSpace).append("try_lock failed, dumpsys below maybe INACCURATE!\n");
+        } else {
+            needUnlock = true;
+        }
+
+        // Enabled sensor information
+        StringAppendF(&ss, "%sSensors total number %zu:\n", prefixSpace.c_str(),
+                      mEnabledSensorsExtra.size());
+        for (auto sensor : mEnabledSensorsExtra) {
+            StringAppendF(&ss,
+                          "%s[Handle: 0x%08x, Format %s Period (set %d max %0.4f min %0.4f) ms",
+                          prefixSpace.c_str(), sensor.first, toString(sensor.second.format).c_str(),
+                          sensor.second.samplingPeriod, media::nsToFloatMs(sensor.second.maxPeriod),
+                          media::nsToFloatMs(sensor.second.minPeriod));
+            if (sensor.second.discontinuityCount.has_value()) {
+                StringAppendF(&ss, ", DiscontinuityCount: %d",
+                              sensor.second.discontinuityCount.value());
+            }
+            ss += "]\n";
+        }
+
+        if (needUnlock) {
+            mMutex.unlock();
+        }
+        return ss;
+    }
+
   private:
     enum DataFormat {
         kUnknown,
@@ -167,15 +209,18 @@ class SensorPoseProviderImpl : public SensorPoseProvider {
     };
 
     struct SensorExtra {
-        DataFormat format;
+        DataFormat format = DataFormat::kUnknown;
+        int32_t samplingPeriod = 0;
+        int64_t latestTimestamp = 0;
+        int64_t maxPeriod = 0;
+        int64_t minPeriod = std::numeric_limits<int64_t>::max();
         std::optional<int32_t> discontinuityCount;
     };
 
     sp<Looper> mLooper;
     Listener* const mListener;
     SensorManager* const mSensorManager;
-    std::thread mThread;
-    std::mutex mMutex;
+    std::timed_mutex mMutex;
     std::map<int32_t, SensorEnableGuard> mEnabledSensors;
     std::map<int32_t, SensorExtra> mEnabledSensorsExtra GUARDED_BY(mMutex);
     sp<SensorEventQueue> mQueue;
@@ -187,12 +232,13 @@ class SensorPoseProviderImpl : public SensorPoseProvider {
     // the worker thread and that thread would notify, via the promise below whenever initialization
     // is finished, and whether it was successful.
     std::promise<bool> mInitPromise;
+    std::thread mThread;
 
     SensorPoseProviderImpl(const char* packageName, Listener* listener)
         : mListener(listener),
-          mSensorManager(&SensorManager::getInstanceForPackage(String16(packageName))),
-          mThread([this] { threadFunc(); }) {}
-
+          mSensorManager(&SensorManager::getInstanceForPackage(String16(packageName))) {
+        mThread = std::thread([this] { threadFunc(); });
+    }
     void initFinished(bool success) { mInitPromise.set_value(success); }
 
     bool waitInitFinished() { return mInitPromise.get_future().get(); }
@@ -261,6 +307,7 @@ class SensorPoseProviderImpl : public SensorPoseProvider {
                 return;
             }
             value = parseEvent(event, iter->second.format, &iter->second.discontinuityCount);
+            updateEventTimestamp(event, iter->second);
         }
         mListener->onPose(event.timestamp, event.sensor, value.pose, value.twist,
                           value.isNewReference);
@@ -316,6 +363,15 @@ class SensorPoseProviderImpl : public SensorPoseProvider {
         return std::nullopt;
     }
 
+    void updateEventTimestamp(const ASensorEvent& event, SensorExtra& extra) {
+        if (extra.latestTimestamp != 0) {
+            int64_t gap = event.timestamp - extra.latestTimestamp;
+            extra.maxPeriod = std::max(gap, extra.maxPeriod);
+            extra.minPeriod = std::min(gap, extra.minPeriod);
+        }
+        extra.latestTimestamp = event.timestamp;
+    }
+
     static PoseEvent parseEvent(const ASensorEvent& event, DataFormat format,
                                 std::optional<int32_t>* discontinutyCount) {
         switch (format) {
@@ -343,6 +399,19 @@ class SensorPoseProviderImpl : public SensorPoseProvider {
 
             default:
                 LOG_ALWAYS_FATAL("Unexpected sensor type: %d", static_cast<int>(format));
+        }
+    }
+
+    const static std::string toString(DataFormat format) {
+        switch (format) {
+            case DataFormat::kUnknown:
+                return "kUnknown";
+            case DataFormat::kQuaternion:
+                return "kQuaternion";
+            case DataFormat::kRotationVectorsAndDiscontinuityCount:
+                return "kRotationVectorsAndDiscontinuityCount";
+            default:
+                return "NotImplemented";
         }
     }
 };

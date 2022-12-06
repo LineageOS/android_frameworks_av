@@ -293,6 +293,12 @@ public:
 
     virtual status_t setDeviceConnectedState(const struct audio_port_v7 *port, bool connected);
 
+    virtual status_t setRequestedLatencyMode(
+            audio_io_handle_t output, audio_latency_mode_t mode);
+
+    virtual status_t getSupportedLatencyModes(audio_io_handle_t output,
+            std::vector<audio_latency_mode_t>* modes);
+
     status_t onTransactWrapper(TransactionCode code, const Parcel& data, uint32_t flags,
         const std::function<status_t()>& delegate) override;
 
@@ -764,6 +770,8 @@ using effect_buffer_t = int16_t;
               void ioConfigChanged(audio_io_config_event_t event,
                                    const sp<AudioIoDescriptor>& ioDesc,
                                    pid_t pid = 0);
+              void onSupportedLatencyModesChanged(
+                    audio_io_handle_t output, const std::vector<audio_latency_mode_t>& modes);
 
               // Allocate an audio_unique_id_t.
               // Specific types are audio_io_handle_t, audio_session_t, effect ID (int),

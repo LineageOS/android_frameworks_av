@@ -17,15 +17,19 @@
 #ifndef ANDROID_MEDIA_SPATIALIZER_H
 #define ANDROID_MEDIA_SPATIALIZER_H
 
+#include <android-base/stringprintf.h>
 #include <android/media/BnEffect.h>
 #include <android/media/BnSpatializer.h>
 #include <android/media/SpatializationLevel.h>
 #include <android/media/SpatializationMode.h>
 #include <android/media/SpatializerHeadTrackingMode.h>
+#include <audio_utils/SimpleLog.h>
+#include <math.h>
+#include <media/AudioEffect.h>
 #include <media/audiohal/EffectHalInterface.h>
 #include <media/stagefright/foundation/ALooper.h>
-#include <media/AudioEffect.h>
 #include <system/audio_effects/effect_spatializer.h>
+#include <string>
 
 #include "SpatializerPoseController.h"
 
@@ -85,7 +89,8 @@ public:
  */
 class Spatializer : public media::BnSpatializer,
                     public IBinder::DeathRecipient,
-                    private SpatializerPoseController::Listener {
+                    private SpatializerPoseController::Listener,
+                    public virtual AudioSystem::SupportedLatencyModesCallback {
   public:
     static sp<Spatializer> create(SpatializerPolicyCallback *callback);
 
@@ -122,6 +127,10 @@ class Spatializer : public media::BnSpatializer,
     /** IBinder::DeathRecipient. Listen to the death of the INativeSpatializerCallback. */
     virtual void binderDied(const wp<IBinder>& who);
 
+    /** SupportedLatencyModesCallback */
+    void onSupportedLatencyModesChanged(
+            audio_io_handle_t output, const std::vector<audio_latency_mode_t>& modes) override;
+
     /** Registers a INativeSpatializerCallback when a client is attached to this Spatializer
      * by audio policy service.
      */
@@ -150,6 +159,50 @@ class Spatializer : public media::BnSpatializer,
 
     void calculateHeadPose();
 
+    /** Convert fields in Spatializer and sub-modules to a string. Disable thread-safety-analysis
+     * here because we want to dump mutex guarded members even try_lock failed to provide as much
+     * information as possible for debugging purpose. */
+    std::string toString(unsigned level) const NO_THREAD_SAFETY_ANALYSIS;
+
+    static std::string toString(audio_latency_mode_t mode) {
+        switch (mode) {
+            case AUDIO_LATENCY_MODE_FREE:
+                return "LATENCY_MODE_FREE";
+            case AUDIO_LATENCY_MODE_LOW:
+                return "LATENCY_MODE_LOW";
+        }
+        return "EnumNotImplemented";
+    };
+
+    /**
+     * Format head to stage vector to a string, [0.00, 0.00, 0.00, -1.29, -0.50, 15.27].
+     */
+    template <typename T>
+    static std::string toString(const std::vector<T>& vec, bool radianToDegree = false) {
+        if (vec.size() == 0) {
+            return "[]";
+        }
+
+        std::string ss = "[";
+        for (auto f = vec.begin(); f != vec.end(); ++f) {
+            if (f != vec.begin()) {
+                ss .append(", ");
+            }
+            if (radianToDegree) {
+                base::StringAppendF(&ss, "%0.2f", HeadToStagePoseRecorder::getDegreeWithRadian(*f));
+            } else {
+                base::StringAppendF(&ss, "%f", *f);
+            }
+        }
+        ss.append("]");
+        return ss;
+    };
+
+    // If the Spatializer is not created, we send the status for metrics purposes.
+    // OK:      Spatializer not expected to be created.
+    // NO_INIT: Spatializer creation failed.
+    static void sendEmptyCreateSpatializerMetricWithStatus(status_t status);
+
 private:
     Spatializer(effect_descriptor_t engineDescriptor,
                      SpatializerPolicyCallback *callback);
@@ -162,6 +215,8 @@ private:
 
     void onHeadToStagePoseMsg(const std::vector<float>& headToStage);
     void onActualModeChangeMsg(media::HeadTrackingMode mode);
+    void onSupportedLatencyModesChangedMsg(
+            audio_io_handle_t output, std::vector<audio_latency_mode_t>&& modes);
 
     static constexpr int kMaxEffectParamValues = 10;
     /**
@@ -301,7 +356,9 @@ private:
     SpatializerPolicyCallback* const mPolicyCallback;
 
     /** Currently there is only one version of the spatializer running */
-    const std::string mMetricsId = AMEDIAMETRICS_KEY_PREFIX_AUDIO_SPATIALIZER "0";
+    static constexpr const char* kDefaultMetricsId =
+            AMEDIAMETRICS_KEY_PREFIX_AUDIO_SPATIALIZER "0";
+    const std::string mMetricsId = kDefaultMetricsId;
 
     /** Mutex protecting internal state */
     mutable std::mutex mLock;
@@ -354,10 +411,105 @@ private:
     sp<EngineCallbackHandler> mHandler;
 
     size_t mNumActiveTracks GUARDED_BY(mLock) = 0;
+    std::vector<audio_latency_mode_t> mSupportedLatencyModes GUARDED_BY(mLock);
 
-    static const std::vector<const char *> sHeadPoseKeys;
-};
+    static const std::vector<const char*> sHeadPoseKeys;
 
+    // Local log for command messages.
+    static constexpr int mMaxLocalLogLine = 10;
+    SimpleLog mLocalLog{mMaxLocalLogLine};
+
+    /**
+     * @brief Calculate and record sensor data.
+     * Dump to local log with max/average pose angle every mPoseRecordThreshold.
+     */
+    class HeadToStagePoseRecorder {
+      public:
+        HeadToStagePoseRecorder(std::chrono::duration<double> threshold, int maxLogLine)
+            : mPoseRecordThreshold(threshold), mPoseRecordLog(maxLogLine) {
+            resetRecord();
+        }
+
+        /** Convert recorded sensor data to string with level indentation */
+        std::string toString(unsigned level) const;
+
+        /**
+         * @brief Calculate sensor data, record into local log when it is time.
+         *
+         * @param headToStage The vector from Pose3f::toVector().
+         */
+        void record(const std::vector<float>& headToStage);
+
+        static constexpr float getDegreeWithRadian(const float radian) {
+            float radianToDegreeRatio = (180 / PI);
+            return (radian * radianToDegreeRatio);
+        }
+
+      private:
+        static constexpr float PI = M_PI;
+        /**
+         * Pose recorder time threshold to record sensor data in local log.
+         * Sensor data will be recorded into log at least every mPoseRecordThreshold.
+         */
+        std::chrono::duration<double> mPoseRecordThreshold;
+        // Number of seconds pass since last record.
+        std::chrono::duration<double> mNumOfSecondsSinceLastRecord;
+        /**
+         * According to frameworks/av/media/libheadtracking/include/media/Pose.h
+         * "The vector will have exactly 6 elements, where the first three are a translation vector
+         * and the last three are a rotation vector."
+         */
+        static constexpr size_t mPoseVectorSize = 6;
+        /**
+         * Timestamp of last sensor data record in local log.
+         */
+        std::chrono::time_point<std::chrono::steady_clock> mFirstSampleTimestamp;
+        /**
+         * Number of sensor samples received since last record, sample rate is ~100Hz which produce
+         * ~6k samples/minute.
+         */
+        uint32_t mNumOfSampleSinceLastRecord = 0;
+        /* The sum of pose angle represented by radian since last dump, div
+         * mNumOfSampleSinceLastRecord to get arithmetic mean. Largest possible value: 2PI * 100Hz *
+         * mPoseRecordThreshold.
+         */
+        std::vector<double> mPoseRadianSum;
+        std::vector<float> mMaxPoseAngle;
+        std::vector<float> mMinPoseAngle;
+        // Local log for history sensor data.
+        SimpleLog mPoseRecordLog{mMaxLocalLogLine};
+
+        bool shouldRecordLog() {
+            mNumOfSecondsSinceLastRecord = std::chrono::duration_cast<std::chrono::seconds>(
+                    std::chrono::steady_clock::now() - mFirstSampleTimestamp);
+            return mNumOfSecondsSinceLastRecord >= mPoseRecordThreshold;
+        }
+
+        void resetRecord() {
+            mPoseRadianSum.assign(mPoseVectorSize, 0);
+            mMaxPoseAngle.assign(mPoseVectorSize, -PI);
+            mMinPoseAngle.assign(mPoseVectorSize, PI);
+            mNumOfSampleSinceLastRecord = 0;
+            mNumOfSecondsSinceLastRecord = std::chrono::seconds(0);
+        }
+
+        // Add each sample to sum and only calculate when record.
+        void poseSumToAverage() {
+            if (mNumOfSampleSinceLastRecord == 0) return;
+            for (auto& p : mPoseRadianSum) {
+                const float reciprocal = 1.f / mNumOfSampleSinceLastRecord;
+                p *= reciprocal;
+            }
+        }
+    };  // HeadToStagePoseRecorder
+
+    // Record one log line per second (up to mMaxLocalLogLine) to capture most recent sensor data.
+    HeadToStagePoseRecorder mPoseRecorder GUARDED_BY(mLock) =
+            HeadToStagePoseRecorder(std::chrono::seconds(1), mMaxLocalLogLine);
+    // Record one log line per minute (up to mMaxLocalLogLine) to capture durable sensor data.
+    HeadToStagePoseRecorder mPoseDurableRecorder GUARDED_BY(mLock) =
+            HeadToStagePoseRecorder(std::chrono::minutes(1), mMaxLocalLogLine);
+};  // Spatializer
 
 }; // namespace android
 

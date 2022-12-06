@@ -57,6 +57,10 @@
 // The Audio Spatializer key appends the spatializerId (currently 0)
 #define AMEDIAMETRICS_KEY_PREFIX_AUDIO_SPATIALIZER AMEDIAMETRICS_KEY_PREFIX_AUDIO "spatializer."
 
+// The Audio Spatializer device key appends the device type.
+#define AMEDIAMETRICS_KEY_PREFIX_AUDIO_SPATIALIZER_DEVICE \
+        AMEDIAMETRICS_KEY_PREFIX_AUDIO_SPATIALIZER "device."
+
 // The AudioStream key appends the "streamId" to the prefix.
 #define AMEDIAMETRICS_KEY_PREFIX_AUDIO_STREAM  AMEDIAMETRICS_KEY_PREFIX_AUDIO "stream."
 
@@ -83,6 +87,7 @@
 #define AMEDIAMETRICS_PROP_PREFIX_EFFECTIVE "effective."
 #define AMEDIAMETRICS_PROP_PREFIX_HAL       "hal."
 #define AMEDIAMETRICS_PROP_PREFIX_HAPTIC    "haptic."
+#define AMEDIAMETRICS_PROP_PREFIX_LAST      "last."
 #define AMEDIAMETRICS_PROP_PREFIX_SERVER    "server."
 
 // Properties within mediametrics are string constants denoted by
@@ -107,6 +112,7 @@
 // of suppressed in the Time Machine.
 #define AMEDIAMETRICS_PROP_SUFFIX_CHAR_DUPLICATES_ALLOWED '#'
 
+#define AMEDIAMETRICS_PROP_ADDRESS        "address"        // string, for example MAC address
 #define AMEDIAMETRICS_PROP_ALLOWUID       "_allowUid"      // int32_t, allow client uid to post
 #define AMEDIAMETRICS_PROP_AUDIOMODE      "audioMode"      // string (audio.flinger)
 #define AMEDIAMETRICS_PROP_AUXEFFECTID    "auxEffectId"    // int32 (AudioTrack)
@@ -116,6 +122,8 @@
 #define AMEDIAMETRICS_PROP_CALLERNAME     "callerName"     // string, eg. "aaudio"
 #define AMEDIAMETRICS_PROP_CHANNELCOUNT   "channelCount"   // int32
 #define AMEDIAMETRICS_PROP_CHANNELMASK    "channelMask"    // int32
+#define AMEDIAMETRICS_PROP_CHANNELMASKS   "channelMasks"   // string with channelMask values
+                                                           // separated by |.
 #define AMEDIAMETRICS_PROP_CONTENTTYPE    "contentType"    // string attributes (AudioTrack)
 #define AMEDIAMETRICS_PROP_CUMULATIVETIMENS "cumulativeTimeNs" // int64_t playback/record time
                                                            // since start
@@ -132,6 +140,7 @@
 
 #define AMEDIAMETRICS_PROP_DIRECTION      "direction"      // string AAudio input or output
 #define AMEDIAMETRICS_PROP_DURATIONNS     "durationNs"     // int64 duration time span
+#define AMEDIAMETRICS_PROP_ENABLED        "enabled"        // string true/false.
 #define AMEDIAMETRICS_PROP_ENCODING       "encoding"       // string value of format
 
 #define AMEDIAMETRICS_PROP_EVENT          "event#"         // string value (often func name)
@@ -141,6 +150,8 @@
 #define AMEDIAMETRICS_PROP_FLAGS          "flags"
 
 #define AMEDIAMETRICS_PROP_FRAMECOUNT     "frameCount"     // int32
+#define AMEDIAMETRICS_PROP_HASHEADTRACKER  "hasHeadTracker" // string true/false
+#define AMEDIAMETRICS_PROP_HEADTRACKERENABLED "headTrackerEnabled" // string true/false
 #define AMEDIAMETRICS_PROP_HEADTRACKINGMODES "headTrackingModes" // string |, like modes.
 #define AMEDIAMETRICS_PROP_INPUTDEVICES   "inputDevices"   // string value
 #define AMEDIAMETRICS_PROP_INTERNALTRACKID "internalTrackId" // int32

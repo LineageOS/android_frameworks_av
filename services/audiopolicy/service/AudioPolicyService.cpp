@@ -272,6 +272,11 @@ void AudioPolicyService::onFirstRef()
         if (hasSpatializer) {
             mSpatializer = Spatializer::create(this);
         }
+        if (mSpatializer == nullptr) {
+            // No spatializer created, signal the reason: NO_INIT a failure, OK means intended.
+            const status_t createStatus = hasSpatializer ? NO_INIT : OK;
+            Spatializer::sendEmptyCreateSpatializerMetricWithStatus(createStatus);
+        }
     }
     AudioSystem::audioPolicyReady();
 }
@@ -516,9 +521,8 @@ void AudioPolicyService::onCheckSpatializer_l()
 
 void AudioPolicyService::doOnCheckSpatializer()
 {
-    Mutex::Autolock _l(mLock);
-
-    ALOGI("%s mSpatializer %p level %d", __func__, mSpatializer.get(), (int)mSpatializer->getLevel());
+    ALOGV("%s mSpatializer %p level %d",
+        __func__, mSpatializer.get(), (int)mSpatializer->getLevel());
 
     if (mSpatializer != nullptr) {
         // Note: mSpatializer != nullptr =>  mAudioPolicyManager != nullptr
@@ -527,6 +531,8 @@ void AudioPolicyService::doOnCheckSpatializer()
             audio_io_handle_t newOutput;
             const audio_attributes_t attr = attributes_initializer(AUDIO_USAGE_MEDIA);
             audio_config_base_t config = mSpatializer->getAudioInConfig();
+
+            Mutex::Autolock _l(mLock);
             status_t status =
                     mAudioPolicyManager->getSpatializerOutput(&config, &attr, &newOutput);
             ALOGV("%s currentOutput %d newOutput %d channel_mask %#x",
@@ -538,21 +544,19 @@ void AudioPolicyService::doOnCheckSpatializer()
             mLock.unlock();
             // It is OK to call detachOutput() is none is already attached.
             mSpatializer->detachOutput();
-            if (status != NO_ERROR || newOutput == AUDIO_IO_HANDLE_NONE) {
-                mLock.lock();
-                return;
+            if (status == NO_ERROR && newOutput != AUDIO_IO_HANDLE_NONE) {
+                status = mSpatializer->attachOutput(newOutput, numActiveTracks);
             }
-            status = mSpatializer->attachOutput(newOutput, numActiveTracks);
             mLock.lock();
             if (status != NO_ERROR) {
                 mAudioPolicyManager->releaseSpatializerOutput(newOutput);
             }
         } else if (mSpatializer->getLevel() == media::SpatializationLevel::NONE
                                && mSpatializer->getOutput() != AUDIO_IO_HANDLE_NONE) {
-            mLock.unlock();
             audio_io_handle_t output = mSpatializer->detachOutput();
-            mLock.lock();
+
             if (output != AUDIO_IO_HANDLE_NONE) {
+                Mutex::Autolock _l(mLock);
                 mAudioPolicyManager->releaseSpatializerOutput(output);
             }
         }
@@ -581,19 +585,16 @@ void AudioPolicyService::onUpdateActiveSpatializerTracks_l() {
 
 void AudioPolicyService::doOnUpdateActiveSpatializerTracks()
 {
-    sp<Spatializer> spatializer;
+    if (mSpatializer == nullptr) {
+        return;
+    }
+    audio_io_handle_t output = mSpatializer->getOutput();
     size_t activeClients;
     {
         Mutex::Autolock _l(mLock);
-        if (mSpatializer == nullptr) {
-            return;
-        }
-        spatializer = mSpatializer;
-        activeClients = countActiveClientsOnOutput_l(mSpatializer->getOutput());
+        activeClients = countActiveClientsOnOutput_l(output);
     }
-    if (spatializer != nullptr) {
-        spatializer->updateActiveTracks(activeClients);
-    }
+    mSpatializer->updateActiveTracks(activeClients);
 }
 
 status_t AudioPolicyService::clientCreateAudioPatch(const struct audio_patch *patch,
@@ -1215,6 +1216,14 @@ status_t AudioPolicyService::dump(int fd, const Vector<String16>& args __unused)
 
         dumpReleaseLock(mLock, locked);
 
+        if (mSpatializer != nullptr) {
+            std::string dumpString = mSpatializer->toString(1 /* level */);
+            write(fd, dumpString.c_str(), dumpString.size());
+        } else {
+            String8 spatializerPtr = String8::format("Spatializer no supportted on this device\n");
+            write(fd, spatializerPtr.c_str(), spatializerPtr.size());
+        }
+
         {
             std::string timeCheckStats = getIAudioPolicyServiceStatistics().dump();
             dprintf(fd, "\nIAudioPolicyService binder call profile\n");
@@ -1338,7 +1347,9 @@ status_t AudioPolicyService::onTransact(
         } else {
             getIAudioPolicyServiceStatistics().event(code, elapsedMs);
         }
-    });
+    }, mediautils::TimeCheck::kDefaultTimeoutDuration,
+    mediautils::TimeCheck::kDefaultSecondChanceDuration,
+    true /* crashOnTimeout */);
 
     switch (code) {
         case SHELL_COMMAND_TRANSACTION: {

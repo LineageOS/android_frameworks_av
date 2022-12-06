@@ -670,6 +670,30 @@ Status AudioSystem::AudioFlingerClient::ioConfigChanged(
     return Status::ok();
 }
 
+Status AudioSystem::AudioFlingerClient::onSupportedLatencyModesChanged(
+        int output, const std::vector<media::LatencyMode>& latencyModes) {
+    audio_io_handle_t outputLegacy = VALUE_OR_RETURN_BINDER_STATUS(
+            aidl2legacy_int32_t_audio_io_handle_t(output));
+    std::vector<audio_latency_mode_t> modesLegacy = VALUE_OR_RETURN_BINDER_STATUS(
+            convertContainer<std::vector<audio_latency_mode_t>>(
+                    latencyModes, aidl2legacy_LatencyMode_audio_latency_mode_t));
+
+    std::vector<sp<SupportedLatencyModesCallback>> callbacks;
+    {
+        Mutex::Autolock _l(mLock);
+        for (auto callback : mSupportedLatencyModesCallbacks) {
+            if (auto ref = callback.promote(); ref != nullptr) {
+                callbacks.push_back(ref);
+            }
+        }
+    }
+    for (const auto& callback : callbacks) {
+        callback->onSupportedLatencyModesChanged(outputLegacy, modesLegacy);
+    }
+
+    return Status::ok();
+}
+
 status_t AudioSystem::AudioFlingerClient::getInputBufferSize(
         uint32_t sampleRate, audio_format_t format,
         audio_channel_mask_t channelMask, size_t* buffSize) {
@@ -746,6 +770,31 @@ status_t AudioSystem::AudioFlingerClient::removeAudioDeviceCallback(
     if (it->second.size() == 0) {
         mAudioDeviceCallbacks.erase(audioIo);
     }
+    return NO_ERROR;
+}
+
+status_t AudioSystem::AudioFlingerClient::addSupportedLatencyModesCallback(
+        const sp<SupportedLatencyModesCallback>& callback) {
+    Mutex::Autolock _l(mLock);
+    if (std::find(mSupportedLatencyModesCallbacks.begin(),
+                  mSupportedLatencyModesCallbacks.end(),
+                  callback) != mSupportedLatencyModesCallbacks.end()) {
+        return INVALID_OPERATION;
+    }
+    mSupportedLatencyModesCallbacks.push_back(callback);
+    return NO_ERROR;
+}
+
+status_t AudioSystem::AudioFlingerClient::removeSupportedLatencyModesCallback(
+        const sp<SupportedLatencyModesCallback>& callback) {
+    Mutex::Autolock _l(mLock);
+    auto it = std::find(mSupportedLatencyModesCallbacks.begin(),
+                                 mSupportedLatencyModesCallbacks.end(),
+                                 callback);
+    if (it == mSupportedLatencyModesCallbacks.end()) {
+        return INVALID_OPERATION;
+    }
+    mSupportedLatencyModesCallbacks.erase(it);
     return NO_ERROR;
 }
 
@@ -1662,6 +1711,24 @@ status_t AudioSystem::removeAudioDeviceCallback(
     return afc->removeAudioDeviceCallback(callback, audioIo, portId);
 }
 
+status_t AudioSystem::addSupportedLatencyModesCallback(
+        const sp<SupportedLatencyModesCallback>& callback) {
+    const sp<AudioFlingerClient> afc = getAudioFlingerClient();
+    if (afc == 0) {
+        return NO_INIT;
+    }
+    return afc->addSupportedLatencyModesCallback(callback);
+}
+
+status_t AudioSystem::removeSupportedLatencyModesCallback(
+        const sp<SupportedLatencyModesCallback>& callback) {
+    const sp<AudioFlingerClient> afc = getAudioFlingerClient();
+    if (afc == 0) {
+        return NO_INIT;
+    }
+    return afc->removeSupportedLatencyModesCallback(callback);
+}
+
 audio_port_handle_t AudioSystem::getDeviceIdForIo(audio_io_handle_t audioIo) {
     const sp<IAudioFlinger>& af = AudioSystem::get_audio_flinger();
     if (af == 0) return PERMISSION_DENIED;
@@ -2336,6 +2403,24 @@ status_t AudioSystem::getDirectProfilesForAttributes(const audio_attributes_t* a
                     audioProfilesAidl, aidl2legacy_AudioProfile_audio_profile, false /*isInput*/));
 
     return NO_ERROR;
+}
+
+status_t AudioSystem::setRequestedLatencyMode(
+            audio_io_handle_t output, audio_latency_mode_t mode) {
+    const sp<IAudioFlinger>& af = AudioSystem::get_audio_flinger();
+    if (af == nullptr) {
+        return PERMISSION_DENIED;
+    }
+    return af->setRequestedLatencyMode(output, mode);
+}
+
+status_t AudioSystem::getSupportedLatencyModes(audio_io_handle_t output,
+        std::vector<audio_latency_mode_t>* modes) {
+    const sp<IAudioFlinger>& af = AudioSystem::get_audio_flinger();
+    if (af == nullptr) {
+        return PERMISSION_DENIED;
+    }
+    return af->getSupportedLatencyModes(output, modes);
 }
 
 class CaptureStateListenerImpl : public media::BnCaptureStateListener,
