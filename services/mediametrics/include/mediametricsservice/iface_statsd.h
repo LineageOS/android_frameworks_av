@@ -32,6 +32,9 @@ extern statsd_pusher statsd_audiotrack;
 extern statsd_pusher statsd_codec;
 extern statsd_pusher statsd_extractor;
 extern statsd_pusher statsd_mediaparser;
+extern statsd_pusher statsd_media_drm_created;
+extern statsd_pusher statsd_media_drm_session_opened;
+extern statsd_pusher statsd_media_drm_errored;
 
 extern statsd_pusher statsd_nuplayer;
 extern statsd_pusher statsd_recorder;
