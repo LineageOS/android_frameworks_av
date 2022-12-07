@@ -193,8 +193,10 @@ public:
             {AUDIO_FORMAT_AC3, {}},
             {AUDIO_FORMAT_E_AC3, {}},
             {AUDIO_FORMAT_DTS, {}},
-            {AUDIO_FORMAT_DTS_HD, {AUDIO_FORMAT_DTS_HD_MA}},
-            {AUDIO_FORMAT_DTS_UHD, {AUDIO_FORMAT_DTS_UHD_P2}},
+            {AUDIO_FORMAT_DTS_HD, {}},
+            {AUDIO_FORMAT_DTS_HD_MA, {}},
+            {AUDIO_FORMAT_DTS_UHD, {}},
+            {AUDIO_FORMAT_DTS_UHD_P2, {}},
             {AUDIO_FORMAT_AAC_LC, {
                     AUDIO_FORMAT_AAC_HE_V1, AUDIO_FORMAT_AAC_HE_V2, AUDIO_FORMAT_AAC_ELD,
                     AUDIO_FORMAT_AAC_XHE}},
