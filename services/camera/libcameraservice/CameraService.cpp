@@ -81,6 +81,9 @@
 
 namespace {
     const char* kPermissionServiceName = "permission";
+    const char* kActivityServiceName = "activity";
+    const char* kSensorPrivacyServiceName = "sensor_privacy";
+    const char* kAppopsServiceName = "appops";
 }; // namespace anonymous
 
 namespace android {
@@ -167,6 +170,15 @@ static bool doesClientHaveSystemUid() {
     return (CameraThreadState::getCallingUid() < AID_APP_START);
 }
 
+void CameraService::onServiceRegistration(const String16& name, const sp<IBinder>&) {
+    if (name != String16(kAppopsServiceName)) {
+        return;
+    }
+
+    ALOGV("appops service registered. setting camera audio restriction");
+    mAppOps.setCameraAudioRestriction(mAudioRestriction);
+}
+
 void CameraService::onFirstRef()
 {
 
@@ -191,7 +203,19 @@ void CameraService::onFirstRef()
     mSensorPrivacyPolicy = new SensorPrivacyPolicy(this);
     mSensorPrivacyPolicy->registerSelf();
     mInjectionStatusListener = new InjectionStatusListener(this);
-    mAppOps.setCameraAudioRestriction(mAudioRestriction);
+
+    // appops function setCamerAudioRestriction uses getService which
+    // is blocking till the appops service is ready. To enable early
+    // boot availability for cameraservice, use checkService which is
+    // non blocking and register for notifications
+    sp<IServiceManager> sm = defaultServiceManager();
+    sp<IBinder> binder = sm->checkService(String16(kAppopsServiceName));
+    if (!binder) {
+        sm->registerForNotifications(String16(kAppopsServiceName), this);
+    } else {
+        mAppOps.setCameraAudioRestriction(mAudioRestriction);
+    }
+
     sp<HidlCameraService> hcs = HidlCameraService::getInstance(this);
     if (hcs->registerAsService() != android::OK) {
         // Deprecated, so it will fail to register on newer devices
@@ -3792,7 +3816,7 @@ void CameraService::Client::OpsCallback::opChanged(int32_t op,
 //                  UidPolicy
 // ----------------------------------------------------------------------------
 
-void CameraService::UidPolicy::registerSelf() {
+void CameraService::UidPolicy::registerWithActivityManager() {
     Mutex::Autolock _l(mUidLock);
 
     if (mRegistered) return;
@@ -3806,6 +3830,27 @@ void CameraService::UidPolicy::registerSelf() {
     if (res == OK) {
         mRegistered = true;
         ALOGV("UidPolicy: Registered with ActivityManager");
+    }
+}
+
+void CameraService::UidPolicy::onServiceRegistration(const String16& name, const sp<IBinder>&) {
+    if (name != String16(kActivityServiceName)) {
+        return;
+    }
+
+    registerWithActivityManager();
+}
+
+void CameraService::UidPolicy::registerSelf() {
+    // Use check service to see if the activity service is available
+    // If not available then register for notifications, instead of blocking
+    // till the service is ready
+    sp<IServiceManager> sm = defaultServiceManager();
+    sp<IBinder> binder = sm->checkService(String16(kActivityServiceName));
+    if (!binder) {
+        sm->registerForNotifications(String16(kActivityServiceName), this);
+    } else {
+        registerWithActivityManager();
     }
 }
 
@@ -4022,7 +4067,9 @@ void CameraService::UidPolicy::updateOverrideUid(uid_t uid, String16 callingPack
 // ----------------------------------------------------------------------------
 //                  SensorPrivacyPolicy
 // ----------------------------------------------------------------------------
-void CameraService::SensorPrivacyPolicy::registerSelf() {
+
+void CameraService::SensorPrivacyPolicy::registerWithSensorPrivacyManager()
+{
     Mutex::Autolock _l(mSensorPrivacyLock);
     if (mRegistered) {
         return;
@@ -4037,6 +4084,27 @@ void CameraService::SensorPrivacyPolicy::registerSelf() {
     }
 }
 
+void CameraService::SensorPrivacyPolicy::onServiceRegistration(const String16& name,
+                                                               const sp<IBinder>&) {
+    if (name != String16(kSensorPrivacyServiceName)) {
+        return;
+    }
+
+    registerWithSensorPrivacyManager();
+}
+
+void CameraService::SensorPrivacyPolicy::registerSelf() {
+    // Use checkservice to see if the sensor_privacy service is available
+    // If service is not available then register for notification
+    sp<IServiceManager> sm = defaultServiceManager();
+    sp<IBinder> binder = sm->checkService(String16(kSensorPrivacyServiceName));
+    if (!binder) {
+        sm->registerForNotifications(String16(kSensorPrivacyServiceName),this);
+    } else {
+        registerWithSensorPrivacyManager();
+    }
+}
+
 void CameraService::SensorPrivacyPolicy::unregisterSelf() {
     Mutex::Autolock _l(mSensorPrivacyLock);
     mSpm.removeSensorPrivacyListener(this);
@@ -4046,6 +4114,10 @@ void CameraService::SensorPrivacyPolicy::unregisterSelf() {
 }
 
 bool CameraService::SensorPrivacyPolicy::isSensorPrivacyEnabled() {
+    if (!mRegistered) {
+      registerWithSensorPrivacyManager();
+    }
+
     Mutex::Autolock _l(mSensorPrivacyLock);
     return mSensorPrivacyEnabled;
 }
