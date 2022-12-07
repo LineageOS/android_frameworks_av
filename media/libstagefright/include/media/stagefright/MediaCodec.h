@@ -259,6 +259,7 @@ private:
         kWhatSetNotification                = 'setN',
         kWhatDrmReleaseCrypto               = 'rDrm',
         kWhatCheckBatteryStats              = 'chkB',
+        kWhatGetMetrics                     = 'getM',
     };
 
     enum {
@@ -328,11 +329,13 @@ private:
     sp<Surface> mSurface;
     SoftwareRenderer *mSoftRenderer;
 
+    Mutex mMetricsLock;
     MediaAnalyticsItem *mAnalyticsItem;
     void initAnalyticsItem();
     void updateAnalyticsItem();
     void flushAnalyticsItem();
     void updateEphemeralAnalytics(MediaAnalyticsItem *item);
+    void onGetMetrics(const sp<AMessage>& msg);
 
     sp<AMessage> mOutputFormat;
     sp<AMessage> mInputFormat;
