@@ -87,6 +87,9 @@ bool dump2Statsd(
         { "nuplayer", statsd_nuplayer },
         { "nuplayer2", statsd_nuplayer },
         { "recorder", statsd_recorder },
+        { "media_drm_created", statsd_media_drm_created },
+        { "media_drm_session_opened", statsd_media_drm_session_opened },
+        { "media_drm_errored", statsd_media_drm_errored },
     };
     return dump2StatsdInternal(statsd_pushers, item, statsdLog);
 }

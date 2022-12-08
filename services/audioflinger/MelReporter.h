@@ -19,8 +19,9 @@
     #error This header file should only be included from AudioFlinger.h
 #endif
 
-#include <unordered_map>
 #include <mutex>
+#include <sounddose/SoundDoseManager.h>
+#include <unordered_map>
 
 constexpr static int kMaxTimestampDeltaInSec = 120;
 
@@ -31,8 +32,7 @@ constexpr static int kMaxTimestampDeltaInSec = 120;
 class MelReporter : public PatchCommandThread::PatchCommandListener {
 public:
     explicit MelReporter(AudioFlinger& audioFlinger)
-        : mAudioFlinger(audioFlinger),
-          mMelAggregator(kMaxTimestampDeltaInSec) {}
+        : mAudioFlinger(audioFlinger) {}
 
     void onFirstRef() override {
         mAudioFlinger.mPatchCommandThread->addListener(this);
@@ -54,7 +54,7 @@ public:
 private:
     AudioFlinger& mAudioFlinger;  // does not own the object
 
-    audio_utils::MelAggregator mMelAggregator;
+    SoundDoseManager mSoundDoseManager;
 
     struct ActiveMelPatch {
         audio_io_handle_t streamHandle{AUDIO_IO_HANDLE_NONE};
