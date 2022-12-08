@@ -1305,6 +1305,7 @@ private:
 
         sp<PreferredMixerAttributesInfo> getPreferredMixerAttributesInfo(
                 audio_port_handle_t devicePortId, product_strategy_t strategy);
+
         sp<SwAudioOutputDescriptor> reopenOutput(
                 sp<SwAudioOutputDescriptor> outputDesc,
                 const audio_config_t *config,
@@ -1313,6 +1314,9 @@ private:
 
         void reopenOutputsWithDevices(
                 const std::map<audio_io_handle_t, DeviceVector>& outputsToReopen);
+
+        PortHandleVector getClientsForStream(audio_stream_type_t streamType) const;
+        void invalidateStreams(StreamTypeVector streams) const;
 };
 
 };

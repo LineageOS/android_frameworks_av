@@ -194,7 +194,6 @@ BINDER_METHOD_ENTRY(suspendOutput) \
 BINDER_METHOD_ENTRY(restoreOutput) \
 BINDER_METHOD_ENTRY(openInput) \
 BINDER_METHOD_ENTRY(closeInput) \
-BINDER_METHOD_ENTRY(invalidateStream) \
 BINDER_METHOD_ENTRY(setVoiceVolume) \
 BINDER_METHOD_ENTRY(getRenderPosition) \
 BINDER_METHOD_ENTRY(getInputFramesLost) \
@@ -3398,17 +3397,23 @@ void AudioFlinger::closeThreadInternal_l(const sp<RecordThread>& thread)
     closeInputFinish(thread);
 }
 
-status_t AudioFlinger::invalidateStream(audio_stream_type_t stream)
-{
+status_t AudioFlinger::invalidateTracks(const std::vector<audio_port_handle_t> &portIds) {
     Mutex::Autolock _l(mLock);
-    ALOGV("invalidateStream() stream %d", stream);
+    ALOGV("%s", __func__);
 
+    std::set<audio_port_handle_t> portIdSet(portIds.begin(), portIds.end());
     for (size_t i = 0; i < mPlaybackThreads.size(); i++) {
         PlaybackThread *thread = mPlaybackThreads.valueAt(i).get();
-        thread->invalidateTracks(stream);
+        thread->invalidateTracks(portIdSet);
+        if (portIdSet.empty()) {
+            return NO_ERROR;
+        }
     }
     for (size_t i = 0; i < mMmapThreads.size(); i++) {
-        mMmapThreads[i]->invalidateTracks(stream);
+        mMmapThreads[i]->invalidateTracks(portIdSet);
+        if (portIdSet.empty()) {
+            return NO_ERROR;
+        }
     }
     return NO_ERROR;
 }
@@ -4607,7 +4612,6 @@ status_t AudioFlinger::onTransactWrapper(TransactionCode code,
         case TransactionCode::RESTORE_OUTPUT:
         case TransactionCode::OPEN_INPUT:
         case TransactionCode::CLOSE_INPUT:
-        case TransactionCode::INVALIDATE_STREAM:
         case TransactionCode::SET_VOICE_VOLUME:
         case TransactionCode::MOVE_EFFECTS:
         case TransactionCode::SET_EFFECT_SUSPENDED:
@@ -4622,6 +4626,7 @@ status_t AudioFlinger::onTransactWrapper(TransactionCode code,
         case TransactionCode::SET_DEVICE_CONNECTED_STATE:
         case TransactionCode::SET_REQUESTED_LATENCY_MODE:
         case TransactionCode::GET_SUPPORTED_LATENCY_MODES:
+        case TransactionCode::INVALIDATE_TRACKS:
             ALOGW("%s: transaction %d received from PID %d",
                   __func__, code, IPCThreadState::self()->getCallingPid());
             // return status only for non void methods

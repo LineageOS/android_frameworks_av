@@ -493,12 +493,6 @@ status_t AudioFlingerClientAdapter::closeInput(audio_io_handle_t input) {
     return statusTFromBinderStatus(mDelegate->closeInput(inputAidl));
 }
 
-status_t AudioFlingerClientAdapter::invalidateStream(audio_stream_type_t stream) {
-    AudioStreamType streamAidl = VALUE_OR_RETURN_STATUS(
-            legacy2aidl_audio_stream_type_t_AudioStreamType(stream));
-    return statusTFromBinderStatus(mDelegate->invalidateStream(streamAidl));
-}
-
 status_t AudioFlingerClientAdapter::setVoiceVolume(float volume) {
     return statusTFromBinderStatus(mDelegate->setVoiceVolume(volume));
 }
@@ -858,6 +852,14 @@ status_t AudioFlingerClientAdapter::getSoundDoseInterface(
     return statusTFromBinderStatus(mDelegate->getSoundDoseInterface(callback, soundDose));
 }
 
+status_t AudioFlingerClientAdapter::invalidateTracks(
+        const std::vector<audio_port_handle_t>& portIds) {
+    std::vector<int32_t> portIdsAidl = VALUE_OR_RETURN_STATUS(
+            convertContainer<std::vector<int32_t>>(
+                    portIds, legacy2aidl_audio_port_handle_t_int32_t));
+    return statusTFromBinderStatus(mDelegate->invalidateTracks(portIdsAidl));
+}
+
 ////////////////////////////////////////////////////////////////////////////////////////////////////
 // AudioFlingerServerAdapter
 AudioFlingerServerAdapter::AudioFlingerServerAdapter(
@@ -1088,12 +1090,6 @@ Status AudioFlingerServerAdapter::closeInput(int32_t input) {
     audio_io_handle_t inputLegacy = VALUE_OR_RETURN_BINDER(
             aidl2legacy_int32_t_audio_io_handle_t(input));
     return Status::fromStatusT(mDelegate->closeInput(inputLegacy));
-}
-
-Status AudioFlingerServerAdapter::invalidateStream(AudioStreamType stream) {
-    audio_stream_type_t streamLegacy = VALUE_OR_RETURN_BINDER(
-            aidl2legacy_AudioStreamType_audio_stream_type_t(stream));
-    return Status::fromStatusT(mDelegate->invalidateStream(streamLegacy));
 }
 
 Status AudioFlingerServerAdapter::setVoiceVolume(float volume) {
@@ -1383,6 +1379,14 @@ Status AudioFlingerServerAdapter::getSoundDoseInterface(
         sp<media::ISoundDose>* soundDose)
 {
     return Status::fromStatusT(mDelegate->getSoundDoseInterface(callback, soundDose));
+}
+
+Status AudioFlingerServerAdapter::invalidateTracks(const std::vector<int32_t>& portIds) {
+    std::vector<audio_port_handle_t> portIdsLegacy = VALUE_OR_RETURN_BINDER(
+            convertContainer<std::vector<audio_port_handle_t>>(
+                    portIds, aidl2legacy_int32_t_audio_port_handle_t));
+    RETURN_BINDER_IF_ERROR(mDelegate->invalidateTracks(portIdsLegacy));
+    return Status::ok();
 }
 
 } // namespace android

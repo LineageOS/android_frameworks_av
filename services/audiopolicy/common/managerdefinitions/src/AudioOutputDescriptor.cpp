@@ -947,6 +947,17 @@ bool SwAudioOutputDescriptor::isConfigurationMatched(const audio_config_base_t &
             && mFormat == config.format;
 }
 
+PortHandleVector SwAudioOutputDescriptor::getClientsForStream(
+        audio_stream_type_t streamType) const {
+    PortHandleVector clientsForStream;
+    for (const auto& client : getClientIterable()) {
+        if (client->stream() == streamType) {
+            clientsForStream.push_back(client->portId());
+        }
+    }
+    return clientsForStream;
+}
+
 void SwAudioOutputCollection::dump(String8 *dst) const
 {
     dst->appendFormat("\n Outputs (%zu):\n", size());

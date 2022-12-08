@@ -782,9 +782,6 @@ private:
         // for each output (destination device) it is attached to.
         virtual status_t setStreamVolume(audio_stream_type_t stream, float volume, audio_io_handle_t output, int delayMs = 0);
 
-        // invalidate a stream type, causing a reroute to an unspecified new output
-        virtual status_t invalidateStream(audio_stream_type_t stream);
-
         // function enabling to send proprietary informations directly from audio policy manager to audio hardware interface.
         virtual void setParameters(audio_io_handle_t ioHandle, const String8& keyValuePairs, int delayMs = 0);
         // function enabling to receive proprietary informations directly from audio hardware interface to audio policy manager.
@@ -843,6 +840,8 @@ private:
 
         status_t setDeviceConnectedState(
                 const struct audio_port_v7 *port, bool connected) override;
+
+        status_t invalidateTracks(const std::vector<audio_port_handle_t>& portIds) override;
 
      private:
         AudioPolicyService *mAudioPolicyService;

@@ -210,8 +210,6 @@ public:
 
     virtual status_t closeInput(audio_io_handle_t input);
 
-    virtual status_t invalidateStream(audio_stream_type_t stream);
-
     virtual status_t setVoiceVolume(float volume);
 
     virtual status_t getRenderPosition(uint32_t *halFrames, uint32_t *dspFrames,
@@ -309,6 +307,8 @@ public:
 
     virtual status_t getSoundDoseInterface(const sp<media::ISoundDoseCallback>& callback,
                                            sp<media::ISoundDose>* soundDose);
+
+    status_t invalidateTracks(const std::vector<audio_port_handle_t>& portIds) override;
 
     status_t onTransactWrapper(TransactionCode code, const Parcel& data, uint32_t flags,
         const std::function<status_t()>& delegate) override;

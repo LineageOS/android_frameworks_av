@@ -134,8 +134,6 @@ interface IAudioFlingerService {
     OpenInputResponse openInput(in OpenInputRequest request);
     void closeInput(int /* audio_io_handle_t */ input);
 
-    void invalidateStream(AudioStreamType stream);
-
     void setVoiceVolume(float volume);
 
     RenderPosition getRenderPosition(int /* audio_io_handle_t */ output);
@@ -253,6 +251,11 @@ interface IAudioFlingerService {
      * sound dose methods on the audio server.
      */
     ISoundDose getSoundDoseInterface(in ISoundDoseCallback callback);
+
+    /**
+     * Invalidate all tracks with given port ids.
+     */
+    void invalidateTracks(in int[] /* audio_port_handle_t[] */ portIds);
 
     // When adding a new method, please review and update
     // IAudioFlinger.h AudioFlingerServerAdapter::Delegate::TransactionCode
