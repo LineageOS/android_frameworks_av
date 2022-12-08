@@ -49,6 +49,9 @@ void AAudioStreamParameters::copyFrom(const AAudioStreamParameters &other) {
     mOpPackageName        = other.mOpPackageName;
     mAttributionTag       = other.mAttributionTag;
     mChannelMask          = other.mChannelMask;
+    mHardwareSamplesPerFrame = other.mHardwareSamplesPerFrame;
+    mHardwareSampleRate   = other.mHardwareSampleRate;
+    mHardwareAudioFormat  = other.mHardwareAudioFormat;
 }
 
 static aaudio_result_t isFormatValid(audio_format_t format) {
@@ -311,4 +314,7 @@ void AAudioStreamParameters::dump() const {
         "(null)" : mOpPackageName.value().c_str());
     ALOGD("mAttributionTag       = %s", !mAttributionTag.has_value() ?
         "(null)" : mAttributionTag.value().c_str());
+    ALOGD("mHardwareSamplesPerFrame = %6d", mHardwareSamplesPerFrame);
+    ALOGD("mHardwareSampleRate   = %6d", mHardwareSampleRate);
+    ALOGD("mHardwareAudioFormat  = %6d", (int)mHardwareAudioFormat);
 }

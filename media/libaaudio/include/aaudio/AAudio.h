@@ -1701,9 +1701,25 @@ AAUDIO_API int32_t AAudioStream_getXRunCount(AAudioStream* stream) __INTRODUCED_
  * Available since API level 26.
  *
  * @param stream reference provided by AAudioStreamBuilder_openStream()
- * @return actual sample rate
+ * @return actual sample rate of the stream
  */
 AAUDIO_API int32_t AAudioStream_getSampleRate(AAudioStream* stream) __INTRODUCED_IN(26);
+
+/**
+ * There may be sample rate conversions in the Audio framework.
+ * The sample rate set in the stream builder may not be actual sample rate used in the hardware.
+ *
+ * This returns the sample rate used by the hardware.
+ *
+ * If AAudioStreamBuilder_openStream() returned AAUDIO_OK, the result should always be valid.
+ *
+ * Available since API level 34.
+ *
+ * @param stream reference provided by AAudioStreamBuilder_openStream()
+ * @return actual sample rate of the underlying hardware
+ */
+AAUDIO_API int32_t AAudioStream_getHardwareSampleRate(AAudioStream* stream)
+        __INTRODUCED_IN(__ANDROID_API_U__);
 
 /**
  * A stream has one or more channels of data.
@@ -1712,9 +1728,26 @@ AAUDIO_API int32_t AAudioStream_getSampleRate(AAudioStream* stream) __INTRODUCED
  * Available since API level 26.
  *
  * @param stream reference provided by AAudioStreamBuilder_openStream()
- * @return actual number of channels
+ * @return actual number of channels of the stream
  */
 AAUDIO_API int32_t AAudioStream_getChannelCount(AAudioStream* stream) __INTRODUCED_IN(26);
+
+/**
+ * There may be channel conversions in the Audio framework.
+ * The channel count or channel mask set in the stream builder may not be actual number of
+ * channels used in the hardware.
+ *
+ * This returns the channel count used by the hardware.
+ *
+ * If AAudioStreamBuilder_openStream() returned AAUDIO_OK, the result should always be valid.
+ *
+ * Available since API level 34.
+ *
+ * @param stream reference provided by AAudioStreamBuilder_openStream()
+ * @return actual number of channels of the underlying hardware
+ */
+AAUDIO_API int32_t AAudioStream_getHardwareChannelCount(AAudioStream* stream)
+        __INTRODUCED_IN(__ANDROID_API_U__);
 
 /**
  * Identical to AAudioStream_getChannelCount().
@@ -1738,9 +1771,25 @@ AAUDIO_API int32_t AAudioStream_getDeviceId(AAudioStream* stream) __INTRODUCED_I
  * Available since API level 26.
  *
  * @param stream reference provided by AAudioStreamBuilder_openStream()
- * @return actual data format
+ * @return actual data format of the stream
  */
 AAUDIO_API aaudio_format_t AAudioStream_getFormat(AAudioStream* stream) __INTRODUCED_IN(26);
+
+/**
+ * There may be data format conversions in the Audio framework.
+ * The data format set in the stream builder may not be actual format used in the hardware.
+ *
+ * This returns the audio format used by the hardware.
+ * AUDIO_FORMAT_PCM_8_24_BIT is currently not supported in AAudio, but the hardware may use it.
+ * If AUDIO_FORMAT_PCM_8_24_BIT is used by the hardware, return AAUDIO_FORMAT_PCM_I24_PACKED.
+ *
+ * Available since API level 34.
+ *
+ * @param stream reference provided by AAudioStreamBuilder_openStream()
+ * @return actual data format of the underlying hardware.
+ */
+AAUDIO_API aaudio_format_t AAudioStream_getHardwareFormat(AAudioStream* stream)
+        __INTRODUCED_IN(__ANDROID_API_U__);
 
 /**
  * Provide actual sharing mode.

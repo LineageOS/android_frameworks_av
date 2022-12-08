@@ -1199,6 +1199,9 @@ status_t AudioFlinger::createTrack(const media::CreateTrackRequest& _input,
 
         output.afFrameCount = thread->frameCount();
         output.afSampleRate = thread->sampleRate();
+        output.afChannelMask = static_cast<audio_channel_mask_t>(thread->channelMask() |
+                                                                 thread->hapticChannelMask());
+        output.afFormat = thread->format();
         output.afLatencyMs = thread->latency();
         output.portId = portId;
 
@@ -2432,6 +2435,12 @@ status_t AudioFlinger::createRecord(const media::CreateRecordRequest& _input,
                     recordTrack->format()
             };
         }
+
+        output.halConfig = {
+                thread->sampleRate(),
+                thread->channelMask(),
+                thread->format()
+        };
 
         // Check if one effect chain was awaiting for an AudioRecord to be created on this
         // session and move it to this thread.

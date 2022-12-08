@@ -67,6 +67,9 @@ LIBAAUDIO {
     AAudioStream_getChannelMask;  # introduced=32
     AAudioStream_getSpatializationBehavior;  # introduced=32
     AAudioStream_isContentSpatialized;       # introduced=32
+    AAudioStream_getHardwareChannelCount; # introduced=UpsideDownCake
+    AAudioStream_getHardwareFormat;       # introduced=UpsideDownCake
+    AAudioStream_getHardwareSampleRate;   # introduced=UpsideDownCake
   local:
     *;
 };

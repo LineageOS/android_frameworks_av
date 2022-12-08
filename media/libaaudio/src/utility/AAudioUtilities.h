@@ -65,6 +65,7 @@ audio_format_t AAudioConvert_aaudioToAndroidDataFormat(aaudio_format_t aaudio_fo
 
 aaudio_format_t AAudioConvert_androidToAAudioDataFormat(audio_format_t format);
 
+aaudio_format_t AAudioConvert_androidToNearestAAudioDataFormat(audio_format_t format);
 
 /**
  * Note that this function does not validate the passed in value.

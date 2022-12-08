@@ -34,6 +34,9 @@ aaudio_format_t kAAudioFormats[] = {
     AAUDIO_FORMAT_UNSPECIFIED,
     AAUDIO_FORMAT_PCM_I16,
     AAUDIO_FORMAT_PCM_FLOAT,
+    AAUDIO_FORMAT_PCM_I24_PACKED,
+    AAUDIO_FORMAT_PCM_I32,
+    AAUDIO_FORMAT_IEC61937
 };
 
 aaudio_usage_t kAAudioUsages[] = {
@@ -399,6 +402,13 @@ void OboeserviceFuzzer::process(const uint8_t *data, size_t size) {
     request.getConfiguration().setPrivacySensitive(fdp.ConsumeBool());
 
     request.getConfiguration().setBufferCapacity(fdp.ConsumeIntegral<int32_t>());
+
+    request.getConfiguration().setHardwareSampleRate(fdp.ConsumeIntegral<int32_t>());
+    request.getConfiguration().setHardwareSamplesPerFrame(fdp.ConsumeIntegral<int32_t>());
+    request.getConfiguration().setHardwareFormat((audio_format_t)(
+        fdp.ConsumeBool()
+            ? fdp.ConsumeIntegral<int32_t>()
+            : kAAudioFormats[fdp.ConsumeIntegralInRange<int32_t>(0, kNumAAudioFormats - 1)]));
 
     aaudio_handle_t stream = mClient->openStream(request, configurationOutput);
     if (stream < 0) {
