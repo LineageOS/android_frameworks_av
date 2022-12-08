@@ -128,6 +128,36 @@ status_t fixupMonochromeTags(
     return res;
 }
 
+status_t fixupAutoframingTags(CameraMetadata& resultMetadata) {
+    status_t res = OK;
+    camera_metadata_entry autoframingEntry =
+            resultMetadata.find(ANDROID_CONTROL_AUTOFRAMING);
+    if (autoframingEntry.count == 0) {
+        const uint8_t defaultAutoframingEntry = ANDROID_CONTROL_AUTOFRAMING_OFF;
+        res = resultMetadata.update(ANDROID_CONTROL_AUTOFRAMING, &defaultAutoframingEntry, 1);
+        if (res != OK) {
+            ALOGE("%s: Failed to update ANDROID_CONTROL_AUTOFRAMING: %s (%d)",
+                  __FUNCTION__, strerror(-res), res);
+            return res;
+        }
+    }
+
+    camera_metadata_entry autoframingStateEntry =
+            resultMetadata.find(ANDROID_CONTROL_AUTOFRAMING_STATE);
+    if (autoframingStateEntry.count == 0) {
+        const uint8_t defaultAutoframingStateEntry = ANDROID_CONTROL_AUTOFRAMING_STATE_INACTIVE;
+        res = resultMetadata.update(ANDROID_CONTROL_AUTOFRAMING_STATE,
+                                    &defaultAutoframingStateEntry, 1);
+        if (res != OK) {
+            ALOGE("%s: Failed to update ANDROID_CONTROL_AUTOFRAMING_STATE: %s (%d)",
+                  __FUNCTION__, strerror(-res), res);
+            return res;
+        }
+    }
+
+    return res;
+}
+
 void correctMeteringRegions(camera_metadata_t *meta) {
     if (meta == nullptr) return;
 
@@ -355,24 +385,17 @@ void sendCaptureResult(
     }
 
     // Fix up autoframing metadata
-    camera_metadata_entry autoframingEntry =
-            captureResult.mMetadata.find(ANDROID_CONTROL_AUTOFRAMING);
-    if (autoframingEntry.count == 0) {
-        const uint8_t defaultAutoframingEntry = ANDROID_CONTROL_AUTOFRAMING_OFF;
-        if (captureResult.mMetadata.update(ANDROID_CONTROL_AUTOFRAMING,
-                &defaultAutoframingEntry, 1) != OK) {
-            SET_ERR("Failed to set autoframing mode in metadata for frame %d", frameNumber);
-            return;
-        }
+    res = fixupAutoframingTags(captureResult.mMetadata);
+    if (res != OK) {
+        SET_ERR("Failed to set autoframing defaults in result metadata: %s (%d)",
+                strerror(-res), res);
+        return;
     }
-
-    camera_metadata_entry autoframingStateEntry =
-            captureResult.mMetadata.find(ANDROID_CONTROL_AUTOFRAMING_STATE);
-    if (autoframingStateEntry.count == 0) {
-        const uint8_t defaultAutoframingStateEntry = ANDROID_CONTROL_AUTOFRAMING_STATE_INACTIVE;
-        if (captureResult.mMetadata.update(ANDROID_CONTROL_AUTOFRAMING_STATE,
-                &defaultAutoframingStateEntry, 1) != OK) {
-            SET_ERR("Failed to set autoframing state in metadata for frame %d", frameNumber);
+    for (auto& physicalMetadata : captureResult.mPhysicalMetadatas) {
+        res = fixupAutoframingTags(physicalMetadata.mPhysicalCameraMetadata);
+        if (res != OK) {
+            SET_ERR("Failed to set autoframing defaults in physical result metadata: %s (%d)",
+                    strerror(-res), res);
             return;
         }
     }
