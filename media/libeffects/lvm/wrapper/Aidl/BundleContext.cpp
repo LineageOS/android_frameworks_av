@@ -89,6 +89,13 @@ RetCode BundleContext::enable() {
             mSamplesToExitCountBb = (mSamplesPerSecond * 0.1);
             tempDisabled = mBassTempDisabled;
             break;
+        case lvm::BundleEffectType::VIRTUALIZER:
+            LOG(DEBUG) << __func__ << " enable bundle VR";
+            if (mSamplesToExitCountVirt <= 0) mNumberEffectsEnabled++;
+            mEffectInDrain &= ~(1 << int(lvm::BundleEffectType::VIRTUALIZER));
+            mSamplesToExitCountVirt = (mSamplesPerSecond * 0.1);
+            tempDisabled = mVirtualizerTempDisabled;
+            break;
         default:
             // Add handling for other effects
             break;
@@ -112,6 +119,10 @@ RetCode BundleContext::enableOperatingMode() {
                 LOG(DEBUG) << __func__ << " enable bundle BB";
                 params.BE_OperatingMode = LVM_BE_ON;
                 break;
+            case lvm::BundleEffectType::VIRTUALIZER:
+                LOG(DEBUG) << __func__ << " enable bundle VR";
+                params.VirtualizerOperatingMode = LVM_MODE_ON;
+                break;
             default:
                 // Add handling for other effects
                 break;
@@ -132,6 +143,10 @@ RetCode BundleContext::disable() {
         case lvm::BundleEffectType::BASS_BOOST:
             LOG(DEBUG) << __func__ << " disable bundle BB";
             mEffectInDrain |= 1 << int(lvm::BundleEffectType::BASS_BOOST);
+            break;
+        case lvm::BundleEffectType::VIRTUALIZER:
+            LOG(DEBUG) << __func__ << " disable bundle VR";
+            mEffectInDrain |= 1 << int(lvm::BundleEffectType::VIRTUALIZER);
             break;
         default:
             // Add handling for other effects
@@ -155,6 +170,10 @@ RetCode BundleContext::disableOperatingMode() {
             case lvm::BundleEffectType::BASS_BOOST:
                 LOG(DEBUG) << __func__ << " disable bundle BB";
                 params.BE_OperatingMode = LVM_BE_OFF;
+                break;
+            case lvm::BundleEffectType::VIRTUALIZER:
+                LOG(DEBUG) << __func__ << " disable bundle VR";
+                params.VirtualizerOperatingMode = LVM_MODE_OFF;
                 break;
             default:
                 // Add handling for other effects
@@ -182,6 +201,7 @@ RetCode BundleContext::limitLevel() {
 
         bool eqEnabled = params.EQNB_OperatingMode == LVM_EQNB_ON;
         bool bbEnabled = params.BE_OperatingMode == LVM_BE_ON;
+        bool viEnabled = params.VirtualizerOperatingMode == LVM_MODE_ON;
 
         if (eqEnabled) {
             for (int i = 0; i < lvm::MAX_NUM_BANDS; i++) {
@@ -223,6 +243,10 @@ RetCode BundleContext::limitLevel() {
                     if (bandEnergy > 0) energyBassBoost += bandEnergy;
                 }
             }
+        }
+        // Virtualizer contribution
+        if (viEnabled) {
+            energyContribution += lvm::kVirtualizerContribution * lvm::kVirtualizerContribution;
         }
 
         double totalEnergyEstimation =
@@ -267,26 +291,55 @@ bool BundleContext::isDeviceSupportedBassBoost(
                                              AudioDeviceDescription::CONNECTION_BT_A2DP});
 }
 
+bool BundleContext::isDeviceSupportedVirtualizer(
+        const aidl::android::media::audio::common::AudioDeviceDescription& device) {
+    return (device == AudioDeviceDescription{AudioDeviceType::OUT_HEADSET,
+                                             AudioDeviceDescription::CONNECTION_ANALOG} ||
+            device == AudioDeviceDescription{AudioDeviceType::OUT_HEADPHONE,
+                                             AudioDeviceDescription::CONNECTION_ANALOG} ||
+            device == AudioDeviceDescription{AudioDeviceType::OUT_HEADPHONE,
+                                             AudioDeviceDescription::CONNECTION_BT_A2DP} ||
+            device == AudioDeviceDescription{AudioDeviceType::OUT_HEADSET,
+                                             AudioDeviceDescription::CONNECTION_USB});
+}
+
 RetCode BundleContext::setOutputDevice(
         const aidl::android::media::audio::common::AudioDeviceDescription& device) {
     mOutputDevice = device;
-    if (mType == lvm::BundleEffectType::BASS_BOOST) {
-        if (isDeviceSupportedBassBoost(device)) {
-            // If a device doesn't support bass boost, the effect must be temporarily disabled.
-            // The effect must still report its original state as this can only be changed by the
-            // start/stop commands.
-            if (mEnabled) {
-                disableOperatingMode();
+    switch (mType) {
+        case lvm::BundleEffectType::BASS_BOOST:
+            if (isDeviceSupportedBassBoost(device)) {
+                // If a device doesn't support bass boost, the effect must be temporarily disabled.
+                // The effect must still report its original state as this can only be changed by
+                // the start/stop commands.
+                if (mEnabled) {
+                    disableOperatingMode();
+                }
+                mBassTempDisabled = true;
+            } else {
+                // If a device supports bass boost and the effect has been temporarily disabled
+                // previously then re-enable it
+                if (!mEnabled) {
+                    enableOperatingMode();
+                }
+                mBassTempDisabled = false;
             }
-            mBassTempDisabled = true;
-        } else {
-            // If a device supports bass boost and the effect has been temporarily disabled
-            // previously then re-enable it
-            if (!mEnabled) {
-                enableOperatingMode();
+            break;
+        case lvm::BundleEffectType::VIRTUALIZER:
+            if (isDeviceSupportedVirtualizer(device)) {
+                if (mEnabled) {
+                    disableOperatingMode();
+                }
+                mVirtualizerTempDisabled = true;
+            } else {
+                if (!mEnabled) {
+                    enableOperatingMode();
+                }
+                mVirtualizerTempDisabled = false;
             }
-            mBassTempDisabled = false;
-        }
+            break;
+        default:
+            break;
     }
     return RetCode::SUCCESS;
 }
@@ -466,6 +519,30 @@ RetCode BundleContext::setBassBoostStrength(int strength) {
     return limitLevel();
 }
 
+RetCode BundleContext::setVirtualizerStrength(int strength) {
+    if (strength < Virtualizer::MIN_PER_MILLE_STRENGTH ||
+        strength > Virtualizer::MAX_PER_MILLE_STRENGTH) {
+        return RetCode::ERROR_ILLEGAL_PARAMETER;
+    }
+
+    // Update Control Parameter
+    LVM_ControlParams_t params;
+    {
+        std::lock_guard lg(mMutex);
+        RETURN_VALUE_IF(LVM_SUCCESS != LVM_GetControlParameters(mInstance, &params),
+                        RetCode::ERROR_EFFECT_LIB_ERROR, " getControlParamFailed");
+
+        params.CS_EffectLevel = ((strength * 32767) / 1000);
+
+        RETURN_VALUE_IF(LVM_SUCCESS != LVM_SetControlParameters(mInstance, &params),
+                        RetCode::ERROR_EFFECT_LIB_ERROR, " setControlParamFailed");
+    }
+
+    mVirtStrengthSaved = strength;
+    LOG(INFO) << __func__ << " success with strength " << strength;
+    return limitLevel();
+}
+
 void BundleContext::initControlParameter(LVM_ControlParams_t& params) const {
     /* General parameters */
     params.OperatingMode = LVM_MODE_ON;
@@ -579,6 +656,12 @@ IEffect::Status BundleContext::lvmProcess(float* in, float* out, int samples) {
             --mNumberEffectsEnabled;
             mEffectInDrain &= ~(1 << int(lvm::BundleEffectType::BASS_BOOST));
         }
+        if ((undrainedEffects & 1 << int(lvm::BundleEffectType::VIRTUALIZER)) != 0) {
+            LOG(DEBUG) << "Draining VIRTUALIZER";
+            mSamplesToExitCountVirt = 0;
+            --mNumberEffectsEnabled;
+            mEffectInDrain &= ~(1 << int(lvm::BundleEffectType::VIRTUALIZER));
+        }
     }
     mEffectProcessCalled |= 1 << int(mType);
     if (!mEnabled) {
@@ -607,6 +690,19 @@ IEffect::Status BundleContext::lvmProcess(float* in, float* out, int samples) {
                         mEffectInDrain &= ~(1 << int(lvm::BundleEffectType::BASS_BOOST));
                     }
                     LOG(DEBUG) << "Effect_process() this is the last frame for BASS_BOOST";
+                }
+                break;
+            case lvm::BundleEffectType::VIRTUALIZER:
+                if (mSamplesToExitCountVirt > 0) {
+                    mSamplesToExitCountVirt -= samples;
+                }
+                if (mSamplesToExitCountVirt <= 0) {
+                    isDataAvailable = false;
+                    if ((mEffectInDrain & 1 << int(lvm::BundleEffectType::VIRTUALIZER)) != 0) {
+                        mNumberEffectsEnabled--;
+                        mEffectInDrain &= ~(1 << int(lvm::BundleEffectType::VIRTUALIZER));
+                    }
+                    LOG(DEBUG) << "Effect_process() this is the last frame for VIRTUALIZER";
                 }
                 break;
             default:
