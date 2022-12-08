@@ -28,6 +28,7 @@ cc_defaults {
         "libGLESv1_CM",
         "libGLESv2",
         "libGLESv3",
+        "libvulkan",
         "libbase",
         "libcodec2",
         "libcutils",
