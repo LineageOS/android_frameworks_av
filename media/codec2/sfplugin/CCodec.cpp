@@ -1898,6 +1898,7 @@ void CCodec::stop() {
         comp = state->comp;
     }
     status_t err = comp->stop();
+    mChannel->stopUseOutputSurface();
     if (err != C2_OK) {
         // TODO: convert err into status_t
         mCallback->onError(UNKNOWN_ERROR, ACTION_CODE_FATAL);
@@ -1991,6 +1992,7 @@ void CCodec::release(bool sendCallback) {
         comp = state->comp;
     }
     comp->release();
+    mChannel->stopUseOutputSurface();
 
     {
         Mutexed<State>::Locked state(mState);
@@ -2138,7 +2140,8 @@ void CCodec::signalResume() {
 
     std::map<size_t, sp<MediaCodecBuffer>> clientInputBuffers;
     status_t err = mChannel->prepareInitialInputBuffers(&clientInputBuffers);
-    if (err != OK) {
+    // FIXME(b/237656746)
+    if (err != OK && err != NO_MEMORY) {
         ALOGE("Resume request for Input Buffers failed");
         mCallback->onError(err, ACTION_CODE_FATAL);
         return;

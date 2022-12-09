@@ -30,6 +30,7 @@
 #include <utils/Trace.h>
 
 #include <android/hardware/camera2/ICameraDeviceCallbacks.h>
+#include <android/binder_ibinder_platform.h>
 
 #include "device3/aidl/AidlCamera3OfflineSession.h"
 #include "device3/Camera3OutputStream.h"
@@ -123,7 +124,8 @@ status_t AidlCamera3OfflineSession::initialize(wp<NotificationListener> listener
         mNumPartialResults, mVendorTagId, mDeviceInfo, mPhysicalDeviceInfoMap,
         mDistortionMappers, mZoomRatioMappers, mRotateAndCropMappers,
         mTagMonitor, mInputStream, mOutputStreams, mSessionStatsBuilder, listener, *this,
-        *this, mBufferRecords, /*legacyClient*/ false, mMinExpectedDuration}, mResultMetadataQueue
+        *this, mBufferRecords, /*legacyClient*/ false, mMinExpectedDuration, mIsFixedFps},
+      mResultMetadataQueue
     };
 
     std::lock_guard<std::mutex> lock(mProcessCaptureResultLock);
@@ -168,7 +170,8 @@ status_t AidlCamera3OfflineSession::initialize(wp<NotificationListener> listener
         mNumPartialResults, mVendorTagId, mDeviceInfo, mPhysicalDeviceInfoMap,
         mDistortionMappers, mZoomRatioMappers, mRotateAndCropMappers,
         mTagMonitor, mInputStream, mOutputStreams, mSessionStatsBuilder, listener, *this,
-        *this, mBufferRecords, /*legacyClient*/ false, mMinExpectedDuration}, mResultMetadataQueue
+        *this, mBufferRecords, /*legacyClient*/ false, mMinExpectedDuration, mIsFixedFps},
+      mResultMetadataQueue
     };
     for (const auto& msg : msgs) {
         camera3::notify(states, msg);
@@ -216,6 +219,12 @@ status_t AidlCamera3OfflineSession::initialize(wp<NotificationListener> listener
         return ::ndk::ScopedAStatus::ok();
     }
     return p->returnStreamBuffers(buffers);
+}
+
+::ndk::SpAIBinder AidlCamera3OfflineSession::AidlCameraDeviceCallbacks::createBinder() {
+    auto binder = BnCameraDeviceCallback::createBinder();
+    AIBinder_setInheritRt(binder.get(), /*inheritRt*/ true);
+    return binder;
 }
 
 ::ndk::ScopedAStatus AidlCamera3OfflineSession::returnStreamBuffers(

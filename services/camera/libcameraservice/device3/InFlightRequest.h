@@ -65,6 +65,7 @@ typedef struct camera_capture_result {
 typedef struct camera_shutter_msg {
     uint32_t frame_number;
     uint64_t timestamp;
+    bool readout_timestamp_valid;
     uint64_t readout_timestamp;
 } camera_shutter_msg_t;
 
@@ -104,8 +105,6 @@ typedef enum {
 struct InFlightRequest {
     // Set by notify() SHUTTER call.
     nsecs_t shutterTimestamp;
-    // Set by notify() SHUTTER call with readout time.
-    nsecs_t shutterReadoutTimestamp;
     // Set by process_capture_result().
     nsecs_t sensorTimestamp;
     int     requestStatus;
@@ -152,6 +151,9 @@ struct InFlightRequest {
     // For manual captures, equal to the max of requested exposure time and frame duration
     // For auto-exposure modes, equal to 1/(lower end of target FPS range)
     nsecs_t maxExpectedDuration;
+
+    // Whether the FPS range is fixed, aka, minFps == maxFps
+    bool isFixedFps;
 
     // Whether the result metadata for this request is to be skipped. The
     // result metadata should be skipped in the case of
@@ -206,6 +208,7 @@ struct InFlightRequest {
             hasCallback(true),
             minExpectedDuration(kDefaultMinExpectedDuration),
             maxExpectedDuration(kDefaultMaxExpectedDuration),
+            isFixedFps(false),
             skipResultMetadata(false),
             errorBufStrategy(ERROR_BUF_CACHE),
             stillCapture(false),
@@ -216,7 +219,7 @@ struct InFlightRequest {
     }
 
     InFlightRequest(int numBuffers, CaptureResultExtras extras, bool hasInput,
-            bool hasAppCallback, nsecs_t minDuration, nsecs_t maxDuration,
+            bool hasAppCallback, nsecs_t minDuration, nsecs_t maxDuration, bool fixedFps,
             const std::set<std::set<String8>>& physicalCameraIdSet, bool isStillCapture,
             bool isZslCapture, bool rotateAndCropAuto, const std::set<std::string>& idsWithZoom,
             nsecs_t requestNs, const SurfaceMap& outSurfaces = SurfaceMap{}) :
@@ -230,6 +233,7 @@ struct InFlightRequest {
             hasCallback(hasAppCallback),
             minExpectedDuration(minDuration),
             maxExpectedDuration(maxDuration),
+            isFixedFps(fixedFps),
             skipResultMetadata(false),
             errorBufStrategy(ERROR_BUF_CACHE),
             physicalCameraIds(physicalCameraIdSet),

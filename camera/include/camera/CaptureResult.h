@@ -103,6 +103,17 @@ struct CaptureResultExtras : public android::Parcelable {
      */
     int64_t lastCompletedZslFrameNumber;
 
+    /**
+     * Whether the readoutTimestamp variable is valid and should be used.
+     */
+    bool hasReadoutTimestamp;
+
+    /**
+     * The readout timestamp of the capture. Its value is equal to the
+     * start-of-exposure timestamp plus the exposure time (and a possible fixed
+     * offset due to sensor crop).
+     */
+    int64_t readoutTimestamp;
 
     /**
      * Constructor initializes object as invalid by setting requestId to be -1.
@@ -118,7 +129,9 @@ struct CaptureResultExtras : public android::Parcelable {
           errorPhysicalCameraId(),
           lastCompletedRegularFrameNumber(-1),
           lastCompletedReprocessFrameNumber(-1),
-          lastCompletedZslFrameNumber(-1) {
+          lastCompletedZslFrameNumber(-1),
+          hasReadoutTimestamp(false),
+          readoutTimestamp(0) {
     }
 
     /**

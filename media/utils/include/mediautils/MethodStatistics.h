@@ -55,15 +55,23 @@ public:
     /**
      * Adds a method event, typically execution time in ms.
      */
-    void event(Code code, FloatType executeMs) {
+    template <typename C>
+    void event(C&& code, FloatType executeMs) {
         std::lock_guard lg(mLock);
-        mStatisticsMap[code].add(executeMs);
+        auto it = mStatisticsMap.lower_bound(code);
+        if (it != mStatisticsMap.end() && it->first == code) {
+            it->second.add(executeMs);
+        } else {
+            // StatsType ctor takes an optional array of data for initialization.
+            FloatType dataArray[1] = { executeMs };
+            mStatisticsMap.emplace_hint(it, std::forward<C>(code), dataArray);
+        }
     }
 
     /**
      * Returns the name for the method code.
      */
-    std::string getMethodForCode(Code code) const {
+    std::string getMethodForCode(const Code& code) const {
         auto it = mMethodMap.find(code);
         return it == mMethodMap.end() ? std::to_string((int)code) : it->second;
     }
@@ -71,7 +79,7 @@ public:
     /**
      * Returns the number of times the method was invoked by event().
      */
-    size_t getMethodCount(Code code) const {
+    size_t getMethodCount(const Code& code) const {
         std::lock_guard lg(mLock);
         auto it = mStatisticsMap.find(code);
         return it == mStatisticsMap.end() ? 0 : it->second.getN();
@@ -80,7 +88,7 @@ public:
     /**
      * Returns the statistics object for the method.
      */
-    StatsType getStatistics(Code code) const {
+    StatsType getStatistics(const Code& code) const {
         std::lock_guard lg(mLock);
         auto it = mStatisticsMap.find(code);
         return it == mStatisticsMap.end() ? StatsType{} : it->second;
@@ -107,9 +115,10 @@ public:
     }
 
 private:
-    const std::map<Code, std::string> mMethodMap;
+    // Note: we use a transparent comparator std::less<> for heterogeneous key lookup.
+    const std::map<Code, std::string, std::less<>> mMethodMap;
     mutable std::mutex mLock;
-    std::map<Code, StatsType> mStatisticsMap GUARDED_BY(mLock);
+    std::map<Code, StatsType, std::less<>> mStatisticsMap GUARDED_BY(mLock);
 };
 
 // Managed Statistics support.

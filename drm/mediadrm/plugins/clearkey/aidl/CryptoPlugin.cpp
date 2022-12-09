@@ -144,6 +144,11 @@ using ::aidl::android::hardware::drm::Status;
             clearDataLengths.push_back(ss.numBytesOfClearData);
             encryptedDataLengths.push_back(ss.numBytesOfEncryptedData);
         }
+        if (in_args.keyId.size() != kBlockSize || in_args.iv.size() != kBlockSize) {
+            android_errorWriteLog(0x534e4554, "244569759");
+            detailedError = "invalid decrypt parameter size";
+            return toNdkScopedAStatus(Status::ERROR_DRM_CANNOT_HANDLE, detailedError);
+        }
         auto res =
                 mSession->decrypt(in_args.keyId.data(), in_args.iv.data(),
                                   srcPtr, static_cast<uint8_t*>(destPtr),

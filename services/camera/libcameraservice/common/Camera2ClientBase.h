@@ -19,6 +19,7 @@
 
 #include "common/CameraDeviceBase.h"
 #include "camera/CaptureResult.h"
+#include "CameraServiceWatchdog.h"
 
 namespace android {
 
@@ -131,6 +132,9 @@ public:
 
 protected:
 
+    // Used for watchdog timeout to monitor disconnect
+    static const nsecs_t kBufferTimeDisconnectNs = 3000000000; // 3 sec.
+
     // The PID provided in the constructor call
     pid_t mInitialClientPid;
     bool mOverrideForPerfClass = false;
@@ -173,6 +177,12 @@ protected:
 private:
     template<typename TProviderPtr>
     status_t              initializeImpl(TProviderPtr providerPtr, const String8& monitorTags);
+
+    binder::Status disconnectImpl();
+
+    // Watchdog thread
+    sp<CameraServiceWatchdog> mCameraServiceWatchdog;
+
 };
 
 }; // namespace android

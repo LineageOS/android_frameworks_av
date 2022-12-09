@@ -40,6 +40,7 @@
 #include "utils/CameraServiceProxyWrapper.h"
 
 namespace android {
+
 using namespace camera2;
 
 // Interface used by CameraService
@@ -144,6 +145,10 @@ status_t Camera2ClientBase<TClientBase>::initializeImpl(TProviderPtr providerPtr
     wp<NotificationListener> weakThis(this);
     res = mDevice->setNotifyCallback(weakThis);
 
+    /** Start watchdog thread */
+    mCameraServiceWatchdog = new CameraServiceWatchdog();
+    mCameraServiceWatchdog->run("Camera2ClientBaseWatchdog");
+
     return OK;
 }
 
@@ -154,6 +159,11 @@ Camera2ClientBase<TClientBase>::~Camera2ClientBase() {
     TClientBase::mDestructionStarted = true;
 
     disconnect();
+
+    if (mCameraServiceWatchdog != NULL) {
+        mCameraServiceWatchdog->requestExit();
+        mCameraServiceWatchdog.clear();
+    }
 
     ALOGI("Closed Camera %s. Client was: %s (PID %d, UID %u)",
             TClientBase::mCameraIdStr.string(),
@@ -238,9 +248,24 @@ status_t Camera2ClientBase<TClientBase>::dumpDevice(
 
 // ICameraClient2BaseUser interface
 
-
 template <typename TClientBase>
 binder::Status Camera2ClientBase<TClientBase>::disconnect() {
+    if (mCameraServiceWatchdog != nullptr && mDevice != nullptr) {
+        // Timer for the disconnect call should be greater than getExpectedInFlightDuration
+        // since this duration is used to error handle methods in the disconnect sequence
+        // thus allowing existing error handling methods to execute first
+        uint64_t maxExpectedDuration =
+                ns2ms(mDevice->getExpectedInFlightDuration() + kBufferTimeDisconnectNs);
+
+        // Initialization from hal succeeded, time disconnect.
+        return mCameraServiceWatchdog->WATCH_CUSTOM_TIMER(disconnectImpl(),
+                maxExpectedDuration / kCycleLengthMs, kCycleLengthMs);
+    }
+    return disconnectImpl();
+}
+
+template <typename TClientBase>
+binder::Status Camera2ClientBase<TClientBase>::disconnectImpl() {
     ATRACE_CALL();
     ALOGD("Camera %s: start to disconnect", TClientBase::mCameraIdStr.string());
     Mutex::Autolock icl(mBinderSerializationLock);

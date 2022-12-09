@@ -16,6 +16,7 @@
 
 #pragma once
 
+#include <chrono>
 #include <vector>
 
 #include <mediautils/TimerThread.h>
@@ -27,10 +28,33 @@ namespace android::mediautils {
 
 class TimeCheck {
   public:
+
+    // Duration for TimeCheck is based on steady_clock, typically nanoseconds.
+    using Duration = std::chrono::steady_clock::duration;
+
+    // Duration for printing is in milliseconds, using float for additional precision.
+    using FloatMs = std::chrono::duration<float, std::milli>;
+
+    // OnTimerFunc is the callback function with 2 parameters.
+    //  bool timeout  (which is true when the TimeCheck object
+    //                 times out, false when the TimeCheck object is
+    //                 destroyed or leaves scope before the timer expires.)
+    //  float elapsedMs (the elapsed time to this event).
     using OnTimerFunc = std::function<void(bool /* timeout */, float /* elapsedMs */ )>;
 
     // The default timeout is chosen to be less than system server watchdog timeout
-    static constexpr uint32_t kDefaultTimeOutMs = 5000;
+    // Note: kDefaultTimeOutMs should be no less than 2 seconds, otherwise spurious timeouts
+    // may occur with system suspend.
+    static constexpr TimeCheck::Duration kDefaultTimeoutDuration = std::chrono::milliseconds(3000);
+
+    // Due to suspend abort not incrementing the monotonic clock,
+    // we allow another second chance timeout after the first timeout expires.
+    //
+    // The total timeout is therefore kDefaultTimeoutDuration + kDefaultSecondChanceDuration,
+    // and the result is more stable when the monotonic clock increments during suspend.
+    //
+    static constexpr TimeCheck::Duration kDefaultSecondChanceDuration =
+            std::chrono::milliseconds(2000);
 
     /**
      * TimeCheck is a RAII object which will notify a callback
@@ -44,24 +68,24 @@ class TimeCheck {
      * the deallocation.
      *
      * \param tag       string associated with the TimeCheck object.
-     * \param onTimer   callback function with 2 parameters
-     *                      bool timeout  (which is true when the TimeCheck object
-     *                                    times out, false when the TimeCheck object is
-     *                                    destroyed or leaves scope before the timer expires.)
-     *                      float elapsedMs (the elapsed time to this event).
+     * \param onTimer   callback function with 2 parameters (described above in OnTimerFunc).
      *                  The callback when timeout is true will be called on a different thread.
      *                  This will cancel the callback on the destructor but is not guaranteed
      *                  to block for callback completion if it is already in progress
      *                  (for maximum concurrency and reduced deadlock potential), so use proper
      *                  lifetime analysis (e.g. shared or weak pointers).
-     * \param timeoutMs timeout in milliseconds.
+     * \param requestedTimeoutDuration timeout in milliseconds.
      *                  A zero timeout means no timeout is set -
      *                  the callback is called only when
      *                  the TimeCheck object is destroyed or leaves scope.
+     * \param secondChanceDuration additional milliseconds to wait if the first timeout expires.
+     *                  This is used to prevent false timeouts if the steady (monotonic)
+     *                  clock advances on aborted suspend.
      * \param crashOnTimeout true if the object issues an abort on timeout.
      */
-    explicit TimeCheck(std::string tag, OnTimerFunc&& onTimer = {},
-            uint32_t timeoutMs = kDefaultTimeOutMs, bool crashOnTimeout = true);
+    explicit TimeCheck(std::string_view tag, OnTimerFunc&& onTimer,
+            Duration requestedTimeoutDuration, Duration secondChanceDuration,
+            bool crashOnTimeout);
 
     TimeCheck() = default;
     // Remove copy constructors as there should only be one call to the destructor.
@@ -79,15 +103,35 @@ class TimeCheck {
     // The usage here is const safe.
     class TimeCheckHandler {
     public:
-        const std::string tag;
+        template <typename S, typename F>
+        TimeCheckHandler(S&& _tag, F&& _onTimer, bool _crashOnTimeout,
+            Duration _timeoutDuration, Duration _secondChanceDuration,
+            std::chrono::system_clock::time_point _startSystemTime,
+            pid_t _tid)
+            : tag(std::forward<S>(_tag))
+            , onTimer(std::forward<F>(_onTimer))
+            , crashOnTimeout(_crashOnTimeout)
+            , timeoutDuration(_timeoutDuration)
+            , secondChanceDuration(_secondChanceDuration)
+            , startSystemTime(_startSystemTime)
+            , tid(_tid)
+            {}
+        const FixedString62 tag;
         const OnTimerFunc onTimer;
         const bool crashOnTimeout;
-        const std::chrono::system_clock::time_point startTime;
+        const Duration timeoutDuration;
+        const Duration secondChanceDuration;
+        const std::chrono::system_clock::time_point startSystemTime;
         const pid_t tid;
 
         void onCancel(TimerThread::Handle handle) const;
-        void onTimeout() const;
+        void onTimeout(TimerThread::Handle handle) const;
     };
+
+    // Returns a string that represents the timeout vs elapsed time,
+    // and diagnostics if there are any potential issues.
+    static std::string analyzeTimeouts(
+            float timeoutMs, float elapsedSteadyMs, float elapsedSystemMs);
 
     static TimerThread& getTimeCheckThread();
     static void accessAudioHalPids(std::vector<pid_t>* pids, bool update);

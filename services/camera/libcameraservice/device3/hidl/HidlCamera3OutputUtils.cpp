@@ -105,6 +105,7 @@ void notify(CaptureOutputStates& states,
             m.type = CAMERA_MSG_SHUTTER;
             m.message.shutter.frame_number = msg.msg.shutter.frameNumber;
             m.message.shutter.timestamp = msg.msg.shutter.timestamp;
+            m.message.shutter.readout_timestamp_valid = false;
             m.message.shutter.readout_timestamp = 0LL;
             break;
     }
