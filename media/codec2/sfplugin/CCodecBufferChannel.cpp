@@ -226,6 +226,9 @@ status_t CCodecBufferChannel::queueInputBufferInternal(
     if (buffer->meta()->findInt32("tunnel-first-frame", &tmp) && tmp) {
         tunnelFirstFrame = true;
     }
+    if (buffer->meta()->findInt32("decode-only", &tmp) && tmp) {
+        flags |= C2FrameData::FLAG_DROP_FRAME;
+    }
     ALOGV("[%s] queueInputBuffer: buffer->size() = %zu", mName, buffer->size());
     std::list<std::unique_ptr<C2Work>> items;
     std::unique_ptr<C2Work> work(new C2Work);

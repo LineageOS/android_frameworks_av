@@ -90,6 +90,7 @@ struct MediaCodec : public AHandler {
         BUFFER_FLAG_EOS           = 4,
         BUFFER_FLAG_PARTIAL_FRAME = 8,
         BUFFER_FLAG_MUXER_DATA    = 16,
+        BUFFER_FLAG_DECODE_ONLY   = 32,
     };
 
     enum CVODegree {

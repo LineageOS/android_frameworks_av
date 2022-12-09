@@ -5226,6 +5226,7 @@ status_t MediaCodec::onQueueInputBuffer(const sp<AMessage> &msg) {
 
     buffer->setRange(offset, size);
     buffer->meta()->setInt64("timeUs", timeUs);
+
     if (flags & BUFFER_FLAG_EOS) {
         buffer->meta()->setInt32("eos", true);
     }
@@ -5234,7 +5235,12 @@ status_t MediaCodec::onQueueInputBuffer(const sp<AMessage> &msg) {
         buffer->meta()->setInt32("csd", true);
     }
 
-    if (mTunneled) {
+    bool isBufferDecodeOnly = ((flags & BUFFER_FLAG_DECODE_ONLY) != 0);
+    if (isBufferDecodeOnly) {
+        buffer->meta()->setInt32("decode-only", true);
+    }
+
+    if (mTunneled && !isBufferDecodeOnly) {
         TunnelPeekState previousState = mTunnelPeekState;
         switch(mTunnelPeekState){
             case TunnelPeekState::kEnabledNoBuffer:

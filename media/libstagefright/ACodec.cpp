@@ -6315,6 +6315,10 @@ void ACodec::BaseState::onInputBufferFilled(const sp<AMessage> &msg) {
                     flags |= OMX_BUFFERFLAG_EOS;
                 }
 
+                int32_t isDecodeOnly = 0;
+                if (buffer->meta()->findInt32("decode-only", &isDecodeOnly) && isDecodeOnly != 0) {
+                    flags |= OMX_BUFFERFLAG_DECODEONLY;
+                }
                 size_t size = buffer->size();
                 size_t offset = buffer->offset();
                 if (buffer->base() != info->mCodecData->base()) {
@@ -6344,6 +6348,10 @@ void ACodec::BaseState::onInputBufferFilled(const sp<AMessage> &msg) {
                     ALOGV("[%s] calling emptyBuffer %u w/ EOS",
                          mCodec->mComponentName.c_str(), bufferID);
                 } else {
+                    if (flags & OMX_BUFFERFLAG_DECODEONLY) {
+                        ALOGV("[%s] calling emptyBuffer %u w/ decode only flag",
+                        mCodec->mComponentName.c_str(), bufferID);
+                    }
 #if TRACK_BUFFER_TIMING
                     ALOGI("[%s] calling emptyBuffer %u w/ time %lld us",
                          mCodec->mComponentName.c_str(), bufferID, (long long)timeUs);
