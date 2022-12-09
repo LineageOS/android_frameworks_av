@@ -787,10 +787,12 @@ void returnAndRemovePendingOutputBuffers(bool useHalBufManager,
         SessionStatsBuilder& sessionStatsBuilder) {
     bool timestampIncreasing =
             !((request.zslCapture && request.stillCapture) || request.hasInputBuffer);
+    nsecs_t readoutTimestamp = request.resultExtras.hasReadoutTimestamp ?
+            request.resultExtras.readoutTimestamp : 0;
     returnOutputBuffers(useHalBufManager, listener,
             request.pendingOutputBuffers.array(),
             request.pendingOutputBuffers.size(),
-            request.shutterTimestamp, request.shutterReadoutTimestamp,
+            request.shutterTimestamp, readoutTimestamp,
             /*requested*/true, request.requestTimeNs, sessionStatsBuilder, timestampIncreasing,
             request.outputSurfaces, request.resultExtras,
             request.errorBufStrategy, request.transform);
@@ -852,13 +854,18 @@ void notifyShutter(CaptureOutputStates& states, const camera_shutter_msg_t &msg)
             }
 
             r.shutterTimestamp = msg.timestamp;
-            r.shutterReadoutTimestamp = msg.readout_timestamp;
-            if (r.minExpectedDuration != states.minFrameDuration) {
+            if (msg.readout_timestamp_valid) {
+                r.resultExtras.hasReadoutTimestamp = true;
+                r.resultExtras.readoutTimestamp = msg.readout_timestamp;
+            }
+            if (r.minExpectedDuration != states.minFrameDuration ||
+                    r.isFixedFps != states.isFixedFps) {
                 for (size_t i = 0; i < states.outputStreams.size(); i++) {
                     auto outputStream = states.outputStreams[i];
-                    outputStream->onMinDurationChanged(r.minExpectedDuration);
+                    outputStream->onMinDurationChanged(r.minExpectedDuration, r.isFixedFps);
                 }
                 states.minFrameDuration = r.minExpectedDuration;
+                states.isFixedFps = r.isFixedFps;
             }
             if (r.hasCallback) {
                 ALOGVV("Camera %s: %s: Shutter fired for frame %d (id %d) at %" PRId64,

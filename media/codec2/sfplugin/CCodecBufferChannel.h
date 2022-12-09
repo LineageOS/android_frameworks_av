@@ -149,6 +149,12 @@ public:
             std::map<size_t, sp<MediaCodecBuffer>> &&clientInputBuffers);
 
     /**
+     * Stop using buffers of the current output surface for other Codec
+     * instances to use the surface safely.
+     */
+    void stopUseOutputSurface();
+
+    /**
      * Stop queueing buffers to the component. This object should never queue
      * buffers after this call, until start() is called.
      */
