@@ -354,8 +354,11 @@ status_t MediaCodec::ResourceManagerServiceProxy::init() {
 }
 
 //static
-Mutex MediaCodec::ResourceManagerServiceProxy::sLockCookies;
-std::set<void*> MediaCodec::ResourceManagerServiceProxy::sCookies;
+// these are no_destroy to keep them from being destroyed at process exit
+// where some thread calls exit() while other threads are still running.
+// see b/194783918
+[[clang::no_destroy]] Mutex MediaCodec::ResourceManagerServiceProxy::sLockCookies;
+[[clang::no_destroy]] std::set<void*> MediaCodec::ResourceManagerServiceProxy::sCookies;
 
 //static
 void MediaCodec::ResourceManagerServiceProxy::addCookie(void* cookie) {
