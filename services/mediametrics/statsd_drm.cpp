@@ -233,4 +233,112 @@ bool statsd_mediadrm_puller(
     return true;
 }
 
+bool statsd_media_drm_created(const std::shared_ptr<const mediametrics::Item>& item,
+        const std::shared_ptr<mediametrics::StatsdLog>& statsdLog)
+{
+    int64_t uuid_lsb = -1;
+    if (!item->getInt64("uuid_lsb", &uuid_lsb)) return false;
+    int64_t uuid_msb = -1;
+    if (!item->getInt64("uuid_msb", &uuid_msb)) return false;
+    int64_t object_nonce_lsb = -1;
+    if (!item->getInt64("object_nonce_lsb", &object_nonce_lsb)) return false;
+    int64_t object_nonce_msb = -1;
+    if (!item->getInt64("object_nonce_msb", &object_nonce_msb)) return false;
+    int64_t apex_version = -1;
+    item->getInt64("apex_version", &apex_version);
+    const int result = stats_write(
+                stats::media_metrics::MEDIA_DRM_CREATED,
+                uuid_lsb, uuid_msb, object_nonce_lsb,
+                object_nonce_msb, apex_version);
+
+    std::stringstream log;
+    log << "result:" << result << " {"
+            << " media_drm_created:"
+            << stats::media_metrics::MEDIA_DRM_CREATED
+            << " uuid_lsb:" << uuid_lsb
+            << " uuid_msb:" << uuid_msb
+            << " object_nonce_lsb:" << object_nonce_lsb
+            << " object_nonce_msb:" << object_nonce_msb
+            << " apex_version:" << apex_version
+            << " }";
+    statsdLog->log(stats::media_metrics::MEDIA_DRM_CREATED, log.str());
+    return true;
+}
+
+bool statsd_media_drm_session_opened(const std::shared_ptr<const mediametrics::Item>& item,
+        const std::shared_ptr<mediametrics::StatsdLog>& statsdLog)
+{
+    int64_t object_nonce_lsb = -1;
+    if (!item->getInt64("object_nonce_lsb", &object_nonce_lsb)) return false;
+    int64_t object_nonce_msb = -1;
+    if (!item->getInt64("object_nonce_msb", &object_nonce_msb)) return false;
+    int64_t session_nonce_lsb = -1;
+    if (!item->getInt64("session_nonce_lsb", &session_nonce_lsb)) return false;
+    int64_t session_nonce_msb = -1;
+    if (!item->getInt64("session_nonce_msb", &session_nonce_msb)) return false;
+    int32_t requested_security_level = -1;
+    if (!item->getInt32("requested_security_level", &requested_security_level)) return false;
+    int32_t opened_security_level = -1;
+    if (!item->getInt32("opened_security_level", &opened_security_level)) return false;
+    const int result = stats_write(
+                stats::media_metrics::MEDIA_DRM_SESSION_OPENED, object_nonce_lsb,
+                object_nonce_msb, session_nonce_lsb, session_nonce_msb,
+                requested_security_level, opened_security_level);
+
+    std::stringstream log;
+    log << "result:" << result << " {"
+            << " media_drm_session_opened:"
+            << stats::media_metrics::MEDIA_DRM_SESSION_OPENED
+            << " object_nonce_lsb:" << object_nonce_lsb
+            << " object_nonce_msb:" << object_nonce_msb
+            << " session_nonce_lsb:" << session_nonce_lsb
+            << " session_nonce_msb:" << session_nonce_msb
+            << " requested_security_level:" << requested_security_level
+            << " opened_security_level:" << opened_security_level
+            << " }";
+    statsdLog->log(stats::media_metrics::MEDIA_DRM_SESSION_OPENED, log.str());
+    return true;
+}
+
+bool statsd_media_drm_errored(const std::shared_ptr<const mediametrics::Item>& item,
+        const std::shared_ptr<mediametrics::StatsdLog>& statsdLog)
+{
+    int64_t object_nonce_lsb = -1;
+    if (!item->getInt64("object_nonce_lsb", &object_nonce_lsb)) return false;
+    int64_t object_nonce_msb = -1;
+    if (!item->getInt64("object_nonce_msb", &object_nonce_msb)) return false;
+    int64_t session_nonce_lsb = 0;
+    item->getInt64("session_nonce_lsb", &session_nonce_lsb);
+    int64_t session_nonce_msb = 0;
+    item->getInt64("session_nonce_msb", &session_nonce_msb);
+    int32_t api = -1;
+    if (!item->getInt32("api", &api)) return false;
+    int32_t error_code = -1;
+    if (!item->getInt32("error_code", &error_code)) return false;
+    int32_t cdm_err = 0;
+    item->getInt32("cdm_err", &cdm_err);
+    int32_t oem_err = 0;
+    item->getInt32("oem_err", &oem_err);
+    const int result = stats_write(
+                stats::media_metrics::MEDIA_DRM_ERRORED, object_nonce_lsb,
+                object_nonce_msb, session_nonce_lsb, session_nonce_msb,
+                api, error_code, cdm_err, oem_err);
+
+    std::stringstream log;
+    log << "result:" << result << " {"
+            << " media_drm_errored:"
+            << stats::media_metrics::MEDIA_DRM_ERRORED
+            << " object_nonce_lsb:" << object_nonce_lsb
+            << " object_nonce_msb:" << object_nonce_msb
+            << " session_nonce_lsb:" << session_nonce_lsb
+            << " session_nonce_msb:" << session_nonce_msb
+            << " api:" << api
+            << " error_code:" << error_code
+            << " cdm_err:" << cdm_err
+            << " oem_err:" << oem_err
+            << " }";
+    statsdLog->log(stats::media_metrics::MEDIA_DRM_ERRORED, log.str());
+    return true;
+}
+
 } // namespace android

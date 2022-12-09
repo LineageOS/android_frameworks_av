@@ -87,6 +87,7 @@ cc_library_shared {
         "libmemunreachable",
         "libmedia_helper",
         "libshmemcompat",
+        "libsounddose",
         "libvibrator",
         "packagemanager_aidl-cpp",
     ],
@@ -103,6 +104,7 @@ cc_library_shared {
         "libaudiohal_headers",
         "libaudioutils_headers",
         "libmedia_headers",
+        "libsounddose_headers",
     ],
 
     export_shared_lib_headers: [

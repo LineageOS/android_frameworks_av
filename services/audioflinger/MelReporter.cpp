@@ -18,12 +18,10 @@
 // #define LOG_NDEBUG 0
 #define LOG_TAG "AudioFlinger::MelReporter"
 
-#include <cinttypes>
-#include <utils/Log.h>
-#include <android-base/stringprintf.h>
-#include <audio_utils/power.h>
-
 #include "AudioFlinger.h"
+
+#include <audio_utils/power.h>
+#include <utils/Log.h>
 
 namespace android {
 
@@ -67,9 +65,12 @@ void AudioFlinger::MelReporter::onCreateAudioPatch(audio_patch_handle_t handle,
             std::lock_guard _lAf(mAudioFlinger.mLock);
             auto thread = mAudioFlinger.checkPlaybackThread_l(streamHandle);
             if (thread != nullptr) {
-                thread->startMelComputation(mMelAggregator.getOrCreateCallbackForDevice(
+                thread->startMelComputation(mSoundDoseManager.getOrCreateProcessorForDevice(
                     deviceId,
-                    newPatch.streamHandle));
+                    newPatch.streamHandle,
+                    thread->mSampleRate,
+                    thread->mChannelCount,
+                    thread->mFormat));
             }
         }
     }
@@ -99,28 +100,17 @@ void AudioFlinger::MelReporter::onReleaseAudioPatch(audio_patch_handle_t handle)
 
     // Stop MEL calculation for the PlaybackThread
     std::lock_guard _lAf(mAudioFlinger.mLock);
+    mSoundDoseManager.removeStreamProcessor(melPatch.streamHandle);
     auto thread = mAudioFlinger.checkPlaybackThread_l(melPatch.streamHandle);
     if (thread != nullptr) {
         thread->stopMelComputation();
     }
-    mMelAggregator.removeStreamCallback(melPatch.streamHandle);
 }
 
 std::string AudioFlinger::MelReporter::dump() {
     std::lock_guard _l(mLock);
-    std::string output;
-
-    base::StringAppendF(&output, "\nMel Reporter:\n");
-    mMelAggregator.foreach([&output](const audio_utils::MelRecord& melRecord) {
-        base::StringAppendF(&output, "Continuous MELs for portId=%d, ", melRecord.portId);
-        base::StringAppendF(&output, "starting at timestamp %" PRId64 ": ", melRecord.timestamp);
-
-        for (const auto& mel : melRecord.mels) {
-            base::StringAppendF(&output, "%d ", mel);
-        }
-        base::StringAppendF(&output, "\n");
-    });
-
+    std::string output("\nSound Dose:\n");
+    output.append(mSoundDoseManager.dump());
     return output;
 }
 
