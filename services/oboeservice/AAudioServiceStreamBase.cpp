@@ -84,7 +84,8 @@ AAudioServiceStreamBase::~AAudioServiceStreamBase() {
 
 std::string AAudioServiceStreamBase::dumpHeader() {
     return std::string(
-            "    T   Handle   UId   Port Run State Format Burst Chan Mask     Capacity");
+            "    T   Handle   UId   Port Run State Format Burst Chan Mask     Capacity"
+            " HwFormat HwChan HwRate");
 }
 
 std::string AAudioServiceStreamBase::dump() const {
@@ -101,6 +102,9 @@ std::string AAudioServiceStreamBase::dump() const {
     result << std::setw(5) << getSamplesPerFrame();
     result << std::setw(8) << std::hex << getChannelMask() << std::dec;
     result << std::setw(9) << getBufferCapacity();
+    result << std::setw(9) << getHardwareFormat();
+    result << std::setw(7) << getHardwareSamplesPerFrame();
+    result << std::setw(7) << getHardwareSampleRate();
 
     return result.str();
 }

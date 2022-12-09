@@ -74,6 +74,7 @@ typedef enum acamera_metadata_section {
     ACAMERA_HEIC_INFO,
     ACAMERA_AUTOMOTIVE,
     ACAMERA_AUTOMOTIVE_LENS,
+    ACAMERA_EXTENSION,
     ACAMERA_SECTION_COUNT,
 
     ACAMERA_VENDOR = 0x8000
@@ -119,6 +120,7 @@ typedef enum acamera_metadata_section_start {
     ACAMERA_HEIC_INFO_START        = ACAMERA_HEIC_INFO         << 16,
     ACAMERA_AUTOMOTIVE_START       = ACAMERA_AUTOMOTIVE        << 16,
     ACAMERA_AUTOMOTIVE_LENS_START  = ACAMERA_AUTOMOTIVE_LENS   << 16,
+    ACAMERA_EXTENSION_START        = ACAMERA_EXTENSION         << 16,
     ACAMERA_VENDOR_START           = ACAMERA_VENDOR            << 16
 } acamera_metadata_section_start_t;
 
@@ -10986,6 +10988,7 @@ typedef enum acamera_metadata_enum_acamera_automotive_lens_facing {
     ACAMERA_AUTOMOTIVE_LENS_FACING_INTERIOR_SEAT_ROW_3_RIGHT         = 14,
 
 } acamera_metadata_enum_android_automotive_lens_facing_t;
+
 
 
 

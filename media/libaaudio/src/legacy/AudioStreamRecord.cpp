@@ -208,6 +208,10 @@ aaudio_result_t AudioStreamRecord::open(const AudioStreamBuilder& builder)
     setBufferCapacity(getBufferCapacityFromDevice());
     setFramesPerBurst(getFramesPerBurstFromDevice());
 
+    setHardwareSamplesPerFrame(mAudioRecord->getHalChannelCount());
+    setHardwareSampleRate(mAudioRecord->getHalSampleRate());
+    setHardwareFormat(mAudioRecord->getHalFormat());
+
     // We may need to pass the data through a block size adapter to guarantee constant size.
     if (mCallbackBufferSize != AAUDIO_UNSPECIFIED) {
         // The block adapter runs before the format conversion.

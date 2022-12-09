@@ -34,4 +34,7 @@ parcelable StreamParameters {
     int /* aaudio_allowed_capture_policy_t */ allowedCapturePolicy;  // = AAUDIO_UNSPECIFIED;
     int /* aaudio_session_id_t */             sessionId;  //            = AAUDIO_SESSION_ID_NONE;
     boolean                                   isPrivacySensitive;  //   = false;
+    int                                       hardwareSamplesPerFrame;//= AAUDIO_UNSPECIFIED;
+    int                                       hardwareSampleRate;  //   = AAUDIO_UNSPECIFIED;
+    AudioFormatDescription                    hardwareAudioFormat;  //  = AUDIO_FORMAT_DEFAULT;
 }

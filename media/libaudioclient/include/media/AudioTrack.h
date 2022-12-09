@@ -655,6 +655,15 @@ public:
      */
             uint32_t    getOriginalSampleRate() const;
 
+    /* Return the sample rate from the AudioFlinger output thread. */
+            uint32_t    getHalSampleRate() const;
+
+    /* Return the channel count from the AudioFlinger output thread. */
+            uint32_t    getHalChannelCount() const;
+
+    /* Return the HAL format from the AudioFlinger output thread. */
+            audio_format_t    getHalFormat() const;
+
     /* Sets the Dual Mono mode presentation on the output device. */
             status_t    setDualMonoMode(audio_dual_mono_mode_t mode);
 
@@ -1270,12 +1279,14 @@ public:
     size_t                  mReqFrameCount;         // frame count to request the first or next time
                                                     // a new IAudioTrack is needed, non-decreasing
 
-    // The following AudioFlinger server-side values are cached in createAudioTrack_l().
+    // The following AudioFlinger server-side values are cached in createTrack_l().
     // These values can be used for informational purposes until the track is invalidated,
     // whereupon restoreTrack_l() calls createTrack_l() to update the values.
     uint32_t                mAfLatency;             // AudioFlinger latency in ms
     size_t                  mAfFrameCount;          // AudioFlinger frame count
     uint32_t                mAfSampleRate;          // AudioFlinger sample rate
+    uint32_t                mAfChannelCount;        // AudioFlinger channel count
+    audio_format_t          mAfFormat;              // AudioFlinger format
 
     // constant after constructor or set()
     audio_format_t          mFormat;                // as requested by client, not forced to 16-bit

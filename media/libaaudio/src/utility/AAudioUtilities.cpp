@@ -184,6 +184,17 @@ aaudio_format_t AAudioConvert_androidToAAudioDataFormat(audio_format_t androidFo
     return aaudioFormat;
 }
 
+aaudio_format_t AAudioConvert_androidToNearestAAudioDataFormat(audio_format_t androidFormat) {
+    // Special case AUDIO_FORMAT_PCM_8_24_BIT because this function should be used to find the
+    // resolution of the data format. Setting AUDIO_FORMAT_PCM_8_24_BIT directly is not available
+    // from AAudio but hardware may use AUDIO_FORMAT_PCM_8_24_BIT under the hood.
+    if (androidFormat == AUDIO_FORMAT_PCM_8_24_BIT) {
+        ALOGD("%s() converting 8.24 to 24 bit packed", __func__);
+        return AAUDIO_FORMAT_PCM_I24_PACKED;
+    }
+    return AAudioConvert_androidToAAudioDataFormat(androidFormat);
+}
+
 // Make a message string from the condition.
 #define STATIC_ASSERT(condition) static_assert(condition, #condition)
 
