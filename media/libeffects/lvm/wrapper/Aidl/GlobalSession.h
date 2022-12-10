@@ -21,6 +21,7 @@
 #include <unordered_map>
 
 #include <android-base/logging.h>
+#include <android-base/thread_annotations.h>
 
 #include "BundleContext.h"
 #include "BundleTypes.h"
@@ -40,7 +41,10 @@ class GlobalSession {
         return instance;
     }
 
-    bool isSessionIdExist(int sessionId) const { return mSessionMap.count(sessionId); }
+    bool isSessionIdExist(int sessionId) {
+        std::lock_guard lg(mMutex);
+        return mSessionMap.count(sessionId);
+    }
 
     static bool findBundleTypeInList(std::vector<std::shared_ptr<BundleContext>>& list,
                                      const lvm::BundleEffectType& type, bool remove = false) {

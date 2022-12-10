@@ -14,6 +14,7 @@
  * limitations under the License.
  */
 
+#include <cstddef>
 #define LOG_TAG "BundleContext"
 #include <Utils.h>
 
@@ -23,8 +24,9 @@
 namespace aidl::android::hardware::audio::effect {
 
 RetCode BundleContext::init() {
+    std::lock_guard lg(mMutex);
     // init with pre-defined preset NORMAL
-    for (int i = 0; i < lvm::MAX_NUM_BANDS; i++) {
+    for (std::size_t i = 0; i < lvm::MAX_NUM_BANDS; i++) {
         mBandGaindB[i] = lvm::kSoftPresets[0 /* normal */][i];
     }
 
@@ -57,6 +59,7 @@ deinit:
 }
 
 void BundleContext::deInit() {
+    std::lock_guard lg(mMutex);
     if (mInstance) {
         LVM_DelInstanceHandle(&mInstance);
         mInstance = nullptr;
@@ -65,14 +68,17 @@ void BundleContext::deInit() {
 
 RetCode BundleContext::enable() {
     LVM_ControlParams_t params;
-    RETURN_VALUE_IF(LVM_SUCCESS != LVM_GetControlParameters(mInstance, &params),
-                    RetCode::ERROR_EFFECT_LIB_ERROR, "failGetControlParams");
-    if (mType == lvm::BundleEffectType::EQUALIZER) {
-        LOG(DEBUG) << __func__ << " enable bundle EQ";
-        params.EQNB_OperatingMode = LVM_EQNB_ON;
+    {
+        std::lock_guard lg(mMutex);
+        RETURN_VALUE_IF(LVM_SUCCESS != LVM_GetControlParameters(mInstance, &params),
+                        RetCode::ERROR_EFFECT_LIB_ERROR, "failGetControlParams");
+        if (mType == lvm::BundleEffectType::EQUALIZER) {
+            LOG(DEBUG) << __func__ << " enable bundle EQ";
+            params.EQNB_OperatingMode = LVM_EQNB_ON;
+        }
+        RETURN_VALUE_IF(LVM_SUCCESS != LVM_SetControlParameters(mInstance, &params),
+                        RetCode::ERROR_EFFECT_LIB_ERROR, "failSetControlParams");
     }
-    RETURN_VALUE_IF(LVM_SUCCESS != LVM_SetControlParameters(mInstance, &params),
-                    RetCode::ERROR_EFFECT_LIB_ERROR, "failSetControlParams");
     mEnabled = true;
     // LvmEffect_limitLevel(pContext);
     return RetCode::SUCCESS;
@@ -80,14 +86,17 @@ RetCode BundleContext::enable() {
 
 RetCode BundleContext::disable() {
     LVM_ControlParams_t params;
-    RETURN_VALUE_IF(LVM_SUCCESS != LVM_GetControlParameters(mInstance, &params),
-                    RetCode::ERROR_EFFECT_LIB_ERROR, "failGetControlParams");
-    if (mType == lvm::BundleEffectType::EQUALIZER) {
-        LOG(DEBUG) << __func__ << " disable bundle EQ";
-        params.EQNB_OperatingMode = LVM_EQNB_OFF;
+    {
+        std::lock_guard lg(mMutex);
+        RETURN_VALUE_IF(LVM_SUCCESS != LVM_GetControlParameters(mInstance, &params),
+                        RetCode::ERROR_EFFECT_LIB_ERROR, "failGetControlParams");
+        if (mType == lvm::BundleEffectType::EQUALIZER) {
+            LOG(DEBUG) << __func__ << " disable bundle EQ";
+            params.EQNB_OperatingMode = LVM_EQNB_OFF;
+        }
+        RETURN_VALUE_IF(LVM_SUCCESS != LVM_SetControlParameters(mInstance, &params),
+                        RetCode::ERROR_EFFECT_LIB_ERROR, "failSetControlParams");
     }
-    RETURN_VALUE_IF(LVM_SUCCESS != LVM_SetControlParameters(mInstance, &params),
-                    RetCode::ERROR_EFFECT_LIB_ERROR, "failSetControlParams");
     mEnabled = false;
     // LvmEffect_limitLevel(pContext);
     return RetCode::SUCCESS;
@@ -148,27 +157,29 @@ RetCode BundleContext::setVolumeStereo(const Parameter::VolumeStereo& volume) {
     // android::VolumeSetVolumeLevel(pContext, (int16_t)(maxdB * 100));
     LOG(DEBUG) << __func__ << " pandB: " << pandB << " maxdB " << maxdB;
 
-    RETURN_VALUE_IF(LVM_SUCCESS != LVM_GetControlParameters(mInstance, &params),
-                    RetCode::ERROR_EFFECT_LIB_ERROR, "");
+    {
+        std::lock_guard lg(mMutex);
+        RETURN_VALUE_IF(LVM_SUCCESS != LVM_GetControlParameters(mInstance, &params),
+                        RetCode::ERROR_EFFECT_LIB_ERROR, "");
+        params.VC_Balance = pandB;
 
-    params.VC_Balance = pandB;
-
-    RETURN_VALUE_IF(LVM_SUCCESS != LVM_SetControlParameters(mInstance, &params),
-                    RetCode::ERROR_EFFECT_LIB_ERROR, "");
-
+        RETURN_VALUE_IF(LVM_SUCCESS != LVM_SetControlParameters(mInstance, &params),
+                        RetCode::ERROR_EFFECT_LIB_ERROR, "");
+    }
     mVolumeStereo = volume;
     return RetCode::SUCCESS;
 }
 
-RetCode BundleContext::setEqualizerPreset(const int presetIdx) {
+RetCode BundleContext::setEqualizerPreset(const std::size_t presetIdx) {
     if (presetIdx < 0 || presetIdx >= lvm::MAX_NUM_PRESETS) {
         return RetCode::ERROR_ILLEGAL_PARAMETER;
     }
 
     std::vector<Equalizer::BandLevel> bandLevels;
     bandLevels.reserve(lvm::MAX_NUM_BANDS);
-    for (int i = 0; i < lvm::MAX_NUM_BANDS; i++) {
-        bandLevels.emplace_back(Equalizer::BandLevel{i, lvm::kSoftPresets[presetIdx][i]});
+    for (std::size_t i = 0; i < lvm::MAX_NUM_BANDS; i++) {
+        bandLevels.emplace_back(
+                Equalizer::BandLevel{static_cast<int32_t>(i), lvm::kSoftPresets[presetIdx][i]});
     }
 
     RetCode ret = updateControlParameter(bandLevels);
@@ -197,8 +208,8 @@ RetCode BundleContext::setEqualizerBandLevels(const std::vector<Equalizer::BandL
 std::vector<Equalizer::BandLevel> BundleContext::getEqualizerBandLevels() const {
     std::vector<Equalizer::BandLevel> bandLevels;
     bandLevels.reserve(lvm::MAX_NUM_BANDS);
-    for (int i = 0; i < lvm::MAX_NUM_BANDS; i++) {
-        bandLevels.emplace_back(Equalizer::BandLevel{i, mBandGaindB[i]});
+    for (std::size_t i = 0; i < lvm::MAX_NUM_BANDS; i++) {
+        bandLevels.emplace_back(Equalizer::BandLevel{static_cast<int32_t>(i), mBandGaindB[i]});
     }
     return bandLevels;
 }
@@ -221,17 +232,20 @@ RetCode BundleContext::updateControlParameter(const std::vector<Equalizer::BandL
     }
 
     LVM_ControlParams_t params;
-    RETURN_VALUE_IF(LVM_SUCCESS != LVM_GetControlParameters(mInstance, &params),
-                    RetCode::ERROR_EFFECT_LIB_ERROR, " getControlParamFailed");
+    {
+        std::lock_guard lg(mMutex);
+        RETURN_VALUE_IF(LVM_SUCCESS != LVM_GetControlParameters(mInstance, &params),
+                        RetCode::ERROR_EFFECT_LIB_ERROR, " getControlParamFailed");
 
-    for (int i = 0; i < lvm::MAX_NUM_BANDS; i++) {
-        params.pEQNB_BandDefinition[i].Frequency = lvm::kPresetsFrequencies[i];
-        params.pEQNB_BandDefinition[i].QFactor = lvm::kPresetsQFactors[i];
-        params.pEQNB_BandDefinition[i].Gain = tempLevel[i];
+        for (std::size_t i = 0; i < lvm::MAX_NUM_BANDS; i++) {
+            params.pEQNB_BandDefinition[i].Frequency = lvm::kPresetsFrequencies[i];
+            params.pEQNB_BandDefinition[i].QFactor = lvm::kPresetsQFactors[i];
+            params.pEQNB_BandDefinition[i].Gain = tempLevel[i];
+        }
+
+        RETURN_VALUE_IF(LVM_SUCCESS != LVM_SetControlParameters(mInstance, &params),
+                        RetCode::ERROR_EFFECT_LIB_ERROR, " setControlParamFailed");
     }
-
-    RETURN_VALUE_IF(LVM_SUCCESS != LVM_SetControlParameters(mInstance, &params),
-                    RetCode::ERROR_EFFECT_LIB_ERROR, " setControlParamFailed");
     mBandGaindB = tempLevel;
     LOG(INFO) << __func__ << " update bandGain to " << ::android::internal::ToString(mBandGaindB);
 
@@ -296,7 +310,7 @@ LVM_EQNB_BandDef_t *BundleContext::getDefaultEqualizerBandDefs() {
     static LVM_EQNB_BandDef_t* BandDefs = []() {
         static LVM_EQNB_BandDef_t tempDefs[lvm::MAX_NUM_BANDS];
         /* N-Band Equaliser parameters */
-        for (int i = 0; i < lvm::MAX_NUM_BANDS; i++) {
+        for (std::size_t i = 0; i < lvm::MAX_NUM_BANDS; i++) {
             tempDefs[i].Frequency = lvm::kPresetsFrequencies[i];
             tempDefs[i].QFactor = lvm::kPresetsQFactors[i];
             tempDefs[i].Gain = lvm::kSoftPresets[0/* normal */][i];
@@ -321,6 +335,28 @@ LVM_HeadroomBandDef_t *BundleContext::getDefaultEqualizerHeadroomBanDefs() {
             },
     };
     return HeadroomBandDef;
+}
+
+IEffect::Status BundleContext::lvmProcess(float* in, float* out, int samples) {
+    IEffect::Status status = {EX_NULL_POINTER, 0, 0};
+
+    auto frameSize = getInputFrameSize();
+    RETURN_VALUE_IF(0== frameSize, status, "nullContext");
+
+    LOG(DEBUG) << __func__ << " start processing";
+    LVM_UINT16 frames = samples * sizeof(float) / frameSize;
+    LVM_ReturnStatus_en lvmStatus;
+    {
+        std::lock_guard lg(mMutex);
+        lvmStatus = LVM_Process(mInstance, in, out, frames, 0);
+    }
+
+    if (lvmStatus != LVM_SUCCESS) {
+        LOG(ERROR) << __func__ << lvmStatus;
+        return {EX_UNSUPPORTED_OPERATION, 0, 0};
+    }
+    LOG(DEBUG) << __func__ << " done processing";
+    return {STATUS_OK, samples, samples};
 }
 
 }  // namespace aidl::android::hardware::audio::effect
