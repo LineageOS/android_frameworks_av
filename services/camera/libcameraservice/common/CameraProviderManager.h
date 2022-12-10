@@ -257,14 +257,15 @@ public:
      * Return the old camera API camera info
      */
     status_t getCameraInfo(const std::string &id,
-            hardware::CameraInfo* info) const;
+            bool overrideToPortrait, int *portraitRotation, hardware::CameraInfo* info) const;
 
     /**
      * Return API2 camera characteristics - returns NAME_NOT_FOUND if a device ID does
      * not have a v3 or newer HAL version.
      */
     status_t getCameraCharacteristics(const std::string &id,
-            bool overrideForPerfClass, CameraMetadata* characteristics) const;
+            bool overrideForPerfClass, CameraMetadata* characteristics,
+            bool overrideToPortrait) const;
 
     status_t isConcurrentSessionConfigurationSupported(
             const std::vector<hardware::camera2::utils::CameraIdAndSessionConfiguration>
@@ -566,13 +567,16 @@ private:
             virtual status_t setTorchMode(bool enabled) = 0;
             virtual status_t turnOnTorchWithStrengthLevel(int32_t torchStrength) = 0;
             virtual status_t getTorchStrengthLevel(int32_t *torchStrength) = 0;
-            virtual status_t getCameraInfo(hardware::CameraInfo *info) const = 0;
+            virtual status_t getCameraInfo(bool overrideToPortrait,
+                    int *portraitRotation,
+                    hardware::CameraInfo *info) const = 0;
             virtual bool isAPI1Compatible() const = 0;
             virtual status_t dumpState(int fd) = 0;
             virtual status_t getCameraCharacteristics(bool overrideForPerfClass,
-                    CameraMetadata *characteristics) const {
+                    CameraMetadata *characteristics, bool overrideToPortrait) {
                 (void) overrideForPerfClass;
                 (void) characteristics;
+                (void) overrideToPortrait;
                 return INVALID_OPERATION;
             }
             virtual status_t getPhysicalCameraCharacteristics(const std::string& physicalCameraId,
@@ -629,12 +633,15 @@ private:
             virtual status_t setTorchMode(bool enabled) = 0;
             virtual status_t turnOnTorchWithStrengthLevel(int32_t torchStrength) = 0;
             virtual status_t getTorchStrengthLevel(int32_t *torchStrength) = 0;
-            virtual status_t getCameraInfo(hardware::CameraInfo *info) const override;
+            virtual status_t getCameraInfo(bool overrideToPortrait,
+                    int *portraitRotation,
+                    hardware::CameraInfo *info) const override;
             virtual bool isAPI1Compatible() const override;
             virtual status_t dumpState(int fd) = 0;
             virtual status_t getCameraCharacteristics(
                     bool overrideForPerfClass,
-                    CameraMetadata *characteristics) const override;
+                    CameraMetadata *characteristics,
+                    bool overrideToPortrait) override;
             virtual status_t getPhysicalCameraCharacteristics(const std::string& physicalCameraId,
                     CameraMetadata *characteristics) const override;
             virtual status_t isSessionConfigurationSupported(
@@ -832,7 +839,7 @@ private:
         const hardware::camera::common::V1_0::TorchModeStatus&);
 
     status_t getCameraCharacteristicsLocked(const std::string &id, bool overrideForPerfClass,
-            CameraMetadata* characteristics) const;
+            CameraMetadata* characteristics, bool overrideToPortrait) const;
     void filterLogicalCameraIdsLocked(std::vector<std::string>& deviceIds) const;
 
     status_t getSystemCameraKindLocked(const std::string& id, SystemCameraKind *kind) const;
