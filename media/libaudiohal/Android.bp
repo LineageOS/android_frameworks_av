@@ -13,7 +13,7 @@ cc_library_shared {
     srcs: [
         "DevicesFactoryHalInterface.cpp",
         "EffectsFactoryHalInterface.cpp",
-        "FactoryHalHidl.cpp",
+        "FactoryHal.cpp",
     ],
 
     cflags: [
@@ -28,10 +28,12 @@ cc_library_shared {
         "libaudiohal@6.0",
         "libaudiohal@7.0",
         "libaudiohal@7.1",
+        "libaudiohal@aidl",
     ],
 
     shared_libs: [
         "audioclient-types-aidl-cpp",
+        "libbinder_ndk",
         "libdl",
         "libhidlbase",
         "liblog",
@@ -65,7 +67,7 @@ cc_library_shared {
 
     header_libs: [
         "libaudiohal_headers"
-    ]
+    ],
 }
 
 cc_library_headers {
