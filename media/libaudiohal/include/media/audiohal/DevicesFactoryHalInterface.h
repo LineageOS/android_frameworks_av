@@ -14,13 +14,14 @@
  * limitations under the License.
  */
 
-#ifndef ANDROID_HARDWARE_DEVICES_FACTORY_HAL_INTERFACE_H
-#define ANDROID_HARDWARE_DEVICES_FACTORY_HAL_INTERFACE_H
+#pragma once
 
 #include <media/audiohal/DeviceHalInterface.h>
 #include <utils/Errors.h>
 #include <utils/RefBase.h>
 #include <vector>
+
+#include "AudioHalVersionInfo.h"
 
 namespace android {
 
@@ -43,7 +44,7 @@ class DevicesFactoryHalInterface : public RefBase
     // The callback can be only set once.
     virtual status_t setCallbackOnce(sp<DevicesFactoryHalCallback> callback) = 0;
 
-    virtual float getHalVersion() const = 0;
+    virtual android::detail::AudioHalVersionInfo getHalVersion() const = 0;
 
     static sp<DevicesFactoryHalInterface> create();
 
@@ -55,5 +56,3 @@ class DevicesFactoryHalInterface : public RefBase
 };
 
 } // namespace android
-
-#endif // ANDROID_HARDWARE_DEVICES_FACTORY_HAL_INTERFACE_H

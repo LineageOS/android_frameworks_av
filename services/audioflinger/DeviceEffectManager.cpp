@@ -30,6 +30,7 @@
 
 namespace android {
 
+using media::AudioHalVersion;
 using media::IEffectClient;
 
 void AudioFlinger::DeviceEffectManager::createAudioPatch(audio_patch_handle_t handle,
@@ -130,14 +131,19 @@ status_t AudioFlinger::DeviceEffectManager::checkEffectCompatibility(
         return BAD_VALUE;
     }
 
-    static const float sMinDeviceEffectHalVersion = 6.0;
-    float halVersion = effectsFactory->getHalVersion();
+    static AudioHalVersion sMinDeviceEffectHalVersion;
+    sMinDeviceEffectHalVersion.type = AudioHalVersion::Type::HIDL;
+    sMinDeviceEffectHalVersion.major = 6;
+    sMinDeviceEffectHalVersion.minor = 0;
+    AudioHalVersion halVersion = effectsFactory->getHalVersion();
 
+    // We can trust AIDL generated AudioHalVersion comparison operator (based on std::tie) as long
+    // as the type, major and minor sequence doesn't change in the definition.
     if (((desc->flags & EFFECT_FLAG_TYPE_MASK) != EFFECT_FLAG_TYPE_PRE_PROC
             && (desc->flags & EFFECT_FLAG_TYPE_MASK) != EFFECT_FLAG_TYPE_POST_PROC)
             || halVersion < sMinDeviceEffectHalVersion) {
-        ALOGW("%s() non pre/post processing device effect %s or incompatible API version %f",
-                __func__, desc->name, halVersion);
+        ALOGW("%s() non pre/post processing device effect %s or incompatible API version %s",
+                __func__, desc->name, halVersion.toString().c_str());
         return BAD_VALUE;
     }
 
