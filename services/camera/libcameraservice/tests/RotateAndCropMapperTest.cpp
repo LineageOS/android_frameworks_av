@@ -195,6 +195,7 @@ TEST(RotationMapperTest, Transform90) {
 
     // Round-trip results can't be exact since we've gone from a large int range -> small int range
     // and back, leading to quantization. For 4/3 aspect ratio, no more than +-1 error expected
+
     e = result.find(ANDROID_CONTROL_AE_REGIONS);
     EXPECT_EQUAL_WITHIN_N(full_region, e.data.i32, 1, "Round-tripped AE region isn't right");
 
@@ -209,11 +210,11 @@ TEST(RotationMapperTest, Transform90) {
     EXPECT_EQUAL_WITHIN_N(full_face, e.data.i32, 1, "App-side face rectangle isn't right");
 
     auto full_landmarks = std::vector<int32_t> {
-        full_crop[0], full_crop[1] + full_crop[3],
         full_crop[0] + full_crop[2], full_crop[1],
-        full_crop[0] + full_crop[2]/4, full_crop[1] + 3*full_crop[3]/4,
+        full_crop[0], full_crop[1] + full_crop[3],
+        full_crop[0] + 3*full_crop[2]/4, full_crop[1] + full_crop[3]/4,
         full_crop[0] + full_crop[2]/2, full_crop[1] + full_crop[3]/2,
-        full_crop[0] + 3*full_crop[2]/4, full_crop[1] + full_crop[3]/4
+        full_crop[0] + full_crop[2]/4, full_crop[1] + 3*full_crop[3]/4
     };
     e = result.find(ANDROID_STATISTICS_FACE_LANDMARKS);
     EXPECT_EQUAL_WITHIN_N(full_landmarks, e.data.i32, 1, "App-side face landmarks aren't right");
@@ -286,7 +287,6 @@ TEST(RotationMapperTest, Transform270) {
 
     // Round-trip results can't be exact since we've gone from a large int range -> small int range
     // and back, leading to quantization. For 4/3 aspect ratio, no more than +-1 error expected
-
     e = result.find(ANDROID_CONTROL_AE_REGIONS);
     EXPECT_EQUAL_WITHIN_N(full_region, e.data.i32, 1, "Round-tripped AE region isn't right");
 
@@ -301,11 +301,11 @@ TEST(RotationMapperTest, Transform270) {
     EXPECT_EQUAL_WITHIN_N(full_face, e.data.i32, 1, "App-side face rectangle isn't right");
 
     auto full_landmarks = std::vector<int32_t> {
-        full_crop[0] + full_crop[2], full_crop[1],
         full_crop[0], full_crop[1] + full_crop[3],
-        full_crop[0] + 3*full_crop[2]/4, full_crop[1] + full_crop[3]/4,
+        full_crop[0] + full_crop[2], full_crop[1],
+        full_crop[0] + full_crop[2]/4, full_crop[1] + 3*full_crop[3]/4,
         full_crop[0] + full_crop[2]/2, full_crop[1] + full_crop[3]/2,
-        full_crop[0] + full_crop[2]/4, full_crop[1] + 3*full_crop[3]/4
+        full_crop[0] + 3*full_crop[2]/4, full_crop[1] + full_crop[3]/4
     };
     e = result.find(ANDROID_STATISTICS_FACE_LANDMARKS);
     EXPECT_EQUAL_WITHIN_N(full_landmarks, e.data.i32, 1, "App-side face landmarks aren't right");

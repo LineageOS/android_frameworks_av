@@ -69,6 +69,10 @@ std::string AAudioServiceEndpoint::dump() const NO_THREAD_SAFETY_ANALYSIS {
     result << "    Reference Count:      " << mOpenCount << "\n";
     result << "    Session Id:           " << getSessionId() << "\n";
     result << "    Privacy Sensitive:    " << isPrivacySensitive() << "\n";
+    result << "    Hardware Channel Count:" << getHardwareSamplesPerFrame() << "\n";
+    result << "    Hardware Format:      " << getHardwareFormat() << " ("
+                                           << audio_format_to_string(getHardwareFormat()) << ")\n";
+    result << "    Hardware Sample Rate: " << getHardwareSampleRate() << "\n";
     result << "    Connected:            " << mConnected.load() << "\n";
     result << "    Registered Streams:" << "\n";
     result << AAudioServiceStreamShared::dumpHeader() << "\n";

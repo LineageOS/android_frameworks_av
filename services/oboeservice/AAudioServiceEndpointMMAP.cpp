@@ -231,6 +231,9 @@ aaudio_result_t AAudioServiceEndpointMMAP::openWithFormat(
 
     setFormat(config.format);
     setSampleRate(config.sample_rate);
+    setHardwareSampleRate(getSampleRate());
+    setHardwareFormat(getFormat());
+    setHardwareSamplesPerFrame(AAudioConvert_channelMaskToCount(getChannelMask()));
 
     // If the position is not updated while the timestamp is updated for more than a certain amount,
     // the timestamp reported from the HAL may not be accurate. Here, a timestamp grace period is
