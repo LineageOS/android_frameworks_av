@@ -183,6 +183,10 @@ public:
         return isSingleDeviceType(mDeviceTypes, deviceType);
     }
 
+    bool onlyContainsDevice(const sp<DeviceDescriptor>& item) const {
+        return this->size() == 1 && contains(item);
+    }
+
     bool contains(const sp<DeviceDescriptor>& item) const { return indexOf(item) >= 0; }
 
     /**

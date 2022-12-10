@@ -1116,10 +1116,10 @@ status_t AudioFlinger::PlaybackThread::Track::start(AudioSystem::sync_event_t ev
             mObservedUnderruns = playbackThread->getFastTrackUnderruns(mFastIndex);
         }
         status = playbackThread->addTrack_l(this);
-        if (status == INVALID_OPERATION || status == PERMISSION_DENIED) {
+        if (status == INVALID_OPERATION || status == PERMISSION_DENIED || status == DEAD_OBJECT) {
             triggerEvents(AudioSystem::SYNC_EVENT_PRESENTATION_COMPLETE);
             //  restore previous state if start was rejected by policy manager
-            if (status == PERMISSION_DENIED) {
+            if (status == PERMISSION_DENIED || status == DEAD_OBJECT) {
                 mState = state;
             }
         }

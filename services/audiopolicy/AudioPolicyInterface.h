@@ -407,6 +407,20 @@ public:
     // retrieves the list of available direct audio profiles for the given audio attributes
     virtual status_t getDirectProfilesForAttributes(const audio_attributes_t* attr,
                                                     AudioProfileVector& audioProfiles) = 0;
+
+    virtual status_t getSupportedMixerAttributes(
+            audio_port_handle_t portId, std::vector<audio_mixer_attributes_t>& mixerAttrs) = 0;
+    virtual status_t setPreferredMixerAttributes(
+            const audio_attributes_t* attr,
+            audio_port_handle_t portId,
+            uid_t uid,
+            const audio_mixer_attributes_t* mixerAttributes) = 0;
+    virtual status_t getPreferredMixerAttributes(const audio_attributes_t* attr,
+                                                 audio_port_handle_t portId,
+                                                 audio_mixer_attributes_t* mixerAttributes) = 0;
+    virtual status_t clearPreferredMixerAttributes(const audio_attributes_t* attr,
+                                                   audio_port_handle_t portId,
+                                                   uid_t uid) = 0;
 };
 
 // Audio Policy client Interface

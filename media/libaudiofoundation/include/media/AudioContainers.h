@@ -31,6 +31,7 @@ using ChannelMaskSet = std::set<audio_channel_mask_t>;
 using DeviceTypeSet = std::set<audio_devices_t>;
 using FormatSet = std::set<audio_format_t>;
 using SampleRateSet = std::set<uint32_t>;
+using MixerBehaviorSet = std::set<audio_mixer_behavior_t>;
 
 using FormatVector = std::vector<audio_format_t>;
 
