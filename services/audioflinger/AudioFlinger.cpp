@@ -39,6 +39,7 @@
 #include <utils/Log.h>
 #include <utils/Trace.h>
 #include <binder/Parcel.h>
+#include <media/audiohal/AudioHalVersionInfo.h>
 #include <media/audiohal/DeviceHalInterface.h>
 #include <media/audiohal/DevicesFactoryHalInterface.h>
 #include <media/audiohal/EffectsFactoryHalInterface.h>
@@ -106,13 +107,15 @@
 
 namespace android {
 
-#define MAX_AAUDIO_PROPERTY_DEVICE_HAL_VERSION 7.1
-
 using ::android::base::StringPrintf;
 using media::IEffectClient;
 using media::audio::common::AudioMMapPolicyInfo;
 using media::audio::common::AudioMMapPolicyType;
 using android::content::AttributionSourceState;
+using android::detail::AudioHalVersionInfo;
+
+static const AudioHalVersionInfo kMaxAAudioPropertyDeviceHalVersion =
+        AudioHalVersionInfo(AudioHalVersionInfo::Type::HIDL, 7, 1);
 
 static const char kDeadlockedString[] = "AudioFlinger may be deadlocked\n";
 static const char kHardwareLockedString[] = "Hardware lock is taken\n";
@@ -399,7 +402,7 @@ void AudioFlinger::onFirstRef()
     mDevicesFactoryHalCallback = new DevicesFactoryHalCallbackImpl;
     mDevicesFactoryHal->setCallbackOnce(mDevicesFactoryHalCallback);
 
-    if (mDevicesFactoryHal->getHalVersion() <= MAX_AAUDIO_PROPERTY_DEVICE_HAL_VERSION) {
+    if (mDevicesFactoryHal->getHalVersion() <= kMaxAAudioPropertyDeviceHalVersion) {
         mAAudioBurstsPerBuffer = getAAudioMixerBurstCountFromSystemProperty();
         mAAudioHwBurstMinMicros = getAAudioHardwareBurstMinUsecFromSystemProperty();
     }
@@ -445,7 +448,7 @@ status_t AudioFlinger::getMmapPolicyInfos(
         *policyInfos = it->second;
         return NO_ERROR;
     }
-    if (mDevicesFactoryHal->getHalVersion() > MAX_AAUDIO_PROPERTY_DEVICE_HAL_VERSION) {
+    if (mDevicesFactoryHal->getHalVersion() > kMaxAAudioPropertyDeviceHalVersion) {
         AutoMutex lock(mHardwareLock);
         for (size_t i = 0; i < mAudioHwDevs.size(); ++i) {
             AudioHwDevice *dev = mAudioHwDevs.valueAt(i);
@@ -2521,7 +2524,7 @@ audio_module_handle_t AudioFlinger::loadHwModule_l(const char *name)
         mHardwareStatus = AUDIO_HW_IDLE;
     }
 
-    if (mDevicesFactoryHal->getHalVersion() > MAX_AAUDIO_PROPERTY_DEVICE_HAL_VERSION) {
+    if (mDevicesFactoryHal->getHalVersion() > kMaxAAudioPropertyDeviceHalVersion) {
         if (int32_t mixerBursts = dev->getAAudioMixerBurstCount();
             mixerBursts > 0 && mixerBursts > mAAudioBurstsPerBuffer) {
             mAAudioBurstsPerBuffer = mixerBursts;
