@@ -2732,7 +2732,11 @@ status_t AudioFlinger::PlaybackThread::addTrack_l(const sp<Track>& track)
             }
             // abort if start is rejected by audio policy manager
             if (status != NO_ERROR) {
-                return PERMISSION_DENIED;
+                // Do not replace the error if it is DEAD_OBJECT. When this happens, it indicates
+                // current playback thread is reopened, which may happen when clients set preferred
+                // mixer configuration. Returning DEAD_OBJECT will make the client restore track
+                // immediately.
+                return status == DEAD_OBJECT ? status : PERMISSION_DENIED;
             }
 #ifdef ADD_BATTERY_DATA
             // to track the speaker usage

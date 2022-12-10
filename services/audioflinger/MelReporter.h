@@ -44,6 +44,8 @@ public:
     // For now only support internal MelReporting
     [[nodiscard]] bool isHalReportingEnabled() const { return false; }
 
+    void registerSoundDoseCallback(const sp<media::ISoundDoseCallback>& callback);
+
     std::string dump();
 
     // PatchCommandListener methods

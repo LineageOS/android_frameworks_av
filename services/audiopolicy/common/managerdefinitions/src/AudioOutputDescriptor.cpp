@@ -26,6 +26,7 @@
 #include "Volume.h"
 #include "HwModule.h"
 #include "TypeConverter.h"
+#include "policy.h"
 #include <media/AudioGain.h>
 #include <media/AudioParameter.h>
 #include <media/AudioPolicy.h>
@@ -310,6 +311,9 @@ void SwAudioOutputDescriptor::dump(String8 *dst, int spaces, const char* extraIn
     String8 allExtraInfo;
     if (extraInfo != nullptr) {
         allExtraInfo.appendFormat("%s; ", extraInfo);
+    }
+    if (mProfile != nullptr) {
+        allExtraInfo.appendFormat("IOProfile name:%s; ", mProfile->getName().c_str());
     }
     std::string flagsLiteral = toString(mFlags);
     allExtraInfo.appendFormat("Latency: %d; 0x%04x", mLatency, mFlags);
@@ -929,6 +933,16 @@ bool SwAudioOutputCollection::isAnyDeviceTypeActive(const DeviceTypeSet& deviceT
         }
     }
     return false;
+}
+
+bool SwAudioOutputDescriptor::isConfigurationMatched(const audio_config_base_t &config,
+                                                     audio_output_flags_t flags) {
+    const uint32_t mustMatchOutputFlags =
+            AUDIO_OUTPUT_FLAG_DIRECT|AUDIO_OUTPUT_FLAG_HW_AV_SYNC|AUDIO_OUTPUT_FLAG_MMAP_NOIRQ;
+    return audio_output_flags_is_subset(AudioOutputDescriptor::mFlags, flags, mustMatchOutputFlags)
+            && mSamplingRate == config.sample_rate
+            && mChannelMask == config.channel_mask
+            && mFormat == config.format;
 }
 
 void SwAudioOutputCollection::dump(String8 *dst) const

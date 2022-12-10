@@ -35,10 +35,7 @@ class HwModule;
 class IOProfile : public AudioPort, public PolicyAudioPort
 {
 public:
-    IOProfile(const std::string &name, audio_port_role_t role)
-        : AudioPort(name, AUDIO_PORT_TYPE_MIX, role),
-          curOpenCount(0),
-          curActiveCount(0) {}
+    IOProfile(const std::string &name, audio_port_role_t role);
 
     virtual ~IOProfile() = default;
 
@@ -66,6 +63,14 @@ public:
         if (getRole() == AUDIO_PORT_ROLE_SINK && (flags & AUDIO_INPUT_FLAG_MMAP_NOIRQ) != 0) {
             maxActiveCount = 0;
         }
+        if (getRole() == AUDIO_PORT_ROLE_SOURCE) {
+            mMixerBehaviors.clear();
+            mMixerBehaviors.insert(AUDIO_MIXER_BEHAVIOR_DEFAULT);
+        }
+    }
+
+    const MixerBehaviorSet& getMixerBehaviors() const {
+        return mMixerBehaviors;
     }
 
     /**
@@ -212,6 +217,8 @@ public:
         return false;
     }
 
+    void toSupportedMixerAttributes(std::vector<audio_mixer_attributes_t>* mixerAttributes) const;
+
     // Number of streams currently opened for this profile.
     uint32_t     curOpenCount;
     // Number of streams currently active for this profile. This is not the number of active clients
@@ -220,6 +227,8 @@ public:
 
 private:
     DeviceVector mSupportedDevices; // supported devices: this input/output can be routed from/to
+
+    MixerBehaviorSet mMixerBehaviors;
 };
 
 class InputProfile : public IOProfile

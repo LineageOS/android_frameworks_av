@@ -28,6 +28,7 @@
 #include <android/media/BnAudioPolicyServiceClient.h>
 #include <android/media/EffectDescriptor.h>
 #include <android/media/INativeSpatializerCallback.h>
+#include <android/media/ISoundDoseCallback.h>
 #include <android/media/ISpatializer.h>
 #include <android/media/RecordClientInfo.h>
 #include <android/media/audio/common/AudioConfigBase.h>
@@ -585,6 +586,9 @@ public:
                                      const AudioDeviceTypeAddrVector &devices,
                                      bool *canBeSpatialized);
 
+    /** Registers the sound dose callback with the audio server. */
+    static status_t registerSoundDoseCallback(const sp<media::ISoundDoseCallback>& callback);
+
     /**
      * Query how the direct playback is currently supported on the device.
      * @param attr audio attributes describing the playback use case
@@ -614,6 +618,19 @@ public:
 
     static status_t getSupportedLatencyModes(audio_io_handle_t output,
             std::vector<audio_latency_mode_t>* modes);
+
+    static status_t getSupportedMixerAttributes(audio_port_handle_t portId,
+                                                std::vector<audio_mixer_attributes_t> *mixerAttrs);
+    static status_t setPreferredMixerAttributes(const audio_attributes_t *attr,
+                                                audio_port_handle_t portId,
+                                                uid_t uid,
+                                                const audio_mixer_attributes_t *mixerAttr);
+    static status_t getPreferredMixerAttributes(const audio_attributes_t* attr,
+                                                audio_port_handle_t portId,
+                                                std::optional<audio_mixer_attributes_t>* mixerAttr);
+    static status_t clearPreferredMixerAttributes(const audio_attributes_t* attr,
+                                                  audio_port_handle_t portId,
+                                                  uid_t uid);
 
     // A listener for capture state changes.
     class CaptureStateListener : public virtual RefBase {

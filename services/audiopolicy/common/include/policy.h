@@ -246,3 +246,16 @@ static inline audio_devices_t apm_extract_one_audio_device(
         }
     }
 }
+
+/**
+ * Indicates if two given audio output flags are considered as matched, which means that
+ * 1) the `supersetFlags` and `subsetFlags` both contain or both don't contain must match flags and
+ * 2) `supersetFlags` contains all flags from `subsetFlags`.
+ */
+static inline bool audio_output_flags_is_subset(audio_output_flags_t supersetFlags,
+                                                audio_output_flags_t subsetFlags,
+                                                uint32_t mustMatchFlags)
+{
+    return ((supersetFlags ^ subsetFlags) & mustMatchFlags) == AUDIO_OUTPUT_FLAG_NONE
+            && (supersetFlags & subsetFlags) == subsetFlags;
+}
