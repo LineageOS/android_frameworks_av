@@ -64,6 +64,11 @@ std::shared_ptr<C2SurfaceSyncMemory> C2SurfaceSyncMemory::Import(
     }
 
     HandleSyncMem *o = static_cast<HandleSyncMem*>(handle);
+    if (o->size() < sizeof(C2SyncVariables)) {
+        android_errorWriteLog(0x534e4554, "240140929");
+        return nullptr;
+    }
+
     void *ptr = mmap(NULL, o->size(), PROT_READ | PROT_WRITE, MAP_SHARED, o->memFd(), 0);
 
     if (ptr == MAP_FAILED) {
