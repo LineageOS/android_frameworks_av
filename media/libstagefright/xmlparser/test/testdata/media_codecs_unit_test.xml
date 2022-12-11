@@ -88,5 +88,21 @@
             <Tuning name="hungry" value="yes"/>
             <Tuning name="pi" value="3.1415"/>
         </MediaCodec>
+        <!-- test minsdk -->
+        <MediaCodec name="test12.encoder" type="video/t12" minsdk="100">
+            <Tuning name="enable-goal" value="no"/>
+        </MediaCodec>
+        <MediaCodec name="test13.encoder" type="video/t13" enabled="false" minsdk="100">
+            <Tuning name="enable-goal" value="no"/>
+        </MediaCodec>
+        <MediaCodec name="test14.encoder" type="video/t14" enabled="true" minsdk="100">
+            <Tuning name="enable-goal" value="no"/>
+        </MediaCodec>
+        <MediaCodec name="test15.encoder" type="video/t15" minsdk="34">
+            <Tuning name="enable-goal" value="yes"/>
+        </MediaCodec>
+        <MediaCodec name="test16.encoder" type="video/t16" enabled="false" minsdk="34">
+            <Tuning name="enable-goal" value="yes"/>
+        </MediaCodec>
     </Encoders>
 </Included>
