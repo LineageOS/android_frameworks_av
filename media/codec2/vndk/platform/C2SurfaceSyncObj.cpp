@@ -177,12 +177,14 @@ bool C2SyncVariables::isDequeueableLocked(uint32_t *waitId) {
     return true;
 }
 
-bool C2SyncVariables::notifyQueuedLocked(uint32_t *waitId) {
+bool C2SyncVariables::notifyQueuedLocked(uint32_t *waitId, bool notify) {
     // Note. thundering herds may occur. Edge trigged signalling.
     // But one waiter will guarantee to dequeue. others may wait again.
     // Minimize futex syscall(trap) for the main use case(one waiter case).
     if (mMaxDequeueCount == mCurDequeueCount--) {
-        broadcast();
+        if (notify) {
+            broadcast();
+        }
         return true;
     }
 
