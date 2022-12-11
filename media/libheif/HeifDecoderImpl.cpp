@@ -518,7 +518,6 @@ bool HeifDecoderImpl::decodeAsync() {
     {
         Mutex::Autolock _l(mRetrieverLock);
         weakRetriever = mRetriever;
-        mRetriever.clear();
     }
 
     for (size_t i = 1; i < mNumSlices; i++) {
@@ -551,6 +550,12 @@ bool HeifDecoderImpl::decodeAsync() {
         }
     }
     // Hold on to mDataSource in case the client wants to redecode.
+
+    {
+        Mutex::Autolock _l(mRetrieverLock);
+        mRetriever.clear();
+    }
+
     return false;
 }
 
@@ -660,7 +665,10 @@ bool HeifDecoderImpl::decode(HeifFrameInfo* frameInfo) {
     mFrameDecoded = true;
 
     // Aggressively clear to avoid holding on to resources
-    mRetriever.clear();
+    {
+        Mutex::Autolock _l(mRetrieverLock);
+        mRetriever.clear();
+    }
 
     // Hold on to mDataSource in case the client wants to redecode.
     return true;

@@ -2365,4 +2365,89 @@ Status AudioPolicyService::getDirectProfilesForAttributes(
     return Status::ok();
 }
 
+Status AudioPolicyService::getSupportedMixerAttributes(
+        int32_t portIdAidl, std::vector<media::AudioMixerAttributesInternal>* _aidl_return) {
+    if (mAudioPolicyManager == nullptr) {
+        return binderStatusFromStatusT(NO_INIT);
+    }
+
+    audio_port_handle_t portId = VALUE_OR_RETURN_BINDER_STATUS(
+            aidl2legacy_int32_t_audio_port_handle_t(portIdAidl));
+
+    std::vector<audio_mixer_attributes_t> mixerAttrs;
+    Mutex::Autolock _l(mLock);
+    RETURN_IF_BINDER_ERROR(
+            binderStatusFromStatusT(mAudioPolicyManager->getSupportedMixerAttributes(
+                    portId, mixerAttrs)));
+    *_aidl_return = VALUE_OR_RETURN_BINDER_STATUS(
+            convertContainer<std::vector<media::AudioMixerAttributesInternal>>(
+                    mixerAttrs,
+                    legacy2aidl_audio_mixer_attributes_t_AudioMixerAttributesInternal));
+    return Status::ok();
+}
+
+Status AudioPolicyService::setPreferredMixerAttributes(
+        const media::AudioAttributesInternal& attrAidl,
+        int32_t portIdAidl,
+        int32_t uidAidl,
+        const media::AudioMixerAttributesInternal& mixerAttrAidl) {
+    if (mAudioPolicyManager == nullptr) {
+        return binderStatusFromStatusT(NO_INIT);
+    }
+
+    audio_attributes_t  attr = VALUE_OR_RETURN_BINDER_STATUS(
+            aidl2legacy_AudioAttributesInternal_audio_attributes_t(attrAidl));
+    audio_mixer_attributes_t mixerAttr = VALUE_OR_RETURN_BINDER_STATUS(
+            aidl2legacy_AudioMixerAttributesInternal_audio_mixer_attributes_t(mixerAttrAidl));
+    uid_t uid = VALUE_OR_RETURN_BINDER_STATUS(aidl2legacy_int32_t_uid_t(uidAidl));
+    audio_port_handle_t portId = VALUE_OR_RETURN_BINDER_STATUS(
+            aidl2legacy_int32_t_audio_port_handle_t(portIdAidl));
+
+    Mutex::Autolock _l(mLock);
+    return binderStatusFromStatusT(
+            mAudioPolicyManager->setPreferredMixerAttributes(&attr, portId, uid, &mixerAttr));
+}
+
+Status AudioPolicyService::getPreferredMixerAttributes(
+        const media::AudioAttributesInternal& attrAidl,
+        int32_t portIdAidl,
+        std::optional<media::AudioMixerAttributesInternal>* _aidl_return) {
+    if (mAudioPolicyManager == nullptr) {
+        return binderStatusFromStatusT(NO_INIT);
+    }
+
+    audio_attributes_t  attr = VALUE_OR_RETURN_BINDER_STATUS(
+            aidl2legacy_AudioAttributesInternal_audio_attributes_t(attrAidl));
+    audio_port_handle_t portId = VALUE_OR_RETURN_BINDER_STATUS(
+            aidl2legacy_int32_t_audio_port_handle_t(portIdAidl));
+
+    Mutex::Autolock _l(mLock);
+    audio_mixer_attributes_t mixerAttr = AUDIO_MIXER_ATTRIBUTES_INITIALIZER;
+    RETURN_IF_BINDER_ERROR(
+            binderStatusFromStatusT(mAudioPolicyManager->getPreferredMixerAttributes(
+                    &attr, portId, &mixerAttr)));
+    *_aidl_return = VALUE_OR_RETURN_BINDER_STATUS(
+            legacy2aidl_audio_mixer_attributes_t_AudioMixerAttributesInternal(mixerAttr));
+    return Status::ok();
+}
+
+Status AudioPolicyService::clearPreferredMixerAttributes(
+        const media::AudioAttributesInternal& attrAidl,
+        int32_t portIdAidl,
+        int32_t uidAidl) {
+    if (mAudioPolicyManager == nullptr) {
+        return binderStatusFromStatusT(NO_INIT);
+    }
+
+    audio_attributes_t  attr = VALUE_OR_RETURN_BINDER_STATUS(
+            aidl2legacy_AudioAttributesInternal_audio_attributes_t(attrAidl));
+    uid_t uid = VALUE_OR_RETURN_BINDER_STATUS(aidl2legacy_int32_t_uid_t(uidAidl));
+    audio_port_handle_t portId = VALUE_OR_RETURN_BINDER_STATUS(
+            aidl2legacy_int32_t_audio_port_handle_t(portIdAidl));
+
+    Mutex::Autolock _l(mLock);
+    return binderStatusFromStatusT(
+            mAudioPolicyManager->clearPreferredMixerAttributes(&attr, portId, uid));
+}
+
 } // namespace android

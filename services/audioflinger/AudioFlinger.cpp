@@ -229,7 +229,7 @@ BINDER_METHOD_ENTRY(getAAudioHardwareBurstMinUsec) \
 BINDER_METHOD_ENTRY(setDeviceConnectedState) \
 BINDER_METHOD_ENTRY(setRequestedLatencyMode) \
 BINDER_METHOD_ENTRY(getSupportedLatencyModes) \
-
+BINDER_METHOD_ENTRY(registerSoundDoseCallback) \
 
 // singleton for Binder Method Statistics for IAudioFlinger
 static auto& getIAudioFlingerStatistics() {
@@ -1658,6 +1658,11 @@ status_t AudioFlinger::getSupportedLatencyModes(audio_io_handle_t output,
         return BAD_VALUE;
     }
     return thread->getSupportedLatencyModes(modes);
+}
+
+status_t AudioFlinger::registerSoundDoseCallback(const sp<media::ISoundDoseCallback>& callback) {
+    mMelReporter->registerSoundDoseCallback(callback);
+    return NO_ERROR;
 }
 
 status_t AudioFlinger::setStreamMute(audio_stream_type_t stream, bool muted)
@@ -4622,6 +4627,7 @@ status_t AudioFlinger::onTransactWrapper(TransactionCode code,
         case TransactionCode::SET_MASTER_VOLUME:
         case TransactionCode::SET_MASTER_MUTE:
         case TransactionCode::MASTER_MUTE:
+        case TransactionCode::REGISTER_SOUND_DOSE_CALLBACK:
         case TransactionCode::SET_MODE:
         case TransactionCode::SET_MIC_MUTE:
         case TransactionCode::SET_LOW_RAM_DEVICE:
@@ -4633,7 +4639,7 @@ status_t AudioFlinger::onTransactWrapper(TransactionCode code,
                 ALOGW("%s: transaction %d received from PID %d unauthorized UID %d",
                       __func__, code, IPCThreadState::self()->getCallingPid(),
                       IPCThreadState::self()->getCallingUid());
-                // return status only for non void methods
+                // return status only for non-void methods
                 switch (code) {
                     case TransactionCode::SYSTEM_READY:
                         break;

@@ -47,6 +47,7 @@
 #include <AudioOutputDescriptor.h>
 #include <AudioPolicyMix.h>
 #include <EffectDescriptor.h>
+#include <PreferredMixerAttributesInfo.h>
 #include <SoundTriggerSession.h>
 #include "EngineLibrary.h"
 #include "TypeConverter.h"
@@ -394,6 +395,21 @@ public:
 
         virtual status_t getDirectProfilesForAttributes(const audio_attributes_t* attr,
                                                          AudioProfileVector& audioProfiles);
+
+        status_t getSupportedMixerAttributes(
+                audio_port_handle_t portId,
+                std::vector<audio_mixer_attributes_t>& mixerAttrs) override;
+        status_t setPreferredMixerAttributes(
+                const audio_attributes_t* attr,
+                audio_port_handle_t portId,
+                uid_t uid,
+                const audio_mixer_attributes_t* mixerAttributes) override;
+        status_t getPreferredMixerAttributes(const audio_attributes_t* attr,
+                                             audio_port_handle_t portId,
+                                             audio_mixer_attributes_t* mixerAttributes) override;
+        status_t clearPreferredMixerAttributes(const audio_attributes_t* attr,
+                                               audio_port_handle_t portId,
+                                               uid_t uid) override;
 
         bool isCallScreenModeSupported() override;
 
@@ -983,6 +999,10 @@ protected:
         sp<SourceClientDescriptor> mCallRxSourceClient;
         sp<SourceClientDescriptor> mCallTxSourceClient;
 
+        std::map<audio_port_handle_t,
+                 std::map<product_strategy_t,
+                          sp<PreferredMixerAttributesInfo>>> mPreferredMixerAttrInfos;
+
         // Support for Multi-Stream Decoder (MSD) module
         sp<DeviceDescriptor> getMsdAudioInDevice() const;
         DeviceVector getMsdAudioOutDevices() const;
@@ -1069,6 +1089,7 @@ private:
                 const audio_config_t *config,
                 audio_output_flags_t *flags,
                 bool *isSpatialized,
+                sp<PreferredMixerAttributesInfo> prefMixerAttrInfo = nullptr,
                 bool forceMutingHaptic = false);
 
         // Internal method checking if a direct output can be opened matching the requested
@@ -1236,11 +1257,15 @@ private:
          * @param[in] profile IOProfile to use as template
          * @param[in] devices initial route to apply to this output stream
          * @param[in] mixerConfig if not null, use this to configure the mixer
+         * @param[in] halConfig if not null, use this to configure the HAL
+         * @param[in] flags the flags to be used to open the output
          * @return an output descriptor for the newly opened stream or null in case of error.
          */
         sp<SwAudioOutputDescriptor> openOutputWithProfileAndDevice(
                 const sp<IOProfile>& profile, const DeviceVector& devices,
-                const audio_config_base_t *mixerConfig = nullptr);
+                const audio_config_base_t *mixerConfig = nullptr,
+                const audio_config_t *halConfig = nullptr,
+                audio_output_flags_t flags = AUDIO_OUTPUT_FLAG_NONE);
 
         bool isOffloadPossible(const audio_offload_info_t& offloadInfo,
                                bool durationIgnored = false);
@@ -1273,6 +1298,13 @@ private:
                                        AudioProfileVector& audioProfiles,
                                        uint32_t flags,
                                        bool isInput);
+
+        sp<PreferredMixerAttributesInfo> getPreferredMixerAttributesInfo(
+                audio_port_handle_t devicePortId, product_strategy_t strategy);
+        status_t reopenOutput(sp<SwAudioOutputDescriptor> outputDesc,
+                              const audio_config_t *config,
+                              audio_output_flags_t flags,
+                              const char* caller);
 };
 
 };

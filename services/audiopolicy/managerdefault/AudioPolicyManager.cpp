@@ -260,6 +260,9 @@ status_t AudioPolicyManager::setDeviceConnectionStateInt(const sp<DeviceDescript
             // remove device from mReportedFormatsMap cache
             mReportedFormatsMap.erase(device);
 
+            // remove preferred mixer configurations
+            mPreferredMixerAttrInfos.erase(device->getId());
+
             } break;
 
         default:
@@ -1270,8 +1273,19 @@ status_t AudioPolicyManager::getOutputForAttrInt(
         }
     }
     if (*output == AUDIO_IO_HANDLE_NONE) {
+        sp<PreferredMixerAttributesInfo> info = nullptr;
+        if (outputDevices.size() == 1) {
+            info = getPreferredMixerAttributesInfo(
+                    outputDevices.itemAt(0)->getId(),
+                    mEngine->getProductStrategyForAttributes(*resultAttr));
+            if (info != nullptr && info->getUid() != uid && info->getActiveClientCount() == 0) {
+                // Only use preferred mixer when the requested uid matched or
+                // there is active client on preferred mixer.
+                info = nullptr;
+            }
+        }
         *output = getOutputForDevices(outputDevices, session, resultAttr, config,
-                flags, isSpatialized, resultAttr->flags & AUDIO_FLAG_MUTE_HAPTIC);
+                flags, isSpatialized, info, resultAttr->flags & AUDIO_FLAG_MUTE_HAPTIC);
     }
     if (*output == AUDIO_IO_HANDLE_NONE) {
         AudioProfileVector profiles;
@@ -1482,6 +1496,7 @@ audio_io_handle_t AudioPolicyManager::getOutputForDevices(
         const audio_config_t *config,
         audio_output_flags_t *flags,
         bool *isSpatialized,
+        sp<PreferredMixerAttributesInfo> prefMixerConfigInfo,
         bool forceMutingHaptic)
 {
     audio_io_handle_t output = AUDIO_IO_HANDLE_NONE;
@@ -1557,11 +1572,36 @@ audio_io_handle_t AudioPolicyManager::getOutputForDevices(
         // get which output is suitable for the specified stream. The actual
         // routing change will happen when startOutput() will be called
         SortedVector<audio_io_handle_t> outputs = getOutputsForDevices(devices, mOutputs);
-
-        // at this stage we should ignore the DIRECT flag as no direct output could be found earlier
-        *flags = (audio_output_flags_t)(*flags & ~AUDIO_OUTPUT_FLAG_DIRECT);
-        output = selectOutput(
-                outputs, *flags, config->format, channelMask, config->sample_rate, session);
+        if (prefMixerConfigInfo != nullptr) {
+            for (audio_io_handle_t outputHandle : outputs) {
+                sp<SwAudioOutputDescriptor> outputDesc = mOutputs.valueFor(outputHandle);
+                if (outputDesc->mProfile == prefMixerConfigInfo->getProfile()) {
+                    output = outputHandle;
+                    break;
+                }
+            }
+            if (output == AUDIO_IO_HANDLE_NONE) {
+                // No output open with the preferred profile. Open a new one.
+                audio_config_t config = AUDIO_CONFIG_INITIALIZER;
+                config.channel_mask = prefMixerConfigInfo->getConfigBase().channel_mask;
+                config.sample_rate = prefMixerConfigInfo->getConfigBase().sample_rate;
+                config.format = prefMixerConfigInfo->getConfigBase().format;
+                sp<SwAudioOutputDescriptor> preferredOutput = openOutputWithProfileAndDevice(
+                        prefMixerConfigInfo->getProfile(), devices, nullptr /*mixerConfig*/,
+                        &config, prefMixerConfigInfo->getFlags());
+                if (preferredOutput == nullptr) {
+                    ALOGE("%s failed to open output with preferred mixer config", __func__);
+                } else {
+                    output = preferredOutput->mIoHandle;
+                }
+            }
+        } else {
+            // at this stage we should ignore the DIRECT flag as no direct output could be
+            // found earlier
+            *flags = (audio_output_flags_t) (*flags & ~AUDIO_OUTPUT_FLAG_DIRECT);
+            output = selectOutput(
+                    outputs, *flags, config->format, channelMask, config->sample_rate, session);
+        }
     }
     ALOGW_IF((output == 0), "getOutputForDevices() could not find output for stream %d, "
             "sampling rate %d, format %#x, channels %#x, flags %#x",
@@ -2015,6 +2055,33 @@ status_t AudioPolicyManager::startOutput(audio_port_handle_t portId)
         outputDesc->stop();
         return status;
     }
+
+    // If the client is the first one active on preferred mixer parameters, reopen the output
+    // if the current mixer parameters doesn't match the preferred one.
+    if (outputDesc->devices().size() == 1) {
+        sp<PreferredMixerAttributesInfo> info = getPreferredMixerAttributesInfo(
+                outputDesc->devices()[0]->getId(), client->strategy());
+        if (info != nullptr && info->getUid() == client->uid()) {
+            if (info->getActiveClientCount() == 0 && !outputDesc->isConfigurationMatched(
+                    info->getConfigBase(), info->getFlags())) {
+                stopSource(outputDesc, client);
+                outputDesc->stop();
+                audio_config_t config = AUDIO_CONFIG_INITIALIZER;
+                config.channel_mask = info->getConfigBase().channel_mask;
+                config.sample_rate = info->getConfigBase().sample_rate;
+                config.format = info->getConfigBase().format;
+                status_t status = reopenOutput(outputDesc, &config, info->getFlags(), __func__);
+                if (status != NO_ERROR) {
+                    return status;
+                }
+                // Intentionally return error to let the client side resending request for
+                // creating and starting.
+                return DEAD_OBJECT;
+            }
+            info->increaseActiveClient();
+        }
+    }
+
     if (delayMs != 0) {
         usleep(delayMs * 1000);
     }
@@ -2267,6 +2334,19 @@ status_t AudioPolicyManager::stopOutput(audio_port_handle_t portId)
 
     if (status == NO_ERROR ) {
         outputDesc->stop();
+    } else {
+        return status;
+    }
+
+    if (outputDesc->devices().size() == 1) {
+        sp<PreferredMixerAttributesInfo> info = getPreferredMixerAttributesInfo(
+                outputDesc->devices()[0]->getId(), client->strategy());
+        if (info != nullptr && info->getUid() == client->uid()) {
+            info->decreaseActiveClient();
+            if (info->getActiveClientCount() == 0) {
+                reopenOutput(outputDesc, nullptr /*config*/, AUDIO_OUTPUT_FLAG_NONE, __func__);
+            }
+        }
     }
     return status;
 }
@@ -3892,6 +3972,15 @@ void AudioPolicyManager::dump(String8 *dst) const
         dst->appendFormat("   - uid=%d flag_mask=%#x\n", policy.first, policy.second);
     }
 
+    dst->appendFormat(" Preferred mixer audio configuration:\n");
+    for (const auto it : mPreferredMixerAttrInfos) {
+        dst->appendFormat("   - device port id: %d\n", it.first);
+        for (const auto preferredMixerInfoIt : it.second) {
+            dst->appendFormat("     - strategy: %d; ", preferredMixerInfoIt.first);
+            preferredMixerInfoIt.second->dump(dst);
+        }
+    }
+
     dst->appendFormat("\nPolicy Engine dump:\n");
     mEngine->dump(dst);
 }
@@ -4122,6 +4211,172 @@ status_t AudioPolicyManager::getDirectProfilesForAttributes(const audio_attribut
                                  AUDIO_OUTPUT_FLAG_DIRECT /*flags*/, false /*isInput*/);
 }
 
+status_t AudioPolicyManager::getSupportedMixerAttributes(
+        audio_port_handle_t portId, std::vector<audio_mixer_attributes_t> &mixerAttrs) {
+    ALOGV("%s, portId=%d", __func__, portId);
+    sp<DeviceDescriptor> deviceDescriptor = mAvailableOutputDevices.getDeviceFromId(portId);
+    if (deviceDescriptor == nullptr) {
+        ALOGE("%s the requested device is currently unavailable", __func__);
+        return BAD_VALUE;
+    }
+    for (const auto& hwModule : mHwModules) {
+        for (const auto& curProfile : hwModule->getOutputProfiles()) {
+            if (curProfile->supportsDevice(deviceDescriptor)) {
+                curProfile->toSupportedMixerAttributes(&mixerAttrs);
+            }
+        }
+    }
+    return NO_ERROR;
+}
+
+status_t AudioPolicyManager::setPreferredMixerAttributes(
+        const audio_attributes_t *attr,
+        audio_port_handle_t portId,
+        uid_t uid,
+        const audio_mixer_attributes_t *mixerAttributes) {
+    ALOGV("%s, attr=%s, mixerAttributes={format=%#x, channelMask=%#x, samplingRate=%u, "
+          "mixerBehavior=%d}, uid=%d, portId=%u",
+          __func__, toString(*attr).c_str(), mixerAttributes->config.format,
+          mixerAttributes->config.channel_mask, mixerAttributes->config.sample_rate,
+          mixerAttributes->mixer_behavior, uid, portId);
+    if (attr->usage != AUDIO_USAGE_MEDIA) {
+        ALOGE("%s failed, only media is allowed, the given usage is %d", __func__, attr->usage);
+        return BAD_VALUE;
+    }
+    sp<DeviceDescriptor> deviceDescriptor = mAvailableOutputDevices.getDeviceFromId(portId);
+    if (deviceDescriptor == nullptr) {
+        ALOGE("%s the requested device is currently unavailable", __func__);
+        return BAD_VALUE;
+    }
+    if (!audio_is_usb_out_device(deviceDescriptor->type())) {
+        ALOGE("%s(%d), type=%d, is not a usb output device",
+              __func__, portId, deviceDescriptor->type());
+        return BAD_VALUE;
+    }
+
+    audio_output_flags_t flags = AUDIO_OUTPUT_FLAG_NONE;
+    audio_flags_to_audio_output_flags(attr->flags, &flags);
+    flags = (audio_output_flags_t) (flags |
+            audio_output_flags_from_mixer_behavior(mixerAttributes->mixer_behavior));
+    sp<IOProfile> profile = nullptr;
+    DeviceVector devices(deviceDescriptor);
+    for (const auto& hwModule : mHwModules) {
+        for (const auto& curProfile : hwModule->getOutputProfiles()) {
+            if (curProfile->hasDynamicAudioProfile()
+                    && curProfile->isCompatibleProfile(devices,
+                                                       mixerAttributes->config.sample_rate,
+                                                       nullptr /*updatedSamplingRate*/,
+                                                       mixerAttributes->config.format,
+                                                       nullptr /*updatedFormat*/,
+                                                       mixerAttributes->config.channel_mask,
+                                                       nullptr /*updatedChannelMask*/,
+                                                       flags,
+                                                       false /*exactMatchRequiredForInputFlags*/)) {
+                profile = curProfile;
+                break;
+            }
+        }
+    }
+    if (profile == nullptr) {
+        ALOGE("%s, there is no compatible profile found", __func__);
+        return BAD_VALUE;
+    }
+
+    sp<PreferredMixerAttributesInfo> mixerAttrInfo =
+            sp<PreferredMixerAttributesInfo>::make(
+                    uid, portId, profile, flags, *mixerAttributes);
+    const product_strategy_t strategy = mEngine->getProductStrategyForAttributes(*attr);
+    mPreferredMixerAttrInfos[portId][strategy] = mixerAttrInfo;
+
+    // If 1) there is any client from the preferred mixer configuration owner that is currently
+    // active and matches the strategy and 2) current output is on the preferred device and the
+    // mixer configuration doesn't match the preferred one, reopen output with preferred mixer
+    // configuration.
+    std::vector<audio_io_handle_t> outputsToReopen;
+    for (size_t i = 0; i < mOutputs.size(); i++) {
+        const auto output = mOutputs.valueAt(i);
+        if (output->mProfile == profile && output->devices().onlyContainsDevice(deviceDescriptor)
+            && !output->isConfigurationMatched(mixerAttributes->config, flags)) {
+            for (const auto& client : output->getActiveClients()) {
+                if (client->uid() == uid && client->strategy() == strategy) {
+                    client->setIsInvalid();
+                    outputsToReopen.push_back(output->mIoHandle);
+                }
+            }
+        }
+    }
+    audio_config_t config = AUDIO_CONFIG_INITIALIZER;
+    config.sample_rate = mixerAttributes->config.sample_rate;
+    config.channel_mask = mixerAttributes->config.channel_mask;
+    config.format = mixerAttributes->config.format;
+    for (const auto output : outputsToReopen) {
+        reopenOutput(mOutputs.valueFor(output), &config, flags, __func__);
+    }
+
+    return NO_ERROR;
+}
+
+sp<PreferredMixerAttributesInfo> AudioPolicyManager::getPreferredMixerAttributesInfo(
+        audio_port_handle_t devicePortId, product_strategy_t strategy) {
+    auto it = mPreferredMixerAttrInfos.find(devicePortId);
+    if (it == mPreferredMixerAttrInfos.end()) {
+        return nullptr;
+    }
+    auto mixerAttrInfoIt = it->second.find(strategy);
+    if (mixerAttrInfoIt == it->second.end()) {
+        return nullptr;
+    }
+    return mixerAttrInfoIt->second;
+}
+
+status_t AudioPolicyManager::getPreferredMixerAttributes(
+        const audio_attributes_t *attr,
+        audio_port_handle_t portId,
+        audio_mixer_attributes_t* mixerAttributes) {
+    sp<PreferredMixerAttributesInfo> info = getPreferredMixerAttributesInfo(
+            portId, mEngine->getProductStrategyForAttributes(*attr));
+    if (info == nullptr) {
+        return NAME_NOT_FOUND;
+    }
+    *mixerAttributes = info->getMixerAttributes();
+    return NO_ERROR;
+}
+
+status_t AudioPolicyManager::clearPreferredMixerAttributes(const audio_attributes_t *attr,
+                                                           audio_port_handle_t portId,
+                                                           uid_t uid) {
+    const product_strategy_t strategy = mEngine->getProductStrategyForAttributes(*attr);
+    const auto preferredMixerAttrInfo = getPreferredMixerAttributesInfo(portId, strategy);
+    if (preferredMixerAttrInfo == nullptr) {
+        return NAME_NOT_FOUND;
+    }
+    if (preferredMixerAttrInfo->getUid() != uid) {
+        ALOGE("%s, requested uid=%d, owned uid=%d",
+              __func__, uid, preferredMixerAttrInfo->getUid());
+        return PERMISSION_DENIED;
+    }
+    mPreferredMixerAttrInfos[portId].erase(strategy);
+    if (mPreferredMixerAttrInfos[portId].empty()) {
+        mPreferredMixerAttrInfos.erase(portId);
+    }
+
+    // Reconfig existing output
+    std::vector<audio_io_handle_t> potentialOutputsToReopen;
+    for (size_t i = 0; i < mOutputs.size(); i++) {
+        if (mOutputs.valueAt(i)->mProfile == preferredMixerAttrInfo->getProfile()) {
+            potentialOutputsToReopen.push_back(mOutputs.keyAt(i));
+        }
+    }
+    for (const auto output : potentialOutputsToReopen) {
+        sp<SwAudioOutputDescriptor> desc = mOutputs.valueFor(output);
+        if (desc->isConfigurationMatched(preferredMixerAttrInfo->getConfigBase(),
+                                         preferredMixerAttrInfo->getFlags())) {
+            reopenOutput(desc, nullptr /*config*/, AUDIO_OUTPUT_FLAG_NONE, __func__);
+        }
+    }
+    return NO_ERROR;
+}
+
 status_t AudioPolicyManager::listAudioPorts(audio_port_role_t role,
                                             audio_port_type_t type,
                                             unsigned int *num_ports,
@@ -4186,6 +4441,7 @@ status_t AudioPolicyManager::listAudioPorts(audio_port_role_t role,
             *num_ports += numOutputs;
         }
     }
+
     *generation = curAudioPortGeneration();
     ALOGV("listAudioPorts() got %zu ports needed %d", portsWritten, *num_ports);
     return NO_ERROR;
@@ -7744,19 +8000,23 @@ bool AudioPolicyManager::areAllActiveTracksRerouted(const sp<SwAudioOutputDescri
 
 sp<SwAudioOutputDescriptor> AudioPolicyManager::openOutputWithProfileAndDevice(
         const sp<IOProfile>& profile, const DeviceVector& devices,
-        const audio_config_base_t *mixerConfig)
+        const audio_config_base_t *mixerConfig, const audio_config_t *halConfig,
+        audio_output_flags_t flags)
 {
     for (const auto& device : devices) {
         // TODO: This should be checking if the profile supports the device combo.
         if (!profile->supportsDevice(device)) {
+            ALOGE("%s profile(%s) doesn't support device %#x", __func__, profile->getName().c_str(),
+                  device->type());
             return nullptr;
         }
     }
     sp<SwAudioOutputDescriptor> desc = new SwAudioOutputDescriptor(profile, mpClientInterface);
     audio_io_handle_t output = AUDIO_IO_HANDLE_NONE;
-    status_t status = desc->open(nullptr /* halConfig */, mixerConfig, devices,
-            AUDIO_STREAM_DEFAULT, AUDIO_OUTPUT_FLAG_NONE, &output);
+    status_t status = desc->open(halConfig, mixerConfig, devices,
+            AUDIO_STREAM_DEFAULT, flags, &output);
     if (status != NO_ERROR) {
+        ALOGE("%s failed to open output %d", __func__, status);
         return nullptr;
     }
 
@@ -7774,7 +8034,9 @@ sp<SwAudioOutputDescriptor> AudioPolicyManager::openOutputWithProfileAndDevice(
         ALOGW("%s() missing param", __func__);
         desc->close();
         return nullptr;
-    } else if (profile->hasDynamicAudioProfile()) {
+    } else if (profile->hasDynamicAudioProfile() && halConfig == nullptr) {
+        // Reopen the output with the best audio profile picked by APM when the profile supports
+        // dynamic audio profile and the hal config is not specified.
         desc->close();
         output = AUDIO_IO_HANDLE_NONE;
         audio_config_t config = AUDIO_CONFIG_INITIALIZER;
@@ -7784,8 +8046,7 @@ sp<SwAudioOutputDescriptor> AudioPolicyManager::openOutputWithProfileAndDevice(
         config.offload_info.channel_mask = config.channel_mask;
         config.offload_info.format = config.format;
 
-        status = desc->open(&config, mixerConfig, devices,
-                            AUDIO_STREAM_DEFAULT, AUDIO_OUTPUT_FLAG_NONE, &output);
+        status = desc->open(&config, mixerConfig, devices, AUDIO_STREAM_DEFAULT, flags, &output);
         if (status != NO_ERROR) {
             return nullptr;
         }
@@ -7942,6 +8203,21 @@ status_t AudioPolicyManager::getProfilesForDevices(const DeviceVector& devices,
         }
     }
 
+    return NO_ERROR;
+}
+
+status_t AudioPolicyManager::reopenOutput(sp<SwAudioOutputDescriptor> outputDesc,
+                                          const audio_config_t *config,
+                                          audio_output_flags_t flags,
+                                          const char* caller) {
+    closeOutput(outputDesc->mIoHandle);
+    sp<SwAudioOutputDescriptor> preferredOutput = openOutputWithProfileAndDevice(
+            outputDesc->mProfile, outputDesc->devices(), nullptr /*mixerConfig*/, config, flags);
+    if (preferredOutput == nullptr) {
+        ALOGE("%s failed to reopen output device=%d, caller=%s",
+              __func__, outputDesc->devices()[0]->getId(), caller);
+        return BAD_VALUE;
+    }
     return NO_ERROR;
 }
 
