@@ -373,6 +373,7 @@ Status AudioPolicyService::getOutputForAttr(const media::AudioAttributesInternal
     AutoCallerClear acc;
     AudioPolicyInterface::output_type_t outputType;
     bool isSpatialized = false;
+    bool isBitPerfect = false;
     status_t result = mAudioPolicyManager->getOutputForAttr(&attr, &output, session,
                                                             &stream,
                                                             attributionSource,
@@ -380,7 +381,8 @@ Status AudioPolicyService::getOutputForAttr(const media::AudioAttributesInternal
                                                             &flags, &selectedDeviceId, &portId,
                                                             &secondaryOutputs,
                                                             &outputType,
-                                                            &isSpatialized);
+                                                            &isSpatialized,
+                                                            &isBitPerfect);
 
     // FIXME: Introduce a way to check for the the telephony device before opening the output
     if (result == NO_ERROR) {
@@ -432,6 +434,7 @@ Status AudioPolicyService::getOutputForAttr(const media::AudioAttributesInternal
                 convertContainer<std::vector<int32_t>>(secondaryOutputs,
                                                        legacy2aidl_audio_io_handle_t_int32_t));
         _aidl_return->isSpatialized = isSpatialized;
+        _aidl_return->isBitPerfect = isBitPerfect;
     } else {
         _aidl_return->configBase.format = VALUE_OR_RETURN_BINDER_STATUS(
                 legacy2aidl_audio_format_t_AudioFormatDescription(config.format));

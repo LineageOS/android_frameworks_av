@@ -591,6 +591,7 @@ private:
     class OffloadThread;
     class DuplicatingThread;
     class AsyncCallbackThread;
+    class BitPerfectThread;
     class Track;
     class RecordTrack;
     class EffectBase;
