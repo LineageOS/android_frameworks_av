@@ -122,6 +122,9 @@ cc_library_shared {
     shared_libs: [
         "liblog",
     ],
+    cflags: [
+        "-Wthread-safety",
+    ],
     visibility: [
         "//hardware/interfaces/audio/aidl/default",
     ],

@@ -17,7 +17,9 @@
 #pragma once
 
 #include <android-base/logging.h>
+#include <android-base/thread_annotations.h>
 #include <array>
+#include <cstddef>
 
 #include "BundleTypes.h"
 #include "effect-impl/EffectContext.h"
@@ -43,8 +45,6 @@ class BundleContext final : public EffectContext {
     RetCode enable();
     RetCode disable();
 
-    LVM_Handle_t getLvmInstance() const { return mInstance; }
-
     void setSampleRate (const int sampleRate) { mSampleRate = sampleRate; }
     int getSampleRate() const { return mSampleRate; }
 
@@ -55,18 +55,21 @@ class BundleContext final : public EffectContext {
         return mChMask;
     }
 
-    RetCode setEqualizerPreset(const int presetIdx);
+    RetCode setEqualizerPreset(const std::size_t presetIdx);
     int getEqualizerPreset() const { return mCurPresetIdx; }
     RetCode setEqualizerBandLevels(const std::vector<Equalizer::BandLevel>& bandLevels);
     std::vector<Equalizer::BandLevel> getEqualizerBandLevels() const;
 
     RetCode setVolumeStereo(const Parameter::VolumeStereo& volumeStereo) override;
-    Parameter::VolumeStereo getVolumeStereo() override { return mVolumeStereo; };
+    Parameter::VolumeStereo getVolumeStereo() override { return mVolumeStereo; }
+
+    IEffect::Status lvmProcess(float* in, float* out, int samples);
 
   private:
+    std::mutex mMutex;
     const lvm::BundleEffectType mType;
     bool mEnabled = false;
-    LVM_Handle_t mInstance = nullptr;
+    LVM_Handle_t mInstance GUARDED_BY(mMutex);
 
     aidl::android::media::audio::common::AudioDeviceDescription mVirtualizerForcedDevice;
     aidl::android::media::audio::common::AudioChannelLayout mChMask;
