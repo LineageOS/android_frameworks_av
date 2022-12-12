@@ -39,6 +39,7 @@ cc_fuzz {
         "libaudiomanager",
         "libaudiopolicy",
         "libaudioclient_aidl_conversion",
+        "libaudio_aidl_conversion_common_cpp",
         "libutils",
     ],
     static_libs: [

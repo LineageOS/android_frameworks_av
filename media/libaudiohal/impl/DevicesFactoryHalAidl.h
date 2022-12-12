@@ -20,14 +20,13 @@
 #include <media/audiohal/DevicesFactoryHalInterface.h>
 #include <utils/RefBase.h>
 
-using namespace ::aidl::android::hardware::audio::core;
-
 namespace android {
 
 class DevicesFactoryHalAidl : public DevicesFactoryHalInterface
 {
   public:
-    explicit DevicesFactoryHalAidl(std::shared_ptr<IConfig> iConfig);
+    explicit DevicesFactoryHalAidl(
+            std::shared_ptr<::aidl::android::hardware::audio::core::IConfig> iConfig);
     void onFirstRef() override;
 
     // Opens a device with the specified name. To close the device, it is
@@ -41,8 +40,8 @@ class DevicesFactoryHalAidl : public DevicesFactoryHalInterface
     android::detail::AudioHalVersionInfo getHalVersion() const override;
 
   private:
-    std::shared_ptr<IConfig> mIConfig;
-    virtual ~DevicesFactoryHalAidl() = default;
+    const std::shared_ptr<::aidl::android::hardware::audio::core::IConfig> mIConfig;
+    ~DevicesFactoryHalAidl() = default;
 };
 
 } // namespace android

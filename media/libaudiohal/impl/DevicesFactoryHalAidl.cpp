@@ -17,18 +17,22 @@
 #define LOG_TAG "DevicesFactoryHalAidl"
 //#define LOG_NDEBUG 0
 
+#include <aidl/android/hardware/audio/core/IModule.h>
 #include <android/binder_manager.h>
+#include <memory>
 #include <utils/Log.h>
 
+#include "DeviceHalAidl.h"
 #include "DevicesFactoryHalAidl.h"
 
+using namespace ::aidl::android::hardware::audio::core;
 using ::android::detail::AudioHalVersionInfo;
 
 namespace android {
 
-DevicesFactoryHalAidl::DevicesFactoryHalAidl(std::shared_ptr<IConfig> iconfig) {
+DevicesFactoryHalAidl::DevicesFactoryHalAidl(std::shared_ptr<IConfig> iconfig)
+    : mIConfig(std::move(iconfig)) {
     ALOG_ASSERT(iconfig != nullptr, "Provided default IConfig service is NULL");
-    mIConfig = std::move(iconfig);
 }
 
 void DevicesFactoryHalAidl::onFirstRef() {
@@ -41,8 +45,18 @@ status_t DevicesFactoryHalAidl::openDevice(const char *name, sp<DeviceHalInterfa
     if (name == nullptr || device == nullptr) {
         return BAD_VALUE;
     }
-    ALOGE("%s not implemented yet", __func__);
+    ALOGE("%s not implemented yet %s", __func__, name);
     return INVALID_OPERATION;
+
+    // TODO: only support primary now ("default" means "primary")
+    if (strcmp(name, "primary") != 0) {
+        auto serviceName = std::string() + IModule::descriptor + "/default";
+        auto service = IModule::fromBinder(
+                ndk::SpAIBinder(AServiceManager_waitForService(serviceName.c_str())));
+        ALOGW("%s fromBinder %s %s", __func__, IModule::descriptor, service ? "succ" : "fail");
+        *device = new DeviceHalAidl(service);
+    }
+    return OK;
 }
 
 status_t DevicesFactoryHalAidl::getHalPids(std::vector<pid_t> *pids) {
@@ -76,9 +90,14 @@ AudioHalVersionInfo DevicesFactoryHalAidl::getHalVersion() const {
 
 // Main entry-point to the shared library.
 extern "C" __attribute__((visibility("default"))) void* createIDevicesFactoryImpl() {
+    auto serviceName = std::string(IConfig::descriptor) + "/default";
     auto service = IConfig::fromBinder(
-            ndk::SpAIBinder(AServiceManager_waitForService(IConfig::descriptor)));
-    return service ? new DevicesFactoryHalAidl(service) : nullptr;
+            ndk::SpAIBinder(AServiceManager_waitForService(serviceName.c_str())));
+    if (!service) {
+        ALOGE("%s binder service %s not exist", __func__, serviceName.c_str());
+        return nullptr;
+    }
+    return new DevicesFactoryHalAidl(service);
 }
 
 } // namespace android
