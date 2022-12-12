@@ -164,8 +164,10 @@ uint64_t AidlCamera3Device::mapProducerToFrameworkUsage(
 
 AidlCamera3Device::AidlCamera3Device(
         std::shared_ptr<CameraServiceProxyWrapper>& cameraServiceProxyWrapper,
-        const String8& id, bool overrideForPerfClass, bool legacyClient) :
-        Camera3Device(cameraServiceProxyWrapper, id, overrideForPerfClass, legacyClient) {
+        const String8& id, bool overrideForPerfClass, bool overrideToPortrait,
+        bool legacyClient) :
+        Camera3Device(cameraServiceProxyWrapper, id, overrideForPerfClass, overrideToPortrait,
+        legacyClient) {
     mCallbacks = ndk::SharedRefBase::make<AidlCameraDeviceCallbacks>(this);
 }
 
@@ -195,7 +197,8 @@ status_t AidlCamera3Device::initialize(sp<CameraProviderManager> manager,
       SET_ERR("Session iface returned is null");
       return INVALID_OPERATION;
     }
-    res = manager->getCameraCharacteristics(mId.string(), mOverrideForPerfClass, &mDeviceInfo);
+    res = manager->getCameraCharacteristics(mId.string(), mOverrideForPerfClass, &mDeviceInfo,
+            mOverrideToPortrait);
     if (res != OK) {
         SET_ERR_L("Could not retrieve camera characteristics: %s (%d)", strerror(-res), res);
         session->close();
@@ -209,7 +212,8 @@ status_t AidlCamera3Device::initialize(sp<CameraProviderManager> manager,
         for (auto& physicalId : physicalCameraIds) {
             // Do not override characteristics for physical cameras
             res = manager->getCameraCharacteristics(
-                    physicalId, /*overrideForPerfClass*/false, &mPhysicalDeviceInfoMap[physicalId]);
+                    physicalId, /*overrideForPerfClass*/false, &mPhysicalDeviceInfoMap[physicalId],
+                    /*overrideToPortrait*/true);
             if (res != OK) {
                 SET_ERR_L("Could not retrieve camera %s characteristics: %s (%d)",
                         physicalId.c_str(), strerror(-res), res);
@@ -374,8 +378,8 @@ status_t AidlCamera3Device::initialize(sp<CameraProviderManager> manager,
         mNumPartialResults, mVendorTagId, mDeviceInfo, mPhysicalDeviceInfoMap,
         mDistortionMappers, mZoomRatioMappers, mRotateAndCropMappers,
         mTagMonitor, mInputStream, mOutputStreams, mSessionStatsBuilder, listener, *this,
-        *this, *(mInterface), mLegacyClient, mMinExpectedDuration, mIsFixedFps},
-        mResultMetadataQueue
+        *this, *(mInterface), mLegacyClient, mMinExpectedDuration, mIsFixedFps,
+        mOverrideToPortrait}, mResultMetadataQueue
     };
 
     for (const auto& result : results) {
@@ -416,8 +420,8 @@ status_t AidlCamera3Device::initialize(sp<CameraProviderManager> manager,
         mNumPartialResults, mVendorTagId, mDeviceInfo, mPhysicalDeviceInfoMap,
         mDistortionMappers, mZoomRatioMappers, mRotateAndCropMappers,
         mTagMonitor, mInputStream, mOutputStreams, mSessionStatsBuilder, listener, *this,
-        *this, *(mInterface), mLegacyClient, mMinExpectedDuration, mIsFixedFps},
-        mResultMetadataQueue
+        *this, *(mInterface), mLegacyClient, mMinExpectedDuration, mIsFixedFps,
+        mOverrideToPortrait}, mResultMetadataQueue
     };
     for (const auto& msg : msgs) {
         camera3::notify(states, msg);
@@ -1411,9 +1415,10 @@ AidlCamera3Device::AidlRequestThread::AidlRequestThread(wp<Camera3Device> parent
                 sp<HalInterface> interface,
                 const Vector<int32_t>& sessionParamKeys,
                 bool useHalBufManager,
-                bool supportCameraMute) :
+                bool supportCameraMute,
+                bool overrideToPortrait) :
           RequestThread(parent, statusTracker, interface, sessionParamKeys, useHalBufManager,
-                  supportCameraMute) {}
+                  supportCameraMute, overrideToPortrait) {}
 
 status_t AidlCamera3Device::AidlRequestThread::switchToOffline(
         const std::vector<int32_t>& streamsToKeep,
@@ -1582,9 +1587,10 @@ sp<Camera3Device::RequestThread> AidlCamera3Device::createNewRequestThread(
                 sp<Camera3Device::HalInterface> interface,
                 const Vector<int32_t>& sessionParamKeys,
                 bool useHalBufManager,
-                bool supportCameraMute) {
+                bool supportCameraMute,
+                bool overrideToPortrait) {
     return new AidlRequestThread(parent, statusTracker, interface, sessionParamKeys,
-            useHalBufManager, supportCameraMute);
+            useHalBufManager, supportCameraMute, overrideToPortrait);
 };
 
 sp<Camera3Device::Camera3DeviceInjectionMethods>

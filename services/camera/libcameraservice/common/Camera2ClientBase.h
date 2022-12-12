@@ -61,6 +61,7 @@ public:
                       uid_t clientUid,
                       int servicePid,
                       bool overrideForPerfClass,
+                      bool overrideToPortrait,
                       bool legacyClient = false);
     virtual ~Camera2ClientBase();
 
