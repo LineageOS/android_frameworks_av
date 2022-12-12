@@ -29,6 +29,7 @@
 #include "DeviceHalHidl.h"
 #include "DevicesFactoryHalHidl.h"
 
+using ::android::detail::AudioHalVersionInfo;
 using ::android::hardware::audio::CPP_VERSION::IDevice;
 using ::android::hardware::audio::CORE_TYPES_CPP_VERSION::Result;
 using ::android::hardware::Return;
@@ -226,8 +227,13 @@ std::vector<sp<::android::hardware::audio::CPP_VERSION::IDevicesFactory>>
     return mDeviceFactories;
 }
 
+
+AudioHalVersionInfo DevicesFactoryHalHidl::getHalVersion() const {
+    return AudioHalVersionInfo(AudioHalVersionInfo::Type::HIDL, MAJOR_VERSION, MINOR_VERSION);
+}
+
 // Main entry-point to the shared library.
-extern "C" __attribute__((visibility("default"))) void* createIDevicesFactory() {
+extern "C" __attribute__((visibility("default"))) void* createIDevicesFactoryImpl() {
     auto service = hardware::audio::CPP_VERSION::IDevicesFactory::getService();
     return service ? new DevicesFactoryHalHidl(service) : nullptr;
 }

@@ -1,5 +1,5 @@
 /*
- * Copyright (C) 2016 The Android Open Source Project
+ * Copyright (C) 2022 The Android Open Source Project
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -14,27 +14,20 @@
  * limitations under the License.
  */
 
-#ifndef ANDROID_HARDWARE_DEVICES_FACTORY_HAL_HIDL_H
-#define ANDROID_HARDWARE_DEVICES_FACTORY_HAL_HIDL_H
+#pragma once
 
-#include <mutex>
-#include <vector>
-
-#include PATH(android/hardware/audio/FILE_VERSION/IDevicesFactory.h)
+#include <aidl/android/hardware/audio/core/IConfig.h>
 #include <media/audiohal/DevicesFactoryHalInterface.h>
-#include <utils/Errors.h>
 #include <utils/RefBase.h>
 
-#include "DeviceHalHidl.h"
-
-using ::android::hardware::audio::CPP_VERSION::IDevicesFactory;
+using namespace ::aidl::android::hardware::audio::core;
 
 namespace android {
 
-class DevicesFactoryHalHidl : public DevicesFactoryHalInterface
+class DevicesFactoryHalAidl : public DevicesFactoryHalInterface
 {
   public:
-    explicit DevicesFactoryHalHidl(sp<IDevicesFactory> devicesFactory);
+    explicit DevicesFactoryHalAidl(std::shared_ptr<IConfig> iConfig);
     void onFirstRef() override;
 
     // Opens a device with the specified name. To close the device, it is
@@ -48,18 +41,8 @@ class DevicesFactoryHalHidl : public DevicesFactoryHalInterface
     android::detail::AudioHalVersionInfo getHalVersion() const override;
 
   private:
-    friend class ServiceNotificationListener;
-    void addDeviceFactory(sp<IDevicesFactory> factory, bool needToNotify);
-    std::vector<sp<IDevicesFactory>> copyDeviceFactories();
-
-    std::mutex mLock;
-    std::vector<sp<IDevicesFactory>> mDeviceFactories;  // GUARDED_BY(mLock)
-    wp<DevicesFactoryHalCallback> mCallback;  // GUARDED_BY(mLock)
-    bool mHaveUndeliveredNotifications = false;  // GUARDED_BY(mLock)
-
-    virtual ~DevicesFactoryHalHidl() = default;
+    std::shared_ptr<IConfig> mIConfig;
+    virtual ~DevicesFactoryHalAidl() = default;
 };
 
 } // namespace android
-
-#endif // ANDROID_HARDWARE_DEVICES_FACTORY_HAL_HIDL_H

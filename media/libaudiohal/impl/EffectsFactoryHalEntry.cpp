@@ -1,5 +1,5 @@
 /*
- * Copyright (C) 2017 The Android Open Source Project
+ * Copyright (C) 2022 The Android Open Source Project
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -14,19 +14,10 @@
  * limitations under the License.
  */
 
-#include <media/audiohal/EffectsFactoryHalInterface.h>
-#include <media/audiohal/FactoryHal.h>
+#include "android/media/AudioHalVersion.h"
 
-namespace android {
+extern "C" void* createIEffectsFactoryImpl();
 
-// static
-sp<EffectsFactoryHalInterface> EffectsFactoryHalInterface::create() {
-    return createPreferredImpl<EffectsFactoryHalInterface>(false /* isCore */);
+extern "C" __attribute__((visibility("default"))) void* createIEffectsFactory() {
+    return createIEffectsFactoryImpl();
 }
-
-// static
-bool EffectsFactoryHalInterface::isNullUuid(const effect_uuid_t *pEffectUuid) {
-    return memcmp(pEffectUuid, EFFECT_UUID_NULL, sizeof(effect_uuid_t)) == 0;
-}
-
-} // namespace android
