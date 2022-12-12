@@ -29,9 +29,9 @@
 #include <media/stagefright/foundation/hexdump.h>
 #include <mediadrm/DrmHalAidl.h>
 #include <mediadrm/DrmSessionManager.h>
+#include <mediadrm/DrmStatus.h>
 #include <mediadrm/DrmUtils.h>
 
-using ::android::DrmUtils::statusAidlToStatusT;
 using ::aidl::android::hardware::drm::CryptoSchemes;
 using ::aidl::android::hardware::drm::DrmMetricNamedValue;
 using ::aidl::android::hardware::drm::DrmMetricValue;
@@ -55,6 +55,7 @@ using ::aidl::android::hardware::drm::SecurityLevel;
 using ::aidl::android::hardware::drm::Status;
 using ::aidl::android::hardware::drm::SupportedContentType;
 using ::aidl::android::hardware::drm::Uuid;
+using ::android::DrmUtils::statusAidlToDrmStatus;
 using DrmMetricGroupAidl = ::aidl::android::hardware::drm::DrmMetricGroup;
 using DrmMetricGroupHidl = ::android::hardware::drm::V1_1::DrmMetricGroup;
 using DrmMetricAidl = ::aidl::android::hardware::drm::DrmMetric;
@@ -396,19 +397,19 @@ DrmHalAidl::DrmHalAidl()
       mFactories(DrmUtils::makeDrmFactoriesAidl()),
       mInitCheck((mFactories.size() == 0) ? ERROR_UNSUPPORTED : NO_INIT) {}
 
-status_t DrmHalAidl::initCheck() const {
-    return mInitCheck;
+DrmStatus DrmHalAidl::initCheck() const {
+    return DrmStatus(mInitCheck);
 }
 
 DrmHalAidl::~DrmHalAidl() {}
 
-status_t DrmHalAidl::setListener(const sp<IDrmClient>& listener) {
+DrmStatus DrmHalAidl::setListener(const sp<IDrmClient>& listener) {
     mListener->setListener(listener);
-    return NO_ERROR;
+    return DrmStatus(NO_ERROR);
 }
 
-status_t DrmHalAidl::isCryptoSchemeSupported(const uint8_t uuid[16], const String8& mimeType,
-                                             DrmPlugin::SecurityLevel level, bool* isSupported) {
+DrmStatus DrmHalAidl::isCryptoSchemeSupported(const uint8_t uuid[16], const String8& mimeType,
+                                              DrmPlugin::SecurityLevel level, bool* isSupported) {
     Mutex::Autolock autoLock(mLock);
     *isSupported = false;
     Uuid uuidAidl = DrmUtils::toAidlUuid(uuid);
@@ -438,9 +439,9 @@ status_t DrmHalAidl::isCryptoSchemeSupported(const uint8_t uuid[16], const Strin
                 // isCryptoSchemeSupported(uuid, mimeType)
                 *isSupported = contentTypes.count(mimeTypeStr);
             }
-            return OK;
+            return DrmStatus(OK);
         } else if (mimeType == "") {
-            return BAD_VALUE;
+            return DrmStatus(BAD_VALUE);
         }
 
         auto ct = contentTypes[mimeTypeStr];
@@ -452,10 +453,10 @@ status_t DrmHalAidl::isCryptoSchemeSupported(const uint8_t uuid[16], const Strin
         break;
     }
 
-    return OK;
+    return DrmStatus(OK);
 }
 
-status_t DrmHalAidl::createPlugin(const uint8_t uuid[16], const String8& appPackageName) {
+DrmStatus DrmHalAidl::createPlugin(const uint8_t uuid[16], const String8& appPackageName) {
     Mutex::Autolock autoLock(mLock);
 
     Uuid uuidAidl = DrmUtils::toAidlUuid(uuid);
@@ -497,10 +498,10 @@ status_t DrmHalAidl::createPlugin(const uint8_t uuid[16], const String8& appPack
         }
     }
 
-    return mInitCheck;
+    return DrmStatus(mInitCheck);
 }
 
-status_t DrmHalAidl::openSession(DrmPlugin::SecurityLevel level, Vector<uint8_t>& sessionId) {
+DrmStatus DrmHalAidl::openSession(DrmPlugin::SecurityLevel level, Vector<uint8_t>& sessionId) {
     Mutex::Autolock autoLock(mLock);
     INIT_CHECK();
 
@@ -510,14 +511,14 @@ status_t DrmHalAidl::openSession(DrmPlugin::SecurityLevel level, Vector<uint8_t>
         return ERROR_DRM_CANNOT_HANDLE;
     }
 
-    status_t err = UNKNOWN_ERROR;
+    DrmStatus err = UNKNOWN_ERROR;
     bool retry = true;
     do {
         std::vector<uint8_t> aSessionId;
 
         ::ndk::ScopedAStatus status = mPlugin->openSession(aSecurityLevel, &aSessionId);
         if (status.isOk()) sessionId = toVector(aSessionId);
-        err = statusAidlToStatusT(status);
+        err = statusAidlToDrmStatus(status);
 
         if (err == ERROR_DRM_RESOURCE_BUSY && retry) {
             mLock.unlock();
@@ -545,13 +546,13 @@ status_t DrmHalAidl::openSession(DrmPlugin::SecurityLevel level, Vector<uint8_t>
     return err;
 }
 
-status_t DrmHalAidl::closeSession(Vector<uint8_t> const& sessionId) {
+DrmStatus DrmHalAidl::closeSession(Vector<uint8_t> const& sessionId) {
     Mutex::Autolock autoLock(mLock);
     INIT_CHECK();
 
     std::vector<uint8_t> sessionIdAidl = toStdVec(sessionId);
     ::ndk::ScopedAStatus status = mPlugin->closeSession(sessionIdAidl);
-    status_t response = statusAidlToStatusT(status);
+    DrmStatus response = statusAidlToDrmStatus(status);
     if (status.isOk()) {
         DrmSessionManager::Instance()->removeSession(sessionId);
         for (auto i = mOpenSessions.begin(); i != mOpenSessions.end(); i++) {
@@ -568,12 +569,12 @@ status_t DrmHalAidl::closeSession(Vector<uint8_t> const& sessionId) {
     return response;
 }
 
-status_t DrmHalAidl::getKeyRequest(Vector<uint8_t> const& sessionId,
-                                   Vector<uint8_t> const& initData, String8 const& mimeType,
-                                   DrmPlugin::KeyType keyType,
-                                   KeyedVector<String8, String8> const& optionalParameters,
-                                   Vector<uint8_t>& request, String8& defaultUrl,
-                                   DrmPlugin::KeyRequestType* keyRequestType) {
+DrmStatus DrmHalAidl::getKeyRequest(Vector<uint8_t> const& sessionId,
+                                    Vector<uint8_t> const& initData, String8 const& mimeType,
+                                    DrmPlugin::KeyType keyType,
+                                    KeyedVector<String8, String8> const& optionalParameters,
+                                    Vector<uint8_t>& request, String8& defaultUrl,
+                                    DrmPlugin::KeyRequestType* keyRequestType) {
     Mutex::Autolock autoLock(mLock);
     INIT_CHECK();
     EventTimer<status_t> keyRequestTimer(&mMetrics.mGetKeyRequestTimeUs);
@@ -592,7 +593,7 @@ status_t DrmHalAidl::getKeyRequest(Vector<uint8_t> const& sessionId,
         return BAD_VALUE;
     }
 
-    status_t err = UNKNOWN_ERROR;
+    DrmStatus err = UNKNOWN_ERROR;
 
     std::vector<uint8_t> sessionIdAidl = toStdVec(sessionId);
     std::vector<uint8_t> initDataAidl = toStdVec(initData);
@@ -607,21 +608,21 @@ status_t DrmHalAidl::getKeyRequest(Vector<uint8_t> const& sessionId,
         *keyRequestType = toKeyRequestType(keyRequest.requestType);
     }
 
-    err = statusAidlToStatusT(status);
+    err = statusAidlToDrmStatus(status);
     keyRequestTimer.SetAttribute(err);
     return err;
 }
 
-status_t DrmHalAidl::provideKeyResponse(Vector<uint8_t> const& sessionId,
-                                        Vector<uint8_t> const& response,
-                                        Vector<uint8_t>& keySetId) {
+DrmStatus DrmHalAidl::provideKeyResponse(Vector<uint8_t> const& sessionId,
+                                         Vector<uint8_t> const& response,
+                                         Vector<uint8_t>& keySetId) {
     Mutex::Autolock autoLock(mLock);
     INIT_CHECK();
     EventTimer<status_t> keyResponseTimer(&mMetrics.mProvideKeyResponseTimeUs);
 
     DrmSessionManager::Instance()->useSession(sessionId);
 
-    status_t err = UNKNOWN_ERROR;
+    DrmStatus err = UNKNOWN_ERROR;
 
     std::vector<uint8_t> sessionIdAidl = toStdVec(sessionId);
     std::vector<uint8_t> responseAidl = toStdVec(response);
@@ -630,21 +631,21 @@ status_t DrmHalAidl::provideKeyResponse(Vector<uint8_t> const& sessionId,
             mPlugin->provideKeyResponse(sessionIdAidl, responseAidl, &keySetIdsAidl);
 
     if (status.isOk()) keySetId = toVector(keySetIdsAidl.keySetId);
-    err = statusAidlToStatusT(status);
+    err = statusAidlToDrmStatus(status);
     keyResponseTimer.SetAttribute(err);
     return err;
 }
 
-status_t DrmHalAidl::removeKeys(Vector<uint8_t> const& keySetId) {
+DrmStatus DrmHalAidl::removeKeys(Vector<uint8_t> const& keySetId) {
     Mutex::Autolock autoLock(mLock);
     INIT_CHECK();
 
     ::ndk::ScopedAStatus status = mPlugin->removeKeys(toStdVec(keySetId));
-    return statusAidlToStatusT(status);
+    return statusAidlToDrmStatus(status);
 }
 
-status_t DrmHalAidl::restoreKeys(Vector<uint8_t> const& sessionId,
-                                 Vector<uint8_t> const& keySetId) {
+DrmStatus DrmHalAidl::restoreKeys(Vector<uint8_t> const& sessionId,
+                                  Vector<uint8_t> const& keySetId) {
     Mutex::Autolock autoLock(mLock);
     INIT_CHECK();
 
@@ -653,11 +654,11 @@ status_t DrmHalAidl::restoreKeys(Vector<uint8_t> const& sessionId,
     KeySetId keySetIdsAidl;
     keySetIdsAidl.keySetId = toStdVec(keySetId);
     ::ndk::ScopedAStatus status = mPlugin->restoreKeys(toStdVec(sessionId), keySetIdsAidl);
-    return statusAidlToStatusT(status);
+    return statusAidlToDrmStatus(status);
 }
 
-status_t DrmHalAidl::queryKeyStatus(Vector<uint8_t> const& sessionId,
-                                    KeyedVector<String8, String8>& infoMap) const {
+DrmStatus DrmHalAidl::queryKeyStatus(Vector<uint8_t> const& sessionId,
+                                     KeyedVector<String8, String8>& infoMap) const {
     Mutex::Autolock autoLock(mLock);
     INIT_CHECK();
 
@@ -668,15 +669,15 @@ status_t DrmHalAidl::queryKeyStatus(Vector<uint8_t> const& sessionId,
 
     infoMap = toKeyedVector(infoMapAidl);
 
-    return statusAidlToStatusT(status);
+    return statusAidlToDrmStatus(status);
 }
 
-status_t DrmHalAidl::getProvisionRequest(String8 const& certType, String8 const& certAuthority,
-                                         Vector<uint8_t>& request, String8& defaultUrl) {
+DrmStatus DrmHalAidl::getProvisionRequest(String8 const& certType, String8 const& certAuthority,
+                                          Vector<uint8_t>& request, String8& defaultUrl) {
     Mutex::Autolock autoLock(mLock);
     INIT_CHECK();
 
-    status_t err = UNKNOWN_ERROR;
+    DrmStatus err = UNKNOWN_ERROR;
 
     ProvisionRequest requestAidl;
     ::ndk::ScopedAStatus status = mPlugin->getProvisionRequest(
@@ -685,29 +686,29 @@ status_t DrmHalAidl::getProvisionRequest(String8 const& certType, String8 const&
     request = toVector(requestAidl.request);
     defaultUrl = toString8(requestAidl.defaultUrl);
 
-    err = statusAidlToStatusT(status);
+    err = statusAidlToDrmStatus(status);
     mMetrics.mGetProvisionRequestCounter.Increment(err);
     return err;
 }
 
-status_t DrmHalAidl::provideProvisionResponse(Vector<uint8_t> const& response,
-                                              Vector<uint8_t>& certificate,
-                                              Vector<uint8_t>& wrappedKey) {
+DrmStatus DrmHalAidl::provideProvisionResponse(Vector<uint8_t> const& response,
+                                               Vector<uint8_t>& certificate,
+                                               Vector<uint8_t>& wrappedKey) {
     Mutex::Autolock autoLock(mLock);
     INIT_CHECK();
 
-    status_t err = UNKNOWN_ERROR;
+    DrmStatus err = UNKNOWN_ERROR;
     ProvideProvisionResponseResult result;
     ::ndk::ScopedAStatus status = mPlugin->provideProvisionResponse(toStdVec(response), &result);
 
     certificate = toVector(result.certificate);
     wrappedKey = toVector(result.wrappedKey);
-    err = statusAidlToStatusT(status);
+    err = statusAidlToDrmStatus(status);
     mMetrics.mProvideProvisionResponseCounter.Increment(err);
     return err;
 }
 
-status_t DrmHalAidl::getSecureStops(List<Vector<uint8_t>>& secureStops) {
+DrmStatus DrmHalAidl::getSecureStops(List<Vector<uint8_t>>& secureStops) {
     Mutex::Autolock autoLock(mLock);
     INIT_CHECK();
 
@@ -716,10 +717,10 @@ status_t DrmHalAidl::getSecureStops(List<Vector<uint8_t>>& secureStops) {
 
     secureStops = toSecureStops(result);
 
-    return statusAidlToStatusT(status);
+    return statusAidlToDrmStatus(status);
 }
 
-status_t DrmHalAidl::getSecureStopIds(List<Vector<uint8_t>>& secureStopIds) {
+DrmStatus DrmHalAidl::getSecureStopIds(List<Vector<uint8_t>>& secureStopIds) {
     Mutex::Autolock autoLock(mLock);
     INIT_CHECK();
 
@@ -728,10 +729,10 @@ status_t DrmHalAidl::getSecureStopIds(List<Vector<uint8_t>>& secureStopIds) {
 
     secureStopIds = toSecureStopIds(result);
 
-    return statusAidlToStatusT(status);
+    return statusAidlToDrmStatus(status);
 }
 
-status_t DrmHalAidl::getSecureStop(Vector<uint8_t> const& ssid, Vector<uint8_t>& secureStop) {
+DrmStatus DrmHalAidl::getSecureStop(Vector<uint8_t> const& ssid, Vector<uint8_t>& secureStop) {
     Mutex::Autolock autoLock(mLock);
     INIT_CHECK();
 
@@ -743,10 +744,10 @@ status_t DrmHalAidl::getSecureStop(Vector<uint8_t> const& ssid, Vector<uint8_t>&
 
     secureStop = toVector(result.opaqueData);
 
-    return statusAidlToStatusT(status);
+    return statusAidlToDrmStatus(status);
 }
 
-status_t DrmHalAidl::releaseSecureStops(Vector<uint8_t> const& ssRelease) {
+DrmStatus DrmHalAidl::releaseSecureStops(Vector<uint8_t> const& ssRelease) {
     Mutex::Autolock autoLock(mLock);
     INIT_CHECK();
 
@@ -754,10 +755,10 @@ status_t DrmHalAidl::releaseSecureStops(Vector<uint8_t> const& ssRelease) {
     ssId.opaqueData = toStdVec(ssRelease);
     ::ndk::ScopedAStatus status = mPlugin->releaseSecureStops(ssId);
 
-    return statusAidlToStatusT(status);
+    return statusAidlToDrmStatus(status);
 }
 
-status_t DrmHalAidl::removeSecureStop(Vector<uint8_t> const& ssid) {
+DrmStatus DrmHalAidl::removeSecureStop(Vector<uint8_t> const& ssid) {
     Mutex::Autolock autoLock(mLock);
 
     INIT_CHECK();
@@ -765,19 +766,19 @@ status_t DrmHalAidl::removeSecureStop(Vector<uint8_t> const& ssid) {
     SecureStopId ssidAidl;
     ssidAidl.secureStopId = toStdVec(ssid);
     ::ndk::ScopedAStatus status = mPlugin->removeSecureStop(ssidAidl);
-    return statusAidlToStatusT(status);
+    return statusAidlToDrmStatus(status);
 }
 
-status_t DrmHalAidl::removeAllSecureStops() {
+DrmStatus DrmHalAidl::removeAllSecureStops() {
     Mutex::Autolock autoLock(mLock);
     INIT_CHECK();
 
     ::ndk::ScopedAStatus status = mPlugin->releaseAllSecureStops();
-    return statusAidlToStatusT(status);
+    return statusAidlToDrmStatus(status);
 }
 
-status_t DrmHalAidl::getHdcpLevels(DrmPlugin::HdcpLevel* connected,
-                                   DrmPlugin::HdcpLevel* max) const {
+DrmStatus DrmHalAidl::getHdcpLevels(DrmPlugin::HdcpLevel* connected,
+                                    DrmPlugin::HdcpLevel* max) const {
     Mutex::Autolock autoLock(mLock);
     INIT_CHECK();
 
@@ -794,10 +795,10 @@ status_t DrmHalAidl::getHdcpLevels(DrmPlugin::HdcpLevel* connected,
     *connected = toHdcpLevel(lvlsAidl.connectedLevel);
     *max = toHdcpLevel(lvlsAidl.maxLevel);
 
-    return statusAidlToStatusT(status);
+    return statusAidlToDrmStatus(status);
 }
 
-status_t DrmHalAidl::getNumberOfSessions(uint32_t* open, uint32_t* max) const {
+DrmStatus DrmHalAidl::getNumberOfSessions(uint32_t* open, uint32_t* max) const {
     Mutex::Autolock autoLock(mLock);
     INIT_CHECK();
 
@@ -814,11 +815,11 @@ status_t DrmHalAidl::getNumberOfSessions(uint32_t* open, uint32_t* max) const {
     *open = result.currentSessions;
     *max = result.maxSessions;
 
-    return statusAidlToStatusT(status);
+    return statusAidlToDrmStatus(status);
 }
 
-status_t DrmHalAidl::getSecurityLevel(Vector<uint8_t> const& sessionId,
-                                      DrmPlugin::SecurityLevel* level) const {
+DrmStatus DrmHalAidl::getSecurityLevel(Vector<uint8_t> const& sessionId,
+                                       DrmPlugin::SecurityLevel* level) const {
     Mutex::Autolock autoLock(mLock);
     INIT_CHECK();
 
@@ -833,10 +834,10 @@ status_t DrmHalAidl::getSecurityLevel(Vector<uint8_t> const& sessionId,
 
     *level = toSecurityLevel(result);
 
-    return statusAidlToStatusT(status);
+    return statusAidlToDrmStatus(status);
 }
 
-status_t DrmHalAidl::getOfflineLicenseKeySetIds(List<Vector<uint8_t>>& keySetIds) const {
+DrmStatus DrmHalAidl::getOfflineLicenseKeySetIds(List<Vector<uint8_t>>& keySetIds) const {
     Mutex::Autolock autoLock(mLock);
     INIT_CHECK();
 
@@ -845,21 +846,21 @@ status_t DrmHalAidl::getOfflineLicenseKeySetIds(List<Vector<uint8_t>>& keySetIds
 
     keySetIds = toKeySetIds(result);
 
-    return statusAidlToStatusT(status);
+    return statusAidlToDrmStatus(status);
 }
 
-status_t DrmHalAidl::removeOfflineLicense(Vector<uint8_t> const& keySetId) {
+DrmStatus DrmHalAidl::removeOfflineLicense(Vector<uint8_t> const& keySetId) {
     Mutex::Autolock autoLock(mLock);
     INIT_CHECK();
 
     KeySetId keySetIdAidl;
     keySetIdAidl.keySetId = toStdVec(keySetId);
     ::ndk::ScopedAStatus status = mPlugin->removeOfflineLicense(keySetIdAidl);
-    return statusAidlToStatusT(status);
+    return statusAidlToDrmStatus(status);
 }
 
-status_t DrmHalAidl::getOfflineLicenseState(Vector<uint8_t> const& keySetId,
-                                            DrmPlugin::OfflineLicenseState* licenseState) const {
+DrmStatus DrmHalAidl::getOfflineLicenseState(Vector<uint8_t> const& keySetId,
+                                             DrmPlugin::OfflineLicenseState* licenseState) const {
     Mutex::Autolock autoLock(mLock);
 
     INIT_CHECK();
@@ -873,15 +874,15 @@ status_t DrmHalAidl::getOfflineLicenseState(Vector<uint8_t> const& keySetId,
 
     *licenseState = toOfflineLicenseState(result);
 
-    return statusAidlToStatusT(status);
+    return statusAidlToDrmStatus(status);
 }
 
-status_t DrmHalAidl::getPropertyString(String8 const& name, String8& value) const {
+DrmStatus DrmHalAidl::getPropertyString(String8 const& name, String8& value) const {
     Mutex::Autolock autoLock(mLock);
-    return getPropertyStringInternal(name, value);
+    return DrmStatus(getPropertyStringInternal(name, value));
 }
 
-status_t DrmHalAidl::getPropertyStringInternal(String8 const& name, String8& value) const {
+DrmStatus DrmHalAidl::getPropertyStringInternal(String8 const& name, String8& value) const {
     // This function is internal to the class and should only be called while
     // mLock is already held.
     INIT_CHECK();
@@ -891,52 +892,53 @@ status_t DrmHalAidl::getPropertyStringInternal(String8 const& name, String8& val
 
     value = toString8(result);
 
-    return statusAidlToStatusT(status);
+    return statusAidlToDrmStatus(status);
 }
 
-status_t DrmHalAidl::getPropertyByteArray(String8 const& name, Vector<uint8_t>& value) const {
+DrmStatus DrmHalAidl::getPropertyByteArray(String8 const& name, Vector<uint8_t>& value) const {
     Mutex::Autolock autoLock(mLock);
-    return getPropertyByteArrayInternal(name, value);
+    return DrmStatus(getPropertyByteArrayInternal(name, value));
 }
 
-status_t DrmHalAidl::getPropertyByteArrayInternal(String8 const& name,
-                                                  Vector<uint8_t>& value) const {
+DrmStatus DrmHalAidl::getPropertyByteArrayInternal(String8 const& name,
+                                                   Vector<uint8_t>& value) const {
     // This function is internal to the class and should only be called while
     // mLock is already held.
     INIT_CHECK();
 
-    status_t err = UNKNOWN_ERROR;
+    DrmStatus err = UNKNOWN_ERROR;
 
     std::vector<uint8_t> result;
     ::ndk::ScopedAStatus status = mPlugin->getPropertyByteArray(toStdString(name), &result);
 
     value = toVector(result);
-    err = statusAidlToStatusT(status);
+    err = statusAidlToDrmStatus(status);
     if (name == kPropertyDeviceUniqueId) {
         mMetrics.mGetDeviceUniqueIdCounter.Increment(err);
     }
     return err;
 }
 
-status_t DrmHalAidl::setPropertyString(String8 const& name, String8 const& value) const {
+DrmStatus DrmHalAidl::setPropertyString(String8 const& name, String8 const& value) const {
     Mutex::Autolock autoLock(mLock);
     INIT_CHECK();
 
     ::ndk::ScopedAStatus status = mPlugin->setPropertyString(toStdString(name), toStdString(value));
-    return statusAidlToStatusT(status);
+    return statusAidlToDrmStatus(status);
 }
 
-status_t DrmHalAidl::setPropertyByteArray(String8 const& name, Vector<uint8_t> const& value) const {
+DrmStatus DrmHalAidl::setPropertyByteArray(String8 const& name,
+                                           Vector<uint8_t> const& value) const {
     Mutex::Autolock autoLock(mLock);
     INIT_CHECK();
 
     ::ndk::ScopedAStatus status = mPlugin->setPropertyByteArray(toStdString(name), toStdVec(value));
-    return statusAidlToStatusT(status);
+    return statusAidlToDrmStatus(status);
 }
 
-status_t DrmHalAidl::getMetrics(const sp<IDrmMetricsConsumer>& consumer) {
+DrmStatus DrmHalAidl::getMetrics(const sp<IDrmMetricsConsumer>& consumer) {
     if (consumer == nullptr) {
-        return UNEXPECTED_NULL;
+        return DrmStatus(UNEXPECTED_NULL);
     }
     consumer->consumeFrameworkMetrics(mMetrics);
 
@@ -957,7 +959,7 @@ status_t DrmHalAidl::getMetrics(const sp<IDrmMetricsConsumer>& consumer) {
     vendor += description;
 
     hidl_vec<DrmMetricGroupHidl> pluginMetrics;
-    status_t err = UNKNOWN_ERROR;
+    DrmStatus err = UNKNOWN_ERROR;
 
     std::vector<DrmMetricGroupAidl> result;
     ::ndk::ScopedAStatus status = mPlugin->getMetrics(&result);
@@ -967,13 +969,13 @@ status_t DrmHalAidl::getMetrics(const sp<IDrmMetricsConsumer>& consumer) {
         consumer->consumeHidlMetrics(vendor, pluginMetrics);
     }
 
-    err = statusAidlToStatusT(status);
+    err = statusAidlToDrmStatus(status);
 
     return err;
 }
 
-status_t DrmHalAidl::setCipherAlgorithm(Vector<uint8_t> const& sessionId,
-                                        String8 const& algorithm) {
+DrmStatus DrmHalAidl::setCipherAlgorithm(Vector<uint8_t> const& sessionId,
+                                         String8 const& algorithm) {
     Mutex::Autolock autoLock(mLock);
     INIT_CHECK();
 
@@ -981,10 +983,10 @@ status_t DrmHalAidl::setCipherAlgorithm(Vector<uint8_t> const& sessionId,
 
     ::ndk::ScopedAStatus status =
             mPlugin->setCipherAlgorithm(toStdVec(sessionId), toStdString(algorithm));
-    return statusAidlToStatusT(status);
+    return statusAidlToDrmStatus(status);
 }
 
-status_t DrmHalAidl::setMacAlgorithm(Vector<uint8_t> const& sessionId, String8 const& algorithm) {
+DrmStatus DrmHalAidl::setMacAlgorithm(Vector<uint8_t> const& sessionId, String8 const& algorithm) {
     Mutex::Autolock autoLock(mLock);
     INIT_CHECK();
 
@@ -992,12 +994,12 @@ status_t DrmHalAidl::setMacAlgorithm(Vector<uint8_t> const& sessionId, String8 c
 
     ::ndk::ScopedAStatus status =
             mPlugin->setMacAlgorithm(toStdVec(sessionId), toStdString(algorithm));
-    return statusAidlToStatusT(status);
+    return statusAidlToDrmStatus(status);
 }
 
-status_t DrmHalAidl::encrypt(Vector<uint8_t> const& sessionId, Vector<uint8_t> const& keyId,
-                             Vector<uint8_t> const& input, Vector<uint8_t> const& iv,
-                             Vector<uint8_t>& output) {
+DrmStatus DrmHalAidl::encrypt(Vector<uint8_t> const& sessionId, Vector<uint8_t> const& keyId,
+                              Vector<uint8_t> const& input, Vector<uint8_t> const& iv,
+                              Vector<uint8_t>& output) {
     Mutex::Autolock autoLock(mLock);
     INIT_CHECK();
 
@@ -1009,12 +1011,12 @@ status_t DrmHalAidl::encrypt(Vector<uint8_t> const& sessionId, Vector<uint8_t> c
 
     output = toVector(result);
 
-    return statusAidlToStatusT(status);
+    return statusAidlToDrmStatus(status);
 }
 
-status_t DrmHalAidl::decrypt(Vector<uint8_t> const& sessionId, Vector<uint8_t> const& keyId,
-                             Vector<uint8_t> const& input, Vector<uint8_t> const& iv,
-                             Vector<uint8_t>& output) {
+DrmStatus DrmHalAidl::decrypt(Vector<uint8_t> const& sessionId, Vector<uint8_t> const& keyId,
+                              Vector<uint8_t> const& input, Vector<uint8_t> const& iv,
+                              Vector<uint8_t>& output) {
     Mutex::Autolock autoLock(mLock);
     INIT_CHECK();
 
@@ -1026,11 +1028,11 @@ status_t DrmHalAidl::decrypt(Vector<uint8_t> const& sessionId, Vector<uint8_t> c
 
     output = toVector(result);
 
-    return statusAidlToStatusT(status);
+    return statusAidlToDrmStatus(status);
 }
 
-status_t DrmHalAidl::sign(Vector<uint8_t> const& sessionId, Vector<uint8_t> const& keyId,
-                          Vector<uint8_t> const& message, Vector<uint8_t>& signature) {
+DrmStatus DrmHalAidl::sign(Vector<uint8_t> const& sessionId, Vector<uint8_t> const& keyId,
+                           Vector<uint8_t> const& message, Vector<uint8_t>& signature) {
     Mutex::Autolock autoLock(mLock);
     INIT_CHECK();
 
@@ -1042,12 +1044,12 @@ status_t DrmHalAidl::sign(Vector<uint8_t> const& sessionId, Vector<uint8_t> cons
 
     signature = toVector(result);
 
-    return statusAidlToStatusT(status);
+    return statusAidlToDrmStatus(status);
 }
 
-status_t DrmHalAidl::verify(Vector<uint8_t> const& sessionId, Vector<uint8_t> const& keyId,
-                            Vector<uint8_t> const& message, Vector<uint8_t> const& signature,
-                            bool& match) {
+DrmStatus DrmHalAidl::verify(Vector<uint8_t> const& sessionId, Vector<uint8_t> const& keyId,
+                             Vector<uint8_t> const& message, Vector<uint8_t> const& signature,
+                             bool& match) {
     Mutex::Autolock autoLock(mLock);
     INIT_CHECK();
 
@@ -1056,12 +1058,12 @@ status_t DrmHalAidl::verify(Vector<uint8_t> const& sessionId, Vector<uint8_t> co
     ::ndk::ScopedAStatus status = mPlugin->verify(toStdVec(sessionId), toStdVec(keyId),
                                                   toStdVec(message), toStdVec(signature), &match);
 
-    return statusAidlToStatusT(status);
+    return statusAidlToDrmStatus(status);
 }
 
-status_t DrmHalAidl::signRSA(Vector<uint8_t> const& sessionId, String8 const& algorithm,
-                             Vector<uint8_t> const& message, Vector<uint8_t> const& wrappedKey,
-                             Vector<uint8_t>& signature) {
+DrmStatus DrmHalAidl::signRSA(Vector<uint8_t> const& sessionId, String8 const& algorithm,
+                              Vector<uint8_t> const& message, Vector<uint8_t> const& wrappedKey,
+                              Vector<uint8_t>& signature) {
     Mutex::Autolock autoLock(mLock);
     INIT_CHECK();
 
@@ -1074,10 +1076,10 @@ status_t DrmHalAidl::signRSA(Vector<uint8_t> const& sessionId, String8 const& al
 
     signature = toVector(result);
 
-    return statusAidlToStatusT(status);
+    return statusAidlToDrmStatus(status);
 }
 
-status_t DrmHalAidl::requiresSecureDecoder(const char* mime, bool* required) const {
+DrmStatus DrmHalAidl::requiresSecureDecoder(const char* mime, bool* required) const {
     Mutex::Autolock autoLock(mLock);
     INIT_CHECK();
 
@@ -1086,14 +1088,15 @@ status_t DrmHalAidl::requiresSecureDecoder(const char* mime, bool* required) con
         mPlugin->requiresSecureDecoder(mimeAidl, SecurityLevel::DEFAULT, required);
     if (!status.isOk()) {
         DrmUtils::LOG2BE("requiresSecureDecoder txn failed: %d", status.getServiceSpecificError());
-        return DEAD_OBJECT;
+        return DrmStatus(DEAD_OBJECT);
     }
 
-    return OK;
+    return DrmStatus(OK);
 }
 
-status_t DrmHalAidl::requiresSecureDecoder(const char* mime, DrmPlugin::SecurityLevel securityLevel,
-                                           bool* required) const {
+DrmStatus DrmHalAidl::requiresSecureDecoder(const char* mime,
+                                            DrmPlugin::SecurityLevel securityLevel,
+                                            bool* required) const {
     Mutex::Autolock autoLock(mLock);
     INIT_CHECK();
 
@@ -1101,7 +1104,7 @@ status_t DrmHalAidl::requiresSecureDecoder(const char* mime, DrmPlugin::Security
     std::string mimeAidl(mime);
     ::ndk::ScopedAStatus status = mPlugin->requiresSecureDecoder(mimeAidl, aLevel, required);
 
-    status_t err = statusAidlToStatusT(status);
+    DrmStatus err = statusAidlToDrmStatus(status);
     if (!status.isOk()) {
         DrmUtils::LOG2BE("requiresSecureDecoder txn failed: %d", status.getServiceSpecificError());
     }
@@ -1109,17 +1112,17 @@ status_t DrmHalAidl::requiresSecureDecoder(const char* mime, DrmPlugin::Security
     return err;
 }
 
-status_t DrmHalAidl::setPlaybackId(Vector<uint8_t> const& sessionId, const char* playbackId) {
+DrmStatus DrmHalAidl::setPlaybackId(Vector<uint8_t> const& sessionId, const char* playbackId) {
     Mutex::Autolock autoLock(mLock);
     INIT_CHECK();
     std::string playbackIdAidl(playbackId);
     ::ndk::ScopedAStatus status = mPlugin->setPlaybackId(toStdVec(sessionId), playbackIdAidl);
-    return statusAidlToStatusT(status);
+    return statusAidlToDrmStatus(status);
 }
 
-status_t DrmHalAidl::getLogMessages(Vector<drm::V1_4::LogMessage>& logs) const {
+DrmStatus DrmHalAidl::getLogMessages(Vector<drm::V1_4::LogMessage>& logs) const {
     Mutex::Autolock autoLock(mLock);
-    return DrmUtils::GetLogMessagesAidl<IDrmPluginAidl>(mPlugin, logs);
+    return DrmStatus(DrmUtils::GetLogMessagesAidl<IDrmPluginAidl>(mPlugin, logs));
 }
 
 void DrmHalAidl::closeOpenSessions() {
@@ -1189,7 +1192,7 @@ std::string DrmHalAidl::reportFrameworkMetrics(const std::string& pluginMetrics)
     return serializedMetrics;
 }
 
-status_t DrmHalAidl::getSupportedSchemes(std::vector<uint8_t> &schemes) const {
+DrmStatus DrmHalAidl::getSupportedSchemes(std::vector<uint8_t>& schemes) const {
     Mutex::Autolock autoLock(mLock);
 
     if (mFactories.empty()) return UNKNOWN_ERROR;
@@ -1205,7 +1208,7 @@ status_t DrmHalAidl::getSupportedSchemes(std::vector<uint8_t> &schemes) const {
         }
     }
 
-    return OK;
+    return DrmStatus(OK);
 }
 
 void DrmHalAidl::cleanup() {
@@ -1225,9 +1228,9 @@ void DrmHalAidl::cleanup() {
     mPlugin.reset();
 }
 
-status_t DrmHalAidl::destroyPlugin() {
+DrmStatus DrmHalAidl::destroyPlugin() {
     cleanup();
-    return OK;
+    return DrmStatus(OK);
 }
 
 ::ndk::ScopedAStatus DrmHalAidl::onEvent(EventTypeAidl eventTypeAidl,
