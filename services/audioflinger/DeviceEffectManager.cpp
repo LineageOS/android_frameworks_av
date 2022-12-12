@@ -30,7 +30,7 @@
 
 namespace android {
 
-using media::AudioHalVersion;
+using detail::AudioHalVersionInfo;
 using media::IEffectClient;
 
 void AudioFlinger::DeviceEffectManager::createAudioPatch(audio_patch_handle_t handle,
@@ -131,14 +131,12 @@ status_t AudioFlinger::DeviceEffectManager::checkEffectCompatibility(
         return BAD_VALUE;
     }
 
-    static AudioHalVersion sMinDeviceEffectHalVersion;
-    sMinDeviceEffectHalVersion.type = AudioHalVersion::Type::HIDL;
-    sMinDeviceEffectHalVersion.major = 6;
-    sMinDeviceEffectHalVersion.minor = 0;
-    AudioHalVersion halVersion = effectsFactory->getHalVersion();
+    static AudioHalVersionInfo sMinDeviceEffectHalVersion =
+            AudioHalVersionInfo(AudioHalVersionInfo::Type::HIDL, 6, 0);
+    AudioHalVersionInfo halVersion = effectsFactory->getHalVersion();
 
-    // We can trust AIDL generated AudioHalVersion comparison operator (based on std::tie) as long
-    // as the type, major and minor sequence doesn't change in the definition.
+    // We can trust AIDL generated AudioHalVersionInfo comparison operator (based on std::tie) as
+    // long as the type, major and minor sequence doesn't change in the definition.
     if (((desc->flags & EFFECT_FLAG_TYPE_MASK) != EFFECT_FLAG_TYPE_PRE_PROC
             && (desc->flags & EFFECT_FLAG_TYPE_MASK) != EFFECT_FLAG_TYPE_POST_PROC)
             || halVersion < sMinDeviceEffectHalVersion) {
