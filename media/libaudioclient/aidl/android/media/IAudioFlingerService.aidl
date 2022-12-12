@@ -35,6 +35,7 @@ import android.media.EffectDescriptor;
 import android.media.IAudioFlingerClient;
 import android.media.IAudioRecord;
 import android.media.IAudioTrack;
+import android.media.ISoundDose;
 import android.media.ISoundDoseCallback;
 import android.media.LatencyMode;
 import android.media.MicrophoneInfoData;
@@ -247,8 +248,11 @@ interface IAudioFlingerService {
      */
     LatencyMode[] getSupportedLatencyModes(int output);
 
-    /** Registers the sound dose callback. */
-    oneway void registerSoundDoseCallback(ISoundDoseCallback callback);
+    /**
+     * Registers the sound dose callback and returns the interface for executing
+     * sound dose methods on the audio server.
+     */
+    ISoundDose getSoundDoseInterface(in ISoundDoseCallback callback);
 
     // When adding a new method, please review and update
     // IAudioFlinger.h AudioFlingerServerAdapter::Delegate::TransactionCode

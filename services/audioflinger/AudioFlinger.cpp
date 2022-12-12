@@ -232,7 +232,7 @@ BINDER_METHOD_ENTRY(getAAudioHardwareBurstMinUsec) \
 BINDER_METHOD_ENTRY(setDeviceConnectedState) \
 BINDER_METHOD_ENTRY(setRequestedLatencyMode) \
 BINDER_METHOD_ENTRY(getSupportedLatencyModes) \
-BINDER_METHOD_ENTRY(registerSoundDoseCallback) \
+BINDER_METHOD_ENTRY(getSoundDoseInterface) \
 
 // singleton for Binder Method Statistics for IAudioFlinger
 static auto& getIAudioFlingerStatistics() {
@@ -1663,8 +1663,13 @@ status_t AudioFlinger::getSupportedLatencyModes(audio_io_handle_t output,
     return thread->getSupportedLatencyModes(modes);
 }
 
-status_t AudioFlinger::registerSoundDoseCallback(const sp<media::ISoundDoseCallback>& callback) {
-    mMelReporter->registerSoundDoseCallback(callback);
+status_t AudioFlinger::getSoundDoseInterface(const sp<media::ISoundDoseCallback>& callback,
+                                             sp<media::ISoundDose>* soundDose) {
+    if (soundDose == nullptr) {
+        return BAD_VALUE;
+    }
+
+    *soundDose = mMelReporter->getSoundDoseInterface(callback);
     return NO_ERROR;
 }
 
@@ -4630,7 +4635,7 @@ status_t AudioFlinger::onTransactWrapper(TransactionCode code,
         case TransactionCode::SET_MASTER_VOLUME:
         case TransactionCode::SET_MASTER_MUTE:
         case TransactionCode::MASTER_MUTE:
-        case TransactionCode::REGISTER_SOUND_DOSE_CALLBACK:
+        case TransactionCode::GET_SOUND_DOSE_INTERFACE:
         case TransactionCode::SET_MODE:
         case TransactionCode::SET_MIC_MUTE:
         case TransactionCode::SET_LOW_RAM_DEVICE:

@@ -28,6 +28,7 @@
 #include <android/media/BnAudioPolicyServiceClient.h>
 #include <android/media/EffectDescriptor.h>
 #include <android/media/INativeSpatializerCallback.h>
+#include <android/media/ISoundDose.h>
 #include <android/media/ISoundDoseCallback.h>
 #include <android/media/ISpatializer.h>
 #include <android/media/RecordClientInfo.h>
@@ -586,8 +587,15 @@ public:
                                      const AudioDeviceTypeAddrVector &devices,
                                      bool *canBeSpatialized);
 
-    /** Registers the sound dose callback with the audio server. */
-    static status_t registerSoundDoseCallback(const sp<media::ISoundDoseCallback>& callback);
+    /**
+     * Registers the sound dose callback with the audio server and returns the ISoundDose
+     * interface.
+     *
+     * \param callback to send messages to the audio server
+     * \param soundDose binder to send messages to the AudioService
+     **/
+    static status_t getSoundDoseInterface(const sp<media::ISoundDoseCallback>& callback,
+                                          sp<media::ISoundDose>* soundDose);
 
     /**
      * Query how the direct playback is currently supported on the device.

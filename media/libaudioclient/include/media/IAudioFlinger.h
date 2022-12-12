@@ -55,6 +55,7 @@
 #include "android/media/IAudioTrackCallback.h"
 #include "android/media/IEffect.h"
 #include "android/media/IEffectClient.h"
+#include "android/media/ISoundDose.h"
 #include "android/media/ISoundDoseCallback.h"
 #include "android/media/OpenInputRequest.h"
 #include "android/media/OpenInputResponse.h"
@@ -371,7 +372,8 @@ public:
     virtual status_t getSupportedLatencyModes(audio_io_handle_t output,
             std::vector<audio_latency_mode_t>* modes) = 0;
 
-    virtual status_t registerSoundDoseCallback(const sp<media::ISoundDoseCallback>& callback) = 0;
+    virtual status_t getSoundDoseInterface(const sp<media::ISoundDoseCallback>& callback,
+                                           sp<media::ISoundDose>* soundDose) = 0;
 };
 
 /**
@@ -478,7 +480,8 @@ public:
             audio_latency_mode_t mode) override;
     status_t getSupportedLatencyModes(
             audio_io_handle_t output, std::vector<audio_latency_mode_t>* modes) override;
-    status_t registerSoundDoseCallback(const sp<media::ISoundDoseCallback>& callback) override;
+    status_t getSoundDoseInterface(const sp<media::ISoundDoseCallback>& callback,
+                                   sp<media::ISoundDose>* soundDose) override;
 
 private:
     const sp<media::IAudioFlingerService> mDelegate;
@@ -570,7 +573,7 @@ public:
             SET_DEVICE_CONNECTED_STATE = media::BnAudioFlingerService::TRANSACTION_setDeviceConnectedState,
             SET_REQUESTED_LATENCY_MODE = media::BnAudioFlingerService::TRANSACTION_setRequestedLatencyMode,
             GET_SUPPORTED_LATENCY_MODES = media::BnAudioFlingerService::TRANSACTION_getSupportedLatencyModes,
-            REGISTER_SOUND_DOSE_CALLBACK = media::BnAudioFlingerService::TRANSACTION_registerSoundDoseCallback,
+            GET_SOUND_DOSE_INTERFACE = media::BnAudioFlingerService::TRANSACTION_getSoundDoseInterface,
         };
 
     protected:
@@ -695,7 +698,8 @@ public:
     Status setRequestedLatencyMode(int output, media::LatencyMode mode) override;
     Status getSupportedLatencyModes(int output,
             std::vector<media::LatencyMode>* _aidl_return) override;
-    Status registerSoundDoseCallback(const sp<media::ISoundDoseCallback>& callback) override;
+    Status getSoundDoseInterface(const sp<media::ISoundDoseCallback>& callback,
+                                 sp<media::ISoundDose>* _aidl_return) override;
 private:
     const sp<AudioFlingerServerAdapter::Delegate> mDelegate;
 };
