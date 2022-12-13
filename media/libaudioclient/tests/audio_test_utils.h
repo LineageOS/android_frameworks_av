@@ -34,8 +34,6 @@
 #include <media/AudioRecord.h>
 #include <media/AudioTrack.h>
 
-#define RECORD_TO_FILE 0
-
 using namespace android;
 
 struct MixPort {
@@ -53,11 +51,11 @@ struct Route {
 status_t parse_audio_policy_configuration_xml(std::vector<std::string>& attachedDevices,
                                               std::vector<MixPort>& mixPorts,
                                               std::vector<Route>& routes);
-void CreateRandomFile(int& fd);
 status_t listAudioPorts(std::vector<audio_port_v7>& portsVec);
 status_t listAudioPatches(std::vector<struct audio_patch>& patchesVec);
 status_t getPortByAttributes(audio_port_role_t role, audio_port_type_t type,
-                             audio_devices_t deviceType, audio_port_v7& port);
+                             audio_devices_t deviceType, const std::string& address,
+                             audio_port_v7& port);
 status_t getPatchForOutputMix(audio_io_handle_t audioIo, audio_patch& patch);
 status_t getPatchForInputMix(audio_io_handle_t audioIo, audio_patch& patch);
 bool patchContainsOutputDevice(audio_port_handle_t deviceId, audio_patch patch);
@@ -76,7 +74,7 @@ class OnAudioDeviceUpdateNotifier : public AudioSystem::AudioDeviceCallback {
     std::condition_variable mCondition;
 
     void onAudioDeviceUpdate(audio_io_handle_t audioIo, audio_port_handle_t deviceId);
-    status_t waitForAudioDeviceCb();
+    status_t waitForAudioDeviceCb(audio_port_handle_t expDeviceId = AUDIO_PORT_HANDLE_NONE);
 };
 
 // Simple AudioPlayback class.
@@ -148,7 +146,8 @@ class AudioCapture : public AudioRecord::IAudioRecordCallback {
                  audio_channel_mask_t channelMask,
                  audio_input_flags_t flags = AUDIO_INPUT_FLAG_NONE,
                  audio_session_t sessionId = AUDIO_SESSION_ALLOCATE,
-                 AudioRecord::transfer_type transferType = AudioRecord::TRANSFER_CALLBACK);
+                 AudioRecord::transfer_type transferType = AudioRecord::TRANSFER_CALLBACK,
+                 const audio_attributes_t* attributes = nullptr);
     ~AudioCapture();
     size_t onMoreData(const AudioRecord::Buffer& buffer) override;
     void onOverrun() override;
@@ -156,6 +155,9 @@ class AudioCapture : public AudioRecord::IAudioRecordCallback {
     void onNewPos(uint32_t newPos) override;
     void onNewIAudioRecord() override;
     status_t create();
+    status_t setRecordDuration(float durationInSec);
+    status_t enableRecordDump();
+    std::string getRecordDumpFileName() const { return mFileName; }
     sp<AudioRecord> getAudioRecordHandle();
     status_t start(AudioSystem::sync_event_t event = AudioSystem::SYNC_EVENT_NONE,
                    audio_session_t triggerSession = AUDIO_SESSION_NONE);
@@ -190,11 +192,13 @@ class AudioCapture : public AudioRecord::IAudioRecordCallback {
     const audio_input_flags_t mFlags;
     const audio_session_t mSessionId;
     const AudioRecord::transfer_type mTransferType;
+    const audio_attributes_t* mAttributes;
 
     size_t mMaxBytesPerCallback = 2048;
     sp<AudioRecord> mRecord;
     State mState;
     bool mStopRecording;
+    std::string mFileName;
     int mOutFileFd = -1;
 
     std::mutex mMutex;
