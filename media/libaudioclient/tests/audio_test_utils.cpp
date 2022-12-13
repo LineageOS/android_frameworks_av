@@ -17,10 +17,14 @@
 //#define LOG_NDEBUG 0
 #define LOG_TAG "AudioTestUtils"
 
+#include <android-base/file.h>
 #include <system/audio_config.h>
 #include <utils/Log.h>
 
 #include "audio_test_utils.h"
+
+#define WAIT_PERIOD_MS 10  // from AudioTrack.cpp
+#define MAX_WAIT_TIME_MS 5000
 
 template <class T>
 constexpr void (*xmlDeleter)(T* t);
@@ -37,12 +41,6 @@ constexpr auto make_xmlUnique(T* t) {
     return std::unique_ptr<T, decltype(deleter)>{t, deleter};
 }
 
-// Generates a random string.
-void CreateRandomFile(int& fd) {
-    std::string filename = "/data/local/tmp/record-XXXXXX";
-    fd = mkstemp(filename.data());
-}
-
 void OnAudioDeviceUpdateNotifier::onAudioDeviceUpdate(audio_io_handle_t audioIo,
                                                       audio_port_handle_t deviceId) {
     std::unique_lock<std::mutex> lock{mMutex};
@@ -52,11 +50,14 @@ void OnAudioDeviceUpdateNotifier::onAudioDeviceUpdate(audio_io_handle_t audioIo,
     mCondition.notify_all();
 }
 
-status_t OnAudioDeviceUpdateNotifier::waitForAudioDeviceCb() {
+status_t OnAudioDeviceUpdateNotifier::waitForAudioDeviceCb(audio_port_handle_t expDeviceId) {
     std::unique_lock<std::mutex> lock{mMutex};
-    if (mAudioIo == AUDIO_IO_HANDLE_NONE) {
+    if (mAudioIo == AUDIO_IO_HANDLE_NONE ||
+        (expDeviceId != AUDIO_PORT_HANDLE_NONE && expDeviceId != mDeviceId)) {
         mCondition.wait_for(lock, std::chrono::milliseconds(500));
-        if (mAudioIo == AUDIO_IO_HANDLE_NONE) return TIMED_OUT;
+        if (mAudioIo == AUDIO_IO_HANDLE_NONE ||
+            (expDeviceId != AUDIO_PORT_HANDLE_NONE && expDeviceId != mDeviceId))
+            return TIMED_OUT;
     }
     return OK;
 }
@@ -167,15 +168,16 @@ void AudioPlayback::onBufferEnd() {
 }
 
 status_t AudioPlayback::fillBuffer() {
-    if (PLAY_STARTED != mState && PLAY_STOPPED != mState) return INVALID_OPERATION;
-    int retry = 25;
+    if (PLAY_STARTED != mState) return INVALID_OPERATION;
+    const int maxTries = MAX_WAIT_TIME_MS / WAIT_PERIOD_MS;
+    int counter = 0;
     uint8_t* ipBuffer = static_cast<uint8_t*>(static_cast<void*>(mMemory->unsecurePointer()));
     size_t nonContig = 0;
     size_t bytesAvailable = mMemCapacity - mBytesUsedSoFar;
     while (bytesAvailable > 0) {
         AudioTrack::Buffer trackBuffer;
         trackBuffer.frameCount = mTrack->frameCount() * 2;
-        status_t status = mTrack->obtainBuffer(&trackBuffer, retry, &nonContig);
+        status_t status = mTrack->obtainBuffer(&trackBuffer, 1, &nonContig);
         if (OK == status) {
             size_t bytesToCopy = std::min(bytesAvailable, trackBuffer.size());
             if (bytesToCopy > 0) {
@@ -184,14 +186,11 @@ status_t AudioPlayback::fillBuffer() {
             mTrack->releaseBuffer(&trackBuffer);
             mBytesUsedSoFar += bytesToCopy;
             bytesAvailable = mMemCapacity - mBytesUsedSoFar;
-            if (bytesAvailable == 0) {
-                stop();
-            }
+            counter = 0;
         } else if (WOULD_BLOCK == status) {
-            if (mStopPlaying)
-                return OK;
-            else
-                return TIMED_OUT;
+            // if not received a buffer for MAX_WAIT_TIME_MS, something has gone wrong
+            if (counter == maxTries) return TIMED_OUT;
+            counter++;
         }
     }
     return OK;
@@ -199,14 +198,15 @@ status_t AudioPlayback::fillBuffer() {
 
 status_t AudioPlayback::waitForConsumption(bool testSeek) {
     if (PLAY_STARTED != mState) return INVALID_OPERATION;
-    // in static buffer mode, lets not play clips with duration > 30 sec
-    int retry = 300;
-    // Total number of frames in the input file.
+
+    const int maxTries = MAX_WAIT_TIME_MS / WAIT_PERIOD_MS;
+    int counter = 0;
     size_t totalFrameCount = mMemCapacity / mTrack->frameSize();
-    while (!mStopPlaying && retry > 0) {
-        // Get the total numbers of frames played.
+    while (!mStopPlaying && counter < maxTries) {
         uint32_t currPosition;
         mTrack->getPosition(&currPosition);
+        if (currPosition >= totalFrameCount) counter++;
+
         if (testSeek && (currPosition > totalFrameCount * 0.6)) {
             testSeek = false;
             if (!mTrack->hasStarted()) return BAD_VALUE;
@@ -227,10 +227,9 @@ status_t AudioPlayback::waitForConsumption(bool testSeek) {
             if (bufferPosition != setPosition) return BAD_VALUE;
             mTrack->start();
         }
-        std::this_thread::sleep_for(std::chrono::milliseconds(100));
-        retry--;
+        std::this_thread::sleep_for(std::chrono::milliseconds(WAIT_PERIOD_MS));
     }
-    if (!mStopPlaying) return TIMED_OUT;
+    if (!mStopPlaying && counter == maxTries) return TIMED_OUT;
     return OK;
 }
 
@@ -246,7 +245,7 @@ status_t AudioPlayback::onProcess(bool testSeek) {
 void AudioPlayback::stop() {
     std::unique_lock<std::mutex> lock{mMutex};
     mStopPlaying = true;
-    if (mState != PLAY_STOPPED) {
+    if (mState != PLAY_STOPPED && mState != PLAY_NO_INIT) {
         int32_t msec = 0;
         (void)mTrack->pendingDuration(&msec);
         mTrack->stopAndJoinCallbacks();
@@ -274,7 +273,7 @@ size_t AudioCapture::onMoreData(const AudioRecord::Buffer& buffer) {
     }
 
     // no more frames to read
-    if (mNumFramesReceived > mNumFramesToRecord || mStopRecording) {
+    if (mNumFramesReceived >= mNumFramesToRecord || mStopRecording) {
         mStopRecording = true;
         return 0;
     }
@@ -369,14 +368,16 @@ void AudioCapture::onNewIAudioRecord() {
 
 AudioCapture::AudioCapture(audio_source_t inputSource, uint32_t sampleRate, audio_format_t format,
                            audio_channel_mask_t channelMask, audio_input_flags_t flags,
-                           audio_session_t sessionId, AudioRecord::transfer_type transferType)
+                           audio_session_t sessionId, AudioRecord::transfer_type transferType,
+                           const audio_attributes_t* attributes)
     : mInputSource(inputSource),
       mSampleRate(sampleRate),
       mFormat(format),
       mChannelMask(channelMask),
       mFlags(flags),
       mSessionId(sessionId),
-      mTransferType(transferType) {
+      mTransferType(transferType),
+      mAttributes(attributes) {
     mFrameCount = 0;
     mNotificationFrames = 0;
     mNumFramesToRecord = 0;
@@ -389,9 +390,6 @@ AudioCapture::AudioCapture(audio_source_t inputSource, uint32_t sampleRate, audi
     mReceivedCbMarkerCount = 0;
     mState = REC_NO_INIT;
     mStopRecording = false;
-#if RECORD_TO_FILE
-    CreateRandomFile(mOutFileFd);
-#endif
 }
 
 AudioCapture::~AudioCapture() {
@@ -431,19 +429,20 @@ status_t AudioCapture::create() {
         if (mSampleRate == 48000) {  // test all available constructors
             mRecord = new AudioRecord(mInputSource, mSampleRate, mFormat, mChannelMask,
                                       attributionSource, mFrameCount, nullptr /* callback */,
-                                      mNotificationFrames, mSessionId, mTransferType, mFlags);
+                                      mNotificationFrames, mSessionId, mTransferType, mFlags,
+                                      mAttributes);
         } else {
             mRecord = new AudioRecord(attributionSource);
             status = mRecord->set(mInputSource, mSampleRate, mFormat, mChannelMask, mFrameCount,
                                   nullptr /* callback */, 0 /* notificationFrames */,
                                   false /* canCallJava */, mSessionId, mTransferType, mFlags,
-                                  attributionSource.uid, attributionSource.pid);
+                                  attributionSource.uid, attributionSource.pid, mAttributes);
         }
         if (NO_ERROR != status) return status;
     } else if (mTransferType == AudioRecord::TRANSFER_CALLBACK) {
         mRecord = new AudioRecord(mInputSource, mSampleRate, mFormat, mChannelMask,
                                   attributionSource, mFrameCount, this, mNotificationFrames,
-                                  mSessionId, mTransferType, mFlags);
+                                  mSessionId, mTransferType, mFlags, mAttributes);
     } else {
         ALOGE("Test application is not handling transfer type %s",
               AudioRecord::convertTransferToText(mTransferType));
@@ -458,6 +457,26 @@ status_t AudioCapture::create() {
         mMaxBytesPerCallback = mNotificationFrames * samplesPerFrame * bytesPerSample;
     }
     return status;
+}
+
+status_t AudioCapture::setRecordDuration(float durationInSec) {
+    if (REC_READY != mState) {
+        return INVALID_OPERATION;
+    }
+    uint32_t sampleRate = mSampleRate == 0 ? mRecord->getSampleRate() : mSampleRate;
+    mNumFramesToRecord = (sampleRate * durationInSec);
+    return OK;
+}
+
+status_t AudioCapture::enableRecordDump() {
+    if (mOutFileFd != -1) {
+        return INVALID_OPERATION;
+    }
+    TemporaryFile tf("/data/local/tmp");
+    tf.DoNotRemove();
+    mOutFileFd = tf.release();
+    mFileName = std::string{tf.path};
+    return OK;
 }
 
 sp<AudioRecord> AudioCapture::getAudioRecordHandle() {
@@ -481,7 +500,7 @@ status_t AudioCapture::start(AudioSystem::sync_event_t event, audio_session_t tr
 status_t AudioCapture::stop() {
     status_t status = OK;
     mStopRecording = true;
-    if (mState != REC_STOPPED) {
+    if (mState != REC_STOPPED && mState != REC_NO_INIT) {
         if (mInputSource != AUDIO_SOURCE_DEFAULT) {
             bool state = false;
             status = AudioSystem::isSourceActive(mInputSource, &state);
@@ -495,81 +514,66 @@ status_t AudioCapture::stop() {
 }
 
 status_t AudioCapture::obtainBuffer(RawBuffer& buffer) {
-    if (REC_STARTED != mState && REC_STOPPED != mState) return INVALID_OPERATION;
-    int retry = 25;
-    AudioRecord::Buffer recordBuffer;
-    recordBuffer.frameCount = mNotificationFrames;
+    if (REC_STARTED != mState) return INVALID_OPERATION;
+    const int maxTries = MAX_WAIT_TIME_MS / WAIT_PERIOD_MS;
+    int counter = 0;
     size_t nonContig = 0;
-    status_t status = mRecord->obtainBuffer(&recordBuffer, retry, &nonContig);
-    if (OK == status) {
-        const int64_t timestampUs =
-                ((1000000LL * mNumFramesReceived) + (mRecord->getSampleRate() >> 1)) /
-                mRecord->getSampleRate();
-        RawBuffer buff{-1, timestampUs, static_cast<int32_t>(recordBuffer.size())};
-        memcpy(buff.mData.get(), recordBuffer.data(), recordBuffer.size());
-        buffer = std::move(buff);
-        mNumFramesReceived += recordBuffer.size() / mRecord->frameSize();
-        mRecord->releaseBuffer(&recordBuffer);
-        if (mNumFramesReceived > mNumFramesToRecord) {
-            stop();
+    while (mNumFramesReceived < mNumFramesToRecord) {
+        AudioRecord::Buffer recordBuffer;
+        recordBuffer.frameCount = mNotificationFrames;
+        status_t status = mRecord->obtainBuffer(&recordBuffer, 1, &nonContig);
+        if (OK == status) {
+            const int64_t timestampUs =
+                    ((1000000LL * mNumFramesReceived) + (mRecord->getSampleRate() >> 1)) /
+                    mRecord->getSampleRate();
+            RawBuffer buff{-1, timestampUs, static_cast<int32_t>(recordBuffer.size())};
+            memcpy(buff.mData.get(), recordBuffer.data(), recordBuffer.size());
+            buffer = std::move(buff);
+            mNumFramesReceived += recordBuffer.size() / mRecord->frameSize();
+            mRecord->releaseBuffer(&recordBuffer);
+            counter = 0;
+        } else if (WOULD_BLOCK == status) {
+            // if not received a buffer for MAX_WAIT_TIME_MS, something has gone wrong
+            if (counter == maxTries) return TIMED_OUT;
+            counter++;
         }
-    } else if (status == WOULD_BLOCK) {
-        if (mStopRecording)
-            return WOULD_BLOCK;
-        else
-            return TIMED_OUT;
     }
     return OK;
 }
 
 status_t AudioCapture::obtainBufferCb(RawBuffer& buffer) {
     if (REC_STARTED != mState) return INVALID_OPERATION;
-    int retry = 10;
+    const int maxTries = MAX_WAIT_TIME_MS / WAIT_PERIOD_MS;
+    int counter = 0;
     std::unique_lock<std::mutex> lock{mMutex};
-    while (mBuffersReceived.empty() && !mStopRecording && retry > 0) {
-        mCondition.wait_for(lock, std::chrono::milliseconds(100));
-        retry--;
+    while (mBuffersReceived.empty() && !mStopRecording && counter < maxTries) {
+        mCondition.wait_for(lock, std::chrono::milliseconds(WAIT_PERIOD_MS));
+        counter++;
     }
     if (!mBuffersReceived.empty()) {
         auto it = mBuffersReceived.begin();
         buffer = std::move(*it);
         mBuffersReceived.erase(it);
     } else {
-        if (retry == 0) return TIMED_OUT;
-        if (mStopRecording)
-            return WOULD_BLOCK;
-        else
-            return UNKNOWN_ERROR;
+        if (!mStopRecording && counter == maxTries) return TIMED_OUT;
     }
     return OK;
 }
 
 status_t AudioCapture::audioProcess() {
     RawBuffer buffer;
-    while (true) {
-        status_t status;
+    status_t status = OK;
+    while (mNumFramesReceived < mNumFramesToRecord && status == OK) {
         if (mTransferType == AudioRecord::TRANSFER_CALLBACK)
             status = obtainBufferCb(buffer);
         else
             status = obtainBuffer(buffer);
-        switch (status) {
-            case OK:
-                if (mOutFileFd > 0) {
-                    const char* ptr =
-                            static_cast<const char*>(static_cast<void*>(buffer.mData.get()));
-                    write(mOutFileFd, ptr, buffer.mCapacity);
-                }
-                break;
-            case WOULD_BLOCK:
-                return OK;
-            case TIMED_OUT:          // "recorder application timed out from receiving buffers"
-            case NO_INIT:            // "recorder not initialized"
-            case INVALID_OPERATION:  // "recorder not started"
-            case UNKNOWN_ERROR:      // "Unknown error"
-            default:
-                return status;
+        if (OK == status && mOutFileFd > 0) {
+            const char* ptr = static_cast<const char*>(static_cast<void*>(buffer.mData.get()));
+            write(mOutFileFd, ptr, buffer.mCapacity);
         }
     }
+    return OK;
 }
 
 status_t listAudioPorts(std::vector<audio_port_v7>& portsVec) {
@@ -613,13 +617,15 @@ status_t getPortById(const audio_port_handle_t portId, audio_port_v7& port) {
 }
 
 status_t getPortByAttributes(audio_port_role_t role, audio_port_type_t type,
-                             audio_devices_t deviceType, audio_port_v7& port) {
+                             audio_devices_t deviceType, const std::string& address,
+                             audio_port_v7& port) {
     std::vector<struct audio_port_v7> ports;
     status_t status = listAudioPorts(ports);
     if (status != OK) return status;
     for (auto i = 0; i < ports.size(); i++) {
         if (ports[i].role == role && ports[i].type == type &&
-            ports[i].ext.device.type == deviceType) {
+            ports[i].ext.device.type == deviceType &&
+            !strncmp(ports[i].ext.device.address, address.c_str(), AUDIO_DEVICE_MAX_ADDRESS_LEN)) {
             port = ports[i];
             return OK;
         }
