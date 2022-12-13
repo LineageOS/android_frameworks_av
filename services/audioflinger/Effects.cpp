@@ -2961,6 +2961,9 @@ void AudioFlinger::EffectChain::checkOutputFlagCompatibility(audio_output_flags_
     if ((*flags & AUDIO_OUTPUT_FLAG_FAST) != 0 && !isFastCompatible()) {
         *flags = (audio_output_flags_t)(*flags & ~AUDIO_OUTPUT_FLAG_FAST);
     }
+    if ((*flags & AUDIO_OUTPUT_FLAG_BIT_PERFECT) != 0 && !isBitPerfectCompatible()) {
+        *flags = (audio_output_flags_t)(*flags & ~AUDIO_OUTPUT_FLAG_BIT_PERFECT);
+    }
 }
 
 void AudioFlinger::EffectChain::checkInputFlagCompatibility(audio_input_flags_t *flags) const
@@ -2987,6 +2990,18 @@ bool AudioFlinger::EffectChain::isRawCompatible() const
 
 bool AudioFlinger::EffectChain::isFastCompatible() const
 {
+    Mutex::Autolock _l(mLock);
+    for (const auto &effect : mEffects) {
+        if (effect->isProcessImplemented()
+                && effect->isImplementationSoftware()) {
+            return false;
+        }
+    }
+    // Allow effects without processing or hw accelerated effects.
+    return true;
+}
+
+bool AudioFlinger::EffectChain::isBitPerfectCompatible() const {
     Mutex::Autolock _l(mLock);
     for (const auto &effect : mEffects) {
         if (effect->isProcessImplemented()

@@ -30,4 +30,8 @@ enum AudioMixerBehavior {
      * different sources.
      */
     DEFAULT = 0,
+    /**
+     * The audio data in the mixer will be bit-perfect as long as possible.
+     */
+    BIT_PERFECT = 1,
 }

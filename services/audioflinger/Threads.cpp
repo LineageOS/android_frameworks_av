@@ -536,6 +536,8 @@ const char *AudioFlinger::ThreadBase::threadTypeToString(AudioFlinger::ThreadBas
         return "MMAP_CAPTURE";
     case SPATIALIZER:
         return "SPATIALIZER";
+    case BIT_PERFECT:
+        return "BIT_PERFECT";
     default:
         return "unknown";
     }
@@ -1519,6 +1521,26 @@ status_t AudioFlinger::PlaybackThread::checkEffectCompatibility_l(
             }
         }
         break;
+    case BIT_PERFECT:
+        if ((desc->flags & EFFECT_FLAG_HW_ACC_TUNNEL) != 0) {
+            // Allow HW accelerated effects of tunnel type
+            break;
+        }
+        // As bit-perfect tracks will not be allowed to apply audio effect that will touch the audio
+        // data, effects will not be allowed on 1) global effects (AUDIO_SESSION_OUTPUT_MIX),
+        // 2) post-processing effects (AUDIO_SESSION_OUTPUT_STAGE or AUDIO_SESSION_DEVICE) and
+        // 3) there is any bit-perfect track with the given session id.
+        if (sessionId == AUDIO_SESSION_OUTPUT_MIX || sessionId == AUDIO_SESSION_OUTPUT_STAGE ||
+            sessionId == AUDIO_SESSION_DEVICE) {
+            ALOGW("%s: effect %s not supported on bit-perfect thread %s",
+                  __func__, desc->name, mThreadName);
+            return BAD_VALUE;
+        } else if ((hasAudioSession_l(sessionId) & ThreadBase::BIT_PERFECT_SESSION) != 0) {
+            ALOGW("%s: effect %s not supported as there is a bit-perfect track with session as %d",
+                  __func__, desc->name, sessionId);
+            return BAD_VALUE;
+        }
+        break;
     default:
         LOG_ALWAYS_FATAL("checkEffectCompatibility_l(): wrong thread type %d", mType);
     }
@@ -2283,7 +2305,8 @@ sp<AudioFlinger::PlaybackThread::Track> AudioFlinger::PlaybackThread::createTrac
         status_t *status,
         audio_port_handle_t portId,
         const sp<media::IAudioTrackCallback>& callback,
-        bool isSpatialized)
+        bool isSpatialized,
+        bool isBitPerfect)
 {
     size_t frameCount = *pFrameCount;
     size_t notificationFrameCount = *pNotificationFrameCount;
@@ -2313,6 +2336,25 @@ sp<AudioFlinger::PlaybackThread::Track> AudioFlinger::PlaybackThread::createTrac
         ALOGW("createTrack_l(): mismatch between requested flags (%08x) and output flags (%08x)",
               *flags, outputFlags);
         *flags = (audio_output_flags_t)(*flags & outputFlags);
+    }
+
+    if (isBitPerfect) {
+        sp<EffectChain> chain = getEffectChain_l(sessionId);
+        if (chain.get() != nullptr) {
+            // Bit-perfect is required according to the configuration and preferred mixer
+            // attributes, but it is not in the output flag from the client's request. Explicitly
+            // adding bit-perfect flag to check the compatibility
+            audio_output_flags_t flagsToCheck =
+                    (audio_output_flags_t)(*flags & AUDIO_OUTPUT_FLAG_BIT_PERFECT);
+            chain->checkOutputFlagCompatibility(&flagsToCheck);
+            if ((flagsToCheck & AUDIO_OUTPUT_FLAG_BIT_PERFECT) == AUDIO_OUTPUT_FLAG_NONE) {
+                ALOGE("%s cannot create track as there is data-processing effect attached to "
+                      "given session id(%d)", __func__, sessionId);
+                lStatus = BAD_VALUE;
+                goto Exit;
+            }
+            *flags = flagsToCheck;
+        }
     }
 
     // client expresses a preference for FAST, but we get the final say
@@ -2495,6 +2537,18 @@ sp<AudioFlinger::PlaybackThread::Track> AudioFlinger::PlaybackThread::createTrac
     *pNotificationFrameCount = notificationFrameCount;
 
     switch (mType) {
+    case BIT_PERFECT:
+        if (isBitPerfect) {
+            if (sampleRate != mSampleRate || format != mFormat || channelMask != mChannelMask) {
+                ALOGE("%s, bad parameter when request streaming bit-perfect, sampleRate=%u, "
+                      "format=%#x, channelMask=%#x, mSampleRate=%u, mFormat=%#x, mChannelMask=%#x",
+                      __func__, sampleRate, format, channelMask, mSampleRate, mFormat,
+                      mChannelMask);
+                lStatus = BAD_VALUE;
+                goto Exit;
+            }
+        }
+        break;
 
     case DIRECT:
         if (audio_is_linear_pcm(format)) { // TODO maybe use audio_has_proportional_frames()?
@@ -2576,7 +2630,7 @@ sp<AudioFlinger::PlaybackThread::Track> AudioFlinger::PlaybackThread::createTrac
                           nullptr /* buffer */, (size_t)0 /* bufferSize */, sharedBuffer,
                           sessionId, creatorPid, attributionSource, trackFlags,
                           TrackBase::TYPE_DEFAULT, portId, SIZE_MAX /*frameCountToBeReady*/,
-                          speed, isSpatialized);
+                          speed, isSpatialized, isBitPerfect);
 
         lStatus = track != 0 ? track->initCheck() : (status_t) NO_MEMORY;
         if (lStatus != NO_ERROR) {
@@ -4020,7 +4074,8 @@ bool AudioFlinger::PlaybackThread::threadLoop()
             // Either threadLoop_mix() or threadLoop_sleepTime() should have set
             // mMixerBuffer with data if mMixerBufferValid is true and mSleepTimeUs == 0.
             // Merge mMixerBuffer data into mEffectBuffer (if any effects are valid)
-            // or mSinkBuffer (if there are no effects).
+            // or mSinkBuffer (if there are no effects and there is no data already copied to
+            // mSinkBuffer).
             //
             // This is done pre-effects computation; if effects change to
             // support higher precision, this needs to move.
@@ -4029,7 +4084,7 @@ bool AudioFlinger::PlaybackThread::threadLoop()
             // TODO use mSleepTimeUs == 0 as an additional condition.
             uint32_t mixerChannelCount = mEffectBufferValid ?
                         audio_channel_count_from_out_mask(mMixerChannelMask) : mChannelCount;
-            if (mMixerBufferValid) {
+            if (mMixerBufferValid && (mEffectBufferValid || !mHasDataCopiedToSinkBuffer)) {
                 void *buffer = mEffectBufferValid ? mEffectBuffer : mSinkBuffer;
                 audio_format_t format = mEffectBufferValid ? mEffectBufferFormat : mFormat;
 
@@ -4120,7 +4175,7 @@ bool AudioFlinger::PlaybackThread::threadLoop()
         // Effects buffer (buffer valid), we need to
         // copy into the sink buffer.
         // TODO use mSleepTimeUs == 0 as an additional condition.
-        if (mEffectBufferValid) {
+        if (mEffectBufferValid && !mHasDataCopiedToSinkBuffer) {
             //ALOGV("writing effect buffer to sink buffer format %#x", mFormat);
             void *effectBuffer = (mType == SPATIALIZER) ? mPostSpatializerBuffer : mEffectBuffer;
             if (requireMonoBlend()) {
@@ -4801,7 +4856,7 @@ AudioFlinger::MixerThread::MixerThread(const sp<AudioFlinger>& audioFlinger, Aud
 
     // initialize fast mixer depending on configuration
     bool initFastMixer;
-    if (mType == SPATIALIZER) {
+    if (mType == SPATIALIZER || mType == BIT_PERFECT) {
         initFastMixer = false;
     } else {
         switch (kUseFastMixer) {
@@ -9781,6 +9836,7 @@ status_t AudioFlinger::MmapThread::start(const AudioClient& client,
         audio_port_handle_t deviceId = mDeviceId;
         std::vector<audio_io_handle_t> secondaryOutputs;
         bool isSpatialized;
+        bool isBitPerfect;
         ret = AudioSystem::getOutputForAttr(&mAttr, &io,
                                             mSessionId,
                                             &stream,
@@ -9790,7 +9846,8 @@ status_t AudioFlinger::MmapThread::start(const AudioClient& client,
                                             &deviceId,
                                             &portId,
                                             &secondaryOutputs,
-                                            &isSpatialized);
+                                            &isSpatialized,
+                                            &isBitPerfect);
         ALOGD_IF(!secondaryOutputs.empty(),
                  "MmapThread::start does not support secondary outputs, ignoring them");
     } else {
@@ -10735,6 +10792,42 @@ status_t AudioFlinger::MmapCaptureThread::getExternalPosition(
         return NO_INIT;
     }
     return mInput->getCapturePosition((int64_t*)position, timeNanos);
+}
+
+// ----------------------------------------------------------------------------
+
+AudioFlinger::BitPerfectThread::BitPerfectThread(const sp<AudioFlinger> &audioflinger,
+        AudioStreamOut *output, audio_io_handle_t id, bool systemReady)
+        : MixerThread(audioflinger, output, id, systemReady, BIT_PERFECT) {}
+
+AudioFlinger::PlaybackThread::mixer_state AudioFlinger::BitPerfectThread::prepareTracks_l(
+        Vector<sp<Track>> *tracksToRemove) {
+    mixer_state result = MixerThread::prepareTracks_l(tracksToRemove);
+    // If there is only one active track and it is bit-perfect, enable tee buffer.
+    if (mActiveTracks.size() == 1 && mActiveTracks[0]->isBitPerfect()) {
+        const int trackId = mActiveTracks[0]->id();
+        mAudioMixer->setParameter(
+                    trackId, AudioMixer::TRACK, AudioMixer::TEE_BUFFER, (void *)mSinkBuffer);
+        mAudioMixer->setParameter(
+                    trackId, AudioMixer::TRACK, AudioMixer::TEE_BUFFER_FRAME_COUNT,
+                    (void *)(uintptr_t)mNormalFrameCount);
+        mIsBitPerfect = true;
+    } else {
+        mIsBitPerfect = false;
+        // No need to copy bit-perfect data directly to sink buffer given there are multiple tracks
+        // active.
+        for (const auto& track : mActiveTracks) {
+            const int trackId = track->id();
+            mAudioMixer->setParameter(
+                        trackId, AudioMixer::TRACK, AudioMixer::TEE_BUFFER, nullptr);
+        }
+    }
+    return result;
+}
+
+void AudioFlinger::BitPerfectThread::threadLoop_mix() {
+    MixerThread::threadLoop_mix();
+    mHasDataCopiedToSinkBuffer = mIsBitPerfect;
 }
 
 } // namespace android

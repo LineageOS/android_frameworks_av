@@ -477,6 +477,8 @@ aidl2legacy_AudioMixerBehavior_audio_mixer_behavior_t(media::AudioMixerBehavior 
     switch (aidl) {
         case media::AudioMixerBehavior::DEFAULT:
             return AUDIO_MIXER_BEHAVIOR_DEFAULT;
+        case media::AudioMixerBehavior::BIT_PERFECT:
+            return AUDIO_MIXER_BEHAVIOR_BIT_PERFECT;
         case media::AudioMixerBehavior::INVALID:
             return AUDIO_MIXER_BEHAVIOR_INVALID;
     }
@@ -487,6 +489,8 @@ legacy2aidl_audio_mixer_behavior_t_AudioMixerBehavior(audio_mixer_behavior_t leg
     switch (legacy) {
         case AUDIO_MIXER_BEHAVIOR_DEFAULT:
             return media::AudioMixerBehavior::DEFAULT;
+        case AUDIO_MIXER_BEHAVIOR_BIT_PERFECT:
+            return media::AudioMixerBehavior::BIT_PERFECT;
         case AUDIO_MIXER_BEHAVIOR_INVALID:
             return media::AudioMixerBehavior::INVALID;
     }

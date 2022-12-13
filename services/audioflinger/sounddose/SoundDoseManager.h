@@ -17,10 +17,11 @@
 
 #pragma once
 
+#include <android/media/BnSoundDose.h>
 #include <android/media/ISoundDoseCallback.h>
 #include <audio_utils/MelAggregator.h>
 #include <audio_utils/MelProcessor.h>
-#include <utils/Errors.h>
+#include <binder/Status.h>
 #include <mutex>
 #include <unordered_map>
 
@@ -69,10 +70,15 @@ class SoundDoseManager : public audio_utils::MelProcessor::MelCallback {
      */
     void setOutputRs2(float rs2Value);
 
-    std::string dump() const;
+    /**
+     * \brief Registers the interface for passing callbacks to the AudioService and gets
+     * the ISoundDose interface.
+     *
+     * \returns the sound dose binder to send commands to the SoundDoseManager
+     **/
+    sp<media::ISoundDose> getSoundDoseInterface(const sp<media::ISoundDoseCallback>& callback);
 
-    /** \brief Registers the interface for passing callbacks to the AudioService. */
-    void registerSoundDoseCallback(const sp<media::ISoundDoseCallback>& callback);
+    std::string dump() const;
 
     // used for testing
     size_t getCachedMelRecordsSize() const;
@@ -86,9 +92,32 @@ class SoundDoseManager : public audio_utils::MelProcessor::MelCallback {
 
     void onMomentaryExposure(float currentMel, audio_port_handle_t deviceId) const override;
 
-  private:
-    sp<media::ISoundDoseCallback> getSoundDoseCallback() const;
+private:
+    class SoundDose : public media::BnSoundDose,
+                      public IBinder::DeathRecipient {
+    public:
+        SoundDose(SoundDoseManager* manager, const sp<media::ISoundDoseCallback>& callback)
+            : mSoundDoseManager(manager),
+              mSoundDoseCallback(callback) {};
 
+        /** IBinder::DeathRecipient. Listen to the death of ISoundDoseCallback. */
+        virtual void binderDied(const wp<IBinder>& who);
+
+        /** BnSoundDose override */
+        binder::Status setOutputRs2(float value) override;
+        binder::Status resetCsd(float currentCsd,
+                                const std::vector<media::SoundDoseRecord>& records) override;
+
+        wp<SoundDoseManager> mSoundDoseManager;
+        const sp<media::ISoundDoseCallback> mSoundDoseCallback;
+    };
+
+    void resetSoundDose();
+
+    void resetCsd(float currentCsd, const std::vector<media::SoundDoseRecord>& records);
+
+    sp<media::ISoundDoseCallback> getSoundDoseCallback() const;
+    
     mutable std::mutex mLock;
 
     // no need for lock since MelAggregator is thread-safe
@@ -99,7 +128,7 @@ class SoundDoseManager : public audio_utils::MelProcessor::MelCallback {
 
     float mRs2Value GUARDED_BY(mLock);
 
-    sp<media::ISoundDoseCallback> mSoundDoseCallback GUARDED_BY(mLock);
+    sp<SoundDose> mSoundDose GUARDED_BY(mLock);
 };
 
 }  // namespace android

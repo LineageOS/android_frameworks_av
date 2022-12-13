@@ -633,7 +633,8 @@ AudioFlinger::PlaybackThread::Track::Track(
             audio_port_handle_t portId,
             size_t frameCountToBeReady,
             float speed,
-            bool isSpatialized)
+            bool isSpatialized,
+            bool isBitPerfect)
     :   TrackBase(thread, client, attr, sampleRate, format, channelMask, frameCount,
                   // TODO: Using unsecurePointer() has some associated security pitfalls
                   //       (see declaration for details).
@@ -668,7 +669,8 @@ AudioFlinger::PlaybackThread::Track::Track(
     mFlushHwPending(false),
     mFlags(flags),
     mSpeed(speed),
-    mIsSpatialized(isSpatialized)
+    mIsSpatialized(isSpatialized),
+    mIsBitPerfect(isBitPerfect)
 {
     // client == 0 implies sharedBuffer == 0
     ALOG_ASSERT(!(client == 0 && sharedBuffer != 0));

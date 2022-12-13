@@ -36,4 +36,5 @@ parcelable GetOutputForAttrResponse {
     boolean isSpatialized;
     /** The suggested audio config if fails to get an output. **/
     AudioConfigBase configBase;
+    boolean isBitPerfect;
 }

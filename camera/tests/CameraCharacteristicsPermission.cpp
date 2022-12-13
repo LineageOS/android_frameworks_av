@@ -74,7 +74,8 @@ TEST_F(CameraCharacteristicsPermission, TestCameraPermission) {
         CameraMetadata metadata;
         std::vector<int32_t> tagsNeedingPermission;
         rc = mCameraService->getCameraCharacteristics(cameraIdStr,
-                /*targetSdkVersion*/__ANDROID_API_FUTURE__, &metadata);
+                /*targetSdkVersion*/__ANDROID_API_FUTURE__,
+                /*overrideToPortrait*/false, &metadata);
         ASSERT_TRUE(rc.isOk());
         EXPECT_FALSE(metadata.isEmpty());
         EXPECT_EQ(metadata.removePermissionEntries(CAMERA_METADATA_INVALID_VENDOR_ID,

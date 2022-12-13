@@ -22,6 +22,7 @@
 #include <android/hardware/drm/1.4/IDrmPlugin.h>
 #include <android/hardware/drm/1.4/types.h>
 #include <media/stagefright/MediaErrors.h>
+#include <mediadrm/DrmStatus.h>
 #include <utils/Errors.h>  // for status_t
 #include <utils/Log.h>
 #include <utils/String8.h>
@@ -198,7 +199,7 @@ inline status_t toStatusT(const android::hardware::Return<T> &status) {
     return toStatusT_1_4(err);
 }
 
-inline status_t statusAidlToStatusT(::ndk::ScopedAStatus &statusAidl) {
+inline DrmStatus statusAidlToDrmStatus(::ndk::ScopedAStatus& statusAidl) {
     if (statusAidl.isOk()) return OK;
     if (statusAidl.getExceptionCode() != EX_SERVICE_SPECIFIC) return DEAD_OBJECT;
     auto status = static_cast<StatusAidl>(statusAidl.getServiceSpecificError());
