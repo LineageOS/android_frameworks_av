@@ -16,27 +16,34 @@
 
 #ifndef DRM_STATUS_
 #define DRM_STATUS_
-#include <stdint.h>
 
 #include <media/stagefright/foundation/ABase.h>
 #include <media/stagefright/MediaErrors.h>
 #include <utils/Errors.h>
 
+#include <stdint.h>
+#include <string>
+
 namespace android {
 
 struct DrmStatus {
   public:
-    DrmStatus(status_t status, int32_t cdmerr = 0, int32_t oemerr = 0)
-        : mStatus(status), mCdmErr(cdmerr), mOemErr(oemerr) {}
+    DrmStatus(status_t status, int32_t cdmErr = 0, int32_t oemErr = 0,
+              int32_t ctx = 0, std::string errMsg = "")
+        : mStatus(status), mCdmErr(cdmErr), mOemErr(oemErr),
+          mCtx(ctx), mErrMsg(errMsg) {}
     operator status_t() const { return mStatus; }
-    int32_t cdmErr() const { return mCdmErr; }
-    int32_t oemErr() const { return mOemErr; }
+    int32_t getCdmErr() const { return mCdmErr; }
+    int32_t getOemErr() const { return mOemErr; }
+    int32_t getContext() const { return mCtx; }
+    std::string getErrorMessage() const { return mErrMsg; }
     bool operator==(status_t other) const { return mStatus == other; }
     bool operator!=(status_t other) const { return mStatus != other; }
 
   private:
     status_t mStatus;
-    int32_t mCdmErr{}, mOemErr{};
+    int32_t mCdmErr{}, mOemErr{}, mCtx{};
+    std::string mErrMsg;
 };
 
 }  // namespace android
