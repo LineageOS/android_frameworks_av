@@ -3009,6 +3009,10 @@ status_t AudioPolicyManager::setVolumeIndexForAttributes(const audio_attributes_
     status_t status = NO_ERROR;
     IVolumeCurves &curves = getVolumeCurves(attributes);
     VolumeSource vs = toVolumeSource(group);
+    // AUDIO_STREAM_BLUETOOTH_SCO is only used for volume control so we remap
+    // to AUDIO_STREAM_VOICE_CALL to match with relevant playback activity
+    VolumeSource activityVs = (vs == toVolumeSource(AUDIO_STREAM_BLUETOOTH_SCO, false)) ?
+            toVolumeSource(AUDIO_STREAM_VOICE_CALL, false) : vs;
     product_strategy_t strategy = mEngine->getProductStrategyForAttributes(attributes);
 
     status = setVolumeCurveIndex(index, device, curves);
@@ -3047,7 +3051,8 @@ status_t AudioPolicyManager::setVolumeIndexForAttributes(const audio_attributes_
         if (curDevices.erase(AUDIO_DEVICE_OUT_SPEAKER_SAFE)) {
             curDevices.insert(AUDIO_DEVICE_OUT_SPEAKER);
         }
-        if (!(desc->isActive(vs) || isInCall())) {
+
+        if (!(desc->isActive(activityVs) || isInCallOrScreening())) {
             continue;
         }
         if (device != AUDIO_DEVICE_OUT_DEFAULT_FOR_VOLUME &&
@@ -3081,7 +3086,7 @@ status_t AudioPolicyManager::setVolumeIndexForAttributes(const audio_attributes_
                 bool isPreempted = false;
                 bool isHigherPriority = productStrategy < strategy;
                 for (const auto &client : activeClients) {
-                    if (isHigherPriority && (client->volumeSource() != vs)) {
+                    if (isHigherPriority && (client->volumeSource() != activityVs)) {
                         ALOGV("%s: Strategy=%d (\nrequester:\n"
                               " group %d, volumeGroup=%d attributes=%s)\n"
                               " higher priority source active:\n"
@@ -3094,7 +3099,7 @@ status_t AudioPolicyManager::setVolumeIndexForAttributes(const audio_attributes_
                         break;
                     }
                     // However, continue for loop to ensure no higher prio clients running on output
-                    if (client->volumeSource() == vs) {
+                    if (client->volumeSource() == activityVs) {
                         applyVolume = true;
                     }
                 }
@@ -7499,12 +7504,16 @@ bool AudioPolicyManager::isStateInCall(int state) const {
     return is_state_in_call(state);
 }
 
-bool AudioPolicyManager::isCallAudioAccessible()
-{
+bool AudioPolicyManager::isCallAudioAccessible() const {
     audio_mode_t mode = mEngine->getPhoneState();
     return (mode == AUDIO_MODE_IN_CALL)
             || (mode == AUDIO_MODE_CALL_SCREEN)
             || (mode == AUDIO_MODE_CALL_REDIRECT);
+}
+
+bool AudioPolicyManager::isInCallOrScreening() const {
+    audio_mode_t mode = mEngine->getPhoneState();
+    return isStateInCall(mode) || mode == AUDIO_MODE_CALL_SCREEN;
 }
 
 void AudioPolicyManager::cleanUpForDevice(const sp<DeviceDescriptor>& deviceDesc)
