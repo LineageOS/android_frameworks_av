@@ -3319,6 +3319,8 @@ aidl2legacy_AudioEncapsulationType_audio_encapsulation_type_t(
             return AUDIO_ENCAPSULATION_TYPE_NONE;
         case AudioEncapsulationType::IEC61937:
             return AUDIO_ENCAPSULATION_TYPE_IEC61937;
+        case AudioEncapsulationType::PCM:
+            return AUDIO_ENCAPSULATION_TYPE_PCM;
     }
     return unexpected(BAD_VALUE);
 }
@@ -3331,6 +3333,8 @@ legacy2aidl_audio_encapsulation_type_t_AudioEncapsulationType(
             return AudioEncapsulationType::NONE;
         case AUDIO_ENCAPSULATION_TYPE_IEC61937:
             return AudioEncapsulationType::IEC61937;
+        case AUDIO_ENCAPSULATION_TYPE_PCM:
+            return AudioEncapsulationType::PCM;
     }
     return unexpected(BAD_VALUE);
 }
