@@ -320,7 +320,7 @@ protected:
     }
 
     virtual aaudio_result_t standby_l() REQUIRES(mLock) {
-        return AAUDIO_ERROR_UNAVAILABLE;
+        return AAUDIO_ERROR_UNIMPLEMENTED;
     }
     class ExitStandbyParam : public AAudioCommandParam {
     public:
