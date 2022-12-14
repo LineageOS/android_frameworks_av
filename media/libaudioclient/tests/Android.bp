@@ -176,6 +176,22 @@ cc_test {
 }
 
 cc_test {
+    name: "audioeffect_analysis",
+    defaults: ["libaudioclient_gtests_defaults"],
+    // flag needed for pfft/pffft.hpp
+    cflags: [
+        "-Wno-error=unused-parameter",
+    ],
+    srcs: [
+        "audioeffect_analyser.cpp",
+        "audio_test_utils.cpp",
+    ],
+    static_libs: [
+        "libpffft",
+    ],
+}
+
+cc_test {
     name: "audiorouting_tests",
     defaults: ["libaudioclient_gtests_defaults"],
     srcs: [
