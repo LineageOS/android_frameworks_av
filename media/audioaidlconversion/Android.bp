@@ -1,0 +1,140 @@
+package {
+    // See: http://go/android-license-faq
+    // A large-scale-change added 'default_applicable_licenses' to import
+    // all of the 'license_kinds' from "frameworks_av_license"
+    // to get the below license kinds:
+    //   SPDX-license-identifier-Apache-2.0
+    default_applicable_licenses: ["frameworks_av_license"],
+}
+
+cc_defaults {
+    name: "audio_aidl_conversion_common_util_default",
+    host_supported: true,
+    vendor_available: true,
+    double_loadable: true,
+    min_sdk_version: "29",
+    export_include_dirs: [
+        "include",
+    ],
+    header_libs: [
+        "libbase_headers",
+        "liberror_headers",
+    ],
+    export_header_lib_headers: [
+        "libbase_headers",
+        "liberror_headers",
+    ],
+    apex_available: [
+        "//apex_available:platform",
+        "com.android.btservices",
+        "com.android.media",
+        "com.android.media.swcodec",
+    ],
+    target: {
+        darwin: {
+            enabled: false,
+        },
+    },
+}
+
+// This is intended for clients needing to include AidlConversionUtil.h, without extra dependencies.
+cc_library_headers {
+    name: "libaudio_aidl_conversion_common_util_cpp",
+    defaults: [
+        "audio_aidl_conversion_common_util_default",
+    ],
+}
+
+cc_library_headers {
+    name: "libaudio_aidl_conversion_common_util_ndk",
+    defaults: [
+        "audio_aidl_conversion_common_util_default",
+    ],
+    cflags: [
+        "-DBACKEND_NDK",
+    ],
+}
+
+cc_defaults {
+    name: "audio_aidl_conversion_common_default",
+    export_include_dirs: ["include"],
+    host_supported: true,
+    vendor_available: true,
+    double_loadable: true,
+    min_sdk_version: "29",
+    header_libs: [
+        "libaudio_system_headers",
+    ],
+    shared_libs: [
+        "libbase",
+        "libbinder",
+        "liblog",
+        "libshmemcompat",
+        "libstagefright_foundation",
+        "libutils",
+        "shared-file-region-aidl-cpp",
+        "framework-permission-aidl-cpp",
+    ],
+    export_shared_lib_headers: [
+        "libbase",
+        "shared-file-region-aidl-cpp",
+    ],
+    cflags: [
+        "-Wall",
+        "-Werror",
+        "-Wno-error=deprecated-declarations",
+    ],
+    sanitize: {
+        misc_undefined: [
+            "unsigned-integer-overflow",
+            "signed-integer-overflow",
+        ],
+    },
+    target: {
+        darwin: {
+            enabled: false,
+        },
+    },
+}
+
+/**
+ * Only AIDL CPP backend conversion supported.
+ */
+cc_library {
+    name: "libaudio_aidl_conversion_common_cpp",
+    srcs: ["AidlConversionCppNdk.cpp"],
+    header_libs: [
+        "libaudio_aidl_conversion_common_util_cpp",
+    ],
+    export_header_lib_headers: [
+        "libaudio_aidl_conversion_common_util_cpp",
+    ],
+    defaults: [
+        "audio_aidl_conversion_common_default",
+        "latest_android_media_audio_common_types_cpp_export_shared",
+    ],
+}
+
+/**
+ * Only AIDL NDK backend conversion supported.
+ */
+cc_library {
+    name: "libaudio_aidl_conversion_common_ndk",
+    srcs: ["AidlConversionCppNdk.cpp"],
+    header_libs: [
+        "libaudio_aidl_conversion_common_util_ndk",
+    ],
+    export_header_lib_headers: [
+        "libaudio_aidl_conversion_common_util_ndk",
+    ],
+    defaults: [
+        "audio_aidl_conversion_common_default",
+        "latest_android_media_audio_common_types_ndk_shared",
+    ],
+    shared_libs: [
+        "libbinder_ndk",
+    ],
+    cflags: [
+        "-DBACKEND_NDK",
+    ],
+}
