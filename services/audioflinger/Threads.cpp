@@ -7332,23 +7332,13 @@ void AudioFlinger::SpatializerThread::onFirstRef() {
         updateHalSupportedLatencyModes_l();
     }
 
-    // update priority if specified.
-    constexpr int32_t kRTPriorityMin = 1;
-    constexpr int32_t kRTPriorityMax = 3;
-    const int32_t priorityBoost =
-            property_get_int32("audio.spatializer.priority", kRTPriorityMin);
-    if (priorityBoost >= kRTPriorityMin && priorityBoost <= kRTPriorityMax) {
-        const pid_t pid = getpid();
-        const pid_t tid = getTid();
-
-        if (tid == -1) {
-            // Unusual: PlaybackThread::onFirstRef() should set the threadLoop running.
-            ALOGW("%s: audio.spatializer.priority %d ignored, thread not running",
-                    __func__, priorityBoost);
-        } else {
-            ALOGD("%s: audio.spatializer.priority %d, allowing real time for pid %d  tid %d",
-                    __func__, priorityBoost, pid, tid);
-            sendPrioConfigEvent_l(pid, tid, priorityBoost, false /*forApp*/);
+    const pid_t tid = getTid();
+    if (tid == -1) {
+        // Unusual: PlaybackThread::onFirstRef() should set the threadLoop running.
+        ALOGW("%s: Cannot update Spatializer mixer thread priority, not running", __func__);
+    } else {
+        const int priorityBoost = requestSpatializerPriority(getpid(), tid);
+        if (priorityBoost > 0) {
             stream()->setHalThreadPriority(priorityBoost);
         }
     }
