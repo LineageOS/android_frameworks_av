@@ -29,6 +29,7 @@
 #include <LVM.h>
 #include <limits.h>
 
+using aidl::android::hardware::audio::effect::Descriptor;
 using aidl::android::hardware::audio::effect::EffectBundleAidl;
 using aidl::android::hardware::audio::effect::kEqualizerBundleImplUUID;
 using aidl::android::hardware::audio::effect::IEffect;
@@ -51,19 +52,12 @@ extern "C" binder_exception_t createEffect(const AudioUuid* uuid,
     }
 }
 
-extern "C" binder_exception_t destroyEffect(const std::shared_ptr<IEffect>& instanceSp) {
-    if (!instanceSp) {
-        LOG(ERROR) << __func__ << "nullInstance";
+extern "C" binder_exception_t queryEffect(const AudioUuid* in_impl_uuid, Descriptor* _aidl_return) {
+    if (!in_impl_uuid || *in_impl_uuid != kEqualizerBundleImplUUID) {
+        LOG(ERROR) << __func__ << "uuid not supported";
         return EX_ILLEGAL_ARGUMENT;
     }
-    State state;
-    ndk::ScopedAStatus status = instanceSp->getState(&state);
-    if (!status.isOk() || State::INIT != state) {
-        LOG(ERROR) << __func__ << " instance " << instanceSp.get()
-                   << " in state: " << toString(state) << ", status: " << status.getDescription();
-        return EX_ILLEGAL_STATE;
-    }
-    LOG(DEBUG) << __func__ << " instance " << instanceSp.get() << " destroyed";
+    *_aidl_return = aidl::android::hardware::audio::effect::lvm::kEqualizerDesc;
     return EX_NONE;
 }
 

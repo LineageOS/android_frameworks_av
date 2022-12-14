@@ -41,5 +41,10 @@
         }
       ]
     }
+  ],
+  "postsubmit": [
+    {
+       "name": "audioeffect_analysis"
+    }
   ]
 }
