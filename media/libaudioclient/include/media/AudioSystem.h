@@ -28,6 +28,7 @@
 #include <android/media/BnAudioPolicyServiceClient.h>
 #include <android/media/EffectDescriptor.h>
 #include <android/media/INativeSpatializerCallback.h>
+#include <android/media/ISoundDose.h>
 #include <android/media/ISoundDoseCallback.h>
 #include <android/media/ISpatializer.h>
 #include <android/media/RecordClientInfo.h>
@@ -300,6 +301,7 @@ public:
      * @param[out] portId the generated port id to identify the client
      * @param[out] secondaryOutputs collection of io handle for secondary outputs
      * @param[out] isSpatialized true if the playback will be spatialized
+     * @param[out] isBitPerfect true if the playback will be bit-perfect
      * @return if the call is successful or not
      */
     static status_t getOutputForAttr(audio_attributes_t *attr,
@@ -312,7 +314,8 @@ public:
                                      audio_port_handle_t *selectedDeviceId,
                                      audio_port_handle_t *portId,
                                      std::vector<audio_io_handle_t> *secondaryOutputs,
-                                     bool *isSpatialized);
+                                     bool *isSpatialized,
+                                     bool *isBitPerfect);
     static status_t startOutput(audio_port_handle_t portId);
     static status_t stopOutput(audio_port_handle_t portId);
     static void releaseOutput(audio_port_handle_t portId);
@@ -586,8 +589,15 @@ public:
                                      const AudioDeviceTypeAddrVector &devices,
                                      bool *canBeSpatialized);
 
-    /** Registers the sound dose callback with the audio server. */
-    static status_t registerSoundDoseCallback(const sp<media::ISoundDoseCallback>& callback);
+    /**
+     * Registers the sound dose callback with the audio server and returns the ISoundDose
+     * interface.
+     *
+     * \param callback to send messages to the audio server
+     * \param soundDose binder to send messages to the AudioService
+     **/
+    static status_t getSoundDoseInterface(const sp<media::ISoundDoseCallback>& callback,
+                                          sp<media::ISoundDose>* soundDose);
 
     /**
      * Query how the direct playback is currently supported on the device.

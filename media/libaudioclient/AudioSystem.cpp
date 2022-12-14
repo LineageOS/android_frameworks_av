@@ -1021,7 +1021,8 @@ status_t AudioSystem::getOutputForAttr(audio_attributes_t* attr,
                                        audio_port_handle_t* selectedDeviceId,
                                        audio_port_handle_t* portId,
                                        std::vector<audio_io_handle_t>* secondaryOutputs,
-                                       bool *isSpatialized) {
+                                       bool *isSpatialized,
+                                       bool *isBitPerfect) {
     if (attr == nullptr) {
         ALOGE("%s NULL audio attributes", __func__);
         return BAD_VALUE;
@@ -1084,6 +1085,7 @@ status_t AudioSystem::getOutputForAttr(audio_attributes_t* attr,
     *secondaryOutputs = VALUE_OR_RETURN_STATUS(convertContainer<std::vector<audio_io_handle_t>>(
             responseAidl.secondaryOutputs, aidl2legacy_int32_t_audio_io_handle_t));
     *isSpatialized = responseAidl.isSpatialized;
+    *isBitPerfect = responseAidl.isBitPerfect;
 
     return OK;
 }
@@ -2375,13 +2377,18 @@ status_t AudioSystem::canBeSpatialized(const audio_attributes_t *attr,
     return OK;
 }
 
-status_t AudioSystem::registerSoundDoseCallback(const sp<media::ISoundDoseCallback>& callback) {
+status_t AudioSystem::getSoundDoseInterface(const sp<media::ISoundDoseCallback>& callback,
+                                            sp<media::ISoundDose>* soundDose) {
     const sp<IAudioFlinger>& af = AudioSystem::get_audio_flinger();
     if (af == nullptr) {
         return PERMISSION_DENIED;
     }
+    if (soundDose == nullptr) {
+        return BAD_VALUE;
+    }
 
-    return af->registerSoundDoseCallback(callback);
+    RETURN_STATUS_IF_ERROR(af->getSoundDoseInterface(callback, soundDose));
+    return OK;
 }
 
 status_t AudioSystem::getDirectPlaybackSupport(const audio_attributes_t *attr,

@@ -151,7 +151,8 @@ bool CameraFuzzer::initCamera() {
     mCameraService->connect(this, mFDP->ConsumeIntegral<int32_t>() /* cameraId */,
                             String16("CAMERAFUZZ"), hardware::ICameraService::USE_CALLING_UID,
                             hardware::ICameraService::USE_CALLING_PID,
-                            /*targetSdkVersion*/ __ANDROID_API_FUTURE__, &cameraDevice);
+                            /*targetSdkVersion*/ __ANDROID_API_FUTURE__,
+                            /*overrideToPortrait*/false, &cameraDevice);
     mCamera = Camera::create(cameraDevice);
     if (!mCamera) {
         return false;
@@ -182,7 +183,7 @@ void CameraFuzzer::invokeCamera() {
                                             : mFDP->ConsumeIntegral<int>();
     cameraInfo.orientation = mFDP->ConsumeBool() ? mFDP->PickValueInArray(kValidOrientation)
                                                  : mFDP->ConsumeIntegral<int>();
-    Camera::getCameraInfo(cameraId, &cameraInfo);
+    Camera::getCameraInfo(cameraId, /*overrideToPortrait*/false, &cameraInfo);
     mCamera->reconnect();
 
     mComposerClient = new SurfaceComposerClient;

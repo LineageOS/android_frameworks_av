@@ -52,6 +52,7 @@ sp<audio_utils::MelProcessor> SoundDoseManager::getOrCreateProcessorForDevice(
             (processor = streamProcessor->second.promote())) {
         ALOGV("%s: found callback for stream %d", __func__, streamHandle);
         processor->setDeviceId(deviceId);
+        processor->setOutputRs2(mRs2Value);
         return processor;
     } else {
         ALOGV("%s: creating new callback for device %d", __func__, streamHandle);
@@ -66,12 +67,14 @@ void SoundDoseManager::setOutputRs2(float rs2Value) {
     ALOGV("%s", __func__);
     std::lock_guard _l(mLock);
 
+    mRs2Value = rs2Value;
+
     for (auto& streamProcessor : mActiveProcessors) {
         sp<audio_utils::MelProcessor> processor = streamProcessor.second.promote();
         if (processor != nullptr) {
-            status_t result = processor->setOutputRs2(rs2Value);
+            status_t result = processor->setOutputRs2(mRs2Value);
             if (result != NO_ERROR) {
-                ALOGW("%s: could not set RS2 value %f for stream %d", __func__, rs2Value,
+                ALOGW("%s: could not set RS2 value %f for stream %d", __func__, mRs2Value,
                       streamProcessor.first);
             }
         }
@@ -84,6 +87,51 @@ void SoundDoseManager::removeStreamProcessor(audio_io_handle_t streamHandle) {
     if (callbackToRemove != mActiveProcessors.end()) {
         mActiveProcessors.erase(callbackToRemove);
     }
+}
+
+void SoundDoseManager::SoundDose::binderDied(__unused const wp<IBinder>& who) {
+    ALOGV("%s", __func__);
+
+    auto soundDoseManager = mSoundDoseManager.promote();
+    if (soundDoseManager != nullptr) {
+        soundDoseManager->resetSoundDose();
+    }
+}
+
+binder::Status SoundDoseManager::SoundDose::setOutputRs2(float value) {
+    ALOGV("%s", __func__);
+    auto soundDoseManager = mSoundDoseManager.promote();
+    if (soundDoseManager != nullptr) {
+        soundDoseManager->setOutputRs2(value);
+    }
+    return binder::Status::ok();
+}
+
+binder::Status SoundDoseManager::SoundDose::resetCsd(
+        float currentCsd, const std::vector<media::SoundDoseRecord>& records) {
+    ALOGV("%s", __func__);
+    auto soundDoseManager = mSoundDoseManager.promote();
+    if (soundDoseManager != nullptr) {
+        soundDoseManager->resetCsd(currentCsd, records);
+    }
+    return binder::Status::ok();
+}
+
+void SoundDoseManager::resetSoundDose() {
+    std::lock_guard lock(mLock);
+    mSoundDose = nullptr;
+}
+
+void SoundDoseManager::resetCsd(float currentCsd,
+                                const std::vector<media::SoundDoseRecord>& records) {
+    std::lock_guard lock(mLock);
+    std::vector<audio_utils::CsdRecord> resetRecords;
+    for (const auto& record : records) {
+        resetRecords.emplace_back(record.timestamp, record.duration, record.value,
+                                  record.averageMel);
+    }
+
+    mMelAggregator->reset(currentCsd, resetRecords);
 }
 
 void SoundDoseManager::onNewMelValues(const std::vector<float>& mels, size_t offset, size_t length,
@@ -120,28 +168,31 @@ void SoundDoseManager::onNewMelValues(const std::vector<float>& mels, size_t off
 
 sp<media::ISoundDoseCallback> SoundDoseManager::getSoundDoseCallback() const {
     std::lock_guard _l(mLock);
-    return mSoundDoseCallback;
+    if (mSoundDose == nullptr) {
+        return nullptr;
+    }
+
+    return mSoundDose->mSoundDoseCallback;
 }
 
 void SoundDoseManager::onMomentaryExposure(float currentMel, audio_port_handle_t deviceId) const {
     ALOGV("%s: Momentary exposure for device %d triggered: %f MEL", __func__, deviceId, currentMel);
 
-    sp<media::ISoundDoseCallback> soundDoseCallback;
-    {
-        std::lock_guard _l(mLock);
-        soundDoseCallback = mSoundDoseCallback;
-    }
-
+    auto soundDoseCallback = getSoundDoseCallback();
     if (soundDoseCallback != nullptr) {
-        mSoundDoseCallback->onMomentaryExposure(currentMel, deviceId);
+        soundDoseCallback->onMomentaryExposure(currentMel, deviceId);
     }
 }
 
-void SoundDoseManager::registerSoundDoseCallback(const sp<media::ISoundDoseCallback>& callback) {
+sp<media::ISoundDose> SoundDoseManager::getSoundDoseInterface(
+        const sp<media::ISoundDoseCallback>& callback) {
     ALOGV("%s: Register ISoundDoseCallback", __func__);
 
     std::lock_guard _l(mLock);
-    mSoundDoseCallback = callback;
+    if (mSoundDose == nullptr) {
+        mSoundDose = sp<SoundDose>::make(this, callback);
+    }
+    return mSoundDose;
 }
 
 std::string SoundDoseManager::dump() const {

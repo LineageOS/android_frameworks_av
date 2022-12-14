@@ -124,7 +124,8 @@ public:
                                   audio_port_handle_t *portId,
                                   std::vector<audio_io_handle_t> *secondaryOutputs,
                                   output_type_t *outputType,
-                                  bool *isSpatialized) override;
+                                  bool *isSpatialized,
+                                  bool *isBitPerfect) override;
         virtual status_t startOutput(audio_port_handle_t portId);
         virtual status_t stopOutput(audio_port_handle_t portId);
         virtual bool releaseOutput(audio_port_handle_t portId);
@@ -616,7 +617,9 @@ protected:
         // true if given state represents a device in a telephony or VoIP call
         virtual bool isStateInCall(int state) const;
         // true if playback to call TX or capture from call RX is possible
-        bool isCallAudioAccessible();
+        bool isCallAudioAccessible() const;
+        // true if device is in a telephony or VoIP call or call screening is active
+        bool isInCallOrScreening() const;
 
         // when a device is connected, checks if an open output can be routed
         // to this device. If none is open, tries to open one of the available outputs.
@@ -1080,7 +1083,8 @@ private:
                 bool *isRequestedDeviceForExclusiveUse,
                 std::vector<sp<AudioPolicyMix>> *secondaryMixes,
                 output_type_t *outputType,
-                bool *isSpatialized);
+                bool *isSpatialized,
+                bool *isBitPerfect);
         // internal method to return the output handle for the given device and format
         audio_io_handle_t getOutputForDevices(
                 const DeviceVector &devices,

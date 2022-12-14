@@ -18,7 +18,6 @@
 #include <functional>
 #include <map>
 #include <memory>
-#include <mutex>
 
 #include <aidl/android/hardware/audio/effect/BnEffect.h>
 #include <android-base/logging.h>
@@ -42,28 +41,21 @@ class EffectBundleAidl final : public EffectImpl {
     ndk::ScopedAStatus setParameterSpecific(const Parameter::Specific& specific) override;
     ndk::ScopedAStatus getParameterSpecific(const Parameter::Id& id,
                                             Parameter::Specific* specific) override;
-    IEffect::Status effectProcessImpl(float *in, float *out, int process) override;
 
     std::shared_ptr<EffectContext> createContext(const Parameter::Common& common) override;
+    std::shared_ptr<EffectContext> getContext() override;
     RetCode releaseContext() override;
 
-    ndk::ScopedAStatus commandStart() override {
-        mContext->enable();
-        return ndk::ScopedAStatus::ok();
-    }
-    ndk::ScopedAStatus commandStop() override {
-        mContext->disable();
-        return ndk::ScopedAStatus::ok();
-    }
-    ndk::ScopedAStatus commandReset() override {
-            mContext->disable();
-            return ndk::ScopedAStatus::ok();
-    }
+    IEffect::Status effectProcessImpl(float* in, float* out, int samples) override;
+
+    ndk::ScopedAStatus commandImpl(CommandId command) override;
+
+    std::string getEffectName() override { return "EqualizerBundle"; }
 
   private:
+    std::shared_ptr<BundleContext> mContext;
     const Descriptor* mDescriptor;
     lvm::BundleEffectType mType = lvm::BundleEffectType::EQUALIZER;
-    std::shared_ptr<BundleContext> mContext;
 
     IEffect::Status status(binder_status_t status, size_t consumed, size_t produced);
     ndk::ScopedAStatus getParameterEqualizer(const Equalizer::Tag& tag,

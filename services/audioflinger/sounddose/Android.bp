@@ -20,6 +20,7 @@ cc_library {
         "audioflinger-aidl-cpp",
         "libaudioutils",
         "libbase",
+        "libbinder",
         "liblog",
         "libutils",
     ],

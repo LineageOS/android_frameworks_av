@@ -59,7 +59,8 @@ protected:
             int sensorOrientation,
             int clientPid,
             uid_t clientUid,
-            int servicePid);
+            int servicePid,
+            bool overrideToPortrait);
 
     sp<hardware::camera2::ICameraDeviceCallbacks> mRemoteCallback;
 };
@@ -189,7 +190,8 @@ public:
             int clientPid,
             uid_t clientUid,
             int servicePid,
-            bool overrideForPerfClass);
+            bool overrideForPerfClass,
+            bool overrideToPortrait);
     virtual ~CameraDeviceClient();
 
     virtual status_t      initialize(sp<CameraProviderManager> manager,

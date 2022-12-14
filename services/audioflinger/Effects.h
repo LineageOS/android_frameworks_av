@@ -545,6 +545,9 @@ public:
     // Is this EffectChain compatible with the FAST audio flag.
     bool isFastCompatible() const;
 
+    // Is this EffectChain compatible with the bit-perfect audio flag.
+    bool isBitPerfectCompatible() const;
+
     // isCompatibleWithThread_l() must be called with thread->mLock held
     bool isCompatibleWithThread_l(const sp<ThreadBase>& thread) const;
 

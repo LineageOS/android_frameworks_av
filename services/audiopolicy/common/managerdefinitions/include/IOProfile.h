@@ -66,6 +66,9 @@ public:
         if (getRole() == AUDIO_PORT_ROLE_SOURCE) {
             mMixerBehaviors.clear();
             mMixerBehaviors.insert(AUDIO_MIXER_BEHAVIOR_DEFAULT);
+            if (mFlags.output & AUDIO_OUTPUT_FLAG_BIT_PERFECT) {
+                mMixerBehaviors.insert(AUDIO_MIXER_BEHAVIOR_BIT_PERFECT);
+            }
         }
     }
 

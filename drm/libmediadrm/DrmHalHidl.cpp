@@ -35,6 +35,7 @@
 #include <mediadrm/DrmHalHidl.h>
 #include <mediadrm/DrmSessionClientInterface.h>
 #include <mediadrm/DrmSessionManager.h>
+#include <mediadrm/DrmStatus.h>
 #include <mediadrm/DrmUtils.h>
 #include <mediadrm/IDrmMetricsConsumer.h>
 #include <utils/Log.h>
@@ -368,14 +369,14 @@ sp<IDrmPlugin> DrmHalHidl::makeDrmPlugin(const sp<IDrmFactory>& factory, const u
     return plugin;
 }
 
-status_t DrmHalHidl::initCheck() const {
-    return mInitCheck;
+DrmStatus DrmHalHidl::initCheck() const {
+    return DrmStatus(mInitCheck);
 }
 
-status_t DrmHalHidl::setListener(const sp<IDrmClient>& listener) {
+DrmStatus DrmHalHidl::setListener(const sp<IDrmClient>& listener) {
     Mutex::Autolock lock(mEventLock);
     mListener = listener;
-    return NO_ERROR;
+    return DrmStatus(NO_ERROR);
 }
 
 Return<void> DrmHalHidl::sendEvent(EventType hEventType, const hidl_vec<uint8_t>& sessionId,
@@ -502,10 +503,10 @@ Return<void> DrmHalHidl::sendSessionLostState(const hidl_vec<uint8_t>& sessionId
     return Void();
 }
 
-status_t DrmHalHidl::matchMimeTypeAndSecurityLevel(const sp<IDrmFactory>& factory,
-                                                   const uint8_t uuid[16], const String8& mimeType,
-                                                   DrmPlugin::SecurityLevel level,
-                                                   bool* isSupported) {
+DrmStatus DrmHalHidl::matchMimeTypeAndSecurityLevel(const sp<IDrmFactory>& factory,
+                                                    const uint8_t uuid[16], const String8& mimeType,
+                                                    DrmPlugin::SecurityLevel level,
+                                                    bool* isSupported) {
     *isSupported = false;
 
     // handle default value cases
@@ -517,23 +518,23 @@ status_t DrmHalHidl::matchMimeTypeAndSecurityLevel(const sp<IDrmFactory>& factor
             // isCryptoSchemeSupported(uuid, mimeType)
             *isSupported = factory->isContentTypeSupported(mimeType.string());
         }
-        return OK;
+        return DrmStatus(OK);
     } else if (mimeType == "") {
-        return BAD_VALUE;
+        return DrmStatus(BAD_VALUE);
     }
 
     sp<drm::V1_2::IDrmFactory> factoryV1_2 = drm::V1_2::IDrmFactory::castFrom(factory);
     if (factoryV1_2 == NULL) {
-        return ERROR_UNSUPPORTED;
+        return DrmStatus(ERROR_UNSUPPORTED);
     } else {
         *isSupported = factoryV1_2->isCryptoSchemeSupported_1_2(uuid, mimeType.string(),
                                                                 toHidlSecurityLevel(level));
-        return OK;
+        return DrmStatus(OK);
     }
 }
 
-status_t DrmHalHidl::isCryptoSchemeSupported(const uint8_t uuid[16], const String8& mimeType,
-                                             DrmPlugin::SecurityLevel level, bool* isSupported) {
+DrmStatus DrmHalHidl::isCryptoSchemeSupported(const uint8_t uuid[16], const String8& mimeType,
+                                              DrmPlugin::SecurityLevel level, bool* isSupported) {
     Mutex::Autolock autoLock(mLock);
     *isSupported = false;
     for (ssize_t i = mFactories.size() - 1; i >= 0; i--) {
@@ -541,10 +542,10 @@ status_t DrmHalHidl::isCryptoSchemeSupported(const uint8_t uuid[16], const Strin
             return matchMimeTypeAndSecurityLevel(mFactories[i], uuid, mimeType, level, isSupported);
         }
     }
-    return OK;
+    return DrmStatus(OK);
 }
 
-status_t DrmHalHidl::createPlugin(const uint8_t uuid[16], const String8& appPackageName) {
+DrmStatus DrmHalHidl::createPlugin(const uint8_t uuid[16], const String8& appPackageName) {
     Mutex::Autolock autoLock(mLock);
 
     for (ssize_t i = mFactories.size() - 1; i >= 0; i--) {
@@ -581,15 +582,15 @@ status_t DrmHalHidl::createPlugin(const uint8_t uuid[16], const String8& appPack
         }
     }
 
-    return mInitCheck;
+    return DrmStatus(mInitCheck);
 }
 
-status_t DrmHalHidl::destroyPlugin() {
+DrmStatus DrmHalHidl::destroyPlugin() {
     cleanup();
-    return OK;
+    return DrmStatus(OK);
 }
 
-status_t DrmHalHidl::openSession(DrmPlugin::SecurityLevel level, Vector<uint8_t>& sessionId) {
+DrmStatus DrmHalHidl::openSession(DrmPlugin::SecurityLevel level, Vector<uint8_t>& sessionId) {
     Mutex::Autolock autoLock(mLock);
     INIT_CHECK();
 
@@ -604,7 +605,7 @@ status_t DrmHalHidl::openSession(DrmPlugin::SecurityLevel level, Vector<uint8_t>
         }
     }
 
-    status_t err = UNKNOWN_ERROR;
+    DrmStatus err = UNKNOWN_ERROR;
     bool retry = true;
     do {
         hidl_vec<uint8_t> hSessionId;
@@ -657,7 +658,7 @@ status_t DrmHalHidl::openSession(DrmPlugin::SecurityLevel level, Vector<uint8_t>
     return err;
 }
 
-status_t DrmHalHidl::closeSession(Vector<uint8_t> const& sessionId) {
+DrmStatus DrmHalHidl::closeSession(Vector<uint8_t> const& sessionId) {
     Mutex::Autolock autoLock(mLock);
     INIT_CHECK();
 
@@ -672,13 +673,13 @@ status_t DrmHalHidl::closeSession(Vector<uint8_t> const& sessionId) {
                 }
             }
         }
-        status_t response = toStatusT(status);
+        DrmStatus response = toStatusT(status);
         mMetrics.SetSessionEnd(sessionId);
         mMetrics.mCloseSessionCounter.Increment(response);
         return response;
     }
     mMetrics.mCloseSessionCounter.Increment(DEAD_OBJECT);
-    return DEAD_OBJECT;
+    return DrmStatus(DEAD_OBJECT);
 }
 
 static DrmPlugin::KeyRequestType toKeyRequestType(KeyRequestType keyRequestType) {
@@ -712,12 +713,12 @@ static DrmPlugin::KeyRequestType toKeyRequestType_1_1(KeyRequestType_V1_1 keyReq
     }
 }
 
-status_t DrmHalHidl::getKeyRequest(Vector<uint8_t> const& sessionId,
-                                   Vector<uint8_t> const& initData, String8 const& mimeType,
-                                   DrmPlugin::KeyType keyType,
-                                   KeyedVector<String8, String8> const& optionalParameters,
-                                   Vector<uint8_t>& request, String8& defaultUrl,
-                                   DrmPlugin::KeyRequestType* keyRequestType) {
+DrmStatus DrmHalHidl::getKeyRequest(Vector<uint8_t> const& sessionId,
+                                    Vector<uint8_t> const& initData, String8 const& mimeType,
+                                    DrmPlugin::KeyType keyType,
+                                    KeyedVector<String8, String8> const& optionalParameters,
+                                    Vector<uint8_t>& request, String8& defaultUrl,
+                                    DrmPlugin::KeyRequestType* keyRequestType) {
     Mutex::Autolock autoLock(mLock);
     INIT_CHECK();
     EventTimer<status_t> keyRequestTimer(&mMetrics.mGetKeyRequestTimeUs);
@@ -738,7 +739,7 @@ status_t DrmHalHidl::getKeyRequest(Vector<uint8_t> const& sessionId,
 
     ::KeyedVector hOptionalParameters = toHidlKeyedVector(optionalParameters);
 
-    status_t err = UNKNOWN_ERROR;
+    DrmStatus err = UNKNOWN_ERROR;
     Return<void> hResult;
 
     if (mPluginV1_2 != NULL) {
@@ -787,16 +788,16 @@ status_t DrmHalHidl::getKeyRequest(Vector<uint8_t> const& sessionId,
     return err;
 }
 
-status_t DrmHalHidl::provideKeyResponse(Vector<uint8_t> const& sessionId,
-                                        Vector<uint8_t> const& response,
-                                        Vector<uint8_t>& keySetId) {
+DrmStatus DrmHalHidl::provideKeyResponse(Vector<uint8_t> const& sessionId,
+                                         Vector<uint8_t> const& response,
+                                         Vector<uint8_t>& keySetId) {
     Mutex::Autolock autoLock(mLock);
     INIT_CHECK();
     EventTimer<status_t> keyResponseTimer(&mMetrics.mProvideKeyResponseTimeUs);
 
     DrmSessionManager::Instance()->useSession(sessionId);
 
-    status_t err = UNKNOWN_ERROR;
+    DrmStatus err = UNKNOWN_ERROR;
 
     Return<void> hResult =
             mPlugin->provideKeyResponse(toHidlVec(sessionId), toHidlVec(response),
@@ -811,27 +812,27 @@ status_t DrmHalHidl::provideKeyResponse(Vector<uint8_t> const& sessionId,
     return err;
 }
 
-status_t DrmHalHidl::removeKeys(Vector<uint8_t> const& keySetId) {
+DrmStatus DrmHalHidl::removeKeys(Vector<uint8_t> const& keySetId) {
     Mutex::Autolock autoLock(mLock);
     INIT_CHECK();
 
     Return<Status> status = mPlugin->removeKeys(toHidlVec(keySetId));
-    return status.isOk() ? toStatusT(status) : DEAD_OBJECT;
+    return status.isOk() ? DrmStatus(toStatusT(status)) : DrmStatus(DEAD_OBJECT);
 }
 
-status_t DrmHalHidl::restoreKeys(Vector<uint8_t> const& sessionId,
-                                 Vector<uint8_t> const& keySetId) {
+DrmStatus DrmHalHidl::restoreKeys(Vector<uint8_t> const& sessionId,
+                                  Vector<uint8_t> const& keySetId) {
     Mutex::Autolock autoLock(mLock);
     INIT_CHECK();
 
     DrmSessionManager::Instance()->useSession(sessionId);
 
     Return<Status> status = mPlugin->restoreKeys(toHidlVec(sessionId), toHidlVec(keySetId));
-    return status.isOk() ? toStatusT(status) : DEAD_OBJECT;
+    return status.isOk() ? DrmStatus(toStatusT(status)) : DrmStatus(DEAD_OBJECT);
 }
 
-status_t DrmHalHidl::queryKeyStatus(Vector<uint8_t> const& sessionId,
-                                    KeyedVector<String8, String8>& infoMap) const {
+DrmStatus DrmHalHidl::queryKeyStatus(Vector<uint8_t> const& sessionId,
+                                     KeyedVector<String8, String8>& infoMap) const {
     Mutex::Autolock autoLock(mLock);
     INIT_CHECK();
 
@@ -839,7 +840,7 @@ status_t DrmHalHidl::queryKeyStatus(Vector<uint8_t> const& sessionId,
 
     ::KeyedVector hInfoMap;
 
-    status_t err = UNKNOWN_ERROR;
+    DrmStatus err = UNKNOWN_ERROR;
 
     Return<void> hResult = mPlugin->queryKeyStatus(
             toHidlVec(sessionId), [&](Status status, const hidl_vec<KeyValue>& map) {
@@ -849,15 +850,15 @@ status_t DrmHalHidl::queryKeyStatus(Vector<uint8_t> const& sessionId,
                 err = toStatusT(status);
             });
 
-    return hResult.isOk() ? err : DEAD_OBJECT;
+    return hResult.isOk() ? DrmStatus(err) : DrmStatus(DEAD_OBJECT);
 }
 
-status_t DrmHalHidl::getProvisionRequest(String8 const& certType, String8 const& certAuthority,
-                                         Vector<uint8_t>& request, String8& defaultUrl) {
+DrmStatus DrmHalHidl::getProvisionRequest(String8 const& certType, String8 const& certAuthority,
+                                          Vector<uint8_t>& request, String8& defaultUrl) {
     Mutex::Autolock autoLock(mLock);
     INIT_CHECK();
 
-    status_t err = UNKNOWN_ERROR;
+    DrmStatus err = UNKNOWN_ERROR;
     Return<void> hResult;
 
     if (mPluginV1_2 != NULL) {
@@ -888,13 +889,13 @@ status_t DrmHalHidl::getProvisionRequest(String8 const& certType, String8 const&
     return err;
 }
 
-status_t DrmHalHidl::provideProvisionResponse(Vector<uint8_t> const& response,
-                                              Vector<uint8_t>& certificate,
-                                              Vector<uint8_t>& wrappedKey) {
+DrmStatus DrmHalHidl::provideProvisionResponse(Vector<uint8_t> const& response,
+                                               Vector<uint8_t>& certificate,
+                                               Vector<uint8_t>& wrappedKey) {
     Mutex::Autolock autoLock(mLock);
     INIT_CHECK();
 
-    status_t err = UNKNOWN_ERROR;
+    DrmStatus err = UNKNOWN_ERROR;
 
     Return<void> hResult = mPlugin->provideProvisionResponse(
             toHidlVec(response), [&](Status status, const hidl_vec<uint8_t>& hCertificate,
@@ -911,11 +912,11 @@ status_t DrmHalHidl::provideProvisionResponse(Vector<uint8_t> const& response,
     return err;
 }
 
-status_t DrmHalHidl::getSecureStops(List<Vector<uint8_t>>& secureStops) {
+DrmStatus DrmHalHidl::getSecureStops(List<Vector<uint8_t>>& secureStops) {
     Mutex::Autolock autoLock(mLock);
     INIT_CHECK();
 
-    status_t err = UNKNOWN_ERROR;
+    DrmStatus err = UNKNOWN_ERROR;
 
     Return<void> hResult =
             mPlugin->getSecureStops([&](Status status, const hidl_vec<SecureStop>& hSecureStops) {
@@ -925,10 +926,10 @@ status_t DrmHalHidl::getSecureStops(List<Vector<uint8_t>>& secureStops) {
                 err = toStatusT(status);
             });
 
-    return hResult.isOk() ? err : DEAD_OBJECT;
+    return hResult.isOk() ? err : DrmStatus(DEAD_OBJECT);
 }
 
-status_t DrmHalHidl::getSecureStopIds(List<Vector<uint8_t>>& secureStopIds) {
+DrmStatus DrmHalHidl::getSecureStopIds(List<Vector<uint8_t>>& secureStopIds) {
     Mutex::Autolock autoLock(mLock);
 
     if (mInitCheck != OK) {
@@ -939,7 +940,7 @@ status_t DrmHalHidl::getSecureStopIds(List<Vector<uint8_t>>& secureStopIds) {
         return ERROR_DRM_CANNOT_HANDLE;
     }
 
-    status_t err = UNKNOWN_ERROR;
+    DrmStatus err = UNKNOWN_ERROR;
 
     Return<void> hResult = mPluginV1_1->getSecureStopIds(
             [&](Status status, const hidl_vec<SecureStopId>& hSecureStopIds) {
@@ -949,14 +950,14 @@ status_t DrmHalHidl::getSecureStopIds(List<Vector<uint8_t>>& secureStopIds) {
                 err = toStatusT(status);
             });
 
-    return hResult.isOk() ? err : DEAD_OBJECT;
+    return hResult.isOk() ? err : DrmStatus(DEAD_OBJECT);
 }
 
-status_t DrmHalHidl::getSecureStop(Vector<uint8_t> const& ssid, Vector<uint8_t>& secureStop) {
+DrmStatus DrmHalHidl::getSecureStop(Vector<uint8_t> const& ssid, Vector<uint8_t>& secureStop) {
     Mutex::Autolock autoLock(mLock);
     INIT_CHECK();
 
-    status_t err = UNKNOWN_ERROR;
+    DrmStatus err = UNKNOWN_ERROR;
 
     Return<void> hResult = mPlugin->getSecureStop(
             toHidlVec(ssid), [&](Status status, const SecureStop& hSecureStop) {
@@ -966,10 +967,10 @@ status_t DrmHalHidl::getSecureStop(Vector<uint8_t> const& ssid, Vector<uint8_t>&
                 err = toStatusT(status);
             });
 
-    return hResult.isOk() ? err : DEAD_OBJECT;
+    return hResult.isOk() ? err : DrmStatus(DEAD_OBJECT);
 }
 
-status_t DrmHalHidl::releaseSecureStops(Vector<uint8_t> const& ssRelease) {
+DrmStatus DrmHalHidl::releaseSecureStops(Vector<uint8_t> const& ssRelease) {
     Mutex::Autolock autoLock(mLock);
     INIT_CHECK();
 
@@ -981,10 +982,10 @@ status_t DrmHalHidl::releaseSecureStops(Vector<uint8_t> const& ssRelease) {
     } else {
         status = mPlugin->releaseSecureStop(toHidlVec(ssRelease));
     }
-    return status.isOk() ? toStatusT(status) : DEAD_OBJECT;
+    return status.isOk() ? DrmStatus(toStatusT(status)) : DrmStatus(DEAD_OBJECT);
 }
 
-status_t DrmHalHidl::removeSecureStop(Vector<uint8_t> const& ssid) {
+DrmStatus DrmHalHidl::removeSecureStop(Vector<uint8_t> const& ssid) {
     Mutex::Autolock autoLock(mLock);
 
     if (mInitCheck != OK) {
@@ -996,10 +997,10 @@ status_t DrmHalHidl::removeSecureStop(Vector<uint8_t> const& ssid) {
     }
 
     Return<Status> status = mPluginV1_1->removeSecureStop(toHidlVec(ssid));
-    return status.isOk() ? toStatusT(status) : DEAD_OBJECT;
+    return status.isOk() ? DrmStatus(toStatusT(status)) : DrmStatus(DEAD_OBJECT);
 }
 
-status_t DrmHalHidl::removeAllSecureStops() {
+DrmStatus DrmHalHidl::removeAllSecureStops() {
     Mutex::Autolock autoLock(mLock);
     INIT_CHECK();
 
@@ -1009,18 +1010,18 @@ status_t DrmHalHidl::removeAllSecureStops() {
     } else {
         status = mPlugin->releaseAllSecureStops();
     }
-    return status.isOk() ? toStatusT(status) : DEAD_OBJECT;
+    return status.isOk() ? DrmStatus(toStatusT(status)) : DrmStatus(DEAD_OBJECT);
 }
 
-status_t DrmHalHidl::getHdcpLevels(DrmPlugin::HdcpLevel* connected,
-                                   DrmPlugin::HdcpLevel* max) const {
+DrmStatus DrmHalHidl::getHdcpLevels(DrmPlugin::HdcpLevel* connected,
+                                    DrmPlugin::HdcpLevel* max) const {
     Mutex::Autolock autoLock(mLock);
     INIT_CHECK();
 
     if (connected == NULL || max == NULL) {
         return BAD_VALUE;
     }
-    status_t err = UNKNOWN_ERROR;
+    DrmStatus err = UNKNOWN_ERROR;
 
     *connected = DrmPlugin::kHdcpLevelUnknown;
     *max = DrmPlugin::kHdcpLevelUnknown;
@@ -1046,26 +1047,26 @@ status_t DrmHalHidl::getHdcpLevels(DrmPlugin::HdcpLevel* connected,
                     err = toStatusT(status);
                 });
     } else {
-        return ERROR_DRM_CANNOT_HANDLE;
+        return DrmStatus(ERROR_DRM_CANNOT_HANDLE);
     }
 
-    return hResult.isOk() ? err : DEAD_OBJECT;
+    return hResult.isOk() ? err : DrmStatus(DEAD_OBJECT);
 }
 
-status_t DrmHalHidl::getNumberOfSessions(uint32_t* open, uint32_t* max) const {
+DrmStatus DrmHalHidl::getNumberOfSessions(uint32_t* open, uint32_t* max) const {
     Mutex::Autolock autoLock(mLock);
     INIT_CHECK();
 
     if (open == NULL || max == NULL) {
         return BAD_VALUE;
     }
-    status_t err = UNKNOWN_ERROR;
+    DrmStatus err = UNKNOWN_ERROR;
 
     *open = 0;
     *max = 0;
 
     if (mPluginV1_1 == NULL) {
-        return ERROR_DRM_CANNOT_HANDLE;
+        return DrmStatus(ERROR_DRM_CANNOT_HANDLE);
     }
 
     Return<void> hResult =
@@ -1077,21 +1078,21 @@ status_t DrmHalHidl::getNumberOfSessions(uint32_t* open, uint32_t* max) const {
                 err = toStatusT(status);
             });
 
-    return hResult.isOk() ? err : DEAD_OBJECT;
+    return hResult.isOk() ? err : DrmStatus(DEAD_OBJECT);
 }
 
-status_t DrmHalHidl::getSecurityLevel(Vector<uint8_t> const& sessionId,
-                                      DrmPlugin::SecurityLevel* level) const {
+DrmStatus DrmHalHidl::getSecurityLevel(Vector<uint8_t> const& sessionId,
+                                       DrmPlugin::SecurityLevel* level) const {
     Mutex::Autolock autoLock(mLock);
     INIT_CHECK();
 
     if (level == NULL) {
-        return BAD_VALUE;
+        return DrmStatus(BAD_VALUE);
     }
-    status_t err = UNKNOWN_ERROR;
+    DrmStatus err = UNKNOWN_ERROR;
 
     if (mPluginV1_1 == NULL) {
-        return ERROR_DRM_CANNOT_HANDLE;
+        return DrmStatus(ERROR_DRM_CANNOT_HANDLE);
     }
 
     *level = DrmPlugin::kSecurityLevelUnknown;
@@ -1104,21 +1105,21 @@ status_t DrmHalHidl::getSecurityLevel(Vector<uint8_t> const& sessionId,
                                                              err = toStatusT(status);
                                                          });
 
-    return hResult.isOk() ? err : DEAD_OBJECT;
+    return hResult.isOk() ? err : DrmStatus(DEAD_OBJECT);
 }
 
-status_t DrmHalHidl::getOfflineLicenseKeySetIds(List<Vector<uint8_t>>& keySetIds) const {
+DrmStatus DrmHalHidl::getOfflineLicenseKeySetIds(List<Vector<uint8_t>>& keySetIds) const {
     Mutex::Autolock autoLock(mLock);
 
     if (mInitCheck != OK) {
-        return mInitCheck;
+        return DrmStatus(mInitCheck);
     }
 
     if (mPluginV1_2 == NULL) {
-        return ERROR_UNSUPPORTED;
+        return DrmStatus(ERROR_UNSUPPORTED);
     }
 
-    status_t err = UNKNOWN_ERROR;
+    DrmStatus err = UNKNOWN_ERROR;
 
     Return<void> hResult = mPluginV1_2->getOfflineLicenseKeySetIds(
             [&](Status status, const hidl_vec<KeySetId>& hKeySetIds) {
@@ -1128,38 +1129,38 @@ status_t DrmHalHidl::getOfflineLicenseKeySetIds(List<Vector<uint8_t>>& keySetIds
                 err = toStatusT(status);
             });
 
-    return hResult.isOk() ? err : DEAD_OBJECT;
+    return hResult.isOk() ? err : DrmStatus(DEAD_OBJECT);
 }
 
-status_t DrmHalHidl::removeOfflineLicense(Vector<uint8_t> const& keySetId) {
+DrmStatus DrmHalHidl::removeOfflineLicense(Vector<uint8_t> const& keySetId) {
     Mutex::Autolock autoLock(mLock);
 
     if (mInitCheck != OK) {
-        return mInitCheck;
+        return DrmStatus(mInitCheck);
     }
 
     if (mPluginV1_2 == NULL) {
-        return ERROR_UNSUPPORTED;
+        return DrmStatus(ERROR_UNSUPPORTED);
     }
 
     Return<Status> status = mPluginV1_2->removeOfflineLicense(toHidlVec(keySetId));
-    return status.isOk() ? toStatusT(status) : DEAD_OBJECT;
+    return status.isOk() ? DrmStatus(toStatusT(status)) : DrmStatus(DEAD_OBJECT);
 }
 
-status_t DrmHalHidl::getOfflineLicenseState(Vector<uint8_t> const& keySetId,
-                                            DrmPlugin::OfflineLicenseState* licenseState) const {
+DrmStatus DrmHalHidl::getOfflineLicenseState(Vector<uint8_t> const& keySetId,
+                                             DrmPlugin::OfflineLicenseState* licenseState) const {
     Mutex::Autolock autoLock(mLock);
 
     if (mInitCheck != OK) {
-        return mInitCheck;
+        return DrmStatus(mInitCheck);
     }
 
     if (mPluginV1_2 == NULL) {
-        return ERROR_UNSUPPORTED;
+        return DrmStatus(ERROR_UNSUPPORTED);
     }
     *licenseState = DrmPlugin::kOfflineLicenseStateUnknown;
 
-    status_t err = UNKNOWN_ERROR;
+    DrmStatus err = UNKNOWN_ERROR;
 
     Return<void> hResult = mPluginV1_2->getOfflineLicenseState(
             toHidlVec(keySetId), [&](Status status, OfflineLicenseState hLicenseState) {
@@ -1169,20 +1170,20 @@ status_t DrmHalHidl::getOfflineLicenseState(Vector<uint8_t> const& keySetId,
                 err = toStatusT(status);
             });
 
-    return hResult.isOk() ? err : DEAD_OBJECT;
+    return hResult.isOk() ? err : DrmStatus(DEAD_OBJECT);
 }
 
-status_t DrmHalHidl::getPropertyString(String8 const& name, String8& value) const {
+DrmStatus DrmHalHidl::getPropertyString(String8 const& name, String8& value) const {
     Mutex::Autolock autoLock(mLock);
     return getPropertyStringInternal(name, value);
 }
 
-status_t DrmHalHidl::getPropertyStringInternal(String8 const& name, String8& value) const {
+DrmStatus DrmHalHidl::getPropertyStringInternal(String8 const& name, String8& value) const {
     // This function is internal to the class and should only be called while
     // mLock is already held.
     INIT_CHECK();
 
-    status_t err = UNKNOWN_ERROR;
+    DrmStatus err = UNKNOWN_ERROR;
 
     Return<void> hResult = mPlugin->getPropertyString(
             toHidlString(name), [&](Status status, const hidl_string& hValue) {
@@ -1192,21 +1193,21 @@ status_t DrmHalHidl::getPropertyStringInternal(String8 const& name, String8& val
                 err = toStatusT(status);
             });
 
-    return hResult.isOk() ? err : DEAD_OBJECT;
+    return hResult.isOk() ? err : DrmStatus(DEAD_OBJECT);
 }
 
-status_t DrmHalHidl::getPropertyByteArray(String8 const& name, Vector<uint8_t>& value) const {
+DrmStatus DrmHalHidl::getPropertyByteArray(String8 const& name, Vector<uint8_t>& value) const {
     Mutex::Autolock autoLock(mLock);
     return getPropertyByteArrayInternal(name, value);
 }
 
-status_t DrmHalHidl::getPropertyByteArrayInternal(String8 const& name,
-                                                  Vector<uint8_t>& value) const {
+DrmStatus DrmHalHidl::getPropertyByteArrayInternal(String8 const& name,
+                                                   Vector<uint8_t>& value) const {
     // This function is internal to the class and should only be called while
     // mLock is already held.
     INIT_CHECK();
 
-    status_t err = UNKNOWN_ERROR;
+    DrmStatus err = UNKNOWN_ERROR;
 
     Return<void> hResult = mPlugin->getPropertyByteArray(
             toHidlString(name), [&](Status status, const hidl_vec<uint8_t>& hValue) {
@@ -1223,25 +1224,26 @@ status_t DrmHalHidl::getPropertyByteArrayInternal(String8 const& name,
     return err;
 }
 
-status_t DrmHalHidl::setPropertyString(String8 const& name, String8 const& value) const {
+DrmStatus DrmHalHidl::setPropertyString(String8 const& name, String8 const& value) const {
     Mutex::Autolock autoLock(mLock);
     INIT_CHECK();
 
     Return<Status> status = mPlugin->setPropertyString(toHidlString(name), toHidlString(value));
-    return status.isOk() ? toStatusT(status) : DEAD_OBJECT;
+    return status.isOk() ? DrmStatus(toStatusT(status)) : DrmStatus(DEAD_OBJECT);
 }
 
-status_t DrmHalHidl::setPropertyByteArray(String8 const& name, Vector<uint8_t> const& value) const {
+DrmStatus DrmHalHidl::setPropertyByteArray(String8 const& name,
+                                           Vector<uint8_t> const& value) const {
     Mutex::Autolock autoLock(mLock);
     INIT_CHECK();
 
     Return<Status> status = mPlugin->setPropertyByteArray(toHidlString(name), toHidlVec(value));
-    return status.isOk() ? toStatusT(status) : DEAD_OBJECT;
+    return status.isOk() ? DrmStatus(toStatusT(status)) : DrmStatus(DEAD_OBJECT);
 }
 
-status_t DrmHalHidl::getMetrics(const sp<IDrmMetricsConsumer>& consumer) {
+DrmStatus DrmHalHidl::getMetrics(const sp<IDrmMetricsConsumer>& consumer) {
     if (consumer == nullptr) {
-        return UNEXPECTED_NULL;
+        return DrmStatus(UNEXPECTED_NULL);
     }
     consumer->consumeFrameworkMetrics(mMetrics);
 
@@ -1262,7 +1264,7 @@ status_t DrmHalHidl::getMetrics(const sp<IDrmMetricsConsumer>& consumer) {
         vendor += description;
 
         hidl_vec<DrmMetricGroup> pluginMetrics;
-        status_t err = UNKNOWN_ERROR;
+        DrmStatus err = UNKNOWN_ERROR;
 
         Return<void> status =
                 mPluginV1_1->getMetrics([&](Status status, hidl_vec<DrmMetricGroup> pluginMetrics) {
@@ -1273,14 +1275,14 @@ status_t DrmHalHidl::getMetrics(const sp<IDrmMetricsConsumer>& consumer) {
                     }
                     err = toStatusT(status);
                 });
-        return status.isOk() ? err : DEAD_OBJECT;
+        return status.isOk() ? err : DrmStatus(DEAD_OBJECT);
     }
 
-    return OK;
+    return DrmStatus(OK);
 }
 
-status_t DrmHalHidl::setCipherAlgorithm(Vector<uint8_t> const& sessionId,
-                                        String8 const& algorithm) {
+DrmStatus DrmHalHidl::setCipherAlgorithm(Vector<uint8_t> const& sessionId,
+                                         String8 const& algorithm) {
     Mutex::Autolock autoLock(mLock);
     INIT_CHECK();
 
@@ -1288,28 +1290,28 @@ status_t DrmHalHidl::setCipherAlgorithm(Vector<uint8_t> const& sessionId,
 
     Return<Status> status =
             mPlugin->setCipherAlgorithm(toHidlVec(sessionId), toHidlString(algorithm));
-    return status.isOk() ? toStatusT(status) : DEAD_OBJECT;
+    return status.isOk() ? DrmStatus(toStatusT(status)) : DrmStatus(DEAD_OBJECT);
 }
 
-status_t DrmHalHidl::setMacAlgorithm(Vector<uint8_t> const& sessionId, String8 const& algorithm) {
+DrmStatus DrmHalHidl::setMacAlgorithm(Vector<uint8_t> const& sessionId, String8 const& algorithm) {
     Mutex::Autolock autoLock(mLock);
     INIT_CHECK();
 
     DrmSessionManager::Instance()->useSession(sessionId);
 
     Return<Status> status = mPlugin->setMacAlgorithm(toHidlVec(sessionId), toHidlString(algorithm));
-    return status.isOk() ? toStatusT(status) : DEAD_OBJECT;
+    return status.isOk() ? DrmStatus(toStatusT(status)) : DrmStatus(DEAD_OBJECT);
 }
 
-status_t DrmHalHidl::encrypt(Vector<uint8_t> const& sessionId, Vector<uint8_t> const& keyId,
-                             Vector<uint8_t> const& input, Vector<uint8_t> const& iv,
-                             Vector<uint8_t>& output) {
+DrmStatus DrmHalHidl::encrypt(Vector<uint8_t> const& sessionId, Vector<uint8_t> const& keyId,
+                              Vector<uint8_t> const& input, Vector<uint8_t> const& iv,
+                              Vector<uint8_t>& output) {
     Mutex::Autolock autoLock(mLock);
     INIT_CHECK();
 
     DrmSessionManager::Instance()->useSession(sessionId);
 
-    status_t err = UNKNOWN_ERROR;
+    DrmStatus err = UNKNOWN_ERROR;
 
     Return<void> hResult =
             mPlugin->encrypt(toHidlVec(sessionId), toHidlVec(keyId), toHidlVec(input),
@@ -1320,18 +1322,18 @@ status_t DrmHalHidl::encrypt(Vector<uint8_t> const& sessionId, Vector<uint8_t> c
                                  err = toStatusT(status);
                              });
 
-    return hResult.isOk() ? err : DEAD_OBJECT;
+    return hResult.isOk() ? err : DrmStatus(DEAD_OBJECT);
 }
 
-status_t DrmHalHidl::decrypt(Vector<uint8_t> const& sessionId, Vector<uint8_t> const& keyId,
-                             Vector<uint8_t> const& input, Vector<uint8_t> const& iv,
-                             Vector<uint8_t>& output) {
+DrmStatus DrmHalHidl::decrypt(Vector<uint8_t> const& sessionId, Vector<uint8_t> const& keyId,
+                              Vector<uint8_t> const& input, Vector<uint8_t> const& iv,
+                              Vector<uint8_t>& output) {
     Mutex::Autolock autoLock(mLock);
     INIT_CHECK();
 
     DrmSessionManager::Instance()->useSession(sessionId);
 
-    status_t err = UNKNOWN_ERROR;
+    DrmStatus err = UNKNOWN_ERROR;
 
     Return<void> hResult =
             mPlugin->decrypt(toHidlVec(sessionId), toHidlVec(keyId), toHidlVec(input),
@@ -1342,17 +1344,17 @@ status_t DrmHalHidl::decrypt(Vector<uint8_t> const& sessionId, Vector<uint8_t> c
                                  err = toStatusT(status);
                              });
 
-    return hResult.isOk() ? err : DEAD_OBJECT;
+    return hResult.isOk() ? err : DrmStatus(DEAD_OBJECT);
 }
 
-status_t DrmHalHidl::sign(Vector<uint8_t> const& sessionId, Vector<uint8_t> const& keyId,
-                          Vector<uint8_t> const& message, Vector<uint8_t>& signature) {
+DrmStatus DrmHalHidl::sign(Vector<uint8_t> const& sessionId, Vector<uint8_t> const& keyId,
+                           Vector<uint8_t> const& message, Vector<uint8_t>& signature) {
     Mutex::Autolock autoLock(mLock);
     INIT_CHECK();
 
     DrmSessionManager::Instance()->useSession(sessionId);
 
-    status_t err = UNKNOWN_ERROR;
+    DrmStatus err = UNKNOWN_ERROR;
 
     Return<void> hResult = mPlugin->sign(toHidlVec(sessionId), toHidlVec(keyId), toHidlVec(message),
                                          [&](Status status, const hidl_vec<uint8_t>& hSignature) {
@@ -1362,18 +1364,18 @@ status_t DrmHalHidl::sign(Vector<uint8_t> const& sessionId, Vector<uint8_t> cons
                                              err = toStatusT(status);
                                          });
 
-    return hResult.isOk() ? err : DEAD_OBJECT;
+    return hResult.isOk() ? err : DrmStatus(DEAD_OBJECT);
 }
 
-status_t DrmHalHidl::verify(Vector<uint8_t> const& sessionId, Vector<uint8_t> const& keyId,
-                            Vector<uint8_t> const& message, Vector<uint8_t> const& signature,
-                            bool& match) {
+DrmStatus DrmHalHidl::verify(Vector<uint8_t> const& sessionId, Vector<uint8_t> const& keyId,
+                             Vector<uint8_t> const& message, Vector<uint8_t> const& signature,
+                             bool& match) {
     Mutex::Autolock autoLock(mLock);
     INIT_CHECK();
 
     DrmSessionManager::Instance()->useSession(sessionId);
 
-    status_t err = UNKNOWN_ERROR;
+    DrmStatus err = UNKNOWN_ERROR;
 
     Return<void> hResult =
             mPlugin->verify(toHidlVec(sessionId), toHidlVec(keyId), toHidlVec(message),
@@ -1386,18 +1388,18 @@ status_t DrmHalHidl::verify(Vector<uint8_t> const& sessionId, Vector<uint8_t> co
                                 err = toStatusT(status);
                             });
 
-    return hResult.isOk() ? err : DEAD_OBJECT;
+    return hResult.isOk() ? err : DrmStatus(DEAD_OBJECT);
 }
 
-status_t DrmHalHidl::signRSA(Vector<uint8_t> const& sessionId, String8 const& algorithm,
-                             Vector<uint8_t> const& message, Vector<uint8_t> const& wrappedKey,
-                             Vector<uint8_t>& signature) {
+DrmStatus DrmHalHidl::signRSA(Vector<uint8_t> const& sessionId, String8 const& algorithm,
+                              Vector<uint8_t> const& message, Vector<uint8_t> const& wrappedKey,
+                              Vector<uint8_t>& signature) {
     Mutex::Autolock autoLock(mLock);
     INIT_CHECK();
 
     DrmSessionManager::Instance()->useSession(sessionId);
 
-    status_t err = UNKNOWN_ERROR;
+    DrmStatus err = UNKNOWN_ERROR;
 
     Return<void> hResult = mPlugin->signRSA(
             toHidlVec(sessionId), toHidlString(algorithm), toHidlVec(message),
@@ -1408,7 +1410,7 @@ status_t DrmHalHidl::signRSA(Vector<uint8_t> const& sessionId, String8 const& al
                 err = toStatusT(status);
             });
 
-    return hResult.isOk() ? err : DEAD_OBJECT;
+    return hResult.isOk() ? err : DrmStatus(DEAD_OBJECT);
 }
 
 std::string DrmHalHidl::reportFrameworkMetrics(const std::string& pluginMetrics) const {
@@ -1467,55 +1469,56 @@ std::string DrmHalHidl::reportPluginMetrics() const {
     return metricsString;
 }
 
-status_t DrmHalHidl::requiresSecureDecoder(const char* mime, bool* required) const {
+DrmStatus DrmHalHidl::requiresSecureDecoder(const char* mime, bool* required) const {
     Mutex::Autolock autoLock(mLock);
     if (mPluginV1_4 == NULL) {
-        return false;
+        return DrmStatus(false);
     }
     auto hResult = mPluginV1_4->requiresSecureDecoderDefault(hidl_string(mime));
     if (!hResult.isOk()) {
         DrmUtils::LOG2BE("requiresSecureDecoder txn failed: %s", hResult.description().c_str());
-        return DEAD_OBJECT;
+        return DrmStatus(DEAD_OBJECT);
     }
     if (required) {
         *required = hResult;
     }
-    return OK;
+    return DrmStatus(OK);
 }
 
-status_t DrmHalHidl::requiresSecureDecoder(const char* mime, DrmPlugin::SecurityLevel securityLevel,
-                                           bool* required) const {
+DrmStatus DrmHalHidl::requiresSecureDecoder(const char* mime,
+                                            DrmPlugin::SecurityLevel securityLevel,
+                                            bool* required) const {
     Mutex::Autolock autoLock(mLock);
     if (mPluginV1_4 == NULL) {
-        return false;
+        return DrmStatus(false);
     }
     auto hLevel = toHidlSecurityLevel(securityLevel);
     auto hResult = mPluginV1_4->requiresSecureDecoder(hidl_string(mime), hLevel);
     if (!hResult.isOk()) {
         DrmUtils::LOG2BE("requiresSecureDecoder txn failed: %s", hResult.description().c_str());
-        return DEAD_OBJECT;
+        return DrmStatus(DEAD_OBJECT);
     }
     if (required) {
         *required = hResult;
     }
-    return OK;
+    return DrmStatus(OK);
 }
 
-status_t DrmHalHidl::setPlaybackId(Vector<uint8_t> const& sessionId, const char* playbackId) {
+DrmStatus DrmHalHidl::setPlaybackId(Vector<uint8_t> const& sessionId, const char* playbackId) {
     Mutex::Autolock autoLock(mLock);
     if (mPluginV1_4 == NULL) {
-        return ERROR_UNSUPPORTED;
+        return DrmStatus(ERROR_UNSUPPORTED);
     }
     auto err = mPluginV1_4->setPlaybackId(toHidlVec(sessionId), hidl_string(playbackId));
-    return err.isOk() ? toStatusT(err) : DEAD_OBJECT;
+    return err.isOk() ? DrmStatus(toStatusT(err)) : DrmStatus(DEAD_OBJECT);
 }
 
-status_t DrmHalHidl::getLogMessages(Vector<drm::V1_4::LogMessage>& logs) const {
+DrmStatus DrmHalHidl::getLogMessages(Vector<drm::V1_4::LogMessage>& logs) const {
     Mutex::Autolock autoLock(mLock);
-    return DrmUtils::GetLogMessages<drm::V1_4::IDrmPlugin>(mPlugin, logs);
+    return DrmStatus(DrmUtils::GetLogMessages<drm::V1_4::IDrmPlugin>(mPlugin, logs));
 }
 
-status_t DrmHalHidl::getSupportedSchemes(std::vector<uint8_t> &schemes) const {
+DrmStatus DrmHalHidl::getSupportedSchemes(std::vector<uint8_t>& schemes) const {
     Mutex::Autolock autoLock(mLock);
     for (auto &factory : mFactories) {
         sp<drm::V1_3::IDrmFactory> factoryV1_3 = drm::V1_3::IDrmFactory::castFrom(factory);
@@ -1531,7 +1534,7 @@ status_t DrmHalHidl::getSupportedSchemes(std::vector<uint8_t> &schemes) const {
             });
     }
 
-    return OK;
+    return DrmStatus(OK);
 }
 
 }  // namespace android
