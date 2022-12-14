@@ -327,12 +327,29 @@ media_status_t MidiExtractor::getMetaData(AMediaFormat *meta)
 
 bool SniffMidi(CDataSource *source, float *confidence)
 {
-    MidiEngine p(source, NULL, NULL);
-    if (p.initCheck() == OK) {
-        *confidence = 0.8;
-        ALOGV("SniffMidi: yes");
-        return true;
+    // look for standard prefix / magic number info in the files.
+    // "MThd" for midi
+    // "XMF_"
+    // this will be very fast.
+    //
+    char hdr_magic[4];
+    if (source->readAt(source->handle, 0, hdr_magic, sizeof(hdr_magic)) == sizeof(hdr_magic)) {
+        if (memcmp(hdr_magic,"MThd", sizeof(hdr_magic)) == 0) {
+            *confidence = 0.85;
+            ALOGV("SniffMidi: yes, MThd");
+            return true;
+        }
+        if (memcmp(hdr_magic,"XMF_", sizeof(hdr_magic)) == 0) {
+            *confidence = 0.85;
+            ALOGV("SniffMidi: yes, XMF_");
+            return true;
+        }
     }
+
+    // alternatives:
+    // instantiate MidiEngine, (expensively) parsing the entire file to decide.
+
+
     ALOGV("SniffMidi: no");
     return false;
 
