@@ -37,6 +37,7 @@ cc_fuzz {
         "liblog",
         "resourcemanager_aidl_interface-ndk",
         "libaidlcommonsupport",
+        "libjsoncpp",
     ],
     header_libs: [
         "libmedia_headers",
