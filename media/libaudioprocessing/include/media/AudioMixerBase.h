@@ -297,6 +297,8 @@ public:
 
         int32_t        mTeeBufferFrameCount;
 
+        uint32_t       mInputFrameSize; // The track input frame size, used for tee buffer
+
       protected:
 
         // hooks

@@ -1401,8 +1401,11 @@ sp<VolumeShaper::State> AudioFlinger::PlaybackThread::Track::getVolumeShaperStat
     return mVolumeHandler->getVolumeShaperState(id);
 }
 
-void AudioFlinger::PlaybackThread::Track::setFinalVolume(float volume)
+void AudioFlinger::PlaybackThread::Track::setFinalVolume(float volumeLeft, float volumeRight)
 {
+    mFinalVolumeLeft = volumeLeft;
+    mFinalVolumeRight = volumeRight;
+    const float volume = (volumeLeft + volumeRight) * 0.5f;
     if (mFinalVolume != volume) { // Compare to an epsilon if too many meaningless updates
         mFinalVolume = volume;
         setMetadataHasChanged();
