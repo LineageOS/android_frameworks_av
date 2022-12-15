@@ -394,6 +394,15 @@ static const char *FourCC2MIME(uint32_t fourcc) {
             return MEDIA_MIMETYPE_AUDIO_MPEGH_MHA1;
         case FOURCC("mhm1"):
             return MEDIA_MIMETYPE_AUDIO_MPEGH_MHM1;
+        case FOURCC("dtsc"):
+            return MEDIA_MIMETYPE_AUDIO_DTS;
+        case FOURCC("dtse"):
+        case FOURCC("dtsh"):
+            return MEDIA_MIMETYPE_AUDIO_DTS_HD;
+        case FOURCC("dtsl"):
+            return MEDIA_MIMETYPE_AUDIO_DTS_HD_MA;
+        case FOURCC("dtsx"):
+            return MEDIA_MIMETYPE_AUDIO_DTS_UHD_P2;
         default:
             ALOGW("Unknown fourcc: %c%c%c%c",
                    (fourcc >> 24) & 0xff,
@@ -1804,6 +1813,11 @@ status_t MPEG4Extractor::parseChunk(off64_t *offset, int depth) {
         case 0x6D730055: // "ms U" mp3 audio
         case FOURCC("mha1"):
         case FOURCC("mhm1"):
+        case FOURCC("dtsc"):
+        case FOURCC("dtse"):
+        case FOURCC("dtsh"):
+        case FOURCC("dtsl"):
+        case FOURCC("dtsx"):
         {
             if (mIsQT && depth >= 1 && mPath[depth - 1] == FOURCC("wave")) {
 
