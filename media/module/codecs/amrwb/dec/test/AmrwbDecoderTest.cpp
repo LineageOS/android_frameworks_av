@@ -21,6 +21,7 @@
 #include <utils/Log.h>
 
 #include <audio_utils/sndfile.h>
+#include <memory>
 #include <stdio.h>
 
 #include "pvamrwbdecoder.h"
@@ -121,7 +122,7 @@ int32_t AmrwbDecoderTest::DecodeFrames(int16_t *decoderCookie, void *decoderBuf,
 
 TEST_F(AmrwbDecoderTest, MultiCreateAmrwbDecoderTest) {
     uint32_t memRequirements = pvDecoder_AmrWbMemRequirements();
-    void *decoderBuf = malloc(memRequirements);
+    std::unique_ptr<char[]> decoderBuf(new char[memRequirements]);
     ASSERT_NE(decoderBuf, nullptr)
             << "Failed to allocate decoder memory of size " << memRequirements;
 
@@ -129,25 +130,21 @@ TEST_F(AmrwbDecoderTest, MultiCreateAmrwbDecoderTest) {
     void *amrHandle = nullptr;
     int16_t *decoderCookie;
     for (int count = 0; count < kMaxCount; count++) {
-        pvDecoder_AmrWb_Init(&amrHandle, decoderBuf, &decoderCookie);
+        pvDecoder_AmrWb_Init(&amrHandle, decoderBuf.get(), &decoderCookie);
         ASSERT_NE(amrHandle, nullptr) << "Failed to initialize decoder";
         ALOGV("Decoder created successfully");
-    }
-    if (decoderBuf) {
-        free(decoderBuf);
-        decoderBuf = nullptr;
     }
 }
 
 TEST_P(AmrwbDecoderTest, DecodeTest) {
     uint32_t memRequirements = pvDecoder_AmrWbMemRequirements();
-    void *decoderBuf = malloc(memRequirements);
+    std::unique_ptr<char[]> decoderBuf(new char[memRequirements]);
     ASSERT_NE(decoderBuf, nullptr)
             << "Failed to allocate decoder memory of size " << memRequirements;
 
     void *amrHandle = nullptr;
     int16_t *decoderCookie;
-    pvDecoder_AmrWb_Init(&amrHandle, decoderBuf, &decoderCookie);
+    pvDecoder_AmrWb_Init(&amrHandle, decoderBuf.get(), &decoderCookie);
     ASSERT_NE(amrHandle, nullptr) << "Failed to initialize decoder";
 
     string inputFile = gEnv->getRes() + GetParam();
@@ -159,25 +156,21 @@ TEST_P(AmrwbDecoderTest, DecodeTest) {
     SNDFILE *outFileHandle = openOutputFile(&sfInfo);
     ASSERT_NE(outFileHandle, nullptr) << "Error opening output file for writing decoded output";
 
-    int32_t decoderErr = DecodeFrames(decoderCookie, decoderBuf, outFileHandle);
+    int32_t decoderErr = DecodeFrames(decoderCookie, decoderBuf.get(), outFileHandle);
     ASSERT_EQ(decoderErr, 0) << "DecodeFrames returned error";
 
     sf_close(outFileHandle);
-    if (decoderBuf) {
-        free(decoderBuf);
-        decoderBuf = nullptr;
-    }
 }
 
 TEST_P(AmrwbDecoderTest, ResetDecoderTest) {
     uint32_t memRequirements = pvDecoder_AmrWbMemRequirements();
-    void *decoderBuf = malloc(memRequirements);
+    std::unique_ptr<char[]> decoderBuf(new char[memRequirements]);
     ASSERT_NE(decoderBuf, nullptr)
             << "Failed to allocate decoder memory of size " << memRequirements;
 
     void *amrHandle = nullptr;
     int16_t *decoderCookie;
-    pvDecoder_AmrWb_Init(&amrHandle, decoderBuf, &decoderCookie);
+    pvDecoder_AmrWb_Init(&amrHandle, decoderBuf.get(), &decoderCookie);
     ASSERT_NE(amrHandle, nullptr) << "Failed to initialize decoder";
 
     string inputFile = gEnv->getRes() + GetParam();
@@ -190,20 +183,18 @@ TEST_P(AmrwbDecoderTest, ResetDecoderTest) {
     ASSERT_NE(outFileHandle, nullptr) << "Error opening output file for writing decoded output";
 
     // Decode 150 frames first
-    int32_t decoderErr = DecodeFrames(decoderCookie, decoderBuf, outFileHandle, kNumFrameReset);
+    int32_t decoderErr =
+            DecodeFrames(decoderCookie, decoderBuf.get(), outFileHandle, kNumFrameReset);
     ASSERT_EQ(decoderErr, 0) << "DecodeFrames returned error";
 
     // Reset Decoder
-    pvDecoder_AmrWb_Reset(decoderBuf, 1);
+    pvDecoder_AmrWb_Reset(decoderBuf.get(), 1);
 
     // Start decoding again
-    decoderErr = DecodeFrames(decoderCookie, decoderBuf, outFileHandle);
+    decoderErr = DecodeFrames(decoderCookie, decoderBuf.get(), outFileHandle);
     ASSERT_EQ(decoderErr, 0) << "DecodeFrames returned error";
 
     sf_close(outFileHandle);
-    if (decoderBuf) {
-        free(decoderBuf);
-    }
 }
 
 INSTANTIATE_TEST_SUITE_P(AmrwbDecoderTestAll, AmrwbDecoderTest,
