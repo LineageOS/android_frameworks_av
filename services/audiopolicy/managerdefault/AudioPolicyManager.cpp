@@ -319,10 +319,10 @@ status_t AudioPolicyManager::setDeviceConnectionStateInt(const sp<DeviceDescript
             checkCloseOutputs();
         }
         (void)updateCallRouting(false /*fromCache*/);
-        std::vector<audio_io_handle_t> outputsToReopen;
         const DeviceVector msdOutDevices = getMsdAudioOutDevices();
         const DeviceVector activeMediaDevices =
                 mEngine->getActiveMediaDevices(mAvailableOutputDevices);
+        std::map<audio_io_handle_t, DeviceVector> outputsToReopenWithDevices;
         for (size_t i = 0; i < mOutputs.size(); i++) {
             sp<SwAudioOutputDescriptor> desc = mOutputs.valueAt(i);
             if (desc->isActive() && ((mEngine->getPhoneState() != AUDIO_MODE_IN_CALL) ||
@@ -336,6 +336,13 @@ status_t AudioPolicyManager::setDeviceConnectionStateInt(const sp<DeviceDescript
                         && (!device_distinguishes_on_address(device->type())
                                 // always force when disconnecting (a non-duplicated device)
                                 || (state == AUDIO_POLICY_DEVICE_STATE_UNAVAILABLE));
+                if (desc->mUsePreferredMixerAttributes && newDevices != desc->devices()) {
+                    // If the device is using preferred mixer attributes, the output need to reopen
+                    // with default configuration when the new selected devices are different from
+                    // current routing devices
+                    outputsToReopenWithDevices.emplace(mOutputs.keyAt(i), newDevices);
+                    continue;
+                }
                 setOutputDevices(desc, newDevices, force, 0);
             }
             if (!desc->isDuplicated() && desc->mProfile->hasDynamicAudioProfile() &&
@@ -346,7 +353,7 @@ status_t AudioPolicyManager::setDeviceConnectionStateInt(const sp<DeviceDescript
                 // `mPendingReopenToQueryProfiles` in the SwOutputDescriptor so that the output
                 // can be reopened to query dynamic profiles when all clients are inactive.
                 if (areAllActiveTracksRerouted(desc)) {
-                    outputsToReopen.push_back(mOutputs.keyAt(i));
+                    outputsToReopenWithDevices.emplace(mOutputs.keyAt(i), activeMediaDevices);
                 } else {
                     desc->mPendingReopenToQueryProfiles = true;
                 }
@@ -356,11 +363,7 @@ status_t AudioPolicyManager::setDeviceConnectionStateInt(const sp<DeviceDescript
                 desc->mPendingReopenToQueryProfiles = false;
             }
         }
-        for (const auto& output : outputsToReopen) {
-            sp<SwAudioOutputDescriptor> desc = mOutputs.valueFor(output);
-            closeOutput(output);
-            openOutputWithProfileAndDevice(desc->mProfile, activeMediaDevices);
-        }
+        reopenOutputsWithDevices(outputsToReopenWithDevices);
 
         if (state == AUDIO_POLICY_DEVICE_STATE_UNAVAILABLE) {
             cleanUpForDevice(device);
@@ -885,16 +888,25 @@ void AudioPolicyManager::setPhoneState(audio_mode_t state)
         }
     }
 
+    std::map<audio_io_handle_t, DeviceVector> outputsToReopen;
     // reevaluate routing on all outputs in case tracks have been started during the call
     for (size_t i = 0; i < mOutputs.size(); i++) {
         sp<SwAudioOutputDescriptor> desc = mOutputs.valueAt(i);
         DeviceVector newDevices = getNewOutputDevices(desc, true /*fromCache*/);
         if (state != AUDIO_MODE_IN_CALL || (desc != mPrimaryOutput && !isTelephonyRxOrTx(desc))) {
             bool forceRouting = !newDevices.isEmpty();
+            if (desc->mUsePreferredMixerAttributes && newDevices != desc->devices()) {
+                // If the device is using preferred mixer attributes, the output need to reopen
+                // with default configuration when the new selected devices are different from
+                // current routing devices.
+                outputsToReopen.emplace(mOutputs.keyAt(i), newDevices);
+                continue;
+            }
             setOutputDevices(desc, newDevices, forceRouting, 0 /*delayMs*/, nullptr,
                              true /*requiresMuteCheck*/, !forceRouting /*requiresVolumeCheck*/);
         }
     }
+    reopenOutputsWithDevices(outputsToReopen);
 
     checkLeBroadcastRoutes(wasLeUnicastActive, nullptr, delayMs);
 
@@ -2059,6 +2071,16 @@ status_t AudioPolicyManager::startOutput(audio_port_handle_t portId)
 
     if (status != NO_ERROR) {
         outputDesc->stop();
+        if (status == DEAD_OBJECT) {
+            sp<SwAudioOutputDescriptor> desc =
+                    reopenOutput(outputDesc, nullptr /*config*/, AUDIO_OUTPUT_FLAG_NONE, __func__);
+            if (desc == nullptr) {
+                // This is not common, it may indicate something wrong with the HAL.
+                ALOGE("%s unable to open output with default config", __func__);
+                return status;
+            }
+            desc->mUsePreferredMixerAttributes = true;
+        }
         return status;
     }
 
@@ -2076,10 +2098,12 @@ status_t AudioPolicyManager::startOutput(audio_port_handle_t portId)
                 config.channel_mask = info->getConfigBase().channel_mask;
                 config.sample_rate = info->getConfigBase().sample_rate;
                 config.format = info->getConfigBase().format;
-                status_t status = reopenOutput(outputDesc, &config, info->getFlags(), __func__);
-                if (status != NO_ERROR) {
-                    return status;
+                sp<SwAudioOutputDescriptor> desc =
+                        reopenOutput(outputDesc, &config, info->getFlags(), __func__);
+                if (desc == nullptr) {
+                    return BAD_VALUE;
                 }
+                desc->mUsePreferredMixerAttributes = true;
                 // Intentionally return error to let the client side resending request for
                 // creating and starting.
                 return DEAD_OBJECT;
@@ -2236,8 +2260,14 @@ status_t AudioPolicyManager::startSource(const sp<SwAudioOutputDescriptor>& outp
             }
         }
 
+        if (outputDesc->mUsePreferredMixerAttributes && devices != outputDesc->devices()) {
+            // If the output is open with preferred mixer attributes, but the routed device is
+            // changed when calling this function, returning DEAD_OBJECT to indicate routing
+            // changed.
+            return DEAD_OBJECT;
+        }
         const uint32_t muteWaitMs =
-                setOutputDevices(outputDesc, devices, force, 0, NULL, requiresMuteCheck);
+                setOutputDevices(outputDesc, devices, force, 0, nullptr, requiresMuteCheck);
 
         // apply volume rules for current stream and device if necessary
         auto &curves = getVolumeCurves(client->attributes());
@@ -2300,6 +2330,7 @@ void AudioPolicyManager::checkLeBroadcastRoutes(bool wasUnicastActive,
     bool isUnicastActive = isLeUnicastActive();
 
     if (wasUnicastActive != isUnicastActive) {
+        std::map<audio_io_handle_t, DeviceVector> outputsToReopen;
         //reroute all outputs routed to LE broadcast if LE unicast activy changed on any output
         for (size_t i = 0; i < mOutputs.size(); i++) {
             sp<SwAudioOutputDescriptor> desc = mOutputs.valueAt(i);
@@ -2312,6 +2343,13 @@ void AudioPolicyManager::checkLeBroadcastRoutes(bool wasUnicastActive,
                                     getAudioDeviceOutLeAudioUnicastSet()).isEmpty()))) {
                 DeviceVector newDevices = getNewOutputDevices(desc, false /*fromCache*/);
                 bool force = desc->devices() != newDevices;
+                if (desc->mUsePreferredMixerAttributes && force) {
+                    // If the device is using preferred mixer attributes, the output need to reopen
+                    // with default configuration when the new selected devices are different from
+                    // current routing devices.
+                    outputsToReopen.emplace(mOutputs.keyAt(i), newDevices);
+                    continue;
+                }
                 setOutputDevices(desc, newDevices, force, delayMs);
                 // re-apply device specific volume if not done by setOutputDevice()
                 if (!force) {
@@ -2319,6 +2357,7 @@ void AudioPolicyManager::checkLeBroadcastRoutes(bool wasUnicastActive,
                 }
             }
         }
+        reopenOutputsWithDevices(outputsToReopen);
     }
 }
 
@@ -2412,6 +2451,7 @@ status_t AudioPolicyManager::stopSource(const sp<SwAudioOutputDescriptor>& outpu
 
             // force restoring the device selection on other active outputs if it differs from the
             // one being selected for this output
+            std::map<audio_io_handle_t, DeviceVector> outputsToReopen;
             uint32_t delayMs = outputDesc->latency()*2;
             for (size_t i = 0; i < mOutputs.size(); i++) {
                 sp<SwAudioOutputDescriptor> desc = mOutputs.valueAt(i);
@@ -2422,6 +2462,13 @@ status_t AudioPolicyManager::stopSource(const sp<SwAudioOutputDescriptor>& outpu
                     DeviceVector newDevices2 = getNewOutputDevices(desc, false /*fromCache*/);
                     bool force = desc->devices() != newDevices2;
 
+                    if (desc->mUsePreferredMixerAttributes && force) {
+                        // If the device is using preferred mixer attributes, the output need to
+                        // reopen with default configuration when the new selected devices are
+                        // different from current routing devices.
+                        outputsToReopen.emplace(mOutputs.keyAt(i), newDevices2);
+                        continue;
+                    }
                     setOutputDevices(desc, newDevices2, force, delayMs);
 
                     // re-apply device specific volume if not done by setOutputDevice()
@@ -2430,6 +2477,7 @@ status_t AudioPolicyManager::stopSource(const sp<SwAudioOutputDescriptor>& outpu
                     }
                 }
             }
+            reopenOutputsWithDevices(outputsToReopen);
             // update the outputs if stopping one with a stream that can affect notification routing
             handleNotificationRoutingForStream(stream);
         }
@@ -3760,6 +3808,7 @@ void AudioPolicyManager::updateCallAndOutputRouting(bool forceVolumeReeval, uint
         // Only apply special touch sound delay once
         delayMs = 0;
     }
+    std::map<audio_io_handle_t, DeviceVector> outputsToReopen;
     for (size_t i = 0; i < mOutputs.size(); i++) {
         sp<SwAudioOutputDescriptor> outputDesc = mOutputs.valueAt(i);
         DeviceVector newDevices = getNewOutputDevices(outputDesc, true /*fromCache*/);
@@ -3769,6 +3818,13 @@ void AudioPolicyManager::updateCallAndOutputRouting(bool forceVolumeReeval, uint
             // preventing the force re-routing in case of default dev that distinguishes on address.
             // Let's give back to engine full device choice decision however.
             bool forceRouting = !newDevices.isEmpty();
+            if (outputDesc->mUsePreferredMixerAttributes && newDevices != outputDesc->devices()) {
+                // If the device is using preferred mixer attributes, the output need to reopen
+                // with default configuration when the new selected devices are different from
+                // current routing devices.
+                outputsToReopen.emplace(mOutputs.keyAt(i), newDevices);
+                continue;
+            }
             waitMs = setOutputDevices(outputDesc, newDevices, forceRouting, delayMs, nullptr,
                                       true /*requiresMuteCheck*/,
                                       !forceRouting /*requiresVolumeCheck*/);
@@ -3779,6 +3835,7 @@ void AudioPolicyManager::updateCallAndOutputRouting(bool forceVolumeReeval, uint
             applyStreamVolumes(outputDesc, newDevices.types(), waitMs, true);
         }
     }
+    reopenOutputsWithDevices(outputsToReopen);
     checkLeBroadcastRoutes(wasLeUnicastActive, nullptr, delayMs);
 }
 
@@ -4306,12 +4363,15 @@ status_t AudioPolicyManager::setPreferredMixerAttributes(
     std::vector<audio_io_handle_t> outputsToReopen;
     for (size_t i = 0; i < mOutputs.size(); i++) {
         const auto output = mOutputs.valueAt(i);
-        if (output->mProfile == profile && output->devices().onlyContainsDevice(deviceDescriptor)
-            && !output->isConfigurationMatched(mixerAttributes->config, flags)) {
-            for (const auto& client : output->getActiveClients()) {
-                if (client->uid() == uid && client->strategy() == strategy) {
-                    client->setIsInvalid();
-                    outputsToReopen.push_back(output->mIoHandle);
+        if (output->mProfile == profile && output->devices().onlyContainsDevice(deviceDescriptor)) {
+            if (output->isConfigurationMatched(mixerAttributes->config, flags)) {
+                output->mUsePreferredMixerAttributes = true;
+            } else {
+                for (const auto &client: output->getActiveClients()) {
+                    if (client->uid() == uid && client->strategy() == strategy) {
+                        client->setIsInvalid();
+                        outputsToReopen.push_back(output->mIoHandle);
+                    }
                 }
             }
         }
@@ -4321,7 +4381,13 @@ status_t AudioPolicyManager::setPreferredMixerAttributes(
     config.channel_mask = mixerAttributes->config.channel_mask;
     config.format = mixerAttributes->config.format;
     for (const auto output : outputsToReopen) {
-        reopenOutput(mOutputs.valueFor(output), &config, flags, __func__);
+        sp<SwAudioOutputDescriptor> desc =
+                reopenOutput(mOutputs.valueFor(output), &config, flags, __func__);
+        if (desc == nullptr) {
+            ALOGE("%s, failed to reopen output with preferred mixer attributes", __func__);
+            continue;
+        }
+        desc->mUsePreferredMixerAttributes = true;
     }
 
     return NO_ERROR;
@@ -5093,6 +5159,7 @@ void AudioPolicyManager::checkStrategyRoute(product_strategy_t ps, audio_io_hand
     auto attributes = mEngine->getAllAttributesForProductStrategy(ps).front();
     DeviceVector devices = mEngine->getOutputDevicesForAttributes(attributes, nullptr, false);
     SortedVector<audio_io_handle_t> outputs = getOutputsForDevices(devices, mOutputs);
+    std::map<audio_io_handle_t, DeviceVector> outputsToReopen;
     for (size_t j = 0; j < mOutputs.size(); j++) {
         if (mOutputs.keyAt(j) == ouptutToSkip) {
             continue;
@@ -5109,10 +5176,18 @@ void AudioPolicyManager::checkStrategyRoute(product_strategy_t ps, audio_io_hand
                 mpClientInterface->invalidateStream(stream);
             }
         } else {
-            setOutputDevices(
-                        outputDesc, getNewOutputDevices(outputDesc, false /*fromCache*/), false);
+            DeviceVector newDevices = getNewOutputDevices(outputDesc, false /*fromCache*/);
+            if (outputDesc->mUsePreferredMixerAttributes && outputDesc->devices() != newDevices) {
+                // If the device is using preferred mixer attributes, the output need to reopen
+                // with default configuration when the new selected devices are different from
+                // current routing devices.
+                outputsToReopen.emplace(mOutputs.keyAt(j), newDevices);
+                continue;
+            }
+            setOutputDevices(outputDesc, newDevices, false);
         }
     }
+    reopenOutputsWithDevices(outputsToReopen);
 }
 
 void AudioPolicyManager::clearSessionRoutes(uid_t uid)
@@ -7139,6 +7214,7 @@ uint32_t AudioPolicyManager::setOutputDevices(const sp<SwAudioOutputDescriptor>&
                                               audio_patch_handle_t *patchHandle,
                                               bool requiresMuteCheck, bool requiresVolumeCheck)
 {
+    // TODO(b/262404095): Consider if the output need to be reopened.
     ALOGV("%s device %s delayMs %d", __func__, devices.toString().c_str(), delayMs);
     uint32_t muteWaitMs;
 
@@ -8222,19 +8298,27 @@ status_t AudioPolicyManager::getProfilesForDevices(const DeviceVector& devices,
     return NO_ERROR;
 }
 
-status_t AudioPolicyManager::reopenOutput(sp<SwAudioOutputDescriptor> outputDesc,
-                                          const audio_config_t *config,
-                                          audio_output_flags_t flags,
-                                          const char* caller) {
+sp<SwAudioOutputDescriptor> AudioPolicyManager::reopenOutput(sp<SwAudioOutputDescriptor> outputDesc,
+                                                             const audio_config_t *config,
+                                                             audio_output_flags_t flags,
+                                                             const char* caller) {
     closeOutput(outputDesc->mIoHandle);
     sp<SwAudioOutputDescriptor> preferredOutput = openOutputWithProfileAndDevice(
             outputDesc->mProfile, outputDesc->devices(), nullptr /*mixerConfig*/, config, flags);
     if (preferredOutput == nullptr) {
         ALOGE("%s failed to reopen output device=%d, caller=%s",
               __func__, outputDesc->devices()[0]->getId(), caller);
-        return BAD_VALUE;
     }
-    return NO_ERROR;
+    return preferredOutput;
+}
+
+void AudioPolicyManager::reopenOutputsWithDevices(
+        const std::map<audio_io_handle_t, DeviceVector> &outputsToReopen) {
+    for (const auto& [output, devices] : outputsToReopen) {
+        sp<SwAudioOutputDescriptor> desc = mOutputs.valueFor(output);
+        closeOutput(output);
+        openOutputWithProfileAndDevice(desc->mProfile, devices);
+    }
 }
 
 } // namespace android
