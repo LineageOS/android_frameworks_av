@@ -67,13 +67,15 @@ apex_defaults {
     // Use a custom AndroidManifest.xml used for API targeting.
     androidManifest: ":com.android.media-androidManifest",
 
-    // IMPORTANT: q-launched-apex-module enables the build system to make
-    // sure the package compatible to Android 10 in two ways:
+    // IMPORTANT: q-launched-dcla-enabled-apex-module enables the build system to make
+    // sure the package compatible to Android 10 in two ways(if flag APEX_BUILD_FOR_PRE_S_DEVICES=1
+    // is set):
     // - build the APEX package compatible to Android 10
     //   so that the package can be installed.
     // - build artifacts (lib/javalib/bin) against Android 10 SDK
     //   so that the artifacts can run.
-    defaults: ["q-launched-apex-module"],
+    // If the flag is not set, the package is built to be compatible with Android 12.
+    defaults: ["q-launched-dcla-enabled-apex-module"],
     // Indicates that pre-installed version of this apex can be compressed.
     // Whether it actually will be compressed is controlled on per-device basis.
     compressible: true,
@@ -191,13 +193,15 @@ apex_defaults {
     // Use a custom AndroidManifest.xml used for API targeting.
     androidManifest: ":com.android.media.swcodec-androidManifest",
 
-    // IMPORTANT: q-launched-apex-module enables the build system to make
-    // sure the package compatible to Android 10 in two ways:
+    // IMPORTANT: q-launched-dcla-enabled-apex-module enables the build system to make
+    // sure the package compatible to Android 10 in two ways(if flag APEX_BUILD_FOR_PRE_S_DEVICES=1
+    // is set):
     // - build the APEX package compatible to Android 10
     //   so that the package can be installed.
     // - build artifacts (lib/javalib/bin) against Android 10 SDK
     //   so that the artifacts can run.
-    defaults: ["q-launched-apex-module"],
+    // If the flag is not set, the package is built to be compatible with Android 12.
+    defaults: ["q-launched-dcla-enabled-apex-module"],
     // Indicates that pre-installed version of this apex can be compressed.
     // Whether it actually will be compressed is controlled on per-device basis.
     compressible: true,
