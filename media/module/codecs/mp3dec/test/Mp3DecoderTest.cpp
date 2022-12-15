@@ -20,6 +20,7 @@
 #include <utils/Log.h>
 
 #include <audio_utils/sndfile.h>
+#include <memory>
 #include <stdio.h>
 
 #include "mp3reader.h"
@@ -99,27 +100,23 @@ SNDFILE *Mp3DecoderTest::openOutputFile(SF_INFO *sfInfo) {
 TEST_F(Mp3DecoderTest, MultiCreateMp3DecoderTest) {
     size_t memRequirements = pvmp3_decoderMemRequirements();
     ASSERT_NE(memRequirements, 0) << "Failed to get the memory requirement size";
-    void *decoderBuf = malloc(memRequirements);
+    unique_ptr<char[]> decoderBuf(new char[memRequirements]);
     ASSERT_NE(decoderBuf, nullptr)
             << "Failed to allocate decoder memory of size " << memRequirements;
     for (int count = 0; count < kMaxCount; count++) {
-        pvmp3_InitDecoder(mConfig, decoderBuf);
+        pvmp3_InitDecoder(mConfig, (void*)decoderBuf.get());
         ALOGV("Decoder created successfully");
-    }
-    if (decoderBuf) {
-        free(decoderBuf);
-        decoderBuf = nullptr;
     }
 }
 
 TEST_P(Mp3DecoderTest, DecodeTest) {
     size_t memRequirements = pvmp3_decoderMemRequirements();
     ASSERT_NE(memRequirements, 0) << "Failed to get the memory requirement size";
-    void *decoderBuf = malloc(memRequirements);
+    unique_ptr<char[]> decoderBuf(new char[memRequirements]);
     ASSERT_NE(decoderBuf, nullptr)
             << "Failed to allocate decoder memory of size " << memRequirements;
 
-    pvmp3_InitDecoder(mConfig, decoderBuf);
+    pvmp3_InitDecoder(mConfig, (void*)decoderBuf.get());
     ALOGV("Decoder created successfully");
     string inputFile = gEnv->getRes() + GetParam();
     bool status = mMp3Reader.init(inputFile.c_str());
@@ -130,27 +127,23 @@ TEST_P(Mp3DecoderTest, DecodeTest) {
     SNDFILE *outFileHandle = openOutputFile(&sfInfo);
     ASSERT_NE(outFileHandle, nullptr) << "Error opening output file for writing decoded output";
 
-    ERROR_CODE decoderErr = DecodeFrames(decoderBuf, outFileHandle, sfInfo);
+    ERROR_CODE decoderErr = DecodeFrames((void*)decoderBuf.get(), outFileHandle, sfInfo);
     ASSERT_EQ(decoderErr, NO_DECODING_ERROR) << "Failed to decode the frames";
     ASSERT_EQ(sfInfo.channels, mConfig->num_channels) << "Number of channels does not match";
     ASSERT_EQ(sfInfo.samplerate, mConfig->samplingRate) << "Sample rate does not match";
 
     mMp3Reader.close();
     sf_close(outFileHandle);
-    if (decoderBuf) {
-        free(decoderBuf);
-        decoderBuf = nullptr;
-    }
 }
 
 TEST_P(Mp3DecoderTest, ResetDecoderTest) {
     size_t memRequirements = pvmp3_decoderMemRequirements();
     ASSERT_NE(memRequirements, 0) << "Failed to get the memory requirement size";
-    void *decoderBuf = malloc(memRequirements);
+    unique_ptr<char[]> decoderBuf(new char[memRequirements]);
     ASSERT_NE(decoderBuf, nullptr)
             << "Failed to allocate decoder memory of size " << memRequirements;
 
-    pvmp3_InitDecoder(mConfig, decoderBuf);
+    pvmp3_InitDecoder(mConfig, (void*)decoderBuf.get());
     ALOGV("Decoder created successfully.");
     string inputFile = gEnv->getRes() + GetParam();
     bool status = mMp3Reader.init(inputFile.c_str());
@@ -162,24 +155,20 @@ TEST_P(Mp3DecoderTest, ResetDecoderTest) {
     ASSERT_NE(outFileHandle, nullptr) << "Error opening output file for writing decoded output";
 
     ERROR_CODE decoderErr;
-    decoderErr = DecodeFrames(decoderBuf, outFileHandle, sfInfo, kNumFrameReset);
+    decoderErr = DecodeFrames((void*)decoderBuf.get(), outFileHandle, sfInfo, kNumFrameReset);
     ASSERT_EQ(decoderErr, NO_DECODING_ERROR) << "Failed to decode the frames";
     ASSERT_EQ(sfInfo.channels, mConfig->num_channels) << "Number of channels does not match";
     ASSERT_EQ(sfInfo.samplerate, mConfig->samplingRate) << "Sample rate does not match";
 
-    pvmp3_resetDecoder(decoderBuf);
+    pvmp3_resetDecoder((void*)decoderBuf.get());
     // Decode the same file.
-    decoderErr = DecodeFrames(decoderBuf, outFileHandle, sfInfo);
+    decoderErr = DecodeFrames((void*)decoderBuf.get(), outFileHandle, sfInfo);
     ASSERT_EQ(decoderErr, NO_DECODING_ERROR) << "Failed to decode the frames";
     ASSERT_EQ(sfInfo.channels, mConfig->num_channels) << "Number of channels does not match";
     ASSERT_EQ(sfInfo.samplerate, mConfig->samplingRate) << "Sample rate does not match";
 
     mMp3Reader.close();
     sf_close(outFileHandle);
-    if (decoderBuf) {
-        free(decoderBuf);
-        decoderBuf = nullptr;
-    }
 }
 
 INSTANTIATE_TEST_SUITE_P(Mp3DecoderTestAll, Mp3DecoderTest,

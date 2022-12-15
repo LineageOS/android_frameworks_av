@@ -19,6 +19,7 @@
 #include <utils/Log.h>
 
 #include <fstream>
+#include <memory>
 
 #include "media/stagefright/foundation/ABitReader.h"
 #include "media/stagefright/foundation/avc_utils.h"
@@ -151,10 +152,10 @@ TEST_P(VOLDimensionTest, DimensionTest) {
     size_t fileSize = buf.st_size;
     ASSERT_NE(fileSize, 0) << "Invalid file size found";
 
-    const uint8_t *volBuffer = new uint8_t[fileSize];
+    std::unique_ptr<uint8_t[]> volBuffer(new uint8_t[fileSize]);
     ASSERT_NE(volBuffer, nullptr) << "Failed to allocate VOL buffer of size: " << fileSize;
 
-    inputFileStream.read((char *)(volBuffer), fileSize);
+    inputFileStream.read((char *)(volBuffer.get()), fileSize);
     ASSERT_EQ(inputFileStream.gcount(), fileSize)
             << "Failed to read complete file, bytes read: " << inputFileStream.gcount();
 
@@ -163,15 +164,13 @@ TEST_P(VOLDimensionTest, DimensionTest) {
     int32_t volWidth = -1;
     int32_t volHeight = -1;
 
-    bool status = ExtractDimensionsFromVOLHeader(volBuffer, fileSize, &volWidth, &volHeight);
+    bool status = ExtractDimensionsFromVOLHeader(volBuffer.get(), fileSize, &volWidth, &volHeight);
     ASSERT_TRUE(status)
             << "Failed to get VOL dimensions from function: ExtractDimensionsFromVOLHeader()";
 
     ASSERT_EQ(volWidth, width) << "Expected width: " << width << "Found: " << volWidth;
 
     ASSERT_EQ(volHeight, height) << "Expected height: " << height << "Found: " << volHeight;
-
-    delete[] volBuffer;
 }
 
 TEST_P(AVCDimensionTest, DimensionTest) {
@@ -186,7 +185,8 @@ TEST_P(AVCDimensionTest, DimensionTest) {
         stringLine >> type >> chunkLength;
         ASSERT_GT(chunkLength, 0) << "Length of the data chunk must be greater than zero";
 
-        const uint8_t *data = new uint8_t[chunkLength];
+        std::unique_ptr<uint8_t[]> dataArray(new uint8_t[chunkLength]);
+        const uint8_t *data = dataArray.get();
         ASSERT_NE(data, nullptr) << "Failed to create a data buffer of size: " << chunkLength;
 
         const uint8_t *nalStart;
@@ -197,9 +197,11 @@ TEST_P(AVCDimensionTest, DimensionTest) {
                 << "Failed to read complete file, bytes read: " << mInputFileStream.gcount();
 
         size_t smallBufferSize = kSmallBufferSize;
-        const uint8_t *sanityData = new uint8_t[smallBufferSize];
+        uint8_t sanityDataBuffer[smallBufferSize];
+        const uint8_t *sanityData = sanityDataBuffer;
         memcpy((void *)sanityData, (void *)data, smallBufferSize);
 
+        // sanityData could be changed, but sanityDataPtr is not and can be cleaned up.
         status_t result = getNextNALUnit(&sanityData, &smallBufferSize, &nalStart, &nalSize, true);
         ASSERT_EQ(result, -EAGAIN) << "Invalid result found when wrong NAL unit passed";
 
@@ -221,7 +223,6 @@ TEST_P(AVCDimensionTest, DimensionTest) {
             ASSERT_EQ(avcHeight, mFrameHeight)
                     << "Expected height: " << mFrameHeight << "Found: " << avcHeight;
         }
-        delete[] data;
     }
     if (mNalUnitsExpected < 0) {
         ASSERT_GT(numNalUnits, 0) << "Failed to find an NAL Unit";
@@ -251,7 +252,8 @@ TEST_P(AvccBoxTest, AvccBoxValidationTest) {
         accessUnitLength += chunkLength;
 
         if (!type.compare("SPS")) {
-            const uint8_t *data = new uint8_t[chunkLength];
+            std::unique_ptr<uint8_t[]> dataArray(new uint8_t[chunkLength]);
+            const uint8_t *data = dataArray.get();
             ASSERT_NE(data, nullptr) << "Failed to create a data buffer of size: " << chunkLength;
 
             const uint8_t *nalStart;
@@ -271,14 +273,13 @@ TEST_P(AvccBoxTest, AvccBoxValidationTest) {
                 profile = nalStart[1];
                 level = nalStart[3];
             }
-            delete[] data;
         }
     }
-    const uint8_t *accessUnitData = new uint8_t[accessUnitLength];
+    std::unique_ptr<uint8_t[]> accessUnitData(new uint8_t[accessUnitLength]);
     ASSERT_NE(accessUnitData, nullptr) << "Failed to create a buffer of size: " << accessUnitLength;
 
     mInputFileStream.seekg(0, ios::beg);
-    mInputFileStream.read((char *)accessUnitData, accessUnitLength);
+    mInputFileStream.read((char *)accessUnitData.get(), accessUnitLength);
     ASSERT_EQ(mInputFileStream.gcount(), accessUnitLength)
             << "Failed to read complete file, bytes read: " << mInputFileStream.gcount();
 
@@ -286,7 +287,7 @@ TEST_P(AvccBoxTest, AvccBoxValidationTest) {
     ASSERT_NE(accessUnit, nullptr)
             << "Failed to create an android data buffer of size: " << accessUnitLength;
 
-    memcpy(accessUnit->data(), accessUnitData, accessUnitLength);
+    memcpy(accessUnit->data(), accessUnitData.get(), accessUnitLength);
     sp<ABuffer> csdDataBuffer = MakeAVCCodecSpecificData(accessUnit, &avcWidth, &avcHeight);
     ASSERT_NE(csdDataBuffer, nullptr) << "No data returned from MakeAVCCodecSpecificData()";
 
@@ -306,7 +307,6 @@ TEST_P(AvccBoxTest, AvccBoxValidationTest) {
     ASSERT_EQ(*(csdData + 3), level)
             << "Expected AVC level: " << level << " found: " << *(csdData + 3);
     csdDataBuffer.clear();
-    delete[] accessUnitData;
     accessUnit.clear();
 }
 
@@ -321,32 +321,31 @@ TEST_P(AVCFrameTest, FrameTest) {
         stringLine >> type >> chunkLength >> frameLayerID;
         ASSERT_GT(chunkLength, 0) << "Length of the data chunk must be greater than zero";
 
-        char *data = new char[chunkLength];
+        std::unique_ptr<char[]> data(new char[chunkLength]);
         ASSERT_NE(data, nullptr) << "Failed to allocation data buffer of size: " << chunkLength;
 
-        mInputFileStream.read(data, chunkLength);
+        mInputFileStream.read(data.get(), chunkLength);
         ASSERT_EQ(mInputFileStream.gcount(), chunkLength)
                 << "Failed to read complete file, bytes read: " << mInputFileStream.gcount();
 
         if (!type.compare("IDR")) {
-            bool isIDR = IsIDR((uint8_t *)data, chunkLength);
+            bool isIDR = IsIDR((uint8_t *)data.get(), chunkLength);
             ASSERT_TRUE(isIDR);
 
-            layerID = FindAVCLayerId((uint8_t *)data, chunkLength);
+            layerID = FindAVCLayerId((uint8_t *)data.get(), chunkLength);
             ASSERT_EQ(layerID, frameLayerID) << "Wrong layer ID found";
         } else if (!type.compare("P") || !type.compare("B")) {
             sp<ABuffer> accessUnit = new ABuffer(chunkLength);
             ASSERT_NE(accessUnit, nullptr) << "Unable to create access Unit";
 
-            memcpy(accessUnit->data(), data, chunkLength);
+            memcpy(accessUnit->data(), data.get(), chunkLength);
             bool isReferenceFrame = IsAVCReferenceFrame(accessUnit);
             ASSERT_TRUE(isReferenceFrame);
 
             accessUnit.clear();
-            layerID = FindAVCLayerId((uint8_t *)data, chunkLength);
+            layerID = FindAVCLayerId((uint8_t *)data.get(), chunkLength);
             ASSERT_EQ(layerID, frameLayerID) << "Wrong layer ID found";
         }
-        delete[] data;
     }
 }
 
