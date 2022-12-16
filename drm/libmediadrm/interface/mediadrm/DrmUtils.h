@@ -283,14 +283,14 @@ status_t GetLogMessages(const sp<U> &obj, Vector<::V1_4::LogMessage> &logs) {
     return OK;
 }
 
-std::string GetExceptionMessage(status_t err, const char *msg,
+std::string GetExceptionMessage(const DrmStatus & err, const char *defaultMsg,
                                 const Vector<::V1_4::LogMessage> &logs);
 
 template<typename T>
-std::string GetExceptionMessage(status_t err, const char *msg, const sp<T> &iface) {
+std::string GetExceptionMessage(const DrmStatus &err, const char *defaultMsg, const sp<T> &iface) {
     Vector<::V1_4::LogMessage> logs;
     iface->getLogMessages(logs);
-    return GetExceptionMessage(err, msg, logs);
+    return GetExceptionMessage(err, defaultMsg, logs);
 }
 
 } // namespace DrmUtils

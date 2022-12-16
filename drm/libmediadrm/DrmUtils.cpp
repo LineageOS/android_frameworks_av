@@ -363,18 +363,23 @@ char logPriorityToChar(::V1_4::LogPriority priority) {
 }
 }  // namespace
 
-std::string GetExceptionMessage(status_t err, const char* msg,
+std::string GetExceptionMessage(const DrmStatus &err, const char* defaultMsg,
                                 const Vector<::V1_4::LogMessage>& logs) {
     std::string ruler("==============================");
     std::string header("Beginning of DRM Plugin Log");
     std::string footer("End of DRM Plugin Log");
+    std::string msg(err.getErrorMessage());
     String8 msg8;
-    if (msg) {
-        msg8 += msg;
+    if (!msg.empty()) {
+        msg8 += msg.c_str();
+        msg8 += ": ";
+    } else if (defaultMsg) {
+        msg8 += defaultMsg;
         msg8 += ": ";
     }
-    auto errStr = StrCryptoError(err);
-    msg8 += errStr.c_str();
+    msg8 += StrCryptoError(err).c_str();
+    msg8 += String8::format("\ncdm err: %d, oem err: %d, ctx: %d",
+                            err.getCdmErr(), err.getOemErr(), err.getContext());
     msg8 += String8::format("\n%s %s %s", ruler.c_str(), header.c_str(), ruler.c_str());
 
     for (auto log : logs) {
