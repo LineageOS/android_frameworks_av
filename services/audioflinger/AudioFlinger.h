@@ -305,6 +305,10 @@ public:
     virtual status_t getSupportedLatencyModes(audio_io_handle_t output,
             std::vector<audio_latency_mode_t>* modes);
 
+    virtual status_t setBluetoothLatencyModesEnabled(bool enabled);
+
+    virtual status_t supportsBluetoothLatencyModes(bool* support);
+
     virtual status_t getSoundDoseInterface(const sp<media::ISoundDoseCallback>& callback,
                                            sp<media::ISoundDose>* soundDose);
 
@@ -1053,6 +1057,9 @@ private:
 
     /** Interface for interacting with the AudioService. */
     mediautils::atomic_sp<IAudioManager>       mAudioManager;
+
+    // Bluetooth Variable latency control logic is enabled or disabled
+    std::atomic_bool mBluetoothLatencyModesEnabled;
 };
 
 #undef INCLUDING_FROM_AUDIOFLINGER_H

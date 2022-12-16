@@ -846,6 +846,21 @@ status_t AudioFlingerClientAdapter::getSupportedLatencyModes(
     return NO_ERROR;
 }
 
+status_t AudioFlingerClientAdapter::setBluetoothLatencyModesEnabled(bool enabled) {
+    return statusTFromBinderStatus(mDelegate->setBluetoothLatencyModesEnabled(enabled));
+}
+
+status_t AudioFlingerClientAdapter::supportsBluetoothLatencyModes(bool* support) {
+    if (support == nullptr) {
+        return BAD_VALUE;
+    }
+
+    RETURN_STATUS_IF_ERROR(statusTFromBinderStatus(
+            mDelegate->supportsBluetoothLatencyModes(support)));
+
+    return NO_ERROR;
+}
+
 status_t AudioFlingerClientAdapter::getSoundDoseInterface(
         const sp<media::ISoundDoseCallback> &callback,
         sp<media::ISoundDose>* soundDose) {
@@ -1372,6 +1387,14 @@ Status AudioFlingerServerAdapter::getSupportedLatencyModes(
             convertContainer<std::vector<media::LatencyMode>>(
                     modesLegacy, legacy2aidl_audio_latency_mode_t_LatencyMode));
     return Status::ok();
+}
+
+Status AudioFlingerServerAdapter::setBluetoothLatencyModesEnabled(bool enabled) {
+    return Status::fromStatusT(mDelegate->setBluetoothLatencyModesEnabled(enabled));
+}
+
+Status AudioFlingerServerAdapter::supportsBluetoothLatencyModes(bool *support) {
+    return Status::fromStatusT(mDelegate->supportsBluetoothLatencyModes(support));
 }
 
 Status AudioFlingerServerAdapter::getSoundDoseInterface(
