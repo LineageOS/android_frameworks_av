@@ -2046,6 +2046,10 @@ aidl2legacy_AudioStandard_audio_standard_t(AudioStandard aidl) {
             return AUDIO_STANDARD_NONE;
         case AudioStandard::EDID:
             return AUDIO_STANDARD_EDID;
+        case AudioStandard::SADB:
+            return AUDIO_STANDARD_SADB;
+        case AudioStandard::VSADB:
+            return AUDIO_STANDARD_VSADB;
     }
     return unexpected(BAD_VALUE);
 }
@@ -2057,6 +2061,10 @@ legacy2aidl_audio_standard_t_AudioStandard(audio_standard_t legacy) {
             return AudioStandard::NONE;
         case AUDIO_STANDARD_EDID:
             return AudioStandard::EDID;
+        case AUDIO_STANDARD_SADB:
+            return AudioStandard::SADB;
+        case AUDIO_STANDARD_VSADB:
+            return AudioStandard::VSADB;
     }
     return unexpected(BAD_VALUE);
 }
