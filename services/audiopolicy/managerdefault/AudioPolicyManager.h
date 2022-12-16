@@ -1305,10 +1305,14 @@ private:
 
         sp<PreferredMixerAttributesInfo> getPreferredMixerAttributesInfo(
                 audio_port_handle_t devicePortId, product_strategy_t strategy);
-        status_t reopenOutput(sp<SwAudioOutputDescriptor> outputDesc,
-                              const audio_config_t *config,
-                              audio_output_flags_t flags,
-                              const char* caller);
+        sp<SwAudioOutputDescriptor> reopenOutput(
+                sp<SwAudioOutputDescriptor> outputDesc,
+                const audio_config_t *config,
+                audio_output_flags_t flags,
+                const char* caller);
+
+        void reopenOutputsWithDevices(
+                const std::map<audio_io_handle_t, DeviceVector>& outputsToReopen);
 };
 
 };

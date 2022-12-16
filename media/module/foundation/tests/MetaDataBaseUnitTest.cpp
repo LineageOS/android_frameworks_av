@@ -19,6 +19,7 @@
 #include <string.h>
 #include <sys/stat.h>
 #include <fstream>
+#include <memory>
 
 #include <media/stagefright/MediaDefs.h>
 #include <media/stagefright/MetaDataBase.h>
@@ -48,18 +49,16 @@ namespace android {
 class MetaDataBaseUnitTest : public ::testing::Test {};
 
 TEST_F(MetaDataBaseUnitTest, CreateMetaDataBaseTest) {
-    MetaDataBase *metaData = new MetaDataBase();
+    std::unique_ptr<MetaDataBase> metaData(new MetaDataBase());
     ASSERT_NE(metaData, nullptr) << "Failed to create meta data";
 
     // Testing copy constructor
-    MetaDataBase *metaDataCopy = metaData;
+    MetaDataBase *metaDataCopy = metaData.get();
     ASSERT_NE(metaDataCopy, nullptr) << "Failed to create meta data copy";
-
-    delete metaData;
 }
 
 TEST_F(MetaDataBaseUnitTest, SetAndFindDataTest) {
-    MetaDataBase *metaData = new MetaDataBase();
+    std::unique_ptr<MetaDataBase> metaData(new MetaDataBase());
     ASSERT_NE(metaData, nullptr) << "Failed to create meta data";
 
     // Setting the different key-value pair type for first time, overwrite
@@ -142,12 +141,10 @@ TEST_F(MetaDataBaseUnitTest, SetAndFindDataTest) {
     int32_t angle;
     status = metaData->findInt32(kKeyRotation, &angle);
     ASSERT_FALSE(status) << "Value for an invalid key is returned when the key is not set";
-
-    delete (metaData);
 }
 
 TEST_F(MetaDataBaseUnitTest, OverWriteFunctionalityTest) {
-    MetaDataBase *metaData = new MetaDataBase();
+    std::unique_ptr<MetaDataBase> metaData(new MetaDataBase());
     ASSERT_NE(metaData, nullptr) << "Failed to create meta data";
 
     // set/set/read to check first overwrite operation
@@ -186,12 +183,10 @@ TEST_F(MetaDataBaseUnitTest, OverWriteFunctionalityTest) {
     status = metaData->findInt32(kKeyHeight, &height);
     ASSERT_TRUE(status) << "kKeyHeight key does not exists in metadata";
     ASSERT_EQ(height, kHeight3) << "Value of height is not overwritten";
-
-    delete (metaData);
 }
 
 TEST_F(MetaDataBaseUnitTest, RemoveKeyTest) {
-    MetaDataBase *metaData = new MetaDataBase();
+    std::unique_ptr<MetaDataBase> metaData(new MetaDataBase());
     ASSERT_NE(metaData, nullptr) << "Failed to create meta data";
 
     bool status = metaData->setCString(kKeyMIMEType, MEDIA_MIMETYPE_VIDEO_AVC);
@@ -246,12 +241,10 @@ TEST_F(MetaDataBaseUnitTest, RemoveKeyTest) {
 
     metaData->setCString(kKeyMIMEType, MEDIA_MIMETYPE_VIDEO_HEVC);
     ASSERT_FALSE(status) << "Overwrite should be false since the metadata was cleared";
-
-    delete (metaData);
 }
 
 TEST_F(MetaDataBaseUnitTest, ConvertToStringTest) {
-    MetaDataBase *metaData = new MetaDataBase();
+    std::unique_ptr<MetaDataBase> metaData(new MetaDataBase());
     ASSERT_NE(metaData, nullptr) << "Failed to create meta data";
 
     String8 info = metaData->toString();
@@ -281,8 +274,6 @@ TEST_F(MetaDataBaseUnitTest, ConvertToStringTest) {
     info = metaData->toString();
     ASSERT_EQ(info.length(), 0) << "MetaData length is non-zero after clearing it: "
                                 << info.length();
-
-    delete (metaData);
 }
 
 }  // namespace android

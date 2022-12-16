@@ -33,7 +33,11 @@ constexpr uint16_t kFeasibleTypes[] = {
 
 class MtpPropertyFuzzer : MtpPacketFuzzerUtils {
   public:
-    MtpPropertyFuzzer(const uint8_t* data, size_t size) : mFdp(data, size){};
+    MtpPropertyFuzzer(const uint8_t* data, size_t size) : mFdp(data, size) {
+        mUsbDevFsUrb = (struct usbdevfs_urb*)malloc(sizeof(struct usbdevfs_urb) +
+                                                    sizeof(struct usbdevfs_iso_packet_desc));
+    };
+    ~MtpPropertyFuzzer() { free(mUsbDevFsUrb); };
     void process();
 
   private:
@@ -41,7 +45,7 @@ class MtpPropertyFuzzer : MtpPacketFuzzerUtils {
 };
 
 void MtpPropertyFuzzer::process() {
-    MtpProperty* mtpProperty;
+    MtpProperty* mtpProperty = nullptr;
     if (mFdp.ConsumeBool()) {
         mtpProperty = new MtpProperty();
     } else {
@@ -75,6 +79,7 @@ void MtpPropertyFuzzer::process() {
                             fillFilePath(&mFdp);
                             int32_t fd = memfd_create(mPath.c_str(), MFD_ALLOW_SEALING);
                             fillUsbRequest(fd, &mFdp);
+                            mUsbRequest.dev = usb_device_new(mPath.c_str(), fd);
                             mtpDataPacket.write(&mUsbRequest,
                                                 mFdp.PickValueInArray<UrbPacketDivisionMode>(
                                                         kUrbPacketDivisionModes),

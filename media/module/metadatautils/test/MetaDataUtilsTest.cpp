@@ -19,6 +19,7 @@
 #include <utils/Log.h>
 
 #include <fstream>
+#include <memory>
 #include <string>
 
 #include <media/esds/ESDS.h>
@@ -228,7 +229,7 @@ TEST_P(AvcCSDTest, AvcCSDValidationTest) {
     ASSERT_TRUE(status) << "Failed to get the mime type";
     ASSERT_STREQ(mimeType, MEDIA_MIMETYPE_VIDEO_AVC);
 
-    MetaDataBase *metaData = new MetaDataBase();
+    std::unique_ptr<MetaDataBase> metaData(new MetaDataBase());
     ASSERT_NE(metaData, nullptr) << "Failed to create MetaData Base";
 
     status = MakeAVCCodecSpecificData(*metaData, mInputBuffer, mInputBufferSize);
@@ -264,7 +265,6 @@ TEST_P(AvcCSDTest, AvcCSDValidationTest) {
     int32_t result = memcmp(csdAMediaFormatBuffer, csdMetaDataBaseBuffer, csdAMediaFormatSize);
     ASSERT_EQ(result, 0) << "CSD from AMediaFormat and MetaDataBase do not match";
 
-    delete metaData;
     AMediaFormat_delete(csdData);
 }
 
@@ -275,7 +275,7 @@ TEST_P(AvcCSDValidateTest, AvcValidateTest) {
     bool status = MakeAVCCodecSpecificData(csdData, mInputBuffer, mInputBufferSize);
     ASSERT_FALSE(status) << "MakeAVCCodecSpecificData with AMediaFormat succeeds with invalid data";
 
-    MetaDataBase *metaData = new MetaDataBase();
+    std::unique_ptr<MetaDataBase> metaData(new MetaDataBase());
     ASSERT_NE(metaData, nullptr) << "Failed to create MetaData Base";
 
     status = MakeAVCCodecSpecificData(*metaData, mInputBuffer, mInputBufferSize);
@@ -307,7 +307,7 @@ TEST_P(AacCSDTest, AacCSDValidationTest) {
     ASSERT_TRUE(status) << "Failed to get the mime type";
     ASSERT_STREQ(mimeType, MEDIA_MIMETYPE_AUDIO_AAC);
 
-    MetaDataBase *metaData = new MetaDataBase();
+    std::unique_ptr<MetaDataBase> metaData(new MetaDataBase());
     ASSERT_NE(metaData, nullptr) << "Failed to create MetaData Base";
 
     status = MakeAACCodecSpecificData(*metaData, mAacProfile, mAacSamplingFreqIndex,
@@ -356,11 +356,10 @@ TEST_P(AacCSDTest, AacCSDValidationTest) {
     ASSERT_EQ(memcmpResult, 0) << "AMediaFormat and MetaDataBase CSDs do not match";
 
     AMediaFormat_delete(csdData);
-    delete metaData;
 }
 
 TEST_P(AacADTSTest, AacADTSValidationTest) {
-    MetaDataBase *metaData = new MetaDataBase();
+    std::unique_ptr<MetaDataBase> metaData(new MetaDataBase());
     ASSERT_NE(metaData, nullptr) << "Failed to create meta data";
 
     bool status = MakeAACCodecSpecificData(*metaData, mInputBuffer, kAdtsCsdSize);
@@ -380,12 +379,10 @@ TEST_P(AacADTSTest, AacADTSValidationTest) {
     status = metaData->findCString(kKeyMIMEType, &mimeType);
     ASSERT_TRUE(status) << "Failed to get mime type";
     ASSERT_STREQ(mimeType, MEDIA_MIMETYPE_AUDIO_AAC);
-
-    delete metaData;
 }
 
 TEST_P(AacCSDValidateTest, AacInvalidInputTest) {
-    MetaDataBase *metaData = new MetaDataBase();
+    std::unique_ptr<MetaDataBase> metaData(new MetaDataBase());
     ASSERT_NE(metaData, nullptr) << "Failed to create meta data";
 
     bool status = MakeAACCodecSpecificData(*metaData, mInputBuffer, kAdtsCsdSize);
@@ -412,14 +409,14 @@ TEST_P(VorbisTest, VorbisCommentTest) {
         istringstream dataStringLine(dataLine);
         dataStringLine >> comment;
 
-        char *buffer = strndup(comment.c_str(), commentLength);
+        std::unique_ptr<char[]> buffer(new char[commentLength]);
         ASSERT_NE(buffer, nullptr) << "Failed to allocate buffer of size: " << commentLength;
+        strncpy(buffer.get(), comment.c_str(), commentLength);
 
         AMediaFormat *fileMeta = AMediaFormat_new();
         ASSERT_NE(fileMeta, nullptr) << "Failed to create AMedia format";
 
-        parseVorbisComment(fileMeta, buffer, commentLength);
-        free(buffer);
+        parseVorbisComment(fileMeta, buffer.get(), commentLength);
 
         if (!strncasecmp(tag.c_str(), "ANDROID_HAPTIC", sizeof(tag))) {
             int32_t numChannelExpected = stoi(value);

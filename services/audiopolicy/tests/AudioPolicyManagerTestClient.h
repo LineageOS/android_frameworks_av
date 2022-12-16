@@ -189,7 +189,7 @@ public:
         mAudioParameters.addInt(String8(AudioParameter::keyStreamSupportedSamplingRates), 48000);
         std::string channelMasks;
         for (const auto& cm : mSupportedChannelMasks) {
-            if (audio_channel_mask_is_valid(cm)) {
+            if (!audio_channel_mask_is_valid(cm)) {
                 continue;
             }
             if (!channelMasks.empty()) channelMasks += AUDIO_PARAMETER_VALUE_LIST_SEPARATOR;
