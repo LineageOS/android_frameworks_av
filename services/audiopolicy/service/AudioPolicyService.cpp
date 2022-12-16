@@ -137,6 +137,7 @@ BINDER_METHOD_ENTRY(setA11yServicesUids) \
 BINDER_METHOD_ENTRY(setCurrentImeUid) \
 BINDER_METHOD_ENTRY(isHapticPlaybackSupported) \
 BINDER_METHOD_ENTRY(isUltrasoundSupported) \
+BINDER_METHOD_ENTRY(isHotwordStreamSupported) \
 BINDER_METHOD_ENTRY(listAudioProductStrategies) \
 BINDER_METHOD_ENTRY(getProductStrategyFromAudioAttributes) \
 BINDER_METHOD_ENTRY(listAudioVolumeGroups) \
@@ -1313,6 +1314,7 @@ status_t AudioPolicyService::onTransact(
         case TRANSACTION_getVolumeGroupFromAudioAttributes:
         case TRANSACTION_acquireSoundTriggerSession:
         case TRANSACTION_releaseSoundTriggerSession:
+        case TRANSACTION_isHotwordStreamSupported:
         case TRANSACTION_setRttEnabled:
         case TRANSACTION_isCallScreenModeSupported:
         case TRANSACTION_setDevicesRoleForStrategy:

@@ -2045,6 +2045,17 @@ Status AudioPolicyService::isUltrasoundSupported(bool* _aidl_return)
     return Status::ok();
 }
 
+Status AudioPolicyService::isHotwordStreamSupported(bool lookbackAudio, bool* _aidl_return)
+{
+    if (mAudioPolicyManager == nullptr) {
+        return binderStatusFromStatusT(NO_INIT);
+    }
+    Mutex::Autolock _l(mLock);
+    AutoCallerClear acc;
+    *_aidl_return = mAudioPolicyManager->isHotwordStreamSupported(lookbackAudio);
+    return Status::ok();
+}
+
 Status AudioPolicyService::listAudioProductStrategies(
         std::vector<media::AudioProductStrategy>* _aidl_return) {
     AudioProductStrategyVector strategies;

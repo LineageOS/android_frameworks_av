@@ -313,6 +313,15 @@ interface IAudioPolicyService {
 
     boolean isUltrasoundSupported();
 
+    /**
+     * Queries if there is hardware support for requesting audio capture content from
+     * the DSP hotword pipeline.
+     *
+     * @param lookbackAudio true if additionally querying for the ability to capture audio
+     *                      from the pipeline prior to capture stream open.
+     */
+    boolean isHotwordStreamSupported(boolean lookbackAudio);
+
     AudioProductStrategy[] listAudioProductStrategies();
     int /* product_strategy_t */ getProductStrategyFromAudioAttributes(
             in AudioAttributesInternal aa, boolean fallbackOnDefault);

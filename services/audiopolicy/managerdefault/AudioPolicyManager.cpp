@@ -5645,6 +5645,21 @@ bool AudioPolicyManager::isUltrasoundSupported()
     return false;
 }
 
+bool AudioPolicyManager::isHotwordStreamSupported(bool lookbackAudio)
+{
+    const auto mask = AUDIO_INPUT_FLAG_HOTWORD_TAP |
+        (lookbackAudio ? AUDIO_INPUT_FLAG_HW_LOOKBACK : 0);
+    for (const auto& hwModule : mHwModules) {
+        const InputProfileCollection &inputProfiles = hwModule->getInputProfiles();
+        for (const auto &inputProfile : inputProfiles) {
+            if ((inputProfile->getFlags() & mask) == mask) {
+                return true;
+            }
+        }
+    }
+    return false;
+}
+
 bool AudioPolicyManager::isCallScreenModeSupported()
 {
     return getConfig().isCallScreenModeSupported();
