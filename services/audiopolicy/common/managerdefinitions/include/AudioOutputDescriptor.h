@@ -452,6 +452,7 @@ public:
     audio_session_t mDirectClientSession; // session id of the direct output client
     bool mPendingReopenToQueryProfiles = false;
     audio_channel_mask_t mMixerChannelMask = AUDIO_CHANNEL_NONE;
+    bool mUsePreferredMixerAttributes = false;
 };
 
 // Audio output driven by an input device directly.

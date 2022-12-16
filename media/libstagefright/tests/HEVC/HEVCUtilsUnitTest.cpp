@@ -19,6 +19,7 @@
 #include <utils/Log.h>
 
 #include <fstream>
+#include <memory>
 
 #include <media/stagefright/foundation/ABitReader.h>
 #include <HevcUtils.h>
@@ -88,10 +89,10 @@ TEST_P(HEVCUtilsUnitTest, NALUnitTest) {
         stringLine >> type >> chunkLength;
         ASSERT_GT(chunkLength, 0) << "Length of data chunk must be greater than 0";
 
-        char *data = (char *)malloc(chunkLength);
+        std::unique_ptr<char[]> data(new char[chunkLength]);
         ASSERT_NE(data, nullptr) << "Failed to allocate data buffer of size: " << chunkLength;
 
-        mMediaFileStream.read(data, chunkLength);
+        mMediaFileStream.read(data.get(), chunkLength);
         ASSERT_EQ(mMediaFileStream.gcount(), chunkLength)
                 << "Failed to read complete file, bytes read: " << mMediaFileStream.gcount();
 
@@ -105,7 +106,7 @@ TEST_P(HEVCUtilsUnitTest, NALUnitTest) {
         offset += 3;
         ASSERT_LE(offset, chunkLength) << "NAL unit offset must not exceed the chunk length";
 
-        uint8_t *nalUnit = (uint8_t *)(data + offset);
+        uint8_t *nalUnit = (uint8_t *)(data.get() + offset);
         size_t nalUnitLength = chunkLength - offset;
 
         // Add NAL units only if they're of type: VPS/SPS/PPS/SEI
@@ -118,20 +119,18 @@ TEST_P(HEVCUtilsUnitTest, NALUnitTest) {
             size_t sizeNalUnit = hevcParams.getSize(index);
             ASSERT_EQ(sizeNalUnit, nalUnitLength) << "Invalid size returned for NAL: " << type;
 
-            uint8_t *destination = (uint8_t *)malloc(nalUnitLength);
+            std::unique_ptr<uint8_t[]> destination(new uint8_t[nalUnitLength]);
             ASSERT_NE(destination, nullptr)
                     << "Failed to allocate buffer of size: " << nalUnitLength;
 
-            bool status = hevcParams.write(index, destination, nalUnitLength);
+            bool status = hevcParams.write(index, destination.get(), nalUnitLength);
             ASSERT_TRUE(status) << "Unable to write NAL Unit data";
 
-            free(destination);
             index++;
         } else {
             err = hevcParams.addNalUnit(nalUnit, nalUnitLength);
             ASSERT_NE(err, (status_t)OK) << "Invalid NAL Unit added, type: " << type;
         }
-        free(data);
     }
 
     size_t numNalUnits = hevcParams.getNumNalUnitsOfType(kVPSCode);
@@ -166,10 +165,10 @@ TEST_P(HEVCUtilsUnitTest, NALUnitTest) {
             << "Expected NAL type: 34(PPS), found: " << typeNalUnit;
 
     size_t hvccBoxSize = kHvccBoxMaxSize;
-    uint8_t *hvcc = (uint8_t *)malloc(kHvccBoxMaxSize);
+    std::unique_ptr<uint8_t[]> hvcc(new uint8_t[kHvccBoxMaxSize]);
     ASSERT_NE(hvcc, nullptr) << "Failed to allocate a hvcc buffer of size: " << kHvccBoxMaxSize;
 
-    err = hevcParams.makeHvcc(hvcc, &hvccBoxSize, kNALSizeLength);
+    err = hevcParams.makeHvcc(hvcc.get(), &hvccBoxSize, kNALSizeLength);
     ASSERT_EQ(err, (status_t)OK) << "Unable to create hvcc box";
 
     ASSERT_GT(hvccBoxSize, kHvccBoxMinSize)
@@ -179,8 +178,6 @@ TEST_P(HEVCUtilsUnitTest, NALUnitTest) {
     if (frameRate != mFrameRate)
         cout << "[   WARN   ] Expected frame rate: " << mFrameRate << " Found: " << frameRate
              << endl;
-
-    free(hvcc);
 }
 
 // Info File contains the type and length for each chunk/frame

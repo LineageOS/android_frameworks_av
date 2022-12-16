@@ -160,7 +160,8 @@ class AudioPolicyManagerTest : public testing::Test {
             audio_io_handle_t *output = nullptr,
             audio_port_handle_t *portId = nullptr,
             audio_attributes_t attr = {},
-            audio_session_t session = AUDIO_SESSION_NONE);
+            audio_session_t session = AUDIO_SESSION_NONE,
+            int uid = 0);
     void getInputForAttr(
             const audio_attributes_t &attr,
             audio_session_t session,
@@ -244,7 +245,8 @@ void AudioPolicyManagerTest::getOutputForAttr(
         audio_io_handle_t *output,
         audio_port_handle_t *portId,
         audio_attributes_t attr,
-        audio_session_t session) {
+        audio_session_t session,
+        int uid) {
     audio_io_handle_t localOutput;
     if (!output) output = &localOutput;
     *output = AUDIO_IO_HANDLE_NONE;
@@ -261,7 +263,7 @@ void AudioPolicyManagerTest::getOutputForAttr(
     bool isBitPerfect;
     // TODO b/182392769: use attribution source util
     AttributionSourceState attributionSource = AttributionSourceState();
-    attributionSource.uid = 0;
+    attributionSource.uid = uid;
     attributionSource.token = sp<BBinder>::make();
     ASSERT_EQ(OK, mManager->getOutputForAttr(
                     &attr, output, session, &stream, attributionSource, &config, &flags,
@@ -1048,6 +1050,70 @@ TEST_F(AudioPolicyManagerTestWithConfigurationFile, PreferredMixerAttributes) {
                   mManager->clearPreferredMixerAttributes(&mediaAttr, usbPortId, uid));
     }
 
+    ASSERT_EQ(NO_ERROR, mManager->setDeviceConnectionState(AUDIO_DEVICE_OUT_USB_DEVICE,
+                                                           AUDIO_POLICY_DEVICE_STATE_UNAVAILABLE,
+                                                           "", "", AUDIO_FORMAT_LDAC));
+}
+
+TEST_F(AudioPolicyManagerTestWithConfigurationFile, RoutingChangedWithPreferredMixerAttributes) {
+    mClient->addSupportedFormat(AUDIO_FORMAT_PCM_16_BIT);
+    mClient->addSupportedChannelMask(AUDIO_CHANNEL_OUT_STEREO);
+    ASSERT_EQ(NO_ERROR, mManager->setDeviceConnectionState(AUDIO_DEVICE_OUT_USB_DEVICE,
+                                                           AUDIO_POLICY_DEVICE_STATE_AVAILABLE,
+                                                           "", "", AUDIO_FORMAT_DEFAULT));
+    auto devices = mManager->getAvailableOutputDevices();
+    audio_port_handle_t usbPortId = AUDIO_PORT_HANDLE_NONE;
+    for (auto device : devices) {
+        if (device->type() == AUDIO_DEVICE_OUT_USB_DEVICE) {
+            usbPortId = device->getId();
+            break;
+        }
+    }
+    EXPECT_NE(AUDIO_PORT_HANDLE_NONE, usbPortId);
+
+    const uid_t uid = 1234;
+    const audio_attributes_t mediaAttr = {
+            .content_type = AUDIO_CONTENT_TYPE_MUSIC,
+            .usage = AUDIO_USAGE_MEDIA,
+    };
+
+    std::vector<audio_mixer_attributes_t> mixerAttributes;
+    EXPECT_EQ(NO_ERROR, mManager->getSupportedMixerAttributes(usbPortId, mixerAttributes));
+    EXPECT_GT(mixerAttributes.size(), 0);
+    EXPECT_EQ(NO_ERROR,
+              mManager->setPreferredMixerAttributes(
+                      &mediaAttr, usbPortId, uid, &mixerAttributes[0]));
+
+    audio_io_handle_t output = AUDIO_IO_HANDLE_NONE;
+    audio_port_handle_t selectedDeviceId = AUDIO_PORT_HANDLE_NONE;
+    audio_port_handle_t portId = AUDIO_PORT_HANDLE_NONE;
+    getOutputForAttr(&selectedDeviceId, AUDIO_FORMAT_PCM_16_BIT, AUDIO_CHANNEL_OUT_STEREO,
+            48000, AUDIO_OUTPUT_FLAG_NONE, &output, &portId, mediaAttr,
+            AUDIO_SESSION_NONE, uid);
+    status_t status = mManager->startOutput(portId);
+    if (status == DEAD_OBJECT) {
+        getOutputForAttr(&selectedDeviceId, AUDIO_FORMAT_PCM_16_BIT, AUDIO_CHANNEL_OUT_STEREO,
+                48000, AUDIO_OUTPUT_FLAG_NONE, &output, &portId, mediaAttr,
+                AUDIO_SESSION_NONE, uid);
+        status = mManager->startOutput(portId);
+    }
+    EXPECT_EQ(NO_ERROR, status);
+    EXPECT_NE(AUDIO_IO_HANDLE_NONE, output);
+    EXPECT_NE(nullptr, mManager->getOutputs().valueFor(output));
+    EXPECT_EQ(NO_ERROR, mManager->setDeviceConnectionState(AUDIO_DEVICE_OUT_BLUETOOTH_A2DP,
+                                                           AUDIO_POLICY_DEVICE_STATE_AVAILABLE,
+                                                           "", "", AUDIO_FORMAT_LDAC));
+    // When BT device is connected, it will be selected as media device and trigger routing changed.
+    // When this happens, existing output that is opened with preferred mixer attributes will be
+    // closed and reopened with default config.
+    EXPECT_EQ(nullptr, mManager->getOutputs().valueFor(output));
+
+    EXPECT_EQ(NO_ERROR,
+              mManager->clearPreferredMixerAttributes(&mediaAttr, usbPortId, uid));
+
+    EXPECT_EQ(NO_ERROR, mManager->setDeviceConnectionState(AUDIO_DEVICE_OUT_BLUETOOTH_A2DP,
+                                                           AUDIO_POLICY_DEVICE_STATE_UNAVAILABLE,
+                                                           "", "", AUDIO_FORMAT_LDAC));
     ASSERT_EQ(NO_ERROR, mManager->setDeviceConnectionState(AUDIO_DEVICE_OUT_USB_DEVICE,
                                                            AUDIO_POLICY_DEVICE_STATE_UNAVAILABLE,
                                                            "", "", AUDIO_FORMAT_LDAC));

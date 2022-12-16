@@ -22,6 +22,7 @@
 #include <string.h>
 #include <sys/stat.h>
 #include <fstream>
+#include <memory>
 
 #include <binder/Parcel.h>
 #include <media/stagefright/foundation/AString.h>
@@ -240,10 +241,10 @@ TEST_P(Text3GPPDescriptionTest, Text3GPPGlobalDescriptionTest) {
 
                     if (remaining < tempFontNameLength) break;
                     const uint8_t *tmpFont = tmpData;
-                    char *tmpFontName = strndup((const char *)tmpFont, tempFontNameLength);
+                    std::unique_ptr<char[]> tmpFontName(new char[tempFontNameLength]);
+                    strncpy(tmpFontName.get(), (const char *)tmpFont, tempFontNameLength);
                     ASSERT_NE(tmpFontName, nullptr) << "Font Name is null";
-                    ALOGI("FontName = %s", tmpFontName);
-                    free(tmpFontName);
+                    ALOGI("FontName = %s", tmpFontName.get());
                     tmpData += tempFontNameLength;
                     remaining -= tempFontNameLength;
                     fontRecordEntries.push_back({tempFontID, tempFontNameLength, tmpFont});

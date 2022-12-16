@@ -21,6 +21,7 @@
 #include <stdio.h>
 #include <string.h>
 #include <fstream>
+#include <memory>
 
 #include <media/esds/ESDS.h>
 #include <binder/ProcessState.h>
@@ -121,18 +122,16 @@ class ESDSUnitTest : public ::testing::TestWithParam<tuple<
 };
 
 TEST_P(ESDSUnitTest, InvalidDataTest) {
-    void *invalidData = calloc(mESDSSize, 1);
+    std::unique_ptr<char[]> invalidData(new char[mESDSSize]());
     ASSERT_NE(invalidData, nullptr) << "Unable to allocate memory";
-    ESDS esds(invalidData, mESDSSize);
-    free(invalidData);
+    ESDS esds((void*)invalidData.get(), mESDSSize);
     ASSERT_NE(esds.InitCheck(), OK) << "invalid ESDS data accepted";
 }
 
 TEST(ESDSSanityUnitTest, ConstructorSanityTest) {
-    void *invalidData = malloc(1);
+    std::unique_ptr<char[]> invalidData(new char[1]());
     ASSERT_NE(invalidData, nullptr) << "Unable to allocate memory";
-    ESDS esds_zero(invalidData, 0);
-    free(invalidData);
+    ESDS esds_zero((void*)invalidData.get(), 0);
     ASSERT_NE(esds_zero.InitCheck(), OK) << "invalid ESDS data accepted";
 
     ESDS esds_null(NULL, 0);
