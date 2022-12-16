@@ -2347,6 +2347,15 @@ status_t Camera2Client::setCameraMute(bool enabled) {
     return mDevice->setCameraMute(enabled);
 }
 
+void Camera2Client::setStreamUseCaseOverrides(
+        const std::vector<int64_t>& useCaseOverrides) {
+    mDevice->setStreamUseCaseOverrides(useCaseOverrides);
+}
+
+void Camera2Client::clearStreamUseCaseOverrides() {
+    mDevice->clearStreamUseCaseOverrides();
+}
+
 status_t Camera2Client::waitUntilCurrentRequestIdLocked() {
     int32_t activeRequestId = mStreamingProcessor->getActiveRequestId();
     if (activeRequestId != 0) {

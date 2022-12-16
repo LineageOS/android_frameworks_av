@@ -117,6 +117,11 @@ class Camera3OutputStreamInterface : public virtual Camera3StreamInterface {
      * AE_TARGET_FPS_RANGE in the capture request.
      */
     virtual void onMinDurationChanged(nsecs_t duration, bool fixedFps) = 0;
+
+    /**
+     * Modify the stream use case for this output.
+     */
+    virtual void setStreamUseCase(int64_t streamUseCase) = 0;
 };
 
 // Helper class to organize a synchronized mapping of stream IDs to stream instances
