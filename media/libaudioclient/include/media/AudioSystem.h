@@ -575,6 +575,10 @@ public:
     static status_t getSupportedLatencyModes(audio_io_handle_t output,
             std::vector<audio_latency_mode_t>* modes);
 
+    static status_t setBluetoothLatencyModesEnabled(bool enabled);
+
+    static status_t supportsBluetoothLatencyModes(bool *support);
+
     // A listener for capture state changes.
     class CaptureStateListener : public virtual RefBase {
     public:
