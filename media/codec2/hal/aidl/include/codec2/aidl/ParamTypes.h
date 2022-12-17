@@ -37,11 +37,14 @@ namespace media {
 namespace c2 {
 namespace utils {
 
+// Returns true iff AIDL c2 HAL is enabled
+bool IsEnabled();
+
 // Make asString() and operator<< work with Status as well as c2_status_t.
 C2_DECLARE_AS_STRING_AND_DEFINE_STREAM_OUT(Status);
 
 /**
- * All objcpy() functions will return a boolean value indicating whether the
+ * All To/FromAidl() functions will return a boolean value indicating whether the
  * conversion succeeds or not.
  */
 
