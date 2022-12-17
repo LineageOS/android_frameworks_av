@@ -23,7 +23,7 @@ namespace android {
 
 class IBinder;
 // Request elevated priority for thread tid, whose thread group leader must be pid.
-// The priority parameter is currently restricted to either 1 or 2.
+// The priority parameter is currently restricted from 1 to 3.
 // The asynchronous parameter should be 'true' to return immediately,
 // after the request is enqueued but not necessarily executed.
 // The default value 'false' means to return after request has been enqueued and executed.
@@ -36,6 +36,12 @@ int requestPriority(pid_t pid, pid_t tid, int32_t prio, bool isForApp, bool asyn
 // will attempt to move media.codec process back to the original cpuset, and
 // 'client' is ignored in this case.
 int requestCpusetBoost(bool enable, const sp<IBinder> &client);
+
+// Audio: Request Spatializer RT priority for thread tid, whose thread group leader must be pid.
+// returns positive value if successful, the RT priority used
+//         zero, if no RT priority selected
+//         negative status code if RT priority unable to be set.
+int requestSpatializerPriority(pid_t pid, pid_t tid);
 
 }   // namespace android
 

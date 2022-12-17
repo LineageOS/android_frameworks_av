@@ -43,7 +43,9 @@ class BundleContext final : public EffectContext {
     lvm::BundleEffectType getBundleType() const { return mType; }
 
     RetCode enable();
+    RetCode enableOperatingMode();
     RetCode disable();
+    RetCode disableOperatingMode();
 
     void setSampleRate (const int sampleRate) { mSampleRate = sampleRate; }
     int getSampleRate() const { return mSampleRate; }
@@ -64,6 +66,8 @@ class BundleContext final : public EffectContext {
     Parameter::VolumeStereo getVolumeStereo() override { return mVolumeStereo; }
 
     IEffect::Status lvmProcess(float* in, float* out, int samples);
+
+    IEffect::Status processEffect(float* in, float* out, int sampleToProcess);
 
   private:
     std::mutex mMutex;
@@ -106,6 +110,7 @@ class BundleContext final : public EffectContext {
 
     void initControlParameter(LVM_ControlParams_t& params) const;
     void initHeadroomParameter(LVM_HeadroomParams_t& params) const;
+    RetCode limitLevel();
     int16_t VolToDb(uint32_t vol) const;
     LVM_INT16 LVC_ToDB_s32Tos16(LVM_INT32 Lin_fix) const;
     RetCode updateControlParameter(const std::vector<Equalizer::BandLevel>& bandLevels);

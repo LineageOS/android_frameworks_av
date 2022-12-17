@@ -1362,25 +1362,7 @@ VolumeShaper::Status AudioFlinger::PlaybackThread::Track::applyVolumeShaper(
         const sp<VolumeShaper::Configuration>& configuration,
         const sp<VolumeShaper::Operation>& operation)
 {
-    sp<VolumeShaper::Configuration> newConfiguration;
-
-    if (isOffloadedOrDirect()) {
-        const VolumeShaper::Configuration::OptionFlag optionFlag
-            = configuration->getOptionFlags();
-        if ((optionFlag & VolumeShaper::Configuration::OPTION_FLAG_CLOCK_TIME) == 0) {
-            ALOGW("%s(%d): %s tracks do not support frame counted VolumeShaper,"
-                    " using clock time instead",
-                    __func__, mId,
-                    isOffloaded() ? "Offload" : "Direct");
-            newConfiguration = new VolumeShaper::Configuration(*configuration);
-            newConfiguration->setOptionFlags(
-                VolumeShaper::Configuration::OptionFlag(optionFlag
-                        | VolumeShaper::Configuration::OPTION_FLAG_CLOCK_TIME));
-        }
-    }
-
-    VolumeShaper::Status status = mVolumeHandler->applyVolumeShaper(
-            (newConfiguration.get() != nullptr ? newConfiguration : configuration), operation);
+    VolumeShaper::Status status = mVolumeHandler->applyVolumeShaper(configuration, operation);
 
     if (isOffloadedOrDirect()) {
         // Signal thread to fetch new volume.

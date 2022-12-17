@@ -6281,11 +6281,20 @@ void AudioFlinger::DirectOutputThread::processVolume_l(Track *track, bool lastTr
 {
     float left, right;
 
-
     // Ensure volumeshaper state always advances even when muted.
     const sp<AudioTrackServerProxy> proxy = track->mAudioTrackServerProxy;
-    const auto [shaperVolume, shaperActive] = track->getVolumeHandler()->getVolume(
-            proxy->framesReleased());
+
+    const size_t framesReleased = proxy->framesReleased();
+    const int64_t frames = mTimestamp.mPosition[ExtendedTimestamp::LOCATION_KERNEL];
+    const int64_t time = mTimestamp.mTimeNs[ExtendedTimestamp::LOCATION_KERNEL];
+
+    ALOGV("%s: Direct/Offload bufferConsumed:%zu  timestamp frames:%lld  time:%lld",
+            __func__, framesReleased, (long long)frames, (long long)time);
+
+    const int64_t volumeShaperFrames =
+            mMonotonicFrameCounter.updateAndGetMonotonicFrameCount(frames, time);
+    const auto [shaperVolume, shaperActive] =
+            track->getVolumeHandler()->getVolume(volumeShaperFrames);
     mVolumeShaperActive = shaperActive;
 
     gain_minifloat_packed_t vlr = proxy->getVolumeLR();
@@ -6767,6 +6776,7 @@ void AudioFlinger::DirectOutputThread::flushHw_l()
     mFlushPending = false;
     mTimestampVerifier.discontinuity(discontinuityForStandbyOrFlush());
     mTimestamp.clear();
+    mMonotonicFrameCounter.onFlush();
 }
 
 int64_t AudioFlinger::DirectOutputThread::computeWaitTimeNs_l() const {
@@ -7467,23 +7477,13 @@ void AudioFlinger::SpatializerThread::onFirstRef() {
         updateHalSupportedLatencyModes_l();
     }
 
-    // update priority if specified.
-    constexpr int32_t kRTPriorityMin = 1;
-    constexpr int32_t kRTPriorityMax = 3;
-    const int32_t priorityBoost =
-            property_get_int32("audio.spatializer.priority", kRTPriorityMin);
-    if (priorityBoost >= kRTPriorityMin && priorityBoost <= kRTPriorityMax) {
-        const pid_t pid = getpid();
-        const pid_t tid = getTid();
-
-        if (tid == -1) {
-            // Unusual: PlaybackThread::onFirstRef() should set the threadLoop running.
-            ALOGW("%s: audio.spatializer.priority %d ignored, thread not running",
-                    __func__, priorityBoost);
-        } else {
-            ALOGD("%s: audio.spatializer.priority %d, allowing real time for pid %d  tid %d",
-                    __func__, priorityBoost, pid, tid);
-            sendPrioConfigEvent_l(pid, tid, priorityBoost, false /*forApp*/);
+    const pid_t tid = getTid();
+    if (tid == -1) {
+        // Unusual: PlaybackThread::onFirstRef() should set the threadLoop running.
+        ALOGW("%s: Cannot update Spatializer mixer thread priority, not running", __func__);
+    } else {
+        const int priorityBoost = requestSpatializerPriority(getpid(), tid);
+        if (priorityBoost > 0) {
             stream()->setHalThreadPriority(priorityBoost);
         }
     }
