@@ -56,11 +56,18 @@ class BundleContext final : public EffectContext {
     aidl::android::media::audio::common::AudioChannelLayout getChannelMask() const {
         return mChMask;
     }
+    bool isDeviceSupportedBassBoost(
+            const aidl::android::media::audio::common::AudioDeviceDescription& device);
+    RetCode setOutputDevice(
+            const aidl::android::media::audio::common::AudioDeviceDescription& device) override;
 
     RetCode setEqualizerPreset(const std::size_t presetIdx);
     int getEqualizerPreset() const { return mCurPresetIdx; }
     RetCode setEqualizerBandLevels(const std::vector<Equalizer::BandLevel>& bandLevels);
     std::vector<Equalizer::BandLevel> getEqualizerBandLevels() const;
+
+    RetCode setBassBoostStrength(int strength);
+    int getBassBoostStrength() const { return mBassStrengthSaved; }
 
     RetCode setVolumeStereo(const Parameter::VolumeStereo& volumeStereo) override;
     Parameter::VolumeStereo getVolumeStereo() override { return mVolumeStereo; }

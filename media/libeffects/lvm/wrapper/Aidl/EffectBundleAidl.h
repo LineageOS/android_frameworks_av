@@ -60,6 +60,10 @@ class EffectBundleAidl final : public EffectImpl {
 
     IEffect::Status status(binder_status_t status, size_t consumed, size_t produced);
 
+    ndk::ScopedAStatus setParameterBassBoost(const Parameter::Specific& specific);
+    ndk::ScopedAStatus getParameterBassBoost(const BassBoost::Id& id,
+                                             Parameter::Specific* specific);
+
     ndk::ScopedAStatus setParameterEqualizer(const Parameter::Specific& specific);
     ndk::ScopedAStatus getParameterEqualizer(const Equalizer::Id& id,
                                              Parameter::Specific* specific);
