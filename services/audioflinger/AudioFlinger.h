@@ -88,6 +88,7 @@
 #include <audio_utils/TimestampVerifier.h>
 
 #include <sounddose/SoundDoseManager.h>
+#include <timing/MonotonicFrameCounter.h>
 
 #include "FastCapture.h"
 #include "FastMixer.h"
