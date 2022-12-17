@@ -24,6 +24,9 @@
 
 namespace aidl::android::hardware::audio::effect {
 
+using aidl::android::media::audio::common::AudioDeviceDescription;
+using aidl::android::media::audio::common::AudioDeviceType;
+
 RetCode BundleContext::init() {
     std::lock_guard lg(mMutex);
     // init with pre-defined preset NORMAL
@@ -69,6 +72,9 @@ void BundleContext::deInit() {
 
 RetCode BundleContext::enable() {
     if (mEnabled) return RetCode::ERROR_ILLEGAL_PARAMETER;
+    // Bass boost or Virtualizer can be temporarily disabled if playing over device speaker due to
+    // their nature.
+    bool tempDisabled = false;
     switch (mType) {
         case lvm::BundleEffectType::EQUALIZER:
             LOG(DEBUG) << __func__ << " enable bundle EQ";
@@ -76,12 +82,19 @@ RetCode BundleContext::enable() {
             mSamplesToExitCountEq = (mSamplesPerSecond * 0.1);
             mEffectInDrain &= ~(1 << int(lvm::BundleEffectType::EQUALIZER));
             break;
+        case lvm::BundleEffectType::BASS_BOOST:
+            LOG(DEBUG) << __func__ << " enable bundle BB";
+            if (mSamplesToExitCountBb <= 0) mNumberEffectsEnabled++;
+            mEffectInDrain &= ~(1 << int(lvm::BundleEffectType::BASS_BOOST));
+            mSamplesToExitCountBb = (mSamplesPerSecond * 0.1);
+            tempDisabled = mBassTempDisabled;
+            break;
         default:
             // Add handling for other effects
             break;
     }
     mEnabled = true;
-    return enableOperatingMode();
+    return (tempDisabled ? RetCode::SUCCESS : enableOperatingMode());
 }
 
 RetCode BundleContext::enableOperatingMode() {
@@ -94,6 +107,10 @@ RetCode BundleContext::enableOperatingMode() {
             case lvm::BundleEffectType::EQUALIZER:
                 LOG(DEBUG) << __func__ << " enable bundle EQ";
                 params.EQNB_OperatingMode = LVM_EQNB_ON;
+                break;
+            case lvm::BundleEffectType::BASS_BOOST:
+                LOG(DEBUG) << __func__ << " enable bundle BB";
+                params.BE_OperatingMode = LVM_BE_ON;
                 break;
             default:
                 // Add handling for other effects
@@ -111,6 +128,10 @@ RetCode BundleContext::disable() {
         case lvm::BundleEffectType::EQUALIZER:
             LOG(DEBUG) << __func__ << " disable bundle EQ";
             mEffectInDrain |= 1 << int(lvm::BundleEffectType::EQUALIZER);
+            break;
+        case lvm::BundleEffectType::BASS_BOOST:
+            LOG(DEBUG) << __func__ << " disable bundle BB";
+            mEffectInDrain |= 1 << int(lvm::BundleEffectType::BASS_BOOST);
             break;
         default:
             // Add handling for other effects
@@ -130,6 +151,10 @@ RetCode BundleContext::disableOperatingMode() {
             case lvm::BundleEffectType::EQUALIZER:
                 LOG(DEBUG) << __func__ << " disable bundle EQ";
                 params.EQNB_OperatingMode = LVM_EQNB_OFF;
+                break;
+            case lvm::BundleEffectType::BASS_BOOST:
+                LOG(DEBUG) << __func__ << " disable bundle BB";
+                params.BE_OperatingMode = LVM_BE_OFF;
                 break;
             default:
                 // Add handling for other effects
@@ -156,6 +181,7 @@ RetCode BundleContext::limitLevel() {
                         RetCode::ERROR_EFFECT_LIB_ERROR, " getControlParamFailed");
 
         bool eqEnabled = params.EQNB_OperatingMode == LVM_EQNB_ON;
+        bool bbEnabled = params.BE_OperatingMode == LVM_BE_ON;
 
         if (eqEnabled) {
             for (int i = 0; i < lvm::MAX_NUM_BANDS; i++) {
@@ -181,6 +207,22 @@ RetCode BundleContext::limitLevel() {
             }
             bandFactorSum -= 1.0;
             if (bandFactorSum > 0) crossCorrection = bandFactorSum * 0.7;
+        }
+        // BassBoost contribution
+        if (bbEnabled) {
+            float boostFactor = mBassStrengthSaved / 1000.0;
+            float boostCoefficient = lvm::kBassBoostEnergyCoefficient;
+
+            energyContribution += boostFactor * boostCoefficient * boostCoefficient;
+
+            if (eqEnabled) {
+                for (int i = 0; i < lvm::MAX_NUM_BANDS; i++) {
+                    float bandFactor = mBandGaindB[i] / 15.0;
+                    float bandCrossCoefficient = lvm::kBassBoostEnergyCrossCoefficient[i];
+                    float bandEnergy = boostFactor * bandFactor * bandCrossCoefficient;
+                    if (bandEnergy > 0) energyBassBoost += bandEnergy;
+                }
+            }
         }
 
         double totalEnergyEstimation =
@@ -213,6 +255,39 @@ RetCode BundleContext::limitLevel() {
         }
     }
 
+    return RetCode::SUCCESS;
+}
+
+bool BundleContext::isDeviceSupportedBassBoost(
+        const aidl::android::media::audio::common::AudioDeviceDescription& device) {
+    return (device == AudioDeviceDescription{AudioDeviceType::OUT_SPEAKER, ""} ||
+            device == AudioDeviceDescription{AudioDeviceType::OUT_CARKIT,
+                                             AudioDeviceDescription::CONNECTION_BT_SCO} ||
+            device == AudioDeviceDescription{AudioDeviceType::OUT_SPEAKER,
+                                             AudioDeviceDescription::CONNECTION_BT_A2DP});
+}
+
+RetCode BundleContext::setOutputDevice(
+        const aidl::android::media::audio::common::AudioDeviceDescription& device) {
+    mOutputDevice = device;
+    if (mType == lvm::BundleEffectType::BASS_BOOST) {
+        if (isDeviceSupportedBassBoost(device)) {
+            // If a device doesn't support bass boost, the effect must be temporarily disabled.
+            // The effect must still report its original state as this can only be changed by the
+            // start/stop commands.
+            if (mEnabled) {
+                disableOperatingMode();
+            }
+            mBassTempDisabled = true;
+        } else {
+            // If a device supports bass boost and the effect has been temporarily disabled
+            // previously then re-enable it
+            if (!mEnabled) {
+                enableOperatingMode();
+            }
+            mBassTempDisabled = false;
+        }
+    }
     return RetCode::SUCCESS;
 }
 
@@ -366,6 +441,31 @@ RetCode BundleContext::updateControlParameter(const std::vector<Equalizer::BandL
     return RetCode::SUCCESS;
 }
 
+RetCode BundleContext::setBassBoostStrength(int strength) {
+    if (strength < BassBoost::MIN_PER_MILLE_STRENGTH ||
+        strength > BassBoost::MAX_PER_MILLE_STRENGTH) {
+        LOG(ERROR) << __func__ << " invalid strength: " << strength;
+        return RetCode::ERROR_ILLEGAL_PARAMETER;
+    }
+
+    // Update Control Parameter
+    LVM_ControlParams_t params;
+    {
+        std::lock_guard lg(mMutex);
+        RETURN_VALUE_IF(LVM_SUCCESS != LVM_GetControlParameters(mInstance, &params),
+                        RetCode::ERROR_EFFECT_LIB_ERROR, " getControlParamFailed");
+
+        params.BE_EffectLevel = (LVM_INT16)((15 * strength) / 1000);
+        params.BE_CentreFreq = LVM_BE_CENTRE_90Hz;
+
+        RETURN_VALUE_IF(LVM_SUCCESS != LVM_SetControlParameters(mInstance, &params),
+                        RetCode::ERROR_EFFECT_LIB_ERROR, " setControlParamFailed");
+    }
+    mBassStrengthSaved = strength;
+    LOG(INFO) << __func__ << " success with strength " << strength;
+    return limitLevel();
+}
+
 void BundleContext::initControlParameter(LVM_ControlParams_t& params) const {
     /* General parameters */
     params.OperatingMode = LVM_MODE_ON;
@@ -473,6 +573,12 @@ IEffect::Status BundleContext::lvmProcess(float* in, float* out, int samples) {
             --mNumberEffectsEnabled;
             mEffectInDrain &= ~(1 << int(lvm::BundleEffectType::EQUALIZER));
         }
+        if ((undrainedEffects & 1 << int(lvm::BundleEffectType::BASS_BOOST)) != 0) {
+            LOG(DEBUG) << "Draining BASS_BOOST";
+            mSamplesToExitCountBb = 0;
+            --mNumberEffectsEnabled;
+            mEffectInDrain &= ~(1 << int(lvm::BundleEffectType::BASS_BOOST));
+        }
     }
     mEffectProcessCalled |= 1 << int(mType);
     if (!mEnabled) {
@@ -488,6 +594,19 @@ IEffect::Status BundleContext::lvmProcess(float* in, float* out, int samples) {
                         mEffectInDrain &= ~(1 << int(lvm::BundleEffectType::EQUALIZER));
                     }
                     LOG(DEBUG) << "Effect_process() this is the last frame for EQUALIZER";
+                }
+                break;
+            case lvm::BundleEffectType::BASS_BOOST:
+                if (mSamplesToExitCountBb > 0) {
+                    mSamplesToExitCountBb -= samples;
+                }
+                if (mSamplesToExitCountBb <= 0) {
+                    isDataAvailable = false;
+                    if ((mEffectInDrain & 1 << int(lvm::BundleEffectType::BASS_BOOST)) != 0) {
+                        mNumberEffectsEnabled--;
+                        mEffectInDrain &= ~(1 << int(lvm::BundleEffectType::BASS_BOOST));
+                    }
+                    LOG(DEBUG) << "Effect_process() this is the last frame for BASS_BOOST";
                 }
                 break;
             default:
