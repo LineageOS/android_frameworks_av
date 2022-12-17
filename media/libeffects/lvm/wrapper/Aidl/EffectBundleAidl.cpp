@@ -32,12 +32,13 @@
 using aidl::android::hardware::audio::effect::Descriptor;
 using aidl::android::hardware::audio::effect::EffectBundleAidl;
 using aidl::android::hardware::audio::effect::IEffect;
+using aidl::android::hardware::audio::effect::kBassBoostBundleImplUUID;
 using aidl::android::hardware::audio::effect::kEqualizerBundleImplUUID;
 using aidl::android::hardware::audio::effect::State;
 using aidl::android::media::audio::common::AudioUuid;
 
 bool isUuidSupported(const AudioUuid* uuid) {
-    return *uuid == kEqualizerBundleImplUUID;
+    return (*uuid == kEqualizerBundleImplUUID || *uuid == kBassBoostBundleImplUUID);
 }
 
 extern "C" binder_exception_t createEffect(const AudioUuid* uuid,
@@ -57,11 +58,15 @@ extern "C" binder_exception_t createEffect(const AudioUuid* uuid,
 }
 
 extern "C" binder_exception_t queryEffect(const AudioUuid* in_impl_uuid, Descriptor* _aidl_return) {
-    if (!in_impl_uuid || *in_impl_uuid != kEqualizerBundleImplUUID) {
+    if (!in_impl_uuid || !isUuidSupported(in_impl_uuid)) {
         LOG(ERROR) << __func__ << "uuid not supported";
         return EX_ILLEGAL_ARGUMENT;
     }
-    *_aidl_return = aidl::android::hardware::audio::effect::lvm::kEqualizerDesc;
+    if (*in_impl_uuid == kEqualizerBundleImplUUID) {
+        *_aidl_return = aidl::android::hardware::audio::effect::lvm::kEqualizerDesc;
+    } else if (*in_impl_uuid == kBassBoostBundleImplUUID) {
+        *_aidl_return = aidl::android::hardware::audio::effect::lvm:: kBassBoostDesc;
+    }
     return EX_NONE;
 }
 
@@ -73,6 +78,10 @@ EffectBundleAidl::EffectBundleAidl(const AudioUuid& uuid) {
         mType = lvm::BundleEffectType::EQUALIZER;
         mDescriptor = &lvm::kEqualizerDesc;
         mEffectName = &lvm::kEqualizerEffectName;
+    } else if (uuid == kBassBoostBundleImplUUID) {
+        mType = lvm::BundleEffectType::BASS_BOOST;
+        mDescriptor = &lvm::kBassBoostDesc;
+        mEffectName = &lvm::kBassBoostEffectName;
     } else {
         // TODO: add other bundle effect types here.
         LOG(ERROR) << __func__ << uuid.toString() << " not supported yet!";
@@ -135,6 +144,8 @@ ndk::ScopedAStatus EffectBundleAidl::setParameterSpecific(const Parameter::Speci
     switch (tag) {
         case Parameter::Specific::equalizer:
             return setParameterEqualizer(specific);
+        case Parameter::Specific::bassBoost:
+            return setParameterBassBoost(specific);
         default:
             LOG(ERROR) << __func__ << " unsupported tag " << toString(tag);
             return ndk::ScopedAStatus::fromExceptionCodeWithMessage(EX_ILLEGAL_ARGUMENT,
@@ -162,6 +173,23 @@ ndk::ScopedAStatus EffectBundleAidl::setParameterEqualizer(const Parameter::Spec
     }
 }
 
+ndk::ScopedAStatus EffectBundleAidl::setParameterBassBoost(const Parameter::Specific& specific) {
+    auto& bb = specific.get<Parameter::Specific::bassBoost>();
+    auto bbTag = bb.getTag();
+    switch (bbTag) {
+        case BassBoost::strengthPm: {
+            RETURN_IF(mContext->setBassBoostStrength(bb.get<BassBoost::strengthPm>()) !=
+                              RetCode::SUCCESS,
+                      EX_ILLEGAL_ARGUMENT, "setStrengthFailed");
+            return ndk::ScopedAStatus::ok();
+        }
+        default:
+            LOG(ERROR) << __func__ << " unsupported parameter " << specific.toString();
+            return ndk::ScopedAStatus::fromExceptionCodeWithMessage(EX_ILLEGAL_ARGUMENT,
+                                                                    "bbTagNotSupported");
+    }
+}
+
 ndk::ScopedAStatus EffectBundleAidl::getParameterSpecific(const Parameter::Id& id,
                                                           Parameter::Specific* specific) {
     RETURN_IF(!specific, EX_NULL_POINTER, "nullPtr");
@@ -170,6 +198,8 @@ ndk::ScopedAStatus EffectBundleAidl::getParameterSpecific(const Parameter::Id& i
     switch (tag) {
         case Parameter::Id::equalizerTag:
             return getParameterEqualizer(id.get<Parameter::Id::equalizerTag>(), specific);
+        case Parameter::Id::bassBoostTag:
+            return getParameterBassBoost(id.get<Parameter::Id::bassBoostTag>(), specific);
         default:
             LOG(ERROR) << __func__ << " unsupported tag: " << toString(tag);
             return ndk::ScopedAStatus::fromExceptionCodeWithMessage(EX_ILLEGAL_ARGUMENT,
@@ -202,6 +232,30 @@ ndk::ScopedAStatus EffectBundleAidl::getParameterEqualizer(const Equalizer::Id& 
     }
 
     specific->set<Parameter::Specific::equalizer>(eqParam);
+    return ndk::ScopedAStatus::ok();
+}
+
+ndk::ScopedAStatus EffectBundleAidl::getParameterBassBoost(const BassBoost::Id& id,
+                                                           Parameter::Specific* specific) {
+    RETURN_IF(id.getTag() != BassBoost::Id::commonTag, EX_ILLEGAL_ARGUMENT,
+              "BassBoostTagNotSupported");
+    RETURN_IF(!mContext, EX_NULL_POINTER, "nullContext");
+    BassBoost bbParam;
+
+    auto tag = id.get<BassBoost::Id::commonTag>();
+    switch (tag) {
+        case BassBoost::strengthPm: {
+            bbParam.set<BassBoost::strengthPm>(mContext->getBassBoostStrength());
+            break;
+        }
+        default: {
+            LOG(ERROR) << __func__ << " not handled tag: " << toString(tag);
+            return ndk::ScopedAStatus::fromExceptionCodeWithMessage(EX_ILLEGAL_ARGUMENT,
+                                                                    "BassBoostTagNotSupported");
+        }
+    }
+
+    specific->set<Parameter::Specific::bassBoost>(bbParam);
     return ndk::ScopedAStatus::ok();
 }
 
