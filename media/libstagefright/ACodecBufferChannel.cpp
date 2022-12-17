@@ -114,6 +114,10 @@ status_t ACodecBufferChannel::queueInputBuffer(const sp<MediaCodecBuffer> &buffe
         if (it->mClientBuffer->meta()->findInt32("csd", &csd)) {
             it->mCodecBuffer->meta()->setInt32("csd", csd);
         }
+        int32_t decodeOnly;
+        if (it->mClientBuffer->meta()->findInt32("decode-only", &decodeOnly)) {
+            it->mCodecBuffer->meta()->setInt32("decode-only", decodeOnly);
+        }
     }
     ALOGV("queueInputBuffer #%d", it->mBufferId);
     sp<AMessage> msg = mInputBufferFilled->dup();
@@ -262,6 +266,10 @@ status_t ACodecBufferChannel::queueSecureInputBuffer(
     int32_t csd;
     if (it->mClientBuffer->meta()->findInt32("csd", &csd)) {
         it->mCodecBuffer->meta()->setInt32("csd", csd);
+    }
+    int32_t decodeOnly;
+    if (it->mClientBuffer->meta()->findInt32("decode-only", &decodeOnly)) {
+        it->mCodecBuffer->meta()->setInt32("decode-only", decodeOnly);
     }
 
     ALOGV("queueSecureInputBuffer #%d", it->mBufferId);
@@ -633,6 +641,9 @@ void ACodecBufferChannel::drainThisBuffer(
     }
     if (omxFlags & OMX_BUFFERFLAG_EOS) {
         flags |= MediaCodec::BUFFER_FLAG_EOS;
+    }
+    if (omxFlags & OMX_BUFFERFLAG_DECODEONLY) {
+        flags |= MediaCodec::BUFFER_FLAG_DECODE_ONLY;
     }
     it->mClientBuffer->meta()->setInt32("flags", flags);
 

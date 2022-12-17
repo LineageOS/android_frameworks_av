@@ -1512,6 +1512,21 @@ void MediaCodec::statsBufferReceived(int64_t presentationUs, const sp<MediaCodec
     }
 }
 
+bool MediaCodec::discardDecodeOnlyOutputBuffer(size_t index) {
+    Mutex::Autolock al(mBufferLock);
+    BufferInfo *info = &mPortBuffers[kPortIndexOutput][index];
+    sp<MediaCodecBuffer> buffer = info->mData;
+    int32_t flags;
+    CHECK(buffer->meta()->findInt32("flags", &flags));
+    if (flags & BUFFER_FLAG_DECODE_ONLY) {
+        info->mOwnedByClient = false;
+        info->mData.clear();
+        mBufferChannel->discardBuffer(buffer);
+        return true;
+    }
+    return false;
+}
+
 // static
 status_t MediaCodec::PostAndAwaitResponse(
         const sp<AMessage> &msg, sp<AMessage> *response) {
@@ -3201,7 +3216,8 @@ bool MediaCodec::handleDequeueInputBuffer(const sp<AReplyToken> &replyID, bool n
     return true;
 }
 
-bool MediaCodec::handleDequeueOutputBuffer(const sp<AReplyToken> &replyID, bool newRequest) {
+MediaCodec::DequeueOutputResult MediaCodec::handleDequeueOutputBuffer(
+        const sp<AReplyToken> &replyID, bool newRequest) {
     if (!isExecuting() || (mFlags & kFlagIsAsync)
             || (newRequest && (mFlags & kFlagDequeueOutputPending))) {
         PostReplyWithError(replyID, INVALID_OPERATION);
@@ -3214,7 +3230,7 @@ bool MediaCodec::handleDequeueOutputBuffer(const sp<AReplyToken> &replyID, bool 
         sp<AMessage> response = new AMessage;
         BufferInfo *info = peekNextPortBuffer(kPortIndexOutput);
         if (!info) {
-            return false;
+            return DequeueOutputResult::kNoBuffer;
         }
 
         // In synchronous mode, output format change should be handled
@@ -3225,10 +3241,13 @@ bool MediaCodec::handleDequeueOutputBuffer(const sp<AReplyToken> &replyID, bool 
         if (mFlags & kFlagOutputFormatChanged) {
             PostReplyWithError(replyID, INFO_FORMAT_CHANGED);
             mFlags &= ~kFlagOutputFormatChanged;
-            return true;
+            return DequeueOutputResult::kRepliedWithError;
         }
 
         ssize_t index = dequeuePortBuffer(kPortIndexOutput);
+        if (discardDecodeOnlyOutputBuffer(index)) {
+            return DequeueOutputResult::kDiscardedBuffer;
+        }
 
         response->setSize("index", index);
         response->setSize("offset", buffer->offset());
@@ -3247,9 +3266,10 @@ bool MediaCodec::handleDequeueOutputBuffer(const sp<AReplyToken> &replyID, bool 
         statsBufferReceived(timeUs, buffer);
 
         response->postReply(replyID);
+        return DequeueOutputResult::kSuccess;
     }
 
-    return true;
+    return DequeueOutputResult::kRepliedWithError;
 }
 
 void MediaCodec::onMessageReceived(const sp<AMessage> &msg) {
@@ -3844,11 +3864,26 @@ void MediaCodec::onMessageReceived(const sp<AMessage> &msg) {
                         handleOutputFormatChangeIfNeeded(buffer);
                         onOutputBufferAvailable();
                     } else if (mFlags & kFlagDequeueOutputPending) {
-                        CHECK(handleDequeueOutputBuffer(mDequeueOutputReplyID));
-
-                        ++mDequeueOutputTimeoutGeneration;
-                        mFlags &= ~kFlagDequeueOutputPending;
-                        mDequeueOutputReplyID = 0;
+                        DequeueOutputResult dequeueResult =
+                            handleDequeueOutputBuffer(mDequeueOutputReplyID);
+                        switch (dequeueResult) {
+                            case DequeueOutputResult::kNoBuffer:
+                                TRESPASS();
+                                break;
+                            case DequeueOutputResult::kDiscardedBuffer:
+                                break;
+                            case DequeueOutputResult::kRepliedWithError:
+                                [[fallthrough]];
+                            case DequeueOutputResult::kSuccess:
+                            {
+                                ++mDequeueOutputTimeoutGeneration;
+                                mFlags &= ~kFlagDequeueOutputPending;
+                                mDequeueOutputReplyID = 0;
+                                break;
+                            }
+                            default:
+                                TRESPASS();
+                        }
                     } else {
                         postActivityNotificationIfPossible();
                     }
@@ -4547,27 +4582,39 @@ void MediaCodec::onMessageReceived(const sp<AMessage> &msg) {
                 break;
             }
 
-            if (handleDequeueOutputBuffer(replyID, true /* new request */)) {
-                break;
-            }
+            DequeueOutputResult dequeueResult =
+                handleDequeueOutputBuffer(replyID, true /* new request */);
+            switch (dequeueResult) {
+                case DequeueOutputResult::kNoBuffer:
+                    [[fallthrough]];
+                case DequeueOutputResult::kDiscardedBuffer:
+                {
+                    int64_t timeoutUs;
+                    CHECK(msg->findInt64("timeoutUs", &timeoutUs));
 
-            int64_t timeoutUs;
-            CHECK(msg->findInt64("timeoutUs", &timeoutUs));
+                    if (timeoutUs == 0LL) {
+                        PostReplyWithError(replyID, -EAGAIN);
+                        break;
+                    }
 
-            if (timeoutUs == 0LL) {
-                PostReplyWithError(replyID, -EAGAIN);
-                break;
-            }
+                    mFlags |= kFlagDequeueOutputPending;
+                    mDequeueOutputReplyID = replyID;
 
-            mFlags |= kFlagDequeueOutputPending;
-            mDequeueOutputReplyID = replyID;
-
-            if (timeoutUs > 0LL) {
-                sp<AMessage> timeoutMsg =
-                    new AMessage(kWhatDequeueOutputTimedOut, this);
-                timeoutMsg->setInt32(
-                        "generation", ++mDequeueOutputTimeoutGeneration);
-                timeoutMsg->post(timeoutUs);
+                    if (timeoutUs > 0LL) {
+                        sp<AMessage> timeoutMsg =
+                            new AMessage(kWhatDequeueOutputTimedOut, this);
+                        timeoutMsg->setInt32(
+                                "generation", ++mDequeueOutputTimeoutGeneration);
+                        timeoutMsg->post(timeoutUs);
+                    }
+                    break;
+                }
+                case DequeueOutputResult::kRepliedWithError:
+                    [[fallthrough]];
+                case DequeueOutputResult::kSuccess:
+                    break;
+                default:
+                    TRESPASS();
             }
             break;
         }
@@ -5229,6 +5276,7 @@ status_t MediaCodec::onQueueInputBuffer(const sp<AMessage> &msg) {
 
     buffer->setRange(offset, size);
     buffer->meta()->setInt64("timeUs", timeUs);
+
     if (flags & BUFFER_FLAG_EOS) {
         buffer->meta()->setInt32("eos", true);
     }
@@ -5237,7 +5285,12 @@ status_t MediaCodec::onQueueInputBuffer(const sp<AMessage> &msg) {
         buffer->meta()->setInt32("csd", true);
     }
 
-    if (mTunneled) {
+    bool isBufferDecodeOnly = ((flags & BUFFER_FLAG_DECODE_ONLY) != 0);
+    if (isBufferDecodeOnly) {
+        buffer->meta()->setInt32("decode-only", true);
+    }
+
+    if (mTunneled && !isBufferDecodeOnly) {
         TunnelPeekState previousState = mTunnelPeekState;
         switch(mTunnelPeekState){
             case TunnelPeekState::kEnabledNoBuffer:
@@ -5550,6 +5603,9 @@ void MediaCodec::onInputBufferAvailable() {
 void MediaCodec::onOutputBufferAvailable() {
     int32_t index;
     while ((index = dequeuePortBuffer(kPortIndexOutput)) >= 0) {
+        if (discardDecodeOnlyOutputBuffer(index)) {
+            continue;
+        }
         const sp<MediaCodecBuffer> &buffer =
             mPortBuffers[kPortIndexOutput][index].mData;
         sp<AMessage> msg = mCallback->dup();
