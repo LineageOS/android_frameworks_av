@@ -32,6 +32,7 @@ struct DrmStatus {
               int32_t ctx = 0, std::string errMsg = "")
         : mStatus(status), mCdmErr(cdmErr), mOemErr(oemErr),
           mCtx(ctx), mErrMsg(errMsg) {}
+    DrmStatus(status_t err, const char *msg);
     operator status_t() const { return mStatus; }
     int32_t getCdmErr() const { return mCdmErr; }
     int32_t getOemErr() const { return mOemErr; }
@@ -41,7 +42,7 @@ struct DrmStatus {
     bool operator!=(status_t other) const { return mStatus != other; }
 
   private:
-    status_t mStatus;
+    status_t mStatus{};
     int32_t mCdmErr{}, mOemErr{}, mCtx{};
     std::string mErrMsg;
 };
