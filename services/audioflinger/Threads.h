@@ -2297,4 +2297,6 @@ protected:
 
 private:
     bool mIsBitPerfect;
+    float mVolumeLeft = 0.f;
+    float mVolumeRight = 0.f;
 };
