@@ -671,12 +671,12 @@ Status AudioSystem::AudioFlingerClient::ioConfigChanged(
 }
 
 Status AudioSystem::AudioFlingerClient::onSupportedLatencyModesChanged(
-        int output, const std::vector<media::LatencyMode>& latencyModes) {
+        int output, const std::vector<media::audio::common::AudioLatencyMode>& latencyModes) {
     audio_io_handle_t outputLegacy = VALUE_OR_RETURN_BINDER_STATUS(
             aidl2legacy_int32_t_audio_io_handle_t(output));
     std::vector<audio_latency_mode_t> modesLegacy = VALUE_OR_RETURN_BINDER_STATUS(
             convertContainer<std::vector<audio_latency_mode_t>>(
-                    latencyModes, aidl2legacy_LatencyMode_audio_latency_mode_t));
+                    latencyModes, aidl2legacy_AudioLatencyMode_audio_latency_mode_t));
 
     std::vector<sp<SupportedLatencyModesCallback>> callbacks;
     {

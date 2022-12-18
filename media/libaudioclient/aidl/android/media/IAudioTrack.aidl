@@ -16,13 +16,13 @@
 
 package android.media;
 
-import android.media.AudioDualMonoMode;
-import android.media.AudioPlaybackRate;
 import android.media.AudioTimestampInternal;
 import android.media.SharedFileRegion;
 import android.media.VolumeShaperConfiguration;
 import android.media.VolumeShaperOperation;
 import android.media.VolumeShaperState;
+import android.media.audio.common.AudioDualMonoMode;
+import android.media.audio.common.AudioPlaybackRate;
 
 /**
  * Unless otherwise noted, methods returning int expect it to be interpreted as a status_t.

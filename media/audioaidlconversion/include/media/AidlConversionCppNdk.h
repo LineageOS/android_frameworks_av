@@ -35,6 +35,7 @@
 #include PREFIX(android/media/audio/common/AudioConfigBase.h)
 #include PREFIX(android/media/audio/common/AudioContentType.h)
 #include PREFIX(android/media/audio/common/AudioDeviceDescription.h)
+#include PREFIX(android/media/audio/common/AudioDualMonoMode.h)
 #include PREFIX(android/media/audio/common/AudioEncapsulationMetadataType.h)
 #include PREFIX(android/media/audio/common/AudioEncapsulationMode.h)
 #include PREFIX(android/media/audio/common/AudioEncapsulationType.h)
@@ -44,11 +45,13 @@
 #include PREFIX(android/media/audio/common/AudioGainMode.h)
 #include PREFIX(android/media/audio/common/AudioInputFlags.h)
 #include PREFIX(android/media/audio/common/AudioIoFlags.h)
+#include PREFIX(android/media/audio/common/AudioLatencyMode.h)
 #include PREFIX(android/media/audio/common/AudioMode.h)
 #include PREFIX(android/media/audio/common/AudioOffloadInfo.h)
 #include PREFIX(android/media/audio/common/AudioOutputFlags.h)
 #include PREFIX(android/media/audio/common/AudioPortExt.h)
 #include PREFIX(android/media/audio/common/AudioPortMixExt.h)
+#include PREFIX(android/media/audio/common/AudioPlaybackRate.h)
 #include PREFIX(android/media/audio/common/AudioProfile.h)
 #include PREFIX(android/media/audio/common/AudioSource.h)
 #include PREFIX(android/media/audio/common/AudioStandard.h)
@@ -286,6 +289,36 @@ ConversionResult<audio_uuid_t> aidl2legacy_AudioUuid_audio_uuid_t(
         const media::audio::common::AudioUuid &aidl);
 ConversionResult<media::audio::common::AudioUuid> legacy2aidl_audio_uuid_t_AudioUuid(
         const audio_uuid_t& legacy);
+
+ConversionResult<audio_dual_mono_mode_t>
+aidl2legacy_AudioDualMonoMode_audio_dual_mono_mode_t(media::audio::common::AudioDualMonoMode aidl);
+ConversionResult<media::audio::common::AudioDualMonoMode>
+legacy2aidl_audio_dual_mono_mode_t_AudioDualMonoMode(audio_dual_mono_mode_t legacy);
+
+ConversionResult<audio_timestretch_fallback_mode_t>
+aidl2legacy_TimestretchFallbackMode_audio_timestretch_fallback_mode_t(
+        media::audio::common::AudioPlaybackRate::TimestretchFallbackMode aidl);
+ConversionResult<media::audio::common::AudioPlaybackRate::TimestretchFallbackMode>
+legacy2aidl_audio_timestretch_fallback_mode_t_TimestretchFallbackMode(
+        audio_timestretch_fallback_mode_t legacy);
+
+ConversionResult<audio_timestretch_stretch_mode_t>
+aidl2legacy_TimestretchMode_audio_timestretch_stretch_mode_t(
+        media::audio::common::AudioPlaybackRate::TimestretchMode aidl);
+ConversionResult<media::audio::common::AudioPlaybackRate::TimestretchMode>
+legacy2aidl_audio_timestretch_stretch_mode_t_TimestretchMode(
+        audio_timestretch_stretch_mode_t legacy);
+
+ConversionResult<audio_playback_rate_t>
+aidl2legacy_AudioPlaybackRate_audio_playback_rate_t(
+        const media::audio::common::AudioPlaybackRate& aidl);
+ConversionResult<media::audio::common::AudioPlaybackRate>
+legacy2aidl_audio_playback_rate_t_AudioPlaybackRate(const audio_playback_rate_t& legacy);
+
+ConversionResult<audio_latency_mode_t>
+aidl2legacy_AudioLatencyMode_audio_latency_mode_t(media::audio::common::AudioLatencyMode aidl);
+ConversionResult<media::audio::common::AudioLatencyMode>
+legacy2aidl_audio_latency_mode_t_AudioLatencyMode(audio_latency_mode_t legacy);
 
 }  // namespace android
 
