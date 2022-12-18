@@ -5513,7 +5513,7 @@ AudioFlinger::PlaybackThread::mixer_state AudioFlinger::MixerThread::prepareTrac
                 vlf *= volume;
                 vrf *= volume;
 
-                track->setFinalVolume((vlf + vrf) / 2.f);
+                track->setFinalVolume(vlf, vrf);
                 ++fastTracks;
             } else {
                 // was it previously active?
@@ -5712,7 +5712,7 @@ AudioFlinger::PlaybackThread::mixer_state AudioFlinger::MixerThread::prepareTrac
                 vaf = v * sendLevel * (1. / MAX_GAIN_INT);
             }
 
-            track->setFinalVolume((vrf + vlf) / 2.f);
+            track->setFinalVolume(vrf, vlf);
 
             // Delegate volume control to effect in track effect chain if needed
             if (chain != 0 && chain->setVolume_l(&vl, &vr)) {
@@ -6329,7 +6329,7 @@ void AudioFlinger::DirectOutputThread::processVolume_l(Track *track, bool lastTr
                        shaperVolume == 0.f});
 
     if (lastTrack) {
-        track->setFinalVolume((left + right) / 2.f);
+        track->setFinalVolume(left, right);
         if (left != mLeftVolFloat || right != mRightVolFloat) {
             mLeftVolFloat = left;
             mRightVolFloat = right;
@@ -10804,6 +10804,8 @@ AudioFlinger::PlaybackThread::mixer_state AudioFlinger::BitPerfectThread::prepar
         Vector<sp<Track>> *tracksToRemove) {
     mixer_state result = MixerThread::prepareTracks_l(tracksToRemove);
     // If there is only one active track and it is bit-perfect, enable tee buffer.
+    float volumeLeft = 1.0f;
+    float volumeRight = 1.0f;
     if (mActiveTracks.size() == 1 && mActiveTracks[0]->isBitPerfect()) {
         const int trackId = mActiveTracks[0]->id();
         mAudioMixer->setParameter(
@@ -10811,6 +10813,7 @@ AudioFlinger::PlaybackThread::mixer_state AudioFlinger::BitPerfectThread::prepar
         mAudioMixer->setParameter(
                     trackId, AudioMixer::TRACK, AudioMixer::TEE_BUFFER_FRAME_COUNT,
                     (void *)(uintptr_t)mNormalFrameCount);
+        mActiveTracks[0]->getFinalVolume(&volumeLeft, &volumeRight);
         mIsBitPerfect = true;
     } else {
         mIsBitPerfect = false;
@@ -10821,6 +10824,11 @@ AudioFlinger::PlaybackThread::mixer_state AudioFlinger::BitPerfectThread::prepar
             mAudioMixer->setParameter(
                         trackId, AudioMixer::TRACK, AudioMixer::TEE_BUFFER, nullptr);
         }
+    }
+    if (mVolumeLeft != volumeLeft || mVolumeRight != volumeRight) {
+        mVolumeLeft = volumeLeft;
+        mVolumeRight = volumeRight;
+        setVolumeForOutput_l(volumeLeft, volumeRight);
     }
     return result;
 }

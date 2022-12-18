@@ -116,6 +116,9 @@ bool AudioMixer::setChannelMasks(int name,
         track->mKeepContractedChannels = false;
     }
 
+    track->mInputFrameSize = audio_bytes_per_frame(
+            track->channelCount + track->mHapticChannelCount, track->mFormat);
+
     // channel masks have changed, does this track need a downmixer?
     // update to try using our desired format (if we aren't already using it)
     const status_t status = track->prepareForDownmix();
@@ -309,9 +312,8 @@ status_t AudioMixer::Track::prepareForTee() {
     ALOGV("AudioMixer::%s(%p) teeBuffer=%p", __func__, this, teeBuffer);
     unprepareForTee();
     if (teeBuffer != nullptr) {
-        const size_t frameSize = audio_bytes_per_frame(channelCount + mHapticChannelCount, mFormat);
         mTeeBufferProvider.reset(new TeeBufferProvider(
-                frameSize, frameSize, kCopyBufferFrameCount,
+                mInputFrameSize, mInputFrameSize, kCopyBufferFrameCount,
                 (uint8_t*)teeBuffer, mTeeBufferFrameCount));
         reconfigureBufferProviders();
     }
@@ -590,6 +592,8 @@ status_t AudioMixer::postCreateTrack(TrackBase *track)
     t->mAdjustInChannelCount = t->channelCount + t->mHapticChannelCount;
     t->mAdjustOutChannelCount = t->channelCount;
     t->mKeepContractedChannels = false;
+    t->mInputFrameSize = audio_bytes_per_frame(
+            t->channelCount + t->mHapticChannelCount, t->mFormat);
     // Check the downmixing (or upmixing) requirements.
     status_t status = t->prepareForDownmix();
     if (status != OK) {
@@ -640,6 +644,10 @@ void AudioMixer::postProcess()
                     break;
                 }
                 break;
+            }
+            if (t->teeBuffer != nullptr && t->volumeRL == 0) {
+                // Need to mute tee
+                memset(t->teeBuffer, 0, t->mTeeBufferFrameCount * t->mInputFrameSize);
             }
         }
     }

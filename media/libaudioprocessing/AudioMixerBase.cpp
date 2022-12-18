@@ -152,6 +152,7 @@ status_t AudioMixerBase::create(
                 AUDIO_CHANNEL_REPRESENTATION_POSITION, AUDIO_CHANNEL_OUT_STEREO);
         t->mMixerChannelCount = audio_channel_count_from_out_mask(t->mMixerChannelMask);
         t->mTeeBufferFrameCount = 0;
+        t->mInputFrameSize = audio_bytes_per_frame(t->channelCount, t->mFormat);
         status_t status = postCreateTrack(t.get());
         if (status != OK) return status;
         mTracks[name] = t;
@@ -178,6 +179,7 @@ bool AudioMixerBase::setChannelMasks(int name,
     track->channelCount = trackChannelCount;
     track->mMixerChannelMask = mixerChannelMask;
     track->mMixerChannelCount = mixerChannelCount;
+    track->mInputFrameSize = audio_bytes_per_frame(track->channelCount, track->mFormat);
 
     // Resampler channels may have changed.
     track->recreateResampler(mSampleRate);

@@ -869,6 +869,7 @@ constexpr int32_t BUFFER_FLAG_CODEC_CONFIG = 2;
 constexpr int32_t BUFFER_FLAG_END_OF_STREAM = 4;
 constexpr int32_t BUFFER_FLAG_KEY_FRAME = 1;
 constexpr int32_t BUFFER_FLAG_PARTIAL_FRAME = 8;
+constexpr int32_t BUFFER_FLAG_DECODE_ONLY = 32;
 constexpr int32_t BUFFER_FLAG_SYNC_FRAME = 1;
 constexpr int32_t CONFIGURE_FLAG_ENCODE = 1;
 constexpr int32_t CONFIGURE_FLAG_USE_BLOCK_MODEL = 2;

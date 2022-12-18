@@ -35,6 +35,7 @@ cc_library {
         "CryptoHalAidl.cpp",
         "DrmUtils.cpp",
         "DrmHalListener.cpp",
+        "DrmStatus.cpp",
     ],
 
     local_include_dirs: [

@@ -289,7 +289,9 @@ std::string GetExceptionMessage(const DrmStatus & err, const char *defaultMsg,
 template<typename T>
 std::string GetExceptionMessage(const DrmStatus &err, const char *defaultMsg, const sp<T> &iface) {
     Vector<::V1_4::LogMessage> logs;
-    iface->getLogMessages(logs);
+    if (iface != NULL) {
+        iface->getLogMessages(logs);
+    }
     return GetExceptionMessage(err, defaultMsg, logs);
 }
 
