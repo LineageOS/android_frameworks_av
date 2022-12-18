@@ -2573,6 +2573,9 @@ audio_module_handle_t AudioFlinger::loadHwModule_l(const char *name)
         ALOGE("loadHwModule() error %d loading module %s", rc, name);
         return AUDIO_MODULE_HANDLE_NONE;
     }
+    if (!mMelReporter->activateHalSoundDoseComputation(name)) {
+        ALOGW("loadHwModule() sound dose reporting is not available");
+    }
 
     mHardwareStatus = AUDIO_HW_INIT;
     rc = dev->initCheck();

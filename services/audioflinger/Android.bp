@@ -24,6 +24,7 @@ cc_library_shared {
 
     defaults: [
         "latest_android_media_audio_common_types_cpp_shared",
+        "latest_android_hardware_audio_sounddose_ndk_shared",
     ],
 
     srcs: [
@@ -76,6 +77,7 @@ cc_library_shared {
         "libutils",
         "liblog",
         "libbinder",
+        "libbinder_ndk",
         "libaudioclient",
         "libaudiomanager",
         "libmedialogservice",
@@ -105,11 +107,11 @@ cc_library_shared {
         "libaudiohal_headers",
         "libaudioutils_headers",
         "libmedia_headers",
-        "libsounddose_headers",
     ],
 
     export_shared_lib_headers: [
         "libpermission",
+        "android.hardware.audio.sounddose-V1-ndk",
     ],
 
     cflags: [
