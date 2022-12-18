@@ -548,31 +548,7 @@ DrmStatus statusAidlToDrmStatus(::ndk::ScopedAStatus& statusAidl) {
         break;
     }
 
-    Json::Value errorDetails;
-    Json::Reader reader;
-    if (!reader.parse(statusAidl.getMessage(), errorDetails)) {
-        return status;
-    }
-
-    int32_t cdmErr{}, oemErr{}, ctx{};
-    std::string errMsg;
-    auto val = errorDetails["cdmError"];
-    if (!val.isNull()) {
-        cdmErr = val.asInt();
-    }
-    val = errorDetails["oemError"];
-    if (!val.isNull()) {
-        oemErr = val.asInt();
-    }
-    val = errorDetails["context"];
-    if (!val.isNull()) {
-        ctx = val.asInt();
-    }
-    val = errorDetails["errorMessage"];
-    if (!val.isNull()) {
-        errMsg = val.asString();
-    }
-    return DrmStatus(status, cdmErr, oemErr, ctx, errMsg);
+    return DrmStatus(status, statusAidl.getMessage());
 }
 
 LogBuffer gLogBuf;
