@@ -273,8 +273,8 @@ static std::string patchSourcesToString(const struct audio_patch *patch)
 
 static std::string toString(audio_latency_mode_t mode) {
     // We convert to the AIDL type to print (eventually the legacy type will be removed).
-    const auto result = legacy2aidl_audio_latency_mode_t_LatencyMode(mode);
-    return result.has_value() ? media::toString(*result) : "UNKNOWN";
+    const auto result = legacy2aidl_audio_latency_mode_t_AudioLatencyMode(mode);
+    return result.has_value() ? media::audio::common::toString(*result) : "UNKNOWN";
 }
 
 // Could be made a template, but other toString overloads for std::vector are confused.
