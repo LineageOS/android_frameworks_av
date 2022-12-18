@@ -23,6 +23,7 @@
 #include <android/media/SpatializationLevel.h>
 #include <android/media/SpatializationMode.h>
 #include <android/media/SpatializerHeadTrackingMode.h>
+#include <android/media/audio/common/AudioLatencyMode.h>
 #include <audio_utils/SimpleLog.h>
 #include <math.h>
 #include <media/AudioEffect.h>
@@ -166,8 +167,9 @@ class Spatializer : public media::BnSpatializer,
 
     static std::string toString(audio_latency_mode_t mode) {
         // We convert to the AIDL type to print (eventually the legacy type will be removed).
-        const auto result = legacy2aidl_audio_latency_mode_t_LatencyMode(mode);
-        return result.has_value() ? media::toString(*result) : "unknown_latency_mode";
+        const auto result = legacy2aidl_audio_latency_mode_t_AudioLatencyMode(mode);
+        return result.has_value() ?
+                media::audio::common::toString(*result) : "unknown_latency_mode";
     }
 
     /**

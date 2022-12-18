@@ -685,9 +685,10 @@ public:
     Status getAAudioMixerBurstCount(int32_t* _aidl_return) override;
     Status getAAudioHardwareBurstMinUsec(int32_t* _aidl_return) override;
     Status setDeviceConnectedState(const media::AudioPort& port, bool connected) override;
-    Status setRequestedLatencyMode(int output, media::LatencyMode mode) override;
+    Status setRequestedLatencyMode(
+            int output, media::audio::common::AudioLatencyMode mode) override;
     Status getSupportedLatencyModes(int output,
-            std::vector<media::LatencyMode>* _aidl_return) override;
+            std::vector<media::audio::common::AudioLatencyMode>* _aidl_return) override;
 private:
     const sp<AudioFlingerServerAdapter::Delegate> mDelegate;
 };
