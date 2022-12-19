@@ -451,7 +451,7 @@ nsecs_t VideoFrameSchedulerBase::schedule(nsecs_t renderTime) {
                 return origRenderTime;
             }
 
-            ATRACE_INT("FRAME_VSYNCS", vsyncsForLastFrame);
+            ATRACE_INT64("FRAME_VSYNCS", vsyncsForLastFrame);
         }
         mLastVsyncTime = nextVsyncTime;
     }
@@ -460,7 +460,7 @@ nsecs_t VideoFrameSchedulerBase::schedule(nsecs_t renderTime) {
     renderTime -= (renderTime - mVsyncTime) % mVsyncPeriod;
     renderTime += mVsyncPeriod / 2;
     ALOGV("adjusting render: %lld => %lld", (long long)origRenderTime, (long long)renderTime);
-    ATRACE_INT("FRAME_FLIP_IN(ms)", (renderTime - now) / 1000000);
+    ATRACE_INT64("FRAME_FLIP_IN(ms)", (renderTime - now) / 1000000);
     return renderTime;
 }
 
