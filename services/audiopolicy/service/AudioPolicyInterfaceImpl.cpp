@@ -1541,7 +1541,8 @@ Status AudioPolicyService::getAudioPort(int portId,
     return Status::ok();
 }
 
-Status AudioPolicyService::createAudioPatch(const media::AudioPatch& patchAidl, int32_t handleAidl,
+Status AudioPolicyService::createAudioPatch(const media::AudioPatchFw& patchAidl,
+                                            int32_t handleAidl,
                                             int32_t* _aidl_return) {
     audio_patch patch = VALUE_OR_RETURN_BINDER_STATUS(
             aidl2legacy_AudioPatch_audio_patch(patchAidl));
@@ -1582,7 +1583,7 @@ Status AudioPolicyService::releaseAudioPatch(int32_t handleAidl)
 }
 
 Status AudioPolicyService::listAudioPatches(Int* count,
-                                            std::vector<media::AudioPatch>* patchesAidl,
+                                            std::vector<media::AudioPatchFw>* patchesAidl,
                                             int32_t* _aidl_return) {
     unsigned int num_patches = VALUE_OR_RETURN_BINDER_STATUS(
             convertIntegral<unsigned int>(count->value));
