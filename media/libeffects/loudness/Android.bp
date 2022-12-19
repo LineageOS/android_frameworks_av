@@ -44,3 +44,32 @@ cc_library_shared {
 
     header_libs: ["libaudioeffects"],
 }
+
+cc_library_shared {
+    name: "libloudnessenhanceraidl",
+    srcs: [
+        "aidl/EffectLoudnessEnhancer.cpp",
+        "aidl/LoudnessEnhancerContext.cpp",
+        "dsp/core/dynamic_range_compression.cpp",
+        ":effectCommonFile",
+    ],
+    defaults: [
+        "aidlaudioservice_defaults",
+        "latest_android_hardware_audio_effect_ndk_shared",
+        "latest_android_media_audio_common_types_ndk_shared",
+    ],
+    header_libs: [
+        "libaudioeffects",
+        "libhardware_headers",
+    ],
+    cflags: [
+        "-Wthread-safety",
+    ],
+    shared_libs: [
+        "libcutils",
+        "liblog",
+    ],
+    visibility: [
+        "//hardware/interfaces/audio/aidl/default",
+    ],
+}
