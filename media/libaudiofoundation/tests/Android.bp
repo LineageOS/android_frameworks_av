@@ -23,6 +23,7 @@ cc_test {
     static_libs: [
         "audioclient-types-aidl-cpp",
         "libaudioclient_aidl_conversion",
+        "libaudio_aidl_conversion_common_cpp",
         "libaudiofoundation",
         "libstagefright_foundation",
     ],
