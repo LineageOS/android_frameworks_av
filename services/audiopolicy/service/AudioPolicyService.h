@@ -176,10 +176,10 @@ public:
                                   int32_t* _aidl_return) override;
     binder::Status getAudioPort(int portId,
                                 media::AudioPortFw* _aidl_return) override;
-    binder::Status createAudioPatch(const media::AudioPatch& patch, int32_t handle,
+    binder::Status createAudioPatch(const media::AudioPatchFw& patch, int32_t handle,
                                     int32_t* _aidl_return) override;
     binder::Status releaseAudioPatch(int32_t handle) override;
-    binder::Status listAudioPatches(Int* count, std::vector<media::AudioPatch>* patches,
+    binder::Status listAudioPatches(Int* count, std::vector<media::AudioPatchFw>* patches,
                                     int32_t* _aidl_return) override;
     binder::Status setAudioPortConfig(const media::AudioPortConfigFw& config) override;
     binder::Status registerClient(const sp<media::IAudioPolicyServiceClient>& client) override;

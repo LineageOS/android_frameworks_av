@@ -677,7 +677,8 @@ status_t AudioFlingerClientAdapter::getAudioPort(struct audio_port_v7* port) {
 
 status_t AudioFlingerClientAdapter::createAudioPatch(const struct audio_patch* patch,
                                                      audio_patch_handle_t* handle) {
-    media::AudioPatch patchAidl = VALUE_OR_RETURN_STATUS(legacy2aidl_audio_patch_AudioPatch(*patch));
+    media::AudioPatchFw patchAidl = VALUE_OR_RETURN_STATUS(
+            legacy2aidl_audio_patch_AudioPatch(*patch));
     int32_t aidlRet = VALUE_OR_RETURN_STATUS(legacy2aidl_audio_patch_handle_t_int32_t(
                     AUDIO_PATCH_HANDLE_NONE));
     if (handle != nullptr) {
@@ -698,7 +699,7 @@ status_t AudioFlingerClientAdapter::releaseAudioPatch(audio_patch_handle_t handl
 
 status_t AudioFlingerClientAdapter::listAudioPatches(unsigned int* num_patches,
                                                      struct audio_patch* patches) {
-    std::vector<media::AudioPatch> aidlRet;
+    std::vector<media::AudioPatchFw> aidlRet;
     int32_t maxPatches = VALUE_OR_RETURN_STATUS(convertIntegral<int32_t>(*num_patches));
     RETURN_STATUS_IF_ERROR(statusTFromBinderStatus(
             mDelegate->listAudioPatches(maxPatches, &aidlRet)));
@@ -1246,7 +1247,7 @@ Status AudioFlingerServerAdapter::getAudioPort(const media::AudioPortFw& port,
     return Status::ok();
 }
 
-Status AudioFlingerServerAdapter::createAudioPatch(const media::AudioPatch& patch,
+Status AudioFlingerServerAdapter::createAudioPatch(const media::AudioPatchFw& patch,
                                                    int32_t* _aidl_return) {
     audio_patch patchLegacy = VALUE_OR_RETURN_BINDER(aidl2legacy_AudioPatch_audio_patch(patch));
     audio_patch_handle_t handleLegacy = VALUE_OR_RETURN_BINDER(
@@ -1263,7 +1264,7 @@ Status AudioFlingerServerAdapter::releaseAudioPatch(int32_t handle) {
 }
 
 Status AudioFlingerServerAdapter::listAudioPatches(int32_t maxCount,
-                            std::vector<media::AudioPatch>* _aidl_return) {
+                            std::vector<media::AudioPatchFw>* _aidl_return) {
     unsigned int count = VALUE_OR_RETURN_BINDER(convertIntegral<unsigned int>(maxCount));
     count = std::min(count, static_cast<unsigned int>(MAX_ITEMS_PER_LIST));
     std::unique_ptr<audio_patch[]> patchesLegacy(new audio_patch[count]);
