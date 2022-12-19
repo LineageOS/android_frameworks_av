@@ -36,6 +36,7 @@
 #include <media/ToneGenerator.h>
 #include <media/AudioEffect.h>
 #include <media/AudioPolicy.h>
+#include <media/UsecaseValidator.h>
 #include <mediautils/ServiceUtilities.h>
 #include "AudioPolicyEffects.h"
 #include "CaptureStateNotifier.h"
@@ -430,6 +431,11 @@ private:
      *          See getOpForSource().
      */
     static bool isAppOpSource(audio_source_t source);
+
+    status_t registerOutput(audio_io_handle_t output,
+                            const audio_config_base_t& config,
+                            const audio_output_flags_t flags);
+    status_t unregisterOutput(audio_io_handle_t output);
 
     // If recording we need to make sure the UID is allowed to do that. If the UID is idle
     // then it cannot record and gets buffers with zeros - silence. As soon as the UID
@@ -903,7 +909,7 @@ private:
 
         const audio_attributes_t attributes; // source, flags ...
         const audio_io_handle_t io;          // audio HAL stream IO handle
-        const AttributionSourceState& attributionSource; //client attributionsource
+        const AttributionSourceState attributionSource; //client attributionsource
         const audio_session_t session;       // audio session ID
         const audio_port_handle_t portId;
         const audio_port_handle_t deviceId;  // selected input device port ID
@@ -1082,6 +1088,7 @@ private:
     void *mLibraryHandle = nullptr;
     CreateAudioPolicyManagerInstance mCreateAudioPolicyManager;
     DestroyAudioPolicyManagerInstance mDestroyAudioPolicyManager;
+    std::unique_ptr<media::UsecaseValidator> mUsecaseValidator;
 };
 
 } // namespace android

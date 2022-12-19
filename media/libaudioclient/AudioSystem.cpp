@@ -1086,6 +1086,8 @@ status_t AudioSystem::getOutputForAttr(audio_attributes_t* attr,
             responseAidl.secondaryOutputs, aidl2legacy_int32_t_audio_io_handle_t));
     *isSpatialized = responseAidl.isSpatialized;
     *isBitPerfect = responseAidl.isBitPerfect;
+    *attr = VALUE_OR_RETURN_STATUS(
+            aidl2legacy_AudioAttributesInternal_audio_attributes_t(responseAidl.attr));
 
     return OK;
 }

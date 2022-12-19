@@ -205,7 +205,8 @@ AudioPolicyService::AudioPolicyService()
       mPhoneState(AUDIO_MODE_INVALID),
       mCaptureStateNotifier(false),
       mCreateAudioPolicyManager(createAudioPolicyManager),
-      mDestroyAudioPolicyManager(destroyAudioPolicyManager) {
+      mDestroyAudioPolicyManager(destroyAudioPolicyManager),
+      mUsecaseValidator(media::createUsecaseValidator()) {
       setMinSchedulerPolicy(SCHED_NORMAL, ANDROID_PRIORITY_AUDIO);
 }
 
@@ -1535,6 +1536,16 @@ status_t AudioPolicyService::printHelp(int out) {
         "  set-uid-state <PACKAGE> <active|idle> [--user USER_ID] overrides the uid state\n"
         "  reset-uid-state <PACKAGE> [--user USER_ID] clears the uid state override\n"
         "  help print this message\n");
+}
+
+status_t AudioPolicyService::registerOutput(audio_io_handle_t output,
+                        const audio_config_base_t& config,
+                        const audio_output_flags_t flags) {
+    return mUsecaseValidator->registerStream(output, config, flags);
+}
+
+status_t AudioPolicyService::unregisterOutput(audio_io_handle_t output) {
+    return mUsecaseValidator->unregisterStream(output);
 }
 
 // -----------  AudioPolicyService::UidPolicy implementation ----------
