@@ -18,12 +18,12 @@ cc_library_headers {
 
     export_include_dirs: ["include"],
     header_libs: [
-        "libaudioclient_aidl_conversion_util",
+        "libaudio_aidl_conversion_common_util_cpp",
         "libaudio_system_headers",
         "libmedia_helper_headers",
     ],
     export_header_lib_headers: [
-        "libaudioclient_aidl_conversion_util",
+        "libaudio_aidl_conversion_common_util_cpp",
         "libaudio_system_headers",
         "libmedia_helper_headers",
     ],
