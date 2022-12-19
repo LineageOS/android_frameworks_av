@@ -707,7 +707,7 @@ status_t AudioFlingerClientAdapter::listAudioPatches(unsigned int* num_patches,
 }
 
 status_t AudioFlingerClientAdapter::setAudioPortConfig(const struct audio_port_config* config) {
-    media::AudioPortConfig configAidl = VALUE_OR_RETURN_STATUS(
+    media::AudioPortConfigFw configAidl = VALUE_OR_RETURN_STATUS(
             legacy2aidl_audio_port_config_AudioPortConfig(*config));
     return statusTFromBinderStatus(mDelegate->setAudioPortConfig(configAidl));
 }
@@ -1274,7 +1274,7 @@ Status AudioFlingerServerAdapter::listAudioPatches(int32_t maxCount,
     return Status::ok();
 }
 
-Status AudioFlingerServerAdapter::setAudioPortConfig(const media::AudioPortConfig& config) {
+Status AudioFlingerServerAdapter::setAudioPortConfig(const media::AudioPortConfigFw& config) {
     audio_port_config configLegacy = VALUE_OR_RETURN_BINDER(
             aidl2legacy_AudioPortConfig_audio_port_config(config));
     return Status::fromStatusT(mDelegate->setAudioPortConfig(&configLegacy));

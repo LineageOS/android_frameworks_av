@@ -18,7 +18,7 @@ package android.media;
 
 import android.media.AudioPatch;
 import android.media.AudioPort;
-import android.media.AudioPortConfig;
+import android.media.AudioPortConfigFw;
 import android.media.AudioUniqueIdUse;
 import android.media.AudioVibratorInfo;
 import android.media.CreateEffectRequest;
@@ -193,7 +193,7 @@ interface IAudioFlingerService {
     /* List existing audio patches */
     AudioPatch[] listAudioPatches(int maxCount);
     /* Set audio port configuration */
-    void setAudioPortConfig(in AudioPortConfig config);
+    void setAudioPortConfig(in AudioPortConfigFw config);
 
     /* Get the HW synchronization source used for an audio session */
     int /* audio_hw_sync_t */ getAudioHwSyncForSession(int /* audio_session_t */ sessionId);

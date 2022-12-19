@@ -1633,7 +1633,7 @@ Status AudioPolicyService::listAudioPatches(Int* count,
     return Status::ok();
 }
 
-Status AudioPolicyService::setAudioPortConfig(const media::AudioPortConfig& configAidl)
+Status AudioPolicyService::setAudioPortConfig(const media::AudioPortConfigFw& configAidl)
 {
     audio_port_config config = VALUE_OR_RETURN_BINDER_STATUS(
             aidl2legacy_AudioPortConfig_audio_port_config(configAidl));
@@ -1806,7 +1806,7 @@ Status AudioPolicyService::removeUserIdDeviceAffinities(int32_t userIdAidl) {
     return binderStatusFromStatusT(mAudioPolicyManager->removeUserIdDeviceAffinities(userId));
 }
 
-Status AudioPolicyService::startAudioSource(const media::AudioPortConfig& sourceAidl,
+Status AudioPolicyService::startAudioSource(const media::AudioPortConfigFw& sourceAidl,
                                             const media::AudioAttributesInternal& attributesAidl,
                                             int32_t* _aidl_return) {
     audio_port_config source = VALUE_OR_RETURN_BINDER_STATUS(

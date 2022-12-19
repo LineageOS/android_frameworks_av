@@ -683,7 +683,7 @@ public:
     Status releaseAudioPatch(int32_t handle) override;
     Status listAudioPatches(int32_t maxCount,
                             std::vector<media::AudioPatch>* _aidl_return) override;
-    Status setAudioPortConfig(const media::AudioPortConfig& config) override;
+    Status setAudioPortConfig(const media::AudioPortConfigFw& config) override;
     Status getAudioHwSyncForSession(int32_t sessionId, int32_t* _aidl_return) override;
     Status systemReady() override;
     Status audioPolicyReady() override;
