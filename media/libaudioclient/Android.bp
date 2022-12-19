@@ -193,88 +193,29 @@ cc_library {
     },
 }
 
-// This is intended for clients needing to include AidlConversionUtil.h, without dragging in a lot of extra
-// dependencies.
-cc_library_headers {
-    name: "libaudioclient_aidl_conversion_util",
-    host_supported: true,
-    vendor_available: true,
-    double_loadable: true,
-    min_sdk_version: "29",
-    export_include_dirs: [
-        "include",
-    ],
-    header_libs: [
-        "libbase_headers",
-        "liberror_headers",
-    ],
-    export_header_lib_headers: [
-        "libbase_headers",
-        "liberror_headers",
-    ],
-    apex_available: [
-        "//apex_available:platform",
-        "com.android.btservices",
-        "com.android.media",
-        "com.android.media.swcodec",
-    ],
-    target: {
-        darwin: {
-            enabled: false,
-        },
-    },
-}
-
 cc_library {
     name: "libaudioclient_aidl_conversion",
     srcs: ["AidlConversion.cpp"],
-    export_include_dirs: ["include"],
-    host_supported: true,
-    vendor_available: true,
-    double_loadable: true,
-    min_sdk_version: "29",
-    header_libs: [
-        "libaudioclient_aidl_conversion_util",
-        "libaudio_system_headers",
-    ],
-    export_header_lib_headers: [
-        "libaudioclient_aidl_conversion_util",
-    ],
-    defaults: [
-        "latest_android_media_audio_common_types_cpp_export_shared",
-    ],
     shared_libs: [
         "audioclient-types-aidl-cpp",
-        "libbase",
-        "libbinder",
-        "liblog",
-        "libshmemcompat",
-        "libstagefright_foundation",
-        "libutils",
-        "shared-file-region-aidl-cpp",
-        "framework-permission-aidl-cpp",
+    ],
+    static_libs: [
+        "libaudio_aidl_conversion_common_cpp",
+    ],
+    export_include_dirs: ["include"],
+    header_libs: [
+        "libaudio_aidl_conversion_common_util_cpp",
+    ],
+    export_header_lib_headers: [
+        "libaudio_aidl_conversion_common_util_cpp",
     ],
     export_shared_lib_headers: [
         "audioclient-types-aidl-cpp",
-        "libbase",
-        "shared-file-region-aidl-cpp",
     ],
-    cflags: [
-        "-Wall",
-        "-Werror",
-        "-Wno-error=deprecated-declarations",
+    defaults: [
+        "audio_aidl_conversion_common_default",
+        "latest_android_media_audio_common_types_cpp_export_shared",
     ],
-    sanitize: {
-        misc_undefined: [
-            "unsigned-integer-overflow",
-            "signed-integer-overflow",
-        ],
-    },
-    target: {
-        darwin: {
-            enabled: false,
-        },
-    },
 }
 
 // AIDL interface between libaudioclient and framework.jar
