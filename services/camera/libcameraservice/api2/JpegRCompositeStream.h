@@ -1,5 +1,5 @@
 /*
- * Copyright (C) 2018 The Android Open Source Project
+ * Copyright (C) 2022 The Android Open Source Project
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -14,20 +14,16 @@
  * limitations under the License.
  */
 
-#ifndef ANDROID_SERVERS_CAMERA_CAMERA3_DEPTH_COMPOSITE_STREAM_H
-#define ANDROID_SERVERS_CAMERA_CAMERA3_DEPTH_COMPOSITE_STREAM_H
-
-#include "common/DepthPhotoProcessor.h"
-#include <dynamic_depth/imaging_model.h>
-#include <dynamic_depth/depth_map.h>
+#ifndef ANDROID_SERVERS_CAMERA_CAMERA3_JPEG_R_COMPOSITE_STREAM_H
+#define ANDROID_SERVERS_CAMERA_CAMERA3_JPEG_R_COMPOSITE_STREAM_H
 
 #include <gui/CpuConsumer.h>
+#include "aidl/android/hardware/graphics/common/Dataspace.h"
+#include "system/graphics-base-v1.1.h"
+
+#include "api1/client2/JpegProcessor.h"
 
 #include "CompositeStream.h"
-
-using dynamic_depth::DepthMap;
-using dynamic_depth::Item;
-using dynamic_depth::ImagingModel;
 
 namespace android {
 
@@ -37,15 +33,15 @@ class Surface;
 
 namespace camera3 {
 
-class DepthCompositeStream : public CompositeStream, public Thread,
+class JpegRCompositeStream : public CompositeStream, public Thread,
         public CpuConsumer::FrameAvailableListener {
 
 public:
-    DepthCompositeStream(sp<CameraDeviceBase> device,
+    JpegRCompositeStream(sp<CameraDeviceBase> device,
             wp<hardware::camera2::ICameraDeviceCallbacks> cb);
-    ~DepthCompositeStream() override;
+    ~JpegRCompositeStream() override;
 
-    static bool isDepthCompositeStream(const sp<Surface> &surface);
+    static bool isJpegRCompositeStream(const sp<Surface> &surface);
 
     // CompositeStream overrides
     status_t createInternalStreams(const std::vector<sp<Surface>>& consumers,
@@ -60,7 +56,7 @@ public:
     status_t insertGbp(SurfaceMap* /*out*/outSurfaceMap, Vector<int32_t>* /*out*/outputStreamIds,
             int32_t* /*out*/currentStreamId) override;
     status_t insertCompositeStreamIds(std::vector<int32_t>* compositeStreamIds /*out*/) override;
-    int getStreamId() override { return mBlobStreamId; }
+    int getStreamId() override { return mP010StreamId; }
 
     // CpuConsumer listener implementation
     void onFrameAvailable(const BufferItem& item) override;
@@ -77,7 +73,7 @@ protected:
 
 private:
     struct InputFrame {
-        CpuConsumer::LockedBuffer depthBuffer;
+        CpuConsumer::LockedBuffer p010Buffer;
         CpuConsumer::LockedBuffer jpegBuffer;
         CameraMetadata            result;
         bool                      error;
@@ -88,26 +84,6 @@ private:
         InputFrame() : error(false), errorNotified(false), frameNumber(-1), requestId(-1) { }
     };
 
-    // Helper methods
-    static void getSupportedDepthSizes(const CameraMetadata& ch, bool maxResolution,
-            std::vector<std::tuple<size_t, size_t>>* depthSizes /*out*/);
-    static status_t getMatchingDepthSize(size_t width, size_t height,
-            const std::vector<std::tuple<size_t, size_t>>& supporedDepthSizes,
-            size_t *depthWidth /*out*/, size_t *depthHeight /*out*/);
-    static status_t checkAndGetMatchingDepthSize(size_t width, size_t height,
-        const std::vector<std::tuple<size_t, size_t>> &depthSizes,
-        const std::vector<std::tuple<size_t, size_t>> &depthSizesMaximumResolution,
-        const std::unordered_set<int32_t> &sensorPixelModesUsed,
-        size_t *depthWidth /*out*/, size_t *depthHeight /*out*/);
-
-
-    // Dynamic depth processing
-    status_t encodeGrayscaleJpeg(size_t width, size_t height, uint8_t *in, void *out,
-            const size_t maxOutSize, uint8_t jpegQuality, size_t &actualSize);
-    std::unique_ptr<DepthMap> processDepthMapFrame(const CpuConsumer::LockedBuffer &depthMapBuffer,
-            size_t maxJpegSize, uint8_t jpegQuality,
-            std::vector<std::unique_ptr<Item>>* items /*out*/);
-    std::unique_ptr<ImagingModel> getImagingModel();
     status_t processInputFrame(nsecs_t ts, const InputFrame &inputFrame);
 
     // Buffer/Results handling
@@ -121,16 +97,28 @@ private:
     // Find next failing frame number with smallest timestamp and return respective frame number
     int64_t getNextFailingInputLocked(int64_t *currentTs /*inout*/);
 
-    static const nsecs_t kWaitDuration = 10000000; // 10 ms
-    static const auto kDepthMapPixelFormat = HAL_PIXEL_FORMAT_Y16;
-    static const auto kDepthMapDataSpace = HAL_DATASPACE_DEPTH;
-    static const auto kJpegDataSpace = HAL_DATASPACE_V0_JFIF;
+    static void deriveDynamicRangeAndDataspace(int64_t dynamicProfile, int64_t* /*out*/dynamicRange,
+            int64_t* /*out*/dataSpace);
 
-    int                  mBlobStreamId, mBlobSurfaceId, mDepthStreamId, mDepthSurfaceId;
+    static const nsecs_t kWaitDuration = 10000000; // 10 ms
+    static const auto kP010PixelFormat = HAL_PIXEL_FORMAT_YCBCR_P010;
+    static const auto kP010DefaultDataSpace = HAL_DATASPACE_BT2020_ITU_HLG;
+    static const auto kP010DefaultDynamicRange =
+        ANDROID_REQUEST_AVAILABLE_DYNAMIC_RANGE_PROFILES_MAP_HLG10;
+    static const auto kJpegDataSpace = HAL_DATASPACE_V0_JFIF;
+    static const auto kJpegRDataSpace =
+        aidl::android::hardware::graphics::common::Dataspace::JPEG_R;
+
+    bool                 mSupportInternalJpeg = false;
+    int64_t              mP010DataSpace = HAL_DATASPACE_BT2020_HLG;
+    int64_t              mP010DynamicRange =
+        ANDROID_REQUEST_AVAILABLE_DYNAMIC_RANGE_PROFILES_MAP_HLG10;
+    int                  mBlobStreamId, mBlobSurfaceId, mP010StreamId, mP010SurfaceId;
     size_t               mBlobWidth, mBlobHeight;
-    sp<CpuConsumer>      mBlobConsumer, mDepthConsumer;
-    bool                 mDepthBufferAcquired, mBlobBufferAcquired;
-    sp<Surface>          mDepthSurface, mBlobSurface, mOutputSurface;
+    sp<CpuConsumer>      mBlobConsumer, mP010Consumer;
+    bool                 mP010BufferAcquired, mBlobBufferAcquired;
+    sp<Surface>          mP010Surface, mBlobSurface, mOutputSurface;
+    int32_t              mOutputColorSpace;
     sp<ProducerListener> mProducerListener;
 
     ssize_t              mMaxJpegBufferSize;
@@ -139,19 +127,16 @@ private:
     camera3::Size        mDefaultMaxJpegSize;
     camera3::Size        mUHRMaxJpegSize;
 
-    std::vector<std::tuple<size_t, size_t>> mSupportedDepthSizes;
-    std::vector<std::tuple<size_t, size_t>> mSupportedDepthSizesMaximumResolution;
-    std::vector<float>   mIntrinsicCalibration, mLensDistortion;
-    bool                 mIsLogicalCamera;
-
-    // Keep all incoming Depth buffer timestamps pending further processing.
-    std::vector<int64_t> mInputDepthBuffers;
+    // Keep all incoming P010 buffer timestamps pending further processing.
+    std::vector<int64_t> mInputP010Buffers;
 
     // Keep all incoming Jpeg/Blob buffer timestamps pending further processing.
     std::vector<int64_t> mInputJpegBuffers;
 
     // Map of all input frames pending further processing.
     std::unordered_map<int64_t, InputFrame> mPendingInputFrames;
+
+    const CameraMetadata mStaticInfo;
 };
 
 }; //namespace camera3

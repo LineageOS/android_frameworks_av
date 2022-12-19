@@ -102,7 +102,7 @@ binder::Status createSurfaceFromGbp(
         int32_t colorSpace);
 
 //check if format is 10-bit output compatible
-bool is10bitCompatibleFormat(int32_t format);
+bool is10bitCompatibleFormat(int32_t format, android_dataspace_t dataSpace);
 
 // check if the dynamic range requires 10-bit output
 bool is10bitDynamicRangeProfile(int64_t dynamicRangeProfile);

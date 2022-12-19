@@ -501,6 +501,11 @@ AidlProviderInfo::AidlDeviceInfo3::AidlDeviceInfo3(
         ALOGE("%s: Unable to derive HEIC tags based on camera and media capabilities: %s (%d)",
                 __FUNCTION__, strerror(-res), res);
     }
+    res = deriveJpegRTags();
+    if (OK != res) {
+        ALOGE("%s: Unable to derive Jpeg/R tags based on camera and media capabilities: %s (%d)",
+                __FUNCTION__, strerror(-res), res);
+    }
 
     if (camera3::SessionConfigurationUtils::isUltraHighResolutionSensor(mCameraCharacteristics)) {
         status_t status = addDynamicDepthTags(/*maxResolution*/true);
@@ -512,6 +517,12 @@ AidlProviderInfo::AidlDeviceInfo3::AidlDeviceInfo3(
         status = deriveHeicTags(/*maxResolution*/true);
         if (OK != status) {
             ALOGE("%s: Unable to derive HEIC tags based on camera and media capabilities for"
+                    "maximum resolution mode: %s (%d)", __FUNCTION__, strerror(-status), status);
+        }
+
+        status = deriveJpegRTags(/*maxResolution*/true);
+        if (OK != status) {
+            ALOGE("%s: Unable to derive Jpeg/R tags based on camera and media capabilities for"
                     "maximum resolution mode: %s (%d)", __FUNCTION__, strerror(-status), status);
         }
     }
