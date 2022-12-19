@@ -446,7 +446,7 @@ void AudioPolicyManagerTestMsd::SetUpManagerConfig() {
     sp<AudioProfile> ac3OutputProfile = new AudioProfile(
             AUDIO_FORMAT_AC3, AUDIO_CHANNEL_OUT_5POINT1, k48000SamplingRate);
     sp<AudioProfile> iec958OutputProfile = new AudioProfile(
-            AUDIO_FORMAT_IEC60958, AUDIO_CHANNEL_OUT_STEREO, k48000SamplingRate);
+            AUDIO_FORMAT_IEC60958, AUDIO_CHANNEL_INDEX_MASK_24, k48000SamplingRate);
     mMsdOutputDevice->addAudioProfile(pcmOutputProfile);
     mMsdOutputDevice->addAudioProfile(ac3OutputProfile);
     mMsdOutputDevice->addAudioProfile(iec958OutputProfile);
@@ -519,7 +519,7 @@ void AudioPolicyManagerTestMsd::SetUpManagerConfig() {
     // Add HDMI input device with IEC60958 profile for HDMI in -> MSD patching.
     mHdmiInputDevice = new DeviceDescriptor(AUDIO_DEVICE_IN_HDMI);
     sp<AudioProfile> iec958InputProfile = new AudioProfile(
-            AUDIO_FORMAT_IEC60958, AUDIO_CHANNEL_IN_STEREO, k48000SamplingRate);
+            AUDIO_FORMAT_IEC60958, AUDIO_CHANNEL_INDEX_MASK_24, k48000SamplingRate);
     mHdmiInputDevice->addAudioProfile(iec958InputProfile);
     config.addDevice(mHdmiInputDevice);
     sp<InputProfile> hdmiInputProfile = new InputProfile("hdmi input");
@@ -677,8 +677,8 @@ TEST_P(AudioPolicyManagerTestMsd, PatchCreationFromHdmiInToMsd) {
     ASSERT_EQ(AUDIO_PORT_ROLE_SINK, patch->mPatch.sinks[0].role);
     ASSERT_EQ(AUDIO_FORMAT_IEC60958, patch->mPatch.sources[0].format);
     ASSERT_EQ(AUDIO_FORMAT_IEC60958, patch->mPatch.sinks[0].format);
-    ASSERT_EQ(AUDIO_CHANNEL_IN_STEREO, patch->mPatch.sources[0].channel_mask);
-    ASSERT_EQ(AUDIO_CHANNEL_OUT_STEREO, patch->mPatch.sinks[0].channel_mask);
+    ASSERT_EQ(AUDIO_CHANNEL_INDEX_MASK_24, patch->mPatch.sources[0].channel_mask);
+    ASSERT_EQ(AUDIO_CHANNEL_INDEX_MASK_24, patch->mPatch.sinks[0].channel_mask);
     ASSERT_EQ(k48000SamplingRate, patch->mPatch.sources[0].sample_rate);
     ASSERT_EQ(k48000SamplingRate, patch->mPatch.sinks[0].sample_rate);
     ASSERT_EQ(1, patchCount.deltaFromSnapshot());
@@ -754,7 +754,7 @@ TEST_P(AudioPolicyManagerTestMsd, IsDirectPlaybackSupportedWithMsd) {
     audio_config_base_t msdDirectConfig2 = AUDIO_CONFIG_BASE_INITIALIZER;
     msdDirectConfig2.format = AUDIO_FORMAT_IEC60958;
     msdDirectConfig2.sample_rate = 48000;
-    msdDirectConfig2.channel_mask = AUDIO_CHANNEL_OUT_STEREO;
+    msdDirectConfig2.channel_mask = AUDIO_CHANNEL_INDEX_MASK_24;
 
     audio_config_base_t msdNonDirectConfig = AUDIO_CONFIG_BASE_INITIALIZER;
     msdNonDirectConfig.format = AUDIO_FORMAT_PCM_16_BIT;
@@ -821,7 +821,7 @@ TEST_P(AudioPolicyManagerTestMsd, GetDirectPlaybackSupportWithMsd) {
     audio_config_t msdDirectConfig2 = AUDIO_CONFIG_INITIALIZER;
     msdDirectConfig2.format = AUDIO_FORMAT_IEC60958;
     msdDirectConfig2.sample_rate = 48000;
-    msdDirectConfig2.channel_mask = AUDIO_CHANNEL_OUT_STEREO;
+    msdDirectConfig2.channel_mask = AUDIO_CHANNEL_INDEX_MASK_24;
 
     audio_config_t msdNonDirectConfig = AUDIO_CONFIG_INITIALIZER;
     msdNonDirectConfig.format = AUDIO_FORMAT_PCM_16_BIT;

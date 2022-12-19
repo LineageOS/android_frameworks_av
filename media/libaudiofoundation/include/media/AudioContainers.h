@@ -66,6 +66,9 @@ static inline ChannelMaskSet asInMask(const ChannelMaskSet& channelMasks) {
     for (const auto &channel : channelMasks) {
         if (audio_channel_mask_out_to_in(channel) != AUDIO_CHANNEL_INVALID) {
             inMaskSet.insert(audio_channel_mask_out_to_in(channel));
+        } else if (audio_channel_mask_get_representation(channel)
+                    == AUDIO_CHANNEL_REPRESENTATION_INDEX) {
+            inMaskSet.insert(channel);
         }
     }
     return inMaskSet;
@@ -76,6 +79,9 @@ static inline ChannelMaskSet asOutMask(const ChannelMaskSet& channelMasks) {
     for (const auto &channel : channelMasks) {
         if (audio_channel_mask_in_to_out(channel) != AUDIO_CHANNEL_INVALID) {
             outMaskSet.insert(audio_channel_mask_in_to_out(channel));
+        } else if (audio_channel_mask_get_representation(channel)
+                    == AUDIO_CHANNEL_REPRESENTATION_INDEX) {
+            outMaskSet.insert(channel);
         }
     }
     return outMaskSet;
