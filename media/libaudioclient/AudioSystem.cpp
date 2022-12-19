@@ -1532,7 +1532,7 @@ status_t AudioSystem::listAudioPorts(audio_port_role_t role,
             legacy2aidl_audio_port_type_t_AudioPortType(type));
     Int numPortsAidl;
     numPortsAidl.value = VALUE_OR_RETURN_STATUS(convertIntegral<int32_t>(*num_ports));
-    std::vector<media::AudioPort> portsAidl;
+    std::vector<media::AudioPortFw> portsAidl;
     int32_t generationAidl;
 
     RETURN_STATUS_IF_ERROR(statusTFromBinderStatus(
@@ -1551,7 +1551,7 @@ status_t AudioSystem::getAudioPort(struct audio_port_v7* port) {
     const sp<IAudioPolicyService>& aps = AudioSystem::get_audio_policy_service();
     if (aps == 0) return PERMISSION_DENIED;
 
-    media::AudioPort portAidl;
+    media::AudioPortFw portAidl;
     RETURN_STATUS_IF_ERROR(
             statusTFromBinderStatus(aps->getAudioPort(port->id, &portAidl)));
     *port = VALUE_OR_RETURN_STATUS(aidl2legacy_AudioPort_audio_port_v7(portAidl));

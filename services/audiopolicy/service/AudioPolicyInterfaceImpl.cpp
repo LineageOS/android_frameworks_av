@@ -1521,7 +1521,7 @@ Status AudioPolicyService::isDirectOutputSupported(
 
 Status AudioPolicyService::listAudioPorts(media::AudioPortRole roleAidl,
                                           media::AudioPortType typeAidl, Int* count,
-                                          std::vector<media::AudioPort>* portsAidl,
+                                          std::vector<media::AudioPortFw>* portsAidl,
                                           int32_t* _aidl_return) {
     audio_port_role_t role = VALUE_OR_RETURN_BINDER_STATUS(
             aidl2legacy_AudioPortRole_audio_port_role_t(roleAidl));
@@ -1553,7 +1553,7 @@ Status AudioPolicyService::listAudioPorts(media::AudioPortRole roleAidl,
 }
 
 Status AudioPolicyService::getAudioPort(int portId,
-                                        media::AudioPort* _aidl_return) {
+                                        media::AudioPortFw* _aidl_return) {
     audio_port_v7 port{ .id = portId };
     Mutex::Autolock _l(mLock);
     if (mAudioPolicyManager == NULL) {

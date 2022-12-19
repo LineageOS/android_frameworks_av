@@ -111,7 +111,7 @@ TEST(AudioHealthTest, ConnectSupportedDevice) {
             continue;
         }
         std::string address = "11:22:33:44:55:66";
-        media::AudioPort aidlPort;
+        media::AudioPortFw aidlPort;
         ASSERT_EQ(OK, manager.deviceToAudioPort(device->type(), address.c_str(), "" /*name*/,
                                                  &aidlPort));
         ASSERT_EQ(AUDIO_POLICY_DEVICE_STATE_UNAVAILABLE,

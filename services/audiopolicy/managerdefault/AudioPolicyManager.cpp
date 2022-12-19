@@ -104,7 +104,7 @@ status_t AudioPolicyManager::setDeviceConnectionState(audio_devices_t device,
                                                       const char* device_address,
                                                       const char* device_name,
                                                       audio_format_t encodedFormat) {
-    media::AudioPort aidlPort;
+    media::AudioPortFw aidlPort;
     if (status_t status = deviceToAudioPort(device, device_address, device_name, &aidlPort);
         status == OK) {
         return setDeviceConnectionState(state, aidlPort.hal, encodedFormat);
@@ -162,7 +162,7 @@ status_t AudioPolicyManager::setDeviceConnectionStateInt(audio_devices_t deviceT
                                                          const char* device_address,
                                                          const char* device_name,
                                                          audio_format_t encodedFormat) {
-    media::AudioPort aidlPort;
+    media::AudioPortFw aidlPort;
     if (status_t status = deviceToAudioPort(deviceType, device_address, device_name, &aidlPort);
         status == OK) {
         return setDeviceConnectionStateInt(state, aidlPort.hal, encodedFormat);
@@ -444,7 +444,7 @@ status_t AudioPolicyManager::setDeviceConnectionStateInt(const sp<DeviceDescript
 
 status_t AudioPolicyManager::deviceToAudioPort(audio_devices_t device, const char* device_address,
                                                const char* device_name,
-                                               media::AudioPort* aidlPort) {
+                                               media::AudioPortFw* aidlPort) {
     DeviceDescriptorBase devDescr(device, device_address);
     devDescr.setName(device_name);
     return devDescr.writeToParcelable(aidlPort);
