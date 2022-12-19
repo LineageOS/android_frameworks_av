@@ -172,10 +172,10 @@ public:
                                            const media::AudioAttributesInternal& attributes,
                                            bool* _aidl_return) override;
     binder::Status listAudioPorts(media::AudioPortRole role, media::AudioPortType type,
-                                  Int* count, std::vector<media::AudioPort>* ports,
+                                  Int* count, std::vector<media::AudioPortFw>* ports,
                                   int32_t* _aidl_return) override;
     binder::Status getAudioPort(int portId,
-                                media::AudioPort* _aidl_return) override;
+                                media::AudioPortFw* _aidl_return) override;
     binder::Status createAudioPatch(const media::AudioPatch& patch, int32_t handle,
                                     int32_t* _aidl_return) override;
     binder::Status releaseAudioPatch(int32_t handle) override;

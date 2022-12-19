@@ -930,7 +930,7 @@ status_t legacy2aidl_AudioPortExt(
 }
 
 ConversionResult<audio_port_v7>
-aidl2legacy_AudioPort_audio_port_v7(const media::AudioPort& aidl) {
+aidl2legacy_AudioPort_audio_port_v7(const media::AudioPortFw& aidl) {
     audio_port_v7 legacy;
     legacy.id = VALUE_OR_RETURN(aidl2legacy_int32_t_audio_port_handle_t(aidl.hal.id));
     legacy.role = VALUE_OR_RETURN(aidl2legacy_AudioPortRole_audio_port_role_t(aidl.sys.role));
@@ -975,9 +975,9 @@ aidl2legacy_AudioPort_audio_port_v7(const media::AudioPort& aidl) {
     return legacy;
 }
 
-ConversionResult<media::AudioPort>
+ConversionResult<media::AudioPortFw>
 legacy2aidl_audio_port_v7_AudioPort(const audio_port_v7& legacy) {
-    media::AudioPort aidl;
+    media::AudioPortFw aidl;
     aidl.hal.id = VALUE_OR_RETURN(legacy2aidl_audio_port_handle_t_int32_t(legacy.id));
     aidl.sys.role = VALUE_OR_RETURN(legacy2aidl_audio_port_role_t_AudioPortRole(legacy.role));
     aidl.sys.type = VALUE_OR_RETURN(legacy2aidl_audio_port_type_t_AudioPortType(legacy.type));
