@@ -1551,7 +1551,7 @@ status_t AudioSystem::listAudioPorts(audio_port_role_t role,
             legacy2aidl_audio_port_type_t_AudioPortType(type));
     Int numPortsAidl;
     numPortsAidl.value = VALUE_OR_RETURN_STATUS(convertIntegral<int32_t>(*num_ports));
-    std::vector<media::AudioPort> portsAidl;
+    std::vector<media::AudioPortFw> portsAidl;
     int32_t generationAidl;
 
     RETURN_STATUS_IF_ERROR(statusTFromBinderStatus(
@@ -1570,7 +1570,7 @@ status_t AudioSystem::getAudioPort(struct audio_port_v7* port) {
     const sp<IAudioPolicyService>& aps = AudioSystem::get_audio_policy_service();
     if (aps == 0) return PERMISSION_DENIED;
 
-    media::AudioPort portAidl;
+    media::AudioPortFw portAidl;
     RETURN_STATUS_IF_ERROR(
             statusTFromBinderStatus(aps->getAudioPort(port->id, &portAidl)));
     *port = VALUE_OR_RETURN_STATUS(aidl2legacy_AudioPort_audio_port_v7(portAidl));
@@ -1586,7 +1586,7 @@ status_t AudioSystem::createAudioPatch(const struct audio_patch* patch,
     const sp<IAudioPolicyService>& aps = AudioSystem::get_audio_policy_service();
     if (aps == 0) return PERMISSION_DENIED;
 
-    media::AudioPatch patchAidl = VALUE_OR_RETURN_STATUS(
+    media::AudioPatchFw patchAidl = VALUE_OR_RETURN_STATUS(
             legacy2aidl_audio_patch_AudioPatch(*patch));
     int32_t handleAidl = VALUE_OR_RETURN_STATUS(legacy2aidl_audio_patch_handle_t_int32_t(*handle));
     RETURN_STATUS_IF_ERROR(
@@ -1617,7 +1617,7 @@ status_t AudioSystem::listAudioPatches(unsigned int* num_patches,
 
     Int numPatchesAidl;
     numPatchesAidl.value = VALUE_OR_RETURN_STATUS(convertIntegral<int32_t>(*num_patches));
-    std::vector<media::AudioPatch> patchesAidl;
+    std::vector<media::AudioPatchFw> patchesAidl;
     int32_t generationAidl;
 
     RETURN_STATUS_IF_ERROR(statusTFromBinderStatus(
@@ -1637,7 +1637,7 @@ status_t AudioSystem::setAudioPortConfig(const struct audio_port_config* config)
     const sp<IAudioPolicyService>& aps = AudioSystem::get_audio_policy_service();
     if (aps == 0) return PERMISSION_DENIED;
 
-    media::AudioPortConfig configAidl = VALUE_OR_RETURN_STATUS(
+    media::AudioPortConfigFw configAidl = VALUE_OR_RETURN_STATUS(
             legacy2aidl_audio_port_config_AudioPortConfig(*config));
     return statusTFromBinderStatus(aps->setAudioPortConfig(configAidl));
 }
@@ -1858,7 +1858,7 @@ status_t AudioSystem::startAudioSource(const struct audio_port_config* source,
     const sp<IAudioPolicyService>& aps = AudioSystem::get_audio_policy_service();
     if (aps == 0) return PERMISSION_DENIED;
 
-    media::AudioPortConfig sourceAidl = VALUE_OR_RETURN_STATUS(
+    media::AudioPortConfigFw sourceAidl = VALUE_OR_RETURN_STATUS(
             legacy2aidl_audio_port_config_AudioPortConfig(*source));
     media::AudioAttributesInternal attributesAidl = VALUE_OR_RETURN_STATUS(
             legacy2aidl_audio_attributes_t_AudioAttributesInternal(*attributes));

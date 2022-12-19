@@ -1507,7 +1507,7 @@ Status AudioPolicyService::isDirectOutputSupported(
 
 Status AudioPolicyService::listAudioPorts(media::AudioPortRole roleAidl,
                                           media::AudioPortType typeAidl, Int* count,
-                                          std::vector<media::AudioPort>* portsAidl,
+                                          std::vector<media::AudioPortFw>* portsAidl,
                                           int32_t* _aidl_return) {
     audio_port_role_t role = VALUE_OR_RETURN_BINDER_STATUS(
             aidl2legacy_AudioPortRole_audio_port_role_t(roleAidl));
@@ -1539,7 +1539,7 @@ Status AudioPolicyService::listAudioPorts(media::AudioPortRole roleAidl,
 }
 
 Status AudioPolicyService::getAudioPort(int portId,
-                                        media::AudioPort* _aidl_return) {
+                                        media::AudioPortFw* _aidl_return) {
     audio_port_v7 port{ .id = portId };
     Mutex::Autolock _l(mLock);
     if (mAudioPolicyManager == NULL) {
@@ -1551,7 +1551,8 @@ Status AudioPolicyService::getAudioPort(int portId,
     return Status::ok();
 }
 
-Status AudioPolicyService::createAudioPatch(const media::AudioPatch& patchAidl, int32_t handleAidl,
+Status AudioPolicyService::createAudioPatch(const media::AudioPatchFw& patchAidl,
+                                            int32_t handleAidl,
                                             int32_t* _aidl_return) {
     audio_patch patch = VALUE_OR_RETURN_BINDER_STATUS(
             aidl2legacy_AudioPatch_audio_patch(patchAidl));
@@ -1592,7 +1593,7 @@ Status AudioPolicyService::releaseAudioPatch(int32_t handleAidl)
 }
 
 Status AudioPolicyService::listAudioPatches(Int* count,
-                                            std::vector<media::AudioPatch>* patchesAidl,
+                                            std::vector<media::AudioPatchFw>* patchesAidl,
                                             int32_t* _aidl_return) {
     unsigned int num_patches = VALUE_OR_RETURN_BINDER_STATUS(
             convertIntegral<unsigned int>(count->value));
@@ -1619,7 +1620,7 @@ Status AudioPolicyService::listAudioPatches(Int* count,
     return Status::ok();
 }
 
-Status AudioPolicyService::setAudioPortConfig(const media::AudioPortConfig& configAidl)
+Status AudioPolicyService::setAudioPortConfig(const media::AudioPortConfigFw& configAidl)
 {
     audio_port_config config = VALUE_OR_RETURN_BINDER_STATUS(
             aidl2legacy_AudioPortConfig_audio_port_config(configAidl));
@@ -1792,7 +1793,7 @@ Status AudioPolicyService::removeUserIdDeviceAffinities(int32_t userIdAidl) {
     return binderStatusFromStatusT(mAudioPolicyManager->removeUserIdDeviceAffinities(userId));
 }
 
-Status AudioPolicyService::startAudioSource(const media::AudioPortConfig& sourceAidl,
+Status AudioPolicyService::startAudioSource(const media::AudioPortConfigFw& sourceAidl,
                                             const media::AudioAttributesInternal& attributesAidl,
                                             int32_t* _aidl_return) {
     audio_port_config source = VALUE_OR_RETURN_BINDER_STATUS(
