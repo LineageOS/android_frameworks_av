@@ -16,13 +16,14 @@
 
 package android.media;
 
-import android.media.AudioPortConfigSys;
-import android.media.audio.common.AudioPortConfig;
+import android.media.AudioPortSys;
+import android.media.audio.common.AudioPort;
 
 /**
  * {@hide}
+ * The Fw suffix is used to break a namespace collision with an SDK API.
  */
-parcelable AudioPortConfig {
-    AudioPortConfig hal;
-    AudioPortConfigSys sys;
+parcelable AudioPortFw {
+    AudioPort hal;
+    AudioPortSys sys;
 }

@@ -16,9 +16,9 @@
 
 package android.media;
 
-import android.media.AudioPatch;
-import android.media.AudioPort;
-import android.media.AudioPortConfig;
+import android.media.AudioPatchFw;
+import android.media.AudioPortFw;
+import android.media.AudioPortConfigFw;
 import android.media.AudioUniqueIdUse;
 import android.media.AudioVibratorInfo;
 import android.media.CreateEffectRequest;
@@ -184,18 +184,18 @@ interface IAudioFlingerService {
     void setLowRamDevice(boolean isLowRamDevice, long totalMemory);
 
     /* Get attributes for a given audio port */
-    AudioPort getAudioPort(in AudioPort port);
+    AudioPortFw getAudioPort(in AudioPortFw port);
 
     /* Create an audio patch between several source and sink ports */
-    int /* audio_patch_handle_t */ createAudioPatch(in AudioPatch patch);
+    int /* audio_patch_handle_t */ createAudioPatch(in AudioPatchFw patch);
 
     /* Release an audio patch */
     void releaseAudioPatch(int /* audio_patch_handle_t */ handle);
 
     /* List existing audio patches */
-    AudioPatch[] listAudioPatches(int maxCount);
+    AudioPatchFw[] listAudioPatches(int maxCount);
     /* Set audio port configuration */
-    void setAudioPortConfig(in AudioPortConfig config);
+    void setAudioPortConfig(in AudioPortConfigFw config);
 
     /* Get the HW synchronization source used for an audio session */
     int /* audio_hw_sync_t */ getAudioHwSyncForSession(int /* audio_session_t */ sessionId);
@@ -229,7 +229,7 @@ interface IAudioFlingerService {
 
     int getAAudioHardwareBurstMinUsec();
 
-    void setDeviceConnectedState(in AudioPort devicePort, boolean connected);
+    void setDeviceConnectedState(in AudioPortFw devicePort, boolean connected);
 
     /**
      * Requests a given latency mode (See LatencyMode.aidl) on an output stream.

@@ -222,7 +222,7 @@ bool AudioPort::equals(const sp<AudioPort> &other) const
            mExtraAudioDescriptors == other->getExtraAudioDescriptors();
 }
 
-status_t AudioPort::writeToParcelable(media::AudioPort* parcelable) const {
+status_t AudioPort::writeToParcelable(media::AudioPortFw* parcelable) const {
     parcelable->hal.name = mName;
     parcelable->sys.type = VALUE_OR_RETURN_STATUS(
             legacy2aidl_audio_port_type_t_AudioPortType(mType));
@@ -249,7 +249,7 @@ status_t AudioPort::writeToParcelable(media::AudioPort* parcelable) const {
     return OK;
 }
 
-status_t AudioPort::readFromParcelable(const media::AudioPort& parcelable) {
+status_t AudioPort::readFromParcelable(const media::AudioPortFw& parcelable) {
     mName = parcelable.hal.name;
     mType = VALUE_OR_RETURN_STATUS(
             aidl2legacy_AudioPortType_audio_port_type_t(parcelable.sys.type));

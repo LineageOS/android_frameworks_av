@@ -65,6 +65,7 @@ cc_library_shared {
         "api2/DepthCompositeStream.cpp",
         "api2/HeicEncoderInfoManager.cpp",
         "api2/HeicCompositeStream.cpp",
+        "api2/JpegRCompositeStream.cpp",
         "device3/BufferUtils.cpp",
         "device3/Camera3Device.cpp",
         "device3/Camera3OfflineSession.cpp",
@@ -172,6 +173,9 @@ cc_library_shared {
         "libbinderthreadstateutils",
         "media_permission-aidl-cpp",
         "libcameraservice_device_independent",
+        "libjpegrecoverymap",
+        "libjpegencoder",
+        "libjpegdecoder",
     ],
 
     export_shared_lib_headers: [
