@@ -29,8 +29,8 @@
 #include <android/media/AudioIoConfigEvent.h>
 #include <android/media/AudioIoDescriptor.h>
 #include <android/media/AudioPlaybackRate.h>
-#include <android/media/AudioPort.h>
-#include <android/media/AudioPortConfig.h>
+#include <android/media/AudioPortFw.h>
+#include <android/media/AudioPortConfigFw.h>
 #include <android/media/AudioPortDeviceExtSys.h>
 #include <android/media/AudioTimestampInternal.h>
 #include <android/media/AudioUniqueIdUse.h>
@@ -92,13 +92,13 @@ ConversionResult<int32_t> legacy2aidl_audio_port_config_session_ext_AudioPortCon
         const audio_port_config_session_ext& legacy);
 
 ConversionResult<audio_port_config> aidl2legacy_AudioPortConfig_audio_port_config(
-        const media::AudioPortConfig& aidl);
-ConversionResult<media::AudioPortConfig> legacy2aidl_audio_port_config_AudioPortConfig(
+        const media::AudioPortConfigFw& aidl);
+ConversionResult<media::AudioPortConfigFw> legacy2aidl_audio_port_config_AudioPortConfig(
         const audio_port_config& legacy);
 
 ConversionResult<struct audio_patch> aidl2legacy_AudioPatch_audio_patch(
-        const media::AudioPatch& aidl);
-ConversionResult<media::AudioPatch> legacy2aidl_audio_patch_AudioPatch(
+        const media::AudioPatchFw& aidl);
+ConversionResult<media::AudioPatchFw> legacy2aidl_audio_patch_AudioPatch(
         const struct audio_patch& legacy);
 
 ConversionResult<sp<AudioIoDescriptor>> aidl2legacy_AudioIoDescriptor_AudioIoDescriptor(
@@ -170,8 +170,8 @@ ConversionResult<int32_t>
 legacy2aidl_audio_port_session_ext_int32_t(const audio_port_session_ext& legacy);
 
 ConversionResult<audio_port_v7>
-aidl2legacy_AudioPort_audio_port_v7(const media::AudioPort& aidl);
-ConversionResult<media::AudioPort>
+aidl2legacy_AudioPort_audio_port_v7(const media::AudioPortFw& aidl);
+ConversionResult<media::AudioPortFw>
 legacy2aidl_audio_port_v7_AudioPort(const audio_port_v7& legacy);
 
 ConversionResult<audio_unique_id_use_t>

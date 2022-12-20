@@ -69,6 +69,12 @@ status_t AudioPolicyService::AudioPolicyClient::openOutput(audio_module_handle_t
         *halConfig = VALUE_OR_RETURN_STATUS(
                 aidl2legacy_AudioConfig_audio_config_t(response.config, false /*isInput*/));
         *latencyMs = VALUE_OR_RETURN_STATUS(convertIntegral<uint32_t>(response.latencyMs));
+
+        audio_config_base_t config = {.sample_rate = halConfig->sample_rate,
+            .channel_mask = halConfig->channel_mask,
+            .format = halConfig->format,
+        };
+        mAudioPolicyService->registerOutput(*output, config, flags);
     }
     return status;
 }
@@ -91,7 +97,7 @@ status_t AudioPolicyService::AudioPolicyClient::closeOutput(audio_io_handle_t ou
     if (af == 0) {
         return PERMISSION_DENIED;
     }
-
+    mAudioPolicyService->unregisterOutput(output);
     return af->closeOutput(output);
 }
 

@@ -75,6 +75,7 @@ typedef enum acamera_metadata_section {
     ACAMERA_AUTOMOTIVE,
     ACAMERA_AUTOMOTIVE_LENS,
     ACAMERA_EXTENSION,
+    ACAMERA_JPEGR,
     ACAMERA_SECTION_COUNT,
 
     ACAMERA_VENDOR = 0x8000
@@ -121,6 +122,7 @@ typedef enum acamera_metadata_section_start {
     ACAMERA_AUTOMOTIVE_START       = ACAMERA_AUTOMOTIVE        << 16,
     ACAMERA_AUTOMOTIVE_LENS_START  = ACAMERA_AUTOMOTIVE_LENS   << 16,
     ACAMERA_EXTENSION_START        = ACAMERA_EXTENSION         << 16,
+    ACAMERA_JPEGR_START            = ACAMERA_JPEGR             << 16,
     ACAMERA_VENDOR_START           = ACAMERA_VENDOR            << 16
 } acamera_metadata_section_start_t;
 
@@ -7513,6 +7515,145 @@ typedef enum acamera_metadata_tag {
             ACAMERA_AUTOMOTIVE_LENS_START,
     ACAMERA_AUTOMOTIVE_LENS_END,
 
+    /**
+     * <p>The available Jpeg/R stream
+     * configurations that this camera device supports
+     * (i.e. format, width, height, output/input stream).</p>
+     *
+     * <p>Type: int32[n*4] (acamera_metadata_enum_android_jpegr_available_jpeg_r_stream_configurations_t)</p>
+     *
+     * <p>This tag may appear in:
+     * <ul>
+     *   <li>ACameraMetadata from ACameraManager_getCameraCharacteristics</li>
+     * </ul></p>
+     *
+     * <p>The configurations are listed as <code>(format, width, height, input?)</code> tuples.</p>
+     * <p>If the camera device supports Jpeg/R, it will support the same stream combinations with
+     * Jpeg/R as it does with P010. The stream combinations with Jpeg/R (or P010) supported
+     * by the device is determined by the device's hardware level and capabilities.</p>
+     * <p>All the static, control, and dynamic metadata tags related to JPEG apply to Jpeg/R formats.
+     * Configuring JPEG and Jpeg/R streams at the same time is not supported.</p>
+     * <p>All the configuration tuples <code>(format, width, height, input?)</code> will contain
+     * AIMAGE_FORMAT_JPEGR format as OUTPUT only.</p>
+     */
+    ACAMERA_JPEGR_AVAILABLE_JPEG_R_STREAM_CONFIGURATIONS =      // int32[n*4] (acamera_metadata_enum_android_jpegr_available_jpeg_r_stream_configurations_t)
+            ACAMERA_JPEGR_START,
+    /**
+     * <p>This lists the minimum frame duration for each
+     * format/size combination for Jpeg/R output formats.</p>
+     *
+     * <p>Type: int64[4*n]</p>
+     *
+     * <p>This tag may appear in:
+     * <ul>
+     *   <li>ACameraMetadata from ACameraManager_getCameraCharacteristics</li>
+     * </ul></p>
+     *
+     * <p>This should correspond to the frame duration when only that
+     * stream is active, with all processing (typically in android.*.mode)
+     * set to either OFF or FAST.</p>
+     * <p>When multiple streams are used in a request, the minimum frame
+     * duration will be max(individual stream min durations).</p>
+     * <p>See ACAMERA_SENSOR_FRAME_DURATION and
+     * ACAMERA_SCALER_AVAILABLE_STALL_DURATIONS for more details about
+     * calculating the max frame rate.</p>
+     *
+     * @see ACAMERA_SCALER_AVAILABLE_STALL_DURATIONS
+     * @see ACAMERA_SENSOR_FRAME_DURATION
+     */
+    ACAMERA_JPEGR_AVAILABLE_JPEG_R_MIN_FRAME_DURATIONS =        // int64[4*n]
+            ACAMERA_JPEGR_START + 1,
+    /**
+     * <p>This lists the maximum stall duration for each
+     * output format/size combination for Jpeg/R streams.</p>
+     *
+     * <p>Type: int64[4*n]</p>
+     *
+     * <p>This tag may appear in:
+     * <ul>
+     *   <li>ACameraMetadata from ACameraManager_getCameraCharacteristics</li>
+     * </ul></p>
+     *
+     * <p>A stall duration is how much extra time would get added
+     * to the normal minimum frame duration for a repeating request
+     * that has streams with non-zero stall.</p>
+     * <p>This functions similarly to
+     * ACAMERA_SCALER_AVAILABLE_STALL_DURATIONS for Jpeg/R
+     * streams.</p>
+     * <p>All Jpeg/R output stream formats may have a nonzero stall
+     * duration.</p>
+     *
+     * @see ACAMERA_SCALER_AVAILABLE_STALL_DURATIONS
+     */
+    ACAMERA_JPEGR_AVAILABLE_JPEG_R_STALL_DURATIONS =            // int64[4*n]
+            ACAMERA_JPEGR_START + 2,
+    /**
+     * <p>The available Jpeg/R stream
+     * configurations that this camera device supports
+     * (i.e. format, width, height, output/input stream).</p>
+     *
+     * <p>Type: int32[n*4] (acamera_metadata_enum_android_jpegr_available_jpeg_r_stream_configurations_maximum_resolution_t)</p>
+     *
+     * <p>This tag may appear in:
+     * <ul>
+     *   <li>ACameraMetadata from ACameraManager_getCameraCharacteristics</li>
+     * </ul></p>
+     *
+     * <p>Refer to ACAMERA_JPEGR_AVAILABLE_JPEG_R_STREAM_CONFIGURATIONS for details.</p>
+     * <p>All the configuration tuples <code>(format, width, height, input?)</code> will contain
+     * AIMAGE_FORMAT_JPEG_R format as OUTPUT only.</p>
+     *
+     * @see ACAMERA_JPEGR_AVAILABLE_JPEG_R_STREAM_CONFIGURATIONS
+     */
+    ACAMERA_JPEGR_AVAILABLE_JPEG_R_STREAM_CONFIGURATIONS_MAXIMUM_RESOLUTION = 
+                                                                // int32[n*4] (acamera_metadata_enum_android_jpegr_available_jpeg_r_stream_configurations_maximum_resolution_t)
+            ACAMERA_JPEGR_START + 3,
+    /**
+     * <p>This lists the minimum frame duration for each
+     * format/size combination for Jpeg/R output formats for CaptureRequests where
+     * ACAMERA_SENSOR_PIXEL_MODE is set to
+     * <a href="https://developer.android.com/reference/android/hardware/camera2/CameraMetadata.html#SENSOR_PIXEL_MODE_MAXIMUM_RESOLUTION">CameraMetadata#SENSOR_PIXEL_MODE_MAXIMUM_RESOLUTION</a>.</p>
+     *
+     * @see ACAMERA_SENSOR_PIXEL_MODE
+     *
+     * <p>Type: int64[4*n]</p>
+     *
+     * <p>This tag may appear in:
+     * <ul>
+     *   <li>ACameraMetadata from ACameraManager_getCameraCharacteristics</li>
+     * </ul></p>
+     *
+     * <p>Refer to ACAMERA_JPEGR_AVAILABLE_JPEG_R_MIN_FRAME_DURATIONS for details.</p>
+     *
+     * @see ACAMERA_JPEGR_AVAILABLE_JPEG_R_MIN_FRAME_DURATIONS
+     */
+    ACAMERA_JPEGR_AVAILABLE_JPEG_R_MIN_FRAME_DURATIONS_MAXIMUM_RESOLUTION = 
+                                                                // int64[4*n]
+            ACAMERA_JPEGR_START + 4,
+    /**
+     * <p>This lists the maximum stall duration for each
+     * output format/size combination for Jpeg/R streams for CaptureRequests where
+     * ACAMERA_SENSOR_PIXEL_MODE is set to
+     * <a href="https://developer.android.com/reference/android/hardware/camera2/CameraMetadata.html#SENSOR_PIXEL_MODE_MAXIMUM_RESOLUTION">CameraMetadata#SENSOR_PIXEL_MODE_MAXIMUM_RESOLUTION</a>.</p>
+     *
+     * @see ACAMERA_SENSOR_PIXEL_MODE
+     *
+     * <p>Type: int64[4*n]</p>
+     *
+     * <p>This tag may appear in:
+     * <ul>
+     *   <li>ACameraMetadata from ACameraManager_getCameraCharacteristics</li>
+     * </ul></p>
+     *
+     * <p>Refer to ACAMERA_JPEGR_AVAILABLE_JPEG_R_STALL_DURATIONS for details.</p>
+     *
+     * @see ACAMERA_JPEGR_AVAILABLE_JPEG_R_STALL_DURATIONS
+     */
+    ACAMERA_JPEGR_AVAILABLE_JPEG_R_STALL_DURATIONS_MAXIMUM_RESOLUTION = 
+                                                                // int64[4*n]
+            ACAMERA_JPEGR_START + 5,
+    ACAMERA_JPEGR_END,
+
 } acamera_metadata_tag_t;
 
 /**
@@ -10989,6 +11130,25 @@ typedef enum acamera_metadata_enum_acamera_automotive_lens_facing {
 
 } acamera_metadata_enum_android_automotive_lens_facing_t;
 
+
+
+// ACAMERA_JPEGR_AVAILABLE_JPEG_R_STREAM_CONFIGURATIONS
+typedef enum acamera_metadata_enum_acamera_jpegr_available_jpeg_r_stream_configurations {
+    ACAMERA_JPEGR_AVAILABLE_JPEG_R_STREAM_CONFIGURATIONS_OUTPUT      = 0,
+
+    ACAMERA_JPEGR_AVAILABLE_JPEG_R_STREAM_CONFIGURATIONS_INPUT       = 1,
+
+} acamera_metadata_enum_android_jpegr_available_jpeg_r_stream_configurations_t;
+
+// ACAMERA_JPEGR_AVAILABLE_JPEG_R_STREAM_CONFIGURATIONS_MAXIMUM_RESOLUTION
+typedef enum acamera_metadata_enum_acamera_jpegr_available_jpeg_r_stream_configurations_maximum_resolution {
+    ACAMERA_JPEGR_AVAILABLE_JPEG_R_STREAM_CONFIGURATIONS_MAXIMUM_RESOLUTION_OUTPUT
+                                                                      = 0,
+
+    ACAMERA_JPEGR_AVAILABLE_JPEG_R_STREAM_CONFIGURATIONS_MAXIMUM_RESOLUTION_INPUT
+                                                                      = 1,
+
+} acamera_metadata_enum_android_jpegr_available_jpeg_r_stream_configurations_maximum_resolution_t;
 
 
 

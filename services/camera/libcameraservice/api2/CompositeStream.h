@@ -46,7 +46,8 @@ public:
             camera_stream_rotation_t rotation, int *id, const String8& physicalCameraId,
             const std::unordered_set<int32_t> &sensorPixelModesUsed,
             std::vector<int> *surfaceIds,
-            int streamSetId, bool isShared, bool isMultiResolution);
+            int streamSetId, bool isShared, bool isMultiResolution, int32_t colorSpace,
+            int64_t dynamicProfile, int64_t streamUseCase);
 
     status_t deleteStream();
 
@@ -59,7 +60,8 @@ public:
             camera_stream_rotation_t rotation, int *id, const String8& physicalCameraId,
             const std::unordered_set<int32_t> &sensorPixelModesUsed,
             std::vector<int> *surfaceIds,
-            int streamSetId, bool isShared) = 0;
+            int streamSetId, bool isShared, int32_t colorSpace,
+            int64_t dynamicProfile, int64_t streamUseCase) = 0;
 
     // Release all internal streams and corresponding resources.
     virtual status_t deleteInternalStreams() = 0;
