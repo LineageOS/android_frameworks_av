@@ -22,9 +22,9 @@ import android.media.SoundDoseRecord;
  * Interface used to push the sound dose related information from the
  * AudioService#SoundDoseHelper to the audio server
  */
-oneway interface ISoundDose {
+interface ISoundDose {
     /** Set a new RS2 value used for momentary exposure warnings. */
-    void setOutputRs2(float rs2Value);
+    oneway void setOutputRs2(float rs2Value);
 
     /**
      * Resets the native CSD values. This can happen after a crash in the
@@ -33,5 +33,15 @@ oneway interface ISoundDose {
      * dosage values and MELs together with their timestamps that lead to this
      * CSD.
      */
-    void resetCsd(float currentCsd, in SoundDoseRecord[] records);
+    oneway void resetCsd(float currentCsd, in SoundDoseRecord[] records);
+
+    /* -------------------------- Test API methods --------------------------
+    /** Get the currently used RS2 value. */
+    float getOutputRs2();
+    /** Get the current CSD from audioserver. */
+    float getCsd();
+    /** Enables/Disables MEL computations from framework. */
+    oneway void forceUseFrameworkMel(boolean useFrameworkMel);
+    /** Enables/Disables the computation of CSD on all devices. */
+    oneway void forceComputeCsdOnAllDevices(boolean computeCsdOnAllDevices);
 }
