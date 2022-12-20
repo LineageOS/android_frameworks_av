@@ -7602,9 +7602,9 @@ status_t AudioFlinger::SpatializerThread::getSupportedLatencyModes(
     return NO_ERROR;
 }
 
-status_t AudioFlinger::PlaybackThread::setBluetoothLatencyModesEnabled(bool enabled) {
+status_t AudioFlinger::PlaybackThread::setBluetoothVariableLatencyEnabled(bool enabled) {
     if (mOutput == nullptr || mOutput->audioHwDev == nullptr
-            || !mOutput->audioHwDev->supportsBluetoothLatencyModes()) {
+            || !mOutput->audioHwDev->supportsBluetoothVariableLatency()) {
         return INVALID_OPERATION;
     }
     mBluetoothLatencyModesEnabled.store(enabled);

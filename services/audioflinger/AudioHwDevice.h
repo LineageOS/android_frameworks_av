@@ -66,7 +66,7 @@ public:
         return (0 != (mFlags & AHWD_IS_INSERT));
     }
 
-    bool supportsBluetoothLatencyModes() const {
+    bool supportsBluetoothVariableLatency() const {
         return (0 != (mFlags & AHWD_SUPPORTS_BT_LATENCY_MODES));
     }
 
