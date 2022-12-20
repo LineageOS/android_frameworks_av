@@ -3571,6 +3571,28 @@ void AudioFlinger::PlaybackThread::invalidateTracks(audio_stream_type_t streamTy
     invalidateTracks_l(streamType);
 }
 
+void AudioFlinger::PlaybackThread::invalidateTracks(std::set<audio_port_handle_t>& portIds) {
+    Mutex::Autolock _l(mLock);
+    invalidateTracks_l(portIds);
+}
+
+bool AudioFlinger::PlaybackThread::invalidateTracks_l(std::set<audio_port_handle_t>& portIds) {
+    bool trackMatch = false;
+    const size_t size = mTracks.size();
+    for (size_t i = 0; i < size; i++) {
+        sp<Track> t = mTracks[i];
+        if (t->isExternalTrack() && portIds.find(t->portId()) != portIds.end()) {
+            t->invalidate();
+            portIds.erase(t->portId());
+            trackMatch = true;
+        }
+        if (portIds.empty()) {
+            break;
+        }
+    }
+    return trackMatch;
+}
+
 // getTrackById_l must be called with holding thread lock
 AudioFlinger::PlaybackThread::Track* AudioFlinger::PlaybackThread::getTrackById_l(
         audio_port_handle_t trackPortId) {
@@ -7218,6 +7240,13 @@ void AudioFlinger::OffloadThread::invalidateTracks(audio_stream_type_t streamTyp
     }
 }
 
+void AudioFlinger::OffloadThread::invalidateTracks(std::set<audio_port_handle_t>& portIds) {
+    Mutex::Autolock _l(mLock);
+    if (PlaybackThread::invalidateTracks_l(portIds)) {
+        mFlushPending = true;
+    }
+}
+
 // ----------------------------------------------------------------------------
 
 AudioFlinger::DuplicatingThread::DuplicatingThread(const sp<AudioFlinger>& audioFlinger,
@@ -10558,6 +10587,25 @@ void AudioFlinger::MmapPlaybackThread::invalidateTracks(audio_stream_type_t stre
         for (const sp<MmapTrack> &track : mActiveTracks) {
             track->invalidate();
         }
+        broadcast_l();
+    }
+}
+
+void AudioFlinger::MmapPlaybackThread::invalidateTracks(std::set<audio_port_handle_t>& portIds)
+{
+    Mutex::Autolock _l(mLock);
+    bool trackMatch = false;
+    for (const sp<MmapTrack> &track : mActiveTracks) {
+        if (portIds.find(track->portId()) != portIds.end()) {
+            track->invalidate();
+            trackMatch = true;
+            portIds.erase(track->portId());
+        }
+        if (portIds.empty()) {
+            break;
+        }
+    }
+    if (trackMatch) {
         broadcast_l();
     }
 }

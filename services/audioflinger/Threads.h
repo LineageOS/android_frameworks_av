@@ -1036,7 +1036,11 @@ public:
 
                 // called with AudioFlinger lock held
                         bool     invalidateTracks_l(audio_stream_type_t streamType);
+                        bool     invalidateTracks_l(std::set<audio_port_handle_t>& portIds);
                 virtual void     invalidateTracks(audio_stream_type_t streamType);
+                // Invalidate tracks by a set of port ids. The port id will be removed from
+                // the given set if the corresponding track is found and invalidated.
+                virtual void     invalidateTracks(std::set<audio_port_handle_t>& portIds);
 
     virtual     size_t      frameCount() const { return mNormalFrameCount; }
 
@@ -1655,6 +1659,7 @@ protected:
     virtual     bool        waitingAsyncCallback();
     virtual     bool        waitingAsyncCallback_l();
     virtual     void        invalidateTracks(audio_stream_type_t streamType);
+                void        invalidateTracks(std::set<audio_port_handle_t>& portIds) override;
 
     virtual     bool        keepWakeLock() const { return (mKeepWakeLock || (mDrainSequence & 1)); }
 
@@ -2151,6 +2156,7 @@ class MmapThread : public ThreadBase
     virtual     audio_stream_type_t streamType() { return AUDIO_STREAM_DEFAULT; }
 
     virtual     void        invalidateTracks(audio_stream_type_t streamType __unused) {}
+    virtual     void        invalidateTracks(std::set<audio_port_handle_t>& portIds __unused) {}
 
                 // Sets the UID records silence
     virtual     void        setRecordSilenced(audio_port_handle_t portId __unused,
@@ -2230,6 +2236,7 @@ public:
                 void        setMasterMute_l(bool muted) { mMasterMute = muted; }
 
     virtual     void        invalidateTracks(audio_stream_type_t streamType);
+                void        invalidateTracks(std::set<audio_port_handle_t>& portIds) override;
 
     virtual     audio_stream_type_t streamType() { return mStreamType; }
     virtual     void        checkSilentMode_l();
