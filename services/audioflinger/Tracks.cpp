@@ -792,7 +792,7 @@ void AudioFlinger::PlaybackThread::Track::appendDumpHeader(String8& result)
                         "  Format Chn mask  SRate "
                         "ST Usg CT "
                         " G db  L dB  R dB  VS dB "
-                        "  Server FrmCnt  FrmRdy F Underruns  Flushed"
+                        "  Server FrmCnt  FrmRdy F Underruns  Flushed BitPerfect"
                         "%s\n",
                         isServerLatencySupported() ? "   Latency" : "");
 }
@@ -878,7 +878,7 @@ void AudioFlinger::PlaybackThread::Track::appendDump(String8& result, bool activ
                         "%08X %08X %6u "
                         "%2u %3x %2x "
                         "%5.2g %5.2g %5.2g %5.2g%c "
-                        "%08X %6zu%c %6zu %c %9u%c %7u",
+                        "%08X %6zu%c %6zu %c %9u%c %7u %10s",
             active ? "yes" : "no",
             (mClient == 0) ? getpid() : mClient->pid(),
             mSessionId,
@@ -907,7 +907,8 @@ void AudioFlinger::PlaybackThread::Track::appendDump(String8& result, bool activ
             fillingStatus,
             mAudioTrackServerProxy->getUnderrunFrames(),
             nowInUnderrun,
-            (unsigned)mAudioTrackServerProxy->framesFlushed() % 10000000
+            (unsigned)mAudioTrackServerProxy->framesFlushed() % 10000000,
+            isBitPerfect() ? "true" : "false"
             );
 
     if (isServerLatencySupported()) {
