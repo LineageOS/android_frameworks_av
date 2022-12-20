@@ -1102,6 +1102,8 @@ public:
                     return INVALID_OPERATION;
                 }
 
+    virtual     status_t setBluetoothLatencyModesEnabled(bool enabled);
+
                 void startMelComputation(const sp<audio_utils::MelProcessor>& processor);
                 void stopMelComputation();
 
@@ -1460,6 +1462,9 @@ protected:
     virtual     void flushHw_l() {
                     mIsTimestampAdvancing.clear();
                 }
+
+        // Bluetooth Variable latency control logic is enabled or disabled for this thread
+        std::atomic_bool mBluetoothLatencyModesEnabled;
 };
 
 class MixerThread : public PlaybackThread {

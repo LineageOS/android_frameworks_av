@@ -374,6 +374,10 @@ public:
                                            sp<media::ISoundDose>* soundDose) = 0;
 
     virtual status_t invalidateTracks(const std::vector<audio_port_handle_t>& portIds) = 0;
+
+    virtual status_t setBluetoothLatencyModesEnabled(bool enabled) = 0;
+
+    virtual status_t supportsBluetoothLatencyModes(bool* support) = 0;
 };
 
 /**
@@ -479,6 +483,8 @@ public:
             audio_latency_mode_t mode) override;
     status_t getSupportedLatencyModes(
             audio_io_handle_t output, std::vector<audio_latency_mode_t>* modes) override;
+    status_t setBluetoothLatencyModesEnabled(bool enabled) override;
+    status_t supportsBluetoothLatencyModes(bool* support) override;
     status_t getSoundDoseInterface(const sp<media::ISoundDoseCallback>& callback,
                                    sp<media::ISoundDose>* soundDose) override;
     status_t invalidateTracks(const std::vector<audio_port_handle_t>& portIds) override;
@@ -572,6 +578,10 @@ public:
             SET_DEVICE_CONNECTED_STATE = media::BnAudioFlingerService::TRANSACTION_setDeviceConnectedState,
             SET_REQUESTED_LATENCY_MODE = media::BnAudioFlingerService::TRANSACTION_setRequestedLatencyMode,
             GET_SUPPORTED_LATENCY_MODES = media::BnAudioFlingerService::TRANSACTION_getSupportedLatencyModes,
+            SET_BLUETOOTH_LATENCY_MODES_ENABLED =
+                    media::BnAudioFlingerService::TRANSACTION_setBluetoothLatencyModesEnabled,
+            SUPPORTS_BLUETOOTH_LATENCY_MODES =
+                    media::BnAudioFlingerService::TRANSACTION_supportsBluetoothLatencyModes,
             GET_SOUND_DOSE_INTERFACE = media::BnAudioFlingerService::TRANSACTION_getSoundDoseInterface,
             INVALIDATE_TRACKS = media::BnAudioFlingerService::TRANSACTION_invalidateTracks,
         };
@@ -697,6 +707,8 @@ public:
     Status setRequestedLatencyMode(int output, media::LatencyMode mode) override;
     Status getSupportedLatencyModes(int output,
             std::vector<media::LatencyMode>* _aidl_return) override;
+    Status setBluetoothLatencyModesEnabled(bool enabled) override;
+    Status supportsBluetoothLatencyModes(bool* support) override;
     Status getSoundDoseInterface(const sp<media::ISoundDoseCallback>& callback,
                                  sp<media::ISoundDose>* _aidl_return) override;
     Status invalidateTracks(const std::vector<int32_t>& portIds) override;
