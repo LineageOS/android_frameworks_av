@@ -367,9 +367,11 @@ public:
     virtual status_t getSupportedLatencyModes(audio_io_handle_t output,
             std::vector<audio_latency_mode_t>* modes) = 0;
 
-    virtual status_t setBluetoothLatencyModesEnabled(bool enabled) = 0;
+    virtual status_t setBluetoothVariableLatencyEnabled(bool enabled) = 0;
 
-    virtual status_t supportsBluetoothLatencyModes(bool* support) = 0;
+    virtual status_t isBluetoothVariableLatencyEnabled(bool* enabled) = 0;
+
+    virtual status_t supportsBluetoothVariableLatency(bool* support) = 0;
 };
 
 /**
@@ -476,8 +478,9 @@ public:
             audio_latency_mode_t mode) override;
     status_t getSupportedLatencyModes(
             audio_io_handle_t output, std::vector<audio_latency_mode_t>* modes) override;
-    status_t setBluetoothLatencyModesEnabled(bool enabled) override;
-    status_t supportsBluetoothLatencyModes(bool* support) override;
+    status_t setBluetoothVariableLatencyEnabled(bool enabled) override;
+    status_t isBluetoothVariableLatencyEnabled(bool* enabled) override;
+    status_t supportsBluetoothVariableLatency(bool* support) override;
 
 private:
     const sp<media::IAudioFlingerService> mDelegate;
@@ -569,10 +572,12 @@ public:
             SET_DEVICE_CONNECTED_STATE = media::BnAudioFlingerService::TRANSACTION_setDeviceConnectedState,
             SET_REQUESTED_LATENCY_MODE = media::BnAudioFlingerService::TRANSACTION_setRequestedLatencyMode,
             GET_SUPPORTED_LATENCY_MODES = media::BnAudioFlingerService::TRANSACTION_getSupportedLatencyModes,
-            SET_BLUETOOTH_LATENCY_MODES_ENABLED =
-                    media::BnAudioFlingerService::TRANSACTION_setBluetoothLatencyModesEnabled,
-            SUPPORTS_BLUETOOTH_LATENCY_MODES =
-                    media::BnAudioFlingerService::TRANSACTION_supportsBluetoothLatencyModes,
+            SET_BLUETOOTH_VARIABLE_LATENCY_ENABLED =
+                    media::BnAudioFlingerService::TRANSACTION_setBluetoothVariableLatencyEnabled,
+            IS_BLUETOOTH_VARIABLE_LATENCY_ENABLED =
+                    media::BnAudioFlingerService::TRANSACTION_isBluetoothVariableLatencyEnabled,
+            SUPPORTS_BLUETOOTH_VARIABLE_LATENCY =
+                    media::BnAudioFlingerService::TRANSACTION_supportsBluetoothVariableLatency,
         };
 
     protected:
@@ -698,8 +703,9 @@ public:
             int output, media::audio::common::AudioLatencyMode mode) override;
     Status getSupportedLatencyModes(int output,
             std::vector<media::audio::common::AudioLatencyMode>* _aidl_return) override;
-    Status setBluetoothLatencyModesEnabled(bool enabled) override;
-    Status supportsBluetoothLatencyModes(bool* support) override;
+    Status setBluetoothVariableLatencyEnabled(bool enabled) override;
+    Status isBluetoothVariableLatencyEnabled(bool* enabled) override;
+    Status supportsBluetoothVariableLatency(bool* support) override;
 private:
     const sp<AudioFlingerServerAdapter::Delegate> mDelegate;
 };
