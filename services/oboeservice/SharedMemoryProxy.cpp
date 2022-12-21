@@ -58,7 +58,7 @@ aaudio_result_t SharedMemoryProxy::open(int originalFD, int32_t capacityInBytes)
     }
 
     // Get original memory address.
-    mOriginalSharedMemory = (uint8_t *) mmap(0, mSharedMemorySizeInBytes,
+    mOriginalSharedMemory = (uint8_t *) mmap(nullptr, mSharedMemorySizeInBytes,
                          PROT_READ|PROT_WRITE,
                          MAP_SHARED,
                          mOriginalFileDescriptor, 0);

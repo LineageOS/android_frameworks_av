@@ -37,7 +37,7 @@
 #include "AAudioServiceEndpointPlay.h"
 #include "AAudioServiceEndpointMMAP.h"
 
-#define AAUDIO_BUFFER_CAPACITY_MIN    4 * 512
+#define AAUDIO_BUFFER_CAPACITY_MIN    (4 * 512)
 #define AAUDIO_SAMPLE_RATE_DEFAULT    48000
 
 // This is an estimate of the time difference between the HW and the MMAP time.
@@ -85,7 +85,7 @@ audio_format_t getNextFormatToTry(audio_format_t curFormat, audio_format_t retur
     return it != NEXT_FORMAT_TO_TRY.end() ? it->second : AUDIO_FORMAT_DEFAULT;
 }
 
-}
+} // namespace
 
 aaudio_result_t AAudioServiceEndpointMMAP::open(const aaudio::AAudioStreamRequest &request) {
     aaudio_result_t result = AAUDIO_OK;
@@ -111,7 +111,7 @@ aaudio_result_t AAudioServiceEndpointMMAP::open(const aaudio::AAudioStreamReques
 
         audio_format_t nextFormatToTry = AUDIO_FORMAT_DEFAULT;
         result = openWithFormat(audioFormat, &nextFormatToTry);
-        if (result == AAUDIO_OK || result != AAUDIO_ERROR_UNAVAILABLE) {
+        if (result != AAUDIO_ERROR_UNAVAILABLE) {
             // Return if it is successful or there is an error that is not
             // AAUDIO_ERROR_UNAVAILABLE happens.
             ALOGI("Opened format=%#x with result=%d", audioFormat, result);
@@ -165,12 +165,12 @@ aaudio_result_t AAudioServiceEndpointMMAP::openWithFormat(
         return AAUDIO_ERROR_ILLEGAL_ARGUMENT;
     }
 
-    MmapStreamInterface::stream_direction_t streamDirection =
+    const MmapStreamInterface::stream_direction_t streamDirection =
             (direction == AAUDIO_DIRECTION_OUTPUT)
             ? MmapStreamInterface::DIRECTION_OUTPUT
             : MmapStreamInterface::DIRECTION_INPUT;
 
-    aaudio_session_id_t requestedSessionId = getSessionId();
+    const aaudio_session_id_t requestedSessionId = getSessionId();
     audio_session_t sessionId = AAudioConvert_aaudioToAndroidSessionId(requestedSessionId);
 
     // Open HAL stream. Set mMmapStream
@@ -178,15 +178,15 @@ aaudio_result_t AAudioServiceEndpointMMAP::openWithFormat(
           "sample_rate=%u, channel_mask=%#x, device=%d",
           __func__, config.format, config.sample_rate,
           config.channel_mask, deviceId);
-    status_t status = MmapStreamInterface::openMmapStream(streamDirection,
-                                                          &attributes,
-                                                          &config,
-                                                          mMmapClient,
-                                                          &deviceId,
-                                                          &sessionId,
-                                                          this, // callback
-                                                          mMmapStream,
-                                                          &mPortHandle);
+    const status_t status = MmapStreamInterface::openMmapStream(streamDirection,
+                                                                &attributes,
+                                                                &config,
+                                                                mMmapClient,
+                                                                &deviceId,
+                                                                &sessionId,
+                                                                this, // callback
+                                                                mMmapStream,
+                                                                &mPortHandle);
     ALOGD("%s() mMapClient.attributionSource = %s => portHandle = %d\n",
           __func__, mMmapClient.attributionSource.toString().c_str(), mPortHandle);
     if (status != OK) {
@@ -209,7 +209,7 @@ aaudio_result_t AAudioServiceEndpointMMAP::openWithFormat(
         ALOGW("%s() - openMmapStream() failed to set sessionId", __func__);
     }
 
-    aaudio_session_id_t actualSessionId =
+    const aaudio_session_id_t actualSessionId =
             (requestedSessionId == AAUDIO_SESSION_ID_NONE)
             ? AAUDIO_SESSION_ID_NONE
             : (aaudio_session_id_t) sessionId;
@@ -278,7 +278,7 @@ aaudio_result_t AAudioServiceEndpointMMAP::startStream(sp<AAudioServiceStreamBas
     if (stream != nullptr) {
         attr = getAudioAttributesFrom(stream.get());
     }
-    aaudio_result_t result = startClient(
+    const aaudio_result_t result = startClient(
             mMmapClient, stream == nullptr ? nullptr : &attr, &tempHandle);
     // When AudioFlinger is passed a valid port handle then it should not change it.
     LOG_ALWAYS_FATAL_IF(tempHandle != mPortHandle,
@@ -288,8 +288,8 @@ aaudio_result_t AAudioServiceEndpointMMAP::startStream(sp<AAudioServiceStreamBas
     return result;
 }
 
-aaudio_result_t AAudioServiceEndpointMMAP::stopStream(sp<AAudioServiceStreamBase> stream,
-                                                  audio_port_handle_t clientHandle __unused) {
+aaudio_result_t AAudioServiceEndpointMMAP::stopStream(sp<AAudioServiceStreamBase> /*stream*/,
+                                                      audio_port_handle_t /*clientHandle*/) {
     mFramesTransferred.reset32();
 
     // Round 64-bit counter up to a multiple of the buffer capacity.
@@ -306,23 +306,21 @@ aaudio_result_t AAudioServiceEndpointMMAP::stopStream(sp<AAudioServiceStreamBase
 aaudio_result_t AAudioServiceEndpointMMAP::startClient(const android::AudioClient& client,
                                                        const audio_attributes_t *attr,
                                                        audio_port_handle_t *clientHandle) {
-    if (mMmapStream == nullptr) return AAUDIO_ERROR_NULL;
-    status_t status = mMmapStream->start(client, attr, clientHandle);
-    return AAudioConvert_androidToAAudioResult(status);
+    return mMmapStream == nullptr
+            ? AAUDIO_ERROR_NULL
+            : AAudioConvert_androidToAAudioResult(mMmapStream->start(client, attr, clientHandle));
 }
 
 aaudio_result_t AAudioServiceEndpointMMAP::stopClient(audio_port_handle_t clientHandle) {
-    if (mMmapStream == nullptr) return AAUDIO_ERROR_NULL;
-    aaudio_result_t result = AAudioConvert_androidToAAudioResult(mMmapStream->stop(clientHandle));
-    return result;
+    return mMmapStream == nullptr
+            ? AAUDIO_ERROR_NULL
+            : AAudioConvert_androidToAAudioResult(mMmapStream->stop(clientHandle));
 }
 
 aaudio_result_t AAudioServiceEndpointMMAP::standby() {
-    if (mMmapStream == nullptr) {
-        return AAUDIO_ERROR_NULL;
-    }
-    aaudio_result_t result = AAudioConvert_androidToAAudioResult(mMmapStream->standby());
-    return result;
+    return mMmapStream == nullptr
+            ? AAUDIO_ERROR_NULL
+            : AAudioConvert_androidToAAudioResult(mMmapStream->standby());
 }
 
 aaudio_result_t AAudioServiceEndpointMMAP::exitStandby(AudioEndpointParcelable* parcelable) {
@@ -330,11 +328,12 @@ aaudio_result_t AAudioServiceEndpointMMAP::exitStandby(AudioEndpointParcelable* 
         return AAUDIO_ERROR_NULL;
     }
     mAudioDataFileDescriptor.reset();
-    aaudio_result_t result = createMmapBuffer(&mAudioDataFileDescriptor);
+    const aaudio_result_t result = createMmapBuffer(&mAudioDataFileDescriptor);
     if (result == AAUDIO_OK) {
-        int32_t bytesPerFrame = calculateBytesPerFrame();
-        int32_t capacityInBytes = getBufferCapacity() * bytesPerFrame;
-        int fdIndex = parcelable->addFileDescriptor(mAudioDataFileDescriptor, capacityInBytes);
+        const int32_t bytesPerFrame = calculateBytesPerFrame();
+        const int32_t capacityInBytes = getBufferCapacity() * bytesPerFrame;
+        const int fdIndex = parcelable->addFileDescriptor(
+                mAudioDataFileDescriptor, capacityInBytes);
         parcelable->mDownDataQueueParcelable.setupMemory(fdIndex, 0, capacityInBytes);
         parcelable->mDownDataQueueParcelable.setBytesPerFrame(bytesPerFrame);
         parcelable->mDownDataQueueParcelable.setFramesPerBurst(mFramesPerBurst);
@@ -350,10 +349,10 @@ aaudio_result_t AAudioServiceEndpointMMAP::getFreeRunningPosition(int64_t *posit
     if (mMmapStream == nullptr) {
         return AAUDIO_ERROR_NULL;
     }
-    status_t status = mMmapStream->getMmapPosition(&position);
+    const status_t status = mMmapStream->getMmapPosition(&position);
     ALOGV("%s() status= %d, pos = %d, nanos = %lld\n",
           __func__, status, position.position_frames, (long long) position.time_nanoseconds);
-    aaudio_result_t result = AAudioConvert_androidToAAudioResult(status);
+    const aaudio_result_t result = AAudioConvert_androidToAAudioResult(status);
     if (result == AAUDIO_ERROR_UNAVAILABLE) {
         ALOGW("%s(): getMmapPosition() has no position data available", __func__);
     } else if (result != AAUDIO_OK) {
@@ -367,8 +366,8 @@ aaudio_result_t AAudioServiceEndpointMMAP::getFreeRunningPosition(int64_t *posit
     return result;
 }
 
-aaudio_result_t AAudioServiceEndpointMMAP::getTimestamp(int64_t *positionFrames,
-                                                    int64_t *timeNanos) {
+aaudio_result_t AAudioServiceEndpointMMAP::getTimestamp(int64_t* /*positionFrames*/,
+                                                        int64_t* /*timeNanos*/) {
     return 0; // TODO
 }
 
@@ -381,7 +380,7 @@ void AAudioServiceEndpointMMAP::handleTearDownAsync(audio_port_handle_t portHand
     } else {
         // Must be a SHARED stream?
         ALOGD("%s(%d) disconnect a specific stream", __func__, portHandle);
-        aaudio_result_t result = mAAudioService.disconnectStreamByPortHandle(portHandle);
+        const aaudio_result_t result = mAAudioService.disconnectStreamByPortHandle(portHandle);
         ALOGD("%s(%d) disconnectStreamByPortHandle returned %d", __func__, portHandle, result);
     }
 };
@@ -389,7 +388,7 @@ void AAudioServiceEndpointMMAP::handleTearDownAsync(audio_port_handle_t portHand
 // This is called by AudioFlinger when it wants to destroy a stream.
 void AAudioServiceEndpointMMAP::onTearDown(audio_port_handle_t portHandle) {
     ALOGD("%s(portHandle = %d) called", __func__, portHandle);
-    android::sp<AAudioServiceEndpointMMAP> holdEndpoint(this);
+    const android::sp<AAudioServiceEndpointMMAP> holdEndpoint(this);
     std::thread asyncTask([holdEndpoint, portHandle]() {
         holdEndpoint->handleTearDownAsync(portHandle);
     });
@@ -398,18 +397,18 @@ void AAudioServiceEndpointMMAP::onTearDown(audio_port_handle_t portHandle) {
 
 void AAudioServiceEndpointMMAP::onVolumeChanged(float volume) {
     ALOGD("%s() volume = %f", __func__, volume);
-    std::lock_guard<std::mutex> lock(mLockStreams);
+    const std::lock_guard<std::mutex> lock(mLockStreams);
     for(const auto& stream : mRegisteredStreams) {
         stream->onVolumeChanged(volume);
     }
 };
 
 void AAudioServiceEndpointMMAP::onRoutingChanged(audio_port_handle_t portHandle) {
-    const int32_t deviceId = static_cast<int32_t>(portHandle);
+    const auto deviceId = static_cast<int32_t>(portHandle);
     ALOGD("%s() called with dev %d, old = %d", __func__, deviceId, getDeviceId());
     if (getDeviceId() != deviceId) {
         if (getDeviceId() != AUDIO_PORT_HANDLE_NONE) {
-            android::sp<AAudioServiceEndpointMMAP> holdEndpoint(this);
+            const android::sp<AAudioServiceEndpointMMAP> holdEndpoint(this);
             std::thread asyncTask([holdEndpoint, deviceId]() {
                 ALOGD("onRoutingChanged() asyncTask launched");
                 holdEndpoint->disconnectRegisteredStreams();
@@ -429,9 +428,9 @@ aaudio_result_t AAudioServiceEndpointMMAP::getDownDataDescription(
         AudioEndpointParcelable* parcelable)
 {
     // Gather information on the data queue based on HAL info.
-    int32_t bytesPerFrame = calculateBytesPerFrame();
-    int32_t capacityInBytes = getBufferCapacity() * bytesPerFrame;
-    int fdIndex = parcelable->addFileDescriptor(mAudioDataFileDescriptor, capacityInBytes);
+    const int32_t bytesPerFrame = calculateBytesPerFrame();
+    const int32_t capacityInBytes = getBufferCapacity() * bytesPerFrame;
+    const int fdIndex = parcelable->addFileDescriptor(mAudioDataFileDescriptor, capacityInBytes);
     parcelable->mDownDataQueueParcelable.setupMemory(fdIndex, 0, capacityInBytes);
     parcelable->mDownDataQueueParcelable.setBytesPerFrame(bytesPerFrame);
     parcelable->mDownDataQueueParcelable.setFramesPerBurst(mFramesPerBurst);
@@ -447,7 +446,7 @@ aaudio_result_t AAudioServiceEndpointMMAP::getExternalPosition(uint64_t *positio
     }
     uint64_t tempPositionFrames;
     int64_t tempTimeNanos;
-    status_t status = mMmapStream->getExternalPosition(&tempPositionFrames, &tempTimeNanos);
+    const status_t status = mMmapStream->getExternalPosition(&tempPositionFrames, &tempTimeNanos);
     if (status != OK) {
         // getExternalPosition reports error. The HAL may not support the API. Cache the result
         // so that the call will not go to the HAL next time.
@@ -527,8 +526,8 @@ aaudio_result_t AAudioServiceEndpointMMAP::createMmapBuffer(
     if (minSizeFrames <= 0) { // zero will get rejected
         minSizeFrames = AAUDIO_BUFFER_CAPACITY_MIN;
     }
-    status_t status = mMmapStream->createMmapBuffer(minSizeFrames, &mMmapBufferinfo);
-    bool isBufferShareable = mMmapBufferinfo.flags & AUDIO_MMAP_APPLICATION_SHAREABLE;
+    const status_t status = mMmapStream->createMmapBuffer(minSizeFrames, &mMmapBufferinfo);
+    const bool isBufferShareable = mMmapBufferinfo.flags & AUDIO_MMAP_APPLICATION_SHAREABLE;
     if (status != OK) {
         ALOGE("%s() - createMmapBuffer() failed with status %d %s",
               __func__, status, strerror(-status));
@@ -545,7 +544,7 @@ aaudio_result_t AAudioServiceEndpointMMAP::createMmapBuffer(
     setBufferCapacity(mMmapBufferinfo.buffer_size_frames);
     if (!isBufferShareable) {
         // Exclusive mode can only be used by the service because the FD cannot be shared.
-        int32_t audioServiceUid =
+        const int32_t audioServiceUid =
             VALUE_OR_FATAL(legacy2aidl_uid_t_int32_t(getuid()));
         if ((mMmapClient.attributionSource.uid != audioServiceUid) &&
             getSharingMode() == AAUDIO_SHARING_MODE_EXCLUSIVE) {

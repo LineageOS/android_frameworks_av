@@ -158,5 +158,5 @@ void *AAudioServiceEndpointPlay::callbackLoop() {
 
     ALOGD("%s() exiting, enabled = %d, state = %d, result = %d <<<<<<<<<<<<< MIXER",
           __func__, mCallbackEnabled.load(), getStreamInternal()->getState(), result);
-    return NULL; // TODO review
+    return nullptr; // TODO review
 }
