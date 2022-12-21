@@ -1161,6 +1161,23 @@ status_t AudioFlinger::PlaybackThread::Track::start(AudioSystem::sync_event_t ev
     }
     if (status == NO_ERROR) {
         forEachTeePatchTrack([](auto patchTrack) { patchTrack->start(); });
+
+        // send format to AudioManager for playback activity monitoring
+        sp<IAudioManager> audioManager = thread->mAudioFlinger->getOrCreateAudioManager();
+        if (audioManager && mPortId != AUDIO_PORT_HANDLE_NONE) {
+            std::unique_ptr<os::PersistableBundle> bundle =
+                    std::make_unique<os::PersistableBundle>();
+        bundle->putBoolean(String16(kExtraPlayerEventSpatializedKey),
+                           isSpatialized());
+        bundle->putInt(String16(kExtraPlayerEventSampleRateKey), mSampleRate);
+        bundle->putInt(String16(kExtraPlayerEventChannelMaskKey), mChannelMask);
+        status_t result = audioManager->portEvent(mPortId,
+                                                  PLAYER_UPDATE_FORMAT, bundle);
+        if (result != OK) {
+            ALOGE("%s: unable to send playback format for port ID %d, status error %d",
+                  __func__, mPortId, result);
+        }
+      }
     }
     return status;
 }
