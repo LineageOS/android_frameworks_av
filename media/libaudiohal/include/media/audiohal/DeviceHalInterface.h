@@ -128,7 +128,7 @@ class DeviceHalInterface : public RefBase
             std::vector<media::audio::common::AudioMMapPolicyInfo> *policyInfos)  = 0;
     virtual int32_t getAAudioMixerBurstCount() = 0;
     virtual int32_t getAAudioHardwareBurstMinUsec() = 0;
-    virtual int32_t supportsBluetoothLatencyModes(bool* supports) = 0;
+    virtual int32_t supportsBluetoothVariableLatency(bool* supports) = 0;
 
     // Update the connection status of an external device.
     virtual status_t setConnectedState(const struct audio_port_v7 *port, bool connected) = 0;

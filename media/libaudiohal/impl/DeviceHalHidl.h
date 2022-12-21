@@ -132,7 +132,7 @@ class DeviceHalHidl : public DeviceHalInterface, public CoreConversionHelperHidl
         return INVALID_OPERATION;
     }
 
-    int32_t supportsBluetoothLatencyModes(bool* supports __unused) override {
+    int32_t supportsBluetoothVariableLatency(bool* supports __unused) override {
         // TODO: Implement the HAL query when moving to AIDL HAL.
         return INVALID_OPERATION;
     }
