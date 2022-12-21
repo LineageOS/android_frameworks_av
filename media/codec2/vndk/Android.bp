@@ -80,6 +80,7 @@ cc_library {
         "libbase",
         "libdmabufheap",
         "android.hardware.media.bufferpool@2.0",
+        "android.hardware.media.bufferpool2-V1-ndk",
     ],
 
     local_include_dirs: [
@@ -94,8 +95,12 @@ cc_library {
     shared_libs: [
         "android.hardware.graphics.bufferqueue@2.0",
         "android.hardware.graphics.common@1.2",
+        "android.hardware.common-V2-ndk",
+        "android.hardware.common.fmq-V1-ndk",
         "android.hardware.media.bufferpool@2.0",
+        "android.hardware.media.bufferpool2-V1-ndk",
         "libbase",
+        "libbinder_ndk",
         "libcutils",
         "libdl",
         "libdmabufheap",
@@ -107,6 +112,7 @@ cc_library {
         "libnativewindow",
         "libstagefright_foundation",
         "libstagefright_bufferpool@2.0.1",
+        "libstagefright_aidl_bufferpool2",
         "libui",
         "libutils",
     ],
@@ -135,6 +141,7 @@ cc_defaults {
         "libnativewindow",
         "libcodec2_soft_common",
         "libsfplugin_ccodec_utils",
+        "libstagefright_aidl_bufferpool2",
         "libstagefright_foundation",
         "libstagefright_bufferpool@2.0.1",
         "libgralloctypes",
@@ -144,9 +151,13 @@ cc_defaults {
         "android.hardware.graphics.allocator@2.0",
         "android.hardware.graphics.allocator@3.0",
         "android.hardware.graphics.bufferqueue@2.0",
+        "android.hardware.common-V2-ndk",
+        "android.hardware.common.fmq-V1-ndk",
+        "android.hardware.media.bufferpool2-V1-ndk",
     ],
 
     shared_libs: [
+        "libbinder_ndk",
         "libui",
         "libdl",
         "libvndksupport",
