@@ -194,6 +194,13 @@ ndk::ScopedAStatus SoundDoseManager::HalSoundDoseCallback::onMomentaryExposureWa
         return ndk::ScopedAStatus::fromExceptionCode(EX_ILLEGAL_STATE);
     }
 
+    std::shared_ptr<ISoundDose> halSoundDose;
+    soundDoseManager->getHalSoundDose(&halSoundDose);
+    if(halSoundDose == nullptr) {
+        ALOGW("%s: HAL sound dose interface deactivated. Ignoring", __func__);
+        return ndk::ScopedAStatus::fromExceptionCode(EX_ILLEGAL_STATE);
+    }
+
     auto id = soundDoseManager->getIdForAudioDevice(in_audioDevice);
     if (id == AUDIO_PORT_HANDLE_NONE) {
         ALOGW("%s: no mapped id for audio device with type %d and address %s",
@@ -213,6 +220,14 @@ ndk::ScopedAStatus SoundDoseManager::HalSoundDoseCallback::onNewMelValues(
     if (soundDoseManager == nullptr) {
         return ndk::ScopedAStatus::fromExceptionCode(EX_ILLEGAL_STATE);
     }
+
+    std::shared_ptr<ISoundDose> halSoundDose;
+    soundDoseManager->getHalSoundDose(&halSoundDose);
+    if(halSoundDose == nullptr) {
+        ALOGW("%s: HAL sound dose interface deactivated. Ignoring", __func__);
+        return ndk::ScopedAStatus::fromExceptionCode(EX_ILLEGAL_STATE);
+    }
+
     auto id = soundDoseManager->getIdForAudioDevice(in_audioDevice);
     if (id == AUDIO_PORT_HANDLE_NONE) {
         ALOGW("%s: no mapped id for audio device with type %d and address %s",
@@ -294,11 +309,14 @@ binder::Status SoundDoseManager::SoundDose::forceComputeCsdOnAllDevices(
 }
 
 void SoundDoseManager::setUseFrameworkMel(bool useFrameworkMel) {
+    // invalidate any HAL sound dose interface used
+    setHalSoundDoseInterface(nullptr);
+
     std::lock_guard _l(mLock);
     mUseFrameworkMel = useFrameworkMel;
 }
 
-bool SoundDoseManager::useFrameworkMel() const {
+bool SoundDoseManager::forceUseFrameworkMel() const {
     std::lock_guard _l(mLock);
     return mUseFrameworkMel;
 }
@@ -308,9 +326,14 @@ void SoundDoseManager::setComputeCsdOnAllDevices(bool computeCsdOnAllDevices) {
     mComputeCsdOnAllDevices = computeCsdOnAllDevices;
 }
 
-bool SoundDoseManager::computeCsdOnAllDevices() const {
+bool SoundDoseManager::forceComputeCsdOnAllDevices() const {
     std::lock_guard _l(mLock);
     return mComputeCsdOnAllDevices;
+}
+
+void SoundDoseManager::getHalSoundDose(std::shared_ptr<ISoundDose>* halSoundDose) const {
+    std::lock_guard _l(mLock);
+    *halSoundDose = mHalSoundDose;
 }
 
 void SoundDoseManager::resetSoundDose() {
