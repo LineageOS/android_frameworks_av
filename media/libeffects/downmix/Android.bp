@@ -47,3 +47,29 @@ cc_library {
         "libhardware_headers",
     ],
 }
+
+cc_library_shared {
+    name: "libdownmixaidl",
+    srcs: [
+        "aidl/EffectDownmix.cpp",
+        "aidl/DownmixContext.cpp",
+        ":effectCommonFile",
+    ],
+    defaults: [
+        "aidlaudioservice_defaults",
+        "latest_android_hardware_audio_effect_ndk_shared",
+        "latest_android_media_audio_common_types_ndk_shared",
+    ],
+    header_libs: [
+        "libaudioeffects",
+        "libhardware_headers"
+    ],
+    shared_libs: [
+        "libaudioutils",
+        "libcutils",
+        "liblog",
+    ],
+    visibility: [
+        "//hardware/interfaces/audio/aidl/default",
+    ],
+}

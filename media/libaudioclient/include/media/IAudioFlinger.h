@@ -268,8 +268,6 @@ public:
 
     virtual status_t closeInput(audio_io_handle_t input) = 0;
 
-    virtual status_t invalidateStream(audio_stream_type_t stream) = 0;
-
     virtual status_t setVoiceVolume(float volume) = 0;
 
     virtual status_t getRenderPosition(uint32_t *halFrames, uint32_t *dspFrames,
@@ -374,6 +372,12 @@ public:
 
     virtual status_t getSoundDoseInterface(const sp<media::ISoundDoseCallback>& callback,
                                            sp<media::ISoundDose>* soundDose) = 0;
+
+    virtual status_t invalidateTracks(const std::vector<audio_port_handle_t>& portIds) = 0;
+
+    virtual status_t setBluetoothLatencyModesEnabled(bool enabled) = 0;
+
+    virtual status_t supportsBluetoothLatencyModes(bool* support) = 0;
 };
 
 /**
@@ -428,7 +432,6 @@ public:
     status_t openInput(const media::OpenInputRequest& request,
                        media::OpenInputResponse* response) override;
     status_t closeInput(audio_io_handle_t input) override;
-    status_t invalidateStream(audio_stream_type_t stream) override;
     status_t setVoiceVolume(float volume) override;
     status_t getRenderPosition(uint32_t* halFrames, uint32_t* dspFrames,
                                audio_io_handle_t output) const override;
@@ -480,8 +483,11 @@ public:
             audio_latency_mode_t mode) override;
     status_t getSupportedLatencyModes(
             audio_io_handle_t output, std::vector<audio_latency_mode_t>* modes) override;
+    status_t setBluetoothLatencyModesEnabled(bool enabled) override;
+    status_t supportsBluetoothLatencyModes(bool* support) override;
     status_t getSoundDoseInterface(const sp<media::ISoundDoseCallback>& callback,
                                    sp<media::ISoundDose>* soundDose) override;
+    status_t invalidateTracks(const std::vector<audio_port_handle_t>& portIds) override;
 
 private:
     const sp<media::IAudioFlingerService> mDelegate;
@@ -535,7 +541,6 @@ public:
             RESTORE_OUTPUT = media::BnAudioFlingerService::TRANSACTION_restoreOutput,
             OPEN_INPUT = media::BnAudioFlingerService::TRANSACTION_openInput,
             CLOSE_INPUT = media::BnAudioFlingerService::TRANSACTION_closeInput,
-            INVALIDATE_STREAM = media::BnAudioFlingerService::TRANSACTION_invalidateStream,
             SET_VOICE_VOLUME = media::BnAudioFlingerService::TRANSACTION_setVoiceVolume,
             GET_RENDER_POSITION = media::BnAudioFlingerService::TRANSACTION_getRenderPosition,
             GET_INPUT_FRAMES_LOST = media::BnAudioFlingerService::TRANSACTION_getInputFramesLost,
@@ -573,7 +578,12 @@ public:
             SET_DEVICE_CONNECTED_STATE = media::BnAudioFlingerService::TRANSACTION_setDeviceConnectedState,
             SET_REQUESTED_LATENCY_MODE = media::BnAudioFlingerService::TRANSACTION_setRequestedLatencyMode,
             GET_SUPPORTED_LATENCY_MODES = media::BnAudioFlingerService::TRANSACTION_getSupportedLatencyModes,
+            SET_BLUETOOTH_LATENCY_MODES_ENABLED =
+                    media::BnAudioFlingerService::TRANSACTION_setBluetoothLatencyModesEnabled,
+            SUPPORTS_BLUETOOTH_LATENCY_MODES =
+                    media::BnAudioFlingerService::TRANSACTION_supportsBluetoothLatencyModes,
             GET_SOUND_DOSE_INTERFACE = media::BnAudioFlingerService::TRANSACTION_getSoundDoseInterface,
+            INVALIDATE_TRACKS = media::BnAudioFlingerService::TRANSACTION_invalidateTracks,
         };
 
     protected:
@@ -653,7 +663,6 @@ public:
     Status openInput(const media::OpenInputRequest& request,
                      media::OpenInputResponse* _aidl_return) override;
     Status closeInput(int32_t input) override;
-    Status invalidateStream(media::audio::common::AudioStreamType stream) override;
     Status setVoiceVolume(float volume) override;
     Status getRenderPosition(int32_t output, media::RenderPosition* _aidl_return) override;
     Status getInputFramesLost(int32_t ioHandle, int32_t* _aidl_return) override;
@@ -698,8 +707,11 @@ public:
     Status setRequestedLatencyMode(int output, media::LatencyMode mode) override;
     Status getSupportedLatencyModes(int output,
             std::vector<media::LatencyMode>* _aidl_return) override;
+    Status setBluetoothLatencyModesEnabled(bool enabled) override;
+    Status supportsBluetoothLatencyModes(bool* support) override;
     Status getSoundDoseInterface(const sp<media::ISoundDoseCallback>& callback,
                                  sp<media::ISoundDose>* _aidl_return) override;
+    Status invalidateTracks(const std::vector<int32_t>& portIds) override;
 private:
     const sp<AudioFlingerServerAdapter::Delegate> mDelegate;
 };

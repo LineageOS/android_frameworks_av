@@ -210,8 +210,6 @@ public:
 
     virtual status_t closeInput(audio_io_handle_t input);
 
-    virtual status_t invalidateStream(audio_stream_type_t stream);
-
     virtual status_t setVoiceVolume(float volume);
 
     virtual status_t getRenderPosition(uint32_t *halFrames, uint32_t *dspFrames,
@@ -307,8 +305,14 @@ public:
     virtual status_t getSupportedLatencyModes(audio_io_handle_t output,
             std::vector<audio_latency_mode_t>* modes);
 
+    virtual status_t setBluetoothLatencyModesEnabled(bool enabled);
+
+    virtual status_t supportsBluetoothLatencyModes(bool* support);
+
     virtual status_t getSoundDoseInterface(const sp<media::ISoundDoseCallback>& callback,
                                            sp<media::ISoundDose>* soundDose);
+
+    status_t invalidateTracks(const std::vector<audio_port_handle_t>& portIds) override;
 
     status_t onTransactWrapper(TransactionCode code, const Parcel& data, uint32_t flags,
         const std::function<status_t()>& delegate) override;
@@ -1053,6 +1057,9 @@ private:
 
     /** Interface for interacting with the AudioService. */
     mediautils::atomic_sp<IAudioManager>       mAudioManager;
+
+    // Bluetooth Variable latency control logic is enabled or disabled
+    std::atomic_bool mBluetoothLatencyModesEnabled;
 };
 
 #undef INCLUDING_FROM_AUDIOFLINGER_H

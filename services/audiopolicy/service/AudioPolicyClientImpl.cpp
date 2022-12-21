@@ -174,16 +174,6 @@ status_t AudioPolicyService::AudioPolicyClient::setStreamVolume(audio_stream_typ
                                                delay_ms);
 }
 
-status_t AudioPolicyService::AudioPolicyClient::invalidateStream(audio_stream_type_t stream)
-{
-    sp<IAudioFlinger> af = AudioSystem::get_audio_flinger();
-    if (af == 0) {
-        return PERMISSION_DENIED;
-    }
-
-    return af->invalidateStream(stream);
-}
-
 void AudioPolicyService::AudioPolicyClient::setParameters(audio_io_handle_t io_handle,
                    const String8& keyValuePairs,
                    int delay_ms)
@@ -326,6 +316,16 @@ status_t AudioPolicyService::AudioPolicyClient::setDeviceConnectedState(
         return PERMISSION_DENIED;
     }
     return af->setDeviceConnectedState(port, connected);
+}
+
+status_t AudioPolicyService::AudioPolicyClient::invalidateTracks(
+        const std::vector<audio_port_handle_t>& portIds) {
+    sp<IAudioFlinger> af = AudioSystem::get_audio_flinger();
+    if (af == 0) {
+        return PERMISSION_DENIED;
+    }
+
+    return af->invalidateTracks(portIds);
 }
 
 

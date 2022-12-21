@@ -2089,7 +2089,8 @@ AudioFlinger::PlaybackThread::PlaybackThread(const sp<AudioFlinger>& audioFlinge
         mHwSupportsPause(false), mHwPaused(false), mFlushPending(false),
         mLeftVolFloat(-1.0), mRightVolFloat(-1.0),
         mDownStreamPatch{},
-        mIsTimestampAdvancing(kMinimumTimeBetweenTimestampChecksNs)
+        mIsTimestampAdvancing(kMinimumTimeBetweenTimestampChecksNs),
+        mBluetoothLatencyModesEnabled(true)
 {
     snprintf(mThreadName, kThreadNameLength, "AudioOut_%X", id);
     mNBLogWriter = audioFlinger->newWriter_l(kLogSize, mThreadName);
@@ -3569,6 +3570,28 @@ void AudioFlinger::PlaybackThread::invalidateTracks(audio_stream_type_t streamTy
 {
     Mutex::Autolock _l(mLock);
     invalidateTracks_l(streamType);
+}
+
+void AudioFlinger::PlaybackThread::invalidateTracks(std::set<audio_port_handle_t>& portIds) {
+    Mutex::Autolock _l(mLock);
+    invalidateTracks_l(portIds);
+}
+
+bool AudioFlinger::PlaybackThread::invalidateTracks_l(std::set<audio_port_handle_t>& portIds) {
+    bool trackMatch = false;
+    const size_t size = mTracks.size();
+    for (size_t i = 0; i < size; i++) {
+        sp<Track> t = mTracks[i];
+        if (t->isExternalTrack() && portIds.find(t->portId()) != portIds.end()) {
+            t->invalidate();
+            portIds.erase(t->portId());
+            trackMatch = true;
+        }
+        if (portIds.empty()) {
+            break;
+        }
+    }
+    return trackMatch;
 }
 
 // getTrackById_l must be called with holding thread lock
@@ -7218,6 +7241,13 @@ void AudioFlinger::OffloadThread::invalidateTracks(audio_stream_type_t streamTyp
     }
 }
 
+void AudioFlinger::OffloadThread::invalidateTracks(std::set<audio_port_handle_t>& portIds) {
+    Mutex::Autolock _l(mLock);
+    if (PlaybackThread::invalidateTracks_l(portIds)) {
+        mFlushPending = true;
+    }
+}
+
 // ----------------------------------------------------------------------------
 
 AudioFlinger::DuplicatingThread::DuplicatingThread(const sp<AudioFlinger>& audioFlinger,
@@ -7569,6 +7599,15 @@ status_t AudioFlinger::SpatializerThread::getSupportedLatencyModes(
     }
     Mutex::Autolock _l(mLock);
     *modes = mSupportedLatencyModes;
+    return NO_ERROR;
+}
+
+status_t AudioFlinger::PlaybackThread::setBluetoothLatencyModesEnabled(bool enabled) {
+    if (mOutput == nullptr || mOutput->audioHwDev == nullptr
+            || !mOutput->audioHwDev->supportsBluetoothLatencyModes()) {
+        return INVALID_OPERATION;
+    }
+    mBluetoothLatencyModesEnabled.store(enabled);
     return NO_ERROR;
 }
 
@@ -10558,6 +10597,25 @@ void AudioFlinger::MmapPlaybackThread::invalidateTracks(audio_stream_type_t stre
         for (const sp<MmapTrack> &track : mActiveTracks) {
             track->invalidate();
         }
+        broadcast_l();
+    }
+}
+
+void AudioFlinger::MmapPlaybackThread::invalidateTracks(std::set<audio_port_handle_t>& portIds)
+{
+    Mutex::Autolock _l(mLock);
+    bool trackMatch = false;
+    for (const sp<MmapTrack> &track : mActiveTracks) {
+        if (portIds.find(track->portId()) != portIds.end()) {
+            track->invalidate();
+            trackMatch = true;
+            portIds.erase(track->portId());
+        }
+        if (portIds.empty()) {
+            break;
+        }
+    }
+    if (trackMatch) {
         broadcast_l();
     }
 }

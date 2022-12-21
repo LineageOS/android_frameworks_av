@@ -134,8 +134,6 @@ interface IAudioFlingerService {
     OpenInputResponse openInput(in OpenInputRequest request);
     void closeInput(int /* audio_io_handle_t */ input);
 
-    void invalidateStream(AudioStreamType stream);
-
     void setVoiceVolume(float volume);
 
     RenderPosition getRenderPosition(int /* audio_io_handle_t */ output);
@@ -249,10 +247,30 @@ interface IAudioFlingerService {
     LatencyMode[] getSupportedLatencyModes(int output);
 
     /**
+     * Requests if the implementation supports controlling the latency modes
+     * over the Bleutooth A2DP or LE Audio links. If it does,
+     * setRequestedLatencyMode() and getSupportedLatencyModes() APIs can also be used
+     * for streams routed to Bluetooth and not just for the spatializer output.
+     */
+     boolean supportsBluetoothLatencyModes();
+
+    /**
+     * Enables or disables the variable Bluetooth latency control mechanism in the
+     * audio framework and the audio HAL. This does not apply to the latency mode control
+     * on the spatializer output with is a built-in feature.
+     */
+    void setBluetoothLatencyModesEnabled(boolean enabled);
+
+    /**
      * Registers the sound dose callback and returns the interface for executing
      * sound dose methods on the audio server.
      */
     ISoundDose getSoundDoseInterface(in ISoundDoseCallback callback);
+
+    /**
+     * Invalidate all tracks with given port ids.
+     */
+    void invalidateTracks(in int[] /* audio_port_handle_t[] */ portIds);
 
     // When adding a new method, please review and update
     // IAudioFlinger.h AudioFlingerServerAdapter::Delegate::TransactionCode

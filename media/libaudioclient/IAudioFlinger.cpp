@@ -493,12 +493,6 @@ status_t AudioFlingerClientAdapter::closeInput(audio_io_handle_t input) {
     return statusTFromBinderStatus(mDelegate->closeInput(inputAidl));
 }
 
-status_t AudioFlingerClientAdapter::invalidateStream(audio_stream_type_t stream) {
-    AudioStreamType streamAidl = VALUE_OR_RETURN_STATUS(
-            legacy2aidl_audio_stream_type_t_AudioStreamType(stream));
-    return statusTFromBinderStatus(mDelegate->invalidateStream(streamAidl));
-}
-
 status_t AudioFlingerClientAdapter::setVoiceVolume(float volume) {
     return statusTFromBinderStatus(mDelegate->setVoiceVolume(volume));
 }
@@ -852,10 +846,33 @@ status_t AudioFlingerClientAdapter::getSupportedLatencyModes(
     return NO_ERROR;
 }
 
+status_t AudioFlingerClientAdapter::setBluetoothLatencyModesEnabled(bool enabled) {
+    return statusTFromBinderStatus(mDelegate->setBluetoothLatencyModesEnabled(enabled));
+}
+
+status_t AudioFlingerClientAdapter::supportsBluetoothLatencyModes(bool* support) {
+    if (support == nullptr) {
+        return BAD_VALUE;
+    }
+
+    RETURN_STATUS_IF_ERROR(statusTFromBinderStatus(
+            mDelegate->supportsBluetoothLatencyModes(support)));
+
+    return NO_ERROR;
+}
+
 status_t AudioFlingerClientAdapter::getSoundDoseInterface(
         const sp<media::ISoundDoseCallback> &callback,
         sp<media::ISoundDose>* soundDose) {
     return statusTFromBinderStatus(mDelegate->getSoundDoseInterface(callback, soundDose));
+}
+
+status_t AudioFlingerClientAdapter::invalidateTracks(
+        const std::vector<audio_port_handle_t>& portIds) {
+    std::vector<int32_t> portIdsAidl = VALUE_OR_RETURN_STATUS(
+            convertContainer<std::vector<int32_t>>(
+                    portIds, legacy2aidl_audio_port_handle_t_int32_t));
+    return statusTFromBinderStatus(mDelegate->invalidateTracks(portIdsAidl));
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////
@@ -1088,12 +1105,6 @@ Status AudioFlingerServerAdapter::closeInput(int32_t input) {
     audio_io_handle_t inputLegacy = VALUE_OR_RETURN_BINDER(
             aidl2legacy_int32_t_audio_io_handle_t(input));
     return Status::fromStatusT(mDelegate->closeInput(inputLegacy));
-}
-
-Status AudioFlingerServerAdapter::invalidateStream(AudioStreamType stream) {
-    audio_stream_type_t streamLegacy = VALUE_OR_RETURN_BINDER(
-            aidl2legacy_AudioStreamType_audio_stream_type_t(stream));
-    return Status::fromStatusT(mDelegate->invalidateStream(streamLegacy));
 }
 
 Status AudioFlingerServerAdapter::setVoiceVolume(float volume) {
@@ -1378,11 +1389,27 @@ Status AudioFlingerServerAdapter::getSupportedLatencyModes(
     return Status::ok();
 }
 
+Status AudioFlingerServerAdapter::setBluetoothLatencyModesEnabled(bool enabled) {
+    return Status::fromStatusT(mDelegate->setBluetoothLatencyModesEnabled(enabled));
+}
+
+Status AudioFlingerServerAdapter::supportsBluetoothLatencyModes(bool *support) {
+    return Status::fromStatusT(mDelegate->supportsBluetoothLatencyModes(support));
+}
+
 Status AudioFlingerServerAdapter::getSoundDoseInterface(
         const sp<media::ISoundDoseCallback>& callback,
         sp<media::ISoundDose>* soundDose)
 {
     return Status::fromStatusT(mDelegate->getSoundDoseInterface(callback, soundDose));
+}
+
+Status AudioFlingerServerAdapter::invalidateTracks(const std::vector<int32_t>& portIds) {
+    std::vector<audio_port_handle_t> portIdsLegacy = VALUE_OR_RETURN_BINDER(
+            convertContainer<std::vector<audio_port_handle_t>>(
+                    portIds, aidl2legacy_int32_t_audio_port_handle_t));
+    RETURN_BINDER_IF_ERROR(mDelegate->invalidateTracks(portIdsLegacy));
+    return Status::ok();
 }
 
 } // namespace android

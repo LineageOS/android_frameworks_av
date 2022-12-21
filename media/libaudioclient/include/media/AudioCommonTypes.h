@@ -94,6 +94,7 @@ const product_strategy_t PRODUCT_STRATEGY_NONE = static_cast<product_strategy_t>
 
 using AttributesVector = std::vector<audio_attributes_t>;
 using StreamTypeVector = std::vector<audio_stream_type_t>;
+using PortHandleVector = std::vector<audio_port_handle_t>;
 
 using TrackSecondaryOutputsMap = std::map<audio_port_handle_t, std::vector<audio_io_handle_t>>;
 
