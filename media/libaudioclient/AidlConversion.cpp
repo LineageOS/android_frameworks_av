@@ -1091,80 +1091,6 @@ legacy2aidl_product_strategy_t_int32_t(product_strategy_t legacy) {
     return convertReinterpret<int32_t>(legacy);
 }
 
-ConversionResult<audio_dual_mono_mode_t>
-aidl2legacy_AudioDualMonoMode_audio_dual_mono_mode_t(media::AudioDualMonoMode aidl) {
-    switch (aidl) {
-        case media::AudioDualMonoMode::OFF:
-            return AUDIO_DUAL_MONO_MODE_OFF;
-        case media::AudioDualMonoMode::LR:
-            return AUDIO_DUAL_MONO_MODE_LR;
-        case media::AudioDualMonoMode::LL:
-            return AUDIO_DUAL_MONO_MODE_LL;
-        case media::AudioDualMonoMode::RR:
-            return AUDIO_DUAL_MONO_MODE_RR;
-    }
-    return unexpected(BAD_VALUE);
-}
-
-ConversionResult<media::AudioDualMonoMode>
-legacy2aidl_audio_dual_mono_mode_t_AudioDualMonoMode(audio_dual_mono_mode_t legacy) {
-    switch (legacy) {
-        case AUDIO_DUAL_MONO_MODE_OFF:
-            return media::AudioDualMonoMode::OFF;
-        case AUDIO_DUAL_MONO_MODE_LR:
-            return media::AudioDualMonoMode::LR;
-        case AUDIO_DUAL_MONO_MODE_LL:
-            return media::AudioDualMonoMode::LL;
-        case AUDIO_DUAL_MONO_MODE_RR:
-            return media::AudioDualMonoMode::RR;
-    }
-    return unexpected(BAD_VALUE);
-}
-
-ConversionResult<audio_timestretch_fallback_mode_t>
-aidl2legacy_int32_t_audio_timestretch_fallback_mode_t(int32_t aidl) {
-    return convertReinterpret<audio_timestretch_fallback_mode_t>(aidl);
-}
-
-ConversionResult<int32_t>
-legacy2aidl_audio_timestretch_fallback_mode_t_int32_t(audio_timestretch_fallback_mode_t legacy) {
-    return convertReinterpret<int32_t>(legacy);
-}
-
-ConversionResult<audio_timestretch_stretch_mode_t>
-aidl2legacy_int32_t_audio_timestretch_stretch_mode_t(int32_t aidl) {
-    return convertReinterpret<audio_timestretch_stretch_mode_t>(aidl);
-}
-
-ConversionResult<int32_t>
-legacy2aidl_audio_timestretch_stretch_mode_t_int32_t(audio_timestretch_stretch_mode_t legacy) {
-    return convertReinterpret<int32_t>(legacy);
-}
-
-ConversionResult<audio_playback_rate_t>
-aidl2legacy_AudioPlaybackRate_audio_playback_rate_t(const media::AudioPlaybackRate& aidl) {
-    audio_playback_rate_t legacy;
-    legacy.mSpeed = aidl.speed;
-    legacy.mPitch = aidl.pitch;
-    legacy.mFallbackMode = VALUE_OR_RETURN(
-            aidl2legacy_int32_t_audio_timestretch_fallback_mode_t(aidl.fallbackMode));
-    legacy.mStretchMode = VALUE_OR_RETURN(
-            aidl2legacy_int32_t_audio_timestretch_stretch_mode_t(aidl.stretchMode));
-    return legacy;
-}
-
-ConversionResult<media::AudioPlaybackRate>
-legacy2aidl_audio_playback_rate_t_AudioPlaybackRate(const audio_playback_rate_t& legacy) {
-    media::AudioPlaybackRate aidl;
-    aidl.speed = legacy.mSpeed;
-    aidl.pitch = legacy.mPitch;
-    aidl.fallbackMode = VALUE_OR_RETURN(
-            legacy2aidl_audio_timestretch_fallback_mode_t_int32_t(legacy.mFallbackMode));
-    aidl.stretchMode = VALUE_OR_RETURN(
-            legacy2aidl_audio_timestretch_stretch_mode_t_int32_t(legacy.mStretchMode));
-    return aidl;
-}
-
 ConversionResult<TrackSecondaryOutputInfoPair>
 aidl2legacy_TrackSecondaryOutputInfo_TrackSecondaryOutputInfoPair(
         const media::TrackSecondaryOutputInfo& aidl) {
@@ -1236,26 +1162,5 @@ ConversionResult<int32_t> legacy2aidl_audio_direct_mode_t_int32_t_mask(audio_dir
             legacyMask, legacy2aidl_audio_direct_mode_t_AudioDirectMode,
             indexToEnum_bitmask<audio_direct_mode_t>,
             enumToMask_index<int32_t, media::AudioDirectMode>);
-}
-
-ConversionResult<audio_latency_mode_t>
-aidl2legacy_LatencyMode_audio_latency_mode_t(media::LatencyMode aidl) {
-    switch (aidl) {
-        case media::LatencyMode::FREE:
-            return AUDIO_LATENCY_MODE_FREE;
-        case media::LatencyMode::LOW:
-            return AUDIO_LATENCY_MODE_LOW;
-    }
-    return unexpected(BAD_VALUE);
-}
-ConversionResult<media::LatencyMode>
-legacy2aidl_audio_latency_mode_t_LatencyMode(audio_latency_mode_t legacy) {
-    switch (legacy) {
-        case AUDIO_LATENCY_MODE_FREE:
-            return media::LatencyMode::FREE;
-        case AUDIO_LATENCY_MODE_LOW:
-            return media::LatencyMode::LOW;
-    }
-    return unexpected(BAD_VALUE);
 }
 }  // namespace android
