@@ -47,7 +47,7 @@ class BundleContext final : public EffectContext {
     RetCode disable();
     RetCode disableOperatingMode();
 
-    void setSampleRate (const int sampleRate) { mSampleRate = sampleRate; }
+    void setSampleRate(const int sampleRate) { mSampleRate = sampleRate; }
     int getSampleRate() const { return mSampleRate; }
 
     void setChannelMask(const aidl::android::media::audio::common::AudioChannelLayout& chMask) {
@@ -57,6 +57,8 @@ class BundleContext final : public EffectContext {
         return mChMask;
     }
     bool isDeviceSupportedBassBoost(
+            const aidl::android::media::audio::common::AudioDeviceDescription& device);
+    bool isDeviceSupportedVirtualizer(
             const aidl::android::media::audio::common::AudioDeviceDescription& device);
     RetCode setOutputDevice(
             const aidl::android::media::audio::common::AudioDeviceDescription& device) override;
@@ -68,6 +70,9 @@ class BundleContext final : public EffectContext {
 
     RetCode setBassBoostStrength(int strength);
     int getBassBoostStrength() const { return mBassStrengthSaved; }
+
+    RetCode setVirtualizerStrength(int strength);
+    int getVirtualizerStrength() const { return mVirtStrengthSaved; }
 
     RetCode setVolumeStereo(const Parameter::VolumeStereo& volumeStereo) override;
     Parameter::VolumeStereo getVolumeStereo() override { return mVolumeStereo; }
