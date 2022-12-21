@@ -191,8 +191,8 @@ NuPlayerDrm::CryptoInfo *NuPlayerDrm::makeCryptoInfo(
         uint8_t key[kBlockSize],
         uint8_t iv[kBlockSize],
         CryptoPlugin::Mode mode,
-        size_t *clearbytes,
-        size_t *encryptedbytes)
+        uint32_t *clearbytes,
+        uint32_t *encryptedbytes)
 {
     // size needed to store all the crypto data
     size_t cryptosize;
@@ -236,7 +236,7 @@ NuPlayerDrm::CryptoInfo *NuPlayerDrm::getSampleCryptoInfo(MetaDataBase &meta)
     if (!meta.findData(kKeyEncryptedSizes, &type, &crypteddata, &cryptedsize)) {
         return NULL;
     }
-    size_t numSubSamples = cryptedsize / sizeof(size_t);
+    size_t numSubSamples = cryptedsize / sizeof(uint32_t);
 
     if (numSubSamples <= 0) {
         ALOGE("getSampleCryptoInfo INVALID numSubSamples: %zu", numSubSamples);
@@ -285,8 +285,8 @@ NuPlayerDrm::CryptoInfo *NuPlayerDrm::getSampleCryptoInfo(MetaDataBase &meta)
             (uint8_t*) key,
             (uint8_t*) iv,
             (CryptoPlugin::Mode)mode,
-            (size_t*) cleardata,
-            (size_t*) crypteddata);
+            (uint32_t*) cleardata,
+            (uint32_t*) crypteddata);
 }
 
 }   // namespace android
