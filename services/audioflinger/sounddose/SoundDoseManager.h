@@ -82,6 +82,9 @@ class SoundDoseManager : public audio_utils::MelProcessor::MelCallback {
 
     // used for testing
     size_t getCachedMelRecordsSize() const;
+    bool useFrameworkMel() const;
+    bool computeCsdOnAllDevices() const;
+
 
     /** Method for converting from audio_utils::CsdRecord to media::SoundDoseRecord. */
     static media::SoundDoseRecord csdRecordToSoundDoseRecord(const audio_utils::CsdRecord& legacy);
@@ -107,6 +110,10 @@ private:
         binder::Status setOutputRs2(float value) override;
         binder::Status resetCsd(float currentCsd,
                                 const std::vector<media::SoundDoseRecord>& records) override;
+        binder::Status getOutputRs2(float* value);
+        binder::Status getCsd(float* value);
+        binder::Status forceUseFrameworkMel(bool useFrameworkMel);
+        binder::Status forceComputeCsdOnAllDevices(bool computeCsdOnAllDevices);
 
         wp<SoundDoseManager> mSoundDoseManager;
         const sp<media::ISoundDoseCallback> mSoundDoseCallback;
@@ -117,7 +124,10 @@ private:
     void resetCsd(float currentCsd, const std::vector<media::SoundDoseRecord>& records);
 
     sp<media::ISoundDoseCallback> getSoundDoseCallback() const;
-    
+
+    void setUseFrameworkMel(bool useFrameworkMel);
+    void setComputeCsdOnAllDevices(bool computeCsdOnAllDevices);
+
     mutable std::mutex mLock;
 
     // no need for lock since MelAggregator is thread-safe
@@ -129,6 +139,9 @@ private:
     float mRs2Value GUARDED_BY(mLock);
 
     sp<SoundDose> mSoundDose GUARDED_BY(mLock);
+
+    bool mUseFrameworkMel GUARDED_BY(mLock);
+    bool mComputeCsdOnAllDevices GUARDED_BY(mLock);
 };
 
 }  // namespace android

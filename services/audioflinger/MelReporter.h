@@ -39,7 +39,7 @@ public:
     }
 
     /** Returns true if we should compute MEL for the given device. */
-    static bool shouldComputeMelForDeviceType(audio_devices_t device);
+    bool shouldComputeMelForDeviceType(audio_devices_t device);
 
     // For now only support internal MelReporting
     [[nodiscard]] bool isHalReportingEnabled() const { return false; }

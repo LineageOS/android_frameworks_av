@@ -27,6 +27,10 @@
 namespace android {
 
 bool AudioFlinger::MelReporter::shouldComputeMelForDeviceType(audio_devices_t device) {
+    if (mSoundDoseManager.computeCsdOnAllDevices()) {
+        return true;
+    }
+
     switch (device) {
         case AUDIO_DEVICE_OUT_WIRED_HEADSET:
         case AUDIO_DEVICE_OUT_WIRED_HEADPHONE:

@@ -117,6 +117,64 @@ binder::Status SoundDoseManager::SoundDose::resetCsd(
     return binder::Status::ok();
 }
 
+binder::Status SoundDoseManager::SoundDose::getOutputRs2(float* value) {
+    ALOGV("%s", __func__);
+    auto soundDoseManager = mSoundDoseManager.promote();
+    if (soundDoseManager != nullptr) {
+        std::lock_guard _l(soundDoseManager->mLock);
+        *value = soundDoseManager->mRs2Value;
+    }
+    return binder::Status::ok();
+}
+
+binder::Status SoundDoseManager::SoundDose::getCsd(float* value) {
+    ALOGV("%s", __func__);
+    auto soundDoseManager = mSoundDoseManager.promote();
+    if (soundDoseManager != nullptr) {
+        *value = soundDoseManager->mMelAggregator->getCsd();
+    }
+    return binder::Status::ok();
+}
+
+binder::Status SoundDoseManager::SoundDose::forceUseFrameworkMel(bool useFrameworkMel) {
+    ALOGV("%s", __func__);
+    auto soundDoseManager = mSoundDoseManager.promote();
+    if (soundDoseManager != nullptr) {
+        soundDoseManager->setUseFrameworkMel(useFrameworkMel);
+    }
+    return binder::Status::ok();
+}
+
+binder::Status SoundDoseManager::SoundDose::forceComputeCsdOnAllDevices(
+        bool computeCsdOnAllDevices) {
+    ALOGV("%s", __func__);
+    auto soundDoseManager = mSoundDoseManager.promote();
+    if (soundDoseManager != nullptr) {
+        soundDoseManager->setComputeCsdOnAllDevices(computeCsdOnAllDevices);
+    }
+    return binder::Status::ok();
+}
+
+void SoundDoseManager::setUseFrameworkMel(bool useFrameworkMel) {
+    std::lock_guard _l(mLock);
+    mUseFrameworkMel = useFrameworkMel;
+}
+
+bool SoundDoseManager::useFrameworkMel() const {
+    std::lock_guard _l(mLock);
+    return mUseFrameworkMel;
+}
+
+void SoundDoseManager::setComputeCsdOnAllDevices(bool computeCsdOnAllDevices) {
+    std::lock_guard _l(mLock);
+    mComputeCsdOnAllDevices = computeCsdOnAllDevices;
+}
+
+bool SoundDoseManager::computeCsdOnAllDevices() const {
+    std::lock_guard _l(mLock);
+    return mComputeCsdOnAllDevices;
+}
+
 void SoundDoseManager::resetSoundDose() {
     std::lock_guard lock(mLock);
     mSoundDose = nullptr;
