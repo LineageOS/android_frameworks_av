@@ -104,11 +104,10 @@ public:
 
     std::string dump() const;
 
-    // used for testing
+    // used for testing only
     size_t getCachedMelRecordsSize() const;
-    bool useFrameworkMel() const;
-    bool computeCsdOnAllDevices() const;
-
+    bool forceUseFrameworkMel() const;
+    bool forceComputeCsdOnAllDevices() const;
 
     /** Method for converting from audio_utils::CsdRecord to media::SoundDoseRecord. */
     static media::SoundDoseRecord csdRecordToSoundDoseRecord(const audio_utils::CsdRecord& legacy);
@@ -166,6 +165,8 @@ private:
 
     void setUseFrameworkMel(bool useFrameworkMel);
     void setComputeCsdOnAllDevices(bool computeCsdOnAllDevices);
+    /** Returns the HAL sound dose interface or null if internal MEL computation is used. */
+    void getHalSoundDose(std::shared_ptr<ISoundDose>* halSoundDose) const;
 
     mutable std::mutex mLock;
 
@@ -185,8 +186,8 @@ private:
     std::shared_ptr<ISoundDose> mHalSoundDose GUARDED_BY(mLock);
     std::shared_ptr<HalSoundDoseCallback> mHalSoundDoseCallback GUARDED_BY(mLock);
 
-    bool mUseFrameworkMel GUARDED_BY(mLock);
-    bool mComputeCsdOnAllDevices GUARDED_BY(mLock);
+    bool mUseFrameworkMel GUARDED_BY(mLock) = false;
+    bool mComputeCsdOnAllDevices GUARDED_BY(mLock) = false;
 };
 
 }  // namespace android

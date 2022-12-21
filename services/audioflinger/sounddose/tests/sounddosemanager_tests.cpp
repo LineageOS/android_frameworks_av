@@ -154,6 +154,28 @@ TEST_F(SoundDoseManagerTest, MomentaryExposureFromHalWithNoAddressIllegalArgumen
     EXPECT_FALSE(status.isOk());
 }
 
+TEST_F(SoundDoseManagerTest, MomentaryExposureFromHalAfterInternalSelectedReturnsException) {
+    std::shared_ptr<ISoundDose::IHalSoundDoseCallback> halCallback;
+
+    EXPECT_CALL(*mHalSoundDose.get(), setOutputRs2).Times(1);
+    EXPECT_CALL(*mHalSoundDose.get(), registerSoundDoseCallback)
+       .Times(1)
+       .WillOnce([&] (const std::shared_ptr<ISoundDose::IHalSoundDoseCallback>& callback) {
+           halCallback = callback;
+           return ndk::ScopedAStatus::ok();
+       });
+
+    EXPECT_TRUE(mSoundDoseManager->setHalSoundDoseInterface(mHalSoundDose));
+    EXPECT_NE(nullptr, halCallback);
+    EXPECT_FALSE(mSoundDoseManager->setHalSoundDoseInterface(nullptr));
+
+    AudioDevice audioDevice = {};
+    audioDevice.address.set<AudioDeviceAddress::id>("test");
+    auto status = halCallback->onMomentaryExposureWarning(
+        /*in_currentDbA=*/101.f, audioDevice);
+    EXPECT_FALSE(status.isOk());
+}
+
 TEST_F(SoundDoseManagerTest, OnNewMelValuesFromHalWithNoAddressIllegalArgument) {
     std::shared_ptr<ISoundDose::IHalSoundDoseCallback> halCallback;
 
@@ -205,6 +227,14 @@ TEST_F(SoundDoseManagerTest, GetUnmappedIdReturnsHandleNone) {
     audioDevice.address.set<AudioDeviceAddress::id>(address);
 
     EXPECT_EQ(AUDIO_PORT_HANDLE_NONE, mSoundDoseManager->getIdForAudioDevice(audioDevice));
+}
+
+TEST_F(SoundDoseManagerTest, GetDefaultForceComputeCsdOnAllDevices) {
+    EXPECT_FALSE(mSoundDoseManager->forceComputeCsdOnAllDevices());
+}
+
+TEST_F(SoundDoseManagerTest, GetDefaultForceUseFrameworkMel) {
+    EXPECT_FALSE(mSoundDoseManager->forceUseFrameworkMel());
 }
 
 }  // namespace

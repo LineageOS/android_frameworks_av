@@ -33,8 +33,14 @@ namespace android {
 constexpr std::string_view kSoundDoseInterfaceModule = "/default";
 
 bool AudioFlinger::MelReporter::activateHalSoundDoseComputation(const std::string& module) {
+    if (mSoundDoseManager->forceUseFrameworkMel()) {
+        ALOGD("%s: Forcing use of internal MEL computation.", __func__);
+        activateInternalSoundDoseComputation();
+        return false;
+    }
+
     if (mSoundDoseFactory == nullptr) {
-        ALOGW("%s sound dose HAL reporting not available", __func__);
+        ALOGW("%s: sound dose HAL reporting not available", __func__);
         activateInternalSoundDoseComputation();
         return false;
     }
@@ -42,14 +48,14 @@ bool AudioFlinger::MelReporter::activateHalSoundDoseComputation(const std::strin
     std::shared_ptr<ISoundDose> soundDoseInterface;
     auto result = mSoundDoseFactory->getSoundDose(module, &soundDoseInterface);
     if (!result.isOk()) {
-        ALOGW("%s HAL cannot provide sound dose interface for module %s",
+        ALOGW("%s: HAL cannot provide sound dose interface for module %s",
               __func__, module.c_str());
         activateInternalSoundDoseComputation();
         return false;
     }
 
     if (!mSoundDoseManager->setHalSoundDoseInterface(soundDoseInterface)) {
-        ALOGW("%s cannot activate HAL MEL reporting for module %s", __func__, module.c_str());
+        ALOGW("%s: cannot activate HAL MEL reporting for module %s", __func__, module.c_str());
         activateInternalSoundDoseComputation();
         return false;
     }
@@ -61,10 +67,16 @@ bool AudioFlinger::MelReporter::activateHalSoundDoseComputation(const std::strin
 }
 
 void AudioFlinger::MelReporter::activateInternalSoundDoseComputation() {
-    mSoundDoseManager->setHalSoundDoseInterface(nullptr);
+    {
+        std::lock_guard _l(mLock);
+        if (!mUseHalSoundDoseInterface) {
+            // no need to start internal MEL on active patches
+            return;
+        }
+        mUseHalSoundDoseInterface = false;
+    }
 
-    std::lock_guard _l(mLock);
-    mUseHalSoundDoseInterface = false;
+    mSoundDoseManager->setHalSoundDoseInterface(nullptr);
 
     for (const auto& activePatches : mActiveMelPatches) {
         for (const auto& deviceId : activePatches.second.deviceHandles) {
@@ -88,7 +100,7 @@ void AudioFlinger::MelReporter::onFirstRef() {
 }
 
 bool AudioFlinger::MelReporter::shouldComputeMelForDeviceType(audio_devices_t device) {
-    if (mSoundDoseManager->computeCsdOnAllDevices()) {
+    if (mSoundDoseManager->forceComputeCsdOnAllDevices()) {
         return true;
     }
 
@@ -130,10 +142,10 @@ void AudioFlinger::MelReporter::onCreateAudioPatch(audio_patch_handle_t handle,
                                     patch.mAudioPatch.sinks[i].ext.device.address};
             mSoundDoseManager->mapAddressToDeviceId(adt, deviceId);
 
-            bool useHalSoundDoseInterface;
+            bool useHalSoundDoseInterface = !mSoundDoseManager->forceUseFrameworkMel();
             {
                 std::lock_guard _l(mLock);
-                useHalSoundDoseInterface = mUseHalSoundDoseInterface;
+                useHalSoundDoseInterface &= mUseHalSoundDoseInterface;
             }
             if (!useHalSoundDoseInterface) {
                 startMelComputationForNewPatch(streamHandle, deviceId);
