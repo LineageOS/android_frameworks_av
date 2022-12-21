@@ -17,8 +17,11 @@
 
 #pragma once
 
+#include <aidl/android/hardware/audio/core/ISoundDose.h>
+#include <aidl/android/media/audio/common/AudioDevice.h>
 #include <android/media/BnSoundDose.h>
 #include <android/media/ISoundDoseCallback.h>
+#include <media/AudioDeviceTypeAddr.h>
 #include <audio_utils/MelAggregator.h>
 #include <audio_utils/MelProcessor.h>
 #include <binder/Status.h>
@@ -27,8 +30,10 @@
 
 namespace android {
 
+using aidl::android::hardware::audio::core::ISoundDose;
+
 class SoundDoseManager : public audio_utils::MelProcessor::MelCallback {
-  public:
+public:
     /** CSD is computed with a rolling window of 7 days. */
     static constexpr int64_t kCsdWindowSeconds = 604800;  // 60s * 60m * 24h * 7d
     /** Default RS2 value in dBA as defined in IEC 62368-1 3rd edition. */
@@ -36,13 +41,13 @@ class SoundDoseManager : public audio_utils::MelProcessor::MelCallback {
 
     SoundDoseManager()
         : mMelAggregator(sp<audio_utils::MelAggregator>::make(kCsdWindowSeconds)),
-          mRs2Value(kDefaultRs2Value){};
+          mRs2Value(kDefaultRs2Value) {};
 
     /**
      * \brief Creates or gets the MelProcessor assigned to the streamHandle
      *
      * \param deviceId          id for the devices where the stream is active.
-     * \param streanHandle      handle to the stream
+     * \param streamHandle      handle to the stream
      * \param sampleRate        sample rate for the processor
      * \param channelCount      number of channels to be processed.
      * \param format            format of the input samples.
@@ -58,7 +63,7 @@ class SoundDoseManager : public audio_utils::MelProcessor::MelCallback {
     /**
      * \brief Removes stream processor when MEL computation is not needed anymore
      *
-     * \param streanHandle      handle to the stream
+     * \param streamHandle      handle to the stream
      */
     void removeStreamProcessor(audio_io_handle_t streamHandle);
 
@@ -77,6 +82,25 @@ class SoundDoseManager : public audio_utils::MelProcessor::MelCallback {
      * \returns the sound dose binder to send commands to the SoundDoseManager
      **/
     sp<media::ISoundDose> getSoundDoseInterface(const sp<media::ISoundDoseCallback>& callback);
+
+    /**
+     * Sets the HAL sound dose interface to use for the MEL computation. Use nullptr
+     * for using the internal MEL computation.
+     *
+     * @return true if setting the HAL sound dose value was successful, false otherwise.
+     */
+    bool setHalSoundDoseInterface(const std::shared_ptr<ISoundDose>& halSoundDose);
+
+    /** Returns the cached audio port id from the active devices. */
+    audio_port_handle_t getIdForAudioDevice(
+            const aidl::android::media::audio::common::AudioDevice& audioDevice) const;
+
+    /** Caches mapping between address and device port id. */
+    void mapAddressToDeviceId(const AudioDeviceTypeAddr& adt,
+                              const audio_port_handle_t deviceId);
+
+    /** Clear all map entries with passed audio_port_handle_t. */
+    void clearMapDeviceIdEntries(audio_port_handle_t deviceId);
 
     std::string dump() const;
 
@@ -101,7 +125,7 @@ private:
     public:
         SoundDose(SoundDoseManager* manager, const sp<media::ISoundDoseCallback>& callback)
             : mSoundDoseManager(manager),
-              mSoundDoseCallback(callback) {};
+              mSoundDoseCallback(callback) {}
 
         /** IBinder::DeathRecipient. Listen to the death of ISoundDoseCallback. */
         virtual void binderDied(const wp<IBinder>& who);
@@ -117,6 +141,21 @@ private:
 
         wp<SoundDoseManager> mSoundDoseManager;
         const sp<media::ISoundDoseCallback> mSoundDoseCallback;
+    };
+
+    class HalSoundDoseCallback : public ISoundDose::BnHalSoundDoseCallback {
+    public:
+        explicit HalSoundDoseCallback(SoundDoseManager* manager)
+            : mSoundDoseManager(manager) {}
+
+        ndk::ScopedAStatus onMomentaryExposureWarning(
+                float in_currentDbA,
+                const aidl::android::media::audio::common::AudioDevice& in_audioDevice) override;
+        ndk::ScopedAStatus onNewMelValues(
+                const ISoundDose::IHalSoundDoseCallback::MelRecord& in_melRecord,
+                const aidl::android::media::audio::common::AudioDevice& in_audioDevice) override;
+
+        wp<SoundDoseManager> mSoundDoseManager;
     };
 
     void resetSoundDose();
@@ -136,9 +175,15 @@ private:
     std::unordered_map<audio_io_handle_t, wp<audio_utils::MelProcessor>> mActiveProcessors
             GUARDED_BY(mLock);
 
+    // map active device address and type to device id
+    std::map<AudioDeviceTypeAddr, audio_port_handle_t> mActiveDevices GUARDED_BY(mLock);
+
     float mRs2Value GUARDED_BY(mLock);
 
     sp<SoundDose> mSoundDose GUARDED_BY(mLock);
+
+    std::shared_ptr<ISoundDose> mHalSoundDose GUARDED_BY(mLock);
+    std::shared_ptr<HalSoundDoseCallback> mHalSoundDoseCallback GUARDED_BY(mLock);
 
     bool mUseFrameworkMel GUARDED_BY(mLock);
     bool mComputeCsdOnAllDevices GUARDED_BY(mLock);
