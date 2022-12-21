@@ -17,6 +17,7 @@
 
 #include <hidl/AidlCameraDeviceCallbacks.h>
 #include <hidl/Utils.h>
+#include <aidl/AidlUtils.h>
 
 namespace android {
 namespace frameworks {
@@ -144,7 +145,7 @@ void H2BCameraDeviceCallbacks::CallbackHandler::processResultMessage(
 
     // Convert Metadata into HCameraMetadata;
     FmqSizeOrMetadata hResult;
-    using hardware::cameraservice::utils::conversion::filterVndkKeys;
+    using hardware::cameraservice::utils::conversion::aidl::filterVndkKeys;
     if (filterVndkKeys(mVndkVersion, result, /*isStatic*/false) != OK) {
         ALOGE("%s: filtering vndk keys from result failed, not sending onResultReceived callback",
                 __FUNCTION__);

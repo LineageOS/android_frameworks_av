@@ -16,66 +16,75 @@
 
 #define LOG_TAG "ACameraVendorUtils"
 
-#include <utils/Log.h>
-
 #include "utils.h"
+
+#include <aidlcommonsupport/NativeHandle.h>
+#include <utils/Log.h>
 
 namespace android {
 namespace acam {
 namespace utils {
 
-// Convert CaptureRequest wrappable by sp<> to hidl CaptureRequest.
-frameworks::cameraservice::device::V2_0::CaptureRequest
-convertToHidl(const CaptureRequest *captureRequest) {
-    frameworks::cameraservice::device::V2_0::CaptureRequest hCaptureRequest;
-    hCaptureRequest.physicalCameraSettings = captureRequest->mCaptureRequest.physicalCameraSettings;
-    hCaptureRequest.streamAndWindowIds = captureRequest->mCaptureRequest.streamAndWindowIds;
-    return hCaptureRequest;
+// Convert CaptureRequest wrappable by sp<> to aidl CaptureRequest.
+AidlCaptureRequest convertToAidl(const CaptureRequest *captureRequest) {
+    AidlCaptureRequest aidlCaptureRequest;
+    aidlCaptureRequest.physicalCameraSettings =
+            captureRequest->mCaptureRequest.physicalCameraSettings;
+    aidlCaptureRequest.streamAndWindowIds = captureRequest->mCaptureRequest.streamAndWindowIds;
+    return aidlCaptureRequest;
 }
 
-HRotation convertToHidl(int rotation) {
-    HRotation hRotation = HRotation::R0;
+OutputConfiguration::Rotation convertToAidl(int rotation) {
+    using AidlRotation = OutputConfiguration::Rotation;
+
+    AidlRotation aRot = AidlRotation ::R0;
     switch(rotation) {
         case CAMERA3_STREAM_ROTATION_90:
-            hRotation = HRotation::R90;
+            aRot = AidlRotation::R90;
             break;
         case CAMERA3_STREAM_ROTATION_180:
-            hRotation = HRotation::R180;
+            aRot = AidlRotation::R180;
             break;
         case CAMERA3_STREAM_ROTATION_270:
-            hRotation = HRotation::R270;
+            aRot = AidlRotation::R270;
             break;
         default:
             break;
     }
-    return hRotation;
+    return aRot;
 }
 
-bool convertFromHidlCloned(const HCameraMetadata &metadata, CameraMetadata *rawMetadata) {
-    const camera_metadata *buffer = (camera_metadata_t*)(metadata.data());
-    size_t expectedSize = metadata.size();
+bool cloneFromAidl(const AidlCameraMetadata& srcMetadata, camera_metadata_t** dst) {
+    const camera_metadata *buffer = (camera_metadata_t*)(srcMetadata.metadata.data());
+    size_t expectedSize = srcMetadata.metadata.size();
     int ret = validate_camera_metadata_structure(buffer, &expectedSize);
-    if (ret == OK || ret == CAMERA_METADATA_VALIDATION_SHIFTED) {
-        *rawMetadata = buffer;
-    } else {
-        ALOGE("%s: Malformed camera metadata received from caller", __FUNCTION__);
+    if (ret != OK && ret != CAMERA_METADATA_VALIDATION_SHIFTED) {
+        ALOGE("%s: Malformed camera srcMetadata received from caller", __FUNCTION__);
         return false;
     }
-    return true;
+
+    camera_metadata_t* clonedBuffer = clone_camera_metadata(buffer);
+    if (clonedBuffer != nullptr) {
+        *dst = clonedBuffer;
+        return true;
+    }
+
+    ALOGE("%s: Failed to clone srcMetadata buffer.", __FUNCTION__);
+    return false;
 }
 
-// Note: existing data in dst will be gone. dst owns memory if shouldOwn is set
-//       to true.
-void convertToHidl(const camera_metadata_t *src, HCameraMetadata* dst, bool shouldOwn) {
+// Note: existing data in dst will be gone.
+void convertToAidl(const camera_metadata_t *src, AidlCameraMetadata* dst) {
     if (src == nullptr) {
         return;
     }
     size_t size = get_camera_metadata_size(src);
-    dst->setToExternal((uint8_t *) src, size, shouldOwn);
-    return;
+    uint8_t* metadataStart = (uint8_t*)src;
+    uint8_t* metadataEnd = metadataStart + size;
+    dst->metadata.assign(metadataStart, metadataEnd);
 }
 
-TemplateId convertToHidl(ACameraDevice_request_template templateId) {
+TemplateId convertToAidl(ACameraDevice_request_template templateId) {
     switch(templateId) {
         case TEMPLATE_STILL_CAPTURE:
             return TemplateId::STILL_CAPTURE;
@@ -92,7 +101,7 @@ TemplateId convertToHidl(ACameraDevice_request_template templateId) {
     }
 }
 
-camera_status_t convertFromHidl(Status status) {
+camera_status_t convertFromAidl(Status status) {
     camera_status_t ret = ACAMERA_OK;
     switch(status) {
         case Status::NO_ERROR:
@@ -146,6 +155,14 @@ bool isWindowNativeHandleEqual(const native_handle_t *nh1, const native_handle_t
     return true;
 }
 
+bool isWindowNativeHandleEqual(const native_handle_t *nh1,
+                               const aidl::android::hardware::common::NativeHandle& nh2) {
+    native_handle_t* tempNh = makeFromAidl(nh2);
+    bool equal = isWindowNativeHandleEqual(nh1, tempNh);
+    native_handle_delete(tempNh);
+    return equal;
+}
+
 bool isWindowNativeHandleLessThan(const native_handle_t *nh1, const native_handle_t *nh2) {
     if (isWindowNativeHandleEqual(nh1, nh2)) {
         return false;
@@ -164,32 +181,6 @@ bool isWindowNativeHandleLessThan(const native_handle_t *nh1, const native_handl
 
 bool isWindowNativeHandleGreaterThan(const native_handle_t *nh1, const native_handle_t *nh2) {
     return !isWindowNativeHandleLessThan(nh1, nh2) && !isWindowNativeHandleEqual(nh1, nh2);
-}
-
-bool areWindowNativeHandlesEqual(hidl_vec<hidl_handle> handles1, hidl_vec<hidl_handle> handles2) {
-    if (handles1.size() != handles2.size()) {
-        return false;
-    }
-    for (int i = 0; i < handles1.size(); i++) {
-        if (!isWindowNativeHandleEqual(handles1[i], handles2[i])) {
-            return false;
-        }
-    }
-    return true;
-}
-
-bool areWindowNativeHandlesLessThan(hidl_vec<hidl_handle> handles1, hidl_vec<hidl_handle>handles2) {
-    if (handles1.size() != handles2.size()) {
-        return handles1.size() < handles2.size();
-    }
-    for (int i = 0; i < handles1.size(); i++) {
-        const native_handle_t *handle1 = handles1[i].getNativeHandle();
-        const native_handle_t *handle2 = handles2[i].getNativeHandle();
-        if (!isWindowNativeHandleEqual(handle1, handle2)) {
-            return isWindowNativeHandleLessThan(handle1, handle2);
-        }
-    }
-    return false;
 }
 
 } // namespace utils

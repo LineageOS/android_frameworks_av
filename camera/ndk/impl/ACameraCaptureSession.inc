@@ -15,9 +15,8 @@
  */
 
 #include "ACameraCaptureSession.h"
-
 #ifdef __ANDROID_VNDK__
-#include "ndk_vendor/impl/ACameraDeviceVendor.inc"
+#include <ndk_vendor/impl/ACameraDeviceVendor.inc>
 #else
 #include "ACameraDevice.inc"
 #endif
@@ -30,7 +29,11 @@ ACameraCaptureSession::setRepeatingRequest(
         /*optional*/T* cbs,
         int numRequests, ACaptureRequest** requests,
         /*optional*/int* captureSequenceId) {
+#ifdef __ANDROID_VNDK__
+    std::shared_ptr<acam::CameraDevice> dev = getDevicePtr();
+#else
     sp<acam::CameraDevice> dev = getDeviceSp();
+#endif
     if (dev == nullptr) {
         ALOGE("Error: Device associated with session %p has been closed!", this);
         return ACAMERA_ERROR_SESSION_CLOSED;
@@ -52,7 +55,11 @@ camera_status_t ACameraCaptureSession::capture(
         /*optional*/T* cbs,
         int numRequests, ACaptureRequest** requests,
         /*optional*/int* captureSequenceId) {
+#ifdef __ANDROID_VNDK__
+    std::shared_ptr<acam::CameraDevice> dev = getDevicePtr();
+#else
     sp<acam::CameraDevice> dev = getDeviceSp();
+#endif
     if (dev == nullptr) {
         ALOGE("Error: Device associated with session %p has been closed!", this);
         return ACAMERA_ERROR_SESSION_CLOSED;
