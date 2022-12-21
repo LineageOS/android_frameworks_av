@@ -47,9 +47,8 @@ public:
             bool hasDeferredConsumer, uint32_t width, uint32_t height, int format,
             camera_stream_rotation_t rotation, int *id, const String8& physicalCameraId,
             const std::unordered_set<int32_t> &sensorPixelModesUsed,
-            std::vector<int> *surfaceIds,
-            int streamSetId, bool isShared, int32_t colorSpace,
-            int64_t dynamicProfile, int64_t streamUseCase) override;
+            std::vector<int> *surfaceIds, int streamSetId, bool isShared, int32_t colorSpace,
+            int64_t dynamicProfile, int64_t streamUseCase, bool useReadoutTimestamp) override;
 
     status_t deleteInternalStreams() override;
 
