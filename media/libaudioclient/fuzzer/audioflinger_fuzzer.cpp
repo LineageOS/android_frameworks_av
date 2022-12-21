@@ -584,7 +584,12 @@ void AudioFlingerFuzzer::invokeAudioSystem() {
 
     float balance = mFdp.ConsumeFloatingPoint<float>();
     af->getMasterBalance(&balance);
-    af->invalidateStream(static_cast<audio_stream_type_t>(mFdp.ConsumeIntegral<uint32_t>()));
+
+    std::vector<audio_port_handle_t> tracks;
+    for (int i = 0; i < mFdp.ConsumeIntegralInRange<int32_t>(0, MAX_ARRAY_LENGTH); ++i) {
+        tracks.push_back(static_cast<audio_port_handle_t>(mFdp.ConsumeIntegral<int32_t>()));
+    }
+    af->invalidateTracks(tracks);
 }
 
 status_t AudioFlingerFuzzer::invokeAudioInputDevice() {

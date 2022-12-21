@@ -820,7 +820,7 @@ void AudioPolicyManager::setPhoneState(audio_mode_t state)
     if (isStateInCall(oldState)) {
         ALOGV("setPhoneState() in call state management: new state is %d", state);
         // force reevaluating accessibility routing when call stops
-        mpClientInterface->invalidateStream(AUDIO_STREAM_ACCESSIBILITY);
+        invalidateStreams({AUDIO_STREAM_ACCESSIBILITY});
     }
 
     /**
@@ -903,7 +903,7 @@ void AudioPolicyManager::setPhoneState(audio_mode_t state)
     if (isStateInCall(state)) {
         ALOGV("setPhoneState() in call state management: new state is %d", state);
         // force reevaluating accessibility routing when call starts
-        mpClientInterface->invalidateStream(AUDIO_STREAM_ACCESSIBILITY);
+        invalidateStreams({AUDIO_STREAM_ACCESSIBILITY});
     }
 
     // Flag that ringtone volume must be limited to music volume until we exit MODE_RINGTONE
@@ -936,8 +936,7 @@ void AudioPolicyManager::setForceUse(audio_policy_force_use_t usage,
 
     // force client reconnection to reevaluate flag AUDIO_FLAG_AUDIBILITY_ENFORCED
     if (usage == AUDIO_POLICY_FORCE_FOR_SYSTEM) {
-        mpClientInterface->invalidateStream(AUDIO_STREAM_SYSTEM);
-        mpClientInterface->invalidateStream(AUDIO_STREAM_ENFORCED_AUDIBLE);
+        invalidateStreams({AUDIO_STREAM_SYSTEM, AUDIO_STREAM_ENFORCED_AUDIBLE});
     }
 
     //FIXME: workaround for truncated touch sounds
@@ -2298,7 +2297,7 @@ status_t AudioPolicyManager::startSource(const sp<SwAudioOutputDescriptor>& outp
 
         // force reevaluating accessibility routing when ringtone or alarm starts
         if (followsSameRouting(clientAttr, attributes_initializer(AUDIO_USAGE_ALARM))) {
-            mpClientInterface->invalidateStream(AUDIO_STREAM_ACCESSIBILITY);
+            invalidateStreams({AUDIO_STREAM_ACCESSIBILITY});
         }
 
         if (waitMs > muteWaitMs) {
@@ -5183,9 +5182,7 @@ void AudioPolicyManager::checkStrategyRoute(product_strategy_t ps, audio_io_hand
         // invalidate all tracks in this strategy to force re connection.
         // Otherwise select new device on the output mix.
         if (outputs.indexOf(mOutputs.keyAt(j)) < 0) {
-            for (auto stream : mEngine->getStreamTypesForProductStrategy(ps)) {
-                mpClientInterface->invalidateStream(stream);
-            }
+            invalidateStreams(mEngine->getStreamTypesForProductStrategy(ps));
         } else {
             DeviceVector newDevices = getNewOutputDevices(outputDesc, false /*fromCache*/);
             if (outputDesc->mUsePreferredMixerAttributes && outputDesc->devices() != newDevices) {
@@ -5753,9 +5750,7 @@ void AudioPolicyManager::checkVirtualizerClientRoutes() {
         }
     }
 
-    for (audio_stream_type_t stream : streamsToInvalidate) {
-        mpClientInterface->invalidateStream(stream);
-    }
+    invalidateStreams(StreamTypeVector(streamsToInvalidate.begin(), streamsToInvalidate.end()));
 }
 
 
@@ -6769,9 +6764,7 @@ void AudioPolicyManager::checkOutputForAttributes(const audio_attributes_t &attr
         }
         // Move tracks associated to this stream (and linked) from previous output to new output
         if (!invalidatedOutputs.empty()) {
-            for (auto stream :  mEngine->getStreamTypesForProductStrategy(psId)) {
-                mpClientInterface->invalidateStream(stream);
-            }
+            invalidateStreams(mEngine->getStreamTypesForProductStrategy(psId));
             for (sp<SwAudioOutputDescriptor> desc : invalidatedOutputs) {
                 desc->setTracksInvalidatedStatusByStrategy(psId);
             }
@@ -6789,7 +6782,7 @@ void AudioPolicyManager::checkOutputForAllStrategies()
 }
 
 void AudioPolicyManager::checkSecondaryOutputs() {
-    std::set<audio_stream_type_t> streamsToInvalidate;
+    PortHandleVector clientsToInvalidate;
     TrackSecondaryOutputsMap trackSecondaryOutputs;
     for (size_t i = 0; i < mOutputs.size(); i++) {
         const sp<SwAudioOutputDescriptor>& outputDescriptor = mOutputs[i];
@@ -6807,8 +6800,11 @@ void AudioPolicyManager::checkSecondaryOutputs() {
                 }
             }
 
-            if (status != OK) {
-                streamsToInvalidate.insert(client->stream());
+            if (status != OK &&
+                (client->flags() & AUDIO_OUTPUT_FLAG_MMAP_NOIRQ) == AUDIO_OUTPUT_FLAG_NONE) {
+                // When it failed to query secondary output, only invalidate the client that is not
+                // MMAP. The reason is that MMAP stream will not support secondary output.
+                clientsToInvalidate.push_back(client->portId());
             } else if (!std::equal(
                     client->getSecondaryOutputs().begin(),
                     client->getSecondaryOutputs().end(),
@@ -6816,7 +6812,7 @@ void AudioPolicyManager::checkSecondaryOutputs() {
                 if (!audio_is_linear_pcm(client->config().format)) {
                     // If the format is not PCM, the tracks should be invalidated to get correct
                     // behavior when the secondary output is changed.
-                    streamsToInvalidate.insert(client->stream());
+                    clientsToInvalidate.push_back(client->portId());
                 } else {
                     std::vector<wp<SwAudioOutputDescriptor>> weakSecondaryDescs;
                     std::vector<audio_io_handle_t> secondaryOutputIds;
@@ -6833,9 +6829,9 @@ void AudioPolicyManager::checkSecondaryOutputs() {
     if (!trackSecondaryOutputs.empty()) {
         mpClientInterface->updateSecondaryOutputs(trackSecondaryOutputs);
     }
-    for (audio_stream_type_t stream : streamsToInvalidate) {
-        ALOGD("%s Invalidate stream %d due to fail getting output for attr", __func__, stream);
-        mpClientInterface->invalidateStream(stream);
+    if (!clientsToInvalidate.empty()) {
+        ALOGD("%s Invalidate clients due to fail getting output for attr", __func__);
+        mpClientInterface->invalidateTracks(clientsToInvalidate);
     }
 }
 
@@ -8330,6 +8326,25 @@ void AudioPolicyManager::reopenOutputsWithDevices(
         closeOutput(output);
         openOutputWithProfileAndDevice(desc->mProfile, devices);
     }
+}
+
+PortHandleVector AudioPolicyManager::getClientsForStream(
+        audio_stream_type_t streamType) const {
+    PortHandleVector clients;
+    for (size_t i = 0; i < mOutputs.size(); ++i) {
+        PortHandleVector clientsForStream = mOutputs.valueAt(i)->getClientsForStream(streamType);
+        clients.insert(clients.end(), clientsForStream.begin(), clientsForStream.end());
+    }
+    return clients;
+}
+
+void AudioPolicyManager::invalidateStreams(StreamTypeVector streams) const {
+    PortHandleVector clients;
+    for (auto stream : streams) {
+        PortHandleVector clientsForStream = getClientsForStream(stream);
+        clients.insert(clients.end(), clientsForStream.begin(), clientsForStream.end());
+    }
+    mpClientInterface->invalidateTracks(clients);
 }
 
 } // namespace android
