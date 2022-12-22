@@ -121,7 +121,7 @@ static const Descriptor kVirtualizerDesc = {
                    .implementor = "NXP Software Ltd."},
         .capability = Capability::make<Capability::virtualizer>(kVirtualizerCap)};
 
-static const Volume::Capability kVolumeCap = {.maxLevel = Volume::MAX_LEVEL_DB};
+static const Volume::Capability kVolumeCap = {.minLevelDb = -9600, .maxLevelDb = 0};
 
 static const std::string kVolumeEffectName = "Volume";
 
