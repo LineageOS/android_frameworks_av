@@ -16,6 +16,7 @@
 
 #include "utils.h"
 
+using ::android::acam::utils::native_handle_ptr_wrapper;
 struct ACameraOutputTarget {
     explicit ACameraOutputTarget(const native_handle_t* window) : mWindow(window) {};
 
@@ -32,5 +33,5 @@ struct ACameraOutputTarget {
         return mWindow > other.mWindow;
     }
 
-    android::acam::utils::native_handle_ptr_wrapper mWindow;
+    native_handle_ptr_wrapper mWindow;
 };
