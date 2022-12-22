@@ -60,8 +60,6 @@ bool AudioFlinger::MelReporter::activateHalSoundDoseComputation(const std::strin
         return false;
     }
 
-    std::lock_guard _l(mLock);
-    mUseHalSoundDoseInterface = true;
     stopInternalMelComputation();
     return true;
 }
@@ -77,12 +75,6 @@ void AudioFlinger::MelReporter::activateInternalSoundDoseComputation() {
     }
 
     mSoundDoseManager->setHalSoundDoseInterface(nullptr);
-
-    for (const auto& activePatches : mActiveMelPatches) {
-        for (const auto& deviceId : activePatches.second.deviceHandles) {
-            startMelComputationForNewPatch(activePatches.second.streamHandle, deviceId);
-        }
-    }
 }
 
 void AudioFlinger::MelReporter::onFirstRef() {
@@ -205,16 +197,9 @@ sp<media::ISoundDose> AudioFlinger::MelReporter::getSoundDoseInterface(
 
 void AudioFlinger::MelReporter::stopInternalMelComputation() {
     ALOGV("%s", __func__);
-    std::unordered_map<audio_patch_handle_t, ActiveMelPatch> activePatchesCopy;
-    {
-        std::lock_guard _l(mLock);
-        activePatchesCopy = mActiveMelPatches;
-        mActiveMelPatches.clear();
-    }
-
-    for (const auto& activePatch : activePatchesCopy) {
-        stopInternalMelComputationForStream(activePatch.second.streamHandle);
-    }
+    std::lock_guard _l(mLock);
+    mActiveMelPatches.clear();
+    mUseHalSoundDoseInterface = true;
 }
 
 void AudioFlinger::MelReporter::stopInternalMelComputationForStream(audio_io_handle_t streamId) {
