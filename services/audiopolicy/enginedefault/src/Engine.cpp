@@ -730,38 +730,6 @@ audio_devices_t Engine::getPreferredDeviceTypeForLegacyStrategy(
     return AUDIO_DEVICE_NONE;
 }
 
-DeviceVector Engine::getPreferredAvailableDevicesForProductStrategy(
-        const DeviceVector& availableOutputDevices, product_strategy_t strategy) const {
-    DeviceVector preferredAvailableDevVec = {};
-    AudioDeviceTypeAddrVector preferredStrategyDevices;
-    const status_t status = getDevicesForRoleAndStrategy(
-            strategy, DEVICE_ROLE_PREFERRED, preferredStrategyDevices);
-    if (status == NO_ERROR) {
-        // there is a preferred device, is it available?
-        preferredAvailableDevVec =
-                availableOutputDevices.getDevicesFromDeviceTypeAddrVec(preferredStrategyDevices);
-        if (preferredAvailableDevVec.size() == preferredStrategyDevices.size()) {
-            ALOGVV("%s using pref device %s for strategy %u",
-                   __func__, preferredAvailableDevVec.toString().c_str(), strategy);
-            return preferredAvailableDevVec;
-        }
-    }
-    return preferredAvailableDevVec;
-}
-
-DeviceVector Engine::getDisabledDevicesForProductStrategy(
-        const DeviceVector &availableOutputDevices, product_strategy_t strategy) const {
-    DeviceVector disabledDevices = {};
-    AudioDeviceTypeAddrVector disabledDevicesTypeAddr;
-    const status_t status = getDevicesForRoleAndStrategy(
-            strategy, DEVICE_ROLE_DISABLED, disabledDevicesTypeAddr);
-    if (status == NO_ERROR) {
-        disabledDevices =
-                availableOutputDevices.getDevicesFromDeviceTypeAddrVec(disabledDevicesTypeAddr);
-    }
-    return disabledDevices;
-}
-
 DeviceVector Engine::getDevicesForProductStrategy(product_strategy_t strategy) const {
     const SwAudioOutputCollection& outputs = getApmObserver()->getOutputs();
 
