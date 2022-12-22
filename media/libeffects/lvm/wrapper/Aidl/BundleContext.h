@@ -71,6 +71,12 @@ class BundleContext final : public EffectContext {
     RetCode setBassBoostStrength(int strength);
     int getBassBoostStrength() const { return mBassStrengthSaved; }
 
+    RetCode setVolumeLevel(int level);
+    int getVolumeLevel() const;
+
+    RetCode setVolumeMute(bool mute);
+    int getVolumeMute() const { return mMuteEnabled; }
+
     RetCode setVirtualizerStrength(int strength);
     int getVirtualizerStrength() const { return mVirtStrengthSaved; }
 
@@ -106,7 +112,7 @@ class BundleContext final : public EffectContext {
     int mEffectProcessCalled = 0;
     int mNumberEffectsEnabled = 0;
     int mNumberEffectsCalled = 0;
-    bool mFirstVolume = false;
+    bool mFirstVolume = true;
     // Bass
     bool mBassTempDisabled = false;
     int mBassStrengthSaved = 0;
@@ -118,6 +124,7 @@ class BundleContext final : public EffectContext {
     bool mVirtualizerTempDisabled = false;
     // Volume
     int mLevelSaved = 0; /* for when mute is set, level must be saved */
+    int mVolume = 0;
     bool mMuteEnabled = false; /* Must store as mute = -96dB level */
 
     void initControlParameter(LVM_ControlParams_t& params) const;
