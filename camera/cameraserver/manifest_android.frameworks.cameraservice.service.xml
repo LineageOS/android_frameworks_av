@@ -8,4 +8,13 @@
             <instance>default</instance>
         </interface>
     </hal>
+
+    <hal format="aidl">
+        <name>android.frameworks.cameraservice.service</name>
+        <version>1</version>
+        <interface>
+            <name>ICameraService</name>
+            <instance>default</instance>
+        </interface>
+    </hal>
 </manifest>

@@ -74,7 +74,14 @@ private:
 
 class C2PooledBlockPool : public C2BlockPool {
 public:
-    C2PooledBlockPool(const std::shared_ptr<C2Allocator> &allocator, const local_id_t localId);
+    enum BufferPoolVer : int {
+        VER_HIDL = 0,
+        VER_AIDL2
+    };
+    C2PooledBlockPool(
+            const std::shared_ptr<C2Allocator> &allocator,
+            const local_id_t localId,
+            BufferPoolVer ver = VER_HIDL);
 
     virtual ~C2PooledBlockPool() override;
 
@@ -117,9 +124,12 @@ public:
 private:
     const std::shared_ptr<C2Allocator> mAllocator;
     const local_id_t mLocalId;
+    const BufferPoolVer mBufferPoolVer;
 
-    class Impl;
+    class Impl; // HIDL BufferPool VER_HIDL
     std::unique_ptr<Impl> mImpl;
+    class Impl2; // AIDL BufferPool(bufferpool2) VER_AIDL2
+    std::unique_ptr<Impl2> mImpl2;
 };
 
 #endif // STAGEFRIGHT_CODEC2_BUFFER_PRIV_H_

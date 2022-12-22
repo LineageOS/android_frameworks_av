@@ -248,18 +248,23 @@ interface IAudioFlingerService {
 
     /**
      * Requests if the implementation supports controlling the latency modes
-     * over the Bleutooth A2DP or LE Audio links. If it does,
+     * over the Bluetooth A2DP or LE Audio links. If it does,
      * setRequestedLatencyMode() and getSupportedLatencyModes() APIs can also be used
      * for streams routed to Bluetooth and not just for the spatializer output.
      */
-     boolean supportsBluetoothLatencyModes();
+     boolean supportsBluetoothVariableLatency();
 
     /**
      * Enables or disables the variable Bluetooth latency control mechanism in the
      * audio framework and the audio HAL. This does not apply to the latency mode control
-     * on the spatializer output with is a built-in feature.
+     * on the spatializer output as this is a built-in feature.
      */
-    void setBluetoothLatencyModesEnabled(boolean enabled);
+    void setBluetoothVariableLatencyEnabled(boolean enabled);
+
+    /**
+     * Indicates if the variable Bluetooth latency control mechanism is enabled or disabled.
+     */
+    boolean isBluetoothVariableLatencyEnabled();
 
     /**
      * Registers the sound dose callback and returns the interface for executing

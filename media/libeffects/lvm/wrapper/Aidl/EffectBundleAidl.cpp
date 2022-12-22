@@ -34,11 +34,13 @@ using aidl::android::hardware::audio::effect::EffectBundleAidl;
 using aidl::android::hardware::audio::effect::IEffect;
 using aidl::android::hardware::audio::effect::kBassBoostBundleImplUUID;
 using aidl::android::hardware::audio::effect::kEqualizerBundleImplUUID;
+using aidl::android::hardware::audio::effect::kVirtualizerBundleImplUUID;
 using aidl::android::hardware::audio::effect::State;
 using aidl::android::media::audio::common::AudioUuid;
 
 bool isUuidSupported(const AudioUuid* uuid) {
-    return (*uuid == kEqualizerBundleImplUUID || *uuid == kBassBoostBundleImplUUID);
+    return (*uuid == kEqualizerBundleImplUUID || *uuid == kBassBoostBundleImplUUID ||
+            *uuid == kVirtualizerBundleImplUUID);
 }
 
 extern "C" binder_exception_t createEffect(const AudioUuid* uuid,
@@ -66,6 +68,8 @@ extern "C" binder_exception_t queryEffect(const AudioUuid* in_impl_uuid, Descrip
         *_aidl_return = aidl::android::hardware::audio::effect::lvm::kEqualizerDesc;
     } else if (*in_impl_uuid == kBassBoostBundleImplUUID) {
         *_aidl_return = aidl::android::hardware::audio::effect::lvm:: kBassBoostDesc;
+    } else if (*in_impl_uuid == kVirtualizerBundleImplUUID) {
+        *_aidl_return = aidl::android::hardware::audio::effect::lvm::kVirtualizerDesc;
     }
     return EX_NONE;
 }
@@ -82,6 +86,10 @@ EffectBundleAidl::EffectBundleAidl(const AudioUuid& uuid) {
         mType = lvm::BundleEffectType::BASS_BOOST;
         mDescriptor = &lvm::kBassBoostDesc;
         mEffectName = &lvm::kBassBoostEffectName;
+    } else if (uuid == kVirtualizerBundleImplUUID) {
+        mType = lvm::BundleEffectType::VIRTUALIZER;
+        mDescriptor = &lvm::kVirtualizerDesc;
+        mEffectName = &lvm::kVirtualizerEffectName;
     } else {
         // TODO: add other bundle effect types here.
         LOG(ERROR) << __func__ << uuid.toString() << " not supported yet!";
@@ -146,6 +154,8 @@ ndk::ScopedAStatus EffectBundleAidl::setParameterSpecific(const Parameter::Speci
             return setParameterEqualizer(specific);
         case Parameter::Specific::bassBoost:
             return setParameterBassBoost(specific);
+        case Parameter::Specific::virtualizer:
+            return setParameterVirtualizer(specific);
         default:
             LOG(ERROR) << __func__ << " unsupported tag " << toString(tag);
             return ndk::ScopedAStatus::fromExceptionCodeWithMessage(EX_ILLEGAL_ARGUMENT,
@@ -190,6 +200,23 @@ ndk::ScopedAStatus EffectBundleAidl::setParameterBassBoost(const Parameter::Spec
     }
 }
 
+ndk::ScopedAStatus EffectBundleAidl::setParameterVirtualizer(const Parameter::Specific& specific) {
+    auto& vr = specific.get<Parameter::Specific::virtualizer>();
+    auto vrTag = vr.getTag();
+    switch (vrTag) {
+        case Virtualizer::strengthPm: {
+            RETURN_IF(mContext->setVirtualizerStrength(vr.get<Virtualizer::strengthPm>()) !=
+                              RetCode::SUCCESS,
+                      EX_ILLEGAL_ARGUMENT, "setStrengthFailed");
+            return ndk::ScopedAStatus::ok();
+        }
+        default:
+            LOG(ERROR) << __func__ << " unsupported parameter " << specific.toString();
+            return ndk::ScopedAStatus::fromExceptionCodeWithMessage(EX_ILLEGAL_ARGUMENT,
+                                                                    "vrTagNotSupported");
+    }
+}
+
 ndk::ScopedAStatus EffectBundleAidl::getParameterSpecific(const Parameter::Id& id,
                                                           Parameter::Specific* specific) {
     RETURN_IF(!specific, EX_NULL_POINTER, "nullPtr");
@@ -200,6 +227,8 @@ ndk::ScopedAStatus EffectBundleAidl::getParameterSpecific(const Parameter::Id& i
             return getParameterEqualizer(id.get<Parameter::Id::equalizerTag>(), specific);
         case Parameter::Id::bassBoostTag:
             return getParameterBassBoost(id.get<Parameter::Id::bassBoostTag>(), specific);
+        case Parameter::Id::virtualizerTag:
+            return getParameterVirtualizer(id.get<Parameter::Id::virtualizerTag>(), specific);
         default:
             LOG(ERROR) << __func__ << " unsupported tag: " << toString(tag);
             return ndk::ScopedAStatus::fromExceptionCodeWithMessage(EX_ILLEGAL_ARGUMENT,
@@ -256,6 +285,31 @@ ndk::ScopedAStatus EffectBundleAidl::getParameterBassBoost(const BassBoost::Id& 
     }
 
     specific->set<Parameter::Specific::bassBoost>(bbParam);
+    return ndk::ScopedAStatus::ok();
+}
+
+ndk::ScopedAStatus EffectBundleAidl::getParameterVirtualizer(const Virtualizer::Id& id,
+                                                             Parameter::Specific* specific) {
+    RETURN_IF(id.getTag() != Virtualizer::Id::commonTag, EX_ILLEGAL_ARGUMENT,
+              "VirtualizerTagNotSupported");
+
+    RETURN_IF(!mContext, EX_NULL_POINTER, "nullContext");
+    Virtualizer vrParam;
+
+    auto tag = id.get<Virtualizer::Id::commonTag>();
+    switch (tag) {
+        case Virtualizer::strengthPm: {
+            vrParam.set<Virtualizer::strengthPm>(mContext->getVirtualizerStrength());
+            break;
+        }
+        default: {
+            LOG(ERROR) << __func__ << " not handled tag: " << toString(tag);
+            return ndk::ScopedAStatus::fromExceptionCodeWithMessage(EX_ILLEGAL_ARGUMENT,
+                                                                    "VirtualizerTagNotSupported");
+        }
+    }
+
+    specific->set<Parameter::Specific::virtualizer>(vrParam);
     return ndk::ScopedAStatus::ok();
 }
 

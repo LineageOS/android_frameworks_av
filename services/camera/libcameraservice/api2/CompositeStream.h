@@ -47,7 +47,7 @@ public:
             const std::unordered_set<int32_t> &sensorPixelModesUsed,
             std::vector<int> *surfaceIds,
             int streamSetId, bool isShared, bool isMultiResolution, int32_t colorSpace,
-            int64_t dynamicProfile, int64_t streamUseCase);
+            int64_t dynamicProfile, int64_t streamUseCase, bool useReadoutTimestamp);
 
     status_t deleteStream();
 
@@ -61,7 +61,7 @@ public:
             const std::unordered_set<int32_t> &sensorPixelModesUsed,
             std::vector<int> *surfaceIds,
             int streamSetId, bool isShared, int32_t colorSpace,
-            int64_t dynamicProfile, int64_t streamUseCase) = 0;
+            int64_t dynamicProfile, int64_t streamUseCase, bool useReadoutTimestamp) = 0;
 
     // Release all internal streams and corresponding resources.
     virtual status_t deleteInternalStreams() = 0;
