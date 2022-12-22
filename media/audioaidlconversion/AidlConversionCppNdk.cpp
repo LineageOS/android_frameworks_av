@@ -53,6 +53,7 @@ using media::audio::common::AudioDevice;
 using media::audio::common::AudioDeviceAddress;
 using media::audio::common::AudioDeviceDescription;
 using media::audio::common::AudioDeviceType;
+using media::audio::common::AudioDualMonoMode;
 using media::audio::common::AudioEncapsulationMetadataType;
 using media::audio::common::AudioEncapsulationMode;
 using media::audio::common::AudioEncapsulationType;
@@ -63,9 +64,11 @@ using media::audio::common::AudioGainConfig;
 using media::audio::common::AudioGainMode;
 using media::audio::common::AudioInputFlags;
 using media::audio::common::AudioIoFlags;
+using media::audio::common::AudioLatencyMode;
 using media::audio::common::AudioMode;
 using media::audio::common::AudioOffloadInfo;
 using media::audio::common::AudioOutputFlags;
+using media::audio::common::AudioPlaybackRate;
 using media::audio::common::AudioPortDeviceExt;
 using media::audio::common::AudioPortExt;
 using media::audio::common::AudioPortMixExt;
@@ -2119,6 +2122,139 @@ legacy2aidl_audio_encapsulation_type_t_AudioEncapsulationType(
             return AudioEncapsulationType::IEC61937;
         case AUDIO_ENCAPSULATION_TYPE_PCM:
             return AudioEncapsulationType::PCM;
+    }
+    return unexpected(BAD_VALUE);
+}
+
+ConversionResult<audio_dual_mono_mode_t>
+aidl2legacy_AudioDualMonoMode_audio_dual_mono_mode_t(AudioDualMonoMode aidl) {
+    switch (aidl) {
+        case AudioDualMonoMode::OFF:
+            return AUDIO_DUAL_MONO_MODE_OFF;
+        case AudioDualMonoMode::LR:
+            return AUDIO_DUAL_MONO_MODE_LR;
+        case AudioDualMonoMode::LL:
+            return AUDIO_DUAL_MONO_MODE_LL;
+        case AudioDualMonoMode::RR:
+            return AUDIO_DUAL_MONO_MODE_RR;
+    }
+    return unexpected(BAD_VALUE);
+}
+
+ConversionResult<AudioDualMonoMode>
+legacy2aidl_audio_dual_mono_mode_t_AudioDualMonoMode(audio_dual_mono_mode_t legacy) {
+    switch (legacy) {
+        case AUDIO_DUAL_MONO_MODE_OFF:
+            return AudioDualMonoMode::OFF;
+        case AUDIO_DUAL_MONO_MODE_LR:
+            return AudioDualMonoMode::LR;
+        case AUDIO_DUAL_MONO_MODE_LL:
+            return AudioDualMonoMode::LL;
+        case AUDIO_DUAL_MONO_MODE_RR:
+            return AudioDualMonoMode::RR;
+    }
+    return unexpected(BAD_VALUE);
+}
+
+ConversionResult<audio_timestretch_fallback_mode_t>
+aidl2legacy_TimestretchFallbackMode_audio_timestretch_fallback_mode_t(
+        AudioPlaybackRate::TimestretchFallbackMode aidl) {
+    switch (aidl) {
+        case AudioPlaybackRate::TimestretchFallbackMode::SYS_RESERVED_CUT_REPEAT:
+            return AUDIO_TIMESTRETCH_FALLBACK_CUT_REPEAT;
+        case AudioPlaybackRate::TimestretchFallbackMode::SYS_RESERVED_DEFAULT:
+            return AUDIO_TIMESTRETCH_FALLBACK_DEFAULT;
+        case AudioPlaybackRate::TimestretchFallbackMode::MUTE:
+            return AUDIO_TIMESTRETCH_FALLBACK_MUTE;
+        case AudioPlaybackRate::TimestretchFallbackMode::FAIL:
+            return AUDIO_TIMESTRETCH_FALLBACK_FAIL;
+    }
+    return unexpected(BAD_VALUE);
+}
+
+ConversionResult<AudioPlaybackRate::TimestretchFallbackMode>
+legacy2aidl_audio_timestretch_fallback_mode_t_TimestretchFallbackMode(
+        audio_timestretch_fallback_mode_t legacy) {
+    switch (legacy) {
+        case AUDIO_TIMESTRETCH_FALLBACK_CUT_REPEAT:
+            return AudioPlaybackRate::TimestretchFallbackMode::SYS_RESERVED_CUT_REPEAT;
+        case AUDIO_TIMESTRETCH_FALLBACK_DEFAULT:
+            return AudioPlaybackRate::TimestretchFallbackMode::SYS_RESERVED_DEFAULT;
+        case AUDIO_TIMESTRETCH_FALLBACK_MUTE:
+            return AudioPlaybackRate::TimestretchFallbackMode::MUTE;
+        case AUDIO_TIMESTRETCH_FALLBACK_FAIL:
+            return AudioPlaybackRate::TimestretchFallbackMode::FAIL;
+    }
+    return unexpected(BAD_VALUE);
+}
+
+ConversionResult<audio_timestretch_stretch_mode_t>
+aidl2legacy_TimestretchMode_audio_timestretch_stretch_mode_t(
+        AudioPlaybackRate::TimestretchMode aidl) {
+    switch (aidl) {
+        case AudioPlaybackRate::TimestretchMode::DEFAULT:
+            return AUDIO_TIMESTRETCH_STRETCH_DEFAULT;
+        case AudioPlaybackRate::TimestretchMode::VOICE:
+            return AUDIO_TIMESTRETCH_STRETCH_VOICE;
+    }
+    return unexpected(BAD_VALUE);
+}
+
+ConversionResult<AudioPlaybackRate::TimestretchMode>
+legacy2aidl_audio_timestretch_stretch_mode_t_TimestretchMode(
+        audio_timestretch_stretch_mode_t legacy) {
+    switch (legacy) {
+        case AUDIO_TIMESTRETCH_STRETCH_DEFAULT:
+            return AudioPlaybackRate::TimestretchMode::DEFAULT;
+        case AUDIO_TIMESTRETCH_STRETCH_VOICE:
+            return AudioPlaybackRate::TimestretchMode::VOICE;
+    }
+    return unexpected(BAD_VALUE);
+}
+
+ConversionResult<audio_playback_rate_t>
+aidl2legacy_AudioPlaybackRate_audio_playback_rate_t(const AudioPlaybackRate& aidl) {
+    audio_playback_rate_t legacy;
+    legacy.mSpeed = aidl.speed;
+    legacy.mPitch = aidl.pitch;
+    legacy.mFallbackMode = VALUE_OR_RETURN(
+            aidl2legacy_TimestretchFallbackMode_audio_timestretch_fallback_mode_t(
+                    aidl.fallbackMode));
+    legacy.mStretchMode = VALUE_OR_RETURN(
+            aidl2legacy_TimestretchMode_audio_timestretch_stretch_mode_t(aidl.timestretchMode));
+    return legacy;
+}
+
+ConversionResult<AudioPlaybackRate>
+legacy2aidl_audio_playback_rate_t_AudioPlaybackRate(const audio_playback_rate_t& legacy) {
+    AudioPlaybackRate aidl;
+    aidl.speed = legacy.mSpeed;
+    aidl.pitch = legacy.mPitch;
+    aidl.fallbackMode = VALUE_OR_RETURN(
+            legacy2aidl_audio_timestretch_fallback_mode_t_TimestretchFallbackMode(
+                    legacy.mFallbackMode));
+    aidl.timestretchMode = VALUE_OR_RETURN(
+            legacy2aidl_audio_timestretch_stretch_mode_t_TimestretchMode(legacy.mStretchMode));
+    return aidl;
+}
+
+ConversionResult<audio_latency_mode_t>
+aidl2legacy_AudioLatencyMode_audio_latency_mode_t(AudioLatencyMode aidl) {
+    switch (aidl) {
+        case AudioLatencyMode::FREE:
+            return AUDIO_LATENCY_MODE_FREE;
+        case AudioLatencyMode::LOW:
+            return AUDIO_LATENCY_MODE_LOW;
+    }
+    return unexpected(BAD_VALUE);
+}
+ConversionResult<AudioLatencyMode>
+legacy2aidl_audio_latency_mode_t_AudioLatencyMode(audio_latency_mode_t legacy) {
+    switch (legacy) {
+        case AUDIO_LATENCY_MODE_FREE:
+            return AudioLatencyMode::FREE;
+        case AUDIO_LATENCY_MODE_LOW:
+            return AudioLatencyMode::LOW;
     }
     return unexpected(BAD_VALUE);
 }

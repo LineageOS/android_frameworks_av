@@ -705,7 +705,8 @@ private:
                 const media::AudioIoDescriptor& ioDesc) override;
 
         binder::Status onSupportedLatencyModesChanged(
-                int output, const std::vector<media::LatencyMode>& latencyModes) override;
+                int output,
+                const std::vector<media::audio::common::AudioLatencyMode>& latencyModes) override;
 
         status_t addAudioDeviceCallback(const wp<AudioDeviceCallback>& callback,
                                                audio_io_handle_t audioIo,

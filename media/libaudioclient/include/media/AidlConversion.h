@@ -24,18 +24,15 @@
 #include <android/media/AudioAttributesInternal.h>
 #include <android/media/AudioClient.h>
 #include <android/media/AudioDirectMode.h>
-#include <android/media/AudioDualMonoMode.h>
 #include <android/media/AudioFlag.h>
 #include <android/media/AudioIoConfigEvent.h>
 #include <android/media/AudioIoDescriptor.h>
-#include <android/media/AudioPlaybackRate.h>
 #include <android/media/AudioPort.h>
 #include <android/media/AudioPortConfig.h>
 #include <android/media/AudioPortDeviceExtSys.h>
 #include <android/media/AudioTimestampInternal.h>
 #include <android/media/AudioUniqueIdUse.h>
 #include <android/media/EffectDescriptor.h>
-#include <android/media/LatencyMode.h>
 #include <android/media/TrackSecondaryOutputInfo.h>
 
 #include <android/media/SharedFileRegion.h>
@@ -184,26 +181,6 @@ aidl2legacy_int32_t_volume_group_t(int32_t aidl);
 ConversionResult<int32_t>
 legacy2aidl_volume_group_t_int32_t(volume_group_t legacy);
 
-ConversionResult<audio_dual_mono_mode_t>
-aidl2legacy_AudioDualMonoMode_audio_dual_mono_mode_t(media::AudioDualMonoMode aidl);
-ConversionResult<media::AudioDualMonoMode>
-legacy2aidl_audio_dual_mono_mode_t_AudioDualMonoMode(audio_dual_mono_mode_t legacy);
-
-ConversionResult<audio_timestretch_fallback_mode_t>
-aidl2legacy_int32_t_audio_timestretch_fallback_mode_t(int32_t aidl);
-ConversionResult<int32_t>
-legacy2aidl_audio_timestretch_fallback_mode_t_int32_t(audio_timestretch_fallback_mode_t legacy);
-
-ConversionResult<audio_timestretch_stretch_mode_t>
-aidl2legacy_int32_t_audio_timestretch_stretch_mode_t(int32_t aidl);
-ConversionResult<int32_t>
-legacy2aidl_audio_timestretch_stretch_mode_t_int32_t(audio_timestretch_stretch_mode_t legacy);
-
-ConversionResult<audio_playback_rate_t>
-aidl2legacy_AudioPlaybackRate_audio_playback_rate_t(const media::AudioPlaybackRate& aidl);
-ConversionResult<media::AudioPlaybackRate>
-legacy2aidl_audio_playback_rate_t_AudioPlaybackRate(const audio_playback_rate_t& legacy);
-
 using TrackSecondaryOutputInfoPair = std::pair<audio_port_handle_t, std::vector<audio_io_handle_t>>;
 ConversionResult<TrackSecondaryOutputInfoPair>
 aidl2legacy_TrackSecondaryOutputInfo_TrackSecondaryOutputInfoPair(
@@ -219,10 +196,5 @@ legacy2aidl_audio_direct_mode_t_AudioDirectMode(audio_direct_mode_t legacy);
 
 ConversionResult<audio_direct_mode_t> aidl2legacy_int32_t_audio_direct_mode_t_mask(int32_t aidl);
 ConversionResult<int32_t> legacy2aidl_audio_direct_mode_t_int32_t_mask(audio_direct_mode_t legacy);
-
-ConversionResult<audio_latency_mode_t>
-aidl2legacy_LatencyMode_audio_latency_mode_t(media::LatencyMode aidl);
-ConversionResult<media::LatencyMode>
-legacy2aidl_audio_latency_mode_t_LatencyMode(audio_latency_mode_t legacy);
 
 }  // namespace android
