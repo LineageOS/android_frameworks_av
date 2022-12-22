@@ -67,6 +67,8 @@ class EffectBundleAidl final : public EffectImpl {
     ndk::ScopedAStatus setParameterEqualizer(const Parameter::Specific& specific);
     ndk::ScopedAStatus getParameterEqualizer(const Equalizer::Id& id,
                                              Parameter::Specific* specific);
+    ndk::ScopedAStatus setParameterVolume(const Parameter::Specific& specific);
+    ndk::ScopedAStatus getParameterVolume(const Volume::Id& id, Parameter::Specific* specific);
     ndk::ScopedAStatus setParameterVirtualizer(const Parameter::Specific& specific);
     ndk::ScopedAStatus getParameterVirtualizer(const Virtualizer::Id& id,
                                                Parameter::Specific* specific);
