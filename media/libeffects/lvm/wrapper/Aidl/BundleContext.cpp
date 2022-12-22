@@ -96,8 +96,11 @@ RetCode BundleContext::enable() {
             mSamplesToExitCountVirt = (mSamplesPerSecond * 0.1);
             tempDisabled = mVirtualizerTempDisabled;
             break;
-        default:
-            // Add handling for other effects
+        case lvm::BundleEffectType::VOLUME:
+            LOG(DEBUG) << __func__ << " enable bundle VOL";
+            if ((mEffectInDrain & (1 << int(lvm::BundleEffectType::VOLUME))) == 0)
+                mNumberEffectsEnabled++;
+            mEffectInDrain &= ~(1 << int(lvm::BundleEffectType::VOLUME));
             break;
     }
     mEnabled = true;
@@ -123,8 +126,8 @@ RetCode BundleContext::enableOperatingMode() {
                 LOG(DEBUG) << __func__ << " enable bundle VR";
                 params.VirtualizerOperatingMode = LVM_MODE_ON;
                 break;
-            default:
-                // Add handling for other effects
+            case lvm::BundleEffectType::VOLUME:
+                LOG(DEBUG) << __func__ << " enable bundle VOL";
                 break;
         }
         RETURN_VALUE_IF(LVM_SUCCESS != LVM_SetControlParameters(mInstance, &params),
@@ -148,8 +151,9 @@ RetCode BundleContext::disable() {
             LOG(DEBUG) << __func__ << " disable bundle VR";
             mEffectInDrain |= 1 << int(lvm::BundleEffectType::VIRTUALIZER);
             break;
-        default:
-            // Add handling for other effects
+        case lvm::BundleEffectType::VOLUME:
+            LOG(DEBUG) << __func__ << " disable bundle VOL";
+            mEffectInDrain |= 1 << int(lvm::BundleEffectType::VOLUME);
             break;
     }
     mEnabled = false;
@@ -175,8 +179,8 @@ RetCode BundleContext::disableOperatingMode() {
                 LOG(DEBUG) << __func__ << " disable bundle VR";
                 params.VirtualizerOperatingMode = LVM_MODE_OFF;
                 break;
-            default:
-                // Add handling for other effects
+            case lvm::BundleEffectType::VOLUME:
+                LOG(DEBUG) << __func__ << " disable bundle VOL";
                 break;
         }
         RETURN_VALUE_IF(LVM_SUCCESS != LVM_SetControlParameters(mInstance, &params),
@@ -255,15 +259,15 @@ RetCode BundleContext::limitLevel() {
 
         // roundoff
         int maxLevelRound = (int)(totalEnergyEstimation + 0.99);
-        if (maxLevelRound + mLevelSaved > 0) {
-            gainCorrection = maxLevelRound + mLevelSaved;
+        if (maxLevelRound + mVolume > 0) {
+            gainCorrection = maxLevelRound + mVolume;
         }
 
-        params.VC_EffectLevel = mLevelSaved - gainCorrection;
+        params.VC_EffectLevel = mVolume - gainCorrection;
         if (params.VC_EffectLevel < -96) {
             params.VC_EffectLevel = -96;
         }
-        LOG(INFO) << "\tVol: " << mLevelSaved << ", GainCorrection: " << gainCorrection
+        LOG(INFO) << "\tVol: " << mVolume << ", GainCorrection: " << gainCorrection
                   << ", Actual vol: " << params.VC_EffectLevel;
 
         /* Activate the initial settings */
@@ -395,8 +399,7 @@ RetCode BundleContext::setVolumeStereo(const Parameter::VolumeStereo& volume) {
     int rightdB = VolToDb(volume.right);
     int maxdB = std::max(leftdB, rightdB);
     int pandB = rightdB - leftdB;
-    // TODO: add volume effect implementation here:
-    // android::VolumeSetVolumeLevel(pContext, (int16_t)(maxdB * 100));
+    setVolumeLevel(maxdB * 100);
     LOG(DEBUG) << __func__ << " pandB: " << pandB << " maxdB " << maxdB;
 
     {
@@ -516,6 +519,35 @@ RetCode BundleContext::setBassBoostStrength(int strength) {
     }
     mBassStrengthSaved = strength;
     LOG(INFO) << __func__ << " success with strength " << strength;
+    return limitLevel();
+}
+
+RetCode BundleContext::setVolumeLevel(int level) {
+    if (level < Volume::MIN_LEVEL_DB || level > lvm::kVolumeCap.maxLevel) {
+        return RetCode::ERROR_ILLEGAL_PARAMETER;
+    }
+
+    if (mMuteEnabled) {
+        mLevelSaved = level / 100;
+    } else {
+        mVolume = level / 100;
+    }
+    LOG(INFO) << __func__ << " success with level " << level;
+    return limitLevel();
+}
+
+int BundleContext::getVolumeLevel() const {
+    return (mMuteEnabled ? mLevelSaved * 100 : mVolume * 100);
+}
+
+RetCode BundleContext::setVolumeMute(bool mute) {
+    mMuteEnabled = mute;
+    if (mMuteEnabled) {
+        mLevelSaved = mVolume;
+        mVolume = -96;
+    } else {
+        mVolume = mLevelSaved;
+    }
     return limitLevel();
 }
 
@@ -662,6 +694,11 @@ IEffect::Status BundleContext::lvmProcess(float* in, float* out, int samples) {
             --mNumberEffectsEnabled;
             mEffectInDrain &= ~(1 << int(lvm::BundleEffectType::VIRTUALIZER));
         }
+        if ((undrainedEffects & 1 << int(lvm::BundleEffectType::VOLUME)) != 0) {
+            LOG(DEBUG) << "Draining VOLUME";
+            --mNumberEffectsEnabled;
+            mEffectInDrain &= ~(1 << int(lvm::BundleEffectType::VOLUME));
+        }
     }
     mEffectProcessCalled |= 1 << int(mType);
     if (!mEnabled) {
@@ -705,8 +742,13 @@ IEffect::Status BundleContext::lvmProcess(float* in, float* out, int samples) {
                     LOG(DEBUG) << "Effect_process() this is the last frame for VIRTUALIZER";
                 }
                 break;
-            default:
-                // Add handling for other effects
+            case lvm::BundleEffectType::VOLUME:
+                isDataAvailable = false;
+                if ((mEffectInDrain & 1 << int(lvm::BundleEffectType::VOLUME)) != 0) {
+                    mNumberEffectsEnabled--;
+                    mEffectInDrain &= ~(1 << int(lvm::BundleEffectType::VOLUME));
+                }
+                LOG(DEBUG) << "Effect_process() LVM_VOLUME Effect is not enabled";
                 break;
         }
     }
