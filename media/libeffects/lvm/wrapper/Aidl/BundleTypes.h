@@ -103,25 +103,8 @@ static const Descriptor kBassBoostDesc = {
                    .implementor = "NXP Software Ltd."},
         .capability = Capability::make<Capability::bassBoost>(kBassBoostCap)};
 
-static const Virtualizer::Capability kVirtualizerCap = {.strengthSupported = mStrengthSupported};
-
-static const std::string kVirtualizerEffectName = "Virtualizer";
-
-static const Descriptor kVirtualizerDesc = {
-        .common = {.id = {.type = kVirtualizerTypeUUID,
-                          .uuid = kVirtualizerBundleImplUUID,
-                          .proxy = kVirtualizerProxyUUID},
-                   .flags = {.type = Flags::Type::INSERT,
-                             .insert = Flags::Insert::FIRST,
-                             .volume = Flags::Volume::CTRL,
-                             .deviceIndication = true},
-                   .cpuLoad = VIRTUALIZER_CUP_LOAD_ARM9E,
-                   .memoryUsage = BUNDLE_MEM_USAGE,
-                   .name = kVirtualizerEffectName,
-                   .implementor = "NXP Software Ltd."},
-        .capability = Capability::make<Capability::virtualizer>(kVirtualizerCap)};
-
 // TODO: add descriptors for other bundle effect types here.
+static const Descriptor kVirtualizerDesc;
 static const Descriptor kVolumeDesc;
 
 /* The following tables have been computed using the actual levels measured by the output of

@@ -12,24 +12,15 @@ cc_library {
 
     double_loadable: true,
 
-    defaults: [
-        "latest_android_media_audio_common_types_ndk_shared",
-        "latest_android_hardware_audio_core_sounddose_ndk_shared",
-        "latest_android_hardware_audio_sounddose_ndk_shared",
-    ],
-
     srcs: [
         "SoundDoseManager.cpp",
     ],
 
     shared_libs: [
         "audioflinger-aidl-cpp",
-        "libaudio_aidl_conversion_common_ndk",
-        "libaudiofoundation",
         "libaudioutils",
         "libbase",
         "libbinder",
-        "libbinder_ndk",
         "liblog",
         "libutils",
     ],

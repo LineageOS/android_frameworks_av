@@ -56,7 +56,7 @@ Camera3OutputStream::Camera3OutputStream(int id,
         const std::unordered_set<int32_t> &sensorPixelModesUsed, IPCTransport transport,
         int setId, bool isMultiResolution, int64_t dynamicRangeProfile,
         int64_t streamUseCase, bool deviceTimeBaseIsRealtime, int timestampBase,
-        int mirrorMode, int32_t colorSpace, bool useReadoutTimestamp) :
+        int mirrorMode, int32_t colorSpace) :
         Camera3IOStreamBase(id, CAMERA_STREAM_OUTPUT, width, height,
                             /*maxSize*/0, format, dataSpace, rotation,
                             physicalCameraId, sensorPixelModesUsed, setId, isMultiResolution,
@@ -67,7 +67,7 @@ Camera3OutputStream::Camera3OutputStream(int id,
         mTraceFirstBuffer(true),
         mUseBufferManager(false),
         mTimestampOffset(timestampOffset),
-        mUseReadoutTime(useReadoutTimestamp),
+        mUseReadoutTime(false),
         mConsumerUsage(0),
         mDropBuffers(false),
         mMirrorMode(mirrorMode),
@@ -91,7 +91,7 @@ Camera3OutputStream::Camera3OutputStream(int id,
         const std::unordered_set<int32_t> &sensorPixelModesUsed, IPCTransport transport,
         int setId, bool isMultiResolution, int64_t dynamicRangeProfile,
         int64_t streamUseCase, bool deviceTimeBaseIsRealtime, int timestampBase,
-        int mirrorMode, int32_t colorSpace, bool useReadoutTimestamp) :
+        int mirrorMode, int32_t colorSpace) :
         Camera3IOStreamBase(id, CAMERA_STREAM_OUTPUT, width, height, maxSize,
                             format, dataSpace, rotation, physicalCameraId, sensorPixelModesUsed,
                             setId, isMultiResolution, dynamicRangeProfile, streamUseCase,
@@ -101,7 +101,7 @@ Camera3OutputStream::Camera3OutputStream(int id,
         mTraceFirstBuffer(true),
         mUseBufferManager(false),
         mTimestampOffset(timestampOffset),
-        mUseReadoutTime(useReadoutTimestamp),
+        mUseReadoutTime(false),
         mConsumerUsage(0),
         mDropBuffers(false),
         mMirrorMode(mirrorMode),
@@ -131,7 +131,7 @@ Camera3OutputStream::Camera3OutputStream(int id,
         const std::unordered_set<int32_t> &sensorPixelModesUsed, IPCTransport transport,
         int setId, bool isMultiResolution, int64_t dynamicRangeProfile,
         int64_t streamUseCase, bool deviceTimeBaseIsRealtime, int timestampBase,
-        int mirrorMode, int32_t colorSpace, bool useReadoutTimestamp) :
+        int mirrorMode, int32_t colorSpace) :
         Camera3IOStreamBase(id, CAMERA_STREAM_OUTPUT, width, height,
                             /*maxSize*/0, format, dataSpace, rotation,
                             physicalCameraId, sensorPixelModesUsed, setId, isMultiResolution,
@@ -142,7 +142,7 @@ Camera3OutputStream::Camera3OutputStream(int id,
         mTraceFirstBuffer(true),
         mUseBufferManager(false),
         mTimestampOffset(timestampOffset),
-        mUseReadoutTime(useReadoutTimestamp),
+        mUseReadoutTime(false),
         mConsumerUsage(consumerUsage),
         mDropBuffers(false),
         mMirrorMode(mirrorMode),
@@ -180,8 +180,7 @@ Camera3OutputStream::Camera3OutputStream(int id, camera_stream_type_t type,
                                          int setId, bool isMultiResolution,
                                          int64_t dynamicRangeProfile, int64_t streamUseCase,
                                          bool deviceTimeBaseIsRealtime, int timestampBase,
-                                         int mirrorMode, int32_t colorSpace,
-                                         bool useReadoutTimestamp) :
+                                         int mirrorMode, int32_t colorSpace) :
         Camera3IOStreamBase(id, type, width, height,
                             /*maxSize*/0,
                             format, dataSpace, rotation,
@@ -192,7 +191,7 @@ Camera3OutputStream::Camera3OutputStream(int id, camera_stream_type_t type,
         mTraceFirstBuffer(true),
         mUseBufferManager(false),
         mTimestampOffset(timestampOffset),
-        mUseReadoutTime(useReadoutTimestamp),
+        mUseReadoutTime(false),
         mConsumerUsage(consumerUsage),
         mDropBuffers(false),
         mMirrorMode(mirrorMode),
@@ -468,7 +467,7 @@ status_t Camera3OutputStream::returnBufferCheckedLocked(
             }
         }
 
-        nsecs_t captureTime = ((mUseReadoutTime || mSyncToDisplay) && readoutTimestamp != 0 ?
+        nsecs_t captureTime = (mUseReadoutTime && readoutTimestamp != 0 ?
                 readoutTimestamp : timestamp) - mTimestampOffset;
         if (mPreviewFrameSpacer != nullptr) {
             nsecs_t readoutTime = (readoutTimestamp != 0 ? readoutTimestamp : timestamp)
@@ -720,12 +719,16 @@ status_t Camera3OutputStream::configureConsumerQueueLocked(bool allowPreviewResp
     mFrameCount = 0;
     mLastTimestamp = 0;
 
+    mUseReadoutTime =
+            (timestampBase == OutputConfiguration::TIMESTAMP_BASE_READOUT_SENSOR || mSyncToDisplay);
+
     if (isDeviceTimeBaseRealtime()) {
         if (isDefaultTimeBase && !isConsumedByHWComposer() && !isVideoStream()) {
             // Default time base, but not hardware composer or video encoder
             mTimestampOffset = 0;
         } else if (timestampBase == OutputConfiguration::TIMESTAMP_BASE_REALTIME ||
-                timestampBase == OutputConfiguration::TIMESTAMP_BASE_SENSOR) {
+                timestampBase == OutputConfiguration::TIMESTAMP_BASE_SENSOR ||
+                timestampBase == OutputConfiguration::TIMESTAMP_BASE_READOUT_SENSOR) {
             mTimestampOffset = 0;
         }
         // If timestampBase is CHOREOGRAPHER SYNCED or MONOTONIC, leave
@@ -735,7 +738,7 @@ status_t Camera3OutputStream::configureConsumerQueueLocked(bool allowPreviewResp
             // Reverse offset for monotonicTime -> bootTime
             mTimestampOffset = -mTimestampOffset;
         } else {
-            // If timestampBase is DEFAULT, MONOTONIC, SENSOR or
+            // If timestampBase is DEFAULT, MONOTONIC, SENSOR, READOUT_SENSOR or
             // CHOREOGRAPHER_SYNCED, timestamp offset is 0.
             mTimestampOffset = 0;
         }

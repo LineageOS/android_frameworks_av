@@ -532,7 +532,7 @@ status_t JpegRCompositeStream::createInternalStreams(const std::vector<sp<Surfac
         const std::unordered_set<int32_t> &sensorPixelModesUsed,
         std::vector<int> *surfaceIds,
         int /*streamSetId*/, bool /*isShared*/, int32_t colorSpace,
-        int64_t dynamicProfile, int64_t streamUseCase, bool useReadoutTimestamp) {
+        int64_t dynamicProfile, int64_t streamUseCase) {
     sp<CameraDeviceBase> device = mDevice.promote();
     if (!device.get()) {
         ALOGE("%s: Invalid camera device!", __FUNCTION__);
@@ -556,9 +556,9 @@ status_t JpegRCompositeStream::createInternalStreams(const std::vector<sp<Surfac
             static_cast<android_dataspace>(mP010DataSpace), rotation,
             id, physicalCameraId, sensorPixelModesUsed, surfaceIds,
             camera3::CAMERA3_STREAM_SET_ID_INVALID, false /*isShared*/, false /*isMultiResolution*/,
-            GRALLOC_USAGE_SW_READ_OFTEN, mP010DynamicRange, streamUseCase,
-            OutputConfiguration::TIMESTAMP_BASE_DEFAULT, OutputConfiguration::MIRROR_MODE_AUTO,
-            ANDROID_REQUEST_AVAILABLE_COLOR_SPACE_PROFILES_MAP_UNSPECIFIED, useReadoutTimestamp);
+            GRALLOC_USAGE_SW_READ_OFTEN,
+            mP010DynamicRange,
+            streamUseCase);
     if (ret == OK) {
         mP010StreamId = *id;
         mP010SurfaceId = (*surfaceIds)[0];
@@ -585,7 +585,7 @@ status_t JpegRCompositeStream::createInternalStreams(const std::vector<sp<Surfac
                 streamUseCase,
                 /*timestampBase*/ OutputConfiguration::TIMESTAMP_BASE_DEFAULT,
                 /*mirrorMode*/ OutputConfiguration::MIRROR_MODE_AUTO,
-                /*colorSpace*/ colorSpace, useReadoutTimestamp);
+                /*colorSpace*/ colorSpace);
         if (ret == OK) {
             mBlobSurfaceId = blobSurfaceId[0];
         } else {

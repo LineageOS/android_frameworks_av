@@ -46,7 +46,7 @@ namespace acam {
  */
 class CameraManagerGlobal final : public RefBase {
   public:
-    static sp<CameraManagerGlobal> getInstance();
+    static CameraManagerGlobal& getInstance();
     sp<hardware::ICameraService> getCameraService();
 
     void registerAvailabilityCallback(
@@ -257,7 +257,7 @@ class CameraManagerGlobal final : public RefBase {
 
     // For the singleton instance
     static Mutex sLock;
-    static wp<CameraManagerGlobal> sInstance;
+    static CameraManagerGlobal* sInstance;
     CameraManagerGlobal() {};
     ~CameraManagerGlobal();
 };
@@ -271,7 +271,7 @@ class CameraManagerGlobal final : public RefBase {
  */
 struct ACameraManager {
     ACameraManager() :
-            mGlobalManager(android::acam::CameraManagerGlobal::getInstance()) {}
+            mGlobalManager(&(android::acam::CameraManagerGlobal::getInstance())) {}
     ~ACameraManager();
     camera_status_t getCameraIdList(ACameraIdList** cameraIdList);
     static void     deleteCameraIdList(ACameraIdList* cameraIdList);

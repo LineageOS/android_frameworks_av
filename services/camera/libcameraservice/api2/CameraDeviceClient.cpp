@@ -890,7 +890,6 @@ binder::Status CameraDeviceClient::createStream(
     int timestampBase = outputConfiguration.getTimestampBase();
     int mirrorMode = outputConfiguration.getMirrorMode();
     int32_t colorSpace = outputConfiguration.getColorSpace();
-    bool useReadoutTimestamp = outputConfiguration.useReadoutTimestamp();
 
     res = SessionConfigurationUtils::checkSurfaceType(numBufferProducers, deferredConsumer,
             outputConfiguration.getSurfaceType());
@@ -974,8 +973,7 @@ binder::Status CameraDeviceClient::createStream(
                 static_cast<camera_stream_rotation_t>(outputConfiguration.getRotation()),
                 &streamId, physicalCameraId, streamInfo.sensorPixelModesUsed, &surfaceIds,
                 outputConfiguration.getSurfaceSetID(), isShared, isMultiResolution,
-                streamInfo.colorSpace, streamInfo.dynamicRangeProfile, streamInfo.streamUseCase,
-                useReadoutTimestamp);
+                streamInfo.colorSpace, streamInfo.dynamicRangeProfile, streamInfo.streamUseCase);
         if (err == OK) {
             Mutex::Autolock l(mCompositeLock);
             mCompositeStreamMap.add(IInterface::asBinder(surfaces[0]->getIGraphicBufferProducer()),
@@ -988,8 +986,7 @@ binder::Status CameraDeviceClient::createStream(
                 &streamId, physicalCameraId, streamInfo.sensorPixelModesUsed, &surfaceIds,
                 outputConfiguration.getSurfaceSetID(), isShared, isMultiResolution,
                 /*consumerUsage*/0, streamInfo.dynamicRangeProfile, streamInfo.streamUseCase,
-                streamInfo.timestampBase, streamInfo.mirrorMode, streamInfo.colorSpace,
-                useReadoutTimestamp);
+                streamInfo.timestampBase, streamInfo.mirrorMode, streamInfo.colorSpace);
     }
 
     if (err != OK) {
@@ -1088,8 +1085,7 @@ binder::Status CameraDeviceClient::createDeferredSurfaceStreamLocked(
             outputConfiguration.isMultiResolution(), consumerUsage,
             outputConfiguration.getDynamicRangeProfile(),
             outputConfiguration.getStreamUseCase(),
-            outputConfiguration.getMirrorMode(),
-            outputConfiguration.useReadoutTimestamp());
+            outputConfiguration.getMirrorMode());
 
     if (err != OK) {
         res = STATUS_ERROR_FMT(CameraService::ERROR_INVALID_OPERATION,

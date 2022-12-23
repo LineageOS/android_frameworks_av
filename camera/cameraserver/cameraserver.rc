@@ -6,4 +6,3 @@ service cameraserver /system/bin/cameraserver
     task_profiles CameraServiceCapacity MaxPerformance
     rlimit rtprio 10 10
     onrestart class_restart cameraWatchdog
-    interface aidl android.frameworks.cameraservice.service.ICameraService/default

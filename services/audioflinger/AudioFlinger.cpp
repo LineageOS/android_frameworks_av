@@ -231,9 +231,8 @@ BINDER_METHOD_ENTRY(getAAudioHardwareBurstMinUsec) \
 BINDER_METHOD_ENTRY(setDeviceConnectedState) \
 BINDER_METHOD_ENTRY(setRequestedLatencyMode) \
 BINDER_METHOD_ENTRY(getSupportedLatencyModes) \
-BINDER_METHOD_ENTRY(setBluetoothVariableLatencyEnabled) \
-BINDER_METHOD_ENTRY(isBluetoothVariableLatencyEnabled) \
-BINDER_METHOD_ENTRY(supportsBluetoothVariableLatency) \
+BINDER_METHOD_ENTRY(setBluetoothLatencyModesEnabled) \
+BINDER_METHOD_ENTRY(supportsBluetoothLatencyModes) \
 BINDER_METHOD_ENTRY(getSoundDoseInterface) \
 
 // singleton for Binder Method Statistics for IAudioFlinger
@@ -1670,12 +1669,12 @@ status_t AudioFlinger::getSupportedLatencyModes(audio_io_handle_t output,
     return thread->getSupportedLatencyModes(modes);
 }
 
-status_t AudioFlinger::setBluetoothVariableLatencyEnabled(bool enabled) {
+status_t AudioFlinger::setBluetoothLatencyModesEnabled(bool enabled) {
     Mutex::Autolock _l(mLock);
     status_t status = INVALID_OPERATION;
     for (size_t i = 0; i < mPlaybackThreads.size(); i++) {
         // Success if at least one PlaybackThread supports Bluetooth latency modes
-        if (mPlaybackThreads.valueAt(i)->setBluetoothVariableLatencyEnabled(enabled) == NO_ERROR) {
+        if (mPlaybackThreads.valueAt(i)->setBluetoothLatencyModesEnabled(enabled) == NO_ERROR) {
             status = NO_ERROR;
         }
     }
@@ -1685,22 +1684,14 @@ status_t AudioFlinger::setBluetoothVariableLatencyEnabled(bool enabled) {
     return status;
 }
 
-status_t AudioFlinger::isBluetoothVariableLatencyEnabled(bool *enabled) {
-    if (enabled == nullptr) {
-        return BAD_VALUE;
-    }
-    *enabled = mBluetoothLatencyModesEnabled.load();
-    return NO_ERROR;
-}
-
-status_t AudioFlinger::supportsBluetoothVariableLatency(bool* support) {
+status_t AudioFlinger::supportsBluetoothLatencyModes(bool* support) {
     if (support == nullptr) {
         return BAD_VALUE;
     }
     Mutex::Autolock _l(mLock);
     *support = false;
     for (size_t i = 0; i < mAudioHwDevs.size(); i++) {
-        if (mAudioHwDevs.valueAt(i)->supportsBluetoothVariableLatency()) {
+        if (mAudioHwDevs.valueAt(i)->supportsBluetoothLatencyModes()) {
              *support = true;
              break;
         }
@@ -2573,9 +2564,6 @@ audio_module_handle_t AudioFlinger::loadHwModule_l(const char *name)
         ALOGE("loadHwModule() error %d loading module %s", rc, name);
         return AUDIO_MODULE_HANDLE_NONE;
     }
-    if (!mMelReporter->activateHalSoundDoseComputation(name)) {
-        ALOGW("loadHwModule() sound dose reporting is not available");
-    }
 
     mHardwareStatus = AUDIO_HW_INIT;
     rc = dev->initCheck();
@@ -2626,7 +2614,7 @@ audio_module_handle_t AudioFlinger::loadHwModule_l(const char *name)
 
 
     if (bool supports = false;
-            dev->supportsBluetoothVariableLatency(&supports) == NO_ERROR && supports) {
+            dev->supportsBluetoothLatencyModes(&supports) == NO_ERROR && supports) {
         flags = static_cast<AudioHwDevice::Flags>(flags |
                 AudioHwDevice::AHWD_SUPPORTS_BT_LATENCY_MODES);
     }
@@ -3004,7 +2992,7 @@ sp<AudioFlinger::ThreadBase> AudioFlinger::openOutput_l(audio_module_handle_t mo
             if (thread->isMsdDevice()) {
                 thread->setDownStreamPatch(&patch);
             }
-            thread->setBluetoothVariableLatencyEnabled(mBluetoothLatencyModesEnabled.load());
+            thread->setBluetoothLatencyModesEnabled(mBluetoothLatencyModesEnabled.load());
             return thread;
         }
     }
@@ -4709,9 +4697,8 @@ status_t AudioFlinger::onTransactWrapper(TransactionCode code,
         case TransactionCode::SET_AUDIO_HAL_PIDS:
         case TransactionCode::SET_VIBRATOR_INFOS:
         case TransactionCode::UPDATE_SECONDARY_OUTPUTS:
-        case TransactionCode::SET_BLUETOOTH_VARIABLE_LATENCY_ENABLED:
-        case TransactionCode::IS_BLUETOOTH_VARIABLE_LATENCY_ENABLED:
-        case TransactionCode::SUPPORTS_BLUETOOTH_VARIABLE_LATENCY: {
+        case TransactionCode::SET_BLUETOOTH_LATENCY_MODES_ENABLED:
+        case TransactionCode::SUPPORTS_BLUETOOTH_LATENCY_MODES: {
             if (!isServiceUid(IPCThreadState::self()->getCallingUid())) {
                 ALOGW("%s: transaction %d received from PID %d unauthorized UID %d",
                       __func__, code, IPCThreadState::self()->getCallingPid(),

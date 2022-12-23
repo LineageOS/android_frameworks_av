@@ -32,34 +32,17 @@ constexpr static int kMaxTimestampDeltaInSec = 120;
 class MelReporter : public PatchCommandThread::PatchCommandListener {
 public:
     explicit MelReporter(AudioFlinger& audioFlinger)
-        : mAudioFlinger(audioFlinger),
-          mSoundDoseManager(sp<SoundDoseManager>::make()) {}
+        : mAudioFlinger(audioFlinger) {}
 
-    void onFirstRef() override;
+    void onFirstRef() override {
+        mAudioFlinger.mPatchCommandThread->addListener(this);
+    }
 
     /** Returns true if we should compute MEL for the given device. */
-    bool shouldComputeMelForDeviceType(audio_devices_t device);
+    static bool shouldComputeMelForDeviceType(audio_devices_t device);
 
-    /**
-     * Activates the MEL reporting from the HAL sound dose interface. If the HAL
-     * does not support the sound dose interface for this module, the internal MEL
-     * calculation will be use.
-     *
-     * For now support internal MelReporting only if the sound dose standalone HAL
-     * is not implemented
-     *
-     * @return true if the MEL reporting will be done from the sound dose HAL
-     * interface
-     */
-    bool activateHalSoundDoseComputation(const std::string& module);
-
-    /**
-     * Activates the MEL reporting from internal framework values. These are used
-     * as a fallback when there is no sound dose interface implementation from HAL.
-     * Note: the internal CSD computation does not guarantee a certification with
-     * IEC62368-1 3rd edition or EN50332-3
-     */
-    void activateInternalSoundDoseComputation();
+    // For now only support internal MelReporting
+    [[nodiscard]] bool isHalReportingEnabled() const { return false; }
 
     sp<media::ISoundDose> getSoundDoseInterface(const sp<media::ISoundDoseCallback>& callback);
 
@@ -71,17 +54,9 @@ public:
     void onReleaseAudioPatch(audio_patch_handle_t handle) override;
 
 private:
-    void stopInternalMelComputation();
-    void stopInternalMelComputationForStream(audio_io_handle_t streamId);
-
-    void startMelComputationForNewPatch(audio_io_handle_t streamHandle,
-                                        audio_port_handle_t deviceId);
-
     AudioFlinger& mAudioFlinger;  // does not own the object
-    std::shared_ptr<::aidl::android::hardware::audio::sounddose::ISoundDoseFactory>
-        mSoundDoseFactory;
 
-    sp<SoundDoseManager> mSoundDoseManager;
+    SoundDoseManager mSoundDoseManager;
 
     struct ActiveMelPatch {
         audio_io_handle_t streamHandle{AUDIO_IO_HANDLE_NONE};
@@ -95,5 +70,4 @@ private:
     std::mutex mLock;
     std::unordered_map<audio_patch_handle_t, ActiveMelPatch>
         mActiveMelPatches GUARDED_BY(AudioFlinger::MelReporter::mLock);
-    bool mUseHalSoundDoseInterface GUARDED_BY(AudioFlinger::MelReporter::mLock) = false;
 };

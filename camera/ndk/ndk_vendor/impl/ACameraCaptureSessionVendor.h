@@ -14,13 +14,8 @@
  * limitations under the License.
  */
 
-#include "utils.h"
-
-#include <android/binder_auto_utils.h>
 #include <string>
-#include <set>
-
-using ::android::acam::utils::native_handle_ptr_wrapper;
+#include "utils.h"
 
 struct ACaptureSessionOutput {
     explicit ACaptureSessionOutput(const native_handle_t* window, bool isShared = false,
@@ -43,23 +38,8 @@ struct ACaptureSessionOutput {
         return mWindow > other.mWindow;
     }
 
-    inline bool isWindowEqual(ACameraWindowType* window) const {
-        return mWindow == native_handle_ptr_wrapper(window);
-    }
-
-    // returns true if the window was successfully added, false otherwise.
-    inline bool addSharedWindow(ACameraWindowType* window) {
-        auto ret = mSharedWindows.insert(window);
-        return ret.second;
-    }
-
-    // returns the number of elements removed.
-    inline size_t removeSharedWindow(ACameraWindowType* window) {
-        return mSharedWindows.erase(window);
-    }
-
-    native_handle_ptr_wrapper mWindow;
-    std::set<native_handle_ptr_wrapper> mSharedWindows;
+    android::acam::utils::native_handle_ptr_wrapper mWindow;
+    std::set<android::acam::utils::native_handle_ptr_wrapper> mSharedWindows;
     bool           mIsShared;
     int            mRotation = CAMERA3_STREAM_ROTATION_0;
     std::string mPhysicalCameraId;

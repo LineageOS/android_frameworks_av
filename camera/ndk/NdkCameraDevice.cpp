@@ -22,10 +22,17 @@
 #include <utils/Trace.h>
 
 #include <camera/NdkCameraDevice.h>
-
 #include "impl/ACameraCaptureSession.h"
 
 using namespace android::acam;
+
+bool areWindowTypesEqual(ACameraWindowType *a, ACameraWindowType *b) {
+#ifdef __ANDROID_VNDK__
+    return utils::isWindowNativeHandleEqual(a, b);
+#else
+    return a == b;
+#endif
+}
 
 EXPORT
 camera_status_t ACameraDevice_close(ACameraDevice* device) {
@@ -176,15 +183,14 @@ camera_status_t ACaptureSessionSharedOutput_add(ACaptureSessionOutput *out,
                 __FUNCTION__);
         return ACAMERA_ERROR_INVALID_OPERATION;
     }
-    if (out->isWindowEqual(window)) {
+    if (areWindowTypesEqual(out->mWindow, window)) {
         ALOGE("%s: Error trying to add the same window associated with the output configuration",
                 __FUNCTION__);
         return ACAMERA_ERROR_INVALID_PARAMETER;
     }
 
-
-    bool insert = out->addSharedWindow(window);
-    camera_status_t ret = (insert) ? ACAMERA_OK : ACAMERA_ERROR_INVALID_PARAMETER;
+    auto insert = out->mSharedWindows.insert(window);
+    camera_status_t ret = (insert.second) ? ACAMERA_OK : ACAMERA_ERROR_INVALID_PARAMETER;
     return ret;
 }
 
@@ -202,13 +208,13 @@ camera_status_t ACaptureSessionSharedOutput_remove(ACaptureSessionOutput *out,
                 __FUNCTION__);
         return ACAMERA_ERROR_INVALID_OPERATION;
     }
-    if (out->isWindowEqual(window)) {
+    if (areWindowTypesEqual(out->mWindow, window)) {
         ALOGE("%s: Error trying to remove the same window associated with the output configuration",
                 __FUNCTION__);
         return ACAMERA_ERROR_INVALID_PARAMETER;
     }
 
-    auto remove = out->removeSharedWindow(window);
+    auto remove = out->mSharedWindows.erase(window);
     camera_status_t ret = (remove) ? ACAMERA_OK : ACAMERA_ERROR_INVALID_PARAMETER;
     return ret;
 }

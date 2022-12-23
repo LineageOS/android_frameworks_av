@@ -24,10 +24,9 @@ SincResampler::SincResampler(const MultiChannelResampler::Builder &builder)
         : MultiChannelResampler(builder)
         , mSingleFrame2(builder.getChannelCount()) {
     assert((getNumTaps() % 4) == 0); // Required for loop unrolling.
-    mNumRows = kMaxCoefficients / getNumTaps(); // includes guard row
-    const int32_t numRowsNoGuard = mNumRows - 1;
-    mPhaseScaler = (double) numRowsNoGuard / mDenominator;
-    const double phaseIncrement = 1.0 / numRowsNoGuard;
+    mNumRows = kMaxCoefficients / getNumTaps(); // no guard row needed
+    mPhaseScaler = (double) mNumRows / mDenominator;
+    double phaseIncrement = 1.0 / mNumRows;
     generateCoefficients(builder.getInputRate(),
                          builder.getOutputRate(),
                          mNumRows,
@@ -41,31 +40,39 @@ void SincResampler::readFrame(float *frame) {
     std::fill(mSingleFrame2.begin(), mSingleFrame2.end(), 0.0);
 
     // Determine indices into coefficients table.
-    const double tablePhase = getIntegerPhase() * mPhaseScaler;
-    const int indexLow = static_cast<int>(floor(tablePhase));
-    const int indexHigh = indexLow + 1; // OK because using a guard row.
-    assert (indexHigh < mNumRows);
-    float *coefficientsLow = &mCoefficients[static_cast<size_t>(indexLow)
-                                            * static_cast<size_t>(getNumTaps())];
-    float *coefficientsHigh = &mCoefficients[static_cast<size_t>(indexHigh)
-                                             * static_cast<size_t>(getNumTaps())];
+    double tablePhase = getIntegerPhase() * mPhaseScaler;
+    int index1 = static_cast<int>(floor(tablePhase));
+    if (index1 >= mNumRows) { // no guard row needed because we wrap the indices
+        tablePhase -= mNumRows;
+        index1 -= mNumRows;
+    }
+
+    int index2 = index1 + 1;
+    if (index2 >= mNumRows) { // no guard row needed because we wrap the indices
+        index2 -= mNumRows;
+    }
+
+    float *coefficients1 = &mCoefficients[static_cast<size_t>(index1)
+            * static_cast<size_t>(getNumTaps())];
+    float *coefficients2 = &mCoefficients[static_cast<size_t>(index2)
+            * static_cast<size_t>(getNumTaps())];
 
     float *xFrame = &mX[static_cast<size_t>(mCursor) * static_cast<size_t>(getChannelCount())];
-    for (int tap = 0; tap < mNumTaps; tap++) {
-        const float coefficientLow = *coefficientsLow++;
-        const float coefficientHigh = *coefficientsHigh++;
+    for (int i = 0; i < mNumTaps; i++) {
+        float coefficient1 = *coefficients1++;
+        float coefficient2 = *coefficients2++;
         for (int channel = 0; channel < getChannelCount(); channel++) {
-            const float sample = *xFrame++;
-            mSingleFrame[channel] += sample * coefficientLow;
-            mSingleFrame2[channel] += sample * coefficientHigh;
+            float sample = *xFrame++;
+            mSingleFrame[channel] +=  sample * coefficient1;
+            mSingleFrame2[channel] += sample * coefficient2;
         }
     }
 
     // Interpolate and copy to output.
-    const float fraction = tablePhase - indexLow;
+    float fraction = tablePhase - index1;
     for (int channel = 0; channel < getChannelCount(); channel++) {
-        const float low = mSingleFrame[channel];
-        const float high = mSingleFrame2[channel];
+        float low = mSingleFrame[channel];
+        float high = mSingleFrame2[channel];
         frame[channel] = low + (fraction * (high - low));
     }
 }

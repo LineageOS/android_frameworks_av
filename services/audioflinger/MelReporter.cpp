@@ -22,88 +22,11 @@
 
 #include <android/media/ISoundDoseCallback.h>
 #include <audio_utils/power.h>
-#include <android/binder_manager.h>
 #include <utils/Log.h>
-
-using aidl::android::hardware::audio::core::ISoundDose;
-using aidl::android::hardware::audio::sounddose::ISoundDoseFactory;
 
 namespace android {
 
-constexpr std::string_view kSoundDoseInterfaceModule = "/default";
-
-bool AudioFlinger::MelReporter::activateHalSoundDoseComputation(const std::string& module) {
-    if (mSoundDoseManager->forceUseFrameworkMel()) {
-        ALOGD("%s: Forcing use of internal MEL computation.", __func__);
-        activateInternalSoundDoseComputation();
-        return false;
-    }
-
-    if (mSoundDoseFactory == nullptr) {
-        ALOGW("%s: sound dose HAL reporting not available", __func__);
-        activateInternalSoundDoseComputation();
-        return false;
-    }
-
-    std::shared_ptr<ISoundDose> soundDoseInterface;
-    auto result = mSoundDoseFactory->getSoundDose(module, &soundDoseInterface);
-    if (!result.isOk()) {
-        ALOGW("%s: HAL cannot provide sound dose interface for module %s",
-              __func__, module.c_str());
-        activateInternalSoundDoseComputation();
-        return false;
-    }
-
-    if (!mSoundDoseManager->setHalSoundDoseInterface(soundDoseInterface)) {
-        ALOGW("%s: cannot activate HAL MEL reporting for module %s", __func__, module.c_str());
-        activateInternalSoundDoseComputation();
-        return false;
-    }
-
-    std::lock_guard _l(mLock);
-    mUseHalSoundDoseInterface = true;
-    stopInternalMelComputation();
-    return true;
-}
-
-void AudioFlinger::MelReporter::activateInternalSoundDoseComputation() {
-    {
-        std::lock_guard _l(mLock);
-        if (!mUseHalSoundDoseInterface) {
-            // no need to start internal MEL on active patches
-            return;
-        }
-        mUseHalSoundDoseInterface = false;
-    }
-
-    mSoundDoseManager->setHalSoundDoseInterface(nullptr);
-
-    for (const auto& activePatches : mActiveMelPatches) {
-        for (const auto& deviceId : activePatches.second.deviceHandles) {
-            startMelComputationForNewPatch(activePatches.second.streamHandle, deviceId);
-        }
-    }
-}
-
-void AudioFlinger::MelReporter::onFirstRef() {
-    mAudioFlinger.mPatchCommandThread->addListener(this);
-
-    std::string interface =
-        std::string(ISoundDoseFactory::descriptor) + kSoundDoseInterfaceModule.data();
-    AIBinder* binder = AServiceManager_checkService(interface.c_str());
-    if (binder == nullptr) {
-        ALOGW("%s service %s doesn't exist", __func__, interface.c_str());
-        return;
-    }
-
-    mSoundDoseFactory = ISoundDoseFactory::fromBinder(ndk::SpAIBinder(binder));
-}
-
 bool AudioFlinger::MelReporter::shouldComputeMelForDeviceType(audio_devices_t device) {
-    if (mSoundDoseManager->forceComputeCsdOnAllDevices()) {
-        return true;
-    }
-
     switch (device) {
         case AUDIO_DEVICE_OUT_WIRED_HEADSET:
         case AUDIO_DEVICE_OUT_WIRED_HEADPHONE:
@@ -138,38 +61,23 @@ void AudioFlinger::MelReporter::onCreateAudioPatch(audio_patch_handle_t handle,
             && shouldComputeMelForDeviceType(patch.mAudioPatch.sinks[i].ext.device.type)) {
             audio_port_handle_t deviceId = patch.mAudioPatch.sinks[i].id;
             newPatch.deviceHandles.push_back(deviceId);
-            AudioDeviceTypeAddr adt{patch.mAudioPatch.sinks[i].ext.device.type,
-                                    patch.mAudioPatch.sinks[i].ext.device.address};
-            mSoundDoseManager->mapAddressToDeviceId(adt, deviceId);
 
-            bool useHalSoundDoseInterface = !mSoundDoseManager->forceUseFrameworkMel();
-            {
-                std::lock_guard _l(mLock);
-                useHalSoundDoseInterface &= mUseHalSoundDoseInterface;
-            }
-            if (!useHalSoundDoseInterface) {
-                startMelComputationForNewPatch(streamHandle, deviceId);
+            // Start the MEL calculation in the PlaybackThread
+            std::lock_guard _lAf(mAudioFlinger.mLock);
+            auto thread = mAudioFlinger.checkPlaybackThread_l(streamHandle);
+            if (thread != nullptr) {
+                thread->startMelComputation(mSoundDoseManager.getOrCreateProcessorForDevice(
+                    deviceId,
+                    newPatch.streamHandle,
+                    thread->mSampleRate,
+                    thread->mChannelCount,
+                    thread->mFormat));
             }
         }
     }
 
     std::lock_guard _l(mLock);
     mActiveMelPatches[patch.mAudioPatch.id] = newPatch;
-}
-
-void AudioFlinger::MelReporter::startMelComputationForNewPatch(
-        audio_io_handle_t streamHandle, audio_port_handle_t deviceId) {
-    // Start the MEL calculation in the PlaybackThread
-    std::lock_guard _lAf(mAudioFlinger.mLock);
-    auto thread = mAudioFlinger.checkPlaybackThread_l(streamHandle);
-    if (thread != nullptr) {
-        thread->startMelComputation(mSoundDoseManager->getOrCreateProcessorForDevice(
-            deviceId,
-            streamHandle,
-            thread->mSampleRate,
-            thread->mChannelCount,
-            thread->mFormat));
-    }
 }
 
 void AudioFlinger::MelReporter::onReleaseAudioPatch(audio_patch_handle_t handle) {
@@ -191,47 +99,25 @@ void AudioFlinger::MelReporter::onReleaseAudioPatch(audio_patch_handle_t handle)
         mActiveMelPatches.erase(patchIt);
     }
 
-    for (const auto& deviceId : melPatch.deviceHandles) {
-        mSoundDoseManager->clearMapDeviceIdEntries(deviceId);
-    }
-    stopInternalMelComputationForStream(melPatch.streamHandle);
-}
-
-sp<media::ISoundDose> AudioFlinger::MelReporter::getSoundDoseInterface(
-        const sp<media::ISoundDoseCallback>& callback) {
-    // no need to lock since getSoundDoseInterface is synchronized
-    return mSoundDoseManager->getSoundDoseInterface(callback);
-}
-
-void AudioFlinger::MelReporter::stopInternalMelComputation() {
-    ALOGV("%s", __func__);
-    std::unordered_map<audio_patch_handle_t, ActiveMelPatch> activePatchesCopy;
-    {
-        std::lock_guard _l(mLock);
-        activePatchesCopy = mActiveMelPatches;
-        mActiveMelPatches.clear();
-    }
-
-    for (const auto& activePatch : activePatchesCopy) {
-        stopInternalMelComputationForStream(activePatch.second.streamHandle);
-    }
-}
-
-void AudioFlinger::MelReporter::stopInternalMelComputationForStream(audio_io_handle_t streamId) {
-    ALOGV("%s: stop internal mel for stream id: %d", __func__, streamId);
-
+    // Stop MEL calculation for the PlaybackThread
     std::lock_guard _lAf(mAudioFlinger.mLock);
-    mSoundDoseManager->removeStreamProcessor(streamId);
-    auto thread = mAudioFlinger.checkPlaybackThread_l(streamId);
+    mSoundDoseManager.removeStreamProcessor(melPatch.streamHandle);
+    auto thread = mAudioFlinger.checkPlaybackThread_l(melPatch.streamHandle);
     if (thread != nullptr) {
         thread->stopMelComputation();
     }
 }
 
+sp<media::ISoundDose> AudioFlinger::MelReporter::getSoundDoseInterface(
+        const sp<media::ISoundDoseCallback>& callback) {
+    // no need to lock since getSoundDoseInterface is synchronized
+    return mSoundDoseManager.getSoundDoseInterface(callback);
+}
+
 std::string AudioFlinger::MelReporter::dump() {
     std::lock_guard _l(mLock);
     std::string output("\nSound Dose:\n");
-    output.append(mSoundDoseManager->dump());
+    output.append(mSoundDoseManager.dump());
     return output;
 }
 

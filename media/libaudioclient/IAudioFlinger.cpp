@@ -846,28 +846,17 @@ status_t AudioFlingerClientAdapter::getSupportedLatencyModes(
     return NO_ERROR;
 }
 
-status_t AudioFlingerClientAdapter::setBluetoothVariableLatencyEnabled(bool enabled) {
-    return statusTFromBinderStatus(mDelegate->setBluetoothVariableLatencyEnabled(enabled));
+status_t AudioFlingerClientAdapter::setBluetoothLatencyModesEnabled(bool enabled) {
+    return statusTFromBinderStatus(mDelegate->setBluetoothLatencyModesEnabled(enabled));
 }
 
-status_t AudioFlingerClientAdapter::isBluetoothVariableLatencyEnabled(bool* enabled) {
-    if (enabled == nullptr) {
-        return BAD_VALUE;
-    }
-
-    RETURN_STATUS_IF_ERROR(statusTFromBinderStatus(
-            mDelegate->isBluetoothVariableLatencyEnabled(enabled)));
-
-    return NO_ERROR;
-}
-
-status_t AudioFlingerClientAdapter::supportsBluetoothVariableLatency(bool* support) {
+status_t AudioFlingerClientAdapter::supportsBluetoothLatencyModes(bool* support) {
     if (support == nullptr) {
         return BAD_VALUE;
     }
 
     RETURN_STATUS_IF_ERROR(statusTFromBinderStatus(
-            mDelegate->supportsBluetoothVariableLatency(support)));
+            mDelegate->supportsBluetoothLatencyModes(support)));
 
     return NO_ERROR;
 }
@@ -1400,16 +1389,12 @@ Status AudioFlingerServerAdapter::getSupportedLatencyModes(
     return Status::ok();
 }
 
-Status AudioFlingerServerAdapter::setBluetoothVariableLatencyEnabled(bool enabled) {
-    return Status::fromStatusT(mDelegate->setBluetoothVariableLatencyEnabled(enabled));
+Status AudioFlingerServerAdapter::setBluetoothLatencyModesEnabled(bool enabled) {
+    return Status::fromStatusT(mDelegate->setBluetoothLatencyModesEnabled(enabled));
 }
 
-Status AudioFlingerServerAdapter::isBluetoothVariableLatencyEnabled(bool *enabled) {
-    return Status::fromStatusT(mDelegate->isBluetoothVariableLatencyEnabled(enabled));
-}
-
-Status AudioFlingerServerAdapter::supportsBluetoothVariableLatency(bool *support) {
-    return Status::fromStatusT(mDelegate->supportsBluetoothVariableLatency(support));
+Status AudioFlingerServerAdapter::supportsBluetoothLatencyModes(bool *support) {
+    return Status::fromStatusT(mDelegate->supportsBluetoothLatencyModes(support));
 }
 
 Status AudioFlingerServerAdapter::getSoundDoseInterface(

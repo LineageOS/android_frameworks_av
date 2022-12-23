@@ -1280,26 +1280,17 @@ status_t AudioPolicyManager::getOutputForAttrInt(
             info = getPreferredMixerAttributesInfo(
                     outputDevices.itemAt(0)->getId(),
                     mEngine->getProductStrategyForAttributes(*resultAttr));
-            // Only use preferred mixer if the uid matches or the preferred mixer is bit-perfect
-            // and it is currently active.
-            if (info != nullptr && info->getUid() != uid &&
-                ((info->getFlags() & AUDIO_OUTPUT_FLAG_BIT_PERFECT) == AUDIO_OUTPUT_FLAG_NONE ||
-                        info->getActiveClientCount() == 0)) {
+            if (info != nullptr && info->getUid() != uid && info->getActiveClientCount() == 0) {
+                // Only use preferred mixer when the requested uid matched or
+                // there is active client on preferred mixer.
                 info = nullptr;
             }
         }
         *output = getOutputForDevices(outputDevices, session, resultAttr, config,
                 flags, isSpatialized, info, resultAttr->flags & AUDIO_FLAG_MUTE_HAPTIC);
-        // The client will be active if the client is currently preferred mixer owner and the
-        // requested configuration matches the preferred mixer configuration.
         *isBitPerfect = (info != nullptr
                 && (info->getFlags() & AUDIO_OUTPUT_FLAG_BIT_PERFECT) != AUDIO_OUTPUT_FLAG_NONE
-                && info->getUid() == uid
-                && *output != AUDIO_IO_HANDLE_NONE
-                // When bit-perfect output is selected for the preferred mixer attributes owner,
-                // only need to consider the config matches.
-                && mOutputs.valueFor(*output)->isConfigurationMatched(
-                        clientConfig, AUDIO_OUTPUT_FLAG_NONE));
+                && *output != AUDIO_IO_HANDLE_NONE);
     }
     if (*output == AUDIO_IO_HANDLE_NONE) {
         AudioProfileVector profiles;

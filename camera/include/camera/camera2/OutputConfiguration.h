@@ -44,7 +44,8 @@ public:
         TIMESTAMP_BASE_MONOTONIC = 2,
         TIMESTAMP_BASE_REALTIME = 3,
         TIMESTAMP_BASE_CHOREOGRAPHER_SYNCED = 4,
-        TIMESTAMP_BASE_MAX = TIMESTAMP_BASE_CHOREOGRAPHER_SYNCED,
+        TIMESTAMP_BASE_READOUT_SENSOR = 5,
+        TIMESTAMP_BASE_MAX = TIMESTAMP_BASE_READOUT_SENSOR,
     };
     enum MirrorModeType {
         MIRROR_MODE_AUTO = 0,
@@ -68,7 +69,6 @@ public:
     int64_t                    getStreamUseCase() const;
     int                        getTimestampBase() const;
     int                        getMirrorMode() const;
-    bool                       useReadoutTimestamp() const;
 
     // set of sensor pixel mode resolutions allowed {MAX_RESOLUTION, DEFAULT_MODE};
     const std::vector<int32_t>&            getSensorPixelModesUsed() const;
@@ -115,8 +115,7 @@ public:
                 mColorSpace == other.mColorSpace &&
                 mStreamUseCase == other.mStreamUseCase &&
                 mTimestampBase == other.mTimestampBase &&
-                mMirrorMode == other.mMirrorMode &&
-                mUseReadoutTimestamp == other.mUseReadoutTimestamp);
+                mMirrorMode == other.mMirrorMode);
     }
     bool operator != (const OutputConfiguration& other) const {
         return !(*this == other);
@@ -168,9 +167,6 @@ public:
         if (mMirrorMode != other.mMirrorMode) {
             return mMirrorMode < other.mMirrorMode;
         }
-        if (mUseReadoutTimestamp != other.mUseReadoutTimestamp) {
-            return mUseReadoutTimestamp < other.mUseReadoutTimestamp;
-        }
         return gbpsLessThan(other);
     }
 
@@ -200,7 +196,6 @@ private:
     int64_t                    mStreamUseCase;
     int                        mTimestampBase;
     int                        mMirrorMode;
-    bool                       mUseReadoutTimestamp;
 };
 } // namespace params
 } // namespace camera2

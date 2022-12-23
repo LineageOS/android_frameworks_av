@@ -1102,7 +1102,7 @@ public:
                     return INVALID_OPERATION;
                 }
 
-    virtual     status_t setBluetoothVariableLatencyEnabled(bool enabled);
+    virtual     status_t setBluetoothLatencyModesEnabled(bool enabled);
 
                 void startMelComputation(const sp<audio_utils::MelProcessor>& processor);
                 void stopMelComputation();

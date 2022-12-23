@@ -33,7 +33,6 @@
 #include <sys/types.h>
 #include <limits.h>
 
-#include <aidl/android/hardware/audio/sounddose/ISoundDoseFactory.h>
 #include <android/media/BnAudioTrack.h>
 #include <android/media/IAudioFlingerClient.h>
 #include <android/media/IAudioTrackCallback.h>
@@ -306,11 +305,9 @@ public:
     virtual status_t getSupportedLatencyModes(audio_io_handle_t output,
             std::vector<audio_latency_mode_t>* modes);
 
-    virtual status_t setBluetoothVariableLatencyEnabled(bool enabled);
+    virtual status_t setBluetoothLatencyModesEnabled(bool enabled);
 
-    virtual status_t isBluetoothVariableLatencyEnabled(bool* enabled);
-
-    virtual status_t supportsBluetoothVariableLatency(bool* support);
+    virtual status_t supportsBluetoothLatencyModes(bool* support);
 
     virtual status_t getSoundDoseInterface(const sp<media::ISoundDoseCallback>& callback,
                                            sp<media::ISoundDose>* soundDose);

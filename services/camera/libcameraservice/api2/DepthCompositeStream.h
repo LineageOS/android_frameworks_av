@@ -54,7 +54,7 @@ public:
             const std::unordered_set<int32_t> &sensorPixelModesUsed,
             std::vector<int> *surfaceIds,
             int streamSetId, bool isShared, int32_t colorSpace,
-            int64_t dynamicProfile, int64_t streamUseCase, bool useReadoutTimestamp) override;
+            int64_t dynamicProfile, int64_t streamUseCase) override;
     status_t deleteInternalStreams() override;
     status_t configureStream() override;
     status_t insertGbp(SurfaceMap* /*out*/outSurfaceMap, Vector<int32_t>* /*out*/outputStreamIds,

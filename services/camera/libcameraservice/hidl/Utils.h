@@ -97,6 +97,8 @@ hidl_vec<HPhysicalCaptureResultInfo> convertToHidl(
 
 HStatus B2HStatus(const binder::Status &bStatus);
 
+status_t filterVndkKeys(int vndk_version, CameraMetadata &metadata, bool isStatic = true);
+
 } // conversion
 } // utils
 } // cameraservice
