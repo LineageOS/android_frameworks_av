@@ -108,5 +108,6 @@ std::map<int, std::vector<camera_metadata_tag>> dynamic_api_level_to_keys{
           ANDROID_CONTROL_SETTINGS_OVERRIDING_FRAME_NUMBER,
           ANDROID_EXTENSION_CURRENT_TYPE,
           ANDROID_EXTENSION_STRENGTH,
+          ANDROID_SCALER_RAW_CROP_REGION,
         }  },
 };

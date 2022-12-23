@@ -956,14 +956,14 @@ binder::Status CameraDeviceClient::createStream(
     std::vector<int> surfaceIds;
     bool isDepthCompositeStream =
             camera3::DepthCompositeStream::isDepthCompositeStream(surfaces[0]);
-    bool isHeicCompisiteStream = camera3::HeicCompositeStream::isHeicCompositeStream(surfaces[0]);
+    bool isHeicCompositeStream = camera3::HeicCompositeStream::isHeicCompositeStream(surfaces[0]);
     bool isJpegRCompositeStream =
         camera3::JpegRCompositeStream::isJpegRCompositeStream(surfaces[0]);
-    if (isDepthCompositeStream || isHeicCompisiteStream || isJpegRCompositeStream) {
+    if (isDepthCompositeStream || isHeicCompositeStream || isJpegRCompositeStream) {
         sp<CompositeStream> compositeStream;
         if (isDepthCompositeStream) {
             compositeStream = new camera3::DepthCompositeStream(mDevice, getRemoteCallback());
-        } else if (isHeicCompisiteStream) {
+        } else if (isHeicCompositeStream) {
             compositeStream = new camera3::HeicCompositeStream(mDevice, getRemoteCallback());
         } else {
             compositeStream = new camera3::JpegRCompositeStream(mDevice, getRemoteCallback());

@@ -121,8 +121,22 @@ static const Descriptor kVirtualizerDesc = {
                    .implementor = "NXP Software Ltd."},
         .capability = Capability::make<Capability::virtualizer>(kVirtualizerCap)};
 
-// TODO: add descriptors for other bundle effect types here.
-static const Descriptor kVolumeDesc;
+static const Volume::Capability kVolumeCap = {.maxLevel = Volume::MAX_LEVEL_DB};
+
+static const std::string kVolumeEffectName = "Volume";
+
+static const Descriptor kVolumeDesc = {
+        .common = {.id = {.type = kVolumeTypeUUID,
+                          .uuid = kVolumeBundleImplUUID,
+                          .proxy = std::nullopt},
+                   .flags = {.type = Flags::Type::INSERT,
+                             .insert = Flags::Insert::LAST,
+                             .volume = Flags::Volume::CTRL},
+                   .cpuLoad = VOLUME_CUP_LOAD_ARM9E,
+                   .memoryUsage = BUNDLE_MEM_USAGE,
+                   .name = kVolumeEffectName,
+                   .implementor = "NXP Software Ltd."},
+        .capability = Capability::make<Capability::volume>(kVolumeCap)};
 
 /* The following tables have been computed using the actual levels measured by the output of
  * white noise or pink noise (IEC268-1) for the EQ and BassBoost Effects. These are estimates of

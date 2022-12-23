@@ -709,9 +709,10 @@ public:
     Status getAAudioMixerBurstCount(int32_t* _aidl_return) override;
     Status getAAudioHardwareBurstMinUsec(int32_t* _aidl_return) override;
     Status setDeviceConnectedState(const media::AudioPortFw& port, bool connected) override;
-    Status setRequestedLatencyMode(int output, media::LatencyMode mode) override;
+    Status setRequestedLatencyMode(
+            int output, media::audio::common::AudioLatencyMode mode) override;
     Status getSupportedLatencyModes(int output,
-            std::vector<media::LatencyMode>* _aidl_return) override;
+            std::vector<media::audio::common::AudioLatencyMode>* _aidl_return) override;
     Status setBluetoothVariableLatencyEnabled(bool enabled) override;
     Status isBluetoothVariableLatencyEnabled(bool* enabled) override;
     Status supportsBluetoothVariableLatency(bool* support) override;
