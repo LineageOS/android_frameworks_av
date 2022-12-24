@@ -440,7 +440,8 @@ Status AudioFlinger::TrackHandle::getVolumeShaperState(
     return Status::ok();
 }
 
-Status AudioFlinger::TrackHandle::getDualMonoMode(media::AudioDualMonoMode* _aidl_return)
+Status AudioFlinger::TrackHandle::getDualMonoMode(
+        media::audio::common::AudioDualMonoMode* _aidl_return)
 {
     audio_dual_mono_mode_t mode = AUDIO_DUAL_MONO_MODE_OFF;
     const status_t status = mTrack->getDualMonoMode(&mode)
@@ -453,7 +454,7 @@ Status AudioFlinger::TrackHandle::getDualMonoMode(media::AudioDualMonoMode* _aid
 }
 
 Status AudioFlinger::TrackHandle::setDualMonoMode(
-        media::AudioDualMonoMode mode)
+        media::audio::common::AudioDualMonoMode mode)
 {
     const auto localMonoMode = VALUE_OR_RETURN_BINDER_STATUS(
             aidl2legacy_AudioDualMonoMode_audio_dual_mono_mode_t(mode));
@@ -477,7 +478,7 @@ Status AudioFlinger::TrackHandle::setAudioDescriptionMixLevel(float leveldB)
 }
 
 Status AudioFlinger::TrackHandle::getPlaybackRateParameters(
-        media::AudioPlaybackRate* _aidl_return)
+        media::audio::common::AudioPlaybackRate* _aidl_return)
 {
     audio_playback_rate_t localPlaybackRate{};
     status_t status = mTrack->getPlaybackRateParameters(&localPlaybackRate)
@@ -490,7 +491,7 @@ Status AudioFlinger::TrackHandle::getPlaybackRateParameters(
 }
 
 Status AudioFlinger::TrackHandle::setPlaybackRateParameters(
-        const media::AudioPlaybackRate& playbackRate)
+        const media::audio::common::AudioPlaybackRate& playbackRate)
 {
     const audio_playback_rate_t localPlaybackRate = VALUE_OR_RETURN_BINDER_STATUS(
             aidl2legacy_AudioPlaybackRate_audio_playback_rate_t(playbackRate));
@@ -792,7 +793,7 @@ void AudioFlinger::PlaybackThread::Track::appendDumpHeader(String8& result)
                         "  Format Chn mask  SRate "
                         "ST Usg CT "
                         " G db  L dB  R dB  VS dB "
-                        "  Server FrmCnt  FrmRdy F Underruns  Flushed"
+                        "  Server FrmCnt  FrmRdy F Underruns  Flushed BitPerfect"
                         "%s\n",
                         isServerLatencySupported() ? "   Latency" : "");
 }
@@ -878,7 +879,7 @@ void AudioFlinger::PlaybackThread::Track::appendDump(String8& result, bool activ
                         "%08X %08X %6u "
                         "%2u %3x %2x "
                         "%5.2g %5.2g %5.2g %5.2g%c "
-                        "%08X %6zu%c %6zu %c %9u%c %7u",
+                        "%08X %6zu%c %6zu %c %9u%c %7u %10s",
             active ? "yes" : "no",
             (mClient == 0) ? getpid() : mClient->pid(),
             mSessionId,
@@ -907,7 +908,8 @@ void AudioFlinger::PlaybackThread::Track::appendDump(String8& result, bool activ
             fillingStatus,
             mAudioTrackServerProxy->getUnderrunFrames(),
             nowInUnderrun,
-            (unsigned)mAudioTrackServerProxy->framesFlushed() % 10000000
+            (unsigned)mAudioTrackServerProxy->framesFlushed() % 10000000,
+            isBitPerfect() ? "true" : "false"
             );
 
     if (isServerLatencySupported()) {
@@ -1160,6 +1162,23 @@ status_t AudioFlinger::PlaybackThread::Track::start(AudioSystem::sync_event_t ev
     }
     if (status == NO_ERROR) {
         forEachTeePatchTrack([](auto patchTrack) { patchTrack->start(); });
+
+        // send format to AudioManager for playback activity monitoring
+        sp<IAudioManager> audioManager = thread->mAudioFlinger->getOrCreateAudioManager();
+        if (audioManager && mPortId != AUDIO_PORT_HANDLE_NONE) {
+            std::unique_ptr<os::PersistableBundle> bundle =
+                    std::make_unique<os::PersistableBundle>();
+        bundle->putBoolean(String16(kExtraPlayerEventSpatializedKey),
+                           isSpatialized());
+        bundle->putInt(String16(kExtraPlayerEventSampleRateKey), mSampleRate);
+        bundle->putInt(String16(kExtraPlayerEventChannelMaskKey), mChannelMask);
+        status_t result = audioManager->portEvent(mPortId,
+                                                  PLAYER_UPDATE_FORMAT, bundle);
+        if (result != OK) {
+            ALOGE("%s: unable to send playback format for port ID %d, status error %d",
+                  __func__, mPortId, result);
+        }
+      }
     }
     return status;
 }

@@ -3740,9 +3740,9 @@ typedef enum acamera_metadata_tag {
      * <p>Output streams use this rectangle to produce their output, cropping to a smaller region
      * if necessary to maintain the stream's aspect ratio, then scaling the sensor input to
      * match the output's configured resolution.</p>
-     * <p>The crop region is applied after the RAW to other color space (e.g. YUV)
-     * conversion. Since raw streams (e.g. RAW16) don't have the conversion stage, they are not
-     * croppable. The crop region will be ignored by raw streams.</p>
+     * <p>The crop region is usually applied after the RAW to other color space (e.g. YUV)
+     * conversion. As a result RAW streams are not croppable unless supported by the
+     * camera device. See ACAMERA_SCALER_AVAILABLE_STREAM_USE_CASES#CROPPED_RAW for details.</p>
      * <p>For non-raw streams, any additional per-stream cropping will be done to maximize the
      * final pixel area of the stream.</p>
      * <p>For example, if the crop region is set to a 4:3 aspect ratio, then 4:3 streams will use
@@ -3833,6 +3833,7 @@ typedef enum acamera_metadata_tag {
      * @see ACAMERA_CONTROL_ZOOM_RATIO
      * @see ACAMERA_DISTORTION_CORRECTION_MODE
      * @see ACAMERA_SCALER_AVAILABLE_MAX_DIGITAL_ZOOM
+     * @see ACAMERA_SCALER_AVAILABLE_STREAM_USE_CASES
      * @see ACAMERA_SCALER_CROPPING_TYPE
      * @see ACAMERA_SENSOR_INFO_ACTIVE_ARRAY_SIZE
      * @see ACAMERA_SENSOR_INFO_ACTIVE_ARRAY_SIZE_MAXIMUM_RESOLUTION
@@ -4488,6 +4489,59 @@ typedef enum acamera_metadata_tag {
      */
     ACAMERA_SCALER_AVAILABLE_STREAM_USE_CASES =                 // int64[n] (acamera_metadata_enum_android_scaler_available_stream_use_cases_t)
             ACAMERA_SCALER_START + 25,
+    /**
+     * <p>The region of the sensor that corresponds to the RAW read out for this
+     * capture when the stream use case of a RAW stream is set to CROPPED_RAW.</p>
+     *
+     * <p>Type: int32[4]</p>
+     *
+     * <p>This tag may appear in:
+     * <ul>
+     *   <li>ACameraMetadata from ACameraCaptureSession_captureCallback_result callbacks</li>
+     * </ul></p>
+     *
+     * <p>The coordinate system follows that of ACAMERA_SENSOR_INFO_PRE_CORRECTION_ACTIVE_ARRAY_SIZE.</p>
+     * <p>This CaptureResult key will be set when the corresponding CaptureRequest has a RAW target
+     * with stream use case set to
+     * <a href="https://developer.android.com/reference/android/hardware/camera2/CameraMetadata.html#SCALER_AVAILABLE_STREAM_USE_CASES_CROPPED_RAW">CameraMetadata#SCALER_AVAILABLE_STREAM_USE_CASES_CROPPED_RAW</a>,
+     * otherwise it will be {@code null}.
+     * The value of this key specifies the region of the sensor used for the RAW capture and can
+     * be used to calculate the corresponding field of view of RAW streams.
+     * This field of view will always be &gt;= field of view for (processed) non-RAW streams for the
+     * capture. Note: The region specified may not necessarily be centered.</p>
+     * <p>For example: Assume a camera device has a pre correction active array size of
+     * {@code {0, 0, 1500, 2000}}. If the RAW_CROP_REGION is {@code {500, 375, 1500, 1125}}, that
+     * corresponds to a centered crop of 1/4th of the full field of view RAW stream.</p>
+     * <p>The metadata keys which describe properties of RAW frames:</p>
+     * <ul>
+     * <li>ACAMERA_STATISTICS_HOT_PIXEL_MAP</li>
+     * <li>android.statistics.lensShadingCorrectionMap</li>
+     * <li>ACAMERA_LENS_DISTORTION</li>
+     * <li>ACAMERA_LENS_POSE_TRANSLATION</li>
+     * <li>ACAMERA_LENS_POSE_ROTATION</li>
+     * <li>ACAMERA_LENS_DISTORTION</li>
+     * <li>ACAMERA_LENS_INTRINSIC_CALIBRATION</li>
+     * </ul>
+     * <p>should be interpreted in the effective after raw crop field-of-view coordinate system.
+     * In this coordinate system,
+     * {preCorrectionActiveArraySize.left, preCorrectionActiveArraySize.top} corresponds to the
+     * the top left corner of the cropped RAW frame and
+     * {preCorrectionActiveArraySize.right, preCorrectionActiveArraySize.bottom} corresponds to
+     * the bottom right corner. Client applications must use the values of the keys
+     * in the CaptureResult metadata if present.</p>
+     * <p>Crop regions (android.scaler.CropRegion), AE/AWB/AF regions and face coordinates still
+     * use the ACAMERA_SENSOR_INFO_ACTIVE_ARRAY_SIZE coordinate system as usual.</p>
+     *
+     * @see ACAMERA_LENS_DISTORTION
+     * @see ACAMERA_LENS_INTRINSIC_CALIBRATION
+     * @see ACAMERA_LENS_POSE_ROTATION
+     * @see ACAMERA_LENS_POSE_TRANSLATION
+     * @see ACAMERA_SENSOR_INFO_ACTIVE_ARRAY_SIZE
+     * @see ACAMERA_SENSOR_INFO_PRE_CORRECTION_ACTIVE_ARRAY_SIZE
+     * @see ACAMERA_STATISTICS_HOT_PIXEL_MAP
+     */
+    ACAMERA_SCALER_RAW_CROP_REGION =                            // int32[4]
+            ACAMERA_SCALER_START + 26,
     ACAMERA_SCALER_END,
 
     /**
@@ -10206,6 +10260,30 @@ typedef enum acamera_metadata_enum_acamera_scaler_available_stream_use_cases {
      * variable frame rate settings to allow sufficient exposure time in low light.</p>
      */
     ACAMERA_SCALER_AVAILABLE_STREAM_USE_CASES_VIDEO_CALL             = 0x5,
+
+    /**
+     * <p>Cropped RAW stream when the client chooses to crop the field of view.</p>
+     * <p>Certain types of image sensors can run in binned modes in order to improve signal to
+     * noise ratio while capturing frames. However, at certain zoom levels and / or when
+     * other scene conditions are deemed fit, the camera sub-system may choose to un-bin and
+     * remosaic the sensor's output. This results in a RAW frame which is cropped in field
+     * of view and yet has the same number of pixels as full field of view RAW, thereby
+     * improving image detail.</p>
+     * <p>The resultant field of view of the RAW stream will be greater than or equal to
+     * croppable non-RAW streams. The effective crop region for this RAW stream will be
+     * reflected in the CaptureResult key ACAMERA_SCALER_RAW_CROP_REGION.</p>
+     * <p>If this stream use case is set on a non-RAW stream, i.e. not one of :</p>
+     * <ul>
+     * <li>{@link AIMAGE_FORMAT_RAW16 RAW_SENSOR}</li>
+     * <li>{@link AIMAGE_FORMAT_RAW10 RAW10}</li>
+     * <li>{@link AIMAGE_FORMAT_RAW12 RAW12}</li>
+     * </ul>
+     * <p>session configuration is not guaranteed to succeed.</p>
+     * <p>This stream use case may not be supported on some devices.</p>
+     *
+     * @see ACAMERA_SCALER_RAW_CROP_REGION
+     */
+    ACAMERA_SCALER_AVAILABLE_STREAM_USE_CASES_CROPPED_RAW            = 0x6,
 
 } acamera_metadata_enum_android_scaler_available_stream_use_cases_t;
 

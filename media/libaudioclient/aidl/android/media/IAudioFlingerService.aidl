@@ -37,12 +37,12 @@ import android.media.IAudioRecord;
 import android.media.IAudioTrack;
 import android.media.ISoundDose;
 import android.media.ISoundDoseCallback;
-import android.media.LatencyMode;
 import android.media.MicrophoneInfoData;
 import android.media.RenderPosition;
 import android.media.TrackSecondaryOutputInfo;
 import android.media.audio.common.AudioChannelLayout;
 import android.media.audio.common.AudioFormatDescription;
+import android.media.audio.common.AudioLatencyMode;
 import android.media.audio.common.AudioMMapPolicyInfo;
 import android.media.audio.common.AudioMMapPolicyType;
 import android.media.audio.common.AudioMode;
@@ -230,36 +230,41 @@ interface IAudioFlingerService {
     void setDeviceConnectedState(in AudioPortFw devicePort, boolean connected);
 
     /**
-     * Requests a given latency mode (See LatencyMode.aidl) on an output stream.
+     * Requests a given latency mode (See AudioLatencyMode.aidl) on an output stream.
      * This can be used when some use case on a given mixer/stream can only be enabled
      * if a specific latency mode is selected on the audio path below the HAL.
      * For instance spatial audio with head tracking.
      * output is the I/O handle of the output stream for which the request is made.
      * latencyMode is the requested latency mode.
      */
-     void setRequestedLatencyMode(int output, LatencyMode latencyMode);
+     void setRequestedLatencyMode(int output, AudioLatencyMode latencyMode);
 
     /**
      * Queries the list of latency modes (See LatencyMode.aidl) supported by an output stream.
      * output is the I/O handle of the output stream to which the query applies.
      * returns the list of supported latency modes.
      */
-    LatencyMode[] getSupportedLatencyModes(int output);
+    AudioLatencyMode[] getSupportedLatencyModes(int output);
 
     /**
      * Requests if the implementation supports controlling the latency modes
-     * over the Bleutooth A2DP or LE Audio links. If it does,
+     * over the Bluetooth A2DP or LE Audio links. If it does,
      * setRequestedLatencyMode() and getSupportedLatencyModes() APIs can also be used
      * for streams routed to Bluetooth and not just for the spatializer output.
      */
-     boolean supportsBluetoothLatencyModes();
+     boolean supportsBluetoothVariableLatency();
 
     /**
      * Enables or disables the variable Bluetooth latency control mechanism in the
      * audio framework and the audio HAL. This does not apply to the latency mode control
-     * on the spatializer output with is a built-in feature.
+     * on the spatializer output as this is a built-in feature.
      */
-    void setBluetoothLatencyModesEnabled(boolean enabled);
+    void setBluetoothVariableLatencyEnabled(boolean enabled);
+
+    /**
+     * Indicates if the variable Bluetooth latency control mechanism is enabled or disabled.
+     */
+    boolean isBluetoothVariableLatencyEnabled();
 
     /**
      * Registers the sound dose callback and returns the interface for executing

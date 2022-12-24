@@ -822,8 +822,8 @@ status_t AudioFlingerClientAdapter::setDeviceConnectedState(
 status_t AudioFlingerClientAdapter::setRequestedLatencyMode(
         audio_io_handle_t output, audio_latency_mode_t mode) {
     int32_t outputAidl = VALUE_OR_RETURN_STATUS(legacy2aidl_audio_io_handle_t_int32_t(output));
-    media::LatencyMode modeAidl  = VALUE_OR_RETURN_STATUS(
-            legacy2aidl_audio_latency_mode_t_LatencyMode(mode));
+    media::audio::common::AudioLatencyMode modeAidl  = VALUE_OR_RETURN_STATUS(
+            legacy2aidl_audio_latency_mode_t_AudioLatencyMode(mode));
     return statusTFromBinderStatus(mDelegate->setRequestedLatencyMode(outputAidl, modeAidl));
 }
 
@@ -834,29 +834,40 @@ status_t AudioFlingerClientAdapter::getSupportedLatencyModes(
     }
 
     int32_t outputAidl = VALUE_OR_RETURN_STATUS(legacy2aidl_audio_io_handle_t_int32_t(output));
-    std::vector<media::LatencyMode> modesAidl;
+    std::vector<media::audio::common::AudioLatencyMode> modesAidl;
 
     RETURN_STATUS_IF_ERROR(statusTFromBinderStatus(
             mDelegate->getSupportedLatencyModes(outputAidl, &modesAidl)));
 
     *modes = VALUE_OR_RETURN_STATUS(
             convertContainer<std::vector<audio_latency_mode_t>>(modesAidl,
-                     aidl2legacy_LatencyMode_audio_latency_mode_t));
+                     aidl2legacy_AudioLatencyMode_audio_latency_mode_t));
 
     return NO_ERROR;
 }
 
-status_t AudioFlingerClientAdapter::setBluetoothLatencyModesEnabled(bool enabled) {
-    return statusTFromBinderStatus(mDelegate->setBluetoothLatencyModesEnabled(enabled));
+status_t AudioFlingerClientAdapter::setBluetoothVariableLatencyEnabled(bool enabled) {
+    return statusTFromBinderStatus(mDelegate->setBluetoothVariableLatencyEnabled(enabled));
 }
 
-status_t AudioFlingerClientAdapter::supportsBluetoothLatencyModes(bool* support) {
+status_t AudioFlingerClientAdapter::isBluetoothVariableLatencyEnabled(bool* enabled) {
+    if (enabled == nullptr) {
+        return BAD_VALUE;
+    }
+
+    RETURN_STATUS_IF_ERROR(statusTFromBinderStatus(
+            mDelegate->isBluetoothVariableLatencyEnabled(enabled)));
+
+    return NO_ERROR;
+}
+
+status_t AudioFlingerClientAdapter::supportsBluetoothVariableLatency(bool* support) {
     if (support == nullptr) {
         return BAD_VALUE;
     }
 
     RETURN_STATUS_IF_ERROR(statusTFromBinderStatus(
-            mDelegate->supportsBluetoothLatencyModes(support)));
+            mDelegate->supportsBluetoothVariableLatency(support)));
 
     return NO_ERROR;
 }
@@ -1366,17 +1377,17 @@ Status AudioFlingerServerAdapter::setDeviceConnectedState(
 }
 
 Status AudioFlingerServerAdapter::setRequestedLatencyMode(
-        int32_t output, media::LatencyMode modeAidl) {
+        int32_t output, media::audio::common::AudioLatencyMode modeAidl) {
     audio_io_handle_t outputLegacy = VALUE_OR_RETURN_BINDER(
             aidl2legacy_int32_t_audio_io_handle_t(output));
     audio_latency_mode_t modeLegacy = VALUE_OR_RETURN_BINDER(
-            aidl2legacy_LatencyMode_audio_latency_mode_t(modeAidl));
+            aidl2legacy_AudioLatencyMode_audio_latency_mode_t(modeAidl));
     return Status::fromStatusT(mDelegate->setRequestedLatencyMode(
             outputLegacy, modeLegacy));
 }
 
 Status AudioFlingerServerAdapter::getSupportedLatencyModes(
-        int output, std::vector<media::LatencyMode>* _aidl_return) {
+        int output, std::vector<media::audio::common::AudioLatencyMode>* _aidl_return) {
     audio_io_handle_t outputLegacy = VALUE_OR_RETURN_BINDER(
             aidl2legacy_int32_t_audio_io_handle_t(output));
     std::vector<audio_latency_mode_t> modesLegacy;
@@ -1384,17 +1395,21 @@ Status AudioFlingerServerAdapter::getSupportedLatencyModes(
     RETURN_BINDER_IF_ERROR(mDelegate->getSupportedLatencyModes(outputLegacy, &modesLegacy));
 
     *_aidl_return = VALUE_OR_RETURN_BINDER(
-            convertContainer<std::vector<media::LatencyMode>>(
-                    modesLegacy, legacy2aidl_audio_latency_mode_t_LatencyMode));
+            convertContainer<std::vector<media::audio::common::AudioLatencyMode>>(
+                    modesLegacy, legacy2aidl_audio_latency_mode_t_AudioLatencyMode));
     return Status::ok();
 }
 
-Status AudioFlingerServerAdapter::setBluetoothLatencyModesEnabled(bool enabled) {
-    return Status::fromStatusT(mDelegate->setBluetoothLatencyModesEnabled(enabled));
+Status AudioFlingerServerAdapter::setBluetoothVariableLatencyEnabled(bool enabled) {
+    return Status::fromStatusT(mDelegate->setBluetoothVariableLatencyEnabled(enabled));
 }
 
-Status AudioFlingerServerAdapter::supportsBluetoothLatencyModes(bool *support) {
-    return Status::fromStatusT(mDelegate->supportsBluetoothLatencyModes(support));
+Status AudioFlingerServerAdapter::isBluetoothVariableLatencyEnabled(bool *enabled) {
+    return Status::fromStatusT(mDelegate->isBluetoothVariableLatencyEnabled(enabled));
+}
+
+Status AudioFlingerServerAdapter::supportsBluetoothVariableLatency(bool *support) {
+    return Status::fromStatusT(mDelegate->supportsBluetoothVariableLatency(support));
 }
 
 Status AudioFlingerServerAdapter::getSoundDoseInterface(

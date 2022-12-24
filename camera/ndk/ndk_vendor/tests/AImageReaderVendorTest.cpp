@@ -254,20 +254,22 @@ class CameraHelper {
                 &mLogicalCaptureCallbacksV2, 1, &mStillRequest, &seqId);
     }
 
-    bool checkCallbacks(int pictureCount) {
+    bool checkCallbacks(int pictureCount, bool printLog = false) {
         std::lock_guard<std::mutex> lock(mMutex);
         if (mCompletedCaptureCallbackCount != pictureCount) {
-            ALOGE("Completed capture callback count not as expected. expected %d actual %d",
-                  pictureCount, mCompletedCaptureCallbackCount);
+            ALOGE_IF(printLog,
+                     "Completed capture callback count not as expected. expected %d actual %d",
+                     pictureCount, mCompletedCaptureCallbackCount);
             return false;
         }
         return true;
     }
-    bool checkCallbacksV2(int pictureCount) {
+    bool checkCallbacksV2(int pictureCount, bool printLog = false) {
         std::lock_guard<std::mutex> lock(mMutex);
         if (mCaptureStartedCallbackCount != pictureCount) {
-            ALOGE("Capture started callback count not as expected. expected %d actual %d",
-                  pictureCount, mCaptureStartedCallbackCount);
+            ALOGE_IF(printLog,
+                     "Capture started callback count not as expected. expected %d actual %d",
+                     pictureCount, mCaptureStartedCallbackCount);
             return false;
         }
         return true;
@@ -670,15 +672,22 @@ class AImageReaderVendorTest : public ::testing::Test {
         // Sleep until all capture finished
         for (int i = 0; i < kCaptureWaitRetry * pictureCount; i++) {
             usleep(kCaptureWaitUs);
-            if (testCase.getAcquiredImageCount() == pictureCount) {
+            bool receivedAllCallbacks = v2 ? cameraHelper.checkCallbacksV2(pictureCount)
+                                           : cameraHelper.checkCallbacks(pictureCount);
+
+            bool acquiredAllImages = testCase.getAcquiredImageCount() == pictureCount;
+            if (acquiredAllImages) {
                 ALOGI("Session take ~%d ms to capture %d images", i * kCaptureWaitUs / 1000,
                       pictureCount);
+            }
+            // Wait for all images to be acquired and all callbacks to be processed
+            if (acquiredAllImages && receivedAllCallbacks) {
                 break;
             }
         }
         return testCase.getAcquiredImageCount() == pictureCount &&
-               v2 ? cameraHelper.checkCallbacksV2(pictureCount) :
-                    cameraHelper.checkCallbacks(pictureCount);
+               v2 ? cameraHelper.checkCallbacksV2(pictureCount, /* printLog= */true) :
+                    cameraHelper.checkCallbacks(pictureCount, /* printLog= */true);
     }
 
     bool testTakePicturesNative(const char* id) {

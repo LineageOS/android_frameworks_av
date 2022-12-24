@@ -29,6 +29,7 @@
 #include "impl/ACameraCaptureSession.h"
 
 #include "impl/ACameraCaptureSession.inc"
+
 #include "NdkCameraCaptureSession.inc"
 
 using namespace android;

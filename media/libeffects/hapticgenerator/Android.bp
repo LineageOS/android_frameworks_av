@@ -57,3 +57,32 @@ cc_library_shared {
         "libaudioeffects",
     ],
 }
+
+cc_library_shared {
+    name: "libhapticgeneratoraidl",
+    srcs: [
+        "aidl/EffectHapticGenerator.cpp",
+        "aidl/HapticGeneratorContext.cpp",
+        "Processors.cpp",
+        ":effectCommonFile",
+    ],
+    defaults: [
+        "aidlaudioservice_defaults",
+        "latest_android_hardware_audio_effect_ndk_shared",
+        "latest_android_media_audio_common_types_ndk_shared",
+    ],
+    header_libs: [
+        "libaudioeffects",
+        "libhardware_headers"
+    ],
+    shared_libs: [
+        "libbase",
+        "libaudioutils",
+        "libcutils",
+        "liblog",
+        "libvibratorutils",
+    ],
+    visibility: [
+        "//hardware/interfaces/audio/aidl/default",
+    ],
+}

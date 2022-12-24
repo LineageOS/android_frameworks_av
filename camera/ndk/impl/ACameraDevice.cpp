@@ -1412,7 +1412,6 @@ CameraDevice::checkAndFireSequenceCompleteLocked() {
     while (it != mSequenceLastFrameNumberMap.end()) {
         int sequenceId = it->first;
         int64_t lastFrameNumber = it->second.lastFrameNumber;
-        bool hasCallback = true;
 
         if (mRemote == nullptr) {
             ALOGW("Camera %s closed while checking sequence complete", getId());
@@ -1425,7 +1424,6 @@ CameraDevice::checkAndFireSequenceCompleteLocked() {
             // This should not happen because we always register callback (with nullptr inside)
             if (mSequenceCallbackMap.count(sequenceId) == 0) {
                 ALOGW("No callback found for sequenceId %d", sequenceId);
-                hasCallback = false;
             }
 
             if (lastFrameNumber <= completedFrameNumber) {

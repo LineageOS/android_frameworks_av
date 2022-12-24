@@ -34,11 +34,14 @@ using aidl::android::hardware::audio::effect::EffectBundleAidl;
 using aidl::android::hardware::audio::effect::IEffect;
 using aidl::android::hardware::audio::effect::kBassBoostBundleImplUUID;
 using aidl::android::hardware::audio::effect::kEqualizerBundleImplUUID;
+using aidl::android::hardware::audio::effect::kVirtualizerBundleImplUUID;
+using aidl::android::hardware::audio::effect::kVolumeBundleImplUUID;
 using aidl::android::hardware::audio::effect::State;
 using aidl::android::media::audio::common::AudioUuid;
 
 bool isUuidSupported(const AudioUuid* uuid) {
-    return (*uuid == kEqualizerBundleImplUUID || *uuid == kBassBoostBundleImplUUID);
+    return (*uuid == kEqualizerBundleImplUUID || *uuid == kBassBoostBundleImplUUID ||
+            *uuid == kVirtualizerBundleImplUUID || *uuid == kVolumeBundleImplUUID);
 }
 
 extern "C" binder_exception_t createEffect(const AudioUuid* uuid,
@@ -66,6 +69,10 @@ extern "C" binder_exception_t queryEffect(const AudioUuid* in_impl_uuid, Descrip
         *_aidl_return = aidl::android::hardware::audio::effect::lvm::kEqualizerDesc;
     } else if (*in_impl_uuid == kBassBoostBundleImplUUID) {
         *_aidl_return = aidl::android::hardware::audio::effect::lvm:: kBassBoostDesc;
+    } else if (*in_impl_uuid == kVirtualizerBundleImplUUID) {
+        *_aidl_return = aidl::android::hardware::audio::effect::lvm::kVirtualizerDesc;
+    } else if (*in_impl_uuid == kVolumeBundleImplUUID) {
+        *_aidl_return = aidl::android::hardware::audio::effect::lvm::kVolumeDesc;
     }
     return EX_NONE;
 }
@@ -82,9 +89,16 @@ EffectBundleAidl::EffectBundleAidl(const AudioUuid& uuid) {
         mType = lvm::BundleEffectType::BASS_BOOST;
         mDescriptor = &lvm::kBassBoostDesc;
         mEffectName = &lvm::kBassBoostEffectName;
+    } else if (uuid == kVirtualizerBundleImplUUID) {
+        mType = lvm::BundleEffectType::VIRTUALIZER;
+        mDescriptor = &lvm::kVirtualizerDesc;
+        mEffectName = &lvm::kVirtualizerEffectName;
+    } else if (uuid == kVolumeBundleImplUUID) {
+        mType = lvm::BundleEffectType::VOLUME;
+        mDescriptor = &lvm::kVolumeDesc;
+        mEffectName = &lvm::kVolumeEffectName;
     } else {
-        // TODO: add other bundle effect types here.
-        LOG(ERROR) << __func__ << uuid.toString() << " not supported yet!";
+        LOG(ERROR) << __func__ << uuid.toString() << " not supported!";
     }
 }
 
@@ -146,6 +160,10 @@ ndk::ScopedAStatus EffectBundleAidl::setParameterSpecific(const Parameter::Speci
             return setParameterEqualizer(specific);
         case Parameter::Specific::bassBoost:
             return setParameterBassBoost(specific);
+        case Parameter::Specific::virtualizer:
+            return setParameterVirtualizer(specific);
+        case Parameter::Specific::volume:
+            return setParameterVolume(specific);
         default:
             LOG(ERROR) << __func__ << " unsupported tag " << toString(tag);
             return ndk::ScopedAStatus::fromExceptionCodeWithMessage(EX_ILLEGAL_ARGUMENT,
@@ -190,6 +208,43 @@ ndk::ScopedAStatus EffectBundleAidl::setParameterBassBoost(const Parameter::Spec
     }
 }
 
+ndk::ScopedAStatus EffectBundleAidl::setParameterVirtualizer(const Parameter::Specific& specific) {
+    auto& vr = specific.get<Parameter::Specific::virtualizer>();
+    auto vrTag = vr.getTag();
+    switch (vrTag) {
+        case Virtualizer::strengthPm: {
+            RETURN_IF(mContext->setVirtualizerStrength(vr.get<Virtualizer::strengthPm>()) !=
+                              RetCode::SUCCESS,
+                      EX_ILLEGAL_ARGUMENT, "setStrengthFailed");
+            return ndk::ScopedAStatus::ok();
+        }
+        default:
+            LOG(ERROR) << __func__ << " unsupported parameter " << specific.toString();
+            return ndk::ScopedAStatus::fromExceptionCodeWithMessage(EX_ILLEGAL_ARGUMENT,
+                                                                    "vrTagNotSupported");
+    }
+}
+
+ndk::ScopedAStatus EffectBundleAidl::setParameterVolume(const Parameter::Specific& specific) {
+    auto& vol = specific.get<Parameter::Specific::volume>();
+    auto volTag = vol.getTag();
+    switch (volTag) {
+        case Volume::levelDb: {
+            RETURN_IF(mContext->setVolumeLevel(vol.get<Volume::levelDb>()) != RetCode::SUCCESS,
+                      EX_ILLEGAL_ARGUMENT, "setLevelFailed");
+            return ndk::ScopedAStatus::ok();
+        }
+        case Volume::mute:
+            RETURN_IF(mContext->setVolumeMute(vol.get<Volume::mute>()) != RetCode::SUCCESS,
+                      EX_ILLEGAL_ARGUMENT, "setMuteFailed");
+            return ndk::ScopedAStatus::ok();
+        default:
+            LOG(ERROR) << __func__ << " unsupported parameter " << specific.toString();
+            return ndk::ScopedAStatus::fromExceptionCodeWithMessage(EX_ILLEGAL_ARGUMENT,
+                                                                    "volTagNotSupported");
+    }
+}
+
 ndk::ScopedAStatus EffectBundleAidl::getParameterSpecific(const Parameter::Id& id,
                                                           Parameter::Specific* specific) {
     RETURN_IF(!specific, EX_NULL_POINTER, "nullPtr");
@@ -200,6 +255,10 @@ ndk::ScopedAStatus EffectBundleAidl::getParameterSpecific(const Parameter::Id& i
             return getParameterEqualizer(id.get<Parameter::Id::equalizerTag>(), specific);
         case Parameter::Id::bassBoostTag:
             return getParameterBassBoost(id.get<Parameter::Id::bassBoostTag>(), specific);
+        case Parameter::Id::virtualizerTag:
+            return getParameterVirtualizer(id.get<Parameter::Id::virtualizerTag>(), specific);
+        case Parameter::Id::volumeTag:
+            return getParameterVolume(id.get<Parameter::Id::volumeTag>(), specific);
         default:
             LOG(ERROR) << __func__ << " unsupported tag: " << toString(tag);
             return ndk::ScopedAStatus::fromExceptionCodeWithMessage(EX_ILLEGAL_ARGUMENT,
@@ -256,6 +315,59 @@ ndk::ScopedAStatus EffectBundleAidl::getParameterBassBoost(const BassBoost::Id& 
     }
 
     specific->set<Parameter::Specific::bassBoost>(bbParam);
+    return ndk::ScopedAStatus::ok();
+}
+
+ndk::ScopedAStatus EffectBundleAidl::getParameterVolume(const Volume::Id& id,
+                                                        Parameter::Specific* specific) {
+    RETURN_IF(id.getTag() != Volume::Id::commonTag, EX_ILLEGAL_ARGUMENT, "VolumeTagNotSupported");
+
+    RETURN_IF(!mContext, EX_NULL_POINTER, "nullContext");
+    Volume volParam;
+
+    auto tag = id.get<Volume::Id::commonTag>();
+    switch (tag) {
+        case Volume::levelDb: {
+            volParam.set<Volume::levelDb>(mContext->getVolumeLevel());
+            break;
+        }
+        case Volume::mute: {
+            volParam.set<Volume::mute>(mContext->getVolumeMute());
+            break;
+        }
+        default: {
+            LOG(ERROR) << __func__ << " not handled tag: " << toString(tag);
+            return ndk::ScopedAStatus::fromExceptionCodeWithMessage(EX_ILLEGAL_ARGUMENT,
+                                                                    "VolumeTagNotSupported");
+        }
+    }
+
+    specific->set<Parameter::Specific::volume>(volParam);
+    return ndk::ScopedAStatus::ok();
+}
+
+ndk::ScopedAStatus EffectBundleAidl::getParameterVirtualizer(const Virtualizer::Id& id,
+                                                             Parameter::Specific* specific) {
+    RETURN_IF(id.getTag() != Virtualizer::Id::commonTag, EX_ILLEGAL_ARGUMENT,
+              "VirtualizerTagNotSupported");
+
+    RETURN_IF(!mContext, EX_NULL_POINTER, "nullContext");
+    Virtualizer vrParam;
+
+    auto tag = id.get<Virtualizer::Id::commonTag>();
+    switch (tag) {
+        case Virtualizer::strengthPm: {
+            vrParam.set<Virtualizer::strengthPm>(mContext->getVirtualizerStrength());
+            break;
+        }
+        default: {
+            LOG(ERROR) << __func__ << " not handled tag: " << toString(tag);
+            return ndk::ScopedAStatus::fromExceptionCodeWithMessage(EX_ILLEGAL_ARGUMENT,
+                                                                    "VirtualizerTagNotSupported");
+        }
+    }
+
+    specific->set<Parameter::Specific::virtualizer>(vrParam);
     return ndk::ScopedAStatus::ok();
 }
 

@@ -103,9 +103,40 @@ static const Descriptor kBassBoostDesc = {
                    .implementor = "NXP Software Ltd."},
         .capability = Capability::make<Capability::bassBoost>(kBassBoostCap)};
 
-// TODO: add descriptors for other bundle effect types here.
-static const Descriptor kVirtualizerDesc;
-static const Descriptor kVolumeDesc;
+static const Virtualizer::Capability kVirtualizerCap = {.strengthSupported = mStrengthSupported};
+
+static const std::string kVirtualizerEffectName = "Virtualizer";
+
+static const Descriptor kVirtualizerDesc = {
+        .common = {.id = {.type = kVirtualizerTypeUUID,
+                          .uuid = kVirtualizerBundleImplUUID,
+                          .proxy = kVirtualizerProxyUUID},
+                   .flags = {.type = Flags::Type::INSERT,
+                             .insert = Flags::Insert::FIRST,
+                             .volume = Flags::Volume::CTRL,
+                             .deviceIndication = true},
+                   .cpuLoad = VIRTUALIZER_CUP_LOAD_ARM9E,
+                   .memoryUsage = BUNDLE_MEM_USAGE,
+                   .name = kVirtualizerEffectName,
+                   .implementor = "NXP Software Ltd."},
+        .capability = Capability::make<Capability::virtualizer>(kVirtualizerCap)};
+
+static const Volume::Capability kVolumeCap = {.maxLevel = Volume::MAX_LEVEL_DB};
+
+static const std::string kVolumeEffectName = "Volume";
+
+static const Descriptor kVolumeDesc = {
+        .common = {.id = {.type = kVolumeTypeUUID,
+                          .uuid = kVolumeBundleImplUUID,
+                          .proxy = std::nullopt},
+                   .flags = {.type = Flags::Type::INSERT,
+                             .insert = Flags::Insert::LAST,
+                             .volume = Flags::Volume::CTRL},
+                   .cpuLoad = VOLUME_CUP_LOAD_ARM9E,
+                   .memoryUsage = BUNDLE_MEM_USAGE,
+                   .name = kVolumeEffectName,
+                   .implementor = "NXP Software Ltd."},
+        .capability = Capability::make<Capability::volume>(kVolumeCap)};
 
 /* The following tables have been computed using the actual levels measured by the output of
  * white noise or pink noise (IEC268-1) for the EQ and BassBoost Effects. These are estimates of

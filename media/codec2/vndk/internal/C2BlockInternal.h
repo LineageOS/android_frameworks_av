@@ -21,17 +21,22 @@
 
 #include <C2Buffer.h>
 
-namespace android {
-namespace hardware {
-namespace media {
-namespace bufferpool {
+// Note: HIDL-BufferPool and AIDL-BufferPool are not compatible
+namespace android::hardware::media::bufferpool {
 
+// BuffePool Data for HIDL-BufferPool
 struct BufferPoolData;
 
 }
+namespace aidl::android::hardware::media::bufferpool2 {
+
+// BuffePool Data for AIDL-BufferPool
+struct BufferPoolData;
+
 }
-}
-}
+
+using bufferpool_BufferPoolData = android::hardware::media::bufferpool::BufferPoolData;
+using bufferpool2_BufferPoolData = aidl::android::hardware::media::bufferpool2::BufferPoolData;
 
 /**
  * Stores informations from C2BlockPool implementations which are required by C2Block.
@@ -40,6 +45,7 @@ struct C2_HIDE _C2BlockPoolData {
     enum type_t : int {
         TYPE_BUFFERPOOL = 0,
         TYPE_BUFFERQUEUE,
+        TYPE_BUFFERPOOL2, // AIDL-BufferPool
     };
 
     virtual type_t getType() const = 0;
@@ -136,6 +142,7 @@ struct _C2BlockFactory {
     std::shared_ptr<C2GraphicBlock> CreateGraphicBlock(
             const C2Handle *handle);
 
+    // HIDL-BufferPool
     /**
      * Create a linear block from the received bufferpool data.
      *
@@ -147,7 +154,7 @@ struct _C2BlockFactory {
     static
     std::shared_ptr<C2LinearBlock> CreateLinearBlock(
             const C2Handle *handle,
-            const std::shared_ptr<android::hardware::media::bufferpool::BufferPoolData> &data);
+            const std::shared_ptr<bufferpool_BufferPoolData> &data);
 
     /**
      * Create a graphic block from the received bufferpool data.
@@ -160,7 +167,7 @@ struct _C2BlockFactory {
     static
     std::shared_ptr<C2GraphicBlock> CreateGraphicBlock(
             const C2Handle *handle,
-            const std::shared_ptr<android::hardware::media::bufferpool::BufferPoolData> &data);
+            const std::shared_ptr<bufferpool_BufferPoolData> &data);
 
     /**
      * Get bufferpool data from the blockpool data.
@@ -174,7 +181,48 @@ struct _C2BlockFactory {
     static
     bool GetBufferPoolData(
             const std::shared_ptr<const _C2BlockPoolData> &poolData,
-            std::shared_ptr<android::hardware::media::bufferpool::BufferPoolData> *bufferPoolData);
+            std::shared_ptr<bufferpool_BufferPoolData> *bufferPoolData);
+
+    // AIDL-BufferPool
+    /**
+     * Create a linear block from the received bufferpool data.
+     *
+     * \param data  bufferpool data to a linear block
+     *
+     * \return shared pointer to the linear block. nullptr if there was not enough memory to
+     *         create this block.
+     */
+    static
+    std::shared_ptr<C2LinearBlock> CreateLinearBlock(
+            const C2Handle *handle,
+            const std::shared_ptr<bufferpool2_BufferPoolData> &data);
+
+    /**
+     * Create a graphic block from the received bufferpool data.
+     *
+     * \param data  bufferpool data to a graphic block
+     *
+     * \return shared pointer to the graphic block. nullptr if there was not enough memory to
+     *         create this block.
+     */
+    static
+    std::shared_ptr<C2GraphicBlock> CreateGraphicBlock(
+            const C2Handle *handle,
+            const std::shared_ptr<bufferpool2_BufferPoolData> &data);
+
+    /**
+     * Get bufferpool data from the blockpool data.
+     *
+     * \param poolData          blockpool data
+     * \param bufferPoolData    pointer to bufferpool data where the bufferpool
+     *                          data is stored.
+     *
+     * \return {\code true} when there is valid bufferpool data, {\code false} otherwise.
+     */
+    static
+    bool GetBufferPoolData(
+            const std::shared_ptr<const _C2BlockPoolData> &poolData,
+            std::shared_ptr<bufferpool2_BufferPoolData> *bufferPoolData);
 
     /*
      * Life Cycle Management of BufferQueue-Based Blocks

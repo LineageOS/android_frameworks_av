@@ -81,7 +81,7 @@ camera_status_t ACameraManager_registerAvailabilityCallback(
                callback->onCameraAvailable, callback->onCameraUnavailable);
         return ACAMERA_ERROR_INVALID_PARAMETER;
     }
-    CameraManagerGlobal::getInstance().registerAvailabilityCallback(callback);
+    CameraManagerGlobal::getInstance()->registerAvailabilityCallback(callback);
     return ACAMERA_OK;
 }
 
@@ -100,7 +100,7 @@ camera_status_t ACameraManager_unregisterAvailabilityCallback(
                callback->onCameraAvailable, callback->onCameraUnavailable);
         return ACAMERA_ERROR_INVALID_PARAMETER;
     }
-    CameraManagerGlobal::getInstance().unregisterAvailabilityCallback(callback);
+    CameraManagerGlobal::getInstance()->unregisterAvailabilityCallback(callback);
     return ACAMERA_OK;
 }
 
@@ -131,7 +131,7 @@ camera_status_t ACameraManager_registerExtendedAvailabilityCallback(
             return ACAMERA_ERROR_INVALID_PARAMETER;
         }
     }
-    CameraManagerGlobal::getInstance().registerExtendedAvailabilityCallback(callback);
+    CameraManagerGlobal::getInstance()->registerExtendedAvailabilityCallback(callback);
     return ACAMERA_OK;
 }
 
@@ -154,7 +154,7 @@ camera_status_t ACameraManager_unregisterExtendedAvailabilityCallback(
                callback->onCameraAccessPrioritiesChanged);
         return ACAMERA_ERROR_INVALID_PARAMETER;
     }
-    CameraManagerGlobal::getInstance().unregisterExtendedAvailabilityCallback(callback);
+    CameraManagerGlobal::getInstance()->unregisterExtendedAvailabilityCallback(callback);
     return ACAMERA_OK;
 }
 

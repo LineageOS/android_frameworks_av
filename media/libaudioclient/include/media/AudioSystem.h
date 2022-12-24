@@ -629,9 +629,11 @@ public:
     static status_t getSupportedLatencyModes(audio_io_handle_t output,
             std::vector<audio_latency_mode_t>* modes);
 
-    static status_t setBluetoothLatencyModesEnabled(bool enabled);
+    static status_t setBluetoothVariableLatencyEnabled(bool enabled);
 
-    static status_t supportsBluetoothLatencyModes(bool *support);
+    static status_t isBluetoothVariableLatencyEnabled(bool *enabled);
+
+    static status_t supportsBluetoothVariableLatency(bool *support);
 
     static status_t getSupportedMixerAttributes(audio_port_handle_t portId,
                                                 std::vector<audio_mixer_attributes_t> *mixerAttrs);
@@ -776,7 +778,8 @@ private:
                 const media::AudioIoDescriptor& ioDesc) override;
 
         binder::Status onSupportedLatencyModesChanged(
-                int output, const std::vector<media::LatencyMode>& latencyModes) override;
+                int output,
+                const std::vector<media::audio::common::AudioLatencyMode>& latencyModes) override;
 
         status_t addAudioDeviceCallback(const wp<AudioDeviceCallback>& callback,
                                                audio_io_handle_t audioIo,

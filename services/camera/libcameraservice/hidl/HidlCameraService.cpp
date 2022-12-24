@@ -21,6 +21,7 @@
 #include <hidl/HidlCameraService.h>
 #include <hidl/HidlCameraDeviceUser.h>
 #include <hidl/Utils.h>
+#include <aidl/AidlUtils.h>
 
 #include <hidl/HidlTransportSupport.h>
 
@@ -34,9 +35,9 @@ namespace implementation {
 using frameworks::cameraservice::service::V2_0::implementation::HidlCameraService;
 using hardware::hidl_vec;
 using hardware::cameraservice::utils::conversion::convertToHidl;
-using hardware::cameraservice::utils::conversion::filterVndkKeys;
 using hardware::cameraservice::utils::conversion::B2HStatus;
 using hardware::Void;
+using hardware::cameraservice::utils::conversion::aidl::filterVndkKeys;
 
 using device::V2_0::implementation::H2BCameraDeviceCallbacks;
 using device::V2_1::implementation::HidlCameraDeviceUser;
