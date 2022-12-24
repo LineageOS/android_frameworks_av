@@ -323,8 +323,11 @@ public:
                                                const AudioDeviceTypeAddrVector &devices) = 0;
 
     virtual status_t removeDevicesRoleForStrategy(product_strategy_t strategy,
-                                                  device_role_t role) = 0;
+                                                  device_role_t role,
+                                                  const AudioDeviceTypeAddrVector &devices) = 0;
 
+    virtual status_t clearDevicesRoleForStrategy(product_strategy_t strategy,
+                                                     device_role_t role) = 0;
 
     virtual status_t getDevicesForRoleAndStrategy(product_strategy_t strategy,
                                                   device_role_t role,

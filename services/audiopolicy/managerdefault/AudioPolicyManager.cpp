@@ -3875,14 +3875,47 @@ void AudioPolicyManager::updateInputRouting() {
     }
 }
 
-status_t AudioPolicyManager::removeDevicesRoleForStrategy(product_strategy_t strategy,
-                                                          device_role_t role)
+status_t
+AudioPolicyManager::removeDevicesRoleForStrategy(product_strategy_t strategy,
+                                                 device_role_t role,
+                                                 const AudioDeviceTypeAddrVector &devices) {
+    ALOGV("%s() strategy=%d role=%d %s", __func__, strategy, role,
+            dumpAudioDeviceTypeAddrVector(devices).c_str());
+
+    if (!areAllDevicesSupported(devices, audio_is_output_device, __func__)) {
+        return BAD_VALUE;
+    }
+    status_t status = mEngine->removeDevicesRoleForStrategy(strategy, role, devices);
+    if (status != NO_ERROR) {
+        ALOGW("Engine could not remove devices %s for strategy %d role %d",
+                dumpAudioDeviceTypeAddrVector(devices).c_str(), strategy, role);
+        return status;
+    }
+
+    checkForDeviceAndOutputChanges();
+
+    bool forceVolumeReeval = false;
+    // TODO(b/263479999): workaround for truncated touch sounds
+    // to be removed when the problem is handled by system UI
+    uint32_t delayMs = 0;
+    if (strategy == mCommunnicationStrategy) {
+        forceVolumeReeval = true;
+        delayMs = TOUCH_SOUND_FIXED_DELAY_MS;
+        updateInputRouting();
+    }
+    updateCallAndOutputRouting(forceVolumeReeval, delayMs);
+
+    return NO_ERROR;
+}
+
+status_t AudioPolicyManager::clearDevicesRoleForStrategy(product_strategy_t strategy,
+                                                         device_role_t role)
 {
     ALOGV("%s() strategy=%d role=%d", __func__, strategy, role);
 
-    status_t status = mEngine->removeDevicesRoleForStrategy(strategy, role);
+    status_t status = mEngine->clearDevicesRoleForStrategy(strategy, role);
     if (status != NO_ERROR) {
-        ALOGV("Engine could not remove preferred device for strategy %d status %d",
+        ALOGV("Engine could not remove device role for strategy %d status %d",
                 strategy, status);
         return status;
     }
