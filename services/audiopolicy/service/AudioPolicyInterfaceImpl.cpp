@@ -2154,8 +2154,31 @@ Status AudioPolicyService::setDevicesRoleForStrategy(
     return binderStatusFromStatusT(status);
 }
 
-Status AudioPolicyService::removeDevicesRoleForStrategy(int32_t strategyAidl,
-                                                        media::DeviceRole roleAidl) {
+Status AudioPolicyService::removeDevicesRoleForStrategy(
+        int32_t strategyAidl,
+        media::DeviceRole roleAidl,
+        const std::vector<AudioDevice>& devicesAidl) {
+    product_strategy_t strategy = VALUE_OR_RETURN_BINDER_STATUS(
+            aidl2legacy_int32_t_product_strategy_t(strategyAidl));
+    device_role_t role = VALUE_OR_RETURN_BINDER_STATUS(
+            aidl2legacy_DeviceRole_device_role_t(roleAidl));
+    AudioDeviceTypeAddrVector devices = VALUE_OR_RETURN_BINDER_STATUS(
+            convertContainer<AudioDeviceTypeAddrVector>(devicesAidl,
+                                                        aidl2legacy_AudioDeviceTypeAddress));
+
+    if (mAudioPolicyManager == NULL) {
+        return binderStatusFromStatusT(NO_INIT);
+    }
+    Mutex::Autolock _l(mLock);
+    status_t status = mAudioPolicyManager->removeDevicesRoleForStrategy(strategy, role, devices);
+    if (status == NO_ERROR) {
+       onCheckSpatializer_l();
+    }
+    return binderStatusFromStatusT(status);
+}
+
+Status AudioPolicyService::clearDevicesRoleForStrategy(int32_t strategyAidl,
+                                                           media::DeviceRole roleAidl) {
      product_strategy_t strategy = VALUE_OR_RETURN_BINDER_STATUS(
             aidl2legacy_int32_t_product_strategy_t(strategyAidl));
     device_role_t role = VALUE_OR_RETURN_BINDER_STATUS(
@@ -2164,7 +2187,7 @@ Status AudioPolicyService::removeDevicesRoleForStrategy(int32_t strategyAidl,
         return binderStatusFromStatusT(NO_INIT);
     }
     Mutex::Autolock _l(mLock);
-    status_t status = mAudioPolicyManager->removeDevicesRoleForStrategy(strategy, role);
+    status_t status = mAudioPolicyManager->clearDevicesRoleForStrategy(strategy, role);
     if (status == NO_ERROR) {
        onCheckSpatializer_l();
     }

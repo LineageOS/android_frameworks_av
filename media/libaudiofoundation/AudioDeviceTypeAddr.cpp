@@ -150,6 +150,20 @@ AudioDeviceTypeAddrVector excludeDeviceTypeAddrsFrom(
     return remainedDevices;
 }
 
+AudioDeviceTypeAddrVector joinDeviceTypeAddrs(
+        const AudioDeviceTypeAddrVector& devices,
+        const AudioDeviceTypeAddrVector& devicesToJoin) {
+    std::set<AudioDeviceTypeAddr> devicesSet(devices.begin(), devices.end());
+    std::set<AudioDeviceTypeAddr> devicesToJoinSet(devicesToJoin.begin(), devicesToJoin.end());
+    AudioDeviceTypeAddrVector joinedDevices;
+
+    std::set_union(devicesSet.begin(), devicesSet.end(),
+                   devicesToJoinSet.begin(), devicesToJoinSet.end(),
+                   std::back_inserter(joinedDevices));
+
+    return joinedDevices;
+}
+
 std::string dumpAudioDeviceTypeAddrVector(const AudioDeviceTypeAddrVector& deviceTypeAddrs,
                                           bool includeSensitiveInfo) {
     std::stringstream stream;

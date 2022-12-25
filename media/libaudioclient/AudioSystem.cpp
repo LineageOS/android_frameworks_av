@@ -2223,8 +2223,25 @@ status_t AudioSystem::setDevicesRoleForStrategy(product_strategy_t strategy,
             aps->setDevicesRoleForStrategy(strategyAidl, roleAidl, devicesAidl));
 }
 
+status_t AudioSystem::removeDevicesRoleForStrategy(product_strategy_t strategy,
+                                                   device_role_t role,
+                                                   const AudioDeviceTypeAddrVector& devices) {
+    const sp<IAudioPolicyService>& aps = AudioSystem::get_audio_policy_service();
+    if (aps == 0) {
+        return PERMISSION_DENIED;
+    }
+
+    int32_t strategyAidl = VALUE_OR_RETURN_STATUS(legacy2aidl_product_strategy_t_int32_t(strategy));
+    media::DeviceRole roleAidl = VALUE_OR_RETURN_STATUS(legacy2aidl_device_role_t_DeviceRole(role));
+    std::vector<AudioDevice> devicesAidl = VALUE_OR_RETURN_STATUS(
+            convertContainer<std::vector<AudioDevice>>(devices,
+                                                       legacy2aidl_AudioDeviceTypeAddress));
+    return statusTFromBinderStatus(
+            aps->removeDevicesRoleForStrategy(strategyAidl, roleAidl, devicesAidl));
+}
+
 status_t
-AudioSystem::removeDevicesRoleForStrategy(product_strategy_t strategy, device_role_t role) {
+AudioSystem::clearDevicesRoleForStrategy(product_strategy_t strategy, device_role_t role) {
     const sp<IAudioPolicyService>& aps = AudioSystem::get_audio_policy_service();
     if (aps == 0) {
         return PERMISSION_DENIED;
@@ -2232,7 +2249,7 @@ AudioSystem::removeDevicesRoleForStrategy(product_strategy_t strategy, device_ro
     int32_t strategyAidl = VALUE_OR_RETURN_STATUS(legacy2aidl_product_strategy_t_int32_t(strategy));
     media::DeviceRole roleAidl = VALUE_OR_RETURN_STATUS(legacy2aidl_device_role_t_DeviceRole(role));
     return statusTFromBinderStatus(
-            aps->removeDevicesRoleForStrategy(strategyAidl, roleAidl));
+            aps->clearDevicesRoleForStrategy(strategyAidl, roleAidl));
 }
 
 status_t AudioSystem::getDevicesForRoleAndStrategy(product_strategy_t strategy,

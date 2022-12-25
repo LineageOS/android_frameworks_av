@@ -523,7 +523,11 @@ public:
     static status_t setDevicesRoleForStrategy(product_strategy_t strategy,
             device_role_t role, const AudioDeviceTypeAddrVector &devices);
 
-    static status_t removeDevicesRoleForStrategy(product_strategy_t strategy, device_role_t role);
+    static status_t removeDevicesRoleForStrategy(product_strategy_t strategy,
+            device_role_t role, const AudioDeviceTypeAddrVector &devices);
+
+    static status_t clearDevicesRoleForStrategy(product_strategy_t strategy,
+            device_role_t role);
 
     static status_t getDevicesForRoleAndStrategy(product_strategy_t strategy,
             device_role_t role, AudioDeviceTypeAddrVector &devices);

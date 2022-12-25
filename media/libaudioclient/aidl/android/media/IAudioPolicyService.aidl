@@ -330,7 +330,10 @@ interface IAudioPolicyService {
                                    in AudioDevice[] devices);
 
     void removeDevicesRoleForStrategy(int /* product_strategy_t */ strategy,
-                                       DeviceRole role);
+                                      DeviceRole role,
+                                      in AudioDevice[] devices);
+
+    void clearDevicesRoleForStrategy(int /* product_strategy_t */ strategy, DeviceRole role);
 
     AudioDevice[] getDevicesForRoleAndStrategy(int /* product_strategy_t */ strategy,
                                                DeviceRole role);
