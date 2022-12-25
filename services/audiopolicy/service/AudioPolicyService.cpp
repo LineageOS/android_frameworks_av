@@ -145,6 +145,7 @@ BINDER_METHOD_ENTRY(setRttEnabled) \
 BINDER_METHOD_ENTRY(isCallScreenModeSupported) \
 BINDER_METHOD_ENTRY(setDevicesRoleForStrategy) \
 BINDER_METHOD_ENTRY(removeDevicesRoleForStrategy) \
+BINDER_METHOD_ENTRY(clearDevicesRoleForStrategy) \
 BINDER_METHOD_ENTRY(getDevicesForRoleAndStrategy) \
 BINDER_METHOD_ENTRY(setDevicesRoleForCapturePreset) \
 BINDER_METHOD_ENTRY(addDevicesRoleForCapturePreset) \
@@ -1318,6 +1319,7 @@ status_t AudioPolicyService::onTransact(
         case TRANSACTION_setDevicesRoleForStrategy:
         case TRANSACTION_setSupportedSystemUsages:
         case TRANSACTION_removeDevicesRoleForStrategy:
+        case TRANSACTION_clearDevicesRoleForStrategy:
         case TRANSACTION_getDevicesForRoleAndStrategy:
         case TRANSACTION_getDevicesForAttributes:
         case TRANSACTION_setAllowedCapturePolicy:

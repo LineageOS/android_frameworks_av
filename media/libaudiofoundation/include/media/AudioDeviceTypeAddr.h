@@ -84,6 +84,14 @@ AudioDeviceTypeAddrVector excludeDeviceTypeAddrsFrom(
         const AudioDeviceTypeAddrVector& devices,
         const AudioDeviceTypeAddrVector& devicesToExclude);
 
+/**
+ * Return a collection of AudioDeviceTypeAddrs that is the union of `devices` and
+ * `devicesToJoin`
+ */
+AudioDeviceTypeAddrVector joinDeviceTypeAddrs(
+        const AudioDeviceTypeAddrVector& devices,
+        const AudioDeviceTypeAddrVector& devicesToJoin);
+
 std::string dumpAudioDeviceTypeAddrVector(const AudioDeviceTypeAddrVector& deviceTypeAddrs,
                                           bool includeSensitiveInfo=false);
 

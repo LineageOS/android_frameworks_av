@@ -326,10 +326,22 @@ public:
      * for the given strategy
      * @param strategy the audio strategy whose routing will be affected
      * @param role the role of the devices for strategy
+     * @param devices the audio devices to be removed
      * @return BAD_VALUE if the strategy or role is invalid,
      *     or NO_ERROR if the devices for this role was removed
      */
-    virtual status_t removeDevicesRoleForStrategy(product_strategy_t strategy,
+    virtual status_t removeDevicesRoleForStrategy(product_strategy_t strategy, device_role_t role,
+            const AudioDeviceTypeAddrVector &devices) = 0;
+
+    /**
+     * @brief clearDevicesRoleForStrategy removes the role of all devices previously set
+     * for the given strategy
+     * @param strategy the audio strategy whose routing will be affected
+     * @param role the role of the devices for strategy
+     * @return BAD_VALUE if the strategy or role is invalid,
+     *     or NO_ERROR if the devices for this role was removed
+     */
+    virtual status_t clearDevicesRoleForStrategy(product_strategy_t strategy,
             device_role_t role) = 0;
 
     /**
