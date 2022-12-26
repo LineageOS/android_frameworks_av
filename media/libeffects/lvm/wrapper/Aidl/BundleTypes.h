@@ -112,7 +112,7 @@ static const Descriptor kVirtualizerDesc = {
                           .uuid = kVirtualizerBundleImplUUID,
                           .proxy = kVirtualizerProxyUUID},
                    .flags = {.type = Flags::Type::INSERT,
-                             .insert = Flags::Insert::FIRST,
+                             .insert = Flags::Insert::LAST,
                              .volume = Flags::Volume::CTRL,
                              .deviceIndication = true},
                    .cpuLoad = VIRTUALIZER_CUP_LOAD_ARM9E,
