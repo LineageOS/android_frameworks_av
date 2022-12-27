@@ -85,7 +85,8 @@ static const Descriptor kEqualizerDesc = {
 
 static const bool mStrengthSupported = true;
 
-static const BassBoost::Capability kBassBoostCap = {.strengthSupported = mStrengthSupported};
+static const BassBoost::Capability kBassBoostCap = {.maxStrengthPm = 1000,
+                                                    .strengthSupported = mStrengthSupported};
 
 static const std::string kBassBoostEffectName = "Dynamic Bass Boost";
 
