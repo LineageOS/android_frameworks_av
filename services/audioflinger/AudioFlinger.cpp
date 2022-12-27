@@ -2117,9 +2117,9 @@ void AudioFlinger::ioConfigChanged(audio_io_config_event_t event,
 void AudioFlinger::onSupportedLatencyModesChanged(
         audio_io_handle_t output, const std::vector<audio_latency_mode_t>& modes) {
     int32_t outputAidl = VALUE_OR_FATAL(legacy2aidl_audio_io_handle_t_int32_t(output));
-    std::vector<media::LatencyMode> modesAidl = VALUE_OR_FATAL(
-                convertContainer<std::vector<media::LatencyMode>>(modes,
-                        legacy2aidl_audio_latency_mode_t_LatencyMode));
+    std::vector<media::audio::common::AudioLatencyMode> modesAidl = VALUE_OR_FATAL(
+                convertContainer<std::vector<media::audio::common::AudioLatencyMode>>(
+                        modes, legacy2aidl_audio_latency_mode_t_AudioLatencyMode));
 
     Mutex::Autolock _l(mClientLock);
     size_t size = mNotificationClients.size();
