@@ -438,7 +438,8 @@ Status AudioFlinger::TrackHandle::getVolumeShaperState(
     return Status::ok();
 }
 
-Status AudioFlinger::TrackHandle::getDualMonoMode(media::AudioDualMonoMode* _aidl_return)
+Status AudioFlinger::TrackHandle::getDualMonoMode(
+        media::audio::common::AudioDualMonoMode* _aidl_return)
 {
     audio_dual_mono_mode_t mode = AUDIO_DUAL_MONO_MODE_OFF;
     const status_t status = mTrack->getDualMonoMode(&mode)
@@ -451,7 +452,7 @@ Status AudioFlinger::TrackHandle::getDualMonoMode(media::AudioDualMonoMode* _aid
 }
 
 Status AudioFlinger::TrackHandle::setDualMonoMode(
-        media::AudioDualMonoMode mode)
+        media::audio::common::AudioDualMonoMode mode)
 {
     const auto localMonoMode = VALUE_OR_RETURN_BINDER_STATUS(
             aidl2legacy_AudioDualMonoMode_audio_dual_mono_mode_t(mode));
@@ -475,7 +476,7 @@ Status AudioFlinger::TrackHandle::setAudioDescriptionMixLevel(float leveldB)
 }
 
 Status AudioFlinger::TrackHandle::getPlaybackRateParameters(
-        media::AudioPlaybackRate* _aidl_return)
+        media::audio::common::AudioPlaybackRate* _aidl_return)
 {
     audio_playback_rate_t localPlaybackRate{};
     status_t status = mTrack->getPlaybackRateParameters(&localPlaybackRate)
@@ -488,7 +489,7 @@ Status AudioFlinger::TrackHandle::getPlaybackRateParameters(
 }
 
 Status AudioFlinger::TrackHandle::setPlaybackRateParameters(
-        const media::AudioPlaybackRate& playbackRate)
+        const media::audio::common::AudioPlaybackRate& playbackRate)
 {
     const audio_playback_rate_t localPlaybackRate = VALUE_OR_RETURN_BINDER_STATUS(
             aidl2legacy_AudioPlaybackRate_audio_playback_rate_t(playbackRate));

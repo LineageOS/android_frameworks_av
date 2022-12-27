@@ -18,7 +18,7 @@ package android.media;
 
 import android.media.AudioIoConfigEvent;
 import android.media.AudioIoDescriptor;
-import android.media.LatencyMode;
+import android.media.audio.common.AudioLatencyMode;
 
 /**
  * A callback interface for AudioFlinger.
@@ -31,7 +31,8 @@ interface IAudioFlingerClient {
     /**
      * Called when the latency modes supported on a given output stream change.
      * output is the I/O handle of the output stream for which the change is signalled.
-     * latencyModes is the new list of supported latency modes (See LatencyMode.aidl).
+     * latencyModes is the new list of supported latency modes (See AudioLatencyMode.aidl).
      */
-    oneway void onSupportedLatencyModesChanged(int output, in LatencyMode[] latencyModes);
+    oneway void onSupportedLatencyModesChanged(
+            int output, in AudioLatencyMode[] latencyModes);
 }

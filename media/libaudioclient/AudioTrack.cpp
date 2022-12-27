@@ -1248,7 +1248,7 @@ status_t AudioTrack::setDualMonoMode_l(audio_dual_mono_mode_t mode)
 status_t AudioTrack::getDualMonoMode(audio_dual_mono_mode_t* mode) const
 {
     AutoMutex lock(mLock);
-    media::AudioDualMonoMode mediaMode;
+    media::audio::common::AudioDualMonoMode mediaMode;
     const status_t status = statusTFromBinderStatus(mAudioTrack->getDualMonoMode(&mediaMode));
     if (status == NO_ERROR) {
         *mode = VALUE_OR_RETURN_STATUS(
@@ -1363,7 +1363,7 @@ const AudioPlaybackRate& AudioTrack::getPlaybackRate()
 {
     AutoMutex lock(mLock);
     if (isOffloadedOrDirect_l()) {
-        media::AudioPlaybackRate playbackRateTemp;
+        media::audio::common::AudioPlaybackRate playbackRateTemp;
         const status_t status = statusTFromBinderStatus(
                 mAudioTrack->getPlaybackRateParameters(&playbackRateTemp));
         if (status == NO_ERROR) { // update local version if changed.
