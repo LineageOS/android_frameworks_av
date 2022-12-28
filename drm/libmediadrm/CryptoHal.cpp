@@ -71,7 +71,7 @@ void CryptoHal::notifyResolution(uint32_t width, uint32_t height) {
     mCryptoHalHidl->notifyResolution(width, height);
 }
 
-status_t CryptoHal::setMediaDrmSession(const Vector<uint8_t>& sessionId) {
+DrmStatus CryptoHal::setMediaDrmSession(const Vector<uint8_t>& sessionId) {
     // This requires plugin to be created.
     if (mCryptoHalAidl->initCheck() == OK) return mCryptoHalAidl->setMediaDrmSession(sessionId);
     return mCryptoHalHidl->setMediaDrmSession(sessionId);
