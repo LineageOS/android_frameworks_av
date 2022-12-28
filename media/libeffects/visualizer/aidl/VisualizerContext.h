@@ -78,22 +78,21 @@ class VisualizerContext final : public EffectContext {
     std::mutex mMutex;
     Parameter::Common mCommon GUARDED_BY(mMutex);
     State mState GUARDED_BY(mMutex) = State::UNINITIALIZED;
-    uint32_t mCaptureIdx GUARDED_BY(mMutex);
-    uint32_t mLastCaptureIdx GUARDED_BY(mMutex);
+    uint32_t mCaptureIdx GUARDED_BY(mMutex) = 0;
+    uint32_t mLastCaptureIdx GUARDED_BY(mMutex) = 0;
     Visualizer::ScalingMode mScalingMode GUARDED_BY(mMutex) = Visualizer::ScalingMode::NORMALIZED;
     struct timespec mBufferUpdateTime GUARDED_BY(mMutex);
     // capture buf with 8 bits PCM
     std::array<uint8_t, kMaxCaptureBufSize> mCaptureBuf GUARDED_BY(mMutex);
-    // no mutex, only accessed by parameters
-    uint32_t mDownstreamLatency;
-    uint32_t mCaptureSamples = kMaxCaptureBufSize;
+    uint32_t mDownstreamLatency GUARDED_BY(mMutex) = 0;
+    uint32_t mCaptureSamples GUARDED_BY(mMutex) = kMaxCaptureBufSize;
 
     // to avoid recomputing it every time a buffer is processed
-    uint8_t mChannelCount GUARDED_BY(mMutex);
+    uint8_t mChannelCount GUARDED_BY(mMutex) = 0;
     Visualizer::MeasurementMode mMeasurementMode GUARDED_BY(mMutex) =
             Visualizer::MeasurementMode::NONE;
     uint8_t mMeasurementWindowSizeInBuffers = kMeasurementWindowMaxSizeInBuffers;
-    uint8_t mMeasurementBufferIdx GUARDED_BY(mMutex);
+    uint8_t mMeasurementBufferIdx GUARDED_BY(mMutex) = 0;
     std::array<BufferStats, kMeasurementWindowMaxSizeInBuffers> mPastMeasurements;
     void init_params();
 
