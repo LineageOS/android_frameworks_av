@@ -17,7 +17,7 @@
 // #define LOG_NDEBUG 0
 #define LOG_TAG "SoundDoseManager_tests"
 
-#include <aidl/android/hardware/audio/core/BnSoundDose.h>
+#include <aidl/android/hardware/audio/core/sounddose/BnSoundDose.h>
 #include <gmock/gmock.h>
 #include <gtest/gtest.h>
 
@@ -26,7 +26,7 @@
 namespace android {
 namespace {
 
-using aidl::android::hardware::audio::core::BnSoundDose;
+using aidl::android::hardware::audio::core::sounddose::BnSoundDose;
 using aidl::android::media::audio::common::AudioDevice;
 using aidl::android::media::audio::common::AudioDeviceAddress;
 
