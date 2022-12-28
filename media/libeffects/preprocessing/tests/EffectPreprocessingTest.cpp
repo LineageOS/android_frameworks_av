@@ -143,10 +143,6 @@ void setPreProcParams(const effect_uuid_t* uuid, EffectTestHelper& effect, size_
         const AGC2Params* agc2Params = &params->agc2Params;
         ASSERT_NO_FATAL_FAILURE(
                 effect.setParam(AGC2_PARAM_FIXED_DIGITAL_GAIN, agc2Params->fixedDigitalGain));
-        ASSERT_NO_FATAL_FAILURE(effect.setParam(AGC2_PARAM_ADAPT_DIGI_LEVEL_ESTIMATOR,
-                                                agc2Params->adaptDigiLevelEstimator));
-        ASSERT_NO_FATAL_FAILURE(effect.setParam(AGC2_PARAM_ADAPT_DIGI_EXTRA_SATURATION_MARGIN,
-                                                agc2Params->extraSaturationMargin));
     } else if (isAECEffect(uuid)) {
         const AECParams* aecParams = &params->aecParams;
         ASSERT_NO_FATAL_FAILURE(effect.setParam(AEC_PARAM_ECHO_DELAY, aecParams->echoDelay));
