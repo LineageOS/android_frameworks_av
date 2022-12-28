@@ -48,6 +48,9 @@ public class Decoder implements IBufferXfer.IReceiveBuffer {
     private boolean mSawOutputEOS;
     private boolean mSignalledError;
 
+    private int mNumInFramesProvided;
+    private int mNumInFramesRequired;
+
     private int mNumOutputFrame;
     private int mIndex;
 
@@ -87,6 +90,10 @@ public class Decoder implements IBufferXfer.IReceiveBuffer {
     }
     public void setupDecoder(Surface surface, boolean render,
             boolean useFrameReleaseQueue, int frameRate) {
+        setupDecoder(surface, render, useFrameReleaseQueue, frameRate, -1);
+    }
+    public void setupDecoder(Surface surface, boolean render,
+            boolean useFrameReleaseQueue, int frameRate, int numInFramesRequired) {
         mSignalledError = false;
         mOutputStream = null;
         mSurface = surface;
@@ -95,6 +102,8 @@ public class Decoder implements IBufferXfer.IReceiveBuffer {
             Log.i(TAG, "Using FrameReleaseQueue with frameRate " + frameRate);
             mFrameReleaseQueue = new FrameReleaseQueue(mRender, frameRate);
         }
+        mNumInFramesRequired = numInFramesRequired;
+        Log.i(TAG, "Decoding " + mNumInFramesRequired + " frames");
     }
 
     private MediaCodec createCodec(String codecName, MediaFormat format) throws IOException {
@@ -147,6 +156,10 @@ public class Decoder implements IBufferXfer.IReceiveBuffer {
         mSawOutputEOS = false;
         mNumOutputFrame = 0;
         mIndex = 0;
+        mNumInFramesProvided = 0;
+        if (mNumInFramesRequired < 0) {
+            mNumInFramesRequired = mInputBuffer.size();
+        }
         long sTime = mStats.getCurTime();
         mCodec = createCodec(codecName, format);
         if (mCodec == null) {
@@ -305,12 +318,22 @@ public class Decoder implements IBufferXfer.IReceiveBuffer {
     }
 
     private void onInputAvailable(int inputBufferId, MediaCodec mediaCodec) {
-        if ((inputBufferId >= 0) && !mSawInputEOS) {
+        if (inputBufferId >= 0) {
             ByteBuffer inputCodecBuffer = mediaCodec.getInputBuffer(inputBufferId);
-            BufferInfo bufInfo = mInputBufferInfo.get(mIndex);
-            inputCodecBuffer.put(mInputBuffer.get(mIndex).array());
-            mIndex++;
+            BufferInfo bufInfo;
+            if (mNumInFramesProvided >= mNumInFramesRequired) {
+                Log.i(TAG, "Input frame limit reached");
+                mIndex = mInputBufferInfo.size() - 1;
+                bufInfo = mInputBufferInfo.get(mIndex);
+                if ((bufInfo.flags & MediaCodec.BUFFER_FLAG_END_OF_STREAM) == 0) {
+                    Log.e(TAG, "Error in EOS flag for Decoder");
+                }
+            }
+            bufInfo = mInputBufferInfo.get(mIndex);
             mSawInputEOS = (bufInfo.flags & MediaCodec.BUFFER_FLAG_END_OF_STREAM) != 0;
+            inputCodecBuffer.put(mInputBuffer.get(mIndex).array());
+            mNumInFramesProvided++;
+            mIndex = mNumInFramesProvided % (mInputBufferInfo.size() - 1);
             if (mSawInputEOS) {
                 Log.i(TAG, "Saw input EOS");
             }
