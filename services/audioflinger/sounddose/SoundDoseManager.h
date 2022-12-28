@@ -17,7 +17,7 @@
 
 #pragma once
 
-#include <aidl/android/hardware/audio/core/ISoundDose.h>
+#include <aidl/android/hardware/audio/core/sounddose/ISoundDose.h>
 #include <aidl/android/media/audio/common/AudioDevice.h>
 #include <android/media/BnSoundDose.h>
 #include <android/media/ISoundDoseCallback.h>
@@ -30,7 +30,7 @@
 
 namespace android {
 
-using aidl::android::hardware::audio::core::ISoundDose;
+using aidl::android::hardware::audio::core::sounddose::ISoundDose;
 
 class SoundDoseManager : public audio_utils::MelProcessor::MelCallback {
 public:
