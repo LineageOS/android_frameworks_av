@@ -551,8 +551,7 @@ RetCode BundleContext::setVolumeMute(bool mute) {
 }
 
 RetCode BundleContext::setVirtualizerStrength(int strength) {
-    if (strength < Virtualizer::MIN_PER_MILLE_STRENGTH ||
-        strength > Virtualizer::MAX_PER_MILLE_STRENGTH) {
+    if (strength < 0 || strength > lvm::kVirtualizerCap.maxStrengthPm) {
         return RetCode::ERROR_ILLEGAL_PARAMETER;
     }
 
