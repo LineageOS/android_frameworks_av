@@ -104,7 +104,8 @@ static const Descriptor kBassBoostDesc = {
                    .implementor = "NXP Software Ltd."},
         .capability = Capability::make<Capability::bassBoost>(kBassBoostCap)};
 
-static const Virtualizer::Capability kVirtualizerCap = {.strengthSupported = mStrengthSupported};
+static const Virtualizer::Capability kVirtualizerCap = {.maxStrengthPm = 1000,
+                                                        .strengthSupported = mStrengthSupported};
 
 static const std::string kVirtualizerEffectName = "Virtualizer";
 
