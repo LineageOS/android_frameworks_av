@@ -522,7 +522,7 @@ RetCode BundleContext::setBassBoostStrength(int strength) {
 }
 
 RetCode BundleContext::setVolumeLevel(int level) {
-    if (level < Volume::MIN_LEVEL_DB || level > lvm::kVolumeCap.maxLevel) {
+    if (level < lvm::kVolumeCap.minLevelDb || level > lvm::kVolumeCap.maxLevelDb) {
         return RetCode::ERROR_ILLEGAL_PARAMETER;
     }
 
