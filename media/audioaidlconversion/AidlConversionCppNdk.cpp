@@ -1167,6 +1167,10 @@ ConversionResult<audio_input_flags_t> aidl2legacy_AudioInputFlags_audio_input_fl
             return AUDIO_INPUT_FLAG_DIRECT;
         case AudioInputFlags::ULTRASOUND:
             return AUDIO_INPUT_FLAG_ULTRASOUND;
+        case AudioInputFlags::HOTWORD_TAP:
+            return AUDIO_INPUT_FLAG_HOTWORD_TAP;
+        case AudioInputFlags::HW_LOOKBACK:
+            return AUDIO_INPUT_FLAG_HW_LOOKBACK;
     }
     return unexpected(BAD_VALUE);
 }
@@ -1194,6 +1198,10 @@ ConversionResult<AudioInputFlags> legacy2aidl_audio_input_flags_t_AudioInputFlag
             return AudioInputFlags::DIRECT;
         case AUDIO_INPUT_FLAG_ULTRASOUND:
             return AudioInputFlags::ULTRASOUND;
+        case AUDIO_INPUT_FLAG_HOTWORD_TAP:
+            return AudioInputFlags::HOTWORD_TAP;
+        case AUDIO_INPUT_FLAG_HW_LOOKBACK:
+            return AudioInputFlags::HW_LOOKBACK;
     }
     return unexpected(BAD_VALUE);
 }

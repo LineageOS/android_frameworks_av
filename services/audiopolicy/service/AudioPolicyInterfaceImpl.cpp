@@ -667,7 +667,9 @@ Status AudioPolicyService::getInputForAttr(const media::AudioAttributesInternal&
         return binderStatusFromStatusT(PERMISSION_DENIED);
     }
 
-    if (((flags & AUDIO_INPUT_FLAG_HW_HOTWORD) != 0)
+    if (((flags & (AUDIO_INPUT_FLAG_HW_HOTWORD |
+                        AUDIO_INPUT_FLAG_HOTWORD_TAP |
+                        AUDIO_INPUT_FLAG_HW_LOOKBACK)) != 0)
             && !canCaptureHotword) {
         ALOGE("%s: permission denied: hotword mode not allowed"
               " for uid %d pid %d", __func__, attributionSource.uid, attributionSource.pid);
