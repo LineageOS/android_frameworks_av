@@ -498,8 +498,7 @@ RetCode BundleContext::updateControlParameter(const std::vector<Equalizer::BandL
 }
 
 RetCode BundleContext::setBassBoostStrength(int strength) {
-    if (strength < BassBoost::MIN_PER_MILLE_STRENGTH ||
-        strength > BassBoost::MAX_PER_MILLE_STRENGTH) {
+    if (strength < 0 || strength > lvm::kBassBoostCap.maxStrengthPm) {
         LOG(ERROR) << __func__ << " invalid strength: " << strength;
         return RetCode::ERROR_ILLEGAL_PARAMETER;
     }
