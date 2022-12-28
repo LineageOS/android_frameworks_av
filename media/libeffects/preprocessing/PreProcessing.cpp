@@ -102,7 +102,8 @@ struct preproc_session_s {
     uint32_t state;                // current state (enum preproc_session_state)
     int id;                        // audio session ID
     int io;                        // handle of input stream this session is on
-    webrtc::AudioProcessing* apm;  // handle on webRTC audio processing module (APM)
+    rtc::scoped_refptr<webrtc::AudioProcessing>
+            apm;  // handle on webRTC audio processing module (APM)
     // Audio Processing module builder
     webrtc::AudioProcessingBuilder ap_builder;
     // frameCount represents the size of the buffers used for processing, and must represent 10ms.
@@ -260,9 +261,6 @@ int Agc2Init(preproc_effect_t* effect) {
     ALOGV("Agc2Init");
     effect->session->config = effect->session->apm->GetConfig();
     effect->session->config.gain_controller2.fixed_digital.gain_db = 0.f;
-    effect->session->config.gain_controller2.adaptive_digital.level_estimator =
-            effect->session->config.gain_controller2.kRms;
-    effect->session->config.gain_controller2.adaptive_digital.extra_saturation_margin_db = 2.f;
     effect->session->apm->ApplyConfig(effect->session->config);
     return 0;
 }
@@ -332,24 +330,19 @@ int Agc2GetParameter(preproc_effect_t* effect, void* pParam, uint32_t* pValueSiz
             ALOGV("Agc2GetParameter() target level %f dB", *(float*)pValue);
             break;
         case AGC2_PARAM_ADAPT_DIGI_LEVEL_ESTIMATOR:
-            *(uint32_t*)pValue = (uint32_t)(
-                    effect->session->config.gain_controller2.adaptive_digital.level_estimator);
-            ALOGV("Agc2GetParameter() level estimator %d",
-                  *(webrtc::AudioProcessing::Config::GainController2::LevelEstimator*)pValue);
+            // WebRTC only supports RMS level estimator now
+            *(uint32_t*)pValue = (uint32_t)(0);
+            ALOGV("Agc2GetParameter() level estimator RMS");
             break;
         case AGC2_PARAM_ADAPT_DIGI_EXTRA_SATURATION_MARGIN:
-            *(float*)pValue = (float)(effect->session->config.gain_controller2.adaptive_digital
-                                              .extra_saturation_margin_db);
+            *(float*)pValue = (float)(2.0);
             ALOGV("Agc2GetParameter() extra saturation margin %f dB", *(float*)pValue);
             break;
         case AGC2_PARAM_PROPERTIES:
             pProperties->fixedDigitalGain =
                     (float)(effect->session->config.gain_controller2.fixed_digital.gain_db);
-            pProperties->level_estimator = (uint32_t)(
-                    effect->session->config.gain_controller2.adaptive_digital.level_estimator);
-            pProperties->extraSaturationMargin =
-                    (float)(effect->session->config.gain_controller2.adaptive_digital
-                                    .extra_saturation_margin_db);
+            pProperties->level_estimator = 0;
+            pProperties->extraSaturationMargin = 2.0;
             break;
         default:
             ALOGW("Agc2GetParameter() unknown param %d", param);
@@ -438,16 +431,19 @@ int Agc2SetParameter(preproc_effect_t* effect, void* pParam, void* pValue) {
             effect->session->config.gain_controller2.fixed_digital.gain_db = valueFloat;
             break;
         case AGC2_PARAM_ADAPT_DIGI_LEVEL_ESTIMATOR:
-            ALOGV("Agc2SetParameter() level estimator %d",
-                  *(webrtc::AudioProcessing::Config::GainController2::LevelEstimator*)pValue);
-            effect->session->config.gain_controller2.adaptive_digital.level_estimator =
-                    (*(webrtc::AudioProcessing::Config::GainController2::LevelEstimator*)pValue);
+            ALOGV("Agc2SetParameter() level estimator %d", *(uint32_t*)pValue);
+            if (*(uint32_t*)pValue != 0) {
+              // only RMS is supported
+              status = -EINVAL;
+            }
             break;
         case AGC2_PARAM_ADAPT_DIGI_EXTRA_SATURATION_MARGIN:
             valueFloat = (float)(*(int32_t*)pValue);
             ALOGV("Agc2SetParameter() extra saturation margin %f dB", valueFloat);
-            effect->session->config.gain_controller2.adaptive_digital.extra_saturation_margin_db =
-                    valueFloat;
+            if (valueFloat != 2.0) {
+              // extra_staturation_margin_db is no longer configurable in webrtc
+              status = -EINVAL;
+            }
             break;
         case AGC2_PARAM_PROPERTIES:
             ALOGV("Agc2SetParameter() properties gain %f, level %d margin %f",
@@ -455,11 +451,9 @@ int Agc2SetParameter(preproc_effect_t* effect, void* pParam, void* pValue) {
                   pProperties->extraSaturationMargin);
             effect->session->config.gain_controller2.fixed_digital.gain_db =
                     pProperties->fixedDigitalGain;
-            effect->session->config.gain_controller2.adaptive_digital.level_estimator =
-                    (webrtc::AudioProcessing::Config::GainController2::LevelEstimator)
-                            pProperties->level_estimator;
-            effect->session->config.gain_controller2.adaptive_digital.extra_saturation_margin_db =
-                    pProperties->extraSaturationMargin;
+            if (pProperties->level_estimator != 0 || pProperties->extraSaturationMargin != 2.0) {
+              status = -EINVAL;
+            }
             break;
         default:
             ALOGW("Agc2SetParameter() unknown param %08x value %08x", param, *(uint32_t*)pValue);
@@ -879,8 +873,8 @@ extern "C" int Session_CreateEffect(preproc_session_t* session, int32_t procId,
 
 error:
     if (session->createdMsk == 0) {
-        delete session->apm;
-        session->apm = NULL;
+        // Scoped_refptr will handle reference counting here
+        session->apm = nullptr;
     }
     return status;
 }
@@ -889,8 +883,8 @@ int Session_ReleaseEffect(preproc_session_t* session, preproc_effect_t* fx) {
     ALOGW_IF(Effect_Release(fx) != 0, " Effect_Release() failed for proc ID %d", fx->procId);
     session->createdMsk &= ~(1 << fx->procId);
     if (session->createdMsk == 0) {
-        delete session->apm;
-        session->apm = NULL;
+        // Scoped_refptr will handle reference counting here
+        session->apm = nullptr;
         session->id = 0;
     }
 

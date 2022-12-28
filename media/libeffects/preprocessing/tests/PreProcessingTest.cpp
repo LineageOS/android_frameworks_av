@@ -400,20 +400,6 @@ int main(int argc, const char* argv[]) {
             ALOGE("Invalid AGC2 Fixed Digital Gain. Error %d\n", status);
             return EXIT_FAILURE;
         }
-        if (int status = preProcSetConfigParam(AGC2_PARAM_ADAPT_DIGI_LEVEL_ESTIMATOR,
-                                               (uint32_t)preProcCfgParams.agc2Level,
-                                               effectHandle[PREPROC_AGC2]);
-            status != 0) {
-            ALOGE("Invalid AGC2 Level Estimator. Error %d\n", status);
-            return EXIT_FAILURE;
-        }
-        if (int status = preProcSetConfigParam(AGC2_PARAM_ADAPT_DIGI_EXTRA_SATURATION_MARGIN,
-                                               (float)preProcCfgParams.agc2SaturationMargin,
-                                               effectHandle[PREPROC_AGC2]);
-            status != 0) {
-            ALOGE("Invalid AGC2 Saturation Margin. Error %d\n", status);
-            return EXIT_FAILURE;
-        }
     }
     if (effectEn[PREPROC_NS]) {
         if (int status = preProcSetConfigParam(NS_PARAM_LEVEL, (uint32_t)preProcCfgParams.nsLevel,
