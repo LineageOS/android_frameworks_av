@@ -386,7 +386,7 @@ void CryptoHalHidl::notifyResolution(uint32_t width, uint32_t height) {
     ALOGE_IF(!hResult.isOk(), "notifyResolution txn failed %s", hResult.description().c_str());
 }
 
-status_t CryptoHalHidl::setMediaDrmSession(const Vector<uint8_t>& sessionId) {
+DrmStatus CryptoHalHidl::setMediaDrmSession(const Vector<uint8_t>& sessionId) {
     Mutex::Autolock autoLock(mLock);
 
     if (mInitCheck != OK) {
