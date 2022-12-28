@@ -260,7 +260,7 @@ void CryptoHalAidl::notifyResolution(uint32_t width, uint32_t height) {
     }
 }
 
-status_t CryptoHalAidl::setMediaDrmSession(const Vector<uint8_t>& sessionId) {
+DrmStatus CryptoHalAidl::setMediaDrmSession(const Vector<uint8_t>& sessionId) {
     Mutex::Autolock autoLock(mLock);
 
     if (mInitCheck != OK) {

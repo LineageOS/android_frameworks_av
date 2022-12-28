@@ -57,7 +57,7 @@ struct CryptoHalHidl : public ICrypto {
 
     virtual void notifyResolution(uint32_t width, uint32_t height);
 
-    virtual status_t setMediaDrmSession(const Vector<uint8_t> &sessionId);
+    virtual DrmStatus setMediaDrmSession(const Vector<uint8_t> &sessionId);
 
     virtual ssize_t decrypt(const uint8_t key[16], const uint8_t iv[16],
             CryptoPlugin::Mode mode, const CryptoPlugin::Pattern &pattern,
