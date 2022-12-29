@@ -17,6 +17,7 @@
 #include <cutils/native_handle.h>
 #include <media/hardware/CryptoAPI.h>
 #include <media/stagefright/foundation/ABase.h>
+#include <mediadrm/DrmStatus.h>
 #include <utils/RefBase.h>
 #include <utils/StrongPointer.h>
 
@@ -65,7 +66,7 @@ struct ICrypto : public RefBase {
 
     virtual void notifyResolution(uint32_t width, uint32_t height) = 0;
 
-    virtual status_t setMediaDrmSession(const Vector<uint8_t> &sessionId) = 0;
+    virtual DrmStatus setMediaDrmSession(const Vector<uint8_t> &sessionId) = 0;
 
     enum DestinationType {
         kDestinationTypeSharedMemory, // non-secure

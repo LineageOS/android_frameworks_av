@@ -25,7 +25,7 @@
 #include <android/binder_manager.h>
 #include <utils/Log.h>
 
-using aidl::android::hardware::audio::core::ISoundDose;
+using aidl::android::hardware::audio::core::sounddose::ISoundDose;
 using aidl::android::hardware::audio::sounddose::ISoundDoseFactory;
 
 namespace android {

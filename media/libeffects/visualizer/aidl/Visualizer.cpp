@@ -101,7 +101,10 @@ ndk::ScopedAStatus VisualizerImpl::setOnlyParameter(
     auto tag = param.getTag();
     switch (tag) {
         case Visualizer::SetOnlyParameters::latencyMs: {
-            mContext->setDownstreamLatency(param.get<Visualizer::SetOnlyParameters::latencyMs>());
+            RETURN_IF(mContext->setDownstreamLatency(
+                              param.get<Visualizer::SetOnlyParameters::latencyMs>()) !=
+                              RetCode::SUCCESS,
+                      EX_ILLEGAL_ARGUMENT, "setLatencyFailed");
             break;
         }
         default: {
