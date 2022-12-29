@@ -34,6 +34,7 @@
 #include <media/stagefright/foundation/AMessage.h>
 #include <media/MediaMetricsItem.h>
 #include <media/ShmemCompat.h>
+#include <mediautils/SchedulingPolicyService.h>
 #include <mediautils/ServiceUtilities.h>
 #include <utils/Thread.h>
 
@@ -111,6 +112,14 @@ public:
     };
 
     void onMessageReceived(const sp<AMessage> &msg) override {
+        // No ALooper method to get the tid so update
+        // Spatializer priority on the first message received.
+        std::call_once(mPrioritySetFlag, [](){
+            const pid_t pid = getpid();
+            const pid_t tid = gettid();
+            (void)requestSpatializerPriority(pid, tid);
+        });
+
         sp<Spatializer> spatializer = mSpatializer.promote();
         if (spatializer == nullptr) {
             ALOGW("%s: Cannot promote spatializer", __func__);
@@ -163,6 +172,7 @@ public:
     }
 private:
     wp<Spatializer> mSpatializer;
+    std::once_flag mPrioritySetFlag;
 };
 
 const std::vector<const char *> Spatializer::sHeadPoseKeys = {
