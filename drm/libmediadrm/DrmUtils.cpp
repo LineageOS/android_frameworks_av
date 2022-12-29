@@ -59,11 +59,11 @@ namespace DrmUtils {
 
 namespace {
 
-template <typename Hal>
-Hal* MakeObject(status_t* pstatus) {
+template <typename Hal, typename... Ts>
+Hal* MakeObject(status_t* pstatus, Ts... args) {
     status_t err = OK;
     status_t& status = pstatus ? *pstatus : err;
-    auto obj = new Hal();
+    auto obj = new Hal(args...);
     status = obj->initCheck();
     if (status != OK && status != NO_INIT) {
         return NULL;
@@ -192,8 +192,8 @@ std::vector<std::shared_ptr<IDrmFactoryAidl>> makeDrmFactoriesAidl() {
     return factories;
 }
 
-sp<IDrm> MakeDrm(status_t* pstatus) {
-    return MakeObject<DrmHal>(pstatus);
+sp<IDrm> MakeDrm(IDrmFrontend frontend, status_t* pstatus) {
+    return MakeObject<DrmMetricsLogger>(pstatus, frontend);
 }
 
 sp<ICrypto> MakeCrypto(status_t* pstatus) {
