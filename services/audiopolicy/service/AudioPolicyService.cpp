@@ -202,6 +202,7 @@ AudioPolicyService::AudioPolicyService()
       mCaptureStateNotifier(false),
       mCreateAudioPolicyManager(createAudioPolicyManager),
       mDestroyAudioPolicyManager(destroyAudioPolicyManager) {
+      setMinSchedulerPolicy(SCHED_NORMAL, ANDROID_PRIORITY_AUDIO);
 }
 
 void AudioPolicyService::loadAudioPolicyManager()
