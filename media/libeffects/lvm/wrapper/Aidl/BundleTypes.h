@@ -85,7 +85,8 @@ static const Descriptor kEqualizerDesc = {
 
 static const bool mStrengthSupported = true;
 
-static const BassBoost::Capability kBassBoostCap = {.strengthSupported = mStrengthSupported};
+static const BassBoost::Capability kBassBoostCap = {.maxStrengthPm = 1000,
+                                                    .strengthSupported = mStrengthSupported};
 
 static const std::string kBassBoostEffectName = "Dynamic Bass Boost";
 
@@ -103,7 +104,8 @@ static const Descriptor kBassBoostDesc = {
                    .implementor = "NXP Software Ltd."},
         .capability = Capability::make<Capability::bassBoost>(kBassBoostCap)};
 
-static const Virtualizer::Capability kVirtualizerCap = {.strengthSupported = mStrengthSupported};
+static const Virtualizer::Capability kVirtualizerCap = {.maxStrengthPm = 1000,
+                                                        .strengthSupported = mStrengthSupported};
 
 static const std::string kVirtualizerEffectName = "Virtualizer";
 
@@ -112,7 +114,7 @@ static const Descriptor kVirtualizerDesc = {
                           .uuid = kVirtualizerBundleImplUUID,
                           .proxy = kVirtualizerProxyUUID},
                    .flags = {.type = Flags::Type::INSERT,
-                             .insert = Flags::Insert::FIRST,
+                             .insert = Flags::Insert::LAST,
                              .volume = Flags::Volume::CTRL,
                              .deviceIndication = true},
                    .cpuLoad = VIRTUALIZER_CUP_LOAD_ARM9E,
@@ -121,7 +123,7 @@ static const Descriptor kVirtualizerDesc = {
                    .implementor = "NXP Software Ltd."},
         .capability = Capability::make<Capability::virtualizer>(kVirtualizerCap)};
 
-static const Volume::Capability kVolumeCap = {.maxLevel = Volume::MAX_LEVEL_DB};
+static const Volume::Capability kVolumeCap = {.minLevelDb = -9600, .maxLevelDb = 0};
 
 static const std::string kVolumeEffectName = "Volume";
 

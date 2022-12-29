@@ -355,6 +355,8 @@ public:
 
         virtual bool isUltrasoundSupported();
 
+        bool isHotwordStreamSupported(bool lookbackAudio) override;
+
         virtual status_t listAudioProductStrategies(AudioProductStrategyVector &strategies)
         {
             return mEngine->listAudioProductStrategies(strategies);

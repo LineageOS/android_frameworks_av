@@ -34,6 +34,7 @@
 #include <map>
 #include <math.h>
 #include <set>
+#include <type_traits>
 #include <unordered_set>
 #include <vector>
 
@@ -5686,6 +5687,21 @@ bool AudioPolicyManager::isUltrasoundSupported()
     return false;
 }
 
+bool AudioPolicyManager::isHotwordStreamSupported(bool lookbackAudio)
+{
+    const auto mask = AUDIO_INPUT_FLAG_HOTWORD_TAP |
+        (lookbackAudio ? AUDIO_INPUT_FLAG_HW_LOOKBACK : 0);
+    for (const auto& hwModule : mHwModules) {
+        const InputProfileCollection &inputProfiles = hwModule->getInputProfiles();
+        for (const auto &inputProfile : inputProfiles) {
+            if ((inputProfile->getFlags() & mask) == mask) {
+                return true;
+            }
+        }
+    }
+    return false;
+}
+
 bool AudioPolicyManager::isCallScreenModeSupported()
 {
     return getConfig().isCallScreenModeSupported();
@@ -7439,8 +7455,11 @@ sp<IOProfile> AudioPolicyManager::getInputProfile(const sp<DeviceDescriptor> &de
     // TODO: perhaps isCompatibleProfile should return a "matching" score so we can return
     // the best matching profile, not the first one.
 
-    const audio_input_flags_t mustMatchFlag = AUDIO_INPUT_FLAG_MMAP_NOIRQ;
-    const audio_input_flags_t oriFlags = flags;
+    using underlying_input_flag_t = std::underlying_type_t<audio_input_flags_t>;
+    const underlying_input_flag_t mustMatchFlag = AUDIO_INPUT_FLAG_MMAP_NOIRQ |
+                         AUDIO_INPUT_FLAG_HOTWORD_TAP | AUDIO_INPUT_FLAG_HW_LOOKBACK;
+
+    const underlying_input_flag_t oriFlags = flags;
 
     for (;;) {
         sp<IOProfile> firstInexact = nullptr;

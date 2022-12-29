@@ -38,7 +38,7 @@ struct CryptoHal : public ICrypto {
     virtual bool requiresSecureDecoderComponent(
             const char *mime) const;
     virtual void notifyResolution(uint32_t width, uint32_t height);
-    virtual status_t setMediaDrmSession(const Vector<uint8_t> &sessionId);
+    virtual DrmStatus setMediaDrmSession(const Vector<uint8_t> &sessionId);
     virtual ssize_t decrypt(const uint8_t key[16], const uint8_t iv[16],
             CryptoPlugin::Mode mode, const CryptoPlugin::Pattern &pattern,
             const drm::V1_0::SharedBuffer &source, size_t offset,

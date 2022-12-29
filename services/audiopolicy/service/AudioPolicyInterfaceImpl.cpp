@@ -667,7 +667,9 @@ Status AudioPolicyService::getInputForAttr(const media::AudioAttributesInternal&
         return binderStatusFromStatusT(PERMISSION_DENIED);
     }
 
-    if (((flags & AUDIO_INPUT_FLAG_HW_HOTWORD) != 0)
+    if (((flags & (AUDIO_INPUT_FLAG_HW_HOTWORD |
+                        AUDIO_INPUT_FLAG_HOTWORD_TAP |
+                        AUDIO_INPUT_FLAG_HW_LOOKBACK)) != 0)
             && !canCaptureHotword) {
         ALOGE("%s: permission denied: hotword mode not allowed"
               " for uid %d pid %d", __func__, attributionSource.uid, attributionSource.pid);
@@ -2040,6 +2042,17 @@ Status AudioPolicyService::isUltrasoundSupported(bool* _aidl_return)
     Mutex::Autolock _l(mLock);
     AutoCallerClear acc;
     *_aidl_return = mAudioPolicyManager->isUltrasoundSupported();
+    return Status::ok();
+}
+
+Status AudioPolicyService::isHotwordStreamSupported(bool lookbackAudio, bool* _aidl_return)
+{
+    if (mAudioPolicyManager == nullptr) {
+        return binderStatusFromStatusT(NO_INIT);
+    }
+    Mutex::Autolock _l(mLock);
+    AutoCallerClear acc;
+    *_aidl_return = mAudioPolicyManager->isHotwordStreamSupported(lookbackAudio);
     return Status::ok();
 }
 
