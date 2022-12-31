@@ -241,15 +241,34 @@ cc_library_shared {
         "libaudiohal_default",
         "latest_android_hardware_audio_common_ndk_shared",
         "latest_android_hardware_audio_core_ndk_shared",
-        "latest_android_hardware_audio_effect_ndk_shared",
+        "latest_android_hardware_audio_effect_ndk_static",
+        "latest_android_media_audio_common_types_ndk_shared",
     ],
     srcs: [
         "DevicesFactoryHalEntry.cpp",
         "DevicesFactoryHalAidl.cpp",
+        "EffectBufferHalAidl.cpp",
+        "EffectHalAidl.cpp",
         "EffectsFactoryHalAidl.cpp",
         "EffectsFactoryHalEntry.cpp",
     ],
+    static_libs: [
+        "android.hardware.common-V2-ndk",
+        "android.hardware.common.fmq-V1-ndk",
+    ],
     shared_libs: [
         "libbinder_ndk",
-    ]
+        "libaudio_aidl_conversion_common_ndk",
+    ],
+    header_libs: [
+        "libaudio_aidl_conversion_common_util_ndk",
+        "libaudio_system_headers",
+    ],
+    cflags: [
+        "-Wall",
+        "-Wextra",
+        "-Werror",
+        "-Wthread-safety",
+        "-DBACKEND_NDK",
+    ],
 }
