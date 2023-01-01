@@ -2863,14 +2863,15 @@ status_t AudioFlinger::getMicrophones(std::vector<media::MicrophoneInfo> *microp
     status_t status = INVALID_OPERATION;
 
     for (size_t i = 0; i < mAudioHwDevs.size(); i++) {
-        std::vector<media::MicrophoneInfo> mics;
+        std::vector<audio_microphone_characteristic_t> mics;
         AudioHwDevice *dev = mAudioHwDevs.valueAt(i);
         mHardwareStatus = AUDIO_HW_GET_MICROPHONES;
         status_t devStatus = dev->hwDevice()->getMicrophones(&mics);
         mHardwareStatus = AUDIO_HW_IDLE;
         if (devStatus == NO_ERROR) {
-            microphones->insert(microphones->begin(), mics.begin(), mics.end());
             // report success if at least one HW module supports the function.
+            std::transform(mics.begin(), mics.end(), std::back_inserter(*microphones),
+                           [](auto& mic) { return media::MicrophoneInfo(mic); });
             status = NO_ERROR;
         }
     }
