@@ -179,3 +179,8 @@ cc_library {
     local_include_dirs: ["include"],
     export_include_dirs: ["include"],
 }
+
+cc_library_headers {
+    name: "mediautils_headers",
+    export_include_dirs: ["include", "."],
+}
