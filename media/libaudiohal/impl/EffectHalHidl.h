@@ -78,6 +78,11 @@ class EffectHalHidl : public EffectHalInterface, public EffectConversionHelperHi
     std::unique_ptr<StatusMQ> mStatusMQ;
     EventFlag* mEfGroup;
     bool mIsInput = false;
+    static constexpr int32_t kRTPriorityMin = 1;
+    static constexpr int32_t kRTPriorityMax = 3;
+    static constexpr int kRTPriorityDisabled = 0;
+    // Typical RealTime mHalThreadPriority ranges from 1 (low) to 3 (high).
+    int mHalThreadPriority = kRTPriorityDisabled;
 
     // Can not be constructed directly by clients.
     EffectHalHidl(const sp<IEffect>& effect, uint64_t effectId);
@@ -93,6 +98,10 @@ class EffectHalHidl : public EffectHalInterface, public EffectConversionHelperHi
             uint32_t cmdCode, uint32_t cmdSize, void *pCmdData,
             uint32_t *replySize, void *pReplyData);
     status_t setProcessBuffers();
+    status_t getHalPid(pid_t *pid) const;
+    status_t getHalWorkerTid(pid_t *tid);
+    bool requestHalThreadPriority(pid_t threadPid, pid_t threadId);
+    status_t checkHalThreadPriority();
 };
 
 } // namespace effect
