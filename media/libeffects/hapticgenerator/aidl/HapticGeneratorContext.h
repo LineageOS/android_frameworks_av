@@ -16,6 +16,7 @@
 
 #pragma once
 
+#include <android-base/thread_annotations.h>
 #include <vibrator/ExternalVibrationUtils.h>
 #include <map>
 
@@ -68,13 +69,11 @@ class HapticGeneratorContext final : public EffectContext {
     RetCode disable();
     void reset();
 
-    RetCode setHgHapticScale(const HapticGenerator::HapticScale& hapticScale);
-    HapticGenerator::HapticScale getHgHapticScale() const { return mParams.mHapticScale; }
+    RetCode setHgHapticScales(const std::vector<HapticGenerator::HapticScale> hapticScales);
+    std::vector<HapticGenerator::HapticScale> getHgHapticScales();
 
     RetCode setHgVibratorInformation(const HapticGenerator::VibratorInformation& vibratorInfo);
-    HapticGenerator::VibratorInformation getHgVibratorInformation() const {
-        return mParams.mVibratorInfo;
-    }
+    HapticGenerator::VibratorInformation getHgVibratorInformation();
 
     IEffect::Status lvmProcess(float* in, float* out, int samples);
 
@@ -89,8 +88,9 @@ class HapticGeneratorContext final : public EffectContext {
     static constexpr float DEFAULT_DISTORTION_INPUT_GAIN = 0.3f;
     static constexpr float DEFAULT_DISTORTION_CUBE_THRESHOLD = 0.1f;
 
+    std::mutex mMutex;
     HapticGeneratorState mState;
-    HapticGeneratorParam mParams;
+    HapticGeneratorParam mParams GUARDED_BY(mMutex);
     int mSampleRate;
     int mFrameCount = 0;
 
