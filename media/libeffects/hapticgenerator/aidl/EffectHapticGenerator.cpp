@@ -99,8 +99,8 @@ ndk::ScopedAStatus HapticGeneratorImpl::setParameterSpecific(const Parameter::Sp
     auto tag = hgParam.getTag();
 
     switch (tag) {
-        case HapticGenerator::hapticScale: {
-            RETURN_IF(mContext->setHgHapticScale(hgParam.get<HapticGenerator::hapticScale>()) !=
+        case HapticGenerator::hapticScales: {
+            RETURN_IF(mContext->setHgHapticScales(hgParam.get<HapticGenerator::hapticScales>()) !=
                               RetCode::SUCCESS,
                       EX_ILLEGAL_ARGUMENT, "setHapticScaleFailed");
             return ndk::ScopedAStatus::ok();
@@ -143,8 +143,8 @@ ndk::ScopedAStatus HapticGeneratorImpl::getParameterHapticGenerator(const Haptic
 
     HapticGenerator hgParam;
     switch (tag) {
-        case HapticGenerator::hapticScale: {
-            hgParam.set<HapticGenerator::hapticScale>(mContext->getHgHapticScale());
+        case HapticGenerator::hapticScales: {
+            hgParam.set<HapticGenerator::hapticScales>(mContext->getHgHapticScales());
             break;
         }
         case HapticGenerator::vibratorInfo: {
