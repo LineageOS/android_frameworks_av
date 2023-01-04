@@ -453,6 +453,7 @@ private:
     void initMediametrics();
     void updateMediametrics();
     void flushMediametrics();
+    void resetMetricsFields();
     void updateEphemeralMediametrics(mediametrics_handle_t item);
     void updateLowLatency(const sp<AMessage> &msg);
     void onGetMetrics(const sp<AMessage>& msg);
@@ -491,6 +492,28 @@ private:
     hdr_format getHdrFormatForDecoder(const AString &mime, const int32_t profile,
             const int32_t colorTransfer);
     bool profileSupport10Bits(const AString &mime, const int32_t profile);
+
+    struct ApiUsageMetrics {
+        bool isArrayMode;
+        enum OperationMode {
+            kUnknownMode = 0,
+            kSynchronousMode = 1,
+            kAsynchronousMode = 2,
+            kBlockMode = 3,
+        };
+        OperationMode operationMode;
+        bool isUsingOutputSurface;
+        struct InputBufferSize {
+            int32_t appMax;  // max size configured by the app
+            int32_t usedMax;  // max size actually used
+            int32_t codecMax;  // max size suggested by the codec
+        } inputBufferSize;
+    } mApiUsageMetrics;
+    struct ReliabilityContextMetrics {
+        int32_t flushCount;
+        int32_t setOutputSurfaceCount;
+        int32_t resolutionChangeCount;
+    } mReliabilityContextMetrics;
 
     // initial create parameters
     AString mInitName;
