@@ -4,6 +4,7 @@
 + [sdploader_fuzzer](#SDPLoader)
 + [rtp_writer_fuzzer](#ARTPWriter)
 + [packet_source_fuzzer](#packetSource)
++ [rtsp_connection_fuzzer](#ARTSPConnection)
 
 # <a name="SDPLoader"></a> Fuzzer for SDPLoader
 
@@ -85,3 +86,32 @@ ARTPWriter supports the following parameters:
   $ adb sync data
   $ adb shell /data/fuzz/arm64/packet_source_fuzzer/packet_source_fuzzer
 ```
+
+# <a name="ARTSPConnection"></a> Fuzzer for ARTSPConnection
+
+## Design Considerations
+This fuzzer aims at covering ARTSPConnection.cpp. A server is implemented in the fuzzer. After accepting a connect request, the server accepts the connections and handles them in a seperate thread. The threads are maintained in a ThreadPool which limits the maximum number of threads alive at a time. When the fuzzer process ends, all the threads in the ThreadPool are joined to the main thread.
+The inputs to the server are generated using FuzzedDataProvider and stored in a variable 'mFuzzData'. As this variable is shared among multiple threads, mutex is used to ensure synchronization.
+### Fuzzer Inputs:
+The inputs generated in the fuzzer using FuzzzedDataProvider have been randomized as much as possible. Due to the constraints in the module source code, the inputs have to be limited and arranged in some specific format.
+
+ARTSPConnection supports the following parameters:
+1. Authentication Type (parameter name: "kAuthType")
+2. FuzzData (parameter name: "mFuzzData")
+3. RequestData (parameter name: "mFuzzRequestData")
+
+| Parameter| Valid Values| Configured Value|
+|------------- |-------------| ----- |
+|`kAuthType`| 0.`Basic`<br/>1.`Digest`|Value obtained from FuzzedDataProvider|
+|`mFuzzData`| `String` |Value obtained from FuzzedDataProvider|
+|`mFuzzRequestData`| `String` |Value obtained from FuzzedDataProvider|
+
+#### Steps to run
+1. Build the fuzzer
+```
+  $ mm -j$(nproc) rtsp_connection_fuzzer
+```
+2. Run on device
+```
+  $ adb sync data
+  $ adb shell /data/fuzz/arm64/rtsp_connection_fuzzer/rtsp_connection_fuzzer
