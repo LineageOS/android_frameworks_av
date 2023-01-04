@@ -167,6 +167,10 @@ public:
     // HotwordDetectionService.
     static void setAudioFlingerBinder(const sp<IBinder>& audioFlinger);
 
+    // Sets a local AudioFlinger interface to be used by AudioSystem.
+    // This is used by audioserver main() to avoid binder AIDL translation.
+    static status_t setLocalAudioFlinger(const sp<IAudioFlinger>& af);
+
     // helper function to obtain AudioFlinger service handle
     static const sp<IAudioFlinger> get_audio_flinger();
 

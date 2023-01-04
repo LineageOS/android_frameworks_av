@@ -82,7 +82,7 @@ sp<CaptureStateListenerImpl> gSoundTriggerCaptureStateListener = nullptr;
 // Binder for the AudioFlinger service that's passed to this client process from the system server.
 // This allows specific isolated processes to access the audio system. Currently used only for the
 // HotwordDetectionService.
-sp<IBinder> gAudioFlingerBinder = nullptr;
+static sp<IBinder> gAudioFlingerBinder = nullptr;
 
 void AudioSystem::setAudioFlingerBinder(const sp<IBinder>& audioFlinger) {
     if (audioFlinger->getInterfaceDescriptor() != media::IAudioFlingerService::descriptor) {
@@ -98,6 +98,15 @@ void AudioSystem::setAudioFlingerBinder(const sp<IBinder>& audioFlinger) {
     gAudioFlingerBinder = audioFlinger;
 }
 
+static sp<IAudioFlinger> gLocalAudioFlinger; // set if we are local.
+
+status_t AudioSystem::setLocalAudioFlinger(const sp<IAudioFlinger>& af) {
+    Mutex::Autolock _l(gLock);
+    if (gAudioFlinger != nullptr) return INVALID_OPERATION;
+    gLocalAudioFlinger = af;
+    return OK;
+}
+
 // establish binder interface to AudioFlinger service
 const sp<IAudioFlinger> AudioSystem::get_audio_flinger() {
     sp<IAudioFlinger> af;
@@ -105,7 +114,19 @@ const sp<IAudioFlinger> AudioSystem::get_audio_flinger() {
     bool reportNoError = false;
     {
         Mutex::Autolock _l(gLock);
-        if (gAudioFlinger == 0) {
+        if (gAudioFlinger != nullptr) {
+            return gAudioFlinger;
+        }
+
+        if (gAudioFlingerClient == nullptr) {
+            gAudioFlingerClient = sp<AudioFlingerClient>::make();
+        } else {
+            reportNoError = true;
+        }
+
+        if (gLocalAudioFlinger != nullptr) {
+            gAudioFlinger = gLocalAudioFlinger;
+        } else {
             sp<IBinder> binder;
             if (gAudioFlingerBinder != nullptr) {
                 binder = gAudioFlingerBinder;
@@ -113,32 +134,24 @@ const sp<IAudioFlinger> AudioSystem::get_audio_flinger() {
                 sp<IServiceManager> sm = defaultServiceManager();
                 do {
                     binder = sm->getService(String16(IAudioFlinger::DEFAULT_SERVICE_NAME));
-                    if (binder != 0)
-                        break;
+                    if (binder != nullptr) break;
                     ALOGW("AudioFlinger not published, waiting...");
                     usleep(500000); // 0.5 s
                 } while (true);
             }
-            if (gAudioFlingerClient == NULL) {
-                gAudioFlingerClient = new AudioFlingerClient();
-            } else {
-                reportNoError = true;
-            }
             binder->linkToDeath(gAudioFlingerClient);
-            gAudioFlinger = new AudioFlingerClientAdapter(
-                    interface_cast<media::IAudioFlingerService>(binder));
-            LOG_ALWAYS_FATAL_IF(gAudioFlinger == 0);
-            afc = gAudioFlingerClient;
-            // Make sure callbacks can be received by gAudioFlingerClient
-            ProcessState::self()->startThreadPool();
+            const auto afs = interface_cast<media::IAudioFlingerService>(binder);
+            LOG_ALWAYS_FATAL_IF(afs == nullptr);
+            gAudioFlinger = sp<AudioFlingerClientAdapter>::make(afs);
         }
+        afc = gAudioFlingerClient;
         af = gAudioFlinger;
+        // Make sure callbacks can be received by gAudioFlingerClient
+        ProcessState::self()->startThreadPool();
     }
-    if (afc != 0) {
-        int64_t token = IPCThreadState::self()->clearCallingIdentity();
-        af->registerClient(afc);
-        IPCThreadState::self()->restoreCallingIdentity(token);
-    }
+    const int64_t token = IPCThreadState::self()->clearCallingIdentity();
+    af->registerClient(afc);
+    IPCThreadState::self()->restoreCallingIdentity(token);
     if (reportNoError) reportError(NO_ERROR);
     return af;
 }

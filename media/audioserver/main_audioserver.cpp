@@ -165,7 +165,8 @@ int main(int argc __unused, char **argv)
         const auto af = sp<AudioFlinger>::make();
         const auto afAdapter = sp<AudioFlingerServerAdapter>::make(af);
         ALOGD("%s: AudioFlinger created", __func__);
-        AudioSystem::setAudioFlingerBinder(afAdapter);
+        ALOGW_IF(AudioSystem::setLocalAudioFlinger(af) != OK,
+                "%s: AudioSystem already has an AudioFlinger instance!", __func__);
         const auto aps = sp<AudioPolicyService>::make();
         ALOGD("%s: AudioPolicy created", __func__);
 
