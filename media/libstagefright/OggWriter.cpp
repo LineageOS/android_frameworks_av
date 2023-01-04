@@ -96,6 +96,7 @@ status_t OggWriter::addSource(const sp<MediaSource>& source) {
         return ERROR_UNSUPPORTED;
     }
 
+    // NOLINTNEXTLINE(clang-analyzer-unix.MallocSizeof)
     mOs = (OggStreamState*) malloc(sizeof(ogg_stream_state));
     if (ogg_stream_init((ogg_stream_state*)mOs, rand()) == -1) {
         ALOGE("ogg stream init failed");
