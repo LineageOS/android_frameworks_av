@@ -29,7 +29,7 @@
 #include <media/stagefright/foundation/MediaDefs.h>
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////
-// Utilities
+// AIDL CPP/NDK backend to legacy audio data structure conversion utilities.
 
 #if defined(BACKEND_NDK)
 /* AIDL String generated in NDK is different than CPP */
@@ -846,8 +846,8 @@ ConversionResult<audio_channel_mask_t> aidl2legacy_AudioChannelLayout_audio_chan
         case Tag::indexMask:
             // Index masks do not have pre-defined values.
             if (const int bits = aidl.get<Tag::indexMask>();
-                    __builtin_popcount(bits) != 0 &&
-                    __builtin_popcount(bits) <= AUDIO_CHANNEL_COUNT_MAX) {
+                __builtin_popcount(bits) != 0 &&
+                __builtin_popcount(bits) <= (int)AUDIO_CHANNEL_COUNT_MAX) {
                 return audio_channel_mask_from_representation_and_bits(
                         AUDIO_CHANNEL_REPRESENTATION_INDEX, bits);
             } else {
@@ -1123,7 +1123,7 @@ ConversionResult<audio_gain_config> aidl2legacy_AudioGainConfig_audio_gain_confi
     for (size_t i = 0; i < numValues; ++i) {
         legacy.values[i] = VALUE_OR_RETURN(convertIntegral<int>(aidl.values[i]));
     }
-    legacy.ramp_duration_ms = VALUE_OR_RETURN(convertIntegral<unsigned int>(aidl.rampDurationMs));
+    legacy.ramp_duration_ms = VALUE_OR_RETURN(convertIntegral<int>(aidl.rampDurationMs));
     return legacy;
 }
 
@@ -1710,12 +1710,12 @@ aidl2legacy_AudioOffloadInfo_audio_offload_info_t(const AudioOffloadInfo& aidl) 
     legacy.format = base.format;
     legacy.stream_type = VALUE_OR_RETURN(
             aidl2legacy_AudioStreamType_audio_stream_type_t(aidl.streamType));
-    legacy.bit_rate = VALUE_OR_RETURN(convertIntegral<uint32_t>(aidl.bitRatePerSecond));
+    legacy.bit_rate = VALUE_OR_RETURN(convertIntegral<int32_t>(aidl.bitRatePerSecond));
     legacy.duration_us = VALUE_OR_RETURN(convertIntegral<int64_t>(aidl.durationUs));
     legacy.has_video = aidl.hasVideo;
     legacy.is_streaming = aidl.isStreaming;
-    legacy.bit_width = VALUE_OR_RETURN(convertIntegral<uint32_t>(aidl.bitWidth));
-    legacy.offload_buffer_size = VALUE_OR_RETURN(convertIntegral<uint32_t>(aidl.offloadBufferSize));
+    legacy.bit_width = VALUE_OR_RETURN(convertIntegral<int32_t>(aidl.bitWidth));
+    legacy.offload_buffer_size = VALUE_OR_RETURN(convertIntegral<int32_t>(aidl.offloadBufferSize));
     legacy.usage = VALUE_OR_RETURN(aidl2legacy_AudioUsage_audio_usage_t(aidl.usage));
     legacy.encapsulation_mode = VALUE_OR_RETURN(
             aidl2legacy_AudioEncapsulationMode_audio_encapsulation_mode_t(aidl.encapsulationMode));
@@ -1789,7 +1789,7 @@ legacy2aidl_audio_config_t_AudioConfig(const audio_config_t& legacy, bool isInpu
 ConversionResult<audio_config_base_t>
 aidl2legacy_AudioConfigBase_audio_config_base_t(const AudioConfigBase& aidl, bool isInput) {
     audio_config_base_t legacy;
-    legacy.sample_rate = VALUE_OR_RETURN(convertIntegral<uint32_t>(aidl.sampleRate));
+    legacy.sample_rate = VALUE_OR_RETURN(convertIntegral<int>(aidl.sampleRate));
     legacy.channel_mask = VALUE_OR_RETURN(
             aidl2legacy_AudioChannelLayout_audio_channel_mask_t(aidl.channelMask, isInput));
     legacy.format = VALUE_OR_RETURN(aidl2legacy_AudioFormatDescription_audio_format_t(aidl.format));

@@ -43,6 +43,7 @@ cc_library_shared {
     header_libs: [
         "libaudiohal_headers",
         "libbase_headers",
+        "liberror_headers",
         "libmediautils_headers",
     ]
 }
@@ -74,8 +75,4 @@ cc_library_headers {
     name: "libaudiohal_headers",
 
     export_include_dirs: ["include"],
-
-    // This is needed because the stream interface includes media/MicrophoneInfo.h
-    header_libs: ["av-headers"],
-    export_header_lib_headers: ["av-headers"],
 }

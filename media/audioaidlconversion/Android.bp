@@ -61,9 +61,9 @@ cc_defaults {
     host_supported: true,
     vendor_available: true,
     double_loadable: true,
-    min_sdk_version: "29",
     header_libs: [
         "libaudio_system_headers",
+        "libhardware_headers",
     ],
     shared_libs: [
         "libbase",
@@ -102,7 +102,9 @@ cc_defaults {
  */
 cc_library {
     name: "libaudio_aidl_conversion_common_cpp",
-    srcs: ["AidlConversionCppNdk.cpp"],
+    srcs: [
+        "AidlConversionCppNdk.cpp",
+    ],
     header_libs: [
         "libaudio_aidl_conversion_common_util_cpp",
     ],
@@ -113,6 +115,7 @@ cc_library {
         "audio_aidl_conversion_common_default",
         "latest_android_media_audio_common_types_cpp_export_shared",
     ],
+    min_sdk_version: "29",
 }
 
 /**
@@ -120,7 +123,10 @@ cc_library {
  */
 cc_library {
     name: "libaudio_aidl_conversion_common_ndk",
-    srcs: ["AidlConversionCppNdk.cpp"],
+    srcs: [
+        "AidlConversionCppNdk.cpp",
+        "AidlConversionNdk.cpp",
+    ],
     header_libs: [
         "libaudio_aidl_conversion_common_util_ndk",
     ],
@@ -129,12 +135,16 @@ cc_library {
     ],
     defaults: [
         "audio_aidl_conversion_common_default",
+        "latest_android_hardware_audio_common_ndk_shared",
+        "latest_android_hardware_audio_effect_ndk_shared",
         "latest_android_media_audio_common_types_ndk_shared",
     ],
     shared_libs: [
         "libbinder_ndk",
+        "libbase",
     ],
     cflags: [
         "-DBACKEND_NDK",
     ],
+    min_sdk_version: "31", //AParcelableHolder has been introduced in 31
 }
