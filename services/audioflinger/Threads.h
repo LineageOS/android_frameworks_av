@@ -1086,7 +1086,7 @@ public:
                     return INVALID_OPERATION;
                 }
 
-    virtual     status_t setBluetoothLatencyModesEnabled(bool enabled);
+    virtual     status_t setBluetoothVariableLatencyEnabled(bool enabled);
 
 protected:
     // updated by readOutputParameters_l()
