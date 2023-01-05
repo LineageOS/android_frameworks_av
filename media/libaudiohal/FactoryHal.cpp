@@ -141,7 +141,7 @@ bool hasHalService(const InterfaceName& interface, const AudioHalVersionInfo& ve
     auto halType = version.getType();
     if (halType == AudioHalVersionInfo::Type::AIDL) {
         return hasAidlHalService(interface, version);
-    } else if (version.getType() == AudioHalVersionInfo::Type::HIDL) {
+    } else if (halType == AudioHalVersionInfo::Type::HIDL) {
         return hasHidlHalService(interface, version);
     } else {
         ALOGE("HalType not supported %s", version.toString().c_str());
@@ -164,9 +164,9 @@ void *createPreferredImpl(bool isDevice) {
     auto siblingInterfaceMap = isDevice ? sEffectsHALInterfaces : sDevicesHALInterfaces;
     auto ifaceVersionIt = findMostRecentVersion(interfaceMap);
     auto siblingVersionIt = findMostRecentVersion(siblingInterfaceMap);
-    if (ifaceVersionIt != sAudioHALVersions.end() &&
-        siblingVersionIt != sAudioHALVersions.end() &&
-        // same major version
+    if (ifaceVersionIt != sAudioHALVersions.end() && siblingVersionIt != sAudioHALVersions.end() &&
+        // same HAL type (HIDL/AIDL) and same major version
+        ifaceVersionIt->getType() == siblingVersionIt->getType() &&
         ifaceVersionIt->getMajorVersion() == siblingVersionIt->getMajorVersion()) {
         void* rawInterface;
         if (createHalService(std::max(*ifaceVersionIt, *siblingVersionIt), isDevice,

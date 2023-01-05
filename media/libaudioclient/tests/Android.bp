@@ -110,6 +110,7 @@ cc_defaults {
         "capture_state_listener-aidl-cpp",
         "framework-permission-aidl-cpp",
         "libaudioclient_aidl_conversion",
+        "libaudio_aidl_conversion_common_cpp",
         "libbase",
         "libbinder",
         "libcgrouprc",

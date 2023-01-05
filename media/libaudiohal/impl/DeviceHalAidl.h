@@ -1,5 +1,5 @@
 /*
- * Copyright (C) 2016 The Android Open Source Project
+ * Copyright (C) 2022 The Android Open Source Project
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -14,20 +14,16 @@
  * limitations under the License.
  */
 
-#ifndef ANDROID_HARDWARE_DEVICE_HAL_HIDL_H
-#define ANDROID_HARDWARE_DEVICE_HAL_HIDL_H
+#pragma once
 
-#include PATH(android/hardware/audio/FILE_VERSION/IDevice.h)
-#include PATH(android/hardware/audio/FILE_VERSION/IPrimaryDevice.h)
 #include <media/audiohal/DeviceHalInterface.h>
 #include <media/audiohal/EffectHalInterface.h>
 
-#include "CoreConversionHelperHidl.h"
+#include <aidl/android/hardware/audio/core/BpModule.h>
 
 namespace android {
 
-class DeviceHalHidl : public DeviceHalInterface, public CoreConversionHelperHidl
-{
+class DeviceHalAidl : public DeviceHalInterface {
   public:
     // Sets the value of 'devices' to a bitmask of 1 or more values of audio_devices_t.
     status_t getSupportedDevices(uint32_t *devices) override;
@@ -49,8 +45,11 @@ class DeviceHalHidl : public DeviceHalInterface, public CoreConversionHelperHidl
 
     // Muting control.
     status_t setMicMute(bool state) override;
-    status_t getMicMute(bool *state) override;
+
+    status_t getMicMute(bool* state) override;
+
     status_t setMasterMute(bool state) override;
+
     status_t getMasterMute(bool *state) override;
 
     // Set global audio parameters.
@@ -87,67 +86,45 @@ class DeviceHalHidl : public DeviceHalInterface, public CoreConversionHelperHidl
     // Releases an audio patch.
     status_t releaseAudioPatch(audio_patch_handle_t patch) override;
 
-    // Fills the list of supported attributes for a given audio port.
-    status_t getAudioPort(struct audio_port *port) override;
-
-    // Fills the list of supported attributes for a given audio port.
-    status_t getAudioPort(struct audio_port_v7 *port) override;
-
     // Set audio port configuration.
-    status_t setAudioPortConfig(const struct audio_port_config *config) override;
+    status_t setAudioPortConfig(const struct audio_port_config* config) override;
 
     // List microphones
-    status_t getMicrophones(std::vector<audio_microphone_characteristic_t>* microphones) override;
+    status_t getMicrophones(std::vector<audio_microphone_characteristic_t>* microphones);
 
     status_t addDeviceEffect(audio_port_handle_t device, sp<EffectHalInterface> effect) override;
+
     status_t removeDeviceEffect(audio_port_handle_t device, sp<EffectHalInterface> effect) override;
 
-    status_t getMmapPolicyInfos(
-            media::audio::common::AudioMMapPolicyType policyType __unused,
-            std::vector<media::audio::common::AudioMMapPolicyInfo> *policyInfos __unused) override {
-        // TODO: Implement the HAL query when moving to AIDL HAL.
-        return INVALID_OPERATION;
-    }
+    status_t getMmapPolicyInfos(media::audio::common::AudioMMapPolicyType policyType __unused,
+                                std::vector<media::audio::common::AudioMMapPolicyInfo>* policyInfos
+                                        __unused) override;
 
-    int32_t getAAudioMixerBurstCount() override {
-        // TODO: Implement the HAL query when moving to AIDL HAL.
-        return INVALID_OPERATION;
-    }
+    int32_t getAAudioMixerBurstCount() override;
 
-    int32_t getAAudioHardwareBurstMinUsec() override {
-        // TODO: Implement the HAL query when moving to AIDL HAL.
-        return INVALID_OPERATION;
-    }
-
-    int32_t supportsBluetoothVariableLatency(bool* supports __unused) override {
-        // TODO: Implement the HAL query when moving to AIDL HAL.
-        return INVALID_OPERATION;
-    }
-
-    status_t setConnectedState(const struct audio_port_v7 *port, bool connected) override;
+    int32_t getAAudioHardwareBurstMinUsec() override;
 
     error::Result<audio_hw_sync_t> getHwAvSync() override;
 
-    status_t dump(int fd, const Vector<String16>& args) override;
+    status_t dump(int __unused, const Vector<String16>& __unused) override;
+
+    int32_t supportsBluetoothVariableLatency(bool* supports __unused) override;
 
   private:
-    friend class DevicesFactoryHalHidl;
-    sp<::android::hardware::audio::CPP_VERSION::IDevice> mDevice;
-    // Null if it's not a primary device.
-    sp<::android::hardware::audio::CPP_VERSION::IPrimaryDevice> mPrimaryDevice;
-    bool supportsSetConnectedState7_1 = true;
+    friend class DevicesFactoryHalAidl;
+    const std::shared_ptr<::aidl::android::hardware::audio::core::IModule> mCore;
+    float mMasterVolume = 0.0f;
+    float mVoiceVolume = 0.0f;
+    bool mMasterMute = false;
+    bool mMicMute = false;
 
     // Can not be constructed directly by clients.
-    explicit DeviceHalHidl(const sp<::android::hardware::audio::CPP_VERSION::IDevice>& device);
-    explicit DeviceHalHidl(
-            const sp<::android::hardware::audio::CPP_VERSION::IPrimaryDevice>& device);
+    explicit DeviceHalAidl(
+            const std::shared_ptr<::aidl::android::hardware::audio::core::IModule>& core)
+        : mCore(core) {}
 
     // The destructor automatically closes the device.
-    virtual ~DeviceHalHidl();
-
-    template <typename HalPort> status_t getAudioPortImpl(HalPort *port);
+    ~DeviceHalAidl();
 };
 
 } // namespace android
-
-#endif // ANDROID_HARDWARE_DEVICE_HAL_HIDL_H
