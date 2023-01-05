@@ -132,6 +132,11 @@ class DeviceHalHidl : public DeviceHalInterface, public CoreConversionHelperHidl
         return INVALID_OPERATION;
     }
 
+    int32_t supportsBluetoothVariableLatency(bool* supports __unused) override {
+        // TODO: Implement the HAL query when moving to AIDL HAL.
+        return INVALID_OPERATION;
+    }
+
     status_t setConnectedState(const struct audio_port_v7 *port, bool connected) override;
 
     error::Result<audio_hw_sync_t> getHwAvSync() override;

@@ -299,6 +299,12 @@ public:
     virtual status_t getSupportedLatencyModes(audio_io_handle_t output,
             std::vector<audio_latency_mode_t>* modes);
 
+    virtual status_t setBluetoothVariableLatencyEnabled(bool enabled);
+
+    virtual status_t isBluetoothVariableLatencyEnabled(bool* enabled);
+
+    virtual status_t supportsBluetoothVariableLatency(bool* support);
+
     status_t onTransactWrapper(TransactionCode code, const Parcel& data, uint32_t flags,
         const std::function<status_t()>& delegate) override;
 
@@ -1031,6 +1037,9 @@ private:
              std::vector<media::audio::common::AudioMMapPolicyInfo>> mPolicyInfos;
     int32_t mAAudioBurstsPerBuffer = 0;
     int32_t mAAudioHwBurstMinMicros = 0;
+
+    // Bluetooth Variable latency control logic is enabled or disabled
+    std::atomic_bool mBluetoothLatencyModesEnabled;
 };
 
 #undef INCLUDING_FROM_AUDIOFLINGER_H

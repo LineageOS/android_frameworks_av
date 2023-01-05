@@ -40,6 +40,8 @@ public:
         // Means that this isn't a terminal module, and software patches
         // are used to transport audio data further.
         AHWD_IS_INSERT              = 0x4,
+        // This Module supports BT Latency mode control
+        AHWD_SUPPORTS_BT_LATENCY_MODES = 0x8,
     };
 
     AudioHwDevice(audio_module_handle_t handle,
@@ -62,6 +64,10 @@ public:
 
     bool isInsert() const {
         return (0 != (mFlags & AHWD_IS_INSERT));
+    }
+
+    bool supportsBluetoothVariableLatency() const {
+        return (0 != (mFlags & AHWD_SUPPORTS_BT_LATENCY_MODES));
     }
 
     audio_module_handle_t handle() const { return mHandle; }

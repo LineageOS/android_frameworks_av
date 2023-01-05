@@ -2063,7 +2063,8 @@ AudioFlinger::PlaybackThread::PlaybackThread(const sp<AudioFlinger>& audioFlinge
         mHwSupportsPause(false), mHwPaused(false), mFlushPending(false),
         mLeftVolFloat(-1.0), mRightVolFloat(-1.0),
         mDownStreamPatch{},
-        mIsTimestampAdvancing(kMinimumTimeBetweenTimestampChecksNs)
+        mIsTimestampAdvancing(kMinimumTimeBetweenTimestampChecksNs),
+        mBluetoothLatencyModesEnabled(true)
 {
     snprintf(mThreadName, kThreadNameLength, "AudioOut_%X", id);
     mNBLogWriter = audioFlinger->newWriter_l(kLogSize, mThreadName);
@@ -7431,6 +7432,15 @@ status_t AudioFlinger::SpatializerThread::getSupportedLatencyModes(
     }
     Mutex::Autolock _l(mLock);
     *modes = mSupportedLatencyModes;
+    return NO_ERROR;
+}
+
+status_t AudioFlinger::PlaybackThread::setBluetoothVariableLatencyEnabled(bool enabled) {
+    if (mOutput == nullptr || mOutput->audioHwDev == nullptr
+            || !mOutput->audioHwDev->supportsBluetoothVariableLatency()) {
+        return INVALID_OPERATION;
+    }
+    mBluetoothLatencyModesEnabled.store(enabled);
     return NO_ERROR;
 }
 

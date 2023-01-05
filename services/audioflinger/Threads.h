@@ -1086,6 +1086,8 @@ public:
                     return INVALID_OPERATION;
                 }
 
+    virtual     status_t setBluetoothVariableLatencyEnabled(bool enabled);
+
 protected:
     // updated by readOutputParameters_l()
     size_t                          mNormalFrameCount;  // normal mixer and effects
@@ -1436,6 +1438,9 @@ protected:
     virtual     void flushHw_l() {
                     mIsTimestampAdvancing.clear();
                 }
+
+        // Bluetooth Variable latency control logic is enabled or disabled for this thread
+        std::atomic_bool mBluetoothLatencyModesEnabled;
 };
 
 class MixerThread : public PlaybackThread {
