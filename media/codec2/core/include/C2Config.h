@@ -2503,7 +2503,8 @@ C2ENUM(C2PlatformConfig::tunnel_peek_mode_t, uint32_t,
  * Note: This parameter allows a decoder to ignore the video peek machinery and
  * to revert to its preferred behavior.
  */
-typedef C2StreamParam<C2Tuning, C2EasyEnum<C2PlatformConfig::tunnel_peek_mode_t>,
+typedef C2StreamParam<C2Tuning,
+        C2SimpleValueStruct<C2EasyEnum<C2PlatformConfig::tunnel_peek_mode_t>>,
         kParamIndexTunnelPeekMode> C2StreamTunnelPeekModeTuning;
 constexpr char C2_PARAMKEY_TUNNEL_PEEK_MODE[] =
         "output.tunnel-peek-mode";
