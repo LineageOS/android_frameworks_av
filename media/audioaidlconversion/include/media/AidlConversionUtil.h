@@ -25,7 +25,9 @@
 #include <error/Result.h>
 
 #if defined(BACKEND_NDK)
+#include <android/binder_enums.h>
 #include <android/binder_status.h>
+
 namespace aidl {
 #else
 #include <binder/Enums.h>
