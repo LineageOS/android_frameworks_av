@@ -337,6 +337,8 @@ public:
         // Should have created new transcoder.
         EXPECT_EQ(mTranscoder->getGeneration(), generation);
         EXPECT_EQ(mTranscoder.use_count(), 2);
+        // b/240537336: Allow extra time to finish onError call
+        sleep(1);
     }
 
     void testPacerHelper(int numSubmits, int sessionDurationMs, int expectedSuccess) {
