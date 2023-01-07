@@ -1153,14 +1153,6 @@ status_t CameraProviderManager::ProviderInfo::DeviceInfo3::deriveJpegRTags(bool 
         return OK;
     }
 
-    if (!isConcurrentDynamicRangeCaptureSupported(c,
-                ANDROID_REQUEST_AVAILABLE_DYNAMIC_RANGE_PROFILES_MAP_HLG10,
-                ANDROID_REQUEST_AVAILABLE_DYNAMIC_RANGE_PROFILES_MAP_STANDARD)) {
-        // Advertise Jpeg/R only in case 10 and 8-bit concurrent capture is supported.
-        // This can be removed when 10-bit to 8-bit tonemapping is available.
-        return OK;
-    }
-
     getSupportedSizes(c, scalerSizesTag,
             static_cast<android_pixel_format_t>(HAL_PIXEL_FORMAT_BLOB), &supportedBlobSizes);
     getSupportedSizes(c, scalerSizesTag,
