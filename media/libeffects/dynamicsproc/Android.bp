@@ -32,34 +32,68 @@ license {
     ],
 }
 
+cc_defaults {
+    name : "dynamicsprocessingdefaults",
+    srcs: [
+        "dsp/DPBase.cpp",
+        "dsp/DPFrequency.cpp",
+    ],
+
+    shared_libs: [
+        "libaudioutils",
+        "libbase",
+        "liblog",
+        "libutils",
+    ],
+    header_libs: [
+        "libaudioeffects",
+        "libeigen",
+    ],
+    cflags: [
+        "-Wthread-safety",
+        "-Wall",
+        "-Werror",
+    ],
+}
+
 cc_library_shared {
     name: "libdynproc",
 
     vendor: true,
 
+    defaults: [
+        "dynamicsprocessingdefaults",
+    ],
+
     srcs: [
         "EffectDynamicsProcessing.cpp",
-        "dsp/DPBase.cpp",
-        "dsp/DPFrequency.cpp",
     ],
 
     cflags: [
         "-O2",
         "-fvisibility=hidden",
-
-        "-Wall",
-        "-Werror",
-    ],
-
-    shared_libs: [
-        "libcutils",
-        "liblog",
     ],
 
     relative_install_path: "soundfx",
+}
 
-    header_libs: [
-        "libaudioeffects",
-        "libeigen",
+cc_library_shared {
+    name: "libdynamicsprocessingaidl",
+
+    srcs: [
+        "aidl/DynamicsProcessing.cpp",
+        "aidl/DynamicsProcessingContext.cpp",
+        ":effectCommonFile",
+    ],
+
+    defaults: [
+        "aidlaudioservice_defaults",
+        "latest_android_hardware_audio_effect_ndk_shared",
+        "latest_android_media_audio_common_types_ndk_shared",
+        "dynamicsprocessingdefaults",
+    ],
+
+    visibility: [
+        "//hardware/interfaces/audio/aidl/default",
     ],
 }
