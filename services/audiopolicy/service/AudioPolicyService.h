@@ -70,7 +70,7 @@ class AudioPolicyService :
     public IBinder::DeathRecipient,
     public SpatializerPolicyCallback
 {
-    friend class BinderService<AudioPolicyService>;
+    friend class sp<AudioPolicyService>;
 
 public:
     // for BinderService
