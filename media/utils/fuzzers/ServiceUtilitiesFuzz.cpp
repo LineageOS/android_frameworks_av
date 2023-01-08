@@ -25,6 +25,7 @@
 
 static constexpr int kMaxOperations = 50;
 static constexpr int kMaxStringLen = 256;
+static constexpr int kMaxSpaces = 1000;
 
 using android::content::AttributionSourceState;
 
@@ -35,7 +36,9 @@ const std::vector<std::function<void(FuzzedDataProvider*, android::MediaPackageM
             pm.allowPlaybackCapture(uid);
         },
         [](FuzzedDataProvider* data_provider, android::MediaPackageManager pm) -> void {
-            int spaces = data_provider->ConsumeIntegral<int>();
+           /* The large value of spaces was taking time in file write operation.
+            * Limited spaces values in range to avoid timeout.*/
+            int spaces = data_provider->ConsumeIntegralInRange<int>(0, kMaxSpaces);
 
             // Dump everything into /dev/null
             int fd = open("/dev/null", O_WRONLY);
