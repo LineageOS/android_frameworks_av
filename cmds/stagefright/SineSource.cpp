@@ -63,11 +63,14 @@ status_t SineSource::read(
         MediaBufferBase **out, const ReadOptions * /* options */) {
     *out = NULL;
 
-    MediaBufferBase *buffer;
+    MediaBufferBase *buffer = nullptr;
     status_t err = mGroup->acquire_buffer(&buffer);
 
     if (err != OK) {
         return err;
+    }
+    if (buffer == nullptr) {
+        return AMEDIA_ERROR_UNKNOWN;
     }
 
     size_t frameSize = mNumChannels * sizeof(int16_t);
