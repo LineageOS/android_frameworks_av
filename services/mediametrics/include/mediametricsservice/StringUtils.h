@@ -23,6 +23,19 @@
 
 namespace android::mediametrics::stringutils {
 
+// Define a way of printing a vector - this
+// is used for proto repeated arguments.
+template <typename T>
+inline std::ostream & operator<< (std::ostream& s,
+                           std::vector<T> const& v) {
+    s << "{ ";
+    for (const auto& e : v) {
+        s << e << " ";
+    }
+    s << "}";
+    return s;
+}
+
 /**
  * fieldPrint is a helper method that logs to a stringstream a sequence of
  * field names (in a fixed size array) together with a variable number of arg parameters.
@@ -202,6 +215,16 @@ inline std::pair<std::string /* prefix */,
         return { key.substr(0, split), suffix };
     }
     return { key, "" };
+}
+
+std::pair<std::string /* external statsd */, std::string /* internal */>
+parseOutputDevicePairs(const std::string& outputDevicePairs);
+
+std::pair<std::string /* external statsd */, std::string /* internal */>
+parseInputDevicePairs(const std::string& inputDevicePairs);
+
+inline bool hasBluetoothOutputDevice(std::string_view devices) {
+    return devices.find("AUDIO_DEVICE_OUT_BLUETOOTH") != std::string::npos;
 }
 
 } // namespace android::mediametrics::stringutils

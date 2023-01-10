@@ -521,7 +521,7 @@ void processCaptureResult(CaptureOutputStates& states, const camera_capture_resu
         if (result->partial_result != 0)
             request.resultExtras.partialResultCount = result->partial_result;
 
-        if ((result->result != nullptr) && !states.legacyClient) {
+        if ((result->result != nullptr) && !states.legacyClient && !states.overrideToPortrait) {
             camera_metadata_ro_entry entry;
             auto ret = find_camera_metadata_ro_entry(result->result,
                     ANDROID_LOGICAL_MULTI_CAMERA_ACTIVE_PHYSICAL_ID, &entry);
@@ -858,12 +858,14 @@ void notifyShutter(CaptureOutputStates& states, const camera_shutter_msg_t &msg)
                 r.resultExtras.hasReadoutTimestamp = true;
                 r.resultExtras.readoutTimestamp = msg.readout_timestamp;
             }
-            if (r.minExpectedDuration != states.minFrameDuration) {
+            if (r.minExpectedDuration != states.minFrameDuration ||
+                    r.isFixedFps != states.isFixedFps) {
                 for (size_t i = 0; i < states.outputStreams.size(); i++) {
                     auto outputStream = states.outputStreams[i];
-                    outputStream->onMinDurationChanged(r.minExpectedDuration);
+                    outputStream->onMinDurationChanged(r.minExpectedDuration, r.isFixedFps);
                 }
                 states.minFrameDuration = r.minExpectedDuration;
+                states.isFixedFps = r.isFixedFps;
             }
             if (r.hasCallback) {
                 ALOGVV("Camera %s: %s: Shutter fired for frame %d (id %d) at %" PRId64,

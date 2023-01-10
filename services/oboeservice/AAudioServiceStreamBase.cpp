@@ -435,7 +435,15 @@ void AAudioServiceStreamBase::run() {
             }
         }
         if (isIdle_l() && AudioClock::getNanoseconds() >= standbyTime) {
-            standby_l();
+            aaudio_result_t result = standby_l();
+            if (result != AAUDIO_OK) {
+                // If standby failed because of the function is not implemented, there is no
+                // need to retry. Otherwise, retry standby later.
+                ALOGW("Failed to enter standby, error=%d", result);
+                standbyTime = result == AAUDIO_ERROR_UNIMPLEMENTED
+                        ? std::numeric_limits<int64_t>::max()
+                        : AudioClock::getNanoseconds() + IDLE_TIMEOUT_NANOS;
+            }
         }
 
         if (command != nullptr) {

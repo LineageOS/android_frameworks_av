@@ -82,7 +82,8 @@ class Camera3Device :
   friend class AidlCamera3Device;
   public:
 
-    explicit Camera3Device(const String8& id, bool overrideForPerfClass, bool legacyClient = false);
+    explicit Camera3Device(const String8& id, bool overrideForPerfClass, bool overrideToPortrait,
+            bool legacyClient = false);
 
     virtual ~Camera3Device();
     // Delete and optionally close native handles and clear the input vector afterward
@@ -280,6 +281,11 @@ class Camera3Device :
      * When muted, black image data is output on all output streams.
      */
     status_t setCameraMute(bool enabled);
+
+    /**
+     * Enables/disables camera service watchdog
+     */
+    status_t setCameraServiceWatchdog(bool enabled);
 
     // Get the status trackeer for the camera device
     wp<camera3::StatusTracker> getStatusTracker() { return mStatusTracker; }
@@ -783,7 +789,8 @@ class Camera3Device :
                 sp<HalInterface> interface,
                 const Vector<int32_t>& sessionParamKeys,
                 bool useHalBufManager,
-                bool supportCameraMute);
+                bool supportCameraMute,
+                bool overrideToPortrait);
         ~RequestThread();
 
         void     setNotificationListener(wp<NotificationListener> listener);
@@ -962,8 +969,13 @@ class Camera3Device :
         // send request in mNextRequests to HAL in a batch. Return true = sucssess
         bool sendRequestsBatch();
 
-        // Calculate the expected (minimum, maximum) duration range for a request
-        std::pair<nsecs_t, nsecs_t> calculateExpectedDurationRange(
+        // Calculate the expected (minimum, maximum, isFixedFps) duration info for a request
+        struct ExpectedDurationInfo {
+            nsecs_t minDuration;
+            nsecs_t maxDuration;
+            bool isFixedFps;
+        };
+        ExpectedDurationInfo calculateExpectedDurationRange(
                 const camera_metadata_t *request);
 
         // Check and update latest session parameters based on the current request settings.
@@ -1055,6 +1067,7 @@ class Camera3Device :
 
         const bool         mUseHalBufManager;
         const bool         mSupportCameraMute;
+        const bool         mOverrideToPortrait;
     };
 
     virtual sp<RequestThread> createNewRequestThread(wp<Camera3Device> /*parent*/,
@@ -1062,7 +1075,8 @@ class Camera3Device :
                 sp<HalInterface> /*interface*/,
                 const Vector<int32_t>& /*sessionParamKeys*/,
                 bool /*useHalBufManager*/,
-                bool /*supportCameraMute*/) = 0;
+                bool /*supportCameraMute*/,
+                bool /*overrideToPortrait*/) = 0;
 
     sp<RequestThread> mRequestThread;
 
@@ -1082,7 +1096,7 @@ class Camera3Device :
     status_t registerInFlight(uint32_t frameNumber,
             int32_t numBuffers, CaptureResultExtras resultExtras, bool hasInput,
             bool callback, nsecs_t minExpectedDuration, nsecs_t maxExpectedDuration,
-            const std::set<std::set<String8>>& physicalCameraIds,
+            bool isFixedFps, const std::set<std::set<String8>>& physicalCameraIds,
             bool isStillCapture, bool isZslCapture, bool rotateAndCropAuto,
             const std::set<std::string>& cameraIdsWithZoom, const SurfaceMap& outputSurfaces,
             nsecs_t requestTimeNs);
@@ -1332,8 +1346,15 @@ class Camera3Device :
     // performance class.
     bool mOverrideForPerfClass;
 
+    // Whether the camera framework overrides the device characteristics for
+    // app compatibility reasons.
+    bool mOverrideToPortrait;
+
     // The current minimum expected frame duration based on AE_TARGET_FPS_RANGE
     nsecs_t mMinExpectedDuration = 0;
+    // Whether the camera device runs at fixed frame rate based on AE_MODE and
+    // AE_TARGET_FPS_RANGE
+    bool mIsFixedFps = false;
 
     // Injection camera related methods.
     class Camera3DeviceInjectionMethods : public virtual RefBase {

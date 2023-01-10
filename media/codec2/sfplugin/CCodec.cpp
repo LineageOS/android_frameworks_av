@@ -1973,7 +1973,6 @@ void CCodec::initiateRelease(bool sendCallback /* = true */) {
     }
 
     mChannel->reset();
-    mChannel->stopUseOutputSurface();
     // thiz holds strong ref to this while the thread is running.
     sp<CCodec> thiz(this);
     std::thread([thiz, sendCallback] { thiz->release(sendCallback); }).detach();
@@ -1994,6 +1993,7 @@ void CCodec::release(bool sendCallback) {
         comp = state->comp;
     }
     comp->release();
+    mChannel->stopUseOutputSurface();
 
     {
         Mutexed<State>::Locked state(mState);
@@ -2141,7 +2141,8 @@ void CCodec::signalResume() {
 
     std::map<size_t, sp<MediaCodecBuffer>> clientInputBuffers;
     status_t err = mChannel->prepareInitialInputBuffers(&clientInputBuffers);
-    if (err != OK) {
+    // FIXME(b/237656746)
+    if (err != OK && err != NO_MEMORY) {
         ALOGE("Resume request for Input Buffers failed");
         mCallback->onError(err, ACTION_CODE_FATAL);
         return;

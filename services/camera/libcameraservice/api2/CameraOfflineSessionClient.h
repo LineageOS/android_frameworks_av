@@ -56,7 +56,8 @@ public:
                     IInterface::asBinder(remoteCallback),
                     // (v)ndk doesn't have offline session support
                     clientPackageName, /*overridePackageName*/false, clientFeatureId,
-                    cameraIdStr, cameraFacing, sensorOrientation, clientPid, clientUid, servicePid),
+                    cameraIdStr, cameraFacing, sensorOrientation, clientPid, clientUid, servicePid,
+                    /*overrideToPortrait*/false),
             mRemoteCallback(remoteCallback), mOfflineSession(session),
             mCompositeStreamMap(offlineCompositeStreamMap) {}
 
@@ -83,6 +84,8 @@ public:
 
     bool supportsCameraMute() override;
     status_t setCameraMute(bool enabled) override;
+
+    status_t setCameraServiceWatchdog(bool enabled) override;
 
     // permissions management
     status_t startCameraOps() override;

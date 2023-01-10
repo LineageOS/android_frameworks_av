@@ -5897,12 +5897,18 @@ status_t MPEG4Source::parseTrackFragmentRun(off64_t offset, off64_t size) {
             return -EINVAL;
         }
 
-        int32_t dataOffsetDelta;
-        if (!mDataSource->getUInt32(offset, (uint32_t*)&dataOffsetDelta)) {
+        uint32_t dataOffsetDelta;
+        if (!mDataSource->getUInt32(offset, &dataOffsetDelta)) {
             return ERROR_MALFORMED;
         }
 
-        dataOffset = mTrackFragmentHeaderInfo.mBaseDataOffset + dataOffsetDelta;
+        if (__builtin_add_overflow(
+                mTrackFragmentHeaderInfo.mBaseDataOffset, dataOffsetDelta, &dataOffset)) {
+            ALOGW("b/232242894 mBaseDataOffset(%" PRIu64 ") + dataOffsetDelta(%u) overflows uint64",
+                    mTrackFragmentHeaderInfo.mBaseDataOffset, dataOffsetDelta);
+            android_errorWriteLog(0x534e4554, "232242894");
+            return ERROR_MALFORMED;
+        }
 
         offset += 4;
         size -= 4;
@@ -6036,7 +6042,12 @@ status_t MPEG4Source::parseTrackFragmentRun(off64_t offset, off64_t size) {
             return NO_MEMORY;
         }
 
-        dataOffset += sampleSize;
+        if (__builtin_add_overflow(dataOffset, sampleSize, &dataOffset)) {
+            ALOGW("b/232242894 dataOffset(%" PRIu64 ") + sampleSize(%u) overflows uint64",
+                    dataOffset, sampleSize);
+            android_errorWriteLog(0x534e4554, "232242894");
+            return ERROR_MALFORMED;
+        }
     }
 
     mTrackFragmentHeaderInfo.mDataOffset = dataOffset;

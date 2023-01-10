@@ -73,7 +73,8 @@ using namespace android::hardware::camera;
 
 namespace android {
 
-Camera3Device::Camera3Device(const String8 &id, bool overrideForPerfClass, bool legacyClient):
+Camera3Device::Camera3Device(const String8 &id, bool overrideForPerfClass, bool overrideToPortrait,
+        bool legacyClient):
         mId(id),
         mLegacyClient(legacyClient),
         mOperatingMode(NO_MODE),
@@ -94,7 +95,8 @@ Camera3Device::Camera3Device(const String8 &id, bool overrideForPerfClass, bool 
         mVendorTagId(CAMERA_METADATA_INVALID_VENDOR_ID),
         mLastTemplateId(-1),
         mNeedFixupMonochromeTags(false),
-        mOverrideForPerfClass(overrideForPerfClass)
+        mOverrideForPerfClass(overrideForPerfClass),
+        mOverrideToPortrait(overrideToPortrait)
 {
     ATRACE_CALL();
     ALOGV("%s: Created device for camera %s", __FUNCTION__, mId.string());
@@ -112,10 +114,6 @@ const String8& Camera3Device::getId() const {
 }
 
 status_t Camera3Device::initializeCommonLocked() {
-
-    /** Start watchdog thread */
-    mCameraServiceWatchdog = new CameraServiceWatchdog();
-    mCameraServiceWatchdog->run("CameraServiceWatchdog");
 
     /** Start up status tracker thread */
     mStatusTracker = new StatusTracker(this);
@@ -170,7 +168,7 @@ status_t Camera3Device::initializeCommonLocked() {
     /** Start up request queue thread */
     mRequestThread = createNewRequestThread(
             this, mStatusTracker, mInterface, sessionParamKeys,
-            mUseHalBufManager, mSupportCameraMute);
+            mUseHalBufManager, mSupportCameraMute, mOverrideToPortrait);
     res = mRequestThread->run(String8::format("C3Dev-%s-ReqQueue", mId.string()).string());
     if (res != OK) {
         SET_ERR_L("Unable to start request queue thread: %s (%d)",
@@ -229,6 +227,15 @@ status_t Camera3Device::initializeCommonLocked() {
 
     // Hidl/AidlCamera3DeviceInjectionMethods
     mInjectionMethods = createCamera3DeviceInjectionMethods(this);
+
+    /** Start watchdog thread */
+    mCameraServiceWatchdog = new CameraServiceWatchdog();
+    res = mCameraServiceWatchdog->run("CameraServiceWatchdog");
+    if (res != OK) {
+        SET_ERR_L("Unable to start camera service watchdog thread: %s (%d)",
+                strerror(-res), res);
+        return res;
+    }
 
     return OK;
 }
@@ -1737,7 +1744,7 @@ status_t Camera3Device::flush(int64_t *frameNumber) {
     }
 
     // Calculate expected duration for flush with additional buffer time in ms for watchdog
-    uint64_t maxExpectedDuration = (getExpectedInFlightDuration() + kBaseGetBufferWait) / 1e6;
+    uint64_t maxExpectedDuration = ns2ms(getExpectedInFlightDuration() + kBaseGetBufferWait);
     status_t res = mCameraServiceWatchdog->WATCH_CUSTOM_TIMER(mRequestThread->flush(),
             maxExpectedDuration / kCycleLengthMs, kCycleLengthMs);
 
@@ -2674,7 +2681,7 @@ void Camera3Device::setErrorStateLockedV(const char *fmt, va_list args) {
 status_t Camera3Device::registerInFlight(uint32_t frameNumber,
         int32_t numBuffers, CaptureResultExtras resultExtras, bool hasInput,
         bool hasAppCallback, nsecs_t minExpectedDuration, nsecs_t maxExpectedDuration,
-        const std::set<std::set<String8>>& physicalCameraIds,
+        bool isFixedFps, const std::set<std::set<String8>>& physicalCameraIds,
         bool isStillCapture, bool isZslCapture, bool rotateAndCropAuto,
         const std::set<std::string>& cameraIdsWithZoom,
         const SurfaceMap& outputSurfaces, nsecs_t requestTimeNs) {
@@ -2683,7 +2690,7 @@ status_t Camera3Device::registerInFlight(uint32_t frameNumber,
 
     ssize_t res;
     res = mInFlightMap.add(frameNumber, InFlightRequest(numBuffers, resultExtras, hasInput,
-            hasAppCallback, minExpectedDuration, maxExpectedDuration, physicalCameraIds,
+            hasAppCallback, minExpectedDuration, maxExpectedDuration, isFixedFps, physicalCameraIds,
             isStillCapture, isZslCapture, rotateAndCropAuto, cameraIdsWithZoom, requestTimeNs,
             outputSurfaces));
     if (res < 0) return res;
@@ -2874,7 +2881,8 @@ Camera3Device::RequestThread::RequestThread(wp<Camera3Device> parent,
         sp<StatusTracker> statusTracker,
         sp<HalInterface> interface, const Vector<int32_t>& sessionParamKeys,
         bool useHalBufManager,
-        bool supportCameraMute) :
+        bool supportCameraMute,
+        bool overrideToPortrait) :
         Thread(/*canCallJava*/false),
         mParent(parent),
         mStatusTracker(statusTracker),
@@ -2903,7 +2911,8 @@ Camera3Device::RequestThread::RequestThread(wp<Camera3Device> parent,
         mSessionParamKeys(sessionParamKeys),
         mLatestSessionParams(sessionParamKeys.size()),
         mUseHalBufManager(useHalBufManager),
-        mSupportCameraMute(supportCameraMute){
+        mSupportCameraMute(supportCameraMute),
+        mOverrideToPortrait(overrideToPortrait) {
     mStatusId = statusTracker->addComponent("RequestThread");
 }
 
@@ -3243,16 +3252,18 @@ bool Camera3Device::RequestThread::sendRequestsBatch() {
     return true;
 }
 
-std::pair<nsecs_t, nsecs_t> Camera3Device::RequestThread::calculateExpectedDurationRange(
-        const camera_metadata_t *request) {
-    std::pair<nsecs_t, nsecs_t> expectedRange(
+Camera3Device::RequestThread::ExpectedDurationInfo
+        Camera3Device::RequestThread::calculateExpectedDurationRange(
+                const camera_metadata_t *request) {
+    ExpectedDurationInfo expectedDurationInfo = {
             InFlightRequest::kDefaultMinExpectedDuration,
-            InFlightRequest::kDefaultMaxExpectedDuration);
+            InFlightRequest::kDefaultMaxExpectedDuration,
+            /*isFixedFps*/false};
     camera_metadata_ro_entry_t e = camera_metadata_ro_entry_t();
     find_camera_metadata_ro_entry(request,
             ANDROID_CONTROL_AE_MODE,
             &e);
-    if (e.count == 0) return expectedRange;
+    if (e.count == 0) return expectedDurationInfo;
 
     switch (e.data.u8[0]) {
         case ANDROID_CONTROL_AE_MODE_OFF:
@@ -3260,29 +3271,32 @@ std::pair<nsecs_t, nsecs_t> Camera3Device::RequestThread::calculateExpectedDurat
                     ANDROID_SENSOR_EXPOSURE_TIME,
                     &e);
             if (e.count > 0) {
-                expectedRange.first = e.data.i64[0];
-                expectedRange.second = expectedRange.first;
+                expectedDurationInfo.minDuration = e.data.i64[0];
+                expectedDurationInfo.maxDuration = expectedDurationInfo.minDuration;
             }
             find_camera_metadata_ro_entry(request,
                     ANDROID_SENSOR_FRAME_DURATION,
                     &e);
             if (e.count > 0) {
-                expectedRange.first = std::max(e.data.i64[0], expectedRange.first);
-                expectedRange.second = expectedRange.first;
+                expectedDurationInfo.minDuration =
+                        std::max(e.data.i64[0], expectedDurationInfo.minDuration);
+                expectedDurationInfo.maxDuration = expectedDurationInfo.minDuration;
             }
+            expectedDurationInfo.isFixedFps = false;
             break;
         default:
             find_camera_metadata_ro_entry(request,
                     ANDROID_CONTROL_AE_TARGET_FPS_RANGE,
                     &e);
             if (e.count > 1) {
-                expectedRange.first = 1e9 / e.data.i32[1];
-                expectedRange.second = 1e9 / e.data.i32[0];
+                expectedDurationInfo.minDuration = 1e9 / e.data.i32[1];
+                expectedDurationInfo.maxDuration = 1e9 / e.data.i32[0];
             }
+            expectedDurationInfo.isFixedFps = (e.data.i32[1] == e.data.i32[0]);
             break;
     }
 
-    return expectedRange;
+    return expectedDurationInfo;
 }
 
 bool Camera3Device::RequestThread::skipHFRTargetFPSUpdate(int32_t tag,
@@ -3567,9 +3581,9 @@ status_t Camera3Device::RequestThread::prepareHalRequests() {
         mPrevTriggers = triggerCount;
 
         // Do not override rotate&crop for stream configurations that include
-        // SurfaceViews(HW_COMPOSER) output. The display rotation there will be
-        // compensated by NATIVE_WINDOW_TRANSFORM_INVERSE_DISPLAY
-        bool rotateAndCropChanged = mComposerOutput ? false :
+        // SurfaceViews(HW_COMPOSER) output, unless mOverrideToPortrait is set.
+        // The display rotation there will be compensated by NATIVE_WINDOW_TRANSFORM_INVERSE_DISPLAY
+        bool rotateAndCropChanged = (mComposerOutput && !mOverrideToPortrait) ? false :
             overrideAutoRotateAndCrop(captureRequest);
         bool testPatternChanged = overrideTestPattern(captureRequest);
 
@@ -3897,13 +3911,14 @@ status_t Camera3Device::RequestThread::prepareHalRequests() {
                 isZslCapture = true;
             }
         }
-        auto expectedDurationRange = calculateExpectedDurationRange(settings);
+        auto expectedDurationInfo = calculateExpectedDurationRange(settings);
         res = parent->registerInFlight(halRequest->frame_number,
                 totalNumBuffers, captureRequest->mResultExtras,
                 /*hasInput*/halRequest->input_buffer != NULL,
                 hasCallback,
-                /*min*/expectedDurationRange.first,
-                /*max*/expectedDurationRange.second,
+                expectedDurationInfo.minDuration,
+                expectedDurationInfo.maxDuration,
+                expectedDurationInfo.isFixedFps,
                 requestedPhysicalCameras, isStillCapture, isZslCapture,
                 captureRequest->mRotateAndCropAuto, mPrevCameraIdsWithZoom,
                 (mUseHalBufManager) ? uniqueSurfaceIdMap :
@@ -4092,6 +4107,17 @@ void Camera3Device::RequestThread::cleanupPhysicalSettings(sp<CaptureRequest> re
             halRequest->physcam_settings = nullptr;
         }
     }
+}
+
+status_t Camera3Device::setCameraServiceWatchdog(bool enabled) {
+    Mutex::Autolock il(mInterfaceLock);
+    Mutex::Autolock l(mLock);
+
+    if (mCameraServiceWatchdog != NULL) {
+        mCameraServiceWatchdog->setEnabled(enabled);
+    }
+
+    return OK;
 }
 
 void Camera3Device::RequestThread::cleanUpFailedRequests(bool sendRequestError) {
@@ -4597,6 +4623,15 @@ status_t Camera3Device::RequestThread::addFakeTriggerIds(
 bool Camera3Device::RequestThread::overrideAutoRotateAndCrop(
         const sp<CaptureRequest> &request) {
     ATRACE_CALL();
+
+    if (mOverrideToPortrait) {
+        Mutex::Autolock l(mTriggerMutex);
+        uint8_t rotateAndCrop_u8 = mRotateAndCropOverride;
+        CameraMetadata &metadata = request->mSettingsList.begin()->metadata;
+        metadata.update(ANDROID_SCALER_ROTATE_AND_CROP,
+                &rotateAndCrop_u8, 1);
+        return true;
+    }
 
     if (request->mRotateAndCropAuto) {
         Mutex::Autolock l(mTriggerMutex);

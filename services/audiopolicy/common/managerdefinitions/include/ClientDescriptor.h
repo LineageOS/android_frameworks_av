@@ -239,12 +239,13 @@ public:
     }
     void setUseSwBridge() { mUseSwBridge = true; }
     bool useSwBridge() const { return mUseSwBridge; }
+    bool canCloseOutput() const { return mCloseOutput; }
     bool isConnected() const { return mPatchHandle != AUDIO_PATCH_HANDLE_NONE; }
     audio_patch_handle_t getPatchHandle() const { return mPatchHandle; }
     sp<DeviceDescriptor> srcDevice() const { return mSrcDevice; }
     sp<DeviceDescriptor> sinkDevice() const { return mSinkDevice; }
     wp<SwAudioOutputDescriptor> swOutput() const { return mSwOutput; }
-    void setSwOutput(const sp<SwAudioOutputDescriptor>& swOutput);
+    void setSwOutput(const sp<SwAudioOutputDescriptor>& swOutput, bool closeOutput = false);
     wp<HwAudioOutputDescriptor> hwOutput() const { return mHwOutput; }
     void setHwOutput(const sp<HwAudioOutputDescriptor>& hwOutput);
 
@@ -258,6 +259,15 @@ public:
     wp<SwAudioOutputDescriptor> mSwOutput;
     wp<HwAudioOutputDescriptor> mHwOutput;
     bool mUseSwBridge = false;
+    /**
+     * For either HW bridge associated to a SwOutput for activity / volume or SwBridge for also
+     * sample rendering / activity & volume, an existing playback thread may be reused (e.g.
+     * not already opened at APM startup or Direct Output).
+     * If reusing an already opened output, when this output is not used anymore, the AudioFlinger
+     * patch must be updated to refine the output device(s) information and ensure the right
+     * behavior of AudioDeviceCallback.
+     */
+    bool mCloseOutput = false;
 };
 
 /**

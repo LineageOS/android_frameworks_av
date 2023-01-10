@@ -96,8 +96,12 @@ class HeadTrackingProcessor {
      * This causes the current poses for both the head and/or screen to be considered "center".
      */
     virtual void recenter(bool recenterHead = true, bool recenterScreen = true) = 0;
-};
 
+    /**
+     * Dump HeadTrackingProcessor parameters under caller lock.
+     */
+    virtual std::string toString_l(unsigned level) const = 0;
+};
 /**
  * Creates an instance featuring a default implementation of the HeadTrackingProcessor interface.
  */

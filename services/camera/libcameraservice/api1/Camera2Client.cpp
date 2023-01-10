@@ -61,11 +61,13 @@ Camera2Client::Camera2Client(const sp<CameraService>& cameraService,
         int clientPid,
         uid_t clientUid,
         int servicePid,
-        bool overrideForPerfClass):
+        bool overrideForPerfClass,
+        bool overrideToPortrait):
         Camera2ClientBase(cameraService, cameraClient, clientPackageName,
                 false/*systemNativeClient - since no ndk for api1*/, clientFeatureId,
                 cameraDeviceId, api1CameraId, cameraFacing, sensorOrientation, clientPid,
-                clientUid, servicePid, overrideForPerfClass, /*legacyClient*/ true),
+                clientUid, servicePid, overrideForPerfClass, overrideToPortrait,
+                /*legacyClient*/ true),
         mParameters(api1CameraId, cameraFacing)
 {
     ATRACE_CALL();
@@ -2314,6 +2316,10 @@ int32_t Camera2Client::getGlobalAudioRestriction() {
     // Empty implementation. getAudioRestriction is hidden interface and not
     // supported by android.hardware.Camera API
     return INVALID_OPERATION;
+}
+
+status_t Camera2Client::setCameraServiceWatchdog(bool enabled) {
+    return mDevice->setCameraServiceWatchdog(enabled);
 }
 
 status_t Camera2Client::setRotateAndCropOverride(uint8_t rotateAndCrop) {

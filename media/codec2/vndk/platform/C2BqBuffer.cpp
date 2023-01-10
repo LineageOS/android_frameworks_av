@@ -432,12 +432,16 @@ private:
         if (fence) {
             static constexpr int kFenceWaitTimeMs = 10;
 
+            if (bufferNeedsReallocation) {
+                mBuffers[slot].clear();
+            }
+
             status_t status = fence->wait(kFenceWaitTimeMs);
             if (status == -ETIME) {
                 // fence is not signalled yet.
                 if (syncVar) {
-                    syncVar->lock();
                     (void)mProducer->cancelBuffer(slot, hFenceWrapper.getHandle()).isOk();
+                    syncVar->lock();
                     dequeueable = syncVar->notifyQueuedLocked(&waitId);
                     syncVar->unlock();
                     if (c2Fence) {
@@ -452,8 +456,8 @@ private:
             if (status != android::NO_ERROR) {
                 ALOGD("buffer fence wait error %d", status);
                 if (syncVar) {
-                    syncVar->lock();
                     (void)mProducer->cancelBuffer(slot, hFenceWrapper.getHandle()).isOk();
+                    syncVar->lock();
                     syncVar->notifyQueuedLocked();
                     syncVar->unlock();
                     if (c2Fence) {
@@ -502,8 +506,8 @@ private:
             } else if (status != android::NO_ERROR) {
                 slotBuffer.clear();
                 if (syncVar) {
-                    syncVar->lock();
                     (void)mProducer->cancelBuffer(slot, hFenceWrapper.getHandle()).isOk();
+                    syncVar->lock();
                     syncVar->notifyQueuedLocked();
                     syncVar->unlock();
                     if (c2Fence) {
@@ -550,8 +554,8 @@ private:
             // Block was not created. call requestBuffer# again next time.
             slotBuffer.clear();
             if (syncVar) {
-                syncVar->lock();
                 (void)mProducer->cancelBuffer(slot, hFenceWrapper.getHandle()).isOk();
+                syncVar->lock();
                 syncVar->notifyQueuedLocked();
                 syncVar->unlock();
                 if (c2Fence) {
@@ -813,11 +817,10 @@ C2BufferQueueBlockPoolData::~C2BufferQueueBlockPoolData() {
         if (mGeneration == mCurrentGeneration && mBqId == mCurrentBqId && !mOwner.expired()) {
             C2SyncVariables *syncVar = mSyncMem ? mSyncMem->mem() : nullptr;
             if (syncVar) {
+                mIgbp->cancelBuffer(mBqSlot, hidl_handle{}).isOk();
                 syncVar->lock();
-                if (syncVar->getSyncStatusLocked() == C2SyncVariables::STATUS_ACTIVE) {
-                    mIgbp->cancelBuffer(mBqSlot, hidl_handle{}).isOk();
-                    syncVar->notifyQueuedLocked();
-                }
+                syncVar->notifyQueuedLocked(nullptr,
+                        syncVar->getSyncStatusLocked() == C2SyncVariables::STATUS_ACTIVE);
                 syncVar->unlock();
             } else {
                 mIgbp->cancelBuffer(mBqSlot, hidl_handle{}).isOk();
@@ -826,11 +829,10 @@ C2BufferQueueBlockPoolData::~C2BufferQueueBlockPoolData() {
     } else if (!mOwner.expired()) {
         C2SyncVariables *syncVar = mSyncMem ? mSyncMem->mem() : nullptr;
         if (syncVar) {
+            mIgbp->cancelBuffer(mBqSlot, hidl_handle{}).isOk();
             syncVar->lock();
-            if (syncVar->getSyncStatusLocked() != C2SyncVariables::STATUS_SWITCHING) {
-                mIgbp->cancelBuffer(mBqSlot, hidl_handle{}).isOk();
-                syncVar->notifyQueuedLocked();
-            }
+            syncVar->notifyQueuedLocked(nullptr,
+                    syncVar->getSyncStatusLocked() != C2SyncVariables::STATUS_SWITCHING);
             syncVar->unlock();
         } else {
             mIgbp->cancelBuffer(mBqSlot, hidl_handle{}).isOk();

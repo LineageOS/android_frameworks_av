@@ -59,6 +59,7 @@ public:
                       uid_t clientUid,
                       int servicePid,
                       bool overrideForPerfClass,
+                      bool overrideToPortrait,
                       bool legacyClient = false);
     virtual ~Camera2ClientBase();
 
@@ -131,6 +132,9 @@ public:
     status_t      stopInjection() override;
 
 protected:
+
+    // Used for watchdog timeout to monitor disconnect
+    static const nsecs_t kBufferTimeDisconnectNs = 3000000000; // 3 sec.
 
     // The PID provided in the constructor call
     pid_t mInitialClientPid;

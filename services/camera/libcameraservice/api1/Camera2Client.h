@@ -90,6 +90,8 @@ public:
     virtual bool            supportsCameraMute();
     virtual status_t        setCameraMute(bool enabled);
 
+    virtual status_t        setCameraServiceWatchdog(bool enabled);
+
     /**
      * Interface used by CameraService
      */
@@ -105,7 +107,8 @@ public:
             int clientPid,
             uid_t clientUid,
             int servicePid,
-            bool overrideForPerfClass);
+            bool overrideForPerfClass,
+            bool overrideToPortrait);
 
     virtual ~Camera2Client();
 

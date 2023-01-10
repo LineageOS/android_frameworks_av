@@ -354,8 +354,11 @@ status_t MediaCodec::ResourceManagerServiceProxy::init() {
 }
 
 //static
-Mutex MediaCodec::ResourceManagerServiceProxy::sLockCookies;
-std::set<void*> MediaCodec::ResourceManagerServiceProxy::sCookies;
+// these are no_destroy to keep them from being destroyed at process exit
+// where some thread calls exit() while other threads are still running.
+// see b/194783918
+[[clang::no_destroy]] Mutex MediaCodec::ResourceManagerServiceProxy::sLockCookies;
+[[clang::no_destroy]] std::set<void*> MediaCodec::ResourceManagerServiceProxy::sCookies;
 
 //static
 void MediaCodec::ResourceManagerServiceProxy::addCookie(void* cookie) {
@@ -807,9 +810,7 @@ MediaCodec::MediaCodec(
       mWidth(0),
       mHeight(0),
       mRotationDegrees(0),
-      mConfigColorTransfer(-1),
-      mHDRStaticInfo(false),
-      mHDR10PlusInfo(false),
+      mHdrInfoFlags(0),
       mDequeueInputTimeoutGeneration(0),
       mDequeueInputReplyID(0),
       mDequeueOutputTimeoutGeneration(0),
@@ -864,6 +865,9 @@ MediaCodec::MediaCodec(
             return NAME_NOT_FOUND;
         };
     }
+
+    // we want an empty metrics record for any early getMetrics() call
+    // this should be the *only* initMediametrics() call that's not on the Looper thread
     initMediametrics();
 }
 
@@ -872,8 +876,17 @@ MediaCodec::~MediaCodec() {
     mResourceManagerProxy->removeClient();
 
     flushMediametrics();
+
+    // clean any saved metrics info we stored as part of configure()
+    if (mConfigureMsg != nullptr) {
+        mediametrics_handle_t metricsHandle;
+        if (mConfigureMsg->findInt64("metrics", &metricsHandle)) {
+            mediametrics_delete(metricsHandle);
+        }
+    }
 }
 
+// except for in constructor, called from the looper thread (and therefore mutexed)
 void MediaCodec::initMediametrics() {
     if (mMetricsHandle == 0) {
         mMetricsHandle = mediametrics_create(kCodecKeyName);
@@ -903,10 +916,11 @@ void MediaCodec::initMediametrics() {
 }
 
 void MediaCodec::updateMediametrics() {
-    ALOGV("MediaCodec::updateMediametrics");
     if (mMetricsHandle == 0) {
         return;
     }
+
+    Mutex::Autolock _lock(mMetricsLock);
 
     if (mLatencyHist.getCount() != 0 ) {
         mediametrics_setInt64(mMetricsHandle, kCodecLatencyMax, mLatencyHist.getMax());
@@ -955,29 +969,73 @@ void MediaCodec::updateMediametrics() {
                               mIndexOfFirstFrameWhenLowLatencyOn);
     }
 
-    mediametrics_setInt32(mMetricsHandle, kCodecHDRStaticInfo, mHDRStaticInfo ? 1 : 0);
-    mediametrics_setInt32(mMetricsHandle, kCodecHDR10PlusInfo, mHDR10PlusInfo ? 1 : 0);
 #if 0
     // enable for short term, only while debugging
     updateEphemeralMediametrics(mMetricsHandle);
 #endif
 }
 
-void MediaCodec::updateHDRFormatMetric() {
+void MediaCodec::updateHdrMetrics(bool isConfig) {
+    if ((mDomain != DOMAIN_VIDEO && mDomain != DOMAIN_IMAGE) || mMetricsHandle == 0) {
+        return;
+    }
+
+    int32_t colorStandard = -1;
+    if (mOutputFormat->findInt32(KEY_COLOR_STANDARD, &colorStandard)) {
+        mediametrics_setInt32(mMetricsHandle,
+                isConfig ? kCodecConfigColorStandard : kCodecParsedColorStandard, colorStandard);
+    }
+    int32_t colorRange = -1;
+    if (mOutputFormat->findInt32(KEY_COLOR_RANGE, &colorRange)) {
+        mediametrics_setInt32(mMetricsHandle,
+                isConfig ? kCodecConfigColorRange : kCodecParsedColorRange, colorRange);
+    }
+    int32_t colorTransfer = -1;
+    if (mOutputFormat->findInt32(KEY_COLOR_TRANSFER, &colorTransfer)) {
+        mediametrics_setInt32(mMetricsHandle,
+                isConfig ? kCodecConfigColorTransfer : kCodecParsedColorTransfer, colorTransfer);
+    }
+    HDRStaticInfo info;
+    if (ColorUtils::getHDRStaticInfoFromFormat(mOutputFormat, &info)
+            && ColorUtils::isHDRStaticInfoValid(&info)) {
+        mHdrInfoFlags |= kFlagHasHdrStaticInfo;
+    }
+    mediametrics_setInt32(mMetricsHandle, kCodecHDRStaticInfo,
+            (mHdrInfoFlags & kFlagHasHdrStaticInfo) ? 1 : 0);
+    sp<ABuffer> hdr10PlusInfo;
+    if (mOutputFormat->findBuffer("hdr10-plus-info", &hdr10PlusInfo)
+            && hdr10PlusInfo != nullptr && hdr10PlusInfo->size() > 0) {
+        mHdrInfoFlags |= kFlagHasHdr10PlusInfo;
+    }
+    mediametrics_setInt32(mMetricsHandle, kCodecHDR10PlusInfo,
+            (mHdrInfoFlags & kFlagHasHdr10PlusInfo) ? 1 : 0);
+
+    // hdr format
+    sp<AMessage> codedFormat = (mFlags & kFlagIsEncoder) ? mOutputFormat : mInputFormat;
+
+    AString mime;
     int32_t profile = -1;
-    AString mediaType;
-    if (mOutputFormat->findInt32(KEY_PROFILE, &profile)
-            && mOutputFormat->findString("mime", &mediaType)) {
-        hdr_format hdrFormat = getHDRFormat(profile, mConfigColorTransfer, mediaType);
+
+    if (codedFormat->findString("mime", &mime)
+            && codedFormat->findInt32(KEY_PROFILE, &profile)
+            && colorTransfer != -1) {
+        hdr_format hdrFormat = getHdrFormat(mime, profile, colorTransfer);
         mediametrics_setInt32(mMetricsHandle, kCodecHDRFormat, static_cast<int>(hdrFormat));
     }
 }
 
-hdr_format MediaCodec::getHDRFormat(const int32_t profile, const int32_t transfer,
-        const AString &mediaType) {
-    switch (transfer) {
+hdr_format MediaCodec::getHdrFormat(const AString &mime, const int32_t profile,
+        const int32_t colorTransfer) {
+    return (mFlags & kFlagIsEncoder)
+            ? getHdrFormatForEncoder(mime, profile, colorTransfer)
+            : getHdrFormatForDecoder(mime, profile, colorTransfer);
+}
+
+hdr_format MediaCodec::getHdrFormatForEncoder(const AString &mime, const int32_t profile,
+        const int32_t colorTransfer) {
+    switch (colorTransfer) {
         case COLOR_TRANSFER_ST2084:
-            if (mediaType.equalsIgnoreCase(MEDIA_MIMETYPE_VIDEO_VP9)) {
+            if (mime.equalsIgnoreCase(MEDIA_MIMETYPE_VIDEO_VP9)) {
                 switch (profile) {
                     case VP9Profile2HDR:
                         return HDR_FORMAT_HDR10;
@@ -986,7 +1044,7 @@ hdr_format MediaCodec::getHDRFormat(const int32_t profile, const int32_t transfe
                     default:
                         return HDR_FORMAT_NONE;
                 }
-            } else if (mediaType.equalsIgnoreCase(MEDIA_MIMETYPE_VIDEO_AV1)) {
+            } else if (mime.equalsIgnoreCase(MEDIA_MIMETYPE_VIDEO_AV1)) {
                 switch (profile) {
                     case AV1ProfileMain10HDR10:
                         return HDR_FORMAT_HDR10;
@@ -995,7 +1053,7 @@ hdr_format MediaCodec::getHDRFormat(const int32_t profile, const int32_t transfe
                     default:
                         return HDR_FORMAT_NONE;
                 }
-            } else if (mediaType.equalsIgnoreCase(MEDIA_MIMETYPE_VIDEO_HEVC)) {
+            } else if (mime.equalsIgnoreCase(MEDIA_MIMETYPE_VIDEO_HEVC)) {
                 switch (profile) {
                     case HEVCProfileMain10HDR10:
                         return HDR_FORMAT_HDR10;
@@ -1008,7 +1066,7 @@ hdr_format MediaCodec::getHDRFormat(const int32_t profile, const int32_t transfe
                 return HDR_FORMAT_NONE;
             }
         case COLOR_TRANSFER_HLG:
-            if (!mediaType.equalsIgnoreCase(MEDIA_MIMETYPE_VIDEO_DOLBY_VISION)) {
+            if (!mime.equalsIgnoreCase(MEDIA_MIMETYPE_VIDEO_DOLBY_VISION)) {
                 return HDR_FORMAT_HLG;
             } else {
                 // TODO: DOLBY format
@@ -1019,7 +1077,50 @@ hdr_format MediaCodec::getHDRFormat(const int32_t profile, const int32_t transfe
     }
 }
 
+hdr_format MediaCodec::getHdrFormatForDecoder(const AString &mime, const int32_t profile,
+        const int32_t colorTransfer) {
+    switch (colorTransfer) {
+        case COLOR_TRANSFER_ST2084:
+            if (!(mHdrInfoFlags & kFlagHasHdrStaticInfo) || !profileSupport10Bits(mime, profile)) {
+                return HDR_FORMAT_NONE;
+            }
+            return mHdrInfoFlags & kFlagHasHdr10PlusInfo ? HDR_FORMAT_HDR10PLUS : HDR_FORMAT_HDR10;
+        case COLOR_TRANSFER_HLG:
+            if (!mime.equalsIgnoreCase(MEDIA_MIMETYPE_VIDEO_DOLBY_VISION)) {
+                return HDR_FORMAT_HLG;
+            }
+            // TODO: DOLBY format
+    }
+    return HDR_FORMAT_NONE;
+}
 
+bool MediaCodec::profileSupport10Bits(const AString &mime, const int32_t profile) {
+    if (mime.equalsIgnoreCase(MEDIA_MIMETYPE_VIDEO_AV1)) {
+        return true;
+    } else if (mime.equalsIgnoreCase(MEDIA_MIMETYPE_VIDEO_VP9)) {
+        switch (profile) {
+            case VP9Profile2:
+            case VP9Profile3:
+            case VP9Profile2HDR:
+            case VP9Profile3HDR:
+            case VP9Profile2HDR10Plus:
+            case VP9Profile3HDR10Plus:
+                return true;
+        }
+    } else if (mime.equalsIgnoreCase(MEDIA_MIMETYPE_VIDEO_HEVC)) {
+        switch (profile) {
+            case HEVCProfileMain10:
+            case HEVCProfileMain10HDR10:
+            case HEVCProfileMain10HDR10Plus:
+                return true;
+        }
+    }
+    return false;
+}
+
+
+// called to update info being passed back via getMetrics(), which is a
+// unique copy for that call, no concurrent access worries.
 void MediaCodec::updateEphemeralMediametrics(mediametrics_handle_t item) {
     ALOGD("MediaCodec::updateEphemeralMediametrics()");
 
@@ -1059,7 +1160,14 @@ void MediaCodec::updateEphemeralMediametrics(mediametrics_handle_t item) {
 }
 
 void MediaCodec::flushMediametrics() {
+    ALOGD("flushMediametrics");
+
+    // update does its own mutex locking
     updateMediametrics();
+
+    // ensure mutex while we do our own work
+    Mutex::Autolock _lock(mMetricsLock);
+    mHdrInfoFlags = 0;
     if (mMetricsHandle != 0) {
         if (mediametrics_count(mMetricsHandle) > 0) {
             mediametrics_selfRecord(mMetricsHandle);
@@ -1575,6 +1683,8 @@ status_t MediaCodec::init(const AString &name) {
     }
     msg->setString("name", name);
 
+    // initial naming setup covers the period before the first call to ::configure().
+    // after that, we manage this through ::configure() and the setup message.
     if (mMetricsHandle != 0) {
         mediametrics_setCString(mMetricsHandle, kCodecCodec, name.c_str());
         mediametrics_setCString(mMetricsHandle, kCodecMode, toCodecMode(mDomain));
@@ -1647,23 +1757,28 @@ status_t MediaCodec::configure(
         const sp<IDescrambler> &descrambler,
         uint32_t flags) {
     sp<AMessage> msg = new AMessage(kWhatConfigure, this);
+    mediametrics_handle_t nextMetricsHandle = mediametrics_create(kCodecKeyName);
 
     // TODO: validity check log-session-id: it should be a 32-hex-digit.
     format->findString("log-session-id", &mLogSessionId);
 
-    if (mMetricsHandle != 0) {
+    if (nextMetricsHandle != 0) {
         int32_t profile = 0;
         if (format->findInt32("profile", &profile)) {
-            mediametrics_setInt32(mMetricsHandle, kCodecProfile, profile);
+            mediametrics_setInt32(nextMetricsHandle, kCodecProfile, profile);
         }
         int32_t level = 0;
         if (format->findInt32("level", &level)) {
-            mediametrics_setInt32(mMetricsHandle, kCodecLevel, level);
+            mediametrics_setInt32(nextMetricsHandle, kCodecLevel, level);
         }
-        mediametrics_setInt32(mMetricsHandle, kCodecEncoder,
+        mediametrics_setInt32(nextMetricsHandle, kCodecEncoder,
                               (flags & CONFIGURE_FLAG_ENCODE) ? 1 : 0);
 
-        mediametrics_setCString(mMetricsHandle, kCodecLogSessionId, mLogSessionId.c_str());
+        mediametrics_setCString(nextMetricsHandle, kCodecLogSessionId, mLogSessionId.c_str());
+
+        // moved here from ::init()
+        mediametrics_setCString(nextMetricsHandle, kCodecCodec, mInitName.c_str());
+        mediametrics_setCString(nextMetricsHandle, kCodecMode, toCodecMode(mDomain));
     }
 
     if (mDomain == DOMAIN_VIDEO || mDomain == DOMAIN_IMAGE) {
@@ -1673,57 +1788,39 @@ status_t MediaCodec::configure(
             mRotationDegrees = 0;
         }
 
-        if (mMetricsHandle != 0) {
-            mediametrics_setInt32(mMetricsHandle, kCodecWidth, mWidth);
-            mediametrics_setInt32(mMetricsHandle, kCodecHeight, mHeight);
-            mediametrics_setInt32(mMetricsHandle, kCodecRotation, mRotationDegrees);
+        if (nextMetricsHandle != 0) {
+            mediametrics_setInt32(nextMetricsHandle, kCodecWidth, mWidth);
+            mediametrics_setInt32(nextMetricsHandle, kCodecHeight, mHeight);
+            mediametrics_setInt32(nextMetricsHandle, kCodecRotation, mRotationDegrees);
             int32_t maxWidth = 0;
             if (format->findInt32("max-width", &maxWidth)) {
-                mediametrics_setInt32(mMetricsHandle, kCodecMaxWidth, maxWidth);
+                mediametrics_setInt32(nextMetricsHandle, kCodecMaxWidth, maxWidth);
             }
             int32_t maxHeight = 0;
             if (format->findInt32("max-height", &maxHeight)) {
-                mediametrics_setInt32(mMetricsHandle, kCodecMaxHeight, maxHeight);
+                mediametrics_setInt32(nextMetricsHandle, kCodecMaxHeight, maxHeight);
             }
             int32_t colorFormat = -1;
             if (format->findInt32("color-format", &colorFormat)) {
-                mediametrics_setInt32(mMetricsHandle, kCodecColorFormat, colorFormat);
+                mediametrics_setInt32(nextMetricsHandle, kCodecColorFormat, colorFormat);
             }
             if (mDomain == DOMAIN_VIDEO) {
                 float frameRate = -1.0;
                 if (format->findFloat("frame-rate", &frameRate)) {
-                    mediametrics_setDouble(mMetricsHandle, kCodecFrameRate, frameRate);
+                    mediametrics_setDouble(nextMetricsHandle, kCodecFrameRate, frameRate);
                 }
                 float captureRate = -1.0;
                 if (format->findFloat("capture-rate", &captureRate)) {
-                    mediametrics_setDouble(mMetricsHandle, kCodecCaptureRate, captureRate);
+                    mediametrics_setDouble(nextMetricsHandle, kCodecCaptureRate, captureRate);
                 }
                 float operatingRate = -1.0;
                 if (format->findFloat("operating-rate", &operatingRate)) {
-                    mediametrics_setDouble(mMetricsHandle, kCodecOperatingRate, operatingRate);
+                    mediametrics_setDouble(nextMetricsHandle, kCodecOperatingRate, operatingRate);
                 }
                 int32_t priority = -1;
                 if (format->findInt32("priority", &priority)) {
-                    mediametrics_setInt32(mMetricsHandle, kCodecPriority, priority);
+                    mediametrics_setInt32(nextMetricsHandle, kCodecPriority, priority);
                 }
-            }
-            int32_t colorStandard = -1;
-            if (format->findInt32(KEY_COLOR_STANDARD, &colorStandard)) {
-                mediametrics_setInt32(mMetricsHandle, kCodecConfigColorStandard, colorStandard);
-            }
-            int32_t colorRange = -1;
-            if (format->findInt32(KEY_COLOR_RANGE, &colorRange)) {
-                mediametrics_setInt32(mMetricsHandle, kCodecConfigColorRange, colorRange);
-            }
-            int32_t colorTransfer = -1;
-            if (format->findInt32(KEY_COLOR_TRANSFER, &colorTransfer)) {
-                mConfigColorTransfer = colorTransfer;
-                mediametrics_setInt32(mMetricsHandle, kCodecConfigColorTransfer, colorTransfer);
-            }
-            HDRStaticInfo info;
-            if (ColorUtils::getHDRStaticInfoFromFormat(format, &info)
-                    && ColorUtils::isHDRStaticInfoValid(&info)) {
-                mHDRStaticInfo = true;
             }
         }
 
@@ -1735,14 +1832,14 @@ status_t MediaCodec::configure(
         }
 
     } else {
-        if (mMetricsHandle != 0) {
+        if (nextMetricsHandle != 0) {
             int32_t channelCount;
             if (format->findInt32(KEY_CHANNEL_COUNT, &channelCount)) {
-                mediametrics_setInt32(mMetricsHandle, kCodecChannelCount, channelCount);
+                mediametrics_setInt32(nextMetricsHandle, kCodecChannelCount, channelCount);
             }
             int32_t sampleRate;
             if (format->findInt32(KEY_SAMPLE_RATE, &sampleRate)) {
-                mediametrics_setInt32(mMetricsHandle, kCodecSampleRate, sampleRate);
+                mediametrics_setInt32(nextMetricsHandle, kCodecSampleRate, sampleRate);
             }
         }
     }
@@ -1752,41 +1849,41 @@ status_t MediaCodec::configure(
                                                  enableMediaFormatShapingDefault);
         if (!enableShaping) {
             ALOGI("format shaping disabled, property '%s'", enableMediaFormatShapingProperty);
-            if (mMetricsHandle != 0) {
-                mediametrics_setInt32(mMetricsHandle, kCodecShapingEnhanced, -1);
+            if (nextMetricsHandle != 0) {
+                mediametrics_setInt32(nextMetricsHandle, kCodecShapingEnhanced, -1);
             }
         } else {
-            (void) shapeMediaFormat(format, flags);
+            (void) shapeMediaFormat(format, flags, nextMetricsHandle);
             // XXX: do we want to do this regardless of shaping enablement?
             mapFormat(mComponentName, format, nullptr, false);
         }
     }
 
     // push min/max QP to MediaMetrics after shaping
-    if (mDomain == DOMAIN_VIDEO && mMetricsHandle != 0) {
+    if (mDomain == DOMAIN_VIDEO && nextMetricsHandle != 0) {
         int32_t qpIMin = -1;
         if (format->findInt32("video-qp-i-min", &qpIMin)) {
-            mediametrics_setInt32(mMetricsHandle, kCodecRequestedVideoQPIMin, qpIMin);
+            mediametrics_setInt32(nextMetricsHandle, kCodecRequestedVideoQPIMin, qpIMin);
         }
         int32_t qpIMax = -1;
         if (format->findInt32("video-qp-i-max", &qpIMax)) {
-            mediametrics_setInt32(mMetricsHandle, kCodecRequestedVideoQPIMax, qpIMax);
+            mediametrics_setInt32(nextMetricsHandle, kCodecRequestedVideoQPIMax, qpIMax);
         }
         int32_t qpPMin = -1;
         if (format->findInt32("video-qp-p-min", &qpPMin)) {
-            mediametrics_setInt32(mMetricsHandle, kCodecRequestedVideoQPPMin, qpPMin);
+            mediametrics_setInt32(nextMetricsHandle, kCodecRequestedVideoQPPMin, qpPMin);
         }
         int32_t qpPMax = -1;
         if (format->findInt32("video-qp-p-max", &qpPMax)) {
-            mediametrics_setInt32(mMetricsHandle, kCodecRequestedVideoQPPMax, qpPMax);
+            mediametrics_setInt32(nextMetricsHandle, kCodecRequestedVideoQPPMax, qpPMax);
         }
         int32_t qpBMin = -1;
         if (format->findInt32("video-qp-b-min", &qpBMin)) {
-            mediametrics_setInt32(mMetricsHandle, kCodecRequestedVideoQPBMin, qpBMin);
+            mediametrics_setInt32(nextMetricsHandle, kCodecRequestedVideoQPBMin, qpBMin);
         }
         int32_t qpBMax = -1;
         if (format->findInt32("video-qp-b-max", &qpBMax)) {
-            mediametrics_setInt32(mMetricsHandle, kCodecRequestedVideoQPBMax, qpBMax);
+            mediametrics_setInt32(nextMetricsHandle, kCodecRequestedVideoQPBMax, qpBMax);
         }
     }
 
@@ -1802,12 +1899,22 @@ status_t MediaCodec::configure(
         } else {
             msg->setPointer("descrambler", descrambler.get());
         }
-        if (mMetricsHandle != 0) {
-            mediametrics_setInt32(mMetricsHandle, kCodecCrypto, 1);
+        if (nextMetricsHandle != 0) {
+            mediametrics_setInt32(nextMetricsHandle, kCodecCrypto, 1);
         }
     } else if (mFlags & kFlagIsSecure) {
         ALOGW("Crypto or descrambler should be given for secure codec");
     }
+
+    if (mConfigureMsg != nullptr) {
+        // if re-configuring, we have one of these from before.
+        // Recover the space before we discard the old mConfigureMsg
+        mediametrics_handle_t metricsHandle;
+        if (mConfigureMsg->findInt64("metrics", &metricsHandle)) {
+            mediametrics_delete(metricsHandle);
+        }
+    }
+    msg->setInt64("metrics", nextMetricsHandle);
 
     // save msg for reset
     mConfigureMsg = msg;
@@ -2135,7 +2242,8 @@ status_t MediaCodec::setupFormatShaper(AString mediaType) {
 
 status_t MediaCodec::shapeMediaFormat(
             const sp<AMessage> &format,
-            uint32_t flags) {
+            uint32_t flags,
+            mediametrics_handle_t metricsHandle) {
     ALOGV("shapeMediaFormat entry");
 
     if (!(flags & CONFIGURE_FLAG_ENCODE)) {
@@ -2191,39 +2299,39 @@ status_t MediaCodec::shapeMediaFormat(
         sp<AMessage> deltas = updatedFormat->changesFrom(format, false /* deep */);
         size_t changeCount = deltas->countEntries();
         ALOGD("shapeMediaFormat: deltas(%zu): %s", changeCount, deltas->debugString(2).c_str());
-        if (mMetricsHandle != 0) {
-            mediametrics_setInt32(mMetricsHandle, kCodecShapingEnhanced, changeCount);
+        if (metricsHandle != 0) {
+            mediametrics_setInt32(metricsHandle, kCodecShapingEnhanced, changeCount);
         }
         if (changeCount > 0) {
-            if (mMetricsHandle != 0) {
+            if (metricsHandle != 0) {
                 // save some old properties before we fold in the new ones
                 int32_t bitrate;
                 if (format->findInt32(KEY_BIT_RATE, &bitrate)) {
-                    mediametrics_setInt32(mMetricsHandle, kCodecOriginalBitrate, bitrate);
+                    mediametrics_setInt32(metricsHandle, kCodecOriginalBitrate, bitrate);
                 }
                 int32_t qpIMin = -1;
                 if (format->findInt32("original-video-qp-i-min", &qpIMin)) {
-                    mediametrics_setInt32(mMetricsHandle, kCodecOriginalVideoQPIMin, qpIMin);
+                    mediametrics_setInt32(metricsHandle, kCodecOriginalVideoQPIMin, qpIMin);
                 }
                 int32_t qpIMax = -1;
                 if (format->findInt32("original-video-qp-i-max", &qpIMax)) {
-                    mediametrics_setInt32(mMetricsHandle, kCodecOriginalVideoQPIMax, qpIMax);
+                    mediametrics_setInt32(metricsHandle, kCodecOriginalVideoQPIMax, qpIMax);
                 }
                 int32_t qpPMin = -1;
                 if (format->findInt32("original-video-qp-p-min", &qpPMin)) {
-                    mediametrics_setInt32(mMetricsHandle, kCodecOriginalVideoQPPMin, qpPMin);
+                    mediametrics_setInt32(metricsHandle, kCodecOriginalVideoQPPMin, qpPMin);
                 }
                 int32_t qpPMax = -1;
                 if (format->findInt32("original-video-qp-p-max", &qpPMax)) {
-                    mediametrics_setInt32(mMetricsHandle, kCodecOriginalVideoQPPMax, qpPMax);
+                    mediametrics_setInt32(metricsHandle, kCodecOriginalVideoQPPMax, qpPMax);
                 }
                  int32_t qpBMin = -1;
                 if (format->findInt32("original-video-qp-b-min", &qpBMin)) {
-                    mediametrics_setInt32(mMetricsHandle, kCodecOriginalVideoQPBMin, qpBMin);
+                    mediametrics_setInt32(metricsHandle, kCodecOriginalVideoQPBMin, qpBMin);
                 }
                 int32_t qpBMax = -1;
                 if (format->findInt32("original-video-qp-b-max", &qpBMax)) {
-                    mediametrics_setInt32(mMetricsHandle, kCodecOriginalVideoQPBMax, qpBMax);
+                    mediametrics_setInt32(metricsHandle, kCodecOriginalVideoQPBMax, qpBMax);
                 }
             }
             // NB: for any field in both format and deltas, the deltas copy wins
@@ -2809,24 +2917,42 @@ status_t MediaCodec::getCodecInfo(sp<MediaCodecInfo> *codecInfo) const {
     return OK;
 }
 
+// this is the user-callable entry point
 status_t MediaCodec::getMetrics(mediametrics_handle_t &reply) {
 
     reply = 0;
 
-    // shouldn't happen, but be safe
-    if (mMetricsHandle == 0) {
-        return UNKNOWN_ERROR;
+    sp<AMessage> msg = new AMessage(kWhatGetMetrics, this);
+    sp<AMessage> response;
+    status_t err;
+    if ((err = PostAndAwaitResponse(msg, &response)) != OK) {
+        return err;
     }
 
-    // update any in-flight data that's not carried within the record
-    updateMediametrics();
-
-    // send it back to the caller.
-    reply = mediametrics_dup(mMetricsHandle);
-
-    updateEphemeralMediametrics(reply);
+    CHECK(response->findInt64("metrics", &reply));
 
     return OK;
+}
+
+// runs on the looper thread (for mutex purposes)
+void MediaCodec::onGetMetrics(const sp<AMessage>& msg) {
+
+    mediametrics_handle_t results = 0;
+
+    sp<AReplyToken> replyID;
+    CHECK(msg->senderAwaitsResponse(&replyID));
+
+    if (mMetricsHandle != 0) {
+        updateMediametrics();
+        results = mediametrics_dup(mMetricsHandle);
+        updateEphemeralMediametrics(results);
+    } else {
+        results = mediametrics_dup(mMetricsHandle);
+    }
+
+    sp<AMessage> response = new AMessage;
+    response->setInt64("metrics", results);
+    response->postReply(replyID);
 }
 
 status_t MediaCodec::getInputBuffers(Vector<sp<MediaCodecBuffer> > *buffers) const {
@@ -3382,8 +3508,6 @@ void MediaCodec::onMessageReceived(const sp<AMessage> &msg) {
                     CHECK(msg->findMessage("input-format", &mInputFormat));
                     CHECK(msg->findMessage("output-format", &mOutputFormat));
 
-                    updateHDRFormatMetric();
-
                     // limit to confirming the opt-in behavior to minimize any behavioral change
                     if (mSurface != nullptr && !mAllowFrameDroppingBySurface) {
                         // signal frame dropping mode in the input format as this may also be
@@ -3426,6 +3550,7 @@ void MediaCodec::onMessageReceived(const sp<AMessage> &msg) {
                         if (interestingFormat->findInt32("level", &level)) {
                             mediametrics_setInt32(mMetricsHandle, kCodecLevel, level);
                         }
+                        updateHdrMetrics(true /* isConfig */);
                         // bitrate and bitrate mode, encoder only
                         if (mFlags & kFlagIsEncoder) {
                             // encoder specific values
@@ -3465,7 +3590,6 @@ void MediaCodec::onMessageReceived(const sp<AMessage> &msg) {
                                 mComponentName.c_str(),
                                 mInputFormat->debugString(4).c_str(),
                                 mOutputFormat->debugString(4).c_str());
-                        updateHDRFormatMetric();
                         CHECK(obj != NULL);
                         response->setObject("input-surface", obj);
                         mHaveInputSurface = true;
@@ -3490,7 +3614,6 @@ void MediaCodec::onMessageReceived(const sp<AMessage> &msg) {
                     if (!msg->findInt32("err", &err)) {
                         CHECK(msg->findMessage("input-format", &mInputFormat));
                         CHECK(msg->findMessage("output-format", &mOutputFormat));
-                        updateHDRFormatMetric();
                         mHaveInputSurface = true;
                     } else {
                         response->setInt32("err", err);
@@ -3890,6 +4013,13 @@ void MediaCodec::onMessageReceived(const sp<AMessage> &msg) {
             break;
         }
 
+        case kWhatGetMetrics:
+        {
+            onGetMetrics(msg);
+            break;
+        }
+
+
         case kWhatConfigure:
         {
             if (mState != INITIALIZED) {
@@ -3909,6 +4039,18 @@ void MediaCodec::onMessageReceived(const sp<AMessage> &msg) {
 
             sp<AMessage> format;
             CHECK(msg->findMessage("format", &format));
+
+            // start with a copy of the passed metrics info for use in this run
+            mediametrics_handle_t handle;
+            CHECK(msg->findInt64("metrics", &handle));
+            if (handle != 0) {
+                if (mMetricsHandle != 0) {
+                    flushMediametrics();
+                }
+                mMetricsHandle = mediametrics_dup(handle);
+                // and set some additional metrics values
+                initMediametrics();
+            }
 
             int32_t push;
             if (msg->findInt32("push-blank-buffers-on-shutdown", &push) && push != 0) {
@@ -4684,7 +4826,6 @@ void MediaCodec::handleOutputFormatChangeIfNeeded(const sp<MediaCodecBuffer> &bu
         buffer->meta()->setObject("changedKeys", changedKeys);
     }
     mOutputFormat = format;
-    updateHDRFormatMetric();
     mapFormat(mComponentName, format, nullptr, true);
     ALOGV("[%s] output format changed to: %s",
             mComponentName.c_str(), mOutputFormat->debugString(4).c_str());
@@ -4710,9 +4851,6 @@ void MediaCodec::handleOutputFormatChangeIfNeeded(const sp<MediaCodecBuffer> &bu
             HDRStaticInfo info;
             if (ColorUtils::getHDRStaticInfoFromFormat(mOutputFormat, &info)) {
                 setNativeWindowHdrMetadata(mSurface.get(), &info);
-                if (ColorUtils::isHDRStaticInfoValid(&info)) {
-                    mHDRStaticInfo = true;
-                }
             }
         }
 
@@ -4721,7 +4859,6 @@ void MediaCodec::handleOutputFormatChangeIfNeeded(const sp<MediaCodecBuffer> &bu
                 && hdr10PlusInfo != nullptr && hdr10PlusInfo->size() > 0) {
             native_window_set_buffers_hdr10_plus_metadata(mSurface.get(),
                     hdr10PlusInfo->size(), hdr10PlusInfo->data());
-            mHDR10PlusInfo = true;
         }
 
         if (mime.startsWithIgnoreCase("video/")) {
@@ -4767,21 +4904,8 @@ void MediaCodec::handleOutputFormatChangeIfNeeded(const sp<MediaCodecBuffer> &bu
         }
     }
 
-    if (mMetricsHandle != 0) {
-        int32_t colorStandard = -1;
-        if (format->findInt32(KEY_COLOR_STANDARD, &colorStandard)) {
-            mediametrics_setInt32(mMetricsHandle, kCodecParsedColorStandard, colorStandard);
-        }
-        int32_t colorRange = -1;
-        if (format->findInt32( KEY_COLOR_RANGE, &colorRange)) {
-            mediametrics_setInt32(mMetricsHandle, kCodecParsedColorRange, colorRange);
-        }
-        int32_t colorTransfer = -1;
-        if (format->findInt32(KEY_COLOR_TRANSFER, &colorTransfer)) {
-            mediametrics_setInt32(mMetricsHandle, kCodecParsedColorTransfer, colorTransfer);
-        }
-    }
-}
+    updateHdrMetrics(false /* isConfig */);
+ }
 
 void MediaCodec::extractCSD(const sp<AMessage> &format) {
     mCSD.clear();

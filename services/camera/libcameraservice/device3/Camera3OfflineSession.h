@@ -248,6 +248,9 @@ class Camera3OfflineSession :
 
     // The current minimum expected frame duration based on AE_TARGET_FPS_RANGE
     nsecs_t mMinExpectedDuration = 0;
+    // Whether the camera device runs at fixed frame rate based on AE_MODE and
+    // AE_TARGET_FPS_RANGE
+    bool mIsFixedFps = false;
 
     // SetErrorInterface
     void setErrorState(const char *fmt, ...) override;
