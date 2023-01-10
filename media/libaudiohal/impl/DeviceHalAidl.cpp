@@ -16,94 +16,149 @@
 
 #define LOG_TAG "DeviceHalAidl"
 
-#include "DeviceHalAidl.h"
+#include <mediautils/TimeCheck.h>
+#include <utils/Log.h>
 
-status_t DeviceHalAidl::getSupportedDevices(uint32_t* devices) {
-    ALOGE("%s not implemented yet devices %p", __func__, devices);
-    return OK;
+#include <aidl/android/hardware/audio/core/StreamDescriptor.h>
+
+#include "DeviceHalAidl.h"
+#include "StreamHalAidl.h"
+
+using ::aidl::android::hardware::audio::core::StreamDescriptor;
+
+namespace android {
+
+status_t DeviceHalAidl::getSupportedDevices(uint32_t*) {
+    // Obsolete.
+    return INVALID_OPERATION;
 }
 
 status_t DeviceHalAidl::initCheck() {
-    ALOGE("%s not implemented yet", __func__);
+    if (mModule == nullptr) return NO_INIT;
+    // HAL modules are already initialized by the time they are published to the SM.
     return OK;
 }
 
 status_t DeviceHalAidl::setVoiceVolume(float volume) {
+    TIME_CHECK();
     mVoiceVolume = volume;
     ALOGE("%s not implemented yet %f", __func__, volume);
     return OK;
 }
 
 status_t DeviceHalAidl::setMasterVolume(float volume) {
+    TIME_CHECK();
     mMasterVolume = volume;
     ALOGE("%s not implemented yet %f", __func__, volume);
     return OK;
 }
 
 status_t DeviceHalAidl::getMasterVolume(float *volume) {
+    TIME_CHECK();
     *volume = mMasterVolume;
     ALOGE("%s not implemented yet %f", __func__, *volume);
     return OK;
 }
 
-status_t DeviceHalAidl::setMode(audio_mode_t mode) {
-    ALOGE("%s not implemented yet %u", __func__, mode);
+status_t DeviceHalAidl::setMode(audio_mode_t mode __unused) {
+    TIME_CHECK();
+    if (!mModule) return NO_INIT;
+    ALOGE("%s not implemented yet", __func__);
     return OK;
 }
 
 status_t DeviceHalAidl::setMicMute(bool state) {
+    TIME_CHECK();
     mMicMute = state;
     ALOGE("%s not implemented yet %d", __func__, state);
     return OK;
 }
+
 status_t DeviceHalAidl::getMicMute(bool *state) {
+    TIME_CHECK();
     *state = mMicMute;
     ALOGE("%s not implemented yet %d", __func__, *state);
     return OK;
 }
+
 status_t DeviceHalAidl::setMasterMute(bool state) {
+    TIME_CHECK();
     mMasterMute = state;
     ALOGE("%s not implemented yet %d", __func__, state);
     return OK;
 }
+
 status_t DeviceHalAidl::getMasterMute(bool *state) {
+    TIME_CHECK();
     *state = mMasterMute;
     ALOGE("%s not implemented yet %d", __func__, *state);
     return OK;
 }
 
-status_t DeviceHalAidl::setParameters(const String8& kvPairs) {
-    ALOGE("%s not implemented yet %s", __func__, kvPairs.c_str());
+status_t DeviceHalAidl::setParameters(const String8& kvPairs __unused) {
+    TIME_CHECK();
+    if (!mModule) return NO_INIT;
+    ALOGE("%s not implemented yet", __func__);
     return OK;
 }
 
-status_t DeviceHalAidl::getParameters(const String8& keys, String8 *values) {
-    ALOGE("%s not implemented yet %s %s", __func__, keys.c_str(), values->c_str());
+status_t DeviceHalAidl::getParameters(const String8& keys __unused, String8 *values) {
+    TIME_CHECK();
+    values->clear();
+    if (!mModule) return NO_INIT;
+    ALOGE("%s not implemented yet", __func__);
     return OK;
 }
 
-status_t DeviceHalAidl::getInputBufferSize(const struct audio_config* config, size_t* size) {
-    ALOGE("%s not implemented yet %p %zu", __func__, config, *size);
+status_t DeviceHalAidl::getInputBufferSize(
+        const struct audio_config* config __unused, size_t* size __unused) {
+    TIME_CHECK();
+    if (!mModule) return NO_INIT;
+    ALOGE("%s not implemented yet", __func__);
     return OK;
 }
 
-status_t DeviceHalAidl::openOutputStream(audio_io_handle_t handle, audio_devices_t devices,
-                                         audio_output_flags_t flags, struct audio_config* config,
-                                         const char* address,
-                                         sp<StreamOutHalInterface>* outStream) {
-    ALOGE("%s not implemented yet %d %u %u %p %s %p", __func__, handle, devices, flags, config,
-          address, outStream);
+status_t DeviceHalAidl::openOutputStream(
+        audio_io_handle_t handle __unused, audio_devices_t devices __unused,
+        audio_output_flags_t flags __unused, struct audio_config* config,
+        const char* address __unused,
+        sp<StreamOutHalInterface>* outStream) {
+    if (!outStream || !config) {
+        return BAD_VALUE;
+    }
+    TIME_CHECK();
+    if (!mModule) return NO_INIT;
+    config->sample_rate = 48000;
+    config->format = AUDIO_FORMAT_PCM_24_BIT_PACKED;
+    config->channel_mask = AUDIO_CHANNEL_OUT_STEREO;
+    StreamDescriptor descriptor;
+    descriptor.frameSizeBytes = audio_bytes_per_sample(config->format) *
+            audio_channel_count_from_out_mask(config->channel_mask);
+    descriptor.bufferSizeFrames = 600;
+    *outStream = sp<StreamOutHalAidl>::make(descriptor, nullptr);
     return OK;
 }
 
-status_t DeviceHalAidl::openInputStream(audio_io_handle_t handle, audio_devices_t devices,
-                                        struct audio_config* config, audio_input_flags_t flags,
-                                        const char* address, audio_source_t source,
-                                        audio_devices_t outputDevice,
-                                        const char* outputDeviceAddress,
-                                        sp<StreamInHalInterface>* inStream) {
-    ALOGE("%s not implemented yet %d %u %u %u %p %s %s %p %d", __func__, handle, devices,
-          outputDevice, flags, config, address, outputDeviceAddress, inStream, source);
+status_t DeviceHalAidl::openInputStream(
+        audio_io_handle_t handle __unused, audio_devices_t devices __unused,
+        struct audio_config* config, audio_input_flags_t flags __unused,
+        const char* address __unused, audio_source_t source __unused,
+        audio_devices_t outputDevice __unused,
+        const char* outputDeviceAddress __unused,
+        sp<StreamInHalInterface>* inStream) {
+    if (!inStream || !config) {
+        return BAD_VALUE;
+    }
+    TIME_CHECK();
+    if (!mModule) return NO_INIT;
+    config->sample_rate = 48000;
+    config->format = AUDIO_FORMAT_PCM_24_BIT_PACKED;
+    config->channel_mask = AUDIO_CHANNEL_IN_STEREO;
+    StreamDescriptor descriptor;
+    descriptor.frameSizeBytes = audio_bytes_per_sample(config->format) *
+            audio_channel_count_from_out_mask(config->channel_mask);
+    descriptor.bufferSizeFrames = 600;
+    *inStream = sp<StreamInHalAidl>::make(descriptor, nullptr);
     return OK;
 }
 
@@ -112,66 +167,94 @@ status_t DeviceHalAidl::supportsAudioPatches(bool* supportsPatches) {
     return OK;
 }
 
-status_t DeviceHalAidl::createAudioPatch(unsigned int num_sources,
-                                         const struct audio_port_config* sources,
-                                         unsigned int num_sinks,
-                                         const struct audio_port_config* sinks,
-                                         audio_patch_handle_t* patch) {
-    ALOGE("%s not implemented yet %d %p %d %p %p", __func__, num_sources, sources, num_sinks,
-            sinks, patch);
+status_t DeviceHalAidl::createAudioPatch(unsigned int num_sources __unused,
+                                         const struct audio_port_config* sources __unused,
+                                         unsigned int num_sinks __unused,
+                                         const struct audio_port_config* sinks __unused,
+                                         audio_patch_handle_t* patch __unused) {
+    TIME_CHECK();
+    if (!mModule) return NO_INIT;
+    ALOGE("%s not implemented yet", __func__);
     return OK;
 }
 
-status_t DeviceHalAidl::releaseAudioPatch(audio_patch_handle_t patch) {
-    ALOGE("%s not implemented yet patch %d", __func__, patch);
+status_t DeviceHalAidl::releaseAudioPatch(audio_patch_handle_t patch __unused) {
+    TIME_CHECK();
+    if (!mModule) return NO_INIT;
+    ALOGE("%s not implemented yet", __func__);
     return OK;
 }
 
-status_t DeviceHalAidl::setAudioPortConfig(const struct audio_port_config* config) {
-    ALOGE("%s not implemented yet config %p", __func__, config);
+status_t DeviceHalAidl::getAudioPort(struct audio_port* port __unused) {
+    TIME_CHECK();
+    ALOGE("%s not implemented yet", __func__);
+    return INVALID_OPERATION;
+}
+
+status_t DeviceHalAidl::getAudioPort(struct audio_port_v7 *port __unused) {
+    TIME_CHECK();
+    ALOGE("%s not implemented yet", __func__);
+    return INVALID_OPERATION;
+}
+
+status_t DeviceHalAidl::setAudioPortConfig(const struct audio_port_config* config __unused) {
+    TIME_CHECK();
+    if (!mModule) return NO_INIT;
+    ALOGE("%s not implemented yet", __func__);
     return OK;
 }
 
 status_t DeviceHalAidl::getMicrophones(
-        std::vector<audio_microphone_characteristic_t>* microphones) {
-    ALOGE("%s not implemented yet microphones %p", __func__, microphones);
+        std::vector<audio_microphone_characteristic_t>* microphones __unused) {
+    TIME_CHECK();
+    if (!mModule) return NO_INIT;
+    ALOGE("%s not implemented yet", __func__);
     return OK;
 }
 
-status_t DeviceHalAidl::addDeviceEffect(audio_port_handle_t device, sp<EffectHalInterface> effect) {
+status_t DeviceHalAidl::addDeviceEffect(audio_port_handle_t device __unused,
+        sp<EffectHalInterface> effect) {
     if (!effect) {
         return BAD_VALUE;
     }
-    ALOGE("%s not implemented yet device %d", __func__, device);
+    TIME_CHECK();
+    if (!mModule) return NO_INIT;
+    ALOGE("%s not implemented yet", __func__);
     return OK;
 }
-status_t DeviceHalAidl::removeDeviceEffect(audio_port_handle_t device,
+status_t DeviceHalAidl::removeDeviceEffect(audio_port_handle_t device __unused,
                             sp<EffectHalInterface> effect) {
     if (!effect) {
         return BAD_VALUE;
     }
-    ALOGE("%s not implemented yet device %d", __func__, device);
+    TIME_CHECK();
+    if (!mModule) return NO_INIT;
+    ALOGE("%s not implemented yet", __func__);
     return OK;
 }
 
 status_t DeviceHalAidl::getMmapPolicyInfos(
         media::audio::common::AudioMMapPolicyType policyType __unused,
         std::vector<media::audio::common::AudioMMapPolicyInfo>* policyInfos __unused) {
+    TIME_CHECK();
     ALOGE("%s not implemented yet", __func__);
     return OK;
 }
 
 int32_t DeviceHalAidl::getAAudioMixerBurstCount() {
+    TIME_CHECK();
     ALOGE("%s not implemented yet", __func__);
     return OK;
 }
 
 int32_t DeviceHalAidl::getAAudioHardwareBurstMinUsec() {
+    TIME_CHECK();
     ALOGE("%s not implemented yet", __func__);
     return OK;
 }
 
 error::Result<audio_hw_sync_t> DeviceHalAidl::getHwAvSync() {
+    TIME_CHECK();
     ALOGE("%s not implemented yet", __func__);
     return base::unexpected(INVALID_OPERATION);
 }
@@ -181,7 +264,10 @@ status_t DeviceHalAidl::dump(int __unused, const Vector<String16>& __unused) {
     return OK;
 };
 
-int32_t DeviceHalAidl::supportsBluetoothVariableLatency(bool* supports __unused) override {
+int32_t DeviceHalAidl::supportsBluetoothVariableLatency(bool* supports __unused) {
+    TIME_CHECK();
     ALOGE("%s not implemented yet", __func__);
     return INVALID_OPERATION;
 }
+
+} // namespace android
