@@ -1392,6 +1392,11 @@ void Camera3OutputStream::onMinDurationChanged(nsecs_t duration, bool fixedFps) 
     mFixedFps = fixedFps;
 }
 
+void Camera3OutputStream::setStreamUseCase(int64_t streamUseCase) {
+    Mutex::Autolock l(mLock);
+    camera_stream::use_case = streamUseCase;
+}
+
 void Camera3OutputStream::returnPrefetchedBuffersLocked() {
     std::vector<Surface::BatchBuffer> batchedBuffers;
 
