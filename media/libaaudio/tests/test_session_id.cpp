@@ -16,6 +16,7 @@
 
 // Test AAudio SessionId, which is used to associate Effects with a stream
 
+#include <memory>
 #include <stdio.h>
 #include <unistd.h>
 
@@ -29,7 +30,7 @@ constexpr int kChannelCount = 2;
 // Test AAUDIO_SESSION_ID_NONE default
 static void checkSessionIdNone(aaudio_performance_mode_t perfMode) {
 
-    float *buffer = new float[kNumFrames * kChannelCount];
+    std::unique_ptr<float[]> buffer(new float[kNumFrames * kChannelCount]);
 
     AAudioStreamBuilder *aaudioBuilder = nullptr;
 
@@ -51,12 +52,12 @@ static void checkSessionIdNone(aaudio_performance_mode_t perfMode) {
 
     ASSERT_EQ(AAUDIO_OK, AAudioStream_requestStart(aaudioStream1));
 
-    ASSERT_EQ(kNumFrames, AAudioStream_write(aaudioStream1, buffer, kNumFrames, kNanosPerSecond));
+    ASSERT_EQ(kNumFrames,
+              AAudioStream_write(aaudioStream1, buffer.get(), kNumFrames, kNanosPerSecond));
 
     EXPECT_EQ(AAUDIO_OK, AAudioStream_requestStop(aaudioStream1));
 
     EXPECT_EQ(AAUDIO_OK, AAudioStream_close(aaudioStream1));
-    delete[] buffer;
     AAudioStreamBuilder_delete(aaudioBuilder);
 }
 
@@ -72,7 +73,7 @@ TEST(test_session_id, aaudio_session_id_none_lowlat) {
 static void checkSessionIdAllocate(aaudio_performance_mode_t perfMode,
                                    aaudio_direction_t direction) {
 
-    float *buffer = new float[kNumFrames * kChannelCount];
+    std::unique_ptr<float[]> buffer(new float[kNumFrames * kChannelCount]);
 
     AAudioStreamBuilder *aaudioBuilder = nullptr;
 
@@ -106,10 +107,10 @@ static void checkSessionIdAllocate(aaudio_performance_mode_t perfMode,
 
     if (direction == AAUDIO_DIRECTION_INPUT) {
         ASSERT_EQ(kNumFrames, AAudioStream_read(aaudioStream1,
-                                                buffer, kNumFrames, kNanosPerSecond));
+                                                buffer.get(), kNumFrames, kNanosPerSecond));
     } else {
         ASSERT_EQ(kNumFrames, AAudioStream_write(aaudioStream1,
-                                         buffer, kNumFrames, kNanosPerSecond));
+                                         buffer.get(), kNumFrames, kNanosPerSecond));
     }
 
     EXPECT_EQ(AAUDIO_OK, AAudioStream_requestStop(aaudioStream1));
@@ -135,10 +136,10 @@ static void checkSessionIdAllocate(aaudio_performance_mode_t perfMode,
 
     if (otherDirection == AAUDIO_DIRECTION_INPUT) {
         ASSERT_EQ(kNumFrames, AAudioStream_read(aaudioStream2,
-                                                 buffer, kNumFrames, kNanosPerSecond));
+                                                 buffer.get(), kNumFrames, kNanosPerSecond));
     } else {
         ASSERT_EQ(kNumFrames, AAudioStream_write(aaudioStream2,
-                                                 buffer, kNumFrames, kNanosPerSecond));
+                                                 buffer.get(), kNumFrames, kNanosPerSecond));
     }
 
     EXPECT_EQ(AAUDIO_OK, AAudioStream_requestStop(aaudioStream2));
@@ -147,7 +148,6 @@ static void checkSessionIdAllocate(aaudio_performance_mode_t perfMode,
 
 
     EXPECT_EQ(AAUDIO_OK, AAudioStream_close(aaudioStream1));
-    delete[] buffer;
     AAudioStreamBuilder_delete(aaudioBuilder);
 }
 
