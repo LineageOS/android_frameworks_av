@@ -480,6 +480,15 @@ class CameraDeviceBase : public virtual FrameProducer {
     void setImageDumpMask(int mask) { mImageDumpMask = mask; }
 
     /**
+     * Set stream use case overrides
+     */
+    void setStreamUseCaseOverrides(const std::vector<int64_t>& useCaseOverrides) {
+          mStreamUseCaseOverrides = useCaseOverrides;
+    }
+
+    void clearStreamUseCaseOverrides() {}
+
+    /**
      * The injection camera session to replace the internal camera
      * session.
      */
@@ -493,6 +502,7 @@ class CameraDeviceBase : public virtual FrameProducer {
 
 protected:
     bool mImageDumpMask = 0;
+    std::vector<int64_t> mStreamUseCaseOverrides;
 };
 
 }; // namespace android
