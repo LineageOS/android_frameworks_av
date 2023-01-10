@@ -248,6 +248,7 @@ cc_library_shared {
         "DeviceHalAidl.cpp",
         "DevicesFactoryHalEntry.cpp",
         "DevicesFactoryHalAidl.cpp",
+        "EffectConversionHelperAidl.cpp",
         "EffectBufferHalAidl.cpp",
         "EffectHalAidl.cpp",
         "EffectsFactoryHalAidl.cpp",
