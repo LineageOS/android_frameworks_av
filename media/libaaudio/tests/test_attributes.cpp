@@ -20,6 +20,7 @@
 // "test_aaudio_attributes.cpp". That other file is more current.
 // So these tests could be deleted.
 
+#include <memory>
 #include <stdio.h>
 #include <unistd.h>
 
@@ -40,7 +41,7 @@ static void checkAttributes(aaudio_performance_mode_t perfMode,
                             int privacyMode = DONT_SET,
                             aaudio_direction_t direction = AAUDIO_DIRECTION_OUTPUT) {
 
-    float *buffer = new float[kNumFrames * kChannelCount];
+    std::unique_ptr<float[]> buffer(new float[kNumFrames * kChannelCount]);
 
     AAudioStreamBuilder *aaudioBuilder = nullptr;
     AAudioStream *aaudioStream = nullptr;
@@ -109,16 +110,15 @@ static void checkAttributes(aaudio_performance_mode_t perfMode,
 
     if (direction == AAUDIO_DIRECTION_INPUT) {
         EXPECT_EQ(kNumFrames,
-                  AAudioStream_read(aaudioStream, buffer, kNumFrames, kNanosPerSecond));
+                  AAudioStream_read(aaudioStream, buffer.get(), kNumFrames, kNanosPerSecond));
     } else {
         EXPECT_EQ(kNumFrames,
-                  AAudioStream_write(aaudioStream, buffer, kNumFrames, kNanosPerSecond));
+                  AAudioStream_write(aaudioStream, buffer.get(), kNumFrames, kNanosPerSecond));
     }
 
     EXPECT_EQ(AAUDIO_OK, AAudioStream_requestStop(aaudioStream));
 
     EXPECT_EQ(AAUDIO_OK, AAudioStream_close(aaudioStream));
-    delete[] buffer;
 }
 
 static const aaudio_usage_t sUsages[] = {
