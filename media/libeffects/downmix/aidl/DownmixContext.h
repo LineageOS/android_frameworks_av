@@ -22,9 +22,6 @@
 
 namespace aidl::android::hardware::audio::effect {
 
-using media::audio::common::AudioChannelLayout;
-using media::audio::common::AudioDeviceDescription;
-
 enum DownmixState {
     DOWNMIX_STATE_UNINITIALIZED,
     DOWNMIX_STATE_INITIALIZED,
@@ -45,34 +42,25 @@ class DownmixContext final : public EffectContext {
     }
     Downmix::Type getDmType() const { return mType; }
 
-    RetCode setVolumeStereo(const Parameter::VolumeStereo& volumeStereo) override {
-        // FIXME change volume
-        mVolumeStereo = volumeStereo;
-        return RetCode::SUCCESS;
-    }
-    Parameter::VolumeStereo getVolumeStereo() override { return mVolumeStereo; }
-
-    RetCode setOutputDevice(const AudioDeviceDescription& device) override {
+    RetCode setOutputDevice(
+            const std::vector<::aidl::android::media::audio::common::AudioDeviceDescription>&
+                    device) override {
         // FIXME change type if playing on headset vs speaker
         mOutputDevice = device;
         return RetCode::SUCCESS;
     }
-    AudioDeviceDescription getOutputDevice() { return mOutputDevice; }
 
     IEffect::Status lvmProcess(float* in, float* out, int samples);
 
   private:
     DownmixState mState;
     Downmix::Type mType;
-    AudioChannelLayout mChMask;
+    ::aidl::android::media::audio::common::AudioChannelLayout mChMask;
     ::android::audio_utils::channels::ChannelMix mChannelMix;
 
     // Common Params
-    AudioDeviceDescription mOutputDevice;
-    Parameter::VolumeStereo mVolumeStereo;
-
     void init_params(const Parameter::Common& common);
-    bool isChannelMaskValid(AudioChannelLayout channelMask);
+    bool isChannelMaskValid(::aidl::android::media::audio::common::AudioChannelLayout channelMask);
 };
 
 }  // namespace aidl::android::hardware::audio::effect
