@@ -70,6 +70,9 @@ public:
     }
 
     virtual status_t writeToParcelable(MicrophoneInfoData* parcelable) const {
+#if defined(BACKEND_NDK)
+        using ::aidl::android::convertReinterpret;
+#endif
         parcelable->deviceId = mDeviceId;
         parcelable->portId = mPortId;
         parcelable->type = VALUE_OR_RETURN_STATUS(convertReinterpret<int32_t>(mType));
@@ -98,6 +101,9 @@ public:
     }
 
     virtual status_t readFromParcelable(const MicrophoneInfoData& parcelable) {
+#if defined(BACKEND_NDK)
+        using ::aidl::android::convertReinterpret;
+#endif
         mDeviceId = parcelable.deviceId;
         mPortId = parcelable.portId;
         mType = VALUE_OR_RETURN_STATUS(convertReinterpret<uint32_t>(parcelable.type));
@@ -207,6 +213,10 @@ private:
     float mMinSpl;
     int32_t mDirectionality;
 };
+
+#if defined(BACKEND_NDK)
+using ::aidl::ConversionResult;
+#endif
 
 // Conversion routines, according to AidlConversion.h conventions.
 inline ConversionResult<MicrophoneInfo>
