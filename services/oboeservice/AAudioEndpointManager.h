@@ -61,7 +61,7 @@ public:
     android::sp<AAudioServiceEndpoint> openEndpoint(android::AAudioService &audioService,
                                         const aaudio::AAudioStreamRequest &request);
 
-    void closeEndpoint(android::sp<AAudioServiceEndpoint> serviceEndpoint);
+    void closeEndpoint(const android::sp<AAudioServiceEndpoint>& serviceEndpoint);
 
 private:
     android::sp<AAudioServiceEndpoint> openExclusiveEndpoint(android::AAudioService &aaudioService,
@@ -79,8 +79,8 @@ private:
             const AAudioStreamConfiguration& configuration)
             REQUIRES(mSharedLock);
 
-    void closeExclusiveEndpoint(android::sp<AAudioServiceEndpoint> serviceEndpoint);
-    void closeSharedEndpoint(android::sp<AAudioServiceEndpoint> serviceEndpoint);
+    void closeExclusiveEndpoint(const android::sp<AAudioServiceEndpoint>& serviceEndpoint);
+    void closeSharedEndpoint(const android::sp<AAudioServiceEndpoint>& serviceEndpoint);
 
     // Use separate locks because opening a Shared endpoint requires opening an Exclusive one.
     // That could cause a recursive lock.
