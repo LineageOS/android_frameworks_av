@@ -106,16 +106,10 @@ class DeviceHalInterface : public RefBase
     virtual status_t releaseAudioPatch(audio_patch_handle_t patch) = 0;
 
     // Fills the list of supported attributes for a given audio port.
-    virtual status_t getAudioPort(struct audio_port* port) {
-        ALOGE("%s override me port %p", __func__, port);
-        return OK;
-    }
+    virtual status_t getAudioPort(struct audio_port* port) = 0;
 
     // Fills the list of supported attributes for a given audio port.
-    virtual status_t getAudioPort(struct audio_port_v7 *port) {
-        ALOGE("%s override me port %p", __func__, port);
-        return OK;
-    }
+    virtual status_t getAudioPort(struct audio_port_v7 *port) = 0;
 
     // Set audio port configuration.
     virtual status_t setAudioPortConfig(const struct audio_port_config *config) = 0;

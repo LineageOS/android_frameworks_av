@@ -283,7 +283,7 @@ void TimeCheck::TimeCheckHandler::onTimeout(TimerThread::Handle timerHandle) con
 }
 
 // Automatically create a TimeCheck class for a class and method.
-// This is used for Audio HIDL support.
+// This is used for Audio HAL support.
 mediautils::TimeCheck makeTimeCheckStatsForClassMethod(
         std::string_view className, std::string_view methodName) {
     std::shared_ptr<MethodStatistics<std::string>> statistics =
