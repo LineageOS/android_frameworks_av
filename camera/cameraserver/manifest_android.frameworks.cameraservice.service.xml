@@ -1,5 +1,5 @@
 <manifest version="1.0" type="framework">
-    <hal>
+    <hal format="hidl" max-level="7">
         <name>android.frameworks.cameraservice.service</name>
         <transport>hwbinder</transport>
         <version>2.2</version>
