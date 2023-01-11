@@ -70,7 +70,7 @@ struct DrmHalHidl : public IDrm,
                                               DrmPlugin::SecurityLevel level, bool* isSupported);
 
     virtual DrmStatus createPlugin(const uint8_t uuid[16],
-                                  const String8 &appPackageName);
+                                   const String8 &appPackageName);
 
     virtual DrmStatus destroyPlugin();
 
