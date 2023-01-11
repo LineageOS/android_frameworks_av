@@ -16,14 +16,15 @@
 
 #pragma once
 
+#include <aidl/android/hardware/audio/core/BpModule.h>
 #include <media/audiohal/DeviceHalInterface.h>
 #include <media/audiohal/EffectHalInterface.h>
 
-#include <aidl/android/hardware/audio/core/BpModule.h>
+#include "ConversionHelperAidl.h"
 
 namespace android {
 
-class DeviceHalAidl : public DeviceHalInterface {
+class DeviceHalAidl : public DeviceHalInterface, public ConversionHelperAidl {
   public:
     // Sets the value of 'devices' to a bitmask of 1 or more values of audio_devices_t.
     status_t getSupportedDevices(uint32_t *devices) override;
@@ -86,6 +87,12 @@ class DeviceHalAidl : public DeviceHalInterface {
     // Releases an audio patch.
     status_t releaseAudioPatch(audio_patch_handle_t patch) override;
 
+    // Fills the list of supported attributes for a given audio port.
+    status_t getAudioPort(struct audio_port* port) override;
+
+    // Fills the list of supported attributes for a given audio port.
+    status_t getAudioPort(struct audio_port_v7 *port) override;
+
     // Set audio port configuration.
     status_t setAudioPortConfig(const struct audio_port_config* config) override;
 
@@ -111,8 +118,10 @@ class DeviceHalAidl : public DeviceHalInterface {
     int32_t supportsBluetoothVariableLatency(bool* supports __unused) override;
 
   private:
-    friend class DevicesFactoryHalAidl;
-    const std::shared_ptr<::aidl::android::hardware::audio::core::IModule> mCore;
+    friend class sp<DeviceHalAidl>;
+
+    const std::shared_ptr<::aidl::android::hardware::audio::core::IModule> mModule;
+    // FIXME: Remove these after implementing calls into the HAL.
     float mMasterVolume = 0.0f;
     float mVoiceVolume = 0.0f;
     bool mMasterMute = false;
@@ -120,11 +129,10 @@ class DeviceHalAidl : public DeviceHalInterface {
 
     // Can not be constructed directly by clients.
     explicit DeviceHalAidl(
-            const std::shared_ptr<::aidl::android::hardware::audio::core::IModule>& core)
-        : mCore(core) {}
+            const std::shared_ptr<::aidl::android::hardware::audio::core::IModule>& module)
+            : ConversionHelperAidl("DeviceHalAidl"), mModule(module) {}
 
-    // The destructor automatically closes the device.
-    ~DeviceHalAidl();
+    ~DeviceHalAidl() override = default;
 };
 
 } // namespace android

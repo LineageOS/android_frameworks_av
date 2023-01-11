@@ -46,9 +46,6 @@ namespace android {
 using namespace ::android::hardware::audio::common::COMMON_TYPES_CPP_VERSION;
 using namespace ::android::hardware::audio::CORE_TYPES_CPP_VERSION;
 
-#define TIME_CHECK() auto timeCheck = \
-        mediautils::makeTimeCheckStatsForClassMethod(getClassName(), __func__)
-
 DeviceHalHidl::DeviceHalHidl(const sp<::android::hardware::audio::CPP_VERSION::IDevice>& device)
         : CoreConversionHelperHidl("DeviceHalHidl"), mDevice(device) {
 }
