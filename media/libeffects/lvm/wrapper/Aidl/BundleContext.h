@@ -57,11 +57,14 @@ class BundleContext final : public EffectContext {
         return mChMask;
     }
     bool isDeviceSupportedBassBoost(
-            const aidl::android::media::audio::common::AudioDeviceDescription& device);
+            const std::vector<aidl::android::media::audio::common::AudioDeviceDescription>&
+                    devices);
     bool isDeviceSupportedVirtualizer(
-            const aidl::android::media::audio::common::AudioDeviceDescription& device);
+            const std::vector<aidl::android::media::audio::common::AudioDeviceDescription>&
+                    devices);
     RetCode setOutputDevice(
-            const aidl::android::media::audio::common::AudioDeviceDescription& device) override;
+            const std::vector<aidl::android::media::audio::common::AudioDeviceDescription>& devices)
+            override;
 
     RetCode setEqualizerPreset(const std::size_t presetIdx);
     int getEqualizerPreset() const { return mCurPresetIdx; }

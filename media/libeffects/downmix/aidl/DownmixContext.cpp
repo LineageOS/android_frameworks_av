@@ -21,6 +21,7 @@
 #include "DownmixContext.h"
 
 using aidl::android::hardware::audio::effect::IEffect;
+using ::aidl::android::media::audio::common::AudioChannelLayout;
 using ::android::hardware::audio::common::getChannelCount;
 
 namespace aidl::android::hardware::audio::effect {
