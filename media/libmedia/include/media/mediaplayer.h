@@ -214,7 +214,8 @@ class MediaPlayer : public BnMediaPlayerClient,
 {
 public:
     explicit MediaPlayer(const android::content::AttributionSourceState& mAttributionSource =
-        android::content::AttributionSourceState());
+        android::content::AttributionSourceState(),
+        audio_session_t sessionId = AUDIO_SESSION_ALLOCATE);
     ~MediaPlayer();
             void            died();
             void            disconnect();
