@@ -1,0 +1,560 @@
+/*
+ * Copyright (C) 2023 The Android Open Source Project
+ *
+ * Licensed under the Apache License, Version 2.0 (the "License");
+ * you may not use this file except in compliance with the License.
+ * You may obtain a copy of the License at
+ *
+ *      http://www.apache.org/licenses/LICENSE-2.0
+ *
+ * Unless required by applicable law or agreed to in writing, software
+ * distributed under the License is distributed on an "AS IS" BASIS,
+ * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+ * See the License for the specific language governing permissions and
+ * limitations under the License.
+ */
+
+#include <cstddef>
+#define LOG_TAG "ReverbContext"
+#include <Utils.h>
+
+#include "ReverbContext.h"
+#include "VectorArithmetic.h"
+#include "math.h"
+
+namespace aidl::android::hardware::audio::effect {
+
+using aidl::android::media::audio::common::AudioDeviceDescription;
+using aidl::android::media::audio::common::AudioDeviceType;
+
+#define GOTO_IF_LVREV_ERROR(status, tag, log)                                     \
+    do {                                                                          \
+        LVREV_ReturnStatus_en temp = (status);                                    \
+        if (temp != LVREV_SUCCESS) {                                              \
+            LOG(ERROR) << __func__ << " return status: " << temp << " " << (log); \
+            goto tag;                                                             \
+        }                                                                         \
+    } while (0)
+
+RetCode ReverbContext::init() {
+    if (isPreset()) {
+        // force reloading preset at first call to process()
+        mPreset = PresetReverb::Presets::NONE;
+        mNextPreset = PresetReverb::Presets::NONE;
+    }
+
+    mVolume.left = kUnitVolume;
+    mVolume.right = kUnitVolume;
+    mPrevVolume.left = kUnitVolume;
+    mPrevVolume.right = kUnitVolume;
+    volumeMode = VOLUME_FLAT;
+
+    mSamplesToExitCount = kDefaultDecayTime * mCommon.input.base.sampleRate / 1000;
+
+    /* Saved strength is used to return the exact strength that was used in the set to the get
+     * because we map the original strength range of 0:1000 to 1:15, and this will avoid
+     * quantisation like effect when returning
+     */
+    mRoomLevel = lvm::kMinLevel;
+    mRoomHfLevel = 0;
+    mEnabled = LVM_FALSE;
+    mDecayTime = kDefaultDecayTime;
+    mDecayHfRatio = kDefaultDamping * 20;
+    mDensity = kDefaultRoomSize * 10;
+    mDiffusion = kDefaultDensity * 10;
+    mLevel = lvm::kMinLevel;
+
+    // allocate lvm reverb instance
+    LVREV_ReturnStatus_en status = LVREV_SUCCESS;
+    {
+        std::lock_guard lg(mMutex);
+        LVREV_InstanceParams_st params = {
+                .MaxBlockSize = lvm::kMaxCallSize,
+                // Max format, could be mono during process
+                .SourceFormat = LVM_STEREO,
+                .NumDelays = LVREV_DELAYLINES_4,
+        };
+        /* Init sets the instance handle */
+        status = LVREV_GetInstanceHandle(&mInstance, &params);
+        GOTO_IF_LVREV_ERROR(status, deinit, "LVREV_GetInstanceHandleFailed");
+
+        // set control
+        LVREV_ControlParams_st controlParams;
+        initControlParameter(controlParams);
+        status = LVREV_SetControlParameters(mInstance, &controlParams);
+        GOTO_IF_LVREV_ERROR(status, deinit, "LVREV_SetControlParametersFailed");
+    }
+
+    return RetCode::SUCCESS;
+
+deinit:
+    deInit();
+    return RetCode::ERROR_EFFECT_LIB_ERROR;
+}
+
+void ReverbContext::deInit() {
+    std::lock_guard lg(mMutex);
+    if (mInstance) {
+        LVREV_FreeInstance(mInstance);
+        mInstance = nullptr;
+    }
+}
+
+RetCode ReverbContext::enable() {
+    if (mEnabled) return RetCode::ERROR_ILLEGAL_PARAMETER;
+    mEnabled = true;
+    mSamplesToExitCount = (mDecayTime * mCommon.input.base.sampleRate) / 1000;
+    // force no volume ramp for first buffer processed after enabling the effect
+    volumeMode = VOLUME_FLAT;
+    return RetCode::SUCCESS;
+}
+
+RetCode ReverbContext::disable() {
+    if (!mEnabled) return RetCode::ERROR_ILLEGAL_PARAMETER;
+    mEnabled = false;
+    return RetCode::SUCCESS;
+}
+
+bool ReverbContext::isAuxiliary() {
+    return (mType == lvm::ReverbEffectType::AUX_ENV || mType == lvm::ReverbEffectType::AUX_PRESET);
+}
+
+bool ReverbContext::isPreset() {
+    return (mType == lvm::ReverbEffectType::AUX_PRESET ||
+            mType == lvm::ReverbEffectType::INSERT_PRESET);
+}
+
+RetCode ReverbContext::setVolumeStereo(const Parameter::VolumeStereo& volume) {
+    if (volumeMode == VOLUME_OFF) {
+        // force no volume ramp for first buffer processed after getting volume control
+        volumeMode = VOLUME_FLAT;
+    }
+    mVolumeStereo = volume;
+    return RetCode::SUCCESS;
+}
+
+RetCode ReverbContext::setPresetReverbPreset(const PresetReverb::Presets& preset) {
+    mNextPreset = preset;
+    return RetCode::SUCCESS;
+}
+
+RetCode ReverbContext::setEnvironmentalReverbRoomLevel(int roomLevel) {
+    if (roomLevel < lvm::kEnvReverbCap.minRoomLevelMb ||
+        roomLevel > lvm::kEnvReverbCap.maxRoomLevelMb) {
+        LOG(ERROR) << __func__ << " invalid roomLevel: " << roomLevel;
+        return RetCode::ERROR_ILLEGAL_PARAMETER;
+    }
+
+    // Update Control Parameter
+    LVREV_ControlParams_st params;
+    {
+        std::lock_guard lg(mMutex);
+        RETURN_VALUE_IF(LVREV_SUCCESS != LVREV_GetControlParameters(mInstance, &params),
+                        RetCode::ERROR_EFFECT_LIB_ERROR, " getControlParamFailed");
+
+        // Sum of room and reverb level controls
+        // needs to subtract max levels for both room level and reverb level
+        int combinedLevel = (roomLevel + mLevel) - lvm::kMaxReverbLevel;
+        params.Level = convertLevel(combinedLevel);
+
+        RETURN_VALUE_IF(LVREV_SUCCESS != LVREV_SetControlParameters(mInstance, &params),
+                        RetCode::ERROR_EFFECT_LIB_ERROR, " setControlParamFailed");
+    }
+    mRoomLevel = roomLevel;
+    return RetCode::SUCCESS;
+}
+
+RetCode ReverbContext::setEnvironmentalReverbRoomHfLevel(int roomHfLevel) {
+    if (roomHfLevel < lvm::kEnvReverbCap.minRoomHfLevelMb ||
+        roomHfLevel > lvm::kEnvReverbCap.maxRoomHfLevelMb) {
+        LOG(ERROR) << __func__ << " invalid roomHfLevel: " << roomHfLevel;
+        return RetCode::ERROR_ILLEGAL_PARAMETER;
+    }
+
+    // Update Control Parameter
+    LVREV_ControlParams_st params;
+    {
+        std::lock_guard lg(mMutex);
+        RETURN_VALUE_IF(LVREV_SUCCESS != LVREV_GetControlParameters(mInstance, &params),
+                        RetCode::ERROR_EFFECT_LIB_ERROR, " getControlParamFailed");
+
+        params.LPF = convertHfLevel(roomHfLevel);
+
+        RETURN_VALUE_IF(LVREV_SUCCESS != LVREV_SetControlParameters(mInstance, &params),
+                        RetCode::ERROR_EFFECT_LIB_ERROR, " setControlParamFailed");
+    }
+    mRoomHfLevel = roomHfLevel;
+    return RetCode::SUCCESS;
+}
+
+RetCode ReverbContext::setEnvironmentalReverbDecayTime(int decayTime) {
+    if (decayTime < 0 || decayTime > lvm::kEnvReverbCap.maxDecayTimeMs) {
+        LOG(ERROR) << __func__ << " invalid decayTime: " << decayTime;
+        return RetCode::ERROR_ILLEGAL_PARAMETER;
+    }
+    int time = decayTime;
+    if (time > lvm::kMaxT60) {
+        time = lvm::kMaxT60;
+    }
+
+    // Update Control Parameter
+    LVREV_ControlParams_st params;
+    {
+        std::lock_guard lg(mMutex);
+        RETURN_VALUE_IF(LVREV_SUCCESS != LVREV_GetControlParameters(mInstance, &params),
+                        RetCode::ERROR_EFFECT_LIB_ERROR, " getControlParamFailed");
+
+        params.T60 = (LVM_UINT16)time;
+        mSamplesToExitCount = (params.T60 * mCommon.input.base.sampleRate) / 1000;
+
+        RETURN_VALUE_IF(LVREV_SUCCESS != LVREV_SetControlParameters(mInstance, &params),
+                        RetCode::ERROR_EFFECT_LIB_ERROR, " setControlParamFailed");
+    }
+    mDecayTime = time;
+    return RetCode::SUCCESS;
+}
+
+RetCode ReverbContext::setEnvironmentalReverbDecayHfRatio(int decayHfRatio) {
+    if (decayHfRatio < lvm::kEnvReverbCap.minDecayHfRatioPm ||
+        decayHfRatio > lvm::kEnvReverbCap.maxDecayHfRatioPm) {
+        LOG(ERROR) << __func__ << " invalid decayHfRatio: " << decayHfRatio;
+        return RetCode::ERROR_ILLEGAL_PARAMETER;
+    }
+
+    // Update Control Parameter
+    LVREV_ControlParams_st params;
+    {
+        std::lock_guard lg(mMutex);
+        RETURN_VALUE_IF(LVREV_SUCCESS != LVREV_GetControlParameters(mInstance, &params),
+                        RetCode::ERROR_EFFECT_LIB_ERROR, " getControlParamFailed");
+
+        params.Damping = (LVM_INT16)(decayHfRatio / 20);
+
+        RETURN_VALUE_IF(LVREV_SUCCESS != LVREV_SetControlParameters(mInstance, &params),
+                        RetCode::ERROR_EFFECT_LIB_ERROR, " setControlParamFailed");
+    }
+    mDecayHfRatio = decayHfRatio;
+    return RetCode::SUCCESS;
+}
+
+RetCode ReverbContext::setEnvironmentalReverbLevel(int level) {
+    if (level < lvm::kEnvReverbCap.minLevelMb || level > lvm::kEnvReverbCap.maxLevelMb) {
+        LOG(ERROR) << __func__ << " invalid level: " << level;
+        return RetCode::ERROR_ILLEGAL_PARAMETER;
+    }
+
+    // Update Control Parameter
+    LVREV_ControlParams_st params;
+    {
+        std::lock_guard lg(mMutex);
+        RETURN_VALUE_IF(LVREV_SUCCESS != LVREV_GetControlParameters(mInstance, &params),
+                        RetCode::ERROR_EFFECT_LIB_ERROR, " getControlParamFailed");
+
+        // Sum of room and reverb level controls
+        // needs to subtract max levels for both room level and level
+        int combinedLevel = (level + mRoomLevel) - lvm::kMaxReverbLevel;
+        params.Level = convertLevel(combinedLevel);
+
+        RETURN_VALUE_IF(LVREV_SUCCESS != LVREV_SetControlParameters(mInstance, &params),
+                        RetCode::ERROR_EFFECT_LIB_ERROR, " setControlParamFailed");
+    }
+    mLevel = level;
+    return RetCode::SUCCESS;
+}
+
+RetCode ReverbContext::setEnvironmentalReverbDelay(int delay) {
+    if (delay < 0 || delay > lvm::kEnvReverbCap.maxDelayMs) {
+        LOG(ERROR) << __func__ << " invalid delay: " << delay;
+        return RetCode::ERROR_ILLEGAL_PARAMETER;
+    }
+    mDelay = delay;
+    return RetCode::SUCCESS;
+}
+
+RetCode ReverbContext::setEnvironmentalReverbDiffusion(int diffusion) {
+    if (diffusion < 0 || diffusion > lvm::kEnvReverbCap.maxDiffusionPm) {
+        LOG(ERROR) << __func__ << " invalid diffusion: " << diffusion;
+        return RetCode::ERROR_ILLEGAL_PARAMETER;
+    }
+
+    // Update Control Parameter
+    LVREV_ControlParams_st params;
+    {
+        std::lock_guard lg(mMutex);
+        RETURN_VALUE_IF(LVREV_SUCCESS != LVREV_GetControlParameters(mInstance, &params),
+                        RetCode::ERROR_EFFECT_LIB_ERROR, " getControlParamFailed");
+
+        params.Density = (LVM_INT16)(diffusion / 10);
+
+        RETURN_VALUE_IF(LVREV_SUCCESS != LVREV_SetControlParameters(mInstance, &params),
+                        RetCode::ERROR_EFFECT_LIB_ERROR, " setControlParamFailed");
+    }
+    mDiffusion = diffusion;
+    return RetCode::SUCCESS;
+}
+
+RetCode ReverbContext::setEnvironmentalReverbDensity(int density) {
+    if (density < 0 || density > lvm::kEnvReverbCap.maxDensityPm) {
+        LOG(ERROR) << __func__ << " invalid density: " << density;
+        return RetCode::ERROR_ILLEGAL_PARAMETER;
+    }
+
+    // Update Control Parameter
+    LVREV_ControlParams_st params;
+    {
+        std::lock_guard lg(mMutex);
+        RETURN_VALUE_IF(LVREV_SUCCESS != LVREV_GetControlParameters(mInstance, &params),
+                        RetCode::ERROR_EFFECT_LIB_ERROR, " getControlParamFailed");
+
+        params.RoomSize = (LVM_INT16)(((density * 99) / 1000) + 1);
+
+        RETURN_VALUE_IF(LVREV_SUCCESS != LVREV_SetControlParameters(mInstance, &params),
+                        RetCode::ERROR_EFFECT_LIB_ERROR, " setControlParamFailed");
+    }
+    mDensity = density;
+    return RetCode::SUCCESS;
+}
+
+RetCode ReverbContext::setEnvironmentalReverbBypass(bool bypass) {
+    mBypass = bypass;
+    return RetCode::SUCCESS;
+}
+
+void ReverbContext::loadPreset() {
+    // TODO: add delay when early reflections are implemented
+    mPreset = mNextPreset;
+
+    if (mPreset != PresetReverb::Presets::NONE) {
+        const t_reverb_settings preset = mReverbPresets[mPreset];
+        setEnvironmentalReverbRoomLevel(preset.roomLevel);
+        setEnvironmentalReverbRoomHfLevel(preset.roomHFLevel);
+        setEnvironmentalReverbDecayTime(preset.decayTime);
+        setEnvironmentalReverbDecayHfRatio(preset.decayHFRatio);
+        setEnvironmentalReverbLevel(preset.reverbLevel);
+        // reverbDelay
+        setEnvironmentalReverbDiffusion(preset.diffusion);
+        setEnvironmentalReverbDensity(preset.density);
+    }
+}
+
+void ReverbContext::initControlParameter(LVREV_ControlParams_st& params) {
+    /* Set the initial process parameters */
+    /* General parameters */
+    params.OperatingMode = LVM_MODE_ON;
+    params.SampleRate = LVM_FS_44100;
+    params.SourceFormat = (::android::hardware::audio::common::getChannelCount(
+                                   mCommon.input.base.channelMask) == 1
+                                   ? LVM_MONO
+                                   : LVM_STEREO);
+
+    if (!isAuxiliary() && params.SourceFormat == LVM_MONO) {
+        params.SourceFormat = LVM_STEREO;
+    }
+
+    /* Reverb parameters */
+    params.Level = kDefaultLevel;
+    params.LPF = kDefaultLPF;
+    params.HPF = kDefaultHPF;
+    params.T60 = kDefaultDecayTime;
+    params.Density = kDefaultDensity;
+    params.Damping = kDefaultDamping;
+    params.RoomSize = kDefaultRoomSize;
+}
+
+/*
+ * Convert level from OpenSL ES format to LVM format
+ *
+ *  @param level : level to be applied
+ */
+
+int ReverbContext::convertLevel(int level) {
+    for (int i = 0; i < kLevelMapping.size(); i++) {
+        if (level <= kLevelMapping[i]) {
+            return i;
+        }
+    }
+    return kDefaultLevel;
+}
+
+/*
+ * Convert level HF from OpenSL ES format to LVM format
+ *
+ * @param hfLevel : level to be applied
+ */
+
+int16_t ReverbContext::convertHfLevel(int hfLevel) {
+    for (auto lpfPair : kLPFMapping) {
+        if (hfLevel <= lpfPair.roomHf) {
+            return lpfPair.lpf;
+        }
+    }
+    return kDefaultLPF;
+}
+
+IEffect::Status ReverbContext::lvmProcess(float* in, float* out, int samples) {
+    IEffect::Status status = {EX_NULL_POINTER, 0, 0};
+    RETURN_VALUE_IF(!in, status, "nullInput");
+    RETURN_VALUE_IF(!out, status, "nullOutput");
+    status = {EX_ILLEGAL_STATE, 0, 0};
+    int64_t inputFrameCount = getCommon().input.frameCount;
+    int64_t outputFrameCount = getCommon().output.frameCount;
+    RETURN_VALUE_IF(inputFrameCount != outputFrameCount, status, "FrameCountMismatch");
+    RETURN_VALUE_IF(0 == getInputFrameSize(), status, "zeroFrameSize");
+
+    LOG(DEBUG) << __func__ << " start processing";
+    std::lock_guard lg(mMutex);
+
+    int channels =
+            ::android::hardware::audio::common::getChannelCount(mCommon.input.base.channelMask);
+    int outChannels =
+            ::android::hardware::audio::common::getChannelCount(mCommon.output.base.channelMask);
+    int frameCount = mCommon.input.frameCount;
+
+    // Reverb only effects the stereo channels in multichannel source.
+    if (channels < 1 || channels > LVM_MAX_CHANNELS) {
+        LOG(ERROR) << __func__ << " process invalid PCM channels " << channels;
+        return status;
+    }
+
+    std::vector<float> inFrames(samples);
+    std::vector<float> outFrames(frameCount * FCC_2);
+
+    if (isPreset() && mNextPreset != mPreset) {
+        loadPreset();
+    }
+
+    if (isAuxiliary()) {
+        inFrames.assign(in, in + samples);
+    } else {
+        // mono input is duplicated
+        if (channels >= FCC_2) {
+            for (int i = 0; i < frameCount; i++) {
+                inFrames[FCC_2 * i] = in[channels * i] * kSendLevel;
+                inFrames[FCC_2 * i + 1] = in[channels * i + 1] * kSendLevel;
+            }
+        } else {
+            for (int i = 0; i < frameCount; i++) {
+                inFrames[FCC_2 * i] = inFrames[FCC_2 * i + 1] = in[i] * kSendLevel;
+            }
+        }
+    }
+
+    if (isPreset() && mPreset == PresetReverb::Presets::NONE) {
+        std::fill(outFrames.begin(), outFrames.end(), 0);  // always stereo here
+    } else {
+        if (!mEnabled && mSamplesToExitCount > 0) {
+            std::fill(outFrames.begin(), outFrames.end(), 0);
+            LOG(VERBOSE) << "Zeroing " << channels << " samples per frame at the end of call ";
+        }
+
+        /* Process the samples, producing a stereo output */
+        LVREV_ReturnStatus_en lvrevStatus =
+                LVREV_Process(mInstance,        /* Instance handle */
+                              inFrames.data(),  /* Input buffer */
+                              outFrames.data(), /* Output buffer */
+                              frameCount);      /* Number of samples to read */
+        if (lvrevStatus != LVREV_SUCCESS) {
+            LOG(ERROR) << __func__ << lvrevStatus;
+            return {EX_UNSUPPORTED_OPERATION, 0, 0};
+        }
+    }
+    // Convert to 16 bits
+    if (isAuxiliary()) {
+        // nothing to do here
+    } else {
+        if (channels >= FCC_2) {
+            for (int i = 0; i < frameCount; i++) {
+                // Mix with dry input
+                outFrames[FCC_2 * i] += in[channels * i];
+                outFrames[FCC_2 * i + 1] += in[channels * i + 1];
+            }
+        } else {
+            for (int i = 0; i < frameCount; i++) {
+                // Mix with dry input
+                outFrames[FCC_2 * i] += in[i];
+                outFrames[FCC_2 * i + 1] += in[i];
+            }
+        }
+
+        // apply volume with ramp if needed
+        if (mVolume != mPrevVolume && volumeMode == VOLUME_RAMP) {
+            float vl = mPrevVolume.left;
+            float incl = (mVolume.left - vl) / frameCount;
+            float vr = mPrevVolume.right;
+            float incr = (mVolume.right - vr) / frameCount;
+
+            for (int i = 0; i < frameCount; i++) {
+                outFrames[FCC_2 * i] *= vl;
+                outFrames[FCC_2 * i + 1] *= vr;
+
+                vl += incl;
+                vr += incr;
+            }
+            mPrevVolume = mVolume;
+        } else if (volumeMode != VOLUME_OFF) {
+            if (mVolume.left != kUnitVolume || mVolume.right != kUnitVolume) {
+                for (int i = 0; i < frameCount; i++) {
+                    outFrames[FCC_2 * i] *= mVolume.left;
+                    outFrames[FCC_2 * i + 1] *= mVolume.right;
+                }
+            }
+            mPrevVolume = mVolume;
+            volumeMode = VOLUME_RAMP;
+        }
+    }
+
+    bool accumulate = false;
+    if (outChannels > 2) {
+        // Accumulate if required
+        if (accumulate) {
+            for (int i = 0; i < frameCount; i++) {
+                out[outChannels * i] += outFrames[FCC_2 * i];
+                out[outChannels * i + 1] += outFrames[FCC_2 * i + 1];
+            }
+        } else {
+            for (int i = 0; i < frameCount; i++) {
+                out[outChannels * i] = outFrames[FCC_2 * i];
+                out[outChannels * i + 1] = outFrames[FCC_2 * i + 1];
+            }
+        }
+        if (!isAuxiliary()) {
+            for (int i = 0; i < frameCount; i++) {
+                // channels and outChannels are expected to be same.
+                for (int j = FCC_2; j < outChannels; j++) {
+                    out[outChannels * i + j] = in[outChannels * i + j];
+                }
+            }
+        }
+    } else {
+        if (accumulate) {
+            if (outChannels == FCC_1) {
+                for (int i = 0; i < frameCount; i++) {
+                    out[i] += ((outFrames[i * FCC_2] + outFrames[i * FCC_2 + 1]) * 0.5f);
+                }
+            } else {
+                for (int i = 0; i < frameCount * FCC_2; i++) {
+                    out[i] += outFrames[i];
+                }
+            }
+        } else {
+            if (outChannels == FCC_1) {
+                From2iToMono_Float(outFrames.data(), out, frameCount);
+            } else {
+                for (int i = 0; i < frameCount * FCC_2; i++) {
+                    out[i] = outFrames[i];
+                }
+            }
+        }
+    }
+
+    LOG(DEBUG) << __func__ << " done processing";
+
+    if (!mEnabled && mSamplesToExitCount > 0) {
+        // signed - unsigned will trigger integer overflow if result becomes negative.
+        mSamplesToExitCount -= samples;
+    }
+
+    return {STATUS_OK, samples, outChannels * frameCount};
+}
+
+}  // namespace aidl::android::hardware::audio::effect

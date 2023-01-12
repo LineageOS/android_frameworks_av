@@ -83,9 +83,8 @@ AAudioServiceStreamBase::~AAudioServiceStreamBase() {
 }
 
 std::string AAudioServiceStreamBase::dumpHeader() {
-    return std::string(
-            "    T   Handle   UId   Port Run State Format Burst Chan Mask     Capacity"
-            " HwFormat HwChan HwRate");
+    return {"    T   Handle   UId   Port Run State Format Burst Chan Mask     Capacity"
+            " HwFormat HwChan HwRate"};
 }
 
 std::string AAudioServiceStreamBase::dump() const {
@@ -477,8 +476,7 @@ void AAudioServiceStreamBase::run() {
                     disconnect_l();
                     break;
                 case REGISTER_AUDIO_THREAD: {
-                    RegisterAudioThreadParam *param =
-                            (RegisterAudioThreadParam *) command->parameter.get();
+                    auto param = (RegisterAudioThreadParam *) command->parameter.get();
                     command->result =
                             param == nullptr ? AAUDIO_ERROR_ILLEGAL_ARGUMENT
                                              : registerAudioThread_l(param->mOwnerPid,
@@ -487,21 +485,20 @@ void AAudioServiceStreamBase::run() {
                 }
                     break;
                 case UNREGISTER_AUDIO_THREAD: {
-                    UnregisterAudioThreadParam *param =
-                            (UnregisterAudioThreadParam *) command->parameter.get();
+                    auto param = (UnregisterAudioThreadParam *) command->parameter.get();
                     command->result =
                             param == nullptr ? AAUDIO_ERROR_ILLEGAL_ARGUMENT
                                              : unregisterAudioThread_l(param->mClientThreadId);
                 }
                     break;
                 case GET_DESCRIPTION: {
-                    GetDescriptionParam *param = (GetDescriptionParam *) command->parameter.get();
+                    auto param = (GetDescriptionParam *) command->parameter.get();
                     command->result = param == nullptr ? AAUDIO_ERROR_ILLEGAL_ARGUMENT
                                                         : getDescription_l(param->mParcelable);
                 }
                     break;
                 case EXIT_STANDBY: {
-                    ExitStandbyParam *param = (ExitStandbyParam *) command->parameter.get();
+                    auto param = (ExitStandbyParam *) command->parameter.get();
                     command->result = param == nullptr ? AAUDIO_ERROR_ILLEGAL_ARGUMENT
                                                        : exitStandby_l(param->mParcelable);
                     standbyTime = AudioClock::getNanoseconds() + IDLE_TIMEOUT_NANOS;

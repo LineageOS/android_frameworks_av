@@ -29,7 +29,7 @@ namespace aaudio {
  */
 class Runnable {
 public:
-    Runnable() {};
+    Runnable() = default;
     virtual ~Runnable() = default;
 
     virtual void run() = 0;

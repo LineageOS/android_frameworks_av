@@ -39,7 +39,7 @@ class AAudioServiceEndpointShared : public AAudioServiceEndpoint {
 public:
     explicit AAudioServiceEndpointShared(AudioStreamInternal *streamInternal);
 
-    virtual ~AAudioServiceEndpointShared() = default;
+    ~AAudioServiceEndpointShared() override = default;
 
     std::string dump() const override;
 
@@ -79,6 +79,6 @@ protected:
     std::atomic<int>         mRunningStreamCount{0};
 };
 
-}
+} // namespace aaudio
 
 #endif //AAUDIO_SERVICE_ENDPOINT_SHARED_H

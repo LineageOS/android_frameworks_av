@@ -33,6 +33,13 @@ struct LogMessage;
 }  // namespace drm
 }  // namespace hardware
 
+enum IDrmFrontend : int32_t {
+    IDRM_UNKNOWN = 0,
+    IDRM_JNI = 1,
+    IDRM_NDK = 2,
+    IDRM_NUPLAYER = 3,
+};
+
 namespace drm = ::android::hardware::drm;
 
 struct AString;
