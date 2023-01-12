@@ -348,6 +348,13 @@ public:
         // Set Camera service watchdog
         virtual status_t setCameraServiceWatchdog(bool enabled) = 0;
 
+        // Set stream use case overrides
+        virtual void setStreamUseCaseOverrides(
+                const std::vector<int64_t>& useCaseOverrides) = 0;
+
+        // Clear stream use case overrides
+        virtual void clearStreamUseCaseOverrides() = 0;
+
         // The injection camera session to replace the internal camera
         // session.
         virtual status_t injectCamera(const String8& injectedCamId,
@@ -502,6 +509,7 @@ public:
         virtual bool canCastToApiClient(apiLevel level) const;
 
         void setImageDumpMask(int /*mask*/) { }
+        void setStreamUseCaseOverrides(const std::vector<int64_t>& /*usecaseOverrides*/) { }
     protected:
         // Initialized in constructor
 
@@ -1216,6 +1224,12 @@ private:
     // Set the camera mute state
     status_t handleSetCameraMute(const Vector<String16>& args);
 
+    // Set the stream use case overrides
+    status_t handleSetStreamUseCaseOverrides(const Vector<String16>& args);
+
+    // Clear the stream use case overrides
+    status_t handleClearStreamUseCaseOverrides();
+
     // Handle 'watch' command as passed through 'cmd'
     status_t handleWatchCommand(const Vector<String16> &args, int inFd, int outFd);
 
@@ -1310,6 +1324,9 @@ private:
 
     // Camera Service watchdog flag
     bool mCameraServiceWatchdogEnabled = true;
+
+    // Current stream use case overrides
+    std::vector<int64_t> mStreamUseCaseOverrides;
 
     /**
      * A listener class that implements the IBinder::DeathRecipient interface

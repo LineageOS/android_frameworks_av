@@ -2043,6 +2043,7 @@ Status CameraService::connectHelper(const sp<CALLBACK>& cameraCb, const String8&
         }
 
         client->setImageDumpMask(mImageDumpMask);
+        client->setStreamUseCaseOverrides(mStreamUseCaseOverrides);
     } // lock is destroyed, allow further connect calls
 
     // Important: release the mutex here so the client can call back into the service from its
@@ -4419,6 +4420,13 @@ status_t CameraService::dump(int fd, const Vector<String16>& args) {
     String8 activeClientString = mActiveClientManager.toString();
     dprintf(fd, "Active Camera Clients:\n%s", activeClientString.string());
     dprintf(fd, "Allowed user IDs: %s\n", toString(mAllowedUsers).string());
+    if (mStreamUseCaseOverrides.size() > 0) {
+        dprintf(fd, "Active stream use case overrides:");
+        for (int64_t useCaseOverride : mStreamUseCaseOverrides) {
+            dprintf(fd, " %" PRId64, useCaseOverride);
+        }
+        dprintf(fd, "\n");
+    }
 
     dumpEventLog(fd);
 
@@ -4910,6 +4918,10 @@ status_t CameraService::shellCommand(int in, int out, int err, const Vector<Stri
         return handleGetImageDumpMask(out);
     } else if (args.size() >= 2 && args[0] == String16("set-camera-mute")) {
         return handleSetCameraMute(args);
+    } else if (args.size() >= 2 && args[0] == String16("set-stream-use-case-override")) {
+        return handleSetStreamUseCaseOverrides(args);
+    } else if (args.size() >= 1 && args[0] == String16("clear-stream-use-case-override")) {
+        return handleClearStreamUseCaseOverrides();
     } else if (args.size() >= 2 && args[0] == String16("watch")) {
         return handleWatchCommand(args, in, out);
     } else if (args.size() >= 2 && args[0] == String16("set-watchdog")) {
@@ -5078,6 +5090,43 @@ status_t CameraService::handleSetCameraMute(const Vector<String16>& args) {
             }
         }
     }
+
+    return OK;
+}
+
+status_t CameraService::handleSetStreamUseCaseOverrides(const Vector<String16>& args) {
+    std::vector<int64_t> useCasesOverride;
+    for (size_t i = 1; i < args.size(); i++) {
+        int64_t useCase = ANDROID_SCALER_AVAILABLE_STREAM_USE_CASES_DEFAULT;
+        String8 arg8 = String8(args[i]);
+        if (arg8 == "DEFAULT") {
+            useCase = ANDROID_SCALER_AVAILABLE_STREAM_USE_CASES_DEFAULT;
+        } else if (arg8 == "PREVIEW") {
+            useCase = ANDROID_SCALER_AVAILABLE_STREAM_USE_CASES_PREVIEW;
+        } else if (arg8 == "STILL_CAPTURE") {
+            useCase = ANDROID_SCALER_AVAILABLE_STREAM_USE_CASES_STILL_CAPTURE;
+        } else if (arg8 == "VIDEO_RECORD") {
+            useCase = ANDROID_SCALER_AVAILABLE_STREAM_USE_CASES_VIDEO_RECORD;
+        } else if (arg8 == "PREVIEW_VIDEO_STILL") {
+            useCase = ANDROID_SCALER_AVAILABLE_STREAM_USE_CASES_PREVIEW_VIDEO_STILL;
+        } else if (arg8 == "VIDEO_CALL") {
+            useCase = ANDROID_SCALER_AVAILABLE_STREAM_USE_CASES_VIDEO_CALL;
+        } else {
+            ALOGE("%s: Invalid stream use case %s", __FUNCTION__, String8(args[i]).c_str());
+            return BAD_VALUE;
+        }
+        useCasesOverride.push_back(useCase);
+    }
+
+    Mutex::Autolock lock(mServiceLock);
+    mStreamUseCaseOverrides = std::move(useCasesOverride);
+
+    return OK;
+}
+
+status_t CameraService::handleClearStreamUseCaseOverrides() {
+    Mutex::Autolock lock(mServiceLock);
+    mStreamUseCaseOverrides.clear();
 
     return OK;
 }
@@ -5436,6 +5485,15 @@ status_t CameraService::printHelp(int out) {
         "      Valid values 0=OFF, 1=ON for JPEG\n"
         "  get-image-dump-mask returns the current image-dump-mask value\n"
         "  set-camera-mute <0/1> enable or disable camera muting\n"
+        "  set-stream-use-case-override <usecase1> <usecase2> ... override stream use cases\n"
+        "      Use cases applied in descending resolutions. So usecase1 is assigned to the\n"
+        "      largest resolution, usecase2 is assigned to the 2nd largest resolution, and so\n"
+        "      on. In case the number of usecases is smaller than the number of streams, the\n"
+        "      last use case is assigned to all the remaining streams. In case of multiple\n"
+        "      streams with the same resolution, the tie-breaker is (JPEG, RAW, YUV, and PRIV)\n"
+        "      Valid values are (case sensitive): DEFAULT, PREVIEW, STILL_CAPTURE, VIDEO_RECORD,\n"
+        "      PREVIEW_VIDEO_STILL, VIDEO_CALL\n"
+        "  clear-stream-use-case-override clear the stream use case override\n"
         "  watch <start|stop|dump|print|clear> manages tag monitoring in connected clients\n"
         "  help print this message\n");
 }
