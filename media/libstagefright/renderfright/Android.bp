@@ -32,6 +32,7 @@ cc_defaults {
         "libEGL",
         "libGLESv1_CM",
         "libGLESv2",
+        "libvulkan",
         "liblog",
         "libnativewindow",
         "libprocessgroup",
