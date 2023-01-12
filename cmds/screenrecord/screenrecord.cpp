@@ -13,6 +13,9 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
+#include <algorithm>
+#include <string_view>
+#include <type_traits>
 
 #include <assert.h>
 #include <ctype.h>
@@ -100,7 +103,6 @@ static const uint32_t kFallbackWidth = 1280;        // 720p
 static const uint32_t kFallbackHeight = 720;
 static const char* kMimeTypeAvc = "video/avc";
 static const char* kMimeTypeApplicationOctetstream = "application/octet-stream";
-static const char* kWinscopeMagicString = "#VV1NSC0PET1ME!#";
 
 // Command-line parameters.
 static bool gVerbose = false;           // chatty on stdout
@@ -354,14 +356,15 @@ static status_t prepareVirtualDisplay(
 }
 
 /*
- * Writes an unsigned integer byte-by-byte in little endian order regardless
+ * Writes an unsigned/signed integer byte-by-byte in little endian order regardless
  * of the platform endianness.
  */
-template <typename UINT>
-static void writeValueLE(UINT value, uint8_t* buffer) {
-    for (int i = 0; i < sizeof(UINT); ++i) {
-        buffer[i] = static_cast<uint8_t>(value);
-        value >>= 8;
+template <typename T>
+static void writeValueLE(T value, uint8_t* buffer) {
+    std::remove_const_t<T> temp = value;
+    for (int i = 0; i < sizeof(T); ++i) {
+        buffer[i] = static_cast<std::uint8_t>(temp & 0xff);
+        temp >>= 8;
     }
 }
 
@@ -377,16 +380,18 @@ static void writeValueLE(UINT value, uint8_t* buffer) {
  * - for every frame its presentation time relative to the elapsed realtime clock in microseconds
  *   (as little endian uint64).
  */
-static status_t writeWinscopeMetadata(const Vector<int64_t>& timestamps,
+static status_t writeWinscopeMetadataLegacy(const Vector<int64_t>& timestamps,
         const ssize_t metaTrackIdx, AMediaMuxer *muxer) {
-    ALOGV("Writing metadata");
+    static constexpr auto kWinscopeMagicStringLegacy = "#VV1NSC0PET1ME!#";
+
+    ALOGV("Writing winscope metadata legacy");
     int64_t systemTimeToElapsedTimeOffsetMicros = (android::elapsedRealtimeNano()
         - systemTime(SYSTEM_TIME_MONOTONIC)) / 1000;
     sp<ABuffer> buffer = new ABuffer(timestamps.size() * sizeof(int64_t)
-        + sizeof(uint32_t) + strlen(kWinscopeMagicString));
+        + sizeof(uint32_t) + strlen(kWinscopeMagicStringLegacy));
     uint8_t* pos = buffer->data();
-    strcpy(reinterpret_cast<char*>(pos), kWinscopeMagicString);
-    pos += strlen(kWinscopeMagicString);
+    strcpy(reinterpret_cast<char*>(pos), kWinscopeMagicStringLegacy);
+    pos += strlen(kWinscopeMagicStringLegacy);
     writeValueLE<uint32_t>(timestamps.size(), pos);
     pos += sizeof(uint32_t);
     for (size_t idx = 0; idx < timestamps.size(); ++idx) {
@@ -395,10 +400,79 @@ static status_t writeWinscopeMetadata(const Vector<int64_t>& timestamps,
         pos += sizeof(uint64_t);
     }
     AMediaCodecBufferInfo bufferInfo = {
-        0,
+        0 /* offset */,
         static_cast<int32_t>(buffer->size()),
-        timestamps[0],
-        0
+        timestamps[0] /* presentationTimeUs */,
+        0 /* flags */
+    };
+    return AMediaMuxer_writeSampleData(muxer, metaTrackIdx, buffer->data(), &bufferInfo);
+}
+
+/*
+ * Saves metadata needed by Winscope to synchronize the screen recording playback with other traces.
+ *
+ * The metadata (version 2) is written as a binary array with the following format:
+ * - winscope magic string (#VV1NSC0PET1ME2#, 16B).
+ * - the metadata version number (4B little endian).
+ * - Realtime-to-elapsed time offset in nanoseconds (8B little endian).
+ * - the recorded frames count (8B little endian)
+ * - for each recorded frame:
+ *     - System time in elapsed clock timebase in nanoseconds (8B little endian).
+ *
+ *
+ * Metadata version 2 changes
+ *
+ * Use elapsed time for compatibility with other UI traces (most of them):
+ * - Realtime-to-elapsed time offset (instead of realtime-to-monotonic)
+ * - Frame timestamps in elapsed clock timebase (instead of monotonic)
+ */
+static status_t writeWinscopeMetadata(const Vector<std::int64_t>& timestampsMonotonicUs,
+        const ssize_t metaTrackIdx, AMediaMuxer *muxer) {
+    ALOGV("Writing winscope metadata");
+
+    static constexpr auto kWinscopeMagicString = std::string_view {"#VV1NSC0PET1ME2#"};
+    static constexpr std::uint32_t metadataVersion = 2;
+
+    const auto elapsedTimeNs = android::elapsedRealtimeNano();
+    const std::int64_t elapsedToMonotonicTimeOffsetNs =
+            elapsedTimeNs - systemTime(SYSTEM_TIME_MONOTONIC);
+    const std::int64_t realToElapsedTimeOffsetNs =
+            systemTime(SYSTEM_TIME_REALTIME) - elapsedTimeNs;
+    const std::uint32_t framesCount = static_cast<std::uint32_t>(timestampsMonotonicUs.size());
+
+    sp<ABuffer> buffer = new ABuffer(
+        kWinscopeMagicString.size() +
+        sizeof(decltype(metadataVersion)) +
+        sizeof(decltype(realToElapsedTimeOffsetNs)) +
+        sizeof(decltype(framesCount)) +
+        framesCount * sizeof(std::uint64_t)
+    );
+    std::uint8_t* pos = buffer->data();
+
+    std::copy(kWinscopeMagicString.cbegin(), kWinscopeMagicString.cend(), pos);
+    pos += kWinscopeMagicString.size();
+
+    writeValueLE(metadataVersion, pos);
+    pos += sizeof(decltype(metadataVersion));
+
+    writeValueLE(realToElapsedTimeOffsetNs, pos);
+    pos += sizeof(decltype(realToElapsedTimeOffsetNs));
+
+    writeValueLE(framesCount, pos);
+    pos += sizeof(decltype(framesCount));
+
+    for (const auto timestampMonotonicUs : timestampsMonotonicUs) {
+        const auto timestampElapsedNs =
+                elapsedToMonotonicTimeOffsetNs + timestampMonotonicUs * 1000;
+        writeValueLE<std::uint64_t>(timestampElapsedNs, pos);
+        pos += sizeof(std::uint64_t);
+    }
+
+    AMediaCodecBufferInfo bufferInfo = {
+        0 /* offset */,
+        static_cast<std::int32_t>(buffer->size()),
+        timestampsMonotonicUs[0] /* presentationTimeUs */,
+        0 /* flags */
     };
     return AMediaMuxer_writeSampleData(muxer, metaTrackIdx, buffer->data(), &bufferInfo);
 }
@@ -418,11 +492,12 @@ static status_t runEncoder(const sp<MediaCodec>& encoder,
     static int kTimeout = 250000;   // be responsive on signal
     status_t err;
     ssize_t trackIdx = -1;
+    ssize_t metaLegacyTrackIdx = -1;
     ssize_t metaTrackIdx = -1;
     uint32_t debugNumFrames = 0;
     int64_t startWhenNsec = systemTime(CLOCK_MONOTONIC);
     int64_t endWhenNsec = startWhenNsec + seconds_to_nanoseconds(gTimeLimitSec);
-    Vector<int64_t> timestamps;
+    Vector<int64_t> timestampsMonotonicUs;
     bool firstFrame = true;
 
     assert((rawFp == NULL && muxer != NULL) || (rawFp != NULL && muxer == NULL));
@@ -520,9 +595,9 @@ static status_t runEncoder(const sp<MediaCodec>& encoder,
                     sp<ABuffer> buffer = new ABuffer(
                             buffers[bufIndex]->data(), buffers[bufIndex]->size());
                     AMediaCodecBufferInfo bufferInfo = {
-                        0,
+                        0 /* offset */,
                         static_cast<int32_t>(buffer->size()),
-                        ptsUsec,
+                        ptsUsec /* presentationTimeUs */,
                         flags
                     };
                     err = AMediaMuxer_writeSampleData(muxer, trackIdx, buffer->data(), &bufferInfo);
@@ -532,7 +607,7 @@ static status_t runEncoder(const sp<MediaCodec>& encoder,
                         return err;
                     }
                     if (gOutputFormat == FORMAT_MP4) {
-                        timestamps.add(ptsUsec);
+                        timestampsMonotonicUs.add(ptsUsec);
                     }
                 }
                 debugNumFrames++;
@@ -565,6 +640,7 @@ static status_t runEncoder(const sp<MediaCodec>& encoder,
                     if (gOutputFormat == FORMAT_MP4) {
                         AMediaFormat *metaFormat = AMediaFormat_new();
                         AMediaFormat_setString(metaFormat, AMEDIAFORMAT_KEY_MIME, kMimeTypeApplicationOctetstream);
+                        metaLegacyTrackIdx = AMediaMuxer_addTrack(muxer, metaFormat);
                         metaTrackIdx = AMediaMuxer_addTrack(muxer, metaFormat);
                         AMediaFormat_delete(metaFormat);
                     }
@@ -604,10 +680,16 @@ static status_t runEncoder(const sp<MediaCodec>& encoder,
                         systemTime(CLOCK_MONOTONIC) - startWhenNsec));
         fflush(stdout);
     }
-    if (metaTrackIdx >= 0 && !timestamps.isEmpty()) {
-        err = writeWinscopeMetadata(timestamps, metaTrackIdx, muxer);
+    if (metaLegacyTrackIdx >= 0 && metaTrackIdx >= 0 && !timestampsMonotonicUs.isEmpty()) {
+        err = writeWinscopeMetadataLegacy(timestampsMonotonicUs, metaLegacyTrackIdx, muxer);
         if (err != NO_ERROR) {
-            fprintf(stderr, "Failed writing metadata to muxer (err=%d)\n", err);
+            fprintf(stderr, "Failed writing legacy winscope metadata to muxer (err=%d)\n", err);
+            return err;
+        }
+
+        err = writeWinscopeMetadata(timestampsMonotonicUs, metaTrackIdx, muxer);
+        if (err != NO_ERROR) {
+            fprintf(stderr, "Failed writing winscope metadata to muxer (err=%d)\n", err);
             return err;
         }
     }

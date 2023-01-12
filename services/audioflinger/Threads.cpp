@@ -8368,8 +8368,6 @@ sp<AudioFlinger::RecordThread::RecordTrack> AudioFlinger::RecordThread::createRe
     audio_input_flags_t inputFlags = mInput->flags;
     audio_input_flags_t requestedFlags = *flags;
     uint32_t sampleRate;
-    AttributionSourceState checkedAttributionSource = AudioFlinger::checkAttributionSourcePackage(
-            attributionSource);
 
     lStatus = initCheck();
     if (lStatus != NO_ERROR) {
@@ -8384,7 +8382,7 @@ sp<AudioFlinger::RecordThread::RecordTrack> AudioFlinger::RecordThread::createRe
     }
 
     if (maxSharedAudioHistoryMs != 0) {
-        if (!captureHotwordAllowed(checkedAttributionSource)) {
+        if (!captureHotwordAllowed(attributionSource)) {
             lStatus = PERMISSION_DENIED;
             goto Exit;
         }
@@ -8505,16 +8503,16 @@ sp<AudioFlinger::RecordThread::RecordTrack> AudioFlinger::RecordThread::createRe
         Mutex::Autolock _l(mLock);
         int32_t startFrames = -1;
         if (!mSharedAudioPackageName.empty()
-                && mSharedAudioPackageName == checkedAttributionSource.packageName
+                && mSharedAudioPackageName == attributionSource.packageName
                 && mSharedAudioSessionId == sessionId
-                && captureHotwordAllowed(checkedAttributionSource)) {
+                && captureHotwordAllowed(attributionSource)) {
             startFrames = mSharedAudioStartFrames;
         }
 
         track = new RecordTrack(this, client, attr, sampleRate,
                       format, channelMask, frameCount,
                       nullptr /* buffer */, (size_t)0 /* bufferSize */, sessionId, creatorPid,
-                      checkedAttributionSource, *flags, TrackBase::TYPE_DEFAULT, portId,
+                      attributionSource, *flags, TrackBase::TYPE_DEFAULT, portId,
                       startFrames);
 
         lStatus = track->initCheck();
@@ -8814,21 +8812,9 @@ void AudioFlinger::RecordThread::updateMetadata_l()
         return; // nothing to do
     }
     StreamInHalInterface::SinkMetadata metadata;
+    auto backInserter = std::back_inserter(metadata.tracks);
     for (const sp<RecordTrack> &track : mActiveTracks) {
-        // Do not forward PatchRecord metadata to audio HAL
-        if (track->isPatchTrack()) {
-            continue;
-        }
-        // No track is invalid as this is called after prepareTrack_l in the same critical section
-        record_track_metadata_v7_t trackMetadata;
-        trackMetadata.base = {
-                .source = track->attributes().source,
-                .gain = 1, // capture tracks do not have volumes
-        };
-        trackMetadata.channel_mask = track->channelMask(),
-        strncpy(trackMetadata.tags, track->attributes().tags, AUDIO_ATTRIBUTES_TAGS_MAX_SIZE);
-
-        metadata.tracks.push_back(trackMetadata);
+        track->copyMetadataTo(backInserter);
     }
     mInput->stream->updateSinkMetadata(metadata);
 }
@@ -10284,18 +10270,21 @@ status_t AudioFlinger::MmapThread::checkEffectCompatibility_l(
 
 void AudioFlinger::MmapThread::checkInvalidTracks_l()
 {
+    sp<MmapStreamCallback> callback;
     for (const sp<MmapTrack> &track : mActiveTracks) {
         if (track->isInvalid()) {
-            sp<MmapStreamCallback> callback = mCallback.promote();
-            if (callback != 0) {
-                mLock.unlock();
-                callback->onTearDown(track->portId());
-                mLock.lock();
-            } else if (mNoCallbackWarningCount < kMaxNoCallbackWarnings) {
-                ALOGW("Could not notify MMAP stream tear down: no onTearDown callback!");
+            callback = mCallback.promote();
+            if (callback == nullptr &&  mNoCallbackWarningCount < kMaxNoCallbackWarnings) {
+                ALOGW("Could not notify MMAP stream tear down: no onRoutingChanged callback!");
                 mNoCallbackWarningCount++;
             }
+            break;
         }
+    }
+    if (callback != 0) {
+        mLock.unlock();
+        callback->onRoutingChanged(AUDIO_PORT_HANDLE_NONE);
+        mLock.lock();
     }
 }
 
