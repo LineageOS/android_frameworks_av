@@ -603,7 +603,8 @@ void C2SoftMpeg4Dec::process(
 
         C2PlanarLayout layout = wView.layout();
         size_t dstYStride = layout.planes[C2PlanarLayout::PLANE_Y].rowInc;
-        size_t dstUVStride = layout.planes[C2PlanarLayout::PLANE_U].rowInc;
+        size_t dstUStride = layout.planes[C2PlanarLayout::PLANE_U].rowInc;
+        size_t dstVStride = layout.planes[C2PlanarLayout::PLANE_V].rowInc;
         size_t srcYStride = align(mWidth, 16);
         size_t srcUStride = srcYStride / 2;
         size_t srcVStride = srcYStride / 2;
@@ -613,8 +614,8 @@ void C2SoftMpeg4Dec::process(
         const uint8_t *srcV = (const uint8_t *)srcY + vStride * srcYStride * 5 / 4;
 
         convertYUV420Planar8ToYV12(outputBufferY, outputBufferU, outputBufferV, srcY, srcU, srcV,
-                                   srcYStride, srcUStride, srcVStride, dstYStride, dstUVStride,
-                                   mWidth, mHeight);
+                                   srcYStride, srcUStride, srcVStride, dstYStride, dstUStride,
+                                   dstVStride, mWidth, mHeight);
 
         inPos += inSize - (size_t)tmpInSize;
         finishWork(workIndex, work);

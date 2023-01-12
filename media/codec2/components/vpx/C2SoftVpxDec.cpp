@@ -766,7 +766,8 @@ status_t C2SoftVpxDec::outputBuffer(
     size_t srcVStride = img->stride[VPX_PLANE_V];
     C2PlanarLayout layout = wView.layout();
     size_t dstYStride = layout.planes[C2PlanarLayout::PLANE_Y].rowInc;
-    size_t dstUVStride = layout.planes[C2PlanarLayout::PLANE_U].rowInc;
+    size_t dstUStride = layout.planes[C2PlanarLayout::PLANE_U].rowInc;
+    size_t dstVStride = layout.planes[C2PlanarLayout::PLANE_V].rowInc;
 
     if (img->fmt == VPX_IMG_FMT_I42016) {
         const uint16_t *srcY = (const uint16_t *)img->planes[VPX_PLANE_Y];
@@ -804,10 +805,10 @@ status_t C2SoftVpxDec::outputBuffer(
         } else if (format == HAL_PIXEL_FORMAT_YCBCR_P010) {
             convertYUV420Planar16ToP010((uint16_t *)dstY, (uint16_t *)dstU, srcY, srcU, srcV,
                                         srcYStride / 2, srcUStride / 2, srcVStride / 2,
-                                        dstYStride / 2, dstUVStride / 2, mWidth, mHeight);
+                                        dstYStride / 2, dstUStride / 2, mWidth, mHeight);
         } else {
             convertYUV420Planar16ToYV12(dstY, dstU, dstV, srcY, srcU, srcV, srcYStride / 2,
-                                        srcUStride / 2, srcVStride / 2, dstYStride, dstUVStride,
+                                        srcUStride / 2, srcVStride / 2, dstYStride, dstUStride,
                                         mWidth, mHeight);
         }
     } else {
@@ -816,7 +817,7 @@ status_t C2SoftVpxDec::outputBuffer(
         const uint8_t *srcV = (const uint8_t *)img->planes[VPX_PLANE_V];
 
         convertYUV420Planar8ToYV12(dstY, dstU, dstV, srcY, srcU, srcV, srcYStride, srcUStride,
-                                   srcVStride, dstYStride, dstUVStride, mWidth, mHeight);
+                                   srcVStride, dstYStride, dstVStride, dstVStride, mWidth, mHeight);
     }
     finishWork(((c2_cntr64_t *)img->user_priv)->peekull(), work, std::move(block));
     return OK;
