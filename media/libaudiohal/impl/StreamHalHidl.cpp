@@ -46,9 +46,6 @@ using ReadCommand = ::android::hardware::audio::CORE_TYPES_CPP_VERSION::IStreamI
 using namespace ::android::hardware::audio::common::COMMON_TYPES_CPP_VERSION;
 using namespace ::android::hardware::audio::CORE_TYPES_CPP_VERSION;
 
-#define TIME_CHECK() auto TimeCheck = \
-       mediautils::makeTimeCheckStatsForClassMethod(getClassName(), __func__)
-
 StreamHalHidl::StreamHalHidl(std::string_view className, IStream *stream)
         : CoreConversionHelperHidl(className),
           mStream(stream),
