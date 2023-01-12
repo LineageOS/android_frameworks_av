@@ -240,9 +240,9 @@ MediaBufferHelper* MidiEngine::readBuffer() {
     if ((state == EAS_STATE_STOPPED) || (state == EAS_STATE_ERROR)) {
         return NULL;
     }
-    MediaBufferHelper *buffer;
+    MediaBufferHelper *buffer = nullptr;
     status_t err = mGroup->acquire_buffer(&buffer);
-    if (err != OK) {
+    if (err != OK || buffer == nullptr) {
         ALOGE("readBuffer: no buffer");
         return NULL;
     }
