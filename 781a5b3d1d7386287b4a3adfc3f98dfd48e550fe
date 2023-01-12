@@ -34,6 +34,24 @@
       "parentUuid": "eb8238b3_8ec3fc43",
       "revId": "781a5b3d1d7386287b4a3adfc3f98dfd48e550fe",
       "serverId": "1ec6b3db-b2c1-4fa4-84a2-4c7efe89ba71"
+    },
+    {
+      "unresolved": false,
+      "key": {
+        "uuid": "e5d03331_23a0bef5",
+        "filename": "services/camera/libcameraservice/utils/SessionConfigurationUtils.cpp",
+        "patchSetId": 2
+      },
+      "lineNbr": 401,
+      "author": {
+        "id": 30475
+      },
+      "writtenOn": "2023-01-12T17:37:02Z",
+      "side": 1,
+      "message": "You are right, this chunk was reverted by later commit. Thanks 👍",
+      "parentUuid": "77b30d5f_870eca85",
+      "revId": "781a5b3d1d7386287b4a3adfc3f98dfd48e550fe",
+      "serverId": "1ec6b3db-b2c1-4fa4-84a2-4c7efe89ba71"
     }
   ]
 }
