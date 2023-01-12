@@ -287,32 +287,42 @@ RetCode BundleContext::limitLevel() {
 }
 
 bool BundleContext::isDeviceSupportedBassBoost(
-        const aidl::android::media::audio::common::AudioDeviceDescription& device) {
-    return (device == AudioDeviceDescription{AudioDeviceType::OUT_SPEAKER, ""} ||
-            device == AudioDeviceDescription{AudioDeviceType::OUT_CARKIT,
-                                             AudioDeviceDescription::CONNECTION_BT_SCO} ||
-            device == AudioDeviceDescription{AudioDeviceType::OUT_SPEAKER,
-                                             AudioDeviceDescription::CONNECTION_BT_A2DP});
+        const std::vector<aidl::android::media::audio::common::AudioDeviceDescription>& devices) {
+    for (const auto& device : devices) {
+        if (device != AudioDeviceDescription{AudioDeviceType::OUT_SPEAKER, ""} &&
+            device != AudioDeviceDescription{AudioDeviceType::OUT_CARKIT,
+                                             AudioDeviceDescription::CONNECTION_BT_SCO} &&
+            device != AudioDeviceDescription{AudioDeviceType::OUT_SPEAKER,
+                                             AudioDeviceDescription::CONNECTION_BT_A2DP}) {
+            return false;
+        }
+    }
+    return true;
 }
 
 bool BundleContext::isDeviceSupportedVirtualizer(
-        const aidl::android::media::audio::common::AudioDeviceDescription& device) {
-    return (device == AudioDeviceDescription{AudioDeviceType::OUT_HEADSET,
-                                             AudioDeviceDescription::CONNECTION_ANALOG} ||
-            device == AudioDeviceDescription{AudioDeviceType::OUT_HEADPHONE,
-                                             AudioDeviceDescription::CONNECTION_ANALOG} ||
-            device == AudioDeviceDescription{AudioDeviceType::OUT_HEADPHONE,
-                                             AudioDeviceDescription::CONNECTION_BT_A2DP} ||
-            device == AudioDeviceDescription{AudioDeviceType::OUT_HEADSET,
-                                             AudioDeviceDescription::CONNECTION_USB});
+        const std::vector<aidl::android::media::audio::common::AudioDeviceDescription>& devices) {
+    for (const auto& device : devices) {
+        if (device != AudioDeviceDescription{AudioDeviceType::OUT_HEADSET,
+                                             AudioDeviceDescription::CONNECTION_ANALOG} &&
+            device != AudioDeviceDescription{AudioDeviceType::OUT_HEADPHONE,
+                                             AudioDeviceDescription::CONNECTION_ANALOG} &&
+            device != AudioDeviceDescription{AudioDeviceType::OUT_HEADPHONE,
+                                             AudioDeviceDescription::CONNECTION_BT_A2DP} &&
+            device != AudioDeviceDescription{AudioDeviceType::OUT_HEADSET,
+                                             AudioDeviceDescription::CONNECTION_USB}) {
+            return false;
+        }
+    }
+    return true;
 }
 
 RetCode BundleContext::setOutputDevice(
-        const aidl::android::media::audio::common::AudioDeviceDescription& device) {
-    mOutputDevice = device;
+        const std::vector<aidl::android::media::audio::common::AudioDeviceDescription>& devices) {
+    mOutputDevice = devices;
     switch (mType) {
         case lvm::BundleEffectType::BASS_BOOST:
-            if (isDeviceSupportedBassBoost(device)) {
+            if (!isDeviceSupportedBassBoost(devices)) {
                 // If a device doesn't support bass boost, the effect must be temporarily disabled.
                 // The effect must still report its original state as this can only be changed by
                 // the start/stop commands.
@@ -330,7 +340,7 @@ RetCode BundleContext::setOutputDevice(
             }
             break;
         case lvm::BundleEffectType::VIRTUALIZER:
-            if (isDeviceSupportedVirtualizer(device)) {
+            if (!isDeviceSupportedVirtualizer(devices)) {
                 if (mEnabled) {
                     disableOperatingMode();
                 }

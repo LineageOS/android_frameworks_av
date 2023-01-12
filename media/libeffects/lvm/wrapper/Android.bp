@@ -129,3 +129,35 @@ cc_library_shared {
         "//hardware/interfaces/audio/aidl/default",
     ],
 }
+
+cc_library_shared {
+    name: "libreverbaidl",
+    srcs: [
+        "Reverb/aidl/ReverbContext.cpp",
+        "Reverb/aidl/EffectReverb.cpp",
+        ":effectCommonFile",
+    ],
+    static_libs: ["libreverb"],
+    defaults: [
+        "aidlaudioservice_defaults",
+        "latest_android_hardware_audio_effect_ndk_shared",
+        "latest_android_media_audio_common_types_ndk_shared",
+    ],
+    local_include_dirs: ["Reverb/aidl"],
+    header_libs: [
+        "libaudioeffects",
+        "libhardware_headers",
+    ],
+    shared_libs: [
+        "libbase",
+        "libaudioutils",
+        "libcutils",
+        "liblog",
+    ],
+    cflags: [
+        "-Wthread-safety",
+    ],
+    visibility: [
+        "//hardware/interfaces/audio/aidl/default",
+    ],
+}

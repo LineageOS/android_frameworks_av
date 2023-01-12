@@ -62,7 +62,7 @@ class AAudioServiceStreamBase
 public:
     explicit AAudioServiceStreamBase(android::AAudioService &aAudioService);
 
-    virtual ~AAudioServiceStreamBase();
+    ~AAudioServiceStreamBase() override;
 
     enum {
         ILLEGAL_THREAD_ID = 0
@@ -254,7 +254,7 @@ protected:
         RegisterAudioThreadParam(pid_t ownerPid, pid_t clientThreadId, int priority)
                 : AAudioCommandParam(), mOwnerPid(ownerPid),
                   mClientThreadId(clientThreadId), mPriority(priority) { }
-        ~RegisterAudioThreadParam() = default;
+        ~RegisterAudioThreadParam() override = default;
 
         pid_t mOwnerPid;
         pid_t mClientThreadId;
@@ -265,9 +265,9 @@ protected:
 
     class UnregisterAudioThreadParam : public AAudioCommandParam {
     public:
-        UnregisterAudioThreadParam(pid_t clientThreadId)
+        explicit UnregisterAudioThreadParam(pid_t clientThreadId)
                 : AAudioCommandParam(), mClientThreadId(clientThreadId) { }
-        ~UnregisterAudioThreadParam() = default;
+        ~UnregisterAudioThreadParam() override = default;
 
         pid_t mClientThreadId;
     };
@@ -275,9 +275,9 @@ protected:
 
     class GetDescriptionParam : public AAudioCommandParam {
     public:
-        GetDescriptionParam(AudioEndpointParcelable* parcelable)
+        explicit GetDescriptionParam(AudioEndpointParcelable* parcelable)
                 : AAudioCommandParam(), mParcelable(parcelable) { }
-        ~GetDescriptionParam() = default;
+        ~GetDescriptionParam() override = default;
 
         AudioEndpointParcelable* mParcelable;
     };
@@ -324,9 +324,9 @@ protected:
     }
     class ExitStandbyParam : public AAudioCommandParam {
     public:
-        ExitStandbyParam(AudioEndpointParcelable* parcelable)
+        explicit ExitStandbyParam(AudioEndpointParcelable* parcelable)
                 : AAudioCommandParam(), mParcelable(parcelable) { }
-        ~ExitStandbyParam() = default;
+        ~ExitStandbyParam() override = default;
 
         AudioEndpointParcelable* mParcelable;
     };

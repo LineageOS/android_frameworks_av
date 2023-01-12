@@ -45,7 +45,7 @@ class AAudioService :
 
 public:
     AAudioService();
-    virtual ~AAudioService() = default;
+    ~AAudioService() override = default;
 
     aaudio::AAudioServiceInterface& asAAudioServiceInterface() {
         return mAdapter;
@@ -53,7 +53,7 @@ public:
 
     static const char* getServiceName() { return AAUDIO_SERVICE_NAME; }
 
-    virtual status_t        dump(int fd, const Vector<String16>& args) override;
+    status_t dump(int fd, const Vector<String16>& args) override;
 
     binder::Status registerClient(const ::android::sp<::aaudio::IAAudioClient>& client) override;
 
@@ -103,7 +103,7 @@ public:
      * This is only called from within the Service.
      * It bypasses the permission checks in closeStream(handle).
      */
-    aaudio_result_t closeStream(sp<aaudio::AAudioServiceStreamBase> serviceStream);
+    aaudio_result_t closeStream(const sp<aaudio::AAudioServiceStreamBase>& serviceStream);
 
 private:
     class Adapter : public aaudio::AAudioBinderAdapter {

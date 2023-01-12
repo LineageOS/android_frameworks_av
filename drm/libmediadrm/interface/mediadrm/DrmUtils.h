@@ -22,6 +22,7 @@
 #include <android/hardware/drm/1.4/IDrmPlugin.h>
 #include <android/hardware/drm/1.4/types.h>
 #include <media/stagefright/MediaErrors.h>
+#include <mediadrm/DrmMetricsLogger.h>
 #include <mediadrm/DrmStatus.h>
 #include <utils/Errors.h>  // for status_t
 #include <utils/Log.h>
@@ -119,7 +120,7 @@ void LogToBuffer(android_LogPriority level, const uint8_t uuid[16], const char *
 
 bool UseDrmService();
 
-sp<IDrm> MakeDrm(status_t *pstatus = nullptr);
+sp<IDrm> MakeDrm(IDrmFrontend frontend = IDRM_JNI, status_t* pstatus = nullptr);
 
 sp<ICrypto> MakeCrypto(status_t *pstatus = nullptr);
 

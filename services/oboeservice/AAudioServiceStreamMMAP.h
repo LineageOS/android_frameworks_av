@@ -47,7 +47,7 @@ class AAudioServiceStreamMMAP : public AAudioServiceStreamBase {
 public:
     AAudioServiceStreamMMAP(android::AAudioService &aAudioService,
                             bool inService);
-    virtual ~AAudioServiceStreamMMAP() = default;
+    ~AAudioServiceStreamMMAP() override = default;
 
     aaudio_result_t open(const aaudio::AAudioStreamRequest &request) override;
 

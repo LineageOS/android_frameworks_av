@@ -30,7 +30,7 @@ namespace aaudio {
 class AAudioServiceEndpointCapture : public AAudioServiceEndpointShared {
 public:
     explicit AAudioServiceEndpointCapture(android::AAudioService &audioService);
-    virtual ~AAudioServiceEndpointCapture() = default;
+    ~AAudioServiceEndpointCapture() override = default;
 
     aaudio_result_t open(const aaudio::AAudioStreamRequest &request) override;
 

@@ -88,7 +88,7 @@ std::string AAudioServiceEndpoint::dump() const NO_THREAD_SAFETY_ANALYSIS {
 
 // @return true if stream found
 bool AAudioServiceEndpoint::isStreamRegistered(audio_port_handle_t portHandle) {
-    std::lock_guard<std::mutex> lock(mLockStreams);
+    const std::lock_guard<std::mutex> lock(mLockStreams);
     for (const auto& stream : mRegisteredStreams) {
         if (stream->getPortHandle() == portHandle) {
             return true;
@@ -101,7 +101,7 @@ std::vector<android::sp<AAudioServiceStreamBase>>
         AAudioServiceEndpoint::disconnectRegisteredStreams() {
     std::vector<android::sp<AAudioServiceStreamBase>> streamsDisconnected;
     {
-        std::lock_guard<std::mutex> lock(mLockStreams);
+        const std::lock_guard<std::mutex> lock(mLockStreams);
         mRegisteredStreams.swap(streamsDisconnected);
     }
     mConnected.store(false);
@@ -122,7 +122,7 @@ std::vector<android::sp<AAudioServiceStreamBase>>
 
 void AAudioServiceEndpoint::releaseRegisteredStreams() {
     // List of streams to be closed after we disconnect everything.
-    std::vector<android::sp<AAudioServiceStreamBase>> streamsToClose
+    const std::vector<android::sp<AAudioServiceStreamBase>> streamsToClose
             = disconnectRegisteredStreams();
 
     // Close outside the lock to avoid recursive locks.
@@ -133,14 +133,14 @@ void AAudioServiceEndpoint::releaseRegisteredStreams() {
     }
 }
 
-aaudio_result_t AAudioServiceEndpoint::registerStream(sp<AAudioServiceStreamBase>stream) {
-    std::lock_guard<std::mutex> lock(mLockStreams);
+aaudio_result_t AAudioServiceEndpoint::registerStream(const sp<AAudioServiceStreamBase>& stream) {
+    const std::lock_guard<std::mutex> lock(mLockStreams);
     mRegisteredStreams.push_back(stream);
     return AAUDIO_OK;
 }
 
-aaudio_result_t AAudioServiceEndpoint::unregisterStream(sp<AAudioServiceStreamBase>stream) {
-    std::lock_guard<std::mutex> lock(mLockStreams);
+aaudio_result_t AAudioServiceEndpoint::unregisterStream(const sp<AAudioServiceStreamBase>& stream) {
+    const std::lock_guard<std::mutex> lock(mLockStreams);
     mRegisteredStreams.erase(std::remove(
             mRegisteredStreams.begin(), mRegisteredStreams.end(), stream),
                              mRegisteredStreams.end());

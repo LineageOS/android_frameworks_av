@@ -25,7 +25,7 @@
 
 namespace aaudio {
 
-aaudio_result_t AAudioCommandQueue::sendCommand(std::shared_ptr<AAudioCommand> command) {
+aaudio_result_t AAudioCommandQueue::sendCommand(const std::shared_ptr<AAudioCommand>& command) {
     {
         std::scoped_lock<std::mutex> _l(mLock);
         if (!mRunning) {

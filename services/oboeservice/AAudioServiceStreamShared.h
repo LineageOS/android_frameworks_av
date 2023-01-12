@@ -44,7 +44,7 @@ class AAudioServiceStreamShared : public AAudioServiceStreamBase {
 
 public:
     explicit AAudioServiceStreamShared(android::AAudioService &aAudioService);
-    virtual ~AAudioServiceStreamShared() = default;
+    ~AAudioServiceStreamShared() override = default;
 
     static std::string dumpHeader();
 

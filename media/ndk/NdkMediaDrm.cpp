@@ -253,7 +253,7 @@ static status_t GetAppPackageName(String8 *packageName) {
 }
 
 static sp<IDrm> CreateDrm() {
-    return DrmUtils::MakeDrm();
+    return DrmUtils::MakeDrm(IDRM_NDK);
 }
 
 
