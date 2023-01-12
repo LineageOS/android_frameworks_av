@@ -89,6 +89,9 @@ public:
         if (err != OK) {
             return err;
         }
+        if (buffer == nullptr) {
+            return AMEDIA_ERROR_UNKNOWN;
+        }
 
         char x = (char)((double)rand() / RAND_MAX * 255);
         memset((*buffer)->data(), x, mSize);
