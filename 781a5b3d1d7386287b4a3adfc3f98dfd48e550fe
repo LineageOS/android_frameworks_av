@@ -16,6 +16,24 @@
       "message": "Squashed commit Ic0f99e55b1519596e49ff2af14895cea1a19c752 (\"Camera: Master callback mode support for MCX raw\") also changed this line this way:\n\n```\n-    bool flexibleConsumer \u003d (consumerUsage \u0026 disallowedFlags) \u003d\u003d 0 \u0026\u0026\n+    bool flexibleConsumer \u003d !isPriviledgedClient \u0026\u0026 (consumerUsage \u0026 disallowedFlags) \u003d\u003d 0 \u0026\u0026\n```\n\nShouldn\u0027t this change be applied as well?",
       "revId": "781a5b3d1d7386287b4a3adfc3f98dfd48e550fe",
       "serverId": "1ec6b3db-b2c1-4fa4-84a2-4c7efe89ba71"
+    },
+    {
+      "unresolved": true,
+      "key": {
+        "uuid": "77b30d5f_870eca85",
+        "filename": "services/camera/libcameraservice/utils/SessionConfigurationUtils.cpp",
+        "patchSetId": 2
+      },
+      "lineNbr": 401,
+      "author": {
+        "id": 6360
+      },
+      "writtenOn": "2023-01-12T15:46:58Z",
+      "side": 1,
+      "message": "Check CAF - it\u0027s not present there?",
+      "parentUuid": "eb8238b3_8ec3fc43",
+      "revId": "781a5b3d1d7386287b4a3adfc3f98dfd48e550fe",
+      "serverId": "1ec6b3db-b2c1-4fa4-84a2-4c7efe89ba71"
     }
   ]
 }
