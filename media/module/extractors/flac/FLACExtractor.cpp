@@ -614,9 +614,9 @@ MediaBufferHelper *FLACParser::readBuffer(bool doSeek, FLAC__uint64 sample)
     }
     // acquire a media buffer
     CHECK(mGroup != NULL);
-    MediaBufferHelper *buffer;
+    MediaBufferHelper *buffer = nullptr;
     status_t err = mGroup->acquire_buffer(&buffer);
-    if (err != OK) {
+    if (err != OK || buffer == nullptr) {
         return NULL;
     }
     const size_t bufferSize = blocksize * getChannels() * getOutputSampleSize();

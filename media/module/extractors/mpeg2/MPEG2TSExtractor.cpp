@@ -182,11 +182,26 @@ media_status_t MPEG2TSSource::read(
         return AMEDIA_ERROR_END_OF_STREAM;
     }
 
-    MediaBufferBase *mbuf;
-    mImpl->read(&mbuf, (MediaTrack::ReadOptions*) options);
+    MediaBufferBase *mbuf = nullptr;
+    status_t err_read = mImpl->read(&mbuf, (MediaTrack::ReadOptions*) options);
+    if (mbuf == nullptr) {
+        ALOGE("Track::read: null buffer read from source");
+        return AMEDIA_ERROR_UNKNOWN;
+    }
+    if (err_read != OK) {
+        ALOGE("Track::read: no buffer read from source");
+        mbuf->release();
+        return AMEDIA_ERROR_UNKNOWN;
+    }
+
     size_t length = mbuf->range_length();
-    MediaBufferHelper *outbuf;
-    mBufferGroup->acquire_buffer(&outbuf, false, length);
+    MediaBufferHelper *outbuf = nullptr;
+    status_t err = mBufferGroup->acquire_buffer(&outbuf, false, length);
+    if (err != OK || outbuf == nullptr) {
+        ALOGE("read: no buffer");
+        mbuf->release();
+        return AMEDIA_ERROR_UNKNOWN;
+    }
     memcpy(outbuf->data(), mbuf->data(), length);
     outbuf->set_range(0, length);
     *out = outbuf;

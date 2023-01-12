@@ -790,7 +790,8 @@ media_status_t MyOggExtractor::_readNextPacket(MediaBufferHelper **out, bool cal
             }
             MediaBufferHelper *tmp;
             if (mBufferGroup) {
-                mBufferGroup->acquire_buffer(&tmp, false, fullSize);
+                // ignore return code here. instead, check tmp below.
+                (void) mBufferGroup->acquire_buffer(&tmp, false, fullSize);
                 ALOGV("acquired buffer %p from group", tmp);
             } else {
                 tmp = new StandAloneMediaBuffer(fullSize);
@@ -924,12 +925,15 @@ media_status_t MyOggExtractor::_readNextPacket(MediaBufferHelper **out, bool cal
 status_t MyOggExtractor::init() {
     AMediaFormat_setString(mMeta, AMEDIAFORMAT_KEY_MIME, mMimeType);
 
-    media_status_t err;
-    MediaBufferHelper *packet;
     for (size_t i = 0; i < mNumHeaders; ++i) {
+        media_status_t err;
+        MediaBufferHelper *packet = nullptr;
         // ignore timestamp for configuration packets
         if ((err = _readNextPacket(&packet, /* calcVorbisTimestamp = */ false)) != AMEDIA_OK) {
             return err;
+        }
+        if (packet == nullptr) {
+            return AMEDIA_ERROR_UNKNOWN;
         }
         ALOGV("read packet of size %zu\n", packet->range_length());
         err = verifyHeader(packet, /* type = */ i * 2 + 1);
