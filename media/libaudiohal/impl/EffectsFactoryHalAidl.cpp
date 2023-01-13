@@ -24,7 +24,6 @@
 #include <android/binder_manager.h>
 #include <media/AidlConversionCppNdk.h>
 #include <media/AidlConversionNdk.h>
-#include <media/audiohal/AudioHalUtils.h>
 #include <utils/Log.h>
 
 #include "EffectBufferHalAidl.h"
@@ -55,7 +54,7 @@ status_t EffectsFactoryHalAidl::queryNumberEffects(uint32_t *pNumEffects) {
 
     {
         std::lock_guard lg(mLock);
-        RETURN_IF_NOT_OK(queryEffectList_l());
+        RETURN_STATUS_IF_ERROR(queryEffectList_l());
         *pNumEffects = mDescList->size();
     }
     ALOGI("%s %d", __func__, *pNumEffects);
@@ -68,7 +67,7 @@ status_t EffectsFactoryHalAidl::getDescriptor(uint32_t index, effect_descriptor_
     }
 
     std::lock_guard lg(mLock);
-    RETURN_IF_NOT_OK(queryEffectList_l());
+    RETURN_STATUS_IF_ERROR(queryEffectList_l());
 
     auto listSize = mDescList->size();
     if (index >= listSize) {
@@ -174,7 +173,7 @@ status_t EffectsFactoryHalAidl::getHalDescriptorWithImplUuid_l(const AudioUuid& 
         return BAD_VALUE;
     }
     if (!mDescList) {
-        RETURN_IF_NOT_OK(queryEffectList_l());
+        RETURN_STATUS_IF_ERROR(queryEffectList_l());
     }
 
     auto matchIt = std::find_if(mDescList->begin(), mDescList->end(),
@@ -195,7 +194,7 @@ status_t EffectsFactoryHalAidl::getHalDescriptorWithTypeUuid_l(
         return BAD_VALUE;
     }
     if (!mDescList) {
-        RETURN_IF_NOT_OK(queryEffectList_l());
+        RETURN_STATUS_IF_ERROR(queryEffectList_l());
     }
     std::vector<Descriptor> result;
     std::copy_if(mDescList->begin(), mDescList->end(), std::back_inserter(result),
