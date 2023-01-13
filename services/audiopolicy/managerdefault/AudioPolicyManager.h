@@ -602,7 +602,9 @@ protected:
         // true if given state represents a device in a telephony or VoIP call
         virtual bool isStateInCall(int state) const;
         // true if playback to call TX or capture from call RX is possible
-        bool isCallAudioAccessible();
+        bool isCallAudioAccessible() const;
+        // true if device is in a telephony or VoIP call or call screening is active
+        bool isInCallOrScreening() const;
 
         // when a device is connected, checks if an open output can be routed
         // to this device. If none is open, tries to open one of the available outputs.
@@ -637,6 +639,10 @@ protected:
 
         bool isCallRxAudioSource(const sp<SourceClientDescriptor> &source) {
             return mCallRxSourceClient != nullptr && source == mCallRxSourceClient;
+        }
+
+        bool isCallTxAudioSource(const sp<SourceClientDescriptor> &source) {
+            return mCallTxSourceClient != nullptr && source == mCallTxSourceClient;
         }
 
         void connectTelephonyRxAudioSource();
