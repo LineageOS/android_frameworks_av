@@ -27,7 +27,6 @@ class DevicesFactoryHalAidl : public DevicesFactoryHalInterface
   public:
     explicit DevicesFactoryHalAidl(
             std::shared_ptr<::aidl::android::hardware::audio::core::IConfig> iConfig);
-    void onFirstRef() override;
 
     // Opens a device with the specified name. To close the device, it is
     // necessary to release references to the returned object.
