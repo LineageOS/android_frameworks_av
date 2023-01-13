@@ -521,9 +521,9 @@ media_status_t MP3Source::read(
         mSamplesRead = 0;
     }
 
-    MediaBufferHelper *buffer;
+    MediaBufferHelper *buffer = nullptr;
     status_t err = mBufferGroup->acquire_buffer(&buffer);
-    if (err != OK) {
+    if (err != OK || buffer == nullptr) {
         return AMEDIA_ERROR_UNKNOWN;
     }
 
