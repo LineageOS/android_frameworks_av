@@ -17,6 +17,7 @@
 package android.media;
 
 /** Record containing information about the computed sound dose. */
+@JavaDerive(toString = true)
 parcelable SoundDoseRecord {
     /**
      * Corresponds to the time in seconds when the CSD value is calculated from.

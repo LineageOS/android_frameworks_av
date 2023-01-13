@@ -46,9 +46,6 @@ namespace effect {
 using namespace ::android::hardware::audio::common::CPP_VERSION;
 using namespace ::android::hardware::audio::effect::CPP_VERSION;
 
-#define TIME_CHECK() auto timeCheck = \
-        mediautils::makeTimeCheckStatsForClassMethod(getClassName(), __func__)
-
 EffectHalHidl::EffectHalHidl(const sp<IEffect>& effect, uint64_t effectId)
         : EffectConversionHelperHidl("EffectHalHidl"),
           mEffect(effect), mEffectId(effectId), mBuffersChanged(true), mEfGroup(nullptr) {
