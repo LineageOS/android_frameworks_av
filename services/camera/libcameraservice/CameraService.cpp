@@ -194,7 +194,8 @@ void CameraService::onFirstRef()
     mAppOps.setCameraAudioRestriction(mAudioRestriction);
     sp<HidlCameraService> hcs = HidlCameraService::getInstance(this);
     if (hcs->registerAsService() != android::OK) {
-        ALOGE("%s: Failed to register default android.frameworks.cameraservice.service@1.0",
+        // Deprecated, so it will fail to register on newer devices
+        ALOGW("%s: Did not register default android.frameworks.cameraservice.service@2.2",
               __FUNCTION__);
     }
 
