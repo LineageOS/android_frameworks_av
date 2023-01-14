@@ -1599,7 +1599,7 @@ status_t HeicCompositeStream::copyOneYuvTile(sp<MediaCodecBuffer>& codecBuffer,
     return OK;
 }
 
-void HeicCompositeStream::initCopyRowFunction(int32_t width)
+void HeicCompositeStream::initCopyRowFunction([[maybe_unused]] int32_t width)
 {
     using namespace libyuv;
 
