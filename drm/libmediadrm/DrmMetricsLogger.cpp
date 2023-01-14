@@ -458,7 +458,7 @@ void DrmMetricsLogger::reportMediaDrmCreated() const {
     mediametrics_delete(handle);
 }
 
-void DrmMetricsLogger::reportMediaDrmSessionOpened(std::vector<uint8_t> sessionId) const {
+void DrmMetricsLogger::reportMediaDrmSessionOpened(const std::vector<uint8_t>& sessionId) const {
     mediametrics_handle_t handle(mediametrics_create("mediadrm.session_opened"));
     mediametrics_setInt64(handle, "obj_nonce_msb", mObjNonceMsb);
     mediametrics_setInt64(handle, "obj_nonce_lsb", mObjNonceLsb);
@@ -475,8 +475,8 @@ void DrmMetricsLogger::reportMediaDrmSessionOpened(std::vector<uint8_t> sessionI
     mediametrics_delete(handle);
 }
 
-void DrmMetricsLogger::reportMediaDrmErrored(DrmStatus error_code, const char* api,
-                                             std::vector<uint8_t> sessionId) const {
+void DrmMetricsLogger::reportMediaDrmErrored(const DrmStatus& error_code, const char* api,
+                                             const std::vector<uint8_t>& sessionId) const {
     mediametrics_handle_t handle(mediametrics_create("mediadrm.errored"));
     mediametrics_setInt64(handle, "obj_nonce_msb", mObjNonceMsb);
     mediametrics_setInt64(handle, "obj_nonce_lsb", mObjNonceLsb);
@@ -491,6 +491,9 @@ void DrmMetricsLogger::reportMediaDrmErrored(DrmStatus error_code, const char* a
     mediametrics_setInt64(handle, "uuid_msb", be64toh(mUuid[0]));
     mediametrics_setInt64(handle, "uuid_lsb", be64toh(mUuid[1]));
     mediametrics_setInt32(handle, "error_code", error_code);
+    mediametrics_setInt32(handle, "cdm_err", error_code.getCdmErr());
+    mediametrics_setInt32(handle, "oem_err", error_code.getOemErr());
+    mediametrics_setInt32(handle, "error_context", error_code.getContext());
     mediametrics_setCString(handle, "api", api);
     mediametrics_setInt32(handle, "frontend", mFrontend);
     mediametrics_selfRecord(handle);
