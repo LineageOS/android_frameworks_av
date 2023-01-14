@@ -17,9 +17,10 @@
 #define LOG_TAG "EffectHalAidl"
 //#define LOG_NDEBUG 0
 
+#include <error/expected_utils.h>
 #include <media/AidlConversionCppNdk.h>
 #include <media/AidlConversionNdk.h>
-#include <media/audiohal/AudioHalUtils.h>
+#include <media/AidlConversionUtil.h>
 #include <media/EffectsFactoryApi.h>
 #include <mediautils/TimeCheck.h>
 #include <utils/Log.h>
@@ -30,6 +31,7 @@
 
 #include <aidl/android/hardware/audio/effect/IEffect.h>
 
+using ::aidl::android::aidl_utils::statusTFromBinderStatus;
 using ::aidl::android::hardware::audio::effect::CommandId;
 using ::aidl::android::hardware::audio::effect::Descriptor;
 using ::aidl::android::hardware::audio::effect::IEffect;
@@ -85,7 +87,7 @@ status_t EffectHalAidl::handleSetConfig(uint32_t cmdCode, uint32_t cmdSize, void
     memcpy(&mConfig, pCmdData, cmdSize);
 
     State state;
-    RETURN_IF_BINDER_FAIL(mEffect->getState(&state));
+    RETURN_STATUS_IF_ERROR(statusTFromBinderStatus(mEffect->getState(&state)));
     // effect not open yet, save settings locally
     if (state != State::INIT) {
         effect_config_t* legacyConfig = static_cast<effect_config_t*>(pCmdData);
@@ -103,7 +105,7 @@ status_t EffectHalAidl::handleSetConfig(uint32_t cmdCode, uint32_t cmdSize, void
         Parameter::Id id;
         id.set<Parameter::Id::commonTag>(Parameter::common);
         aidlParam.set<Parameter::common>(aidlCommon);
-        RETURN_IF_BINDER_FAIL(mEffect->setParameter(aidlParam));
+        RETURN_STATUS_IF_ERROR(statusTFromBinderStatus(mEffect->setParameter(aidlParam)));
     }
     *(int*)pReplyData = 0;
     *static_cast<int32_t*>(pReplyData) = OK;
@@ -153,7 +155,8 @@ status_t EffectHalAidl::command(uint32_t cmdCode, uint32_t cmdSize, void* pCmdDa
             // open with default effect_config_t (convert to Parameter.Common)
             IEffect::OpenEffectReturn ret;
             Parameter::Common common;
-            RETURN_IF_BINDER_FAIL(mEffect->open(common, std::nullopt, &ret));
+            RETURN_STATUS_IF_ERROR(
+                    statusTFromBinderStatus(mEffect->open(common, std::nullopt, &ret)));
             return OK;
         }
         case EFFECT_CMD_SET_CONFIG:
@@ -212,7 +215,7 @@ status_t EffectHalAidl::getDescriptor(effect_descriptor_t* pDescriptor) {
         return BAD_VALUE;
     }
     Descriptor aidlDesc;
-    RETURN_IF_BINDER_FAIL(mEffect->getDescriptor(&aidlDesc));
+    RETURN_STATUS_IF_ERROR(statusTFromBinderStatus(mEffect->getDescriptor(&aidlDesc)));
 
     *pDescriptor = VALUE_OR_RETURN_STATUS(
             ::aidl::android::aidl2legacy_Descriptor_effect_descriptor(aidlDesc));

@@ -790,6 +790,7 @@ media_status_t MatroskaSource::readBlock() {
     int64_t timeUs = mBlockIter.blockTimeUs();
 
     for (int i = 0; i < block->GetFrameCount(); ++i) {
+        status_t err;
         MatroskaExtractor::TrackInfo *trackInfo = &mExtractor->mTracks.editItemAt(mTrackIndex);
         const mkvparser::Block::Frame &frame = block->GetFrame(i);
         size_t len = frame.len;
@@ -798,8 +799,13 @@ media_status_t MatroskaSource::readBlock() {
         }
 
         len += trackInfo->mHeaderLen;
-        MediaBufferHelper *mbuf;
-        mBufferGroup->acquire_buffer(&mbuf, false /* nonblocking */, len /* requested size */);
+        MediaBufferHelper *mbuf = nullptr;
+        err = mBufferGroup->acquire_buffer(&mbuf, false /* nonblocking */,
+                                           len /* requested size */);
+        if (err != OK || mbuf == nullptr) {
+            ALOGE("readBlock: no buffer");
+            return AMEDIA_ERROR_UNKNOWN;
+        }
         mbuf->set_range(0, len);
         uint8_t *data = static_cast<uint8_t *>(mbuf->data());
         if (trackInfo->mHeader) {
@@ -832,7 +838,7 @@ media_status_t MatroskaSource::readBlock() {
             }
         }
 
-        status_t err = frame.Read(mExtractor->mReader, data + trackInfo->mHeaderLen);
+        err = frame.Read(mExtractor->mReader, data + trackInfo->mHeaderLen);
         if (err == OK
                 && mExtractor->mIsWebm
                 && trackInfo->mEncrypted) {
