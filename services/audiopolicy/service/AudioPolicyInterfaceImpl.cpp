@@ -1546,7 +1546,7 @@ Status AudioPolicyService::listAudioPorts(media::AudioPortRole roleAidl,
     numPortsReq = std::min(numPortsReq, num_ports);
     RETURN_IF_BINDER_ERROR(binderStatusFromStatusT(
             convertRange(ports.get(), ports.get() + numPortsReq, std::back_inserter(*portsAidl),
-                         legacy2aidl_audio_port_v7_AudioPort)));
+                         legacy2aidl_audio_port_v7_AudioPortFw)));
     count->value = VALUE_OR_RETURN_BINDER_STATUS(convertIntegral<int32_t>(num_ports));
     *_aidl_return = VALUE_OR_RETURN_BINDER_STATUS(convertIntegral<int32_t>(generation));
     return Status::ok();
@@ -1561,7 +1561,7 @@ Status AudioPolicyService::getAudioPort(int portId,
     }
     AutoCallerClear acc;
     RETURN_IF_BINDER_ERROR(binderStatusFromStatusT(mAudioPolicyManager->getAudioPort(&port)));
-    *_aidl_return = VALUE_OR_RETURN_BINDER_STATUS(legacy2aidl_audio_port_v7_AudioPort(port));
+    *_aidl_return = VALUE_OR_RETURN_BINDER_STATUS(legacy2aidl_audio_port_v7_AudioPortFw(port));
     return Status::ok();
 }
 
@@ -1569,7 +1569,7 @@ Status AudioPolicyService::createAudioPatch(const media::AudioPatchFw& patchAidl
                                             int32_t handleAidl,
                                             int32_t* _aidl_return) {
     audio_patch patch = VALUE_OR_RETURN_BINDER_STATUS(
-            aidl2legacy_AudioPatch_audio_patch(patchAidl));
+            aidl2legacy_AudioPatchFw_audio_patch(patchAidl));
     audio_patch_handle_t handle = VALUE_OR_RETURN_BINDER_STATUS(
             aidl2legacy_int32_t_audio_port_handle_t(handleAidl));
     RETURN_IF_BINDER_ERROR(binderStatusFromStatusT(AudioValidator::validateAudioPatch(patch)));
@@ -1628,7 +1628,7 @@ Status AudioPolicyService::listAudioPatches(Int* count,
     numPatchesReq = std::min(numPatchesReq, num_patches);
     RETURN_IF_BINDER_ERROR(binderStatusFromStatusT(
             convertRange(patches.get(), patches.get() + numPatchesReq,
-                         std::back_inserter(*patchesAidl), legacy2aidl_audio_patch_AudioPatch)));
+                         std::back_inserter(*patchesAidl), legacy2aidl_audio_patch_AudioPatchFw)));
     count->value = VALUE_OR_RETURN_BINDER_STATUS(convertIntegral<int32_t>(num_patches));
     *_aidl_return = VALUE_OR_RETURN_BINDER_STATUS(convertIntegral<int32_t>(generation));
     return Status::ok();
@@ -1637,7 +1637,7 @@ Status AudioPolicyService::listAudioPatches(Int* count,
 Status AudioPolicyService::setAudioPortConfig(const media::AudioPortConfigFw& configAidl)
 {
     audio_port_config config = VALUE_OR_RETURN_BINDER_STATUS(
-            aidl2legacy_AudioPortConfig_audio_port_config(configAidl));
+            aidl2legacy_AudioPortConfigFw_audio_port_config(configAidl));
     RETURN_IF_BINDER_ERROR(
             binderStatusFromStatusT(AudioValidator::validateAudioPortConfig(config)));
 
@@ -1811,7 +1811,7 @@ Status AudioPolicyService::startAudioSource(const media::AudioPortConfigFw& sour
                                             const media::AudioAttributesInternal& attributesAidl,
                                             int32_t* _aidl_return) {
     audio_port_config source = VALUE_OR_RETURN_BINDER_STATUS(
-            aidl2legacy_AudioPortConfig_audio_port_config(sourceAidl));
+            aidl2legacy_AudioPortConfigFw_audio_port_config(sourceAidl));
     audio_attributes_t attributes = VALUE_OR_RETURN_BINDER_STATUS(
             aidl2legacy_AudioAttributesInternal_audio_attributes_t(attributesAidl));
     audio_port_handle_t portId;
