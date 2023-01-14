@@ -521,27 +521,35 @@ void processCaptureResult(CaptureOutputStates& states, const camera_capture_resu
         if (result->partial_result != 0)
             request.resultExtras.partialResultCount = result->partial_result;
 
-        if ((result->result != nullptr) && !states.legacyClient && !states.overrideToPortrait) {
+        if (result->result != nullptr) {
             camera_metadata_ro_entry entry;
             auto ret = find_camera_metadata_ro_entry(result->result,
                     ANDROID_LOGICAL_MULTI_CAMERA_ACTIVE_PHYSICAL_ID, &entry);
             if ((ret == OK) && (entry.count > 0)) {
                 std::string physicalId(reinterpret_cast<const char *>(entry.data.u8));
-                auto deviceInfo = states.physicalDeviceInfoMap.find(physicalId);
-                if (deviceInfo != states.physicalDeviceInfoMap.end()) {
-                    auto orientation = deviceInfo->second.find(ANDROID_SENSOR_ORIENTATION);
-                    if (orientation.count > 0) {
-                        ret = CameraUtils::getRotationTransform(deviceInfo->second,
-                                OutputConfiguration::MIRROR_MODE_AUTO, &request.transform);
-                        if (ret != OK) {
-                            ALOGE("%s: Failed to calculate current stream transformation: %s (%d)",
-                                    __FUNCTION__, strerror(-ret), ret);
+                if (!states.activePhysicalId.empty() && physicalId != states.activePhysicalId) {
+                    states.listener->notifyPhysicalCameraChange(physicalId);
+                }
+                states.activePhysicalId = physicalId;
+
+                if (!states.legacyClient && !states.overrideToPortrait) {
+                    auto deviceInfo = states.physicalDeviceInfoMap.find(physicalId);
+                    if (deviceInfo != states.physicalDeviceInfoMap.end()) {
+                        auto orientation = deviceInfo->second.find(ANDROID_SENSOR_ORIENTATION);
+                        if (orientation.count > 0) {
+                            ret = CameraUtils::getRotationTransform(deviceInfo->second,
+                                    OutputConfiguration::MIRROR_MODE_AUTO, &request.transform);
+                            if (ret != OK) {
+                                ALOGE("%s: Failed to calculate current stream transformation: %s "
+                                        "(%d)", __FUNCTION__, strerror(-ret), ret);
+                            }
+                        } else {
+                            ALOGE("%s: Physical device orientation absent!", __FUNCTION__);
                         }
                     } else {
-                        ALOGE("%s: Physical device orientation absent!", __FUNCTION__);
+                        ALOGE("%s: Physical device not found in device info map found!",
+                                __FUNCTION__);
                     }
-                } else {
-                    ALOGE("%s: Physical device not found in device info map found!", __FUNCTION__);
                 }
             }
         }

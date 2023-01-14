@@ -92,6 +92,7 @@ hardware::Return<void> HidlCamera3OfflineSession::processCaptureResult_3_4(
         listener = mListener.promote();
     }
 
+    std::string activePhysicalId("");
     HidlCaptureOutputStates states {
       {mId,
         mOfflineReqsLock, mLastCompletedRegularFrameNumber,
@@ -106,7 +107,7 @@ hardware::Return<void> HidlCamera3OfflineSession::processCaptureResult_3_4(
         mDistortionMappers, mZoomRatioMappers, mRotateAndCropMappers,
         mTagMonitor, mInputStream, mOutputStreams, mSessionStatsBuilder, listener, *this, *this,
         mBufferRecords, /*legacyClient*/ false, mMinExpectedDuration, mIsFixedFps,
-        /*overrideToPortrait*/false}, mResultMetadataQueue
+        /*overrideToPortrait*/false, activePhysicalId}, mResultMetadataQueue
     };
 
     std::lock_guard<std::mutex> lock(mProcessCaptureResultLock);
@@ -133,6 +134,7 @@ hardware::Return<void> HidlCamera3OfflineSession::processCaptureResult(
 
     hardware::hidl_vec<hardware::camera::device::V3_4::PhysicalCameraMetadata> noPhysMetadata;
 
+    std::string activePhysicalId("");
     HidlCaptureOutputStates states {
       {mId,
         mOfflineReqsLock, mLastCompletedRegularFrameNumber,
@@ -147,7 +149,7 @@ hardware::Return<void> HidlCamera3OfflineSession::processCaptureResult(
         mDistortionMappers, mZoomRatioMappers, mRotateAndCropMappers,
         mTagMonitor, mInputStream, mOutputStreams, mSessionStatsBuilder, listener, *this, *this,
         mBufferRecords, /*legacyClient*/ false, mMinExpectedDuration, mIsFixedFps,
-        /*overrideToPortrait*/false}, mResultMetadataQueue
+        /*overrideToPortrait*/false, activePhysicalId}, mResultMetadataQueue
     };
 
     std::lock_guard<std::mutex> lock(mProcessCaptureResultLock);
@@ -169,6 +171,7 @@ hardware::Return<void> HidlCamera3OfflineSession::notify(
         listener = mListener.promote();
     }
 
+    std::string activePhysicalId("");
     HidlCaptureOutputStates states {
       {mId,
         mOfflineReqsLock, mLastCompletedRegularFrameNumber,
@@ -183,7 +186,7 @@ hardware::Return<void> HidlCamera3OfflineSession::notify(
         mDistortionMappers, mZoomRatioMappers, mRotateAndCropMappers,
         mTagMonitor, mInputStream, mOutputStreams, mSessionStatsBuilder, listener, *this, *this,
         mBufferRecords, /*legacyClient*/ false, mMinExpectedDuration, mIsFixedFps,
-        /*overrideToPortrait*/false}, mResultMetadataQueue
+        /*overrideToPortrait*/false, activePhysicalId}, mResultMetadataQueue
     };
     for (const auto& msg : msgs) {
         camera3::notify(states, msg);
