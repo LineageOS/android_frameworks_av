@@ -1027,7 +1027,7 @@ ToneGenerator::ToneGenerator(audio_stream_type_t streamType, float volume, bool 
     if (property_get("gsm.operator.iso-country", value, "") == 0) {
         property_get("gsm.sim.operator.iso-country", value, "");
     }
-    // If dual sim device has two SIM cards inserted and is not registerd to any network,
+    // If dual sim device has two SIM cards inserted and is not registered to any network,
     // "," is set to "gsm.operator.iso-country" prop.
     // In this case, "gsm.sim.operator.iso-country" prop should be used.
     if (strlen(value) == 1 && strstr(value, ",") != NULL) {

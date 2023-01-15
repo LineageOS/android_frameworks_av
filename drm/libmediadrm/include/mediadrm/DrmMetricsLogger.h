@@ -144,10 +144,11 @@ class DrmMetricsLogger : public IDrm {
 
     void reportMediaDrmCreated() const;
 
-    void reportMediaDrmSessionOpened(std::vector<uint8_t> sessionId) const;
+    void reportMediaDrmSessionOpened(const std::vector<uint8_t>& sessionId) const;
 
-    void reportMediaDrmErrored(DrmStatus error_code, const char* api,
-                               std::vector<uint8_t> sessionId = std::vector<uint8_t>()) const;
+    void reportMediaDrmErrored(
+            const DrmStatus& error_code, const char* api,
+            const std::vector<uint8_t>& sessionId = std::vector<uint8_t>()) const;
 
     DrmStatus checkGetRandom(int64_t* nonce, const char* api);
 
