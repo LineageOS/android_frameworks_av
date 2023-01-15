@@ -96,7 +96,8 @@ Camera3Device::Camera3Device(const String8 &id, bool overrideForPerfClass, bool 
         mLastTemplateId(-1),
         mNeedFixupMonochromeTags(false),
         mOverrideForPerfClass(overrideForPerfClass),
-        mOverrideToPortrait(overrideToPortrait)
+        mOverrideToPortrait(overrideToPortrait),
+        mActivePhysicalId("")
 {
     ATRACE_CALL();
     ALOGV("%s: Created device for camera %s", __FUNCTION__, mId.string());

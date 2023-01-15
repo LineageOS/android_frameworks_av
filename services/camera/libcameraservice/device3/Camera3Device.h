@@ -1357,6 +1357,9 @@ class Camera3Device :
     // app compatibility reasons.
     bool mOverrideToPortrait;
 
+    // Current active physical id of the logical multi-camera, if any
+    std::string mActivePhysicalId;
+
     // The current minimum expected frame duration based on AE_TARGET_FPS_RANGE
     nsecs_t mMinExpectedDuration = 0;
     // Whether the camera device runs at fixed frame rate based on AE_MODE and
