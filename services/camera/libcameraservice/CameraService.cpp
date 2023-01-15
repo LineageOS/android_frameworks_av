@@ -194,7 +194,8 @@ void CameraService::onFirstRef()
     mAppOps.setCameraAudioRestriction(mAudioRestriction);
     sp<HidlCameraService> hcs = HidlCameraService::getInstance(this);
     if (hcs->registerAsService() != android::OK) {
-        ALOGE("%s: Failed to register default android.frameworks.cameraservice.service@1.0",
+        // Deprecated, so it will fail to register on newer devices
+        ALOGW("%s: Did not register default android.frameworks.cameraservice.service@2.2",
               __FUNCTION__);
     }
 
@@ -3532,6 +3533,11 @@ status_t CameraService::BasicClient::handleAppOpMode(int32_t mode) {
                 mClientPackageName);
         bool isCameraPrivacyEnabled =
                 sCameraService->mSensorPrivacyPolicy->isCameraPrivacyEnabled();
+        // We don't want to return EACCESS if the CameraPrivacy is enabled.
+        // We prefer to successfully open the camera and perform camera muting
+        // or blocking in connectHelper as handleAppOpMode can be called before the
+        // connection has been fully established and at that time camera muting
+        // capabilities are unknown.
         if (!isUidActive || !isCameraPrivacyEnabled) {
             ALOGI("Camera %s: Access for \"%s\" has been restricted",
                     mCameraIdStr.string(), String8(mClientPackageName).string());

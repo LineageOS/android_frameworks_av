@@ -511,6 +511,8 @@ bool MediaMetricsService::isContentValid(const mediametrics::Item *item, bool is
     const std::string &key = item->getKey();
     if (startsWith(key, "audio.")) return true;
     if (startsWith(key, "drm.vendor.")) return true;
+    if (startsWith(key, "mediadrm.")) return true;
+
     // the list of allowedKey uses statsd_handlers
     // in iface_statsd.cpp as reference
     // drmmanager is from a trusted uid, therefore not needed here

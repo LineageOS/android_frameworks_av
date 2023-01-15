@@ -310,9 +310,9 @@ media_status_t AACSource::read(
         return AMEDIA_ERROR_END_OF_STREAM;
     }
 
-    MediaBufferHelper *buffer;
+    MediaBufferHelper *buffer = nullptr;
     status_t err = mBufferGroup->acquire_buffer(&buffer);
-    if (err != OK) {
+    if (err != OK || buffer == nullptr) {
         return AMEDIA_ERROR_UNKNOWN;
     }
 
