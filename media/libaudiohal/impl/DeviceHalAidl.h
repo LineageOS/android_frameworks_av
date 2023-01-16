@@ -121,11 +121,6 @@ class DeviceHalAidl : public DeviceHalInterface, public ConversionHelperAidl {
     friend class sp<DeviceHalAidl>;
 
     const std::shared_ptr<::aidl::android::hardware::audio::core::IModule> mModule;
-    // FIXME: Remove these after implementing calls into the HAL.
-    float mMasterVolume = 0.0f;
-    float mVoiceVolume = 0.0f;
-    bool mMasterMute = false;
-    bool mMicMute = false;
 
     // Can not be constructed directly by clients.
     explicit DeviceHalAidl(

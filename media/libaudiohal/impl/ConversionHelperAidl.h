@@ -18,8 +18,27 @@
 
 #include <string>
 #include <string_view>
+#include <vector>
+
+#include <utils/String16.h>
+#include <utils/Vector.h>
 
 namespace android {
+
+class Args {
+  public:
+    explicit Args(const Vector<String16>& args)
+            : mValues(args.size()), mPtrs(args.size()) {
+        for (size_t i = 0; i < args.size(); ++i) {
+            mValues[i] = std::string(String8(args[i]));
+            mPtrs[i] = mValues[i].c_str();
+        }
+    }
+    const char** args() { return mPtrs.data(); }
+  private:
+    std::vector<std::string> mValues;
+    std::vector<const char*> mPtrs;
+};
 
 class ConversionHelperAidl {
   protected:

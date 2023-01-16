@@ -94,6 +94,10 @@ class StreamHalAidl : public virtual StreamHalInterface, public ConversionHelper
     typedef AidlMessageQueue<int8_t,
             ::aidl::android::hardware::common::fmq::SynchronizedReadWrite> DataMQ;
 
+    template<class T>
+    static std::shared_ptr<::aidl::android::hardware::audio::core::IStreamCommon> getStreamCommon(
+            const std::shared_ptr<T>& stream);
+
     // Subclasses can not be constructed directly by clients.
     StreamHalAidl(std::string_view className,
             bool isInput,
