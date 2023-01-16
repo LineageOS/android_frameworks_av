@@ -492,7 +492,7 @@ ConversionResult<media::AudioPortConfigFw> legacy2aidl_audio_port_config_AudioPo
 }
 
 ConversionResult<struct audio_patch> aidl2legacy_AudioPatch_audio_patch(
-        const media::AudioPatch& aidl) {
+        const media::AudioPatchFw& aidl) {
     struct audio_patch legacy;
     legacy.id = VALUE_OR_RETURN(aidl2legacy_int32_t_audio_patch_handle_t(aidl.id));
     legacy.num_sinks = VALUE_OR_RETURN(convertIntegral<unsigned int>(aidl.sinks.size()));
@@ -514,9 +514,9 @@ ConversionResult<struct audio_patch> aidl2legacy_AudioPatch_audio_patch(
     return legacy;
 }
 
-ConversionResult<media::AudioPatch> legacy2aidl_audio_patch_AudioPatch(
+ConversionResult<media::AudioPatchFw> legacy2aidl_audio_patch_AudioPatch(
         const struct audio_patch& legacy) {
-    media::AudioPatch aidl;
+    media::AudioPatchFw aidl;
     aidl.id = VALUE_OR_RETURN(legacy2aidl_audio_patch_handle_t_int32_t(legacy.id));
 
     if (legacy.num_sinks > AUDIO_PATCH_PORTS_MAX) {
