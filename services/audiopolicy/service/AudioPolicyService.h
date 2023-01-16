@@ -181,7 +181,7 @@ public:
     binder::Status releaseAudioPatch(int32_t handle) override;
     binder::Status listAudioPatches(Int* count, std::vector<media::AudioPatch>* patches,
                                     int32_t* _aidl_return) override;
-    binder::Status setAudioPortConfig(const media::AudioPortConfig& config) override;
+    binder::Status setAudioPortConfig(const media::AudioPortConfigFw& config) override;
     binder::Status registerClient(const sp<media::IAudioPolicyServiceClient>& client) override;
     binder::Status setAudioPortCallbacksEnabled(bool enabled) override;
     binder::Status setAudioVolumeGroupCallbacksEnabled(bool enabled) override;
@@ -197,7 +197,7 @@ public:
             int32_t userId,
             const std::vector<AudioDevice>& devices) override;
     binder::Status removeUserIdDeviceAffinities(int32_t userId) override;
-    binder::Status startAudioSource(const media::AudioPortConfig& source,
+    binder::Status startAudioSource(const media::AudioPortConfigFw& source,
                                     const media::AudioAttributesInternal& attributes,
                                     int32_t* _aidl_return) override;
     binder::Status stopAudioSource(int32_t portId) override;

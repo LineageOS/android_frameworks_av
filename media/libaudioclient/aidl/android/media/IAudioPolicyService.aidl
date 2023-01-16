@@ -28,7 +28,7 @@ import android.media.AudioPolicyDeviceState;
 import android.media.AudioPolicyForcedConfig;
 import android.media.AudioPolicyForceUse;
 import android.media.AudioPort;
-import android.media.AudioPortConfig;
+import android.media.AudioPortConfigFw;
 import android.media.AudioPortRole;
 import android.media.AudioPortType;
 import android.media.AudioProductStrategy;
@@ -237,7 +237,7 @@ interface IAudioPolicyService {
     int listAudioPatches(inout Int count, out AudioPatch[] patches);
 
     /** Set audio port configuration. */
-    void setAudioPortConfig(in AudioPortConfig config);
+    void setAudioPortConfig(in AudioPortConfigFw config);
 
     void registerClient(IAudioPolicyServiceClient client);
 
@@ -261,7 +261,7 @@ interface IAudioPolicyService {
 
     void removeUserIdDeviceAffinities(int userId);
 
-    int /* audio_port_handle_t */ startAudioSource(in AudioPortConfig source,
+    int /* audio_port_handle_t */ startAudioSource(in AudioPortConfigFw source,
                                                    in AudioAttributesInternal attributes);
 
     void stopAudioSource(int /* audio_port_handle_t */ portId);

@@ -21,8 +21,9 @@ import android.media.audio.common.AudioPortConfig;
 
 /**
  * {@hide}
+ * Suffixed with Fw to avoid name conflict with SDK class.
  */
-parcelable AudioPortConfig {
+parcelable AudioPortConfigFw {
     AudioPortConfig hal;
     AudioPortConfigSys sys;
 }
