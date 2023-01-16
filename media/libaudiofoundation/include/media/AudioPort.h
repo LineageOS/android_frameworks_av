@@ -19,7 +19,7 @@
 #include <string>
 #include <type_traits>
 
-#include <android/media/AudioPort.h>
+#include <android/media/AudioPortFw.h>
 #include <android/media/AudioPortConfigFw.h>
 #include <android/media/audio/common/ExtraAudioDescriptor.h>
 #include <binder/Parcel.h>
@@ -118,8 +118,8 @@ public:
 
     bool equals(const sp<AudioPort>& other) const;
 
-    status_t writeToParcelable(media::AudioPort* parcelable) const;
-    status_t readFromParcelable(const media::AudioPort& parcelable);
+    status_t writeToParcelable(media::AudioPortFw* parcelable) const;
+    status_t readFromParcelable(const media::AudioPortFw& parcelable);
 
     AudioGains mGains; // gain controllers
     // Maximum number of input or output streams that can be simultaneously

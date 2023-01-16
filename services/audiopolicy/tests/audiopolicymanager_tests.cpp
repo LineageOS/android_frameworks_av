@@ -1790,7 +1790,7 @@ TEST_P(AudioPolicyManagerTestDeviceConnection, PassingExtraAudioDescriptors) {
     }
     const std::string name = std::get<1>(GetParam());
     const std::string address = std::get<2>(GetParam());
-    android::media::AudioPort audioPort;
+    android::media::AudioPortFw audioPort;
     ASSERT_EQ(NO_ERROR,
             mManager->deviceToAudioPort(type, address.c_str(), name.c_str(), &audioPort));
     android::media::audio::common::AudioPort& port = audioPort.hal;

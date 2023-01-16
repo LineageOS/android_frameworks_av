@@ -174,7 +174,7 @@ bool DeviceDescriptorBase::supportsFormat(audio_format_t format)
     return false;
 }
 
-status_t DeviceDescriptorBase::writeToParcelable(media::AudioPort* parcelable) const {
+status_t DeviceDescriptorBase::writeToParcelable(media::AudioPortFw* parcelable) const {
     AudioPort::writeToParcelable(parcelable);
     AudioPortConfig::writeToParcelable(&parcelable->sys.activeConfig.hal, useInputChannelMask());
     parcelable->hal.id = VALUE_OR_RETURN_STATUS(legacy2aidl_audio_port_handle_t_int32_t(mId));
@@ -196,7 +196,7 @@ status_t DeviceDescriptorBase::writeToParcelable(media::AudioPort* parcelable) c
     return OK;
 }
 
-status_t DeviceDescriptorBase::readFromParcelable(const media::AudioPort& parcelable) {
+status_t DeviceDescriptorBase::readFromParcelable(const media::AudioPortFw& parcelable) {
     if (parcelable.sys.type != media::AudioPortType::DEVICE) {
         return BAD_VALUE;
     }
@@ -245,7 +245,7 @@ AudioDeviceTypeAddrVector deviceTypeAddrsFromDescriptors(const DeviceDescriptorB
 }
 
 ConversionResult<sp<DeviceDescriptorBase>>
-aidl2legacy_DeviceDescriptorBase(const media::AudioPort& aidl) {
+aidl2legacy_DeviceDescriptorBase(const media::AudioPortFw& aidl) {
     sp<DeviceDescriptorBase> result = new DeviceDescriptorBase(AUDIO_DEVICE_NONE);
     status_t status = result->readFromParcelable(aidl);
     if (status != OK) {
@@ -254,9 +254,9 @@ aidl2legacy_DeviceDescriptorBase(const media::AudioPort& aidl) {
     return result;
 }
 
-ConversionResult<media::AudioPort>
+ConversionResult<media::AudioPortFw>
 legacy2aidl_DeviceDescriptorBase(const sp<DeviceDescriptorBase>& legacy) {
-    media::AudioPort aidl;
+    media::AudioPortFw aidl;
     status_t status = legacy->writeToParcelable(&aidl);
     if (status != OK) {
         return base::unexpected(status);
