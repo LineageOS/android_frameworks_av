@@ -31,6 +31,20 @@ using ::aidl::android::hardware::audio::core::StreamDescriptor;
 
 namespace android {
 
+// static
+template<class T>
+std::shared_ptr<IStreamCommon> StreamHalAidl::getStreamCommon(const std::shared_ptr<T>& stream) {
+    std::shared_ptr<::aidl::android::hardware::audio::core::IStreamCommon> streamCommon;
+    if (stream != nullptr) {
+        if (ndk::ScopedAStatus status = stream->getStreamCommon(&streamCommon);
+                !status.isOk()) {
+            ALOGE("%s: failed to retrieve IStreamCommon instance: %s", __func__,
+                    status.getDescription().c_str());
+        }
+    }
+    return streamCommon;
+}
+
 StreamHalAidl::StreamHalAidl(
         std::string_view className, bool isInput, const StreamDescriptor& descriptor,
         const std::shared_ptr<IStreamCommon>& stream)
@@ -130,11 +144,10 @@ status_t StreamHalAidl::standby() {
     return OK;
 }
 
-status_t StreamHalAidl::dump(int fd __unused, const Vector<String16>& args __unused) {
+status_t StreamHalAidl::dump(int fd, const Vector<String16>& args) {
     TIME_CHECK();
     if (!mStream) return NO_INIT;
-    ALOGE("%s not implemented yet", __func__);
-    return OK;
+    return mStream->dump(fd, Args(args).args(), args.size());
 }
 
 status_t StreamHalAidl::start() {
@@ -190,18 +203,13 @@ bool StreamHalAidl::requestHalThreadPriority(pid_t threadPid __unused, pid_t thr
 status_t StreamHalAidl::legacyCreateAudioPatch(const struct audio_port_config& port __unused,
                                                std::optional<audio_source_t> source __unused,
                                                audio_devices_t type __unused) {
-    TIME_CHECK();
-    LOG_ALWAYS_FATAL_IF(port.type != AUDIO_PORT_TYPE_DEVICE, "port type must be device");
-    if (!mStream) return NO_INIT;
-    ALOGE("%s not implemented yet", __func__);
-    return OK;
+    // Obsolete since 'DeviceHalAidl.supportsAudioPatches' always returns 'true'.
+    return INVALID_OPERATION;
 }
 
 status_t StreamHalAidl::legacyReleaseAudioPatch() {
-    TIME_CHECK();
-    if (!mStream) return NO_INIT;
-    ALOGE("%s not implemented yet", __func__);
-    return OK;
+    // Obsolete since 'DeviceHalAidl.supportsAudioPatches' always returns 'true'.
+    return INVALID_OPERATION;
 }
 
 namespace {
@@ -237,8 +245,7 @@ class StreamCallback : public ::aidl::android::hardware::audio::core::BnStreamCa
 
 StreamOutHalAidl::StreamOutHalAidl(
         const StreamDescriptor& descriptor, const std::shared_ptr<IStreamOut>& stream)
-        : StreamHalAidl("StreamOutHalAidl", false /*isInput*/, descriptor,
-                nullptr /* FIXME: Retrieve IStreamCommon */),
+        : StreamHalAidl("StreamOutHalAidl", false /*isInput*/, descriptor, getStreamCommon(stream)),
           mStream(stream) {}
 
 status_t StreamOutHalAidl::getLatency(uint32_t *latency) {
@@ -452,8 +459,7 @@ status_t StreamOutHalAidl::exit() {
 
 StreamInHalAidl::StreamInHalAidl(
         const StreamDescriptor& descriptor, const std::shared_ptr<IStreamIn>& stream)
-        : StreamHalAidl("StreamInHalAidl", true /*isInput*/, descriptor,
-                nullptr /* FIXME: Retrieve IStreamCommon */),
+        : StreamHalAidl("StreamInHalAidl", true /*isInput*/, descriptor, getStreamCommon(stream)),
           mStream(stream) {}
 
 status_t StreamInHalAidl::setGain(float gain __unused) {

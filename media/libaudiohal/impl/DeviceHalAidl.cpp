@@ -16,15 +16,22 @@
 
 #define LOG_TAG "DeviceHalAidl"
 
+#include <aidl/android/hardware/audio/core/StreamDescriptor.h>
+#include <error/expected_utils.h>
+#include <media/AidlConversionCppNdk.h>
+#include <media/AidlConversionUtil.h>
 #include <mediautils/TimeCheck.h>
 #include <utils/Log.h>
-
-#include <aidl/android/hardware/audio/core/StreamDescriptor.h>
 
 #include "DeviceHalAidl.h"
 #include "StreamHalAidl.h"
 
-using ::aidl::android::hardware::audio::core::StreamDescriptor;
+using aidl::android::aidl_utils::statusTFromBinderStatus;
+using aidl::android::media::audio::common::AudioMode;
+using aidl::android::media::audio::common::Float;
+using aidl::android::hardware::audio::core::IModule;
+using aidl::android::hardware::audio::core::ITelephony;
+using aidl::android::hardware::audio::core::StreamDescriptor;
 
 namespace android {
 
@@ -41,58 +48,66 @@ status_t DeviceHalAidl::initCheck() {
 
 status_t DeviceHalAidl::setVoiceVolume(float volume) {
     TIME_CHECK();
-    mVoiceVolume = volume;
-    ALOGE("%s not implemented yet %f", __func__, volume);
-    return OK;
+    if (!mModule) return NO_INIT;
+    std::shared_ptr<ITelephony> telephony;
+    if (ndk::ScopedAStatus status = mModule->getTelephony(&telephony);
+            status.isOk() && telephony != nullptr) {
+        ITelephony::TelecomConfig inConfig{ .voiceVolume = Float{volume} }, outConfig;
+        RETURN_STATUS_IF_ERROR(
+                statusTFromBinderStatus(telephony->setTelecomConfig(inConfig, &outConfig)));
+        ALOGW_IF(outConfig.voiceVolume.has_value() && volume != outConfig.voiceVolume.value().value,
+                "%s: the resulting voice volume %f is not the same as requested %f",
+                __func__, outConfig.voiceVolume.value().value, volume);
+    }
+    return INVALID_OPERATION;
 }
 
 status_t DeviceHalAidl::setMasterVolume(float volume) {
     TIME_CHECK();
-    mMasterVolume = volume;
-    ALOGE("%s not implemented yet %f", __func__, volume);
-    return OK;
+    if (!mModule) return NO_INIT;
+    return statusTFromBinderStatus(mModule->setMasterVolume(volume));
 }
 
 status_t DeviceHalAidl::getMasterVolume(float *volume) {
     TIME_CHECK();
-    *volume = mMasterVolume;
-    ALOGE("%s not implemented yet %f", __func__, *volume);
-    return OK;
+    if (!mModule) return NO_INIT;
+    return statusTFromBinderStatus(mModule->getMasterVolume(volume));
 }
 
-status_t DeviceHalAidl::setMode(audio_mode_t mode __unused) {
+status_t DeviceHalAidl::setMode(audio_mode_t mode) {
     TIME_CHECK();
     if (!mModule) return NO_INIT;
-    ALOGE("%s not implemented yet", __func__);
-    return OK;
+    AudioMode audioMode = VALUE_OR_FATAL(::aidl::android::legacy2aidl_audio_mode_t_AudioMode(mode));
+    std::shared_ptr<ITelephony> telephony;
+    if (ndk::ScopedAStatus status = mModule->getTelephony(&telephony);
+            status.isOk() && telephony != nullptr) {
+        RETURN_STATUS_IF_ERROR(statusTFromBinderStatus(telephony->switchAudioMode(audioMode)));
+    }
+    return statusTFromBinderStatus(mModule->updateAudioMode(audioMode));
 }
 
 status_t DeviceHalAidl::setMicMute(bool state) {
     TIME_CHECK();
-    mMicMute = state;
-    ALOGE("%s not implemented yet %d", __func__, state);
-    return OK;
+    if (!mModule) return NO_INIT;
+    return statusTFromBinderStatus(mModule->setMicMute(state));
 }
 
 status_t DeviceHalAidl::getMicMute(bool *state) {
     TIME_CHECK();
-    *state = mMicMute;
-    ALOGE("%s not implemented yet %d", __func__, *state);
-    return OK;
+    if (!mModule) return NO_INIT;
+    return statusTFromBinderStatus(mModule->getMicMute(state));
 }
 
 status_t DeviceHalAidl::setMasterMute(bool state) {
     TIME_CHECK();
-    mMasterMute = state;
-    ALOGE("%s not implemented yet %d", __func__, state);
-    return OK;
+    if (!mModule) return NO_INIT;
+    return statusTFromBinderStatus(mModule->setMasterMute(state));
 }
 
 status_t DeviceHalAidl::getMasterMute(bool *state) {
     TIME_CHECK();
-    *state = mMasterMute;
-    ALOGE("%s not implemented yet %d", __func__, *state);
-    return OK;
+    if (!mModule) return NO_INIT;
+    return statusTFromBinderStatus(mModule->getMasterMute(state));
 }
 
 status_t DeviceHalAidl::setParameters(const String8& kvPairs __unused) {
@@ -259,9 +274,10 @@ error::Result<audio_hw_sync_t> DeviceHalAidl::getHwAvSync() {
     return base::unexpected(INVALID_OPERATION);
 }
 
-status_t DeviceHalAidl::dump(int __unused, const Vector<String16>& __unused) {
-    ALOGE("%s not implemented yet", __func__);
-    return OK;
+status_t DeviceHalAidl::dump(int fd, const Vector<String16>& args) {
+    TIME_CHECK();
+    if (!mModule) return NO_INIT;
+    return mModule->dump(fd, Args(args).args(), args.size());
 };
 
 int32_t DeviceHalAidl::supportsBluetoothVariableLatency(bool* supports __unused) {
