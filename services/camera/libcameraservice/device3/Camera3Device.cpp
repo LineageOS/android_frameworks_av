@@ -96,7 +96,8 @@ Camera3Device::Camera3Device(std::shared_ptr<CameraServiceProxyWrapper>& cameraS
         mLastTemplateId(-1),
         mNeedFixupMonochromeTags(false),
         mOverrideForPerfClass(overrideForPerfClass),
-        mOverrideToPortrait(overrideToPortrait)
+        mOverrideToPortrait(overrideToPortrait),
+        mActivePhysicalId("")
 {
     ATRACE_CALL();
     ALOGV("%s: Created device for camera %s", __FUNCTION__, mId.string());
