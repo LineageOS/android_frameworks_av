@@ -542,7 +542,7 @@ sp<AMessage> VideoFrameDecoder::onGetFormatAndSeekOptions(
     if (dstFormat() == COLOR_Format32bitABGR2101010) {
         videoFormat->setInt32("color-format", COLOR_FormatYUVP010);
     } else {
-        videoFormat->setInt32("color-format", OMX_COLOR_FormatYUV420Planar);
+        videoFormat->setInt32("color-format", COLOR_FormatYUV420Flexible);
     }
 
     // For the thumbnail extraction case, try to allocate single buffer in both
@@ -685,7 +685,6 @@ status_t VideoFrameDecoder::onOutputReceived(
     if (mCaptureLayer != nullptr) {
         return captureSurface();
     }
-
     ColorConverter converter((OMX_COLOR_FORMATTYPE)srcFormat, dstFormat());
 
     uint32_t standard, range, transfer;
@@ -698,8 +697,18 @@ status_t VideoFrameDecoder::onOutputReceived(
     if (!outputFormat->findInt32("color-transfer", (int32_t*)&transfer)) {
         transfer = 0;
     }
+    sp<ABuffer> imgObj;
+    if (videoFrameBuffer->meta()->findBuffer("image-data", &imgObj)) {
+        MediaImage2 *imageData = nullptr;
+        imageData = (MediaImage2 *)(imgObj.get()->data());
+        if (imageData != nullptr) {
+            converter.setSrcMediaImage2(*imageData);
+        }
+    }
+    if (srcFormat == COLOR_FormatYUV420Flexible && imgObj.get() == nullptr) {
+        return ERROR_UNSUPPORTED;
+    }
     converter.setSrcColorSpace(standard, range, transfer);
-
     if (converter.isValid()) {
         converter.convert(
                 (const uint8_t *)videoFrameBuffer->data(),
@@ -864,7 +873,7 @@ sp<AMessage> MediaImageDecoder::onGetFormatAndSeekOptions(
     if (dstFormat() == COLOR_Format32bitABGR2101010) {
         videoFormat->setInt32("color-format", COLOR_FormatYUVP010);
     } else {
-        videoFormat->setInt32("color-format", OMX_COLOR_FormatYUV420Planar);
+        videoFormat->setInt32("color-format", COLOR_FormatYUV420Flexible);
     }
 
     if ((mGridRows == 1) && (mGridCols == 1)) {
@@ -966,6 +975,17 @@ status_t MediaImageDecoder::onOutputReceived(
     }
     if (!outputFormat->findInt32("color-transfer", (int32_t*)&transfer)) {
         transfer = 0;
+    }
+    sp<ABuffer> imgObj;
+    if (videoFrameBuffer->meta()->findBuffer("image-data", &imgObj)) {
+        MediaImage2 *imageData = nullptr;
+        imageData = (MediaImage2 *)(imgObj.get()->data());
+        if (imageData != nullptr) {
+            converter.setSrcMediaImage2(*imageData);
+        }
+    }
+    if (srcFormat == COLOR_FormatYUV420Flexible && imgObj.get() == nullptr) {
+        return ERROR_UNSUPPORTED;
     }
     converter.setSrcColorSpace(standard, range, transfer);
 
