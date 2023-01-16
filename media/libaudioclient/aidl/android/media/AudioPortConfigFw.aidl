@@ -16,13 +16,14 @@
 
 package android.media;
 
-import android.media.AudioPortSys;
-import android.media.audio.common.AudioPort;
+import android.media.AudioPortConfigSys;
+import android.media.audio.common.AudioPortConfig;
 
 /**
  * {@hide}
+ * Suffixed with Fw to avoid name conflict with SDK class.
  */
-parcelable AudioPort {
-    AudioPort hal;
-    AudioPortSys sys;
+parcelable AudioPortConfigFw {
+    AudioPortConfig hal;
+    AudioPortConfigSys sys;
 }

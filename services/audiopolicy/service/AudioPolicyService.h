@@ -172,16 +172,16 @@ public:
                                            const media::AudioAttributesInternal& attributes,
                                            bool* _aidl_return) override;
     binder::Status listAudioPorts(media::AudioPortRole role, media::AudioPortType type,
-                                  Int* count, std::vector<media::AudioPort>* ports,
+                                  Int* count, std::vector<media::AudioPortFw>* ports,
                                   int32_t* _aidl_return) override;
     binder::Status getAudioPort(int portId,
-                                media::AudioPort* _aidl_return) override;
-    binder::Status createAudioPatch(const media::AudioPatch& patch, int32_t handle,
+                                media::AudioPortFw* _aidl_return) override;
+    binder::Status createAudioPatch(const media::AudioPatchFw& patch, int32_t handle,
                                     int32_t* _aidl_return) override;
     binder::Status releaseAudioPatch(int32_t handle) override;
-    binder::Status listAudioPatches(Int* count, std::vector<media::AudioPatch>* patches,
+    binder::Status listAudioPatches(Int* count, std::vector<media::AudioPatchFw>* patches,
                                     int32_t* _aidl_return) override;
-    binder::Status setAudioPortConfig(const media::AudioPortConfig& config) override;
+    binder::Status setAudioPortConfig(const media::AudioPortConfigFw& config) override;
     binder::Status registerClient(const sp<media::IAudioPolicyServiceClient>& client) override;
     binder::Status setAudioPortCallbacksEnabled(bool enabled) override;
     binder::Status setAudioVolumeGroupCallbacksEnabled(bool enabled) override;
@@ -197,7 +197,7 @@ public:
             int32_t userId,
             const std::vector<AudioDevice>& devices) override;
     binder::Status removeUserIdDeviceAffinities(int32_t userId) override;
-    binder::Status startAudioSource(const media::AudioPortConfig& source,
+    binder::Status startAudioSource(const media::AudioPortConfigFw& source,
                                     const media::AudioAttributesInternal& attributes,
                                     int32_t* _aidl_return) override;
     binder::Status stopAudioSource(int32_t portId) override;

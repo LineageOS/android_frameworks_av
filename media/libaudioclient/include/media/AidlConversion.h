@@ -27,8 +27,8 @@
 #include <android/media/AudioFlag.h>
 #include <android/media/AudioIoConfigEvent.h>
 #include <android/media/AudioIoDescriptor.h>
-#include <android/media/AudioPort.h>
-#include <android/media/AudioPortConfig.h>
+#include <android/media/AudioPortFw.h>
+#include <android/media/AudioPortConfigFw.h>
 #include <android/media/AudioPortDeviceExtSys.h>
 #include <android/media/AudioTimestampInternal.h>
 #include <android/media/AudioUniqueIdUse.h>
@@ -88,14 +88,14 @@ aidl2legacy_int32_t_audio_port_config_session_ext(int32_t aidl);
 ConversionResult<int32_t> legacy2aidl_audio_port_config_session_ext_AudioPortConfigSessionExt(
         const audio_port_config_session_ext& legacy);
 
-ConversionResult<audio_port_config> aidl2legacy_AudioPortConfig_audio_port_config(
-        const media::AudioPortConfig& aidl);
-ConversionResult<media::AudioPortConfig> legacy2aidl_audio_port_config_AudioPortConfig(
+ConversionResult<audio_port_config> aidl2legacy_AudioPortConfigFw_audio_port_config(
+        const media::AudioPortConfigFw& aidl);
+ConversionResult<media::AudioPortConfigFw> legacy2aidl_audio_port_config_AudioPortConfigFw(
         const audio_port_config& legacy);
 
-ConversionResult<struct audio_patch> aidl2legacy_AudioPatch_audio_patch(
-        const media::AudioPatch& aidl);
-ConversionResult<media::AudioPatch> legacy2aidl_audio_patch_AudioPatch(
+ConversionResult<struct audio_patch> aidl2legacy_AudioPatchFw_audio_patch(
+        const media::AudioPatchFw& aidl);
+ConversionResult<media::AudioPatchFw> legacy2aidl_audio_patch_AudioPatchFw(
         const struct audio_patch& legacy);
 
 ConversionResult<sp<AudioIoDescriptor>> aidl2legacy_AudioIoDescriptor_AudioIoDescriptor(
@@ -167,9 +167,9 @@ ConversionResult<int32_t>
 legacy2aidl_audio_port_session_ext_int32_t(const audio_port_session_ext& legacy);
 
 ConversionResult<audio_port_v7>
-aidl2legacy_AudioPort_audio_port_v7(const media::AudioPort& aidl);
-ConversionResult<media::AudioPort>
-legacy2aidl_audio_port_v7_AudioPort(const audio_port_v7& legacy);
+aidl2legacy_AudioPortFw_audio_port_v7(const media::AudioPortFw& aidl);
+ConversionResult<media::AudioPortFw>
+legacy2aidl_audio_port_v7_AudioPortFw(const audio_port_v7& legacy);
 
 ConversionResult<audio_unique_id_use_t>
 aidl2legacy_AudioUniqueIdUse_audio_unique_id_use_t(media::AudioUniqueIdUse aidl);

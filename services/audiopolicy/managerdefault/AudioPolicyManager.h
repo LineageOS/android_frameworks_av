@@ -1010,7 +1010,7 @@ protected:
 
         // Called by setDeviceConnectionState()
         status_t deviceToAudioPort(audio_devices_t deviceType, const char* device_address,
-                                   const char* device_name, media::AudioPort* aidPort);
+                                   const char* device_name, media::AudioPortFw* aidPort);
         bool isMsdPatch(const audio_patch_handle_t &handle) const;
 
 private:

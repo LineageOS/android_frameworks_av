@@ -666,17 +666,19 @@ status_t AudioFlingerClientAdapter::setLowRamDevice(bool isLowRamDevice, int64_t
 }
 
 status_t AudioFlingerClientAdapter::getAudioPort(struct audio_port_v7* port) {
-    media::AudioPort portAidl = VALUE_OR_RETURN_STATUS(legacy2aidl_audio_port_v7_AudioPort(*port));
-    media::AudioPort aidlRet;
+    media::AudioPortFw portAidl = VALUE_OR_RETURN_STATUS(
+            legacy2aidl_audio_port_v7_AudioPortFw(*port));
+    media::AudioPortFw aidlRet;
     RETURN_STATUS_IF_ERROR(statusTFromBinderStatus(
             mDelegate->getAudioPort(portAidl, &aidlRet)));
-    *port = VALUE_OR_RETURN_STATUS(aidl2legacy_AudioPort_audio_port_v7(aidlRet));
+    *port = VALUE_OR_RETURN_STATUS(aidl2legacy_AudioPortFw_audio_port_v7(aidlRet));
     return OK;
 }
 
 status_t AudioFlingerClientAdapter::createAudioPatch(const struct audio_patch* patch,
                                                      audio_patch_handle_t* handle) {
-    media::AudioPatch patchAidl = VALUE_OR_RETURN_STATUS(legacy2aidl_audio_patch_AudioPatch(*patch));
+    media::AudioPatchFw patchAidl = VALUE_OR_RETURN_STATUS(
+            legacy2aidl_audio_patch_AudioPatchFw(*patch));
     int32_t aidlRet = VALUE_OR_RETURN_STATUS(legacy2aidl_audio_patch_handle_t_int32_t(
                     AUDIO_PATCH_HANDLE_NONE));
     if (handle != nullptr) {
@@ -697,18 +699,18 @@ status_t AudioFlingerClientAdapter::releaseAudioPatch(audio_patch_handle_t handl
 
 status_t AudioFlingerClientAdapter::listAudioPatches(unsigned int* num_patches,
                                                      struct audio_patch* patches) {
-    std::vector<media::AudioPatch> aidlRet;
+    std::vector<media::AudioPatchFw> aidlRet;
     int32_t maxPatches = VALUE_OR_RETURN_STATUS(convertIntegral<int32_t>(*num_patches));
     RETURN_STATUS_IF_ERROR(statusTFromBinderStatus(
             mDelegate->listAudioPatches(maxPatches, &aidlRet)));
     *num_patches = VALUE_OR_RETURN_STATUS(convertIntegral<unsigned int>(aidlRet.size()));
     return convertRange(aidlRet.begin(), aidlRet.end(), patches,
-                        aidl2legacy_AudioPatch_audio_patch);
+                        aidl2legacy_AudioPatchFw_audio_patch);
 }
 
 status_t AudioFlingerClientAdapter::setAudioPortConfig(const struct audio_port_config* config) {
-    media::AudioPortConfig configAidl = VALUE_OR_RETURN_STATUS(
-            legacy2aidl_audio_port_config_AudioPortConfig(*config));
+    media::AudioPortConfigFw configAidl = VALUE_OR_RETURN_STATUS(
+            legacy2aidl_audio_port_config_AudioPortConfigFw(*config));
     return statusTFromBinderStatus(mDelegate->setAudioPortConfig(configAidl));
 }
 
@@ -805,8 +807,8 @@ int32_t AudioFlingerClientAdapter::getAAudioHardwareBurstMinUsec() {
 
 status_t AudioFlingerClientAdapter::setDeviceConnectedState(
         const struct audio_port_v7 *port, bool connected) {
-    media::AudioPort aidlPort = VALUE_OR_RETURN_STATUS(
-            legacy2aidl_audio_port_v7_AudioPort(*port));
+    media::AudioPortFw aidlPort = VALUE_OR_RETURN_STATUS(
+            legacy2aidl_audio_port_v7_AudioPortFw(*port));
     return statusTFromBinderStatus(mDelegate->setDeviceConnectedState(aidlPort, connected));
 }
 
@@ -1237,17 +1239,17 @@ Status AudioFlingerServerAdapter::setLowRamDevice(bool isLowRamDevice, int64_t t
     return Status::fromStatusT(mDelegate->setLowRamDevice(isLowRamDevice, totalMemory));
 }
 
-Status AudioFlingerServerAdapter::getAudioPort(const media::AudioPort& port,
-                                               media::AudioPort* _aidl_return) {
-    audio_port_v7 portLegacy = VALUE_OR_RETURN_BINDER(aidl2legacy_AudioPort_audio_port_v7(port));
+Status AudioFlingerServerAdapter::getAudioPort(const media::AudioPortFw& port,
+                                               media::AudioPortFw* _aidl_return) {
+    audio_port_v7 portLegacy = VALUE_OR_RETURN_BINDER(aidl2legacy_AudioPortFw_audio_port_v7(port));
     RETURN_BINDER_IF_ERROR(mDelegate->getAudioPort(&portLegacy));
-    *_aidl_return = VALUE_OR_RETURN_BINDER(legacy2aidl_audio_port_v7_AudioPort(portLegacy));
+    *_aidl_return = VALUE_OR_RETURN_BINDER(legacy2aidl_audio_port_v7_AudioPortFw(portLegacy));
     return Status::ok();
 }
 
-Status AudioFlingerServerAdapter::createAudioPatch(const media::AudioPatch& patch,
+Status AudioFlingerServerAdapter::createAudioPatch(const media::AudioPatchFw& patch,
                                                    int32_t* _aidl_return) {
-    audio_patch patchLegacy = VALUE_OR_RETURN_BINDER(aidl2legacy_AudioPatch_audio_patch(patch));
+    audio_patch patchLegacy = VALUE_OR_RETURN_BINDER(aidl2legacy_AudioPatchFw_audio_patch(patch));
     audio_patch_handle_t handleLegacy = VALUE_OR_RETURN_BINDER(
             aidl2legacy_int32_t_audio_patch_handle_t(*_aidl_return));
     RETURN_BINDER_IF_ERROR(mDelegate->createAudioPatch(&patchLegacy, &handleLegacy));
@@ -1262,7 +1264,7 @@ Status AudioFlingerServerAdapter::releaseAudioPatch(int32_t handle) {
 }
 
 Status AudioFlingerServerAdapter::listAudioPatches(int32_t maxCount,
-                            std::vector<media::AudioPatch>* _aidl_return) {
+                            std::vector<media::AudioPatchFw>* _aidl_return) {
     unsigned int count = VALUE_OR_RETURN_BINDER(convertIntegral<unsigned int>(maxCount));
     count = std::min(count, static_cast<unsigned int>(MAX_ITEMS_PER_LIST));
     std::unique_ptr<audio_patch[]> patchesLegacy(new audio_patch[count]);
@@ -1270,13 +1272,13 @@ Status AudioFlingerServerAdapter::listAudioPatches(int32_t maxCount,
     RETURN_BINDER_IF_ERROR(convertRange(&patchesLegacy[0],
                            &patchesLegacy[count],
                            std::back_inserter(*_aidl_return),
-                           legacy2aidl_audio_patch_AudioPatch));
+                           legacy2aidl_audio_patch_AudioPatchFw));
     return Status::ok();
 }
 
-Status AudioFlingerServerAdapter::setAudioPortConfig(const media::AudioPortConfig& config) {
+Status AudioFlingerServerAdapter::setAudioPortConfig(const media::AudioPortConfigFw& config) {
     audio_port_config configLegacy = VALUE_OR_RETURN_BINDER(
-            aidl2legacy_AudioPortConfig_audio_port_config(config));
+            aidl2legacy_AudioPortConfigFw_audio_port_config(config));
     return Status::fromStatusT(mDelegate->setAudioPortConfig(&configLegacy));
 }
 
@@ -1354,8 +1356,8 @@ Status AudioFlingerServerAdapter::getAAudioHardwareBurstMinUsec(int32_t* _aidl_r
 }
 
 Status AudioFlingerServerAdapter::setDeviceConnectedState(
-        const media::AudioPort& port, bool connected) {
-    audio_port_v7 portLegacy = VALUE_OR_RETURN_BINDER(aidl2legacy_AudioPort_audio_port_v7(port));
+        const media::AudioPortFw& port, bool connected) {
+    audio_port_v7 portLegacy = VALUE_OR_RETURN_BINDER(aidl2legacy_AudioPortFw_audio_port_v7(port));
     return Status::fromStatusT(mDelegate->setDeviceConnectedState(&portLegacy, connected));
 }
 

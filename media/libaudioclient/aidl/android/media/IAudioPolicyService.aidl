@@ -23,12 +23,12 @@ import android.media.AudioAttributesInternal;
 import android.media.AudioDirectMode;
 import android.media.AudioMix;
 import android.media.AudioOffloadMode;
-import android.media.AudioPatch;
+import android.media.AudioPatchFw;
 import android.media.AudioPolicyDeviceState;
 import android.media.AudioPolicyForcedConfig;
 import android.media.AudioPolicyForceUse;
-import android.media.AudioPort;
-import android.media.AudioPortConfig;
+import android.media.AudioPortFw;
+import android.media.AudioPortConfigFw;
 import android.media.AudioPortRole;
 import android.media.AudioPortType;
 import android.media.AudioProductStrategy;
@@ -212,16 +212,16 @@ interface IAudioPolicyService {
     int listAudioPorts(AudioPortRole role,
                        AudioPortType type,
                        inout Int count,
-                       out AudioPort[] ports);
+                       out AudioPortFw[] ports);
 
     /** Get attributes for the audio port with the given id (AudioPort.hal.id field). */
-    AudioPort getAudioPort(int /* audio_port_handle_t */ portId);
+    AudioPortFw getAudioPort(int /* audio_port_handle_t */ portId);
 
     /**
      * Create an audio patch between several source and sink ports.
      * The handle argument is used when updating an existing patch.
      */
-    int /* audio_patch_handle_t */ createAudioPatch(in AudioPatch patch, int handle);
+    int /* audio_patch_handle_t */ createAudioPatch(in AudioPatchFw patch, int handle);
 
     /** Release an audio patch. */
     void releaseAudioPatch(int /* audio_patch_handle_t */ handle);
@@ -234,10 +234,10 @@ interface IAudioPolicyService {
      * Passing '0' on input and inspecting the value on output is a common way of determining the
      * number of elements without actually retrieving them.
      */
-    int listAudioPatches(inout Int count, out AudioPatch[] patches);
+    int listAudioPatches(inout Int count, out AudioPatchFw[] patches);
 
     /** Set audio port configuration. */
-    void setAudioPortConfig(in AudioPortConfig config);
+    void setAudioPortConfig(in AudioPortConfigFw config);
 
     void registerClient(IAudioPolicyServiceClient client);
 
@@ -261,7 +261,7 @@ interface IAudioPolicyService {
 
     void removeUserIdDeviceAffinities(int userId);
 
-    int /* audio_port_handle_t */ startAudioSource(in AudioPortConfig source,
+    int /* audio_port_handle_t */ startAudioSource(in AudioPortConfigFw source,
                                                    in AudioAttributesInternal attributes);
 
     void stopAudioSource(int /* audio_port_handle_t */ portId);
