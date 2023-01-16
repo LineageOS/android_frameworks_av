@@ -27,7 +27,7 @@
 #include <android/media/AudioFlag.h>
 #include <android/media/AudioIoConfigEvent.h>
 #include <android/media/AudioIoDescriptor.h>
-#include <android/media/AudioPort.h>
+#include <android/media/AudioPortFw.h>
 #include <android/media/AudioPortConfigFw.h>
 #include <android/media/AudioPortDeviceExtSys.h>
 #include <android/media/AudioTimestampInternal.h>
@@ -167,8 +167,8 @@ ConversionResult<int32_t>
 legacy2aidl_audio_port_session_ext_int32_t(const audio_port_session_ext& legacy);
 
 ConversionResult<audio_port_v7>
-aidl2legacy_AudioPort_audio_port_v7(const media::AudioPort& aidl);
-ConversionResult<media::AudioPort>
+aidl2legacy_AudioPort_audio_port_v7(const media::AudioPortFw& aidl);
+ConversionResult<media::AudioPortFw>
 legacy2aidl_audio_port_v7_AudioPort(const audio_port_v7& legacy);
 
 ConversionResult<audio_unique_id_use_t>

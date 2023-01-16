@@ -117,7 +117,7 @@ TEST(AudioFoundationParcelableTest, ParcelingAudioPort) {
     audioPort->setGains(getAudioGainsForTest());
     audioPort->setAudioProfiles(getAudioProfileVectorForTest());
 
-    media::AudioPort parcelable;
+    media::AudioPortFw parcelable;
     ASSERT_EQ(NO_ERROR, audioPort->writeToParcelable(&parcelable));
     sp<AudioPort> audioPortFromParcel = new AudioPort(
             "", AUDIO_PORT_TYPE_NONE, AUDIO_PORT_ROLE_NONE);
@@ -152,7 +152,7 @@ TEST(AudioFoundationParcelableTest, ParcelingDeviceDescriptorBase) {
     ASSERT_EQ(desc->setEncapsulationMetadataTypes(
             AUDIO_ENCAPSULATION_METADATA_TYPE_ALL_POSITION_BITS), NO_ERROR);
 
-    media::AudioPort parcelable;
+    media::AudioPortFw parcelable;
     ASSERT_EQ(NO_ERROR, desc->writeToParcelable(&parcelable));
     sp<DeviceDescriptorBase> descFromParcel = new DeviceDescriptorBase(AUDIO_DEVICE_NONE);
     ASSERT_EQ(NO_ERROR, descFromParcel->readFromParcelable(parcelable));

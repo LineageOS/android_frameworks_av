@@ -666,8 +666,9 @@ status_t AudioFlingerClientAdapter::setLowRamDevice(bool isLowRamDevice, int64_t
 }
 
 status_t AudioFlingerClientAdapter::getAudioPort(struct audio_port_v7* port) {
-    media::AudioPort portAidl = VALUE_OR_RETURN_STATUS(legacy2aidl_audio_port_v7_AudioPort(*port));
-    media::AudioPort aidlRet;
+    media::AudioPortFw portAidl = VALUE_OR_RETURN_STATUS(
+            legacy2aidl_audio_port_v7_AudioPort(*port));
+    media::AudioPortFw aidlRet;
     RETURN_STATUS_IF_ERROR(statusTFromBinderStatus(
             mDelegate->getAudioPort(portAidl, &aidlRet)));
     *port = VALUE_OR_RETURN_STATUS(aidl2legacy_AudioPort_audio_port_v7(aidlRet));
@@ -805,7 +806,7 @@ int32_t AudioFlingerClientAdapter::getAAudioHardwareBurstMinUsec() {
 
 status_t AudioFlingerClientAdapter::setDeviceConnectedState(
         const struct audio_port_v7 *port, bool connected) {
-    media::AudioPort aidlPort = VALUE_OR_RETURN_STATUS(
+    media::AudioPortFw aidlPort = VALUE_OR_RETURN_STATUS(
             legacy2aidl_audio_port_v7_AudioPort(*port));
     return statusTFromBinderStatus(mDelegate->setDeviceConnectedState(aidlPort, connected));
 }
@@ -1237,8 +1238,8 @@ Status AudioFlingerServerAdapter::setLowRamDevice(bool isLowRamDevice, int64_t t
     return Status::fromStatusT(mDelegate->setLowRamDevice(isLowRamDevice, totalMemory));
 }
 
-Status AudioFlingerServerAdapter::getAudioPort(const media::AudioPort& port,
-                                               media::AudioPort* _aidl_return) {
+Status AudioFlingerServerAdapter::getAudioPort(const media::AudioPortFw& port,
+                                               media::AudioPortFw* _aidl_return) {
     audio_port_v7 portLegacy = VALUE_OR_RETURN_BINDER(aidl2legacy_AudioPort_audio_port_v7(port));
     RETURN_BINDER_IF_ERROR(mDelegate->getAudioPort(&portLegacy));
     *_aidl_return = VALUE_OR_RETURN_BINDER(legacy2aidl_audio_port_v7_AudioPort(portLegacy));
@@ -1354,7 +1355,7 @@ Status AudioFlingerServerAdapter::getAAudioHardwareBurstMinUsec(int32_t* _aidl_r
 }
 
 Status AudioFlingerServerAdapter::setDeviceConnectedState(
-        const media::AudioPort& port, bool connected) {
+        const media::AudioPortFw& port, bool connected) {
     audio_port_v7 portLegacy = VALUE_OR_RETURN_BINDER(aidl2legacy_AudioPort_audio_port_v7(port));
     return Status::fromStatusT(mDelegate->setDeviceConnectedState(&portLegacy, connected));
 }

@@ -27,7 +27,7 @@ import android.media.AudioPatch;
 import android.media.AudioPolicyDeviceState;
 import android.media.AudioPolicyForcedConfig;
 import android.media.AudioPolicyForceUse;
-import android.media.AudioPort;
+import android.media.AudioPortFw;
 import android.media.AudioPortConfigFw;
 import android.media.AudioPortRole;
 import android.media.AudioPortType;
@@ -212,10 +212,10 @@ interface IAudioPolicyService {
     int listAudioPorts(AudioPortRole role,
                        AudioPortType type,
                        inout Int count,
-                       out AudioPort[] ports);
+                       out AudioPortFw[] ports);
 
     /** Get attributes for the audio port with the given id (AudioPort.hal.id field). */
-    AudioPort getAudioPort(int /* audio_port_handle_t */ portId);
+    AudioPortFw getAudioPort(int /* audio_port_handle_t */ portId);
 
     /**
      * Create an audio patch between several source and sink ports.

@@ -678,7 +678,7 @@ public:
     Status getPrimaryOutputSamplingRate(int32_t* _aidl_return) override;
     Status getPrimaryOutputFrameCount(int64_t* _aidl_return) override;
     Status setLowRamDevice(bool isLowRamDevice, int64_t totalMemory) override;
-    Status getAudioPort(const media::AudioPort& port, media::AudioPort* _aidl_return) override;
+    Status getAudioPort(const media::AudioPortFw& port, media::AudioPortFw* _aidl_return) override;
     Status createAudioPatch(const media::AudioPatch& patch, int32_t* _aidl_return) override;
     Status releaseAudioPatch(int32_t handle) override;
     Status listAudioPatches(int32_t maxCount,
@@ -698,7 +698,7 @@ public:
             std::vector<media::audio::common::AudioMMapPolicyInfo> *_aidl_return) override;
     Status getAAudioMixerBurstCount(int32_t* _aidl_return) override;
     Status getAAudioHardwareBurstMinUsec(int32_t* _aidl_return) override;
-    Status setDeviceConnectedState(const media::AudioPort& port, bool connected) override;
+    Status setDeviceConnectedState(const media::AudioPortFw& port, bool connected) override;
     Status setRequestedLatencyMode(
             int output, media::audio::common::AudioLatencyMode mode) override;
     Status getSupportedLatencyModes(int output,
