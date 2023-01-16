@@ -20,7 +20,7 @@
 #include <type_traits>
 
 #include <android/media/AudioPort.h>
-#include <android/media/AudioPortConfig.h>
+#include <android/media/AudioPortConfigFw.h>
 #include <android/media/audio/common/ExtraAudioDescriptor.h>
 #include <binder/Parcel.h>
 #include <binder/Parcelable.h>

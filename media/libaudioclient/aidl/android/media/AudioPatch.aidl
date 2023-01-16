@@ -16,7 +16,7 @@
 
 package android.media;
 
-import android.media.AudioPortConfig;
+import android.media.AudioPortConfigFw;
 
 /**
  * {@hide}
@@ -27,6 +27,6 @@ parcelable AudioPatch {
      * Interpreted as audio_patch_handle_t.
      */
     int id;
-    AudioPortConfig[] sources;
-    AudioPortConfig[] sinks;
+    AudioPortConfigFw[] sources;
+    AudioPortConfigFw[] sinks;
 }

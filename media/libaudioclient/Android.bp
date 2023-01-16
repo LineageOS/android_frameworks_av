@@ -290,7 +290,7 @@ aidl_interface {
         "aidl/android/media/AudioPatch.aidl",
         "aidl/android/media/AudioPort.aidl",
         "aidl/android/media/AudioPortSys.aidl",
-        "aidl/android/media/AudioPortConfig.aidl",
+        "aidl/android/media/AudioPortConfigFw.aidl",
         "aidl/android/media/AudioPortConfigSys.aidl",
         "aidl/android/media/AudioPortDeviceExtSys.aidl",
         "aidl/android/media/AudioPortExtSys.aidl",
