@@ -23,7 +23,7 @@ import android.media.AudioAttributesInternal;
 import android.media.AudioDirectMode;
 import android.media.AudioMix;
 import android.media.AudioOffloadMode;
-import android.media.AudioPatch;
+import android.media.AudioPatchFw;
 import android.media.AudioPolicyDeviceState;
 import android.media.AudioPolicyForcedConfig;
 import android.media.AudioPolicyForceUse;
@@ -221,7 +221,7 @@ interface IAudioPolicyService {
      * Create an audio patch between several source and sink ports.
      * The handle argument is used when updating an existing patch.
      */
-    int /* audio_patch_handle_t */ createAudioPatch(in AudioPatch patch, int handle);
+    int /* audio_patch_handle_t */ createAudioPatch(in AudioPatchFw patch, int handle);
 
     /** Release an audio patch. */
     void releaseAudioPatch(int /* audio_patch_handle_t */ handle);
@@ -234,7 +234,7 @@ interface IAudioPolicyService {
      * Passing '0' on input and inspecting the value on output is a common way of determining the
      * number of elements without actually retrieving them.
      */
-    int listAudioPatches(inout Int count, out AudioPatch[] patches);
+    int listAudioPatches(inout Int count, out AudioPatchFw[] patches);
 
     /** Set audio port configuration. */
     void setAudioPortConfig(in AudioPortConfigFw config);

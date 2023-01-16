@@ -679,10 +679,10 @@ public:
     Status getPrimaryOutputFrameCount(int64_t* _aidl_return) override;
     Status setLowRamDevice(bool isLowRamDevice, int64_t totalMemory) override;
     Status getAudioPort(const media::AudioPortFw& port, media::AudioPortFw* _aidl_return) override;
-    Status createAudioPatch(const media::AudioPatch& patch, int32_t* _aidl_return) override;
+    Status createAudioPatch(const media::AudioPatchFw& patch, int32_t* _aidl_return) override;
     Status releaseAudioPatch(int32_t handle) override;
     Status listAudioPatches(int32_t maxCount,
-                            std::vector<media::AudioPatch>* _aidl_return) override;
+                            std::vector<media::AudioPatchFw>* _aidl_return) override;
     Status setAudioPortConfig(const media::AudioPortConfigFw& config) override;
     Status getAudioHwSyncForSession(int32_t sessionId, int32_t* _aidl_return) override;
     Status systemReady() override;

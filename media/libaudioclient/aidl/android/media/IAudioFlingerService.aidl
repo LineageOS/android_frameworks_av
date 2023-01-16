@@ -16,7 +16,7 @@
 
 package android.media;
 
-import android.media.AudioPatch;
+import android.media.AudioPatchFw;
 import android.media.AudioPortFw;
 import android.media.AudioPortConfigFw;
 import android.media.AudioUniqueIdUse;
@@ -185,13 +185,13 @@ interface IAudioFlingerService {
     AudioPortFw getAudioPort(in AudioPortFw port);
 
     /* Create an audio patch between several source and sink ports */
-    int /* audio_patch_handle_t */ createAudioPatch(in AudioPatch patch);
+    int /* audio_patch_handle_t */ createAudioPatch(in AudioPatchFw patch);
 
     /* Release an audio patch */
     void releaseAudioPatch(int /* audio_patch_handle_t */ handle);
 
     /* List existing audio patches */
-    AudioPatch[] listAudioPatches(int maxCount);
+    AudioPatchFw[] listAudioPatches(int maxCount);
     /* Set audio port configuration */
     void setAudioPortConfig(in AudioPortConfigFw config);
 

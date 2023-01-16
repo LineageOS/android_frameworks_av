@@ -94,8 +94,8 @@ ConversionResult<media::AudioPortConfigFw> legacy2aidl_audio_port_config_AudioPo
         const audio_port_config& legacy);
 
 ConversionResult<struct audio_patch> aidl2legacy_AudioPatch_audio_patch(
-        const media::AudioPatch& aidl);
-ConversionResult<media::AudioPatch> legacy2aidl_audio_patch_AudioPatch(
+        const media::AudioPatchFw& aidl);
+ConversionResult<media::AudioPatchFw> legacy2aidl_audio_patch_AudioPatch(
         const struct audio_patch& legacy);
 
 ConversionResult<sp<AudioIoDescriptor>> aidl2legacy_AudioIoDescriptor_AudioIoDescriptor(
