@@ -411,7 +411,6 @@ static inline ::android::binder::Status binderStatusFromStatusT(
     return Status::fromServiceSpecificError(status, emptyIfNull);
 }
 
-
 } // namespace aidl_utils
 
 }  // namespace android
