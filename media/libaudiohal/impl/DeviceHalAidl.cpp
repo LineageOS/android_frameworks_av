@@ -15,6 +15,7 @@
  */
 
 #define LOG_TAG "DeviceHalAidl"
+// #define LOG_NDEBUG 0
 
 #include <aidl/android/hardware/audio/core/StreamDescriptor.h>
 #include <error/expected_utils.h>
@@ -32,6 +33,7 @@ using aidl::android::media::audio::common::Float;
 using aidl::android::hardware::audio::core::IModule;
 using aidl::android::hardware::audio::core::ITelephony;
 using aidl::android::hardware::audio::core::StreamDescriptor;
+using aidl::android::hardware::audio::core::sounddose::ISoundDose;
 
 namespace android {
 
@@ -284,6 +286,26 @@ int32_t DeviceHalAidl::supportsBluetoothVariableLatency(bool* supports __unused)
     TIME_CHECK();
     ALOGE("%s not implemented yet", __func__);
     return INVALID_OPERATION;
+}
+
+status_t DeviceHalAidl::getSoundDoseInterface(const std::string& module,
+                                              ::ndk::SpAIBinder* soundDoseBinder)  {
+    TIME_CHECK();
+    if (!mModule) return NO_INIT;
+    if (mSoundDose == nullptr) {
+        ndk::ScopedAStatus status = mModule->getSoundDose(&mSoundDose);
+        if (!status.isOk()) {
+            ALOGE("%s failed to return the sound dose interface for module %s: %s",
+                  __func__,
+                  module.c_str(),
+                  status.getDescription().c_str());
+            return BAD_VALUE;
+        }
+    }
+    *soundDoseBinder = mSoundDose->asBinder();
+    ALOGI("%s using audio AIDL HAL sound dose interface", __func__);
+
+    return OK;
 }
 
 } // namespace android
