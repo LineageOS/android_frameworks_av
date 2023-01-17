@@ -82,18 +82,75 @@ binder_status_t TunerService::instantiate() {
     return AServiceManager_addService(tunerService->asBinder().get(), getServiceName());
 }
 
-::ndk::ScopedAStatus TunerService::openDemux(int32_t /* in_demuxHandle */,
+::ndk::ScopedAStatus TunerService::openDemux(int32_t in_demuxHandle,
                                              shared_ptr<ITunerDemux>* _aidl_return) {
     ALOGV("openDemux");
-    vector<int32_t> id;
     shared_ptr<IDemux> demux;
-    auto status = mTuner->openDemux(&id, &demux);
-    if (status.isOk()) {
-        *_aidl_return =
-                ::ndk::SharedRefBase::make<TunerDemux>(demux, id[0], this->ref<TunerService>());
+    bool fallBackToOpenDemux = false;
+    vector<int32_t> ids;
+
+    if (mTunerVersion <= TUNER_HAL_VERSION_2_0) {
+        fallBackToOpenDemux = true;
+    } else {
+        mTuner->getDemuxIds(&ids);
+        if (ids.size() == 0) {
+            fallBackToOpenDemux = true;
+        }
     }
 
-    return status;
+    if (fallBackToOpenDemux) {
+        auto status = mTuner->openDemux(&ids, &demux);
+        return ::ndk::ScopedAStatus::fromServiceSpecificError(
+                static_cast<int32_t>(Result::UNAVAILABLE));
+    } else {
+        int id = TunerHelper::getResourceIdFromHandle(in_demuxHandle, DEMUX);
+        auto status = mTuner->openDemuxById(id, &demux);
+        if (status.isOk()) {
+            *_aidl_return =
+                    ::ndk::SharedRefBase::make<TunerDemux>(demux, id, this->ref<TunerService>());
+        }
+        return status;
+    }
+}
+
+::ndk::ScopedAStatus TunerService::getDemuxInfo(int32_t in_demuxHandle, DemuxInfo* _aidl_return) {
+    if (mTunerVersion <= TUNER_HAL_VERSION_2_0) {
+        return ::ndk::ScopedAStatus::fromServiceSpecificError(
+                static_cast<int32_t>(Result::UNAVAILABLE));
+    }
+    int id = TunerHelper::getResourceIdFromHandle(in_demuxHandle, DEMUX);
+    return mTuner->getDemuxInfo(id, _aidl_return);
+}
+
+::ndk::ScopedAStatus TunerService::getDemuxInfoList(vector<DemuxInfo>* _aidl_return) {
+    if (mTunerVersion <= TUNER_HAL_VERSION_2_0) {
+        return ::ndk::ScopedAStatus::fromServiceSpecificError(
+                static_cast<int32_t>(Result::UNAVAILABLE));
+    }
+    vector<DemuxInfo> demuxInfoList;
+    vector<int32_t> ids;
+    auto status = mTuner->getDemuxIds(&ids);
+    if (!status.isOk()) {
+        return ::ndk::ScopedAStatus::fromServiceSpecificError(
+                static_cast<int32_t>(Result::UNAVAILABLE));
+    }
+
+    for (int i = 0; i < ids.size(); i++) {
+        DemuxInfo demuxInfo;
+        auto res = mTuner->getDemuxInfo(ids[i], &demuxInfo);
+        if (!res.isOk()) {
+            continue;
+        }
+        demuxInfoList.push_back(demuxInfo);
+    }
+
+    if (demuxInfoList.size() > 0) {
+        *_aidl_return = demuxInfoList;
+        return ::ndk::ScopedAStatus::ok();
+    } else {
+        return ::ndk::ScopedAStatus::fromServiceSpecificError(
+                static_cast<int32_t>(Result::UNAVAILABLE));
+    }
 }
 
 ::ndk::ScopedAStatus TunerService::getDemuxCaps(DemuxCapabilities* _aidl_return) {
@@ -230,7 +287,9 @@ void TunerService::removeSharedFilter(const shared_ptr<TunerFilter>& sharedFilte
 }
 
 void TunerService::updateTunerResources() {
-    TunerHelper::updateTunerResources(getTRMFrontendInfos(), getTRMLnbHandles());
+    TunerHelper::updateTunerResources(getTRMFrontendInfos(),
+                                      getTRMDemuxInfos(),
+                                      getTRMLnbHandles());
 }
 
 vector<TunerFrontendInfo> TunerService::getTRMFrontendInfos() {
@@ -253,6 +312,32 @@ vector<TunerFrontendInfo> TunerService::getTRMFrontendInfos() {
                 .exclusiveGroupId = frontendInfo.exclusiveGroupId,
         };
         infos.push_back(tunerFrontendInfo);
+    }
+
+    return infos;
+}
+
+vector<TunerDemuxInfo> TunerService::getTRMDemuxInfos() {
+    vector<TunerDemuxInfo> infos;
+    vector<int32_t> ids;
+
+    if (mTunerVersion <= TUNER_HAL_VERSION_2_0) {
+        return infos;
+    }
+
+    auto status = mTuner->getDemuxIds(&ids);
+    if (!status.isOk()) {
+        return infos;
+    }
+
+    for (int i = 0; i < ids.size(); i++) {
+        DemuxInfo demuxInfo;
+        mTuner->getDemuxInfo(ids[i], &demuxInfo);
+        TunerDemuxInfo tunerDemuxInfo{
+                .handle = TunerHelper::getResourceHandleFromId((int)ids[i], DEMUX),
+                .filterTypes = static_cast<int>(demuxInfo.filterTypes)
+        };
+        infos.push_back(tunerDemuxInfo);
     }
 
     return infos;
