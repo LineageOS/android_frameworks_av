@@ -56,6 +56,7 @@ public:
     AttributesVector getAudioAttributes() const;
     product_strategy_t getId() const { return mId; }
     StreamTypeVector getSupportedStreams() const;
+    VolumeGroupAttributesVector getVolumeGroupAttributes() const { return mAttributesVector; }
 
     /**
      * @brief matches checks if the given audio attributes shall follow the strategy.
@@ -63,9 +64,9 @@ public:
      *        If only the usage is available, the check is performed on the usages of the given
      *        attributes, otherwise all fields must match.
      * @param attributes to consider
-     * @return true if attributes matches with the strategy, false otherwise.
+     * @return matching score, negative value if no match.
      */
-    bool matches(const audio_attributes_t attributes) const;
+    int matchesScore(const audio_attributes_t attributes) const;
 
     bool supportStreamType(const audio_stream_type_t &streamType) const;
 
@@ -84,9 +85,6 @@ public:
     DeviceTypeSet getDeviceTypes() const { return mApplicableDevices; }
 
     audio_attributes_t getAttributesForStreamType(audio_stream_type_t stream) const;
-    audio_stream_type_t getStreamTypeForAttributes(const audio_attributes_t &attr) const;
-
-    volume_group_t getVolumeGroupForAttributes(const audio_attributes_t &attr) const;
 
     volume_group_t getVolumeGroupForStreamType(audio_stream_type_t stream) const;
 
@@ -161,6 +159,9 @@ public:
     void dump(String8 *dst, int spaces = 0) const;
 
 private:
+    VolumeGroupAttributes getVolumeGroupAttributesForAttributes(
+            const audio_attributes_t &attr, bool fallbackOnDefault = true) const;
+
     product_strategy_t mDefaultStrategy = PRODUCT_STRATEGY_NONE;
 };
 
