@@ -1719,6 +1719,8 @@ c2_status_t Codec2Client::Component::setOutputSurface(
                     static_cast<uint64_t>(blockPoolId),
                     bqId == 0 ? nullHgbp : igbp);
 
+    mOutputBufferQueue->expireOldWaiters();
+
     if (!transStatus.isOk()) {
         LOG(ERROR) << "setOutputSurface -- transaction failed.";
         return C2_TRANSACTION_FAILED;
@@ -1764,6 +1766,7 @@ void Codec2Client::Component::stopUsingOutputSurface(
                        << status << ".";
         }
     }
+    mOutputBufferQueue->expireOldWaiters();
 }
 
 c2_status_t Codec2Client::Component::connectToInputSurface(

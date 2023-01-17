@@ -112,6 +112,11 @@ struct C2SyncVariables {
      */
     c2_status_t waitForChange(uint32_t waitId, c2_nsecs_t timeoutNs);
 
+    /**
+     * Wake up and expire all waitors.
+     */
+    void notifyAll();
+
     C2SyncVariables() {}
 
 private:
