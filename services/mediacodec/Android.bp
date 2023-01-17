@@ -147,6 +147,9 @@ prebuilt_etc {
         arm64: {
             src: "seccomp_policy/mediacodec-arm64.policy",
         },
+        riscv64: {
+            enabled: false,
+        },
         x86: {
             src: "seccomp_policy/mediacodec-x86.policy",
         },
