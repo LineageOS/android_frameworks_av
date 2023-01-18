@@ -123,6 +123,20 @@ binder_status_t TunerHidlService::instantiate() {
     return ::ndk::ScopedAStatus::fromServiceSpecificError(static_cast<int32_t>(res));
 }
 
+::ndk::ScopedAStatus TunerHidlService::getDemuxInfo(int32_t /* in_demuxHandle */,
+                                                    DemuxInfo* /* _aidl_return */) {
+    ALOGE("getDemuxInfo is not supported");
+    return ::ndk::ScopedAStatus::fromServiceSpecificError(
+            static_cast<int32_t>(HidlResult::UNAVAILABLE));
+}
+
+::ndk::ScopedAStatus TunerHidlService::getDemuxInfoList(
+        vector<DemuxInfo>* /* _aidle_return */) {
+    ALOGE("getDemuxInfoList is not supported");
+    return ::ndk::ScopedAStatus::fromServiceSpecificError(
+            static_cast<int32_t>(HidlResult::UNAVAILABLE));
+}
+
 ::ndk::ScopedAStatus TunerHidlService::getDemuxCaps(DemuxCapabilities* _aidl_return) {
     ALOGV("getDemuxCaps");
     HidlResult res;

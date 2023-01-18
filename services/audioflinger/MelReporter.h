@@ -45,13 +45,16 @@ public:
      * does not support the sound dose interface for this module, the internal MEL
      * calculation will be use.
      *
-     * For now support internal MelReporting only if the sound dose standalone HAL
-     * is not implemented
+     * <p>If the device is using the audio AIDL HAL then this method will try to get the sound
+     * dose interface from IModule#getSoundDose(). Otherwise, if the legacy audio HIDL HAL is used
+     * this method will be looking for the standalone sound dose implementation. It falls back to
+     * the internal MEL computation if no valid sound dose interface can be retrieved.
      *
-     * @return true if the MEL reporting will be done from the sound dose HAL
-     * interface
+     * @return true if the MEL reporting will be done from any sound dose HAL interface
+     * implementation, false otherwise.
      */
-    bool activateHalSoundDoseComputation(const std::string& module);
+    bool activateHalSoundDoseComputation(const std::string& module,
+                                         const sp<DeviceHalInterface>& device);
 
     /**
      * Activates the MEL reporting from internal framework values. These are used
@@ -78,8 +81,6 @@ private:
                                         audio_port_handle_t deviceId);
 
     AudioFlinger& mAudioFlinger;  // does not own the object
-    std::shared_ptr<::aidl::android::hardware::audio::sounddose::ISoundDoseFactory>
-        mSoundDoseFactory;
 
     sp<SoundDoseManager> mSoundDoseManager;
 

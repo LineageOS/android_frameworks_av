@@ -33,7 +33,6 @@
 #include <sys/types.h>
 #include <limits.h>
 
-#include <aidl/android/hardware/audio/sounddose/ISoundDoseFactory.h>
 #include <android/media/BnAudioTrack.h>
 #include <android/media/IAudioFlingerClient.h>
 #include <android/media/IAudioTrackCallback.h>

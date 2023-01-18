@@ -33,6 +33,7 @@
 using ::aidl::android::hardware::tv::tuner::DemuxCapabilities;
 using ::aidl::android::hardware::tv::tuner::DemuxFilterEvent;
 using ::aidl::android::hardware::tv::tuner::DemuxFilterStatus;
+using ::aidl::android::hardware::tv::tuner::DemuxInfo;
 using ::aidl::android::hardware::tv::tuner::FrontendInfo;
 using ::aidl::android::hardware::tv::tuner::FrontendType;
 using ::aidl::android::media::tv::tuner::ITunerDemux;
@@ -83,6 +84,8 @@ public:
     ::ndk::ScopedAStatus openDemux(int32_t in_demuxHandle,
                                    shared_ptr<ITunerDemux>* _aidl_return) override;
     ::ndk::ScopedAStatus getDemuxCaps(DemuxCapabilities* _aidl_return) override;
+    ::ndk::ScopedAStatus getDemuxInfo(int32_t in_demuxHandle, DemuxInfo* _aidl_return) override;
+    ::ndk::ScopedAStatus getDemuxInfoList(vector<DemuxInfo>* _aidl_return) override;
     ::ndk::ScopedAStatus openDescrambler(int32_t in_descramblerHandle,
                                          shared_ptr<ITunerDescrambler>* _aidl_return) override;
     ::ndk::ScopedAStatus getTunerHalVersion(int32_t* _aidl_return) override;

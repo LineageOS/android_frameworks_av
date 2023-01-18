@@ -130,12 +130,17 @@ class DeviceHalHidl : public DeviceHalInterface, public CoreConversionHelperHidl
 
     status_t dump(int fd, const Vector<String16>& args) override;
 
+    status_t getSoundDoseInterface(const std::string& module,
+                                   ::ndk::SpAIBinder* soundDoseBinder) override;
+
   private:
     friend class DevicesFactoryHalHidl;
     sp<::android::hardware::audio::CPP_VERSION::IDevice> mDevice;
     // Null if it's not a primary device.
     sp<::android::hardware::audio::CPP_VERSION::IPrimaryDevice> mPrimaryDevice;
     bool supportsSetConnectedState7_1 = true;
+    class SoundDoseWrapper;
+    const std::unique_ptr<SoundDoseWrapper> mSoundDoseWrapper;
 
     // Can not be constructed directly by clients.
     explicit DeviceHalHidl(const sp<::android::hardware::audio::CPP_VERSION::IDevice>& device);

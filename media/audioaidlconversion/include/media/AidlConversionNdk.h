@@ -32,6 +32,9 @@
 namespace aidl {
 namespace android {
 
+ConversionResult<::aidl::android::hardware::audio::effect::AcousticEchoCanceler>
+getParameterSpecificAec(const ::aidl::android::hardware::audio::effect::Parameter& aidl);
+
 ConversionResult<uint32_t> aidl2legacy_Flags_Type_uint32(
         ::aidl::android::hardware::audio::effect::Flags::Type type);
 ConversionResult<uint32_t> aidl2legacy_Flags_Insert_uint32(
@@ -61,8 +64,19 @@ legacy2aidl_effect_descriptor_Descriptor(const effect_descriptor_t& hal);
 
 ConversionResult<buffer_config_t> aidl2legacy_AudioConfigBase_buffer_config_t(
         const media::audio::common::AudioConfigBase& aidl, bool isInput);
-ConversionResult<media::audio::common::AudioConfigBase> legacy2aidl_AudioConfigBase_buffer_config_t(
+ConversionResult<media::audio::common::AudioConfigBase> legacy2aidl_buffer_config_t_AudioConfigBase(
         const buffer_config_t& legacy, bool isInput);
+
+ConversionResult<uint32_t> aidl2legacy_Parameter_uint32_echoDelay(
+        const ::aidl::android::hardware::audio::effect::Parameter& aidl);
+ConversionResult<::aidl::android::hardware::audio::effect::Parameter>
+legacy2aidl_uint32_echoDelay_Parameter(const uint32_t& legacy);
+
+ConversionResult<uint32_t> aidl2legacy_Parameter_uint32_mobileMode(
+        const ::aidl::android::hardware::audio::effect::Parameter& aidl);
+ConversionResult<::aidl::android::hardware::audio::effect::Parameter>
+legacy2aidl_uint32_mobileMode_Parameter(const uint32_t& legacy);
+
 
 }  // namespace android
 }  // namespace aidl

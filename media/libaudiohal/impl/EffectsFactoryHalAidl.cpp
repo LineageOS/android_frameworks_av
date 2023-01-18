@@ -21,15 +21,19 @@
 //#define LOG_NDEBUG 0
 
 #include <aidl/android/hardware/audio/effect/IFactory.h>
+#include <error/expected_utils.h>
 #include <android/binder_manager.h>
 #include <media/AidlConversionCppNdk.h>
 #include <media/AidlConversionNdk.h>
+#include <system/audio.h>
 #include <utils/Log.h>
 
 #include "EffectBufferHalAidl.h"
 #include "EffectHalAidl.h"
 #include "EffectsFactoryHalAidl.h"
 
+using ::aidl::android::legacy2aidl_audio_uuid_t_AudioUuid;
+using aidl::android::aidl_utils::statusTFromBinderStatus;
 using aidl::android::hardware::audio::effect::IFactory;
 using aidl::android::media::audio::common::AudioUuid;
 using android::detail::AudioHalVersionInfo;
@@ -86,8 +90,7 @@ status_t EffectsFactoryHalAidl::getDescriptor(const effect_uuid_t* halUuid,
         return BAD_VALUE;
     }
 
-    AudioUuid uuid =
-            VALUE_OR_RETURN_STATUS(::aidl::android::legacy2aidl_audio_uuid_t_AudioUuid(*halUuid));
+    AudioUuid uuid = VALUE_OR_RETURN_STATUS(legacy2aidl_audio_uuid_t_AudioUuid(*halUuid));
     std::lock_guard lg(mLock);
     return getHalDescriptorWithImplUuid_l(uuid, pDescriptor);
 }
@@ -98,8 +101,7 @@ status_t EffectsFactoryHalAidl::getDescriptors(const effect_uuid_t* halType,
         return BAD_VALUE;
     }
 
-    AudioUuid type =
-            VALUE_OR_RETURN_STATUS(::aidl::android::legacy2aidl_audio_uuid_t_AudioUuid(*halType));
+    AudioUuid type = VALUE_OR_RETURN_STATUS(legacy2aidl_audio_uuid_t_AudioUuid(*halType));
     std::lock_guard lg(mLock);
     return getHalDescriptorWithTypeUuid_l(type, descriptors);
 }
@@ -110,24 +112,29 @@ status_t EffectsFactoryHalAidl::createEffect(const effect_uuid_t* uuid, int32_t 
     if (uuid == nullptr || effect == nullptr) {
         return BAD_VALUE;
     }
-    ALOGI("%s session %d ioId %d", __func__, sessionId, ioId);
-
-    AudioUuid aidlUuid =
-            VALUE_OR_RETURN_STATUS(::aidl::android::legacy2aidl_audio_uuid_t_AudioUuid(*uuid));
-    std::shared_ptr<IEffect> aidlEffect;
-    ndk::ScopedAStatus status = mFactory->createEffect(aidlUuid, &aidlEffect);
-    if (!status.isOk() || aidlEffect == nullptr) {
-        ALOGE("%s IFactory::createFactory failed %s UUID %s", __func__,
-              status.getDescription().c_str(), aidlUuid.toString().c_str());
+    if (sessionId == AUDIO_SESSION_DEVICE && ioId == AUDIO_IO_HANDLE_NONE) {
         return INVALID_OPERATION;
     }
+
+    ALOGI("%s session %d ioId %d", __func__, sessionId, ioId);
+
+    AudioUuid aidlUuid = VALUE_OR_RETURN_STATUS(legacy2aidl_audio_uuid_t_AudioUuid(*uuid));
+    std::shared_ptr<IEffect> aidlEffect;
+    Descriptor desc;
+    RETURN_STATUS_IF_ERROR(statusTFromBinderStatus(mFactory->createEffect(aidlUuid, &aidlEffect)));
+    if (aidlEffect == nullptr) {
+        ALOGE("%s IFactory::createFactory failed UUID %s", __func__, aidlUuid.toString().c_str());
+        return NAME_NOT_FOUND;
+    }
+    RETURN_STATUS_IF_ERROR(statusTFromBinderStatus(aidlEffect->getDescriptor(&desc)));
+
     uint64_t effectId;
     {
         std::lock_guard lg(mLock);
         effectId = ++mEffectIdCounter;
     }
 
-    *effect = new EffectHalAidl(aidlEffect, effectId, sessionId, ioId);
+    *effect = sp<EffectHalAidl>::make(aidlEffect, effectId, sessionId, ioId, desc);
     return OK;
 }
 
