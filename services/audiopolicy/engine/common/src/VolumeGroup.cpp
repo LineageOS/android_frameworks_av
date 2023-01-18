@@ -37,6 +37,17 @@ VolumeGroup::VolumeGroup(const std::string &name, int indexMin, int indexMax) :
 {
 }
 
+// Used for introspection, e.g. JAVA
+AttributesVector VolumeGroup::getSupportedAttributes() const
+{
+    AttributesVector supportedAttributes = {};
+    for (auto &aa : mGroupVolumeCurves.getAttributes()) {
+        aa.source = AUDIO_SOURCE_INVALID;
+        supportedAttributes.push_back(aa);
+    }
+    return supportedAttributes;
+}
+
 void VolumeGroup::dump(String8 *dst, int spaces) const
 {
     dst->appendFormat("\n%*s-%s (id: %d)\n", spaces, "", mName.c_str(), mId);
