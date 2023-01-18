@@ -49,6 +49,8 @@
 #include PREFIX(android/media/audio/common/AudioMode.h)
 #include PREFIX(android/media/audio/common/AudioOffloadInfo.h)
 #include PREFIX(android/media/audio/common/AudioOutputFlags.h)
+#include PREFIX(android/media/audio/common/AudioPort.h)
+#include PREFIX(android/media/audio/common/AudioPortConfig.h)
 #include PREFIX(android/media/audio/common/AudioPortExt.h)
 #include PREFIX(android/media/audio/common/AudioPortMixExt.h)
 #include PREFIX(android/media/audio/common/AudioPlaybackRate.h)
@@ -67,6 +69,7 @@
 
 using ::android::String16;
 using ::android::String8;
+using ::android::status_t;
 
 #if defined(BACKEND_NDK)
 namespace aidl {
@@ -76,7 +79,7 @@ namespace android {
 
 // maxSize is the size of the C-string buffer (including the 0-terminator), NOT the max length of
 // the string.
-::android::status_t aidl2legacy_string(std::string_view aidl, char* dest, size_t maxSize);
+status_t aidl2legacy_string(std::string_view aidl, char* dest, size_t maxSize);
 ConversionResult<std::string> legacy2aidl_string(const char* legacy, size_t maxSize);
 
 ConversionResult<audio_module_handle_t> aidl2legacy_int32_t_audio_module_handle_t(int32_t aidl);
@@ -121,6 +124,12 @@ ConversionResult<audio_channel_mask_t> aidl2legacy_AudioChannelLayout_audio_chan
         const media::audio::common::AudioChannelLayout& aidl, bool isInput);
 ConversionResult<media::audio::common::AudioChannelLayout>
 legacy2aidl_audio_channel_mask_t_AudioChannelLayout(audio_channel_mask_t legacy, bool isInput);
+
+enum class AudioPortDirection {
+    INPUT, OUTPUT
+};
+ConversionResult<AudioPortDirection> portDirection(audio_port_role_t role, audio_port_type_t type);
+ConversionResult<audio_port_role_t> portRole(AudioPortDirection direction, audio_port_type_t type);
 
 ConversionResult<audio_config_t>
 aidl2legacy_AudioConfig_audio_config_t(const media::audio::common::AudioConfig& aidl, bool isInput);
@@ -172,13 +181,13 @@ ConversionResult<audio_devices_t> aidl2legacy_AudioDeviceDescription_audio_devic
 ConversionResult<media::audio::common::AudioDeviceDescription>
 legacy2aidl_audio_devices_t_AudioDeviceDescription(audio_devices_t legacy);
 
-::android::status_t aidl2legacy_AudioDevice_audio_device(
+status_t aidl2legacy_AudioDevice_audio_device(
         const media::audio::common::AudioDevice& aidl, audio_devices_t* legacyType,
         char* legacyAddress);
-::android::status_t aidl2legacy_AudioDevice_audio_device(
+status_t aidl2legacy_AudioDevice_audio_device(
         const media::audio::common::AudioDevice& aidl, audio_devices_t* legacyType,
         String8* legacyAddress);
-::android::status_t aidl2legacy_AudioDevice_audio_device(
+status_t aidl2legacy_AudioDevice_audio_device(
         const media::audio::common::AudioDevice& aidl, audio_devices_t* legacyType,
         std::string* legacyAddress);
 
@@ -264,6 +273,48 @@ ConversionResult<audio_output_flags_t>
 aidl2legacy_AudioOutputFlags_audio_output_flags_t(media::audio::common::AudioOutputFlags aidl);
 ConversionResult<media::audio::common::AudioOutputFlags>
 legacy2aidl_audio_output_flags_t_AudioOutputFlags(audio_output_flags_t legacy);
+
+// This type is unnamed in the original definition, thus we name it here.
+using audio_port_config_mix_ext_usecase = decltype(audio_port_config_mix_ext::usecase);
+ConversionResult<audio_port_config_mix_ext_usecase>
+aidl2legacy_AudioPortMixExtUseCase_audio_port_config_mix_ext_usecase(
+        const media::audio::common::AudioPortMixExtUseCase& aidl, bool isInput);
+ConversionResult<media::audio::common::AudioPortMixExtUseCase>
+legacy2aidl_audio_port_config_mix_ext_usecase_AudioPortMixExtUseCase(
+        const audio_port_config_mix_ext_usecase& legacy, bool isInput);
+
+ConversionResult<audio_port_config_device_ext>
+aidl2legacy_AudioPortDeviceExt_audio_port_config_device_ext(
+        const media::audio::common::AudioPortDeviceExt& aidl);
+ConversionResult<media::audio::common::AudioPortDeviceExt>
+        legacy2aidl_audio_port_config_device_ext_AudioPortDeviceExt(
+        const audio_port_config_device_ext& legacy);
+
+status_t aidl2legacy_AudioPortConfig_audio_port_config(
+        const media::audio::common::AudioPortConfig& aidl, bool isInput,
+        audio_port_config* legacy, int32_t* portId);
+ConversionResult<media::audio::common::AudioPortConfig>
+legacy2aidl_audio_port_config_AudioPortConfig(
+        const audio_port_config& legacy, bool isInput, int32_t portId);
+
+ConversionResult<audio_port_mix_ext> aidl2legacy_AudioPortMixExt_audio_port_mix_ext(
+        const media::audio::common::AudioPortMixExt& aidl);
+ConversionResult<media::audio::common::AudioPortMixExt>
+legacy2aidl_audio_port_mix_ext_AudioPortMixExt(
+        const audio_port_mix_ext& legacy);
+
+ConversionResult<audio_port_device_ext>
+aidl2legacy_AudioPortDeviceExt_audio_port_device_ext(
+        const media::audio::common::AudioPortDeviceExt& aidl);
+ConversionResult<media::audio::common::AudioPortDeviceExt>
+legacy2aidl_audio_port_device_ext_AudioPortDeviceExt(
+        const audio_port_device_ext& legacy);
+
+ConversionResult<audio_port_v7>
+aidl2legacy_AudioPort_audio_port_v7(
+        const media::audio::common::AudioPort& aidl, bool isInput);
+ConversionResult<media::audio::common::AudioPort>
+legacy2aidl_audio_port_v7_AudioPort(const audio_port_v7& legacy, bool isInput);
 
 ConversionResult<audio_profile> aidl2legacy_AudioProfile_audio_profile(
         const media::audio::common::AudioProfile& aidl, bool isInput);
