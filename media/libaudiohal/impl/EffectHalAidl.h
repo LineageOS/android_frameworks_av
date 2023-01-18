@@ -20,10 +20,12 @@
 #include <media/audiohal/EffectHalInterface.h>
 #include <system/audio_effect.h>
 
+#include "EffectConversionHelperAidl.h"
+
 namespace android {
 namespace effect {
 
-class EffectHalAidl : public EffectHalInterface {
+class EffectHalAidl : public EffectHalInterface, public EffectConversionHelperAidl {
   public:
     // Set the input buffer.
     status_t setInBuffer(const sp<EffectBufferHalInterface>& buffer) override;
@@ -55,28 +57,27 @@ class EffectHalAidl : public EffectHalInterface {
 
     uint64_t effectId() const override { return mEffectId; }
 
+    const std::shared_ptr<::aidl::android::hardware::audio::effect::IEffect> getIEffect() const {
+        return mEffect;
+    }
+
   private:
-    friend class EffectsFactoryHalAidl;
+    friend class sp<EffectHalAidl>;
 
     const uint64_t mEffectId;
     const int32_t mSessionId;
     const int32_t mIoId;
+    const std::shared_ptr<::aidl::android::hardware::audio::effect::IEffect> mEffect;
+    const ::aidl::android::hardware::audio::effect::Descriptor mDesc;
+
     sp<EffectBufferHalInterface> mInBuffer, mOutBuffer;
     effect_config_t mConfig;
-    std::shared_ptr<::aidl::android::hardware::audio::effect::IEffect> mEffect;
 
     // Can not be constructed directly by clients.
     EffectHalAidl(const std::shared_ptr<::aidl::android::hardware::audio::effect::IEffect>& effect,
-                  uint64_t effectId, int32_t sessionId, int32_t ioId);
-
-    status_t handleSetConfig(uint32_t cmdCode, uint32_t cmdSize, void* pCmdData,
-                             uint32_t* replySize, void* pReplyData);
-    status_t handleGetConfig(uint32_t cmdCode, uint32_t cmdSize, void* pCmdData,
-                             uint32_t* replySize, void* pReplyData);
-    status_t handleSetParameter(uint32_t cmdCode, uint32_t cmdSize, void* pCmdData,
-                                uint32_t* replySize, void* pReplyData);
-    status_t handleGetParameter(uint32_t cmdCode, uint32_t cmdSize, void* pCmdData,
-                                uint32_t* replySize, void* pReplyData);
+                  uint64_t effectId, int32_t sessionId, int32_t ioId,
+                  const ::aidl::android::hardware::audio::effect::Descriptor& desc);
+    bool setEffectReverse(bool reverse);
 
     // The destructor automatically releases the effect.
     virtual ~EffectHalAidl();

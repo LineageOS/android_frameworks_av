@@ -22,37 +22,36 @@
 
 #include <android/media/ISoundDoseCallback.h>
 #include <audio_utils/power.h>
-#include <android/binder_manager.h>
 #include <utils/Log.h>
 
 using aidl::android::hardware::audio::core::sounddose::ISoundDose;
-using aidl::android::hardware::audio::sounddose::ISoundDoseFactory;
 
 namespace android {
 
-constexpr std::string_view kSoundDoseInterfaceModule = "/default";
-
-bool AudioFlinger::MelReporter::activateHalSoundDoseComputation(const std::string& module) {
+bool AudioFlinger::MelReporter::activateHalSoundDoseComputation(const std::string& module,
+        const sp<DeviceHalInterface>& device) {
     if (mSoundDoseManager->forceUseFrameworkMel()) {
         ALOGD("%s: Forcing use of internal MEL computation.", __func__);
         activateInternalSoundDoseComputation();
         return false;
     }
 
-    if (mSoundDoseFactory == nullptr) {
-        ALOGW("%s: sound dose HAL reporting not available", __func__);
-        activateInternalSoundDoseComputation();
-        return false;
-    }
-
-    std::shared_ptr<ISoundDose> soundDoseInterface;
-    auto result = mSoundDoseFactory->getSoundDose(module, &soundDoseInterface);
-    if (!result.isOk()) {
-        ALOGW("%s: HAL cannot provide sound dose interface for module %s",
+    ndk::SpAIBinder soundDoseBinder;
+    if (device->getSoundDoseInterface(module, &soundDoseBinder) != OK) {
+        ALOGW("%s: HAL cannot provide sound dose interface for module %s, use internal MEL",
               __func__, module.c_str());
         activateInternalSoundDoseComputation();
         return false;
     }
+
+    if (soundDoseBinder == nullptr) {
+         ALOGW("%s: HAL doesn't implement a sound dose interface for module %s, use internal MEL",
+              __func__, module.c_str());
+        activateInternalSoundDoseComputation();
+        return false;
+    }
+
+    std::shared_ptr<ISoundDose> soundDoseInterface = ISoundDose::fromBinder(soundDoseBinder);
 
     if (!mSoundDoseManager->setHalSoundDoseInterface(soundDoseInterface)) {
         ALOGW("%s: cannot activate HAL MEL reporting for module %s", __func__, module.c_str());
@@ -79,16 +78,6 @@ void AudioFlinger::MelReporter::activateInternalSoundDoseComputation() {
 
 void AudioFlinger::MelReporter::onFirstRef() {
     mAudioFlinger.mPatchCommandThread->addListener(this);
-
-    std::string interface =
-        std::string(ISoundDoseFactory::descriptor) + kSoundDoseInterfaceModule.data();
-    AIBinder* binder = AServiceManager_checkService(interface.c_str());
-    if (binder == nullptr) {
-        ALOGW("%s service %s doesn't exist", __func__, interface.c_str());
-        return;
-    }
-
-    mSoundDoseFactory = ISoundDoseFactory::fromBinder(ndk::SpAIBinder(binder));
 }
 
 bool AudioFlinger::MelReporter::shouldComputeMelForDeviceType(audio_devices_t device) {

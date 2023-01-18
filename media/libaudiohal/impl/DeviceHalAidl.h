@@ -16,6 +16,7 @@
 
 #pragma once
 
+#include <aidl/android/hardware/audio/core/sounddose/BpSoundDose.h>
 #include <aidl/android/hardware/audio/core/BpModule.h>
 #include <media/audiohal/DeviceHalInterface.h>
 #include <media/audiohal/EffectHalInterface.h>
@@ -117,15 +118,15 @@ class DeviceHalAidl : public DeviceHalInterface, public ConversionHelperAidl {
 
     int32_t supportsBluetoothVariableLatency(bool* supports __unused) override;
 
+    status_t getSoundDoseInterface(const std::string& module,
+                                   ::ndk::SpAIBinder* soundDoseBinder) override;
+
   private:
     friend class sp<DeviceHalAidl>;
 
     const std::shared_ptr<::aidl::android::hardware::audio::core::IModule> mModule;
-    // FIXME: Remove these after implementing calls into the HAL.
-    float mMasterVolume = 0.0f;
-    float mVoiceVolume = 0.0f;
-    bool mMasterMute = false;
-    bool mMicMute = false;
+    std::shared_ptr<::aidl::android::hardware::audio::core::sounddose::ISoundDose>
+        mSoundDose = nullptr;
 
     // Can not be constructed directly by clients.
     explicit DeviceHalAidl(
