@@ -265,113 +265,109 @@ status_t Camera3Device::disconnect() {
 
 status_t Camera3Device::disconnectImpl() {
     ATRACE_CALL();
+    Mutex::Autolock il(mInterfaceLock);
+
     ALOGI("%s: E", __FUNCTION__);
 
     status_t res = OK;
     std::vector<wp<Camera3StreamInterface>> streams;
+    nsecs_t maxExpectedDuration = getExpectedInFlightDuration();
     {
-        Mutex::Autolock il(mInterfaceLock);
-        nsecs_t maxExpectedDuration = getExpectedInFlightDuration();
-        {
-            Mutex::Autolock l(mLock);
-            if (mStatus == STATUS_UNINITIALIZED) return res;
+        Mutex::Autolock l(mLock);
+        if (mStatus == STATUS_UNINITIALIZED) return res;
 
-            if (mRequestThread != NULL) {
-                if (mStatus == STATUS_ACTIVE || mStatus == STATUS_ERROR) {
-                    res = mRequestThread->clear();
+        if (mRequestThread != NULL) {
+            if (mStatus == STATUS_ACTIVE || mStatus == STATUS_ERROR) {
+                res = mRequestThread->clear();
+                if (res != OK) {
+                    SET_ERR_L("Can't stop streaming");
+                    // Continue to close device even in case of error
+                } else {
+                    res = waitUntilStateThenRelock(/*active*/ false, maxExpectedDuration);
                     if (res != OK) {
-                        SET_ERR_L("Can't stop streaming");
+                        SET_ERR_L("Timeout waiting for HAL to drain (% " PRIi64 " ns)",
+                                maxExpectedDuration);
                         // Continue to close device even in case of error
-                    } else {
-                        res = waitUntilStateThenRelock(/*active*/ false, maxExpectedDuration);
-                        if (res != OK) {
-                            SET_ERR_L("Timeout waiting for HAL to drain (% " PRIi64 " ns)",
-                                    maxExpectedDuration);
-                            // Continue to close device even in case of error
-                        }
                     }
                 }
-                // Signal to request thread that we're not expecting any
-                // more requests. This will be true since once we're in
-                // disconnect and we've cleared off the request queue, the
-                // request thread can't receive any new requests through
-                // binder calls - since disconnect holds
-                // mBinderSerialization lock.
-                mRequestThread->setRequestClearing();
             }
+            // Signal to request thread that we're not expecting any
+            // more requests. This will be true since once we're in
+            // disconnect and we've cleared off the request queue, the
+            // request thread can't receive any new requests through
+            // binder calls - since disconnect holds
+            // mBinderSerialization lock.
+            mRequestThread->setRequestClearing();
+        }
 
-            if (mStatus == STATUS_ERROR) {
-                CLOGE("Shutting down in an error state");
-            }
+        if (mStatus == STATUS_ERROR) {
+            CLOGE("Shutting down in an error state");
+        }
 
-            if (mStatusTracker != NULL) {
-                mStatusTracker->requestExit();
-            }
+        if (mStatusTracker != NULL) {
+            mStatusTracker->requestExit();
+        }
 
-            if (mRequestThread != NULL) {
-                mRequestThread->requestExit();
-            }
+        if (mRequestThread != NULL) {
+            mRequestThread->requestExit();
+        }
 
-            streams.reserve(mOutputStreams.size() + (mInputStream != nullptr ? 1 : 0));
-            for (size_t i = 0; i < mOutputStreams.size(); i++) {
-                streams.push_back(mOutputStreams[i]);
-            }
-            if (mInputStream != nullptr) {
-                streams.push_back(mInputStream);
-            }
+        streams.reserve(mOutputStreams.size() + (mInputStream != nullptr ? 1 : 0));
+        for (size_t i = 0; i < mOutputStreams.size(); i++) {
+            streams.push_back(mOutputStreams[i]);
+        }
+        if (mInputStream != nullptr) {
+            streams.push_back(mInputStream);
         }
     }
-    // Joining done without holding mLock and mInterfaceLock, otherwise deadlocks may ensue
-    // as the threads try to access parent state (b/143513518)
+
+    // Joining done without holding mLock, otherwise deadlocks may ensue
+    // as the threads try to access parent state
     if (mRequestThread != NULL && mStatus != STATUS_ERROR) {
         // HAL may be in a bad state, so waiting for request thread
         // (which may be stuck in the HAL processCaptureRequest call)
         // could be dangerous.
-        // give up mInterfaceLock here and then lock it again. Could this lead
-        // to other deadlocks
         mRequestThread->join();
     }
+
+    if (mStatusTracker != NULL) {
+        mStatusTracker->join();
+    }
+
+    if (mInjectionMethods->isInjecting()) {
+        mInjectionMethods->stopInjection();
+    }
+
+    HalInterface* interface;
     {
-        Mutex::Autolock il(mInterfaceLock);
-        if (mStatusTracker != NULL) {
-            mStatusTracker->join();
-        }
+        Mutex::Autolock l(mLock);
+        mRequestThread.clear();
+        Mutex::Autolock stLock(mTrackerLock);
+        mStatusTracker.clear();
+        interface = mInterface.get();
+    }
 
-        if (mInjectionMethods->isInjecting()) {
-            mInjectionMethods->stopInjection();
-        }
+    // Call close without internal mutex held, as the HAL close may need to
+    // wait on assorted callbacks,etc, to complete before it can return.
+    mCameraServiceWatchdog->WATCH(interface->close());
 
-        HalInterface* interface;
-        {
-            Mutex::Autolock l(mLock);
-            mRequestThread.clear();
-            Mutex::Autolock stLock(mTrackerLock);
-            mStatusTracker.clear();
-            interface = mInterface.get();
-        }
+    flushInflightRequests();
 
-        // Call close without internal mutex held, as the HAL close may need to
-        // wait on assorted callbacks,etc, to complete before it can return.
-        mCameraServiceWatchdog->WATCH(interface->close());
+    {
+        Mutex::Autolock l(mLock);
+        mInterface->clear();
+        mOutputStreams.clear();
+        mInputStream.clear();
+        mDeletedStreams.clear();
+        mBufferManager.clear();
+        internalUpdateStatusLocked(STATUS_UNINITIALIZED);
+    }
 
-        flushInflightRequests();
-
-        {
-            Mutex::Autolock l(mLock);
-            mInterface->clear();
-            mOutputStreams.clear();
-            mInputStream.clear();
-            mDeletedStreams.clear();
-            mBufferManager.clear();
-            internalUpdateStatusLocked(STATUS_UNINITIALIZED);
-        }
-
-        for (auto& weakStream : streams) {
-              sp<Camera3StreamInterface> stream = weakStream.promote();
-            if (stream != nullptr) {
-                ALOGE("%s: Stream %d leaked! strong reference (%d)!",
-                        __FUNCTION__, stream->getId(), stream->getStrongCount() - 1);
-            }
+    for (auto& weakStream : streams) {
+        sp<Camera3StreamInterface> stream = weakStream.promote();
+        if (stream != nullptr) {
+            ALOGE("%s: Stream %d leaked! strong reference (%d)!",
+                    __FUNCTION__, stream->getId(), stream->getStrongCount() - 1);
         }
     }
     ALOGI("%s: X", __FUNCTION__);
@@ -2310,7 +2306,9 @@ bool Camera3Device::reconfigureCamera(const CameraMetadata& sessionParams, int c
 
     nsecs_t startTime = systemTime();
 
-    Mutex::Autolock il(mInterfaceLock);
+    // We must not hold mInterfaceLock here since this function is called from
+    // RequestThread::threadLoop and holding mInterfaceLock could lead to
+    // deadlocks (http://b/143513518)
     nsecs_t maxExpectedDuration = getExpectedInFlightDuration();
 
     Mutex::Autolock l(mLock);
