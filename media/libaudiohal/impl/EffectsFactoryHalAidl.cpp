@@ -134,7 +134,7 @@ status_t EffectsFactoryHalAidl::createEffect(const effect_uuid_t* uuid, int32_t 
         effectId = ++mEffectIdCounter;
     }
 
-    *effect = sp<EffectHalAidl>::make(aidlEffect, effectId, sessionId, ioId, desc);
+    *effect = sp<EffectHalAidl>::make(mFactory, aidlEffect, effectId, sessionId, ioId, desc);
     return OK;
 }
 

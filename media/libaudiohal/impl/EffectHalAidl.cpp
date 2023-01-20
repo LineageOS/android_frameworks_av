@@ -42,21 +42,30 @@ using ::aidl::android::aidl_utils::statusTFromBinderStatus;
 using ::aidl::android::hardware::audio::effect::CommandId;
 using ::aidl::android::hardware::audio::effect::Descriptor;
 using ::aidl::android::hardware::audio::effect::IEffect;
+using ::aidl::android::hardware::audio::effect::IFactory;
 using ::aidl::android::hardware::audio::effect::Parameter;
 
 namespace android {
 namespace effect {
 
-EffectHalAidl::EffectHalAidl(const std::shared_ptr<IEffect>& effect, uint64_t effectId,
-                             int32_t sessionId, int32_t ioId, const Descriptor& desc)
-    : EffectConversionHelperAidl(effect, sessionId, ioId, desc.common.id.type),
+EffectHalAidl::EffectHalAidl(
+        const std::shared_ptr<::aidl::android::hardware::audio::effect::IFactory>& factory,
+        const std::shared_ptr<::aidl::android::hardware::audio::effect::IEffect>& effect,
+        uint64_t effectId, int32_t sessionId, int32_t ioId,
+        const ::aidl::android::hardware::audio::effect::Descriptor& desc)
+    : EffectConversionHelperAidl(effect, sessionId, ioId, desc),
+      mFactory(factory),
+      mEffect(effect),
       mEffectId(effectId),
       mSessionId(sessionId),
       mIoId(ioId),
-      mEffect(effect),
       mDesc(desc) {}
 
-EffectHalAidl::~EffectHalAidl() {}
+EffectHalAidl::~EffectHalAidl() {
+    if (mFactory) {
+        mFactory->destroyEffect(mEffect);
+    }
+}
 
 status_t EffectHalAidl::setInBuffer(const sp<EffectBufferHalInterface>& buffer) {
     if (buffer == nullptr) {
@@ -105,8 +114,7 @@ status_t EffectHalAidl::getDescriptor(effect_descriptor_t* pDescriptor) {
 }
 
 status_t EffectHalAidl::close() {
-    RETURN_STATUS_IF_ERROR(statusTFromBinderStatus(mEffect->close()));
-    return OK;
+    return statusTFromBinderStatus(mEffect->close());
 }
 
 status_t EffectHalAidl::dump(int fd) {
