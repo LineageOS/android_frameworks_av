@@ -58,3 +58,39 @@ cc_library {
         "libwebrtc_absl_headers",
     ],
 }
+
+cc_library_shared {
+    name: "libpreprocessingaidl",
+    srcs: [
+        "aidl/PreProcessingContext.cpp",
+        "aidl/EffectPreProcessing.cpp",
+        ":effectCommonFile",
+    ],
+    defaults: [
+        "aidlaudioservice_defaults",
+        "latest_android_hardware_audio_effect_ndk_shared",
+        "latest_android_media_audio_common_types_ndk_shared",
+    ],
+    local_include_dirs: ["aidl"],
+    shared_libs: [
+        "liblog",
+        "libutils",
+        "libaudioutils",
+    ],
+    static_libs: [
+        "webrtc_audio_processing",
+    ],
+    header_libs: [
+        "libwebrtc_absl_headers",
+        "libaudioeffects",
+        "libhardware_headers",
+    ],
+    cflags: [
+        "-Wthread-safety",
+        "-Wno-unused-parameter",
+    ],
+    relative_install_path: "soundfx",
+    visibility: [
+        "//hardware/interfaces/audio/aidl/default",
+    ],
+}
