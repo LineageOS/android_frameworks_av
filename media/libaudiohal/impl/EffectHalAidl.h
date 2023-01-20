@@ -17,6 +17,7 @@
 #pragma once
 
 #include <aidl/android/hardware/audio/effect/IEffect.h>
+#include <aidl/android/hardware/audio/effect/IFactory.h>
 #include <media/audiohal/EffectHalInterface.h>
 #include <system/audio_effect.h>
 
@@ -64,19 +65,22 @@ class EffectHalAidl : public EffectHalInterface, public EffectConversionHelperAi
   private:
     friend class sp<EffectHalAidl>;
 
+    const std::shared_ptr<::aidl::android::hardware::audio::effect::IFactory> mFactory;
+    const std::shared_ptr<::aidl::android::hardware::audio::effect::IEffect> mEffect;
     const uint64_t mEffectId;
     const int32_t mSessionId;
     const int32_t mIoId;
-    const std::shared_ptr<::aidl::android::hardware::audio::effect::IEffect> mEffect;
     const ::aidl::android::hardware::audio::effect::Descriptor mDesc;
 
     sp<EffectBufferHalInterface> mInBuffer, mOutBuffer;
     effect_config_t mConfig;
 
     // Can not be constructed directly by clients.
-    EffectHalAidl(const std::shared_ptr<::aidl::android::hardware::audio::effect::IEffect>& effect,
-                  uint64_t effectId, int32_t sessionId, int32_t ioId,
-                  const ::aidl::android::hardware::audio::effect::Descriptor& desc);
+    EffectHalAidl(
+            const std::shared_ptr<::aidl::android::hardware::audio::effect::IFactory>& factory,
+            const std::shared_ptr<::aidl::android::hardware::audio::effect::IEffect>& effect,
+            uint64_t effectId, int32_t sessionId, int32_t ioId,
+            const ::aidl::android::hardware::audio::effect::Descriptor& desc);
     bool setEffectReverse(bool reverse);
 
     // The destructor automatically releases the effect.

@@ -3535,9 +3535,9 @@ status_t AudioFlinger::PlaybackThread::addEffectChain_l(const sp<EffectChain>& c
             if (result != OK) return result;
 
 #ifdef FLOAT_EFFECT_CHAIN
-            buffer = halInBuffer->audioBuffer()->f32;
+            buffer = halInBuffer ? halInBuffer->audioBuffer()->f32 : buffer;
 #else
-            buffer = halInBuffer->audioBuffer()->s16;
+            buffer = halInBuffer ? halInBuffer->audioBuffer()->s16 : buffer;
 #endif
             ALOGV("addEffectChain_l() creating new input buffer %p session %d",
                     buffer, session);
@@ -3566,7 +3566,8 @@ status_t AudioFlinger::PlaybackThread::addEffectChain_l(const sp<EffectChain>& c
         halOutBuffer = halInBuffer;
         ALOGV("addEffectChain_l() %p on thread %p for session %d", chain.get(), this, session);
         if (!audio_is_global_session(session)) {
-            buffer = reinterpret_cast<effect_buffer_t*>(halInBuffer->externalData());
+            buffer = halInBuffer ? reinterpret_cast<effect_buffer_t*>(halInBuffer->externalData())
+                                 : buffer;
             // Only one effect chain can be present in direct output thread and it uses
             // the sink buffer as input
             if (mType != DIRECT) {
@@ -3578,9 +3579,9 @@ status_t AudioFlinger::PlaybackThread::addEffectChain_l(const sp<EffectChain>& c
                         &halInBuffer);
                 if (result != OK) return result;
 #ifdef FLOAT_EFFECT_CHAIN
-                buffer = halInBuffer->audioBuffer()->f32;
+                buffer = halInBuffer ? halInBuffer->audioBuffer()->f32 : buffer;
 #else
-                buffer = halInBuffer->audioBuffer()->s16;
+                buffer = halInBuffer ? halInBuffer->audioBuffer()->s16 : buffer;
 #endif
                 ALOGV("addEffectChain_l() creating new input buffer %p session %d",
                         buffer, session);
