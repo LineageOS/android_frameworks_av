@@ -116,23 +116,26 @@ void SoundDoseManager::setOutputRs2(float rs2Value) {
     ALOGV("%s", __func__);
     std::lock_guard _l(mLock);
 
-    mRs2Value = rs2Value;
     if (mHalSoundDose != nullptr) {
         // using the HAL sound dose interface
-        if (!mHalSoundDose->setOutputRs2(mRs2Value).isOk()) {
-            ALOGE("%s: Cannot set RS2 value for momentary exposure %f", __func__, mRs2Value);
+        if (!mHalSoundDose->setOutputRs2(rs2Value).isOk()) {
+            ALOGE("%s: Cannot set RS2 value for momentary exposure %f", __func__, rs2Value);
+            return;
         }
+        mRs2Value = rs2Value;
         return;
     }
 
     for (auto& streamProcessor : mActiveProcessors) {
         sp<audio_utils::MelProcessor> processor = streamProcessor.second.promote();
         if (processor != nullptr) {
-            status_t result = processor->setOutputRs2(mRs2Value);
+            status_t result = processor->setOutputRs2(rs2Value);
             if (result != NO_ERROR) {
-                ALOGW("%s: could not set RS2 value %f for stream %d", __func__, mRs2Value,
+                ALOGW("%s: could not set RS2 value %f for stream %d", __func__, rs2Value,
                       streamProcessor.first);
+                return;
             }
+            mRs2Value = rs2Value;
         }
     }
 }
