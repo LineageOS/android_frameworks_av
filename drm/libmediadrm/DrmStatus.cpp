@@ -27,21 +27,20 @@ DrmStatus::DrmStatus(status_t err, const char *msg) : mStatus(err) {
         return;
     }
 
-    std::string errMsg;
     auto val = errorDetails["cdmError"];
-    if (!val.isNull()) {
+    if (val.isInt()) {
         mCdmErr = val.asInt();
     }
     val = errorDetails["oemError"];
-    if (!val.isNull()) {
+    if (val.isInt()) {
         mOemErr = val.asInt();
     }
     val = errorDetails["context"];
-    if (!val.isNull()) {
+    if (val.isInt()) {
         mCtx = val.asInt();
     }
     val = errorDetails["errorMessage"];
-    if (!val.isNull()) {
+    if (val.isString()) {
         mErrMsg = val.asString();
     } else {
         mErrMsg = msg;
