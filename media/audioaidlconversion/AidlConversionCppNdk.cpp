@@ -477,6 +477,15 @@ const detail::AudioDevicePairs& getAudioDevicePairs() {
             {
                 AUDIO_DEVICE_IN_ECHO_REFERENCE, make_AudioDeviceDescription(
                         AudioDeviceType::IN_ECHO_REFERENCE)
+            },
+            {
+                AUDIO_DEVICE_IN_REMOTE_SUBMIX, make_AudioDeviceDescription(
+                         AudioDeviceType::IN_SUBMIX)
+            },
+            {
+                AUDIO_DEVICE_OUT_REMOTE_SUBMIX, make_AudioDeviceDescription(
+                        AudioDeviceType::OUT_SUBMIX,
+                        GET_DEVICE_DESC_CONNECTION(VIRTUAL))
             }
         }};
         append_AudioDeviceDescription(pairs,
@@ -494,9 +503,6 @@ const detail::AudioDevicePairs& getAudioDevicePairs() {
                 AUDIO_DEVICE_IN_HDMI, AUDIO_DEVICE_OUT_HDMI,
                 AudioDeviceType::IN_DEVICE, AudioDeviceType::OUT_DEVICE,
                 GET_DEVICE_DESC_CONNECTION(HDMI));
-        append_AudioDeviceDescription(pairs,
-                AUDIO_DEVICE_IN_REMOTE_SUBMIX, AUDIO_DEVICE_OUT_REMOTE_SUBMIX,
-                AudioDeviceType::IN_SUBMIX, AudioDeviceType::OUT_SUBMIX);
         append_AudioDeviceDescription(pairs,
                 AUDIO_DEVICE_IN_ANLG_DOCK_HEADSET, AUDIO_DEVICE_OUT_ANLG_DOCK_HEADSET,
                 AudioDeviceType::IN_DOCK, AudioDeviceType::OUT_DOCK,
