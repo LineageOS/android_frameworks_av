@@ -32,8 +32,32 @@
 namespace aidl {
 namespace android {
 
-ConversionResult<::aidl::android::hardware::audio::effect::AcousticEchoCanceler>
-getParameterSpecificAec(const ::aidl::android::hardware::audio::effect::Parameter& aidl);
+template <typename P, typename T, typename P::Specific::Tag tag>
+ConversionResult<T> getParameterSpecific(const P& u) {
+    const auto& spec = VALUE_OR_RETURN(UNION_GET(u, specific));
+    return unionGetField<typename P::Specific, tag>(spec);
+}
+
+template <typename P, typename T, typename P::Specific::Tag tag, typename T::Tag field, typename F>
+ConversionResult<F> getParameterSpecificField(const P& u) {
+    const auto& spec =
+            VALUE_OR_RETURN((getParameterSpecific<std::decay_t<decltype(u)>, T, tag>(u)));
+    return VALUE_OR_RETURN((unionGetField<T, field>(spec)));
+}
+
+#define GET_PARAMETER_SPECIFIC_FIELD(u, specific, tag, field, fieldType)                        \
+    getParameterSpecificField<std::decay_t<decltype(u)>, specific,                              \
+                              aidl::android::hardware::audio::effect::Parameter::Specific::tag, \
+                              specific::field, fieldType>(u)
+
+#define MAKE_SPECIFIC_PARAMETER(spec, tag, field, value)                                    \
+    UNION_MAKE(aidl::android::hardware::audio::effect::Parameter, specific,                 \
+               UNION_MAKE(aidl::android::hardware::audio::effect::Parameter::Specific, tag, \
+                          UNION_MAKE(spec, field, value)))
+
+#define MAKE_SPECIFIC_PARAMETER_ID(spec, tag, field)                       \
+    UNION_MAKE(aidl::android::hardware::audio::effect::Parameter::Id, tag, \
+               UNION_MAKE(spec::Id, commonTag, spec::field))
 
 ConversionResult<uint32_t> aidl2legacy_Flags_Type_uint32(
         ::aidl::android::hardware::audio::effect::Flags::Type type);
@@ -67,16 +91,40 @@ ConversionResult<buffer_config_t> aidl2legacy_AudioConfigBase_buffer_config_t(
 ConversionResult<media::audio::common::AudioConfigBase> legacy2aidl_buffer_config_t_AudioConfigBase(
         const buffer_config_t& legacy, bool isInput);
 
-ConversionResult<uint32_t> aidl2legacy_Parameter_uint32_echoDelay(
+ConversionResult<uint32_t> aidl2legacy_Parameter_aec_uint32_echoDelay(
         const ::aidl::android::hardware::audio::effect::Parameter& aidl);
 ConversionResult<::aidl::android::hardware::audio::effect::Parameter>
-legacy2aidl_uint32_echoDelay_Parameter(const uint32_t& legacy);
+legacy2aidl_uint32_echoDelay_Parameter_aec(uint32_t legacy);
 
-ConversionResult<uint32_t> aidl2legacy_Parameter_uint32_mobileMode(
+ConversionResult<uint32_t> aidl2legacy_Parameter_aec_uint32_mobileMode(
         const ::aidl::android::hardware::audio::effect::Parameter& aidl);
 ConversionResult<::aidl::android::hardware::audio::effect::Parameter>
-legacy2aidl_uint32_mobileMode_Parameter(const uint32_t& legacy);
+legacy2aidl_uint32_mobileMode_Parameter_aec(uint32_t legacy);
 
+ConversionResult<uint32_t> aidl2legacy_Parameter_agc_uint32_fixedDigitalGain(
+        const ::aidl::android::hardware::audio::effect::Parameter& aidl);
+ConversionResult<::aidl::android::hardware::audio::effect::Parameter>
+legacy2aidl_uint32_fixedDigitalGain_Parameter_agc(uint32_t legacy);
+
+ConversionResult<uint32_t> aidl2legacy_Parameter_agc_uint32_levelEstimator(
+        const ::aidl::android::hardware::audio::effect::Parameter& aidl);
+ConversionResult<::aidl::android::hardware::audio::effect::Parameter>
+legacy2aidl_uint32_levelEstimator_Parameter_agc(uint32_t legacy);
+
+ConversionResult<uint32_t> aidl2legacy_Parameter_agc_uint32_saturationMargin(
+        const ::aidl::android::hardware::audio::effect::Parameter& aidl);
+ConversionResult<::aidl::android::hardware::audio::effect::Parameter>
+legacy2aidl_uint32_saturationMargin_Parameter_agc(uint32_t legacy);
+
+ConversionResult<uint16_t> aidl2legacy_Parameter_BassBoost_uint16_strengthPm(
+        const ::aidl::android::hardware::audio::effect::Parameter& aidl);
+ConversionResult<::aidl::android::hardware::audio::effect::Parameter>
+legacy2aidl_uint16_strengthPm_Parameter_BassBoost(uint16_t legacy);
+
+ConversionResult<int16_t> aidl2legacy_Parameter_Downmix_int16_type(
+        const ::aidl::android::hardware::audio::effect::Parameter& aidl);
+ConversionResult<::aidl::android::hardware::audio::effect::Parameter>
+legacy2aidl_int16_type_Parameter_Downmix(int16_t legacy);
 
 }  // namespace android
 }  // namespace aidl

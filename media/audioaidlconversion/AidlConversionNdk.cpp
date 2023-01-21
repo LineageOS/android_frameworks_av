@@ -30,21 +30,16 @@ namespace aidl {
 namespace android {
 
 using ::aidl::android::hardware::audio::effect::AcousticEchoCanceler;
+using ::aidl::android::hardware::audio::effect::AutomaticGainControl;
+using ::aidl::android::hardware::audio::effect::BassBoost;
 using ::aidl::android::hardware::audio::effect::Descriptor;
+using ::aidl::android::hardware::audio::effect::Downmix;
 using ::aidl::android::hardware::audio::effect::Flags;
 using ::aidl::android::hardware::audio::effect::Parameter;
 using ::aidl::android::media::audio::common::AudioDeviceDescription;
 
 using ::android::BAD_VALUE;
 using ::android::base::unexpected;
-
-////////////////////////////////////////////////////////////////////////////////////////////////////
-// Utils
-
-ConversionResult<AcousticEchoCanceler> getParameterSpecificAec(const Parameter& aidl) {
-    const auto& specific = VALUE_OR_RETURN(UNION_GET(aidl, specific));
-    return VALUE_OR_RETURN(UNION_GET(specific, acousticEchoCanceler));
-}
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////
 // Converters
@@ -65,6 +60,22 @@ ConversionResult<uint32_t> aidl2legacy_Flags_Type_uint32(Flags::Type type) {
     return unexpected(BAD_VALUE);
 }
 
+ConversionResult<Flags::Type> legacy2aidl_uint32_Flags_Type(uint32_t legacy) {
+    switch (legacy & EFFECT_FLAG_TYPE_MASK) {
+        case EFFECT_FLAG_TYPE_INSERT:
+            return Flags::Type::INSERT;
+        case EFFECT_FLAG_TYPE_AUXILIARY:
+            return Flags::Type::AUXILIARY;
+        case EFFECT_FLAG_TYPE_REPLACE:
+            return Flags::Type::REPLACE;
+        case EFFECT_FLAG_TYPE_PRE_PROC:
+            return Flags::Type::PRE_PROC;
+        case EFFECT_FLAG_TYPE_POST_PROC:
+            return Flags::Type::POST_PROC;
+    }
+    return unexpected(BAD_VALUE);
+}
+
 ConversionResult<uint32_t> aidl2legacy_Flags_Insert_uint32(Flags::Insert insert) {
     switch (insert) {
         case Flags::Insert::ANY:
@@ -75,6 +86,20 @@ ConversionResult<uint32_t> aidl2legacy_Flags_Insert_uint32(Flags::Insert insert)
             return EFFECT_FLAG_INSERT_LAST;
         case Flags::Insert::EXCLUSIVE:
             return EFFECT_FLAG_INSERT_EXCLUSIVE;
+    }
+    return unexpected(BAD_VALUE);
+}
+
+ConversionResult<Flags::Insert> legacy2aidl_uint32_Flags_Insert(uint32_t legacy) {
+    switch (legacy & EFFECT_FLAG_INSERT_MASK) {
+        case EFFECT_FLAG_INSERT_ANY:
+            return Flags::Insert::ANY;
+        case EFFECT_FLAG_INSERT_FIRST:
+            return Flags::Insert::FIRST;
+        case EFFECT_FLAG_INSERT_LAST:
+            return Flags::Insert::LAST;
+        case EFFECT_FLAG_INSERT_EXCLUSIVE:
+            return Flags::Insert::EXCLUSIVE;
     }
     return unexpected(BAD_VALUE);
 }
@@ -92,15 +117,17 @@ ConversionResult<uint32_t> aidl2legacy_Flags_Volume_uint32(Flags::Volume volume)
     }
     return unexpected(BAD_VALUE);
 }
-ConversionResult<uint32_t> aidl2legacy_Flags_HardwareAccelerator_uint32(
-        Flags::HardwareAccelerator hwAcceleratorMode) {
-    switch (hwAcceleratorMode) {
-        case Flags::HardwareAccelerator::NONE:
-            return 0;
-        case Flags::HardwareAccelerator::SIMPLE:
-            return EFFECT_FLAG_HW_ACC_SIMPLE;
-        case Flags::HardwareAccelerator::TUNNEL:
-            return EFFECT_FLAG_HW_ACC_TUNNEL;
+
+ConversionResult<Flags::Volume> legacy2aidl_uint32_Flags_Volume(uint32_t legacy) {
+    switch (legacy & EFFECT_FLAG_VOLUME_MASK) {
+        case EFFECT_FLAG_VOLUME_CTRL:
+            return Flags::Volume::CTRL;
+        case EFFECT_FLAG_VOLUME_IND:
+            return Flags::Volume::IND;
+        case EFFECT_FLAG_VOLUME_MONITOR:
+            return Flags::Volume::MONITOR;
+        case EFFECT_FLAG_VOLUME_NONE:
+            return Flags::Volume::NONE;
     }
     return unexpected(BAD_VALUE);
 }
@@ -130,59 +157,6 @@ ConversionResult<uint32_t> aidl2legacy_Flags_uint32(Flags aidl) {
     return legacy;
 }
 
-ConversionResult<Flags::Type> legacy2aidl_uint32_Flags_Type(uint32_t legacy) {
-    switch (legacy & EFFECT_FLAG_TYPE_MASK) {
-        case EFFECT_FLAG_TYPE_INSERT:
-            return Flags::Type::INSERT;
-        case EFFECT_FLAG_TYPE_AUXILIARY:
-            return Flags::Type::AUXILIARY;
-        case EFFECT_FLAG_TYPE_REPLACE:
-            return Flags::Type::REPLACE;
-        case EFFECT_FLAG_TYPE_PRE_PROC:
-            return Flags::Type::PRE_PROC;
-        case EFFECT_FLAG_TYPE_POST_PROC:
-            return Flags::Type::POST_PROC;
-    }
-    return unexpected(BAD_VALUE);
-}
-
-ConversionResult<Flags::Insert> legacy2aidl_uint32_Flags_Insert(uint32_t legacy) {
-    switch (legacy & EFFECT_FLAG_INSERT_MASK) {
-        case EFFECT_FLAG_INSERT_ANY:
-            return Flags::Insert::ANY;
-        case EFFECT_FLAG_INSERT_FIRST:
-            return Flags::Insert::FIRST;
-        case EFFECT_FLAG_INSERT_LAST:
-            return Flags::Insert::LAST;
-        case EFFECT_FLAG_INSERT_EXCLUSIVE:
-            return Flags::Insert::EXCLUSIVE;
-    }
-    return unexpected(BAD_VALUE);
-}
-
-ConversionResult<Flags::Volume> legacy2aidl_uint32_Flags_Volume(uint32_t legacy) {
-    switch (legacy & EFFECT_FLAG_VOLUME_MASK) {
-        case EFFECT_FLAG_VOLUME_IND:
-            return Flags::Volume::IND;
-        case EFFECT_FLAG_VOLUME_MONITOR:
-            return Flags::Volume::MONITOR;
-        case EFFECT_FLAG_VOLUME_NONE:
-            return Flags::Volume::NONE;
-    }
-    return unexpected(BAD_VALUE);
-}
-
-ConversionResult<Flags::HardwareAccelerator> legacy2aidl_uint32_Flags_HardwareAccelerator(
-        uint32_t legacy) {
-    switch (legacy & EFFECT_FLAG_HW_ACC_MASK) {
-        case EFFECT_FLAG_HW_ACC_SIMPLE:
-            return Flags::HardwareAccelerator::SIMPLE;
-        case EFFECT_FLAG_HW_ACC_TUNNEL:
-            return Flags::HardwareAccelerator::TUNNEL;
-    }
-    return unexpected(BAD_VALUE);
-}
-
 ConversionResult<Flags> legacy2aidl_uint32_Flags(uint32_t legacy) {
     Flags aidl;
 
@@ -196,6 +170,32 @@ ConversionResult<Flags> legacy2aidl_uint32_Flags(uint32_t legacy) {
     aidl.audioSourceIndication = (legacy & EFFECT_FLAG_AUDIO_SOURCE_IND);
     aidl.noProcessing = (legacy & EFFECT_FLAG_NO_PROCESS);
     return aidl;
+}
+
+ConversionResult<uint32_t> aidl2legacy_Flags_HardwareAccelerator_uint32(
+        Flags::HardwareAccelerator hwAcceleratorMode) {
+    switch (hwAcceleratorMode) {
+        case Flags::HardwareAccelerator::NONE:
+            return 0;
+        case Flags::HardwareAccelerator::SIMPLE:
+            return EFFECT_FLAG_HW_ACC_SIMPLE;
+        case Flags::HardwareAccelerator::TUNNEL:
+            return EFFECT_FLAG_HW_ACC_TUNNEL;
+    }
+    return unexpected(BAD_VALUE);
+}
+
+ConversionResult<Flags::HardwareAccelerator> legacy2aidl_uint32_Flags_HardwareAccelerator(
+        uint32_t legacy) {
+    switch (legacy & EFFECT_FLAG_HW_ACC_MASK) {
+        case EFFECT_FLAG_HW_ACC_SIMPLE:
+            return Flags::HardwareAccelerator::SIMPLE;
+        case EFFECT_FLAG_HW_ACC_TUNNEL:
+            return Flags::HardwareAccelerator::TUNNEL;
+        case 0:
+            return Flags::HardwareAccelerator::NONE;
+    }
+    return unexpected(BAD_VALUE);
 }
 
 ConversionResult<effect_descriptor_t>
@@ -231,6 +231,7 @@ legacy2aidl_effect_descriptor_Descriptor(const effect_descriptor_t& legacy) {
     return aidl;
 }
 
+// buffer_provider_t is not supported thus skipped
 ConversionResult<buffer_config_t> aidl2legacy_AudioConfigBase_buffer_config_t(
         const media::audio::common::AudioConfigBase& aidl, bool isInput) {
     buffer_config_t legacy;
@@ -245,6 +246,7 @@ ConversionResult<buffer_config_t> aidl2legacy_AudioConfigBase_buffer_config_t(
     legacy.format = VALUE_OR_RETURN(aidl2legacy_AudioFormatDescription_audio_format_t(aidl.format));
     legacy.mask |= EFFECT_CONFIG_FORMAT;
 
+    // TODO: add accessMode and mask
     return legacy;
 }
 
@@ -263,37 +265,100 @@ legacy2aidl_buffer_config_t_AudioConfigBase(const buffer_config_t& legacy, bool 
         aidl.format = VALUE_OR_RETURN(legacy2aidl_audio_format_t_AudioFormatDescription(
                 static_cast<audio_format_t>(legacy.format)));
     }
+
+    // TODO: add accessMode and mask
     return aidl;
 }
 
-ConversionResult<uint32_t> aidl2legacy_Parameter_uint32_echoDelay(const Parameter& aidl) {
-    const auto& aec = VALUE_OR_RETURN(getParameterSpecificAec(aidl));
-    const auto& echoDelay = VALUE_OR_RETURN(UNION_GET(aec, echoDelayUs));
-    return VALUE_OR_RETURN(convertIntegral<uint32_t>(echoDelay));
+ConversionResult<uint32_t> aidl2legacy_Parameter_aec_uint32_echoDelay(const Parameter& aidl) {
+    int echoDelay = VALUE_OR_RETURN(GET_PARAMETER_SPECIFIC_FIELD(
+            aidl, AcousticEchoCanceler, acousticEchoCanceler, echoDelayUs, int));
+    return VALUE_OR_RETURN(convertReinterpret<uint32_t>(echoDelay));
 }
 
-ConversionResult<Parameter> legacy2aidl_uint32_echoDelay_Parameter(const uint32_t& legacy) {
+ConversionResult<Parameter> legacy2aidl_uint32_echoDelay_Parameter_aec(uint32_t legacy) {
     int delay = VALUE_OR_RETURN(convertReinterpret<int32_t>(legacy));
-    AcousticEchoCanceler aec = AcousticEchoCanceler::make<AcousticEchoCanceler::echoDelayUs>(delay);
-    Parameter::Specific specific =
-            Parameter::Specific::make<Parameter::Specific::acousticEchoCanceler>(aec);
-
-    return Parameter::make<Parameter::specific>(specific);
+    return MAKE_SPECIFIC_PARAMETER(AcousticEchoCanceler, acousticEchoCanceler, echoDelayUs, delay);
 }
 
-ConversionResult<uint32_t> aidl2legacy_Parameter_uint32_mobileMode(const Parameter& aidl) {
-    const auto& aec = VALUE_OR_RETURN(getParameterSpecificAec(aidl));
-    const auto& mobileMode = VALUE_OR_RETURN(UNION_GET(aec, mobileMode));
+ConversionResult<uint32_t> aidl2legacy_Parameter_aec_uint32_mobileMode(const Parameter& aidl) {
+    bool mobileMode = VALUE_OR_RETURN(GET_PARAMETER_SPECIFIC_FIELD(
+            aidl, AcousticEchoCanceler, acousticEchoCanceler, mobileMode, bool));
     return VALUE_OR_RETURN(convertIntegral<uint32_t>(mobileMode));
 }
 
-ConversionResult<Parameter> legacy2aidl_uint32_mobileMode_Parameter(const uint32_t& legacy) {
+ConversionResult<Parameter> legacy2aidl_uint32_mobileMode_Parameter_aec(uint32_t legacy) {
     bool mode = VALUE_OR_RETURN(convertIntegral<bool>(legacy));
-    AcousticEchoCanceler aec = AcousticEchoCanceler::make<AcousticEchoCanceler::mobileMode>(mode);
-    Parameter::Specific specific =
-            Parameter::Specific::make<Parameter::Specific::acousticEchoCanceler>(aec);
+    return MAKE_SPECIFIC_PARAMETER(AcousticEchoCanceler, acousticEchoCanceler, mobileMode, mode);
+}
 
-    return Parameter::make<Parameter::specific>(specific);
+ConversionResult<uint32_t> aidl2legacy_Parameter_agc_uint32_fixedDigitalGain(
+        const Parameter& aidl) {
+    int gain = VALUE_OR_RETURN(GET_PARAMETER_SPECIFIC_FIELD(
+            aidl, AutomaticGainControl, automaticGainControl, fixedDigitalGainMb, int));
+    return VALUE_OR_RETURN(convertReinterpret<uint32_t>(gain));
+}
+
+ConversionResult<Parameter> legacy2aidl_uint32_fixedDigitalGain_Parameter_agc(uint32_t legacy) {
+    int gain = VALUE_OR_RETURN(convertReinterpret<int>(legacy));
+    return MAKE_SPECIFIC_PARAMETER(AutomaticGainControl, automaticGainControl, fixedDigitalGainMb,
+                                   gain);
+}
+
+ConversionResult<uint32_t> aidl2legacy_Parameter_agc_uint32_levelEstimator(
+        const Parameter& aidl) {
+    const auto& le = VALUE_OR_RETURN(
+            GET_PARAMETER_SPECIFIC_FIELD(aidl, AutomaticGainControl, automaticGainControl,
+                                         levelEstimator, AutomaticGainControl::LevelEstimator));
+    return static_cast<uint32_t>(le);
+}
+
+ConversionResult<Parameter> legacy2aidl_uint32_levelEstimator_Parameter_agc(uint32_t legacy) {
+    if (legacy > (uint32_t) AutomaticGainControl::LevelEstimator::PEAK) {
+        return unexpected(BAD_VALUE);
+    }
+    AutomaticGainControl::LevelEstimator le =
+            static_cast<AutomaticGainControl::LevelEstimator>(legacy);
+    return MAKE_SPECIFIC_PARAMETER(AutomaticGainControl, automaticGainControl, levelEstimator, le);
+}
+
+ConversionResult<uint32_t> aidl2legacy_Parameter_agc_uint32_saturationMargin(
+        const Parameter& aidl) {
+    int saturationMargin = VALUE_OR_RETURN(GET_PARAMETER_SPECIFIC_FIELD(
+            aidl, AutomaticGainControl, automaticGainControl, saturationMarginMb, int));
+    return VALUE_OR_RETURN(convertIntegral<uint32_t>(saturationMargin));
+}
+
+ConversionResult<Parameter> legacy2aidl_uint32_saturationMargin_Parameter_agc(uint32_t legacy) {
+    int saturationMargin = VALUE_OR_RETURN(convertIntegral<int>(legacy));
+    return MAKE_SPECIFIC_PARAMETER(AutomaticGainControl, automaticGainControl, saturationMarginMb,
+                                   saturationMargin);
+}
+
+ConversionResult<uint16_t> aidl2legacy_Parameter_BassBoost_uint16_strengthPm(
+        const Parameter& aidl) {
+    int strength = VALUE_OR_RETURN(
+            GET_PARAMETER_SPECIFIC_FIELD(aidl, BassBoost, bassBoost, strengthPm, int));
+    return VALUE_OR_RETURN(convertIntegral<uint16_t>(strength));
+}
+
+ConversionResult<Parameter> legacy2aidl_uint16_strengthPm_Parameter_BassBoost(uint16_t legacy) {
+    int strength = VALUE_OR_RETURN(convertIntegral<int>(legacy));
+    return MAKE_SPECIFIC_PARAMETER(BassBoost, bassBoost, strengthPm, strength);
+}
+
+ConversionResult<int16_t> aidl2legacy_Parameter_Downmix_int16_type(const Parameter& aidl) {
+    Downmix::Type aidlType = VALUE_OR_RETURN(
+            GET_PARAMETER_SPECIFIC_FIELD(aidl, Downmix, downmix, type, Downmix::Type));
+    return VALUE_OR_RETURN(convertIntegral<int16_t>(static_cast<uint32_t>(aidlType)));
+}
+
+ConversionResult<Parameter> legacy2aidl_int16_type_Parameter_Downmix(int16_t legacy) {
+    if (legacy > (uint32_t) Downmix::Type::FOLD) {
+        return unexpected(BAD_VALUE);
+    }
+    Downmix::Type aidlType = static_cast<Downmix::Type>(legacy);
+    return MAKE_SPECIFIC_PARAMETER(Downmix, downmix, type, aidlType);
 }
 
 }  // namespace android
