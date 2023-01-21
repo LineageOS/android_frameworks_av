@@ -278,6 +278,8 @@ ConversionResult<UnionFieldType<T, tag>> unionGetField(const T& u) {
 #define UNION_SET(u, field, value) \
     (u).set<std::decay_t<decltype(u)>::Tag::field>(value)
 
+#define UNION_MAKE(u, field, value) u::make<u::Tag::field>(value)
+
 namespace aidl_utils {
 
 /**

@@ -20,10 +20,16 @@
 
 #include <media/audiohal/EffectsFactoryHalInterface.h>
 
+#include <system/audio_effects/audio_effects_utils.h>
+#include <system/audio_effects/effect_aec.h>
+#include <system/audio_effect.h>
+
 #include <gtest/gtest.h>
 #include <utils/RefBase.h>
 
 namespace android {
+
+using effect::utils::EffectParamWriter;
 
 // EffectsFactoryHalInterface
 TEST(libAudioHalTest, createEffectsFactoryHalInterface) {
@@ -76,6 +82,81 @@ TEST(libAudioHalTest, getHalVersion) {
 
     auto version = factory->getHalVersion();
     EXPECT_NE(0, version.getMajorVersion());
+}
+
+static char testDataBuffer[sizeof(effect_param_t) + 0xff] = {};
+static char testResponseBuffer[sizeof(effect_param_t) + 0xff] = {};
+TEST(libAudioHalTest, agcNotInit) {
+    auto factory = EffectsFactoryHalInterface::create();
+    ASSERT_NE(nullptr, factory);
+
+    std::vector<effect_descriptor_t> descs;
+    EXPECT_EQ(OK, factory->getDescriptors(&FX_IID_AEC_, &descs));
+    for (const auto& desc : descs) {
+        ASSERT_EQ(0, std::memcmp(&desc.type, &FX_IID_AEC_, sizeof(FX_IID_AEC_)));
+        sp<EffectHalInterface> interface;
+        EXPECT_EQ(OK, factory->createEffect(&desc.uuid, 1 /* sessionId */, 1 /* ioId */,
+                                            1 /* deviceId */, &interface));
+        EXPECT_NE(nullptr, interface);
+        effect_param_t* param = (effect_param_t*)testDataBuffer;
+        uint32_t type = AEC_PARAM_ECHO_DELAY, value = 0xbead;
+        param->psize = sizeof(type);
+        param->vsize = sizeof(value);
+        //EXPECT_EQ(1, 0) << param->psize << " " << param->vsize;
+        EffectParamWriter writer(*param);
+        EXPECT_EQ(OK, writer.writeToParameter(&type)) << writer.toString();
+        EXPECT_EQ(OK, writer.writeToValue(&value)) << writer.toString();
+        status_t reply = 0;
+        uint32_t replySize = sizeof(reply);
+        EXPECT_NE(OK, interface->command(EFFECT_CMD_SET_PARAM, (uint32_t)writer.getTotalSize(),
+                                         param, &replySize, &reply));
+        EXPECT_EQ(replySize, sizeof(reply));
+        EXPECT_NE(OK, reply);
+    }
+}
+
+// TODO: rethink about this test case to make it general for all types of effects
+TEST(libAudioHalTest, aecInitSetAndGet) {
+    auto factory = EffectsFactoryHalInterface::create();
+    ASSERT_NE(nullptr, factory);
+
+    std::vector<effect_descriptor_t> descs;
+    EXPECT_EQ(OK, factory->getDescriptors(&FX_IID_AEC_, &descs));
+    static constexpr uint32_t delayValue = 0x20;
+    for (const auto& desc : descs) {
+        ASSERT_EQ(0, std::memcmp(&desc.type, &FX_IID_AEC_, sizeof(FX_IID_AEC_)));
+        sp<EffectHalInterface> interface;
+        EXPECT_EQ(OK, factory->createEffect(&desc.uuid, 1 /* sessionId */, 1 /* ioId */,
+                                            1 /* deviceId */, &interface));
+        EXPECT_NE(nullptr, interface);
+        effect_param_t* param = (effect_param_t*)testDataBuffer;
+        uint32_t type = AEC_PARAM_ECHO_DELAY, value = delayValue;
+        param->psize = sizeof(type);
+        param->vsize = sizeof(value);
+        //EXPECT_EQ(1, 0) << param->psize << " " << param->vsize;
+        EffectParamWriter writer(*param);
+        EXPECT_EQ(OK, writer.writeToParameter(&type)) << writer.toString();
+        EXPECT_EQ(OK, writer.writeToValue(&value)) << writer.toString();
+        status_t reply = 0;
+        uint32_t replySize = sizeof(reply);
+        EXPECT_EQ(OK, interface->command(EFFECT_CMD_INIT, 0, nullptr, &replySize, &reply));
+        EXPECT_EQ(OK, interface->command(EFFECT_CMD_SET_PARAM, (uint32_t)writer.getTotalSize(),
+                                         param, &replySize, &reply));
+        EXPECT_EQ(replySize, sizeof(reply));
+        EXPECT_EQ(OK, reply);
+
+        effect_param_t* responseParam = (effect_param_t*)testResponseBuffer;
+        param->psize = sizeof(type);
+        param->vsize = sizeof(value);
+        EffectParamWriter response(*param);
+        EXPECT_EQ(OK, response.writeToParameter(&type)) << response.toString();
+        replySize = response.getTotalSize();
+        EXPECT_EQ(OK, interface->command(EFFECT_CMD_GET_PARAM, (uint32_t)writer.getTotalSize(),
+                                         param, &replySize, responseParam));
+        EXPECT_EQ(replySize, response.getTotalSize());
+        EXPECT_EQ(OK, response.readFromValue(&value));
+        EXPECT_EQ(delayValue, value);
+    }
 }
 
 // TODO: b/263986405 Add multi-thread testing
