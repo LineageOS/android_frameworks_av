@@ -211,46 +211,6 @@ cc_binary {
 }
 
 cc_binary {
-    name: "mediafilter",
-
-    srcs: [
-        "filters/argbtorgba.rscript",
-        "filters/nightvision.rscript",
-        "filters/saturation.rscript",
-        "mediafilter.cpp",
-    ],
-
-    header_libs: [
-        "libmediadrm_headers",
-        "libmediametrics_headers",
-        "libstagefright_headers",
-        "rs-headers",
-    ],
-
-    shared_libs: [
-        "libstagefright",
-        "liblog",
-        "libutils",
-        "libbinder",
-        "libstagefright_foundation",
-        "libmedia_omx",
-        "libui",
-        "libgui",
-        "libRScpp",
-    ],
-
-    static_libs: ["libstagefright_mediafilter"],
-
-    cflags: [
-        "-Wno-multichar",
-    ],
-
-    sanitize: {
-        cfi: true,
-    },
-}
-
-cc_binary {
     name: "muxer",
 
     srcs: ["muxer.cpp"],
