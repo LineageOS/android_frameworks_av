@@ -16,6 +16,7 @@
 #define LOG_TAG "clearkey-DrmPlugin"
 
 #include <aidl/android/hardware/drm/DrmMetric.h>
+#include <android-base/parseint.h>
 #include <utils/Log.h>
 
 #include <inttypes.h>
@@ -83,12 +84,14 @@ DrmPlugin::DrmPlugin(SessionLibrary* sessionLibrary)
 void DrmPlugin::initProperties() {
     mStringProperties.clear();
     mStringProperties[kVendorKey] = kAidlVendorValue;
-    mStringProperties[kVersionKey] = kAidlVersionValue;
+    mStringProperties[kVersionKey] = kVersionValue;
     mStringProperties[kPluginDescriptionKey] = kAidlPluginDescriptionValue;
     mStringProperties[kAlgorithmsKey] = kAidlAlgorithmsValue;
     mStringProperties[kListenerTestSupportKey] = kAidlListenerTestSupportValue;
     mStringProperties[kDrmErrorTestKey] = kAidlDrmErrorTestValue;
     mStringProperties[kAidlVersionKey] = kAidlVersionValue;
+    mStringProperties[kOemErrorKey] = "0";
+    mStringProperties[kErrorContextKey] = "0";
 
     std::vector<uint8_t> valueVector;
     valueVector.clear();
@@ -102,6 +105,26 @@ void DrmPlugin::initProperties() {
     mByteArrayProperties[kMetricsKey] = valueVector;
 }
 
+int32_t DrmPlugin::getIntProperty(const std::string& prop, int32_t defaultVal) const {
+    if (!mStringProperties.count(prop)) {
+        return defaultVal;
+    }
+    int32_t out = defaultVal;
+    if (!::android::base::ParseInt(mStringProperties.at(prop), &out)) {
+        return defaultVal;
+    }
+    return out;
+}
+
+int32_t DrmPlugin::getOemError() const {
+    return getIntProperty(kOemErrorKey);
+}
+
+int32_t DrmPlugin::getErrorContext() const {
+    return getIntProperty(kErrorContextKey);
+}
+
+//
 // The secure stop in ClearKey implementation is not installed securely.
 // This function merely creates a test environment for testing secure stops APIs.
 // The content in this secure stop is implementation dependent, the clearkey
@@ -127,7 +150,10 @@ void DrmPlugin::installSecureStop(const std::vector<uint8_t>& sessionId) {
         mSessionLibrary->destroySession(session);
         if (session->getMockError() != clearkeydrm::OK) {
             sendSessionLostState(in_sessionId);
-            return toNdkScopedAStatus(Status::ERROR_DRM_INVALID_STATE);
+            return toNdkScopedAStatus(Status::ERROR_DRM_INVALID_STATE,
+                                      nullptr,
+                                      getOemError(),
+                                      getErrorContext());
         }
         mCloseSessionOkCount++;
         return toNdkScopedAStatus(Status::OK);
@@ -198,7 +224,8 @@ void DrmPlugin::installSecureStop(const std::vector<uint8_t>& sessionId) {
         if (!session.get()) {
             return toNdkScopedAStatus(Status::ERROR_DRM_SESSION_NOT_OPENED);
         } else if (session->getMockError() != clearkeydrm::OK) {
-            return toNdkScopedAStatus(session->getMockError());
+            auto err = static_cast<Status>(session->getMockError());
+            return toNdkScopedAStatus(err, nullptr, getOemError(), getErrorContext());
         }
         keyRequestType = KeyRequestType::INITIAL;
     }
@@ -381,6 +408,10 @@ void DrmPlugin::installSecureStop(const std::vector<uint8_t>& sessionId) {
         value = mStringProperties[kDrmErrorTestKey];
     } else if (name == kAidlVersionKey) {
         value = mStringProperties[kAidlVersionKey];
+    } else if (name == kOemErrorKey) {
+        value = mStringProperties[kOemErrorKey];
+    } else if (name == kErrorContextKey) {
+        value = mStringProperties[kErrorContextKey];
     } else {
         ALOGE("App requested unknown string property %s", name.c_str());
         status = Status::ERROR_DRM_CANNOT_HANDLE;
@@ -917,6 +948,13 @@ void DrmPlugin::sendSessionLostState(const std::vector<uint8_t>& in_sessionId) {
             mMockError = Status::ERROR_DRM_INVALID_STATE;
         } else {
             mMockError = Status::ERROR_DRM_UNKNOWN;
+        }
+    }
+
+    if (in_propertyName == kOemErrorKey || in_propertyName == kErrorContextKey) {
+        int32_t err = 0;
+        if (!::android::base::ParseInt(in_value, &err)) {
+            return toNdkScopedAStatus(Status::BAD_VALUE);
         }
     }
 
