@@ -1709,7 +1709,7 @@ AAUDIO_API int32_t AAudioStream_getSampleRate(AAudioStream* stream) __INTRODUCED
  * There may be sample rate conversions in the Audio framework.
  * The sample rate set in the stream builder may not be actual sample rate used in the hardware.
  *
- * This returns the sample rate used by the hardware.
+ * This returns the sample rate used by the hardware in Hertz.
  *
  * If AAudioStreamBuilder_openStream() returned AAUDIO_OK, the result should always be valid.
  *
@@ -1780,8 +1780,15 @@ AAUDIO_API aaudio_format_t AAudioStream_getFormat(AAudioStream* stream) __INTROD
  * The data format set in the stream builder may not be actual format used in the hardware.
  *
  * This returns the audio format used by the hardware.
+ *
+ * If AAudioStreamBuilder_openStream() returned AAUDIO_OK, this should always return an
+ * aaudio_format_t.
+ *
  * AUDIO_FORMAT_PCM_8_24_BIT is currently not supported in AAudio, but the hardware may use it.
  * If AUDIO_FORMAT_PCM_8_24_BIT is used by the hardware, return AAUDIO_FORMAT_PCM_I24_PACKED.
+ *
+ * If any other format used by the hardware is not supported by AAudio, this will return
+ * AAUDIO_FORMAT_INVALID.
  *
  * Available since API level 34.
  *
