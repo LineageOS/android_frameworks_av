@@ -69,7 +69,7 @@ class HapticGeneratorContext final : public EffectContext {
     RetCode disable();
     void reset();
 
-    RetCode setHgHapticScales(const std::vector<HapticGenerator::HapticScale> hapticScales);
+    RetCode setHgHapticScales(const std::vector<HapticGenerator::HapticScale>& hapticScales);
     std::vector<HapticGenerator::HapticScale> getHgHapticScales();
 
     RetCode setHgVibratorInformation(const HapticGenerator::VibratorInformation& vibratorInfo);
