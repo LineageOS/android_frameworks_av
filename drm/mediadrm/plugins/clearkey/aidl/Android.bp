@@ -69,3 +69,78 @@ phony {
         "android.hardware.drm-service.clearkey",
     ],
 }
+
+cc_defaults {
+    name: "fuzz_aidl_clearkey_service_defaults",
+
+    srcs: [
+        "CreatePluginFactories.cpp",
+        "CryptoPlugin.cpp",
+        "DrmFactory.cpp",
+        "DrmPlugin.cpp",
+    ],
+
+    relative_install_path: "hw",
+
+    cflags: ["-Wall", "-Werror", "-Wthread-safety"],
+
+    include_dirs: ["frameworks/av/include"],
+
+    shared_libs: [
+        "libbase",
+        "libbinder_ndk",
+        "libcrypto",
+        "liblog",
+        "libprotobuf-cpp-lite",
+        "libutils",
+        "android.hardware.drm-V1-ndk",
+    ],
+
+    static_libs: [
+        "android.hardware.common-V2-ndk",
+        "libclearkeybase_fuzz",
+    ],
+
+    local_include_dirs: ["include"],
+
+    sanitize: {
+        integer_overflow: true,
+    },
+}
+
+cc_fuzz {
+    name: "android.hardware.drm-service.clearkey.aidl_fuzzer",
+    defaults: [
+        "fuzz_aidl_clearkey_service_defaults",
+    ],
+    static_libs: [
+        "libbase",
+        "libbinder_random_parcel",
+        "libcutils",
+        "liblog",
+        "libutils",
+    ],
+    target: {
+        android: {
+            shared_libs: [
+                "libbinder_ndk",
+                "libbinder",
+            ],
+        },
+        host: {
+            static_libs: [
+                "libbinder_ndk",
+                "libbinder",
+            ],
+        },
+        darwin: {
+            enabled: false,
+        },
+    },
+    srcs: ["fuzzer.cpp"],
+    fuzz_config: {
+        cc: [
+            "hamzeh@google.com",
+        ],
+    },
+}
