@@ -99,6 +99,9 @@ public:
     // Event log ID
     static const int SN_EVENT_LOG_ID = 0x534e4554;
 
+    // Register camera service
+    static void instantiate();
+
     // Implementation of BinderService<T>
     static char const* getServiceName() { return "media.camera"; }
 
