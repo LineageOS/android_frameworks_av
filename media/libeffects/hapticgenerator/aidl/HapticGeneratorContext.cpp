@@ -67,7 +67,7 @@ void HapticGeneratorContext::reset() {
 }
 
 RetCode HapticGeneratorContext::setHgHapticScales(
-        const std::vector<HapticGenerator::HapticScale> hapticScales) {
+        const std::vector<HapticGenerator::HapticScale>& hapticScales) {
     std::lock_guard lg(mMutex);
     for (auto hapticScale : hapticScales) {
         mParams.mHapticScales.insert_or_assign(hapticScale.id, hapticScale.scale);
