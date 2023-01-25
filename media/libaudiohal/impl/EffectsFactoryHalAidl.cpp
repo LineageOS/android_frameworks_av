@@ -24,7 +24,7 @@
 #include <error/expected_utils.h>
 #include <android/binder_manager.h>
 #include <media/AidlConversionCppNdk.h>
-#include <media/AidlConversionNdk.h>
+#include <media/AidlConversionEffect.h>
 #include <system/audio.h>
 #include <utils/Log.h>
 

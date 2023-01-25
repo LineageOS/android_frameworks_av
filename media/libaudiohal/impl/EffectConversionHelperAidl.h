@@ -23,7 +23,6 @@
 
 #include <aidl/android/hardware/audio/effect/IEffect.h>
 
-#include <media/AidlConversionNdk.h>
 #include <system/audio_effect.h>
 #include <system/audio_effects/audio_effects_utils.h>
 
