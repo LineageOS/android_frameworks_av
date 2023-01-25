@@ -163,7 +163,7 @@ audio_port_handle_t SoundDoseManager::getIdForAudioDevice(const AudioDevice& aud
     auto adt = AudioDeviceTypeAddr(type, address);
     auto deviceIt = mActiveDevices.find(adt);
     if (deviceIt == mActiveDevices.end()) {
-        ALOGE("%s: could not find port id for device %s", __func__, adt.toString().c_str());
+        ALOGI("%s: could not find port id for device %s", __func__, adt.toString().c_str());
         return AUDIO_PORT_HANDLE_NONE;
     }
     return deviceIt->second;
@@ -187,7 +187,6 @@ void SoundDoseManager::clearMapDeviceIdEntries(audio_port_handle_t deviceId) {
         }
         ++activeDevice;
     }
-    return;
 }
 
 ndk::ScopedAStatus SoundDoseManager::HalSoundDoseCallback::onMomentaryExposureWarning(
@@ -206,7 +205,7 @@ ndk::ScopedAStatus SoundDoseManager::HalSoundDoseCallback::onMomentaryExposureWa
 
     auto id = soundDoseManager->getIdForAudioDevice(in_audioDevice);
     if (id == AUDIO_PORT_HANDLE_NONE) {
-        ALOGW("%s: no mapped id for audio device with type %d and address %s",
+        ALOGI("%s: no mapped id for audio device with type %d and address %s",
                 __func__, in_audioDevice.type.type,
                 in_audioDevice.address.get<AudioDeviceAddress::id>().c_str());
         return ndk::ScopedAStatus::fromExceptionCode(EX_ILLEGAL_ARGUMENT);
@@ -233,7 +232,7 @@ ndk::ScopedAStatus SoundDoseManager::HalSoundDoseCallback::onNewMelValues(
 
     auto id = soundDoseManager->getIdForAudioDevice(in_audioDevice);
     if (id == AUDIO_PORT_HANDLE_NONE) {
-        ALOGW("%s: no mapped id for audio device with type %d and address %s",
+        ALOGI("%s: no mapped id for audio device with type %d and address %s",
                 __func__, in_audioDevice.type.type,
                 in_audioDevice.address.get<AudioDeviceAddress::id>().c_str());
         return ndk::ScopedAStatus::fromExceptionCode(EX_ILLEGAL_ARGUMENT);

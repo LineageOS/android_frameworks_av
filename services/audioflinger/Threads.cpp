@@ -3229,10 +3229,10 @@ void AudioFlinger::PlaybackThread::readOutputParameters_l()
     item.record();
 }
 
-void AudioFlinger::PlaybackThread::updateMetadata_l()
+AudioFlinger::ThreadBase::MetadataUpdate AudioFlinger::PlaybackThread::updateMetadata_l()
 {
     if (!isStreamInitialized() || !mActiveTracks.readAndClearHasChanged()) {
-        return; // nothing to do
+        return {}; // nothing to do
     }
     StreamOutHalInterface::SourceMetadata metadata;
     auto backInserter = std::back_inserter(metadata.tracks);
@@ -3241,6 +3241,9 @@ void AudioFlinger::PlaybackThread::updateMetadata_l()
         track->copyMetadataTo(backInserter);
     }
     sendMetadataToBackend_l(metadata);
+    MetadataUpdate change;
+    change.playbackMetadataUpdate = metadata.tracks;
+    return change;
 }
 
 void AudioFlinger::PlaybackThread::sendMetadataToBackend_l(
@@ -3478,8 +3481,10 @@ void AudioFlinger::PlaybackThread::startMelComputation(
 }
 
 void AudioFlinger::PlaybackThread::stopMelComputation() {
-    ALOGV("%s: stopping mel processor for thread %d", __func__, id());
-    mMelProcessor = nullptr;
+    if (mMelProcessor.load() != nullptr) {
+        ALOGV("%s: stopping mel processor for thread %d", __func__, id());
+        mMelProcessor = nullptr;
+    }
 }
 
 void AudioFlinger::PlaybackThread::threadLoop_drain()
@@ -3933,6 +3938,7 @@ bool AudioFlinger::PlaybackThread::threadLoop()
             checkOutputStageEffects();
         }
 
+        MetadataUpdate metadataUpdate;
         { // scope for mLock
 
             Mutex::Autolock _l(mLock);
@@ -4034,7 +4040,7 @@ bool AudioFlinger::PlaybackThread::threadLoop()
 
             mActiveTracks.updatePowerState(this);
 
-            updateMetadata_l();
+            metadataUpdate = updateMetadata_l();
 
             // prevent any changes in effect chain list and in each effect chain
             // during mixing and effect process as the audio buffers could be deleted
@@ -4073,6 +4079,11 @@ bool AudioFlinger::PlaybackThread::threadLoop()
 
             setHalLatencyMode_l();
         } // mLock scope ends
+
+        if (!metadataUpdate.playbackMetadataUpdate.empty()) {
+            mAudioFlinger->mMelReporter->updateMetadataForCsd(id(),
+                    metadataUpdate.playbackMetadataUpdate);
+        }
 
         if (mBytesRemaining == 0) {
             mCurrentWriteLength = 0;
@@ -4783,7 +4794,7 @@ status_t AudioFlinger::PlaybackThread::createAudioPatch_l(const struct audio_pat
     if (configChanged) {
         sendIoConfigEvent_l(AUDIO_OUTPUT_CONFIG_CHANGED);
     }
-    // Force meteadata update after a route change
+    // Force metadata update after a route change
     mActiveTracks.setHasChanged();
 
     return status;
@@ -9023,10 +9034,10 @@ void AudioFlinger::RecordThread::resetAudioHistory_l() {
     mSharedAudioPackageName = "";
 }
 
-void AudioFlinger::RecordThread::updateMetadata_l()
+AudioFlinger::ThreadBase::MetadataUpdate AudioFlinger::RecordThread::updateMetadata_l()
 {
     if (!isStreamInitialized() || !mActiveTracks.readAndClearHasChanged()) {
-        return; // nothing to do
+        return {}; // nothing to do
     }
     StreamInHalInterface::SinkMetadata metadata;
     auto backInserter = std::back_inserter(metadata.tracks);
@@ -9034,6 +9045,9 @@ void AudioFlinger::RecordThread::updateMetadata_l()
         track->copyMetadataTo(backInserter);
     }
     mInput->stream->updateSinkMetadata(metadata);
+    MetadataUpdate change;
+    change.recordMetadataUpdate = metadata.tracks;
+    return change;
 }
 
 // destroyTrack_l() must be called with ThreadBase::mLock held
@@ -10733,10 +10747,10 @@ void AudioFlinger::MmapPlaybackThread::processVolume_l()
     }
 }
 
-void AudioFlinger::MmapPlaybackThread::updateMetadata_l()
+AudioFlinger::ThreadBase::MetadataUpdate AudioFlinger::MmapPlaybackThread::updateMetadata_l()
 {
     if (!isStreamInitialized() || !mActiveTracks.readAndClearHasChanged()) {
-        return; // nothing to do
+        return {}; // nothing to do
     }
     StreamOutHalInterface::SourceMetadata metadata;
     for (const sp<MmapTrack> &track : mActiveTracks) {
@@ -10752,7 +10766,11 @@ void AudioFlinger::MmapPlaybackThread::updateMetadata_l()
         metadata.tracks.push_back(trackMetadata);
     }
     mOutput->stream->updateSourceMetadata(metadata);
-}
+
+    MetadataUpdate change;
+    change.playbackMetadataUpdate = metadata.tracks;
+    return change;
+};
 
 void AudioFlinger::MmapPlaybackThread::checkSilentMode_l()
 {
@@ -10860,10 +10878,10 @@ void AudioFlinger::MmapCaptureThread::processVolume_l()
     }
 }
 
-void AudioFlinger::MmapCaptureThread::updateMetadata_l()
+AudioFlinger::ThreadBase::MetadataUpdate AudioFlinger::MmapCaptureThread::updateMetadata_l()
 {
     if (!isStreamInitialized() || !mActiveTracks.readAndClearHasChanged()) {
-        return; // nothing to do
+        return {}; // nothing to do
     }
     StreamInHalInterface::SinkMetadata metadata;
     for (const sp<MmapTrack> &track : mActiveTracks) {
@@ -10878,6 +10896,9 @@ void AudioFlinger::MmapCaptureThread::updateMetadata_l()
         metadata.tracks.push_back(trackMetadata);
     }
     mInput->stream->updateSinkMetadata(metadata);
+    MetadataUpdate change;
+    change.recordMetadataUpdate = metadata.tracks;
+    return change;
 }
 
 void AudioFlinger::MmapCaptureThread::setRecordSilenced(audio_port_handle_t portId, bool silenced)

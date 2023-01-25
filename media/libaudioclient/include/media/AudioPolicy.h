@@ -61,7 +61,10 @@ namespace android {
 #define MIX_ROUTE_FLAG_LOOP_BACK (0x1 << 1)
 /** Loop back some audio while it is rendered */
 #define MIX_ROUTE_FLAG_LOOP_BACK_AND_RENDER (MIX_ROUTE_FLAG_RENDER | MIX_ROUTE_FLAG_LOOP_BACK)
-#define MIX_ROUTE_FLAG_ALL (MIX_ROUTE_FLAG_RENDER | MIX_ROUTE_FLAG_LOOP_BACK)
+/** Control if audio routing disallows preferred device routing **/
+#define MIX_ROUTE_FLAG_DISALLOWS_PREFERRED_DEVICE (0x1 << 2)
+#define MIX_ROUTE_FLAG_ALL (MIX_ROUTE_FLAG_RENDER | MIX_ROUTE_FLAG_LOOP_BACK | \
+    MIX_ROUTE_FLAG_DISALLOWS_PREFERRED_DEVICE)
 
 #define MAX_MIXES_PER_POLICY 10
 #define MAX_CRITERIA_PER_MIX 20
@@ -112,9 +115,9 @@ public:
     void setMatchUserId(int userId);
     /** returns true if this mix has a rule to match or exclude the given userId */
     bool hasUserIdRule(bool match, int userId) const;
-    /** returns true if this mix has a rule for userId match (any userId) */
-    bool hasMatchUserIdRule() const;
-    /** returns true if this mix can be used for uid-device affinity routing */
+    /** returns true if this mix has a rule to match or exclude (any userId) */
+    bool hasUserIdRule(bool match) const;
+    /** returns true if this mix has a rule for userId exclude (any userId) */
     bool isDeviceAffinityCompatible() const;
 
     std::vector<AudioMixMatchCriterion> mCriteria;
@@ -145,6 +148,11 @@ static inline bool is_mix_loopback_render(uint32_t routeFlags) {
 static inline bool is_mix_loopback(uint32_t routeFlags) {
     return (routeFlags & MIX_ROUTE_FLAG_LOOP_BACK)
            == MIX_ROUTE_FLAG_LOOP_BACK;
+}
+
+static inline bool is_mix_disallows_preferred_device(uint32_t routeFlags) {
+    return (routeFlags & MIX_ROUTE_FLAG_DISALLOWS_PREFERRED_DEVICE)
+           == MIX_ROUTE_FLAG_DISALLOWS_PREFERRED_DEVICE;
 }
 
 }; // namespace android
