@@ -62,11 +62,24 @@ public:
     void closeOutput(sp<SwAudioOutputDescriptor> &desc);
 
     /**
-     * Try to find an output descriptor for the given attributes.
+     * Tries to find the best matching audio policy mix
      *
-     * @param[in] attributes to consider fowr the research of output descriptor.
-     * @param[out] desc to return if an primary output could be found.
-     * @param[out] secondaryDesc other desc that the audio should be routed to.
+     * @param[in] attributes to consider for the research of the audio policy mix.
+     * @param[in] config to consider for the research of the audio policy mix.
+     * @param[in] uid to consider for the research of the audio policy mix.
+     * @param[in] session to consider for the research of the audio policy mix.
+     * @param[in] flags to consider for the research of the audio policy mix.
+     * @param[in] availableOutputDevices available output devices can be use during the research
+     *      of the audio policy mix
+     * @param[in] requestedDevice currently requested device that can be used determined if the
+     *      matching audio policy mix should be used instead of the currently set preferred device.
+     * @param[out] primaryMix to return in case a matching audio plicy mix could be found.
+     * @param[out] secondaryMixes that audio should be routed to in case a matching
+     *      secondary mixes could be found.
+     * @param[out] usePrimaryOutputFromPolicyMixes to return in case the audio policy mix
+     *      should be use, including the case where the requested device is explicitly disallowed
+     *      by the audio policy.
+     *
      * @return OK if the request is valid
      *         otherwise if the request is not supported
      */
@@ -75,8 +88,11 @@ public:
                               uid_t uid,
                               audio_session_t session,
                               audio_output_flags_t flags,
+                              const DeviceVector &availableOutputDevices,
+                              const sp<DeviceDescriptor>& requestedDevice,
                               sp<AudioPolicyMix> &primaryMix,
-                              std::vector<sp<AudioPolicyMix>> *secondaryMixes);
+                              std::vector<sp<AudioPolicyMix>> *secondaryMixes,
+                              bool& usePrimaryOutputFromPolicyMixes);
 
     sp<DeviceDescriptor> getDeviceAndMixForInputSource(const audio_attributes_t& attributes,
                                                        const DeviceVector &availableDeviceTypes,
@@ -132,6 +148,13 @@ private:
                             const audio_config_base_t& config,
                             uid_t uid,
                             audio_session_t session);
+    bool mixDisallowsRequestedDevice(const AudioMix* mix,
+                            const sp<DeviceDescriptor>& requestedDevice,
+                            const sp<DeviceDescriptor>& mixDevice,
+                            const uid_t uid);
+
+    sp<DeviceDescriptor> getOutputDeviceForMix(const AudioMix* mix,
+                            const DeviceVector& availableOutputDevices);
 };
 
 std::optional<std::string> extractAddressFromAudioAttributes(const audio_attributes_t& attr);

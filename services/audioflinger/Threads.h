@@ -607,7 +607,11 @@ protected:
                 void checkSuspendOnAddEffectChain_l(const sp<EffectChain>& chain);
 
                 // sends the metadata of the active tracks to the HAL
-    virtual     void        updateMetadata_l() = 0;
+                struct MetadataUpdate {
+                    std::vector<playback_track_metadata_v7_t> playbackMetadataUpdate;
+                    std::vector<record_track_metadata_v7_t>   recordMetadataUpdate;
+                };
+    virtual     MetadataUpdate           updateMetadata_l() = 0;
 
                 String16 getWakeLockTag();
 
@@ -1277,7 +1281,7 @@ private:
     void        removeTrack_l(const sp<Track>& track);
 
     void        readOutputParameters_l();
-    void        updateMetadata_l() final;
+    MetadataUpdate          updateMetadata_l() final;
     virtual void sendMetadataToBackend_l(const StreamOutHalInterface::SourceMetadata& metadata);
 
     void        collectTimestamps_l();
@@ -1983,7 +1987,7 @@ public:
             status_t    setPreferredMicrophoneDirection(audio_microphone_direction_t direction);
             status_t    setPreferredMicrophoneFieldDimension(float zoom);
 
-            void        updateMetadata_l() override;
+            MetadataUpdate        updateMetadata_l() override;
 
             bool        fastTrackAvailable() const { return mFastTrackAvail; }
 
@@ -2257,7 +2261,7 @@ public:
     virtual     void        checkSilentMode_l();
                 void        processVolume_l() override;
 
-                void        updateMetadata_l() override;
+                MetadataUpdate        updateMetadata_l() override;
 
     virtual     void        toAudioPortConfig(struct audio_port_config *config);
 
@@ -2290,7 +2294,7 @@ public:
 
                 status_t       exitStandby_l() REQUIRES(mLock) override;
 
-                void           updateMetadata_l() override;
+                MetadataUpdate           updateMetadata_l() override;
                 void           processVolume_l() override;
                 void           setRecordSilenced(audio_port_handle_t portId,
                                                  bool silenced) override;

@@ -15,7 +15,7 @@
  */
 
 #define LOG_TAG "APM_AudioPolicyMix"
-//#define LOG_NDEBUG 0
+// #define LOG_NDEBUG 0
 
 #include <algorithm>
 #include <iterator>
@@ -259,14 +259,25 @@ status_t AudioPolicyMixCollection::getOutputForAttr(
         const audio_attributes_t& attributes, const audio_config_base_t& config, const uid_t uid,
         const audio_session_t session,
         audio_output_flags_t flags,
+        const DeviceVector &availableOutputDevices,
+        const sp<DeviceDescriptor>& requestedDevice,
         sp<AudioPolicyMix> &primaryMix,
-        std::vector<sp<AudioPolicyMix>> *secondaryMixes)
+        std::vector<sp<AudioPolicyMix>> *secondaryMixes,
+        bool& usePrimaryOutputFromPolicyMixes)
 {
     ALOGV("getOutputForAttr() querying %zu mixes:", size());
     primaryMix.clear();
+    bool mixesDisallowsRequestedDevice = false;
     for (size_t i = 0; i < size(); i++) {
         sp<AudioPolicyMix> policyMix = itemAt(i);
         const bool primaryOutputMix = !is_mix_loopback_render(policyMix->mRouteFlags);
+        sp<DeviceDescriptor> mixDevice = getOutputDeviceForMix(policyMix.get(),
+            availableOutputDevices);
+        if (mixDisallowsRequestedDevice(policyMix.get(), requestedDevice, mixDevice, uid)) {
+            ALOGV("%s: Mix %zu: does not allows device", __func__, i);
+            mixesDisallowsRequestedDevice = true;
+        }
+
         if (!primaryOutputMix && (flags & AUDIO_OUTPUT_FLAG_MMAP_NOIRQ)) {
             // AAudio does not support MMAP_NO_IRQ loopback render, and there is no way with
             // the current MmapStreamInterface::start to reject a specific client added to a shared
@@ -288,6 +299,11 @@ status_t AudioPolicyMixCollection::getOutputForAttr(
             continue; // skip the mix
         }
 
+        if (mixDevice != nullptr && mixDevice->equals(requestedDevice)) {
+            ALOGV("%s: Mix %zu: requested device mathches", __func__, i);
+            mixesDisallowsRequestedDevice = false;
+        }
+
         if (primaryOutputMix) {
             primaryMix = policyMix;
             ALOGV("%s: Mix %zu: set primary desc", __func__, i);
@@ -298,7 +314,34 @@ status_t AudioPolicyMixCollection::getOutputForAttr(
             }
         }
     }
+
+    // Explicit routing is higher priority than dynamic policy primary output, but policy may
+    // explicitly deny it
+    usePrimaryOutputFromPolicyMixes =
+        (mixesDisallowsRequestedDevice || requestedDevice == nullptr) && primaryMix != nullptr;
+
     return NO_ERROR;
+}
+
+sp<DeviceDescriptor> AudioPolicyMixCollection::getOutputDeviceForMix(const AudioMix* mix,
+                                                    const DeviceVector& availableOutputDevices) {
+    ALOGV("%s: device (0x%x, addr=%s) forced by mix", __func__, mix->mDeviceType,
+        mix->mDeviceAddress.c_str());
+    return availableOutputDevices.getDevice(mix->mDeviceType, mix->mDeviceAddress,
+        AUDIO_FORMAT_DEFAULT);
+}
+
+bool AudioPolicyMixCollection::mixDisallowsRequestedDevice(const AudioMix* mix,
+                                                     const sp<DeviceDescriptor>& requestedDevice,
+                                                     const sp<DeviceDescriptor>& mixDevice,
+                                                     const uid_t uid) {
+    if (requestedDevice == nullptr || mixDevice == nullptr) {
+        return false;
+    }
+
+    return is_mix_disallows_preferred_device(mix->mRouteFlags)
+        && requestedDevice->equals(mixDevice)
+        && mix->hasUserIdRule(false /* match */, multiuser_get_user_id(uid));
 }
 
 bool AudioPolicyMixCollection::mixMatch(const AudioMix* mix, size_t mixIndex,
@@ -361,11 +404,7 @@ sp<DeviceDescriptor> AudioPolicyMixCollection::getDeviceAndMixForOutput(
     for (size_t i = 0; i < size(); i++) {
         if (itemAt(i)->getOutput() == output) {
             // This Desc is involved in a Mix, which has the highest prio
-            audio_devices_t deviceType = itemAt(i)->mDeviceType;
-            String8 address = itemAt(i)->mDeviceAddress;
-            ALOGV("%s: device (0x%x, addr=%s) forced by mix",
-                  __FUNCTION__, deviceType, address.c_str());
-            return availableOutputDevices.getDevice(deviceType, address, AUDIO_FORMAT_DEFAULT);
+            return getOutputDeviceForMix(itemAt(i).get(), availableOutputDevices);
         }
     }
     return nullptr;
@@ -568,13 +607,14 @@ status_t AudioPolicyMixCollection::setUserIdDeviceAffinities(int userId,
                 break;
             }
         }
-        if (!deviceMatch && !mix->hasMatchUserIdRule()) {
+        if (!deviceMatch && !mix->hasUserIdRule(true /*match*/)) {
             // this mix doesn't go to one of the listed devices for the given userId,
             // and it's not already restricting the mix on a userId,
             // modify its rules to exclude the userId
-            if (!mix->hasUserIdRule(false /*match*/, userId)) {
+            if (!mix->hasUserIdRule(false /* match */, userId)) {
                 // no need to do it again if userId is already excluded
                 mix->setExcludeUserId(userId);
+                mix->mRouteFlags = mix->mRouteFlags | MIX_ROUTE_FLAG_DISALLOWS_PREFERRED_DEVICE;
             }
         }
     }
@@ -595,6 +635,10 @@ status_t AudioPolicyMixCollection::removeUserIdDeviceAffinities(int userId) {
         EraseCriteriaIf(mix->mCriteria, [userId](const AudioMixMatchCriterion& c) {
             return c.mRule == RULE_EXCLUDE_USERID && c.mValue.mUserId == userId;
         });
+
+        if (!mix->hasUserIdRule(false /* match */)) {
+            mix->mRouteFlags = mix->mRouteFlags & ~MIX_ROUTE_FLAG_DISALLOWS_PREFERRED_DEVICE;
+        }
     }
     return NO_ERROR;
 }

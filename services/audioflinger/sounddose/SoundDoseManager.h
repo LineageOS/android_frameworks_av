@@ -176,7 +176,9 @@ private:
     std::unordered_map<audio_io_handle_t, wp<audio_utils::MelProcessor>> mActiveProcessors
             GUARDED_BY(mLock);
 
-    // map active device address and type to device id
+    // map active device address and type to device id, used also for managing the pause/resume
+    // logic for deviceId's that should not report MEL values (e.g.: do not have an active MUSIC
+    // or GAME stream).
     std::map<AudioDeviceTypeAddr, audio_port_handle_t> mActiveDevices GUARDED_BY(mLock);
 
     float mRs2Value GUARDED_BY(mLock);
