@@ -318,7 +318,6 @@ cc_library {
         "libstagefright_esds",
         "libstagefright_color_conversion",
         "libyuv_static",
-        "libstagefright_mediafilter",
         "libstagefright_webm",
         "libstagefright_timedtext",
         "libogg",
