@@ -215,7 +215,7 @@ bool AudioMix::hasUserIdRule(bool match) const {
 
 bool AudioMix::isDeviceAffinityCompatible() const {
     return ((mMixType == MIX_TYPE_PLAYERS)
-            && (mRouteFlags == MIX_ROUTE_FLAG_RENDER));
+            && ((mRouteFlags & MIX_ROUTE_FLAG_RENDER) == MIX_ROUTE_FLAG_RENDER));
 }
 
 } // namespace android
