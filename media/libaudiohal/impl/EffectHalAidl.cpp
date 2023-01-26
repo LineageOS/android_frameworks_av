@@ -19,7 +19,7 @@
 
 #include <error/expected_utils.h>
 #include <media/AidlConversionCppNdk.h>
-#include <media/AidlConversionNdk.h>
+#include <media/AidlConversionEffect.h>
 #include <media/AidlConversionUtil.h>
 #include <media/EffectsFactoryApi.h>
 #include <mediautils/TimeCheck.h>
