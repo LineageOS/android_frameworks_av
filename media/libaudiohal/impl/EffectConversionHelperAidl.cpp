@@ -21,6 +21,8 @@
 //#define LOG_NDEBUG 0
 
 #include <error/expected_utils.h>
+#include <media/AidlConversionNdk.h>
+#include <media/AidlConversionEffect.h>
 #include <media/audiohal/AudioEffectUuid.h>
 #include <system/audio_effects/effect_aec.h>
 #include <system/audio_effects/effect_agc2.h>
