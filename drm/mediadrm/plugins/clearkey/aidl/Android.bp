@@ -37,6 +37,7 @@ cc_defaults {
     static_libs: [
         "android.hardware.common-V2-ndk",
         "libclearkeybase",
+        "libjsoncpp",
     ],
 
     local_include_dirs: ["include"],
@@ -99,6 +100,7 @@ cc_defaults {
     static_libs: [
         "android.hardware.common-V2-ndk",
         "libclearkeybase_fuzz",
+        "libjsoncpp",
     ],
 
     local_include_dirs: ["include"],
@@ -113,9 +115,6 @@ cc_fuzz {
     defaults: [
         "fuzz_aidl_clearkey_service_defaults",
         "service_fuzzer_defaults",
-    ],
-    static_libs: [
-        "liblog",
     ],
     srcs: ["fuzzer.cpp"],
     fuzz_config: {
