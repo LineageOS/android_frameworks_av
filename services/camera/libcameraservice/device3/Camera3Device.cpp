@@ -283,7 +283,8 @@ status_t Camera3Device::disconnectImpl() {
                     SET_ERR_L("Can't stop streaming");
                     // Continue to close device even in case of error
                 } else {
-                    res = waitUntilStateThenRelock(/*active*/ false, maxExpectedDuration);
+                    res = waitUntilStateThenRelock(/*active*/ false, maxExpectedDuration,
+                                  /*requestThreadInvocation*/ false);
                     if (res != OK) {
                         SET_ERR_L("Timeout waiting for HAL to drain (% " PRIi64 " ns)",
                                 maxExpectedDuration);
@@ -839,7 +840,7 @@ status_t Camera3Device::submitRequestsHelper(
     }
 
     if (res == OK) {
-        waitUntilStateThenRelock(/*active*/true, kActiveTimeout);
+        waitUntilStateThenRelock(/*active*/true, kActiveTimeout, /*requestThreadInvocation*/false);
         if (res != OK) {
             SET_ERR_L("Can't transition to active in %f seconds!",
                     kActiveTimeout/1e9);
@@ -964,7 +965,8 @@ status_t Camera3Device::createInputStream(
             break;
         case STATUS_ACTIVE:
             ALOGV("%s: Stopping activity to reconfigure streams", __FUNCTION__);
-            res = internalPauseAndWaitLocked(maxExpectedDuration);
+            res = internalPauseAndWaitLocked(maxExpectedDuration,
+                          /*requestThreadInvocation*/ false);
             if (res != OK) {
                 SET_ERR_L("Can't pause captures to reconfigure streams!");
                 return res;
@@ -1081,7 +1083,8 @@ status_t Camera3Device::createStream(const std::vector<sp<Surface>>& consumers,
             break;
         case STATUS_ACTIVE:
             ALOGV("%s: Stopping activity to reconfigure streams", __FUNCTION__);
-            res = internalPauseAndWaitLocked(maxExpectedDuration);
+            res = internalPauseAndWaitLocked(maxExpectedDuration,
+                          /*requestThreadInvocation*/ false);
             if (res != OK) {
                 SET_ERR_L("Can't pause captures to reconfigure streams!");
                 return res;
@@ -1554,7 +1557,8 @@ status_t Camera3Device::waitUntilDrainedLocked(nsecs_t maxExpectedDuration) {
     }
     ALOGV("%s: Camera %s: Waiting until idle (%" PRIi64 "ns)", __FUNCTION__, mId.string(),
             maxExpectedDuration);
-    status_t res = waitUntilStateThenRelock(/*active*/ false, maxExpectedDuration);
+    status_t res = waitUntilStateThenRelock(/*active*/ false, maxExpectedDuration,
+                           /*requestThreadInvocation*/ false);
     if (res != OK) {
         mStatusTracker->dumpActiveComponents();
         SET_ERR_L("Error waiting for HAL to drain: %s (%d)", strerror(-res),
@@ -1565,12 +1569,14 @@ status_t Camera3Device::waitUntilDrainedLocked(nsecs_t maxExpectedDuration) {
 
 void Camera3Device::internalUpdateStatusLocked(Status status) {
     mStatus = status;
-    mRecentStatusUpdates.add(mStatus);
+    mStatusIsInternal = mPauseStateNotify ? true : false;
+    mRecentStatusUpdates.add({mStatus, mStatusIsInternal});
     mStatusChanged.broadcast();
 }
 
 // Pause to reconfigure
-status_t Camera3Device::internalPauseAndWaitLocked(nsecs_t maxExpectedDuration) {
+status_t Camera3Device::internalPauseAndWaitLocked(nsecs_t maxExpectedDuration,
+        bool requestThreadInvocation) {
     if (mRequestThread.get() != nullptr) {
         mRequestThread->setPaused(true);
     } else {
@@ -1579,7 +1585,8 @@ status_t Camera3Device::internalPauseAndWaitLocked(nsecs_t maxExpectedDuration) 
 
     ALOGV("%s: Camera %s: Internal wait until idle (% " PRIi64 " ns)", __FUNCTION__, mId.string(),
           maxExpectedDuration);
-    status_t res = waitUntilStateThenRelock(/*active*/ false, maxExpectedDuration);
+    status_t res = waitUntilStateThenRelock(/*active*/ false, maxExpectedDuration,
+                           requestThreadInvocation);
     if (res != OK) {
         mStatusTracker->dumpActiveComponents();
         SET_ERR_L("Can't idle device in %f seconds!",
@@ -1597,7 +1604,9 @@ status_t Camera3Device::internalResumeLocked() {
 
     ALOGV("%s: Camera %s: Internal wait until active (% " PRIi64 " ns)", __FUNCTION__, mId.string(),
             kActiveTimeout);
-    res = waitUntilStateThenRelock(/*active*/ true, kActiveTimeout);
+    // internalResumeLocked is always called from a binder thread.
+    res = waitUntilStateThenRelock(/*active*/ true, kActiveTimeout,
+                  /*requestThreadInvocation*/ false);
     if (res != OK) {
         SET_ERR_L("Can't transition to active in %f seconds!",
                 kActiveTimeout/1e9);
@@ -1606,7 +1615,8 @@ status_t Camera3Device::internalResumeLocked() {
     return OK;
 }
 
-status_t Camera3Device::waitUntilStateThenRelock(bool active, nsecs_t timeout) {
+status_t Camera3Device::waitUntilStateThenRelock(bool active, nsecs_t timeout,
+        bool requestThreadInvocation) {
     status_t res = OK;
 
     size_t startIndex = 0;
@@ -1635,7 +1645,8 @@ status_t Camera3Device::waitUntilStateThenRelock(bool active, nsecs_t timeout) {
     bool stateSeen = false;
     nsecs_t startTime = systemTime();
     do {
-        if (active == (mStatus == STATUS_ACTIVE)) {
+        if (active == (mStatus == STATUS_ACTIVE) &&
+            (requestThreadInvocation || !mStatusIsInternal)) {
             // Desired state is current
             break;
         }
@@ -1657,9 +1668,14 @@ status_t Camera3Device::waitUntilStateThenRelock(bool active, nsecs_t timeout) {
                 "%s: Skipping status updates in Camera3Device, may result in deadlock.",
                 __FUNCTION__);
 
-        // Encountered desired state since we began waiting
+        // Encountered desired state since we began waiting. Internal invocations coming from
+        // request threads (such as reconfigureCamera) should be woken up immediately, whereas
+        // invocations from binder threads (such as createInputStream) should only be woken up if
+        // they are not paused. This avoids intermediate pause signals from reconfigureCamera as it
+        // changes the status to active right after.
         for (size_t i = startIndex; i < mRecentStatusUpdates.size(); i++) {
-            if (active == (mRecentStatusUpdates[i] == STATUS_ACTIVE) ) {
+            if (active == (mRecentStatusUpdates[i].status == STATUS_ACTIVE) &&
+                (requestThreadInvocation || !mRecentStatusUpdates[i].isInternal)) {
                 stateSeen = true;
                 break;
             }
@@ -2323,8 +2339,18 @@ bool Camera3Device::reconfigureCamera(const CameraMetadata& sessionParams, int c
     if (mStatus == STATUS_ACTIVE) {
         markClientActive = true;
         mPauseStateNotify = true;
+        mStatusTracker->markComponentIdle(clientStatusId, Fence::NO_FENCE);
 
-        rc = internalPauseAndWaitLocked(maxExpectedDuration);
+        // This is essentially the same as calling rc = internalPauseAndWaitLocked(..), except that
+        // we don't want to call setPaused(true) to avoid it interfering with setPaused() called
+        // from createInputStream/createStream.
+        rc = waitUntilStateThenRelock(/*active*/ false, maxExpectedDuration,
+                /*requestThreadInvocation*/ true);
+        if (rc != OK) {
+            mStatusTracker->dumpActiveComponents();
+            SET_ERR_L("Can't idle device in %f seconds!",
+                maxExpectedDuration/1e9);
+        }
     }
 
     if (rc == NO_ERROR) {
@@ -3565,13 +3591,8 @@ bool Camera3Device::RequestThread::threadLoop() {
         if (res == OK) {
             sp<Camera3Device> parent = mParent.promote();
             if (parent != nullptr) {
-                sp<StatusTracker> statusTracker = mStatusTracker.promote();
-                if (statusTracker != nullptr) {
-                    statusTracker->markComponentIdle(mStatusId, Fence::NO_FENCE);
-                }
                 mReconfigured |= parent->reconfigureCamera(mLatestSessionParams, mStatusId);
             }
-            setPaused(false);
 
             if (mNextRequests[0].captureRequest->mInputStream != nullptr) {
                 mNextRequests[0].captureRequest->mInputStream->restoreConfiguredState();
