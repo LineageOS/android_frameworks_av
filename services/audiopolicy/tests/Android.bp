@@ -28,6 +28,7 @@ cc_test {
         "liblog",
         "libmedia_helper",
         "libutils",
+        "libcutils",
         "libxml2",
         "framework-permission-aidl-cpp",
         "libbinder",
