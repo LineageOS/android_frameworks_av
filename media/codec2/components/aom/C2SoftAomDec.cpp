@@ -578,7 +578,8 @@ bool C2SoftAomDec::outputBuffer(
     size_t srcVStride = img->stride[AOM_PLANE_V];
     C2PlanarLayout layout = wView.layout();
     size_t dstYStride = layout.planes[C2PlanarLayout::PLANE_Y].rowInc;
-    size_t dstUVStride = layout.planes[C2PlanarLayout::PLANE_U].rowInc;
+    size_t dstUStride = layout.planes[C2PlanarLayout::PLANE_U].rowInc;
+    size_t dstVStride = layout.planes[C2PlanarLayout::PLANE_V].rowInc;
 
     if (img->fmt == AOM_IMG_FMT_I42016) {
         const uint16_t *srcY = (const uint16_t *)img->planes[AOM_PLANE_Y];
@@ -592,7 +593,7 @@ bool C2SoftAomDec::outputBuffer(
                     std::static_pointer_cast<const C2ColorAspectsStruct>(defaultColorAspects));
         } else {
             convertYUV420Planar16ToYV12(dstY, dstU, dstV, srcY, srcU, srcV, srcYStride / 2,
-                                        srcUStride / 2, srcVStride / 2, dstYStride, dstUVStride,
+                                        srcUStride / 2, srcVStride / 2, dstYStride, dstUStride,
                                         mWidth, mHeight);
         }
     } else {
@@ -600,7 +601,7 @@ bool C2SoftAomDec::outputBuffer(
         const uint8_t *srcU = (const uint8_t *)img->planes[AOM_PLANE_U];
         const uint8_t *srcV = (const uint8_t *)img->planes[AOM_PLANE_V];
         convertYUV420Planar8ToYV12(dstY, dstU, dstV, srcY, srcU, srcV, srcYStride, srcUStride,
-                                   srcVStride, dstYStride, dstUVStride, mWidth, mHeight);
+                                   srcVStride, dstYStride, dstUStride, dstVStride, mWidth, mHeight);
     }
     finishWork(*(int64_t*)img->user_priv, work, std::move(block));
     block = nullptr;

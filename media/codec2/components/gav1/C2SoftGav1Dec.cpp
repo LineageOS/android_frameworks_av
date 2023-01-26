@@ -857,7 +857,8 @@ bool C2SoftGav1Dec::outputBuffer(const std::shared_ptr<C2BlockPool> &pool,
 
   C2PlanarLayout layout = wView.layout();
   size_t dstYStride = layout.planes[C2PlanarLayout::PLANE_Y].rowInc;
-  size_t dstUVStride = layout.planes[C2PlanarLayout::PLANE_U].rowInc;
+  size_t dstUStride = layout.planes[C2PlanarLayout::PLANE_U].rowInc;
+  size_t dstVStride = layout.planes[C2PlanarLayout::PLANE_V].rowInc;
 
   if (buffer->bitdepth == 10) {
     const uint16_t *srcY = (const uint16_t *)buffer->plane[0];
@@ -873,10 +874,10 @@ bool C2SoftGav1Dec::outputBuffer(const std::shared_ptr<C2BlockPool> &pool,
     } else if (format == HAL_PIXEL_FORMAT_YCBCR_P010) {
         convertYUV420Planar16ToP010((uint16_t *)dstY, (uint16_t *)dstU, srcY, srcU, srcV,
                                     srcYStride / 2, srcUStride / 2, srcVStride / 2, dstYStride / 2,
-                                    dstUVStride / 2, mWidth, mHeight, isMonochrome);
+                                    dstUStride / 2, mWidth, mHeight, isMonochrome);
     } else {
         convertYUV420Planar16ToYV12(dstY, dstU, dstV, srcY, srcU, srcV, srcYStride / 2,
-                                    srcUStride / 2, srcVStride / 2, dstYStride, dstUVStride, mWidth,
+                                    srcUStride / 2, srcVStride / 2, dstYStride, dstUStride, mWidth,
                                     mHeight, isMonochrome);
     }
   } else {
@@ -884,7 +885,8 @@ bool C2SoftGav1Dec::outputBuffer(const std::shared_ptr<C2BlockPool> &pool,
     const uint8_t *srcU = (const uint8_t *)buffer->plane[1];
     const uint8_t *srcV = (const uint8_t *)buffer->plane[2];
     convertYUV420Planar8ToYV12(dstY, dstU, dstV, srcY, srcU, srcV, srcYStride, srcUStride,
-                               srcVStride, dstYStride, dstUVStride, mWidth, mHeight, isMonochrome);
+                               srcVStride, dstYStride, dstUStride, dstVStride, mWidth, mHeight,
+                               isMonochrome);
   }
   finishWork(buffer->user_private_data, work, std::move(block));
   block = nullptr;

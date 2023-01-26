@@ -14,6 +14,8 @@
  * limitations under the License.
  */
 
+#include <iostream>
+
 #include <gtest/gtest.h>
 
 #include <media/AidlConversion.h>
@@ -22,18 +24,51 @@
 using namespace android;
 using namespace android::aidl_utils;
 
-using android::media::AudioDirectMode;
+using media::AudioDirectMode;
+using media::AudioPortConfigFw;
+using media::AudioPortDeviceExtSys;
+using media::AudioPortFw;
+using media::AudioPortRole;
+using media::AudioPortType;
 using media::audio::common::AudioChannelLayout;
+using media::audio::common::AudioDevice;
 using media::audio::common::AudioDeviceDescription;
 using media::audio::common::AudioDeviceType;
 using media::audio::common::AudioEncapsulationMetadataType;
 using media::audio::common::AudioEncapsulationType;
 using media::audio::common::AudioFormatDescription;
 using media::audio::common::AudioFormatType;
+using media::audio::common::AudioGain;
+using media::audio::common::AudioGainConfig;
 using media::audio::common::AudioGainMode;
+using media::audio::common::AudioIoFlags;
+using media::audio::common::AudioPortDeviceExt;
+using media::audio::common::AudioProfile;
 using media::audio::common::AudioStandard;
 using media::audio::common::ExtraAudioDescriptor;
+using media::audio::common::Int;
 using media::audio::common::PcmType;
+
+// Provide value printers for types generated from AIDL
+// They need to be in the same namespace as the types we intend to print
+namespace android::media {
+#define DEFINE_PRINTING_TEMPLATES()                                                               \
+    template <typename P>                                                                         \
+    std::enable_if_t<std::is_base_of_v<::android::Parcelable, P>, std::ostream&> operator<<(      \
+            std::ostream& os, const P& p) {                                                       \
+        return os << p.toString();                                                                \
+    }                                                                                             \
+    template <typename E>                                                                         \
+    std::enable_if_t<std::is_enum_v<E>, std::ostream&> operator<<(std::ostream& os, const E& e) { \
+        return os << toString(e);                                                                 \
+    }
+DEFINE_PRINTING_TEMPLATES();
+
+namespace audio::common {
+DEFINE_PRINTING_TEMPLATES();
+}  // namespace audio::common
+#undef DEFINE_PRINTING_TEMPLATES
+}  // namespace android::media
 
 namespace {
 
@@ -366,6 +401,134 @@ TEST_P(AudioFormatDescriptionRoundTripTest, Aidl2Legacy2Aidl) {
 INSTANTIATE_TEST_SUITE_P(AudioFormatDescriptionRoundTrip, AudioFormatDescriptionRoundTripTest,
                          testing::Values(make_AFD_Invalid(), AudioFormatDescription{},
                                          make_AFD_Pcm16Bit()));
+
+AudioPortConfigFw createAudioPortConfigFw(const AudioChannelLayout& layout,
+                                          const AudioFormatDescription& format,
+                                          const AudioDeviceDescription& device) {
+    const bool isInput = device.type < AudioDeviceType::OUT_DEFAULT;
+    AudioPortConfigFw result;
+    result.hal.id = 43;
+    result.hal.portId = 42;
+    Int sr44100;
+    sr44100.value = 44100;
+    result.hal.sampleRate = sr44100;
+    result.hal.channelMask = layout;
+    result.hal.format = format;
+    AudioGainConfig gain;
+    gain.mode = 1 << static_cast<int>(AudioGainMode::JOINT);
+    gain.values = std::vector<int32_t>({100});
+    result.hal.gain = gain;
+    AudioPortDeviceExt ext;
+    AudioDevice audioDevice;
+    audioDevice.type = device;
+    ext.device = audioDevice;
+    result.hal.ext = ext;
+    result.sys.role = isInput ? AudioPortRole::SOURCE : AudioPortRole::SINK;
+    result.sys.type = AudioPortType::DEVICE;
+    AudioPortDeviceExtSys sysDevice;
+    sysDevice.hwModule = 1;
+    result.sys.ext = sysDevice;
+    return result;
+}
+
+using AudioPortConfigParam =
+        std::tuple<AudioChannelLayout, AudioFormatDescription, AudioDeviceDescription>;
+class AudioPortConfigRoundTripTest : public testing::TestWithParam<AudioPortConfigParam> {};
+TEST_P(AudioPortConfigRoundTripTest, Aidl2Legacy2Aidl) {
+    const AudioChannelLayout layout = std::get<0>(GetParam());
+    const AudioFormatDescription format = std::get<1>(GetParam());
+    const AudioDeviceDescription device = std::get<2>(GetParam());
+    const bool isInput = device.type < AudioDeviceType::OUT_DEFAULT;
+    AudioPortConfigFw initial = createAudioPortConfigFw(layout, format, device);
+    {
+        audio_port_config conv{};
+        int32_t portId = -1;
+        status_t status =
+                aidl2legacy_AudioPortConfig_audio_port_config(initial.hal, isInput, &conv, &portId);
+        ASSERT_EQ(OK, status);
+        EXPECT_NE(-1, portId);
+        auto convBack = legacy2aidl_audio_port_config_AudioPortConfig(conv, isInput, portId);
+        ASSERT_TRUE(convBack.ok());
+        EXPECT_EQ(initial.hal, convBack.value());
+    }
+    {
+        int32_t portId = -1;
+        auto conv = aidl2legacy_AudioPortConfigFw_audio_port_config(initial, &portId);
+        ASSERT_TRUE(conv.ok());
+        EXPECT_NE(-1, portId);
+        auto convBack = legacy2aidl_audio_port_config_AudioPortConfigFw(conv.value(), portId);
+        ASSERT_TRUE(convBack.ok());
+        EXPECT_EQ(initial, convBack.value());
+    }
+}
+INSTANTIATE_TEST_SUITE_P(
+        AudioPortConfig, AudioPortConfigRoundTripTest,
+        testing::Combine(testing::Values(make_ACL_Stereo(), make_ACL_ChannelIndex2()),
+                         testing::Values(make_AFD_Pcm16Bit()),
+                         testing::Values(make_ADD_DefaultIn(), make_ADD_DefaultOut(),
+                                         make_ADD_WiredHeadset())));
+
+class AudioPortFwRoundTripTest : public testing::TestWithParam<AudioDeviceDescription> {
+  public:
+    AudioProfile createProfile(const AudioFormatDescription& format,
+                               const std::vector<AudioChannelLayout>& channelMasks,
+                               const std::vector<int32_t>& sampleRates) {
+        AudioProfile profile;
+        profile.format = format;
+        profile.channelMasks = channelMasks;
+        profile.sampleRates = sampleRates;
+        return profile;
+    }
+};
+TEST_P(AudioPortFwRoundTripTest, Aidl2Legacy2Aidl) {
+    const AudioDeviceDescription device = GetParam();
+    const bool isInput = device.type < AudioDeviceType::OUT_DEFAULT;
+    AudioPortFw initial;
+    initial.hal.id = 42;
+    initial.hal.profiles.push_back(createProfile(
+            make_AFD_Pcm16Bit(), {make_ACL_Stereo(), make_ACL_ChannelIndex2()}, {44100, 48000}));
+    if (isInput) {
+        initial.hal.flags = AudioIoFlags::make<AudioIoFlags::Tag::input>(0);
+    } else {
+        initial.hal.flags = AudioIoFlags::make<AudioIoFlags::Tag::output>(0);
+    }
+    AudioGain initialGain;
+    initialGain.mode = 1 << static_cast<int>(AudioGainMode::JOINT);
+    initialGain.channelMask = make_ACL_Stereo();
+    initial.hal.gains.push_back(initialGain);
+    AudioPortDeviceExt initialExt;
+    AudioDevice initialDevice;
+    initialDevice.type = device;
+    initialExt.device = initialDevice;
+    initial.hal.ext = initialExt;
+    {
+        auto conv = aidl2legacy_AudioPort_audio_port_v7(initial.hal, isInput);
+        ASSERT_TRUE(conv.ok());
+        auto convBack = legacy2aidl_audio_port_v7_AudioPort(conv.value(), isInput);
+        ASSERT_TRUE(convBack.ok());
+        EXPECT_EQ(initial.hal, convBack.value());
+    }
+    initial.sys.role = isInput ? AudioPortRole::SOURCE : AudioPortRole::SINK;
+    initial.sys.type = AudioPortType::DEVICE;
+    initial.sys.profiles.resize(initial.hal.profiles.size());
+    initial.sys.gains.resize(initial.hal.gains.size());
+    initial.sys.activeConfig =
+            createAudioPortConfigFw(make_ACL_Stereo(), make_AFD_Pcm16Bit(), device);
+    initial.sys.activeConfig.hal.flags = initial.hal.flags;
+    AudioPortDeviceExtSys initialSysDevice;
+    initialSysDevice.hwModule = 1;
+    initial.sys.ext = initialSysDevice;
+    {
+        auto conv = aidl2legacy_AudioPortFw_audio_port_v7(initial);
+        ASSERT_TRUE(conv.ok());
+        auto convBack = legacy2aidl_audio_port_v7_AudioPortFw(conv.value());
+        ASSERT_TRUE(convBack.ok());
+        EXPECT_EQ(initial, convBack.value());
+    }
+}
+INSTANTIATE_TEST_SUITE_P(AudioPortFw, AudioPortFwRoundTripTest,
+                         testing::Values(make_ADD_DefaultIn(), make_ADD_DefaultOut(),
+                                         make_ADD_WiredHeadset()));
 
 class AudioDirectModeRoundTripTest : public testing::TestWithParam<AudioDirectMode> {};
 TEST_P(AudioDirectModeRoundTripTest, Aidl2Legacy2Aidl) {

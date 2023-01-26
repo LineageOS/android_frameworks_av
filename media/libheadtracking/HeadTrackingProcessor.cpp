@@ -97,7 +97,7 @@ class HeadTrackingProcessorImpl : public HeadTrackingProcessor {
             mModeSelector.setScreenStable(mWorldToScreenTimestamp.value(), screenStable);
             // Whenever the screen is unstable, recenter the head pose.
             if (!screenStable) {
-                recenter(true, false);
+                recenter(true, false, "calculate: screen movement");
             }
             mScreenHeadFusion.setWorldToScreenPose(mWorldToScreenTimestamp.value(),
                                                    worldToLogicalScreen);
@@ -109,7 +109,7 @@ class HeadTrackingProcessorImpl : public HeadTrackingProcessor {
             // Auto-recenter.
             bool headStable = mHeadStillnessDetector.calculate(timestamp);
             if (headStable || !screenStable) {
-                recenter(true, false);
+                recenter(true, false, "calculate: head movement");
                 worldToHead = mHeadPoseBias.getOutput();
             }
 
@@ -139,16 +139,16 @@ class HeadTrackingProcessorImpl : public HeadTrackingProcessor {
 
     HeadTrackingMode getActualMode() const override { return mModeSelector.getActualMode(); }
 
-    void recenter(bool recenterHead, bool recenterScreen) override {
+    void recenter(bool recenterHead, bool recenterScreen, std::string source) override {
         if (recenterHead) {
             mHeadPoseBias.recenter();
             mHeadStillnessDetector.reset();
-            mLocalLog.log("recenter Head");
+            mLocalLog.log("recenter Head from %s", source.c_str());
         }
         if (recenterScreen) {
             mScreenPoseBias.recenter();
             mScreenStillnessDetector.reset();
-            mLocalLog.log("recenter Screen");
+            mLocalLog.log("recenter Screen from %s", source.c_str());
         }
 
         // If a sensor being recentered is included in the current mode, apply rate limiting to

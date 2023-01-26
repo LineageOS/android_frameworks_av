@@ -66,125 +66,6 @@ using media::audio::common::ExtraAudioDescriptor;
 using media::audio::common::Int;
 using media::audio::common::PcmType;
 
-namespace {
-
-enum class Direction {
-    INPUT, OUTPUT
-};
-
-ConversionResult<Direction> direction(media::AudioPortRole role, media::AudioPortType type) {
-    switch (type) {
-        case media::AudioPortType::NONE:
-        case media::AudioPortType::SESSION:
-            break;  // must be listed  -Werror,-Wswitch
-        case media::AudioPortType::DEVICE:
-            switch (role) {
-                case media::AudioPortRole::NONE:
-                     break;  // must be listed  -Werror,-Wswitch
-                case media::AudioPortRole::SOURCE:
-                    return Direction::INPUT;
-                case media::AudioPortRole::SINK:
-                    return Direction::OUTPUT;
-            }
-            break;
-        case media::AudioPortType::MIX:
-            switch (role) {
-                case media::AudioPortRole::NONE:
-                     break;  // must be listed  -Werror,-Wswitch
-                case media::AudioPortRole::SOURCE:
-                    return Direction::OUTPUT;
-                case media::AudioPortRole::SINK:
-                    return Direction::INPUT;
-            }
-            break;
-    }
-    return unexpected(BAD_VALUE);
-}
-
-ConversionResult<Direction> direction(audio_port_role_t role, audio_port_type_t type) {
-    switch (type) {
-        case AUDIO_PORT_TYPE_NONE:
-        case AUDIO_PORT_TYPE_SESSION:
-            break;  // must be listed  -Werror,-Wswitch
-        case AUDIO_PORT_TYPE_DEVICE:
-            switch (role) {
-                case AUDIO_PORT_ROLE_NONE:
-                     break;  // must be listed  -Werror,-Wswitch
-                case AUDIO_PORT_ROLE_SOURCE:
-                    return Direction::INPUT;
-                case AUDIO_PORT_ROLE_SINK:
-                    return Direction::OUTPUT;
-            }
-            break;
-        case AUDIO_PORT_TYPE_MIX:
-            switch (role) {
-                case AUDIO_PORT_ROLE_NONE:
-                     break;  // must be listed  -Werror,-Wswitch
-                case AUDIO_PORT_ROLE_SOURCE:
-                    return Direction::OUTPUT;
-                case AUDIO_PORT_ROLE_SINK:
-                    return Direction::INPUT;
-            }
-            break;
-    }
-    return unexpected(BAD_VALUE);
-}
-
-}  // namespace
-
-////////////////////////////////////////////////////////////////////////////////////////////////////
-// Converters
-
-ConversionResult<audio_io_config_event_t> aidl2legacy_AudioIoConfigEvent_audio_io_config_event_t(
-        media::AudioIoConfigEvent aidl) {
-    switch (aidl) {
-        case media::AudioIoConfigEvent::OUTPUT_REGISTERED:
-            return AUDIO_OUTPUT_REGISTERED;
-        case media::AudioIoConfigEvent::OUTPUT_OPENED:
-            return AUDIO_OUTPUT_OPENED;
-        case media::AudioIoConfigEvent::OUTPUT_CLOSED:
-            return AUDIO_OUTPUT_CLOSED;
-        case media::AudioIoConfigEvent::OUTPUT_CONFIG_CHANGED:
-            return AUDIO_OUTPUT_CONFIG_CHANGED;
-        case media::AudioIoConfigEvent::INPUT_REGISTERED:
-            return AUDIO_INPUT_REGISTERED;
-        case media::AudioIoConfigEvent::INPUT_OPENED:
-            return AUDIO_INPUT_OPENED;
-        case media::AudioIoConfigEvent::INPUT_CLOSED:
-            return AUDIO_INPUT_CLOSED;
-        case media::AudioIoConfigEvent::INPUT_CONFIG_CHANGED:
-            return AUDIO_INPUT_CONFIG_CHANGED;
-        case media::AudioIoConfigEvent::CLIENT_STARTED:
-            return AUDIO_CLIENT_STARTED;
-    }
-    return unexpected(BAD_VALUE);
-}
-
-ConversionResult<media::AudioIoConfigEvent> legacy2aidl_audio_io_config_event_t_AudioIoConfigEvent(
-        audio_io_config_event_t legacy) {
-    switch (legacy) {
-        case AUDIO_OUTPUT_REGISTERED:
-            return media::AudioIoConfigEvent::OUTPUT_REGISTERED;
-        case AUDIO_OUTPUT_OPENED:
-            return media::AudioIoConfigEvent::OUTPUT_OPENED;
-        case AUDIO_OUTPUT_CLOSED:
-            return media::AudioIoConfigEvent::OUTPUT_CLOSED;
-        case AUDIO_OUTPUT_CONFIG_CHANGED:
-            return media::AudioIoConfigEvent::OUTPUT_CONFIG_CHANGED;
-        case AUDIO_INPUT_REGISTERED:
-            return media::AudioIoConfigEvent::INPUT_REGISTERED;
-        case AUDIO_INPUT_OPENED:
-            return media::AudioIoConfigEvent::INPUT_OPENED;
-        case AUDIO_INPUT_CLOSED:
-            return media::AudioIoConfigEvent::INPUT_CLOSED;
-        case AUDIO_INPUT_CONFIG_CHANGED:
-            return media::AudioIoConfigEvent::INPUT_CONFIG_CHANGED;
-        case AUDIO_CLIENT_STARTED:
-            return media::AudioIoConfigEvent::CLIENT_STARTED;
-    }
-    return unexpected(BAD_VALUE);
-}
-
 ConversionResult<audio_port_role_t> aidl2legacy_AudioPortRole_audio_port_role_t(
         media::AudioPortRole aidl) {
     switch (aidl) {
@@ -241,52 +122,97 @@ ConversionResult<media::AudioPortType> legacy2aidl_audio_port_type_t_AudioPortTy
     return unexpected(BAD_VALUE);
 }
 
-// This type is unnamed in the original definition, thus we name it here.
-using audio_port_config_mix_ext_usecase = decltype(audio_port_config_mix_ext::usecase);
+ConversionResult<AudioPortDirection> portDirection(
+        media::AudioPortRole role, media::AudioPortType type) {
+    audio_port_role_t legacyRole = VALUE_OR_RETURN(
+            aidl2legacy_AudioPortRole_audio_port_role_t(role));
+    audio_port_type_t legacyType = VALUE_OR_RETURN(
+            aidl2legacy_AudioPortType_audio_port_type_t(type));
+    return portDirection(legacyRole, legacyType);
+}
 
+ConversionResult<audio_io_config_event_t> aidl2legacy_AudioIoConfigEvent_audio_io_config_event_t(
+        media::AudioIoConfigEvent aidl) {
+    switch (aidl) {
+        case media::AudioIoConfigEvent::OUTPUT_REGISTERED:
+            return AUDIO_OUTPUT_REGISTERED;
+        case media::AudioIoConfigEvent::OUTPUT_OPENED:
+            return AUDIO_OUTPUT_OPENED;
+        case media::AudioIoConfigEvent::OUTPUT_CLOSED:
+            return AUDIO_OUTPUT_CLOSED;
+        case media::AudioIoConfigEvent::OUTPUT_CONFIG_CHANGED:
+            return AUDIO_OUTPUT_CONFIG_CHANGED;
+        case media::AudioIoConfigEvent::INPUT_REGISTERED:
+            return AUDIO_INPUT_REGISTERED;
+        case media::AudioIoConfigEvent::INPUT_OPENED:
+            return AUDIO_INPUT_OPENED;
+        case media::AudioIoConfigEvent::INPUT_CLOSED:
+            return AUDIO_INPUT_CLOSED;
+        case media::AudioIoConfigEvent::INPUT_CONFIG_CHANGED:
+            return AUDIO_INPUT_CONFIG_CHANGED;
+        case media::AudioIoConfigEvent::CLIENT_STARTED:
+            return AUDIO_CLIENT_STARTED;
+    }
+    return unexpected(BAD_VALUE);
+}
+
+ConversionResult<media::AudioIoConfigEvent> legacy2aidl_audio_io_config_event_t_AudioIoConfigEvent(
+        audio_io_config_event_t legacy) {
+    switch (legacy) {
+        case AUDIO_OUTPUT_REGISTERED:
+            return media::AudioIoConfigEvent::OUTPUT_REGISTERED;
+        case AUDIO_OUTPUT_OPENED:
+            return media::AudioIoConfigEvent::OUTPUT_OPENED;
+        case AUDIO_OUTPUT_CLOSED:
+            return media::AudioIoConfigEvent::OUTPUT_CLOSED;
+        case AUDIO_OUTPUT_CONFIG_CHANGED:
+            return media::AudioIoConfigEvent::OUTPUT_CONFIG_CHANGED;
+        case AUDIO_INPUT_REGISTERED:
+            return media::AudioIoConfigEvent::INPUT_REGISTERED;
+        case AUDIO_INPUT_OPENED:
+            return media::AudioIoConfigEvent::INPUT_OPENED;
+        case AUDIO_INPUT_CLOSED:
+            return media::AudioIoConfigEvent::INPUT_CLOSED;
+        case AUDIO_INPUT_CONFIG_CHANGED:
+            return media::AudioIoConfigEvent::INPUT_CONFIG_CHANGED;
+        case AUDIO_CLIENT_STARTED:
+            return media::AudioIoConfigEvent::CLIENT_STARTED;
+    }
+    return unexpected(BAD_VALUE);
+}
 ConversionResult<audio_port_config_mix_ext_usecase> aidl2legacy_AudioPortMixExtUseCase(
         const AudioPortMixExtUseCase& aidl, media::AudioPortRole role) {
-    audio_port_config_mix_ext_usecase legacy;
-
     switch (role) {
-        case media::AudioPortRole::NONE:
+        case media::AudioPortRole::NONE: {
+            audio_port_config_mix_ext_usecase legacy;
             // Just verify that the union is empty.
             VALUE_OR_RETURN(UNION_GET(aidl, unspecified));
             return legacy;
-
+        }
         case media::AudioPortRole::SOURCE:
-            // This is not a bug. A SOURCE role corresponds to the stream field.
-            legacy.stream = VALUE_OR_RETURN(aidl2legacy_AudioStreamType_audio_stream_type_t(
-                    VALUE_OR_RETURN(UNION_GET(aidl, stream))));
-            return legacy;
-
+            return aidl2legacy_AudioPortMixExtUseCase_audio_port_config_mix_ext_usecase(
+                    aidl, false /*isInput*/);
         case media::AudioPortRole::SINK:
-            // This is not a bug. A SINK role corresponds to the source field.
-            legacy.source = VALUE_OR_RETURN(aidl2legacy_AudioSource_audio_source_t(
-                    VALUE_OR_RETURN(UNION_GET(aidl, source))));
-            return legacy;
+            return aidl2legacy_AudioPortMixExtUseCase_audio_port_config_mix_ext_usecase(
+                    aidl, true /*isInput*/);
     }
     LOG_ALWAYS_FATAL("Shouldn't get here"); // with -Werror,-Wswitch may compile-time fail
 }
 
 ConversionResult<AudioPortMixExtUseCase> legacy2aidl_AudioPortMixExtUseCase(
         const audio_port_config_mix_ext_usecase& legacy, audio_port_role_t role) {
-    AudioPortMixExtUseCase aidl;
-
     switch (role) {
-        case AUDIO_PORT_ROLE_NONE:
+        case AUDIO_PORT_ROLE_NONE: {
+            AudioPortMixExtUseCase aidl;
             UNION_SET(aidl, unspecified, false);
             return aidl;
+        }
         case AUDIO_PORT_ROLE_SOURCE:
-            // This is not a bug. A SOURCE role corresponds to the stream field.
-            UNION_SET(aidl, stream, VALUE_OR_RETURN(
-                    legacy2aidl_audio_stream_type_t_AudioStreamType(legacy.stream)));
-            return aidl;
+            return legacy2aidl_audio_port_config_mix_ext_usecase_AudioPortMixExtUseCase(
+                    legacy, false /*isInput*/);
         case AUDIO_PORT_ROLE_SINK:
-            // This is not a bug. A SINK role corresponds to the source field.
-            UNION_SET(aidl, source,
-                      VALUE_OR_RETURN(legacy2aidl_audio_source_t_AudioSource(legacy.source)));
-            return aidl;
+            return legacy2aidl_audio_port_config_mix_ext_usecase_AudioPortMixExtUseCase(
+                    legacy, true /*isInput*/);
     }
     LOG_ALWAYS_FATAL("Shouldn't get here"); // with -Werror,-Wswitch may compile-time fail
 }
@@ -294,6 +220,8 @@ ConversionResult<AudioPortMixExtUseCase> legacy2aidl_AudioPortMixExtUseCase(
 ConversionResult<audio_port_config_mix_ext> aidl2legacy_AudioPortMixExt(
         const AudioPortMixExt& aidl, media::AudioPortRole role,
         const media::AudioPortMixExtSys& aidlMixExt) {
+    // Not using HAL-level 'aidl2legacy_AudioPortMixExt' as it does not support
+    // 'media::AudioPortRole::NONE'.
     audio_port_config_mix_ext legacy;
     legacy.hw_module = VALUE_OR_RETURN(
             aidl2legacy_int32_t_audio_module_handle_t(aidlMixExt.hwModule));
@@ -305,6 +233,8 @@ ConversionResult<audio_port_config_mix_ext> aidl2legacy_AudioPortMixExt(
 status_t legacy2aidl_AudioPortMixExt(
         const audio_port_config_mix_ext& legacy, audio_port_role_t role,
         AudioPortMixExt* aidl, media::AudioPortMixExtSys* aidlMixExt) {
+    // Not using HAL-level 'legacy2aidl_AudioPortMixExt' as it does not support
+    // 'AUDIO_PORT_ROLE_NONE'.
     aidlMixExt->hwModule = VALUE_OR_RETURN_STATUS(
             legacy2aidl_audio_module_handle_t_int32_t(legacy.hw_module));
     aidl->handle = VALUE_OR_RETURN_STATUS(legacy2aidl_audio_io_handle_t_int32_t(legacy.handle));
@@ -329,21 +259,20 @@ legacy2aidl_audio_port_config_session_ext_int32_t(
 ConversionResult<audio_port_config_device_ext>
 aidl2legacy_AudioPortDeviceExt_audio_port_config_device_ext(
         const AudioPortDeviceExt& aidl, const media::AudioPortDeviceExtSys& aidlDeviceExt) {
-    audio_port_config_device_ext legacy;
+    audio_port_config_device_ext legacy = VALUE_OR_RETURN(
+            aidl2legacy_AudioPortDeviceExt_audio_port_config_device_ext(aidl));
     legacy.hw_module = VALUE_OR_RETURN(
             aidl2legacy_int32_t_audio_module_handle_t(aidlDeviceExt.hwModule));
-    RETURN_IF_ERROR(aidl2legacy_AudioDevice_audio_device(
-                    aidl.device, &legacy.type, legacy.address));
     return legacy;
 }
 
 status_t legacy2aidl_audio_port_config_device_ext_AudioPortDeviceExt(
         const audio_port_config_device_ext& legacy,
         AudioPortDeviceExt* aidl, media::AudioPortDeviceExtSys* aidlDeviceExt) {
+    *aidl = VALUE_OR_RETURN_STATUS(
+            legacy2aidl_audio_port_config_device_ext_AudioPortDeviceExt(legacy));
     aidlDeviceExt->hwModule = VALUE_OR_RETURN_STATUS(
             legacy2aidl_audio_module_handle_t_int32_t(legacy.hw_module));
-    aidl->device = VALUE_OR_RETURN_STATUS(
-            legacy2aidl_audio_device_AudioDevice(legacy.type, legacy.address));
     return OK;
 }
 
@@ -353,6 +282,8 @@ using audio_port_config_ext = decltype(audio_port_config::ext);
 ConversionResult<audio_port_config_ext> aidl2legacy_AudioPortExt_audio_port_config_ext(
         const AudioPortExt& aidl, media::AudioPortType type,
         media::AudioPortRole role, const media::AudioPortExtSys& aidlSys) {
+    // Not using HAL-level 'aidl2legacy_AudioPortExt_audio_port_config_ext' as it does not support
+    // 'media::AudioPortType::SESSION'.
     audio_port_config_ext legacy;
     switch (type) {
         case media::AudioPortType::NONE:
@@ -384,6 +315,8 @@ ConversionResult<audio_port_config_ext> aidl2legacy_AudioPortExt_audio_port_conf
 status_t legacy2aidl_AudioPortExt(
         const audio_port_config_ext& legacy, audio_port_type_t type, audio_port_role_t role,
         AudioPortExt* aidl, media::AudioPortExtSys* aidlSys) {
+    // Not using HAL-level 'aidl2legacy_AudioPortExt_audio_port_config_ext' as it does not support
+    // 'AUDIO_PORT_TYPE_SESSION'.
     switch (type) {
         case AUDIO_PORT_TYPE_NONE:
             UNION_SET(*aidl, unspecified, false);
@@ -417,40 +350,16 @@ status_t legacy2aidl_AudioPortExt(
 }
 
 ConversionResult<audio_port_config> aidl2legacy_AudioPortConfigFw_audio_port_config(
-        const media::AudioPortConfigFw& aidl) {
-    audio_port_config legacy{};
-    legacy.id = VALUE_OR_RETURN(aidl2legacy_int32_t_audio_port_handle_t(aidl.hal.id));
+        const media::AudioPortConfigFw& aidl, int32_t* aidlPortId) {
+    const bool isInput = VALUE_OR_RETURN(
+            portDirection(aidl.sys.role, aidl.sys.type)) == AudioPortDirection::INPUT;
+    audio_port_config legacy;
+    int32_t aidlPortIdHolder;
+    RETURN_IF_ERROR(aidl2legacy_AudioPortConfig_audio_port_config(
+                    aidl.hal, isInput, &legacy, &aidlPortIdHolder));
+    if (aidlPortId != nullptr) *aidlPortId = aidlPortIdHolder;
     legacy.role = VALUE_OR_RETURN(aidl2legacy_AudioPortRole_audio_port_role_t(aidl.sys.role));
     legacy.type = VALUE_OR_RETURN(aidl2legacy_AudioPortType_audio_port_type_t(aidl.sys.type));
-    const bool isInput =
-            VALUE_OR_RETURN(direction(aidl.sys.role, aidl.sys.type)) == Direction::INPUT;
-    if (aidl.hal.sampleRate.has_value()) {
-        legacy.sample_rate = VALUE_OR_RETURN(
-                convertIntegral<unsigned int>(aidl.hal.sampleRate.value().value));
-        legacy.config_mask |= AUDIO_PORT_CONFIG_SAMPLE_RATE;
-    }
-    if (aidl.hal.channelMask.has_value()) {
-        legacy.channel_mask =
-                VALUE_OR_RETURN(
-                        aidl2legacy_AudioChannelLayout_audio_channel_mask_t(
-                                aidl.hal.channelMask.value(), isInput));
-        legacy.config_mask |= AUDIO_PORT_CONFIG_CHANNEL_MASK;
-    }
-    if (aidl.hal.format.has_value()) {
-        legacy.format = VALUE_OR_RETURN(
-                aidl2legacy_AudioFormatDescription_audio_format_t(aidl.hal.format.value()));
-        legacy.config_mask |= AUDIO_PORT_CONFIG_FORMAT;
-    }
-    if (aidl.hal.gain.has_value()) {
-        legacy.gain = VALUE_OR_RETURN(aidl2legacy_AudioGainConfig_audio_gain_config(
-                        aidl.hal.gain.value(), isInput));
-        legacy.config_mask |= AUDIO_PORT_CONFIG_GAIN;
-    }
-    if (aidl.hal.flags.has_value()) {
-        legacy.flags = VALUE_OR_RETURN(
-                aidl2legacy_AudioIoFlags_audio_io_flags(aidl.hal.flags.value(), isInput));
-        legacy.config_mask |= AUDIO_PORT_CONFIG_FLAGS;
-    }
     legacy.ext = VALUE_OR_RETURN(
             aidl2legacy_AudioPortExt_audio_port_config_ext(
                     aidl.hal.ext, aidl.sys.type, aidl.sys.role, aidl.sys.ext));
@@ -458,34 +367,14 @@ ConversionResult<audio_port_config> aidl2legacy_AudioPortConfigFw_audio_port_con
 }
 
 ConversionResult<media::AudioPortConfigFw> legacy2aidl_audio_port_config_AudioPortConfigFw(
-        const audio_port_config& legacy) {
+        const audio_port_config& legacy, int32_t portId) {
+    const bool isInput = VALUE_OR_RETURN(
+            portDirection(legacy.role, legacy.type)) == AudioPortDirection::INPUT;
     media::AudioPortConfigFw aidl;
-    aidl.hal.id = VALUE_OR_RETURN(legacy2aidl_audio_port_handle_t_int32_t(legacy.id));
+    aidl.hal = VALUE_OR_RETURN(
+            legacy2aidl_audio_port_config_AudioPortConfig(legacy, isInput, portId));
     aidl.sys.role = VALUE_OR_RETURN(legacy2aidl_audio_port_role_t_AudioPortRole(legacy.role));
     aidl.sys.type = VALUE_OR_RETURN(legacy2aidl_audio_port_type_t_AudioPortType(legacy.type));
-    const bool isInput = VALUE_OR_RETURN(
-            direction(legacy.role, legacy.type)) == Direction::INPUT;
-    if (legacy.config_mask & AUDIO_PORT_CONFIG_SAMPLE_RATE) {
-        Int aidl_sampleRate;
-        aidl_sampleRate.value = VALUE_OR_RETURN(convertIntegral<int32_t>(legacy.sample_rate));
-        aidl.hal.sampleRate = aidl_sampleRate;
-    }
-    if (legacy.config_mask & AUDIO_PORT_CONFIG_CHANNEL_MASK) {
-        aidl.hal.channelMask = VALUE_OR_RETURN(
-                legacy2aidl_audio_channel_mask_t_AudioChannelLayout(legacy.channel_mask, isInput));
-    }
-    if (legacy.config_mask & AUDIO_PORT_CONFIG_FORMAT) {
-        aidl.hal.format = VALUE_OR_RETURN(
-                legacy2aidl_audio_format_t_AudioFormatDescription(legacy.format));
-    }
-    if (legacy.config_mask & AUDIO_PORT_CONFIG_GAIN) {
-        aidl.hal.gain = VALUE_OR_RETURN(
-                legacy2aidl_audio_gain_config_AudioGainConfig(legacy.gain, isInput));
-    }
-    if (legacy.config_mask & AUDIO_PORT_CONFIG_FLAGS) {
-        aidl.hal.flags = VALUE_OR_RETURN(
-                legacy2aidl_audio_io_flags_AudioIoFlags(legacy.flags, isInput));
-    }
     RETURN_IF_ERROR(legacy2aidl_AudioPortExt(legacy.ext, legacy.type, legacy.role,
                     &aidl.hal.ext, &aidl.sys.ext));
     return aidl;
@@ -801,18 +690,18 @@ legacy2aidl_effect_descriptor_t_EffectDescriptor(const effect_descriptor_t& lega
 ConversionResult<audio_port_mix_ext>
 aidl2legacy_AudioPortMixExt_audio_port_mix_ext(
         const AudioPortMixExt& aidl, const media::AudioPortMixExtSys& aidlSys) {
-    audio_port_mix_ext legacy{};
+    audio_port_mix_ext legacy = VALUE_OR_RETURN(
+            aidl2legacy_AudioPortMixExt_audio_port_mix_ext(aidl));
     legacy.hw_module = VALUE_OR_RETURN(aidl2legacy_int32_t_audio_module_handle_t(aidlSys.hwModule));
-    legacy.handle = VALUE_OR_RETURN(aidl2legacy_int32_t_audio_io_handle_t(aidl.handle));
     return legacy;
 }
 
 status_t
 legacy2aidl_audio_port_mix_ext_AudioPortMixExt(const audio_port_mix_ext& legacy,
         AudioPortMixExt* aidl, media::AudioPortMixExtSys* aidlMixExt) {
+    *aidl = VALUE_OR_RETURN_STATUS(legacy2aidl_audio_port_mix_ext_AudioPortMixExt(legacy));
     aidlMixExt->hwModule = VALUE_OR_RETURN_STATUS(
             legacy2aidl_audio_module_handle_t_int32_t(legacy.hw_module));
-    aidl->handle = VALUE_OR_RETURN_STATUS(legacy2aidl_audio_io_handle_t_int32_t(legacy.handle));
     return OK;
 }
 
@@ -831,11 +720,10 @@ legacy2aidl_audio_port_session_ext_int32_t(const audio_port_session_ext& legacy)
 ConversionResult<audio_port_device_ext>
 aidl2legacy_AudioPortDeviceExt_audio_port_device_ext(
         const AudioPortDeviceExt& aidl, const media::AudioPortDeviceExtSys& aidlSys) {
-    audio_port_device_ext legacy;
+    audio_port_device_ext legacy = VALUE_OR_RETURN(
+            aidl2legacy_AudioPortDeviceExt_audio_port_device_ext(aidl));
     legacy.hw_module = VALUE_OR_RETURN(
             aidl2legacy_int32_t_audio_module_handle_t(aidlSys.hwModule));
-    RETURN_IF_ERROR(aidl2legacy_AudioDevice_audio_device(
-                    aidl.device, &legacy.type, legacy.address));
     legacy.encapsulation_modes = VALUE_OR_RETURN(
             aidl2legacy_AudioEncapsulationMode_mask(aidlSys.encapsulationModes));
     legacy.encapsulation_metadata_types = VALUE_OR_RETURN(
@@ -847,10 +735,9 @@ aidl2legacy_AudioPortDeviceExt_audio_port_device_ext(
 status_t legacy2aidl_audio_port_device_ext_AudioPortDeviceExt(
         const audio_port_device_ext& legacy,
         AudioPortDeviceExt* aidl, media::AudioPortDeviceExtSys* aidlDeviceExt) {
+    *aidl = VALUE_OR_RETURN_STATUS(legacy2aidl_audio_port_device_ext_AudioPortDeviceExt(legacy));
     aidlDeviceExt->hwModule = VALUE_OR_RETURN_STATUS(
             legacy2aidl_audio_module_handle_t_int32_t(legacy.hw_module));
-    aidl->device = VALUE_OR_RETURN_STATUS(
-            legacy2aidl_audio_device_AudioDevice(legacy.type, legacy.address));
     aidlDeviceExt->encapsulationModes = VALUE_OR_RETURN_STATUS(
             legacy2aidl_AudioEncapsulationMode_mask(legacy.encapsulation_modes));
     aidlDeviceExt->encapsulationMetadataTypes = VALUE_OR_RETURN_STATUS(
@@ -931,42 +818,11 @@ status_t legacy2aidl_AudioPortExt(
 
 ConversionResult<audio_port_v7>
 aidl2legacy_AudioPortFw_audio_port_v7(const media::AudioPortFw& aidl) {
-    audio_port_v7 legacy;
-    legacy.id = VALUE_OR_RETURN(aidl2legacy_int32_t_audio_port_handle_t(aidl.hal.id));
+    const bool isInput = VALUE_OR_RETURN(
+            portDirection(aidl.sys.role, aidl.sys.type)) == AudioPortDirection::INPUT;
+    audio_port_v7 legacy = VALUE_OR_RETURN(aidl2legacy_AudioPort_audio_port_v7(aidl.hal, isInput));
     legacy.role = VALUE_OR_RETURN(aidl2legacy_AudioPortRole_audio_port_role_t(aidl.sys.role));
     legacy.type = VALUE_OR_RETURN(aidl2legacy_AudioPortType_audio_port_type_t(aidl.sys.type));
-    RETURN_IF_ERROR(aidl2legacy_string(aidl.hal.name, legacy.name, sizeof(legacy.name)));
-
-    if (aidl.hal.profiles.size() > std::size(legacy.audio_profiles)) {
-        return unexpected(BAD_VALUE);
-    }
-    const bool isInput =
-            VALUE_OR_RETURN(direction(aidl.sys.role, aidl.sys.type)) == Direction::INPUT;
-    RETURN_IF_ERROR(convertRange(
-                    aidl.hal.profiles.begin(), aidl.hal.profiles.end(), legacy.audio_profiles,
-                    [isInput](const AudioProfile& p) {
-                        return aidl2legacy_AudioProfile_audio_profile(p, isInput);
-                    }));
-    legacy.num_audio_profiles = aidl.hal.profiles.size();
-
-    if (aidl.hal.extraAudioDescriptors.size() > std::size(legacy.extra_audio_descriptors)) {
-        return unexpected(BAD_VALUE);
-    }
-    RETURN_IF_ERROR(
-            convertRange(
-                    aidl.hal.extraAudioDescriptors.begin(), aidl.hal.extraAudioDescriptors.end(),
-                    legacy.extra_audio_descriptors,
-                    aidl2legacy_ExtraAudioDescriptor_audio_extra_audio_descriptor));
-    legacy.num_extra_audio_descriptors = aidl.hal.extraAudioDescriptors.size();
-
-    if (aidl.hal.gains.size() > std::size(legacy.gains)) {
-        return unexpected(BAD_VALUE);
-    }
-    RETURN_IF_ERROR(convertRange(aidl.hal.gains.begin(), aidl.hal.gains.end(), legacy.gains,
-                                 [isInput](const AudioGain& g) {
-                                     return aidl2legacy_AudioGain_audio_gain(g, isInput);
-                                 }));
-    legacy.num_gains = aidl.hal.gains.size();
 
     legacy.active_config = VALUE_OR_RETURN(
             aidl2legacy_AudioPortConfigFw_audio_port_config(aidl.sys.activeConfig));
@@ -977,46 +833,17 @@ aidl2legacy_AudioPortFw_audio_port_v7(const media::AudioPortFw& aidl) {
 
 ConversionResult<media::AudioPortFw>
 legacy2aidl_audio_port_v7_AudioPortFw(const audio_port_v7& legacy) {
+    const bool isInput = VALUE_OR_RETURN(
+            portDirection(legacy.role, legacy.type)) == AudioPortDirection::INPUT;
     media::AudioPortFw aidl;
-    aidl.hal.id = VALUE_OR_RETURN(legacy2aidl_audio_port_handle_t_int32_t(legacy.id));
+    aidl.hal = VALUE_OR_RETURN(legacy2aidl_audio_port_v7_AudioPort(legacy, isInput));
     aidl.sys.role = VALUE_OR_RETURN(legacy2aidl_audio_port_role_t_AudioPortRole(legacy.role));
     aidl.sys.type = VALUE_OR_RETURN(legacy2aidl_audio_port_type_t_AudioPortType(legacy.type));
-    aidl.hal.name = VALUE_OR_RETURN(legacy2aidl_string(legacy.name, sizeof(legacy.name)));
-
-    if (legacy.num_audio_profiles > std::size(legacy.audio_profiles)) {
-        return unexpected(BAD_VALUE);
-    }
-    const bool isInput = VALUE_OR_RETURN(direction(legacy.role, legacy.type)) == Direction::INPUT;
-    RETURN_IF_ERROR(
-            convertRange(legacy.audio_profiles, legacy.audio_profiles + legacy.num_audio_profiles,
-                         std::back_inserter(aidl.hal.profiles),
-                         [isInput](const audio_profile& p) {
-                             return legacy2aidl_audio_profile_AudioProfile(p, isInput);
-                         }));
-
-    if (legacy.num_extra_audio_descriptors > std::size(legacy.extra_audio_descriptors)) {
-        return unexpected(BAD_VALUE);
-    }
+    // These get filled by the call to 'legacy2aidl_AudioPortExt' below.
     aidl.sys.profiles.resize(legacy.num_audio_profiles);
-    RETURN_IF_ERROR(
-            convertRange(legacy.extra_audio_descriptors,
-                    legacy.extra_audio_descriptors + legacy.num_extra_audio_descriptors,
-                    std::back_inserter(aidl.hal.extraAudioDescriptors),
-                    legacy2aidl_audio_extra_audio_descriptor_ExtraAudioDescriptor));
-
-    if (legacy.num_gains > std::size(legacy.gains)) {
-        return unexpected(BAD_VALUE);
-    }
-    RETURN_IF_ERROR(
-            convertRange(legacy.gains, legacy.gains + legacy.num_gains,
-                         std::back_inserter(aidl.hal.gains),
-                         [isInput](const audio_gain& g) {
-                             return legacy2aidl_audio_gain_AudioGain(g, isInput);
-                         }));
     aidl.sys.gains.resize(legacy.num_gains);
-
     aidl.sys.activeConfig = VALUE_OR_RETURN(
-            legacy2aidl_audio_port_config_AudioPortConfigFw(legacy.active_config));
+            legacy2aidl_audio_port_config_AudioPortConfigFw(legacy.active_config, legacy.id));
     aidl.sys.activeConfig.hal.portId = aidl.hal.id;
     RETURN_IF_ERROR(
             legacy2aidl_AudioPortExt(legacy.ext, legacy.type, &aidl.hal.ext, &aidl.sys.ext));

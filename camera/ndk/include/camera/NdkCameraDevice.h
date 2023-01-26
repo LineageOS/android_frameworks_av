@@ -470,18 +470,6 @@ camera_status_t ACaptureSessionOutputContainer_remove(
  *   <a href="http://developer.android.com/reference/android/media/CamcorderProfile.html">
  *    CamcorderProfiles</a>.</li>
  *
- * <li>For efficient YUV processing with <a href=
- *   "http://developer.android.com/reference/android/renderscript/package-summary.html">
- *   RenderScript</a>:
- *   Create a RenderScript
- *   <a href="http://developer.android.com/reference/android/renderscript/Allocation.html">
- *   Allocation</a> with a supported YUV
- *   type, the IO_INPUT flag, and one of the YUV output sizes returned by
- *   {@link ACAMERA_SCALER_AVAILABLE_STREAM_CONFIGURATIONS},
- *   Then obtain the Surface with
- *   <a href="http://developer.android.com/reference/android/renderscript/Allocation.html#getSurface()">
- *   Allocation#getSurface}</a>.</li>
- *
  * <li>For access to RAW, uncompressed YUV, or compressed JPEG data in the application: Create an
  *   {@link AImageReader} object using the {@link AImageReader_new} method with one of the supported
  *   output formats given by {@link ACAMERA_SCALER_AVAILABLE_STREAM_CONFIGURATIONS}. Then obtain a

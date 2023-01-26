@@ -88,10 +88,11 @@ aidl2legacy_int32_t_audio_port_config_session_ext(int32_t aidl);
 ConversionResult<int32_t> legacy2aidl_audio_port_config_session_ext_AudioPortConfigSessionExt(
         const audio_port_config_session_ext& legacy);
 
+// portId needs to be set when dealing with the HAL.
 ConversionResult<audio_port_config> aidl2legacy_AudioPortConfigFw_audio_port_config(
-        const media::AudioPortConfigFw& aidl);
+        const media::AudioPortConfigFw& aidl, int32_t* aidlPortId = nullptr);
 ConversionResult<media::AudioPortConfigFw> legacy2aidl_audio_port_config_AudioPortConfigFw(
-        const audio_port_config& legacy);
+        const audio_port_config& legacy, int32_t portId = 0);
 
 ConversionResult<struct audio_patch> aidl2legacy_AudioPatchFw_audio_patch(
         const media::AudioPatchFw& aidl);

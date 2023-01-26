@@ -38,8 +38,8 @@ constexpr uint16_t kNeutralUVBitDepth10 = 512;
 void convertYUV420Planar8ToYV12(uint8_t *dstY, uint8_t *dstU, uint8_t *dstV, const uint8_t *srcY,
                                 const uint8_t *srcU, const uint8_t *srcV, size_t srcYStride,
                                 size_t srcUStride, size_t srcVStride, size_t dstYStride,
-                                size_t dstUVStride, uint32_t width, uint32_t height,
-                                bool isMonochrome) {
+                                size_t dstUStride, size_t dstVStride, uint32_t width,
+                                uint32_t height, bool isMonochrome) {
     for (size_t i = 0; i < height; ++i) {
         memcpy(dstY, srcY, width);
         srcY += srcYStride;
@@ -51,8 +51,8 @@ void convertYUV420Planar8ToYV12(uint8_t *dstY, uint8_t *dstU, uint8_t *dstV, con
         for (size_t i = 0; i < (height + 1) / 2; ++i) {
             memset(dstV, kNeutralUVBitDepth8, (width + 1) / 2);
             memset(dstU, kNeutralUVBitDepth8, (width + 1) / 2);
-            dstV += dstUVStride;
-            dstU += dstUVStride;
+            dstV += dstVStride;
+            dstU += dstUStride;
         }
         return;
     }
@@ -60,13 +60,13 @@ void convertYUV420Planar8ToYV12(uint8_t *dstY, uint8_t *dstU, uint8_t *dstV, con
     for (size_t i = 0; i < (height + 1) / 2; ++i) {
         memcpy(dstV, srcV, (width + 1) / 2);
         srcV += srcVStride;
-        dstV += dstUVStride;
+        dstV += dstVStride;
     }
 
     for (size_t i = 0; i < (height + 1) / 2; ++i) {
         memcpy(dstU, srcU, (width + 1) / 2);
         srcU += srcUStride;
-        dstU += dstUVStride;
+        dstU += dstUStride;
     }
 }
 

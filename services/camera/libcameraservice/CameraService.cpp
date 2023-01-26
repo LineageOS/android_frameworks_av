@@ -37,6 +37,7 @@
 #include <android-base/macros.h>
 #include <android-base/parseint.h>
 #include <android-base/stringprintf.h>
+#include <android/permission/PermissionChecker.h>
 #include <binder/ActivityManager.h>
 #include <binder/AppOpsManager.h>
 #include <binder/IPCThreadState.h>
@@ -81,6 +82,9 @@
 
 namespace {
     const char* kPermissionServiceName = "permission";
+    const char* kActivityServiceName = "activity";
+    const char* kSensorPrivacyServiceName = "sensor_privacy";
+    const char* kAppopsServiceName = "appops";
 }; // namespace anonymous
 
 namespace android {
@@ -167,6 +171,15 @@ static bool doesClientHaveSystemUid() {
     return (CameraThreadState::getCallingUid() < AID_APP_START);
 }
 
+void CameraService::onServiceRegistration(const String16& name, const sp<IBinder>&) {
+    if (name != String16(kAppopsServiceName)) {
+        return;
+    }
+
+    ALOGV("appops service registered. setting camera audio restriction");
+    mAppOps.setCameraAudioRestriction(mAudioRestriction);
+}
+
 void CameraService::onFirstRef()
 {
 
@@ -191,7 +204,19 @@ void CameraService::onFirstRef()
     mSensorPrivacyPolicy = new SensorPrivacyPolicy(this);
     mSensorPrivacyPolicy->registerSelf();
     mInjectionStatusListener = new InjectionStatusListener(this);
-    mAppOps.setCameraAudioRestriction(mAudioRestriction);
+
+    // appops function setCamerAudioRestriction uses getService which
+    // is blocking till the appops service is ready. To enable early
+    // boot availability for cameraservice, use checkService which is
+    // non blocking and register for notifications
+    sp<IServiceManager> sm = defaultServiceManager();
+    sp<IBinder> binder = sm->checkService(String16(kAppopsServiceName));
+    if (!binder) {
+        sm->registerForNotifications(String16(kAppopsServiceName), this);
+    } else {
+        mAppOps.setCameraAudioRestriction(mAudioRestriction);
+    }
+
     sp<HidlCameraService> hcs = HidlCameraService::getInstance(this);
     if (hcs->registerAsService() != android::OK) {
         // Deprecated, so it will fail to register on newer devices
@@ -667,11 +692,18 @@ void CameraService::onTorchStatusChangedLocked(const String8& cameraId,
     broadcastTorchModeStatus(cameraId, newStatus, systemCameraKind);
 }
 
-static bool hasPermissionsForSystemCamera(int callingPid, int callingUid,
-        bool logPermissionFailure = false) {
-    return checkPermission(sSystemCameraPermission, callingPid, callingUid,
-            logPermissionFailure) &&
-            checkPermission(sCameraPermission, callingPid, callingUid);
+static bool hasPermissionsForSystemCamera(int callingPid, int callingUid) {
+    permission::PermissionChecker permissionChecker;
+    AttributionSourceState attributionSource{};
+    attributionSource.pid = callingPid;
+    attributionSource.uid = callingUid;
+    bool checkPermissionForSystemCamera = permissionChecker.checkPermissionForPreflight(
+            sSystemCameraPermission, attributionSource, String16(), AppOpsManager::OP_NONE)
+            != permission::PermissionChecker::PERMISSION_HARD_DENIED;
+    bool checkPermissionForCamera = permissionChecker.checkPermissionForPreflight(
+            sCameraPermission, attributionSource, String16(), AppOpsManager::OP_NONE)
+            != permission::PermissionChecker::PERMISSION_HARD_DENIED;
+    return checkPermissionForSystemCamera && checkPermissionForCamera;
 }
 
 Status CameraService::getNumberOfCameras(int32_t type, int32_t* numCameras) {
@@ -750,8 +782,14 @@ std::string CameraService::cameraIdIntToStrLocked(int cameraIdInt) {
     const std::vector<std::string> *deviceIds = &mNormalDeviceIdsWithoutSystemCamera;
     auto callingPid = CameraThreadState::getCallingPid();
     auto callingUid = CameraThreadState::getCallingUid();
-    if (checkPermission(sSystemCameraPermission, callingPid, callingUid,
-            /*logPermissionFailure*/false) || getpid() == callingPid) {
+    permission::PermissionChecker permissionChecker;
+    AttributionSourceState attributionSource{};
+    attributionSource.pid = callingPid;
+    attributionSource.uid = callingUid;
+    bool checkPermissionForSystemCamera = permissionChecker.checkPermissionForPreflight(
+                sSystemCameraPermission, attributionSource, String16(), AppOpsManager::OP_NONE)
+                != permission::PermissionChecker::PERMISSION_HARD_DENIED;
+    if (checkPermissionForSystemCamera || getpid() == callingPid) {
         deviceIds = &mNormalDeviceIds;
     }
     if (cameraIdInt < 0 || cameraIdInt >= static_cast<int>(deviceIds->size())) {
@@ -822,9 +860,16 @@ Status CameraService::getCameraCharacteristics(const String16& cameraId,
     // If it's not calling from cameraserver, check the permission only if
     // android.permission.CAMERA is required. If android.permission.SYSTEM_CAMERA was needed,
     // it would've already been checked in shouldRejectSystemCameraConnection.
+    permission::PermissionChecker permissionChecker;
+    AttributionSourceState attributionSource{};
+    attributionSource.pid = callingPid;
+    attributionSource.uid = callingUid;
+    bool checkPermissionForCamera = permissionChecker.checkPermissionForPreflight(
+                sCameraPermission, attributionSource, String16(), AppOpsManager::OP_NONE)
+                != permission::PermissionChecker::PERMISSION_HARD_DENIED;
     if ((callingPid != getpid()) &&
             (deviceKind != SystemCameraKind::SYSTEM_ONLY_CAMERA) &&
-            !checkPermission(sCameraPermission, callingPid, callingUid)) {
+            !checkPermissionForCamera) {
         res = cameraInfo->removePermissionEntries(
                 mCameraProviderManager->getProviderTagIdLocked(String8(cameraId).string()),
                 &tagsRemoved);
@@ -1258,6 +1303,9 @@ Status CameraService::validateConnectLocked(const String8& cameraId,
 Status CameraService::validateClientPermissionsLocked(const String8& cameraId,
         const String8& clientName8, int& clientUid, int& clientPid,
         /*out*/int& originalClientPid) const {
+    permission::PermissionChecker permissionChecker;
+    AttributionSourceState attributionSource{};
+
     int callingPid = CameraThreadState::getCallingPid();
     int callingUid = CameraThreadState::getCallingUid();
 
@@ -1304,9 +1352,14 @@ Status CameraService::validateClientPermissionsLocked(const String8& cameraId,
     // If it's not calling from cameraserver, check the permission if the
     // device isn't a system only camera (shouldRejectSystemCameraConnection already checks for
     // android.permission.SYSTEM_CAMERA for system only camera devices).
+    attributionSource.pid = clientPid;
+    attributionSource.uid = clientUid;
+    attributionSource.packageName = clientName8;
+    bool checkPermissionForCamera = permissionChecker.checkPermissionForPreflight(
+            sCameraPermission, attributionSource, String16(), AppOpsManager::OP_NONE)
+            != permission::PermissionChecker::PERMISSION_HARD_DENIED;
     if (callingPid != getpid() &&
-                (deviceKind != SystemCameraKind::SYSTEM_ONLY_CAMERA) &&
-                !checkPermission(sCameraPermission, clientPid, clientUid)) {
+                (deviceKind != SystemCameraKind::SYSTEM_ONLY_CAMERA) && !checkPermissionForCamera) {
         ALOGE("Permission Denial: can't use the camera pid=%d, uid=%d", clientPid, clientUid);
         return STATUS_ERROR_FMT(ERROR_PERMISSION_DENIED,
                 "Caller \"%s\" (PID %d, UID %d) cannot open camera \"%s\" without camera permission",
@@ -1695,7 +1748,7 @@ bool CameraService::shouldRejectSystemCameraConnection(const String8& cameraId) 
     //     characteristics) even if clients don't have android.permission.CAMERA. We do not want the
     //     same behavior for system camera devices.
     if (!systemClient && systemCameraKind == SystemCameraKind::SYSTEM_ONLY_CAMERA &&
-            !hasPermissionsForSystemCamera(cPid, cUid, /*logPermissionFailure*/true)) {
+            !hasPermissionsForSystemCamera(cPid, cUid)) {
         ALOGW("Rejecting access to system only camera %s, inadequete permissions",
                 cameraId.c_str());
         return true;
@@ -2649,7 +2702,14 @@ Status CameraService::isConcurrentSessionConfigurationSupported(
     // Check for camera permissions
     int callingPid = CameraThreadState::getCallingPid();
     int callingUid = CameraThreadState::getCallingUid();
-    if ((callingPid != getpid()) && !checkPermission(sCameraPermission, callingPid, callingUid)) {
+    permission::PermissionChecker permissionChecker;
+    AttributionSourceState attributionSource{};
+    attributionSource.pid = callingPid;
+    attributionSource.uid = callingUid;
+    bool checkPermissionForCamera = permissionChecker.checkPermissionForPreflight(
+                sCameraPermission, attributionSource, String16(), AppOpsManager::OP_NONE)
+                != permission::PermissionChecker::PERMISSION_HARD_DENIED;
+    if ((callingPid != getpid()) && !checkPermissionForCamera) {
         ALOGE("%s: pid %d doesn't have camera permissions", __FUNCTION__, callingPid);
         return STATUS_ERROR(ERROR_PERMISSION_DENIED,
                 "android.permission.CAMERA needed to call"
@@ -2696,8 +2756,13 @@ Status CameraService::addListenerHelper(const sp<ICameraServiceListener>& listen
 
     auto clientUid = CameraThreadState::getCallingUid();
     auto clientPid = CameraThreadState::getCallingPid();
-    bool openCloseCallbackAllowed = checkPermission(sCameraOpenCloseListenerPermission,
-            clientPid, clientUid, /*logPermissionFailure*/false);
+    permission::PermissionChecker permissionChecker;
+    AttributionSourceState attributionSource{};
+    attributionSource.uid = clientUid;
+    attributionSource.pid = clientPid;
+    bool openCloseCallbackAllowed = permissionChecker.checkPermissionForPreflight(
+            sCameraOpenCloseListenerPermission, attributionSource, String16(),
+            AppOpsManager::OP_NONE) != permission::PermissionChecker::PERMISSION_HARD_DENIED;
 
     Mutex::Autolock lock(mServiceLock);
 
@@ -3792,7 +3857,7 @@ void CameraService::Client::OpsCallback::opChanged(int32_t op,
 //                  UidPolicy
 // ----------------------------------------------------------------------------
 
-void CameraService::UidPolicy::registerSelf() {
+void CameraService::UidPolicy::registerWithActivityManager() {
     Mutex::Autolock _l(mUidLock);
 
     if (mRegistered) return;
@@ -3806,6 +3871,27 @@ void CameraService::UidPolicy::registerSelf() {
     if (res == OK) {
         mRegistered = true;
         ALOGV("UidPolicy: Registered with ActivityManager");
+    }
+}
+
+void CameraService::UidPolicy::onServiceRegistration(const String16& name, const sp<IBinder>&) {
+    if (name != String16(kActivityServiceName)) {
+        return;
+    }
+
+    registerWithActivityManager();
+}
+
+void CameraService::UidPolicy::registerSelf() {
+    // Use check service to see if the activity service is available
+    // If not available then register for notifications, instead of blocking
+    // till the service is ready
+    sp<IServiceManager> sm = defaultServiceManager();
+    sp<IBinder> binder = sm->checkService(String16(kActivityServiceName));
+    if (!binder) {
+        sm->registerForNotifications(String16(kActivityServiceName), this);
+    } else {
+        registerWithActivityManager();
     }
 }
 
@@ -4022,7 +4108,9 @@ void CameraService::UidPolicy::updateOverrideUid(uid_t uid, String16 callingPack
 // ----------------------------------------------------------------------------
 //                  SensorPrivacyPolicy
 // ----------------------------------------------------------------------------
-void CameraService::SensorPrivacyPolicy::registerSelf() {
+
+void CameraService::SensorPrivacyPolicy::registerWithSensorPrivacyManager()
+{
     Mutex::Autolock _l(mSensorPrivacyLock);
     if (mRegistered) {
         return;
@@ -4037,6 +4125,27 @@ void CameraService::SensorPrivacyPolicy::registerSelf() {
     }
 }
 
+void CameraService::SensorPrivacyPolicy::onServiceRegistration(const String16& name,
+                                                               const sp<IBinder>&) {
+    if (name != String16(kSensorPrivacyServiceName)) {
+        return;
+    }
+
+    registerWithSensorPrivacyManager();
+}
+
+void CameraService::SensorPrivacyPolicy::registerSelf() {
+    // Use checkservice to see if the sensor_privacy service is available
+    // If service is not available then register for notification
+    sp<IServiceManager> sm = defaultServiceManager();
+    sp<IBinder> binder = sm->checkService(String16(kSensorPrivacyServiceName));
+    if (!binder) {
+        sm->registerForNotifications(String16(kSensorPrivacyServiceName),this);
+    } else {
+        registerWithSensorPrivacyManager();
+    }
+}
+
 void CameraService::SensorPrivacyPolicy::unregisterSelf() {
     Mutex::Autolock _l(mSensorPrivacyLock);
     mSpm.removeSensorPrivacyListener(this);
@@ -4046,6 +4155,10 @@ void CameraService::SensorPrivacyPolicy::unregisterSelf() {
 }
 
 bool CameraService::SensorPrivacyPolicy::isSensorPrivacyEnabled() {
+    if (!mRegistered) {
+      registerWithSensorPrivacyManager();
+    }
+
     Mutex::Autolock _l(mSensorPrivacyLock);
     return mSensorPrivacyEnabled;
 }
