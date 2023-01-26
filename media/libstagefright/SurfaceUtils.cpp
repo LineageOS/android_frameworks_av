@@ -222,6 +222,11 @@ status_t pushBlankBuffersToNativeWindow(ANativeWindow *nativeWindow /* nonnull *
 
     static_cast<Surface*>(nativeWindow)->getIGraphicBufferProducer()->allowAllocation(true);
 
+    // In nonblocking mode(timetout = 0), native_window_dequeue_buffer_and_wait()
+    // can fail with timeout. Changing to blocking mode will ensure that dequeue
+    // does not timeout.
+    static_cast<Surface*>(nativeWindow)->getIGraphicBufferProducer()->setDequeueTimeout(-1);
+
     err = nativeWindow->query(nativeWindow,
             NATIVE_WINDOW_MIN_UNDEQUEUED_BUFFERS, &minUndequeuedBufs);
     if (err != NO_ERROR) {
