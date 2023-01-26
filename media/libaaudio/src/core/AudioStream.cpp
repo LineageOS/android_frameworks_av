@@ -124,13 +124,17 @@ void AudioStream::logOpenActual() {
         android::mediametrics::LogItem item(mMetricsId);
         item.set(AMEDIAMETRICS_PROP_EVENT, AMEDIAMETRICS_PROP_EVENT_VALUE_OPEN)
             .set(AMEDIAMETRICS_PROP_PERFORMANCEMODEACTUAL,
-                AudioGlobal_convertPerformanceModeToText(getPerformanceMode()))
+                    AudioGlobal_convertPerformanceModeToText(getPerformanceMode()))
             .set(AMEDIAMETRICS_PROP_SHARINGMODEACTUAL,
-                AudioGlobal_convertSharingModeToText(getSharingMode()))
+                    AudioGlobal_convertSharingModeToText(getSharingMode()))
             .set(AMEDIAMETRICS_PROP_BUFFERCAPACITYFRAMES, getBufferCapacity())
             .set(AMEDIAMETRICS_PROP_BURSTFRAMES, getFramesPerBurst())
             .set(AMEDIAMETRICS_PROP_DIRECTION,
-                AudioGlobal_convertDirectionToText(getDirection()));
+                    AudioGlobal_convertDirectionToText(getDirection()))
+            .set(AMEDIAMETRICS_PROP_ENCODINGHARDWARE,
+                    android::toString(getHardwareFormat()).c_str())
+            .set(AMEDIAMETRICS_PROP_CHANNELCOUNTHARDWARE, (int32_t)getHardwareSamplesPerFrame())
+            .set(AMEDIAMETRICS_PROP_SAMPLERATEHARDWARE, (int32_t)getHardwareSampleRate());
 
         if (getDirection() == AAUDIO_DIRECTION_OUTPUT) {
             item.set(AMEDIAMETRICS_PROP_PLAYERIID, mPlayerBase->getPlayerIId());
