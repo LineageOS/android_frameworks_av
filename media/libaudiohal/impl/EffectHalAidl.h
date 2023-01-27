@@ -1,5 +1,5 @@
 /*
- * Copyright (C) 2022 The Android Open Source Project
+ * Copyright (C) 2023 The Android Open Source Project
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -20,13 +20,14 @@
 #include <aidl/android/hardware/audio/effect/IFactory.h>
 #include <media/audiohal/EffectHalInterface.h>
 #include <system/audio_effect.h>
+#include <memory>
 
 #include "EffectConversionHelperAidl.h"
 
 namespace android {
 namespace effect {
 
-class EffectHalAidl : public EffectHalInterface, public EffectConversionHelperAidl {
+class EffectHalAidl : public EffectHalInterface {
   public:
     // Set the input buffer.
     status_t setInBuffer(const sp<EffectBufferHalInterface>& buffer) override;
@@ -71,10 +72,15 @@ class EffectHalAidl : public EffectHalInterface, public EffectConversionHelperAi
     const int32_t mSessionId;
     const int32_t mIoId;
     const ::aidl::android::hardware::audio::effect::Descriptor mDesc;
+    std::unique_ptr<EffectConversionHelperAidl> mConversion;
 
     sp<EffectBufferHalInterface> mInBuffer, mOutBuffer;
     effect_config_t mConfig;
 
+    status_t createAidlConversion(
+            std::shared_ptr<::aidl::android::hardware::audio::effect::IEffect> effect,
+            int32_t sessionId, int32_t ioId,
+            const ::aidl::android::hardware::audio::effect::Descriptor& desc);
     // Can not be constructed directly by clients.
     EffectHalAidl(
             const std::shared_ptr<::aidl::android::hardware::audio::effect::IFactory>& factory,
