@@ -143,6 +143,7 @@ cc_library_shared {
         "libhidlbase",
         "libimage_io",
         "libjpeg",
+        "libjpegrecoverymap",
         "libmedia_codeclist",
         "libmedia_omx",
         "libmemunreachable",
@@ -182,9 +183,6 @@ cc_library_shared {
         "libbinderthreadstateutils",
         "media_permission-aidl-cpp",
         "libcameraservice_device_independent",
-        "libjpegrecoverymap",
-        "libjpegencoder",
-        "libjpegdecoder",
     ],
 
     export_shared_lib_headers: [
