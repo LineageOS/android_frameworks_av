@@ -116,3 +116,16 @@ cc_fuzz {
     header_libs: ["libnativewindow_headers",],
     defaults: ["libmediandk_fuzzer_defaults",],
 }
+
+cc_fuzz {
+    name: "ndk_async_codec_fuzzer",
+    srcs: [
+           "ndk_async_codec_fuzzer.cpp",
+           "NdkMediaCodecFuzzerBase.cpp",
+          ],
+    header_libs: [
+           "libnativewindow_headers",
+           "libutils_headers",
+          ],
+    defaults: ["libmediandk_fuzzer_defaults",],
+}
