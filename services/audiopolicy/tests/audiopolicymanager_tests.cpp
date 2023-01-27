@@ -32,6 +32,7 @@
 #include <media/RecordingActivityTracker.h>
 #include <utils/Log.h>
 #include <utils/Vector.h>
+#include <cutils/multiuser.h>
 
 #include "AudioPolicyInterface.h"
 #include "AudioPolicyManagerTestClient.h"
@@ -2170,6 +2171,8 @@ protected:
     static const std::string sCarConfig;
     static const std::string sCarBusMediaOutput;
     static const std::string sCarBusNavigationOutput;
+    static const std::string sCarRearZoneOneOutput;
+    static const std::string sCarRearZoneTwoOutput;
 };
 
 const std::string AudioPolicyManagerCarTest::sCarConfig =
@@ -2178,6 +2181,10 @@ const std::string AudioPolicyManagerCarTest::sCarConfig =
 const std::string AudioPolicyManagerCarTest::sCarBusMediaOutput = "bus0_media_out";
 
 const std::string AudioPolicyManagerCarTest::sCarBusNavigationOutput = "bus1_navigation_out";
+
+const std::string AudioPolicyManagerCarTest::sCarRearZoneOneOutput = "bus100_audio_zone_1";
+
+const std::string AudioPolicyManagerCarTest::sCarRearZoneTwoOutput = "bus200_audio_zone_2";
 
 TEST_F(AudioPolicyManagerCarTest, InitSuccess) {
     // SetUp must finish with no assertions.
@@ -2304,7 +2311,7 @@ TEST_F(AudioPolicyManagerCarTest, GetOutputForAttrWithSelectedOutputAfterUserAff
     ASSERT_EQ(NO_ERROR, ret);
     const AudioDeviceTypeAddr mediaOutputDevice(AUDIO_DEVICE_OUT_BUS, sCarBusMediaOutput);
     const AudioDeviceTypeAddrVector outputDevices = {mediaOutputDevice};
-    mManager->setUserIdDeviceAffinities(0, outputDevices);
+    mManager->setUserIdDeviceAffinities(/* userId */ 0, outputDevices);
     audio_port_v7 navDevicePort;
     ASSERT_TRUE(findDevicePort(AUDIO_PORT_ROLE_SINK, AUDIO_DEVICE_OUT_BUS,
             sCarBusNavigationOutput, &navDevicePort));
@@ -2410,7 +2417,7 @@ TEST_F(AudioPolicyManagerCarTest,
     const AudioDeviceTypeAddr mediaOutputDevice(AUDIO_DEVICE_OUT_BUS, sCarBusMediaOutput);
     const AudioDeviceTypeAddr navOutputDevice(AUDIO_DEVICE_OUT_BUS, sCarBusNavigationOutput);
     const AudioDeviceTypeAddrVector outputDevices = {mediaOutputDevice, navOutputDevice};
-    mManager->setUserIdDeviceAffinities(0, outputDevices);
+    mManager->setUserIdDeviceAffinities(/* userId */ 0, outputDevices);
     audio_port_v7 navDevicePort;
     ASSERT_TRUE(findDevicePort(AUDIO_PORT_ROLE_SINK, AUDIO_DEVICE_OUT_BUS,
             sCarBusNavigationOutput, &navDevicePort));
@@ -2448,7 +2455,7 @@ TEST_F(AudioPolicyManagerCarTest,
     const AudioDeviceTypeAddr mediaOutputDevice(AUDIO_DEVICE_OUT_BUS, sCarBusMediaOutput);
     const AudioDeviceTypeAddr navOutputDevice(AUDIO_DEVICE_OUT_BUS, sCarBusNavigationOutput);
     const AudioDeviceTypeAddrVector outputDevices = {mediaOutputDevice, navOutputDevice};
-    mManager->setUserIdDeviceAffinities(0, outputDevices);
+    mManager->setUserIdDeviceAffinities(/* userId */ 0, outputDevices);
     audio_port_v7 navDevicePort;
     ASSERT_TRUE(findDevicePort(AUDIO_PORT_ROLE_SINK, AUDIO_DEVICE_OUT_BUS,
             sCarBusNavigationOutput, &navDevicePort));
@@ -2463,6 +2470,132 @@ TEST_F(AudioPolicyManagerCarTest,
             k48000SamplingRate, AUDIO_OUTPUT_FLAG_DIRECT, &output, &portId, alarmAttribute);
 
     ASSERT_EQ(navDevicePort.id, selectedDeviceId);
+}
+
+TEST_F(AudioPolicyManagerCarTest,
+        GetOutputForAttrWithMatMixAfterUserAffinitiesForOneUser) {
+    status_t ret;
+    audio_config_t audioConfig = AUDIO_CONFIG_INITIALIZER;
+    audioConfig.channel_mask = AUDIO_CHANNEL_OUT_STEREO;
+    audioConfig.format = AUDIO_FORMAT_PCM_16_BIT;
+    audioConfig.sample_rate = k48000SamplingRate;
+    std::vector<AudioMixMatchCriterion> mediaMatchCriteria = {
+            createUsageCriterion(AUDIO_USAGE_MEDIA, /*exclude=*/ false)};
+    ret = addPolicyMix(MIX_TYPE_PLAYERS, MIX_ROUTE_FLAG_RENDER,
+            AUDIO_DEVICE_OUT_BUS, sCarBusMediaOutput, audioConfig, mediaMatchCriteria);
+    ASSERT_EQ(NO_ERROR, ret);
+    ret = addPolicyMix(MIX_TYPE_PLAYERS, MIX_ROUTE_FLAG_RENDER,
+            AUDIO_DEVICE_OUT_BUS, sCarRearZoneOneOutput, audioConfig, mediaMatchCriteria);
+    ASSERT_EQ(NO_ERROR, ret);
+    ret = addPolicyMix(MIX_TYPE_PLAYERS, MIX_ROUTE_FLAG_RENDER,
+            AUDIO_DEVICE_OUT_BUS, sCarRearZoneTwoOutput, audioConfig, mediaMatchCriteria);
+    ASSERT_EQ(NO_ERROR, ret);
+    const AudioDeviceTypeAddr mediaOutputDevice(AUDIO_DEVICE_OUT_BUS, sCarBusMediaOutput);
+    const AudioDeviceTypeAddrVector primaryZoneDevices = {mediaOutputDevice};
+    mManager->setUserIdDeviceAffinities(/* userId */ 0, primaryZoneDevices);
+    audio_port_v7 primaryZoneDevicePort;
+    ASSERT_TRUE(findDevicePort(AUDIO_PORT_ROLE_SINK, AUDIO_DEVICE_OUT_BUS,
+            sCarBusMediaOutput, &primaryZoneDevicePort));
+    audio_port_handle_t selectedDeviceId = AUDIO_PORT_HANDLE_NONE;
+    audio_io_handle_t output;
+    audio_port_handle_t portId;
+    const audio_attributes_t mediaAttribute = {
+                    AUDIO_CONTENT_TYPE_UNKNOWN, AUDIO_USAGE_MEDIA,
+                    AUDIO_SOURCE_DEFAULT, AUDIO_FLAG_NONE, ""};
+    uid_t user11AppUid = multiuser_get_uid(/* user_id */ 11, /* app_id */ 12345);
+
+    getOutputForAttr(&selectedDeviceId, AUDIO_FORMAT_PCM_16_BIT, AUDIO_CHANNEL_OUT_STEREO,
+            k48000SamplingRate, AUDIO_OUTPUT_FLAG_DIRECT, &output, &portId, mediaAttribute,
+            AUDIO_SESSION_NONE, user11AppUid);
+
+    ASSERT_EQ(primaryZoneDevicePort.id, selectedDeviceId);
+}
+
+TEST_F(AudioPolicyManagerCarTest,
+        GetOutputForAttrWithMatMixAfterUserAffinitiesForTwoUsers) {
+    status_t ret;
+    audio_config_t audioConfig = AUDIO_CONFIG_INITIALIZER;
+    audioConfig.channel_mask = AUDIO_CHANNEL_OUT_STEREO;
+    audioConfig.format = AUDIO_FORMAT_PCM_16_BIT;
+    audioConfig.sample_rate = k48000SamplingRate;
+    std::vector<AudioMixMatchCriterion> mediaMatchCriteria = {
+            createUsageCriterion(AUDIO_USAGE_MEDIA, /*exclude=*/ false)};
+    ret = addPolicyMix(MIX_TYPE_PLAYERS, MIX_ROUTE_FLAG_RENDER,
+            AUDIO_DEVICE_OUT_BUS, sCarBusMediaOutput, audioConfig, mediaMatchCriteria);
+    ASSERT_EQ(NO_ERROR, ret);
+    ret = addPolicyMix(MIX_TYPE_PLAYERS, MIX_ROUTE_FLAG_RENDER,
+            AUDIO_DEVICE_OUT_BUS, sCarRearZoneOneOutput, audioConfig, mediaMatchCriteria);
+    ASSERT_EQ(NO_ERROR, ret);
+    ret = addPolicyMix(MIX_TYPE_PLAYERS, MIX_ROUTE_FLAG_RENDER,
+            AUDIO_DEVICE_OUT_BUS, sCarRearZoneTwoOutput, audioConfig, mediaMatchCriteria);
+    ASSERT_EQ(NO_ERROR, ret);
+    const AudioDeviceTypeAddr mediaOutputDevice(AUDIO_DEVICE_OUT_BUS, sCarBusMediaOutput);
+    const AudioDeviceTypeAddrVector primaryZoneDevices = {mediaOutputDevice};
+    mManager->setUserIdDeviceAffinities(/* userId */ 0, primaryZoneDevices);
+    const AudioDeviceTypeAddr secondaryOutputDevice(AUDIO_DEVICE_OUT_BUS, sCarRearZoneOneOutput);
+    const AudioDeviceTypeAddrVector secondaryZoneDevices = {secondaryOutputDevice};
+    mManager->setUserIdDeviceAffinities(/* userId */ 11, secondaryZoneDevices);
+    audio_port_v7 secondaryZoneDevicePort;
+    ASSERT_TRUE(findDevicePort(AUDIO_PORT_ROLE_SINK, AUDIO_DEVICE_OUT_BUS,
+            sCarRearZoneOneOutput, &secondaryZoneDevicePort));
+    audio_port_handle_t selectedDeviceId = AUDIO_PORT_HANDLE_NONE;
+    audio_io_handle_t output;
+    audio_port_handle_t portId;
+    const audio_attributes_t mediaAttribute = {
+                    AUDIO_CONTENT_TYPE_UNKNOWN, AUDIO_USAGE_MEDIA,
+                    AUDIO_SOURCE_DEFAULT, AUDIO_FLAG_NONE, ""};
+    uid_t user11AppUid = multiuser_get_uid(/* user_id */ 11, /* app_id */ 12345);
+
+    getOutputForAttr(&selectedDeviceId, AUDIO_FORMAT_PCM_16_BIT, AUDIO_CHANNEL_OUT_STEREO,
+            k48000SamplingRate, AUDIO_OUTPUT_FLAG_DIRECT, &output, &portId, mediaAttribute,
+            AUDIO_SESSION_NONE, user11AppUid);
+
+    ASSERT_EQ(secondaryZoneDevicePort.id, selectedDeviceId);
+}
+
+TEST_F(AudioPolicyManagerCarTest,
+        GetOutputForAttrWithMatMixAfterUserAffinitiesForThreeUsers) {
+    status_t ret;
+    audio_config_t audioConfig = AUDIO_CONFIG_INITIALIZER;
+    audioConfig.channel_mask = AUDIO_CHANNEL_OUT_STEREO;
+    audioConfig.format = AUDIO_FORMAT_PCM_16_BIT;
+    audioConfig.sample_rate = k48000SamplingRate;
+    std::vector<AudioMixMatchCriterion> mediaMatchCriteria = {
+            createUsageCriterion(AUDIO_USAGE_MEDIA, /*exclude=*/ false)};
+    ret = addPolicyMix(MIX_TYPE_PLAYERS, MIX_ROUTE_FLAG_RENDER,
+            AUDIO_DEVICE_OUT_BUS, sCarBusMediaOutput, audioConfig, mediaMatchCriteria);
+    ASSERT_EQ(NO_ERROR, ret);
+    ret = addPolicyMix(MIX_TYPE_PLAYERS, MIX_ROUTE_FLAG_RENDER,
+            AUDIO_DEVICE_OUT_BUS, sCarRearZoneOneOutput, audioConfig, mediaMatchCriteria);
+    ASSERT_EQ(NO_ERROR, ret);
+    ret = addPolicyMix(MIX_TYPE_PLAYERS, MIX_ROUTE_FLAG_RENDER,
+            AUDIO_DEVICE_OUT_BUS, sCarRearZoneTwoOutput, audioConfig, mediaMatchCriteria);
+    ASSERT_EQ(NO_ERROR, ret);
+    const AudioDeviceTypeAddr mediaOutputDevice(AUDIO_DEVICE_OUT_BUS, sCarBusMediaOutput);
+    const AudioDeviceTypeAddrVector primaryZoneDevices = {mediaOutputDevice};
+    mManager->setUserIdDeviceAffinities(/* userId */ 0, primaryZoneDevices);
+    const AudioDeviceTypeAddr secondaryOutputDevice(AUDIO_DEVICE_OUT_BUS, sCarRearZoneOneOutput);
+    const AudioDeviceTypeAddrVector secondaryZoneDevices = {secondaryOutputDevice};
+    mManager->setUserIdDeviceAffinities(/* userId */ 11, secondaryZoneDevices);
+    const AudioDeviceTypeAddr tertiaryOutputDevice(AUDIO_DEVICE_OUT_BUS, sCarRearZoneTwoOutput);
+    const AudioDeviceTypeAddrVector tertiaryZoneDevices = {tertiaryOutputDevice};
+    mManager->setUserIdDeviceAffinities(/* userId */ 15, tertiaryZoneDevices);
+    audio_port_v7 tertiaryZoneDevicePort;
+    ASSERT_TRUE(findDevicePort(AUDIO_PORT_ROLE_SINK, AUDIO_DEVICE_OUT_BUS,
+            sCarRearZoneTwoOutput, &tertiaryZoneDevicePort));
+    audio_port_handle_t selectedDeviceId = AUDIO_PORT_HANDLE_NONE;
+    audio_io_handle_t output;
+    audio_port_handle_t portId;
+    const audio_attributes_t mediaAttribute = {
+                    AUDIO_CONTENT_TYPE_UNKNOWN, AUDIO_USAGE_MEDIA,
+                    AUDIO_SOURCE_DEFAULT, AUDIO_FLAG_NONE, ""};
+    uid_t user15AppUid = multiuser_get_uid(/* user_id */ 15, /* app_id */ 12345);
+
+    getOutputForAttr(&selectedDeviceId, AUDIO_FORMAT_PCM_16_BIT, AUDIO_CHANNEL_OUT_STEREO,
+            k48000SamplingRate, AUDIO_OUTPUT_FLAG_DIRECT, &output, &portId, mediaAttribute,
+            AUDIO_SESSION_NONE, user15AppUid);
+
+    ASSERT_EQ(tertiaryZoneDevicePort.id, selectedDeviceId);
 }
 
 TEST_F(AudioPolicyManagerCarTest, GetOutputForAttrWithNoMatchingMix) {
@@ -2485,7 +2618,7 @@ TEST_F(AudioPolicyManagerCarTest, GetOutputForAttrWithNoMatchingMix) {
     const AudioDeviceTypeAddr mediaOutputDevice(AUDIO_DEVICE_OUT_BUS, sCarBusMediaOutput);
     const AudioDeviceTypeAddr navOutputDevice(AUDIO_DEVICE_OUT_BUS, sCarBusNavigationOutput);
     const AudioDeviceTypeAddrVector outputDevices = {mediaOutputDevice, navOutputDevice};
-    mManager->setUserIdDeviceAffinities(0, outputDevices);
+    mManager->setUserIdDeviceAffinities(/* userId */ 0, outputDevices);
     audio_port_v7 navDevicePort;
     ASSERT_TRUE(findDevicePort(AUDIO_PORT_ROLE_SINK, AUDIO_DEVICE_OUT_BUS,
             sCarBusNavigationOutput, &navDevicePort));
