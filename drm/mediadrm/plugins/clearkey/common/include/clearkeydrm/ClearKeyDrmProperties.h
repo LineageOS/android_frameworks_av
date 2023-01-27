@@ -21,7 +21,7 @@ namespace clearkeydrm {
 static const std::string kVendorKey("vendor");
 static const std::string kVendorValue("Google");
 static const std::string kVersionKey("version");
-static const std::string kVersionValue("1.2");
+static const std::string kVersionValue("14"); // sync with Android OS version
 static const std::string kPluginDescriptionKey("description");
 static const std::string kPluginDescriptionValue("ClearKey CDM");
 static const std::string kAlgorithmsKey("algorithms");
@@ -35,6 +35,8 @@ static const std::string kLostStateValue("lostState");
 static const std::string kFrameTooLargeValue("frameTooLarge");
 static const std::string kInvalidStateValue("invalidState");
 static const std::string kAidlVersionKey("aidlVersion");
+static const std::string kOemErrorKey("oemError");
+static const std::string kErrorContextKey("errorContext");
 
 static const std::string kDeviceIdKey("deviceId");
 static const uint8_t kTestDeviceIdData[] = {0x0, 0x1, 0x2, 0x3, 0x4, 0x5, 0x6, 0x7,
