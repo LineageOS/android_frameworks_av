@@ -15,8 +15,11 @@
  */
 #pragma once
 
+#include <cstdint>
 #include <string>
 #include <vector>
+
+#include <json/json.h>
 
 #include <android/binder_auto_utils.h>
 #include "aidl/android/hardware/drm/Status.h"
@@ -41,17 +44,32 @@ inline ::aidl::android::hardware::drm::Status toMockStatus(
 }
 
 inline ::ndk::ScopedAStatus toNdkScopedAStatus(::aidl::android::hardware::drm::Status status,
-                                               const char* msg = nullptr) {
+                                               const char* msg = nullptr,
+                                               int32_t oemError = 0,
+                                               int32_t errorContext = 0) {
+
+
     if (Status::OK == status) {
         return ::ndk::ScopedAStatus::ok();
-    } else {
-        auto err = static_cast<int32_t>(status);
-        if (msg) {
-            return ::ndk::ScopedAStatus::fromServiceSpecificErrorWithMessage(err, msg);
-        } else {
-            return ::ndk::ScopedAStatus::fromServiceSpecificError(err);
-        }
     }
+
+    Json::Value errObj(Json::objectValue);
+    auto err = static_cast<int32_t>(status);
+    errObj["cdmError"] = err;
+
+    if (oemError) {
+        errObj["oemError"] = oemError;
+    }
+    if (errorContext) {
+        errObj["context"] = errorContext;
+    }
+    if (msg) {
+        errObj["errorMessage"] = msg;
+    }
+
+    Json::FastWriter writer;
+    return ::ndk::ScopedAStatus::fromServiceSpecificErrorWithMessage(
+        err, writer.write(errObj).c_str());
 }
 
 inline ::ndk::ScopedAStatus toNdkScopedAStatus(clearkeydrm::CdmResponseType res) {
