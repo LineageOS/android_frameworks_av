@@ -28,7 +28,7 @@
 #include <sys/types.h>
 #include <unistd.h>
 
-#include <statslog.h>
+#include <stats_media_metrics.h>
 
 #include "MediaMetricsService.h"
 #include "ValidateId.h"
@@ -83,7 +83,8 @@ bool statsd_mediaparser(const std::shared_ptr<const mediametrics::Item>& item,
     item->getString("android.media.mediaparser.logSessionId", &logSessionId);
     logSessionId = mediametrics::ValidateId::get()->validateId(logSessionId);
 
-    int result = android::util::stats_write(android::util::MEDIAMETRICS_MEDIAPARSER_REPORTED,
+    const int result = stats::media_metrics::stats_write(
+                               stats::media_metrics::MEDIAMETRICS_MEDIAPARSER_REPORTED,
                                timestamp_nanos,
                                package_name.c_str(),
                                package_version_code,
@@ -103,7 +104,7 @@ bool statsd_mediaparser(const std::shared_ptr<const mediametrics::Item>& item,
     std::stringstream log;
     log << "result:" << result << " {"
             << " mediametrics_mediaparser_reported:"
-            << android::util::MEDIAMETRICS_MEDIAPARSER_REPORTED
+            << stats::media_metrics::MEDIAMETRICS_MEDIAPARSER_REPORTED
             << " timestamp_nanos:" << timestamp_nanos
             << " package_name:" << package_name
             << " package_version_code:" << package_version_code
@@ -120,7 +121,7 @@ bool statsd_mediaparser(const std::shared_ptr<const mediametrics::Item>& item,
             << " video_height:" << videoHeight
             << " log_session_id:" << logSessionId
             << " }";
-    statsdLog->log(android::util::MEDIAMETRICS_MEDIAPARSER_REPORTED, log.str());
+    statsdLog->log(stats::media_metrics::MEDIAMETRICS_MEDIAPARSER_REPORTED, log.str());
     return true;
 }
 

@@ -35,7 +35,7 @@
 #include "StringUtils.h"
 #include "iface_statsd.h"
 
-#include <statslog.h>
+#include <stats_media_metrics.h>
 
 #include <array>
 #include <string>
@@ -69,8 +69,9 @@ bool statsd_mediadrm(const std::shared_ptr<const mediametrics::Item>& item,
     // This field is left here for backward compatibility.
     // This field is not used anymore.
     const std::string  kUnusedField("");
-    android::util::BytesField bf_serialized(kUnusedField.c_str(), kUnusedField.size());
-    int result = android::util::stats_write(android::util::MEDIAMETRICS_MEDIADRM_REPORTED,
+    const stats::media_metrics::BytesField bf_serialized(kUnusedField.c_str(), kUnusedField.size());
+    const int result = stats::media_metrics::stats_write(
+        stats::media_metrics::MEDIAMETRICS_MEDIADRM_REPORTED,
         timestamp_nanos, package_name.c_str(), package_version_code,
         media_apex_version,
         vendor.c_str(),
@@ -80,7 +81,7 @@ bool statsd_mediadrm(const std::shared_ptr<const mediametrics::Item>& item,
     std::stringstream log;
     log << "result:" << result << " {"
             << " mediametrics_mediadrm_reported:"
-            << android::util::MEDIAMETRICS_MEDIADRM_REPORTED
+            << stats::media_metrics::MEDIAMETRICS_MEDIADRM_REPORTED
             << " timestamp_nanos:" << timestamp_nanos
             << " package_name:" << package_name
             << " package_version_code:" << package_version_code
@@ -90,7 +91,7 @@ bool statsd_mediadrm(const std::shared_ptr<const mediametrics::Item>& item,
             << " description:" << description
             // omitting serialized
             << " }";
-    statsdLog->log(android::util::MEDIAMETRICS_MEDIADRM_REPORTED, log.str());
+    statsdLog->log(stats::media_metrics::MEDIAMETRICS_MEDIADRM_REPORTED, log.str());
     return true;
 }
 
@@ -122,7 +123,8 @@ bool statsd_drmmanager(const std::shared_ptr<const mediametrics::Item>& item,
         item->getInt64(("method"s + std::to_string(i)).c_str(), &methodCounts[i]);
     }
 
-    const int result = android::util::stats_write(android::util::MEDIAMETRICS_DRMMANAGER_REPORTED,
+    const int result = stats::media_metrics::stats_write(
+                               stats::media_metrics::MEDIAMETRICS_DRMMANAGER_REPORTED,
                                timestamp_nanos, package_name.c_str(), package_version_code,
                                media_apex_version,
                                plugin_id.c_str(), description.c_str(),
@@ -136,7 +138,7 @@ bool statsd_drmmanager(const std::shared_ptr<const mediametrics::Item>& item,
     std::stringstream log;
     log << "result:" << result << " {"
             << " mediametrics_drmmanager_reported:"
-            << android::util::MEDIAMETRICS_DRMMANAGER_REPORTED
+            << stats::media_metrics::MEDIAMETRICS_DRMMANAGER_REPORTED
             << " timestamp_nanos:" << timestamp_nanos
             << " package_name:" << package_name
             << " package_version_code:" << package_version_code
@@ -151,7 +153,7 @@ bool statsd_drmmanager(const std::shared_ptr<const mediametrics::Item>& item,
         log << " method_" << i << ":" << methodCounts[i];
     }
     log << " }";
-    statsdLog->log(android::util::MEDIAMETRICS_DRMMANAGER_REPORTED, log.str());
+    statsdLog->log(stats::media_metrics::MEDIAMETRICS_DRMMANAGER_REPORTED, log.str());
     return true;
 }
 
@@ -207,7 +209,7 @@ bool statsd_mediadrm_puller(
 
     // Memory for |event| is internally managed by statsd.
     AStatsEvent* event = AStatsEventList_addStatsEvent(out);
-    AStatsEvent_setAtomId(event, android::util::MEDIA_DRM_ACTIVITY_INFO);
+    AStatsEvent_setAtomId(event, stats::media_metrics::MEDIA_DRM_ACTIVITY_INFO);
     AStatsEvent_writeString(event, item->getPkgName().c_str());
     AStatsEvent_writeInt64(event, item->getPkgVersionCode());
     AStatsEvent_writeString(event, vendor.c_str());
@@ -219,7 +221,7 @@ bool statsd_mediadrm_puller(
     std::stringstream log;
     log << "pulled:" << " {"
             << " media_drm_activity_info:"
-            << android::util::MEDIA_DRM_ACTIVITY_INFO
+            << stats::media_metrics::MEDIA_DRM_ACTIVITY_INFO
             << " package_name:" << item->getPkgName()
             << " package_version_code:" << item->getPkgVersionCode()
             << " vendor:" << vendor
@@ -227,7 +229,7 @@ bool statsd_mediadrm_puller(
             << " framework_metrics:" << mediametrics::stringutils::bytesToString(framework_raw, 8)
             << " vendor_metrics:" <<  mediametrics::stringutils::bytesToString(plugin_raw, 8)
             << " }";
-    statsdLog->log(android::util::MEDIA_DRM_ACTIVITY_INFO, log.str());
+    statsdLog->log(stats::media_metrics::MEDIA_DRM_ACTIVITY_INFO, log.str());
     return true;
 }
 

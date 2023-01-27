@@ -29,7 +29,7 @@
 #include <sys/types.h>
 #include <unistd.h>
 
-#include <statslog.h>
+#include <stats_media_metrics.h>
 
 #include "MediaMetricsService.h"
 #include "ValidateId.h"
@@ -147,8 +147,9 @@ bool statsd_audiorecord(const std::shared_ptr<const mediametrics::Item>& item,
     (void)item->getString("android.media.audiorecord.logSessionId", &logSessionId);
     const auto log_session_id = mediametrics::ValidateId::get()->validateId(logSessionId);
 
-    android::util::BytesField bf_serialized( serialized.c_str(), serialized.size());
-    int result = android::util::stats_write(android::util::MEDIAMETRICS_AUDIORECORD_REPORTED,
+    const stats::media_metrics::BytesField bf_serialized( serialized.c_str(), serialized.size());
+    const int result = stats::media_metrics::stats_write(
+        stats::media_metrics::MEDIAMETRICS_AUDIORECORD_REPORTED,
         timestamp_nanos, package_name.c_str(), package_version_code,
         media_apex_version,
         bf_serialized,
@@ -156,7 +157,7 @@ bool statsd_audiorecord(const std::shared_ptr<const mediametrics::Item>& item,
     std::stringstream log;
     log << "result:" << result << " {"
             << " mediametrics_audiorecord_reported:"
-            << android::util::MEDIAMETRICS_AUDIORECORD_REPORTED
+            << stats::media_metrics::MEDIAMETRICS_AUDIORECORD_REPORTED
             << " timestamp_nanos:" << timestamp_nanos
             << " package_name:" << package_name
             << " package_version_code:" << package_version_code
@@ -181,7 +182,7 @@ bool statsd_audiorecord(const std::shared_ptr<const mediametrics::Item>& item,
 
             << " log_session_id:" << log_session_id
             << " }";
-    statsdLog->log(android::util::MEDIAMETRICS_AUDIORECORD_REPORTED, log.str());
+    statsdLog->log(stats::media_metrics::MEDIAMETRICS_AUDIORECORD_REPORTED, log.str());
     return true;
 }
 
