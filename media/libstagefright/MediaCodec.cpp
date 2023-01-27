@@ -500,6 +500,7 @@ enum {
     kWhatOutputFramesRendered = 'outR',
     kWhatOutputBuffersChanged = 'outC',
     kWhatFirstTunnelFrameReady = 'ftfR',
+    kWhatPollForRenderedBuffers = 'plrb',
 };
 
 class BufferCallback : public CodecBase::BufferCallback {
@@ -4541,6 +4542,14 @@ void MediaCodec::onMessageReceived(const sp<AMessage> &msg) {
             break;
         }
 
+        case kWhatPollForRenderedBuffers:
+        {
+            if (isExecuting()) {
+                mBufferChannel->pollForRenderedBuffers();
+            }
+            break;
+        }
+
         case kWhatSignalEndOfInputStream:
         {
             if (!isExecuting() || !mHaveInputSurface) {
@@ -5272,7 +5281,6 @@ status_t MediaCodec::handleLeftover(size_t index) {
 size_t MediaCodec::CreateFramesRenderedMessage(
         const std::list<FrameRenderTracker::Info> &done, sp<AMessage> &msg) {
     size_t index = 0;
-
     for (std::list<FrameRenderTracker::Info>::const_iterator it = done.cbegin();
             it != done.cend(); ++it) {
         if (it->getRenderTimeNs() < 0) {
@@ -5321,11 +5329,13 @@ status_t MediaCodec::onReleaseOutputBuffer(const sp<AMessage> &msg) {
         int64_t mediaTimeUs = -1;
         buffer->meta()->findInt64("timeUs", &mediaTimeUs);
 
+        bool noRenderTime = false;
         int64_t renderTimeNs = 0;
         if (!msg->findInt64("timestampNs", &renderTimeNs)) {
             // use media timestamp if client did not request a specific render timestamp
             ALOGV("using buffer PTS of %lld", (long long)mediaTimeUs);
             renderTimeNs = mediaTimeUs * 1000;
+            noRenderTime = true;
         }
 
         if (mSoftRenderer != NULL) {
@@ -5341,6 +5351,29 @@ status_t MediaCodec::onReleaseOutputBuffer(const sp<AMessage> &msg) {
                     notify->setMessage("data", data);
                     notify->post();
                 }
+            }
+        }
+
+        // If rendering to the screen, then schedule a time in the future to poll to see if this
+        // frame was ever rendered to seed onFrameRendered callbacks.
+        if (mIsSurfaceToScreen) {
+            // can't initialize this in the constructor because the Looper parent class needs to be
+            // initialized first
+            if (mMsgPollForRenderedBuffers == nullptr) {
+                mMsgPollForRenderedBuffers = new AMessage(kWhatPollForRenderedBuffers, this);
+            }
+            // Schedule the poll to occur 100ms after the render time - should be safe for
+            // determining if the frame was ever rendered. If no render time was specified, the
+            // presentation timestamp is used instead, which almost certainly occurs in the past,
+            // since it's almost always a zero-based offset from the start of the stream. In these
+            // scenarios, we expect the frame to be rendered with no delay.
+            int64_t delayUs = noRenderTime ? 0 : renderTimeNs / 1000 - ALooper::GetNowUs();
+            delayUs += 100 * 1000; /* 100ms in microseconds */
+            status_t err =
+                    mMsgPollForRenderedBuffers->postUnique(/* token= */ mMsgPollForRenderedBuffers,
+                                                           delayUs);
+            if (err != OK) {
+                ALOGE("unexpected failure to post pollForRenderedBuffers: %d", err);
             }
         }
         status_t err = mBufferChannel->renderOutputBuffer(buffer, renderTimeNs);

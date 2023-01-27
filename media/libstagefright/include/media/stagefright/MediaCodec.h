@@ -622,6 +622,9 @@ private:
                                                  // when low latency is on
     int64_t mInputBufferCounter;  // number of input buffers queued since last reset/flush
 
+    // A rescheduleable message that periodically polls for rendered buffers
+    sp<AMessage> mMsgPollForRenderedBuffers;
+
     class ReleaseSurface;
     std::unique_ptr<ReleaseSurface> mReleaseSurface;
 
