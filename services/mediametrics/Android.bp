@@ -169,7 +169,7 @@ cc_library {
         "libmemunreachable",
         "libprotobuf-cpp-lite",
         "libstagefright_foundation",
-        "libstatslog",
+        "libstats_media_metrics",
         "libstatspull",
         "libstatssocket",
         "libutils",
@@ -177,6 +177,7 @@ cc_library {
     ],
 
     export_shared_lib_headers: [
+        "libstats_media_metrics",
         "libstatspull",
         "libstatssocket",
     ],
@@ -198,5 +199,35 @@ cc_library {
     header_libs: [
         "libaaudio_headers",
         "libaudioutils_headers",
+    ],
+}
+
+cc_library {
+    name: "libstats_media_metrics",
+    generated_sources: ["stats_media_metrics.cpp"],
+    generated_headers: ["stats_media_metrics.h"],
+    export_generated_headers: ["stats_media_metrics.h"],
+    shared_libs: [
+        "libcutils",
+        "libstatspull",
+        "libstatssocket",
+    ],
+}
+
+genrule {
+    name: "stats_media_metrics.h",
+    tools: ["stats-log-api-gen"],
+    cmd: "$(location stats-log-api-gen) --header $(genDir)/stats_media_metrics.h --module media_metrics --namespace android,stats,media_metrics",
+    out: [
+        "stats_media_metrics.h",
+    ],
+}
+
+genrule {
+    name: "stats_media_metrics.cpp",
+    tools: ["stats-log-api-gen"],
+    cmd: "$(location stats-log-api-gen) --cpp $(genDir)/stats_media_metrics.cpp --module media_metrics --namespace android,stats,media_metrics --importHeader stats_media_metrics.h",
+    out: [
+        "stats_media_metrics.cpp",
     ],
 }
