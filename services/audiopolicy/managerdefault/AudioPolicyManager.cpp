@@ -3916,7 +3916,8 @@ status_t AudioPolicyManager::clearDevicesRoleForStrategy(product_strategy_t stra
 
     status_t status = mEngine->clearDevicesRoleForStrategy(strategy, role);
     if (status != NO_ERROR) {
-        ALOGV("Engine could not remove device role for strategy %d status %d",
+        ALOGW_IF(status != NAME_NOT_FOUND,
+                "Engine could not remove device role for strategy %d status %d",
                 strategy, status);
         return status;
     }
@@ -3988,10 +3989,11 @@ status_t AudioPolicyManager::removeDevicesRoleForCapturePreset(
 
     status_t status = mEngine->removeDevicesRoleForCapturePreset(
             audioSource, role, devices);
-    ALOGW_IF(status != NO_ERROR,
+    ALOGW_IF(status != NO_ERROR && status != NAME_NOT_FOUND,
             "Engine could not remove devices role (%d) for capture preset %d", role, audioSource);
-
-    updateInputRouting();
+    if (status == NO_ERROR) {
+        updateInputRouting();
+    }
     return status;
 }
 
@@ -4000,10 +4002,11 @@ status_t AudioPolicyManager::clearDevicesRoleForCapturePreset(audio_source_t aud
     ALOGV("%s() audioSource=%d role=%d", __func__, audioSource, role);
 
     status_t status = mEngine->clearDevicesRoleForCapturePreset(audioSource, role);
-    ALOGW_IF(status != NO_ERROR,
+    ALOGW_IF(status != NO_ERROR && status != NAME_NOT_FOUND,
             "Engine could not clear devices role (%d) for capture preset %d", role, audioSource);
-
-    updateInputRouting();
+    if (status == NO_ERROR) {
+        updateInputRouting();
+    }
     return status;
 }
 
