@@ -21,9 +21,12 @@
 
 #include "StringArray.h"
 
-#include "unicode/ucnv.h"
-#include "unicode/ucsdet.h"
-#include "unicode/ustring.h"
+/** Declare opaque structures from ICU4C. */
+struct UConverter;
+typedef struct UConverter UConverter;
+
+struct UCharsetMatch;
+typedef struct UCharsetMatch UCharsetMatch;
 
 namespace android {
 
