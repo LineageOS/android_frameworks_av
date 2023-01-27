@@ -458,6 +458,9 @@ const struct ColorConverter::Coeffs *ColorConverter::getMatrix() const {
         [[fallthrough]];
 
     case ColorUtils::kColorStandardUnspecified:
+        if (isFullRange) {
+            return is10Bit ? &BT2020_FULL : &BT601_FULL;
+        }
         return is10Bit ? &BT2020_LTD_10BIT : &BT601_LIMITED;
 
     }
