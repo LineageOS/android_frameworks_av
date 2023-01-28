@@ -34,6 +34,7 @@ using ::aidl::android::hardware::audio::effect::AutomaticGainControl;
 using ::aidl::android::hardware::audio::effect::BassBoost;
 using ::aidl::android::hardware::audio::effect::Descriptor;
 using ::aidl::android::hardware::audio::effect::Downmix;
+using ::aidl::android::hardware::audio::effect::DynamicsProcessing;
 using ::aidl::android::hardware::audio::effect::Flags;
 using ::aidl::android::hardware::audio::effect::Parameter;
 using ::aidl::android::media::audio::common::AudioDeviceDescription;
@@ -232,8 +233,9 @@ legacy2aidl_effect_descriptor_Descriptor(const effect_descriptor_t& legacy) {
 }
 
 ConversionResult<uint32_t> aidl2legacy_Parameter_aec_uint32_echoDelay(const Parameter& aidl) {
-    int echoDelay = VALUE_OR_RETURN(GET_PARAMETER_SPECIFIC_FIELD(
-            aidl, AcousticEchoCanceler, acousticEchoCanceler, echoDelayUs, int));
+    int echoDelay = VALUE_OR_RETURN(
+            GET_PARAMETER_SPECIFIC_FIELD(aidl, AcousticEchoCanceler, acousticEchoCanceler,
+                                         AcousticEchoCanceler::echoDelayUs, int));
     return VALUE_OR_RETURN(convertReinterpret<uint32_t>(echoDelay));
 }
 
@@ -243,8 +245,9 @@ ConversionResult<Parameter> legacy2aidl_uint32_echoDelay_Parameter_aec(uint32_t 
 }
 
 ConversionResult<uint32_t> aidl2legacy_Parameter_aec_uint32_mobileMode(const Parameter& aidl) {
-    bool mobileMode = VALUE_OR_RETURN(GET_PARAMETER_SPECIFIC_FIELD(
-            aidl, AcousticEchoCanceler, acousticEchoCanceler, mobileMode, bool));
+    bool mobileMode = VALUE_OR_RETURN(
+            GET_PARAMETER_SPECIFIC_FIELD(aidl, AcousticEchoCanceler, acousticEchoCanceler,
+                                         AcousticEchoCanceler::mobileMode, bool));
     return VALUE_OR_RETURN(convertIntegral<uint32_t>(mobileMode));
 }
 
@@ -255,8 +258,9 @@ ConversionResult<Parameter> legacy2aidl_uint32_mobileMode_Parameter_aec(uint32_t
 
 ConversionResult<uint32_t> aidl2legacy_Parameter_agc_uint32_fixedDigitalGain(
         const Parameter& aidl) {
-    int gain = VALUE_OR_RETURN(GET_PARAMETER_SPECIFIC_FIELD(
-            aidl, AutomaticGainControl, automaticGainControl, fixedDigitalGainMb, int));
+    int gain = VALUE_OR_RETURN(
+            GET_PARAMETER_SPECIFIC_FIELD(aidl, AutomaticGainControl, automaticGainControl,
+                                         AutomaticGainControl::fixedDigitalGainMb, int));
     return VALUE_OR_RETURN(convertReinterpret<uint32_t>(gain));
 }
 
@@ -268,9 +272,9 @@ ConversionResult<Parameter> legacy2aidl_uint32_fixedDigitalGain_Parameter_agc(ui
 
 ConversionResult<uint32_t> aidl2legacy_Parameter_agc_uint32_levelEstimator(
         const Parameter& aidl) {
-    const auto& le = VALUE_OR_RETURN(
-            GET_PARAMETER_SPECIFIC_FIELD(aidl, AutomaticGainControl, automaticGainControl,
-                                         levelEstimator, AutomaticGainControl::LevelEstimator));
+    const auto& le = VALUE_OR_RETURN(GET_PARAMETER_SPECIFIC_FIELD(
+            aidl, AutomaticGainControl, automaticGainControl, AutomaticGainControl::levelEstimator,
+            AutomaticGainControl::LevelEstimator));
     return static_cast<uint32_t>(le);
 }
 
@@ -285,8 +289,9 @@ ConversionResult<Parameter> legacy2aidl_uint32_levelEstimator_Parameter_agc(uint
 
 ConversionResult<uint32_t> aidl2legacy_Parameter_agc_uint32_saturationMargin(
         const Parameter& aidl) {
-    int saturationMargin = VALUE_OR_RETURN(GET_PARAMETER_SPECIFIC_FIELD(
-            aidl, AutomaticGainControl, automaticGainControl, saturationMarginMb, int));
+    int saturationMargin = VALUE_OR_RETURN(
+            GET_PARAMETER_SPECIFIC_FIELD(aidl, AutomaticGainControl, automaticGainControl,
+                                         AutomaticGainControl::saturationMarginMb, int));
     return VALUE_OR_RETURN(convertIntegral<uint32_t>(saturationMargin));
 }
 
@@ -299,7 +304,7 @@ ConversionResult<Parameter> legacy2aidl_uint32_saturationMargin_Parameter_agc(ui
 ConversionResult<uint16_t> aidl2legacy_Parameter_BassBoost_uint16_strengthPm(
         const Parameter& aidl) {
     int strength = VALUE_OR_RETURN(
-            GET_PARAMETER_SPECIFIC_FIELD(aidl, BassBoost, bassBoost, strengthPm, int));
+            GET_PARAMETER_SPECIFIC_FIELD(aidl, BassBoost, bassBoost, BassBoost::strengthPm, int));
     return VALUE_OR_RETURN(convertIntegral<uint16_t>(strength));
 }
 
@@ -310,7 +315,7 @@ ConversionResult<Parameter> legacy2aidl_uint16_strengthPm_Parameter_BassBoost(ui
 
 ConversionResult<int16_t> aidl2legacy_Parameter_Downmix_int16_type(const Parameter& aidl) {
     Downmix::Type aidlType = VALUE_OR_RETURN(
-            GET_PARAMETER_SPECIFIC_FIELD(aidl, Downmix, downmix, type, Downmix::Type));
+            GET_PARAMETER_SPECIFIC_FIELD(aidl, Downmix, downmix, Downmix::type, Downmix::Type));
     return VALUE_OR_RETURN(convertIntegral<int16_t>(static_cast<uint32_t>(aidlType)));
 }
 
@@ -321,6 +326,27 @@ ConversionResult<Parameter> legacy2aidl_int16_type_Parameter_Downmix(int16_t leg
     Downmix::Type aidlType = static_cast<Downmix::Type>(legacy);
     return MAKE_SPECIFIC_PARAMETER(Downmix, downmix, type, aidlType);
 }
+
+ConversionResult<int16_t> aidl2legacy_DynamicsProcessing_ResolutionPreference_uint32_(
+        const Parameter& aidl) {
+    Downmix::Type aidlType = VALUE_OR_RETURN(
+            GET_PARAMETER_SPECIFIC_FIELD(aidl, Downmix, downmix, Downmix::type, Downmix::Type));
+    return VALUE_OR_RETURN(convertIntegral<int16_t>(static_cast<uint32_t>(aidlType)));
+}
+
+ConversionResult<DynamicsProcessing::ResolutionPreference>
+legacy2aidl_int32_DynamicsProcessing_ResolutionPreference(int32_t legacy) {
+    if (legacy > (int32_t)DynamicsProcessing::ResolutionPreference::FAVOR_TIME_RESOLUTION) {
+        return unexpected(BAD_VALUE);
+    }
+    return static_cast<DynamicsProcessing::ResolutionPreference>(legacy);
+}
+
+ConversionResult<int32_t> aidl2legacy_DynamicsProcessing_ResolutionPreference_int32(
+        DynamicsProcessing::ResolutionPreference aidl) {
+    return static_cast<int32_t>(aidl);
+}
+
 
 }  // namespace android
 }  // aidl
