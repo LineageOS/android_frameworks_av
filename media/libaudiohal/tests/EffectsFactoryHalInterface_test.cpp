@@ -22,6 +22,7 @@
 
 #include <system/audio_effects/audio_effects_utils.h>
 #include <system/audio_effects/effect_aec.h>
+#include <system/audio_effects/effect_dynamicsprocessing.h>
 #include <system/audio_effect.h>
 
 #include <gtest/gtest.h>
@@ -29,6 +30,7 @@
 
 namespace android {
 
+using effect::utils::EffectParamReader;
 using effect::utils::EffectParamWriter;
 
 // EffectsFactoryHalInterface
@@ -124,7 +126,7 @@ TEST(libAudioHalTest, aecInitSetAndGet) {
     EXPECT_EQ(OK, factory->getDescriptors(&FX_IID_AEC_, &descs));
     static constexpr uint32_t delayValue = 0x20;
     for (const auto& desc : descs) {
-        ASSERT_EQ(0, std::memcmp(&desc.type, &FX_IID_AEC_, sizeof(FX_IID_AEC_)));
+        ASSERT_EQ(0, std::memcmp(&desc.type, &FX_IID_AEC_, sizeof(effect_uuid_t)));
         sp<EffectHalInterface> interface;
         EXPECT_EQ(OK, factory->createEffect(&desc.uuid, 1 /* sessionId */, 1 /* ioId */,
                                             1 /* deviceId */, &interface));
@@ -133,7 +135,6 @@ TEST(libAudioHalTest, aecInitSetAndGet) {
         uint32_t type = AEC_PARAM_ECHO_DELAY, value = delayValue;
         param->psize = sizeof(type);
         param->vsize = sizeof(value);
-        //EXPECT_EQ(1, 0) << param->psize << " " << param->vsize;
         EffectParamWriter writer(*param);
         EXPECT_EQ(OK, writer.writeToParameter(&type)) << writer.toString();
         EXPECT_EQ(OK, writer.writeToValue(&value)) << writer.toString();
@@ -141,24 +142,24 @@ TEST(libAudioHalTest, aecInitSetAndGet) {
         uint32_t replySize = sizeof(reply);
         EXPECT_EQ(OK, interface->command(EFFECT_CMD_INIT, 0, nullptr, &replySize, &reply));
         EXPECT_EQ(OK, interface->command(EFFECT_CMD_SET_PARAM, (uint32_t)writer.getTotalSize(),
-                                         param, &replySize, &reply));
+                                         param, &replySize, &reply)) << writer.toString();
         EXPECT_EQ(replySize, sizeof(reply));
         EXPECT_EQ(OK, reply);
 
         effect_param_t* responseParam = (effect_param_t*)testResponseBuffer;
         param->psize = sizeof(type);
         param->vsize = sizeof(value);
-        EffectParamWriter response(*param);
-        EXPECT_EQ(OK, response.writeToParameter(&type)) << response.toString();
-        replySize = response.getTotalSize();
+        EffectParamWriter request(*param);
+        EXPECT_EQ(OK, request.writeToParameter(&type)) << request.toString();
+        replySize = request.getTotalSize();
         EXPECT_EQ(OK, interface->command(EFFECT_CMD_GET_PARAM, (uint32_t)writer.getTotalSize(),
                                          param, &replySize, responseParam));
-        EXPECT_EQ(replySize, response.getTotalSize());
-        EXPECT_EQ(OK, response.readFromValue(&value));
-        EXPECT_EQ(delayValue, value);
+        EffectParamReader response(*responseParam);
+        EXPECT_EQ(replySize, response.getTotalSize()) << response.toString();
+        EXPECT_EQ(OK, response.readFromValue(&value)) << response.toString();
+        EXPECT_EQ(delayValue, value) << response.toString();
     }
 }
-
 // TODO: b/263986405 Add multi-thread testing
 
 } // namespace android

@@ -57,7 +57,7 @@ ConversionResult<F> getParameterSpecificField(const P& u) {
 
 #define MAKE_SPECIFIC_PARAMETER_ID(spec, tag, field)                       \
     UNION_MAKE(aidl::android::hardware::audio::effect::Parameter::Id, tag, \
-               UNION_MAKE(spec::Id, commonTag, spec::field))
+               UNION_MAKE(spec::Id, commonTag, field))
 
 ConversionResult<uint32_t> aidl2legacy_Flags_Type_uint32(
         ::aidl::android::hardware::audio::effect::Flags::Type type);
@@ -120,6 +120,11 @@ ConversionResult<int16_t> aidl2legacy_Parameter_Downmix_int16_type(
         const ::aidl::android::hardware::audio::effect::Parameter& aidl);
 ConversionResult<::aidl::android::hardware::audio::effect::Parameter>
 legacy2aidl_int16_type_Parameter_Downmix(int16_t legacy);
+
+ConversionResult<::aidl::android::hardware::audio::effect::DynamicsProcessing::ResolutionPreference>
+legacy2aidl_int32_DynamicsProcessing_ResolutionPreference(int32_t legacy);
+ConversionResult<int32_t> aidl2legacy_DynamicsProcessing_ResolutionPreference_int32(
+        ::aidl::android::hardware::audio::effect::DynamicsProcessing::ResolutionPreference aidl);
 
 }  // namespace android
 }  // namespace aidl
