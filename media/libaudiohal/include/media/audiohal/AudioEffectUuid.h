@@ -47,18 +47,18 @@ static const AudioUuid kDownmixTypeUUID = {static_cast<int32_t>(0xfa81862a),
                                            0x11ed,
                                            0x9b6a,
                                            {0x02, 0x42, 0xac, 0x12, 0x00, 0x02}};
-// 0bed4300-ddd6-11db-8f34-0002a5d5c51b.
-static const AudioUuid kEqualizerTypeUUID = {static_cast<int32_t>(0x0bed4300),
-                                             0xddd6,
-                                             0x11db,
-                                             0x8f34,
-                                             {0x00, 0x02, 0xa5, 0xd5, 0xc5, 0x1b}};
 // 7261676f-6d75-7369-6364-28e2fd3ac39e
 static const AudioUuid kDynamicsProcessingTypeUUID = {static_cast<int32_t>(0x7261676f),
                                                       0x6d75,
                                                       0x7369,
                                                       0x6364,
                                                       {0x28, 0xe2, 0xfd, 0x3a, 0xc3, 0x9e}};
+// 0bed4300-ddd6-11db-8f34-0002a5d5c51b.
+static const AudioUuid kEqualizerTypeUUID = {static_cast<int32_t>(0x0bed4300),
+                                             0xddd6,
+                                             0x11db,
+                                             0x8f34,
+                                             {0x00, 0x02, 0xa5, 0xd5, 0xc5, 0x1b}};
 // 1411e6d6-aecd-4021-a1cf-a6aceb0d71e5
 static const AudioUuid kHapticGeneratorTypeUUID = {static_cast<int32_t>(0x1411e6d6),
                                                    0xaecd,

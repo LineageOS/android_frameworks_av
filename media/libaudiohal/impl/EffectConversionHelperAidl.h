@@ -16,13 +16,9 @@
 
 #pragma once
 
-#include <cstddef>
-#include <map>
-#include <memory>
 #include <utils/Errors.h>
 
-#include <aidl/android/hardware/audio/effect/IEffect.h>
-
+#include <aidl/android/hardware/audio/effect/BpEffect.h>
 #include <system/audio_effect.h>
 #include <system/audio_effects/audio_effects_utils.h>
 
@@ -30,24 +26,30 @@ namespace android {
 namespace effect {
 
 class EffectConversionHelperAidl {
+  public:
+    status_t handleCommand(uint32_t cmdCode, uint32_t cmdSize, void* pCmdData, uint32_t* replySize,
+                           void* pReplyData);
+    virtual ~EffectConversionHelperAidl() {}
+
   protected:
+    const int32_t mSessionId;
+    const int32_t mIoId;
+    const ::aidl::android::hardware::audio::effect::Descriptor mDesc;
+    const std::shared_ptr<::aidl::android::hardware::audio::effect::IEffect> mEffect;
+    ::aidl::android::hardware::audio::effect::IEffect::OpenEffectReturn mOpenReturn;
+    ::aidl::android::hardware::audio::effect::Parameter::Common mCommon;
+
     EffectConversionHelperAidl(
             std::shared_ptr<::aidl::android::hardware::audio::effect::IEffect> effect,
             int32_t sessionId, int32_t ioId,
             const ::aidl::android::hardware::audio::effect::Descriptor& desc);
 
-    status_t handleCommand(uint32_t cmdCode, uint32_t cmdSize, void* pCmdData, uint32_t* replySize,
-                           void* pReplyData);
+    status_t handleSetParameter(uint32_t cmdSize, const void* pCmdData, uint32_t* replySize,
+                                void* pReplyData);
+    status_t handleGetParameter(uint32_t cmdSize, const void* pCmdData, uint32_t* replySize,
+                                void* pReplyData);
 
   private:
-    const int32_t mSessionId;
-    const int32_t mIoId;
-    const ::aidl::android::hardware::audio::effect::Descriptor mDesc;
-    ::aidl::android::media::audio::common::AudioUuid mTypeUuid;
-    const std::shared_ptr<::aidl::android::hardware::audio::effect::IEffect> mEffect;
-    ::aidl::android::hardware::audio::effect::IEffect::OpenEffectReturn mOpenReturn;
-    ::aidl::android::hardware::audio::effect::Parameter::Common mCommon;
-
     const aidl::android::media::audio::common::AudioFormatDescription kDefaultFormatDescription = {
             .type = aidl::android::media::audio::common::AudioFormatType::PCM,
             .pcm = aidl::android::media::audio::common::PcmType::FLOAT_32_BIT};
@@ -68,21 +70,8 @@ class EffectConversionHelperAidl {
                                                                    void* /* pReplyData */);
     static const std::map<uint32_t /* effect_command_e */, CommandHandler> mCommandHandlerMap;
 
-    // parameter set/get handler map
-    typedef status_t (EffectConversionHelperAidl::*SetParameter)(
-            android::effect::utils::EffectParamReader& param);
-    typedef status_t (EffectConversionHelperAidl::*GetParameter)(
-            android::effect::utils::EffectParamWriter& param);
-    static const std::map<::aidl::android::media::audio::common::AudioUuid /* TypeUUID */,
-                          std::pair<SetParameter, GetParameter>>
-            mParameterHandlerMap;
-
     status_t handleInit(uint32_t cmdSize, const void* pCmdData, uint32_t* replySize,
                         void* pReplyData);
-    status_t handleSetParameter(uint32_t cmdSize, const void* pCmdData, uint32_t* replySize,
-                                void* pReplyData);
-    status_t handleGetParameter(uint32_t cmdSize, const void* pCmdData, uint32_t* replySize,
-                                void* pReplyData);
     status_t handleSetConfig(uint32_t cmdSize, const void* pCmdData, uint32_t* replySize,
                              void* pReplyData);
     status_t handleGetConfig(uint32_t cmdSize, const void* pCmdData, uint32_t* replySize,
@@ -102,15 +91,9 @@ class EffectConversionHelperAidl {
     status_t handleFirstPriority(uint32_t cmdSize, const void* pCmdData, uint32_t* replySize,
                                  void* pReplyData);
 
-    // set/get parameter handler
-    status_t setAecParameter(android::effect::utils::EffectParamReader& param);
-    status_t getAecParameter(android::effect::utils::EffectParamWriter& param);
-    status_t setAgcParameter(android::effect::utils::EffectParamReader& param);
-    status_t getAgcParameter(android::effect::utils::EffectParamWriter& param);
-    status_t setBassBoostParameter(android::effect::utils::EffectParamReader& param);
-    status_t getBassBoostParameter(android::effect::utils::EffectParamWriter& param);
-    status_t setDownmixParameter(android::effect::utils::EffectParamReader& param);
-    status_t getDownmixParameter(android::effect::utils::EffectParamWriter& param);
+    // implemented by conversion of each effect
+    virtual status_t setParameter(utils::EffectParamReader& param) = 0;
+    virtual status_t getParameter(utils::EffectParamWriter& param) = 0;
 };
 
 }  // namespace effect
