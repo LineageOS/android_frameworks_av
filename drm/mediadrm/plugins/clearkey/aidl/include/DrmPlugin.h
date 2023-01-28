@@ -148,6 +148,9 @@ struct DrmPlugin : public BnDrmPlugin {
 
   private:
     void initProperties();
+    int32_t getIntProperty(const std::string& prop, int32_t defaultVal = 0) const;
+    int32_t getOemError() const;
+    int32_t getErrorContext() const;
     void installSecureStop(const std::vector<uint8_t>& sessionId);
     bool makeKeySetId(std::string* keySetId);
     void setPlayPolicy();
