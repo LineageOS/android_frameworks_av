@@ -23,21 +23,6 @@
 #include <error/expected_utils.h>
 #include <media/AidlConversionNdk.h>
 #include <media/AidlConversionEffect.h>
-#include <media/audiohal/AudioEffectUuid.h>
-#include <system/audio_effects/effect_aec.h>
-#include <system/audio_effects/effect_agc2.h>
-#include <system/audio_effects/effect_bassboost.h>
-#include <system/audio_effects/effect_downmix.h>
-#include <system/audio_effects/effect_dynamicsprocessing.h>
-#include <system/audio_effects/effect_environmentalreverb.h>
-#include <system/audio_effects/effect_equalizer.h>
-#include <system/audio_effects/effect_hapticgenerator.h>
-#include <system/audio_effects/effect_loudnessenhancer.h>
-#include <system/audio_effects/effect_ns.h>
-#include <system/audio_effects/effect_presetreverb.h>
-#include <system/audio_effects/effect_spatializer.h>
-#include <system/audio_effects/effect_virtualizer.h>
-#include <system/audio_effects/effect_visualizer.h>
 
 #include <utils/Log.h>
 
@@ -47,15 +32,10 @@ namespace android {
 namespace effect {
 
 using ::aidl::android::aidl_utils::statusTFromBinderStatus;
-using ::aidl::android::hardware::audio::effect::AcousticEchoCanceler;
-using ::aidl::android::hardware::audio::effect::AutomaticGainControl;
-using ::aidl::android::hardware::audio::effect::BassBoost;
 using ::aidl::android::hardware::audio::effect::CommandId;
 using ::aidl::android::hardware::audio::effect::Descriptor;
-using ::aidl::android::hardware::audio::effect::Downmix;
 using ::aidl::android::hardware::audio::effect::Parameter;
 using ::aidl::android::media::audio::common::AudioDeviceDescription;
-using ::aidl::android::media::audio::common::AudioUuid;
 using android::effect::utils::EffectParamReader;
 using android::effect::utils::EffectParamWriter;
 
@@ -77,26 +57,9 @@ const std::map<uint32_t /* effect_command_e */, EffectConversionHelperAidl::Comm
                 {EFFECT_CMD_OFFLOAD, &EffectConversionHelperAidl::handleSetOffload},
                 {EFFECT_CMD_FIRST_PROPRIETARY, &EffectConversionHelperAidl::handleFirstPriority}};
 
-const std::map<AudioUuid /* TypeUUID */, std::pair<EffectConversionHelperAidl::SetParameter,
-                                                   EffectConversionHelperAidl::GetParameter>>
-        EffectConversionHelperAidl::mParameterHandlerMap = {
-                {kAcousticEchoCancelerTypeUUID,
-                 {&EffectConversionHelperAidl::setAecParameter,
-                  &EffectConversionHelperAidl::getAecParameter}},
-                {kAutomaticGainControlTypeUUID,
-                 {&EffectConversionHelperAidl::setAgcParameter,
-                  &EffectConversionHelperAidl::getAgcParameter}},
-                {kBassBoostTypeUUID,
-                 {&EffectConversionHelperAidl::setBassBoostParameter,
-                  &EffectConversionHelperAidl::getBassBoostParameter}},
-                {kDownmixTypeUUID,
-                 {&EffectConversionHelperAidl::setDownmixParameter,
-                  &EffectConversionHelperAidl::getDownmixParameter}}};
-
 EffectConversionHelperAidl::EffectConversionHelperAidl(
         std::shared_ptr<::aidl::android::hardware::audio::effect::IEffect> effect,
-        int32_t sessionId, int32_t ioId,
-        const ::aidl::android::hardware::audio::effect::Descriptor& desc)
+        int32_t sessionId, int32_t ioId, const Descriptor& desc)
     : mSessionId(sessionId), mIoId(ioId), mDesc(desc), mEffect(std::move(effect)) {
     mCommon.session = sessionId;
     mCommon.ioHandle = ioId;
@@ -138,14 +101,7 @@ status_t EffectConversionHelperAidl::handleSetParameter(uint32_t cmdSize, const 
         return BAD_VALUE;
     }
 
-    const auto& handler = mParameterHandlerMap.find(mDesc.common.id.type);
-    if (handler == mParameterHandlerMap.end() || !handler->second.first) {
-        ALOGE("%s handler for uuid %s not found", __func__,
-              mDesc.common.id.type.toString().c_str());
-        return BAD_VALUE;
-    }
-    const SetParameter& functor = handler->second.first;
-    return *(status_t*)pReplyData = (this->*functor)(reader);
+    return *(status_t*)pReplyData = setParameter(reader);
 }
 
 status_t EffectConversionHelperAidl::handleGetParameter(uint32_t cmdSize, const void* pCmdData,
@@ -155,24 +111,20 @@ status_t EffectConversionHelperAidl::handleGetParameter(uint32_t cmdSize, const 
     }
 
     const auto reader = EffectParamReader(*(effect_param_t*)pCmdData);
-    if (!reader.validateCmdSize(cmdSize)) {
-        ALOGE("%s illegal param %s, replysize %u", __func__, reader.toString().c_str(),
+    if (!reader.validateCmdSize(cmdSize) ||
+        *replySize < sizeof(effect_param_t) + reader.getParameterSize()) {
+        ALOGE("%s illegal param %s, replySize %u", __func__, reader.toString().c_str(),
               *replySize);
         return BAD_VALUE;
     }
 
-    const auto& handler = mParameterHandlerMap.find(mDesc.common.id.type);
-    if (handler == mParameterHandlerMap.end() || !handler->second.second) {
-        ALOGE("%s handler for uuid %s not found", __func__,
-              mDesc.common.id.type.toString().c_str());
-        return BAD_VALUE;
-    }
-    const GetParameter& functor = handler->second.second;
+    // copy effect_param_t and parameters
     memcpy(pReplyData, pCmdData, sizeof(effect_param_t) + reader.getParameterSize());
-    auto writer = EffectParamWriter(*(effect_param_t *)pReplyData);
-    (this->*functor)(writer);
+    auto writer = EffectParamWriter(*(effect_param_t*)pReplyData);
+    status_t ret = getParameter(writer);
+    writer.finishValueWrite();
     *replySize = writer.getTotalSize();
-    return writer.getStatus();
+    return ret;
 }
 
 status_t EffectConversionHelperAidl::handleSetConfig(uint32_t cmdSize, const void* pCmdData,
@@ -184,17 +136,19 @@ status_t EffectConversionHelperAidl::handleSetConfig(uint32_t cmdSize, const voi
 
     const auto& legacyConfig = static_cast<const effect_config_t*>(pCmdData);
     // already open, apply latest settings
-    mCommon.input.base =
+    Parameter::Common common;
+    common.input.base =
             VALUE_OR_RETURN_STATUS(::aidl::android::legacy2aidl_buffer_config_t_AudioConfigBase(
                     legacyConfig->inputCfg, true /* isInput */));
-    mCommon.output.base =
+    common.output.base =
             VALUE_OR_RETURN_STATUS(::aidl::android::legacy2aidl_buffer_config_t_AudioConfigBase(
                     legacyConfig->outputCfg, false /* isInput */));
-    mCommon.session = mSessionId;
-    mCommon.ioHandle = mIoId;
+    common.session = mSessionId;
+    common.ioHandle = mIoId;
     // TODO: add access mode support
     RETURN_STATUS_IF_ERROR(statusTFromBinderStatus(
-            mEffect->setParameter(Parameter::make<Parameter::common>(mCommon))));
+            mEffect->setParameter(Parameter::make<Parameter::common>(common))));
+    mCommon = common;
     return *static_cast<int32_t*>(pReplyData) = OK;
 }
 
@@ -217,6 +171,7 @@ status_t EffectConversionHelperAidl::handleGetConfig(uint32_t cmdSize __unused,
     pConfig->outputCfg =
             VALUE_OR_RETURN_STATUS(::aidl::android::aidl2legacy_AudioConfigBase_buffer_config_t(
                     common.output.base, false));
+    mCommon = common;
     return OK;
 }
 
@@ -308,262 +263,5 @@ status_t EffectConversionHelperAidl::handleFirstPriority(uint32_t cmdSize __unus
     return OK;
 }
 
-status_t EffectConversionHelperAidl::setAecParameter(EffectParamReader& param) {
-    uint32_t type, value = 0;
-    if (!param.validateParamValueSize(sizeof(uint32_t), sizeof(uint32_t)) ||
-        OK != param.readFromParameter(&type) ||
-        OK != param.readFromValue(&value)) {
-        ALOGW("%s invalid param %s", __func__, param.toString().c_str());
-        return BAD_VALUE;
-    }
-
-    Parameter aidlParam;
-    switch (type) {
-        case AEC_PARAM_ECHO_DELAY:
-            FALLTHROUGH_INTENDED;
-        case AEC_PARAM_PROPERTIES: {
-            aidlParam = VALUE_OR_RETURN_STATUS(
-                    aidl::android::legacy2aidl_uint32_echoDelay_Parameter_aec(value));
-            break;
-        }
-        case AEC_PARAM_MOBILE_MODE: {
-            aidlParam = VALUE_OR_RETURN_STATUS(
-                    aidl::android::legacy2aidl_uint32_mobileMode_Parameter_aec(value));
-            break;
-        }
-        default: {
-            ALOGW("%s unknown param %s", __func__, param.toString().c_str());
-            return BAD_VALUE;
-        }
-    }
-
-    return statusTFromBinderStatus(mEffect->setParameter(aidlParam));
-}
-
-status_t EffectConversionHelperAidl::getAecParameter(EffectParamWriter& param) {
-    uint32_t type = 0, value = 0;
-    if (!param.validateParamValueSize(sizeof(uint32_t), sizeof(uint32_t)) ||
-        OK != param.readFromParameter(&type) || OK != param.readFromValue(&value)) {
-        param.setStatus(BAD_VALUE);
-        ALOGW("%s invalid param %s", __func__, param.toString().c_str());
-        return BAD_VALUE;
-    }
-    Parameter aidlParam;
-    switch (type) {
-        case AEC_PARAM_ECHO_DELAY:
-            FALLTHROUGH_INTENDED;
-        case AEC_PARAM_PROPERTIES: {
-            Parameter::Id id = MAKE_SPECIFIC_PARAMETER_ID(AcousticEchoCanceler,
-                                                          acousticEchoCancelerTag, echoDelayUs);
-            RETURN_STATUS_IF_ERROR(statusTFromBinderStatus(mEffect->getParameter(id, &aidlParam)));
-            value = VALUE_OR_RETURN_STATUS(
-                    aidl::android::aidl2legacy_Parameter_aec_uint32_echoDelay(aidlParam));
-            break;
-        }
-        case AEC_PARAM_MOBILE_MODE: {
-            Parameter::Id id = MAKE_SPECIFIC_PARAMETER_ID(AcousticEchoCanceler,
-                                                          acousticEchoCancelerTag, mobileMode);
-            RETURN_STATUS_IF_ERROR(statusTFromBinderStatus(mEffect->getParameter(id, &aidlParam)));
-            value = VALUE_OR_RETURN_STATUS(
-                    aidl::android::aidl2legacy_Parameter_aec_uint32_mobileMode(aidlParam));
-            break;
-        }
-        default:
-            ALOGW("%s unknown param %s", __func__, param.toString().c_str());
-            return BAD_VALUE;
-    }
-    param.writeToValue(&value);
-    return OK;
-}
-
-status_t EffectConversionHelperAidl::setAgcParameter(EffectParamReader& param) {
-    uint32_t type = 0, value = 0;
-    if (!param.validateParamValueSize(sizeof(uint32_t), sizeof(uint32_t)) ||
-        OK != param.readFromParameter(&type) || OK != param.readFromValue(&value)) {
-        ALOGW("%s invalid param %s", __func__, param.toString().c_str());
-        return BAD_VALUE;
-    }
-    Parameter aidlParam;
-    switch (type) {
-        case AGC2_PARAM_FIXED_DIGITAL_GAIN: {
-            aidlParam = VALUE_OR_RETURN_STATUS(
-                    aidl::android::legacy2aidl_uint32_fixedDigitalGain_Parameter_agc(value));
-            break;
-        }
-        case AGC2_PARAM_ADAPT_DIGI_LEVEL_ESTIMATOR: {
-            aidlParam = VALUE_OR_RETURN_STATUS(
-                    aidl::android::legacy2aidl_uint32_levelEstimator_Parameter_agc(value));
-            break;
-        }
-        case AGC2_PARAM_ADAPT_DIGI_EXTRA_SATURATION_MARGIN: {
-            aidlParam = VALUE_OR_RETURN_STATUS(
-                    aidl::android::legacy2aidl_uint32_saturationMargin_Parameter_agc(value));
-            break;
-        }
-        default: {
-            ALOGW("%s unknown param %s", __func__, param.toString().c_str());
-            return BAD_VALUE;
-        }
-    }
-
-    return statusTFromBinderStatus(mEffect->setParameter(aidlParam));
-}
-
-status_t EffectConversionHelperAidl::getAgcParameter(EffectParamWriter& param) {
-    uint32_t type = 0, value = 0;
-    if (!param.validateParamValueSize(sizeof(uint32_t), sizeof(uint32_t)) ||
-        OK != param.readFromParameter(&type) || OK != param.readFromValue(&value)) {
-        ALOGW("%s invalid param %s", __func__, param.toString().c_str());
-        return BAD_VALUE;
-    }
-    Parameter aidlParam;
-    switch (type) {
-        case AGC2_PARAM_FIXED_DIGITAL_GAIN: {
-            Parameter::Id id = MAKE_SPECIFIC_PARAMETER_ID(
-                    AutomaticGainControl, automaticGainControlTag, fixedDigitalGainMb);
-            RETURN_STATUS_IF_ERROR(statusTFromBinderStatus(mEffect->getParameter(id, &aidlParam)));
-            value = VALUE_OR_RETURN_STATUS(
-                    aidl::android::aidl2legacy_Parameter_agc_uint32_fixedDigitalGain(aidlParam));
-            break;
-        }
-        case AGC2_PARAM_ADAPT_DIGI_LEVEL_ESTIMATOR: {
-            Parameter::Id id = MAKE_SPECIFIC_PARAMETER_ID(AutomaticGainControl,
-                                                          automaticGainControlTag, levelEstimator);
-            RETURN_STATUS_IF_ERROR(statusTFromBinderStatus(mEffect->getParameter(id, &aidlParam)));
-            value = VALUE_OR_RETURN_STATUS(
-                    aidl::android::aidl2legacy_Parameter_agc_uint32_levelEstimator(aidlParam));
-            break;
-        }
-        case AGC2_PARAM_ADAPT_DIGI_EXTRA_SATURATION_MARGIN: {
-            Parameter::Id id = MAKE_SPECIFIC_PARAMETER_ID(
-                    AutomaticGainControl, automaticGainControlTag, saturationMarginMb);
-            RETURN_STATUS_IF_ERROR(statusTFromBinderStatus(mEffect->getParameter(id, &aidlParam)));
-            value = VALUE_OR_RETURN_STATUS(
-                    aidl::android::aidl2legacy_Parameter_agc_uint32_saturationMargin(aidlParam));
-            break;
-        }
-        default: {
-            ALOGW("%s unknown param %s", __func__, param.toString().c_str());
-            return BAD_VALUE;
-        }
-    }
-
-    param.writeToValue(&value);
-    return OK;
-}
-
-status_t EffectConversionHelperAidl::setBassBoostParameter(EffectParamReader& param) {
-    uint32_t type = 0;
-    uint16_t value = 0;
-    if (!param.validateParamValueSize(sizeof(uint32_t), sizeof(uint16_t)) ||
-        OK != param.readFromParameter(&type) || OK != param.readFromValue(&value)) {
-        ALOGW("%s invalid param %s", __func__, param.toString().c_str());
-        return BAD_VALUE;
-    }
-    Parameter aidlParam;
-    switch (type) {
-        case BASSBOOST_PARAM_STRENGTH: {
-            aidlParam = VALUE_OR_RETURN_STATUS(
-                    aidl::android::legacy2aidl_uint16_strengthPm_Parameter_BassBoost(value));
-            break;
-        }
-        case BASSBOOST_PARAM_STRENGTH_SUPPORTED: {
-            ALOGW("%s set BASSBOOST_PARAM_STRENGTH_SUPPORTED not supported", __func__);
-            return BAD_VALUE;
-        }
-        default: {
-            ALOGW("%s unknown param %s", __func__, param.toString().c_str());
-            return BAD_VALUE;
-        }
-    }
-
-    return statusTFromBinderStatus(mEffect->setParameter(aidlParam));
-}
-
-status_t EffectConversionHelperAidl::getBassBoostParameter(EffectParamWriter& param) {
-    uint32_t type = 0, value = 0;
-    if (!param.validateParamValueSize(sizeof(uint32_t), sizeof(uint32_t)) ||
-        OK != param.readFromParameter(&type) || OK != param.readFromValue(&value)) {
-        ALOGW("%s invalid param %s", __func__, param.toString().c_str());
-        param.setStatus(BAD_VALUE);
-        return BAD_VALUE;
-    }
-    Parameter aidlParam;
-    switch (type) {
-        case BASSBOOST_PARAM_STRENGTH: {
-            Parameter::Id id = MAKE_SPECIFIC_PARAMETER_ID(BassBoost, bassBoostTag, strengthPm);
-            RETURN_STATUS_IF_ERROR(statusTFromBinderStatus(mEffect->getParameter(id, &aidlParam)));
-            value = VALUE_OR_RETURN_STATUS(
-                    aidl::android::aidl2legacy_Parameter_BassBoost_uint16_strengthPm(aidlParam));
-            break;
-        }
-        case BASSBOOST_PARAM_STRENGTH_SUPPORTED: {
-            const auto& cap =
-                    VALUE_OR_RETURN_STATUS(aidl::android::UNION_GET(mDesc.capability, bassBoost));
-            value = VALUE_OR_RETURN_STATUS(
-                    aidl::android::convertIntegral<uint32_t>(cap.strengthSupported));
-            break;
-        }
-        default: {
-            ALOGW("%s unknown param %s", __func__, param.toString().c_str());
-            return BAD_VALUE;
-        }
-    }
-
-    param.writeToValue(&value);
-    return OK;
-}
-
-status_t EffectConversionHelperAidl::setDownmixParameter(EffectParamReader& param) {
-    uint32_t type = 0;
-    int16_t value = 0;
-    if (!param.validateParamValueSize(sizeof(uint32_t), sizeof(int16_t)) ||
-        OK != param.readFromParameter(&type) || OK != param.readFromValue(&value)) {
-        ALOGW("%s invalid param %s", __func__, param.toString().c_str());
-        return BAD_VALUE;
-    }
-    Parameter aidlParam;
-    switch (type) {
-        case DOWNMIX_PARAM_TYPE: {
-            aidlParam = VALUE_OR_RETURN_STATUS(
-                    aidl::android::legacy2aidl_int16_type_Parameter_Downmix(value));
-            break;
-        }
-        default: {
-            ALOGW("%s unknown param %s", __func__, param.toString().c_str());
-            return BAD_VALUE;
-        }
-    }
-
-    return statusTFromBinderStatus(mEffect->setParameter(aidlParam));
-}
-
-status_t EffectConversionHelperAidl::getDownmixParameter(EffectParamWriter& param) {
-    int16_t value = 0;
-    uint32_t type = 0;
-    if (!param.validateParamValueSize(sizeof(uint32_t), sizeof(uint16_t)) ||
-        OK != param.readFromParameter(&type) || OK != param.readFromValue(&value)) {
-        param.setStatus(BAD_VALUE);
-        return BAD_VALUE;
-    }
-    Parameter aidlParam;
-    switch (type) {
-        case DOWNMIX_PARAM_TYPE: {
-            Parameter::Id id = MAKE_SPECIFIC_PARAMETER_ID(Downmix, downmixTag, type);
-            RETURN_STATUS_IF_ERROR(statusTFromBinderStatus(mEffect->getParameter(id, &aidlParam)));
-            value = VALUE_OR_RETURN_STATUS(
-                    aidl::android::aidl2legacy_Parameter_Downmix_int16_type(aidlParam));
-            break;
-        }
-        default: {
-            ALOGW("%s unknown param %s", __func__, param.toString().c_str());
-            return BAD_VALUE;
-        }
-    }
-
-    param.writeToValue(&value);
-    return OK;
-}
-
-} // namespace effect
-} // namespace android
+}  // namespace effect
+}  // namespace android
