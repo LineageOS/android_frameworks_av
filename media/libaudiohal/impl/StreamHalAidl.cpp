@@ -46,10 +46,11 @@ std::shared_ptr<IStreamCommon> StreamHalAidl::getStreamCommon(const std::shared_
 }
 
 StreamHalAidl::StreamHalAidl(
-        std::string_view className, bool isInput, const StreamDescriptor& descriptor,
-        const std::shared_ptr<IStreamCommon>& stream)
+        std::string_view className, bool isInput, const audio_config& config,
+        const StreamDescriptor& descriptor, const std::shared_ptr<IStreamCommon>& stream)
         : ConversionHelperAidl(className),
           mIsInput(isInput),
+          mConfig(configToBase(config)),
           mFrameSizeBytes(descriptor.frameSizeBytes),
           mBufferSizeFrames(descriptor.bufferSizeFrames),
           mCommandMQ(new CommandMQ(descriptor.command)),
@@ -76,7 +77,7 @@ status_t StreamHalAidl::getBufferSize(size_t *size) {
     if (size == nullptr) {
         return BAD_VALUE;
     }
-    if (mFrameSizeBytes == 0 || mBufferSizeFrames == 0) {
+    if (mFrameSizeBytes == 0 || mBufferSizeFrames == 0 || !mStream) {
         return NO_INIT;
     }
     *size = mFrameSizeBytes * mBufferSizeFrames;
@@ -87,13 +88,8 @@ status_t StreamHalAidl::getAudioProperties(audio_config_base_t *configBase) {
     if (configBase == nullptr) {
         return BAD_VALUE;
     }
-    TIME_CHECK();
-    *configBase = AUDIO_CONFIG_BASE_INITIALIZER;
-    configBase->sample_rate = 48000;
-    configBase->format = AUDIO_FORMAT_PCM_24_BIT_PACKED;
-    configBase->channel_mask = mIsInput ? AUDIO_CHANNEL_IN_STEREO : AUDIO_CHANNEL_OUT_STEREO;
-    // if (!mStream) return NO_INIT;
-    ALOGE("%s not implemented yet", __func__);
+    if (!mStream) return NO_INIT;
+    *configBase = mConfig;
     return OK;
 }
 
@@ -116,7 +112,7 @@ status_t StreamHalAidl::getFrameSize(size_t *size) {
     if (size == nullptr) {
         return BAD_VALUE;
     }
-    if (mFrameSizeBytes == 0) {
+    if (mFrameSizeBytes == 0 || !mStream) {
         return NO_INIT;
     }
     *size = mFrameSizeBytes;
@@ -140,6 +136,9 @@ status_t StreamHalAidl::removeEffect(sp<EffectHalInterface> effect __unused) {
 status_t StreamHalAidl::standby() {
     TIME_CHECK();
     if (!mStream) return NO_INIT;
+    if (mState == StreamDescriptor::State::STANDBY) {
+        return OK;
+    }
     ALOGE("%s not implemented yet", __func__);
     return OK;
 }
@@ -180,7 +179,7 @@ status_t StreamHalAidl::getMmapPosition(struct audio_mmap_position *position __u
 }
 
 status_t StreamHalAidl::setHalThreadPriority(int priority __unused) {
-    mHalThreadPriority = priority;
+    // Obsolete, must be done by the HAL module.
     return OK;
 }
 
@@ -192,12 +191,8 @@ status_t StreamHalAidl::getHalPid(pid_t *pid __unused) {
 }
 
 bool StreamHalAidl::requestHalThreadPriority(pid_t threadPid __unused, pid_t threadId __unused) {
-    if (mHalThreadPriority == HAL_THREAD_PRIORITY_DEFAULT) {
-        return true;
-    }
-    if (!mStream) return NO_INIT;
-    ALOGE("%s not implemented yet", __func__);
-    return OK;
+    // Obsolete, must be done by the HAL module.
+    return true;
 }
 
 status_t StreamHalAidl::legacyCreateAudioPatch(const struct audio_port_config& port __unused,
@@ -244,8 +239,10 @@ class StreamCallback : public ::aidl::android::hardware::audio::core::BnStreamCa
 }  // namespace
 
 StreamOutHalAidl::StreamOutHalAidl(
+        const audio_config& config,
         const StreamDescriptor& descriptor, const std::shared_ptr<IStreamOut>& stream)
-        : StreamHalAidl("StreamOutHalAidl", false /*isInput*/, descriptor, getStreamCommon(stream)),
+        : StreamHalAidl("StreamOutHalAidl", false /*isInput*/, config,
+                descriptor, getStreamCommon(stream)),
           mStream(stream) {}
 
 status_t StreamOutHalAidl::getLatency(uint32_t *latency) {
@@ -360,34 +357,55 @@ status_t StreamOutHalAidl::updateSourceMetadata(
 }
 
 status_t StreamOutHalAidl::getDualMonoMode(audio_dual_mono_mode_t* mode __unused) {
-    return INVALID_OPERATION;
+    TIME_CHECK();
+    if (!mStream) return NO_INIT;
+    ALOGE("%s not implemented yet", __func__);
+    return OK;
 }
 
 status_t StreamOutHalAidl::setDualMonoMode(audio_dual_mono_mode_t mode __unused) {
-    return INVALID_OPERATION;
+    TIME_CHECK();
+    if (!mStream) return NO_INIT;
+    ALOGE("%s not implemented yet", __func__);
+    return OK;
 }
 
 status_t StreamOutHalAidl::getAudioDescriptionMixLevel(float* leveldB __unused) {
-    return INVALID_OPERATION;
+    TIME_CHECK();
+    if (!mStream) return NO_INIT;
+    ALOGE("%s not implemented yet", __func__);
+    return OK;
 }
 
 status_t StreamOutHalAidl::setAudioDescriptionMixLevel(float leveldB __unused) {
-    return INVALID_OPERATION;
+    TIME_CHECK();
+    if (!mStream) return NO_INIT;
+    ALOGE("%s not implemented yet", __func__);
+    return OK;
 }
 
 status_t StreamOutHalAidl::getPlaybackRateParameters(
         audio_playback_rate_t* playbackRate __unused) {
-    return INVALID_OPERATION;
+    TIME_CHECK();
+    if (!mStream) return NO_INIT;
+    ALOGE("%s not implemented yet", __func__);
+    return OK;
 }
 
 status_t StreamOutHalAidl::setPlaybackRateParameters(
         const audio_playback_rate_t& playbackRate __unused) {
-    return INVALID_OPERATION;
+    TIME_CHECK();
+    if (!mStream) return NO_INIT;
+    ALOGE("%s not implemented yet", __func__);
+    return OK;
 }
 
 status_t StreamOutHalAidl::setEventCallback(
         const sp<StreamOutHalInterfaceEventCallback>& callback __unused) {
-    return INVALID_OPERATION;
+    TIME_CHECK();
+    if (!mStream) return NO_INIT;
+    ALOGE("%s not implemented yet", __func__);
+    return OK;
 }
 
 namespace {
@@ -401,17 +419,26 @@ struct StreamOutEventCallback {
 }  // namespace
 
 status_t StreamOutHalAidl::setLatencyMode(audio_latency_mode_t mode __unused) {
-    return INVALID_OPERATION;
+    TIME_CHECK();
+    if (!mStream) return NO_INIT;
+    ALOGE("%s not implemented yet", __func__);
+    return OK;
 };
 
 status_t StreamOutHalAidl::getRecommendedLatencyModes(
         std::vector<audio_latency_mode_t> *modes __unused) {
-    return INVALID_OPERATION;
+    TIME_CHECK();
+    if (!mStream) return NO_INIT;
+    ALOGE("%s not implemented yet", __func__);
+    return OK;
 };
 
 status_t StreamOutHalAidl::setLatencyModeCallback(
         const sp<StreamOutHalInterfaceLatencyModeCallback>& callback __unused) {
-    return INVALID_OPERATION;
+    TIME_CHECK();
+    if (!mStream) return NO_INIT;
+    ALOGE("%s not implemented yet", __func__);
+    return OK;
 };
 
 void StreamOutHalAidl::onWriteReady() {
@@ -458,8 +485,10 @@ status_t StreamOutHalAidl::exit() {
 }
 
 StreamInHalAidl::StreamInHalAidl(
+        const audio_config& config,
         const StreamDescriptor& descriptor, const std::shared_ptr<IStreamIn>& stream)
-        : StreamHalAidl("StreamInHalAidl", true /*isInput*/, descriptor, getStreamCommon(stream)),
+        : StreamHalAidl("StreamInHalAidl", true /*isInput*/, config,
+                descriptor, getStreamCommon(stream)),
           mStream(stream) {}
 
 status_t StreamInHalAidl::setGain(float gain __unused) {
@@ -494,24 +523,33 @@ status_t StreamInHalAidl::getCapturePosition(int64_t *frames __unused, int64_t *
 
 status_t StreamInHalAidl::getActiveMicrophones(
         std::vector<media::MicrophoneInfo> *microphones __unused) {
-    if (mStream == 0) return NO_INIT;
-    return INVALID_OPERATION;
+    TIME_CHECK();
+    if (!mStream) return NO_INIT;
+    ALOGE("%s not implemented yet", __func__);
+    return OK;
 }
 
 status_t StreamInHalAidl::updateSinkMetadata(
         const StreamInHalInterface::SinkMetadata& sinkMetadata  __unused) {
-    return INVALID_OPERATION;
+    TIME_CHECK();
+    if (!mStream) return NO_INIT;
+    ALOGE("%s not implemented yet", __func__);
+    return OK;
 }
 
 status_t StreamInHalAidl::setPreferredMicrophoneDirection(
             audio_microphone_direction_t direction __unused) {
-    if (mStream == 0) return NO_INIT;
-    return INVALID_OPERATION;
+    TIME_CHECK();
+    if (!mStream) return NO_INIT;
+    ALOGE("%s not implemented yet", __func__);
+    return OK;
 }
 
 status_t StreamInHalAidl::setPreferredMicrophoneFieldDimension(float zoom __unused) {
-    if (mStream == 0) return NO_INIT;
-    return INVALID_OPERATION;
+    TIME_CHECK();
+    if (!mStream) return NO_INIT;
+    ALOGE("%s not implemented yet", __func__);
+    return OK;
 }
 
 } // namespace android

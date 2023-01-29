@@ -101,6 +101,7 @@ class StreamHalAidl : public virtual StreamHalInterface, public ConversionHelper
     // Subclasses can not be constructed directly by clients.
     StreamHalAidl(std::string_view className,
             bool isInput,
+            const audio_config& config,
             const ::aidl::android::hardware::audio::core::StreamDescriptor& descriptor,
             const std::shared_ptr<::aidl::android::hardware::audio::core::IStreamCommon>& stream);
 
@@ -111,6 +112,7 @@ class StreamHalAidl : public virtual StreamHalInterface, public ConversionHelper
     bool requestHalThreadPriority(pid_t threadPid, pid_t threadId);
 
     const bool mIsInput;
+    const audio_config_base_t mConfig;
     const size_t mFrameSizeBytes;
     const size_t mBufferSizeFrames;
     const std::unique_ptr<CommandMQ> mCommandMQ;
@@ -118,8 +120,17 @@ class StreamHalAidl : public virtual StreamHalInterface, public ConversionHelper
     const std::unique_ptr<DataMQ> mDataMQ;
     // mStreamPowerLog is used for audio signal power logging.
     StreamPowerLog mStreamPowerLog;
+    ::aidl::android::hardware::audio::core::StreamDescriptor::State mState =
+              ::aidl::android::hardware::audio::core::StreamDescriptor::State::STANDBY;
 
   private:
+    static audio_config_base_t configToBase(const audio_config& config) {
+        audio_config_base_t result = AUDIO_CONFIG_BASE_INITIALIZER;
+        result.sample_rate = config.sample_rate;
+        result.channel_mask = config.channel_mask;
+        result.format = config.format;
+        return result;
+    }
     static std::unique_ptr<DataMQ> maybeCreateDataMQ(
             const ::aidl::android::hardware::audio::core::StreamDescriptor& descriptor) {
         using Tag = ::aidl::android::hardware::audio::core::StreamDescriptor::AudioBuffer::Tag;
@@ -129,9 +140,7 @@ class StreamHalAidl : public virtual StreamHalInterface, public ConversionHelper
         return nullptr;
     }
 
-    const int HAL_THREAD_PRIORITY_DEFAULT = -1;
     const std::shared_ptr<::aidl::android::hardware::audio::core::IStreamCommon> mStream;
-    int mHalThreadPriority = HAL_THREAD_PRIORITY_DEFAULT;
 };
 
 class StreamOutHalAidl : public StreamOutHalInterface, public StreamHalAidl {
@@ -230,6 +239,7 @@ class StreamOutHalAidl : public StreamOutHalInterface, public StreamHalAidl {
 
     // Can not be constructed directly by clients.
     StreamOutHalAidl(
+            const audio_config& config,
             const ::aidl::android::hardware::audio::core::StreamDescriptor& descriptor,
             const std::shared_ptr<::aidl::android::hardware::audio::core::IStreamOut>& stream);
 
@@ -271,6 +281,7 @@ class StreamInHalAidl : public StreamInHalInterface, public StreamHalAidl {
 
     // Can not be constructed directly by clients.
     StreamInHalAidl(
+            const audio_config& config,
             const ::aidl::android::hardware::audio::core::StreamDescriptor& descriptor,
             const std::shared_ptr<::aidl::android::hardware::audio::core::IStreamIn>& stream);
 
