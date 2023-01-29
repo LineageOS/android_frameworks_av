@@ -37,6 +37,7 @@ using ::aidl::android::hardware::audio::effect::Downmix;
 using ::aidl::android::hardware::audio::effect::DynamicsProcessing;
 using ::aidl::android::hardware::audio::effect::Flags;
 using ::aidl::android::hardware::audio::effect::Parameter;
+using ::aidl::android::hardware::audio::effect::PresetReverb;
 using ::aidl::android::media::audio::common::AudioDeviceDescription;
 
 using ::android::BAD_VALUE;
@@ -346,7 +347,6 @@ ConversionResult<int32_t> aidl2legacy_DynamicsProcessing_ResolutionPreference_in
         DynamicsProcessing::ResolutionPreference aidl) {
     return static_cast<int32_t>(aidl);
 }
-
 
 }  // namespace android
 }  // aidl
