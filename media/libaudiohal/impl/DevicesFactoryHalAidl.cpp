@@ -57,7 +57,7 @@ status_t DevicesFactoryHalAidl::openDevice(const char *name, sp<DeviceHalInterfa
     }
     // If the service is a nullptr, the device will not be really functional,
     // but will not crash either.
-    *device = sp<DeviceHalAidl>::make(service);
+    *device = sp<DeviceHalAidl>::make(name, service);
     return OK;
 }
 
