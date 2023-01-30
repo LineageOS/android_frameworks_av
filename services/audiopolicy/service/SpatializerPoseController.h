@@ -24,6 +24,7 @@
 
 #include <media/HeadTrackingProcessor.h>
 #include <media/SensorPoseProvider.h>
+#include <media/VectorRecorder.h>
 
 namespace android {
 
@@ -130,6 +131,16 @@ class SpatializerPoseController : private media::SensorPoseProvider::Listener {
     bool mShouldCalculate = true;
     bool mShouldExit = false;
     bool mCalculated = false;
+
+    media::VectorRecorder mHeadSensorRecorder{
+        8 /* vectorSize */, std::chrono::seconds(1), 10 /* maxLogLine */};
+    media::VectorRecorder mHeadSensorDurableRecorder{
+        8 /* vectorSize */, std::chrono::minutes(1), 10 /* maxLogLine */};
+
+    media::VectorRecorder mScreenSensorRecorder{
+        4 /* vectorSize */, std::chrono::seconds(1), 10 /* maxLogLine */};
+    media::VectorRecorder mScreenSensorDurableRecorder{
+        4 /* vectorSize */, std::chrono::minutes(1), 10 /* maxLogLine */};
 
     // It's important that mThread is the last variable in this class
     // since we starts mThread in initializer list
