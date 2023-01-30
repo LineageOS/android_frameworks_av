@@ -22,6 +22,7 @@
 
 #include "ModeSelector.h"
 #include "PoseBias.h"
+#include "PosePredictor.h"
 #include "ScreenHeadFusion.h"
 #include "StillnessDetector.h"
 
@@ -59,8 +60,8 @@ class HeadTrackingProcessorImpl : public HeadTrackingProcessor {
 
     void setWorldToHeadPose(int64_t timestamp, const Pose3f& worldToHead,
                             const Twist3f& headTwist) override {
-        Pose3f predictedWorldToHead =
-                worldToHead * integrate(headTwist, mOptions.predictionDuration);
+        const Pose3f predictedWorldToHead = mPosePredictor.predict(
+                timestamp, worldToHead, headTwist, mOptions.predictionDuration);
         mHeadPoseBias.setInput(predictedWorldToHead);
         mHeadStillnessDetector.setInput(timestamp, predictedWorldToHead);
         mWorldToHeadTimestamp = timestamp;
@@ -161,6 +162,10 @@ class HeadTrackingProcessorImpl : public HeadTrackingProcessor {
         }
     }
 
+    void setPosePredictorType(PosePredictorType type) override {
+        mPosePredictor.setPosePredictorType(type);
+    }
+
     std::string toString_l(unsigned level) const override {
         std::string prefixSpace(level, ' ');
         std::string ss = prefixSpace + "HeadTrackingProcessor:\n";
@@ -186,6 +191,7 @@ class HeadTrackingProcessorImpl : public HeadTrackingProcessor {
                       prefixSpace.c_str(), mOptions.screenStillnessRotationalThreshold);
         ss += mModeSelector.toString(level + 1);
         ss += mRateLimiter.toString(level + 1);
+        ss += mPosePredictor.toString(level + 1);
         ss.append(prefixSpace + "ReCenterHistory:\n");
         ss += mLocalLog.dumpToString((prefixSpace + " ").c_str(), mMaxLocalLogLine);
         return ss;
@@ -207,6 +213,7 @@ class HeadTrackingProcessorImpl : public HeadTrackingProcessor {
     ScreenHeadFusion mScreenHeadFusion;
     ModeSelector mModeSelector;
     PoseRateLimiter mRateLimiter;
+    PosePredictor mPosePredictor;
     static constexpr std::size_t mMaxLocalLogLine = 10;
     SimpleLog mLocalLog{mMaxLocalLogLine};
 };
@@ -229,6 +236,27 @@ std::string toString(HeadTrackingMode mode) {
     }
     return "EnumNotImplemented";
 };
+
+std::string toString(PosePredictorType posePredictorType) {
+    switch (posePredictorType) {
+        case PosePredictorType::AUTO: return "AUTO";
+        case PosePredictorType::LAST: return "LAST";
+        case PosePredictorType::TWIST: return "TWIST";
+        case PosePredictorType::LEAST_SQUARES: return "LEAST_SQUARES";
+    }
+    return "UNKNOWN" + std::to_string((int)posePredictorType);
+}
+
+bool isValidPosePredictorType(PosePredictorType posePredictorType) {
+    switch (posePredictorType) {
+        case PosePredictorType::AUTO:
+        case PosePredictorType::LAST:
+        case PosePredictorType::TWIST:
+        case PosePredictorType::LEAST_SQUARES:
+            return true;
+    }
+    return false;
+}
 
 }  // namespace media
 }  // namespace android

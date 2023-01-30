@@ -22,6 +22,7 @@
 
 #define LOG_TAG "SpatializerPoseController"
 //#define LOG_NDEBUG 0
+#include <cutils/properties.h>
 #include <sensor/Sensor.h>
 #include <media/MediaMetricsItem.h>
 #include <media/QuaternionUtil.h>
@@ -47,11 +48,17 @@ constexpr float kMaxTranslationalVelocity = 2;
 // This is how fast, in rad/s, we allow rotation angle to shift during rate-limiting.
 constexpr float kMaxRotationalVelocity = 0.8f;
 
-// This is how far into the future we predict the head pose, using linear extrapolation based on
-// twist (velocity). It should be set to a value that matches the characteristic durations of moving
-// one's head. The higher we set this, the more latency we are able to reduce, but setting this too
-// high will result in high prediction errors whenever the head accelerates (changes velocity).
-constexpr auto kPredictionDuration = 50ms;
+// This is how far into the future we predict the head pose.
+// The prediction duration should be based on the actual latency from
+// head-tracker to audio output, though setting the prediction duration too
+// high may result in higher prediction errors when the head accelerates or
+// decelerates (changes velocity).
+//
+// The head tracking predictor will do a best effort to achieve the requested
+// prediction duration.  If the duration is too far in the future based on
+// current sensor variance, the predictor may internally restrict duration to what
+// is achievable with reasonable confidence as the "best prediction".
+constexpr auto kPredictionDuration = 120ms;
 
 // After not getting a pose sample for this long, we would treat the measurement as stale.
 // The max connection interval is 50ms, and HT sensor event interval can differ depending on the
@@ -99,7 +106,15 @@ SpatializerPoseController::SpatializerPoseController(Listener* listener,
               .maxTranslationalVelocity = kMaxTranslationalVelocity / kTicksPerSecond,
               .maxRotationalVelocity = kMaxRotationalVelocity / kTicksPerSecond,
               .freshnessTimeout = Ticks(kFreshnessTimeout).count(),
-              .predictionDuration = Ticks(kPredictionDuration).count(),
+              .predictionDuration = []() -> float {
+                  const int duration_ms =
+                          property_get_int32("audio.spatializer.prediction_duration_ms", 0);
+                  if (duration_ms > 0) {
+                      return duration_ms * 1'000'000LL;
+                  } else {
+                      return Ticks(kPredictionDuration).count();
+                  }
+              }(),
               .autoRecenterWindowDuration = Ticks(kAutoRecenterWindowDuration).count(),
               .autoRecenterTranslationalThreshold = kAutoRecenterTranslationThreshold,
               .autoRecenterRotationalThreshold = kAutoRecenterRotationThreshold,
@@ -147,7 +162,14 @@ SpatializerPoseController::SpatializerPoseController(Listener* listener,
                   mShouldCalculate = false;
               }
           }
-      }) {}
+      }) {
+          const media::PosePredictorType posePredictorType =
+                  (media::PosePredictorType)
+                  property_get_int32("audio.spatializer.pose_predictor_type", -1);
+          if (isValidPosePredictorType(posePredictorType)) {
+              mProcessor->setPosePredictorType(posePredictorType);
+          }
+      }
 
 SpatializerPoseController::~SpatializerPoseController() {
     {
