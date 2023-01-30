@@ -15,6 +15,7 @@
  */
 
 #define LOG_TAG "DeviceHalAidl"
+// #define LOG_NDEBUG 0
 
 #include <algorithm>
 #include <forward_list>
@@ -24,6 +25,7 @@
 #include <media/AidlConversionCppNdk.h>
 #include <media/AidlConversionUtil.h>
 #include <mediautils/TimeCheck.h>
+#include <Utils.h>
 #include <utils/Log.h>
 
 #include "DeviceHalAidl.h"
@@ -32,11 +34,14 @@
 using aidl::android::aidl_utils::statusTFromBinderStatus;
 using aidl::android::media::audio::common::AudioConfig;
 using aidl::android::media::audio::common::AudioDevice;
+using aidl::android::media::audio::common::AudioDeviceType;
+using aidl::android::media::audio::common::AudioInputFlags;
 using aidl::android::media::audio::common::AudioIoFlags;
 using aidl::android::media::audio::common::AudioMode;
 using aidl::android::media::audio::common::AudioOutputFlags;
 using aidl::android::media::audio::common::AudioPort;
 using aidl::android::media::audio::common::AudioPortConfig;
+using aidl::android::media::audio::common::AudioPortDeviceExt;
 using aidl::android::media::audio::common::AudioPortExt;
 using aidl::android::media::audio::common::AudioSource;
 using aidl::android::media::audio::common::Int;
@@ -46,6 +51,9 @@ using aidl::android::hardware::audio::core::AudioPatch;
 using aidl::android::hardware::audio::core::IModule;
 using aidl::android::hardware::audio::core::ITelephony;
 using aidl::android::hardware::audio::core::StreamDescriptor;
+using android::hardware::audio::common::getFrameSizeInBytes;
+using android::hardware::audio::common::isBitPositionFlagSet;
+using android::hardware::audio::common::makeBitPositionFlagMask;
 
 namespace android {
 
@@ -86,6 +94,21 @@ status_t DeviceHalAidl::initCheck() {
             __func__, mInstance.c_str());
     std::transform(ports.begin(), ports.end(), std::inserter(mPorts, mPorts.end()),
             [](const auto& p) { return std::make_pair(p.id, p); });
+    mDefaultInputPortId = mDefaultOutputPortId = -1;
+    const int defaultDeviceFlag = 1 << AudioPortDeviceExt::FLAG_INDEX_DEFAULT_DEVICE;
+    for (const auto& pair : mPorts) {
+        const auto& p = pair.second;
+        if (p.ext.getTag() == AudioPortExt::Tag::device &&
+                (p.ext.get<AudioPortExt::Tag::device>().flags & defaultDeviceFlag) != 0) {
+            if (p.flags.getTag() == AudioIoFlags::Tag::input) {
+                mDefaultInputPortId = p.id;
+            } else if (p.flags.getTag() == AudioIoFlags::Tag::output) {
+                mDefaultOutputPortId = p.id;
+            }
+        }
+    }
+    ALOGI("%s: module %s default port ids: input %d, output %d",
+            __func__, mInstance.c_str(), mDefaultInputPortId, mDefaultOutputPortId);
     std::vector<AudioPortConfig> portConfigs;
     RETURN_STATUS_IF_ERROR(
             statusTFromBinderStatus(mModule->getAudioPortConfigs(&portConfigs)));  // OK if empty
@@ -180,14 +203,6 @@ status_t DeviceHalAidl::getParameters(const String8& keys __unused, String8 *val
     return OK;
 }
 
-status_t DeviceHalAidl::getInputBufferSize(
-        const struct audio_config* config __unused, size_t* size __unused) {
-    TIME_CHECK();
-    if (!mModule) return NO_INIT;
-    ALOGE("%s not implemented yet", __func__);
-    return OK;
-}
-
 namespace {
 
 class Cleanup {
@@ -221,10 +236,33 @@ class DeviceHalAidl::Cleanups : public std::forward_list<Cleanup> {
     void disarmAll() { for (auto& c : *this) c.disarm(); }
 };
 
+status_t DeviceHalAidl::getInputBufferSize(const struct audio_config* config, size_t* size) {
+    ALOGD("%p %s::%s", this, getClassName().c_str(), __func__);
+    if (size == nullptr) return BAD_VALUE;
+    TIME_CHECK();
+    if (!mModule) return NO_INIT;
+    AudioConfig aidlConfig = VALUE_OR_RETURN_STATUS(
+            ::aidl::android::legacy2aidl_audio_config_t_AudioConfig(*config, true /*isInput*/));
+    AudioDevice aidlDevice;
+    aidlDevice.type.type = AudioDeviceType::IN_DEFAULT;
+    AudioIoFlags aidlFlags = AudioIoFlags::make<AudioIoFlags::Tag::input>(0);
+    AudioPortConfig mixPortConfig;
+    Cleanups cleanups;
+    audio_config writableConfig = *config;
+    int32_t nominalLatency;
+    RETURN_STATUS_IF_ERROR(prepareToOpenStream(0 /*handle*/, aidlDevice, aidlFlags, &writableConfig,
+                    &cleanups, &aidlConfig, &mixPortConfig, &nominalLatency));
+    *size = aidlConfig.frameCount *
+            getFrameSizeInBytes(aidlConfig.base.format, aidlConfig.base.channelMask);
+    // Do not disarm cleanups to release temporary port configs.
+    return OK;
+}
+
 status_t DeviceHalAidl::prepareToOpenStream(
         int32_t aidlHandle, const AudioDevice& aidlDevice, const AudioIoFlags& aidlFlags,
         struct audio_config* config,
-        Cleanups* cleanups, AudioConfig* aidlConfig, AudioPortConfig* mixPortConfig) {
+        Cleanups* cleanups, AudioConfig* aidlConfig, AudioPortConfig* mixPortConfig,
+        int32_t* nominalLatency) {
     const bool isInput = aidlFlags.getTag() == AudioIoFlags::Tag::input;
     // Find / create AudioPortConfigs for the device port and the mix port,
     // then find / create a patch between them, and open a stream on the mix port.
@@ -251,6 +289,7 @@ status_t DeviceHalAidl::prepareToOpenStream(
     if (created) {
         cleanups->emplace_front(this, &DeviceHalAidl::resetPatch, patch.id);
     }
+    *nominalLatency = patch.latenciesMs[0];
     if (aidlConfig->frameCount <= 0) {
         aidlConfig->frameCount = patch.minimumStreamBufferSizeFrames;
     }
@@ -264,6 +303,7 @@ status_t DeviceHalAidl::openOutputStream(
         audio_output_flags_t flags, struct audio_config* config,
         const char* address,
         sp<StreamOutHalInterface>* outStream) {
+    ALOGD("%p %s::%s", this, getClassName().c_str(), __func__);
     if (!outStream || !config) {
         return BAD_VALUE;
     }
@@ -280,15 +320,23 @@ status_t DeviceHalAidl::openOutputStream(
     AudioIoFlags aidlFlags = AudioIoFlags::make<AudioIoFlags::Tag::output>(aidlOutputFlags);
     AudioPortConfig mixPortConfig;
     Cleanups cleanups;
+    int32_t nominalLatency;
     RETURN_STATUS_IF_ERROR(prepareToOpenStream(aidlHandle, aidlDevice, aidlFlags, config,
-                    &cleanups, &aidlConfig, &mixPortConfig));
+                    &cleanups, &aidlConfig, &mixPortConfig, &nominalLatency));
     ::aidl::android::hardware::audio::core::IModule::OpenOutputStreamArguments args;
     args.portConfigId = mixPortConfig.id;
     args.offloadInfo = aidlConfig.offloadInfo;
     args.bufferSizeFrames = aidlConfig.frameCount;
     ::aidl::android::hardware::audio::core::IModule::OpenOutputStreamReturn ret;
     RETURN_STATUS_IF_ERROR(statusTFromBinderStatus(mModule->openOutputStream(args, &ret)));
-    *outStream = sp<StreamOutHalAidl>::make(*config, std::move(ret.desc), std::move(ret.stream));
+    StreamContextAidl context(ret.desc);
+    if (!context.isValid()) {
+        ALOGE("%s: Failed to created a valid stream context from the descriptor: %s",
+                __func__, ret.desc.toString().c_str());
+        return NO_INIT;
+    }
+    *outStream = sp<StreamOutHalAidl>::make(*config, std::move(context), nominalLatency,
+            std::move(ret.stream));
     cleanups.disarmAll();
     return OK;
 }
@@ -299,6 +347,7 @@ status_t DeviceHalAidl::openInputStream(
         const char* address, audio_source_t source,
         audio_devices_t outputDevice, const char* outputDeviceAddress,
         sp<StreamInHalInterface>* inStream) {
+    ALOGD("%p %s::%s", this, getClassName().c_str(), __func__);
     if (!inStream || !config) {
         return BAD_VALUE;
     }
@@ -317,8 +366,9 @@ status_t DeviceHalAidl::openInputStream(
             ::aidl::android::legacy2aidl_audio_source_t_AudioSource(source));
     AudioPortConfig mixPortConfig;
     Cleanups cleanups;
+    int32_t nominalLatency;
     RETURN_STATUS_IF_ERROR(prepareToOpenStream(aidlHandle, aidlDevice, aidlFlags, config,
-                    &cleanups, &aidlConfig, &mixPortConfig));
+                    &cleanups, &aidlConfig, &mixPortConfig, &nominalLatency));
     ::aidl::android::hardware::audio::core::IModule::OpenInputStreamArguments args;
     args.portConfigId = mixPortConfig.id;
     RecordTrackMetadata aidlTrackMetadata{
@@ -332,7 +382,14 @@ status_t DeviceHalAidl::openInputStream(
     args.bufferSizeFrames = aidlConfig.frameCount;
     ::aidl::android::hardware::audio::core::IModule::OpenInputStreamReturn ret;
     RETURN_STATUS_IF_ERROR(statusTFromBinderStatus(mModule->openInputStream(args, &ret)));
-    *inStream = sp<StreamInHalAidl>::make(*config, std::move(ret.desc), std::move(ret.stream));
+    StreamContextAidl context(ret.desc);
+    if (!context.isValid()) {
+        ALOGE("%s: Failed to created a valid stream context from the descriptor: %s",
+                __func__, ret.desc.toString().c_str());
+        return NO_INIT;
+    }
+    *inStream = sp<StreamInHalAidl>::make(*config, std::move(context), nominalLatency,
+            std::move(ret.stream));
     cleanups.disarmAll();
     return OK;
 }
@@ -347,6 +404,7 @@ status_t DeviceHalAidl::createAudioPatch(unsigned int num_sources,
                                          unsigned int num_sinks,
                                          const struct audio_port_config* sinks,
                                          audio_patch_handle_t* patch) {
+    ALOGD("%p %s::%s", this, getClassName().c_str(), __func__);
     TIME_CHECK();
     if (!mModule) return NO_INIT;
     if (num_sinks > AUDIO_PATCH_PORTS_MAX || num_sources > AUDIO_PATCH_PORTS_MAX ||
@@ -389,6 +447,9 @@ status_t DeviceHalAidl::createAudioPatch(unsigned int num_sources,
             aidlPatch.sinkPortConfigIds.clear();
         }
     }
+    ALOGD("%s: sources: %s, sinks: %s",
+            __func__, ::android::internal::ToString(aidlSources).c_str(),
+            ::android::internal::ToString(aidlSinks).c_str());
     auto fillPortConfigs = [&](
             const std::vector<AudioPortConfig>& configs, std::vector<int32_t>* ids) -> status_t {
         for (const auto& s : configs) {
@@ -432,6 +493,7 @@ status_t DeviceHalAidl::createAudioPatch(unsigned int num_sources,
 }
 
 status_t DeviceHalAidl::releaseAudioPatch(audio_patch_handle_t patch) {
+    ALOGD("%p %s::%s", this, getClassName().c_str(), __func__);
     TIME_CHECK();
     if (!mModule) return NO_INIT;
     auto idMapIt = mFwkHandles.find(patch);
@@ -529,6 +591,21 @@ int32_t DeviceHalAidl::supportsBluetoothVariableLatency(bool* supports __unused)
     return INVALID_OPERATION;
 }
 
+bool DeviceHalAidl::audioDeviceMatches(const AudioDevice& device, const AudioPort& p) {
+    if (p.ext.getTag() != AudioPortExt::Tag::device) return false;
+    return p.ext.get<AudioPortExt::Tag::device>().device == device;
+}
+
+bool DeviceHalAidl::audioDeviceMatches(const AudioDevice& device, const AudioPortConfig& p) {
+    if (p.ext.getTag() != AudioPortExt::Tag::device) return false;
+    if (device.type.type == AudioDeviceType::IN_DEFAULT) {
+        return p.portId == mDefaultInputPortId;
+    } else if (device.type.type == AudioDeviceType::OUT_DEFAULT) {
+        return p.portId == mDefaultOutputPortId;
+    }
+    return p.ext.get<AudioPortExt::Tag::device>().device == device;
+}
+
 status_t DeviceHalAidl::createPortConfig(const AudioPortConfig& requestedPortConfig,
         AudioPortConfig* appliedPortConfig) {
     TIME_CHECK();
@@ -604,14 +681,14 @@ status_t DeviceHalAidl::findOrCreatePortConfig(const AudioDevice& device,
 }
 
 status_t DeviceHalAidl::findOrCreatePortConfig(
-        const AudioConfig& config, const AudioIoFlags& flags, int32_t ioHandle,
+        const AudioConfig& config, const std::optional<AudioIoFlags>& flags, int32_t ioHandle,
         AudioPortConfig* portConfig, bool* created) {
     auto portConfigIt = findPortConfig(config, flags, ioHandle);
-    if (portConfigIt == mPortConfigs.end()) {
-        auto portsIt = findPort(config, flags);
+    if (portConfigIt == mPortConfigs.end() && flags.has_value()) {
+        auto portsIt = findPort(config, flags.value());
         if (portsIt == mPorts.end()) {
             ALOGE("%s: mix port for config %s, flags %s is not found in the module %s",
-                    __func__, config.toString().c_str(), flags.toString().c_str(),
+                    __func__, config.toString().c_str(), flags.value().toString().c_str(),
                     mInstance.c_str());
             return BAD_VALUE;
         }
@@ -624,6 +701,11 @@ status_t DeviceHalAidl::findOrCreatePortConfig(
         portConfigIt = mPortConfigs.insert(
                 mPortConfigs.end(), std::make_pair(appliedPortConfig.id, appliedPortConfig));
         *created = true;
+    } else if (!flags.has_value()) {
+        ALOGW("%s: mix port config for %s, handle %d not found in the module %s, "
+                "and was not created as flags are not specified",
+                __func__, config.toString().c_str(), ioHandle, mInstance.c_str());
+        return BAD_VALUE;
     } else {
         *created = false;
     }
@@ -637,14 +719,14 @@ status_t DeviceHalAidl::findOrCreatePortConfig(
     if (requestedPortConfig.ext.getTag() == Tag::mix) {
         if (const auto& p = requestedPortConfig;
                 !p.sampleRate.has_value() || !p.channelMask.has_value() ||
-                !p.format.has_value() || !p.flags.has_value()) {
+                !p.format.has_value()) {
             ALOGW("%s: provided mix port config is not fully specified: %s",
                     __func__, p.toString().c_str());
             return BAD_VALUE;
         }
         AudioConfig config;
         setConfigFromPortConfig(&config, requestedPortConfig);
-        return findOrCreatePortConfig(config, requestedPortConfig.flags.value(),
+        return findOrCreatePortConfig(config, requestedPortConfig.flags,
                 requestedPortConfig.ext.get<Tag::mix>().handle, portConfig, created);
     } else if (requestedPortConfig.ext.getTag() == Tag::device) {
         return findOrCreatePortConfig(
@@ -668,47 +750,49 @@ DeviceHalAidl::Patches::iterator DeviceHalAidl::findPatch(
 }
 
 DeviceHalAidl::Ports::iterator DeviceHalAidl::findPort(const AudioDevice& device) {
-    using Tag = AudioPortExt::Tag;
+    if (device.type.type == AudioDeviceType::IN_DEFAULT) {
+        return mPorts.find(mDefaultInputPortId);
+    } else if (device.type.type == AudioDeviceType::OUT_DEFAULT) {
+        return mPorts.find(mDefaultOutputPortId);
+    }
     return std::find_if(mPorts.begin(), mPorts.end(),
-            [&](const auto& pair) {
-                const auto& p = pair.second;
-                return p.ext.getTag() == Tag::device &&
-                        p.ext.template get<Tag::device>().device == device; });
+            [&](const auto& pair) { return audioDeviceMatches(device, pair.second); });
 }
 
 DeviceHalAidl::Ports::iterator DeviceHalAidl::findPort(
             const AudioConfig& config, const AudioIoFlags& flags) {
     using Tag = AudioPortExt::Tag;
-    return std::find_if(mPorts.begin(), mPorts.end(),
-            [&](const auto& pair) {
-                const auto& p = pair.second;
-                return p.ext.getTag() == Tag::mix &&
-                        p.flags == flags &&
-                        std::find_if(p.profiles.begin(), p.profiles.end(),
-                                [&](const auto& prof) {
-                                    return prof.format == config.base.format &&
-                                            std::find(prof.channelMasks.begin(),
-                                                    prof.channelMasks.end(),
-                                                    config.base.channelMask) !=
-                                            prof.channelMasks.end() &&
-                                            std::find(prof.sampleRates.begin(),
-                                                    prof.sampleRates.end(),
-                                                    config.base.sampleRate) !=
-                                            prof.sampleRates.end();
-                                }) != p.profiles.end(); });
+    AudioIoFlags matchFlags = flags;
+    auto matcher = [&](const auto& pair) {
+        const auto& p = pair.second;
+        return p.ext.getTag() == Tag::mix &&
+                p.flags == matchFlags &&
+                std::find_if(p.profiles.begin(), p.profiles.end(),
+                        [&](const auto& prof) {
+                            return prof.format == config.base.format &&
+                                    std::find(prof.channelMasks.begin(), prof.channelMasks.end(),
+                                            config.base.channelMask) != prof.channelMasks.end() &&
+                                    std::find(prof.sampleRates.begin(), prof.sampleRates.end(),
+                                            config.base.sampleRate) != prof.sampleRates.end();
+                        }) != p.profiles.end(); };
+    auto it = std::find_if(mPorts.begin(), mPorts.end(), matcher);
+    if (it == mPorts.end() && flags.getTag() == AudioIoFlags::Tag::input &&
+            isBitPositionFlagSet(flags.get<AudioIoFlags::Tag::input>(), AudioInputFlags::FAST)) {
+        // "Fast" input is not a mandatory flag, try without it.
+        matchFlags.set<AudioIoFlags::Tag::input>(flags.get<AudioIoFlags::Tag::input>() &
+                ~makeBitPositionFlagMask(AudioInputFlags::FAST));
+        it = std::find_if(mPorts.begin(), mPorts.end(), matcher);
+    }
+    return it;
 }
 
 DeviceHalAidl::PortConfigs::iterator DeviceHalAidl::findPortConfig(const AudioDevice& device) {
-    using Tag = AudioPortExt::Tag;
     return std::find_if(mPortConfigs.begin(), mPortConfigs.end(),
-            [&](const auto& pair) {
-                const auto& p = pair.second;
-                return p.ext.getTag() == Tag::device &&
-                        p.ext.template get<Tag::device>().device == device; });
+            [&](const auto& pair) { return audioDeviceMatches(device, pair.second); });
 }
 
 DeviceHalAidl::PortConfigs::iterator DeviceHalAidl::findPortConfig(
-            const AudioConfig& config, const AudioIoFlags& flags, int32_t ioHandle) {
+            const AudioConfig& config, const std::optional<AudioIoFlags>& flags, int32_t ioHandle) {
     using Tag = AudioPortExt::Tag;
     return std::find_if(mPortConfigs.begin(), mPortConfigs.end(),
             [&](const auto& pair) {
@@ -720,7 +804,7 @@ DeviceHalAidl::PortConfigs::iterator DeviceHalAidl::findPortConfig(
                         __func__, p.toString().c_str());
                 return p.ext.getTag() == Tag::mix &&
                         isConfigEqualToPortConfig(config, p) &&
-                        p.flags.value() == flags &&
+                        (!flags.has_value() || p.flags.value() == flags.value()) &&
                         p.ext.template get<Tag::mix>().handle == ioHandle; });
 }
 /*

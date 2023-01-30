@@ -17,7 +17,11 @@
 #define LOG_TAG "StreamHalAidl"
 //#define LOG_NDEBUG 0
 
+#include <algorithm>
+#include <cstdint>
+
 #include <aidl/android/hardware/audio/core/BnStreamCallback.h>
+#include <audio_utils/clock.h>
 #include <mediautils/TimeCheck.h>
 #include <utils/Log.h>
 
@@ -30,6 +34,16 @@ using ::aidl::android::hardware::audio::core::IStreamOut;
 using ::aidl::android::hardware::audio::core::StreamDescriptor;
 
 namespace android {
+
+using HalCommand = StreamDescriptor::Command;
+namespace {
+template<HalCommand::Tag cmd> HalCommand makeHalCommand() {
+    return HalCommand::make<cmd>(::aidl::android::media::audio::common::Void{});
+}
+template<HalCommand::Tag cmd, typename T> HalCommand makeHalCommand(T data) {
+    return HalCommand::make<cmd>(data);
+}
+}  // namespace
 
 // static
 template<class T>
@@ -47,16 +61,17 @@ std::shared_ptr<IStreamCommon> StreamHalAidl::getStreamCommon(const std::shared_
 
 StreamHalAidl::StreamHalAidl(
         std::string_view className, bool isInput, const audio_config& config,
-        const StreamDescriptor& descriptor, const std::shared_ptr<IStreamCommon>& stream)
+        int32_t nominalLatency, StreamContextAidl&& context,
+        const std::shared_ptr<IStreamCommon>& stream)
         : ConversionHelperAidl(className),
           mIsInput(isInput),
           mConfig(configToBase(config)),
-          mFrameSizeBytes(descriptor.frameSizeBytes),
-          mBufferSizeFrames(descriptor.bufferSizeFrames),
-          mCommandMQ(new CommandMQ(descriptor.command)),
-          mReplyMQ(new ReplyMQ(descriptor.reply)),
-          mDataMQ(maybeCreateDataMQ(descriptor)),
+          mContext(std::move(context)),
           mStream(stream) {
+    {
+        std::lock_guard l(mLock);
+        mLastReply.latencyMs = nominalLatency;
+    }
     // Instrument audio signal power logging.
     // Note: This assumes channel mask, format, and sample rate do not change after creation.
     if (audio_config_base_t config = AUDIO_CONFIG_BASE_INITIALIZER;
@@ -74,17 +89,20 @@ StreamHalAidl::~StreamHalAidl() {
 }
 
 status_t StreamHalAidl::getBufferSize(size_t *size) {
+    ALOGD("%p %s::%s", this, getClassName().c_str(), __func__);
     if (size == nullptr) {
         return BAD_VALUE;
     }
-    if (mFrameSizeBytes == 0 || mBufferSizeFrames == 0 || !mStream) {
+    if (mContext.getFrameSizeBytes() == 0 || mContext.getBufferSizeFrames() == 0 ||
+            !mStream) {
         return NO_INIT;
     }
-    *size = mFrameSizeBytes * mBufferSizeFrames;
+    *size = mContext.getBufferSizeBytes();
     return OK;
 }
 
 status_t StreamHalAidl::getAudioProperties(audio_config_base_t *configBase) {
+    ALOGD("%p %s::%s", this, getClassName().c_str(), __func__);
     if (configBase == nullptr) {
         return BAD_VALUE;
     }
@@ -94,6 +112,7 @@ status_t StreamHalAidl::getAudioProperties(audio_config_base_t *configBase) {
 }
 
 status_t StreamHalAidl::setParameters(const String8& kvPairs __unused) {
+    ALOGD("%p %s::%s", this, getClassName().c_str(), __func__);
     TIME_CHECK();
     if (!mStream) return NO_INIT;
     ALOGE("%s not implemented yet", __func__);
@@ -101,6 +120,7 @@ status_t StreamHalAidl::setParameters(const String8& kvPairs __unused) {
 }
 
 status_t StreamHalAidl::getParameters(const String8& keys __unused, String8 *values) {
+    ALOGD("%p %s::%s", this, getClassName().c_str(), __func__);
     TIME_CHECK();
     values->clear();
     if (!mStream) return NO_INIT;
@@ -109,17 +129,19 @@ status_t StreamHalAidl::getParameters(const String8& keys __unused, String8 *val
 }
 
 status_t StreamHalAidl::getFrameSize(size_t *size) {
+    ALOGD("%p %s::%s", this, getClassName().c_str(), __func__);
     if (size == nullptr) {
         return BAD_VALUE;
     }
-    if (mFrameSizeBytes == 0 || !mStream) {
+    if (mContext.getFrameSizeBytes() == 0 || !mStream) {
         return NO_INIT;
     }
-    *size = mFrameSizeBytes;
+    *size = mContext.getFrameSizeBytes();
     return OK;
 }
 
 status_t StreamHalAidl::addEffect(sp<EffectHalInterface> effect __unused) {
+    ALOGD("%p %s::%s", this, getClassName().c_str(), __func__);
     TIME_CHECK();
     if (!mStream) return NO_INIT;
     ALOGE("%s not implemented yet", __func__);
@@ -127,6 +149,7 @@ status_t StreamHalAidl::addEffect(sp<EffectHalInterface> effect __unused) {
 }
 
 status_t StreamHalAidl::removeEffect(sp<EffectHalInterface> effect __unused) {
+    ALOGD("%p %s::%s", this, getClassName().c_str(), __func__);
     TIME_CHECK();
     if (!mStream) return NO_INIT;
     ALOGE("%s not implemented yet", __func__);
@@ -134,22 +157,52 @@ status_t StreamHalAidl::removeEffect(sp<EffectHalInterface> effect __unused) {
 }
 
 status_t StreamHalAidl::standby() {
+    ALOGD("%p %s::%s", this, getClassName().c_str(), __func__);
     TIME_CHECK();
     if (!mStream) return NO_INIT;
-    if (mState == StreamDescriptor::State::STANDBY) {
-        return OK;
+    const auto state = getState();
+    StreamDescriptor::Reply reply;
+    switch (state) {
+        case StreamDescriptor::State::ACTIVE:
+            if (status_t status = pause(&reply); status != OK) return status;
+            if (reply.state != StreamDescriptor::State::PAUSED) {
+                ALOGE("%s: unexpected stream state: %s (expected PAUSED)",
+                        __func__, toString(reply.state).c_str());
+                return INVALID_OPERATION;
+            }
+            FALLTHROUGH_INTENDED;
+        case StreamDescriptor::State::PAUSED:
+        case StreamDescriptor::State::DRAIN_PAUSED:
+            return flush();
+        case StreamDescriptor::State::IDLE:
+            if (status_t status = sendCommand(makeHalCommand<HalCommand::Tag::standby>(),
+                            &reply); status != OK) {
+                return status;
+            }
+            if (reply.state != StreamDescriptor::State::STANDBY) {
+                ALOGE("%s: unexpected stream state: %s (expected STANDBY)",
+                        __func__, toString(reply.state).c_str());
+                return INVALID_OPERATION;
+            }
+            FALLTHROUGH_INTENDED;
+        case StreamDescriptor::State::STANDBY:
+            return OK;
+        default:
+            ALOGE("%s: not supported from %s stream state %s",
+                    __func__, mIsInput ? "input" : "output", toString(state).c_str());
+            return INVALID_OPERATION;
     }
-    ALOGE("%s not implemented yet", __func__);
-    return OK;
 }
 
 status_t StreamHalAidl::dump(int fd, const Vector<String16>& args) {
+    ALOGD("%p %s::%s", this, getClassName().c_str(), __func__);
     TIME_CHECK();
     if (!mStream) return NO_INIT;
     return mStream->dump(fd, Args(args).args(), args.size());
 }
 
 status_t StreamHalAidl::start() {
+    ALOGD("%p %s::%s", this, getClassName().c_str(), __func__);
     TIME_CHECK();
     if (!mStream) return NO_INIT;
     ALOGE("%s not implemented yet", __func__);
@@ -157,6 +210,136 @@ status_t StreamHalAidl::start() {
 }
 
 status_t StreamHalAidl::stop() {
+    ALOGD("%p %s::%s", this, getClassName().c_str(), __func__);
+    TIME_CHECK();
+    if (!mStream) return NO_INIT;
+    ALOGE("%s not implemented yet", __func__);
+    return OK;
+}
+
+status_t StreamHalAidl::getLatency(uint32_t *latency) {
+    ALOGV("%p %s::%s", this, getClassName().c_str(), __func__);
+    if (!mStream) return NO_INIT;
+    StreamDescriptor::Reply reply;
+    if (status_t status = updateCountersIfNeeded(&reply); status != OK) {
+        return status;
+    }
+    *latency = std::max<int32_t>(0, reply.latencyMs);
+    return OK;
+}
+
+status_t StreamHalAidl::getObservablePosition(int64_t *frames, int64_t *timestamp) {
+    ALOGV("%p %s::%s", this, getClassName().c_str(), __func__);
+    if (!mStream) return NO_INIT;
+    StreamDescriptor::Reply reply;
+    if (status_t status = updateCountersIfNeeded(&reply); status != OK) {
+        return status;
+    }
+    *frames = reply.observable.frames;
+    *timestamp = reply.observable.timeNs;
+    return OK;
+}
+
+status_t StreamHalAidl::getXruns(int32_t *frames) {
+    ALOGV("%p %s::%s", this, getClassName().c_str(), __func__);
+    if (!mStream) return NO_INIT;
+    StreamDescriptor::Reply reply;
+    if (status_t status = updateCountersIfNeeded(&reply); status != OK) {
+        return status;
+    }
+    *frames = reply.xrunFrames;
+    return OK;
+}
+
+status_t StreamHalAidl::transfer(void *buffer, size_t bytes, size_t *transferred) {
+    ALOGV("%p %s::%s", this, getClassName().c_str(), __func__);
+    // TIME_CHECK();  // TODO(b/238654698) reenable only when optimized.
+    if (!mStream || mContext.getDataMQ() == nullptr) return NO_INIT;
+    mWorkerTid.store(gettid(), std::memory_order_release);
+    // Switch the stream into an active state if needed.
+    // Note: in future we may add support for priming the audio pipeline
+    // with data prior to enabling output (thus we can issue a "burst" command in the "standby"
+    // stream state), however this scenario wasn't supported by the HIDL HAL.
+    if (getState() == StreamDescriptor::State::STANDBY) {
+        StreamDescriptor::Reply reply;
+        if (status_t status = sendCommand(makeHalCommand<HalCommand::Tag::start>(), &reply);
+                status != OK) {
+            return status;
+        }
+        if (reply.state != StreamDescriptor::State::IDLE) {
+            ALOGE("%s: failed to get the stream out of standby, actual state: %s",
+                    __func__, toString(reply.state).c_str());
+            return INVALID_OPERATION;
+        }
+    }
+    if (!mIsInput) {
+        bytes = std::min(bytes, mContext.getDataMQ()->availableToWrite());
+    }
+    StreamDescriptor::Command burst =
+            StreamDescriptor::Command::make<StreamDescriptor::Command::Tag::burst>(bytes);
+    if (!mIsInput) {
+        if (!mContext.getDataMQ()->write(static_cast<const int8_t*>(buffer), bytes)) {
+            ALOGE("%s: failed to write %zu bytes to data MQ", __func__, bytes);
+            return NOT_ENOUGH_DATA;
+        }
+    }
+    StreamDescriptor::Reply reply;
+    if (status_t status = sendCommand(burst, &reply); status != OK) {
+        return status;
+    }
+    if (mIsInput) {
+        *transferred = reply.fmqByteCount;
+        LOG_ALWAYS_FATAL_IF(*transferred > bytes,
+                "%s: HAL module read %zu bytes, which exceeds requested count %zu",
+                __func__, *transferred, bytes);
+        if (!mContext.getDataMQ()->read(static_cast<int8_t*>(buffer), *transferred)) {
+            ALOGE("%s: failed to read %zu bytes to data MQ", __func__, *transferred);
+            return NOT_ENOUGH_DATA;
+        }
+    }
+    mStreamPowerLog.log(buffer, *transferred);
+    return OK;
+}
+
+status_t StreamHalAidl::pause(StreamDescriptor::Reply* reply) {
+    ALOGD("%p %s::%s", this, getClassName().c_str(), __func__);
+    TIME_CHECK();
+    if (!mStream) return NO_INIT;
+    return sendCommand(makeHalCommand<HalCommand::Tag::pause>(), reply,
+            true /*safeFromNonWorkerThread*/);  // The workers stops its I/O activity first.
+}
+
+status_t StreamHalAidl::resume(StreamDescriptor::Reply* reply) {
+    ALOGD("%p %s::%s", this, getClassName().c_str(), __func__);
+    TIME_CHECK();
+    if (!mStream) return NO_INIT;
+    if (mIsInput) {
+        return sendCommand(makeHalCommand<HalCommand::Tag::burst>(0), reply);
+    } else {
+        return sendCommand(makeHalCommand<HalCommand::Tag::start>(), reply);
+    }
+}
+
+status_t StreamHalAidl::drain(bool earlyNotify, StreamDescriptor::Reply* reply) {
+    ALOGD("%p %s::%s", this, getClassName().c_str(), __func__);
+    TIME_CHECK();
+    if (!mStream) return NO_INIT;
+    return sendCommand(makeHalCommand<HalCommand::Tag::drain>(
+                    mIsInput ? StreamDescriptor::DrainMode::DRAIN_UNSPECIFIED :
+                    earlyNotify ? StreamDescriptor::DrainMode::DRAIN_EARLY_NOTIFY :
+                    StreamDescriptor::DrainMode::DRAIN_ALL), reply);
+}
+
+status_t StreamHalAidl::flush(StreamDescriptor::Reply* reply) {
+    ALOGD("%p %s::%s", this, getClassName().c_str(), __func__);
+    TIME_CHECK();
+    if (!mStream) return NO_INIT;
+    return sendCommand(makeHalCommand<HalCommand::Tag::flush>(), reply,
+            true /*safeFromNonWorkerThread*/);  // The workers stops its I/O activity first.
+}
+
+status_t StreamHalAidl::exit() {
+    ALOGD("%p %s::%s", this, getClassName().c_str(), __func__);
     TIME_CHECK();
     if (!mStream) return NO_INIT;
     ALOGE("%s not implemented yet", __func__);
@@ -165,6 +348,7 @@ status_t StreamHalAidl::stop() {
 
 status_t StreamHalAidl::createMmapBuffer(int32_t minSizeFrames __unused,
                                   struct audio_mmap_buffer_info *info __unused) {
+    ALOGD("%p %s::%s", this, getClassName().c_str(), __func__);
     TIME_CHECK();
     if (!mStream) return NO_INIT;
     ALOGE("%s not implemented yet", __func__);
@@ -172,6 +356,7 @@ status_t StreamHalAidl::createMmapBuffer(int32_t minSizeFrames __unused,
 }
 
 status_t StreamHalAidl::getMmapPosition(struct audio_mmap_position *position __unused) {
+    ALOGD("%p %s::%s", this, getClassName().c_str(), __func__);
     TIME_CHECK();
     if (!mStream) return NO_INIT;
     ALOGE("%s not implemented yet", __func__);
@@ -184,6 +369,7 @@ status_t StreamHalAidl::setHalThreadPriority(int priority __unused) {
 }
 
 status_t StreamHalAidl::getHalPid(pid_t *pid __unused) {
+    ALOGD("%p %s::%s", this, getClassName().c_str(), __func__);
     TIME_CHECK();
     if (!mStream) return NO_INIT;
     ALOGE("%s not implemented yet", __func__);
@@ -205,6 +391,61 @@ status_t StreamHalAidl::legacyCreateAudioPatch(const struct audio_port_config& p
 status_t StreamHalAidl::legacyReleaseAudioPatch() {
     // Obsolete since 'DeviceHalAidl.supportsAudioPatches' always returns 'true'.
     return INVALID_OPERATION;
+}
+
+status_t StreamHalAidl::sendCommand(
+        const ::aidl::android::hardware::audio::core::StreamDescriptor::Command &command,
+        ::aidl::android::hardware::audio::core::StreamDescriptor::Reply* reply,
+        bool safeFromNonWorkerThread) {
+    // TIME_CHECK();  // TODO(b/238654698) reenable only when optimized.
+    if (!safeFromNonWorkerThread) {
+        const pid_t workerTid = mWorkerTid.load(std::memory_order_acquire);
+        LOG_ALWAYS_FATAL_IF(workerTid != gettid(),
+                "%s %s: must be invoked from the worker thread (%d)",
+                __func__, command.toString().c_str(), workerTid);
+    }
+    if (!mContext.getCommandMQ()->writeBlocking(&command, 1)) {
+        ALOGE("%s: failed to write command %s to MQ", __func__, command.toString().c_str());
+        return NOT_ENOUGH_DATA;
+    }
+    StreamDescriptor::Reply localReply{};
+    if (reply == nullptr) {
+        reply = &localReply;
+    }
+    if (!mContext.getReplyMQ()->readBlocking(reply, 1)) {
+        ALOGE("%s: failed to read from reply MQ, command %s", __func__, command.toString().c_str());
+        return NOT_ENOUGH_DATA;
+    }
+    {
+        std::lock_guard l(mLock);
+        mLastReply = *reply;
+    }
+    switch (reply->status) {
+        case STATUS_OK: return OK;
+        case STATUS_BAD_VALUE: return BAD_VALUE;
+        case STATUS_INVALID_OPERATION: return INVALID_OPERATION;
+        case STATUS_NOT_ENOUGH_DATA: return NOT_ENOUGH_DATA;
+        default:
+            ALOGE("%s: unexpected status %d returned for command %s",
+                    __func__, reply->status, command.toString().c_str());
+            return INVALID_OPERATION;
+    }
+}
+
+status_t StreamHalAidl::updateCountersIfNeeded(
+        ::aidl::android::hardware::audio::core::StreamDescriptor::Reply* reply) {
+    if (mWorkerTid.load(std::memory_order_acquire) == gettid()) {
+        if (const auto state = getState(); state != StreamDescriptor::State::ACTIVE &&
+                state != StreamDescriptor::State::DRAINING &&
+                state != StreamDescriptor::State::TRANSFERRING) {
+            return sendCommand(makeHalCommand<HalCommand::Tag::getStatus>(), reply);
+        }
+    }
+    if (reply != nullptr) {
+        std::lock_guard l(mLock);
+        *reply = mLastReply;
+    }
+    return OK;
 }
 
 namespace {
@@ -239,18 +480,14 @@ class StreamCallback : public ::aidl::android::hardware::audio::core::BnStreamCa
 }  // namespace
 
 StreamOutHalAidl::StreamOutHalAidl(
-        const audio_config& config,
-        const StreamDescriptor& descriptor, const std::shared_ptr<IStreamOut>& stream)
-        : StreamHalAidl("StreamOutHalAidl", false /*isInput*/, config,
-                descriptor, getStreamCommon(stream)),
+        const audio_config& config, StreamContextAidl&& context, int32_t nominalLatency,
+        const std::shared_ptr<IStreamOut>& stream)
+        : StreamHalAidl("StreamOutHalAidl", false /*isInput*/, config, nominalLatency,
+                std::move(context), getStreamCommon(stream)),
           mStream(stream) {}
 
 status_t StreamOutHalAidl::getLatency(uint32_t *latency) {
-    TIME_CHECK();
-    *latency = 0;
-    if (!mStream) return NO_INIT;
-    ALOGE("%s not implemented yet", __func__);
-    return OK;
+    return StreamHalAidl::getLatency(latency);
 }
 
 status_t StreamOutHalAidl::setVolume(float left __unused, float right __unused) {
@@ -267,27 +504,29 @@ status_t StreamOutHalAidl::selectPresentation(int presentationId __unused, int p
     return OK;
 }
 
-status_t StreamOutHalAidl::write(
-        const void *buffer __unused, size_t bytes __unused, size_t *written __unused) {
-    // TIME_CHECK();  // TODO(b/238654698) reenable only when optimized.
-    if (!mStream) return NO_INIT;
-    *written = 0;
-    ALOGE("%s not implemented yet", __func__);
-    return OK;
+status_t StreamOutHalAidl::write(const void *buffer, size_t bytes, size_t *written) {
+    if (buffer == nullptr || written == nullptr) {
+        return BAD_VALUE;
+    }
+    // For the output scenario, 'transfer' does not modify the buffer.
+    return transfer(const_cast<void*>(buffer), bytes, written);
 }
 
-status_t StreamOutHalAidl::getRenderPosition(uint32_t *dspFrames __unused) {
-    // TIME_CHECK();  // TODO(b/238654698) reenable only when optimized.
-    if (!mStream) return NO_INIT;
-    ALOGE("%s not implemented yet", __func__);
+status_t StreamOutHalAidl::getRenderPosition(uint32_t *dspFrames) {
+    if (dspFrames == nullptr) {
+        return BAD_VALUE;
+    }
+    int64_t aidlFrames = 0, aidlTimestamp = 0;
+    if (status_t status = getObservablePosition(&aidlFrames, &aidlTimestamp); status != OK) {
+        return OK;
+    }
+    *dspFrames = std::clamp<int64_t>(aidlFrames, 0, UINT32_MAX);
     return OK;
 }
 
 status_t StreamOutHalAidl::getNextWriteTimestamp(int64_t *timestamp __unused) {
-    TIME_CHECK();
-    if (!mStream) return NO_INIT;
-    ALOGE("%s not implemented yet", __func__);
-    return OK;
+    // Obsolete, use getPresentationPosition.
+    return INVALID_OPERATION;
 }
 
 status_t StreamOutHalAidl::setCallback(wp<StreamOutHalInterfaceCallback> callback __unused) {
@@ -297,54 +536,53 @@ status_t StreamOutHalAidl::setCallback(wp<StreamOutHalInterfaceCallback> callbac
     return OK;
 }
 
-status_t StreamOutHalAidl::supportsPauseAndResume(
-        bool *supportsPause __unused, bool *supportsResume __unused) {
+status_t StreamOutHalAidl::supportsPauseAndResume(bool *supportsPause, bool *supportsResume) {
+    if (supportsPause == nullptr || supportsResume == nullptr) {
+        return BAD_VALUE;
+    }
     TIME_CHECK();
     if (!mStream) return NO_INIT;
-    ALOGE("%s not implemented yet", __func__);
+    *supportsPause = *supportsResume = true;
     return OK;
 }
 
 status_t StreamOutHalAidl::pause() {
-    TIME_CHECK();
-    if (!mStream) return NO_INIT;
-    ALOGE("%s not implemented yet", __func__);
-    return OK;
+    return StreamHalAidl::pause();
 }
 
 status_t StreamOutHalAidl::resume() {
+    return StreamHalAidl::resume();
+}
+
+status_t StreamOutHalAidl::supportsDrain(bool *supportsDrain) {
+    if (supportsDrain == nullptr) {
+        return BAD_VALUE;
+    }
     TIME_CHECK();
     if (!mStream) return NO_INIT;
-    ALOGE("%s not implemented yet", __func__);
+    *supportsDrain = true;
     return OK;
 }
 
-status_t StreamOutHalAidl::supportsDrain(bool *supportsDrain __unused) {
-    TIME_CHECK();
-    if (!mStream) return NO_INIT;
-    ALOGE("%s not implemented yet", __func__);
-    return OK;
-}
-
-status_t StreamOutHalAidl::drain(bool earlyNotify __unused) {
-    TIME_CHECK();
-    if (!mStream) return NO_INIT;
-    ALOGE("%s not implemented yet", __func__);
-    return OK;
+status_t StreamOutHalAidl::drain(bool earlyNotify) {
+    return StreamHalAidl::drain(earlyNotify);
 }
 
 status_t StreamOutHalAidl::flush() {
-    TIME_CHECK();
-    if (!mStream) return NO_INIT;
-    ALOGE("%s not implemented yet", __func__);
-    return OK;
+    return StreamHalAidl::flush();
 }
 
-status_t StreamOutHalAidl::getPresentationPosition(
-        uint64_t *frames __unused, struct timespec *timestamp __unused) {
-    // TIME_CHECK();  // TODO(b/238654698) reenable only when optimized.
-    if (!mStream) return NO_INIT;
-    ALOGE("%s not implemented yet", __func__);
+status_t StreamOutHalAidl::getPresentationPosition(uint64_t *frames, struct timespec *timestamp) {
+    if (frames == nullptr || timestamp == nullptr) {
+        return BAD_VALUE;
+    }
+    int64_t aidlFrames = 0, aidlTimestamp = 0;
+    if (status_t status = getObservablePosition(&aidlFrames, &aidlTimestamp); status != OK) {
+        return status;
+    }
+    *frames = std::max<int64_t>(0, aidlFrames);
+    timestamp->tv_sec = aidlTimestamp / NANOS_PER_SECOND;
+    timestamp->tv_nsec = aidlTimestamp - timestamp->tv_sec * NANOS_PER_SECOND;
     return OK;
 }
 
@@ -477,18 +715,14 @@ void StreamOutHalAidl::onRecommendedLatencyModeChanged(
 }
 
 status_t StreamOutHalAidl::exit() {
-    // FIXME this is using hard-coded strings but in the future, this functionality will be
-    //       converted to use audio HAL extensions required to support tunneling
-    if (!mStream) return NO_INIT;
-    ALOGE("%s not implemented yet", __func__);
-    return OK;
+    return StreamHalAidl::exit();
 }
 
 StreamInHalAidl::StreamInHalAidl(
-        const audio_config& config,
-        const StreamDescriptor& descriptor, const std::shared_ptr<IStreamIn>& stream)
-        : StreamHalAidl("StreamInHalAidl", true /*isInput*/, config,
-                descriptor, getStreamCommon(stream)),
+        const audio_config& config, StreamContextAidl&& context, int32_t nominalLatency,
+        const std::shared_ptr<IStreamIn>& stream)
+        : StreamHalAidl("StreamInHalAidl", true /*isInput*/, config, nominalLatency,
+                std::move(context), getStreamCommon(stream)),
           mStream(stream) {}
 
 status_t StreamInHalAidl::setGain(float gain __unused) {
@@ -498,27 +732,30 @@ status_t StreamInHalAidl::setGain(float gain __unused) {
     return OK;
 }
 
-status_t StreamInHalAidl::read(
-        void *buffer __unused, size_t bytes __unused, size_t *read __unused) {
-    // TIME_CHECK();  // TODO(b/238654698) reenable only when optimized.
-    if (!mStream) return NO_INIT;
-    ALOGE("%s not implemented yet", __func__);
-    // FIXME: Don't forget to update mPowerLog
+status_t StreamInHalAidl::read(void *buffer, size_t bytes, size_t *read) {
+    if (buffer == nullptr || read == nullptr) {
+        return BAD_VALUE;
+    }
+    return transfer(buffer, bytes, read);
+}
+
+status_t StreamInHalAidl::getInputFramesLost(uint32_t *framesLost) {
+    if (framesLost == nullptr) {
+        return BAD_VALUE;
+    }
+    int32_t aidlXruns = 0;
+    if (status_t status = getXruns(&aidlXruns); status != OK) {
+        return status;
+    }
+    *framesLost = std::max<int32_t>(0, aidlXruns);
     return OK;
 }
 
-status_t StreamInHalAidl::getInputFramesLost(uint32_t *framesLost __unused) {
-    TIME_CHECK();
-    if (!mStream) return NO_INIT;
-    ALOGE("%s not implemented yet", __func__);
-    return OK;
-}
-
-status_t StreamInHalAidl::getCapturePosition(int64_t *frames __unused, int64_t *time __unused) {
-    // TIME_CHECK();  // TODO(b/238654698) reenable only when optimized.
-    if (!mStream) return NO_INIT;
-    ALOGE("%s not implemented yet", __func__);
-    return OK;
+status_t StreamInHalAidl::getCapturePosition(int64_t *frames, int64_t *time) {
+    if (frames == nullptr || time == nullptr) {
+        return BAD_VALUE;
+    }
+    return getObservablePosition(frames, time);
 }
 
 status_t StreamInHalAidl::getActiveMicrophones(
