@@ -28,6 +28,7 @@
 #include <media/MediaMetrics.h>
 #include <media/MediaProfiles.h>
 #include <media/stagefright/foundation/AHandler.h>
+#include <media/stagefright/CodecErrorLog.h>
 #include <media/stagefright/FrameRenderTracker.h>
 #include <utils/Vector.h>
 
@@ -297,6 +298,8 @@ struct MediaCodec : public AHandler {
         T value;
     };
 
+    inline CodecErrorLog &getErrorLog() { return mErrorLog; }
+
 protected:
     virtual ~MediaCodec();
     virtual void onMessageReceived(const sp<AMessage> &msg);
@@ -321,6 +324,7 @@ private:
         RELEASING,
     };
     std::string stateString(State state);
+    std::string apiStateString();
 
     enum {
         kPortIndexInput         = 0,
@@ -681,6 +685,8 @@ private:
     std::function<sp<CodecBase>(const AString &, const char *)> mGetCodecBase;
     std::function<status_t(const AString &, sp<MediaCodecInfo> *)> mGetCodecInfo;
     friend class MediaTestHelper;
+
+    CodecErrorLog mErrorLog;
 
     DISALLOW_EVIL_CONSTRUCTORS(MediaCodec);
 };
