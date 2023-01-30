@@ -16,6 +16,10 @@
 
 #pragma once
 
+#include <map>
+#include <set>
+#include <vector>
+
 #include <aidl/android/hardware/audio/core/BpModule.h>
 #include <media/audiohal/DeviceHalInterface.h>
 #include <media/audiohal/EffectHalInterface.h>
@@ -119,15 +123,75 @@ class DeviceHalAidl : public DeviceHalInterface, public ConversionHelperAidl {
 
   private:
     friend class sp<DeviceHalAidl>;
+    using Patches = std::map<int32_t /*patch ID*/,
+            ::aidl::android::hardware::audio::core::AudioPatch>;
+    using PortConfigs = std::map<int32_t /*port config ID*/,
+            ::aidl::android::media::audio::common::AudioPortConfig>;
+    using Ports = std::map<int32_t /*port ID*/, ::aidl::android::media::audio::common::AudioPort>;
+    class Cleanups;
 
-    const std::shared_ptr<::aidl::android::hardware::audio::core::IModule> mModule;
-
-    // Can not be constructed directly by clients.
-    explicit DeviceHalAidl(
+    // Must not be constructed directly by clients.
+    DeviceHalAidl(
+            const std::string& instance,
             const std::shared_ptr<::aidl::android::hardware::audio::core::IModule>& module)
-            : ConversionHelperAidl("DeviceHalAidl"), mModule(module) {}
+            : ConversionHelperAidl("DeviceHalAidl"), mInstance(instance), mModule(module) {}
 
     ~DeviceHalAidl() override = default;
+
+    status_t createPortConfig(
+            const ::aidl::android::media::audio::common::AudioPortConfig& requestedPortConfig,
+            ::aidl::android::media::audio::common::AudioPortConfig* appliedPortConfig);
+    status_t findOrCreatePatch(
+        const std::set<int32_t>& sourcePortConfigIds,
+        const std::set<int32_t>& sinkPortConfigIds,
+        ::aidl::android::hardware::audio::core::AudioPatch* patch, bool* created);
+    status_t findOrCreatePatch(
+        const ::aidl::android::hardware::audio::core::AudioPatch& requestedPatch,
+        ::aidl::android::hardware::audio::core::AudioPatch* patch, bool* created);
+    status_t findOrCreatePortConfig(
+            const ::aidl::android::media::audio::common::AudioDevice& device,
+            ::aidl::android::media::audio::common::AudioPortConfig* portConfig,
+            bool* created);
+    status_t findOrCreatePortConfig(
+            const ::aidl::android::media::audio::common::AudioConfig& config,
+            const ::aidl::android::media::audio::common::AudioIoFlags& flags,
+            int32_t ioHandle,
+            ::aidl::android::media::audio::common::AudioPortConfig* portConfig, bool* created);
+    status_t findOrCreatePortConfig(
+        const ::aidl::android::media::audio::common::AudioPortConfig& requestedPortConfig,
+        ::aidl::android::media::audio::common::AudioPortConfig* portConfig, bool* created);
+    Patches::iterator findPatch(const std::set<int32_t>& sourcePortConfigIds,
+            const std::set<int32_t>& sinkPortConfigIds);
+    Ports::iterator findPort(const ::aidl::android::media::audio::common::AudioDevice& device);
+    Ports::iterator findPort(
+            const ::aidl::android::media::audio::common::AudioConfig& config,
+            const ::aidl::android::media::audio::common::AudioIoFlags& flags);
+    PortConfigs::iterator findPortConfig(
+            const ::aidl::android::media::audio::common::AudioDevice& device);
+    PortConfigs::iterator findPortConfig(
+            const ::aidl::android::media::audio::common::AudioConfig& config,
+            const ::aidl::android::media::audio::common::AudioIoFlags& flags,
+            int32_t ioHandle);
+    // Currently unused but may be useful for implementing setAudioPortConfig
+    // PortConfigs::iterator findPortConfig(
+    //         const ::aidl::android::media::audio::common::AudioPortConfig& portConfig);
+    status_t prepareToOpenStream(
+        int32_t aidlHandle,
+        const ::aidl::android::media::audio::common::AudioDevice& aidlDevice,
+        const ::aidl::android::media::audio::common::AudioIoFlags& aidlFlags,
+        struct audio_config* config,
+        Cleanups* cleanups,
+        ::aidl::android::media::audio::common::AudioConfig* aidlConfig,
+        ::aidl::android::media::audio::common::AudioPortConfig* mixPortConfig);
+    void resetPatch(int32_t patchId);
+    void resetPortConfig(int32_t portConfigId);
+
+    const std::string mInstance;
+    const std::shared_ptr<::aidl::android::hardware::audio::core::IModule> mModule;
+    Ports mPorts;
+    PortConfigs mPortConfigs;
+    Patches mPatches;
+    std::map<audio_patch_handle_t, int32_t /* patch ID */> mFwkHandles;
 };
 
 } // namespace android
