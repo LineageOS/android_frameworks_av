@@ -104,6 +104,7 @@ struct C2SoftAomEnc : public SimpleC2Component {
     std::shared_ptr<C2StreamBitrateInfo::output> mBitrate;
     std::shared_ptr<C2StreamBitrateModeTuning::output> mBitrateMode;
     std::shared_ptr<C2StreamRequestSyncFrameTuning::output> mRequestSync;
+    std::shared_ptr<C2StreamColorAspectsInfo::output> mColorAspects;
 
     aom_codec_err_t setupCodecParameters();
 };

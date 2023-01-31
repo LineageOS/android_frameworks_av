@@ -22,6 +22,7 @@
 #include <media/stagefright/foundation/MediaDefs.h>
 
 #include <C2Debug.h>
+#include <Codec2Mapper.h>
 #include <C2PlatformSupport.h>
 #include <SimpleC2Interface.h>
 
@@ -390,6 +391,36 @@ aom_codec_err_t C2SoftAomEnc::setupCodecParameters() {
     codec_return = aom_codec_control(mCodecContext, AV1E_SET_MAX_REFERENCE_FRAMES, 3);
     if (codec_return != AOM_CODEC_OK) goto BailOut;
 
+    ColorAspects sfAspects;
+    if (!C2Mapper::map(mColorAspects->primaries, &sfAspects.mPrimaries)) {
+        sfAspects.mPrimaries = android::ColorAspects::PrimariesUnspecified;
+    }
+    if (!C2Mapper::map(mColorAspects->range, &sfAspects.mRange)) {
+        sfAspects.mRange = android::ColorAspects::RangeUnspecified;
+    }
+    if (!C2Mapper::map(mColorAspects->matrix, &sfAspects.mMatrixCoeffs)) {
+        sfAspects.mMatrixCoeffs = android::ColorAspects::MatrixUnspecified;
+    }
+    if (!C2Mapper::map(mColorAspects->transfer, &sfAspects.mTransfer)) {
+        sfAspects.mTransfer = android::ColorAspects::TransferUnspecified;
+    }
+    int32_t primaries, transfer, matrixCoeffs;
+    bool range;
+    ColorUtils::convertCodecColorAspectsToIsoAspects(sfAspects,
+            &primaries,
+            &transfer,
+            &matrixCoeffs,
+            &range);
+
+    codec_return = aom_codec_control(mCodecContext, AV1E_SET_COLOR_RANGE, range);
+    if (codec_return != AOM_CODEC_OK) goto BailOut;
+    codec_return = aom_codec_control(mCodecContext, AV1E_SET_COLOR_PRIMARIES, primaries);
+    if (codec_return != AOM_CODEC_OK) goto BailOut;
+    codec_return = aom_codec_control(mCodecContext, AV1E_SET_TRANSFER_CHARACTERISTICS, transfer);
+    if (codec_return != AOM_CODEC_OK) goto BailOut;
+    codec_return = aom_codec_control(mCodecContext, AV1E_SET_MATRIX_COEFFICIENTS, matrixCoeffs);
+    if (codec_return != AOM_CODEC_OK) goto BailOut;
+
 BailOut:
     return codec_return;
 }
@@ -406,6 +437,7 @@ status_t C2SoftAomEnc::initEncoder() {
         mFrameRate = mIntf->getFrameRate_l();
         mIntraRefresh = mIntf->getIntraRefresh_l();
         mRequestSync = mIntf->getRequestSync_l();
+        mColorAspects = mIntf->getCodedColorAspects_l();
     }
 
 
