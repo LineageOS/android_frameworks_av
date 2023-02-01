@@ -171,6 +171,11 @@ static bool doesClientHaveSystemUid() {
     return (CameraThreadState::getCallingUid() < AID_APP_START);
 }
 
+// Enable processes with isolated AID to request the binder
+void CameraService::instantiate() {
+    CameraService::publish(true);
+}
+
 void CameraService::onServiceRegistration(const String16& name, const sp<IBinder>&) {
     if (name != String16(kAppopsServiceName)) {
         return;
