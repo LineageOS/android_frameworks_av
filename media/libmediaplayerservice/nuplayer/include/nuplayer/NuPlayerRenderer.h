@@ -304,6 +304,9 @@ private:
     int64_t getDurationUsIfPlayedAtSampleRate(uint32_t numFrames);
 
     DISALLOW_EVIL_CONSTRUCTORS(Renderer);
+
+private:
+    bool mNeedVideoClearAnchor;
 };
 
 } // namespace android
