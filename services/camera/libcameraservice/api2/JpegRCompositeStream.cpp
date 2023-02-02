@@ -247,12 +247,6 @@ status_t JpegRCompositeStream::processInputFrame(nsecs_t ts, const InputFrame &i
         jpegQuality = entry.data.u8[0];
     }
 
-    uint8_t jpegOrientation = 0;
-    entry = inputFrame.result.find(ANDROID_JPEG_ORIENTATION);
-    if (entry.count > 0) {
-        jpegOrientation = entry.data.i32[0];
-    }
-
     if ((res = native_window_set_buffers_dimensions(mOutputSurface.get(), maxJpegRBufferSize, 1))
             != OK) {
         ALOGE("%s: Unable to configure stream buffer dimensions"
