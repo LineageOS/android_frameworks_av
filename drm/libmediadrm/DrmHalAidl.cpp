@@ -393,7 +393,8 @@ DrmHalAidl::DrmSessionClient::~DrmSessionClient() {
 
 // DrmHalAidl methods
 DrmHalAidl::DrmHalAidl()
-    : mListener(::ndk::SharedRefBase::make<DrmHalListener>(&mMetrics)),
+    : mMetrics(std::make_shared<MediaDrmMetrics>()),
+      mListener(::ndk::SharedRefBase::make<DrmHalListener>(mMetrics)),
       mFactories(DrmUtils::makeDrmFactoriesAidl()),
       mInitCheck((mFactories.size() == 0) ? ERROR_UNSUPPORTED : NO_INIT) {}
 
@@ -462,8 +463,8 @@ DrmStatus DrmHalAidl::createPlugin(const uint8_t uuid[16], const String8& appPac
     Uuid uuidAidl = DrmUtils::toAidlUuid(uuid);
     std::string appPackageNameAidl = toStdString(appPackageName);
     std::shared_ptr<IDrmPluginAidl> pluginAidl;
-    mMetrics.SetAppPackageName(appPackageName);
-    mMetrics.SetAppUid(AIBinder_getCallingUid());
+    mMetrics->SetAppPackageName(appPackageName);
+    mMetrics->SetAppUid(AIBinder_getCallingUid());
     for (ssize_t i = mFactories.size() - 1; i >= 0; i--) {
         ::ndk::ScopedAStatus status =
                 mFactories[i]->createDrmPlugin(uuidAidl, appPackageNameAidl, &pluginAidl);
@@ -539,10 +540,10 @@ DrmStatus DrmHalAidl::openSession(DrmPlugin::SecurityLevel level, Vector<uint8_t
                 AIBinder_getCallingPid(), std::static_pointer_cast<IResourceManagerClient>(client),
                 sessionId);
         mOpenSessions.push_back(client);
-        mMetrics.SetSessionStart(sessionId);
+        mMetrics->SetSessionStart(sessionId);
     }
 
-    mMetrics.mOpenSessionCounter.Increment(err);
+    mMetrics->mOpenSessionCounter.Increment(err);
     return err;
 }
 
@@ -562,10 +563,10 @@ DrmStatus DrmHalAidl::closeSession(Vector<uint8_t> const& sessionId) {
             }
         }
 
-        mMetrics.SetSessionEnd(sessionId);
+        mMetrics->SetSessionEnd(sessionId);
     }
 
-    mMetrics.mCloseSessionCounter.Increment(response);
+    mMetrics->mCloseSessionCounter.Increment(response);
     return response;
 }
 
@@ -577,7 +578,7 @@ DrmStatus DrmHalAidl::getKeyRequest(Vector<uint8_t> const& sessionId,
                                     DrmPlugin::KeyRequestType* keyRequestType) {
     Mutex::Autolock autoLock(mLock);
     INIT_CHECK();
-    EventTimer<status_t> keyRequestTimer(&mMetrics.mGetKeyRequestTimeUs);
+    EventTimer<status_t> keyRequestTimer(&mMetrics->mGetKeyRequestTimeUs);
 
     DrmSessionManager::Instance()->useSession(sessionId);
 
@@ -618,7 +619,7 @@ DrmStatus DrmHalAidl::provideKeyResponse(Vector<uint8_t> const& sessionId,
                                          Vector<uint8_t>& keySetId) {
     Mutex::Autolock autoLock(mLock);
     INIT_CHECK();
-    EventTimer<status_t> keyResponseTimer(&mMetrics.mProvideKeyResponseTimeUs);
+    EventTimer<status_t> keyResponseTimer(&mMetrics->mProvideKeyResponseTimeUs);
 
     DrmSessionManager::Instance()->useSession(sessionId);
 
@@ -687,7 +688,7 @@ DrmStatus DrmHalAidl::getProvisionRequest(String8 const& certType, String8 const
     defaultUrl = toString8(requestAidl.defaultUrl);
 
     err = statusAidlToDrmStatus(status);
-    mMetrics.mGetProvisionRequestCounter.Increment(err);
+    mMetrics->mGetProvisionRequestCounter.Increment(err);
     return err;
 }
 
@@ -704,7 +705,7 @@ DrmStatus DrmHalAidl::provideProvisionResponse(Vector<uint8_t> const& response,
     certificate = toVector(result.certificate);
     wrappedKey = toVector(result.wrappedKey);
     err = statusAidlToDrmStatus(status);
-    mMetrics.mProvideProvisionResponseCounter.Increment(err);
+    mMetrics->mProvideProvisionResponseCounter.Increment(err);
     return err;
 }
 
@@ -914,7 +915,7 @@ DrmStatus DrmHalAidl::getPropertyByteArrayInternal(String8 const& name,
     value = toVector(result);
     err = statusAidlToDrmStatus(status);
     if (name == kPropertyDeviceUniqueId) {
-        mMetrics.mGetDeviceUniqueIdCounter.Increment(err);
+        mMetrics->mGetDeviceUniqueIdCounter.Increment(err);
     }
     return err;
 }
@@ -940,7 +941,7 @@ DrmStatus DrmHalAidl::getMetrics(const sp<IDrmMetricsConsumer>& consumer) {
     if (consumer == nullptr) {
         return DrmStatus(UNEXPECTED_NULL);
     }
-    consumer->consumeFrameworkMetrics(mMetrics);
+    consumer->consumeFrameworkMetrics(*mMetrics.get());
 
     // Append vendor metrics if they are supported.
 
@@ -1146,7 +1147,7 @@ std::string DrmHalAidl::reportPluginMetrics() const {
         getPropertyByteArrayInternal(String8("metrics"), metricsVector) == OK) {
         metricsString = toBase64StringNoPad(metricsVector.array(), metricsVector.size());
         status_t res = android::reportDrmPluginMetrics(metricsString, vendor, description,
-                                                       mMetrics.GetAppUid());
+                                                       mMetrics->GetAppUid());
         if (res != OK) {
             ALOGE("Metrics were retrieved but could not be reported: %d", res);
         }
@@ -1156,7 +1157,7 @@ std::string DrmHalAidl::reportPluginMetrics() const {
 
 std::string DrmHalAidl::reportFrameworkMetrics(const std::string& pluginMetrics) const {
     mediametrics_handle_t item(mediametrics_create("mediadrm"));
-    mediametrics_setUid(item, mMetrics.GetAppUid());
+    mediametrics_setUid(item, mMetrics->GetAppUid());
     String8 vendor;
     String8 description;
     status_t result = getPropertyStringInternal(String8("vendor"), vendor);
@@ -1173,7 +1174,7 @@ std::string DrmHalAidl::reportFrameworkMetrics(const std::string& pluginMetrics)
     }
 
     std::string serializedMetrics;
-    result = mMetrics.GetSerializedMetrics(&serializedMetrics);
+    result = mMetrics->GetSerializedMetrics(&serializedMetrics);
     if (result != OK) {
         ALOGE("Failed to serialize framework metrics: %d", result);
     }
