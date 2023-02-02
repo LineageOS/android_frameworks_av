@@ -29,7 +29,7 @@ cc_test {
     ],
 
     defaults: [
-        "latest_android_media_audio_common_types_cpp_shared",
+        "latest_android_media_audio_common_types_ndk_shared",
     ],
 
     cflags: [
@@ -37,11 +37,14 @@ cc_test {
         "-Wextra",
         "-Werror",
         "-Wthread-safety",
+        "-DBACKEND_NDK",
     ],
 
     shared_libs: [
         "audioclient-types-aidl-cpp",
+        "libaudio_aidl_conversion_common_ndk",
         "libaudiohal",
+        "liblog",
         "libutils",
     ],
 
