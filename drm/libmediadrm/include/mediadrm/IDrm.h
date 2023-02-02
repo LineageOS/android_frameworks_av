@@ -24,6 +24,8 @@
 
 #define ANDROID_IDRM_H_
 
+#define IDRM_UUID_SIZE (16)
+
 namespace android {
 namespace hardware {
 namespace drm {
