@@ -70,6 +70,7 @@ cc_library_shared {
     shared_libs: [
         "libcutils",
     ],
+    relative_install_path: "soundfx",
     visibility: [
         "//hardware/interfaces/audio/aidl/default",
     ],
