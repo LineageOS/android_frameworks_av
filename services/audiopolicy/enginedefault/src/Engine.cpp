@@ -291,7 +291,9 @@ DeviceVector Engine::getDevicesForStrategyInt(legacy_strategy strategy,
 
         if ((strategy == STRATEGY_SONIFICATION) ||
                 (getForceUse(AUDIO_POLICY_FORCE_FOR_SYSTEM) == AUDIO_POLICY_FORCE_SYSTEM_ENFORCED)) {
-            devices = availableOutputDevices.getDevicesFromType(AUDIO_DEVICE_OUT_SPEAKER);
+            // favor dock over speaker when available
+            devices = availableOutputDevices.getFirstDevicesFromTypes({
+                    AUDIO_DEVICE_OUT_DGTL_DOCK_HEADSET, AUDIO_DEVICE_OUT_SPEAKER});
         }
 
         // if SCO headset is connected and we are told to use it, play ringtone over
