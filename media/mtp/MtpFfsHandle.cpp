@@ -362,12 +362,10 @@ int MtpFfsHandle::waitEvents(struct io_buffer *buf, int min_events, struct io_ev
 
 void MtpFfsHandle::cancelTransaction() {
     // Device cancels by stalling both bulk endpoints.
-    void *buf = malloc(sizeof(char));
-    if (::read(mBulkIn, buf, 0) != -1 || errno != EBADMSG)
+    if (::read(mBulkIn, nullptr, 0) != -1 || errno != EBADMSG)
         PLOG(ERROR) << "Mtp stall failed on bulk in";
-    if (::write(mBulkOut, buf, 0) != -1 || errno != EBADMSG)
+    if (::write(mBulkOut, nullptr, 0) != -1 || errno != EBADMSG)
         PLOG(ERROR) << "Mtp stall failed on bulk out";
-    free(buf);
     mCanceled = true;
     errno = ECANCELED;
 }
