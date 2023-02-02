@@ -50,6 +50,10 @@ struct OutputBufferQueue {
                    int maxDequeueBufferCount,
                    std::shared_ptr<V1_2::SurfaceSyncObj> *syncObj);
 
+    // If there are waiters to allocate from the old surface, wake up and expire
+    // them.
+    void expireOldWaiters();
+
     // Stop using the current output surface. Pending buffer opeations will not
     // perform anymore.
     void stop();
@@ -86,6 +90,8 @@ private:
     std::weak_ptr<_C2BlockPoolData> mPoolDatas[BufferQueueDefs::NUM_BUFFER_SLOTS];
     std::shared_ptr<C2SurfaceSyncMemory> mSyncMem;
     bool mStopped;
+    std::mutex mOldMutex;
+    std::shared_ptr<C2SurfaceSyncMemory> mOldMem;
 
     bool registerBuffer(const C2ConstGraphicBlock& block);
 };
