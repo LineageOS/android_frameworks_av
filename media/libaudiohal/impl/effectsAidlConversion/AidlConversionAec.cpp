@@ -103,6 +103,7 @@ status_t AidlConversionAec::getParameter(EffectParamWriter& param) {
             break;
         }
         default:
+            // use vendor extension implementation
             ALOGW("%s unknown param %s", __func__, param.toString().c_str());
             return BAD_VALUE;
     }

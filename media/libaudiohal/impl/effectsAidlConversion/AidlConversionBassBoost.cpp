@@ -70,8 +70,8 @@ status_t AidlConversionBassBoost::setParameter(EffectParamReader& param) {
 }
 
 status_t AidlConversionBassBoost::getParameter(EffectParamWriter& param) {
-    uint32_t type = 0, value = 0;
-    if (!param.validateParamValueSize(sizeof(uint32_t), sizeof(uint32_t)) ||
+    uint32_t type = 0;
+    if (!param.validateParamValueSize(sizeof(uint32_t), sizeof(uint16_t)) ||
         OK != param.readFromParameter(&type)) {
         ALOGE("%s invalid param %s", __func__, param.toString().c_str());
         param.setStatus(BAD_VALUE);
@@ -80,26 +80,26 @@ status_t AidlConversionBassBoost::getParameter(EffectParamWriter& param) {
     Parameter aidlParam;
     switch (type) {
         case BASSBOOST_PARAM_STRENGTH: {
+            uint32_t value;
             Parameter::Id id =
                     MAKE_SPECIFIC_PARAMETER_ID(BassBoost, bassBoostTag, BassBoost::strengthPm);
             RETURN_STATUS_IF_ERROR(statusTFromBinderStatus(mEffect->getParameter(id, &aidlParam)));
             value = VALUE_OR_RETURN_STATUS(
                     aidl::android::aidl2legacy_Parameter_BassBoost_uint16_strengthPm(aidlParam));
-            break;
+            return param.writeToValue(&value);
         }
         case BASSBOOST_PARAM_STRENGTH_SUPPORTED: {
+            uint16_t value;
             const auto& cap =
                     VALUE_OR_RETURN_STATUS(aidl::android::UNION_GET(mDesc.capability, bassBoost));
             value = VALUE_OR_RETURN_STATUS(convertIntegral<uint32_t>(cap.strengthSupported));
-            break;
+            return param.writeToValue(&value);
         }
         default: {
             ALOGW("%s unknown param %s", __func__, param.toString().c_str());
             return BAD_VALUE;
         }
     }
-
-    return param.writeToValue(&value);
 }
 
 } // namespace effect
