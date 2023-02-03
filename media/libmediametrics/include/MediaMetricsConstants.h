@@ -122,6 +122,7 @@
 #define AMEDIAMETRICS_PROP_BURSTFRAMES    "burstFrames"    // int32
 #define AMEDIAMETRICS_PROP_CALLERNAME     "callerName"     // string, eg. "aaudio"
 #define AMEDIAMETRICS_PROP_CHANNELCOUNT   "channelCount"   // int32
+#define AMEDIAMETRICS_PROP_CHANNELCOUNTHARDWARE "channelCountHardware" // int32
 #define AMEDIAMETRICS_PROP_CHANNELMASK    "channelMask"    // int32
 #define AMEDIAMETRICS_PROP_CHANNELMASKS   "channelMasks"   // string with channelMask values
                                                            // separated by |.
@@ -147,6 +148,7 @@
 #define AMEDIAMETRICS_PROP_DURATIONNS     "durationNs"     // int64 duration time span
 #define AMEDIAMETRICS_PROP_ENABLED        "enabled"        // string true/false.
 #define AMEDIAMETRICS_PROP_ENCODING       "encoding"       // string value of format
+#define AMEDIAMETRICS_PROP_ENCODINGHARDWARE "encodingHardware" // string value of hardware format
 
 #define AMEDIAMETRICS_PROP_EVENT          "event#"         // string value (often func name)
 #define AMEDIAMETRICS_PROP_EXECUTIONTIMENS "executionTimeNs"  // time to execute the event
@@ -182,6 +184,7 @@
 #define AMEDIAMETRICS_PROP_PLAYERIID      "playerIId"      // int32 (-1 invalid/unset IID)
 #define AMEDIAMETRICS_PROP_ROUTEDDEVICEID "routedDeviceId" // int32
 #define AMEDIAMETRICS_PROP_SAMPLERATE     "sampleRate"     // int32
+#define AMEDIAMETRICS_PROP_SAMPLERATEHARDWARE "sampleRateHardware" // int32
 #define AMEDIAMETRICS_PROP_SELECTEDDEVICEID "selectedDeviceId" // int32
 #define AMEDIAMETRICS_PROP_SELECTEDMICDIRECTION "selectedMicDirection" // int32
 #define AMEDIAMETRICS_PROP_SELECTEDMICFIELDDIRECTION "selectedMicFieldDimension" // double
