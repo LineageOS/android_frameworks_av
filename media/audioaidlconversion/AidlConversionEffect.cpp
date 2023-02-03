@@ -153,7 +153,7 @@ ConversionResult<uint32_t> aidl2legacy_Flags_uint32(Flags aidl) {
     if (aidl.audioSourceIndication) {
         legacy |= EFFECT_FLAG_AUDIO_SOURCE_IND;
     }
-    if (aidl.noProcessing) {
+    if (aidl.bypass) {
         legacy |= EFFECT_FLAG_NO_PROCESS;
     }
     return legacy;
@@ -170,7 +170,7 @@ ConversionResult<Flags> legacy2aidl_uint32_Flags(uint32_t legacy) {
     aidl.deviceIndication = (legacy & EFFECT_FLAG_DEVICE_IND);
     aidl.audioModeIndication = (legacy & EFFECT_FLAG_AUDIO_MODE_IND);
     aidl.audioSourceIndication = (legacy & EFFECT_FLAG_AUDIO_SOURCE_IND);
-    aidl.noProcessing = (legacy & EFFECT_FLAG_NO_PROCESS);
+    aidl.bypass = (legacy & EFFECT_FLAG_NO_PROCESS);
     return aidl;
 }
 
