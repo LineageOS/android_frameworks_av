@@ -238,6 +238,9 @@ static constexpr const char * const AAudioStreamFields[] {
     "sample_rate",
     "content_type",
     "sharing_requested",
+    "format_hardware",
+    "channel_count_hardware",
+    "sample_rate_hardware",
 };
 
 static constexpr const char * HeadTrackerDeviceEnabledFields[] {
@@ -1360,6 +1363,19 @@ void AudioAnalytics::AAudioStreamInfo::endAAudioStream(
     const auto sharingModeRequested =
             types::lookup<types::AAUDIO_SHARING_MODE, int32_t>(sharingModeRequestedStr);
 
+    std::string formatHardwareStr;
+    mAudioAnalytics.mAnalyticsState->timeMachine().get(
+            key, AMEDIAMETRICS_PROP_ENCODINGHARDWARE, &formatHardwareStr);
+    const auto formatHardware = types::lookup<types::ENCODING, int32_t>(formatHardwareStr);
+
+    int32_t channelCountHardware = -1;
+    mAudioAnalytics.mAnalyticsState->timeMachine().get(
+            key, AMEDIAMETRICS_PROP_CHANNELCOUNTHARDWARE, &channelCountHardware);
+
+    int32_t sampleRateHardware = 0;
+    mAudioAnalytics.mAnalyticsState->timeMachine().get(
+            key, AMEDIAMETRICS_PROP_SAMPLERATEHARDWARE, &sampleRateHardware);
+
     LOG(LOG_LEVEL) << "key:" << key
             << " path:" << path
             << " direction:" << direction << "(" << directionStr << ")"
@@ -1379,7 +1395,10 @@ void AudioAnalytics::AAudioStreamInfo::endAAudioStream(
             << " sample_rate: " << sampleRate
             << " content_type: " << contentType << "(" << contentTypeStr << ")"
             << " sharing_requested:" << sharingModeRequested
-                    << "(" << sharingModeRequestedStr << ")";
+                    << "(" << sharingModeRequestedStr << ")"
+            << " format_hardware:" << formatHardware << "(" << formatHardwareStr << ")"
+            << " channel_count_hardware:" << channelCountHardware
+            << " sample_rate_hardware: " << sampleRateHardware;
 
     if (mAudioAnalytics.mDeliverStatistics) {
         const stats::media_metrics::BytesField bf_serialized(
@@ -1404,6 +1423,9 @@ void AudioAnalytics::AAudioStreamInfo::endAAudioStream(
                 , sampleRate
                 , contentType
                 , sharingModeRequested
+                , formatHardware
+                , channelCountHardware
+                , sampleRateHardware
                 );
         std::stringstream ss;
         ss << "result:" << result;
@@ -1427,6 +1449,9 @@ void AudioAnalytics::AAudioStreamInfo::endAAudioStream(
                 , sampleRate
                 , contentType
                 , sharingModeRequested
+                , formatHardware
+                , channelCountHardware
+                , sampleRateHardware
                 );
         ss << " " << fieldsStr;
         std::string str = ss.str();

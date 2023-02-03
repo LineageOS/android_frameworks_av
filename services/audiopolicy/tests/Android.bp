@@ -55,7 +55,10 @@ cc_test {
         "-Wall",
     ],
 
-    test_suites: ["device-tests"],
+    test_suites: [
+        "device-tests",
+        "automotive-tests",
+    ],
 
 }
 
