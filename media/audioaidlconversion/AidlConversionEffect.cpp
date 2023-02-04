@@ -37,6 +37,7 @@ using ::aidl::android::hardware::audio::effect::Downmix;
 using ::aidl::android::hardware::audio::effect::DynamicsProcessing;
 using ::aidl::android::hardware::audio::effect::Flags;
 using ::aidl::android::hardware::audio::effect::Parameter;
+using ::aidl::android::hardware::audio::effect::PresetReverb;
 using ::aidl::android::media::audio::common::AudioDeviceDescription;
 
 using ::android::BAD_VALUE;
@@ -152,7 +153,7 @@ ConversionResult<uint32_t> aidl2legacy_Flags_uint32(Flags aidl) {
     if (aidl.audioSourceIndication) {
         legacy |= EFFECT_FLAG_AUDIO_SOURCE_IND;
     }
-    if (aidl.noProcessing) {
+    if (aidl.bypass) {
         legacy |= EFFECT_FLAG_NO_PROCESS;
     }
     return legacy;
@@ -169,7 +170,7 @@ ConversionResult<Flags> legacy2aidl_uint32_Flags(uint32_t legacy) {
     aidl.deviceIndication = (legacy & EFFECT_FLAG_DEVICE_IND);
     aidl.audioModeIndication = (legacy & EFFECT_FLAG_AUDIO_MODE_IND);
     aidl.audioSourceIndication = (legacy & EFFECT_FLAG_AUDIO_SOURCE_IND);
-    aidl.noProcessing = (legacy & EFFECT_FLAG_NO_PROCESS);
+    aidl.bypass = (legacy & EFFECT_FLAG_NO_PROCESS);
     return aidl;
 }
 
@@ -346,7 +347,6 @@ ConversionResult<int32_t> aidl2legacy_DynamicsProcessing_ResolutionPreference_in
         DynamicsProcessing::ResolutionPreference aidl) {
     return static_cast<int32_t>(aidl);
 }
-
 
 }  // namespace android
 }  // aidl

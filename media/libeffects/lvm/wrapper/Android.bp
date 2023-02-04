@@ -125,6 +125,7 @@ cc_library_shared {
     cflags: [
         "-Wthread-safety",
     ],
+    relative_install_path: "soundfx",
     visibility: [
         "//hardware/interfaces/audio/aidl/default",
     ],
@@ -157,6 +158,7 @@ cc_library_shared {
     cflags: [
         "-Wthread-safety",
     ],
+    relative_install_path: "soundfx",
     visibility: [
         "//hardware/interfaces/audio/aidl/default",
     ],
