@@ -32,7 +32,7 @@
 #include <sensor/SensorManager.h>
 #include <utils/Looper.h>
 
-#include "QuaternionUtil.h"
+#include "media/QuaternionUtil.h"
 
 namespace android {
 namespace media {
