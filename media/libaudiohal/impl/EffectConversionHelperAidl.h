@@ -82,6 +82,10 @@ class EffectConversionHelperAidl {
                            void* pReplyData);
     status_t handleReset(uint32_t cmdSize, const void* pCmdData, uint32_t* replySize,
                          void* pReplyData);
+    status_t handleSetAudioSource(uint32_t cmdSize, const void* pCmdData, uint32_t* replySize,
+                                  void* pReplyData);
+    status_t handleSetAudioMode(uint32_t cmdSize, const void* pCmdData, uint32_t* replySize,
+                                void* pReplyData);
     status_t handleSetDevice(uint32_t cmdSize, const void* pCmdData, uint32_t* replySize,
                              void* pReplyData);
     status_t handleSetVolume(uint32_t cmdSize, const void* pCmdData, uint32_t* replySize,

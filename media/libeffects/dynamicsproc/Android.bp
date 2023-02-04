@@ -54,6 +54,7 @@ cc_defaults {
         "-Wall",
         "-Werror",
     ],
+    relative_install_path: "soundfx",
 }
 
 cc_library_shared {
@@ -73,8 +74,6 @@ cc_library_shared {
         "-O2",
         "-fvisibility=hidden",
     ],
-
-    relative_install_path: "soundfx",
 }
 
 cc_library_shared {
