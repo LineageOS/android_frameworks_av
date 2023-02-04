@@ -16,7 +16,7 @@
 
 #include <gtest/gtest.h>
 
-#include "QuaternionUtil.h"
+#include "media/QuaternionUtil.h"
 #include "TestUtil.h"
 
 using Eigen::Quaternionf;
