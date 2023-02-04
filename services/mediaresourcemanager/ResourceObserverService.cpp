@@ -100,8 +100,10 @@ void ResourceObserverService::BinderDiedCallback(void* cookie) {
 std::shared_ptr<ResourceObserverService> ResourceObserverService::instantiate() {
     std::shared_ptr<ResourceObserverService> observerService =
             ::ndk::SharedRefBase::make<ResourceObserverService>();
-    binder_status_t status = AServiceManager_addService(observerService->asBinder().get(),
-            ResourceObserverService::getServiceName());
+    binder_status_t status = AServiceManager_addServiceWithAllowIsolated(
+      observerService->asBinder().get(),ResourceObserverService::getServiceName(),
+      /*allowIsolated=*/ true);
+
     if (status != STATUS_OK) {
         return nullptr;
     }
