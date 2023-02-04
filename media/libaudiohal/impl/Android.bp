@@ -278,6 +278,7 @@ cc_library_shared {
         "libbinder_ndk",
         "libaudio_aidl_conversion_common_ndk",
         "libaudio_aidl_conversion_effect_ndk",
+        "libaudioaidlcommon",
     ],
     header_libs: [
         "libaudio_aidl_conversion_common_util_ndk",
