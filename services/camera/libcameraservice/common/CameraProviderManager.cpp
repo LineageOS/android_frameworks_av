@@ -2439,8 +2439,8 @@ status_t CameraProviderManager::ProviderInfo::DeviceInfo3::filterSmallJpegSizes(
     for (size_t i = 0; i < streamConfigs.count; i += 4) {
         if ((streamConfigs.data.i32[i] == HAL_PIXEL_FORMAT_BLOB) && (streamConfigs.data.i32[i+3] ==
                 ANDROID_SCALER_AVAILABLE_STREAM_CONFIGURATIONS_OUTPUT)) {
-            if (streamConfigs.data.i32[i+1] < thresholdW  ||
-                    streamConfigs.data.i32[i+2] < thresholdH) {
+            if (streamConfigs.data.i32[i+1] * streamConfigs.data.i32[i+2] <
+                    thresholdW * thresholdH) {
                 continue;
             } else {
                 largeJpegCount ++;
@@ -2460,8 +2460,8 @@ status_t CameraProviderManager::ProviderInfo::DeviceInfo3::filterSmallJpegSizes(
             mCameraCharacteristics.find(ANDROID_SCALER_AVAILABLE_MIN_FRAME_DURATIONS);
     for (size_t i = 0; i < minDurations.count; i += 4) {
         if (minDurations.data.i64[i] == HAL_PIXEL_FORMAT_BLOB) {
-            if (minDurations.data.i64[i+1] < thresholdW ||
-                    minDurations.data.i64[i+2] < thresholdH) {
+            if ((int32_t)minDurations.data.i64[i+1] * (int32_t)minDurations.data.i64[i+2] <
+                    thresholdW * thresholdH) {
                 continue;
             } else {
                 largeJpegCount++;
@@ -2481,8 +2481,8 @@ status_t CameraProviderManager::ProviderInfo::DeviceInfo3::filterSmallJpegSizes(
             mCameraCharacteristics.find(ANDROID_SCALER_AVAILABLE_STALL_DURATIONS);
     for (size_t i = 0; i < stallDurations.count; i += 4) {
         if (stallDurations.data.i64[i] == HAL_PIXEL_FORMAT_BLOB) {
-            if (stallDurations.data.i64[i+1] < thresholdW ||
-                    stallDurations.data.i64[i+2] < thresholdH) {
+            if ((int32_t)stallDurations.data.i64[i+1] * (int32_t)stallDurations.data.i64[i+2] <
+                    thresholdW * thresholdH) {
                 continue;
             } else {
                 largeJpegCount++;
