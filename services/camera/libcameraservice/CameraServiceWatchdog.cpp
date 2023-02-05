@@ -17,6 +17,7 @@
 #define LOG_TAG "CameraServiceWatchdog"
 
 #include "CameraServiceWatchdog.h"
+#include "utils/CameraServiceProxyWrapper.h"
 
 namespace android {
 
@@ -43,6 +44,8 @@ bool CameraServiceWatchdog::threadLoop()
             if (tidToCycleCounterMap[currentThreadId] >= mMaxCycles) {
                 ALOGW("CameraServiceWatchdog triggering abort for pid: %d tid: %d", getpid(),
                         currentThreadId);
+                mCameraServiceProxyWrapper->logClose(mCameraId, 0 /*latencyMs*/,
+                        true /*deviceError*/);
                 // We use abort here so we can get a tombstone for better
                 // debugging.
                 abort();
