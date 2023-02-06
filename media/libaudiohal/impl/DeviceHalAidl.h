@@ -194,8 +194,8 @@ class DeviceHalAidl : public DeviceHalInterface, public ConversionHelperAidl {
     const std::string mInstance;
     const std::shared_ptr<::aidl::android::hardware::audio::core::IModule> mModule;
     Ports mPorts;
-    int32_t mDefaultInputPortId;
-    int32_t mDefaultOutputPortId;
+    int32_t mDefaultInputPortId = -1;
+    int32_t mDefaultOutputPortId = -1;
     PortConfigs mPortConfigs;
     Patches mPatches;
     std::map<audio_patch_handle_t, int32_t /* patch ID */> mFwkHandles;
