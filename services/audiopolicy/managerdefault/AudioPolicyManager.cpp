@@ -5634,6 +5634,17 @@ status_t AudioPolicyManager::initialize() {
         return status;
     }
 
+    // If microphones address is empty, set it according to device type
+    for (size_t i = 0; i < mInputDevicesAll.size(); i++) {
+        if (mInputDevicesAll[i]->address().empty()) {
+            if (mInputDevicesAll[i]->type() == AUDIO_DEVICE_IN_BUILTIN_MIC) {
+                mInputDevicesAll[i]->setAddress(AUDIO_BOTTOM_MICROPHONE_ADDRESS);
+            } else if (mInputDevicesAll[i]->type() == AUDIO_DEVICE_IN_BACK_MIC) {
+                mInputDevicesAll[i]->setAddress(AUDIO_BACK_MICROPHONE_ADDRESS);
+            }
+        }
+    }
+
     mEngine->updateDeviceSelectionCache();
     mCommunnicationStrategy = mEngine->getProductStrategyForAttributes(
         mEngine->getAttributesForStreamType(AUDIO_STREAM_VOICE_CALL));
@@ -5648,17 +5659,6 @@ status_t AudioPolicyManager::initialize() {
                  mDefaultOutputDevice->toString().c_str());
         status = NO_INIT;
     }
-    // If microphones address is empty, set it according to device type
-    for (size_t i = 0; i < mAvailableInputDevices.size(); i++) {
-        if (mAvailableInputDevices[i]->address().empty()) {
-            if (mAvailableInputDevices[i]->type() == AUDIO_DEVICE_IN_BUILTIN_MIC) {
-                mAvailableInputDevices[i]->setAddress(AUDIO_BOTTOM_MICROPHONE_ADDRESS);
-            } else if (mAvailableInputDevices[i]->type() == AUDIO_DEVICE_IN_BACK_MIC) {
-                mAvailableInputDevices[i]->setAddress(AUDIO_BACK_MICROPHONE_ADDRESS);
-            }
-        }
-    }
-
     ALOGW_IF(mPrimaryOutput == nullptr, "The policy configuration does not declare a primary output");
 
     // Silence ALOGV statements
