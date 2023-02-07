@@ -230,7 +230,7 @@ status_t Camera3Device::initializeCommonLocked() {
     mInjectionMethods = createCamera3DeviceInjectionMethods(this);
 
     /** Start watchdog thread */
-    mCameraServiceWatchdog = new CameraServiceWatchdog();
+    mCameraServiceWatchdog = new CameraServiceWatchdog(mId, mCameraServiceProxyWrapper);
     res = mCameraServiceWatchdog->run("CameraServiceWatchdog");
     if (res != OK) {
         SET_ERR_L("Unable to start camera service watchdog thread: %s (%d)",
@@ -4176,6 +4176,12 @@ void Camera3Device::clearStreamUseCaseOverrides() {
     Mutex::Autolock il(mInterfaceLock);
     Mutex::Autolock l(mLock);
     mStreamUseCaseOverrides.clear();
+}
+
+bool Camera3Device::hasDeviceError() {
+    Mutex::Autolock il(mInterfaceLock);
+    Mutex::Autolock l(mLock);
+    return mStatus == STATUS_ERROR;
 }
 
 void Camera3Device::RequestThread::cleanUpFailedRequests(bool sendRequestError) {
