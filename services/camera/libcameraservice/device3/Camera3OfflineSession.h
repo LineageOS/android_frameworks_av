@@ -274,7 +274,12 @@ class Camera3OfflineSession :
     void setErrorStateLockedV(const char *fmt, va_list args);
 
     status_t disconnectImpl();
-    virtual void disconnectSession() = 0;
+
+    // Clients need to ensure that 'mInterfaceLock' is acquired before calling this method
+    virtual void closeSessionLocked() = 0;
+
+    // Clients need to ensure that 'mLock' is acquired before calling this method
+    virtual void releaseSessionLocked() = 0;
 
 }; // class Camera3OfflineSession
 

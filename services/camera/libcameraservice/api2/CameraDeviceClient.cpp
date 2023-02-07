@@ -1851,6 +1851,10 @@ binder::Status CameraDeviceClient::switchToOffline(
         mCompositeStreamMap.clear();
         mInputStream = {false, 0, 0, 0, 0};
     } else {
+        // In case we failed to register the offline client, ensure that it still initialized
+        // so that all failing requests can return back correctly once the object is released.
+        offlineClient->initialize(nullptr /*cameraProviderManager*/, String8()/*monitorTags*/);
+
         switch(ret) {
             case BAD_VALUE:
                 return STATUS_ERROR_FMT(CameraService::ERROR_ILLEGAL_ARGUMENT,
