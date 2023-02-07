@@ -22,6 +22,7 @@
 #include <media/stagefright/foundation/MediaDefs.h>
 
 #include <C2Debug.h>
+#include <Codec2CommonUtils.h>
 #include <Codec2Mapper.h>
 #include <C2PlatformSupport.h>
 #include <SimpleC2Interface.h>
@@ -105,18 +106,17 @@ C2SoftAomEnc::IntfImpl::IntfImpl(const std::shared_ptr<C2ReflectorHelper>& helpe
                          .withSetter(ProfileLevelSetter)
                          .build());
 
+    std::vector<uint32_t> pixelFormats = {HAL_PIXEL_FORMAT_IMPLEMENTATION_DEFINED,
+                                          HAL_PIXEL_FORMAT_YCBCR_420_888};
+    if (isHalPixelFormatSupported((AHardwareBuffer_Format)HAL_PIXEL_FORMAT_YCBCR_P010)) {
+        pixelFormats.push_back(HAL_PIXEL_FORMAT_YCBCR_P010);
+    }
     addParameter(DefineParam(mPixelFormat, C2_PARAMKEY_PIXEL_FORMAT)
-                         .withDefault(new C2StreamPixelFormatInfo::output(
+                         .withDefault(new C2StreamPixelFormatInfo::input(
                               0u, HAL_PIXEL_FORMAT_YCBCR_420_888))
-                         .withFields({C2F(mPixelFormat, value).oneOf({
-                                            HAL_PIXEL_FORMAT_IMPLEMENTATION_DEFINED,
-                                            HAL_PIXEL_FORMAT_YCBCR_420_888,
-                                            HAL_PIXEL_FORMAT_YCBCR_P010
-                                     })
-                         })
+                         .withFields({C2F(mPixelFormat, value).oneOf({pixelFormats})})
                          .withSetter((Setter<decltype(*mPixelFormat)>::StrictValueWithNoDeps))
                          .build());
-
 
     addParameter(DefineParam(mRequestSync, C2_PARAMKEY_REQUEST_SYNC_FRAME)
                          .withDefault(new C2StreamRequestSyncFrameTuning::output(0u, C2_FALSE))

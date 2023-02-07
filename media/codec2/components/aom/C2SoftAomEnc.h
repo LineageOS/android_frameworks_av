@@ -136,7 +136,7 @@ class C2SoftAomEnc::IntfImpl : public SimpleInterface<void>::BaseParams {
     std::shared_ptr<C2StreamColorAspectsInfo::output> getCodedColorAspects_l() const {
         return mCodedColorAspects;
     }
-    std::shared_ptr<C2StreamPixelFormatInfo::output> getPixelFormat_l() const {
+    std::shared_ptr<C2StreamPixelFormatInfo::input> getPixelFormat_l() const {
         return mPixelFormat;
     }
     uint32_t getSyncFramePeriod() const;
@@ -156,7 +156,7 @@ class C2SoftAomEnc::IntfImpl : public SimpleInterface<void>::BaseParams {
     std::shared_ptr<C2StreamProfileLevelInfo::output> mProfileLevel;
     std::shared_ptr<C2StreamColorAspectsInfo::input> mColorAspects;
     std::shared_ptr<C2StreamColorAspectsInfo::output> mCodedColorAspects;
-    std::shared_ptr<C2StreamPixelFormatInfo::output> mPixelFormat;
+    std::shared_ptr<C2StreamPixelFormatInfo::input> mPixelFormat;
 
 };
 
