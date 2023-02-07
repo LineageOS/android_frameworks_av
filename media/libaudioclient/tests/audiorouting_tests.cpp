@@ -73,7 +73,6 @@ TEST(AudioTrackTest, TestPerformanceMode) {
             }
         }
         ap->stop();
-        ap->getAudioTrackHandle()->removeAudioDeviceCallback(cb);
     }
 }
 
