@@ -1,0 +1,27 @@
+{
+  "comments": [
+    {
+      "unresolved": true,
+      "key": {
+        "uuid": "785666b6_692b5ef8",
+        "filename": "services/audiopolicy/service/AudioPolicyInterfaceImpl.cpp",
+        "patchSetId": 1
+      },
+      "lineNbr": 617,
+      "author": {
+        "id": 11883
+      },
+      "writtenOn": "2023-02-07T21:24:40Z",
+      "side": 1,
+      "message": "attributionSource.uid maybe?\nSeems like the attribution UID before used to be bugged at best, so the were manually fixing it up checking the caller, now it seems to have been fixed properly and the attribution is correct.",
+      "range": {
+        "startLine": 617,
+        "startChar": 39,
+        "endLine": 617,
+        "endChar": 78
+      },
+      "revId": "0cb593242d5eb30c146f6fe2b272c7a9637c0337",
+      "serverId": "1ec6b3db-b2c1-4fa4-84a2-4c7efe89ba71"
+    }
+  ]
+}
