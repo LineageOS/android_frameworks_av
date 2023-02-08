@@ -218,10 +218,18 @@ ndk::ScopedAStatus EffectBundleAidl::setParameterVirtualizer(const Parameter::Sp
                       EX_ILLEGAL_ARGUMENT, "setStrengthFailed");
             return ndk::ScopedAStatus::ok();
         }
-        default:
-            LOG(ERROR) << __func__ << " unsupported parameter " << specific.toString();
+        case Virtualizer::device: {
+            RETURN_IF(mContext->setForcedDevice(vr.get<Virtualizer::device>()) != RetCode::SUCCESS,
+                      EX_ILLEGAL_ARGUMENT, "setDeviceFailed");
+            return ndk::ScopedAStatus::ok();
+        }
+        case Virtualizer::speakerAngles:
+            FALLTHROUGH_INTENDED;
+        case Virtualizer::vendor: {
+            LOG(ERROR) << __func__ << " unsupported tag: " << toString(vrTag);
             return ndk::ScopedAStatus::fromExceptionCodeWithMessage(EX_ILLEGAL_ARGUMENT,
-                                                                    "vrTagNotSupported");
+                                                                    "VirtualizerTagNotSupported");
+        }
     }
 }
 
@@ -281,6 +289,10 @@ ndk::ScopedAStatus EffectBundleAidl::getParameterEqualizer(const Equalizer::Id& 
         }
         case Equalizer::preset: {
             eqParam.set<Equalizer::preset>(mContext->getEqualizerPreset());
+            break;
+        }
+        case Equalizer::centerFreqMh: {
+            eqParam.set<Equalizer::centerFreqMh>(mContext->getEqualizerCenterFreqs());
             break;
         }
         default: {
@@ -354,14 +366,27 @@ ndk::ScopedAStatus EffectBundleAidl::getParameterVirtualizer(const Virtualizer::
     RETURN_IF(!mContext, EX_NULL_POINTER, "nullContext");
     Virtualizer vrParam;
 
+    if (id.getTag() == Virtualizer::Id::speakerAnglesPayload) {
+        auto angles = mContext->getSpeakerAngles(id.get<Virtualizer::Id::speakerAnglesPayload>());
+        Virtualizer param = Virtualizer::make<Virtualizer::speakerAngles>(angles);
+        specific->set<Parameter::Specific::virtualizer>(param);
+        return ndk::ScopedAStatus::ok();
+    }
+
     auto tag = id.get<Virtualizer::Id::commonTag>();
     switch (tag) {
         case Virtualizer::strengthPm: {
             vrParam.set<Virtualizer::strengthPm>(mContext->getVirtualizerStrength());
             break;
         }
-        default: {
-            LOG(ERROR) << __func__ << " not handled tag: " << toString(tag);
+        case Virtualizer::device: {
+            vrParam.set<Virtualizer::device>(mContext->getForcedDevice());
+            break;
+        }
+        case Virtualizer::speakerAngles:
+            FALLTHROUGH_INTENDED;
+        case Virtualizer::vendor: {
+            LOG(ERROR) << __func__ << " unsupported tag: " << toString(tag);
             return ndk::ScopedAStatus::fromExceptionCodeWithMessage(EX_ILLEGAL_ARGUMENT,
                                                                     "VirtualizerTagNotSupported");
         }
