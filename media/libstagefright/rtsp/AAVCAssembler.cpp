@@ -332,6 +332,11 @@ void AAVCAssembler::checkIFrameProvided(const sp<ABuffer> &buffer) {
 }
 
 bool AAVCAssembler::dropFramesUntilIframe(const sp<ABuffer> &buffer) {
+    if (buffer->size() == 0) {
+        ALOGE("b/230630526 buffer->size() == 0");
+        android_errorWriteLog(0x534e4554, "230630526");
+        return false;
+    }
     const uint8_t *data = buffer->data();
     unsigned nalType = data[0] & 0x1f;
     if (!mFirstIFrameProvided && nalType < 0x5) {
@@ -624,8 +629,7 @@ int32_t AAVCAssembler::pickStartSeq(const Queue *queue,
     int32_t firstSeqNo = buffer->int32Data();
 
     // This only works for FU-A type & non-start sequence
-    int32_t nalType = buffer->size() >= 1 ? buffer->data()[0] & 0x1f : -1;
-    if (nalType != 28 || (buffer->size() >= 2 && buffer->data()[1] & 0x80)) {
+    if (buffer->size() < 2 || (buffer->data()[0] & 0x1f) != 28 || buffer->data()[1] & 0x80) {
         return firstSeqNo;
     }
 
