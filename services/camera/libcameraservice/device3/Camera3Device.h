@@ -313,6 +313,9 @@ class Camera3Device :
     // Get the status trackeer for the camera device
     wp<camera3::StatusTracker> getStatusTracker() { return mStatusTracker; }
 
+    // Whether the device is in error state
+    bool hasDeviceError();
+
     /**
      * The injection camera session to replace the internal camera
      * session.
