@@ -213,7 +213,7 @@ public:
     void dump() const;
 
 private:
-    bool validateChannelMask() const;
+    aaudio_result_t validateChannelMask() const;
 
     int32_t                         mSamplesPerFrame      = AAUDIO_UNSPECIFIED;
     int32_t                         mSampleRate           = AAUDIO_UNSPECIFIED;
