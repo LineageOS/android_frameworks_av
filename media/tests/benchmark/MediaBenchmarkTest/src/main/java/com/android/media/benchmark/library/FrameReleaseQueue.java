@@ -31,6 +31,8 @@ public class FrameReleaseQueue {
     private boolean doFrameRelease = false;
     private boolean mRender = false;
     private int mWaitTime = 40; // milliseconds per frame
+    private int mWaitTimeCorrection = 0;
+    private int mCorrectionLoopCount;
     private int firstReleaseTime = -1;
     private int THRESHOLD_TIME = 5;
 
@@ -48,29 +50,40 @@ public class FrameReleaseQueue {
     private class ReleaseThread extends Thread {
         public void run() {
             int nextReleaseTime = 0;
+            int loopCount = 0;
             while (doFrameRelease || mFrameInfoQueue.size() > 0) {
                 FrameInfo curFrameInfo = mFrameInfoQueue.peek();
                 if (curFrameInfo == null) {
                     nextReleaseTime += mWaitTime;
                 } else {
-                    if (firstReleaseTime == -1) {
+                    if (curFrameInfo.displayTime == 0) {
+                        // first frame of loop
                         firstReleaseTime = getCurSysTime();
                         nextReleaseTime = firstReleaseTime + mWaitTime;
-                        popAndRelease(curFrameInfo);
+                        popAndRelease(curFrameInfo, true);
+                    } else if (!doFrameRelease && mFrameInfoQueue.size() == 1) {
+                        // EOS
+                        Log.i(TAG, "EOS");
+                        popAndRelease(curFrameInfo, false);
                     } else {
                         nextReleaseTime += mWaitTime;
                         int curSysTime = getCurSysTime();
                         int curMediaTime = curSysTime - firstReleaseTime;
-                        while (curFrameInfo != null && curFrameInfo.displayTime <= curMediaTime) {
+                        while (curFrameInfo != null && curFrameInfo.displayTime > 0 &&
+                                curFrameInfo.displayTime <= curMediaTime) {
                             if (!((curMediaTime - curFrameInfo.displayTime) < THRESHOLD_TIME)) {
-                                Log.d(TAG, "Dropping expired frame " + curFrameInfo.number);
+                                Log.d(TAG, "Dropping expired frame " + curFrameInfo.number +
+                                    " display time " + curFrameInfo.displayTime +
+                                    " current time " + curMediaTime);
+                                popAndRelease(curFrameInfo, false);
+                            } else {
+                                popAndRelease(curFrameInfo, true);
                             }
-                            popAndRelease(curFrameInfo);
                             curFrameInfo = mFrameInfoQueue.peek();
                         }
                         if (curFrameInfo != null && curFrameInfo.displayTime > curMediaTime) {
                             if ((curFrameInfo.displayTime - curMediaTime) < THRESHOLD_TIME) {
-                                popAndRelease(curFrameInfo);
+                                popAndRelease(curFrameInfo, true);
                             }
                         }
                     }
@@ -85,6 +98,10 @@ public class FrameReleaseQueue {
                 } else {
                     Log.d(TAG, "Thread sleep time less than 1");
                 }
+                if (loopCount % mCorrectionLoopCount == 0) {
+                    nextReleaseTime += mWaitTimeCorrection;
+                }
+                loopCount += 1;
             }
         }
     }
@@ -94,8 +111,16 @@ public class FrameReleaseQueue {
         this.mReleaseThread = new ReleaseThread();
         this.doFrameRelease = true;
         this.mRender = render;
-        this.mWaitTime = (int)(1.0f/frameRate * 1000); // wait time in milliseconds per frame
+        this.mWaitTime = 1000 / frameRate; // wait time in milliseconds per frame
+        int waitTimeRemainder = 1000 % frameRate;
+        int gcd = gcd(frameRate, waitTimeRemainder);
+        this.mCorrectionLoopCount = frameRate / gcd;
+        this.mWaitTimeCorrection = waitTimeRemainder / gcd;
         Log.i(TAG, "Constructed FrameReleaseQueue with wait time " + this.mWaitTime + " ms");
+    }
+
+    private static int gcd(int a, int b) {
+        return b == 0 ? a : gcd(b, a % b);
     }
 
     public void setMediaCodec(MediaCodec mediaCodec) {
@@ -121,14 +146,15 @@ public class FrameReleaseQueue {
         return (int)(System.nanoTime()/1000000);
     }
 
-    private void popAndRelease(FrameInfo curFrameInfo) {
+    private void popAndRelease(FrameInfo curFrameInfo, boolean renderThisFrame) {
         try {
             curFrameInfo = mFrameInfoQueue.take();
         } catch (InterruptedException e) {
             Log.e(TAG, "Threw InterruptedException on take");
         }
+        boolean actualRender = (renderThisFrame && mRender);
         try {
-            mCodec.releaseOutputBuffer(curFrameInfo.bufferId, mRender);
+            mCodec.releaseOutputBuffer(curFrameInfo.bufferId, actualRender);
         } catch (IllegalStateException e) {
             Log.e(TAG,
                     "Threw IllegalStateException on releaseOutputBuffer for frame "
