@@ -2100,10 +2100,11 @@ void CameraDeviceClient::detachDevice() {
         mCompositeStreamMap.clear();
     }
 
+    bool hasDeviceError = mDevice->hasDeviceError();
     Camera2ClientBase::detachDevice();
 
     int32_t closeLatencyMs = ns2ms(systemTime() - startTime);
-    mCameraServiceProxyWrapper->logClose(mCameraIdStr, closeLatencyMs);
+    mCameraServiceProxyWrapper->logClose(mCameraIdStr, closeLatencyMs, hasDeviceError);
 }
 
 /** Device-related methods */

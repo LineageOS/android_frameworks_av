@@ -46,11 +46,13 @@ void CameraServiceProxyWrapper::CameraSessionStatsWrapper::onOpen(
 }
 
 void CameraServiceProxyWrapper::CameraSessionStatsWrapper::onClose(
-    sp<hardware::ICameraServiceProxy>& proxyBinder, int32_t latencyMs) {
+    sp<hardware::ICameraServiceProxy>& proxyBinder, int32_t latencyMs,
+    bool deviceError) {
     Mutex::Autolock l(mLock);
 
     mSessionStats.mNewCameraState = CameraSessionStats::CAMERA_STATE_CLOSED;
     mSessionStats.mLatencyMs = latencyMs;
+    mSessionStats.mDeviceError = deviceError;
     updateProxyDeviceState(proxyBinder);
 }
 
@@ -259,7 +261,7 @@ void CameraServiceProxyWrapper::logOpen(const String8& id, int facing,
     sessionStats->onOpen(proxyBinder);
 }
 
-void CameraServiceProxyWrapper::logClose(const String8& id, int32_t latencyMs) {
+void CameraServiceProxyWrapper::logClose(const String8& id, int32_t latencyMs, bool deviceError) {
     std::shared_ptr<CameraSessionStatsWrapper> sessionStats;
     {
         Mutex::Autolock l(mLock);
@@ -275,13 +277,15 @@ void CameraServiceProxyWrapper::logClose(const String8& id, int32_t latencyMs) {
                     __FUNCTION__, id.c_str());
             return;
         }
+
         mSessionStatsMap.erase(id);
-        ALOGV("%s: Erasing id %s", __FUNCTION__, id.c_str());
+        ALOGV("%s: Erasing id %s, deviceError %d", __FUNCTION__, id.c_str(), deviceError);
     }
 
-    ALOGV("%s: id %s, latencyMs %d", __FUNCTION__, id.c_str(), latencyMs);
+    ALOGV("%s: id %s, latencyMs %d, deviceError %d", __FUNCTION__,
+            id.c_str(), latencyMs, deviceError);
     sp<hardware::ICameraServiceProxy> proxyBinder = getCameraServiceProxy();
-    sessionStats->onClose(proxyBinder, latencyMs);
+    sessionStats->onClose(proxyBinder, latencyMs, deviceError);
 }
 
 bool CameraServiceProxyWrapper::isCameraDisabled(int userId) {

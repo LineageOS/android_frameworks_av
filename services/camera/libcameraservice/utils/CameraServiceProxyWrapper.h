@@ -54,7 +54,8 @@ private:
             { }
 
         void onOpen(sp<hardware::ICameraServiceProxy>& proxyBinder);
-        void onClose(sp<hardware::ICameraServiceProxy>& proxyBinder, int32_t latencyMs);
+        void onClose(sp<hardware::ICameraServiceProxy>& proxyBinder, int32_t latencyMs,
+                bool deviceError);
         void onStreamConfigured(int operatingMode, bool internalReconfig, int32_t latencyMs);
         void onActive(sp<hardware::ICameraServiceProxy>& proxyBinder, float maxPreviewFps);
         void onIdle(sp<hardware::ICameraServiceProxy>& proxyBinder,
@@ -83,7 +84,7 @@ public:
             int32_t latencyMs);
 
     // Close
-    void logClose(const String8& id, int32_t latencyMs);
+    void logClose(const String8& id, int32_t latencyMs, bool deviceError);
 
     // Stream configuration
     void logStreamConfigured(const String8& id, int operatingMode, bool internalReconfig,

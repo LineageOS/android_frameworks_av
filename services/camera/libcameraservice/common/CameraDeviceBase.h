@@ -475,6 +475,11 @@ class CameraDeviceBase : public virtual FrameProducer {
     virtual wp<camera3::StatusTracker> getStatusTracker() = 0;
 
     /**
+     * If the device is in eror state
+     */
+    virtual bool hasDeviceError() = 0;
+
+    /**
      * Set bitmask for image dump flag
      */
     void setImageDumpMask(int mask) { mImageDumpMask = mask; }
