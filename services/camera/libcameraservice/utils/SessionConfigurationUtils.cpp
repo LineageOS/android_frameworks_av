@@ -196,6 +196,8 @@ bool roundBufferDimensionNearest(int32_t width, int32_t height,
 
     if (bestWidth == -1) {
         // Return false if no configurations for this format were listed
+        ALOGE("%s: No configurations for format %d width %d, height %d, maxResolution ? %s",
+                __FUNCTION__, format, width, height, maxResolution ? "true" : "false");
         return false;
     }
 
@@ -937,7 +939,7 @@ status_t checkAndOverrideSensorPixelModesUsed(
 
     const std::unordered_set<int32_t> &sensorPixelModesUsedSet =
             convertToSet(sensorPixelModesUsed);
-    if (!isUltraHighResolutionSensor(staticInfo)) {
+    if (!supportsUltraHighResolutionCapture(staticInfo)) {
         if (sensorPixelModesUsedSet.find(ANDROID_SENSOR_PIXEL_MODE_MAXIMUM_RESOLUTION) !=
                 sensorPixelModesUsedSet.end()) {
             // invalid value for non ultra high res sensors
@@ -961,12 +963,14 @@ status_t checkAndOverrideSensorPixelModesUsed(
     // Case 1: The client has not changed the sensor mode defaults. In this case, we check if the
     // size + format of the OutputConfiguration is found exclusively in 1.
     // If yes, add that sensorPixelMode to overriddenSensorPixelModes.
-    // If no, add 'DEFAULT' to sensorPixelMode. This maintains backwards
-    // compatibility.
+    // If no, add 'DEFAULT' and MAXIMUM_RESOLUTION to overriddenSensorPixelModes.
+    // This maintains backwards compatibility and also tells the framework the stream
+    // might be used in either sensor pixel mode.
     if (sensorPixelModesUsedSet.size() == 0) {
-        // Ambiguous case, default to only 'DEFAULT' mode.
+        // Ambiguous case, override to include both cases.
         if (isInDefaultStreamConfigurationMap && isInMaximumResolutionStreamConfigurationMap) {
             overriddenSensorPixelModesUsed->insert(ANDROID_SENSOR_PIXEL_MODE_DEFAULT);
+            overriddenSensorPixelModesUsed->insert(ANDROID_SENSOR_PIXEL_MODE_MAXIMUM_RESOLUTION);
             return OK;
         }
         // We don't allow flexible consumer for max resolution mode.
