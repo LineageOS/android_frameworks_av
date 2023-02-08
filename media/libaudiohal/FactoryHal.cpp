@@ -105,12 +105,12 @@ bool createHalService(const AudioHalVersionInfo& version, bool isDevice, void** 
 
 bool hasAidlHalService(const InterfaceName& interface, const AudioHalVersionInfo& version) {
     const std::string name = interface.first + "." + interface.second + "/default";
-    AIBinder* binder = AServiceManager_checkService(name.c_str());
-    if (binder == nullptr) {
-        ALOGW("%s Service %s doesn't exist", __func__, name.c_str());
+    const bool isDeclared = AServiceManager_isDeclared(name.c_str());
+    if (!isDeclared) {
+        ALOGW("%s %s: false", __func__, name.c_str());
         return false;
     }
-    ALOGI("%s AIDL Service %s exist: %s", __func__, name.c_str(), version.toString().c_str());
+    ALOGI("%s %s: true, version %s", __func__, name.c_str(), version.toString().c_str());
     return true;
 }
 
