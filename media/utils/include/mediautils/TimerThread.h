@@ -340,7 +340,7 @@ class TimerThread {
                 std::pair<std::shared_ptr<const Request>, TimerCallback>>
                         mSecondChanceRequests GUARDED_BY(mMutex);
 
-        RequestQueue& mTimeoutQueue; // locked internally, added to when request times out.
+        RequestQueue& mTimeoutQueue GUARDED_BY(mMutex); // added to when request times out.
 
         // Worker thread variables
         bool mShouldExit GUARDED_BY(mMutex) = false;
