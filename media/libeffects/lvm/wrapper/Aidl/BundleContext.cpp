@@ -24,8 +24,9 @@
 
 namespace aidl::android::hardware::audio::effect {
 
-using aidl::android::media::audio::common::AudioDeviceDescription;
-using aidl::android::media::audio::common::AudioDeviceType;
+using ::aidl::android::media::audio::common::AudioChannelLayout;
+using ::aidl::android::media::audio::common::AudioDeviceDescription;
+using ::aidl::android::media::audio::common::AudioDeviceType;
 
 RetCode BundleContext::init() {
     std::lock_guard lg(mMutex);
@@ -317,6 +318,11 @@ bool BundleContext::isDeviceSupportedVirtualizer(
     return true;
 }
 
+bool BundleContext::isConfigSupportedVirtualizer(size_t channelCount,
+                                                 const AudioDeviceDescription& device) {
+    return (channelCount >= 1 && channelCount <= FCC_2) && isDeviceSupportedVirtualizer({device});
+}
+
 RetCode BundleContext::setOutputDevice(
         const std::vector<aidl::android::media::audio::common::AudioDeviceDescription>& devices) {
     mOutputDevice = devices;
@@ -469,6 +475,23 @@ std::vector<Equalizer::BandLevel> BundleContext::getEqualizerBandLevels() const 
     return bandLevels;
 }
 
+std::vector<int32_t> BundleContext::getEqualizerCenterFreqs() {
+    std::vector<int32_t> freqs;
+
+    LVM_ControlParams_t params;
+    {
+        std::lock_guard lg(mMutex);
+        /* Get the current settings */
+        RETURN_VALUE_IF(LVM_SUCCESS != LVM_GetControlParameters(mInstance, &params), freqs,
+                        " getControlParamFailed");
+        for (std::size_t i = 0; i < lvm::MAX_NUM_BANDS; i++) {
+            freqs.push_back((int32_t)params.pEQNB_BandDefinition[i].Frequency * 1000);
+        }
+    }
+
+    return freqs;
+}
+
 bool BundleContext::isBandLevelIndexInRange(
         const std::vector<Equalizer::BandLevel>& bandLevels) const {
     const auto [min, max] =
@@ -583,6 +606,15 @@ RetCode BundleContext::setVirtualizerStrength(int strength) {
     return limitLevel();
 }
 
+
+RetCode BundleContext::setForcedDevice(
+        const ::aidl::android::media::audio::common::AudioDeviceDescription& device) {
+    RETURN_VALUE_IF(true != isDeviceSupportedVirtualizer({device}), RetCode::ERROR_EFFECT_LIB_ERROR,
+                    " deviceNotSupportVirtualizer");
+    mForceDevice = device;
+    return RetCode::SUCCESS;
+}
+
 void BundleContext::initControlParameter(LVM_ControlParams_t& params) const {
     /* General parameters */
     params.OperatingMode = LVM_MODE_ON;
@@ -666,6 +698,28 @@ LVM_HeadroomBandDef_t *BundleContext::getDefaultEqualizerHeadroomBanDefs() {
             },
     };
     return HeadroomBandDef;
+}
+
+std::vector<Virtualizer::ChannelAngle> BundleContext::getSpeakerAngles(
+        const Virtualizer::SpeakerAnglesPayload payload) {
+    std::vector<Virtualizer::ChannelAngle> angles;
+    auto chCount = ::android::hardware::audio::common::getChannelCount(payload.layout);
+    RETURN_VALUE_IF(!isConfigSupportedVirtualizer(chCount, payload.device), angles,
+                    "payloadNotSupported");
+
+    if (chCount == 1) {
+        angles = {{.channel = (int32_t)AudioChannelLayout::CHANNEL_FRONT_LEFT,
+                   .azimuthDegree = 0,
+                   .elevationDegree = 0}};
+    } else {
+        angles = {{.channel = (int32_t)AudioChannelLayout::CHANNEL_FRONT_LEFT,
+                   .azimuthDegree = -90,
+                   .elevationDegree = 0},
+                  {.channel = (int32_t)AudioChannelLayout::CHANNEL_FRONT_RIGHT,
+                   .azimuthDegree = 90,
+                   .elevationDegree = 0}};
+    }
+    return angles;
 }
 
 IEffect::Status BundleContext::lvmProcess(float* in, float* out, int samples) {

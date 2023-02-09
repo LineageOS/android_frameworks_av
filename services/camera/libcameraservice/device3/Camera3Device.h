@@ -1134,6 +1134,7 @@ class Camera3Device :
         const bool         mUseHalBufManager;
         const bool         mSupportCameraMute;
         const bool         mOverrideToPortrait;
+        int32_t            mVndkVersion = -1;
     };
 
     virtual sp<RequestThread> createNewRequestThread(wp<Camera3Device> /*parent*/,
