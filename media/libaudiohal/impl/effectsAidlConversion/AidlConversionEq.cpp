@@ -69,25 +69,7 @@ status_t AidlConversionEq::setParameter(EffectParamReader& param) {
             break;
         }
         case EQ_PARAM_PROPERTIES: {
-            if (value >= 0) {
-                aidlParam = MAKE_SPECIFIC_PARAMETER(Equalizer, equalizer, preset, (int)value);
-            } else {
-                std::vector<Equalizer::BandLevel> bandLevels;
-                uint16_t numBands;
-                if (OK != param.readFromValue(&numBands)) {
-                    ALOGE("%s invalid bandLevel param %s", __func__, param.toString().c_str());
-                    return BAD_VALUE;
-                }
-                for (int i = 0; i < numBands; i++) {
-                    uint16_t level;
-                    if (OK != param.readFromValue(&level)) {
-                        ALOGE("%s invalid property param %s", __func__, param.toString().c_str());
-                        return BAD_VALUE;
-                    }
-                    bandLevels.push_back({.index = i, .levelMb = level});
-                }
-                aidlParam = MAKE_SPECIFIC_PARAMETER(Equalizer, equalizer, bandLevels, bandLevels);
-            }
+            // TODO: handle properties setting
             break;
         }
         default: {
