@@ -20,7 +20,6 @@
 #include <algorithm>
 #include <cstdint>
 
-#include <aidl/android/hardware/audio/core/BnStreamCallback.h>
 #include <audio_utils/clock.h>
 #include <mediautils/TimeCheck.h>
 #include <utils/Log.h>
@@ -448,43 +447,18 @@ status_t StreamHalAidl::updateCountersIfNeeded(
     return OK;
 }
 
-namespace {
-
-/* Notes on callback ownership.
-
-This is how Binder ownership model looks like. The server implementation
-is owned by Binder framework (via sp<>). Proxies are owned by clients.
-When the last proxy disappears, Binder framework releases the server impl.
-
-Thus, it is not needed to keep any references to StreamCallback (this is
-the server impl) -- it will live as long as HAL server holds a strong ref to
-IStreamCallback proxy.
-
-The callback only keeps a weak reference to the stream. The stream is owned
-by AudioFlinger.
-
-*/
-
-class StreamCallback : public ::aidl::android::hardware::audio::core::BnStreamCallback {
-    ndk::ScopedAStatus onTransferReady() override {
-        return ndk::ScopedAStatus::ok();
-    }
-    ndk::ScopedAStatus onError() override {
-        return ndk::ScopedAStatus::ok();
-    }
-    ndk::ScopedAStatus onDrainReady() override {
-        return ndk::ScopedAStatus::ok();
-    }
-};
-
-}  // namespace
-
 StreamOutHalAidl::StreamOutHalAidl(
         const audio_config& config, StreamContextAidl&& context, int32_t nominalLatency,
-        const std::shared_ptr<IStreamOut>& stream)
+        const std::shared_ptr<IStreamOut>& stream, const sp<CallbackBroker>& callbackBroker)
         : StreamHalAidl("StreamOutHalAidl", false /*isInput*/, config, nominalLatency,
                 std::move(context), getStreamCommon(stream)),
-          mStream(stream) {}
+          mStream(stream), mCallbackBroker(callbackBroker) {}
+
+StreamOutHalAidl::~StreamOutHalAidl() {
+    if (auto broker = mCallbackBroker.promote(); broker != nullptr) {
+        broker->clearCallbacks(this);
+    }
+}
 
 status_t StreamOutHalAidl::getLatency(uint32_t *latency) {
     return StreamHalAidl::getLatency(latency);
@@ -529,10 +503,18 @@ status_t StreamOutHalAidl::getNextWriteTimestamp(int64_t *timestamp __unused) {
     return INVALID_OPERATION;
 }
 
-status_t StreamOutHalAidl::setCallback(wp<StreamOutHalInterfaceCallback> callback __unused) {
+status_t StreamOutHalAidl::setCallback(wp<StreamOutHalInterfaceCallback> callback) {
     TIME_CHECK();
     if (!mStream) return NO_INIT;
-    ALOGE("%s not implemented yet", __func__);
+    if (auto broker = mCallbackBroker.promote(); broker != nullptr) {
+        if (auto cb = callback.promote(); cb != nullptr) {
+            broker->setStreamOutCallback(this, cb);
+        } else {
+            // It is expected that the framework never passes a null pointer.
+            // In the AIDL model callbacks can't be "unregistered".
+            LOG_ALWAYS_FATAL("%s: received an expired or null callback pointer", __func__);
+        }
+    }
     return OK;
 }
 
@@ -639,22 +621,14 @@ status_t StreamOutHalAidl::setPlaybackRateParameters(
 }
 
 status_t StreamOutHalAidl::setEventCallback(
-        const sp<StreamOutHalInterfaceEventCallback>& callback __unused) {
+        const sp<StreamOutHalInterfaceEventCallback>& callback) {
     TIME_CHECK();
     if (!mStream) return NO_INIT;
-    ALOGE("%s not implemented yet", __func__);
+    if (auto broker = mCallbackBroker.promote(); broker != nullptr) {
+        broker->setStreamOutEventCallback(this, callback);
+    }
     return OK;
 }
-
-namespace {
-
-struct StreamOutEventCallback {
-    StreamOutEventCallback(const wp<StreamOutHalAidl>& stream) : mStream(stream) {}
-  private:
-    wp<StreamOutHalAidl> mStream;
-};
-
-}  // namespace
 
 status_t StreamOutHalAidl::setLatencyMode(audio_latency_mode_t mode __unused) {
     TIME_CHECK();
@@ -672,47 +646,14 @@ status_t StreamOutHalAidl::getRecommendedLatencyModes(
 };
 
 status_t StreamOutHalAidl::setLatencyModeCallback(
-        const sp<StreamOutHalInterfaceLatencyModeCallback>& callback __unused) {
+        const sp<StreamOutHalInterfaceLatencyModeCallback>& callback) {
     TIME_CHECK();
     if (!mStream) return NO_INIT;
-    ALOGE("%s not implemented yet", __func__);
+    if (auto broker = mCallbackBroker.promote(); broker != nullptr) {
+        broker->setStreamOutLatencyModeCallback(this, callback);
+    }
     return OK;
 };
-
-void StreamOutHalAidl::onWriteReady() {
-    sp<StreamOutHalInterfaceCallback> callback = mCallback.load().promote();
-    if (callback == 0) return;
-    ALOGV("asyncCallback onWriteReady");
-    callback->onWriteReady();
-}
-
-void StreamOutHalAidl::onDrainReady() {
-    sp<StreamOutHalInterfaceCallback> callback = mCallback.load().promote();
-    if (callback == 0) return;
-    ALOGV("asyncCallback onDrainReady");
-    callback->onDrainReady();
-}
-
-void StreamOutHalAidl::onError() {
-    sp<StreamOutHalInterfaceCallback> callback = mCallback.load().promote();
-    if (callback == 0) return;
-    ALOGV("asyncCallback onError");
-    callback->onError();
-}
-
-void StreamOutHalAidl::onCodecFormatChanged(const std::basic_string<uint8_t>& metadataBs __unused) {
-    sp<StreamOutHalInterfaceEventCallback> callback = mEventCallback.load().promote();
-    if (callback == nullptr) return;
-    ALOGV("asyncCodecFormatCallback %s", __func__);
-    callback->onCodecFormatChanged(metadataBs);
-}
-
-void StreamOutHalAidl::onRecommendedLatencyModeChanged(
-        const std::vector<audio_latency_mode_t>& modes __unused) {
-    sp<StreamOutHalInterfaceLatencyModeCallback> callback = mLatencyModeCallback.load().promote();
-    if (callback == nullptr) return;
-    callback->onRecommendedLatencyModeChanged(modes);
-}
 
 status_t StreamOutHalAidl::exit() {
     return StreamHalAidl::exit();
