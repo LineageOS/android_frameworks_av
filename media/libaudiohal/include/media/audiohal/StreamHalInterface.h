@@ -110,8 +110,8 @@ class StreamOutHalInterfaceCallback : public virtual RefBase {
     virtual void onError() {}
 
   protected:
-    StreamOutHalInterfaceCallback() {}
-    virtual ~StreamOutHalInterfaceCallback() {}
+    StreamOutHalInterfaceCallback() = default;
+    virtual ~StreamOutHalInterfaceCallback() = default;
 };
 
 class StreamOutHalInterfaceEventCallback : public virtual RefBase {
@@ -119,8 +119,8 @@ public:
     virtual void onCodecFormatChanged(const std::basic_string<uint8_t>& metadataBs) = 0;
 
 protected:
-    StreamOutHalInterfaceEventCallback() {}
-    virtual ~StreamOutHalInterfaceEventCallback() {}
+    StreamOutHalInterfaceEventCallback() = default;
+    virtual ~StreamOutHalInterfaceEventCallback() = default;
 };
 
 class StreamOutHalInterfaceLatencyModeCallback : public virtual RefBase {
@@ -131,8 +131,8 @@ public:
     virtual void onRecommendedLatencyModeChanged(std::vector<audio_latency_mode_t> modes) = 0;
 
 protected:
-    StreamOutHalInterfaceLatencyModeCallback() {}
-    virtual ~StreamOutHalInterfaceLatencyModeCallback() {}
+    StreamOutHalInterfaceLatencyModeCallback() = default;
+    virtual ~StreamOutHalInterfaceLatencyModeCallback() = default;
 };
 
 class StreamOutHalInterface : public virtual StreamHalInterface {
