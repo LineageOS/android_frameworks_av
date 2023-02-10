@@ -69,6 +69,7 @@ cc_library {
         "-Wall",
         "-Wextra",
         "-Werror",
+        "-Wthread-safety",
     ],
 
     header_libs: [
