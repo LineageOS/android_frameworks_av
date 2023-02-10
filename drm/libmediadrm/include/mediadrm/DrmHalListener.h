@@ -27,7 +27,7 @@ using aidl::android::hardware::drm::BnDrmPluginListener;
 
 namespace android {
 struct DrmHalListener : public BnDrmPluginListener {
-    explicit DrmHalListener(MediaDrmMetrics* mMetrics);
+    explicit DrmHalListener(const std::shared_ptr<MediaDrmMetrics>& in_metrics);
     ~DrmHalListener();
     ::ndk::ScopedAStatus onEvent(EventTypeAidl in_eventType,
                                  const std::vector<uint8_t>& in_sessionId,
@@ -38,9 +38,9 @@ struct DrmHalListener : public BnDrmPluginListener {
                                       const std::vector<KeyStatusAidl>& in_keyStatusList,
                                       bool in_hasNewUsableKey);
     ::ndk::ScopedAStatus onSessionLostState(const std::vector<uint8_t>& in_sessionId);
-    void setListener(sp<IDrmClient> listener);
+    void setListener(const sp<IDrmClient>& listener);
 private:
-    mutable MediaDrmMetrics* mMetrics;
+    std::shared_ptr<MediaDrmMetrics> mMetrics;
     sp<IDrmClient> mListener;
     mutable Mutex mEventLock;
     mutable Mutex mNotifyLock;
