@@ -46,6 +46,7 @@ cc_test {
         "libaudiohal",
         "liblog",
         "libutils",
+        "libvibrator",
     ],
 
     header_libs: [

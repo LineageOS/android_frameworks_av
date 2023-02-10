@@ -31,10 +31,13 @@
 #include <system/audio_effects/effect_bassboost.h>
 #include <system/audio_effects/effect_downmix.h>
 #include <system/audio_effects/effect_dynamicsprocessing.h>
+#include <system/audio_effects/effect_hapticgenerator.h>
+#include <system/audio_effects/effect_loudnessenhancer.h>
 #include <system/audio_effect.h>
 
 #include <gtest/gtest.h>
 #include <utils/RefBase.h>
+#include <vibrator/ExternalVibrationUtils.h>
 
 namespace android {
 
@@ -162,7 +165,18 @@ std::vector<EffectParamTestTuple> testPairs = {
         std::make_tuple(SL_IID_DYNAMICSPROCESSING,
                         createEffectParamCombination(
                                 std::array<uint32_t, 2>({DP_PARAM_INPUT_GAIN, 0 /* channel */}),
-                                30 /* gainDb */, sizeof(int32_t) /* returnValueSize */))};
+                                30 /* gainDb */, sizeof(int32_t) /* returnValueSize */)),
+        std::make_tuple(
+                FX_IID_HAPTICGENERATOR,
+                createEffectParamCombination(
+                        HG_PARAM_HAPTIC_INTENSITY,
+                        std::array<uint32_t, 2>(
+                                {1, uint32_t(::android::os::HapticScale::HIGH) /* scale */}),
+                        0 /* returnValueSize */)),
+        std::make_tuple(
+                FX_IID_LOUDNESS_ENHANCER,
+                createEffectParamCombination(LOUDNESS_ENHANCER_PARAM_TARGET_GAIN_MB, 5 /* gain */,
+                                             sizeof(int32_t) /* returnValueSize */))};
 
 class libAudioHalEffectParamTest : public ::testing::TestWithParam<EffectParamTestTuple> {
   public:
@@ -237,10 +251,12 @@ class libAudioHalEffectParamTest : public ::testing::TestWithParam<EffectParamTe
                                      &replySize, getParam));
         EffectParamReader parameterGet(*getParam);
         EXPECT_EQ(replySize, parameterGet.getTotalSize()) << parameterGet.toString();
-        std::vector<uint8_t> response(mCombination->valueSize);
-        EXPECT_EQ(OK, parameterGet.readFromValue(response.data(), mCombination->valueSize))
+        if (mCombination->valueSize) {
+            std::vector<uint8_t> response(mCombination->valueSize);
+            EXPECT_EQ(OK, parameterGet.readFromValue(response.data(), mCombination->valueSize))
                 << parameterGet.toString();
-        EXPECT_EQ(response, mExpectedValue);
+            EXPECT_EQ(response, mExpectedValue);
+        }
     }
 
     const EffectParamTestTuple mParamTuple;
