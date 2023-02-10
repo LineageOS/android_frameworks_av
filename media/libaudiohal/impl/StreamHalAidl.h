@@ -27,7 +27,6 @@
 #include <fmq/AidlMessageQueue.h>
 #include <media/audiohal/EffectHalInterface.h>
 #include <media/audiohal/StreamHalInterface.h>
-#include <mediautils/Synchronization.h>
 
 #include "ConversionHelperAidl.h"
 #include "StreamPowerLog.h"
@@ -221,6 +220,8 @@ class StreamHalAidl : public virtual StreamHalInterface, public ConversionHelper
     std::atomic<pid_t> mWorkerTid = -1;
 };
 
+class CallbackBroker;
+
 class StreamOutHalAidl : public StreamOutHalInterface, public StreamHalAidl {
   public:
     // Return the audio hardware driver estimated latency in milliseconds.
@@ -294,33 +295,21 @@ class StreamOutHalAidl : public StreamOutHalInterface, public StreamHalAidl {
     status_t setLatencyModeCallback(
             const sp<StreamOutHalInterfaceLatencyModeCallback>& callback) override;
 
-    void onRecommendedLatencyModeChanged(const std::vector<audio_latency_mode_t>& modes);
-
     status_t exit() override;
-
-    void onCodecFormatChanged(const std::basic_string<uint8_t>& metadataBs);
-
-    // Methods used by StreamOutCallback ().
-    // FIXME: Consider the required visibility.
-    void onWriteReady();
-    void onDrainReady();
-    void onError();
 
   private:
     friend class sp<StreamOutHalAidl>;
 
-    mediautils::atomic_wp<StreamOutHalInterfaceCallback> mCallback;
-    mediautils::atomic_wp<StreamOutHalInterfaceEventCallback> mEventCallback;
-    mediautils::atomic_wp<StreamOutHalInterfaceLatencyModeCallback> mLatencyModeCallback;
-
     const std::shared_ptr<::aidl::android::hardware::audio::core::IStreamOut> mStream;
+    const wp<CallbackBroker> mCallbackBroker;
 
     // Can not be constructed directly by clients.
     StreamOutHalAidl(
             const audio_config& config, StreamContextAidl&& context, int32_t nominalLatency,
-            const std::shared_ptr<::aidl::android::hardware::audio::core::IStreamOut>& stream);
+            const std::shared_ptr<::aidl::android::hardware::audio::core::IStreamOut>& stream,
+            const sp<CallbackBroker>& callbackBroker);
 
-    ~StreamOutHalAidl() override = default;
+    ~StreamOutHalAidl() override;
 };
 
 class StreamInHalAidl : public StreamInHalInterface, public StreamHalAidl {

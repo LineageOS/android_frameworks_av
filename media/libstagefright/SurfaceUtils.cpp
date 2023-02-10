@@ -193,9 +193,37 @@ status_t setNativeWindowRotation(
 
 status_t pushBlankBuffersToNativeWindow(ANativeWindow *nativeWindow /* nonnull */) {
     status_t err = NO_ERROR;
-    ANativeWindowBuffer* anb = NULL;
+    ANativeWindowBuffer* anb = nullptr;
     int numBufs = 0;
     int minUndequeuedBufs = 0;
+
+    auto handleError = [](ANativeWindow *nativeWindow, ANativeWindowBuffer* anb, status_t err)
+    {
+        if (anb != nullptr) {
+            nativeWindow->cancelBuffer(nativeWindow, anb, -1);
+            anb = nullptr;
+        }
+
+        // Clean up after success or error.
+        status_t err2 = native_window_api_disconnect(nativeWindow, NATIVE_WINDOW_API_CPU);
+        if (err2 != NO_ERROR) {
+            ALOGE("error pushing blank frames: api_disconnect failed: %s (%d)",
+                    strerror(-err2), -err2);
+            if (err == NO_ERROR) {
+                err = err2;
+            }
+        }
+
+        err2 = nativeWindowConnect(nativeWindow, "pushBlankBuffersToNativeWindow(err2)");
+        if (err2 != NO_ERROR) {
+            ALOGE("error pushing blank frames: api_connect failed: %s (%d)", strerror(-err), -err);
+            if (err == NO_ERROR) {
+                err = err2;
+            }
+        }
+
+        return err;
+    };
 
     // We need to reconnect to the ANativeWindow as a CPU client to ensure that
     // no frames get dropped by SurfaceFlinger assuming that these are video
@@ -217,7 +245,7 @@ status_t pushBlankBuffersToNativeWindow(ANativeWindow *nativeWindow /* nonnull *
             nativeWindow, 1, 1, HAL_PIXEL_FORMAT_RGBX_8888, 0, GRALLOC_USAGE_SW_WRITE_OFTEN,
             false /* reconnect */);
     if (err != NO_ERROR) {
-        goto error;
+        return handleError(nativeWindow, anb, err);
     }
 
     static_cast<Surface*>(nativeWindow)->getIGraphicBufferProducer()->allowAllocation(true);
@@ -232,14 +260,14 @@ status_t pushBlankBuffersToNativeWindow(ANativeWindow *nativeWindow /* nonnull *
     if (err != NO_ERROR) {
         ALOGE("error pushing blank frames: MIN_UNDEQUEUED_BUFFERS query "
                 "failed: %s (%d)", strerror(-err), -err);
-        goto error;
+        return handleError(nativeWindow, anb, err);
     }
 
     numBufs = minUndequeuedBufs + 1;
     err = native_window_set_buffer_count(nativeWindow, numBufs);
     if (err != NO_ERROR) {
         ALOGE("error pushing blank frames: set_buffer_count failed: %s (%d)", strerror(-err), -err);
-        goto error;
+        return handleError(nativeWindow, anb, err);
     }
 
     // We push numBufs + 1 buffers to ensure that we've drawn into the same
@@ -257,7 +285,7 @@ status_t pushBlankBuffersToNativeWindow(ANativeWindow *nativeWindow /* nonnull *
         sp<GraphicBuffer> buf(GraphicBuffer::from(anb));
 
         // Fill the buffer with the a 1x1 checkerboard pattern ;)
-        uint32_t *img = NULL;
+        uint32_t *img = nullptr;
         err = buf->lock(GRALLOC_USAGE_SW_WRITE_OFTEN, (void**)(&img));
         if (err != NO_ERROR) {
             ALOGE("error pushing blank frames: lock failed: %s (%d)", strerror(-err), -err);
@@ -278,34 +306,10 @@ status_t pushBlankBuffersToNativeWindow(ANativeWindow *nativeWindow /* nonnull *
             break;
         }
 
-        anb = NULL;
+        anb = nullptr;
     }
 
-error:
-
-    if (anb != NULL) {
-        nativeWindow->cancelBuffer(nativeWindow, anb, -1);
-        anb = NULL;
-    }
-
-    // Clean up after success or error.
-    status_t err2 = native_window_api_disconnect(nativeWindow, NATIVE_WINDOW_API_CPU);
-    if (err2 != NO_ERROR) {
-        ALOGE("error pushing blank frames: api_disconnect failed: %s (%d)", strerror(-err2), -err2);
-        if (err == NO_ERROR) {
-            err = err2;
-        }
-    }
-
-    err2 = nativeWindowConnect(nativeWindow, "pushBlankBuffersToNativeWindow(err2)");
-    if (err2 != NO_ERROR) {
-        ALOGE("error pushing blank frames: api_connect failed: %s (%d)", strerror(-err), -err);
-        if (err == NO_ERROR) {
-            err = err2;
-        }
-    }
-
-    return err;
+    return handleError(nativeWindow, anb, err);
 }
 
 status_t nativeWindowConnect(ANativeWindow *surface, const char *reason) {

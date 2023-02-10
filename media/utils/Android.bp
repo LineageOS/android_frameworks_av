@@ -103,6 +103,13 @@ cc_library {
 
     logtags: ["EventLogTags.logtags"],
 
+    cflags: [
+        "-Wall",
+        "-Wextra",
+        "-Werror",
+        "-Wthread-safety",
+    ],
+
     export_shared_lib_headers: [
         "libpermission",
     ],

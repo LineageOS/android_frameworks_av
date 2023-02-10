@@ -22,6 +22,7 @@
 
 #include <aidl/android/hardware/audio/core/BpModule.h>
 #include <aidl/android/hardware/audio/core/sounddose/BpSoundDose.h>
+#include <android-base/thread_annotations.h>
 #include <media/audiohal/DeviceHalInterface.h>
 #include <media/audiohal/EffectHalInterface.h>
 
@@ -29,7 +30,35 @@
 
 namespace android {
 
-class DeviceHalAidl : public DeviceHalInterface, public ConversionHelperAidl {
+class StreamOutHalInterfaceCallback;
+class StreamOutHalInterfaceEventCallback;
+class StreamOutHalInterfaceLatencyModeCallback;
+
+// The role of the broker is to connect AIDL callback interface implementations
+// with StreamOut callback implementations. Since AIDL requires all callbacks
+// to be provided upfront, while libaudiohal interfaces allow late registration,
+// there is a need to coordinate the matching process.
+class CallbackBroker : public virtual RefBase {
+  public:
+    virtual ~CallbackBroker() = default;
+    // The cookie is always the stream instance pointer. We don't use weak pointers to avoid extra
+    // costs on reference counting. The stream cleans up related entries on destruction. Since
+    // access to the callbacks map is synchronized, the possibility for pointer aliasing due to
+    // allocation of a new stream at the address of previously deleted stream is avoided.
+    virtual void clearCallbacks(void* cookie) = 0;
+    virtual sp<StreamOutHalInterfaceCallback> getStreamOutCallback(void* cookie) = 0;
+    virtual void setStreamOutCallback(void* cookie, const sp<StreamOutHalInterfaceCallback>&) = 0;
+    virtual sp<StreamOutHalInterfaceEventCallback> getStreamOutEventCallback(void* cookie) = 0;
+    virtual void setStreamOutEventCallback(void* cookie,
+            const sp<StreamOutHalInterfaceEventCallback>&) = 0;
+    virtual sp<StreamOutHalInterfaceLatencyModeCallback> getStreamOutLatencyModeCallback(
+            void* cookie) = 0;
+    virtual void setStreamOutLatencyModeCallback(
+            void* cookie, const sp<StreamOutHalInterfaceLatencyModeCallback>&) = 0;
+};
+
+class DeviceHalAidl : public DeviceHalInterface, public ConversionHelperAidl,
+                      public CallbackBroker {
   public:
     // Sets the value of 'devices' to a bitmask of 1 or more values of audio_devices_t.
     status_t getSupportedDevices(uint32_t *devices) override;
@@ -127,6 +156,12 @@ class DeviceHalAidl : public DeviceHalInterface, public ConversionHelperAidl {
 
   private:
     friend class sp<DeviceHalAidl>;
+
+    struct Callbacks {  // No need to use `atomic_wp` because access is serialized.
+        wp<StreamOutHalInterfaceCallback> out;
+        wp<StreamOutHalInterfaceEventCallback> event;
+        wp<StreamOutHalInterfaceLatencyModeCallback> latency;
+    };
     using Patches = std::map<int32_t /*patch ID*/,
             ::aidl::android::hardware::audio::core::AudioPatch>;
     using PortConfigs = std::map<int32_t /*port config ID*/,
@@ -195,6 +230,21 @@ class DeviceHalAidl : public DeviceHalInterface, public ConversionHelperAidl {
     void resetPatch(int32_t patchId);
     void resetPortConfig(int32_t portConfigId);
 
+    // CallbackBroker implementation
+    void clearCallbacks(void* cookie) override;
+    sp<StreamOutHalInterfaceCallback> getStreamOutCallback(void* cookie) override;
+    void setStreamOutCallback(void* cookie, const sp<StreamOutHalInterfaceCallback>& cb) override;
+    sp<StreamOutHalInterfaceEventCallback> getStreamOutEventCallback(void* cookie) override;
+    void setStreamOutEventCallback(void* cookie,
+            const sp<StreamOutHalInterfaceEventCallback>& cb) override;
+    sp<StreamOutHalInterfaceLatencyModeCallback> getStreamOutLatencyModeCallback(
+            void* cookie) override;
+    void setStreamOutLatencyModeCallback(
+            void* cookie, const sp<StreamOutHalInterfaceLatencyModeCallback>& cb) override;
+    // Implementation helpers.
+    template<class C> sp<C> getCallbackImpl(void* cookie, wp<C> Callbacks::* field);
+    template<class C> void setCallbackImpl(void* cookie, wp<C> Callbacks::* field, const sp<C>& cb);
+
     const std::string mInstance;
     const std::shared_ptr<::aidl::android::hardware::audio::core::IModule> mModule;
     std::shared_ptr<::aidl::android::hardware::audio::core::sounddose::ISoundDose>
@@ -204,7 +254,9 @@ class DeviceHalAidl : public DeviceHalInterface, public ConversionHelperAidl {
     int32_t mDefaultOutputPortId = -1;
     PortConfigs mPortConfigs;
     Patches mPatches;
-    std::map<audio_patch_handle_t, int32_t /* patch ID */> mFwkHandles;
+    std::map<audio_patch_handle_t, int32_t /*patch ID*/> mFwkHandles;
+    std::mutex mLock;
+    std::map<void*, Callbacks> mCallbacks GUARDED_BY(mLock);
 };
 
 } // namespace android

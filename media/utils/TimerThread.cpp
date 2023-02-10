@@ -288,6 +288,7 @@ TimerThread::MonitorThread::~MonitorThread() {
 
 void TimerThread::MonitorThread::threadFunc() {
     std::unique_lock _l(mMutex);
+    ::android::base::ScopedLockAssertion lock_assertion(mMutex);
     while (!mShouldExit) {
         Handle nextDeadline = INVALID_HANDLE;
         Handle now = INVALID_HANDLE;
@@ -381,6 +382,7 @@ TimerThread::Handle TimerThread::MonitorThread::add(
 std::shared_ptr<const TimerThread::Request> TimerThread::MonitorThread::remove(Handle handle) {
     std::pair<std::shared_ptr<const Request>, TimerCallback> data;
     std::unique_lock ul(mMutex);
+    ::android::base::ScopedLockAssertion lock_assertion(mMutex);
     if (const auto it = mMonitorRequests.find(handle);
         it != mMonitorRequests.end()) {
         data = std::move(it->second);
