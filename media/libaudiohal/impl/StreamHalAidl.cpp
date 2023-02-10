@@ -286,12 +286,13 @@ status_t StreamHalAidl::transfer(void *buffer, size_t bytes, size_t *transferred
     if (status_t status = sendCommand(burst, &reply); status != OK) {
         return status;
     }
+    *transferred = reply.fmqByteCount;
     if (mIsInput) {
-        *transferred = reply.fmqByteCount;
         LOG_ALWAYS_FATAL_IF(*transferred > bytes,
                 "%s: HAL module read %zu bytes, which exceeds requested count %zu",
                 __func__, *transferred, bytes);
-        if (!mContext.getDataMQ()->read(static_cast<int8_t*>(buffer), *transferred)) {
+        if (!mContext.getDataMQ()->read(static_cast<int8_t*>(buffer),
+                                        mContext.getDataMQ()->availableToRead())) {
             ALOGE("%s: failed to read %zu bytes to data MQ", __func__, *transferred);
             return NOT_ENOUGH_DATA;
         }
