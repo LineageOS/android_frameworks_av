@@ -123,7 +123,7 @@ struct DrmHalAidl : public IDrm{
     ::ndk::ScopedAStatus onSessionLostState(const std::vector<uint8_t>& in_sessionId);
   private:
     static Mutex mLock;
-    mutable MediaDrmMetrics mMetrics;
+    std::shared_ptr<MediaDrmMetrics> mMetrics;
     std::shared_ptr<DrmHalListener> mListener;
     const std::vector<std::shared_ptr<IDrmFactoryAidl>> mFactories;
     std::shared_ptr<IDrmPluginAidl> mPlugin;
