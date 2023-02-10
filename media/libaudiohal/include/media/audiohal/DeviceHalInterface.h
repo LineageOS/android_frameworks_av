@@ -35,7 +35,7 @@ namespace android {
 class StreamInHalInterface;
 class StreamOutHalInterface;
 
-class DeviceHalInterface : public RefBase
+class DeviceHalInterface : public virtual RefBase
 {
   public:
     // Sets the value of 'devices' to a bitmask of 1 or more values of audio_devices_t.

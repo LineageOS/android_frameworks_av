@@ -136,29 +136,15 @@ status_t EffectConversionHelperAidl::handleGetParameter(uint32_t cmdSize, const 
     return ret;
 }
 
-status_t EffectConversionHelperAidl::handleSetConfig(uint32_t cmdSize, const void* pCmdData,
+status_t EffectConversionHelperAidl::handleSetConfig(uint32_t cmdSize,
+                                                     const void* pCmdData __unused,
                                                      uint32_t* replySize, void* pReplyData) {
     if (!replySize || *replySize != sizeof(int) || !pReplyData ||
         cmdSize != sizeof(effect_config_t)) {
         return BAD_VALUE;
     }
 
-    return *static_cast<int32_t*>(pReplyData) = OK;
-    const auto& legacyConfig = static_cast<const effect_config_t*>(pCmdData);
-    // already open, apply latest settings
-    Parameter::Common common;
-    common.input.base =
-            VALUE_OR_RETURN_STATUS(::aidl::android::legacy2aidl_buffer_config_t_AudioConfigBase(
-                    legacyConfig->inputCfg, true /* isInput */));
-    common.output.base =
-            VALUE_OR_RETURN_STATUS(::aidl::android::legacy2aidl_buffer_config_t_AudioConfigBase(
-                    legacyConfig->outputCfg, false /* isInput */));
-    common.session = mSessionId;
-    common.ioHandle = mIoId;
-    // TODO: add access mode support
-    RETURN_STATUS_IF_ERROR(statusTFromBinderStatus(
-            mEffect->setParameter(Parameter::make<Parameter::common>(common))));
-    mCommon = common;
+    // TODO: need to implement setConfig with setParameter(common)
     return *static_cast<int32_t*>(pReplyData) = OK;
 }
 

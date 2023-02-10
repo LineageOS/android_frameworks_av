@@ -20,6 +20,8 @@
 #include <algorithm>
 #include <forward_list>
 
+#include <aidl/android/hardware/audio/core/BnStreamCallback.h>
+#include <aidl/android/hardware/audio/core/BnStreamOutEventCallback.h>
 #include <aidl/android/hardware/audio/core/StreamDescriptor.h>
 #include <error/expected_utils.h>
 #include <media/AidlConversionCppNdk.h>
@@ -37,6 +39,7 @@ using aidl::android::media::audio::common::AudioDevice;
 using aidl::android::media::audio::common::AudioDeviceType;
 using aidl::android::media::audio::common::AudioInputFlags;
 using aidl::android::media::audio::common::AudioIoFlags;
+using aidl::android::media::audio::common::AudioLatencyMode;
 using aidl::android::media::audio::common::AudioMode;
 using aidl::android::media::audio::common::AudioOutputFlags;
 using aidl::android::media::audio::common::AudioPort;
@@ -299,6 +302,123 @@ status_t DeviceHalAidl::prepareToOpenStream(
     return OK;
 }
 
+namespace {
+
+class StreamCallbackBase {
+  protected:
+    explicit StreamCallbackBase(const sp<CallbackBroker>& broker) : mBroker(broker) {}
+  public:
+    void* getCookie() const { return mCookie; }
+    void setCookie(void* cookie) { mCookie = cookie; }
+    sp<CallbackBroker> getBroker() const {
+        if (void* cookie = mCookie; cookie != nullptr) return mBroker.promote();
+        return nullptr;
+    }
+  private:
+    const wp<CallbackBroker> mBroker;
+    std::atomic<void*> mCookie;
+};
+
+template<class C>
+class StreamCallbackBaseHelper {
+  protected:
+    explicit StreamCallbackBaseHelper(const StreamCallbackBase& base) : mBase(base) {}
+    sp<C> getCb(const sp<CallbackBroker>& broker, void* cookie);
+    using CbRef = const sp<C>&;
+    ndk::ScopedAStatus runCb(const std::function<void(CbRef cb)>& f) {
+        if (auto cb = getCb(mBase.getBroker(), mBase.getCookie()); cb != nullptr) f(cb);
+        return ndk::ScopedAStatus::ok();
+    }
+  private:
+    const StreamCallbackBase& mBase;
+};
+
+template<>
+sp<StreamOutHalInterfaceCallback> StreamCallbackBaseHelper<StreamOutHalInterfaceCallback>::getCb(
+        const sp<CallbackBroker>& broker, void* cookie) {
+    if (broker != nullptr) return broker->getStreamOutCallback(cookie);
+    return nullptr;
+}
+
+template<>
+sp<StreamOutHalInterfaceEventCallback>
+StreamCallbackBaseHelper<StreamOutHalInterfaceEventCallback>::getCb(
+        const sp<CallbackBroker>& broker, void* cookie) {
+    if (broker != nullptr) return broker->getStreamOutEventCallback(cookie);
+    return nullptr;
+}
+
+template<>
+sp<StreamOutHalInterfaceLatencyModeCallback>
+StreamCallbackBaseHelper<StreamOutHalInterfaceLatencyModeCallback>::getCb(
+        const sp<CallbackBroker>& broker, void* cookie) {
+    if (broker != nullptr) return broker->getStreamOutLatencyModeCallback(cookie);
+    return nullptr;
+}
+
+/*
+Note on the callback ownership.
+
+In the Binder ownership model, the server implementation is kept alive
+as long as there is any client (proxy object) alive. This is done by
+incrementing the refcount of the server-side object by the Binder framework.
+When it detects that the last client is gone, it decrements the refcount back.
+
+Thus, it is not needed to keep any references to StreamCallback on our
+side (after we have sent an instance to the client), because we are
+the server-side. The callback object will be kept alive as long as the HAL server
+holds a strong ref to IStreamCallback proxy.
+*/
+
+class OutputStreamCallbackAidl : public StreamCallbackBase,
+                             public StreamCallbackBaseHelper<StreamOutHalInterfaceCallback>,
+                             public ::aidl::android::hardware::audio::core::BnStreamCallback {
+  public:
+    explicit OutputStreamCallbackAidl(const sp<CallbackBroker>& broker)
+            : StreamCallbackBase(broker),
+              StreamCallbackBaseHelper<StreamOutHalInterfaceCallback>(
+                      *static_cast<StreamCallbackBase*>(this)) {}
+    ndk::ScopedAStatus onTransferReady() override {
+        return runCb([](CbRef cb) { cb->onWriteReady(); });
+    }
+    ndk::ScopedAStatus onError() override {
+        return runCb([](CbRef cb) { cb->onError(); });
+    }
+    ndk::ScopedAStatus onDrainReady() override {
+        return runCb([](CbRef cb) { cb->onDrainReady(); });
+    }
+};
+
+class OutputStreamEventCallbackAidl :
+            public StreamCallbackBase,
+            public StreamCallbackBaseHelper<StreamOutHalInterfaceEventCallback>,
+            public StreamCallbackBaseHelper<StreamOutHalInterfaceLatencyModeCallback>,
+            public ::aidl::android::hardware::audio::core::BnStreamOutEventCallback {
+  public:
+    explicit OutputStreamEventCallbackAidl(const sp<CallbackBroker>& broker)
+            : StreamCallbackBase(broker),
+              StreamCallbackBaseHelper<StreamOutHalInterfaceEventCallback>(
+                      *static_cast<StreamCallbackBase*>(this)),
+              StreamCallbackBaseHelper<StreamOutHalInterfaceLatencyModeCallback>(
+                      *static_cast<StreamCallbackBase*>(this)) {}
+    ndk::ScopedAStatus onCodecFormatChanged(const std::vector<uint8_t>& in_audioMetadata) override {
+        std::basic_string<uint8_t> halMetadata(in_audioMetadata.begin(), in_audioMetadata.end());
+        return StreamCallbackBaseHelper<StreamOutHalInterfaceEventCallback>::runCb(
+                [&halMetadata](auto cb) { cb->onCodecFormatChanged(halMetadata); });
+    }
+    ndk::ScopedAStatus onRecommendedLatencyModeChanged(
+            const std::vector<AudioLatencyMode>& in_modes) override {
+        auto halModes = VALUE_OR_FATAL(
+                ::aidl::android::convertContainer<std::vector<audio_latency_mode_t>>(
+                        in_modes,
+                        ::aidl::android::aidl2legacy_AudioLatencyMode_audio_latency_mode_t));
+        return StreamCallbackBaseHelper<StreamOutHalInterfaceLatencyModeCallback>::runCb(
+                [&halModes](auto cb) { cb->onRecommendedLatencyModeChanged(halModes); });
+    }
+};
+
+}  // namespace
+
 status_t DeviceHalAidl::openOutputStream(
         audio_io_handle_t handle, audio_devices_t devices,
         audio_output_flags_t flags, struct audio_config* config,
@@ -326,8 +446,19 @@ status_t DeviceHalAidl::openOutputStream(
                     &cleanups, &aidlConfig, &mixPortConfig, &nominalLatency));
     ::aidl::android::hardware::audio::core::IModule::OpenOutputStreamArguments args;
     args.portConfigId = mixPortConfig.id;
-    args.offloadInfo = aidlConfig.offloadInfo;
+    const bool isOffload = isBitPositionFlagSet(
+            aidlOutputFlags, AudioOutputFlags::COMPRESS_OFFLOAD);
+    std::shared_ptr<OutputStreamCallbackAidl> streamCb;
+    if (isOffload) {
+        streamCb = ndk::SharedRefBase::make<OutputStreamCallbackAidl>(this);
+    }
+    auto eventCb = ndk::SharedRefBase::make<OutputStreamEventCallbackAidl>(this);
+    if (isOffload) {
+        args.offloadInfo = aidlConfig.offloadInfo;
+        args.callback = streamCb;
+    }
     args.bufferSizeFrames = aidlConfig.frameCount;
+    args.eventCallback = eventCb;
     ::aidl::android::hardware::audio::core::IModule::OpenOutputStreamReturn ret;
     RETURN_STATUS_IF_ERROR(statusTFromBinderStatus(mModule->openOutputStream(args, &ret)));
     StreamContextAidl context(ret.desc);
@@ -337,7 +468,14 @@ status_t DeviceHalAidl::openOutputStream(
         return NO_INIT;
     }
     *outStream = sp<StreamOutHalAidl>::make(*config, std::move(context), nominalLatency,
-            std::move(ret.stream));
+            std::move(ret.stream), this /*callbackBroker*/);
+    void* cbCookie = (*outStream).get();
+    {
+        std::lock_guard l(mLock);
+        mCallbacks.emplace(cbCookie, Callbacks{});
+    }
+    if (streamCb) streamCb->setCookie(cbCookie);
+    eventCb->setCookie(cbCookie);
     cleanups.disarmAll();
     return OK;
 }
@@ -881,6 +1019,57 @@ void DeviceHalAidl::resetPortConfig(int32_t portConfigId) {
         return;
     }
     ALOGE("%s: port config id %d not found", __func__, portConfigId);
+}
+
+void DeviceHalAidl::clearCallbacks(void* cookie) {
+    std::lock_guard l(mLock);
+    mCallbacks.erase(cookie);
+}
+
+sp<StreamOutHalInterfaceCallback> DeviceHalAidl::getStreamOutCallback(void* cookie) {
+    return getCallbackImpl(cookie, &Callbacks::out);
+}
+
+void DeviceHalAidl::setStreamOutCallback(
+        void* cookie, const sp<StreamOutHalInterfaceCallback>& cb) {
+    setCallbackImpl(cookie, &Callbacks::out, cb);
+}
+
+sp<StreamOutHalInterfaceEventCallback> DeviceHalAidl::getStreamOutEventCallback(
+        void* cookie) {
+    return getCallbackImpl(cookie, &Callbacks::event);
+}
+
+void DeviceHalAidl::setStreamOutEventCallback(
+        void* cookie, const sp<StreamOutHalInterfaceEventCallback>& cb) {
+    setCallbackImpl(cookie, &Callbacks::event, cb);
+}
+
+sp<StreamOutHalInterfaceLatencyModeCallback> DeviceHalAidl::getStreamOutLatencyModeCallback(
+        void* cookie) {
+    return getCallbackImpl(cookie, &Callbacks::latency);
+}
+
+void DeviceHalAidl::setStreamOutLatencyModeCallback(
+        void* cookie, const sp<StreamOutHalInterfaceLatencyModeCallback>& cb) {
+    setCallbackImpl(cookie, &Callbacks::latency, cb);
+}
+
+template<class C>
+sp<C> DeviceHalAidl::getCallbackImpl(void* cookie, wp<C> DeviceHalAidl::Callbacks::* field) {
+    std::lock_guard l(mLock);
+    if (auto it = mCallbacks.find(cookie); it != mCallbacks.end()) {
+        return ((it->second).*field).promote();
+    }
+    return nullptr;
+}
+template<class C>
+void DeviceHalAidl::setCallbackImpl(
+        void* cookie, wp<C> DeviceHalAidl::Callbacks::* field, const sp<C>& cb) {
+    std::lock_guard l(mLock);
+    if (auto it = mCallbacks.find(cookie); it != mCallbacks.end()) {
+        (it->second).*field = cb;
+    }
 }
 
 } // namespace android
