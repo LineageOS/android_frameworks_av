@@ -34,6 +34,8 @@ namespace android {
 namespace effect {
 
 using ::aidl::android::aidl_utils::statusTFromBinderStatus;
+using ::aidl::android::getParameterSpecificField;
+using ::aidl::android::hardware::audio::effect::LoudnessEnhancer;
 using ::aidl::android::hardware::audio::effect::Parameter;
 using ::android::status_t;
 using utils::EffectParamReader;
@@ -41,27 +43,52 @@ using utils::EffectParamWriter;
 
 status_t AidlConversionLoudnessEnhancer::setParameter(EffectParamReader& param) {
     uint32_t type = 0;
-    uint16_t value = 0;
+    int32_t gain = 0;
     if (!param.validateParamValueSize(sizeof(uint32_t), sizeof(uint16_t)) ||
-        OK != param.readFromParameter(&type) || OK != param.readFromValue(&value)) {
+        OK != param.readFromParameter(&type) || OK != param.readFromValue(&gain)) {
         ALOGE("%s invalid param %s", __func__, param.toString().c_str());
         return BAD_VALUE;
     }
     Parameter aidlParam;
-    // TODO
+    switch (type) {
+        case LOUDNESS_ENHANCER_PARAM_TARGET_GAIN_MB: {
+            aidlParam = MAKE_SPECIFIC_PARAMETER(LoudnessEnhancer, loudnessEnhancer, gainMb, gain);
+            break;
+        }
+        default: {
+            // TODO: implement vendor extension parameters
+            ALOGW("%s unknown param %s", __func__, param.toString().c_str());
+            return BAD_VALUE;
+        }
+    }
     return statusTFromBinderStatus(mEffect->setParameter(aidlParam));
 }
 
 status_t AidlConversionLoudnessEnhancer::getParameter(EffectParamWriter& param) {
-    uint32_t type = 0, value = 0;
+    uint32_t type = 0;
     if (!param.validateParamValueSize(sizeof(uint32_t), sizeof(uint32_t)) ||
         OK != param.readFromParameter(&type)) {
         ALOGE("%s invalid param %s", __func__, param.toString().c_str());
         param.setStatus(BAD_VALUE);
         return BAD_VALUE;
     }
-    // TODO
-    return param.writeToValue(&value);
+    switch (type) {
+        case LOUDNESS_ENHANCER_PARAM_TARGET_GAIN_MB: {
+            Parameter aidlParam;
+            Parameter::Id id = MAKE_SPECIFIC_PARAMETER_ID(LoudnessEnhancer, loudnessEnhancerTag,
+                                                        LoudnessEnhancer::gainMb);
+            RETURN_STATUS_IF_ERROR(statusTFromBinderStatus(mEffect->getParameter(id, &aidlParam)));
+            int32_t gain = VALUE_OR_RETURN_STATUS(GET_PARAMETER_SPECIFIC_FIELD(
+                    aidlParam, LoudnessEnhancer, loudnessEnhancer, LoudnessEnhancer::gainMb,
+                    std::decay_t<decltype(gain)>));
+            return param.writeToValue(&gain);
+        }
+        default: {
+            // TODO: implement vendor extension parameters
+            ALOGW("%s unknown param %s", __func__, param.toString().c_str());
+            return BAD_VALUE;
+        }
+    }
 }
 
 } // namespace effect
