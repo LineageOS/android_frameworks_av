@@ -34,6 +34,7 @@ namespace android {
 namespace effect {
 
 using ::aidl::android::aidl_utils::statusTFromBinderStatus;
+using ::aidl::android::hardware::audio::effect::HapticGenerator;
 using ::aidl::android::hardware::audio::effect::Parameter;
 using ::android::status_t;
 using utils::EffectParamReader;
@@ -41,27 +42,52 @@ using utils::EffectParamWriter;
 
 status_t AidlConversionHapticGenerator::setParameter(EffectParamReader& param) {
     uint32_t type = 0;
-    uint16_t value = 0;
     if (!param.validateParamValueSize(sizeof(uint32_t), sizeof(uint16_t)) ||
-        OK != param.readFromParameter(&type) || OK != param.readFromValue(&value)) {
+        OK != param.readFromParameter(&type)) {
         ALOGE("%s invalid param %s", __func__, param.toString().c_str());
         return BAD_VALUE;
     }
     Parameter aidlParam;
-    // TODO
+    switch (type) {
+        case HG_PARAM_HAPTIC_INTENSITY: {
+            int32_t id = 0, scale;
+            if (OK != param.readFromValue(&id) || OK != param.readFromValue(&scale)) {
+                ALOGE("%s invalid intensity %s", __func__, param.toString().c_str());
+                return BAD_VALUE;
+            }
+            HapticGenerator::HapticScale hpScale(
+                    {.id = id, .scale = (HapticGenerator::VibratorScale)(scale)});
+            aidlParam = MAKE_SPECIFIC_PARAMETER(HapticGenerator, hapticGenerator, hapticScales,
+                                                {hpScale});
+            break;
+        }
+        case HG_PARAM_VIBRATOR_INFO: {
+            float resonantFrequencyHz, qFactor, maxAmplitude;
+            if (OK != param.readFromValue(&resonantFrequencyHz) ||
+                OK != param.readFromValue(&qFactor) || OK != param.readFromValue(&maxAmplitude)) {
+                ALOGE("%s invalid vibrator info %s", __func__, param.toString().c_str());
+                return BAD_VALUE;
+            }
+            HapticGenerator::VibratorInformation info({.resonantFrequencyHz = resonantFrequencyHz,
+                                                       .qFactor = qFactor,
+                                                       .maxAmplitude = maxAmplitude});
+            aidlParam =
+                    MAKE_SPECIFIC_PARAMETER(HapticGenerator, hapticGenerator, vibratorInfo, info);
+            break;
+        }
+        default: {
+            // TODO: implement vendor extension parameters
+            ALOGW("%s unknown param %s", __func__, param.toString().c_str());
+            return BAD_VALUE;
+        }
+    }
+
     return statusTFromBinderStatus(mEffect->setParameter(aidlParam));
 }
 
-status_t AidlConversionHapticGenerator::getParameter(EffectParamWriter& param) {
-    uint32_t type = 0, value = 0;
-    if (!param.validateParamValueSize(sizeof(uint32_t), sizeof(uint32_t)) ||
-        OK != param.readFromParameter(&type)) {
-        ALOGE("%s invalid param %s", __func__, param.toString().c_str());
-        param.setStatus(BAD_VALUE);
-        return BAD_VALUE;
-    }
-    // TODO
-    return param.writeToValue(&value);
+// No parameter to get for HapticGenerator
+status_t AidlConversionHapticGenerator::getParameter(EffectParamWriter& param __unused) {
+    return OK;
 }
 
 } // namespace effect
