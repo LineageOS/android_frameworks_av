@@ -64,7 +64,8 @@ C2SoftAomEnc::IntfImpl::IntfImpl(const std::shared_ptr<C2ReflectorHelper>& helpe
                                  0u, C2Config::BITRATE_VARIABLE))
                          .withFields({C2F(mBitrateMode, value)
                                               .oneOf({C2Config::BITRATE_CONST,
-                                                      C2Config::BITRATE_VARIABLE})})
+                                                      C2Config::BITRATE_VARIABLE,
+                                                      C2Config::BITRATE_IGNORE})})
                          .withSetter(Setter<decltype(*mBitrateMode)>::StrictValueWithNoDeps)
                          .build());
 
@@ -85,6 +86,12 @@ C2SoftAomEnc::IntfImpl::IntfImpl(const std::shared_ptr<C2ReflectorHelper>& helpe
                          .withDefault(new C2StreamBitrateInfo::output(0u, 64000))
                          .withFields({C2F(mBitrate, value).inRange(4096, 40000000)})
                          .withSetter(BitrateSetter)
+                         .build());
+
+    addParameter(DefineParam(mQuality, C2_PARAMKEY_QUALITY)
+                         .withDefault(new C2StreamQualityTuning::output(0u, 80))
+                         .withFields({C2F(mQuality, value).inRange(0, 100)})
+                         .withSetter(Setter<decltype(*mQuality)>::NonStrictValueWithNoDeps)
                          .build());
 
     addParameter(DefineParam(mIntraRefresh, C2_PARAMKEY_INTRA_REFRESH)
@@ -293,6 +300,12 @@ c2_status_t C2SoftAomEnc::onFlush_sm() {
     return onStop();
 }
 
+// c2Quality is in range of 0-100 (the more - the better),
+// for AOM quality we are using a range of 15-50 (the less - the better)
+static int MapC2QualityToAOMQuality (int c2Quality) {
+    return 15 + 35 * (100 - c2Quality) / 100;
+}
+
 aom_codec_err_t C2SoftAomEnc::setupCodecParameters() {
     aom_codec_err_t codec_return = AOM_CODEC_OK;
 
@@ -391,6 +404,15 @@ aom_codec_err_t C2SoftAomEnc::setupCodecParameters() {
     codec_return = aom_codec_control(mCodecContext, AV1E_SET_MAX_REFERENCE_FRAMES, 3);
     if (codec_return != AOM_CODEC_OK) goto BailOut;
 
+    if (mBitrateControlMode == AOM_Q) {
+        const int aomCQLevel = MapC2QualityToAOMQuality(mQuality->value);
+        ALOGV("Set Q from %d to CQL %d",
+              mQuality->value, aomCQLevel);
+
+        codec_return = aom_codec_control(mCodecContext, AOME_SET_CQ_LEVEL, aomCQLevel);
+        if (codec_return != AOM_CODEC_OK) goto BailOut;
+    }
+
     ColorAspects sfAspects;
     if (!C2Mapper::map(mColorAspects->primaries, &sfAspects.mPrimaries)) {
         sfAspects.mPrimaries = android::ColorAspects::PrimariesUnspecified;
@@ -438,12 +460,16 @@ status_t C2SoftAomEnc::initEncoder() {
         mIntraRefresh = mIntf->getIntraRefresh_l();
         mRequestSync = mIntf->getRequestSync_l();
         mColorAspects = mIntf->getCodedColorAspects_l();
+        mQuality = mIntf->getQuality_l();
     }
 
 
     switch (mBitrateMode->value) {
         case C2Config::BITRATE_CONST:
             mBitrateControlMode = AOM_CBR;
+            break;
+        case C2Config::BITRATE_IGNORE:
+            mBitrateControlMode = AOM_Q;
             break;
         case C2Config::BITRATE_VARIABLE:
             [[fallthrough]];
@@ -484,7 +510,7 @@ status_t C2SoftAomEnc::initEncoder() {
     mCodecConfiguration->g_timebase.den = 1000000;
     // rc_target_bitrate is in kbps, mBitrate in bps
     mCodecConfiguration->rc_target_bitrate = (mBitrate->value + 500) / 1000;
-    mCodecConfiguration->rc_end_usage = AOM_CBR;
+    mCodecConfiguration->rc_end_usage = mBitrateControlMode == AOM_Q ? AOM_Q : AOM_CBR;
     // Disable frame drop - not allowed in MediaCodec now.
     mCodecConfiguration->rc_dropframe_thresh = 0;
     // Disable lagged encoding.
