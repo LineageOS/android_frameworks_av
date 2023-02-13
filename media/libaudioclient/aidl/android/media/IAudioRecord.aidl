@@ -16,7 +16,7 @@
 
 package android.media;
 
-import android.media.MicrophoneInfoData;
+import android.media.MicrophoneInfoFw;
 
 /**
  * Native code must specify namespace media (media::IAudioRecord) when referring to this class.
@@ -39,7 +39,7 @@ interface IAudioRecord {
 
   /* Get a list of current active microphones.
    */
-  void getActiveMicrophones(out MicrophoneInfoData[] activeMicrophones);
+  void getActiveMicrophones(out MicrophoneInfoFw[] activeMicrophones);
 
   /* Set the microphone direction (for processing).
    */

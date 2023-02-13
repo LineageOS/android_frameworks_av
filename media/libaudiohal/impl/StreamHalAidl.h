@@ -328,7 +328,7 @@ class StreamInHalAidl : public StreamInHalInterface, public StreamHalAidl {
     status_t getCapturePosition(int64_t *frames, int64_t *time) override;
 
     // Get active microphones
-    status_t getActiveMicrophones(std::vector<media::MicrophoneInfo> *microphones) override;
+    status_t getActiveMicrophones(std::vector<media::MicrophoneInfoFw> *microphones) override;
 
     // Set microphone direction (for processing)
     status_t setPreferredMicrophoneDirection(

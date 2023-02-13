@@ -32,7 +32,6 @@
 #include <system/audio_effect.h>
 #include <system/audio_policy.h>
 #include <utils/String8.h>
-#include <media/MicrophoneInfo.h>
 #include <map>
 #include <string>
 #include <vector>
@@ -342,7 +341,7 @@ public:
     virtual size_t frameCountHAL(audio_io_handle_t ioHandle) const = 0;
 
     /* List available microphones and their characteristics */
-    virtual status_t getMicrophones(std::vector<media::MicrophoneInfo> *microphones) = 0;
+    virtual status_t getMicrophones(std::vector<media::MicrophoneInfoFw> *microphones) = 0;
 
     virtual status_t setAudioHalPids(const std::vector<pid_t>& pids) = 0;
 
@@ -470,7 +469,7 @@ public:
     status_t audioPolicyReady() override;
 
     size_t frameCountHAL(audio_io_handle_t ioHandle) const override;
-    status_t getMicrophones(std::vector<media::MicrophoneInfo>* microphones) override;
+    status_t getMicrophones(std::vector<media::MicrophoneInfoFw>* microphones) override;
     status_t setAudioHalPids(const std::vector<pid_t>& pids) override;
     status_t setVibratorInfos(const std::vector<media::AudioVibratorInfo>& vibratorInfos) override;
     status_t updateSecondaryOutputs(
@@ -698,7 +697,7 @@ public:
     Status systemReady() override;
     Status audioPolicyReady() override;
     Status frameCountHAL(int32_t ioHandle, int64_t* _aidl_return) override;
-    Status getMicrophones(std::vector<media::MicrophoneInfoData>* _aidl_return) override;
+    Status getMicrophones(std::vector<media::MicrophoneInfoFw>* _aidl_return) override;
     Status setAudioHalPids(const std::vector<int32_t>& pids) override;
     Status setVibratorInfos(const std::vector<media::AudioVibratorInfo>& vibratorInfos) override;
     Status updateSecondaryOutputs(

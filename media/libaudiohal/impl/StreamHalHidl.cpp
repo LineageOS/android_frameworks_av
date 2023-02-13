@@ -24,6 +24,9 @@
 #include <mediautils/SchedulingPolicyService.h>
 #include <mediautils/TimeCheck.h>
 #include <utils/Log.h>
+#if MAJOR_VERSION >= 4
+#include <media/AidlConversion.h>
+#endif
 
 #include PATH(android/hardware/audio/CORE_TYPES_FILE_VERSION/IStreamOutCallback.h)
 #include <HidlUtils.h>
@@ -1169,7 +1172,7 @@ status_t StreamInHalHidl::getCapturePosition(int64_t *frames, int64_t *time) {
 
 #if MAJOR_VERSION == 2
 status_t StreamInHalHidl::getActiveMicrophones(
-        std::vector<media::MicrophoneInfo> *microphones __unused) {
+        std::vector<media::MicrophoneInfoFw> *microphones __unused) {
     if (mStream == 0) return NO_INIT;
     return INVALID_OPERATION;
 }
@@ -1182,7 +1185,7 @@ status_t StreamInHalHidl::updateSinkMetadata(
 
 #elif MAJOR_VERSION >= 4
 status_t StreamInHalHidl::getActiveMicrophones(
-        std::vector<media::MicrophoneInfo> *microphonesInfo) {
+        std::vector<media::MicrophoneInfoFw> *microphonesInfo) {
     TIME_CHECK();
     if (!mStream) return NO_INIT;
     Result retval;
@@ -1190,11 +1193,17 @@ status_t StreamInHalHidl::getActiveMicrophones(
             [&](Result r, hidl_vec<MicrophoneInfo> micArrayHal) {
         retval = r;
         for (size_t k = 0; k < micArrayHal.size(); k++) {
+            // Convert via legacy.
             audio_microphone_characteristic_t dst;
-            // convert
             (void)CoreUtils::microphoneInfoToHal(micArrayHal[k], &dst);
-            media::MicrophoneInfo microphone = media::MicrophoneInfo(dst);
-            microphonesInfo->push_back(microphone);
+            auto conv = legacy2aidl_audio_microphone_characteristic_t_MicrophoneInfoFw(dst);
+            if (conv.ok()) {
+                microphonesInfo->push_back(conv.value());
+            } else {
+                ALOGW("getActiveMicrophones: could not convert %s to AIDL: %d",
+                        toString(micArrayHal[k]).c_str(), conv.error());
+                microphonesInfo->push_back(media::MicrophoneInfoFw{});
+            }
         }
     });
     return processReturn("getActiveMicrophones", ret, retval);

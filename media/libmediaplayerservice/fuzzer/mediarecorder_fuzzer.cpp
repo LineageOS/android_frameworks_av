@@ -198,7 +198,7 @@ void MediaRecorderClientFuzzer::getConfig() {
     mStfRecorder->setInputDevice(deviceId);
     mStfRecorder->getRoutedDeviceId(&deviceId);
 
-    vector<android::media::MicrophoneInfo> activeMicrophones{};
+    vector<android::media::MicrophoneInfoFw> activeMicrophones{};
     mStfRecorder->getActiveMicrophones(&activeMicrophones);
 
     int32_t portId;

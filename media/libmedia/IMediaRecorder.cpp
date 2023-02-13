@@ -428,7 +428,7 @@ public:
         return reply.readInt32();
     }
 
-    status_t getActiveMicrophones(std::vector<media::MicrophoneInfo>* activeMicrophones)
+    status_t getActiveMicrophones(std::vector<media::MicrophoneInfoFw>* activeMicrophones)
     {
         ALOGV("getActiveMicrophones");
         Parcel data, reply;
@@ -756,7 +756,7 @@ status_t BnMediaRecorder::onTransact(
         case GET_ACTIVE_MICROPHONES: {
             ALOGV("GET_ACTIVE_MICROPHONES");
             CHECK_INTERFACE(IMediaRecorder, data, reply);
-            std::vector<media::MicrophoneInfo> activeMicrophones;
+            std::vector<media::MicrophoneInfoFw> activeMicrophones;
             status_t status = getActiveMicrophones(&activeMicrophones);
             reply->writeInt32(status);
             if (status != NO_ERROR) {
