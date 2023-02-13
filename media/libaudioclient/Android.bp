@@ -199,6 +199,7 @@ cc_library {
     srcs: ["AidlConversion.cpp"],
     shared_libs: [
         "audioclient-types-aidl-cpp",
+        "av-types-aidl-cpp",
     ],
     static_libs: [
         "libaudio_aidl_conversion_common_cpp",
@@ -212,6 +213,7 @@ cc_library {
     ],
     export_shared_lib_headers: [
         "audioclient-types-aidl-cpp",
+        "av-types-aidl-cpp",
     ],
     defaults: [
         "audio_aidl_conversion_common_default",

@@ -18,8 +18,8 @@
 #ifndef ANDROID_IMEDIARECORDER_H
 #define ANDROID_IMEDIARECORDER_H
 
+#include <android/media/MicrophoneInfoFw.h>
 #include <binder/IInterface.h>
-#include <media/MicrophoneInfo.h>
 #include <system/audio.h>
 #include <vector>
 
@@ -74,7 +74,7 @@ public:
     virtual status_t getRoutedDeviceId(audio_port_handle_t *deviceId) = 0;
     virtual status_t enableAudioDeviceCallback(bool enabled) = 0;
     virtual status_t getActiveMicrophones(
-                        std::vector<media::MicrophoneInfo>* activeMicrophones) = 0;
+                        std::vector<media::MicrophoneInfoFw>* activeMicrophones) = 0;
     virtual status_t setPreferredMicrophoneDirection(audio_microphone_direction_t direction) = 0;
     virtual status_t setPreferredMicrophoneFieldDimension(float zoom) = 0;
     virtual status_t getPortId(audio_port_handle_t *portId) = 0;
