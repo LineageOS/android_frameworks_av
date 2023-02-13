@@ -2132,6 +2132,10 @@ status_t AudioPolicyManager::startOutput(audio_port_handle_t portId)
         }
     }
 
+    if (client->hasPreferredDevice()) {
+        // playback activity with preferred device impacts routing occurred, inform upper layers
+        mpClientInterface->onRoutingUpdated();
+    }
     if (delayMs != 0) {
         usleep(delayMs * 1000);
     }
@@ -2391,6 +2395,11 @@ status_t AudioPolicyManager::stopOutput(audio_port_handle_t portId)
         return BAD_VALUE;
     }
     sp<TrackClientDescriptor> client = outputDesc->getClient(portId);
+
+    if (client->hasPreferredDevice(true)) {
+        // playback activity with preferred device impacts routing occurred, inform upper layers
+        mpClientInterface->onRoutingUpdated();
+    }
 
     ALOGV("stopOutput() output %d, stream %d, session %d",
           outputDesc->mIoHandle, client->stream(), client->session());
