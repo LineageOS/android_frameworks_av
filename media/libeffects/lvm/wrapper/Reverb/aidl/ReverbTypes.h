@@ -21,6 +21,7 @@
 #include <audio_effects/effect_environmentalreverb.h>
 #include <audio_effects/effect_presetreverb.h>
 #include "effect-impl/EffectUUID.h"
+#include "effect-impl/EffectTypes.h"
 // from Reverb/lib
 #include "LVREV.h"
 
@@ -35,51 +36,51 @@ constexpr inline int kMaxFrameSize = 2560;
 constexpr inline int kCpuLoadARM9E = 470;                      // Expressed in 0.1 MIPS
 constexpr inline int kMemUsage = (71 + (kMaxFrameSize >> 7));  // Expressed in kB
 
-static const EnvironmentalReverb::Capability kEnvReverbCap = {.minRoomLevelMb = lvm::kMinLevel,
-                                                              .maxRoomLevelMb = 0,
-                                                              .minRoomHfLevelMb = -4000,
-                                                              .maxRoomHfLevelMb = 0,
-                                                              .maxDecayTimeMs = lvm::kMaxT60,
-                                                              .minDecayHfRatioPm = 100,
-                                                              .maxDecayHfRatioPm = 2000,
-                                                              .minLevelMb = lvm::kMinLevel,
-                                                              .maxLevelMb = 0,
-                                                              .maxDelayMs = 65,
-                                                              .maxDiffusionPm = 1000,
-                                                              .maxDensityPm = 1000};
+static const std::vector<Range::EnvironmentalReverbRange> kEnvReverbRanges = {
+        MAKE_RANGE(EnvironmentalReverb, roomLevelMb, lvm::kMinLevel, 0),
+        MAKE_RANGE(EnvironmentalReverb, roomHfLevelMb, -4000, 0),
+        MAKE_RANGE(EnvironmentalReverb, decayTimeMs, 0, lvm::kMaxT60),
+        MAKE_RANGE(EnvironmentalReverb, decayHfRatioPm, 100, 2000),
+        MAKE_RANGE(EnvironmentalReverb, levelMb, lvm::kMinLevel, 0),
+        MAKE_RANGE(EnvironmentalReverb, delayMs, 0, 65),
+        MAKE_RANGE(EnvironmentalReverb, diffusionPm, 0, 1000),
+        MAKE_RANGE(EnvironmentalReverb, densityPm, 0, 1000)};
+static const Capability kEnvReverbCap = {
+        .range = Range::make<Range::environmentalReverb>(kEnvReverbRanges)};
 
 // NXP SW auxiliary environmental reverb
 static const std::string kAuxEnvReverbEffectName = "Auxiliary Environmental Reverb";
-static const Descriptor kAuxEnvReverbDesc = {
-        .common = {.id = {.type = kEnvReverbTypeUUID,
-                          .uuid = kAuxEnvReverbImplUUID,
-                          .proxy = std::nullopt},
-                   .flags = {.type = Flags::Type::AUXILIARY},
-                   .cpuLoad = kCpuLoadARM9E,
-                   .memoryUsage = kMemUsage,
-                   .name = kAuxEnvReverbEffectName,
-                   .implementor = "NXP Software Ltd."},
-        .capability = Capability::make<Capability::environmentalReverb>(kEnvReverbCap)};
+static const Descriptor kAuxEnvReverbDesc = {.common = {.id = {.type = kEnvReverbTypeUUID,
+                                                               .uuid = kAuxEnvReverbImplUUID,
+                                                               .proxy = std::nullopt},
+                                                        .flags = {.type = Flags::Type::AUXILIARY},
+                                                        .cpuLoad = kCpuLoadARM9E,
+                                                        .memoryUsage = kMemUsage,
+                                                        .name = kAuxEnvReverbEffectName,
+                                                        .implementor = "NXP Software Ltd."},
+                                             .capability = kEnvReverbCap};
 
 // NXP SW insert environmental reverb
 static const std::string kInsertEnvReverbEffectName = "Insert Environmental Reverb";
-static const Descriptor kInsertEnvReverbDesc = {
-        .common = {.id = {.type = kEnvReverbTypeUUID,
-                          .uuid = kInsertEnvReverbImplUUID,
-                          .proxy = std::nullopt},
-                   .flags = {.type = Flags::Type::INSERT,
-                             .insert = Flags::Insert::FIRST,
-                             .volume = Flags::Volume::CTRL},
-                   .cpuLoad = kCpuLoadARM9E,
-                   .memoryUsage = kMemUsage,
-                   .name = kInsertEnvReverbEffectName,
-                   .implementor = "NXP Software Ltd."},
-        .capability = Capability::make<Capability::environmentalReverb>(kEnvReverbCap)};
+static const Descriptor kInsertEnvReverbDesc = {.common = {.id = {.type = kEnvReverbTypeUUID,
+                                                                  .uuid = kInsertEnvReverbImplUUID,
+                                                                  .proxy = std::nullopt},
+                                                           .flags = {.type = Flags::Type::INSERT,
+                                                                     .insert = Flags::Insert::FIRST,
+                                                                     .volume = Flags::Volume::CTRL},
+                                                           .cpuLoad = kCpuLoadARM9E,
+                                                           .memoryUsage = kMemUsage,
+                                                           .name = kInsertEnvReverbEffectName,
+                                                           .implementor = "NXP Software Ltd."},
+                                                .capability = kEnvReverbCap};
 
 static const std::vector<PresetReverb::Presets> kSupportedPresets{
         ndk::enum_range<PresetReverb::Presets>().begin(),
         ndk::enum_range<PresetReverb::Presets>().end()};
-static const PresetReverb::Capability kPresetReverbCap = {.supportedPresets = kSupportedPresets};
+static const std::vector<Range::PresetReverbRange> kPresetReverbRanges = {
+        MAKE_RANGE(PresetReverb, supportedPresets, kSupportedPresets, kSupportedPresets)};
+static const Capability kPresetReverbCap = {
+        .range = Range::make<Range::presetReverb>(kPresetReverbRanges)};
 
 // NXP SW auxiliary preset reverb
 static const std::string kAuxPresetReverbEffectName = "Auxiliary Preset Reverb";
@@ -92,7 +93,7 @@ static const Descriptor kAuxPresetReverbDesc = {
                    .memoryUsage = kMemUsage,
                    .name = kAuxPresetReverbEffectName,
                    .implementor = "NXP Software Ltd."},
-        .capability = Capability::make<Capability::presetReverb>(kPresetReverbCap)};
+        .capability = kPresetReverbCap};
 
 // NXP SW insert preset reverb
 static const std::string kInsertPresetReverbEffectName = "Insert Preset Reverb";
@@ -107,7 +108,7 @@ static const Descriptor kInsertPresetReverbDesc = {
                    .memoryUsage = kMemUsage,
                    .name = kInsertPresetReverbEffectName,
                    .implementor = "NXP Software Ltd."},
-        .capability = Capability::make<Capability::presetReverb>(kPresetReverbCap)};
+        .capability = kPresetReverbCap};
 
 enum class ReverbEffectType {
     AUX_ENV,
