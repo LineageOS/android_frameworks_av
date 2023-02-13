@@ -124,7 +124,8 @@
             <Limit name="block-size" value="16x16" />
             <Limit name="block-count" range="1-3600" />
             <Limit name="bitrate" range="1-40000000" />
-            <Feature name="bitrate-modes" value="VBR,CBR" />
+            <Limit name="quality" range="0-100"  default="80" />
+            <Feature name="bitrate-modes" value="VBR,CBR,CQ" />
         </MediaCodec>
     </Encoders>
 </Included>

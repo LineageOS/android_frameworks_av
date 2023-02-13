@@ -37,12 +37,12 @@ static hidl_vec<T> toHidlVec(const Vector<T>& vector) {
     return vec;
 }
 
-DrmHalListener::DrmHalListener(MediaDrmMetrics* metrics)
+DrmHalListener::DrmHalListener(const std::shared_ptr<MediaDrmMetrics>& metrics)
     : mMetrics(metrics) {}
 
 DrmHalListener::~DrmHalListener() {}
 
-void DrmHalListener::setListener(sp<IDrmClient> listener) {
+void DrmHalListener::setListener(const sp<IDrmClient>& listener) {
     Mutex::Autolock lock(mEventLock);
     mListener = listener;
 }
