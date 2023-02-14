@@ -20,6 +20,7 @@
 #include <utility>
 #include <unordered_map>
 #include <set>
+#include <tuple>
 
 #include <utils/Condition.h>
 #include <utils/Errors.h>
@@ -1221,7 +1222,7 @@ class Camera3Device :
         // Guarded by mLock
 
         wp<NotificationListener> mListener;
-        std::unordered_map<int, sp<camera3::Camera3StreamInterface> > mPendingStreams;
+        std::list<std::tuple<int, sp<camera3::Camera3StreamInterface>>> mPendingStreams;
         bool mActive;
         bool mCancelNow;
 
