@@ -603,7 +603,10 @@ status_t AudioPolicyManager::getHwOffloadFormatsSupportedForBluetoothMedia(
         audioDeviceSet = getAudioDeviceOutAllA2dpSet();
         break;
     case AUDIO_DEVICE_OUT_BLE_HEADSET:
-        audioDeviceSet = getAudioDeviceOutAllBleSet();
+        audioDeviceSet = getAudioDeviceOutLeAudioUnicastSet();
+        break;
+    case AUDIO_DEVICE_OUT_BLE_BROADCAST:
+        audioDeviceSet = getAudioDeviceOutLeAudioBroadcastSet();
         break;
     default:
         ALOGE("%s() device type 0x%08x not supported", __func__, device);
@@ -1043,7 +1046,7 @@ sp<IOProfile> AudioPolicyManager::searchCompatibleProfileHwModules (
 
              // when searching for direct outputs, if several profiles are compatible, give priority
              // to one with offload capability
-             if (profile != 0 && 
+             if (profile != 0 &&
                  ((curProfile->getFlags() & AUDIO_OUTPUT_FLAG_COMPRESS_OFFLOAD) == 0)) {
                 continue;
              }
