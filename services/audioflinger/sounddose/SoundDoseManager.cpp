@@ -74,7 +74,7 @@ sp<audio_utils::MelProcessor> SoundDoseManager::getOrCreateProcessorForDevice(
     } else {
         ALOGV("%s: creating new callback for stream id %d", __func__, streamHandle);
         sp<audio_utils::MelProcessor> melProcessor = sp<audio_utils::MelProcessor>::make(
-                sampleRate, channelCount, format, *this, deviceId, mRs2Value);
+                sampleRate, channelCount, format, this, deviceId, mRs2Value);
         const auto activeTypeIt = mActiveDeviceTypes.find(deviceId);
         if (activeTypeIt != mActiveDeviceTypes.end()) {
             melProcessor->setAttenuation(mMelAttenuationDB[activeTypeIt->second]);

@@ -68,6 +68,10 @@ cc_library_shared {
     // ],
     // static_libs: ["libsndfile"],
 
+    shared_libs: [
+        "libmediautils",
+    ],
+
     header_libs: ["libaudiohal_headers"],
 
     export_include_dirs: ["include"],
