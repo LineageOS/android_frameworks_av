@@ -153,7 +153,7 @@ status_t CryptoAsync::attachEncryptedBufferAndQueue(sp<AMessage> & msg) {
     // attach buffer
     err = channel->attachEncryptedBuffer(
         memory, secure, key, iv, mode, pattern,
-        offset, subSamples, numSubSamples, buffer);
+        offset, subSamples, numSubSamples, buffer, &errorDetailMsg);
 
     // a generic error
     auto handleError = [this, &err, &msg]() {

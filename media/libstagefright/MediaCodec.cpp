@@ -4290,11 +4290,10 @@ void MediaCodec::onMessageReceived(const sp<AMessage> &msg) {
                     mFlags |= kFlagUseBlockModel;
                 }
                 if (flags & CONFIGURE_FLAG_USE_CRYPTO_ASYNC) {
-                    // silently disable crytoasync with blockmodel
-                    if (!(mFlags & kFlagUseBlockModel)) {
-                        mFlags |= kFlagUseCryptoAsync;
-                    } else {
-                        ALOGW("CrytoAsync not yet enabled for block model, falling back to normal");
+                    mFlags |= kFlagUseCryptoAsync;
+                    if ((mFlags & kFlagUseBlockModel)) {
+                        ALOGW("CrytoAsync not yet enabled for block model,\
+                                falling back to normal");
                     }
                 }
             }
@@ -4324,17 +4323,23 @@ void MediaCodec::onMessageReceived(const sp<AMessage> &msg) {
             mBufferChannel->setDescrambler(mDescrambler);
             if ((mFlags & kFlagUseCryptoAsync) &&
                 mCrypto  && (mDomain == DOMAIN_VIDEO)) {
-                mCryptoAsync = new CryptoAsync(mBufferChannel);
-                mCryptoAsync->setCallback(
-                std::make_unique<CryptoAsyncCallback>(new AMessage(kWhatCodecNotify, this)));
-                mCryptoLooper = new ALooper();
-                mCryptoLooper->setName("CryptoAsyncLooper");
-                mCryptoLooper->registerHandler(mCryptoAsync);
-                status_t err = mCryptoLooper->start();
-                if (err != OK) {
-                    ALOGE("Crypto Looper failed to start");
-                    mCryptoAsync = nullptr;
-                    mCryptoLooper = nullptr;
+                // set kFlagUseCryptoAsync but do-not use this for block model
+                // this is to propagate the error in onCryptoError()
+                // TODO (b/274628160): Enable Use of CONFIG_FLAG_USE_CRYPTO_ASYNC
+                //                     with CONFIGURE_FLAG_USE_BLOCK_MODEL)
+                if (!(mFlags & kFlagUseBlockModel)) {
+                    mCryptoAsync = new CryptoAsync(mBufferChannel);
+                    mCryptoAsync->setCallback(
+                    std::make_unique<CryptoAsyncCallback>(new AMessage(kWhatCodecNotify, this)));
+                    mCryptoLooper = new ALooper();
+                    mCryptoLooper->setName("CryptoAsyncLooper");
+                    mCryptoLooper->registerHandler(mCryptoAsync);
+                    status_t err = mCryptoLooper->start();
+                    if (err != OK) {
+                        ALOGE("Crypto Looper failed to start");
+                        mCryptoAsync = nullptr;
+                        mCryptoLooper = nullptr;
+                    }
                 }
             }
 
@@ -5510,9 +5515,24 @@ status_t MediaCodec::onQueueInputBuffer(const sp<AMessage> &msg) {
         if (c2Buffer) {
             err = mBufferChannel->attachBuffer(c2Buffer, buffer);
         } else if (memory) {
+            AString errorDetailMsg;
             err = mBufferChannel->attachEncryptedBuffer(
                     memory, (mFlags & kFlagIsSecure), key, iv, mode, pattern,
-                    offset, subSamples, numSubSamples, buffer);
+                    offset, subSamples, numSubSamples, buffer, &errorDetailMsg);
+            if (err != OK && hasCryptoOrDescrambler()
+                    && (mFlags & kFlagUseCryptoAsync)) {
+                // create error detail
+                AString errorDetailMsg;
+                sp<AMessage> cryptoErrorInfo = new AMessage();
+                buildCryptoInfoAMessage(cryptoErrorInfo, CryptoAsync::kActionDecrypt);
+                cryptoErrorInfo->setInt32("err", err);
+                cryptoErrorInfo->setInt32("actionCode", ACTION_CODE_FATAL);
+                cryptoErrorInfo->setString("errorDetail", errorDetailMsg);
+                onCryptoError(cryptoErrorInfo);
+                // we want cryptoError to be in the callback
+                // but Codec IllegalStateException to be triggered.
+                err = INVALID_OPERATION;
+            }
         } else {
             err = UNKNOWN_ERROR;
         }
