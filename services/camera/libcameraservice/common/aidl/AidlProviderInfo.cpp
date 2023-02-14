@@ -293,7 +293,7 @@ const std::shared_ptr<ICameraProvider> AidlProviderInfo::startProviderInterface(
             if (link != STATUS_OK) {
                 ALOGW("%s: Unable to link to provider '%s' death notifications",
                         __FUNCTION__, mProviderName.c_str());
-                mManager->removeProvider(mProviderName);
+                mManager->removeProvider(mProviderInstance);
                 return nullptr;
             }
 
