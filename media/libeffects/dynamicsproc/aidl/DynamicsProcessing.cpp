@@ -59,8 +59,34 @@ extern "C" binder_exception_t queryEffect(const AudioUuid* in_impl_uuid, Descrip
 namespace aidl::android::hardware::audio::effect {
 
 const std::string DynamicsProcessingImpl::kEffectName = "DynamicsProcessing";
-const DynamicsProcessing::Capability DynamicsProcessingImpl::kCapability = {.minCutOffFreq = 220,
-                                                                            .maxCutOffFreq = 20000};
+
+const DynamicsProcessing::EqBandConfig DynamicsProcessingImpl::kEqBandConfigMin =
+        DynamicsProcessing::EqBandConfig({.channel = 0,
+                                          .band = 0,
+                                          .enable = false,
+                                          .cutoffFrequencyHz = 220,
+                                          .gainDb = std::numeric_limits<float>::min()});
+const DynamicsProcessing::EqBandConfig DynamicsProcessingImpl::kEqBandConfigMax =
+        DynamicsProcessing::EqBandConfig({.channel = std::numeric_limits<int>::max(),
+                                          .band = std::numeric_limits<int>::max(),
+                                          .enable = true,
+                                          .cutoffFrequencyHz = 20000,
+                                          .gainDb = std::numeric_limits<float>::max()});
+const Range::DynamicsProcessingRange DynamicsProcessingImpl::kPreEqBandRange = {
+        .min = DynamicsProcessing::make<DynamicsProcessing::preEqBand>(
+                {DynamicsProcessingImpl::kEqBandConfigMin}),
+        .max = DynamicsProcessing::make<DynamicsProcessing::preEqBand>(
+                {DynamicsProcessingImpl::kEqBandConfigMax})};
+const Range::DynamicsProcessingRange DynamicsProcessingImpl::kPostEqBandRange = {
+        .min = DynamicsProcessing::make<DynamicsProcessing::postEqBand>(
+                {DynamicsProcessingImpl::kEqBandConfigMin}),
+        .max = DynamicsProcessing::make<DynamicsProcessing::postEqBand>(
+                {DynamicsProcessingImpl::kEqBandConfigMax})};
+const Range DynamicsProcessingImpl::kRange =
+        Range::make<Range::dynamicsProcessing>({DynamicsProcessingImpl::kPreEqBandRange});
+
+const Capability DynamicsProcessingImpl::kCapability = {.range = {DynamicsProcessingImpl::kRange}};
+
 const Descriptor DynamicsProcessingImpl::kDescriptor = {
         .common = {.id = {.type = kDynamicsProcessingTypeUUID,
                           .uuid = kDynamicsProcessingImplUUID,
@@ -70,8 +96,7 @@ const Descriptor DynamicsProcessingImpl::kDescriptor = {
                              .volume = Flags::Volume::CTRL},
                    .name = DynamicsProcessingImpl::kEffectName,
                    .implementor = "The Android Open Source Project"},
-        .capability = Capability::make<Capability::dynamicsProcessing>(
-                DynamicsProcessingImpl::kCapability)};
+        .capability = DynamicsProcessingImpl::kCapability};
 
 ndk::ScopedAStatus DynamicsProcessingImpl::open(const Parameter::Common& common,
                                                 const std::optional<Parameter::Specific>& specific,
@@ -138,6 +163,7 @@ ndk::ScopedAStatus DynamicsProcessingImpl::setParameterSpecific(
     RETURN_IF(!mContext, EX_NULL_POINTER, "nullContext");
 
     auto& param = specific.get<Parameter::Specific::dynamicsProcessing>();
+    // TODO: check range here, dynamicsProcessing need customized method for nested parameters.
     auto tag = param.getTag();
 
     switch (tag) {
