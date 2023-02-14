@@ -55,6 +55,7 @@ struct CodecBase;
 struct CodecParameterDescriptor;
 class IBatteryStats;
 struct ICrypto;
+class CryptoAsync;
 class MediaCodecBuffer;
 class IMemory;
 struct PersistentSurface;
@@ -82,6 +83,7 @@ struct MediaCodec : public AHandler {
     enum ConfigureFlags {
         CONFIGURE_FLAG_ENCODE           = 1,
         CONFIGURE_FLAG_USE_BLOCK_MODEL  = 2,
+        CONFIGURE_FLAG_USE_CRYPTO_ASYNC = 4,
     };
 
     enum BufferFlags {
@@ -106,6 +108,7 @@ struct MediaCodec : public AHandler {
         CB_ERROR = 3,
         CB_OUTPUT_FORMAT_CHANGED = 4,
         CB_RESOURCE_RECLAIMED = 5,
+        CB_CRYPTO_ERROR = 6,
     };
 
     static const pid_t kNoPid = -1;
@@ -376,6 +379,7 @@ private:
         kFlagIsComponentAllocated       = 2048,
         kFlagPushBlankBuffersOnShutdown = 4096,
         kFlagUseBlockModel              = 8192,
+        kFlagUseCryptoAsync             = 16384,
     };
 
     struct BufferInfo {
@@ -530,6 +534,8 @@ private:
     bool mCpuBoostRequested;
 
     std::shared_ptr<BufferChannelBase> mBufferChannel;
+    sp<CryptoAsync> mCryptoAsync;
+    sp<ALooper> mCryptoLooper;
 
     std::unique_ptr<PlaybackDurationAccumulator> mPlaybackDurationAccumulator;
     bool mIsSurfaceToScreen;
@@ -583,6 +589,7 @@ private:
 
     void onInputBufferAvailable();
     void onOutputBufferAvailable();
+    void onCryptoError(const sp<AMessage> &msg);
     void onError(status_t err, int32_t actionCode, const char *detail = NULL);
     void onOutputFormatChanged();
 
