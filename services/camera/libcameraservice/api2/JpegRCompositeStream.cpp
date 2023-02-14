@@ -26,7 +26,7 @@
 
 #include "common/CameraProviderManager.h"
 #include <gui/Surface.h>
-#include <jpegrecoverymap/recoverymap.h>
+#include <jpegrecoverymap/jpegr.h>
 #include <utils/ExifUtils.h>
 #include <utils/Log.h>
 #include "utils/SessionConfigurationUtils.h"
@@ -287,7 +287,7 @@ status_t JpegRCompositeStream::processInputFrame(nsecs_t ts, const InputFrame &i
     size_t actualJpegRSize = 0;
     recoverymap::jpegr_uncompressed_struct p010;
     recoverymap::jpegr_compressed_struct jpegR;
-    recoverymap::RecoveryMap recoveryMap;
+    recoverymap::JpegR jpegREncoder;
 
     p010.height = inputFrame.p010Buffer.height;
     p010.width = inputFrame.p010Buffer.width;
@@ -332,7 +332,7 @@ status_t JpegRCompositeStream::processInputFrame(nsecs_t ts, const InputFrame &i
             jpeg.colorGamut = recoverymap::jpegr_color_gamut::JPEGR_COLORGAMUT_BT709;
         }
 
-        res = recoveryMap.encodeJPEGR(&p010, &jpeg, transferFunction, &jpegR);
+        res = jpegREncoder.encodeJPEGR(&p010, &jpeg, transferFunction, &jpegR);
     } else {
         const uint8_t* exifBuffer = nullptr;
         size_t exifBufferSize = 0;
@@ -351,7 +351,7 @@ status_t JpegRCompositeStream::processInputFrame(nsecs_t ts, const InputFrame &i
         exif.data = reinterpret_cast<void*>(const_cast<uint8_t*>(exifBuffer));
         exif.length = exifBufferSize;
 
-        res = recoveryMap.encodeJPEGR(&p010, transferFunction, &jpegR, jpegQuality, &exif);
+        res = jpegREncoder.encodeJPEGR(&p010, transferFunction, &jpegR, jpegQuality, &exif);
     }
 
     if (res != OK) {
