@@ -753,14 +753,11 @@ size_t AudioFlingerClientAdapter::frameCountHAL(audio_io_handle_t ioHandle) cons
 }
 
 status_t
-AudioFlingerClientAdapter::getMicrophones(std::vector<media::MicrophoneInfo>* microphones) {
-    std::vector<media::MicrophoneInfoData> aidlRet;
-    RETURN_STATUS_IF_ERROR(statusTFromBinderStatus(
-            mDelegate->getMicrophones(&aidlRet)));
+AudioFlingerClientAdapter::getMicrophones(std::vector<media::MicrophoneInfoFw>* microphones) {
+    std::vector<media::MicrophoneInfoFw> aidlRet;
+    RETURN_STATUS_IF_ERROR(statusTFromBinderStatus(mDelegate->getMicrophones(&aidlRet)));
     if (microphones != nullptr) {
-        *microphones = VALUE_OR_RETURN_STATUS(
-                convertContainer<std::vector<media::MicrophoneInfo>>(aidlRet,
-                         media::aidl2legacy_MicrophoneInfo));
+        *microphones = std::move(aidlRet);
     }
     return OK;
 }
@@ -1324,11 +1321,8 @@ Status AudioFlingerServerAdapter::frameCountHAL(int32_t ioHandle, int64_t* _aidl
 }
 
 Status AudioFlingerServerAdapter::getMicrophones(
-        std::vector<media::MicrophoneInfoData>* _aidl_return) {
-    std::vector<media::MicrophoneInfo> resultLegacy;
-    RETURN_BINDER_IF_ERROR(mDelegate->getMicrophones(&resultLegacy));
-    *_aidl_return = VALUE_OR_RETURN_BINDER(convertContainer<std::vector<media::MicrophoneInfoData>>(
-            resultLegacy, media::legacy2aidl_MicrophoneInfo));
+        std::vector<media::MicrophoneInfoFw>* _aidl_return) {
+    RETURN_BINDER_IF_ERROR(mDelegate->getMicrophones(_aidl_return));
     return Status::ok();
 }
 

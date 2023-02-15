@@ -1982,7 +1982,8 @@ public:
             // Sets the UID records silence
             void        setRecordSilenced(audio_port_handle_t portId, bool silenced);
 
-            status_t    getActiveMicrophones(std::vector<media::MicrophoneInfo>* activeMicrophones);
+            status_t    getActiveMicrophones(
+                    std::vector<media::MicrophoneInfoFw>* activeMicrophones);
 
             status_t    setPreferredMicrophoneDirection(audio_microphone_direction_t direction);
             status_t    setPreferredMicrophoneFieldDimension(float zoom);

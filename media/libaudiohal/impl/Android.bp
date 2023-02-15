@@ -55,6 +55,7 @@ cc_defaults {
     shared_libs: [
         "audioclient-types-aidl-cpp",
         "av-types-aidl-cpp",
+        "libaudioclient_aidl_conversion",
         "libaudiofoundation",
         "libaudioutils",
         "libbase",
@@ -70,6 +71,9 @@ cc_defaults {
     header_libs: [
         "libaudioclient_headers",
         "libaudiohal_headers"
+    ],
+    defaults: [
+        "latest_android_media_audio_common_types_cpp_export_shared",
     ],
 
     export_shared_lib_headers: [
@@ -247,7 +251,7 @@ cc_library_shared {
         "latest_android_hardware_audio_common_ndk_shared",
         "latest_android_hardware_audio_core_ndk_shared",
         "latest_android_hardware_audio_core_sounddose_ndk_shared",
-        "latest_android_hardware_audio_effect_ndk_static",
+        "latest_android_hardware_audio_effect_ndk_shared",
         "latest_android_media_audio_common_types_ndk_shared",
     ],
     srcs: [
@@ -287,7 +291,6 @@ cc_library_shared {
         "libaudioaidlcommon",
     ],
     header_libs: [
-        "libaudio_aidl_conversion_common_util_ndk",
         "libaudio_system_headers",
     ],
     cflags: [

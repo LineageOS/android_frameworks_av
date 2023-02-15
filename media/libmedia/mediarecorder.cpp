@@ -884,7 +884,8 @@ status_t MediaRecorder::enableAudioDeviceCallback(bool enabled)
     return mMediaRecorder->enableAudioDeviceCallback(enabled);
 }
 
-status_t MediaRecorder::getActiveMicrophones(std::vector<media::MicrophoneInfo>* activeMicrophones)
+status_t MediaRecorder::getActiveMicrophones(
+        std::vector<media::MicrophoneInfoFw>* activeMicrophones)
 {
     ALOGV("getActiveMicrophones");
 
