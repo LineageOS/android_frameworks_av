@@ -26,7 +26,7 @@
 
 #include "common/CameraProviderManager.h"
 #include <gui/Surface.h>
-#include <jpegrecoverymap/recoverymap.h>
+#include <jpegrecoverymap/jpegr.h>
 #include <utils/ExifUtils.h>
 #include <utils/Log.h>
 #include "utils/SessionConfigurationUtils.h"
@@ -285,13 +285,13 @@ status_t JpegRCompositeStream::processInputFrame(nsecs_t ts, const InputFrame &i
     }
 
     size_t actualJpegRSize = 0;
-    recoverymap::jpegr_uncompressed_struct p010;
-    recoverymap::jpegr_compressed_struct jpegR;
-    recoverymap::RecoveryMap recoveryMap;
+    jpegrecoverymap::jpegr_uncompressed_struct p010;
+    jpegrecoverymap::jpegr_compressed_struct jpegR;
+    jpegrecoverymap::JpegR jpegREncoder;
 
     p010.height = inputFrame.p010Buffer.height;
     p010.width = inputFrame.p010Buffer.width;
-    p010.colorGamut = recoverymap::jpegr_color_gamut::JPEGR_COLORGAMUT_BT2100;
+    p010.colorGamut = jpegrecoverymap::jpegr_color_gamut::JPEGR_COLORGAMUT_BT2100;
     size_t yChannelSizeInByte = p010.width * p010.height * 2;
     size_t uvChannelSizeInByte = p010.width * p010.height;
     p010.data = new uint8_t[yChannelSizeInByte + uvChannelSizeInByte];
@@ -304,18 +304,18 @@ status_t JpegRCompositeStream::processInputFrame(nsecs_t ts, const InputFrame &i
     jpegR.data = dstBuffer;
     jpegR.maxLength = maxJpegRBufferSize;
 
-    recoverymap::jpegr_transfer_function transferFunction;
+    jpegrecoverymap::jpegr_transfer_function transferFunction;
     switch (mP010DynamicRange) {
         case ANDROID_REQUEST_AVAILABLE_DYNAMIC_RANGE_PROFILES_MAP_HDR10:
         case ANDROID_REQUEST_AVAILABLE_DYNAMIC_RANGE_PROFILES_MAP_HDR10_PLUS:
-            transferFunction = recoverymap::jpegr_transfer_function::JPEGR_TF_PQ;
+            transferFunction = jpegrecoverymap::jpegr_transfer_function::JPEGR_TF_PQ;
             break;
         default:
-            transferFunction = recoverymap::jpegr_transfer_function::JPEGR_TF_HLG;
+            transferFunction = jpegrecoverymap::jpegr_transfer_function::JPEGR_TF_HLG;
     }
 
     if (mSupportInternalJpeg) {
-        recoverymap::jpegr_compressed_struct jpeg;
+        jpegrecoverymap::jpegr_compressed_struct jpeg;
 
         jpeg.data = inputFrame.jpegBuffer.data;
         jpeg.length = android::camera2::JpegProcessor::findJpegSize(inputFrame.jpegBuffer.data,
@@ -327,12 +327,12 @@ status_t JpegRCompositeStream::processInputFrame(nsecs_t ts, const InputFrame &i
         }
 
         if (mOutputColorSpace == ANDROID_REQUEST_AVAILABLE_COLOR_SPACE_PROFILES_MAP_DISPLAY_P3) {
-            jpeg.colorGamut = recoverymap::jpegr_color_gamut::JPEGR_COLORGAMUT_P3;
+            jpeg.colorGamut = jpegrecoverymap::jpegr_color_gamut::JPEGR_COLORGAMUT_P3;
         } else {
-            jpeg.colorGamut = recoverymap::jpegr_color_gamut::JPEGR_COLORGAMUT_BT709;
+            jpeg.colorGamut = jpegrecoverymap::jpegr_color_gamut::JPEGR_COLORGAMUT_BT709;
         }
 
-        res = recoveryMap.encodeJPEGR(&p010, &jpeg, transferFunction, &jpegR);
+        res = jpegREncoder.encodeJPEGR(&p010, &jpeg, transferFunction, &jpegR);
     } else {
         const uint8_t* exifBuffer = nullptr;
         size_t exifBufferSize = 0;
@@ -347,11 +347,11 @@ status_t JpegRCompositeStream::processInputFrame(nsecs_t ts, const InputFrame &i
             ALOGE("%s: Unable to generate App1 buffer", __FUNCTION__);
         }
 
-        recoverymap::jpegr_exif_struct exif;
+        jpegrecoverymap::jpegr_exif_struct exif;
         exif.data = reinterpret_cast<void*>(const_cast<uint8_t*>(exifBuffer));
         exif.length = exifBufferSize;
 
-        res = recoveryMap.encodeJPEGR(&p010, transferFunction, &jpegR, jpegQuality, &exif);
+        res = jpegREncoder.encodeJPEGR(&p010, transferFunction, &jpegR, jpegQuality, &exif);
     }
 
     if (res != OK) {
