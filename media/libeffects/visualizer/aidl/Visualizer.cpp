@@ -54,9 +54,16 @@ extern "C" binder_exception_t queryEffect(const AudioUuid* in_impl_uuid, Descrip
 namespace aidl::android::hardware::audio::effect {
 
 const std::string VisualizerImpl::kEffectName = "Visualizer";
-const Visualizer::Capability VisualizerImpl::kCapability = {
-        .maxLatencyMs = VisualizerContext::kMaxLatencyMs,
-        .captureSampleRange = {.min = 0, .max = VisualizerContext::kMaxCaptureBufSize}};
+const std::vector<Range::VisualizerRange> VisualizerImpl::kRanges = {
+        MAKE_RANGE(Visualizer, latencyMs, 0, VisualizerContext::kMaxLatencyMs),
+        MAKE_RANGE(Visualizer, captureSamples, 0, VisualizerContext::kMaxCaptureBufSize),
+        /* get only parameters, set invalid range (min > max) to indicate not support set */
+        MAKE_RANGE(Visualizer, measurement, Visualizer::Measurement({.peak = 1, .rms = 1}),
+                   Visualizer::Measurement({.peak = 0, .rms = 0})),
+        MAKE_RANGE(Visualizer, captureSampleBuffer, std::vector<uint8_t>({1}),
+                   std::vector<uint8_t>({0}))};
+const Capability VisualizerImpl::kCapability = {
+        .range = Range::make<Range::visualizer>(VisualizerImpl::kRanges)};
 const Descriptor VisualizerImpl::kDescriptor = {
         .common = {.id = {.type = kVisualizerTypeUUID,
                           .uuid = kVisualizerImplUUID,
@@ -66,7 +73,7 @@ const Descriptor VisualizerImpl::kDescriptor = {
                              .volume = Flags::Volume::CTRL},
                    .name = VisualizerImpl::kEffectName,
                    .implementor = "The Android Open Source Project"},
-        .capability = Capability::make<Capability::visualizer>(VisualizerImpl::kCapability)};
+        .capability = VisualizerImpl::kCapability};
 
 ndk::ScopedAStatus VisualizerImpl::getDescriptor(Descriptor* _aidl_return) {
     RETURN_IF(!_aidl_return, EX_ILLEGAL_ARGUMENT, "Parameter:nullptr");
@@ -96,32 +103,13 @@ ndk::ScopedAStatus VisualizerImpl::commandImpl(CommandId command) {
     return ndk::ScopedAStatus::ok();
 }
 
-ndk::ScopedAStatus VisualizerImpl::setOnlyParameter(
-        const Visualizer::SetOnlyParameters& param) {
-    auto tag = param.getTag();
-    switch (tag) {
-        case Visualizer::SetOnlyParameters::latencyMs: {
-            RETURN_IF(mContext->setDownstreamLatency(
-                              param.get<Visualizer::SetOnlyParameters::latencyMs>()) !=
-                              RetCode::SUCCESS,
-                      EX_ILLEGAL_ARGUMENT, "setLatencyFailed");
-            break;
-        }
-        default: {
-            LOG(ERROR) << __func__ << " unsupported tag: " << toString(tag);
-            return ndk::ScopedAStatus::fromExceptionCodeWithMessage(
-                    EX_ILLEGAL_ARGUMENT, "setOnlyParameterTagNotSupported");
-        }
-    }
-    return ndk::ScopedAStatus::ok();
-}
-
 ndk::ScopedAStatus VisualizerImpl::setParameterSpecific(const Parameter::Specific& specific) {
     RETURN_IF(Parameter::Specific::visualizer != specific.getTag(), EX_ILLEGAL_ARGUMENT,
               "EffectNotSupported");
     RETURN_IF(!mContext, EX_NULL_POINTER, "nullContext");
 
     auto& param = specific.get<Parameter::Specific::visualizer>();
+    RETURN_IF(!inRange(param, kRanges), EX_ILLEGAL_ARGUMENT, "outOfRange");
     const auto tag = param.getTag();
     switch (tag) {
         case Visualizer::captureSamples: {
@@ -142,8 +130,11 @@ ndk::ScopedAStatus VisualizerImpl::setParameterSpecific(const Parameter::Specifi
                       EX_ILLEGAL_ARGUMENT, "setMeasurementModeFailed");
             return ndk::ScopedAStatus::ok();
         }
-        case Visualizer::setOnlyParameters: {
-            return setOnlyParameter(param.get<Visualizer::setOnlyParameters>());
+        case Visualizer::latencyMs: {
+            RETURN_IF(mContext->setDownstreamLatency(param.get<Visualizer::latencyMs>()) !=
+                              RetCode::SUCCESS,
+                      EX_ILLEGAL_ARGUMENT, "setLatencyFailed");
+            return ndk::ScopedAStatus::ok();
         }
         default: {
             LOG(ERROR) << __func__ << " unsupported tag: " << toString(tag);
@@ -151,30 +142,6 @@ ndk::ScopedAStatus VisualizerImpl::setParameterSpecific(const Parameter::Specifi
                     EX_ILLEGAL_ARGUMENT, "VisualizerTagNotSupported");
         }
     }
-}
-
-ndk::ScopedAStatus VisualizerImpl::getOnlyParameter(const Visualizer::GetOnlyParameters::Tag tag,
-                                                    Parameter::Specific* specific) {
-    Visualizer visualizer;
-    Visualizer::GetOnlyParameters param;
-    switch (tag) {
-        case Visualizer::GetOnlyParameters::measurement: {
-            param.set<Visualizer::GetOnlyParameters::measurement>(mContext->getMeasure());
-            break;
-        }
-        case Visualizer::GetOnlyParameters::captureSampleBuffer: {
-            param.set<Visualizer::GetOnlyParameters::captureSampleBuffer>(mContext->capture());
-            break;
-        }
-        default: {
-            LOG(ERROR) << __func__ << " unsupported tag: " << toString(tag);
-            return ndk::ScopedAStatus::fromExceptionCodeWithMessage(
-                    EX_ILLEGAL_ARGUMENT, "setOnlyParameterTagNotSupported");
-        }
-    }
-    visualizer.set<Visualizer::getOnlyParameters>(param);
-    specific->set<Parameter::Specific::visualizer>(visualizer);
-    return ndk::ScopedAStatus::ok();
 }
 
 ndk::ScopedAStatus VisualizerImpl::getParameterSpecific(const Parameter::Id& id,
@@ -187,9 +154,6 @@ ndk::ScopedAStatus VisualizerImpl::getParameterSpecific(const Parameter::Id& id,
     switch (specificTag) {
         case Visualizer::Id::commonTag: {
             return getParameterVisualizer(specificId.get<Visualizer::Id::commonTag>(), specific);
-        }
-        case Visualizer::Id::getOnlyParamTag: {
-            return getOnlyParameter(specificId.get<Visualizer::Id::getOnlyParamTag>(), specific);
         }
         default: {
             LOG(ERROR) << __func__ << " unsupported tag: " << toString(specificTag);
@@ -216,6 +180,18 @@ ndk::ScopedAStatus VisualizerImpl::getParameterVisualizer(const Visualizer::Tag&
         }
         case Visualizer::measurementMode: {
             param.set<Visualizer::measurementMode>(mContext->getMeasurementMode());
+            break;
+        }
+        case Visualizer::measurement: {
+            param.set<Visualizer::measurement>(mContext->getMeasure());
+            break;
+        }
+        case Visualizer::captureSampleBuffer: {
+            param.set<Visualizer::captureSampleBuffer>(mContext->capture());
+            break;
+        }
+        case Visualizer::latencyMs: {
+            param.set<Visualizer::latencyMs>(mContext->getDownstreamLatency());
             break;
         }
         default: {
