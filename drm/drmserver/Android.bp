@@ -63,3 +63,39 @@ cc_binary {
 
     init_rc: ["drmserver.rc"],
 }
+
+cc_fuzz {
+    name: "drmserver_fuzzer",
+
+    defaults: [
+        "service_fuzzer_defaults",
+    ],
+
+    srcs: [
+        "fuzzer/DrmFuzzer.cpp",
+        "DrmManagerService.cpp",
+        "DrmManager.cpp",
+    ],
+
+    static_libs: [
+        "libmediautils",
+        "liblog",
+        "libdl",
+        "libdrmframeworkcommon",
+        "libselinux",
+        "libstagefright_foundation",
+    ],
+
+     shared_libs: [
+         "libmediametrics",
+     ],
+
+     fuzz_config: {
+         libfuzzer_options: [
+             "max_len=50000",
+         ],
+         cc: [
+             "android-drm-team@google.com",
+         ],
+     },
+}
