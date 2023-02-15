@@ -531,11 +531,6 @@ RetCode BundleContext::updateControlParameter(const std::vector<Equalizer::BandL
 }
 
 RetCode BundleContext::setBassBoostStrength(int strength) {
-    if (strength < 0 || strength > lvm::kBassBoostCap.maxStrengthPm) {
-        LOG(ERROR) << __func__ << " invalid strength: " << strength;
-        return RetCode::ERROR_ILLEGAL_PARAMETER;
-    }
-
     // Update Control Parameter
     LVM_ControlParams_t params;
     {
@@ -555,10 +550,6 @@ RetCode BundleContext::setBassBoostStrength(int strength) {
 }
 
 RetCode BundleContext::setVolumeLevel(int level) {
-    if (level < lvm::kVolumeCap.minLevelDb || level > lvm::kVolumeCap.maxLevelDb) {
-        return RetCode::ERROR_ILLEGAL_PARAMETER;
-    }
-
     if (mMuteEnabled) {
         mLevelSaved = level / 100;
     } else {
@@ -584,10 +575,6 @@ RetCode BundleContext::setVolumeMute(bool mute) {
 }
 
 RetCode BundleContext::setVirtualizerStrength(int strength) {
-    if (strength < 0 || strength > lvm::kVirtualizerCap.maxStrengthPm) {
-        return RetCode::ERROR_ILLEGAL_PARAMETER;
-    }
-
     // Update Control Parameter
     LVM_ControlParams_t params;
     {
