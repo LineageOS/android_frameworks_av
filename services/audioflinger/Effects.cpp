@@ -3485,7 +3485,7 @@ NO_THREAD_SAFETY_ANALYSIS  // conditional try lock
     }
 
     if (locked) {
-        mLock.unlock();
+        mProxyLock.unlock();
     }
 }
 
