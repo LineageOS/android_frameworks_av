@@ -56,6 +56,16 @@ void AudioFlinger::PatchCommandThread::releaseAudioPatch(audio_patch_handle_t ha
     releaseAudioPatchCommand(handle);
 }
 
+void AudioFlinger::PatchCommandThread::updateAudioPatch(audio_patch_handle_t oldHandle,
+        audio_patch_handle_t newHandle, const PatchPanel::Patch& patch) {
+    ALOGV("%s handle %d mHalHandle %d num sinks %d device sink %08x",
+            __func__, oldHandle, patch.mHalHandle,
+            patch.mAudioPatch.num_sinks,
+            patch.mAudioPatch.num_sinks > 0 ? patch.mAudioPatch.sinks[0].ext.device.type : 0);
+
+    updateAudioPatchCommand(oldHandle, newHandle, patch);
+}
+
 bool AudioFlinger::PatchCommandThread::threadLoop()
 NO_THREAD_SAFETY_ANALYSIS  // bug in clang compiler.
 {
@@ -102,6 +112,21 @@ NO_THREAD_SAFETY_ANALYSIS  // bug in clang compiler.
                     }
                 }
                     break;
+                case UPDATE_AUDIO_PATCH: {
+                    const auto data = (UpdateAudioPatchData*) command->mData.get();
+                    ALOGV("%s processing update audio patch old handle %d new handle %d",
+                          __func__,
+                          data->mOldHandle, data->mNewHandle);
+
+                    for (const auto& listener : listenersCopy) {
+                        auto spListener = listener.promote();
+                        if (spListener) {
+                            spListener->onUpdateAudioPatch(data->mOldHandle,
+                                    data->mNewHandle, data->mPatch);
+                        }
+                    }
+                }
+                    break;
                 default:
                     ALOGW("%s unknown command %d", __func__, command->mCommand);
                     break;
@@ -140,6 +165,16 @@ void AudioFlinger::PatchCommandThread::releaseAudioPatchCommand(audio_patch_hand
     sp<Command> command =
         sp<Command>::make(RELEASE_AUDIO_PATCH, new ReleaseAudioPatchData(handle));
     ALOGV("%s adding release patch", __func__);
+    sendCommand(command);
+}
+
+void AudioFlinger::PatchCommandThread::updateAudioPatchCommand(
+        audio_patch_handle_t oldHandle, audio_patch_handle_t newHandle,
+        const PatchPanel::Patch& patch) {
+    sp<Command> command = sp<Command>::make(UPDATE_AUDIO_PATCH,
+                                           new UpdateAudioPatchData(oldHandle, newHandle, patch));
+    ALOGV("%s adding update patch old handle %d new handle %d mHalHandle %d.",
+            __func__, oldHandle, newHandle, patch.mHalHandle);
     sendCommand(command);
 }
 

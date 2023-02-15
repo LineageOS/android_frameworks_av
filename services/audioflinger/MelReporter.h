@@ -69,6 +69,9 @@ public:
     void onCreateAudioPatch(audio_patch_handle_t handle,
                             const PatchPanel::Patch& patch) override;
     void onReleaseAudioPatch(audio_patch_handle_t handle) override;
+    void onUpdateAudioPatch(audio_patch_handle_t oldHandle,
+                            audio_patch_handle_t newHandle,
+                            const PatchPanel::Patch& patch) override;
 
     /**
      * The new metadata can determine whether we should compute MEL for the given thread.

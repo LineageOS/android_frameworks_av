@@ -349,6 +349,9 @@ public:
     virtual status_t onCreatePatch(
             audio_patch_handle_t patchHandle,
             /* const PatchPanel::Patch& */ const void * patch) = 0;
+    virtual status_t onUpdatePatch(audio_patch_handle_t oldPatchHandle,
+            audio_patch_handle_t newPatchHandle,
+            /* const PatchPanel::Patch& */ const void * patch) = 0;
     virtual void onReleasePatch(audio_patch_handle_t patchHandle) = 0;
 
     virtual void dump2(int fd, int spaces) const = 0; // TODO(b/288339104) naming?
