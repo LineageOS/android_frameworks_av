@@ -58,7 +58,7 @@ std::string AAudioServiceEndpointMMAP::dump() const {
     result << "  MMAP: framesTransferred = " << mFramesTransferred.get();
     result << ", HW nanos = " << mHardwareTimeOffsetNanos;
     result << ", port handle = " << mPortHandle;
-    result << ", audio data FD = " << mAudioDataFileDescriptor;
+    result << ", audio data FD = " << mAudioDataWrapper->getDataFileDescriptor();
     result << "\n";
 
     result << "    HW Offset Micros:     " <<
@@ -89,6 +89,7 @@ audio_format_t getNextFormatToTry(audio_format_t curFormat, audio_format_t retur
 
 aaudio_result_t AAudioServiceEndpointMMAP::open(const aaudio::AAudioStreamRequest &request) {
     aaudio_result_t result = AAUDIO_OK;
+    mAudioDataWrapper = std::make_unique<SharedMemoryWrapper>();
     copyFrom(request.getConstantConfiguration());
     mRequestedDeviceId = getDeviceId();
 
@@ -219,7 +220,7 @@ aaudio_result_t AAudioServiceEndpointMMAP::openWithFormat(
           __func__, audioFormat, getDeviceId(), getSessionId());
 
     // Create MMAP/NOIRQ buffer.
-    result = createMmapBuffer(&mAudioDataFileDescriptor);
+    result = createMmapBuffer();
     if (result != AAUDIO_OK) {
         goto error;
     }
@@ -242,6 +243,8 @@ aaudio_result_t AAudioServiceEndpointMMAP::openWithFormat(
     static constexpr int kTimestampGraceBurstCount = 5;
     mTimestampGracePeriodMs = ((int64_t) kTimestampGraceBurstCount * mFramesPerBurst
             * AAUDIO_MILLIS_PER_SECOND) / getSampleRate();
+
+    mDataReportOffsetNanos = ((int64_t)mTimestampGracePeriodMs) * AAUDIO_NANOS_PER_MILLISECOND;
 
     ALOGD("%s() got rate = %d, channels = %d channelMask = %#x, deviceId = %d, capacity = %d\n",
           __func__, getSampleRate(), getSamplesPerFrame(), getChannelMask(),
@@ -327,17 +330,10 @@ aaudio_result_t AAudioServiceEndpointMMAP::exitStandby(AudioEndpointParcelable* 
     if (mMmapStream == nullptr) {
         return AAUDIO_ERROR_NULL;
     }
-    mAudioDataFileDescriptor.reset();
-    const aaudio_result_t result = createMmapBuffer(&mAudioDataFileDescriptor);
+    mAudioDataWrapper->reset();
+    const aaudio_result_t result = createMmapBuffer();
     if (result == AAUDIO_OK) {
-        const int32_t bytesPerFrame = calculateBytesPerFrame();
-        const int32_t capacityInBytes = getBufferCapacity() * bytesPerFrame;
-        const int fdIndex = parcelable->addFileDescriptor(
-                mAudioDataFileDescriptor, capacityInBytes);
-        parcelable->mDownDataQueueParcelable.setupMemory(fdIndex, 0, capacityInBytes);
-        parcelable->mDownDataQueueParcelable.setBytesPerFrame(bytesPerFrame);
-        parcelable->mDownDataQueueParcelable.setFramesPerBurst(mFramesPerBurst);
-        parcelable->mDownDataQueueParcelable.setCapacityInFrames(getBufferCapacity());
+        getDownDataDescription(parcelable);
     }
     return result;
 }
@@ -427,14 +423,19 @@ void AAudioServiceEndpointMMAP::onRoutingChanged(audio_port_handle_t portHandle)
 aaudio_result_t AAudioServiceEndpointMMAP::getDownDataDescription(
         AudioEndpointParcelable* parcelable)
 {
+    if (mAudioDataWrapper->setupFifoBuffer(calculateBytesPerFrame(), getBufferCapacity())
+        != AAUDIO_OK) {
+        ALOGE("Failed to setup audio data wrapper, will not be able to "
+              "set data for sound dose computation");
+        // This will not affect the audio processing capability
+    }
     // Gather information on the data queue based on HAL info.
-    const int32_t bytesPerFrame = calculateBytesPerFrame();
-    const int32_t capacityInBytes = getBufferCapacity() * bytesPerFrame;
-    const int fdIndex = parcelable->addFileDescriptor(mAudioDataFileDescriptor, capacityInBytes);
-    parcelable->mDownDataQueueParcelable.setupMemory(fdIndex, 0, capacityInBytes);
-    parcelable->mDownDataQueueParcelable.setBytesPerFrame(bytesPerFrame);
-    parcelable->mDownDataQueueParcelable.setFramesPerBurst(mFramesPerBurst);
-    parcelable->mDownDataQueueParcelable.setCapacityInFrames(getBufferCapacity());
+    mAudioDataWrapper->fillParcelable(parcelable, parcelable->mDownDataQueueParcelable,
+                                      calculateBytesPerFrame(), mFramesPerBurst,
+                                      getBufferCapacity(),
+                                      getDirection() == AAUDIO_DIRECTION_OUTPUT
+                                              ? SharedMemoryWrapper::WRITE
+                                              : SharedMemoryWrapper::NONE);
     return AAUDIO_OK;
 }
 
@@ -518,8 +519,7 @@ aaudio_result_t AAudioServiceEndpointMMAP::getExternalPosition(uint64_t *positio
     return mHalExternalPositionStatus;
 }
 
-aaudio_result_t AAudioServiceEndpointMMAP::createMmapBuffer(
-        android::base::unique_fd* fileDescriptor)
+aaudio_result_t AAudioServiceEndpointMMAP::createMmapBuffer()
 {
     memset(&mMmapBufferinfo, 0, sizeof(struct audio_mmap_buffer_info));
     int32_t minSizeFrames = getBufferCapacity();
@@ -555,8 +555,9 @@ aaudio_result_t AAudioServiceEndpointMMAP::createMmapBuffer(
 
     // AAudio creates a copy of this FD and retains ownership of the copy.
     // Assume that AudioFlinger will close the original shared_memory_fd.
-    fileDescriptor->reset(dup(mMmapBufferinfo.shared_memory_fd));
-    if (fileDescriptor->get() == -1) {
+
+    mAudioDataWrapper->getDataFileDescriptor().reset(dup(mMmapBufferinfo.shared_memory_fd));
+    if (mAudioDataWrapper->getDataFileDescriptor().get() == -1) {
         ALOGE("%s() - could not dup shared_memory_fd", __func__);
         return AAUDIO_ERROR_INTERNAL;
     }
@@ -570,4 +571,32 @@ aaudio_result_t AAudioServiceEndpointMMAP::createMmapBuffer(
     mFramesPerBurst = mMmapBufferinfo.burst_size_frames;
 
     return AAUDIO_OK;
+}
+
+int64_t AAudioServiceEndpointMMAP::nextDataReportTime() {
+    return getDirection() == AAUDIO_DIRECTION_OUTPUT
+            ? AudioClock::getNanoseconds() + mDataReportOffsetNanos
+            : std::numeric_limits<int64_t>::max();
+}
+
+void AAudioServiceEndpointMMAP::reportData() {
+    if (mMmapStream == nullptr) {
+        // This must not happen
+        ALOGE("%s() invalid state, mmap stream is not initialized", __func__);
+        return;
+    }
+    auto fifo = mAudioDataWrapper->getFifoBuffer();
+    if (fifo == nullptr) {
+        ALOGE("%s() fifo buffer is not initialized, cannot report data", __func__);
+        return;
+    }
+
+    WrappingBuffer wrappingBuffer;
+    fifo_frames_t framesAvailable = fifo->getFullDataAvailable(&wrappingBuffer);
+    for (size_t i = 0; i < WrappingBuffer::SIZE; ++i) {
+        if (wrappingBuffer.numFrames[i] > 0) {
+            mMmapStream->reportData(wrappingBuffer.data[i], wrappingBuffer.numFrames[i]);
+        }
+    }
+    fifo->advanceReadIndex(framesAvailable);
 }

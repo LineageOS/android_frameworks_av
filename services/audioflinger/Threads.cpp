@@ -9823,6 +9823,10 @@ status_t AudioFlinger::MmapThreadHandle::standby()
     return mThread->standby();
 }
 
+status_t AudioFlinger::MmapThreadHandle::reportData(const void* buffer, size_t frameCount) {
+    return mThread->reportData(buffer, frameCount);
+}
+
 
 AudioFlinger::MmapThread::MmapThread(
         const sp<AudioFlinger>& audioFlinger, audio_io_handle_t id,
@@ -10131,6 +10135,11 @@ status_t AudioFlinger::MmapThread::standby()
     }
     releaseWakeLock();
     return NO_ERROR;
+}
+
+status_t AudioFlinger::MmapThread::reportData(const void* /*buffer*/, size_t /*frameCount*/) {
+    // This is a stub implementation. The MmapPlaybackThread overrides this function.
+    return INVALID_OPERATION;
 }
 
 
@@ -10813,6 +10822,13 @@ status_t AudioFlinger::MmapPlaybackThread::getExternalPosition(uint64_t *positio
         *timeNanos = timestamp.tv_sec * NANOS_PER_SECOND + timestamp.tv_nsec;
     }
     return status;
+}
+
+status_t AudioFlinger::MmapPlaybackThread::reportData(const void* buffer, size_t frameCount) {
+    // TODO(264254430): send the data to mel processor.
+    (void) buffer;
+    (void) frameCount;
+    return NO_ERROR;
 }
 
 void AudioFlinger::MmapPlaybackThread::dumpInternals_l(int fd, const Vector<String16>& args)

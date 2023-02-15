@@ -33,7 +33,6 @@ RingBufferParcelable::RingBufferParcelable(const RingBuffer& parcelable)
         : mReadCounterParcelable(parcelable.readCounterParcelable),
           mWriteCounterParcelable(parcelable.writeCounterParcelable),
           mDataParcelable(parcelable.dataParcelable),
-          mSharedMemoryIndex(parcelable.sharedMemoryIndex),
           mBytesPerFrame(parcelable.bytesPerFrame),
           mFramesPerBurst(parcelable.framesPerBurst),
           mCapacityInFrames(parcelable.capacityInFrames),
@@ -46,7 +45,6 @@ RingBuffer RingBufferParcelable::parcelable() const {
     result.readCounterParcelable = mReadCounterParcelable.parcelable();
     result.writeCounterParcelable = mWriteCounterParcelable.parcelable();
     result.dataParcelable = mDataParcelable.parcelable();
-    result.sharedMemoryIndex = mSharedMemoryIndex;
     result.bytesPerFrame = mBytesPerFrame;
     result.framesPerBurst = mFramesPerBurst;
     result.capacityInFrames = mCapacityInFrames;
@@ -62,19 +60,26 @@ void RingBufferParcelable::setupMemory(int32_t sharedMemoryIndex,
                  int32_t readCounterOffset,
                  int32_t writeCounterOffset,
                  int32_t counterSizeBytes) {
-    mSharedMemoryIndex = sharedMemoryIndex;
-    mReadCounterParcelable.setup(sharedMemoryIndex, readCounterOffset, counterSizeBytes);
-    mWriteCounterParcelable.setup(sharedMemoryIndex, writeCounterOffset, counterSizeBytes);
-    mDataParcelable.setup(sharedMemoryIndex, dataMemoryOffset, dataSizeInBytes);
+    mReadCounterParcelable.setup({sharedMemoryIndex, readCounterOffset, counterSizeBytes});
+    mWriteCounterParcelable.setup({sharedMemoryIndex, writeCounterOffset, counterSizeBytes});
+    mDataParcelable.setup({sharedMemoryIndex, dataMemoryOffset, dataSizeInBytes});
 }
 
 void RingBufferParcelable::setupMemory(int32_t sharedMemoryIndex,
                  int32_t dataMemoryOffset,
                  int32_t dataSizeInBytes) {
-    mSharedMemoryIndex = sharedMemoryIndex;
-    mReadCounterParcelable.setup(sharedMemoryIndex, 0, 0);
-    mWriteCounterParcelable.setup(sharedMemoryIndex, 0, 0);
-    mDataParcelable.setup(sharedMemoryIndex, dataMemoryOffset, dataSizeInBytes);
+    mReadCounterParcelable.setup({sharedMemoryIndex, 0, 0});
+    mWriteCounterParcelable.setup({sharedMemoryIndex, 0, 0});
+    mDataParcelable.setup({sharedMemoryIndex, dataMemoryOffset, dataSizeInBytes});
+}
+
+void RingBufferParcelable::setupMemory(
+        const SharedRegionParcelable::MemoryInfoTuple& dataMemoryInfo,
+        const SharedRegionParcelable::MemoryInfoTuple& readCounterInfo,
+        const SharedRegionParcelable::MemoryInfoTuple& writeCounterInfo) {
+    mReadCounterParcelable.setup(readCounterInfo);
+    mWriteCounterParcelable.setup(writeCounterInfo);
+    mDataParcelable.setup(dataMemoryInfo);
 }
 
 int32_t RingBufferParcelable::getBytesPerFrame() const {
@@ -128,9 +133,11 @@ aaudio_result_t RingBufferParcelable::resolve(SharedMemoryParcelable *memoryParc
     return AAUDIO_OK;
 }
 
-void RingBufferParcelable::updateMemory(const RingBufferParcelable& parcelable) {
-    setupMemory(mSharedMemoryIndex, 0,
-                parcelable.getCapacityInFrames() * parcelable.getBytesPerFrame());
+void RingBufferParcelable::updateMemory(const RingBufferParcelable& parcelable,
+                                        const std::map<int32_t, int32_t>& memoryIndexMap) {
+    setupMemory(parcelable.mDataParcelable.getMemoryInfo(&memoryIndexMap),
+                parcelable.mReadCounterParcelable.getMemoryInfo(&memoryIndexMap),
+                parcelable.mWriteCounterParcelable.getMemoryInfo(&memoryIndexMap));
     setBytesPerFrame(parcelable.getBytesPerFrame());
     setFramesPerBurst(parcelable.getFramesPerBurst());
     setCapacityInFrames(parcelable.getCapacityInFrames());
@@ -151,7 +158,6 @@ aaudio_result_t RingBufferParcelable::validate() const {
     }
     return AAUDIO_OK;
 }
-
 
 void RingBufferParcelable::dump() {
     ALOGD("mCapacityInFrames = %d ---------", mCapacityInFrames);
