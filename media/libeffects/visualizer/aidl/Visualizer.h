@@ -28,7 +28,7 @@ namespace aidl::android::hardware::audio::effect {
 class VisualizerImpl final : public EffectImpl {
   public:
     static const std::string kEffectName;
-    static const Visualizer::Capability kCapability;
+    static const Capability kCapability;
     static const Descriptor kDescriptor;
     VisualizerImpl() { LOG(DEBUG) << __func__; }
     ~VisualizerImpl() {
@@ -49,12 +49,10 @@ class VisualizerImpl final : public EffectImpl {
     std::string getEffectName() override { return kEffectName; }
 
   private:
+    static const std::vector<Range::VisualizerRange> kRanges;
     std::shared_ptr<VisualizerContext> mContext;
     ndk::ScopedAStatus getParameterVisualizer(const Visualizer::Tag& tag,
                                                     Parameter::Specific* specific);
-    ndk::ScopedAStatus setOnlyParameter(const Visualizer::SetOnlyParameters& param);
-    ndk::ScopedAStatus getOnlyParameter(const Visualizer::GetOnlyParameters::Tag tag,
-                                        Parameter::Specific* specific);
 };
 
 }  // namespace aidl::android::hardware::audio::effect
