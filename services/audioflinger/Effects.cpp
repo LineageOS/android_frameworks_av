@@ -1005,8 +1005,9 @@ status_t AudioFlinger::EffectModule::configure()
     // mConfig.outputCfg.buffer.frameCount cannot be zero.
     mMaxDisableWaitCnt = (uint32_t)std::max(
             (uint64_t)1, // mMaxDisableWaitCnt must be greater than zero.
-            (uint64_t)MAX_DISABLE_TIME_MS * mConfig.outputCfg.samplingRate
-                / ((uint64_t)1000 * mConfig.outputCfg.buffer.frameCount));
+            (uint64_t)mConfig.outputCfg.buffer.frameCount == 0 ? 1
+                : (MAX_DISABLE_TIME_MS * mConfig.outputCfg.samplingRate
+                / ((uint64_t)1000 * mConfig.outputCfg.buffer.frameCount)));
 
 exit:
     // TODO: consider clearing mConfig on error.
