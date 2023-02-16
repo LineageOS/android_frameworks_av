@@ -39,6 +39,7 @@ cc_test {
         "libaudioclient_aidl_conversion",
         "libaudio_aidl_conversion_common_cpp",
         "audioclient-types-aidl-cpp",
+        "av-types-aidl-cpp",
         "libstagefright_foundation",
     ],
 }

@@ -359,7 +359,7 @@ void AudioFlingerFuzzer::invokeAudioRecord() {
     record->getInputFramesLost();
     record->getFlags();
 
-    std::vector<media::MicrophoneInfo> activeMicrophones;
+    std::vector<media::MicrophoneInfoFw> activeMicrophones;
     record->getActiveMicrophones(&activeMicrophones);
     record->releaseBuffer(&audioBuffer);
 
@@ -541,7 +541,7 @@ void AudioFlingerFuzzer::invokeAudioSystem() {
     AudioSystem::getPrimaryOutputFrameCount();
     AudioSystem::setLowRamDevice(mFdp.ConsumeBool(), mFdp.ConsumeIntegral<int64_t>());
 
-    std::vector<media::MicrophoneInfo> microphones;
+    std::vector<media::MicrophoneInfoFw> microphones;
     AudioSystem::getMicrophones(&microphones);
 
     std::vector<pid_t> pids;

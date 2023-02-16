@@ -563,7 +563,7 @@ status_t MediaRecorderClient::enableAudioDeviceCallback(bool enabled) {
 }
 
 status_t MediaRecorderClient::getActiveMicrophones(
-        std::vector<media::MicrophoneInfo>* activeMicrophones) {
+        std::vector<media::MicrophoneInfoFw>* activeMicrophones) {
     ALOGV("getActiveMicrophones");
     Mutex::Autolock lock(mLock);
     if (mRecorder != NULL) {
