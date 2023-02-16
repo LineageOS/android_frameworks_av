@@ -1481,7 +1481,7 @@ binder::Status CameraDeviceClient::flush(
 
 binder::Status CameraDeviceClient::prepare(int streamId) {
     ATRACE_CALL();
-    ALOGV("%s", __FUNCTION__);
+    ALOGV("%s stream id %d", __FUNCTION__, streamId);
 
     binder::Status res;
     if (!(res = checkPidStatus(__FUNCTION__)).isOk()) return res;
@@ -1521,7 +1521,7 @@ binder::Status CameraDeviceClient::prepare(int streamId) {
 
 binder::Status CameraDeviceClient::prepare2(int maxCount, int streamId) {
     ATRACE_CALL();
-    ALOGV("%s", __FUNCTION__);
+    ALOGV("%s stream id %d", __FUNCTION__, streamId);
 
     binder::Status res;
     if (!(res = checkPidStatus(__FUNCTION__)).isOk()) return res;
@@ -2046,6 +2046,7 @@ void CameraDeviceClient::notifyPrepared(int streamId) {
     // Thread safe. Don't bother locking.
     sp<hardware::camera2::ICameraDeviceCallbacks> remoteCb = getRemoteCallback();
     if (remoteCb != 0) {
+        ALOGV("%s: stream id %d", __FUNCTION__, streamId);
         remoteCb->onPrepared(streamId);
     }
 }

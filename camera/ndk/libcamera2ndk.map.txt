@@ -12,6 +12,8 @@ LIBCAMERA2NDK {
     ACameraCaptureSession_logicalCamera_setRepeatingRequest; # introduced=29
     ACameraCaptureSession_logicalCamera_setRepeatingRequestV2; # introduced=33
     ACameraCaptureSession_stopRepeating;
+    ACameraCaptureSession_setWindowPreparedCallback; # introduced=34
+    ACameraCaptureSession_prepareWindow; # introduced=34
     ACameraCaptureSession_updateSharedOutput; # introduced=28
     ACameraDevice_close;
     ACameraDevice_createCaptureRequest;

@@ -340,6 +340,33 @@ camera_status_t CameraDevice::updateOutputConfigurationLocked(ACaptureSessionOut
     return ACAMERA_OK;
 }
 
+camera_status_t CameraDevice::prepareLocked(ACameraWindowType *window) {
+    camera_status_t ret = checkCameraClosedOrErrorLocked();
+    if (ret != ACAMERA_OK) {
+        return ret;
+    }
+
+    if (window == nullptr) {
+        return ACAMERA_ERROR_INVALID_PARAMETER;
+    }
+
+    int32_t streamId = -1;
+    for (auto& kvPair : mConfiguredOutputs) {
+        if (window == kvPair.second.first) {
+            streamId = kvPair.first;
+            break;
+        }
+    }
+    if (streamId < 0) {
+        ALOGE("Error: Invalid output configuration");
+        return ACAMERA_ERROR_INVALID_PARAMETER;
+    }
+
+    auto remoteRet = mRemote->prepare(streamId);
+    CHECK_TRANSACTION_AND_RET(remoteRet, "prepare()")
+    return ACAMERA_OK;
+}
+
 camera_status_t CameraDevice::allocateCaptureRequestLocked(
         const ACaptureRequest* request, /*out*/sp<CaptureRequest> &outReq) {
     sp<CaptureRequest> req(new CaptureRequest());
@@ -929,6 +956,7 @@ void CameraDevice::CallbackHandler::onMessageReceived(
         case kWhatCaptureSeqEnd:
         case kWhatCaptureSeqAbort:
         case kWhatCaptureBufferLost:
+        case kWhatPreparedCb:
             ALOGV("%s: Received msg %d", __FUNCTION__, msg->what());
             break;
         case kWhatCleanUpSessions:
@@ -1002,6 +1030,7 @@ void CameraDevice::CallbackHandler::onMessageReceived(
         case kWhatCaptureSeqEnd:
         case kWhatCaptureSeqAbort:
         case kWhatCaptureBufferLost:
+        case kWhatPreparedCb:
         {
             sp<RefBase> obj;
             found = msg->findObject(kSessionSpKey, &obj);
@@ -1043,6 +1072,26 @@ void CameraDevice::CallbackHandler::onMessageReceived(
                         return;
                     }
                     (*onState)(context, session.get());
+                    break;
+                }
+                case kWhatPreparedCb:
+                {
+                    ACameraCaptureSession_prepareCallback onWindowPrepared;
+                    found = msg->findPointer(kCallbackFpKey, (void**) &onWindowPrepared);
+                    if (!found) {
+                        ALOGE("%s: Cannot find state callback!", __FUNCTION__);
+                        return;
+                    }
+                    if (onWindowPrepared == nullptr) {
+                        return;
+                    }
+                    native_handle_t* anw;
+                    found = msg->findPointer(kAnwKey, (void**) &anw);
+                    if (!found) {
+                        ALOGE("%s: Cannot find ANativeWindow: %d!", __FUNCTION__, __LINE__);
+                        return;
+                    }
+                    (*onWindowPrepared)(context, anw, session.get());
                     break;
                 }
                 case kWhatCaptureStart:
@@ -1769,6 +1818,37 @@ ScopedAStatus CameraDevice::ServiceCallback::onRepeatingRequestError(int64_t las
 
     dev->checkRepeatingSequenceCompleteLocked(repeatingSequenceId, lastFrameNumber);
 
+    return ScopedAStatus::ok();
+}
+
+ScopedAStatus CameraDevice::ServiceCallback::onPrepared(int32_t streamId) {
+    ALOGV("%s: callback for stream id %d", __FUNCTION__, streamId);
+    std::shared_ptr<CameraDevice> dev = mDevice.lock();
+    if (dev == nullptr) {
+        return ScopedAStatus::ok();
+    }
+    Mutex::Autolock _l(dev->mDeviceLock);
+    if (dev->isClosed() || dev->mRemote == nullptr) {
+        return ScopedAStatus::ok();
+    }
+    auto it = dev->mConfiguredOutputs.find(streamId);
+    if (it == dev->mConfiguredOutputs.end()) {
+        ALOGE("%s: stream id %d does not exist", __FUNCTION__ , streamId);
+        return ScopedAStatus::ok();
+    }
+    sp<ACameraCaptureSession> session = dev->mCurrentSession.promote();
+    if (session == nullptr) {
+        ALOGE("%s: Session is dead already", __FUNCTION__ );
+        return ScopedAStatus::ok();
+    }
+    // We've found the window corresponding to the surface id.
+    const native_handle_t *anw = it->second.first.mWindow;
+    sp<AMessage> msg = new AMessage(kWhatPreparedCb, dev->mHandler);
+    msg->setPointer(kContextKey, session->mPreparedCb.context);
+    msg->setPointer(kAnwKey, (void *)anw);
+    msg->setObject(kSessionSpKey, session);
+    msg->setPointer(kCallbackFpKey, (void *)session->mPreparedCb.onWindowPrepared);
+    dev->postSessionMsgAndCleanup(msg);
     return ScopedAStatus::ok();
 }
 

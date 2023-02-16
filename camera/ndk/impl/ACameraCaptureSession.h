@@ -130,6 +130,12 @@ struct ACameraCaptureSession : public RefBase {
 
     camera_status_t updateOutputConfiguration(ACaptureSessionOutput *output);
 
+    void setWindowPreparedCallback(ACameraCaptureSession_prepareCallbacks *cb) {
+        Mutex::Autolock _l(mSessionLock);
+        mPreparedCb = *cb;
+    }
+    camera_status_t prepare(ACameraWindowType *window);
+
     ACameraDevice* getDevice();
 
   private:
@@ -156,6 +162,7 @@ struct ACameraCaptureSession : public RefBase {
 
     bool  mIsClosed = false;
     bool  mClosedByApp = false;
+    ACameraCaptureSession_prepareCallbacks mPreparedCb;
     Mutex mSessionLock;
 };
 
