@@ -150,6 +150,9 @@ enum ParamName { TUPLE_UUID, TUPLE_PARAM_COMBINATION };
 using EffectParamTestTuple =
         std::tuple<const effect_uuid_t* /* type UUID */, std::shared_ptr<EffectParamCombination>>;
 
+static const effect_uuid_t EXTEND_EFFECT_TYPE_UUID = {
+        0xfa81dbde, 0x588b, 0x11ed, 0x9b6a, {0x02, 0x42, 0xac, 0x12, 0x00, 0x02}};
+
 std::vector<EffectParamTestTuple> testPairs = {
         std::make_tuple(FX_IID_AEC,
                         createEffectParamCombination(AEC_PARAM_ECHO_DELAY, 0xff /* echoDelayMs */,
@@ -180,7 +183,9 @@ std::vector<EffectParamTestTuple> testPairs = {
                                              sizeof(int32_t) /* returnValueSize */)),
         std::make_tuple(FX_IID_NS,
                         createEffectParamCombination(NS_PARAM_LEVEL, 1 /* level */,
-                                                     sizeof(int32_t) /* returnValueSize */))};
+                                                     sizeof(int32_t) /* returnValueSize */)),
+        std::make_tuple(&EXTEND_EFFECT_TYPE_UUID,
+                        createEffectParamCombination(1, 0xbead, sizeof(int32_t)))};
 
 class libAudioHalEffectParamTest : public ::testing::TestWithParam<EffectParamTestTuple> {
   public:
@@ -204,6 +209,7 @@ class libAudioHalEffectParamTest : public ::testing::TestWithParam<EffectParamTe
           }()) {}
 
     void SetUp() override {
+        ASSERT_NE(0ul, mDescs.size());
         for (const auto& desc : mDescs) {
             sp<EffectHalInterface> interface = createEffectHal(desc);
             ASSERT_NE(nullptr, interface);
