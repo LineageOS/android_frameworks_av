@@ -88,11 +88,6 @@ void VisualizerContext::reset() {
 
 RetCode VisualizerContext::setCaptureSamples(int samples) {
     std::lock_guard lg(mMutex);
-    if (samples < 0 || (unsigned)samples > kMaxCaptureBufSize) {
-        LOG(ERROR) << __func__ << " captureSamples " << samples << " exceed valid range: 0 - "
-                   << kMaxCaptureBufSize;
-        return RetCode::ERROR_ILLEGAL_PARAMETER;
-    }
     mCaptureSamples = samples;
     return RetCode::SUCCESS;
 }
@@ -122,14 +117,14 @@ Visualizer::ScalingMode VisualizerContext::getScalingMode() {
 }
 
 RetCode VisualizerContext::setDownstreamLatency(int latency) {
-    if (latency < 0 || (unsigned)latency > kMaxLatencyMs) {
-        LOG(ERROR) << __func__ << " latency " << latency << " exceed valid range: 0 - "
-                   << kMaxLatencyMs;
-        return RetCode::ERROR_ILLEGAL_PARAMETER;
-    }
     std::lock_guard lg(mMutex);
     mDownstreamLatency = latency;
     return RetCode::SUCCESS;
+}
+
+int VisualizerContext::getDownstreamLatency() {
+    std::lock_guard lg(mMutex);
+    return mDownstreamLatency;
 }
 
 uint32_t VisualizerContext::getDeltaTimeMsFromUpdatedTime_l() {
@@ -149,7 +144,7 @@ uint32_t VisualizerContext::getDeltaTimeMsFromUpdatedTime_l() {
     return deltaMs;
 }
 
-Visualizer::GetOnlyParameters::Measurement VisualizerContext::getMeasure() {
+Visualizer::Measurement VisualizerContext::getMeasure() {
     uint16_t peakU16 = 0;
     float sumRmsSquared = 0.0f;
     uint8_t nbValidMeasurements = 0;
@@ -184,7 +179,7 @@ Visualizer::GetOnlyParameters::Measurement VisualizerContext::getMeasure() {
     }
 
     float rms = nbValidMeasurements == 0 ? 0.0f : sqrtf(sumRmsSquared / nbValidMeasurements);
-    Visualizer::GetOnlyParameters::Measurement measure;
+    Visualizer::Measurement measure;
     // convert from I16 sample values to mB and write results
     measure.rms = (rms < 0.000016f) ? -9600 : (int32_t)(2000 * log10(rms / 32767.0f));
     measure.peak = (peakU16 == 0) ? -9600 : (int32_t)(2000 * log10(peakU16 / 32767.0f));

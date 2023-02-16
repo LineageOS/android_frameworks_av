@@ -47,6 +47,8 @@ using media::audio::common::AudioProfile;
 using media::audio::common::AudioStandard;
 using media::audio::common::ExtraAudioDescriptor;
 using media::audio::common::Int;
+using media::audio::common::MicrophoneDynamicInfo;
+using media::audio::common::MicrophoneInfo;
 using media::audio::common::PcmType;
 
 // Provide value printers for types generated from AIDL
@@ -668,3 +670,73 @@ TEST_P(AudioGainTest, Legacy2Aidl2Legacy) {
     }
 }
 INSTANTIATE_TEST_SUITE_P(AudioGain, AudioGainTest, testing::Values(true, false));
+
+TEST(AudioMicrophoneInfoFw, Aidl2Legacy2Aidl) {
+    media::MicrophoneInfoFw initial{};
+    // HALs must return at least 1 element in channelMapping. The zero value is 'UNUSED'.
+    initial.dynamic.channelMapping.resize(1);
+    auto conv = aidl2legacy_MicrophoneInfoFw_audio_microphone_characteristic_t(initial);
+    ASSERT_TRUE(conv.ok());
+    auto convBack = legacy2aidl_audio_microphone_characteristic_t_MicrophoneInfoFw(conv.value());
+    ASSERT_TRUE(convBack.ok());
+    EXPECT_EQ(initial, convBack.value());
+}
+
+TEST(AudioMicrophoneInfoFw, UnknownValues) {
+    {
+        media::MicrophoneInfoFw initial;
+        initial.dynamic.channelMapping.resize(1);
+        initial.info.indexInTheGroup = MicrophoneInfo::INDEX_IN_THE_GROUP_UNKNOWN;
+        auto conv = aidl2legacy_MicrophoneInfoFw_audio_microphone_characteristic_t(initial);
+        ASSERT_TRUE(conv.ok());
+        auto convBack =
+                legacy2aidl_audio_microphone_characteristic_t_MicrophoneInfoFw(conv.value());
+        ASSERT_TRUE(convBack.ok());
+        EXPECT_EQ(initial, convBack.value());
+    }
+    for (const auto f : {&audio_microphone_characteristic_t::sensitivity,
+                         &audio_microphone_characteristic_t::max_spl,
+                         &audio_microphone_characteristic_t::min_spl}) {
+        audio_microphone_characteristic_t mic{};
+        if (f == &audio_microphone_characteristic_t::sensitivity) {
+            mic.*f = AUDIO_MICROPHONE_SENSITIVITY_UNKNOWN;
+        } else {
+            mic.*f = AUDIO_MICROPHONE_SPL_UNKNOWN;
+        }
+        auto aidl = legacy2aidl_audio_microphone_characteristic_t_MicrophoneInfoFw(mic);
+        ASSERT_TRUE(aidl.ok());
+        EXPECT_FALSE(aidl.value().info.sensitivity.has_value());
+    }
+    for (const auto f : {&audio_microphone_characteristic_t::geometric_location,
+                         &audio_microphone_characteristic_t::orientation}) {
+        for (const auto c : {&audio_microphone_coordinate::x, &audio_microphone_coordinate::y,
+                             &audio_microphone_coordinate::z}) {
+            audio_microphone_characteristic_t mic{};
+            mic.*f.*c = AUDIO_MICROPHONE_COORDINATE_UNKNOWN;
+            auto conv = legacy2aidl_audio_microphone_characteristic_t_MicrophoneInfoFw(mic);
+            ASSERT_TRUE(conv.ok());
+            const auto& aidl = conv.value();
+            if (f == &audio_microphone_characteristic_t::geometric_location) {
+                EXPECT_FALSE(aidl.info.position.has_value());
+                EXPECT_TRUE(aidl.info.orientation.has_value());
+            } else {
+                EXPECT_TRUE(aidl.info.position.has_value());
+                EXPECT_FALSE(aidl.info.orientation.has_value());
+            }
+        }
+    }
+}
+
+TEST(AudioMicrophoneInfoFw, ChannelMapping) {
+    audio_microphone_characteristic_t mic{};
+    mic.channel_mapping[1] = AUDIO_MICROPHONE_CHANNEL_MAPPING_DIRECT;
+    mic.channel_mapping[3] = AUDIO_MICROPHONE_CHANNEL_MAPPING_PROCESSED;
+    auto conv = legacy2aidl_audio_microphone_characteristic_t_MicrophoneInfoFw(mic);
+    ASSERT_TRUE(conv.ok());
+    const auto& aidl = conv.value();
+    EXPECT_EQ(4, aidl.dynamic.channelMapping.size());
+    EXPECT_EQ(MicrophoneDynamicInfo::ChannelMapping::UNUSED, aidl.dynamic.channelMapping[0]);
+    EXPECT_EQ(MicrophoneDynamicInfo::ChannelMapping::DIRECT, aidl.dynamic.channelMapping[1]);
+    EXPECT_EQ(MicrophoneDynamicInfo::ChannelMapping::UNUSED, aidl.dynamic.channelMapping[2]);
+    EXPECT_EQ(MicrophoneDynamicInfo::ChannelMapping::PROCESSED, aidl.dynamic.channelMapping[3]);
+}

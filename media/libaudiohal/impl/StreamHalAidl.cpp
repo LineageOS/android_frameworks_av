@@ -701,7 +701,7 @@ status_t StreamInHalAidl::getCapturePosition(int64_t *frames, int64_t *time) {
 }
 
 status_t StreamInHalAidl::getActiveMicrophones(
-        std::vector<media::MicrophoneInfo> *microphones __unused) {
+        std::vector<media::MicrophoneInfoFw> *microphones __unused) {
     TIME_CHECK();
     if (!mStream) return NO_INIT;
     ALOGE("%s not implemented yet", __func__);

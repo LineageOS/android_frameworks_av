@@ -14,6 +14,7 @@
  * limitations under the License.
  */
 
+#include "ReverbTypes.h"
 #define LOG_TAG "EffectReverb"
 #include <Utils.h>
 #include <algorithm>
@@ -132,6 +133,7 @@ ndk::ScopedAStatus EffectReverb::setParameterSpecific(const Parameter::Specific&
 
 ndk::ScopedAStatus EffectReverb::setParameterPresetReverb(const Parameter::Specific& specific) {
     auto& prParam = specific.get<Parameter::Specific::presetReverb>();
+    RETURN_IF(!inRange(prParam, lvm::kPresetReverbRanges), EX_ILLEGAL_ARGUMENT, "outOfRange");
     auto tag = prParam.getTag();
 
     switch (tag) {
@@ -152,6 +154,7 @@ ndk::ScopedAStatus EffectReverb::setParameterPresetReverb(const Parameter::Speci
 ndk::ScopedAStatus EffectReverb::setParameterEnvironmentalReverb(
         const Parameter::Specific& specific) {
     auto& erParam = specific.get<Parameter::Specific::environmentalReverb>();
+    RETURN_IF(!inRange(erParam, lvm::kEnvReverbRanges), EX_ILLEGAL_ARGUMENT, "outOfRange");
     auto tag = erParam.getTag();
 
     switch (tag) {

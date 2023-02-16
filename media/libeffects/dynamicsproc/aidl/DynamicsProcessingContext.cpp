@@ -420,24 +420,18 @@ bool DynamicsProcessingContext::validateEngineConfig(
            validateStageEnablement(engine.postEqStage) && validateStageEnablement(engine.mbcStage);
 }
 
-inline bool DynamicsProcessingContext::validateCutoffFrequency(float freq) {
-    return freq >= DynamicsProcessingImpl::kCapability.minCutOffFreq &&
-            freq <= DynamicsProcessingImpl::kCapability.maxCutOffFreq;
-}
-
 bool DynamicsProcessingContext::validateEqBandConfig(const DynamicsProcessing::EqBandConfig& band,
                                                      int maxChannel, int maxBand) {
-    return validateChannel(band.channel, maxChannel) && validateBand(band.band, maxBand) &&
-           validateCutoffFrequency(band.cutoffFrequencyHz);
+    return validateChannel(band.channel, maxChannel) && validateBand(band.band, maxBand);
 }
 
 bool DynamicsProcessingContext::validateMbcBandConfig(const DynamicsProcessing::MbcBandConfig& band,
                                                       int maxChannel, int maxBand) {
     return validateChannel(band.channel, maxChannel) && validateBand(band.band, maxBand) &&
-           validateCutoffFrequency(band.cutoffFrequencyHz) && validateTime(band.attackTimeMs) &&
-           validateTime(band.releaseTimeMs) && validateRatio(band.ratio) &&
-           validateBandDb(band.thresholdDb) && validateBandDb(band.kneeWidthDb) &&
-           validateBandDb(band.noiseGateThresholdDb) && validateRatio(band.expanderRatio);
+           validateTime(band.attackTimeMs) && validateTime(band.releaseTimeMs) &&
+           validateRatio(band.ratio) && validateBandDb(band.thresholdDb) &&
+           validateBandDb(band.kneeWidthDb) && validateBandDb(band.noiseGateThresholdDb) &&
+           validateRatio(band.expanderRatio);
 }
 
 bool DynamicsProcessingContext::validateLimiterConfig(

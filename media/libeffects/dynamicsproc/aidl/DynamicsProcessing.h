@@ -28,7 +28,7 @@ class DynamicsProcessingImpl final : public EffectImpl {
   public:
     static const std::string kEffectName;
     static const Descriptor kDescriptor;
-    static const DynamicsProcessing::Capability kCapability;
+    static const Capability kCapability;
 
     DynamicsProcessingImpl() { LOG(DEBUG) << __func__; }
     ~DynamicsProcessingImpl() {
@@ -52,6 +52,11 @@ class DynamicsProcessingImpl final : public EffectImpl {
     std::string getEffectName() override { return kEffectName; }
 
   private:
+    static const DynamicsProcessing::EqBandConfig kEqBandConfigMin;
+    static const DynamicsProcessing::EqBandConfig kEqBandConfigMax;
+    static const Range::DynamicsProcessingRange kPreEqBandRange;
+    static const Range::DynamicsProcessingRange kPostEqBandRange;
+    static const Range kRange;
     std::shared_ptr<DynamicsProcessingContext> mContext;
     ndk::ScopedAStatus getParameterDynamicsProcessing(const DynamicsProcessing::Tag& tag,
                                                       Parameter::Specific* specific);
