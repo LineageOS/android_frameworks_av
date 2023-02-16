@@ -2576,7 +2576,7 @@ status_t StagefrightRecorder::enableAudioDeviceCallback(bool enabled) {
 }
 
 status_t StagefrightRecorder::getActiveMicrophones(
-        std::vector<media::MicrophoneInfo>* activeMicrophones) {
+        std::vector<media::MicrophoneInfoFw>* activeMicrophones) {
     if (mAudioSourceNode != 0) {
         return mAudioSourceNode->getActiveMicrophones(activeMicrophones);
     }

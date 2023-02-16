@@ -73,7 +73,8 @@ public:
             void        setSilenced(bool silenced) { if (!isPatchTrack()) mSilenced = silenced; }
             bool        isSilenced() const { return mSilenced; }
 
-            status_t    getActiveMicrophones(std::vector<media::MicrophoneInfo>* activeMicrophones);
+            status_t    getActiveMicrophones(
+                    std::vector<media::MicrophoneInfoFw>* activeMicrophones);
 
             status_t    setPreferredMicrophoneDirection(audio_microphone_direction_t direction);
             status_t    setPreferredMicrophoneFieldDimension(float zoom);
