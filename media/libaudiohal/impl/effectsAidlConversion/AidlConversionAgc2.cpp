@@ -34,7 +34,7 @@ namespace android {
 namespace effect {
 
 using ::aidl::android::aidl_utils::statusTFromBinderStatus;
-using ::aidl::android::hardware::audio::effect::AutomaticGainControl;
+using ::aidl::android::hardware::audio::effect::AutomaticGainControlV2;
 using ::aidl::android::hardware::audio::effect::Parameter;
 using ::android::status_t;
 using utils::EffectParamReader;
@@ -84,8 +84,8 @@ status_t AidlConversionAgc2::getParameter(EffectParamWriter& param) {
     switch (type) {
         case AGC2_PARAM_FIXED_DIGITAL_GAIN: {
             Parameter::Id id =
-                    MAKE_SPECIFIC_PARAMETER_ID(AutomaticGainControl, automaticGainControlTag,
-                                               AutomaticGainControl::fixedDigitalGainMb);
+                    MAKE_SPECIFIC_PARAMETER_ID(AutomaticGainControlV2, automaticGainControlV2Tag,
+                                               AutomaticGainControlV2::fixedDigitalGainMb);
             RETURN_STATUS_IF_ERROR(statusTFromBinderStatus(mEffect->getParameter(id, &aidlParam)));
             value = VALUE_OR_RETURN_STATUS(
                     aidl::android::aidl2legacy_Parameter_agc_uint32_fixedDigitalGain(aidlParam));
@@ -93,8 +93,8 @@ status_t AidlConversionAgc2::getParameter(EffectParamWriter& param) {
         }
         case AGC2_PARAM_ADAPT_DIGI_LEVEL_ESTIMATOR: {
             Parameter::Id id =
-                    MAKE_SPECIFIC_PARAMETER_ID(AutomaticGainControl, automaticGainControlTag,
-                                               AutomaticGainControl::levelEstimator);
+                    MAKE_SPECIFIC_PARAMETER_ID(AutomaticGainControlV2, automaticGainControlV2Tag,
+                                               AutomaticGainControlV2::levelEstimator);
             RETURN_STATUS_IF_ERROR(statusTFromBinderStatus(mEffect->getParameter(id, &aidlParam)));
             value = VALUE_OR_RETURN_STATUS(
                     aidl::android::aidl2legacy_Parameter_agc_uint32_levelEstimator(aidlParam));
@@ -102,8 +102,8 @@ status_t AidlConversionAgc2::getParameter(EffectParamWriter& param) {
         }
         case AGC2_PARAM_ADAPT_DIGI_EXTRA_SATURATION_MARGIN: {
             Parameter::Id id =
-                    MAKE_SPECIFIC_PARAMETER_ID(AutomaticGainControl, automaticGainControlTag,
-                                               AutomaticGainControl::saturationMarginMb);
+                    MAKE_SPECIFIC_PARAMETER_ID(AutomaticGainControlV2, automaticGainControlV2Tag,
+                                               AutomaticGainControlV2::saturationMarginMb);
             RETURN_STATUS_IF_ERROR(statusTFromBinderStatus(mEffect->getParameter(id, &aidlParam)));
             value = VALUE_OR_RETURN_STATUS(
                     aidl::android::aidl2legacy_Parameter_agc_uint32_saturationMargin(aidlParam));
