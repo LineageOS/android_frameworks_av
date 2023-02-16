@@ -990,4 +990,24 @@ ConversionResult<int32_t> legacy2aidl_audio_direct_mode_t_int32_t_mask(audio_dir
             indexToEnum_bitmask<audio_direct_mode_t>,
             enumToMask_index<int32_t, media::AudioDirectMode>);
 }
+
+ConversionResult<audio_microphone_characteristic_t>
+aidl2legacy_MicrophoneInfoFw_audio_microphone_characteristic_t(
+        const media::MicrophoneInfoFw& aidl) {
+    audio_microphone_characteristic_t legacy =
+            VALUE_OR_RETURN(aidl2legacy_MicrophoneInfos_audio_microphone_characteristic_t(
+                            aidl.info, aidl.dynamic));
+    legacy.id = VALUE_OR_RETURN(aidl2legacy_int32_t_audio_port_handle_t(aidl.portId));
+    return legacy;
+}
+ConversionResult<media::MicrophoneInfoFw>
+legacy2aidl_audio_microphone_characteristic_t_MicrophoneInfoFw(
+        const audio_microphone_characteristic_t& legacy) {
+    media::MicrophoneInfoFw aidl;
+    RETURN_IF_ERROR(legacy2aidl_audio_microphone_characteristic_t_MicrophoneInfos(
+                    legacy, &aidl.info, &aidl.dynamic));
+    aidl.portId = VALUE_OR_RETURN(legacy2aidl_audio_port_handle_t_int32_t(legacy.id));
+    return aidl;
+}
+
 }  // namespace android

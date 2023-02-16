@@ -16,24 +16,14 @@
 
 package android.media;
 
+import android.media.audio.common.MicrophoneDynamicInfo;
+import android.media.audio.common.MicrophoneInfo;
+
 /**
  * {@hide}
  */
-parcelable MicrophoneInfoData {
-    @utf8InCpp String deviceId;
+parcelable MicrophoneInfoFw {
+    MicrophoneInfo info;
+    MicrophoneDynamicInfo dynamic;
     int portId;
-    int type;
-    @utf8InCpp String address;
-    int deviceLocation;
-    int deviceGroup;
-    int indexInTheGroup;
-    float[] geometricLocation;
-    float[] orientation;
-    float[] frequencies;
-    float[] frequencyResponses;
-    int[] channelMapping;
-    float sensitivity;
-    float maxSpl;
-    float minSpl;
-    int directionality;
 }

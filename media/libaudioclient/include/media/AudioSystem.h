@@ -28,6 +28,7 @@
 #include <android/media/BnAudioPolicyServiceClient.h>
 #include <android/media/INativeSpatializerCallback.h>
 #include <android/media/ISpatializer.h>
+#include <android/media/MicrophoneInfoFw.h>
 #include <android/media/audio/common/AudioMMapPolicyInfo.h>
 #include <android/media/audio/common/AudioMMapPolicyType.h>
 #include <android/media/audio/common/AudioPort.h>
@@ -38,7 +39,6 @@
 #include <media/AudioProductStrategy.h>
 #include <media/AudioVolumeGroup.h>
 #include <media/AudioIoDescriptor.h>
-#include <media/MicrophoneInfo.h>
 #include <system/audio.h>
 #include <system/audio_effect.h>
 #include <system/audio_policy.h>
@@ -428,7 +428,7 @@ public:
     static float    getStreamVolumeDB(
             audio_stream_type_t stream, int index, audio_devices_t device);
 
-    static status_t getMicrophones(std::vector<media::MicrophoneInfo> *microphones);
+    static status_t getMicrophones(std::vector<media::MicrophoneInfoFw> *microphones);
 
     static status_t getHwOffloadFormatsSupportedForBluetoothMedia(
                                     audio_devices_t device, std::vector<audio_format_t> *formats);

@@ -61,6 +61,8 @@
 #include PREFIX(android/media/audio/common/AudioUuid.h)
 #include PREFIX(android/media/audio/common/ExtraAudioDescriptor.h)
 #include PREFIX(android/media/audio/common/Int.h)
+#include PREFIX(android/media/audio/common/MicrophoneDynamicInfo.h)
+#include PREFIX(android/media/audio/common/MicrophoneInfo.h)
 #undef PREFIX
 
 #include <media/AidlConversionUtil.h>
@@ -370,6 +372,48 @@ ConversionResult<audio_latency_mode_t>
 aidl2legacy_AudioLatencyMode_audio_latency_mode_t(media::audio::common::AudioLatencyMode aidl);
 ConversionResult<media::audio::common::AudioLatencyMode>
 legacy2aidl_audio_latency_mode_t_AudioLatencyMode(audio_latency_mode_t legacy);
+
+ConversionResult<audio_microphone_location_t>
+aidl2legacy_MicrophoneInfoLocation_audio_microphone_location_t(
+        media::audio::common::MicrophoneInfo::Location aidl);
+ConversionResult<media::audio::common::MicrophoneInfo::Location>
+legacy2aidl_audio_microphone_location_t_MicrophoneInfoLocation(audio_microphone_location_t legacy);
+
+ConversionResult<audio_microphone_group_t> aidl2legacy_int32_t_audio_microphone_group_t(
+        int32_t aidl);
+ConversionResult<int32_t> legacy2aidl_audio_microphone_group_t_int32_t(
+        audio_microphone_group_t legacy);
+
+ConversionResult<audio_microphone_directionality_t>
+aidl2legacy_MicrophoneInfoDirectionality_audio_microphone_directionality_t(
+        media::audio::common::MicrophoneInfo::Directionality aidl);
+ConversionResult<media::audio::common::MicrophoneInfo::Directionality>
+legacy2aidl_audio_microphone_directionality_t_MicrophoneInfoDirectionality(
+        audio_microphone_directionality_t legacy);
+
+ConversionResult<audio_microphone_coordinate>
+aidl2legacy_MicrophoneInfoCoordinate_audio_microphone_coordinate(
+        const media::audio::common::MicrophoneInfo::Coordinate& aidl);
+ConversionResult<media::audio::common::MicrophoneInfo::Coordinate>
+legacy2aidl_audio_microphone_coordinate_MicrophoneInfoCoordinate(
+        const audio_microphone_coordinate& legacy);
+
+ConversionResult<audio_microphone_channel_mapping_t>
+aidl2legacy_MicrophoneDynamicInfoChannelMapping_audio_microphone_channel_mapping_t(
+        media::audio::common::MicrophoneDynamicInfo::ChannelMapping aidl);
+ConversionResult<media::audio::common::MicrophoneDynamicInfo::ChannelMapping>
+legacy2aidl_audio_microphone_channel_mapping_t_MicrophoneDynamicInfoChannelMapping(
+        audio_microphone_channel_mapping_t legacy);
+
+ConversionResult<audio_microphone_characteristic_t>
+aidl2legacy_MicrophoneInfos_audio_microphone_characteristic_t(
+        const media::audio::common::MicrophoneInfo& aidlInfo,
+        const media::audio::common::MicrophoneDynamicInfo& aidlDynamic);
+status_t
+legacy2aidl_audio_microphone_characteristic_t_MicrophoneInfos(
+        const audio_microphone_characteristic_t& legacy,
+        media::audio::common::MicrophoneInfo* aidlInfo,
+        media::audio::common::MicrophoneDynamicInfo* aidlDynamic);
 
 }  // namespace android
 

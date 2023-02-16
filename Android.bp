@@ -44,13 +44,16 @@ aidl_interface {
     srcs: [
         "aidl/android/media/InterpolatorConfig.aidl",
         "aidl/android/media/InterpolatorType.aidl",
-        "aidl/android/media/MicrophoneInfoData.aidl",
+        "aidl/android/media/MicrophoneInfoFw.aidl",
         "aidl/android/media/VolumeShaperConfiguration.aidl",
         "aidl/android/media/VolumeShaperConfigurationOptionFlag.aidl",
         "aidl/android/media/VolumeShaperConfigurationType.aidl",
         "aidl/android/media/VolumeShaperOperation.aidl",
         "aidl/android/media/VolumeShaperOperationFlag.aidl",
         "aidl/android/media/VolumeShaperState.aidl",
+    ],
+    imports: [
+        "android.media.audio.common.types-V2",
     ],
     backend: {
         cpp: {
@@ -61,6 +64,9 @@ aidl_interface {
                 "com.android.media",
                 "com.android.media.swcodec",
             ],
+        },
+        java: {
+            sdk_version: "module_current",
         },
     },
 }
