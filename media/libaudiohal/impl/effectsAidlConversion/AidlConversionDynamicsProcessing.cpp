@@ -147,8 +147,6 @@ status_t AidlConversionDp::getParameter(EffectParamWriter& param) {
                                                           DynamicsProcessing::inputGain);
             RETURN_STATUS_IF_ERROR(statusTFromBinderStatus(mEffect->getParameter(id, &aidlParam)));
 
-            DynamicsProcessing::Capability cap =
-                    mDesc.capability.get<Capability::dynamicsProcessing>();
             std::vector<DynamicsProcessing::InputGain> gains =
                     VALUE_OR_RETURN_STATUS(aidl::android::GET_PARAMETER_SPECIFIC_FIELD(
                             aidlParam, DynamicsProcessing, dynamicsProcessing,

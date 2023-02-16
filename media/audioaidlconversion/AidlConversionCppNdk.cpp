@@ -83,6 +83,8 @@ using media::audio::common::AudioUsage;
 using media::audio::common::AudioUuid;
 using media::audio::common::ExtraAudioDescriptor;
 using media::audio::common::Int;
+using media::audio::common::MicrophoneDynamicInfo;
+using media::audio::common::MicrophoneInfo;
 using media::audio::common::PcmType;
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////
@@ -2725,6 +2727,280 @@ legacy2aidl_audio_latency_mode_t_AudioLatencyMode(audio_latency_mode_t legacy) {
             return AudioLatencyMode::LOW;
     }
     return unexpected(BAD_VALUE);
+}
+
+ConversionResult<audio_microphone_location_t>
+aidl2legacy_MicrophoneInfoLocation_audio_microphone_location_t(MicrophoneInfo::Location aidl) {
+    switch (aidl) {
+        case MicrophoneInfo::Location::UNKNOWN:
+            return AUDIO_MICROPHONE_LOCATION_UNKNOWN;
+        case MicrophoneInfo::Location::MAINBODY:
+            return AUDIO_MICROPHONE_LOCATION_MAINBODY;
+        case MicrophoneInfo::Location::MAINBODY_MOVABLE:
+            return AUDIO_MICROPHONE_LOCATION_MAINBODY_MOVABLE;
+        case MicrophoneInfo::Location::PERIPHERAL:
+            return AUDIO_MICROPHONE_LOCATION_PERIPHERAL;
+    }
+    return unexpected(BAD_VALUE);
+}
+ConversionResult<MicrophoneInfo::Location>
+legacy2aidl_audio_microphone_location_t_MicrophoneInfoLocation(audio_microphone_location_t legacy) {
+    switch (legacy) {
+        case AUDIO_MICROPHONE_LOCATION_UNKNOWN:
+            return MicrophoneInfo::Location::UNKNOWN;
+        case AUDIO_MICROPHONE_LOCATION_MAINBODY:
+            return MicrophoneInfo::Location::MAINBODY;
+        case AUDIO_MICROPHONE_LOCATION_MAINBODY_MOVABLE:
+            return MicrophoneInfo::Location::MAINBODY_MOVABLE;
+        case AUDIO_MICROPHONE_LOCATION_PERIPHERAL:
+            return MicrophoneInfo::Location::PERIPHERAL;
+    }
+    return unexpected(BAD_VALUE);
+}
+
+ConversionResult<audio_microphone_group_t> aidl2legacy_int32_t_audio_microphone_group_t(
+        int32_t aidl) {
+    return convertReinterpret<audio_microphone_group_t>(aidl);
+}
+
+ConversionResult<int32_t> legacy2aidl_audio_microphone_group_t_int32_t(
+        audio_microphone_group_t legacy) {
+    return convertReinterpret<int32_t>(legacy);
+}
+
+ConversionResult<audio_microphone_directionality_t>
+aidl2legacy_MicrophoneInfoDirectionality_audio_microphone_directionality_t(
+        MicrophoneInfo::Directionality aidl) {
+    switch (aidl) {
+        case MicrophoneInfo::Directionality::UNKNOWN:
+            return AUDIO_MICROPHONE_DIRECTIONALITY_UNKNOWN;
+        case MicrophoneInfo::Directionality::OMNI:
+            return AUDIO_MICROPHONE_DIRECTIONALITY_OMNI;
+        case MicrophoneInfo::Directionality::BI_DIRECTIONAL:
+            return AUDIO_MICROPHONE_DIRECTIONALITY_BI_DIRECTIONAL;
+        case MicrophoneInfo::Directionality::CARDIOID:
+            return AUDIO_MICROPHONE_DIRECTIONALITY_CARDIOID;
+        case MicrophoneInfo::Directionality::HYPER_CARDIOID:
+            return AUDIO_MICROPHONE_DIRECTIONALITY_HYPER_CARDIOID;
+        case MicrophoneInfo::Directionality::SUPER_CARDIOID:
+            return AUDIO_MICROPHONE_DIRECTIONALITY_SUPER_CARDIOID;
+    }
+    return unexpected(BAD_VALUE);
+}
+ConversionResult<MicrophoneInfo::Directionality>
+legacy2aidl_audio_microphone_directionality_t_MicrophoneInfoDirectionality(
+        audio_microphone_directionality_t legacy) {
+    switch (legacy) {
+        case AUDIO_MICROPHONE_DIRECTIONALITY_UNKNOWN:
+            return MicrophoneInfo::Directionality::UNKNOWN;
+        case AUDIO_MICROPHONE_DIRECTIONALITY_OMNI:
+            return MicrophoneInfo::Directionality::OMNI;
+        case AUDIO_MICROPHONE_DIRECTIONALITY_BI_DIRECTIONAL:
+            return MicrophoneInfo::Directionality::BI_DIRECTIONAL;
+        case AUDIO_MICROPHONE_DIRECTIONALITY_CARDIOID:
+            return MicrophoneInfo::Directionality::CARDIOID;
+        case AUDIO_MICROPHONE_DIRECTIONALITY_HYPER_CARDIOID:
+            return MicrophoneInfo::Directionality::HYPER_CARDIOID;
+        case AUDIO_MICROPHONE_DIRECTIONALITY_SUPER_CARDIOID:
+            return MicrophoneInfo::Directionality::SUPER_CARDIOID;
+    }
+    return unexpected(BAD_VALUE);
+}
+
+ConversionResult<audio_microphone_coordinate>
+aidl2legacy_MicrophoneInfoCoordinate_audio_microphone_coordinate(
+        const MicrophoneInfo::Coordinate& aidl) {
+    audio_microphone_coordinate legacy;
+    legacy.x = aidl.x;
+    legacy.y = aidl.y;
+    legacy.z = aidl.z;
+    return legacy;
+}
+ConversionResult<MicrophoneInfo::Coordinate>
+legacy2aidl_audio_microphone_coordinate_MicrophoneInfoCoordinate(
+        const audio_microphone_coordinate& legacy) {
+    MicrophoneInfo::Coordinate aidl;
+    aidl.x = legacy.x;
+    aidl.y = legacy.y;
+    aidl.z = legacy.z;
+    return aidl;
+}
+
+ConversionResult<audio_microphone_channel_mapping_t>
+aidl2legacy_MicrophoneDynamicInfoChannelMapping_audio_microphone_channel_mapping_t(
+        MicrophoneDynamicInfo::ChannelMapping aidl) {
+    switch (aidl) {
+        case MicrophoneDynamicInfo::ChannelMapping::UNUSED:
+            return AUDIO_MICROPHONE_CHANNEL_MAPPING_UNUSED;
+        case MicrophoneDynamicInfo::ChannelMapping::DIRECT:
+            return AUDIO_MICROPHONE_CHANNEL_MAPPING_DIRECT;
+        case MicrophoneDynamicInfo::ChannelMapping::PROCESSED:
+            return AUDIO_MICROPHONE_CHANNEL_MAPPING_PROCESSED;
+    }
+    return unexpected(BAD_VALUE);
+}
+ConversionResult<MicrophoneDynamicInfo::ChannelMapping>
+legacy2aidl_audio_microphone_channel_mapping_t_MicrophoneDynamicInfoChannelMapping(
+        audio_microphone_channel_mapping_t legacy) {
+    switch (legacy) {
+        case AUDIO_MICROPHONE_CHANNEL_MAPPING_UNUSED:
+            return MicrophoneDynamicInfo::ChannelMapping::UNUSED;
+        case AUDIO_MICROPHONE_CHANNEL_MAPPING_DIRECT:
+            return MicrophoneDynamicInfo::ChannelMapping::DIRECT;
+        case AUDIO_MICROPHONE_CHANNEL_MAPPING_PROCESSED:
+            return MicrophoneDynamicInfo::ChannelMapping::PROCESSED;
+    }
+    return unexpected(BAD_VALUE);
+}
+
+ConversionResult<audio_microphone_characteristic_t>
+aidl2legacy_MicrophoneInfos_audio_microphone_characteristic_t(
+        const MicrophoneInfo& aidlInfo, const MicrophoneDynamicInfo& aidlDynamic) {
+    static const audio_microphone_coordinate kCoordinateUnknown = {
+        AUDIO_MICROPHONE_COORDINATE_UNKNOWN, AUDIO_MICROPHONE_COORDINATE_UNKNOWN,
+        AUDIO_MICROPHONE_COORDINATE_UNKNOWN };
+    audio_microphone_characteristic_t legacy{};
+    if (aidlInfo.id != aidlDynamic.id) {
+        return unexpected(BAD_VALUE);
+    }
+    // Note: in the legacy structure, 'device_id' is the mic's ID, 'id' is APM port id.
+    RETURN_IF_ERROR(aidl2legacy_string(aidlInfo.id, legacy.device_id, AUDIO_MICROPHONE_ID_MAX_LEN));
+    RETURN_IF_ERROR(aidl2legacy_AudioDevice_audio_device(
+                    aidlInfo.device, &legacy.device, legacy.address));
+    legacy.location = VALUE_OR_RETURN(
+            aidl2legacy_MicrophoneInfoLocation_audio_microphone_location_t(aidlInfo.location));
+    legacy.group = VALUE_OR_RETURN(aidl2legacy_int32_t_audio_microphone_group_t(aidlInfo.group));
+    // For some reason, the legacy field is unsigned, however in the SDK layer it is signed,
+    // as it is in AIDL. So, use UINT_MAX for INDEX_IN_THE_GROUP_UNKNOWN which is -1.
+    if (aidlInfo.indexInTheGroup != MicrophoneInfo::INDEX_IN_THE_GROUP_UNKNOWN) {
+        legacy.index_in_the_group = VALUE_OR_RETURN(
+                convertReinterpret<unsigned int>(aidlInfo.indexInTheGroup));
+    } else {
+        legacy.index_in_the_group = UINT_MAX;
+    }
+    if (aidlInfo.sensitivity.has_value()) {
+        legacy.sensitivity = aidlInfo.sensitivity.value().leveldBFS;
+        legacy.max_spl = aidlInfo.sensitivity.value().maxSpldB;
+        legacy.min_spl = aidlInfo.sensitivity.value().minSpldB;
+    } else {
+        legacy.sensitivity = AUDIO_MICROPHONE_SENSITIVITY_UNKNOWN;
+        legacy.max_spl = AUDIO_MICROPHONE_SPL_UNKNOWN;
+        legacy.min_spl = AUDIO_MICROPHONE_SPL_UNKNOWN;
+    }
+    legacy.directionality = VALUE_OR_RETURN(
+            aidl2legacy_MicrophoneInfoDirectionality_audio_microphone_directionality_t(
+                    aidlInfo.directionality));
+    if (aidlInfo.frequencyResponse.size() > AUDIO_MICROPHONE_MAX_FREQUENCY_RESPONSES) {
+        return unexpected(BAD_VALUE);
+    }
+    legacy.num_frequency_responses = 0;
+    for (const auto& p: aidlInfo.frequencyResponse) {
+        legacy.frequency_responses[0][legacy.num_frequency_responses] = p.frequencyHz;
+        legacy.frequency_responses[1][legacy.num_frequency_responses++] = p.leveldB;
+    }
+    if (aidlInfo.position.has_value()) {
+        legacy.geometric_location = VALUE_OR_RETURN(
+                aidl2legacy_MicrophoneInfoCoordinate_audio_microphone_coordinate(
+                        aidlInfo.position.value()));
+    } else {
+        legacy.geometric_location = kCoordinateUnknown;
+    }
+    if (aidlInfo.orientation.has_value()) {
+        legacy.orientation = VALUE_OR_RETURN(
+                aidl2legacy_MicrophoneInfoCoordinate_audio_microphone_coordinate(
+                        aidlInfo.orientation.value()));
+    } else {
+        legacy.orientation = kCoordinateUnknown;
+    }
+    if (aidlDynamic.channelMapping.size() > AUDIO_CHANNEL_COUNT_MAX) {
+        return unexpected(BAD_VALUE);
+    }
+    size_t i = 0;
+    for (; i < aidlDynamic.channelMapping.size(); ++i) {
+        legacy.channel_mapping[i] = VALUE_OR_RETURN(
+                aidl2legacy_MicrophoneDynamicInfoChannelMapping_audio_microphone_channel_mapping_t(
+                        aidlDynamic.channelMapping[i]));
+    }
+    for (; i < AUDIO_CHANNEL_COUNT_MAX; ++i) {
+        legacy.channel_mapping[i] = AUDIO_MICROPHONE_CHANNEL_MAPPING_UNUSED;
+    }
+    return legacy;
+}
+
+status_t
+legacy2aidl_audio_microphone_characteristic_t_MicrophoneInfos(
+        const audio_microphone_characteristic_t& legacy,
+        MicrophoneInfo* aidlInfo, MicrophoneDynamicInfo* aidlDynamic) {
+    aidlInfo->id = VALUE_OR_RETURN_STATUS(
+            legacy2aidl_string(legacy.device_id, AUDIO_MICROPHONE_ID_MAX_LEN));
+    aidlDynamic->id = aidlInfo->id;
+    aidlInfo->device = VALUE_OR_RETURN_STATUS(legacy2aidl_audio_device_AudioDevice(
+                    legacy.device, legacy.address));
+    aidlInfo->location = VALUE_OR_RETURN_STATUS(
+            legacy2aidl_audio_microphone_location_t_MicrophoneInfoLocation(legacy.location));
+    aidlInfo->group = VALUE_OR_RETURN_STATUS(
+            legacy2aidl_audio_microphone_group_t_int32_t(legacy.group));
+    // For some reason, the legacy field is unsigned, however in the SDK layer it is signed,
+    // as it is in AIDL. So, use UINT_MAX for INDEX_IN_THE_GROUP_UNKNOWN which is -1.
+    if (legacy.index_in_the_group != UINT_MAX) {
+        aidlInfo->indexInTheGroup = VALUE_OR_RETURN_STATUS(
+                convertReinterpret<int32_t>(legacy.index_in_the_group));
+    } else {
+        aidlInfo->indexInTheGroup = MicrophoneInfo::INDEX_IN_THE_GROUP_UNKNOWN;
+    }
+    if (legacy.sensitivity != AUDIO_MICROPHONE_SENSITIVITY_UNKNOWN &&
+            legacy.max_spl != AUDIO_MICROPHONE_SPL_UNKNOWN &&
+            legacy.min_spl != AUDIO_MICROPHONE_SPL_UNKNOWN) {
+        MicrophoneInfo::Sensitivity sensitivity;
+        sensitivity.leveldBFS = legacy.sensitivity;
+        sensitivity.maxSpldB = legacy.max_spl;
+        sensitivity.minSpldB = legacy.min_spl;
+        aidlInfo->sensitivity = std::move(sensitivity);
+    } else {
+        aidlInfo->sensitivity = {};
+    }
+    aidlInfo->directionality = VALUE_OR_RETURN_STATUS(
+            legacy2aidl_audio_microphone_directionality_t_MicrophoneInfoDirectionality(
+                    legacy.directionality));
+    if (legacy.num_frequency_responses > AUDIO_MICROPHONE_MAX_FREQUENCY_RESPONSES) {
+        return BAD_VALUE;
+    }
+    aidlInfo->frequencyResponse.resize(legacy.num_frequency_responses);
+    for (size_t i = 0; i < legacy.num_frequency_responses; ++i) {
+        aidlInfo->frequencyResponse[i].frequencyHz = legacy.frequency_responses[0][i];
+        aidlInfo->frequencyResponse[i].leveldB = legacy.frequency_responses[1][i];
+    }
+    if (legacy.geometric_location.x != AUDIO_MICROPHONE_COORDINATE_UNKNOWN &&
+            legacy.geometric_location.y != AUDIO_MICROPHONE_COORDINATE_UNKNOWN &&
+            legacy.geometric_location.z != AUDIO_MICROPHONE_COORDINATE_UNKNOWN) {
+        aidlInfo->position = VALUE_OR_RETURN_STATUS(
+                legacy2aidl_audio_microphone_coordinate_MicrophoneInfoCoordinate(
+                        legacy.geometric_location));
+    } else {
+        aidlInfo->position = {};
+    }
+    if (legacy.orientation.x != AUDIO_MICROPHONE_COORDINATE_UNKNOWN &&
+            legacy.orientation.y != AUDIO_MICROPHONE_COORDINATE_UNKNOWN &&
+            legacy.orientation.z != AUDIO_MICROPHONE_COORDINATE_UNKNOWN) {
+        aidlInfo->orientation = VALUE_OR_RETURN_STATUS(
+                legacy2aidl_audio_microphone_coordinate_MicrophoneInfoCoordinate(
+                        legacy.orientation));
+    } else {
+        aidlInfo->orientation = {};
+    }
+    size_t channelsUsed = AUDIO_CHANNEL_COUNT_MAX;
+    while (channelsUsed != 0 &&
+            legacy.channel_mapping[--channelsUsed] == AUDIO_MICROPHONE_CHANNEL_MAPPING_UNUSED) {}
+    // Doing an increment is correct even when channel 0 is 'UNUSED',
+    // that's because AIDL requires to have at least 1 element in the mapping.
+    ++channelsUsed;
+    aidlDynamic->channelMapping.resize(channelsUsed);
+    for (size_t i = 0; i < channelsUsed; ++i) {
+        aidlDynamic->channelMapping[i] = VALUE_OR_RETURN_STATUS(
+                legacy2aidl_audio_microphone_channel_mapping_t_MicrophoneDynamicInfoChannelMapping(
+                        legacy.channel_mapping[i]));
+    }
+    return OK;
 }
 
 }  // namespace android

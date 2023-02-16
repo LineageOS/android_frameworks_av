@@ -253,7 +253,7 @@ class StreamInHalHidl : public StreamInHalInterface, public StreamHalHidl {
     virtual status_t getCapturePosition(int64_t *frames, int64_t *time);
 
     // Get active microphones
-    virtual status_t getActiveMicrophones(std::vector<media::MicrophoneInfo> *microphones);
+    status_t getActiveMicrophones(std::vector<media::MicrophoneInfoFw> *microphones) override;
 
     // Set microphone direction (for processing)
     virtual status_t setPreferredMicrophoneDirection(

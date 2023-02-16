@@ -522,7 +522,7 @@ status_t AudioSource::removeAudioDeviceCallback(
 }
 
 status_t AudioSource::getActiveMicrophones(
-        std::vector<media::MicrophoneInfo>* activeMicrophones) {
+        std::vector<media::MicrophoneInfoFw>* activeMicrophones) {
     if (mRecord != 0) {
         return mRecord->getActiveMicrophones(activeMicrophones);
     }

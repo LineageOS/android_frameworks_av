@@ -21,7 +21,6 @@
 #include <media/AudioRecord.h>
 #include <media/AudioSystem.h>
 #include <media/stagefright/MediaSource.h>
-#include <media/MicrophoneInfo.h>
 #include <media/stagefright/MediaBuffer.h>
 #include <utils/List.h>
 
@@ -83,7 +82,7 @@ struct AudioSource : public MediaSource,
     status_t addAudioDeviceCallback(const sp<AudioSystem::AudioDeviceCallback>& callback);
     status_t removeAudioDeviceCallback(const sp<AudioSystem::AudioDeviceCallback>& callback);
 
-    status_t getActiveMicrophones(std::vector<media::MicrophoneInfo>* activeMicrophones);
+    status_t getActiveMicrophones(std::vector<media::MicrophoneInfoFw>* activeMicrophones);
     status_t setPreferredMicrophoneDirection(audio_microphone_direction_t direction);
     status_t setPreferredMicrophoneFieldDimension(float zoom);
 
