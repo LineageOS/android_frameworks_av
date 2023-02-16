@@ -77,6 +77,13 @@ const DeviceTypeSet& getAudioDeviceOutLeAudioUnicastSet() {
     return audioDeviceOutLeAudioUnicastSet;
 }
 
+const DeviceTypeSet& getAudioDeviceOutLeAudioBroadcastSet() {
+    static const DeviceTypeSet audioDeviceOutLeAudioUnicastSet = DeviceTypeSet(
+            std::begin(AUDIO_DEVICE_OUT_BLE_BROADCAST_ARRAY),
+            std::end(AUDIO_DEVICE_OUT_BLE_BROADCAST_ARRAY));
+    return audioDeviceOutLeAudioUnicastSet;
+}
+
 std::string deviceTypesToString(const DeviceTypeSet &deviceTypes) {
     if (deviceTypes.empty()) {
         return "Empty device types";
