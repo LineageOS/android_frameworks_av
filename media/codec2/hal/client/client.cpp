@@ -33,15 +33,6 @@
 #include <android/hardware/media/c2/1.0/IConfigurable.h>
 #include <android/hidl/manager/1.2/IServiceManager.h>
 
-#include <aidl/android/hardware/media/c2/FieldSupportedValues.h>
-#include <aidl/android/hardware/media/c2/FieldSupportedValuesQuery.h>
-#include <aidl/android/hardware/media/c2/FieldSupportedValuesQueryResult.h>
-#include <aidl/android/hardware/media/c2/IComponent.h>
-#include <aidl/android/hardware/media/c2/IComponentInterface.h>
-#include <aidl/android/hardware/media/c2/IComponentStore.h>
-#include <aidl/android/hardware/media/c2/IConfigurable.h>
-#include <aidl/android/hardware/media/c2/ParamDescriptor.h>
-
 #include <android-base/properties.h>
 #include <bufferpool/ClientManager.h>
 #include <codec2/hidl/1.0/types.h>
@@ -85,7 +76,6 @@ using H2BGraphicBufferProducer2 = ::android::hardware::graphics::bufferqueue::
 using ::android::hardware::media::c2::V1_2::SurfaceSyncObj;
 
 namespace bufferpool_hidl = ::android::hardware::media::bufferpool::V2_0;
-namespace c2_aidl = ::aidl::android::hardware::media::c2;
 namespace c2_hidl_base = ::android::hardware::media::c2;
 namespace c2_hidl = ::android::hardware::media::c2::V1_2;
 
@@ -537,7 +527,8 @@ c2_status_t Codec2ConfigurableClient::HidlImpl::querySupportedValues(
 // Codec2ConfigurableClient::AidlImpl
 
 struct Codec2ConfigurableClient::AidlImpl : public Codec2ConfigurableClient::ImplBase {
-    typedef c2_aidl::IConfigurable Base;
+    // TODO: C2AIDL was not landed yet, use c2_aidl when it is landed.
+    typedef c2_hidl::IConfigurable Base;
 
     // base cannot be null.
     explicit AidlImpl(const std::shared_ptr<Base>& base);
@@ -573,9 +564,9 @@ private:
 Codec2ConfigurableClient::AidlImpl::AidlImpl(const std::shared_ptr<Base>& base)
       : mBase{base},
         mName{[base]() -> C2String {
-                std::string outName;
-                ndk::ScopedAStatus status = base->getName(&outName);
-                return status.isOk() ? outName : "";
+                // TODO: implementation
+                (void)base;
+                return "";
             }()} {
 }
 
@@ -617,11 +608,6 @@ c2_status_t Codec2ConfigurableClient::AidlImpl::querySupportedValues(
 
 Codec2ConfigurableClient::Codec2ConfigurableClient(const sp<HidlBase> &hidlBase)
     : mImpl(new Codec2ConfigurableClient::HidlImpl(hidlBase)) {
-}
-
-Codec2ConfigurableClient::Codec2ConfigurableClient(
-        const std::shared_ptr<AidlBase> &aidlBase)
-    : mImpl(new Codec2ConfigurableClient::AidlImpl(aidlBase)) {
 }
 
 const C2String& Codec2ConfigurableClient::getName() const {

@@ -113,7 +113,6 @@ namespace android {
 struct Codec2ConfigurableClient {
 
     typedef ::android::hardware::media::c2::V1_0::IConfigurable HidlBase;
-    typedef ::aidl::android::hardware::media::c2::IConfigurable AidlBase;
 
     struct ImplBase {
         virtual ~ImplBase() = default;
@@ -141,7 +140,6 @@ struct Codec2ConfigurableClient {
     };
 
     explicit Codec2ConfigurableClient(const sp<HidlBase> &hidlBase);
-    explicit Codec2ConfigurableClient(const std::shared_ptr<AidlBase> &aidlBase);
 
     const C2String& getName() const;
 
