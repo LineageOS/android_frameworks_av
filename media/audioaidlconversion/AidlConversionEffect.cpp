@@ -30,7 +30,7 @@ namespace aidl {
 namespace android {
 
 using ::aidl::android::hardware::audio::effect::AcousticEchoCanceler;
-using ::aidl::android::hardware::audio::effect::AutomaticGainControl;
+using ::aidl::android::hardware::audio::effect::AutomaticGainControlV2;
 using ::aidl::android::hardware::audio::effect::BassBoost;
 using ::aidl::android::hardware::audio::effect::Descriptor;
 using ::aidl::android::hardware::audio::effect::Downmix;
@@ -260,46 +260,47 @@ ConversionResult<Parameter> legacy2aidl_uint32_mobileMode_Parameter_aec(uint32_t
 ConversionResult<uint32_t> aidl2legacy_Parameter_agc_uint32_fixedDigitalGain(
         const Parameter& aidl) {
     int gain = VALUE_OR_RETURN(
-            GET_PARAMETER_SPECIFIC_FIELD(aidl, AutomaticGainControl, automaticGainControl,
-                                         AutomaticGainControl::fixedDigitalGainMb, int));
+            GET_PARAMETER_SPECIFIC_FIELD(aidl, AutomaticGainControlV2, automaticGainControlV2,
+                                         AutomaticGainControlV2::fixedDigitalGainMb, int));
     return VALUE_OR_RETURN(convertReinterpret<uint32_t>(gain));
 }
 
 ConversionResult<Parameter> legacy2aidl_uint32_fixedDigitalGain_Parameter_agc(uint32_t legacy) {
     int gain = VALUE_OR_RETURN(convertReinterpret<int>(legacy));
-    return MAKE_SPECIFIC_PARAMETER(AutomaticGainControl, automaticGainControl, fixedDigitalGainMb,
-                                   gain);
+    return MAKE_SPECIFIC_PARAMETER(AutomaticGainControlV2, automaticGainControlV2,
+                                   fixedDigitalGainMb, gain);
 }
 
 ConversionResult<uint32_t> aidl2legacy_Parameter_agc_uint32_levelEstimator(
         const Parameter& aidl) {
     const auto& le = VALUE_OR_RETURN(GET_PARAMETER_SPECIFIC_FIELD(
-            aidl, AutomaticGainControl, automaticGainControl, AutomaticGainControl::levelEstimator,
-            AutomaticGainControl::LevelEstimator));
+            aidl, AutomaticGainControlV2, automaticGainControlV2,
+            AutomaticGainControlV2::levelEstimator, AutomaticGainControlV2::LevelEstimator));
     return static_cast<uint32_t>(le);
 }
 
 ConversionResult<Parameter> legacy2aidl_uint32_levelEstimator_Parameter_agc(uint32_t legacy) {
-    if (legacy > (uint32_t) AutomaticGainControl::LevelEstimator::PEAK) {
+    if (legacy > (uint32_t)AutomaticGainControlV2::LevelEstimator::PEAK) {
         return unexpected(BAD_VALUE);
     }
-    AutomaticGainControl::LevelEstimator le =
-            static_cast<AutomaticGainControl::LevelEstimator>(legacy);
-    return MAKE_SPECIFIC_PARAMETER(AutomaticGainControl, automaticGainControl, levelEstimator, le);
+    AutomaticGainControlV2::LevelEstimator le =
+            static_cast<AutomaticGainControlV2::LevelEstimator>(legacy);
+    return MAKE_SPECIFIC_PARAMETER(AutomaticGainControlV2, automaticGainControlV2, levelEstimator,
+                                   le);
 }
 
 ConversionResult<uint32_t> aidl2legacy_Parameter_agc_uint32_saturationMargin(
         const Parameter& aidl) {
     int saturationMargin = VALUE_OR_RETURN(
-            GET_PARAMETER_SPECIFIC_FIELD(aidl, AutomaticGainControl, automaticGainControl,
-                                         AutomaticGainControl::saturationMarginMb, int));
+            GET_PARAMETER_SPECIFIC_FIELD(aidl, AutomaticGainControlV2, automaticGainControlV2,
+                                         AutomaticGainControlV2::saturationMarginMb, int));
     return VALUE_OR_RETURN(convertIntegral<uint32_t>(saturationMargin));
 }
 
 ConversionResult<Parameter> legacy2aidl_uint32_saturationMargin_Parameter_agc(uint32_t legacy) {
     int saturationMargin = VALUE_OR_RETURN(convertIntegral<int>(legacy));
-    return MAKE_SPECIFIC_PARAMETER(AutomaticGainControl, automaticGainControl, saturationMarginMb,
-                                   saturationMargin);
+    return MAKE_SPECIFIC_PARAMETER(AutomaticGainControlV2, automaticGainControlV2,
+                                   saturationMarginMb, saturationMargin);
 }
 
 ConversionResult<uint16_t> aidl2legacy_Parameter_BassBoost_uint16_strengthPm(
