@@ -48,7 +48,7 @@ namespace android {
 AidlCamera3OfflineSession::~AidlCamera3OfflineSession() {
     ATRACE_CALL();
     ALOGV("%s: Tearing down aidl offline session for camera id %s", __FUNCTION__, mId.string());
-    AidlCamera3OfflineSession::disconnectSession();
+    Camera3OfflineSession::disconnectImpl();
 }
 
 status_t AidlCamera3OfflineSession::initialize(wp<NotificationListener> listener) {
@@ -247,12 +247,17 @@ status_t AidlCamera3OfflineSession::initialize(wp<NotificationListener> listener
     return ::ndk::ScopedAStatus::ok();
 }
 
-void AidlCamera3OfflineSession::disconnectSession() {
-  std::lock_guard<std::mutex> lock(mLock);
-  if (mSession != nullptr) {
-      mSession->close();
-  }
-  mSession.reset();
+void AidlCamera3OfflineSession::closeSessionLocked() {
+    if (mSession != nullptr) {
+        auto err = mSession->close();
+        if (!err.isOk()) {
+            ALOGE("%s: Close transaction error: %s", __FUNCTION__, err.getDescription().c_str());
+        }
+    }
+}
+
+void AidlCamera3OfflineSession::releaseSessionLocked() {
+    mSession.reset();
 }
 
 }; // namespace android
