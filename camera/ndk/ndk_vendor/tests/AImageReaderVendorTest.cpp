@@ -330,7 +330,7 @@ class CameraHelper {
     }
     void incPendingPrepared(ACameraWindowType *anw) {
         std::lock_guard<std::mutex> lock(mMutex);
-        if (!(mPendingPreparedCbs.find(anw) == mPendingPreparedCbs.end())) {
+        if ((mPendingPreparedCbs.find(anw) == mPendingPreparedCbs.end())) {
             mPendingPreparedCbs[anw] = 1;
             return;
         }
