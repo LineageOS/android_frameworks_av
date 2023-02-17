@@ -101,7 +101,9 @@ class HidlCamera3OfflineSession :
     // FMQ to write result on. Must be guarded by mProcessCaptureResultLock.
     std::unique_ptr<ResultMetadataQueue> mResultMetadataQueue;
 
-    virtual void disconnectSession() override;
+    virtual void closeSessionLocked() override;
+
+    virtual void releaseSessionLocked() override;
 }; // class Camera3OfflineSession
 
 }; // namespace android

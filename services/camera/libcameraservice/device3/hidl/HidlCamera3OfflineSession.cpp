@@ -39,7 +39,7 @@ namespace android {
 HidlCamera3OfflineSession::~HidlCamera3OfflineSession() {
     ATRACE_CALL();
     ALOGV("%s: Tearing down hidl offline session for camera id %s", __FUNCTION__, mId.string());
-    HidlCamera3OfflineSession::disconnectSession();
+    Camera3OfflineSession::disconnectImpl();
 }
 
 status_t HidlCamera3OfflineSession::initialize(wp<NotificationListener> listener) {
@@ -229,13 +229,17 @@ hardware::Return<void> HidlCamera3OfflineSession::returnStreamBuffers(
     return hardware::Void();
 }
 
-void HidlCamera3OfflineSession::disconnectSession() {
-  // TODO: Make sure this locking is correct.
-  std::lock_guard<std::mutex> lock(mLock);
-  if (mSession != nullptr) {
-      mSession->close();
-  }
-  mSession.clear();
+void HidlCamera3OfflineSession::closeSessionLocked() {
+    if (mSession != nullptr) {
+        auto err = mSession->close();
+        if (!err.isOk()) {
+            ALOGE("%s: Close transaction error: %s", __FUNCTION__, err.description().c_str());
+        }
+    }
+}
+
+void HidlCamera3OfflineSession::releaseSessionLocked() {
+    mSession.clear();
 }
 
 }; // namespace android
