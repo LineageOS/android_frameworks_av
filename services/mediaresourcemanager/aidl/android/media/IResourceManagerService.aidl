@@ -20,6 +20,7 @@ import android.media.IResourceManagerClient;
 import android.media.MediaResourceParcel;
 import android.media.MediaResourcePolicyParcel;
 import android.media.ClientInfoParcel;
+import android.media.ClientConfigParcel;
 
 /**
  * ResourceManagerService interface that keeps track of media resource
@@ -125,4 +126,34 @@ interface IResourceManagerService {
      * @param pid pid from which resources will be reclaimed.
      */
     void reclaimResourcesFromClientsPendingRemoval(int pid);
+
+    /**
+     * Notify that the client has been created.
+     *
+     * This call is made to collect the (concurrent) metrics about the
+     * resources associated with the Codec (and also DRM sessions).
+     *
+     * @param clientInfo Information of the client.
+     */
+    void notifyClientCreated(in ClientInfoParcel clientInfo);
+
+    /**
+     * Notify that the client has been started.
+     *
+     * This call is made to collect the (concurrent) metrics about the
+     * resources associated with the Codec (and also DRM sessions).
+     *
+     * @param clientConfig Configuration information of the client.
+     */
+    void notifyClientStarted(in ClientConfigParcel clientConfig);
+
+    /**
+     * Notify that the client has been stopped.
+     *
+     * This call is made to collect the (concurrent) metrics about the
+     * resources associated with the Codec (and also DRM sessions).
+     *
+     * @param clientConfig Configuration information of the client.
+     */
+    void notifyClientStopped(in ClientConfigParcel clientConfig);
 }
