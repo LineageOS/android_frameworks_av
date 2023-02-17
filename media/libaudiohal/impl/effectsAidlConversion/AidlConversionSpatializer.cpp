@@ -40,28 +40,24 @@ using utils::EffectParamReader;
 using utils::EffectParamWriter;
 
 status_t AidlConversionSpatializer::setParameter(EffectParamReader& param) {
-    uint32_t type = 0;
-    uint16_t value = 0;
-    if (!param.validateParamValueSize(sizeof(uint32_t), sizeof(uint16_t)) ||
-        OK != param.readFromParameter(&type) || OK != param.readFromValue(&value)) {
-        ALOGE("%s invalid param %s", __func__, param.toString().c_str());
-        return BAD_VALUE;
-    }
-    Parameter aidlParam;
-    // TODO
+    Parameter aidlParam = VALUE_OR_RETURN_STATUS(
+            ::aidl::android::legacy2aidl_EffectParameterReader_ParameterExtension(param));
     return statusTFromBinderStatus(mEffect->setParameter(aidlParam));
 }
 
 status_t AidlConversionSpatializer::getParameter(EffectParamWriter& param) {
-    uint32_t type = 0, value = 0;
-    if (!param.validateParamValueSize(sizeof(uint32_t), sizeof(uint32_t)) ||
-        OK != param.readFromParameter(&type)) {
-        ALOGE("%s invalid param %s", __func__, param.toString().c_str());
+    Parameter aidlParam;
+    Parameter::Id id = UNION_MAKE(Parameter::Id, vendorEffectTag, 0 /* no tag */);
+    RETURN_STATUS_IF_ERROR(statusTFromBinderStatus(mEffect->getParameter(id, &aidlParam)));
+    const auto& extBytes = VALUE_OR_RETURN_STATUS(
+            ::aidl::android::aidl2legacy_ParameterExtension_vector_uint8(aidlParam));
+    if (param.getValueSize() < extBytes.size()) {
+        ALOGE("%s extension return data %zu exceed vsize %zu", __func__, extBytes.size(),
+              param.getValueSize());
         param.setStatus(BAD_VALUE);
         return BAD_VALUE;
     }
-    // TODO
-    return param.writeToValue(&value);
+    return param.writeToValue(extBytes.data(), extBytes.size());
 }
 
 } // namespace effect
