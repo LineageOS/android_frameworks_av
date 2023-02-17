@@ -34,33 +34,77 @@ namespace android {
 namespace effect {
 
 using ::aidl::android::aidl_utils::statusTFromBinderStatus;
+using ::aidl::android::getParameterSpecificField;
 using ::aidl::android::hardware::audio::effect::Parameter;
+using ::aidl::android::hardware::audio::effect::NoiseSuppression;
 using ::android::status_t;
 using utils::EffectParamReader;
 using utils::EffectParamWriter;
 
 status_t AidlConversionNoiseSuppression::setParameter(EffectParamReader& param) {
-    uint32_t type = 0;
-    uint16_t value = 0;
+    uint32_t type = 0, value = 0;
     if (!param.validateParamValueSize(sizeof(uint32_t), sizeof(uint16_t)) ||
         OK != param.readFromParameter(&type) || OK != param.readFromValue(&value)) {
         ALOGE("%s invalid param %s", __func__, param.toString().c_str());
         return BAD_VALUE;
     }
     Parameter aidlParam;
-    // TODO
+    switch (type) {
+        case NS_PARAM_LEVEL: {
+            aidlParam = MAKE_SPECIFIC_PARAMETER(NoiseSuppression, noiseSuppression, level,
+                                                static_cast<NoiseSuppression::Level>(value));
+            break;
+        }
+        case NS_PARAM_TYPE: {
+            aidlParam = MAKE_SPECIFIC_PARAMETER(NoiseSuppression, noiseSuppression, type,
+                                                static_cast<NoiseSuppression::Type>(value));
+            break;
+        }
+        default: {
+            // TODO: implement vendor extension parameters
+            ALOGW("%s unknown param %s", __func__, param.toString().c_str());
+            return BAD_VALUE;
+        }
+    }
     return statusTFromBinderStatus(mEffect->setParameter(aidlParam));
 }
 
 status_t AidlConversionNoiseSuppression::getParameter(EffectParamWriter& param) {
-    uint32_t type = 0, value = 0;
+    uint32_t paramType = 0, value = 0;
     if (!param.validateParamValueSize(sizeof(uint32_t), sizeof(uint32_t)) ||
-        OK != param.readFromParameter(&type)) {
+        OK != param.readFromParameter(&paramType)) {
         ALOGE("%s invalid param %s", __func__, param.toString().c_str());
         param.setStatus(BAD_VALUE);
         return BAD_VALUE;
     }
-    // TODO
+    Parameter aidlParam;
+    switch (paramType) {
+        case NS_PARAM_LEVEL: {
+            Parameter::Id id = MAKE_SPECIFIC_PARAMETER_ID(NoiseSuppression, noiseSuppressionTag,
+                                                        NoiseSuppression::level);
+            RETURN_STATUS_IF_ERROR(statusTFromBinderStatus(mEffect->getParameter(id, &aidlParam)));
+            NoiseSuppression::Level level = VALUE_OR_RETURN_STATUS(
+                    GET_PARAMETER_SPECIFIC_FIELD(aidlParam, NoiseSuppression, noiseSuppression,
+                                                 NoiseSuppression::level, NoiseSuppression::Level));
+            value = static_cast<uint32_t>(level);
+            break;
+        }
+        case NS_PARAM_TYPE: {
+            Parameter::Id id = MAKE_SPECIFIC_PARAMETER_ID(NoiseSuppression, noiseSuppressionTag,
+                                                        NoiseSuppression::type);
+            RETURN_STATUS_IF_ERROR(statusTFromBinderStatus(mEffect->getParameter(id, &aidlParam)));
+            NoiseSuppression::Type nsType = VALUE_OR_RETURN_STATUS(
+                    GET_PARAMETER_SPECIFIC_FIELD(aidlParam, NoiseSuppression, noiseSuppression,
+                                                 NoiseSuppression::type, NoiseSuppression::Type));
+            value = static_cast<uint32_t>(nsType);
+            break;
+        }
+        default: {
+            // TODO: implement vendor extension parameters
+            ALOGW("%s unknown param %s", __func__, param.toString().c_str());
+            return BAD_VALUE;
+        }
+    }
     return param.writeToValue(&value);
 }
 

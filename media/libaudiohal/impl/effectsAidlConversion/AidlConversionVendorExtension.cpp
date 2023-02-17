@@ -17,9 +17,11 @@
 #include <cstdint>
 #include <cstring>
 #include <optional>
+#include <type_traits>
 #define LOG_TAG "AidlConversionVendorExtension"
 //#define LOG_NDEBUG 0
 
+#include <aidl/android/hardware/audio/effect/DefaultExtension.h>
 #include <error/expected_utils.h>
 #include <media/AidlConversionNdk.h>
 #include <media/AidlConversionEffect.h>
@@ -32,34 +34,64 @@ namespace android {
 namespace effect {
 
 using ::aidl::android::aidl_utils::statusTFromBinderStatus;
+using ::aidl::android::hardware::audio::effect::DefaultExtension;
 using ::aidl::android::hardware::audio::effect::Parameter;
+using ::aidl::android::hardware::audio::effect::VendorExtension;
 using ::android::status_t;
 using utils::EffectParamReader;
 using utils::EffectParamWriter;
 
+/**
+ * For all effect types we currently don't support, add a default extension implementation to use
+ * std::vector<uint8_t> to pass through all data in the format of effect_param_t (the data we got
+ * from libaudioclient for now).
+ * This logic will be removed after we adopt to same AIDL parameter union AIDL in libaudioclient,
+ * after that framework doesn't need to do any AIDL conversion, and the vendor extension can be
+ * pass down in Parameter as is.
+ */
 status_t AidlConversionVendorExtension::setParameter(EffectParamReader& param) {
-    uint32_t type = 0;
-    uint16_t value = 0;
-    if (!param.validateParamValueSize(sizeof(uint32_t), sizeof(uint16_t)) ||
-        OK != param.readFromParameter(&type) || OK != param.readFromValue(&value)) {
-        ALOGE("%s invalid param %s", __func__, param.toString().c_str());
+    size_t len = param.getValueSize();
+    DefaultExtension ext;
+    ext.bytes.resize(len);
+    if (OK != param.readFromValue(ext.bytes.data(), len)) {
+        ALOGE("%s read value from param %s failed", __func__, param.toString().c_str());
         return BAD_VALUE;
     }
-    Parameter aidlParam;
-    // TODO
+    VendorExtension effectParam;
+    effectParam.extension.setParcelable(ext);
+    Parameter aidlParam = UNION_MAKE(Parameter, specific,
+                                     UNION_MAKE(Parameter::Specific, vendorEffect, effectParam));
     return statusTFromBinderStatus(mEffect->setParameter(aidlParam));
 }
 
 status_t AidlConversionVendorExtension::getParameter(EffectParamWriter& param) {
-    uint32_t type = 0, value = 0;
-    if (!param.validateParamValueSize(sizeof(uint32_t), sizeof(uint32_t)) ||
-        OK != param.readFromParameter(&type)) {
+    int32_t tag;
+    if (OK != param.readFromParameter(&tag)) {
         ALOGE("%s invalid param %s", __func__, param.toString().c_str());
         param.setStatus(BAD_VALUE);
         return BAD_VALUE;
     }
-    // TODO
-    return param.writeToValue(&value);
+
+    Parameter aidlParam;
+    Parameter::Id id = UNION_MAKE(Parameter::Id, vendorEffectTag, tag /* parameter tag */);
+    RETURN_STATUS_IF_ERROR(statusTFromBinderStatus(mEffect->getParameter(id, &aidlParam)));
+    VendorExtension effectParam = VALUE_OR_RETURN_STATUS(
+            (::aidl::android::getParameterSpecific<Parameter, VendorExtension,
+                                                   Parameter::Specific::vendorEffect>(aidlParam)));
+    std::optional<DefaultExtension> ext;
+    if (STATUS_OK != effectParam.extension.getParcelable(&ext) || !ext.has_value()) {
+        ALOGE("%s get extension parcelable failed", __func__);
+        param.setStatus(BAD_VALUE);
+        return BAD_VALUE;
+    }
+    const auto& extBytes = ext.value().bytes;
+    if (param.getValueSize() < extBytes.size()) {
+        ALOGE("%s extension return data %zu exceed vsize %zu", __func__, extBytes.size(),
+              param.getValueSize());
+        param.setStatus(BAD_VALUE);
+        return BAD_VALUE;
+    }
+    return param.writeToValue(extBytes.data(), extBytes.size());
 }
 
 } // namespace effect
