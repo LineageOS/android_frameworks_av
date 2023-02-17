@@ -131,7 +131,9 @@ class AidlCamera3OfflineSession :
 
     std::shared_ptr<AidlCameraDeviceCallbacks> mCallbacks;
 
-    virtual void disconnectSession() override;
+    virtual void closeSessionLocked() override;
+
+    virtual void releaseSessionLocked() override;
 
 }; // class AidlCamera3OfflineSession
 
