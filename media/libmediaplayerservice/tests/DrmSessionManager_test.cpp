@@ -24,9 +24,8 @@
 #include <aidl/android/media/BnResourceManagerClient.h>
 #include <aidl/android/media/BnResourceManagerService.h>
 
-#include <media/stagefright/foundation/ADebug.h>
-#include <media/stagefright/ProcessInfoInterface.h>
 #include <mediadrm/DrmSessionManager.h>
+#include <mediautils/ProcessInfoInterface.h>
 
 #include <algorithm>
 #include <iostream>
