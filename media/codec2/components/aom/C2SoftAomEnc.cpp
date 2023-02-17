@@ -774,10 +774,12 @@ void C2SoftAomEnc::process(const std::unique_ptr<C2Work>& work,
                     if (mConversionBuffer.size() >= stride * vstride * 3) {
                         uint16_t *dstY, *dstU, *dstV;
                         dstY = (uint16_t*)mConversionBuffer.data();
-                        dstU = ((uint16_t*)mConversionBuffer.data()) + stride * vstride;
-                        dstV = ((uint16_t*)mConversionBuffer.data()) + (stride * vstride) / 4;
+                        dstU = dstY + stride * vstride;
+                        dstV = dstU + (stride * vstride) / 4;
                         convertP010ToYUV420Planar16(dstY, dstU, dstV, (uint16_t*)(rView->data()[0]),
-                                                    (uint16_t*)(rView->data()[1]), stride, stride,
+                                                    (uint16_t*)(rView->data()[1]),
+                                                    layout.planes[layout.PLANE_Y].rowInc / 2,
+                                                    layout.planes[layout.PLANE_U].rowInc / 2,
                                                     stride, stride / 2, stride / 2, stride,
                                                     vstride);
                         aom_img_wrap(&raw_frame, AOM_IMG_FMT_I42016, stride, vstride, mStrideAlign,
