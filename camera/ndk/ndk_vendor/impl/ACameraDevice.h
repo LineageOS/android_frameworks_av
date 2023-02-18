@@ -130,6 +130,7 @@ class CameraDevice final : public std::enable_shared_from_this<CameraDevice> {
 
         ndk::ScopedAStatus onCaptureStarted(const CaptureResultExtras& in_resultExtras,
                                             int64_t in_timestamp) override;
+        ndk::ScopedAStatus onPrepared(int32_t in_streamId) override;
         ndk::ScopedAStatus onRepeatingRequestError(int64_t in_lastFrameNumber,
                                                    int32_t in_repeatingRequestId) override;
         ndk::ScopedAStatus onResultReceived(const CaptureMetadataInfo& in_result,
@@ -195,6 +196,8 @@ class CameraDevice final : public std::enable_shared_from_this<CameraDevice> {
     void addRequestSettingsMetadata(ACaptureRequest *aCaptureRequest, sp<CaptureRequest> &req);
 
     camera_status_t updateOutputConfigurationLocked(ACaptureSessionOutput *output);
+
+    camera_status_t prepareLocked(ACameraWindowType *window);
 
     // Since this writes to ICameraDeviceUser's fmq, clients must take care that:
     //   a) This function is called serially.
@@ -269,7 +272,8 @@ class CameraDevice final : public std::enable_shared_from_this<CameraDevice> {
         kWhatLogicalCaptureFail, // onLogicalCameraCaptureFailed
         kWhatCaptureSeqEnd,    // onCaptureSequenceCompleted
         kWhatCaptureSeqAbort,  // onCaptureSequenceAborted
-        kWhatCaptureBufferLost,// onCaptureBufferLost
+        kWhatCaptureBufferLost, // onCaptureBufferLost
+        kWhatPreparedCb, // onPrepared
         // Internal cleanup
         kWhatCleanUpSessions   // Cleanup cached sp<ACameraCaptureSession>
     };

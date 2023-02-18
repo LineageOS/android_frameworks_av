@@ -145,6 +145,21 @@ cc_fuzz {
 }
 
 cc_fuzz {
+    name: "C2FuzzerAV1Dec",
+    defaults: ["C2Fuzzer-defaults"],
+
+    cflags: [
+        "-DC2COMPONENTNAME=\"c2.android.av1.decoder\"",
+    ],
+
+    static_libs: [
+        "libgav1",
+        "libyuv_static",
+        "libcodec2_soft_av1dec_gav1",
+    ],
+}
+
+cc_fuzz {
     name: "C2FuzzerAacDec",
     defaults: ["C2Fuzzer-defaults"],
 

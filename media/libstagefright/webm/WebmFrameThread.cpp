@@ -197,7 +197,6 @@ status_t WebmFrameSinkThread::start() {
 }
 
 status_t WebmFrameSinkThread::stop() {
-    mDone = true;
     mVideoFrames.push(WebmFrame::EOS);
     mAudioFrames.push(WebmFrame::EOS);
     return WebmFrameThread::stop();

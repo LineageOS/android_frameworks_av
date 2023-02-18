@@ -178,8 +178,9 @@ binder::Status AidlCameraDeviceCallbacks::onResultReceived(
     return binder::Status::ok();
 }
 
-binder::Status AidlCameraDeviceCallbacks::onPrepared(int32_t) {
-    // not implemented
+binder::Status AidlCameraDeviceCallbacks::onPrepared(int32_t streamId) {
+    auto ret = mBase->onPrepared(streamId);
+    LOG_STATUS_ERROR_IF_NOT_OK(ret, "onPrepared")
     return binder::Status::ok();
 }
 
@@ -191,6 +192,7 @@ binder::Status AidlCameraDeviceCallbacks::onRepeatingRequestError(
     LOG_STATUS_ERROR_IF_NOT_OK(ret, "onRepeatingRequestError")
     return binder::Status::ok();
 }
+
 binder::Status AidlCameraDeviceCallbacks::onRequestQueueEmpty() {
     // not implemented
     return binder::Status::ok();

@@ -40,6 +40,7 @@ void ACameraCaptureSession_close(ACameraCaptureSession* session) {
     if (session != nullptr) {
         session->closeByApp();
     }
+
     return;
 }
 
@@ -190,4 +191,43 @@ camera_status_t ACameraCaptureSession_updateSharedOutput(ACameraCaptureSession* 
         return ACAMERA_ERROR_SESSION_CLOSED;
     }
     return session->updateOutputConfiguration(output);
+}
+EXPORT
+camera_status_t ACameraCaptureSession_setWindowPreparedCallback(
+        ACameraCaptureSession* session, ACameraCaptureSession_prepareCallbacks *cb) {
+    ATRACE_CALL();
+    if (session == nullptr || cb == nullptr) {
+        ALOGE("%s: Error: session %p / callback %p is null", __FUNCTION__, session, cb);
+        return ACAMERA_ERROR_INVALID_PARAMETER;
+    }
+
+    if (cb->reserved0 != nullptr || cb->reserved1 != nullptr) {
+         ALOGE("%s: Setting reserved 0 and reserved 1 fields of "
+               "ACameraCaptureSession_prepareCallbacks is currently not supported "
+               " .They must be set to  null", __FUNCTION__);
+        return ACAMERA_ERROR_INVALID_PARAMETER;
+    }
+    if (session->isClosed()) {
+        ALOGE("%s: session %p is already closed", __FUNCTION__, session);
+        return ACAMERA_ERROR_SESSION_CLOSED;
+    }
+    session->setWindowPreparedCallback(cb);
+    return ACAMERA_OK;
+}
+
+EXPORT
+camera_status_t ACameraCaptureSession_prepareWindow(
+        ACameraCaptureSession* session,
+        ACameraWindowType *window) {
+    ATRACE_CALL();
+    if (session == nullptr || window == nullptr) {
+        ALOGE("%s: Error: session %p / window %p is null", __FUNCTION__, session, window);
+        return ACAMERA_ERROR_INVALID_PARAMETER;
+    }
+
+    if (session->isClosed()) {
+        ALOGE("%s: session %p is already closed", __FUNCTION__, session);
+        return ACAMERA_ERROR_SESSION_CLOSED;
+    }
+    return session->prepare(window);
 }
