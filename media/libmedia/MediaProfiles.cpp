@@ -898,10 +898,9 @@ void MediaProfiles::checkAndAddRequiredProfilesIfNecessary() {
         }
     }
 
-    for (size_t cameraId = 0; cameraId < mCameraIds.size(); ++cameraId) {
+    for (size_t refIndex = 0; refIndex < mCameraIds.size(); ++refIndex) {
+        const int cameraId = mCameraIds[refIndex];
         for (size_t j = 0; j < kNumRequiredProfiles; ++j) {
-            int refIndex = getRequiredProfileRefIndex(cameraId);
-            CHECK(refIndex != -1);
             RequiredProfileRefInfo *info =
                     &mRequiredProfileRefs[refIndex].mRefs[j];
 
@@ -931,14 +930,14 @@ void MediaProfiles::checkAndAddRequiredProfilesIfNecessary() {
 
                 int index = getCamcorderProfileIndex(cameraId, profile->mQuality);
                 if (index != -1) {
-                    ALOGV("Profile quality %d for camera %zu already exists",
+                    ALOGV("Profile quality %d for camera %d already exists",
                         profile->mQuality, cameraId);
                     CHECK(index == refIndex);
                     continue;
                 }
 
                 // Insert the new profile
-                ALOGV("Add a profile: quality %d=>%d for camera %zu",
+                ALOGV("Add a profile: quality %d=>%d for camera %d",
                         mCamcorderProfiles[info->mRefProfileIndex]->mQuality,
                         profile->mQuality, cameraId);
 
