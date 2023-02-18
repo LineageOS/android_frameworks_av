@@ -146,6 +146,27 @@ camera_status_t ACameraCaptureSession::updateOutputConfiguration(ACaptureSession
     return ret;
 }
 
+camera_status_t ACameraCaptureSession::prepare(ACameraWindowType* window) {
+#ifdef __ANDROID_VNDK__
+    std::shared_ptr<acam::CameraDevice> dev = getDevicePtr();
+#else
+    sp<acam::CameraDevice> dev = getDeviceSp();
+#endif
+    if (dev == nullptr) {
+        ALOGE("Error: Device associated with session %p has been closed!", this);
+        return ACAMERA_ERROR_SESSION_CLOSED;
+    }
+
+    camera_status_t ret;
+    dev->lockDeviceForSessionOps();
+    {
+        Mutex::Autolock _l(mSessionLock);
+        ret = dev->prepareLocked(window);
+    }
+    dev->unlockDevice();
+    return ret;
+}
+
 ACameraDevice*
 ACameraCaptureSession::getDevice() {
     Mutex::Autolock _l(mSessionLock);

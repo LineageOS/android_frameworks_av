@@ -84,6 +84,7 @@ class AidlCameraDeviceUser final : public SBnCameraDeviceUser {
             MQDescriptor<int8_t, SynchronizedReadWrite>* _aidl_return) override;
     ndk::ScopedAStatus isSessionConfigurationSupported(
             const SSessionConfiguration& in_sessionConfiguration, bool* _aidl_return) override;
+    ndk::ScopedAStatus prepare(int32_t in_streamId) override;
     ndk::ScopedAStatus submitRequestList(const std::vector<SCaptureRequest>& in_requestList,
                                          bool in_isRepeating, SSubmitInfo* _aidl_return) override;
     ndk::ScopedAStatus updateOutputConfiguration(

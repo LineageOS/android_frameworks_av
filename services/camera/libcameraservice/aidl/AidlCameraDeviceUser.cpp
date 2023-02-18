@@ -56,6 +56,7 @@ AidlCameraDeviceUser::AidlCameraDeviceUser(const sp<UICameraDeviceUser>& deviceR
       mDeviceRemote(deviceRemote) {
     mInitSuccess = initDevice();
 }
+
 bool AidlCameraDeviceUser::initDevice() {
     // TODO: Get request and result metadata queue size from a system property.
     int32_t reqFMQSize = CAMERA_REQUEST_METADATA_QUEUE_SIZE;
@@ -93,6 +94,11 @@ ndk::ScopedAStatus AidlCameraDeviceUser::getCaptureResultMetadataQueue(
         *_aidl_return = mCaptureResultMetadataQueue->dupeDesc();
     }
     return ScopedAStatus::ok();
+}
+
+ndk::ScopedAStatus AidlCameraDeviceUser::prepare(int32_t in_streamId) {
+    UStatus ret = mDeviceRemote->prepare(in_streamId);
+    return fromUStatus(ret);
 }
 
 ndk::ScopedAStatus AidlCameraDeviceUser::submitRequestList(
