@@ -14,6 +14,10 @@ cc_test {
     defaults: [
       "libeffects-test-defaults",
     ],
+    // TODO(b/269868814)
+    test_options: {
+        unit_test: false,
+    },
     srcs: [
         "EffectReverbTest.cpp",
     ],
