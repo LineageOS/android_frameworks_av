@@ -172,10 +172,17 @@ status_t StreamHalAidl::standby() {
             FALLTHROUGH_INTENDED;
         case StreamDescriptor::State::PAUSED:
         case StreamDescriptor::State::DRAIN_PAUSED:
-            return flush();
+            if (mIsInput) return flush();
+            if (status_t status = flush(&reply); status != OK) return status;
+            if (reply.state != StreamDescriptor::State::IDLE) {
+                ALOGE("%s: unexpected stream state: %s (expected IDLE)",
+                        __func__, toString(reply.state).c_str());
+                return INVALID_OPERATION;
+            }
+            FALLTHROUGH_INTENDED;
         case StreamDescriptor::State::IDLE:
             if (status_t status = sendCommand(makeHalCommand<HalCommand::Tag::standby>(),
-                            &reply); status != OK) {
+                            &reply, true /*safeFromNonWorkerThread*/); status != OK) {
                 return status;
             }
             if (reply.state != StreamDescriptor::State::STANDBY) {
@@ -291,9 +298,9 @@ status_t StreamHalAidl::transfer(void *buffer, size_t bytes, size_t *transferred
         LOG_ALWAYS_FATAL_IF(*transferred > bytes,
                 "%s: HAL module read %zu bytes, which exceeds requested count %zu",
                 __func__, *transferred, bytes);
-        if (!mContext.getDataMQ()->read(static_cast<int8_t*>(buffer),
-                                        mContext.getDataMQ()->availableToRead())) {
-            ALOGE("%s: failed to read %zu bytes to data MQ", __func__, *transferred);
+        if (auto toRead = mContext.getDataMQ()->availableToRead();
+                toRead != 0 && !mContext.getDataMQ()->read(static_cast<int8_t*>(buffer), toRead)) {
+            ALOGE("%s: failed to read %zu bytes to data MQ", __func__, toRead);
             return NOT_ENOUGH_DATA;
         }
     }
