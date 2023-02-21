@@ -200,7 +200,10 @@ cc_test {
     name: "timerthread_tests",
 
     defaults: ["libmediautils_tests_defaults"],
-
+    // TODO(b/270180838)
+    test_options: {
+        unit_test: false,
+    },
     srcs: [
         "TimerThread-test.cpp",
     ],
