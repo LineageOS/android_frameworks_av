@@ -108,7 +108,7 @@ struct LoopbackData {
     aaudio_result_t    outputError = AAUDIO_OK;
 
     GlitchAnalyzer     sineAnalyzer;
-    PulseLatencyAnalyzer echoAnalyzer;
+    WhiteNoiseLatencyAnalyzer echoAnalyzer;
     AudioRecording     audioRecording;
     LoopbackProcessor *loopbackProcessor;
 
