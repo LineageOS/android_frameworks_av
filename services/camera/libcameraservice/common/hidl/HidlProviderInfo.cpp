@@ -388,7 +388,7 @@ HidlProviderInfo::startProviderInterface() {
                   __FUNCTION__,
                   mProviderName.c_str(),
                   linked.description().c_str());
-              mManager->removeProvider(mProviderName);
+              mManager->removeProvider(mProviderInstance);
               return nullptr;
             } else if (!linked) {
               ALOGW("%s: Unable to link to provider '%s' death notifications",
