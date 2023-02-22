@@ -30,6 +30,10 @@ class EffectConversionHelperAidl {
     status_t handleCommand(uint32_t cmdCode, uint32_t cmdSize, void* pCmdData, uint32_t* replySize,
                            void* pReplyData);
     virtual ~EffectConversionHelperAidl() {}
+    const ::aidl::android::hardware::audio::effect::IEffect::OpenEffectReturn&
+    getEffectReturnParam() const {
+        return mOpenReturn;
+    }
 
   protected:
     const int32_t mSessionId;
