@@ -43,157 +43,208 @@ using ::android::status_t;
 using utils::EffectParamReader;
 using utils::EffectParamWriter;
 
-#define MAKE_AIDL_PARAMETER(aidlParam, param, value, tag)                            \
-    {                                                                                \
-        if (OK != param.readFromValue(&value)) {                                     \
-            ALOGE("%s invalid parameter %s %d", __func__, #tag, value);              \
-            return BAD_VALUE;                                                        \
-        }                                                                            \
-        aidlParam = MAKE_SPECIFIC_PARAMETER(                                         \
-                EnvironmentalReverb, environmentalReverb, tag,                       \
-                VALUE_OR_RETURN_STATUS(aidl::android::convertIntegral<int>(value))); \
+/**
+ * Macro to get a parameter from effect_param_t wrapper and set it to AIDL effect.
+ *
+ * Return if there is any error, otherwise continue execution.
+ *
+ * @param param EffectParamReader, a reader wrapper of effect_param_t.
+ * @param aidlType Type of the AIDL parameter field, used to construct AIDL Parameter union.
+ * @param valueType Type of the value get from effect_param_t.
+ * @param tag The AIDL parameter union field tag.
+ */
+#define SET_AIDL_PARAMETER(param, aidlType, valueType, tag)                                \
+    {                                                                                      \
+        Parameter aidlParam;                                                               \
+        valueType value;                                                                   \
+        if (status_t status = param.readFromValue(&value); status != OK) {                 \
+            ALOGE("%s  %s read from parameter failed, ret %d", __func__, #tag, status);    \
+            return status;                                                                 \
+        }                                                                                  \
+        aidlParam = MAKE_SPECIFIC_PARAMETER(                                               \
+                EnvironmentalReverb, environmentalReverb, tag,                             \
+                VALUE_OR_RETURN_STATUS(aidl::android::convertIntegral<aidlType>(value)));  \
+        RETURN_STATUS_IF_ERROR(statusTFromBinderStatus(mEffect->setParameter(aidlParam))); \
     }
 
-#define GET_AIDL_PARAMETER(tag, value, param)                                                      \
+/**
+ * Macro to get a parameter from AIDL effect and write the value to effect_param_t with wrapper.
+ *
+ * Return if there is any error, otherwise continue execution.
+ *
+ * @param param EffectParamWriter, a writer wrapper of effect_param_t.
+ * @param aidlType Type of the AIDL parameter field, used to construct AIDL Parameter union.
+ * @param valueType  Type of the value get from effect_param_t.
+ * @param tag The AIDL parameter union field tag.
+ */
+#define GET_AIDL_PARAMETER(param, aidltype, valueType, tag)                                        \
     {                                                                                              \
+        aidltype value;                                                                            \
         Parameter aidlParam;                                                                       \
         Parameter::Id id = MAKE_SPECIFIC_PARAMETER_ID(EnvironmentalReverb, environmentalReverbTag, \
                                                       EnvironmentalReverb::tag);                   \
         RETURN_STATUS_IF_ERROR(statusTFromBinderStatus(mEffect->getParameter(id, &aidlParam)));    \
-        value = VALUE_OR_RETURN_STATUS(GET_PARAMETER_SPECIFIC_FIELD(                               \
-                aidlParam, EnvironmentalReverb, environmentalReverb, EnvironmentalReverb::tag,     \
-                std::decay_t<decltype(value)>));                                                   \
-        return param.writeToValue(&value);                                                         \
+        value = VALUE_OR_RETURN_STATUS(                                                            \
+                GET_PARAMETER_SPECIFIC_FIELD(aidlParam, EnvironmentalReverb, environmentalReverb,  \
+                                             EnvironmentalReverb::tag, std::decay_t<aidltype>));   \
+        if (status_t status = param.writeToValue((valueType*)&value); status != OK) {              \
+            param.setStatus(status);                                                               \
+            ALOGE("%s %s write to parameter failed %d, ret %d", __func__, #tag, value, status);    \
+            return status;                                                                         \
+        }                                                                                          \
     }
 
 status_t AidlConversionEnvReverb::setParameter(EffectParamReader& param) {
     uint32_t type = 0;
-    if (!param.validateParamValueSize(sizeof(uint32_t), sizeof(uint16_t)) ||
-        OK != param.readFromParameter(&type)) {
-        ALOGE("%s invalid param %s", __func__, param.toString().c_str());
+    if (status_t status = param.readFromParameter(&type); status != OK) {
+        ALOGE("%s failed to read type from %s, ret %d", __func__, param.toString().c_str(), status);
         return BAD_VALUE;
     }
-    Parameter aidlParam;
-    uint16_t value16;
-    uint32_t value32;
+
     switch (type) {
         case REVERB_PARAM_ROOM_LEVEL: {
-            MAKE_AIDL_PARAMETER(aidlParam, param, value16, roomLevelMb);
+            SET_AIDL_PARAMETER(param, int32_t, int16_t, roomLevelMb);
             break;
         }
         case REVERB_PARAM_ROOM_HF_LEVEL: {
-            MAKE_AIDL_PARAMETER(aidlParam, param, value16, roomHfLevelMb);
+            SET_AIDL_PARAMETER(param, int32_t, int16_t, roomHfLevelMb);
             break;
         }
         case REVERB_PARAM_DECAY_TIME: {
-            MAKE_AIDL_PARAMETER(aidlParam, param, value32, decayTimeMs);
+            SET_AIDL_PARAMETER(param, int32_t, uint32_t, decayTimeMs);
             break;
         }
         case REVERB_PARAM_DECAY_HF_RATIO: {
-            MAKE_AIDL_PARAMETER(aidlParam, param, value16, decayHfRatioPm);
-            break;
-        }
-        case REVERB_PARAM_REVERB_LEVEL: {
-            MAKE_AIDL_PARAMETER(aidlParam, param, value16, levelMb);
-            break;
-        }
-        case REVERB_PARAM_REVERB_DELAY: {
-            MAKE_AIDL_PARAMETER(aidlParam, param, value32, delayMs);
-            break;
-        }
-        case REVERB_PARAM_DIFFUSION: {
-            MAKE_AIDL_PARAMETER(aidlParam, param, value16, diffusionPm);
-            break;
-        }
-        case REVERB_PARAM_DENSITY: {
-            MAKE_AIDL_PARAMETER(aidlParam, param, value16, densityPm);
-            break;
-        }
-        case REVERB_PARAM_BYPASS: {
-            if (OK != param.readFromValue(&value32)) {
-                ALOGE("%s invalid bypass parameter %d", __func__, value32);
-                return BAD_VALUE;
-            }
-            bool isByPass = VALUE_OR_RETURN_STATUS(aidl::android::convertIntegral<bool>(value32));
-            aidlParam = MAKE_SPECIFIC_PARAMETER(EnvironmentalReverb, environmentalReverb, bypass,
-                                                isByPass);
+            SET_AIDL_PARAMETER(param, int32_t, int16_t, decayHfRatioPm);
             break;
         }
         case REVERB_PARAM_REFLECTIONS_LEVEL: {
-            // TODO
+            SET_AIDL_PARAMETER(param, int32_t, int16_t, reflectionsLevelMb);
             break;
         }
         case REVERB_PARAM_REFLECTIONS_DELAY: {
-            // TODO
+            SET_AIDL_PARAMETER(param, int32_t, uint32_t, reflectionsDelayMs);
+            break;
+        }
+        case REVERB_PARAM_REVERB_LEVEL: {
+            SET_AIDL_PARAMETER(param, int32_t, int16_t, levelMb);
+            break;
+        }
+        case REVERB_PARAM_REVERB_DELAY: {
+            SET_AIDL_PARAMETER(param, int32_t, uint32_t, delayMs);
+            break;
+        }
+        case REVERB_PARAM_DIFFUSION: {
+            SET_AIDL_PARAMETER(param, int32_t, int16_t, diffusionPm);
+            break;
+        }
+        case REVERB_PARAM_DENSITY: {
+            SET_AIDL_PARAMETER(param, int32_t, int16_t, densityPm);
+            break;
+        }
+        case REVERB_PARAM_BYPASS: {
+            SET_AIDL_PARAMETER(param, bool, int32_t, bypass);
             break;
         }
         case REVERB_PARAM_PROPERTIES: {
-            // TODO
+            if (sizeof(t_reverb_settings) > param.getValueSize()) {
+                ALOGE("%s vsize %zu less than t_reverb_settings size %zu", __func__,
+                      param.getValueSize(), sizeof(t_reverb_settings));
+                return BAD_VALUE;
+            }
+            // this sequency needs to be aligned with t_reverb_settings
+            SET_AIDL_PARAMETER(param, int32_t, int16_t, roomLevelMb);
+            SET_AIDL_PARAMETER(param, int32_t, int16_t, roomHfLevelMb);
+            SET_AIDL_PARAMETER(param, int32_t, uint32_t, decayTimeMs);
+            SET_AIDL_PARAMETER(param, int32_t, int16_t, decayHfRatioPm);
+            SET_AIDL_PARAMETER(param, int32_t, int16_t, reflectionsLevelMb);
+            SET_AIDL_PARAMETER(param, int32_t, uint32_t, reflectionsDelayMs);
+            SET_AIDL_PARAMETER(param, int32_t, int16_t, levelMb);
+            SET_AIDL_PARAMETER(param, int32_t, uint32_t, delayMs);
+            SET_AIDL_PARAMETER(param, int32_t, int16_t, diffusionPm);
+            SET_AIDL_PARAMETER(param, int32_t, int16_t, densityPm);
             break;
         }
         default: {
             // TODO: handle with vendor extension
         }
     }
-    return statusTFromBinderStatus(mEffect->setParameter(aidlParam));
+    return OK;
 }
 
 status_t AidlConversionEnvReverb::getParameter(EffectParamWriter& param) {
     uint32_t type = 0;
-    if (!param.validateParamValueSize(sizeof(uint32_t), sizeof(uint32_t)) ||
-        OK != param.readFromParameter(&type)) {
-        ALOGE("%s invalid param %s", __func__, param.toString().c_str());
-        param.setStatus(BAD_VALUE);
-        return BAD_VALUE;
+    if (status_t status = param.readFromParameter(&type); status != OK) {
+        ALOGE("%s failed to read type from %s", __func__, param.toString().c_str());
+        param.setStatus(status);
+        return status;
     }
-    uint16_t value16;
-    uint32_t value32;
+
     switch (type) {
         case REVERB_PARAM_ROOM_LEVEL: {
-            GET_AIDL_PARAMETER(roomLevelMb, value16, param);
+            GET_AIDL_PARAMETER(param, int32_t, int16_t, roomLevelMb);
+            break;
         }
         case REVERB_PARAM_ROOM_HF_LEVEL: {
-            GET_AIDL_PARAMETER(roomHfLevelMb, value16, param);
+            GET_AIDL_PARAMETER(param, int32_t, int16_t, roomHfLevelMb);
+            break;
         }
         case REVERB_PARAM_DECAY_TIME: {
-            GET_AIDL_PARAMETER(decayTimeMs, value32, param);
+            GET_AIDL_PARAMETER(param, int32_t, uint32_t, decayTimeMs);
+            break;
         }
         case REVERB_PARAM_DECAY_HF_RATIO: {
-            GET_AIDL_PARAMETER(decayHfRatioPm, value16, param);
-        }
-        case REVERB_PARAM_REVERB_LEVEL: {
-            GET_AIDL_PARAMETER(levelMb, value16, param);
-        }
-        case REVERB_PARAM_REVERB_DELAY: {
-            GET_AIDL_PARAMETER(delayMs, value32, param);
-        }
-        case REVERB_PARAM_DIFFUSION: {
-            GET_AIDL_PARAMETER(diffusionPm, value16, param);
-        }
-        case REVERB_PARAM_DENSITY: {
-            GET_AIDL_PARAMETER(densityPm, value16, param);
-        }
-        case REVERB_PARAM_BYPASS: {
-            bool isByPass;
-            GET_AIDL_PARAMETER(bypass, isByPass, param);
+            GET_AIDL_PARAMETER(param, int32_t, int16_t, decayHfRatioPm);
+            break;
         }
         case REVERB_PARAM_REFLECTIONS_LEVEL: {
-            // TODO
+            GET_AIDL_PARAMETER(param, int32_t, int16_t, reflectionsLevelMb);
             break;
         }
         case REVERB_PARAM_REFLECTIONS_DELAY: {
-            // TODO
+            GET_AIDL_PARAMETER(param, int32_t, uint32_t, reflectionsDelayMs);
+            break;
+        }
+        case REVERB_PARAM_REVERB_LEVEL: {
+            GET_AIDL_PARAMETER(param, int32_t, int16_t, levelMb);
+            break;
+        }
+        case REVERB_PARAM_REVERB_DELAY: {
+            GET_AIDL_PARAMETER(param, int32_t, uint32_t, delayMs);
+            break;
+        }
+        case REVERB_PARAM_DIFFUSION: {
+            GET_AIDL_PARAMETER(param, int32_t, int16_t, diffusionPm);
+            break;
+        }
+        case REVERB_PARAM_DENSITY: {
+            GET_AIDL_PARAMETER(param, int32_t, int16_t, densityPm);
+            break;
+        }
+        case REVERB_PARAM_BYPASS: {
+            GET_AIDL_PARAMETER(param, bool, int32_t, bypass);
             break;
         }
         case REVERB_PARAM_PROPERTIES: {
-            // TODO
+            // this sequency needs to be aligned with t_reverb_settings
+            GET_AIDL_PARAMETER(param, int32_t, int16_t, roomLevelMb);
+            GET_AIDL_PARAMETER(param, int32_t, int16_t, roomHfLevelMb);
+            GET_AIDL_PARAMETER(param, int32_t, uint32_t, decayTimeMs);
+            GET_AIDL_PARAMETER(param, int32_t, int16_t, decayHfRatioPm);
+            GET_AIDL_PARAMETER(param, int32_t, int16_t, reflectionsLevelMb);
+            GET_AIDL_PARAMETER(param, int32_t, uint32_t, reflectionsDelayMs);
+            GET_AIDL_PARAMETER(param, int32_t, int16_t, levelMb);
+            GET_AIDL_PARAMETER(param, int32_t, uint32_t, delayMs);
+            GET_AIDL_PARAMETER(param, int32_t, int16_t, diffusionPm);
+            GET_AIDL_PARAMETER(param, int32_t, int16_t, densityPm);
             break;
         }
         default: {
             // TODO: handle with vendor extension
+            return BAD_VALUE;
         }
     }
-    return BAD_VALUE;
+    return OK;
 }
 
 } // namespace effect
