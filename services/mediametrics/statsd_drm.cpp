@@ -248,10 +248,10 @@ bool statsd_mediadrm_created(const std::shared_ptr<const mediametrics::Item>& it
     if (!item->getInt32("frontend", &frontend)) return false;
 
     // Optional to be included
-    int64_t apex_version = -1;
-    item->getInt64("apex_version", &apex_version);
+    std::string version = "";
+    item->getString("version", &version);
     const int result = stats_write(stats::media_metrics::MEDIA_DRM_CREATED,
-                    scheme, uuid_lsb, uuid_msb, uid, frontend, apex_version);
+                    scheme, uuid_lsb, uuid_msb, uid, frontend, version.c_str());
 
     std::stringstream log;
     log << "result:" << result << " {"
@@ -262,7 +262,7 @@ bool statsd_mediadrm_created(const std::shared_ptr<const mediametrics::Item>& it
             << " uuid_msb:" << uuid_msb
             << " uid:" << uid
             << " frontend:" << frontend
-            << " apex_version:" << apex_version
+            << " version:" << version
             << " }";
     statsdLog->log(stats::media_metrics::MEDIA_DRM_CREATED, log.str());
     return true;
@@ -287,10 +287,10 @@ bool statsd_mediadrm_session_opened(const std::shared_ptr<const mediametrics::It
     if (!item->getInt32("opened_security_level", &opened_security_level)) return false;
 
     // Optional to be included
-    int64_t apex_version = -1;
-    item->getInt64("apex_version", &apex_version);
+    std::string version = "";
+    item->getString("version", &version);
     const int result = stats_write(stats::media_metrics::MEDIA_DRM_SESSION_OPENED,
-                        scheme, uuid_lsb, uuid_msb, uid, frontend, apex_version,
+                        scheme, uuid_lsb, uuid_msb, uid, frontend, version.c_str(),
                         object_nonce.c_str(), requested_security_level,
                         opened_security_level);
 
@@ -303,7 +303,7 @@ bool statsd_mediadrm_session_opened(const std::shared_ptr<const mediametrics::It
             << " uuid_msb:" << uuid_msb
             << " uid:" << uid
             << " frontend:" << frontend
-            << " apex_version:" << apex_version
+            << " version:" << version
             << " object_nonce:" << object_nonce
             << " requested_security_level:" << requested_security_level
             << " opened_security_level:" << opened_security_level
@@ -334,8 +334,8 @@ bool statsd_mediadrm_errored(const std::shared_ptr<const mediametrics::Item>& it
     if (!item->getInt32("error_code", &error_code)) return false;
 
     // Optional to be included
-    int64_t apex_version = -1;
-    item->getInt64("apex_version", &apex_version);
+    std::string version = "";
+    item->getString("version", &version);
     std::string session_nonce = "";
     item->getString("session_nonce", &session_nonce);
 
@@ -347,7 +347,7 @@ bool statsd_mediadrm_errored(const std::shared_ptr<const mediametrics::Item>& it
     item->getInt32("error_context", &error_context);
 
     const int result = stats_write(stats::media_metrics::MEDIA_DRM_ERRORED, scheme, uuid_lsb,
-                        uuid_msb, uid, frontend, apex_version, object_nonce.c_str(),
+                        uuid_msb, uid, frontend, version.c_str(), object_nonce.c_str(),
                         session_nonce.c_str(), security_level, api, error_code, cdm_err,
                         oem_err, error_context);
 
@@ -360,7 +360,7 @@ bool statsd_mediadrm_errored(const std::shared_ptr<const mediametrics::Item>& it
             << " uuid_msb:" << uuid_msb
             << " uid:" << uid
             << " frontend:" << frontend
-            << " apex_version:" << apex_version
+            << " version:" << version
             << " object_nonce:" << object_nonce
             << " session_nonce:" << session_nonce
             << " security_level:" << security_level
