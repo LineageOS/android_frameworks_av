@@ -165,7 +165,7 @@ std::vector<EffectParamTestTuple> testPairs = {
                                                      sizeof(int32_t) /* returnValueSize */)),
         std::make_tuple(EFFECT_UIID_DOWNMIX,
                         createEffectParamCombination(DOWNMIX_PARAM_TYPE, DOWNMIX_TYPE_FOLD,
-                                                     sizeof(int32_t) /* returnValueSize */)),
+                                                     sizeof(int16_t) /* returnValueSize */)),
         std::make_tuple(SL_IID_DYNAMICSPROCESSING,
                         createEffectParamCombination(
                                 std::array<uint32_t, 2>({DP_PARAM_INPUT_GAIN, 0 /* channel */}),
@@ -264,7 +264,8 @@ class libAudioHalEffectParamTest : public ::testing::TestWithParam<EffectParamTe
         if (mCombination->valueSize) {
             std::vector<uint8_t> response(mCombination->valueSize);
             EXPECT_EQ(OK, parameterGet.readFromValue(response.data(), mCombination->valueSize))
-                << parameterGet.toString();
+                    << " try get valueSize " << mCombination->valueSize << " from "
+                    << parameterGet.toString();
             EXPECT_EQ(response, mExpectedValue);
         }
     }
