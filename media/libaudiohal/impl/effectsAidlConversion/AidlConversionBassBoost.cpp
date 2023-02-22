@@ -82,7 +82,7 @@ status_t AidlConversionBassBoost::getParameter(EffectParamWriter& param) {
     Parameter aidlParam;
     switch (type) {
         case BASSBOOST_PARAM_STRENGTH: {
-            uint32_t value;
+            uint16_t value;
             Parameter::Id id =
                     MAKE_SPECIFIC_PARAMETER_ID(BassBoost, bassBoostTag, BassBoost::strengthPm);
             RETURN_STATUS_IF_ERROR(statusTFromBinderStatus(mEffect->getParameter(id, &aidlParam)));
@@ -92,7 +92,7 @@ status_t AidlConversionBassBoost::getParameter(EffectParamWriter& param) {
         }
         case BASSBOOST_PARAM_STRENGTH_SUPPORTED: {
             // an invalid range indicates not setting support for this parameter
-            uint16_t value =
+            uint32_t value =
                     ::aidl::android::hardware::audio::effect::isRangeValid<Range::Tag::bassBoost>(
                             BassBoost::strengthPm, mDesc.capability);
             return param.writeToValue(&value);
