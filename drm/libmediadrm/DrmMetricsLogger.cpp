@@ -63,6 +63,8 @@ DrmStatus DrmMetricsLogger::isCryptoSchemeSupported(const uint8_t uuid[IDRM_UUID
 DrmStatus DrmMetricsLogger::createPlugin(const uint8_t uuid[IDRM_UUID_SIZE],
                                          const String8& appPackageName) {
     std::memcpy(mUuid.data(), uuid, IDRM_UUID_SIZE);
+    mUuid[0] = betoh64(mUuid[0]);
+    mUuid[1] = betoh64(mUuid[1]);
     if (kUuidSchemeMap.count(mUuid)) {
         mScheme = kUuidSchemeMap.at(mUuid);
     } else {
@@ -460,8 +462,8 @@ DrmStatus DrmMetricsLogger::getSupportedSchemes(std::vector<uint8_t>& schemes) c
 void DrmMetricsLogger::reportMediaDrmCreated() const {
     mediametrics_handle_t handle(mediametrics_create("mediadrm.created"));
     mediametrics_setCString(handle, "scheme", mScheme.c_str());
-    mediametrics_setInt64(handle, "uuid_msb", be64toh(mUuid[0]));
-    mediametrics_setInt64(handle, "uuid_lsb", be64toh(mUuid[1]));
+    mediametrics_setInt64(handle, "uuid_msb", mUuid[0]);
+    mediametrics_setInt64(handle, "uuid_lsb", mUuid[1]);
     mediametrics_setInt32(handle, "frontend", mFrontend);
     mediametrics_setCString(handle, "object_nonce", mObjNonce.c_str());
     mediametrics_selfRecord(handle);
@@ -471,8 +473,8 @@ void DrmMetricsLogger::reportMediaDrmCreated() const {
 void DrmMetricsLogger::reportMediaDrmSessionOpened(const std::vector<uint8_t>& sessionId) const {
     mediametrics_handle_t handle(mediametrics_create("mediadrm.session_opened"));
     mediametrics_setCString(handle, "scheme", mScheme.c_str());
-    mediametrics_setInt64(handle, "uuid_msb", be64toh(mUuid[0]));
-    mediametrics_setInt64(handle, "uuid_lsb", be64toh(mUuid[1]));
+    mediametrics_setInt64(handle, "uuid_msb", mUuid[0]);
+    mediametrics_setInt64(handle, "uuid_lsb", mUuid[1]);
     mediametrics_setInt32(handle, "frontend", mFrontend);
     mediametrics_setCString(handle, "object_nonce", mObjNonce.c_str());
     const std::lock_guard<std::mutex> lock(mSessionMapMutex);
@@ -490,8 +492,8 @@ void DrmMetricsLogger::reportMediaDrmErrored(const DrmStatus& error_code, const 
                                              const std::vector<uint8_t>& sessionId) const {
     mediametrics_handle_t handle(mediametrics_create("mediadrm.errored"));
     mediametrics_setCString(handle, "scheme", mScheme.c_str());
-    mediametrics_setInt64(handle, "uuid_msb", be64toh(mUuid[0]));
-    mediametrics_setInt64(handle, "uuid_lsb", be64toh(mUuid[1]));
+    mediametrics_setInt64(handle, "uuid_msb", mUuid[0]);
+    mediametrics_setInt64(handle, "uuid_lsb", mUuid[1]);
     mediametrics_setInt32(handle, "frontend", mFrontend);
     mediametrics_setCString(handle, "object_nonce", mObjNonce.c_str());
     if (!sessionId.empty()) {
