@@ -34,6 +34,9 @@
 #include <system/audio.h>
 #include <utils/String8.h>
 
+#include <inttypes.h>
+#include <stdint.h>
+
 extern "C" {
     #include <Tremolo/codec_internal.h>
 
@@ -346,66 +349,118 @@ status_t MyOggExtractor::findNextPage(
         off64_t startOffset, off64_t *pageOffset) {
     *pageOffset = startOffset;
 
-    for (;;) {
-        char signature[4];
-        ssize_t n = mSource->readAt(*pageOffset, &signature, 4);
+    // balance between larger reads and reducing how much we over-read.
+    const int FIND_BUF_SIZE = 2048;
+    const int lenOggS = strlen("OggS");
+    while(1) {
 
-        if (n < 4) {
+        // work with big buffers to amortize readAt() costs
+        char signatureBuffer[FIND_BUF_SIZE];
+        ssize_t n = mSource->readAt(*pageOffset, &signatureBuffer, sizeof(signatureBuffer));
+
+        if (n < lenOggS) {
             *pageOffset = 0;
-
             return (n < 0) ? n : (status_t)ERROR_END_OF_STREAM;
         }
 
-        if (!memcmp(signature, "OggS", 4)) {
-            if (*pageOffset > startOffset) {
-                ALOGV("skipped %lld bytes of junk to reach next frame",
-                     (long long)(*pageOffset - startOffset));
-            }
-
-            return OK;
-        }
-
-        // see how far ahead to skip; avoid some fruitless comparisons
-        unsigned int i;
-        for (i = 1; i < 4 ; i++) {
-            if (signature[i] == 'O')
+        for(int i = 0; i < n - (lenOggS - 1) ; i++) {
+            // fast scan for 1st character in a signature
+            char *p = (char *)memchr(&signatureBuffer[i], 'O', n - (lenOggS - 1) - i);
+            if (p == NULL) {
+                // no signature start in the rest of this buffer.
                 break;
+            }
+            int jump = (p-&signatureBuffer[i]);
+            i += jump;
+            if (memcmp("OggS", &signatureBuffer[i], lenOggS) == 0) {
+                *pageOffset += i;
+                if (*pageOffset > startOffset) {
+                    ALOGD("skipped %" PRIu64 " bytes of junk to reach next frame",
+                         (*pageOffset - startOffset));
+                }
+                return OK;
+            }
         }
-        *pageOffset += i;
+
+        // on to next block. buffer didn't end with "OggS", but could end with "Ogg".
+        // overlap enough to detect this. n >= lenOggS, so this always advances.
+        *pageOffset += n - (lenOggS - 1);
     }
+    return (status_t)ERROR_END_OF_STREAM;
 }
 
 // Given the offset of the "current" page, find the page immediately preceding
 // it (if any) and return its granule position.
 // To do this we back up from the "current" page's offset until we find any
 // page preceding it and then scan forward to just before the current page.
+//
 status_t MyOggExtractor::findPrevGranulePosition(
         off64_t pageOffset, uint64_t *granulePos) {
     *granulePos = 0;
 
-    off64_t prevPageOffset = 0;
-    off64_t prevGuess = pageOffset;
-    for (;;) {
-        if (prevGuess >= 5000) {
-            prevGuess -= 5000;
+    const int FIND_BUF_SIZE = 2048;
+    const int lenOggS = strlen("OggS");
+
+    if (pageOffset == 0) {
+        ALOGV("no page before the first page");
+        return UNKNOWN_ERROR;
+    }
+
+    off64_t prevPageOffset = pageOffset;
+
+    // we start our search on the byte immediately in front of pageOffset
+    // which could mean "O" immediately before and "ggS" starting at pageOffset
+    //
+    // if there was an "OggS" at pageOffset, we'll have scanned a few extra bytes
+    // but if pageOffset was chosen by a seek operation, we don't know that it
+    // reflects the beginning of a page. By choosing to scan 3 possibly unneeded
+    // bytes at the start we cover both cases.
+    //
+    off64_t firstAfter = pageOffset + lenOggS - 1;    // NOT within our buffer
+    off64_t nextOffset = pageOffset;
+
+    while(prevPageOffset == pageOffset) {
+        // work with big buffers to amortize readAt() costs
+        char signatureBuffer[FIND_BUF_SIZE];
+
+        ssize_t desired = sizeof(signatureBuffer);
+        if (firstAfter >= desired) {
+            nextOffset = firstAfter - desired;
         } else {
-            prevGuess = 0;
+            nextOffset = 0;
+            desired = firstAfter;
         }
+        ssize_t n = mSource->readAt(nextOffset, &signatureBuffer, desired);
 
-        ALOGV("backing up %lld bytes", (long long)(pageOffset - prevGuess));
-
-        status_t err = findNextPage(prevGuess, &prevPageOffset);
-        if (err == ERROR_END_OF_STREAM) {
-            // We are at the last page and didn't back off enough;
-            // back off 5000 bytes more and try again.
-            continue;
-        } else if (err != OK) {
-            return err;
-        }
-
-        if (prevPageOffset < pageOffset || prevGuess == 0) {
+        if (n < lenOggS) {
+            ALOGD("short read, get out");
             break;
         }
+
+        // work backwards
+        // loop control ok for n >= 0
+        for(int i = n - lenOggS; i >= 0 ; i--) {
+            // fast scan for 1st character in the signature
+            char *p = (char *)memrchr(&signatureBuffer[0], 'O', i);
+            if (p == NULL) {
+                // no signature start in the rest of this buffer.
+                break;
+            }
+            i = (p-&signatureBuffer[0]);
+            // loop start chosen to ensure we will always have lenOggS bytes
+            if (memcmp("OggS", &signatureBuffer[i], lenOggS) == 0) {
+                prevPageOffset = nextOffset + i;
+                break;
+            }
+        }
+
+        // back up for next read; make sure we catch overlaps
+        if (nextOffset == 0) {
+            // can't back up any further
+            break;
+        }
+        // current buffer might start with "ggS", include those bytes in the next iteration
+        firstAfter = nextOffset + lenOggS - 1;
     }
 
     if (prevPageOffset == pageOffset) {
@@ -413,8 +468,8 @@ status_t MyOggExtractor::findPrevGranulePosition(
         return UNKNOWN_ERROR;
     }
 
-    ALOGV("prevPageOffset at %lld, pageOffset at %lld",
-            (long long)prevPageOffset, (long long)pageOffset);
+    ALOGV("prevPageOffset at %" PRIu64 ", pageOffset at %" PRIu64,
+          prevPageOffset, pageOffset);
     uint8_t flag = 0;
     for (;;) {
         Page prevPage;
