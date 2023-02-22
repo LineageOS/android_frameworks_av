@@ -26,6 +26,7 @@
 #include <hardware/audio_effect.h>
 #include <media/AidlConversionUtil.h>
 #include <system/audio_effect.h>
+#include <system/audio_effects/audio_effects_utils.h>
 
 #include <aidl/android/hardware/audio/effect/IEffect.h>
 
@@ -125,6 +126,25 @@ ConversionResult<::aidl::android::hardware::audio::effect::DynamicsProcessing::R
 legacy2aidl_int32_DynamicsProcessing_ResolutionPreference(int32_t legacy);
 ConversionResult<int32_t> aidl2legacy_DynamicsProcessing_ResolutionPreference_int32(
         ::aidl::android::hardware::audio::effect::DynamicsProcessing::ResolutionPreference aidl);
+
+ConversionResult<uint32_t> aidl2legacy_Parameter_Visualizer_ScalingMode_uint32(
+        ::aidl::android::hardware::audio::effect::Visualizer::ScalingMode aidl);
+ConversionResult<::aidl::android::hardware::audio::effect::Visualizer::ScalingMode>
+legacy2aidl_Parameter_Visualizer_uint32_ScalingMode(uint32_t legacy);
+
+ConversionResult<uint32_t> aidl2legacy_Parameter_Visualizer_MeasurementMode_uint32(
+        ::aidl::android::hardware::audio::effect::Visualizer::MeasurementMode aidl);
+ConversionResult<::aidl::android::hardware::audio::effect::Visualizer::MeasurementMode>
+legacy2aidl_Parameter_Visualizer_uint32_MeasurementMode(uint32_t legacy);
+
+ConversionResult<::aidl::android::hardware::audio::effect::Parameter>
+legacy2aidl_EffectParameterReader_ParameterExtension(
+        ::android::effect::utils::EffectParamReader& param);
+ConversionResult<std::vector<uint8_t>> aidl2legacy_ParameterExtension_vector_uint8(
+        const ::aidl::android::hardware::audio::effect::Parameter& legacy);
+ConversionResult<::android::status_t> aidl2legacy_ParameterExtension_EffectParameterWriter(
+        const ::aidl::android::hardware::audio::effect::Parameter& aidl,
+        ::android::effect::utils::EffectParamWriter& legacy);
 
 }  // namespace android
 }  // namespace aidl

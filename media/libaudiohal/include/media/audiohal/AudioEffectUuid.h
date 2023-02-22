@@ -42,11 +42,11 @@ static const AudioUuid kBassBoostTypeUUID = {static_cast<int32_t>(0x0634f220),
                                              0xa0fc,
                                              {0x00, 0x02, 0xa5, 0xd5, 0xc5, 0x1b}};
 // fa81862a-588b-11ed-9b6a-0242ac120002
-static const AudioUuid kDownmixTypeUUID = {static_cast<int32_t>(0xfa81862a),
-                                           0x588b,
-                                           0x11ed,
-                                           0x9b6a,
-                                           {0x02, 0x42, 0xac, 0x12, 0x00, 0x02}};
+static const AudioUuid kDownmixTypeUUID = {static_cast<int32_t>(0x381e49cc),
+                                           0xa858,
+                                           0x4aa2,
+                                           0x87f6,
+                                           {0xe8, 0x38, 0x8e, 0x76, 0x01, 0xb2}};
 // 7261676f-6d75-7369-6364-28e2fd3ac39e
 static const AudioUuid kDynamicsProcessingTypeUUID = {static_cast<int32_t>(0x7261676f),
                                                       0x6d75,
@@ -101,12 +101,12 @@ static const AudioUuid kVirtualizerTypeUUID = {static_cast<int32_t>(0x37cc2c00),
                                                0x11db,
                                                0x8577,
                                                {0x00, 0x02, 0xa5, 0xd5, 0xc5, 0x1b}};
-// fa819f3e-588b-11ed-9b6a-0242ac120002
-static const AudioUuid kVisualizerTypeUUID = {static_cast<int32_t>(0xfa819f3e),
-                                              0x588b,
-                                              0x11ed,
-                                              0x9b6a,
-                                              {0x02, 0x42, 0xac, 0x12, 0x00, 0x02}};
+// e46b26a0-dddd-11db-8afd-0002a5d5c51b
+static const AudioUuid kVisualizerTypeUUID = {static_cast<int32_t>(0xe46b26a0),
+                                              0xdddd,
+                                              0x11db,
+                                              0x8afd,
+                                              {0x00, 0x02, 0xa5, 0xd5, 0xc5, 0x1b}};
 // fa81a2b8-588b-11ed-9b6a-0242ac120002
 static const AudioUuid kVolumeTypeUUID = {static_cast<int32_t>(0xfa81a2b8),
                                           0x588b,
