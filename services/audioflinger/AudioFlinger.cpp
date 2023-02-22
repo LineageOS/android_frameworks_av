@@ -3679,6 +3679,20 @@ AudioFlinger::ThreadBase *AudioFlinger::checkThread_l(audio_io_handle_t ioHandle
     return thread;
 }
 
+// checkOutputThread_l() must be called with AudioFlinger::mLock held
+sp<AudioFlinger::ThreadBase> AudioFlinger::checkOutputThread_l(audio_io_handle_t ioHandle) const
+{
+    if (audio_unique_id_get_use(ioHandle) != AUDIO_UNIQUE_ID_USE_OUTPUT) {
+        return nullptr;
+    }
+
+    sp<AudioFlinger::ThreadBase> thread = mPlaybackThreads.valueFor(ioHandle);
+    if (thread == nullptr) {
+        thread = mMmapThreads.valueFor(ioHandle);
+    }
+    return thread;
+}
+
 // checkPlaybackThread_l() must be called with AudioFlinger::mLock held
 AudioFlinger::PlaybackThread *AudioFlinger::checkPlaybackThread_l(audio_io_handle_t output) const
 {
