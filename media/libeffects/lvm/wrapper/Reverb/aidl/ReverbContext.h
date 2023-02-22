@@ -83,6 +83,18 @@ class ReverbContext final : public EffectContext {
     RetCode setVolumeStereo(const Parameter::VolumeStereo& volumeStereo) override;
     Parameter::VolumeStereo getVolumeStereo() override { return mVolumeStereo; }
 
+    RetCode setReflectionsDelay(int delay) {
+        mReflectionsDelayMs = delay;
+        return RetCode::SUCCESS;
+    }
+    bool getReflectionsDelay() const { return mReflectionsDelayMs; }
+
+    RetCode setReflectionsLevel(int level) {
+        mReflectionsLevelMb = level;
+        return RetCode::SUCCESS;
+    }
+    bool getReflectionsLevel() const { return mReflectionsLevelMb; }
+
     IEffect::Status lvmProcess(float* in, float* out, int samples);
 
   private:
@@ -146,15 +158,17 @@ class ReverbContext final : public EffectContext {
     bool mEnabled = false;
     LVREV_Handle_t mInstance GUARDED_BY(mMutex);
 
-    int mRoomLevel;
-    int mRoomHfLevel;
-    int mDecayTime;
-    int mDecayHfRatio;
-    int mLevel;
-    int mDelay;
-    int mDiffusion;
-    int mDensity;
-    bool mBypass;
+    int mRoomLevel = 0;
+    int mRoomHfLevel = 0;
+    int mDecayTime = 0;
+    int mDecayHfRatio = 0;
+    int mLevel = 0;
+    int mDelay = 0;
+    int mDiffusion = 0;
+    int mDensity = 0;
+    bool mBypass = 0;
+    int mReflectionsLevelMb = 0;
+    int mReflectionsDelayMs = 0;
 
     PresetReverb::Presets mPreset;
     PresetReverb::Presets mNextPreset;
