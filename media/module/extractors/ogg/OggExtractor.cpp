@@ -1048,16 +1048,21 @@ void MyOggExtractor::buildTableOfContents() {
     size_t numerator = mTableOfContents.size();
 
     if (numerator > kMaxNumTOCEntries) {
-        size_t denom = numerator - kMaxNumTOCEntries;
+        Vector<TOCEntry> maxTOC;
+        maxTOC.setCapacity(kMaxNumTOCEntries);
 
+        size_t denom = numerator - kMaxNumTOCEntries;
         size_t accum = 0;
-        for (ssize_t i = mTableOfContents.size(); i > 0; --i) {
+        for (ssize_t i = 0; i < mTableOfContents.size(); i++) {
             accum += denom;
             if (accum >= numerator) {
-                mTableOfContents.removeAt(i);
                 accum -= numerator;
+            } else {
+                maxTOC.push(mTableOfContents.itemAt(i));
             }
         }
+
+        mTableOfContents = maxTOC;
     }
 }
 
