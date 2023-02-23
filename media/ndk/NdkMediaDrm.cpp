@@ -758,6 +758,9 @@ media_status_t AMediaDrm_setPropertyString(AMediaDrm *mObj,
 EXPORT
 media_status_t AMediaDrm_setPropertyByteArray(AMediaDrm *mObj,
         const char *propertyName, const uint8_t *value, size_t valueSize) {
+    if (!mObj || mObj->mDrm == NULL) {
+        return AMEDIA_ERROR_INVALID_OBJECT;
+    }
 
     Vector<uint8_t> byteArray;
     byteArray.appendArray(value, valueSize);
