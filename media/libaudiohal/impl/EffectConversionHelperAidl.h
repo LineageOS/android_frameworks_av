@@ -94,10 +94,20 @@ class EffectConversionHelperAidl {
                               void* pReplyData);
     status_t handleFirstPriority(uint32_t cmdSize, const void* pCmdData, uint32_t* replySize,
                                  void* pReplyData);
+    status_t handleVisualizerCapture(uint32_t cmdSize, const void* pCmdData, uint32_t* replySize,
+                                     void* pReplyData);
+    status_t handleVisualizerMeasure(uint32_t cmdSize, const void* pCmdData, uint32_t* replySize,
+                                     void* pReplyData);
 
     // implemented by conversion of each effect
     virtual status_t setParameter(utils::EffectParamReader& param) = 0;
     virtual status_t getParameter(utils::EffectParamWriter& param) = 0;
+    virtual status_t visualizerCapture(uint32_t* replySize __unused, void* pReplyData __unused) {
+        return BAD_VALUE;
+    }
+    virtual status_t visualizerMeasure(uint32_t* replySize __unused, void* pReplyData __unused) {
+        return BAD_VALUE;
+    }
 };
 
 }  // namespace effect
