@@ -2165,9 +2165,19 @@ void AudioFlinger::PlaybackThread::onFirstRef()
     if (!isStreamInitialized()) {
         ALOGE("The stream is not open yet"); // This should not happen.
     } else {
-        // setEventCallback will need a strong pointer as a parameter. Calling it
-        // here instead of constructor of PlaybackThread so that the onFirstRef
-        // callback would not be made on an incompletely constructed object.
+        // Callbacks take strong or weak pointers as a parameter.
+        // Since PlaybackThread passes itself as a callback handler, it can only
+        // be done outside of the constructor. Creating weak and especially strong
+        // pointers to a refcounted object in its own constructor is strongly
+        // discouraged, see comments in system/core/libutils/include/utils/RefBase.h.
+        // Even if a function takes a weak pointer, it is possible that it will
+        // need to convert it to a strong pointer down the line.
+        if (mOutput->flags & AUDIO_OUTPUT_FLAG_NON_BLOCKING &&
+                mOutput->stream->setCallback(this) == OK) {
+            mUseAsyncWrite = true;
+            mCallbackThread = new AudioFlinger::AsyncCallbackThread(this);
+        }
+
         if (mOutput->stream->setEventCallback(this) != OK) {
             ALOGD("Failed to add event callback");
         }
@@ -3066,13 +3076,6 @@ void AudioFlinger::PlaybackThread::readOutputParameters_l()
     if (hasMixer() && (mFrameCount & 15)) {
         ALOGW("HAL output buffer size is %zu frames but AudioMixer requires multiples of 16 frames",
                 mFrameCount);
-    }
-
-    if (mOutput->flags & AUDIO_OUTPUT_FLAG_NON_BLOCKING) {
-        if (mOutput->stream->setCallback(this) == OK) {
-            mUseAsyncWrite = true;
-            mCallbackThread = new AudioFlinger::AsyncCallbackThread(this);
-        }
     }
 
     mHwSupportsPause = false;
