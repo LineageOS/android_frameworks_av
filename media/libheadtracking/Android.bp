@@ -21,6 +21,7 @@ cc_library {
       "ScreenHeadFusion.cpp",
       "StillnessDetector.cpp",
       "Twist.cpp",
+      "VectorRecorder.cpp",
     ],
     shared_libs: [
         "libaudioutils",
@@ -34,6 +35,9 @@ cc_library {
     ],
     export_header_lib_headers: [
         "libeigen",
+    ],
+    cflags: [
+        "-Wthread-safety",
     ],
 }
 
