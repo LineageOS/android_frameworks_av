@@ -31,6 +31,7 @@
 #include <utils/Log.h>
 
 #include "EffectHalAidl.h"
+#include "EffectProxy.h"
 
 #include <aidl/android/hardware/audio/effect/IEffect.h>
 
@@ -61,19 +62,22 @@ namespace effect {
 
 EffectHalAidl::EffectHalAidl(const std::shared_ptr<IFactory>& factory,
                              const std::shared_ptr<IEffect>& effect, uint64_t effectId,
-                             int32_t sessionId, int32_t ioId, const Descriptor& desc)
+                             int32_t sessionId, int32_t ioId, const Descriptor& desc,
+                             bool isProxyEffect)
     : mFactory(factory),
       mEffect(effect),
       mEffectId(effectId),
       mSessionId(sessionId),
       mIoId(ioId),
-      mDesc(desc) {
+      mDesc(desc),
+      mIsProxyEffect(isProxyEffect) {
     createAidlConversion(effect, sessionId, ioId, desc);
 }
 
 EffectHalAidl::~EffectHalAidl() {
-    if (mFactory) {
-        mFactory->destroyEffect(mEffect);
+    if (mEffect) {
+        mIsProxyEffect ? std::static_pointer_cast<EffectProxy>(mEffect)->destroy()
+                       : mFactory->destroyEffect(mEffect);
     }
 }
 
@@ -160,34 +164,49 @@ status_t EffectHalAidl::setOutBuffer(const sp<EffectBufferHalInterface>& buffer)
 
 // write to input FMQ here, wait for statusMQ STATUS_OK, and read from output FMQ
 status_t EffectHalAidl::process() {
-    size_t available = mInputQ->availableToWrite();
+    auto statusQ = mConversion->getStatusMQ();
+    auto inputQ = mConversion->getInputMQ();
+    auto outputQ = mConversion->getOutputMQ();
+    if (!statusQ || !statusQ->isValid() || !inputQ || !inputQ->isValid() || !outputQ ||
+        !outputQ->isValid()) {
+        ALOGE("%s invalid FMQ [Status %d I %d O %d]", __func__, statusQ ? statusQ->isValid() : 0,
+              inputQ ? inputQ->isValid() : 0, outputQ ? outputQ->isValid() : 0);
+        return INVALID_OPERATION;
+    }
+
+    size_t available = inputQ->availableToWrite();
     size_t floatsToWrite = std::min(available, mInBuffer->getSize() / sizeof(float));
     if (floatsToWrite == 0) {
-        ALOGW("%s not able to write, floats in buffer %zu, space in FMQ %zu", __func__,
+        ALOGE("%s not able to write, floats in buffer %zu, space in FMQ %zu", __func__,
               mInBuffer->getSize() / sizeof(float), available);
         return INVALID_OPERATION;
     }
-    if (!mInputQ->write((float*)mInBuffer->ptr(), floatsToWrite)) {
-        ALOGW("%s failed to write %zu into inputQ", __func__, floatsToWrite);
+    if (!mInBuffer->audioBuffer() ||
+        !inputQ->write((float*)mInBuffer->audioBuffer()->f32, floatsToWrite)) {
+        ALOGE("%s failed to write %zu floats from audiobuffer %p to inputQ [avail %zu]", __func__,
+              floatsToWrite, mInBuffer->audioBuffer(), inputQ->availableToWrite());
         return INVALID_OPERATION;
     }
 
     IEffect::Status retStatus{};
-    if (!mStatusQ->readBlocking(&retStatus, 1) || retStatus.status != OK ||
+    if (!statusQ->readBlocking(&retStatus, 1) || retStatus.status != OK ||
         (size_t)retStatus.fmqConsumed != floatsToWrite || retStatus.fmqProduced == 0) {
-        ALOGW("%s read status failed: %s", __func__, retStatus.toString().c_str());
+        ALOGE("%s read status failed: %s", __func__, retStatus.toString().c_str());
         return INVALID_OPERATION;
     }
 
-    available = mOutputQ->availableToRead();
+    available = outputQ->availableToRead();
     size_t floatsToRead = std::min(available, mOutBuffer->getSize() / sizeof(float));
     if (floatsToRead == 0) {
-        ALOGW("%s not able to read, buffer space %zu, floats in FMQ %zu", __func__,
+        ALOGE("%s not able to read, buffer space %zu, floats in FMQ %zu", __func__,
               mOutBuffer->getSize() / sizeof(float), available);
         return INVALID_OPERATION;
     }
-    if (!mOutputQ->read((float*)mOutBuffer->ptr(), floatsToRead)) {
-        ALOGW("%s failed to read %zu from outputQ", __func__, floatsToRead);
+    // always read floating point data for AIDL
+    if (!mOutBuffer->audioBuffer() ||
+        !outputQ->read(mOutBuffer->audioBuffer()->f32, floatsToRead)) {
+        ALOGE("%s failed to read %zu from outputQ to audioBuffer %p", __func__, floatsToRead,
+              mOutBuffer->audioBuffer());
         return INVALID_OPERATION;
     }
 
@@ -210,20 +229,7 @@ status_t EffectHalAidl::command(uint32_t cmdCode, uint32_t cmdSize, void* pCmdDa
         return INVALID_OPERATION;
     }
 
-    status_t ret = mConversion->handleCommand(cmdCode, cmdSize, pCmdData, replySize, pReplyData);
-    // update FMQs when effect open successfully
-    if (ret == OK && cmdCode == EFFECT_CMD_INIT) {
-        const auto& retParam = mConversion->getEffectReturnParam();
-        mStatusQ = std::make_unique<StatusMQ>(retParam.statusMQ);
-        mInputQ = std::make_unique<DataMQ>(retParam.inputDataMQ);
-        mOutputQ = std::make_unique<DataMQ>(retParam.outputDataMQ);
-        if (!mStatusQ->isValid() || !mInputQ->isValid() || !mOutputQ->isValid()) {
-            ALOGE("%s return with invalid FMQ", __func__);
-            return NO_INIT;
-        }
-    }
-
-    return ret;
+    return mConversion->handleCommand(cmdCode, cmdSize, pCmdData, replySize, pReplyData);
 }
 
 status_t EffectHalAidl::getDescriptor(effect_descriptor_t* pDescriptor) {
