@@ -21,12 +21,14 @@
 #include <cstdint>
 
 #include <audio_utils/clock.h>
+#include <media/AidlConversionUtil.h>
 #include <mediautils/TimeCheck.h>
 #include <utils/Log.h>
 
 #include "DeviceHalAidl.h"
 #include "StreamHalAidl.h"
 
+using ::aidl::android::aidl_utils::statusTFromBinderStatus;
 using ::aidl::android::hardware::audio::core::IStreamCommon;
 using ::aidl::android::hardware::audio::core::IStreamIn;
 using ::aidl::android::hardware::audio::core::IStreamOut;
@@ -334,7 +336,8 @@ status_t StreamHalAidl::drain(bool earlyNotify, StreamDescriptor::Reply* reply) 
     return sendCommand(makeHalCommand<HalCommand::Tag::drain>(
                     mIsInput ? StreamDescriptor::DrainMode::DRAIN_UNSPECIFIED :
                     earlyNotify ? StreamDescriptor::DrainMode::DRAIN_EARLY_NOTIFY :
-                    StreamDescriptor::DrainMode::DRAIN_ALL), reply);
+                    StreamDescriptor::DrainMode::DRAIN_ALL), reply,
+                    true /*safeFromNonWorkerThread*/);
 }
 
 status_t StreamHalAidl::flush(StreamDescriptor::Reply* reply) {
@@ -472,11 +475,10 @@ status_t StreamOutHalAidl::getLatency(uint32_t *latency) {
     return StreamHalAidl::getLatency(latency);
 }
 
-status_t StreamOutHalAidl::setVolume(float left __unused, float right __unused) {
+status_t StreamOutHalAidl::setVolume(float left, float right) {
     TIME_CHECK();
     if (!mStream) return NO_INIT;
-    ALOGE("%s not implemented yet", __func__);
-    return OK;
+    return statusTFromBinderStatus(mStream->setHwVolume({left, right}));
 }
 
 status_t StreamOutHalAidl::selectPresentation(int presentationId __unused, int programId __unused) {
@@ -617,7 +619,7 @@ status_t StreamOutHalAidl::getPlaybackRateParameters(
     TIME_CHECK();
     if (!mStream) return NO_INIT;
     ALOGE("%s not implemented yet", __func__);
-    return OK;
+    return BAD_VALUE;
 }
 
 status_t StreamOutHalAidl::setPlaybackRateParameters(
@@ -625,7 +627,7 @@ status_t StreamOutHalAidl::setPlaybackRateParameters(
     TIME_CHECK();
     if (!mStream) return NO_INIT;
     ALOGE("%s not implemented yet", __func__);
-    return OK;
+    return BAD_VALUE;
 }
 
 status_t StreamOutHalAidl::setEventCallback(
