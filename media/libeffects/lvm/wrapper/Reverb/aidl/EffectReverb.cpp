@@ -184,6 +184,20 @@ ndk::ScopedAStatus EffectReverb::setParameterEnvironmentalReverb(
                     EX_ILLEGAL_ARGUMENT, "setDecayHfRatioFailed");
             return ndk::ScopedAStatus::ok();
         }
+        case EnvironmentalReverb::reflectionsLevelMb: {
+            RETURN_IF(mContext->setReflectionsLevel(
+                              erParam.get<EnvironmentalReverb::reflectionsLevelMb>()) !=
+                              RetCode::SUCCESS,
+                      EX_ILLEGAL_ARGUMENT, "setReflectionsLevelFailed");
+            return ndk::ScopedAStatus::ok();
+        }
+        case EnvironmentalReverb::reflectionsDelayMs: {
+            RETURN_IF(mContext->setReflectionsDelay(
+                              erParam.get<EnvironmentalReverb::reflectionsDelayMs>()) !=
+                              RetCode::SUCCESS,
+                      EX_ILLEGAL_ARGUMENT, "setReflectionsDelayFailed");
+            return ndk::ScopedAStatus::ok();
+        }
         case EnvironmentalReverb::levelMb: {
             RETURN_IF(mContext->setEnvironmentalReverbLevel(
                               erParam.get<EnvironmentalReverb::levelMb>()) != RetCode::SUCCESS,
@@ -290,6 +304,14 @@ ndk::ScopedAStatus EffectReverb::getParameterEnvironmentalReverb(const Environme
         case EnvironmentalReverb::decayHfRatioPm: {
             erParam.set<EnvironmentalReverb::decayHfRatioPm>(
                     mContext->getEnvironmentalReverbDecayHfRatio());
+            break;
+        }
+        case EnvironmentalReverb::reflectionsLevelMb: {
+            erParam.set<EnvironmentalReverb::reflectionsLevelMb>(mContext->getReflectionsLevel());
+            break;
+        }
+        case EnvironmentalReverb::reflectionsDelayMs: {
+            erParam.set<EnvironmentalReverb::reflectionsDelayMs>(mContext->getReflectionsDelay());
             break;
         }
         case EnvironmentalReverb::levelMb: {

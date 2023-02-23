@@ -206,7 +206,7 @@ aaudio_result_t AAudioStreamParameters::validate() const {
     return validateChannelMask();
 }
 
-bool AAudioStreamParameters::validateChannelMask() const {
+aaudio_result_t AAudioStreamParameters::validateChannelMask() const {
     if (mChannelMask == AAUDIO_UNSPECIFIED) {
         return AAUDIO_OK;
     }

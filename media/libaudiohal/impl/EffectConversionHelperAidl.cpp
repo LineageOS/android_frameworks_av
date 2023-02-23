@@ -24,6 +24,7 @@
 #include <media/AidlConversionCppNdk.h>
 #include <media/AidlConversionNdk.h>
 #include <media/AidlConversionEffect.h>
+#include <system/audio_effects/effect_visualizer.h>
 
 #include <utils/Log.h>
 
@@ -59,7 +60,10 @@ const std::map<uint32_t /* effect_command_e */, EffectConversionHelperAidl::Comm
                 {EFFECT_CMD_SET_INPUT_DEVICE, &EffectConversionHelperAidl::handleSetDevice},
                 {EFFECT_CMD_SET_VOLUME, &EffectConversionHelperAidl::handleSetVolume},
                 {EFFECT_CMD_OFFLOAD, &EffectConversionHelperAidl::handleSetOffload},
-                {EFFECT_CMD_FIRST_PROPRIETARY, &EffectConversionHelperAidl::handleFirstPriority}};
+                {EFFECT_CMD_FIRST_PROPRIETARY, &EffectConversionHelperAidl::handleFirstPriority},
+                // Only visualizer support these commands
+                {VISUALIZER_CMD_CAPTURE, &EffectConversionHelperAidl::handleVisualizerCapture},
+                {VISUALIZER_CMD_MEASURE, &EffectConversionHelperAidl::handleVisualizerMeasure}};
 
 EffectConversionHelperAidl::EffectConversionHelperAidl(
         std::shared_ptr<::aidl::android::hardware::audio::effect::IEffect> effect,
@@ -284,6 +288,46 @@ status_t EffectConversionHelperAidl::handleFirstPriority(uint32_t cmdSize __unus
 
     // TODO to be implemented
     return OK;
+}
+
+status_t EffectConversionHelperAidl::handleVisualizerCapture(uint32_t cmdSize __unused,
+                                                             const void* pCmdData __unused,
+                                                             uint32_t* replySize,
+                                                             void* pReplyData) {
+    if (!replySize || !pReplyData) {
+        ALOGE("%s parameter invalid %p %p", __func__, replySize, pReplyData);
+        return BAD_VALUE;
+    }
+
+    const auto& uuid = VALUE_OR_RETURN_STATUS(
+            ::aidl::android::aidl2legacy_AudioUuid_audio_uuid_t(mDesc.common.id.type));
+    if (0 != memcmp(&uuid, SL_IID_VISUALIZATION, sizeof(effect_uuid_t))) {
+        ALOGE("%s visualizer command not supported by %s", __func__,
+              mDesc.common.id.toString().c_str());
+        return BAD_VALUE;
+    }
+
+    return visualizerCapture(replySize, pReplyData);
+}
+
+status_t EffectConversionHelperAidl::handleVisualizerMeasure(uint32_t cmdSize __unused,
+                                                             const void* pCmdData __unused,
+                                                             uint32_t* replySize,
+                                                             void* pReplyData) {
+    if (!replySize || !pReplyData) {
+        ALOGE("%s parameter invalid %p %p", __func__, replySize, pReplyData);
+        return BAD_VALUE;
+    }
+
+    const auto& uuid = VALUE_OR_RETURN_STATUS(
+            ::aidl::android::aidl2legacy_AudioUuid_audio_uuid_t(mDesc.common.id.type));
+    if (0 != memcmp(&uuid, SL_IID_VISUALIZATION, sizeof(effect_uuid_t))) {
+        ALOGE("%s visualizer command not supported by %s", __func__,
+              mDesc.common.id.toString().c_str());
+        return BAD_VALUE;
+    }
+
+    return visualizerMeasure(replySize, pReplyData);
 }
 
 }  // namespace effect
