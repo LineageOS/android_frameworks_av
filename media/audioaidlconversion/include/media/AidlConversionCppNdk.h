@@ -127,6 +127,11 @@ ConversionResult<audio_channel_mask_t> aidl2legacy_AudioChannelLayout_audio_chan
 ConversionResult<media::audio::common::AudioChannelLayout>
 legacy2aidl_audio_channel_mask_t_AudioChannelLayout(audio_channel_mask_t legacy, bool isInput);
 
+audio_channel_mask_t aidl2legacy_AudioChannelLayout_layout_audio_channel_mask_t_bits(
+        int aidlLayout, bool isInput);
+int legacy2aidl_audio_channel_mask_t_bits_AudioChannelLayout_layout(
+        audio_channel_mask_t legacy, bool isInput);
+
 enum class AudioPortDirection {
     INPUT, OUTPUT
 };

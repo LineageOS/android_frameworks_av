@@ -32,8 +32,11 @@ class AidlConversionVisualizer : public EffectConversionHelperAidl {
     ~AidlConversionVisualizer() {}
 
   private:
+    uint32_t mCaptureSize;
     status_t setParameter(utils::EffectParamReader& param) override;
     status_t getParameter(utils::EffectParamWriter& param) override;
+    status_t visualizerCapture(uint32_t* replySize, void* pReplyData) override;
+    status_t visualizerMeasure(uint32_t* replySize, void* pReplyData) override;
 };
 
 }  // namespace effect
