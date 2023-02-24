@@ -70,12 +70,11 @@ static const std::vector<Equalizer::Preset> kEqPresets = {
 
 const std::vector<Range::EqualizerRange> kEqRanges = {
         MAKE_RANGE(Equalizer, preset, 0, MAX_NUM_PRESETS - 1),
-        MAKE_RANGE(
-                Equalizer, bandLevels,
-                std::vector<Equalizer::BandLevel>{Equalizer::BandLevel(
-                        {.index = 0, .levelMb = std::numeric_limits<int>::min()})},
-                std::vector<Equalizer::BandLevel>{Equalizer::BandLevel(
-                        {.index = MAX_NUM_BANDS - 1, .levelMb = std::numeric_limits<int>::max()})}),
+        MAKE_RANGE(Equalizer, bandLevels,
+                   std::vector<Equalizer::BandLevel>{
+                           Equalizer::BandLevel({.index = 0, .levelMb = -15})},
+                   std::vector<Equalizer::BandLevel>{
+                           Equalizer::BandLevel({.index = MAX_NUM_BANDS - 1, .levelMb = 15})}),
         /* capability definition */
         MAKE_RANGE(Equalizer, bandFrequencies, kEqBandFrequency, kEqBandFrequency),
         MAKE_RANGE(Equalizer, presets, kEqPresets, kEqPresets),
