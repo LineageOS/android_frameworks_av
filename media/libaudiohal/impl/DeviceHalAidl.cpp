@@ -460,7 +460,7 @@ status_t DeviceHalAidl::openOutputStream(
     args.eventCallback = eventCb;
     ::aidl::android::hardware::audio::core::IModule::OpenOutputStreamReturn ret;
     RETURN_STATUS_IF_ERROR(statusTFromBinderStatus(mModule->openOutputStream(args, &ret)));
-    StreamContextAidl context(ret.desc);
+    StreamContextAidl context(ret.desc, isOffload);
     if (!context.isValid()) {
         ALOGE("%s: Failed to created a valid stream context from the descriptor: %s",
                 __func__, ret.desc.toString().c_str());
@@ -520,7 +520,7 @@ status_t DeviceHalAidl::openInputStream(
     args.bufferSizeFrames = aidlConfig.frameCount;
     ::aidl::android::hardware::audio::core::IModule::OpenInputStreamReturn ret;
     RETURN_STATUS_IF_ERROR(statusTFromBinderStatus(mModule->openInputStream(args, &ret)));
-    StreamContextAidl context(ret.desc);
+    StreamContextAidl context(ret.desc, false /*isAsynchronous*/);
     if (!context.isValid()) {
         ALOGE("%s: Failed to created a valid stream context from the descriptor: %s",
                 __func__, ret.desc.toString().c_str());
