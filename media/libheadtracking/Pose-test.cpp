@@ -18,7 +18,7 @@
 
 #include <gtest/gtest.h>
 
-#include "QuaternionUtil.h"
+#include "media/QuaternionUtil.h"
 #include "TestUtil.h"
 
 using android::media::Pose3f;

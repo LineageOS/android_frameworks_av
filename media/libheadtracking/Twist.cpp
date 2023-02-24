@@ -16,7 +16,7 @@
 
 #include "media/Twist.h"
 
-#include "QuaternionUtil.h"
+#include "media/QuaternionUtil.h"
 
 namespace android {
 namespace media {

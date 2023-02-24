@@ -16,8 +16,8 @@
 #include <android-base/stringprintf.h>
 
 #include "media/Pose.h"
+#include "media/QuaternionUtil.h"
 #include "media/Twist.h"
-#include "QuaternionUtil.h"
 
 namespace android {
 namespace media {
