@@ -122,11 +122,15 @@ private:
 
 
 struct TestClient : public BnResourceManagerClient {
-    TestClient(int pid, const std::shared_ptr<ResourceManagerService> &service)
-        : mPid(pid), mService(service) {}
+    TestClient(int pid, int uid, const std::shared_ptr<ResourceManagerService> &service)
+        : mPid(pid), mUid(uid), mService(service) {}
 
     Status reclaimResource(bool* _aidl_return) override {
-        mService->removeClient(mPid, getId(ref<TestClient>()));
+        ClientInfoParcel clientInfo{.pid = static_cast<int32_t>(mPid),
+                                    .uid = static_cast<int32_t>(mUid),
+                                    .id = getId(ref<TestClient>()),
+                                    .name = "none"};
+        mService->removeClient(clientInfo);
         mWasReclaimResourceCalled = true;
         *_aidl_return = true;
         return Status::ok();
@@ -148,6 +152,7 @@ struct TestClient : public BnResourceManagerClient {
 private:
     bool mWasReclaimResourceCalled = false;
     int mPid;
+    int mUid;
     std::shared_ptr<ResourceManagerService> mService;
     DISALLOW_EVIL_CONSTRUCTORS(TestClient);
 };
@@ -196,13 +201,13 @@ public:
         : mSystemCB(new TestSystemCallback()),
           mService(::ndk::SharedRefBase::make<ResourceManagerService>(
                   new TestProcessInfo, mSystemCB)),
-          mTestClient1(::ndk::SharedRefBase::make<TestClient>(kTestPid1, mService)),
-          mTestClient2(::ndk::SharedRefBase::make<TestClient>(kTestPid2, mService)),
-          mTestClient3(::ndk::SharedRefBase::make<TestClient>(kTestPid2, mService)) {
+          mTestClient1(::ndk::SharedRefBase::make<TestClient>(kTestPid1, kTestUid1, mService)),
+          mTestClient2(::ndk::SharedRefBase::make<TestClient>(kTestPid2, kTestUid2, mService)),
+          mTestClient3(::ndk::SharedRefBase::make<TestClient>(kTestPid2, kTestUid2, mService)) {
     }
 
-    std::shared_ptr<IResourceManagerClient> createTestClient(int pid) {
-        return ::ndk::SharedRefBase::make<TestClient>(pid, mService);
+    std::shared_ptr<IResourceManagerClient> createTestClient(int pid, int uid) {
+        return ::ndk::SharedRefBase::make<TestClient>(pid, uid, mService);
     }
 
     sp<TestSystemCallback> mSystemCB;
