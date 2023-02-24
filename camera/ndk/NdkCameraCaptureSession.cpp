@@ -40,7 +40,6 @@ void ACameraCaptureSession_close(ACameraCaptureSession* session) {
     if (session != nullptr) {
         session->closeByApp();
     }
-
     return;
 }
 
@@ -192,6 +191,7 @@ camera_status_t ACameraCaptureSession_updateSharedOutput(ACameraCaptureSession* 
     }
     return session->updateOutputConfiguration(output);
 }
+
 EXPORT
 camera_status_t ACameraCaptureSession_setWindowPreparedCallback(
         ACameraCaptureSession* session, ACameraCaptureSession_prepareCallbacks *cb) {

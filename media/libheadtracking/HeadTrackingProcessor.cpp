@@ -18,10 +18,10 @@
 #include <android-base/stringprintf.h>
 #include <audio_utils/SimpleLog.h>
 #include "media/HeadTrackingProcessor.h"
+#include "media/QuaternionUtil.h"
 
 #include "ModeSelector.h"
 #include "PoseBias.h"
-#include "QuaternionUtil.h"
 #include "ScreenHeadFusion.h"
 #include "StillnessDetector.h"
 

@@ -18,7 +18,8 @@
 #include <cmath>
 
 #include "PoseDriftCompensator.h"
-#include "QuaternionUtil.h"
+
+#include "media/QuaternionUtil.h"
 #include "TestUtil.h"
 
 namespace android {

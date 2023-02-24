@@ -17,7 +17,8 @@
 #include <gtest/gtest.h>
 
 #include "PoseRateLimiter.h"
-#include "QuaternionUtil.h"
+
+#include "media/QuaternionUtil.h"
 #include "TestUtil.h"
 
 namespace android {

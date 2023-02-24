@@ -37,16 +37,15 @@ using ::aidl::android::getParameterSpecificField;
 using ::aidl::android::aidl_utils::statusTFromBinderStatus;
 using ::aidl::android::hardware::audio::effect::Equalizer;
 using ::aidl::android::hardware::audio::effect::Parameter;
+using ::aidl::android::hardware::audio::effect::Range;
+using ::android::base::unexpected;
 using ::android::status_t;
 using utils::EffectParamReader;
 using utils::EffectParamWriter;
 
 status_t AidlConversionEq::setParameter(EffectParamReader& param) {
     uint32_t type;
-    uint16_t value = 0;
-    if (!param.validateParamValueSize(sizeof(uint32_t), sizeof(uint32_t)) ||
-        OK != param.readFromParameter(&type) ||
-        OK != param.readFromValue(&value)) {
+    if (OK != param.readFromParameter(&type)) {
         ALOGE("%s invalid param %s", __func__, param.toString().c_str());
         return BAD_VALUE;
     }
@@ -54,23 +53,52 @@ status_t AidlConversionEq::setParameter(EffectParamReader& param) {
     Parameter aidlParam;
     switch (type) {
         case EQ_PARAM_CUR_PRESET: {
+            uint16_t value = 0;
+            if (OK != param.readFromValue(&value)) {
+                ALOGE("%s invalid param %s", __func__, param.toString().c_str());
+                return BAD_VALUE;
+            }
             aidlParam = MAKE_SPECIFIC_PARAMETER(Equalizer, equalizer, preset, (int)value);
-            break;
+            return statusTFromBinderStatus(mEffect->setParameter(aidlParam));
         }
         case EQ_PARAM_BAND_LEVEL: {
             int32_t band;
-            uint16_t level;
-            if (OK != param.readFromParameter(&band) || OK != param.readFromParameter(&level)) {
+            int16_t level;
+            if (OK != param.readFromParameter(&band) || OK != param.readFromValue(&level)) {
                 ALOGE("%s invalid bandLevel param %s", __func__, param.toString().c_str());
                 return BAD_VALUE;
             }
             std::vector<Equalizer::BandLevel> bandLevels = {{.index = band, .levelMb = level}};
             aidlParam = MAKE_SPECIFIC_PARAMETER(Equalizer, equalizer, bandLevels, bandLevels);
-            break;
+            return statusTFromBinderStatus(mEffect->setParameter(aidlParam));
         }
         case EQ_PARAM_PROPERTIES: {
-            // TODO: handle properties setting
-            break;
+            int16_t num;
+            if (OK != param.readFromValue(&num)) {
+                ALOGE("%s invalid param %s", __func__, param.toString().c_str());
+                return BAD_VALUE;
+            }
+            // set preset if it's valid
+            if (num >= 0) {
+                aidlParam = MAKE_SPECIFIC_PARAMETER(Equalizer, equalizer, preset, (int)num);
+                return statusTFromBinderStatus(mEffect->setParameter(aidlParam));
+            }
+            // set bandLevel if no preset was set
+            if (OK != param.readFromValue(&num)) {
+                ALOGE("%s invalid param %s", __func__, param.toString().c_str());
+                return BAD_VALUE;
+            }
+            std::vector<Equalizer::BandLevel> bandLevels;
+            for (int i = 0; i < num; i++) {
+                Equalizer::BandLevel level({.index = i});
+                if (OK != param.readFromValue((uint16_t*)&level.levelMb)) {
+                    ALOGE("%s invalid param %s", __func__, param.toString().c_str());
+                    return BAD_VALUE;
+                }
+                bandLevels.push_back(level);
+            }
+            aidlParam = MAKE_SPECIFIC_PARAMETER(Equalizer, equalizer, bandLevels, bandLevels);
+            return statusTFromBinderStatus(mEffect->setParameter(aidlParam));
         }
         default: {
             // TODO: implement vendor extension parameters
@@ -78,8 +106,6 @@ status_t AidlConversionEq::setParameter(EffectParamReader& param) {
             return BAD_VALUE;
         }
     }
-
-    return statusTFromBinderStatus(mEffect->setParameter(aidlParam));
 }
 
 aidl::ConversionResult<Parameter> AidlConversionEq::getAidlParameter(Equalizer::Tag tag) {
@@ -89,29 +115,188 @@ aidl::ConversionResult<Parameter> AidlConversionEq::getAidlParameter(Equalizer::
     return aidlParam;
 }
 
+aidl::ConversionResult<int32_t> AidlConversionEq::getParameterPreset() {
+    Parameter aidlParam = VALUE_OR_RETURN_STATUS(getAidlParameter(Equalizer::preset));
+    return VALUE_OR_RETURN_STATUS(GET_PARAMETER_SPECIFIC_FIELD(aidlParam, Equalizer, equalizer,
+                                                               Equalizer::preset, int32_t));
+}
+
+aidl::ConversionResult<std::string> AidlConversionEq::getParameterPresetName(
+        EffectParamWriter& param) {
+    int32_t presetIdx;
+    if (OK != param.readFromParameter(&presetIdx)) {
+        ALOGE("%s invalid param %s", __func__, param.toString().c_str());
+        return unexpected(BAD_VALUE);
+    }
+    Parameter aidlParam = VALUE_OR_RETURN(getAidlParameter(Equalizer::presets));
+    const auto& presets = VALUE_OR_RETURN(GET_PARAMETER_SPECIFIC_FIELD(
+            aidlParam, Equalizer, equalizer, Equalizer::presets, std::vector<Equalizer::Preset>));
+    for (const auto& preset : presets) {
+        if (presetIdx == preset.index) {
+            return preset.name;
+        }
+    }
+    return unexpected(BAD_VALUE);
+}
+
 status_t AidlConversionEq::getParameter(EffectParamWriter& param) {
-    uint32_t type = 0, value = 0;
-    if (!param.validateParamValueSize(sizeof(uint32_t), sizeof(uint32_t)) ||
-        OK != param.readFromParameter(&type)) {
+    uint32_t type = 0;
+    if (OK != param.readFromParameter(&type)) {
         param.setStatus(BAD_VALUE);
         ALOGE("%s invalid param %s", __func__, param.toString().c_str());
         return BAD_VALUE;
     }
-    Parameter aidlParam;
+
     switch (type) {
         case EQ_PARAM_NUM_BANDS: {
-            aidlParam = VALUE_OR_RETURN_STATUS(getAidlParameter(Equalizer::bandLevels));
-            auto bandLevels = VALUE_OR_RETURN_STATUS(GET_PARAMETER_SPECIFIC_FIELD(
+            Parameter aidlParam = VALUE_OR_RETURN_STATUS(getAidlParameter(Equalizer::bandLevels));
+            const auto& bandLevels = VALUE_OR_RETURN_STATUS(GET_PARAMETER_SPECIFIC_FIELD(
                     aidlParam, Equalizer, equalizer, Equalizer::bandLevels,
                     std::vector<Equalizer::BandLevel>));
-            uint32_t num = bandLevels.size();
+            uint16_t bands = bandLevels.size();
+            return param.writeToValue(&bands);
+        }
+        case EQ_PARAM_LEVEL_RANGE: {
+            const auto& ranges = mDesc.capability.range.get<Range::equalizer>();
+            for (const auto& r : ranges) {
+                if (r.min.getTag() == Equalizer::bandLevels &&
+                    r.max.getTag() == Equalizer::bandLevels) {
+                    const auto& aidlMin = r.min.get<Equalizer::bandLevels>();
+                    const auto& aidlMax = r.max.get<Equalizer::bandLevels>();
+                    int16_t min =
+                            std::min_element(aidlMin.begin(), aidlMin.end(), [](auto& a, auto& b) {
+                                return a.levelMb < b.levelMb;
+                            })->levelMb;
+                    int16_t max =
+                            std::max_element(aidlMax.begin(), aidlMax.end(), [](auto& a, auto& b) {
+                                return a.levelMb < b.levelMb;
+                            })->levelMb;
+                    return (OK == param.writeToValue(&min) && OK == param.writeToValue(&max))
+                                   ? OK
+                                   : BAD_VALUE;
+                }
+            }
+            break;
+        }
+        case EQ_PARAM_BAND_LEVEL: {
+            int32_t bandIdx;
+            if (OK != param.readFromParameter(&bandIdx)) {
+                break;
+            }
+
+            Parameter aidlParam = VALUE_OR_RETURN_STATUS(getAidlParameter(Equalizer::bandLevels));
+            const auto& bandLevels = VALUE_OR_RETURN_STATUS(GET_PARAMETER_SPECIFIC_FIELD(
+                    aidlParam, Equalizer, equalizer, Equalizer::bandLevels,
+                    std::vector<Equalizer::BandLevel>));
+            for (const auto& band : bandLevels) {
+                if (band.index == bandIdx) {
+                    return param.writeToValue((uint16_t *)&band.levelMb);
+                }
+            }
+            break;
+        }
+        case EQ_PARAM_CENTER_FREQ: {
+            int32_t index;
+            if (OK != param.readFromParameter(&index)) {
+                break;
+            }
+
+            Parameter aidlParam = VALUE_OR_RETURN_STATUS(getAidlParameter(Equalizer::centerFreqMh));
+            const auto& freqs = VALUE_OR_RETURN_STATUS(GET_PARAMETER_SPECIFIC_FIELD(
+                    aidlParam, Equalizer, equalizer, Equalizer::centerFreqMh, std::vector<int>));
+            if ((size_t)index >= freqs.size()) {
+                ALOGE("%s index %d exceed size %zu", __func__, index, freqs.size());
+                break;
+            }
+            return param.writeToValue(&freqs[index]);
+        }
+        case EQ_PARAM_BAND_FREQ_RANGE: {
+            int32_t index;
+            if (OK != param.readFromParameter(&index)) {
+                break;
+            }
+
+            Parameter aidlParam =
+                    VALUE_OR_RETURN_STATUS(getAidlParameter(Equalizer::bandFrequencies));
+            const auto& bands = VALUE_OR_RETURN_STATUS(GET_PARAMETER_SPECIFIC_FIELD(
+                    aidlParam, Equalizer, equalizer, Equalizer::bandFrequencies,
+                    std::vector<Equalizer::BandFrequency>));
+            for (const auto& band : bands) {
+                if (band.index == index) {
+                    return (OK == param.writeToValue(&band.minMh) &&
+                            OK == param.writeToValue(&band.maxMh))
+                                   ? OK
+                                   : BAD_VALUE;
+                }
+            }
+            break;
+        }
+        case EQ_PARAM_GET_BAND: {
+            int32_t freq;
+            if (OK != param.readFromParameter(&freq)) {
+                break;
+            }
+
+            Parameter aidlParam =
+                    VALUE_OR_RETURN_STATUS(getAidlParameter(Equalizer::bandFrequencies));
+            const auto& bands = VALUE_OR_RETURN_STATUS(GET_PARAMETER_SPECIFIC_FIELD(
+                    aidlParam, Equalizer, equalizer, Equalizer::bandFrequencies,
+                    std::vector<Equalizer::BandFrequency>));
+            for (const auto& band : bands) {
+                if (freq >= band.minMh && freq <= band.maxMh) {
+                    return param.writeToValue((uint16_t*)&band.index);
+                }
+            }
+            break;
+        }
+        case EQ_PARAM_CUR_PRESET: {
+            int32_t preset = VALUE_OR_RETURN_STATUS(getParameterPreset());
+            return param.writeToValue((uint16_t*)&preset);
+        }
+        case EQ_PARAM_GET_NUM_OF_PRESETS: {
+            Parameter aidlParam = VALUE_OR_RETURN_STATUS(getAidlParameter(Equalizer::presets));
+            const auto& presets = VALUE_OR_RETURN_STATUS(GET_PARAMETER_SPECIFIC_FIELD(
+                    aidlParam, Equalizer, equalizer, Equalizer::presets,
+                    std::vector<Equalizer::Preset>));
+            uint16_t num = presets.size();
             return param.writeToValue(&num);
         }
-        default:
+        case EQ_PARAM_GET_PRESET_NAME: {
+            std::string name = VALUE_OR_RETURN_STATUS(getParameterPresetName(param));
+            return param.writeToValue(name.c_str(), name.length());
+        }
+        case EQ_PARAM_PROPERTIES: {
+            int32_t preset = VALUE_OR_RETURN_STATUS(getParameterPreset());
+            if (OK != param.writeToValue((uint16_t*)&preset)) {
+                break;
+            }
+            Parameter aidlParam = VALUE_OR_RETURN_STATUS(getAidlParameter(Equalizer::bandLevels));
+            std::vector<Equalizer::BandLevel> bandLevels =
+                    VALUE_OR_RETURN_STATUS(GET_PARAMETER_SPECIFIC_FIELD(
+                            aidlParam, Equalizer, equalizer, Equalizer::bandLevels,
+                            std::vector<Equalizer::BandLevel>));
+            uint16_t bands = bandLevels.size();
+            if (OK != param.writeToValue(&bands)) {
+                break;
+            }
+            std::sort(bandLevels.begin(), bandLevels.end(),
+                      [](const auto& a, const auto& b) { return a.index < b.index; });
+            for (const auto& level : bandLevels) {
+                if (status_t status = param.writeToValue((uint16_t*)&level.levelMb); status != OK) {
+                    return status;
+                }
+            }
+            return OK;
+        }
+        default: {
             ALOGW("%s unknown param %s", __func__, param.toString().c_str());
             return BAD_VALUE;
+        }
     }
-    return param.writeToValue(&value);
+
+    param.setStatus(BAD_VALUE);
+    ALOGE("%s invalid param %s", __func__, param.toString().c_str());
+    return BAD_VALUE;
 }
 
 } // namespace effect
