@@ -344,8 +344,9 @@ void ResourceManagerService::instantiate() {
     std::shared_ptr<ResourceManagerService> service =
             ::ndk::SharedRefBase::make<ResourceManagerService>();
     binder_status_t status =
-                        AServiceManager_addServiceWithAllowIsolated(
-                        service->asBinder().get(), getServiceName(), /*allowIsolated=*/ true);
+                        AServiceManager_addServiceWithFlag(
+                        service->asBinder().get(), getServiceName(),
+                        AServiceManager_AddServiceFlag::ADD_SERVICE_ALLOW_ISOLATED);
     if (status != STATUS_OK) {
         return;
     }
