@@ -75,6 +75,16 @@ static audio_channel_mask_t getMaxChannelMask(
     return maxMask;
 }
 
+std::vector<float> recordFromRotationVector(const std::vector<float>& rotationVector) {
+    constexpr float RAD_TO_DEGREE = 180.f / M_PI;
+    std::vector<float> record{
+        rotationVector[0], rotationVector[1], rotationVector[2],
+        rotationVector[3] * RAD_TO_DEGREE,
+        rotationVector[4] * RAD_TO_DEGREE,
+        rotationVector[5] * RAD_TO_DEGREE};
+    return record;
+}
+
 // ---------------------------------------------------------------------------
 
 class Spatializer::EngineCallbackHandler : public AHandler {
@@ -183,41 +193,6 @@ const std::vector<const char *> Spatializer::sHeadPoseKeys = {
     Spatializer::EngineCallbackHandler::kRotation1Key,
     Spatializer::EngineCallbackHandler::kRotation2Key,
 };
-
-// ---------------------------------------------------------------------------
-
-// Convert recorded sensor data to string with level indentation.
-std::string Spatializer::HeadToStagePoseRecorder::toString(unsigned level) const {
-    std::string prefixSpace(level, ' ');
-    return mPoseRecordLog.dumpToString((prefixSpace + " ").c_str(), Spatializer::mMaxLocalLogLine);
-}
-
-// Compute sensor data, record into local log when it is time.
-void Spatializer::HeadToStagePoseRecorder::record(const std::vector<float>& headToStage) {
-    if (headToStage.size() != mPoseVectorSize) return;
-
-    if (mNumOfSampleSinceLastRecord++ == 0) {
-        mFirstSampleTimestamp = std::chrono::steady_clock::now();
-    }
-    // if it's time, do record and reset.
-    if (shouldRecordLog()) {
-        poseSumToAverage();
-        mPoseRecordLog.log(
-                "mean: %s, min: %s, max %s, calculated %d samples in %0.4f second(s)",
-                Spatializer::toString<double>(mPoseRadianSum, true /* radianToDegree */).c_str(),
-                Spatializer::toString<float>(mMinPoseAngle, true /* radianToDegree */).c_str(),
-                Spatializer::toString<float>(mMaxPoseAngle, true /* radianToDegree */).c_str(),
-                mNumOfSampleSinceLastRecord, mNumOfSecondsSinceLastRecord.count());
-        resetRecord();
-    }
-    // update stream average.
-    for (int i = 0; i < mPoseVectorSize; i++) {
-        mPoseRadianSum[i] += headToStage[i];
-        mMaxPoseAngle[i] = std::max(mMaxPoseAngle[i], headToStage[i]);
-        mMinPoseAngle[i] = std::min(mMinPoseAngle[i], headToStage[i]);
-    }
-    return;
-}
 
 // ---------------------------------------------------------------------------
 sp<Spatializer> Spatializer::create(SpatializerPolicyCallback *callback) {
@@ -590,7 +565,8 @@ Status Spatializer::setGlobalTransform(const std::vector<float>& screenToStage) 
     }
     std::lock_guard lock(mLock);
     if (mPoseController != nullptr) {
-        mLocalLog.log("%s with screenToStage %s", __func__, toString<float>(screenToStage).c_str());
+        mLocalLog.log("%s with screenToStage %s", __func__,
+                media::VectorRecorder::toString<float>(screenToStage).c_str());
         mPoseController->setScreenToStagePose(maybePose.value());
     }
     return Status::ok();
