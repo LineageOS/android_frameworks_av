@@ -16,6 +16,7 @@ filegroup {
         "aidl/android/media/MediaResourceSubType.aidl",
         "aidl/android/media/MediaResourceParcel.aidl",
         "aidl/android/media/MediaResourcePolicyParcel.aidl",
+        "aidl/android/media/ClientInfoParcel.aidl",
     ],
     path: "aidl",
 }
@@ -87,10 +88,15 @@ cc_library {
         "libbinder_ndk",
         "libutils",
         "liblog",
+        "libstats_media_metrics",
+        "libstatspull",
+        "libstatssocket",
+        "libprotobuf-cpp-lite",
     ],
 
     static_libs: [
         "resourceobserver_aidl_interface-V1-ndk",
+        "libplatformprotos",
     ],
 
     include_dirs: ["frameworks/av/include"],
@@ -101,4 +107,10 @@ cc_library {
     ],
 
     export_include_dirs: ["."],
+
+    export_shared_lib_headers: [
+        "libstats_media_metrics",
+        "libstatspull",
+        "libstatssocket",
+    ],
 }

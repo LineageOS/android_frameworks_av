@@ -34,6 +34,7 @@
 #include <sys/stat.h>
 #include <sys/time.h>
 #include <unistd.h>
+#include <stats_media_metrics.h>
 
 #include "IMediaResourceMonitor.h"
 #include "ResourceManagerService.h"
@@ -41,6 +42,14 @@
 #include "ServiceLog.h"
 
 namespace android {
+
+using stats::media_metrics::stats_write;
+using stats::media_metrics::MEDIA_CODEC_RECLAIM_REQUEST_COMPLETED;
+using stats::media_metrics::MEDIA_CODEC_RECLAIM_REQUEST_COMPLETED__RECLAIM_STATUS__RECLAIM_SUCCESS;
+using stats::media_metrics::\
+    MEDIA_CODEC_RECLAIM_REQUEST_COMPLETED__RECLAIM_STATUS__RECLAIM_FAILED_NO_CLIENTS;
+using stats::media_metrics::\
+    MEDIA_CODEC_RECLAIM_REQUEST_COMPLETED__RECLAIM_STATUS__RECLAIM_FAILED_RECLAIM_RESOURCES;
 
 //static
 std::mutex ResourceManagerService::sCookieLock;
@@ -97,7 +106,8 @@ void DeathNotifier::binderDied() {
 
     service->overridePid(mPid, -1);
     // thiz is freed in the call below, so it must be last call referring thiz
-    service->removeResource(mPid, mClientId, false /*checkValid*/);
+    ClientInfoParcel clientInfo{.pid = mPid, .id = mClientId};
+    service->removeResource(clientInfo, false /*checkValid*/);
 }
 
 class OverrideProcessInfoDeathNotifier : public DeathNotifier {
@@ -183,6 +193,7 @@ static ResourceInfos& getResourceInfosForEdit(int pid, PidResourceInfosMap& map)
 }
 
 static ResourceInfo& getResourceInfoForEdit(uid_t uid, int64_t clientId,
+                                            const std::string& name,
         const std::shared_ptr<IResourceManagerClient>& client, ResourceInfos& infos) {
     ssize_t index = infos.indexOfKey(clientId);
 
@@ -190,6 +201,7 @@ static ResourceInfo& getResourceInfoForEdit(uid_t uid, int64_t clientId,
         ResourceInfo info;
         info.uid = uid;
         info.clientId = clientId;
+        info.name = name;
         info.client = client;
         info.cookie = 0;
         info.pendingRemoval = false;
@@ -262,7 +274,15 @@ binder_status_t ResourceManagerService::dump(int fd, const char** /*args*/, uint
 
     result.append("  Processes:\n");
     for (size_t i = 0; i < mapCopy.size(); ++i) {
-        snprintf(buffer, SIZE, "    Pid: %d\n", mapCopy.keyAt(i));
+        int pid = mapCopy.keyAt(i);
+        snprintf(buffer, SIZE, "    Pid: %d\n", pid);
+        result.append(buffer);
+        int priority = 0;
+        if (getPriority_l(pid, &priority)) {
+            snprintf(buffer, SIZE, "    Priority: %d\n", priority);
+        } else {
+            snprintf(buffer, SIZE, "    Priority: <unknown>\n");
+        }
         result.append(buffer);
 
         const ResourceInfos &infos = mapCopy.valueAt(i);
@@ -273,7 +293,7 @@ binder_status_t ResourceManagerService::dump(int fd, const char** /*args*/, uint
 
             std::string clientName = "<unknown client>";
             if (infos[j].client != nullptr) {
-                Status status = infos[j].client->getName(&clientName);
+                clientName = infos[j].name;
             }
             snprintf(buffer, SIZE, "        Name: %s\n", clientName.c_str());
             result.append(buffer);
@@ -433,11 +453,15 @@ void ResourceManagerService::mergeResources(MediaResourceParcel& r1,
     }
 }
 
-Status ResourceManagerService::addResource(int32_t pid, int32_t uid, int64_t clientId,
+Status ResourceManagerService::addResource(const ClientInfoParcel& clientInfo,
         const std::shared_ptr<IResourceManagerClient>& client,
         const std::vector<MediaResourceParcel>& resources) {
-    String8 log = String8::format("addResource(pid %d, clientId %lld, resources %s)",
-            pid, (long long) clientId, getString(resources).string());
+    int32_t pid = clientInfo.pid;
+    int32_t uid = clientInfo.uid;
+    int64_t clientId = clientInfo.id;
+    const std::string& name = clientInfo.name;
+    String8 log = String8::format("addResource(pid %d, uid %d clientId %lld, resources %s)",
+            pid, uid, (long long) clientId, getString(resources).string());
     mServiceLog->add(log);
 
     Mutex::Autolock lock(mLock);
@@ -450,7 +474,7 @@ Status ResourceManagerService::addResource(int32_t pid, int32_t uid, int64_t cli
         uid = callingUid;
     }
     ResourceInfos& infos = getResourceInfosForEdit(pid, mMap);
-    ResourceInfo& info = getResourceInfoForEdit(uid, clientId, client, infos);
+    ResourceInfo& info = getResourceInfoForEdit(uid, clientId, name, client, infos);
     ResourceList resourceAdded;
 
     for (size_t i = 0; i < resources.size(); ++i) {
@@ -489,13 +513,50 @@ Status ResourceManagerService::addResource(int32_t pid, int32_t uid, int64_t cli
         mObserverService->onResourceAdded(uid, pid, resourceAdded);
     }
     notifyResourceGranted(pid, resources);
+
+    // Increase the instance count of the resource associated with this client.
+    increaseResourceInstanceCount(clientId, name);
+
     return Status::ok();
 }
 
-Status ResourceManagerService::removeResource(int32_t pid, int64_t clientId,
+void ResourceManagerService::increaseResourceInstanceCount(int64_t clientId,
+                                                           const std::string& name) {
+    // Check whether this client has been looked into already.
+    if (mClientIdSet.find(clientId) == mClientIdSet.end()) {
+        mClientIdSet.insert(clientId);
+        // Update the resource instance count.
+        auto found = mConcurrentResourceCountMap.find(name);
+        if (found == mConcurrentResourceCountMap.end()) {
+            mConcurrentResourceCountMap[name] = 1;
+        } else {
+            found->second++;
+        }
+    }
+}
+
+void ResourceManagerService::decreaseResourceInstanceCount(int64_t clientId,
+                                                           const std::string& name) {
+    // Since this client has been removed, remove it from mClientIdSet
+    mClientIdSet.erase(clientId);
+    // Update the resource instance count also.
+    auto found = mConcurrentResourceCountMap.find(name);
+    if (found != mConcurrentResourceCountMap.end()) {
+        if (found->second == 1) {
+            mConcurrentResourceCountMap.erase(found);
+        } else {
+            found->second--;
+        }
+    }
+}
+
+Status ResourceManagerService::removeResource(const ClientInfoParcel& clientInfo,
         const std::vector<MediaResourceParcel>& resources) {
-    String8 log = String8::format("removeResource(pid %d, clientId %lld, resources %s)",
-            pid, (long long) clientId, getString(resources).string());
+    int32_t pid = clientInfo.pid;
+    int32_t uid = clientInfo.uid;
+    int64_t clientId = clientInfo.id;
+    String8 log = String8::format("removeResource(pid %d, uid %d clientId %lld, resources %s)",
+            pid, uid, (long long) clientId, getString(resources).string());
     mServiceLog->add(log);
 
     Mutex::Autolock lock(mLock);
@@ -555,15 +616,17 @@ Status ResourceManagerService::removeResource(int32_t pid, int64_t clientId,
     return Status::ok();
 }
 
-Status ResourceManagerService::removeClient(int32_t pid, int64_t clientId) {
-    removeResource(pid, clientId, true /*checkValid*/);
+Status ResourceManagerService::removeClient(const ClientInfoParcel& clientInfo) {
+    removeResource(clientInfo, true /*checkValid*/);
     return Status::ok();
 }
 
-Status ResourceManagerService::removeResource(int pid, int64_t clientId, bool checkValid) {
-    String8 log = String8::format(
-            "removeResource(pid %d, clientId %lld)",
-            pid, (long long) clientId);
+Status ResourceManagerService::removeResource(const ClientInfoParcel& clientInfo, bool checkValid) {
+    int32_t pid = clientInfo.pid;
+    int32_t uid = clientInfo.uid;
+    int64_t clientId = clientInfo.id;
+    String8 log = String8::format("removeResource(pid %d, uid %d clientId %lld)",
+            pid, uid, (long long) clientId);
     mServiceLog->add(log);
 
     Mutex::Autolock lock(mLock);
@@ -591,6 +654,10 @@ Status ResourceManagerService::removeResource(int pid, int64_t clientId, bool ch
         onLastRemoved(it->second, info);
     }
 
+    // Since this client has been removed, decrease the corresponding
+    // resources instance count.
+    decreaseResourceInstanceCount(clientId, info.name);
+
     removeCookieAndUnlink_l(info.client, info.cookie);
 
     if (mObserverService != nullptr && !info.resources.empty()) {
@@ -601,25 +668,30 @@ Status ResourceManagerService::removeResource(int pid, int64_t clientId, bool ch
     return Status::ok();
 }
 
-void ResourceManagerService::getClientForResource_l(int callingPid, const MediaResourceParcel *res,
+void ResourceManagerService::getClientForResource_l(int callingPid,
+        const MediaResourceParcel *res,
+        PidUidVector* idVector,
         Vector<std::shared_ptr<IResourceManagerClient>> *clients) {
     if (res == NULL) {
         return;
     }
     std::shared_ptr<IResourceManagerClient> client;
-    if (getLowestPriorityBiggestClient_l(callingPid, res->type, res->subType, &client)) {
+    if (getLowestPriorityBiggestClient_l(callingPid, res->type, res->subType, idVector, &client)) {
         clients->push_back(client);
     }
 }
 
-Status ResourceManagerService::reclaimResource(int32_t callingPid,
+Status ResourceManagerService::reclaimResource(const ClientInfoParcel& clientInfo,
         const std::vector<MediaResourceParcel>& resources, bool* _aidl_return) {
-    String8 log = String8::format("reclaimResource(callingPid %d, resources %s)",
-            callingPid, getString(resources).string());
+    int32_t callingPid = clientInfo.pid;
+    std::string clientName = clientInfo.name;
+    String8 log = String8::format("reclaimResource(callingPid %d, uid %d resources %s)",
+            callingPid, clientInfo.uid, getString(resources).string());
     mServiceLog->add(log);
     *_aidl_return = false;
 
     Vector<std::shared_ptr<IResourceManagerClient>> clients;
+    PidUidVector idVector;
     {
         Mutex::Autolock lock(mLock);
         if (!mProcessInfo->isPidTrusted(callingPid)) {
@@ -655,13 +727,13 @@ Status ResourceManagerService::reclaimResource(int32_t callingPid,
         if (secureCodec != NULL) {
             if (!mSupportsMultipleSecureCodecs) {
                 if (!getAllClients_l(callingPid, MediaResource::Type::kSecureCodec,
-                            secureCodec->subType, &clients)) {
+                            secureCodec->subType, &idVector, &clients)) {
                     return Status::ok();
                 }
             }
             if (!mSupportsSecureWithNonSecureCodec) {
                 if (!getAllClients_l(callingPid, MediaResource::Type::kNonSecureCodec,
-                            secureCodec->subType, &clients)) {
+                            secureCodec->subType, &idVector, &clients)) {
                     return Status::ok();
                 }
             }
@@ -669,13 +741,13 @@ Status ResourceManagerService::reclaimResource(int32_t callingPid,
         if (nonSecureCodec != NULL) {
             if (!mSupportsSecureWithNonSecureCodec) {
                 if (!getAllClients_l(callingPid, MediaResource::Type::kSecureCodec,
-                        nonSecureCodec->subType, &clients)) {
+                        nonSecureCodec->subType, &idVector, &clients)) {
                     return Status::ok();
                 }
             }
         }
         if (drmSession != NULL) {
-            getClientForResource_l(callingPid, drmSession, &clients);
+            getClientForResource_l(callingPid, drmSession, &idVector, &clients);
             if (clients.size() == 0) {
                 return Status::ok();
             }
@@ -683,30 +755,106 @@ Status ResourceManagerService::reclaimResource(int32_t callingPid,
 
         if (clients.size() == 0) {
             // if no secure/non-secure codec conflict, run second pass to handle other resources.
-            getClientForResource_l(callingPid, graphicMemory, &clients);
+            getClientForResource_l(callingPid, graphicMemory, &idVector, &clients);
         }
 
         if (clients.size() == 0) {
             // if we are here, run the third pass to free one codec with the same type.
-            getClientForResource_l(callingPid, secureCodec, &clients);
-            getClientForResource_l(callingPid, nonSecureCodec, &clients);
+            getClientForResource_l(callingPid, secureCodec, &idVector, &clients);
+            getClientForResource_l(callingPid, nonSecureCodec, &idVector, &clients);
         }
 
         if (clients.size() == 0) {
             // if we are here, run the fourth pass to free one codec with the different type.
             if (secureCodec != NULL) {
                 MediaResource temp(MediaResource::Type::kNonSecureCodec, secureCodec->subType, 1);
-                getClientForResource_l(callingPid, &temp, &clients);
+                getClientForResource_l(callingPid, &temp, &idVector, &clients);
             }
             if (nonSecureCodec != NULL) {
                 MediaResource temp(MediaResource::Type::kSecureCodec, nonSecureCodec->subType, 1);
-                getClientForResource_l(callingPid, &temp, &clients);
+                getClientForResource_l(callingPid, &temp, &idVector, &clients);
             }
         }
     }
 
     *_aidl_return = reclaimUnconditionallyFrom(clients);
+
+    // Log Reclaim Pushed Atom to statsd
+    pushReclaimAtom(clientInfo, clients, idVector, *_aidl_return);
+
     return Status::ok();
+}
+
+void ResourceManagerService::pushReclaimAtom(const ClientInfoParcel& clientInfo,
+                        const Vector<std::shared_ptr<IResourceManagerClient>>& clients,
+                        const PidUidVector& idVector, bool reclaimed) {
+    // Construct the metrics for codec reclaim as a pushed atom.
+    // 1. Information about the requester.
+    //  - UID and the priority (oom score)
+    int32_t callingPid = clientInfo.pid;
+    int32_t requesterUid = clientInfo.uid;
+    std::string clientName = clientInfo.name;
+    int requesterPriority = -1;
+    getPriority_l(callingPid, &requesterPriority);
+
+    //  2. Information about the codec.
+    //  - Name of the codec requested
+    //  - Number of concurrent codecs running.
+    int32_t noOfConcurrentCodecs = 0;
+    auto found = mConcurrentResourceCountMap.find(clientName);
+    if (found != mConcurrentResourceCountMap.end()) {
+        noOfConcurrentCodecs = found->second;
+    }
+
+    // 3. Information about the Reclaim:
+    // - Status of reclaim request
+    // - How many codecs are reclaimed
+    // - For each codecs reclaimed, information of the process that it belonged to:
+    //    - UID and the Priority (oom score)
+    int32_t reclaimStatus = MEDIA_CODEC_RECLAIM_REQUEST_COMPLETED__RECLAIM_STATUS__RECLAIM_SUCCESS;
+    if (!reclaimed) {
+      if (clients.size() == 0) {
+        // No clients to reclaim from
+        reclaimStatus =
+            MEDIA_CODEC_RECLAIM_REQUEST_COMPLETED__RECLAIM_STATUS__RECLAIM_FAILED_NO_CLIENTS;
+      } else {
+        // Couldn't reclaim resources from the clients
+        reclaimStatus =
+            MEDIA_CODEC_RECLAIM_REQUEST_COMPLETED__RECLAIM_STATUS__RECLAIM_FAILED_RECLAIM_RESOURCES;
+      }
+    }
+    int32_t noOfCodecsReclaimed = clients.size();
+    int32_t targetIndex = 1;
+    for (const auto& id : idVector) {
+        int32_t targetUid = id.second;
+        int targetPriority = -1;
+        getPriority_l(id.first, &targetPriority);
+        // Post the pushed atom
+        int result = stats_write(
+            MEDIA_CODEC_RECLAIM_REQUEST_COMPLETED,
+            requesterUid,
+            requesterPriority,
+            clientName.c_str(),
+            noOfConcurrentCodecs,
+            reclaimStatus,
+            noOfCodecsReclaimed,
+            targetIndex,
+            targetUid,
+            targetPriority);
+        ALOGI("%s: Pushed MEDIA_CODEC_RECLAIM_REQUEST_COMPLETED atom: "
+              "Requester[pid(%d): uid(%d): priority(%d)] "
+              "Codec: [%s] "
+              "No of concurrent codecs: %d "
+              "Reclaim Status: %d "
+              "No of codecs reclaimed: %d "
+              "Target[%d][pid(%d): uid(%d): priority(%d)] "
+              "Atom Size: %d",
+              __func__, callingPid, requesterUid, requesterPriority,
+              clientName.c_str(), noOfConcurrentCodecs,
+              reclaimStatus, noOfCodecsReclaimed,
+              targetIndex, id.first, targetUid, targetPriority, result);
+        targetIndex++;
+    }
 }
 
 bool ResourceManagerService::reclaimUnconditionallyFrom(
@@ -868,7 +1016,9 @@ void ResourceManagerService::removeProcessInfoOverride_l(int pid) {
     mProcessInfoOverrideMap.erase(pid);
 }
 
-Status ResourceManagerService::markClientForPendingRemoval(int32_t pid, int64_t clientId) {
+Status ResourceManagerService::markClientForPendingRemoval(const ClientInfoParcel& clientInfo) {
+    int32_t pid = clientInfo.pid;
+    int64_t clientId = clientInfo.id;
     String8 log = String8::format(
             "markClientForPendingRemoval(pid %d, clientId %lld)",
             pid, (long long) clientId);
@@ -926,7 +1076,8 @@ Status ResourceManagerService::reclaimResourcesFromClientsPendingRemoval(int32_t
                                                            MediaResource::SubType::kVideoCodec,
                                                            MediaResource::SubType::kImageCodec}) {
                         std::shared_ptr<IResourceManagerClient> client;
-                        if (getBiggestClientPendingRemoval_l(pid, type, subType, &client)) {
+                        uid_t uid = 0;
+                        if (getBiggestClientPendingRemoval_l(pid, type, subType, uid, &client)) {
                             clients.add(client);
                             continue;
                         }
@@ -935,8 +1086,9 @@ Status ResourceManagerService::reclaimResourcesFromClientsPendingRemoval(int32_t
                 // Non-codec resources are shared by audio, video and image codecs (no subtype).
                 default:
                     std::shared_ptr<IResourceManagerClient> client;
+                    uid_t uid = 0;
                     if (getBiggestClientPendingRemoval_l(pid, type,
-                            MediaResource::SubType::kUnspecifiedSubType, &client)) {
+                            MediaResource::SubType::kUnspecifiedSubType, uid, &client)) {
                         clients.add(client);
                     }
                     break;
@@ -963,8 +1115,12 @@ bool ResourceManagerService::getPriority_l(int pid, int* priority) {
 }
 
 bool ResourceManagerService::getAllClients_l(int callingPid, MediaResource::Type type,
-        MediaResource::SubType subType, Vector<std::shared_ptr<IResourceManagerClient>> *clients) {
+        MediaResource::SubType subType,
+        PidUidVector* idVector,
+        Vector<std::shared_ptr<IResourceManagerClient>> *clients) {
     Vector<std::shared_ptr<IResourceManagerClient>> temp;
+    PidUidVector tempIdList;
+
     for (size_t i = 0; i < mMap.size(); ++i) {
         ResourceInfos &infos = mMap.editValueAt(i);
         for (size_t j = 0; j < infos.size(); ++j) {
@@ -977,6 +1133,7 @@ bool ResourceManagerService::getAllClients_l(int callingPid, MediaResource::Type
                     return false;
                 }
                 temp.push_back(infos[j].client);
+                tempIdList.emplace_back(mMap.keyAt(i), infos[j].uid);
             }
         }
     }
@@ -985,19 +1142,24 @@ bool ResourceManagerService::getAllClients_l(int callingPid, MediaResource::Type
         return true;
     }
     clients->appendVector(temp);
+    idVector->insert(std::end(*idVector), std::begin(tempIdList), std::end(tempIdList));
     return true;
 }
 
 bool ResourceManagerService::getLowestPriorityBiggestClient_l(int callingPid,
-        MediaResource::Type type, MediaResource::SubType subType,
+        MediaResource::Type type,
+        MediaResource::SubType subType,
+        PidUidVector* idVector,
         std::shared_ptr<IResourceManagerClient> *client) {
     int lowestPriorityPid;
     int lowestPriority;
     int callingPriority;
+    uid_t uid = 0;
 
     // Before looking into other processes, check if we have clients marked for
     // pending removal in the same process.
-    if (getBiggestClientPendingRemoval_l(callingPid, type, subType, client)) {
+    if (getBiggestClientPendingRemoval_l(callingPid, type, subType, uid, client)) {
+        idVector->emplace_back(callingPid, uid);
         return true;
     }
     if (!getPriority_l(callingPid, &callingPriority)) {
@@ -1014,9 +1176,11 @@ bool ResourceManagerService::getLowestPriorityBiggestClient_l(int callingPid,
         return false;
     }
 
-    if (!getBiggestClient_l(lowestPriorityPid, type, subType, client)) {
+    if (!getBiggestClient_l(lowestPriorityPid, type, subType, uid, client)) {
         return false;
     }
+
+    idVector->emplace_back(lowestPriorityPid, uid);
     return true;
 }
 
@@ -1068,12 +1232,14 @@ bool ResourceManagerService::isCallingPriorityHigher_l(int callingPid, int pid) 
 }
 
 bool ResourceManagerService::getBiggestClientPendingRemoval_l(int pid, MediaResource::Type type,
-        MediaResource::SubType subType, std::shared_ptr<IResourceManagerClient> *client) {
-    return getBiggestClient_l(pid, type, subType, client, true /* pendingRemovalOnly */);
+        MediaResource::SubType subType, uid_t& uid,
+        std::shared_ptr<IResourceManagerClient> *client) {
+    return getBiggestClient_l(pid, type, subType, uid, client, true /* pendingRemovalOnly */);
 }
 
 bool ResourceManagerService::getBiggestClient_l(int pid, MediaResource::Type type,
-        MediaResource::SubType subType, std::shared_ptr<IResourceManagerClient> *client,
+        MediaResource::SubType subType, uid_t& uid,
+        std::shared_ptr<IResourceManagerClient> *client,
         bool pendingRemovalOnly) {
     ssize_t index = mMap.indexOfKey(pid);
     if (index < 0) {
@@ -1096,6 +1262,7 @@ bool ResourceManagerService::getBiggestClient_l(int pid, MediaResource::Type typ
                 if (resource.value > largestValue) {
                     largestValue = resource.value;
                     clientTemp = infos[i].client;
+                    uid = infos[i].uid;
                 }
             }
         }
