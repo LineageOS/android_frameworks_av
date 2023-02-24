@@ -1093,7 +1093,7 @@ void CameraDevice::CallbackHandler::onMessageReceived(
                     ACameraCaptureSession_prepareCallback onWindowPrepared;
                     found = msg->findPointer(kCallbackFpKey, (void**) &onWindowPrepared);
                     if (!found) {
-                        ALOGE("%s: Cannot find state callback!", __FUNCTION__);
+                        ALOGE("%s: Cannot find window prepared callback!", __FUNCTION__);
                         return;
                     }
                     if (onWindowPrepared == nullptr) {
