@@ -16,6 +16,8 @@
 
 #pragma once
 
+#include <aidl/android/hardware/common/Ashmem.h>
+
 #include <media/audiohal/EffectBufferHalInterface.h>
 #include <system/audio_effect.h>
 
@@ -44,16 +46,18 @@ class EffectBufferHalAidl : public EffectBufferHalInterface {
   private:
     friend class EffectBufferHalInterface;
 
+    // buffer size in bytes
     const size_t mBufferSize;
     bool mFrameCountChanged;
     void* mExternalData;
+    aidl::android::hardware::common::Ashmem mMemory;
     audio_buffer_t mAudioBuffer;
 
     // Can not be constructed directly by clients.
     explicit EffectBufferHalAidl(size_t size);
 
     ~EffectBufferHalAidl();
-
+    void copy(void* dst, const void* src, size_t n) const;
     status_t init();
 };
 

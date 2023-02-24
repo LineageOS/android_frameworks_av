@@ -107,13 +107,13 @@ status_t EffectHalHidl::setOutBuffer(const sp<EffectBufferHalInterface>& buffer)
 }
 
 status_t EffectHalHidl::process() {
-    // TIME_CHECK();  // TODO(b/238654698) reenable only when optimized.
+    // TIME_CHECK();  // TODO(b/243839867) reenable only when optimized.
 
     return processImpl(static_cast<uint32_t>(MessageQueueFlagBits::REQUEST_PROCESS));
 }
 
 status_t EffectHalHidl::processReverse() {
-    // TIME_CHECK();  // TODO(b/238654698) reenable only when optimized.
+    // TIME_CHECK();  // TODO(b/243839867) reenable only when optimized.
 
     return processImpl(static_cast<uint32_t>(MessageQueueFlagBits::REQUEST_PROCESS_REVERSE));
 }
