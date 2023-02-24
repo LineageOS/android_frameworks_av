@@ -135,11 +135,15 @@ struct TestSystemCallback : public ResourceManagerService::SystemCallbackInterfa
 };
 
 struct TestClient : public BnResourceManagerClient {
-    TestClient(int pid, const shared_ptr<ResourceManagerService>& service)
-        : mReclaimed(false), mPid(pid), mService(service) {}
+    TestClient(int pid, int uid, const shared_ptr<ResourceManagerService>& service)
+        : mReclaimed(false), mPid(pid), mUid(uid), mService(service) {}
 
     Status reclaimResource(bool* aidlReturn) override {
-        mService->removeClient(mPid, getId(ref<TestClient>()));
+        ClientInfoParcel clientInfo{.pid = static_cast<int32_t>(mPid),
+                                    .uid = static_cast<int32_t>(mUid),
+                                    .id = getId(ref<TestClient>()),
+                                    .name = ""};
+        mService->removeClient(clientInfo);
         mReclaimed = true;
         *aidlReturn = true;
         return Status::ok();
@@ -155,6 +159,7 @@ struct TestClient : public BnResourceManagerClient {
    private:
     bool mReclaimed;
     int mPid;
+    int mUid;
     shared_ptr<ResourceManagerService> mService;
     DISALLOW_EVIL_CONSTRUCTORS(TestClient);
 };
@@ -176,9 +181,12 @@ class ResourceManagerServiceFuzzer {
     static void* addResource(void* arg) {
         resourceThreadArgs* tArgs = (resourceThreadArgs*)arg;
         if (tArgs) {
+            ClientInfoParcel clientInfo{.pid = static_cast<int32_t>(tArgs->pid),
+                                        .uid = static_cast<int32_t>(tArgs->uid),
+                                        .id = tArgs->testClientId,
+                                        .name = ""};
             (tArgs->service)
-                ->addResource(tArgs->pid, tArgs->uid, tArgs->testClientId, tArgs->testClient,
-                              tArgs->mediaResource);
+                ->addResource(clientInfo, tArgs->testClient, tArgs->mediaResource);
         }
         return nullptr;
     }
@@ -187,10 +195,14 @@ class ResourceManagerServiceFuzzer {
         resourceThreadArgs* tArgs = (resourceThreadArgs*)arg;
         if (tArgs) {
             bool result;
-            (tArgs->service)->markClientForPendingRemoval(tArgs->pid, tArgs->testClientId);
-            (tArgs->service)->removeResource(tArgs->pid, tArgs->testClientId, tArgs->mediaResource);
-            (tArgs->service)->reclaimResource(tArgs->pid, tArgs->mediaResource, &result);
-            (tArgs->service)->removeClient(tArgs->pid, tArgs->testClientId);
+            ClientInfoParcel clientInfo{.pid = static_cast<int32_t>(tArgs->pid),
+                                        .uid = static_cast<int32_t>(tArgs->uid),
+                                        .id = tArgs->testClientId,
+                                        .name = ""};
+            (tArgs->service)->markClientForPendingRemoval(clientInfo);
+            (tArgs->service)->removeResource(clientInfo, tArgs->mediaResource);
+            (tArgs->service)->reclaimResource(clientInfo, tArgs->mediaResource, &result);
+            (tArgs->service)->removeClient(clientInfo);
             (tArgs->service)->overridePid(tArgs->pid, tArgs->pid - 1);
         }
         return nullptr;
@@ -240,7 +252,8 @@ void ResourceManagerServiceFuzzer::setResources() {
         uint64_t mediaResourceValue = mFuzzedDataProvider->ConsumeIntegral<uint64_t>();
         threadArgs[k].service = mService;
         shared_ptr<IResourceManagerClient> testClient =
-                ::ndk::SharedRefBase::make<TestClient>(threadArgs[k].pid, mService);
+                ::ndk::SharedRefBase::make<TestClient>(threadArgs[k].pid, threadArgs[k].uid,
+                                                       mService);
         threadArgs[k].testClient = testClient;
         threadArgs[k].testClientId = getId(testClient);
         mediaResource[k].push_back(MediaResource(static_cast<MedResType>(mediaResourceType),
@@ -258,7 +271,7 @@ void ResourceManagerServiceFuzzer::setResources() {
     // No resource was added with pid = 0
     int32_t pidZero = 0;
     shared_ptr<IResourceManagerClient> testClient =
-        ::ndk::SharedRefBase::make<TestClient>(pidZero, mService);
+        ::ndk::SharedRefBase::make<TestClient>(pidZero, 0, mService);
     int32_t mediaResourceType =
         mFuzzedDataProvider->ConsumeIntegralInRange<int32_t>(kMinResourceType, kMaxResourceType);
     int32_t mediaResourceSubType =
@@ -269,9 +282,13 @@ void ResourceManagerServiceFuzzer::setResources() {
                                      static_cast<MedResSubType>(mediaResourceSubType),
                                      mediaResourceValue));
     bool result;
-    mService->reclaimResource(pidZero, mediaRes, &result);
-    mService->removeResource(pidZero, getId(testClient), mediaRes);
-    mService->removeClient(pidZero, getId(testClient));
+    ClientInfoParcel pidZeroClient{.pid = static_cast<int32_t>(pidZero),
+                                   .uid = static_cast<int32_t>(0),
+                                   .id = getId(testClient),
+                                   .name = ""};
+    mService->reclaimResource(pidZeroClient, mediaRes, &result);
+    mService->removeResource(pidZeroClient, mediaRes);
+    mService->removeClient(pidZeroClient);
 }
 
 void ResourceManagerServiceFuzzer::setServiceLog() {

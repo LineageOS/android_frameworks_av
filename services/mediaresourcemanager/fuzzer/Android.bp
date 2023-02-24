@@ -41,6 +41,9 @@ cc_fuzz {
         "libbinder_ndk",
         "libmedia",
         "libutils",
+        "libstats_media_metrics",
+        "libstatspull",
+        "libstatssocket",
     ],
     fuzz_config: {
         cc: [
