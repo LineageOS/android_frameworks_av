@@ -261,7 +261,7 @@ status_t StreamHalAidl::getXruns(int32_t *frames) {
 
 status_t StreamHalAidl::transfer(void *buffer, size_t bytes, size_t *transferred) {
     ALOGV("%p %s::%s", this, getClassName().c_str(), __func__);
-    // TIME_CHECK();  // TODO(b/238654698) reenable only when optimized.
+    // TIME_CHECK();  // TODO(b/243839867) reenable only when optimized.
     if (!mStream || mContext.getDataMQ() == nullptr) return NO_INIT;
     mWorkerTid.store(gettid(), std::memory_order_release);
     // Switch the stream into an active state if needed.
@@ -407,7 +407,7 @@ status_t StreamHalAidl::sendCommand(
         const ::aidl::android::hardware::audio::core::StreamDescriptor::Command &command,
         ::aidl::android::hardware::audio::core::StreamDescriptor::Reply* reply,
         bool safeFromNonWorkerThread) {
-    // TIME_CHECK();  // TODO(b/238654698) reenable only when optimized.
+    // TIME_CHECK();  // TODO(b/243839867) reenable only when optimized.
     if (!safeFromNonWorkerThread) {
         const pid_t workerTid = mWorkerTid.load(std::memory_order_acquire);
         LOG_ALWAYS_FATAL_IF(workerTid != gettid(),

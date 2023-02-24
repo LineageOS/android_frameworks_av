@@ -14,26 +14,39 @@
  * limitations under the License.
  */
 
+#include <algorithm>
+#include <cstdint>
+#include <cstring>
+#include <sys/mman.h>
 #define LOG_TAG "EffectBufferHalAidl"
 //#define LOG_NDEBUG 0
 
+#include <cutils/ashmem.h>
 #include <utils/Log.h>
 
 #include "EffectBufferHalAidl.h"
+
+using ndk::ScopedFileDescriptor;
 
 namespace android {
 namespace effect {
 
 // static
 status_t EffectBufferHalAidl::allocate(size_t size, sp<EffectBufferHalInterface>* buffer) {
-    ALOGE("%s not implemented yet %zu %p", __func__, size, buffer);
     return mirror(nullptr, size, buffer);
 }
 
 status_t EffectBufferHalAidl::mirror(void* external, size_t size,
                                      sp<EffectBufferHalInterface>* buffer) {
-    // buffer->setExternalData(external);
-    ALOGW("%s not implemented yet %p %zu %p", __func__, external, size, buffer);
+    sp<EffectBufferHalAidl> tempBuffer = new EffectBufferHalAidl(size);
+    status_t status = tempBuffer.get()->init();
+    if (status != OK) {
+        ALOGE("%s init failed %d", __func__, status);
+        return status;
+    }
+
+    tempBuffer->setExternalData(external);
+    *buffer = tempBuffer;
     return OK;
 }
 
@@ -48,7 +61,22 @@ EffectBufferHalAidl::~EffectBufferHalAidl() {
 }
 
 status_t EffectBufferHalAidl::init() {
-    ALOGW("%s not implemented yet", __func__);
+    int fd = ashmem_create_region("audioEffectAidl", mBufferSize);
+    if (fd < 0) {
+        ALOGE("%s create ashmem failed %d", __func__, fd);
+        return fd;
+    }
+
+    ScopedFileDescriptor tempFd(fd);
+    mAudioBuffer.raw = mmap(nullptr /* address */, mBufferSize /* length */, PROT_READ | PROT_WRITE,
+                            MAP_SHARED, fd, 0 /* offset */);
+    if (mAudioBuffer.raw == MAP_FAILED) {
+        ALOGE("mmap failed for fd %d", fd);
+        mAudioBuffer.raw = nullptr;
+        return INVALID_OPERATION;
+    }
+
+    mMemory = {std::move(tempFd), static_cast<int64_t>(mBufferSize)};
     return OK;
 }
 
@@ -76,11 +104,26 @@ void EffectBufferHalAidl::setExternalData(void* external) {
 }
 
 void EffectBufferHalAidl::update() {
-    ALOGW("%s not implemented yet", __func__);
+    update(mBufferSize);
 }
 
 void EffectBufferHalAidl::commit() {
-    ALOGW("%s not implemented yet", __func__);
+    commit(mBufferSize);
+}
+
+void EffectBufferHalAidl::copy(void* dst, const void* src, size_t n) const {
+    if (!dst || !src) {
+        return;
+    }
+    std::memcpy(dst, src, std::min(n, mBufferSize));
+}
+
+void EffectBufferHalAidl::update(size_t n) {
+    copy(mAudioBuffer.raw, mExternalData, n);
+}
+
+void EffectBufferHalAidl::commit(size_t n) {
+    copy(mExternalData, mAudioBuffer.raw, n);
 }
 
 } // namespace effect
