@@ -16,11 +16,13 @@
 
 #pragma once
 
+#include <memory>
+
 #include <aidl/android/hardware/audio/effect/IEffect.h>
 #include <aidl/android/hardware/audio/effect/IFactory.h>
+#include <fmq/AidlMessageQueue.h>
 #include <media/audiohal/EffectHalInterface.h>
 #include <system/audio_effect.h>
-#include <memory>
 
 #include "EffectConversionHelperAidl.h"
 
@@ -29,6 +31,12 @@ namespace effect {
 
 class EffectHalAidl : public EffectHalInterface {
   public:
+    using StatusMQ = ::android::AidlMessageQueue<
+            ::aidl::android::hardware::audio::effect::IEffect::Status,
+            ::aidl::android::hardware::common::fmq::SynchronizedReadWrite>;
+    using DataMQ = ::android::AidlMessageQueue<
+            float, ::aidl::android::hardware::common::fmq::SynchronizedReadWrite>;
+
     // Set the input buffer.
     status_t setInBuffer(const sp<EffectBufferHalInterface>& buffer) override;
 
@@ -63,6 +71,9 @@ class EffectHalAidl : public EffectHalInterface {
         return mEffect;
     }
 
+    // for TIME_CHECK
+    const std::string getClassName() const { return "EffectHalAidl"; }
+
   private:
     friend class sp<EffectHalAidl>;
 
@@ -73,6 +84,8 @@ class EffectHalAidl : public EffectHalInterface {
     const int32_t mIoId;
     const ::aidl::android::hardware::audio::effect::Descriptor mDesc;
     std::unique_ptr<EffectConversionHelperAidl> mConversion;
+    std::unique_ptr<StatusMQ> mStatusQ;
+    std::unique_ptr<DataMQ> mInputQ, mOutputQ;
 
     sp<EffectBufferHalInterface> mInBuffer, mOutBuffer;
     effect_config_t mConfig;
