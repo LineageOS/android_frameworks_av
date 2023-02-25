@@ -254,7 +254,6 @@ class DeviceHalAidl : public DeviceHalInterface, public ConversionHelperAidl,
     int32_t mDefaultOutputPortId = -1;
     PortConfigs mPortConfigs;
     Patches mPatches;
-    std::map<audio_patch_handle_t, int32_t /*patch ID*/> mFwkHandles;
     std::mutex mLock;
     std::map<void*, Callbacks> mCallbacks GUARDED_BY(mLock);
 };

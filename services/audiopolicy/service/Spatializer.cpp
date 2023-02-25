@@ -33,6 +33,7 @@
 #include <media/stagefright/foundation/AHandler.h>
 #include <media/stagefright/foundation/AMessage.h>
 #include <media/MediaMetricsItem.h>
+#include <media/QuaternionUtil.h>
 #include <media/ShmemCompat.h>
 #include <mediautils/SchedulingPolicyService.h>
 #include <mediautils/ServiceUtilities.h>
@@ -75,13 +76,21 @@ static audio_channel_mask_t getMaxChannelMask(
     return maxMask;
 }
 
-std::vector<float> recordFromRotationVector(const std::vector<float>& rotationVector) {
+static std::vector<float> recordFromTranslationRotationVector(
+        const std::vector<float>& trVector) {
+    auto headToStageOpt = Pose3f::fromVector(trVector);
+    if (!headToStageOpt) return {};
+
+    const auto stageToHead = headToStageOpt.value().inverse();
+    const auto stageToHeadTranslation = stageToHead.translation();
     constexpr float RAD_TO_DEGREE = 180.f / M_PI;
     std::vector<float> record{
-        rotationVector[0], rotationVector[1], rotationVector[2],
-        rotationVector[3] * RAD_TO_DEGREE,
-        rotationVector[4] * RAD_TO_DEGREE,
-        rotationVector[5] * RAD_TO_DEGREE};
+        stageToHeadTranslation[0], stageToHeadTranslation[1], stageToHeadTranslation[2],
+        0.f, 0.f, 0.f};
+    media::quaternionToAngles(stageToHead.rotation(), &record[3], &record[4], &record[5]);
+    record[3] *= RAD_TO_DEGREE;
+    record[4] *= RAD_TO_DEGREE;
+    record[5] *= RAD_TO_DEGREE;
     return record;
 }
 
@@ -747,8 +756,9 @@ void Spatializer::onHeadToStagePoseMsg(const std::vector<float>& headToStage) {
         callback = mHeadTrackingCallback;
         if (mEngine != nullptr) {
             setEffectParameter_l(SPATIALIZER_PARAM_HEAD_TO_STAGE, headToStage);
-            mPoseRecorder.record(headToStage);
-            mPoseDurableRecorder.record(headToStage);
+            const auto record = recordFromTranslationRotationVector(headToStage);
+            mPoseRecorder.record(record);
+            mPoseDurableRecorder.record(record);
         }
     }
 
@@ -1008,8 +1018,7 @@ void Spatializer::onFramesProcessed(int32_t framesProcessed) {
 }
 
 std::string Spatializer::toString(unsigned level) const {
-    std::string prefixSpace;
-    prefixSpace.append(level, ' ');
+    std::string prefixSpace(level, ' ');
     std::string ss = prefixSpace + "Spatializer:\n";
     bool needUnlock = false;
 
@@ -1065,14 +1074,15 @@ std::string Spatializer::toString(unsigned level) const {
 
     // PostController dump.
     if (mPoseController != nullptr) {
-        ss += mPoseController->toString(level + 1);
-        ss.append(prefixSpace +
-                  "Sensor data format - [rx, ry, rz, vx, vy, vz] (units-degree, "
-                  "r-transform, v-angular velocity, x-pitch, y-roll, z-yaw):\n");
-        ss.append(prefixSpace + " PerMinuteHistory:\n");
-        ss += mPoseDurableRecorder.toString(level + 1);
-        ss.append(prefixSpace + " PerSecondHistory:\n");
-        ss += mPoseRecorder.toString(level + 1);
+        ss.append(mPoseController->toString(level + 1))
+            .append(prefixSpace)
+            .append("Pose (active stage-to-head) [tx, ty, tz, pitch, roll, yaw]:\n")
+            .append(prefixSpace)
+            .append(" PerMinuteHistory:\n")
+            .append(mPoseDurableRecorder.toString(level + 2))
+            .append(prefixSpace)
+            .append(" PerSecondHistory:\n")
+            .append(mPoseRecorder.toString(level + 2));
     } else {
         ss.append(prefixSpace).append("SpatializerPoseController not exist\n");
     }
