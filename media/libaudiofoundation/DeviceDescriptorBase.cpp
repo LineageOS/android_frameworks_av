@@ -186,12 +186,12 @@ status_t DeviceDescriptorBase::writeToParcelable(media::AudioPortFw* parcelable)
     deviceExt.encodedFormats = VALUE_OR_RETURN_STATUS(
             convertContainer<std::vector<media::audio::common::AudioFormatDescription>>(
                     mEncodedFormats, legacy2aidl_audio_format_t_AudioFormatDescription));
+    deviceExt.encapsulationModes = VALUE_OR_RETURN_STATUS(
+            legacy2aidl_AudioEncapsulationMode_mask(mEncapsulationModes));
+    deviceExt.encapsulationMetadataTypes = VALUE_OR_RETURN_STATUS(
+            legacy2aidl_AudioEncapsulationMetadataType_mask(mEncapsulationMetadataTypes));
     UNION_SET(parcelable->hal.ext, device, deviceExt);
     media::AudioPortDeviceExtSys deviceSys;
-    deviceSys.encapsulationModes = VALUE_OR_RETURN_STATUS(
-            legacy2aidl_AudioEncapsulationMode_mask(mEncapsulationModes));
-    deviceSys.encapsulationMetadataTypes = VALUE_OR_RETURN_STATUS(
-            legacy2aidl_AudioEncapsulationMetadataType_mask(mEncapsulationMetadataTypes));
     UNION_SET(parcelable->sys.ext, device, deviceSys);
     return OK;
 }
@@ -214,12 +214,12 @@ status_t DeviceDescriptorBase::readFromParcelable(const media::AudioPortFw& parc
     mEncodedFormats = VALUE_OR_RETURN_STATUS(
             convertContainer<FormatVector>(deviceExt.encodedFormats,
                     aidl2legacy_AudioFormatDescription_audio_format_t));
+    mEncapsulationModes = VALUE_OR_RETURN_STATUS(
+            aidl2legacy_AudioEncapsulationMode_mask(deviceExt.encapsulationModes));
+    mEncapsulationMetadataTypes = VALUE_OR_RETURN_STATUS(
+            aidl2legacy_AudioEncapsulationMetadataType_mask(deviceExt.encapsulationMetadataTypes));
     media::AudioPortDeviceExtSys deviceSys = VALUE_OR_RETURN_STATUS(
             UNION_GET(parcelable.sys.ext, device));
-    mEncapsulationModes = VALUE_OR_RETURN_STATUS(
-            aidl2legacy_AudioEncapsulationMode_mask(deviceSys.encapsulationModes));
-    mEncapsulationMetadataTypes = VALUE_OR_RETURN_STATUS(
-            aidl2legacy_AudioEncapsulationMetadataType_mask(deviceSys.encapsulationMetadataTypes));
     return OK;
 }
 
