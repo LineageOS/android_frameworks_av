@@ -33,6 +33,27 @@ constexpr effect_uuid_t kEffectUuids[] = {
 
 constexpr size_t kNumEffectUuids = std::size(kEffectUuids);
 
+static constexpr audio_channel_mask_t kChMasks[] = {
+        AUDIO_CHANNEL_OUT_MONO,          AUDIO_CHANNEL_OUT_STEREO,
+        AUDIO_CHANNEL_OUT_2POINT1,       AUDIO_CHANNEL_OUT_5POINT1,
+        AUDIO_CHANNEL_OUT_7POINT1POINT4, AUDIO_CHANNEL_INDEX_MASK_23,
+        AUDIO_CHANNEL_OUT_22POINT2,
+};
+
+static constexpr size_t kNumChMasks = std::size(kChMasks);
+
+static constexpr size_t kSampleRates[] = {8000, 11025, 44100, 48000, 192000};
+
+static constexpr size_t kNumSampleRates = std::size(kSampleRates);
+
+static constexpr size_t kFrameCounts[] = {4, 512};
+
+static constexpr size_t kNumFrameCounts = std::size(kFrameCounts);
+
+static constexpr size_t kLoopCounts[] = {1, 4};
+
+static constexpr size_t kNumLoopCounts = std::size(kLoopCounts);
+
 static bool isAuxMode(const effect_uuid_t* uuid) {
     // Update this, if the order of effects in kEffectUuids is updated
     return (uuid == &kEffectUuids[2] || uuid == &kEffectUuids[3]);
@@ -50,15 +71,15 @@ typedef std::tuple<int, int, int, int, int, int> SingleEffectTestParam;
 class SingleEffectTest : public ::testing::TestWithParam<SingleEffectTestParam> {
   public:
     SingleEffectTest()
-        : mSampleRate(EffectTestHelper::kSampleRates[std::get<1>(GetParam())]),
-          mFrameCount(EffectTestHelper::kFrameCounts[std::get<2>(GetParam())]),
-          mLoopCount(EffectTestHelper::kLoopCounts[std::get<3>(GetParam())]),
+        : mSampleRate(kSampleRates[std::get<1>(GetParam())]),
+          mFrameCount(kFrameCounts[std::get<2>(GetParam())]),
+          mLoopCount(kLoopCounts[std::get<3>(GetParam())]),
           mTotalFrameCount(mFrameCount * mLoopCount),
           mUuid(&kEffectUuids[std::get<4>(GetParam())]),
           mInChMask(isAuxMode(mUuid) ? AUDIO_CHANNEL_OUT_MONO
-                                     : EffectTestHelper::kChMasks[std::get<0>(GetParam())]),
+                                     : kChMasks[std::get<0>(GetParam())]),
           mInChannelCount(audio_channel_count_from_out_mask(mInChMask)),
-          mOutChMask(EffectTestHelper::kChMasks[std::get<0>(GetParam())]),
+          mOutChMask(kChMasks[std::get<0>(GetParam())]),
           mOutChannelCount(audio_channel_count_from_out_mask(mOutChMask)),
           mPreset(kPresets[std::get<5>(GetParam())]) {}
 
@@ -100,10 +121,10 @@ TEST_P(SingleEffectTest, SimpleProcess) {
 
 INSTANTIATE_TEST_SUITE_P(
         EffectReverbTestAll, SingleEffectTest,
-        ::testing::Combine(::testing::Range(0, (int)EffectTestHelper::kNumChMasks),
-                           ::testing::Range(0, (int)EffectTestHelper::kNumSampleRates),
-                           ::testing::Range(0, (int)EffectTestHelper::kNumFrameCounts),
-                           ::testing::Range(0, (int)EffectTestHelper::kNumLoopCounts),
+        ::testing::Combine(::testing::Range(0, (int)kNumChMasks),
+                           ::testing::Range(0, (int)kNumSampleRates),
+                           ::testing::Range(0, (int)kNumFrameCounts),
+                           ::testing::Range(0, (int)kNumLoopCounts),
                            ::testing::Range(0, (int)kNumEffectUuids),
                            ::testing::Range(0, (int)kNumPresets)));
 
@@ -112,9 +133,9 @@ class SingleEffectComparisonTest
     : public ::testing::TestWithParam<SingleEffectComparisonTestParam> {
   public:
     SingleEffectComparisonTest()
-        : mSampleRate(EffectTestHelper::kSampleRates[std::get<0>(GetParam())]),
-          mFrameCount(EffectTestHelper::kFrameCounts[std::get<1>(GetParam())]),
-          mLoopCount(EffectTestHelper::kLoopCounts[std::get<2>(GetParam())]),
+        : mSampleRate(kSampleRates[std::get<0>(GetParam())]),
+          mFrameCount(kFrameCounts[std::get<1>(GetParam())]),
+          mLoopCount(kLoopCounts[std::get<2>(GetParam())]),
           mTotalFrameCount(mFrameCount * mLoopCount),
           mUuid(&kEffectUuids[std::get<3>(GetParam())]),
           mPreset(kPresets[std::get<4>(GetParam())]) {}
@@ -173,7 +194,7 @@ TEST_P(SingleEffectComparisonTest, SimpleProcess) {
     std::vector<int16_t> monoRefI16(mTotalFrameCount);
     memcpy_to_i16_from_float(monoRefI16.data(), monoOutput.data(), mTotalFrameCount);
 
-    for (size_t outChMask : EffectTestHelper::kChMasks) {
+    for (size_t outChMask : kChMasks) {
         size_t outChannelCount = audio_channel_count_from_out_mask(outChMask);
         size_t inChMask = isAuxMode(mUuid) ? AUDIO_CHANNEL_OUT_MONO : outChMask;
 
@@ -225,9 +246,9 @@ TEST_P(SingleEffectComparisonTest, SimpleProcess) {
 
 INSTANTIATE_TEST_SUITE_P(
         EffectReverbTestAll, SingleEffectComparisonTest,
-        ::testing::Combine(::testing::Range(0, (int)EffectTestHelper::kNumSampleRates),
-                           ::testing::Range(0, (int)EffectTestHelper::kNumFrameCounts),
-                           ::testing::Range(0, (int)EffectTestHelper::kNumLoopCounts),
+        ::testing::Combine(::testing::Range(0, (int)kNumSampleRates),
+                           ::testing::Range(0, (int)kNumFrameCounts),
+                           ::testing::Range(0, (int)kNumLoopCounts),
                            ::testing::Range(0, (int)kNumEffectUuids),
                            ::testing::Range(0, (int)kNumPresets)));
 
