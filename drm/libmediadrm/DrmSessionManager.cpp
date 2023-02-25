@@ -34,6 +34,7 @@
 namespace android {
 
 using aidl::android::media::MediaResourceParcel;
+using aidl::android::media::ClientInfoParcel;
 
 namespace {
 void ResourceManagerServiceDied(void* cookie) {
@@ -137,7 +138,10 @@ void DrmSessionManager::addSession(int pid,
 
     static int64_t clientId = 0;
     mSessionMap[toStdVec(sessionId)] = (SessionInfo){pid, uid, clientId};
-    mService->addResource(pid, uid, clientId++, drm, toResourceVec(sessionId, INT64_MAX));
+    ClientInfoParcel clientInfo{.pid = static_cast<int32_t>(pid),
+                                .uid = static_cast<int32_t>(uid),
+                                .id = clientId++};
+    mService->addResource(clientInfo, drm, toResourceVec(sessionId, INT64_MAX));
 }
 
 void DrmSessionManager::useSession(const Vector<uint8_t> &sessionId) {
@@ -150,7 +154,10 @@ void DrmSessionManager::useSession(const Vector<uint8_t> &sessionId) {
     }
 
     auto info = it->second;
-    mService->addResource(info.pid, info.uid, info.clientId, NULL, toResourceVec(sessionId, -1));
+    ClientInfoParcel clientInfo{.pid = static_cast<int32_t>(info.pid),
+                                .uid = static_cast<int32_t>(info.uid),
+                                .id = info.clientId};
+    mService->addResource(clientInfo, NULL, toResourceVec(sessionId, -1));
 }
 
 void DrmSessionManager::removeSession(const Vector<uint8_t> &sessionId) {
@@ -164,7 +171,10 @@ void DrmSessionManager::removeSession(const Vector<uint8_t> &sessionId) {
 
     auto info = it->second;
     // removeClient instead of removeSession because each client has only one session
-    mService->removeClient(info.pid, info.clientId);
+    ClientInfoParcel clientInfo{.pid = static_cast<int32_t>(info.pid),
+                                .uid = static_cast<int32_t>(info.uid),
+                                .id = info.clientId};
+    mService->removeClient(clientInfo);
     mSessionMap.erase(it);
 }
 
@@ -182,9 +192,13 @@ bool DrmSessionManager::reclaimSession(int callingPid) {
 
     // cannot update mSessionMap because we do not know which sessionId is reclaimed;
     // we rely on IResourceManagerClient to removeSession in reclaimResource
-    Vector<uint8_t> dummy;
+    Vector<uint8_t> placeHolder;
     bool success;
-    ScopedAStatus status = service->reclaimResource(callingPid, toResourceVec(dummy, INT64_MAX), &success);
+    uid_t uid = AIBinder_getCallingUid();
+    ClientInfoParcel clientInfo{.pid = static_cast<int32_t>(callingPid),
+                                .uid = static_cast<int32_t>(uid)};
+    ScopedAStatus status = service->reclaimResource(
+        clientInfo, toResourceVec(placeHolder, INT64_MAX), &success);
     return status.isOk() && success;
 }
 

@@ -20,6 +20,9 @@ cc_test {
         "libmedia",
         "libmediautils",
         "libutils",
+        "libstats_media_metrics",
+        "libstatspull",
+        "libstatssocket",
     ],
     include_dirs: [
         "frameworks/av/include",
@@ -66,6 +69,9 @@ cc_test {
         "libmedia",
         "libmediautils",
         "libutils",
+        "libstats_media_metrics",
+        "libstatspull",
+        "libstatssocket",
     ],
     include_dirs: [
         "frameworks/av/include",
