@@ -261,7 +261,7 @@ status_t StreamHalAidl::getXruns(int32_t *frames) {
 
 status_t StreamHalAidl::transfer(void *buffer, size_t bytes, size_t *transferred) {
     ALOGV("%p %s::%s", this, getClassName().c_str(), __func__);
-    // TIME_CHECK();  // TODO(b/238654698) reenable only when optimized.
+    // TIME_CHECK();  // TODO(b/243839867) reenable only when optimized.
     if (!mStream || mContext.getDataMQ() == nullptr) return NO_INIT;
     mWorkerTid.store(gettid(), std::memory_order_release);
     // Switch the stream into an active state if needed.
@@ -325,6 +325,26 @@ status_t StreamHalAidl::resume(StreamDescriptor::Reply* reply) {
     if (mIsInput) {
         return sendCommand(makeHalCommand<HalCommand::Tag::burst>(0), reply);
     } else {
+        if (mContext.isAsynchronous()) {
+            // Handle pause-flush-resume sequence. 'flush' from PAUSED goes to
+            // IDLE. We move here from IDLE to ACTIVE (same as 'start' from PAUSED).
+            const auto state = getState();
+            if (state == StreamDescriptor::State::IDLE) {
+                StreamDescriptor::Reply localReply{};
+                StreamDescriptor::Reply* innerReply = reply ?: &localReply;
+                if (status_t status =
+                        sendCommand(makeHalCommand<HalCommand::Tag::burst>(0), innerReply);
+                        status != OK) {
+                    return status;
+                }
+                if (innerReply->state != StreamDescriptor::State::ACTIVE) {
+                    ALOGE("%s: unexpected stream state: %s (expected ACTIVE)",
+                            __func__, toString(innerReply->state).c_str());
+                    return INVALID_OPERATION;
+                }
+                return OK;
+            }
+        }
         return sendCommand(makeHalCommand<HalCommand::Tag::start>(), reply);
     }
 }
@@ -407,7 +427,7 @@ status_t StreamHalAidl::sendCommand(
         const ::aidl::android::hardware::audio::core::StreamDescriptor::Command &command,
         ::aidl::android::hardware::audio::core::StreamDescriptor::Reply* reply,
         bool safeFromNonWorkerThread) {
-    // TIME_CHECK();  // TODO(b/238654698) reenable only when optimized.
+    // TIME_CHECK();  // TODO(b/243839867) reenable only when optimized.
     if (!safeFromNonWorkerThread) {
         const pid_t workerTid = mWorkerTid.load(std::memory_order_acquire);
         LOG_ALWAYS_FATAL_IF(workerTid != gettid(),
@@ -516,6 +536,10 @@ status_t StreamOutHalAidl::getNextWriteTimestamp(int64_t *timestamp __unused) {
 status_t StreamOutHalAidl::setCallback(wp<StreamOutHalInterfaceCallback> callback) {
     TIME_CHECK();
     if (!mStream) return NO_INIT;
+    if (!mContext.isAsynchronous()) {
+        ALOGE("%s: the callback is intended for asynchronous streams only", __func__);
+        return INVALID_OPERATION;
+    }
     if (auto broker = mCallbackBroker.promote(); broker != nullptr) {
         if (auto cb = callback.promote(); cb != nullptr) {
             broker->setStreamOutCallback(this, cb);

@@ -19,6 +19,7 @@ package android.media;
 import android.media.IResourceManagerClient;
 import android.media.MediaResourceParcel;
 import android.media.MediaResourcePolicyParcel;
+import android.media.ClientInfoParcel;
 
 /**
  * ResourceManagerService interface that keeps track of media resource
@@ -44,46 +45,40 @@ interface IResourceManagerService {
     /**
      * Add a client to a process with a list of resources.
      *
-     * @param pid pid of the client.
-     * @param uid uid of the client.
-     * @param clientId an identifier that uniquely identifies the client within the pid.
+     * @param clientInfo info of the calling client.
      * @param client interface for the ResourceManagerService to call the client.
      * @param resources an array of resources to be added.
      */
     void addResource(
-            int pid,
-            int uid,
-            long clientId,
+            in ClientInfoParcel clientInfo,
             IResourceManagerClient client,
             in MediaResourceParcel[] resources);
 
     /**
      * Remove the listed resources from a client.
      *
-     * @param pid pid from which the list of resources will be removed.
-     * @param clientId clientId within the pid from which the list of resources will be removed.
+     * @param clientInfo info of the calling client.
      * @param resources an array of resources to be removed from the client.
      */
-    void removeResource(int pid, long clientId, in MediaResourceParcel[] resources);
+    void removeResource(in ClientInfoParcel clientInfo, in MediaResourceParcel[] resources);
 
     /**
      * Remove all resources from a client.
      *
-     * @param pid pid from which the client's resources will be removed.
-     * @param clientId clientId within the pid that will be removed.
+     * @param clientInfo info of the calling client.
      */
-    void removeClient(int pid, long clientId);
+    void removeClient(in ClientInfoParcel clientInfo);
 
     /**
      * Tries to reclaim resource from processes with lower priority than the
      * calling process according to the requested resources.
      *
-     * @param callingPid pid of the calling process.
+     * @param clientInfo info of the calling client.
      * @param resources an array of resources to be reclaimed.
      *
      * @return true if the reclaim was successful and false otherwise.
      */
-    boolean reclaimResource(int callingPid, in MediaResourceParcel[] resources);
+    boolean reclaimResource(in ClientInfoParcel clientInfo, in MediaResourceParcel[] resources);
 
     /**
      * Override the pid of original calling process with the pid of the process
@@ -120,10 +115,9 @@ interface IResourceManagerService {
     /**
      * Mark a client for pending removal
      *
-     * @param pid pid from which the client's resources will be removed.
-     * @param clientId clientId within the pid that will be removed.
+     * @param clientInfo info of the calling client.
      */
-    void markClientForPendingRemoval(int pid, long clientId);
+    void markClientForPendingRemoval(in ClientInfoParcel clientInfo);
 
     /**
      * Reclaim resources from clients pending removal, if any.

@@ -462,7 +462,7 @@ status_t DeviceHalAidl::openOutputStream(
     args.eventCallback = eventCb;
     ::aidl::android::hardware::audio::core::IModule::OpenOutputStreamReturn ret;
     RETURN_STATUS_IF_ERROR(statusTFromBinderStatus(mModule->openOutputStream(args, &ret)));
-    StreamContextAidl context(ret.desc);
+    StreamContextAidl context(ret.desc, isOffload);
     if (!context.isValid()) {
         ALOGE("%s: Failed to created a valid stream context from the descriptor: %s",
                 __func__, ret.desc.toString().c_str());
@@ -522,7 +522,7 @@ status_t DeviceHalAidl::openInputStream(
     args.bufferSizeFrames = aidlConfig.frameCount;
     ::aidl::android::hardware::audio::core::IModule::OpenInputStreamReturn ret;
     RETURN_STATUS_IF_ERROR(statusTFromBinderStatus(mModule->openInputStream(args, &ret)));
-    StreamContextAidl context(ret.desc);
+    StreamContextAidl context(ret.desc, false /*isAsynchronous*/);
     if (!context.isValid()) {
         ALOGE("%s: Failed to created a valid stream context from the descriptor: %s",
                 __func__, ret.desc.toString().c_str());
@@ -551,8 +551,19 @@ status_t DeviceHalAidl::createAudioPatch(unsigned int num_sources,
         sources == nullptr || sinks == nullptr || patch == nullptr) {
         return BAD_VALUE;
     }
-    // Note that the patch handle (*patch) is provided by the framework.
-    // In tests it's possible that its value is AUDIO_PATCH_HANDLE_NONE.
+    // When the patch handle (*patch) is AUDIO_PATCH_HANDLE_NONE, it means
+    // the framework wants to create a new patch. The handle has to be generated
+    // by the HAL. Since handles generated this way can only be unique within
+    // a HAL module, the framework generates a globally unique handle, and maps
+    // it on the <HAL module, patch handle> pair.
+    // When the patch handle is set, it meant the framework intends to update
+    // an existing patch.
+    //
+    // This behavior corresponds to HAL module behavior, with the only difference
+    // that the HAL module uses `int32_t` for patch IDs. The following assert ensures
+    // that both the framework and the HAL use the same value for "no ID":
+    static_assert(AUDIO_PATCH_HANDLE_NONE == 0);
+    int32_t halPatchId = static_cast<int32_t>(*patch);
 
     // Upon conversion, mix port configs contain audio configuration, while
     // device port configs contain device address. This data is used to find
@@ -575,17 +586,12 @@ status_t DeviceHalAidl::createAudioPatch(unsigned int num_sources,
                                 sinks[i], isInput, 0)));
     }
     Cleanups cleanups;
-    auto existingPatchIt = mPatches.end();
-    auto fwkHandlesIt = *patch != AUDIO_PATCH_HANDLE_NONE ?
-            mFwkHandles.find(*patch) : mFwkHandles.end();
+    auto existingPatchIt = halPatchId != 0 ? mPatches.find(halPatchId): mPatches.end();
     AudioPatch aidlPatch;
-    if (fwkHandlesIt != mFwkHandles.end()) {
-        existingPatchIt = mPatches.find(fwkHandlesIt->second);
-        if (existingPatchIt != mPatches.end()) {
-            aidlPatch = existingPatchIt->second;
-            aidlPatch.sourcePortConfigIds.clear();
-            aidlPatch.sinkPortConfigIds.clear();
-        }
+    if (existingPatchIt != mPatches.end()) {
+        aidlPatch = existingPatchIt->second;
+        aidlPatch.sourcePortConfigIds.clear();
+        aidlPatch.sinkPortConfigIds.clear();
     }
     ALOGD("%s: sources: %s, sinks: %s",
             __func__, ::android::internal::ToString(aidlSources).c_str(),
@@ -613,20 +619,8 @@ status_t DeviceHalAidl::createAudioPatch(unsigned int num_sources,
         bool created = false;
         RETURN_STATUS_IF_ERROR(findOrCreatePatch(aidlPatch, &aidlPatch, &created));
         // Since no cleanup of the patch is needed, 'created' is ignored.
-        if (fwkHandlesIt != mFwkHandles.end()) {
-            fwkHandlesIt->second = aidlPatch.id;
-            // Patch handle (*patch) stays the same.
-        } else {
-            if (*patch == AUDIO_PATCH_HANDLE_NONE) {
-                // This isn't good as the module can't provide a handle which is really unique.
-                // However, this situation should only happen in tests.
-                *patch = aidlPatch.id;
-                LOG_ALWAYS_FATAL_IF(mFwkHandles.count(*patch) > 0,
-                        "%s: patch id %d clashes with another framework patch handle",
-                        __func__, *patch);
-            }
-            mFwkHandles.emplace(*patch, aidlPatch.id);
-        }
+        halPatchId = aidlPatch.id;
+        *patch = static_cast<audio_patch_handle_t>(halPatchId);
     }
     cleanups.disarmAll();
     return OK;
@@ -636,12 +630,18 @@ status_t DeviceHalAidl::releaseAudioPatch(audio_patch_handle_t patch) {
     ALOGD("%p %s::%s", this, getClassName().c_str(), __func__);
     TIME_CHECK();
     if (!mModule) return NO_INIT;
-    auto idMapIt = mFwkHandles.find(patch);
-    if (idMapIt == mFwkHandles.end()) {
+    static_assert(AUDIO_PATCH_HANDLE_NONE == 0);
+    if (patch == AUDIO_PATCH_HANDLE_NONE) {
         return BAD_VALUE;
     }
-    RETURN_STATUS_IF_ERROR(statusTFromBinderStatus(mModule->resetAudioPatch(idMapIt->second)));
-    mFwkHandles.erase(idMapIt);
+    int32_t halPatchId = static_cast<int32_t>(patch);
+    auto patchIt = mPatches.find(halPatchId);
+    if (patchIt == mPatches.end()) {
+        ALOGE("%s: patch with id %d not found", __func__, halPatchId);
+        return BAD_VALUE;
+    }
+    RETURN_STATUS_IF_ERROR(statusTFromBinderStatus(mModule->resetAudioPatch(halPatchId)));
+    mPatches.erase(patchIt);
     return OK;
 }
 

@@ -20,7 +20,6 @@
 #define LOG_TAG "EffectsFactoryHalAidl"
 //#define LOG_NDEBUG 0
 
-#include <aidl/android/hardware/audio/effect/IFactory.h>
 #include <error/expected_utils.h>
 #include <android/binder_manager.h>
 #include <media/AidlConversionCppNdk.h>
@@ -139,20 +138,18 @@ status_t EffectsFactoryHalAidl::createEffect(const effect_uuid_t* uuid, int32_t 
 }
 
 status_t EffectsFactoryHalAidl::dumpEffects(int fd) {
-    ALOGE("%s not implemented yet, fd %d", __func__, fd);
-    return INVALID_OPERATION;
+    // TODO: add proxy dump here because AIDL service EffectFactory doesn't have proxy handle
+    return mFactory->dump(fd, nullptr, 0);
 }
 
 status_t EffectsFactoryHalAidl::allocateBuffer(size_t size, sp<EffectBufferHalInterface>* buffer) {
     ALOGI("%s size %zu buffer %p", __func__, size, buffer);
-    // Buffer doesn't allocated here for AIDL, instead each effect open will return I/O data FMQ.
     return EffectBufferHalAidl::allocate(size, buffer);
 }
 
 status_t EffectsFactoryHalAidl::mirrorBuffer(void* external, size_t size,
                                              sp<EffectBufferHalInterface>* buffer) {
     ALOGI("%s extern %p size %zu buffer %p", __func__, external, size, buffer);
-    // TODO: implement with FMQ
     return EffectBufferHalAidl::mirror(external, size, buffer);
 }
 
