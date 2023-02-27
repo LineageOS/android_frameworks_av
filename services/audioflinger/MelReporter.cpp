@@ -224,6 +224,11 @@ void AudioFlinger::MelReporter::stopInternalMelComputation() {
 }
 
 void AudioFlinger::MelReporter::stopMelComputationForPatch_l(const ActiveMelPatch& patch) {
+    if (!patch.csdActive) {
+        // no need to stop CSD inactive patches
+        return;
+    }
+
     auto thread = mAudioFlinger.checkPlaybackThread_l(patch.streamHandle);
     ALOGV("%s: stop MEL for stream id: %d", __func__, patch.streamHandle);
     for (const auto& deviceId : patch.deviceHandles) {
