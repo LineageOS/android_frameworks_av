@@ -35,6 +35,19 @@ interface ISoundDose {
      */
     oneway void resetCsd(float currentCsd, in SoundDoseRecord[] records);
 
+    /**
+     * Updates the attenuation used for the MEL calculation when the volume is
+     * not applied by the audio framework. This can be the case when for example
+     * the absolute volume is used for a particular device.
+     *
+     * @param attenuationDB the attenuation as a negative value in dB that will
+     *                      be applied for the internal MEL when computing CSD.
+     *                      A value of 0 represents no attenuation for the MELs
+     * @param device        the audio_devices_t type for which we will apply the
+     *                      attenuation
+     */
+    oneway void updateAttenuation(float attenuationDB, int device);
+
     /* -------------------------- Test API methods --------------------------
     /** Get the currently used RS2 value. */
     float getOutputRs2();
