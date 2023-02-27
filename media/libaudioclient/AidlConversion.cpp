@@ -724,11 +724,6 @@ aidl2legacy_AudioPortDeviceExt_audio_port_device_ext(
             aidl2legacy_AudioPortDeviceExt_audio_port_device_ext(aidl));
     legacy.hw_module = VALUE_OR_RETURN(
             aidl2legacy_int32_t_audio_module_handle_t(aidlSys.hwModule));
-    legacy.encapsulation_modes = VALUE_OR_RETURN(
-            aidl2legacy_AudioEncapsulationMode_mask(aidlSys.encapsulationModes));
-    legacy.encapsulation_metadata_types = VALUE_OR_RETURN(
-            aidl2legacy_AudioEncapsulationMetadataType_mask(
-                    aidlSys.encapsulationMetadataTypes));
     return legacy;
 }
 
@@ -738,10 +733,6 @@ status_t legacy2aidl_audio_port_device_ext_AudioPortDeviceExt(
     *aidl = VALUE_OR_RETURN_STATUS(legacy2aidl_audio_port_device_ext_AudioPortDeviceExt(legacy));
     aidlDeviceExt->hwModule = VALUE_OR_RETURN_STATUS(
             legacy2aidl_audio_module_handle_t_int32_t(legacy.hw_module));
-    aidlDeviceExt->encapsulationModes = VALUE_OR_RETURN_STATUS(
-            legacy2aidl_AudioEncapsulationMode_mask(legacy.encapsulation_modes));
-    aidlDeviceExt->encapsulationMetadataTypes = VALUE_OR_RETURN_STATUS(
-            legacy2aidl_AudioEncapsulationMetadataType_mask(legacy.encapsulation_metadata_types));
     return OK;
 }
 
