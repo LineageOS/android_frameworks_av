@@ -63,7 +63,7 @@ sp<audio_utils::MelProcessor> SoundDoseManager::getOrCreateProcessorForDevice(
     sp<audio_utils::MelProcessor> processor;
     if (streamProcessor != mActiveProcessors.end() &&
             (processor = streamProcessor->second.promote())) {
-        ALOGV("%s: found callback for stream %d", __func__, streamHandle);
+        ALOGV("%s: found callback for stream id %d", __func__, streamHandle);
         const auto activeTypeIt = mActiveDeviceTypes.find(deviceId);
         if (activeTypeIt != mActiveDeviceTypes.end()) {
             processor->setAttenuation(mMelAttenuationDB[activeTypeIt->second]);
@@ -72,7 +72,7 @@ sp<audio_utils::MelProcessor> SoundDoseManager::getOrCreateProcessorForDevice(
         processor->setOutputRs2(mRs2Value);
         return processor;
     } else {
-        ALOGV("%s: creating new callback for device %d", __func__, streamHandle);
+        ALOGV("%s: creating new callback for stream id %d", __func__, streamHandle);
         sp<audio_utils::MelProcessor> melProcessor = sp<audio_utils::MelProcessor>::make(
                 sampleRate, channelCount, format, *this, deviceId, mRs2Value);
         const auto activeTypeIt = mActiveDeviceTypes.find(deviceId);
@@ -180,7 +180,7 @@ audio_port_handle_t SoundDoseManager::getIdForAudioDevice(const AudioDevice& aud
 void SoundDoseManager::mapAddressToDeviceId(const AudioDeviceTypeAddr& adt,
                                             const audio_port_handle_t deviceId) {
     std::lock_guard _l(mLock);
-    ALOGI("%s: map address: %s to device id: %d", __func__, adt.toString().c_str(), deviceId);
+    ALOGI("%s: map address: %d to device id: %d", __func__, adt.mType, deviceId);
     mActiveDevices[adt] = deviceId;
     mActiveDeviceTypes[deviceId] = adt.mType;
 }
@@ -189,8 +189,8 @@ void SoundDoseManager::clearMapDeviceIdEntries(audio_port_handle_t deviceId) {
     std::lock_guard _l(mLock);
     for (auto activeDevice = mActiveDevices.begin(); activeDevice != mActiveDevices.end();) {
         if (activeDevice->second == deviceId) {
-            ALOGI("%s: clear mapping addr: %s to deviceId: %d",
-                  __func__, activeDevice->first.toString().c_str(), deviceId);
+            ALOGI("%s: clear mapping type: %d to deviceId: %d",
+                  __func__, activeDevice->first.mType, deviceId);
             activeDevice = mActiveDevices.erase(activeDevice);
             continue;
         }
@@ -331,7 +331,7 @@ binder::Status SoundDoseManager::SoundDose::forceComputeCsdOnAllDevices(
 
 void SoundDoseManager::updateAttenuation(float attenuationDB, audio_devices_t deviceType) {
     std::lock_guard _l(mLock);
-    ALOGV("%s: updating MEL processor attenuation for device %d to %f",
+    ALOGV("%s: updating MEL processor attenuation for device type %d to %f",
             __func__, deviceType, attenuationDB);
     mMelAttenuationDB[deviceType] = attenuationDB;
     for (const auto& mp : mActiveProcessors) {
@@ -339,7 +339,7 @@ void SoundDoseManager::updateAttenuation(float attenuationDB, audio_devices_t de
         if (melProcessor != nullptr) {
             auto deviceId = melProcessor->getDeviceId();
             if (mActiveDeviceTypes[deviceId] == deviceType) {
-                ALOGV("%s: updating MEL processor attenuation for deviceId %d to %f",
+                ALOGV("%s: set attenuation for deviceId %d to %f",
                         __func__, deviceId, attenuationDB);
                 melProcessor->setAttenuation(attenuationDB);
             }
