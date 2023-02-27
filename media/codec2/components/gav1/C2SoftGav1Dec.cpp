@@ -790,6 +790,18 @@ bool C2SoftGav1Dec::outputBuffer(const std::shared_ptr<C2BlockPool> &pool,
   getHDRStaticParams(buffer, work);
   getHDR10PlusInfoData(buffer, work);
 
+#if LIBYUV_VERSION < 1779
+  if (buffer->bitdepth == 10 &&
+      !(buffer->image_format == libgav1::kImageFormatYuv420 ||
+        buffer->image_format == libgav1::kImageFormatMonochrome400)) {
+    ALOGE("image_format %d not supported for 10bit", buffer->image_format);
+    mSignalledError = true;
+    work->workletsProcessed = 1u;
+    work->result = C2_CORRUPTED;
+    return false;
+  }
+#endif
+
   const bool isMonochrome =
       buffer->image_format == libgav1::kImageFormatMonochrome400;
 
@@ -886,6 +898,7 @@ bool C2SoftGav1Dec::outputBuffer(const std::shared_ptr<C2BlockPool> &pool,
         dstYStride /= 2;
         dstUStride /= 2;
         dstVStride /= 2;
+#if LIBYUV_VERSION >= 1779
         if (buffer->image_format == libgav1::kImageFormatYuv444 ||
             buffer->image_format == libgav1::kImageFormatYuv422) {
             // TODO(https://crbug.com/libyuv/952): replace this block with libyuv::I410ToP010 and
@@ -918,7 +931,13 @@ bool C2SoftGav1Dec::outputBuffer(const std::shared_ptr<C2BlockPool> &pool,
                                         srcYStride, srcUStride, srcVStride, dstYStride,
                                         dstUStride, mWidth, mHeight, isMonochrome);
         }
+#else  // LIBYUV_VERSION < 1779
+        convertYUV420Planar16ToP010((uint16_t *)dstY, (uint16_t *)dstU, srcY, srcU, srcV,
+                                    srcYStride, srcUStride, srcVStride, dstYStride,
+                                    dstUStride, mWidth, mHeight, isMonochrome);
+#endif  // LIBYUV_VERSION >= 1779
     } else {
+#if LIBYUV_VERSION >= 1779
         if (buffer->image_format == libgav1::kImageFormatYuv444) {
             // TODO(https://crbug.com/libyuv/950): replace this block with libyuv::I410ToI420 when
             // it's available.
@@ -942,10 +961,15 @@ bool C2SoftGav1Dec::outputBuffer(const std::shared_ptr<C2BlockPool> &pool,
                                dstY, dstYStride, dstU, dstUStride, dstV, dstVStride,
                                mWidth, mHeight);
         } else {
-            convertYUV420Planar16ToYV12(dstY, dstU, dstV, srcY, srcU, srcV, srcYStride / 2,
-                                        srcUStride / 2, srcVStride / 2, dstYStride, dstUStride,
+            convertYUV420Planar16ToYV12(dstY, dstU, dstV, srcY, srcU, srcV, srcYStride,
+                                        srcUStride, srcVStride, dstYStride, dstUStride,
                                         mWidth, mHeight, isMonochrome);
         }
+#else  // LIBYUV_VERSION < 1779
+        convertYUV420Planar16ToYV12(dstY, dstU, dstV, srcY, srcU, srcV, srcYStride,
+                                    srcUStride, srcVStride, dstYStride, dstUStride,
+                                    mWidth, mHeight, isMonochrome);
+#endif  // LIBYUV_VERSION >= 1779
     }
   } else {
     const uint8_t *srcY = (const uint8_t *)buffer->plane[0];
