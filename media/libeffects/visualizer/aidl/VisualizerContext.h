@@ -83,7 +83,7 @@ class VisualizerContext final : public EffectContext {
     uint32_t mLastCaptureIdx GUARDED_BY(mMutex) = 0;
     Visualizer::ScalingMode mScalingMode GUARDED_BY(mMutex) = Visualizer::ScalingMode::NORMALIZED;
     struct timespec mBufferUpdateTime GUARDED_BY(mMutex);
-    // capture buf with 8 bits PCM
+    // capture buf with 8 bits mono PCM samples
     std::array<uint8_t, kMaxCaptureBufSize> mCaptureBuf GUARDED_BY(mMutex);
     uint32_t mDownstreamLatency GUARDED_BY(mMutex) = 0;
     uint32_t mCaptureSamples GUARDED_BY(mMutex) = kMaxCaptureBufSize;

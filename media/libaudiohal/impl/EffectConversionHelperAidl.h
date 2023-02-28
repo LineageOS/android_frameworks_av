@@ -96,8 +96,6 @@ class EffectConversionHelperAidl {
                              void* pReplyData);
     status_t handleSetOffload(uint32_t cmdSize, const void* pCmdData, uint32_t* replySize,
                               void* pReplyData);
-    status_t handleFirstPriority(uint32_t cmdSize, const void* pCmdData, uint32_t* replySize,
-                                 void* pReplyData);
     status_t handleVisualizerCapture(uint32_t cmdSize, const void* pCmdData, uint32_t* replySize,
                                      void* pReplyData);
     status_t handleVisualizerMeasure(uint32_t cmdSize, const void* pCmdData, uint32_t* replySize,

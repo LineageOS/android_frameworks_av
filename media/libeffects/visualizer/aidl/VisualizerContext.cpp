@@ -191,9 +191,15 @@ Visualizer::Measurement VisualizerContext::getMeasure() {
 std::vector<uint8_t> VisualizerContext::capture() {
     std::vector<uint8_t> result;
     std::lock_guard lg(mMutex);
-    RETURN_VALUE_IF(mState != State::ACTIVE, result, "illegalState");
-    const uint32_t deltaMs = getDeltaTimeMsFromUpdatedTime_l();
+    // cts android.media.audio.cts.VisualizerTest expecting silence data when effect not running
+    // RETURN_VALUE_IF(mState != State::ACTIVE, result, "illegalState");
+    if (mState != State::ACTIVE) {
+        result.resize(mCaptureSamples);
+        memset(result.data(), 0x80, mCaptureSamples);
+        return result;
+    }
 
+    const uint32_t deltaMs = getDeltaTimeMsFromUpdatedTime_l();
     // if audio framework has stopped playing audio although the effect is still active we must
     // clear the capture buffer to return silence
     if ((mLastCaptureIdx == mCaptureIdx) && (mBufferUpdateTime.tv_sec != 0) &&
