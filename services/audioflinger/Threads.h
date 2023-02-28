@@ -2130,6 +2130,7 @@ class MmapThread : public ThreadBase
     status_t stop(audio_port_handle_t handle);
     status_t standby();
     virtual status_t getExternalPosition(uint64_t *position, int64_t *timeNaos) = 0;
+    virtual status_t reportData(const void* buffer, size_t frameCount);
 
     // RefBase
     virtual     void        onFirstRef();
@@ -2271,6 +2272,8 @@ public:
     virtual     bool        isStreamInitialized() {
                                 return !(mOutput == nullptr || mOutput->stream == nullptr);
                             }
+
+                status_t    reportData(const void* buffer, size_t frameCount) override;
 
 protected:
                 void        dumpInternals_l(int fd, const Vector<String16>& args) override;

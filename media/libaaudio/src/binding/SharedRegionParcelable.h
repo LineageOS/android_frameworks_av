@@ -37,11 +37,35 @@ public:
     // Construct based on a parcelable representation.
     explicit SharedRegionParcelable(const SharedRegion& parcelable);
 
-    void setup(int32_t sharedMemoryIndex, int32_t offsetInBytes, int32_t sizeInBytes);
+    // A tuple that contains information for setting up shared memory.
+    // The information in the tuple is <shared memory index, offset, size in byte>.
+    using MemoryInfoTuple = std::tuple<int, int, int>;
+    // Enums to use as index to query from MemoryInfoTuple
+    enum {
+        MEMORY_INDEX = 0,
+        OFFSET = 1,
+        SIZE = 2,
+    };
+    void setup(MemoryInfoTuple memoryInfoTuple);
 
     aaudio_result_t resolve(SharedMemoryParcelable *memoryParcels, void **regionAddressPtr);
 
     bool isFileDescriptorSafe(SharedMemoryParcelable *memoryParcels);
+
+    int32_t getSharedMemoryIndex() const { return mSharedMemoryIndex; }
+
+    /**
+     * Get the memory information of this SharedRegionParcelable.
+     *
+     * If the `memoryIndexMap` is not null, it indicates the caller has a different indexing for
+     * the shared memory. In that case, the `memoryIndexMap` must contains information from the
+     * shared memory indexes used by this object to the caller's shared memory indexes.
+     *
+     * @param memoryIndexMap a pointer to a map of memory index, which map the current shared
+     *                       memory index to a new shared memory index.
+     * @return
+     */
+    MemoryInfoTuple getMemoryInfo(const std::map<int32_t, int32_t>* memoryIndexMap) const;
 
     void dump();
 
