@@ -131,16 +131,15 @@ std::string getVendorXmlPath(const std::string &path) {
 
     if (!vendorPath.empty()) {
         if (fileExists(vendorPath + std::string(".xml"))) {
-            char version[PROP_VALUE_MAX] = {0};
             result = vendorPath + std::string(".xml");
 #ifdef __ANDROID_VNDK__
-            property_get("vendor.media.target.version", version, "0");
+            auto version = android::base::GetIntProperty("vendor.media.target.version", 0);
 #else
-            property_get("vendor.sys.media.target.version", version, "0");
+            auto version = android::base::GetIntProperty("vendor.sys.media.target.version", 0);
 #endif
-            if (atoi(version) > 0) {
+            if (version > 0) {
                 std::string versionedXml = vendorPath + std::string("_v") +
-                                 std::string(version) + std::string(".xml");
+                                 std::to_string(version) + std::string(".xml");
                 if(fileExists(versionedXml)) {
                     result = versionedXml;
                 }
