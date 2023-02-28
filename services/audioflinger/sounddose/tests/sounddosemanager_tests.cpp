@@ -17,11 +17,16 @@
 // #define LOG_NDEBUG 0
 #define LOG_TAG "SoundDoseManager_tests"
 
+#include <SoundDoseManager.h>
+
 #include <aidl/android/hardware/audio/core/sounddose/BnSoundDose.h>
 #include <gmock/gmock.h>
 #include <gtest/gtest.h>
 
-#include <SoundDoseManager.h>
+#if !defined(BACKEND_NDK)
+#define BACKEND_NDK
+#endif
+#include <media/AidlConversionCppNdk.h>
 
 namespace android {
 namespace {
@@ -199,26 +204,30 @@ TEST_F(SoundDoseManagerTest, OnNewMelValuesFromHalWithNoAddressIllegalArgument) 
 TEST_F(SoundDoseManagerTest, GetIdReturnsMappedAddress) {
     const std::string address = "testAddress";
     const audio_port_handle_t deviceId = 2;
-    const AudioDeviceTypeAddr adt{audio_devices_t{0}, address};
-    AudioDevice audioDevice;
-    audioDevice.address.set<AudioDeviceAddress::id>(address);
+    const audio_devices_t deviceType = AUDIO_DEVICE_OUT_WIRED_HEADSET;
+    const AudioDeviceTypeAddr adt{deviceType, address};
+    auto audioDevice = aidl::android::legacy2aidl_audio_device_AudioDevice(
+            deviceType, address.c_str());
+    ASSERT_TRUE(audioDevice.ok());
 
     mSoundDoseManager->mapAddressToDeviceId(adt, deviceId);
 
-    EXPECT_EQ(deviceId, mSoundDoseManager->getIdForAudioDevice(audioDevice));
+    EXPECT_EQ(deviceId, mSoundDoseManager->getIdForAudioDevice(audioDevice.value()));
 }
 
 TEST_F(SoundDoseManagerTest, GetAfterClearIdReturnsNone) {
     const std::string address = "testAddress";
-    const AudioDeviceTypeAddr adt {audio_devices_t{0}, address};
+    const audio_devices_t deviceType = AUDIO_DEVICE_OUT_WIRED_HEADSET;
+    const AudioDeviceTypeAddr adt{deviceType, address};
     const audio_port_handle_t deviceId = 2;
-    AudioDevice audioDevice;
-    audioDevice.address.set<AudioDeviceAddress::id>(address);
+    auto audioDevice = aidl::android::legacy2aidl_audio_device_AudioDevice(
+            deviceType, address.c_str());
+    ASSERT_TRUE(audioDevice.ok());
 
     mSoundDoseManager->mapAddressToDeviceId(adt, deviceId);
     mSoundDoseManager->clearMapDeviceIdEntries(deviceId);
 
-    EXPECT_EQ(AUDIO_PORT_HANDLE_NONE, mSoundDoseManager->getIdForAudioDevice(audioDevice));
+    EXPECT_EQ(AUDIO_PORT_HANDLE_NONE, mSoundDoseManager->getIdForAudioDevice(audioDevice.value()));
 }
 
 TEST_F(SoundDoseManagerTest, GetUnmappedIdReturnsHandleNone) {

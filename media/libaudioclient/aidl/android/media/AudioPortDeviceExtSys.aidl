@@ -22,8 +22,4 @@ package android.media;
 parcelable AudioPortDeviceExtSys {
     /** Module the device is attached to. Interpreted as audio_module_handle_t. */
     int hwModule;
-    /** Bitmask, indexed by AudioEncapsulationMode. */
-    int encapsulationModes;
-    /** Bitmask, indexed by AudioEncapsulationMetadataType. */
-    int encapsulationMetadataTypes;
 }
