@@ -95,9 +95,8 @@ public:
     audio_port_handle_t getIdForAudioDevice(
             const aidl::android::media::audio::common::AudioDevice& audioDevice) const;
 
-    /** Caches mapping between address and device port id. */
-    void mapAddressToDeviceId(const AudioDeviceTypeAddr& adt,
-                              const audio_port_handle_t deviceId);
+    /** Caches mapping between address, device port id and device type. */
+    void mapAddressToDeviceId(const AudioDeviceTypeAddr& adt, const audio_port_handle_t deviceId);
 
     /** Clear all map entries with passed audio_port_handle_t. */
     void clearMapDeviceIdEntries(audio_port_handle_t deviceId);
@@ -133,10 +132,11 @@ private:
         binder::Status setOutputRs2(float value) override;
         binder::Status resetCsd(float currentCsd,
                                 const std::vector<media::SoundDoseRecord>& records) override;
-        binder::Status getOutputRs2(float* value);
-        binder::Status getCsd(float* value);
-        binder::Status forceUseFrameworkMel(bool useFrameworkMel);
-        binder::Status forceComputeCsdOnAllDevices(bool computeCsdOnAllDevices);
+        binder::Status updateAttenuation(float attenuationDB, int device) override;
+        binder::Status getOutputRs2(float* value) override;
+        binder::Status getCsd(float* value) override;
+        binder::Status forceUseFrameworkMel(bool useFrameworkMel) override;
+        binder::Status forceComputeCsdOnAllDevices(bool computeCsdOnAllDevices) override;
 
         wp<SoundDoseManager> mSoundDoseManager;
         const sp<media::ISoundDoseCallback> mSoundDoseCallback;
@@ -163,6 +163,7 @@ private:
 
     sp<media::ISoundDoseCallback> getSoundDoseCallback() const;
 
+    void updateAttenuation(float attenuationDB, audio_devices_t deviceType);
     void setUseFrameworkMel(bool useFrameworkMel);
     void setComputeCsdOnAllDevices(bool computeCsdOnAllDevices);
     /** Returns the HAL sound dose interface or null if internal MEL computation is used. */
@@ -180,8 +181,10 @@ private:
     // logic for deviceId's that should not report MEL values (e.g.: do not have an active MUSIC
     // or GAME stream).
     std::map<AudioDeviceTypeAddr, audio_port_handle_t> mActiveDevices GUARDED_BY(mLock);
+    std::unordered_map<audio_port_handle_t, audio_devices_t> mActiveDeviceTypes GUARDED_BY(mLock);
 
     float mRs2Value GUARDED_BY(mLock);
+    std::unordered_map<audio_devices_t, float> mMelAttenuationDB GUARDED_BY(mLock);
 
     sp<SoundDose> mSoundDose GUARDED_BY(mLock);
 
