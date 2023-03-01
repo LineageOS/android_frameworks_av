@@ -346,6 +346,11 @@ protected:
                 || mState == AAUDIO_STREAM_STATE_STOPPED;
     }
 
+    virtual int64_t nextDataReportTime_l() REQUIRES(mLock) {
+        return std::numeric_limits<int64_t>::max();
+    }
+    virtual void reportData_l() REQUIRES(mLock) { return; }
+
     pid_t                   mRegisteredClientThread = ILLEGAL_THREAD_ID;
 
     std::mutex              mUpMessageQueueLock;
