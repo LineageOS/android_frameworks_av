@@ -384,7 +384,11 @@ aaudio_result_t AudioStreamInternal::exitStandby_l() {
         goto exit;
     }
     // Reconstruct data queue descriptor using new shared file descriptor.
-    mEndPointParcelable.updateDataFileDescriptor(&endpointParcelable);
+    result = mEndPointParcelable.updateDataFileDescriptor(&endpointParcelable);
+    if (result != AAUDIO_OK) {
+        ALOGE("%s failed to update data file descriptor, error=%d", __func__, result);
+        goto exit;
+    }
     result = mEndPointParcelable.resolveDataQueue(&mEndpointDescriptor.dataQueueDescriptor);
     if (result != AAUDIO_OK) {
         ALOGE("Failed to resolve data queue after exiting standby, error=%d", result);

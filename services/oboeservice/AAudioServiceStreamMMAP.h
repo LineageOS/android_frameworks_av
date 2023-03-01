@@ -84,6 +84,10 @@ protected:
     aaudio_result_t getHardwareTimestamp_l(
             int64_t *positionFrames, int64_t *timeNanos) REQUIRES(mLock) override;
 
+    int64_t nextDataReportTime_l() REQUIRES(mLock) override;
+
+    void reportData_l() REQUIRES(mLock) override;
+
     /**
      * Device specific startup.
      * @return AAUDIO_OK or negative error.

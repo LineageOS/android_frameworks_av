@@ -404,7 +404,8 @@ void AAudioServiceStreamBase::run() {
     // Hold onto the ref counted stream until the end.
     android::sp<AAudioServiceStreamBase> holdStream(this);
     TimestampScheduler timestampScheduler;
-    int64_t nextTime;
+    int64_t nextTimestampReportTime;
+    int64_t nextDataReportTime;
     int64_t standbyTime = AudioClock::getNanoseconds() + IDLE_TIMEOUT_NANOS;
     // Balance the incStrong from when the thread was launched.
     holdStream->decStrong(nullptr);
@@ -418,7 +419,8 @@ void AAudioServiceStreamBase::run() {
         loopCount++;
         int64_t timeoutNanos = -1;
         if (isRunning() || (isIdle_l() && !isStandby_l())) {
-            timeoutNanos = (isRunning() ? nextTime : standbyTime) - AudioClock::getNanoseconds();
+            timeoutNanos = (isRunning() ? std::min(nextTimestampReportTime, nextDataReportTime)
+                                        : standbyTime) - AudioClock::getNanoseconds();
             timeoutNanos = std::max<int64_t>(0, timeoutNanos);
         }
 
@@ -428,13 +430,20 @@ void AAudioServiceStreamBase::run() {
             break;
         }
 
-        if (isRunning() && AudioClock::getNanoseconds() >= nextTime) {
-            // It is time to update timestamp.
-            if (sendCurrentTimestamp_l() != AAUDIO_OK) {
-                ALOGE("Failed to send current timestamp, stop updating timestamp");
-                disconnect_l();
-            } else {
-                nextTime = timestampScheduler.nextAbsoluteTime();
+        if (isRunning()) {
+            auto currentTimestamp = AudioClock::getNanoseconds();
+            if (currentTimestamp >= nextDataReportTime) {
+                reportData_l();
+                nextDataReportTime = nextDataReportTime_l();
+            }
+            if (currentTimestamp >= nextTimestampReportTime) {
+                // It is time to update timestamp.
+                if (sendCurrentTimestamp_l() != AAUDIO_OK) {
+                    ALOGE("Failed to send current timestamp, stop updating timestamp");
+                    disconnect_l();
+                } else {
+                    nextTimestampReportTime = timestampScheduler.nextAbsoluteTime();
+                }
             }
         }
         if (isIdle_l() && AudioClock::getNanoseconds() >= standbyTime) {
@@ -456,7 +465,8 @@ void AAudioServiceStreamBase::run() {
                     command->result = start_l();
                     timestampScheduler.setBurstPeriod(mFramesPerBurst, getSampleRate());
                     timestampScheduler.start(AudioClock::getNanoseconds());
-                    nextTime = timestampScheduler.nextAbsoluteTime();
+                    nextTimestampReportTime = timestampScheduler.nextAbsoluteTime();
+                    nextDataReportTime = nextDataReportTime_l();
                     break;
                 case PAUSE:
                     command->result = pause_l();
