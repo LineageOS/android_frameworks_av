@@ -256,6 +256,7 @@ cc_library_shared {
         "EffectBufferHalAidl.cpp",
         "EffectHalAidl.cpp",
         "effectsAidlConversion/AidlConversionAec.cpp",
+        "effectsAidlConversion/AidlConversionAgc1.cpp",
         "effectsAidlConversion/AidlConversionAgc2.cpp",
         "effectsAidlConversion/AidlConversionBassBoost.cpp",
         "effectsAidlConversion/AidlConversionDownmix.cpp",
