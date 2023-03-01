@@ -27,6 +27,7 @@
 #include <media/audiohal/EffectsFactoryHalInterface.h>
 #include <system/audio_effects/audio_effects_utils.h>
 #include <system/audio_effects/effect_aec.h>
+#include <system/audio_effects/effect_agc.h>
 #include <system/audio_effects/effect_agc2.h>
 #include <system/audio_effects/effect_bassboost.h>
 #include <system/audio_effects/effect_downmix.h>
@@ -157,6 +158,9 @@ std::vector<EffectParamTestTuple> testPairs = {
         std::make_tuple(FX_IID_AEC,
                         createEffectParamCombination(AEC_PARAM_ECHO_DELAY, 0xff /* echoDelayMs */,
                                                      sizeof(int32_t) /* returnValueSize */)),
+        std::make_tuple(FX_IID_AGC,
+                        createEffectParamCombination(AGC_PARAM_TARGET_LEVEL, 20 /* targetLevel */,
+                                                     sizeof(int16_t) /* returnValueSize */)),
         std::make_tuple(FX_IID_AGC2, createEffectParamCombination(
                                              AGC2_PARAM_FIXED_DIGITAL_GAIN, 15 /* digitalGainDb */,
                                              sizeof(int32_t) /* returnValueSize */)),
