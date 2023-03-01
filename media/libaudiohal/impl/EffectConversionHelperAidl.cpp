@@ -60,8 +60,7 @@ const std::map<uint32_t /* effect_command_e */, EffectConversionHelperAidl::Comm
                 {EFFECT_CMD_SET_INPUT_DEVICE, &EffectConversionHelperAidl::handleSetDevice},
                 {EFFECT_CMD_SET_VOLUME, &EffectConversionHelperAidl::handleSetVolume},
                 {EFFECT_CMD_OFFLOAD, &EffectConversionHelperAidl::handleSetOffload},
-                {EFFECT_CMD_FIRST_PROPRIETARY, &EffectConversionHelperAidl::handleFirstPriority},
-                // Only visualizer support these commands
+                // Only visualizer support these commands, reuse of EFFECT_CMD_FIRST_PROPRIETARY
                 {VISUALIZER_CMD_CAPTURE, &EffectConversionHelperAidl::handleVisualizerCapture},
                 {VISUALIZER_CMD_MEASURE, &EffectConversionHelperAidl::handleVisualizerMeasure}};
 
@@ -276,18 +275,6 @@ status_t EffectConversionHelperAidl::handleSetOffload(uint32_t cmdSize, const vo
     }
     // TODO: handle this after effectproxy implemented in libaudiohal
     return *static_cast<int32_t*>(pReplyData) = OK;
-}
-
-status_t EffectConversionHelperAidl::handleFirstPriority(uint32_t cmdSize __unused,
-                                                         const void* pCmdData __unused,
-                                                         uint32_t* replySize, void* pReplyData) {
-    if (!replySize || !pReplyData) {
-        ALOGE("%s parameter invalid %p %p", __func__, replySize, pReplyData);
-        return BAD_VALUE;
-    }
-
-    // TODO to be implemented
-    return OK;
 }
 
 status_t EffectConversionHelperAidl::handleVisualizerCapture(uint32_t cmdSize __unused,
