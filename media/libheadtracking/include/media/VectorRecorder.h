@@ -34,9 +34,25 @@ namespace android::media {
  */
 class VectorRecorder {
   public:
+    /**
+     * @param vectorSize is the size of the vector input.
+     *        If the input does not match this size, it is ignored.
+     * @param threshold is the time interval we bucket for averaging.
+     * @param maxLogLine is the number of lines we log.  At this
+     *        threshold, the oldest line will expire when the new line comes in.
+     * @param delimiterIdx is an optional array of delimiter indices that
+     *        replace the ',' with a ':'.  For example if delimiterIdx = { 3 } then
+     *        the above example would format as [0.00, 0.00, 0.00 : -1.29, -0.50, 15.27].
+     * @param formatString is the sprintf format string for the double converted data
+     *        to use.
+     */
     VectorRecorder(
-        size_t vectorSize, std::chrono::duration<double> threshold, int maxLogLine)
+        size_t vectorSize, std::chrono::duration<double> threshold, int maxLogLine,
+            std::vector<size_t> delimiterIdx = {},
+            const std::string_view formatString = {})
         : mVectorSize(vectorSize)
+        , mDelimiterIdx(std::move(delimiterIdx))
+        , mFormatString(formatString)
         , mRecordLog(maxLogLine)
         , mRecordThreshold(threshold)
     {
@@ -55,19 +71,38 @@ class VectorRecorder {
 
     /**
      * Format vector to a string, [0.00, 0.00, 0.00, -1.29, -0.50, 15.27].
+     *
+     * @param delimiterIdx is an optional array of delimiter indices that
+     *        replace the ',' with a ':'.  For example if delimiterIdx = { 3 } then
+     *        the above example would format as [0.00, 0.00, 0.00 : -1.29, -0.50, 15.27].
+     * @param formatString is the sprintf format string for the double converted data
+     *        to use.
      */
     template <typename T>
-    static std::string toString(const std::vector<T>& record) {
+    static std::string toString(const std::vector<T>& record,
+            const std::vector<size_t>& delimiterIdx = {},
+            const char * const formatString = nullptr) {
         if (record.size() == 0) {
             return "[]";
         }
 
         std::string ss = "[";
+        auto nextDelimiter = delimiterIdx.begin();
         for (size_t i = 0; i < record.size(); ++i) {
             if (i > 0) {
-                ss.append(", ");
+                if (nextDelimiter != delimiterIdx.end()
+                        && *nextDelimiter <= i) {
+                     ss.append(" : ");
+                     ++nextDelimiter;
+                } else {
+                    ss.append(", ");
+                }
             }
-            base::StringAppendF(&ss, "%0.2lf", static_cast<double>(record[i]));
+            if (formatString != nullptr && *formatString) {
+                base::StringAppendF(&ss, formatString, static_cast<double>(record[i]));
+            } else {
+                base::StringAppendF(&ss, "%5.2lf", static_cast<double>(record[i]));
+            }
         }
         ss.append("]");
         return ss;
@@ -77,6 +112,8 @@ class VectorRecorder {
     static constexpr int mMaxLocalLogLine = 10;
 
     const size_t mVectorSize;
+    const std::vector<size_t> mDelimiterIdx;
+    const std::string mFormatString;
 
     // Local log for historical vector data.
     // Locked internally, so does not need mutex below.
