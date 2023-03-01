@@ -35,6 +35,7 @@
 #include <aidl/android/hardware/audio/effect/IEffect.h>
 
 #include "effectsAidlConversion/AidlConversionAec.h"
+#include "effectsAidlConversion/AidlConversionAgc1.h"
 #include "effectsAidlConversion/AidlConversionAgc2.h"
 #include "effectsAidlConversion/AidlConversionBassBoost.h"
 #include "effectsAidlConversion/AidlConversionDownmix.h"
@@ -89,6 +90,9 @@ status_t EffectHalAidl::createAidlConversion(
     if (typeUuid == kAcousticEchoCancelerTypeUUID) {
         mConversion =
                 std::make_unique<android::effect::AidlConversionAec>(effect, sessionId, ioId, desc);
+    } else if (typeUuid == kAutomaticGainControl1TypeUUID) {
+        mConversion = std::make_unique<android::effect::AidlConversionAgc1>(effect, sessionId, ioId,
+                                                                            desc);
     } else if (typeUuid == kAutomaticGainControl2TypeUUID) {
         mConversion = std::make_unique<android::effect::AidlConversionAgc2>(effect, sessionId, ioId,
                                                                             desc);
