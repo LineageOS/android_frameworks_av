@@ -238,7 +238,7 @@ struct _C2BlockFactory {
      *   - Local migration on blockpool side will be done automatically by
      *     blockpool.
      *   - Before attachBuffer(), BeginAttachBlockToBufferQueue() should be called
-     *     to test eligiblity.
+     *     to test eligibility.
      *   - After attachBuffer() is called, EndAttachBlockToBufferQueue() should
      *     be called. This will set "held" status to true. If it returned
      *     false, cancelBuffer() should be called.
