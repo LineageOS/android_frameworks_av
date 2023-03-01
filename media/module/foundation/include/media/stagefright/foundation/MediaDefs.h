@@ -74,6 +74,7 @@ extern const char *MEDIA_MIMETYPE_AUDIO_DVI_IMA_ADPCM;
 extern const char *MEDIA_MIMETYPE_AUDIO_DTS;
 extern const char *MEDIA_MIMETYPE_AUDIO_DTS_HD;
 extern const char *MEDIA_MIMETYPE_AUDIO_DTS_HD_MA;
+extern const char *MEDIA_MIMETYPE_AUDIO_DTS_UHD;
 extern const char *MEDIA_MIMETYPE_AUDIO_DTS_UHD_P1;
 extern const char *MEDIA_MIMETYPE_AUDIO_DTS_UHD_P2;
 extern const char *MEDIA_MIMETYPE_AUDIO_EVRC;
