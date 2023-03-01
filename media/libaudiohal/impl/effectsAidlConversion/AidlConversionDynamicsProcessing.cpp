@@ -27,7 +27,7 @@
 #include <media/audiohal/AudioEffectUuid.h>
 #include <system/audio_effect.h>
 #include <system/audio_effects/effect_dynamicsprocessing.h>
-
+#include <Utils.h>
 #include <utils/Log.h>
 
 #include "AidlConversionDynamicsProcessing.h"
@@ -47,19 +47,13 @@ using utils::EffectParamWriter;
 
 status_t AidlConversionDp::setParameter(EffectParamReader& param) {
     uint32_t type = 0;
-    if (OK != param.readFromParameter(&type)) {
-        ALOGE("%s invalid param %s", __func__, param.toString().c_str());
-        return BAD_VALUE;
-    }
+    RETURN_STATUS_IF_ERROR(param.readFromParameter(&type));
     Parameter aidlParam;
     switch (type) {
         case DP_PARAM_INPUT_GAIN: {
             DynamicsProcessing::InputGain inputGainAidl;
-            if (OK != param.readFromParameter(&inputGainAidl.channel) ||
-                OK != param.readFromValue(&inputGainAidl.gainDb)) {
-                ALOGE("%s invalid inputGain %s", __func__, param.toString().c_str());
-                return BAD_VALUE;
-            }
+            RETURN_STATUS_IF_ERROR(param.readFromParameter(&inputGainAidl.channel));
+            RETURN_STATUS_IF_ERROR(param.readFromValue(&inputGainAidl.gainDb));
             aidlParam = MAKE_SPECIFIC_PARAMETER(DynamicsProcessing, dynamicsProcessing, inputGain,
                                                 {inputGainAidl});
             break;
@@ -132,17 +126,12 @@ status_t AidlConversionDp::setParameter(EffectParamReader& param) {
 
 status_t AidlConversionDp::getParameter(EffectParamWriter& param) {
     uint32_t type = 0;
-    if (OK != param.readFromParameter(&type)) {
-        ALOGE("%s invalid param %s", __func__, param.toString().c_str());
-    }
+    RETURN_STATUS_IF_ERROR(param.readFromParameter(&type));
     Parameter aidlParam;
     switch (type) {
         case DP_PARAM_INPUT_GAIN: {
             int32_t channel;
-            if (OK != param.readFromParameter(&channel)) {
-                ALOGE("%s invalid inputGain %s", __func__, param.toString().c_str());
-                return BAD_VALUE;
-            }
+            RETURN_STATUS_IF_ERROR(param.readFromParameter(&channel));
             Parameter::Id id = MAKE_SPECIFIC_PARAMETER_ID(DynamicsProcessing, dynamicsProcessingTag,
                                                           DynamicsProcessing::inputGain);
             RETURN_STATUS_IF_ERROR(statusTFromBinderStatus(mEffect->getParameter(id, &aidlParam)));
@@ -161,11 +150,6 @@ status_t AidlConversionDp::getParameter(EffectParamWriter& param) {
             return BAD_VALUE;
         }
         case DP_PARAM_ENGINE_ARCHITECTURE: {
-            int32_t channel;
-            if (OK != param.readFromParameter(&channel)) {
-                ALOGE("%s invalid inputGain %s", __func__, param.toString().c_str());
-                return BAD_VALUE;
-            }
             Parameter::Id id = MAKE_SPECIFIC_PARAMETER_ID(DynamicsProcessing, dynamicsProcessingTag,
                                                           DynamicsProcessing::engineArchitecture);
             RETURN_STATUS_IF_ERROR(statusTFromBinderStatus(mEffect->getParameter(id, &aidlParam)));
@@ -186,18 +170,15 @@ status_t AidlConversionDp::getParameter(EffectParamWriter& param) {
                     VALUE_OR_RETURN_STATUS(convertIntegral<int32_t>(engine.postEqStage.inUse));
             int32_t limiterInUse =
                     VALUE_OR_RETURN_STATUS(convertIntegral<int32_t>(engine.limiterInUse));
-            if (OK != param.writeToValue(&resolution) ||
-                OK != param.writeToValue(&engine.preferredProcessingDurationMs) ||
-                OK != param.writeToValue(&preEqInUse) ||
-                OK != param.writeToValue(&engine.preEqStage.bandCount) ||
-                OK != param.writeToValue(&mbcInUse) ||
-                OK != param.writeToValue(&engine.mbcStage.bandCount) ||
-                OK != param.writeToValue(&postEqInUse) ||
-                OK != param.writeToValue(&engine.postEqStage.bandCount) ||
-                OK != param.writeToValue(&limiterInUse)) {
-                ALOGE("%s invalid engineArchitecture %s", __func__, param.toString().c_str());
-                return BAD_VALUE;
-            }
+            RETURN_STATUS_IF_ERROR(param.writeToValue(&resolution));
+            RETURN_STATUS_IF_ERROR(param.writeToValue(&engine.preferredProcessingDurationMs));
+            RETURN_STATUS_IF_ERROR(param.writeToValue(&preEqInUse));
+            RETURN_STATUS_IF_ERROR(param.writeToValue(&engine.preEqStage.bandCount));
+            RETURN_STATUS_IF_ERROR(param.writeToValue(&mbcInUse));
+            RETURN_STATUS_IF_ERROR(param.writeToValue(&engine.mbcStage.bandCount));
+            RETURN_STATUS_IF_ERROR(param.writeToValue(&postEqInUse));
+            RETURN_STATUS_IF_ERROR(param.writeToValue(&engine.postEqStage.bandCount));
+            RETURN_STATUS_IF_ERROR(param.writeToValue(&limiterInUse));
             mEngine = engine;
             return OK;
         }
@@ -223,14 +204,9 @@ status_t AidlConversionDp::getParameter(EffectParamWriter& param) {
             return getLimiterConfig(param);
         }
         case DP_PARAM_GET_CHANNEL_COUNT: {
-            uint32_t channel = VALUE_OR_RETURN_STATUS(
-                    aidl::android::aidl2legacy_AudioChannelLayout_audio_channel_mask_t(
-                            mCommon.input.base.channelMask, true /* input */));
-            if (OK != param.writeToValue(&channel)) {
-                ALOGE("%s write channel number %d to param failed %s", __func__, channel,
-                      param.toString().c_str());
-                return BAD_VALUE;
-            }
+            uint32_t channel = ::android::hardware::audio::common::getChannelCount(
+                    mCommon.input.base.channelMask);
+            RETURN_STATUS_IF_ERROR(param.writeToValue(&channel));
             return OK;
         }
         default: {
@@ -243,10 +219,9 @@ status_t AidlConversionDp::getParameter(EffectParamWriter& param) {
 aidl::ConversionResult<DynamicsProcessing::ChannelConfig>
 AidlConversionDp::readChannelConfigFromParam(EffectParamReader& param) {
     int32_t enable, channel;
-    if (OK != param.readFromParameter(&channel) || OK != param.readFromValue(&enable)) {
-        ALOGE("%s invalid channel config param %s", __func__, param.toString().c_str());
-        return ::android::base::unexpected(::android::BAD_VALUE);
-    }
+    RETURN_IF_ERROR(param.readFromParameter(&channel));
+    RETURN_IF_ERROR(param.readFromValue(&enable));
+
     return DynamicsProcessing::ChannelConfig(
             {.enable = VALUE_OR_RETURN(convertIntegral<bool>(enable)), .channel = channel});
 }
@@ -255,14 +230,12 @@ aidl::ConversionResult<DynamicsProcessing::EqBandConfig>
 AidlConversionDp::readEqBandConfigFromParam(EffectParamReader& param) {
     DynamicsProcessing::EqBandConfig config;
     int32_t enable;
-    if (OK != param.readFromParameter(&config.channel) ||
-        OK != param.readFromParameter(&config.band) ||
-        OK != param.readFromValue(&enable) ||
-        OK != param.readFromValue(&config.cutoffFrequencyHz) ||
-        OK != param.readFromValue(&config.gainDb)) {
-        ALOGE("%s invalid eq band param %s", __func__, param.toString().c_str());
-        return ::android::base::unexpected(::android::BAD_VALUE);
-    }
+    RETURN_IF_ERROR(param.readFromParameter(&config.channel));
+    RETURN_IF_ERROR(param.readFromParameter(&config.band));
+    RETURN_IF_ERROR(param.readFromValue(&enable));
+    RETURN_IF_ERROR(param.readFromValue(&config.cutoffFrequencyHz));
+    RETURN_IF_ERROR(param.readFromValue(&config.gainDb));
+
     config.enable = VALUE_OR_RETURN(convertIntegral<bool>(enable));
     return config;
 }
@@ -271,22 +244,20 @@ aidl::ConversionResult<DynamicsProcessing::MbcBandConfig>
 AidlConversionDp::readMbcBandConfigFromParam(EffectParamReader& param) {
     DynamicsProcessing::MbcBandConfig config;
     int32_t enable;
-    if (OK != param.readFromParameter(&config.channel) ||
-        OK != param.readFromParameter(&config.band) ||
-        OK != param.readFromValue(&enable) ||
-        OK != param.readFromValue(&config.cutoffFrequencyHz) ||
-        OK != param.readFromValue(&config.attackTimeMs) ||
-        OK != param.readFromValue(&config.releaseTimeMs) ||
-        OK != param.readFromValue(&config.ratio) ||
-        OK != param.readFromValue(&config.thresholdDb) ||
-        OK != param.readFromValue(&config.kneeWidthDb) ||
-        OK != param.readFromValue(&config.noiseGateThresholdDb) ||
-        OK != param.readFromValue(&config.expanderRatio) ||
-        OK != param.readFromValue(&config.preGainDb) ||
-        OK != param.readFromValue(&config.postGainDb)) {
-        ALOGE("%s invalid mbc band config param %s", __func__, param.toString().c_str());
-        return ::android::base::unexpected(::android::BAD_VALUE);
-    }
+    RETURN_IF_ERROR(param.readFromParameter(&config.channel));
+    RETURN_IF_ERROR(param.readFromParameter(&config.band));
+    RETURN_IF_ERROR(param.readFromValue(&enable));
+    RETURN_IF_ERROR(param.readFromValue(&config.cutoffFrequencyHz));
+    RETURN_IF_ERROR(param.readFromValue(&config.attackTimeMs));
+    RETURN_IF_ERROR(param.readFromValue(&config.releaseTimeMs));
+    RETURN_IF_ERROR(param.readFromValue(&config.ratio));
+    RETURN_IF_ERROR(param.readFromValue(&config.thresholdDb));
+    RETURN_IF_ERROR(param.readFromValue(&config.kneeWidthDb));
+    RETURN_IF_ERROR(param.readFromValue(&config.noiseGateThresholdDb));
+    RETURN_IF_ERROR(param.readFromValue(&config.expanderRatio));
+    RETURN_IF_ERROR(param.readFromValue(&config.preGainDb));
+    RETURN_IF_ERROR(param.readFromValue(&config.postGainDb));
+
     config.enable = VALUE_OR_RETURN(convertIntegral<bool>(enable));
     return config;
 }
@@ -295,18 +266,16 @@ aidl::ConversionResult<DynamicsProcessing::LimiterConfig>
 AidlConversionDp::readLimiterConfigFromParam(EffectParamReader& param) {
     DynamicsProcessing::LimiterConfig config;
     int32_t enable, inUse;
-    if (OK != param.readFromParameter(&config.channel) ||
-        OK != param.readFromValue(&inUse) ||
-        OK != param.readFromValue(&enable) ||
-        OK != param.readFromValue(&config.linkGroup) ||
-        OK != param.readFromValue(&config.attackTimeMs) ||
-        OK != param.readFromValue(&config.releaseTimeMs) ||
-        OK != param.readFromValue(&config.ratio) ||
-        OK != param.readFromValue(&config.thresholdDb) ||
-        OK != param.readFromValue(&config.postGainDb)) {
-        ALOGE("%s invalid limiter config param %s", __func__, param.toString().c_str());
-        return ::android::base::unexpected(::android::BAD_VALUE);
-    }
+    RETURN_IF_ERROR(param.readFromParameter(&config.channel));
+    RETURN_IF_ERROR(param.readFromValue(&inUse));
+    RETURN_IF_ERROR(param.readFromValue(&enable));
+    RETURN_IF_ERROR(param.readFromValue(&config.linkGroup));
+    RETURN_IF_ERROR(param.readFromValue(&config.attackTimeMs));
+    RETURN_IF_ERROR(param.readFromValue(&config.releaseTimeMs));
+    RETURN_IF_ERROR(param.readFromValue(&config.ratio));
+    RETURN_IF_ERROR(param.readFromValue(&config.thresholdDb));
+    RETURN_IF_ERROR(param.readFromValue(&config.postGainDb));
+
     config.enable = VALUE_OR_RETURN(convertIntegral<bool>(enable));
     return config;
 }
@@ -315,18 +284,15 @@ aidl::ConversionResult<DynamicsProcessing::EngineArchitecture>
 AidlConversionDp::readEngineArchitectureFromParam(EffectParamReader& param) {
     DynamicsProcessing::EngineArchitecture engine;
     int32_t variant, preEqInUse, mbcInUse, postEqInUse, limiterInUse;
-    if (OK != param.readFromValue(&variant) &&
-        OK != param.readFromValue(&engine.preferredProcessingDurationMs) &&
-        OK != param.readFromValue(&preEqInUse) &&
-        OK != param.readFromValue(&engine.preEqStage.bandCount) &&
-        OK != param.readFromValue(&mbcInUse) &&
-        OK != param.readFromValue(&engine.mbcStage.bandCount) &&
-        OK != param.readFromValue(&postEqInUse) &&
-        OK != param.readFromValue(&engine.postEqStage.bandCount) &&
-        OK != param.readFromValue(&limiterInUse)) {
-        ALOGE("%s invalid engineArchitecture %s", __func__, param.toString().c_str());
-        return ::android::base::unexpected(::android::BAD_VALUE);
-    }
+    RETURN_IF_ERROR(param.readFromValue(&variant));
+    RETURN_IF_ERROR(param.readFromValue(&engine.preferredProcessingDurationMs));
+    RETURN_IF_ERROR(param.readFromValue(&preEqInUse));
+    RETURN_IF_ERROR(param.readFromValue(&engine.preEqStage.bandCount));
+    RETURN_IF_ERROR(param.readFromValue(&mbcInUse));
+    RETURN_IF_ERROR(param.readFromValue(&engine.mbcStage.bandCount));
+    RETURN_IF_ERROR(param.readFromValue(&postEqInUse));
+    RETURN_IF_ERROR(param.readFromValue(&engine.postEqStage.bandCount));
+    RETURN_IF_ERROR(param.readFromValue(&limiterInUse));
 
     engine.resolutionPreference = VALUE_OR_RETURN(
             aidl::android::legacy2aidl_int32_DynamicsProcessing_ResolutionPreference(variant));
@@ -339,10 +305,7 @@ AidlConversionDp::readEngineArchitectureFromParam(EffectParamReader& param) {
 
 status_t AidlConversionDp::getChannelConfig(DynamicsProcessing::Tag tag, EffectParamWriter& param) {
     int32_t channel;
-    if (OK != param.readFromParameter(&channel)) {
-        ALOGE("%s invalid parameter %s", __func__, param.toString().c_str());
-        return BAD_VALUE;
-    }
+    RETURN_STATUS_IF_ERROR(param.readFromParameter(&channel));
 
     Parameter aidlParam;
     Parameter::Id id = MAKE_SPECIFIC_PARAMETER_ID(DynamicsProcessing, dynamicsProcessingTag, tag);
@@ -384,13 +347,9 @@ status_t AidlConversionDp::getChannelConfig(DynamicsProcessing::Tag tag, EffectP
     for (const auto& ch : channels) {
         if (ch.channel == channel) {
             int32_t enable = ch.enable;
-            if (OK != param.writeToValue(&inUse) ||
-                OK != param.writeToValue(&enable) ||
-                OK != param.writeToValue(&bandCount)) {
-                ALOGE("%s failed to write into param value %s", __func__,
-                      param.toString().c_str());
-                return BAD_VALUE;
-            }
+            RETURN_STATUS_IF_ERROR(param.writeToValue(&inUse));
+            RETURN_STATUS_IF_ERROR(param.writeToValue(&enable));
+            RETURN_STATUS_IF_ERROR(param.writeToValue(&bandCount));
             return OK;
         }
     }
@@ -400,10 +359,8 @@ status_t AidlConversionDp::getChannelConfig(DynamicsProcessing::Tag tag, EffectP
 
 status_t AidlConversionDp::getEqBandConfig(DynamicsProcessing::Tag tag, EffectParamWriter& param) {
     int32_t channel, band;
-    if (OK != param.readFromParameter(&channel) || OK != param.readFromParameter(&band)) {
-        ALOGE("%s invalid parameter %s", __func__, param.toString().c_str());
-        return BAD_VALUE;
-    }
+    RETURN_STATUS_IF_ERROR(param.readFromParameter(&channel));
+    RETURN_STATUS_IF_ERROR(param.readFromParameter(&band));
 
     Parameter aidlParam;
     Parameter::Id id = MAKE_SPECIFIC_PARAMETER_ID(DynamicsProcessing, dynamicsProcessingTag, tag);
@@ -425,12 +382,9 @@ status_t AidlConversionDp::getEqBandConfig(DynamicsProcessing::Tag tag, EffectPa
     for (const auto& bandIt : bands) {
         if (bandIt.channel == channel && bandIt.band == band) {
             int32_t enable = bandIt.enable;
-            if (OK != param.writeToValue(&enable) ||
-                OK != param.writeToValue(&bandIt.cutoffFrequencyHz) ||
-                OK != param.writeToValue(&bandIt.gainDb)) {
-                ALOGE("%s failed to write into param value %s", __func__, param.toString().c_str());
-                return BAD_VALUE;
-            }
+            RETURN_STATUS_IF_ERROR(param.writeToValue(&enable));
+            RETURN_STATUS_IF_ERROR(param.writeToValue(&bandIt.cutoffFrequencyHz));
+            RETURN_STATUS_IF_ERROR(param.writeToValue(&bandIt.gainDb));
             return OK;
         }
     }
@@ -440,10 +394,8 @@ status_t AidlConversionDp::getEqBandConfig(DynamicsProcessing::Tag tag, EffectPa
 
 status_t AidlConversionDp::getMbcBandConfig(EffectParamWriter& param) {
     int32_t channel, band;
-    if (OK != param.readFromParameter(&channel) || OK != param.readFromParameter(&band)) {
-        ALOGE("%s invalid parameter %s", __func__, param.toString().c_str());
-        return BAD_VALUE;
-    }
+    RETURN_STATUS_IF_ERROR(param.readFromParameter(&channel));
+    RETURN_STATUS_IF_ERROR(param.readFromParameter(&band));
     Parameter aidlParam;
     Parameter::Id id = MAKE_SPECIFIC_PARAMETER_ID(DynamicsProcessing, dynamicsProcessingTag,
                                                   DynamicsProcessing::mbcBand);
@@ -457,20 +409,17 @@ status_t AidlConversionDp::getMbcBandConfig(EffectParamWriter& param) {
     for (const auto& bandIt : bands) {
         if (bandIt.channel == channel && bandIt.band == band) {
             int32_t enable = bandIt.enable;
-            if (OK != param.writeToValue(&enable) ||
-                OK != param.writeToValue(&bandIt.cutoffFrequencyHz) ||
-                OK != param.writeToValue(&bandIt.attackTimeMs) ||
-                OK != param.writeToValue(&bandIt.releaseTimeMs) ||
-                OK != param.writeToValue(&bandIt.ratio) ||
-                OK != param.writeToValue(&bandIt.thresholdDb) ||
-                OK != param.writeToValue(&bandIt.kneeWidthDb) ||
-                OK != param.writeToValue(&bandIt.noiseGateThresholdDb) ||
-                OK != param.writeToValue(&bandIt.expanderRatio) ||
-                OK != param.writeToValue(&bandIt.preGainDb) ||
-                OK != param.writeToValue(&bandIt.postGainDb)) {
-                ALOGE("%s failed to write into param value %s", __func__, param.toString().c_str());
-                return BAD_VALUE;
-            }
+            RETURN_STATUS_IF_ERROR(param.writeToValue(&enable));
+            RETURN_STATUS_IF_ERROR(param.writeToValue(&bandIt.cutoffFrequencyHz));
+            RETURN_STATUS_IF_ERROR(param.writeToValue(&bandIt.attackTimeMs));
+            RETURN_STATUS_IF_ERROR(param.writeToValue(&bandIt.releaseTimeMs));
+            RETURN_STATUS_IF_ERROR(param.writeToValue(&bandIt.ratio));
+            RETURN_STATUS_IF_ERROR(param.writeToValue(&bandIt.thresholdDb));
+            RETURN_STATUS_IF_ERROR(param.writeToValue(&bandIt.kneeWidthDb));
+            RETURN_STATUS_IF_ERROR(param.writeToValue(&bandIt.noiseGateThresholdDb));
+            RETURN_STATUS_IF_ERROR(param.writeToValue(&bandIt.expanderRatio));
+            RETURN_STATUS_IF_ERROR(param.writeToValue(&bandIt.preGainDb));
+            RETURN_STATUS_IF_ERROR(param.writeToValue(&bandIt.postGainDb));
             return OK;
         }
     }
@@ -480,10 +429,7 @@ status_t AidlConversionDp::getMbcBandConfig(EffectParamWriter& param) {
 
 status_t AidlConversionDp::getLimiterConfig(EffectParamWriter& param) {
     int32_t channel;
-    if (OK != param.readFromParameter(&channel)) {
-        ALOGE("%s invalid parameter %s", __func__, param.toString().c_str());
-        return BAD_VALUE;
-    }
+    RETURN_STATUS_IF_ERROR(param.readFromParameter(&channel));
     Parameter aidlParam;
     Parameter::Id id = MAKE_SPECIFIC_PARAMETER_ID(DynamicsProcessing, dynamicsProcessingTag,
                                                   DynamicsProcessing::limiter);
@@ -498,17 +444,14 @@ status_t AidlConversionDp::getLimiterConfig(EffectParamWriter& param) {
         if (config.channel == channel) {
             int32_t inUse = mEngine.limiterInUse;
             int32_t enable = config.enable;
-            if (OK != param.writeToValue(&inUse) ||
-                OK != param.writeToValue(&enable) ||
-                OK != param.writeToValue(&config.linkGroup) ||
-                OK != param.writeToValue(&config.attackTimeMs) ||
-                OK != param.writeToValue(&config.releaseTimeMs) ||
-                OK != param.writeToValue(&config.ratio) ||
-                OK != param.writeToValue(&config.thresholdDb) ||
-                OK != param.writeToValue(&config.postGainDb)) {
-                ALOGE("%s failed to write into param value %s", __func__, param.toString().c_str());
-                return BAD_VALUE;
-            }
+            RETURN_STATUS_IF_ERROR(param.writeToValue(&inUse));
+            RETURN_STATUS_IF_ERROR(param.writeToValue(&enable));
+            RETURN_STATUS_IF_ERROR(param.writeToValue(&config.linkGroup));
+            RETURN_STATUS_IF_ERROR(param.writeToValue(&config.attackTimeMs));
+            RETURN_STATUS_IF_ERROR(param.writeToValue(&config.releaseTimeMs));
+            RETURN_STATUS_IF_ERROR(param.writeToValue(&config.ratio));
+            RETURN_STATUS_IF_ERROR(param.writeToValue(&config.thresholdDb));
+            RETURN_STATUS_IF_ERROR(param.writeToValue(&config.postGainDb));
             return OK;
         }
     }
