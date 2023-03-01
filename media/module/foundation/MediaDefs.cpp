@@ -72,6 +72,7 @@ const char *MEDIA_MIMETYPE_AUDIO_DVI_IMA_ADPCM = "audio/x-adpcm-dvi-ima";
 const char *MEDIA_MIMETYPE_AUDIO_DTS = "audio/vnd.dts";
 const char *MEDIA_MIMETYPE_AUDIO_DTS_HD = "audio/vnd.dts.hd";
 const char *MEDIA_MIMETYPE_AUDIO_DTS_HD_MA = "audio/vnd.dts.hd;profile=dtsma";
+const char *MEDIA_MIMETYPE_AUDIO_DTS_UHD = "audio/vnd.dts.uhd";
 const char *MEDIA_MIMETYPE_AUDIO_DTS_UHD_P1 = "audio/vnd.dts.uhd;profile=p1";
 const char *MEDIA_MIMETYPE_AUDIO_DTS_UHD_P2 = "audio/vnd.dts.uhd;profile=p2";
 const char *MEDIA_MIMETYPE_AUDIO_EVRC = "audio/evrc";

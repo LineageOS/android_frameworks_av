@@ -798,6 +798,8 @@ static std::vector<std::pair<const char *, uint32_t>> int32Mappings {
         { "dvb-audio-description", kKeyDvbAudioDescription},
         { "dvb-teletext-magazine-number", kKeyDvbTeletextMagazineNumber},
         { "dvb-teletext-page-number", kKeyDvbTeletextPageNumber},
+        { "profile", kKeyAudioProfile },
+        { "level", kKeyAudioLevel },
     }
 };
 
