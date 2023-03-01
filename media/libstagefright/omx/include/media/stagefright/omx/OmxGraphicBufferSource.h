@@ -70,7 +70,7 @@ public:
         int32_t bufferCount,
         uint32_t frameWidth,
         uint32_t frameHeight,
-        uint32_t consumerUsage);
+        uint64_t consumerUsage);
 
     // Rest of the interface in GraphicBufferSource.
 
