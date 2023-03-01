@@ -104,6 +104,7 @@ cc_library {
         "AAudioStreamTracker.cpp",
         "AAudioThread.cpp",
         "SharedMemoryProxy.cpp",
+        "SharedMemoryWrapper.cpp",
         "SharedRingBuffer.cpp",
         "TimestampScheduler.cpp",
     ],
