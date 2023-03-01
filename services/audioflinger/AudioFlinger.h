@@ -757,6 +757,7 @@ using effect_buffer_t = int16_t;
                                audio_port_handle_t *handle);
         virtual status_t stop(audio_port_handle_t handle);
         virtual status_t standby();
+                status_t reportData(const void* buffer, size_t frameCount) override;
 
     private:
         const sp<MmapThread> mThread;

@@ -64,7 +64,9 @@ public:
 
     int32_t getSizeInBytes();
 
-    void dump();
+    bool isInUse() const { return mFd.get() != -1; }
+
+    void dump() const;
 
     // Extract a parcelable representation of this object.
     // Since we own a unique FD, move semantics are provided to avoid the need to dupe.

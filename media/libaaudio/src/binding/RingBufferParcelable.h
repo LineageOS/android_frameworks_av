@@ -17,6 +17,7 @@
 #ifndef ANDROID_AAUDIO_RINGBUFFER_PARCELABLE_H
 #define ANDROID_AAUDIO_RINGBUFFER_PARCELABLE_H
 
+#include <map>
 #include <stdint.h>
 
 #include <aaudio/RingBuffer.h>
@@ -46,6 +47,22 @@ public:
                      int32_t dataMemoryOffset,
                      int32_t dataSizeInBytes);
 
+    /**
+     * Set up memory for the RingBufferParcelable.
+     *
+     * This function will take three MemoryInfoTuple as parameters to set up memory. The
+     * MemoryInfoTuple contains the shared memory index, offset in the shared memory and size
+     * of the object. This will allow setting up the read counter, write counter and data memory
+     * that are located in different shared memory blocks.
+     *
+     * @param dataMemoryInfo
+     * @param readCounterInfo
+     * @param writeCounterInfo
+     */
+    void setupMemory(const SharedRegionParcelable::MemoryInfoTuple& dataMemoryInfo,
+                     const SharedRegionParcelable::MemoryInfoTuple& readCounterInfo,
+                     const SharedRegionParcelable::MemoryInfoTuple& writeCounterInfo);
+
     int32_t getBytesPerFrame() const;
 
     void setBytesPerFrame(int32_t bytesPerFrame);
@@ -62,10 +79,24 @@ public:
 
     aaudio_result_t resolve(SharedMemoryParcelable *memoryParcels, RingBufferDescriptor *descriptor);
 
-    void updateMemory(const RingBufferParcelable& parcelable);
+    /**
+     * Update this ring buffer with the given ring buffer.
+     *
+     * @param parcelable the ring buffer to be used to update this ring buffer.
+     * @param memoryIndexMap a map from the shared memory indexes used by the given ring buffer
+     *                       to the shared memory indexes used by this ring buffer.
+     */
+    void updateMemory(const RingBufferParcelable& parcelable,
+                      const std::map<int32_t, int32_t>& memoryIndexMap);
 
-    int32_t getSharedMemoryIndex() const {
-        return mSharedMemoryIndex;
+    int32_t getReadCounterSharedMemoryIndex() const {
+        return mReadCounterParcelable.getSharedMemoryIndex();
+    }
+    int32_t getWriteCounterSharedMemoryIndex() const {
+        return mWriteCounterParcelable.getSharedMemoryIndex();
+    }
+    int32_t getDataSharedMemoryIndex() const {
+        return mDataParcelable.getSharedMemoryIndex();
     }
 
     void dump();
@@ -77,7 +108,6 @@ private:
     SharedRegionParcelable  mReadCounterParcelable;
     SharedRegionParcelable  mWriteCounterParcelable;
     SharedRegionParcelable  mDataParcelable;
-    int32_t                 mSharedMemoryIndex = -1;
     int32_t                 mBytesPerFrame = 0;     // index is in frames
     int32_t                 mFramesPerBurst = 0;    // for ISOCHRONOUS queues
     int32_t                 mCapacityInFrames = 0;  // zero if unused

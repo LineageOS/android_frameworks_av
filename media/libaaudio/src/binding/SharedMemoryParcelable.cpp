@@ -146,7 +146,7 @@ aaudio_result_t SharedMemoryParcelable::validate() const {
     return AAUDIO_OK;
 }
 
-void SharedMemoryParcelable::dump() {
+void SharedMemoryParcelable::dump() const {
     ALOGD("mFd = %d", mFd.get());
     ALOGD("mSizeInBytes = %" PRId64, mSizeInBytes);
 }
