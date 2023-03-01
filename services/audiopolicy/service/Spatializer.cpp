@@ -1076,13 +1076,13 @@ std::string Spatializer::toString(unsigned level) const {
     if (mPoseController != nullptr) {
         ss.append(mPoseController->toString(level + 1))
             .append(prefixSpace)
-            .append("Pose (active stage-to-head) [tx, ty, tz, pitch, roll, yaw]:\n")
+            .append("Pose (active stage-to-head) [tx, ty, tz : pitch, roll, yaw]:\n")
             .append(prefixSpace)
             .append(" PerMinuteHistory:\n")
-            .append(mPoseDurableRecorder.toString(level + 2))
+            .append(mPoseDurableRecorder.toString(level + 3))
             .append(prefixSpace)
             .append(" PerSecondHistory:\n")
-            .append(mPoseRecorder.toString(level + 2));
+            .append(mPoseRecorder.toString(level + 3));
     } else {
         ss.append(prefixSpace).append("SpatializerPoseController not exist\n");
     }
