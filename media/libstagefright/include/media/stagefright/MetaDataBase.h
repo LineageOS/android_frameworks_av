@@ -117,6 +117,12 @@ enum {
     kKeyVideoProfile      = 'vprf',  // int32_t
     kKeyVideoLevel        = 'vlev',  // int32_t
 
+    // audio profile and level
+    // The codec framework doesn't distinguish between video and audio profiles,
+    // so there is no need to define a separate key
+    kKeyAudioProfile      = 'vprf',  // int32_t
+    kKeyAudioLevel        = 'vlev',  // int32_t
+
     kKey2ByteNalLength    = '2NAL',  // int32_t (bool)
 
     // Identify the file output format for authoring
