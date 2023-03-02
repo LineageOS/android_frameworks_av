@@ -37,6 +37,7 @@
 #include <ctime>
 #include <deque>
 #include <endian.h>
+#include <inttypes.h>
 #include <iterator>
 #include <mutex>
 #include <string>
@@ -105,9 +106,9 @@ template <typename... Args>
 void LogToBuffer(android_LogPriority level, const uint8_t uuid[16], const char *fmt, Args... args) {
     uint64_t uuid2[2] = {};
     std::memcpy(uuid2, uuid, sizeof(uuid2));
-    std::string uuidFmt("uuid=[%lx %lx] ");
+    std::string uuidFmt("uuid=[%" PRIx64 " %" PRIx64 "] ");
     uuidFmt += fmt;
-    LogToBuffer(level, uuidFmt.c_str(), htobe64(uuid2[0]), htobe64(uuid2[1]), args...);
+    LogToBuffer(level, uuidFmt.c_str(), betoh64(uuid2[0]), betoh64(uuid2[1]), args...);
 }
 
 #ifndef LOG2BE
