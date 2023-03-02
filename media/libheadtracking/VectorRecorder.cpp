@@ -21,7 +21,7 @@ namespace android::media {
 // Convert data to string with level indentation.
 // No need for a lock as the SimpleLog is thread-safe.
 std::string VectorRecorder::toString(size_t indent) const {
-    return mRecordLog.dumpToString(std::string(indent + 1, ' ').c_str(), mMaxLocalLogLine);
+    return mRecordLog.dumpToString(std::string(indent, ' ').c_str(), mMaxLocalLogLine);
 }
 
 // Record into local log when it is time.
@@ -36,9 +36,9 @@ void VectorRecorder::record(const std::vector<float>& record) {
         sumToAverage_l();
         mRecordLog.log(
                 "mean: %s, min: %s, max %s, calculated %zu samples in %0.4f second(s)",
-                toString(mSum).c_str(),
-                toString(mMin).c_str(),
-                toString(mMax).c_str(),
+                toString(mSum, mDelimiterIdx, mFormatString.c_str()).c_str(),
+                toString(mMin, mDelimiterIdx, mFormatString.c_str()).c_str(),
+                toString(mMax, mDelimiterIdx, mFormatString.c_str()).c_str(),
                 mNumberOfSamples,
                 mNumberOfSecondsSinceFirstSample.count());
         resetRecord_l();

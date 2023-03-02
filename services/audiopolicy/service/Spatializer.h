@@ -407,10 +407,10 @@ private:
      */
     // Record one log line per second (up to mMaxLocalLogLine) to capture most recent sensor data.
     media::VectorRecorder mPoseRecorder GUARDED_BY(mLock) {
-        6 /* vectorSize */, std::chrono::seconds(1), mMaxLocalLogLine };
+        6 /* vectorSize */, std::chrono::seconds(1), mMaxLocalLogLine, { 3 } /* delimiterIdx */};
     // Record one log line per minute (up to mMaxLocalLogLine) to capture durable sensor data.
     media::VectorRecorder mPoseDurableRecorder  GUARDED_BY(mLock) {
-        6 /* vectorSize */, std::chrono::minutes(1), mMaxLocalLogLine };
+        6 /* vectorSize */, std::chrono::minutes(1), mMaxLocalLogLine, { 3 } /* delimiterIdx */};
 };  // Spatializer
 
 }; // namespace android
