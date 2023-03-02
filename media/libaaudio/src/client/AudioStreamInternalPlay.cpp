@@ -74,7 +74,7 @@ aaudio_result_t AudioStreamInternalPlay::requestPause_l()
     if (result != AAUDIO_OK) {
         return result;
     }
-    if (mServiceStreamHandle == AAUDIO_HANDLE_INVALID) {
+    if (getServiceHandle() == AAUDIO_HANDLE_INVALID) {
         ALOGW("%s() mServiceStreamHandle invalid", __func__);
         return AAUDIO_ERROR_INVALID_STATE;
     }
@@ -82,17 +82,17 @@ aaudio_result_t AudioStreamInternalPlay::requestPause_l()
     mClockModel.stop(AudioClock::getNanoseconds());
     setState(AAUDIO_STREAM_STATE_PAUSING);
     mAtomicInternalTimestamp.clear();
-    return mServiceInterface.pauseStream(mServiceStreamHandle);
+    return mServiceInterface.pauseStream(mServiceStreamHandleInfo);
 }
 
 aaudio_result_t AudioStreamInternalPlay::requestFlush_l() {
-    if (mServiceStreamHandle == AAUDIO_HANDLE_INVALID) {
+    if (getServiceHandle() == AAUDIO_HANDLE_INVALID) {
         ALOGW("%s() mServiceStreamHandle invalid", __func__);
         return AAUDIO_ERROR_INVALID_STATE;
     }
 
     setState(AAUDIO_STREAM_STATE_FLUSHING);
-    return mServiceInterface.flushStream(mServiceStreamHandle);
+    return mServiceInterface.flushStream(mServiceStreamHandleInfo);
 }
 
 void AudioStreamInternalPlay::prepareBuffersForStart() {
