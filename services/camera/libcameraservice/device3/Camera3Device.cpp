@@ -1897,7 +1897,7 @@ void Camera3Device::notifyStatus(bool idle) {
                     streamUseCase = camera3Stream->getStreamUseCase();
                 }
                 streamStats.emplace_back(stream->getWidth(), stream->getHeight(),
-                    stream->getFormat(), streamMaxPreviewFps, stream->getDataSpace(), usage,
+                    stream->getOriginalFormat(), streamMaxPreviewFps, stream->getDataSpace(), usage,
                     stream->getMaxHalBuffers(),
                     stream->getMaxTotalBuffers() - stream->getMaxHalBuffers(),
                     stream->getDynamicRangeProfile(), streamUseCase,
