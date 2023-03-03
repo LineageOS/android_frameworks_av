@@ -36,11 +36,13 @@ namespace android {
 namespace effect {
 
 using ::aidl::android::convertIntegral;
+using ::aidl::android::getParameterSpecificField;
 using ::aidl::android::aidl_utils::statusTFromBinderStatus;
 using ::aidl::android::hardware::audio::effect::Capability;
 using ::aidl::android::hardware::audio::effect::DynamicsProcessing;
 using ::aidl::android::hardware::audio::effect::Parameter;
 using ::aidl::android::hardware::audio::effect::toString;
+using ::aidl::android::hardware::audio::effect::VendorExtension;
 using ::android::status_t;
 using utils::EffectParamReader;
 using utils::EffectParamWriter;
@@ -116,8 +118,12 @@ status_t AidlConversionDp::setParameter(EffectParamReader& param) {
             break;
         }
         default: {
-            ALOGW("%s unknown param %s", __func__, param.toString().c_str());
-            return BAD_VALUE;
+            // for vendor extension, copy data area to the DefaultExtension, parameter ignored
+            VendorExtension ext = VALUE_OR_RETURN_STATUS(
+                    aidl::android::legacy2aidl_EffectParameterReader_Data_VendorExtension(param));
+            aidlParam =
+                    MAKE_SPECIFIC_PARAMETER(DynamicsProcessing, dynamicsProcessing, vendor, ext);
+            break;
         }
     }
 
@@ -210,8 +216,7 @@ status_t AidlConversionDp::getParameter(EffectParamWriter& param) {
             return OK;
         }
         default: {
-            ALOGW("%s unknown param %s", __func__, param.toString().c_str());
-            return BAD_VALUE;
+            VENDOR_EXTENSION_GET_AND_RETURN(DynamicsProcessing, dynamicsProcessing, param);
         }
     }
 }

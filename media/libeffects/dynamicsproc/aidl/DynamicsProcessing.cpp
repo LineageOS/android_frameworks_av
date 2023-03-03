@@ -221,7 +221,7 @@ ndk::ScopedAStatus DynamicsProcessingImpl::setParameterSpecific(
                       EX_ILLEGAL_ARGUMENT, "setInputGainFailed");
             return ndk::ScopedAStatus::ok();
         }
-        case DynamicsProcessing::vendorExtension: {
+        case DynamicsProcessing::vendor: {
             LOG(ERROR) << __func__ << " unsupported tag: " << toString(tag);
             return ndk::ScopedAStatus::fromExceptionCodeWithMessage(
                     EX_ILLEGAL_ARGUMENT, "DPVendorExtensionTagNotSupported");
@@ -301,7 +301,7 @@ ndk::ScopedAStatus DynamicsProcessingImpl::getParameterDynamicsProcessing(
                             mContext->getInputGain()));
             return ndk::ScopedAStatus::ok();
         }
-        case DynamicsProcessing::vendorExtension: {
+        case DynamicsProcessing::vendor: {
             LOG(ERROR) << __func__ << " wrong vendor tag in CommonTag: " << toString(tag);
             return ndk::ScopedAStatus::fromExceptionCodeWithMessage(
                     EX_ILLEGAL_ARGUMENT, "DPVendorExtensionTagInWrongId");

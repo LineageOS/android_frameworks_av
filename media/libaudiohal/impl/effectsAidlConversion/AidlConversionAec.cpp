@@ -33,9 +33,11 @@
 namespace android {
 namespace effect {
 
+using ::aidl::android::getParameterSpecificField;
 using ::aidl::android::aidl_utils::statusTFromBinderStatus;
 using ::aidl::android::hardware::audio::effect::AcousticEchoCanceler;
 using ::aidl::android::hardware::audio::effect::Parameter;
+using ::aidl::android::hardware::audio::effect::VendorExtension;
 using ::android::status_t;
 using utils::EffectParamReader;
 using utils::EffectParamWriter;
@@ -64,8 +66,13 @@ status_t AidlConversionAec::setParameter(EffectParamReader& param) {
             break;
         }
         default: {
-            ALOGW("%s unknown param %s", __func__, param.toString().c_str());
-            return BAD_VALUE;
+            // for vendor extension, copy data area to the DefaultExtension, parameter ignored
+            VendorExtension ext = VALUE_OR_RETURN_STATUS(
+                    aidl::android::legacy2aidl_EffectParameterReader_Data_VendorExtension(param));
+            aidlParam = MAKE_SPECIFIC_PARAMETER(AcousticEchoCanceler, acousticEchoCanceler, vendor,
+                                                ext);
+            RETURN_STATUS_IF_ERROR(statusTFromBinderStatus(mEffect->setParameter(aidlParam)));
+            break;
         }
     }
 
@@ -73,7 +80,7 @@ status_t AidlConversionAec::setParameter(EffectParamReader& param) {
 }
 
 status_t AidlConversionAec::getParameter(EffectParamWriter& param) {
-    uint32_t type = 0, value = 0;
+    uint32_t type = 0;
     if (!param.validateParamValueSize(sizeof(uint32_t), sizeof(uint32_t)) ||
         OK != param.readFromParameter(&type)) {
         param.setStatus(BAD_VALUE);
@@ -85,29 +92,30 @@ status_t AidlConversionAec::getParameter(EffectParamWriter& param) {
         case AEC_PARAM_ECHO_DELAY:
             FALLTHROUGH_INTENDED;
         case AEC_PARAM_PROPERTIES: {
+            int32_t delay = 0;
             Parameter::Id id =
                     MAKE_SPECIFIC_PARAMETER_ID(AcousticEchoCanceler, acousticEchoCancelerTag,
                                                AcousticEchoCanceler::echoDelayUs);
             RETURN_STATUS_IF_ERROR(statusTFromBinderStatus(mEffect->getParameter(id, &aidlParam)));
-            value = VALUE_OR_RETURN_STATUS(
+            delay = VALUE_OR_RETURN_STATUS(
                     aidl::android::aidl2legacy_Parameter_aec_uint32_echoDelay(aidlParam));
-            break;
+            return param.writeToValue(&delay);
         }
         case AEC_PARAM_MOBILE_MODE: {
+            int32_t mode = 0;
             Parameter::Id id =
                     MAKE_SPECIFIC_PARAMETER_ID(AcousticEchoCanceler, acousticEchoCancelerTag,
                                                AcousticEchoCanceler::mobileMode);
             RETURN_STATUS_IF_ERROR(statusTFromBinderStatus(mEffect->getParameter(id, &aidlParam)));
-            value = VALUE_OR_RETURN_STATUS(
+            mode = VALUE_OR_RETURN_STATUS(
                     aidl::android::aidl2legacy_Parameter_aec_uint32_mobileMode(aidlParam));
-            break;
+            return param.writeToValue(&mode);
         }
-        default:
-            // use vendor extension implementation
-            ALOGW("%s unknown param %s", __func__, param.toString().c_str());
-            return BAD_VALUE;
+        default: {
+            // use vendor extension implementation, the first 32bits (param type) won't pass to HAL
+            VENDOR_EXTENSION_GET_AND_RETURN(AcousticEchoCanceler, acousticEchoCanceler, param);
+        }
     }
-    return param.writeToValue(&value);
 }
 
 } // namespace effect

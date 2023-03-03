@@ -22,6 +22,7 @@
 //#define LOG_NDEBUG 0
 
 #include <aidl/android/hardware/audio/effect/DefaultExtension.h>
+#include <aidl/android/hardware/audio/effect/VendorExtension.h>
 #include <error/expected_utils.h>
 #include <media/AidlConversionNdk.h>
 #include <media/AidlConversionEffect.h>
@@ -56,17 +57,11 @@ status_t AidlConversionVendorExtension::setParameter(EffectParamReader& param) {
 }
 
 status_t AidlConversionVendorExtension::getParameter(EffectParamWriter& param) {
-    int32_t tag;
-    if (OK != param.readFromParameter(&tag)) {
-        ALOGE("%s invalid param %s", __func__, param.toString().c_str());
-        param.setStatus(BAD_VALUE);
-        return BAD_VALUE;
-    }
-
+    VendorExtension extId = VALUE_OR_RETURN_STATUS(
+            aidl::android::legacy2aidl_EffectParameterReader_Param_VendorExtension(param));
+    Parameter::Id id = UNION_MAKE(Parameter::Id, vendorEffectTag, extId);
     Parameter aidlParam;
-    Parameter::Id id = UNION_MAKE(Parameter::Id, vendorEffectTag, tag /* parameter tag */);
     RETURN_STATUS_IF_ERROR(statusTFromBinderStatus(mEffect->getParameter(id, &aidlParam)));
-
     // copy the AIDL extension data back to effect_param_t
     return VALUE_OR_RETURN_STATUS(
             ::aidl::android::aidl2legacy_ParameterExtension_EffectParameterWriter(aidlParam,
