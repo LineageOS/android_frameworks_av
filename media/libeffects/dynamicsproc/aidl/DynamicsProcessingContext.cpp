@@ -64,6 +64,7 @@ void DynamicsProcessingContext::reset() {
 RetCode DynamicsProcessingContext::setCommon(const Parameter::Common& common) {
     mCommon = common;
     init();
+    LOG(INFO) << __func__ << common.toString();
     return RetCode::SUCCESS;
 }
 
