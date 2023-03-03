@@ -29,6 +29,14 @@
 #include <media/stagefright/foundation/AUtils.h>
 #include <media/stagefright/foundation/MediaDefs.h>
 
+// libyuv version required for I410ToAB30Matrix and I210ToAB30Matrix.
+#if LIBYUV_VERSION >= 1780
+#include <algorithm>
+#define HAVE_LIBYUV_I410_I210_TO_AB30 1
+#else
+#define HAVE_LIBYUV_I410_I210_TO_AB30 0
+#endif
+
 namespace android {
 
 // codecname set and passed in as a compile flag from Android.bp
@@ -818,6 +826,7 @@ bool C2SoftGav1Dec::outputBuffer(const std::shared_ptr<C2BlockPool> &pool,
       allowRGBA1010102 = true;
     }
     format = getHalPixelFormatForBitDepth10(allowRGBA1010102);
+#if !HAVE_LIBYUV_I410_I210_TO_AB30
     if ((format == HAL_PIXEL_FORMAT_RGBA_1010102) &&
         (buffer->image_format != libgav1::kImageFormatYuv420)) {
         ALOGE("Only YUV420 output is supported when targeting RGBA_1010102");
@@ -826,6 +835,7 @@ bool C2SoftGav1Dec::outputBuffer(const std::shared_ptr<C2BlockPool> &pool,
       work->workletsProcessed = 1u;
       return false;
     }
+#endif
   }
 
   if (mHalPixelFormat != format) {
@@ -889,11 +899,41 @@ bool C2SoftGav1Dec::outputBuffer(const std::shared_ptr<C2BlockPool> &pool,
     size_t srcVStride = buffer->stride[2] / 2;
 
     if (format == HAL_PIXEL_FORMAT_RGBA_1010102) {
-        convertYUV420Planar16ToY410OrRGBA1010102(
-                (uint32_t *)dstY, srcY, srcU, srcV, srcYStride,
-                srcUStride, srcVStride,
-                dstYStride / sizeof(uint32_t), mWidth, mHeight,
-                std::static_pointer_cast<const C2ColorAspectsStruct>(codedColorAspects));
+        bool processed = false;
+#if HAVE_LIBYUV_I410_I210_TO_AB30
+        if (buffer->image_format == libgav1::kImageFormatYuv444) {
+            libyuv::I410ToAB30Matrix(srcY, srcYStride, srcU, srcUStride, srcV, srcVStride,
+                                     dstY, dstYStride, &libyuv::kYuvV2020Constants,
+                                     mWidth, mHeight);
+            processed = true;
+        } else if (buffer->image_format == libgav1::kImageFormatYuv422) {
+            libyuv::I210ToAB30Matrix(srcY, srcYStride, srcU, srcUStride, srcV, srcVStride,
+                                     dstY, dstYStride, &libyuv::kYuvV2020Constants,
+                                     mWidth, mHeight);
+            processed = true;
+        }
+#endif  // HAVE_LIBYUV_I410_I210_TO_AB30
+        if (!processed) {
+            if (isMonochrome) {
+                const size_t tmpSize = mWidth;
+                const bool needFill = tmpSize > mTmpFrameBufferSize;
+                if (!allocTmpFrameBuffer(tmpSize)) {
+                    ALOGE("Error allocating temp conversion buffer (%zu bytes)", tmpSize);
+                    setError(work, C2_NO_MEMORY);
+                    return false;
+                }
+                srcU = srcV = mTmpFrameBuffer.get();
+                srcUStride = srcVStride = 0;
+                if (needFill) {
+                    std::fill_n(mTmpFrameBuffer.get(), tmpSize, 512);
+                }
+            }
+            convertYUV420Planar16ToY410OrRGBA1010102(
+                    (uint32_t *)dstY, srcY, srcU, srcV, srcYStride,
+                    srcUStride, srcVStride,
+                    dstYStride / sizeof(uint32_t), mWidth, mHeight,
+                    std::static_pointer_cast<const C2ColorAspectsStruct>(codedColorAspects));
+        }
     } else if (format == HAL_PIXEL_FORMAT_YCBCR_P010) {
         dstYStride /= 2;
         dstUStride /= 2;
