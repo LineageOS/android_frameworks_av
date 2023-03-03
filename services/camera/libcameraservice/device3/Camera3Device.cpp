@@ -2451,8 +2451,9 @@ status_t Camera3Device::configureStreamsLocked(int operatingMode,
     // max_buffers, usage, and priv fields, as well as data_space and format
     // fields for IMPLEMENTATION_DEFINED formats.
 
+    int64_t logId = mCameraServiceProxyWrapper->getCurrentLogIdForCamera(mId);
     const camera_metadata_t *sessionBuffer = sessionParams.getAndLock();
-    res = mInterface->configureStreams(sessionBuffer, &config, bufferSizes);
+    res = mInterface->configureStreams(sessionBuffer, &config, bufferSizes, logId);
     sessionParams.unlock(sessionBuffer);
 
     if (res == BAD_VALUE) {
