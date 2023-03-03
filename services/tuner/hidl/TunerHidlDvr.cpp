@@ -72,7 +72,7 @@ TunerHidlDvr::~TunerHidlDvr() {
 
     AidlMQDesc aidlMQDesc;
     unsafeHidlToAidlMQDescriptor<uint8_t, int8_t, SynchronizedReadWrite>(dvrMQDesc, &aidlMQDesc);
-    *_aidl_return = move(aidlMQDesc);
+    *_aidl_return = std::move(aidlMQDesc);
     return ::ndk::ScopedAStatus::ok();
 }
 
