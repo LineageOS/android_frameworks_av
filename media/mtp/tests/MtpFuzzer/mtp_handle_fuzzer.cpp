@@ -128,10 +128,10 @@ void MtpFfsHandleFuzzer::invokeMtpFfsHandle() {
         std::unique_ptr<IMtpHandle> handle;
         if (mFdp.ConsumeBool()) {
             std::unique_ptr<IMtpHandle> mtpCompactHandle(new MtpFfsCompatHandle(controlFd));
-            handle = move(mtpCompactHandle);
+            handle = std::move(mtpCompactHandle);
         } else {
             std::unique_ptr<IMtpHandle> mtpHandle(new MtpFfsHandle(controlFd));
-            handle = move(mtpHandle);
+            handle = std::move(mtpHandle);
         }
 
         int32_t mtpHandle = mFdp.ConsumeIntegralInRange<size_t>(kMinAPICase, kMaxMtpHandleAPI);
