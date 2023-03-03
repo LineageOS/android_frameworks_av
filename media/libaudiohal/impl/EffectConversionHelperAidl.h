@@ -40,6 +40,8 @@ class EffectConversionHelperAidl {
     const int32_t mIoId;
     const ::aidl::android::hardware::audio::effect::Descriptor mDesc;
     const std::shared_ptr<::aidl::android::hardware::audio::effect::IEffect> mEffect;
+    // whether the effect is instantiated on an input stream
+    const bool mIsInputStream;
     ::aidl::android::hardware::audio::effect::IEffect::OpenEffectReturn mOpenReturn;
     ::aidl::android::hardware::audio::effect::Parameter::Common mCommon;
 
