@@ -82,6 +82,8 @@ TEST(HeadTrackingProcessor, Prediction) {
     std::unique_ptr<HeadTrackingProcessor> processor = createHeadTrackingProcessor(
             Options{.predictionDuration = 2.f}, HeadTrackingMode::WORLD_RELATIVE);
 
+    processor->setPosePredictorType(PosePredictorType::TWIST);
+
     // Establish a baseline for the drift compensators.
     processor->setWorldToHeadPose(0, Pose3f(), Twist3f());
     processor->setWorldToScreenPose(0, Pose3f());
