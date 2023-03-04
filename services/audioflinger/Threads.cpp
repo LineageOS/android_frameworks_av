@@ -3428,12 +3428,6 @@ ssize_t AudioFlinger::PlaybackThread::threadLoop_write()
         if (framesWritten > 0) {
             bytesWritten = framesWritten * mFrameSize;
 
-            // Send to MelProcessor for sound dose measurement.
-            auto processor = mMelProcessor.load();
-            if (processor) {
-                processor->process((char *)mSinkBuffer + offset, bytesWritten);
-            }
-
 #ifdef TEE_SINK
             mTee.write((char *)mSinkBuffer + offset, framesWritten);
 #endif
@@ -3479,15 +3473,14 @@ ssize_t AudioFlinger::PlaybackThread::threadLoop_write()
 void AudioFlinger::PlaybackThread::startMelComputation(
         const sp<audio_utils::MelProcessor>& processor)
 {
-    ALOGV("%s: starting mel processor for thread %d", __func__, id());
-    mMelProcessor = processor;
+    auto outputSink = static_cast<AudioStreamOutSink*>(mOutputSink.get());
+    outputSink->startMelComputation(processor);
 }
 
-void AudioFlinger::PlaybackThread::stopMelComputation() {
-    if (mMelProcessor.load() != nullptr) {
-        ALOGV("%s: stopping mel processor for thread %d", __func__, id());
-        mMelProcessor = nullptr;
-    }
+void AudioFlinger::PlaybackThread::stopMelComputation()
+{
+    auto outputSink = static_cast<AudioStreamOutSink*>(mOutputSink.get());
+    outputSink->stopMelComputation();
 }
 
 void AudioFlinger::PlaybackThread::threadLoop_drain()

@@ -140,7 +140,7 @@ TunerHidlFilter::~TunerHidlFilter() {
 
     AidlMQDesc aidlMQDesc;
     unsafeHidlToAidlMQDescriptor<uint8_t, int8_t, SynchronizedReadWrite>(filterMQDesc, &aidlMQDesc);
-    *_aidl_return = move(aidlMQDesc);
+    *_aidl_return = std::move(aidlMQDesc);
 
     return ::ndk::ScopedAStatus::ok();
 }
@@ -1020,8 +1020,8 @@ void TunerHidlFilter::FilterCallback::getMediaEvent(
         }
 
         DemuxFilterEvent filterEvent;
-        filterEvent.set<DemuxFilterEvent::media>(move(media));
-        res.push_back(move(filterEvent));
+        filterEvent.set<DemuxFilterEvent::media>(std::move(media));
+        res.push_back(std::move(filterEvent));
     }
 }
 
@@ -1037,8 +1037,8 @@ void TunerHidlFilter::FilterCallback::getSectionEvent(
         section.dataLength = static_cast<int64_t>(sectionEvent.dataLength);
 
         DemuxFilterEvent filterEvent;
-        filterEvent.set<DemuxFilterEvent::section>(move(section));
-        res.push_back(move(filterEvent));
+        filterEvent.set<DemuxFilterEvent::section>(std::move(section));
+        res.push_back(std::move(filterEvent));
     }
 }
 
@@ -1053,8 +1053,8 @@ void TunerHidlFilter::FilterCallback::getPesEvent(const vector<HidlDemuxFilterEv
         pes.mpuSequenceNumber = static_cast<int32_t>(pesEvent.mpuSequenceNumber);
 
         DemuxFilterEvent filterEvent;
-        filterEvent.set<DemuxFilterEvent::pes>(move(pes));
-        res.push_back(move(filterEvent));
+        filterEvent.set<DemuxFilterEvent::pes>(std::move(pes));
+        res.push_back(std::move(filterEvent));
     }
 }
 
@@ -1103,8 +1103,8 @@ void TunerHidlFilter::FilterCallback::getTsRecordEvent(
         }
 
         DemuxFilterEvent filterEvent;
-        filterEvent.set<DemuxFilterEvent::tsRecord>(move(tsRecord));
-        res.push_back(move(filterEvent));
+        filterEvent.set<DemuxFilterEvent::tsRecord>(std::move(tsRecord));
+        res.push_back(std::move(filterEvent));
     }
 }
 
@@ -1130,8 +1130,8 @@ void TunerHidlFilter::FilterCallback::getMmtpRecordEvent(
         }
 
         DemuxFilterEvent filterEvent;
-        filterEvent.set<DemuxFilterEvent::mmtpRecord>(move(mmtpRecord));
-        res.push_back(move(filterEvent));
+        filterEvent.set<DemuxFilterEvent::mmtpRecord>(std::move(mmtpRecord));
+        res.push_back(std::move(filterEvent));
     }
 }
 
@@ -1149,8 +1149,8 @@ void TunerHidlFilter::FilterCallback::getDownloadEvent(
         download.dataLength = static_cast<int32_t>(downloadEvent.dataLength);
 
         DemuxFilterEvent filterEvent;
-        filterEvent.set<DemuxFilterEvent::download>(move(download));
-        res.push_back(move(filterEvent));
+        filterEvent.set<DemuxFilterEvent::download>(std::move(download));
+        res.push_back(std::move(filterEvent));
     }
 }
 
@@ -1163,8 +1163,8 @@ void TunerHidlFilter::FilterCallback::getIpPayloadEvent(
         ipPayload.dataLength = static_cast<int32_t>(ipPayloadEvent.dataLength);
 
         DemuxFilterEvent filterEvent;
-        filterEvent.set<DemuxFilterEvent::ipPayload>(move(ipPayload));
-        res.push_back(move(filterEvent));
+        filterEvent.set<DemuxFilterEvent::ipPayload>(std::move(ipPayload));
+        res.push_back(std::move(filterEvent));
     }
 }
 
@@ -1181,8 +1181,8 @@ void TunerHidlFilter::FilterCallback::getTemiEvent(
         copy(descrData.begin(), descrData.end(), temi.descrData.begin());
 
         DemuxFilterEvent filterEvent;
-        filterEvent.set<DemuxFilterEvent::temi>(move(temi));
-        res.push_back(move(filterEvent));
+        filterEvent.set<DemuxFilterEvent::temi>(std::move(temi));
+        res.push_back(std::move(filterEvent));
     }
 }
 
@@ -1204,15 +1204,15 @@ void TunerHidlFilter::FilterCallback::getMonitorEvent(
     }
 
     DemuxFilterEvent filterEvent;
-    filterEvent.set<DemuxFilterEvent::monitorEvent>(move(monitor));
-    res.push_back(move(filterEvent));
+    filterEvent.set<DemuxFilterEvent::monitorEvent>(std::move(monitor));
+    res.push_back(std::move(filterEvent));
 }
 
 void TunerHidlFilter::FilterCallback::getRestartEvent(
         const vector<HidlDemuxFilterEventExt::Event>& eventsExt, vector<DemuxFilterEvent>& res) {
     DemuxFilterEvent filterEvent;
     filterEvent.set<DemuxFilterEvent::startId>(static_cast<int32_t>(eventsExt[0].startId()));
-    res.push_back(move(filterEvent));
+    res.push_back(std::move(filterEvent));
 }
 
 }  // namespace tuner
