@@ -1909,6 +1909,7 @@ status_t MediaCodec::configure(
         if (mWidth < 0 || mHeight < 0 ||
                (uint64_t)mWidth * mHeight > (uint64_t)INT32_MAX / 4) {
             ALOGE("Invalid size(s), width=%d, height=%d", mWidth, mHeight);
+            mediametrics_delete(nextMetricsHandle);
             return BAD_VALUE;
         }
 
