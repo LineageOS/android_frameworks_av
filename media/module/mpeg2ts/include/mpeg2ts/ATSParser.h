@@ -157,6 +157,9 @@ struct ATSParser : public RefBase {
         STREAMTYPE_LPCM_AC3             = 0x83,
         STREAMTYPE_EAC3                 = 0x87,
 
+        // DTS audio stream type which contains only Core substream
+        STREAMTYPE_DTS                  = 0x8A,
+
         //Sample Encrypted types
         STREAMTYPE_H264_ENCRYPTED       = 0xDB,
         STREAMTYPE_AAC_ENCRYPTED        = 0xCF,
@@ -168,6 +171,7 @@ struct ATSParser : public RefBase {
         DESCRIPTOR_CA                   = 0x09,
 
         // DVB BlueBook A038 Table 12
+        DESCRIPTOR_DTS                  = 0x7B,
         DESCRIPTOR_DVB_EXTENSION        = 0x7F,
     };
 
@@ -175,6 +179,8 @@ struct ATSParser : public RefBase {
     enum {
         EXT_DESCRIPTOR_DVB_AC4                  = 0x15,
         EXT_DESCRIPTOR_DVB_AUDIO_PRESELECTION   = 0x19,
+        EXT_DESCRIPTOR_DVB_DTS_HD               = 0x0E,
+        EXT_DESCRIPTOR_DVB_DTS_UHD              = 0x21,
         EXT_DESCRIPTOR_DVB_RESERVED_MAX         = 0x7F,
     };
 
