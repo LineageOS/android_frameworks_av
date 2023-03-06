@@ -22,6 +22,7 @@
 #include "system/graphics-base-v1.1.h"
 
 #include "api1/client2/JpegProcessor.h"
+#include "utils/SessionStatsBuilder.h"
 
 #include "CompositeStream.h"
 
@@ -65,6 +66,9 @@ public:
     static status_t getCompositeStreamInfo(const OutputStreamInfo &streamInfo,
             const CameraMetadata& ch, std::vector<OutputStreamInfo>* compositeOutput /*out*/);
 
+    // Get composite stream stats
+    void getStreamStats(hardware::CameraStreamStats* streamStats) override;
+
 protected:
 
     bool threadLoop() override;
@@ -80,8 +84,10 @@ private:
         bool                      errorNotified;
         int64_t                   frameNumber;
         int32_t                   requestId;
+        nsecs_t                   requestTimeNs;
 
-        InputFrame() : error(false), errorNotified(false), frameNumber(-1), requestId(-1) { }
+        InputFrame() : error(false), errorNotified(false), frameNumber(-1), requestId(-1),
+            requestTimeNs(-1) { }
     };
 
     status_t processInputFrame(nsecs_t ts, const InputFrame &inputFrame);
@@ -119,6 +125,8 @@ private:
     bool                 mP010BufferAcquired, mBlobBufferAcquired;
     sp<Surface>          mP010Surface, mBlobSurface, mOutputSurface;
     int32_t              mOutputColorSpace;
+    int64_t              mOutputStreamUseCase;
+    nsecs_t              mFirstRequestLatency;
     sp<ProducerListener> mProducerListener;
 
     ssize_t              mMaxJpegBufferSize;
@@ -137,6 +145,8 @@ private:
     std::unordered_map<int64_t, InputFrame> mPendingInputFrames;
 
     const CameraMetadata mStaticInfo;
+
+    SessionStatsBuilder  mSessionStatsBuilder;
 };
 
 }; //namespace camera3
