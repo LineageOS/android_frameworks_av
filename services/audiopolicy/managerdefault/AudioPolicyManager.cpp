@@ -1531,6 +1531,10 @@ audio_io_handle_t AudioPolicyManager::getOutputForDevices(
     if ((*flags & (AUDIO_OUTPUT_FLAG_HW_AV_SYNC | AUDIO_OUTPUT_FLAG_MMAP_NOIRQ)) != 0) {
         return AUDIO_IO_HANDLE_NONE;
     }
+    // A request for Tuner cannot fallback to a mixed output
+    if ((directConfig.offload_info.content_id || directConfig.offload_info.sync_id)) {
+        return AUDIO_IO_HANDLE_NONE;
+    }
 
     // ignoring channel mask due to downmix capability in mixer
 
