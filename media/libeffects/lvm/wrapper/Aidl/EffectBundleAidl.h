@@ -23,7 +23,6 @@
 #include <android-base/logging.h>
 
 #include "effect-impl/EffectImpl.h"
-#include "effect-impl/EffectUUID.h"
 
 #include "BundleContext.h"
 #include "BundleTypes.h"

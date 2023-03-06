@@ -19,7 +19,6 @@
 #include <aidl/android/hardware/audio/effect/BnEffect.h>
 
 #include "effect-impl/EffectImpl.h"
-#include "effect-impl/EffectUUID.h"
 #include "DynamicsProcessingContext.h"
 
 namespace aidl::android::hardware::audio::effect {
