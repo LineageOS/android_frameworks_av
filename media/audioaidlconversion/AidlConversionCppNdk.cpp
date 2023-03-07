@@ -2724,6 +2724,10 @@ aidl2legacy_AudioLatencyMode_audio_latency_mode_t(AudioLatencyMode aidl) {
             return AUDIO_LATENCY_MODE_FREE;
         case AudioLatencyMode::LOW:
             return AUDIO_LATENCY_MODE_LOW;
+        case AudioLatencyMode::DYNAMIC_SPATIAL_AUDIO_SOFTWARE:
+            return AUDIO_LATENCY_MODE_DYNAMIC_SPATIAL_AUDIO_SOFTWARE;
+        case AudioLatencyMode::DYNAMIC_SPATIAL_AUDIO_HARDWARE:
+            return AUDIO_LATENCY_MODE_DYNAMIC_SPATIAL_AUDIO_HARDWARE;
     }
     return unexpected(BAD_VALUE);
 }
@@ -2734,6 +2738,10 @@ legacy2aidl_audio_latency_mode_t_AudioLatencyMode(audio_latency_mode_t legacy) {
             return AudioLatencyMode::FREE;
         case AUDIO_LATENCY_MODE_LOW:
             return AudioLatencyMode::LOW;
+        case AUDIO_LATENCY_MODE_DYNAMIC_SPATIAL_AUDIO_SOFTWARE:
+            return AudioLatencyMode::DYNAMIC_SPATIAL_AUDIO_SOFTWARE;
+        case AUDIO_LATENCY_MODE_DYNAMIC_SPATIAL_AUDIO_HARDWARE:
+            return AudioLatencyMode::DYNAMIC_SPATIAL_AUDIO_HARDWARE;
     }
     return unexpected(BAD_VALUE);
 }
