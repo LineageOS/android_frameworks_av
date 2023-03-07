@@ -557,6 +557,7 @@ DrmStatus DrmHalHidl::isCryptoSchemeSupported(const uint8_t uuid[16], const Stri
 DrmStatus DrmHalHidl::createPlugin(const uint8_t uuid[16], const String8& appPackageName) {
     Mutex::Autolock autoLock(mLock);
 
+    if (mInitCheck == ERROR_UNSUPPORTED) return mInitCheck;
     for (ssize_t i = mFactories.size() - 1; i >= 0; i--) {
         auto hResult = mFactories[i]->isCryptoSchemeSupported(uuid);
         if (hResult.isOk() && hResult) {
