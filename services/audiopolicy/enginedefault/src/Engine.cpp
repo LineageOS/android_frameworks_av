@@ -479,6 +479,37 @@ DeviceVector Engine::getDevicesForStrategyInt(legacy_strategy strategy,
     return devices;
 }
 
+DeviceVector Engine::getPreferredAvailableDevicesForInputSource(
+            const DeviceVector& availableInputDevices, audio_source_t inputSource) const {
+    DeviceVector preferredAvailableDevVec = {};
+    AudioDeviceTypeAddrVector preferredDevices;
+    const status_t status = getDevicesForRoleAndCapturePreset(
+            inputSource, DEVICE_ROLE_PREFERRED, preferredDevices);
+    if (status == NO_ERROR) {
+        // Only use preferred devices when they are all available.
+        preferredAvailableDevVec =
+                availableInputDevices.getDevicesFromDeviceTypeAddrVec(preferredDevices);
+        if (preferredAvailableDevVec.size() == preferredDevices.size()) {
+            ALOGVV("%s using pref device %s for source %u",
+                   __func__, preferredAvailableDevVec.toString().c_str(), inputSource);
+            return preferredAvailableDevVec;
+        }
+    }
+    return preferredAvailableDevVec;
+}
+
+DeviceVector Engine::getDisabledDevicesForInputSource(
+            const DeviceVector& availableInputDevices, audio_source_t inputSource) const {
+    DeviceVector disabledDevices = {};
+    AudioDeviceTypeAddrVector disabledDevicesTypeAddr;
+    const status_t status = getDevicesForRoleAndCapturePreset(
+            inputSource, DEVICE_ROLE_DISABLED, disabledDevicesTypeAddr);
+    if (status == NO_ERROR) {
+        disabledDevices =
+                availableInputDevices.getDevicesFromDeviceTypeAddrVec(disabledDevicesTypeAddr);
+    }
+    return disabledDevices;
+}
 
 sp<DeviceDescriptor> Engine::getDeviceForInputSource(audio_source_t inputSource) const
 {
@@ -509,6 +540,20 @@ sp<DeviceDescriptor> Engine::getDeviceForInputSource(audio_source_t inputSource)
             break;
         }
     }
+
+    // Use the preferred device for the input source if it is available.
+    DeviceVector preferredInputDevices = getPreferredAvailableDevicesForInputSource(
+            availableDevices, inputSource);
+    if (!preferredInputDevices.isEmpty()) {
+        // Currently, only support single device for input. The public JAVA API also only
+        // support setting single device as preferred device. In that case, returning the
+        // first device is OK here.
+        return preferredInputDevices[0];
+    }
+    // Remove the disabled device for the input source from the available input device list.
+    DeviceVector disabledInputDevices = getDisabledDevicesForInputSource(
+            availableDevices, inputSource);
+    availableDevices.remove(disabledInputDevices);
 
     audio_devices_t commDeviceType =
         getPreferredDeviceTypeForLegacyStrategy(availableOutputDevices, STRATEGY_PHONE);
