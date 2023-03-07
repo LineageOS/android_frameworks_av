@@ -274,17 +274,17 @@ status_t EffectConversionHelperAidl::handleSetDevice(uint32_t cmdSize, const voi
     return *static_cast<int32_t*>(pReplyData) = OK;
 }
 status_t EffectConversionHelperAidl::handleSetVolume(uint32_t cmdSize, const void* pCmdData,
-                                                     uint32_t* replySize, void* pReplyData) {
-    if (cmdSize != 2 * sizeof(uint32_t) || !pCmdData || !replySize || !pReplyData) {
-        ALOGE("%s parameter invalid %u %p %p %p", __func__, cmdSize, pCmdData, replySize,
-              pReplyData);
+                                                     uint32_t* replySize __unused,
+                                                     void* pReplyData __unused) {
+    if (cmdSize != 2 * sizeof(uint32_t) || !pCmdData) {
+        ALOGE("%s parameter invalid %u %p", __func__, cmdSize, pCmdData);
         return BAD_VALUE;
     }
     Parameter::VolumeStereo volume = {.left = (float)(*(uint32_t*)pCmdData) / (1 << 24),
                                       .right = (float)(*(uint32_t*)pCmdData + 1) / (1 << 24)};
     RETURN_STATUS_IF_ERROR(statusTFromBinderStatus(
             mEffect->setParameter(Parameter::make<Parameter::volumeStereo>(volume))));
-    return *static_cast<int32_t*>(pReplyData) = OK;
+    return OK;
 }
 
 status_t EffectConversionHelperAidl::handleSetOffload(uint32_t cmdSize, const void* pCmdData,
