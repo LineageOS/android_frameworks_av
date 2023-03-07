@@ -308,7 +308,7 @@ ndk::ScopedAStatus EffectBundleAidl::getParameterEqualizer(const Equalizer::Id& 
             eqParam.set<Equalizer::centerFreqMh>(mContext->getEqualizerCenterFreqs());
             break;
         }
-        case Equalizer::vendorExtension: {
+        case Equalizer::vendor: {
             LOG(ERROR) << __func__ << " not handled tag: " << toString(tag);
             return ndk::ScopedAStatus::fromExceptionCodeWithMessage(
                     EX_ILLEGAL_ARGUMENT, "unsupportedTag");
