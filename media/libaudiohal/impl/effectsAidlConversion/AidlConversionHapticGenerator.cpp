@@ -33,9 +33,11 @@
 namespace android {
 namespace effect {
 
+using ::aidl::android::getParameterSpecificField;
 using ::aidl::android::aidl_utils::statusTFromBinderStatus;
 using ::aidl::android::hardware::audio::effect::HapticGenerator;
 using ::aidl::android::hardware::audio::effect::Parameter;
+using ::aidl::android::hardware::audio::effect::VendorExtension;
 using ::android::status_t;
 using utils::EffectParamReader;
 using utils::EffectParamWriter;
@@ -76,9 +78,11 @@ status_t AidlConversionHapticGenerator::setParameter(EffectParamReader& param) {
             break;
         }
         default: {
-            // TODO: implement vendor extension parameters
-            ALOGW("%s unknown param %s", __func__, param.toString().c_str());
-            return BAD_VALUE;
+            // for vendor extension, copy data area to the DefaultExtension, parameter ignored
+            VendorExtension ext = VALUE_OR_RETURN_STATUS(
+                    aidl::android::legacy2aidl_EffectParameterReader_Data_VendorExtension(param));
+            aidlParam = MAKE_SPECIFIC_PARAMETER(HapticGenerator, hapticGenerator, vendor, ext);
+            break;
         }
     }
 
@@ -86,8 +90,8 @@ status_t AidlConversionHapticGenerator::setParameter(EffectParamReader& param) {
 }
 
 // No parameter to get for HapticGenerator
-status_t AidlConversionHapticGenerator::getParameter(EffectParamWriter& param __unused) {
-    return OK;
+status_t AidlConversionHapticGenerator::getParameter(EffectParamWriter& param) {
+    VENDOR_EXTENSION_GET_AND_RETURN(HapticGenerator, hapticGenerator, param);
 }
 
 } // namespace effect
