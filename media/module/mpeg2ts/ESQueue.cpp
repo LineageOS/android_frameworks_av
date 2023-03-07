@@ -362,6 +362,436 @@ static status_t parseAC4SyncFrame(
     return OK;
 }
 
+#define RETURN_ERROR_IF_NOT_ENOUGH_BYTES_LEFT(bitstream, size) \
+    do { \
+        if ((bitstream).numBitsLeft() < (size)) { \
+        ALOGE("Not enough bits left for further parsing"); \
+        return ERROR_MALFORMED; } \
+    } while (0)
+
+// Parse DTS Digital Surround and DTS Express(LBR) stream header
+static status_t parseDTSHDSyncFrame(
+    const uint8_t *ptr, size_t size, unsigned &frameSize, sp<MetaData> *metaData) {
+    static const unsigned channelCountTable[] = {1, 2, 2, 2, 2, 3, 3, 4,
+                                                 4, 5, 6, 6, 6, 7, 8, 8};
+    static const unsigned samplingRateTableCoreSS[] = {0, 8000, 16000, 32000, 0, 0, 11025, 22050,
+                                                       44100, 0, 0, 12000, 24000, 48000, 0, 0};
+    static const unsigned samplingRateTableExtSS[] = {8000, 16000, 32000, 64000, 128000,
+                                                      22050, 44100, 88200, 176400, 352800,
+                                                      12000, 24000, 48000, 96000, 192000, 384000};
+
+    const uint32_t DTSHD_SYNC_CORE_16BIT_BE = 0x7ffe8001;
+    const uint32_t DTSHD_SYNC_EXSS_16BIT_BE = 0x64582025;
+
+    uint32_t numChannels = 0, samplingRate = 0;
+    bool isLBR = false;
+
+    ABitReader bits(ptr, size);
+
+    RETURN_ERROR_IF_NOT_ENOUGH_BYTES_LEFT(bits, 32);
+    uint32_t dtshdSyncWord = bits.getBits(32);
+
+    // Expecting DTS Digital Surround or DTS Express(LBR) streams only
+    if (dtshdSyncWord == DTSHD_SYNC_CORE_16BIT_BE) { // DTS Digital Surround Header
+        RETURN_ERROR_IF_NOT_ENOUGH_BYTES_LEFT(bits, (1 + 5 + 1 + 7 + 14 + 6 + 4 + 15 + 2));
+
+        // FTYPE, SHORT, CRC, NBLKS
+        bits.skipBits(1 + 5 + 1 + 7);
+
+        frameSize = bits.getBits(14) + 1;
+        uint32_t amode = bits.getBits(6);
+        uint32_t freqIndex = bits.getBits(4);
+
+        // RATE, FIXEDBIT, DYNF, TIMEF, AUXF, HDCD, EXT_AUDIO_ID, EXT_AUDIO, ASPF
+        bits.skipBits(5 + 1 + 1 + 1 + 1 + 1 + 3 + 1 + 1);
+
+        uint32_t lfeFlag = bits.getBits(2);
+        numChannels = (amode <= 15) ? channelCountTable[amode] : 0;
+        numChannels += ((lfeFlag == 1) || (lfeFlag == 2)) ? 1 : 0;
+        samplingRate = (freqIndex <= 15) ? samplingRateTableCoreSS[freqIndex] : 0;
+
+        isLBR = false;
+    } else if (dtshdSyncWord == DTSHD_SYNC_EXSS_16BIT_BE) { // DTS Express(LBR) Header
+        RETURN_ERROR_IF_NOT_ENOUGH_BYTES_LEFT(bits, (8 + 2 + 1));
+
+        uint32_t extHeadersize, extSSFsize;
+        uint32_t numAudioPresent = 1, numAssets = 1;
+        uint32_t nuActiveExSSMask[8];
+
+        // userDefinedBits
+        bits.skipBits(8);
+
+        uint32_t extSSIndex = bits.getBits(2);
+        uint32_t headerSizeType = bits.getBits(1);
+
+        if (headerSizeType == 0) {
+            RETURN_ERROR_IF_NOT_ENOUGH_BYTES_LEFT(bits, (8 + 16));
+
+            extHeadersize = bits.getBits(8) + 1;
+            extSSFsize = bits.getBits(16) + 1;
+        } else {
+            RETURN_ERROR_IF_NOT_ENOUGH_BYTES_LEFT(bits, (12 + 20));
+
+            extHeadersize = bits.getBits(12) + 1;
+            extSSFsize = bits.getBits(20) + 1;
+        }
+
+        RETURN_ERROR_IF_NOT_ENOUGH_BYTES_LEFT(bits, (1));
+
+        uint32_t staticFieldsPresent = bits.getBits(1);
+
+        if (staticFieldsPresent) {
+            RETURN_ERROR_IF_NOT_ENOUGH_BYTES_LEFT(bits, (2 + 3 + 1));
+
+            // nuRefClockCode, nuExSSFrameDurationCode
+            bits.skipBits(2 + 3);
+
+            if (bits.getBits(1)) {
+                RETURN_ERROR_IF_NOT_ENOUGH_BYTES_LEFT(bits, (32 + 4));
+
+                bits.skipBits(32 + 4);
+            }
+
+            RETURN_ERROR_IF_NOT_ENOUGH_BYTES_LEFT(bits, (3 + 3));
+
+            // numAudioPresent, numAssets
+            bits.skipBits(3 + 3);
+
+            for (uint32_t nAuPr = 0; nAuPr < numAudioPresent; nAuPr++) {
+                RETURN_ERROR_IF_NOT_ENOUGH_BYTES_LEFT(bits, (extSSIndex + 1));
+
+                nuActiveExSSMask[nAuPr] = bits.getBits(extSSIndex + 1);
+            }
+
+            for (uint32_t nAuPr = 0; nAuPr < numAudioPresent; nAuPr++) {
+                for (uint32_t nSS = 0; nSS < extSSIndex + 1; nSS++) {
+                    if (((nuActiveExSSMask[nAuPr] >> nSS) & 0x1) == 1) {
+                        RETURN_ERROR_IF_NOT_ENOUGH_BYTES_LEFT(bits, 8);
+
+                        // nuActiveAssetMask
+                        bits.skipBits(8);
+                    }
+                }
+            }
+
+            RETURN_ERROR_IF_NOT_ENOUGH_BYTES_LEFT(bits, 1);
+
+            // bMixMetadataEnbl
+            if (bits.getBits(1)) {
+                RETURN_ERROR_IF_NOT_ENOUGH_BYTES_LEFT(bits, (2 + 2 + 2));
+
+                // nuMixMetadataAdjLevel
+                bits.skipBits(2);
+
+                uint32_t bits4MixOutMask = (bits.getBits(2) + 1) << 2;
+                uint32_t numMixOutConfigs = bits.getBits(2) + 1;
+
+                for (int ns = 0; ns < numMixOutConfigs; ns++) {
+                    RETURN_ERROR_IF_NOT_ENOUGH_BYTES_LEFT(bits, bits4MixOutMask);
+
+                    // nuMixOutChMask
+                    bits.skipBits(bits4MixOutMask);
+                }
+            }
+        }
+
+        for (int nAst = 0; nAst < numAssets; nAst++) {
+            int bits4ExSSFsize = (headerSizeType == 0) ? 16 : 20;
+
+            RETURN_ERROR_IF_NOT_ENOUGH_BYTES_LEFT(bits, bits4ExSSFsize);
+
+            bits.skipBits(bits4ExSSFsize);
+        }
+
+        /* Asset descriptor */
+        for (int nAst = 0; nAst < numAssets; nAst++) {
+            RETURN_ERROR_IF_NOT_ENOUGH_BYTES_LEFT(bits, (9 + 3));
+
+            // nuAssetDescriptFsize, nuAssetIndex
+            bits.skipBits(9 + 3);
+
+            if (staticFieldsPresent) {
+                RETURN_ERROR_IF_NOT_ENOUGH_BYTES_LEFT(bits, 1);
+
+                // bAssetTypeDescrPresent
+                if (bits.getBits(1)) {
+                    RETURN_ERROR_IF_NOT_ENOUGH_BYTES_LEFT(bits, 4);
+
+                    // nuAssetTypeDescriptor
+                    bits.skipBits(4);
+                }
+
+                RETURN_ERROR_IF_NOT_ENOUGH_BYTES_LEFT(bits, 1);
+
+                // bLanguageDescrPresent
+                if (bits.getBits(1)) {
+                    RETURN_ERROR_IF_NOT_ENOUGH_BYTES_LEFT(bits, 24);
+
+                    // LanguageDescriptor
+                    bits.skipBits(24);
+                }
+
+                RETURN_ERROR_IF_NOT_ENOUGH_BYTES_LEFT(bits, 1);
+
+                // bInfoTextPresent
+                if (bits.getBits(1)) {
+                    RETURN_ERROR_IF_NOT_ENOUGH_BYTES_LEFT(bits, 10);
+
+                    uint32_t nuInfoTextByteSize = bits.getBits(10) + 1;
+
+                    RETURN_ERROR_IF_NOT_ENOUGH_BYTES_LEFT(bits, (nuInfoTextByteSize * 8));
+
+                    // InfoTextString
+                    bits.skipBits(nuInfoTextByteSize * 8);
+                }
+
+                RETURN_ERROR_IF_NOT_ENOUGH_BYTES_LEFT(bits, (5 + 4 + 8));
+
+                // nuBitResolution
+                bits.skipBits(5);
+
+                samplingRate = samplingRateTableExtSS[bits.getBits(4)];
+                numChannels = bits.getBits(8) + 1;
+            }
+        }
+
+        frameSize = extHeadersize + extSSFsize;
+        isLBR = true;
+    } else {
+        ALOGE("No valid sync word in DTS/DTSHD header");
+        return ERROR_MALFORMED;
+    }
+
+    if (metaData != NULL) {
+        if (isLBR) {
+            (*metaData)->setCString(kKeyMIMEType, MEDIA_MIMETYPE_AUDIO_DTS_HD);
+            (*metaData)->setInt32(kKeyAudioProfile, 0x2); // CodecProfileLevel.DTS_HDProfileLBR
+        } else {
+            (*metaData)->setCString(kKeyMIMEType, MEDIA_MIMETYPE_AUDIO_DTS);
+        }
+        (*metaData)->setInt32(kKeyChannelCount, numChannels);
+        (*metaData)->setInt32(kKeySampleRate, samplingRate);
+    }
+    return OK;
+}
+
+static status_t extractVarLenBitFields(
+    ABitReader *bits, size_t *bitsUsed, uint32_t *value,
+    unsigned ucTable[], bool extractAndAddFlag) {
+
+    static const unsigned bitsUsedTbl[8] = {1, 1, 1, 1, 2, 2, 3, 3}; // prefix code lengths
+    static const unsigned indexTbl[8] = {0, 0, 0, 0, 1, 1, 2, 3}; // code to prefix code index map
+
+    /* Clone the bitstream */
+    ABitReader bitStream(bits->data(), bits->numBitsLeft() / 8);
+    ABitReader bitstreamClone(bits->data(), bits->numBitsLeft() / 8);
+
+    RETURN_ERROR_IF_NOT_ENOUGH_BYTES_LEFT(bitstreamClone, 3);
+
+    unsigned code = bitstreamClone.getBits(3);
+    unsigned totalBitsUsed = bitsUsedTbl[code];
+    unsigned unIndex = indexTbl[code];
+
+    RETURN_ERROR_IF_NOT_ENOUGH_BYTES_LEFT(bitStream, totalBitsUsed);
+
+    bitStream.skipBits(totalBitsUsed);
+
+    uint32_t unValue = 0;
+    if (ucTable[unIndex] > 0) {
+        if (extractAndAddFlag) {
+            for (unsigned un = 0; un < unIndex; un++) {
+                unValue += (1 << ucTable[un]);
+            }
+
+            RETURN_ERROR_IF_NOT_ENOUGH_BYTES_LEFT(bitStream, ucTable[unIndex]);
+
+            unValue += bitStream.getBits(ucTable[unIndex]);
+            totalBitsUsed += ucTable[unIndex];
+        } else {
+            RETURN_ERROR_IF_NOT_ENOUGH_BYTES_LEFT(bitStream, ucTable[unIndex]);
+
+            unValue += bitStream.getBits(ucTable[unIndex]);
+            totalBitsUsed += ucTable[unIndex];
+        }
+    }
+
+    *bitsUsed = (size_t)totalBitsUsed;
+    *value = unValue;
+    return OK;
+}
+
+// Parse DTS UHD Profile-2 stream header
+static status_t parseDTSUHDSyncFrame(
+    const uint8_t *ptr, size_t size, unsigned &frameSize, sp<MetaData> *metaData) {
+
+    static const uint32_t DTSUHD_SYNC_CORE_16BIT_BE = 0x40411BF2;
+    static const uint32_t DTSUHD_NONSYNC_CORE_16BIT_BE = 0x71C442E8;
+
+    unsigned audioSamplRate = 0;
+
+    ABitReader bits(ptr, size);
+
+    RETURN_ERROR_IF_NOT_ENOUGH_BYTES_LEFT(bits, 32);
+
+    uint32_t syncWord = bits.getBits(32);
+
+    bool isSyncFrameFlag = false;
+    switch (syncWord) {
+        case DTSUHD_SYNC_CORE_16BIT_BE:
+            isSyncFrameFlag = true;
+            break;
+        case DTSUHD_NONSYNC_CORE_16BIT_BE:
+            isSyncFrameFlag = false;
+            break;
+        default:
+            ALOGE("No valid sync word in DTSUHD header");
+            return ERROR_MALFORMED; // invalid sync word
+    }
+
+    unsigned uctable1[4] = { 5, 8, 10, 12 };
+    uint32_t sizeOfFTOCPayload = 0;
+    size_t nuBitsUsed = 0;
+    status_t status = OK;
+
+    status = extractVarLenBitFields(&bits, &nuBitsUsed, &sizeOfFTOCPayload, uctable1, true);
+
+    if (status != OK) {
+        ALOGE("Failed to extractVarLenBitFields from DTSUHD header");
+        return ERROR_MALFORMED;
+    }
+
+    bits.skipBits(nuBitsUsed);
+
+    if (isSyncFrameFlag) {
+        RETURN_ERROR_IF_NOT_ENOUGH_BYTES_LEFT(bits, (1 + 2 + 3 + 2 + 1));
+
+        // FullChannelBasedMixFlag, ETSI TS 103 491 V1.2.1, Section 6.4.6.1
+        if (!(bits.getBits(1))) {
+            // This implementation only supports full channel mask-based
+            // audio presentation (i.e. 2.0, 5.1, 11.1 mix without objects)
+            ALOGE("Objects not supported, only DTSUHD full channel mask-based mix");
+            return ERROR_MALFORMED;
+        }
+
+        // BaseDuration, FrameDuration
+        bits.skipBits(2 + 3);
+
+        unsigned clockRateIndex = bits.getBits(2);
+        unsigned clockRateHertz = 0;
+
+        switch (clockRateIndex) {
+            case 0:
+                clockRateHertz = 32000;
+                break;
+            case 1:
+                clockRateHertz = 44100;
+                break;
+            case 2:
+                clockRateHertz = 48000;
+                break;
+            default:
+                ALOGE("Invalid clockRateIndex in DTSUHD header");
+                return ERROR_MALFORMED;
+        }
+
+        if (bits.getBits(1)) {
+            RETURN_ERROR_IF_NOT_ENOUGH_BYTES_LEFT(bits, (32 + 4));
+
+            bits.skipBits(32 + 4);
+        }
+
+        RETURN_ERROR_IF_NOT_ENOUGH_BYTES_LEFT(bits, 2);
+
+        unsigned samplRateMultiplier = (1 << bits.getBits(2));
+        audioSamplRate = clockRateHertz * samplRateMultiplier;
+    }
+
+    uint32_t chunkPayloadBytes = 0;
+    int numOfMDChunks = isSyncFrameFlag ? 1 : 0; // Metadata chunks
+    for (int nmdc = 0; nmdc < numOfMDChunks; nmdc++) {
+        unsigned uctable2[4] = {6, 9, 12, 15};
+        uint32_t nuMDChunkSize = 0;
+        nuBitsUsed = 0;
+
+        status = extractVarLenBitFields(&bits, &nuBitsUsed, &nuMDChunkSize, uctable2, true);
+        if (status != OK) {
+            ALOGE("Failed to extractVarLenBitFields from DTSUHD header");
+            return ERROR_MALFORMED;
+        }
+
+        bits.skipBits(nuBitsUsed);
+
+        if (nuMDChunkSize > 32767) {
+            ALOGE("Unsupported number of metadata chunks in DTSUHD header");
+            return ERROR_MALFORMED;
+        }
+        chunkPayloadBytes += nuMDChunkSize;
+    }
+
+    // Ony one audio chunk is supported
+    int numAudioChunks = 1;
+    for (int nac = 0; nac < numAudioChunks; nac++) {
+        uint32_t acID = 256, nuAudioChunkSize = 0;
+
+        // isSyncFrameFlag means that ACID is present
+        if (isSyncFrameFlag) {
+            unsigned uctable3[4] = {2, 4, 6, 8};
+            nuBitsUsed = 0;
+
+            status = extractVarLenBitFields(&bits, &nuBitsUsed, &acID, uctable3, true);
+
+            if (status != OK) {
+                ALOGE("Failed to extractVarLenBitFields from DTSUHD header");
+                return ERROR_MALFORMED;
+            }
+
+            bits.skipBits(nuBitsUsed);
+        }
+
+        nuBitsUsed = 0;
+        if (acID == 0) {
+            nuAudioChunkSize = 0;
+        } else {
+            unsigned uctable4[4] = {9, 11, 13, 16};
+
+            status = extractVarLenBitFields(&bits, &nuBitsUsed, &nuAudioChunkSize, uctable4, true);
+
+            if (status != OK) {
+                ALOGE("Failed to extractVarLenBitFields from DTSUHD header");
+                return ERROR_MALFORMED;
+            }
+        }
+
+        if (nuAudioChunkSize > 65535){
+            ALOGE("Unsupported number of audio chunks in DTSUHD header");
+            return ERROR_MALFORMED;
+        }
+
+        chunkPayloadBytes += nuAudioChunkSize;
+    }
+
+    frameSize = (sizeOfFTOCPayload + 1) + chunkPayloadBytes;
+
+    if (metaData != NULL) {
+        (*metaData)->setCString(kKeyMIMEType, MEDIA_MIMETYPE_AUDIO_DTS_UHD);
+        (*metaData)->setInt32(kKeyAudioProfile, 0x2); // CodecProfileLevel.DTS_UHDProfileP2
+        (*metaData)->setInt32(kKeyChannelCount, 2); // Setting default channel count as stereo
+        (*metaData)->setInt32(kKeySampleRate, audioSamplRate);
+    }
+
+    return OK;
+}
+
+static status_t isSeeminglyValidDTSHDHeader(const uint8_t *ptr, size_t size,unsigned &frameSize)
+{
+    return parseDTSHDSyncFrame(ptr, size, frameSize, NULL);
+}
+
+static status_t isSeeminglyValidDTSUHDHeader(const uint8_t *ptr, size_t size,unsigned &frameSize)
+{
+    return parseDTSUHDSyncFrame(ptr, size, frameSize, NULL);
+}
+
 static status_t IsSeeminglyValidAC4Header(const uint8_t *ptr, size_t size, unsigned &frameSize) {
     return parseAC4SyncFrame(ptr, size, frameSize, NULL);
 }
@@ -655,6 +1085,70 @@ status_t ElementaryStreamQueue::appendData(
                 break;
             }
 
+            case DTS: //  Checking for DTS or DTS-HD syncword
+            case DTS_HD:
+            {
+                uint8_t *ptr = (uint8_t *)data;
+                unsigned frameSize = 0;
+                ssize_t startOffset = -1;
+
+                for (size_t i = 0; i < size; ++i) {
+                    if (isSeeminglyValidDTSHDHeader(&ptr[i], size - i, frameSize) == OK) {
+                        startOffset = i;
+                        break;
+                    }
+                }
+
+                if (startOffset < 0) {
+                    return ERROR_MALFORMED;
+                }
+                if (startOffset > 0) {
+                    ALOGI("found something resembling a DTS-HD syncword at "
+                          "offset %zd",
+                          startOffset);
+                }
+
+                if (frameSize != size - startOffset) {
+                    ALOGV("DTS-HD frame size is %u bytes, while the buffer size is %zd bytes.",
+                          frameSize, size - startOffset);
+                }
+
+                data = &ptr[startOffset];
+                size -= startOffset;
+                break;
+            }
+
+            case DTS_UHD:
+            {
+                uint8_t *ptr = (uint8_t *)data;
+                ssize_t startOffset = -1;
+                unsigned frameSize = 0;
+
+                for (size_t i = 0; i < size; ++i) {
+                    if (isSeeminglyValidDTSUHDHeader(&ptr[i], size - i, frameSize) == OK) {
+                        startOffset = i;
+                        break;
+                    }
+                }
+
+                if (startOffset < 0) {
+                    return ERROR_MALFORMED;
+                }
+                if (startOffset >= 0) {
+                    ALOGI("found something resembling a DTS UHD syncword"
+                          "syncword at offset %zd",
+                          startOffset);
+                }
+
+                if (frameSize != size - startOffset) {
+                    ALOGV("DTS-UHD frame size is %u bytes, while the buffer size is %zd bytes.",
+                          frameSize, size - startOffset);
+                }
+                data = &ptr[startOffset];
+                size -= startOffset;
+                break;
+            }
+
             case PCM_AUDIO:
             case METADATA:
             {
@@ -928,6 +1422,11 @@ sp<ABuffer> ElementaryStreamQueue::dequeueAccessUnit() {
             return dequeueAccessUnitPCMAudio();
         case METADATA:
             return dequeueAccessUnitMetadata();
+        case DTS: // Using same dequeue function for both DTS and DTS-HD types.
+        case DTS_HD:
+            return dequeueAccessUnitDTSOrDTSHD();
+        case DTS_UHD:
+            return dequeueAccessUnitDTSUHD();
         default:
             if (mMode != MPEG_AUDIO) {
                 ALOGE("Unknown mode");
@@ -935,6 +1434,113 @@ sp<ABuffer> ElementaryStreamQueue::dequeueAccessUnit() {
             }
             return dequeueAccessUnitMPEGAudio();
     }
+}
+
+sp<ABuffer> ElementaryStreamQueue::dequeueAccessUnitDTSOrDTSHD() {
+    unsigned syncStartPos = 0; // in bytes
+    unsigned payloadSize = 0;
+    sp<MetaData> format = new MetaData;
+
+    ALOGV("dequeueAccessUnitDTSOrDTSHD[%d]: mBuffer %p(%zu)", mAUIndex,
+          mBuffer->data(), mBuffer->size());
+
+    while (true) {
+        if (syncStartPos + 4 >= mBuffer->size()) {
+            return NULL;
+        }
+        uint8_t *ptr = mBuffer->data() + syncStartPos;
+        size_t size = mBuffer->size() - syncStartPos;
+        status_t status = parseDTSHDSyncFrame(ptr, size, payloadSize, &format);
+        if (status == 0) {
+            break;
+        }
+        ++syncStartPos;
+    }
+
+    if (mBuffer->size() < syncStartPos + payloadSize) {
+        ALOGV("Not enough buffer size for DTS/DTS-HD");
+        return NULL;
+    }
+
+    if (mFormat == NULL) {
+        mFormat = format;
+    }
+
+    int64_t timeUs = fetchTimestamp(syncStartPos + payloadSize);
+    if (timeUs < 0LL) {
+        ALOGE("negative timeUs");
+        return NULL;
+    }
+    mAUIndex++;
+
+    sp<ABuffer> accessUnit = new ABuffer(syncStartPos + payloadSize);
+    memcpy(accessUnit->data(), mBuffer->data(), syncStartPos + payloadSize);
+
+    accessUnit->meta()->setInt64("timeUs", timeUs);
+    accessUnit->meta()->setInt32("isSync", 1);
+
+    memmove(
+        mBuffer->data(),
+        mBuffer->data() + syncStartPos + payloadSize,
+        mBuffer->size() - syncStartPos - payloadSize);
+
+    mBuffer->setRange(0, mBuffer->size() - syncStartPos - payloadSize);
+
+    return accessUnit;
+}
+
+sp<ABuffer> ElementaryStreamQueue::dequeueAccessUnitDTSUHD()
+{
+    unsigned syncStartPos = 0; // in bytes
+    unsigned payloadSize = 0;
+    sp<MetaData> format = new MetaData;
+
+    ALOGV("dequeueAccessUnitDTSUHD[%d]: mBuffer %p(%zu)", mAUIndex,
+          mBuffer->data(), mBuffer->size());
+
+    while (true) {
+        if (syncStartPos + 4 >= mBuffer->size()) {
+            return NULL;
+        }
+        uint8_t *ptr = mBuffer->data() + syncStartPos;
+        size_t size = mBuffer->size() - syncStartPos;
+        status_t status = parseDTSUHDSyncFrame(ptr, size, payloadSize, &format);
+        if (status == 0) {
+            break;
+        }
+        ++syncStartPos;
+    }
+
+    if (mBuffer->size() < syncStartPos + payloadSize) {
+        ALOGV("Not enough buffer size for DTS-UHD");
+        return NULL;
+    }
+
+    if (mFormat == NULL) {
+        mFormat = format;
+    }
+
+    int64_t timeUs = fetchTimestamp(syncStartPos + payloadSize);
+    if (timeUs < 0LL) {
+        ALOGE("negative timeUs");
+        return NULL;
+    }
+    mAUIndex++;
+
+    sp<ABuffer> accessUnit = new ABuffer(syncStartPos + payloadSize);
+    memcpy(accessUnit->data(), mBuffer->data(), syncStartPos + payloadSize);
+
+    accessUnit->meta()->setInt64("timeUs", timeUs);
+    accessUnit->meta()->setInt32("isSync", 1);
+
+    memmove(
+        mBuffer->data(),
+        mBuffer->data() + syncStartPos + payloadSize,
+        mBuffer->size() - syncStartPos - payloadSize);
+
+    mBuffer->setRange(0, mBuffer->size() - syncStartPos - payloadSize);
+
+    return accessUnit;
 }
 
 sp<ABuffer> ElementaryStreamQueue::dequeueAccessUnitEAC3() {
