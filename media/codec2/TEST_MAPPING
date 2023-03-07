@@ -8,17 +8,6 @@
   ],
   "presubmit-large": [
     {
-      "name": "CtsMediaMiscTestCases",
-      "options": [
-        {
-          "include-annotation": "android.platform.test.annotations.Presubmit"
-        },
-        {
-          "exclude-annotation": "android.platform.test.annotations.RequiresDevice"
-        }
-      ]
-    },
-    {
       "name": "CtsMediaAudioTestCases",
       "options": [
         {
@@ -33,50 +22,6 @@
         },
         {
           "exclude-filter": "android.media.audio.cts.AudioRecordTest"
-        }
-      ]
-    },
-    {
-      "name": "CtsMediaDecoderTestCases",
-      "options": [
-        {
-          "include-annotation": "android.platform.test.annotations.Presubmit"
-        },
-        {
-          "exclude-annotation": "android.platform.test.annotations.RequiresDevice"
-        }
-      ]
-    },
-    {
-      "name": "CtsMediaEncoderTestCases",
-      "options": [
-        {
-          "include-annotation": "android.platform.test.annotations.Presubmit"
-        },
-        {
-          "exclude-annotation": "android.platform.test.annotations.RequiresDevice"
-        }
-      ]
-    },
-    {
-      "name": "CtsMediaCodecTestCases",
-      "options": [
-        {
-          "include-annotation": "android.platform.test.annotations.Presubmit"
-        },
-        {
-          "exclude-annotation": "android.platform.test.annotations.RequiresDevice"
-        }
-      ]
-    },
-    {
-      "name": "CtsMediaPlayerTestCases",
-      "options": [
-        {
-          "include-annotation": "android.platform.test.annotations.Presubmit"
-        },
-        {
-          "exclude-annotation": "android.platform.test.annotations.RequiresDevice"
         }
       ]
     }
