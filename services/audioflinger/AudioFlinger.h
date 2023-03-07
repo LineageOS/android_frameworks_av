@@ -764,6 +764,8 @@ using effect_buffer_t = int16_t;
     };
 
               ThreadBase *checkThread_l(audio_io_handle_t ioHandle) const;
+              sp<AudioFlinger::ThreadBase> checkOutputThread_l(audio_io_handle_t ioHandle) const
+                      REQUIRES(mLock);
               PlaybackThread *checkPlaybackThread_l(audio_io_handle_t output) const;
               MixerThread *checkMixerThread_l(audio_io_handle_t output) const;
               RecordThread *checkRecordThread_l(audio_io_handle_t input) const;
