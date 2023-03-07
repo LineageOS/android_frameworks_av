@@ -2045,6 +2045,21 @@ product_strategy_t AudioFlinger::ThreadBase::getStrategyForStream(audio_stream_t
     return AudioSystem::getStrategyForStream(stream);
 }
 
+// startMelComputation_l() must be called with AudioFlinger::mLock held
+void AudioFlinger::ThreadBase::startMelComputation_l(
+        const sp<audio_utils::MelProcessor>& /*processor*/)
+{
+    // Do nothing
+    ALOGW("%s: ThreadBase does not support CSD", __func__);
+}
+
+// stopMelComputation_l() must be called with AudioFlinger::mLock held
+void AudioFlinger::ThreadBase::stopMelComputation_l()
+{
+    // Do nothing
+    ALOGW("%s: ThreadBase does not support CSD", __func__);
+}
+
 // ----------------------------------------------------------------------------
 //      Playback
 // ----------------------------------------------------------------------------
@@ -3470,14 +3485,16 @@ ssize_t AudioFlinger::PlaybackThread::threadLoop_write()
     return bytesWritten;
 }
 
-void AudioFlinger::PlaybackThread::startMelComputation(
+// startMelComputation_l() must be called with AudioFlinger::mLock held
+void AudioFlinger::PlaybackThread::startMelComputation_l(
         const sp<audio_utils::MelProcessor>& processor)
 {
     auto outputSink = static_cast<AudioStreamOutSink*>(mOutputSink.get());
     outputSink->startMelComputation(processor);
 }
 
-void AudioFlinger::PlaybackThread::stopMelComputation()
+// stopMelComputation_l() must be called with AudioFlinger::mLock held
+void AudioFlinger::PlaybackThread::stopMelComputation_l()
 {
     auto outputSink = static_cast<AudioStreamOutSink*>(mOutputSink.get());
     outputSink->stopMelComputation();
@@ -10135,7 +10152,6 @@ status_t AudioFlinger::MmapThread::reportData(const void* /*buffer*/, size_t /*f
     return INVALID_OPERATION;
 }
 
-
 void AudioFlinger::MmapThread::readHalParameters_l()
 {
     status_t result = mHalStream->getAudioProperties(&mSampleRate, &mChannelMask, &mHALFormat);
@@ -10818,10 +10834,30 @@ status_t AudioFlinger::MmapPlaybackThread::getExternalPosition(uint64_t *positio
 }
 
 status_t AudioFlinger::MmapPlaybackThread::reportData(const void* buffer, size_t frameCount) {
-    // TODO(264254430): send the data to mel processor.
-    (void) buffer;
-    (void) frameCount;
+    // Send to MelProcessor for sound dose measurement.
+    auto processor = mMelProcessor.load();
+    if (processor) {
+        processor->process(buffer, frameCount * mFrameSize);
+    }
+
     return NO_ERROR;
+}
+
+// startMelComputation_l() must be called with AudioFlinger::mLock held
+void AudioFlinger::MmapPlaybackThread::startMelComputation_l(
+        const sp<audio_utils::MelProcessor>& processor)
+{
+    ALOGV("%s: starting mel processor for thread %d", __func__, id());
+    if (processor != nullptr) {
+        mMelProcessor = processor;
+    }
+}
+
+// stopMelComputation_l() must be called with AudioFlinger::mLock held
+void AudioFlinger::MmapPlaybackThread::stopMelComputation_l()
+{
+    ALOGV("%s: stopping mel processor for thread %d", __func__, id());
+    mMelProcessor = nullptr;
 }
 
 void AudioFlinger::MmapPlaybackThread::dumpInternals_l(int fd, const Vector<String16>& args)
