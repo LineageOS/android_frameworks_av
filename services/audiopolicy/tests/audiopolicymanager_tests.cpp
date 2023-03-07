@@ -2833,6 +2833,108 @@ TEST_P(AudioPolicyManagerDevicesRoleForCapturePresetTest, DevicesRoleForCaptureP
               mManager->getDevicesForRoleAndCapturePreset(audioSource, role, devices));
 }
 
+TEST_F(AudioPolicyManagerDevicesRoleForCapturePresetTest, PreferredDeviceUsedForInput) {
+    const audio_source_t source = AUDIO_SOURCE_MIC;
+    const device_role_t role = DEVICE_ROLE_PREFERRED;
+    const std::string address = "card=1;device=0";
+    const std::string deviceName = "randomName";
+
+    ASSERT_EQ(NO_ERROR, mManager->setDeviceConnectionState(
+            AUDIO_DEVICE_IN_USB_DEVICE, AUDIO_POLICY_DEVICE_STATE_AVAILABLE,
+            address.c_str(), deviceName.c_str(), AUDIO_FORMAT_DEFAULT));
+    auto availableDevices = mManager->getAvailableInputDevices();
+    ASSERT_GT(availableDevices.size(), 1);
+
+    audio_attributes_t attr = AUDIO_ATTRIBUTES_INITIALIZER;
+    attr.source = source;
+    audio_port_handle_t selectedDeviceId = AUDIO_PORT_HANDLE_NONE;
+    ASSERT_NO_FATAL_FAILURE(getInputForAttr(attr, AUDIO_SESSION_NONE, 1, &selectedDeviceId,
+                                            AUDIO_FORMAT_PCM_16_BIT, AUDIO_CHANNEL_IN_STEREO,
+                                            48000));
+    auto selectedDevice = availableDevices.getDeviceFromId(selectedDeviceId);
+    ASSERT_NE(nullptr, selectedDevice);
+
+    sp<DeviceDescriptor> preferredDevice = nullptr;
+    for (const auto& device : availableDevices) {
+        if (device != selectedDevice) {
+            preferredDevice = device;
+            break;
+        }
+    }
+    ASSERT_NE(nullptr, preferredDevice);
+    // After setting preferred device for capture preset, the selected device for input should be
+    // the preferred device.
+    ASSERT_EQ(NO_ERROR,
+              mManager->setDevicesRoleForCapturePreset(source, role,
+                                                       {preferredDevice->getDeviceTypeAddr()}));
+    selectedDeviceId = AUDIO_PORT_HANDLE_NONE;
+    ASSERT_NO_FATAL_FAILURE(getInputForAttr(attr, AUDIO_SESSION_NONE, 1, &selectedDeviceId,
+                                            AUDIO_FORMAT_PCM_16_BIT, AUDIO_CHANNEL_IN_STEREO,
+                                            48000));
+    ASSERT_EQ(preferredDevice, availableDevices.getDeviceFromId(selectedDeviceId));
+
+    // After clearing preferred device for capture preset, the selected device for input should be
+    // the same as original one.
+    ASSERT_EQ(NO_ERROR,
+              mManager->clearDevicesRoleForCapturePreset(source, role));
+    selectedDeviceId = AUDIO_PORT_HANDLE_NONE;
+    ASSERT_NO_FATAL_FAILURE(getInputForAttr(attr, AUDIO_SESSION_NONE, 1, &selectedDeviceId,
+                                            AUDIO_FORMAT_PCM_16_BIT, AUDIO_CHANNEL_IN_STEREO,
+                                            48000));
+    ASSERT_EQ(selectedDevice, availableDevices.getDeviceFromId(selectedDeviceId));
+
+    ASSERT_EQ(NO_ERROR, mManager->setDeviceConnectionState(
+            AUDIO_DEVICE_IN_USB_DEVICE, AUDIO_POLICY_DEVICE_STATE_UNAVAILABLE,
+            address.c_str(), deviceName.c_str(), AUDIO_FORMAT_DEFAULT));
+}
+
+TEST_F(AudioPolicyManagerDevicesRoleForCapturePresetTest, DisabledDeviceNotUsedForInput) {
+    const audio_source_t source = AUDIO_SOURCE_MIC;
+    const device_role_t role = DEVICE_ROLE_DISABLED;
+    const std::string address = "card=1;device=0";
+    const std::string deviceName = "randomName";
+
+    ASSERT_EQ(NO_ERROR, mManager->setDeviceConnectionState(
+            AUDIO_DEVICE_IN_USB_DEVICE, AUDIO_POLICY_DEVICE_STATE_AVAILABLE,
+            address.c_str(), deviceName.c_str(), AUDIO_FORMAT_DEFAULT));
+    auto availableDevices = mManager->getAvailableInputDevices();
+    ASSERT_GT(availableDevices.size(), 1);
+
+    audio_attributes_t attr = AUDIO_ATTRIBUTES_INITIALIZER;
+    attr.source = source;
+    audio_port_handle_t selectedDeviceId = AUDIO_PORT_HANDLE_NONE;
+    ASSERT_NO_FATAL_FAILURE(getInputForAttr(attr, AUDIO_SESSION_NONE, 1, &selectedDeviceId,
+                                            AUDIO_FORMAT_PCM_16_BIT, AUDIO_CHANNEL_IN_STEREO,
+                                            48000));
+    auto selectedDevice = availableDevices.getDeviceFromId(selectedDeviceId);
+    ASSERT_NE(nullptr, selectedDevice);
+
+    // After setting disabled device for capture preset, the disabled device must not be
+    // selected for input.
+    ASSERT_EQ(NO_ERROR,
+              mManager->setDevicesRoleForCapturePreset(source, role,
+                                                       {selectedDevice->getDeviceTypeAddr()}));
+    selectedDeviceId = AUDIO_PORT_HANDLE_NONE;
+    ASSERT_NO_FATAL_FAILURE(getInputForAttr(attr, AUDIO_SESSION_NONE, 1, &selectedDeviceId,
+                                            AUDIO_FORMAT_PCM_16_BIT, AUDIO_CHANNEL_IN_STEREO,
+                                            48000));
+    ASSERT_NE(selectedDevice, availableDevices.getDeviceFromId(selectedDeviceId));
+
+    // After clearing disabled device for capture preset, the selected device for input should be
+    // the original one.
+    ASSERT_EQ(NO_ERROR,
+              mManager->clearDevicesRoleForCapturePreset(source, role));
+    selectedDeviceId = AUDIO_PORT_HANDLE_NONE;
+    ASSERT_NO_FATAL_FAILURE(getInputForAttr(attr, AUDIO_SESSION_NONE, 1, &selectedDeviceId,
+                                            AUDIO_FORMAT_PCM_16_BIT, AUDIO_CHANNEL_IN_STEREO,
+                                            48000));
+    ASSERT_EQ(selectedDevice, availableDevices.getDeviceFromId(selectedDeviceId));
+
+    ASSERT_EQ(NO_ERROR, mManager->setDeviceConnectionState(
+            AUDIO_DEVICE_IN_USB_DEVICE, AUDIO_POLICY_DEVICE_STATE_UNAVAILABLE,
+            address.c_str(), deviceName.c_str(), AUDIO_FORMAT_DEFAULT));
+}
+
 INSTANTIATE_TEST_CASE_P(
         DevicesRoleForCapturePresetOperation,
         AudioPolicyManagerDevicesRoleForCapturePresetTest,
