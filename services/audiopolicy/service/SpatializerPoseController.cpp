@@ -290,22 +290,29 @@ void SpatializerPoseController::onPose(int64_t timestamp, int32_t sensor, const 
     const float delayMs = (elapsedRealtimeNano() - timestamp) * NANOS_TO_MILLIS; // CLOCK_BOOTTIME
 
     if (sensor == mHeadSensor) {
-        std::vector<float> pryxyzdt(8);  // pitch, roll, yaw, rot_vel_x, rot_vel_y, rot_vel_z,
+        std::vector<float> pryprydt(8);  // pitch, roll, yaw, d_pitch, d_roll, d_yaw,
                                          // discontinuity, timestamp_delay
-        media::quaternionToAngles(pose.rotation(), &pryxyzdt[0], &pryxyzdt[1], &pryxyzdt[2]);
+        media::quaternionToAngles(pose.rotation(), &pryprydt[0], &pryprydt[1], &pryprydt[2]);
         if (twist) {
             const auto rotationalVelocity = twist->rotationalVelocity();
-            for (size_t i = 0; i < 3; ++i) {
-                pryxyzdt[i + 3] = rotationalVelocity[i];
-            }
+            // The rotational velocity is an intrinsic transform (i.e. based on the head
+            // coordinate system, not the world coordinate system).  It is a 3 element vector:
+            // axis (d theta / dt).
+            //
+            // We leave rotational velocity relative to the head coordinate system,
+            // as the initial head tracking sensor's world frame is arbitrary.
+            media::quaternionToAngles(media::rotationVectorToQuaternion(rotationalVelocity),
+                    &pryprydt[3], &pryprydt[4], &pryprydt[5]);
         }
-        pryxyzdt[6] = isNewReference;
-        pryxyzdt[7] = delayMs;
-        for (size_t i = 0; i < 3; ++i) { // pitch, roll, yaw only.  rotational velocity in rad/s.
-            pryxyzdt[i] *= RAD_TO_DEGREE;
+        pryprydt[6] = isNewReference;
+        pryprydt[7] = delayMs;
+        for (size_t i = 0; i < 6; ++i) {
+            // pitch, roll, yaw in degrees, referenced in degrees on the world frame.
+            // d_pitch, d_roll, d_yaw rotational velocity in degrees/s, based on the world frame.
+            pryprydt[i] *= RAD_TO_DEGREE;
         }
-        mHeadSensorRecorder.record(pryxyzdt);
-        mHeadSensorDurableRecorder.record(pryxyzdt);
+        mHeadSensorRecorder.record(pryprydt);
+        mHeadSensorDurableRecorder.record(pryprydt);
 
         mProcessor->setWorldToHeadPose(timestamp, pose,
                                        twist.value_or(Twist3f()) / kTicksPerSecond);
@@ -346,15 +353,16 @@ std::string SpatializerPoseController::toString(unsigned level) const {
     if (mHeadSensor == INVALID_SENSOR) {
         ss += "HeadSensor: INVALID\n";
     } else {
-        base::StringAppendF(&ss, "HeadSensor: 0x%08x (active world-to-head) "
-            "[ pitch, roll, yaw, vx, vy, vz, disc, delay ] "
-            "(degrees, rad/s, bool, ms)\n", mHeadSensor);
+        base::StringAppendF(&ss, "HeadSensor: 0x%08x "
+            "(active world-to-head : head-relative velocity) "
+            "[ pitch, roll, yaw : d_pitch, d_roll, d_yaw : disc : delay ] "
+            "(degrees, degrees/s, bool, ms)\n", mHeadSensor);
         ss.append(prefixSpace)
             .append(" PerMinuteHistory:\n")
-            .append(mHeadSensorDurableRecorder.toString(level + 2))
+            .append(mHeadSensorDurableRecorder.toString(level + 3))
             .append(prefixSpace)
             .append(" PerSecondHistory:\n")
-            .append(mHeadSensorRecorder.toString(level + 2));
+            .append(mHeadSensorRecorder.toString(level + 3));
     }
 
     ss += prefixSpace;
@@ -362,14 +370,14 @@ std::string SpatializerPoseController::toString(unsigned level) const {
         ss += "ScreenSensor: INVALID\n";
     } else {
         base::StringAppendF(&ss, "ScreenSensor: 0x%08x (active world-to-screen) "
-            "[ pitch, roll, yaw, delay ] "
+            "[ pitch, roll, yaw : delay ] "
             "(degrees, ms)\n", mScreenSensor);
         ss.append(prefixSpace)
             .append(" PerMinuteHistory:\n")
-            .append(mScreenSensorDurableRecorder.toString(level + 2))
+            .append(mScreenSensorDurableRecorder.toString(level + 3))
             .append(prefixSpace)
             .append(" PerSecondHistory:\n")
-            .append(mScreenSensorRecorder.toString(level + 2));
+            .append(mScreenSensorRecorder.toString(level + 3));
     }
 
     ss += prefixSpace;
