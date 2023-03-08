@@ -105,7 +105,7 @@ aaudio_result_t AAudioServiceEndpointMMAP::open(const aaudio::AAudioStreamReques
     while (true) {
         if (formatsTried.find(audioFormat) != formatsTried.end()) {
             // APM returning something that has already tried.
-            ALOGW("Have already tried to open #x, but failed before");
+            ALOGW("Have already tried to open with format=%#x, but failed before", audioFormat);
             break;
         }
         formatsTried.insert(audioFormat);
@@ -195,7 +195,7 @@ aaudio_result_t AAudioServiceEndpointMMAP::openWithFormat(
         // not match the hardware.
         ALOGD("%s() - openMmapStream() returned status=%d, suggested format=%#x, sample_rate=%u, "
               "channel_mask=%#x",
-              __func__, status, config.format, config.sample_rate, config.format);
+              __func__, status, config.format, config.sample_rate, config.channel_mask);
         *nextFormatToTry = config.format != audioFormat ? config.format
                                                         : *nextFormatToTry;
         return AAUDIO_ERROR_UNAVAILABLE;
