@@ -576,6 +576,9 @@ public:
 
     virtual     bool isStreamInitialized() = 0;
 
+    virtual     void startMelComputation_l(const sp<audio_utils::MelProcessor>& processor);
+    virtual     void stopMelComputation_l();
+
 protected:
 
                 // entry describing an effect being suspended in mSuspendedSessions keyed vector
@@ -1110,8 +1113,8 @@ public:
                     return INVALID_OPERATION;
                 }
 
-                void startMelComputation(const sp<audio_utils::MelProcessor>& processor);
-                void stopMelComputation();
+                void startMelComputation_l(const sp<audio_utils::MelProcessor>& processor) override;
+                void stopMelComputation_l() override;
 
 protected:
     // updated by readOutputParameters_l()
@@ -2273,6 +2276,9 @@ public:
 
                 status_t    reportData(const void* buffer, size_t frameCount) override;
 
+                void startMelComputation_l(const sp<audio_utils::MelProcessor>& processor) override;
+                void stopMelComputation_l() override;
+
 protected:
                 void        dumpInternals_l(int fd, const Vector<String16>& args) override;
 
@@ -2282,6 +2288,8 @@ protected:
                 bool                        mMasterMute;
                 bool                        mStreamMute;
                 AudioStreamOut*             mOutput;
+
+                mediautils::atomic_sp<audio_utils::MelProcessor> mMelProcessor;
 };
 
 class MmapCaptureThread : public MmapThread
