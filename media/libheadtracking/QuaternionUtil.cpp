@@ -14,7 +14,7 @@
  * limitations under the License.
  */
 
-#include "QuaternionUtil.h"
+#include "media/QuaternionUtil.h"
 
 #include <cassert>
 
