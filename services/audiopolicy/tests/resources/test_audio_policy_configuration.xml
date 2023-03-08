@@ -77,12 +77,14 @@
                 </devicePort>
                 <devicePort tagName="USB Device Out" type="AUDIO_DEVICE_OUT_USB_DEVICE" role="sink">
                 </devicePort>
+                <devicePort tagName="USB Device In" type="AUDIO_DEVICE_IN_USB_DEVICE" role="source">
+                </devicePort>
             </devicePorts>
             <routes>
                 <route type="mix" sink="Speaker"
                        sources="primary output,voip_rx"/>
                 <route type="mix" sink="primary input"
-                       sources="Built-In Mic,Hdmi-In Mic"/>
+                       sources="Built-In Mic,Hdmi-In Mic,USB Device In"/>
                 <route type="mix" sink="voip_tx"
                        sources="Built-In Mic"/>
                 <route type="mix" sink="Hdmi"

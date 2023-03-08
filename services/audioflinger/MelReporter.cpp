@@ -170,8 +170,8 @@ void AudioFlinger::MelReporter::onCreateAudioPatch(audio_patch_handle_t handle,
 }
 
 void AudioFlinger::MelReporter::startMelComputationForActivePatch_l(const ActiveMelPatch& patch) {
-    auto thread = mAudioFlinger.checkPlaybackThread_l(patch.streamHandle);
-    if (thread == nullptr) {
+    auto outputThread = mAudioFlinger.checkOutputThread_l(patch.streamHandle);
+    if (outputThread == nullptr) {
         ALOGE("%s cannot find thread for stream handle %d", __func__, patch.streamHandle);
         return;
     }
@@ -180,13 +180,16 @@ void AudioFlinger::MelReporter::startMelComputationForActivePatch_l(const Active
         ++mActiveDevices[deviceHandle];
         ALOGI("%s add stream %d that uses device %d for CSD, nr of streams: %d", __func__,
               patch.streamHandle, deviceHandle, mActiveDevices[deviceHandle]);
-        thread->startMelComputation(mSoundDoseManager->getOrCreateProcessorForDevice(
-            deviceHandle,
-            patch.streamHandle,
-            thread->mSampleRate,
-            thread->mChannelCount,
-            thread->mFormat));
+
+        if (outputThread != nullptr) {
+            outputThread->startMelComputation_l(mSoundDoseManager->getOrCreateProcessorForDevice(
+                deviceHandle,
+                patch.streamHandle,
+                outputThread->mSampleRate,
+                outputThread->mChannelCount,
+                outputThread->mFormat));
         }
+    }
 }
 
 void AudioFlinger::MelReporter::onReleaseAudioPatch(audio_patch_handle_t handle) {
@@ -229,7 +232,8 @@ void AudioFlinger::MelReporter::stopMelComputationForPatch_l(const ActiveMelPatc
         return;
     }
 
-    auto thread = mAudioFlinger.checkPlaybackThread_l(patch.streamHandle);
+   auto outputThread = mAudioFlinger.checkOutputThread_l(patch.streamHandle);
+
     ALOGV("%s: stop MEL for stream id: %d", __func__, patch.streamHandle);
     for (const auto& deviceId : patch.deviceHandles) {
         if (mActiveDevices[deviceId] > 0) {
@@ -243,8 +247,8 @@ void AudioFlinger::MelReporter::stopMelComputationForPatch_l(const ActiveMelPatc
     }
 
     mSoundDoseManager->removeStreamProcessor(patch.streamHandle);
-    if (thread != nullptr) {
-        thread->stopMelComputation();
+    if (outputThread != nullptr) {
+        outputThread->stopMelComputation_l();
     }
 }
 
