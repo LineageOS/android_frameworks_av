@@ -808,8 +808,7 @@ void Spatializer::onActualModeChangeMsg(HeadTrackingMode mode) {
             }
         }
         callback = mHeadTrackingCallback;
-        mLocalLog.log("%s: %s, spatializerMode %s", __func__, media::toString(mode).c_str(),
-                      media::toString(spatializerMode).c_str());
+        mLocalLog.log("%s: updating mode to %s", __func__, media::toString(mode).c_str());
     }
     if (callback != nullptr) {
         callback->onHeadTrackingModeChanged(spatializerMode);

@@ -66,6 +66,9 @@ class Twist3f {
         return Twist3f(mTranslationalVelocity / s, mRotationalVelocity / s);
     }
 
+    // Convert instance to a string representation.
+    std::string toString() const;
+
   private:
     Eigen::Vector3f mTranslationalVelocity;
     Eigen::Vector3f mRotationalVelocity;
