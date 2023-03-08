@@ -21,8 +21,11 @@
 #include <cstdint>
 
 #include <audio_utils/clock.h>
+#include <media/AidlConversionCppNdk.h>
 #include <media/AidlConversionUtil.h>
+#include <media/AudioParameter.h>
 #include <mediautils/TimeCheck.h>
+#include <system/audio.h>
 #include <utils/Log.h>
 
 #include "DeviceHalAidl.h"
@@ -33,6 +36,7 @@ using ::aidl::android::hardware::audio::core::IStreamCommon;
 using ::aidl::android::hardware::audio::core::IStreamIn;
 using ::aidl::android::hardware::audio::core::IStreamOut;
 using ::aidl::android::hardware::audio::core::StreamDescriptor;
+using ::aidl::android::legacy2aidl_audio_channel_mask_t_AudioChannelLayout;
 
 namespace android {
 
@@ -483,12 +487,31 @@ StreamOutHalAidl::StreamOutHalAidl(
         const std::shared_ptr<IStreamOut>& stream, const sp<CallbackBroker>& callbackBroker)
         : StreamHalAidl("StreamOutHalAidl", false /*isInput*/, config, nominalLatency,
                 std::move(context), getStreamCommon(stream)),
-          mStream(stream), mCallbackBroker(callbackBroker) {}
+          mStream(stream), mCallbackBroker(callbackBroker) {
+    // Initialize the offload metadata
+    mOffloadMetadata.sampleRate = static_cast<int32_t>(config.sample_rate);
+    mOffloadMetadata.channelMask = VALUE_OR_FATAL(
+            legacy2aidl_audio_channel_mask_t_AudioChannelLayout(config.channel_mask, false));
+    mOffloadMetadata.averageBitRatePerSecond = static_cast<int32_t>(config.offload_info.bit_rate);
+}
 
 StreamOutHalAidl::~StreamOutHalAidl() {
     if (auto broker = mCallbackBroker.promote(); broker != nullptr) {
         broker->clearCallbacks(this);
     }
+}
+
+status_t StreamOutHalAidl::setParameters(const String8& kvPairs) {
+    if (!mStream) return NO_INIT;
+
+    AudioParameter parameters(kvPairs);
+    ALOGD("%s parameters: %s", __func__, parameters.toString().c_str());
+
+    if (filterAndUpdateOffloadMetadata(parameters) != OK) {
+        ALOGW("%s filtering or updating offload metadata gets failed", __func__);
+    }
+
+    return StreamHalAidl::setParameters(parameters.toString());
 }
 
 status_t StreamOutHalAidl::getLatency(uint32_t *latency) {
@@ -691,6 +714,78 @@ status_t StreamOutHalAidl::setLatencyModeCallback(
 
 status_t StreamOutHalAidl::exit() {
     return StreamHalAidl::exit();
+}
+
+status_t StreamOutHalAidl::filterAndUpdateOffloadMetadata(AudioParameter &parameters) {
+    TIME_CHECK();
+
+    if (parameters.containsKey(String8(AudioParameter::keyOffloadCodecAverageBitRate)) ||
+            parameters.containsKey(String8(AudioParameter::keyOffloadCodecSampleRate)) ||
+            parameters.containsKey(String8(AudioParameter::keyOffloadCodecChannels)) ||
+            parameters.containsKey(String8(AudioParameter::keyOffloadCodecDelaySamples)) ||
+            parameters.containsKey(String8(AudioParameter::keyOffloadCodecPaddingSamples))) {
+        int value = 0;
+        if (parameters.getInt(String8(AudioParameter::keyOffloadCodecAverageBitRate), value)
+                == NO_ERROR) {
+            if (value <= 0) {
+                return BAD_VALUE;
+            }
+            mOffloadMetadata.averageBitRatePerSecond = value;
+            parameters.remove(String8(AudioParameter::keyOffloadCodecAverageBitRate));
+        }
+
+        if (parameters.getInt(String8(AudioParameter::keyOffloadCodecSampleRate), value)
+                == NO_ERROR) {
+            if (value <= 0) {
+                return BAD_VALUE;
+            }
+            mOffloadMetadata.sampleRate = value;
+            parameters.remove(String8(AudioParameter::keyOffloadCodecSampleRate));
+        }
+
+        if (parameters.getInt(String8(AudioParameter::keyOffloadCodecChannels), value)
+                == NO_ERROR) {
+            if (value <= 0) {
+                return BAD_VALUE;
+            }
+            audio_channel_mask_t channel_mask =
+                    audio_channel_out_mask_from_count(static_cast<uint32_t>(value));
+            if (channel_mask == AUDIO_CHANNEL_INVALID) {
+                return BAD_VALUE;
+            }
+            mOffloadMetadata.channelMask =
+                    VALUE_OR_RETURN_STATUS(legacy2aidl_audio_channel_mask_t_AudioChannelLayout(
+                        channel_mask, false));
+            parameters.remove(String8(AudioParameter::keyOffloadCodecChannels));
+        }
+
+        // The legacy keys are misnamed. The delay and padding are in frame.
+        if (parameters.getInt(String8(AudioParameter::keyOffloadCodecDelaySamples), value)
+                == NO_ERROR) {
+            if (value < 0) {
+                return BAD_VALUE;
+            }
+            mOffloadMetadata.delayFrames = value;
+            parameters.remove(String8(AudioParameter::keyOffloadCodecDelaySamples));
+        }
+
+        if (parameters.getInt(String8(AudioParameter::keyOffloadCodecPaddingSamples), value)
+                == NO_ERROR) {
+            if (value < 0) {
+                return BAD_VALUE;
+            }
+            mOffloadMetadata.paddingFrames = value;
+            parameters.remove(String8(AudioParameter::keyOffloadCodecPaddingSamples));
+        }
+
+        ALOGD("%s set offload metadata %s", __func__, mOffloadMetadata.toString().c_str());
+        status_t status = statusTFromBinderStatus(mStream->updateOffloadMetadata(mOffloadMetadata));
+        if (status != OK) {
+            ALOGE("%s: updateOffloadMetadata failed %d", __func__, status);
+            return status;
+        }
+    }
+    return OK;
 }
 
 StreamInHalAidl::StreamInHalAidl(

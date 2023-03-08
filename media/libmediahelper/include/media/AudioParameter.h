@@ -107,6 +107,12 @@ public:
     static const char * const keyAdditionalOutputDeviceDelay;
     static const char * const keyMaxAdditionalOutputDeviceDelay;
 
+    static const char * const keyOffloadCodecAverageBitRate;
+    static const char * const keyOffloadCodecSampleRate;
+    static const char * const keyOffloadCodecChannels;
+    static const char * const keyOffloadCodecDelaySamples;
+    static const char * const keyOffloadCodecPaddingSamples;
+
     String8 toString() const { return toStringImpl(true); }
     String8 keysToString() const { return toStringImpl(false); }
 
@@ -125,6 +131,7 @@ public:
 
     size_t size() const { return mParameters.size(); }
 
+    bool containsKey(const String8& key) const;
 private:
     String8 mKeyValuePairs;
     KeyedVector <String8, String8> mParameters;
