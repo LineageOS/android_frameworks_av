@@ -799,6 +799,28 @@ void C2SoftAomEnc::process(const std::unique_ptr<C2Work>& work,
             }
             break;
         }
+        case C2PlanarLayout::TYPE_YUVA: {
+            if (mConversionBuffer.size() >= stride * vstride * 3) {
+                uint16_t *dstY, *dstU, *dstV;
+                dstY = (uint16_t*)mConversionBuffer.data();
+                dstU = dstY + stride * vstride;
+                dstV = dstU + (stride * vstride) / 4;
+                convertRGBA1010102ToYUV420Planar16(dstY, dstU, dstV, (uint32_t*)(rView->data()[0]),
+                                                   layout.planes[layout.PLANE_Y].rowInc / 4, stride,
+                                                   vstride, mColorAspects->matrix,
+                                                   mColorAspects->range);
+                aom_img_wrap(&raw_frame, AOM_IMG_FMT_I42016, stride, vstride, mStrideAlign,
+                                mConversionBuffer.data());
+                aom_img_set_rect(&raw_frame, 0, 0, width, height, 0);
+            } else {
+                ALOGE("Conversion buffer is too small: %u x %u for %zu", stride, vstride,
+                        mConversionBuffer.size());
+                work->result = C2_BAD_VALUE;
+                return;
+            }
+            break;
+        }
+
         default:
             ALOGE("Unrecognized plane type: %d", layout.type);
             work->result = C2_BAD_VALUE;
