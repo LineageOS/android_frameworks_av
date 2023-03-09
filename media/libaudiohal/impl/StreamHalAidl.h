@@ -21,15 +21,19 @@
 #include <mutex>
 #include <string_view>
 
+#include <aidl/android/hardware/audio/common/AudioOffloadMetadata.h>
 #include <aidl/android/hardware/audio/core/BpStreamCommon.h>
 #include <aidl/android/hardware/audio/core/BpStreamIn.h>
 #include <aidl/android/hardware/audio/core/BpStreamOut.h>
 #include <fmq/AidlMessageQueue.h>
 #include <media/audiohal/EffectHalInterface.h>
 #include <media/audiohal/StreamHalInterface.h>
+#include <media/AudioParameter.h>
 
 #include "ConversionHelperAidl.h"
 #include "StreamPowerLog.h"
+
+using ::aidl::android::hardware::audio::common::AudioOffloadMetadata;
 
 namespace android {
 
@@ -230,6 +234,9 @@ class CallbackBroker;
 
 class StreamOutHalAidl : public StreamOutHalInterface, public StreamHalAidl {
   public:
+    // Extract the output stream parameters and set by AIDL APIs.
+    status_t setParameters(const String8& kvPairs) override;
+
     // Return the audio hardware driver estimated latency in milliseconds.
     status_t getLatency(uint32_t *latency) override;
 
@@ -309,6 +316,8 @@ class StreamOutHalAidl : public StreamOutHalInterface, public StreamHalAidl {
     const std::shared_ptr<::aidl::android::hardware::audio::core::IStreamOut> mStream;
     const wp<CallbackBroker> mCallbackBroker;
 
+    AudioOffloadMetadata mOffloadMetadata;
+
     // Can not be constructed directly by clients.
     StreamOutHalAidl(
             const audio_config& config, StreamContextAidl&& context, int32_t nominalLatency,
@@ -316,6 +325,10 @@ class StreamOutHalAidl : public StreamOutHalInterface, public StreamHalAidl {
             const sp<CallbackBroker>& callbackBroker);
 
     ~StreamOutHalAidl() override;
+
+    // Filter and update the offload metadata. The parameters which are related to the offload
+    // metadata will be removed after filtering.
+    status_t filterAndUpdateOffloadMetadata(AudioParameter &parameters);
 };
 
 class StreamInHalAidl : public StreamInHalInterface, public StreamHalAidl {
