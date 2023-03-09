@@ -135,11 +135,15 @@ cc_library {
     ],
     defaults: [
         "audio_aidl_conversion_common_default",
+        "latest_android_hardware_audio_common_ndk_shared",
         "latest_android_media_audio_common_types_ndk_shared",
     ],
     shared_libs: [
         "libbinder_ndk",
         "libbase",
+    ],
+    static_libs: [
+        "libaudioaidlcommon",
     ],
     cflags: [
         "-DBACKEND_NDK",
