@@ -3032,6 +3032,16 @@ const char *NuPlayer::getDataSourceType() {
     }
  }
 
+ void NuPlayer::dump(AString& logString) {
+    logString.append("renderer(");
+    if (mRenderer != nullptr) {
+        mRenderer->dump(logString);
+    } else {
+        logString.append("null");
+    }
+    logString.append(")");
+ }
+
 // Modular DRM begin
 status_t NuPlayer::prepareDrm(const uint8_t uuid[16], const Vector<uint8_t> &drmSessionId)
 {
