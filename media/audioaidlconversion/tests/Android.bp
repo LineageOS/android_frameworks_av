@@ -1,0 +1,46 @@
+package {
+    // See: http://go/android-license-faq
+    // A large-scale-change added 'default_applicable_licenses' to import
+    // all of the 'license_kinds' from "frameworks_av_license"
+    // to get the below license kinds:
+    //   SPDX-license-identifier-Apache-2.0
+    default_applicable_licenses: ["frameworks_av_license"],
+}
+
+cc_defaults {
+    name: "libaudio_aidl_conversion_tests_defaults",
+    test_suites: ["device-tests"],
+    cflags: [
+        "-Wall",
+        "-Werror",
+    ],
+    sanitize: {
+        misc_undefined: [
+            "unsigned-integer-overflow",
+            "signed-integer-overflow",
+        ],
+    },
+}
+
+cc_test {
+    name: "audio_aidl_ndk_conversion_tests",
+
+    defaults: [
+        "latest_android_media_audio_common_types_ndk_static",
+        "latest_android_hardware_audio_common_ndk_static",
+        "libaudio_aidl_conversion_tests_defaults",
+    ],
+    srcs: ["audio_aidl_ndk_conversion_tests.cpp"],
+    shared_libs: [
+        "libbinder",
+        "libcutils",
+        "liblog",
+        "libutils",
+    ],
+    static_libs: [
+        "libaudio_aidl_conversion_common_ndk",
+    ],
+    cflags: [
+        "-DBACKEND_NDK",
+    ],
+}
