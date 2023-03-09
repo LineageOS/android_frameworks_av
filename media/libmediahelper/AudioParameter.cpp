@@ -61,6 +61,12 @@ const char * const AudioParameter::keyAdditionalOutputDeviceDelay =
         AUDIO_PARAMETER_DEVICE_ADDITIONAL_OUTPUT_DELAY;
 const char * const AudioParameter::keyMaxAdditionalOutputDeviceDelay =
         AUDIO_PARAMETER_DEVICE_MAX_ADDITIONAL_OUTPUT_DELAY;
+const char * const AudioParameter::keyOffloadCodecAverageBitRate = AUDIO_OFFLOAD_CODEC_AVG_BIT_RATE;
+const char * const AudioParameter::keyOffloadCodecSampleRate = AUDIO_OFFLOAD_CODEC_SAMPLE_RATE;
+const char * const AudioParameter::keyOffloadCodecChannels = AUDIO_OFFLOAD_CODEC_NUM_CHANNEL;
+const char * const AudioParameter::keyOffloadCodecDelaySamples = AUDIO_OFFLOAD_CODEC_DELAY_SAMPLES;
+const char * const AudioParameter::keyOffloadCodecPaddingSamples =
+        AUDIO_OFFLOAD_CODEC_PADDING_SAMPLES;
 
 AudioParameter::AudioParameter(const String8& keyValuePairs)
 {
@@ -224,6 +230,11 @@ status_t AudioParameter::getAt(size_t index, String8& key, String8& value) const
     } else {
         return BAD_VALUE;
     }
+}
+
+bool AudioParameter::containsKey(const String8& key) const
+{
+    return mParameters.indexOfKey(key) >= 0;
 }
 
 } // namespace android
