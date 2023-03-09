@@ -407,6 +407,14 @@ public:
      */
     virtual status_t renderOutputBuffer(
             const sp<MediaCodecBuffer> &buffer, int64_t timestampNs) = 0;
+
+    /**
+     * Poll for updates about rendered buffers.
+     *
+     * Triggers callbacks to CodecCallback::onOutputFramesRendered.
+     */
+    virtual void pollForRenderedBuffers() = 0;
+
     /**
      * Discard a buffer to the underlying CodecBase object.
      *
