@@ -16,17 +16,20 @@
 
 #pragma once
 
-#include <android/binder_auto_utils.h>
-#include <android/binder_manager.h>
-#include <android/binder_process.h>
-
 /**
- * Can only handle conversion between AIDL (NDK backend) and legacy type.
+ * Can only handle conversion between AIDL (NDK backend) and legacy types.
  */
+
+#include <string>
+#include <vector>
+
 #include <hardware/audio_effect.h>
-#include <media/AidlConversionUtil.h>
 #include <system/audio_effect.h>
+
+#include <aidl/android/hardware/audio/common/PlaybackTrackMetadata.h>
+#include <aidl/android/hardware/audio/common/RecordTrackMetadata.h>
 #include <aidl/android/media/audio/common/AudioConfig.h>
+#include <media/AidlConversionUtil.h>
 
 namespace aidl {
 namespace android {
@@ -35,6 +38,23 @@ ConversionResult<buffer_config_t> aidl2legacy_AudioConfigBase_buffer_config_t(
         const media::audio::common::AudioConfigBase& aidl, bool isInput);
 ConversionResult<media::audio::common::AudioConfigBase> legacy2aidl_buffer_config_t_AudioConfigBase(
         const buffer_config_t& legacy, bool isInput);
+
+::android::status_t aidl2legacy_AudioAttributesTags(
+        const std::vector<std::string>& aidl, char* legacy);
+ConversionResult<std::vector<std::string>> legacy2aidl_AudioAttributesTags(const char* legacy);
+
+ConversionResult<playback_track_metadata_v7>
+aidl2legacy_PlaybackTrackMetadata_playback_track_metadata_v7(
+        const hardware::audio::common::PlaybackTrackMetadata& aidl);
+ConversionResult<hardware::audio::common::PlaybackTrackMetadata>
+legacy2aidl_playback_track_metadata_v7_PlaybackTrackMetadata(
+        const playback_track_metadata_v7& legacy);
+
+ConversionResult<record_track_metadata_v7>
+aidl2legacy_RecordTrackMetadata_record_track_metadata_v7(
+        const hardware::audio::common::RecordTrackMetadata& aidl);
+ConversionResult<hardware::audio::common::RecordTrackMetadata>
+legacy2aidl_record_track_metadata_v7_RecordTrackMetadata(const record_track_metadata_v7& legacy);
 
 }  // namespace android
 }  // namespace aidl
