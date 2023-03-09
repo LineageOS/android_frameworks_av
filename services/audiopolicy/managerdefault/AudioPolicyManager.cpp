@@ -3752,11 +3752,12 @@ void AudioPolicyManager::dumpManualSurroundFormats(String8 *dst) const
 bool  AudioPolicyManager::areAllDevicesSupported(
         const AudioDeviceTypeAddrVector& devices,
         std::function<bool(audio_devices_t)> predicate,
-        const char *context) {
+        const char *context,
+        bool matchAddress) {
     for (size_t i = 0; i < devices.size(); i++) {
         sp<DeviceDescriptor> devDesc = mHwModules.getDeviceDescriptor(
                 devices[i].mType, devices[i].getAddress(), String8(),
-                AUDIO_FORMAT_DEFAULT, false /*allowToCreate*/, true /*matchAddress*/);
+                AUDIO_FORMAT_DEFAULT, false /*allowToCreate*/, matchAddress);
         if (devDesc == nullptr || (predicate != nullptr && !predicate(devices[i].mType))) {
             ALOGE("%s: device type %#x address %s not supported or not match predicate",
                     context, devices[i].mType, devices[i].getAddress());
@@ -3895,7 +3896,8 @@ AudioPolicyManager::removeDevicesRoleForStrategy(product_strategy_t strategy,
     ALOGV("%s() strategy=%d role=%d %s", __func__, strategy, role,
             dumpAudioDeviceTypeAddrVector(devices).c_str());
 
-    if (!areAllDevicesSupported(devices, audio_is_output_device, __func__)) {
+    if (!areAllDevicesSupported(
+            devices, audio_is_output_device, __func__, /*matchAddress*/false)) {
         return BAD_VALUE;
     }
     status_t status = mEngine->removeDevicesRoleForStrategy(strategy, role, devices);
@@ -3995,7 +3997,8 @@ status_t AudioPolicyManager::removeDevicesRoleForCapturePreset(
     ALOGV("%s() audioSource=%d role=%d devices=%s", __func__, audioSource, role,
             dumpAudioDeviceTypeAddrVector(devices).c_str());
 
-    if (!areAllDevicesSupported(devices, audio_call_is_input_device, __func__)) {
+    if (!areAllDevicesSupported(
+            devices, audio_call_is_input_device, __func__, /*matchAddress*/false)) {
         return BAD_VALUE;
     }
 
