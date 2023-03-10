@@ -75,6 +75,9 @@ public:
     static status_t getCompositeStreamInfo(const OutputStreamInfo &streamInfo,
             const CameraMetadata& ch, std::vector<OutputStreamInfo>* compositeOutput /*out*/);
 
+    // Get composite stream stats
+    void getStreamStats(hardware::CameraStreamStats*) override {};
+
     static bool isSizeSupportedByHeifEncoder(int32_t width, int32_t height,
             bool* useHeic, bool* useGrid, int64_t* stall, AString* hevcName = nullptr);
     static bool isInMemoryTempFileSupported();
