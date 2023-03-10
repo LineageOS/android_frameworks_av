@@ -477,6 +477,10 @@ status_t ACodecBufferChannel::renderOutputBuffer(
     return OK;
 }
 
+void ACodecBufferChannel::pollForRenderedBuffers() {
+    // TODO(b/266211548): Poll the native window for rendered buffers.
+}
+
 status_t ACodecBufferChannel::discardBuffer(const sp<MediaCodecBuffer> &buffer) {
     std::shared_ptr<const std::vector<const BufferInfo>> array(
             std::atomic_load(&mInputBuffers));

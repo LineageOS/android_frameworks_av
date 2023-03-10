@@ -1582,6 +1582,10 @@ status_t Codec2Client::Component::queueToOutputSurface(
     return mOutputBufferQueue->outputBuffer(block, input, output);
 }
 
+void Codec2Client::Component::pollForRenderedFrames(FrameEventHistoryDelta* delta) {
+    mOutputBufferQueue->pollForRenderedFrames(delta);
+}
+
 void Codec2Client::Component::setOutputSurfaceMaxDequeueCount(
         int maxDequeueCount) {
     mOutputBufferQueue->updateMaxDequeueBufferCount(maxDequeueCount);

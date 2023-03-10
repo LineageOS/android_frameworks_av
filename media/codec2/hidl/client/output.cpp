@@ -476,6 +476,12 @@ status_t OutputBufferQueue::outputBuffer(
     return OK;
 }
 
+void OutputBufferQueue::pollForRenderedFrames(FrameEventHistoryDelta* delta) {
+    if (mIgbp) {
+        mIgbp->getFrameTimestamps(delta);
+    }
+}
+
 void OutputBufferQueue::holdBufferQueueBlocks(
         const std::list<std::unique_ptr<C2Work>>& workList) {
     forEachBlock(workList,
