@@ -52,6 +52,8 @@ JpegRCompositeStream::JpegRCompositeStream(sp<CameraDeviceBase> device,
         mP010BufferAcquired(false),
         mBlobBufferAcquired(false),
         mOutputColorSpace(ANDROID_REQUEST_AVAILABLE_COLOR_SPACE_PROFILES_MAP_UNSPECIFIED),
+        mOutputStreamUseCase(0),
+        mFirstRequestLatency(-1),
         mProducerListener(new ProducerListener()),
         mMaxJpegBufferSize(-1),
         mUHRMaxJpegBufferSize(-1),
@@ -152,15 +154,23 @@ void JpegRCompositeStream::compilePendingInputLocked() {
         // Negative timestamp indicates that something went wrong during the capture result
         // collection process.
         if (it->first >= 0) {
-            mPendingInputFrames[it->first].frameNumber = std::get<0>(it->second);
+            auto frameNumber = std::get<0>(it->second);
+            mPendingInputFrames[it->first].frameNumber = frameNumber;
             mPendingInputFrames[it->first].result = std::get<1>(it->second);
+            mSessionStatsBuilder.incResultCounter(false /*dropped*/);
         }
         mCaptureResults.erase(it);
     }
 
     while (!mFrameNumberMap.empty()) {
         auto it = mFrameNumberMap.begin();
-        mPendingInputFrames[it->second].frameNumber = it->first;
+        auto frameNumber = it->first;
+        mPendingInputFrames[it->second].frameNumber = frameNumber;
+        auto requestTimeIt = mRequestTimeMap.find(frameNumber);
+        if (requestTimeIt != mRequestTimeMap.end()) {
+            mPendingInputFrames[it->second].requestTimeNs = requestTimeIt->second;
+            mRequestTimeMap.erase(requestTimeIt);
+        }
         mFrameNumberMap.erase(it);
     }
 
@@ -176,6 +186,8 @@ void JpegRCompositeStream::compilePendingInputLocked() {
         }
 
         if (frameFound) {
+            mSessionStatsBuilder.incCounter(mP010StreamId, true /*dropped*/,
+                    0 /*captureLatencyMs*/);
             it = mErrorFrameNumbers.erase(it);
         } else {
             ALOGW("%s: Not able to find failing input with frame number: %" PRId64, __FUNCTION__,
@@ -193,6 +205,7 @@ bool JpegRCompositeStream::getNextReadyInputLocked(int64_t *currentTs /*inout*/)
     bool newInputAvailable = false;
     for (const auto& it : mPendingInputFrames) {
         if ((!it.second.error) && (it.second.p010Buffer.data != nullptr) &&
+                (it.second.requestTimeNs != -1) &&
                 ((it.second.jpegBuffer.data != nullptr) || !mSupportInternalJpeg) &&
                 (it.first < *currentTs)) {
             *currentTs = it.first;
@@ -245,12 +258,6 @@ status_t JpegRCompositeStream::processInputFrame(nsecs_t ts, const InputFrame &i
     auto entry = inputFrame.result.find(ANDROID_JPEG_QUALITY);
     if (entry.count > 0) {
         jpegQuality = entry.data.u8[0];
-    }
-
-    uint8_t jpegOrientation = 0;
-    entry = inputFrame.result.find(ANDROID_JPEG_ORIENTATION);
-    if (entry.count > 0) {
-        jpegOrientation = entry.data.i32[0];
     }
 
     if ((res = native_window_set_buffers_dimensions(mOutputSurface.get(), maxJpegRBufferSize, 1))
@@ -384,6 +391,14 @@ status_t JpegRCompositeStream::processInputFrame(nsecs_t ts, const InputFrame &i
         .blobSizeBytes = static_cast<int32_t>(actualJpegRSize)
     };
     memcpy(header, &blobHeader, sizeof(CameraBlob));
+
+    if (inputFrame.requestTimeNs != -1) {
+        auto captureLatency = ns2ms(systemTime() - inputFrame.requestTimeNs);
+        mSessionStatsBuilder.incCounter(mP010StreamId, false /*dropped*/, captureLatency);
+        if (mFirstRequestLatency == -1) {
+            mFirstRequestLatency = captureLatency;
+        }
+    }
     outputANW->queueBuffer(mOutputSurface.get(), anb, /*fence*/ -1);
 
     return res;
@@ -410,6 +425,7 @@ void JpegRCompositeStream::releaseInputFrameLocked(InputFrame *inputFrame /*out*
         //TODO: Figure out correct requestId
         notifyError(inputFrame->frameNumber, -1 /*requestId*/);
         inputFrame->errorNotified = true;
+        mSessionStatsBuilder.incCounter(mP010StreamId, true /*dropped*/, 0 /*captureLatencyMs*/);
     }
 }
 
@@ -614,6 +630,7 @@ status_t JpegRCompositeStream::createInternalStreams(const std::vector<sp<Surfac
     }
 
     mOutputColorSpace = colorSpace;
+    mOutputStreamUseCase = streamUseCase;
     mBlobWidth = width;
     mBlobHeight = height;
 
@@ -667,6 +684,8 @@ status_t JpegRCompositeStream::configureStream() {
         ALOGE("%s: Unable to set buffer count for stream %d", __FUNCTION__, mP010StreamId);
         return res;
     }
+
+    mSessionStatsBuilder.addStream(mP010StreamId);
 
     run("JpegRCompositeStreamProc");
 
@@ -772,6 +791,7 @@ void JpegRCompositeStream::onResultError(const CaptureResultExtras& resultExtras
     // characteristics data. The actual result data can be used for the jpeg quality but
     // in case it is absent we can default to maximum.
     eraseResult(resultExtras.frameNumber);
+    mSessionStatsBuilder.incResultCounter(true /*dropped*/);
 }
 
 bool JpegRCompositeStream::onStreamBufferError(const CaptureResultExtras& resultExtras) {
@@ -824,6 +844,32 @@ status_t JpegRCompositeStream::getCompositeStreamInfo(const OutputStreamInfo &st
     }
 
     return NO_ERROR;
+}
+
+void JpegRCompositeStream::getStreamStats(hardware::CameraStreamStats* streamStats) {
+    if ((streamStats == nullptr) || (mFirstRequestLatency != -1)) {
+        return;
+    }
+
+    bool deviceError;
+    std::map<int, StreamStats> stats;
+    mSessionStatsBuilder.buildAndReset(&streamStats->mRequestCount, &streamStats->mErrorCount,
+            &deviceError, &stats);
+    if (stats.find(mP010StreamId) != stats.end()) {
+        streamStats->mWidth = mBlobWidth;
+        streamStats->mHeight = mBlobHeight;
+        streamStats->mFormat = HAL_PIXEL_FORMAT_BLOB;
+        streamStats->mDataSpace = static_cast<int>(kJpegRDataSpace);
+        streamStats->mDynamicRangeProfile = mP010DynamicRange;
+        streamStats->mColorSpace = mOutputColorSpace;
+        streamStats->mStreamUseCase = mOutputStreamUseCase;
+        streamStats->mStartLatencyMs = mFirstRequestLatency;
+        streamStats->mHistogramType = hardware::CameraStreamStats::HISTOGRAM_TYPE_CAPTURE_LATENCY;
+        streamStats->mHistogramBins.assign(stats[mP010StreamId].mCaptureLatencyBins.begin(),
+                stats[mP010StreamId].mCaptureLatencyBins.end());
+        streamStats->mHistogramCounts.assign(stats[mP010StreamId].mCaptureLatencyHistogram.begin(),
+                stats[mP010StreamId].mCaptureLatencyHistogram.end());
+    }
 }
 
 }; // namespace camera3

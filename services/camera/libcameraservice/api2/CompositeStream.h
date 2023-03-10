@@ -83,6 +83,9 @@ public:
     // Notify when shutter notify is triggered
     virtual void onShutter(const CaptureResultExtras& /*resultExtras*/, nsecs_t /*timestamp*/) {}
 
+    // Get composite stream stats
+    virtual void getStreamStats(hardware::CameraStreamStats* streamStats /*out*/) = 0;
+
     void onResultAvailable(const CaptureResult& result);
     bool onError(int32_t errorCode, const CaptureResultExtras& resultExtras);
 
@@ -139,6 +142,9 @@ protected:
 
     // Keeps a set buffer/result frame numbers for any errors detected during processing.
     std::set<int64_t> mErrorFrameNumbers;
+
+    // Frame number to request time map
+    std::unordered_map<int64_t, nsecs_t> mRequestTimeMap;
 
 };
 

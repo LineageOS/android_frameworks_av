@@ -87,6 +87,7 @@ status_t CompositeStream::deleteStream() {
         mCaptureResults.clear();
         mFrameNumberMap.clear();
         mErrorFrameNumbers.clear();
+        mRequestTimeMap.clear();
     }
 
     return deleteInternalStreams();
@@ -97,6 +98,8 @@ void CompositeStream::onBufferRequestForFrameNumber(uint64_t frameNumber, int st
     Mutex::Autolock l(mMutex);
     if (!mErrorState && (streamId == getStreamId())) {
         mPendingCaptureResults.emplace(frameNumber, CameraMetadata());
+        auto ts = systemTime();
+        mRequestTimeMap.emplace(frameNumber, ts);
     }
 }
 
@@ -110,6 +113,11 @@ void CompositeStream::onBufferReleased(const BufferInfo& bufferInfo) {
 
 void CompositeStream::eraseResult(int64_t frameNumber) {
     Mutex::Autolock l(mMutex);
+
+    auto requestTimeIt = mRequestTimeMap.find(frameNumber);
+    if (requestTimeIt != mRequestTimeMap.end()) {
+        mRequestTimeMap.erase(requestTimeIt);
+    }
 
     auto it = mPendingCaptureResults.find(frameNumber);
     if (it == mPendingCaptureResults.end()) {
