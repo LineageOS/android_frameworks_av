@@ -373,8 +373,9 @@ ndk::ScopedAStatus EffectBundleAidl::getParameterVolume(const Volume::Id& id,
 
 ndk::ScopedAStatus EffectBundleAidl::getParameterVirtualizer(const Virtualizer::Id& id,
                                                              Parameter::Specific* specific) {
-    RETURN_IF(id.getTag() != Virtualizer::Id::commonTag, EX_ILLEGAL_ARGUMENT,
-              "VirtualizerTagNotSupported");
+    RETURN_IF((id.getTag() != Virtualizer::Id::commonTag) &&
+                      (id.getTag() != Virtualizer::Id::speakerAnglesPayload),
+              EX_ILLEGAL_ARGUMENT, "VirtualizerTagNotSupported");
 
     RETURN_IF(!mContext, EX_NULL_POINTER, "nullContext");
     Virtualizer vrParam;
