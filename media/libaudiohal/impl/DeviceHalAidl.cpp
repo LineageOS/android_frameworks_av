@@ -50,14 +50,14 @@ using aidl::android::media::audio::common::AudioPortExt;
 using aidl::android::media::audio::common::AudioSource;
 using aidl::android::media::audio::common::Int;
 using aidl::android::media::audio::common::Float;
+using aidl::android::hardware::audio::common::getFrameSizeInBytes;
+using aidl::android::hardware::audio::common::isBitPositionFlagSet;
+using aidl::android::hardware::audio::common::makeBitPositionFlagMask;
 using aidl::android::hardware::audio::common::RecordTrackMetadata;
 using aidl::android::hardware::audio::core::AudioPatch;
 using aidl::android::hardware::audio::core::IModule;
 using aidl::android::hardware::audio::core::ITelephony;
 using aidl::android::hardware::audio::core::StreamDescriptor;
-using android::hardware::audio::common::getFrameSizeInBytes;
-using android::hardware::audio::common::isBitPositionFlagSet;
-using android::hardware::audio::common::makeBitPositionFlagMask;
 
 namespace android {
 
