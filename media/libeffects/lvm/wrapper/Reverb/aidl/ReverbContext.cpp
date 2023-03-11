@@ -15,7 +15,9 @@
  */
 
 #include <cstddef>
+
 #define LOG_TAG "ReverbContext"
+#include <android-base/logging.h>
 #include <Utils.h>
 
 #include "ReverbContext.h"
@@ -301,7 +303,7 @@ void ReverbContext::initControlParameter(LVREV_ControlParams_st& params) {
     /* General parameters */
     params.OperatingMode = LVM_MODE_ON;
     params.SampleRate = LVM_FS_44100;
-    params.SourceFormat = (::android::hardware::audio::common::getChannelCount(
+    params.SourceFormat = (::aidl::android::hardware::audio::common::getChannelCount(
                                    mCommon.input.base.channelMask) == 1
                                    ? LVM_MONO
                                    : LVM_STEREO);
@@ -363,10 +365,10 @@ IEffect::Status ReverbContext::lvmProcess(float* in, float* out, int samples) {
     LOG(DEBUG) << __func__ << " start processing";
     std::lock_guard lg(mMutex);
 
-    int channels =
-            ::android::hardware::audio::common::getChannelCount(mCommon.input.base.channelMask);
-    int outChannels =
-            ::android::hardware::audio::common::getChannelCount(mCommon.output.base.channelMask);
+    int channels = ::aidl::android::hardware::audio::common::getChannelCount(
+            mCommon.input.base.channelMask);
+    int outChannels = ::aidl::android::hardware::audio::common::getChannelCount(
+            mCommon.output.base.channelMask);
     int frameCount = mCommon.input.frameCount;
 
     // Reverb only effects the stereo channels in multichannel source.
