@@ -362,7 +362,7 @@ class C2SoftHevcEnc::IntfImpl : public SimpleInterface<void>::BaseParams {
                 needsUpdate = true;
             }
         }
-        if (!found) {
+        if (!found || me.v.level > LEVEL_HEVC_MAIN_5_2) {
             // We set to the highest supported level.
             me.set().level = LEVEL_HEVC_MAIN_5_2;
         }
