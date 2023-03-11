@@ -1,0 +1,7 @@
+{
+  "presubmit": [
+    {
+      "name": "audio_aidl_ndk_conversion_tests"
+    }
+  ]
+}
