@@ -22,6 +22,7 @@
 
 #include <audio_utils/clock.h>
 #include <media/AidlConversionCppNdk.h>
+#include <media/AidlConversionNdk.h>
 #include <media/AidlConversionUtil.h>
 #include <media/AudioParameter.h>
 #include <mediautils/TimeCheck.h>
@@ -32,6 +33,8 @@
 #include "StreamHalAidl.h"
 
 using ::aidl::android::aidl_utils::statusTFromBinderStatus;
+using ::aidl::android::hardware::audio::common::PlaybackTrackMetadata;
+using ::aidl::android::hardware::audio::common::RecordTrackMetadata;
 using ::aidl::android::hardware::audio::core::IStreamCommon;
 using ::aidl::android::hardware::audio::core::IStreamIn;
 using ::aidl::android::hardware::audio::core::IStreamOut;
@@ -482,6 +485,17 @@ status_t StreamHalAidl::updateCountersIfNeeded(
     return OK;
 }
 
+// static
+::aidl::ConversionResult<::aidl::android::hardware::audio::common::SourceMetadata>
+StreamOutHalAidl::legacy2aidl_SourceMetadata(const StreamOutHalInterface::SourceMetadata& legacy) {
+    ::aidl::android::hardware::audio::common::SourceMetadata aidl;
+    aidl.tracks = VALUE_OR_RETURN(
+            ::aidl::android::convertContainer<std::vector<PlaybackTrackMetadata>>(
+                    legacy.tracks,
+                    ::aidl::android::legacy2aidl_playback_track_metadata_v7_PlaybackTrackMetadata));
+    return aidl;
+}
+
 StreamOutHalAidl::StreamOutHalAidl(
         const audio_config& config, StreamContextAidl&& context, int32_t nominalLatency,
         const std::shared_ptr<IStreamOut>& stream, const sp<CallbackBroker>& callbackBroker)
@@ -507,8 +521,8 @@ status_t StreamOutHalAidl::setParameters(const String8& kvPairs) {
     AudioParameter parameters(kvPairs);
     ALOGD("%s parameters: %s", __func__, parameters.toString().c_str());
 
-    if (filterAndUpdateOffloadMetadata(parameters) != OK) {
-        ALOGW("%s filtering or updating offload metadata gets failed", __func__);
+    if (status_t status = filterAndUpdateOffloadMetadata(parameters); status != OK) {
+        ALOGW("%s filtering or updating offload metadata failed: %d", __func__, status);
     }
 
     return StreamHalAidl::setParameters(parameters.toString());
@@ -626,11 +640,12 @@ status_t StreamOutHalAidl::getPresentationPosition(uint64_t *frames, struct time
 }
 
 status_t StreamOutHalAidl::updateSourceMetadata(
-        const StreamOutHalInterface::SourceMetadata& sourceMetadata __unused) {
+        const StreamOutHalInterface::SourceMetadata& sourceMetadata) {
     TIME_CHECK();
     if (!mStream) return NO_INIT;
-    ALOGE("%s not implemented yet", __func__);
-    return OK;
+    ::aidl::android::hardware::audio::common::SourceMetadata aidlMetadata =
+              VALUE_OR_RETURN_STATUS(legacy2aidl_SourceMetadata(sourceMetadata));
+    return statusTFromBinderStatus(mStream->updateMetadata(aidlMetadata));
 }
 
 status_t StreamOutHalAidl::getDualMonoMode(audio_dual_mono_mode_t* mode __unused) {
@@ -788,6 +803,17 @@ status_t StreamOutHalAidl::filterAndUpdateOffloadMetadata(AudioParameter &parame
     return OK;
 }
 
+// static
+::aidl::ConversionResult<::aidl::android::hardware::audio::common::SinkMetadata>
+StreamInHalAidl::legacy2aidl_SinkMetadata(const StreamInHalInterface::SinkMetadata& legacy) {
+    ::aidl::android::hardware::audio::common::SinkMetadata aidl;
+    aidl.tracks = VALUE_OR_RETURN(
+            ::aidl::android::convertContainer<std::vector<RecordTrackMetadata>>(
+                    legacy.tracks,
+                    ::aidl::android::legacy2aidl_record_track_metadata_v7_RecordTrackMetadata));
+    return aidl;
+}
+
 StreamInHalAidl::StreamInHalAidl(
         const audio_config& config, StreamContextAidl&& context, int32_t nominalLatency,
         const std::shared_ptr<IStreamIn>& stream)
@@ -837,11 +863,12 @@ status_t StreamInHalAidl::getActiveMicrophones(
 }
 
 status_t StreamInHalAidl::updateSinkMetadata(
-        const StreamInHalInterface::SinkMetadata& sinkMetadata  __unused) {
+        const StreamInHalInterface::SinkMetadata& sinkMetadata) {
     TIME_CHECK();
     if (!mStream) return NO_INIT;
-    ALOGE("%s not implemented yet", __func__);
-    return OK;
+    ::aidl::android::hardware::audio::common::SinkMetadata aidlMetadata =
+              VALUE_OR_RETURN_STATUS(legacy2aidl_SinkMetadata(sinkMetadata));
+    return statusTFromBinderStatus(mStream->updateMetadata(aidlMetadata));
 }
 
 status_t StreamInHalAidl::setPreferredMicrophoneDirection(

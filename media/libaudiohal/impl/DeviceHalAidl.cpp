@@ -55,7 +55,6 @@ using aidl::android::hardware::audio::core::AudioPatch;
 using aidl::android::hardware::audio::core::IModule;
 using aidl::android::hardware::audio::core::ITelephony;
 using aidl::android::hardware::audio::core::StreamDescriptor;
-using aidl::android::hardware::audio::core::sounddose::ISoundDose;
 using android::hardware::audio::common::getFrameSizeInBytes;
 using android::hardware::audio::common::isBitPositionFlagSet;
 using android::hardware::audio::common::makeBitPositionFlagMask;

@@ -2026,8 +2026,20 @@ void CameraDeviceClient::notifyIdle(
     if (remoteCb != 0) {
         remoteCb->onDeviceIdle();
     }
+
+    std::vector<hardware::CameraStreamStats> fullStreamStats = streamStats;
+    {
+        Mutex::Autolock l(mCompositeLock);
+        for (size_t i = 0; i < mCompositeStreamMap.size(); i++) {
+            hardware::CameraStreamStats compositeStats;
+            mCompositeStreamMap.valueAt(i)->getStreamStats(&compositeStats);
+            if (compositeStats.mWidth > 0) {
+                fullStreamStats.push_back(compositeStats);
+            }
+        }
+    }
     Camera2ClientBase::notifyIdleWithUserTag(requestCount, resultErrorCount, deviceError,
-            streamStats, mUserTag, mVideoStabilizationMode);
+            fullStreamStats, mUserTag, mVideoStabilizationMode);
 }
 
 void CameraDeviceClient::notifyShutter(const CaptureResultExtras& resultExtras,
