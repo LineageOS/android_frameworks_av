@@ -160,11 +160,9 @@ void subScaleCoordinatesTest(bool usePreCorrectArray) {
             false/*hasZoomRatioRange*/, zoomRatioRange,
             usePreCorrectArray));
 
-    size_t index = 0;
     int32_t width = testActiveArraySize[2];
     int32_t height = testActiveArraySize[3];
     if (usePreCorrectArray) {
-        index = 1;
         width = testPreCorrActiveArraySize[2];
         height = testPreCorrActiveArraySize[3];
     }

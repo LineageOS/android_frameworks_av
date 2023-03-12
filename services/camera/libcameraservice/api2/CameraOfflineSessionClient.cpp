@@ -309,26 +309,20 @@ void CameraOfflineSessionClient::notifyIdle(
     finishCameraStreamingOps();
 }
 
-void CameraOfflineSessionClient::notifyAutoFocus(uint8_t newState, int triggerId) {
-    (void)newState;
-    (void)triggerId;
-
+void CameraOfflineSessionClient::notifyAutoFocus([[maybe_unused]] uint8_t newState,
+                [[maybe_unused]] int triggerId) {
     ALOGV("%s: Autofocus state now %d, last trigger %d",
           __FUNCTION__, newState, triggerId);
 }
 
-void CameraOfflineSessionClient::notifyAutoExposure(uint8_t newState, int triggerId) {
-    (void)newState;
-    (void)triggerId;
-
+void CameraOfflineSessionClient::notifyAutoExposure([[maybe_unused]] uint8_t newState,
+                [[maybe_unused]] int triggerId) {
     ALOGV("%s: Autoexposure state now %d, last trigger %d",
             __FUNCTION__, newState, triggerId);
 }
 
-void CameraOfflineSessionClient::notifyAutoWhitebalance(uint8_t newState, int triggerId) {
-    (void)newState;
-    (void)triggerId;
-
+void CameraOfflineSessionClient::notifyAutoWhitebalance([[maybe_unused]] uint8_t newState,
+                [[maybe_unused]] int triggerId) {
     ALOGV("%s: Auto-whitebalance state now %d, last trigger %d", __FUNCTION__, newState,
             triggerId);
 }
