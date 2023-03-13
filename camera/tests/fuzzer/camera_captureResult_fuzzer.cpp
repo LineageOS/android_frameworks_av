@@ -63,7 +63,7 @@ extern "C" int LLVMFuzzerTestOneInput(const uint8_t* data, size_t size) {
     invokeReadWriteNullParcel<CaptureResult>(captureResult);
     invokeReadWriteParcel<CaptureResult>(captureResult);
     CaptureResult captureResult2(*captureResult);
-    CaptureResult captureResult3(move(captureResult2));
+    CaptureResult captureResult3(std::move(captureResult2));
 
     delete captureResult;
     delete physicalCaptureResultInfo;
