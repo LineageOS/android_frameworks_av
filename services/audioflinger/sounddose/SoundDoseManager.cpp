@@ -20,10 +20,6 @@
 
 #include "SoundDoseManager.h"
 
-#if !defined(BACKEND_NDK)
-#define BACKEND_NDK
-#endif
-
 #include "android/media/SoundDoseRecord.h"
 #include <android-base/stringprintf.h>
 #include <media/AidlConversionCppNdk.h>
