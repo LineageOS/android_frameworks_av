@@ -29,6 +29,7 @@ struct SessionContext {
     std::string mNonce;
     int64_t mTargetSecurityLevel;
     DrmPlugin::SecurityLevel mActualSecurityLevel;
+    std::string mVersion;
 };
 
 class DrmMetricsLogger : public IDrm {
@@ -161,6 +162,7 @@ class DrmMetricsLogger : public IDrm {
     std::array<int64_t, 2> mUuid;
     std::string mObjNonce;
     std::string mScheme;
+    std::string mVersion;
     std::map<std::vector<uint8_t>, SessionContext> mSessionMap;
     mutable std::mutex mSessionMapMutex;
     IDrmFrontend mFrontend;
