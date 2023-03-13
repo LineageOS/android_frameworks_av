@@ -148,11 +148,11 @@ RetCode PreProcessingContext::setCommon(const Parameter::Common& common) {
 
 void PreProcessingContext::updateConfigs(const Parameter::Common& common) {
     mInputConfig.set_sample_rate_hz(common.input.base.sampleRate);
-    mInputConfig.set_num_channels(
-            ::android::hardware::audio::common::getChannelCount(common.input.base.channelMask));
+    mInputConfig.set_num_channels(::aidl::android::hardware::audio::common::getChannelCount(
+                    common.input.base.channelMask));
     mOutputConfig.set_sample_rate_hz(common.input.base.sampleRate);
-    mOutputConfig.set_num_channels(
-            ::android::hardware::audio::common::getChannelCount(common.output.base.channelMask));
+    mOutputConfig.set_num_channels(::aidl::android::hardware::audio::common::getChannelCount(
+                    common.output.base.channelMask));
 }
 
 RetCode PreProcessingContext::setAcousticEchoCancelerEchoDelay(int echoDelayUs) {
