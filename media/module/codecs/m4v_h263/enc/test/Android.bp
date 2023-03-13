@@ -55,4 +55,7 @@ cc_test {
         ],
         cfi: true,
     },
+    data: [
+        ":https://storage.googleapis.com/android_media/frameworks/av/media/libstagefright/codecs/m4v_h263/enc/test/Mpeg4H263Encoder.zip?unzip=true",
+    ],
 }
