@@ -217,7 +217,6 @@ bool OutputBufferQueue::configure(const sp<IGraphicBufferProducer>& igbp,
     sp<GraphicBuffer> buffers[BufferQueueDefs::NUM_BUFFER_SLOTS];
     std::weak_ptr<_C2BlockPoolData>
             poolDatas[BufferQueueDefs::NUM_BUFFER_SLOTS];
-    std::shared_ptr<C2SurfaceSyncMemory> oldMem;
     {
         std::scoped_lock<std::mutex> l(mMutex);
         bool stopped = mStopped;
@@ -239,7 +238,7 @@ bool OutputBufferQueue::configure(const sp<IGraphicBufferProducer>& igbp,
             }
             return false;
         }
-        oldMem = mSyncMem;
+        std::shared_ptr<C2SurfaceSyncMemory> oldMem = mSyncMem;
         C2SyncVariables *oldSync = mSyncMem ? mSyncMem->mem() : nullptr;
         if (oldSync) {
             oldSync->lock();
@@ -315,24 +314,9 @@ bool OutputBufferQueue::configure(const sp<IGraphicBufferProducer>& igbp,
             newSync->unlock();
         }
     }
-    {
-        std::scoped_lock<std::mutex> l(mOldMutex);
-        mOldMem = oldMem;
-    }
     ALOGD("remote graphic buffer migration %zu/%zu",
           success, tryNum);
     return true;
-}
-
-void OutputBufferQueue::expireOldWaiters() {
-    std::scoped_lock<std::mutex> l(mOldMutex);
-    if (mOldMem) {
-        C2SyncVariables *oldSync = mOldMem->mem();
-        if (oldSync) {
-            oldSync->notifyAll();
-        }
-        mOldMem.reset();
-    }
 }
 
 void OutputBufferQueue::stop() {
@@ -492,6 +476,12 @@ status_t OutputBufferQueue::outputBuffer(
     return OK;
 }
 
+void OutputBufferQueue::pollForRenderedFrames(FrameEventHistoryDelta* delta) {
+    if (mIgbp) {
+        mIgbp->getFrameTimestamps(delta);
+    }
+}
+
 void OutputBufferQueue::holdBufferQueueBlocks(
         const std::list<std::unique_ptr<C2Work>>& workList) {
     forEachBlock(workList,
@@ -516,4 +506,3 @@ void OutputBufferQueue::updateMaxDequeueBufferCount(int maxDequeueBufferCount) {
 }  // namespace media
 }  // namespace hardware
 }  // namespace android
-
