@@ -6751,6 +6751,8 @@ void ACodec::BaseState::onOutputBufferDrained(const sp<AMessage> &msg) {
         info->checkReadFence("onOutputBufferDrained before queueBuffer");
         err = mCodec->mNativeWindow->queueBuffer(
                     mCodec->mNativeWindow.get(), info->mGraphicBuffer.get(), info->mFenceFd);
+        // TODO(b/266211548): Poll the native window for rendered buffers, since when queueing
+        // buffers, the frame event history delta is retrieved.
         info->mFenceFd = -1;
         if (err == OK) {
             info->mStatus = BufferInfo::OWNED_BY_NATIVE_WINDOW;

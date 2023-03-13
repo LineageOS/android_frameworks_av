@@ -18,6 +18,7 @@
 
 #define CCODEC_BUFFER_CHANNEL_H_
 
+#include <deque>
 #include <map>
 #include <memory>
 #include <vector>
@@ -88,6 +89,7 @@ public:
             const sp<MediaCodecBuffer> &buffer) override;
     virtual status_t renderOutputBuffer(
             const sp<MediaCodecBuffer> &buffer, int64_t timestampNs) override;
+    virtual void pollForRenderedBuffers() override;
     virtual status_t discardBuffer(const sp<MediaCodecBuffer> &buffer) override;
     virtual void getInputBufferArray(Vector<sp<MediaCodecBuffer>> *array) override;
     virtual void getOutputBufferArray(Vector<sp<MediaCodecBuffer>> *array) override;
@@ -263,6 +265,14 @@ private:
         bool mRunning;
     };
 
+    struct TrackedFrame {
+        uint64_t number;
+        int64_t mediaTimeUs;
+        int64_t desiredRenderTimeNs;
+        nsecs_t latchTime;
+        sp<Fence> presentFence;
+    };
+
     void feedInputBufferIfAvailable();
     void feedInputBufferIfAvailableInternal();
     status_t queueInputBufferInternal(sp<MediaCodecBuffer> buffer,
@@ -274,6 +284,12 @@ private:
     void sendOutputBuffers();
     void ensureDecryptDestination(size_t size);
     int32_t getHeapSeqNum(const sp<hardware::HidlMemory> &memory);
+
+    void initializeFrameTrackingFor(ANativeWindow * window);
+    void trackReleasedFrame(const IGraphicBufferProducer::QueueBufferOutput& qbo,
+                            int64_t mediaTimeUs, int64_t desiredRenderTimeNs);
+    void processRenderedFrames(const FrameEventHistoryDelta& delta);
+    int64_t getRenderTimeNs(const TrackedFrame& frame);
 
     QueueSync mSync;
     sp<MemoryDealer> mDealer;
@@ -315,6 +331,9 @@ private:
     std::atomic_uint64_t mFirstValidFrameIndex;
 
     sp<MemoryDealer> makeMemoryDealer(size_t heapSize);
+
+    std::deque<TrackedFrame> mTrackedFrames;
+    bool mHasPresentFenceTimes;
 
     struct OutputSurface {
         sp<Surface> surface;
