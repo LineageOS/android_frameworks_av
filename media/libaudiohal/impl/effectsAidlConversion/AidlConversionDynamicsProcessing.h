@@ -36,18 +36,18 @@ class AidlConversionDp : public EffectConversionHelperAidl {
     status_t setParameter(utils::EffectParamReader& param) override;
     status_t getParameter(utils::EffectParamWriter& param) override;
 
-    aidl::ConversionResult<
+    ConversionResult<
             aidl::android::hardware::audio::effect::DynamicsProcessing::ChannelConfig>
     readChannelConfigFromParam(utils::EffectParamReader& param);
-    aidl::ConversionResult<aidl::android::hardware::audio::effect::DynamicsProcessing::EqBandConfig>
+    ConversionResult<aidl::android::hardware::audio::effect::DynamicsProcessing::EqBandConfig>
     readEqBandConfigFromParam(utils::EffectParamReader& param);
-    aidl::ConversionResult<
+    ConversionResult<
             aidl::android::hardware::audio::effect::DynamicsProcessing::MbcBandConfig>
     readMbcBandConfigFromParam(utils::EffectParamReader& param);
-    aidl::ConversionResult<
+    ConversionResult<
             aidl::android::hardware::audio::effect::DynamicsProcessing::LimiterConfig>
     readLimiterConfigFromParam(utils::EffectParamReader& param);
-    aidl::ConversionResult<
+    ConversionResult<
             aidl::android::hardware::audio::effect::DynamicsProcessing::EngineArchitecture>
     readEngineArchitectureFromParam(utils::EffectParamReader& param);
 
