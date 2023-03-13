@@ -17,18 +17,19 @@
 #include "VisualizerContext.h"
 
 #include <algorithm>
+#include <math.h>
+#include <time.h>
+
 #include <android/binder_status.h>
 #include <audio_utils/primitives.h>
-#include <math.h>
 #include <system/audio.h>
-#include <time.h>
 #include <Utils.h>
 
 #ifndef BUILD_FLOAT
         #error AIDL Visualizer only support float 32bits, make sure add cflags -DBUILD_FLOAT,
 #endif
 
-using android::hardware::audio::common::getChannelCount;
+using aidl::android::hardware::audio::common::getChannelCount;
 
 namespace aidl::android::hardware::audio::effect {
 
