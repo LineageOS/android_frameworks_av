@@ -22,10 +22,6 @@
 #include <aidl/android/hardware/audio/core/sounddose/BnSoundDose.h>
 #include <gmock/gmock.h>
 #include <gtest/gtest.h>
-
-#if !defined(BACKEND_NDK)
-#define BACKEND_NDK
-#endif
 #include <media/AidlConversionCppNdk.h>
 
 namespace android {

@@ -41,6 +41,7 @@ cc_library {
     cflags: [
         "-Wall",
         "-Werror",
+        "-DBACKEND_NDK",
     ],
 }
 
