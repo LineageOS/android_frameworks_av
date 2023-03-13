@@ -15,7 +15,9 @@
  */
 
 #include <cstddef>
+
 #define LOG_TAG "BundleContext"
+#include <android-base/logging.h>
 #include <Utils.h>
 
 #include "BundleContext.h"
@@ -690,7 +692,7 @@ LVM_HeadroomBandDef_t *BundleContext::getDefaultEqualizerHeadroomBanDefs() {
 std::vector<Virtualizer::ChannelAngle> BundleContext::getSpeakerAngles(
         const Virtualizer::SpeakerAnglesPayload payload) {
     std::vector<Virtualizer::ChannelAngle> angles;
-    auto chCount = ::android::hardware::audio::common::getChannelCount(payload.layout);
+    auto chCount = ::aidl::android::hardware::audio::common::getChannelCount(payload.layout);
     RETURN_VALUE_IF(!isConfigSupportedVirtualizer(chCount, payload.device), angles,
                     "payloadNotSupported");
 

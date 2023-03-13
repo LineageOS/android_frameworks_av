@@ -210,7 +210,7 @@ status_t AidlConversionDp::getParameter(EffectParamWriter& param) {
             return getLimiterConfig(param);
         }
         case DP_PARAM_GET_CHANNEL_COUNT: {
-            uint32_t channel = ::android::hardware::audio::common::getChannelCount(
+            uint32_t channel = ::aidl::android::hardware::audio::common::getChannelCount(
                     mCommon.input.base.channelMask);
             RETURN_STATUS_IF_ERROR(param.writeToValue(&channel));
             return OK;
