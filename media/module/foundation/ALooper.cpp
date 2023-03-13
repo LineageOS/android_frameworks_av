@@ -69,6 +69,10 @@ int64_t ALooper::GetNowUs() {
     return systemTime(SYSTEM_TIME_MONOTONIC) / 1000LL;
 }
 
+int64_t ALooper::getNowUs() {
+    return GetNowUs();
+}
+
 ALooper::ALooper()
     : mRunningLocally(false) {
     // clean up stale AHandlers. Doing it here instead of in the destructor avoids
@@ -170,11 +174,11 @@ void ALooper::post(const sp<AMessage> &msg, int64_t delayUs) {
 
     int64_t whenUs;
     if (delayUs > 0) {
-        int64_t nowUs = GetNowUs();
+        int64_t nowUs = getNowUs();
         whenUs = (delayUs > INT64_MAX - nowUs ? INT64_MAX : nowUs + delayUs);
 
     } else {
-        whenUs = GetNowUs();
+        whenUs = getNowUs();
     }
 
     List<Event>::iterator it = mEventQueue.begin();
@@ -185,6 +189,7 @@ void ALooper::post(const sp<AMessage> &msg, int64_t delayUs) {
     Event event;
     event.mWhenUs = whenUs;
     event.mMessage = msg;
+    event.mToken = nullptr;
 
     if (it == mEventQueue.begin()) {
         mQueueChangedCondition.signal();
@@ -193,7 +198,57 @@ void ALooper::post(const sp<AMessage> &msg, int64_t delayUs) {
     mEventQueue.insert(it, event);
 }
 
+status_t ALooper::postUnique(const sp<AMessage> &msg, const sp<RefBase> &token, int64_t delayUs) {
+    if (token == nullptr) {
+        return -EINVAL;
+    }
+    Mutex::Autolock autoLock(mLock);
+
+    int64_t whenUs;
+    if (delayUs > 0) {
+        int64_t nowUs = getNowUs();
+        whenUs = (delayUs > INT64_MAX - nowUs ? INT64_MAX : nowUs + delayUs);
+    } else {
+        whenUs = getNowUs();
+    }
+
+    // We only need to wake the loop up if we're rescheduling to the earliest event in the queue.
+    // This needs to be checked now, before we reschedule the message, in case this message is
+    // already at the beginning of the queue.
+    bool shouldAwakeLoop = mEventQueue.empty() || whenUs < mEventQueue.begin()->mWhenUs;
+
+    // Erase any previously-posted event with this token.
+    for (auto i = mEventQueue.begin(); i != mEventQueue.end();) {
+        if (i->mToken == token) {
+            i = mEventQueue.erase(i);
+        } else {
+            ++i;
+        }
+    }
+
+    // Find the insertion point for the rescheduled message.
+    List<Event>::iterator i = mEventQueue.begin();
+    while (i != mEventQueue.end() && i->mWhenUs <= whenUs) {
+        ++i;
+    }
+
+    Event event;
+    event.mWhenUs = whenUs;
+    event.mMessage = msg;
+    event.mToken = token;
+    mEventQueue.insert(i, event);
+
+    // If we rescheduled the event to be earlier than the first event, then we need to wake up the
+    // looper earlier than it was previously scheduled to be woken up. Otherwise, it can sleep until
+    // the previous wake-up time and then go to sleep again if needed.
+    if (shouldAwakeLoop){
+        mQueueChangedCondition.signal();
+    }
+    return OK;
+}
+
 bool ALooper::loop() {
+
     Event event;
 
     {
@@ -206,7 +261,7 @@ bool ALooper::loop() {
             return true;
         }
         int64_t whenUs = (*mEventQueue.begin()).mWhenUs;
-        int64_t nowUs = GetNowUs();
+        int64_t nowUs = getNowUs();
 
         if (whenUs > nowUs) {
             int64_t delayUs = whenUs - nowUs;
