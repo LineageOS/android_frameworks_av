@@ -17,18 +17,43 @@
 //#define LOG_NDEBUG 0
 #define LOG_TAG "AData_test"
 
+#include <gmock/gmock.h>
 #include <gtest/gtest.h>
 #include <utils/RefBase.h>
 
 #include <media/stagefright/foundation/AMessage.h>
+#include <media/stagefright/foundation/AHandler.h>
+#include <media/stagefright/foundation/ALooper.h>
 
 using namespace android;
 
-class AMessageTest : public ::testing::Test {
+using ::testing::InSequence;
+using ::testing::NiceMock;
+
+class LooperWithSettableClock : public ALooper {
+public:
+  LooperWithSettableClock() : mClockUs(0) {}
+
+  void setClockUs(int64_t nowUs) {
+    mClockUs = nowUs;
+  }
+
+  int64_t getNowUs() override {
+    return mClockUs;
+  }
+
+private:
+  int64_t mClockUs;
 };
 
+timespec millis100 = {0, 100L*1000*1000};
 
-TEST(AMessage_tests, item_manipulation) {
+class MockHandler : public AHandler {
+public:
+    MOCK_METHOD(void, onMessageReceived, (const sp<AMessage>&), (override));
+};
+
+TEST(AMessage_tests, settersAndGetters) {
   sp<AMessage> m1 = new AMessage();
 
   m1->setInt32("value", 2);
@@ -120,6 +145,171 @@ TEST(AMessage_tests, item_manipulation) {
   EXPECT_TRUE(m1->findInt32("alittlelonger", &i32));
 
   EXPECT_NE(OK, m1->removeEntryByName("notpresent"));
-
 }
 
+TEST(AMessage_tests, deliversMultipleMessagesInOrderImmediately) {
+  sp<NiceMock<MockHandler>> mockHandler = new NiceMock<MockHandler>;
+  sp<LooperWithSettableClock> looper = new LooperWithSettableClock();
+  looper->registerHandler(mockHandler);
+
+  sp<AMessage> msgNow1 = new AMessage(0, mockHandler);
+  msgNow1->post();
+  sp<AMessage> msgNow2 = new AMessage(0, mockHandler);
+  msgNow2->post();
+
+  {
+    InSequence inSequence;
+    EXPECT_CALL(*mockHandler, onMessageReceived(msgNow1)).Times(1);
+    EXPECT_CALL(*mockHandler, onMessageReceived(msgNow2)).Times(1);
+  }
+  looper->start();
+  nanosleep(&millis100, nullptr); // just enough time for the looper thread to run
+}
+
+TEST(AMessage_tests, doesNotDeliverDelayedMessageImmediately) {
+  sp<NiceMock<MockHandler>> mockHandler = new NiceMock<MockHandler>;
+  sp<LooperWithSettableClock> looper = new LooperWithSettableClock();
+  looper->registerHandler(mockHandler);
+
+  sp<AMessage> msgNow = new AMessage(0, mockHandler);
+  msgNow->post();
+  sp<AMessage> msgDelayed = new AMessage(0, mockHandler);
+  msgDelayed->post(100);
+
+  EXPECT_CALL(*mockHandler, onMessageReceived(msgNow)).Times(1);
+  // note: never called
+  EXPECT_CALL(*mockHandler, onMessageReceived(msgDelayed)).Times(0);
+  looper->start();
+  nanosleep(&millis100, nullptr); // just enough time for the looper thread to run
+}
+
+TEST(AMessage_tests, deliversDelayedMessagesInSequence) {
+  sp<NiceMock<MockHandler>> mockHandler = new NiceMock<MockHandler>;
+  sp<LooperWithSettableClock> looper = new LooperWithSettableClock();
+  looper->registerHandler(mockHandler);
+
+  sp<AMessage> msgIn500 = new AMessage(0, mockHandler);
+  msgIn500->post(500);
+  sp<AMessage> msgNow = new AMessage(0, mockHandler);
+  msgNow->post();
+  sp<AMessage> msgIn100 = new AMessage(0, mockHandler);
+  msgIn100->post(100);
+  // not expected to be received
+  sp<AMessage> msgIn1000 = new AMessage(0, mockHandler);
+  msgIn1000->post(1000);
+
+  looper->setClockUs(500);
+  {
+    InSequence inSequence;
+
+    EXPECT_CALL(*mockHandler, onMessageReceived(msgNow)).Times(1);
+    EXPECT_CALL(*mockHandler, onMessageReceived(msgIn100)).Times(1);
+    EXPECT_CALL(*mockHandler, onMessageReceived(msgIn500)).Times(1);
+  }
+  // note: never called
+  EXPECT_CALL(*mockHandler, onMessageReceived(msgIn1000)).Times(0);
+  looper->start();
+  nanosleep(&millis100, nullptr); // just enough time for the looper thread to run
+}
+
+TEST(AMessage_tests, deliversDelayedUniqueMessage) {
+  sp<NiceMock<MockHandler>> mockHandler = new NiceMock<MockHandler>;
+  sp<LooperWithSettableClock> looper = new LooperWithSettableClock();
+  looper->registerHandler(mockHandler);
+
+  sp<AMessage> msg = new AMessage(0, mockHandler);
+  msg->postUnique(msg, 50);
+
+  looper->setClockUs(50);
+  EXPECT_CALL(*mockHandler, onMessageReceived(msg)).Times(1);
+  looper->start();
+  nanosleep(&millis100, nullptr); // just enough time for the looper thread to run
+}
+
+TEST(AMessage_tests, deliversImmediateUniqueMessage) {
+  sp<NiceMock<MockHandler>> mockHandler = new NiceMock<MockHandler>;
+  // note: we don't need to set the clock, but we do want a stable clock that doesn't advance
+  sp<LooperWithSettableClock> looper = new LooperWithSettableClock();
+  looper->registerHandler(mockHandler);
+
+  sp<AMessage> msg = new AMessage(0, mockHandler);
+  msg->postUnique(msg, 0);
+
+  EXPECT_CALL(*mockHandler, onMessageReceived(msg)).Times(1);
+  looper->start();
+  nanosleep(&millis100, nullptr); // just enough time for the looper thread to run
+}
+
+TEST(AMessage_tests, doesNotDeliverUniqueMessageAfterRescheduleLater) {
+  sp<NiceMock<MockHandler>> mockHandler = new NiceMock<MockHandler>;
+  sp<LooperWithSettableClock> looper = new LooperWithSettableClock();
+  looper->registerHandler(mockHandler);
+
+  sp<AMessage> msg = new AMessage(0, mockHandler);
+  msg->postUnique(msg, 50);
+  msg->postUnique(msg, 100); // reschedule for later
+
+  looper->setClockUs(50); // if the message is correctly rescheduled, it should not be delivered
+  // Never called because the message was rescheduled to a later point in time
+  EXPECT_CALL(*mockHandler, onMessageReceived(msg)).Times(0);
+  looper->start();
+  nanosleep(&millis100, nullptr); // just enough time for the looper thread to run
+}
+
+TEST(AMessage_tests, deliversUniqueMessageAfterRescheduleEarlier) {
+  sp<NiceMock<MockHandler>> mockHandler = new NiceMock<MockHandler>;
+  sp<LooperWithSettableClock> looper = new LooperWithSettableClock();
+  looper->registerHandler(mockHandler);
+
+  sp<AMessage> msg = new AMessage(0, mockHandler);
+  msg->postUnique(msg, 100);
+  msg->postUnique(msg, 50); // reschedule to fire earlier
+
+  looper->setClockUs(50); // if the message is rescheduled correctly, it should be delivered
+  EXPECT_CALL(*mockHandler, onMessageReceived(msg)).Times(1);
+  looper->start();
+  nanosleep(&millis100, nullptr); // just enough time for the looper thread to run
+}
+
+TEST(AMessage_tests, deliversSameMessageTwice) {
+  sp<NiceMock<MockHandler>> mockHandler = new NiceMock<MockHandler>;
+  sp<LooperWithSettableClock> looper = new LooperWithSettableClock();
+  looper->registerHandler(mockHandler);
+
+  sp<AMessage> msg = new AMessage(0, mockHandler);
+  msg->post(50);
+  msg->post(100);
+
+  looper->setClockUs(100);
+  EXPECT_CALL(*mockHandler, onMessageReceived(msg)).Times(2);
+  looper->start();
+  nanosleep(&millis100, nullptr); // just enough time for the looper thread to run
+}
+
+// When messages are posted twice with the same token, it will only be delivered once after being
+// rescheduled.
+TEST(AMessage_tests, deliversUniqueMessageOnce) {
+  sp<NiceMock<MockHandler>> mockHandler = new NiceMock<MockHandler>;
+  sp<LooperWithSettableClock> looper = new LooperWithSettableClock();
+  looper->registerHandler(mockHandler);
+
+  sp<AMessage> msg1 = new AMessage(0, mockHandler);
+  msg1->postUnique(msg1, 50);
+  sp<AMessage> msg2 = new AMessage(0, mockHandler);
+  msg2->postUnique(msg1, 75); // note, using the same token as msg1
+
+  looper->setClockUs(100);
+  EXPECT_CALL(*mockHandler, onMessageReceived(msg1)).Times(0);
+  EXPECT_CALL(*mockHandler, onMessageReceived(msg2)).Times(1);
+  looper->start();
+  nanosleep(&millis100, nullptr); // just enough time for the looper thread to run
+}
+
+TEST(AMessage_tests, postUnique_withNullToken_returnsInvalidArgument) {
+  sp<NiceMock<MockHandler>> mockHandler = new NiceMock<MockHandler>;
+  sp<ALooper> looper = new ALooper();
+  looper->registerHandler(mockHandler);
+
+  sp<AMessage> msg = new AMessage(0, mockHandler);
+  EXPECT_EQ(msg->postUnique(nullptr, 0), -EINVAL);
+}
