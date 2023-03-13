@@ -789,6 +789,13 @@ static status_t recordScreen(const char* fileName) {
         return NAME_NOT_FOUND;
     }
 
+    DisplayMode displayMode;
+    err = SurfaceComposerClient::getActiveDisplayMode(display, &displayMode);
+    if (err != NO_ERROR) {
+        fprintf(stderr, "ERROR: unable to get display config\n");
+        return err;
+    }
+
     ui::DisplayState displayState;
     err = SurfaceComposerClient::getDisplayState(display, &displayState);
     if (err != NO_ERROR) {
@@ -796,11 +803,9 @@ static status_t recordScreen(const char* fileName) {
         return err;
     }
 
-    DisplayMode displayMode;
-    err = SurfaceComposerClient::getActiveDisplayMode(display, &displayMode);
-    if (err != NO_ERROR) {
-        fprintf(stderr, "ERROR: unable to get display config\n");
-        return err;
+    if (displayState.layerStack == ui::INVALID_LAYER_STACK) {
+        fprintf(stderr, "ERROR: INVALID_LAYER_STACK, please check your display state.\n");
+        return INVALID_OPERATION;
     }
 
     const ui::Size& layerStackSpaceRect = displayState.layerStackSpaceRect;
