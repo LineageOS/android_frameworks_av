@@ -899,7 +899,7 @@ status_t CCodecBufferChannel::renderOutputBuffer(
     }
 
     // TODO: revisit this after C2Fence implementation.
-    android::IGraphicBufferProducer::QueueBufferInput qbi(
+    IGraphicBufferProducer::QueueBufferInput qbi(
             timestampNs,
             false, // droppable
             dataSpace,
@@ -963,9 +963,9 @@ status_t CCodecBufferChannel::renderOutputBuffer(
     }
     SetMetadataToGralloc4Handle(dataSpace, hdrStaticInfo, hdrDynamicInfo, block.handle());
 
-    // we don't have dirty regions
-    qbi.setSurfaceDamage(Region::INVALID_REGION);
-    android::IGraphicBufferProducer::QueueBufferOutput qbo;
+    qbi.setSurfaceDamage(Region::INVALID_REGION); // we don't have dirty regions
+    qbi.getFrameTimestamps = true; // we need to know when a frame is rendered
+    IGraphicBufferProducer::QueueBufferOutput qbo;
     status_t result = mComponent->queueToOutputSurface(block, qbi, &qbo);
     if (result != OK) {
         ALOGI("[%s] queueBuffer failed: %d", mName, result);
@@ -984,8 +984,105 @@ status_t CCodecBufferChannel::renderOutputBuffer(
     int64_t mediaTimeUs = 0;
     (void)buffer->meta()->findInt64("timeUs", &mediaTimeUs);
     mCCodecCallback->onOutputFramesRendered(mediaTimeUs, timestampNs);
+    trackReleasedFrame(qbo, mediaTimeUs, timestampNs);
+    processRenderedFrames(qbo.frameTimestamps);
 
     return OK;
+}
+
+void CCodecBufferChannel::initializeFrameTrackingFor(ANativeWindow * window) {
+    int hasPresentFenceTimes = 0;
+    window->query(window, NATIVE_WINDOW_FRAME_TIMESTAMPS_SUPPORTS_PRESENT, &hasPresentFenceTimes);
+    mHasPresentFenceTimes = hasPresentFenceTimes == 1;
+    if (mHasPresentFenceTimes) {
+        ALOGI("Using latch times for frame rendered signals - present fences not supported");
+    }
+    mTrackedFrames.clear();
+}
+
+void CCodecBufferChannel::trackReleasedFrame(const IGraphicBufferProducer::QueueBufferOutput& qbo,
+                                             int64_t mediaTimeUs, int64_t desiredRenderTimeNs) {
+    // If the render time is earlier than now, then we're suggesting it should be rendered ASAP,
+    // so track the frame as if the desired render time is now.
+    int64_t nowNs = systemTime(SYSTEM_TIME_MONOTONIC);
+    if (desiredRenderTimeNs < nowNs) {
+        desiredRenderTimeNs = nowNs;
+    }
+    // We've just released a frame to the surface, so keep track of it and later check to see if it
+    // is actually rendered.
+    TrackedFrame frame;
+    frame.number = qbo.nextFrameNumber - 1;
+    frame.mediaTimeUs = mediaTimeUs;
+    frame.desiredRenderTimeNs = desiredRenderTimeNs;
+    frame.latchTime = -1;
+    frame.presentFence = nullptr;
+    mTrackedFrames.push_back(frame);
+}
+
+void CCodecBufferChannel::processRenderedFrames(const FrameEventHistoryDelta& deltas) {
+    // Grab the latch times and present fences from the frame event deltas
+    for (const auto& delta : deltas) {
+        for (auto& frame : mTrackedFrames) {
+            if (delta.getFrameNumber() == frame.number) {
+                delta.getLatchTime(&frame.latchTime);
+                delta.getDisplayPresentFence(&frame.presentFence);
+            }
+        }
+    }
+
+    // Scan all frames and check to see if the frames that SHOULD have been rendered by now, have,
+    // in fact, been rendered.
+    int64_t nowNs = systemTime(SYSTEM_TIME_MONOTONIC);
+    while (!mTrackedFrames.empty()) {
+        TrackedFrame & frame = mTrackedFrames.front();
+        // Frames that should have been rendered at least 100ms in the past are checked
+        if (frame.desiredRenderTimeNs > nowNs - 100*1000*1000LL) {
+            break;
+        }
+
+        // If we don't have a render time by now, then consider the frame as dropped
+        int64_t renderTimeNs = getRenderTimeNs(frame);
+        if (renderTimeNs != -1) {
+            mCCodecCallback->onOutputFramesRendered(frame.mediaTimeUs, renderTimeNs);
+        }
+        mTrackedFrames.pop_front();
+    }
+}
+
+int64_t CCodecBufferChannel::getRenderTimeNs(const TrackedFrame& frame) {
+    // If the device doesn't have accurate present fence times, then use the latch time as a proxy
+    if (!mHasPresentFenceTimes) {
+        if (frame.latchTime == -1) {
+            ALOGD("no latch time for frame %d", (int) frame.number);
+            return -1;
+        }
+        return frame.latchTime;
+    }
+
+    if (frame.presentFence == nullptr) {
+        ALOGW("no present fence for frame %d", (int) frame.number);
+        return -1;
+    }
+
+    nsecs_t actualRenderTimeNs = frame.presentFence->getSignalTime();
+
+    if (actualRenderTimeNs == Fence::SIGNAL_TIME_INVALID) {
+        ALOGW("invalid signal time for frame %d", (int) frame.number);
+        return -1;
+    }
+
+    if (actualRenderTimeNs == Fence::SIGNAL_TIME_PENDING) {
+        ALOGD("present fence has not fired for frame %d", (int) frame.number);
+        return -1;
+    }
+
+    return actualRenderTimeNs;
+}
+
+void CCodecBufferChannel::pollForRenderedBuffers() {
+    FrameEventHistoryDelta delta;
+    mComponent->pollForRenderedFrames(&delta);
+    processRenderedFrames(delta);
 }
 
 status_t CCodecBufferChannel::discardBuffer(const sp<MediaCodecBuffer> &buffer) {
@@ -1604,6 +1701,8 @@ void CCodecBufferChannel::reset() {
         Mutexed<Output>::Locked output(mOutput);
         output->buffers.reset();
     }
+    // reset the frames that are being tracked for onFrameRendered callbacks
+    mTrackedFrames.clear();
 }
 
 void CCodecBufferChannel::release() {
@@ -1672,6 +1771,8 @@ void CCodecBufferChannel::flush(const std::list<std::unique_ptr<C2Work>> &flushe
             output->buffers->flushStash();
         }
     }
+    // reset the frames that are being tracked for onFrameRendered callbacks
+    mTrackedFrames.clear();
 }
 
 void CCodecBufferChannel::onWorkDone(
@@ -2140,7 +2241,7 @@ status_t CCodecBufferChannel::setSurface(const sp<Surface> &newSurface) {
         output->surface = newSurface;
         output->generation = generation;
     }
-
+    initializeFrameTrackingFor(static_cast<ANativeWindow *>(newSurface.get()));
     return OK;
 }
 

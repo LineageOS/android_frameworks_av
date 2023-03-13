@@ -23,6 +23,7 @@
 #include <C2Param.h>
 #include <C2.h>
 
+#include <gui/FrameTimestamps.h>
 #include <gui/IGraphicBufferProducer.h>
 #include <hidl/HidlSupport.h>
 #include <utils/StrongPointer.h>
@@ -407,6 +408,9 @@ struct Codec2Client::Component : public Codec2Client::Configurable {
             const C2ConstGraphicBlock& block,
             const QueueBufferInput& input,
             QueueBufferOutput* output);
+
+    // Retrieve frame event history from the output surface.
+    void pollForRenderedFrames(FrameEventHistoryDelta* delta);
 
     // Set max dequeue count for output surface.
     void setOutputSurfaceMaxDequeueCount(int maxDequeueCount);
