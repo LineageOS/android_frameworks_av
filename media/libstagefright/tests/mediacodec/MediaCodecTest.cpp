@@ -70,6 +70,7 @@ public:
     MOCK_METHOD(status_t, discardBuffer, (const sp<MediaCodecBuffer> &buffer), (override));
     MOCK_METHOD(void, getInputBufferArray, (Vector<sp<MediaCodecBuffer>> *array), (override));
     MOCK_METHOD(void, getOutputBufferArray, (Vector<sp<MediaCodecBuffer>> *array), (override));
+    MOCK_METHOD(void, pollForRenderedBuffers, (), (override));
 };
 
 class MockCodec : public CodecBase {

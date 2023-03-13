@@ -17,6 +17,7 @@
 #ifndef CODEC2_HIDL_V1_0_UTILS_OUTPUT_BUFFER_QUEUE
 #define CODEC2_HIDL_V1_0_UTILS_OUTPUT_BUFFER_QUEUE
 
+#include <gui/FrameTimestamps.h>
 #include <gui/IGraphicBufferProducer.h>
 #include <codec2/hidl/1.0/types.h>
 #include <codec2/hidl/1.2/types.h>
@@ -50,10 +51,6 @@ struct OutputBufferQueue {
                    int maxDequeueBufferCount,
                    std::shared_ptr<V1_2::SurfaceSyncObj> *syncObj);
 
-    // If there are waiters to allocate from the old surface, wake up and expire
-    // them.
-    void expireOldWaiters();
-
     // Stop using the current output surface. Pending buffer opeations will not
     // perform anymore.
     void stop();
@@ -63,6 +60,9 @@ struct OutputBufferQueue {
             const C2ConstGraphicBlock& block,
             const BnGraphicBufferProducer::QueueBufferInput& input,
             BnGraphicBufferProducer::QueueBufferOutput* output);
+
+    // Retrieve frame event history from the output surface.
+    void pollForRenderedFrames(FrameEventHistoryDelta* delta);
 
     // Call holdBufferQueueBlock() on output blocks in the given workList.
     // The OutputBufferQueue will take the ownership of output blocks.
@@ -90,8 +90,6 @@ private:
     std::weak_ptr<_C2BlockPoolData> mPoolDatas[BufferQueueDefs::NUM_BUFFER_SLOTS];
     std::shared_ptr<C2SurfaceSyncMemory> mSyncMem;
     bool mStopped;
-    std::mutex mOldMutex;
-    std::shared_ptr<C2SurfaceSyncMemory> mOldMem;
 
     bool registerBuffer(const C2ConstGraphicBlock& block);
 };

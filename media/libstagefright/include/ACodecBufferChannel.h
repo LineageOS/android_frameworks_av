@@ -97,6 +97,7 @@ public:
             const sp<MediaCodecBuffer> &buffer) override;
     virtual status_t renderOutputBuffer(
             const sp<MediaCodecBuffer> &buffer, int64_t timestampNs) override;
+    virtual void pollForRenderedBuffers() override;
     virtual status_t discardBuffer(const sp<MediaCodecBuffer> &buffer) override;
     virtual void getInputBufferArray(Vector<sp<MediaCodecBuffer>> *array) override;
     virtual void getOutputBufferArray(Vector<sp<MediaCodecBuffer>> *array) override;
