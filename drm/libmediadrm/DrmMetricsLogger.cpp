@@ -75,6 +75,10 @@ DrmStatus DrmMetricsLogger::createPlugin(const uint8_t uuid[IDRM_UUID_SIZE],
     }
     DrmStatus status = mImpl->createPlugin(uuid, appPackageName);
     if (status == OK) {
+        String8 version8;
+        if (getPropertyString(String8("version"), version8) == OK) {
+            mVersion = version8.string();
+        }
         reportMediaDrmCreated();
     } else {
         reportMediaDrmErrored(status, __func__);
@@ -102,6 +106,9 @@ DrmStatus DrmMetricsLogger::openSession(DrmPlugin::SecurityLevel securityLevel,
         ctx.mTargetSecurityLevel = securityLevel;
         if (getSecurityLevel(sessionId, &ctx.mActualSecurityLevel) != OK) {
             ctx.mActualSecurityLevel = DrmPlugin::kSecurityLevelUnknown;
+        }
+        if (!mVersion.empty()) {
+            ctx.mVersion = mVersion;
         }
         {
             const std::lock_guard<std::mutex> lock(mSessionMapMutex);
@@ -466,6 +473,7 @@ void DrmMetricsLogger::reportMediaDrmCreated() const {
     mediametrics_setInt64(handle, "uuid_lsb", mUuid[1]);
     mediametrics_setInt32(handle, "frontend", mFrontend);
     mediametrics_setCString(handle, "object_nonce", mObjNonce.c_str());
+    mediametrics_setCString(handle, "version", mVersion.c_str());
     mediametrics_selfRecord(handle);
     mediametrics_delete(handle);
 }
@@ -476,6 +484,7 @@ void DrmMetricsLogger::reportMediaDrmSessionOpened(const std::vector<uint8_t>& s
     mediametrics_setInt64(handle, "uuid_msb", mUuid[0]);
     mediametrics_setInt64(handle, "uuid_lsb", mUuid[1]);
     mediametrics_setInt32(handle, "frontend", mFrontend);
+    mediametrics_setCString(handle, "version", mVersion.c_str());
     mediametrics_setCString(handle, "object_nonce", mObjNonce.c_str());
     const std::lock_guard<std::mutex> lock(mSessionMapMutex);
     auto it = mSessionMap.find(sessionId);
@@ -495,6 +504,7 @@ void DrmMetricsLogger::reportMediaDrmErrored(const DrmStatus& error_code, const 
     mediametrics_setInt64(handle, "uuid_msb", mUuid[0]);
     mediametrics_setInt64(handle, "uuid_lsb", mUuid[1]);
     mediametrics_setInt32(handle, "frontend", mFrontend);
+    mediametrics_setCString(handle, "version", mVersion.c_str());
     mediametrics_setCString(handle, "object_nonce", mObjNonce.c_str());
     if (!sessionId.empty()) {
         const std::lock_guard<std::mutex> lock(mSessionMapMutex);
