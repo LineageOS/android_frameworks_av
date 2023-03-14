@@ -153,9 +153,9 @@ ZoomRatioMapper::ZoomRatioMapper(const CameraMetadata* deviceInfo,
         return;
     }
 
-    bool isUltraHighResolutionSensor =
-            camera3::SessionConfigurationUtils::isUltraHighResolutionSensor(*deviceInfo);
-    if (isUltraHighResolutionSensor) {
+    bool supportsUltraHighResolutionCapture =
+            camera3::SessionConfigurationUtils::supportsUltraHighResolutionCapture(*deviceInfo);
+    if (supportsUltraHighResolutionCapture) {
         if (!SessionConfigurationUtils::getArrayWidthAndHeight(deviceInfo,
                 ANDROID_SENSOR_INFO_PRE_CORRECTION_ACTIVE_ARRAY_SIZE_MAXIMUM_RESOLUTION,
                 &arrayMaximumResolutionW, &arrayMaximumResolutionH)) {
