@@ -34,6 +34,7 @@
 #include <media/stagefright/foundation/AMessage.h>
 #include <media/MediaMetricsItem.h>
 #include <media/ShmemCompat.h>
+#include <mediautils/SchedulingPolicyService.h>
 #include <mediautils/ServiceUtilities.h>
 #include <utils/Thread.h>
 
@@ -111,6 +112,14 @@ public:
     };
 
     void onMessageReceived(const sp<AMessage> &msg) override {
+        // No ALooper method to get the tid so update
+        // Spatializer priority on the first message received.
+        std::call_once(mPrioritySetFlag, [](){
+            const pid_t pid = getpid();
+            const pid_t tid = gettid();
+            (void)requestSpatializerPriority(pid, tid);
+        });
+
         sp<Spatializer> spatializer = mSpatializer.promote();
         if (spatializer == nullptr) {
             ALOGW("%s: Cannot promote spatializer", __func__);
@@ -163,6 +172,7 @@ public:
     }
 private:
     wp<Spatializer> mSpatializer;
+    std::once_flag mPrioritySetFlag;
 };
 
 const std::vector<const char *> Spatializer::sHeadPoseKeys = {
@@ -255,6 +265,7 @@ Spatializer::Spatializer(effect_descriptor_t engineDescriptor, SpatializerPolicy
     : mEngineDescriptor(engineDescriptor),
       mPolicyCallback(callback) {
     ALOGV("%s", __func__);
+    setMinSchedulerPolicy(SCHED_NORMAL, ANDROID_PRIORITY_AUDIO);
 }
 
 void Spatializer::onFirstRef() {
@@ -263,7 +274,7 @@ void Spatializer::onFirstRef() {
     mLooper->start(
             /*runOnCallingThread*/false,
             /*canCallJava*/       false,
-            PRIORITY_AUDIO);
+            PRIORITY_URGENT_AUDIO);
 
     mHandler = new EngineCallbackHandler(this);
     mLooper->registerHandler(mHandler);
@@ -741,6 +752,17 @@ void Spatializer::onHeadToStagePose(const Pose3f& headToStage) {
     msg->post();
 }
 
+void Spatializer::resetEngineHeadPose_l() {
+    ALOGV("%s mEngine %p", __func__, mEngine.get());
+    if (mEngine == nullptr) {
+        return;
+    }
+    const std::vector<float> headToStage(6, 0.0);
+    setEffectParameter_l(SPATIALIZER_PARAM_HEAD_TO_STAGE, headToStage);
+    setEffectParameter_l(SPATIALIZER_PARAM_HEADTRACKING_MODE,
+            std::vector<SpatializerHeadTrackingMode>{SpatializerHeadTrackingMode::DISABLED});
+}
+
 void Spatializer::onHeadToStagePoseMsg(const std::vector<float>& headToStage) {
     ALOGV("%s", __func__);
     sp<media::ISpatializerHeadTrackingCallback> callback;
@@ -792,8 +814,12 @@ void Spatializer::onActualModeChangeMsg(HeadTrackingMode mode) {
         }
         mActualHeadTrackingMode = spatializerMode;
         if (mEngine != nullptr) {
-            setEffectParameter_l(SPATIALIZER_PARAM_HEADTRACKING_MODE,
-                                 std::vector<SpatializerHeadTrackingMode>{spatializerMode});
+            if (spatializerMode == SpatializerHeadTrackingMode::DISABLED) {
+                resetEngineHeadPose_l();
+            } else {
+                setEffectParameter_l(SPATIALIZER_PARAM_HEADTRACKING_MODE,
+                                     std::vector<SpatializerHeadTrackingMode>{spatializerMode});
+            }
         }
         callback = mHeadTrackingCallback;
         mLocalLog.log("%s: %s, spatializerMode %s", __func__, media::toString(mode).c_str(),
@@ -920,23 +946,38 @@ void Spatializer::updateActiveTracks(size_t numActiveTracks) {
 
 void Spatializer::checkSensorsState_l() {
     audio_latency_mode_t requestedLatencyMode = AUDIO_LATENCY_MODE_FREE;
-    bool lowLatencySupported = mSupportedLatencyModes.empty()
-            || (std::find(mSupportedLatencyModes.begin(), mSupportedLatencyModes.end(),
-                    AUDIO_LATENCY_MODE_LOW) != mSupportedLatencyModes.end());
-    if (mSupportsHeadTracking && mPoseController != nullptr) {
-        if (lowLatencySupported && mNumActiveTracks > 0 && mLevel != SpatializationLevel::NONE
-            && mDesiredHeadTrackingMode != HeadTrackingMode::STATIC
-            && mHeadSensor != SpatializerPoseController::INVALID_SENSOR) {
-            mPoseController->setHeadSensor(mHeadSensor);
-            mPoseController->setScreenSensor(mScreenSensor);
-            requestedLatencyMode = AUDIO_LATENCY_MODE_LOW;
+    const bool supportsSetLatencyMode = !mSupportedLatencyModes.empty();
+    const bool supportsLowLatencyMode = supportsSetLatencyMode && std::find(
+            mSupportedLatencyModes.begin(), mSupportedLatencyModes.end(),
+            AUDIO_LATENCY_MODE_LOW) != mSupportedLatencyModes.end();
+    if (mSupportsHeadTracking) {
+        if (mPoseController != nullptr) {
+            // TODO(b/253297301, b/255433067) reenable low latency condition check
+            // for Head Tracking after Bluetooth HAL supports it correctly.
+            if (mNumActiveTracks > 0 && mLevel != SpatializationLevel::NONE
+                && mDesiredHeadTrackingMode != HeadTrackingMode::STATIC
+                && mHeadSensor != SpatializerPoseController::INVALID_SENSOR) {
+                if (mEngine != nullptr) {
+                    setEffectParameter_l(SPATIALIZER_PARAM_HEADTRACKING_MODE,
+                            std::vector<SpatializerHeadTrackingMode>{mActualHeadTrackingMode});
+                }
+                mPoseController->setHeadSensor(mHeadSensor);
+                mPoseController->setScreenSensor(mScreenSensor);
+                if (supportsLowLatencyMode) requestedLatencyMode = AUDIO_LATENCY_MODE_LOW;
+            } else {
+                mPoseController->setHeadSensor(SpatializerPoseController::INVALID_SENSOR);
+                mPoseController->setScreenSensor(SpatializerPoseController::INVALID_SENSOR);
+                resetEngineHeadPose_l();
+            }
         } else {
-            mPoseController->setHeadSensor(SpatializerPoseController::INVALID_SENSOR);
-            mPoseController->setScreenSensor(SpatializerPoseController::INVALID_SENSOR);
+            resetEngineHeadPose_l();
         }
     }
-    if (mOutput != AUDIO_IO_HANDLE_NONE) {
-        AudioSystem::setRequestedLatencyMode(mOutput, requestedLatencyMode);
+    if (mOutput != AUDIO_IO_HANDLE_NONE && supportsSetLatencyMode) {
+        const status_t status =
+                AudioSystem::setRequestedLatencyMode(mOutput, requestedLatencyMode);
+        ALOGD("%s: setRequestedLatencyMode for output thread(%d) to %s returned %d",
+                __func__, mOutput, toString(requestedLatencyMode).c_str(), status);
     }
 }
 
@@ -946,8 +987,6 @@ void Spatializer::checkEngineState_l() {
             mEngine->setEnabled(true);
             setEffectParameter_l(SPATIALIZER_PARAM_LEVEL,
                     std::vector<SpatializationLevel>{mLevel});
-            setEffectParameter_l(SPATIALIZER_PARAM_HEADTRACKING_MODE,
-                    std::vector<SpatializerHeadTrackingMode>{mActualHeadTrackingMode});
         } else {
             setEffectParameter_l(SPATIALIZER_PARAM_LEVEL,
                     std::vector<SpatializationLevel>{SpatializationLevel::NONE});
@@ -969,6 +1008,7 @@ void Spatializer::checkPoseController_l() {
         mPoseController->setDisplayOrientation(mDisplayOrientation);
     } else if (!isControllerNeeded && mPoseController != nullptr) {
         mPoseController.reset();
+        resetEngineHeadPose_l();
     }
     if (mPoseController != nullptr) {
         mPoseController->setDesiredMode(mDesiredHeadTrackingMode);

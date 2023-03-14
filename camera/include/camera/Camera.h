@@ -58,7 +58,7 @@ struct CameraTraits<Camera>
     typedef ::android::hardware::ICameraClient TCamCallbacks;
     typedef ::android::binder::Status(::android::hardware::ICameraService::*TCamConnectService)
         (const sp<::android::hardware::ICameraClient>&,
-        int, const String16&, int, int, int,
+        int, const String16&, int, int, int, bool,
         /*out*/
         sp<::android::hardware::ICamera>*);
     static TCamConnectService     fnConnectService;
@@ -81,7 +81,8 @@ public:
     static  sp<Camera>  create(const sp<::android::hardware::ICamera>& camera);
     static  sp<Camera>  connect(int cameraId,
                                 const String16& clientPackageName,
-                                int clientUid, int clientPid, int targetSdkVersion);
+                                int clientUid, int clientPid, int targetSdkVersion,
+                                bool overrideToPortrait);
 
             virtual     ~Camera();
 

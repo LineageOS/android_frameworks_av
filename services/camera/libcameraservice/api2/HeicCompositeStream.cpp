@@ -1161,11 +1161,13 @@ status_t HeicCompositeStream::processCompletedInputFrame(int64_t frameNumber,
     inputFrame.fileFd = -1;
 
     // Fill in HEIC header
-    uint8_t *header = static_cast<uint8_t*>(dstBuffer) + mMaxHeicBufferSize - sizeof(CameraBlob);
-    CameraBlob *blobHeader = (CameraBlob *)header;
     // Must be in sync with CAMERA3_HEIC_BLOB_ID in android_media_Utils.cpp
-    blobHeader->blobId = static_cast<CameraBlobId>(0x00FE);
-    blobHeader->blobSizeBytes = fSize;
+    uint8_t *header = static_cast<uint8_t*>(dstBuffer) + mMaxHeicBufferSize - sizeof(CameraBlob);
+    CameraBlob blobHeader = {
+        .blobId = static_cast<CameraBlobId>(0x00FE),
+        .blobSizeBytes = static_cast<int32_t>(fSize)
+    };
+    memcpy(header, &blobHeader, sizeof(CameraBlob));
 
     res = native_window_set_buffers_timestamp(mOutputSurface.get(), inputFrame.timestamp);
     if (res != OK) {

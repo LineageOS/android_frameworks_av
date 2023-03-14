@@ -50,7 +50,6 @@ private:
     bool mFirstIFrameProvided;
     int32_t mLastCvo;
     uint64_t mLastIFrameProvidedAtMs;
-    int64_t mLastRtpTimeJitterDataUs;
     int32_t mWidth;
     int32_t mHeight;
     List<sp<ABuffer> > mNALUnits;
