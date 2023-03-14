@@ -506,8 +506,8 @@ AidlProviderInfo::AidlDeviceInfo3::AidlDeviceInfo3(
         ALOGE("%s: Unable to derive Jpeg/R tags based on camera and media capabilities: %s (%d)",
                 __FUNCTION__, strerror(-res), res);
     }
-
-    if (camera3::SessionConfigurationUtils::isUltraHighResolutionSensor(mCameraCharacteristics)) {
+    using camera3::SessionConfigurationUtils::supportsUltraHighResolutionCapture;
+    if (supportsUltraHighResolutionCapture(mCameraCharacteristics)) {
         status_t status = addDynamicDepthTags(/*maxResolution*/true);
         if (OK != status) {
             ALOGE("%s: Failed appending dynamic depth tags for maximum resolution mode: %s (%d)",

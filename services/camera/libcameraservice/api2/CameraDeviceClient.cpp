@@ -191,11 +191,11 @@ status_t CameraDeviceClient::initializeImpl(TProviderPtr providerPtr, const Stri
     // Cache physical camera ids corresponding to this device and also the high
     // resolution sensors in this device + physical camera ids
     mProviderManager->isLogicalCamera(mCameraIdStr.string(), &mPhysicalCameraIds);
-    if (isUltraHighResolutionSensor(mCameraIdStr)) {
+    if (supportsUltraHighResolutionCapture(mCameraIdStr)) {
         mHighResolutionSensors.insert(mCameraIdStr.string());
     }
     for (auto &physicalId : mPhysicalCameraIds) {
-        if (isUltraHighResolutionSensor(String8(physicalId.c_str()))) {
+        if (supportsUltraHighResolutionCapture(String8(physicalId.c_str()))) {
             mHighResolutionSensors.insert(physicalId.c_str());
         }
     }
@@ -2259,9 +2259,9 @@ const CameraMetadata &CameraDeviceClient::getStaticInfo(const String8 &cameraId)
     return mDevice->infoPhysical(cameraId);
 }
 
-bool CameraDeviceClient::isUltraHighResolutionSensor(const String8 &cameraId) {
+bool CameraDeviceClient::supportsUltraHighResolutionCapture(const String8 &cameraId) {
     const CameraMetadata &deviceInfo = getStaticInfo(cameraId);
-    return SessionConfigurationUtils::isUltraHighResolutionSensor(deviceInfo);
+    return SessionConfigurationUtils::supportsUltraHighResolutionCapture(deviceInfo);
 }
 
 bool CameraDeviceClient::isSensorPixelModeConsistent(
