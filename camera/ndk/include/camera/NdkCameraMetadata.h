@@ -190,7 +190,7 @@ typedef struct ACameraMetadata_const_entry {
  * @param metadata the {@link ACameraMetadata} of interest.
  * @param tag the tag value of the camera metadata entry to be get.
  * @param entry the output {@link ACameraMetadata_const_entry} will be filled here if the method
- *        call succeeeds.
+ *        call succeeds.
  *
  * @return <ul>
  *         <li>{@link ACAMERA_OK} if the method call succeeds.</li>
