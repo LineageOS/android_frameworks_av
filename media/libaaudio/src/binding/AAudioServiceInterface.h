@@ -45,55 +45,58 @@ public:
     /**
      * @param request info needed to create the stream
      * @param configuration contains information about the created stream
-     * @return handle to the stream or a negative error
+     * @return an object for aaudio handle information, which includes the connected
+     *         aaudio service lifetime id to recognize the connected aaudio service
+     *         and aaudio handle to recognize the stream. If an error occurs, the
+     *         aaudio handle will be set as the negative error.
      */
-    virtual aaudio_handle_t openStream(const AAudioStreamRequest &request,
-                                       AAudioStreamConfiguration &configuration) = 0;
+    virtual AAudioHandleInfo openStream(const AAudioStreamRequest &request,
+                                        AAudioStreamConfiguration &configuration) = 0;
 
-    virtual aaudio_result_t closeStream(aaudio_handle_t streamHandle) = 0;
+    virtual aaudio_result_t closeStream(const AAudioHandleInfo& streamHandleInfo) = 0;
 
     /* Get an immutable description of the in-memory queues
     * used to communicate with the underlying HAL or Service.
     */
-    virtual aaudio_result_t getStreamDescription(aaudio_handle_t streamHandle,
+    virtual aaudio_result_t getStreamDescription(const AAudioHandleInfo& streamHandleInfo,
                                                  AudioEndpointParcelable &parcelable) = 0;
 
     /**
      * Start the flow of data.
      */
-    virtual aaudio_result_t startStream(aaudio_handle_t streamHandle) = 0;
+    virtual aaudio_result_t startStream(const AAudioHandleInfo& streamHandleInfo) = 0;
 
     /**
      * Stop the flow of data such that start() can resume without loss of data.
      */
-    virtual aaudio_result_t pauseStream(aaudio_handle_t streamHandle) = 0;
+    virtual aaudio_result_t pauseStream(const AAudioHandleInfo& streamHandleInfo) = 0;
 
     /**
-     * Stop the flow of data after data currently inthe buffer has played.
+     * Stop the flow of data after data currently in the buffer has played.
      */
-    virtual aaudio_result_t stopStream(aaudio_handle_t streamHandle) = 0;
+    virtual aaudio_result_t stopStream(const AAudioHandleInfo& streamHandleInfo) = 0;
 
     /**
      *  Discard any data held by the underlying HAL or Service.
      */
-    virtual aaudio_result_t flushStream(aaudio_handle_t streamHandle) = 0;
+    virtual aaudio_result_t flushStream(const AAudioHandleInfo& streamHandleInfo) = 0;
 
     /**
      * Manage the specified thread as a low latency audio thread.
      */
-    virtual aaudio_result_t registerAudioThread(aaudio_handle_t streamHandle,
+    virtual aaudio_result_t registerAudioThread(const AAudioHandleInfo& streamHandleInfo,
                                                 pid_t clientThreadId,
                                                 int64_t periodNanoseconds) = 0;
 
-    virtual aaudio_result_t unregisterAudioThread(aaudio_handle_t streamHandle,
+    virtual aaudio_result_t unregisterAudioThread(const AAudioHandleInfo& streamHandleInfo,
                                                   pid_t clientThreadId) = 0;
 
-    virtual aaudio_result_t startClient(aaudio_handle_t streamHandle,
+    virtual aaudio_result_t startClient(const AAudioHandleInfo& streamHandleInfo,
                                         const android::AudioClient& client,
                                         const audio_attributes_t *attr,
                                         audio_port_handle_t *clientHandle) = 0;
 
-    virtual aaudio_result_t stopClient(aaudio_handle_t streamHandle,
+    virtual aaudio_result_t stopClient(const AAudioHandleInfo& streamHandleInfo,
                                        audio_port_handle_t clientHandle) = 0;
 
     /**
@@ -103,7 +106,7 @@ public:
      * @param parcelable contains new data queue information
      * @return the result of the execution
      */
-    virtual aaudio_result_t exitStandby(aaudio_handle_t streamHandle,
+    virtual aaudio_result_t exitStandby(const AAudioHandleInfo& streamHandleInfo,
                                         AudioEndpointParcelable &parcelable) = 0;
 };
 
