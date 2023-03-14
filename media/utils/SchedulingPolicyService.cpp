@@ -18,6 +18,7 @@
 //#define LOG_NDEBUG 0
 
 #include <binder/IServiceManager.h>
+#include <cutils/properties.h>
 #include <utils/Mutex.h>
 #include "ISchedulingPolicyService.h"
 #include "mediautils/SchedulingPolicyService.h"
@@ -84,6 +85,27 @@ int requestCpusetBoost(bool enable, const sp<IBinder> &client)
     sSchedulingPolicyService.clear();
     sMutex.unlock();
     return ret;
+}
+
+int requestSpatializerPriority(pid_t pid, pid_t tid) {
+    if (pid == -1 || tid == -1) return BAD_VALUE;
+
+    // update priority to RT if specified.
+    constexpr int32_t kRTPriorityMin = 1;
+    constexpr int32_t kRTPriorityMax = 3;
+    const int32_t priorityBoost =
+            property_get_int32("audio.spatializer.priority", kRTPriorityMin);
+    if (priorityBoost >= kRTPriorityMin && priorityBoost <= kRTPriorityMax) {
+        const status_t status = requestPriority(
+                pid, tid, priorityBoost, false /* isForApp */, true /*asynchronous*/);
+        if (status != OK) {
+            ALOGW("%s: Cannot request spatializer priority boost %d, status:%d",
+                    __func__, priorityBoost, status);
+            return status < 0 ? status : UNKNOWN_ERROR;
+        }
+        return priorityBoost;
+    }
+    return 0;  // no boost requested
 }
 
 }   // namespace android

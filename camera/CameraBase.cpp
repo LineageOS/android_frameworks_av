@@ -23,6 +23,7 @@
 #include <cutils/properties.h>
 
 #include <android/hardware/ICameraService.h>
+#include <com/android/internal/compat/IPlatformCompatNative.h>
 
 #include <binder/IPCThreadState.h>
 #include <binder/IServiceManager.h>
@@ -161,7 +162,8 @@ const sp<::android::hardware::ICameraService> CameraBase<TCam, TCamTraits>::getC
 template <typename TCam, typename TCamTraits>
 sp<TCam> CameraBase<TCam, TCamTraits>::connect(int cameraId,
                                                const String16& clientPackageName,
-                                               int clientUid, int clientPid, int targetSdkVersion)
+                                               int clientUid, int clientPid, int targetSdkVersion,
+                                               bool overrideToPortrait)
 {
     ALOGV("%s: connect", __FUNCTION__);
     sp<TCam> c = new TCam(cameraId);
@@ -171,8 +173,9 @@ sp<TCam> CameraBase<TCam, TCamTraits>::connect(int cameraId,
     binder::Status ret;
     if (cs != nullptr) {
         TCamConnectService fnConnectService = TCamTraits::fnConnectService;
+        ALOGI("Connect camera (legacy API) - overrideToPortrait %d", overrideToPortrait);
         ret = (cs.get()->*fnConnectService)(cl, cameraId, clientPackageName, clientUid,
-                                               clientPid, targetSdkVersion, /*out*/ &c->mCamera);
+                clientPid, targetSdkVersion, overrideToPortrait, /*out*/ &c->mCamera);
     }
     if (ret.isOk() && c->mCamera != nullptr) {
         IInterface::asBinder(c->mCamera)->linkToDeath(c);
@@ -273,10 +276,11 @@ int CameraBase<TCam, TCamTraits>::getNumberOfCameras() {
 // this can be in BaseCamera but it should be an instance method
 template <typename TCam, typename TCamTraits>
 status_t CameraBase<TCam, TCamTraits>::getCameraInfo(int cameraId,
+        bool overrideToPortrait,
         struct hardware::CameraInfo* cameraInfo) {
     const sp<::android::hardware::ICameraService> cs = getCameraService();
     if (cs == 0) return UNKNOWN_ERROR;
-    binder::Status res = cs->getCameraInfo(cameraId, cameraInfo);
+    binder::Status res = cs->getCameraInfo(cameraId, overrideToPortrait, cameraInfo);
     return res.isOk() ? OK : res.serviceSpecificErrorCode();
 }
 

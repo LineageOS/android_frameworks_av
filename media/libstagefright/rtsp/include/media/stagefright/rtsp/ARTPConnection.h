@@ -20,6 +20,7 @@
 
 #include <media/stagefright/foundation/AHandler.h>
 #include <utils/List.h>
+#include <sys/socket.h>
 
 namespace android {
 
@@ -48,6 +49,8 @@ struct ARTPConnection : public AHandler {
     void setSelfID(const uint32_t selfID);
     void setStaticJitterTimeMs(const uint32_t jbTimeMs);
     void setTargetBitrate(int32_t targetBitrate);
+    void setRtpSockOptEcn(int32_t sockOptEcn);
+    void setIsIPv6(const char *localIp);
 
     // Creates a pair of UDP datagram sockets bound to adjacent ports
     // (the rtpSocket is bound to an even port, the rtcpSocket to the
@@ -60,7 +63,8 @@ struct ARTPConnection : public AHandler {
     static void MakeRTPSocketPair(
             int *rtpSocket, int *rtcpSocket,
             const char *localIp, const char *remoteIp,
-            unsigned localPort, unsigned remotePort, int64_t socketNetwork = 0);
+            unsigned localPort, unsigned remotePort, int64_t socketNetwork = 0,
+            int32_t sockOptEcn = 0);
 
 protected:
     virtual ~ARTPConnection();
@@ -77,6 +81,7 @@ private:
     };
 
     static const int64_t kSelectTimeoutUs;
+    static const int64_t kMinOneSecondNotifyDelayUs;
 
     uint32_t mFlags;
 
@@ -87,9 +92,12 @@ private:
     int64_t mLastReceiverReportTimeUs;
     int64_t mLastBitrateReportTimeUs;
     int64_t mLastEarlyNotifyTimeUs;
+    int64_t mLastCongestionNotifyTimeUs;
 
     int32_t mSelfID;
     int32_t mTargetBitrate;
+    int32_t mRtpSockOptEcn;
+    bool mIsIPv6;
 
     uint32_t mStaticJitterTimeMs;
 
@@ -103,6 +111,8 @@ private:
     void onInjectPacket(const sp<AMessage> &msg);
     void onSendReceiverReports();
     void checkRxBitrate(int64_t nowUs);
+    void notifyCongestionToUpperLayerIfNeeded(StreamInfo *s);
+    void handleIpHeadersIfReceived(StreamInfo *s, struct msghdr sMsg);
 
     status_t receive(StreamInfo *info, bool receiveRTP);
     ssize_t send(const StreamInfo *info, const sp<ABuffer> buffer);

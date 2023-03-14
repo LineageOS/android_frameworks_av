@@ -165,14 +165,10 @@ class Spatializer : public media::BnSpatializer,
     std::string toString(unsigned level) const NO_THREAD_SAFETY_ANALYSIS;
 
     static std::string toString(audio_latency_mode_t mode) {
-        switch (mode) {
-            case AUDIO_LATENCY_MODE_FREE:
-                return "LATENCY_MODE_FREE";
-            case AUDIO_LATENCY_MODE_LOW:
-                return "LATENCY_MODE_LOW";
-        }
-        return "EnumNotImplemented";
-    };
+        // We convert to the AIDL type to print (eventually the legacy type will be removed).
+        const auto result = legacy2aidl_audio_latency_mode_t_LatencyMode(mode);
+        return result.has_value() ? media::toString(*result) : "unknown_latency_mode";
+    }
 
     /**
      * Format head to stage vector to a string, [0.00, 0.00, 0.00, -1.29, -0.50, 15.27].
@@ -349,6 +345,12 @@ private:
      * playback activity and requested level.
      */
     void checkEngineState_l() REQUIRES(mLock);
+
+    /**
+     * Reset head tracking mode and recenter pose in engine: Called when the head tracking
+     * is disabled.
+     */
+    void resetEngineHeadPose_l() REQUIRES(mLock);
 
     /** Effect engine descriptor */
     const effect_descriptor_t mEngineDescriptor;

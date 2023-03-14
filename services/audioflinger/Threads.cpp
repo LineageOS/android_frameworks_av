@@ -269,6 +269,23 @@ static std::string patchSourcesToString(const struct audio_patch *patch)
     return ss.str();
 }
 
+static std::string toString(audio_latency_mode_t mode) {
+    // We convert to the AIDL type to print (eventually the legacy type will be removed).
+    const auto result = legacy2aidl_audio_latency_mode_t_LatencyMode(mode);
+    return result.has_value() ? media::toString(*result) : "UNKNOWN";
+}
+
+// Could be made a template, but other toString overloads for std::vector are confused.
+static std::string toString(const std::vector<audio_latency_mode_t>& elements) {
+    std::string s("{ ");
+    for (const auto& e : elements) {
+        s.append(toString(e));
+        s.append(" ");
+    }
+    s.append("}");
+    return s;
+}
+
 static pthread_once_t sFastTrackMultiplierOnce = PTHREAD_ONCE_INIT;
 
 static void sFastTrackMultiplierInit()
@@ -7315,23 +7332,13 @@ void AudioFlinger::SpatializerThread::onFirstRef() {
         updateHalSupportedLatencyModes_l();
     }
 
-    // update priority if specified.
-    constexpr int32_t kRTPriorityMin = 1;
-    constexpr int32_t kRTPriorityMax = 3;
-    const int32_t priorityBoost =
-            property_get_int32("audio.spatializer.priority", kRTPriorityMin);
-    if (priorityBoost >= kRTPriorityMin && priorityBoost <= kRTPriorityMax) {
-        const pid_t pid = getpid();
-        const pid_t tid = getTid();
-
-        if (tid == -1) {
-            // Unusual: PlaybackThread::onFirstRef() should set the threadLoop running.
-            ALOGW("%s: audio.spatializer.priority %d ignored, thread not running",
-                    __func__, priorityBoost);
-        } else {
-            ALOGD("%s: audio.spatializer.priority %d, allowing real time for pid %d  tid %d",
-                    __func__, priorityBoost, pid, tid);
-            sendPrioConfigEvent_l(pid, tid, priorityBoost, false /*forApp*/);
+    const pid_t tid = getTid();
+    if (tid == -1) {
+        // Unusual: PlaybackThread::onFirstRef() should set the threadLoop running.
+        ALOGW("%s: Cannot update Spatializer mixer thread priority, not running", __func__);
+    } else {
+        const int priorityBoost = requestSpatializerPriority(getpid(), tid);
+        if (priorityBoost > 0) {
             stream()->setHalThreadPriority(priorityBoost);
         }
     }
@@ -7347,10 +7354,13 @@ status_t AudioFlinger::SpatializerThread::createAudioPatch_l(const struct audio_
 
 void AudioFlinger::SpatializerThread::updateHalSupportedLatencyModes_l() {
     std::vector<audio_latency_mode_t> latencyModes;
-    if (mOutput->stream->getRecommendedLatencyModes(&latencyModes) != NO_ERROR) {
+    const status_t status = mOutput->stream->getRecommendedLatencyModes(&latencyModes);
+    if (status != NO_ERROR) {
         latencyModes.clear();
     }
     if (latencyModes != mSupportedLatencyModes) {
+        ALOGD("%s: thread(%d) status %d supported latency modes: %s",
+            __func__, mId, status, toString(latencyModes).c_str());
         mSupportedLatencyModes.swap(latencyModes);
         sendHalLatencyModesChangedEvent_l();
     }
@@ -7390,6 +7400,8 @@ void AudioFlinger::SpatializerThread::setHalLatencyMode_l() {
 
     if (latencyMode != mSetLatencyMode) {
         status_t status = mOutput->stream->setLatencyMode(latencyMode);
+        ALOGD("%s: thread(%d) setLatencyMode(%s) returned %d",
+                __func__, mId, toString(latencyMode).c_str(), status);
         if (status == NO_ERROR) {
             mSetLatencyMode = latencyMode;
         }
@@ -7471,6 +7483,8 @@ void AudioFlinger::SpatializerThread::onRecommendedLatencyModeChanged(
         std::vector<audio_latency_mode_t> modes) {
     Mutex::Autolock _l(mLock);
     if (modes != mSupportedLatencyModes) {
+        ALOGD("%s: thread(%d) supported latency modes: %s",
+            __func__, mId, toString(modes).c_str());
         mSupportedLatencyModes.swap(modes);
         sendHalLatencyModesChangedEvent_l();
     }
@@ -8773,21 +8787,9 @@ void AudioFlinger::RecordThread::updateMetadata_l()
         return; // nothing to do
     }
     StreamInHalInterface::SinkMetadata metadata;
+    auto backInserter = std::back_inserter(metadata.tracks);
     for (const sp<RecordTrack> &track : mActiveTracks) {
-        // Do not forward PatchRecord metadata to audio HAL
-        if (track->isPatchTrack()) {
-            continue;
-        }
-        // No track is invalid as this is called after prepareTrack_l in the same critical section
-        record_track_metadata_v7_t trackMetadata;
-        trackMetadata.base = {
-                .source = track->attributes().source,
-                .gain = 1, // capture tracks do not have volumes
-        };
-        trackMetadata.channel_mask = track->channelMask(),
-        strncpy(trackMetadata.tags, track->attributes().tags, AUDIO_ATTRIBUTES_TAGS_MAX_SIZE);
-
-        metadata.tracks.push_back(trackMetadata);
+        track->copyMetadataTo(backInserter);
     }
     mInput->stream->updateSinkMetadata(metadata);
 }
@@ -10243,18 +10245,21 @@ status_t AudioFlinger::MmapThread::checkEffectCompatibility_l(
 
 void AudioFlinger::MmapThread::checkInvalidTracks_l()
 {
+    sp<MmapStreamCallback> callback;
     for (const sp<MmapTrack> &track : mActiveTracks) {
         if (track->isInvalid()) {
-            sp<MmapStreamCallback> callback = mCallback.promote();
-            if (callback != 0) {
-                mLock.unlock();
-                callback->onTearDown(track->portId());
-                mLock.lock();
-            } else if (mNoCallbackWarningCount < kMaxNoCallbackWarnings) {
-                ALOGW("Could not notify MMAP stream tear down: no onTearDown callback!");
+            callback = mCallback.promote();
+            if (callback == nullptr &&  mNoCallbackWarningCount < kMaxNoCallbackWarnings) {
+                ALOGW("Could not notify MMAP stream tear down: no onRoutingChanged callback!");
                 mNoCallbackWarningCount++;
             }
+            break;
         }
+    }
+    if (callback != 0) {
+        mLock.unlock();
+        callback->onRoutingChanged(AUDIO_PORT_HANDLE_NONE);
+        mLock.lock();
     }
 }
 

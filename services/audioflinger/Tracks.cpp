@@ -334,6 +334,7 @@ AudioFlinger::TrackHandle::TrackHandle(const sp<AudioFlinger::PlaybackThread::Tr
     : BnAudioTrack(),
       mTrack(track)
 {
+    setMinSchedulerPolicy(SCHED_NORMAL, ANDROID_PRIORITY_AUDIO);
 }
 
 AudioFlinger::TrackHandle::~TrackHandle() {
@@ -1477,7 +1478,7 @@ void AudioFlinger::PlaybackThread::Track::copyMetadataTo(MetadataInserter& backI
         }
     }
 
-    metadata.channel_mask = mChannelMask,
+    metadata.channel_mask = mChannelMask;
     strncpy(metadata.tags, mAttr.tags, AUDIO_ATTRIBUTES_TAGS_MAX_SIZE);
     *backInserter++ = metadata;
 }
@@ -2021,7 +2022,6 @@ ssize_t AudioFlinger::PlaybackThread::OutputTrack::write(void* data, uint32_t fr
 {
     Buffer *pInBuffer;
     Buffer inBuffer;
-    bool outputBufferFull = false;
     inBuffer.frameCount = frames;
     inBuffer.raw = data;
 
@@ -2051,7 +2051,6 @@ ssize_t AudioFlinger::PlaybackThread::OutputTrack::write(void* data, uint32_t fr
                 ALOGV("%s(%d): thread %d no more output buffers; status %d",
                         __func__, mId,
                         (int)mThreadIoHandle, status);
-                outputBufferFull = true;
                 break;
             }
             uint32_t waitTimeMs = (uint32_t)ns2ms(systemTime() - startTime);
@@ -2331,6 +2330,7 @@ AudioFlinger::RecordHandle::RecordHandle(
     : BnAudioRecord(),
     mRecordTrack(recordTrack)
 {
+    setMinSchedulerPolicy(SCHED_NORMAL, ANDROID_PRIORITY_AUDIO);
 }
 
 AudioFlinger::RecordHandle::~RecordHandle() {
@@ -2747,6 +2747,25 @@ status_t AudioFlinger::RecordThread::RecordTrack::shareAudioHistory(
     }
 }
 
+void AudioFlinger::RecordThread::RecordTrack::copyMetadataTo(MetadataInserter& backInserter) const
+{
+
+    // Do not forward PatchRecord metadata with unspecified audio source
+    if (mAttr.source == AUDIO_SOURCE_DEFAULT) {
+        return;
+    }
+
+    // No track is invalid as this is called after prepareTrack_l in the same critical section
+    record_track_metadata_v7_t metadata;
+    metadata.base = {
+            .source = mAttr.source,
+            .gain = 1, // capture tracks do not have volumes
+    };
+    metadata.channel_mask = mChannelMask;
+    strncpy(metadata.tags, mAttr.tags, AUDIO_ATTRIBUTES_TAGS_MAX_SIZE);
+
+    *backInserter++ = metadata;
+}
 
 // ----------------------------------------------------------------------------
 #undef LOG_TAG
@@ -2760,9 +2779,10 @@ AudioFlinger::RecordThread::PatchRecord::PatchRecord(RecordThread *recordThread,
                                                      void *buffer,
                                                      size_t bufferSize,
                                                      audio_input_flags_t flags,
-                                                     const Timeout& timeout)
+                                                     const Timeout& timeout,
+                                                     audio_source_t source)
     :   RecordTrack(recordThread, NULL,
-                audio_attributes_t{} /* currently unused for patch track */,
+                audio_attributes_t{ .source = source } ,
                 sampleRate, format, channelMask, frameCount,
                 buffer, bufferSize, AUDIO_SESSION_NONE, getpid(),
                 audioServerAttributionSource(getpid()), flags, TYPE_PATCH),
@@ -2873,9 +2893,10 @@ AudioFlinger::RecordThread::PassthruPatchRecord::PassthruPatchRecord(
         audio_channel_mask_t channelMask,
         audio_format_t format,
         size_t frameCount,
-        audio_input_flags_t flags)
+        audio_input_flags_t flags,
+        audio_source_t source)
         : PatchRecord(recordThread, sampleRate, channelMask, format, frameCount,
-                nullptr /*buffer*/, 0 /*bufferSize*/, flags),
+                nullptr /*buffer*/, 0 /*bufferSize*/, flags, {} /* timeout */, source),
           mPatchRecordAudioBufferProvider(*this),
           mSinkBuffer(allocAligned(32, mFrameCount * mFrameSize)),
           mStubBuffer(allocAligned(32, mFrameCount * mFrameSize))
