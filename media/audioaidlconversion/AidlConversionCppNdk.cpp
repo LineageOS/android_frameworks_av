@@ -43,6 +43,9 @@ namespace android {
 
 using ::android::BAD_VALUE;
 using ::android::OK;
+using ::android::String16;
+using ::android::String8;
+using ::android::status_t;
 using ::android::base::unexpected;
 
 using media::audio::common::AudioChannelLayout;
