@@ -88,6 +88,10 @@ public:
                                     && (flags & AUDIO_INPUT_FLAG_HW_AV_SYNC) == 0;
                         }
 
+            using SinkMetadatas = std::vector<record_track_metadata_v7_t>;
+            using MetadataInserter = std::back_insert_iterator<SinkMetadatas>;
+            virtual void    copyMetadataTo(MetadataInserter& backInserter) const;
+
 private:
     friend class AudioFlinger;  // for mState
 
@@ -135,7 +139,8 @@ public:
                 void *buffer,
                 size_t bufferSize,
                 audio_input_flags_t flags,
-                const Timeout& timeout = {});
+                const Timeout& timeout = {},
+                audio_source_t source = AUDIO_SOURCE_DEFAULT);
     virtual             ~PatchRecord();
 
     virtual Source* getSource() { return nullptr; }
@@ -167,7 +172,8 @@ public:
                         audio_channel_mask_t channelMask,
                         audio_format_t format,
                         size_t frameCount,
-                        audio_input_flags_t flags);
+                        audio_input_flags_t flags,
+                        audio_source_t source = AUDIO_SOURCE_DEFAULT);
 
     Source* getSource() override { return static_cast<Source*>(this); }
 

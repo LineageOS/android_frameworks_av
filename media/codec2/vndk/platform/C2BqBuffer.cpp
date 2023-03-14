@@ -432,6 +432,10 @@ private:
         if (fence) {
             static constexpr int kFenceWaitTimeMs = 10;
 
+            if (bufferNeedsReallocation) {
+                mBuffers[slot].clear();
+            }
+
             status_t status = fence->wait(kFenceWaitTimeMs);
             if (status == -ETIME) {
                 // fence is not signalled yet.
