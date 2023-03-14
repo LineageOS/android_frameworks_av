@@ -281,6 +281,7 @@ cc_library_shared {
     ],
     shared_libs: [
         "libbinder_ndk",
+        "libaudio_aidl_conversion_common_cpp",
         "libaudio_aidl_conversion_common_ndk",
         "libaudio_aidl_conversion_effect_ndk",
         "libaudioaidlcommon",
@@ -293,6 +294,6 @@ cc_library_shared {
         "-Wextra",
         "-Werror",
         "-Wthread-safety",
-        "-DBACKEND_NDK",
+        "-DBACKEND_CPP_NDK",
     ],
 }

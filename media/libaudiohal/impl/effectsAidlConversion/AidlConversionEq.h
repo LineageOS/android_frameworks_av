@@ -33,10 +33,10 @@ class AidlConversionEq : public EffectConversionHelperAidl {
   private:
     status_t setParameter(utils::EffectParamReader& param) override;
     status_t getParameter(utils::EffectParamWriter& param) override;
-    aidl::ConversionResult<::aidl::android::hardware::audio::effect::Parameter> getAidlParameter(
+    ConversionResult<::aidl::android::hardware::audio::effect::Parameter> getAidlParameter(
             ::aidl::android::hardware::audio::effect::Equalizer::Tag tag);
-    aidl::ConversionResult<int32_t> getParameterPreset();
-    aidl::ConversionResult<std::string> getParameterPresetName(utils::EffectParamWriter& param);
+    ConversionResult<int32_t> getParameterPreset();
+    ConversionResult<std::string> getParameterPresetName(utils::EffectParamWriter& param);
 };
 
 }  // namespace effect
