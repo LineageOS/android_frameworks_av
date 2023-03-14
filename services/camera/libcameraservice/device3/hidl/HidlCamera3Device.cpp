@@ -203,7 +203,7 @@ status_t HidlCamera3Device::initialize(sp<CameraProviderManager> manager,
                     &mPhysicalDeviceInfoMap[physicalId],
                     mSupportNativeZoomRatio, usePrecorrectArray);
 
-            if (SessionConfigurationUtils::isUltraHighResolutionSensor(
+            if (SessionConfigurationUtils::supportsUltraHighResolutionCapture(
                     mPhysicalDeviceInfoMap[physicalId])) {
                 mUHRCropAndMeteringRegionMappers[physicalId] =
                         UHRCropAndMeteringRegionMapper(mPhysicalDeviceInfoMap[physicalId],
