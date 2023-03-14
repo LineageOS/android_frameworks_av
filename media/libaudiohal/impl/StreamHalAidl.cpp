@@ -505,7 +505,8 @@ StreamOutHalAidl::StreamOutHalAidl(
     // Initialize the offload metadata
     mOffloadMetadata.sampleRate = static_cast<int32_t>(config.sample_rate);
     mOffloadMetadata.channelMask = VALUE_OR_FATAL(
-            legacy2aidl_audio_channel_mask_t_AudioChannelLayout(config.channel_mask, false));
+            ::aidl::android::legacy2aidl_audio_channel_mask_t_AudioChannelLayout(
+                    config.channel_mask, false));
     mOffloadMetadata.averageBitRatePerSecond = static_cast<int32_t>(config.offload_info.bit_rate);
 }
 
@@ -769,8 +770,9 @@ status_t StreamOutHalAidl::filterAndUpdateOffloadMetadata(AudioParameter &parame
                 return BAD_VALUE;
             }
             mOffloadMetadata.channelMask =
-                    VALUE_OR_RETURN_STATUS(legacy2aidl_audio_channel_mask_t_AudioChannelLayout(
-                        channel_mask, false));
+                    VALUE_OR_RETURN_STATUS(
+                            ::aidl::android::legacy2aidl_audio_channel_mask_t_AudioChannelLayout(
+                                    channel_mask, false));
             parameters.remove(String8(AudioParameter::keyOffloadCodecChannels));
         }
 
