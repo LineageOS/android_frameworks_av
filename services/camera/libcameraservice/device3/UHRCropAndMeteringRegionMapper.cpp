@@ -91,6 +91,8 @@ void UHRCropAndMeteringRegionMapper::fixMeteringRegionsIfNeeded(CameraMetadata *
         if (meteringRegionsSetEntry.count == 1 &&
                 meteringRegionsSetEntry.data.u8[0] == entry.second.second) {
             // metering region set by client, doesn't need to be fixed.
+            ALOGV("%s: Metering region %u set by client, they don't need to be fixed",
+                    __FUNCTION__, entry.first);
             continue;
         }
         camera_metadata_entry meteringRegionEntry = request->find(entry.first);
@@ -121,6 +123,7 @@ void UHRCropAndMeteringRegionMapper::fixCropRegionsIfNeeded(CameraMetadata *requ
     if (cropRegionSetEntry.count == 1 &&
         cropRegionSetEntry.data.u8[0] == ANDROID_SCALER_CROP_REGION_SET_TRUE) {
         // crop regions set by client, doesn't need to be fixed.
+        ALOGV("%s: crop region set by client, doesn't need to be fixed", __FUNCTION__);
         return;
     }
     camera_metadata_entry_t cropRegionEntry = request->find(ANDROID_SCALER_CROP_REGION);
