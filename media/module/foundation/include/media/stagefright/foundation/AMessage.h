@@ -141,6 +141,11 @@ struct AMessage : public RefBase {
 
     status_t post(int64_t delayUs = 0);
 
+    // Post a message uniquely to its target with the given timeout.
+    // This method ensures that there is exactly one message with the same token posted to its
+    // target after the call returns. A null token will result in an EINVAL error status.
+    status_t postUnique(const sp<RefBase> &token, int64_t delayUs = 0);
+
     // Posts the message to its target and waits for a response (or error)
     // before returning.
     status_t postAndAwaitResponse(sp<AMessage> *response);

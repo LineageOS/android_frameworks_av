@@ -24,6 +24,14 @@
 #include <binder/Status.h>
 #include <error/Result.h>
 
+namespace android {
+// `ConversionResult` is always defined in the `::android` namespace,
+// so that it can be found from any nested namespace.
+// See below for the convenience alias specific to the NDK backend.
+template <typename T>
+using ConversionResult = ::android::error::Result<T>;
+}  // namespace android
+
 #if defined(BACKEND_NDK)
 #include <android/binder_auto_utils.h>
 #include <android/binder_enums.h>
@@ -32,12 +40,16 @@
 namespace aidl {
 #else
 #include <binder/Enums.h>
-#endif
-
-template <typename T>
-using ConversionResult = ::android::error::Result<T>;
-
+#endif  // BACKEND_NDK
 namespace android {
+
+#if defined(BACKEND_NDK)
+// This adds `::aidl::android::ConversionResult` for convenience.
+// Otherwise, it would be required to write `::android::ConversionResult` everywhere.
+template <typename T>
+using ConversionResult = ::android::ConversionResult<T>;
+#endif  // BACKEND_NDK
+
 /**
  * A generic template to safely cast between integral types, respecting limits of the destination
  * type.

@@ -72,7 +72,7 @@ std::vector<std::string> splitString(const std::string& s, char separator) {
 std::vector<std::string> filterOutNonVendorTags(const std::vector<std::string>& tags) {
     std::vector<std::string> result;
     std::copy_if(tags.begin(), tags.end(), std::back_inserter(result),
-            ::android::hardware::audio::common::maybeVendorExtension);
+            ::aidl::android::hardware::audio::common::maybeVendorExtension);
     return result;
 }
 

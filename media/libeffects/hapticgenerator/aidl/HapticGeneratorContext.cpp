@@ -17,6 +17,7 @@
 #define LOG_TAG "AHAL_HapticGeneratorContext"
 
 #include <Utils.h>
+#include <android-base/logging.h>
 #include <android-base/parsedouble.h>
 #include <android-base/properties.h>
 
@@ -193,9 +194,9 @@ void HapticGeneratorContext::init_params(media::audio::common::AudioChannelLayou
     mParams.mVibratorInfo.resonantFrequencyHz = DEFAULT_RESONANT_FREQUENCY;
     mParams.mVibratorInfo.qFactor = DEFAULT_BSF_ZERO_Q;
 
-    mParams.mAudioChannelCount = ::android::hardware::audio::common::getChannelCount(
+    mParams.mAudioChannelCount = ::aidl::android::hardware::audio::common::getChannelCount(
             inputChMask, ~media::audio::common::AudioChannelLayout::LAYOUT_HAPTIC_AB);
-    mParams.mHapticChannelCount = ::android::hardware::audio::common::getChannelCount(
+    mParams.mHapticChannelCount = ::aidl::android::hardware::audio::common::getChannelCount(
             outputChMask, media::audio::common::AudioChannelLayout::LAYOUT_HAPTIC_AB);
     LOG_ALWAYS_FATAL_IF(mParams.mHapticChannelCount > 2, "haptic channel count is too large");
     for (size_t i = 0; i < mParams.mHapticChannelCount; ++i) {

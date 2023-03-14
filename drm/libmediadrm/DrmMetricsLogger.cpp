@@ -41,6 +41,70 @@ DrmMetricsLogger::DrmMetricsLogger(IDrmFrontend frontend)
 
 DrmMetricsLogger::~DrmMetricsLogger() {}
 
+int MediaErrorToJavaError(status_t err) {
+#define STATUS_CASE(status) \
+    case status: \
+        return J##status
+
+    switch (err) {
+        STATUS_CASE(ERROR_DRM_UNKNOWN);
+        STATUS_CASE(ERROR_DRM_NO_LICENSE);
+        STATUS_CASE(ERROR_DRM_LICENSE_EXPIRED);
+        STATUS_CASE(ERROR_DRM_RESOURCE_BUSY);
+        STATUS_CASE(ERROR_DRM_INSUFFICIENT_OUTPUT_PROTECTION);
+        STATUS_CASE(ERROR_DRM_SESSION_NOT_OPENED);
+        STATUS_CASE(ERROR_DRM_CANNOT_HANDLE);
+        STATUS_CASE(ERROR_DRM_INSUFFICIENT_SECURITY);
+        STATUS_CASE(ERROR_DRM_FRAME_TOO_LARGE);
+        STATUS_CASE(ERROR_DRM_SESSION_LOST_STATE);
+        STATUS_CASE(ERROR_DRM_CERTIFICATE_MALFORMED);
+        STATUS_CASE(ERROR_DRM_CERTIFICATE_MISSING);
+        STATUS_CASE(ERROR_DRM_CRYPTO_LIBRARY);
+        STATUS_CASE(ERROR_DRM_GENERIC_OEM);
+        STATUS_CASE(ERROR_DRM_GENERIC_PLUGIN);
+        STATUS_CASE(ERROR_DRM_INIT_DATA);
+        STATUS_CASE(ERROR_DRM_KEY_NOT_LOADED);
+        STATUS_CASE(ERROR_DRM_LICENSE_PARSE);
+        STATUS_CASE(ERROR_DRM_LICENSE_POLICY);
+        STATUS_CASE(ERROR_DRM_LICENSE_RELEASE);
+        STATUS_CASE(ERROR_DRM_LICENSE_REQUEST_REJECTED);
+        STATUS_CASE(ERROR_DRM_LICENSE_RESTORE);
+        STATUS_CASE(ERROR_DRM_LICENSE_STATE);
+        STATUS_CASE(ERROR_DRM_MEDIA_FRAMEWORK);
+        STATUS_CASE(ERROR_DRM_PROVISIONING_CERTIFICATE);
+        STATUS_CASE(ERROR_DRM_PROVISIONING_CONFIG);
+        STATUS_CASE(ERROR_DRM_PROVISIONING_PARSE);
+        STATUS_CASE(ERROR_DRM_PROVISIONING_REQUEST_REJECTED);
+        STATUS_CASE(ERROR_DRM_PROVISIONING_RETRY);
+        STATUS_CASE(ERROR_DRM_RESOURCE_CONTENTION);
+        STATUS_CASE(ERROR_DRM_SECURE_STOP_RELEASE);
+        STATUS_CASE(ERROR_DRM_STORAGE_READ);
+        STATUS_CASE(ERROR_DRM_STORAGE_WRITE);
+        STATUS_CASE(ERROR_DRM_ZERO_SUBSAMPLES);
+#undef STATUS_CASE
+    }
+    return static_cast<int>(err);
+}
+
+int DrmPluginSecurityLevelToJavaSecurityLevel(DrmPlugin::SecurityLevel securityLevel) {
+#define STATUS_CASE(status) \
+    case DrmPlugin::k##status: \
+        return J##status
+
+    switch (securityLevel) {
+        STATUS_CASE(SecurityLevelUnknown);
+        STATUS_CASE(SecurityLevelSwSecureCrypto);
+        STATUS_CASE(SecurityLevelSwSecureDecode);
+        STATUS_CASE(SecurityLevelHwSecureCrypto);
+        STATUS_CASE(SecurityLevelHwSecureDecode);
+        STATUS_CASE(SecurityLevelHwSecureAll);
+        STATUS_CASE(SecurityLevelMax);
+#undef STATUS_CASE
+    }
+    return static_cast<int>(securityLevel);
+}
+
+
 DrmStatus DrmMetricsLogger::initCheck() const {
     DrmStatus status = mImpl->initCheck();
     if (status != OK) {
@@ -75,6 +139,10 @@ DrmStatus DrmMetricsLogger::createPlugin(const uint8_t uuid[IDRM_UUID_SIZE],
     }
     DrmStatus status = mImpl->createPlugin(uuid, appPackageName);
     if (status == OK) {
+        String8 version8;
+        if (getPropertyString(String8("version"), version8) == OK) {
+            mVersion = version8.string();
+        }
         reportMediaDrmCreated();
     } else {
         reportMediaDrmErrored(status, __func__);
@@ -102,6 +170,9 @@ DrmStatus DrmMetricsLogger::openSession(DrmPlugin::SecurityLevel securityLevel,
         ctx.mTargetSecurityLevel = securityLevel;
         if (getSecurityLevel(sessionId, &ctx.mActualSecurityLevel) != OK) {
             ctx.mActualSecurityLevel = DrmPlugin::kSecurityLevelUnknown;
+        }
+        if (!mVersion.empty()) {
+            ctx.mVersion = mVersion;
         }
         {
             const std::lock_guard<std::mutex> lock(mSessionMapMutex);
@@ -466,6 +537,7 @@ void DrmMetricsLogger::reportMediaDrmCreated() const {
     mediametrics_setInt64(handle, "uuid_lsb", mUuid[1]);
     mediametrics_setInt32(handle, "frontend", mFrontend);
     mediametrics_setCString(handle, "object_nonce", mObjNonce.c_str());
+    mediametrics_setCString(handle, "version", mVersion.c_str());
     mediametrics_selfRecord(handle);
     mediametrics_delete(handle);
 }
@@ -476,13 +548,16 @@ void DrmMetricsLogger::reportMediaDrmSessionOpened(const std::vector<uint8_t>& s
     mediametrics_setInt64(handle, "uuid_msb", mUuid[0]);
     mediametrics_setInt64(handle, "uuid_lsb", mUuid[1]);
     mediametrics_setInt32(handle, "frontend", mFrontend);
+    mediametrics_setCString(handle, "version", mVersion.c_str());
     mediametrics_setCString(handle, "object_nonce", mObjNonce.c_str());
     const std::lock_guard<std::mutex> lock(mSessionMapMutex);
     auto it = mSessionMap.find(sessionId);
     if (it != mSessionMap.end()) {
         mediametrics_setCString(handle, "session_nonce", it->second.mNonce.c_str());
-        mediametrics_setInt64(handle, "requested_seucrity_level", it->second.mTargetSecurityLevel);
-        mediametrics_setInt64(handle, "opened_seucrity_level", it->second.mActualSecurityLevel);
+        mediametrics_setInt32(handle, "requested_security_level",
+                    DrmPluginSecurityLevelToJavaSecurityLevel(it->second.mTargetSecurityLevel));
+        mediametrics_setInt32(handle, "opened_security_level",
+                    DrmPluginSecurityLevelToJavaSecurityLevel(it->second.mActualSecurityLevel));
     }
     mediametrics_selfRecord(handle);
     mediametrics_delete(handle);
@@ -495,17 +570,19 @@ void DrmMetricsLogger::reportMediaDrmErrored(const DrmStatus& error_code, const 
     mediametrics_setInt64(handle, "uuid_msb", mUuid[0]);
     mediametrics_setInt64(handle, "uuid_lsb", mUuid[1]);
     mediametrics_setInt32(handle, "frontend", mFrontend);
+    mediametrics_setCString(handle, "version", mVersion.c_str());
     mediametrics_setCString(handle, "object_nonce", mObjNonce.c_str());
     if (!sessionId.empty()) {
         const std::lock_guard<std::mutex> lock(mSessionMapMutex);
         auto it = mSessionMap.find(sessionId);
         if (it != mSessionMap.end()) {
             mediametrics_setCString(handle, "session_nonce", it->second.mNonce.c_str());
-            mediametrics_setInt64(handle, "seucrity_level", it->second.mActualSecurityLevel);
+            mediametrics_setInt32(handle, "security_level",
+                        DrmPluginSecurityLevelToJavaSecurityLevel(it->second.mActualSecurityLevel));
         }
     }
     mediametrics_setCString(handle, "api", api);
-    mediametrics_setInt32(handle, "error_code", error_code);
+    mediametrics_setInt32(handle, "error_code", MediaErrorToJavaError(error_code));
     mediametrics_setInt32(handle, "cdm_err", error_code.getCdmErr());
     mediametrics_setInt32(handle, "oem_err", error_code.getOemErr());
     mediametrics_setInt32(handle, "error_context", error_code.getContext());

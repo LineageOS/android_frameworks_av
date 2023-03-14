@@ -210,7 +210,7 @@ status_t AidlConversionDp::getParameter(EffectParamWriter& param) {
             return getLimiterConfig(param);
         }
         case DP_PARAM_GET_CHANNEL_COUNT: {
-            uint32_t channel = ::android::hardware::audio::common::getChannelCount(
+            uint32_t channel = ::aidl::android::hardware::audio::common::getChannelCount(
                     mCommon.input.base.channelMask);
             RETURN_STATUS_IF_ERROR(param.writeToValue(&channel));
             return OK;
@@ -221,7 +221,7 @@ status_t AidlConversionDp::getParameter(EffectParamWriter& param) {
     }
 }
 
-aidl::ConversionResult<DynamicsProcessing::ChannelConfig>
+ConversionResult<DynamicsProcessing::ChannelConfig>
 AidlConversionDp::readChannelConfigFromParam(EffectParamReader& param) {
     int32_t enable, channel;
     RETURN_IF_ERROR(param.readFromParameter(&channel));
@@ -231,7 +231,7 @@ AidlConversionDp::readChannelConfigFromParam(EffectParamReader& param) {
             {.enable = VALUE_OR_RETURN(convertIntegral<bool>(enable)), .channel = channel});
 }
 
-aidl::ConversionResult<DynamicsProcessing::EqBandConfig>
+ConversionResult<DynamicsProcessing::EqBandConfig>
 AidlConversionDp::readEqBandConfigFromParam(EffectParamReader& param) {
     DynamicsProcessing::EqBandConfig config;
     int32_t enable;
@@ -245,7 +245,7 @@ AidlConversionDp::readEqBandConfigFromParam(EffectParamReader& param) {
     return config;
 }
 
-aidl::ConversionResult<DynamicsProcessing::MbcBandConfig>
+ConversionResult<DynamicsProcessing::MbcBandConfig>
 AidlConversionDp::readMbcBandConfigFromParam(EffectParamReader& param) {
     DynamicsProcessing::MbcBandConfig config;
     int32_t enable;
@@ -267,7 +267,7 @@ AidlConversionDp::readMbcBandConfigFromParam(EffectParamReader& param) {
     return config;
 }
 
-aidl::ConversionResult<DynamicsProcessing::LimiterConfig>
+ConversionResult<DynamicsProcessing::LimiterConfig>
 AidlConversionDp::readLimiterConfigFromParam(EffectParamReader& param) {
     DynamicsProcessing::LimiterConfig config;
     int32_t enable, inUse;
@@ -285,7 +285,7 @@ AidlConversionDp::readLimiterConfigFromParam(EffectParamReader& param) {
     return config;
 }
 
-aidl::ConversionResult<DynamicsProcessing::EngineArchitecture>
+ConversionResult<DynamicsProcessing::EngineArchitecture>
 AidlConversionDp::readEngineArchitectureFromParam(EffectParamReader& param) {
     DynamicsProcessing::EngineArchitecture engine;
     int32_t variant, preEqInUse, mbcInUse, postEqInUse, limiterInUse;
