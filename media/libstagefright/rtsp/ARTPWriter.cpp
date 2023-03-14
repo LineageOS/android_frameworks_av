@@ -255,9 +255,34 @@ status_t ARTPWriter::start(MetaData * params) {
     if (params->findInt32(kKeyRtpCvoDegrees, &rtpCVODegrees))
         mRTPCVODegrees = rtpCVODegrees;
 
+    bool needToSetSockOpt = false;
     int32_t dscp = 0;
-    if (params->findInt32(kKeyRtpDscp, &dscp))
-        updateSocketDscp(dscp);
+    if (params->findInt32(kKeyRtpDscp, &dscp)) {
+        mRtpLayer3Dscp = dscp << 2;
+        needToSetSockOpt = true;
+    }
+
+    int32_t ecn = 0;
+    if (params->findInt32(kKeyRtpEcn, &ecn)) {
+        /*
+         * @ecn, possible value for ECN.
+         *  +-----+-----+
+         *  | ECN FIELD |
+         *  +-----+-----+
+         *    ECT   CE         [Obsolete] RFC 2481 names for the ECN bits.
+         *     0     0         Not-ECT
+         *     0     1         ECT (ECN-Capable Transport) (1)
+         *     1     0         ECT (ECN-Capable Transport) (0)
+         *     1     1         CE (Congestion Experienced)
+         *
+         */
+        mRtpSockOptEcn = ecn;
+        needToSetSockOpt = true;
+    }
+
+    if (needToSetSockOpt) {
+        updateSocketOpt();
+    }
 
     int64_t sockNetwork = 0;
     if (params->findInt64(kKeySocketNetwork, &sockNetwork))
@@ -1438,18 +1463,29 @@ void ARTPWriter::updatePayloadType(int32_t payloadType) {
     mPayloadType = payloadType;
 }
 
-void ARTPWriter::updateSocketDscp(int32_t dscp) {
-    mRtpLayer3Dscp = dscp << 2;
+/*
+ * This function will set socket option in IP header
+ */
+void ARTPWriter::updateSocketOpt() {
+    /*
+     * 0     1     2     3     4     5     6     7
+     * +-----+-----+-----+-----+-----+-----+-----+-----+
+     * |          DS FIELD, DSCP           | ECN FIELD |
+     * +-----+-----+-----+-----+-----+-----+-----+-----+
+     */
+    int sockOpt = mRtpLayer3Dscp ^ mRtpSockOptEcn;
+    ALOGD("Update socket opt with sockopt=%d, mRtpLayer3Dscp=%d, mRtpSockOptEcn=%d",
+                sockOpt, mRtpLayer3Dscp, mRtpSockOptEcn);
 
-    /* mRtpLayer3Dscp will be mapped to WMM(Wifi) as per operator's requirement */
-    if (setsockopt(mRTPSocket, IPPROTO_IP, IP_TOS,
-                (int *)&mRtpLayer3Dscp, sizeof(mRtpLayer3Dscp)) < 0) {
-        ALOGE("failed to set dscp on rtpsock. err=%s", strerror(errno));
+    /* sockOpt will be used to set socket option in IP header */
+    if (setsockopt(mRTPSocket, mIsIPv6 ? IPPROTO_IPV6 : IPPROTO_IP, mIsIPv6 ? IPV6_TCLASS : IP_TOS,
+                (int *)&sockOpt, sizeof(sockOpt)) < 0) {
+        ALOGE("failed to set sockopt on rtpsock. err=%s", strerror(errno));
     } else {
-        ALOGD("successfully set dscp on rtpsock. opt=%d", mRtpLayer3Dscp);
-        setsockopt(mRTCPSocket, IPPROTO_IP, IP_TOS,
-                (int *)&mRtpLayer3Dscp, sizeof(mRtpLayer3Dscp));
-        ALOGD("successfully set dscp on rtcpsock. opt=%d", mRtpLayer3Dscp);
+        ALOGD("successfully set sockopt. opt=%d", sockOpt);
+        setsockopt(mRTCPSocket, mIsIPv6 ? IPPROTO_IPV6 : IPPROTO_IP, mIsIPv6 ? IPV6_TCLASS : IP_TOS,
+                (int *)&sockOpt, sizeof(sockOpt));
+        ALOGD("successfully set sockopt rtcpsock. opt=%d", sockOpt);
     }
 }
 

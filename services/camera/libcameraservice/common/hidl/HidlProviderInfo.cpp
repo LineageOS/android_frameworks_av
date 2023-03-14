@@ -919,7 +919,8 @@ status_t HidlProviderInfo::convertToHALStreamCombinationAndCameraIdsLocked(
         bool overrideForPerfClass =
                 SessionConfigurationUtils::targetPerfClassPrimaryCamera(
                         perfClassPrimaryCameraIds, cameraId, targetSdkVersion);
-        res = mManager->getCameraCharacteristicsLocked(cameraId, overrideForPerfClass, &deviceInfo);
+        res = mManager->getCameraCharacteristicsLocked(cameraId, overrideForPerfClass, &deviceInfo,
+                /*overrideToPortrait*/true);
         if (res != OK) {
             return res;
         }
@@ -927,7 +928,7 @@ status_t HidlProviderInfo::convertToHALStreamCombinationAndCameraIdsLocked(
                 [this](const String8 &id, bool overrideForPerfClass) {
                     CameraMetadata physicalDeviceInfo;
                     mManager->getCameraCharacteristicsLocked(id.string(), overrideForPerfClass,
-                                                   &physicalDeviceInfo);
+                            &physicalDeviceInfo, /*overrideToPortrait*/true);
                     return physicalDeviceInfo;
                 };
         std::vector<std::string> physicalCameraIds;

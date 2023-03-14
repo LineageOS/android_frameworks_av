@@ -39,7 +39,7 @@ class AidlCamera3Device :
     using AidlRequestMetadataQueue = AidlMessageQueue<int8_t, SynchronizedReadWrite>;
     class AidlCameraDeviceCallbacks;
     friend class AidlCameraDeviceCallbacks;
-    explicit AidlCamera3Device(const String8& id, bool overrideForPerfClass,
+    explicit AidlCamera3Device(const String8& id, bool overrideForPerfClass, bool overrideToPortrait,
             bool legacyClient = false);
 
     virtual ~AidlCamera3Device() { }
@@ -174,7 +174,8 @@ class AidlCamera3Device :
                 sp<HalInterface> interface,
                 const Vector<int32_t>& sessionParamKeys,
                 bool useHalBufManager,
-                bool supportCameraMute);
+                bool supportCameraMute,
+                bool overrideToPortrait);
 
         status_t switchToOffline(
                 const std::vector<int32_t>& streamsToKeep,
@@ -259,7 +260,8 @@ class AidlCamera3Device :
                 sp<HalInterface> interface,
                 const Vector<int32_t>& sessionParamKeys,
                 bool useHalBufManager,
-                bool supportCameraMute) override;
+                bool supportCameraMute,
+                bool overrideToPortrait) override;
 
     virtual sp<Camera3DeviceInjectionMethods>
             createCamera3DeviceInjectionMethods(wp<Camera3Device>) override;
