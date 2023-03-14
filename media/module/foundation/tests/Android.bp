@@ -20,8 +20,12 @@ cc_test {
 
     shared_libs: [
         "liblog",
-        "libstagefright_foundation",
         "libutils",
+    ],
+
+    static_libs: [
+        "libstagefright_foundation",
+        "libgmock",
     ],
 
     srcs: [

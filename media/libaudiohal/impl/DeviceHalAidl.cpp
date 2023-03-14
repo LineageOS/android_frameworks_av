@@ -46,18 +46,19 @@ using aidl::android::media::audio::common::AudioPort;
 using aidl::android::media::audio::common::AudioPortConfig;
 using aidl::android::media::audio::common::AudioPortDeviceExt;
 using aidl::android::media::audio::common::AudioPortMixExt;
+using aidl::android::media::audio::common::AudioPortMixExtUseCase;
 using aidl::android::media::audio::common::AudioPortExt;
 using aidl::android::media::audio::common::AudioSource;
 using aidl::android::media::audio::common::Int;
 using aidl::android::media::audio::common::Float;
+using aidl::android::hardware::audio::common::getFrameSizeInBytes;
+using aidl::android::hardware::audio::common::isBitPositionFlagSet;
+using aidl::android::hardware::audio::common::makeBitPositionFlagMask;
 using aidl::android::hardware::audio::common::RecordTrackMetadata;
 using aidl::android::hardware::audio::core::AudioPatch;
 using aidl::android::hardware::audio::core::IModule;
 using aidl::android::hardware::audio::core::ITelephony;
 using aidl::android::hardware::audio::core::StreamDescriptor;
-using android::hardware::audio::common::getFrameSizeInBytes;
-using android::hardware::audio::common::isBitPositionFlagSet;
-using android::hardware::audio::common::makeBitPositionFlagMask;
 
 namespace android {
 
@@ -249,13 +250,14 @@ status_t DeviceHalAidl::getInputBufferSize(const struct audio_config* config, si
             ::aidl::android::legacy2aidl_audio_config_t_AudioConfig(*config, true /*isInput*/));
     AudioDevice aidlDevice;
     aidlDevice.type.type = AudioDeviceType::IN_DEFAULT;
+    AudioSource aidlSource = AudioSource::DEFAULT;
     AudioIoFlags aidlFlags = AudioIoFlags::make<AudioIoFlags::Tag::input>(0);
     AudioPortConfig mixPortConfig;
     Cleanups cleanups;
     audio_config writableConfig = *config;
     int32_t nominalLatency;
-    RETURN_STATUS_IF_ERROR(prepareToOpenStream(0 /*handle*/, aidlDevice, aidlFlags, &writableConfig,
-                    &cleanups, &aidlConfig, &mixPortConfig, &nominalLatency));
+    RETURN_STATUS_IF_ERROR(prepareToOpenStream(0 /*handle*/, aidlDevice, aidlFlags, aidlSource,
+                    &writableConfig, &cleanups, &aidlConfig, &mixPortConfig, &nominalLatency));
     *size = aidlConfig.frameCount *
             getFrameSizeInBytes(aidlConfig.base.format, aidlConfig.base.channelMask);
     // Do not disarm cleanups to release temporary port configs.
@@ -264,7 +266,7 @@ status_t DeviceHalAidl::getInputBufferSize(const struct audio_config* config, si
 
 status_t DeviceHalAidl::prepareToOpenStream(
         int32_t aidlHandle, const AudioDevice& aidlDevice, const AudioIoFlags& aidlFlags,
-        struct audio_config* config,
+        AudioSource aidlSource, struct audio_config* config,
         Cleanups* cleanups, AudioConfig* aidlConfig, AudioPortConfig* mixPortConfig,
         int32_t* nominalLatency) {
     const bool isInput = aidlFlags.getTag() == AudioIoFlags::Tag::input;
@@ -276,7 +278,7 @@ status_t DeviceHalAidl::prepareToOpenStream(
     if (created) {
         cleanups->emplace_front(this, &DeviceHalAidl::resetPortConfig, devicePortConfig.id);
     }
-    RETURN_STATUS_IF_ERROR(findOrCreatePortConfig(*aidlConfig, aidlFlags, aidlHandle,
+    RETURN_STATUS_IF_ERROR(findOrCreatePortConfig(*aidlConfig, aidlFlags, aidlHandle, aidlSource,
                     mixPortConfig, &created));
     if (created) {
         cleanups->emplace_front(this, &DeviceHalAidl::resetPortConfig, mixPortConfig->id);
@@ -442,8 +444,9 @@ status_t DeviceHalAidl::openOutputStream(
     AudioPortConfig mixPortConfig;
     Cleanups cleanups;
     int32_t nominalLatency;
-    RETURN_STATUS_IF_ERROR(prepareToOpenStream(aidlHandle, aidlDevice, aidlFlags, config,
-                    &cleanups, &aidlConfig, &mixPortConfig, &nominalLatency));
+    RETURN_STATUS_IF_ERROR(prepareToOpenStream(aidlHandle, aidlDevice, aidlFlags,
+                    AudioSource::SYS_RESERVED_INVALID /*only needed for input*/,
+                    config, &cleanups, &aidlConfig, &mixPortConfig, &nominalLatency));
     ::aidl::android::hardware::audio::core::IModule::OpenOutputStreamArguments args;
     args.portConfigId = mixPortConfig.id;
     const bool isOffload = isBitPositionFlagSet(
@@ -506,8 +509,8 @@ status_t DeviceHalAidl::openInputStream(
     AudioPortConfig mixPortConfig;
     Cleanups cleanups;
     int32_t nominalLatency;
-    RETURN_STATUS_IF_ERROR(prepareToOpenStream(aidlHandle, aidlDevice, aidlFlags, config,
-                    &cleanups, &aidlConfig, &mixPortConfig, &nominalLatency));
+    RETURN_STATUS_IF_ERROR(prepareToOpenStream(aidlHandle, aidlDevice, aidlFlags, aidlSource,
+                    config, &cleanups, &aidlConfig, &mixPortConfig, &nominalLatency));
     ::aidl::android::hardware::audio::core::IModule::OpenInputStreamArguments args;
     args.portConfigId = mixPortConfig.id;
     RecordTrackMetadata aidlTrackMetadata{
@@ -843,7 +846,7 @@ status_t DeviceHalAidl::findOrCreatePortConfig(const AudioDevice& device,
 
 status_t DeviceHalAidl::findOrCreatePortConfig(
         const AudioConfig& config, const std::optional<AudioIoFlags>& flags, int32_t ioHandle,
-        AudioPortConfig* portConfig, bool* created) {
+        AudioSource source, AudioPortConfig* portConfig, bool* created) {
     // These flags get removed one by one in this order when retrying port finding.
     static const std::vector<AudioInputFlags> kOptionalInputFlags{
         AudioInputFlags::FAST, AudioInputFlags::RAW };
@@ -877,6 +880,11 @@ status_t DeviceHalAidl::findOrCreatePortConfig(
         requestedPortConfig.portId = portsIt->first;
         setPortConfigFromConfig(&requestedPortConfig, config);
         requestedPortConfig.ext = AudioPortMixExt{ .handle = ioHandle };
+        if (matchFlags.getTag() == AudioIoFlags::Tag::input
+                && source != AudioSource::SYS_RESERVED_INVALID) {
+            requestedPortConfig.ext.get<AudioPortExt::Tag::mix>().usecase =
+                    AudioPortMixExtUseCase::make<AudioPortMixExtUseCase::Tag::source>(source);
+        }
         RETURN_STATUS_IF_ERROR(createPortConfig(requestedPortConfig, &portConfigIt));
         *created = true;
     } else if (!flags.has_value()) {
@@ -904,8 +912,12 @@ status_t DeviceHalAidl::findOrCreatePortConfig(
         }
         AudioConfig config;
         setConfigFromPortConfig(&config, requestedPortConfig);
+        AudioSource source = requestedPortConfig.ext.get<Tag::mix>().usecase.getTag() ==
+                AudioPortMixExtUseCase::Tag::source ?
+                requestedPortConfig.ext.get<Tag::mix>().usecase.
+                get<AudioPortMixExtUseCase::Tag::source>() : AudioSource::SYS_RESERVED_INVALID;
         return findOrCreatePortConfig(config, requestedPortConfig.flags,
-                requestedPortConfig.ext.get<Tag::mix>().handle, portConfig, created);
+                requestedPortConfig.ext.get<Tag::mix>().handle, source, portConfig, created);
     } else if (requestedPortConfig.ext.getTag() == Tag::device) {
         return findOrCreatePortConfig(
                 requestedPortConfig.ext.get<Tag::device>().device, portConfig, created);

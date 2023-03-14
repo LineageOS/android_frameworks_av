@@ -23,6 +23,7 @@
 #include <C2Param.h>
 #include <C2.h>
 
+#include <gui/FrameTimestamps.h>
 #include <gui/IGraphicBufferProducer.h>
 #include <hidl/HidlSupport.h>
 #include <utils/StrongPointer.h>
@@ -83,13 +84,6 @@ struct IComponent;
 struct IComponentStore;
 }  // namespace android::hardware::media::c2::V1_2
 
-namespace aidl::android::hardware::media::c2 {
-class IComponent;
-class IComponentInterface;
-class IComponentStore;
-class IConfigurable;
-}  // namespace aidl::android::hardware::media::c2
-
 namespace android::hardware::media::bufferpool::V2_0 {
 struct IClientManager;
 }  // namespace android::hardware::media::bufferpool::V2_0
@@ -112,34 +106,7 @@ namespace android {
 // declaration of an inner class is not possible.
 struct Codec2ConfigurableClient {
 
-    typedef ::android::hardware::media::c2::V1_0::IConfigurable HidlBase;
-
-    struct ImplBase {
-        virtual ~ImplBase() = default;
-
-        virtual const C2String& getName() const = 0;
-
-        virtual c2_status_t query(
-                const std::vector<C2Param*>& stackParams,
-                const std::vector<C2Param::Index> &heapParamIndices,
-                c2_blocking_t mayBlock,
-                std::vector<std::unique_ptr<C2Param>>* const heapParams) const = 0;
-
-        virtual c2_status_t config(
-                const std::vector<C2Param*> &params,
-                c2_blocking_t mayBlock,
-                std::vector<std::unique_ptr<C2SettingResult>>* const failures) = 0;
-
-        virtual c2_status_t querySupportedParams(
-                std::vector<std::shared_ptr<C2ParamDescriptor>>* const params
-                ) const = 0;
-
-        virtual c2_status_t querySupportedValues(
-                std::vector<C2FieldSupportedValuesQuery>& fields,
-                c2_blocking_t mayBlock) const = 0;
-    };
-
-    explicit Codec2ConfigurableClient(const sp<HidlBase> &hidlBase);
+    typedef ::android::hardware::media::c2::V1_0::IConfigurable Base;
 
     const C2String& getName() const;
 
@@ -161,11 +128,15 @@ struct Codec2ConfigurableClient {
     c2_status_t querySupportedValues(
             std::vector<C2FieldSupportedValuesQuery>& fields,
             c2_blocking_t mayBlock) const;
-private:
-    struct HidlImpl;
-    struct AidlImpl;
 
-    const std::unique_ptr<ImplBase> mImpl;
+    // base cannot be null.
+    Codec2ConfigurableClient(const sp<Base>& base);
+
+protected:
+    sp<Base> mBase;
+    C2String mName;
+
+    friend struct Codec2Client;
 };
 
 struct Codec2Client : public Codec2ConfigurableClient {
@@ -438,6 +409,9 @@ struct Codec2Client::Component : public Codec2Client::Configurable {
             const QueueBufferInput& input,
             QueueBufferOutput* output);
 
+    // Retrieve frame event history from the output surface.
+    void pollForRenderedFrames(FrameEventHistoryDelta* delta);
+
     // Set max dequeue count for output surface.
     void setOutputSurfaceMaxDequeueCount(int maxDequeueCount);
 
@@ -538,4 +512,3 @@ protected:
 }  // namespace android
 
 #endif  // CODEC2_HIDL_CLIENT_H
-

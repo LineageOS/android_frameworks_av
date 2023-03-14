@@ -59,6 +59,9 @@ struct ALooper : public RefBase {
     }
 
 protected:
+    // overridable by test harness
+    virtual int64_t getNowUs();
+
     virtual ~ALooper();
 
 private:
@@ -67,6 +70,7 @@ private:
     struct Event {
         int64_t mWhenUs;
         sp<AMessage> mMessage;
+        sp<RefBase> mToken;
     };
 
     Mutex mLock;
@@ -87,8 +91,13 @@ private:
 
     // START --- methods used only by AMessage
 
-    // posts a message on this looper with the given timeout
+    // Posts a message on this looper with the given timeout.
     void post(const sp<AMessage> &msg, int64_t delayUs);
+
+    // Post a message uniquely on this looper with the given timeout.
+    // This method ensures that there is exactly one message with the same token pending posted on
+    // this looper after the call returns. A null token will result in an EINVAL error status.
+    status_t postUnique(const sp<AMessage> &msg, const sp<RefBase> &token, int64_t delayUs);
 
     // creates a reply token to be used with this looper
     sp<AReplyToken> createReplyToken();
