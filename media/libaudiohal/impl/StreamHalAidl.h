@@ -313,7 +313,7 @@ class StreamOutHalAidl : public StreamOutHalInterface, public StreamHalAidl {
   private:
     friend class sp<StreamOutHalAidl>;
 
-    static ::aidl::ConversionResult<::aidl::android::hardware::audio::common::SourceMetadata>
+    static ConversionResult<::aidl::android::hardware::audio::common::SourceMetadata>
     legacy2aidl_SourceMetadata(const StreamOutHalInterface::SourceMetadata& legacy);
 
     const std::shared_ptr<::aidl::android::hardware::audio::core::IStreamOut> mStream;
@@ -365,7 +365,7 @@ class StreamInHalAidl : public StreamInHalInterface, public StreamHalAidl {
   private:
     friend class sp<StreamInHalAidl>;
 
-    static ::aidl::ConversionResult<::aidl::android::hardware::audio::common::SinkMetadata>
+    static ConversionResult<::aidl::android::hardware::audio::common::SinkMetadata>
     legacy2aidl_SinkMetadata(const StreamInHalInterface::SinkMetadata& legacy);
 
     const std::shared_ptr<::aidl::android::hardware::audio::core::IStreamIn> mStream;

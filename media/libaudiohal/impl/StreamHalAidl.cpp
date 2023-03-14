@@ -486,7 +486,7 @@ status_t StreamHalAidl::updateCountersIfNeeded(
 }
 
 // static
-::aidl::ConversionResult<::aidl::android::hardware::audio::common::SourceMetadata>
+ConversionResult<::aidl::android::hardware::audio::common::SourceMetadata>
 StreamOutHalAidl::legacy2aidl_SourceMetadata(const StreamOutHalInterface::SourceMetadata& legacy) {
     ::aidl::android::hardware::audio::common::SourceMetadata aidl;
     aidl.tracks = VALUE_OR_RETURN(
@@ -804,7 +804,7 @@ status_t StreamOutHalAidl::filterAndUpdateOffloadMetadata(AudioParameter &parame
 }
 
 // static
-::aidl::ConversionResult<::aidl::android::hardware::audio::common::SinkMetadata>
+ConversionResult<::aidl::android::hardware::audio::common::SinkMetadata>
 StreamInHalAidl::legacy2aidl_SinkMetadata(const StreamInHalInterface::SinkMetadata& legacy) {
     ::aidl::android::hardware::audio::common::SinkMetadata aidl;
     aidl.tracks = VALUE_OR_RETURN(
