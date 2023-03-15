@@ -144,7 +144,8 @@ class CameraHelper {
         }
         if (prepareWindows) {
             // Set window prepared callback
-            ACameraCaptureSession_setWindowPreparedCallback(mSession, &mPreparedCb);
+            ACameraCaptureSession_setWindowPreparedCallback(mSession, /*context*/this,
+                    mPreparedCb);
             // Prepare windows
             for (auto &window : configuredWindows) {
                 ret = ACameraCaptureSession_prepareWindow(mSession, window);
@@ -342,8 +343,7 @@ class CameraHelper {
     ACameraDevice_StateCallbacks mDeviceCb{this, nullptr, nullptr};
     ACameraCaptureSession_stateCallbacks mSessionCb{ this, nullptr, nullptr, nullptr};
 
-    ACameraCaptureSession_prepareCallbacks mPreparedCb{
-            this, onPreparedCb, /*reserved0*/nullptr, /*reserved1*/nullptr};
+    ACameraCaptureSession_prepareCallback mPreparedCb = &onPreparedCb;
 
     const native_handle_t* mImgReaderAnw = nullptr;  // not owned by us.
 
