@@ -20,6 +20,7 @@
 //#define LOG_NDEBUG 0
 #include <utils/Log.h>
 
+#include <algorithm>
 #include <inttypes.h>
 #include <limits.h>
 #include <stdint.h>
@@ -92,6 +93,16 @@ static std::vector<float> recordFromTranslationRotationVector(
     record[4] *= RAD_TO_DEGREE;
     record[5] *= RAD_TO_DEGREE;
     return record;
+}
+
+template<typename T>
+static constexpr const T& safe_clamp(const T& value, const T& low, const T& high) {
+    if constexpr (std::is_floating_point_v<T>) {
+        return value != value /* constexpr isnan */
+                ? low : std::clamp(value, low, high);
+    } else /* constexpr */ {
+        return std::clamp(value, low, high);
+    }
 }
 
 // ---------------------------------------------------------------------------
@@ -638,28 +649,48 @@ Status Spatializer::setScreenSensor(int sensorHandle) {
 
 Status Spatializer::setDisplayOrientation(float physicalToLogicalAngle) {
     ALOGV("%s physicalToLogicalAngle %f", __func__, physicalToLogicalAngle);
-    if (!mSupportsHeadTracking) {
-        return binderStatusFromStatusT(INVALID_OPERATION);
-    }
-    std::lock_guard lock(mLock);
-    mDisplayOrientation = physicalToLogicalAngle;
     mLocalLog.log("%s with %f", __func__, physicalToLogicalAngle);
+    const float angle = safe_clamp(physicalToLogicalAngle, 0.f, (float)(2. * M_PI));
+    // It is possible due to numerical inaccuracies to exceed the boundaries of 0 to 2 * M_PI.
+    ALOGI_IF(angle != physicalToLogicalAngle,
+            "%s: clamping %f to %f", __func__, physicalToLogicalAngle, angle);
+    std::lock_guard lock(mLock);
+    mDisplayOrientation = angle;
     if (mPoseController != nullptr) {
-        mPoseController->setDisplayOrientation(mDisplayOrientation);
+        // This turns on the rate-limiter.
+        mPoseController->setDisplayOrientation(angle);
     }
     if (mEngine != nullptr) {
         setEffectParameter_l(
-            SPATIALIZER_PARAM_DISPLAY_ORIENTATION, std::vector<float>{physicalToLogicalAngle});
+            SPATIALIZER_PARAM_DISPLAY_ORIENTATION, std::vector<float>{angle});
     }
     return Status::ok();
 }
 
 Status Spatializer::setHingeAngle(float hingeAngle) {
-    std::lock_guard lock(mLock);
     ALOGV("%s hingeAngle %f", __func__, hingeAngle);
+    mLocalLog.log("%s with %f", __func__, hingeAngle);
+    const float angle = safe_clamp(hingeAngle, 0.f, (float)(2. * M_PI));
+    // It is possible due to numerical inaccuracies to exceed the boundaries of 0 to 2 * M_PI.
+    ALOGI_IF(angle != hingeAngle,
+            "%s: clamping %f to %f", __func__, hingeAngle, angle);
+    std::lock_guard lock(mLock);
+    mHingeAngle = angle;
     if (mEngine != nullptr) {
-        mLocalLog.log("%s with %f", __func__, hingeAngle);
-        setEffectParameter_l(SPATIALIZER_PARAM_HINGE_ANGLE, std::vector<float>{hingeAngle});
+        setEffectParameter_l(SPATIALIZER_PARAM_HINGE_ANGLE, std::vector<float>{angle});
+    }
+    return Status::ok();
+}
+
+Status Spatializer::setFoldState(bool folded) {
+    ALOGV("%s foldState %d", __func__, (int)folded);
+    mLocalLog.log("%s with %d", __func__, (int)folded);
+    std::lock_guard lock(mLock);
+    mFoldedState = folded;
+    if (mEngine != nullptr) {
+        // we don't suppress multiple calls with the same folded state - that's
+        // done at the caller.
+        setEffectParameter_l(SPATIALIZER_PARAM_FOLD_STATE, std::vector<uint8_t>{mFoldedState});
     }
     return Status::ok();
 }
@@ -862,6 +893,14 @@ status_t Spatializer::attachOutput(audio_io_handle_t output, size_t numActiveTra
             checkSensorsState_l();
         }
         callback = mSpatializerCallback;
+
+        // Restore common effect state.
+        setEffectParameter_l(SPATIALIZER_PARAM_DISPLAY_ORIENTATION,
+                std::vector<float>{mDisplayOrientation});
+        setEffectParameter_l(SPATIALIZER_PARAM_FOLD_STATE,
+                std::vector<uint8_t>{mFoldedState});
+        setEffectParameter_l(SPATIALIZER_PARAM_HINGE_ANGLE,
+                std::vector<float>{mHingeAngle});
     }
 
     if (outputChanged && callback != nullptr) {
