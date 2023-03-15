@@ -98,7 +98,7 @@ DepthCompositeStream::DepthCompositeStream(sp<CameraDeviceBase> device,
         }
 
         getSupportedDepthSizes(staticInfo, /*maxResolution*/false, &mSupportedDepthSizes);
-        if (SessionConfigurationUtils::isUltraHighResolutionSensor(staticInfo)) {
+        if (SessionConfigurationUtils::supportsUltraHighResolutionCapture(staticInfo)) {
             getSupportedDepthSizes(staticInfo, true, &mSupportedDepthSizesMaximumResolution);
         }
     }
@@ -901,7 +901,7 @@ status_t DepthCompositeStream::getCompositeStreamInfo(const OutputStreamInfo &st
         return BAD_VALUE;
     }
 
-    if (SessionConfigurationUtils::isUltraHighResolutionSensor(ch)) {
+    if (SessionConfigurationUtils::supportsUltraHighResolutionCapture(ch)) {
         getSupportedDepthSizes(ch, /*maxResolution*/true, &depthSizesMaximumResolution);
         if (depthSizesMaximumResolution.empty()) {
             ALOGE("%s: No depth stream configurations for maximum resolution present",
