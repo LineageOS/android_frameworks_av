@@ -96,16 +96,32 @@ interface ISpatializer {
 
     /**
      * Sets the display orientation.
+     *
+     * This is the rotation of the displayed content relative to its natural orientation.
+     *
      * Orientation is expressed in the angle of rotation from the physical "up" side of the screen
      * to the logical "up" side of the content displayed the screen. Counterclockwise angles, as
      * viewed while facing the screen are positive.
+     *
+     * Note: DisplayManager currently only returns this in increments of 90 degrees,
+     * so the values will be 0, PI/2, PI, 3PI/2.
      */
     void setDisplayOrientation(float physicalToLogicalAngle);
 
     /**
      * Sets the hinge angle for foldable devices.
+     *
+     * Per the hinge angle sensor, this returns a value from 0 to 2PI.
+     * The value of 0 is considered closed, and PI is considered flat open.
      */
     void setHingeAngle(float hingeAngle);
+
+    /**
+     * Sets whether a foldable is considered "folded" or not.
+     *
+     * The fold state may affect which physical screen is active for display.
+     */
+    void setFoldState(boolean folded);
 
     /** Reports the list of supported spatialization modess (see SpatializationMode.aidl).
      * The list should never be empty if an ISpatializer interface was successfully
