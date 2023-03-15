@@ -969,13 +969,16 @@ status_t NuPlayerDriver::dump(
     }
 
     if (locked) {
-        snprintf(buf, sizeof(buf), "  state(%d), atEOS(%d), looping(%d), autoLoop(%d)\n",
+        snprintf(buf, sizeof(buf), "  state(%d), atEOS(%d), looping(%d), autoLoop(%d), ",
                 mState, mAtEOS, mLooping, mAutoLoop);
+        logString.append(buf);
+        mPlayer->dump(logString);
+        logString.append("\n");
         mLock.unlock();
     } else {
         snprintf(buf, sizeof(buf), "  NPD(%p) lock is taken\n", this);
+        logString.append(buf);
     }
-    logString.append(buf);
 
     for (size_t i = 0; i < trackStats.size(); ++i) {
         const sp<AMessage> &stats = trackStats.itemAt(i);
