@@ -21,6 +21,7 @@
 #include <cstdint>
 
 #include <audio_utils/clock.h>
+#include <media/AidlConversion.h>
 #include <media/AidlConversionCppNdk.h>
 #include <media/AidlConversionNdk.h>
 #include <media/AidlConversionUtil.h>
@@ -39,7 +40,7 @@ using ::aidl::android::hardware::audio::core::IStreamCommon;
 using ::aidl::android::hardware::audio::core::IStreamIn;
 using ::aidl::android::hardware::audio::core::IStreamOut;
 using ::aidl::android::hardware::audio::core::StreamDescriptor;
-using ::aidl::android::legacy2aidl_audio_channel_mask_t_AudioChannelLayout;
+using ::aidl::android::media::audio::common::MicrophoneDynamicInfo;
 
 namespace android {
 
@@ -818,10 +819,10 @@ StreamInHalAidl::legacy2aidl_SinkMetadata(const StreamInHalInterface::SinkMetada
 
 StreamInHalAidl::StreamInHalAidl(
         const audio_config& config, StreamContextAidl&& context, int32_t nominalLatency,
-        const std::shared_ptr<IStreamIn>& stream)
+        const std::shared_ptr<IStreamIn>& stream, const sp<MicrophoneInfoProvider>& micInfoProvider)
         : StreamHalAidl("StreamInHalAidl", true /*isInput*/, config, nominalLatency,
                 std::move(context), getStreamCommon(stream)),
-          mStream(stream) {}
+          mStream(stream), mMicInfoProvider(micInfoProvider) {}
 
 status_t StreamInHalAidl::setGain(float gain __unused) {
     TIME_CHECK();
@@ -856,11 +857,38 @@ status_t StreamInHalAidl::getCapturePosition(int64_t *frames, int64_t *time) {
     return getObservablePosition(frames, time);
 }
 
-status_t StreamInHalAidl::getActiveMicrophones(
-        std::vector<media::MicrophoneInfoFw> *microphones __unused) {
+status_t StreamInHalAidl::getActiveMicrophones(std::vector<media::MicrophoneInfoFw> *microphones) {
+    if (!microphones) {
+        return BAD_VALUE;
+    }
     TIME_CHECK();
     if (!mStream) return NO_INIT;
-    ALOGE("%s not implemented yet", __func__);
+    sp<MicrophoneInfoProvider> micInfoProvider = mMicInfoProvider.promote();
+    if (!micInfoProvider) return NO_INIT;
+    auto staticInfo = micInfoProvider->getMicrophoneInfo();
+    if (!staticInfo) return INVALID_OPERATION;
+    std::vector<MicrophoneDynamicInfo> dynamicInfo;
+    RETURN_STATUS_IF_ERROR(statusTFromBinderStatus(mStream->getActiveMicrophones(&dynamicInfo)));
+    std::vector<media::MicrophoneInfoFw> result;
+    result.reserve(dynamicInfo.size());
+    for (const auto& d : dynamicInfo) {
+        const auto staticInfoIt = std::find_if(staticInfo->begin(), staticInfo->end(),
+                [&](const auto& s) { return s.id == d.id; });
+        if (staticInfoIt != staticInfo->end()) {
+            // Convert into the c++ backend type from the ndk backend type via the legacy structure.
+            audio_microphone_characteristic_t legacy = VALUE_OR_RETURN_STATUS(
+                    ::aidl::android::aidl2legacy_MicrophoneInfos_audio_microphone_characteristic_t(
+                            *staticInfoIt, d));
+            media::MicrophoneInfoFw info = VALUE_OR_RETURN_STATUS(
+                    ::android::legacy2aidl_audio_microphone_characteristic_t_MicrophoneInfoFw(
+                            legacy));
+            // Note: info.portId is not filled because it's a bit of framework info.
+            result.push_back(std::move(info));
+        } else {
+            ALOGE("%s: no static info for active microphone with id '%s'", __func__, d.id.c_str());
+        }
+    }
+    *microphones = std::move(result);
     return OK;
 }
 
