@@ -717,8 +717,11 @@ int32_t DeviceHalAidl::getAAudioHardwareBurstMinUsec() {
 
 error::Result<audio_hw_sync_t> DeviceHalAidl::getHwAvSync() {
     TIME_CHECK();
-    ALOGE("%s not implemented yet", __func__);
-    return base::unexpected(INVALID_OPERATION);
+    if (!mModule) return NO_INIT;
+    int32_t aidlHwAvSync;
+    RETURN_STATUS_IF_ERROR(statusTFromBinderStatus(mModule->generateHwAvSyncId(&aidlHwAvSync)));
+    return VALUE_OR_RETURN_STATUS(
+            ::aidl::android::aidl2legacy_int32_t_audio_hw_sync_t(aidlHwAvSync));
 }
 
 status_t DeviceHalAidl::dump(int fd, const Vector<String16>& args) {

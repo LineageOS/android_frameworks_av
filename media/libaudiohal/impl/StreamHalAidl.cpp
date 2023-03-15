@@ -119,11 +119,45 @@ status_t StreamHalAidl::getAudioProperties(audio_config_base_t *configBase) {
     return OK;
 }
 
-status_t StreamHalAidl::setParameters(const String8& kvPairs __unused) {
-    ALOGD("%p %s::%s", this, getClassName().c_str(), __func__);
+namespace {
+
+// 'action' must accept a value of type 'T' and return 'status_t'.
+// The function returns 'true' if the parameter was found, and the action has succeeded.
+// The function returns 'false' if the parameter was not found.
+// Any errors get propagated, if there are errors it means the parameter was found.
+template<typename T, typename F>
+error::Result<bool> filterOutAndProcessParameter(
+        AudioParameter& parameters, const String8& key, const F& action) {
+    if (parameters.containsKey(key)) {
+        T value;
+        status_t status = parameters.get(key, value);
+        if (status == OK) {
+            parameters.remove(key);
+            status = action(value);
+            if (status == OK) return true;
+        }
+        return base::unexpected(status);
+    }
+    return false;
+}
+
+}  // namespace
+
+status_t StreamHalAidl::setParameters(const String8& kvPairs) {
     TIME_CHECK();
     if (!mStream) return NO_INIT;
-    ALOGE("%s not implemented yet", __func__);
+
+    AudioParameter parameters(kvPairs);
+    ALOGD("%s: parameters: %s", __func__, parameters.toString().c_str());
+
+    (void)VALUE_OR_RETURN_STATUS(filterOutAndProcessParameter<int>(
+                    parameters, String8(AudioParameter::keyStreamHwAvSync),
+            [&](int hwAvSyncId) {
+                return statusTFromBinderStatus(mStream->updateHwAvSyncId(hwAvSyncId));
+            }));
+
+    ALOGW_IF(parameters.size() != 0, "%s: unknown parameters, ignored: %s",
+            __func__, parameters.toString().c_str());
     return OK;
 }
 
@@ -734,70 +768,57 @@ status_t StreamOutHalAidl::exit() {
 
 status_t StreamOutHalAidl::filterAndUpdateOffloadMetadata(AudioParameter &parameters) {
     TIME_CHECK();
-
-    if (parameters.containsKey(String8(AudioParameter::keyOffloadCodecAverageBitRate)) ||
-            parameters.containsKey(String8(AudioParameter::keyOffloadCodecSampleRate)) ||
-            parameters.containsKey(String8(AudioParameter::keyOffloadCodecChannels)) ||
-            parameters.containsKey(String8(AudioParameter::keyOffloadCodecDelaySamples)) ||
-            parameters.containsKey(String8(AudioParameter::keyOffloadCodecPaddingSamples))) {
-        int value = 0;
-        if (parameters.getInt(String8(AudioParameter::keyOffloadCodecAverageBitRate), value)
-                == NO_ERROR) {
-            if (value <= 0) {
-                return BAD_VALUE;
-            }
-            mOffloadMetadata.averageBitRatePerSecond = value;
-            parameters.remove(String8(AudioParameter::keyOffloadCodecAverageBitRate));
-        }
-
-        if (parameters.getInt(String8(AudioParameter::keyOffloadCodecSampleRate), value)
-                == NO_ERROR) {
-            if (value <= 0) {
-                return BAD_VALUE;
-            }
-            mOffloadMetadata.sampleRate = value;
-            parameters.remove(String8(AudioParameter::keyOffloadCodecSampleRate));
-        }
-
-        if (parameters.getInt(String8(AudioParameter::keyOffloadCodecChannels), value)
-                == NO_ERROR) {
-            if (value <= 0) {
-                return BAD_VALUE;
-            }
-            audio_channel_mask_t channel_mask =
-                    audio_channel_out_mask_from_count(static_cast<uint32_t>(value));
-            if (channel_mask == AUDIO_CHANNEL_INVALID) {
-                return BAD_VALUE;
-            }
-            mOffloadMetadata.channelMask =
-                    VALUE_OR_RETURN_STATUS(
-                            ::aidl::android::legacy2aidl_audio_channel_mask_t_AudioChannelLayout(
-                                    channel_mask, false));
-            parameters.remove(String8(AudioParameter::keyOffloadCodecChannels));
-        }
-
-        // The legacy keys are misnamed. The delay and padding are in frame.
-        if (parameters.getInt(String8(AudioParameter::keyOffloadCodecDelaySamples), value)
-                == NO_ERROR) {
-            if (value < 0) {
-                return BAD_VALUE;
-            }
-            mOffloadMetadata.delayFrames = value;
-            parameters.remove(String8(AudioParameter::keyOffloadCodecDelaySamples));
-        }
-
-        if (parameters.getInt(String8(AudioParameter::keyOffloadCodecPaddingSamples), value)
-                == NO_ERROR) {
-            if (value < 0) {
-                return BAD_VALUE;
-            }
-            mOffloadMetadata.paddingFrames = value;
-            parameters.remove(String8(AudioParameter::keyOffloadCodecPaddingSamples));
-        }
-
+    bool updateMetadata = false;
+    if (VALUE_OR_RETURN_STATUS(filterOutAndProcessParameter<int>(
+                parameters, String8(AudioParameter::keyOffloadCodecAverageBitRate),
+                [&](int value) {
+                    return value > 0 ?
+                            mOffloadMetadata.averageBitRatePerSecond = value, OK : BAD_VALUE;
+                }))) {
+        updateMetadata = true;
+    }
+    if (VALUE_OR_RETURN_STATUS(filterOutAndProcessParameter<int>(
+                parameters, String8(AudioParameter::keyOffloadCodecSampleRate),
+                [&](int value) {
+                    return value > 0 ? mOffloadMetadata.sampleRate = value, OK : BAD_VALUE;
+                }))) {
+        updateMetadata = true;
+    }
+    if (VALUE_OR_RETURN_STATUS(filterOutAndProcessParameter<int>(
+                parameters, String8(AudioParameter::keyOffloadCodecChannels),
+                [&](int value) -> status_t {
+                    if (value > 0) {
+                        audio_channel_mask_t channel_mask = audio_channel_out_mask_from_count(
+                                static_cast<uint32_t>(value));
+                        if (channel_mask == AUDIO_CHANNEL_INVALID) return BAD_VALUE;
+                        mOffloadMetadata.channelMask = VALUE_OR_RETURN_STATUS(
+                                ::aidl::android::legacy2aidl_audio_channel_mask_t_AudioChannelLayout(
+                                        channel_mask, false /*isInput*/));
+                    }
+                    return BAD_VALUE;
+                }))) {
+        updateMetadata = true;
+    }
+    if (VALUE_OR_RETURN_STATUS(filterOutAndProcessParameter<int>(
+                parameters, String8(AudioParameter::keyOffloadCodecDelaySamples),
+                [&](int value) {
+                    // The legacy keys are misnamed, the value is in frames.
+                    return value > 0 ? mOffloadMetadata.delayFrames = value, OK : BAD_VALUE;
+                }))) {
+        updateMetadata = true;
+    }
+    if (VALUE_OR_RETURN_STATUS(filterOutAndProcessParameter<int>(
+                parameters, String8(AudioParameter::keyOffloadCodecPaddingSamples),
+                [&](int value) {
+                    // The legacy keys are misnamed, the value is in frames.
+                    return value > 0 ? mOffloadMetadata.paddingFrames = value, OK : BAD_VALUE;
+                }))) {
+        updateMetadata = true;
+    }
+    if (updateMetadata) {
         ALOGD("%s set offload metadata %s", __func__, mOffloadMetadata.toString().c_str());
-        status_t status = statusTFromBinderStatus(mStream->updateOffloadMetadata(mOffloadMetadata));
-        if (status != OK) {
+        if (status_t status = statusTFromBinderStatus(
+                        mStream->updateOffloadMetadata(mOffloadMetadata)); status != OK) {
             ALOGE("%s: updateOffloadMetadata failed %d", __func__, status);
             return status;
         }
