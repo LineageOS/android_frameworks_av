@@ -49,6 +49,7 @@ using ::aidl::android::media::audio::common::AudioDeviceDescription;
 
 using ::android::BAD_VALUE;
 using ::android::OK;
+using ::android::status_t;
 using ::android::base::unexpected;
 using ::android::effect::utils::EffectParamReader;
 using ::android::effect::utils::EffectParamWriter;
