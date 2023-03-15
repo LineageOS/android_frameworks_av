@@ -123,6 +123,12 @@ public:
 
     status_t remove(const String8& key);
 
+    status_t get(const String8& key, int& value) const {
+        return getInt(key, value);
+    }
+    status_t get(const String8& key, float& value) const {
+        return getFloat(key, value);
+    }
     status_t get(const String8& key, String8& value) const;
     status_t getInt(const String8& key, int& value) const;
     status_t getFloat(const String8& key, float& value) const;
