@@ -334,6 +334,8 @@ class StreamOutHalAidl : public StreamOutHalInterface, public StreamHalAidl {
     status_t filterAndUpdateOffloadMetadata(AudioParameter &parameters);
 };
 
+class MicrophoneInfoProvider;
+
 class StreamInHalAidl : public StreamInHalInterface, public StreamHalAidl {
   public:
     // Set the input gain for the audio driver.
@@ -369,11 +371,13 @@ class StreamInHalAidl : public StreamInHalInterface, public StreamHalAidl {
     legacy2aidl_SinkMetadata(const StreamInHalInterface::SinkMetadata& legacy);
 
     const std::shared_ptr<::aidl::android::hardware::audio::core::IStreamIn> mStream;
+    const wp<MicrophoneInfoProvider> mMicInfoProvider;
 
     // Can not be constructed directly by clients.
     StreamInHalAidl(
             const audio_config& config, StreamContextAidl&& context, int32_t nominalLatency,
-            const std::shared_ptr<::aidl::android::hardware::audio::core::IStreamIn>& stream);
+            const std::shared_ptr<::aidl::android::hardware::audio::core::IStreamIn>& stream,
+            const sp<MicrophoneInfoProvider>& micInfoProvider);
 
     ~StreamInHalAidl() override = default;
 };
