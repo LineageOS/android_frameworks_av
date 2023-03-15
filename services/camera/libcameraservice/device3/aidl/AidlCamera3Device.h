@@ -101,7 +101,9 @@ class AidlCamera3Device :
 
         virtual status_t configureStreams(const camera_metadata_t *sessionParams,
                 /*inout*/ camera_stream_configuration_t *config,
-                const std::vector<uint32_t>& bufferSizes) override;
+                const std::vector<uint32_t>& bufferSizes,
+                int64_t logId) override;
+
         // The injection camera configures the streams to hal.
         virtual status_t configureInjectedStreams(
                 const camera_metadata_t* sessionParams,
