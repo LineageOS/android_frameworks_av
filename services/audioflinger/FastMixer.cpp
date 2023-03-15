@@ -79,8 +79,6 @@ FastMixer::FastMixer(audio_io_handle_t parentIoHandle)
     mMasterMono(false),
     mThreadIoHandle(parentIoHandle)
 {
-    (void)mThreadIoHandle; // prevent unused warning, see C++17 [[maybe_unused]]
-
     // FIXME pass sInitial as parameter to base class constructor, and make it static local
     mPrevious = &sInitial;
     mCurrent = &sInitial;

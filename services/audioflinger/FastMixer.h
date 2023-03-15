@@ -107,7 +107,8 @@ private:
     std::atomic<float> mMasterBalance{};
     std::atomic_int_fast64_t mBoottimeOffset;
 
-    const audio_io_handle_t mThreadIoHandle; // parent thread id for debugging purposes
+    // parent thread id for debugging purposes
+    [[maybe_unused]] const audio_io_handle_t mThreadIoHandle;
 #ifdef TEE_SINK
     NBAIO_Tee       mTee;
 #endif
