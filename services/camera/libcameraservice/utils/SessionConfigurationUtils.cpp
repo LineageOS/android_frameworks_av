@@ -210,7 +210,8 @@ bool roundBufferDimensionNearest(int32_t width, int32_t height,
         auto entry = info.find(ANDROID_REQUEST_AVAILABLE_CAPABILITIES);
         for (size_t i = 0; i < entry.count; ++i) {
             uint8_t capability = entry.data.u8[i];
-            if (capability == ANDROID_REQUEST_AVAILABLE_CAPABILITIES_LOGICAL_MULTI_CAMERA) {
+            if (capability == ANDROID_REQUEST_AVAILABLE_CAPABILITIES_LOGICAL_MULTI_CAMERA ||
+                    capability == ANDROID_REQUEST_AVAILABLE_CAPABILITIES_RAW) {
                 isLogicalCamera = true;
                 break;
             }
