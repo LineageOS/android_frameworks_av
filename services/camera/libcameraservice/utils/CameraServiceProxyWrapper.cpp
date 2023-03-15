@@ -101,6 +101,11 @@ void CameraServiceProxyWrapper::CameraSessionStatsWrapper::onIdle(
     mSessionStats.mStreamStats.clear();
 }
 
+int64_t CameraServiceProxyWrapper::CameraSessionStatsWrapper::getLogId() {
+    Mutex::Autolock l(mLock);
+    return mSessionStats.mLogId;
+}
+
 /**
  * CameraServiceProxyWrapper functions
  */
@@ -301,6 +306,21 @@ bool CameraServiceProxyWrapper::isCameraDisabled(int userId) {
                 status.exceptionMessage().c_str());
     }
     return ret;
+}
+
+int64_t CameraServiceProxyWrapper::getCurrentLogIdForCamera(const String8& cameraId) {
+    std::shared_ptr<CameraSessionStatsWrapper> stats;
+    {
+        Mutex::Autolock _l(mLock);
+        if (mSessionStatsMap.count(cameraId) == 0) {
+            ALOGE("%s: SessionStatsMap should contain camera %s before asking for its logging ID.",
+                  __FUNCTION__, cameraId.c_str());
+            return 0;
+        }
+
+        stats = mSessionStatsMap[cameraId];
+    }
+    return stats->getLogId();
 }
 
 int64_t CameraServiceProxyWrapper::generateLogId(std::random_device& randomDevice) {

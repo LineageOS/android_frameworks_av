@@ -880,7 +880,8 @@ bool HidlCamera3Device::HidlHalInterface::isReconfigurationRequired(
 
 status_t HidlCamera3Device::HidlHalInterface::configureStreams(
         const camera_metadata_t *sessionParams,
-        camera_stream_configuration *config, const std::vector<uint32_t>& bufferSizes) {
+        camera_stream_configuration *config, const std::vector<uint32_t>& bufferSizes,
+        int64_t /*logId*/) {
     ATRACE_NAME("CameraHal::configureStreams");
     if (!valid()) return INVALID_OPERATION;
     status_t res = OK;

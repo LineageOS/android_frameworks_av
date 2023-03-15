@@ -64,6 +64,9 @@ private:
                 int64_t requestCount, int64_t resultErrorCount, bool deviceError,
                 const std::string& userTag, int32_t videoStabilizationMode,
                 const std::vector<hardware::CameraStreamStats>& streamStats);
+
+        // Returns the logId associated with this event.
+        int64_t getLogId();
     };
 
     // Lock for camera session stats map
@@ -119,6 +122,11 @@ public:
 
     // Detect if the camera is disabled by device policy.
     bool isCameraDisabled(int userId);
+
+    // Returns the logId currently associated with the given cameraId. See 'mLogId' in
+    // frameworks/av/camera/include/camera/CameraSessionStats.h for more details about this
+    // identifier. Returns a non-0 value on success.
+    int64_t getCurrentLogIdForCamera(const String8& cameraId);
 };
 
 } // android
