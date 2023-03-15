@@ -248,9 +248,12 @@ void CameraServiceProxyWrapper::logOpen(const String8& id, int facing,
             apiLevel = CameraSessionStats::CAMERA_API_LEVEL_2;
         }
 
-        sessionStats = std::make_shared<CameraSessionStatsWrapper>(String16(id), facing,
-                CameraSessionStats::CAMERA_STATE_OPEN, clientPackageName,
-                apiLevel, isNdk, latencyMs);
+        // Generate a new log ID for open events
+        int64_t logId = generateLogId(mRandomDevice);
+
+        sessionStats = std::make_shared<CameraSessionStatsWrapper>(
+                String16(id), facing, CameraSessionStats::CAMERA_STATE_OPEN, clientPackageName,
+                apiLevel, isNdk, latencyMs, logId);
         mSessionStatsMap.emplace(id, sessionStats);
         ALOGV("%s: Adding id %s", __FUNCTION__, id.c_str());
     }
@@ -300,4 +303,16 @@ bool CameraServiceProxyWrapper::isCameraDisabled(int userId) {
     return ret;
 }
 
-}; // namespace android
+int64_t CameraServiceProxyWrapper::generateLogId(std::random_device& randomDevice) {
+    int64_t ret = 0;
+    do {
+        // std::random_device generates 32 bits per call, so we call it twice
+        ret = randomDevice();
+        ret = ret << 32;
+        ret = ret | randomDevice();
+    } while (ret == 0); // 0 is not a valid identifier
+
+    return ret;
+}
+
+}  // namespace android
