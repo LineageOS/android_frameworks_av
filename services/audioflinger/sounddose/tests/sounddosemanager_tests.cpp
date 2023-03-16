@@ -33,8 +33,8 @@ using aidl::android::media::audio::common::AudioDeviceAddress;
 
 class HalSoundDoseMock : public BnSoundDose {
 public:
-    MOCK_METHOD(ndk::ScopedAStatus, getOutputRs2, (float*), (override));
-    MOCK_METHOD(ndk::ScopedAStatus, setOutputRs2, (float), (override));
+    MOCK_METHOD(ndk::ScopedAStatus, getOutputRs2UpperBound, (float*), (override));
+    MOCK_METHOD(ndk::ScopedAStatus, setOutputRs2UpperBound, (float), (override));
     MOCK_METHOD(ndk::ScopedAStatus, registerSoundDoseCallback,
                 (const std::shared_ptr<ISoundDose::IHalSoundDoseCallback>&), (override));
 };
@@ -45,7 +45,7 @@ protected:
         mSoundDoseManager = sp<SoundDoseManager>::make();
         mHalSoundDose = ndk::SharedRefBase::make<HalSoundDoseMock>();
 
-        ON_CALL(*mHalSoundDose.get(), setOutputRs2)
+        ON_CALL(*mHalSoundDose.get(), setOutputRs2UpperBound)
             .WillByDefault([] (float rs2) {
                 EXPECT_EQ(rs2, ISoundDose::DEFAULT_MAX_RS2);
                 return ndk::ScopedAStatus::ok();
@@ -105,7 +105,7 @@ TEST_F(SoundDoseManagerTest, InvalidHalInterfaceIsNotSet) {
 }
 
 TEST_F(SoundDoseManagerTest, SetHalSoundDoseDisablesNewMelProcessorCallbacks) {
-    EXPECT_CALL(*mHalSoundDose.get(), setOutputRs2).Times(1);
+    EXPECT_CALL(*mHalSoundDose.get(), setOutputRs2UpperBound).Times(1);
     EXPECT_CALL(*mHalSoundDose.get(), registerSoundDoseCallback)
         .Times(1)
         .WillOnce([&] (const std::shared_ptr<ISoundDose::IHalSoundDoseCallback>& callback) {
@@ -123,7 +123,7 @@ TEST_F(SoundDoseManagerTest, SetHalSoundDoseDisablesNewMelProcessorCallbacks) {
 }
 
 TEST_F(SoundDoseManagerTest, SetHalSoundDoseRegistersHalCallbacks) {
-    EXPECT_CALL(*mHalSoundDose.get(), setOutputRs2).Times(1);
+    EXPECT_CALL(*mHalSoundDose.get(), setOutputRs2UpperBound).Times(1);
     EXPECT_CALL(*mHalSoundDose.get(), registerSoundDoseCallback)
         .Times(1)
         .WillOnce([&] (const std::shared_ptr<ISoundDose::IHalSoundDoseCallback>& callback) {
@@ -137,7 +137,7 @@ TEST_F(SoundDoseManagerTest, SetHalSoundDoseRegistersHalCallbacks) {
 TEST_F(SoundDoseManagerTest, MomentaryExposureFromHalWithNoAddressIllegalArgument) {
     std::shared_ptr<ISoundDose::IHalSoundDoseCallback> halCallback;
 
-    EXPECT_CALL(*mHalSoundDose.get(), setOutputRs2).Times(1);
+    EXPECT_CALL(*mHalSoundDose.get(), setOutputRs2UpperBound).Times(1);
     EXPECT_CALL(*mHalSoundDose.get(), registerSoundDoseCallback)
        .Times(1)
        .WillOnce([&] (const std::shared_ptr<ISoundDose::IHalSoundDoseCallback>& callback) {
@@ -158,7 +158,7 @@ TEST_F(SoundDoseManagerTest, MomentaryExposureFromHalWithNoAddressIllegalArgumen
 TEST_F(SoundDoseManagerTest, MomentaryExposureFromHalAfterInternalSelectedReturnsException) {
     std::shared_ptr<ISoundDose::IHalSoundDoseCallback> halCallback;
 
-    EXPECT_CALL(*mHalSoundDose.get(), setOutputRs2).Times(1);
+    EXPECT_CALL(*mHalSoundDose.get(), setOutputRs2UpperBound).Times(1);
     EXPECT_CALL(*mHalSoundDose.get(), registerSoundDoseCallback)
        .Times(1)
        .WillOnce([&] (const std::shared_ptr<ISoundDose::IHalSoundDoseCallback>& callback) {
@@ -180,7 +180,7 @@ TEST_F(SoundDoseManagerTest, MomentaryExposureFromHalAfterInternalSelectedReturn
 TEST_F(SoundDoseManagerTest, OnNewMelValuesFromHalWithNoAddressIllegalArgument) {
     std::shared_ptr<ISoundDose::IHalSoundDoseCallback> halCallback;
 
-    EXPECT_CALL(*mHalSoundDose.get(), setOutputRs2).Times(1);
+    EXPECT_CALL(*mHalSoundDose.get(), setOutputRs2UpperBound).Times(1);
     EXPECT_CALL(*mHalSoundDose.get(), registerSoundDoseCallback)
        .Times(1)
        .WillOnce([&] (const std::shared_ptr<ISoundDose::IHalSoundDoseCallback>& callback) {
