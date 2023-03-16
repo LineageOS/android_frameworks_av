@@ -46,9 +46,8 @@ class LoudnessEnhancerContext final : public EffectContext {
 
   private:
     std::mutex mMutex;
-    LoudnessEnhancerState mState;
-    int mSampleRate;
-    int mGain;
+    LoudnessEnhancerState mState GUARDED_BY(mMutex) = LOUDNESS_ENHANCER_STATE_UNINITIALIZED;
+    int mGain = LOUDNESS_ENHANCER_DEFAULT_TARGET_GAIN_MB;
     // In this implementation, there is no coupling between the compression on the left and right
     // channels
     std::unique_ptr<le_fx::AdaptiveDynamicRangeCompression> mCompressor GUARDED_BY(mMutex);
