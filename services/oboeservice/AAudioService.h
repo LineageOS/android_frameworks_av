@@ -36,6 +36,7 @@
 namespace android {
 
 #define AAUDIO_SERVICE_NAME  "media.aaudio"
+#define DEFAULT_AAUDIO_SERVICE_ID 0
 
 class AAudioService :
     public BinderService<AAudioService>,
@@ -108,20 +109,22 @@ public:
 private:
     class Adapter : public aaudio::AAudioBinderAdapter {
     public:
+        // Always use default service id in server side since when crash happens,
+        // the aaudio service will restart.
         explicit Adapter(AAudioService *service)
-                : aaudio::AAudioBinderAdapter(service),
+                : aaudio::AAudioBinderAdapter(service, DEFAULT_AAUDIO_SERVICE_ID),
                   mService(service) {}
 
-        aaudio_result_t startClient(aaudio::aaudio_handle_t streamHandle,
+        aaudio_result_t startClient(const aaudio::AAudioHandleInfo& streamHandleInfo,
                                     const android::AudioClient &client,
                                     const audio_attributes_t *attr,
                                     audio_port_handle_t *clientHandle) override {
-            return mService->startClient(streamHandle, client, attr, clientHandle);
+            return mService->startClient(streamHandleInfo.getHandle(), client, attr, clientHandle);
         }
 
-        aaudio_result_t stopClient(aaudio::aaudio_handle_t streamHandle,
+        aaudio_result_t stopClient(const aaudio::AAudioHandleInfo& streamHandleInfo,
                                    audio_port_handle_t clientHandle) override {
-            return mService->stopClient(streamHandle, clientHandle);
+            return mService->stopClient(streamHandleInfo.getHandle(), clientHandle);
         }
 
     private:

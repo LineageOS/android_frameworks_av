@@ -131,8 +131,13 @@ extern "C" int LLVMFuzzerTestOneInput(const uint8_t* data, size_t size) {
             parcelCamSessionStats.writeInt32(latencyMs);
         }
 
+        int64_t logId = fdp.ConsumeIntegral<int64_t>();
+        if (fdp.ConsumeBool()) {
+            parcelCamSessionStats.writeInt64(logId);
+        }
+
         cameraSessionStats = new CameraSessionStats(cameraId, facing, newCameraState, clientName,
-                                                    apiLevel, isNdk, latencyMs);
+                                                    apiLevel, isNdk, latencyMs, logId);
     }
 
     if (fdp.ConsumeBool()) {

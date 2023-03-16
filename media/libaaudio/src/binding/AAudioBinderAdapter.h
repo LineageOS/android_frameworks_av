@@ -30,38 +30,40 @@ namespace aaudio {
  */
 class AAudioBinderAdapter : public AAudioServiceInterface {
 public:
-    explicit AAudioBinderAdapter(IAAudioService* delegate);
+    AAudioBinderAdapter(IAAudioService* delegate, int32_t serviceLifetimeId);
 
     void registerClient(const android::sp<IAAudioClient>& client) override;
 
-    aaudio_handle_t openStream(const AAudioStreamRequest& request,
-                               AAudioStreamConfiguration& configuration) override;
+    AAudioHandleInfo openStream(const AAudioStreamRequest& request,
+                                AAudioStreamConfiguration& configuration) override;
 
-    aaudio_result_t closeStream(aaudio_handle_t streamHandle) override;
+    aaudio_result_t closeStream(const AAudioHandleInfo& streamHandleInfo) override;
 
-    aaudio_result_t getStreamDescription(aaudio_handle_t streamHandle,
+    aaudio_result_t getStreamDescription(const AAudioHandleInfo& streamHandleInfo,
                                          AudioEndpointParcelable& endpoint) override;
 
-    aaudio_result_t startStream(aaudio_handle_t streamHandle) override;
+    aaudio_result_t startStream(const AAudioHandleInfo& streamHandleInfo) override;
 
-    aaudio_result_t pauseStream(aaudio_handle_t streamHandle) override;
+    aaudio_result_t pauseStream(const AAudioHandleInfo& streamHandleInfo) override;
 
-    aaudio_result_t stopStream(aaudio_handle_t streamHandle) override;
+    aaudio_result_t stopStream(const AAudioHandleInfo& streamHandleInfo) override;
 
-    aaudio_result_t flushStream(aaudio_handle_t streamHandle) override;
+    aaudio_result_t flushStream(const AAudioHandleInfo& streamHandleInfo) override;
 
-    aaudio_result_t registerAudioThread(aaudio_handle_t streamHandle,
+    aaudio_result_t registerAudioThread(const AAudioHandleInfo& streamHandleInfo,
                                         pid_t clientThreadId,
                                         int64_t periodNanoseconds) override;
 
-    aaudio_result_t unregisterAudioThread(aaudio_handle_t streamHandle,
+    aaudio_result_t unregisterAudioThread(const AAudioHandleInfo& streamHandleInfo,
                                           pid_t clientThreadId) override;
 
-    aaudio_result_t exitStandby(aaudio_handle_t streamHandle,
+    aaudio_result_t exitStandby(const AAudioHandleInfo& streamHandleInfo,
                                 AudioEndpointParcelable &parcelable) override;
 
 private:
     IAAudioService* const mDelegate;
+    // A unique id to recognize the service that the adapter connected to.
+    const int32_t mServiceLifetimeId;
 };
 
 }  // namespace aaudio

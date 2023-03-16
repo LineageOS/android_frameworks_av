@@ -67,6 +67,7 @@ bool AWakeLock::acquire() {
             if (status.isOk()) {
                 mWakeLockToken = binder;
                 mWakeLockCount++;
+                ALOGI("AwakeLock acquired");
                 return true;
             }
         }
@@ -93,6 +94,7 @@ void AWakeLock::release(bool force) {
             IPCThreadState::self()->restoreCallingIdentity(token);
         }
         mWakeLockToken.clear();
+        ALOGI("AwakeLock released");
     }
 }
 

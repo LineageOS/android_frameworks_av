@@ -24,6 +24,7 @@
 #include <utils/String16.h>
 #include <utils/StrongPointer.h>
 #include <utils/Timers.h>
+#include <random>
 
 #include <camera/CameraSessionStats.h>
 
@@ -37,7 +38,7 @@ private:
     sp<hardware::ICameraServiceProxy> mCameraServiceProxy;
 
     class CameraSessionStatsWrapper {
-    private:
+      private:
         hardware::CameraSessionStats mSessionStats;
         Mutex mLock; // lock for per camera session stats
 
@@ -47,11 +48,12 @@ private:
          */
         void updateProxyDeviceState(sp<hardware::ICameraServiceProxy>& proxyBinder);
 
-    public:
+      public:
         CameraSessionStatsWrapper(const String16& cameraId, int facing, int newCameraState,
-                const String16& clientName, int apiLevel, bool isNdk, int32_t latencyMs) :
-            mSessionStats(cameraId, facing, newCameraState, clientName, apiLevel, isNdk, latencyMs)
-            { }
+                                  const String16& clientName, int apiLevel, bool isNdk,
+                                  int32_t latencyMs, int64_t logId)
+            : mSessionStats(cameraId, facing, newCameraState, clientName, apiLevel, isNdk,
+                            latencyMs, logId) {}
 
         void onOpen(sp<hardware::ICameraServiceProxy>& proxyBinder);
         void onClose(sp<hardware::ICameraServiceProxy>& proxyBinder, int32_t latencyMs,
@@ -62,6 +64,9 @@ private:
                 int64_t requestCount, int64_t resultErrorCount, bool deviceError,
                 const std::string& userTag, int32_t videoStabilizationMode,
                 const std::vector<hardware::CameraStreamStats>& streamStats);
+
+        // Returns the logId associated with this event.
+        int64_t getLogId();
     };
 
     // Lock for camera session stats map
@@ -69,7 +74,14 @@ private:
     // Map from camera id to the camera's session statistics
     std::map<String8, std::shared_ptr<CameraSessionStatsWrapper>> mSessionStatsMap;
 
+    std::random_device mRandomDevice;  // pulls 32-bit random numbers from /dev/urandom
+
     sp<hardware::ICameraServiceProxy> getCameraServiceProxy();
+
+    // Returns a randomly generated ID that is suitable for logging the event. A new identifier
+    // should only be generated for an open event. All other events for the cameraId should use the
+    // ID generated for the open event associated with them.
+    static int64_t generateLogId(std::random_device& randomDevice);
 
 public:
     CameraServiceProxyWrapper(sp<hardware::ICameraServiceProxy> serviceProxy = nullptr) :
@@ -110,6 +122,11 @@ public:
 
     // Detect if the camera is disabled by device policy.
     bool isCameraDisabled(int userId);
+
+    // Returns the logId currently associated with the given cameraId. See 'mLogId' in
+    // frameworks/av/camera/include/camera/CameraSessionStats.h for more details about this
+    // identifier. Returns a non-0 value on success.
+    int64_t getCurrentLogIdForCamera(const String8& cameraId);
 };
 
 } // android

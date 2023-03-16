@@ -54,6 +54,8 @@ using aidl::android::media::audio::common::Float;
 using aidl::android::hardware::audio::common::getFrameSizeInBytes;
 using aidl::android::hardware::audio::common::isBitPositionFlagSet;
 using aidl::android::hardware::audio::common::makeBitPositionFlagMask;
+using aidl::android::media::audio::common::MicrophoneDynamicInfo;
+using aidl::android::media::audio::common::MicrophoneInfo;
 using aidl::android::hardware::audio::common::RecordTrackMetadata;
 using aidl::android::hardware::audio::core::AudioPatch;
 using aidl::android::hardware::audio::core::IModule;
@@ -531,7 +533,7 @@ status_t DeviceHalAidl::openInputStream(
         return NO_INIT;
     }
     *inStream = sp<StreamInHalAidl>::make(*config, std::move(context), nominalLatency,
-            std::move(ret.stream));
+            std::move(ret.stream), this /*micInfoProvider*/);
     cleanups.disarmAll();
     return OK;
 }
@@ -666,11 +668,45 @@ status_t DeviceHalAidl::setAudioPortConfig(const struct audio_port_config* confi
     return OK;
 }
 
+MicrophoneInfoProvider::Info const* DeviceHalAidl::getMicrophoneInfo() {
+    if (mMicrophones.status == Microphones::Status::UNKNOWN) {
+        TIME_CHECK();
+        std::vector<MicrophoneInfo> aidlInfo;
+        status_t status = statusTFromBinderStatus(mModule->getMicrophones(&aidlInfo));
+        if (status == OK) {
+            mMicrophones.status = Microphones::Status::QUERIED;
+            mMicrophones.info = std::move(aidlInfo);
+        } else if (status == INVALID_OPERATION) {
+            mMicrophones.status = Microphones::Status::NOT_SUPPORTED;
+        } else {
+            ALOGE("%s: Unexpected status from 'IModule.getMicrophones': %d", __func__, status);
+            return {};
+        }
+    }
+    if (mMicrophones.status == Microphones::Status::QUERIED) {
+        return &mMicrophones.info;
+    }
+    return {};  // NOT_SUPPORTED
+}
+
 status_t DeviceHalAidl::getMicrophones(
-        std::vector<audio_microphone_characteristic_t>* microphones __unused) {
+        std::vector<audio_microphone_characteristic_t>* microphones) {
+    if (!microphones) {
+        return BAD_VALUE;
+    }
     TIME_CHECK();
     if (!mModule) return NO_INIT;
-    ALOGE("%s not implemented yet", __func__);
+    auto staticInfo = getMicrophoneInfo();
+    if (!staticInfo) return INVALID_OPERATION;
+    std::vector<MicrophoneDynamicInfo> emptyDynamicInfo;
+    emptyDynamicInfo.reserve(staticInfo->size());
+    std::transform(staticInfo->begin(), staticInfo->end(), std::back_inserter(emptyDynamicInfo),
+            [](const auto& info) { return MicrophoneDynamicInfo{ .id = info.id }; });
+    *microphones = VALUE_OR_RETURN_STATUS(
+            ::aidl::android::convertContainers<std::vector<audio_microphone_characteristic_t>>(
+                    *staticInfo, emptyDynamicInfo,
+                    ::aidl::android::aidl2legacy_MicrophoneInfos_audio_microphone_characteristic_t)
+    );
     return OK;
 }
 
@@ -717,8 +753,11 @@ int32_t DeviceHalAidl::getAAudioHardwareBurstMinUsec() {
 
 error::Result<audio_hw_sync_t> DeviceHalAidl::getHwAvSync() {
     TIME_CHECK();
-    ALOGE("%s not implemented yet", __func__);
-    return base::unexpected(INVALID_OPERATION);
+    if (!mModule) return NO_INIT;
+    int32_t aidlHwAvSync;
+    RETURN_STATUS_IF_ERROR(statusTFromBinderStatus(mModule->generateHwAvSyncId(&aidlHwAvSync)));
+    return VALUE_OR_RETURN_STATUS(
+            ::aidl::android::aidl2legacy_int32_t_audio_hw_sync_t(aidlHwAvSync));
 }
 
 status_t DeviceHalAidl::dump(int fd, const Vector<String16>& args) {
