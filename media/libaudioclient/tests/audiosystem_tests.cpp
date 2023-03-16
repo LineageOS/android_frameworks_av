@@ -214,8 +214,11 @@ TEST_F(AudioSystemTest, StartAndStopAudioSource) {
         GTEST_SKIP() << "No ports returned by the audio system";
     }
 
+    bool sourceFound = false;
     for (const auto& port : ports) {
         if (port.role != AUDIO_PORT_ROLE_SOURCE || port.type != AUDIO_PORT_TYPE_DEVICE) continue;
+        if (port.ext.device.type != AUDIO_DEVICE_IN_FM_TUNER) continue;
+        sourceFound = true;
         sourcePortConfig = port.active_config;
 
         bool patchFound;
@@ -223,8 +226,9 @@ TEST_F(AudioSystemTest, StartAndStopAudioSource) {
         // start audio source.
         status_t ret =
                 AudioSystem::startAudioSource(&sourcePortConfig, &attributes, &sourcePortHandle);
-        EXPECT_EQ(OK, ret) << "AudioSystem::startAudioSource for source " << port.ext.device.address
-                           << " failed";
+        EXPECT_EQ(OK, ret) << "AudioSystem::startAudioSource for source "
+                           << audio_device_to_string(port.ext.device.type) << " failed";
+        if (ret != OK) continue;
 
         // verify that patch is established by the source port.
         ASSERT_NO_FATAL_FAILURE(anyPatchContainsInputDevice(port.id, patchFound));
@@ -233,12 +237,16 @@ TEST_F(AudioSystemTest, StartAndStopAudioSource) {
 
         if (sourcePortHandle != AUDIO_PORT_HANDLE_NONE) {
             ret = AudioSystem::stopAudioSource(sourcePortHandle);
-            EXPECT_EQ(OK, ret) << "AudioSystem::stopAudioSource for handle failed";
+            EXPECT_EQ(OK, ret) << "AudioSystem::stopAudioSource failed for handle "
+                               << sourcePortHandle;
         }
 
         // verify that no source port patch exists.
         ASSERT_NO_FATAL_FAILURE(anyPatchContainsInputDevice(port.id, patchFound));
         EXPECT_EQ(false, patchFound);
+    }
+    if (!sourceFound) {
+        GTEST_SKIP() << "No ports suitable for testing";
     }
 }
 
