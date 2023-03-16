@@ -24,7 +24,7 @@
 #include <android-base/stringprintf.h>
 #include <media/AidlConversionCppNdk.h>
 #include <cinttypes>
-#include <time.h>
+#include <ctime>
 #include <utils/Log.h>
 
 namespace android {
@@ -65,12 +65,12 @@ sp<audio_utils::MelProcessor> SoundDoseManager::getOrCreateProcessorForDevice(
             processor->setAttenuation(mMelAttenuationDB[activeTypeIt->second]);
         }
         processor->setDeviceId(deviceId);
-        processor->setOutputRs2(mRs2Value);
+        processor->setOutputRs2UpperBound(mRs2UpperBound);
         return processor;
     } else {
         ALOGV("%s: creating new callback for stream id %d", __func__, streamHandle);
         sp<audio_utils::MelProcessor> melProcessor = sp<audio_utils::MelProcessor>::make(
-                sampleRate, channelCount, format, this, deviceId, mRs2Value);
+                sampleRate, channelCount, format, this, deviceId, mRs2UpperBound);
         const auto activeTypeIt = mActiveDeviceTypes.find(deviceId);
         if (activeTypeIt != mActiveDeviceTypes.end()) {
             melProcessor->setAttenuation(mMelAttenuationDB[activeTypeIt->second]);
@@ -92,10 +92,10 @@ bool SoundDoseManager::setHalSoundDoseInterface(const std::shared_ptr<ISoundDose
             return false;
         }
 
-        if (!mHalSoundDose->setOutputRs2(mRs2Value).isOk()) {
+        if (!mHalSoundDose->setOutputRs2UpperBound(mRs2UpperBound).isOk()) {
             ALOGW("%s: Cannot set RS2 value for momentary exposure %f",
                   __func__,
-                  mRs2Value);
+                  mRs2UpperBound);
         }
 
         // initialize the HAL sound dose callback lazily
@@ -116,30 +116,30 @@ bool SoundDoseManager::setHalSoundDoseInterface(const std::shared_ptr<ISoundDose
     return true;
 }
 
-void SoundDoseManager::setOutputRs2(float rs2Value) {
+void SoundDoseManager::setOutputRs2UpperBound(float rs2Value) {
     ALOGV("%s", __func__);
     std::lock_guard _l(mLock);
 
     if (mHalSoundDose != nullptr) {
         // using the HAL sound dose interface
-        if (!mHalSoundDose->setOutputRs2(rs2Value).isOk()) {
+        if (!mHalSoundDose->setOutputRs2UpperBound(rs2Value).isOk()) {
             ALOGE("%s: Cannot set RS2 value for momentary exposure %f", __func__, rs2Value);
             return;
         }
-        mRs2Value = rs2Value;
+        mRs2UpperBound = rs2Value;
         return;
     }
 
     for (auto& streamProcessor : mActiveProcessors) {
         sp<audio_utils::MelProcessor> processor = streamProcessor.second.promote();
         if (processor != nullptr) {
-            status_t result = processor->setOutputRs2(rs2Value);
+            status_t result = processor->setOutputRs2UpperBound(rs2Value);
             if (result != NO_ERROR) {
-                ALOGW("%s: could not set RS2 value %f for stream %d", __func__, rs2Value,
+                ALOGW("%s: could not set RS2 upper bound %f for stream %d", __func__, rs2Value,
                       streamProcessor.first);
                 return;
             }
-            mRs2Value = rs2Value;
+            mRs2UpperBound = rs2Value;
         }
     }
 }
@@ -259,11 +259,11 @@ void SoundDoseManager::SoundDose::binderDied(__unused const wp<IBinder>& who) {
     }
 }
 
-binder::Status SoundDoseManager::SoundDose::setOutputRs2(float value) {
+binder::Status SoundDoseManager::SoundDose::setOutputRs2UpperBound(float value) {
     ALOGV("%s", __func__);
     auto soundDoseManager = mSoundDoseManager.promote();
     if (soundDoseManager != nullptr) {
-        soundDoseManager->setOutputRs2(value);
+        soundDoseManager->setOutputRs2UpperBound(value);
     }
     return binder::Status::ok();
 }
@@ -287,12 +287,12 @@ binder::Status SoundDoseManager::SoundDose::updateAttenuation(float attenuationD
     return binder::Status::ok();
 }
 
-binder::Status SoundDoseManager::SoundDose::getOutputRs2(float* value) {
+binder::Status SoundDoseManager::SoundDose::getOutputRs2UpperBound(float* value) {
     ALOGV("%s", __func__);
     auto soundDoseManager = mSoundDoseManager.promote();
     if (soundDoseManager != nullptr) {
         std::lock_guard _l(soundDoseManager->mLock);
-        *value = soundDoseManager->mRs2Value;
+        *value = soundDoseManager->mRs2UpperBound;
     }
     return binder::Status::ok();
 }

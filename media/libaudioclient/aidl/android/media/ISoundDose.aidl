@@ -23,8 +23,8 @@ import android.media.SoundDoseRecord;
  * AudioService#SoundDoseHelper to the audio server
  */
 interface ISoundDose {
-    /** Set a new RS2 value used for momentary exposure warnings. */
-    oneway void setOutputRs2(float rs2Value);
+    /** Set a new RS2 upper bound used for momentary exposure warnings. */
+    oneway void setOutputRs2UpperBound(float rs2Value);
 
     /**
      * Resets the native CSD values. This can happen after a crash in the
@@ -49,8 +49,8 @@ interface ISoundDose {
     oneway void updateAttenuation(float attenuationDB, int device);
 
     /* -------------------------- Test API methods --------------------------
-    /** Get the currently used RS2 value. */
-    float getOutputRs2();
+    /** Get the currently used RS2 upper bound. */
+    float getOutputRs2UpperBound();
     /** Get the current CSD from audioserver. */
     float getCsd();
     /** Enables/Disables MEL computations from framework. */
