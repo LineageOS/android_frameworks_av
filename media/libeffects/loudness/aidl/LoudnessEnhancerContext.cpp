@@ -14,6 +14,10 @@
  * limitations under the License.
  */
 
+#define LOG_TAG "LoudnessEnhancerContext"
+
+#include <Utils.h>
+
 #include "LoudnessEnhancerContext.h"
 
 namespace aidl::android::hardware::audio::effect {
@@ -21,17 +25,15 @@ namespace aidl::android::hardware::audio::effect {
 LoudnessEnhancerContext::LoudnessEnhancerContext(int statusDepth, const Parameter::Common& common)
     : EffectContext(statusDepth, common) {
     LOG(DEBUG) << __func__;
-    mState = LOUDNESS_ENHANCER_STATE_UNINITIALIZED;
-    mSampleRate = common.input.base.sampleRate;
     init_params();
 }
 
 LoudnessEnhancerContext::~LoudnessEnhancerContext() {
     LOG(DEBUG) << __func__;
-    mState = LOUDNESS_ENHANCER_STATE_UNINITIALIZED;
 }
 
 RetCode LoudnessEnhancerContext::enable() {
+    std::lock_guard lg(mMutex);
     if (mState != LOUDNESS_ENHANCER_STATE_INITIALIZED) {
         return RetCode::ERROR_EFFECT_LIB_ERROR;
     }
@@ -40,6 +42,7 @@ RetCode LoudnessEnhancerContext::enable() {
 }
 
 RetCode LoudnessEnhancerContext::disable() {
+    std::lock_guard lg(mMutex);
     if (mState != LOUDNESS_ENHANCER_STATE_ACTIVE) {
         return RetCode::ERROR_EFFECT_LIB_ERROR;
     }
@@ -49,12 +52,10 @@ RetCode LoudnessEnhancerContext::disable() {
 
 void LoudnessEnhancerContext::reset() {
     float targetAmp = pow(10, mGain / 2000.0f);  // mB to linear amplification
-    {
-        std::lock_guard lg(mMutex);
-        if (mCompressor != nullptr) {
-            // Get samplingRate from input
-            mCompressor->Initialize(targetAmp, mSampleRate);
-        }
+    std::lock_guard lg(mMutex);
+    if (mCompressor != nullptr) {
+        // Get samplingRate from input
+        mCompressor->Initialize(targetAmp, mCommon.input.base.sampleRate);
     }
 }
 
@@ -75,39 +76,41 @@ IEffect::Status LoudnessEnhancerContext::lvmProcess(float* in, float* out, int s
     auto frameSize = getInputFrameSize();
     RETURN_VALUE_IF(0 == frameSize, status, "zeroFrameSize");
 
+    std::lock_guard lg(mMutex);
+    status = {STATUS_INVALID_OPERATION, 0, 0};
+    RETURN_VALUE_IF(mState != LOUDNESS_ENHANCER_STATE_ACTIVE, status, "stateNotActive");
+
     LOG(DEBUG) << __func__ << " start processing";
-    {
-        std::lock_guard lg(mMutex);
-        // PcmType is always expected to be Float 32 bit.
-        constexpr float scale = 1 << 15;  // power of 2 is lossless conversion to int16_t range
-        constexpr float inverseScale = 1.f / scale;
-        const float inputAmp = pow(10, mGain / 2000.0f) * scale;
-        float leftSample, rightSample;
-        if (mCompressor != nullptr) {
-            for (int inIdx = 0; inIdx < samples; inIdx += 2) {
-                // makeup gain is applied on the input of the compressor
-                leftSample = inputAmp * in[inIdx];
-                rightSample = inputAmp * in[inIdx + 1];
-                mCompressor->Compress(&leftSample, &rightSample);
-                in[inIdx] = leftSample * inverseScale;
-                in[inIdx + 1] = rightSample * inverseScale;
-            }
-        } else {
-            for (int inIdx = 0; inIdx < samples; inIdx += 2) {
-                leftSample = inputAmp * in[inIdx];
-                rightSample = inputAmp * in[inIdx + 1];
-                in[inIdx] = leftSample * inverseScale;
-                in[inIdx + 1] = rightSample * inverseScale;
-            }
+    // PcmType is always expected to be Float 32 bit.
+    constexpr float scale = 1 << 15;  // power of 2 is lossless conversion to int16_t range
+    constexpr float inverseScale = 1.f / scale;
+    const float inputAmp = pow(10, mGain / 2000.0f) * scale;
+    float leftSample, rightSample;
+
+    if (mCompressor != nullptr) {
+        for (int inIdx = 0; inIdx < samples; inIdx += 2) {
+            // makeup gain is applied on the input of the compressor
+            leftSample = inputAmp * in[inIdx];
+            rightSample = inputAmp * in[inIdx + 1];
+            mCompressor->Compress(&leftSample, &rightSample);
+            in[inIdx] = leftSample * inverseScale;
+            in[inIdx + 1] = rightSample * inverseScale;
         }
-        bool accumulate = false;
-        if (in != out) {
-            for (int i = 0; i < samples; i++) {
-                if (accumulate) {
-                    out[i] += in[i];
-                } else {
-                    out[i] = in[i];
-                }
+    } else {
+        for (int inIdx = 0; inIdx < samples; inIdx += 2) {
+            leftSample = inputAmp * in[inIdx];
+            rightSample = inputAmp * in[inIdx + 1];
+            in[inIdx] = leftSample * inverseScale;
+            in[inIdx + 1] = rightSample * inverseScale;
+        }
+    }
+    bool accumulate = false;
+    if (in != out) {
+        for (int i = 0; i < samples; i++) {
+            if (accumulate) {
+                out[i] += in[i];
+            } else {
+                out[i] = in[i];
             }
         }
     }
@@ -115,15 +118,17 @@ IEffect::Status LoudnessEnhancerContext::lvmProcess(float* in, float* out, int s
 }
 
 void LoudnessEnhancerContext::init_params() {
+    int channelCount = ::aidl::android::hardware::audio::common::getChannelCount(
+            mCommon.input.base.channelMask);
+    LOG_ALWAYS_FATAL_IF(channelCount != 2, "channel count %d not supported", channelCount);
+
     mGain = LOUDNESS_ENHANCER_DEFAULT_TARGET_GAIN_MB;
     float targetAmp = pow(10, mGain / 2000.0f);  // mB to linear amplification
     LOG(DEBUG) << __func__ << "Target gain = " << mGain << "mB <=> factor = " << targetAmp;
 
-    {
-        std::lock_guard lg(mMutex);
-        mCompressor = std::make_unique<le_fx::AdaptiveDynamicRangeCompression>();
-        mCompressor->Initialize(targetAmp, mSampleRate);
-    }
+    std::lock_guard lg(mMutex);
+    mCompressor = std::make_unique<le_fx::AdaptiveDynamicRangeCompression>();
+    mCompressor->Initialize(targetAmp, mCommon.input.base.sampleRate);
     mState = LOUDNESS_ENHANCER_STATE_INITIALIZED;
 }
 
