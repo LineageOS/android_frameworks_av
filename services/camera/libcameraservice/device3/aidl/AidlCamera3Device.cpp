@@ -238,7 +238,7 @@ status_t AidlCamera3Device::initialize(sp<CameraProviderManager> manager,
                     &mPhysicalDeviceInfoMap[physicalId],
                     mSupportNativeZoomRatio, usePrecorrectArray);
 
-            if (SessionConfigurationUtils::isUltraHighResolutionSensor(
+            if (SessionConfigurationUtils::supportsUltraHighResolutionCapture(
                     mPhysicalDeviceInfoMap[physicalId])) {
                 mUHRCropAndMeteringRegionMappers[physicalId] =
                         UHRCropAndMeteringRegionMapper(mPhysicalDeviceInfoMap[physicalId],
@@ -874,8 +874,9 @@ status_t AidlCamera3Device::AidlHalInterface::constructDefaultRequestSettings(
 }
 
 status_t AidlCamera3Device::AidlHalInterface::configureStreams(
-    const camera_metadata_t *sessionParams,
-        camera_stream_configuration *config, const std::vector<uint32_t>& bufferSizes) {
+        const camera_metadata_t *sessionParams,
+        camera_stream_configuration *config, const std::vector<uint32_t>& bufferSizes,
+        int64_t logId) {
     using camera::device::StreamType;
     using camera::device::StreamConfigurationMode;
 
@@ -960,6 +961,7 @@ status_t AidlCamera3Device::AidlHalInterface::configureStreams(
 
     requestedConfiguration.streamConfigCounter = mNextStreamConfigCounter++;
     requestedConfiguration.multiResolutionInputImage = config->input_is_multi_resolution;
+    requestedConfiguration.logId = logId;
     auto err = mAidlSession->configureStreams(requestedConfiguration, &finalConfiguration);
     if (!err.isOk()) {
         ALOGE("%s: Transaction error: %s", __FUNCTION__, err.getMessage());

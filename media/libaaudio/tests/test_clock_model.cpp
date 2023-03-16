@@ -30,7 +30,8 @@ using namespace aaudio;
 // We can use arbitrary values here because we are not opening a real audio stream.
 #define SAMPLE_RATE             48000
 #define HW_FRAMES_PER_BURST     48
-#define NANOS_PER_BURST         (NANOS_PER_SECOND * HW_FRAMES_PER_BURST / SAMPLE_RATE)
+// Sometimes we need a (double) value to avoid misguided Build warnings.
+#define NANOS_PER_BURST         ((double) NANOS_PER_SECOND * HW_FRAMES_PER_BURST / SAMPLE_RATE)
 
 class ClockModelTestFixture: public ::testing::Test {
 public:
@@ -49,10 +50,20 @@ public:
         // cleanup any pending stuff, but no exceptions allowed
     }
 
-    // Test processing of timestamps when the hardware may be slightly off from
-    // the expected sample rate.
-    void checkDriftingClock(double hardwareFramesPerSecond, int numLoops) {
+    /** Test processing of timestamps when the hardware may be slightly off from
+     * the expected sample rate.
+     * @param hardwareFramesPerSecond  sample rate that may be slightly off
+     * @param numLoops number of iterations
+     * @param hardwarePauseTime  number of seconds to jump forward at halfway point
+     */
+    void checkDriftingClock(double hardwareFramesPerSecond,
+                            int numLoops,
+                            double hardwarePauseTime = 0.0) {
+        int checksToSkip = 0;
         const int64_t startTimeNanos = 500000000; // arbitrary
+        int64_t jumpOffsetNanos = 0;
+
+        srand48(123456); // arbitrary seed for repeatable test results
         model.start(startTimeNanos);
 
         const int64_t startPositionFrames = HW_FRAMES_PER_BURST; // hardware
@@ -64,7 +75,7 @@ public:
         model.processTimestamp(startPositionFrames, markerTime);
         ASSERT_EQ(startPositionFrames, model.convertTimeToPosition(markerTime));
 
-        double elapsedTimeSeconds = startTimeNanos / (double) NANOS_PER_SECOND;
+        double elapsedTimeSeconds = 0.0;
         for (int i = 0; i < numLoops; i++) {
             // Calculate random delay over several bursts.
             const double timeDelaySeconds = 10.0 * drand48() * NANOS_PER_BURST / NANOS_PER_SECOND;
@@ -75,12 +86,37 @@ public:
             const int64_t currentTimeFrames = startPositionFrames +
                                         (int64_t)(hardwareFramesPerSecond * elapsedTimeSeconds);
             const int64_t numBursts = currentTimeFrames / HW_FRAMES_PER_BURST;
-            const int64_t alignedPosition = startPositionFrames + (numBursts * HW_FRAMES_PER_BURST);
+            const int64_t hardwarePosition = startPositionFrames
+                    + (numBursts * HW_FRAMES_PER_BURST);
 
-            // Apply drifting timestamp.
-            model.processTimestamp(alignedPosition, currentTimeNanos);
+            // Simulate a pause in the DSP where the position freezes for a length of time.
+            if (i == numLoops / 2) {
+                jumpOffsetNanos = (int64_t)(hardwarePauseTime * NANOS_PER_SECOND);
+                checksToSkip = 5; // Give the model some time to catch up.
+            }
 
-            ASSERT_EQ(alignedPosition, model.convertTimeToPosition(currentTimeNanos));
+            // Apply drifting timestamp. Add a random time to simulate the
+            // random sampling of the clock that occurs when polling the DSP clock.
+            int64_t sampledTimeNanos = (int64_t) (currentTimeNanos
+                    + jumpOffsetNanos
+                    + (drand48() * NANOS_PER_BURST));
+            model.processTimestamp(hardwarePosition, sampledTimeNanos);
+
+            if (checksToSkip > 0) {
+                checksToSkip--;
+            } else {
+                // When the model is drifting it may be pushed forward or backward.
+                const int64_t modelPosition = model.convertTimeToPosition(sampledTimeNanos);
+                if (hardwareFramesPerSecond >= SAMPLE_RATE) { // fast hardware
+                    ASSERT_LE(hardwarePosition - HW_FRAMES_PER_BURST, modelPosition);
+                    ASSERT_GE(hardwarePosition + HW_FRAMES_PER_BURST, modelPosition);
+                } else {
+                    // Slow hardware. If this fails then the model may be drifting
+                    // forward in time too slowly. Increase kDriftNanos.
+                    ASSERT_LE(hardwarePosition, modelPosition);
+                    ASSERT_GE(hardwarePosition + (2 * HW_FRAMES_PER_BURST), modelPosition);
+                }
+            }
         }
     }
 
@@ -144,23 +180,31 @@ TEST_F(ClockModelTestFixture, clock_timestamp) {
     EXPECT_EQ(position, model.convertTimeToPosition(markerTime + (73 * NANOS_PER_MICROSECOND)));
 
     // convertPositionToTime rounds up
-    EXPECT_EQ(markerTime + NANOS_PER_BURST, model.convertPositionToTime(position + 17));
+    EXPECT_EQ(markerTime + (int64_t)NANOS_PER_BURST, model.convertPositionToTime(position + 17));
 }
 
-#define NUM_LOOPS_DRIFT   10000
+#define NUM_LOOPS_DRIFT   200000
 
-// test nudging the window by using a drifting HW clock
 TEST_F(ClockModelTestFixture, clock_no_drift) {
     checkDriftingClock(SAMPLE_RATE, NUM_LOOPS_DRIFT);
 }
 
-// These slow drift rates caused errors when I disabled the code that handles
-// drifting in the clock model. So I think the test is valid.
+// Test drifting hardware clocks.
 // It is unlikely that real hardware would be off by more than this amount.
+
+// Test a slow clock. This will cause the times to be later than expected.
+// This will push the clock model window forward and cause it to drift.
 TEST_F(ClockModelTestFixture, clock_slow_drift) {
-    checkDriftingClock(0.998 * SAMPLE_RATE, NUM_LOOPS_DRIFT);
+    checkDriftingClock(0.99998 * SAMPLE_RATE, NUM_LOOPS_DRIFT);
 }
 
+// Test a fast hardware clock. This will cause the times to be earlier
+// than expected. This will cause the clock model to jump backwards quickly.
 TEST_F(ClockModelTestFixture, clock_fast_drift) {
-    checkDriftingClock(1.002 * SAMPLE_RATE, NUM_LOOPS_DRIFT);
+    checkDriftingClock(1.00002 * SAMPLE_RATE, NUM_LOOPS_DRIFT);
+}
+
+// Simulate a pause in the DSP, which can occur if the DSP reroutes the audio.
+TEST_F(ClockModelTestFixture, clock_jump_forward_500) {
+    checkDriftingClock(SAMPLE_RATE, NUM_LOOPS_DRIFT, 0.500);
 }

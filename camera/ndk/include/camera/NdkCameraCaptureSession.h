@@ -101,6 +101,20 @@ typedef struct ACameraCaptureSession_stateCallbacks {
 
 /**
  * The definition of camera capture session onWindowPrepared callback.
+ *
+ * <p>This callback is called when the buffer pre-allocation for an output window Surface is
+ * complete. </p>
+ *
+ * <p>Buffer pre-allocation for an output window is started by
+ * {@link ACameraCaptureSession_prepare}
+ * call. While allocation is underway, the output must not be used in a capture request.
+ * Once this callback is called, the output provided can be used as a target for a
+ * capture request. In case of an error during pre-allocation (such as running out of
+ * suitable-memory), this callback is still invoked after the error is encountered, though some
+ * buffers may not have been successfully pre-allocated.</p>
+ *
+ * Introduced in API 34.
+ *
  * @param context The optional app-provided context pointer that was included in
  *        the {@link ACameraCaptureSession_prepareCallbacks} struct.
  * @param window The window that {@link ACameraCaptureSession_prepare} was called on.
@@ -111,32 +125,6 @@ typedef void (*ACameraCaptureSession_prepareCallback)(
         void *context,
         ACameraWindowType *window,
         ACameraCaptureSession *session);
-
-/**
- * Capture session state callbacks used in {@link ACameraDevice_setPrepareCallbacks}
- */
-typedef struct ACameraCaptureSession_prepareCallbacks {
-    /// optional application context. This will be passed in the context
-    /// parameter of the {@link onWindowPrepared} callback.
-    void*                               context;
-
-    /**
-     * This callback is called when the buffer pre-allocation for an output window Surface is
-     * complete.
-     * <p>Buffer pre-allocation for an output window is started by
-     * {@link ACameraCaptureSession_prepare}
-     * call. While allocation is underway, the output must not be used in a capture request.
-     * Once this callback is called, the output provided can be used as a target for a
-     * capture request. In case of an error during pre-allocation (such as running out of
-     * suitable-memory), this callback is still invoked after the error is encountered, though some
-     * buffers may not have been successfully pre-allocated </p>
-     */
-    ACameraCaptureSession_prepareCallback onWindowPrepared;
-
-    // Reserved for future callback additions, these must be set to nullptr by the client.
-    ACameraCaptureSession_prepareCallback reserved0;
-    ACameraCaptureSession_prepareCallback reserved1;
-} ACameraCaptureSession_prepareCallbacks;
 
 /// Enum for describing error reason in {@link ACameraCaptureFailure}
 enum {
@@ -1033,8 +1021,10 @@ camera_status_t ACameraCaptureSession_logicalCamera_setRepeatingRequestV2(
  * pre-allocation of buffers through the {@link ACameraCaptureSession_prepareWindow} call has
  * completed the pre-allocation of buffers.
  * @param session the ACameraCaptureSession on which ACameraCaptureSession_prepareWindow was called.
- * @param callbacks the callback to be called when the output window's buffer pre-allocation is
- *                  complete.
+ * @param context optional application provided context. This will be passed into the context
+ *        parameter of the {@link onWindowPrepared} callback.
+ * @param callback the callback to be called when the output window's buffer pre-allocation is
+ *        complete.
  * @return <ul><li> {@link ACAMERA_OK} if the method succeeds</li>
  *         <li>{@link ACAMERA_ERROR_INVALID_PARAMETER} if session or callbacks is
  *              NULL. Or if the session has not been configured with the window</li>
@@ -1046,7 +1036,8 @@ camera_status_t ACameraCaptureSession_logicalCamera_setRepeatingRequestV2(
  */
 camera_status_t ACameraCaptureSession_setWindowPreparedCallback(
     ACameraCaptureSession* session,
-    ACameraCaptureSession_prepareCallbacks* callbacks) __INTRODUCED_IN(34);
+    void *context,
+    ACameraCaptureSession_prepareCallback callback) __INTRODUCED_IN(34);
 
 /**
  *
@@ -1087,7 +1078,7 @@ camera_status_t ACameraCaptureSession_setWindowPreparedCallback(
  * <p>Once allocation is complete, {@link ACameraCaptureSession_prepareCallback#onWindowPrepared}
  * will be invoked with the output provided to this method. Between the prepare call and the
  * {@link ACameraCaptureSession_prepareCallback#onWindowPrepared} call,
- * the output provided to prepare must not be used as a target of a capture qequest submitted
+ * the output provided to prepare must not be used as a target of a capture request submitted
  * to this session.</p>
  *
  * <p>{@link android.hardware.camera2.CameraCharacteristics#INFO_SUPPORTED_HARDWARE_LEVEL_LEGACY LEGACY}

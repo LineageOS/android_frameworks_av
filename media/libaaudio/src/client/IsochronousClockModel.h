@@ -129,6 +129,9 @@ public:
 
 private:
 
+    void driftForward(int64_t latenessNanos,
+                      int64_t expectedNanosDelta,
+                      int64_t framePosition);
     int32_t getLateTimeOffsetNanos() const;
     void update();
 
@@ -139,28 +142,44 @@ private:
         STATE_RUNNING
     };
 
-    // Amount of time to drift forward when we get a late timestamp.
-    static constexpr int32_t   kDriftNanos         =   1 * 1000;
+    // Maximum amount of time to drift forward when we get a late timestamp.
+    static constexpr int64_t   kMaxDriftNanos      = 10 * AAUDIO_NANOS_PER_MICROSECOND;
     // Safety margin to add to the late edge of the timestamp window.
-    static constexpr int32_t   kExtraLatenessNanos = 100 * 1000;
-    // Initial small threshold for causing a drift later in time.
-    static constexpr int32_t   kInitialLatenessForDriftNanos = 10 * 1000;
+    static constexpr int32_t   kExtraLatenessNanos = 100 * AAUDIO_NANOS_PER_MICROSECOND;
+    // Predicted lateness due to scheduling jitter in the HAL timestamp collection.
+    static constexpr int32_t   kLatenessMarginForSchedulingJitter
+            = 1000 * AAUDIO_NANOS_PER_MICROSECOND;
+    // Amount we multiply mLatenessForDriftNanos to get mLatenessForJumpNanos.
+    // This determines when we go from thinking the clock is drifting to
+    // when it has actually paused briefly.
+    static constexpr int32_t   kScalerForJumpLateness = 5;
+    // Amount to divide lateness past the expected burst window to generate
+    // the drift value for the window. This is meant to be a very slight nudge forward.
+    static constexpr int32_t   kShifterForDrift = 6; // divide by 2^N
+    static constexpr int32_t   kVeryLateCountsNeededToTriggerJump = 2;
 
     static constexpr int32_t   kHistogramBinWidthMicros = 50;
-    static constexpr int32_t   kHistogramBinCount = 128;
+    static constexpr int32_t   kHistogramBinCount       = 128;
 
     int64_t             mMarkerFramePosition{0}; // Estimated HW position.
     int64_t             mMarkerNanoTime{0};      // Estimated HW time.
+    int64_t             mBurstPeriodNanos{0};    // Time between HW bursts.
+    // Includes mBurstPeriodNanos because we sample randomly over time.
+    int64_t             mMaxMeasuredLatenessNanos{0};
+    // Threshold for lateness that triggers a drift later in time.
+    int64_t             mLatenessForDriftNanos{0}; // Set in update()
+    // Based on the observed lateness when the DSP is paused for playing a touch sound.
+    int64_t             mLatenessForJumpNanos{0}; // Set in update()
+    int64_t             mLastJumpWarningTimeNanos{0}; // For throttling warnings.
+
     int32_t             mSampleRate{48000};
     int32_t             mFramesPerBurst{48};     // number of frames transferred at one time.
-    int32_t             mBurstPeriodNanos{0};    // Time between HW bursts.
-    // Includes mBurstPeriodNanos because we sample randomly over time.
-    int32_t             mMaxMeasuredLatenessNanos{0};
-    // Threshold for lateness that triggers a drift later in time.
-    int32_t             mLatenessForDriftNanos;
+    int32_t             mConsecutiveVeryLateCount{0};  // To detect persistent DSP lateness.
+
     clock_model_state_t mState{STATE_STOPPED};   // State machine handles startup sequence.
 
     int32_t             mTimestampCount = 0;  // For logging.
+    int32_t             mDspStallCount = 0;  // For logging.
 
     // distribution of timestamps relative to earliest
     std::unique_ptr<android::audio_utils::Histogram>   mHistogramMicros;
