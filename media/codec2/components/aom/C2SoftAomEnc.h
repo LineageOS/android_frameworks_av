@@ -103,6 +103,7 @@ struct C2SoftAomEnc : public SimpleC2Component {
     std::shared_ptr<C2StreamFrameRateInfo::output> mFrameRate;
     std::shared_ptr<C2StreamBitrateInfo::output> mBitrate;
     std::shared_ptr<C2StreamQualityTuning::output> mQuality;
+    std::shared_ptr<C2StreamComplexityTuning::output> mComplexity;
     std::shared_ptr<C2StreamBitrateModeTuning::output> mBitrateMode;
     std::shared_ptr<C2StreamRequestSyncFrameTuning::output> mRequestSync;
     std::shared_ptr<C2StreamColorAspectsInfo::output> mColorAspects;
@@ -129,6 +130,9 @@ class C2SoftAomEnc::IntfImpl : public SimpleInterface<void>::BaseParams {
     std::shared_ptr<C2StreamFrameRateInfo::output> getFrameRate_l() const { return mFrameRate; }
     std::shared_ptr<C2StreamBitrateInfo::output> getBitrate_l() const { return mBitrate; }
     std::shared_ptr<C2StreamQualityTuning::output> getQuality_l() const { return mQuality; }
+    std::shared_ptr<C2StreamComplexityTuning::output> getComplexity_l() const {
+      return mComplexity;
+    }
     std::shared_ptr<C2StreamBitrateModeTuning::output> getBitrateMode_l() const {
         return mBitrateMode;
     }
@@ -155,6 +159,7 @@ class C2SoftAomEnc::IntfImpl : public SimpleInterface<void>::BaseParams {
     std::shared_ptr<C2StreamSyncFrameIntervalTuning::output> mSyncFramePeriod;
     std::shared_ptr<C2StreamBitrateInfo::output> mBitrate;
     std::shared_ptr<C2StreamQualityTuning::output> mQuality;
+    std::shared_ptr<C2StreamComplexityTuning::output> mComplexity;
     std::shared_ptr<C2StreamBitrateModeTuning::output> mBitrateMode;
     std::shared_ptr<C2StreamProfileLevelInfo::output> mProfileLevel;
     std::shared_ptr<C2StreamColorAspectsInfo::input> mColorAspects;
