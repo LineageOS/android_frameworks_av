@@ -128,13 +128,14 @@ class DeviceHalInterface : public virtual RefBase
             std::vector<media::audio::common::AudioMMapPolicyInfo> *policyInfos) = 0;
     virtual int32_t getAAudioMixerBurstCount() = 0;
     virtual int32_t getAAudioHardwareBurstMinUsec() = 0;
+
     virtual int32_t supportsBluetoothVariableLatency(bool* supports) = 0;
 
     // Update the connection status of an external device.
-    virtual status_t setConnectedState(const struct audio_port_v7* port, bool connected) {
-        ALOGE("%s override me port %p connected %d", __func__, port, connected);
-        return OK;
-    }
+    virtual status_t setConnectedState(const struct audio_port_v7* port, bool connected) = 0;
+
+    // Enable simulation of external devices connection at the HAL level.
+    virtual status_t setSimulateDeviceConnections(bool enabled) = 0;
 
     virtual error::Result<audio_hw_sync_t> getHwAvSync() = 0;
 

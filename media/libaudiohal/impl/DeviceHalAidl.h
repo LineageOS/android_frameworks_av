@@ -24,6 +24,7 @@
 #include <android-base/thread_annotations.h>
 #include <media/audiohal/DeviceHalInterface.h>
 #include <media/audiohal/EffectHalInterface.h>
+#include <media/audiohal/StreamHalInterface.h>
 
 #include "ConversionHelperAidl.h"
 
@@ -138,7 +139,7 @@ class DeviceHalAidl : public DeviceHalInterface, public ConversionHelperAidl,
     status_t setAudioPortConfig(const struct audio_port_config* config) override;
 
     // List microphones
-    status_t getMicrophones(std::vector<audio_microphone_characteristic_t>* microphones);
+    status_t getMicrophones(std::vector<audio_microphone_characteristic_t>* microphones) override;
 
     status_t addDeviceEffect(audio_port_handle_t device, sp<EffectHalInterface> effect) override;
 
@@ -154,9 +155,13 @@ class DeviceHalAidl : public DeviceHalInterface, public ConversionHelperAidl,
 
     error::Result<audio_hw_sync_t> getHwAvSync() override;
 
-    status_t dump(int __unused, const Vector<String16>& __unused) override;
-
     int32_t supportsBluetoothVariableLatency(bool* supports __unused) override;
+
+    status_t setConnectedState(const struct audio_port_v7 *port, bool connected) override;
+
+    status_t setSimulateDeviceConnections(bool enabled) override;
+
+    status_t dump(int __unused, const Vector<String16>& __unused) override;
 
   private:
     friend class sp<DeviceHalAidl>;
@@ -176,6 +181,7 @@ class DeviceHalAidl : public DeviceHalInterface, public ConversionHelperAidl,
     using PortConfigs = std::map<int32_t /*port config ID*/,
             ::aidl::android::media::audio::common::AudioPortConfig>;
     using Ports = std::map<int32_t /*port ID*/, ::aidl::android::media::audio::common::AudioPort>;
+    using Streams = std::map<wp<StreamHalInterface>, int32_t /*patch ID*/>;
     class Cleanups;
 
     // Must not be constructed directly by clients.
@@ -225,9 +231,6 @@ class DeviceHalAidl : public DeviceHalInterface, public ConversionHelperAidl,
             const ::aidl::android::media::audio::common::AudioConfig& config,
             const std::optional<::aidl::android::media::audio::common::AudioIoFlags>& flags,
             int32_t ioHandle);
-    // Currently unused but may be useful for implementing setAudioPortConfig
-    // PortConfigs::iterator findPortConfig(
-    //         const ::aidl::android::media::audio::common::AudioPortConfig& portConfig);
     status_t prepareToOpenStream(
         int32_t aidlHandle,
         const ::aidl::android::media::audio::common::AudioDevice& aidlDevice,
@@ -237,9 +240,12 @@ class DeviceHalAidl : public DeviceHalInterface, public ConversionHelperAidl,
         Cleanups* cleanups,
         ::aidl::android::media::audio::common::AudioConfig* aidlConfig,
         ::aidl::android::media::audio::common::AudioPortConfig* mixPortConfig,
-        int32_t* nominalLatency);
+        ::aidl::android::hardware::audio::core::AudioPatch* aidlPatch);
     void resetPatch(int32_t patchId);
     void resetPortConfig(int32_t portConfigId);
+    void resetUnusedPatches();
+    void resetUnusedPatchesAndPortConfigs();
+    void resetUnusedPortConfigs();
 
     // CallbackBroker implementation
     void clearCallbacks(void* cookie) override;
@@ -266,6 +272,7 @@ class DeviceHalAidl : public DeviceHalInterface, public ConversionHelperAidl,
     int32_t mDefaultOutputPortId = -1;
     PortConfigs mPortConfigs;
     Patches mPatches;
+    Streams mStreams;
     Microphones mMicrophones;
     std::mutex mLock;
     std::map<void*, Callbacks> mCallbacks GUARDED_BY(mLock);
