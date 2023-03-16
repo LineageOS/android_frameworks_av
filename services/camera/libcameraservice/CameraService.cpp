@@ -697,17 +697,100 @@ void CameraService::onTorchStatusChangedLocked(const String8& cameraId,
     broadcastTorchModeStatus(cameraId, newStatus, systemCameraKind);
 }
 
-static bool hasPermissionsForSystemCamera(int callingPid, int callingUid) {
+static bool isAutomotiveDevice() {
+    // Checks the property ro.hardware.type and returns true if it is
+    // automotive.
+    char value[PROPERTY_VALUE_MAX] = {0};
+    property_get("ro.hardware.type", value, "");
+    return strncmp(value, "automotive", PROPERTY_VALUE_MAX) == 0;
+}
+
+static bool isAutomotivePrivilegedClient(int32_t uid) {
+    // Returns false if this is not an automotive device type.
+    if (!isAutomotiveDevice())
+        return false;
+
+    // Returns true if the uid is AID_AUTOMOTIVE_EVS which is a
+    // privileged client uid used for safety critical use cases such as
+    // rear view and surround view.
+    return uid == AID_AUTOMOTIVE_EVS;
+}
+
+bool CameraService::isAutomotiveExteriorSystemCamera(const String8& cam_id) const{
+    // Returns false if this is not an automotive device type.
+    if (!isAutomotiveDevice())
+        return false;
+
+    // Returns false if no camera id is provided.
+    if (cam_id.isEmpty())
+        return false;
+
+    SystemCameraKind systemCameraKind = SystemCameraKind::PUBLIC;
+    if (getSystemCameraKind(cam_id, &systemCameraKind) != OK) {
+        // This isn't a known camera ID, so it's not a system camera.
+        ALOGE("%s: Unknown camera id %s, ", __FUNCTION__, cam_id.c_str());
+        return false;
+    }
+
+    if (systemCameraKind != SystemCameraKind::SYSTEM_ONLY_CAMERA) {
+        ALOGE("%s: camera id %s is not a system camera", __FUNCTION__, cam_id.c_str());
+        return false;
+    }
+
+    CameraMetadata cameraInfo;
+    status_t res = mCameraProviderManager->getCameraCharacteristics(
+            cam_id.string(), false, &cameraInfo, false);
+    if (res != OK){
+        ALOGE("%s: Not able to get camera characteristics for camera id %s",__FUNCTION__,
+                cam_id.c_str());
+        return false;
+    }
+
+    camera_metadata_entry auto_location  = cameraInfo.find(ANDROID_AUTOMOTIVE_LOCATION);
+    if (auto_location.count != 1)
+        return false;
+
+    uint8_t location = auto_location.data.u8[0];
+    if ((location != ANDROID_AUTOMOTIVE_LOCATION_EXTERIOR_FRONT) &&
+            (location != ANDROID_AUTOMOTIVE_LOCATION_EXTERIOR_REAR) &&
+            (location != ANDROID_AUTOMOTIVE_LOCATION_EXTERIOR_LEFT) &&
+            (location != ANDROID_AUTOMOTIVE_LOCATION_EXTERIOR_RIGHT)) {
+        return false;
+    }
+
+    return true;
+}
+
+bool CameraService::checkPermission(const String8& cam_id, const String16& permission,
+        const AttributionSourceState& attributionSource,const String16& message,
+        int32_t attributedOpCode) const{
+    if (isAutomotivePrivilegedClient(attributionSource.uid)) {
+        // If cam_id is empty, then it means that this check is not used for the
+        // purpose of accessing a specific camera, hence grant permission just
+        // based on uid to the automotive privileged client.
+        if (cam_id.isEmpty())
+            return true;
+        // If this call is used for accessing a specific camera then cam_id must be provided.
+        // In that case, only pre-grants the permission for accessing the exterior system only
+        // camera.
+        return isAutomotiveExteriorSystemCamera(cam_id);
+
+    }
+
     permission::PermissionChecker permissionChecker;
+    return permissionChecker.checkPermissionForPreflight(permission, attributionSource,
+            message, attributedOpCode) != permission::PermissionChecker::PERMISSION_HARD_DENIED;
+}
+
+bool CameraService::hasPermissionsForSystemCamera(const String8& cam_id, int callingPid,
+        int callingUid) const{
     AttributionSourceState attributionSource{};
     attributionSource.pid = callingPid;
     attributionSource.uid = callingUid;
-    bool checkPermissionForSystemCamera = permissionChecker.checkPermissionForPreflight(
-            sSystemCameraPermission, attributionSource, String16(), AppOpsManager::OP_NONE)
-            != permission::PermissionChecker::PERMISSION_HARD_DENIED;
-    bool checkPermissionForCamera = permissionChecker.checkPermissionForPreflight(
-            sCameraPermission, attributionSource, String16(), AppOpsManager::OP_NONE)
-            != permission::PermissionChecker::PERMISSION_HARD_DENIED;
+    bool checkPermissionForSystemCamera = checkPermission(cam_id,
+            sSystemCameraPermission, attributionSource, String16(), AppOpsManager::OP_NONE);
+    bool checkPermissionForCamera = checkPermission(cam_id,
+            sCameraPermission, attributionSource, String16(), AppOpsManager::OP_NONE);
     return checkPermissionForSystemCamera && checkPermissionForCamera;
 }
 
@@ -715,7 +798,7 @@ Status CameraService::getNumberOfCameras(int32_t type, int32_t* numCameras) {
     ATRACE_CALL();
     Mutex::Autolock l(mServiceLock);
     bool hasSystemCameraPermissions =
-            hasPermissionsForSystemCamera(CameraThreadState::getCallingPid(),
+            hasPermissionsForSystemCamera(String8(), CameraThreadState::getCallingPid(),
                     CameraThreadState::getCallingUid());
     switch (type) {
         case CAMERA_TYPE_BACKWARD_COMPATIBLE:
@@ -756,9 +839,8 @@ Status CameraService::getCameraInfo(int cameraId, bool overrideToPortrait,
         return STATUS_ERROR(ERROR_DISCONNECTED,
                 "Camera subsystem is not available");
     }
-    bool hasSystemCameraPermissions =
-            hasPermissionsForSystemCamera(CameraThreadState::getCallingPid(),
-                    CameraThreadState::getCallingUid());
+    bool hasSystemCameraPermissions = hasPermissionsForSystemCamera(String8::format("%d", cameraId),
+            CameraThreadState::getCallingPid(), CameraThreadState::getCallingUid());
     int cameraIdBound = mNumberOfCamerasWithoutSystemCamera;
     if (hasSystemCameraPermissions) {
         cameraIdBound = mNumberOfCameras;
@@ -787,13 +869,11 @@ std::string CameraService::cameraIdIntToStrLocked(int cameraIdInt) {
     const std::vector<std::string> *deviceIds = &mNormalDeviceIdsWithoutSystemCamera;
     auto callingPid = CameraThreadState::getCallingPid();
     auto callingUid = CameraThreadState::getCallingUid();
-    permission::PermissionChecker permissionChecker;
     AttributionSourceState attributionSource{};
     attributionSource.pid = callingPid;
     attributionSource.uid = callingUid;
-    bool checkPermissionForSystemCamera = permissionChecker.checkPermissionForPreflight(
-                sSystemCameraPermission, attributionSource, String16(), AppOpsManager::OP_NONE)
-                != permission::PermissionChecker::PERMISSION_HARD_DENIED;
+    bool checkPermissionForSystemCamera = checkPermission(String8::format("%d", cameraIdInt),
+                sSystemCameraPermission, attributionSource, String16(), AppOpsManager::OP_NONE);
     if (checkPermissionForSystemCamera || getpid() == callingPid) {
         deviceIds = &mNormalDeviceIds;
     }
@@ -865,13 +945,11 @@ Status CameraService::getCameraCharacteristics(const String16& cameraId,
     // If it's not calling from cameraserver, check the permission only if
     // android.permission.CAMERA is required. If android.permission.SYSTEM_CAMERA was needed,
     // it would've already been checked in shouldRejectSystemCameraConnection.
-    permission::PermissionChecker permissionChecker;
     AttributionSourceState attributionSource{};
     attributionSource.pid = callingPid;
     attributionSource.uid = callingUid;
-    bool checkPermissionForCamera = permissionChecker.checkPermissionForPreflight(
-                sCameraPermission, attributionSource, String16(), AppOpsManager::OP_NONE)
-                != permission::PermissionChecker::PERMISSION_HARD_DENIED;
+    bool checkPermissionForCamera = checkPermission(String8(cameraId), sCameraPermission,
+            attributionSource, String16(), AppOpsManager::OP_NONE);
     if ((callingPid != getpid()) &&
             (deviceKind != SystemCameraKind::SYSTEM_ONLY_CAMERA) &&
             !checkPermissionForCamera) {
@@ -1308,7 +1386,6 @@ Status CameraService::validateConnectLocked(const String8& cameraId,
 Status CameraService::validateClientPermissionsLocked(const String8& cameraId,
         const String8& clientName8, int& clientUid, int& clientPid,
         /*out*/int& originalClientPid) const {
-    permission::PermissionChecker permissionChecker;
     AttributionSourceState attributionSource{};
 
     int callingPid = CameraThreadState::getCallingPid();
@@ -1360,9 +1437,8 @@ Status CameraService::validateClientPermissionsLocked(const String8& cameraId,
     attributionSource.pid = clientPid;
     attributionSource.uid = clientUid;
     attributionSource.packageName = clientName8;
-    bool checkPermissionForCamera = permissionChecker.checkPermissionForPreflight(
-            sCameraPermission, attributionSource, String16(), AppOpsManager::OP_NONE)
-            != permission::PermissionChecker::PERMISSION_HARD_DENIED;
+    bool checkPermissionForCamera = checkPermission(cameraId, sCameraPermission, attributionSource,
+            String16(), AppOpsManager::OP_NONE);
     if (callingPid != getpid() &&
                 (deviceKind != SystemCameraKind::SYSTEM_ONLY_CAMERA) && !checkPermissionForCamera) {
         ALOGE("Permission Denial: can't use the camera pid=%d, uid=%d", clientPid, clientUid);
@@ -1383,8 +1459,13 @@ Status CameraService::validateClientPermissionsLocked(const String8& cameraId,
                 callingUid, procState);
     }
 
-    // If sensor privacy is enabled then prevent access to the camera
-    if (mSensorPrivacyPolicy->isSensorPrivacyEnabled()) {
+
+    // Automotive privileged client AID_AUTOMOTIVE_EVS using exterior system camera for use cases
+    // such as rear view and surround view cannot be disabled and are exempt from sensor privacy
+    // policy. In all other cases,if sensor privacy is enabled then prevent access to the camera.
+    if ((!isAutomotivePrivilegedClient(callingUid) ||
+            !isAutomotiveExteriorSystemCamera(cameraId)) &&
+            mSensorPrivacyPolicy->isSensorPrivacyEnabled()) {
         ALOGE("Access Denial: cannot use the camera when sensor privacy is enabled");
         return STATUS_ERROR_FMT(ERROR_DISABLED,
                 "Caller \"%s\" (PID %d, UID %d) cannot open camera \"%s\" when sensor privacy "
@@ -1713,7 +1794,7 @@ bool CameraService::shouldSkipStatusUpdates(SystemCameraKind systemCameraKind,
     //      have android.permission.SYSTEM_CAMERA permissions.
     if (!isVendorListener && (systemCameraKind == SystemCameraKind::HIDDEN_SECURE_CAMERA ||
             (systemCameraKind == SystemCameraKind::SYSTEM_ONLY_CAMERA &&
-            !hasPermissionsForSystemCamera(clientPid, clientUid)))) {
+            !hasPermissionsForSystemCamera(String8(), clientPid, clientUid)))) {
         return true;
     }
     return false;
@@ -1753,7 +1834,7 @@ bool CameraService::shouldRejectSystemCameraConnection(const String8& cameraId) 
     //     characteristics) even if clients don't have android.permission.CAMERA. We do not want the
     //     same behavior for system camera devices.
     if (!systemClient && systemCameraKind == SystemCameraKind::SYSTEM_ONLY_CAMERA &&
-            !hasPermissionsForSystemCamera(cPid, cUid)) {
+            !hasPermissionsForSystemCamera(cameraId, cPid, cUid)) {
         ALOGW("Rejecting access to system only camera %s, inadequete permissions",
                 cameraId.c_str());
         return true;
@@ -1801,7 +1882,10 @@ Status CameraService::connectDevice(
         clientUserId = multiuser_get_user_id(callingUid);
     }
 
-    if (mCameraServiceProxyWrapper->isCameraDisabled(clientUserId)) {
+    // Automotive privileged client AID_AUTOMOTIVE_EVS using exterior system camera for use cases
+    // such as rear view and surround view cannot be disabled.
+    if ((!isAutomotivePrivilegedClient(callingUid) || !isAutomotiveExteriorSystemCamera(id)) &&
+            mCameraServiceProxyWrapper->isCameraDisabled(clientUserId)) {
         String8 msg =
                 String8::format("Camera disabled by device policy");
         ALOGE("%s: %s", __FUNCTION__, msg.string());
@@ -1810,7 +1894,7 @@ Status CameraService::connectDevice(
 
     // enforce system camera permissions
     if (oomScoreOffset > 0 &&
-            !hasPermissionsForSystemCamera(callingPid, CameraThreadState::getCallingUid()) &&
+            !hasPermissionsForSystemCamera(id, callingPid, CameraThreadState::getCallingUid()) &&
             !isTrustedCallingUid(CameraThreadState::getCallingUid())) {
         String8 msg =
                 String8::format("Cannot change the priority of a client %s pid %d for "
@@ -1890,6 +1974,8 @@ Status CameraService::connectHelper(const sp<CALLBACK>& cameraCb, const String8&
 
     bool isNonSystemNdk = false;
     String16 clientPackageName;
+    int packageUid = (clientUid == USE_CALLING_UID) ?
+            CameraThreadState::getCallingUid() : clientUid;
     if (clientPackageNameMaybe.size() <= 0) {
         // NDK calls don't come with package names, but we need one for various cases.
         // Generally, there's a 1:1 mapping between UID and package name, but shared UIDs
@@ -1897,8 +1983,6 @@ Status CameraService::connectHelper(const sp<CALLBACK>& cameraCb, const String8&
         // same permissions, so picking any associated package name is sufficient. For some
         // other cases, this may give inaccurate names for clients in logs.
         isNonSystemNdk = true;
-        int packageUid = (clientUid == USE_CALLING_UID) ?
-            CameraThreadState::getCallingUid() : clientUid;
         clientPackageName = getPackageNameFromUid(packageUid);
     } else {
         clientPackageName = clientPackageNameMaybe;
@@ -2093,32 +2177,38 @@ Status CameraService::connectHelper(const sp<CALLBACK>& cameraCb, const String8&
                     clientPackageName));
         }
 
-        // Set camera muting behavior
-        bool isCameraPrivacyEnabled =
-                mSensorPrivacyPolicy->isCameraPrivacyEnabled();
-        if (client->supportsCameraMute()) {
-            client->setCameraMute(
-                    mOverrideCameraMuteMode || isCameraPrivacyEnabled);
-        } else if (isCameraPrivacyEnabled) {
-            // no camera mute supported, but privacy is on! => disconnect
-            ALOGI("Camera mute not supported for package: %s, camera id: %s",
-                    String8(client->getPackageName()).string(), cameraId.string());
-            // Do not hold mServiceLock while disconnecting clients, but
-            // retain the condition blocking other clients from connecting
-            // in mServiceLockWrapper if held.
-            mServiceLock.unlock();
-            // Clear caller identity temporarily so client disconnect PID
-            // checks work correctly
-            int64_t token = CameraThreadState::clearCallingIdentity();
-            // Note AppOp to trigger the "Unblock" dialog
-            client->noteAppOp();
-            client->disconnect();
-            CameraThreadState::restoreCallingIdentity(token);
-            // Reacquire mServiceLock
-            mServiceLock.lock();
+        // Automotive privileged client AID_AUTOMOTIVE_EVS using exterior system camera for use
+        // cases such as rear view and surround view cannot be disabled and are exempt from camera
+        // privacy policy.
+        if ((!isAutomotivePrivilegedClient(packageUid) ||
+                !isAutomotiveExteriorSystemCamera(cameraId))) {
+            // Set camera muting behavior.
+            bool isCameraPrivacyEnabled =
+                    mSensorPrivacyPolicy->isCameraPrivacyEnabled();
+            if (client->supportsCameraMute()) {
+                client->setCameraMute(
+                        mOverrideCameraMuteMode || isCameraPrivacyEnabled);
+            } else if (isCameraPrivacyEnabled) {
+                // no camera mute supported, but privacy is on! => disconnect
+                ALOGI("Camera mute not supported for package: %s, camera id: %s",
+                        String8(client->getPackageName()).string(), cameraId.string());
+                // Do not hold mServiceLock while disconnecting clients, but
+                // retain the condition blocking other clients from connecting
+                // in mServiceLockWrapper if held.
+                mServiceLock.unlock();
+                // Clear caller identity temporarily so client disconnect PID
+                // checks work correctly
+                int64_t token = CameraThreadState::clearCallingIdentity();
+                // Note AppOp to trigger the "Unblock" dialog
+                client->noteAppOp();
+                client->disconnect();
+                CameraThreadState::restoreCallingIdentity(token);
+                // Reacquire mServiceLock
+                mServiceLock.lock();
 
-            return STATUS_ERROR_FMT(ERROR_DISABLED,
-                    "Camera \"%s\" disabled due to camera mute", cameraId.string());
+                return STATUS_ERROR_FMT(ERROR_DISABLED,
+                        "Camera \"%s\" disabled due to camera mute", cameraId.string());
+            }
         }
 
         if (shimUpdateOnly) {
@@ -2707,13 +2797,11 @@ Status CameraService::isConcurrentSessionConfigurationSupported(
     // Check for camera permissions
     int callingPid = CameraThreadState::getCallingPid();
     int callingUid = CameraThreadState::getCallingUid();
-    permission::PermissionChecker permissionChecker;
     AttributionSourceState attributionSource{};
     attributionSource.pid = callingPid;
     attributionSource.uid = callingUid;
-    bool checkPermissionForCamera = permissionChecker.checkPermissionForPreflight(
-                sCameraPermission, attributionSource, String16(), AppOpsManager::OP_NONE)
-                != permission::PermissionChecker::PERMISSION_HARD_DENIED;
+    bool checkPermissionForCamera = checkPermission(String8(),
+                sCameraPermission, attributionSource, String16(), AppOpsManager::OP_NONE);
     if ((callingPid != getpid()) && !checkPermissionForCamera) {
         ALOGE("%s: pid %d doesn't have camera permissions", __FUNCTION__, callingPid);
         return STATUS_ERROR(ERROR_PERMISSION_DENIED,
@@ -2761,13 +2849,13 @@ Status CameraService::addListenerHelper(const sp<ICameraServiceListener>& listen
 
     auto clientUid = CameraThreadState::getCallingUid();
     auto clientPid = CameraThreadState::getCallingPid();
-    permission::PermissionChecker permissionChecker;
     AttributionSourceState attributionSource{};
     attributionSource.uid = clientUid;
     attributionSource.pid = clientPid;
-    bool openCloseCallbackAllowed = permissionChecker.checkPermissionForPreflight(
+
+   bool openCloseCallbackAllowed = checkPermission(String8(),
             sCameraOpenCloseListenerPermission, attributionSource, String16(),
-            AppOpsManager::OP_NONE) != permission::PermissionChecker::PERMISSION_HARD_DENIED;
+            AppOpsManager::OP_NONE);
 
     Mutex::Autolock lock(mServiceLock);
 
