@@ -8961,11 +8961,6 @@ typedef enum acamera_metadata_enum_acamera_control_autoframing {
      */
     ACAMERA_CONTROL_AUTOFRAMING_ON                                   = 1,
 
-    /**
-     * <p>Automatically select ON or OFF based on the system level preferences.</p>
-     */
-    ACAMERA_CONTROL_AUTOFRAMING_AUTO                                 = 2,
-
 } acamera_metadata_enum_android_control_autoframing_t;
 
 // ACAMERA_CONTROL_AUTOFRAMING_AVAILABLE
