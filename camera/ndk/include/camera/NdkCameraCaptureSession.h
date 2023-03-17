@@ -116,7 +116,8 @@ typedef struct ACameraCaptureSession_stateCallbacks {
  * Introduced in API 34.
  *
  * @param context The optional app-provided context pointer that was included in
- *        the {@link ACameraCaptureSession_prepareCallbacks} struct.
+ *        the {@link ACameraCaptureSession_setWindowPreparedCallback} method
+ *        call.
  * @param window The window that {@link ACameraCaptureSession_prepare} was called on.
  * @param session The camera capture session on which {@link ACameraCaptureSession_prepare} was
  *                called on.
@@ -1091,7 +1092,7 @@ camera_status_t ACameraCaptureSession_setWindowPreparedCallback(
  *
  * @return <ul><li>
  *             {@link ACAMERA_OK} if the method succeeds</li>
- *         <li>{@link ACAMERA_ERROR_INVALID_PARAMETER} if session/ window or prepareCallbacks is
+ *         <li>{@link ACAMERA_ERROR_INVALID_PARAMETER} if session/ window is
  *              NULL. Or if the session has not been configured with the window</li>
  *         <li>{@link ACAMERA_ERROR_SESSION_CLOSED} if the capture session has been closed</li>
  *         <li>{@link ACAMERA_ERROR_CAMERA_DISCONNECTED} if the camera device is closed</li>
