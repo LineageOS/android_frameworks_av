@@ -48,6 +48,15 @@ interface ISoundDose {
      */
     oneway void updateAttenuation(float attenuationDB, int device);
 
+    /**
+     * Disable the calculation of sound dose. This has the effect that no MEL
+     * values will be computed on the framework side. The MEL returned from
+     * the IHalSoundDoseCallbacks will be ignored.
+     * Should only be called once at startup if the AudioService does not
+     * support CSD.
+     */
+    oneway void disableCsd();
+
     /* -------------------------- Test API methods --------------------------
     /** Get the currently used RS2 upper bound. */
     float getOutputRs2UpperBound();
