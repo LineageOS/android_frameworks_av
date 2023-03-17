@@ -211,6 +211,10 @@ Return<void> CryptoPlugin::decrypt_1_2(
             _hidl_cb(Status_V1_2::ERROR_DRM_CANNOT_HANDLE, 0, "invalid decrypt parameter size");
             return Void();
         }
+        if (!mSession) {
+            _hidl_cb(Status_V1_2::ERROR_DRM_CANNOT_HANDLE, 0, "session not found");
+            return Void();
+        }
         Status_V1_2 res = mSession->decrypt(keyId.data(), iv.data(), srcPtr,
                 static_cast<uint8_t*>(destPtr), toVector(subSamples), &bytesDecrypted);
         if (res == Status_V1_2::OK) {
