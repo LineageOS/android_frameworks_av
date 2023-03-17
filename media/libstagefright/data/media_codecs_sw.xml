@@ -360,8 +360,7 @@
             <Feature name="bitrate-modes" value="VBR,CBR" />
             <Attribute name="software-codec" />
         </MediaCodec>
-        <MediaCodec name="c2.android.av1.encoder" type="video/av01" variant="slow-cpu,!slow-cpu">
-            <!-- TODO: implement a mechanism to prevent AV1 Encoder usage on pre-U devices -->
+        <MediaCodec name="c2.android.av1.encoder" type="video/av01" enabled="false" minsdk="34" variant="slow-cpu,!slow-cpu">
             <Limit name="alignment" value="2x2" />
             <Limit name="block-size" value="16x16" />
             <Variant name="!slow-cpu">
@@ -375,6 +374,7 @@
                 <Limit name="bitrate" range="1-5000000" />
             </Variant>
             <Limit name="quality" range="0-100"  default="80" />
+            <Limit name="complexity" range="0-5"  default="0" />
             <Feature name="bitrate-modes" value="VBR,CBR,CQ" />
             <Attribute name="software-codec" />
         </MediaCodec>
