@@ -375,6 +375,7 @@
                 <Limit name="bitrate" range="1-5000000" />
             </Variant>
             <Limit name="quality" range="0-100"  default="80" />
+            <Limit name="complexity" range="0-5"  default="0" />
             <Feature name="bitrate-modes" value="VBR,CBR,CQ" />
             <Attribute name="software-codec" />
         </MediaCodec>
