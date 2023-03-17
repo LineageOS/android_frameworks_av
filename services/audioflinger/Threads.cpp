@@ -3488,14 +3488,18 @@ void AudioFlinger::PlaybackThread::startMelComputation_l(
         const sp<audio_utils::MelProcessor>& processor)
 {
     auto outputSink = static_cast<AudioStreamOutSink*>(mOutputSink.get());
-    outputSink->startMelComputation(processor);
+    if (outputSink != nullptr) {
+        outputSink->startMelComputation(processor);
+    }
 }
 
 // stopMelComputation_l() must be called with AudioFlinger::mLock held
 void AudioFlinger::PlaybackThread::stopMelComputation_l()
 {
     auto outputSink = static_cast<AudioStreamOutSink*>(mOutputSink.get());
-    outputSink->stopMelComputation();
+    if (outputSink != nullptr) {
+        outputSink->stopMelComputation();
+    }
 }
 
 void AudioFlinger::PlaybackThread::threadLoop_drain()
