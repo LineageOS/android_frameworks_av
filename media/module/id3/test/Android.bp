@@ -57,4 +57,7 @@ cc_test {
             "signed-integer-overflow",
         ],
     },
+    data: [
+        ":https://storage.googleapis.com/android_media/frameworks/av/media/libstagefright/id3/test/ID3Test-1.2.zip?unzip=true",
+    ],
 }
