@@ -1073,7 +1073,7 @@ binder::Status CameraDeviceClient::createDeferredSurfaceStreamLocked(
             outputConfiguration.getSensorPixelModesUsed();
     if (SessionConfigurationUtils::checkAndOverrideSensorPixelModesUsed(
             sensorPixelModesUsed, format, width, height, getStaticInfo(cameraIdUsed),
-            /*allowRounding*/ false, &overriddenSensorPixelModesUsed) != OK) {
+            &overriddenSensorPixelModesUsed) != OK) {
         return STATUS_ERROR(CameraService::ERROR_ILLEGAL_ARGUMENT,
                 "sensor pixel modes used not valid for deferred stream");
     }
