@@ -137,6 +137,8 @@ using ::aidl::android::hardware::drm::Status;
         *_aidl_return = static_cast<ssize_t>(offset);
         return toNdkScopedAStatus(Status::OK);
     } else if (in_args.mode == Mode::AES_CTR) {
+        if (!mSession) return toNdkScopedAStatus(Status::ERROR_DRM_CANNOT_HANDLE,
+                    "session not found");
         size_t bytesDecrypted{};
         std::vector<int32_t> clearDataLengths;
         std::vector<int32_t> encryptedDataLengths;
@@ -149,6 +151,7 @@ using ::aidl::android::hardware::drm::Status;
             detailedError = "invalid decrypt parameter size";
             return toNdkScopedAStatus(Status::ERROR_DRM_CANNOT_HANDLE, detailedError);
         }
+
         auto res =
                 mSession->decrypt(in_args.keyId.data(), in_args.iv.data(),
                                   srcPtr, static_cast<uint8_t*>(destPtr),
