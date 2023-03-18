@@ -218,7 +218,7 @@ camera_status_t ACameraManager_unregisterAvailabilityCallback(
  * @param manager the {@link ACameraManager} of interest.
  * @param cameraId the ID string of the camera device of interest.
  * @param characteristics the output {@link ACameraMetadata} will be filled here if the method call
- *        succeeeds.
+ *        succeeds.
  *
  * @return <ul>
  *         <li>{@link ACAMERA_OK} if the method call succeeds.</li>
