@@ -36,12 +36,12 @@ class SoundDoseManager : public audio_utils::MelProcessor::MelCallback {
 public:
     /** CSD is computed with a rolling window of 7 days. */
     static constexpr int64_t kCsdWindowSeconds = 604800;  // 60s * 60m * 24h * 7d
-    /** Default RS2 value in dBA as defined in IEC 62368-1 3rd edition. */
-    static constexpr float kDefaultRs2Value = 100.f;
+    /** Default RS2 upper bound in dBA as defined in IEC 62368-1 3rd edition. */
+    static constexpr float kDefaultRs2UpperBound = 100.f;
 
     SoundDoseManager()
         : mMelAggregator(sp<audio_utils::MelAggregator>::make(kCsdWindowSeconds)),
-          mRs2Value(kDefaultRs2Value) {};
+          mRs2UpperBound(kDefaultRs2UpperBound) {};
 
     /**
      * \brief Creates or gets the MelProcessor assigned to the streamHandle
@@ -68,12 +68,12 @@ public:
     void removeStreamProcessor(audio_io_handle_t streamHandle);
 
     /**
-     * Sets the output RS2 value for momentary exposure warnings. Must not be
+     * Sets the output RS2 upper bound for momentary exposure warnings. Must not be
      * higher than 100dBA and not lower than 80dBA.
      *
      * \param rs2Value value to use for momentary exposure
      */
-    void setOutputRs2(float rs2Value);
+    void setOutputRs2UpperBound(float rs2Value);
 
     /**
      * \brief Registers the interface for passing callbacks to the AudioService and gets
@@ -100,6 +100,9 @@ public:
 
     /** Clear all map entries with passed audio_port_handle_t. */
     void clearMapDeviceIdEntries(audio_port_handle_t deviceId);
+
+    /** Returns true if CSD is disabled. */
+    bool isCsdDisabled();
 
     std::string dump() const;
 
@@ -129,11 +132,13 @@ private:
         virtual void binderDied(const wp<IBinder>& who);
 
         /** BnSoundDose override */
-        binder::Status setOutputRs2(float value) override;
+        binder::Status setOutputRs2UpperBound(float value) override;
         binder::Status resetCsd(float currentCsd,
                                 const std::vector<media::SoundDoseRecord>& records) override;
         binder::Status updateAttenuation(float attenuationDB, int device) override;
-        binder::Status getOutputRs2(float* value) override;
+        binder::Status getOutputRs2UpperBound(float* value) override;
+        binder::Status disableCsd() override;
+
         binder::Status getCsd(float* value) override;
         binder::Status forceUseFrameworkMel(bool useFrameworkMel) override;
         binder::Status forceComputeCsdOnAllDevices(bool computeCsdOnAllDevices) override;
@@ -164,6 +169,7 @@ private:
     sp<media::ISoundDoseCallback> getSoundDoseCallback() const;
 
     void updateAttenuation(float attenuationDB, audio_devices_t deviceType);
+    void disableCsd();
     void setUseFrameworkMel(bool useFrameworkMel);
     void setComputeCsdOnAllDevices(bool computeCsdOnAllDevices);
     /** Returns the HAL sound dose interface or null if internal MEL computation is used. */
@@ -183,7 +189,7 @@ private:
     std::map<AudioDeviceTypeAddr, audio_port_handle_t> mActiveDevices GUARDED_BY(mLock);
     std::unordered_map<audio_port_handle_t, audio_devices_t> mActiveDeviceTypes GUARDED_BY(mLock);
 
-    float mRs2Value GUARDED_BY(mLock);
+    float mRs2UpperBound GUARDED_BY(mLock);
     std::unordered_map<audio_devices_t, float> mMelAttenuationDB GUARDED_BY(mLock);
 
     sp<SoundDose> mSoundDose GUARDED_BY(mLock);
@@ -191,8 +197,10 @@ private:
     std::shared_ptr<ISoundDose> mHalSoundDose GUARDED_BY(mLock);
     std::shared_ptr<HalSoundDoseCallback> mHalSoundDoseCallback GUARDED_BY(mLock);
 
-    bool mUseFrameworkMel GUARDED_BY(mLock) = false;
+    bool mUseFrameworkMel GUARDED_BY(mLock) = true;
     bool mComputeCsdOnAllDevices GUARDED_BY(mLock) = false;
+
+    bool mDisableCsd GUARDED_BY(mLock) = false;
 };
 
 }  // namespace android

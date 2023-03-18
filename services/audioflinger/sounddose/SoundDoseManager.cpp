@@ -24,7 +24,7 @@
 #include <android-base/stringprintf.h>
 #include <media/AidlConversionCppNdk.h>
 #include <cinttypes>
-#include <time.h>
+#include <ctime>
 #include <utils/Log.h>
 
 namespace android {
@@ -50,7 +50,7 @@ sp<audio_utils::MelProcessor> SoundDoseManager::getOrCreateProcessorForDevice(
         size_t channelCount, audio_format_t format) {
     std::lock_guard _l(mLock);
 
-    if (mHalSoundDose != nullptr) {
+    if (mHalSoundDose != nullptr && !mDisableCsd) {
         ALOGW("%s: using HAL MEL computation, no MelProcessor needed.", __func__);
         return nullptr;
     }
@@ -65,12 +65,12 @@ sp<audio_utils::MelProcessor> SoundDoseManager::getOrCreateProcessorForDevice(
             processor->setAttenuation(mMelAttenuationDB[activeTypeIt->second]);
         }
         processor->setDeviceId(deviceId);
-        processor->setOutputRs2(mRs2Value);
+        processor->setOutputRs2UpperBound(mRs2UpperBound);
         return processor;
     } else {
         ALOGV("%s: creating new callback for stream id %d", __func__, streamHandle);
         sp<audio_utils::MelProcessor> melProcessor = sp<audio_utils::MelProcessor>::make(
-                sampleRate, channelCount, format, this, deviceId, mRs2Value);
+                sampleRate, channelCount, format, this, deviceId, mRs2UpperBound);
         const auto activeTypeIt = mActiveDeviceTypes.find(deviceId);
         if (activeTypeIt != mActiveDeviceTypes.end()) {
             melProcessor->setAttenuation(mMelAttenuationDB[activeTypeIt->second]);
@@ -92,10 +92,10 @@ bool SoundDoseManager::setHalSoundDoseInterface(const std::shared_ptr<ISoundDose
             return false;
         }
 
-        if (!mHalSoundDose->setOutputRs2(mRs2Value).isOk()) {
+        if (!mHalSoundDose->setOutputRs2UpperBound(mRs2UpperBound).isOk()) {
             ALOGW("%s: Cannot set RS2 value for momentary exposure %f",
                   __func__,
-                  mRs2Value);
+                  mRs2UpperBound);
         }
 
         // initialize the HAL sound dose callback lazily
@@ -116,30 +116,30 @@ bool SoundDoseManager::setHalSoundDoseInterface(const std::shared_ptr<ISoundDose
     return true;
 }
 
-void SoundDoseManager::setOutputRs2(float rs2Value) {
+void SoundDoseManager::setOutputRs2UpperBound(float rs2Value) {
     ALOGV("%s", __func__);
     std::lock_guard _l(mLock);
 
     if (mHalSoundDose != nullptr) {
         // using the HAL sound dose interface
-        if (!mHalSoundDose->setOutputRs2(rs2Value).isOk()) {
+        if (!mHalSoundDose->setOutputRs2UpperBound(rs2Value).isOk()) {
             ALOGE("%s: Cannot set RS2 value for momentary exposure %f", __func__, rs2Value);
             return;
         }
-        mRs2Value = rs2Value;
+        mRs2UpperBound = rs2Value;
         return;
     }
 
     for (auto& streamProcessor : mActiveProcessors) {
         sp<audio_utils::MelProcessor> processor = streamProcessor.second.promote();
         if (processor != nullptr) {
-            status_t result = processor->setOutputRs2(rs2Value);
+            status_t result = processor->setOutputRs2UpperBound(rs2Value);
             if (result != NO_ERROR) {
-                ALOGW("%s: could not set RS2 value %f for stream %d", __func__, rs2Value,
+                ALOGW("%s: could not set RS2 upper bound %f for stream %d", __func__, rs2Value,
                       streamProcessor.first);
                 return;
             }
-            mRs2Value = rs2Value;
+            mRs2UpperBound = rs2Value;
         }
     }
 }
@@ -259,11 +259,11 @@ void SoundDoseManager::SoundDose::binderDied(__unused const wp<IBinder>& who) {
     }
 }
 
-binder::Status SoundDoseManager::SoundDose::setOutputRs2(float value) {
+binder::Status SoundDoseManager::SoundDose::setOutputRs2UpperBound(float value) {
     ALOGV("%s", __func__);
     auto soundDoseManager = mSoundDoseManager.promote();
     if (soundDoseManager != nullptr) {
-        soundDoseManager->setOutputRs2(value);
+        soundDoseManager->setOutputRs2UpperBound(value);
     }
     return binder::Status::ok();
 }
@@ -287,12 +287,21 @@ binder::Status SoundDoseManager::SoundDose::updateAttenuation(float attenuationD
     return binder::Status::ok();
 }
 
-binder::Status SoundDoseManager::SoundDose::getOutputRs2(float* value) {
+binder::Status SoundDoseManager::SoundDose::disableCsd() {
+    ALOGV("%s", __func__);
+    auto soundDoseManager = mSoundDoseManager.promote();
+    if (soundDoseManager != nullptr) {
+        soundDoseManager->disableCsd();
+    }
+    return binder::Status::ok();
+}
+
+binder::Status SoundDoseManager::SoundDose::getOutputRs2UpperBound(float* value) {
     ALOGV("%s", __func__);
     auto soundDoseManager = mSoundDoseManager.promote();
     if (soundDoseManager != nullptr) {
         std::lock_guard _l(soundDoseManager->mLock);
-        *value = soundDoseManager->mRs2Value;
+        *value = soundDoseManager->mRs2UpperBound;
     }
     return binder::Status::ok();
 }
@@ -341,6 +350,28 @@ void SoundDoseManager::updateAttenuation(float attenuationDB, audio_devices_t de
             }
         }
     }
+}
+
+void SoundDoseManager::disableCsd() {
+    ALOGV("%s",  __func__);
+
+    std::lock_guard _l(mLock);
+    mDisableCsd = true;
+
+    // Normally, there should be no active MelProcessors when this method is called
+    // We pause however every cached MelProcessor as a defensive mechanism to not
+    // have unnecessary processing
+    for (auto& activeEntry : mActiveProcessors) {
+        auto melProcessor = activeEntry.second.promote();
+        if (melProcessor != nullptr) {
+            melProcessor->pause();
+        }
+    }
+}
+
+bool SoundDoseManager::isCsdDisabled() {
+    std::lock_guard _l(mLock);
+    return mDisableCsd;
 }
 
 void SoundDoseManager::setUseFrameworkMel(bool useFrameworkMel) {
@@ -392,11 +423,16 @@ void SoundDoseManager::onNewMelValues(const std::vector<float>& mels, size_t off
                                       audio_port_handle_t deviceId) const {
     ALOGV("%s", __func__);
 
+
     sp<media::ISoundDoseCallback> soundDoseCallback;
     std::vector<audio_utils::CsdRecord> records;
     float currentCsd;
     {
         std::lock_guard _l(mLock);
+        if (mDisableCsd) {
+            return;
+        }
+
 
         int64_t timestampSec = getMonotonicSecond();
 
@@ -432,6 +468,13 @@ sp<media::ISoundDoseCallback> SoundDoseManager::getSoundDoseCallback() const {
 void SoundDoseManager::onMomentaryExposure(float currentMel, audio_port_handle_t deviceId) const {
     ALOGV("%s: Momentary exposure for device %d triggered: %f MEL", __func__, deviceId, currentMel);
 
+    {
+        std::lock_guard _l(mLock);
+        if (mDisableCsd) {
+            return;
+        }
+    }
+
     auto soundDoseCallback = getSoundDoseCallback();
     if (soundDoseCallback != nullptr) {
         soundDoseCallback->onMomentaryExposure(currentMel, deviceId);
@@ -451,6 +494,14 @@ sp<media::ISoundDose> SoundDoseManager::getSoundDoseInterface(
 
 std::string SoundDoseManager::dump() const {
     std::string output;
+    {
+        std::lock_guard _l(mLock);
+        if (mDisableCsd) {
+            base::StringAppendF(&output, "CSD is disabled");
+            return output;
+        }
+    }
+
     mMelAggregator->foreachCsd([&output](audio_utils::CsdRecord csdRecord) {
         base::StringAppendF(&output,
                             "CSD %f with average MEL %f in interval [%" PRId64 ", %" PRId64 "]",
