@@ -193,7 +193,7 @@ typedef struct ACameraCaptureFailure {
  *                capture request sent by application, so the address is different to what
  *                application sent but the content will match. This request will be freed by
  *                framework immediately after this callback returns.
- * @param timestamp The timestamp when the capture is started. This timestmap will match
+ * @param timestamp The timestamp when the capture is started. This timestamp will match
  *                  {@link ACAMERA_SENSOR_TIMESTAMP} of the {@link ACameraMetadata} in
  *                  {@link ACameraCaptureSession_captureCallbacks#onCaptureCompleted} callback.
  */
@@ -228,7 +228,7 @@ typedef void (*ACameraCaptureSession_captureCallback_result)(
  *                capture request sent by application, so the address is different to what
  *                application sent but the content will match. This request will be freed by
  *                framework immediately after this callback returns.
- * @param failure The {@link ACameraCaptureFailure} desribes the capture failure. The memory is
+ * @param failure The {@link ACameraCaptureFailure} describes the capture failure. The memory is
  *                managed by camera framework. Do not access this pointer after this callback
  *                returns.
  */
@@ -440,7 +440,7 @@ enum {
  * and any repeating requests are stopped (as if {@link ACameraCaptureSession_stopRepeating} was
  * called). However, any in-progress capture requests submitted to the session will be completed as
  * normal; once all captures have completed and the session has been torn down,
- * {@link ACameraCaptureSession_stateCallbacks#onClosed} callback will be called and the seesion
+ * {@link ACameraCaptureSession_stateCallbacks#onClosed} callback will be called and the session
  * will be removed from memory.</p>
  *
  * <p>Closing a session is idempotent; closing more than once has no effect.</p>
@@ -527,7 +527,7 @@ camera_status_t ACameraCaptureSession_capture(
  *
  * <p>Repeating burst requests are a simple way for an application to
  * maintain a preview or other continuous stream of frames where each
- * request is different in a predicatable way, without having to continually
+ * request is different in a predictable way, without having to continually
  * submit requests through {@link ACameraCaptureSession_capture}.</p>
  *
  * <p>To stop the repeating capture, call {@link ACameraCaptureSession_stopRepeating}. Any
@@ -738,7 +738,7 @@ typedef struct ALogicalCameraCaptureFailure {
  *                capture request sent by application, so the address is different to what
  *                application sent but the content will match. This request will be freed by
  *                framework immediately after this callback returns.
- * @param failure The {@link ALogicalCameraCaptureFailure} desribes the capture failure. The memory
+ * @param failure The {@link ALogicalCameraCaptureFailure} describes the capture failure. The memory
  *                is managed by camera framework. Do not access this pointer after this callback
  *                returns.
  */
