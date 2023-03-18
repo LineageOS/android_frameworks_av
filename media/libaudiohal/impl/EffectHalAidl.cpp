@@ -24,10 +24,10 @@
 #include <media/AidlConversionCppNdk.h>
 #include <media/AidlConversionEffect.h>
 #include <media/AidlConversionUtil.h>
-#include <media/audiohal/AudioEffectUuid.h>
 #include <media/EffectsFactoryApi.h>
 #include <mediautils/TimeCheck.h>
 #include <system/audio.h>
+#include <system/audio_effects/effect_uuid.h>
 #include <utils/Log.h>
 
 #include "EffectHalAidl.h"
@@ -52,20 +52,16 @@
 #include "effectsAidlConversion/AidlConversionVisualizer.h"
 
 using ::aidl::android::aidl_utils::statusTFromBinderStatus;
-using ::aidl::android::hardware::audio::effect::CommandId;
 using ::aidl::android::hardware::audio::effect::Descriptor;
 using ::aidl::android::hardware::audio::effect::IEffect;
 using ::aidl::android::hardware::audio::effect::IFactory;
-using ::aidl::android::hardware::audio::effect::Parameter;
 
 namespace android {
 namespace effect {
 
-EffectHalAidl::EffectHalAidl(
-        const std::shared_ptr<::aidl::android::hardware::audio::effect::IFactory>& factory,
-        const std::shared_ptr<::aidl::android::hardware::audio::effect::IEffect>& effect,
-        uint64_t effectId, int32_t sessionId, int32_t ioId,
-        const ::aidl::android::hardware::audio::effect::Descriptor& desc)
+EffectHalAidl::EffectHalAidl(const std::shared_ptr<IFactory>& factory,
+                             const std::shared_ptr<IEffect>& effect, uint64_t effectId,
+                             int32_t sessionId, int32_t ioId, const Descriptor& desc)
     : mFactory(factory),
       mEffect(effect),
       mEffectId(effectId),
@@ -82,54 +78,65 @@ EffectHalAidl::~EffectHalAidl() {
 }
 
 status_t EffectHalAidl::createAidlConversion(
-        std::shared_ptr<::aidl::android::hardware::audio::effect::IEffect> effect,
+        std::shared_ptr<IEffect> effect,
         int32_t sessionId, int32_t ioId,
-        const ::aidl::android::hardware::audio::effect::Descriptor& desc) {
+        const Descriptor& desc) {
     const auto& typeUuid = desc.common.id.type;
     ALOGI("%s create UUID %s", __func__, typeUuid.toString().c_str());
-    if (typeUuid == kAcousticEchoCancelerTypeUUID) {
+    if (typeUuid ==
+        ::aidl::android::hardware::audio::effect::getEffectTypeUuidAcousticEchoCanceler()) {
         mConversion =
                 std::make_unique<android::effect::AidlConversionAec>(effect, sessionId, ioId, desc);
-    } else if (typeUuid == kAutomaticGainControl1TypeUUID) {
+    } else if (typeUuid == ::aidl::android::hardware::audio::effect::
+                                   getEffectTypeUuidAutomaticGainControlV1()) {
         mConversion = std::make_unique<android::effect::AidlConversionAgc1>(effect, sessionId, ioId,
                                                                             desc);
-    } else if (typeUuid == kAutomaticGainControl2TypeUUID) {
+    } else if (typeUuid == ::aidl::android::hardware::audio::effect::
+                                   getEffectTypeUuidAutomaticGainControlV2()) {
         mConversion = std::make_unique<android::effect::AidlConversionAgc2>(effect, sessionId, ioId,
                                                                             desc);
-    } else if (typeUuid == kBassBoostTypeUUID) {
+    } else if (typeUuid == ::aidl::android::hardware::audio::effect::getEffectTypeUuidBassBoost()) {
         mConversion = std::make_unique<android::effect::AidlConversionBassBoost>(effect, sessionId,
                                                                                  ioId, desc);
-    } else if (typeUuid == kDownmixTypeUUID) {
+    } else if (typeUuid == ::aidl::android::hardware::audio::effect::getEffectTypeUuidDownmix()) {
         mConversion = std::make_unique<android::effect::AidlConversionDownmix>(effect, sessionId,
                                                                                ioId, desc);
-    } else if (typeUuid == kDynamicsProcessingTypeUUID) {
+    } else if (typeUuid ==
+               ::aidl::android::hardware::audio::effect::getEffectTypeUuidDynamicsProcessing()) {
         mConversion =
                 std::make_unique<android::effect::AidlConversionDp>(effect, sessionId, ioId, desc);
-    } else if (typeUuid == kEnvReverbTypeUUID) {
+    } else if (typeUuid == ::aidl::android::hardware::audio::effect::getEffectTypeUuidEnvReverb()) {
         mConversion = std::make_unique<android::effect::AidlConversionEnvReverb>(effect, sessionId,
                                                                                  ioId, desc);
-    } else if (typeUuid == kEqualizerTypeUUID) {
+    } else if (typeUuid == ::aidl::android::hardware::audio::effect::getEffectTypeUuidEqualizer()) {
         mConversion =
                 std::make_unique<android::effect::AidlConversionEq>(effect, sessionId, ioId, desc);
-    } else if (typeUuid == kHapticGeneratorTypeUUID) {
+    } else if (typeUuid ==
+               ::aidl::android::hardware::audio::effect::getEffectTypeUuidHapticGenerator()) {
         mConversion = std::make_unique<android::effect::AidlConversionHapticGenerator>(
                 effect, sessionId, ioId, desc);
-    } else if (typeUuid == kLoudnessEnhancerTypeUUID) {
+    } else if (typeUuid ==
+               ::aidl::android::hardware::audio::effect::getEffectTypeUuidLoudnessEnhancer()) {
         mConversion = std::make_unique<android::effect::AidlConversionLoudnessEnhancer>(
                 effect, sessionId, ioId, desc);
-    } else if (typeUuid == kNoiseSuppressionTypeUUID) {
+    } else if (typeUuid ==
+               ::aidl::android::hardware::audio::effect::getEffectTypeUuidNoiseSuppression()) {
         mConversion = std::make_unique<android::effect::AidlConversionNoiseSuppression>(
                 effect, sessionId, ioId, desc);
-    } else if (typeUuid == kPresetReverbTypeUUID) {
+    } else if (typeUuid ==
+               ::aidl::android::hardware::audio::effect::getEffectTypeUuidPresetReverb()) {
         mConversion = std::make_unique<android::effect::AidlConversionPresetReverb>(
                 effect, sessionId, ioId, desc);
-    } else if (typeUuid == kSpatializerTypeUUID) {
+    } else if (typeUuid ==
+               ::aidl::android::hardware::audio::effect::getEffectTypeUuidSpatializer()) {
         mConversion = std::make_unique<android::effect::AidlConversionSpatializer>(
                 effect, sessionId, ioId, desc);
-    } else if (typeUuid == kVirtualizerTypeUUID) {
+    } else if (typeUuid ==
+               ::aidl::android::hardware::audio::effect::getEffectTypeUuidVirtualizer()) {
         mConversion = std::make_unique<android::effect::AidlConversionVirtualizer>(
                 effect, sessionId, ioId, desc);
-    } else if (typeUuid == kVisualizerTypeUUID) {
+    } else if (typeUuid ==
+               ::aidl::android::hardware::audio::effect::getEffectTypeUuidVisualizer()) {
         mConversion = std::make_unique<android::effect::AidlConversionVisualizer>(effect, sessionId,
                                                                                   ioId, desc);
     } else {
