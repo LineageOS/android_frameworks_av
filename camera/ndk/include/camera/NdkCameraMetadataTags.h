@@ -7978,7 +7978,7 @@ typedef enum acamera_metadata_enum_acamera_control_ae_mode {
     /**
      * <p>An external flash has been turned on.</p>
      * <p>It informs the camera device that an external flash has been turned on, and that
-     * metering (and continuous focus if active) should be quickly recaculated to account
+     * metering (and continuous focus if active) should be quickly recalculated to account
      * for the external flash. Otherwise, this mode acts like ON.</p>
      * <p>When the external flash is turned off, AE mode should be changed to one of the
      * other available AE modes.</p>
@@ -8960,11 +8960,6 @@ typedef enum acamera_metadata_enum_acamera_control_autoframing {
      * <p>Enable autoframing to keep people in the frame's field of view.</p>
      */
     ACAMERA_CONTROL_AUTOFRAMING_ON                                   = 1,
-
-    /**
-     * <p>Automatically select ON or OFF based on the system level preferences.</p>
-     */
-    ACAMERA_CONTROL_AUTOFRAMING_AUTO                                 = 2,
 
 } acamera_metadata_enum_android_control_autoframing_t;
 
