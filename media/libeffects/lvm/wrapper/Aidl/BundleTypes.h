@@ -18,7 +18,8 @@
 #include <array>
 
 #include <aidl/android/hardware/audio/effect/BnEffect.h>
-#include "effect-impl/EffectUUID.h"
+#include <system/audio_effects/effect_uuid.h>
+
 #include "effect-impl/EffectTypes.h"
 #include "LVM.h"
 
@@ -82,33 +83,36 @@ const std::vector<Range::EqualizerRange> kEqRanges = {
         MAKE_RANGE(Equalizer, centerFreqMh, std::vector<int>({1}), std::vector<int>({}))};
 static const Capability kEqCap = {.range = kEqRanges};
 static const std::string kEqualizerEffectName = "EqualizerBundle";
-static const Descriptor kEqualizerDesc = {.common = {.id = {.type = kEqualizerTypeUUID,
-                                                            .uuid = kEqualizerBundleImplUUID,
-                                                            .proxy = kEqualizerProxyUUID},
-                                                     .flags = {.type = Flags::Type::INSERT,
-                                                               .insert = Flags::Insert::FIRST,
-                                                               .volume = Flags::Volume::CTRL},
-                                                     .name = kEqualizerEffectName,
-                                                     .implementor = "NXP Software Ltd."},
-                                          .capability = kEqCap};
+static const Descriptor kEqualizerDesc = {
+        .common = {.id = {.type = getEffectTypeUuidEqualizer(),
+                          .uuid = getEffectImplUuidEqualizerBundle(),
+                          .proxy = getEffectImplUuidEqualizerProxy()},
+
+                   .flags = {.type = Flags::Type::INSERT,
+                             .insert = Flags::Insert::FIRST,
+                             .volume = Flags::Volume::CTRL},
+                   .name = kEqualizerEffectName,
+                   .implementor = "NXP Software Ltd."},
+        .capability = kEqCap};
 
 static const int mMaxStrengthSupported = 1000;
 static const std::vector<Range::BassBoostRange> kBassBoostRanges = {
         MAKE_RANGE(BassBoost, strengthPm, 0, mMaxStrengthSupported)};
 static const Capability kBassBoostCap = {.range = kBassBoostRanges};
 static const std::string kBassBoostEffectName = "Dynamic Bass Boost";
-static const Descriptor kBassBoostDesc = {.common = {.id = {.type = kBassBoostTypeUUID,
-                                                            .uuid = kBassBoostBundleImplUUID,
-                                                            .proxy = kBassBoostProxyUUID},
-                                                     .flags = {.type = Flags::Type::INSERT,
-                                                               .insert = Flags::Insert::FIRST,
-                                                               .volume = Flags::Volume::CTRL,
-                                                               .deviceIndication = true},
-                                                     .cpuLoad = BASS_BOOST_CUP_LOAD_ARM9E,
-                                                     .memoryUsage = BUNDLE_MEM_USAGE,
-                                                     .name = kBassBoostEffectName,
-                                                     .implementor = "NXP Software Ltd."},
-                                          .capability = kBassBoostCap};
+static const Descriptor kBassBoostDesc = {
+        .common = {.id = {.type = getEffectTypeUuidBassBoost(),
+                          .uuid = getEffectImplUuidBassBoostBundle(),
+                          .proxy = getEffectImplUuidBassBoostProxy()},
+                   .flags = {.type = Flags::Type::INSERT,
+                             .insert = Flags::Insert::FIRST,
+                             .volume = Flags::Volume::CTRL,
+                             .deviceIndication = true},
+                   .cpuLoad = BASS_BOOST_CUP_LOAD_ARM9E,
+                   .memoryUsage = BUNDLE_MEM_USAGE,
+                   .name = kBassBoostEffectName,
+                   .implementor = "NXP Software Ltd."},
+        .capability = kBassBoostCap};
 
 static const std::vector<Range::VirtualizerRange> kVirtualizerRanges = {
         MAKE_RANGE(Virtualizer, strengthPm, 0, mMaxStrengthSupported)};
@@ -116,9 +120,9 @@ static const Capability kVirtualizerCap = {.range = kVirtualizerRanges};
 static const std::string kVirtualizerEffectName = "Virtualizer";
 
 static const Descriptor kVirtualizerDesc = {
-        .common = {.id = {.type = kVirtualizerTypeUUID,
-                          .uuid = kVirtualizerBundleImplUUID,
-                          .proxy = kVirtualizerProxyUUID},
+        .common = {.id = {.type = getEffectTypeUuidVirtualizer(),
+                          .uuid = getEffectImplUuidVirtualizerBundle(),
+                          .proxy = getEffectImplUuidVirtualizerProxy()},
                    .flags = {.type = Flags::Type::INSERT,
                              .insert = Flags::Insert::LAST,
                              .volume = Flags::Volume::CTRL,
@@ -133,17 +137,18 @@ static const std::vector<Range::VolumeRange> kVolumeRanges = {
         MAKE_RANGE(Volume, levelDb, -9600, 0)};
 static const Capability kVolumeCap = {.range = kVolumeRanges};
 static const std::string kVolumeEffectName = "Volume";
-static const Descriptor kVolumeDesc = {.common = {.id = {.type = kVolumeTypeUUID,
-                                                         .uuid = kVolumeBundleImplUUID,
-                                                         .proxy = std::nullopt},
-                                                  .flags = {.type = Flags::Type::INSERT,
-                                                            .insert = Flags::Insert::LAST,
-                                                            .volume = Flags::Volume::CTRL},
-                                                  .cpuLoad = VOLUME_CUP_LOAD_ARM9E,
-                                                  .memoryUsage = BUNDLE_MEM_USAGE,
-                                                  .name = kVolumeEffectName,
-                                                  .implementor = "NXP Software Ltd."},
-                                       .capability = kVolumeCap};
+static const Descriptor kVolumeDesc = {
+        .common = {.id = {.type = getEffectTypeUuidVolume(),
+                          .uuid = getEffectImplUuidVolumeBundle(),
+                          .proxy = std::nullopt},
+                   .flags = {.type = Flags::Type::INSERT,
+                             .insert = Flags::Insert::LAST,
+                             .volume = Flags::Volume::CTRL},
+                   .cpuLoad = VOLUME_CUP_LOAD_ARM9E,
+                   .memoryUsage = BUNDLE_MEM_USAGE,
+                   .name = kVolumeEffectName,
+                   .implementor = "NXP Software Ltd."},
+        .capability = kVolumeCap};
 
 /* The following tables have been computed using the actual levels measured by the output of
  * white noise or pink noise (IEC268-1) for the EQ and BassBoost Effects. These are estimates of
