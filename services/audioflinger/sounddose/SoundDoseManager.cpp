@@ -334,6 +334,16 @@ binder::Status SoundDoseManager::SoundDose::forceComputeCsdOnAllDevices(
     return binder::Status::ok();
 }
 
+binder::Status SoundDoseManager::SoundDose::isSoundDoseHalSupported(bool* value) {
+    ALOGV("%s", __func__);
+    *value = false;
+    auto soundDoseManager = mSoundDoseManager.promote();
+    if (soundDoseManager != nullptr) {
+        *value = soundDoseManager->isSoundDoseHalSupported();
+    }
+    return binder::Status::ok();
+}
+
 void SoundDoseManager::updateAttenuation(float attenuationDB, audio_devices_t deviceType) {
     std::lock_guard _l(mLock);
     ALOGV("%s: updating MEL processor attenuation for device type %d to %f",
@@ -395,6 +405,19 @@ void SoundDoseManager::setComputeCsdOnAllDevices(bool computeCsdOnAllDevices) {
 bool SoundDoseManager::forceComputeCsdOnAllDevices() const {
     std::lock_guard _l(mLock);
     return mComputeCsdOnAllDevices;
+}
+
+bool SoundDoseManager::isSoundDoseHalSupported() const {
+    if (mDisableCsd) {
+        return false;
+    }
+
+    std::shared_ptr<ISoundDose> halSoundDose;
+    getHalSoundDose(&halSoundDose);
+    if (mHalSoundDose == nullptr) {
+        return false;
+    }
+    return true;
 }
 
 void SoundDoseManager::getHalSoundDose(std::shared_ptr<ISoundDose>* halSoundDose) const {
