@@ -30,19 +30,21 @@
 #include <LVM.h>
 #include <limits.h>
 
+using aidl::android::hardware::audio::effect::getEffectImplUuidBassBoostBundle;
 using aidl::android::hardware::audio::effect::Descriptor;
 using aidl::android::hardware::audio::effect::EffectBundleAidl;
+using aidl::android::hardware::audio::effect::getEffectImplUuidEqualizerBundle;
 using aidl::android::hardware::audio::effect::IEffect;
-using aidl::android::hardware::audio::effect::kBassBoostBundleImplUUID;
-using aidl::android::hardware::audio::effect::kEqualizerBundleImplUUID;
-using aidl::android::hardware::audio::effect::kVirtualizerBundleImplUUID;
-using aidl::android::hardware::audio::effect::kVolumeBundleImplUUID;
 using aidl::android::hardware::audio::effect::State;
+using aidl::android::hardware::audio::effect::getEffectImplUuidVirtualizerBundle;
+using aidl::android::hardware::audio::effect::getEffectImplUuidVolumeBundle;
 using aidl::android::media::audio::common::AudioUuid;
 
 bool isUuidSupported(const AudioUuid* uuid) {
-    return (*uuid == kEqualizerBundleImplUUID || *uuid == kBassBoostBundleImplUUID ||
-            *uuid == kVirtualizerBundleImplUUID || *uuid == kVolumeBundleImplUUID);
+    return (*uuid == getEffectImplUuidBassBoostBundle() ||
+            *uuid == getEffectImplUuidEqualizerBundle() ||
+            *uuid == getEffectImplUuidVirtualizerBundle() ||
+            *uuid == getEffectImplUuidVolumeBundle());
 }
 
 extern "C" binder_exception_t createEffect(const AudioUuid* uuid,
@@ -66,13 +68,13 @@ extern "C" binder_exception_t queryEffect(const AudioUuid* in_impl_uuid, Descrip
         LOG(ERROR) << __func__ << "uuid not supported";
         return EX_ILLEGAL_ARGUMENT;
     }
-    if (*in_impl_uuid == kEqualizerBundleImplUUID) {
+    if (*in_impl_uuid == getEffectImplUuidEqualizerBundle()) {
         *_aidl_return = aidl::android::hardware::audio::effect::lvm::kEqualizerDesc;
-    } else if (*in_impl_uuid == kBassBoostBundleImplUUID) {
+    } else if (*in_impl_uuid == getEffectImplUuidBassBoostBundle()) {
         *_aidl_return = aidl::android::hardware::audio::effect::lvm:: kBassBoostDesc;
-    } else if (*in_impl_uuid == kVirtualizerBundleImplUUID) {
+    } else if (*in_impl_uuid == getEffectImplUuidVirtualizerBundle()) {
         *_aidl_return = aidl::android::hardware::audio::effect::lvm::kVirtualizerDesc;
-    } else if (*in_impl_uuid == kVolumeBundleImplUUID) {
+    } else if (*in_impl_uuid == getEffectImplUuidVolumeBundle()) {
         *_aidl_return = aidl::android::hardware::audio::effect::lvm::kVolumeDesc;
     }
     return EX_NONE;
@@ -82,19 +84,19 @@ namespace aidl::android::hardware::audio::effect {
 
 EffectBundleAidl::EffectBundleAidl(const AudioUuid& uuid) {
     LOG(DEBUG) << __func__ << uuid.toString();
-    if (uuid == kEqualizerBundleImplUUID) {
+    if (uuid == getEffectImplUuidEqualizerBundle()) {
         mType = lvm::BundleEffectType::EQUALIZER;
         mDescriptor = &lvm::kEqualizerDesc;
         mEffectName = &lvm::kEqualizerEffectName;
-    } else if (uuid == kBassBoostBundleImplUUID) {
+    } else if (uuid == getEffectImplUuidBassBoostBundle()) {
         mType = lvm::BundleEffectType::BASS_BOOST;
         mDescriptor = &lvm::kBassBoostDesc;
         mEffectName = &lvm::kBassBoostEffectName;
-    } else if (uuid == kVirtualizerBundleImplUUID) {
+    } else if (uuid == getEffectImplUuidVirtualizerBundle()) {
         mType = lvm::BundleEffectType::VIRTUALIZER;
         mDescriptor = &lvm::kVirtualizerDesc;
         mEffectName = &lvm::kVirtualizerEffectName;
-    } else if (uuid == kVolumeBundleImplUUID) {
+    } else if (uuid == getEffectImplUuidVolumeBundle()) {
         mType = lvm::BundleEffectType::VOLUME;
         mDescriptor = &lvm::kVolumeDesc;
         mEffectName = &lvm::kVolumeEffectName;
