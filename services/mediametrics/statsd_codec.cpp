@@ -444,6 +444,12 @@ bool statsd_codec(const std::shared_ptr<const mediametrics::Item>& item,
     }
     AStatsEvent_writeInt32(event, hdrFormat);
 
+    int64_t codecId = 0;
+    if (item->getInt64("android.media.mediacodec.id", &codecId)) {
+        metrics_proto.set_codec_id(codecId);
+    }
+    AStatsEvent_writeInt64(event, codecId);
+
     int err = AStatsEvent_write(event);
     if (err < 0) {
       ALOGE("Failed to write codec metrics to statsd (%d)", err);
