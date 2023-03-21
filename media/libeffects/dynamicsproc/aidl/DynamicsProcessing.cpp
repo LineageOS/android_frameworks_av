@@ -17,6 +17,7 @@
 #define LOG_TAG "AHAL_DynamicsProcessingLibEffects"
 
 #include <android-base/logging.h>
+#include <system/audio_effects/effect_uuid.h>
 
 #include "DynamicsProcessing.h"
 
@@ -25,15 +26,16 @@
 
 using aidl::android::hardware::audio::effect::Descriptor;
 using aidl::android::hardware::audio::effect::DynamicsProcessingImpl;
+using aidl::android::hardware::audio::effect::getEffectImplUuidDynamicsProcessing;
+using aidl::android::hardware::audio::effect::getEffectTypeUuidDynamicsProcessing;
 using aidl::android::hardware::audio::effect::IEffect;
-using aidl::android::hardware::audio::effect::kDynamicsProcessingImplUUID;
 using aidl::android::hardware::audio::effect::State;
 using aidl::android::media::audio::common::AudioUuid;
 using aidl::android::media::audio::common::PcmType;
 
 extern "C" binder_exception_t createEffect(const AudioUuid* in_impl_uuid,
                                            std::shared_ptr<IEffect>* instanceSpp) {
-    if (!in_impl_uuid || *in_impl_uuid != kDynamicsProcessingImplUUID) {
+    if (!in_impl_uuid || *in_impl_uuid != getEffectImplUuidDynamicsProcessing()) {
         LOG(ERROR) << __func__ << "uuid not supported";
         return EX_ILLEGAL_ARGUMENT;
     }
@@ -48,7 +50,7 @@ extern "C" binder_exception_t createEffect(const AudioUuid* in_impl_uuid,
 }
 
 extern "C" binder_exception_t queryEffect(const AudioUuid* in_impl_uuid, Descriptor* _aidl_return) {
-    if (!in_impl_uuid || *in_impl_uuid != kDynamicsProcessingImplUUID) {
+    if (!in_impl_uuid || *in_impl_uuid != getEffectImplUuidDynamicsProcessing()) {
         LOG(ERROR) << __func__ << "uuid not supported";
         return EX_ILLEGAL_ARGUMENT;
     }
@@ -88,8 +90,8 @@ const Range DynamicsProcessingImpl::kRange =
 const Capability DynamicsProcessingImpl::kCapability = {.range = {DynamicsProcessingImpl::kRange}};
 
 const Descriptor DynamicsProcessingImpl::kDescriptor = {
-        .common = {.id = {.type = kDynamicsProcessingTypeUUID,
-                          .uuid = kDynamicsProcessingImplUUID,
+        .common = {.id = {.type = getEffectTypeUuidDynamicsProcessing(),
+                          .uuid = getEffectImplUuidDynamicsProcessing(),
                           .proxy = std::nullopt},
                    .flags = {.type = Flags::Type::INSERT,
                              .insert = Flags::Insert::LAST,

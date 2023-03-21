@@ -48,7 +48,7 @@ status_t DevicesFactoryHalAidl::openDevice(const char *name, sp<DeviceHalInterfa
     // however currently we still get the list of module names from the config.
     // Since the example service does not have all modules, the SM will wait
     // for the missing ones forever.
-    if (strcmp(name, "primary") == 0 || strcmp(name, "r_submix") == 0) {
+    if (strcmp(name, "primary") == 0 || strcmp(name, "r_submix") == 0 || strcmp(name, "usb") == 0) {
         if (strcmp(name, "primary") == 0) name = "default";
         auto serviceName = std::string(IModule::descriptor) + "/" + name;
         service = IModule::fromBinder(
