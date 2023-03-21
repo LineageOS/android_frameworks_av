@@ -45,6 +45,7 @@ cc_fuzz {
         "libstats_media_metrics",
         "libstatspull",
         "libstatssocket",
+        "libactivitymanager_aidl",
     ],
     fuzz_config: {
         cc: [
