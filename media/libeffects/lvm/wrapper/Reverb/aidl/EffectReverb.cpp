@@ -31,17 +31,19 @@
 
 using aidl::android::hardware::audio::effect::Descriptor;
 using aidl::android::hardware::audio::effect::EffectReverb;
+using aidl::android::hardware::audio::effect::getEffectImplUuidAuxEnvReverb;
+using aidl::android::hardware::audio::effect::getEffectImplUuidAuxPresetReverb;
+using aidl::android::hardware::audio::effect::getEffectImplUuidInsertEnvReverb;
+using aidl::android::hardware::audio::effect::getEffectImplUuidInsertPresetReverb;
 using aidl::android::hardware::audio::effect::IEffect;
-using aidl::android::hardware::audio::effect::kAuxEnvReverbImplUUID;
-using aidl::android::hardware::audio::effect::kAuxPresetReverbImplUUID;
-using aidl::android::hardware::audio::effect::kInsertEnvReverbImplUUID;
-using aidl::android::hardware::audio::effect::kInsertPresetReverbImplUUID;
 using aidl::android::hardware::audio::effect::State;
 using aidl::android::media::audio::common::AudioUuid;
 
 bool isReverbUuidSupported(const AudioUuid* uuid) {
-    return (*uuid == kAuxEnvReverbImplUUID || *uuid == kInsertEnvReverbImplUUID ||
-            *uuid == kAuxPresetReverbImplUUID || *uuid == kInsertPresetReverbImplUUID);
+    return (*uuid == getEffectImplUuidAuxEnvReverb() ||
+            *uuid == getEffectImplUuidAuxPresetReverb() ||
+            *uuid == getEffectImplUuidInsertEnvReverb() ||
+            *uuid == getEffectImplUuidInsertPresetReverb());
 }
 
 extern "C" binder_exception_t createEffect(const AudioUuid* uuid,
@@ -61,18 +63,17 @@ extern "C" binder_exception_t createEffect(const AudioUuid* uuid,
 }
 
 extern "C" binder_exception_t queryEffect(const AudioUuid* in_impl_uuid, Descriptor* _aidl_return) {
-    if (!in_impl_uuid || !isReverbUuidSupported(in_impl_uuid)) {
+    if (*in_impl_uuid == getEffectImplUuidAuxEnvReverb()) {
+        *_aidl_return = aidl::android::hardware::audio::effect::lvm::kAuxEnvReverbDesc;
+    } else if (*in_impl_uuid == getEffectImplUuidInsertEnvReverb()) {
+        *_aidl_return = aidl::android::hardware::audio::effect::lvm::kInsertEnvReverbDesc;
+    } else if (*in_impl_uuid == getEffectImplUuidAuxPresetReverb()) {
+        *_aidl_return = aidl::android::hardware::audio::effect::lvm::kAuxPresetReverbDesc;
+    } else if (*in_impl_uuid == getEffectImplUuidInsertPresetReverb()) {
+        *_aidl_return = aidl::android::hardware::audio::effect::lvm::kInsertPresetReverbDesc;
+    } else {
         LOG(ERROR) << __func__ << "uuid not supported";
         return EX_ILLEGAL_ARGUMENT;
-    }
-    if (*in_impl_uuid == kAuxEnvReverbImplUUID) {
-        *_aidl_return = aidl::android::hardware::audio::effect::lvm::kAuxEnvReverbDesc;
-    } else if (*in_impl_uuid == kInsertEnvReverbImplUUID) {
-        *_aidl_return = aidl::android::hardware::audio::effect::lvm::kInsertEnvReverbDesc;
-    } else if (*in_impl_uuid == kAuxPresetReverbImplUUID) {
-        *_aidl_return = aidl::android::hardware::audio::effect::lvm::kAuxPresetReverbDesc;
-    } else if (*in_impl_uuid == kInsertPresetReverbImplUUID) {
-        *_aidl_return = aidl::android::hardware::audio::effect::lvm::kInsertPresetReverbDesc;
     }
     return EX_NONE;
 }
@@ -81,19 +82,19 @@ namespace aidl::android::hardware::audio::effect {
 
 EffectReverb::EffectReverb(const AudioUuid& uuid) {
     LOG(DEBUG) << __func__ << uuid.toString();
-    if (uuid == kAuxEnvReverbImplUUID) {
+    if (uuid == getEffectImplUuidAuxEnvReverb()) {
         mType = lvm::ReverbEffectType::AUX_ENV;
         mDescriptor = &lvm::kAuxEnvReverbDesc;
         mEffectName = &lvm::kAuxEnvReverbEffectName;
-    } else if (uuid == kInsertEnvReverbImplUUID) {
+    } else if (uuid == getEffectImplUuidInsertEnvReverb()) {
         mType = lvm::ReverbEffectType::INSERT_ENV;
         mDescriptor = &lvm::kInsertEnvReverbDesc;
         mEffectName = &lvm::kInsertEnvReverbEffectName;
-    } else if (uuid == kAuxPresetReverbImplUUID) {
+    } else if (uuid == getEffectImplUuidAuxPresetReverb()) {
         mType = lvm::ReverbEffectType::AUX_PRESET;
         mDescriptor = &lvm::kAuxPresetReverbDesc;
         mEffectName = &lvm::kAuxPresetReverbEffectName;
-    } else if (uuid == kInsertPresetReverbImplUUID) {
+    } else if (uuid == getEffectImplUuidInsertPresetReverb()) {
         mType = lvm::ReverbEffectType::INSERT_PRESET;
         mDescriptor = &lvm::kInsertPresetReverbDesc;
         mEffectName = &lvm::kInsertPresetReverbEffectName;

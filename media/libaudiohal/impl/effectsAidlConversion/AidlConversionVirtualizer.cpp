@@ -24,7 +24,6 @@
 #include <media/AidlConversionCppNdk.h>
 #include <media/AidlConversionNdk.h>
 #include <media/AidlConversionEffect.h>
-#include <media/audiohal/AudioEffectUuid.h>
 #include <system/audio_effects/aidl_effects_utils.h>
 #include <system/audio_effects/effect_virtualizer.h>
 

@@ -23,7 +23,6 @@
 #include <error/expected_utils.h>
 #include <media/AidlConversionNdk.h>
 #include <media/AidlConversionEffect.h>
-#include <media/audiohal/AudioEffectUuid.h>
 #include <system/audio_effects/effect_downmix.h>
 
 #include <system/audio_effect.h>

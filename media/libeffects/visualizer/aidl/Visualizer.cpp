@@ -17,18 +17,21 @@
 #define LOG_TAG "AHAL_VisualizerLibEffects"
 
 #include <android-base/logging.h>
+#include <system/audio_effects/effect_uuid.h>
+
 #include "Visualizer.h"
 
 using aidl::android::hardware::audio::effect::Descriptor;
+using aidl::android::hardware::audio::effect::getEffectImplUuidVisualizer;
+using aidl::android::hardware::audio::effect::getEffectTypeUuidVisualizer;
 using aidl::android::hardware::audio::effect::IEffect;
-using aidl::android::hardware::audio::effect::VisualizerImpl;
-using aidl::android::hardware::audio::effect::kVisualizerImplUUID;
 using aidl::android::hardware::audio::effect::State;
+using aidl::android::hardware::audio::effect::VisualizerImpl;
 using aidl::android::media::audio::common::AudioUuid;
 
 extern "C" binder_exception_t createEffect(const AudioUuid* in_impl_uuid,
                                            std::shared_ptr<IEffect>* instanceSpp) {
-    if (!in_impl_uuid || *in_impl_uuid != kVisualizerImplUUID) {
+    if (!in_impl_uuid || *in_impl_uuid != getEffectImplUuidVisualizer()) {
         LOG(ERROR) << __func__ << "uuid not supported";
         return EX_ILLEGAL_ARGUMENT;
     }
@@ -43,7 +46,7 @@ extern "C" binder_exception_t createEffect(const AudioUuid* in_impl_uuid,
 }
 
 extern "C" binder_exception_t queryEffect(const AudioUuid* in_impl_uuid, Descriptor* _aidl_return) {
-    if (!in_impl_uuid || *in_impl_uuid != kVisualizerImplUUID) {
+    if (!in_impl_uuid || *in_impl_uuid != getEffectImplUuidVisualizer()) {
         LOG(ERROR) << __func__ << "uuid not supported";
         return EX_ILLEGAL_ARGUMENT;
     }
@@ -65,8 +68,8 @@ const std::vector<Range::VisualizerRange> VisualizerImpl::kRanges = {
 const Capability VisualizerImpl::kCapability = {
         .range = Range::make<Range::visualizer>(VisualizerImpl::kRanges)};
 const Descriptor VisualizerImpl::kDescriptor = {
-        .common = {.id = {.type = kVisualizerTypeUUID,
-                          .uuid = kVisualizerImplUUID,
+        .common = {.id = {.type = getEffectTypeUuidVisualizer(),
+                          .uuid = getEffectImplUuidVisualizer(),
                           .proxy = std::nullopt},
                    .flags = {.type = Flags::Type::INSERT,
                              .insert = Flags::Insert::LAST,
