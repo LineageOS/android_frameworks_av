@@ -1332,21 +1332,18 @@ bool Camera2Client::recordingEnabledL() {
             || l.mParameters.state == Parameters::VIDEO_SNAPSHOT);
 }
 
-void Camera2Client::releaseRecordingFrame(const sp<IMemory>& mem) {
-    (void)mem;
+void Camera2Client::releaseRecordingFrame([[maybe_unused]] const sp<IMemory>& mem) {
     ATRACE_CALL();
     ALOGW("%s: Not supported in buffer queue mode.", __FUNCTION__);
 }
 
-void Camera2Client::releaseRecordingFrameHandle(native_handle_t *handle) {
-    (void)handle;
+void Camera2Client::releaseRecordingFrameHandle([[maybe_unused]] native_handle_t *handle) {
     ATRACE_CALL();
     ALOGW("%s: Not supported in buffer queue mode.", __FUNCTION__);
 }
 
 void Camera2Client::releaseRecordingFrameHandleBatch(
-        const std::vector<native_handle_t*>& handles) {
-    (void)handles;
+        [[maybe_unused]] const std::vector<native_handle_t*>& handles) {
     ATRACE_CALL();
     ALOGW("%s: Not supported in buffer queue mode.", __FUNCTION__);
 }

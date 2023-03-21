@@ -1858,13 +1858,12 @@ sp<CameraProviderManager::StatusListener> CameraProviderManager::getStatusListen
 CameraProviderManager::ProviderInfo::ProviderInfo(
         const std::string &providerName,
         const std::string &providerInstance,
-        CameraProviderManager *manager) :
+        [[maybe_unused]] CameraProviderManager *manager) :
         mProviderName(providerName),
         mProviderInstance(providerInstance),
         mProviderTagid(generateVendorTagId(providerName)),
         mUniqueDeviceCount(0),
         mManager(manager) {
-    (void) mManager;
 }
 
 const std::string& CameraProviderManager::ProviderInfo::getType() const {
