@@ -67,8 +67,7 @@ status_t Camera3FakeStream::returnBufferCheckedLocked(
     return INVALID_OPERATION;
 }
 
-void Camera3FakeStream::dump(int fd, const Vector<String16> &args) const {
-    (void) args;
+void Camera3FakeStream::dump(int fd, [[maybe_unused]] const Vector<String16> &args) const {
     String8 lines;
     lines.appendFormat("    Stream[%d]: Fake\n", mId);
     write(fd, lines.string(), lines.size());
@@ -82,9 +81,8 @@ status_t Camera3FakeStream::setTransform(int, bool) {
     return OK;
 }
 
-status_t Camera3FakeStream::detachBuffer(sp<GraphicBuffer>* buffer, int* fenceFd) {
-    (void) buffer;
-    (void) fenceFd;
+status_t Camera3FakeStream::detachBuffer([[maybe_unused]] sp<GraphicBuffer>* buffer,
+                [[maybe_unused]] int* fenceFd) {
     // Do nothing
     return OK;
 }

@@ -451,10 +451,9 @@ status_t Camera3BufferManager::onBuffersRemoved(int streamId, int streamSetId,
     return OK;
 }
 
-void Camera3BufferManager::dump(int fd, const Vector<String16>& args) const {
+void Camera3BufferManager::dump(int fd, [[maybe_unused]] const Vector<String16>& args) const {
     Mutex::Autolock l(mLock);
 
-    (void) args;
     String8 lines;
     lines.appendFormat("      Total stream sets: %zu\n", mStreamSetMap.size());
     for (size_t i = 0; i < mStreamSetMap.size(); i++) {
