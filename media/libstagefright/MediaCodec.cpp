@@ -1284,12 +1284,14 @@ void MediaCodec::flushMediametrics() {
     // ensure mutex while we do our own work
     Mutex::Autolock _lock(mMetricsLock);
     if (mMetricsHandle != 0) {
-        if (mediametrics_count(mMetricsHandle) > 0) {
+        if (mMetricsToUpload && mediametrics_count(mMetricsHandle) > 0) {
             mediametrics_selfRecord(mMetricsHandle);
         }
         mediametrics_delete(mMetricsHandle);
         mMetricsHandle = 0;
     }
+    // we no longer have anything pending upload
+    mMetricsToUpload = false;
 }
 
 void MediaCodec::updateLowLatency(const sp<AMessage> &msg) {
@@ -1894,6 +1896,7 @@ status_t MediaCodec::configure(
         const sp<ICrypto> &crypto,
         const sp<IDescrambler> &descrambler,
         uint32_t flags) {
+
     sp<AMessage> msg = new AMessage(kWhatConfigure, this);
     mediametrics_handle_t nextMetricsHandle = mediametrics_create(kCodecKeyName);
 
@@ -4245,6 +4248,10 @@ void MediaCodec::onMessageReceived(const sp<AMessage> &msg) {
                 // and set some additional metrics values
                 initMediametrics();
             }
+
+            // from this point forward, in this configure/use/release lifecycle, we want to
+            // upload our data
+            mMetricsToUpload = true;
 
             int32_t push;
             if (msg->findInt32("push-blank-buffers-on-shutdown", &push) && push != 0) {
