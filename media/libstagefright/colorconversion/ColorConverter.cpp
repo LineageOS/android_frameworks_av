@@ -281,7 +281,7 @@ status_t ColorConverter::Image::getYUVPlaneOffsetAndStride(
         size_t *u_stride,
         size_t *v_stride) const {
 
-    if (y_offset == nullptr || v_offset == nullptr || v_offset == nullptr
+    if (y_offset == nullptr || u_offset == nullptr || v_offset == nullptr
             || y_stride == nullptr || u_stride == nullptr || v_stride == nullptr) {
         return ERROR_UNSUPPORTED;
     }
