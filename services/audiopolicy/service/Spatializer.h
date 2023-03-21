@@ -119,6 +119,7 @@ class Spatializer : public media::BnSpatializer,
     binder::Status setScreenSensor(int sensorHandle) override;
     binder::Status setDisplayOrientation(float physicalToLogicalAngle) override;
     binder::Status setHingeAngle(float hingeAngle) override;
+    binder::Status setFoldState(bool folded) override;
     binder::Status getSupportedModes(std::vector<media::SpatializationMode>* modes) override;
     binder::Status registerHeadTrackingCallback(
         const sp<media::ISpatializerHeadTrackingCallback>& callback) override;
@@ -376,8 +377,13 @@ private:
     int32_t mScreenSensor GUARDED_BY(mLock) = SpatializerPoseController::INVALID_SENSOR;
 
     /** Last display orientation received */
-    static constexpr float kDisplayOrientationInvalid = 1000;
-    float mDisplayOrientation GUARDED_BY(mLock) = kDisplayOrientationInvalid;
+    float mDisplayOrientation GUARDED_BY(mLock) = 0.f;  // aligned to natural up orientation.
+
+    /** Last folded state */
+    bool mFoldedState GUARDED_BY(mLock) = false;  // foldable: true means folded.
+
+    /** Last hinge angle */
+    float mHingeAngle GUARDED_BY(mLock) = 0.f;  // foldable: 0.f is closed, M_PI flat open.
 
     std::vector<media::SpatializationLevel> mLevels;
     std::vector<media::SpatializerHeadTrackingMode> mHeadTrackingModes;
