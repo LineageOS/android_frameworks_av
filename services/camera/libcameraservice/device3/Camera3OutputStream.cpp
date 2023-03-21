@@ -394,13 +394,12 @@ status_t Camera3OutputStream::returnBufferCheckedLocked(
             const camera_stream_buffer &buffer,
             nsecs_t timestamp,
             nsecs_t readoutTimestamp,
-            bool output,
+            [[maybe_unused]] bool output,
             int32_t transform,
             const std::vector<size_t>& surface_ids,
             /*out*/
             sp<Fence> *releaseFenceOut) {
 
-    (void)output;
     ALOG_ASSERT(output, "Expected output to be true");
 
     status_t res;
@@ -519,8 +518,7 @@ status_t Camera3OutputStream::returnBufferCheckedLocked(
     return res;
 }
 
-void Camera3OutputStream::dump(int fd, const Vector<String16> &args) const {
-    (void) args;
+void Camera3OutputStream::dump(int fd, [[maybe_unused]] const Vector<String16> &args) const {
     String8 lines;
     lines.appendFormat("    Stream[%d]: Output\n", mId);
     lines.appendFormat("      Consumer name: %s\n", mConsumerName.string());
