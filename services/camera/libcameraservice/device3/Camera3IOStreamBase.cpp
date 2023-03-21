@@ -73,8 +73,7 @@ bool Camera3IOStreamBase::hasOutstandingBuffersLocked() const {
     return false;
 }
 
-void Camera3IOStreamBase::dump(int fd, const Vector<String16> &args) const {
-    (void) args;
+void Camera3IOStreamBase::dump(int fd, [[maybe_unused]] const Vector<String16> &args) const {
     String8 lines;
 
     uint64_t consumerUsage = 0;
