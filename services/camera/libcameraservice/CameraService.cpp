@@ -3714,8 +3714,7 @@ void CameraService::BasicClient::block() {
 // ----------------------------------------------------------------------------
 
 void CameraService::Client::notifyError(int32_t errorCode,
-        const CaptureResultExtras& resultExtras) {
-    (void) resultExtras;
+        [[maybe_unused]] const CaptureResultExtras& resultExtras) {
     if (mRemoteCallback != NULL) {
         int32_t api1ErrorCode = CAMERA_ERROR_RELEASED;
         if (errorCode == hardware::camera2::ICameraDeviceCallbacks::ERROR_CAMERA_DISABLED) {

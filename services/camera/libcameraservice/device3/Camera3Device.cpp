@@ -497,9 +497,8 @@ ssize_t Camera3Device::getRawOpaqueBufferSize(const CameraMetadata &info, int32_
     return BAD_VALUE;
 }
 
-status_t Camera3Device::dump(int fd, const Vector<String16> &args) {
+status_t Camera3Device::dump(int fd, [[maybe_unused]] const Vector<String16> &args) {
     ATRACE_CALL();
-    (void)args;
 
     // Try to lock, but continue in case of failure (to avoid blocking in
     // deadlocks)

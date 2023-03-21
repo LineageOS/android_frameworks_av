@@ -442,8 +442,7 @@ hardware::Return<void> HidlProviderInfo::torchModeStatusChange(
 }
 
 void HidlProviderInfo::serviceDied(uint64_t cookie,
-        const wp<hidl::base::V1_0::IBase>& who) {
-    (void) who;
+        [[maybe_unused]] const wp<hidl::base::V1_0::IBase>& who) {
     ALOGI("Camera provider '%s' has died; removing it", mProviderInstance.c_str());
     if (cookie != mId) {
         ALOGW("%s: Unexpected serviceDied cookie %" PRIu64 ", expected %" PRIu32,
