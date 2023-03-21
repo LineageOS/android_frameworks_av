@@ -405,7 +405,7 @@ void MediaCodecList::findMatchingCodecs(
     // a suitable codec.
     //
     int profile = -1;
-    if (matches->empty() && format->findInt32(KEY_PROFILE, &profile)) {
+    if (matches->empty() && format != nullptr && format->findInt32(KEY_PROFILE, &profile)) {
         ALOGV("no matching codec found, retrying without profile");
         sp<AMessage> formatNoProfile = format->dup();
         formatNoProfile->removeEntryByName(KEY_PROFILE);
