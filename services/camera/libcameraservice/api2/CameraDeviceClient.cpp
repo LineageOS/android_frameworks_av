@@ -61,7 +61,7 @@ CameraDeviceClientBase::CameraDeviceClientBase(
         bool systemNativeClient,
         const std::optional<String16>& clientFeatureId,
         const String8& cameraId,
-        int api1CameraId,
+        [[maybe_unused]] int api1CameraId,
         int cameraFacing,
         int sensorOrientation,
         int clientPid,
@@ -81,8 +81,6 @@ CameraDeviceClientBase::CameraDeviceClientBase(
             servicePid,
             overrideToPortrait),
     mRemoteCallback(remoteCallback) {
-    // We don't need it for API2 clients, but Camera2ClientBase requires it.
-    (void) api1CameraId;
 }
 
 // Interface used by CameraService
