@@ -442,6 +442,7 @@ private:
 
     Mutex mMetricsLock;
     mediametrics_handle_t mMetricsHandle = 0;
+    bool mMetricsToUpload = false;
     nsecs_t mLifetimeStartNs = 0;
     void initMediametrics();
     void updateMediametrics();
