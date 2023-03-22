@@ -418,7 +418,16 @@ void AAudioServiceStreamBase::run() {
     while (mThreadEnabled.load()) {
         loopCount++;
         int64_t timeoutNanos = -1;
-        if (isRunning() || (isIdle_l() && !isStandby_l())) {
+        if (isDisconnected_l()) {
+            if (!isStandby_l()) {
+                // If the stream is disconnected but not in standby mode, wait until standby time.
+                timeoutNanos = standbyTime - AudioClock::getNanoseconds();
+                timeoutNanos = std::max<int64_t>(0, timeoutNanos);
+            } // else {
+                // If the stream is disconnected and in standby mode, keep `timeoutNanos` as
+                // -1 to wait forever until next command as the stream can only be closed.
+            // }
+        } else if (isRunning() || (isIdle_l() && !isStandby_l())) {
             timeoutNanos = (isRunning() ? std::min(nextTimestampReportTime, nextDataReportTime)
                                         : standbyTime) - AudioClock::getNanoseconds();
             timeoutNanos = std::max<int64_t>(0, timeoutNanos);
@@ -430,7 +439,7 @@ void AAudioServiceStreamBase::run() {
             break;
         }
 
-        if (isRunning()) {
+        if (isRunning() && !isDisconnected_l()) {
             auto currentTimestamp = AudioClock::getNanoseconds();
             if (currentTimestamp >= nextDataReportTime) {
                 reportData_l();
@@ -441,12 +450,11 @@ void AAudioServiceStreamBase::run() {
                 if (sendCurrentTimestamp_l() != AAUDIO_OK) {
                     ALOGE("Failed to send current timestamp, stop updating timestamp");
                     disconnect_l();
-                } else {
-                    nextTimestampReportTime = timestampScheduler.nextAbsoluteTime();
                 }
+                nextTimestampReportTime = timestampScheduler.nextAbsoluteTime();
             }
         }
-        if (isIdle_l() && AudioClock::getNanoseconds() >= standbyTime) {
+        if ((isIdle_l() || isDisconnected_l()) && AudioClock::getNanoseconds() >= standbyTime) {
             aaudio_result_t result = standby_l();
             if (result != AAUDIO_OK) {
                 // If standby failed because of the function is not implemented, there is no
