@@ -142,6 +142,7 @@ private:
         binder::Status getCsd(float* value) override;
         binder::Status forceUseFrameworkMel(bool useFrameworkMel) override;
         binder::Status forceComputeCsdOnAllDevices(bool computeCsdOnAllDevices) override;
+        binder::Status isSoundDoseHalSupported(bool* value) override;
 
         wp<SoundDoseManager> mSoundDoseManager;
         const sp<media::ISoundDoseCallback> mSoundDoseCallback;
@@ -172,6 +173,7 @@ private:
     void disableCsd();
     void setUseFrameworkMel(bool useFrameworkMel);
     void setComputeCsdOnAllDevices(bool computeCsdOnAllDevices);
+    bool isSoundDoseHalSupported() const;
     /** Returns the HAL sound dose interface or null if internal MEL computation is used. */
     void getHalSoundDose(std::shared_ptr<ISoundDose>* halSoundDose) const;
 
