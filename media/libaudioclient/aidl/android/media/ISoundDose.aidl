@@ -62,6 +62,11 @@ interface ISoundDose {
     float getOutputRs2UpperBound();
     /** Get the current CSD from audioserver. */
     float getCsd();
+    /**
+     * Returns true if the HAL supports the ISoundDose interface. Can be either
+     * as part of IModule or standalon sound dose HAL.
+     */
+    boolean isSoundDoseHalSupported();
     /** Enables/Disables MEL computations from framework. */
     oneway void forceUseFrameworkMel(boolean useFrameworkMel);
     /** Enables/Disables the computation of CSD on all devices. */
