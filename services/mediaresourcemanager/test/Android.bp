@@ -23,6 +23,7 @@ cc_test {
         "libstats_media_metrics",
         "libstatspull",
         "libstatssocket",
+        "libactivitymanager_aidl",
     ],
     include_dirs: [
         "frameworks/av/include",
@@ -72,6 +73,7 @@ cc_test {
         "libstats_media_metrics",
         "libstatspull",
         "libstatssocket",
+        "libactivitymanager_aidl",
     ],
     include_dirs: [
         "frameworks/av/include",
