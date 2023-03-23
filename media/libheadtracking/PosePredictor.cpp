@@ -91,20 +91,23 @@ std::string LeastSquaresPredictor::toString(size_t index) const {
 
 // Formatting
 static inline std::vector<size_t> createDelimiterIdx(size_t predictors, size_t lookaheads) {
-    if (predictors == 0) return {};
-    --predictors;
-    std::vector<size_t> delimiterIdx(predictors);
-    for (size_t i = 0; i < predictors; ++i) {
-        delimiterIdx[i] = (i + 1) * lookaheads;
+    if (lookaheads == 0) return {};
+    --lookaheads;
+    std::vector<size_t> delimiterIdx(lookaheads);
+    for (size_t i = 0; i < lookaheads; ++i) {
+        delimiterIdx[i] = (i + 1) * predictors;
     }
     return delimiterIdx;
 }
 
 PosePredictor::PosePredictor()
-    : mPredictors{  // must match switch in getCurrentPredictor()
+    : mPredictors{
+            // First predictors must match switch in getCurrentPredictor()
             std::make_shared<LastPredictor>(),
             std::make_shared<TwistPredictor>(),
             std::make_shared<LeastSquaresPredictor>(),
+            // After this, can place additional predictors here for comparison such as
+            // std::make_shared<LeastSquaresPredictor>(0.25),
         }
     , mLookaheadMs(kLookAheadMs.begin(), kLookAheadMs.end())
     , mVerifiers(std::size(mLookaheadMs) * std::size(mPredictors))
@@ -195,7 +198,12 @@ std::string PosePredictor::toString(size_t index) const {
     if constexpr (kEnableVerification) {
         // dump verification
         ss.append(prefixSpace)
-            .append(" Prediction abs error (L1) degrees [ type (last twist least-squares) x ( ");
+            .append(" Prediction abs error (L1) degrees [ type (");
+        for (size_t i = 0; i < mPredictors.size(); ++i) {
+            if (i > 0) ss.append(" , ");
+            ss.append(mPredictors[i]->name());
+        }
+        ss.append(" ) x ( ");
         for (size_t i = 0; i < mLookaheadMs.size(); ++i) {
             if (i > 0) ss.append(" : ");
             ss.append(std::to_string(mLookaheadMs[i]));

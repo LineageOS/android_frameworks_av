@@ -108,8 +108,8 @@ SpatializerPoseController::SpatializerPoseController(Listener* listener,
               .freshnessTimeout = Ticks(kFreshnessTimeout).count(),
               .predictionDuration = []() -> float {
                   const int duration_ms =
-                          property_get_int32("audio.spatializer.prediction_duration_ms", 0);
-                  if (duration_ms > 0) {
+                          property_get_int32("audio.spatializer.prediction_duration_ms", -1);
+                  if (duration_ms >= 0) {
                       return duration_ms * 1'000'000LL;
                   } else {
                       return Ticks(kPredictionDuration).count();
