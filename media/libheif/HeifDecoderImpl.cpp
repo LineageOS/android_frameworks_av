@@ -26,7 +26,6 @@
 #include <binder/IMemory.h>
 #include <binder/MemoryDealer.h>
 #include <drm/drm_framework_common.h>
-#include <log/log.h>
 #include <media/mediametadataretriever.h>
 #include <media/stagefright/MediaSource.h>
 #include <media/stagefright/foundation/ADebug.h>
