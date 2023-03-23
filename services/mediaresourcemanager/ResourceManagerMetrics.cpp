@@ -146,18 +146,21 @@ void ResourceManagerMetrics::notifyClientCreated(const ClientInfoParcel& clientI
 
 void ResourceManagerMetrics::notifyClientReleased(const ClientInfoParcel& clientInfo) {
     bool stopCalled = true;
-    ClientConfigMap::iterator found;
+    ClientConfigParcel clientConfig;
     {
         std::scoped_lock lock(mLock);
-        found = mClientConfigMap.find(clientInfo.id);
+        ClientConfigMap::iterator found = mClientConfigMap.find(clientInfo.id);
         if (found != mClientConfigMap.end()) {
             // Release is called without Stop!
             stopCalled = false;
+            clientConfig = found->second;
+            // Update the timestamp for stopping the codec.
+            clientConfig.timeStamp = systemTime(SYSTEM_TIME_MONOTONIC) / 1000LL;
         }
     }
     if (!stopCalled) {
         // call Stop to update the metrics.
-        notifyClientStopped(found->second);
+        notifyClientStopped(clientConfig);
     }
     {
         std::scoped_lock lock(mLock);
