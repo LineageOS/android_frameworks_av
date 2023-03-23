@@ -23,6 +23,7 @@
 #include <vector>
 
 #include <android/content/AttributionSourceState.h>
+#include <android/media/AudioPortFw.h>
 #include <android/media/AudioVibratorInfo.h>
 #include <android/media/BnAudioFlingerClient.h>
 #include <android/media/BnAudioPolicyServiceClient.h>
@@ -377,6 +378,9 @@ public:
                                    unsigned int *num_ports,
                                    struct audio_port_v7 *ports,
                                    unsigned int *generation);
+
+    static status_t listDeclaredDevicePorts(media::AudioPortRole role,
+                                            std::vector<media::AudioPortFw>* result);
 
     /* Get attributes for a given audio port. On input, the port
      * only needs the 'id' field to be filled in. */

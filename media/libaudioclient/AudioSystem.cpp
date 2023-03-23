@@ -1544,6 +1544,15 @@ status_t AudioSystem::listAudioPorts(audio_port_role_t role,
     return OK;
 }
 
+status_t AudioSystem::listDeclaredDevicePorts(media::AudioPortRole role,
+                                              std::vector<media::AudioPortFw>* result) {
+    if (result == nullptr) return BAD_VALUE;
+    const sp<IAudioPolicyService>& aps = AudioSystem::get_audio_policy_service();
+    if (aps == 0) return PERMISSION_DENIED;
+    RETURN_STATUS_IF_ERROR(statusTFromBinderStatus(aps->listDeclaredDevicePorts(role, result)));
+    return OK;
+}
+
 status_t AudioSystem::getAudioPort(struct audio_port_v7* port) {
     if (port == nullptr) {
         return BAD_VALUE;
