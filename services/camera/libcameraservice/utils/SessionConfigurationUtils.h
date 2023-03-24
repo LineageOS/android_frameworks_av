@@ -145,7 +145,7 @@ StreamConfigurationPair getStreamConfigurationPair(const CameraMetadata &metadat
 
 status_t checkAndOverrideSensorPixelModesUsed(
         const std::vector<int32_t> &sensorPixelModesUsed, int format, int width, int height,
-        const CameraMetadata &staticInfo, bool flexibleConsumer,
+        const CameraMetadata &staticInfo,
         std::unordered_set<int32_t> *overriddenSensorPixelModesUsed);
 
 bool targetPerfClassPrimaryCamera(
