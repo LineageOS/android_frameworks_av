@@ -32,6 +32,7 @@ public:
     virtual void add(int64_t atNs, const Pose3f& pose, const Twist3f& twist) = 0;
     virtual Pose3f predict(int64_t atNs) const = 0;
     virtual void reset() = 0;
+    virtual std::string name() const = 0;
     virtual std::string toString(size_t index) const = 0;
 };
 
@@ -55,6 +56,10 @@ public:
 
     void reset() override {
         mLastPose = {};
+    }
+
+    std::string name() const override {
+        return "LAST";
     }
 
     std::string toString(size_t index) const override {
@@ -90,6 +95,10 @@ public:
         mLastAtNs = {};
         mLastPose = {};
         mLastTwist = {};
+    }
+
+    std::string name() const override {
+        return "TWIST";
     }
 
     std::string toString(size_t index) const override {
@@ -130,13 +139,16 @@ public:
     void add(int64_t atNs, const Pose3f& pose, const Twist3f& twist) override;
     Pose3f predict(int64_t atNs) const override;
     void reset() override;
+    std::string name() const override {
+        return "LEAST_SQUARES(" + std::to_string(mAlpha) + ")";
+    }
     std::string toString(size_t index) const override;
 
 private:
     const double mAlpha;
     int64_t mLastAtNs{};
     Pose3f mLastPose;
-    static constexpr double kDefaultAlphaEstimator = 0.5;
+    static constexpr double kDefaultAlphaEstimator = 0.2;
     static constexpr size_t kMinimumSamplesForPrediction = 4;
     audio_utils::LinearLeastSquaresFit<double> mRw;
     audio_utils::LinearLeastSquaresFit<double> mRx;
