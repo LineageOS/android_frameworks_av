@@ -1104,14 +1104,14 @@ bool NuPlayer::Decoder::onInputBufferFetched(const sp<AMessage> &msg) {
                         static_cast<MediaBufferHolder*>(holder.get())->mediaBuffer() : nullptr;
                 }
                 if (mediaBuf != NULL) {
-                    if (mediaBuf->size() > codecBuffer->capacity()) {
+                    if (mediaBuf->range_length() > codecBuffer->capacity()) {
                         handleError(ERROR_BUFFER_TOO_SMALL);
                         mDequeuedInputBuffers.push_back(bufferIx);
                         return false;
                     }
 
-                    codecBuffer->setRange(0, mediaBuf->size());
-                    memcpy(codecBuffer->data(), mediaBuf->data(), mediaBuf->size());
+                    codecBuffer->setRange(0, mediaBuf->range_length());
+                    memcpy(codecBuffer->data(), mediaBuf->data(), mediaBuf->range_length());
 
                     MetaDataBase &meta_data = mediaBuf->meta_data();
                     cryptInfo = NuPlayerDrm::getSampleCryptoInfo(meta_data);
