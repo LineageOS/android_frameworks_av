@@ -483,7 +483,7 @@ binder::Status createSurfaceFromGbp(
     }
     std::unordered_set<int32_t> overriddenSensorPixelModes;
     if (checkAndOverrideSensorPixelModesUsed(sensorPixelModesUsed, format, width, height,
-            physicalCameraMetadata, flexibleConsumer, &overriddenSensorPixelModes) != OK) {
+            physicalCameraMetadata, &overriddenSensorPixelModes) != OK) {
         String8 msg = String8::format("Camera %s: sensor pixel modes for stream with "
                 "format %#x are not valid",logicalCameraId.string(), format);
         ALOGE("%s: %s", __FUNCTION__, msg.string());
@@ -757,7 +757,7 @@ convertToHALStreamCombination(
             streamInfo.dynamicRangeProfile = it.getDynamicRangeProfile();
             if (checkAndOverrideSensorPixelModesUsed(sensorPixelModesUsed,
                     streamInfo.format, streamInfo.width,
-                    streamInfo.height, metadataChosen, false /*flexibleConsumer*/,
+                    streamInfo.height, metadataChosen,
                     &streamInfo.sensorPixelModesUsed) != OK) {
                         ALOGE("%s: Deferred surface sensor pixel modes not valid",
                                 __FUNCTION__);
@@ -934,7 +934,7 @@ static std::unordered_set<int32_t> convertToSet(const std::vector<int32_t> &sens
 
 status_t checkAndOverrideSensorPixelModesUsed(
         const std::vector<int32_t> &sensorPixelModesUsed, int format, int width, int height,
-        const CameraMetadata &staticInfo, bool flexibleConsumer,
+        const CameraMetadata &staticInfo,
         std::unordered_set<int32_t> *overriddenSensorPixelModesUsed) {
 
     const std::unordered_set<int32_t> &sensorPixelModesUsedSet =
@@ -943,6 +943,8 @@ status_t checkAndOverrideSensorPixelModesUsed(
         if (sensorPixelModesUsedSet.find(ANDROID_SENSOR_PIXEL_MODE_MAXIMUM_RESOLUTION) !=
                 sensorPixelModesUsedSet.end()) {
             // invalid value for non ultra high res sensors
+            ALOGE("%s ANDROID_SENSOR_PIXEL_MODE_MAXIMUM_RESOLUTION used on a device which doesn't "
+                    "support ultra high resolution capture", __FUNCTION__);
             return BAD_VALUE;
         }
         overriddenSensorPixelModesUsed->clear();
@@ -973,27 +975,30 @@ status_t checkAndOverrideSensorPixelModesUsed(
             overriddenSensorPixelModesUsed->insert(ANDROID_SENSOR_PIXEL_MODE_MAXIMUM_RESOLUTION);
             return OK;
         }
-        // We don't allow flexible consumer for max resolution mode.
         if (isInMaximumResolutionStreamConfigurationMap) {
-            overriddenSensorPixelModesUsed->insert(ANDROID_SENSOR_PIXEL_MODE_MAXIMUM_RESOLUTION);
-            return OK;
-        }
-        if (isInDefaultStreamConfigurationMap || (flexibleConsumer && width < ROUNDING_WIDTH_CAP)) {
+            overriddenSensorPixelModesUsed->insert(
+                    ANDROID_SENSOR_PIXEL_MODE_MAXIMUM_RESOLUTION);
+        } else {
             overriddenSensorPixelModesUsed->insert(ANDROID_SENSOR_PIXEL_MODE_DEFAULT);
-            return OK;
         }
-        return BAD_VALUE;
+        return OK;
     }
 
     // Case2: The app has set sensorPixelModesUsed, we need to verify that they
     // are valid / err out.
     if (sensorPixelModesUsedSet.find(ANDROID_SENSOR_PIXEL_MODE_DEFAULT) !=
             sensorPixelModesUsedSet.end() && !isInDefaultStreamConfigurationMap) {
+        ALOGE("%s: ANDROID_SENSOR_PIXEL_MODE_DEFAULT set by client, but stream f: %d size %d x %d"
+                " isn't present in default stream configuration map", __FUNCTION__, format, width,
+                height);
         return BAD_VALUE;
     }
 
    if (sensorPixelModesUsedSet.find(ANDROID_SENSOR_PIXEL_MODE_MAXIMUM_RESOLUTION) !=
             sensorPixelModesUsedSet.end() && !isInMaximumResolutionStreamConfigurationMap) {
+        ALOGE("%s: ANDROID_SENSOR_PIXEL_MODE_MAXIMUM_RESOLUTION set by client, but stream f: "
+                "%d size %d x %d isn't present in default stream configuration map", __FUNCTION__,
+                format, width, height);
         return BAD_VALUE;
     }
     *overriddenSensorPixelModesUsed = sensorPixelModesUsedSet;
