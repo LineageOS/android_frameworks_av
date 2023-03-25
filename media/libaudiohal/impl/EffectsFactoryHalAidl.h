@@ -25,6 +25,8 @@
 #include <media/audiohal/EffectsFactoryHalInterface.h>
 #include <system/thread_defs.h>
 
+#include "EffectProxy.h"
+
 namespace android {
 namespace effect {
 
@@ -60,24 +62,35 @@ class EffectsFactoryHalAidl final : public EffectsFactoryHalInterface {
 
     detail::AudioHalVersionInfo getHalVersion() const override;
 
-    // for TIME_CHECK
-    const std::string getClassName() const { return "EffectHalAidl"; }
-
   private:
-    std::mutex mLock;
     const std::shared_ptr<IFactory> mFactory;
-    uint64_t mEffectIdCounter GUARDED_BY(mLock) = 0; // Align with HIDL (0 is INVALID_ID)
-    std::unique_ptr<std::vector<Descriptor>> mDescList GUARDED_BY(mLock) = nullptr;
     const detail::AudioHalVersionInfo mHalVersion;
+    // Full list of HAL effect descriptors
+    const std::vector<Descriptor> mHalDescList;
+    // Map of proxy UUID (key) to the proxy object
+    const std::map<::aidl::android::media::audio::common::AudioUuid /* proxy impl UUID */,
+                   std::shared_ptr<EffectProxy>>
+            mUuidProxyMap;
+    // List of effect proxy, initialize after mUuidProxyMap because it need to have all sub-effects
+    const std::vector<Descriptor> mProxyDescList;
+    // List of non-proxy effects
+    const std::vector<Descriptor> mNonProxyDescList;
+    // total number of effects including proxy effects
+    const size_t mEffectCount;
+
+    std::mutex mLock;
+    uint64_t mEffectIdCounter GUARDED_BY(mLock) = 0;  // Align with HIDL (0 is INVALID_ID)
 
     virtual ~EffectsFactoryHalAidl() = default;
-    status_t queryEffectList_l() REQUIRES(mLock);
-    status_t getHalDescriptorWithImplUuid_l(
+    status_t getHalDescriptorWithImplUuid(
             const aidl::android::media::audio::common::AudioUuid& uuid,
-            effect_descriptor_t* pDescriptor) REQUIRES(mLock);
-    status_t getHalDescriptorWithTypeUuid_l(
+            effect_descriptor_t* pDescriptor);
+
+    status_t getHalDescriptorWithTypeUuid(
             const aidl::android::media::audio::common::AudioUuid& type,
-            std::vector<effect_descriptor_t>* descriptors) REQUIRES(mLock);
+            std::vector<effect_descriptor_t>* descriptors);
+
+    bool isProxyEffect(const aidl::android::media::audio::common::AudioUuid& uuid) const;
 };
 
 } // namespace effect
