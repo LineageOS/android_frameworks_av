@@ -625,9 +625,14 @@ class Camera3Device :
         // overriding of ROTATE_AND_CROP value and adjustment of coordinates
         // in several other controls in both the request and the result
         bool                                mRotateAndCropAuto;
+        // Indicates that the ROTATE_AND_CROP value within 'mSettingsList' was modified
+        // irrespective of the original value.
+        bool                                mRotateAndCropChanged = false;
         // Whether this request has AUTOFRAMING_AUTO set, so need to override the AUTOFRAMING value
         // in the capture request.
         bool                                mAutoframingAuto;
+        // Indicates that the auto framing value within 'mSettingsList' was modified
+        bool                                mAutoframingChanged = false;
 
         // Whether this capture request has its zoom ratio set to 1.0x before
         // the framework overrides it for camera HAL consumption.
@@ -816,6 +821,15 @@ class Camera3Device :
      */
     static nsecs_t getMonoToBoottimeOffset();
 
+    // Override rotate_and_crop control if needed
+    static bool    overrideAutoRotateAndCrop(const sp<CaptureRequest> &request /*out*/,
+            bool overrideToPortrait,
+            camera_metadata_enum_android_scaler_rotate_and_crop_t rotateAndCropOverride);
+
+    // Override auto framing control if needed
+    static bool    overrideAutoframing(const sp<CaptureRequest> &request /*out*/,
+            camera_metadata_enum_android_control_autoframing_t autoframingOverride);
+
     struct RequestTrigger {
         // Metadata tag number, e.g. android.control.aePrecaptureTrigger
         uint32_t metadataTag;
@@ -973,7 +987,7 @@ class Camera3Device :
         status_t           addFakeTriggerIds(const sp<CaptureRequest> &request);
 
         // Override rotate_and_crop control if needed; returns true if the current value was changed
-        bool               overrideAutoRotateAndCrop(const sp<CaptureRequest> &request);
+        bool               overrideAutoRotateAndCrop(const sp<CaptureRequest> &request /*out*/);
 
         // Override autoframing control if needed; returns true if the current value was changed
         bool               overrideAutoframing(const sp<CaptureRequest> &request);
@@ -1417,6 +1431,11 @@ class Camera3Device :
     // Whether the camera framework overrides the device characteristics for
     // app compatibility reasons.
     bool mOverrideToPortrait;
+    camera_metadata_enum_android_scaler_rotate_and_crop_t mRotateAndCropOverride;
+    bool mComposerOutput;
+
+    // Auto framing override value
+    camera_metadata_enum_android_control_autoframing mAutoframingOverride;
 
     // Current active physical id of the logical multi-camera, if any
     std::string mActivePhysicalId;

@@ -1262,6 +1262,11 @@ public:
     audio_track_cblk_t*     mCblk;                  // re-load after mLock.unlock()
     audio_io_handle_t       mOutput = AUDIO_IO_HANDLE_NONE; // from AudioSystem::getOutputForAttr()
 
+    // A copy of shared memory and proxy between obtainBuffer and releaseBuffer to keep the
+    // shared memory valid when processing data.
+    sp<IMemory>               mCblkMemoryObtainBufferRef GUARDED_BY(mLock);
+    sp<AudioTrackClientProxy> mProxyObtainBufferRef GUARDED_BY(mLock);
+
     sp<AudioTrackThread>    mAudioTrackThread;
     bool                    mThreadCanCallJava;
 
