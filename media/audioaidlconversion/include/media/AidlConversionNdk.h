@@ -34,9 +34,9 @@
 namespace aidl {
 namespace android {
 
-ConversionResult<buffer_config_t> aidl2legacy_AudioConfigBase_buffer_config_t(
-        const media::audio::common::AudioConfigBase& aidl, bool isInput);
-ConversionResult<media::audio::common::AudioConfigBase> legacy2aidl_buffer_config_t_AudioConfigBase(
+ConversionResult<buffer_config_t> aidl2legacy_AudioConfig_buffer_config_t(
+        const media::audio::common::AudioConfig& aidl, bool isInput);
+ConversionResult<media::audio::common::AudioConfig> legacy2aidl_buffer_config_t_AudioConfig(
         const buffer_config_t& legacy, bool isInput);
 
 ::android::status_t aidl2legacy_AudioAttributesTags(
