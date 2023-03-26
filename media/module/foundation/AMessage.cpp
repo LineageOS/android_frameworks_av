@@ -961,6 +961,11 @@ size_t AMessage::countEntries() const {
     return mItems.size();
 }
 
+/* static */
+size_t AMessage::maxAllowedEntries() {
+    return kMaxNumItems;
+}
+
 const char *AMessage::getEntryNameAt(size_t index, Type *type) const {
     if (index >= mItems.size()) {
         *type = kTypeInt32;
