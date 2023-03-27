@@ -38,7 +38,7 @@ namespace effect {
  * and parameters will only passthrough to the active sub-effect.
  *
  */
-class EffectProxy : public ::aidl::android::hardware::audio::effect::BnEffect {
+class EffectProxy final : public ::aidl::android::hardware::audio::effect::BnEffect {
   public:
     EffectProxy(const ::aidl::android::hardware::audio::effect::Descriptor::Identity& id,
                 const std::shared_ptr<::aidl::android::hardware::audio::effect::IFactory>& factory);
