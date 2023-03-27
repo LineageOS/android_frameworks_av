@@ -627,9 +627,11 @@ status_t NuMediaExtractor::appendVorbisNumPageSamples(
         numPageSamples = -1;
     }
 
+    // insert, including accounting for the space used.
     memcpy((uint8_t *)buffer->data() + mbuf->range_length(),
            &numPageSamples,
            sizeof(numPageSamples));
+    buffer->setRange(buffer->offset(), buffer->size() + sizeof(numPageSamples));
 
     uint32_t type;
     const void *data;
@@ -678,6 +680,8 @@ status_t NuMediaExtractor::readSampleData(const sp<ABuffer> &buffer) {
 
     ssize_t minIndex = fetchAllTrackSamples();
 
+    buffer->setRange(0, 0);     // start with an empty buffer
+
     if (minIndex < 0) {
         return ERROR_END_OF_STREAM;
     }
@@ -693,23 +697,23 @@ status_t NuMediaExtractor::readSampleData(const sp<ABuffer> &buffer) {
         sampleSize += sizeof(int32_t);
     }
 
+    // capacity() is ok since we cleared out the buffer
     if (buffer->capacity() < sampleSize) {
         return -ENOMEM;
     }
 
+    const size_t srclen = it->mBuffer->range_length();
     const uint8_t *src =
         (const uint8_t *)it->mBuffer->data()
             + it->mBuffer->range_offset();
 
-    memcpy((uint8_t *)buffer->data(), src, it->mBuffer->range_length());
+    memcpy((uint8_t *)buffer->data(), src, srclen);
+    buffer->setRange(0, srclen);
 
     status_t err = OK;
     if (info->mTrackFlags & kIsVorbis) {
+        // adjusts range when it inserts the extra bits
         err = appendVorbisNumPageSamples(it->mBuffer, buffer);
-    }
-
-    if (err == OK) {
-        buffer->setRange(0, sampleSize);
     }
 
     return err;
