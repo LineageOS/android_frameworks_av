@@ -979,9 +979,10 @@ void StreamOutHalHidl::onRecommendedLatencyModeChanged(
 }
 
 status_t StreamOutHalHidl::exit() {
-    // FIXME this is using hard-coded strings but in the future, this functionality will be
-    //       converted to use audio HAL extensions required to support tunneling
-    return setParameters(String8("exiting=1"));
+    // Signal exiting to remote_submix HAL.
+    AudioParameter param;
+    param.addInt(String8(AudioParameter::keyExiting), 1);
+    return setParameters(param.toString());
 }
 
 StreamInHalHidl::StreamInHalHidl(
