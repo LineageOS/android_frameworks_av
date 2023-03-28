@@ -2901,6 +2901,9 @@ bool AudioFlinger::PlaybackThread::destroyTrack_l(const sp<Track>& track)
     if (!trackActive) {
         removeTrack_l(track);
     } else if (track->isFastTrack() || track->isOffloaded() || track->isDirect()) {
+        if (track->isPausePending()) {
+            track->pauseAck();
+        }
         track->mState = TrackBase::STOPPING_1;
     }
 
