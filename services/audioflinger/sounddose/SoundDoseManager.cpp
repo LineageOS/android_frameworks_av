@@ -51,33 +51,36 @@ sp<audio_utils::MelProcessor> SoundDoseManager::getOrCreateProcessorForDevice(
     std::lock_guard _l(mLock);
 
     if (mHalSoundDose != nullptr && !mDisableCsd) {
-        ALOGW("%s: using HAL MEL computation, no MelProcessor needed.", __func__);
+        ALOGD("%s: using HAL MEL computation, no MelProcessor needed.", __func__);
         return nullptr;
     }
 
     auto streamProcessor = mActiveProcessors.find(streamHandle);
-    sp<audio_utils::MelProcessor> processor;
-    if (streamProcessor != mActiveProcessors.end() &&
-            (processor = streamProcessor->second.promote())) {
-        ALOGV("%s: found callback for stream id %d", __func__, streamHandle);
-        const auto activeTypeIt = mActiveDeviceTypes.find(deviceId);
-        if (activeTypeIt != mActiveDeviceTypes.end()) {
-            processor->setAttenuation(mMelAttenuationDB[activeTypeIt->second]);
+    if (streamProcessor != mActiveProcessors.end()) {
+        auto processor = streamProcessor->second.promote();
+        // if processor is nullptr it means it was removed by the playback
+        // thread and can be replaced in the mActiveProcessors map
+        if (processor != nullptr) {
+            ALOGV("%s: found callback for stream id %d", __func__, streamHandle);
+            const auto activeTypeIt = mActiveDeviceTypes.find(deviceId);
+            if (activeTypeIt != mActiveDeviceTypes.end()) {
+                processor->setAttenuation(mMelAttenuationDB[activeTypeIt->second]);
+            }
+            processor->setDeviceId(deviceId);
+            processor->setOutputRs2UpperBound(mRs2UpperBound);
+            return processor;
         }
-        processor->setDeviceId(deviceId);
-        processor->setOutputRs2UpperBound(mRs2UpperBound);
-        return processor;
-    } else {
-        ALOGV("%s: creating new callback for stream id %d", __func__, streamHandle);
-        sp<audio_utils::MelProcessor> melProcessor = sp<audio_utils::MelProcessor>::make(
-                sampleRate, channelCount, format, this, deviceId, mRs2UpperBound);
-        const auto activeTypeIt = mActiveDeviceTypes.find(deviceId);
-        if (activeTypeIt != mActiveDeviceTypes.end()) {
-            melProcessor->setAttenuation(mMelAttenuationDB[activeTypeIt->second]);
-        }
-        mActiveProcessors[streamHandle] = melProcessor;
-        return melProcessor;
     }
+
+    ALOGV("%s: creating new callback for stream id %d", __func__, streamHandle);
+    sp<audio_utils::MelProcessor> melProcessor = sp<audio_utils::MelProcessor>::make(
+            sampleRate, channelCount, format, this, deviceId, mRs2UpperBound);
+    const auto activeTypeIt = mActiveDeviceTypes.find(deviceId);
+    if (activeTypeIt != mActiveDeviceTypes.end()) {
+        melProcessor->setAttenuation(mMelAttenuationDB[activeTypeIt->second]);
+    }
+    mActiveProcessors[streamHandle] = melProcessor;
+    return melProcessor;
 }
 
 bool SoundDoseManager::setHalSoundDoseInterface(const std::shared_ptr<ISoundDose>& halSoundDose) {
