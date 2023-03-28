@@ -356,7 +356,7 @@ public:
                 needsUpdate = true;
             }
         }
-        if (!found) {
+        if (!found || me.v.level > LEVEL_AVC_5) {
             // We set to the highest supported level.
             me.set().level = LEVEL_AVC_5;
         }
