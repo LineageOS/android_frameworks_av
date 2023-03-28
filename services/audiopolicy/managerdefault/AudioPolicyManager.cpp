@@ -2088,8 +2088,7 @@ status_t AudioPolicyManager::startSource(const sp<SwAudioOutputDescriptor>& outp
     outputDesc->setClientActive(client, true);
 
     if (client->hasPreferredDevice(true)) {
-        if (outputDesc->clientsList(true /*activeOnly*/).size() == 1 &&
-                client->isPreferredDeviceForExclusiveUse()) {
+        if (outputDesc->sameExclusivePreferredDevicesCount() > 0) {
             // Preferred device may be exclusive, use only if no other active clients on this output
             devices = DeviceVector(
                         mAvailableOutputDevices.getDeviceFromId(client->preferredDeviceId()));
@@ -2293,7 +2292,8 @@ status_t AudioPolicyManager::stopSource(const sp<SwAudioOutputDescriptor>& outpu
             }
         }
         bool forceDeviceUpdate = false;
-        if (client->hasPreferredDevice(true)) {
+        if (client->hasPreferredDevice(true) &&
+                outputDesc->sameExclusivePreferredDevicesCount() < 2) {
             checkStrategyRoute(client->strategy(), AUDIO_IO_HANDLE_NONE);
             forceDeviceUpdate = true;
         }
