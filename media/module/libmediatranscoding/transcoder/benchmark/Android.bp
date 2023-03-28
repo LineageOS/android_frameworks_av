@@ -26,25 +26,16 @@ cc_test {
     name: "MediaTranscoderBenchmark",
     srcs: ["MediaTranscoderBenchmark.cpp"],
     defaults: ["benchmarkdefaults"],
-    data: [
-        ":https://storage.googleapis.com/android_media/frameworks/av/media/libmediatranscoding/transcoder/benchmark/TranscodingBenchmark-1.2.zip?unzip=true",
-    ],
 }
 
 cc_test {
     name: "MediaSampleReaderBenchmark",
     srcs: ["MediaSampleReaderBenchmark.cpp"],
     defaults: ["benchmarkdefaults"],
-    data: [
-        ":https://storage.googleapis.com/android_media/frameworks/av/media/libmediatranscoding/transcoder/benchmark/TranscodingBenchmark-1.2.zip?unzip=true",
-    ],
 }
 
 cc_test {
     name: "MediaTrackTranscoderBenchmark",
     srcs: ["MediaTrackTranscoderBenchmark.cpp"],
     defaults: ["benchmarkdefaults"],
-    data: [
-        ":https://storage.googleapis.com/android_media/frameworks/av/media/libmediatranscoding/transcoder/benchmark/TranscodingBenchmark-1.2.zip?unzip=true",
-    ],
 }
