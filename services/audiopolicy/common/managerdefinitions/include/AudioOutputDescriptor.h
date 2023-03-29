@@ -301,6 +301,10 @@ public:
         return mActiveClients;
     }
 
+    // Returns 0 if not all active clients have the same exclusive preferred device
+    // or the number of active clients with the same exclusive preferred device
+    size_t sameExclusivePreferredDevicesCount() const;
+
     bool useHwGain() const
     {
         return !devices().isEmpty() ? devices().itemAt(0)->hasGainController() : false;
