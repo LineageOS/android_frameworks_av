@@ -62,5 +62,13 @@ cc_fuzz {
             "android-media-fuzzing-reports@google.com",
         ],
         componentid: 155276,
+        hotlists: [
+            "4593311",
+        ],
+        description: "The fuzzer targets the APIs of libstagefright_httplive",
+        vector: "remote",
+        service_privilege: "privileged",
+        users: "multi_user",
+        fuzzed_code_usage: "shipped",
     },
 }
