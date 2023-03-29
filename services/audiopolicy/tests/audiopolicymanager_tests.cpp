@@ -82,6 +82,14 @@ AudioMixMatchCriterion createSessionIdCriterion(audio_session_t session, bool ex
     return criterion;
 }
 
+// TODO b/182392769: use attribution source util
+AttributionSourceState createAttributionSourceState(uid_t uid) {
+    AttributionSourceState attributionSourceState;
+    attributionSourceState.uid = uid;
+    attributionSourceState.token = sp<BBinder>::make();
+    return attributionSourceState;
+}
+
 } // namespace
 
 TEST(AudioPolicyManagerTestInit, EngineFailure) {
@@ -271,10 +279,7 @@ void AudioPolicyManagerTest::getOutputForAttr(
     AudioPolicyInterface::output_type_t outputType;
     bool isSpatialized;
     bool isBitPerfectInternal;
-    // TODO b/182392769: use attribution source util
-    AttributionSourceState attributionSource = AttributionSourceState();
-    attributionSource.uid = uid;
-    attributionSource.token = sp<BBinder>::make();
+    AttributionSourceState attributionSource = createAttributionSourceState(uid);
     ASSERT_EQ(OK, mManager->getOutputForAttr(
                     &attr, output, session, &stream, attributionSource, &config, &flags,
                     selectedDeviceId, portId, {}, &outputType, &isSpatialized,
@@ -302,10 +307,7 @@ void AudioPolicyManagerTest::getInputForAttr(
     if (!portId) portId = &localPortId;
     *portId = AUDIO_PORT_HANDLE_NONE;
     AudioPolicyInterface::input_type_t inputType;
-    // TODO b/182392769: use attribution source util
-    AttributionSourceState attributionSource = AttributionSourceState();
-    attributionSource.uid = 0;
-    attributionSource.token = sp<BBinder>::make();
+    AttributionSourceState attributionSource = createAttributionSourceState(/*uid=*/ 0);
     ASSERT_EQ(OK, mManager->getInputForAttr(
             &attr, &input, riid, session, attributionSource, &config, flags,
             selectedDeviceId, &inputType, portId));
@@ -1858,6 +1860,82 @@ INSTANTIATE_TEST_SUITE_P(
                                      createUsageCriterion(AUDIO_USAGE_MEDIA)},
                     /*expected_match=*/ false)
                     .withSessionId(TEST_SESSION_ID).withUsage(AUDIO_USAGE_MEDIA)));
+
+struct DPMmapTestParam {
+    DPMmapTestParam(int mixRouteFlags, audio_devices_t deviceType, const std::string& deviceAddress)
+        : mixRouteFlags(mixRouteFlags), deviceType(deviceType), deviceAddress(deviceAddress) {}
+
+    int mixRouteFlags;
+    audio_devices_t deviceType;
+    std::string deviceAddress;
+};
+
+class AudioPolicyManagerTestMMapPlaybackRerouting
+    : public AudioPolicyManagerTestDynamicPolicy,
+      public ::testing::WithParamInterface<DPMmapTestParam> {
+  protected:
+    void SetUp() override {
+        AudioPolicyManagerTestDynamicPolicy::SetUp();
+        audioConfig = AUDIO_CONFIG_INITIALIZER;
+        audioConfig.channel_mask = AUDIO_CHANNEL_OUT_STEREO;
+        audioConfig.format = AUDIO_FORMAT_PCM_16_BIT;
+        audioConfig.sample_rate = k48000SamplingRate;
+    }
+
+    audio_config_t audioConfig;
+    audio_io_handle_t mOutput;
+    audio_stream_type_t mStream = AUDIO_STREAM_DEFAULT;
+    audio_port_handle_t mSelectedDeviceId = AUDIO_PORT_HANDLE_NONE;
+    audio_port_handle_t mPortId;
+    AudioPolicyInterface::output_type_t mOutputType;
+    audio_attributes_t attr = AUDIO_ATTRIBUTES_INITIALIZER;
+    bool mIsSpatialized;
+    bool mIsBitPerfect;
+};
+
+TEST_P(AudioPolicyManagerTestMMapPlaybackRerouting, MmapPlaybackStreamMatchingDapMixFails) {
+    // Add mix matching the test uid.
+    const int testUid = 12345;
+    const auto param = GetParam();
+    status_t ret = addPolicyMix(MIX_TYPE_PLAYERS, param.mixRouteFlags, param.deviceType,
+                                param.deviceAddress, audioConfig, {createUidCriterion(testUid)});
+    ASSERT_EQ(NO_ERROR, ret);
+
+    // Geting output for matching uid and mmap-ed stream should fail.
+    audio_output_flags_t outputFlags = AUDIO_OUTPUT_FLAG_MMAP_NOIRQ;
+    ASSERT_EQ(INVALID_OPERATION,
+              mManager->getOutputForAttr(&attr, &mOutput, AUDIO_SESSION_NONE, &mStream,
+                                         createAttributionSourceState(testUid), &audioConfig,
+                                         &outputFlags, &mSelectedDeviceId, &mPortId, {},
+                                         &mOutputType, &mIsSpatialized, &mIsBitPerfect));
+}
+
+TEST_P(AudioPolicyManagerTestMMapPlaybackRerouting, NonMmapPlaybackStreamMatchingDapMixSucceeds) {
+    // Add mix matching the test uid.
+    const int testUid = 12345;
+    const auto param = GetParam();
+    status_t ret = addPolicyMix(MIX_TYPE_PLAYERS, param.mixRouteFlags, param.deviceType,
+                                param.deviceAddress, audioConfig, {createUidCriterion(testUid)});
+    ASSERT_EQ(NO_ERROR, ret);
+
+    // Geting output for matching uid should succeed for non-mmaped stream.
+    audio_output_flags_t outputFlags = AUDIO_OUTPUT_FLAG_NONE;
+    ASSERT_EQ(NO_ERROR,
+              mManager->getOutputForAttr(&attr, &mOutput, AUDIO_SESSION_NONE, &mStream,
+                                         createAttributionSourceState(testUid), &audioConfig,
+                                         &outputFlags, &mSelectedDeviceId, &mPortId, {},
+                                         &mOutputType, &mIsSpatialized, &mIsBitPerfect));
+}
+
+INSTANTIATE_TEST_SUITE_P(
+        MmapPlaybackRerouting, AudioPolicyManagerTestMMapPlaybackRerouting,
+        testing::Values(DPMmapTestParam(MIX_ROUTE_FLAG_LOOP_BACK, AUDIO_DEVICE_OUT_REMOTE_SUBMIX,
+                                        /*deviceAddress=*/"remote_submix_media"),
+                        DPMmapTestParam(MIX_ROUTE_FLAG_LOOP_BACK_AND_RENDER,
+                                        AUDIO_DEVICE_OUT_REMOTE_SUBMIX,
+                                        /*deviceAddress=*/"remote_submix_media"),
+                        DPMmapTestParam(MIX_ROUTE_FLAG_RENDER, AUDIO_DEVICE_OUT_SPEAKER,
+                                        /*deviceAddress=*/"")));
 
 class AudioPolicyManagerTestDPMixRecordInjection : public AudioPolicyManagerTestDynamicPolicy,
         public testing::WithParamInterface<DPTestParam> {
