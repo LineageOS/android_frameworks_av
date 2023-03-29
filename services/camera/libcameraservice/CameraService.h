@@ -29,6 +29,8 @@
 #include <binder/ActivityManager.h>
 #include <binder/AppOpsManager.h>
 #include <binder/BinderService.h>
+#include <binder/IServiceManager.h>
+#include <binder/IActivityManager.h>
 #include <binder/IAppOpsCallback.h>
 #include <binder/IUidObserver.h>
 #include <hardware/camera.h>
@@ -595,6 +597,20 @@ public:
     int32_t updateAudioRestrictionLocked();
 
 private:
+
+    // TODO: b/263304156 update this to make use of a death callback for more
+    // robust/fault tolerant logging
+    static const sp<IActivityManager>& getActivityManager() {
+        static const char* kActivityService = "activity";
+        static const auto activityManager = []() -> sp<IActivityManager> {
+            const sp<IServiceManager> sm(defaultServiceManager());
+            if (sm != nullptr) {
+                 return interface_cast<IActivityManager>(sm->checkService(String16(kActivityService)));
+            }
+            return nullptr;
+        }();
+        return activityManager;
+    }
 
     /**
      * Typesafe version of device status, containing both the HAL-layer and the service interface-
