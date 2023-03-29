@@ -68,6 +68,7 @@ using aidl::android::hardware::audio::common::isDefaultAudioFormat;
 using aidl::android::hardware::audio::common::makeBitPositionFlagMask;
 using aidl::android::hardware::audio::common::RecordTrackMetadata;
 using aidl::android::hardware::audio::core::AudioPatch;
+using aidl::android::hardware::audio::core::AudioRoute;
 using aidl::android::hardware::audio::core::IModule;
 using aidl::android::hardware::audio::core::ITelephony;
 using aidl::android::hardware::audio::core::ModuleDebug;
@@ -196,6 +197,7 @@ status_t DeviceHalAidl::initCheck() {
     }
     ALOGI("%s: module %s default port ids: input %d, output %d",
             __func__, mInstance.c_str(), mDefaultInputPortId, mDefaultOutputPortId);
+    RETURN_STATUS_IF_ERROR(updateRoutes());
     std::vector<AudioPortConfig> portConfigs;
     RETURN_STATUS_IF_ERROR(
             statusTFromBinderStatus(mModule->getAudioPortConfigs(&portConfigs)));  // OK if empty
@@ -365,7 +367,7 @@ status_t DeviceHalAidl::prepareToOpenStream(
         cleanups->emplace_front(this, &DeviceHalAidl::resetPortConfig, devicePortConfig.id);
     }
     RETURN_STATUS_IF_ERROR(findOrCreatePortConfig(*aidlConfig, aidlFlags, aidlHandle, aidlSource,
-                    mixPortConfig, &created));
+                    std::set<int32_t>{devicePortConfig.portId}, mixPortConfig, &created));
     if (created) {
         cleanups->emplace_front(this, &DeviceHalAidl::resetPortConfig, mixPortConfig->id);
     }
@@ -685,20 +687,41 @@ status_t DeviceHalAidl::createAudioPatch(unsigned int num_sources,
             __func__, ::android::internal::ToString(aidlSources).c_str(),
             ::android::internal::ToString(aidlSinks).c_str());
     auto fillPortConfigs = [&](
-            const std::vector<AudioPortConfig>& configs, std::vector<int32_t>* ids) -> status_t {
+            const std::vector<AudioPortConfig>& configs,
+            const std::set<int32_t>& destinationPortIds,
+            std::vector<int32_t>* ids, std::set<int32_t>* portIds) -> status_t {
         for (const auto& s : configs) {
             AudioPortConfig portConfig;
             bool created = false;
-            RETURN_STATUS_IF_ERROR(findOrCreatePortConfig(s, &portConfig, &created));
+            RETURN_STATUS_IF_ERROR(findOrCreatePortConfig(
+                            s, destinationPortIds, &portConfig, &created));
             if (created) {
                 cleanups.emplace_front(this, &DeviceHalAidl::resetPortConfig, portConfig.id);
             }
             ids->push_back(portConfig.id);
+            if (portIds != nullptr) {
+                portIds->insert(portConfig.portId);
+            }
         }
         return OK;
     };
-    RETURN_STATUS_IF_ERROR(fillPortConfigs(aidlSources, &aidlPatch.sourcePortConfigIds));
-    RETURN_STATUS_IF_ERROR(fillPortConfigs(aidlSinks, &aidlPatch.sinkPortConfigIds));
+    // When looking up port configs, the destinationPortId is only used for mix ports.
+    // Thus, we process device port configs first, and look up the destination port ID from them.
+    bool sourceIsDevice = std::any_of(aidlSources.begin(), aidlSources.end(),
+            [](const auto& config) { return config.ext.getTag() == AudioPortExt::device; });
+    const std::vector<AudioPortConfig>& devicePortConfigs =
+            sourceIsDevice ? aidlSources : aidlSinks;
+    std::vector<int32_t>* devicePortConfigIds =
+            sourceIsDevice ? &aidlPatch.sourcePortConfigIds : &aidlPatch.sinkPortConfigIds;
+    const std::vector<AudioPortConfig>& mixPortConfigs =
+            sourceIsDevice ? aidlSinks : aidlSources;
+    std::vector<int32_t>* mixPortConfigIds =
+            sourceIsDevice ? &aidlPatch.sinkPortConfigIds : &aidlPatch.sourcePortConfigIds;
+    std::set<int32_t> devicePortIds;
+    RETURN_STATUS_IF_ERROR(fillPortConfigs(
+                    devicePortConfigs, std::set<int32_t>(), devicePortConfigIds, &devicePortIds));
+    RETURN_STATUS_IF_ERROR(fillPortConfigs(
+                    mixPortConfigs, devicePortIds, mixPortConfigIds, nullptr));
     if (existingPatchIt != mPatches.end()) {
         RETURN_STATUS_IF_ERROR(statusTFromBinderStatus(
                         mModule->setAudioPatch(aidlPatch, &aidlPatch)));
@@ -793,7 +816,8 @@ status_t DeviceHalAidl::setAudioPortConfig(const struct audio_port_config* confi
                     *config, isInput, 0 /*portId*/));
     AudioPortConfig portConfig;
     bool created = false;
-    RETURN_STATUS_IF_ERROR(findOrCreatePortConfig(requestedPortConfig, &portConfig, &created));
+    RETURN_STATUS_IF_ERROR(findOrCreatePortConfig(
+                    requestedPortConfig, std::set<int32_t>(), &portConfig, &created));
     return OK;
 }
 
@@ -969,7 +993,7 @@ status_t DeviceHalAidl::setConnectedState(const struct audio_port_v7 *port, bool
                                 portsIt->second.id)));
         mPorts.erase(portsIt);
     }
-    return OK;
+    return updateRoutes();
 }
 
 status_t DeviceHalAidl::setSimulateDeviceConnections(bool enabled) {
@@ -1079,7 +1103,8 @@ status_t DeviceHalAidl::findOrCreatePortConfig(const AudioDevice& device,
 
 status_t DeviceHalAidl::findOrCreatePortConfig(
         const AudioConfig& config, const std::optional<AudioIoFlags>& flags, int32_t ioHandle,
-        AudioSource source, AudioPortConfig* portConfig, bool* created) {
+        AudioSource source, const std::set<int32_t>& destinationPortIds,
+        AudioPortConfig* portConfig, bool* created) {
     // These flags get removed one by one in this order when retrying port finding.
     static const std::vector<AudioInputFlags> kOptionalInputFlags{
         AudioInputFlags::FAST, AudioInputFlags::RAW };
@@ -1087,7 +1112,7 @@ status_t DeviceHalAidl::findOrCreatePortConfig(
     if (portConfigIt == mPortConfigs.end() && flags.has_value()) {
         auto optionalInputFlagsIt = kOptionalInputFlags.begin();
         AudioIoFlags matchFlags = flags.value();
-        auto portsIt = findPort(config, matchFlags);
+        auto portsIt = findPort(config, matchFlags, destinationPortIds);
         while (portsIt == mPorts.end() && matchFlags.getTag() == AudioIoFlags::Tag::input
                 && optionalInputFlagsIt != kOptionalInputFlags.end()) {
             if (!isBitPositionFlagSet(
@@ -1097,7 +1122,7 @@ status_t DeviceHalAidl::findOrCreatePortConfig(
             }
             matchFlags.set<AudioIoFlags::Tag::input>(matchFlags.get<AudioIoFlags::Tag::input>() &
                     ~makeBitPositionFlagMask(*optionalInputFlagsIt++));
-            portsIt = findPort(config, matchFlags);
+            portsIt = findPort(config, matchFlags, destinationPortIds);
             ALOGI("%s: mix port for config %s, flags %s was not found in the module %s, "
                     "retried with flags %s", __func__, config.toString().c_str(),
                     flags.value().toString().c_str(), mInstance.c_str(),
@@ -1133,7 +1158,8 @@ status_t DeviceHalAidl::findOrCreatePortConfig(
 }
 
 status_t DeviceHalAidl::findOrCreatePortConfig(
-        const AudioPortConfig& requestedPortConfig, AudioPortConfig* portConfig, bool* created) {
+        const AudioPortConfig& requestedPortConfig, const std::set<int32_t>& destinationPortIds,
+        AudioPortConfig* portConfig, bool* created) {
     using Tag = AudioPortExt::Tag;
     if (requestedPortConfig.ext.getTag() == Tag::mix) {
         if (const auto& p = requestedPortConfig;
@@ -1150,7 +1176,8 @@ status_t DeviceHalAidl::findOrCreatePortConfig(
                 requestedPortConfig.ext.get<Tag::mix>().usecase.
                 get<AudioPortMixExtUseCase::Tag::source>() : AudioSource::SYS_RESERVED_INVALID;
         return findOrCreatePortConfig(config, requestedPortConfig.flags,
-                requestedPortConfig.ext.get<Tag::mix>().handle, source, portConfig, created);
+                requestedPortConfig.ext.get<Tag::mix>().handle, source, destinationPortIds,
+                portConfig, created);
     } else if (requestedPortConfig.ext.getTag() == Tag::device) {
         return findOrCreatePortConfig(
                 requestedPortConfig.ext.get<Tag::device>().device, portConfig, created);
@@ -1182,8 +1209,10 @@ DeviceHalAidl::Ports::iterator DeviceHalAidl::findPort(const AudioDevice& device
             [&](const auto& pair) { return audioDeviceMatches(device, pair.second); });
 }
 
+
 DeviceHalAidl::Ports::iterator DeviceHalAidl::findPort(
-            const AudioConfig& config, const AudioIoFlags& flags) {
+            const AudioConfig& config, const AudioIoFlags& flags,
+            const std::set<int32_t>& destinationPortIds) {
     auto belongsToProfile = [&config](const AudioProfile& prof) {
         return (isDefaultAudioFormat(config.base.format) || prof.format == config.base.format) &&
                 (config.base.channelMask.getTag() == AudioChannelLayout::none ||
@@ -1197,6 +1226,10 @@ DeviceHalAidl::Ports::iterator DeviceHalAidl::findPort(
         const auto& p = pair.second;
         return p.ext.getTag() == AudioPortExt::Tag::mix &&
                 p.flags == flags &&
+                (destinationPortIds.empty() ||
+                        std::any_of(destinationPortIds.begin(), destinationPortIds.end(),
+                                [&](const int32_t destId) { return mRoutingMatrix.count(
+                                            std::make_pair(p.id, destId)) != 0; })) &&
                 (p.profiles.empty() ||
                         std::find_if(p.profiles.begin(), p.profiles.end(), belongsToProfile) !=
                         p.profiles.end()); };
@@ -1283,6 +1316,23 @@ void DeviceHalAidl::resetUnusedPortConfigs() {
         for (int32_t id : p.second.sinkPortConfigIds) portConfigIds.erase(id);
     }
     for (int32_t id : portConfigIds) resetPortConfig(id);
+}
+
+status_t DeviceHalAidl::updateRoutes() {
+    TIME_CHECK();
+    std::vector<AudioRoute> routes;
+    RETURN_STATUS_IF_ERROR(
+            statusTFromBinderStatus(mModule->getAudioRoutes(&routes)));
+    ALOGW_IF(routes.empty(), "%s: module %s returned an empty list of audio routes",
+            __func__, mInstance.c_str());
+    mRoutingMatrix.clear();
+    for (const auto& r : routes) {
+        for (auto portId : r.sourcePortIds) {
+            mRoutingMatrix.emplace(r.sinkPortId, portId);
+            mRoutingMatrix.emplace(portId, r.sinkPortId);
+        }
+    }
+    return OK;
 }
 
 void DeviceHalAidl::clearCallbacks(void* cookie) {
