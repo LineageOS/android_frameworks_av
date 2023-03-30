@@ -346,7 +346,8 @@ void CameraFuzzer::invokeCameraAPIs() {
                                  android::CameraService::USE_CALLING_UID,
                                  android::CameraService::USE_CALLING_PID,
                                  /*targetSdkVersion*/ __ANDROID_API_FUTURE__,
-                                 /*overrideToPortrait*/true, &cameraDevice);
+                                 /*overrideToPortrait*/true, /*forceSlowJpegMode*/false,
+                                 &cameraDevice);
     if (!rc.isOk()) {
         // camera not connected
         return;

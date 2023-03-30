@@ -29,6 +29,8 @@
 #include <binder/ActivityManager.h>
 #include <binder/AppOpsManager.h>
 #include <binder/BinderService.h>
+#include <binder/IServiceManager.h>
+#include <binder/IActivityManager.h>
 #include <binder/IAppOpsCallback.h>
 #include <binder/IUidObserver.h>
 #include <hardware/camera.h>
@@ -152,7 +154,7 @@ public:
     virtual binder::Status     connect(const sp<hardware::ICameraClient>& cameraClient,
             int32_t cameraId, const String16& clientPackageName,
             int32_t clientUid, int clientPid, int targetSdkVersion,
-            bool overrideToPortrait,
+            bool overrideToPortrait, bool forceSlowJpegMode,
             /*out*/
             sp<hardware::ICamera>* device) override;
 
@@ -596,6 +598,20 @@ public:
 
 private:
 
+    // TODO: b/263304156 update this to make use of a death callback for more
+    // robust/fault tolerant logging
+    static const sp<IActivityManager>& getActivityManager() {
+        static const char* kActivityService = "activity";
+        static const auto activityManager = []() -> sp<IActivityManager> {
+            const sp<IServiceManager> sm(defaultServiceManager());
+            if (sm != nullptr) {
+                 return interface_cast<IActivityManager>(sm->checkService(String16(kActivityService)));
+            }
+            return nullptr;
+        }();
+        return activityManager;
+    }
+
     /**
      * Typesafe version of device status, containing both the HAL-layer and the service interface-
      * layer values.
@@ -887,7 +903,8 @@ private:
             int api1CameraId, const String16& clientPackageNameMaybe, bool systemNativeClient,
             const std::optional<String16>& clientFeatureId, int clientUid, int clientPid,
             apiLevel effectiveApiLevel, bool shimUpdateOnly, int scoreOffset, int targetSdkVersion,
-            bool overrideToPortrait, /*out*/sp<CLIENT>& device);
+            bool overrideToPortrait, bool forceSlowJpegMode,
+            /*out*/sp<CLIENT>& device);
 
     // Lock guarding camera service state
     Mutex               mServiceLock;
@@ -1340,7 +1357,8 @@ private:
             const String8& cameraId, int api1CameraId, int facing, int sensorOrientation,
             int clientPid, uid_t clientUid, int servicePid,
             std::pair<int, IPCTransport> deviceVersionAndIPCTransport, apiLevel effectiveApiLevel,
-            bool overrideForPerfClass, bool overrideToPortrait, /*out*/sp<BasicClient>* client);
+            bool overrideForPerfClass, bool overrideToPortrait, bool forceSlowJpegMode,
+            /*out*/sp<BasicClient>* client);
 
     status_t checkCameraAccess(const String16& opPackageName);
 

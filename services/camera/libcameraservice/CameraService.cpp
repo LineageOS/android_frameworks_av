@@ -69,6 +69,8 @@
 #include <private/android_filesystem_config.h>
 #include <system/camera_vendor_tags.h>
 #include <system/camera_metadata.h>
+#include <binder/IServiceManager.h>
+#include <binder/IActivityManager.h>
 
 #include <system/camera.h>
 
@@ -137,6 +139,8 @@ static const String16 sCameraOpenCloseListenerPermission(
         "android.permission.CAMERA_OPEN_CLOSE_LISTENER");
 static const String16
         sCameraInjectExternalCameraPermission("android.permission.CAMERA_INJECT_EXTERNAL_CAMERA");
+// Constant integer for FGS Logging, used to denote the API type for logger
+static const int LOG_FGS_CAMERA_API = 1;
 const char *sFileName = "lastOpenSessionDumpFile";
 static constexpr int32_t kSystemNativeClientScore = resource_policy::PERCEPTIBLE_APP_ADJ;
 static constexpr int32_t kSystemNativeClientState =
@@ -1024,7 +1028,7 @@ Status CameraService::makeClient(const sp<CameraService>& cameraService,
         int api1CameraId, int facing, int sensorOrientation, int clientPid, uid_t clientUid,
         int servicePid, std::pair<int, IPCTransport> deviceVersionAndTransport,
         apiLevel effectiveApiLevel, bool overrideForPerfClass, bool overrideToPortrait,
-        /*out*/sp<BasicClient>* client) {
+        bool forceSlowJpegMode, /*out*/sp<BasicClient>* client) {
     // For HIDL devices
     if (deviceVersionAndTransport.second == IPCTransport::HIDL) {
         // Create CameraClient based on device version reported by the HAL.
@@ -1057,9 +1061,10 @@ Status CameraService::makeClient(const sp<CameraService>& cameraService,
         sp<ICameraClient> tmp = static_cast<ICameraClient*>(cameraCb.get());
         *client = new Camera2Client(cameraService, tmp, cameraService->mCameraServiceProxyWrapper,
                 packageName, featureId, cameraId, api1CameraId, facing, sensorOrientation,
-                clientPid, clientUid, servicePid, overrideForPerfClass, overrideToPortrait);
-        ALOGI("%s: Camera1 API (legacy), override to portrait %d", __FUNCTION__,
-                overrideToPortrait);
+                clientPid, clientUid, servicePid, overrideForPerfClass, overrideToPortrait,
+                forceSlowJpegMode);
+        ALOGI("%s: Camera1 API (legacy), override to portrait %d, forceSlowJpegMode %d",
+                __FUNCTION__, overrideToPortrait, forceSlowJpegMode);
     } else { // Camera2 API route
         sp<hardware::camera2::ICameraDeviceCallbacks> tmp =
                 static_cast<hardware::camera2::ICameraDeviceCallbacks*>(cameraCb.get());
@@ -1157,7 +1162,8 @@ Status CameraService::initializeShimMetadata(int cameraId) {
             sp<ICameraClient>{nullptr}, id, cameraId,
             internalPackageName, /*systemNativeClient*/ false, {}, uid, USE_CALLING_PID,
             API_1, /*shimUpdateOnly*/ true, /*oomScoreOffset*/ 0,
-            /*targetSdkVersion*/ __ANDROID_API_FUTURE__, /*overrideToPortrait*/ true, /*out*/ tmp)
+            /*targetSdkVersion*/ __ANDROID_API_FUTURE__, /*overrideToPortrait*/ true,
+            /*forceSlowJpegMode*/false, /*out*/ tmp)
             ).isOk()) {
         ALOGE("%s: Error initializing shim metadata: %s", __FUNCTION__, ret.toString8().string());
     }
@@ -1682,6 +1688,7 @@ Status CameraService::connect(
         int clientPid,
         int targetSdkVersion,
         bool overrideToPortrait,
+        bool forceSlowJpegMode,
         /*out*/
         sp<ICamera>* device) {
 
@@ -1693,7 +1700,7 @@ Status CameraService::connect(
     ret = connectHelper<ICameraClient,Client>(cameraClient, id, api1CameraId,
             clientPackageName,/*systemNativeClient*/ false, {}, clientUid, clientPid, API_1,
             /*shimUpdateOnly*/ false, /*oomScoreOffset*/ 0, targetSdkVersion,
-            overrideToPortrait, /*out*/client);
+            overrideToPortrait, forceSlowJpegMode, /*out*/client);
 
     if(!ret.isOk()) {
         logRejected(id, CameraThreadState::getCallingPid(), String8(clientPackageName),
@@ -1702,6 +1709,15 @@ Status CameraService::connect(
     }
 
     *device = client;
+
+    const sp<IServiceManager> sm(defaultServiceManager());
+    const auto& mActivityManager = getActivityManager();
+    if (mActivityManager) {
+        mActivityManager->logFgsApiBegin(LOG_FGS_CAMERA_API,
+            CameraThreadState::getCallingUid(),
+            CameraThreadState::getCallingPid());
+    }
+
     return ret;
 }
 
@@ -1823,7 +1839,8 @@ Status CameraService::connectDevice(
     ret = connectHelper<hardware::camera2::ICameraDeviceCallbacks,CameraDeviceClient>(cameraCb, id,
             /*api1CameraId*/-1, clientPackageNameAdj, systemNativeClient,clientFeatureId,
             clientUid, USE_CALLING_PID, API_2, /*shimUpdateOnly*/ false, oomScoreOffset,
-            targetSdkVersion, overrideToPortrait, /*out*/client);
+            targetSdkVersion, overrideToPortrait, /*forceSlowJpegMode*/false,
+            /*out*/client);
 
     if(!ret.isOk()) {
         logRejected(id, callingPid, String8(clientPackageNameAdj), ret.toString8());
@@ -1846,6 +1863,13 @@ Status CameraService::connectDevice(
         if (mMemFd == -1) {
             ALOGE("%s: Error while creating the file: %s", __FUNCTION__, sFileName);
         }
+    }
+    const sp<IServiceManager> sm(defaultServiceManager());
+    const auto& mActivityManager = getActivityManager();
+    if (mActivityManager) {
+        mActivityManager->logFgsApiBegin(LOG_FGS_CAMERA_API,
+            CameraThreadState::getCallingUid(),
+            CameraThreadState::getCallingPid());
     }
     return ret;
 }
@@ -1885,7 +1909,8 @@ Status CameraService::connectHelper(const sp<CALLBACK>& cameraCb, const String8&
         int api1CameraId, const String16& clientPackageNameMaybe, bool systemNativeClient,
         const std::optional<String16>& clientFeatureId, int clientUid, int clientPid,
         apiLevel effectiveApiLevel, bool shimUpdateOnly, int oomScoreOffset, int targetSdkVersion,
-        bool overrideToPortrait, /*out*/sp<CLIENT>& device) {
+        bool overrideToPortrait, bool forceSlowJpegMode,
+        /*out*/sp<CLIENT>& device) {
     binder::Status ret = binder::Status::ok();
 
     bool isNonSystemNdk = false;
@@ -2001,7 +2026,8 @@ Status CameraService::connectHelper(const sp<CALLBACK>& cameraCb, const String8&
                 clientFeatureId, cameraId, api1CameraId, facing, orientation,
                 clientPid, clientUid, getpid(),
                 deviceVersionAndTransport, effectiveApiLevel, overrideForPerfClass,
-                overrideToPortrait, /*out*/&tmp)).isOk()) {
+                overrideToPortrait, forceSlowJpegMode,
+                /*out*/&tmp)).isOk()) {
             return ret;
         }
         client = static_cast<CLIENT*>(tmp.get());
@@ -3510,6 +3536,13 @@ binder::Status CameraService::BasicClient::disconnect() {
 
     // client shouldn't be able to call into us anymore
     mClientPid = 0;
+
+    const auto& mActivityManager = getActivityManager();
+    if (mActivityManager) {
+        mActivityManager->logFgsApiEnd(LOG_FGS_CAMERA_API,
+            CameraThreadState::getCallingUid(),
+            CameraThreadState::getCallingPid());
+    }
 
     return res;
 }

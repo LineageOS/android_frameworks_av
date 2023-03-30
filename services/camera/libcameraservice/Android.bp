@@ -120,6 +120,7 @@ cc_library_shared {
     ],
 
     shared_libs: [
+        "libactivitymanager_aidl",
         "libbase",
         "libdl",
         "libexif",
