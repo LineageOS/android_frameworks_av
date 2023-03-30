@@ -1028,8 +1028,8 @@ bool DeviceHalAidl::audioDeviceMatches(const AudioDevice& device, const AudioPor
     return p.ext.get<AudioPortExt::Tag::device>().device == device;
 }
 
-status_t DeviceHalAidl::createPortConfig(
-        const AudioPortConfig& requestedPortConfig, PortConfigs::iterator* result) {
+status_t DeviceHalAidl::createOrUpdatePortConfig(
+        const AudioPortConfig& requestedPortConfig, PortConfigs::iterator* result, bool* created) {
     TIME_CHECK();
     AudioPortConfig appliedPortConfig;
     bool applied = false;
@@ -1044,11 +1044,17 @@ status_t DeviceHalAidl::createPortConfig(
             return NO_INIT;
         }
     }
-    auto id = appliedPortConfig.id;
-    auto [it, inserted] = mPortConfigs.emplace(std::move(id), std::move(appliedPortConfig));
-    LOG_ALWAYS_FATAL_IF(!inserted, "%s: port config with id %d already exists",
-            __func__, it->first);
+
+    int32_t id = appliedPortConfig.id;
+    if (requestedPortConfig.id != 0 && requestedPortConfig.id != id) {
+        LOG_ALWAYS_FATAL("%s: requested port config id %d changed to %d", __func__,
+                requestedPortConfig.id, id);
+    }
+
+    auto [it, inserted] = mPortConfigs.insert_or_assign(std::move(id),
+            std::move(appliedPortConfig));
     *result = it;
+    *created = inserted;
     return OK;
 }
 
@@ -1095,8 +1101,8 @@ status_t DeviceHalAidl::findOrCreatePortConfig(const AudioDevice& device,
         }
         AudioPortConfig requestedPortConfig;
         requestedPortConfig.portId = portsIt->first;
-        RETURN_STATUS_IF_ERROR(createPortConfig(requestedPortConfig, &portConfigIt));
-        *created = true;
+        RETURN_STATUS_IF_ERROR(createOrUpdatePortConfig(requestedPortConfig, &portConfigIt,
+                created));
     } else {
         *created = false;
     }
@@ -1146,15 +1152,29 @@ status_t DeviceHalAidl::findOrCreatePortConfig(
             requestedPortConfig.ext.get<AudioPortExt::Tag::mix>().usecase =
                     AudioPortMixExtUseCase::make<AudioPortMixExtUseCase::Tag::source>(source);
         }
-        RETURN_STATUS_IF_ERROR(createPortConfig(requestedPortConfig, &portConfigIt));
-        *created = true;
+        RETURN_STATUS_IF_ERROR(createOrUpdatePortConfig(requestedPortConfig, &portConfigIt,
+                created));
     } else if (!flags.has_value()) {
         ALOGW("%s: mix port config for %s, handle %d not found in the module %s, "
                 "and was not created as flags are not specified",
                 __func__, config.toString().c_str(), ioHandle, mInstance.c_str());
         return BAD_VALUE;
     } else {
-        *created = false;
+        AudioPortConfig requestedPortConfig = portConfigIt->second;
+        if (requestedPortConfig.ext.getTag() == AudioPortExt::Tag::mix) {
+            AudioPortMixExt& mixExt = requestedPortConfig.ext.get<AudioPortExt::Tag::mix>();
+            if (mixExt.usecase.getTag() == AudioPortMixExtUseCase::Tag::source &&
+                    source != AudioSource::SYS_RESERVED_INVALID) {
+                mixExt.usecase.get<AudioPortMixExtUseCase::Tag::source>() = source;
+            }
+        }
+
+        if (requestedPortConfig != portConfigIt->second) {
+            RETURN_STATUS_IF_ERROR(createOrUpdatePortConfig(requestedPortConfig, &portConfigIt,
+                    created));
+        } else {
+            *created = false;
+        }
     }
     *portConfig = portConfigIt->second;
     return OK;
