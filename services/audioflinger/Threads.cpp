@@ -6486,9 +6486,13 @@ void AudioFlinger::DirectOutputThread::processVolume_l(Track *track, bool lastTr
         if (right > GAIN_FLOAT_UNITY) {
             right = GAIN_FLOAT_UNITY;
         }
-
-        left *= v * mMasterBalanceLeft; // DirectOutputThread balance applied as track volume
-        right *= v * mMasterBalanceRight;
+        left *= v;
+        right *= v;
+        if (mAudioFlinger->getMode() != AUDIO_MODE_IN_COMMUNICATION
+                || audio_channel_count_from_out_mask(mChannelMask) > 1) {
+            left *= mMasterBalanceLeft; // DirectOutputThread balance applied as track volume
+            right *= mMasterBalanceRight;
+        }
     }
 
     track->processMuteEvent_l(mAudioFlinger->getOrCreateAudioManager(),
