@@ -120,7 +120,7 @@ public:
     static sp<TCam>      connect(int cameraId,
                                  const String16& clientPackageName,
                                  int clientUid, int clientPid, int targetSdkVersion,
-                                 bool overrideToPortrait);
+                                 bool overrideToPortrait, bool forceSlowJpegMode);
     virtual void         disconnect();
 
     void                 setListener(const sp<TCamListener>& listener);

@@ -152,7 +152,7 @@ bool CameraFuzzer::initCamera() {
                             String16("CAMERAFUZZ"), hardware::ICameraService::USE_CALLING_UID,
                             hardware::ICameraService::USE_CALLING_PID,
                             /*targetSdkVersion*/ __ANDROID_API_FUTURE__,
-                            /*overrideToPortrait*/false, &cameraDevice);
+                            /*overrideToPortrait*/false, /*forceSlowJpegMode*/false, &cameraDevice);
     mCamera = Camera::create(cameraDevice);
     if (!mCamera) {
         return false;
