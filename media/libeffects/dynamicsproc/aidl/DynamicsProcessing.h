@@ -18,8 +18,9 @@
 
 #include <aidl/android/hardware/audio/effect/BnEffect.h>
 
-#include "effect-impl/EffectImpl.h"
 #include "DynamicsProcessingContext.h"
+#include "EffectRangeSpecific.h"
+#include "effect-impl/EffectImpl.h"
 
 namespace aidl::android::hardware::audio::effect {
 
@@ -51,14 +52,10 @@ class DynamicsProcessingImpl final : public EffectImpl {
     std::string getEffectName() override { return kEffectName; }
 
   private:
-    static const DynamicsProcessing::EqBandConfig kEqBandConfigMin;
-    static const DynamicsProcessing::EqBandConfig kEqBandConfigMax;
-    static const Range::DynamicsProcessingRange kPreEqBandRange;
-    static const Range::DynamicsProcessingRange kPostEqBandRange;
-    static const Range kRange;
     std::shared_ptr<DynamicsProcessingContext> mContext;
     ndk::ScopedAStatus getParameterDynamicsProcessing(const DynamicsProcessing::Tag& tag,
                                                       Parameter::Specific* specific);
+    bool isParamInRange(const Parameter::Specific& specific);
 };
 
 }  // namespace aidl::android::hardware::audio::effect
