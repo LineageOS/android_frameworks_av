@@ -25,6 +25,7 @@
 #include <aidl/android/hardware/audio/core/BpStreamCommon.h>
 #include <aidl/android/hardware/audio/core/BpStreamIn.h>
 #include <aidl/android/hardware/audio/core/BpStreamOut.h>
+#include <aidl/android/hardware/audio/core/MmapBufferDescriptor.h>
 #include <fmq/AidlMessageQueue.h>
 #include <media/audiohal/EffectHalInterface.h>
 #include <media/audiohal/StreamHalInterface.h>
@@ -34,6 +35,7 @@
 #include "StreamPowerLog.h"
 
 using ::aidl::android::hardware::audio::common::AudioOffloadMetadata;
+using ::aidl::android::hardware::audio::core::MmapBufferDescriptor;
 
 namespace android {
 
@@ -47,21 +49,25 @@ class StreamContextAidl {
             ::aidl::android::hardware::common::fmq::SynchronizedReadWrite> DataMQ;
 
     explicit StreamContextAidl(
-            const ::aidl::android::hardware::audio::core::StreamDescriptor& descriptor,
+            ::aidl::android::hardware::audio::core::StreamDescriptor& descriptor,
             bool isAsynchronous)
         : mFrameSizeBytes(descriptor.frameSizeBytes),
           mCommandMQ(new CommandMQ(descriptor.command)),
           mReplyMQ(new ReplyMQ(descriptor.reply)),
           mBufferSizeFrames(descriptor.bufferSizeFrames),
           mDataMQ(maybeCreateDataMQ(descriptor)),
-          mIsAsynchronous(isAsynchronous) {}
+          mIsAsynchronous(isAsynchronous),
+          mIsMmapped(isMmapped(descriptor)),
+          mMmapBufferDescriptor(maybeGetMmapBuffer(descriptor)) {}
     StreamContextAidl(StreamContextAidl&& other) :
             mFrameSizeBytes(other.mFrameSizeBytes),
             mCommandMQ(std::move(other.mCommandMQ)),
             mReplyMQ(std::move(other.mReplyMQ)),
             mBufferSizeFrames(other.mBufferSizeFrames),
             mDataMQ(std::move(other.mDataMQ)),
-            mIsAsynchronous(other.mIsAsynchronous) {}
+            mIsAsynchronous(other.mIsAsynchronous),
+            mIsMmapped(other.mIsMmapped),
+            mMmapBufferDescriptor(std::move(other.mMmapBufferDescriptor)) {}
     StreamContextAidl& operator=(StreamContextAidl&& other) {
         mFrameSizeBytes = other.mFrameSizeBytes;
         mCommandMQ = std::move(other.mCommandMQ);
@@ -69,16 +75,19 @@ class StreamContextAidl {
         mBufferSizeFrames = other.mBufferSizeFrames;
         mDataMQ = std::move(other.mDataMQ);
         mIsAsynchronous = other.mIsAsynchronous;
+        mIsMmapped = other.mIsMmapped;
+        mMmapBufferDescriptor = std::move(other.mMmapBufferDescriptor);
         return *this;
     }
     bool isValid() const {
         return mFrameSizeBytes != 0 &&
                 mCommandMQ != nullptr && mCommandMQ->isValid() &&
                 mReplyMQ != nullptr && mReplyMQ->isValid() &&
-                (mDataMQ != nullptr || (
+                (mDataMQ == nullptr || (
                         mDataMQ->isValid() &&
                         mDataMQ->getQuantumCount() * mDataMQ->getQuantumSize() >=
-                        mFrameSizeBytes * mBufferSizeFrames));
+                        mFrameSizeBytes * mBufferSizeFrames)) &&
+                (!mIsMmapped || mMmapBufferDescriptor.sharedMemory.fd.get() >= 0);
     }
     size_t getBufferSizeBytes() const { return mFrameSizeBytes * mBufferSizeFrames; }
     size_t getBufferSizeFrames() const { return mBufferSizeFrames; }
@@ -87,6 +96,8 @@ class StreamContextAidl {
     size_t getFrameSizeBytes() const { return mFrameSizeBytes; }
     ReplyMQ* getReplyMQ() const { return mReplyMQ.get(); }
     bool isAsynchronous() const { return mIsAsynchronous; }
+    bool isMmapped() const { return mIsMmapped; }
+    const MmapBufferDescriptor& getMmapBufferDescriptor() const { return mMmapBufferDescriptor; }
 
   private:
     static std::unique_ptr<DataMQ> maybeCreateDataMQ(
@@ -97,6 +108,19 @@ class StreamContextAidl {
         }
         return nullptr;
     }
+    static bool isMmapped(
+            const ::aidl::android::hardware::audio::core::StreamDescriptor& descriptor) {
+        using Tag = ::aidl::android::hardware::audio::core::StreamDescriptor::AudioBuffer::Tag;
+        return descriptor.audio.getTag() == Tag::mmap;
+    }
+    static MmapBufferDescriptor maybeGetMmapBuffer(
+            ::aidl::android::hardware::audio::core::StreamDescriptor& descriptor) {
+        using Tag = ::aidl::android::hardware::audio::core::StreamDescriptor::AudioBuffer::Tag;
+        if (descriptor.audio.getTag() == Tag::mmap) {
+            return std::move(descriptor.audio.get<Tag::mmap>());
+        }
+        return {};
+    }
 
     size_t mFrameSizeBytes;
     std::unique_ptr<CommandMQ> mCommandMQ;
@@ -104,6 +128,8 @@ class StreamContextAidl {
     size_t mBufferSizeFrames;
     std::unique_ptr<DataMQ> mDataMQ;
     bool mIsAsynchronous;
+    bool mIsMmapped;
+    MmapBufferDescriptor mMmapBufferDescriptor;
 };
 
 class StreamHalAidl : public virtual StreamHalInterface, public ConversionHelperAidl {
@@ -180,6 +206,8 @@ class StreamHalAidl : public virtual StreamHalInterface, public ConversionHelper
     status_t getLatency(uint32_t *latency);
 
     status_t getObservablePosition(int64_t *frames, int64_t *timestamp);
+
+    status_t getHardwarePosition(int64_t *frames, int64_t *timestamp);
 
     status_t getXruns(int32_t *frames);
 
