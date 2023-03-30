@@ -118,7 +118,7 @@ AudioFlinger::ThreadBase::TrackBase::TrackBase(
         mThreadIoHandle(thread ? thread->id() : AUDIO_IO_HANDLE_NONE),
         mPortId(portId),
         mIsInvalid(false),
-        mTrackMetrics(std::move(metricsId), isOut),
+        mTrackMetrics(std::move(metricsId), isOut, clientUid),
         mCreatorPid(creatorPid)
 {
     const uid_t callingUid = IPCThreadState::self()->getCallingUid();
