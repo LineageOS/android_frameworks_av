@@ -41,49 +41,59 @@ DrmMetricsLogger::DrmMetricsLogger(IDrmFrontend frontend)
 
 DrmMetricsLogger::~DrmMetricsLogger() {}
 
-int MediaErrorToJavaError(status_t err) {
+int MediaErrorToEnum(status_t err) {
+#define ERROR_BAD_VALUE (BAD_VALUE)
+#define ERROR_DEAD_OBJECT (DEAD_OBJECT)
 #define STATUS_CASE(status) \
-    case status: \
-        return J##status
+    case ERROR_##status: \
+        return ENUM_##status
 
     switch (err) {
-        STATUS_CASE(ERROR_DRM_UNKNOWN);
-        STATUS_CASE(ERROR_DRM_NO_LICENSE);
-        STATUS_CASE(ERROR_DRM_LICENSE_EXPIRED);
-        STATUS_CASE(ERROR_DRM_RESOURCE_BUSY);
-        STATUS_CASE(ERROR_DRM_INSUFFICIENT_OUTPUT_PROTECTION);
-        STATUS_CASE(ERROR_DRM_SESSION_NOT_OPENED);
-        STATUS_CASE(ERROR_DRM_CANNOT_HANDLE);
-        STATUS_CASE(ERROR_DRM_INSUFFICIENT_SECURITY);
-        STATUS_CASE(ERROR_DRM_FRAME_TOO_LARGE);
-        STATUS_CASE(ERROR_DRM_SESSION_LOST_STATE);
-        STATUS_CASE(ERROR_DRM_CERTIFICATE_MALFORMED);
-        STATUS_CASE(ERROR_DRM_CERTIFICATE_MISSING);
-        STATUS_CASE(ERROR_DRM_CRYPTO_LIBRARY);
-        STATUS_CASE(ERROR_DRM_GENERIC_OEM);
-        STATUS_CASE(ERROR_DRM_GENERIC_PLUGIN);
-        STATUS_CASE(ERROR_DRM_INIT_DATA);
-        STATUS_CASE(ERROR_DRM_KEY_NOT_LOADED);
-        STATUS_CASE(ERROR_DRM_LICENSE_PARSE);
-        STATUS_CASE(ERROR_DRM_LICENSE_POLICY);
-        STATUS_CASE(ERROR_DRM_LICENSE_RELEASE);
-        STATUS_CASE(ERROR_DRM_LICENSE_REQUEST_REJECTED);
-        STATUS_CASE(ERROR_DRM_LICENSE_RESTORE);
-        STATUS_CASE(ERROR_DRM_LICENSE_STATE);
-        STATUS_CASE(ERROR_DRM_MEDIA_FRAMEWORK);
-        STATUS_CASE(ERROR_DRM_PROVISIONING_CERTIFICATE);
-        STATUS_CASE(ERROR_DRM_PROVISIONING_CONFIG);
-        STATUS_CASE(ERROR_DRM_PROVISIONING_PARSE);
-        STATUS_CASE(ERROR_DRM_PROVISIONING_REQUEST_REJECTED);
-        STATUS_CASE(ERROR_DRM_PROVISIONING_RETRY);
-        STATUS_CASE(ERROR_DRM_RESOURCE_CONTENTION);
-        STATUS_CASE(ERROR_DRM_SECURE_STOP_RELEASE);
-        STATUS_CASE(ERROR_DRM_STORAGE_READ);
-        STATUS_CASE(ERROR_DRM_STORAGE_WRITE);
-        STATUS_CASE(ERROR_DRM_ZERO_SUBSAMPLES);
+        STATUS_CASE(DRM_UNKNOWN);
+        STATUS_CASE(DRM_NO_LICENSE);
+        STATUS_CASE(DRM_LICENSE_EXPIRED);
+        STATUS_CASE(DRM_RESOURCE_BUSY);
+        STATUS_CASE(DRM_INSUFFICIENT_OUTPUT_PROTECTION);
+        STATUS_CASE(DRM_SESSION_NOT_OPENED);
+        STATUS_CASE(DRM_CANNOT_HANDLE);
+        STATUS_CASE(DRM_INSUFFICIENT_SECURITY);
+        STATUS_CASE(DRM_FRAME_TOO_LARGE);
+        STATUS_CASE(DRM_SESSION_LOST_STATE);
+        STATUS_CASE(DRM_CERTIFICATE_MALFORMED);
+        STATUS_CASE(DRM_CERTIFICATE_MISSING);
+        STATUS_CASE(DRM_CRYPTO_LIBRARY);
+        STATUS_CASE(DRM_GENERIC_OEM);
+        STATUS_CASE(DRM_GENERIC_PLUGIN);
+        STATUS_CASE(DRM_INIT_DATA);
+        STATUS_CASE(DRM_KEY_NOT_LOADED);
+        STATUS_CASE(DRM_LICENSE_PARSE);
+        STATUS_CASE(DRM_LICENSE_POLICY);
+        STATUS_CASE(DRM_LICENSE_RELEASE);
+        STATUS_CASE(DRM_LICENSE_REQUEST_REJECTED);
+        STATUS_CASE(DRM_LICENSE_RESTORE);
+        STATUS_CASE(DRM_LICENSE_STATE);
+        STATUS_CASE(DRM_MEDIA_FRAMEWORK);
+        STATUS_CASE(DRM_PROVISIONING_CERTIFICATE);
+        STATUS_CASE(DRM_PROVISIONING_CONFIG);
+        STATUS_CASE(DRM_PROVISIONING_PARSE);
+        STATUS_CASE(DRM_PROVISIONING_REQUEST_REJECTED);
+        STATUS_CASE(DRM_PROVISIONING_RETRY);
+        STATUS_CASE(DRM_RESOURCE_CONTENTION);
+        STATUS_CASE(DRM_SECURE_STOP_RELEASE);
+        STATUS_CASE(DRM_STORAGE_READ);
+        STATUS_CASE(DRM_STORAGE_WRITE);
+        STATUS_CASE(DRM_ZERO_SUBSAMPLES);
+        STATUS_CASE(DRM_INVALID_STATE);
+        STATUS_CASE(BAD_VALUE);
+        STATUS_CASE(DRM_NOT_PROVISIONED);
+        STATUS_CASE(DRM_DEVICE_REVOKED);
+        STATUS_CASE(DRM_DECRYPT);
+        STATUS_CASE(DEAD_OBJECT);
+#undef ERROR_BAD_VALUE
+#undef ERROR_DEAD_OBJECT
 #undef STATUS_CASE
     }
-    return static_cast<int>(err);
+    return ENUM_DRM_UNKNOWN;
 }
 
 int DrmPluginSecurityLevelToJavaSecurityLevel(DrmPlugin::SecurityLevel securityLevel) {
@@ -187,12 +197,12 @@ DrmStatus DrmMetricsLogger::openSession(DrmPlugin::SecurityLevel securityLevel,
 
 DrmStatus DrmMetricsLogger::closeSession(Vector<uint8_t> const& sessionId) {
     std::vector<uint8_t> sid = toStdVec(sessionId);
-    {
+    DrmStatus status = mImpl->closeSession(sessionId);
+    if (status == OK) {
         const std::lock_guard<std::mutex> lock(mSessionMapMutex);
         mSessionMap.erase(sid);
-    }
-    DrmStatus status = mImpl->closeSession(sessionId);
-    if (status != OK) {
+    } else {
+        // TODO(b/275729711): reclaim sessions that failed to close
         reportMediaDrmErrored(status, __func__, sid);
     }
     return status;
@@ -582,7 +592,7 @@ void DrmMetricsLogger::reportMediaDrmErrored(const DrmStatus& error_code, const 
         }
     }
     mediametrics_setCString(handle, "api", api);
-    mediametrics_setInt32(handle, "error_code", MediaErrorToJavaError(error_code));
+    mediametrics_setInt32(handle, "error_code", MediaErrorToEnum(error_code));
     mediametrics_setInt32(handle, "cdm_err", error_code.getCdmErr());
     mediametrics_setInt32(handle, "oem_err", error_code.getOemErr());
     mediametrics_setInt32(handle, "error_context", error_code.getContext());

@@ -281,9 +281,9 @@ bool statsd_mediadrm_session_opened(const std::shared_ptr<const mediametrics::It
     const int32_t uid = IPCThreadState::self()->getCallingUid();
     int32_t frontend = 0;
     if (!item->getInt32("frontend", &frontend)) return false;
-    int32_t requested_security_level = -1;
+    int32_t requested_security_level = 0;
     if (!item->getInt32("requested_security_level", &requested_security_level)) return false;
-    int32_t opened_security_level = -1;
+    int32_t opened_security_level = 0;
     if (!item->getInt32("opened_security_level", &opened_security_level)) return false;
 
     // Optional to be included
@@ -325,12 +325,10 @@ bool statsd_mediadrm_errored(const std::shared_ptr<const mediametrics::Item>& it
     if (!item->getInt32("frontend", &frontend)) return false;
     std::string object_nonce = "";
     if (!item->getString("object_nonce", &object_nonce)) return false;
-    int32_t security_level = -1;
-    if (!item->getInt32("security_level", &security_level)) return false;
     std::string api_str = "";
     if (!item->getString("api", &api_str)) return false;
     const int32_t api = MediaDrmStatsdHelper::findDrmApi(api_str);
-    int32_t error_code = -1;
+    int32_t error_code = 0;
     if (!item->getInt32("error_code", &error_code)) return false;
 
     // Optional to be included
@@ -338,12 +336,14 @@ bool statsd_mediadrm_errored(const std::shared_ptr<const mediametrics::Item>& it
     item->getString("version", &version);
     std::string session_nonce = "";
     item->getString("session_nonce", &session_nonce);
+    int32_t security_level = 0;
+    item->getInt32("security_level", &security_level);
 
     int32_t cdm_err = 0;
     item->getInt32("cdm_err", &cdm_err);
     int32_t oem_err = 0;
     item->getInt32("oem_err", &oem_err);
-    int32_t error_context = -1;
+    int32_t error_context = 0;
     item->getInt32("error_context", &error_context);
 
     const int result = stats_write(stats::media_metrics::MEDIA_DRM_ERRORED, scheme, uuid_lsb,
