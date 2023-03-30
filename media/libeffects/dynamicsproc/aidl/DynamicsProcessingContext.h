@@ -103,28 +103,22 @@ class DynamicsProcessingContext final : public EffectContext {
     RetCode setDpChannels_l(const std::vector<DynamicsProcessing::ChannelConfig>& channels,
                             bool stageInUse, StageType type) REQUIRES(mMutex);
     template <typename T /* BandConfig */>
-    RetCode setBands_l(const std::vector<T>& bands, int maxBand, StageType type) REQUIRES(mMutex);
-    RetCode setDpChannelBand_l(const std::any& anyConfig, StageType type, int maxCh, int maxBand,
+    RetCode setBands_l(const std::vector<T>& bands, StageType type) REQUIRES(mMutex);
+    RetCode setDpChannelBand_l(const std::any& anyConfig, StageType type,
                                std::set<std::pair<int, int>>& chBandSet) REQUIRES(mMutex);
 
     std::vector<DynamicsProcessing::EqBandConfig> getEqBandConfigs(StageType type);
     std::vector<DynamicsProcessing::ChannelConfig> getChannelConfig(StageType type);
 
-    bool validateStageEnablement(const DynamicsProcessing::StageEnablement& enablement);
-    bool validateEngineConfig(const DynamicsProcessing::EngineArchitecture& engine);
-    bool validateEqBandConfig(const DynamicsProcessing::EqBandConfig& band, int maxChannel,
-                              int maxBand);
-    bool validateMbcBandConfig(const DynamicsProcessing::MbcBandConfig& band, int maxChannel,
-                               int maxBand);
-    bool validateLimiterConfig(const DynamicsProcessing::LimiterConfig& limiter, int maxChannel);
-    bool validateInputGainConfig(const DynamicsProcessing::InputGain& gain, int maxChannel);
+    template <typename T /* BandConfig */>
+    bool validateBandConfig(const std::vector<T>& bands, int maxChannel, int maxBand);
+    bool validateLimiterConfig(const std::vector<DynamicsProcessing::LimiterConfig>& cfgs,
+                               int maxChannel);
+    bool validateInputGainConfig(const std::vector<DynamicsProcessing::InputGain>& cfgs,
+                                 int maxChannel);
 
-    inline bool validateCutoffFrequency(float freq);
     inline bool validateChannel(int ch, int maxCh) { return ch >= 0 && ch < maxCh; }
     inline bool validateBand(int band, int maxBand) { return band >= 0 && band < maxBand; }
-    inline bool validateTime(int time) { return time >= 0; }
-    inline bool validateRatio(int ratio) { return ratio >= 0; }
-    inline bool validateBandDb(int db) { return db <= 0; }
 };
 
 }  // namespace aidl::android::hardware::audio::effect

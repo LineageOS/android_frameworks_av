@@ -92,6 +92,10 @@ cc_library_shared {
         "dynamicsprocessingdefaults",
     ],
 
+    static_libs: [
+        "libaudioaidlranges",
+    ],
+
     visibility: [
         "//hardware/interfaces/audio/aidl/default",
     ],
