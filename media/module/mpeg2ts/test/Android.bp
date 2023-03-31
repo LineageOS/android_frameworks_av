@@ -74,7 +74,4 @@ cc_test{
             "signed-integer-overflow",
         ],
     },
-    data: [
-        ":https://storage.googleapis.com/android_media/frameworks/av/media/libstagefright/mpeg2ts/test/Mpeg2tsUnitTest.zip?unzip=true",
-    ],
 }
