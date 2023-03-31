@@ -16,11 +16,11 @@
 
 #define LOG_TAG "AHAL_DPLibEffectsContext"
 
-#include "DynamicsProcessing.h"
 #include "DynamicsProcessingContext.h"
+#include "DynamicsProcessing.h"
 
-#include <functional>
 #include <sys/param.h>
+#include <functional>
 #include <unordered_set>
 
 namespace aidl::android::hardware::audio::effect {
@@ -83,7 +83,7 @@ void DynamicsProcessingContext::dpSetFreqDomainVariant_l(
     if (block < minBlockSize) {
         block = minBlockSize;
     } else if (!powerof2(block)) {
-        //find next highest power of 2.
+        // find next highest power of 2.
         block = 1 << (32 - __builtin_clz(block));
     }
     mDpFreq->configure(block, block >> 1, sampleRate);
@@ -91,9 +91,6 @@ void DynamicsProcessingContext::dpSetFreqDomainVariant_l(
 
 RetCode DynamicsProcessingContext::setEngineArchitecture(
         const DynamicsProcessing::EngineArchitecture& engineArchitecture) {
-    RETURN_VALUE_IF(!validateEngineConfig(engineArchitecture), RetCode::ERROR_ILLEGAL_PARAMETER,
-                    "illegalEngineConfig");
-
     std::lock_guard lg(mMutex);
     if (!mEngineInited || mEngineArchitecture != engineArchitecture) {
         if (engineArchitecture.resolutionPreference ==
@@ -134,10 +131,12 @@ RetCode DynamicsProcessingContext::setMbc(
 RetCode DynamicsProcessingContext::setPreEqBand(
         const std::vector<DynamicsProcessing::EqBandConfig>& bands) {
     std::lock_guard lg(mMutex);
-    RETURN_VALUE_IF(!mEngineArchitecture.postEqStage.inUse, RetCode::ERROR_ILLEGAL_PARAMETER,
-                    "postEqNotInUse");
-    return setBands_l<DynamicsProcessing::EqBandConfig>(
-            bands, mEngineArchitecture.preEqStage.bandCount, StageType::PREEQ);
+    RETURN_VALUE_IF(!mEngineArchitecture.preEqStage.inUse, RetCode::ERROR_ILLEGAL_PARAMETER,
+                    "preEqNotInUse");
+    RETURN_VALUE_IF(
+            !validateBandConfig(bands, mChannelCount, mEngineArchitecture.preEqStage.bandCount),
+            RetCode::ERROR_ILLEGAL_PARAMETER, "eqBandNotValid");
+    return setBands_l<DynamicsProcessing::EqBandConfig>(bands, StageType::PREEQ);
 }
 
 RetCode DynamicsProcessingContext::setPostEqBand(
@@ -145,8 +144,10 @@ RetCode DynamicsProcessingContext::setPostEqBand(
     std::lock_guard lg(mMutex);
     RETURN_VALUE_IF(!mEngineArchitecture.postEqStage.inUse, RetCode::ERROR_ILLEGAL_PARAMETER,
                     "postEqNotInUse");
-    return setBands_l<DynamicsProcessing::EqBandConfig>(
-            bands, mEngineArchitecture.postEqStage.bandCount, StageType::POSTEQ);
+    RETURN_VALUE_IF(
+            !validateBandConfig(bands, mChannelCount, mEngineArchitecture.postEqStage.bandCount),
+            RetCode::ERROR_ILLEGAL_PARAMETER, "eqBandNotValid");
+    return setBands_l<DynamicsProcessing::EqBandConfig>(bands, StageType::POSTEQ);
 }
 
 RetCode DynamicsProcessingContext::setMbcBand(
@@ -154,8 +155,10 @@ RetCode DynamicsProcessingContext::setMbcBand(
     std::lock_guard lg(mMutex);
     RETURN_VALUE_IF(!mEngineArchitecture.mbcStage.inUse, RetCode::ERROR_ILLEGAL_PARAMETER,
                     "mbcNotInUse");
-    return setBands_l<DynamicsProcessing::MbcBandConfig>(
-            bands, mEngineArchitecture.preEqStage.bandCount, StageType::MBC);
+    RETURN_VALUE_IF(
+            !validateBandConfig(bands, mChannelCount, mEngineArchitecture.mbcStage.bandCount),
+            RetCode::ERROR_ILLEGAL_PARAMETER, "eqBandNotValid");
+    return setBands_l<DynamicsProcessing::MbcBandConfig>(bands, StageType::MBC);
 }
 
 RetCode DynamicsProcessingContext::setLimiter(
@@ -163,13 +166,17 @@ RetCode DynamicsProcessingContext::setLimiter(
     std::lock_guard lg(mMutex);
     RETURN_VALUE_IF(!mEngineArchitecture.limiterInUse, RetCode::ERROR_ILLEGAL_PARAMETER,
                     "limiterNotInUse");
-    return setBands_l<DynamicsProcessing::LimiterConfig>(limiters, -1, StageType::LIMITER);
+    RETURN_VALUE_IF(!validateLimiterConfig(limiters, mChannelCount),
+                    RetCode::ERROR_ILLEGAL_PARAMETER, "limiterConfigNotValid");
+    return setBands_l<DynamicsProcessing::LimiterConfig>(limiters, StageType::LIMITER);
 }
 
 RetCode DynamicsProcessingContext::setInputGain(
         const std::vector<DynamicsProcessing::InputGain>& inputGains) {
     std::lock_guard lg(mMutex);
-    return setBands_l<DynamicsProcessing::InputGain>(inputGains, -1, StageType::INPUTGAIN);
+    RETURN_VALUE_IF(!validateInputGainConfig(inputGains, mChannelCount),
+                    RetCode::ERROR_ILLEGAL_PARAMETER, "inputGainNotValid");
+    return setBands_l<DynamicsProcessing::InputGain>(inputGains, StageType::INPUTGAIN);
 }
 
 DynamicsProcessing::EngineArchitecture DynamicsProcessingContext::getEngineArchitecture() {
@@ -406,45 +413,33 @@ std::vector<DynamicsProcessing::EqBandConfig> DynamicsProcessingContext::getEqBa
     return eqBands;
 }
 
-/**
- * When StageEnablement is in use, bandCount needs to be positive.
- */
-bool DynamicsProcessingContext::validateStageEnablement(
-        const DynamicsProcessing::StageEnablement& enablement) {
-    return !enablement.inUse || (enablement.inUse && enablement.bandCount > 0);
-}
-
-bool DynamicsProcessingContext::validateEngineConfig(
-        const DynamicsProcessing::EngineArchitecture& engine) {
-    return engine.preferredProcessingDurationMs >= 0 &&
-           validateStageEnablement(engine.preEqStage) &&
-           validateStageEnablement(engine.postEqStage) && validateStageEnablement(engine.mbcStage);
-}
-
-bool DynamicsProcessingContext::validateEqBandConfig(const DynamicsProcessing::EqBandConfig& band,
-                                                     int maxChannel, int maxBand) {
-    return validateChannel(band.channel, maxChannel) && validateBand(band.band, maxBand);
-}
-
-bool DynamicsProcessingContext::validateMbcBandConfig(const DynamicsProcessing::MbcBandConfig& band,
-                                                      int maxChannel, int maxBand) {
-    return validateChannel(band.channel, maxChannel) && validateBand(band.band, maxBand) &&
-           validateTime(band.attackTimeMs) && validateTime(band.releaseTimeMs) &&
-           validateRatio(band.ratio) && validateBandDb(band.thresholdDb) &&
-           validateBandDb(band.kneeWidthDb) && validateBandDb(band.noiseGateThresholdDb) &&
-           validateRatio(band.expanderRatio);
+template <typename T>
+bool DynamicsProcessingContext::validateBandConfig(const std::vector<T>& bands, int maxChannel,
+                                                   int maxBand) {
+    std::vector<float> freqs(bands.size(), -1);
+    for (auto band : bands) {
+        if (!validateChannel(band.channel, maxChannel)) return false;
+        if (!validateBand(band.band, maxBand)) return false;
+        freqs[band.band] = band.cutoffFrequencyHz;
+    }
+    if (std::count(freqs.begin(), freqs.end(), -1)) return false;
+    return std::is_sorted(freqs.begin(), freqs.end());
 }
 
 bool DynamicsProcessingContext::validateLimiterConfig(
-        const DynamicsProcessing::LimiterConfig& limiter, int maxChannel) {
-    return validateChannel(limiter.channel, maxChannel) && validateTime(limiter.attackTimeMs) &&
-           validateTime(limiter.releaseTimeMs) && validateRatio(limiter.ratio) &&
-           validateBandDb(limiter.thresholdDb);
+        const std::vector<DynamicsProcessing::LimiterConfig>& cfgs, int maxChannel) {
+    for (auto cfg : cfgs) {
+        if (!validateChannel(cfg.channel, maxChannel)) return false;
+    }
+    return true;
 }
 
-bool DynamicsProcessingContext::validateInputGainConfig(const DynamicsProcessing::InputGain& gain,
-                                                        int maxChannel) {
-    return validateChannel(gain.channel, maxChannel);
+bool DynamicsProcessingContext::validateInputGainConfig(
+        const std::vector<DynamicsProcessing::InputGain>& cfgs, int maxChannel) {
+    for (auto cfg : cfgs) {
+        if (!validateChannel(cfg.channel, maxChannel)) return false;
+    }
+    return true;
 }
 
 template <typename D>
@@ -483,7 +478,6 @@ RetCode DynamicsProcessingContext::setDpChannels_l(
 }
 
 RetCode DynamicsProcessingContext::setDpChannelBand_l(const std::any& anyConfig, StageType type,
-                                                      int maxCh, int maxBand,
                                                       std::set<std::pair<int, int>>& chBandSet) {
     RETURN_VALUE_IF(!anyConfig.has_value(), RetCode::ERROR_ILLEGAL_PARAMETER, "bandInvalid");
     RetCode ret = RetCode::SUCCESS;
@@ -494,8 +488,6 @@ RetCode DynamicsProcessingContext::setDpChannelBand_l(const std::any& anyConfig,
         case StageType::POSTEQ: {
             dp_fx::DPEq* dp;
             const auto& config = std::any_cast<DynamicsProcessing::EqBandConfig>(anyConfig);
-            RETURN_VALUE_IF(!validateEqBandConfig(config, maxCh, maxBand),
-                            RetCode::ERROR_ILLEGAL_PARAMETER, "eqBandNotValid");
             RETURN_VALUE_IF(
                     nullptr == (dp = getEqWithType_l(type, config.channel)) || !dp->isEnabled(),
                     RetCode::ERROR_ILLEGAL_PARAMETER, "dpEqNotExist");
@@ -508,8 +500,6 @@ RetCode DynamicsProcessingContext::setDpChannelBand_l(const std::any& anyConfig,
         case StageType::MBC: {
             dp_fx::DPMbc* dp;
             const auto& config = std::any_cast<DynamicsProcessing::MbcBandConfig>(anyConfig);
-            RETURN_VALUE_IF(!validateMbcBandConfig(config, maxCh, maxBand),
-                            RetCode::ERROR_ILLEGAL_PARAMETER, "mbcBandNotValid");
             RETURN_VALUE_IF(nullptr == (dp = getMbc_l(config.channel)) || !dp->isEnabled(),
                             RetCode::ERROR_ILLEGAL_PARAMETER, "dpMbcNotExist");
             dp_fx::DPMbcBand band;
@@ -524,8 +514,6 @@ RetCode DynamicsProcessingContext::setDpChannelBand_l(const std::any& anyConfig,
         case StageType::LIMITER: {
             dp_fx::DPChannel* dp;
             const auto& config = std::any_cast<DynamicsProcessing::LimiterConfig>(anyConfig);
-            RETURN_VALUE_IF(!validateLimiterConfig(config, maxCh),
-                            RetCode::ERROR_ILLEGAL_PARAMETER, "limiterBandNotValid");
             RETURN_VALUE_IF(nullptr == (dp = getChannel_l(config.channel)),
                             RetCode::ERROR_ILLEGAL_PARAMETER, "dpChNotExist");
             dp_fx::DPLimiter limiter;
@@ -539,8 +527,6 @@ RetCode DynamicsProcessingContext::setDpChannelBand_l(const std::any& anyConfig,
         case StageType::INPUTGAIN: {
             dp_fx::DPChannel* dp;
             const auto& config = std::any_cast<DynamicsProcessing::InputGain>(anyConfig);
-            RETURN_VALUE_IF(!validateInputGainConfig(config, maxCh),
-                            RetCode::ERROR_ILLEGAL_PARAMETER, "inputGainNotValid");
             RETURN_VALUE_IF(nullptr == (dp = getChannel_l(config.channel)),
                             RetCode::ERROR_ILLEGAL_PARAMETER, "dpChNotExist");
             dp->setInputGain(config.gainDb);
@@ -555,14 +541,12 @@ RetCode DynamicsProcessingContext::setDpChannelBand_l(const std::any& anyConfig,
 }
 
 template <typename T /* BandConfig */>
-RetCode DynamicsProcessingContext::setBands_l(
-        const std::vector<T>& bands, int maxBand, StageType type) {
+RetCode DynamicsProcessingContext::setBands_l(const std::vector<T>& bands, StageType type) {
     RetCode ret = RetCode::SUCCESS;
     std::set<std::pair<int /* channel */, int /* band */>> bandSet;
 
     for (const auto& it : bands) {
-        if (RetCode::SUCCESS !=
-            setDpChannelBand_l(std::make_any<T>(it), type, mChannelCount, maxBand, bandSet)) {
+        if (RetCode::SUCCESS != setDpChannelBand_l(std::make_any<T>(it), type, bandSet)) {
             LOG(WARNING) << __func__ << " skipping band " << it.toString();
             ret = RetCode::ERROR_ILLEGAL_PARAMETER;
             continue;
