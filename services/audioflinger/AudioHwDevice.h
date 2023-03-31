@@ -46,7 +46,7 @@ public:
 
     AudioHwDevice(audio_module_handle_t handle,
                   const char *moduleName,
-                  sp<DeviceHalInterface> hwDevice,
+                  const sp<DeviceHalInterface>& hwDevice,
                   Flags flags)
         : mHandle(handle)
         , mModuleName(strdup(moduleName))

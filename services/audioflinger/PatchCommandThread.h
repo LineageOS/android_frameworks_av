@@ -84,7 +84,7 @@ private:
 
     class ReleaseAudioPatchData : public CommandData {
     public:
-        ReleaseAudioPatchData(audio_patch_handle_t handle)
+        explicit ReleaseAudioPatchData(audio_patch_handle_t handle)
             :   mHandle(handle) {}
 
         audio_patch_handle_t mHandle;
