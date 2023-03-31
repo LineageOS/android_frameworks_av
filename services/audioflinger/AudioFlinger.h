@@ -293,6 +293,8 @@ public:
 
     virtual status_t setDeviceConnectedState(const struct audio_port_v7 *port, bool connected);
 
+    virtual status_t setSimulateDeviceConnections(bool enabled);
+
     virtual status_t setRequestedLatencyMode(
             audio_io_handle_t output, audio_latency_mode_t mode);
 
@@ -932,6 +934,7 @@ using effect_buffer_t = int16_t;
         AUDIO_HW_GET_MASTER_MUTE,       // get_master_mute
         AUDIO_HW_GET_MICROPHONES,       // getMicrophones
         AUDIO_HW_SET_CONNECTED_STATE,   // setConnectedState
+        AUDIO_HW_SET_SIMULATE_CONNECTIONS, // setSimulateDeviceConnections
     };
 
     mutable     hardware_call_state                 mHardwareStatus;    // for dump only

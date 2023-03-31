@@ -229,6 +229,7 @@ BINDER_METHOD_ENTRY(getMmapPolicyInfos) \
 BINDER_METHOD_ENTRY(getAAudioMixerBurstCount) \
 BINDER_METHOD_ENTRY(getAAudioHardwareBurstMinUsec) \
 BINDER_METHOD_ENTRY(setDeviceConnectedState) \
+BINDER_METHOD_ENTRY(setSimulateDeviceConnections) \
 BINDER_METHOD_ENTRY(setRequestedLatencyMode) \
 BINDER_METHOD_ENTRY(getSupportedLatencyModes) \
 BINDER_METHOD_ENTRY(setBluetoothVariableLatencyEnabled) \
@@ -497,6 +498,25 @@ status_t AudioFlinger::setDeviceConnectedState(const struct audio_port_v7 *port,
     }
     mHardwareStatus = AUDIO_HW_IDLE;
     return final_result;
+}
+
+status_t AudioFlinger::setSimulateDeviceConnections(bool enabled) {
+    bool at_least_one_succeeded = false;
+    status_t last_error = INVALID_OPERATION;
+    Mutex::Autolock _l(mLock);
+    AutoMutex lock(mHardwareLock);
+    mHardwareStatus = AUDIO_HW_SET_SIMULATE_CONNECTIONS;
+    for (size_t i = 0; i < mAudioHwDevs.size(); i++) {
+        sp<DeviceHalInterface> dev = mAudioHwDevs.valueAt(i)->hwDevice();
+        status_t result = dev->setSimulateDeviceConnections(enabled);
+        if (result == OK) {
+            at_least_one_succeeded = true;
+        } else {
+            last_error = result;
+        }
+    }
+    mHardwareStatus = AUDIO_HW_IDLE;
+    return at_least_one_succeeded ? OK : last_error;
 }
 
 // getDefaultVibratorInfo_l must be called with AudioFlinger lock held.

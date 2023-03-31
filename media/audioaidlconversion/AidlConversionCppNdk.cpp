@@ -14,6 +14,8 @@
  * limitations under the License.
  */
 
+#include <stdio.h>
+
 #include <algorithm>
 #include <map>
 #include <utility>
@@ -570,7 +572,6 @@ const detail::AudioDevicePairs& getAudioDevicePairs() {
                 GET_DEVICE_DESC_CONNECTION(BT_LE));
         return pairs;
     }();
-#undef GET_DEVICE_DESC_CONNECTION
     return pairs;
 }
 
@@ -998,55 +999,161 @@ ConversionResult<AudioDeviceDescription> legacy2aidl_audio_devices_t_AudioDevice
     }
 }
 
+AudioDeviceAddress::Tag suggestDeviceAddressTag(const AudioDeviceDescription& description) {
+    using Tag = AudioDeviceAddress::Tag;
+    if (std::string connection = description.connection;
+            connection == GET_DEVICE_DESC_CONNECTION(BT_A2DP) ||
+            // Note: BT LE Broadcast uses a "group id".
+            (description.type != AudioDeviceType::OUT_BROADCAST &&
+                    connection == GET_DEVICE_DESC_CONNECTION(BT_LE)) ||
+            connection == GET_DEVICE_DESC_CONNECTION(BT_SCO) ||
+            connection == GET_DEVICE_DESC_CONNECTION(WIRELESS)) {
+        return Tag::mac;
+    } else if (connection == GET_DEVICE_DESC_CONNECTION(IP_V4)) {
+        return Tag::ipv4;
+    } else if (connection == GET_DEVICE_DESC_CONNECTION(USB)) {
+        return Tag::alsa;
+    }
+    return Tag::id;
+}
+
 ::android::status_t aidl2legacy_AudioDevice_audio_device(
         const AudioDevice& aidl,
         audio_devices_t* legacyType, char* legacyAddress) {
-    *legacyType = VALUE_OR_RETURN_STATUS(
-            aidl2legacy_AudioDeviceDescription_audio_devices_t(aidl.type));
-    return aidl2legacy_string(
-                    aidl.address.get<AudioDeviceAddress::id>(),
-                    legacyAddress, AUDIO_DEVICE_MAX_ADDRESS_LEN);
+    std::string stringAddress;
+    RETURN_STATUS_IF_ERROR(aidl2legacy_AudioDevice_audio_device(
+                    aidl, legacyType, &stringAddress));
+    return aidl2legacy_string(stringAddress, legacyAddress, AUDIO_DEVICE_MAX_ADDRESS_LEN);
 }
 
 ::android::status_t aidl2legacy_AudioDevice_audio_device(
         const AudioDevice& aidl,
         audio_devices_t* legacyType, String8* legacyAddress) {
-    *legacyType = VALUE_OR_RETURN_STATUS(
-            aidl2legacy_AudioDeviceDescription_audio_devices_t(aidl.type));
-    *legacyAddress = VALUE_OR_RETURN_STATUS(aidl2legacy_string_view_String8(
-                    aidl.address.get<AudioDeviceAddress::id>()));
+    std::string stringAddress;
+    RETURN_STATUS_IF_ERROR(aidl2legacy_AudioDevice_audio_device(
+                    aidl, legacyType, &stringAddress));
+    *legacyAddress = VALUE_OR_RETURN_STATUS(aidl2legacy_string_view_String8(stringAddress));
     return OK;
 }
 
 ::android::status_t aidl2legacy_AudioDevice_audio_device(
         const AudioDevice& aidl,
         audio_devices_t* legacyType, std::string* legacyAddress) {
+    using Tag = AudioDeviceAddress::Tag;
     *legacyType = VALUE_OR_RETURN_STATUS(
             aidl2legacy_AudioDeviceDescription_audio_devices_t(aidl.type));
-    *legacyAddress = aidl.address.get<AudioDeviceAddress::id>();
+    char addressBuffer[AUDIO_DEVICE_MAX_ADDRESS_LEN]{};
+    // 'aidl.address' can be empty even when the connection type is not.
+    // This happens for device ports that act as "blueprints". In this case
+    // we pass an empty string using the 'id' variant.
+    switch (aidl.address.getTag()) {
+        case Tag::mac: {
+            const std::vector<uint8_t>& mac = aidl.address.get<AudioDeviceAddress::mac>();
+            if (mac.size() != 6) return BAD_VALUE;
+            snprintf(addressBuffer, AUDIO_DEVICE_MAX_ADDRESS_LEN, "%02X:%02X:%02X:%02X:%02X:%02X",
+                    mac[0], mac[1], mac[2], mac[3], mac[4], mac[5]);
+        } break;
+        case Tag::ipv4: {
+            const std::vector<uint8_t>& ipv4 = aidl.address.get<AudioDeviceAddress::ipv4>();
+            if (ipv4.size() != 4) return BAD_VALUE;
+            snprintf(addressBuffer, AUDIO_DEVICE_MAX_ADDRESS_LEN, "%u.%u.%u.%u",
+                    ipv4[0], ipv4[1], ipv4[2], ipv4[3]);
+        } break;
+        case Tag::ipv6: {
+            const std::vector<int32_t>& ipv6 = aidl.address.get<AudioDeviceAddress::ipv6>();
+            if (ipv6.size() != 8) return BAD_VALUE;
+            snprintf(addressBuffer, AUDIO_DEVICE_MAX_ADDRESS_LEN,
+                    "%04X:%04X:%04X:%04X:%04X:%04X:%04X:%04X",
+                    ipv6[0], ipv6[1], ipv6[2], ipv6[3], ipv6[4], ipv6[5], ipv6[6], ipv6[7]);
+        } break;
+        case Tag::alsa: {
+            const std::vector<int32_t>& alsa = aidl.address.get<AudioDeviceAddress::alsa>();
+            if (alsa.size() != 2) return BAD_VALUE;
+            snprintf(addressBuffer, AUDIO_DEVICE_MAX_ADDRESS_LEN, "card=%d;device=%d",
+                    alsa[0], alsa[1]);
+        } break;
+        case Tag::id: {
+            RETURN_STATUS_IF_ERROR(aidl2legacy_string(aidl.address.get<AudioDeviceAddress::id>(),
+                            addressBuffer, AUDIO_DEVICE_MAX_ADDRESS_LEN));
+        } break;
+    }
+    *legacyAddress = addressBuffer;
     return OK;
 }
 
 ConversionResult<AudioDevice> legacy2aidl_audio_device_AudioDevice(
         audio_devices_t legacyType, const char* legacyAddress) {
-    AudioDevice aidl;
-    aidl.type = VALUE_OR_RETURN(
-            legacy2aidl_audio_devices_t_AudioDeviceDescription(legacyType));
-    const std::string aidl_id = VALUE_OR_RETURN(
+    const std::string stringAddress = VALUE_OR_RETURN(
             legacy2aidl_string(legacyAddress, AUDIO_DEVICE_MAX_ADDRESS_LEN));
-    aidl.address = AudioDeviceAddress::make<AudioDeviceAddress::id>(aidl_id);
-    return aidl;
+    return legacy2aidl_audio_device_AudioDevice(legacyType, stringAddress);
 }
 
 ConversionResult<AudioDevice>
 legacy2aidl_audio_device_AudioDevice(
         audio_devices_t legacyType, const String8& legacyAddress) {
+    const std::string stringAddress = VALUE_OR_RETURN(legacy2aidl_String8_string(legacyAddress));
+    return legacy2aidl_audio_device_AudioDevice(legacyType, stringAddress);
+}
+
+ConversionResult<AudioDevice>
+legacy2aidl_audio_device_AudioDevice(
+        audio_devices_t legacyType, const std::string& legacyAddress) {
+    using Tag = AudioDeviceAddress::Tag;
     AudioDevice aidl;
     aidl.type = VALUE_OR_RETURN(
             legacy2aidl_audio_devices_t_AudioDeviceDescription(legacyType));
-    const std::string aidl_id = VALUE_OR_RETURN(
-            legacy2aidl_String8_string(legacyAddress));
-    aidl.address = AudioDeviceAddress::make<AudioDeviceAddress::id>(aidl_id);
+    // 'legacyAddress' can be empty even when the connection type is not.
+    // This happens for device ports that act as "blueprints". In this case
+    // we pass an empty string using the 'id' variant.
+    if (!legacyAddress.empty()) {
+        switch (suggestDeviceAddressTag(aidl.type)) {
+            case Tag::mac: {
+                std::vector<uint8_t> mac(6);
+                int status = sscanf(legacyAddress.c_str(), "%hhX:%hhX:%hhX:%hhX:%hhX:%hhX",
+                        &mac[0], &mac[1], &mac[2], &mac[3], &mac[4], &mac[5]);
+                if (status != mac.size()) {
+                    ALOGE("%s: malformed MAC address: \"%s\"", __func__, legacyAddress.c_str());
+                    return unexpected(BAD_VALUE);
+                }
+                aidl.address = AudioDeviceAddress::make<AudioDeviceAddress::mac>(std::move(mac));
+            } break;
+            case Tag::ipv4: {
+                std::vector<uint8_t> ipv4(4);
+                int status = sscanf(legacyAddress.c_str(), "%hhu.%hhu.%hhu.%hhu",
+                        &ipv4[0], &ipv4[1], &ipv4[2], &ipv4[3]);
+                if (status != ipv4.size()) {
+                    ALOGE("%s: malformed IPv4 address: \"%s\"", __func__, legacyAddress.c_str());
+                    return unexpected(BAD_VALUE);
+                }
+                aidl.address = AudioDeviceAddress::make<AudioDeviceAddress::ipv4>(std::move(ipv4));
+            } break;
+            case Tag::ipv6: {
+                std::vector<int32_t> ipv6(8);
+                int status = sscanf(legacyAddress.c_str(), "%X:%X:%X:%X:%X:%X:%X:%X",
+                        &ipv6[0], &ipv6[1], &ipv6[2], &ipv6[3], &ipv6[4], &ipv6[5], &ipv6[6],
+                        &ipv6[7]);
+                if (status != ipv6.size()) {
+                    ALOGE("%s: malformed IPv6 address: \"%s\"", __func__, legacyAddress.c_str());
+                    return unexpected(BAD_VALUE);
+                }
+                aidl.address = AudioDeviceAddress::make<AudioDeviceAddress::ipv6>(std::move(ipv6));
+            } break;
+            case Tag::alsa: {
+                std::vector<int32_t> alsa(2);
+                int status = sscanf(legacyAddress.c_str(), "card=%d;device=%d", &alsa[0], &alsa[1]);
+                if (status != alsa.size()) {
+                    ALOGE("%s: malformed ALSA address: \"%s\"", __func__, legacyAddress.c_str());
+                    return unexpected(BAD_VALUE);
+                }
+                aidl.address = AudioDeviceAddress::make<AudioDeviceAddress::alsa>(std::move(alsa));
+            } break;
+            case Tag::id: {
+                aidl.address = AudioDeviceAddress::make<AudioDeviceAddress::id>(legacyAddress);
+            } break;
+        }
+    } else {
+        aidl.address = AudioDeviceAddress::make<AudioDeviceAddress::id>(legacyAddress);
+    }
     return aidl;
 }
 
@@ -3008,6 +3115,8 @@ legacy2aidl_audio_microphone_characteristic_t_MicrophoneInfos(
 }
 
 }  // namespace android
+
+#undef GET_DEVICE_DESC_CONNECTION
 
 #if defined(BACKEND_NDK)
 }  // aidl
