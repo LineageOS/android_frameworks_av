@@ -10872,16 +10872,23 @@ void AudioFlinger::MmapPlaybackThread::startMelComputation_l(
         const sp<audio_utils::MelProcessor>& processor)
 {
     ALOGV("%s: starting mel processor for thread %d", __func__, id());
-    if (processor != nullptr) {
-        mMelProcessor = processor;
+    mMelProcessor.store(processor);
+    if (processor) {
+        processor->resume();
     }
+
+    // no need to update output format for MMapPlaybackThread since it is
+    // assigned constant for each thread
 }
 
 // stopMelComputation_l() must be called with AudioFlinger::mLock held
 void AudioFlinger::MmapPlaybackThread::stopMelComputation_l()
 {
-    ALOGV("%s: stopping mel processor for thread %d", __func__, id());
-    mMelProcessor = nullptr;
+    ALOGV("%s: pausing mel processor for thread %d", __func__, id());
+    auto melProcessor = mMelProcessor.load();
+    if (melProcessor != nullptr) {
+        melProcessor->pause();
+    }
 }
 
 void AudioFlinger::MmapPlaybackThread::dumpInternals_l(int fd, const Vector<String16>& args)

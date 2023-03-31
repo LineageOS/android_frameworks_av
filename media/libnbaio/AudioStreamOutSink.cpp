@@ -103,19 +103,24 @@ status_t AudioStreamOutSink::getTimestamp(ExtendedTimestamp &timestamp)
 void AudioStreamOutSink::startMelComputation(const sp<audio_utils::MelProcessor>& processor)
 {
     ALOGV("%s start mel computation for device %d", __func__, processor->getDeviceId());
-    mMelProcessor = processor;
-    // update format for MEL computation
+
+    mMelProcessor.store(processor);
     if (processor) {
-        processor->updateAudioFormat(mFormat.mSampleRate,  mFormat.mChannelCount, mFormat.mFormat);
+        // update format for MEL computation
+        processor->updateAudioFormat(mFormat.mSampleRate,
+                                     mFormat.mChannelCount,
+                                     mFormat.mFormat);
+        processor->resume();
     }
+
 }
 
 void AudioStreamOutSink::stopMelComputation()
 {
     auto melProcessor = mMelProcessor.load();
     if (melProcessor != nullptr) {
-        ALOGV("%s stop mel computation for device %d", __func__, melProcessor->getDeviceId());
-        mMelProcessor = nullptr;
+        ALOGV("%s pause mel computation for device %d", __func__, melProcessor->getDeviceId());
+        melProcessor->pause();
     }
 }
 

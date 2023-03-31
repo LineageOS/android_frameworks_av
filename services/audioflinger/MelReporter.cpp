@@ -174,12 +174,14 @@ void AudioFlinger::MelReporter::onCreateAudioPatch(audio_patch_handle_t handle,
         }
     }
 
-    std::lock_guard _afl(mAudioFlinger.mLock);
-    std::lock_guard _l(mLock);
-    ALOGV("%s add patch handle %d to active devices", __func__, handle);
-    startMelComputationForActivePatch_l(newPatch);
-    newPatch.csdActive = true;
-    mActiveMelPatches[handle] = newPatch;
+    if (!newPatch.deviceHandles.empty()) {
+        std::lock_guard _afl(mAudioFlinger.mLock);
+        std::lock_guard _l(mLock);
+        ALOGV("%s add patch handle %d to active devices", __func__, handle);
+        startMelComputationForActivePatch_l(newPatch);
+        newPatch.csdActive = true;
+        mActiveMelPatches[handle] = newPatch;
+    }
 }
 
 void AudioFlinger::MelReporter::startMelComputationForActivePatch_l(const ActiveMelPatch& patch)
@@ -254,7 +256,7 @@ NO_THREAD_SAFETY_ANALYSIS  // access of AudioFlinger::checkOutputThread_l
         return;
     }
 
-   auto outputThread = mAudioFlinger.checkOutputThread_l(patch.streamHandle);
+    auto outputThread = mAudioFlinger.checkOutputThread_l(patch.streamHandle);
 
     ALOGV("%s: stop MEL for stream id: %d", __func__, patch.streamHandle);
     for (const auto& deviceId : patch.deviceHandles) {
@@ -268,7 +270,6 @@ NO_THREAD_SAFETY_ANALYSIS  // access of AudioFlinger::checkOutputThread_l
         }
     }
 
-    mSoundDoseManager->removeStreamProcessor(patch.streamHandle);
     if (outputThread != nullptr) {
         outputThread->stopMelComputation_l();
     }
