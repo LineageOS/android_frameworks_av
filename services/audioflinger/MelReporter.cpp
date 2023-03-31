@@ -163,7 +163,7 @@ void AudioFlinger::MelReporter::onCreateAudioPatch(audio_patch_handle_t handle,
     audio_io_handle_t streamHandle = patch.mAudioPatch.sources[0].ext.mix.handle;
     ActiveMelPatch newPatch;
     newPatch.streamHandle = streamHandle;
-    for (int i = 0; i < patch.mAudioPatch.num_sinks; ++ i) {
+    for (size_t i = 0; i < patch.mAudioPatch.num_sinks; ++i) {
         if (patch.mAudioPatch.sinks[i].type == AUDIO_PORT_TYPE_DEVICE
             && shouldComputeMelForDeviceType(patch.mAudioPatch.sinks[i].ext.device.type)) {
             audio_port_handle_t deviceId = patch.mAudioPatch.sinks[i].id;
@@ -184,7 +184,9 @@ void AudioFlinger::MelReporter::onCreateAudioPatch(audio_patch_handle_t handle,
     }
 }
 
-void AudioFlinger::MelReporter::startMelComputationForActivePatch_l(const ActiveMelPatch& patch) {
+void AudioFlinger::MelReporter::startMelComputationForActivePatch_l(const ActiveMelPatch& patch)
+NO_THREAD_SAFETY_ANALYSIS  // access of AudioFlinger::checkOutputThread_l
+{
     auto outputThread = mAudioFlinger.checkOutputThread_l(patch.streamHandle);
     if (outputThread == nullptr) {
         ALOGE("%s cannot find thread for stream handle %d", __func__, patch.streamHandle);
@@ -246,7 +248,9 @@ void AudioFlinger::MelReporter::stopInternalMelComputation() {
     mUseHalSoundDoseInterface = true;
 }
 
-void AudioFlinger::MelReporter::stopMelComputationForPatch_l(const ActiveMelPatch& patch) {
+void AudioFlinger::MelReporter::stopMelComputationForPatch_l(const ActiveMelPatch& patch)
+NO_THREAD_SAFETY_ANALYSIS  // access of AudioFlinger::checkOutputThread_l
+{
     if (!patch.csdActive) {
         // no need to stop CSD inactive patches
         return;

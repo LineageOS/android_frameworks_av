@@ -143,7 +143,8 @@ public:
         mDeviceStartupMs.add(startupMs);
     }
 
-    void updateMinMaxVolume(int64_t durationNs, double deviceVolume) {
+    void updateMinMaxVolume_l(int64_t durationNs, double deviceVolume)
+            REQUIRES(mLock) {
         if (deviceVolume > mMaxVolume) {
             mMaxVolume = deviceVolume;
             mMaxVolumeDurationNs = durationNs;
@@ -195,7 +196,7 @@ private:
             mDeviceTimeNs += durationNs;
             mCumulativeTimeNs += durationNs;
         }
-        updateMinMaxVolume(durationNs, mVolume); // always update.
+        updateMinMaxVolume_l(durationNs, mVolume); // always update.
         mVolume = volume;
         mLastVolumeChangeTimeNs = timeNs;
     }
