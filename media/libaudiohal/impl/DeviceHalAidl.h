@@ -181,6 +181,9 @@ class DeviceHalAidl : public DeviceHalInterface, public ConversionHelperAidl,
     using PortConfigs = std::map<int32_t /*port config ID*/,
             ::aidl::android::media::audio::common::AudioPortConfig>;
     using Ports = std::map<int32_t /*port ID*/, ::aidl::android::media::audio::common::AudioPort>;
+    // Answers the question "whether portID 'first' is reachable from portID 'second'?"
+    // It's not a map because both portIDs are known. The matrix is symmetric.
+    using RoutingMatrix = std::set<std::pair<int32_t, int32_t>>;
     using Streams = std::map<wp<StreamHalInterface>, int32_t /*patch ID*/>;
     class Cleanups;
 
@@ -215,16 +218,19 @@ class DeviceHalAidl : public DeviceHalInterface, public ConversionHelperAidl,
             const std::optional<::aidl::android::media::audio::common::AudioIoFlags>& flags,
             int32_t ioHandle,
             ::aidl::android::media::audio::common::AudioSource aidlSource,
+            const std::set<int32_t>& destinationPortIds,
             ::aidl::android::media::audio::common::AudioPortConfig* portConfig, bool* created);
     status_t findOrCreatePortConfig(
         const ::aidl::android::media::audio::common::AudioPortConfig& requestedPortConfig,
+        const std::set<int32_t>& destinationPortIds,
         ::aidl::android::media::audio::common::AudioPortConfig* portConfig, bool* created);
     Patches::iterator findPatch(const std::set<int32_t>& sourcePortConfigIds,
             const std::set<int32_t>& sinkPortConfigIds);
     Ports::iterator findPort(const ::aidl::android::media::audio::common::AudioDevice& device);
     Ports::iterator findPort(
             const ::aidl::android::media::audio::common::AudioConfig& config,
-            const ::aidl::android::media::audio::common::AudioIoFlags& flags);
+            const ::aidl::android::media::audio::common::AudioIoFlags& flags,
+            const std::set<int32_t>& destinationPortIds);
     PortConfigs::iterator findPortConfig(
             const ::aidl::android::media::audio::common::AudioDevice& device);
     PortConfigs::iterator findPortConfig(
@@ -246,6 +252,7 @@ class DeviceHalAidl : public DeviceHalInterface, public ConversionHelperAidl,
     void resetUnusedPatches();
     void resetUnusedPatchesAndPortConfigs();
     void resetUnusedPortConfigs();
+    status_t updateRoutes();
 
     // CallbackBroker implementation
     void clearCallbacks(void* cookie) override;
@@ -272,6 +279,7 @@ class DeviceHalAidl : public DeviceHalInterface, public ConversionHelperAidl,
     int32_t mDefaultOutputPortId = -1;
     PortConfigs mPortConfigs;
     Patches mPatches;
+    RoutingMatrix mRoutingMatrix;
     Streams mStreams;
     Microphones mMicrophones;
     std::mutex mLock;
