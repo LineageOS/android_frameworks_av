@@ -122,6 +122,9 @@ public:
     // set audio mode in audio hardware
     static status_t setMode(audio_mode_t mode);
 
+    // test API: switch HALs into the mode which simulates external device connections
+    static status_t setSimulateDeviceConnections(bool enabled);
+
     // returns true in *state if tracks are active on the specified stream or have been active
     // in the past inPastMs milliseconds
     static status_t isStreamActive(audio_stream_type_t stream, bool *state, uint32_t inPastMs);

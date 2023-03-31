@@ -250,6 +250,12 @@ status_t AudioSystem::setMode(audio_mode_t mode) {
     return af->setMode(mode);
 }
 
+status_t AudioSystem::setSimulateDeviceConnections(bool enabled) {
+    const sp<IAudioFlinger>& af = AudioSystem::get_audio_flinger();
+    if (af == 0) return PERMISSION_DENIED;
+    return af->setSimulateDeviceConnections(enabled);
+}
+
 status_t AudioSystem::setParameters(audio_io_handle_t ioHandle, const String8& keyValuePairs) {
     const sp<IAudioFlinger>& af = AudioSystem::get_audio_flinger();
     if (af == 0) return PERMISSION_DENIED;
