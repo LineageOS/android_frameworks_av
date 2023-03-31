@@ -360,6 +360,8 @@ public:
 
     virtual status_t setDeviceConnectedState(const struct audio_port_v7 *port, bool connected) = 0;
 
+    virtual status_t setSimulateDeviceConnections(bool enabled) = 0;
+
     virtual status_t setRequestedLatencyMode(
             audio_io_handle_t output, audio_latency_mode_t mode) = 0;
 
@@ -473,6 +475,7 @@ public:
     int32_t getAAudioMixerBurstCount() override;
     int32_t getAAudioHardwareBurstMinUsec() override;
     status_t setDeviceConnectedState(const struct audio_port_v7 *port, bool connected) override;
+    status_t setSimulateDeviceConnections(bool enabled) override;
     status_t setRequestedLatencyMode(audio_io_handle_t output,
             audio_latency_mode_t mode) override;
     status_t getSupportedLatencyModes(
@@ -569,6 +572,7 @@ public:
             GET_AAUDIO_MIXER_BURST_COUNT = media::BnAudioFlingerService::TRANSACTION_getAAudioMixerBurstCount,
             GET_AAUDIO_HARDWARE_BURST_MIN_USEC = media::BnAudioFlingerService::TRANSACTION_getAAudioHardwareBurstMinUsec,
             SET_DEVICE_CONNECTED_STATE = media::BnAudioFlingerService::TRANSACTION_setDeviceConnectedState,
+            SET_SIMULATE_DEVICE_CONNECTIONS = media::BnAudioFlingerService::TRANSACTION_setSimulateDeviceConnections,
             SET_REQUESTED_LATENCY_MODE = media::BnAudioFlingerService::TRANSACTION_setRequestedLatencyMode,
             GET_SUPPORTED_LATENCY_MODES = media::BnAudioFlingerService::TRANSACTION_getSupportedLatencyModes,
             SET_BLUETOOTH_VARIABLE_LATENCY_ENABLED =
@@ -698,6 +702,7 @@ public:
     Status getAAudioMixerBurstCount(int32_t* _aidl_return) override;
     Status getAAudioHardwareBurstMinUsec(int32_t* _aidl_return) override;
     Status setDeviceConnectedState(const media::AudioPortFw& port, bool connected) override;
+    Status setSimulateDeviceConnections(bool enabled) override;
     Status setRequestedLatencyMode(
             int output, media::audio::common::AudioLatencyMode mode) override;
     Status getSupportedLatencyModes(int output,

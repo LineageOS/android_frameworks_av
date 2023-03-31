@@ -202,7 +202,9 @@ interface IAudioPolicyService {
                                     in AudioAttributesInternal attributes);
 
     /**
-     * List available audio ports and their attributes. Returns the generation.
+     * List currently attached audio ports and their attributes. Returns the generation.
+     * The generation is incremented each time when anything changes in the ports
+     * configuration.
      *
      * On input, count represents the maximum length of the returned array.
      * On output, count is the total number of elements, which may be larger than the array size.
@@ -213,6 +215,13 @@ interface IAudioPolicyService {
                        AudioPortType type,
                        inout Int count,
                        out AudioPortFw[] ports);
+
+    /**
+     * List all device ports declared in the configuration (including currently detached ones)
+     * 'role' can be 'NONE' to get both input and output devices,
+     * 'SINK' for output devices, and 'SOURCE' for input devices.
+     */
+    AudioPortFw[] listDeclaredDevicePorts(AudioPortRole role);
 
     /** Get attributes for the audio port with the given id (AudioPort.hal.id field). */
     AudioPortFw getAudioPort(int /* audio_port_handle_t */ portId);

@@ -250,6 +250,12 @@ status_t AudioSystem::setMode(audio_mode_t mode) {
     return af->setMode(mode);
 }
 
+status_t AudioSystem::setSimulateDeviceConnections(bool enabled) {
+    const sp<IAudioFlinger>& af = AudioSystem::get_audio_flinger();
+    if (af == 0) return PERMISSION_DENIED;
+    return af->setSimulateDeviceConnections(enabled);
+}
+
 status_t AudioSystem::setParameters(audio_io_handle_t ioHandle, const String8& keyValuePairs) {
     const sp<IAudioFlinger>& af = AudioSystem::get_audio_flinger();
     if (af == 0) return PERMISSION_DENIED;
@@ -1541,6 +1547,15 @@ status_t AudioSystem::listAudioPorts(audio_port_role_t role,
     *generation = VALUE_OR_RETURN_STATUS(convertIntegral<unsigned int>(generationAidl));
     RETURN_STATUS_IF_ERROR(convertRange(portsAidl.begin(), portsAidl.end(), ports,
                                         aidl2legacy_AudioPortFw_audio_port_v7));
+    return OK;
+}
+
+status_t AudioSystem::listDeclaredDevicePorts(media::AudioPortRole role,
+                                              std::vector<media::AudioPortFw>* result) {
+    if (result == nullptr) return BAD_VALUE;
+    const sp<IAudioPolicyService>& aps = AudioSystem::get_audio_policy_service();
+    if (aps == 0) return PERMISSION_DENIED;
+    RETURN_STATUS_IF_ERROR(statusTFromBinderStatus(aps->listDeclaredDevicePorts(role, result)));
     return OK;
 }
 

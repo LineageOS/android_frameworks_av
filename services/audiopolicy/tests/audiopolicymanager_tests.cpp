@@ -1681,19 +1681,19 @@ TEST_F(AudioPolicyManagerTestDeviceConnection, RoutingUpdate) {
     // Connecting a valid output device with valid parameters should trigger a routing update
     ASSERT_EQ(NO_ERROR, mManager->setDeviceConnectionState(
             AUDIO_DEVICE_OUT_BLUETOOTH_SCO, AUDIO_POLICY_DEVICE_STATE_AVAILABLE,
-            "a", "b", AUDIO_FORMAT_DEFAULT));
+            "00:11:22:33:44:55", "b", AUDIO_FORMAT_DEFAULT));
     ASSERT_EQ(1, mClient->getRoutingUpdatedCounter());
 
     // Disconnecting a connected device should succeed and trigger a routing update
     ASSERT_EQ(NO_ERROR, mManager->setDeviceConnectionState(
             AUDIO_DEVICE_OUT_BLUETOOTH_SCO, AUDIO_POLICY_DEVICE_STATE_UNAVAILABLE,
-            "a", "b", AUDIO_FORMAT_DEFAULT));
+            "00:11:22:33:44:55", "b", AUDIO_FORMAT_DEFAULT));
     ASSERT_EQ(2, mClient->getRoutingUpdatedCounter());
 
     // Disconnecting a disconnected device should fail and not trigger a routing update
     ASSERT_EQ(INVALID_OPERATION, mManager->setDeviceConnectionState(
             AUDIO_DEVICE_OUT_BLUETOOTH_SCO, AUDIO_POLICY_DEVICE_STATE_UNAVAILABLE,
-            "a", "b",  AUDIO_FORMAT_DEFAULT));
+            "00:11:22:33:44:55", "b",  AUDIO_FORMAT_DEFAULT));
     ASSERT_EQ(2, mClient->getRoutingUpdatedCounter());
 
     // Changing force use should trigger an update
@@ -1820,9 +1820,9 @@ INSTANTIATE_TEST_CASE_P(
                 DeviceConnectionTestParams({AUDIO_DEVICE_OUT_HDMI, "test_out_hdmi",
                                             "audio_policy_test_out_hdmi"}),
                 DeviceConnectionTestParams({AUDIO_DEVICE_IN_BLUETOOTH_SCO_HEADSET, "bt_hfp_in",
-                                            "hfp_client_in"}),
+                                            "00:11:22:33:44:55"}),
                 DeviceConnectionTestParams({AUDIO_DEVICE_OUT_BLUETOOTH_SCO, "bt_hfp_out",
-                                            "hfp_client_out"})
+                                            "00:11:22:33:44:55"})
                 )
         );
 

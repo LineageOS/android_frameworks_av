@@ -190,6 +190,9 @@ ConversionResult<audio_devices_t> aidl2legacy_AudioDeviceDescription_audio_devic
 ConversionResult<media::audio::common::AudioDeviceDescription>
 legacy2aidl_audio_devices_t_AudioDeviceDescription(audio_devices_t legacy);
 
+media::audio::common::AudioDeviceAddress::Tag suggestDeviceAddressTag(
+        const media::audio::common::AudioDeviceDescription& description);
+
 ::android::status_t aidl2legacy_AudioDevice_audio_device(
         const media::audio::common::AudioDevice& aidl, audio_devices_t* legacyType,
         char* legacyAddress);
@@ -204,6 +207,8 @@ ConversionResult<media::audio::common::AudioDevice> legacy2aidl_audio_device_Aud
         audio_devices_t legacyType, const char* legacyAddress);
 ConversionResult<media::audio::common::AudioDevice> legacy2aidl_audio_device_AudioDevice(
         audio_devices_t legacyType, const ::android::String8& legacyAddress);
+ConversionResult<media::audio::common::AudioDevice> legacy2aidl_audio_device_AudioDevice(
+        audio_devices_t legacyType, const std::string& legacyAddress);
 
 ConversionResult<audio_extra_audio_descriptor>
 aidl2legacy_ExtraAudioDescriptor_audio_extra_audio_descriptor(

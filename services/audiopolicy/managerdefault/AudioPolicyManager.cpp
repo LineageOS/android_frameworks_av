@@ -4242,6 +4242,28 @@ status_t AudioPolicyManager::listAudioPorts(audio_port_role_t role,
     return NO_ERROR;
 }
 
+status_t AudioPolicyManager::listDeclaredDevicePorts(media::AudioPortRole role,
+        std::vector<media::AudioPortFw>* _aidl_return) {
+    auto pushPort = [&](const sp<DeviceDescriptor>& dev) -> status_t {
+        audio_port_v7 port;
+        dev->toAudioPort(&port);
+        auto aidlPort = VALUE_OR_RETURN_STATUS(legacy2aidl_audio_port_v7_AudioPortFw(port));
+        _aidl_return->push_back(std::move(aidlPort));
+        return OK;
+    };
+
+    for (const auto& module : mHwModulesAll) {
+        for (const auto& dev : module->getDeclaredDevices()) {
+            if (role == media::AudioPortRole::NONE ||
+                    ((role == media::AudioPortRole::SOURCE)
+                            == audio_is_input_device(dev->type()))) {
+                RETURN_STATUS_IF_ERROR(pushPort(dev));
+            }
+        }
+    }
+    return OK;
+}
+
 status_t AudioPolicyManager::getAudioPort(struct audio_port_v7 *port)
 {
     if (port == nullptr || port->id == AUDIO_PORT_HANDLE_NONE) {

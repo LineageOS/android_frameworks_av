@@ -23,6 +23,7 @@
 #include <vector>
 
 #include <android/content/AttributionSourceState.h>
+#include <android/media/AudioPortFw.h>
 #include <android/media/AudioVibratorInfo.h>
 #include <android/media/BnAudioFlingerClient.h>
 #include <android/media/BnAudioPolicyServiceClient.h>
@@ -120,6 +121,9 @@ public:
 
     // set audio mode in audio hardware
     static status_t setMode(audio_mode_t mode);
+
+    // test API: switch HALs into the mode which simulates external device connections
+    static status_t setSimulateDeviceConnections(bool enabled);
 
     // returns true in *state if tracks are active on the specified stream or have been active
     // in the past inPastMs milliseconds
@@ -377,6 +381,9 @@ public:
                                    unsigned int *num_ports,
                                    struct audio_port_v7 *ports,
                                    unsigned int *generation);
+
+    static status_t listDeclaredDevicePorts(media::AudioPortRole role,
+                                            std::vector<media::AudioPortFw>* result);
 
     /* Get attributes for a given audio port. On input, the port
      * only needs the 'id' field to be filled in. */

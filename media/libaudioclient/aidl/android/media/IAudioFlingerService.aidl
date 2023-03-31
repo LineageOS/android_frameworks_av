@@ -229,6 +229,9 @@ interface IAudioFlingerService {
 
     void setDeviceConnectedState(in AudioPortFw devicePort, boolean connected);
 
+    // Used for tests only. Requires AIDL HAL to work.
+    void setSimulateDeviceConnections(boolean enabled);
+
     /**
      * Requests a given latency mode (See AudioLatencyMode.aidl) on an output stream.
      * This can be used when some use case on a given mixer/stream can only be enabled

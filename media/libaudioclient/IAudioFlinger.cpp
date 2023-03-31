@@ -809,6 +809,10 @@ status_t AudioFlingerClientAdapter::setDeviceConnectedState(
     return statusTFromBinderStatus(mDelegate->setDeviceConnectedState(aidlPort, connected));
 }
 
+status_t AudioFlingerClientAdapter::setSimulateDeviceConnections(bool enabled) {
+    return statusTFromBinderStatus(mDelegate->setSimulateDeviceConnections(enabled));
+}
+
 status_t AudioFlingerClientAdapter::setRequestedLatencyMode(
         audio_io_handle_t output, audio_latency_mode_t mode) {
     int32_t outputAidl = VALUE_OR_RETURN_STATUS(legacy2aidl_audio_io_handle_t_int32_t(output));
@@ -1353,6 +1357,10 @@ Status AudioFlingerServerAdapter::setDeviceConnectedState(
         const media::AudioPortFw& port, bool connected) {
     audio_port_v7 portLegacy = VALUE_OR_RETURN_BINDER(aidl2legacy_AudioPortFw_audio_port_v7(port));
     return Status::fromStatusT(mDelegate->setDeviceConnectedState(&portLegacy, connected));
+}
+
+Status AudioFlingerServerAdapter::setSimulateDeviceConnections(bool enabled) {
+    return Status::fromStatusT(mDelegate->setSimulateDeviceConnections(enabled));
 }
 
 Status AudioFlingerServerAdapter::setRequestedLatencyMode(

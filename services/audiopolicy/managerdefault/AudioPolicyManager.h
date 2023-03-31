@@ -261,6 +261,8 @@ public:
                                         unsigned int *num_ports,
                                         struct audio_port_v7 *ports,
                                         unsigned int *generation);
+                status_t listDeclaredDevicePorts(media::AudioPortRole role,
+                                                 std::vector<media::AudioPortFw>* result) override;
         virtual status_t getAudioPort(struct audio_port_v7 *port);
         virtual status_t createAudioPatch(const struct audio_patch *patch,
                                            audio_patch_handle_t *handle,
