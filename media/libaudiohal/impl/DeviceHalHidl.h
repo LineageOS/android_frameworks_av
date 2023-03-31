@@ -126,6 +126,11 @@ class DeviceHalHidl : public DeviceHalInterface, public CoreConversionHelperHidl
 
     status_t setConnectedState(const struct audio_port_v7 *port, bool connected) override;
 
+    status_t setSimulateDeviceConnections(bool enabled __unused) override {
+        // Only supported by AIDL HALs.
+        return INVALID_OPERATION;
+    }
+
     error::Result<audio_hw_sync_t> getHwAvSync() override;
 
     status_t dump(int fd, const Vector<String16>& args) override;
