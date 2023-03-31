@@ -186,7 +186,9 @@ public:
             }
             sp<os::ExternalVibration> getExternalVibration() const { return mExternalVibration; }
 
-            void    setTeePatches(TeePatches teePatches);
+            // This function should be called with holding thread lock.
+            void    updateTeePatches();
+            void    setTeePatchesToUpdate(TeePatches teePatchesToUpdate);
 
     void tallyUnderrunFrames(size_t frames) override {
        if (isOut()) { // we expect this from output tracks only
@@ -369,6 +371,7 @@ private:
     bool                mPauseHwPending = false; // direct/offload track request for thread pause
     audio_output_flags_t mFlags;
     TeePatches  mTeePatches;
+    std::optional<TeePatches> mTeePatchesToUpdate;
     const float         mSpeed;
     const bool          mIsSpatialized;
     const bool          mIsBitPerfect;

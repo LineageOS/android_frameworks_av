@@ -4103,6 +4103,10 @@ NO_THREAD_SAFETY_ANALYSIS  // manual locking of AudioFlinger
             activeTracks.insert(activeTracks.end(), mActiveTracks.begin(), mActiveTracks.end());
 
             setHalLatencyMode_l();
+
+            for (const auto &track : mActiveTracks ) {
+                track->updateTeePatches();
+            }
         } // mLock scope ends
 
         if (mBytesRemaining == 0) {
