@@ -1516,6 +1516,17 @@ Status AudioPolicyService::listAudioPorts(media::AudioPortRole roleAidl,
     return Status::ok();
 }
 
+Status AudioPolicyService::listDeclaredDevicePorts(media::AudioPortRole role,
+                                                    std::vector<media::AudioPortFw>* _aidl_return) {
+    Mutex::Autolock _l(mLock);
+    if (mAudioPolicyManager == NULL) {
+        return binderStatusFromStatusT(NO_INIT);
+    }
+    AutoCallerClear acc;
+    return binderStatusFromStatusT(mAudioPolicyManager->listDeclaredDevicePorts(
+                    role, _aidl_return));
+}
+
 Status AudioPolicyService::getAudioPort(int portId,
                                         media::AudioPortFw* _aidl_return) {
     audio_port_v7 port{ .id = portId };

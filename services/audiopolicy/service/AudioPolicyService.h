@@ -174,6 +174,8 @@ public:
     binder::Status listAudioPorts(media::AudioPortRole role, media::AudioPortType type,
                                   Int* count, std::vector<media::AudioPortFw>* ports,
                                   int32_t* _aidl_return) override;
+    binder::Status listDeclaredDevicePorts(media::AudioPortRole role,
+                                           std::vector<media::AudioPortFw>* _aidl_return) override;
     binder::Status getAudioPort(int portId,
                                 media::AudioPortFw* _aidl_return) override;
     binder::Status createAudioPatch(const media::AudioPatchFw& patch, int32_t handle,
