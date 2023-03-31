@@ -14,6 +14,12 @@ cc_defaults {
         "-Wall",
         "-Werror",
     ],
+    shared_libs: [
+        "libbinder",
+        "libcutils",
+        "liblog",
+        "libutils",
+    ],
     sanitize: {
         misc_undefined: [
             "unsigned-integer-overflow",
@@ -22,26 +28,27 @@ cc_defaults {
     },
 }
 
-cc_test {
-    name: "audio_aidl_conversion_tests",
+cc_defaults {
+    name: "audio_aidl_conversion_test_defaults",
     defaults: [
         "libaudioclient_tests_defaults",
         "latest_android_media_audio_common_types_cpp_static",
     ],
-    srcs: ["audio_aidl_legacy_conversion_tests.cpp"],
-    shared_libs: [
-        "libbinder",
-        "libcutils",
-        "liblog",
-        "libutils",
-    ],
     static_libs: [
-        "libaudioclient_aidl_conversion",
-        "libaudio_aidl_conversion_common_cpp",
         "audioclient-types-aidl-cpp",
         "av-types-aidl-cpp",
+        "libaudio_aidl_conversion_common_cpp",
+        "libaudioclient_aidl_conversion",
         "libstagefright_foundation",
     ],
+}
+
+cc_test {
+    name: "audio_aidl_conversion_tests",
+    defaults: [
+        "audio_aidl_conversion_test_defaults",
+    ],
+    srcs: ["audio_aidl_legacy_conversion_tests.cpp"],
 }
 
 cc_test {
@@ -50,9 +57,6 @@ cc_test {
     srcs: ["audio_aidl_status_tests.cpp"],
     shared_libs: [
         "libaudioclient_aidl_conversion",
-        "libbinder",
-        "libcutils",
-        "libutils",
     ],
 }
 
@@ -70,9 +74,6 @@ cc_test {
     shared_libs: [
         "framework-permission-aidl-cpp",
         "libaudioclient",
-        "libbinder",
-        "libcutils",
-        "libutils",
     ],
     data: ["track_test_input_*.txt"],
 }
@@ -89,35 +90,23 @@ cc_test {
         "libmediametrics_headers",
     ],
     shared_libs: [
-        "libaudioclient",
-        "libbinder",
-        "libcutils",
-        "libutils",
         "framework-permission-aidl-cpp",
+        "libaudioclient",
     ],
     data: ["record_test_input_*.txt"],
 }
 
 cc_defaults {
     name: "libaudioclient_gtests_defaults",
-    cflags: [
-        "-Wall",
-        "-Werror",
-    ],
     defaults: [
-        "latest_android_media_audio_common_types_cpp_static",
+        "audio_aidl_conversion_test_defaults",
     ],
     shared_libs: [
         "capture_state_listener-aidl-cpp",
         "framework-permission-aidl-cpp",
-        "libaudioclient_aidl_conversion",
-        "libaudio_aidl_conversion_common_cpp",
         "libbase",
-        "libbinder",
         "libcgrouprc",
-        "libcutils",
         "libdl",
-        "liblog",
         "libmedia",
         "libmediametrics",
         "libmediautils",
@@ -125,8 +114,6 @@ cc_defaults {
         "libnblog",
         "libprocessgroup",
         "libshmemcompat",
-        "libstagefright_foundation",
-        "libutils",
         "libxml2",
         "mediametricsservice-aidl-cpp",
         "packagemanager_aidl-cpp",
@@ -148,7 +135,6 @@ cc_defaults {
     ],
     data: ["bbb*.raw"],
     test_config_template: "audio_test_template.xml",
-    test_suites: ["device-tests"],
 }
 
 cc_test {
