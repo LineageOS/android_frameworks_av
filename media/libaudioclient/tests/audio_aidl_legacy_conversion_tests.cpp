@@ -15,6 +15,7 @@
  */
 
 #include <iostream>
+#include <string>
 
 #include <gtest/gtest.h>
 
@@ -32,6 +33,7 @@ using media::AudioPortRole;
 using media::AudioPortType;
 using media::audio::common::AudioChannelLayout;
 using media::audio::common::AudioDevice;
+using media::audio::common::AudioDeviceAddress;
 using media::audio::common::AudioDeviceDescription;
 using media::audio::common::AudioDeviceType;
 using media::audio::common::AudioEncapsulationMetadataType;
@@ -131,6 +133,14 @@ AudioDeviceDescription make_ADD_DefaultIn() {
     return make_AudioDeviceDescription(AudioDeviceType::IN_DEFAULT);
 }
 
+AudioDeviceDescription make_ADD_MicIn() {
+    return make_AudioDeviceDescription(AudioDeviceType::IN_MICROPHONE);
+}
+
+AudioDeviceDescription make_ADD_RSubmixIn() {
+    return make_AudioDeviceDescription(AudioDeviceType::IN_SUBMIX);
+}
+
 AudioDeviceDescription make_ADD_DefaultOut() {
     return make_AudioDeviceDescription(AudioDeviceType::OUT_DEFAULT);
 }
@@ -143,6 +153,39 @@ AudioDeviceDescription make_ADD_WiredHeadset() {
 AudioDeviceDescription make_ADD_BtScoHeadset() {
     return make_AudioDeviceDescription(AudioDeviceType::OUT_HEADSET,
                                        AudioDeviceDescription::CONNECTION_BT_SCO());
+}
+
+AudioDeviceDescription make_ADD_BtA2dpHeadphone() {
+    return make_AudioDeviceDescription(AudioDeviceType::OUT_HEADPHONE,
+                                       AudioDeviceDescription::CONNECTION_BT_A2DP());
+}
+
+AudioDeviceDescription make_ADD_BtLeHeadset() {
+    return make_AudioDeviceDescription(AudioDeviceType::OUT_HEADSET,
+                                       AudioDeviceDescription::CONNECTION_BT_LE());
+}
+
+AudioDeviceDescription make_ADD_BtLeBroadcast() {
+    return make_AudioDeviceDescription(AudioDeviceType::OUT_BROADCAST,
+                                       AudioDeviceDescription::CONNECTION_BT_LE());
+}
+
+AudioDeviceDescription make_ADD_IpV4Device() {
+    return make_AudioDeviceDescription(AudioDeviceType::OUT_DEVICE,
+                                       AudioDeviceDescription::CONNECTION_IP_V4());
+}
+
+AudioDeviceDescription make_ADD_UsbHeadset() {
+    return make_AudioDeviceDescription(AudioDeviceType::OUT_HEADSET,
+                                       AudioDeviceDescription::CONNECTION_USB());
+}
+
+AudioDevice make_AudioDevice(const AudioDeviceDescription& type,
+                             const AudioDeviceAddress& address) {
+    AudioDevice result;
+    result.type = type;
+    result.address = address;
+    return result;
 }
 
 AudioFormatDescription make_AudioFormatDescription(AudioFormatType type) {
@@ -389,6 +432,48 @@ INSTANTIATE_TEST_SUITE_P(AudioDeviceDescriptionRoundTrip, AudioDeviceDescription
                          testing::Values(AudioDeviceDescription{}, make_ADD_DefaultIn(),
                                          make_ADD_DefaultOut(), make_ADD_WiredHeadset(),
                                          make_ADD_BtScoHeadset()));
+
+class AudioDeviceRoundTripTest : public testing::TestWithParam<AudioDevice> {};
+TEST_P(AudioDeviceRoundTripTest, Aidl2Legacy2Aidl) {
+    const auto initial = GetParam();
+    audio_devices_t legacyType;
+    String8 legacyAddress;
+    status_t status = aidl2legacy_AudioDevice_audio_device(initial, &legacyType, &legacyAddress);
+    ASSERT_EQ(OK, status);
+    auto convBack = legacy2aidl_audio_device_AudioDevice(legacyType, legacyAddress);
+    ASSERT_TRUE(convBack.ok());
+    EXPECT_EQ(initial, convBack.value());
+}
+INSTANTIATE_TEST_SUITE_P(
+        AudioDeviceRoundTrip, AudioDeviceRoundTripTest,
+        testing::Values(
+                make_AudioDevice(make_ADD_MicIn(),
+                                 AudioDeviceAddress::make<AudioDeviceAddress::Tag::id>("bottom")),
+                make_AudioDevice(make_ADD_RSubmixIn(),
+                                 AudioDeviceAddress::make<AudioDeviceAddress::Tag::id>("1:2-in-3")),
+                // The case of a "blueprint" device port for an external device.
+                make_AudioDevice(make_ADD_BtScoHeadset(),
+                                 AudioDeviceAddress::make<AudioDeviceAddress::Tag::id>("")),
+                make_AudioDevice(make_ADD_BtScoHeadset(),
+                                 AudioDeviceAddress::make<AudioDeviceAddress::Tag::mac>(
+                                         std::vector<uint8_t>{1, 2, 3, 4, 5, 6})),
+                // Another "blueprint"
+                make_AudioDevice(make_ADD_BtA2dpHeadphone(),
+                                 AudioDeviceAddress::make<AudioDeviceAddress::Tag::id>("")),
+                make_AudioDevice(make_ADD_BtA2dpHeadphone(),
+                                 AudioDeviceAddress::make<AudioDeviceAddress::Tag::mac>(
+                                         std::vector<uint8_t>{1, 2, 3, 4, 5, 6})),
+                make_AudioDevice(make_ADD_BtLeHeadset(),
+                                 AudioDeviceAddress::make<AudioDeviceAddress::Tag::mac>(
+                                         std::vector<uint8_t>{1, 2, 3, 4, 5, 6})),
+                make_AudioDevice(make_ADD_BtLeBroadcast(),
+                                 AudioDeviceAddress::make<AudioDeviceAddress::Tag::id>("42")),
+                make_AudioDevice(make_ADD_IpV4Device(),
+                                 AudioDeviceAddress::make<AudioDeviceAddress::Tag::ipv4>(
+                                         std::vector<uint8_t>{192, 168, 0, 1})),
+                make_AudioDevice(make_ADD_UsbHeadset(),
+                                 AudioDeviceAddress::make<AudioDeviceAddress::Tag::alsa>(
+                                         std::vector<int32_t>{1, 2}))));
 
 class AudioFormatDescriptionRoundTripTest : public testing::TestWithParam<AudioFormatDescription> {
 };
