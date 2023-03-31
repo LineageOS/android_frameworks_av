@@ -40,6 +40,7 @@ using ::aidl::android::hardware::audio::core::IStreamCommon;
 using ::aidl::android::hardware::audio::core::IStreamIn;
 using ::aidl::android::hardware::audio::core::IStreamOut;
 using ::aidl::android::hardware::audio::core::StreamDescriptor;
+using ::aidl::android::hardware::audio::core::MmapBufferDescriptor;
 using ::aidl::android::media::audio::common::MicrophoneDynamicInfo;
 
 namespace android {
@@ -255,16 +256,23 @@ status_t StreamHalAidl::start() {
     ALOGD("%p %s::%s", this, getClassName().c_str(), __func__);
     TIME_CHECK();
     if (!mStream) return NO_INIT;
-    ALOGE("%s not implemented yet", __func__);
-    return OK;
+    const auto state = getState();
+    StreamDescriptor::Reply reply;
+    if (state == StreamDescriptor::State::STANDBY) {
+        if (status_t status = sendCommand(makeHalCommand<HalCommand::Tag::start>(), &reply, true);
+                status != OK) {
+            return status;
+        }
+        return sendCommand(makeHalCommand<HalCommand::Tag::burst>(0), &reply, true);
+    }
+
+    return INVALID_OPERATION;
 }
 
 status_t StreamHalAidl::stop() {
     ALOGD("%p %s::%s", this, getClassName().c_str(), __func__);
-    TIME_CHECK();
     if (!mStream) return NO_INIT;
-    ALOGE("%s not implemented yet", __func__);
-    return OK;
+    return standby();
 }
 
 status_t StreamHalAidl::getLatency(uint32_t *latency) {
@@ -287,6 +295,20 @@ status_t StreamHalAidl::getObservablePosition(int64_t *frames, int64_t *timestam
     }
     *frames = reply.observable.frames;
     *timestamp = reply.observable.timeNs;
+    return OK;
+}
+
+status_t StreamHalAidl::getHardwarePosition(int64_t *frames, int64_t *timestamp) {
+    ALOGV("%p %s::%s", this, getClassName().c_str(), __func__);
+    if (!mStream) return NO_INIT;
+    StreamDescriptor::Reply reply;
+    // TODO: switch to updateCountersIfNeeded once we sort out mWorkerTid initialization
+    if (status_t status = sendCommand(makeHalCommand<HalCommand::Tag::getStatus>(), &reply, true);
+            status != OK) {
+        return status;
+    }
+    *frames = reply.hardware.frames;
+    *timestamp = reply.hardware.timeNs;
     return OK;
 }
 
@@ -419,19 +441,35 @@ status_t StreamHalAidl::exit() {
 }
 
 status_t StreamHalAidl::createMmapBuffer(int32_t minSizeFrames __unused,
-                                  struct audio_mmap_buffer_info *info __unused) {
+                                         struct audio_mmap_buffer_info *info) {
     ALOGD("%p %s::%s", this, getClassName().c_str(), __func__);
     TIME_CHECK();
     if (!mStream) return NO_INIT;
-    ALOGE("%s not implemented yet", __func__);
+    if (!mContext.isMmapped()) {
+        return BAD_VALUE;
+    }
+    const MmapBufferDescriptor& bufferDescriptor = mContext.getMmapBufferDescriptor();
+    info->shared_memory_fd = bufferDescriptor.sharedMemory.fd.get();
+    info->buffer_size_frames = mContext.getBufferSizeFrames();
+    info->burst_size_frames = bufferDescriptor.burstSizeFrames;
+    info->flags = static_cast<audio_mmap_buffer_flag>(bufferDescriptor.flags);
+
     return OK;
 }
 
-status_t StreamHalAidl::getMmapPosition(struct audio_mmap_position *position __unused) {
-    ALOGD("%p %s::%s", this, getClassName().c_str(), __func__);
+status_t StreamHalAidl::getMmapPosition(struct audio_mmap_position *position) {
     TIME_CHECK();
     if (!mStream) return NO_INIT;
-    ALOGE("%s not implemented yet", __func__);
+    if (!mContext.isMmapped()) {
+        return BAD_VALUE;
+    }
+    int64_t aidlPosition = 0, aidlTimestamp = 0;
+    if (status_t status = getHardwarePosition(&aidlPosition, &aidlTimestamp); status != OK) {
+        return status;
+    }
+
+    position->time_nanoseconds = aidlTimestamp;
+    position->position_frames = static_cast<int32_t>(aidlPosition);
     return OK;
 }
 
