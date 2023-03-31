@@ -72,9 +72,15 @@ public:
         ++mIntervalCount;
         const auto& mActivityManager = getActivityManager();
         if (mActivityManager) {
-            mActivityManager->logFgsApiBegin(AUDIO_API,
-                mUid,
-                IPCThreadState::self() -> getCallingPid());
+            if (mIsOut) {
+                mActivityManager->logFgsApiBegin(AUDIO_API,
+                    mUid,
+                    IPCThreadState::self() -> getCallingPid());
+            } else {
+                mActivityManager->logFgsApiBegin(MICROPHONE_API,
+                    mUid,
+                    IPCThreadState::self() -> getCallingPid());
+            }
         }
     }
 
@@ -107,9 +113,15 @@ public:
         }
         const auto& mActivityManager = getActivityManager();
         if (mActivityManager) {
-            mActivityManager->logFgsApiEnd(AUDIO_API,
-                mUid,
-                IPCThreadState::self() -> getCallingPid());
+            if (mIsOut) {
+                mActivityManager->logFgsApiEnd(AUDIO_API,
+                    mUid,
+                    IPCThreadState::self() -> getCallingPid());
+            } else {
+                mActivityManager->logFgsApiEnd(MICROPHONE_API,
+                    mUid,
+                    IPCThreadState::self() -> getCallingPid());
+            }
         }
     }
 
@@ -256,6 +268,7 @@ private:
     const bool        mIsOut;  // if true, than a playback track, otherwise used for record.
 
     static constexpr int AUDIO_API = 5;
+    static constexpr int MICROPHONE_API = 6;
     const int         mUid;
 
     mutable           std::mutex mLock;
