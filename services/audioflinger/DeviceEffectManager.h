@@ -45,11 +45,11 @@ public:
            int32_t sessionId, int32_t deviceId,
            sp<EffectHalInterface> *effect);
     status_t addEffectToHal(audio_port_handle_t deviceId, audio_module_handle_t hwModuleId,
-            sp<EffectHalInterface> effect) {
+            const sp<EffectHalInterface>& effect) {
         return mAudioFlinger.addEffectToHal(deviceId, hwModuleId, effect);
     };
     status_t removeEffectFromHal(audio_port_handle_t deviceId, audio_module_handle_t hwModuleId,
-            sp<EffectHalInterface> effect) {
+            const sp<EffectHalInterface>& effect) {
         return mAudioFlinger.removeEffectFromHal(deviceId, hwModuleId, effect);
     };
 
@@ -74,7 +74,7 @@ private:
 
 class DeviceEffectManagerCallback : public EffectCallbackInterface {
 public:
-    DeviceEffectManagerCallback(DeviceEffectManager& manager)
+    explicit DeviceEffectManagerCallback(DeviceEffectManager& manager)
         : mManager(manager) {}
 
     status_t createEffectHal(const effect_uuid_t *pEffectUuid,
@@ -105,10 +105,10 @@ public:
     size_t    frameCount() const override  { return 0; }
     uint32_t  latency() const override  { return 0; }
 
-    status_t addEffectToHal(sp<EffectHalInterface> effect __unused) override {
+    status_t addEffectToHal(const sp<EffectHalInterface>& /* effect */) override {
         return NO_ERROR;
     }
-    status_t removeEffectFromHal(sp<EffectHalInterface> effect __unused) override {
+    status_t removeEffectFromHal(const sp<EffectHalInterface>& /* effect */) override {
         return NO_ERROR;
     }
 
@@ -133,11 +133,11 @@ public:
     int newEffectId() { return mManager.audioFlinger().nextUniqueId(AUDIO_UNIQUE_ID_USE_EFFECT); }
 
     status_t addEffectToHal(audio_port_handle_t deviceId,
-            audio_module_handle_t hwModuleId, sp<EffectHalInterface> effect) {
+            audio_module_handle_t hwModuleId, const sp<EffectHalInterface>& effect) {
         return mManager.addEffectToHal(deviceId, hwModuleId, effect);
     }
     status_t removeEffectFromHal(audio_port_handle_t deviceId,
-            audio_module_handle_t hwModuleId, sp<EffectHalInterface> effect) {
+            audio_module_handle_t hwModuleId, const sp<EffectHalInterface>& effect) {
         return mManager.removeEffectFromHal(deviceId, hwModuleId, effect);
     }
 private:

@@ -2522,11 +2522,22 @@ nsecs_t AudioTrack::processAudioBuffer()
         timeout.tv_sec = WAIT_STREAM_END_TIMEOUT_SEC;
         timeout.tv_nsec = 0;
 
+        // Use timestamp progress to safeguard we don't falsely time out.
+        AudioTimestamp timestamp{};
+        const bool isTimestampValid = getTimestamp(timestamp) == OK;
+        const auto frameCount = isTimestampValid ? timestamp.mPosition : 0;
+
         status_t status = proxy->waitStreamEndDone(&timeout);
         switch (status) {
+        case TIMED_OUT:
+            if (isTimestampValid
+                    && getTimestamp(timestamp) == OK && frameCount != timestamp.mPosition) {
+                ALOGD("%s: waitStreamEndDone retrying", __func__);
+                break;  // we retry again (and recheck possible state change).
+            }
+            [[fallthrough]];
         case NO_ERROR:
         case DEAD_OBJECT:
-        case TIMED_OUT:
             if (status != DEAD_OBJECT) {
                 // for DEAD_OBJECT, we do not send a EVENT_STREAM_END after stop();
                 // instead, the application should handle the EVENT_NEW_IAUDIOTRACK.
@@ -2544,6 +2555,7 @@ nsecs_t AudioTrack::processAudioBuffer()
                 }
             }
             if (waitStreamEnd && status != DEAD_OBJECT) {
+               ALOGV("%s: waitStreamEndDone complete", __func__);
                return NS_INACTIVE;
             }
             break;
