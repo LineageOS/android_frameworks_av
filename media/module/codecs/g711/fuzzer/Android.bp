@@ -44,6 +44,14 @@ cc_fuzz {
             "android-media-fuzzing-reports@google.com",
         ],
         componentid: 155276,
+        hotlists: [
+            "4593311",
+        ],
+        description: "The fuzzer targets the APIs of codecs_g711dec library with a special focus on Alaw APIs",
+        vector: "remote",
+        service_privilege: "constrained",
+        users: "multi_user",
+        fuzzed_code_usage: "shipped",
     },
 }
 
@@ -61,5 +69,13 @@ cc_fuzz {
             "android-media-fuzzing-reports@google.com",
         ],
         componentid: 155276,
+        hotlists: [
+            "4593311",
+        ],
+        description: "The fuzzer targets the APIs of codecs_g711dec library with a special focus on Mlaw APIs",
+        vector: "remote",
+        service_privilege: "constrained",
+        users: "multi_user",
+        fuzzed_code_usage: "shipped",
     },
 }

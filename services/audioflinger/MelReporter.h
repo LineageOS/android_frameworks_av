@@ -90,12 +90,13 @@ private:
     void stopInternalMelComputation();
 
     /** Should be called with the following order of locks: mAudioFlinger.mLock -> mLock. */
-    void stopMelComputationForPatch_l(const ActiveMelPatch& patch);
+    void stopMelComputationForPatch_l(const ActiveMelPatch& patch) REQUIRES(mLock);
 
     /** Should be called with the following order of locks: mAudioFlinger.mLock -> mLock. */
-    void startMelComputationForActivePatch_l(const ActiveMelPatch& patch);
+    void startMelComputationForActivePatch_l(const ActiveMelPatch& patch) REQUIRES(mLock);
 
-    std::optional<audio_patch_handle_t> activePatchStreamHandle_l(audio_io_handle_t streamHandle);
+    std::optional<audio_patch_handle_t>
+    activePatchStreamHandle_l(audio_io_handle_t streamHandle) REQUIRES(mLock);
 
     bool useHalSoundDoseInterface();
 

@@ -124,7 +124,6 @@ class DevicesFactoryHalInterface;
 class EffectsFactoryHalInterface;
 class FastMixer;
 class IAudioManager;
-class ISoundDoseCallback;
 class PassthruBufferProvider;
 class RecordBufferConverter;
 class ServerProxy;
@@ -300,6 +299,8 @@ public:
 
     virtual status_t setDeviceConnectedState(const struct audio_port_v7 *port, bool connected);
 
+    virtual status_t setSimulateDeviceConnections(bool enabled);
+
     virtual status_t setRequestedLatencyMode(
             audio_io_handle_t output, audio_latency_mode_t mode);
 
@@ -341,12 +342,12 @@ public:
     static void onExternalVibrationStop(const sp<os::ExternalVibration>& externalVibration);
 
     status_t addEffectToHal(audio_port_handle_t deviceId,
-            audio_module_handle_t hwModuleId, sp<EffectHalInterface> effect);
+            audio_module_handle_t hwModuleId, const sp<EffectHalInterface>& effect);
     status_t removeEffectFromHal(audio_port_handle_t deviceId,
-            audio_module_handle_t hwModuleId, sp<EffectHalInterface> effect);
+            audio_module_handle_t hwModuleId, const sp<EffectHalInterface>& effect);
 
     void updateDownStreamPatches_l(const struct audio_patch *patch,
-                                   const std::set<audio_io_handle_t> streams);
+                                   const std::set<audio_io_handle_t>& streams);
 
     std::optional<media::AudioVibratorInfo> getDefaultVibratorInfo_l();
 
@@ -389,7 +390,7 @@ public:
                   audio_session_t triggerSession,
                   audio_session_t listenerSession,
                   sync_event_callback_t callBack,
-                  wp<RefBase> cookie)
+                  const wp<RefBase>& cookie)
         : mType(type), mTriggerSession(triggerSession), mListenerSession(listenerSession),
           mCallback(callBack), mCookie(cookie)
         {}
@@ -869,7 +870,7 @@ using effect_buffer_t = int16_t;
                 void updateOutDevicesForRecordThreads_l(const DeviceDescriptorBaseVector& devices);
                 void forwardParametersToDownstreamPatches_l(
                         audio_io_handle_t upStream, const String8& keyValuePairs,
-                        std::function<bool(const sp<PlaybackThread>&)> useThread = nullptr);
+                        const std::function<bool(const sp<PlaybackThread>&)>& useThread = nullptr);
 
     // AudioStreamIn is immutable, so their fields are const.
     // For emphasis, we could also make all pointers to them be "const *",
@@ -882,7 +883,8 @@ using effect_buffer_t = int16_t;
 
         sp<DeviceHalInterface> hwDev() const { return audioHwDev->hwDevice(); }
 
-        AudioStreamIn(AudioHwDevice *dev, sp<StreamInHalInterface> in, audio_input_flags_t flags) :
+        AudioStreamIn(AudioHwDevice *dev, const sp<StreamInHalInterface>& in,
+                audio_input_flags_t flags) :
             audioHwDev(dev), stream(in), flags(flags) {}
         status_t read(void *buffer, size_t bytes, size_t *read) override {
             return stream->read(buffer, bytes, read);
@@ -953,6 +955,7 @@ using effect_buffer_t = int16_t;
         AUDIO_HW_GET_MASTER_MUTE,       // get_master_mute
         AUDIO_HW_GET_MICROPHONES,       // getMicrophones
         AUDIO_HW_SET_CONNECTED_STATE,   // setConnectedState
+        AUDIO_HW_SET_SIMULATE_CONNECTIONS, // setSimulateDeviceConnections
     };
 
     mutable     hardware_call_state                 mHardwareStatus;    // for dump only

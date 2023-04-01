@@ -229,6 +229,7 @@ BINDER_METHOD_ENTRY(getMmapPolicyInfos) \
 BINDER_METHOD_ENTRY(getAAudioMixerBurstCount) \
 BINDER_METHOD_ENTRY(getAAudioHardwareBurstMinUsec) \
 BINDER_METHOD_ENTRY(setDeviceConnectedState) \
+BINDER_METHOD_ENTRY(setSimulateDeviceConnections) \
 BINDER_METHOD_ENTRY(setRequestedLatencyMode) \
 BINDER_METHOD_ENTRY(getSupportedLatencyModes) \
 BINDER_METHOD_ENTRY(setBluetoothVariableLatencyEnabled) \
@@ -502,6 +503,25 @@ status_t AudioFlinger::setDeviceConnectedState(const struct audio_port_v7 *port,
     return final_result;
 }
 
+status_t AudioFlinger::setSimulateDeviceConnections(bool enabled) {
+    bool at_least_one_succeeded = false;
+    status_t last_error = INVALID_OPERATION;
+    Mutex::Autolock _l(mLock);
+    AutoMutex lock(mHardwareLock);
+    mHardwareStatus = AUDIO_HW_SET_SIMULATE_CONNECTIONS;
+    for (size_t i = 0; i < mAudioHwDevs.size(); i++) {
+        sp<DeviceHalInterface> dev = mAudioHwDevs.valueAt(i)->hwDevice();
+        status_t result = dev->setSimulateDeviceConnections(enabled);
+        if (result == OK) {
+            at_least_one_succeeded = true;
+        } else {
+            last_error = result;
+        }
+    }
+    mHardwareStatus = AUDIO_HW_IDLE;
+    return at_least_one_succeeded ? OK : last_error;
+}
+
 // getDefaultVibratorInfo_l must be called with AudioFlinger lock held.
 std::optional<media::AudioVibratorInfo> AudioFlinger::getDefaultVibratorInfo_l() {
     if (mAudioVibratorInfos.empty()) {
@@ -706,7 +726,7 @@ void AudioFlinger::onExternalVibrationStop(const sp<os::ExternalVibration>& exte
 }
 
 status_t AudioFlinger::addEffectToHal(audio_port_handle_t deviceId,
-        audio_module_handle_t hwModuleId, sp<EffectHalInterface> effect) {
+        audio_module_handle_t hwModuleId, const sp<EffectHalInterface>& effect) {
     AutoMutex lock(mHardwareLock);
     AudioHwDevice *audioHwDevice = mAudioHwDevs.valueFor(hwModuleId);
     if (audioHwDevice == nullptr) {
@@ -716,7 +736,7 @@ status_t AudioFlinger::addEffectToHal(audio_port_handle_t deviceId,
 }
 
 status_t AudioFlinger::removeEffectFromHal(audio_port_handle_t deviceId,
-        audio_module_handle_t hwModuleId, sp<EffectHalInterface> effect) {
+        audio_module_handle_t hwModuleId, const sp<EffectHalInterface>& effect) {
     AutoMutex lock(mHardwareLock);
     AudioHwDevice *audioHwDevice = mAudioHwDevs.valueFor(hwModuleId);
     if (audioHwDevice == nullptr) {
@@ -838,6 +858,7 @@ bool AudioFlinger::dumpTryLock(Mutex& mutex)
 }
 
 status_t AudioFlinger::dump(int fd, const Vector<String16>& args)
+NO_THREAD_SAFETY_ANALYSIS  // conditional try lock
 {
     if (!dumpAllowed()) {
         dumpPermissionDenial(fd, args);
@@ -943,7 +964,6 @@ status_t AudioFlinger::dump(int fd, const Vector<String16>& args)
         // to lookup the service if it's not running, as it will block for a second
         if (sMediaLogServiceAsBinder != 0) {
             dprintf(fd, "\nmedia.log:\n");
-            Vector<String16> args;
             sMediaLogServiceAsBinder->dump(fd, args);
         }
 
@@ -1445,8 +1465,9 @@ status_t AudioFlinger::setMode(audio_mode_t mode)
     if (NO_ERROR == ret) {
         Mutex::Autolock _l(mLock);
         mMode = mode;
-        for (size_t i = 0; i < mPlaybackThreads.size(); i++)
+        for (size_t i = 0; i < mPlaybackThreads.size(); i++) {
             mPlaybackThreads.valueAt(i)->setMode(mode);
+        }
     }
 
     mediametrics::LogItem(mMetricsId)
@@ -1794,7 +1815,7 @@ void AudioFlinger::updateOutDevicesForRecordThreads_l(const DeviceDescriptorBase
 // forwardAudioHwSyncToDownstreamPatches_l() must be called with AudioFlinger::mLock held
 void AudioFlinger::forwardParametersToDownstreamPatches_l(
         audio_io_handle_t upStream, const String8& keyValuePairs,
-        std::function<bool(const sp<PlaybackThread>&)> useThread)
+        const std::function<bool(const sp<PlaybackThread>&)>& useThread)
 {
     std::vector<PatchPanel::SoftwarePatch> swPatches;
     if (mPatchPanel.getDownstreamSoftwarePatches(upStream, &swPatches) != OK) return;
@@ -1810,7 +1831,7 @@ void AudioFlinger::forwardParametersToDownstreamPatches_l(
 
 // Update downstream patches for all playback threads attached to an MSD module
 void AudioFlinger::updateDownStreamPatches_l(const struct audio_patch *patch,
-                                             const std::set<audio_io_handle_t> streams)
+                                             const std::set<audio_io_handle_t>& streams)
 {
     for (const audio_io_handle_t stream : streams) {
         PlaybackThread *playbackThread = checkPlaybackThread_l(stream);
@@ -2016,24 +2037,29 @@ size_t AudioFlinger::getInputBufferSize(uint32_t sampleRate, audio_format_t form
     mHardwareStatus = AUDIO_HW_GET_INPUT_BUFFER_SIZE;
 
     sp<DeviceHalInterface> dev = mPrimaryHardwareDev->hwDevice();
+
     std::vector<audio_channel_mask_t> channelMasks = {channelMask};
-    if (channelMask != AUDIO_CHANNEL_IN_MONO)
+    if (channelMask != AUDIO_CHANNEL_IN_MONO) {
         channelMasks.push_back(AUDIO_CHANNEL_IN_MONO);
-    if (channelMask != AUDIO_CHANNEL_IN_STEREO)
+    }
+    if (channelMask != AUDIO_CHANNEL_IN_STEREO) {
         channelMasks.push_back(AUDIO_CHANNEL_IN_STEREO);
+    }
 
     std::vector<audio_format_t> formats = {format};
-    if (format != AUDIO_FORMAT_PCM_16_BIT)
+    if (format != AUDIO_FORMAT_PCM_16_BIT) {
         formats.push_back(AUDIO_FORMAT_PCM_16_BIT);
+    }
 
     std::vector<uint32_t> sampleRates = {sampleRate};
     static const uint32_t SR_44100 = 44100;
     static const uint32_t SR_48000 = 48000;
-
-    if (sampleRate != SR_48000)
+    if (sampleRate != SR_48000) {
         sampleRates.push_back(SR_48000);
-    if (sampleRate != SR_44100)
+    }
+    if (sampleRate != SR_44100) {
         sampleRates.push_back(SR_44100);
+    }
 
     mHardwareStatus = AUDIO_HW_IDLE;
 
@@ -2504,7 +2530,7 @@ status_t AudioFlinger::createRecord(const media::CreateRecordRequest& _input,
         // session and move it to this thread.
         sp<EffectChain> chain = getOrphanEffectChain_l(sessionId);
         if (chain != 0) {
-            Mutex::Autolock _l(thread->mLock);
+            Mutex::Autolock _l2(thread->mLock);
             thread->addEffectChain_l(chain);
         }
         break;
@@ -2906,7 +2932,7 @@ void AudioFlinger::setAudioHwSyncForSession_l(PlaybackThread *thread, audio_sess
 sp<AudioFlinger::ThreadBase> AudioFlinger::openOutput_l(audio_module_handle_t module,
                                                         audio_io_handle_t *output,
                                                         audio_config_t *halConfig,
-                                                        audio_config_base_t *mixerConfig __unused,
+                                                        audio_config_base_t *mixerConfig,
                                                         audio_devices_t deviceType,
                                                         const String8& address,
                                                         audio_output_flags_t flags)
@@ -3032,7 +3058,6 @@ status_t AudioFlinger::openOutput(const media::OpenOutputRequest& request,
             aidl2legacy_int32_t_audio_output_flags_t_mask(request.flags));
 
     audio_io_handle_t output;
-    uint32_t latencyMs;
 
     ALOGI("openOutput() this %p, module %d Device %s, SamplingRate %d, Format %#08x, "
               "Channels %#x, flags %#x",
@@ -3055,6 +3080,7 @@ status_t AudioFlinger::openOutput(const media::OpenOutputRequest& request,
     sp<ThreadBase> thread = openOutput_l(module, &output, &halConfig,
             &mixerConfig, deviceType, address, flags);
     if (thread != 0) {
+        uint32_t latencyMs = 0;
         if ((flags & AUDIO_OUTPUT_FLAG_MMAP_NOIRQ) == 0) {
             PlaybackThread *playbackThread = (PlaybackThread *)thread.get();
             latencyMs = playbackThread->latency();
@@ -3403,7 +3429,7 @@ status_t AudioFlinger::closeInput_nonvirtual(audio_io_handle_t input)
                         continue;
                     }
                     if (t->hasAudioSession(chain->sessionId()) != 0) {
-                        Mutex::Autolock _l(t->mLock);
+                        Mutex::Autolock _l2(t->mLock);
                         ALOGV("closeInput() found thread %d for effect session %d",
                               t->id(), chain->sessionId());
                         t->addEffectChain_l(chain);
@@ -3614,7 +3640,8 @@ std::vector<sp<AudioFlinger::EffectModule>> AudioFlinger::purgeStaleEffects_l() 
     }
 
     for (size_t i = 0; i < chains.size(); i++) {
-        sp<EffectChain> ec = chains[i];
+         // clang-tidy suggests const ref
+        sp<EffectChain> ec = chains[i];  // NOLINT(performance-unnecessary-copy-initialization)
         int sessionid = ec->sessionId();
         sp<ThreadBase> t = ec->thread().promote();
         if (t == 0) {
@@ -3797,7 +3824,7 @@ DeviceTypeSet AudioFlinger::primaryOutputDevice_l() const
     PlaybackThread *thread = primaryPlaybackThread_l();
 
     if (thread == NULL) {
-        return DeviceTypeSet();
+        return {};
     }
 
     return thread->outDeviceTypes();
@@ -4309,7 +4336,7 @@ status_t AudioFlinger::createEffect(const media::CreateEffectRequest& request,
             // session and used it instead of creating a new one.
             sp<EffectChain> chain = getOrphanEffectChain_l(sessionId);
             if (chain != 0) {
-                Mutex::Autolock _l(thread->mLock);
+                Mutex::Autolock _l2(thread->mLock);
                 thread->addEffectChain_l(chain);
             }
         }
@@ -4427,6 +4454,7 @@ void AudioFlinger::setEffectSuspended(int effectId,
 status_t AudioFlinger::moveEffectChain_l(audio_session_t sessionId,
                                    AudioFlinger::PlaybackThread *srcThread,
                                    AudioFlinger::PlaybackThread *dstThread)
+NO_THREAD_SAFETY_ANALYSIS // requires srcThread and dstThread locks
 {
     ALOGV("moveEffectChain_l() session %d from thread %p to thread %p",
             sessionId, srcThread, dstThread);
@@ -4456,11 +4484,12 @@ status_t AudioFlinger::moveEffectChain_l(audio_session_t sessionId,
     // transfer all effects one by one so that new effect chain is created on new thread with
     // correct buffer sizes and audio parameters and effect engines reconfigured accordingly
     sp<EffectChain> dstChain;
-    sp<EffectModule> effect = chain->getEffectFromId_l(0);
     Vector< sp<EffectModule> > removed;
     status_t status = NO_ERROR;
     std::string errorString;
-    while (effect != nullptr) {
+    // process effects one by one.
+    for (sp<EffectModule> effect = chain->getEffectFromId_l(0); effect != nullptr;
+            effect = chain->getEffectFromId_l(0)) {
         srcThread->removeEffect_l(effect);
         removed.add(effect);
         status = dstThread->addEffect_l(effect);
@@ -4481,7 +4510,6 @@ status_t AudioFlinger::moveEffectChain_l(audio_session_t sessionId,
                 break;
             }
         }
-        effect = chain->getEffectFromId_l(0);
     }
 
     size_t restored = 0;
@@ -4585,6 +4613,7 @@ Exit:
 }
 
 bool AudioFlinger::isNonOffloadableGlobalEffectEnabled_l()
+NO_THREAD_SAFETY_ANALYSIS  // thread lock for getEffectChain_l.
 {
     if (mGlobalEffectEnableTime != 0 &&
             ((systemTime() - mGlobalEffectEnableTime) < kMinGlobalEffectEnabletimeNs)) {

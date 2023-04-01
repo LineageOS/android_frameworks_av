@@ -187,7 +187,9 @@ template<typename T> bool StateQueue<T>::push(StateQueue<T>::block_t block)
 
 }   // namespace android
 
-// hack for gcc
+// Hack to avoid explicit template instantiation of
+// template class StateQueue<FastCaptureState>;
+// template class StateQueue<FastMixerState>;
 #ifdef STATE_QUEUE_INSTANTIATIONS
-#include STATE_QUEUE_INSTANTIATIONS
+#include STATE_QUEUE_INSTANTIATIONS  // NOLINT(bugprone-suspicious-include)
 #endif

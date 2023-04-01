@@ -59,7 +59,7 @@ public:
     void event(C&& code, FloatType executeMs) {
         std::lock_guard lg(mLock);
         auto it = mStatisticsMap.lower_bound(code);
-        if (it != mStatisticsMap.end() && it->first == code) {
+        if (it != mStatisticsMap.end() && it->first == static_cast<Code>(code)) {
             it->second.add(executeMs);
         } else {
             // StatsType ctor takes an optional array of data for initialization.
