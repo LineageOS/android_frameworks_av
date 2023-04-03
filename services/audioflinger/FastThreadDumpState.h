@@ -67,6 +67,6 @@ struct FastThreadDumpState {
 
 };  // struct FastThreadDumpState
 
-}   // android
+}  // namespace android
 
 #endif  // ANDROID_AUDIO_FAST_THREAD_DUMP_STATE_H

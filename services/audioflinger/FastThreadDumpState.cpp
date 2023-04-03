@@ -56,4 +56,4 @@ void FastThreadDumpState::increaseSamplingN(uint32_t samplingN)
 }
 #endif
 
-}   // android
+}  // namespace android

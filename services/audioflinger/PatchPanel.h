@@ -199,7 +199,7 @@ public:
             return mRecord.handle() != AUDIO_PATCH_HANDLE_NONE ||
                     mPlayback.handle() != AUDIO_PATCH_HANDLE_NONE; }
 
-        void setThread(sp<ThreadBase> thread) { mThread = thread; }
+        void setThread(const sp<ThreadBase>& thread) { mThread = thread; }
         wp<ThreadBase> thread() const { return mThread; }
 
         // returns the latency of the patch (from record to playback).

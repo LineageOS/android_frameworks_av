@@ -81,6 +81,6 @@ struct FastMixerDumpState : FastThreadDumpState {
     TimestampVerifier<int64_t /* frame count */, int64_t /* time ns */> mTimestampVerifier;
 };
 
-}   // android
+}  // namespace android
 
 #endif  // ANDROID_AUDIO_FAST_MIXER_DUMP_STATE_H
