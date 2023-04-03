@@ -426,7 +426,8 @@ status_t CCodecBufferChannel::attachEncryptedBuffer(
         size_t offset,
         const CryptoPlugin::SubSample *subSamples,
         size_t numSubSamples,
-        const sp<MediaCodecBuffer> &buffer) {
+        const sp<MediaCodecBuffer> &buffer,
+        AString* errorDetailMsg) {
     static const C2MemoryUsage kSecureUsage{C2MemoryUsage::READ_PROTECTED, 0};
     static const C2MemoryUsage kDefaultReadWriteUsage{
         C2MemoryUsage::CPU_READ, C2MemoryUsage::CPU_WRITE};
@@ -456,7 +457,6 @@ status_t CCodecBufferChannel::attachEncryptedBuffer(
     ssize_t result = -1;
     ssize_t codecDataOffset = 0;
     if (mCrypto) {
-        AString errorDetailMsg;
         int32_t heapSeqNum = getHeapSeqNum(memory);
         hardware::drm::V1_0::SharedBuffer src{(uint32_t)heapSeqNum, offset, size};
         hardware::drm::V1_0::DestinationBuffer dst;
@@ -470,7 +470,7 @@ status_t CCodecBufferChannel::attachEncryptedBuffer(
         }
         result = mCrypto->decrypt(
                 key, iv, mode, pattern, src, 0, subSamples, numSubSamples,
-                dst, &errorDetailMsg);
+                dst, errorDetailMsg);
         if (result < 0) {
             ALOGI("[%s] attachEncryptedBuffer: decrypt failed: result = %zd", mName, result);
             return result;
@@ -515,7 +515,9 @@ status_t CCodecBufferChannel::attachEncryptedBuffer(
                     result = (ssize_t)_bytesWritten;
                     detailedError = _detailedError;
                 });
-
+        if (errorDetailMsg) {
+            errorDetailMsg->setTo(detailedError.c_str(), detailedError.size());
+        }
         if (!returnVoid.isOk() || status != CasStatus::OK || result < 0) {
             ALOGI("[%s] descramble failed, trans=%s, status=%d, result=%zd",
                     mName, returnVoid.description().c_str(), status, result);
