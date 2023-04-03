@@ -278,17 +278,6 @@ status_t AudioPolicyMixCollection::getOutputForAttr(
             mixesDisallowsRequestedDevice = true;
         }
 
-        if (!primaryOutputMix && (flags & AUDIO_OUTPUT_FLAG_MMAP_NOIRQ)) {
-            // AAudio does not support MMAP_NO_IRQ loopback render, and there is no way with
-            // the current MmapStreamInterface::start to reject a specific client added to a shared
-            // mmap stream.
-            // As a result all MMAP_NOIRQ requests have to be rejected when an loopback render
-            // policy is present. That ensures no shared mmap stream is used when an loopback
-            // render policy is registered.
-            ALOGD("%s: Rejecting MMAP_NOIRQ request due to LOOPBACK|RENDER mix present.", __func__);
-            return INVALID_OPERATION;
-        }
-
         if (primaryOutputMix && primaryMix != nullptr) {
             ALOGV("%s: Skiping %zu: Primary output already found", __func__, i);
             continue; // Primary output already found
@@ -297,6 +286,13 @@ status_t AudioPolicyMixCollection::getOutputForAttr(
         if(!mixMatch(policyMix.get(), i, attributes, config, uid, session)) {
             ALOGV("%s: Mix %zu: does not match", __func__, i);
             continue; // skip the mix
+        }
+
+        if (flags & AUDIO_OUTPUT_FLAG_MMAP_NOIRQ) {
+            // AAudio MMAP_NOIRQ streams cannot be routed using dynamic audio policy.
+            ALOGD("%s: Rejecting MMAP_NOIRQ request matched to dynamic audio policy mix.",
+                __func__);
+            return INVALID_OPERATION;
         }
 
         if (mixDevice != nullptr && mixDevice->equals(requestedDevice)) {
