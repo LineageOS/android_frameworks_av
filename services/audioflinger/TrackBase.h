@@ -122,7 +122,7 @@ public:
              * This may be called without the thread lock.
              */
     virtual double      bufferLatencyMs() const {
-                            return mServerProxy->framesReadySafe() * 1000 / sampleRate();
+                            return mServerProxy->framesReadySafe() * 1000. / sampleRate();
                         }
 
             /** returns whether the track supports server latency computation.
@@ -430,7 +430,7 @@ class PatchTrackBase : public PatchProxyBufferProvider
 {
 public:
     using Timeout = std::optional<std::chrono::nanoseconds>;
-                        PatchTrackBase(sp<ClientProxy> proxy, const ThreadBase& thread,
+                        PatchTrackBase(const sp<ClientProxy>& proxy, const ThreadBase& thread,
                                        const Timeout& timeout);
             void        setPeerTimeout(std::chrono::nanoseconds timeout);
             template <typename T>

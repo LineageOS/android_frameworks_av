@@ -45,8 +45,8 @@ public:
     // Non trivial methods usually implemented with help from ThreadBase:
     //   pay attention to mutex locking order
     virtual uint32_t latency() const { return 0; }
-    virtual status_t addEffectToHal(sp<EffectHalInterface> effect) = 0;
-    virtual status_t removeEffectFromHal(sp<EffectHalInterface> effect) = 0;
+    virtual status_t addEffectToHal(const sp<EffectHalInterface>& effect) = 0;
+    virtual status_t removeEffectFromHal(const sp<EffectHalInterface>& effect) = 0;
     virtual void setVolumeForOutput(float left, float right) const = 0;
     virtual bool disconnectEffectHandle(EffectHandle *handle, bool unpinIfLast) = 0;
     virtual void checkSuspendOnEffectEnabled(const sp<EffectBase>& effect,
@@ -159,8 +159,8 @@ public:
     bool             isPinned() const { return mPinned; }
     void             unPin() { mPinned = false; }
 
-    void             lock() { mLock.lock(); }
-    void             unlock() { mLock.unlock(); }
+    void             lock() ACQUIRE(mLock) { mLock.lock(); }
+    void             unlock() RELEASE(mLock) { mLock.unlock(); }
 
     status_t         updatePolicyState();
 
@@ -459,10 +459,10 @@ public:
 
     void process_l();
 
-    void lock() {
+    void lock() ACQUIRE(mLock) {
         mLock.lock();
     }
-    void unlock() {
+    void unlock() RELEASE(mLock) {
         mLock.unlock();
     }
 
@@ -605,8 +605,8 @@ private:
         size_t frameCount() const override;
         uint32_t latency() const override;
 
-        status_t addEffectToHal(sp<EffectHalInterface> effect) override;
-        status_t removeEffectFromHal(sp<EffectHalInterface> effect) override;
+        status_t addEffectToHal(const sp<EffectHalInterface>& effect) override;
+        status_t removeEffectFromHal(const sp<EffectHalInterface>& effect) override;
         bool disconnectEffectHandle(EffectHandle *handle, bool unpinIfLast) override;
         void setVolumeForOutput(float left, float right) const override;
 
@@ -721,8 +721,8 @@ public:
 
     size_t removeEffect(const sp<EffectModule>& effect);
 
-    status_t addEffectToHal(sp<EffectHalInterface> effect);
-    status_t removeEffectFromHal(sp<EffectHalInterface> effect);
+    status_t addEffectToHal(const sp<EffectHalInterface>& effect);
+    status_t removeEffectFromHal(const sp<EffectHalInterface>& effect);
 
     const AudioDeviceTypeAddr& device() { return mDevice; };
     bool isOutput() const;
@@ -766,8 +766,8 @@ private:
         size_t frameCount() const override  { return 0; }
         uint32_t latency() const override  { return 0; }
 
-        status_t addEffectToHal(sp<EffectHalInterface> effect) override;
-        status_t removeEffectFromHal(sp<EffectHalInterface> effect) override;
+        status_t addEffectToHal(const sp<EffectHalInterface>& effect) override;
+        status_t removeEffectFromHal(const sp<EffectHalInterface>& effect) override;
 
         bool disconnectEffectHandle(EffectHandle *handle, bool unpinIfLast) override;
         void setVolumeForOutput(float left __unused, float right __unused) const override {}

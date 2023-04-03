@@ -203,4 +203,4 @@ void FastMixerDumpState::dump(int fd) const
     }
 }
 
-}   // android
+}  // namespace android

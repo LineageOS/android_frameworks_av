@@ -38,6 +38,6 @@ struct FastCaptureDumpState : FastThreadDumpState {
     bool     mSilenced = false; // capture is silenced
 };
 
-}   // android
+}  // namespace android
 
 #endif  // ANDROID_AUDIO_FAST_CAPTURE_DUMP_STATE_H

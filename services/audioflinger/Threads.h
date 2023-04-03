@@ -163,7 +163,7 @@ public:
 
     class SetParameterConfigEventData : public ConfigEventData {
     public:
-        explicit SetParameterConfigEventData(String8 keyValuePairs) :
+        explicit SetParameterConfigEventData(const String8& keyValuePairs) :
             mKeyValuePairs(keyValuePairs) {}
 
         virtual  void dump(char *buffer, size_t size) {
@@ -175,7 +175,7 @@ public:
 
     class SetParameterConfigEvent : public ConfigEvent {
     public:
-        explicit SetParameterConfigEvent(String8 keyValuePairs) :
+        explicit SetParameterConfigEvent(const String8& keyValuePairs) :
             ConfigEvent(CFG_EVENT_SET_PARAMETER) {
             mData = new SetParameterConfigEventData(keyValuePairs);
             mWaitStatus = true;
@@ -789,7 +789,7 @@ protected:
                     // ThreadBase thread.
                     void            clear();
                     // periodically called in the threadLoop() to update power state uids.
-                    void            updatePowerState(sp<ThreadBase> thread, bool force = false);
+                    void updatePowerState(const sp<ThreadBase>& thread, bool force = false);
 
                     /** @return true if one or move active tracks was added or removed since the
                      *          last time this function was called or the vector was created.
@@ -1260,7 +1260,7 @@ private:
     template <typename T>
     class Tracks {
     public:
-        Tracks(bool saveDeletedTrackIds) :
+        explicit Tracks(bool saveDeletedTrackIds) :
             mSaveDeletedTrackIds(saveDeletedTrackIds) { }
 
         // SortedVector methods
@@ -1289,7 +1289,7 @@ private:
             return mTracks.end();
         }
 
-        size_t          processDeletedTrackIds(std::function<void(int)> f) {
+        size_t          processDeletedTrackIds(const std::function<void(int)>& f) {
             for (const int trackId : mDeletedTrackIds) {
                 f(trackId);
             }
@@ -1411,7 +1411,7 @@ protected:
                 class IsTimestampAdvancing {
                 public:
                     // The timestamp will not be checked any faster than the specified time.
-                    IsTimestampAdvancing(nsecs_t minimumTimeBetweenChecksNs)
+                    explicit IsTimestampAdvancing(nsecs_t minimumTimeBetweenChecksNs)
                         :   mMinimumTimeBetweenChecksNs(minimumTimeBetweenChecksNs)
                     {
                         clear();
@@ -1700,7 +1700,7 @@ protected:
                 void        dumpInternals_l(int fd, const Vector<String16>& args) override;
 
 private:
-                bool        outputsReady(const SortedVector< sp<OutputTrack> > &outputTracks);
+                bool        outputsReady();
 protected:
     // threadLoop snippets
     virtual     void        threadLoop_mix();
@@ -2066,7 +2066,7 @@ class MmapThread : public ThreadBase
 #include "MmapTracks.h"
 
     MmapThread(const sp<AudioFlinger>& audioFlinger, audio_io_handle_t id,
-               AudioHwDevice *hwDev, sp<StreamHalInterface> stream, bool systemReady,
+               AudioHwDevice *hwDev, const sp<StreamHalInterface>& stream, bool systemReady,
                bool isOut);
     virtual     ~MmapThread();
 

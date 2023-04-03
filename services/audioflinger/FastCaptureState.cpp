@@ -42,4 +42,4 @@ const char *FastCaptureState::commandToString(Command command)
     LOG_ALWAYS_FATAL("%s", __func__);
 }
 
-}   // android
+}  // namespace android
