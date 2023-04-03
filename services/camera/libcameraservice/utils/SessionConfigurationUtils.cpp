@@ -380,6 +380,23 @@ bool isPublicFormat(int32_t format)
     }
 }
 
+bool dataSpaceFromColorSpace(android_dataspace *dataSpace, int32_t colorSpace) {
+    switch (colorSpace) {
+        case ANDROID_REQUEST_AVAILABLE_COLOR_SPACE_PROFILES_MAP_SRGB:
+            *dataSpace = HAL_DATASPACE_V0_SRGB;
+            return true;
+        case ANDROID_REQUEST_AVAILABLE_COLOR_SPACE_PROFILES_MAP_DISPLAY_P3:
+            *dataSpace = HAL_DATASPACE_DISPLAY_P3;
+            return true;
+        case ANDROID_REQUEST_AVAILABLE_COLOR_SPACE_PROFILES_MAP_BT2020_HLG:
+            *(reinterpret_cast<int32_t*>(dataSpace)) = HAL_DATASPACE_BT2020_HLG;
+            return true;
+        default:
+            ALOGE("%s: Unsupported color space %d", __FUNCTION__, colorSpace);
+            return false;
+    }
+}
+
 bool isStreamUseCaseSupported(int64_t streamUseCase,
         const CameraMetadata &deviceInfo) {
     camera_metadata_ro_entry_t availableStreamUseCases =
@@ -470,6 +487,16 @@ binder::Status createSurfaceFromGbp(
                 logicalCameraId.string(), strerror(-err), err);
         ALOGE("%s: %s", __FUNCTION__, msg.string());
         return STATUS_ERROR(CameraService::ERROR_INVALID_OPERATION, msg.string());
+    }
+
+    if (colorSpace != ANDROID_REQUEST_AVAILABLE_COLOR_SPACE_PROFILES_MAP_UNSPECIFIED &&
+            format != HAL_PIXEL_FORMAT_BLOB) {
+        if (!dataSpaceFromColorSpace(&dataSpace, colorSpace)) {
+            String8 msg = String8::format("Camera %s: color space %d not supported, failed to "
+                    "convert to data space", logicalCameraId.string(), colorSpace);
+            ALOGE("%s: %s", __FUNCTION__, msg.string());
+            return STATUS_ERROR(CameraService::ERROR_ILLEGAL_ARGUMENT, msg.string());
+        }
     }
 
     // FIXME: remove this override since the default format should be
