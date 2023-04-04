@@ -340,6 +340,14 @@ size_t ColorConverter::BitmapParams::cropHeight() const {
     return mCropBottom - mCropTop + 1;
 }
 
+bool ColorConverter::BitmapParams::isValid() const {
+    if (!((mStride & 1) == 0  // stride must be even
+        && mStride >= mBpp * cropWidth())) {
+            return false;
+    }
+    return true;
+}
+
 status_t ColorConverter::convert(
         const void *srcBits,
         size_t srcWidth, size_t srcHeight, size_t srcStride,
@@ -359,9 +367,11 @@ status_t ColorConverter::convert(
             dstWidth, dstHeight, dstStride,
             dstCropLeft, dstCropTop, dstCropRight, dstCropBottom, mDstFormat);
 
-    if (!((src.mCropLeft & 1) == 0
-        && src.cropWidth() == dst.cropWidth()
-        && src.cropHeight() == dst.cropHeight())) {
+    if (!(src.isValid()
+            && dst.isValid()
+            && (src.mCropLeft & 1) == 0
+            && src.cropWidth() == dst.cropWidth()
+            && src.cropHeight() == dst.cropHeight())) {
         return ERROR_UNSUPPORTED;
     }
 
@@ -463,6 +473,7 @@ const struct ColorConverter::Coeffs *ColorConverter::getMatrix() const {
     }
 }
 
+// Interleaved YUV 422 CbYCrY to RGB565
 status_t ColorConverter::convertCbYCrY(
         const BitmapParams &src, const BitmapParams &dst) {
     // XXX Untested
@@ -485,10 +496,10 @@ status_t ColorConverter::convertCbYCrY(
         + dst.mCropTop * dst.mWidth + dst.mCropLeft;
 
     const uint8_t *src_ptr = (const uint8_t *)src.mBits
-        + (src.mCropTop * dst.mWidth + src.mCropLeft) * 2;
+        + (src.mCropTop * src.mWidth + src.mCropLeft) * 2;
 
     for (size_t y = 0; y < src.cropHeight(); ++y) {
-        for (size_t x = 0; x < src.cropWidth(); x += 2) {
+        for (size_t x = 0; x < src.cropWidth() - 1; x += 2) {
             signed y1 = (signed)src_ptr[2 * x + 1] - _c16;
             signed y2 = (signed)src_ptr[2 * x + 3] - _c16;
             signed u = (signed)src_ptr[2 * x] - 128;
@@ -658,13 +669,15 @@ getReadFromSrc(OMX_COLOR_FORMATTYPE srcFormat) {
             *u = ((uint8_t*)src_u)[x / 2] - 128;
             *v = ((uint8_t*)src_v)[x / 2] - 128;
         };
+    // this format stores 10 bits content with 16 bits
+    // converting it to 8 bits src
     case OMX_COLOR_FormatYUV420Planar16:
         return [](void *src_y, void *src_u, void *src_v, size_t x,
                 signed *y1, signed *y2, signed *u, signed *v) {
-            *y1 = (signed)(((uint16_t*)src_y)[x] >> 2);
-            *y2 = (signed)(((uint16_t*)src_y)[x + 1] >> 2);
-            *u = (signed)(((uint16_t*)src_u)[x / 2] >> 2) - 128;
-            *v = (signed)(((uint16_t*)src_v)[x / 2] >> 2) - 128;
+            *y1 = (uint8_t)(((uint16_t*)src_y)[x] >> 2);
+            *y2 = (uint8_t)(((uint16_t*)src_y)[x + 1] >> 2);
+            *u = (uint8_t)(((uint16_t*)src_u)[x / 2] >> 2) - 128;
+            *v = (uint8_t)(((uint16_t*)src_v)[x / 2] >> 2) - 128;
         };
     default:
         TRESPASS();
@@ -1122,46 +1135,25 @@ status_t ColorConverter::convertYUV420Planar16ToY410(
 
 status_t ColorConverter::convertQCOMYUV420SemiPlanar(
         const BitmapParams &src, const BitmapParams &dst) {
-    const uint8_t *src_y =
-        (const uint8_t *)src.mBits + src.mCropTop * src.mWidth + src.mCropLeft;
-
-    const uint8_t *src_u =
-        (const uint8_t *)src_y + src.mWidth * src.mHeight
-        + src.mCropTop * src.mWidth + src.mCropLeft;
-
     /* QCOMYUV420SemiPlanar is NV21, while MediaCodec uses NV12 */
     return convertYUV420SemiPlanarBase(
-            src, dst, src_y, src_u, src.mWidth /* row_inc */, true /* isNV21 */);
+            src, dst, src.mWidth /* row_inc */, true /* isNV21 */);
 }
 
 status_t ColorConverter::convertTIYUV420PackedSemiPlanar(
         const BitmapParams &src, const BitmapParams &dst) {
-    const uint8_t *src_y =
-        (const uint8_t *)src.mBits + src.mCropTop * src.mWidth + src.mCropLeft;
-
-    const uint8_t *src_u =
-        (const uint8_t *)src_y + src.mWidth * (src.mHeight - src.mCropTop / 2);
-
     return convertYUV420SemiPlanarBase(
-            src, dst, src_y, src_u, src.mWidth /* row_inc */);
+            src, dst, src.mWidth /* row_inc */);
 }
 
 status_t ColorConverter::convertYUV420SemiPlanar(
         const BitmapParams &src, const BitmapParams &dst) {
-    const uint8_t *src_y =
-        (const uint8_t *)src.mBits + src.mCropTop * src.mStride + src.mCropLeft;
-
-    const uint8_t *src_u =
-        (const uint8_t *)src.mBits + src.mHeight * src.mStride +
-        (src.mCropTop / 2) * src.mStride + src.mCropLeft;
-
     return convertYUV420SemiPlanarBase(
-            src, dst, src_y, src_u, src.mStride /* row_inc */);
+            src, dst, src.mStride /* row_inc */);
 }
 
-status_t ColorConverter::convertYUV420SemiPlanarBase(
-        const BitmapParams &src, const BitmapParams &dst,
-        const uint8_t *src_y, const uint8_t *src_u, size_t row_inc, bool isNV21) {
+status_t ColorConverter::convertYUV420SemiPlanarBase(const BitmapParams &src,
+        const BitmapParams &dst, size_t row_inc, bool isNV21) {
     const struct Coeffs *matrix = getMatrix();
     if (!matrix) {
         return ERROR_UNSUPPORTED;
@@ -1178,6 +1170,12 @@ status_t ColorConverter::convertYUV420SemiPlanarBase(
 
     uint16_t *dst_ptr = (uint16_t *)((uint8_t *)
             dst.mBits + dst.mCropTop * dst.mStride + dst.mCropLeft * dst.mBpp);
+
+    const uint8_t *src_y =
+        (const uint8_t *)src.mBits + src.mCropTop * row_inc + src.mCropLeft;
+
+    const uint8_t *src_u = (const uint8_t *)src.mBits + src.mHeight * row_inc +
+        (src.mCropTop / 2) * row_inc + src.mCropLeft;
 
     for (size_t y = 0; y < src.cropHeight(); ++y) {
         for (size_t x = 0; x < src.cropWidth(); x += 2) {
