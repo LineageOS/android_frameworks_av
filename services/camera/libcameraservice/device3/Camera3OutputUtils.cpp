@@ -639,9 +639,24 @@ void processCaptureResult(CaptureOutputStates& states, const camera_capture_resu
                     if (deviceInfo != states.physicalDeviceInfoMap.end()) {
                         auto orientation = deviceInfo->second.find(ANDROID_SENSOR_ORIENTATION);
                         if (orientation.count > 0) {
+                            int32_t transform;
                             ret = CameraUtils::getRotationTransform(deviceInfo->second,
-                                    OutputConfiguration::MIRROR_MODE_AUTO, &request.transform);
-                            if (ret != OK) {
+                                    OutputConfiguration::MIRROR_MODE_AUTO, &transform);
+                            if (ret == OK) {
+                                // It is possible for camera providers to return the capture
+                                // results after the processed frames. In such scenario, we will
+                                // not be able to set the output transformation before the frames
+                                // return back to the consumer for the current capture request
+                                // but we could still try and configure it for any future requests
+                                // that are still in flight. The assumption is that the physical
+                                // device id remains the same for the duration of the pending queue.
+                                for (size_t i = 0; i < states.inflightMap.size(); i++) {
+                                    auto &r = states.inflightMap.editValueAt(i);
+                                    if (r.requestTimeNs >= request.requestTimeNs) {
+                                        r.transform = transform;
+                                    }
+                                }
+                            } else {
                                 ALOGE("%s: Failed to calculate current stream transformation: %s "
                                         "(%d)", __FUNCTION__, strerror(-ret), ret);
                             }
