@@ -354,14 +354,6 @@ sp<DeviceDescriptor> Engine::getInputDeviceForAttributes(const audio_attributes_
     return availableInputDevices.getDevice(deviceType, String8(address.c_str()), AUDIO_FORMAT_DEFAULT);
 }
 
-void Engine::updateDeviceSelectionCache()
-{
-    for (const auto &iter : getProductStrategies()) {
-        const auto &strategy = iter.second;
-        mDevicesForStrategies[strategy->getId()] = getDevicesForProductStrategy(strategy->getId());
-    }
-}
-
 void Engine::setDeviceAddressForProductStrategy(product_strategy_t strategy,
                                                 const std::string &address)
 {
