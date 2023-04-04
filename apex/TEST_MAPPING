@@ -7,16 +7,16 @@
   "presubmit": [
     // The following tests validate codec and drm path.
     {
-      "name": "GtsMediaTestCases",
+      "name": "WvtsDeviceTestCases",
       "options" : [
         {
           "include-annotation": "android.platform.test.annotations.Presubmit"
         },
         {
-          "include-filter": "com.google.android.media.gts.WidevineGenericOpsTests"
+          "include-filter": "com.google.android.media.wvts.WidevineGenericOpsTests"
         },
         {
-          "include-filter": "com.google.android.media.gts.WidevineH264PlaybackTests"
+          "include-filter": "com.google.android.media.wvts.WidevineH264PlaybackTests"
         }
       ]
     }
