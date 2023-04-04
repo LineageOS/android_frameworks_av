@@ -115,6 +115,8 @@ bool deviceReportsColorSpaces(const CameraMetadata& staticMeta);
 bool isColorSpaceSupported(int32_t colorSpace, int32_t format, android_dataspace dataSpace,
         int64_t dynamicRangeProfile, const CameraMetadata& staticMeta);
 
+bool dataSpaceFromColorSpace(android_dataspace *dataSpace, int32_t colorSpace);
+
 bool isStreamUseCaseSupported(int64_t streamUseCase, const CameraMetadata &deviceInfo);
 
 void mapStreamInfo(const OutputStreamInfo &streamInfo,
