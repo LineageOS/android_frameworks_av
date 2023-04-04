@@ -19,6 +19,7 @@
 #include "AidlCameraDeviceUser.h"
 #include <aidl/AidlUtils.h>
 #include <aidl/android/frameworks/cameraservice/device/CaptureMetadataInfo.h>
+#include <android-base/properties.h>
 
 namespace android::frameworks::cameraservice::device::implementation {
 
@@ -35,7 +36,7 @@ using ::android::hardware::cameraservice::utils::conversion::aidl::cloneFromAidl
 using ::android::hardware::cameraservice::utils::conversion::aidl::cloneToAidl;
 using ::android::hardware::cameraservice::utils::conversion::aidl::convertFromAidl;
 using ::android::hardware::cameraservice::utils::conversion::aidl::convertToAidl;
-using ::android::hardware::cameraservice::utils::conversion::aidl::convertToAidl;
+using ::android::hardware::cameraservice::utils::conversion::aidl::filterVndkKeys;
 using ::ndk::ScopedAStatus;
 
 namespace {
@@ -55,6 +56,7 @@ inline ScopedAStatus fromUStatus(const UStatus& status) {
 AidlCameraDeviceUser::AidlCameraDeviceUser(const sp<UICameraDeviceUser>& deviceRemote):
       mDeviceRemote(deviceRemote) {
     mInitSuccess = initDevice();
+    mVndkVersion = base::GetIntProperty("ro.vndk.version", __ANDROID_API_FUTURE__);
 }
 
 bool AidlCameraDeviceUser::initDevice() {
@@ -171,6 +173,13 @@ ndk::ScopedAStatus AidlCameraDeviceUser::createDefaultRequest(STemplateId in_tem
         ALOGE("%s: Failed to create default request: %s", __FUNCTION__, ret.toString8().string());
         return fromUStatus(ret);
     }
+
+    if (filterVndkKeys(mVndkVersion, metadata, /*isStatic*/false) != OK) {
+        ALOGE("%s: Unable to filter vndk metadata keys for version %d",
+              __FUNCTION__, mVndkVersion);
+        return fromSStatus(SStatus::UNKNOWN_ERROR);
+    }
+
     const camera_metadata_t* rawMetadata = metadata.getAndLock();
     cloneToAidl(rawMetadata, _aidl_return);
     metadata.unlock(rawMetadata);
