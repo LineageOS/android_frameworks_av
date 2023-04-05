@@ -24,6 +24,7 @@
 
 #include <aidl/android/hardware/camera/device/CameraBlob.h>
 #include <aidl/android/hardware/camera/device/CameraBlobId.h>
+#include "aidl/android/hardware/graphics/common/Dataspace.h"
 
 #include <android-base/unique_fd.h>
 #include <cutils/properties.h>
@@ -456,7 +457,10 @@ status_t Camera3OutputStream::returnBufferCheckedLocked(
             mTraceFirstBuffer = false;
         }
         // Fix CameraBlob id type discrepancy between HIDL and AIDL, details : http://b/229688810
-        if (getFormat() == HAL_PIXEL_FORMAT_BLOB && getDataSpace() == HAL_DATASPACE_V0_JFIF) {
+        if (getFormat() == HAL_PIXEL_FORMAT_BLOB && (getDataSpace() == HAL_DATASPACE_V0_JFIF ||
+                    (getDataSpace() ==
+                     static_cast<android_dataspace_t>(
+                         aidl::android::hardware::graphics::common::Dataspace::JPEG_R)))) {
             if (mIPCTransport == IPCTransport::HIDL) {
                 fixUpHidlJpegBlobHeader(anwBuffer, anwReleaseFence);
             }
