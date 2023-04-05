@@ -238,6 +238,7 @@ cc_library {
         "CallbackMediaSource.cpp",
         "CameraSource.cpp",
         "CameraSourceTimeLapse.cpp",
+        "CodecErrorLog.cpp",
         "FrameDecoder.cpp",
         "HevcUtils.cpp",
         "InterfaceUtils.cpp",
