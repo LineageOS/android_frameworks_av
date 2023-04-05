@@ -53,6 +53,7 @@
 #include <android/hardware/camera2/ICameraDeviceUser.h>
 
 #include "CameraService.h"
+#include "aidl/android/hardware/graphics/common/Dataspace.h"
 #include "aidl/AidlUtils.h"
 #include "device3/Camera3Device.h"
 #include "device3/Camera3FakeStream.h"
@@ -80,6 +81,7 @@ Camera3Device::Camera3Device(std::shared_ptr<CameraServiceProxyWrapper>& cameraS
         mLegacyClient(legacyClient),
         mOperatingMode(NO_MODE),
         mIsConstrainedHighSpeedConfiguration(false),
+        mSupportNativeJpegR(false),
         mStatus(STATUS_UNINITIALIZED),
         mStatusWaiters(0),
         mUsePartialResult(false),
@@ -2465,7 +2467,10 @@ status_t Camera3Device::configureStreamsLocked(int operatingMode,
         if (outputStream->format == HAL_PIXEL_FORMAT_BLOB) {
             size_t k = i + ((mInputStream != nullptr) ? 1 : 0); // Input stream if present should
                                                                 // always occupy the initial entry.
-            if (outputStream->data_space == HAL_DATASPACE_V0_JFIF) {
+            if ((outputStream->data_space == HAL_DATASPACE_V0_JFIF) ||
+                    (outputStream->data_space ==
+                     static_cast<android_dataspace_t>(
+                         aidl::android::hardware::graphics::common::Dataspace::JPEG_R))) {
                 bufferSizes[k] = static_cast<uint32_t>(
                         getJpegBufferSize(infoPhysical(String8(outputStream->physical_camera_id)),
                                 outputStream->width, outputStream->height));
