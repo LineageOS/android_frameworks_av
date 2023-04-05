@@ -62,7 +62,8 @@ public:
              size_t offset,
              const CryptoPlugin::SubSample *subSamples,
              size_t numSubSamples,
-             const sp<MediaCodecBuffer> &buffer),
+             const sp<MediaCodecBuffer> &buffer,
+             AString* errorDetailMsg),
             (override));
     MOCK_METHOD(status_t, renderOutputBuffer,
             (const sp<MediaCodecBuffer> &buffer, int64_t timestampNs),
