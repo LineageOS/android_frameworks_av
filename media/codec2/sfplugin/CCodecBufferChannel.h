@@ -330,6 +330,7 @@ private:
     sp<MemoryDealer> makeMemoryDealer(size_t heapSize);
 
     std::deque<TrackedFrame> mTrackedFrames;
+    bool mIsSurfaceToDisplay;
     bool mHasPresentFenceTimes;
 
     struct OutputSurface {
