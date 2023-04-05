@@ -147,6 +147,8 @@ CCodecBufferChannel::CCodecBufferChannel(
       mCCodecCallback(callback),
       mFrameIndex(0u),
       mFirstValidFrameIndex(0u),
+      mIsSurfaceToDisplay(false),
+      mHasPresentFenceTimes(false),
       mMetaMode(MODE_NONE),
       mInputMetEos(false),
       mSendEncryptedInfoBuffer(false) {
@@ -983,21 +985,36 @@ status_t CCodecBufferChannel::renderOutputBuffer(
 
     int64_t mediaTimeUs = 0;
     (void)buffer->meta()->findInt64("timeUs", &mediaTimeUs);
-    mCCodecCallback->onOutputFramesRendered(mediaTimeUs, timestampNs);
-    trackReleasedFrame(qbo, mediaTimeUs, timestampNs);
-    processRenderedFrames(qbo.frameTimestamps);
+    if (mIsSurfaceToDisplay) {
+        trackReleasedFrame(qbo, mediaTimeUs, timestampNs);
+        processRenderedFrames(qbo.frameTimestamps);
+    } else {
+        // When the surface is an intermediate surface, onFrameRendered is triggered immediately
+        // when the frame is queued to the non-display surface
+        mCCodecCallback->onOutputFramesRendered(mediaTimeUs, timestampNs);
+    }
 
     return OK;
 }
 
 void CCodecBufferChannel::initializeFrameTrackingFor(ANativeWindow * window) {
+    mTrackedFrames.clear();
+
+    int isSurfaceToDisplay = 0;
+    window->query(window, NATIVE_WINDOW_QUEUES_TO_WINDOW_COMPOSER, &isSurfaceToDisplay);
+    mIsSurfaceToDisplay = isSurfaceToDisplay == 1;
+    // No frame tracking is needed if we're not sending frames to the display
+    if (!mIsSurfaceToDisplay) {
+        // Return early so we don't call into SurfaceFlinger (requiring permissions)
+        return;
+    }
+
     int hasPresentFenceTimes = 0;
     window->query(window, NATIVE_WINDOW_FRAME_TIMESTAMPS_SUPPORTS_PRESENT, &hasPresentFenceTimes);
     mHasPresentFenceTimes = hasPresentFenceTimes == 1;
     if (mHasPresentFenceTimes) {
         ALOGI("Using latch times for frame rendered signals - present fences not supported");
     }
-    mTrackedFrames.clear();
 }
 
 void CCodecBufferChannel::trackReleasedFrame(const IGraphicBufferProducer::QueueBufferOutput& qbo,
