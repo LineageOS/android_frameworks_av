@@ -94,7 +94,8 @@ public:
             size_t offset,
             const CryptoPlugin::SubSample *subSamples,
             size_t numSubSamples,
-            const sp<MediaCodecBuffer> &buffer) override;
+            const sp<MediaCodecBuffer> &buffer,
+            AString* errorDetailMsg) override;
     virtual status_t renderOutputBuffer(
             const sp<MediaCodecBuffer> &buffer, int64_t timestampNs) override;
     virtual void pollForRenderedBuffers() override;

@@ -347,7 +347,8 @@ status_t ACodecBufferChannel::attachEncryptedBuffer(
         size_t offset,
         const CryptoPlugin::SubSample *subSamples,
         size_t numSubSamples,
-        const sp<MediaCodecBuffer> &buffer) {
+        const sp<MediaCodecBuffer> &buffer,
+        AString* errorDetailMsg) {
     std::shared_ptr<const std::vector<const BufferInfo>> array(
             std::atomic_load(&mInputBuffers));
     BufferInfoIterator it = findClientBuffer(array, buffer);
@@ -371,7 +372,6 @@ status_t ACodecBufferChannel::attachEncryptedBuffer(
     ssize_t result = -1;
     ssize_t codecDataOffset = 0;
     if (mCrypto != NULL) {
-        AString errorDetailMsg;
         hardware::drm::V1_0::DestinationBuffer destination;
         if (secure) {
             destination.type = DrmBufferType::NATIVE_HANDLE;
@@ -387,7 +387,7 @@ status_t ACodecBufferChannel::attachEncryptedBuffer(
 
         result = mCrypto->decrypt(key, iv, mode, pattern,
                 source, it->mClientBuffer->offset(),
-                subSamples, numSubSamples, destination, &errorDetailMsg);
+                subSamples, numSubSamples, destination, errorDetailMsg);
 
         if (result < 0) {
             return result;
@@ -441,7 +441,9 @@ status_t ACodecBufferChannel::attachEncryptedBuffer(
                     result = (ssize_t)_bytesWritten;
                     detailedError = _detailedError;
                 });
-
+        if (errorDetailMsg) {
+            errorDetailMsg->setTo(detailedError.c_str(), detailedError.size());
+        }
         if (!returnVoid.isOk() || status != Status::OK || result < 0) {
             ALOGE("descramble failed, trans=%s, status=%d, result=%zd",
                     returnVoid.description().c_str(), status, result);
