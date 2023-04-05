@@ -319,7 +319,8 @@ private:
                                     // sending disable command.
     uint32_t mDisableWaitCnt;       // current process() calls count during disable period.
     bool     mOffloaded;            // effect is currently offloaded to the audio DSP
-    bool     mAddedToHal;           // effect has been added to the audio HAL
+    // effect has been added to this HAL input stream
+    audio_io_handle_t mCurrentHalStream = AUDIO_IO_HANDLE_NONE;
     bool     mIsOutput;             // direction of the AF thread
 
 #ifdef FLOAT_EFFECT_CHAIN
