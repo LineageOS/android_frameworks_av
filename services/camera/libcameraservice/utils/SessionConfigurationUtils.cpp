@@ -672,7 +672,7 @@ void mapStreamInfo(const OutputStreamInfo &streamInfo,
 binder::Status
 convertToHALStreamCombination(
         const SessionConfiguration& sessionConfiguration,
-        const String8 &logicalCameraId, const CameraMetadata &deviceInfo,
+        const String8 &logicalCameraId, const CameraMetadata &deviceInfo, bool supportNativeJpegR,
         metadataGetter getMetadata, const std::vector<std::string> &physicalCameraIds,
         aidl::android::hardware::camera::device::StreamConfiguration &streamConfiguration,
         bool overrideForPerfClass, bool *earlyExit) {
@@ -816,7 +816,8 @@ convertToHALStreamCombination(
                 bool isHeicCompositeStream =
                         camera3::HeicCompositeStream::isHeicCompositeStream(surface);
                 bool isJpegRCompositeStream =
-                        camera3::JpegRCompositeStream::isJpegRCompositeStream(surface);
+                        camera3::JpegRCompositeStream::isJpegRCompositeStream(surface) &&
+                        !supportNativeJpegR;
                 if (isDepthCompositeStream || isHeicCompositeStream || isJpegRCompositeStream) {
                     // We need to take in to account that composite streams can have
                     // additional internal camera streams.
