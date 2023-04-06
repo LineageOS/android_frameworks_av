@@ -119,6 +119,7 @@ class Camera3Device :
     status_t dumpWatchedEventsToVector(std::vector<std::string> &out) override;
     const CameraMetadata& info() const override;
     const CameraMetadata& infoPhysical(const String8& physicalId) const override;
+    bool supportNativeJpegR() const override { return mSupportNativeJpegR; };
 
     // Capture and setStreamingRequest will configure streams if currently in
     // idle state
@@ -543,6 +544,7 @@ class Camera3Device :
 
     CameraMetadata             mDeviceInfo;
     bool                       mSupportNativeZoomRatio;
+    bool                       mSupportNativeJpegR;
     std::unordered_map<std::string, CameraMetadata> mPhysicalDeviceInfoMap;
 
     CameraMetadata             mRequestTemplateCache[CAMERA_TEMPLATE_COUNT];
