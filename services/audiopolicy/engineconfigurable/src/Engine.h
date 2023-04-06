@@ -67,8 +67,6 @@ public:
                                                      sp<AudioPolicyMix> *mix = nullptr)
                                                      const override;
 
-    void updateDeviceSelectionCache() override;
-
     ///
     /// from AudioPolicyPluginInterface
     ///
@@ -123,15 +121,17 @@ private:
 
     status_t loadAudioPolicyEngineConfig();
 
-    DeviceVector getDevicesForProductStrategy(product_strategy_t strategy) const;
     DeviceVector getCachedDevices(product_strategy_t ps) const;
+
+    ///
+    /// from EngineBase
+    ///
+    DeviceVector getDevicesForProductStrategy(product_strategy_t strategy) const override;
 
     /**
      * Policy Parameter Manager hidden through a wrapper.
      */
     ParameterManagerWrapper *mPolicyParameterMgr;
-
-    DeviceStrategyMap mDevicesForStrategies;
 };
 
 } // namespace audio_policy
