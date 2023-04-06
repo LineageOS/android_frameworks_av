@@ -240,6 +240,9 @@ sp<IMemory> FrameDecoder::getMetadataOnly(
 
     sp<IMemory> metaMem =
             allocMetaFrame(trackMeta, width, height, tileWidth, tileHeight, dstBpp, bitDepth);
+    if (metaMem == nullptr) {
+        return NULL;
+    }
 
     // try to fill sequence meta's duration based on average frame rate,
     // default to 33ms if frame rate is unavailable.
