@@ -284,7 +284,8 @@ DeviceVector Engine::getDevicesForStrategyInt(legacy_strategy strategy,
                             }));
         if (!devices.isEmpty()) break;
         devices = availableOutputDevices.getFirstDevicesFromTypes({
-                AUDIO_DEVICE_OUT_DGTL_DOCK_HEADSET, AUDIO_DEVICE_OUT_EARPIECE});
+                AUDIO_DEVICE_OUT_DGTL_DOCK_HEADSET, AUDIO_DEVICE_OUT_EARPIECE,
+                AUDIO_DEVICE_OUT_SPEAKER});
     } break;
 
     case STRATEGY_SONIFICATION:
@@ -648,15 +649,9 @@ sp<DeviceDescriptor> Engine::getDeviceForInputSource(audio_source_t inputSource)
     return device;
 }
 
-void Engine::updateDeviceSelectionCache()
-{
-    for (const auto &iter : getProductStrategies()) {
-        const auto& strategy = iter.second;
-        auto devices = getDevicesForProductStrategy(strategy->getId());
-        mDevicesForStrategies[strategy->getId()] = devices;
-        strategy->setDeviceTypes(devices.types());
-        strategy->setDeviceAddress(devices.getFirstValidAddress().c_str());
-    }
+void Engine::setStrategyDevices(const sp<ProductStrategy>& strategy, const DeviceVector &devices) {
+    strategy->setDeviceTypes(devices.types());
+    strategy->setDeviceAddress(devices.getFirstValidAddress().c_str());
 }
 
 product_strategy_t Engine::getProductStrategyFromLegacy(legacy_strategy legacyStrategy) const {
