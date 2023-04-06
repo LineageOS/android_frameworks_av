@@ -421,6 +421,16 @@ public:
      */
     virtual DeviceVector getActiveMediaDevices(const DeviceVector& availableDevices) const = 0;
 
+    /**
+     * @brief initializeDeviceSelectionCache. Device selection for AudioAttribute / Streams is
+     * cached in the engine in order to speed up process when the audio system is stable. When the
+     * audio system is initializing, not all audio devices information will be available. In that
+     * case, calling this function can allow the engine to initialize the device selection cache
+     * with default values.
+     * This must only be called when audio policy manager is initializing.
+     */
+    virtual void initializeDeviceSelectionCache() = 0;
+
     virtual void dump(String8 *dst) const = 0;
 
 protected:

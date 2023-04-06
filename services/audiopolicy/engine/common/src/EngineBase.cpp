@@ -627,6 +627,26 @@ DeviceVector EngineBase::getActiveMediaDevices(const DeviceVector& availableDevi
     return activeDevices;
 }
 
+void EngineBase::initializeDeviceSelectionCache() {
+    // Initializing the device selection cache with default device won't be harmful, it will be
+    // updated after the audio modules are initialized.
+    auto defaultDevices = DeviceVector(getApmObserver()->getDefaultOutputDevice());
+    for (const auto &iter : getProductStrategies()) {
+        const auto &strategy = iter.second;
+        mDevicesForStrategies[strategy->getId()] = defaultDevices;
+        setStrategyDevices(strategy, defaultDevices);
+    }
+}
+
+void EngineBase::updateDeviceSelectionCache() {
+    for (const auto &iter : getProductStrategies()) {
+        const auto& strategy = iter.second;
+        auto devices = getDevicesForProductStrategy(strategy->getId());
+        mDevicesForStrategies[strategy->getId()] = devices;
+        setStrategyDevices(strategy, devices);
+    }
+}
+
 void EngineBase::dumpCapturePresetDevicesRoleMap(String8 *dst, int spaces) const
 {
     dst->appendFormat("\n%*sDevice role per capture preset dump:", spaces, "");
