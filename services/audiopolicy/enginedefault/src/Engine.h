@@ -67,7 +67,10 @@ private:
                                                      sp<AudioPolicyMix> *mix = nullptr)
                                                      const override;
 
-    void updateDeviceSelectionCache() override;
+    void setStrategyDevices(const sp<ProductStrategy>& strategy,
+                            const DeviceVector& devices) override;
+
+    DeviceVector getDevicesForProductStrategy(product_strategy_t strategy) const override;
 
 private:
     /* Copy facilities are put private to disable copy. */
@@ -87,8 +90,6 @@ private:
                                           DeviceVector availableOutputDevices,
                                           const SwAudioOutputCollection &outputs) const;
 
-    DeviceVector getDevicesForProductStrategy(product_strategy_t strategy) const;
-
     sp<DeviceDescriptor> getDeviceForInputSource(audio_source_t inputSource) const;
 
     product_strategy_t getProductStrategyFromLegacy(legacy_strategy legacyStrategy) const;
@@ -96,8 +97,6 @@ private:
         const DeviceVector& availableOutputDevices, legacy_strategy legacyStrategy) const;
     DeviceVector getPreferredAvailableDevicesForProductStrategy(
         const DeviceVector& availableOutputDevices, product_strategy_t strategy) const;
-
-    DeviceStrategyMap mDevicesForStrategies;
 
     std::map<product_strategy_t, legacy_strategy> mLegacyStrategyMap;
 };
