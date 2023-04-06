@@ -301,6 +301,9 @@ status_t JpegRCompositeStream::processInputFrame(nsecs_t ts, const InputFrame &i
     p010.colorGamut = jpegrecoverymap::jpegr_color_gamut::JPEGR_COLORGAMUT_BT2100;
     p010.data = inputFrame.p010Buffer.data;
     p010.chroma_data = inputFrame.p010Buffer.dataCb;
+    // Strides are expected to be in pixels not bytes
+    p010.luma_stride = inputFrame.p010Buffer.stride / 2;
+    p010.chroma_stride = inputFrame.p010Buffer.chromaStride / 2;
 
     jpegR.data = dstBuffer;
     jpegR.maxLength = maxJpegRBufferSize;
