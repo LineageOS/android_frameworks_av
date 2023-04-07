@@ -27,40 +27,6 @@
 #include <utils/String8.h>
 #include <utils/KeyedVector.h>
 
-// The binder is supposed to propagate the scheduler group across
-// the binder interface so that remote calls are executed with
-// the same priority as local calls. This is currently not working
-// so this change puts in a temporary hack to fix the issue with
-// metadata retrieval which can be a huge CPU hit if done on a
-// foreground thread.
-#ifndef DISABLE_GROUP_SCHEDULE_HACK
-
-#undef LOG_TAG
-#define LOG_TAG "IMediaMetadataRetriever"
-#include <utils/Log.h>
-#include <cutils/sched_policy.h>
-
-namespace android {
-
-static void sendSchedPolicy(Parcel& data)
-{
-    SchedPolicy policy;
-    get_sched_policy(gettid(), &policy);
-    data.writeInt32(policy);
-}
-
-static void setSchedPolicy(const Parcel& data)
-{
-    SchedPolicy policy = (SchedPolicy) data.readInt32();
-    set_sched_policy(gettid(), policy);
-}
-static void restoreSchedPolicy()
-{
-    set_sched_policy(gettid(), SP_FOREGROUND);
-}
-}; // end namespace android
-#endif
-
 namespace android {
 
 enum {
@@ -157,9 +123,6 @@ public:
         data.writeInt32(option);
         data.writeInt32(colorFormat);
         data.writeInt32(metaOnly);
-#ifndef DISABLE_GROUP_SCHEDULE_HACK
-        sendSchedPolicy(data);
-#endif
         remote()->transact(GET_FRAME_AT_TIME, data, &reply);
         status_t ret = reply.readInt32();
         if (ret != NO_ERROR) {
@@ -178,9 +141,6 @@ public:
         data.writeInt32(colorFormat);
         data.writeInt32(metaOnly);
         data.writeInt32(thumbnail);
-#ifndef DISABLE_GROUP_SCHEDULE_HACK
-        sendSchedPolicy(data);
-#endif
         remote()->transact(GET_IMAGE_AT_INDEX, data, &reply);
         status_t ret = reply.readInt32();
         if (ret != NO_ERROR) {
@@ -202,9 +162,6 @@ public:
         data.writeInt32(top);
         data.writeInt32(right);
         data.writeInt32(bottom);
-#ifndef DISABLE_GROUP_SCHEDULE_HACK
-        sendSchedPolicy(data);
-#endif
         remote()->transact(GET_IMAGE_RECT_AT_INDEX, data, &reply);
         status_t ret = reply.readInt32();
         if (ret != NO_ERROR) {
@@ -223,9 +180,6 @@ public:
         data.writeInt32(index);
         data.writeInt32(colorFormat);
         data.writeInt32(metaOnly);
-#ifndef DISABLE_GROUP_SCHEDULE_HACK
-        sendSchedPolicy(data);
-#endif
         remote()->transact(GET_FRAME_AT_INDEX, data, &reply);
         status_t ret = reply.readInt32();
         if (ret != NO_ERROR) {
@@ -238,9 +192,6 @@ public:
     {
         Parcel data, reply;
         data.writeInterfaceToken(IMediaMetadataRetriever::getInterfaceDescriptor());
-#ifndef DISABLE_GROUP_SCHEDULE_HACK
-        sendSchedPolicy(data);
-#endif
         remote()->transact(EXTRACT_ALBUM_ART, data, &reply);
         status_t ret = reply.readInt32();
         if (ret != NO_ERROR) {
@@ -253,9 +204,6 @@ public:
     {
         Parcel data, reply;
         data.writeInterfaceToken(IMediaMetadataRetriever::getInterfaceDescriptor());
-#ifndef DISABLE_GROUP_SCHEDULE_HACK
-        sendSchedPolicy(data);
-#endif
         data.writeInt32(keyCode);
         remote()->transact(EXTRACT_METADATA, data, &reply);
         status_t ret = reply.readInt32();
@@ -366,9 +314,6 @@ status_t BnMediaMetadataRetriever::onTransact(
             bool metaOnly = (data.readInt32() != 0);
             ALOGV("getTimeAtTime: time(%" PRId64 " us), option(%d), colorFormat(%d), metaOnly(%d)",
                     timeUs, option, colorFormat, metaOnly);
-#ifndef DISABLE_GROUP_SCHEDULE_HACK
-            setSchedPolicy(data);
-#endif
             sp<IMemory> bitmap = getFrameAtTime(timeUs, option, colorFormat, metaOnly);
             if (bitmap != 0) {  // Don't send NULL across the binder interface
                 reply->writeInt32(NO_ERROR);
@@ -376,9 +321,6 @@ status_t BnMediaMetadataRetriever::onTransact(
             } else {
                 reply->writeInt32(UNKNOWN_ERROR);
             }
-#ifndef DISABLE_GROUP_SCHEDULE_HACK
-            restoreSchedPolicy();
-#endif
             return NO_ERROR;
         } break;
         case GET_IMAGE_AT_INDEX: {
@@ -389,9 +331,6 @@ status_t BnMediaMetadataRetriever::onTransact(
             bool thumbnail = (data.readInt32() != 0);
             ALOGV("getImageAtIndex: index(%d), colorFormat(%d), metaOnly(%d), thumbnail(%d)",
                     index, colorFormat, metaOnly, thumbnail);
-#ifndef DISABLE_GROUP_SCHEDULE_HACK
-            setSchedPolicy(data);
-#endif
             sp<IMemory> bitmap = getImageAtIndex(index, colorFormat, metaOnly, thumbnail);
             if (bitmap != 0) {  // Don't send NULL across the binder interface
                 reply->writeInt32(NO_ERROR);
@@ -399,9 +338,6 @@ status_t BnMediaMetadataRetriever::onTransact(
             } else {
                 reply->writeInt32(UNKNOWN_ERROR);
             }
-#ifndef DISABLE_GROUP_SCHEDULE_HACK
-            restoreSchedPolicy();
-#endif
             return NO_ERROR;
         } break;
 
@@ -415,9 +351,6 @@ status_t BnMediaMetadataRetriever::onTransact(
             int bottom = data.readInt32();
             ALOGV("getImageRectAtIndex: index(%d), colorFormat(%d), rect {%d, %d, %d, %d}",
                     index, colorFormat, left, top, right, bottom);
-#ifndef DISABLE_GROUP_SCHEDULE_HACK
-            setSchedPolicy(data);
-#endif
             sp<IMemory> bitmap = getImageRectAtIndex(
                     index, colorFormat, left, top, right, bottom);
             if (bitmap != 0) {  // Don't send NULL across the binder interface
@@ -426,9 +359,6 @@ status_t BnMediaMetadataRetriever::onTransact(
             } else {
                 reply->writeInt32(UNKNOWN_ERROR);
             }
-#ifndef DISABLE_GROUP_SCHEDULE_HACK
-            restoreSchedPolicy();
-#endif
             return NO_ERROR;
         } break;
 
@@ -439,9 +369,6 @@ status_t BnMediaMetadataRetriever::onTransact(
             bool metaOnly = (data.readInt32() != 0);
             ALOGV("getFrameAtIndex: index(%d), colorFormat(%d), metaOnly(%d)",
                     index, colorFormat, metaOnly);
-#ifndef DISABLE_GROUP_SCHEDULE_HACK
-            setSchedPolicy(data);
-#endif
             sp<IMemory> frame = getFrameAtIndex(index, colorFormat, metaOnly);
             if (frame != nullptr) {  // Don't send NULL across the binder interface
                 reply->writeInt32(NO_ERROR);
@@ -449,16 +376,10 @@ status_t BnMediaMetadataRetriever::onTransact(
             } else {
                 reply->writeInt32(UNKNOWN_ERROR);
             }
-#ifndef DISABLE_GROUP_SCHEDULE_HACK
-            restoreSchedPolicy();
-#endif
             return NO_ERROR;
         } break;
         case EXTRACT_ALBUM_ART: {
             CHECK_INTERFACE(IMediaMetadataRetriever, data, reply);
-#ifndef DISABLE_GROUP_SCHEDULE_HACK
-            setSchedPolicy(data);
-#endif
             sp<IMemory> albumArt = extractAlbumArt();
             if (albumArt != 0) {  // Don't send NULL across the binder interface
                 reply->writeInt32(NO_ERROR);
@@ -466,16 +387,10 @@ status_t BnMediaMetadataRetriever::onTransact(
             } else {
                 reply->writeInt32(UNKNOWN_ERROR);
             }
-#ifndef DISABLE_GROUP_SCHEDULE_HACK
-            restoreSchedPolicy();
-#endif
             return NO_ERROR;
         } break;
         case EXTRACT_METADATA: {
             CHECK_INTERFACE(IMediaMetadataRetriever, data, reply);
-#ifndef DISABLE_GROUP_SCHEDULE_HACK
-            setSchedPolicy(data);
-#endif
             int keyCode = data.readInt32();
             const char* value = extractMetadata(keyCode);
             if (value != NULL) {  // Don't send NULL across the binder interface
@@ -484,9 +399,6 @@ status_t BnMediaMetadataRetriever::onTransact(
             } else {
                 reply->writeInt32(UNKNOWN_ERROR);
             }
-#ifndef DISABLE_GROUP_SCHEDULE_HACK
-            restoreSchedPolicy();
-#endif
             return NO_ERROR;
         } break;
         default:
