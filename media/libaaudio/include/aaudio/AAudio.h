@@ -134,7 +134,11 @@ enum {
      * The call was successful.
      */
     AAUDIO_OK,
-    AAUDIO_ERROR_BASE = -900, // TODO review
+
+    /**
+     * Reserved. This should not be returned.
+     */
+    AAUDIO_ERROR_BASE = -900,
 
     /**
      * The audio device was disconnected. This could occur, for example, when headphones
@@ -150,6 +154,10 @@ enum {
      */
     AAUDIO_ERROR_ILLEGAL_ARGUMENT,
     // reserved
+
+    /**
+     * An internal error occurred.
+     */
     AAUDIO_ERROR_INTERNAL = AAUDIO_ERROR_ILLEGAL_ARGUMENT + 2,
 
     /**
@@ -158,7 +166,9 @@ enum {
     AAUDIO_ERROR_INVALID_STATE,
     // reserved
     // reserved
-    /* The server rejected the handle used to identify the stream.
+
+    /**
+     * The server rejected the handle used to identify the stream.
      */
     AAUDIO_ERROR_INVALID_HANDLE = AAUDIO_ERROR_INVALID_STATE + 3,
     // reserved
@@ -174,6 +184,10 @@ enum {
      * or a timestamp is not available.
      */
     AAUDIO_ERROR_UNAVAILABLE,
+
+    /**
+     * Reserved. This should not be returned.
+     */
     AAUDIO_ERROR_NO_FREE_HANDLES,
 
     /**
@@ -191,6 +205,10 @@ enum {
      * An operation took longer than expected.
      */
     AAUDIO_ERROR_TIMEOUT,
+
+    /**
+     * A queue is full. This queue would be blocked.
+     */
     AAUDIO_ERROR_WOULD_BLOCK,
 
     /**
