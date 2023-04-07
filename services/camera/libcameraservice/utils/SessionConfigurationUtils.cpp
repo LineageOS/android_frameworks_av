@@ -161,8 +161,13 @@ bool roundBufferDimensionNearest(int32_t width, int32_t height,
             getAppropriateModeTag(ANDROID_SCALER_AVAILABLE_STREAM_CONFIGURATIONS, maxResolution);
     const int32_t heicSizesTag =
             getAppropriateModeTag(ANDROID_HEIC_AVAILABLE_HEIC_STREAM_CONFIGURATIONS, maxResolution);
+    const int32_t jpegRSizesTag = getAppropriateModeTag(
+            ANDROID_JPEGR_AVAILABLE_JPEG_R_STREAM_CONFIGURATIONS, maxResolution);
 
+    bool isJpegRDataSpace = (dataSpace == static_cast<android_dataspace_t>(
+                ::aidl::android::hardware::graphics::common::Dataspace::JPEG_R));
     camera_metadata_ro_entry streamConfigs =
+            (isJpegRDataSpace) ? info.find(jpegRSizesTag) :
             (dataSpace == HAL_DATASPACE_DEPTH) ? info.find(depthSizesTag) :
             (dataSpace == static_cast<android_dataspace>(HAL_DATASPACE_HEIF)) ?
             info.find(heicSizesTag) :
