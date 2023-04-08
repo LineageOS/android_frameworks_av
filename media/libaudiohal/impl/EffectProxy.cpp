@@ -158,8 +158,7 @@ ndk::ScopedAStatus EffectProxy::open(const Parameter::Common& common,
     for (auto& sub : mSubEffects) {
         auto& effect = std::get<SubEffectTupleIndex::HANDLE>(sub.second);
         auto& openRet = std::get<SubEffectTupleIndex::RETURN>(sub.second);
-        if (!effect ||
-            (status = effect->open(common, specific, &openRet)).isOk()) {
+        if (!effect || !(status = effect->open(common, specific, &openRet)).isOk()) {
             ALOGE("%s: failed to open UUID %s", __func__, sub.first.uuid.toString().c_str());
             break;
         }
