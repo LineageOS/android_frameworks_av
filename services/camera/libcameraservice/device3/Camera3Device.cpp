@@ -1391,11 +1391,6 @@ status_t Camera3Device::filterParamsAndConfigureLocked(const CameraMetadata& ses
             request->mSettingsList.push_back(settingsList);
 
             if (rotateAndCropSessionKey) {
-                sp<CaptureRequest> request = new CaptureRequest();
-                PhysicalCameraSettings settingsList;
-                settingsList.metadata = filteredParams;
-                request->mSettingsList.push_back(settingsList);
-
                 auto rotateAndCropEntry = filteredParams.find(ANDROID_SCALER_ROTATE_AND_CROP);
                 if (rotateAndCropEntry.count > 0 &&
                         rotateAndCropEntry.data.u8[0] == ANDROID_SCALER_ROTATE_AND_CROP_AUTO) {
