@@ -65,6 +65,7 @@ private:
     std::shared_ptr<C2StreamPictureSizeInfo::input> mSize;
     std::shared_ptr<C2StreamFrameRateInfo::output> mFrameRate;
     std::shared_ptr<C2StreamBitrateInfo::output> mBitrate;
+    ProfileLevelType mProfileLevel;
 
     int64_t  mNumInputFrames;
     MP4EncodingMode mEncodeMode;
