@@ -1172,10 +1172,8 @@ status_t CameraProviderManager::ProviderInfo::DeviceInfo3::deriveJpegRTags(bool 
             static_cast<android_pixel_format_t>(HAL_PIXEL_FORMAT_YCBCR_P010), &supportedP010Sizes);
     auto it = supportedP010Sizes.begin();
     while (it != supportedP010Sizes.end()) {
-        // Resolutions that don't align on 32 pixels are not supported by Jpeg/R.
-        // This can be removed as soon as the encoder restriction is lifted.
-        if ((std::find(supportedBlobSizes.begin(), supportedBlobSizes.end(), *it) ==
-                supportedBlobSizes.end()) || ((std::get<0>(*it) % 32) != 0)) {
+        if (std::find(supportedBlobSizes.begin(), supportedBlobSizes.end(), *it) ==
+                supportedBlobSizes.end()) {
             it = supportedP010Sizes.erase(it);
         } else {
             it++;
