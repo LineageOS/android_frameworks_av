@@ -260,7 +260,7 @@ void sendPartialCaptureResult(CaptureOutputStates& states,
 
     auto mapper = states.rotateAndCropMappers.find(states.cameraId.c_str());
     if (mapper != states.rotateAndCropMappers.end()) {
-        const auto& remappedKeys = iter->second.getRemappedKeys();
+        const auto& remappedKeys = mapper->second.getRemappedKeys();
         keysToRemove.insert(remappedKeys.begin(), remappedKeys.end());
     }
 
