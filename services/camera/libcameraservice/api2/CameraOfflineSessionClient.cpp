@@ -106,6 +106,14 @@ void CameraOfflineSessionClient::setStreamUseCaseOverrides(
 void CameraOfflineSessionClient::clearStreamUseCaseOverrides() {
 }
 
+bool CameraOfflineSessionClient::supportsZoomOverride() {
+    return false;
+}
+
+status_t CameraOfflineSessionClient::setZoomOverride(int32_t /*zoomOverride*/) {
+    return INVALID_OPERATION;
+}
+
 status_t CameraOfflineSessionClient::dump(int fd, const Vector<String16>& args) {
     return BasicClient::dump(fd, args);
 }

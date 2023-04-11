@@ -312,6 +312,14 @@ class Camera3Device :
     // Clear stream use case overrides
     void clearStreamUseCaseOverrides();
 
+    /**
+     * Whether the camera device supports zoom override.
+     */
+    bool supportsZoomOverride();
+
+    // Set/reset zoom override
+    status_t setZoomOverride(int32_t zoomOverride);
+
     // Get the status trackeer for the camera device
     wp<camera3::StatusTracker> getStatusTracker() { return mStatusTracker; }
 
@@ -862,7 +870,8 @@ class Camera3Device :
                 const Vector<int32_t>& sessionParamKeys,
                 bool useHalBufManager,
                 bool supportCameraMute,
-                bool overrideToPortrait);
+                bool overrideToPortrait,
+                bool supportSettingsOverride);
         ~RequestThread();
 
         void     setNotificationListener(wp<NotificationListener> listener);
@@ -969,6 +978,8 @@ class Camera3Device :
 
         status_t setCameraMute(int32_t muteMode);
 
+        status_t setZoomOverride(int32_t zoomOverride);
+
         status_t setHalInterface(sp<HalInterface> newHalInterface);
 
       protected:
@@ -997,6 +1008,10 @@ class Camera3Device :
         // Override test_pattern control if needed for camera mute; returns true
         // if the current value was changed
         bool               overrideTestPattern(const sp<CaptureRequest> &request);
+
+        // Override settings override if needed for lower zoom latency; return
+        // true if the current value was changed
+        bool               overrideSettingsOverride(const sp<CaptureRequest> &request);
 
         static const nsecs_t kRequestTimeout = 50e6; // 50 ms
 
@@ -1132,6 +1147,8 @@ class Camera3Device :
         bool               mComposerOutput;
         int32_t            mCameraMute; // 0 = no mute, otherwise the TEST_PATTERN_MODE to use
         bool               mCameraMuteChanged;
+        int32_t            mSettingsOverride; // -1 = use original, otherwise
+                                              // the settings override to use.
 
         int64_t            mRepeatingLastFrameNumber;
 
@@ -1151,6 +1168,7 @@ class Camera3Device :
         const bool         mUseHalBufManager;
         const bool         mSupportCameraMute;
         const bool         mOverrideToPortrait;
+        const bool         mSupportSettingsOverride;
         int32_t            mVndkVersion = -1;
     };
 
@@ -1160,7 +1178,8 @@ class Camera3Device :
                 const Vector<int32_t>& /*sessionParamKeys*/,
                 bool /*useHalBufManager*/,
                 bool /*supportCameraMute*/,
-                bool /*overrideToPortrait*/) = 0;
+                bool /*overrideToPortrait*/,
+                bool /*supportSettingsOverride*/) = 0;
 
     sp<RequestThread> mRequestThread;
 
@@ -1425,6 +1444,8 @@ class Camera3Device :
     bool mSupportCameraMute = false;
     // Whether the HAL supports SOLID_COLOR or BLACK if mSupportCameraMute is true
     bool mSupportTestPatternSolidColor = false;
+    // Whether the HAL supports zoom settings override
+    bool mSupportZoomOverride = false;
 
     // Whether the camera framework overrides the device characteristics for
     // performance class.
@@ -1438,6 +1459,10 @@ class Camera3Device :
 
     // Auto framing override value
     camera_metadata_enum_android_control_autoframing mAutoframingOverride;
+
+    // Settings override value
+    int32_t mSettingsOverride; // -1 = use original, otherwise
+                               // the settings override to use.
 
     // Current active physical id of the logical multi-camera, if any
     std::string mActivePhysicalId;

@@ -2391,6 +2391,14 @@ void Camera2Client::clearStreamUseCaseOverrides() {
     mDevice->clearStreamUseCaseOverrides();
 }
 
+bool Camera2Client::supportsZoomOverride() {
+    return mDevice->supportsZoomOverride();
+}
+
+status_t  Camera2Client::setZoomOverride(int zoomOverride) {
+    return mDevice->setZoomOverride(zoomOverride);
+}
+
 status_t Camera2Client::waitUntilCurrentRequestIdLocked() {
     int32_t activeRequestId = mStreamingProcessor->getActiveRequestId();
     if (activeRequestId != 0) {
