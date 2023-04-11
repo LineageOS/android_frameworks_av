@@ -28,6 +28,7 @@ constexpr UrbPacketDivisionMode kUrbPacketDivisionModes[] = {FIRST_PACKET_ONLY_H
 constexpr size_t kMinSize = 0;
 constexpr size_t kMaxSize = 1000;
 constexpr size_t kMaxLength = 1000;
+constexpr size_t kMaxPathLength = 64;
 
 class MtpPacketFuzzerUtils {
   protected:
@@ -43,7 +44,7 @@ class MtpPacketFuzzerUtils {
     };
 
     void fillFilePath(FuzzedDataProvider* fdp) {
-       mPath= fdp->ConsumeRandomLengthString(kMaxLength);
+       mPath= fdp->ConsumeRandomLengthString(kMaxPathLength);
     };
 
     void fillUsbDevFsUrb(FuzzedDataProvider* fdp) {
