@@ -67,7 +67,7 @@ static const Range::DynamicsProcessingRange kEngineConfigRange = {
                 DynamicsProcessing::engineArchitecture>(DynamicsProcessing::EngineArchitecture(
                 {.resolutionPreference =
                          DynamicsProcessing::ResolutionPreference::FAVOR_FREQUENCY_RESOLUTION,
-                 .preferredProcessingDurationMs = 0,
+                 .preferredProcessingDurationMs = 1.0f,
                  .preEqStage = {.inUse = false, .bandCount = 0},
                  .postEqStage = {.inUse = false, .bandCount = 0},
                  .mbcStage = {.inUse = false, .bandCount = 0},
@@ -75,11 +75,11 @@ static const Range::DynamicsProcessingRange kEngineConfigRange = {
         .max = DynamicsProcessing::make<
                 DynamicsProcessing::engineArchitecture>(DynamicsProcessing::EngineArchitecture(
                 {.resolutionPreference =
-                         DynamicsProcessing::ResolutionPreference::FAVOR_FREQUENCY_RESOLUTION,
-                 .preferredProcessingDurationMs = std::numeric_limits<float>::max(),
-                 .preEqStage = {.inUse = true, .bandCount = std::numeric_limits<int>::max()},
-                 .postEqStage = {.inUse = true, .bandCount = std::numeric_limits<int>::max()},
-                 .mbcStage = {.inUse = true, .bandCount = std::numeric_limits<int>::max()},
+                         DynamicsProcessing::ResolutionPreference::FAVOR_TIME_RESOLUTION,
+                 .preferredProcessingDurationMs = 1000.0f,
+                 .preEqStage = {.inUse = true, .bandCount = 128},
+                 .postEqStage = {.inUse = true, .bandCount = 128},
+                 .mbcStage = {.inUse = true, .bandCount = 128},
                  .limiterInUse = true}))};
 
 static const DynamicsProcessing::ChannelConfig kChannelConfigMin =
@@ -105,15 +105,15 @@ static const DynamicsProcessing::EqBandConfig kEqBandConfigMin =
         DynamicsProcessing::EqBandConfig({.channel = 0,
                                           .band = 0,
                                           .enable = false,
-                                          .cutoffFrequencyHz = 220,
-                                          .gainDb = std::numeric_limits<float>::lowest()});
+                                          .cutoffFrequencyHz = 20,
+                                          .gainDb = -200});
 
 static const DynamicsProcessing::EqBandConfig kEqBandConfigMax =
         DynamicsProcessing::EqBandConfig({.channel = std::numeric_limits<int>::max(),
                                           .band = std::numeric_limits<int>::max(),
                                           .enable = true,
                                           .cutoffFrequencyHz = 20000,
-                                          .gainDb = std::numeric_limits<float>::max()});
+                                          .gainDb = 200});
 
 static const Range::DynamicsProcessingRange kPreEqBandConfigRange = {
         .min = DynamicsProcessing::make<DynamicsProcessing::preEqBand>({kEqBandConfigMin}),
@@ -129,39 +129,39 @@ static const Range::DynamicsProcessingRange kMbcBandConfigRange = {
                         {.channel = 0,
                          .band = 0,
                          .enable = false,
-                         .cutoffFrequencyHz = 220,
+                         .cutoffFrequencyHz = 20,
                          .attackTimeMs = 0,
                          .releaseTimeMs = 0,
-                         .ratio = 0,
-                         .thresholdDb = std::numeric_limits<float>::lowest(),
+                         .ratio = 1,
+                         .thresholdDb = -200,
                          .kneeWidthDb = 0,
-                         .noiseGateThresholdDb = std::numeric_limits<float>::lowest(),
-                         .expanderRatio = 0,
-                         .preGainDb = std::numeric_limits<float>::lowest(),
-                         .postGainDb = std::numeric_limits<float>::lowest()})}),
+                         .noiseGateThresholdDb = -200,
+                         .expanderRatio = 1,
+                         .preGainDb = -200,
+                         .postGainDb = -200})}),
         .max = DynamicsProcessing::make<DynamicsProcessing::mbcBand>(
                 {DynamicsProcessing::MbcBandConfig(
                         {.channel = std::numeric_limits<int>::max(),
                          .band = std::numeric_limits<int>::max(),
                          .enable = true,
                          .cutoffFrequencyHz = 20000,
-                         .attackTimeMs = std::numeric_limits<float>::max(),
-                         .releaseTimeMs = std::numeric_limits<float>::max(),
-                         .ratio = std::numeric_limits<float>::max(),
-                         .thresholdDb = 0,
-                         .kneeWidthDb = std::numeric_limits<float>::max(),
-                         .noiseGateThresholdDb = 0,
-                         .expanderRatio = std::numeric_limits<float>::max(),
-                         .preGainDb = std::numeric_limits<float>::max(),
-                         .postGainDb = std::numeric_limits<float>::max()})})};
+                         .attackTimeMs = 60000,
+                         .releaseTimeMs = 60000,
+                         .ratio = 50,
+                         .thresholdDb = 200,
+                         .kneeWidthDb = 100,
+                         .noiseGateThresholdDb = 200,
+                         .expanderRatio = 50,
+                         .preGainDb = 200,
+                         .postGainDb = 200})})};
 
 static const Range::DynamicsProcessingRange kInputGainRange = {
         .min = DynamicsProcessing::make<DynamicsProcessing::inputGain>(
                 {DynamicsProcessing::InputGain(
-                        {.channel = 0, .gainDb = std::numeric_limits<float>::lowest()})}),
+                        {.channel = 0, .gainDb = -200.0f})}),
         .max = DynamicsProcessing::make<DynamicsProcessing::inputGain>(
                 {DynamicsProcessing::InputGain({.channel = std::numeric_limits<int>::max(),
-                                                .gainDb = std::numeric_limits<float>::max()})})};
+                                                .gainDb = 200.0f})})};
 
 static const Range::DynamicsProcessingRange kLimiterRange = {
         .min = DynamicsProcessing::make<DynamicsProcessing::limiter>(
@@ -171,19 +171,19 @@ static const Range::DynamicsProcessingRange kLimiterRange = {
                          .linkGroup = std::numeric_limits<int>::min(),
                          .attackTimeMs = 0,
                          .releaseTimeMs = 0,
-                         .ratio = 0,
-                         .thresholdDb = std::numeric_limits<float>::min(),
-                         .postGainDb = std::numeric_limits<float>::min()})}),
+                         .ratio = 1,
+                         .thresholdDb = -200,
+                         .postGainDb = -200})}),
         .max = DynamicsProcessing::make<DynamicsProcessing::limiter>(
                 {DynamicsProcessing::LimiterConfig(
                         {.channel = std::numeric_limits<int>::max(),
                          .enable = true,
                          .linkGroup = std::numeric_limits<int>::max(),
-                         .attackTimeMs = std::numeric_limits<float>::max(),
-                         .releaseTimeMs = std::numeric_limits<float>::max(),
-                         .ratio = std::numeric_limits<float>::max(),
-                         .thresholdDb = 0,
-                         .postGainDb = std::numeric_limits<float>::max()})})};
+                         .attackTimeMs = 60000,
+                         .releaseTimeMs = 60000,
+                         .ratio = 50,
+                         .thresholdDb = 200,
+                         .postGainDb = 200})})};
 
 const std::vector<Range::DynamicsProcessingRange> kRanges = {
         kEngineConfigRange,     kPreEqChannelConfigRange, kPostEqChannelConfigRange,
