@@ -478,19 +478,6 @@ status_t StreamHalAidl::setHalThreadPriority(int priority __unused) {
     return OK;
 }
 
-status_t StreamHalAidl::getHalPid(pid_t *pid __unused) {
-    ALOGD("%p %s::%s", this, getClassName().c_str(), __func__);
-    TIME_CHECK();
-    if (!mStream) return NO_INIT;
-    ALOGE("%s not implemented yet", __func__);
-    return OK;
-}
-
-bool StreamHalAidl::requestHalThreadPriority(pid_t threadPid __unused, pid_t threadId __unused) {
-    // Obsolete, must be done by the HAL module.
-    return true;
-}
-
 status_t StreamHalAidl::legacyCreateAudioPatch(const struct audio_port_config& port __unused,
                                                std::optional<audio_source_t> source __unused,
                                                audio_devices_t type __unused) {
