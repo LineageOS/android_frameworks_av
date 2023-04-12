@@ -199,10 +199,6 @@ class StreamHalAidl : public virtual StreamHalInterface, public ConversionHelper
 
     ~StreamHalAidl() override;
 
-    status_t getHalPid(pid_t *pid);
-
-    bool requestHalThreadPriority(pid_t threadPid, pid_t threadId);
-
     status_t getLatency(uint32_t *latency);
 
     status_t getObservablePosition(int64_t *frames, int64_t *timestamp);
