@@ -1,6 +1,7 @@
 service media.tuner /system/bin/mediatuner
     class main
     group media
+    user root
     ioprio rt 4
     onrestart restart vendor.tuner-hal-1-0
     onrestart restart vendor.tuner-hal-1-1
