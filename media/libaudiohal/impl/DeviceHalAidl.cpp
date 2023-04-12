@@ -937,10 +937,13 @@ status_t DeviceHalAidl::dump(int fd, const Vector<String16>& args) {
     return mModule->dump(fd, Args(args).args(), args.size());
 }
 
-int32_t DeviceHalAidl::supportsBluetoothVariableLatency(bool* supports __unused) {
+int32_t DeviceHalAidl::supportsBluetoothVariableLatency(bool* supports) {
     TIME_CHECK();
-    ALOGE("%s not implemented yet", __func__);
-    return INVALID_OPERATION;
+    if (!mModule) return NO_INIT;
+    if (supports == nullptr) {
+        return BAD_VALUE;
+    }
+    return statusTFromBinderStatus(mModule->supportsVariableLatency(supports));
 }
 
 status_t DeviceHalAidl::setConnectedState(const struct audio_port_v7 *port, bool connected) {
