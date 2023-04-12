@@ -169,6 +169,12 @@ public:
 
     void updateDeviceSelectionCache() override;
 
+protected:
+    DeviceVector getPreferredAvailableDevicesForProductStrategy(
+        const DeviceVector& availableOutputDevices, product_strategy_t strategy) const;
+    DeviceVector getDisabledDevicesForProductStrategy(
+        const DeviceVector& availableOutputDevices, product_strategy_t strategy) const;
+
 private:
     /**
      * Get media devices as the given role

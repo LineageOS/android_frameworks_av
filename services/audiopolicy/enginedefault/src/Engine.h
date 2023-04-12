@@ -96,10 +96,6 @@ private:
     product_strategy_t getProductStrategyFromLegacy(legacy_strategy legacyStrategy) const;
     audio_devices_t getPreferredDeviceTypeForLegacyStrategy(
         const DeviceVector& availableOutputDevices, legacy_strategy legacyStrategy) const;
-    DeviceVector getPreferredAvailableDevicesForProductStrategy(
-        const DeviceVector& availableOutputDevices, product_strategy_t strategy) const;
-    DeviceVector getDisabledDevicesForProductStrategy(
-        const DeviceVector& availableOutputDevices, product_strategy_t strategy) const;
     DeviceVector getPreferredAvailableDevicesForInputSource(
             const DeviceVector& availableInputDevices, audio_source_t inputSource) const;
     DeviceVector getDisabledDevicesForInputSource(
