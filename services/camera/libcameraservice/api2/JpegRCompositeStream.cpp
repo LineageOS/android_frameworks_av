@@ -299,14 +299,11 @@ status_t JpegRCompositeStream::processInputFrame(nsecs_t ts, const InputFrame &i
     p010.height = inputFrame.p010Buffer.height;
     p010.width = inputFrame.p010Buffer.width;
     p010.colorGamut = jpegrecoverymap::jpegr_color_gamut::JPEGR_COLORGAMUT_BT2100;
-    size_t yChannelSizeInByte = p010.width * p010.height * 2;
-    size_t uvChannelSizeInByte = p010.width * p010.height;
-    p010.data = new uint8_t[yChannelSizeInByte + uvChannelSizeInByte];
-    std::unique_ptr<uint8_t[]> p010_data;
-    p010_data.reset(reinterpret_cast<uint8_t*>(p010.data));
-    memcpy((uint8_t*)p010.data, inputFrame.p010Buffer.data, yChannelSizeInByte);
-    memcpy((uint8_t*)p010.data + yChannelSizeInByte, inputFrame.p010Buffer.dataCb,
-           uvChannelSizeInByte);
+    p010.data = inputFrame.p010Buffer.data;
+    p010.chroma_data = inputFrame.p010Buffer.dataCb;
+    // Strides are expected to be in pixels not bytes
+    p010.luma_stride = inputFrame.p010Buffer.stride / 2;
+    p010.chroma_stride = inputFrame.p010Buffer.chromaStride / 2;
 
     jpegR.data = dstBuffer;
     jpegR.maxLength = maxJpegRBufferSize;
@@ -367,7 +364,6 @@ status_t JpegRCompositeStream::processInputFrame(nsecs_t ts, const InputFrame &i
     }
 
     actualJpegRSize = jpegR.length;
-    p010_data.release();
 
     size_t finalJpegRSize = actualJpegRSize + sizeof(CameraBlob);
     if (finalJpegRSize > maxJpegRBufferSize) {
