@@ -156,4 +156,16 @@ interface IResourceManagerService {
      * @param clientConfig Configuration information of the client.
      */
     void notifyClientStopped(in ClientConfigParcel clientConfig);
+
+    /**
+     * Notify that the client's configuration has changed.
+     *
+     * This call is made to collect the (concurrent) metrics about the
+     * resources associated with the Codec (and also DRM sessions).
+     * This is called after notifyClientStarted (and before notifyClientStopped)
+     * to make changes to some of the configurations associated with the client.
+     *
+     * @param clientConfig Configuration information of the client.
+     */
+    void notifyClientConfigChanged(in ClientConfigParcel clientConfig);
 }

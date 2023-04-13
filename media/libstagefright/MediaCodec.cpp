@@ -295,6 +295,7 @@ struct MediaCodec::ResourceManagerServiceProxy : public RefBase {
     void notifyClientCreated();
     void notifyClientStarted(ClientConfigParcel& clientConfig);
     void notifyClientStopped(ClientConfigParcel& clientConfig);
+    void notifyClientConfigChanged(ClientConfigParcel& clientConfig);
 
     inline void setCodecName(const char* name) {
         mCodecName = name;
@@ -482,7 +483,7 @@ void MediaCodec::ResourceManagerServiceProxy::notifyClientCreated() {
 }
 
 void MediaCodec::ResourceManagerServiceProxy::notifyClientStarted(
-    ClientConfigParcel& clientConfig) {
+        ClientConfigParcel& clientConfig) {
     clientConfig.clientInfo.pid = static_cast<int32_t>(mPid);
     clientConfig.clientInfo.uid = static_cast<int32_t>(mUid);
     clientConfig.clientInfo.id = getId(mClient);
@@ -491,12 +492,21 @@ void MediaCodec::ResourceManagerServiceProxy::notifyClientStarted(
 }
 
 void MediaCodec::ResourceManagerServiceProxy::notifyClientStopped(
-    ClientConfigParcel& clientConfig) {
+        ClientConfigParcel& clientConfig) {
     clientConfig.clientInfo.pid = static_cast<int32_t>(mPid);
     clientConfig.clientInfo.uid = static_cast<int32_t>(mUid);
     clientConfig.clientInfo.id = getId(mClient);
     clientConfig.clientInfo.name = mCodecName;
     mService->notifyClientStopped(clientConfig);
+}
+
+void MediaCodec::ResourceManagerServiceProxy::notifyClientConfigChanged(
+        ClientConfigParcel& clientConfig) {
+    clientConfig.clientInfo.pid = static_cast<int32_t>(mPid);
+    clientConfig.clientInfo.uid = static_cast<int32_t>(mUid);
+    clientConfig.clientInfo.id = getId(mClient);
+    clientConfig.clientInfo.name = mCodecName;
+    mService->notifyClientConfigChanged(clientConfig);
 }
 
 ////////////////////////////////////////////////////////////////////////////////
@@ -5097,15 +5107,28 @@ void MediaCodec::handleOutputFormatChangeIfNeeded(const sp<MediaCodecBuffer> &bu
         postActivityNotificationIfPossible();
     }
 
-    // Notify mCrypto of video resolution changes
-    if (mCrypto != NULL) {
-        int32_t left, top, right, bottom, width, height;
-        if (mOutputFormat->findRect("crop", &left, &top, &right, &bottom)) {
-            mCrypto->notifyResolution(right - left + 1, bottom - top + 1);
-        } else if (mOutputFormat->findInt32("width", &width)
-                && mOutputFormat->findInt32("height", &height)) {
-            mCrypto->notifyResolution(width, height);
+    // Update the width and the height.
+    int32_t left = 0, top = 0, right = 0, bottom = 0, width = 0, height = 0;
+    bool resolutionChanged = false;
+    if (mOutputFormat->findRect("crop", &left, &top, &right, &bottom)) {
+        mWidth = right - left + 1;
+        mHeight = bottom - top + 1;
+        resolutionChanged = true;
+    } else if (mOutputFormat->findInt32("width", &width) &&
+               mOutputFormat->findInt32("height", &height)) {
+        mWidth = width;
+        mHeight = height;
+        resolutionChanged = true;
+    }
+
+    // Notify mCrypto and the RM of video resolution changes
+    if (resolutionChanged) {
+        if (mCrypto != NULL) {
+            mCrypto->notifyResolution(mWidth, mHeight);
         }
+        ClientConfigParcel clientConfig;
+        initClientConfigParcel(clientConfig);
+        mResourceManagerProxy->notifyClientConfigChanged(clientConfig);
     }
 
     updateHdrMetrics(false /* isConfig */);
