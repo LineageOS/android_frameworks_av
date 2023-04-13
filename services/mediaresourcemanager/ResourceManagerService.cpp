@@ -1208,6 +1208,11 @@ Status ResourceManagerService::notifyClientStopped(const ClientConfigParcel& cli
     return Status::ok();
 }
 
+Status ResourceManagerService::notifyClientConfigChanged(const ClientConfigParcel& clientConfig) {
+    mResourceManagerMetrics->notifyClientConfigChanged(clientConfig);
+    return Status::ok();
+}
+
 long ResourceManagerService::getPeakConcurrentPixelCount(int pid) const {
     return mResourceManagerMetrics->getPeakConcurrentPixelCount(pid);
 }
