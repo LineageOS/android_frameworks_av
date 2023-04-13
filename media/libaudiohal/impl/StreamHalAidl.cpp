@@ -167,9 +167,8 @@ status_t StreamHalAidl::getParameters(const String8& keys __unused, String8 *val
     ALOGD("%p %s::%s", this, getClassName().c_str(), __func__);
     TIME_CHECK();
     values->clear();
-    if (!mStream) return NO_INIT;
-    ALOGE("%s not implemented yet", __func__);
-    return OK;
+    // AIDL HAL doesn't support getParameters API.
+    return INVALID_OPERATION;
 }
 
 status_t StreamHalAidl::getFrameSize(size_t *size) {
