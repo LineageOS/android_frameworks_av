@@ -23,6 +23,7 @@
 #include <fmq/AidlMessageQueue.h>
 #include <media/audiohal/EffectHalInterface.h>
 #include <system/audio_effect.h>
+#include <system/audio_effects/aidl_effects_utils.h>
 
 #include "EffectConversionHelperAidl.h"
 
