@@ -161,16 +161,17 @@ status_t EffectHalAidl::setOutBuffer(const sp<EffectBufferHalInterface>& buffer)
     return OK;
 }
 
-
 // write to input FMQ here, wait for statusMQ STATUS_OK, and read from output FMQ
 status_t EffectHalAidl::process() {
     auto statusQ = mConversion->getStatusMQ();
     auto inputQ = mConversion->getInputMQ();
     auto outputQ = mConversion->getOutputMQ();
+    auto efGroup = mConversion->getEventFlagGroup();
     if (!statusQ || !statusQ->isValid() || !inputQ || !inputQ->isValid() || !outputQ ||
-        !outputQ->isValid()) {
-        ALOGE("%s invalid FMQ [Status %d I %d O %d]", __func__, statusQ ? statusQ->isValid() : 0,
-              inputQ ? inputQ->isValid() : 0, outputQ ? outputQ->isValid() : 0);
+        !outputQ->isValid() || !efGroup) {
+        ALOGE("%s invalid FMQ [Status %d I %d O %d] efGroup %p", __func__,
+              statusQ ? statusQ->isValid() : 0, inputQ ? inputQ->isValid() : 0,
+              outputQ ? outputQ->isValid() : 0, efGroup.get());
         return INVALID_OPERATION;
     }
 
@@ -187,6 +188,7 @@ status_t EffectHalAidl::process() {
               floatsToWrite, mInBuffer->audioBuffer(), inputQ->availableToWrite());
         return INVALID_OPERATION;
     }
+    efGroup->wake(aidl::android::hardware::audio::effect::kEventFlagNotEmpty);
 
     IEffect::Status retStatus{};
     if (!statusQ->readBlocking(&retStatus, 1) || retStatus.status != OK ||
