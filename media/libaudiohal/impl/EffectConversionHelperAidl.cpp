@@ -14,6 +14,7 @@
  * limitations under the License.
  */
 
+#include <cstddef>
 #include <cstdint>
 #include <cstring>
 #include <optional>
@@ -44,6 +45,7 @@ using ::aidl::android::hardware::audio::effect::State;
 using ::aidl::android::media::audio::common::AudioDeviceDescription;
 using ::aidl::android::media::audio::common::AudioMode;
 using ::aidl::android::media::audio::common::AudioSource;
+using ::android::hardware::EventFlag;
 using android::effect::utils::EffectParamReader;
 using android::effect::utils::EffectParamWriter;
 
@@ -127,6 +129,8 @@ status_t EffectConversionHelperAidl::handleSetParameter(uint32_t cmdSize, const 
 status_t EffectConversionHelperAidl::handleGetParameter(uint32_t cmdSize, const void* pCmdData,
                                                         uint32_t* replySize, void* pReplyData) {
     if (cmdSize < sizeof(effect_param_t) || !pCmdData || !replySize || !pReplyData) {
+        ALOGE("%s illegal cmdSize %u pCmdData %p replySize %p replyData %p", __func__, cmdSize,
+              pCmdData, replySize, pReplyData);
         return BAD_VALUE;
     }
 
@@ -183,8 +187,9 @@ status_t EffectConversionHelperAidl::handleSetConfig(uint32_t cmdSize, const voi
     }
 
     if (state == State::INIT) {
-        ALOGI("%s at state %s, opening effect", __func__,
-              android::internal::ToString(state).c_str());
+        ALOGI("%s at state %s, opening effect with input %s output %s", __func__,
+              android::internal::ToString(state).c_str(), common.input.toString().c_str(),
+              common.output.toString().c_str());
         IEffect::OpenEffectReturn openReturn;
         RETURN_STATUS_IF_ERROR(
                 statusTFromBinderStatus(mEffect->open(common, std::nullopt, &openReturn)));
@@ -199,6 +204,11 @@ status_t EffectConversionHelperAidl::handleSetConfig(uint32_t cmdSize, const voi
             mStatusQ = std::make_shared<StatusMQ>(openReturn.statusMQ);
             mInputQ = std::make_shared<DataMQ>(openReturn.inputDataMQ);
             mOutputQ = std::make_shared<DataMQ>(openReturn.outputDataMQ);
+        }
+
+        if (status_t status = updateEventFlags(); status != OK) {
+            mEffect->close();
+            return status;
         }
         mCommon = common;
     } else if (mCommon != common) {
@@ -343,6 +353,7 @@ status_t EffectConversionHelperAidl::handleSetOffload(uint32_t cmdSize, const vo
         mStatusQ = std::make_shared<StatusMQ>(ret->statusMQ);
         mInputQ = std::make_shared<DataMQ>(ret->inputDataMQ);
         mOutputQ = std::make_shared<DataMQ>(ret->outputDataMQ);
+        RETURN_STATUS_IF_ERROR(updateEventFlags());
     }
     return *static_cast<int32_t*>(pReplyData) = OK;
 }
@@ -385,6 +396,21 @@ status_t EffectConversionHelperAidl::handleVisualizerMeasure(uint32_t cmdSize __
     }
 
     return visualizerMeasure(replySize, pReplyData);
+}
+
+status_t EffectConversionHelperAidl::updateEventFlags() {
+    status_t status = BAD_VALUE;
+    EventFlag* efGroup = nullptr;
+    if (mStatusQ->isValid()) {
+        status = EventFlag::createEventFlag(mStatusQ->getEventFlagWord(), &efGroup);
+        if (status != OK || !efGroup) {
+            ALOGE("%s: create EventFlagGroup failed, ret %d, egGroup %p", __func__, status,
+                  efGroup);
+            status = (status == OK) ? BAD_VALUE : status;
+        }
+    }
+    mEfGroup.reset(efGroup, EventFlagDeleter());
+    return status;
 }
 
 }  // namespace effect
