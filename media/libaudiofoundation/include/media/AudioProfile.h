@@ -139,6 +139,9 @@ public:
     bool hasDynamicProfile() const;
     bool hasDynamicRateFor(audio_format_t format) const;
 
+    const SampleRateSet getSampleRatesFor(audio_format_t format) const;
+    const ChannelMaskSet getChannelMasksFor(audio_format_t format) const;
+
     bool contains(const sp<AudioProfile>& profile, bool ignoreDynamicFlags = false) const;
 
     virtual void dump(std::string *dst, int spaces) const;
