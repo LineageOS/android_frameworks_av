@@ -4,6 +4,7 @@
 service media.tuner /system/bin/mediatuner
     class main
     group media
+    user root
     ioprio rt 4
     task_profiles ProcessCapacityHigh HighPerformance
     interface aidl media.tuner

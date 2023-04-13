@@ -298,6 +298,9 @@ status_t NuMediaExtractor::getFileFormat(sp<AMessage> *format) const {
     size_t psshsize;
     if (meta->findData(kKeyPssh, &type, &pssh, &psshsize)) {
         sp<ABuffer> buf = new ABuffer(psshsize);
+        if (buf->data() == nullptr) {
+            return -ENOMEM;
+        }
         memcpy(buf->data(), pssh, psshsize);
         (*format)->setBuffer("pssh", buf);
     }
@@ -308,6 +311,9 @@ status_t NuMediaExtractor::getFileFormat(sp<AMessage> *format) const {
     if (meta->findData(kKeySlowMotionMarkers, &type, &slomoMarkers, &slomoMarkersSize)
             && slomoMarkersSize > 0) {
         sp<ABuffer> buf = new ABuffer(slomoMarkersSize);
+        if (buf->data() == nullptr) {
+            return -ENOMEM;
+        }
         memcpy(buf->data(), slomoMarkers, slomoMarkersSize);
         (*format)->setBuffer("slow-motion-markers", buf);
     }
@@ -639,6 +645,7 @@ status_t NuMediaExtractor::appendVorbisNumPageSamples(
         numPageSamples = -1;
     }
 
+    // caller has verified there is sufficient space
     // insert, including accounting for the space used.
     memcpy((uint8_t *)buffer->data() + mbuf->range_length(),
            &numPageSamples,
