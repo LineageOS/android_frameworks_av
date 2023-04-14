@@ -40,6 +40,7 @@ class EffectConversionHelperAidl {
     std::shared_ptr<StatusMQ> getStatusMQ() { return mStatusQ; }
     std::shared_ptr<DataMQ> getInputMQ() { return mInputQ; }
     std::shared_ptr<DataMQ> getOutputMQ() { return mOutputQ; }
+    std::shared_ptr<android::hardware::EventFlag> getEventFlagGroup() { return mEfGroup; }
 
   protected:
     const int32_t mSessionId;
@@ -85,6 +86,17 @@ class EffectConversionHelperAidl {
     std::shared_ptr<StatusMQ> mStatusQ = nullptr;
     std::shared_ptr<DataMQ> mInputQ = nullptr, mOutputQ = nullptr;
 
+
+    struct EventFlagDeleter {
+        void operator()(::android::hardware::EventFlag* flag) const {
+            if (flag) {
+                ::android::hardware::EventFlag::deleteEventFlag(&flag);
+            }
+        }
+    };
+    std::shared_ptr<android::hardware::EventFlag> mEfGroup = nullptr;
+    status_t updateEventFlags();
+
     status_t handleInit(uint32_t cmdSize, const void* pCmdData, uint32_t* replySize,
                         void* pReplyData);
     status_t handleSetConfig(uint32_t cmdSize, const void* pCmdData, uint32_t* replySize,
@@ -121,6 +133,7 @@ class EffectConversionHelperAidl {
     virtual status_t visualizerMeasure(uint32_t* replySize __unused, void* pReplyData __unused) {
         return BAD_VALUE;
     }
+
 };
 
 }  // namespace effect

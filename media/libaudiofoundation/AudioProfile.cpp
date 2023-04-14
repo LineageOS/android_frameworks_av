@@ -327,6 +327,24 @@ bool AudioProfileVector::hasDynamicRateFor(audio_format_t format) const
     return false;
 }
 
+const SampleRateSet AudioProfileVector::getSampleRatesFor(audio_format_t format) const {
+    for (const auto& profile : *this) {
+        if (profile->getFormat() == format) {
+            return profile->getSampleRates();
+        }
+    }
+    return {};
+}
+
+const ChannelMaskSet AudioProfileVector::getChannelMasksFor(audio_format_t format) const {
+    for (const auto& profile : *this) {
+        if (profile->getFormat() == format) {
+            return profile->getChannels();
+        }
+    }
+    return {};
+}
+
 bool AudioProfileVector::contains(const sp<AudioProfile>& profile, bool ignoreDynamicFlags) const
 {
     for (const auto& audioProfile : *this) {

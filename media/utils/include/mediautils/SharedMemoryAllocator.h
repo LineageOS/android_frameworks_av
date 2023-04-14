@@ -22,6 +22,7 @@
 
 #include <iomanip>
 #include <limits>
+#include <mutex>
 #include <sstream>
 #include <string>
 #include <type_traits>
@@ -109,13 +110,14 @@ struct NamedAllocRequest : public BasicAllocRequest {
 // TODO is there some way to avoid paying this cost?
 template <typename Allocator>
 class ScopedAllocator;
-template <typename AllocationT, typename AllocatorHandleType>
+
 class ScopedAllocation : public BnMemory {
   public:
     template <typename T>
     friend class ScopedAllocator;
-    ScopedAllocation(const AllocationT& allocation, const AllocatorHandleType& handle)
-        : mAllocation(allocation), mHandle(handle) {}
+    template <typename Deallocator>
+    ScopedAllocation(const AllocationType& allocation, Deallocator&& deallocator)
+        : mAllocation(allocation), mDeallocator(std::forward<Deallocator>(deallocator)) {}
 
     // Defer the implementation to the underlying mAllocation
 
@@ -125,10 +127,10 @@ class ScopedAllocation : public BnMemory {
     }
 
   private:
-    ~ScopedAllocation() override { mHandle->deallocate(mAllocation); }
+    ~ScopedAllocation() override { mDeallocator(mAllocation); }
 
-    const AllocationT mAllocation;
-    const AllocatorHandleType mHandle;
+    const AllocationType mAllocation;
+    const std::function<void(const AllocationType&)> mDeallocator;
 };
 
 // Allocations are only deallocated when going out of scope.
@@ -136,7 +138,6 @@ class ScopedAllocation : public BnMemory {
 template <typename Allocator>
 class ScopedAllocator {
   public:
-    using HandleT = std::shared_ptr<Allocator>;
     static constexpr size_t alignment() { return Allocator::alignment(); }
 
     explicit ScopedAllocator(const std::shared_ptr<Allocator>& allocator) : mAllocator(allocator) {}
@@ -145,11 +146,16 @@ class ScopedAllocator {
 
     template <typename T>
     auto allocate(T&& request) {
+        std::lock_guard l{*mLock};
         const auto allocation = mAllocator->allocate(std::forward<T>(request));
         if (!allocation) {
-            return sp<ScopedAllocation<AllocationType, HandleT>>{};
+            return sp<ScopedAllocation>{};
         }
-        return sp<ScopedAllocation<AllocationType, HandleT>>::make(allocation, mAllocator);
+        return sp<ScopedAllocation>::make(allocation,
+                [allocator = mAllocator, lock = mLock] (const AllocationType& allocation) {
+                    std::lock_guard l{*lock};
+                    allocator->deallocate(allocation);
+                });
     }
 
     // Deallocate and deallocate_all are implicitly unsafe due to double
@@ -159,20 +165,23 @@ class ScopedAllocator {
     //
     // Owns is only safe to pseudo-impl due to static cast reqs
     template <typename Enable = bool>
-    auto owns(const sp<ScopedAllocation<AllocationType, HandleT>>& allocation) const
+    auto owns(const sp<ScopedAllocation>& allocation) const
             -> std::enable_if_t<shared_allocator_impl::has_owns<Allocator>, Enable> {
+        std::lock_guard l{*mLock};
         return mAllocator->owns(allocation->mAllocation);
     }
 
     template <typename Enable = std::string>
     auto dump() const -> std::enable_if_t<shared_allocator_impl::has_dump<Allocator>, Enable> {
+        std::lock_guard l{*mLock};
         return mAllocator->dump();
     }
 
   private:
     // We store a shared pointer in order to ensure that the allocator outlives
     // allocations (which call back to become dereferenced).
-    const HandleT mAllocator;
+    const std::shared_ptr<Allocator> mAllocator;
+    const std::shared_ptr<std::mutex> mLock = std::make_shared<std::mutex>();
 };
 
 // A simple policy for PolicyAllocator which enforces a pool size and an allocation
