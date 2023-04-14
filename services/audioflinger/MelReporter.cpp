@@ -92,7 +92,8 @@ bool AudioFlinger::MelReporter::shouldComputeMelForDeviceType(audio_devices_t de
     switch (device) {
         case AUDIO_DEVICE_OUT_WIRED_HEADSET:
         case AUDIO_DEVICE_OUT_WIRED_HEADPHONE:
-        case AUDIO_DEVICE_OUT_BLUETOOTH_A2DP:
+        // TODO(b/278265907): enable A2DP when we can distinguish A2DP headsets
+        // case AUDIO_DEVICE_OUT_BLUETOOTH_A2DP:
         case AUDIO_DEVICE_OUT_BLUETOOTH_A2DP_HEADPHONES:
         case AUDIO_DEVICE_OUT_HEARING_AID:
         case AUDIO_DEVICE_OUT_USB_HEADSET:
