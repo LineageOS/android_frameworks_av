@@ -22,6 +22,7 @@
 
 #include <audio_utils/clock.h>
 #include <media/AidlConversion.h>
+#include <media/AidlConversionCore.h>
 #include <media/AidlConversionCppNdk.h>
 #include <media/AidlConversionNdk.h>
 #include <media/AidlConversionUtil.h>
@@ -890,11 +891,10 @@ StreamInHalAidl::StreamInHalAidl(
                 std::move(context), getStreamCommon(stream)),
           mStream(stream), mMicInfoProvider(micInfoProvider) {}
 
-status_t StreamInHalAidl::setGain(float gain __unused) {
+status_t StreamInHalAidl::setGain(float gain) {
     TIME_CHECK();
     if (!mStream) return NO_INIT;
-    ALOGE("%s not implemented yet", __func__);
-    return OK;
+    return statusTFromBinderStatus(mStream->setHwGain({gain}));
 }
 
 status_t StreamInHalAidl::read(void *buffer, size_t bytes, size_t *read) {
@@ -967,19 +967,20 @@ status_t StreamInHalAidl::updateSinkMetadata(
     return statusTFromBinderStatus(mStream->updateMetadata(aidlMetadata));
 }
 
-status_t StreamInHalAidl::setPreferredMicrophoneDirection(
-            audio_microphone_direction_t direction __unused) {
+status_t StreamInHalAidl::setPreferredMicrophoneDirection(audio_microphone_direction_t direction) {
     TIME_CHECK();
     if (!mStream) return NO_INIT;
-    ALOGE("%s not implemented yet", __func__);
-    return OK;
+    ::aidl::android::hardware::audio::core::IStreamIn::MicrophoneDirection aidlDirection =
+              VALUE_OR_RETURN_STATUS(
+                      ::aidl::android::legacy2aidl_audio_microphone_direction_t_MicrophoneDirection(
+                              direction));
+    return statusTFromBinderStatus(mStream->setMicrophoneDirection(aidlDirection));
 }
 
-status_t StreamInHalAidl::setPreferredMicrophoneFieldDimension(float zoom __unused) {
+status_t StreamInHalAidl::setPreferredMicrophoneFieldDimension(float zoom) {
     TIME_CHECK();
     if (!mStream) return NO_INIT;
-    ALOGE("%s not implemented yet", __func__);
-    return OK;
+    return statusTFromBinderStatus(mStream->setMicrophoneFieldDimension(zoom));
 }
 
 } // namespace android
