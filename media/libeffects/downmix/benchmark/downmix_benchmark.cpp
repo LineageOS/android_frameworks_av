@@ -60,34 +60,35 @@ static constexpr effect_uuid_t downmix_uuid = {
 static constexpr size_t kFrameCount = 1000;
 
 /*
-Pixel 4XL
-$ adb shell /data/benchmarktest/downmix_benchmark/vendor/downmix_benchmark
+Pixel 7
+$ atest downmix_benchmark
 
 --------------------------------------------------------
 Benchmark              Time             CPU   Iterations
 --------------------------------------------------------
-BM_Downmix/0        3638 ns         3624 ns       197517 AUDIO_CHANNEL_OUT_MONO
-BM_Downmix/1        4040 ns         4024 ns       178766
-BM_Downmix/2        4759 ns         4740 ns       134741 AUDIO_CHANNEL_OUT_STEREO
-BM_Downmix/3        6042 ns         6017 ns       129546 AUDIO_CHANNEL_OUT_2POINT1
-BM_Downmix/4        6897 ns         6868 ns        96316 AUDIO_CHANNEL_OUT_2POINT0POINT2
-BM_Downmix/5        2117 ns         2109 ns       331705 AUDIO_CHANNEL_OUT_QUAD
-BM_Downmix/6        2097 ns         2088 ns       335421 AUDIO_CHANNEL_OUT_QUAD_SIDE
-BM_Downmix/7        7291 ns         7263 ns        96256 AUDIO_CHANNEL_OUT_SURROUND
-BM_Downmix/8        8246 ns         8206 ns        84318 AUDIO_CHANNEL_OUT_2POINT1POINT2
-BM_Downmix/9        8341 ns         8303 ns        84298 AUDIO_CHANNEL_OUT_3POINT0POINT2
-BM_Downmix/10       7549 ns         7517 ns        84293 AUDIO_CHANNEL_OUT_PENTA
-BM_Downmix/11       9395 ns         9354 ns        75209 AUDIO_CHANNEL_OUT_3POINT1POINT2
-BM_Downmix/12       3267 ns         3253 ns       215596 AUDIO_CHANNEL_OUT_5POINT1
-BM_Downmix/13       3178 ns         3163 ns       220132 AUDIO_CHANNEL_OUT_5POINT1_SIDE
-BM_Downmix/14      10245 ns        10199 ns        67486 AUDIO_CHANNEL_OUT_6POINT1
-BM_Downmix/15      10975 ns        10929 ns        61359 AUDIO_CHANNEL_OUT_5POINT1POINT2
-BM_Downmix/16       3796 ns         3780 ns       184728 AUDIO_CHANNEL_OUT_7POINT1
-BM_Downmix/17      13562 ns        13503 ns        51823 AUDIO_CHANNEL_OUT_5POINT1POINT4
-BM_Downmix/18      13573 ns        13516 ns        51800 AUDIO_CHANNEL_OUT_7POINT1POINT2
-BM_Downmix/19      15502 ns        15435 ns        47147 AUDIO_CHANNEL_OUT_7POINT1POINT4
-BM_Downmix/20      16693 ns        16624 ns        42109 AUDIO_CHANNEL_OUT_13POINT_360RA
-BM_Downmix/21      28267 ns        28116 ns        24982 AUDIO_CHANNEL_OUT_22POINT2
+downmix_benchmark:
+  #BM_Downmix/0     2216 ns    2208 ns       308323
+  #BM_Downmix/1     2237 ns    2228 ns       314730
+  #BM_Downmix/2      270 ns     268 ns      2681469
+  #BM_Downmix/3     3016 ns    2999 ns       234146
+  #BM_Downmix/4     3331 ns    3313 ns       212026
+  #BM_Downmix/5      816 ns     809 ns       864395
+  #BM_Downmix/6      813 ns     809 ns       863876
+  #BM_Downmix/7     3336 ns    3319 ns       211938
+  #BM_Downmix/8     3786 ns    3762 ns       185047
+  #BM_Downmix/9     3810 ns    3797 ns       186840
+  #BM_Downmix/10    3767 ns    3746 ns       187015
+  #BM_Downmix/11    4212 ns    4191 ns       166119
+  #BM_Downmix/12    1245 ns    1231 ns       574388
+  #BM_Downmix/13    1234 ns    1228 ns       574743
+  #BM_Downmix/14    4795 ns    4771 ns       147157
+  #BM_Downmix/15    1334 ns    1327 ns       527728
+  #BM_Downmix/16    1346 ns    1332 ns       525444
+  #BM_Downmix/17    2144 ns    2121 ns       333343
+  #BM_Downmix/18    2133 ns    2118 ns       330391
+  #BM_Downmix/19    2527 ns    2513 ns       278553
+  #BM_Downmix/20    8148 ns    8113 ns        86136
+  #BM_Downmix/21    6332 ns    6301 ns       111134
 */
 
 static void BM_Downmix(benchmark::State& state) {
