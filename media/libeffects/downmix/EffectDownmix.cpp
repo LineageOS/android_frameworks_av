@@ -40,7 +40,7 @@ struct downmix_object_t {
     downmix_type_t type;
     bool apply_volume_correction;
     uint8_t input_channel_count;
-    android::audio_utils::channels::ChannelMix channelMix;
+    android::audio_utils::channels::ChannelMix<AUDIO_CHANNEL_OUT_STEREO> channelMix;
 };
 
 typedef struct downmix_module_s {
