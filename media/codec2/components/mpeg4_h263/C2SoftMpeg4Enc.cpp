@@ -265,14 +265,16 @@ class C2SoftMpeg4Enc::IntfImpl : public SimpleInterface<void>::BaseParams {
                 needsUpdate = true;
             }
         }
-        // If not found, set to the highest supported level.
-        if (!found) {
+        // If not found or exceeds max level, set to the highest supported level.
 #ifdef MPEG4
+        if (!found || me.v.level > LEVEL_MP4V_2) {
             me.set().level = LEVEL_MP4V_2;
-#else
-            me.set().level = LEVEL_H263_40;
-#endif
         }
+#else
+        if (!found || (me.v.level != LEVEL_H263_45 && me.v.level > LEVEL_H263_40)) {
+            me.set().level = LEVEL_H263_40;
+        }
+#endif
         return C2R::Ok();
     }
 
@@ -286,18 +288,6 @@ class C2SoftMpeg4Enc::IntfImpl : public SimpleInterface<void>::BaseParams {
         }
         double period = mSyncFramePeriod->value / 1e6 * mFrameRate->value;
         return (uint32_t)c2_max(c2_min(period + 0.5, double(UINT32_MAX)), 1.);
-    }
-
-    ProfileLevelType getProfileLevel_l() const {
-#ifdef MPEG4
-        if (mProfileLevel->level == LEVEL_MP4V_0) return SIMPLE_PROFILE_LEVEL0;
-        else if (mProfileLevel->level == LEVEL_MP4V_1) return SIMPLE_PROFILE_LEVEL1;
-        return SIMPLE_PROFILE_LEVEL2;  // level == LEVEL_MP4V_2
-#else
-        // library does not export h263 specific levels. No way to map C2 enums to
-        // library specific constants. Return max supported level.
-        return CORE_PROFILE_LEVEL2;
-#endif
     }
 
    private:
@@ -416,7 +406,7 @@ c2_status_t C2SoftMpeg4Enc::initEncParams() {
     mEncParams->encFrameRate[0] = mFrameRate->value + 0.5;
     mEncParams->rcType = VBR_1;
     mEncParams->vbvDelay = VBV_DELAY;
-    mEncParams->profile_level = mProfileLevel;
+    mEncParams->profile_level = CORE_PROFILE_LEVEL2;
     mEncParams->packetSize = 32;
     mEncParams->rvlcEnable = PV_OFF;
     mEncParams->numLayers = 1;
@@ -457,7 +447,6 @@ c2_status_t C2SoftMpeg4Enc::initEncoder() {
         mSize = mIntf->getSize_l();
         mBitrate = mIntf->getBitrate_l();
         mFrameRate = mIntf->getFrameRate_l();
-        mProfileLevel = mIntf->getProfileLevel_l();
     }
     c2_status_t err = initEncParams();
     if (C2_OK != err) {
