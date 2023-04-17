@@ -77,6 +77,16 @@ private:
 struct ConcurrentCodecs {
     ConcurrentCodecsMap mCurrent;
     ConcurrentCodecsMap mPeak;
+    // concurrent HW Video codecs.
+    int mHWVideoCodecs;
+    // concurrent SW Video codecs.
+    int mSWVideoCodecs;
+    // concurrent Video codecs.
+    int mVideoCodecs;
+    // concurrent Audio codecs.
+    int mAudioCodecs;
+    // concurrent Image codecs.
+    int mImageCodecs;
 };
 
 // Current and Peak pixel count for a process.
@@ -119,6 +129,9 @@ public:
     // To be called when a client is stopped.
     void notifyClientStopped(const ClientConfigParcel& clientConfig);
 
+    // To be called when a client's configuration has changed.
+    void notifyClientConfigChanged(const ClientConfigParcel& clientConfig);
+
     // To be called when after a reclaim event.
     void pushReclaimAtom(const ClientInfoParcel& clientInfo,
                          const std::vector<int>& priorities,
@@ -143,8 +156,9 @@ private:
     void increaseConcurrentCodecs(int32_t pid, CodecBucket codecBucket);
     void decreaseConcurrentCodecs(int32_t pid, CodecBucket codecBucket);
 
-    // To increase/decrease the concurrent pixels usage for a process.
+    // To increase/update/decrease the concurrent pixels usage for a process.
     void increasePixelCount(int32_t pid, long pixels);
+    void updatePixelCount(int32_t pid, long newPixels, long lastPixels);
     void decreasePixelCount(int32_t pid, long pixels);
 
     // Issued when the process/application with given pid/uid is terminated.
