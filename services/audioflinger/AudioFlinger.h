@@ -425,6 +425,8 @@ public:
 
     bool        btNrecIsOff() const { return mBtNrecIsOff.load(); }
 
+    void             lock() ACQUIRE(mLock) { mLock.lock(); }
+    void             unlock() RELEASE(mLock) { mLock.unlock(); }
 
 private:
 
