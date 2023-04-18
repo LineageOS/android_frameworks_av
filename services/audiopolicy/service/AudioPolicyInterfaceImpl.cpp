@@ -301,7 +301,8 @@ Status AudioPolicyService::getOutput(AudioStreamType streamAidl, int32_t* _aidl_
     audio_stream_type_t stream = VALUE_OR_RETURN_BINDER_STATUS(
             aidl2legacy_AudioStreamType_audio_stream_type_t(streamAidl));
 
-    if (uint32_t(stream) >= AUDIO_STREAM_PUBLIC_CNT) {
+    if (uint32_t(stream) >= AUDIO_STREAM_PUBLIC_CNT
+          && stream != AUDIO_STREAM_ASSISTANT && stream != AUDIO_STREAM_CALL_ASSISTANT) {
         *_aidl_return = VALUE_OR_RETURN_BINDER_STATUS(
             legacy2aidl_audio_io_handle_t_int32_t(AUDIO_IO_HANDLE_NONE));
         return Status::ok();
