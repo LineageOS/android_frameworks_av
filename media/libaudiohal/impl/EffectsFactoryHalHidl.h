@@ -17,6 +17,7 @@
 #pragma once
 
 #include <memory>
+#include <vector>
 
 #include PATH(android/hardware/audio/effect/FILE_VERSION/IEffectsFactory.h)
 #include <media/audiohal/EffectsFactoryHalInterface.h>
@@ -62,9 +63,19 @@ class EffectsFactoryHalHidl final : public EffectsFactoryHalInterface,
 
     android::detail::AudioHalVersionInfo getHalVersion() const override;
 
+    std::shared_ptr<const effectsConfig::Processings> getProcessings() const override;
+
+    ::android::error::Result<size_t> getSkippedElements() const override;
+
   private:
-    sp<IEffectsFactory> mEffectsFactory;
-    std::unique_ptr<EffectDescriptorCache> mCache;
+    const sp<IEffectsFactory> mEffectsFactory;
+    const std::unique_ptr<EffectDescriptorCache> mCache;
+    /**
+     * Configuration file parser result, used by getProcessings() and getConfigParseResult().
+     * This struct holds the result of parsing a configuration file. The result includes the parsed
+     * configuration data, as well as any errors that occurred during parsing.
+     */
+    const effectsConfig::ParsingResult mParsingResult;
 };
 
 } // namespace effect
