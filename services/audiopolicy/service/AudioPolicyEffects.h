@@ -20,22 +20,33 @@
 #include <stdlib.h>
 #include <stdio.h>
 #include <string.h>
+#include <future>
+
+#include <android-base/thread_annotations.h>
 #include <cutils/misc.h>
 #include <media/AudioEffect.h>
+#include <media/audiohal/EffectsFactoryHalInterface.h>
 #include <system/audio.h>
 #include <utils/Vector.h>
 #include <utils/SortedVector.h>
-#include <android-base/thread_annotations.h>
-
-#include <future>
 
 namespace android {
 
 // ----------------------------------------------------------------------------
 
-// AudioPolicyEffects class
-// This class will manage all effects attached to input and output streams in
-// AudioPolicyService as configured in audio_effects.conf.
+/**
+ * AudioPolicyEffects class.
+ *
+ * This class manages all effects attached to input and output streams in AudioPolicyService.
+ * The effect configurations can be queried in several ways:
+ *
+ * With HIDL HAL, the configuration file `audio_effects.xml` will be loaded by libAudioHal. If this
+ * file does not exist, AudioPolicyEffects class will fallback to load configuration from
+ * `/vendor/etc/audio_effects.conf` (AUDIO_EFFECT_VENDOR_CONFIG_FILE). If this file also does not
+ * exist, the configuration will be loaded from the file `/system/etc/audio_effects.conf`.
+ *
+ * With AIDL HAL, the configuration will be queried with the method `IFactory::queryProcessing()`.
+ */
 class AudioPolicyEffects : public RefBase
 {
 
@@ -44,7 +55,7 @@ public:
     // The constructor will parse audio_effects.conf
     // First it will look whether vendor specific file exists,
     // otherwise it will parse the system default file.
-	         AudioPolicyEffects();
+    explicit AudioPolicyEffects(const sp<EffectsFactoryHalInterface>& effectsFactoryHal);
     virtual ~AudioPolicyEffects();
 
     // NOTE: methods on AudioPolicyEffects should never be called with the AudioPolicyService
@@ -218,7 +229,6 @@ private:
 
     };
 
-
     static const char * const kInputSourceNames[AUDIO_SOURCE_CNT -1];
     static audio_source_t inputSourceNameToEnum(const char *name);
 
@@ -226,8 +236,8 @@ private:
     audio_stream_type_t streamNameToEnum(const char *name);
 
     // Parse audio_effects.conf
-    status_t loadAudioEffectConfig(const char *path); // TODO: add legacy in the name
-    status_t loadAudioEffectXmlConfig(); // TODO: remove "Xml" in the name
+    status_t loadAudioEffectConfigLegacy(const char *path);
+    status_t loadAudioEffectConfig(const sp<EffectsFactoryHalInterface>& effectsFactoryHal);
 
     // Load all effects descriptors in configuration file
     status_t loadEffects(cnode *root, Vector <EffectDesc *>& effects);

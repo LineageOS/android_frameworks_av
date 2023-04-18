@@ -286,7 +286,7 @@ ParsingResult parseWithPath(std::string&& path) {
         return {nullptr, 0, std::move(path)};
     }
 
-    auto config = std::make_unique<Config>();
+    auto config = std::make_shared<Config>();
     size_t nbSkippedElements = 0;
     auto registerFailure = [&nbSkippedElements](bool result) {
         nbSkippedElements += result ? 0 : 1;
