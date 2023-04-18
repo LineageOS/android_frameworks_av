@@ -135,6 +135,10 @@ status_t AudioFlinger::PatchPanel::getAudioPort(struct audio_port_v7 *port)
 status_t AudioFlinger::PatchPanel::createAudioPatch(const struct audio_patch *patch,
                                    audio_patch_handle_t *handle,
                                    bool endpointPatch)
+ //unlocks AudioFlinger::mLock when calling ThreadBase::sendCreateAudioPatchConfigEvent
+ //to avoid deadlocks if the thread loop needs to acquire AudioFlinger::mLock
+ //before processing the create patch request.
+ NO_THREAD_SAFETY_ANALYSIS
 {
     if (handle == NULL || patch == NULL) {
         return BAD_VALUE;
@@ -245,7 +249,6 @@ status_t AudioFlinger::PatchPanel::createAudioPatch(const struct audio_patch *pa
                         status = INVALID_OPERATION;
                         goto exit;
                     }
-
                     sp<ThreadBase> thread =
                             mAudioFlinger.checkPlaybackThread_l(patch->sources[1].ext.mix.handle);
                     if (thread == 0) {
@@ -356,11 +359,12 @@ status_t AudioFlinger::PatchPanel::createAudioPatch(const struct audio_patch *pa
                             goto exit;
                         }
                     }
+                    mAudioFlinger.unlock();
                     status = thread->sendCreateAudioPatchConfigEvent(patch, &halHandle);
+                    mAudioFlinger.lock();
                     if (status == NO_ERROR) {
                         newPatch.setThread(thread);
                     }
-
                     // remove stale audio patch with same input as sink if any
                     for (auto& iter : mPatches) {
                         if (iter.second.mAudioPatch.sinks[0].ext.mix.handle == thread->id()) {
@@ -422,7 +426,9 @@ status_t AudioFlinger::PatchPanel::createAudioPatch(const struct audio_patch *pa
                 mAudioFlinger.updateOutDevicesForRecordThreads_l(devices);
             }
 
+            mAudioFlinger.unlock();
             status = thread->sendCreateAudioPatchConfigEvent(patch, &halHandle);
+            mAudioFlinger.lock();
             if (status == NO_ERROR) {
                 newPatch.setThread(thread);
             }
