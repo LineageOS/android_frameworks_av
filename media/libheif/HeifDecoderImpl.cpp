@@ -476,35 +476,37 @@ bool HeifDecoderImpl::getEncodedColor(HeifEncodedColor* /*outColor*/) const {
 }
 
 bool HeifDecoderImpl::setOutputColor(HeifColorFormat heifColor) {
-    if (heifColor == (HeifColorFormat)mOutputColor) {
-        return true;
-    }
-
+    android_pixel_format_t outputColor;
     switch(heifColor) {
         case kHeifColorFormat_RGB565:
         {
-            mOutputColor = HAL_PIXEL_FORMAT_RGB_565;
+            outputColor = HAL_PIXEL_FORMAT_RGB_565;
             break;
         }
         case kHeifColorFormat_RGBA_8888:
         {
-            mOutputColor = HAL_PIXEL_FORMAT_RGBA_8888;
+            outputColor = HAL_PIXEL_FORMAT_RGBA_8888;
             break;
         }
         case kHeifColorFormat_BGRA_8888:
         {
-            mOutputColor = HAL_PIXEL_FORMAT_BGRA_8888;
+            outputColor = HAL_PIXEL_FORMAT_BGRA_8888;
             break;
         }
         case kHeifColorFormat_RGBA_1010102:
         {
-            mOutputColor = HAL_PIXEL_FORMAT_RGBA_1010102;
+            outputColor = HAL_PIXEL_FORMAT_RGBA_1010102;
             break;
         }
         default:
             ALOGE("Unsupported output color format %d", heifColor);
             return false;
     }
+    if (outputColor == mOutputColor) {
+        return true;
+    }
+
+    mOutputColor = outputColor;
 
     if (mFrameDecoded) {
         return reinit(nullptr);
