@@ -144,7 +144,7 @@ cc_library_shared {
         "libhidlbase",
         "libimage_io",
         "libjpeg",
-        "libjpegrecoverymap",
+        "libultrahdr",
         "libmedia_codeclist",
         "libmedia_omx",
         "libmemunreachable",
