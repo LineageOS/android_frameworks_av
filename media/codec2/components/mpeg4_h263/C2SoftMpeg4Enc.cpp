@@ -243,6 +243,9 @@ class C2SoftMpeg4Enc::IntfImpl : public SimpleInterface<void>::BaseParams {
             needsUpdate = true;
         }
 #endif
+        if (!me.F(me.v.level).supportsAtAll(me.v.level)) {
+            needsUpdate = true;
+        }
         for (const LevelLimits &limit : kLimits) {
             if (sampleRate <= limit.sampleRate && size.v.width <= limit.width &&
                     vbvSize <= limit.vbvSize && size.v.height <= limit.height &&
