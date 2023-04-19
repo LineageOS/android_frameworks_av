@@ -334,7 +334,10 @@ public:
         // By default needsUpdate = false in case the supplied level does meet
         // the requirements. For Level 1b, we want to update the level anyway,
         // so we set it to true in that case.
-        bool needsUpdate = (me.v.level == LEVEL_AVC_1B);
+        bool needsUpdate = false;
+        if (me.v.level == LEVEL_AVC_1B || !me.F(me.v.level).supportsAtAll(me.v.level)) {
+            needsUpdate = true;
+        }
         for (const LevelLimits &limit : kLimits) {
             if (mbs <= limit.mbs && mbsPerSec <= limit.mbsPerSec &&
                     bitrate.v.value <= limit.bitrate) {
