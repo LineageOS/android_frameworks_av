@@ -75,7 +75,6 @@
 
 #include <private/android_filesystem_config.h>
 
-#include "ActivityManager.h"
 #include "MediaRecorderClient.h"
 #include "MediaPlayerService.h"
 #include "MetadataRetrieverClient.h"
@@ -1002,31 +1001,13 @@ status_t MediaPlayerService::Client::setDataSource(
         }
     }
 
-    if (strncmp(url, "content://", 10) == 0) {
-        // get a filedescriptor for the content Uri and
-        // pass it to the setDataSource(fd) method
-
-        String16 url16(url);
-        int fd = android::openContentProviderFile(url16);
-        if (fd < 0)
-        {
-            ALOGE("Couldn't open fd for %s", url);
-            return UNKNOWN_ERROR;
-        }
-        status_t status = setDataSource(fd, 0, 0x7fffffffffLL); // this sets mStatus
-        close(fd);
-        return mStatus = status;
-    } else {
-        player_type playerType = MediaPlayerFactory::getPlayerType(this, url);
-        sp<MediaPlayerBase> p = setDataSource_pre(playerType);
-        if (p == NULL) {
-            return NO_INIT;
-        }
-
-        return mStatus =
-                setDataSource_post(
-                p, p->setDataSource(httpService, url, headers));
+    player_type playerType = MediaPlayerFactory::getPlayerType(this, url);
+    sp<MediaPlayerBase> p = setDataSource_pre(playerType);
+    if (p == NULL) {
+        return NO_INIT;
     }
+
+    return mStatus = setDataSource_post(p, p->setDataSource(httpService, url, headers));
 }
 
 status_t MediaPlayerService::Client::setDataSource(int fd, int64_t offset, int64_t length)
