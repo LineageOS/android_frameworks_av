@@ -2066,7 +2066,10 @@ bool CCodecBufferChannel::handleWork(
     // csd cannot be re-ordered and will always arrive first.
     if (initData != nullptr) {
         Mutexed<Output>::Locked output(mOutput);
-        if (output->buffers && outputFormat) {
+        if (!output->buffers) {
+            return false;
+        }
+        if (outputFormat) {
             output->buffers->updateSkipCutBuffer(outputFormat);
             output->buffers->setFormat(outputFormat);
         }
@@ -2075,7 +2078,7 @@ bool CCodecBufferChannel::handleWork(
         }
         size_t index;
         sp<MediaCodecBuffer> outBuffer;
-        if (output->buffers && output->buffers->registerCsd(initData, &index, &outBuffer) == OK) {
+        if (output->buffers->registerCsd(initData, &index, &outBuffer) == OK) {
             outBuffer->meta()->setInt64("timeUs", timestamp.peek());
             outBuffer->meta()->setInt32("flags", BUFFER_FLAG_CODEC_CONFIG);
             ALOGV("[%s] onWorkDone: csd index = %zu [%p]", mName, index, outBuffer.get());
