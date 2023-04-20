@@ -1116,6 +1116,32 @@ public:
                 void startMelComputation_l(const sp<audio_utils::MelProcessor>& processor) override;
                 void stopMelComputation_l() override;
 
+                void setStandby() {
+                    Mutex::Autolock _l(mLock);
+                    setStandby_l();
+                }
+
+                void setStandby_l() {
+                    mStandby = true;
+                    mHalStarted = false;
+                    mKernelPositionOnStandby =
+                        mTimestamp.mPosition[ExtendedTimestamp::LOCATION_KERNEL];
+                }
+
+                bool waitForHalStart() {
+                    Mutex::Autolock _l(mLock);
+                    static const nsecs_t kWaitHalTimeoutNs = seconds(2);
+                    nsecs_t endWaitTimetNs = systemTime() + kWaitHalTimeoutNs;
+                    while (!mHalStarted) {
+                        nsecs_t timeNs = systemTime();
+                        if (timeNs >= endWaitTimetNs) {
+                            break;
+                        }
+                        nsecs_t waitTimeLeftNs = endWaitTimetNs - timeNs;
+                        mWaitHalStartCV.waitRelative(mLock, waitTimeLeftNs);
+                    }
+                    return mHalStarted;
+                }
 protected:
     // updated by readOutputParameters_l()
     size_t                          mNormalFrameCount;  // normal mixer and effects
@@ -1414,6 +1440,14 @@ private:
 
     // Downstream patch latency, available if mDownstreamLatencyStatMs.getN() > 0.
     audio_utils::Statistics<double> mDownstreamLatencyStatMs{0.999};
+
+    // output stream start detection based on render position returned by the kernel
+    // condition signalled when the output stream has started
+    Condition                mWaitHalStartCV;
+    // true when the output stream render position has moved, reset to false in standby
+    bool                     mHalStarted = false;
+    // last kernel render position saved when entering standby
+    int64_t                  mKernelPositionOnStandby = 0;
 
 public:
     virtual     bool        hasFastMixer() const = 0;
