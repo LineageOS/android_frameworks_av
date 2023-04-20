@@ -35,6 +35,7 @@ cc_defaults {
         "android.hidl.allocator@1.0",
         "android.hidl.memory@1.0",
         "libaudiohal_deathhandler",
+        "libeffectsconfig",
         "libhidlbase",
         "libhidlmemory",
     ],
@@ -281,15 +282,16 @@ cc_library_shared {
         "android.hardware.common.fmq-V1-ndk",
     ],
     shared_libs: [
-        "libbinder_ndk",
         "libaudio_aidl_conversion_common_cpp",
         "libaudio_aidl_conversion_common_ndk",
         "libaudio_aidl_conversion_core_ndk",
         "libaudio_aidl_conversion_effect_ndk",
         "libaudioaidlcommon",
+        "libbinder_ndk",
     ],
     header_libs: [
         "libaudio_system_headers",
+        "libeffectsconfig_headers",
     ],
     cflags: [
         "-Wall",
