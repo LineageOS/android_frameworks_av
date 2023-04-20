@@ -97,6 +97,9 @@ public:
                                     const std::vector<int64_t>& useCaseOverrides);
     virtual void            clearStreamUseCaseOverrides();
 
+    virtual bool            supportsZoomOverride();
+    virtual status_t        setZoomOverride(int32_t zoomOverride);
+
     /**
      * Interface used by CameraService
      */

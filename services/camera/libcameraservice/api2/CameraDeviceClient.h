@@ -204,6 +204,9 @@ public:
     virtual bool          supportsCameraMute();
     virtual status_t      setCameraMute(bool enabled);
 
+    virtual bool          supportsZoomOverride() override;
+    virtual status_t      setZoomOverride(int32_t zoomOverride) override;
+
     virtual status_t      dump(int fd, const Vector<String16>& args);
 
     virtual status_t      dumpClient(int fd, const Vector<String16>& args);
