@@ -128,6 +128,9 @@ class CameraDeviceBase : public virtual FrameProducer {
         int32_t mOriginalTestPatternMode = 0;
         int32_t mOriginalTestPatternData[4] = {};
 
+        // Original value of SETTINGS_OVERRIDE so that they can be restored if
+        // camera service isn't overwriting the app value.
+        int32_t mOriginalSettingsOverride = ANDROID_CONTROL_SETTINGS_OVERRIDE_OFF;
     };
     typedef List<PhysicalCameraSettings> PhysicalCameraSettingsList;
 
@@ -465,6 +468,14 @@ class CameraDeviceBase : public virtual FrameProducer {
      * When muted, black image data is output on all output streams.
      */
     virtual status_t setCameraMute(bool enabled) = 0;
+
+    /**
+     * Whether the camera device supports zoom override.
+     */
+    virtual bool supportsZoomOverride() = 0;
+
+    // Set/reset zoom override
+    virtual status_t setZoomOverride(int32_t zoomOverride) = 0;
 
     /**
      * Enable/disable camera service watchdog
