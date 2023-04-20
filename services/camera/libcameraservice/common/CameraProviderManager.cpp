@@ -1110,7 +1110,7 @@ bool CameraProviderManager::isConcurrentDynamicRangeCaptureSupported(
 
     for (size_t i = 0; i < entry.count; i += 3) {
         if (entry.data.i64[i] == profile) {
-            if (entry.data.i64[i+1] & concurrentProfile) {
+            if ((entry.data.i64[i+1] == 0) || (entry.data.i64[i+1] & concurrentProfile)) {
                 return true;
             }
         }
