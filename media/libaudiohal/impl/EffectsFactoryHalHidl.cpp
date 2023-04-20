@@ -33,10 +33,11 @@
 
 #include "android/media/AudioHalVersion.h"
 
+using ::android::base::unexpected;
 using ::android::detail::AudioHalVersionInfo;
+using ::android::hardware::Return;
 using ::android::hardware::audio::common::CPP_VERSION::implementation::UuidUtils;
 using ::android::hardware::audio::effect::CPP_VERSION::implementation::EffectUtils;
-using ::android::hardware::Return;
 
 namespace android {
 namespace effect {
@@ -78,7 +79,17 @@ EffectDescriptorCache::QueryResult EffectDescriptorCache::queryAllDescriptors(
 }
 
 EffectsFactoryHalHidl::EffectsFactoryHalHidl(sp<IEffectsFactory> effectsFactory)
-        : EffectConversionHelperHidl("EffectsFactory"), mCache(new EffectDescriptorCache) {
+    : EffectConversionHelperHidl("EffectsFactory"),
+      mCache(new EffectDescriptorCache),
+      mEffectProcessings([&]() -> effectsConfig::EffectProcessings {
+          effectsConfig::EffectProcessings processings;
+          const auto& parseResult = effectsConfig::parse();
+          if (!parseResult.parsedConfig) {
+              return INVALID_EFFECT_PROCESSING;
+          }
+          return {parseResult.nbSkippedElement, parseResult.parsedConfig->preprocess,
+                  parseResult.parsedConfig->postprocess, parseResult.parsedConfig->deviceprocess};
+      }()) {
     ALOG_ASSERT(effectsFactory != nullptr, "Provided IEffectsFactory service is NULL");
     mEffectsFactory = std::move(effectsFactory);
 }
@@ -226,6 +237,10 @@ status_t EffectsFactoryHalHidl::mirrorBuffer(void* external, size_t size,
 
 AudioHalVersionInfo EffectsFactoryHalHidl::getHalVersion() const {
     return AudioHalVersionInfo(AudioHalVersionInfo::Type::HIDL, MAJOR_VERSION, MINOR_VERSION);
+}
+
+const effectsConfig::EffectProcessings& EffectsFactoryHalHidl::getProcessings() const {
+    return mEffectProcessings;
 }
 
 } // namespace effect
