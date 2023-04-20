@@ -2159,6 +2159,7 @@ Status CameraService::connectHelper(const sp<CALLBACK>& cameraCb, const String8&
 
         client->setImageDumpMask(mImageDumpMask);
         client->setStreamUseCaseOverrides(mStreamUseCaseOverrides);
+        client->setZoomOverride(mZoomOverrideValue);
     } // lock is destroyed, allow further connect calls
 
     // Important: release the mutex here so the client can call back into the service from its
@@ -5123,6 +5124,8 @@ status_t CameraService::shellCommand(int in, int out, int err, const Vector<Stri
     } else if (args.size() >= 1 && args[0] == String16("clear-stream-use-case-override")) {
         handleClearStreamUseCaseOverrides();
         return OK;
+    } else if (args.size() >= 1 && args[0] == String16("set-zoom-override")) {
+        return handleSetZoomOverride(args);
     } else if (args.size() >= 2 && args[0] == String16("watch")) {
         return handleWatchCommand(args, in, out);
     } else if (args.size() >= 2 && args[0] == String16("set-watchdog")) {
@@ -5364,6 +5367,34 @@ status_t CameraService::handleSetStreamUseCaseOverrides(const Vector<String16>& 
 void CameraService::handleClearStreamUseCaseOverrides() {
     Mutex::Autolock lock(mServiceLock);
     mStreamUseCaseOverrides.clear();
+}
+
+status_t CameraService::handleSetZoomOverride(const Vector<String16>& args) {
+    char* end;
+    int zoomOverrideValue = strtol(String8(args[1]), &end, /*base=*/10);
+    if ((*end != '\0') ||
+            (zoomOverrideValue != -1 &&
+             zoomOverrideValue != ANDROID_CONTROL_SETTINGS_OVERRIDE_OFF &&
+             zoomOverrideValue != ANDROID_CONTROL_SETTINGS_OVERRIDE_ZOOM)) {
+        return BAD_VALUE;
+    }
+
+    Mutex::Autolock lock(mServiceLock);
+    mZoomOverrideValue = zoomOverrideValue;
+
+    const auto clients = mActiveClientManager.getAll();
+    for (auto& current : clients) {
+        if (current != nullptr) {
+            const auto basicClient = current->getValue();
+            if (basicClient.get() != nullptr) {
+                if (basicClient->supportsZoomOverride()) {
+                    basicClient->setZoomOverride(mZoomOverrideValue);
+                }
+            }
+        }
+    }
+
+    return OK;
 }
 
 status_t CameraService::handleWatchCommand(const Vector<String16>& args, int inFd, int outFd) {
@@ -5732,6 +5763,8 @@ status_t CameraService::printHelp(int out) {
         "      Valid values are (case sensitive): DEFAULT, PREVIEW, STILL_CAPTURE, VIDEO_RECORD,\n"
         "      PREVIEW_VIDEO_STILL, VIDEO_CALL, CROPPED_RAW\n"
         "  clear-stream-use-case-override clear the stream use case override\n"
+        "  set-zoom-override <-1/0/1> enable or disable zoom override\n"
+        "      Valid values -1: do not override, 0: override to OFF, 1: override to ZOOM\n"
         "  watch <start|stop|dump|print|clear> manages tag monitoring in connected clients\n"
         "  help print this message\n");
 }
