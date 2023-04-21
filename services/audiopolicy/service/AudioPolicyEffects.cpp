@@ -41,24 +41,25 @@ using content::AttributionSourceState;
 // AudioPolicyEffects Implementation
 // ----------------------------------------------------------------------------
 
-AudioPolicyEffects::AudioPolicyEffects(const sp<EffectsFactoryHalInterface>& effectsFactoryHal) {
-    // load xml config with effectsFactoryHal
-    status_t loadResult = loadAudioEffectConfig(effectsFactoryHal);
+AudioPolicyEffects::AudioPolicyEffects()
+{
+    status_t loadResult = loadAudioEffectXmlConfig();
     if (loadResult == NO_ERROR) {
-        mDefaultDeviceEffectFuture =
-                std::async(std::launch::async, &AudioPolicyEffects::initDefaultDeviceEffects, this);
+        mDefaultDeviceEffectFuture = std::async(
+                    std::launch::async, &AudioPolicyEffects::initDefaultDeviceEffects, this);
     } else if (loadResult < 0) {
-        ALOGW("Failed to query effect configuration, fallback to load .conf");
+        ALOGW("Failed to load XML effect configuration, fallback to .conf");
         // load automatic audio effect modules
         if (access(AUDIO_EFFECT_VENDOR_CONFIG_FILE, R_OK) == 0) {
-            loadAudioEffectConfigLegacy(AUDIO_EFFECT_VENDOR_CONFIG_FILE);
+            loadAudioEffectConfig(AUDIO_EFFECT_VENDOR_CONFIG_FILE);
         } else if (access(AUDIO_EFFECT_DEFAULT_CONFIG_FILE, R_OK) == 0) {
-            loadAudioEffectConfigLegacy(AUDIO_EFFECT_DEFAULT_CONFIG_FILE);
+            loadAudioEffectConfig(AUDIO_EFFECT_DEFAULT_CONFIG_FILE);
         }
     } else if (loadResult > 0) {
         ALOGE("Effect config is partially invalid, skipped %d elements", loadResult);
     }
 }
+
 
 AudioPolicyEffects::~AudioPolicyEffects()
 {
@@ -906,15 +907,11 @@ status_t AudioPolicyEffects::loadEffects(cnode *root, Vector <EffectDesc *>& eff
     return NO_ERROR;
 }
 
-status_t AudioPolicyEffects::loadAudioEffectConfig(
-        const sp<EffectsFactoryHalInterface>& effectsFactoryHal) {
-    if (!effectsFactoryHal) {
-        ALOGE("%s Null EffectsFactoryHalInterface", __func__);
-        return UNEXPECTED_NULL;
+status_t AudioPolicyEffects::loadAudioEffectXmlConfig() {
+    auto result = effectsConfig::parse();
+    if (result.parsedConfig == nullptr) {
+        return -ENOENT;
     }
-
-    const auto& processings = effectsFactoryHal->getProcessings();
-    const auto& skippedElements = VALUE_OR_RETURN_STATUS(processings.result);
 
     auto loadProcessingChain = [](auto& processingChain, auto& streams) {
         for (auto& stream : processingChain) {
@@ -927,8 +924,9 @@ status_t AudioPolicyEffects::loadAudioEffectConfig(
         }
     };
 
-    auto loadDeviceProcessingChain = [](auto& processingChain, auto& devicesEffects) {
+    auto loadDeviceProcessingChain = [](auto &processingChain, auto& devicesEffects) {
         for (auto& deviceProcess : processingChain) {
+
             auto effectDescs = std::make_unique<EffectDescVector>();
             for (auto& effect : deviceProcess.effects) {
                 effectDescs->mEffects.add(
@@ -940,18 +938,17 @@ status_t AudioPolicyEffects::loadAudioEffectConfig(
         }
     };
 
-    loadProcessingChain(processings.preprocess, mInputSources);
-    loadProcessingChain(processings.postprocess, mOutputStreams);
-
+    loadProcessingChain(result.parsedConfig->preprocess, mInputSources);
+    loadProcessingChain(result.parsedConfig->postprocess, mOutputStreams);
     {
         Mutex::Autolock _l(mLock);
-        loadDeviceProcessingChain(processings.deviceprocess, mDeviceEffects);
+        loadDeviceProcessingChain(result.parsedConfig->deviceprocess, mDeviceEffects);
     }
-
-    return skippedElements;
+    // Casting from ssize_t to status_t is probably safe, there should not be more than 2^31 errors
+    return result.nbSkippedElement;
 }
 
-status_t AudioPolicyEffects::loadAudioEffectConfigLegacy(const char *path)
+status_t AudioPolicyEffects::loadAudioEffectConfig(const char *path)
 {
     cnode *root;
     char *data;

@@ -22,10 +22,8 @@
  * @see audio_effects_conf_V2_0.xsd for documentation on each structure
  */
 
-#include <error/Result.h>
 #include <system/audio_effect.h>
 
-#include <cstddef>
 #include <map>
 #include <memory>
 #include <string>
@@ -75,14 +73,6 @@ using InputStream = Stream<audio_source_t>;
 
 struct DeviceEffects : Stream<audio_devices_t> {
     std::string address;
-};
-
-struct EffectProcessings {
-    // status_t if parser return error, skipped element if parsing result is OK
-    ::android::error::Result<size_t /* skipped element, 0 by default */> result;
-    std::vector<InputStream> preprocess;
-    std::vector<OutputStream> postprocess;
-    std::vector<DeviceEffects> deviceprocess;
 };
 
 /** Parsed configuration.
