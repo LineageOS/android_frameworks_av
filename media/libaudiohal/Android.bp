@@ -74,6 +74,12 @@ cc_library_shared {
 cc_library_headers {
     name: "libaudiohal_headers",
 
+    header_libs: [
+        "libeffectsconfig_headers",
+    ],
+
+    export_header_lib_headers: ["libeffectsconfig_headers"],
+
     export_include_dirs: ["include"],
 }
 
