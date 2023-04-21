@@ -692,6 +692,11 @@ HidlProviderInfo::HidlDeviceInfo3::HidlDeviceInfo3(
 
     mTorchStrengthLevel = 0;
 
+    if (!kEnableLazyHal) {
+        // Save HAL reference indefinitely
+        mSavedInterface = interface;
+    }
+
     queryPhysicalCameraIds();
 
     // Get physical camera characteristics if applicable
@@ -752,13 +757,6 @@ HidlProviderInfo::HidlDeviceInfo3::HidlDeviceInfo3(
             }
         }
     }
-
-    if (!kEnableLazyHal) {
-        // Save HAL reference indefinitely
-        mSavedInterface = interface;
-    }
-
-
 }
 
 status_t HidlProviderInfo::HidlDeviceInfo3::setTorchMode(bool enabled) {
