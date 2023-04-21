@@ -30,6 +30,7 @@
 #include <audio_utils/fixedfft.h>
 #include <cutils/bitops.h>
 #include <hardware/sensors.h>
+#include <media/audiohal/EffectsFactoryHalInterface.h>
 #include <media/stagefright/foundation/AHandler.h>
 #include <media/stagefright/foundation/AMessage.h>
 #include <media/MediaMetricsItem.h>
@@ -214,17 +215,18 @@ const std::vector<const char *> Spatializer::sHeadPoseKeys = {
 };
 
 // ---------------------------------------------------------------------------
-sp<Spatializer> Spatializer::create(SpatializerPolicyCallback* callback,
-                                    const sp<EffectsFactoryHalInterface>& effectsFactoryHal) {
+sp<Spatializer> Spatializer::create(SpatializerPolicyCallback *callback) {
     sp<Spatializer> spatializer;
 
+    sp<EffectsFactoryHalInterface> effectsFactoryHal = EffectsFactoryHalInterface::create();
     if (effectsFactoryHal == nullptr) {
         ALOGW("%s failed to create effect factory interface", __func__);
         return spatializer;
     }
 
     std::vector<effect_descriptor_t> descriptors;
-    status_t status = effectsFactoryHal->getDescriptors(FX_IID_SPATIALIZER, &descriptors);
+    status_t status =
+            effectsFactoryHal->getDescriptors(FX_IID_SPATIALIZER, &descriptors);
     if (status != NO_ERROR) {
         ALOGW("%s failed to get spatializer descriptor, error %d", __func__, status);
         return spatializer;
