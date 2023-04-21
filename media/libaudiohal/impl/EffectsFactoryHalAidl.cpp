@@ -23,7 +23,6 @@
 //#define LOG_NDEBUG 0
 
 #include <error/expected_utils.h>
-#include <aidl/android/media/audio/common/AudioStreamType.h>
 #include <android/binder_manager.h>
 #include <media/AidlConversionCppNdk.h>
 #include <media/AidlConversionEffect.h>
@@ -36,13 +35,11 @@
 #include "EffectsFactoryHalAidl.h"
 
 using ::aidl::android::legacy2aidl_audio_uuid_t_AudioUuid;
-using ::aidl::android::aidl_utils::statusTFromBinderStatus;
-using ::aidl::android::hardware::audio::effect::Descriptor;
-using ::aidl::android::hardware::audio::effect::IFactory;
-using ::aidl::android::hardware::audio::effect::Processing;
-using ::aidl::android::media::audio::common::AudioUuid;
-using ::android::base::unexpected;
-using ::android::detail::AudioHalVersionInfo;
+using aidl::android::aidl_utils::statusTFromBinderStatus;
+using aidl::android::hardware::audio::effect::Descriptor;
+using aidl::android::hardware::audio::effect::IFactory;
+using aidl::android::media::audio::common::AudioUuid;
+using android::detail::AudioHalVersionInfo;
 
 namespace android {
 namespace effect {
@@ -95,8 +92,7 @@ EffectsFactoryHalAidl::EffectsFactoryHalAidl(std::shared_ptr<IFactory> effectsFa
                        [](const Descriptor& desc) { return !desc.common.id.proxy.has_value(); });
           return list;
       }()),
-      mEffectCount(mNonProxyDescList.size() + mProxyDescList.size()),
-      mEffectProcessings(INVALID_EFFECT_PROCESSING) {
+      mEffectCount(mNonProxyDescList.size() + mProxyDescList.size()) {
     ALOG_ASSERT(mFactory != nullptr, "Provided IEffectsFactory service is NULL");
     ALOGI("%s with %zu nonProxyEffects and %zu proxyEffects", __func__, mNonProxyDescList.size(),
           mProxyDescList.size());
@@ -271,10 +267,6 @@ status_t EffectsFactoryHalAidl::getHalDescriptorWithTypeUuid(
 
 bool EffectsFactoryHalAidl::isProxyEffect(const AudioUuid& uuid) const {
     return 0 != mUuidProxyMap.count(uuid);
-}
-
-const effectsConfig::EffectProcessings& EffectsFactoryHalAidl::getProcessings() const {
-    return mEffectProcessings;
 }
 
 } // namespace effect
