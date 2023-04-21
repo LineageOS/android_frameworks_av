@@ -253,6 +253,11 @@ class Camera3OutputStream :
     virtual void onMinDurationChanged(nsecs_t duration, bool fixedFps) override;
 
     /**
+     * Modify stream use case
+     */
+    virtual void setStreamUseCase(int64_t streamUseCase) override;
+
+    /**
      * Apply ZSL related consumer usage quirk.
      */
     static void applyZSLUsageQuirk(int format, uint64_t *consumerUsage /*inout*/);
