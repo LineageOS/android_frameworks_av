@@ -62,8 +62,6 @@ class EffectsFactoryHalAidl final : public EffectsFactoryHalInterface {
 
     detail::AudioHalVersionInfo getHalVersion() const override;
 
-    const effectsConfig::EffectProcessings& getProcessings() const override;
-
   private:
     const std::shared_ptr<IFactory> mFactory;
     const detail::AudioHalVersionInfo mHalVersion;
@@ -79,8 +77,6 @@ class EffectsFactoryHalAidl final : public EffectsFactoryHalInterface {
     const std::vector<Descriptor> mNonProxyDescList;
     // total number of effects including proxy effects
     const size_t mEffectCount;
-    // Query result and all processing from effect factory
-    const effectsConfig::EffectProcessings mEffectProcessings;
 
     std::mutex mLock;
     uint64_t mEffectIdCounter GUARDED_BY(mLock) = 0;  // Align with HIDL (0 is INVALID_ID)
