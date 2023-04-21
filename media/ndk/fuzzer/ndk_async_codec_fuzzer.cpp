@@ -60,11 +60,7 @@ class CallBackHandle {
   public:
     CallBackHandle() : mSawError(false), mIsDone(false) {}
 
-    virtual ~CallBackHandle() {
-        if (mIOThread.joinable()) {
-            mIOThread.join();
-        }
-    }
+    virtual ~CallBackHandle() {}
 
     void ioThread();
 
@@ -88,7 +84,6 @@ class CallBackHandle {
     // Keep a queue of all function callbacks.
     typedef function<void()> IOTask;
     CallBackQueue<IOTask> mIOQueue;
-    thread mIOThread;
     bool mSawError;
     bool mIsDone;
 };
@@ -144,6 +139,11 @@ class NdkAsyncCodecFuzzer : public NdkMediaCodecFuzzerBase, public CallBackHandl
         mNumOfFrames = 0;
         mNumInputFrames = 0;
     };
+    ~NdkAsyncCodecFuzzer() {
+        mIOThreadPool->stop();
+        delete (mIOThreadPool);
+    };
+
     void process();
 
     static void codecOnFrameRendered(AMediaCodec* codec, void* userdata, int64_t mediaTimeUs,
@@ -152,6 +152,20 @@ class NdkAsyncCodecFuzzer : public NdkMediaCodecFuzzerBase, public CallBackHandl
         (void)userdata;
         (void)mediaTimeUs;
         (void)systemNano;
+    };
+    class ThreadPool {
+      public:
+        void start();
+        void queueJob(const std::function<void()>& job);
+        void stop();
+
+      private:
+        void ThreadLoop();
+        bool mShouldTerminate = false;
+        std::vector<std::thread> mThreads;
+        std::mutex mQueueMutex;
+        std::condition_variable mQueueMutexCondition;
+        std::queue<std::function<void()>> mJobs;
     };
 
   private:
@@ -172,7 +186,52 @@ class NdkAsyncCodecFuzzer : public NdkMediaCodecFuzzerBase, public CallBackHandl
     int32_t mNumInputFrames;
     mutable Mutex mMutex;
     bool mIsEncoder;
+    ThreadPool* mIOThreadPool = new ThreadPool();
 };
+
+void NdkAsyncCodecFuzzer::ThreadPool::start() {
+    const uint32_t numThreads = std::thread::hardware_concurrency();
+    mThreads.resize(numThreads);
+    for (uint32_t i = 0; i < numThreads; ++i) {
+        mThreads.at(i) = std::thread(&ThreadPool::ThreadLoop, this);
+    }
+}
+
+void NdkAsyncCodecFuzzer::ThreadPool::ThreadLoop() {
+    while (true) {
+        std::function<void()> job;
+        {
+            std::unique_lock<std::mutex> lock(mQueueMutex);
+            mQueueMutexCondition.wait(lock, [this] { return !mJobs.empty() || mShouldTerminate; });
+            if (mShouldTerminate) {
+                return;
+            }
+            job = mJobs.front();
+            mJobs.pop();
+        }
+        job();
+    }
+}
+
+void NdkAsyncCodecFuzzer::ThreadPool::queueJob(const std::function<void()>& job) {
+    {
+        std::unique_lock<std::mutex> lock(mQueueMutex);
+        mJobs.push(job);
+    }
+    mQueueMutexCondition.notify_one();
+}
+
+void NdkAsyncCodecFuzzer::ThreadPool::stop() {
+    {
+        std::unique_lock<std::mutex> lock(mQueueMutex);
+        mShouldTerminate = true;
+    }
+    mQueueMutexCondition.notify_all();
+    for (std::thread& active_thread : mThreads) {
+        active_thread.join();
+    }
+    mThreads.clear();
+}
 
 void NdkAsyncCodecFuzzer::receiveError(void) {
     mSignalledError = true;
@@ -258,7 +317,7 @@ void NdkAsyncCodecFuzzer::invokekAsyncCodecAPIs(bool isEncoder) {
         AMediaCodecOnAsyncNotifyCallback callBack = {onAsyncInputAvailable, onAsyncOutputAvailable,
                                                      onAsyncFormatChanged, onAsyncError};
         AMediaCodec_setAsyncNotifyCallback(mCodec, callBack, this);
-        mIOThread = thread(&CallBackHandle::ioThread, this);
+        mIOThreadPool->queueJob([this] { CallBackHandle::ioThread(); });
 
         AMediaCodec_start(mCodec);
         sleep(5);
@@ -322,6 +381,8 @@ void NdkAsyncCodecFuzzer::invokekAsyncCodecAPIs(bool isEncoder) {
 }
 
 void NdkAsyncCodecFuzzer::invokeAsyncCodeConfigAPI() {
+    mIOThreadPool->start();
+
     while (mFdp.remaining_bytes() > 0) {
         mIsEncoder = mFdp.ConsumeBool();
         mCodec = createCodec(mIsEncoder, mFdp.ConsumeBool() /* isCodecForClient */);
@@ -330,6 +391,7 @@ void NdkAsyncCodecFuzzer::invokeAsyncCodeConfigAPI() {
             AMediaCodec_delete(mCodec);
         }
     }
+    mIOThreadPool->stop();
 }
 
 void NdkAsyncCodecFuzzer::invokeCodecCryptoInfoAPI() {
