@@ -4023,7 +4023,7 @@ NO_THREAD_SAFETY_ANALYSIS  // manual locking of AudioFlinger
                         LOG_AUDIO_STATE();
                         mThreadMetrics.logEndInterval();
                         mThreadSnapshot.onEnd();
-                        mStandby = true;
+                        setStandby_l();
                     }
                     sendStatistics(false /* force */);
                 }
@@ -4106,6 +4106,14 @@ NO_THREAD_SAFETY_ANALYSIS  // manual locking of AudioFlinger
 
             for (const auto &track : mActiveTracks ) {
                 track->updateTeePatches();
+            }
+
+            // signal actual start of output stream when the render position reported by the kernel
+            // starts moving.
+            if (!mStandby && !mHalStarted && mKernelPositionOnStandby !=
+                    mTimestamp.mPosition[ExtendedTimestamp::LOCATION_KERNEL]) {
+                mHalStarted = true;
+                mWaitHalStartCV.broadcast();
             }
         } // mLock scope ends
 
@@ -4492,7 +4500,7 @@ NO_THREAD_SAFETY_ANALYSIS  // manual locking of AudioFlinger
 
     if (!mStandby) {
         threadLoop_standby();
-        mStandby = true;
+        setStandby();
     }
 
     releaseWakeLock();
@@ -6243,7 +6251,7 @@ bool AudioFlinger::MixerThread::checkForNewParameter_l(const String8& keyValuePa
             if (!mStandby) {
                 mThreadMetrics.logEndInterval();
                 mThreadSnapshot.onEnd();
-                mStandby = true;
+                setStandby_l();
             }
             mBytesWritten = 0;
             status = mOutput->stream->setParameters(keyValuePair);
@@ -6894,7 +6902,7 @@ bool AudioFlinger::DirectOutputThread::checkForNewParameter_l(const String8& key
             if (!mStandby) {
                 mThreadMetrics.logEndInterval();
                 mThreadSnapshot.onEnd();
-                mStandby = true;
+                setStandby_l();
             }
             mBytesWritten = 0;
             status = mOutput->stream->setParameters(keyValuePair);
