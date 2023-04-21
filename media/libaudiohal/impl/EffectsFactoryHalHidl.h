@@ -66,8 +66,8 @@ class EffectsFactoryHalHidl final : public EffectsFactoryHalInterface,
     const effectsConfig::EffectProcessings& getProcessings() const override;
 
   private:
-    const sp<IEffectsFactory> mEffectsFactory;
-    const std::unique_ptr<EffectDescriptorCache> mCache;
+    sp<IEffectsFactory> mEffectsFactory;
+    std::unique_ptr<EffectDescriptorCache> mCache;
     // Configuration file parser result together with all processings from effect factory
     const effectsConfig::EffectProcessings mEffectProcessings;
 };

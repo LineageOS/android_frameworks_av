@@ -80,20 +80,18 @@ EffectDescriptorCache::QueryResult EffectDescriptorCache::queryAllDescriptors(
 
 EffectsFactoryHalHidl::EffectsFactoryHalHidl(sp<IEffectsFactory> effectsFactory)
     : EffectConversionHelperHidl("EffectsFactory"),
-      mEffectsFactory(std::move(effectsFactory)),
       mCache(new EffectDescriptorCache),
-      mEffectProcessings(
-              [&]() -> effectsConfig::EffectProcessings {
-                  effectsConfig::EffectProcessings processings;
-                  const auto& parseResult = effectsConfig::parse();
-                  if (!parseResult.parsedConfig) {
-                      return INVALID_EFFECT_PROCESSING;
-                  }
-                  return {parseResult.nbSkippedElement, parseResult.parsedConfig->preprocess,
-                          parseResult.parsedConfig->postprocess,
-                          parseResult.parsedConfig->deviceprocess};
-              }()) {
+      mEffectProcessings([&]() -> effectsConfig::EffectProcessings {
+          effectsConfig::EffectProcessings processings;
+          const auto& parseResult = effectsConfig::parse();
+          if (!parseResult.parsedConfig) {
+              return INVALID_EFFECT_PROCESSING;
+          }
+          return {parseResult.nbSkippedElement, parseResult.parsedConfig->preprocess,
+                  parseResult.parsedConfig->postprocess, parseResult.parsedConfig->deviceprocess};
+      }()) {
     ALOG_ASSERT(effectsFactory != nullptr, "Provided IEffectsFactory service is NULL");
+    mEffectsFactory = std::move(effectsFactory);
 }
 
 status_t EffectsFactoryHalHidl::queryNumberEffects(uint32_t *pNumEffects) {
