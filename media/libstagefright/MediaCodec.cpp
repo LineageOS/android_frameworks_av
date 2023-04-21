@@ -118,15 +118,6 @@ static const char *kCodecFrameRate = "android.media.mediacodec.frame-rate";
 static const char *kCodecCaptureRate = "android.media.mediacodec.capture-rate";
 static const char *kCodecOperatingRate = "android.media.mediacodec.operating-rate";
 static const char *kCodecPriority = "android.media.mediacodec.priority";
-static const char *kCodecConfigColorStandard = "android.media.mediacodec.config-color-standard";
-static const char *kCodecConfigColorRange = "android.media.mediacodec.config-color-range";
-static const char *kCodecConfigColorTransfer = "android.media.mediacodec.config-color-transfer";
-static const char *kCodecParsedColorStandard = "android.media.mediacodec.parsed-color-standard";
-static const char *kCodecParsedColorRange = "android.media.mediacodec.parsed-color-range";
-static const char *kCodecParsedColorTransfer = "android.media.mediacodec.parsed-color-transfer";
-static const char *kCodecHDRStaticInfo = "android.media.mediacodec.hdr-static-info";
-static const char *kCodecHDR10PlusInfo = "android.media.mediacodec.hdr10-plus-info";
-static const char *kCodecHDRFormat = "android.media.mediacodec.hdr-format";
 
 // Min/Max QP before shaping
 static const char *kCodecOriginalVideoQPIMin = "android.media.mediacodec.original-video-qp-i-min";
@@ -175,6 +166,29 @@ static const char *kCodecVideoEncodedFrames = "android.media.mediacodec.vencode.
 static const char *kCodecVideoInputBytes = "android.media.mediacodec.video.input.bytes";
 static const char *kCodecVideoInputFrames = "android.media.mediacodec.video.input.frames";
 static const char *kCodecVideoEncodedDurationUs = "android.media.mediacodec.vencode.durationUs";
+// HDR metrics
+static const char *kCodecConfigColorStandard = "android.media.mediacodec.config-color-standard";
+static const char *kCodecConfigColorRange = "android.media.mediacodec.config-color-range";
+static const char *kCodecConfigColorTransfer = "android.media.mediacodec.config-color-transfer";
+static const char *kCodecParsedColorStandard = "android.media.mediacodec.parsed-color-standard";
+static const char *kCodecParsedColorRange = "android.media.mediacodec.parsed-color-range";
+static const char *kCodecParsedColorTransfer = "android.media.mediacodec.parsed-color-transfer";
+static const char *kCodecHDRStaticInfo = "android.media.mediacodec.hdr-static-info";
+static const char *kCodecHDR10PlusInfo = "android.media.mediacodec.hdr10-plus-info";
+static const char *kCodecHDRFormat = "android.media.mediacodec.hdr-format";
+// array/sync/async/block modes
+static const char *kCodecArrayMode = "android.media.mediacodec.array-mode";
+static const char *kCodecOperationMode = "android.media.mediacodec.operation-mode";
+static const char *kCodecOutputSurface = "android.media.mediacodec.output-surface";
+// max size configured by the app
+static const char *kCodecAppMaxInputSize = "android.media.mediacodec.app-max-input-size";
+// max size actually used
+static const char *kCodecUsedMaxInputSize = "android.media.mediacodec.used-max-input-size";
+// max size suggested by the codec
+static const char *kCodecCodecMaxInputSize = "android.media.mediacodec.codec-max-input-size";
+static const char *kCodecFlushCount = "android.media.mediacodec.flush-count";
+static const char *kCodecSetSurfaceCount = "android.media.mediacodec.set-surface-count";
+static const char *kCodecResolutionChangeCount = "android.media.mediacodec.resolution-change-count";
 
 // the kCodecRecent* fields appear only in getMetrics() results
 static const char *kCodecRecentLatencyMax = "android.media.mediacodec.recent.max";      /* in us */
@@ -935,7 +949,6 @@ MediaCodec::MediaCodec(
       mWidth(0),
       mHeight(0),
       mRotationDegrees(0),
-      mHdrInfoFlags(0),
       mDequeueInputTimeoutGeneration(0),
       mDequeueInputReplyID(0),
       mDequeueOutputTimeoutGeneration(0),
@@ -1043,6 +1056,14 @@ void MediaCodec::initMediametrics() {
     }
 
     mLifetimeStartNs = systemTime(SYSTEM_TIME_MONOTONIC);
+    resetMetricsFields();
+}
+
+void MediaCodec::resetMetricsFields() {
+    mHdrInfoFlags = 0;
+
+    mApiUsageMetrics = ApiUsageMetrics();
+    mReliabilityContextMetrics = ReliabilityContextMetrics();
 }
 
 void MediaCodec::updateMediametrics() {
@@ -1052,6 +1073,28 @@ void MediaCodec::updateMediametrics() {
     }
 
     Mutex::Autolock _lock(mMetricsLock);
+
+    mediametrics_setInt32(mMetricsHandle, kCodecArrayMode, mApiUsageMetrics.isArrayMode ? 1 : 0);
+    mApiUsageMetrics.operationMode = (mFlags & kFlagIsAsync) ?
+            ((mFlags & kFlagUseBlockModel) ? ApiUsageMetrics::kBlockMode
+                    : ApiUsageMetrics::kAsynchronousMode)
+            : ApiUsageMetrics::kSynchronousMode;
+    mediametrics_setInt32(mMetricsHandle, kCodecOperationMode, mApiUsageMetrics.operationMode);
+    mediametrics_setInt32(mMetricsHandle, kCodecOutputSurface,
+            mApiUsageMetrics.isUsingOutputSurface ? 1 : 0);
+
+    mediametrics_setInt32(mMetricsHandle, kCodecAppMaxInputSize,
+            mApiUsageMetrics.inputBufferSize.appMax);
+    mediametrics_setInt32(mMetricsHandle, kCodecUsedMaxInputSize,
+            mApiUsageMetrics.inputBufferSize.usedMax);
+    mediametrics_setInt32(mMetricsHandle, kCodecCodecMaxInputSize,
+            mApiUsageMetrics.inputBufferSize.codecMax);
+
+    mediametrics_setInt32(mMetricsHandle, kCodecFlushCount, mReliabilityContextMetrics.flushCount);
+    mediametrics_setInt32(mMetricsHandle, kCodecSetSurfaceCount,
+            mReliabilityContextMetrics.setOutputSurfaceCount);
+    mediametrics_setInt32(mMetricsHandle, kCodecResolutionChangeCount,
+            mReliabilityContextMetrics.resolutionChangeCount);
 
     if (mLatencyHist.getCount() != 0 ) {
         mediametrics_setInt64(mMetricsHandle, kCodecLatencyMax, mLatencyHist.getMax());
@@ -1295,7 +1338,7 @@ void MediaCodec::flushMediametrics() {
 
     // update does its own mutex locking
     updateMediametrics();
-    mHdrInfoFlags = 0;
+    resetMetricsFields();
 
     // ensure mutex while we do our own work
     Mutex::Autolock _lock(mMetricsLock);
@@ -1966,6 +2009,10 @@ status_t MediaCodec::configure(
             int32_t colorFormat = -1;
             if (format->findInt32("color-format", &colorFormat)) {
                 mediametrics_setInt32(nextMetricsHandle, kCodecColorFormat, colorFormat);
+            }
+            int32_t appMaxInputSize = -1;
+            if (format->findInt32(KEY_MAX_INPUT_SIZE, &appMaxInputSize)) {
+                mApiUsageMetrics.inputBufferSize.appMax = appMaxInputSize;
             }
             if (mDomain == DOMAIN_VIDEO) {
                 float frameRate = -1.0;
@@ -3768,6 +3815,10 @@ void MediaCodec::onMessageReceived(const sp<AMessage> &msg) {
                             mediametrics_setInt32(mMetricsHandle, kCodecLevel, level);
                         }
                         updateHdrMetrics(true /* isConfig */);
+                        int32_t codecMaxInputSize = -1;
+                        if (mInputFormat->findInt32(KEY_MAX_INPUT_SIZE, &codecMaxInputSize)) {
+                            mApiUsageMetrics.inputBufferSize.codecMax = codecMaxInputSize;
+                        }
                         // bitrate and bitrate mode, encoder only
                         if (mFlags & kFlagIsEncoder) {
                             // encoder specific values
@@ -4168,6 +4219,7 @@ void MediaCodec::onMessageReceived(const sp<AMessage> &msg) {
                         setState(STARTED);
                         mCodec->signalResume();
                     }
+                    mReliabilityContextMetrics.flushCount++;
 
                     postPendingRepliesAndDeferredMessages("kWhatFlushCompleted");
                     break;
@@ -4328,6 +4380,8 @@ void MediaCodec::onMessageReceived(const sp<AMessage> &msg) {
                 handleSetSurface(NULL);
             }
 
+            mApiUsageMetrics.isUsingOutputSurface = true;
+
             uint32_t flags;
             CHECK(msg->findInt32("flags", (int32_t *)&flags));
             if (flags & CONFIGURE_FLAG_USE_BLOCK_MODEL ||
@@ -4468,6 +4522,7 @@ void MediaCodec::onMessageReceived(const sp<AMessage> &msg) {
                                 (void)disconnectFromSurface();
                                 mSurface = surface;
                             }
+                            mReliabilityContextMetrics.setOutputSurfaceCount++;
                         }
                     }
                     break;
@@ -5005,6 +5060,8 @@ void MediaCodec::onMessageReceived(const sp<AMessage> &msg) {
                 }
             }
 
+            mApiUsageMetrics.isArrayMode = true;
+
             (new AMessage)->postReply(replyID);
             break;
         }
@@ -5273,6 +5330,7 @@ void MediaCodec::handleOutputFormatChangeIfNeeded(const sp<MediaCodecBuffer> &bu
         ClientConfigParcel clientConfig;
         initClientConfigParcel(clientConfig);
         mResourceManagerProxy->notifyClientConfigChanged(clientConfig);
+        mReliabilityContextMetrics.resolutionChangeCount++;
     }
 
     updateHdrMetrics(false /* isConfig */);
@@ -5708,6 +5766,10 @@ status_t MediaCodec::onQueueInputBuffer(const sp<AMessage> &msg) {
     if (err != OK) {
         return -EINVAL;
     }
+
+    int32_t usedMaxInputSize = mApiUsageMetrics.inputBufferSize.usedMax;
+    mApiUsageMetrics.inputBufferSize.usedMax = size > usedMaxInputSize ? size : usedMaxInputSize;
+
     if (hasCryptoOrDescrambler() && !c2Buffer && !memory) {
         AString *errorDetailMsg;
         CHECK(msg->findPointer("errorDetailMsg", (void **)&errorDetailMsg));
