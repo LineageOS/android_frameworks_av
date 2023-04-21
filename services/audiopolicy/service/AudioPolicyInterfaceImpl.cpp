@@ -460,14 +460,14 @@ Status AudioPolicyService::startOutput(int32_t portIdAidl)
     }
     ALOGV("startOutput()");
     sp<AudioPlaybackClient> client;
-    sp<AudioPolicyEffects> audioPolicyEffects;
+    sp<AudioPolicyEffects>audioPolicyEffects;
 
     getPlaybackClientAndEffects(portId, client, audioPolicyEffects, __func__);
 
     if (audioPolicyEffects != 0) {
         // create audio processors according to stream
-        status_t status = audioPolicyEffects->addOutputSessionEffects(client->io, client->stream,
-                                                                      client->session);
+        status_t status = audioPolicyEffects->addOutputSessionEffects(
+            client->io, client->stream, client->session);
         if (status != NO_ERROR && status != ALREADY_EXISTS) {
             ALOGW("Failed to add effects on session %d", client->session);
         }

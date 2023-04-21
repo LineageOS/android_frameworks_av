@@ -252,8 +252,7 @@ void AudioPolicyService::onFirstRef()
     }
 
     // load audio processing modules
-    const sp<EffectsFactoryHalInterface> effectsFactoryHal = EffectsFactoryHalInterface::create();
-    sp<AudioPolicyEffects> audioPolicyEffects = new AudioPolicyEffects(effectsFactoryHal);
+    sp<AudioPolicyEffects> audioPolicyEffects = new AudioPolicyEffects();
     sp<UidPolicy> uidPolicy = new UidPolicy(this);
     sp<SensorPrivacyPolicy> sensorPrivacyPolicy = new SensorPrivacyPolicy(this);
     {
@@ -272,7 +271,7 @@ void AudioPolicyService::onFirstRef()
         AudioDeviceTypeAddrVector devices;
         bool hasSpatializer = mAudioPolicyManager->canBeSpatialized(&attr, nullptr, devices);
         if (hasSpatializer) {
-            mSpatializer = Spatializer::create(this, effectsFactoryHal);
+            mSpatializer = Spatializer::create(this);
         }
         if (mSpatializer == nullptr) {
             // No spatializer created, signal the reason: NO_INIT a failure, OK means intended.
