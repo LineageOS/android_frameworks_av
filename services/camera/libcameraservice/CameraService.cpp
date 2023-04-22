@@ -3910,18 +3910,21 @@ void CameraService::Client::OpsCallback::opChanged(int32_t op,
 
 void CameraService::UidPolicy::registerWithActivityManager() {
     Mutex::Autolock _l(mUidLock);
+    int32_t emptyUidArray[] = { };
 
     if (mRegistered) return;
     status_t res = mAm.linkToDeath(this);
-    mAm.registerUidObserver(this, ActivityManager::UID_OBSERVER_GONE
+    mAm.registerUidObserverForUids(this, ActivityManager::UID_OBSERVER_GONE
             | ActivityManager::UID_OBSERVER_IDLE
             | ActivityManager::UID_OBSERVER_ACTIVE | ActivityManager::UID_OBSERVER_PROCSTATE
             | ActivityManager::UID_OBSERVER_PROC_OOM_ADJ,
             ActivityManager::PROCESS_STATE_UNKNOWN,
-            String16("cameraserver"));
+            String16("cameraserver"), emptyUidArray, 0, mObserverToken);
     if (res == OK) {
         mRegistered = true;
         ALOGV("UidPolicy: Registered with ActivityManager");
+    } else {
+        ALOGE("UidPolicy: Failed to register with ActivityManager: 0x%08x", res);
     }
 }
 
@@ -4019,13 +4022,16 @@ void CameraService::UidPolicy::onUidProcAdjChanged(uid_t uid, int32_t adj) {
             if (it->second.hasCamera) {
                 for (auto &monitoredUid : mMonitoredUids) {
                     if (monitoredUid.first != uid && adj > monitoredUid.second.procAdj) {
+                        ALOGV("%s: notify uid %d", __FUNCTION__, monitoredUid.first);
                         notifyUidSet.emplace(monitoredUid.first);
                     }
                 }
+                ALOGV("%s: notify uid %d", __FUNCTION__, uid);
                 notifyUidSet.emplace(uid);
             } else {
                 for (auto &monitoredUid : mMonitoredUids) {
                     if (monitoredUid.second.hasCamera && adj < monitoredUid.second.procAdj) {
+                        ALOGV("%s: notify uid %d", __FUNCTION__, uid);
                         notifyUidSet.emplace(uid);
                     }
                 }
@@ -4056,6 +4062,10 @@ void CameraService::UidPolicy::registerMonitorUid(uid_t uid, bool openCamera) {
         monitoredUid.procAdj = resource_policy::UNKNOWN_ADJ;
         monitoredUid.refCount = 1;
         it = mMonitoredUids.emplace(std::pair<uid_t, MonitoredUid>(uid, monitoredUid)).first;
+        status_t res = mAm.addUidToObserver(mObserverToken, String16("cameraserver"), uid);
+        if (res != OK) {
+            ALOGE("UidPolicy: Failed to add uid to observer: 0x%08x", res);
+        }
     }
 
     if (openCamera) {
@@ -4073,6 +4083,10 @@ void CameraService::UidPolicy::unregisterMonitorUid(uid_t uid, bool closeCamera)
         it->second.refCount--;
         if (it->second.refCount == 0) {
             mMonitoredUids.erase(it);
+            status_t res = mAm.removeUidFromObserver(mObserverToken, String16("cameraserver"), uid);
+            if (res != OK) {
+                ALOGE("UidPolicy: Failed to remove uid from observer: 0x%08x", res);
+            }
         } else if (closeCamera) {
             it->second.hasCamera = false;
         }
