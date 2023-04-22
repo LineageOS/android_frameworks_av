@@ -23,10 +23,9 @@
 #include <aidl/android/hardware/audio/core/BnStreamCallback.h>
 #include <aidl/android/hardware/audio/core/BnStreamOutEventCallback.h>
 #include <aidl/android/hardware/audio/core/StreamDescriptor.h>
-#include <android/binder_enums.h>
-#include <binder/Enums.h>
 #include <error/expected_utils.h>
 #include <media/AidlConversionCppNdk.h>
+#include <media/AidlConversionNdkCpp.h>
 #include <media/AidlConversionUtil.h>
 #include <mediautils/TimeCheck.h>
 #include <Utils.h>
@@ -94,75 +93,6 @@ void setPortConfigFromConfig(AudioPortConfig* portConfig, const AudioConfig& con
     portConfig->sampleRate = Int{ .value = config.base.sampleRate };
     portConfig->channelMask = config.base.channelMask;
     portConfig->format = config.base.format;
-}
-
-template<typename OutEnum, typename OutEnumRange, typename InEnum>
-ConversionResult<OutEnum> convertEnum(const OutEnumRange& range, InEnum e) {
-    using InIntType = std::underlying_type_t<InEnum>;
-    static_assert(std::is_same_v<InIntType, std::underlying_type_t<OutEnum>>);
-
-    InIntType inEnumIndex = static_cast<InIntType>(e);
-    OutEnum outEnum = static_cast<OutEnum>(inEnumIndex);
-    if (std::find(range.begin(), range.end(), outEnum) == range.end()) {
-        return ::android::base::unexpected(BAD_VALUE);
-    }
-    return outEnum;
-}
-
-template<typename NdkEnum, typename CppEnum>
-ConversionResult<NdkEnum> cpp2ndk_Enum(CppEnum e) {
-    return convertEnum<NdkEnum>(::ndk::enum_range<NdkEnum>(), e);
-}
-
-template<typename CppEnum, typename NdkEnum>
-ConversionResult<CppEnum> ndk2cpp_Enum(NdkEnum e) {
-    return convertEnum<CppEnum>(::android::enum_range<CppEnum>(), e);
-}
-
-ConversionResult<android::media::audio::common::AudioDeviceAddress>
-ndk2cpp_AudioDeviceAddress(const AudioDeviceAddress& ndk) {
-    using CppTag = android::media::audio::common::AudioDeviceAddress::Tag;
-    using NdkTag = AudioDeviceAddress::Tag;
-
-    CppTag cppTag = VALUE_OR_RETURN(ndk2cpp_Enum<CppTag>(ndk.getTag()));
-
-    switch (cppTag) {
-        case CppTag::id:
-            return android::media::audio::common::AudioDeviceAddress::make<CppTag::id>(
-                    ndk.get<NdkTag::id>());
-        case CppTag::mac:
-            return android::media::audio::common::AudioDeviceAddress::make<CppTag::mac>(
-                    ndk.get<NdkTag::mac>());
-        case CppTag::ipv4:
-            return android::media::audio::common::AudioDeviceAddress::make<CppTag::ipv4>(
-                    ndk.get<NdkTag::ipv4>());
-        case CppTag::ipv6:
-            return android::media::audio::common::AudioDeviceAddress::make<CppTag::ipv6>(
-                    ndk.get<NdkTag::ipv6>());
-        case CppTag::alsa:
-            return android::media::audio::common::AudioDeviceAddress::make<CppTag::alsa>(
-                    ndk.get<NdkTag::alsa>());
-    }
-
-    return ::android::base::unexpected(BAD_VALUE);
-}
-
-ConversionResult<media::audio::common::AudioDevice> ndk2cpp_AudioDevice(const AudioDevice& ndk) {
-    media::audio::common::AudioDevice cpp;
-    cpp.type.type = VALUE_OR_RETURN(
-            ndk2cpp_Enum<media::audio::common::AudioDeviceType>(ndk.type.type));
-    cpp.type.connection = ndk.type.connection;
-    cpp.address = VALUE_OR_RETURN(ndk2cpp_AudioDeviceAddress(ndk.address));
-    return cpp;
-}
-
-ConversionResult<media::audio::common::AudioMMapPolicyInfo>
-ndk2cpp_AudioMMapPolicyInfo(const AudioMMapPolicyInfo& ndk) {
-    media::audio::common::AudioMMapPolicyInfo cpp;
-    cpp.device = VALUE_OR_RETURN(ndk2cpp_AudioDevice(ndk.device));
-    cpp.mmapPolicy = VALUE_OR_RETURN(
-            ndk2cpp_Enum<media::audio::common::AudioMMapPolicy>(ndk.mmapPolicy));
-    return cpp;
 }
 
 }  // namespace
@@ -888,8 +818,8 @@ status_t DeviceHalAidl::getMmapPolicyInfos(
         media::audio::common::AudioMMapPolicyType policyType,
         std::vector<media::audio::common::AudioMMapPolicyInfo>* policyInfos) {
     TIME_CHECK();
-    AudioMMapPolicyType mmapPolicyType =
-            VALUE_OR_RETURN_STATUS(cpp2ndk_Enum<AudioMMapPolicyType>(policyType));
+    AudioMMapPolicyType mmapPolicyType = VALUE_OR_RETURN_STATUS(
+            cpp2ndk_AudioMMapPolicyType(policyType));
 
     std::vector<AudioMMapPolicyInfo> mmapPolicyInfos;
 
