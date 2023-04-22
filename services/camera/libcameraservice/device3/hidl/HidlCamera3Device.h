@@ -177,7 +177,8 @@ class HidlCamera3Device :
                 const Vector<int32_t>& sessionParamKeys,
                 bool useHalBufManager,
                 bool supportCameraMute,
-                bool overrideToPortrait);
+                bool overrideToPortrait,
+                bool supportSettingsOverride);
 
         status_t switchToOffline(
                 const std::vector<int32_t>& streamsToKeep,
@@ -225,7 +226,8 @@ class HidlCamera3Device :
                 const Vector<int32_t>& sessionParamKeys,
                 bool useHalBufManager,
                 bool supportCameraMute,
-                bool overrideToPortrait) override;
+                bool overrideToPortrait,
+                bool supportSettingsOverride) override;
 
     virtual sp<Camera3DeviceInjectionMethods>
             createCamera3DeviceInjectionMethods(wp<Camera3Device>) override;
