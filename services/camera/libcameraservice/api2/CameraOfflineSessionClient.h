@@ -94,6 +94,10 @@ public:
 
     void clearStreamUseCaseOverrides() override;
 
+    bool supportsZoomOverride() override;
+
+    status_t setZoomOverride(int32_t zoomOverride) override;
+
     // permissions management
     status_t startCameraOps() override;
     status_t finishCameraOps() override;
