@@ -143,7 +143,7 @@ public:
     bool isValid() const { return mIsValid; }
 
 protected:
-    audio_utils::channels::ChannelMix mChannelMix;
+    audio_utils::channels::ChannelMix<AUDIO_CHANNEL_OUT_STEREO> mChannelMix;
     bool mIsValid = false;
 };
 
