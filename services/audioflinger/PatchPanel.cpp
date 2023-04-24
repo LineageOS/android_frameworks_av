@@ -735,7 +735,11 @@ String8 AudioFlinger::PatchPanel::Patch::dump(audio_patch_handle_t myHandle) con
 
 /* Disconnect a patch */
 status_t AudioFlinger::PatchPanel::releaseAudioPatch(audio_patch_handle_t handle)
-{
+ //unlocks AudioFlinger::mLock when calling ThreadBase::sendReleaseAudioPatchConfigEvent
+ //to avoid deadlocks if the thread loop needs to acquire AudioFlinger::mLock
+ //before processing the release patch request.
+ NO_THREAD_SAFETY_ANALYSIS
+ {
     ALOGV("%s handle %d", __func__, handle);
     status_t status = NO_ERROR;
 
@@ -772,7 +776,9 @@ status_t AudioFlinger::PatchPanel::releaseAudioPatch(audio_patch_handle_t handle
                         break;
                     }
                 }
+                mAudioFlinger.unlock();
                 status = thread->sendReleaseAudioPatchConfigEvent(removedPatch.mHalHandle);
+                mAudioFlinger.lock();
             } else {
                 status = hwDevice->releaseAudioPatch(removedPatch.mHalHandle);
             }
@@ -793,7 +799,9 @@ status_t AudioFlinger::PatchPanel::releaseAudioPatch(audio_patch_handle_t handle
                     break;
                 }
             }
+            mAudioFlinger.unlock();
             status = thread->sendReleaseAudioPatchConfigEvent(removedPatch.mHalHandle);
+            mAudioFlinger.lock();
         } break;
         default:
             status = BAD_VALUE;
