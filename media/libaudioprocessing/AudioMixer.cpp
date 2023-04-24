@@ -190,7 +190,7 @@ status_t AudioMixer::Track::prepareForDownmix()
 
     // See if we should use our built-in non-effect downmixer.
     if (mMixerInFormat == AUDIO_FORMAT_PCM_FLOAT
-            && mMixerChannelMask == AUDIO_CHANNEL_OUT_STEREO
+            && ChannelMixBufferProvider::isOutputChannelMaskSupported(mMixerChannelMask)
             && audio_channel_mask_get_representation(channelMask)
                     == AUDIO_CHANNEL_REPRESENTATION_POSITION) {
         mDownmixerBufferProvider.reset(new ChannelMixBufferProvider(channelMask,
