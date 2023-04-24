@@ -31,6 +31,7 @@ audio_effect_library_t AUDIO_EFFECT_LIBRARY_INFO_SYM = [] {
                 (audio_effect_library_t*)dlsym(effectLib, AUDIO_EFFECT_LIBRARY_INFO_SYM_AS_STR);
         if (effectInterface == nullptr) {
             ALOGE("dlsym failed: %s", dlerror());
+            dlclose(effectLib);
             exit(-1);
         }
         symbol = (audio_effect_library_t)(*effectInterface);
