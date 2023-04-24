@@ -68,6 +68,10 @@ class MicrophoneInfoProvider : public virtual RefBase {
 class DeviceHalAidl : public DeviceHalInterface, public ConversionHelperAidl,
                       public CallbackBroker, public MicrophoneInfoProvider {
   public:
+    status_t getAudioPorts(std::vector<media::audio::common::AudioPort> *ports) override;
+
+    status_t getAudioRoutes(std::vector<media::AudioRoute> *routes) override;
+
     // Sets the value of 'devices' to a bitmask of 1 or more values of audio_devices_t.
     status_t getSupportedDevices(uint32_t *devices) override;
 
@@ -181,6 +185,7 @@ class DeviceHalAidl : public DeviceHalInterface, public ConversionHelperAidl,
     using PortConfigs = std::map<int32_t /*port config ID*/,
             ::aidl::android::media::audio::common::AudioPortConfig>;
     using Ports = std::map<int32_t /*port ID*/, ::aidl::android::media::audio::common::AudioPort>;
+    using Routes = std::vector<::aidl::android::hardware::audio::core::AudioRoute>;
     // Answers the question "whether portID 'first' is reachable from portID 'second'?"
     // It's not a map because both portIDs are known. The matrix is symmetric.
     using RoutingMatrix = std::set<std::pair<int32_t, int32_t>>;
@@ -279,6 +284,7 @@ class DeviceHalAidl : public DeviceHalInterface, public ConversionHelperAidl,
     int32_t mDefaultOutputPortId = -1;
     PortConfigs mPortConfigs;
     Patches mPatches;
+    Routes mRoutes;
     RoutingMatrix mRoutingMatrix;
     Streams mStreams;
     Microphones mMicrophones;

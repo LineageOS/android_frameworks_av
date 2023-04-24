@@ -95,7 +95,34 @@ void setPortConfigFromConfig(AudioPortConfig* portConfig, const AudioConfig& con
     portConfig->format = config.base.format;
 }
 
+// Note: these converters are for types defined in different AIDL files. Although these
+// AIDL files are copies of each other, however formally these are different types
+// thus we don't use a conversion via a parcelable.
+ConversionResult<media::AudioRoute> ndk2cpp_AudioRoute(const AudioRoute& ndk) {
+    media::AudioRoute cpp;
+    cpp.sourcePortIds.insert(
+            cpp.sourcePortIds.end(), ndk.sourcePortIds.begin(), ndk.sourcePortIds.end());
+    cpp.sinkPortId = ndk.sinkPortId;
+    cpp.isExclusive = ndk.isExclusive;
+    return cpp;
+}
+
 }  // namespace
+
+status_t DeviceHalAidl::getAudioPorts(std::vector<media::audio::common::AudioPort> *ports) {
+    auto convertAudioPortFromMap = [](const Ports::value_type& pair) {
+        return ndk2cpp_AudioPort(pair.second);
+    };
+    return ::aidl::android::convertRange(mPorts.begin(), mPorts.end(), ports->begin(),
+            convertAudioPortFromMap);
+}
+
+status_t DeviceHalAidl::getAudioRoutes(std::vector<media::AudioRoute> *routes) {
+    *routes = VALUE_OR_RETURN_STATUS(
+            ::aidl::android::convertContainer<std::vector<media::AudioRoute>>(
+                    mRoutes, ndk2cpp_AudioRoute));
+    return OK;
+}
 
 status_t DeviceHalAidl::getSupportedDevices(uint32_t*) {
     // Obsolete.
@@ -106,8 +133,7 @@ status_t DeviceHalAidl::initCheck() {
     TIME_CHECK();
     if (mModule == nullptr) return NO_INIT;
     std::vector<AudioPort> ports;
-    RETURN_STATUS_IF_ERROR(
-            statusTFromBinderStatus(mModule->getAudioPorts(&ports)));
+    RETURN_STATUS_IF_ERROR(statusTFromBinderStatus(mModule->getAudioPorts(&ports)));
     ALOGW_IF(ports.empty(), "%s: module %s returned an empty list of audio ports",
             __func__, mInstance.c_str());
     std::transform(ports.begin(), ports.end(), std::inserter(mPorts, mPorts.end()),
@@ -1273,13 +1299,12 @@ void DeviceHalAidl::resetUnusedPortConfigs() {
 
 status_t DeviceHalAidl::updateRoutes() {
     TIME_CHECK();
-    std::vector<AudioRoute> routes;
     RETURN_STATUS_IF_ERROR(
-            statusTFromBinderStatus(mModule->getAudioRoutes(&routes)));
-    ALOGW_IF(routes.empty(), "%s: module %s returned an empty list of audio routes",
+            statusTFromBinderStatus(mModule->getAudioRoutes(&mRoutes)));
+    ALOGW_IF(mRoutes.empty(), "%s: module %s returned an empty list of audio routes",
             __func__, mInstance.c_str());
     mRoutingMatrix.clear();
-    for (const auto& r : routes) {
+    for (const auto& r : mRoutes) {
         for (auto portId : r.sourcePortIds) {
             mRoutingMatrix.emplace(r.sinkPortId, portId);
             mRoutingMatrix.emplace(portId, r.sinkPortId);
