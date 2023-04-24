@@ -52,6 +52,7 @@ status_t AidlConversionVisualizer::setParameter(EffectParamReader& param) {
     Parameter aidlParam;
     switch (type) {
         case VISUALIZER_PARAM_CAPTURE_SIZE: {
+            mCaptureSize = value;
             aidlParam = MAKE_SPECIFIC_PARAMETER(Visualizer, visualizer, captureSamples, value);
             break;
         }
