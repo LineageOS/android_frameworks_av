@@ -4023,7 +4023,7 @@ NO_THREAD_SAFETY_ANALYSIS  // manual locking of AudioFlinger
                         LOG_AUDIO_STATE();
                         mThreadMetrics.logEndInterval();
                         mThreadSnapshot.onEnd();
-                        mStandby = true;
+                        setStandby_l();
                     }
                     sendStatistics(false /* force */);
                 }
@@ -4103,6 +4103,14 @@ NO_THREAD_SAFETY_ANALYSIS  // manual locking of AudioFlinger
             activeTracks.insert(activeTracks.end(), mActiveTracks.begin(), mActiveTracks.end());
 
             setHalLatencyMode_l();
+
+            // signal actual start of output stream when the render position reported by the kernel
+            // starts moving.
+            if (!mStandby && !mHalStarted && mKernelPositionOnStandby !=
+                    mTimestamp.mPosition[ExtendedTimestamp::LOCATION_KERNEL]) {
+                mHalStarted = true;
+                mWaitHalStartCV.broadcast();
+            }
         } // mLock scope ends
 
         if (mBytesRemaining == 0) {
@@ -4488,7 +4496,7 @@ NO_THREAD_SAFETY_ANALYSIS  // manual locking of AudioFlinger
 
     if (!mStandby) {
         threadLoop_standby();
-        mStandby = true;
+        setStandby();
     }
 
     releaseWakeLock();
@@ -6239,7 +6247,7 @@ bool AudioFlinger::MixerThread::checkForNewParameter_l(const String8& keyValuePa
             if (!mStandby) {
                 mThreadMetrics.logEndInterval();
                 mThreadSnapshot.onEnd();
-                mStandby = true;
+                setStandby_l();
             }
             mBytesWritten = 0;
             status = mOutput->stream->setParameters(keyValuePair);
@@ -6890,7 +6898,7 @@ bool AudioFlinger::DirectOutputThread::checkForNewParameter_l(const String8& key
             if (!mStandby) {
                 mThreadMetrics.logEndInterval();
                 mThreadSnapshot.onEnd();
-                mStandby = true;
+                setStandby_l();
             }
             mBytesWritten = 0;
             status = mOutput->stream->setParameters(keyValuePair);
