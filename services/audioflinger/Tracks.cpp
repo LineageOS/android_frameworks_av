@@ -2056,17 +2056,50 @@ void AudioFlinger::PlaybackThread::OutputTrack::stop()
 
 ssize_t AudioFlinger::PlaybackThread::OutputTrack::write(void* data, uint32_t frames)
 {
+    if (!mActive && frames != 0) {
+        sp<ThreadBase> thread = mThread.promote();
+        if (thread != nullptr && thread->standby()) {
+            // preload one silent buffer to trigger mixer on start()
+            ClientProxy::Buffer buf { .mFrameCount = mClientProxy->getStartThresholdInFrames() };
+            status_t status = mClientProxy->obtainBuffer(&buf);
+            if (status != NO_ERROR && status != NOT_ENOUGH_DATA && status != WOULD_BLOCK) {
+                ALOGE("%s(%d): could not obtain buffer on start", __func__, mId);
+                return 0;
+            }
+            memset(buf.mRaw, 0, buf.mFrameCount * mFrameSize);
+            mClientProxy->releaseBuffer(&buf);
+
+            (void) start();
+
+            // wait for HAL stream to start before sending actual audio. Doing this on each
+            // OutputTrack makes that playback start on all output streams is synchronized.
+            // If another OutputTrack has already started it can underrun but this is OK
+            // as only silence has been played so far and the retry count is very high on
+            // OutputTrack.
+            auto pt = static_cast<PlaybackThread *>(thread.get());
+            if (!pt->waitForHalStart()) {
+                ALOGW("%s(%d): timeout waiting for thread to exit standby", __func__, mId);
+                stop();
+                return 0;
+            }
+
+            // enqueue the first buffer and exit so that other OutputTracks will also start before
+            // write() is called again and this buffer actually consumed.
+            Buffer firstBuffer;
+            firstBuffer.frameCount = frames;
+            firstBuffer.raw = data;
+            queueBuffer(firstBuffer);
+            return frames;
+        } else {
+            (void) start();
+        }
+    }
+
     Buffer *pInBuffer;
     Buffer inBuffer;
     inBuffer.frameCount = frames;
     inBuffer.raw = data;
-
     uint32_t waitTimeLeftMs = mSourceThread->waitTimeMs();
-
-    if (!mActive && frames != 0) {
-        (void) start();
-    }
-
     while (waitTimeLeftMs) {
         // First write pending buffers, then new data
         if (mBufferQueue.size()) {
@@ -2134,25 +2167,7 @@ ssize_t AudioFlinger::PlaybackThread::OutputTrack::write(void* data, uint32_t fr
     if (inBuffer.frameCount) {
         sp<ThreadBase> thread = mThread.promote();
         if (thread != 0 && !thread->standby()) {
-            if (mBufferQueue.size() < kMaxOverFlowBuffers) {
-                pInBuffer = new Buffer;
-                const size_t bufferSize = inBuffer.frameCount * mFrameSize;
-                pInBuffer->mBuffer = malloc(bufferSize);
-                LOG_ALWAYS_FATAL_IF(pInBuffer->mBuffer == nullptr,
-                        "%s: Unable to malloc size %zu", __func__, bufferSize);
-                pInBuffer->frameCount = inBuffer.frameCount;
-                pInBuffer->raw = pInBuffer->mBuffer;
-                memcpy(pInBuffer->raw, inBuffer.raw, inBuffer.frameCount * mFrameSize);
-                mBufferQueue.add(pInBuffer);
-                ALOGV("%s(%d): thread %d adding overflow buffer %zu", __func__, mId,
-                        (int)mThreadIoHandle, mBufferQueue.size());
-                // audio data is consumed (stored locally); set frameCount to 0.
-                inBuffer.frameCount = 0;
-            } else {
-                ALOGW("%s(%d): thread %d no more overflow buffers",
-                        __func__, mId, (int)mThreadIoHandle);
-                // TODO: return error for this.
-            }
+            queueBuffer(inBuffer);
         }
     }
 
@@ -2163,6 +2178,29 @@ ssize_t AudioFlinger::PlaybackThread::OutputTrack::write(void* data, uint32_t fr
     }
 
     return frames - inBuffer.frameCount;  // number of frames consumed.
+}
+
+void AudioFlinger::PlaybackThread::OutputTrack::queueBuffer(Buffer& inBuffer) {
+
+    if (mBufferQueue.size() < kMaxOverFlowBuffers) {
+        Buffer *pInBuffer = new Buffer;
+        const size_t bufferSize = inBuffer.frameCount * mFrameSize;
+        pInBuffer->mBuffer = malloc(bufferSize);
+        LOG_ALWAYS_FATAL_IF(pInBuffer->mBuffer == nullptr,
+                "%s: Unable to malloc size %zu", __func__, bufferSize);
+        pInBuffer->frameCount = inBuffer.frameCount;
+        pInBuffer->raw = pInBuffer->mBuffer;
+        memcpy(pInBuffer->raw, inBuffer.raw, inBuffer.frameCount * mFrameSize);
+        mBufferQueue.add(pInBuffer);
+        ALOGV("%s(%d): thread %d adding overflow buffer %zu", __func__, mId,
+                (int)mThreadIoHandle, mBufferQueue.size());
+        // audio data is consumed (stored locally); set frameCount to 0.
+        inBuffer.frameCount = 0;
+    } else {
+        ALOGW("%s(%d): thread %d no more overflow buffers",
+                __func__, mId, (int)mThreadIoHandle);
+        // TODO: return error for this.
+    }
 }
 
 void AudioFlinger::PlaybackThread::OutputTrack::copyMetadataTo(MetadataInserter& backInserter) const
