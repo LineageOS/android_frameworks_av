@@ -426,6 +426,7 @@ public:
 private:
     status_t            obtainBuffer(AudioBufferProvider::Buffer* buffer,
                                      uint32_t waitTimeMs);
+    void                queueBuffer(Buffer& inBuffer);
     void                clearBufferQueue();
 
     void                restartIfDisabled();
