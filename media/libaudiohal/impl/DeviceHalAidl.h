@@ -199,9 +199,9 @@ class DeviceHalAidl : public DeviceHalInterface, public ConversionHelperAidl,
             const ::aidl::android::media::audio::common::AudioPort& p);
     bool audioDeviceMatches(const ::aidl::android::media::audio::common::AudioDevice& device,
             const ::aidl::android::media::audio::common::AudioPortConfig& p);
-    status_t createPortConfig(
+    status_t createOrUpdatePortConfig(
             const ::aidl::android::media::audio::common::AudioPortConfig& requestedPortConfig,
-            PortConfigs::iterator* result);
+            PortConfigs::iterator* result, bool *created);
     status_t findOrCreatePatch(
         const std::set<int32_t>& sourcePortConfigIds,
         const std::set<int32_t>& sinkPortConfigIds,
