@@ -438,7 +438,7 @@ bool statsd_codec(const std::shared_ptr<const mediametrics::Item>& item,
     }
     AStatsEvent_writeInt32(event, hdr10PlusInfo);
 
-    int32_t hdrFormat= -1;
+    int32_t hdrFormat = -1;
     if (item->getInt32("android.media.mediacodec.hdr-format", &hdrFormat)) {
         metrics_proto.set_hdr_format(hdrFormat);
     }
@@ -449,6 +449,61 @@ bool statsd_codec(const std::shared_ptr<const mediametrics::Item>& item,
         metrics_proto.set_codec_id(codecId);
     }
     AStatsEvent_writeInt64(event, codecId);
+
+    int32_t arrayMode = -1;
+    if (item->getInt32("android.media.mediacodec.array-mode", &arrayMode)) {
+        metrics_proto.set_array_mode(arrayMode);
+    }
+    AStatsEvent_writeInt32(event, arrayMode);
+
+    int32_t operationMode = -1;
+    if (item->getInt32("android.media.mediacodec.operation-mode", &operationMode)) {
+        metrics_proto.set_operation_mode(operationMode);
+    }
+    AStatsEvent_writeInt32(event, operationMode);
+
+    int32_t outputSurface = -1;
+    if (item->getInt32("android.media.mediacodec.output-surface", &outputSurface)) {
+        metrics_proto.set_output_surface(outputSurface);
+    }
+    AStatsEvent_writeInt32(event, outputSurface);
+
+    int32_t appMaxInputSize = -1;
+    if (item->getInt32("android.media.mediacodec.app-max-input-size", &appMaxInputSize)) {
+        metrics_proto.set_app_max_input_size(appMaxInputSize);
+    }
+    AStatsEvent_writeInt32(event, appMaxInputSize);
+
+    int32_t usedMaxInputSize = -1;
+    if (item->getInt32("android.media.mediacodec.used-max-input-size", &usedMaxInputSize)) {
+        metrics_proto.set_used_max_input_size(usedMaxInputSize);
+    }
+    AStatsEvent_writeInt32(event, usedMaxInputSize);
+
+    int32_t codecMaxInputSize = -1;
+    if (item->getInt32("android.media.mediacodec.codec-max-input-size", &codecMaxInputSize)) {
+        metrics_proto.set_codec_max_input_size(codecMaxInputSize);
+    }
+    AStatsEvent_writeInt32(event, codecMaxInputSize);
+
+    int32_t flushCount = -1;
+    if (item->getInt32("android.media.mediacodec.flush-count", &flushCount)) {
+        metrics_proto.set_flush_count(flushCount);
+    }
+    AStatsEvent_writeInt32(event, flushCount);
+
+    int32_t setSurfaceCount = -1;
+    if (item->getInt32("android.media.mediacodec.set-surface-count", &setSurfaceCount)) {
+        metrics_proto.set_set_surface_count(setSurfaceCount);
+    }
+    AStatsEvent_writeInt32(event, setSurfaceCount);
+
+    int32_t resolutionChangeCount = -1;
+    if (item->getInt32("android.media.mediacodec.resolution-change-count",
+            &resolutionChangeCount)) {
+        metrics_proto.set_resolution_change_count(resolutionChangeCount);
+    }
+    AStatsEvent_writeInt32(event, resolutionChangeCount);
 
     int err = AStatsEvent_write(event);
     if (err < 0) {
