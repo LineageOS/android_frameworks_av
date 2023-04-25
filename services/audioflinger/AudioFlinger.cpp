@@ -1236,21 +1236,20 @@ status_t AudioFlinger::createTrack(const media::CreateTrackRequest& _input,
         output.portId = portId;
 
         if (lStatus == NO_ERROR) {
+            // no risk of deadlock because AudioFlinger::mLock is held
+            Mutex::Autolock _dl(thread->mLock);
             // Connect secondary outputs. Failure on a secondary output must not imped the primary
             // Any secondary output setup failure will lead to a desync between the AP and AF until
             // the track is destroyed.
             updateSecondaryOutputsForTrack_l(track.get(), thread, secondaryOutputs);
-        }
-
-        // move effect chain to this output thread if an effect on same session was waiting
-        // for a track to be created
-        if (lStatus == NO_ERROR && effectThread != NULL) {
-            // no risk of deadlock because AudioFlinger::mLock is held
-            Mutex::Autolock _dl(thread->mLock);
-            Mutex::Autolock _sl(effectThread->mLock);
-            if (moveEffectChain_l(sessionId, effectThread, thread) == NO_ERROR) {
-                effectThreadId = thread->id();
-                effectIds = thread->getEffectIds_l(sessionId);
+            // move effect chain to this output thread if an effect on same session was waiting
+            // for a track to be created
+            if (effectThread != nullptr) {
+                Mutex::Autolock _sl(effectThread->mLock);
+                if (moveEffectChain_l(sessionId, effectThread, thread) == NO_ERROR) {
+                    effectThreadId = thread->id();
+                    effectIds = thread->getEffectIds_l(sessionId);
+                }
             }
         }
 
