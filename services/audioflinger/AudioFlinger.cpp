@@ -1827,6 +1827,8 @@ void AudioFlinger::filterReservedParameters(String8& keyValuePairs, uid_t callin
         String8(AudioParameter::keyStreamSupportedFormats),
         String8(AudioParameter::keyStreamSupportedChannels),
         String8(AudioParameter::keyStreamSupportedSamplingRates),
+        String8(AudioParameter::keyClosing),
+        String8(AudioParameter::keyExiting),
     };
 
     if (isAudioServerUid(callingUid)) {

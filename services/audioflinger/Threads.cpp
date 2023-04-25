@@ -6056,12 +6056,12 @@ bool AudioFlinger::MixerThread::checkForNewParameter_l(const String8& keyValuePa
     if (status == NO_ERROR) {
         status = mOutput->stream->setParameters(keyValuePair);
         if (!mStandby && status == INVALID_OPERATION) {
+            ALOGW("%s: setParameters failed with keyValuePair %s, entering standby",
+                    __func__, keyValuePair.c_str());
             mOutput->standby();
-            if (!mStandby) {
-                mThreadMetrics.logEndInterval();
-                mThreadSnapshot.onEnd();
-                mStandby = true;
-            }
+            mThreadMetrics.logEndInterval();
+            mThreadSnapshot.onEnd();
+            mStandby = true;
             mBytesWritten = 0;
             status = mOutput->stream->setParameters(keyValuePair);
         }
