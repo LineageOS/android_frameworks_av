@@ -54,7 +54,7 @@ class CameraServiceWatchdog : public Thread {
 
 struct MonitoredFunction {
     uint32_t cycles;
-    const char* functionName;
+    std::string functionName;
 };
 
 public:
@@ -144,7 +144,7 @@ private:
      */
     void stop(uint32_t tid);
 
-    std::string getAbortMessage(int pid, int tid, const char* functionName);
+    std::string getAbortMessage(const std::string& functionName);
 
     virtual bool    threadLoop();
 
