@@ -20,6 +20,7 @@ license {
 cc_library {
 
     srcs: [
+        "ActivityManager.cpp",
         "DeathNotifier.cpp",
         "MediaPlayerFactory.cpp",
         "MediaPlayerService.cpp",
