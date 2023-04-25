@@ -436,8 +436,7 @@ status_t StreamHalAidl::exit() {
     ALOGD("%p %s::%s", this, getClassName().c_str(), __func__);
     TIME_CHECK();
     if (!mStream) return NO_INIT;
-    ALOGE("%s not implemented yet", __func__);
-    return OK;
+    return statusTFromBinderStatus(mStream->prepareToClose());
 }
 
 status_t StreamHalAidl::createMmapBuffer(int32_t minSizeFrames __unused,
