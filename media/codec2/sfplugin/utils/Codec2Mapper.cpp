@@ -119,8 +119,8 @@ ALookup<C2Color::primaries_t, ColorAspects::Primaries> sColorPrimariesSf = {
     { C2Color::PRIMARIES_BT601_525,    ColorAspects::PrimariesBT601_6_525 },
     { C2Color::PRIMARIES_GENERIC_FILM, ColorAspects::PrimariesGenericFilm },
     { C2Color::PRIMARIES_BT2020,       ColorAspects::PrimariesBT2020 },
-//    { C2Color::PRIMARIES_RP431,        ColorAspects::Primaries... },
-//    { C2Color::PRIMARIES_EG432,        ColorAspects::Primaries... },
+    { C2Color::PRIMARIES_RP431,        ColorAspects::PrimariesRP431 },
+    { C2Color::PRIMARIES_EG432,        ColorAspects::PrimariesEG432 },
 //    { C2Color::PRIMARIES_EBU3213,      ColorAspects::Primaries... },
     { C2Color::PRIMARIES_OTHER,        ColorAspects::PrimariesOther },
 };
