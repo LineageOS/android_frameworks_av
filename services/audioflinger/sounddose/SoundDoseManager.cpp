@@ -216,7 +216,7 @@ ndk::ScopedAStatus SoundDoseManager::HalSoundDoseCallback::onMomentaryExposureWa
     if (id == AUDIO_PORT_HANDLE_NONE) {
         ALOGI("%s: no mapped id for audio device with type %d and address %s",
                 __func__, in_audioDevice.type.type,
-                in_audioDevice.address.get<AudioDeviceAddress::id>().c_str());
+                in_audioDevice.address.toString().c_str());
         return ndk::ScopedAStatus::fromExceptionCode(EX_ILLEGAL_ARGUMENT);
     }
     soundDoseManager->onMomentaryExposure(in_currentDbA, id);
@@ -243,7 +243,7 @@ ndk::ScopedAStatus SoundDoseManager::HalSoundDoseCallback::onNewMelValues(
     if (id == AUDIO_PORT_HANDLE_NONE) {
         ALOGI("%s: no mapped id for audio device with type %d and address %s",
                 __func__, in_audioDevice.type.type,
-                in_audioDevice.address.get<AudioDeviceAddress::id>().c_str());
+                in_audioDevice.address.toString().c_str());
         return ndk::ScopedAStatus::fromExceptionCode(EX_ILLEGAL_ARGUMENT);
     }
     // TODO: introduce timestamp in onNewMelValues callback
