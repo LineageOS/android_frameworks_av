@@ -733,32 +733,36 @@ const struct ColorConverter::Coeffs *ColorConverter::getMatrix() const {
     const bool is10Bit = (mSrcFormat == COLOR_FormatYUVP010
             || mSrcFormat == OMX_COLOR_FormatYUV420Planar16);
 
-    switch (mSrcColorSpace.mStandard) {
-    case ColorUtils::kColorStandardBT601_525:
-    case ColorUtils::kColorStandardBT601_625:
+    ColorAspects::Primaries primaries;
+    ColorAspects::MatrixCoeffs matrix;
+    if (ColorUtils::unwrapColorAspectsFromColorStandard(
+            mSrcColorSpace.mStandard, &primaries, &matrix) != OK) {
+        matrix = ColorAspects::MatrixUnspecified;
+    }
+
+    switch (matrix) {
+    case ColorAspects::MatrixBT601_6:
+    case ColorAspects::MatrixBT470_6M:   // use 601 matrix as that is the closest for now
+    case ColorAspects::MatrixSMPTE240M:  // use 601 matrix as that is the closest for now
         return (isFullRange ? &BT601_FULL :
                 is10Bit ? &BT601_LTD_10BIT : &BT601_LIMITED);
 
-    case ColorUtils::kColorStandardBT709:
+    case ColorAspects::MatrixBT709_5:
         return (isFullRange ? &BT709_FULL :
                 is10Bit ? &BT709_LTD_10BIT : &BT709_LIMITED);
 
-    case ColorUtils::kColorStandardBT2020:
+    case ColorAspects::MatrixBT2020:
+    case ColorAspects::MatrixBT2020Constant: // use 2020 matrix as that is the closest for now
         return (isFullRange ? &BT2020_FULL :
                 is10Bit ? &BT2020_LTD_10BIT : &BT2020_LIMITED);
 
     default:
-        // for now use the default matrices for unhandled color spaces
-        // TODO: fail?
-        // return nullptr;
-        [[fallthrough]];
-
-    case ColorUtils::kColorStandardUnspecified:
-        if (isFullRange) {
-            return is10Bit ? &BT2020_FULL : &BT601_FULL;
+        // use BT.2020 for 10-bit and 601 for 8-bit by default
+        if (is10Bit) {
+            return isFullRange ? &BT2020_FULL : &BT2020_LTD_10BIT;
+        } else {
+            return isFullRange ? &BT601_FULL : &BT601_LIMITED;
         }
-        return is10Bit ? &BT2020_LTD_10BIT : &BT601_LIMITED;
-
     }
 }
 
