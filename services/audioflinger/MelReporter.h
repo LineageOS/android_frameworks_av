@@ -98,7 +98,7 @@ private:
     std::optional<audio_patch_handle_t>
     activePatchStreamHandle_l(audio_io_handle_t streamHandle) REQUIRES(mLock);
 
-    bool useHalSoundDoseInterface();
+    bool useHalSoundDoseInterface_l() REQUIRES(mLock);
 
     AudioFlinger& mAudioFlinger;  // does not own the object
 
