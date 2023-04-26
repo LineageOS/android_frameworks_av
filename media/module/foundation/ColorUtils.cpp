@@ -60,6 +60,10 @@ ALookup<CU::ColorStandard, std::pair<CA::Primaries, CA::MatrixCoeffs>> sStandard
         { CU::kColorStandardBT470M,         { CA::PrimariesBT470_6M, CA::MatrixBT470_6M } },
         // NOTE: there is no close match to the matrix used by standard film, chose closest
         { CU::kColorStandardFilm,           { CA::PrimariesGenericFilm, CA::MatrixBT2020 } },
+        // DCI-P3 (in DataSpace that drives this standard) is actually Display P3
+        // ITU does not specify a matrix suitable for P3. The theoretical KR/KB numbers are
+        // 0.229 and 0.079. Assume BT.601 matrix as P3 is commonly used for JPEG with BT.601.
+        { CU::kColorStandardDisplay_P3,     { CA::PrimariesEG432, CA::MatrixBT601_6 } },
     }
 };
 
@@ -264,6 +268,8 @@ ALookup<int32_t, ColorAspects::Primaries> sIsoPrimaries {
         { 8, ColorAspects::PrimariesGenericFilm },
         { 9, ColorAspects::PrimariesBT2020 },
         { 10, ColorAspects::PrimariesOther /* XYZ */ },
+        { 11, ColorAspects::PrimariesRP431 },
+        { 12, ColorAspects::PrimariesEG432 },
     }
 };
 
@@ -438,6 +444,9 @@ ALookup<CU::ColorStandard, CA::Primaries> sStandardPrimariesFallbacks {
         { CU::kColorStandardBT2020,               CA::PrimariesBT2020 },
         { CU::kColorStandardBT601_525_Unadjusted, CA::PrimariesBT601_6_525 },
         { CU::kColorStandardBT601_625_Unadjusted, CA::PrimariesBT601_6_625 },
+        { CU::kColorStandardDisplay_P3,           CA::PrimariesEG432 },
+        // fall back DCI P3 primaries to Display P3
+        { CU::kColorStandardDisplay_P3,           CA::PrimariesRP431 },
     }
 };
 
@@ -469,7 +478,8 @@ ALookup<CU::ColorStandard, uint32_t> sGfxStandards {
         { CU::kColorStandardBT2020Constant,       GET_HAL_BITFIELD(STANDARD, BT2020_CONSTANT_LUMINANCE) },
         { CU::kColorStandardBT470M,               GET_HAL_BITFIELD(STANDARD, BT470M) },
         { CU::kColorStandardFilm,                 GET_HAL_BITFIELD(STANDARD, FILM) },
-        { CU::kColorStandardDCI_P3,               GET_HAL_BITFIELD(STANDARD, DCI_P3) },
+        // DCI-P3 (in DataSpace that drives this standard) is actually Display P3
+        { CU::kColorStandardDisplay_P3,           GET_HAL_BITFIELD(STANDARD, DCI_P3) },
     }
 };
 
