@@ -316,16 +316,16 @@ bool CameraProviderManager::supportNativeZoomRatio(const std::string &id) const 
     return deviceInfo->supportNativeZoomRatio();
 }
 
-bool CameraProviderManager::supportNativeJpegR(const std::string &id) const {
+bool CameraProviderManager::isCompositeJpegRDisabled(const std::string &id) const {
     std::lock_guard<std::mutex> lock(mInterfaceMutex);
-    return supportNativeJpegRLocked(id);
+    return isCompositeJpegRDisabledLocked(id);
 }
 
-bool CameraProviderManager::supportNativeJpegRLocked(const std::string &id) const {
+bool CameraProviderManager::isCompositeJpegRDisabledLocked(const std::string &id) const {
     auto deviceInfo = findDeviceInfoLocked(id);
     if (deviceInfo == nullptr) return false;
 
-    return deviceInfo->supportNativeJpegR();
+    return deviceInfo->isCompositeJpegRDisabled();
 }
 
 status_t CameraProviderManager::getResourceCost(const std::string &id,
@@ -1120,7 +1120,7 @@ bool CameraProviderManager::isConcurrentDynamicRangeCaptureSupported(
 }
 
 status_t CameraProviderManager::ProviderInfo::DeviceInfo3::deriveJpegRTags(bool maxResolution) {
-    if (kFrameworkJpegRDisabled || mSupportsNativeJpegR) {
+    if (kFrameworkJpegRDisabled || mCompositeJpegRDisabled) {
         return OK;
     }
 
@@ -1163,6 +1163,18 @@ status_t CameraProviderManager::ProviderInfo::DeviceInfo3::deriveJpegRTags(bool 
             ANDROID_REQUEST_AVAILABLE_CAPABILITIES_DYNAMIC_RANGE_TEN_BIT) != end;
     if (!isTenBitOutputSupported) {
         // No 10-bit support, nothing more to do.
+        return OK;
+    }
+
+    if (!isConcurrentDynamicRangeCaptureSupported(c,
+                ANDROID_REQUEST_AVAILABLE_DYNAMIC_RANGE_PROFILES_MAP_HLG10,
+                ANDROID_REQUEST_AVAILABLE_DYNAMIC_RANGE_PROFILES_MAP_STANDARD) &&
+            !property_get_bool("ro.camera.enableCompositeAPI0JpegR", false)) {
+        // API0, P010 only Jpeg/R support is meant to be used only as a reference due to possible
+        // impact on quality and performance.
+        // This data path will be turned off by default and individual device builds must enable
+        // 'ro.camera.enableCompositeAPI0JpegR' in order to experiment using it.
+        mCompositeJpegRDisabled = true;
         return OK;
     }
 
