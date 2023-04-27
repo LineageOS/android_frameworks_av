@@ -535,9 +535,28 @@ status_t DeviceHalHidl::removeDeviceEffect(
 }
 #endif
 
+status_t DeviceHalHidl::prepareToDisconnectExternalDevice(const struct audio_port_v7* port) {
+    // For HIDL HAL, there is not API to call notify the HAL to prepare for device connected
+    // state changed. Call `setConnectedState` directly.
+    const status_t status = setConnectedState(port, false /*connected*/);
+    if (status == NO_ERROR) {
+        // Cache the port id so that it won't disconnect twice.
+        mDeviceDisconnectionNotified.insert(port->id);
+    }
+    return status;
+}
+
 status_t DeviceHalHidl::setConnectedState(const struct audio_port_v7 *port, bool connected) {
     TIME_CHECK();
     if (mDevice == 0) return NO_INIT;
+    if (!connected && mDeviceDisconnectionNotified.erase(port->id) > 0) {
+        // For device disconnection, APM will first call `prepareToDisconnectExternalDevice` and
+        // then call `setConnectedState`. However, in HIDL HAL, there is no API for
+        // `prepareToDisconnectExternalDevice`. In that case, HIDL HAL will call `setConnectedState`
+        // when calling `prepareToDisconnectExternalDevice`. Do not call to the HAL if previous
+        // call is successful. Also remove the cache here to avoid a large cache after a long run.
+        return NO_ERROR;
+    }
 #if MAJOR_VERSION == 7 && MINOR_VERSION == 1
     if (supportsSetConnectedState7_1) {
         AudioPort hidlPort;

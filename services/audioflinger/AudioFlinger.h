@@ -297,7 +297,8 @@ public:
 
     virtual int32_t getAAudioHardwareBurstMinUsec();
 
-    virtual status_t setDeviceConnectedState(const struct audio_port_v7 *port, bool connected);
+    virtual status_t setDeviceConnectedState(const struct audio_port_v7 *port,
+                                             media::DeviceConnectedState state);
 
     virtual status_t setSimulateDeviceConnections(bool enabled);
 

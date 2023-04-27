@@ -138,6 +138,8 @@ class DeviceHalHidl : public DeviceHalInterface, public CoreConversionHelperHidl
     status_t getSoundDoseInterface(const std::string& module,
                                    ::ndk::SpAIBinder* soundDoseBinder) override;
 
+    status_t prepareToDisconnectExternalDevice(const struct audio_port_v7* port) override;
+
   private:
     friend class DevicesFactoryHalHidl;
     sp<::android::hardware::audio::CPP_VERSION::IDevice> mDevice;
@@ -146,6 +148,7 @@ class DeviceHalHidl : public DeviceHalInterface, public CoreConversionHelperHidl
     bool supportsSetConnectedState7_1 = true;
     class SoundDoseWrapper;
     const std::unique_ptr<SoundDoseWrapper> mSoundDoseWrapper;
+    std::set<audio_port_handle_t> mDeviceDisconnectionNotified;
 
     // Can not be constructed directly by clients.
     explicit DeviceHalHidl(const sp<::android::hardware::audio::CPP_VERSION::IDevice>& device);
