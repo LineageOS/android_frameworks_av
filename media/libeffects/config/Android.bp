@@ -27,8 +27,21 @@ cc_library {
         "libcutils",
     ],
 
-    header_libs: ["libaudio_system_headers"],
-    export_header_lib_headers: ["libaudio_system_headers"],
+    header_libs: [
+        "libaudio_system_headers",
+        "liberror_headers",
+    ],
+
+    export_header_lib_headers: [
+        "libaudio_system_headers",
+        "liberror_headers",
+    ],
+
+    export_include_dirs: ["include"],
+}
+
+cc_library_headers {
+    name: "libeffectsconfig_headers",
 
     export_include_dirs: ["include"],
 }
