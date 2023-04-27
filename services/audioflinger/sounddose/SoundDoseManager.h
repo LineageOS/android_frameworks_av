@@ -101,8 +101,8 @@ public:
     /** Clear all map entries with passed audio_port_handle_t. */
     void clearMapDeviceIdEntries(audio_port_handle_t deviceId);
 
-    /** Returns true if CSD is disabled. */
-    bool isCsdDisabled();
+    /** Returns true if CSD is enabled. */
+    bool isCsdEnabled();
 
     std::string dump() const;
 
@@ -137,7 +137,7 @@ private:
                                 const std::vector<media::SoundDoseRecord>& records) override;
         binder::Status updateAttenuation(float attenuationDB, int device) override;
         binder::Status getOutputRs2UpperBound(float* value) override;
-        binder::Status disableCsd() override;
+        binder::Status setCsdEnabled(bool enabled) override;
 
         binder::Status getCsd(float* value) override;
         binder::Status forceUseFrameworkMel(bool useFrameworkMel) override;
@@ -170,7 +170,7 @@ private:
     sp<media::ISoundDoseCallback> getSoundDoseCallback() const;
 
     void updateAttenuation(float attenuationDB, audio_devices_t deviceType);
-    void disableCsd();
+    void setCsdEnabled(bool enabled);
     void setUseFrameworkMel(bool useFrameworkMel);
     void setComputeCsdOnAllDevices(bool computeCsdOnAllDevices);
     bool isSoundDoseHalSupported() const;
@@ -202,7 +202,7 @@ private:
     bool mUseFrameworkMel GUARDED_BY(mLock) = true;
     bool mComputeCsdOnAllDevices GUARDED_BY(mLock) = false;
 
-    bool mDisableCsd GUARDED_BY(mLock) = false;
+    bool mEnabledCsd GUARDED_BY(mLock) = true;
 };
 
 }  // namespace android
