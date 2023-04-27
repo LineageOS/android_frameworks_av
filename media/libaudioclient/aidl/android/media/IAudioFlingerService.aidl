@@ -27,6 +27,7 @@ import android.media.CreateRecordRequest;
 import android.media.CreateRecordResponse;
 import android.media.CreateTrackRequest;
 import android.media.CreateTrackResponse;
+import android.media.DeviceConnectedState;
 import android.media.OpenInputRequest;
 import android.media.OpenInputResponse;
 import android.media.OpenOutputRequest;
@@ -227,7 +228,7 @@ interface IAudioFlingerService {
 
     int getAAudioHardwareBurstMinUsec();
 
-    void setDeviceConnectedState(in AudioPortFw devicePort, boolean connected);
+    void setDeviceConnectedState(in AudioPortFw devicePort, DeviceConnectedState state);
 
     // Used for tests only. Requires AIDL HAL to work.
     void setSimulateDeviceConnections(boolean enabled);
