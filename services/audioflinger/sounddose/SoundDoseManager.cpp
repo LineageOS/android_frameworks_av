@@ -50,7 +50,7 @@ sp<audio_utils::MelProcessor> SoundDoseManager::getOrCreateProcessorForDevice(
         size_t channelCount, audio_format_t format) {
     std::lock_guard _l(mLock);
 
-    if (mHalSoundDose != nullptr && !mDisableCsd) {
+    if (mHalSoundDose != nullptr && mEnabledCsd) {
         ALOGD("%s: using HAL MEL computation, no MelProcessor needed.", __func__);
         return nullptr;
     }
@@ -290,11 +290,11 @@ binder::Status SoundDoseManager::SoundDose::updateAttenuation(float attenuationD
     return binder::Status::ok();
 }
 
-binder::Status SoundDoseManager::SoundDose::disableCsd() {
+binder::Status SoundDoseManager::SoundDose::setCsdEnabled(bool enabled) {
     ALOGV("%s", __func__);
     auto soundDoseManager = mSoundDoseManager.promote();
     if (soundDoseManager != nullptr) {
-        soundDoseManager->disableCsd();
+        soundDoseManager->setCsdEnabled(enabled);
     }
     return binder::Status::ok();
 }
@@ -365,26 +365,27 @@ void SoundDoseManager::updateAttenuation(float attenuationDB, audio_devices_t de
     }
 }
 
-void SoundDoseManager::disableCsd() {
+void SoundDoseManager::setCsdEnabled(bool enabled) {
     ALOGV("%s",  __func__);
 
     std::lock_guard _l(mLock);
-    mDisableCsd = true;
+    mEnabledCsd = enabled;
 
-    // Normally, there should be no active MelProcessors when this method is called
-    // We pause however every cached MelProcessor as a defensive mechanism to not
-    // have unnecessary processing
     for (auto& activeEntry : mActiveProcessors) {
         auto melProcessor = activeEntry.second.promote();
         if (melProcessor != nullptr) {
-            melProcessor->pause();
+            if (enabled) {
+                melProcessor->resume();
+            } else {
+                melProcessor->pause();
+            }
         }
     }
 }
 
-bool SoundDoseManager::isCsdDisabled() {
+bool SoundDoseManager::isCsdEnabled() {
     std::lock_guard _l(mLock);
-    return mDisableCsd;
+    return mEnabledCsd;
 }
 
 void SoundDoseManager::setUseFrameworkMel(bool useFrameworkMel) {
@@ -411,7 +412,7 @@ bool SoundDoseManager::forceComputeCsdOnAllDevices() const {
 }
 
 bool SoundDoseManager::isSoundDoseHalSupported() const {
-    if (mDisableCsd) {
+    if (!mEnabledCsd) {
         return false;
     }
 
@@ -455,7 +456,7 @@ void SoundDoseManager::onNewMelValues(const std::vector<float>& mels, size_t off
     float currentCsd;
     {
         std::lock_guard _l(mLock);
-        if (mDisableCsd) {
+        if (!mEnabledCsd) {
             return;
         }
 
@@ -496,7 +497,7 @@ void SoundDoseManager::onMomentaryExposure(float currentMel, audio_port_handle_t
 
     {
         std::lock_guard _l(mLock);
-        if (mDisableCsd) {
+        if (!mEnabledCsd) {
             return;
         }
     }
@@ -522,7 +523,7 @@ std::string SoundDoseManager::dump() const {
     std::string output;
     {
         std::lock_guard _l(mLock);
-        if (mDisableCsd) {
+        if (!mEnabledCsd) {
             base::StringAppendF(&output, "CSD is disabled");
             return output;
         }
