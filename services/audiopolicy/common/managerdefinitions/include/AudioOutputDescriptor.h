@@ -424,6 +424,15 @@ public:
     bool supportsAllDevices(const DeviceVector &devices) const;
 
     /**
+     * @brief supportsAtLeastOne checks if any device in devices is currently supported
+     * @param devices to be checked against
+     * @return true if the device is weakly supported by type (e.g. for non bus / rsubmix devices),
+     *         true if the device is supported (both type and address) for bus / remote submix
+     *         false otherwise
+     */
+    bool supportsAtLeastOne(const DeviceVector &devices) const;
+
+    /**
      * @brief supportsDevicesForPlayback
      * @param devices to be checked against
      * @return true if the devices is a supported combo for playback
