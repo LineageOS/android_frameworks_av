@@ -30,6 +30,8 @@
 #include <media/stagefright/foundation/AHandler.h>
 #include <media/stagefright/CodecErrorLog.h>
 #include <media/stagefright/FrameRenderTracker.h>
+#include <media/stagefright/PlaybackDurationAccumulator.h>
+#include <media/stagefright/VideoRenderQualityTracker.h>
 #include <utils/Vector.h>
 
 class C2Buffer;
@@ -63,7 +65,6 @@ class IMemory;
 struct PersistentSurface;
 class SoftwareRenderer;
 class Surface;
-class PlaybackDurationAccumulator;
 namespace hardware {
 namespace cas {
 namespace native {
@@ -459,7 +460,7 @@ private:
     void onGetMetrics(const sp<AMessage>& msg);
     constexpr const char *asString(TunnelPeekState state, const char *default_string="?");
     void updateTunnelPeek(const sp<AMessage> &msg);
-    void updatePlaybackDuration(const sp<AMessage> &msg);
+    void processRenderedFrames(const sp<AMessage> &msg);
 
     inline void initClientConfigParcel(ClientConfigParcel& clientConfig);
 
@@ -569,8 +570,9 @@ private:
     sp<CryptoAsync> mCryptoAsync;
     sp<ALooper> mCryptoLooper;
 
-    std::unique_ptr<PlaybackDurationAccumulator> mPlaybackDurationAccumulator;
-    bool mIsSurfaceToScreen;
+    bool mIsSurfaceToDisplay;
+    PlaybackDurationAccumulator mPlaybackDurationAccumulator;
+    VideoRenderQualityTracker mVideoRenderQualityTracker;
 
     MediaCodec(
             const sp<ALooper> &looper, pid_t pid, uid_t uid,

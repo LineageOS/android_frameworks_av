@@ -30,7 +30,6 @@
 #include <C2Buffer.h>
 
 #include "include/SoftwareRenderer.h"
-#include "PlaybackDurationAccumulator.h"
 
 #include <android/binder_manager.h>
 #include <android/content/pm/IPackageManagerNative.h>
@@ -198,6 +197,14 @@ static const char *kCodecRecentLatencyCount = "android.media.mediacodec.recent.n
 static const char *kCodecRecentLatencyHist = "android.media.mediacodec.recent.hist";    /* in us */
 static const char *kCodecPlaybackDurationSec =
         "android.media.mediacodec.playback-duration-sec"; /* in sec */
+
+static const char *kCodecFramesReleased = "android.media.mediacodec.frames.released";
+static const char *kCodecFramesRendered = "android.media.mediacodec.frames.rendered";
+static const char *kCodecFramesSkipped = "android.media.mediacodec.frames.skipped";
+static const char *kCodecFramesDropped = "android.media.mediacodec.frames.dropped";
+static const char *kCodecFramerateContent = "android.media.mediacodec.framerate.content";
+static const char *kCodecFramerateDesired = "android.media.mediacodec.framerate.desired";
+static const char *kCodecFramerateActual = "android.media.mediacodec.framerate.actual";
 
 /* -1: shaper disabled
    >=0: number of fields changed */
@@ -960,8 +967,7 @@ MediaCodec::MediaCodec(
       mHaveInputSurface(false),
       mHavePendingInputBuffers(false),
       mCpuBoostRequested(false),
-      mPlaybackDurationAccumulator(new PlaybackDurationAccumulator()),
-      mIsSurfaceToScreen(false),
+      mIsSurfaceToDisplay(false),
       mLatencyUnknown(0),
       mBytesEncoded(0),
       mEarliestEncodedPtsUs(INT64_MAX),
@@ -1096,6 +1102,20 @@ void MediaCodec::updateMediametrics() {
     mediametrics_setInt32(mMetricsHandle, kCodecResolutionChangeCount,
             mReliabilityContextMetrics.resolutionChangeCount);
 
+    // Video rendering quality metrics
+    {
+        const VideoRenderQualityMetrics& m = mVideoRenderQualityTracker.getMetrics();
+        if (m.frameRenderedCount > 0) {
+            mediametrics_setInt64(mMetricsHandle, kCodecFramesReleased, m.frameReleasedCount);
+            mediametrics_setInt64(mMetricsHandle, kCodecFramesRendered, m.frameRenderedCount);
+            mediametrics_setInt64(mMetricsHandle, kCodecFramesSkipped, m.frameSkippedCount);
+            mediametrics_setInt64(mMetricsHandle, kCodecFramesDropped, m.frameDroppedCount);
+            mediametrics_setDouble(mMetricsHandle, kCodecFramerateContent, m.contentFrameRate);
+            mediametrics_setDouble(mMetricsHandle, kCodecFramerateDesired, m.desiredFrameRate);
+            mediametrics_setDouble(mMetricsHandle, kCodecFramerateActual, m.actualFrameRate);
+        }
+    }
+
     if (mLatencyHist.getCount() != 0 ) {
         mediametrics_setInt64(mMetricsHandle, kCodecLatencyMax, mLatencyHist.getMax());
         mediametrics_setInt64(mMetricsHandle, kCodecLatencyMin, mLatencyHist.getMin());
@@ -1111,7 +1131,7 @@ void MediaCodec::updateMediametrics() {
     if (mLatencyUnknown > 0) {
         mediametrics_setInt64(mMetricsHandle, kCodecLatencyUnknown, mLatencyUnknown);
     }
-    int64_t playbackDurationSec = mPlaybackDurationAccumulator->getDurationInSeconds();
+    int64_t playbackDurationSec = mPlaybackDurationAccumulator.getDurationInSeconds();
     if (playbackDurationSec > 0) {
         mediametrics_setInt64(mMetricsHandle, kCodecPlaybackDurationSec, playbackDurationSec);
     }
@@ -1436,25 +1456,33 @@ void MediaCodec::updateTunnelPeek(const sp<AMessage> &msg) {
     ALOGV("TunnelPeekState: %s -> %s", asString(previousState), asString(mTunnelPeekState));
 }
 
-void MediaCodec::updatePlaybackDuration(const sp<AMessage> &msg) {
+void MediaCodec::processRenderedFrames(const sp<AMessage> &msg) {
     int what = 0;
     msg->findInt32("what", &what);
     if (msg->what() != kWhatCodecNotify && what != kWhatOutputFramesRendered) {
         static bool logged = false;
         if (!logged) {
             logged = true;
-            ALOGE("updatePlaybackDuration: expected kWhatOuputFramesRendered (%d)", msg->what());
+            ALOGE("processRenderedFrames: expected kWhatOutputFramesRendered (%d)", msg->what());
         }
         return;
     }
-    // Playback duration only counts if the buffers are going to the screen.
-    if (!mIsSurfaceToScreen) {
-        return;
-    }
-    int64_t renderTimeNs;
-    size_t index = 0;
-    while (msg->findInt64(AStringPrintf("%zu-system-nano", index++).c_str(), &renderTimeNs)) {
-        mPlaybackDurationAccumulator->processRenderTime(renderTimeNs);
+    // Rendered frames only matter if they're being sent to the display
+    if (mIsSurfaceToDisplay) {
+        int64_t renderTimeNs;
+        for (size_t index = 0;
+            msg->findInt64(AStringPrintf("%zu-system-nano", index).c_str(), &renderTimeNs);
+            index++) {
+            // Capture metrics for playback duration
+            mPlaybackDurationAccumulator.onFrameRendered(renderTimeNs);
+            // Capture metrics for quality
+            int64_t mediaTimeUs = 0;
+            if (!msg->findInt64(AStringPrintf("%zu-media-time-us", index).c_str(), &mediaTimeUs)) {
+                ALOGE("processRenderedFrames: no media time found");
+                continue;
+            }
+            mVideoRenderQualityTracker.onFrameRendered(mediaTimeUs, renderTimeNs);
+        }
     }
 }
 
@@ -3964,7 +3992,7 @@ void MediaCodec::onMessageReceived(const sp<AMessage> &msg) {
                                 asString(previousState),
                                 asString(TunnelPeekState::kBufferRendered));
                     }
-                    updatePlaybackDuration(msg);
+                    processRenderedFrames(msg);
                     // check that we have a notification set
                     if (mOnFrameRenderedNotification != NULL) {
                         sp<AMessage> notify = mOnFrameRenderedNotification->dup();
@@ -4158,6 +4186,10 @@ void MediaCodec::onMessageReceived(const sp<AMessage> &msg) {
                               mState, stateString(mState).c_str());
                         break;
                     }
+
+                    if (mIsSurfaceToDisplay) {
+                        mVideoRenderQualityTracker.resetForDiscontinuity();
+                    }
                     // Notify the RM that the codec has been stopped.
                     ClientConfigParcel clientConfig;
                     initClientConfigParcel(clientConfig);
@@ -4211,6 +4243,10 @@ void MediaCodec::onMessageReceived(const sp<AMessage> &msg) {
                         ALOGW("received FlushCompleted message in state %d/%s",
                                 mState, stateString(mState).c_str());
                         break;
+                    }
+
+                    if (mIsSurfaceToDisplay) {
+                        mVideoRenderQualityTracker.resetForDiscontinuity();
                     }
 
                     if (mFlags & kFlagIsAsync) {
@@ -5927,7 +5963,9 @@ status_t MediaCodec::onReleaseOutputBuffer(const sp<AMessage> &msg) {
 
         // If rendering to the screen, then schedule a time in the future to poll to see if this
         // frame was ever rendered to seed onFrameRendered callbacks.
-        if (mIsSurfaceToScreen) {
+        if (mIsSurfaceToDisplay) {
+            noRenderTime ? mVideoRenderQualityTracker.onFrameReleased(mediaTimeUs)
+                         : mVideoRenderQualityTracker.onFrameReleased(mediaTimeUs, renderTimeNs);
             // can't initialize this in the constructor because the Looper parent class needs to be
             // initialized first
             if (mMsgPollForRenderedBuffers == nullptr) {
@@ -5957,6 +5995,11 @@ status_t MediaCodec::onReleaseOutputBuffer(const sp<AMessage> &msg) {
             ALOGI("rendring output error %d", err);
         }
     } else {
+        if (mIsSurfaceToDisplay) {
+            int64_t mediaTimeUs = -1;
+            buffer->meta()->findInt64("timeUs", &mediaTimeUs);
+            mVideoRenderQualityTracker.onFrameSkipped(mediaTimeUs);
+        }
         mBufferChannel->discardBuffer(buffer);
     }
 
@@ -6023,7 +6066,7 @@ status_t MediaCodec::connectToSurface(const sp<Surface> &surface) {
 
         // in case we don't connect, ensure that we don't signal the surface is
         // connected to the screen
-        mIsSurfaceToScreen = false;
+        mIsSurfaceToDisplay = false;
 
         err = nativeWindowConnect(surface.get(), "connectToSurface");
         if (err == OK) {
@@ -6053,7 +6096,7 @@ status_t MediaCodec::connectToSurface(const sp<Surface> &surface) {
             // keep track whether or not the buffers of the connected surface go to the screen
             int result = 0;
             surface->query(NATIVE_WINDOW_QUEUES_TO_WINDOW_COMPOSER, &result);
-            mIsSurfaceToScreen = result != 0;
+            mIsSurfaceToDisplay = result != 0;
         }
     }
     // do not return ALREADY_EXISTS unless surfaces are the same
@@ -6071,7 +6114,7 @@ status_t MediaCodec::disconnectFromSurface() {
         }
         // assume disconnected even on error
         mSurface.clear();
-        mIsSurfaceToScreen = false;
+        mIsSurfaceToDisplay = false;
     }
     return err;
 }
