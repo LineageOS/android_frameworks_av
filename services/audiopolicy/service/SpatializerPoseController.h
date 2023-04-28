@@ -121,9 +121,7 @@ class SpatializerPoseController : private media::SensorPoseProvider::Listener {
     mutable std::timed_mutex mMutex;
     Listener* const mListener;
     const std::chrono::microseconds mSensorPeriod;
-    // Order matters for the following two members to ensure correct destruction.
     std::unique_ptr<media::HeadTrackingProcessor> mProcessor;
-    std::unique_ptr<media::SensorPoseProvider> mPoseProvider;
     int32_t mHeadSensor = media::SensorPoseProvider::INVALID_HANDLE;
     int32_t mScreenSensor = media::SensorPoseProvider::INVALID_HANDLE;
     std::optional<media::HeadTrackingMode> mActualMode;
@@ -145,6 +143,9 @@ class SpatializerPoseController : private media::SensorPoseProvider::Listener {
     media::VectorRecorder mScreenSensorDurableRecorder{
         4 /* vectorSize */, std::chrono::minutes(1), 10 /* maxLogLine */,
         { 3 } /* delimiterIdx */};
+
+    // Next to last variable as releasing this stops the callbacks
+    std::unique_ptr<media::SensorPoseProvider> mPoseProvider;
 
     // It's important that mThread is the last variable in this class
     // since we starts mThread in initializer list
