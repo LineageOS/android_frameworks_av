@@ -210,6 +210,10 @@ class DeviceHalAidl : public DeviceHalInterface, public ConversionHelperAidl,
     status_t createOrUpdatePortConfig(
             const ::aidl::android::media::audio::common::AudioPortConfig& requestedPortConfig,
             PortConfigs::iterator* result, bool *created);
+    status_t filterAndUpdateBtA2dpParameters(AudioParameter &parameters);
+    status_t filterAndUpdateBtHfpParameters(AudioParameter &parameters);
+    status_t filterAndUpdateBtLeParameters(AudioParameter &parameters);
+    status_t filterAndUpdateBtScoParameters(AudioParameter &parameters);
     status_t findOrCreatePatch(
         const std::set<int32_t>& sourcePortConfigIds,
         const std::set<int32_t>& sinkPortConfigIds,
@@ -284,6 +288,9 @@ class DeviceHalAidl : public DeviceHalInterface, public ConversionHelperAidl,
     const std::string mInstance;
     const std::shared_ptr<::aidl::android::hardware::audio::core::IModule> mModule;
     const std::shared_ptr<::aidl::android::hardware::audio::core::ITelephony> mTelephony;
+    const std::shared_ptr<::aidl::android::hardware::audio::core::IBluetooth> mBluetooth;
+    const std::shared_ptr<::aidl::android::hardware::audio::core::IBluetoothA2dp> mBluetoothA2dp;
+    const std::shared_ptr<::aidl::android::hardware::audio::core::IBluetoothLe> mBluetoothLe;
     Ports mPorts;
     int32_t mDefaultInputPortId = -1;
     int32_t mDefaultOutputPortId = -1;
