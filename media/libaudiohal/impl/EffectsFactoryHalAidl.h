@@ -62,6 +62,10 @@ class EffectsFactoryHalAidl final : public EffectsFactoryHalInterface {
 
     detail::AudioHalVersionInfo getHalVersion() const override;
 
+    std::shared_ptr<const effectsConfig::Processings> getProcessings() const override;
+
+    ::android::error::Result<size_t> getSkippedElements() const override;
+
   private:
     const std::shared_ptr<IFactory> mFactory;
     const detail::AudioHalVersionInfo mHalVersion;
@@ -77,6 +81,8 @@ class EffectsFactoryHalAidl final : public EffectsFactoryHalInterface {
     const std::vector<Descriptor> mNonProxyDescList;
     // total number of effects including proxy effects
     const size_t mEffectCount;
+    // Query result of pre and post processing from effect factory
+    const std::shared_ptr<const effectsConfig::Processings> mEffectProcessings;
 
     std::mutex mLock;
     uint64_t mEffectIdCounter GUARDED_BY(mLock) = 0;  // Align with HIDL (0 is INVALID_ID)
