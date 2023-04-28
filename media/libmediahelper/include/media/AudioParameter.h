@@ -49,6 +49,12 @@ public:
     static const char * const keyInputSource;
     static const char * const keyScreenState;
 
+    // TODO(b/73175392) consider improvement to AIDL StreamOut interface.
+    // keyClosing: "true" when AudioOutputDescriptor is closing.  Used by A2DP HAL.
+    // keyExiting: "1" on AudioFlinger Thread preExit.  Used by remote_submix and A2DP HAL.
+    static const char * const keyClosing;
+    static const char * const keyExiting;
+
     //  keyBtNrec: BT SCO Noise Reduction + Echo Cancellation parameters
     //  keyHwAvSync: get HW synchronization source identifier from a device
     //  keyMonoOutput: Enable mono audio playback

@@ -40,7 +40,7 @@ struct downmix_object_t {
     downmix_type_t type;
     bool apply_volume_correction;
     uint8_t input_channel_count;
-    android::audio_utils::channels::ChannelMix channelMix;
+    android::audio_utils::channels::ChannelMix<AUDIO_CHANNEL_OUT_STEREO> channelMix;
 };
 
 typedef struct downmix_module_s {
@@ -259,7 +259,7 @@ static int32_t DownmixLib_Create(const effect_uuid_t *uuid,
     ret = Downmix_Init(module);
     if (ret < 0) {
         ALOGW("DownmixLib_Create() init failed");
-        free(module);
+        delete module;
         return ret;
     }
 
@@ -582,7 +582,7 @@ static int Downmix_Init(downmix_module_t *pDwmModule) {
     ALOGV("Downmix_Init module %p", pDwmModule);
     int ret = 0;
 
-    memset(&pDwmModule->context, 0, sizeof(downmix_object_t));
+    pDwmModule->context = downmix_object_t{};  // zero initialize (contains class with vtable).
 
     pDwmModule->config.inputCfg.accessMode = EFFECT_BUFFER_ACCESS_READ;
     pDwmModule->config.inputCfg.format = AUDIO_FORMAT_PCM_FLOAT;

@@ -4023,7 +4023,7 @@ NO_THREAD_SAFETY_ANALYSIS  // manual locking of AudioFlinger
                         LOG_AUDIO_STATE();
                         mThreadMetrics.logEndInterval();
                         mThreadSnapshot.onEnd();
-                        mStandby = true;
+                        setStandby_l();
                     }
                     sendStatistics(false /* force */);
                 }
@@ -4103,6 +4103,14 @@ NO_THREAD_SAFETY_ANALYSIS  // manual locking of AudioFlinger
             activeTracks.insert(activeTracks.end(), mActiveTracks.begin(), mActiveTracks.end());
 
             setHalLatencyMode_l();
+
+            // signal actual start of output stream when the render position reported by the kernel
+            // starts moving.
+            if (!mStandby && !mHalStarted && mKernelPositionOnStandby !=
+                    mTimestamp.mPosition[ExtendedTimestamp::LOCATION_KERNEL]) {
+                mHalStarted = true;
+                mWaitHalStartCV.broadcast();
+            }
         } // mLock scope ends
 
         if (mBytesRemaining == 0) {
@@ -4488,7 +4496,7 @@ NO_THREAD_SAFETY_ANALYSIS  // manual locking of AudioFlinger
 
     if (!mStandby) {
         threadLoop_standby();
-        mStandby = true;
+        setStandby();
     }
 
     releaseWakeLock();
@@ -4976,7 +4984,7 @@ AudioFlinger::MixerThread::MixerThread(const sp<AudioFlinger>& audioFlinger, Aud
         const NBAIO_Format offersFast[1] = {format};
         size_t numCounterOffersFast = 0;
 #if !LOG_NDEBUG
-        ssize_t index =
+        index =
 #else
         (void)
 #endif
@@ -6235,12 +6243,12 @@ bool AudioFlinger::MixerThread::checkForNewParameter_l(const String8& keyValuePa
     if (status == NO_ERROR) {
         status = mOutput->stream->setParameters(keyValuePair);
         if (!mStandby && status == INVALID_OPERATION) {
+            ALOGW("%s: setParameters failed with keyValuePair %s, entering standby",
+                    __func__, keyValuePair.c_str());
             mOutput->standby();
-            if (!mStandby) {
-                mThreadMetrics.logEndInterval();
-                mThreadSnapshot.onEnd();
-                mStandby = true;
-            }
+            mThreadMetrics.logEndInterval();
+            mThreadSnapshot.onEnd();
+            setStandby_l();
             mBytesWritten = 0;
             status = mOutput->stream->setParameters(keyValuePair);
         }
@@ -6547,7 +6555,8 @@ void AudioFlinger::DirectOutputThread::onAddNewTrack_l()
                 mFlushPending = true;
             }
         } else /* mType == OFFLOAD */ {
-            if (previousTrack->sessionId() != latestTrack->sessionId()) {
+            if (previousTrack->sessionId() != latestTrack->sessionId() ||
+                previousTrack->isFlushPending()) {
                 mFlushPending = true;
             }
         }
@@ -6889,7 +6898,7 @@ bool AudioFlinger::DirectOutputThread::checkForNewParameter_l(const String8& key
             if (!mStandby) {
                 mThreadMetrics.logEndInterval();
                 mThreadSnapshot.onEnd();
-                mStandby = true;
+                setStandby_l();
             }
             mBytesWritten = 0;
             status = mOutput->stream->setParameters(keyValuePair);
@@ -7874,15 +7883,15 @@ AudioFlinger::RecordThread::RecordThread(const sp<AudioFlinger>& audioFlinger,
         Pipe *pipe = new Pipe(pipeFramesP2, format, pipeBuffer);
         const NBAIO_Format offersFast[1] = {format};
         size_t numCounterOffersFast = 0;
-        [[maybe_unused]] ssize_t index = pipe->negotiate(offersFast, std::size(offersFast),
+        [[maybe_unused]] ssize_t index2 = pipe->negotiate(offersFast, std::size(offersFast),
                 nullptr /* counterOffers */, numCounterOffersFast);
-        ALOG_ASSERT(index == 0);
+        ALOG_ASSERT(index2 == 0);
         mPipeSink = pipe;
         PipeReader *pipeReader = new PipeReader(*pipe);
         numCounterOffersFast = 0;
-        index = pipeReader->negotiate(offersFast, std::size(offersFast),
+        index2 = pipeReader->negotiate(offersFast, std::size(offersFast),
                 nullptr /* counterOffers */, numCounterOffersFast);
-        ALOG_ASSERT(index == 0);
+        ALOG_ASSERT(index2 == 0);
         mPipeSource = pipeReader;
         mPipeFramesP2 = pipeFramesP2;
         mPipeMemory = pipeMemory;
@@ -9297,7 +9306,7 @@ void AudioFlinger::RecordThread::ResamplerBufferProvider::releaseBuffer(
     if (stepCount == 0) {
         return;
     }
-    ALOG_ASSERT(stepCount <= mRsmpInUnrel);
+    ALOG_ASSERT(stepCount <= (int32_t)mRsmpInUnrel);
     mRsmpInUnrel -= stepCount;
     mRsmpInFront = audio_utils::safe_add_overflow(mRsmpInFront, stepCount);
     buffer->raw = NULL;

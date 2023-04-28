@@ -56,7 +56,7 @@ class DownmixContext final : public EffectContext {
     DownmixState mState;
     Downmix::Type mType;
     ::aidl::android::media::audio::common::AudioChannelLayout mChMask;
-    ::android::audio_utils::channels::ChannelMix mChannelMix;
+    ::android::audio_utils::channels::ChannelMix<AUDIO_CHANNEL_OUT_STEREO> mChannelMix;
 
     // Common Params
     void init_params(const Parameter::Common& common);

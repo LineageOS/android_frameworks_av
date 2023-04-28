@@ -103,6 +103,7 @@ Camera3Device::Camera3Device(std::shared_ptr<CameraServiceProxyWrapper>& cameraS
         mRotateAndCropOverride(ANDROID_SCALER_ROTATE_AND_CROP_NONE),
         mComposerOutput(false),
         mAutoframingOverride(ANDROID_CONTROL_AUTOFRAMING_OFF),
+        mSettingsOverride(-1),
         mActivePhysicalId("")
 {
     ATRACE_CALL();
@@ -172,10 +173,21 @@ status_t Camera3Device::initializeCommonLocked() {
         }
     }
 
+    camera_metadata_entry_t availableSettingsOverrides = mDeviceInfo.find(
+            ANDROID_CONTROL_AVAILABLE_SETTINGS_OVERRIDES);
+    for (size_t i = 0; i < availableSettingsOverrides.count; i++) {
+        if (availableSettingsOverrides.data.i32[i] ==
+                ANDROID_CONTROL_SETTINGS_OVERRIDE_ZOOM) {
+            mSupportZoomOverride = true;
+            break;
+        }
+    }
+
     /** Start up request queue thread */
     mRequestThread = createNewRequestThread(
             this, mStatusTracker, mInterface, sessionParamKeys,
-            mUseHalBufManager, mSupportCameraMute, mOverrideToPortrait);
+            mUseHalBufManager, mSupportCameraMute, mOverrideToPortrait,
+            mSupportZoomOverride);
     res = mRequestThread->run(String8::format("C3Dev-%s-ReqQueue", mId.string()).string());
     if (res != OK) {
         SET_ERR_L("Unable to start request queue thread: %s (%d)",
@@ -2232,6 +2244,16 @@ sp<Camera3Device::CaptureRequest> Camera3Device::createCaptureRequest(
         }
     }
 
+    if (mSupportZoomOverride) {
+        for (auto& settings : newRequest->mSettingsList) {
+            auto settingsOverrideEntry =
+                    settings.metadata.find(ANDROID_CONTROL_SETTINGS_OVERRIDE);
+            settings.mOriginalSettingsOverride = settingsOverrideEntry.count > 0 ?
+                    settingsOverrideEntry.data.i32[0] :
+                    ANDROID_CONTROL_SETTINGS_OVERRIDE_OFF;
+        }
+    }
+
     return newRequest;
 }
 
@@ -2959,7 +2981,8 @@ Camera3Device::RequestThread::RequestThread(wp<Camera3Device> parent,
         sp<HalInterface> interface, const Vector<int32_t>& sessionParamKeys,
         bool useHalBufManager,
         bool supportCameraMute,
-        bool overrideToPortrait) :
+        bool overrideToPortrait,
+        bool supportSettingsOverride) :
         Thread(/*canCallJava*/false),
         mParent(parent),
         mStatusTracker(statusTracker),
@@ -2981,6 +3004,7 @@ Camera3Device::RequestThread::RequestThread(wp<Camera3Device> parent,
         mComposerOutput(false),
         mCameraMute(ANDROID_SENSOR_TEST_PATTERN_MODE_OFF),
         mCameraMuteChanged(false),
+        mSettingsOverride(ANDROID_CONTROL_SETTINGS_OVERRIDE_OFF),
         mRepeatingLastFrameNumber(
             hardware::camera2::ICameraDeviceUser::NO_IN_FLIGHT_REPEATING_FRAMES),
         mPrepareVideoStream(false),
@@ -2990,7 +3014,8 @@ Camera3Device::RequestThread::RequestThread(wp<Camera3Device> parent,
         mLatestSessionParams(sessionParamKeys.size()),
         mUseHalBufManager(useHalBufManager),
         mSupportCameraMute(supportCameraMute),
-        mOverrideToPortrait(overrideToPortrait) {
+        mOverrideToPortrait(overrideToPortrait),
+        mSupportSettingsOverride(supportSettingsOverride) {
     mStatusId = statusTracker->addComponent("RequestThread");
     mVndkVersion = property_get_int32("ro.vndk.version", __ANDROID_API_FUTURE__);
 }
@@ -3671,6 +3696,7 @@ status_t Camera3Device::RequestThread::prepareHalRequests() {
         mPrevTriggers = triggerCount;
 
         bool testPatternChanged = overrideTestPattern(captureRequest);
+        bool settingsOverrideChanged = overrideSettingsOverride(captureRequest);
 
         // If the request is the same as last, or we had triggers now or last time or
         // changing overrides this time
@@ -3678,7 +3704,7 @@ status_t Camera3Device::RequestThread::prepareHalRequests() {
                 (mPrevRequest != captureRequest || triggersMixedIn ||
                          captureRequest->mRotateAndCropChanged ||
                          captureRequest->mAutoframingChanged ||
-                         testPatternChanged) &&
+                         testPatternChanged || settingsOverrideChanged) &&
                 // Request settings are all the same within one batch, so only treat the first
                 // request in a batch as new
                 !(batchedRequest && i > 0);
@@ -4179,6 +4205,13 @@ status_t Camera3Device::RequestThread::setCameraMute(int32_t muteMode) {
         mCameraMute = muteMode;
         mCameraMuteChanged = true;
     }
+    return OK;
+}
+
+status_t Camera3Device::RequestThread::setZoomOverride(int32_t zoomOverride) {
+    ATRACE_CALL();
+    Mutex::Autolock l(mTriggerMutex);
+    mSettingsOverride = zoomOverride;
     return OK;
 }
 
@@ -4883,6 +4916,33 @@ bool Camera3Device::RequestThread::overrideTestPattern(
     return changed;
 }
 
+bool Camera3Device::RequestThread::overrideSettingsOverride(
+        const sp<CaptureRequest> &request) {
+    ATRACE_CALL();
+
+    if (!mSupportSettingsOverride) return false;
+
+    Mutex::Autolock l(mTriggerMutex);
+
+    // For a multi-camera, only override the logical camera's metadata.
+    CameraMetadata &metadata = request->mSettingsList.begin()->metadata;
+    camera_metadata_entry entry = metadata.find(ANDROID_CONTROL_SETTINGS_OVERRIDE);
+    int32_t originalValue = request->mSettingsList.begin()->mOriginalSettingsOverride;
+    if (mSettingsOverride != -1 &&
+            (entry.count == 0 || entry.data.i32[0] != mSettingsOverride)) {
+        metadata.update(ANDROID_CONTROL_SETTINGS_OVERRIDE,
+                &mSettingsOverride, 1);
+        return true;
+    } else if (mSettingsOverride == -1 &&
+            (entry.count == 0 || entry.data.i32[0] != originalValue)) {
+        metadata.update(ANDROID_CONTROL_SETTINGS_OVERRIDE,
+                &originalValue, 1);
+        return true;
+    }
+
+    return false;
+}
+
 status_t Camera3Device::RequestThread::setHalInterface(
         sp<HalInterface> newHalInterface) {
     if (newHalInterface.get() == nullptr) {
@@ -5347,6 +5407,25 @@ status_t Camera3Device::setCameraMute(bool enabled) {
             mSupportTestPatternSolidColor ? ANDROID_SENSOR_TEST_PATTERN_MODE_SOLID_COLOR :
                                             ANDROID_SENSOR_TEST_PATTERN_MODE_BLACK;
     return mRequestThread->setCameraMute(muteMode);
+}
+
+bool Camera3Device::supportsZoomOverride() {
+    Mutex::Autolock il(mInterfaceLock);
+    Mutex::Autolock l(mLock);
+
+    return mSupportZoomOverride;
+}
+
+status_t Camera3Device::setZoomOverride(int32_t zoomOverride) {
+    ATRACE_CALL();
+    Mutex::Autolock il(mInterfaceLock);
+    Mutex::Autolock l(mLock);
+
+    if (mRequestThread == nullptr || !mSupportZoomOverride) {
+        return INVALID_OPERATION;
+    }
+
+    return mRequestThread->setZoomOverride(zoomOverride);
 }
 
 status_t Camera3Device::injectCamera(const String8& injectedCamId,

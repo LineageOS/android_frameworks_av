@@ -142,9 +142,14 @@ public:
 
     bool isValid() const { return mIsValid; }
 
+    static bool isOutputChannelMaskSupported(audio_channel_mask_t outputChannelMask) {
+        return audio_utils::channels::IChannelMix::isOutputChannelMaskSupported(
+                outputChannelMask);
+    }
+
 protected:
-    audio_utils::channels::ChannelMix mChannelMix;
-    bool mIsValid = false;
+    const std::shared_ptr<audio_utils::channels::IChannelMix> mChannelMix;
+    const bool mIsValid;
 };
 
 // RemixBufferProvider derives from CopyBufferProvider to perform an

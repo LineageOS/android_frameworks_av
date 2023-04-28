@@ -371,6 +371,12 @@ public:
         // Clear stream use case overrides
         virtual void clearStreamUseCaseOverrides() = 0;
 
+        // Whether the client supports camera zoom override
+        virtual bool supportsZoomOverride() = 0;
+
+        // Set/reset zoom override
+        virtual status_t setZoomOverride(int32_t zoomOverride) = 0;
+
         // The injection camera session to replace the internal camera
         // session.
         virtual status_t injectCamera(const String8& injectedCamId,
@@ -1306,6 +1312,9 @@ private:
     // Clear the stream use case overrides
     void handleClearStreamUseCaseOverrides();
 
+    // Set or clear the zoom override flag
+    status_t handleSetZoomOverride(const Vector<String16>& args);
+
     // Handle 'watch' command as passed through 'cmd'
     status_t handleWatchCommand(const Vector<String16> &args, int inFd, int outFd);
 
@@ -1407,6 +1416,9 @@ private:
 
     // Current stream use case overrides
     std::vector<int64_t> mStreamUseCaseOverrides;
+
+    // Current zoom override value
+    int32_t mZoomOverrideValue = -1;
 
     /**
      * A listener class that implements the IBinder::DeathRecipient interface
