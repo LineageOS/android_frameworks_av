@@ -255,6 +255,7 @@ cc_library {
         "MediaCodecSource.cpp",
         "MediaExtractor.cpp",
         "MediaExtractorFactory.cpp",
+        "MediaHistogram.cpp",
         "MediaSource.cpp",
         "MediaSync.cpp",
         "MediaTrack.cpp",

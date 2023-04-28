@@ -30,6 +30,7 @@
 #include <media/stagefright/foundation/AHandler.h>
 #include <media/stagefright/CodecErrorLog.h>
 #include <media/stagefright/FrameRenderTracker.h>
+#include <media/stagefright/MediaHistogram.h>
 #include <media/stagefright/PlaybackDurationAccumulator.h>
 #include <media/stagefright/VideoRenderQualityTracker.h>
 #include <utils/Vector.h>
@@ -714,31 +715,8 @@ private:
     int mRecentHead;
     Mutex mRecentLock;
 
-    class Histogram {
-      public:
-        Histogram() : mFloor(0), mWidth(0), mBelow(0), mAbove(0),
-                      mMin(INT64_MAX), mMax(INT64_MIN), mSum(0), mCount(0),
-                      mBucketCount(0), mBuckets(NULL) {};
-        ~Histogram() { clear(); };
-        void clear() { if (mBuckets != NULL) free(mBuckets); mBuckets = NULL; };
-        bool setup(int nbuckets, int64_t width, int64_t floor = 0);
-        void insert(int64_t sample);
-        int64_t getMin() const { return mMin; }
-        int64_t getMax() const { return mMax; }
-        int64_t getCount() const { return mCount; }
-        int64_t getSum() const { return mSum; }
-        int64_t getAvg() const { return mSum / (mCount == 0 ? 1 : mCount); }
-        std::string emit();
-      private:
-        int64_t mFloor, mCeiling, mWidth;
-        int64_t mBelow, mAbove;
-        int64_t mMin, mMax, mSum, mCount;
+    MediaHistogram mLatencyHist;
 
-        int mBucketCount;
-        int64_t *mBuckets;
-    };
-
-    Histogram mLatencyHist;
     // An unique ID for the codec - Used by the metrics.
     uint64_t mCodecId = 0;
 

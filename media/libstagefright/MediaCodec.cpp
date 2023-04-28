@@ -1322,7 +1322,7 @@ void MediaCodec::updateEphemeralMediametrics(mediametrics_handle_t item) {
         return;
     }
 
-    Histogram recentHist;
+    MediaHistogram recentHist;
 
     // build an empty histogram
     recentHist.setup(kLatencyHistBuckets, kLatencyHistWidth, kLatencyHistFloor);
@@ -1331,7 +1331,7 @@ void MediaCodec::updateEphemeralMediametrics(mediametrics_handle_t item) {
     {
         Mutex::Autolock al(mRecentLock);
 
-        for (int i=0; i<kRecentLatencyFrames; i++) {
+        for (int i = 0; i < kRecentLatencyFrames; i++) {
             if (mRecentSamples[i] != kRecentSampleInvalid) {
                 recentHist.insert(mRecentSamples[i]);
             }
@@ -1339,7 +1339,7 @@ void MediaCodec::updateEphemeralMediametrics(mediametrics_handle_t item) {
     }
 
     // spit the data (if any) into the supplied analytics record
-    if (recentHist.getCount()!= 0 ) {
+    if (recentHist.getCount() != 0 ) {
         mediametrics_setInt64(item, kCodecRecentLatencyMax, recentHist.getMax());
         mediametrics_setInt64(item, kCodecRecentLatencyMin, recentHist.getMin());
         mediametrics_setInt64(item, kCodecRecentLatencyAvg, recentHist.getAvg());
@@ -1484,96 +1484,6 @@ void MediaCodec::processRenderedFrames(const sp<AMessage> &msg) {
             mVideoRenderQualityTracker.onFrameRendered(mediaTimeUs, renderTimeNs);
         }
     }
-}
-
-bool MediaCodec::Histogram::setup(int nbuckets, int64_t width, int64_t floor)
-{
-    if (nbuckets <= 0 || width <= 0) {
-        return false;
-    }
-
-    // get histogram buckets
-    if (nbuckets == mBucketCount && mBuckets != NULL) {
-        // reuse our existing buffer
-        memset(mBuckets, 0, sizeof(*mBuckets) * mBucketCount);
-    } else {
-        // get a new pre-zeroed buffer
-        int64_t *newbuckets = (int64_t *)calloc(nbuckets, sizeof (*mBuckets));
-        if (newbuckets == NULL) {
-            goto bad;
-        }
-        if (mBuckets != NULL)
-            free(mBuckets);
-        mBuckets = newbuckets;
-    }
-
-    mWidth = width;
-    mFloor = floor;
-    mCeiling = floor + nbuckets * width;
-    mBucketCount = nbuckets;
-
-    mMin = INT64_MAX;
-    mMax = INT64_MIN;
-    mSum = 0;
-    mCount = 0;
-    mBelow = mAbove = 0;
-
-    return true;
-
-  bad:
-    if (mBuckets != NULL) {
-        free(mBuckets);
-        mBuckets = NULL;
-    }
-
-    return false;
-}
-
-void MediaCodec::Histogram::insert(int64_t sample)
-{
-    // histogram is not set up
-    if (mBuckets == NULL) {
-        return;
-    }
-
-    mCount++;
-    mSum += sample;
-    if (mMin > sample) mMin = sample;
-    if (mMax < sample) mMax = sample;
-
-    if (sample < mFloor) {
-        mBelow++;
-    } else if (sample >= mCeiling) {
-        mAbove++;
-    } else {
-        int64_t slot = (sample - mFloor) / mWidth;
-        CHECK(slot < mBucketCount);
-        mBuckets[slot]++;
-    }
-    return;
-}
-
-std::string MediaCodec::Histogram::emit()
-{
-    std::string value;
-    char buffer[64];
-
-    // emits:  width,Below{bucket0,bucket1,...., bucketN}above
-    // unconfigured will emit: 0,0{}0
-    // XXX: is this best representation?
-    snprintf(buffer, sizeof(buffer), "%" PRId64 ",%" PRId64 ",%" PRId64 "{",
-             mFloor, mWidth, mBelow);
-    value = buffer;
-    for (int i = 0; i < mBucketCount; i++) {
-        if (i != 0) {
-            value = value + ",";
-        }
-        snprintf(buffer, sizeof(buffer), "%" PRId64, mBuckets[i]);
-        value = value + buffer;
-    }
-    snprintf(buffer, sizeof(buffer), "}%" PRId64 , mAbove);
-    value = value + buffer;
-    return value;
 }
 
 // when we send a buffer to the codec;
