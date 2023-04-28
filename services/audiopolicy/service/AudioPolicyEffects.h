@@ -39,12 +39,7 @@ namespace android {
  *
  * This class manages all effects attached to input and output streams in AudioPolicyService.
  * The effect configurations can be queried in several ways:
- *
- * With HIDL HAL, the configuration file `audio_effects.xml` will be loaded by libAudioHal. If this
- * file does not exist, AudioPolicyEffects class will fallback to load configuration from
- * `/vendor/etc/audio_effects.conf` (AUDIO_EFFECT_VENDOR_CONFIG_FILE). If this file also does not
- * exist, the configuration will be loaded from the file `/system/etc/audio_effects.conf`.
- *
+ * With HIDL HAL, the configuration file `audio_effects.xml` will be loaded by libAudioHal.
  * With AIDL HAL, the configuration will be queried with the method `IFactory::queryProcessing()`.
  */
 class AudioPolicyEffects : public RefBase
@@ -52,7 +47,7 @@ class AudioPolicyEffects : public RefBase
 
 public:
 
-    // The constructor will parse audio_effects.conf
+    // The constructor will parse audio_effects.xml
     // First it will look whether vendor specific file exists,
     // otherwise it will parse the system default file.
     explicit AudioPolicyEffects(const sp<EffectsFactoryHalInterface>& effectsFactoryHal);
@@ -121,7 +116,7 @@ private:
     void initDefaultDeviceEffects();
 
     // class to store the description of an effects and its parameters
-    // as defined in audio_effects.conf
+    // as defined in audio_effects.xml
     class EffectDesc {
     public:
         EffectDesc(const char *name,
@@ -235,8 +230,7 @@ private:
     static const char *kStreamNames[AUDIO_STREAM_PUBLIC_CNT+1]; //+1 required as streams start from -1
     audio_stream_type_t streamNameToEnum(const char *name);
 
-    // Parse audio_effects.conf
-    status_t loadAudioEffectConfigLegacy(const char *path);
+    // Parse audio_effects.xml
     status_t loadAudioEffectConfig(const sp<EffectsFactoryHalInterface>& effectsFactoryHal);
 
     // Load all effects descriptors in configuration file
