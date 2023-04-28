@@ -27,6 +27,7 @@
 #include <audio_utils/SimpleLog.h>
 #include <math.h>
 #include <media/AudioEffect.h>
+#include <media/audiohal/EffectsFactoryHalInterface.h>
 #include <media/VectorRecorder.h>
 #include <media/audiohal/EffectHalInterface.h>
 #include <media/stagefright/foundation/ALooper.h>
@@ -94,7 +95,8 @@ class Spatializer : public media::BnSpatializer,
                     private SpatializerPoseController::Listener,
                     public virtual AudioSystem::SupportedLatencyModesCallback {
   public:
-    static sp<Spatializer> create(SpatializerPolicyCallback *callback);
+    static sp<Spatializer> create(SpatializerPolicyCallback* callback,
+                                  const sp<EffectsFactoryHalInterface>& effectsFactoryHal);
 
            ~Spatializer() override;
 
