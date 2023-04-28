@@ -389,6 +389,10 @@ static inline ::android::status_t statusTFromBinderStatus(const ::ndk::ScopedASt
         ?: statusTFromExceptionCode(status.getExceptionCode()); // a service-side error with a
                                                      // standard Java exception (fromExceptionCode)
 }
+
+static inline ::android::status_t statusTFromBinderStatusT(binder_status_t status) {
+    return statusTFromBinderStatus(::ndk::ScopedAStatus::fromStatus(status));
+}
 #endif
 
 /**
