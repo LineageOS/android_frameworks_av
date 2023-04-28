@@ -300,11 +300,13 @@ aidl_interface {
         "aidl/android/media/AudioPortRole.aidl",
         "aidl/android/media/AudioPortType.aidl",
         "aidl/android/media/AudioProfileSys.aidl",
+        "aidl/android/media/AudioRoute.aidl",
         "aidl/android/media/AudioTimestampInternal.aidl",
         "aidl/android/media/AudioUniqueIdUse.aidl",
         "aidl/android/media/AudioVibratorInfo.aidl",
         "aidl/android/media/EffectDescriptor.aidl",
         "aidl/android/media/TrackSecondaryOutputInfo.aidl",
+        "aidl/android/media/SurroundSoundConfig.aidl",
     ],
     imports: [
         "android.media.audio.common.types-V2",
