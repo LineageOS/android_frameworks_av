@@ -216,8 +216,9 @@ class AudioPolicyManagerFuzzer {
     virtual void process();
 
    protected:
+    sp<AudioPolicyConfig> mConfig{AudioPolicyConfig::createWritableForTests()};
     std::unique_ptr<AudioPolicyManagerTestClient> mClient{new AudioPolicyManagerTestClient};
-    std::unique_ptr<AudioPolicyTestManager> mManager{new AudioPolicyTestManager(mClient.get())};
+    std::unique_ptr<AudioPolicyTestManager> mManager;
     FuzzedDataProvider *mFdp;
 };
 
@@ -230,7 +231,10 @@ bool AudioPolicyManagerFuzzer::initialize() {
     }
     // init code
     SetUpManagerConfig();
-
+    if (mConfig == nullptr) {
+        return false;
+    }
+    mManager.reset(new AudioPolicyTestManager(mConfig, mClient.get()));
     if (mManager->initialize() != NO_ERROR) {
         return false;
     }
@@ -240,7 +244,7 @@ bool AudioPolicyManagerFuzzer::initialize() {
     return true;
 }
 
-void AudioPolicyManagerFuzzer::SetUpManagerConfig() { mManager->getConfig().setDefault(); }
+void AudioPolicyManagerFuzzer::SetUpManagerConfig() { mConfig->setDefault(); }
 
 bool AudioPolicyManagerFuzzer::getOutputForAttr(
     audio_port_handle_t *selectedDeviceId, audio_format_t format, audio_channel_mask_t channelMask,
@@ -406,7 +410,11 @@ std::string AudioPolicyManagerFuzzerWithConfigurationFile::getConfigFile() {
 }
 
 void AudioPolicyManagerFuzzerWithConfigurationFile::SetUpManagerConfig() {
-    deserializeAudioPolicyFile(getConfigFile().c_str(), &mManager->getConfig());
+    const std::string configFilePath = getConfigFile();
+    auto result = AudioPolicyConfig::loadFromCustomXmlConfigForTests(configFilePath);
+    mConfig = result.ok() ? mConfig = result.value() : nullptr;
+    ALOGE_IF(!result.ok(), "%s: Failed to deserialize \"%s\": %d",
+            __func__, configFilePath.c_str(), result.error());
 }
 
 void AudioPolicyManagerFuzzerWithConfigurationFile::traverseAndFuzzXML(xmlDocPtr pDoc,

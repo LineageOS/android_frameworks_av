@@ -16,62 +16,56 @@
 
 #pragma once
 
+#include <string>
 #include <unordered_map>
 #include <unordered_set>
+#include <vector>
 
-#include <AudioPatch.h>
 #include <DeviceDescriptor.h>
-#include <IOProfile.h>
 #include <HwModule.h>
-#include <PolicyAudioPort.h>
-#include <AudioInputDescriptor.h>
-#include <AudioOutputDescriptor.h>
-#include <AudioPolicyMix.h>
-#include <EffectDescriptor.h>
-#include <SoundTriggerSession.h>
-#include <media/AudioProfile.h>
+#include <error/Result.h>
+#include <utils/StrongPointer.h>
+#include <utils/RefBase.h>
 
 namespace android {
 
-// This class gathers together various bits of AudioPolicyManager
-// configuration, which are usually filled out as a result of parsing
-// the audio_policy_configuration.xml file.
+// This class gathers together various bits of AudioPolicyManager configuration. It can be filled
+// out either as a result of parsing the audio_policy_configuration.xml file, from the HAL data, or
+// to default fallback data.
 //
-// Note that AudioPolicyConfig doesn't own some of the data,
-// it simply proxies access to the fields of AudioPolicyManager
-// class. Be careful about the fields that are references,
-// e.g. 'mOutputDevices'. This also means that it's impossible
-// to implement "deep copying" of this class without re-designing it.
-class AudioPolicyConfig
+// The data in this class is immutable once loaded, this is why a pointer to a const is returned
+// from the factory methods. However, this does not prevent modifications of data bits that
+// are held inside collections, for example, individual modules, devices, etc.
+class AudioPolicyConfig : public RefBase
 {
 public:
-    AudioPolicyConfig(HwModuleCollection &hwModules,
-                      DeviceVector &outputDevices,
-                      DeviceVector &inputDevices,
-                      sp<DeviceDescriptor> &defaultOutputDevice)
-        : mHwModules(hwModules),
-          mOutputDevices(outputDevices),
-          mInputDevices(inputDevices),
-          mDefaultOutputDevice(defaultOutputDevice) {
-        clear();
-    }
+    // Surround formats, with an optional list of subformats that are equivalent from users' POV.
+    using SurroundFormats = std::unordered_map<audio_format_t, std::unordered_set<audio_format_t>>;
 
-    void clear() {
-        mSource = {};
-        mEngineLibraryNameSuffix = kDefaultEngineLibraryNameSuffix;
-        mHwModules.clear();
-        mOutputDevices.clear();
-        mInputDevices.clear();
-        mDefaultOutputDevice.clear();
-        mIsSpeakerDrcEnabled = false;
-        mIsCallScreenModeSupported = false;
-        mSurroundFormats.clear();
-    }
+    // The source used to indicate the default fallback configuration.
+    static const constexpr char* const kDefaultConfigSource = "AudioPolicyConfig::setDefault";
+
+    // Creates the default (fallback) configuration.
+    static sp<const AudioPolicyConfig> createDefault();
+    // Attempts to load the configuration from the XML file, falls back to default on failure.
+    // If the XML file path is not provided, uses `audio_get_audio_policy_config_file` function.
+    static sp<const AudioPolicyConfig> loadFromApmXmlConfigWithFallback(
+            const std::string& xmlFilePath = "");
+    // The factory method to use in APM tests which craft the configuration manually.
+    static sp<AudioPolicyConfig> createWritableForTests();
+    // The factory method to use in APM tests which use a custom XML file.
+    static error::Result<sp<AudioPolicyConfig>> loadFromCustomXmlConfigForTests(
+            const std::string& xmlFilePath);
+    // The factory method to use in VTS tests. If the 'configPath' is empty,
+    // it is determined automatically from the list of known config paths.
+    static error::Result<sp<AudioPolicyConfig>> loadFromCustomXmlConfigForVtsTests(
+            const std::string& configPath, const std::string& xmlFileName);
+
+    ~AudioPolicyConfig() = default;
 
     const std::string& getSource() const {
         return mSource;
     }
-
     void setSource(const std::string& file) {
         mSource = file;
     }
@@ -79,16 +73,24 @@ public:
     const std::string& getEngineLibraryNameSuffix() const {
         return mEngineLibraryNameSuffix;
     }
-
     void setEngineLibraryNameSuffix(const std::string& suffix) {
         mEngineLibraryNameSuffix = suffix;
     }
 
+    const HwModuleCollection& getHwModules() const { return mHwModules; }
     void setHwModules(const HwModuleCollection &hwModules)
     {
         mHwModules = hwModules;
     }
 
+    const DeviceVector& getInputDevices() const
+    {
+        return mInputDevices;
+    }
+    const DeviceVector& getOutputDevices() const
+    {
+        return mOutputDevices;
+    }
     void addDevice(const sp<DeviceDescriptor> &device)
     {
         if (audio_is_output_device(device->type())) {
@@ -97,128 +99,70 @@ public:
             mInputDevices.add(device);
         }
     }
-
     void addInputDevices(const DeviceVector &inputDevices)
     {
         mInputDevices.add(inputDevices);
     }
-
     void addOutputDevices(const DeviceVector &outputDevices)
     {
         mOutputDevices.add(outputDevices);
     }
 
-    bool isSpeakerDrcEnabled() const { return mIsSpeakerDrcEnabled; }
+    const sp<DeviceDescriptor>& getDefaultOutputDevice() const { return mDefaultOutputDevice; }
+    void setDefaultOutputDevice(const sp<DeviceDescriptor> &defaultDevice)
+    {
+        mDefaultOutputDevice = defaultDevice;
+    }
 
+    bool isSpeakerDrcEnabled() const { return mIsSpeakerDrcEnabled; }
     void setSpeakerDrcEnabled(bool isSpeakerDrcEnabled)
     {
         mIsSpeakerDrcEnabled = isSpeakerDrcEnabled;
     }
 
     bool isCallScreenModeSupported() const { return mIsCallScreenModeSupported; }
-
     void setCallScreenModeSupported(bool isCallScreenModeSupported)
     {
         mIsCallScreenModeSupported = isCallScreenModeSupported;
     }
 
-
-    const HwModuleCollection getHwModules() const { return mHwModules; }
-
-    const DeviceVector &getInputDevices() const
-    {
-        return mInputDevices;
-    }
-
-    const DeviceVector &getOutputDevices() const
-    {
-        return mOutputDevices;
-    }
-
-    void setDefaultOutputDevice(const sp<DeviceDescriptor> &defaultDevice)
-    {
-        mDefaultOutputDevice = defaultDevice;
-    }
-
-    const sp<DeviceDescriptor> &getDefaultOutputDevice() const { return mDefaultOutputDevice; }
-
-    void setDefault(void)
-    {
-        mSource = "AudioPolicyConfig::setDefault";
-        mEngineLibraryNameSuffix = kDefaultEngineLibraryNameSuffix;
-        mDefaultOutputDevice = new DeviceDescriptor(AUDIO_DEVICE_OUT_SPEAKER);
-        mDefaultOutputDevice->addAudioProfile(AudioProfile::createFullDynamic(gDynamicFormat));
-        sp<DeviceDescriptor> defaultInputDevice = new DeviceDescriptor(AUDIO_DEVICE_IN_BUILTIN_MIC);
-        defaultInputDevice->addAudioProfile(AudioProfile::createFullDynamic(gDynamicFormat));
-        sp<AudioProfile> micProfile = new AudioProfile(
-                AUDIO_FORMAT_PCM_16_BIT, AUDIO_CHANNEL_IN_MONO, 8000);
-        defaultInputDevice->addAudioProfile(micProfile);
-        mOutputDevices.add(mDefaultOutputDevice);
-        mInputDevices.add(defaultInputDevice);
-
-        sp<HwModule> module = new HwModule(AUDIO_HARDWARE_MODULE_ID_PRIMARY, 2 /*halVersionMajor*/);
-        mHwModules.add(module);
-
-        sp<OutputProfile> outProfile = new OutputProfile("primary");
-        outProfile->addAudioProfile(
-                new AudioProfile(AUDIO_FORMAT_PCM_16_BIT, AUDIO_CHANNEL_OUT_STEREO, 44100));
-        outProfile->addSupportedDevice(mDefaultOutputDevice);
-        outProfile->setFlags(AUDIO_OUTPUT_FLAG_PRIMARY);
-        module->addOutputProfile(outProfile);
-
-        sp<InputProfile> inProfile = new InputProfile("primary");
-        inProfile->addAudioProfile(micProfile);
-        inProfile->addSupportedDevice(defaultInputDevice);
-        module->addInputProfile(inProfile);
-
-        setDefaultSurroundFormats();
-    }
-
-    // Surround formats, with an optional list of subformats that are equivalent from users' POV.
-    using SurroundFormats = std::unordered_map<audio_format_t, std::unordered_set<audio_format_t>>;
-
     const SurroundFormats &getSurroundFormats() const
     {
         return mSurroundFormats;
     }
-
+    void setDefaultSurroundFormats();
     void setSurroundFormats(const SurroundFormats &surroundFormats)
     {
         mSurroundFormats = surroundFormats;
     }
-
-    void setDefaultSurroundFormats()
+    void setSurroundFormats(SurroundFormats &&surroundFormats)
     {
-        mSurroundFormats = {
-            {AUDIO_FORMAT_AC3, {}},
-            {AUDIO_FORMAT_E_AC3, {}},
-            {AUDIO_FORMAT_DTS, {}},
-            {AUDIO_FORMAT_DTS_HD, {}},
-            {AUDIO_FORMAT_DTS_HD_MA, {}},
-            {AUDIO_FORMAT_DTS_UHD, {}},
-            {AUDIO_FORMAT_DTS_UHD_P2, {}},
-            {AUDIO_FORMAT_AAC_LC, {
-                    AUDIO_FORMAT_AAC_HE_V1, AUDIO_FORMAT_AAC_HE_V2, AUDIO_FORMAT_AAC_ELD,
-                    AUDIO_FORMAT_AAC_XHE}},
-            {AUDIO_FORMAT_DOLBY_TRUEHD, {}},
-            {AUDIO_FORMAT_E_AC3_JOC, {}},
-            {AUDIO_FORMAT_AC4, {}}};
+        mSurroundFormats = std::move(surroundFormats);
     }
 
+    void setDefault();
+
 private:
+    friend class sp<AudioPolicyConfig>;
+
     static const constexpr char* const kDefaultEngineLibraryNameSuffix = "default";
 
-    std::string mSource;
-    std::string mEngineLibraryNameSuffix;
-    HwModuleCollection &mHwModules; /**< Collection of Module, with Profiles, i.e. Mix Ports. */
-    DeviceVector &mOutputDevices;
-    DeviceVector &mInputDevices;
-    sp<DeviceDescriptor> &mDefaultOutputDevice;
+    AudioPolicyConfig() = default;
+
+    void augmentData();
+    status_t loadFromXml(const std::string& xmlFilePath, bool forVts);
+
+    std::string mSource;  // Not kDefaultConfigSource. Empty source means an empty config.
+    std::string mEngineLibraryNameSuffix = kDefaultEngineLibraryNameSuffix;
+    HwModuleCollection mHwModules; /**< Collection of Module, with Profiles, i.e. Mix Ports. */
+    DeviceVector mOutputDevices;
+    DeviceVector mInputDevices;
+    sp<DeviceDescriptor> mDefaultOutputDevice;
     // TODO: remove when legacy conf file is removed. true on devices that use DRC on the
     // DEVICE_CATEGORY_SPEAKER path to boost soft sounds, used to adjust volume curves accordingly.
     // Note: remove also speaker_drc_enabled from global configuration of XML config file.
-    bool mIsSpeakerDrcEnabled;
-    bool mIsCallScreenModeSupported;
+    bool mIsSpeakerDrcEnabled = false;
+    bool mIsCallScreenModeSupported = false;
     SurroundFormats mSurroundFormats;
 };
 
