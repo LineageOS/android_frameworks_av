@@ -60,9 +60,9 @@
 #include "device3/Camera3InputStream.h"
 #include "device3/Camera3OutputStream.h"
 #include "device3/Camera3SharedOutputStream.h"
-#include "mediautils/SchedulingPolicyService.h"
 #include "utils/CameraThreadState.h"
 #include "utils/CameraTraces.h"
+#include "utils/SchedulingPolicyUtils.h"
 #include "utils/SessionConfigurationUtils.h"
 #include "utils/TraceHFR.h"
 
@@ -2616,8 +2616,8 @@ status_t Camera3Device::configureStreamsLocked(int operatingMode,
     if (disableFifo != 1) {
         // Boost priority of request thread to SCHED_FIFO.
         pid_t requestThreadTid = mRequestThread->getTid();
-        res = requestPriority(getpid(), requestThreadTid,
-                kRequestThreadPriority, /*isForApp*/ false, /*asynchronous*/ false);
+        res = SchedulingPolicyUtils::requestPriorityDirect(getpid(), requestThreadTid,
+                kRequestThreadPriority);
         if (res != OK) {
             ALOGW("Can't set realtime priority for request processing thread: %s (%d)",
                     strerror(-res), res);
