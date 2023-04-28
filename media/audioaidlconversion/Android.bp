@@ -212,3 +212,27 @@ cc_library {
     ],
     min_sdk_version: "31", //AParcelableHolder has been introduced in 31
 }
+
+/**
+ * Conversions between the NDK and CPP backends for common types.
+ */
+cc_library {
+    name: "libaudio_aidl_conversion_common_ndk_cpp",
+    srcs: [
+        "AidlConversionNdkCpp.cpp",
+    ],
+    defaults: [
+        "audio_aidl_conversion_common_default",
+        "audio_aidl_conversion_common_util_default",
+        "latest_android_media_audio_common_types_cpp_shared",
+        "latest_android_media_audio_common_types_ndk_shared",
+    ],
+    shared_libs: [
+        "libbinder_ndk",
+        "libbase",
+    ],
+    cflags: [
+        "-DBACKEND_CPP_NDK",
+    ],
+    min_sdk_version: "33", //AParcel_unmarshal has been introduced in 33
+}
