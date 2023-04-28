@@ -15,8 +15,10 @@
  */
 
 #pragma once
+#include <vector>
 
 #include <media/audiohal/EffectHalInterface.h>
+#include <media/EffectsConfig.h>
 #include <system/audio_effect.h>
 #include <utils/Errors.h>
 #include <utils/RefBase.h>
@@ -33,21 +35,24 @@ class EffectsFactoryHalInterface : public RefBase
     virtual status_t queryNumberEffects(uint32_t *pNumEffects) = 0;
 
     // Returns a descriptor of the next available effect.
-    virtual status_t getDescriptor(uint32_t index,
-            effect_descriptor_t *pDescriptor) = 0;
+    virtual status_t getDescriptor(uint32_t index, effect_descriptor_t* pDescriptor) = 0;
 
-    virtual status_t getDescriptor(const effect_uuid_t *pEffectUuid,
-            effect_descriptor_t *pDescriptor) = 0;
+    virtual status_t getDescriptor(const effect_uuid_t* pEffectUuid,
+                                   effect_descriptor_t* pDescriptor) = 0;
 
     virtual status_t getDescriptors(const effect_uuid_t *pEffectType,
                                     std::vector<effect_descriptor_t> *descriptors) = 0;
 
+    virtual std::shared_ptr<const effectsConfig::Processings> getProcessings() const = 0;
+
+    // status_t if parser return error, skipped elements if parsing result is OK (always 0 for AIDL)
+    virtual error::Result<size_t> getSkippedElements() const = 0;
+
     // Creates an effect engine of the specified type.
     // To release the effect engine, it is necessary to release references
     // to the returned effect object.
-    virtual status_t createEffect(const effect_uuid_t *pEffectUuid,
-            int32_t sessionId, int32_t ioId, int32_t deviceId,
-            sp<EffectHalInterface> *effect) = 0;
+    virtual status_t createEffect(const effect_uuid_t* pEffectUuid, int32_t sessionId, int32_t ioId,
+                                  int32_t deviceId, sp<EffectHalInterface>* effect) = 0;
 
     virtual status_t dumpEffects(int fd) = 0;
 
