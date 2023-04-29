@@ -22,8 +22,10 @@
  * @see audio_effects_conf_V2_0.xsd for documentation on each structure
  */
 
+#include <error/Result.h>
 #include <system/audio_effect.h>
 
+#include <cstddef>
 #include <map>
 #include <memory>
 #include <string>
@@ -75,6 +77,12 @@ struct DeviceEffects : Stream<audio_devices_t> {
     std::string address;
 };
 
+struct Processings {
+    std::vector<InputStream> preprocess;
+    std::vector<OutputStream> postprocess;
+    std::vector<DeviceEffects> deviceprocess;
+};
+
 /** Parsed configuration.
  * Intended to be a transient structure only used for deserialization.
  * Note: Everything is copied in the configuration from the xml dom.
@@ -82,19 +90,16 @@ struct DeviceEffects : Stream<audio_devices_t> {
  *       consider keeping a private handle on the xml dom and replace all strings by dom pointers.
  *       Or even better, use SAX parsing to avoid the allocations all together.
  */
-struct Config {
+struct Config : public Processings {
     float version;
     Libraries libraries;
     Effects effects;
-    std::vector<OutputStream> postprocess;
-    std::vector<InputStream> preprocess;
-    std::vector<DeviceEffects> deviceprocess;
 };
 
 /** Result of `parse(const char*)` */
 struct ParsingResult {
     /** Parsed config, nullptr if the xml lib could not load the file */
-    std::unique_ptr<Config> parsedConfig;
+    std::shared_ptr<const Config> parsedConfig;
     size_t nbSkippedElement; //< Number of skipped invalid library, effect or processing chain
     const std::string configPath; //< Path to the loaded configuration
 };
