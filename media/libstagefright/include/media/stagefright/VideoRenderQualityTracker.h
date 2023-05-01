@@ -22,6 +22,8 @@
 #include <list>
 #include <queue>
 
+#include <media/stagefright/MediaHistogram.h>
+
 namespace android {
 
 static const float FRAME_RATE_UNDETERMINED = -1.0f;
@@ -55,6 +57,12 @@ struct VideoRenderQualityMetrics {
     // The frame rate as detected by looking at the actual render time, as returned by the system
     // post-render.
     float actualFrameRate;
+
+    // A histogram of the durations of freezes due to dropped/skipped frames.
+    MediaHistogram freezeDurationMsHistogram;
+
+    // A histogram of the durations between each freeze.
+    MediaHistogram freezeDistanceMsHistogram;
 };
 
 ///////////////////////////////////////////////////////
@@ -101,6 +109,10 @@ public:
         // short, but the content frame duration is large, it is assumed the app is intentionally
         // seeking forward.
         int32_t contentTimeAdvancedForLiveContentToleranceUs;
+
+        // Freeze configuration
+        std::vector<int64_t> freezeDurationMsHistogramBuckets;
+        std::vector<int64_t> freezeDistanceMsHistogramBuckets;
     };
 
     VideoRenderQualityTracker();
@@ -160,6 +172,9 @@ private:
         int64_t priorTimestampUs;
     };
 
+    // Configure histograms for the metrics.
+    static void configureHistograms(VideoRenderQualityMetrics &m, const Configuration &c);
+
     // The current time in microseconds.
     static int64_t nowUs();
 
@@ -177,6 +192,10 @@ private:
     // Determine whether or not 3:2 pulldowng for displaying 24fps content on 60Hz displays is
     // occurring.
     static bool is32pulldown(const FrameDurationUs &durationUs, const Configuration &c);
+
+    // Process a frame freeze.
+    static void processFreeze(int64_t actualRenderTimeUs, int64_t lastRenderTimeUs,
+                              int64_t lastFreezeEndTimeUs, VideoRenderQualityMetrics &m);
 
     // Check to see if a discontinuity has occurred by examining the content time and the
     // app-desired render time. If so, reset some internal state.
@@ -203,6 +222,9 @@ private:
 
     // The most recently processed timestamp referring to the wall clock time a frame was rendered.
     int64_t mLastRenderTimeUs;
+
+    // The most recent timestamp of the first frame rendered after the freeze.
+    int64_t mLastFreezeEndTimeUs;
 
     // Frames skipped at the end of playback shouldn't really be considered skipped, therefore keep
     // a list of the frames, and process them as skipped frames the next time a frame is rendered.

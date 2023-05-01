@@ -18,31 +18,36 @@
 #define MEDIA_HISTOGRAM_H_
 
 #include <string>
+#include <vector>
 
 namespace android {
 
 class MediaHistogram {
     public:
-    MediaHistogram() : mFloor(0), mWidth(0), mBelow(0), mAbove(0),
-                    mMin(INT64_MAX), mMax(INT64_MIN), mSum(0), mCount(0),
-                    mBucketCount(0), mBuckets(NULL) {};
+    MediaHistogram();
     ~MediaHistogram() { clear(); };
-    void clear() { if (mBuckets != NULL) free(mBuckets); mBuckets = NULL; };
+    void clear();
     bool setup(int bucketCount, int64_t width, int64_t floor = 0);
+    bool setup(const std::vector<int64_t> &bucketLimits);
     void insert(int64_t sample);
     int64_t getMin() const { return mMin; }
     int64_t getMax() const { return mMax; }
     int64_t getCount() const { return mCount; }
     int64_t getSum() const { return mSum; }
     int64_t getAvg() const { return mSum / (mCount == 0 ? 1 : mCount); }
-    std::string emit();
+    std::string emit() const;
 private:
+    MediaHistogram(const MediaHistogram &); // disallow
+
+    bool allocate(int bucketCount, bool withBucketLimits);
+
     int64_t mFloor, mCeiling, mWidth;
     int64_t mBelow, mAbove;
     int64_t mMin, mMax, mSum, mCount;
 
     int mBucketCount;
     int64_t *mBuckets;
+    int64_t *mBucketLimits;
 };
 
 } // android

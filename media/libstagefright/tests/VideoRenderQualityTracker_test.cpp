@@ -50,6 +50,15 @@ public:
         }
     }
 
+    void render(int numFrames) {
+        for (int i = 0; i < numFrames; ++i) {
+            mVideoRenderQualityTracker.onFrameReleased(mMediaTimeUs);
+            mVideoRenderQualityTracker.onFrameRendered(mMediaTimeUs, mClockTimeNs);
+            mMediaTimeUs += mContentFrameDurationUs;
+            mClockTimeNs += mContentFrameDurationUs * 1000;
+        }
+    }
+
     void skip(int numFrames) {
         for (int i = 0; i < numFrames; ++i) {
             mVideoRenderQualityTracker.onFrameSkipped(mMediaTimeUs);
@@ -216,6 +225,70 @@ TEST_F(VideoRenderQualityTrackerTest, whenFrameRateIsUnstable_doesntDetectFrameR
     h.render({16.66, 30.0, 16.66, 30.0, 16.66});
     EXPECT_NEAR(h.getMetrics().contentFrameRate, 60.0, 0.5);
     EXPECT_EQ(h.getMetrics().actualFrameRate, FRAME_RATE_UNDETERMINED);
+}
+
+TEST_F(VideoRenderQualityTrackerTest, capturesFreezeDurationHistogram) {
+    Configuration c;
+    // +17 because freeze durations include the render time of the previous frame
+    c.freezeDurationMsHistogramBuckets = {2 * 17 + 17, 3 * 17 + 17, 6 * 17 + 17};
+    Helper h(17, c);
+    h.render(1);
+    h.drop(1); // below
+    h.render(1);
+    h.drop(3); // bucket 1
+    h.render(1);
+    h.drop(2); // bucket 0
+    h.render(1);
+    h.drop(4); // bucket 1
+    h.render(1);
+    h.drop(2); // bucket 0
+    h.render(1);
+    h.drop(5); // bucket 1
+    h.render(1);
+    h.drop(10); // above
+    h.render(1);
+    h.drop(15); // above
+    h.render(1);
+    EXPECT_EQ(h.getMetrics().freezeDurationMsHistogram.emit(), "1{2,3}2");
+    EXPECT_EQ(h.getMetrics().freezeDurationMsHistogram.getCount(), 8);
+    // the smallest frame drop was 1, +17 because it includes the previous frame render time
+    EXPECT_EQ(h.getMetrics().freezeDurationMsHistogram.getMin(), 1 * 17 + 17);
+    // the largest frame drop was 10, +17 because it includes the previous frame render time
+    EXPECT_EQ(h.getMetrics().freezeDurationMsHistogram.getMax(), 15 * 17 + 17);
+    // total frame drop count, multiplied by 17, plus 17 for each occurrence, divided by occurrences
+    EXPECT_EQ(h.getMetrics().freezeDurationMsHistogram.getAvg(), ((1 + 3 + 2 + 4 + 2 + 5 + 10 + 15)
+                                                                   * 17 + 8 * 17) / 8);
+}
+
+TEST_F(VideoRenderQualityTrackerTest, capturesFreezeDistanceHistogram) {
+    Configuration c;
+    c.freezeDistanceMsHistogramBuckets = {1 * 17, 5 * 17, 6 * 17};
+    Helper h(17, c);
+    h.render(1);
+    h.drop(1);
+    h.render(5); // bucket 0
+    h.drop(3);
+    h.render(3); // bucket 0
+    h.drop(2);
+    h.render(9); // above
+    h.drop(5);
+    h.render(1); // below
+    h.drop(2);
+    h.render(6); // bucket 1
+    h.drop(4);
+    h.render(12); // above
+    h.drop(2);
+    h.render(1);
+    EXPECT_EQ(h.getMetrics().freezeDistanceMsHistogram.emit(), "1{2,1}2");
+    EXPECT_EQ(h.getMetrics().freezeDistanceMsHistogram.getCount(), 6);
+    // the smallest render between drops was 1, -17 because the last frame rendered also froze
+    EXPECT_EQ(h.getMetrics().freezeDistanceMsHistogram.getMin(), 1 * 17 - 17);
+    // the largest render between drops was 12, -17 because the last frame rendered also froze
+    EXPECT_EQ(h.getMetrics().freezeDistanceMsHistogram.getMax(), 12 * 17 - 17);
+    // total render count between, multiplied by 17, minus 17 for each occurrence, divided by
+    // occurrences
+    EXPECT_EQ(h.getMetrics().freezeDistanceMsHistogram.getAvg(), ((5 + 3 + 9 + 1 + 6 + 12) * 17 -
+                                                                  6 * 17) / 6);
 }
 
 } // android

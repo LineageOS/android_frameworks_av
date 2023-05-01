@@ -206,6 +206,15 @@ static const char *kCodecFramerateContent = "android.media.mediacodec.framerate.
 static const char *kCodecFramerateDesired = "android.media.mediacodec.framerate.desired";
 static const char *kCodecFramerateActual = "android.media.mediacodec.framerate.actual";
 
+static const char *kCodecFreezeCount = "android.media.mediacodec.freeze.count";
+static const char *kCodecFreezeDurationAverage = "android.media.mediacodec.freeze.duration.average";
+static const char *kCodecFreezeDurationMax = "android.media.mediacodec.freeze.duration.max";
+static const char *kCodecFreezeDurationHistogram =
+        "android.media.mediacodec.freeze.duration.histogram";
+static const char *kCodecFreezeDistanceAverage = "android.media.mediacodec.freeze.distance.average";
+static const char *kCodecFreezeDistanceHistogram =
+        "android.media.mediacodec.freeze.distance.histogram";
+
 /* -1: shaper disabled
    >=0: number of fields changed */
 static const char *kCodecShapingEnhanced = "android.media.mediacodec.shaped";
@@ -1113,6 +1122,18 @@ void MediaCodec::updateMediametrics() {
             mediametrics_setDouble(mMetricsHandle, kCodecFramerateContent, m.contentFrameRate);
             mediametrics_setDouble(mMetricsHandle, kCodecFramerateDesired, m.desiredFrameRate);
             mediametrics_setDouble(mMetricsHandle, kCodecFramerateActual, m.actualFrameRate);
+        }
+        if (m.freezeDurationMsHistogram.getCount() >= 1) {
+            const MediaHistogram &histogram = m.freezeDurationMsHistogram;
+            mediametrics_setInt64(mMetricsHandle, kCodecFreezeCount, histogram.getCount());
+            mediametrics_setInt64(mMetricsHandle, kCodecFreezeDurationAverage, histogram.getAvg());
+            mediametrics_setInt64(mMetricsHandle, kCodecFreezeDurationMax, histogram.getMax());
+            mediametrics_setString(mMetricsHandle, kCodecFreezeDurationHistogram, histogram.emit());
+        }
+        if (m.freezeDistanceMsHistogram.getCount() >= 1) {
+            const MediaHistogram &histogram = m.freezeDistanceMsHistogram;
+            mediametrics_setInt64(mMetricsHandle, kCodecFreezeDistanceAverage, histogram.getAvg());
+            mediametrics_setString(mMetricsHandle, kCodecFreezeDistanceHistogram, histogram.emit());
         }
     }
 

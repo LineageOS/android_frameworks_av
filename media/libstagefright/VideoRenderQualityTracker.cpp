@@ -50,15 +50,21 @@ VideoRenderQualityTracker::Configuration::Configuration() {
     // Allow for a tolerance of 200 milliseconds for determining if we moved forward in content time
     // because of frame drops for live content, or because the user is seeking.
     contentTimeAdvancedForLiveContentToleranceUs = 200 * 1000;
+
+    // Freeze configuration
+    freezeDurationMsHistogramBuckets = {1, 20, 40, 60, 80, 100, 120, 150, 175, 225, 300, 400, 500};
+    freezeDistanceMsHistogramBuckets = {0, 20, 100, 400, 1000, 2000, 3000, 4000, 8000, 15000, 30000,
+                                        60000};
 }
 
-VideoRenderQualityTracker::VideoRenderQualityTracker() :
-        mConfiguration(Configuration()) {
+VideoRenderQualityTracker::VideoRenderQualityTracker() : mConfiguration(Configuration()) {
+    configureHistograms(mMetrics, mConfiguration);
     resetForDiscontinuity();
 }
 
 VideoRenderQualityTracker::VideoRenderQualityTracker(const Configuration &configuration) :
         mConfiguration(configuration) {
+    configureHistograms(mMetrics, mConfiguration);
     resetForDiscontinuity();
 }
 
@@ -128,6 +134,7 @@ const VideoRenderQualityMetrics &VideoRenderQualityTracker::getMetrics() const {
 void VideoRenderQualityTracker::resetForDiscontinuity() {
     mLastContentTimeUs = -1;
     mLastRenderTimeUs = -1;
+    mLastFreezeEndTimeUs = -1;
 
     // Don't worry about tracking frame rendering times from now up until playback catches up to the
     // discontinuity. While stuttering or freezing could be found in the next few frames, the impact
@@ -226,6 +233,29 @@ void VideoRenderQualityTracker::processMetricsForRenderedFrame(int64_t contentTi
     updateFrameRate(mMetrics.contentFrameRate, mContentFrameDurationUs, mConfiguration);
     updateFrameRate(mMetrics.desiredFrameRate, mDesiredFrameDurationUs, mConfiguration);
     updateFrameRate(mMetrics.actualFrameRate, mActualFrameDurationUs, mConfiguration);
+
+    // If the previous frame was dropped, there was a freeze if we've already rendered a frame
+    if (mActualFrameDurationUs[1] == -1 && mLastRenderTimeUs != -1) {
+        processFreeze(actualRenderTimeUs, mLastRenderTimeUs, mLastFreezeEndTimeUs, mMetrics);
+        mLastFreezeEndTimeUs = actualRenderTimeUs;
+    }
+}
+
+void VideoRenderQualityTracker::processFreeze(int64_t actualRenderTimeUs, int64_t lastRenderTimeUs,
+                                              int64_t lastFreezeEndTimeUs,
+                                              VideoRenderQualityMetrics &m) {
+    int64_t freezeDurationMs = (actualRenderTimeUs - lastRenderTimeUs) / 1000;
+    m.freezeDurationMsHistogram.insert(freezeDurationMs);
+    if (lastFreezeEndTimeUs != -1) {
+        int64_t distanceSinceLastFreezeMs = (lastRenderTimeUs - lastFreezeEndTimeUs) / 1000;
+        m.freezeDistanceMsHistogram.insert(distanceSinceLastFreezeMs);
+    }
+}
+
+void VideoRenderQualityTracker::configureHistograms(VideoRenderQualityMetrics &m,
+                                                    const Configuration &c) {
+    m.freezeDurationMsHistogram.setup(c.freezeDurationMsHistogramBuckets);
+    m.freezeDistanceMsHistogram.setup(c.freezeDistanceMsHistogramBuckets);
 }
 
 int64_t VideoRenderQualityTracker::nowUs() {
