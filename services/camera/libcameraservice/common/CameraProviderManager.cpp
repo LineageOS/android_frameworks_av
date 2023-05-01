@@ -2526,6 +2526,10 @@ void CameraProviderManager::ProviderInfo::DeviceInfo3::notifyDeviceStateChange(i
             (mDeviceStateOrientationMap.find(newState) != mDeviceStateOrientationMap.end())) {
         mCameraCharacteristics.update(ANDROID_SENSOR_ORIENTATION,
                 &mDeviceStateOrientationMap[newState], 1);
+        if (mCameraCharNoPCOverride.get() != nullptr) {
+            mCameraCharNoPCOverride->update(ANDROID_SENSOR_ORIENTATION,
+                &mDeviceStateOrientationMap[newState], 1);
+        }
     }
 }
 
