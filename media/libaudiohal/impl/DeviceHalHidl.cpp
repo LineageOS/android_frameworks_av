@@ -104,6 +104,15 @@ DeviceHalHidl::~DeviceHalHidl() {
     }
 }
 
+status_t DeviceHalHidl::getAudioPorts(
+        std::vector<media::audio::common::AudioPort> *ports __unused) {
+    return INVALID_OPERATION;
+}
+
+status_t DeviceHalHidl::getAudioRoutes(std::vector<media::AudioRoute> *routes __unused) {
+    return INVALID_OPERATION;
+}
+
 status_t DeviceHalHidl::getSupportedDevices(uint32_t*) {
     // Obsolete.
     return INVALID_OPERATION;
@@ -430,6 +439,7 @@ status_t DeviceHalHidl::releaseAudioPatch(audio_patch_handle_t patch) {
 
 template <typename HalPort>
 status_t DeviceHalHidl::getAudioPortImpl(HalPort *port) {
+    using ::android::hardware::audio::common::COMMON_TYPES_CPP_VERSION::AudioPort;
     if (mDevice == 0) return NO_INIT;
     AudioPort hidlPort;
     HidlUtils::audioPortFromHal(*port, &hidlPort);
@@ -472,6 +482,7 @@ status_t DeviceHalHidl::getAudioPort(struct audio_port_v7 *port) {
 }
 
 status_t DeviceHalHidl::setAudioPortConfig(const struct audio_port_config *config) {
+    using ::android::hardware::audio::common::COMMON_TYPES_CPP_VERSION::AudioPortConfig;
     TIME_CHECK();
     if (mDevice == 0) return NO_INIT;
     AudioPortConfig hidlConfig;
@@ -536,6 +547,7 @@ status_t DeviceHalHidl::removeDeviceEffect(
 #endif
 
 status_t DeviceHalHidl::setConnectedState(const struct audio_port_v7 *port, bool connected) {
+    using ::android::hardware::audio::common::COMMON_TYPES_CPP_VERSION::AudioPort;
     TIME_CHECK();
     if (mDevice == 0) return NO_INIT;
 #if MAJOR_VERSION == 7 && MINOR_VERSION == 1
