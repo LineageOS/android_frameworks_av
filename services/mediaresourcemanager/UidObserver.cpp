@@ -170,7 +170,7 @@ void UidObserver::onUidStateChanged(uid_t /*uid*/,
                                     int32_t /*capability*/) {
 }
 
-void UidObserver::onUidProcAdjChanged(uid_t /*uid*/) {
+void UidObserver::onUidProcAdjChanged(uid_t /*uid*/, int32_t /*adj*/) {
 }
 
 void UidObserver::binderDied(const wp<IBinder>& /*who*/) {
