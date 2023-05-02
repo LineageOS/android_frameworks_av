@@ -847,7 +847,7 @@ private:
                 const TrackSecondaryOutputsMap& trackSecondaryOutputs) override;
 
         status_t setDeviceConnectedState(
-                const struct audio_port_v7 *port, bool connected) override;
+                const struct audio_port_v7 *port, media::DeviceConnectedState state) override;
 
         status_t invalidateTracks(const std::vector<audio_port_handle_t>& portIds) override;
 

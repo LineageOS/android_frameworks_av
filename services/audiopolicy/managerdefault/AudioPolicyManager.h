@@ -35,6 +35,7 @@
 #include <media/PatchBuilder.h>
 #include "AudioPolicyInterface.h"
 
+#include <android/media/DeviceConnectedState.h>
 #include <android/media/audio/common/AudioPort.h>
 #include <AudioPolicyManagerObserver.h>
 #include <AudioPolicyConfig.h>
@@ -1060,13 +1061,16 @@ private:
         void updateAudioProfiles(const sp<DeviceDescriptor>& devDesc, audio_io_handle_t ioHandle,
                 AudioProfileVector &profiles);
 
+        // Notify the policy client to prepare for disconnecting external device.
+        void prepareToDisconnectExternalDevice(const sp<DeviceDescriptor> &device);
+
         // Notify the policy client of any change of device state with AUDIO_IO_HANDLE_NONE,
         // so that the client interprets it as global to audio hardware interfaces.
         // It can give a chance to HAL implementer to retrieve dynamic capabilities associated
         // to this device for example.
         // TODO avoid opening stream to retrieve capabilities of a profile.
         void broadcastDeviceConnectionState(const sp<DeviceDescriptor> &device,
-                                            audio_policy_dev_state_t state);
+                                            media::DeviceConnectedState state);
 
         // updates device caching and output for streams that can influence the
         //    routing of notifications
