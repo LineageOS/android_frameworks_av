@@ -20,6 +20,7 @@
 #include <binder/Parcelable.h>
 
 #include <camera/CameraMetadata.h>
+#include <android/hardware/CameraExtensionSessionStats.h>
 
 namespace android {
 namespace hardware {
@@ -159,6 +160,8 @@ public:
     String16 mUserTag;
     int mVideoStabilizationMode;
     int mSessionIndex;
+
+    CameraExtensionSessionStats mCameraExtensionSessionStats;
 
     // Constructors
     CameraSessionStats();
