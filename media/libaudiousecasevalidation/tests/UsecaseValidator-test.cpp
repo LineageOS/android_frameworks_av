@@ -52,10 +52,8 @@ audio_port_handle_t UsecaseValidatorTest::testCreatePortId(audio_io_handle_t str
  */
 error::Result<audio_attributes_t> UsecaseValidatorTest::testStartClient(audio_io_handle_t streamId,
         audio_port_handle_t portId,
-        audio_usage_t usage) {
+        audio_attributes_t attributes) {
     content::AttributionSourceState attributionSource;
-    audio_attributes_t attributes = AUDIO_ATTRIBUTES_INITIALIZER;
-    attributes.usage = usage;
 
     return m_validator->startClient(streamId, portId, attributionSource, attributes, NULL);
 }
@@ -141,11 +139,14 @@ TEST_F(UsecaseValidatorTest, testHangingClient) {
     mediaPortId = testCreatePortId(mediaStreamId);
     EXPECT_NE(mediaPortId, 0);
 
+    audio_attributes_t attributes = AUDIO_ATTRIBUTES_INITIALIZER;
+    attributes.usage = AUDIO_USAGE_GAME;
     // Start client on game stream.
-    testStartClient(gameStreamId, gamePortId, AUDIO_USAGE_GAME);
+    testStartClient(gameStreamId, gamePortId, attributes);
 
+    attributes.usage = AUDIO_USAGE_MEDIA;
     // Start client on media stream.
-    testStartClient(mediaStreamId, mediaPortId, AUDIO_USAGE_MEDIA);
+    testStartClient(mediaStreamId, mediaPortId, attributes);
 
     // Unregister media stream before stopClient.
     EXPECT_EQ(m_validator->unregisterStream(gameStreamId), 0);
@@ -175,18 +176,23 @@ TEST_F(UsecaseValidatorTest, testAttributesUsageUnchanged) {
     voiceCommPortId = testCreatePortId(gameStreamId);
     EXPECT_NE(voiceCommPortId, 0);
 
+    audio_attributes_t attributes = AUDIO_ATTRIBUTES_INITIALIZER;
     // Verify attributes on game stream.
-    auto attr = testStartClient(gameStreamId, gamePortId, AUDIO_USAGE_GAME);
+    attributes.usage = AUDIO_USAGE_GAME;
+    auto attr = testStartClient(gameStreamId, gamePortId, attributes);
     EXPECT_EQ(attr.value().usage, AUDIO_USAGE_GAME);
 
-    attr = testStartClient(gameStreamId, voiceCommPortId, AUDIO_USAGE_VOICE_COMMUNICATION);
+    attributes.usage = AUDIO_USAGE_VOICE_COMMUNICATION;
+    attr = testStartClient(gameStreamId, voiceCommPortId, attributes);
     EXPECT_EQ(attr.value().usage, AUDIO_USAGE_VOICE_COMMUNICATION);
 
     // Verify attributes on media stream.
-    attr = testStartClient(mediaStreamId, mediaPortId, AUDIO_USAGE_MEDIA);
+    attributes.usage = AUDIO_USAGE_MEDIA;
+    attr = testStartClient(mediaStreamId, mediaPortId, attributes);
     EXPECT_EQ(attr.value().usage, AUDIO_USAGE_MEDIA);
 
-    attr = testStartClient(mediaStreamId, unknownPortId, AUDIO_USAGE_UNKNOWN);
+    attributes.usage = AUDIO_USAGE_UNKNOWN;
+    attr = testStartClient(mediaStreamId, unknownPortId, attributes);
     EXPECT_EQ(attr.value().usage, AUDIO_USAGE_UNKNOWN);
 
     // Stop client on game and media stream.
@@ -215,12 +221,75 @@ TEST_F(UsecaseValidatorTest, testAttributesUsageChanged) {
     unknownPortId = testCreatePortId(gameStreamId);
     EXPECT_NE(unknownPortId, 0);
 
+    audio_attributes_t attributes = AUDIO_ATTRIBUTES_INITIALIZER;
+    attributes.flags = AUDIO_FLAG_LOW_LATENCY;
     // Verify attributes on game stream.
-    auto attr = testStartClient(gameStreamId, mediaPortId, AUDIO_USAGE_MEDIA);
+    attributes.usage = AUDIO_USAGE_MEDIA;
+    auto attr = testStartClient(gameStreamId, mediaPortId, attributes);
     EXPECT_EQ(attr.value().usage, AUDIO_USAGE_GAME);
 
-    attr = testStartClient(gameStreamId, unknownPortId, AUDIO_USAGE_UNKNOWN);
+    attributes.usage = AUDIO_USAGE_UNKNOWN;
+    attr = testStartClient(gameStreamId, unknownPortId, attributes);
     EXPECT_EQ(attr.value().usage, AUDIO_USAGE_GAME);
+
+    // Unregister game stream.
+    EXPECT_EQ(m_validator->unregisterStream(gameStreamId), 0);
+}
+
+/**
+ * Verify attributes usage does not change for non low latency clients.
+ */
+TEST_F(UsecaseValidatorTest, testAttributesUsageUnChangedIfNotLowLatency) {
+    audio_io_handle_t gameStreamId;
+    audio_port_handle_t mediaPortId, unknownPortId;
+
+    // Register game and media stream.
+    gameStreamId = testRegisterStream(true);
+    EXPECT_NE(gameStreamId, 0);
+
+    // Assign portId.
+    mediaPortId = testCreatePortId(gameStreamId);
+    EXPECT_NE(mediaPortId, 0);
+    unknownPortId = testCreatePortId(gameStreamId);
+    EXPECT_NE(unknownPortId, 0);
+
+    audio_attributes_t attributes = AUDIO_ATTRIBUTES_INITIALIZER;
+    // Verify attributes on game stream.
+    attributes.usage = AUDIO_USAGE_MEDIA;
+    auto attr = testStartClient(gameStreamId, mediaPortId, attributes);
+    EXPECT_EQ(attr.value().usage, AUDIO_USAGE_MEDIA);
+
+    attributes.usage = AUDIO_USAGE_UNKNOWN;
+    attr = testStartClient(gameStreamId, unknownPortId, attributes);
+    EXPECT_EQ(attr.value().usage, AUDIO_USAGE_UNKNOWN);
+
+    // Unregister game stream.
+    EXPECT_EQ(m_validator->unregisterStream(gameStreamId), 0);
+}
+
+/**
+ * Verify attributes usage does not change for content type speech.
+ */
+TEST_F(UsecaseValidatorTest, testAttributesUsageUnChangedIfSpeech) {
+    audio_io_handle_t gameStreamId;
+    audio_port_handle_t mediaPortId, unknownPortId;
+
+    // Register game and media stream.
+    gameStreamId = testRegisterStream(true);
+    EXPECT_NE(gameStreamId, 0);
+
+    // Assign portId.
+    mediaPortId = testCreatePortId(gameStreamId);
+    EXPECT_NE(mediaPortId, 0);
+    unknownPortId = testCreatePortId(gameStreamId);
+    EXPECT_NE(unknownPortId, 0);
+
+    audio_attributes_t attributes = AUDIO_ATTRIBUTES_INITIALIZER;
+    // Verify attributes on game stream.
+    attributes.usage = AUDIO_USAGE_MEDIA;
+    attributes.content_type = AUDIO_CONTENT_TYPE_SPEECH;
+    auto attr = testStartClient(gameStreamId, mediaPortId, attributes);
+    EXPECT_EQ(attr.value().usage, AUDIO_USAGE_MEDIA);
 
     // Unregister game stream.
     EXPECT_EQ(m_validator->unregisterStream(gameStreamId), 0);
