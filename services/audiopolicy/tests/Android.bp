@@ -19,18 +19,19 @@ cc_test {
     ],
 
     shared_libs: [
+        "framework-permission-aidl-cpp",
         "libaudioclient",
         "libaudiofoundation",
         "libaudiopolicy",
         "libaudiopolicymanagerdefault",
         "libbase",
+        "libbinder",
+        "libcutils",
         "libhidlbase",
         "liblog",
         "libmedia_helper",
         "libutils",
         "libxml2",
-        "framework-permission-aidl-cpp",
-        "libbinder",
     ],
 
     static_libs: [
@@ -69,17 +70,19 @@ cc_test {
     require_root: true,
 
     shared_libs: [
-        "libaudiofoundation",
+        "audioclient-types-aidl-cpp",
         "libaudioclient",
+        "libaudioclient_aidl_conversion",
+        "libaudiofoundation",
         "libaudiopolicymanagerdefault",
+        "libcutils",
         "liblog",
         "libmedia_helper",
-        "libutils",
-        "libaudioclient_aidl_conversion",
-        "libstagefright_foundation",
         "libshmemcompat",
         "libshmemutil",
-        "audioclient-types-aidl-cpp",
+        "libstagefright_foundation",
+        "libutils",
+        "libxml2",
     ],
 
     static_libs: ["libaudiopolicycomponents"],

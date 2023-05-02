@@ -22,9 +22,11 @@ namespace android {
 class AudioPolicyTestManager : public AudioPolicyManager {
   public:
     explicit AudioPolicyTestManager(AudioPolicyClientInterface *clientInterface)
-            : AudioPolicyManager(clientInterface, true /*forTesting*/) { }
+            : AudioPolicyManager(AudioPolicyConfig::createDefault(), clientInterface) {}
+    AudioPolicyTestManager(const sp<const AudioPolicyConfig>& config,
+            AudioPolicyClientInterface *clientInterface)
+            : AudioPolicyManager(config, clientInterface) {}
     using AudioPolicyManager::getConfig;
-    using AudioPolicyManager::loadConfig;
     using AudioPolicyManager::initialize;
     using AudioPolicyManager::getOutputs;
     using AudioPolicyManager::getAvailableOutputDevices;
