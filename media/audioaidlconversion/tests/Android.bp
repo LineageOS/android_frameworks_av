@@ -44,3 +44,27 @@ cc_test {
         "-DBACKEND_NDK",
     ],
 }
+
+cc_test {
+    name: "audio_aidl_ndk_cpp_conversion_tests",
+
+    defaults: [
+        "latest_android_media_audio_common_types_cpp_static",
+        "latest_android_media_audio_common_types_ndk_static",
+        "libaudio_aidl_conversion_tests_defaults",
+    ],
+    srcs: ["audio_aidl_ndk_cpp_conversion_tests.cpp"],
+    shared_libs: [
+        "libbinder",
+        "libbinder_ndk",
+        "libcutils",
+        "liblog",
+        "libutils",
+    ],
+    static_libs: [
+        "libaudio_aidl_conversion_common_ndk_cpp",
+    ],
+    cflags: [
+        "-DBACKEND_CPP_NDK",
+    ],
+}
