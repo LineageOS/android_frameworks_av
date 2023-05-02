@@ -165,6 +165,8 @@ class DeviceHalAidl : public DeviceHalInterface, public ConversionHelperAidl,
     status_t getSoundDoseInterface(const std::string& module,
                                    ::ndk::SpAIBinder* soundDoseBinder) override;
 
+    status_t prepareToDisconnectExternalDevice(const struct audio_port_v7 *port) override;
+
     status_t setConnectedState(const struct audio_port_v7 *port, bool connected) override;
 
     status_t setSimulateDeviceConnections(bool enabled) override;
@@ -298,6 +300,7 @@ class DeviceHalAidl : public DeviceHalInterface, public ConversionHelperAidl,
     Microphones mMicrophones;
     std::mutex mLock;
     std::map<void*, Callbacks> mCallbacks GUARDED_BY(mLock);
+    std::set<audio_port_handle_t> mDeviceDisconnectionNotified;
 };
 
 } // namespace android

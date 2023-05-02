@@ -485,14 +485,17 @@ int32_t AudioFlinger::getAAudioHardwareBurstMinUsec() {
     return mAAudioHwBurstMinMicros;
 }
 
-status_t AudioFlinger::setDeviceConnectedState(const struct audio_port_v7 *port, bool connected) {
+status_t AudioFlinger::setDeviceConnectedState(const struct audio_port_v7 *port,
+                                               media::DeviceConnectedState state) {
     status_t final_result = NO_INIT;
     Mutex::Autolock _l(mLock);
     AutoMutex lock(mHardwareLock);
     mHardwareStatus = AUDIO_HW_SET_CONNECTED_STATE;
     for (size_t i = 0; i < mAudioHwDevs.size(); i++) {
         sp<DeviceHalInterface> dev = mAudioHwDevs.valueAt(i)->hwDevice();
-        status_t result = dev->setConnectedState(port, connected);
+        status_t result = state == media::DeviceConnectedState::PREPARE_TO_DISCONNECT
+                ? dev->prepareToDisconnectExternalDevice(port)
+                : dev->setConnectedState(port, state == media::DeviceConnectedState::CONNECTED);
         // Same logic as with setParameter: it's a success if at least one
         // HAL module accepts the update.
         if (final_result != NO_ERROR) {
