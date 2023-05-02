@@ -103,10 +103,11 @@ public:
         ++mAudioPortListUpdateCount;
     }
 
-    status_t setDeviceConnectedState(const struct audio_port_v7 *port, bool connected) override {
-        if (connected) {
+    status_t setDeviceConnectedState(const struct audio_port_v7 *port,
+                                     media::DeviceConnectedState state) override {
+        if (state == media::DeviceConnectedState::CONNECTED) {
             mConnectedDevicePorts.push_back(*port);
-        } else {
+        } else if (state == media::DeviceConnectedState::DISCONNECTED){
             mDisconnectedDevicePorts.push_back(*port);
         }
         return NO_ERROR;
