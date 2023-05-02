@@ -99,10 +99,8 @@ class UsecaseValidatorImpl : public UsecaseValidator {
 
         audio_attributes_t attrRet = attributes;
 
-        // Check if attribute usage media or unknown has been set.
-        bool isUsageValid = this->isUsageValid(attributes);
-
-        if (isUsageValid && m_lookup.isGameStream(streamId)) {
+        if (isUsageValid(attributes.usage) && isContentTypeValid(attributes.content_type)
+                && areFlagsValid(attributes.flags) && m_lookup.isGameStream(streamId)) {
             ALOGI("%s update usage: %d to AUDIO_USAGE_GAME for output: %d pid: %d package: %s",
                     __func__, attributes.usage, streamId, attributionSource.pid,
                     attributionSource.packageName.value_or("").c_str());
@@ -117,14 +115,35 @@ class UsecaseValidatorImpl : public UsecaseValidator {
     /**
      * Check if attribute usage valid.
      */
-    bool isUsageValid(const audio_attributes_t& attr) {
-        ALOGV("isUsageValid attr.usage: %d", attr.usage);
-        switch (attr.usage) {
+    bool isUsageValid(audio_usage_t usage) {
+        ALOGV("isUsageValid usage: %d", usage);
+        switch (usage) {
             case AUDIO_USAGE_MEDIA:
             case AUDIO_USAGE_UNKNOWN:
                 return true;
             default:
                 break;
+        }
+        return false;
+    }
+
+    bool isContentTypeValid(audio_content_type_t contentType) {
+        ALOGV("isContentTypeValid contentType: %d", contentType);
+        switch (contentType) {
+            case AUDIO_CONTENT_TYPE_MUSIC:
+            case AUDIO_CONTENT_TYPE_MOVIE:
+            case AUDIO_CONTENT_TYPE_UNKNOWN:
+                return true;
+            default:
+                break;
+        }
+        return false;
+    }
+
+    bool areFlagsValid(audio_flags_mask_t flags) {
+        ALOGV("areFlagsValid flags: %#x", flags);
+        if ((flags & AUDIO_FLAG_LOW_LATENCY) != 0) {
+            return true;
         }
         return false;
     }
