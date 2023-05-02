@@ -822,7 +822,7 @@ private:
                 const TrackSecondaryOutputsMap& trackSecondaryOutputs) override;
 
         status_t setDeviceConnectedState(
-                const struct audio_port_v7 *port, bool connected) override;
+                const struct audio_port_v7 *port, media::DeviceConnectedState state) override;
 
      private:
         AudioPolicyService *mAudioPolicyService;
