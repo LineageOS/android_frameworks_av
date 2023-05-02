@@ -255,10 +255,11 @@ audio_source_t AAudioConvert_inputPresetToAudioSource(aaudio_input_preset_t pres
     return (audio_source_t) preset; // same value
 }
 
-audio_flags_mask_t AAudioConvert_allowCapturePolicyToAudioFlagsMask(
+audio_flags_mask_t AAudio_computeAudioFlagsMask(
         aaudio_allowed_capture_policy_t policy,
         aaudio_spatialization_behavior_t spatializationBehavior,
-        bool isContentSpatialized) {
+        bool isContentSpatialized,
+        audio_output_flags_t outputFlags) {
     audio_flags_mask_t flagsMask = AUDIO_FLAG_NONE;
     switch (policy) {
         case AAUDIO_UNSPECIFIED:
@@ -293,6 +294,15 @@ audio_flags_mask_t AAudioConvert_allowCapturePolicyToAudioFlagsMask(
 
     if (isContentSpatialized) {
         flagsMask = static_cast<audio_flags_mask_t>(flagsMask | AUDIO_FLAG_CONTENT_SPATIALIZED);
+    }
+
+    if ((outputFlags & AUDIO_OUTPUT_FLAG_HW_AV_SYNC) != 0) {
+        flagsMask = static_cast<audio_flags_mask_t>(flagsMask | AUDIO_FLAG_HW_AV_SYNC);
+    }
+    if ((outputFlags & AUDIO_OUTPUT_FLAG_FAST) != 0) {
+        flagsMask = static_cast<audio_flags_mask_t>(flagsMask | AUDIO_FLAG_LOW_LATENCY);
+    } else if ((outputFlags & AUDIO_OUTPUT_FLAG_DEEP_BUFFER) != 0) {
+        flagsMask = static_cast<audio_flags_mask_t>(flagsMask | AUDIO_FLAG_DEEP_BUFFER);
     }
 
     return flagsMask;
