@@ -233,6 +233,7 @@ public:
 
     // Monitored UIDs availability notification
     void                notifyMonitoredUids();
+    void                notifyMonitoredUids(const std::unordered_set<uid_t> &notifyUidSet);
 
     // Stores current open session device info in temp file.
     void cacheDump();
@@ -763,13 +764,13 @@ private:
         void onUidIdle(uid_t uid, bool disabled) override;
         void onUidStateChanged(uid_t uid, int32_t procState, int64_t procStateSeq,
                 int32_t capability) override;
-        void onUidProcAdjChanged(uid_t uid) override;
+        void onUidProcAdjChanged(uid_t uid, int adj) override;
 
         void addOverrideUid(uid_t uid, String16 callingPackage, bool active);
         void removeOverrideUid(uid_t uid, String16 callingPackage);
 
-        void registerMonitorUid(uid_t uid);
-        void unregisterMonitorUid(uid_t uid);
+        void registerMonitorUid(uid_t uid, bool openCamera);
+        void unregisterMonitorUid(uid_t uid, bool closeCamera);
 
         // Implementation of IServiceManager::LocalRegistrationCallback
         virtual void onServiceRegistration(const String16& name,
@@ -784,6 +785,8 @@ private:
 
         struct MonitoredUid {
             int32_t procState;
+            int32_t procAdj;
+            bool hasCamera;
             size_t refCount;
         };
 

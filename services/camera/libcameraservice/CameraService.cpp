@@ -2602,6 +2602,19 @@ void CameraService::notifyMonitoredUids() {
     }
 }
 
+void CameraService::notifyMonitoredUids(const std::unordered_set<uid_t> &notifyUidSet) {
+    Mutex::Autolock lock(mStatusListenerLock);
+
+    for (const auto& it : mListenerList) {
+        if (notifyUidSet.find(it->getListenerUid()) != notifyUidSet.end()) {
+            ALOGV("%s: notifying uid %d", __FUNCTION__, it->getListenerUid());
+            auto ret = it->getListener()->onCameraAccessPrioritiesChanged();
+            it->handleBinderStatus(ret, "%s: Failed to trigger permission callback for %d:%d: %d",
+                    __FUNCTION__, it->getListenerUid(), it->getListenerPid(), ret.exceptionCode());
+        }
+    }
+}
+
 Status CameraService::notifyDeviceStateChange(int64_t newState) {
     const int pid = CameraThreadState::getCallingPid();
     const int selfPid = getpid();
@@ -2823,7 +2836,7 @@ Status CameraService::addListenerHelper(const sp<ICameraServiceListener>& listen
         // permissions the listener process has / whether it is a vendor listener. Since it might be
         // eligible to listen to other camera ids.
         mListenerList.emplace_back(serviceListener);
-        mUidPolicy->registerMonitorUid(clientUid);
+        mUidPolicy->registerMonitorUid(clientUid, /*openCamera*/false);
     }
 
     /* Collect current devices and status */
@@ -2891,7 +2904,7 @@ Status CameraService::removeListener(const sp<ICameraServiceListener>& listener)
         Mutex::Autolock lock(mStatusListenerLock);
         for (auto it = mListenerList.begin(); it != mListenerList.end(); it++) {
             if (IInterface::asBinder((*it)->getListener()) == IInterface::asBinder(listener)) {
-                mUidPolicy->unregisterMonitorUid((*it)->getListenerUid());
+                mUidPolicy->unregisterMonitorUid((*it)->getListenerUid(), /*closeCamera*/false);
                 IInterface::asBinder(listener)->unlinkToDeath(*it);
                 mListenerList.erase(it);
                 return Status::ok();
@@ -3680,7 +3693,7 @@ status_t CameraService::BasicClient::startCameraOps() {
     // Transition device availability listeners from PRESENT -> NOT_AVAILABLE
     sCameraService->updateStatus(StatusInternal::NOT_AVAILABLE, mCameraIdStr);
 
-    sCameraService->mUidPolicy->registerMonitorUid(mClientUid);
+    sCameraService->mUidPolicy->registerMonitorUid(mClientUid, /*openCamera*/true);
 
     // Notify listeners of camera open/close status
     sCameraService->updateOpenCloseStatus(mCameraIdStr, true/*open*/, mClientPackageName);
@@ -3788,7 +3801,7 @@ status_t CameraService::BasicClient::finishCameraOps() {
     }
     mOpsCallback.clear();
 
-    sCameraService->mUidPolicy->unregisterMonitorUid(mClientUid);
+    sCameraService->mUidPolicy->unregisterMonitorUid(mClientUid, /*closeCamera*/true);
 
     // Notify listeners of camera open/close status
     sCameraService->updateOpenCloseStatus(mCameraIdStr, false/*open*/, mClientPackageName);
@@ -3988,24 +4001,51 @@ void CameraService::UidPolicy::onUidStateChanged(uid_t uid, int32_t procState,
     }
 }
 
-void CameraService::UidPolicy::onUidProcAdjChanged(uid_t uid) {
-    bool procAdjChange = false;
+/**
+ * When the OOM adj of the uid owning the camera changes, a different uid waiting on camera
+ * privileges may take precedence if the owner's new OOM adj is greater than the waiting package.
+ * Here, we track which monitoredUid has the camera, and track its adj relative to other
+ * monitoredUids. If it is revised above some other monitoredUid, signal
+ * onCameraAccessPrioritiesChanged. This only needs to capture the case where there are two
+ * foreground apps in split screen - state changes will capture all other cases.
+ */
+void CameraService::UidPolicy::onUidProcAdjChanged(uid_t uid, int32_t adj) {
+    std::unordered_set<uid_t> notifyUidSet;
     {
         Mutex::Autolock _l(mUidLock);
-        if (mMonitoredUids.find(uid) != mMonitoredUids.end()) {
-            procAdjChange = true;
+        auto it = mMonitoredUids.find(uid);
+
+        if (it != mMonitoredUids.end()) {
+            if (it->second.hasCamera) {
+                for (auto &monitoredUid : mMonitoredUids) {
+                    if (monitoredUid.first != uid && adj > monitoredUid.second.procAdj) {
+                        notifyUidSet.emplace(monitoredUid.first);
+                    }
+                }
+                notifyUidSet.emplace(uid);
+            } else {
+                for (auto &monitoredUid : mMonitoredUids) {
+                    if (monitoredUid.second.hasCamera && adj < monitoredUid.second.procAdj) {
+                        notifyUidSet.emplace(uid);
+                    }
+                }
+            }
+            it->second.procAdj = adj;
         }
     }
 
-    if (procAdjChange) {
+    if (notifyUidSet.size() > 0) {
         sp<CameraService> service = mService.promote();
         if (service != nullptr) {
-            service->notifyMonitoredUids();
+            service->notifyMonitoredUids(notifyUidSet);
         }
     }
 }
 
-void CameraService::UidPolicy::registerMonitorUid(uid_t uid) {
+/**
+ * Register a uid for monitoring, and note whether it owns a camera.
+ */
+void CameraService::UidPolicy::registerMonitorUid(uid_t uid, bool openCamera) {
     Mutex::Autolock _l(mUidLock);
     auto it = mMonitoredUids.find(uid);
     if (it != mMonitoredUids.end()) {
@@ -4013,18 +4053,28 @@ void CameraService::UidPolicy::registerMonitorUid(uid_t uid) {
     } else {
         MonitoredUid monitoredUid;
         monitoredUid.procState = ActivityManager::PROCESS_STATE_NONEXISTENT;
+        monitoredUid.procAdj = resource_policy::UNKNOWN_ADJ;
         monitoredUid.refCount = 1;
-        mMonitoredUids.emplace(std::pair<uid_t, MonitoredUid>(uid, monitoredUid));
+        it = mMonitoredUids.emplace(std::pair<uid_t, MonitoredUid>(uid, monitoredUid)).first;
+    }
+
+    if (openCamera) {
+        it->second.hasCamera = true;
     }
 }
 
-void CameraService::UidPolicy::unregisterMonitorUid(uid_t uid) {
+/**
+ * Unregister a uid for monitoring, and note whether it lost ownership of a camera.
+ */
+void CameraService::UidPolicy::unregisterMonitorUid(uid_t uid, bool closeCamera) {
     Mutex::Autolock _l(mUidLock);
     auto it = mMonitoredUids.find(uid);
     if (it != mMonitoredUids.end()) {
         it->second.refCount--;
         if (it->second.refCount == 0) {
             mMonitoredUids.erase(it);
+        } else if (closeCamera) {
+            it->second.hasCamera = false;
         }
     } else {
         ALOGE("%s: Trying to unregister uid: %d which is not monitored!", __FUNCTION__, uid);
