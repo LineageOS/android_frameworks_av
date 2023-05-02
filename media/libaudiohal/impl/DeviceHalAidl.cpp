@@ -927,11 +927,31 @@ status_t DeviceHalAidl::getSoundDoseInterface(const std::string& module,
     return OK;
 }
 
+status_t DeviceHalAidl::prepareToDisconnectExternalDevice(const struct audio_port_v7* port) {
+    // There is not AIDL API defined for `prepareToDisconnectExternalDevice`.
+    // Call `setConnectedState` instead.
+    // TODO(b/279824103): call prepareToDisconnectExternalDevice when it is added.
+    const status_t status = setConnectedState(port, false /*connected*/);
+    if (status == NO_ERROR) {
+        mDeviceDisconnectionNotified.insert(port->id);
+    }
+    return status;
+}
+
 status_t DeviceHalAidl::setConnectedState(const struct audio_port_v7 *port, bool connected) {
     TIME_CHECK();
     if (!mModule) return NO_INIT;
     if (port == nullptr) {
         return BAD_VALUE;
+    }
+    if (!connected && mDeviceDisconnectionNotified.erase(port->id) > 0) {
+        // For device disconnection, APM will first call `prepareToDisconnectExternalDevice`
+        // and then call `setConnectedState`. However, there is no API for
+        // `prepareToDisconnectExternalDevice` yet. In that case, `setConnectedState` will be
+        // called when calling `prepareToDisconnectExternalDevice`. Do not call to the HAL if
+        // previous call is successful. Also remove the cache here to avoid a large cache after
+        // a long run.
+        return NO_ERROR;
     }
     bool isInput = VALUE_OR_RETURN_STATUS(::aidl::android::portDirection(port->role, port->type)) ==
             ::aidl::android::AudioPortDirection::INPUT;
