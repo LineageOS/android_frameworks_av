@@ -69,7 +69,7 @@ class UsecaseValidatorTest : public ::testing::Test {
     audio_port_handle_t testCreatePortId(audio_io_handle_t streamId);
     error::Result<audio_attributes_t> testStartClient(audio_io_handle_t streamId,
                                                       audio_port_handle_t portId,
-                                                      audio_usage_t usage);
+                                                      audio_attributes_t attributes);
     error::Result<audio_attributes_t> testVerifyAudioAttributes(audio_io_handle_t streamId,
                                                                 audio_usage_t usage);
 
