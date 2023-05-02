@@ -29,6 +29,7 @@
 #include <utils/StrongPointer.h>
 #include <utils/Errors.h>
 #include <utils/RefBase.h>
+#include "IOProfile.h"
 #include "Serializer.h"
 #include "TypeConverter.h"
 
@@ -907,7 +908,6 @@ status_t deserializeAudioPolicyFile(const char *fileName, AudioPolicyConfig *con
 {
     PolicySerializer serializer;
     status_t status = serializer.deserialize(fileName, config);
-    if (status != OK) config->clear();
     return status;
 }
 
@@ -915,7 +915,6 @@ status_t deserializeAudioPolicyFileForVts(const char *fileName, AudioPolicyConfi
 {
     PolicySerializer serializer;
     status_t status = serializer.deserialize(fileName, config, true /*ignoreVendorExtensions*/);
-    if (status != OK) config->clear();
     return status;
 }
 
