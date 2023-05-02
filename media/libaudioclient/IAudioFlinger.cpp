@@ -810,10 +810,10 @@ int32_t AudioFlingerClientAdapter::getAAudioHardwareBurstMinUsec() {
 }
 
 status_t AudioFlingerClientAdapter::setDeviceConnectedState(
-        const struct audio_port_v7 *port, bool connected) {
+        const struct audio_port_v7 *port, media::DeviceConnectedState state) {
     media::AudioPortFw aidlPort = VALUE_OR_RETURN_STATUS(
             legacy2aidl_audio_port_v7_AudioPortFw(*port));
-    return statusTFromBinderStatus(mDelegate->setDeviceConnectedState(aidlPort, connected));
+    return statusTFromBinderStatus(mDelegate->setDeviceConnectedState(aidlPort, state));
 }
 
 status_t AudioFlingerClientAdapter::setSimulateDeviceConnections(bool enabled) {
@@ -1369,9 +1369,9 @@ Status AudioFlingerServerAdapter::getAAudioHardwareBurstMinUsec(int32_t* _aidl_r
 }
 
 Status AudioFlingerServerAdapter::setDeviceConnectedState(
-        const media::AudioPortFw& port, bool connected) {
+        const media::AudioPortFw& port, media::DeviceConnectedState state) {
     audio_port_v7 portLegacy = VALUE_OR_RETURN_BINDER(aidl2legacy_AudioPortFw_audio_port_v7(port));
-    return Status::fromStatusT(mDelegate->setDeviceConnectedState(&portLegacy, connected));
+    return Status::fromStatusT(mDelegate->setDeviceConnectedState(&portLegacy, state));
 }
 
 Status AudioFlingerServerAdapter::setSimulateDeviceConnections(bool enabled) {

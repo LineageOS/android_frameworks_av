@@ -361,7 +361,8 @@ public:
 
     virtual int32_t getAAudioHardwareBurstMinUsec() = 0;
 
-    virtual status_t setDeviceConnectedState(const struct audio_port_v7 *port, bool connected) = 0;
+    virtual status_t setDeviceConnectedState(const struct audio_port_v7 *port,
+                                             media::DeviceConnectedState state) = 0;
 
     virtual status_t setSimulateDeviceConnections(bool enabled) = 0;
 
@@ -481,7 +482,8 @@ public:
             std::vector<media::audio::common::AudioMMapPolicyInfo> *policyInfos) override;
     int32_t getAAudioMixerBurstCount() override;
     int32_t getAAudioHardwareBurstMinUsec() override;
-    status_t setDeviceConnectedState(const struct audio_port_v7 *port, bool connected) override;
+    status_t setDeviceConnectedState(const struct audio_port_v7 *port,
+                                     media::DeviceConnectedState state) override;
     status_t setSimulateDeviceConnections(bool enabled) override;
     status_t setRequestedLatencyMode(audio_io_handle_t output,
             audio_latency_mode_t mode) override;
@@ -711,7 +713,8 @@ public:
             std::vector<media::audio::common::AudioMMapPolicyInfo> *_aidl_return) override;
     Status getAAudioMixerBurstCount(int32_t* _aidl_return) override;
     Status getAAudioHardwareBurstMinUsec(int32_t* _aidl_return) override;
-    Status setDeviceConnectedState(const media::AudioPortFw& port, bool connected) override;
+    Status setDeviceConnectedState(const media::AudioPortFw& port,
+                                   media::DeviceConnectedState state) override;
     Status setSimulateDeviceConnections(bool enabled) override;
     Status setRequestedLatencyMode(
             int output, media::audio::common::AudioLatencyMode mode) override;
