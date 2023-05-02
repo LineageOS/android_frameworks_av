@@ -85,9 +85,7 @@ static const Capability kEqCap = {.range = kEqRanges};
 static const std::string kEqualizerEffectName = "EqualizerBundle";
 static const Descriptor kEqualizerDesc = {
         .common = {.id = {.type = getEffectTypeUuidEqualizer(),
-                          .uuid = getEffectImplUuidEqualizerBundle(),
-                          .proxy = getEffectImplUuidEqualizerProxy()},
-
+                          .uuid = getEffectImplUuidEqualizerBundle()},
                    .flags = {.type = Flags::Type::INSERT,
                              .insert = Flags::Insert::FIRST,
                              .volume = Flags::Volume::CTRL},
@@ -102,8 +100,7 @@ static const Capability kBassBoostCap = {.range = kBassBoostRanges};
 static const std::string kBassBoostEffectName = "Dynamic Bass Boost";
 static const Descriptor kBassBoostDesc = {
         .common = {.id = {.type = getEffectTypeUuidBassBoost(),
-                          .uuid = getEffectImplUuidBassBoostBundle(),
-                          .proxy = getEffectImplUuidBassBoostProxy()},
+                          .uuid = getEffectImplUuidBassBoostBundle()},
                    .flags = {.type = Flags::Type::INSERT,
                              .insert = Flags::Insert::FIRST,
                              .volume = Flags::Volume::CTRL,
@@ -121,8 +118,7 @@ static const std::string kVirtualizerEffectName = "Virtualizer";
 
 static const Descriptor kVirtualizerDesc = {
         .common = {.id = {.type = getEffectTypeUuidVirtualizer(),
-                          .uuid = getEffectImplUuidVirtualizerBundle(),
-                          .proxy = getEffectImplUuidVirtualizerProxy()},
+                          .uuid = getEffectImplUuidVirtualizerBundle()},
                    .flags = {.type = Flags::Type::INSERT,
                              .insert = Flags::Insert::LAST,
                              .volume = Flags::Volume::CTRL,
@@ -139,8 +135,7 @@ static const Capability kVolumeCap = {.range = kVolumeRanges};
 static const std::string kVolumeEffectName = "Volume";
 static const Descriptor kVolumeDesc = {
         .common = {.id = {.type = getEffectTypeUuidVolume(),
-                          .uuid = getEffectImplUuidVolumeBundle(),
-                          .proxy = std::nullopt},
+                          .uuid = getEffectImplUuidVolumeBundle()},
                    .flags = {.type = Flags::Type::INSERT,
                              .insert = Flags::Insert::LAST,
                              .volume = Flags::Volume::CTRL},
