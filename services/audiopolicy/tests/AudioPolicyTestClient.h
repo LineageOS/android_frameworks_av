@@ -96,8 +96,8 @@ public:
             const TrackSecondaryOutputsMap& trackSecondaryOutputs __unused) override {
         return NO_INIT;
     }
-    status_t setDeviceConnectedState(
-            const struct audio_port_v7 *port __unused, bool connected __unused) override {
+    status_t setDeviceConnectedState(const struct audio_port_v7 *port __unused,
+                                     media::DeviceConnectedState state __unused) override {
         return NO_INIT;
     }
     status_t invalidateTracks(const std::vector<audio_port_handle_t>& /*portIds*/) override {

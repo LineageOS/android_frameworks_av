@@ -106,6 +106,10 @@ static const char* idFromHal(const char *name, status_t* status) {
 }
 #endif
 
+status_t DevicesFactoryHalHidl::getDeviceNames(std::vector<std::string> *names __unused) {
+    return INVALID_OPERATION;
+}
+
 status_t DevicesFactoryHalHidl::openDevice(const char *name, sp<DeviceHalInterface> *device) {
     auto factories = copyDeviceFactories();
     if (factories.empty()) return NO_INIT;
@@ -230,6 +234,16 @@ std::vector<sp<::android::hardware::audio::CPP_VERSION::IDevicesFactory>>
 
 AudioHalVersionInfo DevicesFactoryHalHidl::getHalVersion() const {
     return AudioHalVersionInfo(AudioHalVersionInfo::Type::HIDL, MAJOR_VERSION, MINOR_VERSION);
+}
+
+status_t DevicesFactoryHalHidl::getSurroundSoundConfig(
+        media::SurroundSoundConfig *config __unused) {
+    return INVALID_OPERATION;
+}
+
+status_t DevicesFactoryHalHidl::getEngineConfig(
+        media::audio::common::AudioHalEngineConfig *config __unused) {
+    return INVALID_OPERATION;
 }
 
 // Main entry-point to the shared library.

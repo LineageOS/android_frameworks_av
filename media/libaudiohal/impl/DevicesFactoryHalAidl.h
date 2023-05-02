@@ -26,7 +26,9 @@ class DevicesFactoryHalAidl : public DevicesFactoryHalInterface
 {
   public:
     explicit DevicesFactoryHalAidl(
-            std::shared_ptr<::aidl::android::hardware::audio::core::IConfig> iConfig);
+            std::shared_ptr<::aidl::android::hardware::audio::core::IConfig> config);
+
+    status_t getDeviceNames(std::vector<std::string> *names) override;
 
     // Opens a device with the specified name. To close the device, it is
     // necessary to release references to the returned object.
@@ -38,8 +40,12 @@ class DevicesFactoryHalAidl : public DevicesFactoryHalInterface
 
     android::detail::AudioHalVersionInfo getHalVersion() const override;
 
+    status_t getSurroundSoundConfig(media::SurroundSoundConfig *config) override;
+
+    status_t getEngineConfig(media::audio::common::AudioHalEngineConfig *config) override;
+
   private:
-    const std::shared_ptr<::aidl::android::hardware::audio::core::IConfig> mIConfig;
+    const std::shared_ptr<::aidl::android::hardware::audio::core::IConfig> mConfig;
     ~DevicesFactoryHalAidl() = default;
 };
 

@@ -29,6 +29,10 @@ namespace android {
 class DeviceHalHidl : public DeviceHalInterface, public CoreConversionHelperHidl
 {
   public:
+    status_t getAudioPorts(std::vector<media::audio::common::AudioPort> *ports) override;
+
+    status_t getAudioRoutes(std::vector<media::AudioRoute> *routes) override;
+
     // Sets the value of 'devices' to a bitmask of 1 or more values of audio_devices_t.
     status_t getSupportedDevices(uint32_t *devices) override;
 
@@ -138,6 +142,8 @@ class DeviceHalHidl : public DeviceHalInterface, public CoreConversionHelperHidl
     status_t getSoundDoseInterface(const std::string& module,
                                    ::ndk::SpAIBinder* soundDoseBinder) override;
 
+    status_t prepareToDisconnectExternalDevice(const struct audio_port_v7* port) override;
+
   private:
     friend class DevicesFactoryHalHidl;
     sp<::android::hardware::audio::CPP_VERSION::IDevice> mDevice;
@@ -146,6 +152,7 @@ class DeviceHalHidl : public DeviceHalInterface, public CoreConversionHelperHidl
     bool supportsSetConnectedState7_1 = true;
     class SoundDoseWrapper;
     const std::unique_ptr<SoundDoseWrapper> mSoundDoseWrapper;
+    std::set<audio_port_handle_t> mDeviceDisconnectionNotified;
 
     // Can not be constructed directly by clients.
     explicit DeviceHalHidl(const sp<::android::hardware::audio::CPP_VERSION::IDevice>& device);

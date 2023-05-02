@@ -16,6 +16,8 @@
 
 #pragma once
 
+#include <android/media/audio/common/AudioHalEngineConfig.h>
+#include <android/media/SurroundSoundConfig.h>
 #include <media/audiohal/DeviceHalInterface.h>
 #include <utils/Errors.h>
 #include <utils/RefBase.h>
@@ -34,6 +36,8 @@ class DevicesFactoryHalCallback : public RefBase
 class DevicesFactoryHalInterface : public RefBase
 {
   public:
+    virtual status_t getDeviceNames(std::vector<std::string> *names) = 0;
+
     // Opens a device with the specified name. To close the device, it is
     // necessary to release references to the returned object.
     virtual status_t openDevice(const char *name, sp<DeviceHalInterface> *device) = 0;
@@ -45,6 +49,10 @@ class DevicesFactoryHalInterface : public RefBase
     virtual status_t setCallbackOnce(sp<DevicesFactoryHalCallback> callback) = 0;
 
     virtual android::detail::AudioHalVersionInfo getHalVersion() const = 0;
+
+    virtual status_t getSurroundSoundConfig(media::SurroundSoundConfig *config) = 0;
+
+    virtual status_t getEngineConfig(media::audio::common::AudioHalEngineConfig *config) = 0;
 
     static sp<DevicesFactoryHalInterface> create();
 
