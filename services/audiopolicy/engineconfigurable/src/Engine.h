@@ -33,10 +33,15 @@ class Engine : public EngineBase, AudioPolicyPluginInterface
 {
 public:
     Engine();
-    virtual ~Engine();
+    virtual ~Engine() = default;
 
     template <class RequestedInterface>
     RequestedInterface *queryInterface();
+
+    ///
+    /// from EngineInterface
+    ///
+    android::status_t loadFromXmlConfigWithFallback(const std::string& xmlFilePath = "") override;
 
     ///
     /// from EngineBase
@@ -132,7 +137,7 @@ private:
     template <typename Property, typename Key>
     bool setPropertyForKey(const Property &property, const Key &key);
 
-    status_t loadAudioPolicyEngineConfig();
+    status_t loadAudioPolicyEngineConfig(const std::string& xmlFilePath);
 
     DeviceVector getCachedDevices(product_strategy_t ps) const;
 
@@ -150,4 +155,3 @@ private:
 } // namespace audio_policy
 
 } // namespace android
-

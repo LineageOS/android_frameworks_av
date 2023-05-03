@@ -186,8 +186,10 @@ static auto& getIAudioPolicyServiceStatistics() {
 
 static AudioPolicyInterface* createAudioPolicyManager(AudioPolicyClientInterface *clientInterface)
 {
+    auto config = AudioPolicyConfig::loadFromApmXmlConfigWithFallback();  // This can't fail.
     AudioPolicyManager *apm = new AudioPolicyManager(
-            AudioPolicyConfig::loadFromApmXmlConfigWithFallback(), clientInterface);
+            config, loadApmEngineLibraryAndCreateEngine(config->getEngineLibraryNameSuffix()),
+            clientInterface);
     status_t status = apm->initialize();
     if (status != NO_ERROR) {
         delete apm;

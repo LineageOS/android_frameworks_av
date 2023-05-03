@@ -45,8 +45,13 @@ enum legacy_strategy {
 class Engine : public EngineBase
 {
 public:
-    Engine();
+    Engine() = default;
     virtual ~Engine() = default;
+
+    ///
+    /// from EngineInterface
+    ///
+    status_t loadFromXmlConfigWithFallback(const std::string& xmlFilePath = "") override;
 
 private:
     ///
@@ -105,4 +110,3 @@ private:
 };
 } // namespace audio_policy
 } // namespace android
-
