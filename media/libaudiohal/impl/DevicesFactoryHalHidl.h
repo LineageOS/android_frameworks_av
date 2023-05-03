@@ -37,6 +37,8 @@ class DevicesFactoryHalHidl : public DevicesFactoryHalInterface
     explicit DevicesFactoryHalHidl(sp<IDevicesFactory> devicesFactory);
     void onFirstRef() override;
 
+    status_t getDeviceNames(std::vector<std::string> *names) override;
+
     // Opens a device with the specified name. To close the device, it is
     // necessary to release references to the returned object.
     status_t openDevice(const char *name, sp<DeviceHalInterface> *device) override;
@@ -46,6 +48,10 @@ class DevicesFactoryHalHidl : public DevicesFactoryHalInterface
     status_t setCallbackOnce(sp<DevicesFactoryHalCallback> callback) override;
 
     android::detail::AudioHalVersionInfo getHalVersion() const override;
+
+    status_t getSurroundSoundConfig(media::SurroundSoundConfig *config) override;
+
+    status_t getEngineConfig(media::audio::common::AudioHalEngineConfig *config) override;
 
   private:
     friend class ServiceNotificationListener;

@@ -19,6 +19,8 @@
 
 #include <android/media/audio/common/AudioMMapPolicyInfo.h>
 #include <android/media/audio/common/AudioMMapPolicyType.h>
+#include <android/media/audio/common/AudioPort.h>
+#include <android/media/AudioRoute.h>
 #include <error/Result.h>
 #include <media/audiohal/EffectHalInterface.h>
 #include <system/audio.h>
@@ -38,6 +40,10 @@ class StreamOutHalInterface;
 class DeviceHalInterface : public virtual RefBase
 {
   public:
+    virtual status_t getAudioPorts(std::vector<media::audio::common::AudioPort> *ports) = 0;
+
+    virtual status_t getAudioRoutes(std::vector<media::AudioRoute> *routes) = 0;
+
     // Sets the value of 'devices' to a bitmask of 1 or more values of audio_devices_t.
     virtual status_t getSupportedDevices(uint32_t *devices) = 0;
 
@@ -148,6 +154,8 @@ class DeviceHalInterface : public virtual RefBase
     // Returns the sound dose binder interface if it is supported by the HAL, nullptr otherwise
     virtual status_t getSoundDoseInterface(const std::string& module,
                                            ::ndk::SpAIBinder* soundDoseBinder) = 0;
+
+    virtual status_t prepareToDisconnectExternalDevice(const struct audio_port_v7* port) = 0;
 
   protected:
     // Subclasses can not be constructed directly by clients.

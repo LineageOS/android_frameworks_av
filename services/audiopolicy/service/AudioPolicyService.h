@@ -484,7 +484,7 @@ private:
         void onUidIdle(uid_t uid, bool disabled) override;
         void onUidStateChanged(uid_t uid, int32_t procState, int64_t procStateSeq,
                 int32_t capability) override;
-        void onUidProcAdjChanged(uid_t uid) override;
+        void onUidProcAdjChanged(uid_t uid, int32_t adj) override;
 
         void addOverrideUid(uid_t uid, bool active) { updateOverrideUid(uid, active, true); }
         void removeOverrideUid(uid_t uid) { updateOverrideUid(uid, false, false); }
@@ -847,7 +847,7 @@ private:
                 const TrackSecondaryOutputsMap& trackSecondaryOutputs) override;
 
         status_t setDeviceConnectedState(
-                const struct audio_port_v7 *port, bool connected) override;
+                const struct audio_port_v7 *port, media::DeviceConnectedState state) override;
 
         status_t invalidateTracks(const std::vector<audio_port_handle_t>& portIds) override;
 

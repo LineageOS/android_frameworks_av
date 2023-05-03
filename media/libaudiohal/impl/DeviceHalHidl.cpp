@@ -104,6 +104,15 @@ DeviceHalHidl::~DeviceHalHidl() {
     }
 }
 
+status_t DeviceHalHidl::getAudioPorts(
+        std::vector<media::audio::common::AudioPort> *ports __unused) {
+    return INVALID_OPERATION;
+}
+
+status_t DeviceHalHidl::getAudioRoutes(std::vector<media::AudioRoute> *routes __unused) {
+    return INVALID_OPERATION;
+}
+
 status_t DeviceHalHidl::getSupportedDevices(uint32_t*) {
     // Obsolete.
     return INVALID_OPERATION;
@@ -430,6 +439,7 @@ status_t DeviceHalHidl::releaseAudioPatch(audio_patch_handle_t patch) {
 
 template <typename HalPort>
 status_t DeviceHalHidl::getAudioPortImpl(HalPort *port) {
+    using ::android::hardware::audio::common::COMMON_TYPES_CPP_VERSION::AudioPort;
     if (mDevice == 0) return NO_INIT;
     AudioPort hidlPort;
     HidlUtils::audioPortFromHal(*port, &hidlPort);
@@ -472,6 +482,7 @@ status_t DeviceHalHidl::getAudioPort(struct audio_port_v7 *port) {
 }
 
 status_t DeviceHalHidl::setAudioPortConfig(const struct audio_port_config *config) {
+    using ::android::hardware::audio::common::COMMON_TYPES_CPP_VERSION::AudioPortConfig;
     TIME_CHECK();
     if (mDevice == 0) return NO_INIT;
     AudioPortConfig hidlConfig;
@@ -535,9 +546,29 @@ status_t DeviceHalHidl::removeDeviceEffect(
 }
 #endif
 
+status_t DeviceHalHidl::prepareToDisconnectExternalDevice(const struct audio_port_v7* port) {
+    // For HIDL HAL, there is not API to call notify the HAL to prepare for device connected
+    // state changed. Call `setConnectedState` directly.
+    const status_t status = setConnectedState(port, false /*connected*/);
+    if (status == NO_ERROR) {
+        // Cache the port id so that it won't disconnect twice.
+        mDeviceDisconnectionNotified.insert(port->id);
+    }
+    return status;
+}
+
 status_t DeviceHalHidl::setConnectedState(const struct audio_port_v7 *port, bool connected) {
+    using ::android::hardware::audio::common::COMMON_TYPES_CPP_VERSION::AudioPort;
     TIME_CHECK();
     if (mDevice == 0) return NO_INIT;
+    if (!connected && mDeviceDisconnectionNotified.erase(port->id) > 0) {
+        // For device disconnection, APM will first call `prepareToDisconnectExternalDevice` and
+        // then call `setConnectedState`. However, in HIDL HAL, there is no API for
+        // `prepareToDisconnectExternalDevice`. In that case, HIDL HAL will call `setConnectedState`
+        // when calling `prepareToDisconnectExternalDevice`. Do not call to the HAL if previous
+        // call is successful. Also remove the cache here to avoid a large cache after a long run.
+        return NO_ERROR;
+    }
 #if MAJOR_VERSION == 7 && MINOR_VERSION == 1
     if (supportsSetConnectedState7_1) {
         AudioPort hidlPort;

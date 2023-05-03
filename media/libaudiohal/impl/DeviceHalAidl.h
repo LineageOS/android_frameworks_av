@@ -69,6 +69,10 @@ class MicrophoneInfoProvider : public virtual RefBase {
 class DeviceHalAidl : public DeviceHalInterface, public ConversionHelperAidl,
                       public CallbackBroker, public MicrophoneInfoProvider {
   public:
+    status_t getAudioPorts(std::vector<media::audio::common::AudioPort> *ports) override;
+
+    status_t getAudioRoutes(std::vector<media::AudioRoute> *routes) override;
+
     // Sets the value of 'devices' to a bitmask of 1 or more values of audio_devices_t.
     status_t getSupportedDevices(uint32_t *devices) override;
 
@@ -161,6 +165,8 @@ class DeviceHalAidl : public DeviceHalInterface, public ConversionHelperAidl,
     status_t getSoundDoseInterface(const std::string& module,
                                    ::ndk::SpAIBinder* soundDoseBinder) override;
 
+    status_t prepareToDisconnectExternalDevice(const struct audio_port_v7 *port) override;
+
     status_t setConnectedState(const struct audio_port_v7 *port, bool connected) override;
 
     status_t setSimulateDeviceConnections(bool enabled) override;
@@ -185,6 +191,7 @@ class DeviceHalAidl : public DeviceHalInterface, public ConversionHelperAidl,
     using PortConfigs = std::map<int32_t /*port config ID*/,
             ::aidl::android::media::audio::common::AudioPortConfig>;
     using Ports = std::map<int32_t /*port ID*/, ::aidl::android::media::audio::common::AudioPort>;
+    using Routes = std::vector<::aidl::android::hardware::audio::core::AudioRoute>;
     // Answers the question "whether portID 'first' is reachable from portID 'second'?"
     // It's not a map because both portIDs are known. The matrix is symmetric.
     using RoutingMatrix = std::set<std::pair<int32_t, int32_t>>;
@@ -287,11 +294,13 @@ class DeviceHalAidl : public DeviceHalInterface, public ConversionHelperAidl,
     PortConfigs mPortConfigs;
     std::set<int32_t> mInitialPortConfigIds;
     Patches mPatches;
+    Routes mRoutes;
     RoutingMatrix mRoutingMatrix;
     Streams mStreams;
     Microphones mMicrophones;
     std::mutex mLock;
     std::map<void*, Callbacks> mCallbacks GUARDED_BY(mLock);
+    std::set<audio_port_handle_t> mDeviceDisconnectionNotified;
 };
 
 } // namespace android
