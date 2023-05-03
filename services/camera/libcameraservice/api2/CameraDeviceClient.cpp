@@ -957,7 +957,7 @@ binder::Status CameraDeviceClient::createStream(
     bool isHeicCompositeStream = camera3::HeicCompositeStream::isHeicCompositeStream(surfaces[0]);
     bool isJpegRCompositeStream =
         camera3::JpegRCompositeStream::isJpegRCompositeStream(surfaces[0]) &&
-        !mDevice->supportNativeJpegR();
+        !mDevice->isCompositeJpegRDisabled();
     if (isDepthCompositeStream || isHeicCompositeStream || isJpegRCompositeStream) {
         sp<CompositeStream> compositeStream;
         if (isDepthCompositeStream) {
@@ -1851,7 +1851,7 @@ binder::Status CameraDeviceClient::switchToOffline(
             isCompositeStream = camera3::DepthCompositeStream::isDepthCompositeStream(s) ||
                 camera3::HeicCompositeStream::isHeicCompositeStream(s) ||
                 (camera3::JpegRCompositeStream::isJpegRCompositeStream(s) &&
-                 !mDevice->supportNativeJpegR());
+                 !mDevice->isCompositeJpegRDisabled());
             if (isCompositeStream) {
                 auto compositeIdx = mCompositeStreamMap.indexOfKey(IInterface::asBinder(gbp));
                 if (compositeIdx == NAME_NOT_FOUND) {
