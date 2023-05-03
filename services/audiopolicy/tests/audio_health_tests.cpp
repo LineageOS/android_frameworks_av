@@ -21,6 +21,7 @@
 
 #include <gtest/gtest.h>
 
+#include <AudioPolicyConfig.h>
 #include <media/AudioSystem.h>
 #include <media/TypeConverter.h>
 #include <system/audio.h>
@@ -65,19 +66,17 @@ TEST(AudioHealthTest, AttachedDeviceFound) {
     }
     free(audioPorts);
 
-    AudioPolicyManagerTestClient client;
-    AudioPolicyTestManager manager(&client);
-    manager.loadConfig();
-    ASSERT_NE("AudioPolicyConfig::setDefault", manager.getConfig().getSource());
+    auto config = AudioPolicyConfig::loadFromApmXmlConfigWithFallback();
+    ASSERT_NE(AudioPolicyConfig::kDefaultConfigSource, config->getSource());
 
-    for (auto desc : manager.getConfig().getInputDevices()) {
+    for (const auto& desc : config->getInputDevices()) {
         if (attachedDevices.find(desc->type()) == attachedDevices.end()) {
             std::string deviceType;
             (void)DeviceConverter::toString(desc->type(), deviceType);
             ADD_FAILURE() << "Input device \"" << deviceType << "\" not found";
         }
     }
-    for (auto desc : manager.getConfig().getOutputDevices()) {
+    for (const auto& desc : config->getOutputDevices()) {
         if (attachedDevices.find(desc->type()) == attachedDevices.end()) {
             std::string deviceType;
             (void)DeviceConverter::toString(desc->type(), deviceType);
@@ -87,13 +86,13 @@ TEST(AudioHealthTest, AttachedDeviceFound) {
 }
 
 TEST(AudioHealthTest, ConnectSupportedDevice) {
+    auto config = AudioPolicyConfig::loadFromApmXmlConfigWithFallback();
+    ASSERT_NE(AudioPolicyConfig::kDefaultConfigSource, config->getSource());
     AudioPolicyManagerTestClient client;
-    AudioPolicyTestManager manager(&client);
-    manager.loadConfig();
-    ASSERT_NE("AudioPolicyConfig::setDefault", manager.getConfig().getSource());
+    AudioPolicyTestManager manager(config, &client);
 
     DeviceVector devices;
-    for (const auto& hwModule : manager.getConfig().getHwModules()) {
+    for (const auto& hwModule : config->getHwModules()) {
         for (const auto& profile : hwModule->getOutputProfiles()) {
             devices.merge(profile->getSupportedDevices());
         }
