@@ -113,7 +113,7 @@ public:
     status_t getDevicesForRoleAndStrategy(product_strategy_t strategy, device_role_t role,
             AudioDeviceTypeAddrVector &devices) const override;
 
-    engineConfig::ParsingResult loadAudioPolicyEngineConfig();
+    engineConfig::ParsingResult loadAudioPolicyEngineConfig(const std::string& xmlFilePath = "");
 
     const ProductStrategyMap &getProductStrategies() const { return mProductStrategies; }
 
