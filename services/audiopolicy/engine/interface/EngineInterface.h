@@ -16,6 +16,7 @@
 
 #pragma once
 
+#include <string>
 #include <utility>
 
 #include <AudioPolicyManagerObserver.h>
@@ -45,6 +46,13 @@ using CapturePresetDevicesRoleMap =
 class EngineInterface
 {
 public:
+    /**
+     * Loads the engine configuration from the specified or the default config file.
+     * If loading failed, tries to fall back to some default configuration. If fallback
+     * is impossible, returns an error.
+     */
+    virtual status_t loadFromXmlConfigWithFallback(const std::string& xmlFilePath = "") = 0;
+
     /**
      * Checks if the engine was correctly initialized.
      *
