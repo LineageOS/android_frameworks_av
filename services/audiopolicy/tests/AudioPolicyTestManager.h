@@ -22,10 +22,12 @@ namespace android {
 class AudioPolicyTestManager : public AudioPolicyManager {
   public:
     explicit AudioPolicyTestManager(AudioPolicyClientInterface *clientInterface)
-            : AudioPolicyManager(AudioPolicyConfig::createDefault(), clientInterface) {}
+            : AudioPolicyTestManager(AudioPolicyConfig::createDefault(), clientInterface) {}
     AudioPolicyTestManager(const sp<const AudioPolicyConfig>& config,
             AudioPolicyClientInterface *clientInterface)
-            : AudioPolicyManager(config, clientInterface) {}
+            : AudioPolicyManager(config,
+                    loadApmEngineLibraryAndCreateEngine(config->getEngineLibraryNameSuffix()),
+                    clientInterface) {}
     using AudioPolicyManager::getConfig;
     using AudioPolicyManager::initialize;
     using AudioPolicyManager::getOutputs;
