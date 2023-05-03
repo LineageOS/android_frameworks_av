@@ -248,9 +248,9 @@ public:
     bool supportNativeZoomRatio(const std::string &id) const;
 
     /**
-     * Return true if the camera device has native Jpeg/R support.
+     * Return true if the camera device has no composite Jpeg/R support.
      */
-    bool supportNativeJpegR(const std::string &id) const;
+    bool isCompositeJpegRDisabled(const std::string &id) const;
 
     /**
      * Return the resource cost of this camera device
@@ -573,7 +573,7 @@ private:
 
             bool hasFlashUnit() const { return mHasFlashUnit; }
             bool supportNativeZoomRatio() const { return mSupportNativeZoomRatio; }
-            bool supportNativeJpegR() const { return mSupportsNativeJpegR; }
+            bool isCompositeJpegRDisabled() const { return mCompositeJpegRDisabled; }
             virtual status_t setTorchMode(bool enabled) = 0;
             virtual status_t turnOnTorchWithStrengthLevel(int32_t torchStrength) = 0;
             virtual status_t getTorchStrengthLevel(int32_t *torchStrength) = 0;
@@ -615,14 +615,14 @@ private:
                     mParentProvider(parentProvider), mTorchStrengthLevel(0),
                     mTorchMaximumStrengthLevel(0), mTorchDefaultStrengthLevel(0),
                     mHasFlashUnit(false), mSupportNativeZoomRatio(false),
-                    mPublicCameraIds(publicCameraIds), mSupportsNativeJpegR(false) {}
+                    mPublicCameraIds(publicCameraIds), mCompositeJpegRDisabled(false) {}
             virtual ~DeviceInfo() {}
         protected:
 
             bool mHasFlashUnit; // const after constructor
             bool mSupportNativeZoomRatio; // const after constructor
             const std::vector<std::string>& mPublicCameraIds;
-            bool mSupportsNativeJpegR;
+            bool mCompositeJpegRDisabled;
         };
         std::vector<std::unique_ptr<DeviceInfo>> mDevices;
         std::unordered_set<std::string> mUniqueCameraIds;
@@ -811,7 +811,7 @@ private:
     // No guarantees on the order of traversal
     ProviderInfo::DeviceInfo* findDeviceInfoLocked(const std::string& id) const;
 
-    bool supportNativeJpegRLocked(const std::string &id) const;
+    bool isCompositeJpegRDisabledLocked(const std::string &id) const;
 
     // Map external providers to USB devices in order to handle USB hotplug
     // events for lazy HALs
