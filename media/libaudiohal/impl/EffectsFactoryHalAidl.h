@@ -17,6 +17,7 @@
 #pragma once
 
 #include <cstddef>
+#include <list>
 #include <memory>
 
 #include <aidl/android/hardware/audio/effect/IFactory.h>
@@ -71,10 +72,9 @@ class EffectsFactoryHalAidl final : public EffectsFactoryHalInterface {
     const detail::AudioHalVersionInfo mHalVersion;
     // Full list of HAL effect descriptors
     const std::vector<Descriptor> mHalDescList;
-    // Map of proxy UUID (key) to the proxy object
-    const std::map<::aidl::android::media::audio::common::AudioUuid /* proxy impl UUID */,
-                   std::shared_ptr<EffectProxy>>
-            mUuidProxyMap;
+    // Map of proxy UUID (key) to the Descriptor of sub-effects
+    const std::map<::aidl::android::media::audio::common::AudioUuid, std::vector<Descriptor>>
+            mProxyUuidDescriptorMap;
     // List of effect proxy, initialize after mUuidProxyMap because it need to have all sub-effects
     const std::vector<Descriptor> mProxyDescList;
     // List of non-proxy effects
@@ -84,13 +84,16 @@ class EffectsFactoryHalAidl final : public EffectsFactoryHalInterface {
     // Query result of pre and post processing from effect factory
     const std::vector<Processing> mAidlProcessings;
 
+    // list of the EffectProxy instances
+    std::list<std::shared_ptr<EffectProxy>> mProxyList;
+
     virtual ~EffectsFactoryHalAidl() = default;
     status_t getHalDescriptorWithImplUuid(
-            const aidl::android::media::audio::common::AudioUuid& uuid,
+            const ::aidl::android::media::audio::common::AudioUuid& uuid,
             effect_descriptor_t* pDescriptor);
 
     status_t getHalDescriptorWithTypeUuid(
-            const aidl::android::media::audio::common::AudioUuid& type,
+            const ::aidl::android::media::audio::common::AudioUuid& type,
             std::vector<effect_descriptor_t>* descriptors);
 
     bool isProxyEffect(const aidl::android::media::audio::common::AudioUuid& uuid) const;
