@@ -53,6 +53,10 @@ public:
     {
         collectionSupported();
     }
+    ~Collection()
+    {
+        clear();
+    }
 
     /**
      * Add a policy element to the collection. Policy elements are streams, strategies, input
