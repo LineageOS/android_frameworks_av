@@ -5617,10 +5617,12 @@ uint32_t AudioPolicyManager::nextAudioPortGeneration()
 }
 
 AudioPolicyManager::AudioPolicyManager(const sp<const AudioPolicyConfig>& config,
+                                       EngineInstance&& engine,
                                        AudioPolicyClientInterface *clientInterface)
     :
     mUidCached(AID_AUDIOSERVER), // no need to call getuid(), there's only one of us running.
     mConfig(config),
+    mEngine(std::move(engine)),
     mpClientInterface(clientInterface),
     mLimitRingtoneVolume(false), mLastVoiceVolume(-1.0f),
     mA2dpSuspended(false),
@@ -5635,18 +5637,8 @@ AudioPolicyManager::AudioPolicyManager(const sp<const AudioPolicyConfig>& config
 }
 
 status_t AudioPolicyManager::initialize() {
-    {
-        auto engLib = EngineLibrary::load(
-                        "libaudiopolicyengine" + mConfig->getEngineLibraryNameSuffix() + ".so");
-        if (!engLib) {
-            ALOGE("%s: Failed to load the engine library", __FUNCTION__);
-            return NO_INIT;
-        }
-        mEngine = engLib->createEngine();
-        if (mEngine == nullptr) {
-            ALOGE("%s: Failed to instantiate the APM engine", __FUNCTION__);
-            return NO_INIT;
-        }
+    if (mEngine == nullptr) {
+        return NO_INIT;
     }
     mEngine->setObserver(this);
     status_t status = mEngine->initCheck();

@@ -94,6 +94,7 @@ class AudioPolicyManager : public AudioPolicyInterface, public AudioPolicyManage
 
 public:
         AudioPolicyManager(const sp<const AudioPolicyConfig>& config,
+                           EngineInstance&& engine,
                            AudioPolicyClientInterface *clientInterface);
         virtual ~AudioPolicyManager();
 
@@ -902,6 +903,7 @@ protected:
 
         const uid_t mUidCached;                         // AID_AUDIOSERVER
         sp<const AudioPolicyConfig> mConfig;
+        EngineInstance mEngine;                         // Audio Policy Engine instance
         AudioPolicyClientInterface *mpClientInterface;  // audio policy client interface
         sp<SwAudioOutputDescriptor> mPrimaryOutput;     // primary output descriptor
         // list of descriptors for outputs currently opened
@@ -953,9 +955,6 @@ protected:
         audio_io_handle_t mMusicEffectOutput;     // output selected for music effects
 
         uint32_t nextAudioPortGeneration();
-
-        // Audio Policy Engine Interface.
-        EngineInstance mEngine;
 
         // Surround formats that are enabled manually. Taken into account when
         // "encoded surround" is forced into "manual" mode.
