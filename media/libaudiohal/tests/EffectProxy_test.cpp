@@ -60,7 +60,7 @@ class EffectProxyTest : public testing::Test {
         mFactory->queryEffects(std::nullopt, std::nullopt, std::nullopt, &mDescs);
         for (const auto& desc : mDescs) {
             if (desc.common.id.proxy.has_value()) {
-                mProxyDescs.insert({desc.common.id, desc});
+                mProxyDescs[desc.common.id.proxy.value()].emplace_back(desc);
             }
         }
     }
@@ -96,44 +96,24 @@ class EffectProxyTest : public testing::Test {
         return common;
     }
 
-    static bool isFlagSet(const ::aidl::android::hardware::audio::effect::Descriptor& desc,
-                          Flags::HardwareAccelerator flag) {
-        return desc.common.flags.hwAcceleratorMode == flag;
-    }
-
     enum TupleIndex { HANDLE, DESCRIPTOR };
     using EffectProxyTuple = std::tuple<std::shared_ptr<EffectProxy>, std::vector<Descriptor>>;
 
     std::map<AudioUuid, EffectProxyTuple> createAllProxies() {
         std::map<AudioUuid, EffectProxyTuple> proxyMap;
         for (const auto& itor : mProxyDescs) {
-            const auto& uuid = itor.first.proxy.value();
+            const auto& uuid = itor.first;
             if (proxyMap.end() == proxyMap.find(uuid)) {
                 std::get<TupleIndex::HANDLE>(proxyMap[uuid]) =
-                        ndk::SharedRefBase::make<EffectProxy>(itor.first, mFactory);
+                        ndk::SharedRefBase::make<EffectProxy>(itor.first, itor.second, mFactory);
             }
         }
         return proxyMap;
     }
 
-    bool addAllSubEffects(std::map<AudioUuid, EffectProxyTuple> proxyMap) {
-        for (auto& itor : mProxyDescs) {
-            const auto& uuid = itor.first.proxy.value();
-            if (proxyMap.end() == proxyMap.find(uuid)) {
-                return false;
-            }
-            auto& proxy = std::get<TupleIndex::HANDLE>(proxyMap[uuid]);
-            if (!proxy->addSubEffect(itor.second).isOk()) {
-                return false;
-            }
-            std::get<TupleIndex::DESCRIPTOR>(proxyMap[uuid]).emplace_back(itor.second);
-        }
-        return true;
-    }
-
     std::shared_ptr<IFactory> mFactory;
     std::vector<Descriptor> mDescs;
-    std::map<Descriptor::Identity, Descriptor> mProxyDescs;
+    std::map<const AudioUuid, std::vector<Descriptor>> mProxyDescs;
 };
 
 TEST_F(EffectProxyTest, createProxy) {
@@ -144,24 +124,20 @@ TEST_F(EffectProxyTest, createProxy) {
 
 TEST_F(EffectProxyTest, addSubEffectsCreateAndDestroy) {
     auto proxyMap = createAllProxies();
-    ASSERT_TRUE(addAllSubEffects(proxyMap));
 
     for (const auto& itor : proxyMap) {
         auto& proxy = std::get<TupleIndex::HANDLE>(itor.second);
-        EXPECT_TRUE(proxy->create().isOk());
         EXPECT_TRUE(proxy->destroy().isOk());
     }
 }
 
 TEST_F(EffectProxyTest, addSubEffectsCreateOpenCloseDestroy) {
     auto proxyMap = createAllProxies();
-    EXPECT_TRUE(addAllSubEffects(proxyMap));
 
     Parameter::Common common = createParamCommon();
     IEffect::OpenEffectReturn ret;
     for (const auto& itor : proxyMap) {
         auto& proxy = std::get<TupleIndex::HANDLE>(itor.second);
-        EXPECT_TRUE(proxy->create().isOk());
         EXPECT_TRUE(proxy->open(common, std::nullopt, &ret).isOk());
         EXPECT_TRUE(proxy->close().isOk());
         EXPECT_TRUE(proxy->destroy().isOk());
@@ -171,33 +147,23 @@ TEST_F(EffectProxyTest, addSubEffectsCreateOpenCloseDestroy) {
 // Add sub-effects, set active sub-effect with different checkers
 TEST_F(EffectProxyTest, setOffloadParam) {
     auto proxyMap = createAllProxies();
-    EXPECT_TRUE(addAllSubEffects(proxyMap));
 
     // Any flag exist should be able to set successfully
-    bool isNoneExist = false, isSimpleExist = false, isTunnelExist = false;
-    for (const auto& itor : mProxyDescs) {
-        isNoneExist = isNoneExist || isFlagSet(itor.second, Flags::HardwareAccelerator::NONE);
-        isSimpleExist = isSimpleExist || isFlagSet(itor.second, Flags::HardwareAccelerator::SIMPLE);
-        isTunnelExist = isTunnelExist || isFlagSet(itor.second, Flags::HardwareAccelerator::TUNNEL);
-    }
-
     Parameter::Common common = createParamCommon();
     IEffect::OpenEffectReturn ret;
     for (const auto& itor : proxyMap) {
         auto& proxy = std::get<TupleIndex::HANDLE>(itor.second);
-        EXPECT_TRUE(proxy->create().isOk());
         EXPECT_TRUE(proxy->open(common, std::nullopt, &ret).isOk());
         effect_offload_param_t offloadParam{false, 0};
-        EXPECT_EQ(isNoneExist || isSimpleExist, proxy->setOffloadParam(&offloadParam).isOk());
+        EXPECT_TRUE(proxy->setOffloadParam(&offloadParam).isOk());
         offloadParam.isOffload = true;
-        EXPECT_EQ(isTunnelExist, proxy->setOffloadParam(&offloadParam).isOk());
+        EXPECT_TRUE(proxy->setOffloadParam(&offloadParam).isOk());
         EXPECT_TRUE(proxy->close().isOk());
         EXPECT_TRUE(proxy->destroy().isOk());
     }
 }
 TEST_F(EffectProxyTest, destroyWithoutCreate) {
     auto proxyMap = createAllProxies();
-    ASSERT_TRUE(addAllSubEffects(proxyMap));
 
     for (const auto& itor : proxyMap) {
         auto& proxy = std::get<TupleIndex::HANDLE>(itor.second);
@@ -207,11 +173,9 @@ TEST_F(EffectProxyTest, destroyWithoutCreate) {
 
 TEST_F(EffectProxyTest, closeWithoutOpen) {
     auto proxyMap = createAllProxies();
-    ASSERT_TRUE(addAllSubEffects(proxyMap));
 
     for (const auto& itor : proxyMap) {
         auto& proxy = std::get<TupleIndex::HANDLE>(itor.second);
-        EXPECT_TRUE(proxy->create().isOk());
 
         EXPECT_TRUE(proxy->close().isOk());
         EXPECT_TRUE(proxy->destroy().isOk());
@@ -221,16 +185,6 @@ TEST_F(EffectProxyTest, closeWithoutOpen) {
 // Add sub-effects, set active sub-effect, create, open, and send command, expect success handling
 TEST_F(EffectProxyTest, normalSequency) {
     auto proxyMap = createAllProxies();
-    ASSERT_TRUE(addAllSubEffects(proxyMap));
-
-    bool isTunnelExist = [&]() {
-        for (const auto& itor : mProxyDescs) {
-            if (isFlagSet(itor.second, Flags::HardwareAccelerator::TUNNEL)) {
-                return true;
-            }
-        }
-        return false;
-    }();
 
     Parameter::Common common = createParamCommon();
     IEffect::OpenEffectReturn ret;
@@ -242,14 +196,14 @@ TEST_F(EffectProxyTest, normalSequency) {
         Parameter expect;
         auto& proxy = std::get<TupleIndex::HANDLE>(itor.second);
         effect_offload_param_t offloadParam{true, 0};
-        EXPECT_EQ(isTunnelExist, proxy->setOffloadParam(&offloadParam).isOk());
+        EXPECT_TRUE(proxy->setOffloadParam(&offloadParam).isOk());
 
-        EXPECT_TRUE(proxy->create().isOk());
         EXPECT_TRUE(proxy->open(common, std::nullopt, &ret).isOk());
 
         EXPECT_TRUE(proxy->setParameter(param).isOk());
         EXPECT_TRUE(proxy->getParameter(id, &expect).isOk());
-        EXPECT_EQ(expect, param);
+        EXPECT_EQ(expect, param) << " EXPECTED: " << expect.toString()
+                                 << "\nACTUAL: " << param.toString();
 
         EXPECT_TRUE(proxy->command(CommandId::START).isOk());
         EXPECT_TRUE(proxy->getState(&state).isOk());
@@ -267,14 +221,6 @@ TEST_F(EffectProxyTest, normalSequency) {
 // setParameter, change active sub-effect, verify with getParameter
 TEST_F(EffectProxyTest, changeActiveSubAndVerifyParameter) {
     auto proxyMap = createAllProxies();
-    EXPECT_TRUE(addAllSubEffects(proxyMap));
-
-    bool isNoneExist = false, isSimpleExist = false, isTunnelExist = false;
-    for (const auto& itor : mProxyDescs) {
-        isNoneExist = isNoneExist || isFlagSet(itor.second, Flags::HardwareAccelerator::NONE);
-        isSimpleExist = isSimpleExist || isFlagSet(itor.second, Flags::HardwareAccelerator::SIMPLE);
-        isTunnelExist = isTunnelExist || isFlagSet(itor.second, Flags::HardwareAccelerator::TUNNEL);
-    }
 
     Parameter::Common common = createParamCommon();
     IEffect::OpenEffectReturn ret;
@@ -284,19 +230,18 @@ TEST_F(EffectProxyTest, changeActiveSubAndVerifyParameter) {
     for (const auto& itor : proxyMap) {
         Parameter expect;
         auto& proxy = std::get<TupleIndex::HANDLE>(itor.second);
-        EXPECT_TRUE(proxy->create().isOk());
         EXPECT_TRUE(proxy->open(common, std::nullopt, &ret).isOk());
         EXPECT_TRUE(proxy->setParameter(param).isOk());
         EXPECT_TRUE(proxy->getParameter(id, &expect).isOk());
         EXPECT_EQ(expect, param);
 
         effect_offload_param_t offloadParam{false, 0};
-        EXPECT_EQ(isNoneExist || isSimpleExist, proxy->setOffloadParam(&offloadParam).isOk());
+        EXPECT_TRUE(proxy->setOffloadParam(&offloadParam).isOk());
         EXPECT_TRUE(proxy->getParameter(id, &expect).isOk());
         EXPECT_EQ(expect, param);
 
         offloadParam.isOffload = true;
-        EXPECT_EQ(isTunnelExist, proxy->setOffloadParam(&offloadParam).isOk());
+        EXPECT_TRUE(proxy->setOffloadParam(&offloadParam).isOk());
         EXPECT_TRUE(proxy->getParameter(id, &expect).isOk());
         EXPECT_EQ(expect, param);
 
@@ -308,14 +253,6 @@ TEST_F(EffectProxyTest, changeActiveSubAndVerifyParameter) {
 // send command, change active sub-effect, then verify the state with getState
 TEST_F(EffectProxyTest, changeActiveSubAndVerifyState) {
     auto proxyMap = createAllProxies();
-    ASSERT_TRUE(addAllSubEffects(proxyMap));
-
-    bool isNoneExist = false, isSimpleExist = false, isTunnelExist = false;
-    for (const auto& itor : mProxyDescs) {
-        isNoneExist = isNoneExist || isFlagSet(itor.second, Flags::HardwareAccelerator::NONE);
-        isSimpleExist = isSimpleExist || isFlagSet(itor.second, Flags::HardwareAccelerator::SIMPLE);
-        isTunnelExist = isTunnelExist || isFlagSet(itor.second, Flags::HardwareAccelerator::TUNNEL);
-    }
 
     Parameter::Common common = createParamCommon();
     IEffect::OpenEffectReturn ret;
@@ -323,7 +260,6 @@ TEST_F(EffectProxyTest, changeActiveSubAndVerifyState) {
     for (const auto& itor : proxyMap) {
         Parameter expect;
         auto& proxy = std::get<TupleIndex::HANDLE>(itor.second);
-        EXPECT_TRUE(proxy->create().isOk());
         EXPECT_TRUE(proxy->getState(&state).isOk());
         EXPECT_EQ(State::INIT, state);
         EXPECT_TRUE(proxy->open(common, std::nullopt, &ret).isOk());
@@ -334,12 +270,12 @@ TEST_F(EffectProxyTest, changeActiveSubAndVerifyState) {
         EXPECT_EQ(State::PROCESSING, state);
 
         effect_offload_param_t offloadParam{false, 0};
-        EXPECT_EQ(isNoneExist || isSimpleExist, proxy->setOffloadParam(&offloadParam).isOk());
+        EXPECT_TRUE(proxy->setOffloadParam(&offloadParam).isOk());
         EXPECT_TRUE(proxy->getState(&state).isOk());
         EXPECT_EQ(State::PROCESSING, state);
 
         offloadParam.isOffload = true;
-        EXPECT_EQ(isTunnelExist, proxy->setOffloadParam(&offloadParam).isOk());
+        EXPECT_TRUE(proxy->setOffloadParam(&offloadParam).isOk());
         EXPECT_TRUE(proxy->getState(&state).isOk());
         EXPECT_EQ(State::PROCESSING, state);
 
