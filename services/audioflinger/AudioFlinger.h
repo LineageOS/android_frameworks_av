@@ -319,6 +319,8 @@ public:
 
     status_t invalidateTracks(const std::vector<audio_port_handle_t>& portIds) override;
 
+    virtual status_t getAudioPolicyConfig(media::AudioPolicyConfig* config);
+
     status_t onTransactWrapper(TransactionCode code, const Parcel& data, uint32_t flags,
         const std::function<status_t()>& delegate) override;
 
@@ -990,7 +992,7 @@ using effect_buffer_t = int16_t;
                 float       masterVolume_l() const;
                 float       getMasterBalance_l() const;
                 bool        masterMute_l() const;
-                audio_module_handle_t loadHwModule_l(const char *name);
+                AudioHwDevice* loadHwModule_l(const char *name);
 
                 Vector < sp<SyncEvent> > mPendingSyncEvents; // sync events awaiting for a session
                                                              // to be created

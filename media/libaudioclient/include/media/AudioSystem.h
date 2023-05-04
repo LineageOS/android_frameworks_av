@@ -23,6 +23,7 @@
 #include <vector>
 
 #include <android/content/AttributionSourceState.h>
+#include <android/media/AudioPolicyConfig.h>
 #include <android/media/AudioPortFw.h>
 #include <android/media/AudioVibratorInfo.h>
 #include <android/media/BnAudioFlingerClient.h>
@@ -662,6 +663,8 @@ public:
     static status_t clearPreferredMixerAttributes(const audio_attributes_t* attr,
                                                   audio_port_handle_t portId,
                                                   uid_t uid);
+
+    static status_t getAudioPolicyConfig(media::AudioPolicyConfig *config);
 
     // A listener for capture state changes.
     class CaptureStateListener : public virtual RefBase {
