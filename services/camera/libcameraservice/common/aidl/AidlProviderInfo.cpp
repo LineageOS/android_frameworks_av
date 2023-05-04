@@ -483,7 +483,7 @@ AidlProviderInfo::AidlDeviceInfo3::AidlDeviceInfo3(
         }
     }
 
-    mSupportsNativeJpegR = mCameraCharacteristics.exists(
+    mCompositeJpegRDisabled = mCameraCharacteristics.exists(
             ANDROID_JPEGR_AVAILABLE_JPEG_R_STREAM_CONFIGURATIONS);
 
     mSystemCameraKind = getSystemCameraKind();
@@ -735,7 +735,7 @@ status_t AidlProviderInfo::AidlDeviceInfo3::isSessionConfigurationSupported(
     camera::device::StreamConfiguration streamConfiguration;
     bool earlyExit = false;
     auto bRes = SessionConfigurationUtils::convertToHALStreamCombination(configuration,
-            String8(mId.c_str()), mCameraCharacteristics, mSupportsNativeJpegR, getMetadata,
+            String8(mId.c_str()), mCameraCharacteristics, mCompositeJpegRDisabled, getMetadata,
             mPhysicalIds, streamConfiguration, overrideForPerfClass, &earlyExit);
 
     if (!bRes.isOk()) {
@@ -802,7 +802,7 @@ status_t AidlProviderInfo::convertToAidlHALStreamCombinationAndCameraIdsLocked(
             SessionConfigurationUtils::convertToHALStreamCombination(
                     cameraIdAndSessionConfig.mSessionConfiguration,
                     String8(cameraId.c_str()), deviceInfo,
-                    mManager->supportNativeJpegRLocked(cameraId), getMetadata,
+                    mManager->isCompositeJpegRDisabledLocked(cameraId), getMetadata,
                     physicalCameraIds, streamConfiguration,
                     overrideForPerfClass, &shouldExit);
         if (!bStatus.isOk()) {
