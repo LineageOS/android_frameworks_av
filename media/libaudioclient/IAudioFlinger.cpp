@@ -887,6 +887,16 @@ status_t AudioFlingerClientAdapter::invalidateTracks(
     return statusTFromBinderStatus(mDelegate->invalidateTracks(portIdsAidl));
 }
 
+status_t AudioFlingerClientAdapter::getAudioPolicyConfig(media::AudioPolicyConfig *config) {
+    if (config == nullptr) {
+        return BAD_VALUE;
+    }
+
+    RETURN_STATUS_IF_ERROR(statusTFromBinderStatus(mDelegate->getAudioPolicyConfig(config)));
+
+    return NO_ERROR;
+}
+
 ////////////////////////////////////////////////////////////////////////////////////////////////////
 // AudioFlingerServerAdapter
 AudioFlingerServerAdapter::AudioFlingerServerAdapter(
@@ -1427,6 +1437,10 @@ Status AudioFlingerServerAdapter::invalidateTracks(const std::vector<int32_t>& p
                     portIds, aidl2legacy_int32_t_audio_port_handle_t));
     RETURN_BINDER_IF_ERROR(mDelegate->invalidateTracks(portIdsLegacy));
     return Status::ok();
+}
+
+Status AudioFlingerServerAdapter::getAudioPolicyConfig(media::AudioPolicyConfig* _aidl_return) {
+    return Status::fromStatusT(mDelegate->getAudioPolicyConfig(_aidl_return));
 }
 
 } // namespace android
