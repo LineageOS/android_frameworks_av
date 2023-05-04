@@ -17,6 +17,7 @@
 package android.media;
 
 import android.media.AudioPatchFw;
+import android.media.AudioPolicyConfig;
 import android.media.AudioPortFw;
 import android.media.AudioPortConfigFw;
 import android.media.AudioUniqueIdUse;
@@ -280,6 +281,12 @@ interface IAudioFlingerService {
      * Invalidate all tracks with given port ids.
      */
     void invalidateTracks(in int[] /* audio_port_handle_t[] */ portIds);
+
+    /**
+     * Only implemented for AIDL. Provides the APM configuration which
+     * used to be in the XML file.
+     */
+    AudioPolicyConfig getAudioPolicyConfig();
 
     // When adding a new method, please review and update
     // IAudioFlinger.h AudioFlingerServerAdapter::Delegate::TransactionCode
