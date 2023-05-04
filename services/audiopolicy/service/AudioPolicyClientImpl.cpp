@@ -27,6 +27,18 @@ namespace android {
 
 /* implementation of the client interface from the policy manager */
 
+status_t AudioPolicyService::AudioPolicyClient::getAudioPolicyConfig(
+        media::AudioPolicyConfig *config)
+{
+    sp<IAudioFlinger> af = AudioSystem::get_audio_flinger();
+    if (af == 0) {
+        ALOGW("%s: could not get AudioFlinger", __func__);
+        return AUDIO_MODULE_HANDLE_NONE;
+    }
+
+    return af->getAudioPolicyConfig(config);
+}
+
 audio_module_handle_t AudioPolicyService::AudioPolicyClient::loadHwModule(const char *name)
 {
     sp<IAudioFlinger> af = AudioSystem::get_audio_flinger();
