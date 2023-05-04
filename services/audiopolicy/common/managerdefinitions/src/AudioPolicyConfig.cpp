@@ -41,9 +41,8 @@ sp<const AudioPolicyConfig> AudioPolicyConfig::loadFromApmXmlConfigWithFallback(
     auto config = sp<AudioPolicyConfig>::make();
     if (status_t status = config->loadFromXml(filePath, false /*forVts*/); status == NO_ERROR) {
         return config;
-    } else {
-        return createDefault();
     }
+    return createDefault();
 }
 
 // static
