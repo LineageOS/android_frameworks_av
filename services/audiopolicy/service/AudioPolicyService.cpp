@@ -46,6 +46,7 @@
 
 #include <system/audio.h>
 #include <system/audio_policy.h>
+#include <AudioPolicyConfig.h>
 #include <AudioPolicyManager.h>
 
 namespace android {
@@ -185,7 +186,10 @@ static auto& getIAudioPolicyServiceStatistics() {
 
 static AudioPolicyInterface* createAudioPolicyManager(AudioPolicyClientInterface *clientInterface)
 {
-    AudioPolicyManager *apm = new AudioPolicyManager(clientInterface);
+    auto config = AudioPolicyConfig::loadFromApmXmlConfigWithFallback();  // This can't fail.
+    AudioPolicyManager *apm = new AudioPolicyManager(
+            config, loadApmEngineLibraryAndCreateEngine(config->getEngineLibraryNameSuffix()),
+            clientInterface);
     status_t status = apm->initialize();
     if (status != NO_ERROR) {
         delete apm;

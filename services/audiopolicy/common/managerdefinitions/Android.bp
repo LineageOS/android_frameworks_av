@@ -15,6 +15,7 @@ cc_library_static {
         "src/AudioInputDescriptor.cpp",
         "src/AudioOutputDescriptor.cpp",
         "src/AudioPatch.cpp",
+        "src/AudioPolicyConfig.cpp",
         "src/AudioPolicyMix.cpp",
         "src/AudioProfileVectorHelper.cpp",
         "src/AudioRoute.cpp",

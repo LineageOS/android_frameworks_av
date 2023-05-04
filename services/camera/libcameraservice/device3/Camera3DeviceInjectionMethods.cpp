@@ -58,7 +58,8 @@ status_t Camera3Device::Camera3DeviceInjectionMethods::injectCamera(
     if (parent->mStatus == STATUS_ACTIVE) {
         ALOGV("%s: Let the device be IDLE and the request thread is paused",
                 __FUNCTION__);
-        res = parent->internalPauseAndWaitLocked(maxExpectedDuration);
+        res = parent->internalPauseAndWaitLocked(maxExpectedDuration,
+                                                 /*requestThreadInvocation*/false);
         if (res != OK) {
             ALOGE("%s: Can't pause captures to inject camera!", __FUNCTION__);
             return res;
@@ -117,7 +118,8 @@ status_t Camera3Device::Camera3DeviceInjectionMethods::stopInjection() {
     if (parent->mStatus == STATUS_ACTIVE) {
         ALOGV("%s: Let the device be IDLE and the request thread is paused",
                 __FUNCTION__);
-        res = parent->internalPauseAndWaitLocked(maxExpectedDuration);
+        res = parent->internalPauseAndWaitLocked(maxExpectedDuration,
+                                                 /*requestThreadInvocation*/false);
         if (res != OK) {
             ALOGE("%s: Can't pause captures to stop injection!", __FUNCTION__);
             return res;
