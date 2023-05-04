@@ -50,6 +50,8 @@ using android::media::audio::common::AudioMMapPolicyType;
 
 int main(int argc __unused, char **argv)
 {
+    ALOGD("%s: starting", __func__);
+    const auto startTime = std::chrono::steady_clock::now();
     // TODO: update with refined parameters
     limitProcessMemory(
         "audio.maxmem", /* "ro.audio.maxmem", property that defines limit */
@@ -144,11 +146,35 @@ int main(int argc __unused, char **argv)
             setpgid(0, 0);                      // but if I die first, don't kill my parent
         }
         android::hardware::configureRpcThreadpool(4, false /*callerWillJoin*/);
-        sp<ProcessState> proc(ProcessState::self());
+
+        // Ensure threads for possible callbacks.  Note that get_audio_flinger() does
+        // this automatically when called from AudioPolicy, but we do this anyways here.
+        ProcessState::self()->startThreadPool();
+
+        // Instantiating AudioFlinger (making it public, e.g. through ::initialize())
+        // and then instantiating AudioPolicy (and making it public)
+        // leads to situations where AudioFlinger is accessed remotely before
+        // AudioPolicy is initialized.  Not only might this
+        // cause inaccurate results, but if AudioPolicy has slow audio HAL
+        // initialization, it can cause a TimeCheck abort to occur on an AudioFlinger
+        // call which tries to access AudioPolicy.
+        //
+        // We create AudioFlinger and AudioPolicy locally then make it public to ServiceManager.
+        // This requires both AudioFlinger and AudioPolicy to be in-proc.
+        //
+        const auto af = sp<AudioFlinger>::make();
+        const auto afAdapter = sp<AudioFlingerServerAdapter>::make(af);
+        ALOGD("%s: AudioFlinger created", __func__);
+        AudioSystem::setAudioFlingerBinder(afAdapter);
+        const auto aps = sp<AudioPolicyService>::make();
+        ALOGD("%s: AudioPolicy created", __func__);
+
+        // Add AudioFlinger and AudioPolicy to ServiceManager.
         sp<IServiceManager> sm = defaultServiceManager();
-        ALOGI("ServiceManager: %p", sm.get());
-        AudioFlinger::instantiate();
-        AudioPolicyService::instantiate();
+        sm->addService(String16(IAudioFlinger::DEFAULT_SERVICE_NAME), afAdapter,
+                false /* allowIsolated */, IServiceManager::DUMP_FLAG_PRIORITY_DEFAULT);
+        sm->addService(String16(AudioPolicyService::getServiceName()), aps,
+                false /* allowIsolated */, IServiceManager::DUMP_FLAG_PRIORITY_DEFAULT);
 
         // AAudioService should only be used in OC-MR1 and later.
         // And only enable the AAudioService if the system MMAP policy explicitly allows it.
@@ -156,7 +182,6 @@ int main(int argc __unused, char **argv)
         // If we cannot get audio flinger here, there must be some serious problems. In that case,
         // attempting to call audio flinger on a null pointer could make the process crash
         // and attract attentions.
-        sp<IAudioFlinger> af = AudioSystem::get_audio_flinger();
         std::vector<AudioMMapPolicyInfo> policyInfos;
         status_t status = af->getMmapPolicyInfos(
                 AudioMMapPolicyType::DEFAULT, &policyInfos);
@@ -169,11 +194,14 @@ int main(int argc __unused, char **argv)
             })) {
             AAudioService::instantiate();
         } else {
-            ALOGD("Do not init aaudio service, status %d, policy info size %zu",
-                  status, policyInfos.size());
+            ALOGD("%s: Do not init aaudio service, status %d, policy info size %zu",
+                  __func__, status, policyInfos.size());
         }
-
-        ProcessState::self()->startThreadPool();
+        const auto endTime = std::chrono::steady_clock::now();
+        using FloatMillis = std::chrono::duration<float, std::milli>;
+        const float timeTaken = std::chrono::duration_cast<FloatMillis>(
+                endTime - startTime).count();
+        ALOGI("%s: initialization done in %.3f ms, joining thread pool", __func__, timeTaken);
         IPCThreadState::self()->joinThreadPool();
     }
 }
