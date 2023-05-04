@@ -123,6 +123,7 @@ GENERATE_CONVERTERS(android::media::audio::common, AudioFormatDescription);
 GENERATE_CONVERTERS(android::media::audio::common, AudioHalEngineConfig);
 GENERATE_CONVERTERS(android::media::audio::common, AudioMMapPolicyInfo);
 GENERATE_ENUM_CONVERTERS(android::media::audio::common, AudioMMapPolicyType);
+GENERATE_ENUM_CONVERTERS(android::media::audio::common, AudioMode);
 GENERATE_CONVERTERS(android::media::audio::common, AudioPort);
 
 }  // namespace android

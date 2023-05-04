@@ -366,6 +366,7 @@ class Camera3Device :
 
     // A lock to enforce serialization on the input/configure side
     // of the public interface.
+    // Only locked by public methods inherited from CameraDeviceBase.
     // Not locked by methods guarded by mOutputLock, since they may act
     // concurrently to the input/configure side of the interface.
     // Must be locked before mLock if both will be locked by a method
@@ -571,8 +572,15 @@ class Camera3Device :
         STATUS_ACTIVE
     }                          mStatus;
 
+    struct StatusInfo {
+        Status status;
+        bool isInternal; // status triggered by internal reconfigureCamera.
+    };
+
+    bool                       mStatusIsInternal;
+
     // Only clear mRecentStatusUpdates, mStatusWaiters from waitUntilStateThenRelock
-    Vector<Status>             mRecentStatusUpdates;
+    Vector<StatusInfo>         mRecentStatusUpdates;
     int                        mStatusWaiters;
 
     Condition                  mStatusChanged;
@@ -717,7 +725,8 @@ class Camera3Device :
      * CameraDeviceBase interface we shouldn't need to.
      * Must be called with mLock and mInterfaceLock both held.
      */
-    status_t internalPauseAndWaitLocked(nsecs_t maxExpectedDuration);
+    status_t internalPauseAndWaitLocked(nsecs_t maxExpectedDuration,
+                     bool requestThreadInvocation);
 
     /**
      * Resume work after internalPauseAndWaitLocked()
@@ -736,7 +745,8 @@ class Camera3Device :
      * During the wait mLock is released.
      *
      */
-    status_t waitUntilStateThenRelock(bool active, nsecs_t timeout);
+    status_t waitUntilStateThenRelock(bool active, nsecs_t timeout,
+                     bool requestThreadInvocation);
 
     /**
      * Implementation of waitUntilDrained. On success, will transition to IDLE state.
