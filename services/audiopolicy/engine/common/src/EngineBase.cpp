@@ -115,7 +115,7 @@ product_strategy_t EngineBase::getProductStrategyByName(const std::string &name)
     return PRODUCT_STRATEGY_NONE;
 }
 
-engineConfig::ParsingResult EngineBase::loadAudioPolicyEngineConfig()
+engineConfig::ParsingResult EngineBase::loadAudioPolicyEngineConfig(const std::string& xmlFilePath)
 {
     auto loadVolumeConfig = [](auto &volumeGroups, auto &volumeConfig) {
         // Ensure name unicity to prevent duplicate
@@ -163,8 +163,9 @@ engineConfig::ParsingResult EngineBase::loadAudioPolicyEngineConfig()
         return stat(path, &fileStat) == 0 && S_ISREG(fileStat.st_mode);
     };
 
-    auto result = fileExists(engineConfig::DEFAULT_PATH) ?
-            engineConfig::parse(engineConfig::DEFAULT_PATH) : engineConfig::ParsingResult{};
+    const std::string filePath = xmlFilePath.empty() ? engineConfig::DEFAULT_PATH : xmlFilePath;
+    auto result = fileExists(filePath.c_str()) ?
+            engineConfig::parse(filePath.c_str()) : engineConfig::ParsingResult{};
     if (result.parsedConfig == nullptr) {
         ALOGD("%s: No configuration found, using default matching phone experience.", __FUNCTION__);
         engineConfig::Config config = gDefaultEngineConfig;
