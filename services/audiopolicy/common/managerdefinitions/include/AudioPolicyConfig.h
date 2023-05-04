@@ -44,6 +44,8 @@ public:
 
     // The source used to indicate the default fallback configuration.
     static const constexpr char* const kDefaultConfigSource = "AudioPolicyConfig::setDefault";
+    // The suffix of the "engine default" implementation shared library name.
+    static const constexpr char* const kDefaultEngineLibraryNameSuffix = "default";
 
     // Creates the default (fallback) configuration.
     static sp<const AudioPolicyConfig> createDefault();
@@ -114,12 +116,6 @@ public:
         mDefaultOutputDevice = defaultDevice;
     }
 
-    bool isSpeakerDrcEnabled() const { return mIsSpeakerDrcEnabled; }
-    void setSpeakerDrcEnabled(bool isSpeakerDrcEnabled)
-    {
-        mIsSpeakerDrcEnabled = isSpeakerDrcEnabled;
-    }
-
     bool isCallScreenModeSupported() const { return mIsCallScreenModeSupported; }
     void setCallScreenModeSupported(bool isCallScreenModeSupported)
     {
@@ -135,17 +131,11 @@ public:
     {
         mSurroundFormats = surroundFormats;
     }
-    void setSurroundFormats(SurroundFormats &&surroundFormats)
-    {
-        mSurroundFormats = std::move(surroundFormats);
-    }
 
     void setDefault();
 
 private:
     friend class sp<AudioPolicyConfig>;
-
-    static const constexpr char* const kDefaultEngineLibraryNameSuffix = "default";
 
     AudioPolicyConfig() = default;
 
@@ -155,13 +145,9 @@ private:
     std::string mSource;  // Not kDefaultConfigSource. Empty source means an empty config.
     std::string mEngineLibraryNameSuffix = kDefaultEngineLibraryNameSuffix;
     HwModuleCollection mHwModules; /**< Collection of Module, with Profiles, i.e. Mix Ports. */
-    DeviceVector mOutputDevices;
-    DeviceVector mInputDevices;
+    DeviceVector mOutputDevices;  // Attached output devices.
+    DeviceVector mInputDevices;   // Attached input devices.
     sp<DeviceDescriptor> mDefaultOutputDevice;
-    // TODO: remove when legacy conf file is removed. true on devices that use DRC on the
-    // DEVICE_CATEGORY_SPEAKER path to boost soft sounds, used to adjust volume curves accordingly.
-    // Note: remove also speaker_drc_enabled from global configuration of XML config file.
-    bool mIsSpeakerDrcEnabled = false;
     bool mIsCallScreenModeSupported = false;
     SurroundFormats mSurroundFormats;
 };
