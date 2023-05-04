@@ -23,6 +23,7 @@
 #include <vector>
 
 #include <android/content/AttributionSourceState.h>
+#include <android/media/AudioPolicyConfig.h>
 #include <android/media/AudioPortFw.h>
 #include <android/media/AudioVibratorInfo.h>
 #include <android/media/BnAudioFlingerClient.h>
@@ -587,6 +588,8 @@ public:
     static status_t isBluetoothVariableLatencyEnabled(bool *enabled);
 
     static status_t supportsBluetoothVariableLatency(bool *support);
+
+    static status_t getAudioPolicyConfig(media::AudioPolicyConfig *config);
 
     // A listener for capture state changes.
     class CaptureStateListener : public virtual RefBase {

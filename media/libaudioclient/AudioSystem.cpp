@@ -2467,6 +2467,14 @@ status_t AudioSystem::supportsBluetoothVariableLatency(
     return af->supportsBluetoothVariableLatency(support);
 }
 
+status_t AudioSystem::getAudioPolicyConfig(media::AudioPolicyConfig *config) {
+    const sp<IAudioFlinger>& af = AudioSystem::get_audio_flinger();
+    if (af == nullptr) {
+        return PERMISSION_DENIED;
+    }
+    return af->getAudioPolicyConfig(config);
+}
+
 class CaptureStateListenerImpl : public media::BnCaptureStateListener,
                                  public IBinder::DeathRecipient {
 public:
