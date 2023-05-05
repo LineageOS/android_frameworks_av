@@ -72,6 +72,8 @@ class DeviceHalAidl : public DeviceHalInterface, public ConversionHelperAidl,
 
     status_t getAudioRoutes(std::vector<media::AudioRoute> *routes) override;
 
+    status_t getSupportedModes(std::vector<media::audio::common::AudioMode> *modes) override;
+
     // Sets the value of 'devices' to a bitmask of 1 or more values of audio_devices_t.
     status_t getSupportedDevices(uint32_t *devices) override;
 
@@ -197,8 +199,7 @@ class DeviceHalAidl : public DeviceHalInterface, public ConversionHelperAidl,
     // Must not be constructed directly by clients.
     DeviceHalAidl(
             const std::string& instance,
-            const std::shared_ptr<::aidl::android::hardware::audio::core::IModule>& module)
-            : ConversionHelperAidl("DeviceHalAidl"), mInstance(instance), mModule(module) {}
+            const std::shared_ptr<::aidl::android::hardware::audio::core::IModule>& module);
 
     ~DeviceHalAidl() override = default;
 
@@ -282,6 +283,7 @@ class DeviceHalAidl : public DeviceHalInterface, public ConversionHelperAidl,
 
     const std::string mInstance;
     const std::shared_ptr<::aidl::android::hardware::audio::core::IModule> mModule;
+    const std::shared_ptr<::aidl::android::hardware::audio::core::ITelephony> mTelephony;
     Ports mPorts;
     int32_t mDefaultInputPortId = -1;
     int32_t mDefaultOutputPortId = -1;

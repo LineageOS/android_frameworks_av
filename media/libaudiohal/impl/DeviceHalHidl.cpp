@@ -88,6 +88,11 @@ status_t DeviceHalHidl::getAudioRoutes(std::vector<media::AudioRoute> *routes __
     return INVALID_OPERATION;
 }
 
+status_t DeviceHalHidl::getSupportedModes(
+        std::vector<media::audio::common::AudioMode> *modes __unused) {
+    return INVALID_OPERATION;
+}
+
 status_t DeviceHalHidl::getSupportedDevices(uint32_t*) {
     // Obsolete.
     return INVALID_OPERATION;

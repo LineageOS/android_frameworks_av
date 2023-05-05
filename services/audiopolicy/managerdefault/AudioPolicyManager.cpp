@@ -5705,10 +5705,14 @@ void AudioPolicyManager::onNewAudioModulesAvailableInt(DeviceVector *newDevices)
         if (std::find(mHwModules.begin(), mHwModules.end(), hwModule) != mHwModules.end()) {
             continue;
         }
-        hwModule->setHandle(mpClientInterface->loadHwModule(hwModule->getName()));
         if (hwModule->getHandle() == AUDIO_MODULE_HANDLE_NONE) {
-            ALOGW("could not open HW module %s", hwModule->getName());
-            continue;
+            if (audio_module_handle_t handle = mpClientInterface->loadHwModule(hwModule->getName());
+                    handle != AUDIO_MODULE_HANDLE_NONE) {
+                hwModule->setHandle(handle);
+            } else {
+                ALOGW("could not load HW module %s", hwModule->getName());
+                continue;
+            }
         }
         mHwModules.push_back(hwModule);
         // open all output streams needed to access attached devices.
