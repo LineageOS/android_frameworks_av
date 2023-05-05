@@ -418,6 +418,8 @@ class AudioPolicyClientInterface
 public:
     virtual ~AudioPolicyClientInterface() {}
 
+    virtual status_t getAudioPolicyConfig(media::AudioPolicyConfig *config) = 0;
+
     //
     // Audio HW module functions
     //

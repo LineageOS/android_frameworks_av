@@ -374,6 +374,8 @@ public:
     virtual status_t isBluetoothVariableLatencyEnabled(bool* enabled) = 0;
 
     virtual status_t supportsBluetoothVariableLatency(bool* support) = 0;
+
+    virtual status_t getAudioPolicyConfig(media::AudioPolicyConfig* output) = 0;
 };
 
 /**
@@ -485,6 +487,7 @@ public:
     status_t setBluetoothVariableLatencyEnabled(bool enabled) override;
     status_t isBluetoothVariableLatencyEnabled(bool* enabled) override;
     status_t supportsBluetoothVariableLatency(bool* support) override;
+    status_t getAudioPolicyConfig(media::AudioPolicyConfig* output) override;
 
 private:
     const sp<media::IAudioFlingerService> mDelegate;
@@ -583,6 +586,8 @@ public:
                     media::BnAudioFlingerService::TRANSACTION_isBluetoothVariableLatencyEnabled,
             SUPPORTS_BLUETOOTH_VARIABLE_LATENCY =
                     media::BnAudioFlingerService::TRANSACTION_supportsBluetoothVariableLatency,
+            GET_AUDIO_POLICY_CONFIG =
+                    media::BnAudioFlingerService::TRANSACTION_getAudioPolicyConfig,
         };
 
     protected:
@@ -713,6 +718,7 @@ public:
     Status setBluetoothVariableLatencyEnabled(bool enabled) override;
     Status isBluetoothVariableLatencyEnabled(bool* enabled) override;
     Status supportsBluetoothVariableLatency(bool* support) override;
+    Status getAudioPolicyConfig(media::AudioPolicyConfig* _aidl_return) override;
 private:
     const sp<AudioFlingerServerAdapter::Delegate> mDelegate;
 };
