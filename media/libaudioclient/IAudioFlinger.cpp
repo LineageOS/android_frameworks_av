@@ -866,6 +866,16 @@ status_t AudioFlingerClientAdapter::supportsBluetoothVariableLatency(bool* suppo
     return NO_ERROR;
 }
 
+status_t AudioFlingerClientAdapter::getAudioPolicyConfig(media::AudioPolicyConfig *config) {
+    if (config == nullptr) {
+        return BAD_VALUE;
+    }
+
+    RETURN_STATUS_IF_ERROR(statusTFromBinderStatus(mDelegate->getAudioPolicyConfig(config)));
+
+    return NO_ERROR;
+}
+
 ////////////////////////////////////////////////////////////////////////////////////////////////////
 // AudioFlingerServerAdapter
 AudioFlingerServerAdapter::AudioFlingerServerAdapter(
@@ -1397,6 +1407,10 @@ Status AudioFlingerServerAdapter::isBluetoothVariableLatencyEnabled(bool *enable
 
 Status AudioFlingerServerAdapter::supportsBluetoothVariableLatency(bool *support) {
     return Status::fromStatusT(mDelegate->supportsBluetoothVariableLatency(support));
+}
+
+Status AudioFlingerServerAdapter::getAudioPolicyConfig(media::AudioPolicyConfig* _aidl_return) {
+    return Status::fromStatusT(mDelegate->getAudioPolicyConfig(_aidl_return));
 }
 
 } // namespace android

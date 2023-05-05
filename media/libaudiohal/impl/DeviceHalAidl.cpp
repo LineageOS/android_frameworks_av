@@ -107,7 +107,25 @@ ConversionResult<media::AudioRoute> ndk2cpp_AudioRoute(const AudioRoute& ndk) {
     return cpp;
 }
 
+template<typename T>
+std::shared_ptr<T> retrieveSubInterface(const std::shared_ptr<IModule>& module,
+        ::ndk::ScopedAStatus (IModule::*getT)(std::shared_ptr<T>*)) {
+    if (module != nullptr) {
+        std::shared_ptr<T> instance;
+        if (auto status = (module.get()->*getT)(&instance); status.isOk()) {
+            return instance;
+        }
+    }
+    return nullptr;
+}
+
 }  // namespace
+
+DeviceHalAidl::DeviceHalAidl(const std::string& instance, const std::shared_ptr<IModule>& module)
+        : ConversionHelperAidl("DeviceHalAidl"),
+          mInstance(instance), mModule(module),
+          mTelephony(retrieveSubInterface<ITelephony>(module, &IModule::getTelephony)) {
+}
 
 status_t DeviceHalAidl::getAudioPorts(std::vector<media::audio::common::AudioPort> *ports) {
     auto convertAudioPortFromMap = [](const Ports::value_type& pair) {
@@ -121,6 +139,22 @@ status_t DeviceHalAidl::getAudioRoutes(std::vector<media::AudioRoute> *routes) {
     *routes = VALUE_OR_RETURN_STATUS(
             ::aidl::android::convertContainer<std::vector<media::AudioRoute>>(
                     mRoutes, ndk2cpp_AudioRoute));
+    return OK;
+}
+
+status_t DeviceHalAidl::getSupportedModes(std::vector<media::audio::common::AudioMode> *modes) {
+    TIME_CHECK();
+    if (modes == nullptr) {
+        return BAD_VALUE;
+    }
+    if (mModule == nullptr) return NO_INIT;
+    if (mTelephony == nullptr) return INVALID_OPERATION;
+    std::vector<AudioMode> aidlModes;
+    RETURN_STATUS_IF_ERROR(
+            statusTFromBinderStatus(mTelephony->getSupportedAudioModes(&aidlModes)));
+    *modes = VALUE_OR_RETURN_STATUS(
+            ::aidl::android::convertContainer<std::vector<media::audio::common::AudioMode>>(
+                    aidlModes, ndk2cpp_AudioMode));
     return OK;
 }
 
@@ -175,17 +209,14 @@ status_t DeviceHalAidl::initCheck() {
 status_t DeviceHalAidl::setVoiceVolume(float volume) {
     TIME_CHECK();
     if (!mModule) return NO_INIT;
-    std::shared_ptr<ITelephony> telephony;
-    if (ndk::ScopedAStatus status = mModule->getTelephony(&telephony);
-            status.isOk() && telephony != nullptr) {
-        ITelephony::TelecomConfig inConfig{ .voiceVolume = Float{volume} }, outConfig;
-        RETURN_STATUS_IF_ERROR(
-                statusTFromBinderStatus(telephony->setTelecomConfig(inConfig, &outConfig)));
-        ALOGW_IF(outConfig.voiceVolume.has_value() && volume != outConfig.voiceVolume.value().value,
-                "%s: the resulting voice volume %f is not the same as requested %f",
-                __func__, outConfig.voiceVolume.value().value, volume);
-    }
-    return INVALID_OPERATION;
+    if (mTelephony == nullptr) return INVALID_OPERATION;
+    ITelephony::TelecomConfig inConfig{ .voiceVolume = Float{volume} }, outConfig;
+    RETURN_STATUS_IF_ERROR(
+            statusTFromBinderStatus(mTelephony->setTelecomConfig(inConfig, &outConfig)));
+    ALOGW_IF(outConfig.voiceVolume.has_value() && volume != outConfig.voiceVolume.value().value,
+            "%s: the resulting voice volume %f is not the same as requested %f",
+            __func__, outConfig.voiceVolume.value().value, volume);
+    return OK;
 }
 
 status_t DeviceHalAidl::setMasterVolume(float volume) {
@@ -204,10 +235,8 @@ status_t DeviceHalAidl::setMode(audio_mode_t mode) {
     TIME_CHECK();
     if (!mModule) return NO_INIT;
     AudioMode audioMode = VALUE_OR_FATAL(::aidl::android::legacy2aidl_audio_mode_t_AudioMode(mode));
-    std::shared_ptr<ITelephony> telephony;
-    if (ndk::ScopedAStatus status = mModule->getTelephony(&telephony);
-            status.isOk() && telephony != nullptr) {
-        RETURN_STATUS_IF_ERROR(statusTFromBinderStatus(telephony->switchAudioMode(audioMode)));
+    if (mTelephony != nullptr) {
+        RETURN_STATUS_IF_ERROR(statusTFromBinderStatus(mTelephony->switchAudioMode(audioMode)));
     }
     return statusTFromBinderStatus(mModule->updateAudioMode(audioMode));
 }

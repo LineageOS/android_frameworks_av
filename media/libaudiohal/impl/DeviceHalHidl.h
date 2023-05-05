@@ -33,6 +33,8 @@ class DeviceHalHidl : public DeviceHalInterface, public CoreConversionHelperHidl
 
     status_t getAudioRoutes(std::vector<media::AudioRoute> *routes) override;
 
+    status_t getSupportedModes(std::vector<media::audio::common::AudioMode> *modes) override;
+
     // Sets the value of 'devices' to a bitmask of 1 or more values of audio_devices_t.
     status_t getSupportedDevices(uint32_t *devices) override;
 
