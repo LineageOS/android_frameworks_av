@@ -25,8 +25,16 @@
 
 namespace android {
 
+static constexpr float FRAME_RATE_UNDETERMINED = VideoRenderQualityMetrics::FRAME_RATE_UNDETERMINED;
+static constexpr float FRAME_RATE_24_3_2_PULLDOWN =
+        VideoRenderQualityMetrics::FRAME_RATE_24_3_2_PULLDOWN;
+
 VideoRenderQualityMetrics::VideoRenderQualityMetrics() {
-    firstFrameRenderTimeUs = 0;
+    clear();
+}
+
+void VideoRenderQualityMetrics::clear() {
+    firstRenderTimeUs = 0;
     frameReleasedCount = 0;
     frameRenderedCount = 0;
     frameDroppedCount = 0;
@@ -34,9 +42,14 @@ VideoRenderQualityMetrics::VideoRenderQualityMetrics() {
     contentFrameRate = FRAME_RATE_UNDETERMINED;
     desiredFrameRate = FRAME_RATE_UNDETERMINED;
     actualFrameRate = FRAME_RATE_UNDETERMINED;
+    freezeDurationMsHistogram.clear();
+    freezeDistanceMsHistogram.clear();
+    judderScoreHistogram.clear();
 }
 
 VideoRenderQualityTracker::Configuration::Configuration() {
+    enabled = true;
+
     // Assume that the app is skipping frames because it's detected that the frame couldn't be
     // rendered in time.
     areSkippedFramesDropped = true;
@@ -53,26 +66,32 @@ VideoRenderQualityTracker::Configuration::Configuration() {
 
     // Freeze configuration
     freezeDurationMsHistogramBuckets = {1, 20, 40, 60, 80, 100, 120, 150, 175, 225, 300, 400, 500};
+    freezeDurationMsHistogramToScore = {1,  1,  1,  1,  1,   1,   1,   1,   1,   1,   1,   1,   1};
     freezeDistanceMsHistogramBuckets = {0, 20, 100, 400, 1000, 2000, 3000, 4000, 8000, 15000, 30000,
                                         60000};
 
     // Judder configuration
     judderErrorToleranceUs = 2000;
     judderScoreHistogramBuckets = {1, 4, 5, 9, 11, 20, 30, 40, 50, 60, 70, 80};
+    judderScoreHistogramToScore = {1, 1, 1, 1,  1,  1,  1,  1,  1,  1,  1,  1};
 }
 
 VideoRenderQualityTracker::VideoRenderQualityTracker() : mConfiguration(Configuration()) {
     configureHistograms(mMetrics, mConfiguration);
-    resetForDiscontinuity();
+    clear();
 }
 
 VideoRenderQualityTracker::VideoRenderQualityTracker(const Configuration &configuration) :
         mConfiguration(configuration) {
     configureHistograms(mMetrics, mConfiguration);
-    resetForDiscontinuity();
+    clear();
 }
 
 void VideoRenderQualityTracker::onFrameSkipped(int64_t contentTimeUs) {
+    if (!mConfiguration.enabled) {
+        return;
+    }
+
     // Frames skipped at the beginning shouldn't really be counted as skipped frames, since the
     // app might be seeking to a starting point that isn't the first key frame.
     if (mLastRenderTimeUs == -1) {
@@ -90,6 +109,10 @@ void VideoRenderQualityTracker::onFrameReleased(int64_t contentTimeUs) {
 
 void VideoRenderQualityTracker::onFrameReleased(int64_t contentTimeUs,
                                                 int64_t desiredRenderTimeNs) {
+    if (!mConfiguration.enabled) {
+        return;
+    }
+
     int64_t desiredRenderTimeUs = desiredRenderTimeNs / 1000;
     resetIfDiscontinuity(contentTimeUs, desiredRenderTimeUs);
     mMetrics.frameReleasedCount++;
@@ -98,8 +121,15 @@ void VideoRenderQualityTracker::onFrameReleased(int64_t contentTimeUs,
 }
 
 void VideoRenderQualityTracker::onFrameRendered(int64_t contentTimeUs, int64_t actualRenderTimeNs) {
+    if (!mConfiguration.enabled) {
+        return;
+    }
+
     int64_t actualRenderTimeUs = actualRenderTimeNs / 1000;
 
+    if (mLastRenderTimeUs != -1) {
+        mRenderDurationMs += (actualRenderTimeUs - mLastRenderTimeUs) / 1000;
+    }
     // Now that a frame has been rendered, the previously skipped frames can be processed as skipped
     // frames since the app is not skipping them to terminate playback.
     for (int64_t contentTimeUs : mPendingSkippedFrameContentTimeUsList) {
@@ -131,8 +161,45 @@ void VideoRenderQualityTracker::onFrameRendered(int64_t contentTimeUs, int64_t a
     mLastRenderTimeUs = actualRenderTimeUs;
 }
 
-const VideoRenderQualityMetrics &VideoRenderQualityTracker::getMetrics() const {
+const VideoRenderQualityMetrics &VideoRenderQualityTracker::getMetrics() {
+    if (!mConfiguration.enabled) {
+        return mMetrics;
+    }
+
+    mMetrics.freezeScore = 0;
+    if (mConfiguration.freezeDurationMsHistogramToScore.size() ==
+        mMetrics.freezeDurationMsHistogram.size()) {
+        for (int i = 0; i < mMetrics.freezeDurationMsHistogram.size(); ++i) {
+            int32_t count = 0;
+            for (int j = i; j < mMetrics.freezeDurationMsHistogram.size(); ++j) {
+                count += mMetrics.freezeDurationMsHistogram[j];
+            }
+            mMetrics.freezeScore += count / mConfiguration.freezeDurationMsHistogramToScore[i];
+        }
+    }
+    mMetrics.freezeRate = float(double(mMetrics.freezeDurationMsHistogram.getSum()) /
+            mRenderDurationMs);
+
+    mMetrics.judderScore = 0;
+    if (mConfiguration.judderScoreHistogramToScore.size() == mMetrics.judderScoreHistogram.size()) {
+        for (int i = 0; i < mMetrics.judderScoreHistogram.size(); ++i) {
+            int32_t count = 0;
+            for (int j = i; j < mMetrics.judderScoreHistogram.size(); ++j) {
+                count += mMetrics.judderScoreHistogram[j];
+            }
+            mMetrics.judderScore += count / mConfiguration.judderScoreHistogramToScore[i];
+        }
+    }
+    mMetrics.judderRate = float(double(mMetrics.judderScoreHistogram.getCount()) /
+            (mMetrics.frameReleasedCount + mMetrics.frameSkippedCount));
+
     return mMetrics;
+}
+
+void VideoRenderQualityTracker::clear() {
+    mRenderDurationMs = 0;
+    mMetrics.clear();
+    resetForDiscontinuity();
 }
 
 void VideoRenderQualityTracker::resetForDiscontinuity() {
@@ -220,11 +287,12 @@ void VideoRenderQualityTracker::processMetricsForRenderedFrame(int64_t contentTi
                                                                int64_t desiredRenderTimeUs,
                                                                int64_t actualRenderTimeUs) {
     // Capture the timestamp at which the first frame was rendered
-    if (mMetrics.firstFrameRenderTimeUs == 0) {
-        mMetrics.firstFrameRenderTimeUs = actualRenderTimeUs;
+    if (mMetrics.firstRenderTimeUs == 0) {
+        mMetrics.firstRenderTimeUs = actualRenderTimeUs;
     }
 
     mMetrics.frameRenderedCount++;
+
     // The content time is -1 when it was rendered after a discontinuity (e.g. seek) was detected.
     // So, even though a frame was rendered, it's impact on the user is insignificant, so don't do
     // anything other than count it as a rendered frame.
@@ -352,7 +420,7 @@ float VideoRenderQualityTracker::detectFrameRate(const FrameDurationUs &duration
     // Only determine frame rate if the render durations are stable across 3 frames
     if (abs(durationUs[0] - durationUs[1]) > c.frameRateDetectionToleranceUs ||
         abs(durationUs[0] - durationUs[2]) > c.frameRateDetectionToleranceUs) {
-        return is32pulldown(durationUs, c) ? FRAME_RATE_24HZ_3_2_PULLDOWN : FRAME_RATE_UNDETERMINED;
+        return is32pulldown(durationUs, c) ? FRAME_RATE_24_3_2_PULLDOWN : FRAME_RATE_UNDETERMINED;
     }
     return 1000.0 * 1000.0 / durationUs[0];
 }

@@ -22,7 +22,6 @@
 #include <set>
 #include <random>
 #include <stdlib.h>
-
 #include <inttypes.h>
 #include <stdlib.h>
 #include <dlfcn.h>
@@ -108,7 +107,9 @@ static const char *kCodecModeAudio = "audio";
 static const char *kCodecModeImage = "image";
 static const char *kCodecModeUnknown = "unknown";
 static const char *kCodecEncoder = "android.media.mediacodec.encoder"; /* 0,1 */
+static const char *kCodecHardware = "android.media.mediacodec.hardware"; /* 0,1 */
 static const char *kCodecSecure = "android.media.mediacodec.secure";   /* 0, 1 */
+static const char *kCodecTunneled = "android.media.mediacodec.tunneled"; /* 0,1 */
 static const char *kCodecWidth = "android.media.mediacodec.width";     /* 0..n */
 static const char *kCodecHeight = "android.media.mediacodec.height";   /* 0..n */
 static const char *kCodecRotation = "android.media.mediacodec.rotation-degrees";  /* 0/90/180/270 */
@@ -172,9 +173,9 @@ static const char *kCodecConfigColorTransfer = "android.media.mediacodec.config-
 static const char *kCodecParsedColorStandard = "android.media.mediacodec.parsed-color-standard";
 static const char *kCodecParsedColorRange = "android.media.mediacodec.parsed-color-range";
 static const char *kCodecParsedColorTransfer = "android.media.mediacodec.parsed-color-transfer";
-static const char *kCodecHDRStaticInfo = "android.media.mediacodec.hdr-static-info";
-static const char *kCodecHDR10PlusInfo = "android.media.mediacodec.hdr10-plus-info";
-static const char *kCodecHDRFormat = "android.media.mediacodec.hdr-format";
+static const char *kCodecHdrStaticInfo = "android.media.mediacodec.hdr-static-info";
+static const char *kCodecHdr10PlusInfo = "android.media.mediacodec.hdr10-plus-info";
+static const char *kCodecHdrFormat = "android.media.mediacodec.hdr-format";
 // array/sync/async/block modes
 static const char *kCodecArrayMode = "android.media.mediacodec.array-mode";
 static const char *kCodecOperationMode = "android.media.mediacodec.operation-mode";
@@ -195,34 +196,43 @@ static const char *kCodecRecentLatencyMin = "android.media.mediacodec.recent.min
 static const char *kCodecRecentLatencyAvg = "android.media.mediacodec.recent.avg";      /* in us */
 static const char *kCodecRecentLatencyCount = "android.media.mediacodec.recent.n";
 static const char *kCodecRecentLatencyHist = "android.media.mediacodec.recent.hist";    /* in us */
-static const char *kCodecPlaybackDurationSec =
-        "android.media.mediacodec.playback-duration-sec"; /* in sec */
-
-static const char *kCodecFramesReleased = "android.media.mediacodec.frames.released";
-static const char *kCodecFramesRendered = "android.media.mediacodec.frames.rendered";
-static const char *kCodecFramesSkipped = "android.media.mediacodec.frames.skipped";
-static const char *kCodecFramesDropped = "android.media.mediacodec.frames.dropped";
-static const char *kCodecFramerateContent = "android.media.mediacodec.framerate.content";
-static const char *kCodecFramerateDesired = "android.media.mediacodec.framerate.desired";
-static const char *kCodecFramerateActual = "android.media.mediacodec.framerate.actual";
-
-static const char *kCodecFreezeCount = "android.media.mediacodec.freeze.count";
-static const char *kCodecFreezeDurationAverage = "android.media.mediacodec.freeze.duration.average";
-static const char *kCodecFreezeDurationMax = "android.media.mediacodec.freeze.duration.max";
-static const char *kCodecFreezeDurationHistogram =
-        "android.media.mediacodec.freeze.duration.histogram";
-static const char *kCodecFreezeDistanceAverage = "android.media.mediacodec.freeze.distance.average";
-static const char *kCodecFreezeDistanceHistogram =
-        "android.media.mediacodec.freeze.distance.histogram";
-
-static const char *kCodecJudderCount = "android.media.mediacodec.judder.count";
-static const char *kCodecJudderScoreAverage = "android.media.mediacodec.judder.average";
-static const char *kCodecJudderScoreMax = "android.media.mediacodec.judder.max";
-static const char *kCodecJudderScoreHistogram = "android.media.mediacodec.judder.histogram";
 
 /* -1: shaper disabled
    >=0: number of fields changed */
 static const char *kCodecShapingEnhanced = "android.media.mediacodec.shaped";
+
+// Render metrics
+static const char *kCodecPlaybackDurationSec = "android.media.mediacodec.playback-duration-sec";
+static const char *kCodecFirstRenderTimeUs = "android.media.mediacodec.first-render-time-us";
+static const char *kCodecFramesReleased = "android.media.mediacodec.frames-released";
+static const char *kCodecFramesRendered = "android.media.mediacodec.frames-rendered";
+static const char *kCodecFramesDropped = "android.media.mediacodec.frames-dropped";
+static const char *kCodecFramesSkipped = "android.media.mediacodec.frames-skipped";
+static const char *kCodecFramerateContent = "android.media.mediacodec.framerate-content";
+static const char *kCodecFramerateDesired = "android.media.mediacodec.framerate-desired";
+static const char *kCodecFramerateActual = "android.media.mediacodec.framerate-actual";
+static const char *kCodecFreezeCount = "android.media.mediacodec.freeze-count";
+static const char *kCodecFreezeScore = "android.media.mediacodec.freeze-score";
+static const char *kCodecFreezeRate = "android.media.mediacodec.freeze-rate";
+static const char *kCodecFreezeDurationMsAvg = "android.media.mediacodec.freeze-duration-ms-avg";
+static const char *kCodecFreezeDurationMsMax = "android.media.mediacodec.freeze-duration-ms-max";
+static const char *kCodecFreezeDurationMsHistogram =
+        "android.media.mediacodec.freeze-duration-ms-histogram";
+static const char *kCodecFreezeDurationMsHistogramBuckets =
+        "android.media.mediacodec.freeze-duration-ms-histogram-buckets";
+static const char *kCodecFreezeDistanceMsAvg = "android.media.mediacodec.freeze-distance-ms-avg";
+static const char *kCodecFreezeDistanceMsHistogram =
+        "android.media.mediacodec.freeze-distance-ms-histogram";
+static const char *kCodecFreezeDistanceMsHistogramBuckets =
+        "android.media.mediacodec.freeze-distance-ms-histogram-buckets";
+static const char *kCodecJudderCount = "android.media.mediacodec.judder-count";
+static const char *kCodecJudderScore = "android.media.mediacodec.judder-score";
+static const char *kCodecJudderRate = "android.media.mediacodec.judder-rate";
+static const char *kCodecJudderScoreAvg = "android.media.mediacodec.judder-score-avg";
+static const char *kCodecJudderScoreMax = "android.media.mediacodec.judder-score-max";
+static const char *kCodecJudderScoreHistogram = "android.media.mediacodec.judder-score-histogram";
+static const char *kCodecJudderScoreHistogramBuckets =
+        "android.media.mediacodec.judder-score-histogram-buckets";
 
 // XXX suppress until we get our representation right
 static bool kEmitHistogram = false;
@@ -1118,8 +1128,9 @@ void MediaCodec::updateMediametrics() {
 
     // Video rendering quality metrics
     {
-        const VideoRenderQualityMetrics& m = mVideoRenderQualityTracker.getMetrics();
+        const VideoRenderQualityMetrics &m = mVideoRenderQualityTracker.getMetrics();
         if (m.frameRenderedCount > 0) {
+            mediametrics_setInt64(mMetricsHandle, kCodecFirstRenderTimeUs, m.firstRenderTimeUs);
             mediametrics_setInt64(mMetricsHandle, kCodecFramesReleased, m.frameReleasedCount);
             mediametrics_setInt64(mMetricsHandle, kCodecFramesRendered, m.frameRenderedCount);
             mediametrics_setInt64(mMetricsHandle, kCodecFramesSkipped, m.frameSkippedCount);
@@ -1129,23 +1140,33 @@ void MediaCodec::updateMediametrics() {
             mediametrics_setDouble(mMetricsHandle, kCodecFramerateActual, m.actualFrameRate);
         }
         if (m.freezeDurationMsHistogram.getCount() >= 1) {
-            const MediaHistogram &histogram = m.freezeDurationMsHistogram;
-            mediametrics_setInt64(mMetricsHandle, kCodecFreezeCount, histogram.getCount());
-            mediametrics_setInt64(mMetricsHandle, kCodecFreezeDurationAverage, histogram.getAvg());
-            mediametrics_setInt64(mMetricsHandle, kCodecFreezeDurationMax, histogram.getMax());
-            mediametrics_setString(mMetricsHandle, kCodecFreezeDurationHistogram, histogram.emit());
+            const MediaHistogram<int32_t> &h = m.freezeDurationMsHistogram;
+            mediametrics_setInt64(mMetricsHandle, kCodecFreezeScore, m.freezeScore);
+            mediametrics_setDouble(mMetricsHandle, kCodecFreezeRate, m.freezeRate);
+            mediametrics_setInt64(mMetricsHandle, kCodecFreezeCount, h.getCount());
+            mediametrics_setInt32(mMetricsHandle, kCodecFreezeDurationMsAvg, h.getAvg());
+            mediametrics_setInt32(mMetricsHandle, kCodecFreezeDurationMsMax, h.getMax());
+            mediametrics_setString(mMetricsHandle, kCodecFreezeDurationMsHistogram, h.emit());
+            mediametrics_setString(mMetricsHandle, kCodecFreezeDurationMsHistogramBuckets,
+                                   h.emitBuckets());
         }
         if (m.freezeDistanceMsHistogram.getCount() >= 1) {
-            const MediaHistogram &histogram = m.freezeDistanceMsHistogram;
-            mediametrics_setInt64(mMetricsHandle, kCodecFreezeDistanceAverage, histogram.getAvg());
-            mediametrics_setString(mMetricsHandle, kCodecFreezeDistanceHistogram, histogram.emit());
+            const MediaHistogram<int32_t> &h = m.freezeDistanceMsHistogram;
+            mediametrics_setInt32(mMetricsHandle, kCodecFreezeDistanceMsAvg, h.getAvg());
+            mediametrics_setString(mMetricsHandle, kCodecFreezeDistanceMsHistogram, h.emit());
+            mediametrics_setString(mMetricsHandle, kCodecFreezeDistanceMsHistogramBuckets,
+                                   h.emitBuckets());
         }
         if (m.judderScoreHistogram.getCount() >= 1) {
-            const MediaHistogram &histogram = m.judderScoreHistogram;
-            mediametrics_setInt64(mMetricsHandle, kCodecJudderCount, histogram.getCount());
-            mediametrics_setInt64(mMetricsHandle, kCodecJudderScoreAverage, histogram.getAvg());
-            mediametrics_setInt64(mMetricsHandle, kCodecJudderScoreMax, histogram.getMax());
-            mediametrics_setString(mMetricsHandle, kCodecJudderScoreHistogram, histogram.emit());
+            const MediaHistogram<int32_t> &h = m.judderScoreHistogram;
+            mediametrics_setInt64(mMetricsHandle, kCodecJudderScore, m.judderScore);
+            mediametrics_setDouble(mMetricsHandle, kCodecJudderRate, m.judderRate);
+            mediametrics_setInt64(mMetricsHandle, kCodecJudderCount, h.getCount());
+            mediametrics_setInt32(mMetricsHandle, kCodecJudderScoreAvg, h.getAvg());
+            mediametrics_setInt32(mMetricsHandle, kCodecJudderScoreMax, h.getMax());
+            mediametrics_setString(mMetricsHandle, kCodecJudderScoreHistogram, h.emit());
+            mediametrics_setString(mMetricsHandle, kCodecJudderScoreHistogramBuckets,
+                                   h.emitBuckets());
         }
     }
 
@@ -1227,14 +1248,14 @@ void MediaCodec::updateHdrMetrics(bool isConfig) {
             && ColorUtils::isHDRStaticInfoValid(&info)) {
         mHdrInfoFlags |= kFlagHasHdrStaticInfo;
     }
-    mediametrics_setInt32(mMetricsHandle, kCodecHDRStaticInfo,
+    mediametrics_setInt32(mMetricsHandle, kCodecHdrStaticInfo,
             (mHdrInfoFlags & kFlagHasHdrStaticInfo) ? 1 : 0);
     sp<ABuffer> hdr10PlusInfo;
     if (mOutputFormat->findBuffer("hdr10-plus-info", &hdr10PlusInfo)
             && hdr10PlusInfo != nullptr && hdr10PlusInfo->size() > 0) {
         mHdrInfoFlags |= kFlagHasHdr10PlusInfo;
     }
-    mediametrics_setInt32(mMetricsHandle, kCodecHDR10PlusInfo,
+    mediametrics_setInt32(mMetricsHandle, kCodecHdr10PlusInfo,
             (mHdrInfoFlags & kFlagHasHdr10PlusInfo) ? 1 : 0);
 
     // hdr format
@@ -1247,7 +1268,7 @@ void MediaCodec::updateHdrMetrics(bool isConfig) {
             && codedFormat->findInt32(KEY_PROFILE, &profile)
             && colorTransfer != -1) {
         hdr_format hdrFormat = getHdrFormat(mime, profile, colorTransfer);
-        mediametrics_setInt32(mMetricsHandle, kCodecHDRFormat, static_cast<int>(hdrFormat));
+        mediametrics_setInt32(mMetricsHandle, kCodecHdrFormat, static_cast<int>(hdrFormat));
     }
 }
 
@@ -1355,9 +1376,8 @@ void MediaCodec::updateEphemeralMediametrics(mediametrics_handle_t item) {
         return;
     }
 
-    MediaHistogram recentHist;
-
     // build an empty histogram
+    MediaHistogram<int64_t> recentHist;
     recentHist.setup(kLatencyHistBuckets, kLatencyHistWidth, kLatencyHistFloor);
 
     // stuff it with the samples in the ring buffer
@@ -3593,8 +3613,7 @@ void MediaCodec::onMessageReceived(const sp<AMessage> &msg) {
 
                                 setState(UNINITIALIZED);
                             } else {
-                                setState(
-                                        (mFlags & kFlagIsAsync) ? FLUSHED : STARTED);
+                                setState((mFlags & kFlagIsAsync) ? FLUSHED : STARTED);
                             }
                             break;
                         }
@@ -3718,6 +3737,9 @@ void MediaCodec::onMessageReceived(const sp<AMessage> &msg) {
                         mFlags &= ~kFlagIsSecure;
                         mediametrics_setInt32(mMetricsHandle, kCodecSecure, 0);
                     }
+
+                    mediametrics_setInt32(mMetricsHandle, kCodecHardware,
+                                          MediaCodecList::isSoftwareCodec(mComponentName) ? 0 : 1);
 
                     mResourceManagerProxy->addResource(MediaResource::CodecResource(
                             mFlags & kFlagIsSecure, toMediaResourceSubType(mDomain)));
@@ -4133,6 +4155,7 @@ void MediaCodec::onMessageReceived(const sp<AMessage> &msg) {
                     if (mIsSurfaceToDisplay) {
                         mVideoRenderQualityTracker.resetForDiscontinuity();
                     }
+
                     // Notify the RM that the codec has been stopped.
                     ClientConfigParcel clientConfig;
                     initClientConfigParcel(clientConfig);
@@ -4443,6 +4466,7 @@ void MediaCodec::onMessageReceived(const sp<AMessage> &msg) {
             } else {
                 mTunneled = false;
             }
+            mediametrics_setInt32(mMetricsHandle, kCodecTunneled, mTunneled ? 1 : 0);
 
             int32_t background = 0;
             if (format->findInt32("android._background-mode", &background) && background) {
