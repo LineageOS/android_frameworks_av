@@ -122,7 +122,7 @@ static uint32_t gVideoHeight = 0;
 static uint32_t gBitRate = 20000000;     // 20Mbps
 static uint32_t gTimeLimitSec = kMaxTimeLimitSec;
 static uint32_t gBframes = 0;
-static PhysicalDisplayId gPhysicalDisplayId;
+static std::optional<PhysicalDisplayId> gPhysicalDisplayId;
 // Set by signal handler to stop recording.
 static volatile bool gStopRequested = false;
 
@@ -336,6 +336,24 @@ static status_t setDisplayProjection(
 }
 
 /*
+ * Gets the physical id of the display to record. If the user specified a physical
+ * display id, then that id will be set. Otherwise, the default display will be set.
+ */
+static status_t getPhysicalDisplayId(PhysicalDisplayId& outDisplayId) {
+    if (gPhysicalDisplayId) {
+        outDisplayId = *gPhysicalDisplayId;
+        return NO_ERROR;
+    }
+
+    const std::vector<PhysicalDisplayId> ids = SurfaceComposerClient::getPhysicalDisplayIds();
+    if (ids.empty()) {
+        return INVALID_OPERATION;
+    }
+    outDisplayId = ids.front();
+    return NO_ERROR;
+}
+
+/*
  * Configures the virtual display.  When this completes, virtual display
  * frames will start arriving from the buffer producer.
  */
@@ -350,7 +368,12 @@ static status_t prepareVirtualDisplay(
     setDisplayProjection(t, dpy, displayState);
     ui::LayerStack layerStack = ui::LayerStack::fromValue(std::rand());
     t.setDisplayLayerStack(dpy, layerStack);
-    *mirrorRoot = SurfaceComposerClient::getDefault()->mirrorDisplay(gPhysicalDisplayId);
+    PhysicalDisplayId displayId;
+    status_t err = getPhysicalDisplayId(displayId);
+    if (err != NO_ERROR) {
+        return err;
+    }
+    *mirrorRoot = SurfaceComposerClient::getDefault()->mirrorDisplay(displayId);
     if (*mirrorRoot == nullptr) {
         ALOGE("Failed to create a mirror for screenrecord");
         return UNKNOWN_ERROR;
@@ -486,6 +509,43 @@ static status_t writeWinscopeMetadata(const Vector<std::int64_t>& timestampsMono
 }
 
 /*
+ * Update the display projection if size or orientation have changed.
+ */
+void updateDisplayProjection(const sp<IBinder>& virtualDpy, ui::DisplayState& displayState) {
+    ATRACE_NAME("updateDisplayProjection");
+
+    PhysicalDisplayId displayId;
+    if (getPhysicalDisplayId(displayId) != NO_ERROR) {
+        fprintf(stderr, "ERROR: Failed to get display id\n");
+        return;
+    }
+
+    sp<IBinder> displayToken = SurfaceComposerClient::getPhysicalDisplayToken(displayId);
+    if (!displayToken) {
+        fprintf(stderr, "ERROR: failed to get display token\n");
+        return;
+    }
+
+    ui::DisplayState currentDisplayState;
+    if (SurfaceComposerClient::getDisplayState(displayToken, &currentDisplayState) != NO_ERROR) {
+        ALOGW("ERROR: failed to get display state\n");
+        return;
+    }
+
+    if (currentDisplayState.orientation != displayState.orientation ||
+        currentDisplayState.layerStackSpaceRect != displayState.layerStackSpaceRect) {
+        displayState = currentDisplayState;
+        ALOGD("display state changed, now has orientation %s, size (%d, %d)",
+              toCString(displayState.orientation), displayState.layerStackSpaceRect.getWidth(),
+              displayState.layerStackSpaceRect.getHeight());
+
+        SurfaceComposerClient::Transaction t;
+        setDisplayProjection(t, virtualDpy, currentDisplayState);
+        t.apply();
+    }
+}
+
+/*
  * Runs the MediaCodec encoder, sending the output to the MediaMuxer.  The
  * input frames are coming from the virtual display as fast as SurfaceFlinger
  * wants to send them.
@@ -494,9 +554,8 @@ static status_t writeWinscopeMetadata(const Vector<std::int64_t>& timestampsMono
  *
  * The muxer must *not* have been started before calling.
  */
-static status_t runEncoder(const sp<MediaCodec>& encoder,
-        AMediaMuxer *muxer, FILE* rawFp, const sp<IBinder>& display,
-        const sp<IBinder>& virtualDpy, ui::Rotation orientation) {
+static status_t runEncoder(const sp<MediaCodec>& encoder, AMediaMuxer* muxer, FILE* rawFp,
+                           const sp<IBinder>& virtualDpy, ui::DisplayState displayState) {
     static int kTimeout = 250000;   // be responsive on signal
     status_t err;
     ssize_t trackIdx = -1;
@@ -555,24 +614,7 @@ static status_t runEncoder(const sp<MediaCodec>& encoder,
                 ALOGV("Got data in buffer %zu, size=%zu, pts=%" PRId64,
                         bufIndex, size, ptsUsec);
 
-                { // scope
-                    ATRACE_NAME("orientation");
-                    // Check orientation, update if it has changed.
-                    //
-                    // Polling for changes is inefficient and wrong, but the
-                    // useful stuff is hard to get at without a Dalvik VM.
-                    ui::DisplayState displayState;
-                    err = SurfaceComposerClient::getDisplayState(display, &displayState);
-                    if (err != NO_ERROR) {
-                        ALOGW("getDisplayState() failed: %d", err);
-                    } else if (orientation != displayState.orientation) {
-                        ALOGD("orientation changed, now %s", toCString(displayState.orientation));
-                        SurfaceComposerClient::Transaction t;
-                        setDisplayProjection(t, virtualDpy, displayState);
-                        t.apply();
-                        orientation = displayState.orientation;
-                    }
-                }
+                updateDisplayProjection(virtualDpy, displayState);
 
                 // If the virtual display isn't providing us with timestamps,
                 // use the current time.  This isn't great -- we could get
@@ -764,6 +806,38 @@ struct RecordingData {
 };
 
 /*
+ * Computes the maximum width and height across all physical displays.
+ */
+static ui::Size getMaxDisplaySize() {
+    const std::vector<PhysicalDisplayId> physicalDisplayIds =
+            SurfaceComposerClient::getPhysicalDisplayIds();
+    if (physicalDisplayIds.empty()) {
+        fprintf(stderr, "ERROR: Failed to get physical display ids\n");
+        return {};
+    }
+
+    ui::Size result;
+    for (auto& displayId : physicalDisplayIds) {
+        sp<IBinder> displayToken = SurfaceComposerClient::getPhysicalDisplayToken(displayId);
+        if (!displayToken) {
+            fprintf(stderr, "ERROR: failed to get display token\n");
+            continue;
+        }
+
+        ui::DisplayState displayState;
+        status_t err = SurfaceComposerClient::getDisplayState(displayToken, &displayState);
+        if (err != NO_ERROR) {
+            fprintf(stderr, "ERROR: failed to get display state\n");
+            continue;
+        }
+
+        result.height = std::max(result.height, displayState.layerStackSpaceRect.getHeight());
+        result.width = std::max(result.width, displayState.layerStackSpaceRect.getWidth());
+    }
+    return result;
+}
+
+/*
  * Main "do work" start point.
  *
  * Configures codec, muxer, and virtual display, then starts moving bits
@@ -781,9 +855,15 @@ static status_t recordScreen(const char* fileName) {
     sp<ProcessState> self = ProcessState::self();
     self->startThreadPool();
 
+    PhysicalDisplayId displayId;
+    err = getPhysicalDisplayId(displayId);
+    if (err != NO_ERROR) {
+        fprintf(stderr, "ERROR: Failed to get display id\n");
+        return err;
+    }
+
     // Get main display parameters.
-    sp<IBinder> display = SurfaceComposerClient::getPhysicalDisplayToken(
-            gPhysicalDisplayId);
+    sp<IBinder> display = SurfaceComposerClient::getPhysicalDisplayToken(displayId);
     if (display == nullptr) {
         fprintf(stderr, "ERROR: no display\n");
         return NAME_NOT_FOUND;
@@ -808,7 +888,8 @@ static status_t recordScreen(const char* fileName) {
         return INVALID_OPERATION;
     }
 
-    const ui::Size& layerStackSpaceRect = displayState.layerStackSpaceRect;
+    const ui::Size layerStackSpaceRect =
+        gPhysicalDisplayId ? displayState.layerStackSpaceRect : getMaxDisplaySize();
     if (gVerbose) {
         printf("Display is %dx%d @%.2ffps (orientation=%s), layerStack=%u\n",
                 layerStackSpaceRect.getWidth(), layerStackSpaceRect.getHeight(),
@@ -973,8 +1054,7 @@ static status_t recordScreen(const char* fileName) {
         }
     } else {
         // Main encoder loop.
-        err = runEncoder(recordingData.encoder, muxer, rawFp, display, recordingData.dpy,
-                         displayState.orientation);
+        err = runEncoder(recordingData.encoder, muxer, rawFp, recordingData.dpy, displayState);
         if (err != NO_ERROR) {
             fprintf(stderr, "Encoder failed (err=%d)\n", err);
             // fall through to cleanup
@@ -1174,14 +1254,6 @@ int main(int argc, char* const argv[]) {
         { "display-id",         required_argument,  NULL, 'd' },
         { NULL,                 0,                  NULL, 0 }
     };
-
-    const std::vector<PhysicalDisplayId> ids = SurfaceComposerClient::getPhysicalDisplayIds();
-    if (ids.empty()) {
-        fprintf(stderr, "Failed to get ID for any displays\n");
-        return 1;
-    }
-
-    gPhysicalDisplayId = ids.front();
 
     while (true) {
         int optionIndex = 0;
