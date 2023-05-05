@@ -1444,7 +1444,7 @@ nsecs_t Camera3OutputStream::syncTimestampToDisplayLocked(nsecs_t t) {
     //
     nsecs_t captureInterval = t - mLastCaptureTime;
     if (captureInterval > kSpacingResetIntervalNs) {
-        for (size_t i = 0; i < VsyncEventData::kFrameTimelinesLength; i++) {
+        for (size_t i = 0; i < vsyncEventData.frameTimelinesLength; i++) {
             const auto& timeline = vsyncEventData.frameTimelines[i];
             if (timeline.deadlineTimestamp >= currentTime &&
                     timeline.expectedPresentationTime > minPresentT) {
@@ -1513,7 +1513,7 @@ nsecs_t Camera3OutputStream::syncTimestampToDisplayLocked(nsecs_t t) {
     // - For variable FPS, or if the capture interval deviates from refresh
     //   interval for more than 5%, find a presentation time closest to the
     //   (lastPresentationTime + captureToPresentOffset) instead.
-    int maxTimelines = std::min(kMaxTimelines, (int)VsyncEventData::kFrameTimelinesLength);
+    int maxTimelines = std::min(kMaxTimelines, (int)vsyncEventData.frameTimelinesLength);
     float biasForShortDelay = 1.0f;
     for (int i = 0; i < maxTimelines; i ++) {
         const auto& vsyncTime = vsyncEventData.frameTimelines[i];

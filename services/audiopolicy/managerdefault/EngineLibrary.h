@@ -26,9 +26,12 @@ namespace android {
 
 using EngineInstance = std::unique_ptr<EngineInterface, std::function<void (EngineInterface*)>>;
 
+EngineInstance loadApmEngineLibraryAndCreateEngine(const std::string& librarySuffix,
+        const std::string& configXmlFilePath = "");
+
 class EngineLibrary : public std::enable_shared_from_this<EngineLibrary> {
 public:
-    static std::shared_ptr<EngineLibrary> load(std::string libraryPath);
+    static std::shared_ptr<EngineLibrary> load(const std::string& librarySuffix);
     ~EngineLibrary();
 
     EngineLibrary(const EngineLibrary&) = delete;
@@ -36,11 +39,12 @@ public:
     EngineLibrary& operator=(const EngineLibrary&) = delete;
     EngineLibrary& operator=(EngineLibrary&&) = delete;
 
-    EngineInstance createEngine();
+    EngineInstance createEngineUsingXmlConfig(const std::string& xmlFilePath);
 
 private:
     EngineLibrary() = default;
     bool init(std::string libraryPath);
+    EngineInstance createEngine();
     void close();
 
     void *mLibraryHandle = nullptr;

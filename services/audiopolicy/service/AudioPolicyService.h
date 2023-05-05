@@ -735,6 +735,8 @@ private:
         explicit AudioPolicyClient(AudioPolicyService *service) : mAudioPolicyService(service) {}
         virtual ~AudioPolicyClient() {}
 
+        virtual status_t getAudioPolicyConfig(media::AudioPolicyConfig *config);
+
         //
         // Audio HW module functions
         //

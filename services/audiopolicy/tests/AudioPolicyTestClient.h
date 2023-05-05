@@ -25,6 +25,9 @@ public:
     virtual ~AudioPolicyTestClient() = default;
 
     // AudioPolicyClientInterface Implementation
+    status_t getAudioPolicyConfig(media::AudioPolicyConfig* /*config*/) override {
+        return INVALID_OPERATION;
+    }
     audio_module_handle_t loadHwModule(const char* /*name*/) override {
         return AUDIO_MODULE_HANDLE_NONE;
     }
