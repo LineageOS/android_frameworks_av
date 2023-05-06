@@ -128,11 +128,8 @@ DeviceHalAidl::DeviceHalAidl(const std::string& instance, const std::shared_ptr<
 }
 
 status_t DeviceHalAidl::getAudioPorts(std::vector<media::audio::common::AudioPort> *ports) {
-    auto convertAudioPortFromMap = [](const Ports::value_type& pair) {
-        return ndk2cpp_AudioPort(pair.second);
-    };
-    return ::aidl::android::convertRange(mPorts.begin(), mPorts.end(), ports->begin(),
-            convertAudioPortFromMap);
+    return ::aidl::android::convertContainer(mPorts, ports,
+            [](const Ports::value_type& pair) { return ndk2cpp_AudioPort(pair.second); });
 }
 
 status_t DeviceHalAidl::getAudioRoutes(std::vector<media::AudioRoute> *routes) {

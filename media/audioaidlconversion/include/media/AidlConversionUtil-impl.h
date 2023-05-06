@@ -119,6 +119,20 @@ template<typename InputIterator, typename OutputIterator, typename Func>
 }
 
 /**
+ * A generic template that helps convert containers of convertible types without
+ * using an intermediate container.
+ */
+template<typename InputContainer, typename OutputContainer, typename Func>
+::android::status_t convertContainer(const InputContainer& input, OutputContainer* output,
+        const Func& itemConversion) {
+    auto ins = std::inserter(*output, output->begin());
+    for (const auto& item : input) {
+        *ins = VALUE_OR_RETURN_STATUS(itemConversion(item));
+    }
+    return ::android::OK;
+}
+
+/**
  * A generic template that helps convert containers of convertible types.
  */
 template<typename OutputContainer, typename InputContainer, typename Func>
@@ -208,6 +222,34 @@ using IntegralTypeOf = typename IntegralTypeOfStruct<T>::Type;
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////
 // Utilities for handling bitmasks.
+// Some AIDL enums are specified using bit indices, for example:
+//   `AidlEnum { FOO = 0, BAR = 1, BAZ = 2' }`
+// while corresponding legacy types universally uses actual bitmasks, for example:
+//   `enum legacy_enum_t { LEGACY_FOO = 1 << 0, LEGACY_BAR = 1 << 1, LEGACY_BAZ = 1 << 2 }`
+// There is also the third type used to store the resulting mask, which is combined
+// from individual bits. In AIDL this is typically an int (`int32_t`), in legacy types this
+// is often the enum type itself (although, strictly this is not correct since masks are not
+// declared as part of the enum type). The bit index value always has an integer type.
+//
+// `indexToEnum_index` constructs an instance of the enum from an index,
+// for example `AidlEnum::BAR` from `1`.
+// `indexToEnum_bitmask` produces a corresponding legacy bitmask enum instance,
+// for example, `LEGACY_BAR` (`2`) from `1`.
+// `enumToMask_bitmask` simply casts an enum type to a bitmask type.
+// `enumToMask_index` creates a mask from an enum type which specifies an index.
+//
+// All these functions can be plugged into `convertBitmask`. For example, to implement
+// conversion from `AidlEnum` to `legacy_enum_t`, with a mask stored in `int32_t`,
+// the following call needs to be made:
+//   convertBitmask<legacy_enum_t /*DestMask*/, int32_t /*SrcMask*/,
+//                  legacy_enum_t /*DestEnum*/, AidlEnum /*SrcEnum*/>(
+//     maskField /*int32_t*/, aidl2legacy_AidlEnum_legacy_enum_t /*enumConversion*/,
+//     indexToEnum_index<AidlEnum> /*srcIndexToEnum*/,
+//     enumToMask_bitmask<legacy_enum_t, legacy_enum_t> /*destEnumToMask*/)
+//
+// The only extra function needed is for mapping between corresponding enum values
+// of the AidlEnum and the legacy_enum_t. Note that the mapping is between values
+// of enums, for example, `AidlEnum::BAZ` maps to `LEGACY_BAZ` and vice versa.
 
 template<typename Enum>
 Enum indexToEnum_index(int index) {
