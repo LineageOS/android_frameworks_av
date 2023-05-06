@@ -70,6 +70,12 @@ Engine::Engine() : mPolicyParameterMgr(new ParameterManagerWrapper())
 {
 }
 
+status_t Engine::loadFromHalConfigWithFallback(
+        const media::audio::common::AudioHalEngineConfig& config __unused) {
+    // b/242678729. Need to implement for the configurable engine.
+    return INVALID_OPERATION;
+}
+
 status_t Engine::loadFromXmlConfigWithFallback(const std::string& xmlFilePath)
 {
     status_t loadResult = loadAudioPolicyEngineConfig(xmlFilePath);

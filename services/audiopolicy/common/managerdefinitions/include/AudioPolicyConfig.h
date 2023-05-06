@@ -23,6 +23,7 @@
 
 #include <DeviceDescriptor.h>
 #include <HwModule.h>
+#include <android/media/AudioPolicyConfig.h>
 #include <error/Result.h>
 #include <utils/StrongPointer.h>
 #include <utils/RefBase.h>
@@ -42,6 +43,8 @@ public:
     // Surround formats, with an optional list of subformats that are equivalent from users' POV.
     using SurroundFormats = std::unordered_map<audio_format_t, std::unordered_set<audio_format_t>>;
 
+    // The source used to indicate the configuration from the AIDL HAL.
+    static const constexpr char* const kAidlConfigSource = "AIDL HAL";
     // The source used to indicate the default fallback configuration.
     static const constexpr char* const kDefaultConfigSource = "AudioPolicyConfig::setDefault";
     // The suffix of the "engine default" implementation shared library name.
@@ -49,6 +52,9 @@ public:
 
     // Creates the default (fallback) configuration.
     static sp<const AudioPolicyConfig> createDefault();
+    // Attempts to load the configuration from the AIDL config falls back to default on failure.
+    static sp<const AudioPolicyConfig> loadFromApmAidlConfigWithFallback(
+            const media::AudioPolicyConfig& aidl);
     // Attempts to load the configuration from the XML file, falls back to default on failure.
     // If the XML file path is not provided, uses `audio_get_audio_policy_config_file` function.
     static sp<const AudioPolicyConfig> loadFromApmXmlConfigWithFallback(
@@ -140,6 +146,7 @@ private:
     AudioPolicyConfig() = default;
 
     void augmentData();
+    status_t loadFromAidl(const media::AudioPolicyConfig& aidl);
     status_t loadFromXml(const std::string& xmlFilePath, bool forVts);
 
     std::string mSource;  // Not kDefaultConfigSource. Empty source means an empty config.

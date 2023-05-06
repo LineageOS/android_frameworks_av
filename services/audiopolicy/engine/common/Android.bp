@@ -51,10 +51,10 @@ cc_library_static {
         "libaudiopolicyengine_common_headers",
     ],
     static_libs: [
-        "libaudiopolicycomponents",
         "libaudiopolicyengine_config",
     ],
     shared_libs: [
         "libaudiofoundation",
+        "libaudiopolicycomponents",
     ],
 }
