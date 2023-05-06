@@ -43,8 +43,7 @@ bool CameraServiceWatchdog::threadLoop()
             mTidMap[currentThreadId].cycles++;
 
             if (mTidMap[currentThreadId].cycles >= mMaxCycles) {
-                std::string abortMessage = getAbortMessage(getpid(), currentThreadId,
-                        mTidMap[currentThreadId].functionName);
+                std::string abortMessage = getAbortMessage(mTidMap[currentThreadId].functionName);
                 android_set_abort_message(abortMessage.c_str());
                 ALOGW("CameraServiceWatchdog triggering abort for pid: %d tid: %d", getpid(),
                         currentThreadId);
@@ -60,10 +59,9 @@ bool CameraServiceWatchdog::threadLoop()
     return true;
 }
 
-std::string CameraServiceWatchdog::getAbortMessage(int pid, int tid, std::string functionName) {
+std::string CameraServiceWatchdog::getAbortMessage(const std::string& functionName) {
     std::string res = "CameraServiceWatchdog triggering abort during "
-            + functionName + " | pid: " + std::to_string(pid)
-            + " tid: " + std::to_string(tid);
+            + functionName;
     return res;
 }
 
