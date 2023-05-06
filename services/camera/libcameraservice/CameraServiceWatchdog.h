@@ -144,7 +144,7 @@ private:
      */
     void stop(uint32_t tid);
 
-    std::string getAbortMessage(int pid, int tid, std::string functionName);
+    std::string getAbortMessage(const std::string& functionName);
 
     virtual bool    threadLoop();
 
