@@ -798,6 +798,7 @@ private:
         // Monitored uid map
         std::unordered_map<uid_t, MonitoredUid> mMonitoredUids;
         std::unordered_map<uid_t, bool> mOverrideUids;
+        sp<IBinder> mObserverToken;
     }; // class UidPolicy
 
     // If sensor privacy is enabled then all apps, including those that are active, should be
