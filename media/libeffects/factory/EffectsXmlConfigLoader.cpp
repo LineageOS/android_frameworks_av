@@ -63,7 +63,7 @@ bool loadLibrary(const char* relativePath, lib_entry_t* libEntry) noexcept {
 
     std::string absolutePath;
     if (!resolveLibrary(relativePath, &absolutePath)) {
-        ALOGE("Could not find library in effect directories: %s", relativePath);
+        ALOGE("%s Could not find library in effect directories: %s", __func__, relativePath);
         libEntry->path = strdup(relativePath);
         return false;
     }
@@ -74,20 +74,20 @@ bool loadLibrary(const char* relativePath, lib_entry_t* libEntry) noexcept {
     std::unique_ptr<void, decltype(dlclose)*> libHandle(dlopen(path, RTLD_NOW),
                                                        dlclose);
     if (libHandle == nullptr) {
-        ALOGE("Could not dlopen library %s: %s", path, dlerror());
+        ALOGE("%s Could not dlopen library %s: %s", __func__, path, dlerror());
         return false;
     }
 
     auto* description = static_cast<audio_effect_library_t*>(
           dlsym(libHandle.get(), AUDIO_EFFECT_LIBRARY_INFO_SYM_AS_STR));
     if (description == nullptr) {
-        ALOGE("Invalid effect library, failed not find symbol '%s' in %s: %s",
+        ALOGE("%s Invalid effect library, failed not find symbol '%s' in %s: %s", __func__,
               AUDIO_EFFECT_LIBRARY_INFO_SYM_AS_STR, path, dlerror());
         return false;
     }
 
     if (description->tag != AUDIO_EFFECT_LIBRARY_TAG) {
-        ALOGE("Bad tag %#08x in description structure, expected %#08x for library %s",
+        ALOGE("%s Bad tag %#08x in description structure, expected %#08x for library %s", __func__,
               description->tag, AUDIO_EFFECT_LIBRARY_TAG, path);
         return false;
     }
@@ -95,8 +95,8 @@ bool loadLibrary(const char* relativePath, lib_entry_t* libEntry) noexcept {
     uint32_t majorVersion = EFFECT_API_VERSION_MAJOR(description->version);
     uint32_t expectedMajorVersion = EFFECT_API_VERSION_MAJOR(EFFECT_LIBRARY_API_VERSION_CURRENT);
     if (majorVersion != expectedMajorVersion) {
-        ALOGE("Unsupported major version %#08x, expected %#08x for library %s",
-              majorVersion, expectedMajorVersion, path);
+        ALOGE("%s Unsupported major version %#08x, expected %#08x for library %s",
+              __func__, majorVersion, expectedMajorVersion, path);
         return false;
     }
 
@@ -154,14 +154,13 @@ size_t loadLibraries(const effectsConfig::Libraries& libs,
 {
     size_t nbSkippedElement = 0;
     for (auto& library : libs) {
-
         // Construct a lib entry
         auto libEntry = makeUniqueC<lib_entry_t>();
-        libEntry->name = strdup(library.name.c_str());
+        libEntry->name = strdup(library->name.c_str());
         libEntry->effects = nullptr;
         pthread_mutex_init(&libEntry->lock, nullptr);
 
-        if (!loadLibrary(library.path.c_str(), libEntry.get())) {
+        if (!loadLibrary(library->path.c_str(), libEntry.get())) {
             // Register library load failure
             listPush(std::move(libEntry), libFailedList);
             ++nbSkippedElement;
@@ -208,24 +207,24 @@ struct LoadEffectResult {
     UniqueCPtr<effect_descriptor_t> effectDesc;
 };
 
-LoadEffectResult loadEffect(const EffectImpl& effect, const std::string& name,
-                            list_elem_t* libList) {
+LoadEffectResult loadEffect(const std::shared_ptr<const EffectImpl>& effect,
+                            const std::string& name, list_elem_t* libList) {
     LoadEffectResult result;
 
     // Find the effect library
-    result.lib = findLibrary(effect.library->name.c_str(), libList);
+    result.lib = findLibrary(effect->library->name.c_str(), libList);
     if (result.lib == nullptr) {
-        ALOGE("Could not find library %s to load effect %s",
-              effect.library->name.c_str(), name.c_str());
+        ALOGE("%s Could not find library %s to load effect %s",
+              __func__, effect->library->name.c_str(), name.c_str());
         return result;
     }
 
     result.effectDesc = makeUniqueC<effect_descriptor_t>();
 
     // Get the effect descriptor
-    if (result.lib->desc->get_descriptor(&effect.uuid, result.effectDesc.get()) != 0) {
+    if (result.lib->desc->get_descriptor(&effect->uuid, result.effectDesc.get()) != 0) {
         ALOGE("Error querying effect %s on lib %s",
-              uuidToString(effect.uuid), result.lib->name);
+              uuidToString(effect->uuid), result.lib->name);
         result.effectDesc.reset();
         return result;
     }
@@ -240,14 +239,15 @@ LoadEffectResult loadEffect(const EffectImpl& effect, const std::string& name,
     // Check effect is supported
     uint32_t expectedMajorVersion = EFFECT_API_VERSION_MAJOR(EFFECT_CONTROL_API_VERSION);
     if (EFFECT_API_VERSION_MAJOR(result.effectDesc->apiVersion) != expectedMajorVersion) {
-        ALOGE("Bad API version %#08x for effect %s in lib %s, expected major %#08x",
+        ALOGE("%s Bad API version %#08x for effect %s in lib %s, expected major %#08x", __func__,
               result.effectDesc->apiVersion, name.c_str(), result.lib->name, expectedMajorVersion);
         return result;
     }
 
     lib_entry_t *_;
-    if (findEffect(nullptr, &effect.uuid, &_, nullptr) == 0) {
-        ALOGE("Effect %s uuid %s already exist", uuidToString(effect.uuid), name.c_str());
+    if (findEffect(nullptr, &effect->uuid, &_, nullptr) == 0) {
+        ALOGE("%s Effect %s uuid %s already exist", __func__, uuidToString(effect->uuid),
+              name.c_str());
         return result;
     }
 
@@ -260,8 +260,11 @@ size_t loadEffects(const Effects& effects, list_elem_t* libList, list_elem_t** s
     size_t nbSkippedElement = 0;
 
     for (auto& effect : effects) {
+        if (!effect) {
+            continue;
+        }
 
-        auto effectLoadResult = loadEffect(effect, effect.name, libList);
+        auto effectLoadResult = loadEffect(effect, effect->name, libList);
         if (!effectLoadResult.success) {
             if (effectLoadResult.effectDesc != nullptr) {
                 listPush(std::move(effectLoadResult.effectDesc), skippedEffects);
@@ -270,9 +273,9 @@ size_t loadEffects(const Effects& effects, list_elem_t* libList, list_elem_t** s
             continue;
         }
 
-        if (effect.isProxy) {
-            auto swEffectLoadResult = loadEffect(effect.libSw, effect.name + " libsw", libList);
-            auto hwEffectLoadResult = loadEffect(effect.libHw, effect.name + " libhw", libList);
+        if (effect->isProxy) {
+            auto swEffectLoadResult = loadEffect(effect->libSw, effect->name + " libsw", libList);
+            auto hwEffectLoadResult = loadEffect(effect->libHw, effect->name + " libhw", libList);
             if (!swEffectLoadResult.success || !hwEffectLoadResult.success) {
                 // Push the main effect in the skipped list even if only a subeffect is invalid
                 // as the main effect is not usable without its subeffects.
@@ -286,7 +289,7 @@ size_t loadEffects(const Effects& effects, list_elem_t* libList, list_elem_t** s
             // get_descriptor call, we replace it with the corresponding
             // sw effect descriptor, but keep the Proxy UUID
             *effectLoadResult.effectDesc = *swEffectLoadResult.effectDesc;
-            effectLoadResult.effectDesc->uuid = effect.uuid;
+            effectLoadResult.effectDesc->uuid = effect->uuid;
 
             effectLoadResult.effectDesc->flags |= EFFECT_FLAG_OFFLOAD_SUPPORTED;
 
@@ -325,8 +328,8 @@ extern "C" ssize_t EffectLoadXmlEffectConfig(const char* path)
                                loadEffects(result.parsedConfig->effects, gLibraryList,
                                            &gSkippedEffects, &gSubEffectList);
 
-    ALOGE_IF(result.nbSkippedElement != 0, "%zu errors during loading of configuration: %s",
-             result.nbSkippedElement,
+    ALOGE_IF(result.nbSkippedElement != 0, "%s %zu errors during loading of configuration: %s",
+             __func__, result.nbSkippedElement,
              result.configPath.empty() ? "No config file found" : result.configPath.c_str());
 
     return result.nbSkippedElement;
