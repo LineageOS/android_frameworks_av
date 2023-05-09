@@ -589,7 +589,7 @@ status_t GraphicBufferSource::onInputBufferEmptied(codec_buffer_id bufferId, int
 
 void GraphicBufferSource::onDataspaceChanged_l(
         android_dataspace dataspace, android_pixel_format pixelFormat) {
-    ALOGD("got buffer with new dataSpace #%x", dataspace);
+    ALOGD("got buffer with new dataSpace %#x", dataspace);
     mLastDataspace = dataspace;
 
     if (ColorUtils::convertDataSpaceToV0(dataspace)) {
