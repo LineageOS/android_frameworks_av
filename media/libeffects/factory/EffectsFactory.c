@@ -26,7 +26,6 @@
 
 #include <media/EffectsFactoryApi.h>
 
-#include "EffectsConfigLoader.h"
 #include "EffectsFactoryState.h"
 #include "EffectsXmlConfigLoader.h"
 
@@ -464,8 +463,7 @@ int init() {
     } else {
         gConfigNbElemSkipped = EffectLoadXmlEffectConfig(NULL);
         if (gConfigNbElemSkipped < 0) {
-            ALOGW("Failed to load XML effect configuration, fallback to .conf");
-            EffectLoadEffectConfig();
+            ALOGE("Failed to load XML effect configuration with status %zd", gConfigNbElemSkipped);
         } else if (gConfigNbElemSkipped > 0) {
             ALOGE("Effect config is partially invalid, skipped %zd elements", gConfigNbElemSkipped);
         }
