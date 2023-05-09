@@ -542,15 +542,15 @@ status_t C2SoftAomEnc::initEncoder() {
     mCodecConfiguration->kf_max_dist = 3000;
     // Encoder determines optimal key frame placement automatically.
     mCodecConfiguration->kf_mode = AOM_KF_AUTO;
-    // Initial value of the buffer level in ms.
-    mCodecConfiguration->rc_buf_initial_sz = 500;
-    // Amount of data that the encoder should try to maintain in ms.
-    mCodecConfiguration->rc_buf_optimal_sz = 600;
     // The amount of data that may be buffered by the decoding
     // application in ms.
     mCodecConfiguration->rc_buf_sz = 1000;
 
     if (mBitrateControlMode == AOM_CBR) {
+        // Initial value of the buffer level in ms.
+        mCodecConfiguration->rc_buf_initial_sz = 500;
+        // Amount of data that the encoder should try to maintain in ms.
+        mCodecConfiguration->rc_buf_optimal_sz = 600;
         // Maximum amount of bits that can be subtracted from the target
         // bitrate - expressed as percentage of the target bitrate.
         mCodecConfiguration->rc_undershoot_pct = 100;
@@ -563,7 +563,7 @@ status_t C2SoftAomEnc::initEncoder() {
         mCodecConfiguration->rc_undershoot_pct = 100;
         // Maximum amount of bits that can be added to the target
         // bitrate - expressed as percentage of the target bitrate.
-        mCodecConfiguration->rc_overshoot_pct = 25;
+        mCodecConfiguration->rc_overshoot_pct = 100;
     }
 
     if (mIntf->getSyncFramePeriod() >= 0) {
@@ -576,6 +576,12 @@ status_t C2SoftAomEnc::initEncoder() {
     }
     if (mMaxQuantizer > 0) {
         mCodecConfiguration->rc_max_quantizer = mMaxQuantizer;
+    } else {
+        if (mBitrateControlMode == AOM_VBR) {
+            // For VBR we are limiting MaxQP to 52 (down 11 steps) to maintain quality
+            // 52 comes from experiments done on libaom standalone app
+            mCodecConfiguration->rc_max_quantizer = 52;
+        }
     }
 
     mCodecContext = new aom_codec_ctx_t;
