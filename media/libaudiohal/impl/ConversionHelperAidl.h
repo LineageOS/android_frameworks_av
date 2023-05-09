@@ -20,6 +20,9 @@
 #include <string_view>
 #include <vector>
 
+#include <android-base/expected.h>
+#include <error/Result.h>
+#include <media/AudioParameter.h>
 #include <utils/String16.h>
 #include <utils/Vector.h>
 
@@ -50,5 +53,25 @@ class ConversionHelperAidl {
 
     const std::string mClassName;
 };
+
+// 'action' must accept a value of type 'T' and return 'status_t'.
+// The function returns 'true' if the parameter was found, and the action has succeeded.
+// The function returns 'false' if the parameter was not found.
+// Any errors get propagated, if there are errors it means the parameter was found.
+template<typename T, typename F>
+error::Result<bool> filterOutAndProcessParameter(
+        AudioParameter& parameters, const String8& key, const F& action) {
+    if (parameters.containsKey(key)) {
+        T value;
+        status_t status = parameters.get(key, value);
+        if (status == OK) {
+            parameters.remove(key);
+            status = action(value);
+            if (status == OK) return true;
+        }
+        return base::unexpected(status);
+    }
+    return false;
+}
 
 }  // namespace android
