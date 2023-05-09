@@ -122,30 +122,6 @@ status_t StreamHalAidl::getAudioProperties(audio_config_base_t *configBase) {
     return OK;
 }
 
-namespace {
-
-// 'action' must accept a value of type 'T' and return 'status_t'.
-// The function returns 'true' if the parameter was found, and the action has succeeded.
-// The function returns 'false' if the parameter was not found.
-// Any errors get propagated, if there are errors it means the parameter was found.
-template<typename T, typename F>
-error::Result<bool> filterOutAndProcessParameter(
-        AudioParameter& parameters, const String8& key, const F& action) {
-    if (parameters.containsKey(key)) {
-        T value;
-        status_t status = parameters.get(key, value);
-        if (status == OK) {
-            parameters.remove(key);
-            status = action(value);
-            if (status == OK) return true;
-        }
-        return base::unexpected(status);
-    }
-    return false;
-}
-
-}  // namespace
-
 status_t StreamHalAidl::setParameters(const String8& kvPairs) {
     TIME_CHECK();
     if (!mStream) return NO_INIT;
@@ -579,10 +555,10 @@ status_t StreamOutHalAidl::setParameters(const String8& kvPairs) {
     if (!mStream) return NO_INIT;
 
     AudioParameter parameters(kvPairs);
-    ALOGD("%s parameters: %s", __func__, parameters.toString().c_str());
+    ALOGD("%s: parameters: \"%s\"", __func__, parameters.toString().c_str());
 
     if (status_t status = filterAndUpdateOffloadMetadata(parameters); status != OK) {
-        ALOGW("%s filtering or updating offload metadata failed: %d", __func__, status);
+        ALOGW("%s: filtering or updating offload metadata failed: %d", __func__, status);
     }
 
     return StreamHalAidl::setParameters(parameters.toString());
