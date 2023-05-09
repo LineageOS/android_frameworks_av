@@ -145,6 +145,7 @@ const char *sFileName = "lastOpenSessionDumpFile";
 static constexpr int32_t kSystemNativeClientScore = resource_policy::PERCEPTIBLE_APP_ADJ;
 static constexpr int32_t kSystemNativeClientState =
         ActivityManager::PROCESS_STATE_PERSISTENT_UI;
+static const String16 kServiceName("cameraserver");
 
 const String8 CameraService::kOfflineDevice("offline-");
 const String16 CameraService::kWatchAllClientsFlag("all");
@@ -1232,13 +1233,12 @@ int32_t CameraService::mapToInterface(StatusInternal status) {
 Status CameraService::initializeShimMetadata(int cameraId) {
     int uid = CameraThreadState::getCallingUid();
 
-    String16 internalPackageName("cameraserver");
     String8 id = String8::format("%d", cameraId);
     Status ret = Status::ok();
     sp<Client> tmp = nullptr;
     if (!(ret = connectHelper<ICameraClient,Client>(
             sp<ICameraClient>{nullptr}, id, cameraId,
-            internalPackageName, /*systemNativeClient*/ false, {}, uid, USE_CALLING_PID,
+            kServiceName, /*systemNativeClient*/ false, {}, uid, USE_CALLING_PID,
             API_1, /*shimUpdateOnly*/ true, /*oomScoreOffset*/ 0,
             /*targetSdkVersion*/ __ANDROID_API_FUTURE__, /*overrideToPortrait*/ true,
             /*forceSlowJpegMode*/false, /*out*/ tmp)
@@ -4007,7 +4007,7 @@ void CameraService::UidPolicy::registerWithActivityManager() {
             | ActivityManager::UID_OBSERVER_ACTIVE | ActivityManager::UID_OBSERVER_PROCSTATE
             | ActivityManager::UID_OBSERVER_PROC_OOM_ADJ,
             ActivityManager::PROCESS_STATE_UNKNOWN,
-            String16("cameraserver"), emptyUidArray, 0, mObserverToken);
+            kServiceName, emptyUidArray, 0, mObserverToken);
     if (res == OK) {
         mRegistered = true;
         ALOGV("UidPolicy: Registered with ActivityManager");
@@ -4150,7 +4150,7 @@ void CameraService::UidPolicy::registerMonitorUid(uid_t uid, bool openCamera) {
         monitoredUid.procAdj = resource_policy::UNKNOWN_ADJ;
         monitoredUid.refCount = 1;
         it = mMonitoredUids.emplace(std::pair<uid_t, MonitoredUid>(uid, monitoredUid)).first;
-        status_t res = mAm.addUidToObserver(mObserverToken, String16("cameraserver"), uid);
+        status_t res = mAm.addUidToObserver(mObserverToken, kServiceName, uid);
         if (res != OK) {
             ALOGE("UidPolicy: Failed to add uid to observer: 0x%08x", res);
         }
@@ -4171,7 +4171,7 @@ void CameraService::UidPolicy::unregisterMonitorUid(uid_t uid, bool closeCamera)
         it->second.refCount--;
         if (it->second.refCount == 0) {
             mMonitoredUids.erase(it);
-            status_t res = mAm.removeUidFromObserver(mObserverToken, String16("cameraserver"), uid);
+            status_t res = mAm.removeUidFromObserver(mObserverToken, kServiceName, uid);
             if (res != OK) {
                 ALOGE("UidPolicy: Failed to remove uid from observer: 0x%08x", res);
             }
