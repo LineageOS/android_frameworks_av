@@ -48,13 +48,7 @@ AudioPolicyEffects::AudioPolicyEffects(const sp<EffectsFactoryHalInterface>& eff
         mDefaultDeviceEffectFuture =
                 std::async(std::launch::async, &AudioPolicyEffects::initDefaultDeviceEffects, this);
     } else if (loadResult < 0) {
-        ALOGW("Failed to query effect configuration, fallback to load .conf");
-        // load automatic audio effect modules
-        if (access(AUDIO_EFFECT_VENDOR_CONFIG_FILE, R_OK) == 0) {
-            loadAudioEffectConfigLegacy(AUDIO_EFFECT_VENDOR_CONFIG_FILE);
-        } else if (access(AUDIO_EFFECT_DEFAULT_CONFIG_FILE, R_OK) == 0) {
-            loadAudioEffectConfigLegacy(AUDIO_EFFECT_DEFAULT_CONFIG_FILE);
-        }
+        ALOGE("Failed to query effect configuration with status %d", loadResult);
     } else if (loadResult > 0) {
         ALOGE("Effect config is partially invalid, skipped %d elements", loadResult);
     }
@@ -924,8 +918,7 @@ status_t AudioPolicyEffects::loadAudioEffectConfig(
         for (auto& stream : processingChain) {
             auto effectDescs = std::make_unique<EffectDescVector>();
             for (auto& effect : stream.effects) {
-                effectDescs->mEffects.add(
-                        new EffectDesc{effect.get().name.c_str(), effect.get().uuid});
+                effectDescs->mEffects.add(new EffectDesc{effect->name.c_str(), effect->uuid});
             }
             streams.add(stream.type, effectDescs.release());
         }
@@ -935,8 +928,7 @@ status_t AudioPolicyEffects::loadAudioEffectConfig(
         for (auto& deviceProcess : processingChain) {
             auto effectDescs = std::make_unique<EffectDescVector>();
             for (auto& effect : deviceProcess.effects) {
-                effectDescs->mEffects.add(
-                        new EffectDesc{effect.get().name.c_str(), effect.get().uuid});
+                effectDescs->mEffects.add(new EffectDesc{effect->name.c_str(), effect->uuid});
             }
             auto deviceEffects = std::make_unique<DeviceEffects>(
                         std::move(effectDescs), deviceProcess.type, deviceProcess.address);
@@ -953,34 +945,6 @@ status_t AudioPolicyEffects::loadAudioEffectConfig(
     }
 
     return skippedElements;
-}
-
-status_t AudioPolicyEffects::loadAudioEffectConfigLegacy(const char *path)
-{
-    cnode *root;
-    char *data;
-
-    data = (char *)load_file(path, NULL);
-    if (data == NULL) {
-        return -ENODEV;
-    }
-    root = config_node("", "");
-    config_load(root, data);
-
-    Vector <EffectDesc *> effects;
-    loadEffects(root, effects);
-    loadInputEffectConfigurations(root, effects);
-    loadStreamEffectConfigurations(root, effects);
-
-    for (size_t i = 0; i < effects.size(); i++) {
-        delete effects[i];
-    }
-
-    config_free(root);
-    free(root);
-    free(data);
-
-    return NO_ERROR;
 }
 
 void AudioPolicyEffects::initDefaultDeviceEffects()

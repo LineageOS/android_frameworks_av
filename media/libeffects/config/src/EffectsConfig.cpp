@@ -19,6 +19,7 @@
 #include <algorithm>
 #include <cstdint>
 #include <functional>
+#include <memory>
 #include <string>
 #include <unistd.h>
 
@@ -149,7 +150,10 @@ bool parseLibrary(const XMLElement& xmlLibrary, Libraries* libraries) {
         ALOGE("library must have a name and a path: %s", dump(xmlLibrary));
         return false;
     }
-    libraries->push_back({name, path});
+
+    // need this temp variable because `struct Library` doesn't have a constructor
+    Library lib({.name = name, .path = path});
+    libraries->push_back(std::make_shared<const Library>(lib));
     return true;
 }
 
@@ -157,10 +161,10 @@ bool parseLibrary(const XMLElement& xmlLibrary, Libraries* libraries) {
  * @return nullptr if not found, the element address if found.
  */
 template <class T>
-T* findByName(const char* name, std::vector<T>& collection) {
+T findByName(const char* name, std::vector<T>& collection) {
     auto it = find_if(begin(collection), end(collection),
-                         [name] (auto& item) { return item.name == name; });
-    return it != end(collection) ? &*it : nullptr;
+                      [name](auto& item) { return item && item->name == name; });
+    return it != end(collection) ? *it : nullptr;
 }
 
 /** Parse an effect from an xml element describing it.
@@ -187,7 +191,7 @@ bool parseEffect(const XMLElement& xmlEffect, Libraries& libraries, Effects* eff
         }
 
         // Convert library name to a pointer to the previously loaded library
-        auto* library = findByName(libraryName, libraries);
+        auto library = findByName(libraryName, libraries);
         if (library == nullptr) {
             ALOGE("Could not find library referenced in: %s", dump(xmlImpl));
             return false;
@@ -211,20 +215,25 @@ bool parseEffect(const XMLElement& xmlEffect, Libraries& libraries, Effects* eff
         effect.isProxy = true;
 
         // Function to parse libhw and libsw
-        auto parseProxy = [&xmlEffect, &parseImpl](const char* tag, EffectImpl& proxyLib) {
+        auto parseProxy = [&xmlEffect, &parseImpl](const char* tag,
+                                                   const std::shared_ptr<EffectImpl>& proxyLib) {
             auto* xmlProxyLib = xmlEffect.FirstChildElement(tag);
             if (xmlProxyLib == nullptr) {
                 ALOGE("effectProxy must contain a <%s>: %s", tag, dump(xmlEffect));
                 return false;
             }
-            return parseImpl(*xmlProxyLib, proxyLib);
+            return parseImpl(*xmlProxyLib, *proxyLib);
         };
+        effect.libSw = std::make_shared<EffectImpl>();
+        effect.libHw = std::make_shared<EffectImpl>();
         if (!parseProxy("libhw", effect.libHw) || !parseProxy("libsw", effect.libSw)) {
+            effect.libSw.reset();
+            effect.libHw.reset();
             return false;
         }
     }
 
-    effects->push_back(std::move(effect));
+    effects->push_back(std::make_shared<const Effect>(effect));
     return true;
 }
 
@@ -250,12 +259,12 @@ bool parseStream(const XMLElement& xmlStream, Effects& effects, std::vector<Stre
             ALOGE("<stream|device>/apply must have reference an effect: %s", dump(xmlApply));
             return false;
         }
-        auto* effect = findByName(effectName, effects);
+        auto effect = findByName(effectName, effects);
         if (effect == nullptr) {
             ALOGE("Could not find effect referenced in: %s", dump(xmlApply));
             return false;
         }
-        stream.effects.emplace_back(*effect);
+        stream.effects.emplace_back(effect);
     }
     streams->push_back(std::move(stream));
     return true;
