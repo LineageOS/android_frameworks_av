@@ -120,7 +120,7 @@ status_t HeicCompositeStream::createInternalStreams(const std::vector<sp<Surface
         camera_stream_rotation_t rotation, int *id, const String8& physicalCameraId,
         const std::unordered_set<int32_t> &sensorPixelModesUsed,
         std::vector<int> *surfaceIds,
-        int /*streamSetId*/, bool /*isShared*/, int32_t /*colorSpace*/,
+        int /*streamSetId*/, bool /*isShared*/, int32_t colorSpace,
         int64_t /*dynamicProfile*/, int64_t /*streamUseCase*/, bool useReadoutTimestamp) {
     sp<CameraDeviceBase> device = mDevice.promote();
     if (!device.get()) {
@@ -153,7 +153,7 @@ status_t HeicCompositeStream::createInternalStreams(const std::vector<sp<Surface
             ANDROID_SCALER_AVAILABLE_STREAM_USE_CASES_DEFAULT,
             OutputConfiguration::TIMESTAMP_BASE_DEFAULT,
             OutputConfiguration::MIRROR_MODE_AUTO,
-            ANDROID_REQUEST_AVAILABLE_COLOR_SPACE_PROFILES_MAP_UNSPECIFIED,
+            colorSpace,
             useReadoutTimestamp);
     if (res == OK) {
         mAppSegmentSurfaceId = (*surfaceIds)[0];
@@ -196,7 +196,7 @@ status_t HeicCompositeStream::createInternalStreams(const std::vector<sp<Surface
             ANDROID_SCALER_AVAILABLE_STREAM_USE_CASES_DEFAULT,
             OutputConfiguration::TIMESTAMP_BASE_DEFAULT,
             OutputConfiguration::MIRROR_MODE_AUTO,
-            ANDROID_REQUEST_AVAILABLE_COLOR_SPACE_PROFILES_MAP_UNSPECIFIED,
+            colorSpace,
             useReadoutTimestamp);
     if (res == OK) {
         mMainImageSurfaceId = sourceSurfaceId[0];
