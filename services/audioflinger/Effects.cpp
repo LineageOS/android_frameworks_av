@@ -3375,8 +3375,18 @@ status_t AudioFlinger::DeviceEffectProxy::checkPort(const PatchPanel::Patch& pat
     ALOGV("%s type %d device type %d address %s device ID %d patch.isSoftware() %d",
             __func__, port->type, port->ext.device.type,
             port->ext.device.address, port->id, patch.isSoftware());
-    if (port->type != AUDIO_PORT_TYPE_DEVICE || port->ext.device.type != mDevice.mType
-        || port->ext.device.address != mDevice.address()) {
+    if (port->type != AUDIO_PORT_TYPE_DEVICE || port->ext.device.type != mDevice.mType ||
+        port->ext.device.address != mDevice.address()) {
+        return NAME_NOT_FOUND;
+    }
+    if (((mDescriptor.flags & EFFECT_FLAG_TYPE_MASK) == EFFECT_FLAG_TYPE_POST_PROC) &&
+        (audio_port_config_has_input_direction(port))) {
+        ALOGI("%s don't create postprocessing effect on record port", __func__);
+        return NAME_NOT_FOUND;
+    }
+    if (((mDescriptor.flags & EFFECT_FLAG_TYPE_MASK) == EFFECT_FLAG_TYPE_PRE_PROC) &&
+        (!audio_port_config_has_input_direction(port))) {
+        ALOGI("%s don't create preprocessing effect on playback port", __func__);
         return NAME_NOT_FOUND;
     }
     status_t status = NAME_NOT_FOUND;
@@ -3407,20 +3417,12 @@ status_t AudioFlinger::DeviceEffectProxy::checkPort(const PatchPanel::Patch& pat
     } else if (patch.isSoftware() || patch.thread().promote() != nullptr) {
         sp <ThreadBase> thread;
         if (audio_port_config_has_input_direction(port)) {
-            if ((mDescriptor.flags & EFFECT_FLAG_TYPE_MASK) == EFFECT_FLAG_TYPE_POST_PROC) {
-                ALOGI("%s don't create postprocessing effect on record thread", __func__);
-                return NAME_NOT_FOUND;
-            }
             if (patch.isSoftware()) {
                 thread = patch.mRecord.thread();
             } else {
                 thread = patch.thread().promote();
             }
         } else {
-            if ((mDescriptor.flags & EFFECT_FLAG_TYPE_MASK) == EFFECT_FLAG_TYPE_PRE_PROC) {
-                ALOGI("%s don't create preprocessing effect on playback thread", __func__);
-                return NAME_NOT_FOUND;
-            }
             if (patch.isSoftware()) {
                 thread = patch.mPlayback.thread();
             } else {
@@ -3436,6 +3438,7 @@ status_t AudioFlinger::DeviceEffectProxy::checkPort(const PatchPanel::Patch& pat
     } else {
         status = BAD_VALUE;
     }
+
     if (status == NO_ERROR || status == ALREADY_EXISTS) {
         Status bs;
         if (isEnabled()) {
