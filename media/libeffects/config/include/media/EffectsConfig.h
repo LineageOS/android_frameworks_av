@@ -49,26 +49,27 @@ struct Library {
     std::string name;
     std::string path;
 };
-using Libraries = std::vector<Library>;
+using Libraries = std::vector<std::shared_ptr<const Library>>;
 
 struct EffectImpl {
-    Library* library; //< Only valid as long as the associated library vector is unmodified
+    //< Only valid as long as the associated library vector is unmodified
+    std::shared_ptr<const Library> library;
     effect_uuid_t uuid;
 };
 
 struct Effect : public EffectImpl {
     std::string name;
     bool isProxy;
-    EffectImpl libSw; //< Only valid if isProxy
-    EffectImpl libHw; //< Only valid if isProxy
+    std::shared_ptr<EffectImpl> libSw; //< Only valid if isProxy
+    std::shared_ptr<EffectImpl> libHw; //< Only valid if isProxy
 };
 
-using Effects = std::vector<Effect>;
+using Effects = std::vector<std::shared_ptr<const Effect>>;
 
 template <class Type>
 struct Stream {
     Type type;
-    std::vector<std::reference_wrapper<Effect>> effects;
+    Effects effects;
 };
 using OutputStream = Stream<audio_stream_type_t>;
 using InputStream = Stream<audio_source_t>;
