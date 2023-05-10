@@ -918,8 +918,7 @@ status_t AudioPolicyEffects::loadAudioEffectConfig(
         for (auto& stream : processingChain) {
             auto effectDescs = std::make_unique<EffectDescVector>();
             for (auto& effect : stream.effects) {
-                effectDescs->mEffects.add(
-                        new EffectDesc{effect.get().name.c_str(), effect.get().uuid});
+                effectDescs->mEffects.add(new EffectDesc{effect->name.c_str(), effect->uuid});
             }
             streams.add(stream.type, effectDescs.release());
         }
@@ -929,8 +928,7 @@ status_t AudioPolicyEffects::loadAudioEffectConfig(
         for (auto& deviceProcess : processingChain) {
             auto effectDescs = std::make_unique<EffectDescVector>();
             for (auto& effect : deviceProcess.effects) {
-                effectDescs->mEffects.add(
-                        new EffectDesc{effect.get().name.c_str(), effect.get().uuid});
+                effectDescs->mEffects.add(new EffectDesc{effect->name.c_str(), effect->uuid});
             }
             auto deviceEffects = std::make_unique<DeviceEffects>(
                         std::move(effectDescs), deviceProcess.type, deviceProcess.address);
