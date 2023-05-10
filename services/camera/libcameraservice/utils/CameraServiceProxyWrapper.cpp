@@ -53,6 +53,7 @@ void CameraServiceProxyWrapper::CameraSessionStatsWrapper::onClose(
     mSessionStats.mNewCameraState = CameraSessionStats::CAMERA_STATE_CLOSED;
     mSessionStats.mLatencyMs = latencyMs;
     mSessionStats.mDeviceError = deviceError;
+    mSessionStats.mSessionIndex = 0;
     updateProxyDeviceState(proxyBinder);
 }
 
@@ -74,6 +75,7 @@ void CameraServiceProxyWrapper::CameraSessionStatsWrapper::onActive(
 
     mSessionStats.mNewCameraState = CameraSessionStats::CAMERA_STATE_ACTIVE;
     mSessionStats.mMaxPreviewFps = maxPreviewFps;
+    mSessionStats.mSessionIndex++;
     updateProxyDeviceState(proxyBinder);
 
     // Reset mCreationDuration to -1 to distinguish between 1st session
