@@ -158,6 +158,7 @@ public:
     std::vector<CameraStreamStats> mStreamStats;
     String16 mUserTag;
     int mVideoStabilizationMode;
+    int mSessionIndex;
 
     // Constructors
     CameraSessionStats();
