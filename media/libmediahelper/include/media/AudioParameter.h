@@ -55,11 +55,22 @@ public:
     static const char * const keyClosing;
     static const char * const keyExiting;
 
+    //  keyBtSco: Whether BT SCO is 'on' or 'off'
+    //  keyBtScoHeadsetName: BT SCO headset name (for debugging)
     //  keyBtNrec: BT SCO Noise Reduction + Echo Cancellation parameters
+    //  keyBtScoWb: BT SCO NR wideband mode
+    //  keyHfp...: Parameters of the Hands-Free Profile
+    static const char * const keyBtSco;
+    static const char * const keyBtScoHeadsetName;
+    static const char * const keyBtNrec;
+    static const char * const keyBtScoWb;
+    static const char * const keyBtHfpEnable;
+    static const char * const keyBtHfpSamplingRate;
+    static const char * const keyBtHfpVolume;
+
     //  keyHwAvSync: get HW synchronization source identifier from a device
     //  keyMonoOutput: Enable mono audio playback
     //  keyStreamHwAvSync: set HW synchronization source identifier on a stream
-    static const char * const keyBtNrec;
     static const char * const keyHwAvSync;
     static const char * const keyMonoOutput;
     static const char * const keyStreamHwAvSync;
@@ -90,13 +101,19 @@ public:
 
     static const char * const valueOn;
     static const char * const valueOff;
+    static const char * const valueTrue;
+    static const char * const valueFalse;
 
     static const char * const valueListSeparator;
 
+    // keyBtA2dpSuspended: 'true' or 'false'
     // keyReconfigA2dp: Ask HwModule to reconfigure A2DP offloaded codec
     // keyReconfigA2dpSupported: Query if HwModule supports A2DP offload codec config
+    // keyBtLeSuspended: 'true' or 'false'
+    static const char * const keyBtA2dpSuspended;
     static const char * const keyReconfigA2dp;
     static const char * const keyReconfigA2dpSupported;
+    static const char * const keyBtLeSuspended;
 
     // For querying device supported encapsulation capabilities. All returned values are integer,
     // which are bit fields composed from using encapsulation capability values as position bits.
