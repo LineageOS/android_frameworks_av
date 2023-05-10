@@ -20,6 +20,7 @@
 #include <utils/Log.h>
 
 #include <media/AudioParameter.h>
+#include <hardware/audio.h>
 #include <system/audio.h>
 
 namespace android {
@@ -34,7 +35,13 @@ const char * const AudioParameter::keyInputSource = AUDIO_PARAMETER_STREAM_INPUT
 const char * const AudioParameter::keyScreenState = AUDIO_PARAMETER_KEY_SCREEN_STATE;
 const char * const AudioParameter::keyClosing = AUDIO_PARAMETER_KEY_CLOSING;
 const char * const AudioParameter::keyExiting = AUDIO_PARAMETER_KEY_EXITING;
+const char * const AudioParameter::keyBtSco = AUDIO_PARAMETER_KEY_BT_SCO;
+const char * const AudioParameter::keyBtScoHeadsetName = AUDIO_PARAMETER_KEY_BT_SCO_HEADSET_NAME;
 const char * const AudioParameter::keyBtNrec = AUDIO_PARAMETER_KEY_BT_NREC;
+const char * const AudioParameter::keyBtScoWb = AUDIO_PARAMETER_KEY_BT_SCO_WB;
+const char * const AudioParameter::keyBtHfpEnable = AUDIO_PARAMETER_KEY_HFP_ENABLE;
+const char * const AudioParameter::keyBtHfpSamplingRate = AUDIO_PARAMETER_KEY_HFP_SET_SAMPLING_RATE;
+const char * const AudioParameter::keyBtHfpVolume = AUDIO_PARAMETER_KEY_HFP_VOLUME;
 const char * const AudioParameter::keyHwAvSync = AUDIO_PARAMETER_HW_AV_SYNC;
 const char * const AudioParameter::keyPresentationId = AUDIO_PARAMETER_STREAM_PRESENTATION_ID;
 const char * const AudioParameter::keyProgramId = AUDIO_PARAMETER_STREAM_PROGRAM_ID;
@@ -52,9 +59,13 @@ const char * const AudioParameter::keyStreamSupportedSamplingRates =
         AUDIO_PARAMETER_STREAM_SUP_SAMPLING_RATES;
 const char * const AudioParameter::valueOn = AUDIO_PARAMETER_VALUE_ON;
 const char * const AudioParameter::valueOff = AUDIO_PARAMETER_VALUE_OFF;
+const char * const AudioParameter::valueTrue = AUDIO_PARAMETER_VALUE_TRUE;
+const char * const AudioParameter::valueFalse = AUDIO_PARAMETER_VALUE_FALSE;
 const char * const AudioParameter::valueListSeparator = AUDIO_PARAMETER_VALUE_LIST_SEPARATOR;
+const char * const AudioParameter::keyBtA2dpSuspended = AUDIO_PARAMETER_KEY_BT_A2DP_SUSPENDED;
 const char * const AudioParameter::keyReconfigA2dp = AUDIO_PARAMETER_RECONFIG_A2DP;
 const char * const AudioParameter::keyReconfigA2dpSupported = AUDIO_PARAMETER_A2DP_RECONFIG_SUPPORTED;
+const char * const AudioParameter::keyBtLeSuspended = AUDIO_PARAMETER_KEY_BT_LE_SUSPENDED;
 // const char * const AudioParameter::keyDeviceSupportedEncapsulationModes =
 //        AUDIO_PARAMETER_DEVICE_SUP_ENCAPSULATION_MODES;
 // const char * const AudioParameter::keyDeviceSupportedEncapsulationMetadataTypes =
