@@ -601,6 +601,7 @@ private:
             status_t internalError = UNKNOWN_ERROR);
 
     status_t requestIDRFrame();
+    status_t setSurfaceParameters(const sp<AMessage> &params);
     status_t setParameters(const sp<AMessage> &params);
 
     // set vendor extension parameters specified in params that are supported by the codec
