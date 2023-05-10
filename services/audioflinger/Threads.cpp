@@ -4575,7 +4575,8 @@ status_t AudioFlinger::PlaybackThread::handleVoipVolume_l(float *volume)
     if ((mOutput->flags & AUDIO_OUTPUT_FLAG_VOIP_RX) != 0) {
         if (*volume != mLeftVolFloat) {
             result = mOutput->stream->setVolume(*volume, *volume);
-            ALOGE_IF(result != OK,
+            // HAL can return INVALID_OPERATION if operation is not supported.
+            ALOGE_IF(result != OK && result != INVALID_OPERATION,
                      "Error when setting output stream volume: %d", result);
             if (result == NO_ERROR) {
                 mLeftVolFloat = *volume;
