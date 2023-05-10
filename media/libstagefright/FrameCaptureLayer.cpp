@@ -64,14 +64,6 @@ ui::Dataspace translateDataspace(ui::Dataspace dataspace) {
     return updatedDataspace;
 }
 
-bool isHdrY410(const BufferItem &bi) {
-    ui::Dataspace dataspace = translateDataspace(static_cast<ui::Dataspace>(bi.mDataSpace));
-    // pixel format is HDR Y410 masquerading as RGBA_1010102
-    return ((dataspace == ui::Dataspace::BT2020_ITU_PQ ||
-            dataspace == ui::Dataspace::BT2020_ITU_HLG) &&
-            bi.mGraphicBuffer->getPixelFormat() == HAL_PIXEL_FORMAT_RGBA_1010102);
-}
-
 struct FrameCaptureLayer::BufferLayer : public FrameCaptureProcessor::Layer {
     BufferLayer(const BufferItem &bi) : mBufferItem(bi) {}
     void getLayerSettings(
@@ -95,7 +87,6 @@ void FrameCaptureLayer::BufferLayer::getLayerSettings(
     layerSettings->source.buffer.fence = mBufferItem.mFence;
     layerSettings->source.buffer.textureName = textureName;
     layerSettings->source.buffer.usePremultipliedAlpha = false;
-    layerSettings->source.buffer.isY410BT2020 = isHdrY410(mBufferItem);
     bool hasSmpte2086 = mBufferItem.mHdrMetadata.validTypes & HdrMetadata::SMPTE2086;
     bool hasCta861_3 = mBufferItem.mHdrMetadata.validTypes & HdrMetadata::CTA861_3;
     layerSettings->source.buffer.maxMasteringLuminance = hasSmpte2086
