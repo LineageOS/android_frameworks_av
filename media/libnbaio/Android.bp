@@ -49,7 +49,7 @@ cc_library_shared {
     defaults: ["libnbaio_mono_defaults"],
 }
 
-cc_library_shared {
+cc_library {
     name: "libnbaio",
     defaults: ["libnbaio_mono_defaults"],
     srcs: [
