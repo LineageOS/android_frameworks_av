@@ -9504,6 +9504,9 @@ status_t AudioFlinger::MmapThread::start(const AudioClient& client,
     audio_port_handle_t portId = AUDIO_PORT_HANDLE_NONE;
 
     audio_io_handle_t io = mId;
+    AttributionSourceState adjAttributionSource = AudioFlinger::checkAttributionSourcePackage(
+            client.attributionSource);
+
     if (isOutput()) {
         audio_config_t config = AUDIO_CONFIG_INITIALIZER;
         config.sample_rate = mSampleRate;
@@ -9517,7 +9520,7 @@ status_t AudioFlinger::MmapThread::start(const AudioClient& client,
         ret = AudioSystem::getOutputForAttr(&mAttr, &io,
                                             mSessionId,
                                             &stream,
-                                            client.attributionSource,
+                                            adjAttributionSource,
                                             &config,
                                             flags,
                                             &deviceId,
@@ -9534,7 +9537,7 @@ status_t AudioFlinger::MmapThread::start(const AudioClient& client,
         ret = AudioSystem::getInputForAttr(&mAttr, &io,
                                               RECORD_RIID_INVALID,
                                               mSessionId,
-                                              client.attributionSource,
+                                              adjAttributionSource,
                                               &config,
                                               AUDIO_INPUT_FLAG_MMAP_NOIRQ,
                                               &deviceId,
