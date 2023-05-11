@@ -1801,8 +1801,6 @@ void CCodecBufferChannel::flush(const std::list<std::unique_ptr<C2Work>> &flushe
             output->buffers->flushStash();
         }
     }
-    // reset the frames that are being tracked for onFrameRendered callbacks
-    mTrackedFrames.clear();
 }
 
 void CCodecBufferChannel::onWorkDone(
