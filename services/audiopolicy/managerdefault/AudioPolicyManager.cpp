@@ -4373,6 +4373,11 @@ status_t AudioPolicyManager::getSupportedMixerAttributes(
         ALOGE("%s the requested device is currently unavailable", __func__);
         return BAD_VALUE;
     }
+    if (!audio_is_usb_out_device(deviceDescriptor->type())) {
+        ALOGE("%s the requested device(type=%#x) is not usb device", __func__,
+              deviceDescriptor->type());
+        return BAD_VALUE;
+    }
     for (const auto& hwModule : mHwModules) {
         for (const auto& curProfile : hwModule->getOutputProfiles()) {
             if (curProfile->supportsDevice(deviceDescriptor)) {
