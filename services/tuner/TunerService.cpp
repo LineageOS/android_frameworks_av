@@ -100,8 +100,11 @@ binder_status_t TunerService::instantiate() {
 
     if (fallBackToOpenDemux) {
         auto status = mTuner->openDemux(&ids, &demux);
-        return ::ndk::ScopedAStatus::fromServiceSpecificError(
-                static_cast<int32_t>(Result::UNAVAILABLE));
+        if (status.isOk()) {
+            *_aidl_return = ::ndk::SharedRefBase::make<TunerDemux>(demux, ids[0],
+                                                                   this->ref<TunerService>());
+        }
+        return status;
     } else {
         int id = TunerHelper::getResourceIdFromHandle(in_demuxHandle, DEMUX);
         auto status = mTuner->openDemuxById(id, &demux);
