@@ -155,6 +155,7 @@ static const char *kCodecLatencyHist = "android.media.mediacodec.latency.hist"; 
 static const char *kCodecLatencyUnknown = "android.media.mediacodec.latency.unknown";
 static const char *kCodecQueueSecureInputBufferError = "android.media.mediacodec.queueSecureInputBufferError";
 static const char *kCodecQueueInputBufferError = "android.media.mediacodec.queueInputBufferError";
+static const char *kCodecComponentColorFormat = "android.media.mediacodec.component-color-format";
 
 static const char *kCodecNumLowLatencyModeOn = "android.media.mediacodec.low-latency.on";  /* 0..n */
 static const char *kCodecNumLowLatencyModeOff = "android.media.mediacodec.low-latency.off";  /* 0..n */
@@ -3806,6 +3807,14 @@ void MediaCodec::onMessageReceived(const sp<AMessage> &msg) {
                         int32_t level = 0;
                         if (interestingFormat->findInt32("level", &level)) {
                             mediametrics_setInt32(mMetricsHandle, kCodecLevel, level);
+                        }
+                        sp<AMessage> uncompressedFormat =
+                                (mFlags & kFlagIsEncoder) ? mInputFormat : mOutputFormat;
+                        int32_t componentColorFormat  = -1;
+                        if (uncompressedFormat->findInt32("android._color-format",
+                                &componentColorFormat)) {
+                            mediametrics_setInt32(mMetricsHandle,
+                                    kCodecComponentColorFormat, componentColorFormat);
                         }
                         updateHdrMetrics(true /* isConfig */);
                         int32_t codecMaxInputSize = -1;

@@ -648,6 +648,12 @@ bool statsd_codec(const std::shared_ptr<const mediametrics::Item>& item,
     }
     AStatsEvent_writeInt32(event, resolutionChangeCount);
 
+    int32_t componentColorFormat = -1;
+    if (item->getInt32("android.media.mediacodec.component-color-format", &componentColorFormat)) {
+        metrics_proto.set_component_color_format(componentColorFormat);
+    }
+    AStatsEvent_writeInt32(event, componentColorFormat);
+
     int64_t firstRenderTimeUs = -1;
     item->getInt64("android.media.mediacodec.first-render-time-us", &firstRenderTimeUs);
     int64_t framesReleased = -1;
