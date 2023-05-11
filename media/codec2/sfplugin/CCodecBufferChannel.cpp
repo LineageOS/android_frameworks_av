@@ -1801,8 +1801,6 @@ void CCodecBufferChannel::flush(const std::list<std::unique_ptr<C2Work>> &flushe
             output->buffers->flushStash();
         }
     }
-    // reset the frames that are being tracked for onFrameRendered callbacks
-    mTrackedFrames.clear();
 }
 
 void CCodecBufferChannel::onWorkDone(
@@ -2113,7 +2111,10 @@ bool CCodecBufferChannel::handleWork(
             outBuffer->meta()->setInt32("flags", BUFFER_FLAG_CODEC_CONFIG);
             ALOGV("[%s] onWorkDone: csd index = %zu [%p]", mName, index, outBuffer.get());
 
-            output.unlock();
+            // TRICKY: we want popped buffers reported in order, so sending
+            // the callback while holding the lock here. This assumes that
+            // onOutputBufferAvailable() does not block. onOutputBufferAvailable()
+            // callbacks are always sent with the Output lock held.
             mCallback->onOutputBufferAvailable(index, outBuffer);
         } else {
             ALOGD("[%s] onWorkDone: unable to register csd", mName);
@@ -2203,7 +2204,10 @@ void CCodecBufferChannel::sendOutputBuffers() {
         case OutputBuffers::DISCARD:
             break;
         case OutputBuffers::NOTIFY_CLIENT:
-            output.unlock();
+            // TRICKY: we want popped buffers reported in order, so sending
+            // the callback while holding the lock here. This assumes that
+            // onOutputBufferAvailable() does not block. onOutputBufferAvailable()
+            // callbacks are always sent with the Output lock held.
             mCallback->onOutputBufferAvailable(index, outBuffer);
             break;
         case OutputBuffers::REALLOCATE:
