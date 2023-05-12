@@ -80,7 +80,6 @@ cc_fuzz {
     static_libs: [
         "libmediautils",
         "liblog",
-        "libdl",
         "libdrmframeworkcommon",
         "libselinux",
         "libstagefright_foundation",
