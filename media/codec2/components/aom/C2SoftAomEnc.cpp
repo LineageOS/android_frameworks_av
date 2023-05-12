@@ -636,11 +636,11 @@ void C2SoftAomEnc::process(const std::unique_ptr<C2Work>& work,
         return;
     }
 
-    std::shared_ptr<const C2GraphicView> rView;
+    std::shared_ptr<C2GraphicView> rView;
     std::shared_ptr<C2Buffer> inputBuffer;
     if (!work->input.buffers.empty()) {
         inputBuffer = work->input.buffers[0];
-        rView = std::make_shared<const C2GraphicView>(
+        rView = std::make_shared<C2GraphicView>(
                 inputBuffer->data().graphicBlocks().front().map().get());
         if (rView->error() != C2_OK) {
             ALOGE("graphic view map err = %d", rView->error());
@@ -677,6 +677,10 @@ void C2SoftAomEnc::process(const std::unique_ptr<C2Work>& work,
         work->result = C2_CORRUPTED;
         return;
     }
+
+    //(b/279387842)
+    //workaround for incorrect crop size in view when using surface mode
+    rView->setCrop_be(C2Rect(mSize->width, mSize->height));
 
     if (!mHeadersReceived) {
         Av1Config av1_config;
