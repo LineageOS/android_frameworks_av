@@ -23,6 +23,7 @@
 #include <audio_utils/primitives.h>
 
 #include "AudioFlinger.h"
+#include "EffectConfiguration.h"
 #include <media/audiohal/EffectsFactoryHalInterface.h>
 
 // ----------------------------------------------------------------------------
@@ -111,14 +112,16 @@ sp<AudioFlinger::EffectHandle> AudioFlinger::DeviceEffectManager::createEffect_l
 
 status_t AudioFlinger::DeviceEffectManager::checkEffectCompatibility(
         const effect_descriptor_t *desc) {
-    sp<EffectsFactoryHalInterface> effectsFactory = mAudioFlinger.getEffectsFactory();
+    const sp<EffectsFactoryHalInterface> effectsFactory =
+            audioflinger::EffectConfiguration::getEffectsFactoryHal();
     if (effectsFactory == nullptr) {
         return BAD_VALUE;
     }
 
-    static AudioHalVersionInfo sMinDeviceEffectHalVersion =
+    static const AudioHalVersionInfo sMinDeviceEffectHalVersion =
             AudioHalVersionInfo(AudioHalVersionInfo::Type::HIDL, 6, 0);
-    AudioHalVersionInfo halVersion = effectsFactory->getHalVersion();
+    static const AudioHalVersionInfo halVersion =
+            audioflinger::EffectConfiguration::getAudioHalVersionInfo();
 
     // We can trust AIDL generated AudioHalVersionInfo comparison operator (based on std::tie) as
     // long as the type, major and minor sequence doesn't change in the definition.
@@ -137,7 +140,8 @@ status_t AudioFlinger::DeviceEffectManager::createEffectHal(
         const effect_uuid_t *pEffectUuid, int32_t sessionId, int32_t deviceId,
         sp<EffectHalInterface> *effect) {
     status_t status = NO_INIT;
-    sp<EffectsFactoryHalInterface> effectsFactory = mAudioFlinger.getEffectsFactory();
+    const sp<EffectsFactoryHalInterface> effectsFactory =
+            audioflinger::EffectConfiguration::getEffectsFactoryHal();
     if (effectsFactory != 0) {
         status = effectsFactory->createEffect(
                 pEffectUuid, sessionId, AUDIO_IO_HANDLE_NONE, deviceId, effect);

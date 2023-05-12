@@ -44,6 +44,7 @@
 #include <mediautils/TimeCheck.h>
 
 #include "AudioFlinger.h"
+#include "EffectConfiguration.h"
 
 // ----------------------------------------------------------------------------
 
@@ -65,6 +66,7 @@
 namespace android {
 
 using aidl_utils::statusTFromBinderStatus;
+using audioflinger::EffectConfiguration;
 using binder::Status;
 
 namespace {
@@ -982,6 +984,7 @@ status_t AudioFlinger::EffectModule::configure()
 
 #ifdef MULTICHANNEL_EFFECT_CHAIN
     if (status != NO_ERROR &&
+            EffectConfiguration::isHidl() && // only HIDL effects support channel conversion
             mIsOutput &&
             (mConfig.inputCfg.channels != AUDIO_CHANNEL_OUT_STEREO
                     || mConfig.outputCfg.channels != AUDIO_CHANNEL_OUT_STEREO)) {
@@ -1012,7 +1015,8 @@ status_t AudioFlinger::EffectModule::configure()
         mSupportsFloat = true;
     }
 
-    if (status != NO_ERROR) {
+    // only HIDL effects support integer conversion.
+    if (status != NO_ERROR && EffectConfiguration::isHidl()) {
         ALOGV("EFFECT_CMD_SET_CONFIG failed with float format, retry with int16_t.");
         mConfig.inputCfg.format = AUDIO_FORMAT_PCM_16_BIT;
         mConfig.outputCfg.format = AUDIO_FORMAT_PCM_16_BIT;
@@ -3032,7 +3036,8 @@ status_t AudioFlinger::EffectChain::EffectCallback::createEffectHal(
         const effect_uuid_t *pEffectUuid, int32_t sessionId, int32_t deviceId,
         sp<EffectHalInterface> *effect) {
     status_t status = NO_INIT;
-    sp<EffectsFactoryHalInterface> effectsFactory = mAudioFlinger.getEffectsFactory();
+    const sp<EffectsFactoryHalInterface> effectsFactory =
+            EffectConfiguration::getEffectsFactoryHal();
     if (effectsFactory != 0) {
         status = effectsFactory->createEffect(pEffectUuid, sessionId, io(), deviceId, effect);
     }
