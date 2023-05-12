@@ -13,19 +13,27 @@
      See the License for the specific language governing permissions and
      limitations under the License.
 -->
-<configuration description="Test module config for Amr-nb Encoder unit test">
+<configuration description="Test module config for Amr-wb Encoder unit test">
     <option name="test-suite-tag" value="AmrnbEncoderTest" />
     <target_preparer class="com.android.tradefed.targetprep.PushFilePreparer">
         <option name="cleanup" value="true" />
         <option name="push" value="AmrnbEncoderTest->/data/local/tmp/AmrnbEncoderTest" />
-        <option name="push-file"
-            key="https://storage.googleapis.com/android_media/frameworks/av/media/libstagefright/codecs/amrnb/enc/test/AmrnbEncoderTest.zip?unzip=true"
-            value="/data/local/tmp/AmrnbEncoderTestRes/" />
+    </target_preparer>
+
+    <target_preparer class="com.android.compatibility.common.tradefed.targetprep.DynamicConfigPusher">
+        <option name="target" value="host" />
+        <option name="config-filename" value="AmrnbEncoderTest" />
+        <option name="version" value="1.0"/>
+    </target_preparer>
+    <target_preparer class="com.android.compatibility.common.tradefed.targetprep.MediaPreparer">
+        <option name="push-all" value="true" />
+        <option name="media-folder-name" value="AmrnbEncoderTest-1.0" />
+        <option name="dynamic-config-module" value="AmrnbEncoderTest" />
     </target_preparer>
 
     <test class="com.android.tradefed.testtype.GTest" >
         <option name="native-test-device-path" value="/data/local/tmp" />
         <option name="module-name" value="AmrnbEncoderTest" />
-        <option name="native-test-flag" value="-P /data/local/tmp/AmrnbEncoderTestRes/" />
+        <option name="native-test-flag" value="-P /sdcard/test/AmrnbEncoderTest-1.0/" />
     </test>
 </configuration>
