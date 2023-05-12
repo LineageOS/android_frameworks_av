@@ -1843,14 +1843,12 @@ void AudioPolicyService::UidPolicy::dumpInternals(int fd) {
 void AudioPolicyService::SensorPrivacyPolicy::registerSelf() {
     SensorPrivacyManager spm;
     mSensorPrivacyEnabled = spm.isSensorPrivacyEnabled();
-    (void)spm.addToggleSensorPrivacyListener(this);
     spm.addSensorPrivacyListener(this);
 }
 
 void AudioPolicyService::SensorPrivacyPolicy::unregisterSelf() {
     SensorPrivacyManager spm;
     spm.removeSensorPrivacyListener(this);
-    spm.removeToggleSensorPrivacyListener(this);
 }
 
 bool AudioPolicyService::SensorPrivacyPolicy::isSensorPrivacyEnabled() {
@@ -1919,6 +1917,7 @@ void AudioPolicyService::OpRecordAudioMonitor::onFirstRef()
     // since it controls the mic permission for legacy apps.
     mAppOpsManager.startWatchingMode(mAppOp, VALUE_OR_FATAL(aidl2legacy_string_view_String16(
         mAttributionSource.packageName.value_or(""))),
+        AppOpsManager::WATCH_FOREGROUND_CHANGES,
         mOpCallback);
 }
 
