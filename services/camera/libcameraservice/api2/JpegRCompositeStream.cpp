@@ -658,6 +658,13 @@ status_t JpegRCompositeStream::configureStream() {
         return res;
     }
 
+    if ((res = native_window_set_usage(mOutputSurface.get(),
+            GRALLOC_USAGE_SW_READ_OFTEN | GRALLOC_USAGE_SW_WRITE_OFTEN)) != OK) {
+        ALOGE("%s: Unable to configure stream buffer usage for stream %d", __FUNCTION__,
+                mP010StreamId);
+        return res;
+    }
+
     int maxProducerBuffers;
     ANativeWindow *anw = mP010Surface.get();
     if ((res = anw->query(anw, NATIVE_WINDOW_MIN_UNDEQUEUED_BUFFERS, &maxProducerBuffers)) != OK) {
