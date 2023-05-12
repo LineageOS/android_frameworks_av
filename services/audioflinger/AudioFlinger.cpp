@@ -58,6 +58,7 @@
 #include <audiomanager/IAudioManager.h>
 
 #include "AudioFlinger.h"
+#include "EffectConfiguration.h"
 #include "NBAIO_Tee.h"
 #include "PropertyUtils.h"
 
@@ -372,7 +373,7 @@ AudioFlinger::AudioFlinger()
     BatteryNotifier::getInstance().noteResetAudio();
 
     mDevicesFactoryHal = DevicesFactoryHalInterface::create();
-    mEffectsFactoryHal = EffectsFactoryHalInterface::create();
+    mEffectsFactoryHal = audioflinger::EffectConfiguration::getEffectsFactoryHal();
 
     mMediaLogNotifier->run("MediaLogNotifier");
     std::vector<pid_t> halPids;
