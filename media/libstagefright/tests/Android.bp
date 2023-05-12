@@ -55,3 +55,20 @@ cc_test {
         "-Wall",
     ],
 }
+
+cc_test {
+    name: "VideoRenderQualityTracker_test",
+    srcs: ["VideoRenderQualityTracker_test.cpp"],
+
+    // TODO(b/234833109): Figure out why shared_libs linkage causes stack corruption
+    static_libs: [
+        "libstagefright",
+        "liblog",
+    ],
+
+    cflags: [
+        "-Werror",
+        "-Wall",
+    ],
+
+}
