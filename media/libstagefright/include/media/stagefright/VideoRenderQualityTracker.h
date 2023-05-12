@@ -63,6 +63,9 @@ struct VideoRenderQualityMetrics {
 
     // A histogram of the durations between each freeze.
     MediaHistogram freezeDistanceMsHistogram;
+
+    // A histogram of the judder scores.
+    MediaHistogram judderScoreHistogram;
 };
 
 ///////////////////////////////////////////////////////
@@ -113,6 +116,9 @@ public:
         // Freeze configuration
         std::vector<int64_t> freezeDurationMsHistogramBuckets;
         std::vector<int64_t> freezeDistanceMsHistogramBuckets;
+
+        int32_t judderErrorToleranceUs;
+        std::vector<int64_t> judderScoreHistogramBuckets;
     };
 
     VideoRenderQualityTracker();
@@ -196,6 +202,11 @@ private:
     // Process a frame freeze.
     static void processFreeze(int64_t actualRenderTimeUs, int64_t lastRenderTimeUs,
                               int64_t lastFreezeEndTimeUs, VideoRenderQualityMetrics &m);
+
+    // Compute a judder score for the previously-rendered frame.
+    static int64_t computePreviousJudderScore(const FrameDurationUs &actualRenderDurationUs,
+                                              const FrameDurationUs &contentRenderDurationUs,
+                                              const Configuration &c);
 
     // Check to see if a discontinuity has occurred by examining the content time and the
     // app-desired render time. If so, reset some internal state.

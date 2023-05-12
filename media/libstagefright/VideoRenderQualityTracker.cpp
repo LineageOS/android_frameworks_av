@@ -55,6 +55,10 @@ VideoRenderQualityTracker::Configuration::Configuration() {
     freezeDurationMsHistogramBuckets = {1, 20, 40, 60, 80, 100, 120, 150, 175, 225, 300, 400, 500};
     freezeDistanceMsHistogramBuckets = {0, 20, 100, 400, 1000, 2000, 3000, 4000, 8000, 15000, 30000,
                                         60000};
+
+    // Judder configuration
+    judderErrorToleranceUs = 2000;
+    judderScoreHistogramBuckets = {1, 4, 5, 9, 11, 20, 30, 40, 50, 60, 70, 80};
 }
 
 VideoRenderQualityTracker::VideoRenderQualityTracker() : mConfiguration(Configuration()) {
@@ -239,6 +243,14 @@ void VideoRenderQualityTracker::processMetricsForRenderedFrame(int64_t contentTi
         processFreeze(actualRenderTimeUs, mLastRenderTimeUs, mLastFreezeEndTimeUs, mMetrics);
         mLastFreezeEndTimeUs = actualRenderTimeUs;
     }
+
+    // Judder is computed on the prior video frame, not the current video frame
+    int64_t judderScore = computePreviousJudderScore(mActualFrameDurationUs,
+                                                     mContentFrameDurationUs,
+                                                     mConfiguration);
+    if (judderScore != 0) {
+        mMetrics.judderScoreHistogram.insert(judderScore);
+    }
 }
 
 void VideoRenderQualityTracker::processFreeze(int64_t actualRenderTimeUs, int64_t lastRenderTimeUs,
@@ -252,10 +264,53 @@ void VideoRenderQualityTracker::processFreeze(int64_t actualRenderTimeUs, int64_
     }
 }
 
+int64_t VideoRenderQualityTracker::computePreviousJudderScore(
+        const FrameDurationUs &actualFrameDurationUs,
+        const FrameDurationUs &contentFrameDurationUs,
+        const Configuration &c) {
+    // If the frame before or after was dropped, then don't generate a judder score, since any
+    // problems with frame drops are scored as a freeze instead.
+    if (actualFrameDurationUs[0] == -1 || actualFrameDurationUs[1] == -1 ||
+        actualFrameDurationUs[2] == -1) {
+        return 0;
+    }
+
+    // Don't score judder for when playback is paused or rebuffering (long frame duration), or if
+    // the player is intentionally playing each frame at a slow rate (e.g. half-rate). If the long
+    // frame duration was unintentional, it is assumed that this will be coupled with a later frame
+    // drop, and be scored as a freeze instead of judder.
+    if (actualFrameDurationUs[1] >= 2 * contentFrameDurationUs[1]) {
+        return 0;
+    }
+
+    // The judder score is based on the error of this frame
+    int64_t errorUs = actualFrameDurationUs[1] - contentFrameDurationUs[1];
+    // Don't score judder if the previous frame has high error, but this frame has low error
+    if (abs(errorUs) < c.judderErrorToleranceUs) {
+        return 0;
+    }
+
+    // Add a penalty if this frame has judder that amplifies the problem introduced by previous
+    // judder, instead of catching up for the previous judder (50, 16, 16, 50) vs (50, 16, 50, 16)
+    int64_t previousErrorUs = actualFrameDurationUs[2] - contentFrameDurationUs[2];
+    // Don't add the pentalty for errors from the previous frame if the previous frame has low error
+    if (abs(previousErrorUs) >= c.judderErrorToleranceUs) {
+        errorUs = abs(errorUs) + abs(errorUs + previousErrorUs);
+    }
+
+    // Avoid scoring judder for 3:2 pulldown or other minimally-small frame duration errors
+    if (abs(errorUs) < contentFrameDurationUs[1] / 4) {
+        return 0;
+    }
+
+    return abs(errorUs) / 1000; // error in millis to keep numbers small
+}
+
 void VideoRenderQualityTracker::configureHistograms(VideoRenderQualityMetrics &m,
                                                     const Configuration &c) {
     m.freezeDurationMsHistogram.setup(c.freezeDurationMsHistogramBuckets);
     m.freezeDistanceMsHistogram.setup(c.freezeDistanceMsHistogramBuckets);
+    m.judderScoreHistogram.setup(c.judderScoreHistogramBuckets);
 }
 
 int64_t VideoRenderQualityTracker::nowUs() {
