@@ -50,12 +50,13 @@ public:
         }
     }
 
-    void render(int numFrames) {
+    void render(int numFrames, float durationMs = -1) {
+        int64_t durationUs = durationMs < 0 ? mContentFrameDurationUs : durationMs * 1000;
         for (int i = 0; i < numFrames; ++i) {
             mVideoRenderQualityTracker.onFrameReleased(mMediaTimeUs);
             mVideoRenderQualityTracker.onFrameRendered(mMediaTimeUs, mClockTimeNs);
             mMediaTimeUs += mContentFrameDurationUs;
-            mClockTimeNs += mContentFrameDurationUs * 1000;
+            mClockTimeNs += durationUs * 1000;
         }
     }
 
@@ -289,6 +290,209 @@ TEST_F(VideoRenderQualityTrackerTest, capturesFreezeDistanceHistogram) {
     // occurrences
     EXPECT_EQ(h.getMetrics().freezeDistanceMsHistogram.getAvg(), ((5 + 3 + 9 + 1 + 6 + 12) * 17 -
                                                                   6 * 17) / 6);
+}
+
+TEST_F(VideoRenderQualityTrackerTest, when60hz_hasNoJudder) {
+    Configuration c;
+    Helper h(16.66, c); // ~24Hz
+    h.render({16.66, 16.66, 16.66, 16.66, 16.66, 16.66, 16.66});
+    EXPECT_LE(h.getMetrics().judderScoreHistogram.getMax(), 0);
+    EXPECT_EQ(h.getMetrics().judderScoreHistogram.getCount(), 0);
+}
+
+TEST_F(VideoRenderQualityTrackerTest, whenSmallVariance60hz_hasNoJudder) {
+    Configuration c;
+    Helper h(16.66, c); // ~24Hz
+    h.render({14, 18, 14, 18, 14, 18, 14, 18});
+    EXPECT_LE(h.getMetrics().judderScoreHistogram.getMax(), 0);
+    EXPECT_EQ(h.getMetrics().judderScoreHistogram.getCount(), 0);
+}
+
+TEST_F(VideoRenderQualityTrackerTest, whenBadSmallVariance60Hz_hasJudder) {
+    Configuration c;
+    Helper h(16.66, c); // ~24Hz
+    h.render({14, 18, 14, /* no 18 between 14s */ 14, 18, 14, 18});
+    EXPECT_EQ(h.getMetrics().judderScoreHistogram.getCount(), 1);
+}
+
+TEST_F(VideoRenderQualityTrackerTest, when30Hz_hasNoJudder) {
+    Configuration c;
+    Helper h(33.33, c);
+    h.render({33.33, 33.33, 33.33, 33.33, 33.33, 33.33});
+    EXPECT_LE(h.getMetrics().judderScoreHistogram.getMax(), 0);
+    EXPECT_EQ(h.getMetrics().judderScoreHistogram.getCount(), 0);
+}
+
+TEST_F(VideoRenderQualityTrackerTest, whenSmallVariance30Hz_hasNoJudder) {
+    Configuration c;
+    Helper h(33.33, c);
+    h.render({29.0, 35.0, 29.0, 35.0, 29.0, 35.0});
+    EXPECT_LE(h.getMetrics().judderScoreHistogram.getMax(), 0);
+    EXPECT_EQ(h.getMetrics().judderScoreHistogram.getCount(), 0);
+}
+
+TEST_F(VideoRenderQualityTrackerTest, whenBadSmallVariance30Hz_hasJudder) {
+    Configuration c;
+    Helper h(33.33, c);
+    h.render({29.0, 35.0, 29.0, /* no 35 between 29s */ 29.0, 35.0, 29.0, 35.0});
+    EXPECT_EQ(h.getMetrics().judderScoreHistogram.getCount(), 1);
+}
+
+TEST_F(VideoRenderQualityTrackerTest, whenBad30HzTo60Hz_hasJudder) {
+    Configuration c;
+    Helper h(33.33, c);
+    h.render({33.33, 33.33, 50.0, /* frame stayed 1 vsync too long */ 16.66, 33.33, 33.33});
+    EXPECT_EQ(h.getMetrics().judderScoreHistogram.getCount(), 2); // note: 2 counts of judder
+}
+
+TEST_F(VideoRenderQualityTrackerTest, when24HzTo60Hz_hasNoJudder) {
+    Configuration c;
+    Helper h(41.66, c);
+    h.render({50.0, 33.33, 50.0, 33.33, 50.0, 33.33});
+    EXPECT_LE(h.getMetrics().judderScoreHistogram.getMax(), 0);
+    EXPECT_EQ(h.getMetrics().judderScoreHistogram.getCount(), 0);
+}
+
+TEST_F(VideoRenderQualityTrackerTest, when25HzTo60Hz_hasJudder) {
+    Configuration c;
+    Helper h(40, c);
+    h.render({33.33, 33.33, 50.0});
+    h.render({33.33, 33.33, 50.0});
+    h.render({33.33, 33.33, 50.0});
+    h.render({33.33, 33.33, 50.0});
+    h.render({33.33, 33.33, 50.0});
+    h.render({33.33, 33.33, 50.0});
+    EXPECT_GT(h.getMetrics().judderScoreHistogram.getCount(), 0);
+}
+
+TEST_F(VideoRenderQualityTrackerTest, when50HzTo60Hz_hasJudder) {
+    Configuration c;
+    Helper h(20, c);
+    h.render({16.66, 16.66, 16.66, 33.33});
+    h.render({16.66, 16.66, 16.66, 33.33});
+    h.render({16.66, 16.66, 16.66, 33.33});
+    h.render({16.66, 16.66, 16.66, 33.33});
+    h.render({16.66, 16.66, 16.66, 33.33});
+    h.render({16.66, 16.66, 16.66, 33.33});
+    EXPECT_GT(h.getMetrics().judderScoreHistogram.getCount(), 0);
+}
+
+TEST_F(VideoRenderQualityTrackerTest, when30HzTo50Hz_hasJudder) {
+    Configuration c;
+    Helper h(33.33, c);
+    h.render({40.0, 40.0, 40.0, 60.0});
+    h.render({40.0, 40.0, 40.0, 60.0});
+    h.render({40.0, 40.0, 40.0, 60.0});
+    h.render({40.0, 40.0, 40.0, 60.0});
+    h.render({40.0, 40.0, 40.0, 60.0});
+    EXPECT_GT(h.getMetrics().judderScoreHistogram.getCount(), 0);
+}
+
+TEST_F(VideoRenderQualityTrackerTest, whenSmallVariancePulldown24HzTo60Hz_hasNoJudder) {
+    Configuration c;
+    Helper h(41.66, c);
+    h.render({52.0, 31.33, 52.0, 31.33, 52.0, 31.33});
+    EXPECT_EQ(h.getMetrics().judderScoreHistogram.getCount(), 0);
+}
+
+TEST_F(VideoRenderQualityTrackerTest, whenBad24HzTo60Hz_hasJudder) {
+    Configuration c;
+    Helper h(41.66, c);
+    h.render({50.0, 33.33, 50.0, 33.33, /* no 50 between 33s */ 33.33, 50.0, 33.33});
+    EXPECT_EQ(h.getMetrics().judderScoreHistogram.getCount(), 1);
+}
+
+TEST_F(VideoRenderQualityTrackerTest, capturesJudderScoreHistogram) {
+    Configuration c;
+    c.judderErrorToleranceUs = 2000;
+    c.judderScoreHistogramBuckets = {1, 5, 8};
+    Helper h(16, c);
+    h.render({16, 16, 23, 16, 16, 10, 16, 4, 16, 20, 16, 16});
+    EXPECT_EQ(h.getMetrics().judderScoreHistogram.emit(), "0{1,2}1");
+    EXPECT_EQ(h.getMetrics().judderScoreHistogram.getCount(), 4);
+    EXPECT_EQ(h.getMetrics().judderScoreHistogram.getMin(), 4);
+    EXPECT_EQ(h.getMetrics().judderScoreHistogram.getMax(), 12);
+    EXPECT_EQ(h.getMetrics().judderScoreHistogram.getAvg(), (7 + 6 + 12 + 4) / 4);
+}
+
+TEST_F(VideoRenderQualityTrackerTest, ranksJudderScoresInOrder) {
+    // Each rendering is ranked from best to worst from a user experience
+    Configuration c;
+    c.judderErrorToleranceUs = 2000;
+    c.judderScoreHistogramBuckets = {0, 1000};
+    int64_t previousScore = 0;
+
+    // 30fps poorly displayed at 60Hz
+    {
+        Helper h(33.33, c);
+        h.render({33.33, 33.33, 16.66, 50.0, 33.33, 33.33});
+        int64_t scoreBad30fpsTo60Hz = h.getMetrics().judderScoreHistogram.getMax();
+        EXPECT_GT(scoreBad30fpsTo60Hz, previousScore);
+        previousScore = scoreBad30fpsTo60Hz;
+    }
+
+    // 25fps displayed at 60hz
+    {
+        Helper h(40, c);
+        h.render({33.33, 33.33, 50.0});
+        h.render({33.33, 33.33, 50.0});
+        h.render({33.33, 33.33, 50.0});
+        h.render({33.33, 33.33, 50.0});
+        h.render({33.33, 33.33, 50.0});
+        h.render({33.33, 33.33, 50.0});
+        int64_t score25fpsTo60hz = h.getMetrics().judderScoreHistogram.getMax();
+        EXPECT_GT(score25fpsTo60hz, previousScore);
+        previousScore = score25fpsTo60hz;
+    }
+
+    // 50fps displayed at 60hz
+    {
+        Helper h(20, c);
+        h.render({16.66, 16.66, 16.66, 33.33});
+        h.render({16.66, 16.66, 16.66, 33.33});
+        h.render({16.66, 16.66, 16.66, 33.33});
+        h.render({16.66, 16.66, 16.66, 33.33});
+        h.render({16.66, 16.66, 16.66, 33.33});
+        h.render({16.66, 16.66, 16.66, 33.33});
+        int64_t score50fpsTo60hz = h.getMetrics().judderScoreHistogram.getMax();
+        EXPECT_GT(score50fpsTo60hz, previousScore);
+        previousScore = score50fpsTo60hz;
+    }
+
+    // 24fps poorly displayed at 60Hz
+    {
+        Helper h(41.66, c);
+        h.render({50.0, 33.33, 50.0, 33.33, 33.33, 50.0, 33.33});
+        int64_t scoreBad24HzTo60Hz = h.getMetrics().judderScoreHistogram.getMax();
+        EXPECT_GT(scoreBad24HzTo60Hz, previousScore);
+        previousScore = scoreBad24HzTo60Hz;
+    }
+
+    // 30fps displayed at 50hz
+    {
+        Helper h(33.33, c);
+        h.render({40.0, 40.0, 40.0, 60.0});
+        h.render({40.0, 40.0, 40.0, 60.0});
+        h.render({40.0, 40.0, 40.0, 60.0});
+        h.render({40.0, 40.0, 40.0, 60.0});
+        h.render({40.0, 40.0, 40.0, 60.0});
+        int64_t score30fpsTo50hz = h.getMetrics().judderScoreHistogram.getMax();
+        EXPECT_GT(score30fpsTo50hz, previousScore);
+        previousScore = score30fpsTo50hz;
+    }
+
+    // 24fps displayed at 50Hz
+    {
+        Helper h(41.66, c);
+        h.render(40.0, 11);
+        h.render(60.0, 1);
+        h.render(40.0, 11);
+        h.render(60.0, 1);
+        h.render(40.0, 11);
+        int64_t score24HzTo50Hz = h.getMetrics().judderScoreHistogram.getMax();
+        EXPECT_GT(score24HzTo50Hz, previousScore);
+        previousScore = score24HzTo50Hz;
+    }
 }
 
 } // android
