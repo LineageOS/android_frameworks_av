@@ -3074,6 +3074,13 @@ Status CameraService::injectCamera(
     return binder::Status::ok();
 }
 
+Status CameraService::reportExtensionSessionStats(
+        const hardware::CameraExtensionSessionStats& stats, String16* sessionKey /*out*/) {
+    ALOGV("%s: reported %s", __FUNCTION__, stats.toString().c_str());
+    *sessionKey = mCameraServiceProxyWrapper->updateExtensionStats(stats);
+    return Status::ok();
+}
+
 void CameraService::removeByClient(const BasicClient* client) {
     Mutex::Autolock lock(mServiceLock);
     for (auto& i : mActiveClientManager.getAll()) {

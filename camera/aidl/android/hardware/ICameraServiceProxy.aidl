@@ -17,6 +17,7 @@
 package android.hardware;
 
 import android.hardware.CameraSessionStats;
+import android.hardware.CameraExtensionSessionStats;
 
 /**
  * Binder interface for the camera service proxy running in system_server.

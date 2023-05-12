@@ -26,8 +26,14 @@
 
 namespace android {
 
-using hardware::ICameraServiceProxy;
+using hardware::CameraExtensionSessionStats;
 using hardware::CameraSessionStats;
+using hardware::ICameraServiceProxy;
+
+namespace {
+// Sentinel value to be returned when extension session with a stale or invalid key is reported.
+const String16 POISON_EXT_STATS_KEY("poisoned_stats");
+} // anonymous namespace
 
 /**
  * CameraSessionStatsWrapper functions
@@ -97,15 +103,76 @@ void CameraServiceProxyWrapper::CameraSessionStatsWrapper::onIdle(
     mSessionStats.mUserTag = String16(userTag.c_str());
     mSessionStats.mVideoStabilizationMode = videoStabilizationMode;
     mSessionStats.mStreamStats = streamStats;
+
     updateProxyDeviceState(proxyBinder);
 
     mSessionStats.mInternalReconfigure = 0;
     mSessionStats.mStreamStats.clear();
+    mSessionStats.mCameraExtensionSessionStats = {};
 }
 
 int64_t CameraServiceProxyWrapper::CameraSessionStatsWrapper::getLogId() {
     Mutex::Autolock l(mLock);
     return mSessionStats.mLogId;
+}
+
+String16 CameraServiceProxyWrapper::CameraSessionStatsWrapper::updateExtensionSessionStats(
+        const hardware::CameraExtensionSessionStats& extStats) {
+    Mutex::Autolock l(mLock);
+    CameraExtensionSessionStats& currStats = mSessionStats.mCameraExtensionSessionStats;
+    if (currStats.key != extStats.key) {
+        // Mismatched keys. Extensions stats likely reported for a closed session
+        ALOGW("%s: mismatched extensions stats key: current='%s' reported='%s'. Dropping stats.",
+              __FUNCTION__, String8(currStats.key).c_str(), String8(extStats.key).c_str());
+        return POISON_EXT_STATS_KEY; // return poisoned key to so future calls are
+                                     // definitely dropped.
+    }
+
+    // Matching keys...
+    if (currStats.key.size()) {
+        // non-empty matching keys. overwrite.
+        ALOGV("%s: Overwriting extension session stats: %s", __FUNCTION__,
+              extStats.toString().c_str());
+        currStats = extStats;
+        return currStats.key;
+    }
+
+    // Matching empty keys...
+    if (mSessionStats.mClientName != extStats.clientName) {
+        ALOGW("%s: extension stats reported for unexpected package: current='%s' reported='%s'. "
+              "Dropping stats.", __FUNCTION__,
+              String8(mSessionStats.mClientName).c_str(),
+              String8(extStats.clientName).c_str());
+        return POISON_EXT_STATS_KEY;
+    }
+
+    // Matching empty keys for the current client...
+    if (mSessionStats.mNewCameraState == CameraSessionStats::CAMERA_STATE_OPEN ||
+        mSessionStats.mNewCameraState == CameraSessionStats::CAMERA_STATE_IDLE) {
+        // Camera is open, but not active. It is possible that the active callback hasn't
+        // occurred yet. Keep the stats, but don't associate it with any session.
+        ALOGV("%s: extension stat reported for an open, but not active camera. "
+              "Saving stats, but not generating key.", __FUNCTION__);
+        currStats = extStats;
+        return {}; // Subsequent calls will handle setting the correct key.
+    }
+
+    if (mSessionStats.mNewCameraState == CameraSessionStats::CAMERA_STATE_ACTIVE) {
+        // camera is active. First call for the session!
+        currStats = extStats;
+
+        // Generate a new key from logId and sessionIndex.
+        std::ostringstream key;
+        key << mSessionStats.mSessionIndex << '/' << mSessionStats.mLogId;
+        currStats.key = String16(key.str().c_str());
+        ALOGV("%s: New extension session stats: %s", __FUNCTION__, currStats.toString().c_str());
+        return currStats.key;
+    }
+
+    // Camera is closed. Probably a stale call.
+    ALOGW("%s: extension stats reported for closed camera id '%s'. Dropping stats.",
+          __FUNCTION__, String8(mSessionStats.mCameraId).c_str());
+    return {};
 }
 
 /**
@@ -335,6 +402,23 @@ int64_t CameraServiceProxyWrapper::generateLogId(std::random_device& randomDevic
     } while (ret == 0); // 0 is not a valid identifier
 
     return ret;
+}
+
+String16 CameraServiceProxyWrapper::updateExtensionStats(
+        const hardware::CameraExtensionSessionStats& extStats) {
+    std::shared_ptr<CameraSessionStatsWrapper> stats;
+    String8 cameraId = String8(extStats.cameraId);
+    {
+        Mutex::Autolock _l(mLock);
+        if (mSessionStatsMap.count(cameraId) == 0) {
+            ALOGE("%s CameraExtensionSessionStats reported for camera id that isn't open: %s",
+                  __FUNCTION__, cameraId.c_str());
+            return {};
+        }
+
+        stats = mSessionStatsMap[cameraId];
+        return stats->updateExtensionSessionStats(extStats);
+    }
 }
 
 }  // namespace android
