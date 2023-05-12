@@ -215,6 +215,11 @@ static const char *kCodecFreezeDistanceAverage = "android.media.mediacodec.freez
 static const char *kCodecFreezeDistanceHistogram =
         "android.media.mediacodec.freeze.distance.histogram";
 
+static const char *kCodecJudderCount = "android.media.mediacodec.judder.count";
+static const char *kCodecJudderScoreAverage = "android.media.mediacodec.judder.average";
+static const char *kCodecJudderScoreMax = "android.media.mediacodec.judder.max";
+static const char *kCodecJudderScoreHistogram = "android.media.mediacodec.judder.histogram";
+
 /* -1: shaper disabled
    >=0: number of fields changed */
 static const char *kCodecShapingEnhanced = "android.media.mediacodec.shaped";
@@ -1134,6 +1139,13 @@ void MediaCodec::updateMediametrics() {
             const MediaHistogram &histogram = m.freezeDistanceMsHistogram;
             mediametrics_setInt64(mMetricsHandle, kCodecFreezeDistanceAverage, histogram.getAvg());
             mediametrics_setString(mMetricsHandle, kCodecFreezeDistanceHistogram, histogram.emit());
+        }
+        if (m.judderScoreHistogram.getCount() >= 1) {
+            const MediaHistogram &histogram = m.judderScoreHistogram;
+            mediametrics_setInt64(mMetricsHandle, kCodecJudderCount, histogram.getCount());
+            mediametrics_setInt64(mMetricsHandle, kCodecJudderScoreAverage, histogram.getAvg());
+            mediametrics_setInt64(mMetricsHandle, kCodecJudderScoreMax, histogram.getMax());
+            mediametrics_setString(mMetricsHandle, kCodecJudderScoreHistogram, histogram.emit());
         }
     }
 
