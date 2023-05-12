@@ -33,7 +33,7 @@ public:
     }
 
     // Process a render time expressed in nanoseconds.
-    void processRenderTime(int64_t newRenderTimeNs) {
+    void onFrameRendered(int64_t newRenderTimeNs) {
         // If we detect wrap-around or out of order frames, just ignore the duration for this
         // and the next frame.
         if (newRenderTimeNs < mPreviousRenderTimeNs) {
@@ -59,7 +59,7 @@ private:
     int64_t mPreviousRenderTimeNs;
 };
 
-}
+} // android
 
-#endif
+#endif // PLAYBACK_DURATION_ACCUMULATOR_H_
 
