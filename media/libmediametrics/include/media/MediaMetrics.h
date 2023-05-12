@@ -50,7 +50,7 @@ void mediametrics_setDouble(mediametrics_handle_t handle, attr_t attr,
 void mediametrics_setRate(mediametrics_handle_t handle, attr_t attr,
                           int64_t count, int64_t duration);
 void mediametrics_setCString(mediametrics_handle_t handle, attr_t attr,
-                            const char * value);
+                             const char * value);
 
 // fused get/add/set; if attr wasn't there, it's a simple set.
 // these do not provide atomicity or mutual exclusion, only simpler code sequences.
@@ -94,5 +94,12 @@ bool mediametrics_isEnabled();
 bool mediametrics_getAttributes(mediametrics_handle_t handle, char **buffer, size_t *length);
 
 __END_DECLS
+
+#ifdef __cplusplus
+#include <string>
+void mediametrics_setString(mediametrics_handle_t handle, attr_t attr,
+                            const std::string &value);
+bool mediametrics_getString(mediametrics_handle_t handle, attr_t attr, std::string *value);
+#endif // __cplusplus
 
 #endif
