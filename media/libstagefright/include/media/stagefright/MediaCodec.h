@@ -715,7 +715,7 @@ private:
     int mRecentHead;
     Mutex mRecentLock;
 
-    MediaHistogram mLatencyHist;
+    MediaHistogram<int64_t> mLatencyHist;
 
     // An unique ID for the codec - Used by the metrics.
     uint64_t mCodecId = 0;
