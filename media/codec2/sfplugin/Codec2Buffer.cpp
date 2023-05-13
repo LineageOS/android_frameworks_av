@@ -478,19 +478,56 @@ public:
                 mInitCheck = NO_INIT;
                 return;
             case C2PlanarLayout::TYPE_RGB:
-                ALOGD("Converter: unrecognized color format "
-                        "(client %d component %d) for RGB layout",
-                        mClientColorFormat, mComponentColorFormat);
-                mInitCheck = NO_INIT;
+                mediaImage->mType = MediaImage2::MEDIA_IMAGE_TYPE_RGB;
                 // TODO: support MediaImage layout
-                return;
+                switch (mClientColorFormat) {
+                    case COLOR_FormatSurface:
+                    case COLOR_FormatRGBFlexible:
+                    case COLOR_Format24bitBGR888:
+                    case COLOR_Format24bitRGB888:
+                        ALOGD("Converter: accept color format "
+                                "(client %d component %d) for RGB layout",
+                                mClientColorFormat, mComponentColorFormat);
+                        break;
+                    default:
+                        ALOGD("Converter: unrecognized color format "
+                                "(client %d component %d) for RGB layout",
+                                mClientColorFormat, mComponentColorFormat);
+                        mInitCheck = BAD_VALUE;
+                        return;
+                }
+                if (layout.numPlanes != 3) {
+                    ALOGD("Converter: %d planes for RGB layout", layout.numPlanes);
+                    mInitCheck = BAD_VALUE;
+                    return;
+                }
+                break;
             case C2PlanarLayout::TYPE_RGBA:
-                ALOGD("Converter: unrecognized color format "
-                        "(client %d component %d) for RGBA layout",
-                        mClientColorFormat, mComponentColorFormat);
-                mInitCheck = NO_INIT;
+                mediaImage->mType = MediaImage2::MEDIA_IMAGE_TYPE_RGBA;
                 // TODO: support MediaImage layout
-                return;
+                switch (mClientColorFormat) {
+                    case COLOR_FormatSurface:
+                    case COLOR_FormatRGBAFlexible:
+                    case COLOR_Format32bitABGR8888:
+                    case COLOR_Format32bitARGB8888:
+                    case COLOR_Format32bitBGRA8888:
+                        ALOGD("Converter: accept color format "
+                                "(client %d component %d) for RGBA layout",
+                                mClientColorFormat, mComponentColorFormat);
+                        break;
+                    default:
+                        ALOGD("Converter: unrecognized color format "
+                                "(client %d component %d) for RGBA layout",
+                                mClientColorFormat, mComponentColorFormat);
+                        mInitCheck = BAD_VALUE;
+                        return;
+                }
+                if (layout.numPlanes != 4) {
+                    ALOGD("Converter: %d planes for RGBA layout", layout.numPlanes);
+                    mInitCheck = BAD_VALUE;
+                    return;
+                }
+                break;
             default:
                 mediaImage->mType = MediaImage2::MEDIA_IMAGE_TYPE_UNKNOWN;
                 if (layout.numPlanes == 1) {
