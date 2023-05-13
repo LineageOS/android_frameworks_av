@@ -218,6 +218,9 @@ public:
             /*out*/
             sp<hardware::camera2::ICameraInjectionSession>* cameraInjectionSession);
 
+    virtual binder::Status reportExtensionSessionStats(
+            const hardware::CameraExtensionSessionStats& stats, String16* sessionKey /*out*/);
+
     // Extra permissions checks
     virtual status_t    onTransact(uint32_t code, const Parcel& data,
                                    Parcel* reply, uint32_t flags);

@@ -1048,6 +1048,9 @@ public:
         }
         return true;
     }
+    bool getString(const char *key, std::string *value) const {
+        return get(key, value);
+    }
     // Caller owns the returned string
     bool getCString(const char *key, char **value) const {
         std::string s;
@@ -1056,9 +1059,6 @@ public:
             return true;
         }
         return false;
-    }
-    bool getString(const char *key, std::string *value) const {
-        return get(key, value);
     }
 
     const Prop::Elem* get(const char *key) const {
