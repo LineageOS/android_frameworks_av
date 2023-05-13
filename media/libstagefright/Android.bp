@@ -270,6 +270,7 @@ cc_library {
         "SurfaceUtils.cpp",
         "ThrottledSource.cpp",
         "Utils.cpp",
+        "VideoRenderQualityTracker.cpp",
         "VideoFrameSchedulerBase.cpp",
         "VideoFrameScheduler.cpp",
     ],
