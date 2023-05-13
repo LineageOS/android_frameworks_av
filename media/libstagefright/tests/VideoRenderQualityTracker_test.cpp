@@ -27,6 +27,10 @@ namespace android {
 using Metrics = VideoRenderQualityMetrics;
 using Configuration = VideoRenderQualityTracker::Configuration;
 
+static constexpr float FRAME_RATE_UNDETERMINED = VideoRenderQualityMetrics::FRAME_RATE_UNDETERMINED;
+static constexpr float FRAME_RATE_24_3_2_PULLDOWN =
+        VideoRenderQualityMetrics::FRAME_RATE_24_3_2_PULLDOWN;
+
 class Helper {
 public:
     Helper(double contentFrameDurationMs, const Configuration &configuration) :
@@ -76,7 +80,7 @@ public:
         }
     }
 
-    const Metrics & getMetrics() const {
+    const Metrics & getMetrics() {
         return mVideoRenderQualityTracker.getMetrics();
     }
 
@@ -194,7 +198,7 @@ TEST_F(VideoRenderQualityTrackerTest, detects32Pulldown) {
     Helper h(41.66, c);
     h.render({49.9, 33.2, 50.0, 33.4, 50.1, 33.2});
     EXPECT_NEAR(h.getMetrics().contentFrameRate, 24.0, 0.5);
-    EXPECT_EQ(h.getMetrics().actualFrameRate, FRAME_RATE_24HZ_3_2_PULLDOWN);
+    EXPECT_EQ(h.getMetrics().actualFrameRate, FRAME_RATE_24_3_2_PULLDOWN);
 }
 
 TEST_F(VideoRenderQualityTrackerTest, whenBad32Pulldown_doesntDetect32Pulldown) {
@@ -216,7 +220,7 @@ TEST_F(VideoRenderQualityTrackerTest, whenFrameRateChanges_detectsMostRecentFram
     h.changeContentFrameDuration(41.66);
     h.render({50.0, 33.33, 50.0, 33.33, 50.0, 33.33});
     EXPECT_NEAR(h.getMetrics().contentFrameRate, 24.0, 0.5);
-    EXPECT_EQ(h.getMetrics().actualFrameRate, FRAME_RATE_24HZ_3_2_PULLDOWN);
+    EXPECT_EQ(h.getMetrics().actualFrameRate, FRAME_RATE_24_3_2_PULLDOWN);
 }
 
 TEST_F(VideoRenderQualityTrackerTest, whenFrameRateIsUnstable_doesntDetectFrameRate) {
