@@ -72,11 +72,6 @@ status_t legacy2aidl_audio_port_config_device_ext_AudioPortDeviceExt(
         media::audio::common::AudioPortDeviceExt* aidl,
         media::AudioPortDeviceExtSys* aidlDeviceExt);
 
-ConversionResult<audio_stream_type_t> aidl2legacy_AudioStreamType_audio_stream_type_t(
-        media::audio::common::AudioStreamType aidl);
-ConversionResult<media::audio::common::AudioStreamType>
-legacy2aidl_audio_stream_type_t_AudioStreamType(audio_stream_type_t legacy);
-
 ConversionResult<audio_port_config_mix_ext> aidl2legacy_AudioPortMixExt(
         const media::audio::common::AudioPortMixExt& aidl, media::AudioPortRole role,
         const media::AudioPortMixExtSys& aidlMixExt);

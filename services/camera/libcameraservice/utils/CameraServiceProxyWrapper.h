@@ -65,6 +65,8 @@ private:
                 const std::string& userTag, int32_t videoStabilizationMode,
                 const std::vector<hardware::CameraStreamStats>& streamStats);
 
+        String16 updateExtensionSessionStats(const hardware::CameraExtensionSessionStats& extStats);
+
         // Returns the logId associated with this event.
         int64_t getLogId();
     };
@@ -127,6 +129,9 @@ public:
     // frameworks/av/camera/include/camera/CameraSessionStats.h for more details about this
     // identifier. Returns a non-0 value on success.
     int64_t getCurrentLogIdForCamera(const String8& cameraId);
+
+    // Update the stored extension stats to the latest values
+    String16 updateExtensionStats(const hardware::CameraExtensionSessionStats& extStats);
 };
 
 } // android

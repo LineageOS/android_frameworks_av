@@ -15,6 +15,7 @@
  */
 
 //#define LOG_NDEBUG 0
+#include <algorithm>
 #include <cstddef>
 #include <cstdint>
 #include <cstring>
@@ -89,6 +90,47 @@ TEST(libAudioHalTest, createEffect) {
         EXPECT_EQ(OK, factory->getDescriptor(i, &desc));
         EXPECT_EQ(OK, factory->createEffect(&desc.uuid, 1 /* sessionId */, 1 /* ioId */,
                                             1 /* deviceId */, &interface));
+    }
+}
+
+TEST(libAudioHalTest, getProcessings) {
+    auto factory = EffectsFactoryHalInterface::create();
+    ASSERT_NE(nullptr, factory);
+
+    const auto &processings = factory->getProcessings();
+    if (processings) {
+        EXPECT_NE(0UL, processings->preprocess.size() + processings->postprocess.size() +
+                               processings->deviceprocess.size());
+
+        auto processingChecker = [](const auto& processings) {
+            if (processings.size() != 0) {
+                // any process need at least 1 effect inside
+                std::for_each(processings.begin(), processings.end(), [](const auto& process) {
+                    EXPECT_NE(0ul, process.effects.size());
+                    // any effect should have a valid name string, and not proxy
+                    for (const auto& effect : process.effects) {
+                        SCOPED_TRACE("Effect: {" +
+                                     (effect == nullptr
+                                              ? "NULL}"
+                                              : ("{name: " + effect->name + ", isproxy: " +
+                                                 (effect->isProxy ? "true" : "false") + ", sw: " +
+                                                 (effect->libSw ? "non-null" : "null") + ", hw: " +
+                                                 (effect->libHw ? "non-null" : "null") + "}")));
+                        EXPECT_NE(nullptr, effect);
+                        EXPECT_NE("", effect->name);
+                        EXPECT_EQ(false, effect->isProxy);
+                        EXPECT_EQ(nullptr, effect->libSw);
+                        EXPECT_EQ(nullptr, effect->libHw);
+                    }
+                });
+            }
+        };
+
+        processingChecker(processings->preprocess);
+        processingChecker(processings->postprocess);
+        processingChecker(processings->deviceprocess);
+    } else {
+        GTEST_SKIP() << "no processing found, skipping the test";
     }
 }
 
