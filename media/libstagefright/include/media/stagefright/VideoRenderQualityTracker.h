@@ -26,15 +26,17 @@
 
 namespace android {
 
-static const float FRAME_RATE_UNDETERMINED = -1.0f;
-static const float FRAME_RATE_24HZ_3_2_PULLDOWN = -2.0f;
-
 // A variety of video rendering quality metrics.
 struct VideoRenderQualityMetrics {
+    static constexpr float FRAME_RATE_UNDETERMINED = -1.0f;
+    static constexpr float FRAME_RATE_24_3_2_PULLDOWN = -2.0f;
+
     VideoRenderQualityMetrics();
 
+    void clear();
+
     // The render time of the first video frame.
-    int64_t firstFrameRenderTimeUs;
+    int64_t firstRenderTimeUs;
 
     // The number of frames released to be rendered.
     int64_t frameReleasedCount;
@@ -59,13 +61,21 @@ struct VideoRenderQualityMetrics {
     float actualFrameRate;
 
     // A histogram of the durations of freezes due to dropped/skipped frames.
-    MediaHistogram freezeDurationMsHistogram;
+    MediaHistogram<int32_t> freezeDurationMsHistogram;
+    // The computed overall freeze score using the above histogram and score conversion table.
+    int32_t freezeScore;
+    // The computed percentage of total playback duration that was frozen.
+    float freezeRate;
 
     // A histogram of the durations between each freeze.
-    MediaHistogram freezeDistanceMsHistogram;
+    MediaHistogram<int32_t> freezeDistanceMsHistogram;
 
     // A histogram of the judder scores.
-    MediaHistogram judderScoreHistogram;
+    MediaHistogram<int32_t> judderScoreHistogram;
+    // The computed overall judder score using the above histogram and score conversion table.
+    int32_t judderScore;
+    // The computed percentage of total frames that had judder.
+    float judderRate;
 };
 
 ///////////////////////////////////////////////////////
@@ -93,6 +103,9 @@ public:
     public:
         Configuration();
 
+        // Whether or not frame render quality is tracked.
+        bool enabled;
+
         // Whether or not frames that are intentionally not rendered by the app should be considered
         // as dropped.
         bool areSkippedFramesDropped;
@@ -114,11 +127,24 @@ public:
         int32_t contentTimeAdvancedForLiveContentToleranceUs;
 
         // Freeze configuration
-        std::vector<int64_t> freezeDurationMsHistogramBuckets;
-        std::vector<int64_t> freezeDistanceMsHistogramBuckets;
+        //
+        // The values used to distribute freeze durations across a histogram.
+        std::vector<int32_t> freezeDurationMsHistogramBuckets;
+        // The values used to compare against freeze duration counts when determining an overall
+        // score.
+        std::vector<int64_t> freezeDurationMsHistogramToScore;
+        // The values used to distribute distances between freezes across a histogram.
+        std::vector<int32_t> freezeDistanceMsHistogramBuckets;
 
+        // Judder configuration
+        //
+        // A judder error lower than this value is not scored as judder.
         int32_t judderErrorToleranceUs;
-        std::vector<int64_t> judderScoreHistogramBuckets;
+        // The values used to distribute judder scores across a histogram.
+        std::vector<int32_t> judderScoreHistogramBuckets;
+        // The values used to compare against judder score histogram counts when determining an
+        // overall score.
+        std::vector<int32_t> judderScoreHistogramToScore;
     };
 
     VideoRenderQualityTracker();
@@ -138,10 +164,13 @@ public:
     void onFrameRendered(int64_t contentTimeUs, int64_t actualRenderTimeNs);
 
     // Retrieve the metrics.
-    const VideoRenderQualityMetrics &getMetrics() const;
+    const VideoRenderQualityMetrics &getMetrics();
 
     // Called when a change in codec state will result in a content discontinuity - e.g. flush.
     void resetForDiscontinuity();
+
+    // Clear out all metrics and tracking - e.g. codec reconfigured.
+    void clear();
 
 private:
     // Tracking of frames that are pending to be rendered to the display.
@@ -236,6 +265,9 @@ private:
 
     // The most recent timestamp of the first frame rendered after the freeze.
     int64_t mLastFreezeEndTimeUs;
+
+    // The render duration of the playback.
+    int64_t mRenderDurationMs;
 
     // Frames skipped at the end of playback shouldn't really be considered skipped, therefore keep
     // a list of the frames, and process them as skipped frames the next time a frame is rendered.
