@@ -30,6 +30,8 @@ class AudioHalVersionInfo : public android::media::AudioHalVersion {
         minor = halMinor;
     }
 
+    bool isHidl() const { return type == Type::HIDL; }
+
     Type getType() const { return type; }
 
     int getMajorVersion() const { return major; }
