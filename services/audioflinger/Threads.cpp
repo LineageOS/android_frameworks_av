@@ -6320,6 +6320,12 @@ void AudioFlinger::MixerThread::dumpInternals_l(int fd, const Vector<String16>& 
     } else {
         dprintf(fd, "  No FastMixer\n");
     }
+
+     dprintf(fd, "Bluetooth latency modes are %senabled\n",
+            mBluetoothLatencyModesEnabled ? "" : "not ");
+     dprintf(fd, "HAL does %ssupport Bluetooth latency modes\n", mOutput != nullptr &&
+             mOutput->audioHwDev->supportsBluetoothVariableLatency() ? "" : "not ");
+     dprintf(fd, "Supported latency modes: %s\n", toString(mSupportedLatencyModes).c_str());
 }
 
 uint32_t AudioFlinger::MixerThread::idleSleepTimeUs() const
