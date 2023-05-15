@@ -23,6 +23,7 @@
 #include <pthread.h>
 #include <pwd.h>
 #include <stdint.h>
+#include <string>
 #include <string.h>
 #include <sys/stat.h>
 #include <sys/time.h>
@@ -32,11 +33,12 @@
 #include <stats_media_metrics.h>
 #include <stats_event.h>
 
-#include "cleaner.h"
-#include "MediaMetricsService.h"
-#include "ValidateId.h"
-#include "frameworks/proto_logging/stats/message/mediametrics_message.pb.h"
-#include "iface_statsd.h"
+#include <frameworks/proto_logging/stats/message/mediametrics_message.pb.h>
+#include <mediametricsservice/cleaner.h>
+#include <mediametricsservice/iface_statsd.h>
+#include <mediametricsservice/MediaMetricsService.h>
+#include <mediametricsservice/StringUtils.h>
+#include <mediametricsservice/ValidateId.h>
 
 namespace android {
 
@@ -169,27 +171,8 @@ static int32_t getMetricsHdrFormatEnum(std::string &mime, std::string &component
 }
 
 static void parseVector(const std::string &str, std::vector<int32_t> *vector) {
-    char valueStr[12] = {};
-    int i = 0;
-    for (char const * p = str.c_str(); *p != 0; ++p) {
-        if (*p == ',' || *p == '{' || *p == '}') {
-            valueStr[i] = 0;
-            int64_t value = strtol(valueStr, nullptr, 10);
-            if (value >= std::numeric_limits<int32_t>::max() ||
-                value <= std::numeric_limits<int32_t>::min() ||
-                value == 0) {
-                ALOGE("failed to parse integer vector at '%s' from '%s'", p, str.c_str());
-                return;
-            }
-            vector->push_back(int32_t(value));
-            i = valueStr[0] = 0;
-        } else {
-            valueStr[i++] = *p;
-            if (i == sizeof(valueStr) - 1) { // -1 because we need space for a null terminator
-                ALOGE("failed to parse integer vector at '%s' from '%s'", p, str.c_str());
-                return;
-            }
-        }
+    if (!mediametrics::stringutils::parseVector(str, vector)) {
+        ALOGE("failed to parse integer vector from '%s'", str.c_str());
     }
 }
 
