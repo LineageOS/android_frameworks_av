@@ -16,10 +16,12 @@
 
 #pragma once
 
-#include <audio_utils/SimpleLog.h>
 #include <map>
 #include <mutex>
 #include <sstream>
+
+#include <android-base/thread_annotations.h>
+#include <audio_utils/SimpleLog.h>
 
 namespace android::mediametrics {
 
@@ -61,9 +63,9 @@ public:
    }
 
 private:
+    mutable std::mutex mLock;
     SimpleLog mSimpleLog; // internally locked
     std::map<int /* atom */, size_t /* count */> mCountMap GUARDED_BY(mLock); // sorted
-    mutable std::mutex mLock;
 };
 
 } // namespace android::mediametrics
