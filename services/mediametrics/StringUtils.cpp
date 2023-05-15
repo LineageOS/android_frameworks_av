@@ -15,10 +15,12 @@
  */
 
 //#define LOG_NDEBUG 0
-#define LOG_TAG "MediaMetricsService::stringutils"
+#define LOG_TAG "mediametrics::stringutils"
 #include <utils/Log.h>
 
 #include "StringUtils.h"
+
+#include <charconv>
 
 #include "AudioTypes.h"
 
@@ -52,6 +54,26 @@ std::vector<std::string> split(const std::string& flags, const char *delim)
         auto token = tokenizer(it, flags.end(), delim);
         if (token.size() != 1 || strchr(delim, token[0]) == nullptr) return result;
     }
+}
+
+bool parseVector(const std::string &str, std::vector<int32_t> *vector) {
+    std::vector<int32_t> values;
+    const char *p = str.c_str();
+    const char *last = p + str.size();
+    while (p != last) {
+        if (*p == ',' || *p == '{' || *p == '}') {
+            p++;
+        }
+        int32_t value = -1;
+        auto [ptr, error] = std::from_chars(p, last, value);
+        if (error == std::errc::invalid_argument || error == std::errc::result_out_of_range) {
+            return false;
+        }
+        p = ptr;
+        values.push_back(value);
+    }
+    *vector = std::move(values);
+    return true;
 }
 
 std::vector<std::pair<std::string, std::string>> getDeviceAddressPairs(const std::string& devices)
