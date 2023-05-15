@@ -842,6 +842,8 @@ void AudioFlinger::dumpInternals(int fd, const Vector<String16>& args __unused)
     for (const auto& vibratorInfo : mAudioVibratorInfos) {
         dprintf(fd, "  - %s\n", vibratorInfo.toString().c_str());
     }
+    dprintf(fd, "Bluetooth latency modes are %senabled\n",
+            mBluetoothLatencyModesEnabled ? "" : "not ");
 }
 
 void AudioFlinger::dumpPermissionDenial(int fd, const Vector<String16>& args __unused)
