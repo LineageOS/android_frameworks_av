@@ -26,6 +26,7 @@
 
 #include <media/EffectsConfig.h>
 
+#include "EffectsConfigLoader.h"
 #include "EffectsFactoryState.h"
 #include "EffectsXmlConfigLoader.h"
 
