@@ -90,12 +90,13 @@ AudioFlinger::ThreadBase::TrackBase::TrackBase(
             pid_t creatorPid,
             uid_t clientUid,
             bool isOut,
-            alloc_type alloc,
+            const alloc_type alloc,
             track_type type,
             audio_port_handle_t portId,
             std::string metricsId)
     :   RefBase(),
         mThread(thread),
+        mAllocType(alloc),
         mClient(client),
         mCblk(NULL),
         // mBuffer, mBufferSize
@@ -276,6 +277,10 @@ AudioFlinger::ThreadBase::TrackBase::~TrackBase()
         // must run with AudioFlinger lock held. Thus the explicit clear() rather than
         // relying on the automatic clear() at end of scope.
         mClient.clear();
+    }
+    if (mAllocType == ALLOC_LOCAL) {
+        free(mBuffer);
+        mBuffer = nullptr;
     }
     // flush the binder command buffer
     IPCThreadState::self()->flushCommands();
