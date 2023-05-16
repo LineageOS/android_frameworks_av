@@ -84,7 +84,7 @@ public:
             pid_t       creatorPid() const { return mCreatorPid; }
 
             audio_port_handle_t portId() const { return mPortId; }
-    virtual status_t    setSyncEvent(const sp<SyncEvent>& event);
+    virtual status_t    setSyncEvent(const sp<audioflinger::SyncEvent>& event);
 
             sp<IMemory> getBuffers() const { return mBufferMemory; }
             void*       buffer() const { return mBuffer; }
@@ -374,7 +374,7 @@ protected:
 
     const audio_session_t mSessionId;
     uid_t               mUid;
-    Vector < sp<SyncEvent> >mSyncEvents;
+    std::list<sp<audioflinger::SyncEvent>> mSyncEvents;
     const bool          mIsOut;
     sp<ServerProxy>     mServerProxy;
     const int           mId;
