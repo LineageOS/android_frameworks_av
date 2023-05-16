@@ -21,6 +21,7 @@ cc_library_shared {
     vendor: true,
     srcs: [
          "EffectsFactory.c",
+         "EffectsConfigLoader.c",
          "EffectsFactoryState.c",
          "EffectsXmlConfigLoader.cpp",
     ],
