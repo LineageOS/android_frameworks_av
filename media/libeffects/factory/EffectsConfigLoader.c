@@ -137,7 +137,7 @@ int checkLibraryPath(const char *lib_path_in, char *lib_path_out) {
                  kLibraryPathRoot[i],
                  lib_name);
         if (F_OK == access(path, 0)) {
-            strcpy(lib_path_out, path);
+            strlcpy(lib_path_out, path, PATH_MAX);
             ALOGW_IF(strncmp(lib_path_out, lib_path_in, PATH_MAX) != 0,
                 "checkLibraryPath() corrected library path %s to %s", lib_path_in, lib_path_out);
             return 0;
