@@ -23,6 +23,7 @@ cc_library_shared {
 
     shared_libs: [
         "libaudiofoundation",
+        "libaudiopolicycomponents",
         "libcutils",
         "libdl",
         "libutils",
@@ -48,8 +49,6 @@ cc_library_shared {
         "libaudiopolicyengine_interface_headers",
         "libaudiopolicymanager_interface_headers",
     ],
-
-    static_libs: ["libaudiopolicycomponents"],
 
     cflags: [
         "-Wall",
