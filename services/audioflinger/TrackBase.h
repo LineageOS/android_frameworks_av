@@ -67,7 +67,7 @@ public:
                                 pid_t creatorPid,
                                 uid_t uid,
                                 bool isOut,
-                                alloc_type alloc = ALLOC_CBLK,
+                                const alloc_type alloc = ALLOC_CBLK,
                                 track_type type = TYPE_DEFAULT,
                                 audio_port_handle_t portId = AUDIO_PORT_HANDLE_NONE,
                                 std::string metricsId = {});
@@ -352,6 +352,7 @@ protected:
                                     // this could be a track type if needed later
 
     const wp<ThreadBase> mThread;
+    const alloc_type     mAllocType;
     /*const*/ sp<Client> mClient;   // see explanation at ~TrackBase() why not const
     sp<IMemory>         mCblkMemory;
     audio_track_cblk_t* mCblk;
