@@ -16,31 +16,48 @@
 
 #include <media/EffectsFactoryApi.h>
 #include <unistd.h>
-
 #include "EffectsXmlConfigLoader.h"
+#include "EffectsConfigLoader.h"
 
 int main(int argc, char* argv[]) {
-    char* path = nullptr;
-    if ((argc == 2 || argc == 3) && strcmp(argv[1], "--xml") == 0) {
+    const char* path = nullptr;
+    bool legacyFormat;
+
+    if (argc == 2 && strcmp(argv[1], "--legacy") == 0) {
+        legacyFormat = true;
+        fprintf(stderr, "Dumping legacy effect config file\n");
+    } else if ((argc == 2 || argc == 3) && strcmp(argv[1], "--xml") == 0) {
+        legacyFormat = false;
         if (argc == 3) {
-            path = argv[2];
             fprintf(stderr, "Dumping XML effect config file: %s\n", path);
         } else {
             fprintf(stderr, "Dumping default XML effect config file.\n");
         }
     } else {
-        fprintf(stderr, "Invalid arguments.\nUsage: %s [--xml [FILE]]\n", argv[0]);
+        fprintf(stderr, "Invalid arguments.\n"
+                        "Usage: %s [--legacy|--xml [FILE]]\n", argv[0]);
         return 1;
     }
 
-    ssize_t ret = EffectLoadXmlEffectConfig(path);
-    if (ret < 0) {
-        fprintf(stderr, "loadXmlEffectConfig failed, see logcat for detail.\n");
-        return 2;
+    if (!legacyFormat) {
+        ssize_t ret = EffectLoadXmlEffectConfig(path);
+        if (ret < 0) {
+            fprintf(stderr, "loadXmlEffectConfig failed, see logcat for detail.\n");
+            return 2;
+        }
+        if (ret > 0) {
+            fprintf(stderr, "Partially failed to load config. Skipped %zu elements, "
+                    "see logcat for detail.\n", (size_t)ret);
+        }
     }
-    if (ret > 0) {
-        fprintf(stderr, "Partially failed to load config. Skipped %zu elements, "
-                "see logcat for detail.\n", (size_t)ret);
+
+    if (legacyFormat) {
+        auto ret = EffectLoadEffectConfig();
+        if (ret < 0) {
+            fprintf(stderr, "loadEffectConfig failed, see logcat for detail.\n");
+            return 3;
+        }
+        fprintf(stderr, "legacy loadEffectConfig has probably succeed, see logcat to make sure.\n");
     }
 
     if (EffectDumpEffects(STDOUT_FILENO) != 0) {
