@@ -21,6 +21,7 @@
 #include <mutex>
 
 #include <aidl/android/hardware/audio/effect/IFactory.h>
+#include <aidl/android/hardware/audio/effect/Processing.h>
 #include <android-base/thread_annotations.h>
 #include <media/audiohal/EffectsFactoryHalInterface.h>
 #include <system/thread_defs.h>
@@ -82,7 +83,7 @@ class EffectsFactoryHalAidl final : public EffectsFactoryHalInterface {
     // total number of effects including proxy effects
     const size_t mEffectCount;
     // Query result of pre and post processing from effect factory
-    const std::shared_ptr<const effectsConfig::Processings> mEffectProcessings;
+    const std::vector<Processing> mAidlProcessings;
 
     std::mutex mLock;
     uint64_t mEffectIdCounter GUARDED_BY(mLock) = 0;  // Align with HIDL (0 is INVALID_ID)
