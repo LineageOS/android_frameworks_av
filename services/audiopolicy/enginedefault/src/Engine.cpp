@@ -35,10 +35,7 @@
 #include <utils/String8.h>
 #include <utils/Log.h>
 
-namespace android
-{
-namespace audio_policy
-{
+namespace android::audio_policy {
 
 struct legacy_strategy_map { const char *name; legacy_strategy id; };
 static const std::vector<legacy_strategy_map>& getLegacyStrategy() {
@@ -59,8 +56,18 @@ static const std::vector<legacy_strategy_map>& getLegacyStrategy() {
     return legacyStrategy;
 }
 
+status_t Engine::loadFromHalConfigWithFallback(
+        const media::audio::common::AudioHalEngineConfig& aidlConfig) {
+    return loadWithFallback(aidlConfig);
+}
+
 status_t Engine::loadFromXmlConfigWithFallback(const std::string& xmlFilePath) {
-    auto result = EngineBase::loadAudioPolicyEngineConfig(xmlFilePath);
+    return loadWithFallback(xmlFilePath);
+}
+
+template<typename T>
+status_t Engine::loadWithFallback(const T& configSource) {
+    auto result = EngineBase::loadAudioPolicyEngineConfig(configSource);
     ALOGE_IF(result.nbSkippedElement != 0,
              "Policy Engine configuration is partially invalid, skipped %zu elements",
              result.nbSkippedElement);
@@ -72,6 +79,7 @@ status_t Engine::loadFromXmlConfigWithFallback(const std::string& xmlFilePath) {
 
     return OK;
 }
+
 
 status_t Engine::setForceUse(audio_policy_force_use_t usage, audio_policy_forced_cfg_t config)
 {
@@ -844,5 +852,4 @@ sp<DeviceDescriptor> Engine::getInputDeviceForAttributes(const audio_attributes_
                                            AUDIO_FORMAT_DEFAULT);
 }
 
-} // namespace audio_policy
-} // namespace android
+} // namespace android::audio_policy

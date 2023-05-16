@@ -78,6 +78,7 @@ cc_test {
         "libaudioclient",
         "libaudioclient_aidl_conversion",
         "libaudiofoundation",
+        "libaudiopolicycomponents",
         "libaudiopolicymanagerdefault",
         "libcutils",
         "liblog",
@@ -88,8 +89,6 @@ cc_test {
         "libutils",
         "libxml2",
     ],
-
-    static_libs: ["libaudiopolicycomponents"],
 
     header_libs: [
         "libaudiopolicyengine_interface_headers",
