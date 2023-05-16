@@ -19,6 +19,7 @@
 
 #include <gtest/gtest.h>
 
+#include <media/AidlConversionCppNdk.h>
 #include <media/AidlConversionNdk.h>
 
 namespace {
@@ -88,4 +89,43 @@ TEST(AudioRecordTrackMetadata, NonVendorTags) {
     ASSERT_TRUE(convBack.ok());
     ASSERT_EQ(1, convBack.value().tags.size());
     EXPECT_EQ(initial.tags[1], convBack.value().tags[0]);
+}
+
+class AudioTagsRoundTripTest : public testing::TestWithParam<std::vector<std::string>>
+{
+};
+TEST_P(AudioTagsRoundTripTest, Aidl2Legacy2Aidl) {
+    const auto& initial = GetParam();
+    auto conv = aidl2legacy_AudioTags_string(initial);
+    ASSERT_TRUE(conv.ok());
+    auto convBack = legacy2aidl_string_AudioTags(conv.value());
+    ASSERT_TRUE(convBack.ok());
+    EXPECT_EQ(initial, convBack.value());
+}
+INSTANTIATE_TEST_SUITE_P(AudioTagsRoundTrip, AudioTagsRoundTripTest,
+        testing::Values(std::vector<std::string>{},
+                std::vector<std::string>{"VX_GOOGLE_41"},
+                std::vector<std::string>{"VX_GOOGLE_41", "VX_GOOGLE_42"}));
+
+TEST(AudioTags, NonVendorTags) {
+    const std::string separator(1, AUDIO_ATTRIBUTES_TAGS_SEPARATOR);
+    const std::vector<std::string> initial{
+        "random_string", "random" + separator + "string", "VX_GOOGLE_42"};
+    auto conv = aidl2legacy_AudioTags_string(initial);
+    ASSERT_TRUE(conv.ok());
+    EXPECT_EQ("VX_GOOGLE_42", conv.value());
+}
+
+TEST(AudioTags, IllFormedAidlTag) {
+    const std::string separator(1, AUDIO_ATTRIBUTES_TAGS_SEPARATOR);
+    const std::vector<std::string> initial{"VX_GOOGLE" + separator + "42", "VX_GOOGLE_42"};
+    auto conv = aidl2legacy_AudioTags_string(initial);
+    // Note: with the current regex for vendor tags: VX_[A-Z0-9]{3,}_[_A-Z0-9]+
+    // it's impossible to create a vendor tag that would contain the separator, but in case
+    // the criteria changes, we ensure that either such tags get filtered out or an error happens.
+    if (conv.ok()) {
+        EXPECT_EQ("VX_GOOGLE_42", conv.value());
+    } else {
+        EXPECT_FALSE(conv.ok()) << conv.value();
+    }
 }

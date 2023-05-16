@@ -20,6 +20,7 @@
 #include <utility>
 
 #include <AudioPolicyManagerObserver.h>
+#include <android/media/audio/common/AudioHalEngineConfig.h>
 #include <media/AudioProductStrategy.h>
 #include <media/AudioVolumeGroup.h>
 #include <IVolumeCurves.h>
@@ -46,6 +47,14 @@ using CapturePresetDevicesRoleMap =
 class EngineInterface
 {
 public:
+    /**
+     * Loads the engine configuration from AIDL configuration data.
+     * If loading failed, tries to fall back to some default configuration. If fallback
+     * is impossible, returns an error.
+     */
+    virtual status_t loadFromHalConfigWithFallback(
+            const media::audio::common::AudioHalEngineConfig& config) = 0;
+
     /**
      * Loads the engine configuration from the specified or the default config file.
      * If loading failed, tries to fall back to some default configuration. If fallback
