@@ -57,7 +57,6 @@ struct AttributesGroupTraits : public BaseSerializerTraits<AttributesGroup, Attr
     static constexpr const char *collectionTag = "AttributesGroups";
 
     struct Attributes {
-        static constexpr const char *name = "name";
         static constexpr const char *streamType = "streamType";
         static constexpr const char *volumeGroup = "volumeGroup";
     };
@@ -313,12 +312,6 @@ static status_t deserializeAttributesCollection(_xmlDoc *doc, const _xmlNode *cu
 status_t AttributesGroupTraits::deserialize(_xmlDoc *doc, const _xmlNode *child,
                                             Collection &attributesGroup)
 {
-    std::string name = getXmlAttribute(child, Attributes::name);
-    if (name.empty()) {
-        ALOGV("AttributesGroupTraits No attribute %s found", Attributes::name);
-    }
-    ALOGV("%s: %s = %s", __FUNCTION__, Attributes::name, name.c_str());
-
     std::string volumeGroup = getXmlAttribute(child, Attributes::volumeGroup);
     if (volumeGroup.empty()) {
         ALOGE("%s: No attribute %s found", __FUNCTION__, Attributes::volumeGroup);
@@ -339,7 +332,7 @@ status_t AttributesGroupTraits::deserialize(_xmlDoc *doc, const _xmlNode *child,
     AttributesVector attributesVect;
     deserializeAttributesCollection(doc, child, attributesVect);
 
-    attributesGroup.push_back({name, streamType, volumeGroup, attributesVect});
+    attributesGroup.push_back({streamType, volumeGroup, attributesVect});
     return NO_ERROR;
 }
 
