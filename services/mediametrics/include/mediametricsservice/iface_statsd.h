@@ -15,7 +15,9 @@
  */
 
 #include <memory>
+
 #include <stats_event.h>
+#include <StatsdLog.h>
 
 namespace android {
 namespace mediametrics {
