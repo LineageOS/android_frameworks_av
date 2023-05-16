@@ -619,30 +619,30 @@ void CCodecConfig::initializeStandardParams() {
         .limitTo(D::OUTPUT & D::READ));
 
     deprecated(ConfigMapper(KEY_HDR10_PLUS_INFO, C2_PARAMKEY_INPUT_HDR10_PLUS_INFO, "value")
-        .limitTo(D::VIDEO & D::PARAM & D::INPUT));
+        .limitTo(D::VIDEO & D::PARAM & D::INPUT & (D::CONFIG | D::PARAM)));
 
     deprecated(ConfigMapper(KEY_HDR10_PLUS_INFO, C2_PARAMKEY_OUTPUT_HDR10_PLUS_INFO, "value")
-        .limitTo(D::VIDEO & D::OUTPUT));
+        .limitTo(D::VIDEO & D::OUTPUT & D::READ));
 
     add(ConfigMapper(
             std::string(C2_PARAMKEY_INPUT_HDR_DYNAMIC_INFO) + ".type",
             C2_PARAMKEY_INPUT_HDR_DYNAMIC_INFO, "type")
-        .limitTo(D::VIDEO & D::PARAM & D::INPUT));
+        .limitTo(D::VIDEO & D::PARAM & D::INPUT & (D::CONFIG | D::PARAM)));
 
     add(ConfigMapper(
             std::string(C2_PARAMKEY_INPUT_HDR_DYNAMIC_INFO) + ".data",
             C2_PARAMKEY_INPUT_HDR_DYNAMIC_INFO, "data")
-        .limitTo(D::VIDEO & D::PARAM & D::INPUT));
+        .limitTo(D::VIDEO & D::PARAM & D::INPUT & (D::CONFIG | D::PARAM)));
 
     add(ConfigMapper(
             std::string(C2_PARAMKEY_OUTPUT_HDR_DYNAMIC_INFO) + ".type",
             C2_PARAMKEY_OUTPUT_HDR_DYNAMIC_INFO, "type")
-        .limitTo(D::VIDEO & D::OUTPUT));
+        .limitTo(D::VIDEO & D::OUTPUT & D::READ));
 
     add(ConfigMapper(
             std::string(C2_PARAMKEY_OUTPUT_HDR_DYNAMIC_INFO) + ".data",
             C2_PARAMKEY_OUTPUT_HDR_DYNAMIC_INFO, "data")
-        .limitTo(D::VIDEO & D::OUTPUT));
+        .limitTo(D::VIDEO & D::OUTPUT & D::READ));
 
     add(ConfigMapper(C2_PARAMKEY_TEMPORAL_LAYERING, C2_PARAMKEY_TEMPORAL_LAYERING, "")
         .limitTo(D::ENCODER & D::VIDEO & D::OUTPUT));
