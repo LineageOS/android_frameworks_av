@@ -4001,7 +4001,7 @@ void AudioFlinger::updateSecondaryOutputsForTrack_l(
     track->setTeePatchesToUpdate(std::move(teePatches));
 }
 
-sp<AudioFlinger::SyncEvent> AudioFlinger::createSyncEvent(AudioSystem::sync_event_t type,
+sp<SyncEvent> AudioFlinger::createSyncEvent(AudioSystem::sync_event_t type,
                                     audio_session_t triggerSession,
                                     audio_session_t listenerSession,
                                     sync_event_callback_t callBack,
