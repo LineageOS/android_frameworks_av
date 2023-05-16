@@ -180,10 +180,23 @@ static auto& getIAudioPolicyServiceStatistics() {
 
 static AudioPolicyInterface* createAudioPolicyManager(AudioPolicyClientInterface *clientInterface)
 {
-    auto config = AudioPolicyConfig::loadFromApmXmlConfigWithFallback();  // This can't fail.
-    AudioPolicyManager *apm = new AudioPolicyManager(
-            config, loadApmEngineLibraryAndCreateEngine(config->getEngineLibraryNameSuffix()),
-            clientInterface);
+    AudioPolicyManager *apm = nullptr;
+    media::AudioPolicyConfig apmConfig;
+    if (status_t status = clientInterface->getAudioPolicyConfig(&apmConfig); status == OK) {
+        auto config = AudioPolicyConfig::loadFromApmAidlConfigWithFallback(apmConfig);
+        LOG_ALWAYS_FATAL_IF(config->getEngineLibraryNameSuffix() !=
+                AudioPolicyConfig::kDefaultEngineLibraryNameSuffix,
+                "Only default engine is currently supported with the AIDL HAL");
+        apm = new AudioPolicyManager(config,
+                loadApmEngineLibraryAndCreateEngine(
+                        config->getEngineLibraryNameSuffix(), apmConfig.engineConfig),
+                clientInterface);
+    } else {
+        auto config = AudioPolicyConfig::loadFromApmXmlConfigWithFallback();  // This can't fail.
+        apm = new AudioPolicyManager(config,
+                loadApmEngineLibraryAndCreateEngine(config->getEngineLibraryNameSuffix()),
+                clientInterface);
+    }
     status_t status = apm->initialize();
     if (status != NO_ERROR) {
         delete apm;
