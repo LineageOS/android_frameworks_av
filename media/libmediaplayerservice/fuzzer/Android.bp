@@ -173,5 +173,6 @@ cc_fuzz {
         "libnetd_client",
         "libpowermanager",
         "libstagefright_httplive",
+        "libaudiohal@7.0",
     ],
 }
