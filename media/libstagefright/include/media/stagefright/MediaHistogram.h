@@ -197,13 +197,11 @@ std::string MediaHistogram<T>::emitBuckets() const {
         for (int i = 0; i < mBucketLimits.size(); ++i) {
             ss << ',' << mBucketLimits[i];
         }
-        ss << ',' << mCeiling;
     } else {
         ss << mFloor;
-        for (int i = 0; i < mBuckets.size(); ++i) {
+        for (int i = 1; i <= mBuckets.size(); ++i) {
             ss << ',' << (mFloor + i * mWidth);
         }
-        ss << ',' << mCeiling;
     }
     return ss.str();
 }
