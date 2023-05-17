@@ -150,6 +150,9 @@ public:
     VideoRenderQualityTracker();
     VideoRenderQualityTracker(const Configuration &configuration);
 
+    // Called when a tunnel mode frame has been queued.
+    void onTunnelFrameQueued(int64_t contentTimeUs);
+
     // Called when the app has intentionally decided not to render this frame.
     void onFrameSkipped(int64_t contentTimeUs);
 
@@ -276,6 +279,11 @@ private:
     // Since the system only signals when a frame is rendered, dropped frames are detected by
     // checking to see if the next expected frame is rendered. If not, it is considered dropped.
     std::queue<FrameInfo> mNextExpectedRenderedFrameQueue;
+
+    // When B-frames are present in the stream, a P-frame will be queued before the B-frame even
+    // though it is rendered after. Therefore, the P-frame is held here and not inserted into
+    // mNextExpectedRenderedFrameQueue until it should be inserted to maintain render order.
+    int64_t mTunnelFrameQueuedContentTimeUs;
 
     // Frame durations derived from timestamps encoded into the content stream. These are the
     // durations that each frame is supposed to be rendered for.

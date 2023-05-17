@@ -87,6 +87,25 @@ VideoRenderQualityTracker::VideoRenderQualityTracker(const Configuration &config
     clear();
 }
 
+void VideoRenderQualityTracker::onTunnelFrameQueued(int64_t contentTimeUs) {
+    if (!mConfiguration.enabled) {
+        return;
+    }
+
+    // Since P-frames are queued out of order, hold onto the P-frame until we can track it in
+    // render order. This only works because it depends on today's encoding algorithms that only
+    // allow B-frames to refer to ONE P-frame that comes after it. If the cardinality of P-frames
+    // in a single mini-GOP is increased, this algorithm breaks down.
+    if (mTunnelFrameQueuedContentTimeUs == -1) {
+        mTunnelFrameQueuedContentTimeUs = contentTimeUs;
+    } else if (contentTimeUs < mTunnelFrameQueuedContentTimeUs) {
+        onFrameReleased(contentTimeUs, 0);
+    } else {
+        onFrameReleased(mTunnelFrameQueuedContentTimeUs, 0);
+        mTunnelFrameQueuedContentTimeUs = contentTimeUs;
+    }
+}
+
 void VideoRenderQualityTracker::onFrameSkipped(int64_t contentTimeUs) {
     if (!mConfiguration.enabled) {
         return;
@@ -136,6 +155,13 @@ void VideoRenderQualityTracker::onFrameRendered(int64_t contentTimeUs, int64_t a
         processMetricsForSkippedFrame(contentTimeUs);
     }
     mPendingSkippedFrameContentTimeUsList = {};
+
+    // We can render a pending queued frame if it's the last frame of the video, so release it
+    // immediately.
+    if (contentTimeUs == mTunnelFrameQueuedContentTimeUs && mTunnelFrameQueuedContentTimeUs != -1) {
+        onFrameReleased(mTunnelFrameQueuedContentTimeUs, 0);
+        mTunnelFrameQueuedContentTimeUs = -1;
+    }
 
     static const FrameInfo noFrame = {-1, -1};
     FrameInfo nextExpectedFrame = noFrame;
@@ -211,6 +237,7 @@ void VideoRenderQualityTracker::resetForDiscontinuity() {
     // discontinuity. While stuttering or freezing could be found in the next few frames, the impact
     // to the user is is minimal, so better to just keep things simple and don't bother.
     mNextExpectedRenderedFrameQueue = {};
+    mTunnelFrameQueuedContentTimeUs = -1;
 
     // Ignore any frames that were skipped just prior to the discontinuity.
     mPendingSkippedFrameContentTimeUsList = {};
