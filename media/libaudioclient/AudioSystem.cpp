@@ -1066,8 +1066,8 @@ status_t AudioSystem::getOutputForAttr(audio_attributes_t* attr,
     const sp<IAudioPolicyService>& aps = AudioSystem::get_audio_policy_service();
     if (aps == 0) return NO_INIT;
 
-    media::AudioAttributesInternal attrAidl = VALUE_OR_RETURN_STATUS(
-            legacy2aidl_audio_attributes_t_AudioAttributesInternal(*attr));
+    media::audio::common::AudioAttributes attrAidl = VALUE_OR_RETURN_STATUS(
+            legacy2aidl_audio_attributes_t_AudioAttributes(*attr));
     int32_t sessionAidl = VALUE_OR_RETURN_STATUS(legacy2aidl_audio_session_t_int32_t(session));
     AudioConfig configAidl = VALUE_OR_RETURN_STATUS(
             legacy2aidl_audio_config_t_AudioConfig(*config, false /*isInput*/));
@@ -1106,7 +1106,7 @@ status_t AudioSystem::getOutputForAttr(audio_attributes_t* attr,
     *isSpatialized = responseAidl.isSpatialized;
     *isBitPerfect = responseAidl.isBitPerfect;
     *attr = VALUE_OR_RETURN_STATUS(
-            aidl2legacy_AudioAttributesInternal_audio_attributes_t(responseAidl.attr));
+            aidl2legacy_AudioAttributes_audio_attributes_t(responseAidl.attr));
 
     return OK;
 }
@@ -1171,8 +1171,8 @@ status_t AudioSystem::getInputForAttr(const audio_attributes_t* attr,
     const sp<IAudioPolicyService>& aps = AudioSystem::get_audio_policy_service();
     if (aps == 0) return NO_INIT;
 
-    media::AudioAttributesInternal attrAidl = VALUE_OR_RETURN_STATUS(
-            legacy2aidl_audio_attributes_t_AudioAttributesInternal(*attr));
+    media::audio::common::AudioAttributes attrAidl = VALUE_OR_RETURN_STATUS(
+            legacy2aidl_audio_attributes_t_AudioAttributes(*attr));
     int32_t inputAidl = VALUE_OR_RETURN_STATUS(legacy2aidl_audio_io_handle_t_int32_t(*input));
     int32_t riidAidl = VALUE_OR_RETURN_STATUS(legacy2aidl_audio_unique_id_t_int32_t(riid));
     int32_t sessionAidl = VALUE_OR_RETURN_STATUS(legacy2aidl_audio_session_t_int32_t(session));
@@ -1293,8 +1293,8 @@ status_t AudioSystem::setVolumeIndexForAttributes(const audio_attributes_t& attr
     const sp<IAudioPolicyService>& aps = AudioSystem::get_audio_policy_service();
     if (aps == 0) return PERMISSION_DENIED;
 
-    media::AudioAttributesInternal attrAidl = VALUE_OR_RETURN_STATUS(
-            legacy2aidl_audio_attributes_t_AudioAttributesInternal(attr));
+    media::audio::common::AudioAttributes attrAidl = VALUE_OR_RETURN_STATUS(
+            legacy2aidl_audio_attributes_t_AudioAttributes(attr));
     int32_t indexAidl = VALUE_OR_RETURN_STATUS(convertIntegral<int32_t>(index));
     AudioDeviceDescription deviceAidl = VALUE_OR_RETURN_STATUS(
             legacy2aidl_audio_devices_t_AudioDeviceDescription(device));
@@ -1308,8 +1308,8 @@ status_t AudioSystem::getVolumeIndexForAttributes(const audio_attributes_t& attr
     const sp<IAudioPolicyService>& aps = AudioSystem::get_audio_policy_service();
     if (aps == 0) return PERMISSION_DENIED;
 
-    media::AudioAttributesInternal attrAidl = VALUE_OR_RETURN_STATUS(
-            legacy2aidl_audio_attributes_t_AudioAttributesInternal(attr));
+    media::audio::common::AudioAttributes attrAidl = VALUE_OR_RETURN_STATUS(
+            legacy2aidl_audio_attributes_t_AudioAttributes(attr));
     AudioDeviceDescription deviceAidl = VALUE_OR_RETURN_STATUS(
             legacy2aidl_audio_devices_t_AudioDeviceDescription(device));
     int32_t indexAidl;
@@ -1323,8 +1323,8 @@ status_t AudioSystem::getMaxVolumeIndexForAttributes(const audio_attributes_t& a
     const sp<IAudioPolicyService>& aps = AudioSystem::get_audio_policy_service();
     if (aps == 0) return PERMISSION_DENIED;
 
-    media::AudioAttributesInternal attrAidl = VALUE_OR_RETURN_STATUS(
-            legacy2aidl_audio_attributes_t_AudioAttributesInternal(attr));
+    media::audio::common::AudioAttributes attrAidl = VALUE_OR_RETURN_STATUS(
+            legacy2aidl_audio_attributes_t_AudioAttributes(attr));
     int32_t indexAidl;
     RETURN_STATUS_IF_ERROR(statusTFromBinderStatus(
             aps->getMaxVolumeIndexForAttributes(attrAidl, &indexAidl)));
@@ -1336,8 +1336,8 @@ status_t AudioSystem::getMinVolumeIndexForAttributes(const audio_attributes_t& a
     const sp<IAudioPolicyService>& aps = AudioSystem::get_audio_policy_service();
     if (aps == 0) return PERMISSION_DENIED;
 
-    media::AudioAttributesInternal attrAidl = VALUE_OR_RETURN_STATUS(
-            legacy2aidl_audio_attributes_t_AudioAttributesInternal(attr));
+    media::audio::common::AudioAttributes attrAidl = VALUE_OR_RETURN_STATUS(
+            legacy2aidl_audio_attributes_t_AudioAttributes(attr));
     int32_t indexAidl;
     RETURN_STATUS_IF_ERROR(statusTFromBinderStatus(
             aps->getMinVolumeIndexForAttributes(attrAidl, &indexAidl)));
@@ -1369,8 +1369,8 @@ status_t AudioSystem::getDevicesForAttributes(const audio_attributes_t& aa,
     const sp<IAudioPolicyService>& aps = AudioSystem::get_audio_policy_service();
     if (aps == 0) return PERMISSION_DENIED;
 
-    media::AudioAttributesInternal aaAidl = VALUE_OR_RETURN_STATUS(
-             legacy2aidl_audio_attributes_t_AudioAttributesInternal(aa));
+    media::audio::common::AudioAttributes aaAidl = VALUE_OR_RETURN_STATUS(
+             legacy2aidl_audio_attributes_t_AudioAttributes(aa));
     std::vector<AudioDevice> retAidl;
     RETURN_STATUS_IF_ERROR(
             statusTFromBinderStatus(aps->getDevicesForAttributes(aaAidl, forVolume, &retAidl)));
@@ -1888,8 +1888,8 @@ status_t AudioSystem::startAudioSource(const struct audio_port_config* source,
 
     media::AudioPortConfigFw sourceAidl = VALUE_OR_RETURN_STATUS(
             legacy2aidl_audio_port_config_AudioPortConfigFw(*source));
-    media::AudioAttributesInternal attributesAidl = VALUE_OR_RETURN_STATUS(
-            legacy2aidl_audio_attributes_t_AudioAttributesInternal(*attributes));
+    media::audio::common::AudioAttributes attributesAidl = VALUE_OR_RETURN_STATUS(
+            legacy2aidl_audio_attributes_t_AudioAttributes(*attributes));
     int32_t portIdAidl;
     RETURN_STATUS_IF_ERROR(statusTFromBinderStatus(
             aps->startAudioSource(sourceAidl, attributesAidl, &portIdAidl)));
@@ -2175,8 +2175,8 @@ status_t AudioSystem::getProductStrategyFromAudioAttributes(const audio_attribut
     const sp<IAudioPolicyService>& aps = AudioSystem::get_audio_policy_service();
     if (aps == 0) return PERMISSION_DENIED;
 
-    media::AudioAttributesInternal aaAidl = VALUE_OR_RETURN_STATUS(
-            legacy2aidl_audio_attributes_t_AudioAttributesInternal(aa));
+    media::audio::common::AudioAttributes aaAidl = VALUE_OR_RETURN_STATUS(
+            legacy2aidl_audio_attributes_t_AudioAttributes(aa));
     int32_t productStrategyAidl;
 
     RETURN_STATUS_IF_ERROR(statusTFromBinderStatus(
@@ -2205,8 +2205,8 @@ status_t AudioSystem::getVolumeGroupFromAudioAttributes(const audio_attributes_t
     const sp<IAudioPolicyService>& aps = AudioSystem::get_audio_policy_service();
     if (aps == 0) return PERMISSION_DENIED;
 
-    media::AudioAttributesInternal aaAidl = VALUE_OR_RETURN_STATUS(
-            legacy2aidl_audio_attributes_t_AudioAttributesInternal(aa));
+    media::audio::common::AudioAttributes aaAidl = VALUE_OR_RETURN_STATUS(
+            legacy2aidl_audio_attributes_t_AudioAttributes(aa));
     int32_t volumeGroupAidl;
     RETURN_STATUS_IF_ERROR(statusTFromBinderStatus(
             aps->getVolumeGroupFromAudioAttributes(aaAidl, fallbackOnDefault, &volumeGroupAidl)));
@@ -2411,8 +2411,8 @@ status_t AudioSystem::canBeSpatialized(const audio_attributes_t *attr,
     audio_attributes_t attributes = attr != nullptr ? *attr : AUDIO_ATTRIBUTES_INITIALIZER;
     audio_config_t configuration = config != nullptr ? *config : AUDIO_CONFIG_INITIALIZER;
 
-    std::optional<media::AudioAttributesInternal> attrAidl = VALUE_OR_RETURN_STATUS(
-            legacy2aidl_audio_attributes_t_AudioAttributesInternal(attributes));
+    std::optional<media::audio::common::AudioAttributes> attrAidl = VALUE_OR_RETURN_STATUS(
+            legacy2aidl_audio_attributes_t_AudioAttributes(attributes));
     std::optional<AudioConfig> configAidl = VALUE_OR_RETURN_STATUS(
             legacy2aidl_audio_config_t_AudioConfig(configuration, false /*isInput*/));
     std::vector<AudioDevice> devicesAidl = VALUE_OR_RETURN_STATUS(
@@ -2449,8 +2449,8 @@ status_t AudioSystem::getDirectPlaybackSupport(const audio_attributes_t *attr,
         return PERMISSION_DENIED;
     }
 
-    media::AudioAttributesInternal attrAidl = VALUE_OR_RETURN_STATUS(
-            legacy2aidl_audio_attributes_t_AudioAttributesInternal(*attr));
+    media::audio::common::AudioAttributes attrAidl = VALUE_OR_RETURN_STATUS(
+            legacy2aidl_audio_attributes_t_AudioAttributes(*attr));
     AudioConfig configAidl = VALUE_OR_RETURN_STATUS(
             legacy2aidl_audio_config_t_AudioConfig(*config, false /*isInput*/));
 
@@ -2473,8 +2473,8 @@ status_t AudioSystem::getDirectProfilesForAttributes(const audio_attributes_t* a
         return PERMISSION_DENIED;
     }
 
-    media::AudioAttributesInternal attrAidl = VALUE_OR_RETURN_STATUS(
-            legacy2aidl_audio_attributes_t_AudioAttributesInternal(*attr));
+    media::audio::common::AudioAttributes attrAidl = VALUE_OR_RETURN_STATUS(
+            legacy2aidl_audio_attributes_t_AudioAttributes(*attr));
 
     std::vector<media::audio::common::AudioProfile> audioProfilesAidl;
     RETURN_STATUS_IF_ERROR(statusTFromBinderStatus(
@@ -2653,8 +2653,8 @@ status_t AudioSystem::setPreferredMixerAttributes(const audio_attributes_t *attr
         return PERMISSION_DENIED;
     }
 
-    media::AudioAttributesInternal attrAidl = VALUE_OR_RETURN_STATUS(
-            legacy2aidl_audio_attributes_t_AudioAttributesInternal(*attr));
+    media::audio::common::AudioAttributes attrAidl = VALUE_OR_RETURN_STATUS(
+            legacy2aidl_audio_attributes_t_AudioAttributes(*attr));
     media::AudioMixerAttributesInternal mixerAttrAidl = VALUE_OR_RETURN_STATUS(
             legacy2aidl_audio_mixer_attributes_t_AudioMixerAttributesInternal(*mixerAttr));
     int32_t uidAidl = VALUE_OR_RETURN_STATUS(legacy2aidl_uid_t_int32_t(uid));
@@ -2673,8 +2673,8 @@ status_t AudioSystem::getPreferredMixerAttributes(
         return PERMISSION_DENIED;
     }
 
-    media::AudioAttributesInternal attrAidl = VALUE_OR_RETURN_STATUS(
-            legacy2aidl_audio_attributes_t_AudioAttributesInternal(*attr));
+    media::audio::common::AudioAttributes attrAidl = VALUE_OR_RETURN_STATUS(
+            legacy2aidl_audio_attributes_t_AudioAttributes(*attr));
     int32_t portIdAidl = VALUE_OR_RETURN_STATUS(legacy2aidl_audio_port_handle_t_int32_t(portId));
     std::optional<media::AudioMixerAttributesInternal> _aidlReturn;
     RETURN_STATUS_IF_ERROR(statusTFromBinderStatus(
@@ -2696,8 +2696,8 @@ status_t AudioSystem::clearPreferredMixerAttributes(const audio_attributes_t *at
         return PERMISSION_DENIED;
     }
 
-    media::AudioAttributesInternal attrAidl = VALUE_OR_RETURN_STATUS(
-            legacy2aidl_audio_attributes_t_AudioAttributesInternal(*attr));
+    media::audio::common::AudioAttributes attrAidl = VALUE_OR_RETURN_STATUS(
+            legacy2aidl_audio_attributes_t_AudioAttributes(*attr));
     int32_t uidAidl = VALUE_OR_RETURN_STATUS(legacy2aidl_uid_t_int32_t(uid));
     int32_t portIdAidl = VALUE_OR_RETURN_STATUS(legacy2aidl_audio_port_handle_t_int32_t(portId));
     return statusTFromBinderStatus(
