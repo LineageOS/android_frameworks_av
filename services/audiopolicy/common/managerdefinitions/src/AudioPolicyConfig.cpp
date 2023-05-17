@@ -256,10 +256,6 @@ status_t AudioPolicyConfig::loadFromAidl(const media::AudioPolicyConfig& aidl) {
             media::audio::common::AudioMode::CALL_SCREEN) != aidl.supportedModes.end();
     mSurroundFormats = VALUE_OR_RETURN_STATUS(
             aidl2legacy_SurroundSoundConfig_SurroundFormats(aidl.surroundSoundConfig));
-    // TODO(b/205884982): Remove after landing aosp/2353423.
-    if (mSurroundFormats.empty()) {
-        setDefaultSurroundFormats();
-    }
     mSource = kAidlConfigSource;
     // No need to augmentData() as AIDL HAL must provide correct mic addresses.
     return NO_ERROR;
