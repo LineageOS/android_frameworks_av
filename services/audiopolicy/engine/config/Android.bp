@@ -22,11 +22,13 @@ cc_library {
         "-Wextra",
     ],
     shared_libs: [
-        "libmedia_helper",
-        "libxml2",
-        "libutils",
-        "liblog",
+        "libaudio_aidl_conversion_common_cpp",
+        "libaudiopolicycomponents",
         "libcutils",
+        "liblog",
+        "libmedia_helper",
+        "libutils",
+        "libxml2",
     ],
     header_libs: [
         "libaudio_system_headers",
