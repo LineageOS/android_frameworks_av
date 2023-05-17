@@ -19,7 +19,6 @@
 #include <algorithm>
 #include <map>
 #include <sstream>
-#include <regex>
 #include <utility>
 #include <vector>
 
@@ -100,12 +99,6 @@ using media::audio::common::PcmType;
 // Converters
 
 namespace {
-
-bool isVendorExtension(const std::string& s) {
-    // Must be the same as defined in AudioAttributes.aidl and {Playback|Record}TrackMetadata.aidl
-    static const std::regex vendorExtension("VX_[A-Z0-9]{3,}_[_A-Z0-9]+");
-    return std::regex_match(s.begin(), s.end(), vendorExtension);
-}
 
 std::vector<std::string> splitString(const std::string& s, char separator) {
     std::istringstream iss(s);
@@ -1815,11 +1808,6 @@ legacy2aidl_audio_usage_t_AudioUsage(audio_usage_t legacy) {
     return unexpected(BAD_VALUE);
 }
 
-namespace {
-
-// TODO(b/281850726): Expose publicly once android.media.AudioFlag is removed.
-// Until that, `legacy2aidl_audio_flags_mask_t_AudioFlag` function is ambiguous.
-
 ConversionResult<audio_flags_mask_t>
 aidl2legacy_AudioFlag_audio_flags_mask_t(AudioFlag aidl) {
     switch (aidl) {
@@ -1921,8 +1909,6 @@ legacy2aidl_audio_flags_mask_t_int32_t_mask(audio_flags_mask_t legacy) {
             enumToMask_bitmask<int32_t, AudioFlag>);
 }
 
-}  // namespace
-
 ConversionResult<std::string>
 aidl2legacy_AudioTags_string(const std::vector<std::string>& aidl) {
     std::ostringstream tagsBuffer;
@@ -1931,17 +1917,12 @@ aidl2legacy_AudioTags_string(const std::vector<std::string>& aidl) {
         if (hasValue) {
             tagsBuffer << AUDIO_ATTRIBUTES_TAGS_SEPARATOR;
         }
-        if (isVendorExtension(tag)) {
-            // Note: with the current regex for vendor tags: VX_[A-Z0-9]{3,}_[_A-Z0-9]+
-            // it's impossible to create a vendor tag that would contain the separator, but in case
-            // the criteria changes, we double check it here.
-            if (strchr(tag.c_str(), AUDIO_ATTRIBUTES_TAGS_SEPARATOR) == nullptr) {
-                tagsBuffer << tag;
-                hasValue = true;
-            } else {
-                ALOGE("Vendor extension tag is ill-formed: \"%s\"", tag.c_str());
-                return unexpected(BAD_VALUE);
-            }
+        if (strchr(tag.c_str(), AUDIO_ATTRIBUTES_TAGS_SEPARATOR) == nullptr) {
+            tagsBuffer << tag;
+            hasValue = true;
+        } else {
+            ALOGE("Tag is ill-formed: \"%s\"", tag.c_str());
+            return unexpected(BAD_VALUE);
         }
     }
     return tagsBuffer.str();
@@ -1949,11 +1930,7 @@ aidl2legacy_AudioTags_string(const std::vector<std::string>& aidl) {
 
 ConversionResult<std::vector<std::string>>
 legacy2aidl_string_AudioTags(const std::string& legacy) {
-    auto allTags = splitString(legacy, AUDIO_ATTRIBUTES_TAGS_SEPARATOR);
-    std::vector<std::string> result;
-    std::copy_if(std::make_move_iterator(allTags.begin()), std::make_move_iterator(allTags.end()),
-                    std::back_inserter(result), isVendorExtension);
-    return result;
+    return splitString(legacy, AUDIO_ATTRIBUTES_TAGS_SEPARATOR);
 }
 
 ConversionResult<audio_attributes_t>

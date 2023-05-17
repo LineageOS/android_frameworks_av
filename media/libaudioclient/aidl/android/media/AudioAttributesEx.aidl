@@ -16,7 +16,7 @@
 
 package android.media;
 
-import android.media.AudioAttributesInternal;
+import android.media.audio.common.AudioAttributes;
 import android.media.audio.common.AudioStreamType;
 
 /**
@@ -24,7 +24,7 @@ import android.media.audio.common.AudioStreamType;
  * {@hide}
  */
 parcelable AudioAttributesEx {
-    AudioAttributesInternal attributes;
+    AudioAttributes attributes;
     AudioStreamType streamType;
     /** Interpreted as volume_group_t. */
     int groupId;
