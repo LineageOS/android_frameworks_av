@@ -29,11 +29,8 @@ package {
     ],
 }
 
-cc_fuzz {
-    name: "camera_service_fuzzer",
-    srcs: [
-        "camera_service_fuzzer.cpp",
-    ],
+cc_defaults {
+    name: "camera_service_fuzzer_defaults",
     header_libs: [
         "libmedia_headers",
     ],
@@ -71,5 +68,30 @@ cc_fuzz {
             "timeout=770",
         ],
 
+    },
+}
+
+cc_fuzz {
+    name: "camera_service_fuzzer",
+    srcs: [
+        "camera_service_fuzzer.cpp",
+    ],
+    defaults: [
+        "camera_service_fuzzer_defaults"
+    ],
+}
+
+cc_fuzz {
+    name: "camera_service_aidl_fuzzer",
+    srcs: [
+        "camera_service_aidl_fuzzer.cpp",
+    ],
+    defaults: [
+        "camera_service_fuzzer_defaults",
+        "service_fuzzer_defaults",
+        "fuzzer_disable_leaks",
+    ],
+    fuzz_config: {
+        triage_assignee: "waghpawan@google.com",
     },
 }
