@@ -20,6 +20,7 @@
 //#define LOG_NDEBUG 0
 
 #include <fmq/AidlMessageQueue.h>
+#include <system/audio_aidl_utils.h>
 #include <utils/Log.h>
 
 #include "EffectProxy.h"
@@ -32,6 +33,7 @@ using ::aidl::android::hardware::audio::effect::IFactory;
 using ::aidl::android::hardware::audio::effect::Parameter;
 using ::aidl::android::hardware::audio::effect::State;
 using ::aidl::android::media::audio::common::AudioUuid;
+using ::android::audio::utils::toString;
 
 namespace android {
 namespace effect {
@@ -54,7 +56,7 @@ EffectProxy::~EffectProxy() {
 
 // sub effect must have same proxy UUID as EffectProxy, and the type UUID must match.
 ndk::ScopedAStatus EffectProxy::addSubEffect(const Descriptor& sub) {
-    ALOGV("%s: %s", __func__, mIdentity.type.toString().c_str());
+    ALOGV("%s: %s", __func__, toString(mIdentity.type).c_str());
     if (0 != mSubEffects.count(sub.common.id) || !sub.common.id.proxy.has_value() ||
         sub.common.id.proxy.value() != mIdentity.uuid) {
         ALOGE("%s sub effect already exist or mismatch %s", __func__, sub.toString().c_str());
@@ -92,15 +94,15 @@ ndk::ScopedAStatus EffectProxy::addSubEffect(const Descriptor& sub) {
 }
 
 ndk::ScopedAStatus EffectProxy::create() {
-    ALOGV("%s: %s", __func__, mIdentity.type.toString().c_str());
+    ALOGV("%s: %s", __func__, toString(mIdentity.type).c_str());
     ndk::ScopedAStatus status = ndk::ScopedAStatus::ok();
 
     for (auto& sub : mSubEffects) {
         auto& effectHandle = std::get<SubEffectTupleIndex::HANDLE>(sub.second);
-        ALOGI("%s sub-effect %s", __func__, sub.first.uuid.toString().c_str());
+        ALOGI("%s sub-effect %s", __func__, toString(sub.first.uuid).c_str());
         status = mFactory->createEffect(sub.first.uuid, &effectHandle);
         if (!status.isOk() || !effectHandle) {
-            ALOGE("%s sub-effect failed %s", __func__, sub.first.uuid.toString().c_str());
+            ALOGE("%s sub-effect failed %s", __func__, toString(sub.first.uuid).c_str());
             break;
         }
     }
@@ -113,7 +115,7 @@ ndk::ScopedAStatus EffectProxy::create() {
 }
 
 ndk::ScopedAStatus EffectProxy::destroy() {
-    ALOGV("%s: %s", __func__, mIdentity.type.toString().c_str());
+    ALOGV("%s: %s", __func__, toString(mIdentity.type).c_str());
     return runWithAllSubEffects([&](std::shared_ptr<IEffect>& effect) {
         ndk::ScopedAStatus status = mFactory->destroyEffect(effect);
         if (status.isOk()) {
@@ -131,7 +133,7 @@ ndk::ScopedAStatus EffectProxy::setOffloadParam(const effect_offload_param_t* of
     const auto& itor = std::find_if(mSubEffects.begin(), mSubEffects.end(), [&](const auto& sub) {
         const auto& desc = std::get<SubEffectTupleIndex::DESCRIPTOR>(sub.second);
         ALOGI("%s: isOffload %d sub-effect: %s, flags %s", __func__, offload->isOffload,
-              desc.common.id.uuid.toString().c_str(), desc.common.flags.toString().c_str());
+              toString(desc.common.id.uuid).c_str(), desc.common.flags.toString().c_str());
         return offload->isOffload ==
                (desc.common.flags.hwAcceleratorMode == Flags::HardwareAccelerator::TUNNEL);
     });
@@ -143,7 +145,7 @@ ndk::ScopedAStatus EffectProxy::setOffloadParam(const effect_offload_param_t* of
 
     mActiveSub = itor->first;
     ALOGI("%s: active %soffload sub-effect: %s, flags %s", __func__,
-          offload->isOffload ? "" : "non-", mActiveSub.uuid.toString().c_str(),
+          offload->isOffload ? "" : "non-", toString(mActiveSub.uuid).c_str(),
           std::get<SubEffectTupleIndex::DESCRIPTOR>(itor->second).common.flags.toString().c_str());
     return ndk::ScopedAStatus::ok();
 }
@@ -152,14 +154,14 @@ ndk::ScopedAStatus EffectProxy::setOffloadParam(const effect_offload_param_t* of
 ndk::ScopedAStatus EffectProxy::open(const Parameter::Common& common,
                                      const std::optional<Parameter::Specific>& specific,
                                      IEffect::OpenEffectReturn* ret __unused) {
-    ALOGV("%s: %s", __func__, mIdentity.type.toString().c_str());
+    ALOGV("%s: %s", __func__, toString(mIdentity.type).c_str());
     ndk::ScopedAStatus status = ndk::ScopedAStatus::fromExceptionCodeWithMessage(
             EX_ILLEGAL_ARGUMENT, "nullEffectHandle");
     for (auto& sub : mSubEffects) {
         auto& effect = std::get<SubEffectTupleIndex::HANDLE>(sub.second);
         auto& openRet = std::get<SubEffectTupleIndex::RETURN>(sub.second);
         if (!effect || !(status = effect->open(common, specific, &openRet)).isOk()) {
-            ALOGE("%s: failed to open UUID %s", __func__, sub.first.uuid.toString().c_str());
+            ALOGE("%s: failed to open UUID %s", __func__, toString(sub.first.uuid).c_str());
             break;
         }
     }
@@ -173,7 +175,7 @@ ndk::ScopedAStatus EffectProxy::open(const Parameter::Common& common,
 }
 
 ndk::ScopedAStatus EffectProxy::close() {
-    ALOGV("%s: %s", __func__, mIdentity.type.toString().c_str());
+    ALOGV("%s: %s", __func__, toString(mIdentity.type).c_str());
     return runWithAllSubEffects([&](std::shared_ptr<IEffect>& effect) {
         return effect->close();
     });
@@ -203,7 +205,7 @@ ndk::ScopedAStatus EffectProxy::getDescriptor(Descriptor* desc) {
 
 // Handle with active sub-effect first, only send to other sub-effects when success
 ndk::ScopedAStatus EffectProxy::command(CommandId id) {
-    ALOGV("%s: %s, command %s", __func__, mIdentity.type.toString().c_str(),
+    ALOGV("%s: %s, command %s", __func__, toString(mIdentity.type).c_str(),
           android::internal::ToString(id).c_str());
     return runWithActiveSubEffectThenOthers(
             [&](const std::shared_ptr<IEffect>& effect) -> ndk::ScopedAStatus {
