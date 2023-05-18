@@ -8,6 +8,31 @@ package {
 }
 
 cc_test {
+    name: "mediasyncevent_tests",
+
+    host_supported: true,
+
+    srcs: [
+        "mediasyncevent_tests.cpp"
+    ],
+
+    header_libs: [
+        "libaudioclient_headers",
+    ],
+
+    static_libs: [
+        "liblog",
+        "libutils", // RefBase
+    ],
+
+    cflags: [
+        "-Wall",
+        "-Werror",
+        "-Wextra",
+    ],
+}
+
+cc_test {
     name: "monotonicframecounter_tests",
 
     host_supported: true,
