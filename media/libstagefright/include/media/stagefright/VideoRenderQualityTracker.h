@@ -269,6 +269,9 @@ private:
     // The most recent timestamp of the first frame rendered after the freeze.
     int64_t mLastFreezeEndTimeUs;
 
+    // The previous video frame was dropped.
+    bool mWasPreviousFrameDropped;
+
     // The render duration of the playback.
     int64_t mRenderDurationMs;
 
