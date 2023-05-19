@@ -232,6 +232,7 @@ void VideoRenderQualityTracker::resetForDiscontinuity() {
     mLastContentTimeUs = -1;
     mLastRenderTimeUs = -1;
     mLastFreezeEndTimeUs = -1;
+    mWasPreviousFrameDropped = false;
 
     // Don't worry about tracking frame rendering times from now up until playback catches up to the
     // discontinuity. While stuttering or freezing could be found in the next few frames, the impact
@@ -298,6 +299,7 @@ void VideoRenderQualityTracker::processMetricsForSkippedFrame(int64_t contentTim
     updateFrameDurations(mDesiredFrameDurationUs, -1);
     updateFrameDurations(mActualFrameDurationUs, -1);
     updateFrameRate(mMetrics.contentFrameRate, mContentFrameDurationUs, mConfiguration);
+    mWasPreviousFrameDropped = false;
 }
 
 void VideoRenderQualityTracker::processMetricsForDroppedFrame(int64_t contentTimeUs,
@@ -308,6 +310,7 @@ void VideoRenderQualityTracker::processMetricsForDroppedFrame(int64_t contentTim
     updateFrameDurations(mActualFrameDurationUs, -1);
     updateFrameRate(mMetrics.contentFrameRate, mContentFrameDurationUs, mConfiguration);
     updateFrameRate(mMetrics.desiredFrameRate, mDesiredFrameDurationUs, mConfiguration);
+    mWasPreviousFrameDropped = true;
 }
 
 void VideoRenderQualityTracker::processMetricsForRenderedFrame(int64_t contentTimeUs,
@@ -334,7 +337,7 @@ void VideoRenderQualityTracker::processMetricsForRenderedFrame(int64_t contentTi
     updateFrameRate(mMetrics.actualFrameRate, mActualFrameDurationUs, mConfiguration);
 
     // If the previous frame was dropped, there was a freeze if we've already rendered a frame
-    if (mActualFrameDurationUs[1] == -1 && mLastRenderTimeUs != -1) {
+    if (mWasPreviousFrameDropped && mLastRenderTimeUs != -1) {
         processFreeze(actualRenderTimeUs, mLastRenderTimeUs, mLastFreezeEndTimeUs, mMetrics);
         mLastFreezeEndTimeUs = actualRenderTimeUs;
     }
@@ -346,6 +349,8 @@ void VideoRenderQualityTracker::processMetricsForRenderedFrame(int64_t contentTi
     if (judderScore != 0) {
         mMetrics.judderScoreHistogram.insert(judderScore);
     }
+
+    mWasPreviousFrameDropped = false;
 }
 
 void VideoRenderQualityTracker::processFreeze(int64_t actualRenderTimeUs, int64_t lastRenderTimeUs,
