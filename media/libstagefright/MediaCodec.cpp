@@ -155,6 +155,7 @@ static const char *kCodecLatencyHist = "android.media.mediacodec.latency.hist"; 
 static const char *kCodecLatencyUnknown = "android.media.mediacodec.latency.unknown";
 static const char *kCodecQueueSecureInputBufferError = "android.media.mediacodec.queueSecureInputBufferError";
 static const char *kCodecQueueInputBufferError = "android.media.mediacodec.queueInputBufferError";
+static const char *kCodecComponentColorFormat = "android.media.mediacodec.component-color-format";
 
 static const char *kCodecNumLowLatencyModeOn = "android.media.mediacodec.low-latency.on";  /* 0..n */
 static const char *kCodecNumLowLatencyModeOff = "android.media.mediacodec.low-latency.off";  /* 0..n */
@@ -1129,7 +1130,7 @@ void MediaCodec::updateMediametrics() {
     // Video rendering quality metrics
     {
         const VideoRenderQualityMetrics &m = mVideoRenderQualityTracker.getMetrics();
-        if (m.frameRenderedCount > 0) {
+        if (m.frameReleasedCount > 0) {
             mediametrics_setInt64(mMetricsHandle, kCodecFirstRenderTimeUs, m.firstRenderTimeUs);
             mediametrics_setInt64(mMetricsHandle, kCodecFramesReleased, m.frameReleasedCount);
             mediametrics_setInt64(mMetricsHandle, kCodecFramesRendered, m.frameRenderedCount);
@@ -1534,7 +1535,11 @@ void MediaCodec::processRenderedFrames(const sp<AMessage> &msg) {
                 ALOGE("processRenderedFrames: no media time found");
                 continue;
             }
-            mVideoRenderQualityTracker.onFrameRendered(mediaTimeUs, renderTimeNs);
+            // Tunneled frames use INT64_MAX to indicate end-of-stream, so don't report it as a
+            // rendered frame.
+            if (!mTunneled || mediaTimeUs != INT64_MAX) {
+                mVideoRenderQualityTracker.onFrameRendered(mediaTimeUs, renderTimeNs);
+            }
         }
     }
 }
@@ -3807,6 +3812,14 @@ void MediaCodec::onMessageReceived(const sp<AMessage> &msg) {
                         if (interestingFormat->findInt32("level", &level)) {
                             mediametrics_setInt32(mMetricsHandle, kCodecLevel, level);
                         }
+                        sp<AMessage> uncompressedFormat =
+                                (mFlags & kFlagIsEncoder) ? mInputFormat : mOutputFormat;
+                        int32_t componentColorFormat  = -1;
+                        if (uncompressedFormat->findInt32("android._color-format",
+                                &componentColorFormat)) {
+                            mediametrics_setInt32(mMetricsHandle,
+                                    kCodecComponentColorFormat, componentColorFormat);
+                        }
                         updateHdrMetrics(true /* isConfig */);
                         int32_t codecMaxInputSize = -1;
                         if (mInputFormat->findInt32(KEY_MAX_INPUT_SIZE, &codecMaxInputSize)) {
@@ -5818,6 +5831,10 @@ status_t MediaCodec::onQueueInputBuffer(const sp<AMessage> &msg) {
     }
 
     if (err == OK) {
+        if (mTunneled && (flags & (BUFFER_FLAG_DECODE_ONLY | BUFFER_FLAG_END_OF_STREAM)) == 0) {
+            mVideoRenderQualityTracker.onTunnelFrameQueued(timeUs);
+        }
+
         // synchronization boundary for getBufferAndFormat
         Mutex::Autolock al(mBufferLock);
         info->mOwnedByClient = false;
@@ -5900,7 +5917,7 @@ status_t MediaCodec::onReleaseOutputBuffer(const sp<AMessage> &msg) {
     }
 
     if (render && buffer->size() != 0) {
-        int64_t mediaTimeUs = -1;
+        int64_t mediaTimeUs = INT64_MIN;
         buffer->meta()->findInt64("timeUs", &mediaTimeUs);
 
         bool noRenderTime = false;
@@ -5931,8 +5948,11 @@ status_t MediaCodec::onReleaseOutputBuffer(const sp<AMessage> &msg) {
         // If rendering to the screen, then schedule a time in the future to poll to see if this
         // frame was ever rendered to seed onFrameRendered callbacks.
         if (mIsSurfaceToDisplay) {
-            noRenderTime ? mVideoRenderQualityTracker.onFrameReleased(mediaTimeUs)
-                         : mVideoRenderQualityTracker.onFrameReleased(mediaTimeUs, renderTimeNs);
+            if (mediaTimeUs != INT64_MIN) {
+                noRenderTime ? mVideoRenderQualityTracker.onFrameReleased(mediaTimeUs)
+                             : mVideoRenderQualityTracker.onFrameReleased(mediaTimeUs,
+                                                                          renderTimeNs);
+            }
             // can't initialize this in the constructor because the Looper parent class needs to be
             // initialized first
             if (mMsgPollForRenderedBuffers == nullptr) {
@@ -5963,9 +5983,10 @@ status_t MediaCodec::onReleaseOutputBuffer(const sp<AMessage> &msg) {
         }
     } else {
         if (mIsSurfaceToDisplay) {
-            int64_t mediaTimeUs = -1;
-            buffer->meta()->findInt64("timeUs", &mediaTimeUs);
-            mVideoRenderQualityTracker.onFrameSkipped(mediaTimeUs);
+            int64_t mediaTimeUs = INT64_MIN;
+            if (buffer->meta()->findInt64("timeUs", &mediaTimeUs)) {
+                mVideoRenderQualityTracker.onFrameSkipped(mediaTimeUs);
+            }
         }
         mBufferChannel->discardBuffer(buffer);
     }
