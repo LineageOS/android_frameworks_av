@@ -232,6 +232,18 @@ TEST_F(VideoRenderQualityTrackerTest, whenFrameRateIsUnstable_doesntDetectFrameR
     EXPECT_EQ(h.getMetrics().actualFrameRate, FRAME_RATE_UNDETERMINED);
 }
 
+TEST_F(VideoRenderQualityTrackerTest, capturesFreezeRate) {
+    Configuration c;
+    Helper h(20, c);
+    h.render(3);
+    EXPECT_EQ(h.getMetrics().freezeRate, 0);
+    h.drop(3);
+    h.render(3);
+    // +1 because the first frame before drops is considered frozen
+    // and then -1 because the last frame has an unknown render duration
+    EXPECT_EQ(h.getMetrics().freezeRate, 4.0 / 8.0);
+}
+
 TEST_F(VideoRenderQualityTrackerTest, capturesFreezeDurationHistogram) {
     Configuration c;
     // +17 because freeze durations include the render time of the previous frame
