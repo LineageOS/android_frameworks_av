@@ -83,24 +83,15 @@ status_t DevicesFactoryHalAidl::openDevice(const char *name, sp<DeviceHalInterfa
     if (name == nullptr || device == nullptr) {
         return BAD_VALUE;
     }
-
-    // FIXME: Remove this call and the check for the supported module names
-    // after implementing retrieval of module names on the framework side.
-    // Currently it is still using the legacy XML config.
-    std::vector<std::string> deviceNames;
-    if (status_t status = getDeviceNames(&deviceNames); status != OK) {
-        return status;
-    }
     std::shared_ptr<IModule> service;
-    if (std::find(deviceNames.begin(), deviceNames.end(), name) != deviceNames.end()) {
-        if (strcmp(name, "primary") == 0) name = "default";
-        auto serviceName = std::string(IModule::descriptor) + "/" + name;
-        service = IModule::fromBinder(
-                ndk::SpAIBinder(AServiceManager_waitForService(serviceName.c_str())));
-        ALOGE_IF(service == nullptr, "%s fromBinder %s failed", __func__, serviceName.c_str());
+    if (strcmp(name, "primary") == 0) name = "default";
+    auto serviceName = std::string(IModule::descriptor) + "/" + name;
+    service = IModule::fromBinder(
+            ndk::SpAIBinder(AServiceManager_waitForService(serviceName.c_str())));
+    if (service == nullptr) {
+        ALOGE("%s fromBinder %s failed", __func__, serviceName.c_str());
+        return NO_INIT;
     }
-    // If the service is a nullptr, the device object will not be really functional,
-    // but will not crash either.
     *device = sp<DeviceHalAidl>::make(name, service);
     return OK;
 }
