@@ -75,7 +75,7 @@ bool IOProfile::isCompatibleProfile(const DeviceVector &devices,
             if (checkExactAudioProfile(&config) != NO_ERROR) {
                 return false;
             }
-        } else if (checkCompatibleAudioProfile(
+        } else if (checkExactAudioProfile(&config) != NO_ERROR && checkCompatibleAudioProfile(
                 myUpdatedSamplingRate, myUpdatedChannelMask, myUpdatedFormat) != NO_ERROR) {
             return false;
         }
