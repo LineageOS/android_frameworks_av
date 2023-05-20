@@ -1017,7 +1017,7 @@ void CCodecBufferChannel::initializeFrameTrackingFor(ANativeWindow * window) {
     int hasPresentFenceTimes = 0;
     window->query(window, NATIVE_WINDOW_FRAME_TIMESTAMPS_SUPPORTS_PRESENT, &hasPresentFenceTimes);
     mHasPresentFenceTimes = hasPresentFenceTimes == 1;
-    if (mHasPresentFenceTimes) {
+    if (!mHasPresentFenceTimes) {
         ALOGI("Using latch times for frame rendered signals - present fences not supported");
     }
 }
