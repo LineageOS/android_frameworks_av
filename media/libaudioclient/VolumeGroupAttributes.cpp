@@ -48,7 +48,7 @@ ConversionResult<media::AudioAttributesEx>
 legacy2aidl_VolumeGroupAttributes_AudioAttributesEx(const VolumeGroupAttributes& legacy) {
     media::AudioAttributesEx aidl;
     aidl.attributes = VALUE_OR_RETURN(
-            legacy2aidl_audio_attributes_t_AudioAttributesInternal(legacy.getAttributes()));
+            legacy2aidl_audio_attributes_t_AudioAttributes(legacy.getAttributes()));
     aidl.streamType = VALUE_OR_RETURN(
             legacy2aidl_audio_stream_type_t_AudioStreamType(legacy.getStreamType()));
     aidl.groupId = VALUE_OR_RETURN(legacy2aidl_volume_group_t_int32_t(legacy.getGroupId()));
@@ -60,7 +60,7 @@ aidl2legacy_AudioAttributesEx_VolumeGroupAttributes(const media::AudioAttributes
     return VolumeGroupAttributes(VALUE_OR_RETURN(aidl2legacy_int32_t_volume_group_t(aidl.groupId)),
                            VALUE_OR_RETURN(aidl2legacy_AudioStreamType_audio_stream_type_t(
                                    aidl.streamType)),
-                           VALUE_OR_RETURN(aidl2legacy_AudioAttributesInternal_audio_attributes_t(
+                           VALUE_OR_RETURN(aidl2legacy_AudioAttributes_audio_attributes_t(
                                    aidl.attributes)));
 }
 
