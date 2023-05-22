@@ -1306,7 +1306,7 @@ bool ToneGenerator::initAudioTrack() {
         streamType = AUDIO_STREAM_DTMF;
     }
     attr = AudioSystem::streamTypeToAttributes(streamType);
-    attr.flags = AUDIO_FLAG_LOW_LATENCY;
+    attr.flags = static_cast<audio_flags_mask_t>(attr.flags | AUDIO_FLAG_LOW_LATENCY);
 
     const size_t frameCount = mProcessSize;
     status_t status = mpAudioTrack->set(
