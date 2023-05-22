@@ -142,6 +142,9 @@ class UsecaseValidatorImpl : public UsecaseValidator {
 
     bool areFlagsValid(audio_flags_mask_t flags) {
         ALOGV("areFlagsValid flags: %#x", flags);
+        if ((flags & (AUDIO_FLAG_SCO|AUDIO_FLAG_AUDIBILITY_ENFORCED|AUDIO_FLAG_BEACON)) != 0) {
+            return false;
+        }
         if ((flags & AUDIO_FLAG_LOW_LATENCY) != 0) {
             return true;
         }
