@@ -395,7 +395,7 @@ media_status_t AImageReader_newWithUsage(
  * the combination of {@code hardwareBufferFormat} and {@code dataSpace} for the
  * format of the Image that the reader will produce.</p>
  *
- * Available since API level 33.
+ * Available since API level 34.
  *
  * @param width The default width in pixels of the Images that this reader will produce.
  * @param height The default height in pixels of the Images that this reader will produce.
@@ -422,7 +422,7 @@ media_status_t AImageReader_newWithUsage(
  */
 media_status_t AImageReader_newWithDataSpace(int32_t width, int32_t height, uint64_t usage,
         int32_t maxImages, uint32_t hardwareBufferFormat, int32_t dataSpace,
-        /*out*/ AImageReader** reader) __INTRODUCED_IN(33);
+        /*out*/ AImageReader** reader) __INTRODUCED_IN(34);
 
 /**
  * Acquire the next {@link AImage} from the image reader's queue asynchronously.
