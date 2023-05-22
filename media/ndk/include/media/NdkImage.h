@@ -829,7 +829,7 @@ media_status_t AImage_getHardwareBuffer(const AImage* image, /*out*/AHardwareBuf
 /**
  * Query the dataspace of the input {@link AImage}.
  *
- * Available since API level 33.
+ * Available since API level 34.
  *
  * @param image the {@link AImage} of interest.
  * @param dataSpace the dataspace of the image will be filled here if the method call succeeds.
@@ -843,7 +843,7 @@ media_status_t AImage_getHardwareBuffer(const AImage* image, /*out*/AHardwareBuf
  *                 image has been deleted.</li></ul>
  */
 media_status_t AImage_getDataSpace(const AImage* image,
-                                   /*out*/int32_t* dataSpace) __INTRODUCED_IN(33);
+                                   /*out*/int32_t* dataSpace) __INTRODUCED_IN(34);
 
 __END_DECLS
 
