@@ -16,9 +16,9 @@
 
 package android.media;
 
+import android.media.audio.common.AudioAttributes;
 import android.media.audio.common.AudioConfigBase;
 import android.media.audio.common.AudioStreamType;
-import android.media.AudioAttributesInternal;
 /**
  * {@hide}
  */
@@ -38,5 +38,5 @@ parcelable GetOutputForAttrResponse {
     AudioConfigBase configBase;
     boolean isBitPerfect;
     /** The corrected audio attributes. **/
-    AudioAttributesInternal attr;
+    AudioAttributes attr;
 }
