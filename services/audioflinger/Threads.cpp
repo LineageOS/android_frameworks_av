@@ -4110,8 +4110,9 @@ NO_THREAD_SAFETY_ANALYSIS  // manual locking of AudioFlinger
 
             // signal actual start of output stream when the render position reported by the kernel
             // starts moving.
-            if (!mStandby && !mHalStarted && mKernelPositionOnStandby !=
-                    mTimestamp.mPosition[ExtendedTimestamp::LOCATION_KERNEL]) {
+            if (!mHalStarted && ((isSuspended() && (mBytesWritten != 0)) || (!mStandby
+                    && (mKernelPositionOnStandby
+                            != mTimestamp.mPosition[ExtendedTimestamp::LOCATION_KERNEL])))) {
                 mHalStarted = true;
                 mWaitHalStartCV.broadcast();
             }
