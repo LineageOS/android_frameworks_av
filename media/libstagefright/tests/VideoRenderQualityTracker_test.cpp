@@ -26,6 +26,8 @@ namespace android {
 
 using Metrics = VideoRenderQualityMetrics;
 using Configuration = VideoRenderQualityTracker::Configuration;
+using FreezeEvent = VideoRenderQualityTracker::FreezeEvent;
+using JudderEvent = VideoRenderQualityTracker::JudderEvent;
 
 static constexpr float FRAME_RATE_UNDETERMINED = VideoRenderQualityMetrics::FRAME_RATE_UNDETERMINED;
 static constexpr float FRAME_RATE_24_3_2_PULLDOWN =
@@ -48,7 +50,8 @@ public:
     void render(std::initializer_list<T> renderDurationMsList) {
         for (auto renderDurationMs : renderDurationMsList) {
             mVideoRenderQualityTracker.onFrameReleased(mMediaTimeUs);
-            mVideoRenderQualityTracker.onFrameRendered(mMediaTimeUs, mClockTimeNs);
+            mVideoRenderQualityTracker.onFrameRendered(mMediaTimeUs, mClockTimeNs, &mFreezeEvent,
+                                                       &mJudderEvent);
             mMediaTimeUs += mContentFrameDurationUs;
             mClockTimeNs += int64_t(renderDurationMs * 1000 * 1000);
         }
@@ -58,7 +61,8 @@ public:
         int64_t durationUs = durationMs < 0 ? mContentFrameDurationUs : durationMs * 1000;
         for (int i = 0; i < numFrames; ++i) {
             mVideoRenderQualityTracker.onFrameReleased(mMediaTimeUs);
-            mVideoRenderQualityTracker.onFrameRendered(mMediaTimeUs, mClockTimeNs);
+            mVideoRenderQualityTracker.onFrameRendered(mMediaTimeUs, mClockTimeNs, &mFreezeEvent,
+                                                       &mJudderEvent);
             mMediaTimeUs += mContentFrameDurationUs;
             mClockTimeNs += durationUs * 1000;
         }
@@ -84,11 +88,25 @@ public:
         return mVideoRenderQualityTracker.getMetrics();
     }
 
+    FreezeEvent getAndClearFreezeEvent() {
+        FreezeEvent e = std::move(mFreezeEvent);
+        mFreezeEvent.valid = false;
+        return e;
+    }
+
+    JudderEvent getAndClearJudderEvent() {
+        JudderEvent e = std::move(mJudderEvent);
+        mJudderEvent.valid = false;
+        return e;
+    }
+
 private:
     VideoRenderQualityTracker mVideoRenderQualityTracker;
     int64_t mContentFrameDurationUs;
     int64_t mMediaTimeUs;
     int64_t mClockTimeNs;
+    VideoRenderQualityTracker::FreezeEvent mFreezeEvent;
+    VideoRenderQualityTracker::JudderEvent mJudderEvent;
 };
 
 class VideoRenderQualityTrackerTest : public ::testing::Test {
@@ -509,6 +527,148 @@ TEST_F(VideoRenderQualityTrackerTest, ranksJudderScoresInOrder) {
         EXPECT_GT(score24HzTo50Hz, previousScore);
         previousScore = score24HzTo50Hz;
     }
+}
+
+TEST_F(VideoRenderQualityTrackerTest, capturesFreezeEvents) {
+    Configuration c;
+    c.freezeEventMax = 5;
+    c.freezeEventDetailsMax = 4;
+    c.freezeEventDistanceToleranceMs = 1000;
+    Helper h(20, c);
+    h.render(10);
+    EXPECT_EQ(h.getAndClearFreezeEvent().valid, false);
+    h.drop(3);
+    h.render(1000 / 20); // +1 because it's unclear if the current frame is frozen
+    EXPECT_EQ(h.getAndClearFreezeEvent().valid, false);
+    h.drop(1);
+    h.render(10);
+    EXPECT_EQ(h.getAndClearFreezeEvent().valid, false);
+    h.drop(6);
+    h.render(12);
+    EXPECT_EQ(h.getAndClearFreezeEvent().valid, false);
+    h.drop(10);
+    h.render(1000 / 20 + 1); // +1 because it's unclear if the current frame is frozen
+    EXPECT_EQ(h.getMetrics().freezeEventCount, 1);
+    FreezeEvent e = h.getAndClearFreezeEvent();
+    EXPECT_EQ(e.valid, true); // freeze event
+    // -1 because the last rendered frame is considered frozen
+    EXPECT_EQ(e.initialTimeUs, 9 * 20 * 1000);
+    // only count the last frame of the first group of rendered frames
+    EXPECT_EQ(e.durationMs, (1 + 3 + 1000 / 20 + 1 + 10 + 6 + 12 + 10) * 20);
+    EXPECT_EQ(e.count, 4);
+    // number of dropped frames
+    // +1 because the last rendered frame is considered frozen
+    EXPECT_EQ(e.sumDurationMs, (4 + 2 + 7 + 11) * 20);
+    // number of rendered frames between dropped frames
+    // -1 because the last rendered frame is considered frozen
+    EXPECT_EQ(e.sumDistanceMs, ((1000 / 20) - 1 + 9 + 11) * 20);
+    // +1 for each since the last rendered frame is considered frozen
+    ASSERT_EQ(e.details.durationMs.size(), 4);
+    EXPECT_EQ(e.details.durationMs[0], 4 * 20);
+    EXPECT_EQ(e.details.durationMs[1], 2 * 20);
+    EXPECT_EQ(e.details.durationMs[2], 7 * 20);
+    EXPECT_EQ(e.details.durationMs[3], 11 * 20);
+    // -1 for each since the last rendered frame is considered frozen
+    ASSERT_EQ(e.details.distanceMs.size(), 4);
+    EXPECT_EQ(e.details.distanceMs[0], -1);
+    EXPECT_EQ(e.details.distanceMs[1], 1000 - 20);
+    EXPECT_EQ(e.details.distanceMs[2], 9 * 20);
+    EXPECT_EQ(e.details.distanceMs[3], 11 * 20);
+    int64_t previousEventEndTimeUs = e.initialTimeUs + e.durationMs * 1000;
+    h.drop(1);
+    h.render(4);
+    h.drop(1);
+    h.render(4);
+    h.drop(1);
+    h.render(4);
+    h.drop(1);
+    h.render(4);
+    h.drop(1);
+    h.render(1000 / 20 + 1);
+    EXPECT_EQ(h.getMetrics().freezeEventCount, 2);
+    e = h.getAndClearFreezeEvent();
+    EXPECT_EQ(e.valid, true);
+    // 1000ms tolerance means 1000ms from the end of the last event to the beginning of this event
+    EXPECT_EQ(e.initialTimeUs, previousEventEndTimeUs + 1000 * 1000);
+    EXPECT_EQ(e.count, 5);
+    // 5 freezes captured in the freeze event, but only 4 details are recorded
+    EXPECT_EQ(e.details.durationMs.size(), 4);
+    EXPECT_EQ(e.details.distanceMs.size(), 4);
+    EXPECT_EQ(e.details.distanceMs[0], 1000); // same as the tolerance
+    // The duration across the entire series f freezes is captured, with only 4 details captured
+    // +1 because the first rendered frame is considered frozen (not the 1st dropped frame)
+    EXPECT_EQ(e.durationMs, (1 + 1 + 4 + 1 + 4 + 1 + 4 + 1 + 4 + 1) * 20);
+    // The duration of all 5 freeze events are captured, with only 4 details captured
+    EXPECT_EQ(e.sumDurationMs, (2 + 2 + 2 + 2 + 2) * 20);
+    // The distance of all 5 freeze events are captured, with only 4 details captured
+    EXPECT_EQ(e.sumDistanceMs, (3 + 3 + 3 + 3) * 20);
+    h.drop(1);
+    h.render(1000 / 20 + 1);
+    EXPECT_EQ(h.getMetrics().freezeEventCount, 3);
+    EXPECT_EQ(h.getAndClearFreezeEvent().valid, true);
+    h.drop(1);
+    h.render(1000 / 20 + 1);
+    EXPECT_EQ(h.getMetrics().freezeEventCount, 4);
+    EXPECT_EQ(h.getAndClearFreezeEvent().valid, true);
+    h.drop(1);
+    h.render(1000 / 20 + 1);
+    EXPECT_EQ(h.getMetrics().freezeEventCount, 5);
+    EXPECT_EQ(h.getAndClearFreezeEvent().valid, true);
+    h.drop(1);
+    h.render(1000 / 20 + 1);
+    // The 6th event isn't captured because it exceeds the configured limit
+    EXPECT_EQ(h.getMetrics().freezeEventCount, 6);
+    EXPECT_EQ(h.getAndClearFreezeEvent().valid, false);
+}
+
+TEST_F(VideoRenderQualityTrackerTest, capturesJudderEvents) {
+    Configuration c;
+    c.judderEventMax = 4;
+    c.judderEventDetailsMax = 3;
+    c.judderEventDistanceToleranceMs = 100;
+    Helper h(20, c);
+    h.render({19, 20, 19});
+    EXPECT_EQ(h.getAndClearJudderEvent().valid, false);
+    h.render({15, 19, 20, 19});
+    EXPECT_EQ(h.getAndClearJudderEvent().valid, false);
+    h.render({28, 20, 19});
+    EXPECT_EQ(h.getAndClearJudderEvent().valid, false);
+    h.render({13, 20, 20, 20, 20});
+    EXPECT_EQ(h.getAndClearJudderEvent().valid, false);
+    // Start with judder for the next event at the end of the sequence, because judder is scored
+    // one frame behind, and for combining judder occurrences into events, it's not clear yet if
+    // the current frame has judder or not.
+    h.render({15, 20, 20, 20, 20, 20, 15});
+    JudderEvent e = h.getAndClearJudderEvent();
+    EXPECT_EQ(e.valid, true);
+    EXPECT_EQ(e.initialTimeUs, (19 + 20 + 19) * 1000);
+    EXPECT_EQ(e.durationMs, 15 + 19 + 20 + 19 /**/ + 28 + 20 + 19 /**/ + 13 + 20 * 4 /**/ + 15);
+    EXPECT_EQ(e.count, 4);
+    EXPECT_EQ(e.sumScore, (20 - 15) + (28 - 20) + (20 - 13) + (20 - 15));
+    EXPECT_EQ(e.sumDistanceMs, 19 + 20 + 19 /**/ + 20 + 19 /**/ + 20 * 4);
+    ASSERT_EQ(e.details.actualRenderDurationUs.size(), 3); // 3 details per configured maximum
+    EXPECT_EQ(e.details.actualRenderDurationUs[0], 15 * 1000);
+    EXPECT_EQ(e.details.actualRenderDurationUs[1], 28 * 1000);
+    EXPECT_EQ(e.details.actualRenderDurationUs[2], 13 * 1000);
+    ASSERT_EQ(e.details.contentRenderDurationUs.size(), 3);
+    EXPECT_EQ(e.details.contentRenderDurationUs[0], 20 * 1000);
+    EXPECT_EQ(e.details.contentRenderDurationUs[1], 20 * 1000);
+    EXPECT_EQ(e.details.contentRenderDurationUs[2], 20 * 1000);
+    ASSERT_EQ(e.details.distanceMs.size(), 3);
+    EXPECT_EQ(e.details.distanceMs[0], -1);
+    EXPECT_EQ(e.details.distanceMs[1], 19 + 20 + 19);
+    EXPECT_EQ(e.details.distanceMs[2], 20 + 19);
+    h.render({20, 20, 20, 20, 20, 15});
+    e = h.getAndClearJudderEvent();
+    EXPECT_EQ(e.valid, true);
+    ASSERT_EQ(e.details.distanceMs.size(), 1);
+    EXPECT_EQ(e.details.distanceMs[0], 100); // same as the tolerance
+    h.render({20, 20, 20, 20, 20, 15});
+    EXPECT_EQ(h.getAndClearJudderEvent().valid, true);
+    h.render({20, 20, 20, 20, 20, 15});
+    EXPECT_EQ(h.getAndClearJudderEvent().valid, true);
+    h.render({20, 20, 20, 20, 20, 20});
+    EXPECT_EQ(h.getAndClearJudderEvent().valid, false); // max number of judder events exceeded
 }
 
 } // android
