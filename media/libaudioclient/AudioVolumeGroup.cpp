@@ -23,7 +23,6 @@
 
 #include <media/AidlConversion.h>
 #include <media/AudioVolumeGroup.h>
-#include <media/AudioAttributes.h>
 #include <media/PolicyAidlConversion.h>
 
 namespace android {

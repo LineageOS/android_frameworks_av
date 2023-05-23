@@ -188,7 +188,7 @@ engineConfig::ParsingResult EngineBase::processParsingResult(
     };
     auto addSupportedAttributesToGroup = [](auto &group, auto &volumeGroup, auto &strategy) {
         for (const auto &attr : group.attributesVect) {
-            strategy->addAttributes({group.stream, volumeGroup->getId(), attr});
+            strategy->addAttributes({volumeGroup->getId(), group.stream, attr});
             volumeGroup->addSupportedAttributes(attr);
         }
     };
@@ -307,7 +307,7 @@ status_t EngineBase::listAudioProductStrategies(AudioProductStrategyVector &stra
     for (const auto &iter : mProductStrategies) {
         const auto &productStrategy = iter.second;
         strategies.push_back(
-        {productStrategy->getName(), productStrategy->listAudioAttributes(),
+        {productStrategy->getName(), productStrategy->listVolumeGroupAttributes(),
          productStrategy->getId()});
     }
     return NO_ERROR;

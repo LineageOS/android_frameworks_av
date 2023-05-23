@@ -48,7 +48,7 @@ cc_library_headers {
 cc_library {
     name: "libaudiopolicy",
     srcs: [
-        "AudioAttributes.cpp",
+        "VolumeGroupAttributes.cpp",
         "AudioPolicy.cpp",
         "AudioProductStrategy.cpp",
         "AudioVolumeGroup.cpp",
