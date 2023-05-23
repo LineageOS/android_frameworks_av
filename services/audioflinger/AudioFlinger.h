@@ -84,6 +84,8 @@
 #include <audio_utils/SimpleLog.h>
 #include <audio_utils/TimestampVerifier.h>
 
+#include <timing/MonotonicFrameCounter.h>
+
 #include "FastCapture.h"
 #include "FastMixer.h"
 #include <media/nbaio/NBAIO.h>

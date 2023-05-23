@@ -1581,6 +1581,8 @@ protected:
     virtual     void        onAddNewTrack_l();
 
     const       audio_offload_info_t mOffloadInfo;
+
+    audioflinger::MonotonicFrameCounter mMonotonicFrameCounter;  // for VolumeShaper
     bool mVolumeShaperActive = false;
 
     DirectOutputThread(const sp<AudioFlinger>& audioFlinger, AudioStreamOut* output,
