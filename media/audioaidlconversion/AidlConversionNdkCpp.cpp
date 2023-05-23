@@ -15,6 +15,7 @@
  */
 
 #include <algorithm>
+#include <regex>
 #include <type_traits>
 
 #define LOG_TAG "AidlConversionNdkCpp"
@@ -33,6 +34,24 @@ using aidl::android::aidl_utils::statusTFromBinderStatusT;
 namespace android {
 
 namespace {
+
+bool isVendorExtension(const std::string& s) {
+    // Per definition in AudioAttributes.aidl and {Playback|Record}TrackMetadata.aidl
+    static const std::regex vendorExtension("VX_[A-Z0-9]{3,}_[_A-Z0-9]+");
+    return std::regex_match(s.begin(), s.end(), vendorExtension);
+}
+
+inline bool isNotVendorExtension(const std::string& s) { return !isVendorExtension(s); }
+
+void filterOutNonVendorTagsInPlace(std::vector<std::string>& tags) {
+    if (std::find_if(tags.begin(), tags.end(), isNotVendorExtension) == tags.end()) {
+        return;
+    }
+    std::vector<std::string> temp;
+    temp.reserve(tags.size());
+    std::copy_if(tags.begin(), tags.end(), std::back_inserter(temp), isVendorExtension);
+    tags = std::move(temp);
+}
 
 // cpp2ndk and ndk2cpp are universal converters which work for any type,
 // however they are not the most efficient way to convert due to extra
@@ -99,12 +118,15 @@ template<typename CppEnum, typename NdkEnum>
 
 }  // namespace
 
-#define GENERATE_CONVERTERS(packageName, className)                     \
-    ConversionResult<::aidl::packageName::className> cpp2ndk_##className( \
+#define GENERATE_CONVERTERS(packageName, className) \
+    GENERATE_CONVERTERS_IMPL(packageName, _, className)
+
+#define GENERATE_CONVERTERS_IMPL(packageName, prefix, className)        \
+    ConversionResult<::aidl::packageName::className> cpp2ndk##prefix##className( \
             const ::packageName::className& cpp) {                      \
         return cpp2ndk<::aidl::packageName::className>(cpp);            \
     }                                                                   \
-    ConversionResult<::packageName::className> ndk2cpp_##className(     \
+    ConversionResult<::packageName::className> ndk2cpp##prefix##className( \
             const ::aidl::packageName::className& ndk) {                \
         return ndk2cpp<::packageName::className>(ndk);                  \
     }
@@ -120,10 +142,46 @@ template<typename CppEnum, typename NdkEnum>
 }
 
 GENERATE_CONVERTERS(android::media::audio::common, AudioFormatDescription);
-GENERATE_CONVERTERS(android::media::audio::common, AudioHalEngineConfig);
+GENERATE_CONVERTERS_IMPL(android::media::audio::common, _Impl_, AudioHalEngineConfig);
 GENERATE_CONVERTERS(android::media::audio::common, AudioMMapPolicyInfo);
 GENERATE_ENUM_CONVERTERS(android::media::audio::common, AudioMMapPolicyType);
 GENERATE_ENUM_CONVERTERS(android::media::audio::common, AudioMode);
 GENERATE_CONVERTERS(android::media::audio::common, AudioPort);
+
+namespace {
+
+// Filter out all AudioAttributes tags that do not conform to the vendor extension pattern.
+template<typename T>
+void filterOutNonVendorTags(T& audioHalEngineConfig) {
+    for (auto& strategy : audioHalEngineConfig.productStrategies) {
+        for (auto& group : strategy.attributesGroups) {
+            for (auto& attr : group.attributes) {
+                filterOutNonVendorTagsInPlace(attr.tags);
+            }
+        }
+    }
+}
+
+}  // namespace
+
+ConversionResult<::aidl::android::media::audio::common::AudioHalEngineConfig>
+cpp2ndk_AudioHalEngineConfig(const ::android::media::audio::common::AudioHalEngineConfig& cpp) {
+    auto conv = cpp2ndk_Impl_AudioHalEngineConfig(cpp);
+    if (conv.ok()) {
+        filterOutNonVendorTags(conv.value());
+    }
+    return conv;
+}
+
+ConversionResult<::android::media::audio::common::AudioHalEngineConfig>
+ndk2cpp_AudioHalEngineConfig(
+        const ::aidl::android::media::audio::common::AudioHalEngineConfig& ndk) {
+    auto conv = ndk2cpp_Impl_AudioHalEngineConfig(ndk);
+    if (conv.ok()) {
+        filterOutNonVendorTags(conv.value());
+    }
+    return conv;
+}
+
 
 }  // namespace android
