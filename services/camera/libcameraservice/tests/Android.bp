@@ -31,11 +31,14 @@ cc_test {
         "libmedia_headers",
     ],
 
+    defaults: [
+        "libcameraservice_deps",
+    ],
+
     shared_libs: [
         "libbase",
         "libbinder",
         "libcutils",
-        "libcameraservice",
         "libhidlbase",
         "liblog",
         "libcamera_client",
@@ -45,11 +48,6 @@ cc_test {
         "libjpeg",
         "libexif",
         "android.hardware.camera.common@1.0",
-        "android.hardware.camera.provider@2.4",
-        "android.hardware.camera.provider@2.5",
-        "android.hardware.camera.provider@2.6",
-        "android.hardware.camera.provider@2.7",
-        "android.hardware.camera.provider-V2-ndk",
         "android.hardware.camera.device@1.0",
         "android.hardware.camera.device@3.2",
         "android.hardware.camera.device@3.4",
@@ -58,6 +56,12 @@ cc_test {
     ],
 
     static_libs: [
+        "android.hardware.camera.provider@2.4",
+        "android.hardware.camera.provider@2.5",
+        "android.hardware.camera.provider@2.6",
+        "android.hardware.camera.provider@2.7",
+        "android.hardware.camera.provider-V2-ndk",
+        "libcameraservice",
         "libgmock",
     ],
 
