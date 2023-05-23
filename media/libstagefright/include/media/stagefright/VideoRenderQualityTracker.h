@@ -174,9 +174,8 @@ public:
             // The distance between the beginning of this freeze and the end of the previous freeze.
             std::vector<int32_t> distanceMs;
         };
-        FreezeEvent() : valid(false) {}
         // Whether or not the data in this structure is valid.
-        bool valid;
+        bool valid = false;
         // The time at which the first freeze for this event was detected.
         int64_t initialTimeUs;
         // The total duration from the beginning of the first freeze to the end of the last freeze
@@ -203,9 +202,8 @@ public:
             // The distance from this judder occurrence and the previous judder occurrence.
             std::vector<int32_t> distanceMs;
         };
-        JudderEvent() : valid(false) {}
         // Whether or not the data in this structure is valid.
-        bool valid;
+        bool valid = false;
         // The time at which the first judder occurrence for this event was detected.
         int64_t initialTimeUs;
         // The total duration from the first judder occurrence to the last judder occurrence in this
