@@ -247,9 +247,9 @@ static const char *kFreezeEventCount = "android.media.mediacodec.freeze.count";
 static const char *kFreezeEventAvgDurationMs = "android.media.mediacodec.freeze.avg-duration-ms";
 static const char *kFreezeEventAvgDistanceMs = "android.media.mediacodec.freeze.avg-distance-ms";
 static const char *kFreezeEventDetailsDurationMs =
-        "android.media.mediacodec.freeze.detail-duration-ms";
+        "android.media.mediacodec.freeze.details-duration-ms";
 static const char *kFreezeEventDetailsDistanceMs =
-        "android.media.mediacodec.freeze.detail-distance-ms";
+        "android.media.mediacodec.freeze.details-distance-ms";
 // Judder event
 static const char *kCodecJudderEventCount = "android.media.mediacodec.judder-event-count";
 static const char *kJudderEventKeyName = "judder";
@@ -259,11 +259,11 @@ static const char *kJudderEventCount = "android.media.mediacodec.judder.count";
 static const char *kJudderEventAvgScore = "android.media.mediacodec.judder.avg-score";
 static const char *kJudderEventAvgDistanceMs = "android.media.mediacodec.judder.avg-distance-ms";
 static const char *kJudderEventDetailsActualDurationUs =
-        "android.media.mediacodec.judder.detail-actual-duration-us";
+        "android.media.mediacodec.judder.details-actual-duration-us";
 static const char *kJudderEventDetailsContentDurationUs =
-        "android.media.mediacodec.judder.detail-content-duration-us";
+        "android.media.mediacodec.judder.details-content-duration-us";
 static const char *kJudderEventDetailsDistanceMs =
-        "android.media.mediacodec.judder.detail-distance-ms";
+        "android.media.mediacodec.judder.details-distance-ms";
 
 // XXX suppress until we get our representation right
 static bool kEmitHistogram = false;
@@ -1445,7 +1445,7 @@ void MediaCodec::updateEphemeralMediametrics(mediametrics_handle_t item) {
 
 static std::string emitVector(std::vector<int32_t> vector) {
     std::ostringstream sstr;
-    for (int i = 0; i < vector.size(); ++i) {
+    for (size_t i = 0; i < vector.size(); ++i) {
         if (i != 0) {
             sstr << ',';
         }

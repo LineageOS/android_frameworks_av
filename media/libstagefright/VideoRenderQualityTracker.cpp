@@ -414,6 +414,9 @@ void VideoRenderQualityTracker::processFreeze(int64_t actualRenderTimeUs, int64_
             e.count = 0;
             e.details.durationMs.clear();
             e.details.distanceMs.clear();
+        // The first occurrence in the event should not have the distance recorded as part of the
+        // event, because it belongs in a vacuum between two events. However we still want the
+        // distance recorded in the details to calculate times in all details in all events.
         } else if (distanceMs != -1) {
             e.durationMs += distanceMs;
             e.sumDistanceMs += distanceMs;
@@ -423,7 +426,7 @@ void VideoRenderQualityTracker::processFreeze(int64_t actualRenderTimeUs, int64_
         e.sumDurationMs += durationMs;
         if (e.details.durationMs.size() < c.freezeEventDetailsMax) {
             e.details.durationMs.push_back(durationMs);
-            e.details.distanceMs.push_back(distanceMs);
+            e.details.distanceMs.push_back(distanceMs); // -1 for first detail in the first event
         }
     }
 }
@@ -513,6 +516,9 @@ void VideoRenderQualityTracker::processJudder(int32_t judderScore, int64_t judde
             e.details.contentRenderDurationUs.clear();
             e.details.actualRenderDurationUs.clear();
             e.details.distanceMs.clear();
+        // The first occurrence in the event should not have the distance recorded as part of the
+        // event, because it belongs in a vacuum between two events. However we still want the
+        // distance recorded in the details to calculate the times using all details in all events.
         } else if (distanceMs != -1) {
             e.durationMs += distanceMs;
             e.sumDistanceMs += distanceMs;
@@ -523,7 +529,7 @@ void VideoRenderQualityTracker::processJudder(int32_t judderScore, int64_t judde
         if (e.details.contentRenderDurationUs.size() < c.judderEventDetailsMax) {
             e.details.actualRenderDurationUs.push_back(actualDurationUs[1]);
             e.details.contentRenderDurationUs.push_back(contentDurationUs[1]);
-            e.details.distanceMs.push_back(distanceMs);
+            e.details.distanceMs.push_back(distanceMs); // -1 for first detail in the first event
         }
     }
 }
