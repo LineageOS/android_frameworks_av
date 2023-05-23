@@ -98,7 +98,8 @@ public:
     binder::Status getForceUse(media::AudioPolicyForceUse usage,
                                media::AudioPolicyForcedConfig* _aidl_return) override;
     binder::Status getOutput(AudioStreamType stream, int32_t* _aidl_return) override;
-    binder::Status getOutputForAttr(const media::AudioAttributesInternal& attr, int32_t session,
+    binder::Status getOutputForAttr(const media::audio::common::AudioAttributes& attr,
+                                    int32_t session,
                                     const AttributionSourceState &attributionSource,
                                     const AudioConfig& config,
                                     int32_t flags, int32_t selectedDeviceId,
@@ -106,7 +107,7 @@ public:
     binder::Status startOutput(int32_t portId) override;
     binder::Status stopOutput(int32_t portId) override;
     binder::Status releaseOutput(int32_t portId) override;
-    binder::Status getInputForAttr(const media::AudioAttributesInternal& attr, int32_t input,
+    binder::Status getInputForAttr(const media::audio::common::AudioAttributes& attr, int32_t input,
                                    int32_t riid, int32_t session,
                                    const AttributionSourceState &attributionSource,
                                    const AudioConfigBase& config, int32_t flags,
@@ -123,19 +124,19 @@ public:
     binder::Status getStreamVolumeIndex(AudioStreamType stream,
                                         const AudioDeviceDescription& device,
                                         int32_t* _aidl_return) override;
-    binder::Status setVolumeIndexForAttributes(const media::AudioAttributesInternal& attr,
+    binder::Status setVolumeIndexForAttributes(const media::audio::common::AudioAttributes& attr,
                                                const AudioDeviceDescription& device,
                                                int32_t index) override;
-    binder::Status getVolumeIndexForAttributes(const media::AudioAttributesInternal& attr,
+    binder::Status getVolumeIndexForAttributes(const media::audio::common::AudioAttributes& attr,
                                                const AudioDeviceDescription& device,
                                                int32_t* _aidl_return) override;
-    binder::Status getMaxVolumeIndexForAttributes(const media::AudioAttributesInternal& attr,
+    binder::Status getMaxVolumeIndexForAttributes(const media::audio::common::AudioAttributes& attr,
                                                   int32_t* _aidl_return) override;
-    binder::Status getMinVolumeIndexForAttributes(const media::AudioAttributesInternal& attr,
+    binder::Status getMinVolumeIndexForAttributes(const media::audio::common::AudioAttributes& attr,
                                                   int32_t* _aidl_return) override;
     binder::Status getStrategyForStream(AudioStreamType stream,
                                         int32_t* _aidl_return) override;
-    binder::Status getDevicesForAttributes(const media::AudioAttributesInternal& attr,
+    binder::Status getDevicesForAttributes(const media::audio::common::AudioAttributes& attr,
                                            bool forVolume,
                                            std::vector<AudioDevice>* _aidl_return) override;
     binder::Status getOutputForEffect(const media::EffectDescriptor& desc,
@@ -170,7 +171,7 @@ public:
     binder::Status getOffloadSupport(const media::audio::common::AudioOffloadInfo& info,
                                      media::AudioOffloadMode* _aidl_return) override;
     binder::Status isDirectOutputSupported(const AudioConfigBase& config,
-                                           const media::AudioAttributesInternal& attributes,
+                                           const media::audio::common::AudioAttributes& attributes,
                                            bool* _aidl_return) override;
     binder::Status listAudioPorts(media::AudioPortRole role, media::AudioPortType type,
                                   Int* count, std::vector<media::AudioPortFw>* ports,
@@ -201,7 +202,7 @@ public:
             const std::vector<AudioDevice>& devices) override;
     binder::Status removeUserIdDeviceAffinities(int32_t userId) override;
     binder::Status startAudioSource(const media::AudioPortConfigFw& source,
-                                    const media::AudioAttributesInternal& attributes,
+                                    const media::audio::common::AudioAttributes& attributes,
                                     int32_t* _aidl_return) override;
     binder::Status stopAudioSource(int32_t portId) override;
     binder::Status setMasterMono(bool mono) override;
@@ -228,14 +229,16 @@ public:
     binder::Status isHotwordStreamSupported(bool lookbackAudio, bool* _aidl_return) override;
     binder::Status listAudioProductStrategies(
             std::vector<media::AudioProductStrategy>* _aidl_return) override;
-    binder::Status getProductStrategyFromAudioAttributes(const media::AudioAttributesInternal& aa,
-                                                         bool fallbackOnDefault,
-                                                         int32_t* _aidl_return) override;
+    binder::Status getProductStrategyFromAudioAttributes(
+            const media::audio::common::AudioAttributes& aa,
+            bool fallbackOnDefault,
+            int32_t* _aidl_return) override;
     binder::Status listAudioVolumeGroups(
             std::vector<media::AudioVolumeGroup>* _aidl_return) override;
-    binder::Status getVolumeGroupFromAudioAttributes(const media::AudioAttributesInternal& aa,
-                                                     bool fallbackOnDefault,
-                                                     int32_t* _aidl_return) override;
+    binder::Status getVolumeGroupFromAudioAttributes(
+            const media::audio::common::AudioAttributes& aa,
+            bool fallbackOnDefault,
+            int32_t* _aidl_return) override;
     binder::Status setRttEnabled(bool enabled) override;
     binder::Status isCallScreenModeSupported(bool* _aidl_return) override;
     binder::Status setDevicesRoleForStrategy(
@@ -274,31 +277,31 @@ public:
     binder::Status getSpatializer(const sp<media::INativeSpatializerCallback>& callback,
             media::GetSpatializerResponse* _aidl_return) override;
     binder::Status canBeSpatialized(
-            const std::optional<media::AudioAttributesInternal>& attr,
+            const std::optional<media::audio::common::AudioAttributes>& attr,
             const std::optional<AudioConfig>& config,
             const std::vector<AudioDevice>& devices,
             bool* _aidl_return) override;
 
-    binder::Status getDirectPlaybackSupport(const media::AudioAttributesInternal& attr,
+    binder::Status getDirectPlaybackSupport(const media::audio::common::AudioAttributes& attr,
                                             const AudioConfig& config,
                                             media::AudioDirectMode* _aidl_return) override;
 
-    binder::Status getDirectProfilesForAttributes(const media::AudioAttributesInternal& attr,
+    binder::Status getDirectProfilesForAttributes(const media::audio::common::AudioAttributes& attr,
                         std::vector<media::audio::common::AudioProfile>* _aidl_return) override;
 
     binder::Status getSupportedMixerAttributes(
             int32_t portId,
             std::vector<media::AudioMixerAttributesInternal>* _aidl_return) override;
     binder::Status setPreferredMixerAttributes(
-            const media::AudioAttributesInternal& attr,
+            const media::audio::common::AudioAttributes& attr,
             int32_t portId,
             int32_t uid,
             const media::AudioMixerAttributesInternal& mixerAttr) override;
     binder::Status getPreferredMixerAttributes(
-            const media::AudioAttributesInternal& attr,
+            const media::audio::common::AudioAttributes& attr,
             int32_t portId,
             std::optional<media::AudioMixerAttributesInternal>* _aidl_return) override;
-    binder::Status clearPreferredMixerAttributes(const media::AudioAttributesInternal& attr,
+    binder::Status clearPreferredMixerAttributes(const media::audio::common::AudioAttributes& attr,
                                                  int32_t portId,
                                                  int32_t uid) override;
 

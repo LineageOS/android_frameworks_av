@@ -357,6 +357,16 @@ ConversionResult<audio_usage_t> aidl2legacy_AudioUsage_audio_usage_t(
 ConversionResult<media::audio::common::AudioUsage> legacy2aidl_audio_usage_t_AudioUsage(
         audio_usage_t legacy);
 
+ConversionResult<audio_flags_mask_t>
+aidl2legacy_AudioFlag_audio_flags_mask_t(media::audio::common::AudioFlag aidl);
+ConversionResult<media::audio::common::AudioFlag>
+legacy2aidl_audio_flags_mask_t_AudioFlag(audio_flags_mask_t legacy);
+
+ConversionResult<audio_flags_mask_t>
+aidl2legacy_int32_t_audio_flags_mask_t_mask(int32_t aidl);
+ConversionResult<int32_t>
+legacy2aidl_audio_flags_mask_t_int32_t_mask(audio_flags_mask_t legacy);
+
 ConversionResult<std::string>
 aidl2legacy_AudioTags_string(const std::vector<std::string>& aidl);
 ConversionResult<std::vector<std::string>>
