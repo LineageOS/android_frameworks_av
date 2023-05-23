@@ -2292,7 +2292,11 @@ CameraProviderManager::ProviderInfo::DeviceInfo3::DeviceInfo3(const std::string&
         const CameraResourceCost& resourceCost,
         sp<ProviderInfo> parentProvider,
         const std::vector<std::string>& publicCameraIds) :
-        DeviceInfo(name, tagId, id, hardware::hidl_version{3, minorVersion},
+        DeviceInfo(name, tagId, id,
+                   hardware::hidl_version{
+                        static_cast<uint16_t >(
+                                parentProvider->getIPCTransport() == IPCTransport::HIDL ? 3 : 1),
+                                minorVersion},
                    publicCameraIds, resourceCost, parentProvider) { }
 
 void CameraProviderManager::ProviderInfo::DeviceInfo3::notifyDeviceStateChange(int64_t newState) {
