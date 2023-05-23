@@ -48,7 +48,7 @@ cc_library_headers {
 cc_library {
     name: "libaudiopolicy",
     srcs: [
-        "AudioAttributes.cpp",
+        "VolumeGroupAttributes.cpp",
         "AudioPolicy.cpp",
         "AudioProductStrategy.cpp",
         "AudioVolumeGroup.cpp",
@@ -281,10 +281,8 @@ aidl_interface {
     double_loadable: true,
     local_include_dir: "aidl",
     srcs: [
-        "aidl/android/media/AudioAttributesInternal.aidl",
         "aidl/android/media/AudioClient.aidl",
         "aidl/android/media/AudioDirectMode.aidl",
-        "aidl/android/media/AudioFlag.aidl",
         "aidl/android/media/AudioGainSys.aidl",
         "aidl/android/media/AudioHalVersion.aidl",
         "aidl/android/media/AudioHwModule.aidl",

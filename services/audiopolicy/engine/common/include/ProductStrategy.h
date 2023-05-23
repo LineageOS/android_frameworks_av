@@ -24,7 +24,7 @@
 #include <vector>
 
 #include <HandleGenerator.h>
-#include <media/AudioAttributes.h>
+#include <media/VolumeGroupAttributes.h>
 #include <media/AudioContainers.h>
 #include <media/AudioDeviceTypeAddr.h>
 #include <media/AudioPolicy.h>
@@ -43,20 +43,14 @@ namespace android {
 class ProductStrategy : public virtual RefBase, private HandleGenerator<uint32_t>
 {
 private:
-    struct AudioAttributes {
-        audio_stream_type_t mStream = AUDIO_STREAM_DEFAULT;
-        volume_group_t mVolumeGroup = VOLUME_GROUP_NONE;
-        audio_attributes_t mAttributes = AUDIO_ATTRIBUTES_INITIALIZER;
-    };
-
-    using AudioAttributesVector = std::vector<AudioAttributes>;
+    using VolumeGroupAttributesVector = std::vector<VolumeGroupAttributes>;
 
 public:
     ProductStrategy(const std::string &name);
 
-    void addAttributes(const AudioAttributes &audioAttributes);
+    void addAttributes(const VolumeGroupAttributes &volumeGroupAttributes);
 
-    std::vector<android::AudioAttributes> listAudioAttributes() const;
+    std::vector<android::VolumeGroupAttributes> listVolumeGroupAttributes() const;
 
     std::string getName() const { return mName; }
     AttributesVector getAudioAttributes() const;
@@ -105,7 +99,7 @@ public:
 private:
     std::string mName;
 
-    AudioAttributesVector mAttributesVector;
+    VolumeGroupAttributesVector mAttributesVector;
 
     product_strategy_t mId;
 
