@@ -26,15 +26,20 @@
 
 namespace android {
 
-class AudioAttributes : public Parcelable
+class VolumeGroupAttributes : public Parcelable
 {
 public:
-    AudioAttributes() = default;
-    AudioAttributes(const audio_attributes_t &attributes) : mAttributes(attributes) {} // NOLINT
-    AudioAttributes(volume_group_t groupId,
+    VolumeGroupAttributes() = default;
+    VolumeGroupAttributes(const audio_attributes_t &attributes)
+        : mAttributes(attributes) {} // NOLINT
+    VolumeGroupAttributes(volume_group_t groupId,
                     audio_stream_type_t stream,
                     const audio_attributes_t &attributes) :
-         mAttributes(attributes), mStreamType(stream), mGroupId(groupId) {}
+         mAttributes(attributes), mStreamType(stream), mGroupId(groupId) {
+        // TODO: align native & JAVA source initializer.
+        // As far as this class concerns attributes for volume group, it applies only to playback.
+        mAttributes.source = AUDIO_SOURCE_INVALID;
+    }
 
     audio_attributes_t getAttributes() const { return mAttributes; }
 
@@ -61,8 +66,8 @@ private:
 
 // AIDL conversion routines.
 ConversionResult<media::AudioAttributesEx>
-legacy2aidl_AudioAttributes_AudioAttributesEx(const AudioAttributes& legacy);
-ConversionResult<AudioAttributes>
-aidl2legacy_AudioAttributesEx_AudioAttributes(const media::AudioAttributesEx& aidl);
+legacy2aidl_VolumeGroupAttributes_AudioAttributesEx(const VolumeGroupAttributes& legacy);
+ConversionResult<VolumeGroupAttributes>
+aidl2legacy_AudioAttributesEx_VolumeGroupAttributes(const media::AudioAttributesEx& aidl);
 
 } // namespace android
