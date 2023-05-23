@@ -1021,8 +1021,8 @@ public:
                 status_t    getRenderPosition(uint32_t *halFrames, uint32_t *dspFrames);
                 // Consider also removing and passing an explicit mMainBuffer initialization
                 // parameter to AF::PlaybackThread::Track::Track().
-                effect_buffer_t *sinkBuffer() const {
-                    return reinterpret_cast<effect_buffer_t *>(mSinkBuffer); };
+                float *sinkBuffer() const {
+                    return reinterpret_cast<float *>(mSinkBuffer); };
 
     virtual     void detachAuxEffect_l(int effectId);
                 status_t attachAuxEffect(const sp<AudioFlinger::PlaybackThread::Track>& track,
