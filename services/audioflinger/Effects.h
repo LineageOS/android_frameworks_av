@@ -491,14 +491,14 @@ public:
     void setInBuffer(const sp<EffectBufferHalInterface>& buffer) {
         mInBuffer = buffer;
     }
-    effect_buffer_t *inBuffer() const {
-        return mInBuffer != 0 ? reinterpret_cast<effect_buffer_t*>(mInBuffer->ptr()) : NULL;
+    float *inBuffer() const {
+        return mInBuffer != 0 ? reinterpret_cast<float*>(mInBuffer->ptr()) : NULL;
     }
     void setOutBuffer(const sp<EffectBufferHalInterface>& buffer) {
         mOutBuffer = buffer;
     }
-    effect_buffer_t *outBuffer() const {
-        return mOutBuffer != 0 ? reinterpret_cast<effect_buffer_t*>(mOutBuffer->ptr()) : NULL;
+    float *outBuffer() const {
+        return mOutBuffer != 0 ? reinterpret_cast<float*>(mOutBuffer->ptr()) : NULL;
     }
 
     void incTrackCnt() { android_atomic_inc(&mTrackCnt); }
