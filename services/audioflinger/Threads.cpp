@@ -6190,8 +6190,18 @@ void AudioFlinger::DirectOutputThread::processVolume_l(Track *track, bool lastTr
 
     // Ensure volumeshaper state always advances even when muted.
     const sp<AudioTrackServerProxy> proxy = track->mAudioTrackServerProxy;
-    const auto [shaperVolume, shaperActive] = track->getVolumeHandler()->getVolume(
-            proxy->framesReleased());
+
+    const size_t framesReleased = proxy->framesReleased();
+    const int64_t frames = mTimestamp.mPosition[ExtendedTimestamp::LOCATION_KERNEL];
+    const int64_t time = mTimestamp.mTimeNs[ExtendedTimestamp::LOCATION_KERNEL];
+
+    ALOGV("%s: Direct/Offload bufferConsumed:%zu  timestamp frames:%lld  time:%lld",
+            __func__, framesReleased, (long long)frames, (long long)time);
+
+    const int64_t volumeShaperFrames =
+            mMonotonicFrameCounter.updateAndGetMonotonicFrameCount(frames, time);
+    const auto [shaperVolume, shaperActive] =
+            track->getVolumeHandler()->getVolume(volumeShaperFrames);
     mVolumeShaperActive = shaperActive;
 
     if (mMasterMute || mStreamTypes[track->streamType()].mute || track->isPlaybackRestricted()) {
@@ -6667,6 +6677,7 @@ void AudioFlinger::DirectOutputThread::flushHw_l()
     mFlushPending = false;
     mTimestampVerifier.discontinuity(discontinuityForStandbyOrFlush());
     mTimestamp.clear();
+    mMonotonicFrameCounter.onFlush();
 }
 
 int64_t AudioFlinger::DirectOutputThread::computeWaitTimeNs_l() const {
