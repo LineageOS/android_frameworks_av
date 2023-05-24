@@ -1615,6 +1615,7 @@ void AudioFlinger::PlaybackThread::Track::triggerEvents(AudioSystem::sync_event_
 {
     for (auto it = mSyncEvents.begin(); it != mSyncEvents.end();) {
         if ((*it)->type() == type) {
+            ALOGV("%s: triggering SyncEvent type %d", __func__, type);
             (*it)->trigger();
             it = mSyncEvents.erase(it);
         } else {
@@ -1865,6 +1866,8 @@ void AudioFlinger::PlaybackThread::Track::updateTrackFrameInfo(
         }
     }
 
+    ALOGV("%s: trackFramesReleased:%lld  sinkFramesWritten:%lld  setDrained: %d",
+        __func__, (long long)trackFramesReleased, (long long)sinkFramesWritten, drained);
     mAudioTrackServerProxy->setDrained(drained);
     // Set correction for flushed frames that are not accounted for in released.
     local.mFlushed = mAudioTrackServerProxy->framesFlushed();
@@ -2399,7 +2402,6 @@ AudioFlinger::RecordThread::RecordTrack::RecordTrack(
                   type, portId,
                   std::string(AMEDIAMETRICS_KEY_PREFIX_AUDIO_RECORD) + std::to_string(portId)),
         mOverflow(false),
-        mFramesToDrop(0),
         mResamplerBufferProvider(NULL), // initialize in case of early constructor exit
         mRecordBufferConverter(NULL),
         mFlags(flags),
@@ -2601,28 +2603,24 @@ void AudioFlinger::RecordThread::RecordTrack::appendDump(String8& result, bool a
     result.append("\n");
 }
 
+// This is invoked by SyncEvent callback.
 void AudioFlinger::RecordThread::RecordTrack::handleSyncStartEvent(
         const sp<audioflinger::SyncEvent>& event)
 {
-    if (event == mSyncStartEvent) {
-        ssize_t framesToDrop = 0;
-        sp<ThreadBase> threadBase = mThread.promote();
-        if (threadBase != 0) {
-            // TODO: use actual buffer filling status instead of 2 buffers when info is available
-            // from audio HAL
-            framesToDrop = threadBase->mFrameCount * 2;
-        }
-        mFramesToDrop = framesToDrop;
+    size_t framesToDrop = 0;
+    sp<ThreadBase> threadBase = mThread.promote();
+    if (threadBase != 0) {
+        // TODO: use actual buffer filling status instead of 2 buffers when info is available
+        // from audio HAL
+        framesToDrop = threadBase->mFrameCount * 2;
     }
+
+    mSynchronizedRecordState.onPlaybackFinished(event, framesToDrop);
 }
 
 void AudioFlinger::RecordThread::RecordTrack::clearSyncStartEvent()
 {
-    if (mSyncStartEvent != 0) {
-        mSyncStartEvent->cancel();
-        mSyncStartEvent.clear();
-    }
-    mFramesToDrop = 0;
+    mSynchronizedRecordState.clear();
 }
 
 void AudioFlinger::RecordThread::RecordTrack::updateTrackFrameInfo(

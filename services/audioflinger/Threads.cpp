@@ -8222,7 +8222,11 @@ reacquire_wakelock:
                     overrun = OVERRUN_FALSE;
                 }
 
-                if (activeTrack->mFramesToDrop == 0) {
+                // MediaSyncEvent handling: Synchronize AudioRecord to AudioTrack completion.
+                const ssize_t framesToDrop =
+                        activeTrack->mSynchronizedRecordState.updateRecordFrames(framesOut);
+                if (framesToDrop == 0) {
+                    // no sync event, process normally, otherwise ignore.
                     if (framesOut > 0) {
                         activeTrack->mSink.frameCount = framesOut;
                         // Sanitize before releasing if the track has no access to the source data
@@ -8232,28 +8236,7 @@ reacquire_wakelock:
                         }
                         activeTrack->releaseBuffer(&activeTrack->mSink);
                     }
-                } else {
-                    // FIXME could do a partial drop of framesOut
-                    if (activeTrack->mFramesToDrop > 0) {
-                        activeTrack->mFramesToDrop -= (ssize_t)framesOut;
-                        if (activeTrack->mFramesToDrop <= 0) {
-                            activeTrack->clearSyncStartEvent();
-                        }
-                    } else {
-                        activeTrack->mFramesToDrop += framesOut;
-                        if (activeTrack->mFramesToDrop >= 0 || activeTrack->mSyncStartEvent == 0 ||
-                                activeTrack->mSyncStartEvent->isCancelled()) {
-                            ALOGW("Synced record %s, session %d, trigger session %d",
-                                  (activeTrack->mFramesToDrop >= 0) ? "timed out" : "cancelled",
-                                  activeTrack->sessionId(),
-                                  (activeTrack->mSyncStartEvent != 0) ?
-                                          activeTrack->mSyncStartEvent->triggerSession() :
-                                          AUDIO_SESSION_NONE);
-                            activeTrack->clearSyncStartEvent();
-                        }
-                    }
                 }
-
                 if (framesOut == 0) {
                     break;
                 }
@@ -8586,20 +8569,10 @@ status_t AudioFlinger::RecordThread::start(RecordThread::RecordTrack* recordTrac
     if (event == AudioSystem::SYNC_EVENT_NONE) {
         recordTrack->clearSyncStartEvent();
     } else if (event != AudioSystem::SYNC_EVENT_SAME) {
-        recordTrack->mSyncStartEvent = mAudioFlinger->createSyncEvent(event,
-                                       triggerSession,
-                                       recordTrack->sessionId(),
-                                       syncStartEventCallback,
-                                       recordTrack);
-        // Sync event can be cancelled by the trigger session if the track is not in a
-        // compatible state in which case we start record immediately
-        if (recordTrack->mSyncStartEvent->isCancelled()) {
-            recordTrack->clearSyncStartEvent();
-        } else {
-            // do not wait for the event for more than AudioSystem::kSyncRecordStartTimeOutMs
-            recordTrack->mFramesToDrop = -(ssize_t)
-                    ((AudioSystem::kSyncRecordStartTimeOutMs * recordTrack->mSampleRate) / 1000);
-        }
+        recordTrack->mSynchronizedRecordState.startRecording(
+                mAudioFlinger->createSyncEvent(
+                        event, triggerSession,
+                        recordTrack->sessionId(), syncStartEventCallback, recordTrack));
     }
 
     {
