@@ -245,15 +245,44 @@ cc_library_shared {
     ]
 }
 
-cc_library_shared {
-    name: "libaudiohal@aidl",
+cc_defaults {
+    name: "libaudiohal_aidl_default",
     defaults: [
-        "libaudiohal_default",
         "latest_android_hardware_audio_common_ndk_shared",
         "latest_android_hardware_audio_core_ndk_shared",
         "latest_android_hardware_audio_core_sounddose_ndk_shared",
         "latest_android_hardware_audio_effect_ndk_shared",
         "latest_android_media_audio_common_types_ndk_shared",
+    ],
+    shared_libs: [
+        "android.hardware.common-V2-ndk",
+        "android.hardware.common.fmq-V1-ndk",
+        "libaudio_aidl_conversion_common_cpp",
+        "libaudio_aidl_conversion_common_ndk",
+        "libaudio_aidl_conversion_common_ndk_cpp",
+        "libaudio_aidl_conversion_core_ndk",
+        "libaudio_aidl_conversion_effect_ndk",
+        "libaudioaidlcommon",
+        "libbinder_ndk",
+    ],
+    header_libs: [
+        "libaudio_system_headers",
+        "libeffectsconfig_headers",
+    ],
+    cflags: [
+        "-Wall",
+        "-Wextra",
+        "-Werror",
+        "-Wthread-safety",
+        "-DBACKEND_CPP_NDK",
+    ],
+}
+
+cc_library_shared {
+    name: "libaudiohal@aidl",
+    defaults: [
+        "libaudiohal_default",
+        "libaudiohal_aidl_default",
     ],
     srcs: [
         "DeviceHalAidl.cpp",
@@ -282,30 +311,6 @@ cc_library_shared {
         "EffectsFactoryHalEntry.cpp",
         "StreamHalAidl.cpp",
         ":audio_effectproxy_src_files"
-    ],
-    static_libs: [
-        "android.hardware.common-V2-ndk",
-        "android.hardware.common.fmq-V1-ndk",
-    ],
-    shared_libs: [
-        "libaudio_aidl_conversion_common_cpp",
-        "libaudio_aidl_conversion_common_ndk",
-        "libaudio_aidl_conversion_common_ndk_cpp",
-        "libaudio_aidl_conversion_core_ndk",
-        "libaudio_aidl_conversion_effect_ndk",
-        "libaudioaidlcommon",
-        "libbinder_ndk",
-    ],
-    header_libs: [
-        "libaudio_system_headers",
-        "libeffectsconfig_headers",
-    ],
-    cflags: [
-        "-Wall",
-        "-Wextra",
-        "-Werror",
-        "-Wthread-safety",
-        "-DBACKEND_CPP_NDK",
     ],
 }
 
