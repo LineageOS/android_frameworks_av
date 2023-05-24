@@ -131,7 +131,7 @@ public:
 // implement FastMixerState::VolumeProvider interface
     virtual gain_minifloat_packed_t getVolumeLR();
 
-    virtual status_t    setSyncEvent(const sp<SyncEvent>& event);
+            status_t    setSyncEvent(const sp<audioflinger::SyncEvent>& event) override;
 
     virtual bool        isFastTrack() const { return (mFlags & AUDIO_OUTPUT_FLAG_FAST) != 0; }
 

@@ -375,10 +375,10 @@ public:
 
     static inline std::atomic<AudioFlinger *> gAudioFlinger = nullptr;
 
-    sp<SyncEvent> createSyncEvent(AudioSystem::sync_event_t type,
+    sp<audioflinger::SyncEvent> createSyncEvent(AudioSystem::sync_event_t type,
                                         audio_session_t triggerSession,
                                         audio_session_t listenerSession,
-                                        sync_event_callback_t callBack,
+                                        audioflinger::SyncEventCallback callBack,
                                         const wp<RefBase>& cookie);
 
     bool        btNrecIsOff() const { return mBtNrecIsOff.load(); }
@@ -939,8 +939,8 @@ using effect_buffer_t = int16_t;
                 bool        masterMute_l() const;
                 AudioHwDevice* loadHwModule_l(const char *name);
 
-                Vector < sp<SyncEvent> > mPendingSyncEvents; // sync events awaiting for a session
-                                                             // to be created
+                // sync events awaiting for a session to be created.
+                std::list<sp<audioflinger::SyncEvent>> mPendingSyncEvents;
 
                 // Effect chains without a valid thread
                 DefaultKeyedVector< audio_session_t , sp<EffectChain> > mOrphanEffectChains;

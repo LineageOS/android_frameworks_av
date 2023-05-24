@@ -302,9 +302,10 @@ void AudioFlinger::ThreadBase::TrackBase::releaseBuffer(AudioBufferProvider::Buf
     mServerProxy->releaseBuffer(&buf);
 }
 
-status_t AudioFlinger::ThreadBase::TrackBase::setSyncEvent(const sp<SyncEvent>& event)
+status_t AudioFlinger::ThreadBase::TrackBase::setSyncEvent(
+        const sp<audioflinger::SyncEvent>& event)
 {
-    mSyncEvents.add(event);
+    mSyncEvents.emplace_back(event);
     return NO_ERROR;
 }
 
@@ -1612,12 +1613,12 @@ void AudioFlinger::PlaybackThread::Track::notifyPresentationComplete()
 
 void AudioFlinger::PlaybackThread::Track::triggerEvents(AudioSystem::sync_event_t type)
 {
-    for (size_t i = 0; i < mSyncEvents.size();) {
-        if (mSyncEvents[i]->type() == type) {
-            mSyncEvents[i]->trigger();
-            mSyncEvents.removeAt(i);
+    for (auto it = mSyncEvents.begin(); it != mSyncEvents.end();) {
+        if ((*it)->type() == type) {
+            (*it)->trigger();
+            it = mSyncEvents.erase(it);
         } else {
-            ++i;
+            ++it;
         }
     }
 }
@@ -1649,7 +1650,8 @@ gain_minifloat_packed_t AudioFlinger::PlaybackThread::Track::getVolumeLR()
     return vlr;
 }
 
-status_t AudioFlinger::PlaybackThread::Track::setSyncEvent(const sp<SyncEvent>& event)
+status_t AudioFlinger::PlaybackThread::Track::setSyncEvent(
+        const sp<audioflinger::SyncEvent>& event)
 {
     if (isTerminated() || mState == PAUSED ||
             ((framesReady() == 0) && ((mSharedBuffer != 0) ||
@@ -2599,7 +2601,8 @@ void AudioFlinger::RecordThread::RecordTrack::appendDump(String8& result, bool a
     result.append("\n");
 }
 
-void AudioFlinger::RecordThread::RecordTrack::handleSyncStartEvent(const sp<SyncEvent>& event)
+void AudioFlinger::RecordThread::RecordTrack::handleSyncStartEvent(
+        const sp<audioflinger::SyncEvent>& event)
 {
     if (event == mSyncStartEvent) {
         ssize_t framesToDrop = 0;
