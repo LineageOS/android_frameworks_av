@@ -41,6 +41,8 @@ public:
         mAttributes.source = AUDIO_SOURCE_INVALID;
     }
 
+    int matchesScore(const audio_attributes_t &attributes) const;
+
     audio_attributes_t getAttributes() const { return mAttributes; }
 
     status_t readFromParcel(const Parcel *parcel) override;

@@ -2132,8 +2132,7 @@ audio_stream_type_t AudioSystem::attributesToStreamType(const audio_attributes_t
         if (strategy.getId() == psId) {
             auto attrVect = strategy.getVolumeGroupAttributes();
             auto iter = std::find_if(begin(attrVect), end(attrVect), [&attr](const auto& refAttr) {
-                return AudioProductStrategy::attributesMatches(
-                        refAttr.getAttributes(), attr);
+                return refAttr.matchesScore(attr) > 0;
             });
             if (iter != end(attrVect)) {
                 return iter->getStreamType();
