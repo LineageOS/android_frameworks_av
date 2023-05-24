@@ -66,6 +66,8 @@ struct VideoRenderQualityMetrics {
     int32_t freezeScore;
     // The computed percentage of total playback duration that was frozen.
     float freezeRate;
+    // The number of freeze events.
+    int32_t freezeEventCount;
 
     // A histogram of the durations between each freeze.
     MediaHistogram<int32_t> freezeDistanceMsHistogram;
@@ -76,6 +78,8 @@ struct VideoRenderQualityMetrics {
     int32_t judderScore;
     // The computed percentage of total frames that had judder.
     float judderRate;
+    // The number of judder events.
+    int32_t judderEventCount;
 };
 
 ///////////////////////////////////////////////////////
@@ -135,6 +139,13 @@ public:
         std::vector<int64_t> freezeDurationMsHistogramToScore;
         // The values used to distribute distances between freezes across a histogram.
         std::vector<int32_t> freezeDistanceMsHistogramBuckets;
+        // The maximum number of freeze events to send back to the caller.
+        int64_t freezeEventMax;
+        // The maximum number of detail entries tracked per freeze event.
+        int64_t freezeEventDetailsMax;
+        // The maximum distance in time between two freeze occurrences such that both will be
+        // lumped into the same freeze event.
+        int64_t freezeEventDistanceToleranceMs;
 
         // Judder configuration
         //
@@ -145,6 +156,67 @@ public:
         // The values used to compare against judder score histogram counts when determining an
         // overall score.
         std::vector<int32_t> judderScoreHistogramToScore;
+        // The maximum number of judder events to send back to the caller.
+        int64_t judderEventMax;
+        // The maximum number of detail entries tracked per judder event.
+        int64_t judderEventDetailsMax;
+        // The maximum distance in time between two judder occurrences such that both will be
+        // lumped into the same judder event.
+        int64_t judderEventDistanceToleranceMs;
+    };
+
+    struct FreezeEvent {
+        // Details are captured for each freeze up to a limited number. The arrays are guaranteed to
+        // have the same size.
+        struct Details {
+            /// The duration of the freeze.
+            std::vector<int32_t> durationMs;
+            // The distance between the beginning of this freeze and the end of the previous freeze.
+            std::vector<int32_t> distanceMs;
+        };
+        // Whether or not the data in this structure is valid.
+        bool valid = false;
+        // The time at which the first freeze for this event was detected.
+        int64_t initialTimeUs;
+        // The total duration from the beginning of the first freeze to the end of the last freeze
+        // in this event.
+        int32_t durationMs;
+        // The number of freezes in this event.
+        int64_t count;
+        // The sum of all durations of all freezes in this event.
+        int64_t sumDurationMs;
+        // The sum of all distances between each freeze in this event.
+        int64_t sumDistanceMs;
+        // Detailed information for the first N freezes in this event.
+        Details details;
+    };
+
+    struct JudderEvent {
+        // Details are captured for each frame judder up to a limited number. The arrays are
+        // guaranteed to have the same size.
+        struct Details {
+            // The actual render duration of the frame for this judder occurrence.
+            std::vector<int32_t> actualRenderDurationUs;
+            // The content render duration of the frame for this judder occurrence.
+            std::vector<int32_t> contentRenderDurationUs;
+            // The distance from this judder occurrence and the previous judder occurrence.
+            std::vector<int32_t> distanceMs;
+        };
+        // Whether or not the data in this structure is valid.
+        bool valid = false;
+        // The time at which the first judder occurrence for this event was detected.
+        int64_t initialTimeUs;
+        // The total duration from the first judder occurrence to the last judder occurrence in this
+        // event.
+        int32_t durationMs;
+        // The number of judder occurrences in this event.
+        int64_t count;
+        // The sum of all judder scores in this event.
+        int64_t sumScore;
+        // The sum of all distances between each judder occurrence in this event.
+        int64_t sumDistanceMs;
+        // Detailed information for the first N judder occurrences in this event.
+        Details details;
     };
 
     VideoRenderQualityTracker();
@@ -164,7 +236,16 @@ public:
     void onFrameReleased(int64_t contentTimeUs, int64_t desiredRenderTimeNs);
 
     // Called when the system has detected that the frame has actually been rendered to the display.
-    void onFrameRendered(int64_t contentTimeUs, int64_t actualRenderTimeNs);
+    // Returns any freeze events or judder events that were detected.
+    void onFrameRendered(int64_t contentTimeUs, int64_t actualRenderTimeNs,
+                         FreezeEvent *freezeEventOut = nullptr,
+                         JudderEvent *judderEventOut = nullptr);
+
+    // Gets and resets data for the current freeze event.
+    FreezeEvent getAndResetFreezeEvent();
+
+    // Gets and resets data for the current judder event.
+    JudderEvent getAndResetJudderEvent();
 
     // Retrieve the metrics.
     const VideoRenderQualityMetrics &getMetrics();
@@ -233,12 +314,30 @@ private:
 
     // Process a frame freeze.
     static void processFreeze(int64_t actualRenderTimeUs, int64_t lastRenderTimeUs,
-                              int64_t lastFreezeEndTimeUs, VideoRenderQualityMetrics &m);
+                              int64_t lastFreezeEndTimeUs, FreezeEvent &e,
+                              VideoRenderQualityMetrics &m, const Configuration &c);
+
+    // Retrieve a freeze event if an event just finished.
+    static void maybeCaptureFreezeEvent(int64_t actualRenderTimeUs, int64_t lastFreezeEndTimeUs,
+                                        FreezeEvent &e, const VideoRenderQualityMetrics & m,
+                                        const Configuration &c, FreezeEvent *freezeEventOut);
 
     // Compute a judder score for the previously-rendered frame.
     static int64_t computePreviousJudderScore(const FrameDurationUs &actualRenderDurationUs,
                                               const FrameDurationUs &contentRenderDurationUs,
                                               const Configuration &c);
+
+    // Process a frame judder.
+    static void processJudder(int32_t judderScore, int64_t judderTimeUs,
+                              int64_t lastJudderEndTimeUs,
+                              const FrameDurationUs &contentDurationUs,
+                              const FrameDurationUs &actualDurationUs, JudderEvent &e,
+                              VideoRenderQualityMetrics &m, const Configuration &c);
+
+    // Retrieve a judder event if an event just finished.
+    static void maybeCaptureJudderEvent(int64_t actualRenderTimeUs, int64_t lastJudderEndTimeUs,
+                                        JudderEvent &e, const VideoRenderQualityMetrics & m,
+                                        const Configuration &c, JudderEvent *judderEventOut);
 
     // Check to see if a discontinuity has occurred by examining the content time and the
     // app-desired render time. If so, reset some internal state.
@@ -252,7 +351,8 @@ private:
 
     // Update the metrics because a rendered frame was detected.
     void processMetricsForRenderedFrame(int64_t contentTimeUs, int64_t desiredRenderTimeUs,
-                                        int64_t actualRenderTimeUs);
+                                        int64_t actualRenderTimeUs,
+                                        FreezeEvent *freezeEventOut, JudderEvent *judderEventOut);
 
     // Configurable elements of the metrics algorithms.
     const Configuration mConfiguration;
@@ -269,11 +369,20 @@ private:
     // The most recent timestamp of the first frame rendered after the freeze.
     int64_t mLastFreezeEndTimeUs;
 
-    // The previous video frame was dropped.
-    bool mWasPreviousFrameDropped;
+    // The most recent timestamp of frame judder.
+    int64_t mLastJudderEndTimeUs;
 
     // The render duration of the playback.
     int64_t mRenderDurationMs;
+
+    // True if the previous frame was dropped.
+    bool mWasPreviousFrameDropped;
+
+    // The freeze event that's currently being tracked.
+    FreezeEvent mFreezeEvent;
+
+    // The judder event that's currently being tracked.
+    JudderEvent mJudderEvent;
 
     // Frames skipped at the end of playback shouldn't really be considered skipped, therefore keep
     // a list of the frames, and process them as skipped frames the next time a frame is rendered.
