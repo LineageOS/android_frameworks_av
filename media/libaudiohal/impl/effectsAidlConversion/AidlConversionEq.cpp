@@ -161,6 +161,9 @@ status_t AidlConversionEq::getParameter(EffectParamWriter& param) {
             return param.writeToValue(&bands);
         }
         case EQ_PARAM_LEVEL_RANGE: {
+            if (mDesc.capability.range.getTag() != Range::equalizer) {
+                return OK;
+            }
             const auto& ranges = mDesc.capability.range.get<Range::equalizer>();
             for (const auto& r : ranges) {
                 if (r.min.getTag() == Equalizer::bandLevels &&
