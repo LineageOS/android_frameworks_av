@@ -378,7 +378,7 @@ public:
     sp<audioflinger::SyncEvent> createSyncEvent(AudioSystem::sync_event_t type,
                                         audio_session_t triggerSession,
                                         audio_session_t listenerSession,
-                                        audioflinger::SyncEventCallback callBack,
+                                        const audioflinger::SyncEventCallback& callBack,
                                         const wp<RefBase>& cookie);
 
     bool        btNrecIsOff() const { return mBtNrecIsOff.load(); }

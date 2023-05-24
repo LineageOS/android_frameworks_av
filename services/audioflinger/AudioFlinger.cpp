@@ -3923,7 +3923,7 @@ void AudioFlinger::updateSecondaryOutputsForTrack_l(
 sp<audioflinger::SyncEvent> AudioFlinger::createSyncEvent(AudioSystem::sync_event_t type,
                                     audio_session_t triggerSession,
                                     audio_session_t listenerSession,
-                                    audioflinger::SyncEventCallback callBack,
+                                    const audioflinger::SyncEventCallback& callBack,
                                     const wp<RefBase>& cookie)
 {
     Mutex::Autolock _l(mLock);
