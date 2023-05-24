@@ -21,10 +21,15 @@
 #include <binder/Parcel.h>
 
 #include <media/AidlConversion.h>
+#include <media/AudioProductStrategy.h>
 #include <media/VolumeGroupAttributes.h>
 #include <media/PolicyAidlConversion.h>
 
 namespace android {
+
+int VolumeGroupAttributes::matchesScore(const audio_attributes_t &attributes) const {
+    return AudioProductStrategy::attributesMatchesScore(mAttributes, attributes);
+}
 
 status_t VolumeGroupAttributes::readFromParcel(const Parcel* parcel) {
     media::AudioAttributesEx aidl;
