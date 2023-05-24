@@ -573,9 +573,7 @@ AudioFlinger::EffectModule::EffectModule(const sp<AudioFlinger::EffectCallbackIn
       mDisableWaitCnt(0),    // set by process() and updateState()
       mOffloaded(false),
       mIsOutput(false)
-#ifdef FLOAT_EFFECT_CHAIN
       , mSupportsFloat(false)
-#endif
 {
     ALOGV("Constructor %p pinned %d", this, pinned);
     int lStatus;
@@ -694,31 +692,16 @@ void AudioFlinger::EffectModule::process()
                             mConfig.inputCfg.buffer.frameCount,
                             mConfig.outputCfg.buffer.frameCount);
     const auto accumulateInputToOutput = [this, safeInputOutputSampleCount]() {
-#ifdef FLOAT_EFFECT_CHAIN
         accumulate_float(
                 mConfig.outputCfg.buffer.f32,
                 mConfig.inputCfg.buffer.f32,
                 safeInputOutputSampleCount);
-#else
-        accumulate_i16(
-                mConfig.outputCfg.buffer.s16,
-                mConfig.inputCfg.buffer.s16,
-                safeInputOutputSampleCount);
-#endif
     };
     const auto copyInputToOutput = [this, safeInputOutputSampleCount]() {
-#ifdef FLOAT_EFFECT_CHAIN
         memcpy(
                 mConfig.outputCfg.buffer.f32,
                 mConfig.inputCfg.buffer.f32,
                 safeInputOutputSampleCount * sizeof(*mConfig.outputCfg.buffer.f32));
-
-#else
-        memcpy(
-                mConfig.outputCfg.buffer.s16,
-                mConfig.inputCfg.buffer.s16,
-                safeInputOutputSampleCount * sizeof(*mConfig.outputCfg.buffer.s16));
-#endif
     };
 
     if (isProcessEnabled()) {
@@ -727,35 +710,14 @@ void AudioFlinger::EffectModule::process()
             if (auxType) {
                 // We overwrite the aux input buffer here and clear after processing.
                 // aux input is always mono.
-#ifdef FLOAT_EFFECT_CHAIN
-                if (mSupportsFloat) {
-#ifndef FLOAT_AUX
-                    // Do in-place float conversion for auxiliary effect input buffer.
-                    static_assert(sizeof(float) <= sizeof(int32_t),
-                            "in-place conversion requires sizeof(float) <= sizeof(int32_t)");
 
-                    memcpy_to_float_from_q4_27(
-                            mConfig.inputCfg.buffer.f32,
-                            mConfig.inputCfg.buffer.s32,
-                            mConfig.inputCfg.buffer.frameCount);
-#endif // !FLOAT_AUX
-                } else
-#endif // FLOAT_EFFECT_CHAIN
-                {
-#ifdef FLOAT_AUX
+                if (!mSupportsFloat) {
                     memcpy_to_i16_from_float(
                             mConfig.inputCfg.buffer.s16,
                             mConfig.inputCfg.buffer.f32,
                             mConfig.inputCfg.buffer.frameCount);
-#else
-                    memcpy_to_i16_from_q4_27(
-                            mConfig.inputCfg.buffer.s16,
-                            mConfig.inputCfg.buffer.s32,
-                            mConfig.inputCfg.buffer.frameCount);
-#endif
                 }
             }
-#ifdef FLOAT_EFFECT_CHAIN
             sp<EffectBufferHalInterface> inBuffer = mInBuffer;
             sp<EffectBufferHalInterface> outBuffer = mOutBuffer;
 
@@ -802,9 +764,7 @@ void AudioFlinger::EffectModule::process()
                     outBuffer = mOutConversionBuffer;
                 }
             }
-#endif
             ret = mEffectInterface->process();
-#ifdef FLOAT_EFFECT_CHAIN
             if (!mSupportsFloat) { // convert output int16_t back to float.
                 sp<EffectBufferHalInterface> target =
                         mOutChannelCountRequested != outChannelCount
@@ -821,11 +781,8 @@ void AudioFlinger::EffectModule::process()
                         sizeof(float),
                         sizeof(float) * outChannelCount * mConfig.outputCfg.buffer.frameCount);
             }
-#endif
         } else {
-#ifdef FLOAT_EFFECT_CHAIN
             data_bypass:
-#endif
             if (!auxType  /* aux effects do not require data bypass */
                     && mConfig.inputCfg.buffer.raw != mConfig.outputCfg.buffer.raw) {
                 if (mConfig.outputCfg.accessMode == EFFECT_BUFFER_ACCESS_ACCUMULATE) {
@@ -844,13 +801,8 @@ void AudioFlinger::EffectModule::process()
 
         // clear auxiliary effect input buffer for next accumulation
         if (auxType) {
-#ifdef FLOAT_AUX
             const size_t size =
                     mConfig.inputCfg.buffer.frameCount * inChannelCount * sizeof(float);
-#else
-            const size_t size =
-                    mConfig.inputCfg.buffer.frameCount * inChannelCount * sizeof(int32_t);
-#endif
             memset(mConfig.inputCfg.buffer.raw, 0, size);
         }
     } else if ((mDescriptor.flags & EFFECT_FLAG_TYPE_MASK) == EFFECT_FLAG_TYPE_INSERT &&
@@ -905,23 +857,6 @@ status_t AudioFlinger::EffectModule::configure()
             ALOGV("Overriding auxiliary effect input channels %#x as MONO",
                     mConfig.inputCfg.channels);
         }
-#ifndef MULTICHANNEL_EFFECT_CHAIN
-        if (mConfig.outputCfg.channels != AUDIO_CHANNEL_OUT_STEREO) {
-            mConfig.outputCfg.channels = AUDIO_CHANNEL_OUT_STEREO;
-            ALOGV("Overriding auxiliary effect output channels %#x as STEREO",
-                    mConfig.outputCfg.channels);
-        }
-#endif
-    } else {
-#ifndef MULTICHANNEL_EFFECT_CHAIN
-        // TODO: Update this logic when multichannel effects are implemented.
-        // For offloaded tracks consider mono output as stereo for proper effect initialization
-        if (channelMask == AUDIO_CHANNEL_OUT_MONO) {
-            mConfig.inputCfg.channels = AUDIO_CHANNEL_OUT_STEREO;
-            mConfig.outputCfg.channels = AUDIO_CHANNEL_OUT_STEREO;
-            ALOGV("Overriding effect input and output as STEREO");
-        }
-#endif
     }
     if (isHapticGenerator()) {
         audio_channel_mask_t hapticChannelMask = callback->hapticChannelMask();
@@ -933,8 +868,8 @@ status_t AudioFlinger::EffectModule::configure()
     mOutChannelCountRequested =
             audio_channel_count_from_out_mask(mConfig.outputCfg.channels);
 
-    mConfig.inputCfg.format = EFFECT_BUFFER_FORMAT;
-    mConfig.outputCfg.format = EFFECT_BUFFER_FORMAT;
+    mConfig.inputCfg.format = AUDIO_FORMAT_PCM_FLOAT;
+    mConfig.outputCfg.format = AUDIO_FORMAT_PCM_FLOAT;
 
     // Don't use sample rate for thread if effect isn't offloadable.
     if (callback->isOffloadOrDirect() && !isOffloaded()) {
@@ -982,7 +917,6 @@ status_t AudioFlinger::EffectModule::configure()
         status = cmdStatus;
     }
 
-#ifdef MULTICHANNEL_EFFECT_CHAIN
     if (status != NO_ERROR &&
             EffectConfiguration::isHidl() && // only HIDL effects support channel conversion
             mIsOutput &&
@@ -1008,9 +942,7 @@ status_t AudioFlinger::EffectModule::configure()
             status = cmdStatus;
         }
     }
-#endif
 
-#ifdef FLOAT_EFFECT_CHAIN
     if (status == NO_ERROR) {
         mSupportsFloat = true;
     }
@@ -1036,7 +968,6 @@ status_t AudioFlinger::EffectModule::configure()
             ALOGE("%s failed %d with int16_t (as well as float)", __func__, status);
         }
     }
-#endif
 
     if (status == NO_ERROR) {
         // Establish Buffer strategy
@@ -1349,7 +1280,6 @@ void AudioFlinger::EffectModule::setInBuffer(const sp<EffectBufferHalInterface>&
     mInBuffer = buffer;
     mEffectInterface->setInBuffer(buffer);
 
-#ifdef FLOAT_EFFECT_CHAIN
     // aux effects do in place conversion to float - we don't allocate mInConversionBuffer.
     // Theoretically insert effects can also do in-place conversions (destroying
     // the original buffer) when the output buffer is identical to the input buffer,
@@ -1381,7 +1311,6 @@ void AudioFlinger::EffectModule::setInBuffer(const sp<EffectBufferHalInterface>&
             ALOGE("%s cannot create mInConversionBuffer", __func__);
         }
     }
-#endif
 }
 
 void AudioFlinger::EffectModule::setOutBuffer(const sp<EffectBufferHalInterface>& buffer) {
@@ -1397,7 +1326,6 @@ void AudioFlinger::EffectModule::setOutBuffer(const sp<EffectBufferHalInterface>
     mOutBuffer = buffer;
     mEffectInterface->setOutBuffer(buffer);
 
-#ifdef FLOAT_EFFECT_CHAIN
     // Note: Any effect that does not accumulate does not need mOutConversionBuffer and
     // can do in-place conversion from int16_t to float.  We don't optimize here.
     const uint32_t outChannelCount =
@@ -1425,7 +1353,6 @@ void AudioFlinger::EffectModule::setOutBuffer(const sp<EffectBufferHalInterface>
             ALOGE("%s cannot create mOutConversionBuffer", __func__);
         }
     }
-#endif
 }
 
 status_t AudioFlinger::EffectModule::setVolume(uint32_t *left, uint32_t *right, bool controller)
@@ -1721,15 +1648,12 @@ NO_THREAD_SAFETY_ANALYSIS  // conditional try lock
             mConfig.outputCfg.format,
             formatToString((audio_format_t)mConfig.outputCfg.format).c_str());
 
-#ifdef FLOAT_EFFECT_CHAIN
-
     result.appendFormat("\t\t- HAL buffers:\n"
             "\t\t\tIn(%s) InConversion(%s) Out(%s) OutConversion(%s)\n",
             dumpInOutBuffer(true /* isInput */, mInBuffer).c_str(),
             dumpInOutBuffer(true /* isInput */, mInConversionBuffer).c_str(),
             dumpInOutBuffer(false /* isInput */, mOutBuffer).c_str(),
             dumpInOutBuffer(false /* isInput */, mOutConversionBuffer).c_str());
-#endif
 
     write(fd, result.string(), result.length());
 
@@ -2262,7 +2186,7 @@ void AudioFlinger::EffectChain::clearInputBuffer_l()
     if (mInBuffer == NULL) {
         return;
     }
-    const size_t frameSize = audio_bytes_per_sample(EFFECT_BUFFER_FORMAT)
+    const size_t frameSize = audio_bytes_per_sample(AUDIO_FORMAT_PCM_FLOAT)
             * mEffectCallback->inChannelCount(mEffects[0]->id());
 
     memset(mInBuffer->audioBuffer()->raw, 0, mEffectCallback->frameCount() * frameSize);
@@ -2363,13 +2287,9 @@ status_t AudioFlinger::EffectChain::addEffect_ll(const sp<EffectModule>& effect)
         // calling the process in effect engine
         size_t numSamples = mEffectCallback->frameCount();
         sp<EffectBufferHalInterface> halBuffer;
-#ifdef FLOAT_EFFECT_CHAIN
+
         status_t result = mEffectCallback->allocateHalBuffer(
                 numSamples * sizeof(float), &halBuffer);
-#else
-        status_t result = mEffectCallback->allocateHalBuffer(
-                numSamples * sizeof(int32_t), &halBuffer);
-#endif
         if (result != OK) return result;
 
         effect->configure();

@@ -1410,15 +1410,6 @@ status_t AudioFlinger::PlaybackThread::checkEffectCompatibility_l(
 
     switch (mType) {
     case MIXER: {
-#ifndef MULTICHANNEL_EFFECT_CHAIN
-        // Reject any effect on mixer multichannel sinks.
-        // TODO: fix both format and multichannel issues with effects.
-        if (mChannelCount != FCC_2) {
-            ALOGW("%s: effect %s for multichannel(%d) on MIXER thread %s",
-                    __func__, desc->name, mChannelCount, mThreadName);
-            return BAD_VALUE;
-        }
-#endif
         audio_output_flags_t flags = mOutput->flags;
         if (hasFastMixer() || (flags & AUDIO_OUTPUT_FLAG_FAST)) {
             if (sessionId == AUDIO_SESSION_OUTPUT_MIX) {
@@ -1471,15 +1462,6 @@ status_t AudioFlinger::PlaybackThread::checkEffectCompatibility_l(
                 __func__, desc->name, mThreadName);
         return BAD_VALUE;
     case DUPLICATING:
-#ifndef MULTICHANNEL_EFFECT_CHAIN
-        // Reject any effect on mixer multichannel sinks.
-        // TODO: fix both format and multichannel issues with effects.
-        if (mChannelCount != FCC_2) {
-            ALOGW("%s: effect %s for multichannel(%d) on DUPLICATING thread %s",
-                    __func__, desc->name, mChannelCount, mThreadName);
-            return BAD_VALUE;
-        }
-#endif
         if (audio_is_global_session(sessionId)) {
             ALOGW("%s: global effect %s on DUPLICATING thread %s",
                     __func__, desc->name, mThreadName);
@@ -3200,7 +3182,7 @@ void AudioFlinger::PlaybackThread::readOutputParameters_l()
     free(mEffectBuffer);
     mEffectBuffer = NULL;
     if (mEffectBufferEnabled) {
-        mEffectBufferFormat = EFFECT_BUFFER_FORMAT;
+        mEffectBufferFormat = AUDIO_FORMAT_PCM_FLOAT;
         mEffectBufferSize = mNormalFrameCount * mixerChannelCount
                 * audio_bytes_per_sample(mEffectBufferFormat);
         (void)posix_memalign(&mEffectBuffer, 32, mEffectBufferSize);
@@ -3646,7 +3628,7 @@ status_t AudioFlinger::PlaybackThread::addEffectChain_l(const sp<EffectChain>& c
 {
     audio_session_t session = chain->sessionId();
     sp<EffectBufferHalInterface> halInBuffer, halOutBuffer;
-    effect_buffer_t *buffer = nullptr; // only used for non global sessions
+    float *buffer = nullptr; // only used for non global sessions
 
     if (mType == SPATIALIZER) {
         if (!audio_is_global_session(session)) {
@@ -3664,7 +3646,7 @@ status_t AudioFlinger::PlaybackThread::addEffectChain_l(const sp<EffectChain>& c
             size_t numSamples = mNormalFrameCount
                     * (audio_channel_count_from_out_mask(channelMask) + mHapticChannelCount);
             status_t result = mAudioFlinger->mEffectsFactoryHal->allocateBuffer(
-                    numSamples * sizeof(effect_buffer_t),
+                    numSamples * sizeof(float),
                     &halInBuffer);
             if (result != OK) return result;
 
@@ -3674,11 +3656,8 @@ status_t AudioFlinger::PlaybackThread::addEffectChain_l(const sp<EffectChain>& c
                     &halOutBuffer);
             if (result != OK) return result;
 
-#ifdef FLOAT_EFFECT_CHAIN
             buffer = halInBuffer ? halInBuffer->audioBuffer()->f32 : buffer;
-#else
-            buffer = halInBuffer ? halInBuffer->audioBuffer()->s16 : buffer;
-#endif
+
             ALOGV("addEffectChain_l() creating new input buffer %p session %d",
                     buffer, session);
         } else {
@@ -3706,7 +3685,7 @@ status_t AudioFlinger::PlaybackThread::addEffectChain_l(const sp<EffectChain>& c
         halOutBuffer = halInBuffer;
         ALOGV("addEffectChain_l() %p on thread %p for session %d", chain.get(), this, session);
         if (!audio_is_global_session(session)) {
-            buffer = halInBuffer ? reinterpret_cast<effect_buffer_t*>(halInBuffer->externalData())
+            buffer = halInBuffer ? reinterpret_cast<float*>(halInBuffer->externalData())
                                  : buffer;
             // Only one effect chain can be present in direct output thread and it uses
             // the sink buffer as input
@@ -3715,14 +3694,11 @@ status_t AudioFlinger::PlaybackThread::addEffectChain_l(const sp<EffectChain>& c
                         * (audio_channel_count_from_out_mask(mMixerChannelMask)
                                                              + mHapticChannelCount);
                 const status_t allocateStatus = mAudioFlinger->mEffectsFactoryHal->allocateBuffer(
-                        numSamples * sizeof(effect_buffer_t),
+                        numSamples * sizeof(float),
                         &halInBuffer);
                 if (allocateStatus != OK) return allocateStatus;
-#ifdef FLOAT_EFFECT_CHAIN
+
                 buffer = halInBuffer ? halInBuffer->audioBuffer()->f32 : buffer;
-#else
-                buffer = halInBuffer ? halInBuffer->audioBuffer()->s16 : buffer;
-#endif
                 ALOGV("addEffectChain_l() creating new input buffer %p session %d",
                         buffer, session);
             }
@@ -3806,7 +3782,7 @@ size_t AudioFlinger::PlaybackThread::removeEffectChain_l(const sp<EffectChain>& 
             for (size_t j = 0; j < mTracks.size(); ++j) {
                 sp<Track> track = mTracks[j];
                 if (session == track->sessionId()) {
-                    track->setMainBuffer(reinterpret_cast<effect_buffer_t*>(mSinkBuffer));
+                    track->setMainBuffer(reinterpret_cast<float*>(mSinkBuffer));
                     chain->decTrackCnt();
                 }
             }
@@ -4226,12 +4202,12 @@ NO_THREAD_SAFETY_ANALYSIS  // manual locking of AudioFlinger
 
                         const size_t audioBufferSize = mNormalFrameCount
                             * audio_bytes_per_frame(hapticSessionChannelCount,
-                                                    EFFECT_BUFFER_FORMAT);
+                                                    AUDIO_FORMAT_PCM_FLOAT);
                         memcpy_by_audio_format(
                                 (uint8_t*)effectChains[i]->outBuffer() + audioBufferSize,
-                                EFFECT_BUFFER_FORMAT,
+                                AUDIO_FORMAT_PCM_FLOAT,
                                 (const uint8_t*)effectChains[i]->inBuffer() + audioBufferSize,
-                                EFFECT_BUFFER_FORMAT, mNormalFrameCount * mHapticChannelCount);
+                                AUDIO_FORMAT_PCM_FLOAT, mNormalFrameCount * mHapticChannelCount);
                     }
                 }
             }
@@ -5922,7 +5898,7 @@ AudioFlinger::PlaybackThread::mixer_state AudioFlinger::MixerThread::prepareTrac
                 mAudioMixer->setParameter(
                         trackId,
                         AudioMixer::TRACK,
-                        AudioMixer::MIXER_FORMAT, (void *)EFFECT_BUFFER_FORMAT);
+                        AudioMixer::MIXER_FORMAT, (void *)AUDIO_FORMAT_PCM_FLOAT);
                 mAudioMixer->setParameter(
                         trackId,
                         AudioMixer::TRACK,
