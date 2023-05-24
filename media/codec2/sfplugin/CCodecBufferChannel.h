@@ -321,6 +321,9 @@ private:
         std::unique_ptr<OutputBuffers> buffers;
         size_t numSlots;
         uint32_t outputDelay;
+        // true iff the underlying block pool is bounded --- for example,
+        // a BufferQueue-based block pool would be bounded by the BufferQueue.
+        bool bounded;
     };
     Mutexed<Output> mOutput;
     Mutexed<std::list<std::unique_ptr<C2Work>>> mFlushedConfigs;
