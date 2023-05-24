@@ -384,6 +384,7 @@ ndk::ScopedAStatus EffectBundleAidl::getParameterVirtualizer(const Virtualizer::
 
     if (id.getTag() == Virtualizer::Id::speakerAnglesPayload) {
         auto angles = mContext->getSpeakerAngles(id.get<Virtualizer::Id::speakerAnglesPayload>());
+        RETURN_IF(angles.size() == 0, EX_ILLEGAL_ARGUMENT, "getSpeakerAnglesFailed");
         Virtualizer param = Virtualizer::make<Virtualizer::speakerAngles>(angles);
         specific->set<Parameter::Specific::virtualizer>(param);
         return ndk::ScopedAStatus::ok();
