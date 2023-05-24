@@ -91,8 +91,8 @@
 #include <timing/SyncEvent.h>
 #include <timing/SynchronizedRecordState.h>
 
-#include "FastCapture.h"
-#include "FastMixer.h"
+#include <fastpath/FastCapture.h>
+#include <fastpath/FastMixer.h>
 #include <media/nbaio/NBAIO.h>
 #include "AudioStreamOut.h"
 #include "SpdifStreamOut.h"

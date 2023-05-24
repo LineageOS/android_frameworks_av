@@ -72,6 +72,10 @@ cc_library_shared {
     ],
 
     whole_static_libs: ["libaudioprocessing_base"],
+
+    export_shared_lib_headers: [
+        "libvibrator",
+    ],
 }
 
 cc_library_static {
