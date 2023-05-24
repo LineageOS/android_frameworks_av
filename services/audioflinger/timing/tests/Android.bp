@@ -52,3 +52,28 @@ cc_test {
         "-Wextra",
     ],
 }
+
+cc_test {
+     name: "synchronizedrecordstate_tests",
+
+     host_supported: true,
+
+     srcs: [
+         "synchronizedrecordstate_tests.cpp"
+     ],
+
+     header_libs: [
+         "libaudioclient_headers",
+     ],
+
+     static_libs: [
+         "liblog",
+         "libutils", // RefBase
+     ],
+
+     cflags: [
+         "-Wall",
+         "-Werror",
+         "-Wextra",
+     ],
+ }

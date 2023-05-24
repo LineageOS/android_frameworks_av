@@ -109,10 +109,8 @@ private:
             // be dropped and therefore not read by the application.
             sp<audioflinger::SyncEvent>        mSyncStartEvent;
 
-            // number of captured frames to drop after the start sync event has been received.
-            // when < 0, maximum frames to drop before starting capture even if sync event is
-            // not received
-            ssize_t                             mFramesToDrop;
+            audioflinger::SynchronizedRecordState
+                    mSynchronizedRecordState{mSampleRate}; // sampleRate defined in base
 
             // used by resampler to find source frames
             ResamplerBufferProvider            *mResamplerBufferProvider;
