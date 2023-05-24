@@ -90,6 +90,7 @@
 #include <sounddose/SoundDoseManager.h>
 #include <timing/MonotonicFrameCounter.h>
 #include <timing/SyncEvent.h>
+#include <timing/SynchronizedRecordState.h>
 
 #include "FastCapture.h"
 #include "FastMixer.h"
