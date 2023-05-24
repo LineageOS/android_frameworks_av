@@ -92,7 +92,7 @@
 #include "AutoPark.h"
 
 #include <pthread.h>
-#include "TypedLogger.h"
+#include <afutils/TypedLogger.h>
 
 // ----------------------------------------------------------------------------
 

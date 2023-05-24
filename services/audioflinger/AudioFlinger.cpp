@@ -58,7 +58,6 @@
 #include <audiomanager/AudioManager.h>
 
 #include "AudioFlinger.h"
-#include "NBAIO_Tee.h"
 #include "PropertyUtils.h"
 
 #include <media/AudioResamplerPublic.h>
@@ -86,9 +85,8 @@
 #include <private/android_filesystem_config.h>
 
 //#define BUFLOG_NDEBUG 0
-#include <BufLog.h>
-
-#include "TypedLogger.h"
+#include <afutils/BufLog.h>
+#include <afutils/TypedLogger.h>
 
 // ----------------------------------------------------------------------------
 
