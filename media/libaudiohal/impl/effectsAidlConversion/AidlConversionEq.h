@@ -25,9 +25,10 @@ namespace effect {
 class AidlConversionEq : public EffectConversionHelperAidl {
   public:
     AidlConversionEq(std::shared_ptr<::aidl::android::hardware::audio::effect::IEffect> effect,
-                      int32_t sessionId, int32_t ioId,
-                      const ::aidl::android::hardware::audio::effect::Descriptor& desc)
-        : EffectConversionHelperAidl(effect, sessionId, ioId, desc) {}
+                     int32_t sessionId, int32_t ioId,
+                     const ::aidl::android::hardware::audio::effect::Descriptor& desc,
+                     bool isProxyEffect)
+        : EffectConversionHelperAidl(effect, sessionId, ioId, desc, isProxyEffect) {}
     ~AidlConversionEq() {}
 
   private:

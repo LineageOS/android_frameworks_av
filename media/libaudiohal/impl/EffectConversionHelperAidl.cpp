@@ -72,14 +72,13 @@ const std::map<uint32_t /* effect_command_e */, EffectConversionHelperAidl::Comm
 
 EffectConversionHelperAidl::EffectConversionHelperAidl(
         std::shared_ptr<::aidl::android::hardware::audio::effect::IEffect> effect,
-        int32_t sessionId, int32_t ioId, const Descriptor& desc)
+        int32_t sessionId, int32_t ioId, const Descriptor& desc, bool isProxy)
     : mSessionId(sessionId),
       mIoId(ioId),
       mDesc(desc),
       mEffect(std::move(effect)),
       mIsInputStream(mDesc.common.flags.type == Flags::Type::PRE_PROC),
-      mIsProxyEffect(mDesc.common.id.proxy.has_value() &&
-                     mDesc.common.id.proxy.value() == mDesc.common.id.uuid) {
+      mIsProxyEffect(isProxy) {
     mCommon.session = sessionId;
     mCommon.ioHandle = ioId;
     mCommon.input = mCommon.output = kDefaultAudioConfig;
