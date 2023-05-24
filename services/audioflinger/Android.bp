@@ -145,6 +145,7 @@ cc_defaults {
         "libaudioclient_aidl_conversion",
         "libactivitymanager_aidl",
         "libaudioflinger_timing",
+        "libaudioflinger_utils",
         "libaudiofoundation",
         "libaudiohal",
         "libaudioprocessing",
@@ -158,6 +159,7 @@ cc_defaults {
         "libaudiomanager",
         "libmediametrics",
         "libmediautils",
+        "libnbaio",
         "libnblog",
         "libpermission",
         "libpowermanager",
@@ -172,7 +174,6 @@ cc_defaults {
     static_libs: [
         "libmedialogservice",
         "libaudiospdif",
-        "libnbaio",
     ],
 }
 
@@ -191,8 +192,6 @@ cc_library {
         "AudioFlinger.cpp",
         "AudioHwDevice.cpp",
         "AudioStreamOut.cpp",
-        "AudioWatchdog.cpp",
-        "BufLog.cpp",
         "DeviceEffectManager.cpp",
         "Effects.cpp",
         "FastCapture.cpp",
@@ -205,7 +204,6 @@ cc_library {
         "FastThreadDumpState.cpp",
         "FastThreadState.cpp",
         "MelReporter.cpp",
-        "NBAIO_Tee.cpp",
         "PatchCommandThread.cpp",
         "PatchPanel.cpp",
         "PropertyUtils.cpp",
@@ -213,7 +211,6 @@ cc_library {
         "StateQueue.cpp",
         "Threads.cpp",
         "Tracks.cpp",
-        "TypedLogger.cpp",
     ],
 
     include_dirs: [
@@ -223,7 +220,6 @@ cc_library {
 
     static_libs: [
         "libcpustats",
-        "libsndfile",
         "libpermission",
     ],
 

@@ -79,6 +79,9 @@
 #include <mediautils/Synchronization.h>
 #include <mediautils/ThreadSnapshot.h>
 
+#include <afutils/AudioWatchdog.h>
+#include <afutils/NBAIO_Tee.h>
+
 #include <audio_utils/clock.h>
 #include <audio_utils/FdToString.h>
 #include <audio_utils/LinearMap.h>
@@ -95,11 +98,9 @@
 #include "FastCapture.h"
 #include "FastMixer.h"
 #include <media/nbaio/NBAIO.h>
-#include "AudioWatchdog.h"
 #include "AudioStreamOut.h"
 #include "SpdifStreamOut.h"
 #include "AudioHwDevice.h"
-#include "NBAIO_Tee.h"
 #include "ThreadMetrics.h"
 #include "TrackMetrics.h"
 #include "AllocatorFactory.h"
