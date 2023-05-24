@@ -1,25 +1,5 @@
 
-
-package {
-    default_applicable_licenses: [
-        "frameworks_av_services_audioflinger_license",
-    ],
-}
-
-// Added automatically by a large-scale-change
-// See: http://go/android-license-faq
-license {
-    name: "frameworks_av_services_audioflinger_license",
-    visibility: [":__subpackages__"],
-    license_kinds: [
-        "SPDX-license-identifier-Apache-2.0",
-    ],
-    license_text: [
-        "NOTICE",
-    ],
-}
-
-tidy_errors = [
+fastpath_tidy_errors = [
     // https://clang.llvm.org/extra/clang-tidy/checks/list.html
     // For many categories, the checks are too many to specify individually.
     // Feel free to disable as needed - as warnings are generally ignored,
@@ -96,7 +76,7 @@ tidy_errors = [
 
 // Eventually use common tidy defaults
 cc_defaults {
-    name: "audioflinger_flags_defaults",
+    name: "fastpath_flags_defaults",
     // https://clang.llvm.org/docs/UsersManual.html#command-line-options
     // https://clang.llvm.org/docs/DiagnosticsReference.html
     cflags: [
@@ -127,118 +107,58 @@ cc_defaults {
     ],
     // https://clang.llvm.org/extra/clang-tidy/
     tidy: true,
-    tidy_checks: tidy_errors,
-    tidy_checks_as_errors: tidy_errors,
+    tidy_checks: fastpath_tidy_errors,
+    tidy_checks_as_errors: fastpath_tidy_errors,
     tidy_flags: [
       "-format-style=file",
     ],
 }
 
-cc_defaults {
-    name: "libaudioflinger_dependencies",
-
-    shared_libs: [
-        "audioflinger-aidl-cpp",
-        "audioclient-types-aidl-cpp",
-        "av-types-aidl-cpp",
-        "effect-aidl-cpp",
-        "libaudioclient_aidl_conversion",
-        "libactivitymanager_aidl",
-        "libaudioflinger_fastpath",
-        "libaudioflinger_timing",
-        "libaudioflinger_utils",
-        "libaudiofoundation",
-        "libaudiohal",
-        "libaudioprocessing",
-        "libaudioutils",
-        "libcutils",
-        "libutils",
-        "liblog",
-        "libbinder",
-        "libbinder_ndk",
-        "libaudioclient",
-        "libaudiomanager",
-        "libmediametrics",
-        "libmediautils",
-        "libnbaio",
-        "libnblog",
-        "libpermission",
-        "libpowermanager",
-        "libmemunreachable",
-        "libmedia_helper",
-        "libshmemcompat",
-        "libsounddose",
-        "libvibrator",
-        "packagemanager_aidl-cpp",
-    ],
-
-    static_libs: [
-        "libmedialogservice",
-        "libaudiospdif",
-    ],
-}
-
-
-cc_library {
-    name: "libaudioflinger",
+cc_library_shared {
+    name: "libaudioflinger_fastpath",
 
     defaults: [
-        "libaudioflinger_dependencies",
-        "latest_android_media_audio_common_types_cpp_shared",
-        "latest_android_hardware_audio_core_sounddose_ndk_shared",
-        "audioflinger_flags_defaults",
+        "fastpath_flags_defaults",
     ],
 
     srcs: [
-        "AudioFlinger.cpp",
-        "AudioHwDevice.cpp",
-        "AudioStreamOut.cpp",
-        "DeviceEffectManager.cpp",
-        "Effects.cpp",
-        "MelReporter.cpp",
-        "PatchCommandThread.cpp",
-        "PatchPanel.cpp",
-        "PropertyUtils.cpp",
-        "SpdifStreamOut.cpp",
-        "Threads.cpp",
-        "Tracks.cpp",
+        "FastCapture.cpp",
+        "FastCaptureDumpState.cpp",
+        "FastCaptureState.cpp",
+        "FastMixer.cpp",
+        "FastMixerDumpState.cpp",
+        "FastMixerState.cpp",
+        "FastThread.cpp",
+        "FastThreadDumpState.cpp",
+        "FastThreadState.cpp",
+        "StateQueue.cpp",
     ],
 
     include_dirs: [
-        "frameworks/av/services/audiopolicy",
-        "frameworks/av/services/medialog",
+        "frameworks/av/services/audioflinger", // for Configuration
     ],
 
-    static_libs: [
-        "libcpustats",
-        "libpermission",
+    shared_libs: [
+        "libaudioflinger_utils", // NBAIO_Tee
+        "libaudioprocessing",
+        "libaudioutils",
+        "libcutils",
+        "liblog",
+        "libnbaio",
+        "libnblog", // legacy NBLog that can be removed.
+        "libutils",
     ],
 
     header_libs: [
-        "libaaudio_headers",
-        "libaudioclient_headers",
         "libaudiohal_headers",
-        "libaudioutils_headers",
         "libmedia_headers",
     ],
 
-    export_shared_lib_headers: [
-        "libpermission",
-        "android.hardware.audio.core.sounddose-V1-ndk",
-    ],
-
     cflags: [
-        "-fvisibility=hidden",
-        "-Werror",
-        "-Wall",
+        "-DSTATE_QUEUE_INSTANTIATIONS=\"StateQueueInstantiations.cpp\"",
     ],
     sanitize: {
         integer_overflow: true,
     },
 
-}
-
-cc_library_headers {
-    name: "libaudioflinger_headers",
-    export_include_dirs: ["."],
 }
