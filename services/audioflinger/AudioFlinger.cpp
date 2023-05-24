@@ -2942,14 +2942,6 @@ sp<AudioFlinger::ThreadBase> AudioFlinger::openOutput_l(audio_module_handle_t mo
         return nullptr;
     }
 
-#ifndef MULTICHANNEL_EFFECT_CHAIN
-    if (flags & AUDIO_OUTPUT_FLAG_SPATIALIZER) {
-        ALOGE("openOutput_l() cannot create spatializer thread "
-                "without #define MULTICHANNEL_EFFECT_CHAIN");
-        return nullptr;
-    }
-#endif
-
     mHardwareStatus = AUDIO_HW_OUTPUT_OPEN;
 
     // FOR TESTING ONLY:
