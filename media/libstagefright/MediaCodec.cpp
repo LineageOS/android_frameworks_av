@@ -527,17 +527,18 @@ std::shared_ptr<IResourceManagerService> MediaCodec::ResourceManagerServiceProxy
 
 void MediaCodec::ResourceManagerServiceProxy::reRegisterAllResources_l() {
     if (mMediaResourceParcel.empty()) {
-        ALOGV("%s:%d:%p No resources to add", __func__, __LINE__, this);
+        ALOGV("No resources to add");
+        return;
+    }
+
+    if (mService == nullptr) {
+        ALOGW("Service isn't available");
         return;
     }
 
     std::vector<MediaResourceParcel> resources;
     std::copy(mMediaResourceParcel.begin(), mMediaResourceParcel.end(),
               std::back_inserter(resources));
-    if (mService == nullptr) {
-        ALOGW("%s:%d:%p Serice isn't available", __func__, __LINE__, this);
-        return;
-    }
     ClientInfoParcel clientInfo{.pid = static_cast<int32_t>(mPid),
                                 .uid = static_cast<int32_t>(mUid),
                                 .id = getId(mClient),
@@ -570,7 +571,7 @@ void MediaCodec::ResourceManagerServiceProxy::addResource(
     std::scoped_lock lock{mLock};
     std::shared_ptr<IResourceManagerService> service = getService_l();
     if (service == nullptr) {
-        ALOGW("%s:%d:%p Serice isn't available", __func__, __LINE__, this);
+        ALOGW("Service isn't available");
         return;
     }
     std::vector<MediaResourceParcel> resources;
@@ -588,7 +589,7 @@ void MediaCodec::ResourceManagerServiceProxy::removeResource(
     std::scoped_lock lock{mLock};
     std::shared_ptr<IResourceManagerService> service = getService_l();
     if (service == nullptr) {
-        ALOGW("%s:%d:%p Serice isn't available", __func__, __LINE__, this);
+        ALOGW("Service isn't available");
         return;
     }
     std::vector<MediaResourceParcel> resources;
@@ -605,7 +606,7 @@ void MediaCodec::ResourceManagerServiceProxy::removeClient() {
     std::scoped_lock lock{mLock};
     std::shared_ptr<IResourceManagerService> service = getService_l();
     if (service == nullptr) {
-        ALOGW("%s:%d:%p Serice isn't available", __func__, __LINE__, this);
+        ALOGW("Service isn't available");
         return;
     }
     ClientInfoParcel clientInfo{.pid = static_cast<int32_t>(mPid),
@@ -620,7 +621,7 @@ void MediaCodec::ResourceManagerServiceProxy::markClientForPendingRemoval() {
     std::scoped_lock lock{mLock};
     std::shared_ptr<IResourceManagerService> service = getService_l();
     if (service == nullptr) {
-        ALOGW("%s:%d:%p Serice isn't available", __func__, __LINE__, this);
+        ALOGW("Service isn't available");
         return;
     }
     ClientInfoParcel clientInfo{.pid = static_cast<int32_t>(mPid),
@@ -636,7 +637,7 @@ bool MediaCodec::ResourceManagerServiceProxy::reclaimResource(
     std::scoped_lock lock{mLock};
     std::shared_ptr<IResourceManagerService> service = getService_l();
     if (service == nullptr) {
-        ALOGW("%s:%d:%p Service isn't available", __func__, __LINE__, this);
+        ALOGW("Service isn't available");
         return false;
     }
     bool success;
@@ -652,7 +653,7 @@ void MediaCodec::ResourceManagerServiceProxy::notifyClientCreated() {
     std::scoped_lock lock{mLock};
     std::shared_ptr<IResourceManagerService> service = getService_l();
     if (service == nullptr) {
-        ALOGW("%s:%d:%p Serice isn't available", __func__, __LINE__, this);
+        ALOGW("Service isn't available");
         return;
     }
     ClientInfoParcel clientInfo{.pid = static_cast<int32_t>(mPid),
@@ -667,7 +668,7 @@ void MediaCodec::ResourceManagerServiceProxy::notifyClientStarted(
     std::scoped_lock lock{mLock};
     std::shared_ptr<IResourceManagerService> service = getService_l();
     if (service == nullptr) {
-        ALOGW("%s:%d:%p Serice isn't available", __func__, __LINE__, this);
+        ALOGW("Service isn't available");
         return;
     }
     clientConfig.clientInfo.pid = static_cast<int32_t>(mPid);
@@ -682,7 +683,7 @@ void MediaCodec::ResourceManagerServiceProxy::notifyClientStopped(
     std::scoped_lock lock{mLock};
     std::shared_ptr<IResourceManagerService> service = getService_l();
     if (service == nullptr) {
-        ALOGW("%s:%d:%p Serice isn't available", __func__, __LINE__, this);
+        ALOGW("Service isn't available");
         return;
     }
     clientConfig.clientInfo.pid = static_cast<int32_t>(mPid);
@@ -697,7 +698,7 @@ void MediaCodec::ResourceManagerServiceProxy::notifyClientConfigChanged(
     std::scoped_lock lock{mLock};
     std::shared_ptr<IResourceManagerService> service = getService_l();
     if (service == nullptr) {
-        ALOGW("%s:%d:%p Serice isn't available", __func__, __LINE__, this);
+        ALOGW("Service isn't available");
         return;
     }
     clientConfig.clientInfo.pid = static_cast<int32_t>(mPid);
