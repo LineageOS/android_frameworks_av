@@ -133,7 +133,7 @@ static String8 getString(const std::vector<T> &items) {
 }
 
 static bool hasResourceType(MediaResource::Type type, MediaResource::SubType subType,
-        MediaResourceParcel resource) {
+        const MediaResourceParcel& resource) {
     if (type != resource.type) {
       return false;
     }
