@@ -285,9 +285,7 @@ cc_library_shared {
         "libaudiohal_aidl_default",
     ],
     srcs: [
-        "DeviceHalAidl.cpp",
         "DevicesFactoryHalEntry.cpp",
-        "DevicesFactoryHalAidl.cpp",
         "EffectConversionHelperAidl.cpp",
         "EffectBufferHalAidl.cpp",
         "EffectHalAidl.cpp",
@@ -309,8 +307,17 @@ cc_library_shared {
         "effectsAidlConversion/AidlConversionVisualizer.cpp",
         "EffectsFactoryHalAidl.cpp",
         "EffectsFactoryHalEntry.cpp",
+        ":audio_effectproxy_src_files",
+        ":core_audio_hal_aidl_src_files",
+    ],
+}
+
+filegroup {
+    name: "core_audio_hal_aidl_src_files",
+    srcs: [
+        "DeviceHalAidl.cpp",
+        "DevicesFactoryHalAidl.cpp",
         "StreamHalAidl.cpp",
-        ":audio_effectproxy_src_files"
     ],
 }
 

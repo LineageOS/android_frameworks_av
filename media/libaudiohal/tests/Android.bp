@@ -33,6 +33,16 @@ cc_defaults {
 }
 
 cc_test {
+    name: "CoreAudioHalAidlTest",
+    srcs: [
+        "CoreAudioHalAidl_test.cpp",
+        ":core_audio_hal_aidl_src_files",
+    ],
+    defaults: ["libaudiohal_aidl_test_default"],
+    header_libs: ["libaudiohalimpl_headers"],
+}
+
+cc_test {
     name: "EffectsFactoryHalInterfaceTest",
     srcs: ["EffectsFactoryHalInterface_test.cpp"],
     defaults: ["libaudiohal_aidl_test_default"],
