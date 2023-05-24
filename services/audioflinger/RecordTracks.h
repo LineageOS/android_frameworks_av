@@ -58,7 +58,7 @@ public:
             void        appendDumpHeader(String8& result);
             void        appendDump(String8& result, bool active);
 
-            void        handleSyncStartEvent(const sp<SyncEvent>& event);
+            void        handleSyncStartEvent(const sp<audioflinger::SyncEvent>& event);
             void        clearSyncStartEvent();
 
             void        updateTrackFrameInfo(int64_t trackFramesReleased,
@@ -107,7 +107,7 @@ private:
 
             // sync event triggering actual audio capture. Frames read before this event will
             // be dropped and therefore not read by the application.
-            sp<SyncEvent>                       mSyncStartEvent;
+            sp<audioflinger::SyncEvent>        mSyncStartEvent;
 
             // number of captured frames to drop after the start sync event has been received.
             // when < 0, maximum frames to drop before starting capture even if sync event is
