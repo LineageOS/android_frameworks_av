@@ -637,6 +637,10 @@ status_t Codec2InfoBuilder::buildMediaCodecList(MediaCodecListWriter* writer) {
             if (encoder) {
                 attrs |= MediaCodecInfo::kFlagIsEncoder;
             }
+            if (codec.quirkSet.find("attribute::enforce-xml-capabilities") !=
+                codec.quirkSet.end()) {
+                attrs |= MediaCodecInfo::kFlagIsEnforceXmlCapabilities;
+            }
             if (trait.owner == "software") {
                 attrs |= MediaCodecInfo::kFlagIsSoftwareOnly;
             } else {
