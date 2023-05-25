@@ -33,8 +33,8 @@ namespace android {
 /*static*/ const FastCaptureState FastCapture::sInitial;
 
 FastCapture::FastCapture() : FastThread("cycleC_ms", "loadC_us"),
-    mInputSource(NULL), mInputSourceGen(0), mPipeSink(NULL), mPipeSinkGen(0),
-    mReadBuffer(NULL), mReadBufferState(-1), mFormat(Format_Invalid), mSampleRate(0),
+    mInputSource(nullptr), mInputSourceGen(0), mPipeSink(nullptr), mPipeSinkGen(0),
+    mReadBuffer(nullptr), mReadBufferState(-1), mFormat(Format_Invalid), mSampleRate(0),
     // mDummyDumpState
     mTotalNativeFramesRead(0)
 {
@@ -42,10 +42,6 @@ FastCapture::FastCapture() : FastThread("cycleC_ms", "loadC_us"),
     mCurrent = &sInitial;
 
     mDummyDumpState = &mDummyFastCaptureDumpState;
-}
-
-FastCapture::~FastCapture()
-{
 }
 
 FastCaptureStateQueue* FastCapture::sq()
@@ -95,11 +91,11 @@ void FastCapture::onStateChange()
     bool eitherChanged = false;
 
     // check for change in input HAL configuration
-    NBAIO_Format previousFormat = mFormat;
+    const NBAIO_Format previousFormat = mFormat;
     if (current->mInputSourceGen != mInputSourceGen) {
         mInputSource = current->mInputSource;
         mInputSourceGen = current->mInputSourceGen;
-        if (mInputSource == NULL) {
+        if (mInputSource == nullptr) {
             mFormat = Format_Invalid;
             mSampleRate = 0;
         } else {
@@ -122,19 +118,19 @@ void FastCapture::onStateChange()
     }
 
     // input source and pipe sink must be compatible
-    if (eitherChanged && mInputSource != NULL && mPipeSink != NULL) {
+    if (eitherChanged && mInputSource != nullptr && mPipeSink != nullptr) {
         ALOG_ASSERT(Format_isEqual(mFormat, mPipeSink->format()));
     }
 
     if ((!Format_isEqual(mFormat, previousFormat)) || (frameCount != previous->mFrameCount)) {
         // FIXME to avoid priority inversion, don't free here
         free(mReadBuffer);
-        mReadBuffer = NULL;
+        mReadBuffer = nullptr;
         if (frameCount > 0 && mSampleRate > 0) {
             // FIXME new may block for unbounded time at internal mutex of the heap
             //       implementation; it would be better to have normal capture thread allocate for
             //       us to avoid blocking here and to prevent possible priority inversion
-            size_t bufferSize = frameCount * Format_frameSize(mFormat);
+            const size_t bufferSize = frameCount * Format_frameSize(mFormat);
             (void)posix_memalign(&mReadBuffer, 32, bufferSize);
             memset(mReadBuffer, 0, bufferSize); // if posix_memalign fails, will segv here.
             mPeriodNs = (frameCount * 1000000000LL) / mSampleRate;      // 1.00
@@ -166,9 +162,9 @@ void FastCapture::onWork()
     AudioBufferProvider* fastPatchRecordBufferProvider = current->mFastPatchRecordBufferProvider;
     AudioBufferProvider::Buffer patchBuffer;
 
-    if (fastPatchRecordBufferProvider != 0) {
+    if (fastPatchRecordBufferProvider != nullptr) {
         patchBuffer.frameCount = ~0;
-        status_t status = fastPatchRecordBufferProvider->getNextBuffer(&patchBuffer);
+        const status_t status = fastPatchRecordBufferProvider->getNextBuffer(&patchBuffer);
         if (status != NO_ERROR) {
             frameCount = 0;
         } else if (patchBuffer.frameCount < frameCount) {
@@ -179,11 +175,11 @@ void FastCapture::onWork()
     }
 
     if ((command & FastCaptureState::READ) /*&& isWarm*/) {
-        ALOG_ASSERT(mInputSource != NULL);
-        ALOG_ASSERT(mReadBuffer != NULL);
+        ALOG_ASSERT(mInputSource != nullptr);
+        ALOG_ASSERT(mReadBuffer != nullptr);
         dumpState->mReadSequence++;
         ATRACE_BEGIN("read");
-        ssize_t framesRead = mInputSource->read(mReadBuffer, frameCount);
+        const ssize_t framesRead = mInputSource->read(mReadBuffer, frameCount);
         ATRACE_END();
         dumpState->mReadSequence++;
         if (framesRead >= 0) {
@@ -201,8 +197,8 @@ void FastCapture::onWork()
     }
 
     if (command & FastCaptureState::WRITE) {
-        ALOG_ASSERT(mPipeSink != NULL);
-        ALOG_ASSERT(mReadBuffer != NULL);
+        ALOG_ASSERT(mPipeSink != nullptr);
+        ALOG_ASSERT(mReadBuffer != nullptr);
         if (mReadBufferState < 0) {
             memset(mReadBuffer, 0, frameCount * Format_frameSize(mFormat));
             mReadBufferState = frameCount;
@@ -211,23 +207,23 @@ void FastCapture::onWork()
             if (current->mSilenceCapture) {
                 memset(mReadBuffer, 0, mReadBufferState * Format_frameSize(mFormat));
             }
-            ssize_t framesWritten = mPipeSink->write(mReadBuffer, mReadBufferState);
+            const ssize_t framesWritten = mPipeSink->write(mReadBuffer, mReadBufferState);
             audio_track_cblk_t* cblk = current->mCblk;
-            if (fastPatchRecordBufferProvider != 0) {
+            if (fastPatchRecordBufferProvider != nullptr) {
                 // This indicates the fast track is a patch record, update the cblk by
                 // calling releaseBuffer().
                 memcpy_by_audio_format(patchBuffer.raw, current->mFastPatchRecordFormat,
                         mReadBuffer, mFormat.mFormat, framesWritten * mFormat.mChannelCount);
                 patchBuffer.frameCount = framesWritten;
                 fastPatchRecordBufferProvider->releaseBuffer(&patchBuffer);
-            } else if (cblk != NULL && framesWritten > 0) {
+            } else if (cblk != nullptr && framesWritten > 0) {
                 // FIXME This supports at most one fast capture client.
                 //       To handle multiple clients this could be converted to an array,
                 //       or with a lot more work the control block could be shared by all clients.
-                int32_t rear = cblk->u.mStreaming.mRear;
+                const int32_t rear = cblk->u.mStreaming.mRear;
                 android_atomic_release_store(framesWritten + rear, &cblk->u.mStreaming.mRear);
                 cblk->mServer += framesWritten;
-                int32_t old = android_atomic_or(CBLK_FUTEX_WAKE, &cblk->mFutex);
+                const int32_t old = android_atomic_or(CBLK_FUTEX_WAKE, &cblk->mFutex);
                 if (!(old & CBLK_FUTEX_WAKE)) {
                     // client is never in server process, so don't use FUTEX_WAKE_PRIVATE
                     (void) syscall(__NR_futex, &cblk->mFutex, FUTEX_WAKE, 1);

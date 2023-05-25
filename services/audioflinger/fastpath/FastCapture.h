@@ -14,8 +14,7 @@
  * limitations under the License.
  */
 
-#ifndef ANDROID_AUDIO_FAST_CAPTURE_H
-#define ANDROID_AUDIO_FAST_CAPTURE_H
+#pragma once
 
 #include "FastThread.h"
 #include "StateQueue.h"
@@ -24,13 +23,12 @@
 
 namespace android {
 
-typedef StateQueue<FastCaptureState> FastCaptureStateQueue;
+using FastCaptureStateQueue = StateQueue<FastCaptureState>;
 
 class FastCapture : public FastThread {
 
 public:
             FastCapture();
-    virtual ~FastCapture();
 
             FastCaptureStateQueue*  sq();
 
@@ -38,13 +36,13 @@ private:
             FastCaptureStateQueue   mSQ;
 
     // callouts
-    virtual const FastThreadState *poll();
-    virtual void setNBLogWriter(NBLog::Writer *logWriter);
-    virtual void onIdle();
-    virtual void onExit();
-    virtual bool isSubClassCommand(FastThreadState::Command command);
-    virtual void onStateChange();
-    virtual void onWork();
+    const FastThreadState *poll() override;
+    void setNBLogWriter(NBLog::Writer *logWriter) override;
+    void onIdle() override;
+    void onExit() override;
+    bool isSubClassCommand(FastThreadState::Command command) override;
+    void onStateChange() override;
+    void onWork() override;
 
     static const FastCaptureState sInitial;
 
@@ -65,5 +63,3 @@ private:
 };  // class FastCapture
 
 }   // namespace android
-
-#endif  // ANDROID_AUDIO_FAST_CAPTURE_H
