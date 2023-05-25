@@ -117,8 +117,8 @@ public:
             status_t    attachAuxEffect(int EffectId);
             void        setAuxBuffer(int EffectId, int32_t *buffer);
             int32_t     *auxBuffer() const { return mAuxBuffer; }
-            void        setMainBuffer(effect_buffer_t *buffer) { mMainBuffer = buffer; }
-            effect_buffer_t *mainBuffer() const { return mMainBuffer; }
+            void        setMainBuffer(float *buffer) { mMainBuffer = buffer; }
+            float       *mainBuffer() const { return mMainBuffer; }
             int         auxEffectId() const { return mAuxEffectId; }
     virtual status_t    getTimestamp(AudioTimestamp& timestamp);
             void        signal();
@@ -297,7 +297,7 @@ protected:
 
     bool                mResetDone;
     const audio_stream_type_t mStreamType;
-    effect_buffer_t     *mMainBuffer;
+    float     *mMainBuffer;
 
     int32_t             *mAuxBuffer;
     int                 mAuxEffectId;

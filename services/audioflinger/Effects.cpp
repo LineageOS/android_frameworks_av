@@ -868,8 +868,8 @@ status_t AudioFlinger::EffectModule::configure()
     mOutChannelCountRequested =
             audio_channel_count_from_out_mask(mConfig.outputCfg.channels);
 
-    mConfig.inputCfg.format = EFFECT_BUFFER_FORMAT;
-    mConfig.outputCfg.format = EFFECT_BUFFER_FORMAT;
+    mConfig.inputCfg.format = AUDIO_FORMAT_PCM_FLOAT;
+    mConfig.outputCfg.format = AUDIO_FORMAT_PCM_FLOAT;
 
     // Don't use sample rate for thread if effect isn't offloadable.
     if (callback->isOffloadOrDirect() && !isOffloaded()) {
@@ -2186,7 +2186,7 @@ void AudioFlinger::EffectChain::clearInputBuffer_l()
     if (mInBuffer == NULL) {
         return;
     }
-    const size_t frameSize = audio_bytes_per_sample(EFFECT_BUFFER_FORMAT)
+    const size_t frameSize = audio_bytes_per_sample(AUDIO_FORMAT_PCM_FLOAT)
             * mEffectCallback->inChannelCount(mEffects[0]->id());
 
     memset(mInBuffer->audioBuffer()->raw, 0, mEffectCallback->frameCount() * frameSize);
