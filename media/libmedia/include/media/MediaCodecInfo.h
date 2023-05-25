@@ -59,6 +59,7 @@ struct MediaCodecInfo : public RefBase {
         kFlagIsVendor = 1 << 1,
         kFlagIsSoftwareOnly = 1 << 2,
         kFlagIsHardwareAccelerated = 1 << 3,
+        kFlagIsEnforceXmlCapabilities = 1 << 4,
     };
 
     struct Capabilities : public RefBase {
@@ -95,6 +96,8 @@ struct MediaCodecInfo : public RefBase {
          * TODO: expose this as separate API-s and wrap here.
          */
         const sp<AMessage> getDetails() const;
+
+        bool isResolutionSupported(int32_t width, int32_t height);
 
     protected:
         Vector<ProfileLevel> mProfileLevels;
