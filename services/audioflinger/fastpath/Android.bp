@@ -154,9 +154,6 @@ cc_library_shared {
         "libmedia_headers",
     ],
 
-    cflags: [
-        "-DSTATE_QUEUE_INSTANTIATIONS=\"StateQueueInstantiations.cpp\"",
-    ],
     sanitize: {
         integer_overflow: true,
     },
