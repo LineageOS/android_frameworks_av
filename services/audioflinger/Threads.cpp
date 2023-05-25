@@ -1404,15 +1404,6 @@ status_t AudioFlinger::PlaybackThread::checkEffectCompatibility_l(
 
     switch (mType) {
     case MIXER: {
-#ifndef MULTICHANNEL_EFFECT_CHAIN
-        // Reject any effect on mixer multichannel sinks.
-        // TODO: fix both format and multichannel issues with effects.
-        if (mChannelCount != FCC_2) {
-            ALOGW("%s: effect %s for multichannel(%d) on MIXER thread %s",
-                    __func__, desc->name, mChannelCount, mThreadName);
-            return BAD_VALUE;
-        }
-#endif
         audio_output_flags_t flags = mOutput->flags;
         if (hasFastMixer() || (flags & AUDIO_OUTPUT_FLAG_FAST)) {
             if (sessionId == AUDIO_SESSION_OUTPUT_MIX) {
@@ -1465,15 +1456,6 @@ status_t AudioFlinger::PlaybackThread::checkEffectCompatibility_l(
                 __func__, desc->name, mThreadName);
         return BAD_VALUE;
     case DUPLICATING:
-#ifndef MULTICHANNEL_EFFECT_CHAIN
-        // Reject any effect on mixer multichannel sinks.
-        // TODO: fix both format and multichannel issues with effects.
-        if (mChannelCount != FCC_2) {
-            ALOGW("%s: effect %s for multichannel(%d) on DUPLICATING thread %s",
-                    __func__, desc->name, mChannelCount, mThreadName);
-            return BAD_VALUE;
-        }
-#endif
         if (audio_is_global_session(sessionId)) {
             ALOGW("%s: global effect %s on DUPLICATING thread %s",
                     __func__, desc->name, mThreadName);
@@ -3546,11 +3528,8 @@ status_t AudioFlinger::PlaybackThread::addEffectChain_l(const sp<EffectChain>& c
                     &halOutBuffer);
             if (result != OK) return result;
 
-#ifdef FLOAT_EFFECT_CHAIN
             buffer = halInBuffer ? halInBuffer->audioBuffer()->f32 : buffer;
-#else
-            buffer = halInBuffer ? halInBuffer->audioBuffer()->s16 : buffer;
-#endif
+
             ALOGV("addEffectChain_l() creating new input buffer %p session %d",
                     buffer, session);
         } else {
@@ -3590,11 +3569,8 @@ status_t AudioFlinger::PlaybackThread::addEffectChain_l(const sp<EffectChain>& c
                         numSamples * sizeof(effect_buffer_t),
                         &halInBuffer);
                 if (allocateStatus != OK) return allocateStatus;
-#ifdef FLOAT_EFFECT_CHAIN
+
                 buffer = halInBuffer ? halInBuffer->audioBuffer()->f32 : buffer;
-#else
-                buffer = halInBuffer ? halInBuffer->audioBuffer()->s16 : buffer;
-#endif
                 ALOGV("addEffectChain_l() creating new input buffer %p session %d",
                         buffer, session);
             }

@@ -322,13 +322,11 @@ private:
     bool     mAddedToHal;           // effect has been added to the audio HAL
     bool     mIsOutput;             // direction of the AF thread
 
-#ifdef FLOAT_EFFECT_CHAIN
     bool    mSupportsFloat;         // effect supports float processing
     sp<EffectBufferHalInterface> mInConversionBuffer;  // Buffers for HAL conversion if needed.
     sp<EffectBufferHalInterface> mOutConversionBuffer;
     uint32_t mInChannelCountRequested;
     uint32_t mOutChannelCountRequested;
-#endif
 
     class AutoLockReentrant {
     public:
