@@ -71,3 +71,19 @@ cc_fuzz {
         "resourcemanager_service_fuzzer.cpp",
     ],
 }
+
+cc_fuzz {
+    name: "resourceobserver_service_fuzzer",
+    defaults: [
+        "mediaresourcemanager_fuzzer_defaults",
+    ],
+    static_libs: [
+        "resourceobserver_aidl_interface-V1-ndk",
+    ],
+    srcs: [
+        "resourceobserver_service_fuzzer.cpp",
+    ],
+    fuzz_config: {
+        triage_assignee: "waghpawan@google.com",
+    },
+}
