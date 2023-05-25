@@ -462,6 +462,7 @@ private:
     constexpr const char *asString(TunnelPeekState state, const char *default_string="?");
     void updateTunnelPeek(const sp<AMessage> &msg);
     void processRenderedFrames(const sp<AMessage> &msg);
+    bool isResolutionSupported(const sp<AMessage> &format);
 
     inline void initClientConfigParcel(ClientConfigParcel& clientConfig);
 
