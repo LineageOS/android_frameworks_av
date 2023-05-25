@@ -596,8 +596,6 @@ private:
     };
 
     // --- PlaybackThread ---
-#define EFFECT_BUFFER_FORMAT AUDIO_FORMAT_PCM_FLOAT
-using effect_buffer_t = float;
 
 #include "Threads.h"
 
