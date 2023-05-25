@@ -41,6 +41,7 @@ public:
     //  keyInputSource: to change audio input source, value is an int in audio_source_t
     //     (defined in media/mediarecorder.h)
     //  keyScreenState: either "on" or "off"
+    //  keyScreenRotation: one of: 0, 90, 180, 270
     static const char * const keyRouting;
     static const char * const keySamplingRate;
     static const char * const keyFormat;
@@ -48,6 +49,7 @@ public:
     static const char * const keyFrameCount;
     static const char * const keyInputSource;
     static const char * const keyScreenState;
+    static const char * const keyScreenRotation;
 
     // TODO(b/73175392) consider improvement to AIDL StreamOut interface.
     // keyClosing: "true" when AudioOutputDescriptor is closing.  Used by A2DP HAL.
