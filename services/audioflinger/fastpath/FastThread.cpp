@@ -40,7 +40,7 @@ namespace android {
 
 FastThread::FastThread(const char *cycleMs, const char *loadUs) : Thread(false /*canCallJava*/),
     // re-initialized to &sInitial by subclass constructor
-    mPrevious(NULL), mCurrent(NULL),
+    mPrevious(nullptr), mCurrent(nullptr),
     /* mOldTs({0, 0}), */
     mOldTsValid(false),
     mSleepNs(-1),
@@ -51,8 +51,8 @@ FastThread::FastThread(const char *cycleMs, const char *loadUs) : Thread(false /
     mWarmupNsMin(0),
     mWarmupNsMax(LONG_MAX),
     // re-initialized to &mDummySubclassDumpState by subclass constructor
-    mDummyDumpState(NULL),
-    mDumpState(NULL),
+    mDummyDumpState(nullptr),
+    mDumpState(nullptr),
     mIgnoreNextOverrun(true),
 #ifdef FAST_THREAD_STATISTICS
     // mOldLoad
@@ -84,10 +84,6 @@ FastThread::FastThread(const char *cycleMs, const char *loadUs) : Thread(false /
     strlcpy(mLoadUs, loadUs, sizeof(mLoadUs));
 }
 
-FastThread::~FastThread()
-{
-}
-
 bool FastThread::threadLoop()
 {
     // LOGT now works even if tlNBLogWriter is nullptr, but we're considering changing that,
@@ -100,7 +96,7 @@ bool FastThread::threadLoop()
             if (mSleepNs > 0) {
                 ALOG_ASSERT(mSleepNs < 1000000000);
                 const struct timespec req = {0, mSleepNs};
-                nanosleep(&req, NULL);
+                nanosleep(&req, nullptr);
             } else {
                 sched_yield();
             }
@@ -110,7 +106,7 @@ bool FastThread::threadLoop()
 
         // poll for state change
         const FastThreadState *next = poll();
-        if (next == NULL) {
+        if (next == nullptr) {
             // continue to use the default initial state until a real state is available
             // FIXME &sInitial not available, should save address earlier
             //ALOG_ASSERT(mCurrent == &sInitial && previous == &sInitial);
@@ -121,8 +117,8 @@ bool FastThread::threadLoop()
         if (next != mCurrent) {
 
             // As soon as possible of learning of a new dump area, start using it
-            mDumpState = next->mDumpState != NULL ? next->mDumpState : mDummyDumpState;
-            tlNBLogWriter = next->mNBLogWriter != NULL ?
+            mDumpState = next->mDumpState != nullptr ? next->mDumpState : mDummyDumpState;
+            tlNBLogWriter = next->mNBLogWriter != nullptr ?
                     next->mNBLogWriter : mDummyNBLogWriter.get();
             setNBLogWriter(tlNBLogWriter); // This is used for debugging only
 
@@ -149,7 +145,7 @@ bool FastThread::threadLoop()
             mCurrent = next;
         }
 #if !LOG_NDEBUG
-        next = NULL;    // not referenced again
+        next = nullptr;    // not referenced again
 #endif
 
         mDumpState->mCommand = mCommand;
@@ -167,12 +163,12 @@ bool FastThread::threadLoop()
             // FIXME consider checking previous state and only perform if previous != COLD_IDLE
             if (mCurrent->mColdGen != mColdGen) {
                 int32_t *coldFutexAddr = mCurrent->mColdFutexAddr;
-                ALOG_ASSERT(coldFutexAddr != NULL);
-                int32_t old = android_atomic_dec(coldFutexAddr);
+                ALOG_ASSERT(coldFutexAddr != nullptr);
+                const int32_t old = android_atomic_dec(coldFutexAddr);
                 if (old <= 0) {
-                    syscall(__NR_futex, coldFutexAddr, FUTEX_WAIT_PRIVATE, old - 1, NULL);
+                    syscall(__NR_futex, coldFutexAddr, FUTEX_WAIT_PRIVATE, old - 1, nullptr);
                 }
-                int policy = sched_getscheduler(0) & ~SCHED_RESET_ON_FORK;
+                const int policy = sched_getscheduler(0) & ~SCHED_RESET_ON_FORK;
                 if (!(policy == SCHED_FIFO || policy == SCHED_RR)) {
                     ALOGE("did not receive expected priority boost on time");
                 }
@@ -267,7 +263,7 @@ bool FastThread::threadLoop()
                 mSleepNs = -1;
                 if (mIsWarm) {
                     if (sec > 0 || nsec > mUnderrunNs) {
-                        ATRACE_NAME("underrun");
+                        ATRACE_NAME("underrun");   // NOLINT(misc-const-correctness)
                         // FIXME only log occasionally
                         ALOGV("underrun: time since last cycle %d.%03ld sec",
                                 (int) sec, nsec / 1000000L);
@@ -298,7 +294,7 @@ bool FastThread::threadLoop()
 #ifdef FAST_THREAD_STATISTICS
                 if (mIsWarm) {
                     // advance the FIFO queue bounds
-                    size_t i = mBounds & (mDumpState->mSamplingN - 1);
+                    const size_t i = mBounds & (mDumpState->mSamplingN - 1);
                     mBounds = (mBounds & 0xFFFF0000) | ((mBounds + 1) & 0xFFFF);
                     if (mFull) {
                         //mBounds += 0x10000;
