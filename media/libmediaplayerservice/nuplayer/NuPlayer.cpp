@@ -2217,6 +2217,11 @@ status_t NuPlayer::setVideoScalingMode(int32_t mode) {
                 -ret, strerror(-ret));
             return ret;
         }
+        if (mVideoDecoder != NULL) {
+            sp<AMessage> params = new AMessage();
+            params->setInt32("android._video-scaling", mode);
+            mVideoDecoder->setParameters(params);
+        }
     }
     return OK;
 }
