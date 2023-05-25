@@ -21,34 +21,34 @@ package {
 }
 
 cc_defaults {
-    name: "AudioHalTestDefaults",
+    name: "libaudiohal_aidl_test_default",
     test_suites: ["device-tests"],
     defaults: [
-        "latest_android_media_audio_common_types_ndk_shared",
+        "libaudiohal_default",
+        "libaudiohal_aidl_default",
     ],
-    cflags: [
-        "-Wall",
-        "-Wextra",
-        "-Werror",
-        "-Wthread-safety",
-        "-DBACKEND_NDK",
-    ],
-
     shared_libs: [
-        "audioclient-types-aidl-cpp",
-        "libaudio_aidl_conversion_common_ndk",
         "libaudiohal",
-        "liblog",
-        "libutils",
-        "libvibrator",
     ],
+}
+
+cc_test {
+    name: "CoreAudioHalAidlTest",
+    srcs: [
+        "CoreAudioHalAidl_test.cpp",
+        ":core_audio_hal_aidl_src_files",
+    ],
+    defaults: ["libaudiohal_aidl_test_default"],
+    header_libs: ["libaudiohalimpl_headers"],
 }
 
 cc_test {
     name: "EffectsFactoryHalInterfaceTest",
     srcs: ["EffectsFactoryHalInterface_test.cpp"],
-    defaults: ["AudioHalTestDefaults"],
-    header_libs: ["libaudiohal_headers"],
+    defaults: ["libaudiohal_aidl_test_default"],
+    shared_libs: [
+        "libvibrator",
+    ],
 }
 
 cc_test {
@@ -58,15 +58,8 @@ cc_test {
         ":audio_effectproxy_src_files",
     ],
     defaults: [
-        "AudioHalTestDefaults",
-        "latest_android_hardware_audio_effect_ndk_shared",
-        "libaudiohal_default",
+        "libaudiohal_aidl_test_default",
         "use_libaidlvintf_gtest_helper_static",
-    ],
-    shared_libs: [
-        "android.hardware.common.fmq-V1-ndk",
-        "libbinder_ndk",
-        "libfmq",
     ],
     header_libs: ["libaudiohalimpl_headers"],
 }
