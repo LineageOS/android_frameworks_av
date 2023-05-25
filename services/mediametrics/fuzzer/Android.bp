@@ -27,13 +27,8 @@ package {
     default_applicable_licenses: ["frameworks_av_license"],
 }
 
-cc_fuzz {
-    name: "mediametrics_service_fuzzer",
-
-    srcs: [
-        "mediametrics_service_fuzzer.cpp",
-    ],
-
+cc_defaults {
+    name: "mediametrics_service_fuzzer_defaults",
     static_libs: [
         "libmediametrics",
         "libmediametricsservice",
@@ -77,4 +72,27 @@ cc_fuzz {
         users: "multi_user",
         fuzzed_code_usage: "shipped",
     },
+}
+
+cc_fuzz {
+    name: "mediametrics_service_fuzzer",
+
+    srcs: [
+        "mediametrics_service_fuzzer.cpp",
+    ],
+    defaults: [
+        "mediametrics_service_fuzzer_defaults",
+    ],
+}
+
+cc_fuzz {
+    name: "mediametrics_aidl_fuzzer",
+    srcs: [
+        "mediametrics_aidl_fuzzer.cpp",
+    ],
+    defaults: [
+        "service_fuzzer_defaults",
+        "fuzzer_disable_leaks",
+        "mediametrics_service_fuzzer_defaults",
+    ],
 }
