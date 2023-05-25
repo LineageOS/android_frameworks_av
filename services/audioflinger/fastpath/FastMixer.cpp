@@ -61,13 +61,13 @@ FastMixer::FastMixer(audio_io_handle_t parentIoHandle)
     : FastThread("cycle_ms", "load_us"),
     // mFastTrackNames
     // mGenerations
-    mOutputSink(NULL),
+    mOutputSink(nullptr),
     mOutputSinkGen(0),
-    mMixer(NULL),
-    mSinkBuffer(NULL),
+    mMixer(nullptr),
+    mSinkBuffer(nullptr),
     mSinkBufferSize(0),
     mSinkChannelCount(FCC_2),
-    mMixerBuffer(NULL),
+    mMixerBuffer(nullptr),
     mMixerBufferSize(0),
     mMixerBufferState(UNDEFINED),
     mFormat(Format_Invalid),
@@ -97,10 +97,6 @@ FastMixer::FastMixer(audio_io_handle_t parentIoHandle)
     mOldLoad.tv_sec = 0;
     mOldLoad.tv_nsec = 0;
 #endif
-}
-
-FastMixer::~FastMixer()
-{
 }
 
 FastMixerStateQueue* FastMixer::sq()
@@ -229,13 +225,13 @@ void FastMixer::onStateChange()
     unsigned previousTrackMask;
 
     // check for change in output HAL configuration
-    NBAIO_Format previousFormat = mFormat;
+    const NBAIO_Format previousFormat = mFormat;
     if (current->mOutputSinkGen != mOutputSinkGen) {
         mOutputSink = current->mOutputSink;
         mOutputSinkGen = current->mOutputSinkGen;
         mSinkChannelMask = current->mSinkChannelMask;
         mBalance.setChannelMask(mSinkChannelMask);
-        if (mOutputSink == NULL) {
+        if (mOutputSink == nullptr) {
             mFormat = Format_Invalid;
             mSampleRate = 0;
             mSinkChannelCount = 0;
@@ -259,11 +255,11 @@ void FastMixer::onStateChange()
     if ((!Format_isEqual(mFormat, previousFormat)) || (frameCount != previous->mFrameCount)) {
         // FIXME to avoid priority inversion, don't delete here
         delete mMixer;
-        mMixer = NULL;
+        mMixer = nullptr;
         free(mMixerBuffer);
-        mMixerBuffer = NULL;
+        mMixerBuffer = nullptr;
         free(mSinkBuffer);
-        mSinkBuffer = NULL;
+        mSinkBuffer = nullptr;
         if (frameCount > 0 && mSampleRate > 0) {
             // FIXME new may block for unbounded time at internal mutex of the heap
             //       implementation; it would be better to have normal mixer allocate for us
@@ -320,7 +316,7 @@ void FastMixer::onStateChange()
         // process removed tracks first to avoid running out of track names
         unsigned removedTracks = previousTrackMask & ~currentTrackMask;
         while (removedTracks != 0) {
-            int i = __builtin_ctz(removedTracks);
+            const int i = __builtin_ctz(removedTracks);
             removedTracks &= ~(1 << i);
             updateMixerTrack(i, REASON_REMOVE);
             // don't reset track dump state, since other side is ignoring it
@@ -329,7 +325,7 @@ void FastMixer::onStateChange()
         // now process added tracks
         unsigned addedTracks = currentTrackMask & ~previousTrackMask;
         while (addedTracks != 0) {
-            int i = __builtin_ctz(addedTracks);
+            const int i = __builtin_ctz(addedTracks);
             addedTracks &= ~(1 << i);
             updateMixerTrack(i, REASON_ADD);
         }
@@ -338,7 +334,7 @@ void FastMixer::onStateChange()
         // but may have a different buffer provider or volume provider
         unsigned modifiedTracks = currentTrackMask & previousTrackMask;
         while (modifiedTracks != 0) {
-            int i = __builtin_ctz(modifiedTracks);
+            const int i = __builtin_ctz(modifiedTracks);
             modifiedTracks &= ~(1 << i);
             updateMixerTrack(i, REASON_MODIFY);
         }
@@ -373,8 +369,8 @@ void FastMixer::onWork()
     const FastMixerState::Command command = mCommand;
     const size_t frameCount = current->mFrameCount;
 
-    if ((command & FastMixerState::MIX) && (mMixer != NULL) && mIsWarm) {
-        ALOG_ASSERT(mMixerBuffer != NULL);
+    if ((command & FastMixerState::MIX) && (mMixer != nullptr) && mIsWarm) {
+        ALOG_ASSERT(mMixerBuffer != nullptr);
 
         // AudioMixer::mState.enabledTracks is undefined if mState.hook == process__validate,
         // so we keep a side copy of enabledTracks
@@ -383,7 +379,7 @@ void FastMixer::onWork()
         // for each track, update volume and check for underrun
         unsigned currentTrackMask = current->mTrackMask;
         while (currentTrackMask != 0) {
-            int i = __builtin_ctz(currentTrackMask);
+            const int i = __builtin_ctz(currentTrackMask);
             currentTrackMask &= ~(1 << i);
             const FastTrack* fastTrack = &current->mFastTracks[i];
 
@@ -406,8 +402,8 @@ void FastMixer::onWork()
             fastTrack->mBufferProvider->onTimestamp(perTrackTimestamp);
 
             const int name = i;
-            if (fastTrack->mVolumeProvider != NULL) {
-                gain_minifloat_packed_t vlr = fastTrack->mVolumeProvider->getVolumeLR();
+            if (fastTrack->mVolumeProvider != nullptr) {
+                const gain_minifloat_packed_t vlr = fastTrack->mVolumeProvider->getVolumeLR();
                 float vlf = float_from_gain(gain_minifloat_unpack_left(vlr));
                 float vrf = float_from_gain(gain_minifloat_unpack_right(vlr));
 
@@ -418,7 +414,7 @@ void FastMixer::onWork()
             // takes a tryLock, which can block
             // up to 1 ms.  If enough active tracks all blocked in sequence, this would result
             // in the overall fast mix cycle being delayed.  Should use a non-blocking FIFO.
-            size_t framesReady = fastTrack->mBufferProvider->framesReady();
+            const size_t framesReady = fastTrack->mBufferProvider->framesReady();
             if (ATRACE_ENABLED()) {
                 // I wish we had formatted trace names
                 char traceName[16];
@@ -464,7 +460,8 @@ void FastMixer::onWork()
         mMixerBufferState = UNDEFINED;
     }
     //bool didFullWrite = false;    // dumpsys could display a count of partial writes
-    if ((command & FastMixerState::WRITE) && (mOutputSink != NULL) && (mMixerBuffer != NULL)) {
+    if ((command & FastMixerState::WRITE)
+            && (mOutputSink != nullptr) && (mMixerBuffer != nullptr)) {
         if (mMixerBufferState == UNDEFINED) {
             memset(mMixerBuffer, 0, mMixerBufferSize);
             mMixerBufferState = ZEROED;
@@ -481,7 +478,7 @@ void FastMixer::onWork()
         mBalance.process((float *)mMixerBuffer, frameCount);
 
         // prepare the buffer used to write to sink
-        void *buffer = mSinkBuffer != NULL ? mSinkBuffer : mMixerBuffer;
+        void *buffer = mSinkBuffer != nullptr ? mSinkBuffer : mMixerBuffer;
         if (mFormat.mFormat != mMixerBufferFormat) { // sink format not the same as mixer format
             memcpy_by_audio_format(buffer, mFormat.mFormat, mMixerBuffer, mMixerBufferFormat,
                     frameCount * Format_channelCount(mFormat));
@@ -493,7 +490,7 @@ void FastMixer::onWork()
                     audio_bytes_per_sample(mFormat.mFormat),
                     frameCount * audio_bytes_per_frame(mAudioChannelCount, mFormat.mFormat));
         }
-        // if non-NULL, then duplicate write() to this non-blocking sink
+        // if non-nullptr, then duplicate write() to this non-blocking sink
 #ifdef TEE_SINK
         mTee.write(buffer, frameCount);
 #endif
@@ -501,7 +498,7 @@ void FastMixer::onWork()
         //       but this code should be modified to handle both non-blocking and blocking sinks
         dumpState->mWriteSequence++;
         ATRACE_BEGIN("write");
-        ssize_t framesWritten = mOutputSink->write(buffer, frameCount);
+        const ssize_t framesWritten = mOutputSink->write(buffer, frameCount);
         ATRACE_END();
         dumpState->mWriteSequence++;
         if (framesWritten >= 0) {

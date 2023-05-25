@@ -14,8 +14,7 @@
  * limitations under the License.
  */
 
-#ifndef ANDROID_AUDIO_FAST_MIXER_H
-#define ANDROID_AUDIO_FAST_MIXER_H
+#pragma once
 
 #include <atomic>
 #include <audio_utils/Balance.h>
@@ -29,7 +28,7 @@ namespace android {
 
 class AudioMixer;
 
-typedef StateQueue<FastMixerState> FastMixerStateQueue;
+using FastMixerStateQueue = StateQueue<FastMixerState>;
 
 class FastMixer : public FastThread {
 
@@ -37,7 +36,6 @@ public:
     /** FastMixer constructor takes as param the parent MixerThread's io handle (id)
         for purposes of identification. */
     explicit FastMixer(audio_io_handle_t threadIoHandle);
-    virtual ~FastMixer();
 
             FastMixerStateQueue* sq();
 
@@ -51,13 +49,13 @@ private:
             FastMixerStateQueue mSQ;
 
     // callouts
-    virtual const FastThreadState *poll();
-    virtual void setNBLogWriter(NBLog::Writer *logWriter);
-    virtual void onIdle();
-    virtual void onExit();
-    virtual bool isSubClassCommand(FastThreadState::Command command);
-    virtual void onStateChange();
-    virtual void onWork();
+    const FastThreadState *poll() override;
+    void setNBLogWriter(NBLog::Writer *logWriter) override;
+    void onIdle() override;
+    void onExit() override;
+    bool isSubClassCommand(FastThreadState::Command command) override;
+    void onStateChange() override;
+    void onWork() override;
 
     enum Reason {
         REASON_REMOVE,
@@ -115,5 +113,3 @@ private:
 };  // class FastMixer
 
 }   // namespace android
-
-#endif  // ANDROID_AUDIO_FAST_MIXER_H

@@ -1,3 +1,11 @@
+package {
+    // See: http://go/android-license-faq
+    // A large-scale-change added 'default_applicable_licenses' to import
+    // all of the 'license_kinds' from "frameworks_base_license"
+    // to get the below license kinds:
+    //   SPDX-license-identifier-Apache-2.0
+    default_applicable_licenses: ["frameworks_av_services_audioflinger_license"],
+}
 
 fastpath_tidy_errors = [
     // https://clang.llvm.org/extra/clang-tidy/checks/list.html
@@ -58,19 +66,11 @@ fastpath_tidy_errors = [
     "-bugprone-parent-virtual-call",
     "-cert-dcl59-cpp",
     "-cert-err34-c",
-    "-google-build-namespaces",
-    "-google-build-using-namespace",
-    "-google-default-arguments",
     "-google-runtime-int",
-    "-misc-const-correctness",
     "-misc-non-private-member-variables-in-classes",
     "-modernize-concat-nested-namespaces",
     "-modernize-loop-convert",
     "-modernize-use-default-member-init",
-    "-modernize-use-equals-default",
-    "-modernize-use-nullptr",
-    "-modernize-use-override",
-    "-modernize-use-using",
     "-performance-no-int-to-ptr",
 ]
 

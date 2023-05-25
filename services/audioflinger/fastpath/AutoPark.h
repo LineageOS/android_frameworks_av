@@ -14,6 +14,8 @@
  * limitations under the License.
  */
 
+#pragma once
+
 namespace android {
 
 // T is FastMixer or FastCapture
