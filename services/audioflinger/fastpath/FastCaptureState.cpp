@@ -18,11 +18,6 @@
 
 namespace android {
 
-FastCaptureState::FastCaptureState() : FastThreadState(),
-    mInputSource(nullptr), mInputSourceGen(0), mPipeSink(nullptr), mPipeSinkGen(0), mFrameCount(0)
-{
-}
-
 // static
 const char *FastCaptureState::commandToString(Command command)
 {
@@ -35,7 +30,7 @@ const char *FastCaptureState::commandToString(Command command)
     case FastCaptureState::WRITE:       return "WRITE";
     case FastCaptureState::READ_WRITE:  return "READ_WRITE";
     }
-    LOG_ALWAYS_FATAL("%s", __func__);
+    LOG_ALWAYS_FATAL("%s: command %d invalid", __func__, (int) command);
 }
 
 }  // namespace android
