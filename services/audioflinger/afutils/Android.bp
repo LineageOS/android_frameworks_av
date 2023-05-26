@@ -1,0 +1,40 @@
+package {
+    // See: http://go/android-license-faq
+    // A large-scale-change added 'default_applicable_licenses' to import
+    // all of the 'license_kinds' from "frameworks_base_license"
+    // to get the below license kinds:
+    //   SPDX-license-identifier-Apache-2.0
+    default_applicable_licenses: ["frameworks_av_services_audioflinger_license"],
+}
+
+cc_library {
+    name: "libaudioflinger_utils",
+
+    defaults: [
+        "audioflinger_flags_defaults",
+    ],
+
+    srcs: [
+        "AudioWatchdog.cpp",
+        "BufLog.cpp",
+        "NBAIO_Tee.cpp",
+        "TypedLogger.cpp",
+    ],
+
+    shared_libs: [
+        "libaudioutils",
+        "libbase",
+        "liblog",
+        "libnbaio",
+        "libnblog",
+        "libutils",
+    ],
+
+    static_libs: [
+        "libsndfile",
+    ],
+
+    include_dirs: [
+        "frameworks/av/services/audioflinger",  // for configuration
+    ],
+}
