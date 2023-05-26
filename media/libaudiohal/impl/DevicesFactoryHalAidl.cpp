@@ -34,7 +34,8 @@ using aidl::android::hardware::audio::core::IConfig;
 using aidl::android::hardware::audio::core::IModule;
 using aidl::android::hardware::audio::core::SurroundSoundConfig;
 using aidl::android::media::audio::common::AudioHalEngineConfig;
-using ::android::detail::AudioHalVersionInfo;
+using aidl::android::media::audio::IHalAdapterVendorExtension;
+using android::detail::AudioHalVersionInfo;
 
 namespace android {
 
@@ -92,7 +93,7 @@ status_t DevicesFactoryHalAidl::openDevice(const char *name, sp<DeviceHalInterfa
         ALOGE("%s fromBinder %s failed", __func__, serviceName.c_str());
         return NO_INIT;
     }
-    *device = sp<DeviceHalAidl>::make(name, service);
+    *device = sp<DeviceHalAidl>::make(name, service, getVendorExtension());
     return OK;
 }
 
@@ -152,6 +153,20 @@ status_t DevicesFactoryHalAidl::getEngineConfig(
     RETURN_STATUS_IF_ERROR(statusTFromBinderStatus(mConfig->getEngineConfig(&ndkConfig)));
     *config = VALUE_OR_RETURN_STATUS(ndk2cpp_AudioHalEngineConfig(ndkConfig));
     return OK;
+}
+
+std::shared_ptr<IHalAdapterVendorExtension> DevicesFactoryHalAidl::getVendorExtension() {
+    if (!mVendorExt.has_value()) {
+        auto serviceName = std::string(IHalAdapterVendorExtension::descriptor) + "/default";
+        if (AServiceManager_isDeclared(serviceName.c_str())) {
+            mVendorExt = std::shared_ptr<IHalAdapterVendorExtension>(
+                    IHalAdapterVendorExtension::fromBinder(ndk::SpAIBinder(
+                                    AServiceManager_waitForService(serviceName.c_str()))));
+        } else {
+            mVendorExt = nullptr;
+        }
+    }
+    return mVendorExt.value();
 }
 
 // Main entry-point to the shared library.
