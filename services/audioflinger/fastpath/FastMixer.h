@@ -69,39 +69,39 @@ private:
     static const FastMixerState sInitial;
 
     FastMixerState  mPreIdle;   // copy of state before we went into idle
-    int             mGenerations[FastMixerState::kMaxFastTracks];
+    int             mGenerations[FastMixerState::kMaxFastTracks]{};
                                 // last observed mFastTracks[i].mGeneration
-    NBAIO_Sink*     mOutputSink;
-    int             mOutputSinkGen;
-    AudioMixer*     mMixer;
+    NBAIO_Sink*     mOutputSink = nullptr;
+    int             mOutputSinkGen = 0;
+    AudioMixer*     mMixer = nullptr;
 
     // mSinkBuffer audio format is stored in format.mFormat.
-    void*           mSinkBuffer;        // used for mixer output format translation
+    void*           mSinkBuffer = nullptr; // used for mixer output format translation
                                         // if sink format is different than mixer output.
-    size_t          mSinkBufferSize;
-    uint32_t        mSinkChannelCount;
+    size_t          mSinkBufferSize = 0;
+    uint32_t        mSinkChannelCount = FCC_2;
     audio_channel_mask_t mSinkChannelMask;
-    void*           mMixerBuffer;       // mixer output buffer.
-    size_t          mMixerBufferSize;
+    void*           mMixerBuffer = nullptr;       // mixer output buffer.
+    size_t          mMixerBufferSize = 0;
     static constexpr audio_format_t mMixerBufferFormat = AUDIO_FORMAT_PCM_FLOAT;
 
     uint32_t        mAudioChannelCount; // audio channel count, excludes haptic channels.
 
-    enum {UNDEFINED, MIXED, ZEROED} mMixerBufferState;
-    NBAIO_Format    mFormat;
-    unsigned        mSampleRate;
-    int             mFastTracksGen;
+    enum {UNDEFINED, MIXED, ZEROED} mMixerBufferState = UNDEFINED;
+    NBAIO_Format    mFormat{Format_Invalid};
+    unsigned        mSampleRate = 0;
+    int             mFastTracksGen = 0;
     FastMixerDumpState mDummyFastMixerDumpState;
-    int64_t         mTotalNativeFramesWritten;  // copied to dumpState->mFramesWritten
+    int64_t         mTotalNativeFramesWritten = 0;  // copied to dumpState->mFramesWritten
 
     // next 2 fields are valid only when timestampStatus == NO_ERROR
     ExtendedTimestamp mTimestamp;
-    int64_t         mNativeFramesWrittenButNotPresented;
+    int64_t         mNativeFramesWrittenButNotPresented = 0;
 
     audio_utils::Balance mBalance;
 
     // accessed without lock between multiple threads.
-    std::atomic_bool mMasterMono;
+    std::atomic_bool mMasterMono{};
     std::atomic<float> mMasterBalance{};
     std::atomic_int_fast64_t mBoottimeOffset;
 

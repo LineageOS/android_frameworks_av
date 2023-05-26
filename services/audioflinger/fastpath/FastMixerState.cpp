@@ -22,16 +22,7 @@
 
 namespace android {
 
-FastTrack::FastTrack() :
-    mBufferProvider(nullptr), mVolumeProvider(nullptr),
-    mChannelMask(AUDIO_CHANNEL_OUT_STEREO), mFormat(AUDIO_FORMAT_INVALID), mGeneration(0)
-{
-}
-
-FastMixerState::FastMixerState() : FastThreadState(),
-    // mFastTracks
-    mFastTracksGen(0), mTrackMask(0), mOutputSink(nullptr), mOutputSinkGen(0),
-    mFrameCount(0)
+FastMixerState::FastMixerState() : FastThreadState()
 {
     const int ok = pthread_once(&sMaxFastTracksOnce, sMaxFastTracksInit);
     if (ok != 0) {
@@ -66,7 +57,7 @@ void FastMixerState::sMaxFastTracksInit()
     char value[PROPERTY_VALUE_MAX];
     if (property_get("ro.audio.max_fast_tracks", value, nullptr /* default_value */) > 0) {
         char *endptr;
-        const unsigned long ul = strtoul(value, &endptr, 0);
+        const auto ul = strtoul(value, &endptr, 0);
         if (*endptr == '\0' && kMinFastTracks <= ul && ul <= kMaxFastTracks) {
             sMaxFastTracks = (unsigned) ul;
         }
