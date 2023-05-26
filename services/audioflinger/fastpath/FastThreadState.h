@@ -27,8 +27,6 @@ struct FastThreadDumpState;
 
 // Represents a single state of a FastThread
 struct FastThreadState {
-                FastThreadState();
-
     using Command = uint32_t;
     static const Command
         INITIAL = 0,            // used only for the initial state
@@ -37,13 +35,14 @@ struct FastThreadState {
         IDLE = 3,               // either HOT_IDLE or COLD_IDLE
         EXIT = 4;               // exit from thread
         // additional values defined per subclass
-    Command     mCommand;       // current command
-    int32_t*    mColdFutexAddr; // for COLD_IDLE only, pointer to the associated futex
-    unsigned    mColdGen;       // increment when COLD_IDLE is requested so it's only performed once
+    Command     mCommand = INITIAL;       // current command
+    int32_t*    mColdFutexAddr = nullptr; // for COLD_IDLE only, pointer to the associated futex
+    unsigned    mColdGen = 0;             // increment when COLD_IDLE is requested
+                                          // so it's only performed once
 
     // This might be a one-time configuration rather than per-state
-    FastThreadDumpState* mDumpState; // if non-NULL, then update dump state periodically
-    NBLog::Writer* mNBLogWriter; // non-blocking logger
+    FastThreadDumpState* mDumpState = nullptr; // if non-NULL, then update dump state periodically
+    NBLog::Writer* mNBLogWriter = nullptr; // non-blocking logger
 
     // returns NULL if command belongs to a subclass
     static const char *commandToString(Command command);
