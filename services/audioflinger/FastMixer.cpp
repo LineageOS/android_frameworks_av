@@ -42,7 +42,7 @@
 #include <cutils/bitops.h>
 #include <media/AudioMixer.h>
 #include "FastMixer.h"
-#include "TypedLogger.h"
+#include <afutils/TypedLogger.h>
 
 namespace android {
 

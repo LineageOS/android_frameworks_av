@@ -146,8 +146,6 @@ cc_library_shared {
         "AudioFlinger.cpp",
         "AudioHwDevice.cpp",
         "AudioStreamOut.cpp",
-        "AudioWatchdog.cpp",
-        "BufLog.cpp",
         "DeviceEffectManager.cpp",
         "Effects.cpp",
         "FastCapture.cpp",
@@ -159,14 +157,12 @@ cc_library_shared {
         "FastThread.cpp",
         "FastThreadDumpState.cpp",
         "FastThreadState.cpp",
-        "NBAIO_Tee.cpp",
         "PatchPanel.cpp",
         "PropertyUtils.cpp",
         "SpdifStreamOut.cpp",
         "StateQueue.cpp",
         "Threads.cpp",
         "Tracks.cpp",
-        "TypedLogger.cpp",
     ],
 
     include_dirs: [
@@ -181,6 +177,7 @@ cc_library_shared {
         "effect-aidl-cpp",
         "libaudioclient_aidl_conversion",
         "libaudioflinger_timing",
+        "libaudioflinger_utils",
         "libaudiofoundation",
         "libaudiohal",
         "libaudioprocessing",
@@ -208,7 +205,6 @@ cc_library_shared {
 
     static_libs: [
         "libcpustats",
-        "libsndfile",
         "libpermission",
     ],
 
