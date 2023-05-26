@@ -23,7 +23,7 @@
 #include "StateQueue.h"
 #include "FastMixerState.h"
 #include "FastMixerDumpState.h"
-#include "NBAIO_Tee.h"
+#include <afutils/NBAIO_Tee.h>
 
 namespace android {
 
