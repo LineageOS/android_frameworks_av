@@ -74,8 +74,6 @@
 #include <media/audiohal/StreamHalInterface.h>
 
 #include "AudioFlinger.h"
-#include "FastMixer.h"
-#include "FastCapture.h"
 #include <mediautils/SchedulingPolicyService.h>
 #include <mediautils/ServiceUtilities.h>
 
@@ -89,7 +87,7 @@
 #include <cpustats/ThreadCpuUsage.h>
 #endif
 
-#include "AutoPark.h"
+#include <fastpath/AutoPark.h>
 
 #include <pthread.h>
 #include <afutils/TypedLogger.h>
