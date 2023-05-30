@@ -2447,7 +2447,8 @@ size_t AudioFlinger::EffectChain::removeEffect_l(const sp<EffectModule>& effect,
 
             // make sure the input buffer configuration for the new first effect in the chain
             // is updated if needed (can switch from HAL channel mask to mixer channel mask)
-            if (i == 0 && size > 1) {
+            if (type != EFFECT_FLAG_TYPE_AUXILIARY // TODO(b/284522658) breaks for aux FX, why?
+                    && i == 0 && size > 1) {
                 mEffects[0]->configure();
                 mEffects[0]->setInBuffer(mInBuffer);
                 mEffects[0]->updateAccessMode();      // reconfig if neeeded.
