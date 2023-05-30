@@ -432,6 +432,80 @@ TEST_F(VideoRenderQualityTrackerTest, detectsFrameRate) {
     EXPECT_NEAR(h.getMetrics().actualFrameRate, 60.0, 0.5);
 }
 
+TEST_F(VideoRenderQualityTrackerTest, handlesSeeking) {
+    Configuration c;
+    c.maxExpectedContentFrameDurationUs = 30;
+    VideoRenderQualityTracker v(c);
+    v.onFrameReleased(0, 0);
+    v.onFrameRendered(0, 0);
+    v.onFrameReleased(20, 20);
+    v.onFrameRendered(20, 20);
+    v.onFrameReleased(40, 40);
+    v.onFrameRendered(40, 40);
+    v.onFrameReleased(60, 60);
+    v.onFrameRendered(60, 60);
+    v.onFrameReleased(80, 80);
+    v.onFrameRendered(80, 80);
+    v.onFrameReleased(7200000000, 100);
+    v.onFrameRendered(7200000000, 100);
+    v.onFrameReleased(7200000020, 120);
+    v.onFrameRendered(7200000020, 120);
+    v.onFrameReleased(7200000040, 140);
+    v.onFrameRendered(7200000040, 140);
+    v.onFrameReleased(7200000060, 160);
+    v.onFrameRendered(7200000060, 160);
+    v.onFrameReleased(7200000080, 180);
+    v.onFrameRendered(7200000080, 180);
+    v.onFrameReleased(0, 200);
+    v.onFrameRendered(0, 200);
+    v.onFrameReleased(20, 220);
+    v.onFrameRendered(20, 220);
+    v.onFrameReleased(40, 240);
+    v.onFrameRendered(40, 240);
+    v.onFrameReleased(60, 260);
+    v.onFrameRendered(60, 260);
+    const VideoRenderQualityMetrics &m = v.getMetrics();
+    EXPECT_EQ(m.judderRate, 0); // frame durations can get messed up during discontinuities so if
+                                // the discontinuity is not detected, judder is expected
+    EXPECT_NE(m.contentFrameRate, FRAME_RATE_UNDETERMINED);
+}
+
+TEST_F(VideoRenderQualityTrackerTest, withSkipping_handlesSeeking) {
+    Configuration c;
+    c.maxExpectedContentFrameDurationUs = 30;
+    VideoRenderQualityTracker v(c);
+    v.onFrameReleased(0, 0);
+    v.onFrameRendered(0, 0);
+    v.onFrameReleased(20, 20);
+    v.onFrameRendered(20, 20);
+    v.onFrameReleased(40, 40);
+    v.onFrameRendered(40, 40);
+    v.onFrameReleased(60, 60);
+    v.onFrameRendered(60, 60);
+    v.onFrameReleased(80, 80);
+    v.onFrameRendered(80, 80);
+    v.onFrameSkipped(7200000000);
+    v.onFrameSkipped(7200000020);
+    v.onFrameReleased(7200000040, 100);
+    v.onFrameRendered(7200000040, 100);
+    v.onFrameReleased(7200000060, 120);
+    v.onFrameRendered(7200000060, 120);
+    v.onFrameReleased(7200000080, 140);
+    v.onFrameSkipped(0);
+    v.onFrameRendered(7200000080, 140);
+    v.onFrameSkipped(20);
+    v.onFrameReleased(40, 160);
+    v.onFrameRendered(40, 160);
+    v.onFrameReleased(60, 180);
+    v.onFrameRendered(60, 180);
+    v.onFrameReleased(80, 200);
+    v.onFrameRendered(80, 200);
+    const VideoRenderQualityMetrics &m = v.getMetrics();
+    EXPECT_EQ(m.judderRate, 0); // frame durations can get messed up during discontinuities so if
+                                // the discontinuity is not detected, judder is expected
+    EXPECT_NE(m.contentFrameRate, FRAME_RATE_UNDETERMINED);
+}
+
 TEST_F(VideoRenderQualityTrackerTest, whenLowTolerance_doesntDetectFrameRate) {
     Configuration c;
     c.frameRateDetectionToleranceUs = 0;
