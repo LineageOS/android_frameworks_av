@@ -29,19 +29,15 @@ FastCaptureDumpState::FastCaptureDumpState() : FastThreadDumpState(),
 {
 }
 
-FastCaptureDumpState::~FastCaptureDumpState()
-{
-}
-
 void FastCaptureDumpState::dump(int fd) const
 {
     if (mCommand == FastCaptureState::INITIAL) {
         dprintf(fd, "  FastCapture not initialized\n");
         return;
     }
-    double measuredWarmupMs = (mMeasuredWarmupTs.tv_sec * 1000.0) +
+    const double measuredWarmupMs = (mMeasuredWarmupTs.tv_sec * 1000.0) +
             (mMeasuredWarmupTs.tv_nsec / 1000000.0);
-    double periodSec = (double) mFrameCount / mSampleRate;
+    const double periodSec = (double) mFrameCount / mSampleRate;
     dprintf(fd, "  FastCapture command=%s readSequence=%u framesRead=%u\n"
                 "              readErrors=%u sampleRate=%u frameCount=%zu\n"
                 "              measuredWarmup=%.3g ms, warmupCycles=%u period=%.2f ms\n"

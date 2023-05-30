@@ -41,18 +41,14 @@ void StateQueueMutatorDump::dump(int fd)
 // Constructor and destructor
 
 template<typename T> StateQueue<T>::StateQueue() :
-    mAck(NULL), mCurrent(NULL),
-    mMutating(&mStates[0]), mExpecting(NULL),
+    mAck(nullptr), mCurrent(nullptr),
+    mMutating(&mStates[0]), mExpecting(nullptr),
     mInMutation(false), mIsDirty(false), mIsInitialized(false)
 #ifdef STATE_QUEUE_DUMP
     , mObserverDump(&mObserverDummyDump), mMutatorDump(&mMutatorDummyDump)
 #endif
 {
     atomic_init(&mNext, static_cast<uintptr_t>(0));
-}
-
-template<typename T> StateQueue<T>::~StateQueue()
-{
 }
 
 // Observer APIs
@@ -112,7 +108,7 @@ template<typename T> bool StateQueue<T>::push(StateQueue<T>::block_t block)
 #endif
 
         // wait for prior push to be acknowledged
-        if (mExpecting != NULL) {
+        if (mExpecting != nullptr) {
 #ifdef STATE_QUEUE_DUMP
             unsigned count = 0;
 #endif
@@ -120,7 +116,7 @@ template<typename T> bool StateQueue<T>::push(StateQueue<T>::block_t block)
                 const T *ack = (const T *) mAck;    // no additional barrier needed
                 if (ack == mExpecting) {
                     // unnecessary as we're about to rewrite
-                    //mExpecting = NULL;
+                    //mExpecting = nullptr;
                     break;
                 }
                 if (block == BLOCK_NEVER) {
@@ -132,7 +128,7 @@ template<typename T> bool StateQueue<T>::push(StateQueue<T>::block_t block)
                 }
                 ++count;
 #endif
-                nanosleep(&req, NULL);
+                nanosleep(&req, nullptr);
             }
 #ifdef STATE_QUEUE_DUMP
             if (count > 1) {
@@ -156,14 +152,14 @@ template<typename T> bool StateQueue<T>::push(StateQueue<T>::block_t block)
 
     // optionally wait for this push or a prior push to be acknowledged
     if (block == BLOCK_UNTIL_ACKED) {
-        if (mExpecting != NULL) {
+        if (mExpecting != nullptr) {
 #ifdef STATE_QUEUE_DUMP
             unsigned count = 0;
 #endif
             for (;;) {
                 const T *ack = (const T *) mAck;    // no additional barrier needed
                 if (ack == mExpecting) {
-                    mExpecting = NULL;
+                    mExpecting = nullptr;
                     break;
                 }
 #ifdef STATE_QUEUE_DUMP
@@ -172,7 +168,7 @@ template<typename T> bool StateQueue<T>::push(StateQueue<T>::block_t block)
                 }
                 ++count;
 #endif
-                nanosleep(&req, NULL);
+                nanosleep(&req, nullptr);
             }
 #ifdef STATE_QUEUE_DUMP
             if (count > 1) {

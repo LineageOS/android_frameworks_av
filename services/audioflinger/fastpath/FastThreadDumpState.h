@@ -14,8 +14,9 @@
  * limitations under the License.
  */
 
-#ifndef ANDROID_AUDIO_FAST_THREAD_DUMP_STATE_H
-#define ANDROID_AUDIO_FAST_THREAD_DUMP_STATE_H
+#pragma once
+
+#include <type_traits>
 
 #include "Configuration.h"
 #include "FastThreadState.h"
@@ -30,7 +31,6 @@ namespace android {
 // It has a different lifetime than the FastThread, and so it can't be a member of FastThread.
 struct FastThreadDumpState {
     FastThreadDumpState();
-    /*virtual*/ ~FastThreadDumpState();
 
     FastThreadState::Command mCommand;   // current command
     uint32_t mUnderruns;        // total number of underruns
@@ -67,6 +67,7 @@ struct FastThreadDumpState {
 
 };  // struct FastThreadDumpState
 
-}  // namespace android
+// No virtuals.
+static_assert(!std::is_polymorphic_v<FastThreadDumpState>);
 
-#endif  // ANDROID_AUDIO_FAST_THREAD_DUMP_STATE_H
+}  // namespace android

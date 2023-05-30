@@ -14,10 +14,10 @@
  * limitations under the License.
  */
 
-#ifndef ANDROID_AUDIO_FAST_MIXER_STATE_H
-#define ANDROID_AUDIO_FAST_MIXER_STATE_H
+#pragma once
 
 #include <math.h>
+#include <type_traits>
 
 #include <audio_utils/minifloat.h>
 #include <system/audio.h>
@@ -38,13 +38,12 @@ public:
     virtual gain_minifloat_packed_t getVolumeLR() = 0;
 protected:
     VolumeProvider() { }
-    virtual ~VolumeProvider() { }
+    virtual ~VolumeProvider() = default;
 };
 
 // Represents the state of a fast track
 struct FastTrack {
     FastTrack();
-    /*virtual*/ ~FastTrack();
 
     ExtendedAudioBufferProvider* mBufferProvider; // must be NULL if inactive, or non-NULL if active
     VolumeProvider*         mVolumeProvider; // optional; if NULL then full-scale
@@ -56,10 +55,12 @@ struct FastTrack {
     float                   mHapticMaxAmplitude = NAN; // max amplitude allowed for haptic data
 };
 
+// No virtuals.
+static_assert(!std::is_polymorphic_v<FastTrack>);
+
 // Represents a single state of the fast mixer
 struct FastMixerState : FastThreadState {
                 FastMixerState();
-    /*virtual*/ ~FastMixerState();
 
     // These are the minimum, maximum, and default values for maximum number of fast tracks
     static const unsigned kMinFastTracks = 2;
@@ -95,6 +96,7 @@ struct FastMixerState : FastThreadState {
 
 };  // struct FastMixerState
 
-}   // namespace android
+// No virtuals.
+static_assert(!std::is_polymorphic_v<FastMixerState>);
 
-#endif  // ANDROID_AUDIO_FAST_MIXER_STATE_H
+}   // namespace android

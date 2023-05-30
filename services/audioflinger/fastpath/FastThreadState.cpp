@@ -20,12 +20,8 @@
 namespace android {
 
 FastThreadState::FastThreadState() :
-    mCommand(INITIAL), mColdFutexAddr(NULL), mColdGen(0), mDumpState(NULL), mNBLogWriter(NULL)
-
-{
-}
-
-FastThreadState::~FastThreadState()
+    mCommand(INITIAL), mColdFutexAddr(nullptr), mColdGen(0), mDumpState(nullptr)
+    , mNBLogWriter(nullptr)
 {
 }
 
@@ -38,7 +34,7 @@ const char *FastThreadState::commandToString(FastThreadState::Command command)
     case FastThreadState::COLD_IDLE:    return "COLD_IDLE";
     case FastThreadState::EXIT:         return "EXIT";
     }
-    return NULL;
+    return nullptr;
 }
 
 }   // namespace android
