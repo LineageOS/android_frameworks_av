@@ -114,6 +114,247 @@ public:
     VideoRenderQualityTrackerTest() {}
 };
 
+TEST_F(VideoRenderQualityTrackerTest, getFromServerConfigurableFlags_withDefaults) {
+    Configuration::GetServerConfigurableFlagFn getServerConfigurableFlagFn =
+        [](const std::string &, const std::string &, const std::string &defaultStr) -> std::string {
+            return defaultStr;
+        };
+
+    Configuration c = Configuration::getFromServerConfigurableFlags(getServerConfigurableFlagFn);
+    Configuration d; // default configuration
+    EXPECT_EQ(c.enabled, d.enabled);
+    EXPECT_EQ(c.areSkippedFramesDropped, d.areSkippedFramesDropped);
+    EXPECT_EQ(c.maxExpectedContentFrameDurationUs, d.maxExpectedContentFrameDurationUs);
+    EXPECT_EQ(c.frameRateDetectionToleranceUs, d.frameRateDetectionToleranceUs);
+    EXPECT_EQ(c.liveContentFrameDropToleranceUs, d.liveContentFrameDropToleranceUs);
+    EXPECT_EQ(c.freezeDurationMsHistogramBuckets, d.freezeDurationMsHistogramBuckets);
+    EXPECT_EQ(c.freezeDurationMsHistogramToScore, d.freezeDurationMsHistogramToScore);
+    EXPECT_EQ(c.freezeDistanceMsHistogramBuckets, d.freezeDistanceMsHistogramBuckets);
+    EXPECT_EQ(c.freezeEventMax, d.freezeEventMax);
+    EXPECT_EQ(c.freezeEventDetailsMax, d.freezeEventDetailsMax);
+    EXPECT_EQ(c.freezeEventDistanceToleranceMs, d.freezeEventDistanceToleranceMs);
+    EXPECT_EQ(c.judderErrorToleranceUs, d.judderErrorToleranceUs);
+    EXPECT_EQ(c.judderScoreHistogramBuckets, d.judderScoreHistogramBuckets);
+    EXPECT_EQ(c.judderScoreHistogramToScore, d.judderScoreHistogramToScore);
+    EXPECT_EQ(c.judderEventMax, d.judderEventMax);
+    EXPECT_EQ(c.judderEventDetailsMax, d.judderEventDetailsMax);
+    EXPECT_EQ(c.judderEventDistanceToleranceMs, d.judderEventDistanceToleranceMs);
+}
+
+TEST_F(VideoRenderQualityTrackerTest, getFromServerConfigurableFlags_withEmpty) {
+    Configuration::GetServerConfigurableFlagFn getServerConfigurableFlagFn{
+        [](const std::string &, const std::string &, const std::string &) -> std::string {
+            return "";
+        }
+    };
+    Configuration c = Configuration::getFromServerConfigurableFlags(getServerConfigurableFlagFn);
+    Configuration d; // default configuration
+    EXPECT_EQ(c.enabled, d.enabled);
+    EXPECT_EQ(c.areSkippedFramesDropped, d.areSkippedFramesDropped);
+    EXPECT_EQ(c.maxExpectedContentFrameDurationUs, d.maxExpectedContentFrameDurationUs);
+    EXPECT_EQ(c.frameRateDetectionToleranceUs, d.frameRateDetectionToleranceUs);
+    EXPECT_EQ(c.liveContentFrameDropToleranceUs, d.liveContentFrameDropToleranceUs);
+    EXPECT_EQ(c.freezeDurationMsHistogramBuckets, d.freezeDurationMsHistogramBuckets);
+    EXPECT_EQ(c.freezeDurationMsHistogramToScore, d.freezeDurationMsHistogramToScore);
+    EXPECT_EQ(c.freezeDistanceMsHistogramBuckets, d.freezeDistanceMsHistogramBuckets);
+    EXPECT_EQ(c.freezeEventMax, d.freezeEventMax);
+    EXPECT_EQ(c.freezeEventDetailsMax, d.freezeEventDetailsMax);
+    EXPECT_EQ(c.freezeEventDistanceToleranceMs, d.freezeEventDistanceToleranceMs);
+    EXPECT_EQ(c.judderErrorToleranceUs, d.judderErrorToleranceUs);
+    EXPECT_EQ(c.judderScoreHistogramBuckets, d.judderScoreHistogramBuckets);
+    EXPECT_EQ(c.judderScoreHistogramToScore, d.judderScoreHistogramToScore);
+    EXPECT_EQ(c.judderEventMax, d.judderEventMax);
+    EXPECT_EQ(c.judderEventDetailsMax, d.judderEventDetailsMax);
+    EXPECT_EQ(c.judderEventDistanceToleranceMs, d.judderEventDistanceToleranceMs);
+}
+
+TEST_F(VideoRenderQualityTrackerTest, getFromServerConfigurableFlags_withInvalid) {
+    Configuration::GetServerConfigurableFlagFn getServerConfigurableFlagFn{
+        [](const std::string &, const std::string &, const std::string &) -> std::string {
+            return "abc";
+        }
+    };
+    Configuration c = Configuration::getFromServerConfigurableFlags(getServerConfigurableFlagFn);
+    Configuration d; // default configuration
+    EXPECT_EQ(c.enabled, d.enabled);
+    EXPECT_EQ(c.areSkippedFramesDropped, d.areSkippedFramesDropped);
+    EXPECT_EQ(c.maxExpectedContentFrameDurationUs, d.maxExpectedContentFrameDurationUs);
+    EXPECT_EQ(c.frameRateDetectionToleranceUs, d.frameRateDetectionToleranceUs);
+    EXPECT_EQ(c.liveContentFrameDropToleranceUs, d.liveContentFrameDropToleranceUs);
+    EXPECT_EQ(c.freezeDurationMsHistogramBuckets, d.freezeDurationMsHistogramBuckets);
+    EXPECT_EQ(c.freezeDurationMsHistogramToScore, d.freezeDurationMsHistogramToScore);
+    EXPECT_EQ(c.freezeDistanceMsHistogramBuckets, d.freezeDistanceMsHistogramBuckets);
+    EXPECT_EQ(c.freezeEventMax, d.freezeEventMax);
+    EXPECT_EQ(c.freezeEventDetailsMax, d.freezeEventDetailsMax);
+    EXPECT_EQ(c.freezeEventDistanceToleranceMs, d.freezeEventDistanceToleranceMs);
+    EXPECT_EQ(c.judderErrorToleranceUs, d.judderErrorToleranceUs);
+    EXPECT_EQ(c.judderScoreHistogramBuckets, d.judderScoreHistogramBuckets);
+    EXPECT_EQ(c.judderScoreHistogramToScore, d.judderScoreHistogramToScore);
+    EXPECT_EQ(c.judderEventMax, d.judderEventMax);
+    EXPECT_EQ(c.judderEventDetailsMax, d.judderEventDetailsMax);
+    EXPECT_EQ(c.judderEventDistanceToleranceMs, d.judderEventDistanceToleranceMs);
+}
+
+TEST_F(VideoRenderQualityTrackerTest, getFromServerConfigurableFlags_withAlmostValid) {
+    Configuration::GetServerConfigurableFlagFn getServerConfigurableFlagFn{
+        [](const std::string &, const std::string &flag, const std::string &) -> std::string {
+            if (flag == "render_metrics_enabled") {
+                return "fals";
+            } else if (flag == "render_metrics_are_skipped_frames_dropped") {
+                return "fals";
+            } else if (flag == "render_metrics_max_expected_content_frame_duration_us") {
+                return "100a";
+            } else if (flag == "render_metrics_frame_rate_detection_tolerance_us") {
+                return "10b0";
+            } else if (flag == "render_metrics_live_content_frame_drop_tolerance_us") {
+                return "c100";
+            } else if (flag == "render_metrics_freeze_duration_ms_histogram_buckets") {
+                return "1,5300,3b400,123";
+            } else if (flag == "render_metrics_freeze_duration_ms_histogram_to_score") {
+                return "2,5300*400,132";
+            } else if (flag == "render_metrics_freeze_distance_ms_histogram_buckets") {
+                return "3,12345678901234,5,7";
+            } else if (flag == "render_metrics_freeze_event_max") {
+                return "12345678901234";
+            } else if (flag == "render_metrics_freeze_event_details_max") {
+                return "12345.11321";
+            } else if (flag == "render_metrics_freeze_event_distance_tolerance_ms") {
+                return "*!-";
+            } else if (flag == "render_metrics_judder_error_tolerance_us") {
+                return "10.5";
+            } else if (flag == "render_metrics_judder_score_histogram_buckets") {
+                return "abc";
+            } else if (flag == "render_metrics_judder_score_histogram_to_score") {
+                return "123,";
+            } else if (flag == "render_metrics_judder_event_max") {
+                return ",1234";
+            } else if (flag == "render_metrics_judder_event_details_max") {
+                return "10*10";
+            } else if (flag == "render_metrics_judder_event_distance_tolerance_ms") {
+                return "140-a";
+            }
+            return "";
+        }
+    };
+    Configuration c = Configuration::getFromServerConfigurableFlags(getServerConfigurableFlagFn);
+    Configuration d; // default configuration
+    EXPECT_EQ(c.enabled, d.enabled);
+    EXPECT_EQ(c.areSkippedFramesDropped, d.areSkippedFramesDropped);
+    EXPECT_EQ(c.maxExpectedContentFrameDurationUs, d.maxExpectedContentFrameDurationUs);
+    EXPECT_EQ(c.frameRateDetectionToleranceUs, d.frameRateDetectionToleranceUs);
+    EXPECT_EQ(c.liveContentFrameDropToleranceUs, d.liveContentFrameDropToleranceUs);
+    EXPECT_EQ(c.freezeDurationMsHistogramBuckets, d.freezeDurationMsHistogramBuckets);
+    EXPECT_EQ(c.freezeDurationMsHistogramToScore, d.freezeDurationMsHistogramToScore);
+    EXPECT_EQ(c.freezeDistanceMsHistogramBuckets, d.freezeDistanceMsHistogramBuckets);
+    EXPECT_EQ(c.freezeEventMax, d.freezeEventMax);
+    EXPECT_EQ(c.freezeEventDetailsMax, d.freezeEventDetailsMax);
+    EXPECT_EQ(c.freezeEventDistanceToleranceMs, d.freezeEventDistanceToleranceMs);
+    EXPECT_EQ(c.judderErrorToleranceUs, d.judderErrorToleranceUs);
+    EXPECT_EQ(c.judderScoreHistogramBuckets, d.judderScoreHistogramBuckets);
+    EXPECT_EQ(c.judderScoreHistogramToScore, d.judderScoreHistogramToScore);
+    EXPECT_EQ(c.judderEventMax, d.judderEventMax);
+    EXPECT_EQ(c.judderEventDetailsMax, d.judderEventDetailsMax);
+    EXPECT_EQ(c.judderEventDistanceToleranceMs, d.judderEventDistanceToleranceMs);
+}
+
+TEST_F(VideoRenderQualityTrackerTest, getFromServerConfigurableFlags_withValid) {
+    Configuration::GetServerConfigurableFlagFn getServerConfigurableFlagFn{
+        [](const std::string &, const std::string &flag, const std::string &) -> std::string {
+            if (flag == "render_metrics_enabled") {
+                return "false";
+            } else if (flag == "render_metrics_are_skipped_frames_dropped") {
+                return "false";
+            } else if (flag == "render_metrics_max_expected_content_frame_duration_us") {
+                return "2000";
+            } else if (flag == "render_metrics_frame_rate_detection_tolerance_us") {
+                return "3000";
+            } else if (flag == "render_metrics_live_content_frame_drop_tolerance_us") {
+                return "4000";
+            } else if (flag == "render_metrics_freeze_duration_ms_histogram_buckets") {
+                return "100,200,300,400";
+            } else if (flag == "render_metrics_freeze_duration_ms_histogram_to_score") {
+                return "1234567890120,1234567890121,1234567890122";
+            } else if (flag == "render_metrics_freeze_distance_ms_histogram_buckets") {
+                return "500,600,700,800,900";
+            } else if (flag == "render_metrics_freeze_event_max") {
+                return "5000";
+            } else if (flag == "render_metrics_freeze_event_details_max") {
+                return "6000";
+            } else if (flag == "render_metrics_freeze_event_distance_tolerance_ms") {
+                return "7000";
+            } else if (flag == "render_metrics_judder_error_tolerance_us") {
+                return "8000";
+            } else if (flag == "render_metrics_judder_score_histogram_buckets") {
+                return "1,2,3,4,5";
+            } else if (flag == "render_metrics_judder_score_histogram_to_score") {
+                return "-1,-2,-3,-4,-5";
+            } else if (flag == "render_metrics_judder_event_max") {
+                return "9000";
+            } else if (flag == "render_metrics_judder_event_details_max") {
+                return "10000";
+            } else if (flag == "render_metrics_judder_event_distance_tolerance_ms") {
+                return "11000";
+            }
+            return "";
+        }
+    };
+
+    Configuration c = Configuration::getFromServerConfigurableFlags(getServerConfigurableFlagFn);
+    // The default configuration here used to verify we're not configuring the values to the
+    // default - if we are accidentally configuring to the default then we're not necessarily
+    // testing the parsing.
+    Configuration d;
+    EXPECT_EQ(c.enabled, false);
+    EXPECT_NE(c.enabled, d.enabled);
+    EXPECT_EQ(c.areSkippedFramesDropped, false);
+    EXPECT_NE(c.areSkippedFramesDropped, d.areSkippedFramesDropped);
+    EXPECT_EQ(c.maxExpectedContentFrameDurationUs, 2000);
+    EXPECT_NE(c.maxExpectedContentFrameDurationUs, d.maxExpectedContentFrameDurationUs);
+    EXPECT_EQ(c.frameRateDetectionToleranceUs, 3000);
+    EXPECT_NE(c.frameRateDetectionToleranceUs, d.frameRateDetectionToleranceUs);
+    EXPECT_EQ(c.liveContentFrameDropToleranceUs, 4000);
+    EXPECT_NE(c.liveContentFrameDropToleranceUs, d.liveContentFrameDropToleranceUs);
+    {
+        std::vector<int32_t> expected({100,200,300,400});
+        EXPECT_EQ(c.freezeDurationMsHistogramBuckets, expected);
+        EXPECT_NE(c.freezeDurationMsHistogramBuckets, d.freezeDurationMsHistogramBuckets);
+    }
+    {
+        std::vector<int64_t> expected({1234567890120LL,1234567890121LL,1234567890122LL});
+        EXPECT_EQ(c.freezeDurationMsHistogramToScore, expected);
+        EXPECT_NE(c.freezeDurationMsHistogramToScore, d.freezeDurationMsHistogramToScore);
+    }
+    {
+        std::vector<int32_t> expected({500,600,700,800,900});
+        EXPECT_EQ(c.freezeDistanceMsHistogramBuckets, expected);
+        EXPECT_NE(c.freezeDistanceMsHistogramBuckets, d.freezeDistanceMsHistogramBuckets);
+    }
+    EXPECT_EQ(c.freezeEventMax, 5000);
+    EXPECT_NE(c.freezeEventMax, d.freezeEventMax);
+    EXPECT_EQ(c.freezeEventDetailsMax, 6000);
+    EXPECT_NE(c.freezeEventDetailsMax, d.freezeEventDetailsMax);
+    EXPECT_EQ(c.freezeEventDistanceToleranceMs, 7000);
+    EXPECT_NE(c.freezeEventDistanceToleranceMs, d.freezeEventDistanceToleranceMs);
+    EXPECT_EQ(c.judderErrorToleranceUs, 8000);
+    EXPECT_NE(c.judderErrorToleranceUs, d.judderErrorToleranceUs);
+    {
+        std::vector<int32_t> expected({1,2,3,4,5});
+        EXPECT_EQ(c.judderScoreHistogramBuckets, expected);
+        EXPECT_NE(c.judderScoreHistogramBuckets, d.judderScoreHistogramBuckets);
+    }
+    {
+        std::vector<int64_t> expected({-1,-2,-3,-4,-5});
+        EXPECT_EQ(c.judderScoreHistogramToScore, expected);
+        EXPECT_NE(c.judderScoreHistogramToScore, d.judderScoreHistogramToScore);
+    }
+    EXPECT_EQ(c.judderEventMax, 9000);
+    EXPECT_NE(c.judderEventMax, d.judderEventMax);
+    EXPECT_EQ(c.judderEventDetailsMax, 10000);
+    EXPECT_NE(c.judderEventDetailsMax, d.judderEventDetailsMax);
+    EXPECT_EQ(c.judderEventDistanceToleranceMs, 11000);
+    EXPECT_NE(c.judderEventDistanceToleranceMs, d.judderEventDistanceToleranceMs);
+}
+
 TEST_F(VideoRenderQualityTrackerTest, countsReleasedFrames) {
     Configuration c;
     Helper h(16.66, c);

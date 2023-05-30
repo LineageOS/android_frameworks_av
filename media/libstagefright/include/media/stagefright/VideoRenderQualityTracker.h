@@ -105,6 +105,15 @@ public:
     // Configurable elements of the metrics algorithms
     class Configuration {
     public:
+        // system/server_configurable_flags/libflags/include/get_flags.h:GetServerConfigurableFlag
+        typedef std::string (*GetServerConfigurableFlagFn)(
+                const std::string& experiment_category_name,
+                const std::string& experiment_flag_name,
+                const std::string& default_value);
+
+        static Configuration getFromServerConfigurableFlags(
+                GetServerConfigurableFlagFn getServerConfigurableFlagFn);
+
         Configuration();
 
         // Whether or not frame render quality is tracked.
@@ -128,7 +137,7 @@ public:
         // skip forward in content time is due to frame drops. If the app-desired frame duration is
         // short, but the content frame duration is large, it is assumed the app is intentionally
         // seeking forward.
-        int32_t contentTimeAdvancedForLiveContentToleranceUs;
+        int32_t liveContentFrameDropToleranceUs;
 
         // Freeze configuration
         //
@@ -140,12 +149,12 @@ public:
         // The values used to distribute distances between freezes across a histogram.
         std::vector<int32_t> freezeDistanceMsHistogramBuckets;
         // The maximum number of freeze events to send back to the caller.
-        int64_t freezeEventMax;
+        int32_t freezeEventMax;
         // The maximum number of detail entries tracked per freeze event.
-        int64_t freezeEventDetailsMax;
+        int32_t freezeEventDetailsMax;
         // The maximum distance in time between two freeze occurrences such that both will be
         // lumped into the same freeze event.
-        int64_t freezeEventDistanceToleranceMs;
+        int32_t freezeEventDistanceToleranceMs;
 
         // Judder configuration
         //
@@ -155,14 +164,14 @@ public:
         std::vector<int32_t> judderScoreHistogramBuckets;
         // The values used to compare against judder score histogram counts when determining an
         // overall score.
-        std::vector<int32_t> judderScoreHistogramToScore;
+        std::vector<int64_t> judderScoreHistogramToScore;
         // The maximum number of judder events to send back to the caller.
-        int64_t judderEventMax;
+        int32_t judderEventMax;
         // The maximum number of detail entries tracked per judder event.
-        int64_t judderEventDetailsMax;
+        int32_t judderEventDetailsMax;
         // The maximum distance in time between two judder occurrences such that both will be
         // lumped into the same judder event.
-        int64_t judderEventDistanceToleranceMs;
+        int32_t judderEventDistanceToleranceMs;
     };
 
     struct FreezeEvent {
