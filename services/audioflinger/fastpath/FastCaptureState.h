@@ -14,9 +14,9 @@
  * limitations under the License.
  */
 
-#ifndef ANDROID_AUDIO_FAST_CAPTURE_STATE_H
-#define ANDROID_AUDIO_FAST_CAPTURE_STATE_H
+#pragma once
 
+#include <type_traits>
 #include <media/nbaio/NBAIO.h>
 #include <media/AudioBufferProvider.h>
 #include "FastThreadState.h"
@@ -27,7 +27,6 @@ namespace android {
 // Represent a single state of the fast capture
 struct FastCaptureState : FastThreadState {
                 FastCaptureState();
-    /*virtual*/ ~FastCaptureState();
 
     // all pointer fields use raw pointers; objects are owned and ref-counted by RecordThread
     NBAIO_Source*   mInputSource;       // HAL input device, must already be negotiated
@@ -55,6 +54,7 @@ struct FastCaptureState : FastThreadState {
     static const char *commandToString(Command command);
 };  // struct FastCaptureState
 
-}   // namespace android
+// No virtuals.
+static_assert(!std::is_polymorphic_v<FastCaptureState>);
 
-#endif  // ANDROID_AUDIO_FAST_CAPTURE_STATE_H
+}   // namespace android

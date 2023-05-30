@@ -37,15 +37,11 @@ FastMixerDumpState::FastMixerDumpState() : FastThreadDumpState(),
 {
 }
 
-FastMixerDumpState::~FastMixerDumpState()
-{
-}
-
 // helper function called by qsort()
 static int compare_uint32_t(const void *pa, const void *pb)
 {
-    uint32_t a = *(const uint32_t *)pa;
-    uint32_t b = *(const uint32_t *)pb;
+    const uint32_t a = *(const uint32_t *)pa;
+    const uint32_t b = *(const uint32_t *)pb;
     if (a < b) {
         return -1;
     } else if (a > b) {
@@ -61,9 +57,9 @@ void FastMixerDumpState::dump(int fd) const
         dprintf(fd, "  FastMixer not initialized\n");
         return;
     }
-    double measuredWarmupMs = (mMeasuredWarmupTs.tv_sec * 1000.0) +
+    const double measuredWarmupMs = (mMeasuredWarmupTs.tv_sec * 1000.0) +
             (mMeasuredWarmupTs.tv_nsec / 1000000.0);
-    double mixPeriodSec = (double) mFrameCount / mSampleRate;
+    const double mixPeriodSec = (double) mFrameCount / mSampleRate;
     dprintf(fd, "  FastMixer command=%s writeSequence=%u framesWritten=%u\n"
                 "            numTracks=%u writeErrors=%u underruns=%u overruns=%u\n"
                 "            sampleRate=%u frameCount=%zu measuredWarmup=%.3g ms, warmupCycles=%u\n"
@@ -99,16 +95,16 @@ void FastMixerDumpState::dump(int fd) const
     // the mean account for 99.73% of the population.  So if we take each tail to be 1/1000 of the
     // sample set, we get 99.8% combined, or close to three standard deviations.
     static const uint32_t kTailDenominator = 1000;
-    uint32_t *tail = n >= kTailDenominator ? new uint32_t[n] : NULL;
+    uint32_t *tail = n >= kTailDenominator ? new uint32_t[n] : nullptr;
     // loop over all the samples
     for (uint32_t j = 0; j < n; ++j) {
-        size_t i = oldestClosed++ & (mSamplingN - 1);
-        uint32_t wallNs = mMonotonicNs[i];
-        if (tail != NULL) {
+        const size_t i = oldestClosed++ & (mSamplingN - 1);
+        const uint32_t wallNs = mMonotonicNs[i];
+        if (tail != nullptr) {
             tail[j] = wallNs;
         }
         wall.add(wallNs);
-        uint32_t sampleLoadNs = mLoadNs[i];
+        const uint32_t sampleLoadNs = mLoadNs[i];
         loadNs.add(sampleLoadNs);
 #ifdef CPU_FREQUENCY_STATISTICS
         uint32_t sampleCpukHz = mCpukHz[i];
@@ -146,10 +142,10 @@ void FastMixerDumpState::dump(int fd) const
                 "    mean=%.1f min=%.1f max=%.1f stddev=%.1f\n",
                 loadMHz.getMean(), loadMHz.getMin(), loadMHz.getMax(), loadMHz.getStdDev());
 #endif
-    if (tail != NULL) {
+    if (tail != nullptr) {
         qsort(tail, n, sizeof(uint32_t), compare_uint32_t);
         // assume same number of tail samples on each side, left and right
-        uint32_t count = n / kTailDenominator;
+        const uint32_t count = n / kTailDenominator;
         audio_utils::Statistics<double> left, right;
         for (uint32_t i = 0; i < count; ++i) {
             left.add(tail[i]);
@@ -175,7 +171,7 @@ void FastMixerDumpState::dump(int fd) const
             FastMixerState::sMaxFastTracks, trackMask);
     dprintf(fd, "  Index Active Full Partial Empty  Recent Ready    Written\n");
     for (uint32_t i = 0; i < FastMixerState::sMaxFastTracks; ++i, trackMask >>= 1) {
-        bool isActive = trackMask & 1;
+        const bool isActive = trackMask & 1;
         const FastTrackDump *ftDump = &mTracks[i];
         const FastTrackUnderruns& underruns = ftDump->mUnderruns;
         const char *mostRecent;
