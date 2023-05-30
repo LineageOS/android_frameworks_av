@@ -187,9 +187,14 @@ template<typename T> bool StateQueue<T>::push(StateQueue<T>::block_t block)
 
 }   // namespace android
 
-// Hack to avoid explicit template instantiation of
-// template class StateQueue<FastCaptureState>;
-// template class StateQueue<FastMixerState>;
-#ifdef STATE_QUEUE_INSTANTIATIONS
-#include STATE_QUEUE_INSTANTIATIONS  // NOLINT(bugprone-suspicious-include)
-#endif
+// Instantiate StateQueue template for the types we need.
+// This needs to be done in the same translation unit as the template
+// method definitions above.
+
+#include "FastCaptureState.h"
+#include "FastMixerState.h"
+
+namespace android {
+template class StateQueue<FastCaptureState>;
+template class StateQueue<FastMixerState>;
+}   // namespace android
