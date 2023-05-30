@@ -14,18 +14,26 @@
      limitations under the License.
 -->
 <configuration description="Runs Media Benchmark Tests">
+    <option name="test-tag" value="MediaBenchmarkTest" />
     <target_preparer class="com.android.tradefed.targetprep.PushFilePreparer">
         <option name="cleanup" value="true" />
-        <option name="push-file"
-            key="https://storage.googleapis.com/android_media/frameworks/av/media/tests/benchmark/MediaBenchmark.zip?unzip=true"
-            value="/data/local/tmp/MediaBenchmark/res/" />
     </target_preparer>
-    <target_preparer class="com.android.tradefed.targetprep.TestAppInstallSetup">
-        <option name="cleanup-apks" value="false" />
+    <target_preparer class="com.android.compatibility.common.tradefed.targetprep.DynamicConfigPusher">
+        <option name="target" value="host" />
+        <option name="config-filename" value="MediaBenchmarkTest" />
+        <option name="version" value="1.0"/>
+    </target_preparer>
+    <target_preparer class="com.android.compatibility.common.tradefed.targetprep.MediaPreparer">
+        <option name="push-all" value="true" />
+        <option name="media-folder-name" value="MediaBenchmarkTest-1.1" />
+        <option name="dynamic-config-module" value="MediaBenchmarkTest" />
+    </target_preparer>
+
+    <target_preparer class="com.android.tradefed.targetprep.suite.SuiteApkInstaller">
+        <option name="cleanup-apks" value="true" />
         <option name="test-file-name" value="MediaBenchmarkTest.apk" />
     </target_preparer>
 
-    <option name="test-tag" value="MediaBenchmarkTest" />
     <test class="com.android.tradefed.testtype.AndroidJUnitTest" >
         <option name="package" value="com.android.media.benchmark" />
         <option name="runner" value="androidx.test.runner.AndroidJUnitRunner" />
