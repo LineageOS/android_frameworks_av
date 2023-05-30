@@ -1586,7 +1586,8 @@ status_t CCodecBufferChannel::start(
         watcher->inputDelay(inputDelayValue)
                 .pipelineDelay(pipelineDelayValue)
                 .outputDelay(outputDelayValue)
-                .smoothnessFactor(kSmoothnessFactor);
+                .smoothnessFactor(kSmoothnessFactor)
+                .tunneled(mTunneled);
         watcher->flush();
     }
 
