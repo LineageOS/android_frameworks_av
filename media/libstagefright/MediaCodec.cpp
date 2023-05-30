@@ -82,6 +82,7 @@
 #include <media/stagefright/SurfaceUtils.h>
 #include <nativeloader/dlext_namespaces.h>
 #include <private/android_filesystem_config.h>
+#include <server_configurable_flags/get_flags.h>
 #include <utils/Singleton.h>
 
 namespace android {
@@ -1024,6 +1025,9 @@ MediaCodec::MediaCodec(
       mHavePendingInputBuffers(false),
       mCpuBoostRequested(false),
       mIsSurfaceToDisplay(false),
+      mVideoRenderQualityTracker(
+              VideoRenderQualityTracker::Configuration::getFromServerConfigurableFlags(
+                      server_configurable_flags::GetServerConfigurableFlag)),
       mLatencyUnknown(0),
       mBytesEncoded(0),
       mEarliestEncodedPtsUs(INT64_MAX),
