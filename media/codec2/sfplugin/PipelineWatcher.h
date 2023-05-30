@@ -37,7 +37,8 @@ public:
         : mInputDelay(0),
           mPipelineDelay(0),
           mOutputDelay(0),
-          mSmoothnessFactor(0) {}
+          mSmoothnessFactor(0),
+          mTunneled(false) {}
     ~PipelineWatcher() = default;
 
     /**
@@ -63,6 +64,12 @@ public:
      * \return  this object
      */
     PipelineWatcher &smoothnessFactor(uint32_t value);
+
+    /**
+     * \param value the new tunneled value
+     * \return  this object
+     */
+    PipelineWatcher &tunneled(bool value);
 
     /**
      * Client queued a work item to the component.
@@ -122,6 +129,7 @@ private:
     uint32_t mPipelineDelay;
     uint32_t mOutputDelay;
     uint32_t mSmoothnessFactor;
+    bool mTunneled;
 
     struct Frame {
         Frame(std::vector<std::shared_ptr<C2Buffer>> &&b,
