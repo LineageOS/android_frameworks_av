@@ -14,9 +14,9 @@
  * limitations under the License.
  */
 
-#ifndef ANDROID_AUDIO_FAST_THREAD_STATE_H
-#define ANDROID_AUDIO_FAST_THREAD_STATE_H
+#pragma once
 
+#include <type_traits>
 #include "Configuration.h"
 #include <stdint.h>
 #include <media/nblog/NBLog.h>
@@ -28,9 +28,8 @@ struct FastThreadDumpState;
 // Represents a single state of a FastThread
 struct FastThreadState {
                 FastThreadState();
-    /*virtual*/ ~FastThreadState();
 
-    typedef uint32_t Command;
+    using Command = uint32_t;
     static const Command
         INITIAL = 0,            // used only for the initial state
         HOT_IDLE = 1,           // do nothing
@@ -50,6 +49,7 @@ struct FastThreadState {
     static const char *commandToString(Command command);
 };  // struct FastThreadState
 
-}  // namespace android
+// No virtuals.
+static_assert(!std::is_polymorphic_v<FastThreadState>);
 
-#endif  // ANDROID_AUDIO_FAST_THREAD_STATE_H
+}  // namespace android

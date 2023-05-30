@@ -14,8 +14,7 @@
  * limitations under the License.
  */
 
-#ifndef ANDROID_AUDIO_FAST_THREAD_H
-#define ANDROID_AUDIO_FAST_THREAD_H
+#pragma once
 
 #include "Configuration.h"
 #ifdef CPU_FREQUENCY_STATISTICS
@@ -31,11 +30,10 @@ class FastThread : public Thread {
 
 public:
             FastThread(const char *cycleMs, const char *loadUs);
-    virtual ~FastThread();
 
 private:
     // implement Thread::threadLoop()
-    virtual bool threadLoop();
+    bool threadLoop() override;
 
 protected:
     // callouts to subclass in same lexical order as they were in original FastMixer.cpp
@@ -93,5 +91,3 @@ protected:
 };  // class FastThread
 
 }  // namespace android
-
-#endif  // ANDROID_AUDIO_FAST_THREAD_H

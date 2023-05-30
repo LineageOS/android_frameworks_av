@@ -34,17 +34,13 @@ FastThreadDumpState::FastThreadDumpState() :
 #endif
 }
 
-FastThreadDumpState::~FastThreadDumpState()
-{
-}
-
 #ifdef FAST_THREAD_STATISTICS
 void FastThreadDumpState::increaseSamplingN(uint32_t samplingN)
 {
     if (samplingN <= mSamplingN || samplingN > kSamplingN || roundup(samplingN) != samplingN) {
         return;
     }
-    uint32_t additional = samplingN - mSamplingN;
+    const uint32_t additional = samplingN - mSamplingN;
     // sample arrays aren't accessed atomically with respect to the bounds,
     // so clearing reduces chance for dumpsys to read random uninitialized samples
     memset(&mMonotonicNs[mSamplingN], 0, sizeof(mMonotonicNs[0]) * additional);
