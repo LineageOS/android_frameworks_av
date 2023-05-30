@@ -14,10 +14,10 @@
  * limitations under the License.
  */
 
-#ifndef ANDROID_AUDIO_FAST_CAPTURE_DUMP_STATE_H
-#define ANDROID_AUDIO_FAST_CAPTURE_DUMP_STATE_H
+#pragma once
 
 #include <stdint.h>
+#include <type_traits>
 #include "Configuration.h"
 #include "FastThreadDumpState.h"
 
@@ -25,7 +25,6 @@ namespace android {
 
 struct FastCaptureDumpState : FastThreadDumpState {
     FastCaptureDumpState();
-    /*virtual*/ ~FastCaptureDumpState();
 
     void dump(int fd) const;    // should only be called on a stable copy, not the original
 
@@ -38,6 +37,7 @@ struct FastCaptureDumpState : FastThreadDumpState {
     bool     mSilenced = false; // capture is silenced
 };
 
-}  // namespace android
+// No virtuals
+static_assert(!std::is_polymorphic_v<FastCaptureDumpState>);
 
-#endif  // ANDROID_AUDIO_FAST_CAPTURE_DUMP_STATE_H
+}  // namespace android
