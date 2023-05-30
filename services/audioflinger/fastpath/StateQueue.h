@@ -14,8 +14,7 @@
  * limitations under the License.
  */
 
-#ifndef ANDROID_AUDIO_STATE_QUEUE_H
-#define ANDROID_AUDIO_STATE_QUEUE_H
+#pragma once
 
 #include <stdatomic.h>
 
@@ -128,7 +127,7 @@ template<typename T> class StateQueue {
 
 public:
             StateQueue();
-    virtual ~StateQueue();
+    virtual ~StateQueue() = default;  // why is this virtual?
 
     // Observer APIs
 
@@ -211,5 +210,3 @@ private:
 };  // class StateQueue
 
 }   // namespace android
-
-#endif  // ANDROID_AUDIO_STATE_QUEUE_H

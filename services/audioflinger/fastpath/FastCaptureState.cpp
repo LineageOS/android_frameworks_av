@@ -19,11 +19,7 @@
 namespace android {
 
 FastCaptureState::FastCaptureState() : FastThreadState(),
-    mInputSource(NULL), mInputSourceGen(0), mPipeSink(NULL), mPipeSinkGen(0), mFrameCount(0)
-{
-}
-
-FastCaptureState::~FastCaptureState()
+    mInputSource(nullptr), mInputSourceGen(0), mPipeSink(nullptr), mPipeSinkGen(0), mFrameCount(0)
 {
 }
 
@@ -31,7 +27,7 @@ FastCaptureState::~FastCaptureState()
 const char *FastCaptureState::commandToString(Command command)
 {
     const char *str = FastThreadState::commandToString(command);
-    if (str != NULL) {
+    if (str != nullptr) {
         return str;
     }
     switch (command) {

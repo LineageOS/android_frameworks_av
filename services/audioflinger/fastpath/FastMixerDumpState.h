@@ -14,10 +14,10 @@
  * limitations under the License.
  */
 
-#ifndef ANDROID_AUDIO_FAST_MIXER_DUMP_STATE_H
-#define ANDROID_AUDIO_FAST_MIXER_DUMP_STATE_H
+#pragma once
 
 #include <stdint.h>
+#include <type_traits>
 #include <audio_utils/TimestampVerifier.h>
 #include "Configuration.h"
 #include "FastThreadDumpState.h"
@@ -55,15 +55,16 @@ private:
 // Represents the dump state of a fast track
 struct FastTrackDump {
     FastTrackDump() : mFramesReady(0) { }
-    /*virtual*/ ~FastTrackDump() { }
     FastTrackUnderruns  mUnderruns;
     size_t              mFramesReady;        // most recent value only; no long-term statistics kept
     int64_t             mFramesWritten;      // last value from track
 };
 
+// No virtuals.
+static_assert(!std::is_polymorphic_v<FastTrackDump>);
+
 struct FastMixerDumpState : FastThreadDumpState {
     FastMixerDumpState();
-    /*virtual*/ ~FastMixerDumpState();
 
     void dump(int fd) const;    // should only be called on a stable copy, not the original
 
@@ -81,6 +82,7 @@ struct FastMixerDumpState : FastThreadDumpState {
     TimestampVerifier<int64_t /* frame count */, int64_t /* time ns */> mTimestampVerifier;
 };
 
-}  // namespace android
+// No virtuals.
+static_assert(!std::is_polymorphic_v<FastMixerDumpState>);
 
-#endif  // ANDROID_AUDIO_FAST_MIXER_DUMP_STATE_H
+}  // namespace android
