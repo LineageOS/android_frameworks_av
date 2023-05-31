@@ -85,56 +85,57 @@ constexpr uint64_t hash(const char (&file)[n], uint32_t line) {
 //      slower than nullptr check when logging is enabled at compile-time and disabled at runtime.
 
 // Write formatted entry to log
-#define LOGT(fmt, ...) do { NBLog::Writer *x = tlNBLogWriter; if (x != nullptr) \
+#define LOGT(fmt, ...) do { NBLog::Writer *x = aflog::getThreadWriter(); if (x != nullptr) \
                                 x->logFormat((fmt), hash(__FILE__, __LINE__), ##__VA_ARGS__); } \
                                 while (0)
 
 // Write histogram timestamp entry
-#define LOG_HIST_TS() do { NBLog::Writer *x = tlNBLogWriter; if (x != nullptr) \
+#define LOG_HIST_TS() do { NBLog::Writer *x = aflog::getThreadWriter(); if (x != nullptr) \
         x->logEventHistTs(NBLog::EVENT_HISTOGRAM_ENTRY_TS, hash(__FILE__, __LINE__)); } while(0)
 
 // Record that audio was turned on/off
-#define LOG_AUDIO_STATE() do { NBLog::Writer *x = tlNBLogWriter; if (x != nullptr) \
+#define LOG_AUDIO_STATE() do { NBLog::Writer *x = aflog::getThreadWriter(); if (x != nullptr) \
         x->logEventHistTs(NBLog::EVENT_AUDIO_STATE, hash(__FILE__, __LINE__)); } while(0)
 
 // Log the difference bewteen frames presented by HAL and frames written to HAL output sink,
 // divided by the sample rate. Parameter ms is of type double.
-#define LOG_LATENCY(ms) do { NBLog::Writer *x = tlNBLogWriter; if (x != nullptr) \
+#define LOG_LATENCY(ms) do { NBLog::Writer *x = aflog::getThreadWriter(); if (x != nullptr) \
         x->log<NBLog::EVENT_LATENCY>(ms); } while (0)
 
 // Record thread overrun event nanosecond timestamp. Parameter ns is an int64_t.
-#define LOG_OVERRUN(ns) do { NBLog::Writer *x = tlNBLogWriter; if (x != nullptr) \
+#define LOG_OVERRUN(ns) do { NBLog::Writer *x = aflog::getThreadWriter(); if (x != nullptr) \
         x->log<NBLog::EVENT_OVERRUN>(ns); } while (0)
 
 // Record thread info. This currently includes type, frameCount, and sampleRate.
 // Parameter type is thread_info_t as defined in NBLog.h.
-#define LOG_THREAD_INFO(info) do { NBLog::Writer *x = tlNBLogWriter; \
+#define LOG_THREAD_INFO(info) do { NBLog::Writer *x = aflog::getThreadWriter(); \
         if (x != nullptr) x->log<NBLog::EVENT_THREAD_INFO>(info); } while (0)
 
-#define LOG_THREAD_PARAMS(params) do {NBLog::Writer *x = tlNBLogWriter; \
+#define LOG_THREAD_PARAMS(params) do {NBLog::Writer *x = aflog::getThreadWriter(); \
         if (x != nullptr) x->log<NBLog::EVENT_THREAD_PARAMS>(params); } while (0)
 
 // Record thread underrun event nanosecond timestamp. Parameter ns is an int64_t.
-#define LOG_UNDERRUN(ns) do { NBLog::Writer *x = tlNBLogWriter; if (x != nullptr) \
+#define LOG_UNDERRUN(ns) do { NBLog::Writer *x = aflog::getThreadWriter(); if (x != nullptr) \
         x->log<NBLog::EVENT_UNDERRUN>(ns); } while (0)
 
 // Record thread warmup time in milliseconds. Parameter ms is of type double.
-#define LOG_WARMUP_TIME(ms) do { NBLog::Writer *x = tlNBLogWriter; if (x != nullptr) \
+#define LOG_WARMUP_TIME(ms) do { \
+        NBLog::Writer *x = aflog::getThreadWriter(); if (x != nullptr) \
         x->log<NBLog::EVENT_WARMUP_TIME>(ms); } while (0)
 
 // Record a typed entry that represents a thread's work time in nanoseconds.
 // Parameter ns should be of type uint32_t.
-#define LOG_WORK_TIME(ns) do { NBLog::Writer *x = tlNBLogWriter; if (x != nullptr) \
+#define LOG_WORK_TIME(ns) do { NBLog::Writer *x = aflog::getThreadWriter(); if (x != nullptr) \
         x->log<NBLog::EVENT_WORK_TIME>(ns); } while (0)
 
-namespace android {
-extern "C" {
+namespace android::aflog {
 // TODO consider adding a thread_local NBLog::Writer tlStubNBLogWriter and then
-// initialize below tlNBLogWriter to &tlStubNBLogWriter to remove the need to
+// initialize setThreadWriter() to &tlStubNBLogWriter to remove the need to
 // check for nullptr every time. Also reduces the need to add a new logging macro above
 // each time we want to log a new type.
-extern thread_local NBLog::Writer *tlNBLogWriter;
-}
-} // namespace android
+
+NBLog::Writer *getThreadWriter();
+void setThreadWriter(NBLog::Writer *writer);
+} // namespace android::aflog
 
 #endif // ANDROID_TYPED_LOGGER_H
