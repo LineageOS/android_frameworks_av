@@ -1906,7 +1906,7 @@ float Camera3Device::getMaxPreviewFps(sp<camera3::Camera3OutputStreamInterface> 
     camera_metadata_entry minDurations =
             mDeviceInfo.find(ANDROID_SCALER_AVAILABLE_MIN_FRAME_DURATIONS);
     for (size_t i = 0; i < minDurations.count; i += 4) {
-        if (minDurations.data.i64[i] == stream->getFormat()
+        if (minDurations.data.i64[i] == stream->getOriginalFormat()
                 && minDurations.data.i64[i+1] == stream->getWidth()
                 && minDurations.data.i64[i+2] == stream->getHeight()) {
             int64_t minFrameDuration = minDurations.data.i64[i+3];
