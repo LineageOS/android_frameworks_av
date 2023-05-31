@@ -286,6 +286,9 @@ status_t DeviceHalAidl::setParameters(const String8& kvPairs) {
     if (status_t status = filterAndUpdateBtScoParameters(parameters); status != OK) {
         ALOGW("%s: filtering or updating BT SCO parameters failed: %d", __func__, status);
     }
+    if (status_t status = filterAndUpdateScreenParameters(parameters); status != OK) {
+        ALOGW("%s: filtering or updating screen parameters failed: %d", __func__, status);
+    }
 
     ALOGW_IF(parameters.size() != 0, "%s: unknown parameters, ignored: \"%s\"",
             __func__, parameters.toString().c_str());
@@ -1231,6 +1234,44 @@ status_t DeviceHalAidl::filterAndUpdateBtScoParameters(AudioParameter &parameter
         IBluetooth::ScoConfig newScoConfig;
         return statusTFromBinderStatus(mBluetooth->setScoConfig(scoConfig, &newScoConfig));
     }
+    return OK;
+}
+
+status_t DeviceHalAidl::filterAndUpdateScreenParameters(AudioParameter &parameters) {
+    TIME_CHECK();
+    (void)VALUE_OR_RETURN_STATUS(filterOutAndProcessParameter<String8>(
+                    parameters, String8(AudioParameter::keyScreenState),
+                    [&](const String8& onOrOff) -> status_t {
+                        std::optional<bool> isTurnedOn;
+                        if (onOrOff == AudioParameter::valueOn) {
+                            isTurnedOn = true;
+                        } else if (onOrOff == AudioParameter::valueOff) {
+                            isTurnedOn = false;
+                        }
+                        if (!isTurnedOn.has_value()) {
+                            ALOGE("setParameters: parameter key \"%s\" has invalid value \"%s\"",
+                                    AudioParameter::keyScreenState, onOrOff.c_str());
+                            return BAD_VALUE;
+                        }
+                        return statusTFromBinderStatus(
+                                mModule->updateScreenState(isTurnedOn.value()));
+                    }));
+    (void)VALUE_OR_RETURN_STATUS(filterOutAndProcessParameter<int>(
+                    parameters, String8(AudioParameter::keyScreenRotation),
+            [&](int rotationDegrees) -> status_t {
+                IModule::ScreenRotation rotation;
+                switch (rotationDegrees) {
+                    case 0: rotation = IModule::ScreenRotation::DEG_0; break;
+                    case 90: rotation = IModule::ScreenRotation::DEG_90; break;
+                    case 180: rotation = IModule::ScreenRotation::DEG_180; break;
+                    case 270: rotation = IModule::ScreenRotation::DEG_270; break;
+                    default:
+                        ALOGE("setParameters: parameter key \"%s\" has invalid value %d",
+                                AudioParameter::keyScreenRotation, rotationDegrees);
+                        return BAD_VALUE;
+                }
+                return statusTFromBinderStatus(mModule->updateScreenRotation(rotation));
+            }));
     return OK;
 }
 
