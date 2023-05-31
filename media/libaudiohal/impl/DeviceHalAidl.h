@@ -218,6 +218,7 @@ class DeviceHalAidl : public DeviceHalInterface, public ConversionHelperAidl,
     status_t filterAndUpdateBtHfpParameters(AudioParameter &parameters);
     status_t filterAndUpdateBtLeParameters(AudioParameter &parameters);
     status_t filterAndUpdateBtScoParameters(AudioParameter &parameters);
+    status_t filterAndUpdateScreenParameters(AudioParameter &parameters);
     status_t findOrCreatePatch(
         const std::set<int32_t>& sourcePortConfigIds,
         const std::set<int32_t>& sinkPortConfigIds,
