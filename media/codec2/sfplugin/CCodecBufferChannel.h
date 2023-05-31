@@ -344,6 +344,7 @@ private:
         std::map<uint64_t, int> rotation;
     };
     Mutexed<OutputSurface> mOutputSurface;
+    int mRenderingDepth;
 
     struct BlockPools {
         C2Allocator::id_t inputAllocatorId;
