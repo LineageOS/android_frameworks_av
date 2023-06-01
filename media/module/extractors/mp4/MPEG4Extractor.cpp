@@ -6500,6 +6500,16 @@ media_status_t MPEG4Source::read(
             AMediaFormat_setInt32(meta, AMEDIAFORMAT_KEY_IS_SYNC_FRAME, 1);
         }
 
+        void *presentationsData;
+        size_t presentationsSize;
+        if (AMediaFormat_getBuffer(
+                    mFormat, AMEDIAFORMAT_KEY_AUDIO_PRESENTATION_INFO,
+                    &presentationsData, &presentationsSize)) {
+            AMediaFormat_setBuffer(
+                    meta, AMEDIAFORMAT_KEY_AUDIO_PRESENTATION_INFO,
+                    presentationsData, presentationsSize);
+        }
+
         ++mCurrentSampleIndex;
 
         *out = mBuffer;
