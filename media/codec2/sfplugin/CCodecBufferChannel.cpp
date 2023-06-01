@@ -34,6 +34,7 @@
 
 #include <android/hardware/cas/native/1.0/IDescrambler.h>
 #include <android/hardware/drm/1.0/types.h>
+#include <android-base/parseint.h>
 #include <android-base/properties.h>
 #include <android-base/stringprintf.h>
 #include <binder/MemoryBase.h>
@@ -52,6 +53,7 @@
 #include <media/stagefright/SurfaceUtils.h>
 #include <media/MediaCodecBuffer.h>
 #include <mediadrm/ICrypto.h>
+#include <server_configurable_flags/get_flags.h>
 #include <system/window.h>
 
 #include "CCodecBufferChannel.h"
@@ -75,7 +77,6 @@ using DrmBufferType = hardware::drm::V1_0::BufferType;
 namespace {
 
 constexpr size_t kSmoothnessFactor = 4;
-constexpr size_t kRenderingDepth = 3;
 
 // This is for keeping IGBP's buffer dropping logic in legacy mode other
 // than making it non-blocking. Do not change this value.
@@ -149,10 +150,11 @@ CCodecBufferChannel::CCodecBufferChannel(
       mFirstValidFrameIndex(0u),
       mIsSurfaceToDisplay(false),
       mHasPresentFenceTimes(false),
+      mRenderingDepth(0u),
       mMetaMode(MODE_NONE),
       mInputMetEos(false),
       mSendEncryptedInfoBuffer(false) {
-    mOutputSurface.lock()->maxDequeueBuffers = kSmoothnessFactor + kRenderingDepth;
+    mOutputSurface.lock()->maxDequeueBuffers = kSmoothnessFactor;
     {
         Mutexed<Input>::Locked input(mInput);
         input->buffers.reset(new DummyInputBuffers(""));
@@ -173,6 +175,9 @@ CCodecBufferChannel::CCodecBufferChannel(
         Mutexed<BlockPools>::Locked pools(mBlockPools);
         pools->outputPoolId = C2BlockPool::BASIC_LINEAR;
     }
+    std::string value = server_configurable_flags::GetServerConfigurableFlag(
+            "media_native", "ccodec_rendering_depth", "0");
+    android::base::ParseInt(value, &mRenderingDepth);
 }
 
 CCodecBufferChannel::~CCodecBufferChannel() {
@@ -1387,7 +1392,7 @@ status_t CCodecBufferChannel::start(
         {
             Mutexed<OutputSurface>::Locked output(mOutputSurface);
             maxDequeueCount = output->maxDequeueBuffers = numOutputSlots +
-                    reorderDepth.value + kRenderingDepth;
+                    reorderDepth.value + mRenderingDepth;
             outputSurface = output->surface ?
                     output->surface->getIGraphicBufferProducer() : nullptr;
             if (outputSurface) {
@@ -2055,7 +2060,7 @@ bool CCodecBufferChannel::handleWork(
         {
             Mutexed<OutputSurface>::Locked output(mOutputSurface);
             maxDequeueCount = output->maxDequeueBuffers =
-                    numOutputSlots + reorderDepth + kRenderingDepth;
+                    numOutputSlots + reorderDepth + mRenderingDepth;
             if (output->surface) {
                 output->surface->setMaxDequeuedBufferCount(output->maxDequeueBuffers);
             }
