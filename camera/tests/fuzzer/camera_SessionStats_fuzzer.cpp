@@ -17,6 +17,7 @@
 #include <CameraSessionStats.h>
 #include <binder/Parcel.h>
 #include <fuzzer/FuzzedDataProvider.h>
+#include <camera/StringUtils.h>
 #include "camera2common.h"
 
 using namespace std;
@@ -100,10 +101,9 @@ extern "C" int LLVMFuzzerTestOneInput(const uint8_t* data, size_t size) {
     if (fdp.ConsumeBool()) {
         cameraSessionStats = new CameraSessionStats();
     } else {
-        string camId = fdp.ConsumeRandomLengthString();
-        String16 cameraId(camId.c_str());
+        string cameraId = fdp.ConsumeRandomLengthString();
         if (fdp.ConsumeBool()) {
-            parcelCamSessionStats.writeString16(cameraId);
+            parcelCamSessionStats.writeString16(toString16(cameraId));
         }
         int32_t facing = fdp.ConsumeIntegral<int32_t>();
         if (fdp.ConsumeBool()) {
@@ -113,10 +113,9 @@ extern "C" int LLVMFuzzerTestOneInput(const uint8_t* data, size_t size) {
         if (fdp.ConsumeBool()) {
             parcelCamSessionStats.writeInt32(newCameraState);
         }
-        string name = fdp.ConsumeRandomLengthString();
-        String16 clientName(name.c_str());
+        string clientName = fdp.ConsumeRandomLengthString();
         if (fdp.ConsumeBool()) {
-            parcelCamSessionStats.writeString16(clientName);
+            parcelCamSessionStats.writeString16(toString16(clientName));
         }
         int32_t apiLevel = fdp.ConsumeIntegral<int32_t>();
         if (fdp.ConsumeBool()) {

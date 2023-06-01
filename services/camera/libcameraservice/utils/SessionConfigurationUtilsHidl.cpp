@@ -105,7 +105,7 @@ convertAidlToHidl37StreamCombination(
 binder::Status
 convertToHALStreamCombination(
         const SessionConfiguration& sessionConfiguration,
-        const String8 &logicalCameraId, const CameraMetadata &deviceInfo,
+        const std::string &logicalCameraId, const CameraMetadata &deviceInfo,
         metadataGetter getMetadata, const std::vector<std::string> &physicalCameraIds,
         hardware::camera::device::V3_7::StreamConfiguration &streamConfiguration,
         bool overrideForPerfClass, bool *earlyExit) {

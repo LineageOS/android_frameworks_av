@@ -17,6 +17,7 @@
 #ifndef ANDROID_SERVERS_CAMERA_CAMERAFLASHLIGHT_H
 #define ANDROID_SERVERS_CAMERA_CAMERAFLASHLIGHT_H
 
+#include <string>
 #include <gui/GLConsumer.h>
 #include <gui/Surface.h>
 #include <utils/KeyedVector.h>
@@ -38,20 +39,21 @@ class FlashControlBase : public virtual VirtualLightRefBase {
         // cause the torch mode to be turned off in HAL v1 devices. If
         // previously-on torch mode is turned off,
         // callbacks.torch_mode_status_change() should be invoked.
-        virtual status_t hasFlashUnit(const String8& cameraId,
+        virtual status_t hasFlashUnit(const std::string& cameraId,
                     bool *hasFlash) = 0;
 
         // set the torch mode to on or off.
-        virtual status_t setTorchMode(const String8& cameraId,
+        virtual status_t setTorchMode(const std::string& cameraId,
                     bool enabled) = 0;
 
         // Change the brightness level of the torch. If the torch is OFF and
         // torchStrength >= 1, then the torch will also be turned ON.
-        virtual status_t turnOnTorchWithStrengthLevel(const String8& cameraId,
+        virtual status_t turnOnTorchWithStrengthLevel(const std::string& cameraId,
                     int32_t torchStrength) = 0;
 
         // Returns the torch strength level.
-        virtual status_t getTorchStrengthLevel(const String8& cameraId, int32_t* torchStrength) = 0;
+        virtual status_t getTorchStrengthLevel(const std::string& cameraId,
+                int32_t* torchStrength) = 0;
 };
 
 /**
@@ -70,49 +72,49 @@ class CameraFlashlight : public virtual VirtualLightRefBase {
 
         // Whether a camera device has a flash unit. Before findFlashUnits() is
         // called, this function always returns false.
-        bool hasFlashUnit(const String8& cameraId);
+        bool hasFlashUnit(const std::string& cameraId);
 
         // set the torch mode to on or off.
-        status_t setTorchMode(const String8& cameraId, bool enabled);
+        status_t setTorchMode(const std::string& cameraId, bool enabled);
 
         // Change the torch strength level of the flash unit in torch mode.
-        status_t turnOnTorchWithStrengthLevel(const String8& cameraId, int32_t torchStrength);
+        status_t turnOnTorchWithStrengthLevel(const std::string& cameraId, int32_t torchStrength);
 
         // Get the torch strength level
-        status_t getTorchStrengthLevel(const String8& cameraId, int32_t* torchStrength);
+        status_t getTorchStrengthLevel(const std::string& cameraId, int32_t* torchStrength);
 
         // Notify CameraFlashlight that camera service is going to open a camera
         // device. CameraFlashlight will free the resources that may cause the
         // camera open to fail. Camera service must call this function before
         // opening a camera device.
-        status_t prepareDeviceOpen(const String8& cameraId);
+        status_t prepareDeviceOpen(const std::string& cameraId);
 
         // Notify CameraFlashlight that camera service has closed a camera
         // device. CameraFlashlight may invoke callbacks for torch mode
         // available depending on the implementation.
-        status_t deviceClosed(const String8& cameraId);
+        status_t deviceClosed(const std::string& cameraId);
 
     private:
         // create flashlight control based on camera module API and camera
         // device API versions.
-        status_t createFlashlightControl(const String8& cameraId);
+        status_t createFlashlightControl(const std::string& cameraId);
 
         // mLock should be locked.
-        bool hasFlashUnitLocked(const String8& cameraId);
+        bool hasFlashUnitLocked(const std::string& cameraId);
 
         // Check if flash control is in backward compatible mode (simulated torch API by
         // opening cameras)
-        bool isBackwardCompatibleMode(const String8& cameraId);
+        bool isBackwardCompatibleMode(const std::string& cameraId);
 
         sp<FlashControlBase> mFlashControl;
 
         sp<CameraProviderManager> mProviderManager;
 
         CameraProviderManager::StatusListener* mCallbacks;
-        SortedVector<String8> mOpenedCameraIds;
+        SortedVector<std::string> mOpenedCameraIds;
 
         // camera id -> if it has a flash unit
-        KeyedVector<String8, bool> mHasFlashlightMap;
+        KeyedVector<std::string, bool> mHasFlashlightMap;
         bool mFlashlightMapInitialized;
 
         Mutex mLock; // protect CameraFlashlight API
@@ -127,10 +129,10 @@ class ProviderFlashControl : public FlashControlBase {
         virtual ~ProviderFlashControl();
 
         // FlashControlBase
-        status_t hasFlashUnit(const String8& cameraId, bool *hasFlash);
-        status_t setTorchMode(const String8& cameraId, bool enabled);
-        status_t turnOnTorchWithStrengthLevel(const String8& cameraId, int32_t torchStrength);
-        status_t getTorchStrengthLevel(const String8& cameraId, int32_t* torchStrength);
+        status_t hasFlashUnit(const std::string& cameraId, bool *hasFlash);
+        status_t setTorchMode(const std::string& cameraId, bool enabled);
+        status_t turnOnTorchWithStrengthLevel(const std::string& cameraId, int32_t torchStrength);
+        status_t getTorchStrengthLevel(const std::string& cameraId, int32_t* torchStrength);
 
     private:
         sp<CameraProviderManager> mProviderManager;
