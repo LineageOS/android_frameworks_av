@@ -7,6 +7,9 @@
           "include-filter": "android.nativemedia.aaudio.AAudioTests#AAudioBasic.*"
         }
       ]
+    },
+    {
+      "name": "CoreAudioHalAidlTest"
     }
   ]
 }
