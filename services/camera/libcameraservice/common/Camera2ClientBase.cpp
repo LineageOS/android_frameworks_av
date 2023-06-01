@@ -145,7 +145,6 @@ status_t Camera2ClientBase<TClientBase>::initializeImpl(TProviderPtr providerPtr
     res = TClientBase::startCameraOps();
     if (res != OK) {
         TClientBase::finishCameraOps();
-        mDevice.clear();
         return res;
     }
 
