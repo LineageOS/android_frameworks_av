@@ -20,6 +20,7 @@
 
 #include <aidl/android/hardware/camera/device/CameraBlob.h>
 #include <aidl/android/hardware/camera/device/CameraBlobId.h>
+#include <camera/StringUtils.h>
 
 #include "api1/client2/JpegProcessor.h"
 #include "common/CameraProviderManager.h"
@@ -495,17 +496,17 @@ bool DepthCompositeStream::isDepthCompositeStream(const sp<Surface> &surface) {
     status_t err;
     int format;
     if ((err = anw->query(anw, NATIVE_WINDOW_FORMAT, &format)) != OK) {
-        String8 msg = String8::format("Failed to query Surface format: %s (%d)", strerror(-err),
+        std::string msg = fmt::sprintf("Failed to query Surface format: %s (%d)", strerror(-err),
                 err);
-        ALOGE("%s: %s", __FUNCTION__, msg.string());
+        ALOGE("%s: %s", __FUNCTION__, msg.c_str());
         return false;
     }
 
     int dataspace;
     if ((err = anw->query(anw, NATIVE_WINDOW_DEFAULT_DATASPACE, &dataspace)) != OK) {
-        String8 msg = String8::format("Failed to query Surface dataspace: %s (%d)", strerror(-err),
+        std::string msg = fmt::sprintf("Failed to query Surface dataspace: %s (%d)", strerror(-err),
                 err);
-        ALOGE("%s: %s", __FUNCTION__, msg.string());
+        ALOGE("%s: %s", __FUNCTION__, msg.c_str());
         return false;
     }
 
@@ -578,7 +579,7 @@ status_t DepthCompositeStream::checkAndGetMatchingDepthSize(size_t width, size_t
 
 status_t DepthCompositeStream::createInternalStreams(const std::vector<sp<Surface>>& consumers,
         bool /*hasDeferredConsumer*/, uint32_t width, uint32_t height, int format,
-        camera_stream_rotation_t rotation, int *id, const String8& physicalCameraId,
+        camera_stream_rotation_t rotation, int *id, const std::string& physicalCameraId,
         const std::unordered_set<int32_t> &sensorPixelModesUsed,
         std::vector<int> *surfaceIds,
         int /*streamSetId*/, bool /*isShared*/) {

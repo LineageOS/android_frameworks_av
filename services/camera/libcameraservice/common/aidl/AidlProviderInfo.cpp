@@ -431,7 +431,7 @@ status_t AidlProviderInfo::getConcurrentCameraIdsInternalLocked(
     for (const auto& combination : combs) {
         std::unordered_set<std::string> deviceIds;
         for (const auto &cameraDeviceId : combination.combination) {
-            deviceIds.insert(cameraDeviceId.c_str());
+            deviceIds.insert(cameraDeviceId);
         }
         mConcurrentCameraIdCombinations.push_back(std::move(deviceIds));
     }
@@ -711,7 +711,7 @@ status_t AidlProviderInfo::AidlDeviceInfo3::isSessionConfigurationSupported(
     camera::device::StreamConfiguration streamConfiguration;
     bool earlyExit = false;
     auto bRes = SessionConfigurationUtils::convertToHALStreamCombination(configuration,
-            String8(mId.c_str()), mCameraCharacteristics, getMetadata, mPhysicalIds,
+            mId, mCameraCharacteristics, getMetadata, mPhysicalIds,
             streamConfiguration, overrideForPerfClass, &earlyExit);
 
     if (!bRes.isOk()) {
@@ -765,9 +765,9 @@ status_t AidlProviderInfo::convertToAidlHALStreamCombinationAndCameraIdsLocked(
             return res;
         }
         camera3::metadataGetter getMetadata =
-                [this](const String8 &id, bool overrideForPerfClass) {
+                [this](const std::string &id, bool overrideForPerfClass) {
                     CameraMetadata physicalDeviceInfo;
-                    mManager->getCameraCharacteristicsLocked(id.string(), overrideForPerfClass,
+                    mManager->getCameraCharacteristicsLocked(id, overrideForPerfClass,
                                                    &physicalDeviceInfo,
                                                    /*overrideToPortrait*/false);
                     return physicalDeviceInfo;
@@ -777,7 +777,7 @@ status_t AidlProviderInfo::convertToAidlHALStreamCombinationAndCameraIdsLocked(
         bStatus =
             SessionConfigurationUtils::convertToHALStreamCombination(
                     cameraIdAndSessionConfig.mSessionConfiguration,
-                    String8(cameraId.c_str()), deviceInfo, getMetadata,
+                    cameraId, deviceInfo, getMetadata,
                     physicalCameraIds, streamConfiguration,
                     overrideForPerfClass, &shouldExit);
         if (!bStatus.isOk()) {

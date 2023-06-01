@@ -20,7 +20,6 @@
 #include <vector>
 
 #include <utils/RefBase.h>
-#include <utils/String8.h>
 #include <utils/Timers.h>
 
 #include "camera/CaptureResult.h"

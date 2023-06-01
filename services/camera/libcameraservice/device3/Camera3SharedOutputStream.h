@@ -37,7 +37,7 @@ public:
             uint32_t width, uint32_t height, int format,
             uint64_t consumerUsage, android_dataspace dataSpace,
             camera_stream_rotation_t rotation, nsecs_t timestampOffset,
-            const String8& physicalCameraId,
+            const std::string& physicalCameraId,
             const std::unordered_set<int32_t> &sensorPixelModesUsed, IPCTransport transport,
             int setId = CAMERA3_STREAM_SET_ID_INVALID,
             bool useHalBufManager = false,

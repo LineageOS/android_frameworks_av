@@ -18,10 +18,13 @@
 #define ATRACE_TAG ATRACE_TAG_CAMERA
 //#define LOG_NDEBUG 0
 
+#include <sstream>
+
 #include <inttypes.h>
 
 #include <utils/Log.h>
 #include <utils/Trace.h>
+#include <camera/StringUtils.h>
 #include "device3/Camera3IOStreamBase.h"
 #include "device3/StatusTracker.h"
 
@@ -32,7 +35,7 @@ namespace camera3 {
 Camera3IOStreamBase::Camera3IOStreamBase(int id, camera_stream_type_t type,
         uint32_t width, uint32_t height, size_t maxSize, int format,
         android_dataspace dataSpace, camera_stream_rotation_t rotation,
-        const String8& physicalCameraId,
+        const std::string& physicalCameraId,
         const std::unordered_set<int32_t> &sensorPixelModesUsed,
         int setId, bool isMultiResolution, int64_t dynamicRangeProfile, int64_t streamUseCase,
         bool deviceTimeBaseIsRealtime, int timestampBase) :
@@ -74,31 +77,33 @@ bool Camera3IOStreamBase::hasOutstandingBuffersLocked() const {
 }
 
 void Camera3IOStreamBase::dump(int fd, [[maybe_unused]] const Vector<String16> &args) const {
-    String8 lines;
+    std::ostringstream lines;
 
     uint64_t consumerUsage = 0;
     status_t res = getEndpointUsage(&consumerUsage);
     if (res != OK) consumerUsage = 0;
 
-    lines.appendFormat("      State: %d\n", mState);
-    lines.appendFormat("      Dims: %d x %d, format 0x%x, dataspace 0x%x\n",
+    lines << fmt::sprintf("      State: %d\n", mState);
+    lines << fmt::sprintf("      Dims: %d x %d, format 0x%x, dataspace 0x%x\n",
             camera_stream::width, camera_stream::height,
             camera_stream::format, camera_stream::data_space);
-    lines.appendFormat("      Max size: %zu\n", mMaxSize);
-    lines.appendFormat("      Combined usage: 0x%" PRIx64 ", max HAL buffers: %d\n",
+    lines << fmt::sprintf("      Max size: %zu\n", mMaxSize);
+    lines << fmt::sprintf("      Combined usage: 0x%" PRIx64 ", max HAL buffers: %d\n",
             mUsage | consumerUsage, camera_stream::max_buffers);
-    if (strlen(camera_stream::physical_camera_id) > 0) {
-        lines.appendFormat("      Physical camera id: %s\n", camera_stream::physical_camera_id);
+    if (!camera_stream::physical_camera_id.empty()) {
+        lines << "      Physical camera id: " << camera_stream::physical_camera_id << "\n";
     }
-    lines.appendFormat("      Dynamic Range Profile: 0x%" PRIx64 "\n",
+    lines << fmt::sprintf("      Dynamic Range Profile: 0x%" PRIx64 "\n",
             camera_stream::dynamic_range_profile);
-    lines.appendFormat("      Stream use case: %" PRId64 "\n", camera_stream::use_case);
-    lines.appendFormat("      Timestamp base: %d\n", getTimestampBase());
-    lines.appendFormat("      Frames produced: %d, last timestamp: %" PRId64 " ns\n",
+    lines << fmt::sprintf("      Stream use case: %" PRId64 "\n", camera_stream::use_case);
+    lines << fmt::sprintf("      Timestamp base: %d\n", getTimestampBase());
+    lines << fmt::sprintf("      Frames produced: %d, last timestamp: %" PRId64 " ns\n",
             mFrameCount, mLastTimestamp);
-    lines.appendFormat("      Total buffers: %zu, currently dequeued: %zu, currently cached: %zu\n",
-            mTotalBufferCount, mHandoutTotalBufferCount, mCachedOutputBufferCount);
-    write(fd, lines.string(), lines.size());
+    lines << fmt::sprintf("      Total buffers: %zu, currently dequeued: %zu, "
+            "currently cached: %zu\n", mTotalBufferCount, mHandoutTotalBufferCount,
+            mCachedOutputBufferCount);
+    std::string linesStr = std::move(lines.str());
+    write(fd, linesStr.c_str(), linesStr.size());
 
     Camera3Stream::dump(fd, args);
 }
@@ -266,7 +271,7 @@ status_t Camera3IOStreamBase::returnAnyBufferLocked(
     // carry on
 
     if (releaseFence != 0) {
-        mCombinedFence = Fence::merge(mName, mCombinedFence, releaseFence);
+        mCombinedFence = Fence::merge(toString8(mName), mCombinedFence, releaseFence);
     }
 
     if (output) {

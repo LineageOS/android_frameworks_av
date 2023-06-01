@@ -21,7 +21,6 @@
 
 #include <camera/CaptureResult.h>
 #include <camera/CameraMetadata.h>
-#include <utils/String8.h>
 #include <utils/Timers.h>
 
 #include "common/CameraDeviceBase.h"
@@ -168,7 +167,7 @@ struct InFlightRequest {
     // For request on a physical camera stream, the inside set contains one Id
     // For request on a stream group containing physical camera streams, the
     // inside set contains all stream Ids in the group.
-    std::set<std::set<String8>> physicalCameraIds;
+    std::set<std::set<std::string>> physicalCameraIds;
 
     // Map of physicalCameraId <-> Metadata
     std::vector<PhysicalCaptureResultInfo> physicalMetadatas;
@@ -220,7 +219,7 @@ struct InFlightRequest {
 
     InFlightRequest(int numBuffers, CaptureResultExtras extras, bool hasInput,
             bool hasAppCallback, nsecs_t minDuration, nsecs_t maxDuration, bool fixedFps,
-            const std::set<std::set<String8>>& physicalCameraIdSet, bool isStillCapture,
+            const std::set<std::set<std::string>>& physicalCameraIdSet, bool isStillCapture,
             bool isZslCapture, bool rotateAndCropAuto, const std::set<std::string>& idsWithZoom,
             nsecs_t requestNs, const SurfaceMap& outSurfaces = SurfaceMap{}) :
             shutterTimestamp(0),

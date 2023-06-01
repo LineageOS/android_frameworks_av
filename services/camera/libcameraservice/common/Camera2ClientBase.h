@@ -48,10 +48,10 @@ public:
     // TODO: too many params, move into a ClientArgs<T>
     Camera2ClientBase(const sp<CameraService>& cameraService,
                       const sp<TCamCallbacks>& remoteCallback,
-                      const String16& clientPackageName,
+                      const std::string& clientPackageName,
                       bool systemNativeClient,
-                      const std::optional<String16>& clientFeatureId,
-                      const String8& cameraId,
+                      const std::optional<std::string>& clientFeatureId,
+                      const std::string& cameraId,
                       int api1CameraId,
                       int cameraFacing,
                       int sensorOrientation,
@@ -63,11 +63,12 @@ public:
                       bool legacyClient = false);
     virtual ~Camera2ClientBase();
 
-    virtual status_t      initialize(sp<CameraProviderManager> manager, const String8& monitorTags);
-    virtual status_t      dumpClient(int fd, const Vector<String16>& args);
-    virtual status_t      startWatchingTags(const String8 &tags, int out);
-    virtual status_t      stopWatchingTags(int out);
-    virtual status_t      dumpWatchedEventsToVector(std::vector<std::string> &out);
+    virtual status_t      initialize(sp<CameraProviderManager> manager,
+            const std::string& monitorTags) override;
+    virtual status_t      dumpClient(int fd, const Vector<String16>& args) override;
+    virtual status_t      startWatchingTags(const std::string &tags, int out) override;
+    virtual status_t      stopWatchingTags(int out) override;
+    virtual status_t      dumpWatchedEventsToVector(std::vector<std::string> &out) override;
 
     /**
      * NotificationListener implementation
@@ -128,7 +129,7 @@ public:
         mutable Mutex mRemoteCallbackLock;
     } mSharedCameraCallbacks;
 
-    status_t      injectCamera(const String8& injectedCamId,
+    status_t      injectCamera(const std::string& injectedCamId,
                                sp<CameraProviderManager> manager) override;
     status_t      stopInjection() override;
 
@@ -178,7 +179,7 @@ protected:
 
 private:
     template<typename TProviderPtr>
-    status_t              initializeImpl(TProviderPtr providerPtr, const String8& monitorTags);
+    status_t              initializeImpl(TProviderPtr providerPtr, const std::string& monitorTags);
 
     binder::Status disconnectImpl();
 
