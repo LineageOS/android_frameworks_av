@@ -346,7 +346,7 @@ String8 TagMonitor::getEventDataString(const uint8_t* data_ptr, uint32_t tag, in
                         == OK) {
                         returnStr += value_string_tmp;
                     } else {
-                        returnStr.appendFormat("%hhu", *(data_ptr + index));
+                        returnStr.appendFormat("%hhu ", *(data_ptr + index));
                     }
                     break;
                 case TYPE_INT32:
@@ -363,7 +363,7 @@ String8 TagMonitor::getEventDataString(const uint8_t* data_ptr, uint32_t tag, in
                     }
                     break;
                 case TYPE_FLOAT:
-                    returnStr.appendFormat("%0.8f", *(float*)(data_ptr + index));
+                    returnStr.appendFormat("%0.8f ", *(float*)(data_ptr + index));
                     break;
                 case TYPE_INT64:
                     returnStr.appendFormat("%" PRId64 " ", *(int64_t*)(data_ptr + index));
