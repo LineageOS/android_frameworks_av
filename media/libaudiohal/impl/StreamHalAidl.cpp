@@ -43,6 +43,7 @@ using ::aidl::android::hardware::audio::core::IStreamOut;
 using ::aidl::android::hardware::audio::core::StreamDescriptor;
 using ::aidl::android::hardware::audio::core::MmapBufferDescriptor;
 using ::aidl::android::media::audio::common::MicrophoneDynamicInfo;
+using ::aidl::android::media::audio::IHalAdapterVendorExtension;
 
 namespace android {
 
@@ -73,12 +74,14 @@ std::shared_ptr<IStreamCommon> StreamHalAidl::getStreamCommon(const std::shared_
 StreamHalAidl::StreamHalAidl(
         std::string_view className, bool isInput, const audio_config& config,
         int32_t nominalLatency, StreamContextAidl&& context,
-        const std::shared_ptr<IStreamCommon>& stream)
+        const std::shared_ptr<IStreamCommon>& stream,
+        const std::shared_ptr<IHalAdapterVendorExtension>& vext)
         : ConversionHelperAidl(className),
           mIsInput(isInput),
           mConfig(configToBase(config)),
           mContext(std::move(context)),
-          mStream(stream) {
+          mStream(stream),
+          mVendorExt(vext) {
     {
         std::lock_guard l(mLock);
         mLastReply.latencyMs = nominalLatency;
@@ -125,7 +128,6 @@ status_t StreamHalAidl::getAudioProperties(audio_config_base_t *configBase) {
 status_t StreamHalAidl::setParameters(const String8& kvPairs) {
     TIME_CHECK();
     if (!mStream) return NO_INIT;
-
     AudioParameter parameters(kvPairs);
     ALOGD("%s: parameters: %s", __func__, parameters.toString().c_str());
 
@@ -134,18 +136,18 @@ status_t StreamHalAidl::setParameters(const String8& kvPairs) {
             [&](int hwAvSyncId) {
                 return statusTFromBinderStatus(mStream->updateHwAvSyncId(hwAvSyncId));
             }));
-
-    ALOGW_IF(parameters.size() != 0, "%s: unknown parameters, ignored: %s",
-            __func__, parameters.toString().c_str());
-    return OK;
+    return parseAndSetVendorParameters(mVendorExt, mStream, parameters);
 }
 
 status_t StreamHalAidl::getParameters(const String8& keys __unused, String8 *values) {
-    ALOGD("%p %s::%s", this, getClassName().c_str(), __func__);
     TIME_CHECK();
-    values->clear();
-    // AIDL HAL doesn't support getParameters API.
-    return INVALID_OPERATION;
+    if (!mStream) return NO_INIT;
+    if (values == nullptr) {
+        return BAD_VALUE;
+    }
+    AudioParameter parameterKeys(keys), result;
+    *values = result.toString();
+    return parseAndGetVendorParameters(mVendorExt, mStream, parameterKeys, values);
 }
 
 status_t StreamHalAidl::getFrameSize(size_t *size) {
@@ -533,9 +535,11 @@ StreamOutHalAidl::legacy2aidl_SourceMetadata(const StreamOutHalInterface::Source
 
 StreamOutHalAidl::StreamOutHalAidl(
         const audio_config& config, StreamContextAidl&& context, int32_t nominalLatency,
-        const std::shared_ptr<IStreamOut>& stream, const sp<CallbackBroker>& callbackBroker)
+        const std::shared_ptr<IStreamOut>& stream,
+        const std::shared_ptr<IHalAdapterVendorExtension>& vext,
+        const sp<CallbackBroker>& callbackBroker)
         : StreamHalAidl("StreamOutHalAidl", false /*isInput*/, config, nominalLatency,
-                std::move(context), getStreamCommon(stream)),
+                std::move(context), getStreamCommon(stream), vext),
           mStream(stream), mCallbackBroker(callbackBroker) {
     // Initialize the offload metadata
     mOffloadMetadata.sampleRate = static_cast<int32_t>(config.sample_rate);
@@ -861,9 +865,11 @@ StreamInHalAidl::legacy2aidl_SinkMetadata(const StreamInHalInterface::SinkMetada
 
 StreamInHalAidl::StreamInHalAidl(
         const audio_config& config, StreamContextAidl&& context, int32_t nominalLatency,
-        const std::shared_ptr<IStreamIn>& stream, const sp<MicrophoneInfoProvider>& micInfoProvider)
+        const std::shared_ptr<IStreamIn>& stream,
+        const std::shared_ptr<IHalAdapterVendorExtension>& vext,
+        const sp<MicrophoneInfoProvider>& micInfoProvider)
         : StreamHalAidl("StreamInHalAidl", true /*isInput*/, config, nominalLatency,
-                std::move(context), getStreamCommon(stream)),
+                std::move(context), getStreamCommon(stream), vext),
           mStream(stream), mMicInfoProvider(micInfoProvider) {}
 
 status_t StreamInHalAidl::setGain(float gain) {
