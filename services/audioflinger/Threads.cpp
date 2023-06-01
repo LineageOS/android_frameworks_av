@@ -3705,7 +3705,7 @@ void AudioFlinger::PlaybackThread::detachAuxEffect_l(int effectId)
 bool AudioFlinger::PlaybackThread::threadLoop()
 NO_THREAD_SAFETY_ANALYSIS  // manual locking of AudioFlinger
 {
-    tlNBLogWriter = mNBLogWriter.get();
+    aflog::setThreadWriter(mNBLogWriter.get());
 
     Vector< sp<Track> > tracksToRemove;
 
