@@ -21,6 +21,7 @@
 #include <inttypes.h>
 #include <android/hardware/ICameraService.h>
 #include <gui/Surface.h>
+#include <camera/StringUtils.h>
 #include "ACameraDevice.h"
 #include "ACameraMetadata.h"
 #include "ACaptureRequest.h"
@@ -234,8 +235,7 @@ camera_status_t CameraDevice::isSessionConfigurationSupported(
             return ret;
         }
 
-        String16 physicalId16(output.mPhysicalCameraId.c_str());
-        OutputConfiguration outConfig(iGBP, output.mRotation, physicalId16,
+        OutputConfiguration outConfig(iGBP, output.mRotation, output.mPhysicalCameraId,
                 OutputConfiguration::INVALID_SET_ID, true);
 
         for (auto& anw : output.mSharedWindows) {
@@ -299,8 +299,7 @@ camera_status_t CameraDevice::updateOutputConfigurationLocked(ACaptureSessionOut
         return ret;
     }
 
-    String16 physicalId16(output->mPhysicalCameraId.c_str());
-    OutputConfiguration outConfig(iGBP, output->mRotation, physicalId16,
+    OutputConfiguration outConfig(iGBP, output->mRotation, output->mPhysicalCameraId,
             OutputConfiguration::INVALID_SET_ID, true);
 
     for (auto& anw : output->mSharedWindows) {
@@ -683,9 +682,8 @@ CameraDevice::configureStreamsLocked(const ACaptureSessionOutputContainer* outpu
         if (ret != ACAMERA_OK) {
             return ret;
         }
-        String16 physicalId16(outConfig.mPhysicalCameraId.c_str());
         outputSet.insert(std::make_pair(
-                anw, OutputConfiguration(iGBP, outConfig.mRotation, physicalId16,
+                anw, OutputConfiguration(iGBP, outConfig.mRotation, outConfig.mPhysicalCameraId,
                         OutputConfiguration::INVALID_SET_ID, outConfig.mIsShared)));
     }
     auto addSet = outputSet;
@@ -919,7 +917,7 @@ CameraDevice::onCaptureErrorLocked(
         msg->setObject(kSessionSpKey, session);
         if (cbh.mIsLogicalCameraCallback) {
             if (resultExtras.errorPhysicalCameraId.size() > 0) {
-                String8 cameraId(resultExtras.errorPhysicalCameraId);
+                String8 cameraId = toString8(resultExtras.errorPhysicalCameraId);
                 msg->setString(kFailingPhysicalCameraId, cameraId.string(), cameraId.size());
             }
             msg->setPointer(kCallbackFpKey, (void*) cbh.mOnLogicalCameraCaptureFailed);
@@ -1215,7 +1213,7 @@ void CameraDevice::CallbackHandler::onMessageReceived(
                     std::vector<std::string> physicalCameraIds;
                     std::vector<sp<ACameraMetadata>> physicalMetadataCopy;
                     for (size_t i = 0; i < physicalResultInfo.size(); i++) {
-                        String8 physicalId8(physicalResultInfo[i].mPhysicalCameraId);
+                        String8 physicalId8 = toString8(physicalResultInfo[i].mPhysicalCameraId);
                         physicalCameraIds.push_back(physicalId8.c_str());
 
                         CameraMetadata clone = physicalResultInfo[i].mPhysicalCameraMetadata;

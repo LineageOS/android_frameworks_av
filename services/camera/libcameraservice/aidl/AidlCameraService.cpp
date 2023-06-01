@@ -86,7 +86,7 @@ ScopedAStatus AidlCameraService::getCameraCharacteristics(const std::string& in_
     if (_aidl_return == nullptr) { return fromSStatus(SStatus::ILLEGAL_ARGUMENT); }
 
     ::android::CameraMetadata cameraMetadata;
-    UStatus ret = mCameraService->getCameraCharacteristics(String16(in_cameraId.c_str()),
+    UStatus ret = mCameraService->getCameraCharacteristics(in_cameraId,
                                                            mVndkVersion,
                                                            /* overrideToPortrait= */ false,
                                                            &cameraMetadata);
@@ -140,8 +140,8 @@ ndk::ScopedAStatus AidlCameraService::connectDevice(
     sp<hardware::camera2::ICameraDeviceCallbacks> callbacks = hybridCallbacks;
     binder::Status serviceRet = mCameraService->connectDevice(
             callbacks,
-            String16(in_cameraId.c_str()),
-            String16(""),
+            in_cameraId,
+            std::string(),
             /* clientFeatureId= */{},
             hardware::ICameraService::USE_CALLING_UID,
             /* scoreOffset= */ 0,
@@ -249,7 +249,7 @@ SStatus AidlCameraService::addListenerInternal(
             [this](const hardware::CameraStatus& s) {
                 bool supportsHAL3 = false;
                 binder::Status sRet =
-                            mCameraService->supportsCameraApi(String16(s.cameraId),
+                            mCameraService->supportsCameraApi(s.cameraId,
                                     UICameraService::API_VERSION_2, &supportsHAL3);
                 return !sRet.isOk() || !supportsHAL3;
             }), cameraStatusAndIds->end());
