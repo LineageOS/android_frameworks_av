@@ -1293,7 +1293,8 @@ status_t AudioPolicyManager::getOutputForAttrInt(
         if (outputDevices.size() == 1) {
             info = getPreferredMixerAttributesInfo(
                     outputDevices.itemAt(0)->getId(),
-                    mEngine->getProductStrategyForAttributes(*resultAttr));
+                    mEngine->getProductStrategyForAttributes(*resultAttr),
+                    true /*activeBitPerfectPreferred*/);
             // Only use preferred mixer if the uid matches or the preferred mixer is bit-perfect
             // and it is currently active.
             if (info != nullptr && info->getUid() != uid &&
@@ -4532,16 +4533,24 @@ status_t AudioPolicyManager::setPreferredMixerAttributes(
 }
 
 sp<PreferredMixerAttributesInfo> AudioPolicyManager::getPreferredMixerAttributesInfo(
-        audio_port_handle_t devicePortId, product_strategy_t strategy) {
+        audio_port_handle_t devicePortId,
+        product_strategy_t strategy,
+        bool activeBitPerfectPreferred) {
     auto it = mPreferredMixerAttrInfos.find(devicePortId);
     if (it == mPreferredMixerAttrInfos.end()) {
         return nullptr;
     }
-    auto mixerAttrInfoIt = it->second.find(strategy);
-    if (mixerAttrInfoIt == it->second.end()) {
-        return nullptr;
+    if (activeBitPerfectPreferred) {
+        for (auto [strategy, info] : it->second) {
+            if ((info->getFlags() & AUDIO_OUTPUT_FLAG_BIT_PERFECT) != AUDIO_OUTPUT_FLAG_NONE
+                && info->getActiveClientCount() != 0) {
+                return info;
+            }
+        }
     }
-    return mixerAttrInfoIt->second;
+    auto strategyMatchedMixerAttrInfoIt = it->second.find(strategy);
+    return strategyMatchedMixerAttrInfoIt == it->second.end()
+            ? nullptr : strategyMatchedMixerAttrInfoIt->second;
 }
 
 status_t AudioPolicyManager::getPreferredMixerAttributes(

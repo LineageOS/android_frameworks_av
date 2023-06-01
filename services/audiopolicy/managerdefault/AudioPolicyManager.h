@@ -1317,8 +1317,15 @@ private:
                                        uint32_t flags,
                                        bool isInput);
 
+        /**
+         * Returns the preferred mixer attributes info for the given device port id and strategy.
+         * Bit-perfect mixer attributes will be returned if it is active and
+         * `activeBitPerfectPreferred` is true.
+         */
         sp<PreferredMixerAttributesInfo> getPreferredMixerAttributesInfo(
-                audio_port_handle_t devicePortId, product_strategy_t strategy);
+                audio_port_handle_t devicePortId,
+                product_strategy_t strategy,
+                bool activeBitPerfectPreferred = false);
 
         sp<SwAudioOutputDescriptor> reopenOutput(
                 sp<SwAudioOutputDescriptor> outputDesc,
