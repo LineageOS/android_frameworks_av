@@ -26,10 +26,10 @@
 #endif
 
 // Convenience macro for transient errors
-#define CLOGE(fmt, ...) ALOGE("Camera %s: %s: " fmt, mId.string(), __FUNCTION__, \
+#define CLOGE(fmt, ...) ALOGE("Camera %s: %s: " fmt, mId.c_str(), __FUNCTION__, \
             ##__VA_ARGS__)
 
-#define CLOGW(fmt, ...) ALOGW("Camera %s: %s: " fmt, mId.string(), __FUNCTION__, \
+#define CLOGW(fmt, ...) ALOGW("Camera %s: %s: " fmt, mId.c_str(), __FUNCTION__, \
             ##__VA_ARGS__)
 
 // Convenience macros for transitioning to the error state
@@ -53,6 +53,7 @@
 #include <aidlcommonsupport/NativeHandle.h>
 #include <android/binder_ibinder_platform.h>
 #include <android/hardware/camera2/ICameraDeviceUser.h>
+#include <camera/StringUtils.h>
 
 #include "utils/CameraTraces.h"
 #include "mediautils/SchedulingPolicyService.h"
@@ -164,7 +165,7 @@ uint64_t AidlCamera3Device::mapProducerToFrameworkUsage(
 
 AidlCamera3Device::AidlCamera3Device(
         std::shared_ptr<CameraServiceProxyWrapper>& cameraServiceProxyWrapper,
-        const String8& id, bool overrideForPerfClass, bool overrideToPortrait,
+        const std::string& id, bool overrideForPerfClass, bool overrideToPortrait,
         bool legacyClient) :
         Camera3Device(cameraServiceProxyWrapper, id, overrideForPerfClass, overrideToPortrait,
         legacyClient) {
@@ -172,12 +173,12 @@ AidlCamera3Device::AidlCamera3Device(
 }
 
 status_t AidlCamera3Device::initialize(sp<CameraProviderManager> manager,
-        const String8& monitorTags) {
+        const std::string& monitorTags) {
     ATRACE_CALL();
     Mutex::Autolock il(mInterfaceLock);
     Mutex::Autolock l(mLock);
 
-    ALOGV("%s: Initializing AIDL device for camera %s", __FUNCTION__, mId.string());
+    ALOGV("%s: Initializing AIDL device for camera %s", __FUNCTION__, mId.c_str());
     if (mStatus != STATUS_UNINITIALIZED) {
         CLOGE("Already initialized!");
         return INVALID_OPERATION;
@@ -186,7 +187,7 @@ status_t AidlCamera3Device::initialize(sp<CameraProviderManager> manager,
 
     std::shared_ptr<camera::device::ICameraDeviceSession> session;
     ATRACE_BEGIN("CameraHal::openSession");
-    status_t res = manager->openAidlSession(mId.string(), mCallbacks,
+    status_t res = manager->openAidlSession(mId, mCallbacks,
             /*out*/ &session);
     ATRACE_END();
     if (res != OK) {
@@ -197,18 +198,18 @@ status_t AidlCamera3Device::initialize(sp<CameraProviderManager> manager,
       SET_ERR("Session iface returned is null");
       return INVALID_OPERATION;
     }
-    res = manager->getCameraCharacteristics(mId.string(), mOverrideForPerfClass, &mDeviceInfo,
+    res = manager->getCameraCharacteristics(mId, mOverrideForPerfClass, &mDeviceInfo,
             mOverrideToPortrait);
     if (res != OK) {
         SET_ERR_L("Could not retrieve camera characteristics: %s (%d)", strerror(-res), res);
         session->close();
         return res;
     }
-    mSupportNativeZoomRatio = manager->supportNativeZoomRatio(mId.string());
-    mIsCompositeJpegRDisabled = manager->isCompositeJpegRDisabled(mId.string());
+    mSupportNativeZoomRatio = manager->supportNativeZoomRatio(mId);
+    mIsCompositeJpegRDisabled = manager->isCompositeJpegRDisabled(mId);
 
     std::vector<std::string> physicalCameraIds;
-    bool isLogical = manager->isLogicalCamera(mId.string(), &physicalCameraIds);
+    bool isLogical = manager->isLogicalCamera(mId, &physicalCameraIds);
     if (isLogical) {
         for (auto& physicalId : physicalCameraIds) {
             // Do not override characteristics for physical cameras
@@ -299,10 +300,10 @@ status_t AidlCamera3Device::initialize(sp<CameraProviderManager> manager,
     mInterface = new AidlHalInterface(session, queue, mUseHalBufManager, mSupportOfflineProcessing);
 
     std::string providerType;
-    mVendorTagId = manager->getProviderTagIdLocked(mId.string());
+    mVendorTagId = manager->getProviderTagIdLocked(mId);
     mTagMonitor.initialize(mVendorTagId);
-    if (!monitorTags.isEmpty()) {
-        mTagMonitor.parseTagsToMonitor(String8(monitorTags));
+    if (!monitorTags.empty()) {
+        mTagMonitor.parseTagsToMonitor(monitorTags);
     }
 
     for (size_t i = 0; i < capabilities.count; i++) {
@@ -922,7 +923,7 @@ status_t AidlCamera3Device::AidlHalInterface::configureStreams(
         dst.colorSpace = src->color_space;
 
         dst.bufferSize = bufferSizes[i];
-        if (src->physical_camera_id != nullptr) {
+        if (!src->physical_camera_id.empty()) {
             dst.physicalCameraId = src->physical_camera_id;
         }
         dst.groupId = cam3stream->getHalStreamGroupId();
@@ -1100,7 +1101,7 @@ status_t AidlCamera3Device::AidlHalInterface::configureInjectedStreams(
             mapToAidlDataspace(cam3stream->isDataSpaceOverridden() ?
                     cam3stream->getOriginalDataSpace() : src->data_space);
         dst.bufferSize = bufferSizes[i];
-        if (src->physical_camera_id != nullptr) {
+        if (!src->physical_camera_id.empty()) {
             dst.physicalCameraId = src->physical_camera_id;
         }
         dst.groupId = cam3stream->getHalStreamGroupId();
@@ -1456,7 +1457,7 @@ status_t AidlCamera3Device::AidlRequestThread::switchToOffline(
 }
 
 status_t AidlCamera3Device::AidlCamera3DeviceInjectionMethods::injectionInitialize(
-        const String8& injectedCamId, sp<CameraProviderManager> manager,
+        const std::string& injectedCamId, sp<CameraProviderManager> manager,
         const std::shared_ptr<camera::device::ICameraDeviceCallback>&callback) {
     ATRACE_CALL();
     Mutex::Autolock lock(mInjectionLock);
@@ -1480,7 +1481,7 @@ status_t AidlCamera3Device::AidlCamera3DeviceInjectionMethods::injectionInitiali
     mInjectedCamId = injectedCamId;
     std::shared_ptr<camera::device::ICameraInjectionSession> injectionSession;
     ATRACE_BEGIN("Injection CameraHal::openSession");
-    status_t res = manager->openAidlInjectionSession(injectedCamId.string(), callback,
+    status_t res = manager->openAidlInjectionSession(injectedCamId, callback,
                                           /*out*/ &injectionSession);
     ATRACE_END();
     if (res != OK) {
@@ -1579,7 +1580,7 @@ status_t AidlCamera3Device::AidlCamera3DeviceInjectionMethods::replaceHalInterfa
     return OK;
 }
 
-status_t AidlCamera3Device::injectionCameraInitialize(const String8 &injectedCamId,
+status_t AidlCamera3Device::injectionCameraInitialize(const std::string &injectedCamId,
             sp<CameraProviderManager> manager) {
         return (static_cast<AidlCamera3DeviceInjectionMethods *>
                     (mInjectionMethods.get()))->injectionInitialize(injectedCamId, manager,

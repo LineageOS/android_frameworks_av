@@ -19,6 +19,7 @@
 #include <fcntl.h>
 #include <fuzzer/FuzzedDataProvider.h>
 #include <utils/String16.h>
+#include <camera/StringUtils.h>
 
 using namespace std;
 using namespace android;
@@ -77,7 +78,7 @@ void CameraParametersFuzzer::initCameraParameters(type** obj) {
         } else {
             params = mFDP->ConsumeRandomLengthString();
         }
-        *obj = new type(String8(params.c_str()));
+        *obj = new type(toString8(params));
     }
 }
 

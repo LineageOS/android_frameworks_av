@@ -25,6 +25,7 @@
 #include <gui/IGraphicBufferProducer.h>
 #include <gui/BufferQueue.h>
 #include <gui/Surface.h>
+#include <camera/StringUtils.h>
 
 #include <ui/GraphicBuffer.h>
 
@@ -92,7 +93,7 @@ status_t Camera3StreamSplitter::connect(const std::unordered_map<size_t, sp<Surf
     if (mBufferItemConsumer == nullptr) {
         return NO_MEMORY;
     }
-    mConsumer->setConsumerName(mConsumerName);
+    mConsumer->setConsumerName(toString8(mConsumerName));
 
     *consumer = new Surface(mProducer);
     if (*consumer == nullptr) {
@@ -408,9 +409,9 @@ status_t Camera3StreamSplitter::outputBufferLocked(const sp<IGraphicBufferProduc
     return res;
 }
 
-String8 Camera3StreamSplitter::getUniqueConsumerName() {
+std::string Camera3StreamSplitter::getUniqueConsumerName() {
     static volatile int32_t counter = 0;
-    return String8::format("Camera3StreamSplitter-%d", android_atomic_inc(&counter));
+    return fmt::sprintf("Camera3StreamSplitter-%d", android_atomic_inc(&counter));
 }
 
 status_t Camera3StreamSplitter::notifyBufferReleased(const sp<GraphicBuffer>& buffer) {
