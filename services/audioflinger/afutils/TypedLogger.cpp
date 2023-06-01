@@ -22,6 +22,25 @@
 #include <pthread.h>
 #include "TypedLogger.h"
 
-namespace android {
+namespace android::aflog {
+
+// External linkage access of thread local storage outside of this shared library
+// causes orphaned memory allocations.  This occurs in the implementation of
+// __emutls_get_address(), see b/284657986.
+//
+// We only expose a thread local storage getter and setter here, not the
+// actual thread local variable.
+
+namespace {
 thread_local NBLog::Writer *tlNBLogWriter;
+} // namespace
+
+NBLog::Writer *getThreadWriter() {
+    return tlNBLogWriter;
 }
+
+void setThreadWriter(NBLog::Writer *writer) {
+    tlNBLogWriter = writer;
+}
+
+} // namespace android::aflog
