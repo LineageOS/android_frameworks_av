@@ -446,7 +446,14 @@ class Camera3OutputStream :
     static constexpr nsecs_t kTimelineThresholdNs = 1000000LL; // 1 millisecond
     static constexpr float kMaxIntervalRatioDeviation = 0.05f;
     static constexpr int kMaxTimelines = 2;
-    nsecs_t syncTimestampToDisplayLocked(nsecs_t t);
+    nsecs_t syncTimestampToDisplayLocked(nsecs_t t, int releaseFence);
+
+    // In case of fence being used
+    sp<Fence> mReferenceFrameFence;
+    nsecs_t mReferenceCaptureTime = 0;
+    nsecs_t mReferenceArrivalTime = 0;
+    nsecs_t mFenceSignalOffset = 0;
+    VsyncEventData  mRefVsyncData;
 
     // Re-space frames by delaying queueBuffer so that frame delivery has
     // the same cadence as capture. Default is on for SurfaceTexture bound
