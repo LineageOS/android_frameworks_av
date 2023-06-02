@@ -38,16 +38,10 @@ IMediaDeathNotifier::getMediaPlayerService()
     Mutex::Autolock _l(sServiceLock);
     if (sMediaPlayerService == 0) {
         sp<IServiceManager> sm = defaultServiceManager();
-        sp<IBinder> binder;
-        do {
-            binder = sm->getService(String16("media.player"));
-            if (binder != 0) {
-                break;
-            }
-            ALOGW("Media player service not published, waiting...");
-            usleep(500000); // 0.5 s
-        } while (true);
-
+        sp<IBinder> binder = sm->waitForService(String16("media.player"));
+        if (binder == nullptr) {
+            return nullptr;
+        }
         if (sDeathNotifier == NULL) {
             sDeathNotifier = new DeathNotifier();
         }
