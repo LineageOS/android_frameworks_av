@@ -323,11 +323,8 @@ const VideoRenderQualityMetrics &VideoRenderQualityTracker::getMetrics() {
     if (mConfiguration.freezeDurationMsHistogramToScore.size() ==
         mMetrics.freezeDurationMsHistogram.size()) {
         for (int i = 0; i < mMetrics.freezeDurationMsHistogram.size(); ++i) {
-            int32_t count = 0;
-            for (int j = i; j < mMetrics.freezeDurationMsHistogram.size(); ++j) {
-                count += mMetrics.freezeDurationMsHistogram[j];
-            }
-            mMetrics.freezeScore += count / mConfiguration.freezeDurationMsHistogramToScore[i];
+            mMetrics.freezeScore += mMetrics.freezeDurationMsHistogram[i] *
+                    mConfiguration.freezeDurationMsHistogramToScore[i];
         }
     }
     mMetrics.freezeRate = float(double(mMetrics.freezeDurationMsHistogram.getSum()) /
@@ -336,11 +333,8 @@ const VideoRenderQualityMetrics &VideoRenderQualityTracker::getMetrics() {
     mMetrics.judderScore = 0;
     if (mConfiguration.judderScoreHistogramToScore.size() == mMetrics.judderScoreHistogram.size()) {
         for (int i = 0; i < mMetrics.judderScoreHistogram.size(); ++i) {
-            int32_t count = 0;
-            for (int j = i; j < mMetrics.judderScoreHistogram.size(); ++j) {
-                count += mMetrics.judderScoreHistogram[j];
-            }
-            mMetrics.judderScore += count / mConfiguration.judderScoreHistogramToScore[i];
+            mMetrics.judderScore += mMetrics.judderScoreHistogram[i] *
+                    mConfiguration.judderScoreHistogramToScore[i];
         }
     }
     mMetrics.judderRate = float(double(mMetrics.judderScoreHistogram.getCount()) /
