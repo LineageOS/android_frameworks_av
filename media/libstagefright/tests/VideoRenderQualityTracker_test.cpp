@@ -912,4 +912,42 @@ TEST_F(VideoRenderQualityTrackerTest, capturesJudderEvents) {
     EXPECT_EQ(h.getAndClearJudderEvent().valid, false); // max number of judder events exceeded
 }
 
+TEST_F(VideoRenderQualityTrackerTest, capturesOverallFreezeScore) {
+    Configuration c;
+    // # drops * 20ms + 20ms because current frame is frozen + 1 for bucket threshold
+    c.freezeDurationMsHistogramBuckets = {1 * 20 + 21, 5 * 20 + 21, 10 * 20 + 21};
+    c.freezeDurationMsHistogramToScore = {10, 100, 1000};
+    Helper h(20, c);
+    h.render(5);
+    h.drop(2); // bucket = 0, bucket count = 1, bucket score = 10
+    h.render(5);
+    h.drop(11); // bucket = 2, bucket count = 1, bucket score = 1000
+    h.render(5);
+    h.drop(6); // bucket = 1, bucket count = 1, bucket score = 100
+    h.render(5);
+    h.drop(1); // bucket = null
+    h.render(5);
+    h.drop(3); // bucket = 0, bucket count = 2, bucket score = 20
+    h.render(5);
+    h.drop(10); // bucket = 1, bucket count = 2, bucket score = 200
+    h.render(5);
+    h.drop(7); // bucket = 1, bucket count = 3, bucket score = 300
+    h.render(5);
+    EXPECT_EQ(h.getMetrics().freezeScore, 20 + 300 + 1000);
+}
+
+TEST_F(VideoRenderQualityTrackerTest, capturesOverallJudderScore) {
+    Configuration c;
+    c.judderScoreHistogramBuckets = {0, 6, 10};
+    c.judderScoreHistogramToScore = {10, 100, 1000};
+    Helper h(20, c);
+    h.render({20, 20, 15, 20, 20}); // bucket = 0, bucket count = 1, bucket score = 10
+    h.render({20, 20, 11, 20, 20}); // bucket = 1, bucket count = 1, bucket score = 100
+    h.render({20, 20, 13, 20, 20}); // bucket = 1, bucket count = 2, bucket score = 200
+    h.render({20, 20,  5, 20, 20}); // bucket = 2, bucket count = 1, bucket score = 1000
+    h.render({20, 20, 14, 20, 20}); // bucket = 1, bucket count = 3, bucket score = 300
+    h.render({20, 20, 10, 20, 20}); // bucket = 2, bucket count = 2, bucket score = 2000
+    EXPECT_EQ(h.getMetrics().judderScore, 10 + 300 + 2000);
+}
+
 } // android
