@@ -1,0 +1,7 @@
+import /system/etc/init/hw/drmserver.${ro.zygote}.rc
+
+on property:drm.service.enabled=true
+    start drm
+
+on property:drm.service.enabled=1
+    start drm
