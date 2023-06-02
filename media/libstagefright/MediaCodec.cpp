@@ -6130,7 +6130,7 @@ status_t MediaCodec::onReleaseOutputBuffer(const sp<AMessage> &msg) {
             ALOGI("rendring output error %d", err);
         }
     } else {
-        if (mIsSurfaceToDisplay) {
+        if (mIsSurfaceToDisplay && buffer->size() != 0) {
             int64_t mediaTimeUs = INT64_MIN;
             if (buffer->meta()->findInt64("timeUs", &mediaTimeUs)) {
                 mVideoRenderQualityTracker.onFrameSkipped(mediaTimeUs);
