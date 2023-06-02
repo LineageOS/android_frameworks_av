@@ -31,7 +31,33 @@ license {
     ],
 }
 
-cc_binary {
+prebuilt_etc {
+    name: "drmserver.zygote64_32.rc",
+    src: "drmserver.zygote64_32.rc",
+    sub_dir: "init/hw",
+}
+
+prebuilt_etc {
+    name: "drmserver.zygote64.rc",
+    src: "drmserver.zygote64.rc",
+    sub_dir: "init/hw",
+}
+
+soong_config_module_type {
+    name: "drmserver_cc_binary",
+    module_type: "cc_binary",
+    config_namespace: "ANDROID",
+    bool_variables: ["TARGET_DYNAMIC_64_32_DRMSERVER"],
+    properties: [
+        "compile_multilib",
+        "init_rc",
+        "multilib.lib32.suffix",
+        "multilib.lib64.suffix",
+        "required",
+    ],
+}
+
+drmserver_cc_binary {
     name: "drmserver",
 
     srcs: [
@@ -61,7 +87,27 @@ cc_binary {
 
     compile_multilib: "prefer32",
 
-    init_rc: ["drmserver.rc"],
+    soong_config_variables: {
+        TARGET_DYNAMIC_64_32_DRMSERVER: {
+            compile_multilib: "both",
+            multilib: {
+                lib32: {
+                    suffix: "32",
+                },
+                lib64: {
+                    suffix: "64",
+                },
+            },
+            required: [
+                "drmserver.zygote64_32.rc",
+                "drmserver.zygote64.rc",
+            ],
+            init_rc: ["drmserver_dynamic.rc"],
+            conditions_default: {
+                init_rc: ["drmserver.rc"],
+            },
+        },
+    },
 }
 
 cc_fuzz {
