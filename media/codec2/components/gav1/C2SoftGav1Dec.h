@@ -105,6 +105,7 @@ struct C2SoftGav1Dec : public SimpleC2Component {
   // Sets |work->result| and mSignalledError. Returns false.
   void setError(const std::unique_ptr<C2Work> &work, c2_status_t error);
   bool allocTmpFrameBuffer(size_t size);
+  bool fillMonochromeRow(int value);
   bool outputBuffer(const std::shared_ptr<C2BlockPool>& pool,
                     const std::unique_ptr<C2Work>& work);
   c2_status_t drainInternal(uint32_t drainMode,
