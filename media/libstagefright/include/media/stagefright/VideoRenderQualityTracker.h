@@ -62,7 +62,13 @@ struct VideoRenderQualityMetrics {
 
     // A histogram of the durations of freezes due to dropped/skipped frames.
     MediaHistogram<int32_t> freezeDurationMsHistogram;
-    // The computed overall freeze score using the above histogram and score conversion table.
+    // The computed overall freeze score using the above histogram and score conversion table. The
+    // score is based on counts in the histogram bucket, multiplied by the value in the score
+    // conversion table for that bucket. For example, the impact of a short freeze may be minimal,
+    // but the impact of long freeze may be disproportionally worse. Therefore, the score
+    // multipliers for each bucket might increase exponentially instead of linearly. A score
+    // multiplier of zero would reflect that small freeze durations have near-zero impact to the
+    // user experience.
     int32_t freezeScore;
     // The computed percentage of total playback duration that was frozen.
     float freezeRate;
@@ -72,9 +78,16 @@ struct VideoRenderQualityMetrics {
     // A histogram of the durations between each freeze.
     MediaHistogram<int32_t> freezeDistanceMsHistogram;
 
-    // A histogram of the judder scores.
+    // A histogram of the judder scores - based on the error tolerance between actual render
+    // duration of each frame and the ideal render duration.
     MediaHistogram<int32_t> judderScoreHistogram;
-    // The computed overall judder score using the above histogram and score conversion table.
+    // The computed overall judder score using the above histogram and score conversion table. The
+    // score is based on counts in the histogram bucket, multiplied by the value in the score
+    // conversion table for that bucket. For example, the impact of minimal judder may be small,
+    // but the impact of large judder may be disproportionally worse. Therefore, the score
+    // multipliers for each bucket might increase exponentially instead of linearly. A score
+    // multiplier of zero would reflect that small judder errors have near-zero impact to the user
+    // experience.
     int32_t judderScore;
     // The computed percentage of total frames that had judder.
     float judderRate;
@@ -143,15 +156,21 @@ public:
         //
         // The values used to distribute freeze durations across a histogram.
         std::vector<int32_t> freezeDurationMsHistogramBuckets;
-        // The values used to compare against freeze duration counts when determining an overall
-        // score.
+        //
+        // The values used to multiply the counts in the histogram buckets above to compute an
+        // overall score. This allows the score to reflect disproportionate impact as freeze
+        // durations increase.
         std::vector<int64_t> freezeDurationMsHistogramToScore;
+        //
         // The values used to distribute distances between freezes across a histogram.
         std::vector<int32_t> freezeDistanceMsHistogramBuckets;
+        //
         // The maximum number of freeze events to send back to the caller.
         int32_t freezeEventMax;
+        //
         // The maximum number of detail entries tracked per freeze event.
         int32_t freezeEventDetailsMax;
+        //
         // The maximum distance in time between two freeze occurrences such that both will be
         // lumped into the same freeze event.
         int32_t freezeEventDistanceToleranceMs;
@@ -160,15 +179,21 @@ public:
         //
         // A judder error lower than this value is not scored as judder.
         int32_t judderErrorToleranceUs;
+        //
         // The values used to distribute judder scores across a histogram.
         std::vector<int32_t> judderScoreHistogramBuckets;
-        // The values used to compare against judder score histogram counts when determining an
-        // overall score.
+        //
+        // The values used to multiply the counts in the histogram buckets above to compute an
+        // overall score. This allows the score to reflect disproportionate impact as judder scores
+        // increase.
         std::vector<int64_t> judderScoreHistogramToScore;
+        //
         // The maximum number of judder events to send back to the caller.
         int32_t judderEventMax;
+        //
         // The maximum number of detail entries tracked per judder event.
         int32_t judderEventDetailsMax;
+        //
         // The maximum distance in time between two judder occurrences such that both will be
         // lumped into the same judder event.
         int32_t judderEventDistanceToleranceMs;

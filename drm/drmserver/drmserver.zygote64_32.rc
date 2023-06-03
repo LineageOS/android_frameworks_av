@@ -1,0 +1,6 @@
+service drm /system/bin/drmserver32
+    disabled
+    class main
+    user drm
+    group drm system inet drmrpc readproc
+    task_profiles ProcessCapacityHigh
