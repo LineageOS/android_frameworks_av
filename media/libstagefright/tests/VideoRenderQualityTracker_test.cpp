@@ -432,6 +432,80 @@ TEST_F(VideoRenderQualityTrackerTest, detectsFrameRate) {
     EXPECT_NEAR(h.getMetrics().actualFrameRate, 60.0, 0.5);
 }
 
+TEST_F(VideoRenderQualityTrackerTest, handlesSeeking) {
+    Configuration c;
+    c.maxExpectedContentFrameDurationUs = 30;
+    VideoRenderQualityTracker v(c);
+    v.onFrameReleased(0, 0);
+    v.onFrameRendered(0, 0);
+    v.onFrameReleased(20, 20);
+    v.onFrameRendered(20, 20);
+    v.onFrameReleased(40, 40);
+    v.onFrameRendered(40, 40);
+    v.onFrameReleased(60, 60);
+    v.onFrameRendered(60, 60);
+    v.onFrameReleased(80, 80);
+    v.onFrameRendered(80, 80);
+    v.onFrameReleased(7200000000, 100);
+    v.onFrameRendered(7200000000, 100);
+    v.onFrameReleased(7200000020, 120);
+    v.onFrameRendered(7200000020, 120);
+    v.onFrameReleased(7200000040, 140);
+    v.onFrameRendered(7200000040, 140);
+    v.onFrameReleased(7200000060, 160);
+    v.onFrameRendered(7200000060, 160);
+    v.onFrameReleased(7200000080, 180);
+    v.onFrameRendered(7200000080, 180);
+    v.onFrameReleased(0, 200);
+    v.onFrameRendered(0, 200);
+    v.onFrameReleased(20, 220);
+    v.onFrameRendered(20, 220);
+    v.onFrameReleased(40, 240);
+    v.onFrameRendered(40, 240);
+    v.onFrameReleased(60, 260);
+    v.onFrameRendered(60, 260);
+    const VideoRenderQualityMetrics &m = v.getMetrics();
+    EXPECT_EQ(m.judderRate, 0); // frame durations can get messed up during discontinuities so if
+                                // the discontinuity is not detected, judder is expected
+    EXPECT_NE(m.contentFrameRate, FRAME_RATE_UNDETERMINED);
+}
+
+TEST_F(VideoRenderQualityTrackerTest, withSkipping_handlesSeeking) {
+    Configuration c;
+    c.maxExpectedContentFrameDurationUs = 30;
+    VideoRenderQualityTracker v(c);
+    v.onFrameReleased(0, 0);
+    v.onFrameRendered(0, 0);
+    v.onFrameReleased(20, 20);
+    v.onFrameRendered(20, 20);
+    v.onFrameReleased(40, 40);
+    v.onFrameRendered(40, 40);
+    v.onFrameReleased(60, 60);
+    v.onFrameRendered(60, 60);
+    v.onFrameReleased(80, 80);
+    v.onFrameRendered(80, 80);
+    v.onFrameSkipped(7200000000);
+    v.onFrameSkipped(7200000020);
+    v.onFrameReleased(7200000040, 100);
+    v.onFrameRendered(7200000040, 100);
+    v.onFrameReleased(7200000060, 120);
+    v.onFrameRendered(7200000060, 120);
+    v.onFrameReleased(7200000080, 140);
+    v.onFrameSkipped(0);
+    v.onFrameRendered(7200000080, 140);
+    v.onFrameSkipped(20);
+    v.onFrameReleased(40, 160);
+    v.onFrameRendered(40, 160);
+    v.onFrameReleased(60, 180);
+    v.onFrameRendered(60, 180);
+    v.onFrameReleased(80, 200);
+    v.onFrameRendered(80, 200);
+    const VideoRenderQualityMetrics &m = v.getMetrics();
+    EXPECT_EQ(m.judderRate, 0); // frame durations can get messed up during discontinuities so if
+                                // the discontinuity is not detected, judder is expected
+    EXPECT_NE(m.contentFrameRate, FRAME_RATE_UNDETERMINED);
+}
+
 TEST_F(VideoRenderQualityTrackerTest, whenLowTolerance_doesntDetectFrameRate) {
     Configuration c;
     c.frameRateDetectionToleranceUs = 0;
@@ -910,6 +984,44 @@ TEST_F(VideoRenderQualityTrackerTest, capturesJudderEvents) {
     EXPECT_EQ(h.getAndClearJudderEvent().valid, true);
     h.render({20, 20, 20, 20, 20, 20});
     EXPECT_EQ(h.getAndClearJudderEvent().valid, false); // max number of judder events exceeded
+}
+
+TEST_F(VideoRenderQualityTrackerTest, capturesOverallFreezeScore) {
+    Configuration c;
+    // # drops * 20ms + 20ms because current frame is frozen + 1 for bucket threshold
+    c.freezeDurationMsHistogramBuckets = {1 * 20 + 21, 5 * 20 + 21, 10 * 20 + 21};
+    c.freezeDurationMsHistogramToScore = {10, 100, 1000};
+    Helper h(20, c);
+    h.render(5);
+    h.drop(2); // bucket = 0, bucket count = 1, bucket score = 10
+    h.render(5);
+    h.drop(11); // bucket = 2, bucket count = 1, bucket score = 1000
+    h.render(5);
+    h.drop(6); // bucket = 1, bucket count = 1, bucket score = 100
+    h.render(5);
+    h.drop(1); // bucket = null
+    h.render(5);
+    h.drop(3); // bucket = 0, bucket count = 2, bucket score = 20
+    h.render(5);
+    h.drop(10); // bucket = 1, bucket count = 2, bucket score = 200
+    h.render(5);
+    h.drop(7); // bucket = 1, bucket count = 3, bucket score = 300
+    h.render(5);
+    EXPECT_EQ(h.getMetrics().freezeScore, 20 + 300 + 1000);
+}
+
+TEST_F(VideoRenderQualityTrackerTest, capturesOverallJudderScore) {
+    Configuration c;
+    c.judderScoreHistogramBuckets = {0, 6, 10};
+    c.judderScoreHistogramToScore = {10, 100, 1000};
+    Helper h(20, c);
+    h.render({20, 20, 15, 20, 20}); // bucket = 0, bucket count = 1, bucket score = 10
+    h.render({20, 20, 11, 20, 20}); // bucket = 1, bucket count = 1, bucket score = 100
+    h.render({20, 20, 13, 20, 20}); // bucket = 1, bucket count = 2, bucket score = 200
+    h.render({20, 20,  5, 20, 20}); // bucket = 2, bucket count = 1, bucket score = 1000
+    h.render({20, 20, 14, 20, 20}); // bucket = 1, bucket count = 3, bucket score = 300
+    h.render({20, 20, 10, 20, 20}); // bucket = 2, bucket count = 2, bucket score = 2000
+    EXPECT_EQ(h.getMetrics().judderScore, 10 + 300 + 2000);
 }
 
 } // android

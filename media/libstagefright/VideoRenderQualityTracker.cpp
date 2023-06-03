@@ -228,6 +228,9 @@ void VideoRenderQualityTracker::onFrameSkipped(int64_t contentTimeUs) {
     if (mLastRenderTimeUs == -1) {
         return;
     }
+
+    resetIfDiscontinuity(contentTimeUs, -1);
+
     // Frames skipped at the end of playback shouldn't be counted as skipped frames, since the
     // app could be terminating the playback. The pending count will be added to the metrics if and
     // when the next frame is rendered.
@@ -323,11 +326,8 @@ const VideoRenderQualityMetrics &VideoRenderQualityTracker::getMetrics() {
     if (mConfiguration.freezeDurationMsHistogramToScore.size() ==
         mMetrics.freezeDurationMsHistogram.size()) {
         for (int i = 0; i < mMetrics.freezeDurationMsHistogram.size(); ++i) {
-            int32_t count = 0;
-            for (int j = i; j < mMetrics.freezeDurationMsHistogram.size(); ++j) {
-                count += mMetrics.freezeDurationMsHistogram[j];
-            }
-            mMetrics.freezeScore += count / mConfiguration.freezeDurationMsHistogramToScore[i];
+            mMetrics.freezeScore += mMetrics.freezeDurationMsHistogram[i] *
+                    mConfiguration.freezeDurationMsHistogramToScore[i];
         }
     }
     mMetrics.freezeRate = float(double(mMetrics.freezeDurationMsHistogram.getSum()) /
@@ -336,11 +336,8 @@ const VideoRenderQualityMetrics &VideoRenderQualityTracker::getMetrics() {
     mMetrics.judderScore = 0;
     if (mConfiguration.judderScoreHistogramToScore.size() == mMetrics.judderScoreHistogram.size()) {
         for (int i = 0; i < mMetrics.judderScoreHistogram.size(); ++i) {
-            int32_t count = 0;
-            for (int j = i; j < mMetrics.judderScoreHistogram.size(); ++j) {
-                count += mMetrics.judderScoreHistogram[j];
-            }
-            mMetrics.judderScore += count / mConfiguration.judderScoreHistogramToScore[i];
+            mMetrics.judderScore += mMetrics.judderScoreHistogram[i] *
+                    mConfiguration.judderScoreHistogramToScore[i];
         }
     }
     mMetrics.judderRate = float(double(mMetrics.judderScoreHistogram.getCount()) /
@@ -380,6 +377,9 @@ void VideoRenderQualityTracker::resetForDiscontinuity() {
         mDesiredFrameDurationUs[i] = -1;
         mContentFrameDurationUs[i] = -1;
     }
+    mActualFrameDurationUs.priorTimestampUs = -1;
+    mDesiredFrameDurationUs.priorTimestampUs = -1;
+    mContentFrameDurationUs.priorTimestampUs = -1;
 }
 
 bool VideoRenderQualityTracker::resetIfDiscontinuity(int64_t contentTimeUs,
@@ -403,11 +403,14 @@ bool VideoRenderQualityTracker::resetIfDiscontinuity(int64_t contentTimeUs,
         // occur if the time the user spends seeking is equal to the duration of the seek. This is
         // very unlikely to occur in practice but CAN occur - the user starts seeking forward, gets
         // distracted, and then returns to seeking forward.
-        int64_t contentFrameDurationUs = contentTimeUs - mLastContentTimeUs;
-        int64_t desiredFrameDurationUs = desiredRenderTimeUs - mLastRenderTimeUs;
-        bool skippedForwardDueToLiveContentFrameDrops =
-                abs(contentFrameDurationUs - desiredFrameDurationUs) <
-                mConfiguration.liveContentFrameDropToleranceUs;
+        bool skippedForwardDueToLiveContentFrameDrops = false;
+        if (desiredRenderTimeUs != -1) {
+            int64_t contentFrameDurationUs = contentTimeUs - mLastContentTimeUs;
+            int64_t desiredFrameDurationUs = desiredRenderTimeUs - mLastRenderTimeUs;
+            skippedForwardDueToLiveContentFrameDrops =
+                    abs(contentFrameDurationUs - desiredFrameDurationUs) <
+                    mConfiguration.liveContentFrameDropToleranceUs;
+        }
         if (!skippedForwardDueToLiveContentFrameDrops) {
             ALOGI("Video playback jumped %d ms forward in content time (%d -> %d) ",
                 int((contentTimeUs - mLastContentTimeUs) / 1000), int(mLastContentTimeUs / 1000),
@@ -481,9 +484,9 @@ void VideoRenderQualityTracker::processMetricsForRenderedFrame(int64_t contentTi
     int64_t judderScore = computePreviousJudderScore(mActualFrameDurationUs,
                                                      mContentFrameDurationUs,
                                                      mConfiguration);
-    int64_t judderTimeUs = actualRenderTimeUs - mActualFrameDurationUs[0] -
-                           mActualFrameDurationUs[1];
     if (judderScore != 0) {
+        int64_t judderTimeUs = actualRenderTimeUs - mActualFrameDurationUs[0] -
+                mActualFrameDurationUs[1];
         processJudder(judderScore, judderTimeUs, mLastJudderEndTimeUs, mActualFrameDurationUs,
                       mContentFrameDurationUs, mJudderEvent, mMetrics, mConfiguration);
         mLastJudderEndTimeUs = judderTimeUs + mActualFrameDurationUs[1];
