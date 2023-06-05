@@ -41,14 +41,10 @@ const sp<IMediaPlayerService> MediaMetadataRetriever::getService()
     if (sService == 0) {
         sp<IServiceManager> sm = defaultServiceManager();
         sp<IBinder> binder;
-        do {
-            binder = sm->getService(String16("media.player"));
-            if (binder != 0) {
-                break;
-            }
-            ALOGW("MediaPlayerService not published, waiting...");
-            usleep(500000); // 0.5 s
-        } while (true);
+        binder = sm->waitForService(String16("media.player"));
+        if (binder == nullptr) {
+            return nullptr;
+        }
         if (sDeathNotifier == NULL) {
             sDeathNotifier = new DeathNotifier();
         }
