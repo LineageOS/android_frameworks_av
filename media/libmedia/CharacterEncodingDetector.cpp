@@ -393,10 +393,6 @@ const UCharsetMatch *CharacterEncodingDetector::getPreferred(
         while (true) {
             // demerit the current encoding for each "special" character found after conversion.
             // The amount of demerit is somewhat arbitrarily chosen.
-            int inchar;
-            if (source != sourceLimit) {
-                inchar = (source[0] << 8) + source[1];
-            }
             UChar32 c = ucnv_getNextUChar(conv, &source, sourceLimit, &status);
             if (!U_SUCCESS(status)) {
                 break;
