@@ -1,0 +1,6 @@
+# Bug component: 817235
+
+# Exclude /media/OWNERS but include top-level OWNERS
+set noparent
+include platform/frameworks/av:/OWNERS
+include platform/frameworks/av:/media/janitors/media_solutions_OWNERS
