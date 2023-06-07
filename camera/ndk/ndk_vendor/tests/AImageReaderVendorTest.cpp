@@ -31,10 +31,13 @@
 #include <stdio.h>
 
 #include <android/log.h>
+#include <android/hidl/manager/1.2/IServiceManager.h>
+#include <android/hidl/token/1.0/ITokenManager.h>
 #include <camera/NdkCameraError.h>
 #include <camera/NdkCameraManager.h>
 #include <camera/NdkCameraDevice.h>
 #include <camera/NdkCameraCaptureSession.h>
+#include <hidl/ServiceManagement.h>
 #include <media/NdkImage.h>
 #include <media/NdkImageReader.h>
 #include <cutils/native_handle.h>
@@ -50,6 +53,8 @@ static constexpr int kTestImageHeight = 480;
 static constexpr int kTestImageFormat = AIMAGE_FORMAT_YUV_420_888;
 
 using android::hardware::camera::common::V1_0::helper::VendorTagDescriptorCache;
+using android::hidl::manager::V1_0::IServiceManager;
+using android::hidl::token::V1_0::ITokenManager;
 using ConfiguredWindows = std::set<const native_handle_t *>;
 
 class CameraHelper {
@@ -981,11 +986,19 @@ class AImageReaderVendorTest : public ::testing::Test {
 
 
 TEST_F(AImageReaderVendorTest, CreateWindowNativeHandle) {
+    auto transport = android::hardware::defaultServiceManager()->getTransport(ITokenManager::descriptor, "default");
+    if (transport.isOk() && transport == IServiceManager::Transport::EMPTY) {
+        GTEST_SKIP() << "This device no longer supports AImageReader_getWindowNativeHandle";
+    }
     testBasicTakePictures(/*prepareSurfaces*/ false);
     testBasicTakePictures(/*prepareSurfaces*/ true);
 }
 
 TEST_F(AImageReaderVendorTest, LogicalCameraPhysicalStream) {
+    auto transport = android::hardware::defaultServiceManager()->getTransport(ITokenManager::descriptor, "default");
+    if (transport.isOk() && transport == IServiceManager::Transport::EMPTY) {
+        GTEST_SKIP() << "This device no longer supports AImageReader_getWindowNativeHandle";
+    }
     for (auto & v2 : {true, false}) {
         testLogicalCameraPhysicalStream(false/*usePhysicalSettings*/, v2);
         testLogicalCameraPhysicalStream(true/*usePhysicalSettings*/, v2);
