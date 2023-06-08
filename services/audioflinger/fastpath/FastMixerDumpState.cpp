@@ -29,14 +29,6 @@
 
 namespace android {
 
-FastMixerDumpState::FastMixerDumpState() : FastThreadDumpState(),
-    mWriteSequence(0), mFramesWritten(0),
-    mNumTracks(0), mWriteErrors(0),
-    mSampleRate(0), mFrameCount(0),
-    mTrackMask(0)
-{
-}
-
 // helper function called by qsort()
 static int compare_uint32_t(const void *pa, const void *pb)
 {

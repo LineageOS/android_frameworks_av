@@ -38,48 +38,8 @@
 
 namespace android {
 
-FastThread::FastThread(const char *cycleMs, const char *loadUs) : Thread(false /*canCallJava*/),
-    // re-initialized to &sInitial by subclass constructor
-    mPrevious(nullptr), mCurrent(nullptr),
-    /* mOldTs({0, 0}), */
-    mOldTsValid(false),
-    mSleepNs(-1),
-    mPeriodNs(0),
-    mUnderrunNs(0),
-    mOverrunNs(0),
-    mForceNs(0),
-    mWarmupNsMin(0),
-    mWarmupNsMax(LONG_MAX),
-    // re-initialized to &mDummySubclassDumpState by subclass constructor
-    mDummyDumpState(nullptr),
-    mDumpState(nullptr),
-    mIgnoreNextOverrun(true),
-#ifdef FAST_THREAD_STATISTICS
-    // mOldLoad
-    mOldLoadValid(false),
-    mBounds(0),
-    mFull(false),
-    // mTcu
-#endif
-    mColdGen(0),
-    mIsWarm(false),
-    /* mMeasuredWarmupTs({0, 0}), */
-    mWarmupCycles(0),
-    mWarmupConsecutiveInRangeCycles(0),
-    mTimestampStatus(INVALID_OPERATION),
-
-    mCommand(FastThreadState::INITIAL),
-#if 0
-    frameCount(0),
-#endif
-    mAttemptedWrite(false)
-    // mCycleMs(cycleMs)
-    // mLoadUs(loadUs)
+FastThread::FastThread(const char *cycleMs, const char *loadUs) : Thread(false /*canCallJava*/)
 {
-    mOldTs.tv_sec = 0;
-    mOldTs.tv_nsec = 0;
-    mMeasuredWarmupTs.tv_sec = 0;
-    mMeasuredWarmupTs.tv_nsec = 0;
     strlcpy(mCycleMs, cycleMs, sizeof(mCycleMs));
     strlcpy(mLoadUs, loadUs, sizeof(mLoadUs));
 }
@@ -95,7 +55,10 @@ bool FastThread::threadLoop()
         if (mSleepNs >= 0) {
             if (mSleepNs > 0) {
                 ALOG_ASSERT(mSleepNs < 1000000000);
-                const struct timespec req = {0, mSleepNs};
+                const struct timespec req = {
+                    0, // tv_sec
+                    static_cast<long>(mSleepNs) // NOLINT(google-runtime-int)
+                };
                 nanosleep(&req, nullptr);
             } else {
                 sched_yield();
@@ -221,7 +184,7 @@ bool FastThread::threadLoop()
         if (rc == 0) {
             if (mOldTsValid) {
                 time_t sec = newTs.tv_sec - mOldTs.tv_sec;
-                long nsec = newTs.tv_nsec - mOldTs.tv_nsec;
+                auto nsec = newTs.tv_nsec - mOldTs.tv_nsec;
                 ALOGE_IF(sec < 0 || (sec == 0 && nsec < 0),
                         "clock_gettime(CLOCK_MONOTONIC) failed: was %ld.%09ld but now %ld.%09ld",
                         mOldTs.tv_sec, mOldTs.tv_nsec, newTs.tv_sec, newTs.tv_nsec);
