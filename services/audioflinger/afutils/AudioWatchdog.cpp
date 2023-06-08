@@ -41,7 +41,7 @@ void AudioWatchdogDump::dump(int fd)
 bool AudioWatchdog::threadLoop()
 {
     {
-        AutoMutex _l(mMyLock);
+        const AutoMutex _l(mMyLock);
         if (mPaused) {
             mMyCond.wait(mMyLock);
             // ignore previous timestamp after resume()
@@ -116,13 +116,13 @@ void AudioWatchdog::requestExit()
 
 void AudioWatchdog::pause()
 {
-    AutoMutex _l(mMyLock);
+    const AutoMutex _l(mMyLock);
     mPaused = true;
 }
 
 void AudioWatchdog::resume()
 {
-    AutoMutex _l(mMyLock);
+    const AutoMutex _l(mMyLock);
     if (mPaused) {
         mPaused = false;
         mMyCond.signal();

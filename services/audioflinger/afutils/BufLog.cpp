@@ -28,12 +28,14 @@
 
 #define MIN(a, b) ((a) < (b) ? (a) : (b))
 
+namespace android {
+
 // ------------------------------
 // BufLogSingleton
 // ------------------------------
 pthread_once_t onceControl = PTHREAD_ONCE_INIT;
 
-BufLog *BufLogSingleton::mInstance = NULL;
+BufLog *BufLogSingleton::mInstance = nullptr;
 
 void BufLogSingleton::initOnce() {
     mInstance = new BufLog();
@@ -49,7 +51,7 @@ BufLog *BufLogSingleton::instance() {
 }
 
 bool BufLogSingleton::instanceExists() {
-    return mInstance != NULL;
+    return mInstance != nullptr;
 }
 
 // ------------------------------
@@ -61,43 +63,42 @@ BufLog::BufLog() {
 }
 
 BufLog::~BufLog() {
-    android::Mutex::Autolock autoLock(mLock);
+    const AutoMutex autoLock(mLock);
 
-    for (unsigned int id = 0; id < BUFLOG_MAXSTREAMS; id++) {
+    for (unsigned int id = 0; id < BUFLOG_MAXSTREAMS; id++) { // NOLINT(modernize-loop-convert)
         BufLogStream *pBLStream = mStreams[id];
-        if (pBLStream != NULL) {
+        if (pBLStream != nullptr) {
             delete pBLStream ;
-            mStreams[id] = NULL;
+            mStreams[id] = nullptr;
         }
     }
 }
 
 size_t BufLog::write(int streamid, const char *tag, int format, int channels,
         int samplingRate, size_t maxBytes, const void *buf, size_t size) {
-    unsigned int id = streamid % BUFLOG_MAXSTREAMS;
-    android::Mutex::Autolock autoLock(mLock);
+    const unsigned int id = streamid % BUFLOG_MAXSTREAMS;
+    const AutoMutex autoLock(mLock);
 
     BufLogStream *pBLStream = mStreams[id];
 
-    if (pBLStream == NULL) {
+    if (pBLStream == nullptr) {
         pBLStream = mStreams[id] = new BufLogStream(id, tag, format, channels,
                 samplingRate, maxBytes);
-        ALOG_ASSERT(pBLStream != NULL, "BufLogStream Failed to be created");
     }
 
     return pBLStream->write(buf, size);
 }
 
 void BufLog::reset() {
-    android::Mutex::Autolock autoLock(mLock);
+    const AutoMutex autoLock(mLock);
     ALOGV("Resetting all BufLogs");
     int count = 0;
 
-    for (unsigned int id = 0; id < BUFLOG_MAXSTREAMS; id++) {
+    for (unsigned int id = 0; id < BUFLOG_MAXSTREAMS; id++) { // NOLINT(modernize-loop-convert)
         BufLogStream *pBLStream = mStreams[id];
-        if (pBLStream != NULL) {
+        if (pBLStream != nullptr) {
             delete pBLStream;
-            mStreams[id] = NULL;
+            mStreams[id] = nullptr;
             count++;
         }
     }
@@ -117,7 +118,7 @@ BufLogStream::BufLogStream(unsigned int id,
                 mSamplingRate(samplingRate), mMaxBytes(maxBytes) {
     mByteCount = 0;
     mPaused = false;
-    if (tag != NULL) {
+    if (tag != nullptr) {
         (void)audio_utils_strlcpy(mTag, tag);
     } else {
         mTag[0] = 0;
@@ -129,7 +130,7 @@ BufLogStream::BufLogStream(unsigned int id,
     //timestamp
     char timeStr[16];   //size 16: format %Y%m%d%H%M%S 14 chars + string null terminator
     struct timeval tv;
-    gettimeofday(&tv, NULL);
+    gettimeofday(&tv, nullptr);
     struct tm tm;
     localtime_r(&tv.tv_sec, &tm);
     strftime(timeStr, sizeof(timeStr), "%Y%m%d%H%M%S", &tm);
@@ -139,7 +140,7 @@ BufLogStream::BufLogStream(unsigned int id,
     ALOGV("data output: %s", logPath);
 
     mFile = fopen(logPath, "wb");
-    if (mFile != NULL) {
+    if (mFile != nullptr) {
         ALOGV("Success creating file at: %p", mFile);
     } else {
         ALOGE("Error: could not create file BufLogStream %s", strerror(errno));
@@ -148,24 +149,24 @@ BufLogStream::BufLogStream(unsigned int id,
 
 void BufLogStream::closeStream_l() {
     ALOGV("Closing BufLogStream id:%d tag:%s", mId, mTag);
-    if (mFile != NULL) {
+    if (mFile != nullptr) {
         fclose(mFile);
-        mFile = NULL;
+        mFile = nullptr;
     }
 }
 
 BufLogStream::~BufLogStream() {
     ALOGV("Destroying BufLogStream id:%d tag:%s", mId, mTag);
-    android::Mutex::Autolock autoLock(mLock);
+    const AutoMutex autoLock(mLock);
     closeStream_l();
 }
 
 size_t BufLogStream::write(const void *buf, size_t size) {
 
     size_t bytes = 0;
-    if (!mPaused && mFile != NULL) {
-        if (size > 0 && buf != NULL) {
-            android::Mutex::Autolock autoLock(mLock);
+    if (!mPaused && mFile != nullptr) {
+        if (size > 0 && buf != nullptr) {
+            const AutoMutex autoLock(mLock);
             if (mMaxBytes > 0) {
                 size = MIN(size, mMaxBytes - mByteCount);
             }
@@ -185,12 +186,14 @@ size_t BufLogStream::write(const void *buf, size_t size) {
 }
 
 bool BufLogStream::setPause(bool pause) {
-    bool old = mPaused;
+    const bool old = mPaused;
     mPaused = pause;
     return old;
 }
 
 void BufLogStream::finalize() {
-    android::Mutex::Autolock autoLock(mLock);
+    const AutoMutex autoLock(mLock);
     closeStream_l();
 }
+
+} // namespace android

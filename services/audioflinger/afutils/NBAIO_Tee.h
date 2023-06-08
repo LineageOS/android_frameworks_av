@@ -15,8 +15,8 @@
  */
 
 // Enabled with TEE_SINK in Configuration.h
-#ifndef ANDROID_NBAIO_TEE_H
-#define ANDROID_NBAIO_TEE_H
+
+#pragma once
 
 #ifdef TEE_SINK
 
@@ -320,7 +320,4 @@ private:
     const std::shared_ptr<NBAIO_TeeImpl> mTee;
 }; // NBAIO_Tee
 
-} // namespace android
-
 #endif // TEE_SINK
-#endif // !ANDROID_NBAIO_TEE_H

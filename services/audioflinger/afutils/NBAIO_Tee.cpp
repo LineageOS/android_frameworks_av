@@ -123,7 +123,7 @@ private:
     std::string generateFilename(const std::string &suffix) const {
         char fileTime[sizeof("YYYYmmdd_HHMMSS_\0")];
         struct timeval tv;
-        gettimeofday(&tv, NULL);
+        gettimeofday(&tv, nullptr /* struct timezone */);
         struct tm tm;
         localtime_r(&tv.tv_sec, &tm);
         LOG_ALWAYS_FATAL_IF(strftime(fileTime, sizeof(fileTime), "%Y%m%d_%H%M%S_", &tm) == 0,
@@ -230,14 +230,16 @@ NBAIO_Tee::NBAIO_TeeImpl::NBAIO_SinkSource NBAIO_Tee::NBAIO_TeeImpl::makeSinkSou
         Pipe *pipe = new Pipe(frames, format);
         size_t numCounterOffers = 0;
         const NBAIO_Format offers[1] = {format};
-        ssize_t index = pipe->negotiate(offers, 1, NULL, numCounterOffers);
+        ssize_t index = pipe->negotiate(
+                offers, 1 /* numOffers */, nullptr /* counterOffers */, numCounterOffers);
         if (index != 0) {
             ALOGW("pipe failure to negotiate: %zd", index);
             goto exit;
         }
         PipeReader *pipeReader = new PipeReader(*pipe);
         numCounterOffers = 0;
-        index = pipeReader->negotiate(offers, 1, NULL, numCounterOffers);
+        index = pipeReader->negotiate(
+                offers, 1 /* numOffers */, nullptr /* counterOffers */, numCounterOffers);
         if (index != 0) {
             ALOGW("pipeReader failure to negotiate: %zd", index);
             goto exit;
