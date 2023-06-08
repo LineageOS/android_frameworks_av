@@ -47,44 +47,47 @@ protected:
     virtual void onWork() = 0;
 
     // FIXME these former local variables need comments
-    const FastThreadState*  mPrevious;
-    const FastThreadState*  mCurrent;
-    struct timespec mOldTs;
-    bool            mOldTsValid;
-    long            mSleepNs;       // -1: busy wait, 0: sched_yield, > 0: nanosleep
-    long            mPeriodNs;      // expected period; the time required to render one mix buffer
-    long            mUnderrunNs;    // underrun likely when write cycle is greater than this value
-    long            mOverrunNs;     // overrun likely when write cycle is less than this value
-    long            mForceNs;       // if overrun detected,
-                                    // force the write cycle to take this much time
-    long            mWarmupNsMin;   // warmup complete when write cycle is greater than or equal to
-                                    // this value
-    long            mWarmupNsMax;   // and less than or equal to this value
-    FastThreadDumpState* mDummyDumpState;
-    FastThreadDumpState* mDumpState;
-    bool            mIgnoreNextOverrun;     // used to ignore initial overrun and first after an
-                                            // underrun
+    const FastThreadState*  mPrevious = nullptr;
+    const FastThreadState*  mCurrent = nullptr;
+    struct timespec mOldTs{};
+    bool            mOldTsValid = false;
+    int64_t         mSleepNs = -1;     // -1: busy wait, 0: sched_yield, > 0: nanosleep
+    int64_t         mPeriodNs = 0;     // expected period; the time required to
+                                       // render one mix buffer
+    int64_t         mUnderrunNs = 0;   // underrun likely when write cycle
+                                       // is greater than this value
+    int64_t         mOverrunNs = 0;    // overrun likely when write cycle is less than this value
+    int64_t         mForceNs = 0;      // if overrun detected,
+                                       // force the write cycle to take this much time
+    int64_t         mWarmupNsMin = 0;  // warmup complete when write cycle is greater
+                                       //  than or equal to this value
+    int64_t         mWarmupNsMax = INT64_MAX;  // and less than or equal to this value
+    FastThreadDumpState* mDummyDumpState = nullptr;
+    FastThreadDumpState* mDumpState = nullptr;
+    bool            mIgnoreNextOverrun = true; // used to ignore initial overrun
+                                               //  and first after an underrun
 #ifdef FAST_THREAD_STATISTICS
     struct timespec mOldLoad;       // previous value of clock_gettime(CLOCK_THREAD_CPUTIME_ID)
-    bool            mOldLoadValid;  // whether oldLoad is valid
-    uint32_t        mBounds;
-    bool            mFull;          // whether we have collected at least mSamplingN samples
+    bool            mOldLoadValid = false;  // whether oldLoad is valid
+    uint32_t        mBounds = 0;
+    bool            mFull = false;        // whether we have collected at least mSamplingN samples
 #ifdef CPU_FREQUENCY_STATISTICS
     ThreadCpuUsage  mTcu;           // for reading the current CPU clock frequency in kHz
 #endif
 #endif
-    unsigned        mColdGen;       // last observed mColdGen
-    bool            mIsWarm;        // true means ready to mix,
+    unsigned        mColdGen = 0;       // last observed mColdGen
+    bool            mIsWarm = false;        // true means ready to mix,
                                     // false means wait for warmup before mixing
-    struct timespec   mMeasuredWarmupTs;  // how long did it take for warmup to complete
-    uint32_t          mWarmupCycles;  // counter of number of loop cycles during warmup phase
-    uint32_t          mWarmupConsecutiveInRangeCycles;    // number of consecutive cycles in range
+    struct timespec   mMeasuredWarmupTs{};  // how long did it take for warmup to complete
+    uint32_t          mWarmupCycles = 0;  // counter of number of loop cycles during warmup phase
+    uint32_t          mWarmupConsecutiveInRangeCycles = 0; // number of consecutive cycles in range
     const sp<NBLog::Writer> mDummyNBLogWriter{new NBLog::Writer()};
-    status_t          mTimestampStatus;
+    status_t          mTimestampStatus = INVALID_OPERATION;
 
-    FastThreadState::Command mCommand;
-    bool            mAttemptedWrite;
+    FastThreadState::Command mCommand = FastThreadState::INITIAL;
+    bool            mAttemptedWrite = false;
 
+    // init in constructor
     char            mCycleMs[16];   // cycle_ms + suffix
     char            mLoadUs[16];    // load_us + suffix
 

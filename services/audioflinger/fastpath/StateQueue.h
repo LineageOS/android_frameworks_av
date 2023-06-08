@@ -126,7 +126,6 @@ struct StateQueueMutatorDump {
 template<typename T> class StateQueue {
 
 public:
-            StateQueue();
     virtual ~StateQueue() = default;  // why is this virtual?
 
     // Observer APIs
@@ -187,24 +186,27 @@ private:
     T                 mStates[kN];      // written by mutator, read by observer
 
     // "volatile" is meaningless with SMP, but here it indicates that we're using atomic ops
-    atomic_uintptr_t  mNext; // written by mutator to advance next, read by observer
-    volatile const T* mAck;  // written by observer to acknowledge advance of next, read by mutator
+    atomic_uintptr_t  mNext{}; // written by mutator to advance next, read by observer
+    volatile const T* mAck = nullptr;  // written by observer to acknowledge advance of next,
+                                       // read by mutator
 
     // only used by observer
-    const T*          mCurrent;         // most recent value returned by poll()
+    const T*    mCurrent = nullptr;     // most recent value returned by poll()
 
     // only used by mutator
-    T*                mMutating;        // where updates by mutator are done in place
-    const T*          mExpecting;       // what the mutator expects mAck to be set to
-    bool              mInMutation;      // whether we're currently in the middle of a mutation
-    bool              mIsDirty;         // whether mutating state has been modified since last push
-    bool              mIsInitialized;   // whether mutating state has been initialized yet
+    T*          mMutating{&mStates[0]}; // where updates by mutator are done in place
+    const T*    mExpecting = nullptr;   // what the mutator expects mAck to be set to
+    bool        mInMutation = false;    // whether we're currently in the middle of a mutation
+    bool        mIsDirty = false;       // whether mutating state has been modified since last push
+    bool        mIsInitialized = false; // whether mutating state has been initialized yet
 
 #ifdef STATE_QUEUE_DUMP
     StateQueueObserverDump  mObserverDummyDump; // default area for observer dump if not set
-    StateQueueObserverDump* mObserverDump;      // pointer to active observer dump, always non-NULL
+    // pointer to active observer dump, always non-nullptr
+    StateQueueObserverDump* mObserverDump{&mObserverDummyDump};
     StateQueueMutatorDump   mMutatorDummyDump;  // default area for mutator dump if not set
-    StateQueueMutatorDump*  mMutatorDump;       // pointer to active mutator dump, always non-NULL
+    // pointer to active mutator dump, always non-nullptr
+    StateQueueMutatorDump*  mMutatorDump{&mMutatorDummyDump};
 #endif
 
 };  // class StateQueue

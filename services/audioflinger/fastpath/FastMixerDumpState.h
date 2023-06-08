@@ -54,9 +54,8 @@ private:
 
 // Represents the dump state of a fast track
 struct FastTrackDump {
-    FastTrackDump() : mFramesReady(0) { }
     FastTrackUnderruns  mUnderruns;
-    size_t              mFramesReady;        // most recent value only; no long-term statistics kept
+    size_t              mFramesReady = 0;    // most recent value only; no long-term statistics kept
     int64_t             mFramesWritten;      // last value from track
 };
 
@@ -64,18 +63,16 @@ struct FastTrackDump {
 static_assert(!std::is_polymorphic_v<FastTrackDump>);
 
 struct FastMixerDumpState : FastThreadDumpState {
-    FastMixerDumpState();
-
     void dump(int fd) const;    // should only be called on a stable copy, not the original
 
-    double   mLatencyMs = 0.;   // measured latency, default of 0 if no valid timestamp read.
-    uint32_t mWriteSequence;    // incremented before and after each write()
-    uint32_t mFramesWritten;    // total number of frames written successfully
-    uint32_t mNumTracks;        // total number of active fast tracks
-    uint32_t mWriteErrors;      // total number of write() errors
-    uint32_t mSampleRate;
-    size_t   mFrameCount;
-    uint32_t mTrackMask;        // mask of active tracks
+    double   mLatencyMs = 0.;     // measured latency, default of 0 if no valid timestamp read.
+    uint32_t mWriteSequence = 0;  // incremented before and after each write()
+    uint32_t mFramesWritten = 0;  // total number of frames written successfully
+    uint32_t mNumTracks = 0;      // total number of active fast tracks
+    uint32_t mWriteErrors = 0;    // total number of write() errors
+    uint32_t mSampleRate = 0;
+    size_t   mFrameCount = 0;
+    uint32_t mTrackMask = 0;      // mask of active tracks
     FastTrackDump   mTracks[FastMixerState::kMaxFastTracks];
 
     // For timestamp statistics.
