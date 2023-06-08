@@ -24,16 +24,14 @@
 namespace android {
 
 struct FastCaptureDumpState : FastThreadDumpState {
-    FastCaptureDumpState();
-
     void dump(int fd) const;    // should only be called on a stable copy, not the original
 
     // FIXME by renaming, could pull up many of these to FastThreadDumpState
-    uint32_t mReadSequence;     // incremented before and after each read()
-    uint32_t mFramesRead;       // total number of frames read successfully
-    uint32_t mReadErrors;       // total number of read() errors
-    uint32_t mSampleRate;
-    size_t   mFrameCount;
+    uint32_t mReadSequence = 0;  // incremented before and after each read()
+    uint32_t mFramesRead = 0;    // total number of frames read successfully
+    uint32_t mReadErrors = 0;    // total number of read() errors
+    uint32_t mSampleRate = 0;
+    size_t   mFrameCount = 0;
     bool     mSilenced = false; // capture is silenced
 };
 
