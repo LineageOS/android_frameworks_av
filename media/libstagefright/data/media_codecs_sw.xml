@@ -331,8 +331,8 @@
             <Limit name="alignment" value="2x2" />
             <Limit name="block-size" value="8x8" />
             <Limit name="block-count" range="1-4096" /> <!-- max 512x512 -->
-            <Limit name="blocks-per-second" range="1-122880" />
-            <Limit name="frame-rate" range="1-120" />
+            <Limit name="blocks-per-second" range="1-259200" />
+            <Limit name="frame-rate" range="1-300" />
             <Limit name="bitrate" range="1-10000000" />
             <Limit name="complexity" range="0-10"  default="0" />
             <Limit name="quality" range="0-100"  default="80" />
