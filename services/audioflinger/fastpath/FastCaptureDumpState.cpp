@@ -24,11 +24,6 @@
 
 namespace android {
 
-FastCaptureDumpState::FastCaptureDumpState() : FastThreadDumpState(),
-    mReadSequence(0), mFramesRead(0), mReadErrors(0), mSampleRate(0), mFrameCount(0)
-{
-}
-
 void FastCaptureDumpState::dump(int fd) const
 {
     if (mCommand == FastCaptureState::INITIAL) {

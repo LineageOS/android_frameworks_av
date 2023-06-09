@@ -19,16 +19,8 @@
 
 namespace android {
 
-FastThreadDumpState::FastThreadDumpState() :
-    mCommand(FastThreadState::INITIAL), mUnderruns(0), mOverruns(0),
-    /* mMeasuredWarmupTs({0, 0}), */
-    mWarmupCycles(0)
-#ifdef FAST_THREAD_STATISTICS
-    , mSamplingN(0), mBounds(0)
-#endif
+FastThreadDumpState::FastThreadDumpState()
 {
-    mMeasuredWarmupTs.tv_sec = 0;
-    mMeasuredWarmupTs.tv_nsec = 0;
 #ifdef FAST_THREAD_STATISTICS
     increaseSamplingN(1);
 #endif

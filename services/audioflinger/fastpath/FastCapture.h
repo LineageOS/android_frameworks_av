@@ -48,17 +48,17 @@ private:
 
     FastCaptureState    mPreIdle;   // copy of state before we went into idle
     // FIXME by renaming, could pull up many of these to FastThread
-    NBAIO_Source*       mInputSource;
-    int                 mInputSourceGen;
-    NBAIO_Sink*         mPipeSink;
-    int                 mPipeSinkGen;
-    void*               mReadBuffer;
-    ssize_t             mReadBufferState;   // number of initialized frames in readBuffer,
-                                            // or -1 to clear
-    NBAIO_Format        mFormat;
-    unsigned            mSampleRate;
+    NBAIO_Source*       mInputSource = nullptr;
+    int                 mInputSourceGen = 0;
+    NBAIO_Sink*         mPipeSink = nullptr;
+    int                 mPipeSinkGen = 0;
+    void*               mReadBuffer = nullptr;
+    ssize_t             mReadBufferState = -1;  // number of initialized frames in readBuffer,
+                                                // or -1 to clear
+    NBAIO_Format        mFormat = Format_Invalid;
+    unsigned            mSampleRate = 0;
     FastCaptureDumpState mDummyFastCaptureDumpState;
-    uint32_t            mTotalNativeFramesRead; // copied to dumpState->mFramesRead
+    uint32_t            mTotalNativeFramesRead = 0; // copied to dumpState->mFramesRead
 
 };  // class FastCapture
 

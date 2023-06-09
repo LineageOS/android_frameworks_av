@@ -26,15 +26,14 @@ namespace android {
 
 // Represent a single state of the fast capture
 struct FastCaptureState : FastThreadState {
-                FastCaptureState();
-
     // all pointer fields use raw pointers; objects are owned and ref-counted by RecordThread
-    NBAIO_Source*   mInputSource;       // HAL input device, must already be negotiated
+    NBAIO_Source*   mInputSource = nullptr; // HAL input device, must already be negotiated
     // FIXME by renaming, could pull up these fields to FastThreadState
-    int             mInputSourceGen;    // increment when mInputSource is assigned
-    NBAIO_Sink*     mPipeSink;          // after reading from input source, write to this pipe sink
-    int             mPipeSinkGen;       // increment when mPipeSink is assigned
-    size_t          mFrameCount;        // number of frames per fast capture buffer
+    int             mInputSourceGen = 0;    // increment when mInputSource is assigned
+    NBAIO_Sink*     mPipeSink = nullptr;    // after reading from input source,
+                                            // write to this pipe sink
+    int             mPipeSinkGen = 0;       // increment when mPipeSink is assigned
+    size_t          mFrameCount = 0;        // number of frames per fast capture buffer
     audio_track_cblk_t* mCblk;          // control block for the single fast client, or NULL
 
     audio_format_t  mFastPatchRecordFormat = AUDIO_FORMAT_INVALID;
