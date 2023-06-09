@@ -79,6 +79,12 @@ private:
     unsigned mHeaderOffset;
     bool mWroteHeader;
     char mHeader[FLAC_HEADER_SIZE];
+    struct OutputBuffer {
+        std::shared_ptr<C2Buffer> buffer;
+        c2_cntr64_t timestampUs;
+        std::uint64_t frameIndex;
+    };
+    std::list<OutputBuffer> mOutputBuffers;
 
     C2_DO_NOT_COPY(C2SoftFlacEnc);
 };
