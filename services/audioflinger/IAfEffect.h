@@ -109,6 +109,11 @@ public:
     virtual sp<IAfEffectModule> asEffectModule() = 0;
     virtual sp<IAfDeviceEffectProxy> asDeviceEffectProxy() = 0;
 
+    virtual status_t command(int32_t cmdCode,
+            const std::vector<uint8_t>& cmdData,
+            int32_t maxReplySize,
+            std::vector<uint8_t>* reply) = 0;
+
     virtual void dump(int fd, const Vector<String16>& args) const = 0;
 
 private:
@@ -116,11 +121,6 @@ private:
     virtual status_t setEnabled_l(bool enabled) = 0;
     virtual void setSuspended(bool suspended) = 0;
     virtual bool suspended() const = 0;
-
-    virtual status_t command(int32_t cmdCode,
-            const std::vector<uint8_t>& cmdData,
-            int32_t maxReplySize,
-            std::vector<uint8_t>* reply) = 0;
 
     virtual ssize_t disconnectHandle(IAfEffectHandle *handle, bool unpinIfLast) = 0;
     virtual ssize_t removeHandle_l(IAfEffectHandle *handle) = 0;

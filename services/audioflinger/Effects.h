@@ -707,6 +707,11 @@ public:
     audio_channel_mask_t channelMask() const final;
     uint32_t channelCount() const final;
 
+    status_t command(int32_t cmdCode,
+                     const std::vector<uint8_t>& cmdData,
+                     int32_t maxReplySize,
+                     std::vector<uint8_t>* reply) final;
+
     void dump2(int fd, int spaces) const final;
 
 private:

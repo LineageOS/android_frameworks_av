@@ -3472,6 +3472,23 @@ status_t DeviceEffectProxy::removeEffectFromHal(
     return mManagerCallback->removeEffectFromHal(&mDevicePort, effect);
 }
 
+status_t DeviceEffectProxy::command(
+        int32_t cmdCode, const std::vector<uint8_t>& cmdData, int32_t maxReplySize,
+        std::vector<uint8_t>* reply) {
+    Mutex::Autolock _l(mProxyLock);
+    status_t status = EffectBase::command(cmdCode, cmdData, maxReplySize, reply);
+    if (status == NO_ERROR) {
+        for (auto& handle : mEffectHandles) {
+            sp<IAfEffectBase> effect = handle.second->effect().promote();
+            if (effect != nullptr) {
+                status = effect->command(cmdCode, cmdData, maxReplySize, reply);
+            }
+        }
+    }
+    ALOGV("%s status %d", __func__, status);
+    return status;
+}
+
 bool DeviceEffectProxy::isOutput() const {
     if (mDevicePort.id != AUDIO_PORT_HANDLE_NONE) {
         return mDevicePort.role == AUDIO_PORT_ROLE_SINK;
