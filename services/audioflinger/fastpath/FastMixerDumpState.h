@@ -56,7 +56,7 @@ private:
 struct FastTrackDump {
     FastTrackUnderruns  mUnderruns;
     size_t              mFramesReady = 0;    // most recent value only; no long-term statistics kept
-    int64_t             mFramesWritten;      // last value from track
+    int64_t             mFramesWritten = 0;  // last value from track
 };
 
 // No virtuals.
