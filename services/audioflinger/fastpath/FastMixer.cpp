@@ -61,38 +61,19 @@ FastMixer::FastMixer(audio_io_handle_t parentIoHandle)
     : FastThread("cycle_ms", "load_us"),
     // mFastTrackNames
     // mGenerations
-    mOutputSink(nullptr),
-    mOutputSinkGen(0),
-    mMixer(nullptr),
-    mSinkBuffer(nullptr),
-    mSinkBufferSize(0),
-    mSinkChannelCount(FCC_2),
-    mMixerBuffer(nullptr),
-    mMixerBufferSize(0),
-    mMixerBufferState(UNDEFINED),
-    mFormat(Format_Invalid),
-    mSampleRate(0),
-    mFastTracksGen(0),
-    mTotalNativeFramesWritten(0),
     // timestamp
-    mNativeFramesWrittenButNotPresented(0),   // the = 0 is to silence the compiler
-    mMasterMono(false),
     mThreadIoHandle(parentIoHandle)
 {
     // FIXME pass sInitial as parameter to base class constructor, and make it static local
     mPrevious = &sInitial;
     mCurrent = &sInitial;
-
     mDummyDumpState = &mDummyFastMixerDumpState;
+
     // TODO: Add channel mask to NBAIO_Format.
     // We assume that the channel mask must be a valid positional channel mask.
     mSinkChannelMask = getChannelMaskFromCount(mSinkChannelCount);
     mBalance.setChannelMask(mSinkChannelMask);
 
-    unsigned i;
-    for (i = 0; i < FastMixerState::sMaxFastTracks; ++i) {
-        mGenerations[i] = 0;
-    }
 #ifdef FAST_THREAD_STATISTICS
     mOldLoad.tv_sec = 0;
     mOldLoad.tv_nsec = 0;
