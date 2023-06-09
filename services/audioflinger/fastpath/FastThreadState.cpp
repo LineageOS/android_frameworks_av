@@ -19,12 +19,6 @@
 
 namespace android {
 
-FastThreadState::FastThreadState() :
-    mCommand(INITIAL), mColdFutexAddr(nullptr), mColdGen(0), mDumpState(nullptr)
-    , mNBLogWriter(nullptr)
-{
-}
-
 // static
 const char *FastThreadState::commandToString(FastThreadState::Command command)
 {

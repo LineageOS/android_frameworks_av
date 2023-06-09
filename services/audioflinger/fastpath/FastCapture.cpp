@@ -30,17 +30,13 @@
 
 namespace android {
 
-/*static*/ const FastCaptureState FastCapture::sInitial;
+/*static*/ const FastCaptureState FastCapture::sInitial{};
 
-FastCapture::FastCapture() : FastThread("cycleC_ms", "loadC_us"),
-    mInputSource(nullptr), mInputSourceGen(0), mPipeSink(nullptr), mPipeSinkGen(0),
-    mReadBuffer(nullptr), mReadBufferState(-1), mFormat(Format_Invalid), mSampleRate(0),
-    // mDummyDumpState
-    mTotalNativeFramesRead(0)
+FastCapture::FastCapture() : FastThread("cycleC_ms", "loadC_us")
 {
+    // base class initialization
     mPrevious = &sInitial;
     mCurrent = &sInitial;
-
     mDummyDumpState = &mDummyFastCaptureDumpState;
 }
 

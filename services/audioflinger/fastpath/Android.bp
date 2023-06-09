@@ -61,16 +61,7 @@ fastpath_tidy_errors = [
     "-bugprone-narrowing-conversions", // b/182410845
 
     // TODO(b/275642749) Reenable these warnings
-    "-bugprone-assignment-in-if-condition",
-    "-bugprone-forward-declaration-namespace",
-    "-bugprone-parent-virtual-call",
-    "-cert-dcl59-cpp",
-    "-cert-err34-c",
-    "-google-runtime-int",
     "-misc-non-private-member-variables-in-classes",
-    "-modernize-concat-nested-namespaces",
-    "-modernize-loop-convert",
-    "-modernize-use-default-member-init",
     "-performance-no-int-to-ptr",
 ]
 

@@ -38,19 +38,6 @@ void StateQueueMutatorDump::dump(int fd)
 }
 #endif
 
-// Constructor and destructor
-
-template<typename T> StateQueue<T>::StateQueue() :
-    mAck(nullptr), mCurrent(nullptr),
-    mMutating(&mStates[0]), mExpecting(nullptr),
-    mInMutation(false), mIsDirty(false), mIsInitialized(false)
-#ifdef STATE_QUEUE_DUMP
-    , mObserverDump(&mObserverDummyDump), mMutatorDump(&mMutatorDummyDump)
-#endif
-{
-    atomic_init(&mNext, static_cast<uintptr_t>(0));
-}
-
 // Observer APIs
 
 template<typename T> const T* StateQueue<T>::poll()
