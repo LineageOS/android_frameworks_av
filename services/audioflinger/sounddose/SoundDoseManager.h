@@ -129,7 +129,7 @@ private:
               mSoundDoseCallback(callback) {}
 
         /** IBinder::DeathRecipient. Listen to the death of ISoundDoseCallback. */
-        virtual void binderDied(const wp<IBinder>& who);
+        void binderDied(const wp<IBinder>& who) override;
 
         /** BnSoundDose override */
         binder::Status setOutputRs2UpperBound(float value) override;
