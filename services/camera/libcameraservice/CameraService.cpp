@@ -87,6 +87,7 @@ namespace {
     const char* kActivityServiceName = "activity";
     const char* kSensorPrivacyServiceName = "sensor_privacy";
     const char* kAppopsServiceName = "appops";
+    const char* kProcessInfoServiceName = "processinfo";
 }; // namespace anonymous
 
 namespace android {
@@ -1589,33 +1590,6 @@ status_t CameraService::handleEvictionsLocked(const String8& cameraId, int clien
             }
         }
 
-        // Get current active client PIDs
-        std::vector<int> ownerPids(mActiveClientManager.getAllOwners());
-        ownerPids.push_back(clientPid);
-
-        std::vector<int> priorityScores(ownerPids.size());
-        std::vector<int> states(ownerPids.size());
-
-        // Get priority scores of all active PIDs
-        status_t err = ProcessInfoService::getProcessStatesScoresFromPids(
-                ownerPids.size(), &ownerPids[0], /*out*/&states[0],
-                /*out*/&priorityScores[0]);
-        if (err != OK) {
-            ALOGE("%s: Priority score query failed: %d",
-                  __FUNCTION__, err);
-            return err;
-        }
-
-        // Update all active clients' priorities
-        std::map<int,resource_policy::ClientPriority> pidToPriorityMap;
-        for (size_t i = 0; i < ownerPids.size() - 1; i++) {
-            pidToPriorityMap.emplace(ownerPids[i],
-                    resource_policy::ClientPriority(priorityScores[i], states[i],
-                            /* isVendorClient won't get copied over*/ false,
-                            /* oomScoreOffset won't get copied over*/ 0));
-        }
-        mActiveClientManager.updatePriorities(pidToPriorityMap);
-
         // Get state for the given cameraId
         auto state = getCameraState(cameraId);
         if (state == nullptr) {
@@ -1625,16 +1599,57 @@ status_t CameraService::handleEvictionsLocked(const String8& cameraId, int clien
             return BAD_VALUE;
         }
 
-        int32_t actualScore = priorityScores[priorityScores.size() - 1];
-        int32_t actualState = states[states.size() - 1];
+        sp<IServiceManager> sm = defaultServiceManager();
+        sp<IBinder> binder = sm->checkService(String16(kProcessInfoServiceName));
+        if (!binder && isAutomotivePrivilegedClient(CameraThreadState::getCallingUid())) {
+            // If processinfo service is not available and the client is automotive privileged
+            // client used for safety critical uses cases such as rear-view and surround-view which
+            // needs to be available before android boot completes, then use the hardcoded values
+            // for the process state and priority score. As this scenario is before android system
+            // services are up and client is native client, hence using NATIVE_ADJ as the priority
+            // score and state as PROCESS_STATE_BOUND_TOP as such automotive apps need to be
+            // visible on the top.
+            clientDescriptor = CameraClientManager::makeClientDescriptor(cameraId,
+                    sp<BasicClient>{nullptr}, static_cast<int32_t>(state->getCost()),
+                    state->getConflicting(), resource_policy::NATIVE_ADJ, clientPid,
+                    ActivityManager::PROCESS_STATE_BOUND_TOP, oomScoreOffset, systemNativeClient);
+        } else {
+            // Get current active client PIDs
+            std::vector<int> ownerPids(mActiveClientManager.getAllOwners());
+            ownerPids.push_back(clientPid);
 
-        // Make descriptor for incoming client. We store the oomScoreOffset
-        // since we might need it later on new handleEvictionsLocked and
-        // ProcessInfoService would not take that into account.
-        clientDescriptor = CameraClientManager::makeClientDescriptor(cameraId,
-                sp<BasicClient>{nullptr}, static_cast<int32_t>(state->getCost()),
-                state->getConflicting(), actualScore, clientPid, actualState,
-                oomScoreOffset, systemNativeClient);
+            std::vector<int> priorityScores(ownerPids.size());
+            std::vector<int> states(ownerPids.size());
+
+            // Get priority scores of all active PIDs
+            status_t err = ProcessInfoService::getProcessStatesScoresFromPids(ownerPids.size(),
+                    &ownerPids[0], /*out*/&states[0], /*out*/&priorityScores[0]);
+            if (err != OK) {
+                ALOGE("%s: Priority score query failed: %d", __FUNCTION__, err);
+                return err;
+            }
+
+            // Update all active clients' priorities
+            std::map<int,resource_policy::ClientPriority> pidToPriorityMap;
+            for (size_t i = 0; i < ownerPids.size() - 1; i++) {
+                pidToPriorityMap.emplace(ownerPids[i],
+                        resource_policy::ClientPriority(priorityScores[i], states[i],
+                        /* isVendorClient won't get copied over*/ false,
+                        /* oomScoreOffset won't get copied over*/ 0));
+            }
+            mActiveClientManager.updatePriorities(pidToPriorityMap);
+
+            int32_t actualScore = priorityScores[priorityScores.size() - 1];
+            int32_t actualState = states[states.size() - 1];
+
+            // Make descriptor for incoming client. We store the oomScoreOffset
+            // since we might need it later on new handleEvictionsLocked and
+            // ProcessInfoService would not take that into account.
+            clientDescriptor = CameraClientManager::makeClientDescriptor(cameraId,
+                    sp<BasicClient>{nullptr}, static_cast<int32_t>(state->getCost()),
+                    state->getConflicting(), actualScore, clientPid, actualState,
+                    oomScoreOffset, systemNativeClient);
+        }
 
         resource_policy::ClientPriority clientPriority = clientDescriptor->getPriority();
 
