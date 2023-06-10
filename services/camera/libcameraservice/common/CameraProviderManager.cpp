@@ -1127,8 +1127,8 @@ status_t CameraProviderManager::ProviderInfo::DeviceInfo3::deriveJpegRTags(bool 
     const int32_t scalerSizesTag =
               SessionConfigurationUtils::getAppropriateModeTag(
                       ANDROID_SCALER_AVAILABLE_STREAM_CONFIGURATIONS, maxResolution);
-    const int32_t scalerMinFrameDurationsTag =
-            ANDROID_SCALER_AVAILABLE_MIN_FRAME_DURATIONS;
+    const int32_t scalerMinFrameDurationsTag = SessionConfigurationUtils::getAppropriateModeTag(
+            ANDROID_SCALER_AVAILABLE_MIN_FRAME_DURATIONS, maxResolution);
     const int32_t scalerStallDurationsTag =
                  SessionConfigurationUtils::getAppropriateModeTag(
                         ANDROID_SCALER_AVAILABLE_STALL_DURATIONS, maxResolution);
