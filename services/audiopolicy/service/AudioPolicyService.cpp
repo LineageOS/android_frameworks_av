@@ -21,9 +21,11 @@
 #undef __STRICT_ANSI__
 #define __STDINT_LIMITS
 #define __STDC_LIMIT_MACROS
+#include <map>
 #include <stdint.h>
 #include <sys/time.h>
 
+#include <android/content/pm/IPackageManagerNative.h>
 #include <audio_utils/clock.h>
 #include <binder/IServiceManager.h>
 #include <utils/Log.h>
@@ -54,6 +56,37 @@ static const nsecs_t kAudioCommandTimeoutNs = seconds(3); // 3 seconds
 
 static const String16 sManageAudioPolicyPermission("android.permission.MANAGE_AUDIO_POLICY");
 
+namespace {
+int getTargetSdkForPackageName(String16 packageName) {
+    const auto binder = defaultServiceManager()->checkService(String16{"package_native"});
+    int targetSdk = -1;
+    if (binder != nullptr) {
+        const auto pm = interface_cast<content::pm::IPackageManagerNative>(binder);
+        if (pm != nullptr) {
+            const auto status = pm->getTargetSdkVersionForPackage(packageName, &targetSdk);
+            ALOGI("Capy check package %s, sdk %d", String8(packageName).string(), targetSdk);
+            return status.isOk() ? targetSdk : -1;
+        }
+    }
+    return targetSdk;
+}
+
+bool doesUidTargetAtLeastU(uid_t uid) {
+    Vector<String16> packages;
+    PermissionController pc;
+    pc.getPackagesForUid(uid, packages);
+    constexpr int ANDROID_API_U = 34;
+    return packages.empty() || (getTargetSdkForPackageName(packages[0]) >= ANDROID_API_U);
+}
+
+bool doesUidTargetAtLeastUCached(uid_t uid) {
+    static std::map<uid_t, bool> cache;
+    const auto it = cache.find(uid);
+    return it == cache.end() ? (cache[uid] = doesUidTargetAtLeastU(uid)) : it->second;
+}
+
+
+} // anonymous
 // ----------------------------------------------------------------------------
 
 AudioPolicyService::AudioPolicyService()
@@ -1076,9 +1109,29 @@ void AudioPolicyService::UidPolicy::onUidIdle(uid_t uid, __unused bool disabled)
 void AudioPolicyService::UidPolicy::onUidStateChanged(uid_t uid,
                                                       int32_t procState,
                                                       int64_t procStateSeq __unused,
-                                                      int32_t capability __unused) {
+                                                      int32_t capability) {
     if (procState != ActivityManager::PROCESS_STATE_UNKNOWN) {
-        updateUid(&mCachedUids, uid, true, procState, true);
+        if (doesUidTargetAtLeastUCached(uid)) {
+            // See ActivityManager.java
+            constexpr int32_t PROCESS_CAPABILITY_FOREGROUND_MICROPHONE = 1 << 2;
+            if (capability & PROCESS_CAPABILITY_FOREGROUND_MICROPHONE) {
+                // The implementation relies on the assumption that this callback is preceded by
+                // onUidActive. This may not be the case if we have lost and then regained the
+                // capability, since we simulate onUidIdle below. So, we simulate onUidActive.
+                // In the typical case where we  haven't regained capability, this is a no-op, since
+                // we should've been preceded by an onUidActive callback anyway.
+                updateUid(&mCachedUids, uid, true /* active */,
+                        ActivityManager::PROCESS_STATE_UNKNOWN, true /* insert */);
+                updateUid(&mCachedUids, uid, true /* active */, procState, true /* insert */);
+            } else {
+                // If we have lost the capability (e.g. moving to background), treat as-if we have
+                // gotten onUidIdle.
+                updateUid(&mCachedUids, uid, false /* active */,
+                        ActivityManager::PROCESS_STATE_UNKNOWN, true /* insert */);
+            }
+        } else {
+            updateUid(&mCachedUids, uid, true, procState, true);
+        }
     }
 }
 
