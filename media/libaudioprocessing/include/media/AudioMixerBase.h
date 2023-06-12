@@ -299,6 +299,16 @@ public:
 
         uint32_t       mInputFrameSize; // The track input frame size, used for tee buffer
 
+        // consider volume muted only if all channel volume (floating point) is 0.f
+        inline bool isVolumeMuted() const {
+            for (const auto volume : mVolume) {
+                if (volume != 0) {
+                    return false;
+                }
+            }
+            return true;
+        }
+
       protected:
 
         // hooks
