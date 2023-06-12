@@ -453,9 +453,9 @@ void AudioMixerBase::setParameter(int name, int target, int param, void *value)
                         &track->mVolume[param - VOLUME0],
                         &track->mPrevVolume[param - VOLUME0],
                         &track->mVolumeInc[param - VOLUME0])) {
-                    ALOGV("setParameter(%s, VOLUME%d: %04x)",
-                            target == VOLUME ? "VOLUME" : "RAMP_VOLUME", param - VOLUME0,
-                                    track->volume[param - VOLUME0]);
+                    ALOGV("setParameter(%s, VOLUME%d: %f)",
+                          target == VOLUME ? "VOLUME" : "RAMP_VOLUME", param - VOLUME0,
+                          track->mVolume[param - VOLUME0]);
                     invalidate();
                 }
             } else {
@@ -630,7 +630,7 @@ void AudioMixerBase::process__validate()
 
         if (t->volumeInc[0]|t->volumeInc[1]) {
             volumeRamp = true;
-        } else if (!t->doesResample() && t->volumeRL == 0) {
+        } else if (!t->doesResample() && t->isVolumeMuted()) {
             n |= NEEDS_MUTE;
         }
         t->needs = n;
@@ -730,7 +730,7 @@ void AudioMixerBase::process__validate()
 
         for (const int name : mEnabled) {
             const std::shared_ptr<TrackBase> &t = mTracks[name];
-            if (!t->doesResample() && t->volumeRL == 0) {
+            if (!t->doesResample() && t->isVolumeMuted()) {
                 t->needs |= NEEDS_MUTE;
                 t->hook = &TrackBase::track__nop;
             } else {
