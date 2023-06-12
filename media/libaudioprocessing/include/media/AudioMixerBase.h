@@ -290,6 +290,16 @@ public:
         audio_channel_mask_t mMixerChannelMask;
         uint32_t             mMixerChannelCount;
 
+        // consider volume muted only if all channel volume (floating point) is 0.f
+        inline bool isVolumeMuted() const {
+            for (const auto volume : mVolume) {
+                if (volume != 0) {
+                    return false;
+                }
+            }
+            return true;
+        }
+
       protected:
 
         // hooks
