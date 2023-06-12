@@ -138,7 +138,7 @@ public:
      */
     status_t setUserIdDeviceAffinities(int userId, const AudioDeviceTypeAddrVector& devices);
     status_t removeUserIdDeviceAffinities(int userId);
-    status_t getDevicesForUserId(int userId, Vector<AudioDeviceTypeAddr>& devices) const;
+    status_t getDevicesForUserId(int userId, AudioDeviceTypeAddrVector& devices) const;
 
     void dump(String8 *dst) const;
 

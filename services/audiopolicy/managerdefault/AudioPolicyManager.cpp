@@ -3788,6 +3788,44 @@ bool  AudioPolicyManager::areAllDevicesSupported(
     return true;
 }
 
+void AudioPolicyManager::changeOutputDevicesMuteState(
+        const AudioDeviceTypeAddrVector& devices) {
+    ALOGVV("%s() num devices %zu", __func__, devices.size());
+
+    std::vector<sp<SwAudioOutputDescriptor>> outputs =
+            getSoftwareOutputsForDevices(devices);
+
+    for (size_t i = 0; i < outputs.size(); i++) {
+        sp<SwAudioOutputDescriptor> outputDesc = outputs[i];
+        DeviceVector prevDevices = outputDesc->devices();
+        checkDeviceMuteStrategies(outputDesc, prevDevices, 0 /* delayMs */);
+    }
+}
+
+std::vector<sp<SwAudioOutputDescriptor>> AudioPolicyManager::getSoftwareOutputsForDevices(
+        const AudioDeviceTypeAddrVector& devices) const
+{
+    std::vector<sp<SwAudioOutputDescriptor>> outputs;
+    DeviceVector deviceDescriptors;
+    for (size_t j = 0; j < devices.size(); j++) {
+        sp<DeviceDescriptor> desc = mHwModules.getDeviceDescriptor(
+                devices[j].mType, devices[j].getAddress(), String8(), AUDIO_FORMAT_DEFAULT);
+        if (desc == nullptr || !audio_is_output_device(devices[j].mType)) {
+            ALOGE("%s: device type %#x address %s not supported or not an output device",
+                __func__, devices[j].mType, devices[j].getAddress());
+                    continue;
+        }
+        deviceDescriptors.add(desc);
+    }
+    for (size_t i = 0; i < mOutputs.size(); i++) {
+        if (!mOutputs.valueAt(i)->supportsAtLeastOne(deviceDescriptors)) {
+            continue;
+        }
+        outputs.push_back(mOutputs.valueAt(i));
+    }
+    return outputs;
+}
+
 status_t AudioPolicyManager::setUidDeviceAffinities(uid_t uid,
         const AudioDeviceTypeAddrVector& devices) {
     ALOGV("%s() uid=%d num devices %zu", __FUNCTION__, uid, devices.size());
@@ -3854,7 +3892,8 @@ status_t AudioPolicyManager::setDevicesRoleForStrategy(product_strategy_t strate
     return NO_ERROR;
 }
 
-void AudioPolicyManager::updateCallAndOutputRouting(bool forceVolumeReeval, uint32_t delayMs)
+void AudioPolicyManager::updateCallAndOutputRouting(bool forceVolumeReeval, uint32_t delayMs,
+    bool skipDelays)
 {
     uint32_t waitMs = 0;
     bool wasLeUnicastActive = isLeUnicastActive();
@@ -3880,8 +3919,8 @@ void AudioPolicyManager::updateCallAndOutputRouting(bool forceVolumeReeval, uint
                 continue;
             }
             waitMs = setOutputDevices(outputDesc, newDevices, forceRouting, delayMs, nullptr,
-                                      true /*requiresMuteCheck*/,
-                                      !forceRouting /*requiresVolumeCheck*/);
+                                      !skipDelays /*requiresMuteCheck*/,
+                                      !forceRouting /*requiresVolumeCheck*/, skipDelays);
             // Only apply special touch sound delay once
             delayMs = 0;
         }
@@ -4066,13 +4105,18 @@ status_t AudioPolicyManager::setUserIdDeviceAffinities(int userId,
 
     // reevaluate outputs for all devices
     checkForDeviceAndOutputChanges();
-    updateCallAndOutputRouting();
+    changeOutputDevicesMuteState(devices);
+    updateCallAndOutputRouting(false /* forceVolumeReeval */, 0 /* delayMs */,
+        true /* skipDelays */);
+    changeOutputDevicesMuteState(devices);
 
     return NO_ERROR;
 }
 
 status_t AudioPolicyManager::removeUserIdDeviceAffinities(int userId) {
     ALOGV("%s() userId=%d", __FUNCTION__, userId);
+    AudioDeviceTypeAddrVector devices;
+    mPolicyMixes.getDevicesForUserId(userId, devices);
     status_t status = mPolicyMixes.removeUserIdDeviceAffinities(userId);
     if (status != NO_ERROR) {
         ALOGE("%s() Could not remove all device affinities fo userId = %d",
@@ -4082,7 +4126,10 @@ status_t AudioPolicyManager::removeUserIdDeviceAffinities(int userId) {
 
     // reevaluate outputs for all devices
     checkForDeviceAndOutputChanges();
-    updateCallAndOutputRouting();
+    changeOutputDevicesMuteState(devices);
+    updateCallAndOutputRouting(false /* forceVolumeReeval */, 0 /* delayMs */,
+        true /* skipDelays */);
+    changeOutputDevicesMuteState(devices);
 
     return NO_ERROR;
 }
@@ -7329,7 +7376,8 @@ uint32_t AudioPolicyManager::setOutputDevices(const sp<SwAudioOutputDescriptor>&
                                               bool force,
                                               int delayMs,
                                               audio_patch_handle_t *patchHandle,
-                                              bool requiresMuteCheck, bool requiresVolumeCheck)
+                                              bool requiresMuteCheck, bool requiresVolumeCheck,
+                                              bool skipMuteDelay)
 {
     // TODO(b/262404095): Consider if the output need to be reopened.
     ALOGV("%s device %s delayMs %d", __func__, devices.toString().c_str(), delayMs);
@@ -7337,9 +7385,9 @@ uint32_t AudioPolicyManager::setOutputDevices(const sp<SwAudioOutputDescriptor>&
 
     if (outputDesc->isDuplicated()) {
         muteWaitMs = setOutputDevices(outputDesc->subOutput1(), devices, force, delayMs,
-                nullptr /* patchHandle */, requiresMuteCheck);
+                nullptr /* patchHandle */, requiresMuteCheck, skipMuteDelay);
         muteWaitMs += setOutputDevices(outputDesc->subOutput2(), devices, force, delayMs,
-                nullptr /* patchHandle */, requiresMuteCheck);
+                nullptr /* patchHandle */, requiresMuteCheck, skipMuteDelay);
         return muteWaitMs;
     }
 
@@ -7405,12 +7453,16 @@ uint32_t AudioPolicyManager::setOutputDevices(const sp<SwAudioOutputDescriptor>&
 
         // Add half reported latency to delayMs when muteWaitMs is null in order
         // to avoid disordered sequence of muting volume and changing devices.
-        installPatch(__func__, patchHandle, outputDesc.get(), patchBuilder.patch(),
-                muteWaitMs == 0 ? (delayMs + (outputDesc->latency() / 2)) : delayMs);
+        int actualDelayMs = !skipMuteDelay && muteWaitMs == 0
+                ? (delayMs + (outputDesc->latency() / 2)) : delayMs;
+        installPatch(__func__, patchHandle, outputDesc.get(), patchBuilder.patch(), actualDelayMs);
     }
 
-    // update stream volumes according to new device
-    applyStreamVolumes(outputDesc, filteredDevices.types(), delayMs);
+    // Since the mute is skip, also skip the apply stream volume as that will be applied externally
+    if (!skipMuteDelay) {
+        // update stream volumes according to new device
+        applyStreamVolumes(outputDesc, filteredDevices.types(), delayMs);
+    }
 
     return muteWaitMs;
 }

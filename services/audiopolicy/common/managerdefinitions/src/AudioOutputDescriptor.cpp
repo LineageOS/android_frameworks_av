@@ -389,6 +389,11 @@ bool SwAudioOutputDescriptor::supportsAllDevices(const DeviceVector &devices) co
     return supportedDevices().containsAllDevices(devices);
 }
 
+bool SwAudioOutputDescriptor::supportsAtLeastOne(const DeviceVector &devices) const
+{
+    return filterSupportedDevices(devices).size() > 0;
+}
+
 bool SwAudioOutputDescriptor::supportsDevicesForPlayback(const DeviceVector &devices) const
 {
     // No considering duplicated output
