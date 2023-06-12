@@ -54,7 +54,7 @@ class EffectConversionHelperAidl {
     EffectConversionHelperAidl(
             std::shared_ptr<::aidl::android::hardware::audio::effect::IEffect> effect,
             int32_t sessionId, int32_t ioId,
-            const ::aidl::android::hardware::audio::effect::Descriptor& desc);
+            const ::aidl::android::hardware::audio::effect::Descriptor& desc, bool isProxy);
 
     status_t handleSetParameter(uint32_t cmdSize, const void* pCmdData, uint32_t* replySize,
                                 void* pReplyData);
