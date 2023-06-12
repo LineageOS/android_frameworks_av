@@ -26,8 +26,9 @@ class AidlConversionAgc1 : public EffectConversionHelperAidl {
   public:
     AidlConversionAgc1(std::shared_ptr<::aidl::android::hardware::audio::effect::IEffect> effect,
                        int32_t sessionId, int32_t ioId,
-                       const ::aidl::android::hardware::audio::effect::Descriptor& desc)
-        : EffectConversionHelperAidl(effect, sessionId, ioId, desc) {}
+                       const ::aidl::android::hardware::audio::effect::Descriptor& desc,
+                       bool isProxyEffect)
+        : EffectConversionHelperAidl(effect, sessionId, ioId, desc, isProxyEffect) {}
     ~AidlConversionAgc1() {}
 
   private:
