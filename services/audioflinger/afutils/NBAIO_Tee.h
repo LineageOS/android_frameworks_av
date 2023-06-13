@@ -216,7 +216,7 @@ private:
             // Note: as mentioned in NBAIO_Tee::set(), don't call set() while write() is
             // ongoing.
             if (enabled) {
-                std::lock_guard<std::mutex> _l(mLock);
+                const std::lock_guard<std::mutex> _l(mLock);
                 mFlags = flags;
                 mFormat = format; // could get this from the Sink.
                 mFrames = frames;
@@ -228,7 +228,7 @@ private:
         }
 
         void setId(const std::string &id) {
-            std::lock_guard<std::mutex> _l(mLock);
+            const std::lock_guard<std::mutex> _l(mLock);
             mId = id;
         }
 
@@ -237,7 +237,7 @@ private:
             std::string suffix;
             NBAIO_SinkSource sinkSource;
             {
-                std::lock_guard<std::mutex> _l(mLock);
+                const std::lock_guard<std::mutex> _l(mLock);
                 suffix = mId + reason;
                 sinkSource = mSinkSource;
             }
@@ -281,13 +281,13 @@ private:
     class RunningTees {
     public:
         void add(const std::shared_ptr<NBAIO_TeeImpl> &tee) {
-            std::lock_guard<std::mutex> _l(mLock);
+            const std::lock_guard<std::mutex> _l(mLock);
             ALOGW_IF(!mTees.emplace(tee).second,
                     "%s: %p already exists in mTees", __func__, tee.get());
         }
 
         void remove(const std::shared_ptr<NBAIO_TeeImpl> &tee) {
-            std::lock_guard<std::mutex> _l(mLock);
+            const std::lock_guard<std::mutex> _l(mLock);
             ALOGW_IF(mTees.erase(tee) != 1,
                     "%s: %p doesn't exist in mTees", __func__, tee.get());
         }
@@ -295,7 +295,7 @@ private:
         void dump(int fd, const std::string &reason) {
             std::vector<std::shared_ptr<NBAIO_TeeImpl>> tees; // safe snapshot of tees
             {
-                std::lock_guard<std::mutex> _l(mLock);
+                const std::lock_guard<std::mutex> _l(mLock);
                 tees.insert(tees.end(), mTees.begin(), mTees.end());
             }
             for (const auto &tee : tees) {
@@ -319,5 +319,7 @@ private:
     // This is allowed for maximum concurrency.
     const std::shared_ptr<NBAIO_TeeImpl> mTee;
 }; // NBAIO_Tee
+
+} // namespace android
 
 #endif // TEE_SINK
