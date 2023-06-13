@@ -166,9 +166,9 @@ LVM_ReturnStatus_en LVM_Process(LVM_Handle_t hInstance, const LVM_FLOAT* pInData
              * Bypass mode or everything off, so copy the input to the output
              */
             if (pToProcess != pProcessed) {
-                Copy_Float(pToProcess,                          /* Source */
-                           pProcessed,                          /* Destination */
-                           (LVM_INT16)(NrChannels * NrFrames)); /* Copy all samples */
+                Copy_Float(pToProcess,   /* Source */
+                           pProcessed,   /* Destination */
+                           SampleCount); /* Copy all samples */
             }
 
             /*
