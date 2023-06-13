@@ -403,13 +403,6 @@ void OboeserviceFuzzer::process(const uint8_t *data, size_t size) {
 
     request.getConfiguration().setBufferCapacity(fdp.ConsumeIntegral<int32_t>());
 
-    request.getConfiguration().setHardwareSampleRate(fdp.ConsumeIntegral<int32_t>());
-    request.getConfiguration().setHardwareSamplesPerFrame(fdp.ConsumeIntegral<int32_t>());
-    request.getConfiguration().setHardwareFormat((audio_format_t)(
-        fdp.ConsumeBool()
-            ? fdp.ConsumeIntegral<int32_t>()
-            : kAAudioFormats[fdp.ConsumeIntegralInRange<int32_t>(0, kNumAAudioFormats - 1)]));
-
     auto streamHandleInfo = mClient->openStream(request, configurationOutput);
     if (streamHandleInfo.getHandle() < 0) {
         // invalid request, stream not opened.

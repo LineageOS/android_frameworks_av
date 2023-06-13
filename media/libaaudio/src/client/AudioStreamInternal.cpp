@@ -132,10 +132,6 @@ aaudio_result_t AudioStreamInternal::open(const AudioStreamBuilder &builder) {
 
     request.getConfiguration().setBufferCapacity(builder.getBufferCapacity());
 
-    request.getConfiguration().setHardwareSamplesPerFrame(builder.getHardwareSamplesPerFrame());
-    request.getConfiguration().setHardwareSampleRate(builder.getHardwareSampleRate());
-    request.getConfiguration().setHardwareFormat(builder.getHardwareFormat());
-
     mDeviceChannelCount = getSamplesPerFrame(); // Assume it will be the same. Update if not.
 
     mServiceStreamHandleInfo = mServiceInterface.openStream(request, configurationOutput);
