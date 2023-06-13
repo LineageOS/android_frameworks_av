@@ -237,6 +237,27 @@ TrackClientVector AudioOutputDescriptor::clientsList(bool activeOnly, product_st
     return clients;
 }
 
+size_t AudioOutputDescriptor::sameExclusivePreferredDevicesCount() const
+{
+    audio_port_handle_t deviceId = AUDIO_PORT_HANDLE_NONE;
+    size_t count = 0;
+    for (const auto &client : getClientIterable()) {
+        if (client->active()) {
+            if (!(client->hasPreferredDevice() &&
+                    client->isPreferredDeviceForExclusiveUse())) {
+                return 0;
+            }
+            if (deviceId == AUDIO_PORT_HANDLE_NONE) {
+                deviceId = client->preferredDeviceId();
+            } else if (deviceId != client->preferredDeviceId()) {
+                return 0;
+            }
+            count++;
+        }
+    }
+    return count;
+}
+
 bool AudioOutputDescriptor::isAnyActive(VolumeSource volumeSourceToIgnore) const
 {
     return std::find_if(begin(mActiveClients), end(mActiveClients),

@@ -18,10 +18,11 @@
 #include <android-base/stringprintf.h>
 #include <audio_utils/SimpleLog.h>
 #include "media/HeadTrackingProcessor.h"
+#include "media/QuaternionUtil.h"
 
 #include "ModeSelector.h"
 #include "PoseBias.h"
-#include "QuaternionUtil.h"
+#include "PosePredictor.h"
 #include "ScreenHeadFusion.h"
 #include "StillnessDetector.h"
 
@@ -59,8 +60,8 @@ class HeadTrackingProcessorImpl : public HeadTrackingProcessor {
 
     void setWorldToHeadPose(int64_t timestamp, const Pose3f& worldToHead,
                             const Twist3f& headTwist) override {
-        Pose3f predictedWorldToHead =
-                worldToHead * integrate(headTwist, mOptions.predictionDuration);
+        const Pose3f predictedWorldToHead = mPosePredictor.predict(
+                timestamp, worldToHead, headTwist, mOptions.predictionDuration);
         mHeadPoseBias.setInput(predictedWorldToHead);
         mHeadStillnessDetector.setInput(timestamp, predictedWorldToHead);
         mWorldToHeadTimestamp = timestamp;
@@ -97,7 +98,7 @@ class HeadTrackingProcessorImpl : public HeadTrackingProcessor {
             mModeSelector.setScreenStable(mWorldToScreenTimestamp.value(), screenStable);
             // Whenever the screen is unstable, recenter the head pose.
             if (!screenStable) {
-                recenter(true, false);
+                recenter(true, false, "calculate: screen movement");
             }
             mScreenHeadFusion.setWorldToScreenPose(mWorldToScreenTimestamp.value(),
                                                    worldToLogicalScreen);
@@ -109,7 +110,7 @@ class HeadTrackingProcessorImpl : public HeadTrackingProcessor {
             // Auto-recenter.
             bool headStable = mHeadStillnessDetector.calculate(timestamp);
             if (headStable || !screenStable) {
-                recenter(true, false);
+                recenter(true, false, "calculate: head movement");
                 worldToHead = mHeadPoseBias.getOutput();
             }
 
@@ -139,16 +140,16 @@ class HeadTrackingProcessorImpl : public HeadTrackingProcessor {
 
     HeadTrackingMode getActualMode() const override { return mModeSelector.getActualMode(); }
 
-    void recenter(bool recenterHead, bool recenterScreen) override {
+    void recenter(bool recenterHead, bool recenterScreen, std::string source) override {
         if (recenterHead) {
             mHeadPoseBias.recenter();
             mHeadStillnessDetector.reset();
-            mLocalLog.log("recenter Head");
+            mLocalLog.log("recenter Head from %s", source.c_str());
         }
         if (recenterScreen) {
             mScreenPoseBias.recenter();
             mScreenStillnessDetector.reset();
-            mLocalLog.log("recenter Screen");
+            mLocalLog.log("recenter Screen from %s", source.c_str());
         }
 
         // If a sensor being recentered is included in the current mode, apply rate limiting to
@@ -159,6 +160,10 @@ class HeadTrackingProcessorImpl : public HeadTrackingProcessor {
             (recenterScreen && mode == HeadTrackingMode::SCREEN_RELATIVE)) {
             mRateLimiter.enable();
         }
+    }
+
+    void setPosePredictorType(PosePredictorType type) override {
+        mPosePredictor.setPosePredictorType(type);
     }
 
     std::string toString_l(unsigned level) const override {
@@ -186,6 +191,7 @@ class HeadTrackingProcessorImpl : public HeadTrackingProcessor {
                       prefixSpace.c_str(), mOptions.screenStillnessRotationalThreshold);
         ss += mModeSelector.toString(level + 1);
         ss += mRateLimiter.toString(level + 1);
+        ss += mPosePredictor.toString(level + 1);
         ss.append(prefixSpace + "ReCenterHistory:\n");
         ss += mLocalLog.dumpToString((prefixSpace + " ").c_str(), mMaxLocalLogLine);
         return ss;
@@ -207,6 +213,7 @@ class HeadTrackingProcessorImpl : public HeadTrackingProcessor {
     ScreenHeadFusion mScreenHeadFusion;
     ModeSelector mModeSelector;
     PoseRateLimiter mRateLimiter;
+    PosePredictor mPosePredictor;
     static constexpr std::size_t mMaxLocalLogLine = 10;
     SimpleLog mLocalLog{mMaxLocalLogLine};
 };
@@ -229,6 +236,27 @@ std::string toString(HeadTrackingMode mode) {
     }
     return "EnumNotImplemented";
 };
+
+std::string toString(PosePredictorType posePredictorType) {
+    switch (posePredictorType) {
+        case PosePredictorType::AUTO: return "AUTO";
+        case PosePredictorType::LAST: return "LAST";
+        case PosePredictorType::TWIST: return "TWIST";
+        case PosePredictorType::LEAST_SQUARES: return "LEAST_SQUARES";
+    }
+    return "UNKNOWN" + std::to_string((int)posePredictorType);
+}
+
+bool isValidPosePredictorType(PosePredictorType posePredictorType) {
+    switch (posePredictorType) {
+        case PosePredictorType::AUTO:
+        case PosePredictorType::LAST:
+        case PosePredictorType::TWIST:
+        case PosePredictorType::LEAST_SQUARES:
+            return true;
+    }
+    return false;
+}
 
 }  // namespace media
 }  // namespace android

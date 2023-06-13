@@ -343,6 +343,29 @@ void Camera2ClientBase<TClientBase>::notifyError(
 }
 
 template <typename TClientBase>
+void Camera2ClientBase<TClientBase>::notifyPhysicalCameraChange(const std::string &physicalId) {
+    // We're only interested in this notification if overrideToPortrait is turned on.
+    if (!TClientBase::mOverrideToPortrait) {
+        return;
+    }
+
+    String8 physicalId8(physicalId.c_str());
+    auto physicalCameraMetadata = mDevice->infoPhysical(physicalId8);
+    auto orientationEntry = physicalCameraMetadata.find(ANDROID_SENSOR_ORIENTATION);
+
+    if (orientationEntry.count == 1) {
+        int orientation = orientationEntry.data.i32[0];
+        int rotateAndCropMode = ANDROID_SCALER_ROTATE_AND_CROP_NONE;
+
+        if (orientation == 0 || orientation == 180) {
+            rotateAndCropMode = ANDROID_SCALER_ROTATE_AND_CROP_90;
+        }
+
+        static_cast<TClientBase *>(this)->setRotateAndCropOverride(rotateAndCropMode);
+    }
+}
+
+template <typename TClientBase>
 status_t Camera2ClientBase<TClientBase>::notifyActive(float maxPreviewFps) {
     if (!mDeviceActive) {
         status_t res = TClientBase::startCameraStreamingOps();

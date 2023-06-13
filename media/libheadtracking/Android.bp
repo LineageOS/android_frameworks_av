@@ -16,11 +16,13 @@ cc_library {
       "Pose.cpp",
       "PoseBias.cpp",
       "PoseDriftCompensator.cpp",
+      "PosePredictor.cpp",
       "PoseRateLimiter.cpp",
       "QuaternionUtil.cpp",
       "ScreenHeadFusion.cpp",
       "StillnessDetector.cpp",
       "Twist.cpp",
+      "VectorRecorder.cpp",
     ],
     shared_libs: [
         "libaudioutils",
@@ -35,6 +37,15 @@ cc_library {
     export_header_lib_headers: [
         "libeigen",
     ],
+    cflags: [
+        "-Wthread-safety",
+    ],
+    product_variables: {
+        debuggable: {
+            // enable experiments only in userdebug and eng builds
+            cflags: ["-DENABLE_VERIFICATION"],
+        },
+    },
 }
 
 cc_library {
@@ -76,6 +87,7 @@ cc_test_host {
         "Pose-test.cpp",
         "PoseBias-test.cpp",
         "PoseDriftCompensator-test.cpp",
+        "PosePredictor.cpp",
         "PoseRateLimiter-test.cpp",
         "QuaternionUtil-test.cpp",
         "ScreenHeadFusion-test.cpp",
@@ -84,6 +96,7 @@ cc_test_host {
     ],
     shared_libs: [
         "libaudioutils",
+        "libbase", // StringAppendF
         "libheadtracking",
     ],
 }

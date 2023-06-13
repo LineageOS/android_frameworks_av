@@ -13,6 +13,7 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
+
 #include "SpatializerPoseController.h"
 #include <android-base/stringprintf.h>
 #include <chrono>
@@ -21,8 +22,10 @@
 
 #define LOG_TAG "SpatializerPoseController"
 //#define LOG_NDEBUG 0
+#include <cutils/properties.h>
 #include <sensor/Sensor.h>
 #include <media/MediaMetricsItem.h>
+#include <media/QuaternionUtil.h>
 #include <utils/Log.h>
 #include <utils/SystemClock.h>
 
@@ -45,11 +48,17 @@ constexpr float kMaxTranslationalVelocity = 2;
 // This is how fast, in rad/s, we allow rotation angle to shift during rate-limiting.
 constexpr float kMaxRotationalVelocity = 0.8f;
 
-// This is how far into the future we predict the head pose, using linear extrapolation based on
-// twist (velocity). It should be set to a value that matches the characteristic durations of moving
-// one's head. The higher we set this, the more latency we are able to reduce, but setting this too
-// high will result in high prediction errors whenever the head accelerates (changes velocity).
-constexpr auto kPredictionDuration = 50ms;
+// This is how far into the future we predict the head pose.
+// The prediction duration should be based on the actual latency from
+// head-tracker to audio output, though setting the prediction duration too
+// high may result in higher prediction errors when the head accelerates or
+// decelerates (changes velocity).
+//
+// The head tracking predictor will do a best effort to achieve the requested
+// prediction duration.  If the duration is too far in the future based on
+// current sensor variance, the predictor may internally restrict duration to what
+// is achievable with reasonable confidence as the "best prediction".
+constexpr auto kPredictionDuration = 120ms;
 
 // After not getting a pose sample for this long, we would treat the measurement as stale.
 // The max connection interval is 50ms, and HT sensor event interval can differ depending on the
@@ -97,7 +106,15 @@ SpatializerPoseController::SpatializerPoseController(Listener* listener,
               .maxTranslationalVelocity = kMaxTranslationalVelocity / kTicksPerSecond,
               .maxRotationalVelocity = kMaxRotationalVelocity / kTicksPerSecond,
               .freshnessTimeout = Ticks(kFreshnessTimeout).count(),
-              .predictionDuration = Ticks(kPredictionDuration).count(),
+              .predictionDuration = []() -> float {
+                  const int duration_ms =
+                          property_get_int32("audio.spatializer.prediction_duration_ms", -1);
+                  if (duration_ms >= 0) {
+                      return duration_ms * 1'000'000LL;
+                  } else {
+                      return Ticks(kPredictionDuration).count();
+                  }
+              }(),
               .autoRecenterWindowDuration = Ticks(kAutoRecenterWindowDuration).count(),
               .autoRecenterTranslationalThreshold = kAutoRecenterTranslationThreshold,
               .autoRecenterRotationalThreshold = kAutoRecenterRotationThreshold,
@@ -145,7 +162,14 @@ SpatializerPoseController::SpatializerPoseController(Listener* listener,
                   mShouldCalculate = false;
               }
           }
-      }) {}
+      }) {
+          const media::PosePredictorType posePredictorType =
+                  (media::PosePredictorType)
+                  property_get_int32("audio.spatializer.pose_predictor_type", -1);
+          if (isValidPosePredictorType(posePredictorType)) {
+              mProcessor->setPosePredictorType(posePredictorType);
+          }
+      }
 
 SpatializerPoseController::~SpatializerPoseController() {
     {
@@ -192,7 +216,7 @@ void SpatializerPoseController::setHeadSensor(int32_t sensor) {
         mHeadSensor = INVALID_SENSOR;
     }
 
-    mProcessor->recenter(true /* recenterHead */, false /* recenterScreen */);
+    mProcessor->recenter(true /* recenterHead */, false /* recenterScreen */, __func__);
 }
 
 void SpatializerPoseController::setScreenSensor(int32_t sensor) {
@@ -229,7 +253,7 @@ void SpatializerPoseController::setScreenSensor(int32_t sensor) {
         mScreenSensor = INVALID_SENSOR;
     }
 
-    mProcessor->recenter(false /* recenterHead */, true /* recenterScreen */);
+    mProcessor->recenter(false /* recenterHead */, true /* recenterScreen */, __func__);
 }
 
 void SpatializerPoseController::setDesiredMode(HeadTrackingMode mode) {
@@ -276,30 +300,66 @@ SpatializerPoseController::calculate_l() {
 
 void SpatializerPoseController::recenter() {
     std::lock_guard lock(mMutex);
-    mProcessor->recenter();
+    mProcessor->recenter(true /* recenterHead */, true /* recenterScreen */, __func__);
 }
 
 void SpatializerPoseController::onPose(int64_t timestamp, int32_t sensor, const Pose3f& pose,
                                        const std::optional<Twist3f>& twist, bool isNewReference) {
     std::lock_guard lock(mMutex);
+    constexpr float NANOS_TO_MILLIS = 1e-6;
+    constexpr float RAD_TO_DEGREE = 180.f / M_PI;
+
+    const float delayMs = (elapsedRealtimeNano() - timestamp) * NANOS_TO_MILLIS; // CLOCK_BOOTTIME
+
     if (sensor == mHeadSensor) {
+        std::vector<float> pryprydt(8);  // pitch, roll, yaw, d_pitch, d_roll, d_yaw,
+                                         // discontinuity, timestamp_delay
+        media::quaternionToAngles(pose.rotation(), &pryprydt[0], &pryprydt[1], &pryprydt[2]);
+        if (twist) {
+            const auto rotationalVelocity = twist->rotationalVelocity();
+            // The rotational velocity is an intrinsic transform (i.e. based on the head
+            // coordinate system, not the world coordinate system).  It is a 3 element vector:
+            // axis (d theta / dt).
+            //
+            // We leave rotational velocity relative to the head coordinate system,
+            // as the initial head tracking sensor's world frame is arbitrary.
+            media::quaternionToAngles(media::rotationVectorToQuaternion(rotationalVelocity),
+                    &pryprydt[3], &pryprydt[4], &pryprydt[5]);
+        }
+        pryprydt[6] = isNewReference;
+        pryprydt[7] = delayMs;
+        for (size_t i = 0; i < 6; ++i) {
+            // pitch, roll, yaw in degrees, referenced in degrees on the world frame.
+            // d_pitch, d_roll, d_yaw rotational velocity in degrees/s, based on the world frame.
+            pryprydt[i] *= RAD_TO_DEGREE;
+        }
+        mHeadSensorRecorder.record(pryprydt);
+        mHeadSensorDurableRecorder.record(pryprydt);
+
         mProcessor->setWorldToHeadPose(timestamp, pose,
                                        twist.value_or(Twist3f()) / kTicksPerSecond);
         if (isNewReference) {
-            mProcessor->recenter(true, false);
+            mProcessor->recenter(true, false, __func__);
         }
     }
     if (sensor == mScreenSensor) {
+        std::vector<float> pryt{ 0.f, 0.f, 0.f, delayMs}; // pitch, roll, yaw, timestamp_delay
+        media::quaternionToAngles(pose.rotation(), &pryt[0], &pryt[1], &pryt[2]);
+        for (size_t i = 0; i < 3; ++i) {
+            pryt[i] *= RAD_TO_DEGREE;
+        }
+        mScreenSensorRecorder.record(pryt);
+        mScreenSensorDurableRecorder.record(pryt);
+
         mProcessor->setWorldToScreenPose(timestamp, pose);
         if (isNewReference) {
-            mProcessor->recenter(false, true);
+            mProcessor->recenter(false, true, __func__);
         }
     }
 }
 
 std::string SpatializerPoseController::toString(unsigned level) const {
-    std::string prefixSpace;
-    prefixSpace.append(level, ' ');
+    std::string prefixSpace(level, ' ');
     std::string ss = prefixSpace + "SpatializerPoseController:\n";
     bool needUnlock = false;
 
@@ -315,14 +375,31 @@ std::string SpatializerPoseController::toString(unsigned level) const {
     if (mHeadSensor == INVALID_SENSOR) {
         ss += "HeadSensor: INVALID\n";
     } else {
-        base::StringAppendF(&ss, "HeadSensor: 0x%08x\n", mHeadSensor);
+        base::StringAppendF(&ss, "HeadSensor: 0x%08x "
+            "(active world-to-head : head-relative velocity) "
+            "[ pitch, roll, yaw : d_pitch, d_roll, d_yaw : disc : delay ] "
+            "(degrees, degrees/s, bool, ms)\n", mHeadSensor);
+        ss.append(prefixSpace)
+            .append(" PerMinuteHistory:\n")
+            .append(mHeadSensorDurableRecorder.toString(level + 3))
+            .append(prefixSpace)
+            .append(" PerSecondHistory:\n")
+            .append(mHeadSensorRecorder.toString(level + 3));
     }
 
     ss += prefixSpace;
     if (mScreenSensor == INVALID_SENSOR) {
         ss += "ScreenSensor: INVALID\n";
     } else {
-        base::StringAppendF(&ss, "ScreenSensor: 0x%08x\n", mScreenSensor);
+        base::StringAppendF(&ss, "ScreenSensor: 0x%08x (active world-to-screen) "
+            "[ pitch, roll, yaw : delay ] "
+            "(degrees, ms)\n", mScreenSensor);
+        ss.append(prefixSpace)
+            .append(" PerMinuteHistory:\n")
+            .append(mScreenSensorDurableRecorder.toString(level + 3))
+            .append(prefixSpace)
+            .append(" PerSecondHistory:\n")
+            .append(mScreenSensorRecorder.toString(level + 3));
     }
 
     ss += prefixSpace;

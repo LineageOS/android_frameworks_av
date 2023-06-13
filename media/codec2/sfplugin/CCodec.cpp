@@ -877,6 +877,16 @@ void CCodec::configure(const sp<AMessage> &msg) {
                     if (msg->findInt32(KEY_PUSH_BLANK_BUFFERS_ON_STOP, &pushBlankBuffersOnStop)) {
                         config->mPushBlankBuffersOnStop = pushBlankBuffersOnStop == 1;
                     }
+                    // secure compoment or protected content default with
+                    // "push-blank-buffers-on-shutdown" flag
+                    if (!config->mPushBlankBuffersOnStop) {
+                        int32_t usageProtected;
+                        if (comp->getName().find(".secure") != std::string::npos) {
+                            config->mPushBlankBuffersOnStop = true;
+                        } else if (msg->findInt32("protected", &usageProtected) && usageProtected) {
+                            config->mPushBlankBuffersOnStop = true;
+                        }
+                    }
                 }
             }
             setSurface(surface);
@@ -1869,18 +1879,14 @@ void CCodec::initiateStop() {
         }
         state->set(STOPPING);
     }
-    {
-        Mutexed<std::unique_ptr<Config>>::Locked configLocked(mConfig);
-        const std::unique_ptr<Config> &config = *configLocked;
-        if (config->mPushBlankBuffersOnStop) {
-            mChannel->pushBlankBufferToOutputSurface();
-        }
-    }
     mChannel->reset();
-    (new AMessage(kWhatStop, this))->post();
+    bool pushBlankBuffer = mConfig.lock().get()->mPushBlankBuffersOnStop;
+    sp<AMessage> stopMessage(new AMessage(kWhatStop, this));
+    stopMessage->setInt32("pushBlankBuffer", pushBlankBuffer);
+    stopMessage->post();
 }
 
-void CCodec::stop() {
+void CCodec::stop(bool pushBlankBuffer) {
     std::shared_ptr<Codec2Client::Component> comp;
     {
         Mutexed<State>::Locked state(mState);
@@ -1899,7 +1905,7 @@ void CCodec::stop() {
         comp = state->comp;
     }
     status_t err = comp->stop();
-    mChannel->stopUseOutputSurface();
+    mChannel->stopUseOutputSurface(pushBlankBuffer);
     if (err != C2_OK) {
         // TODO: convert err into status_t
         mCallback->onError(UNKNOWN_ERROR, ACTION_CODE_FATAL);
@@ -1964,21 +1970,16 @@ void CCodec::initiateRelease(bool sendCallback /* = true */) {
             config->mInputSurfaceDataspace = HAL_DATASPACE_UNKNOWN;
         }
     }
-    {
-        Mutexed<std::unique_ptr<Config>>::Locked configLocked(mConfig);
-        const std::unique_ptr<Config> &config = *configLocked;
-        if (config->mPushBlankBuffersOnStop) {
-            mChannel->pushBlankBufferToOutputSurface();
-        }
-    }
 
     mChannel->reset();
+    bool pushBlankBuffer = mConfig.lock().get()->mPushBlankBuffersOnStop;
     // thiz holds strong ref to this while the thread is running.
     sp<CCodec> thiz(this);
-    std::thread([thiz, sendCallback] { thiz->release(sendCallback); }).detach();
+    std::thread([thiz, sendCallback, pushBlankBuffer]
+                { thiz->release(sendCallback, pushBlankBuffer); }).detach();
 }
 
-void CCodec::release(bool sendCallback) {
+void CCodec::release(bool sendCallback, bool pushBlankBuffer) {
     std::shared_ptr<Codec2Client::Component> comp;
     {
         Mutexed<State>::Locked state(mState);
@@ -1993,7 +1994,7 @@ void CCodec::release(bool sendCallback) {
         comp = state->comp;
     }
     comp->release();
-    mChannel->stopUseOutputSurface();
+    mChannel->stopUseOutputSurface(pushBlankBuffer);
 
     {
         Mutexed<State>::Locked state(mState);
@@ -2007,6 +2008,7 @@ void CCodec::release(bool sendCallback) {
 }
 
 status_t CCodec::setSurface(const sp<Surface> &surface) {
+    bool pushBlankBuffer = false;
     {
         Mutexed<std::unique_ptr<Config>>::Locked configLocked(mConfig);
         const std::unique_ptr<Config> &config = *configLocked;
@@ -2032,8 +2034,9 @@ status_t CCodec::setSurface(const sp<Surface> &surface) {
                 return err;
             }
         }
+        pushBlankBuffer = config->mPushBlankBuffersOnStop;
     }
-    return mChannel->setSurface(surface);
+    return mChannel->setSurface(surface, pushBlankBuffer);
 }
 
 void CCodec::signalFlush() {
@@ -2332,7 +2335,11 @@ void CCodec::onMessageReceived(const sp<AMessage> &msg) {
         case kWhatStop: {
             // C2Component::stop() should return within 500ms.
             setDeadline(now, 1500ms, "stop");
-            stop();
+            int32_t pushBlankBuffer;
+            if (!msg->findInt32("pushBlankBuffer", &pushBlankBuffer)) {
+                pushBlankBuffer = 0;
+            }
+            stop(static_cast<bool>(pushBlankBuffer));
             break;
         }
         case kWhatFlush: {

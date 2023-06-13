@@ -1760,6 +1760,15 @@ status_t CameraDeviceClient::setCameraMute(bool enabled) {
     return mDevice->setCameraMute(enabled);
 }
 
+void CameraDeviceClient::setStreamUseCaseOverrides(
+        const std::vector<int64_t>& useCaseOverrides) {
+    mDevice->setStreamUseCaseOverrides(useCaseOverrides);
+}
+
+void CameraDeviceClient::clearStreamUseCaseOverrides() {
+    mDevice->clearStreamUseCaseOverrides();
+}
+
 binder::Status CameraDeviceClient::switchToOffline(
         const sp<hardware::camera2::ICameraDeviceCallbacks>& cameraCb,
         const std::vector<int>& offlineOutputIds,
