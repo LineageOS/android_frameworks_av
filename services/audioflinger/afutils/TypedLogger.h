@@ -15,8 +15,7 @@
  * limitations under the License.
  */
 
-#ifndef ANDROID_TYPED_LOGGER_H
-#define ANDROID_TYPED_LOGGER_H
+#pragma once
 
 // This is the client API for the typed logger.
 
@@ -136,6 +135,5 @@ namespace android::aflog {
 
 NBLog::Writer *getThreadWriter();
 void setThreadWriter(NBLog::Writer *writer);
-} // namespace android::aflog
 
-#endif // ANDROID_TYPED_LOGGER_H
+} // namespace android::aflog
