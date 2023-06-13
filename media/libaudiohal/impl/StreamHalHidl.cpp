@@ -979,9 +979,10 @@ void StreamOutHalHidl::onRecommendedLatencyModeChanged(
 }
 
 status_t StreamOutHalHidl::exit() {
-    // Signal exiting to remote_submix HAL.
+    // Signal exiting to HALs that use intermediate pipes to close them.
     AudioParameter param;
     param.addInt(String8(AudioParameter::keyExiting), 1);
+    param.add(String8(AudioParameter::keyClosing), String8(AudioParameter::valueTrue));
     return setParameters(param.toString());
 }
 
