@@ -535,8 +535,9 @@ protected:
          *        and currently active, allow to have proper drain and avoid pops
          * @param requiresVolumeCheck true if called requires to reapply volume if the routing did
          * not change (but the output is still routed).
+         * @param skipMuteDelay if true will skip mute delay when installing audio patch
          * @return the number of ms we have slept to allow new routing to take effect in certain
-         * cases.
+         *        cases.
          */
         uint32_t setOutputDevices(const sp<SwAudioOutputDescriptor>& outputDesc,
                                   const DeviceVector &device,
@@ -544,7 +545,8 @@ protected:
                                   int delayMs = 0,
                                   audio_patch_handle_t *patchHandle = NULL,
                                   bool requiresMuteCheck = true,
-                                  bool requiresVolumeCheck = false);
+                                  bool requiresVolumeCheck = false,
+                                  bool skipMuteDelay = false);
         status_t resetOutputDevice(const sp<AudioOutputDescriptor>& outputDesc,
                                    int delayMs = 0,
                                    audio_patch_handle_t *patchHandle = NULL);
@@ -647,8 +649,10 @@ protected:
         /**
          * @brief updates routing for all outputs (including call if call in progress).
          * @param delayMs delay for unmuting if required
+         * @param skipDelays if true all the delays will be skip while updating routing
          */
-        void updateCallAndOutputRouting(bool forceVolumeReeval = true, uint32_t delayMs = 0);
+        void updateCallAndOutputRouting(bool forceVolumeReeval = true, uint32_t delayMs = 0,
+                bool skipDelays = false);
 
         bool isCallRxAudioSource(const sp<SourceClientDescriptor> &source) {
             return mCallRxSourceClient != nullptr && source == mCallRxSourceClient;
@@ -1240,6 +1244,21 @@ private:
                 std::function<bool(audio_devices_t)> predicate,
                 const char* context,
                 bool matchAddress = true);
+
+        /**
+         * @brief changeOutputDevicesMuteState mute/unmute devices using checkDeviceMuteStrategies
+         * @param devices devices to mute/unmute
+         */
+        void changeOutputDevicesMuteState(const AudioDeviceTypeAddrVector& devices);
+
+        /**
+         * @brief Returns a vector of software output descriptor that support the queried devices
+         * @param devices devices to query
+         * @param openOutputs open outputs where the devices are supported as determined by
+         *      SwAudioOutputDescriptor::supportsAtLeastOne
+         */
+        std::vector<sp<SwAudioOutputDescriptor>> getSoftwareOutputsForDevices(
+                const AudioDeviceTypeAddrVector& devices) const;
 
         bool isScoRequestedForComm() const;
 
