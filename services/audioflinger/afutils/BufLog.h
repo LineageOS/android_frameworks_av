@@ -14,8 +14,7 @@
  * limitations under the License.
  */
 
-#ifndef ANDROID_AUDIO_BUFLOG_H
-#define ANDROID_AUDIO_BUFLOG_H
+#pragma once
 
 /*
  * BUFLOG creates up to BUFLOG_MAXSTREAMS simultaneous streams [0:15] of audio buffer data
@@ -99,7 +98,6 @@
     BufLogSingleton::instance()->reset(); } } while (0)
 #endif
 
-
 #include <stdint.h>
 #include <stdio.h>
 #include <sys/types.h>
@@ -109,6 +107,8 @@
 #define BUFLOGSTREAM_MAX_TAGSIZE    32
 #define BUFLOG_BASE_PATH            "/data/misc/audioserver"
 #define BUFLOG_MAX_PATH_SIZE        300
+
+namespace android {
 
 class BufLogStream {
 public:
@@ -196,4 +196,4 @@ private:
     static BufLog   *mInstance;
 };
 
-#endif //ANDROID_AUDIO_BUFLOG_H
+} // namespace android
