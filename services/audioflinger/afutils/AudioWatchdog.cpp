@@ -38,12 +38,12 @@ void AudioWatchdogDump::dump(int fd)
             mUnderruns, mLogs, buf);
 }
 
-bool AudioWatchdog::threadLoop()
+bool AudioWatchdog::threadLoop() NO_THREAD_SAFETY_ANALYSIS // unique_lock
 {
     {
-        const AutoMutex _l(mMyLock);
+        std::unique_lock _l(mLock);
         if (mPaused) {
-            mMyCond.wait(mMyLock);
+            mCond.wait(_l);
             // ignore previous timestamp after resume()
             mOldTsValid = false;
             // force an immediate log on first underrun after resume()
@@ -65,7 +65,7 @@ bool AudioWatchdog::threadLoop()
         return true;
     }
     time_t sec = newTs.tv_sec - mOldTs.tv_sec;
-    long nsec = newTs.tv_nsec - mOldTs.tv_nsec;
+    auto nsec = newTs.tv_nsec - mOldTs.tv_nsec;
     if (nsec < 0) {
         --sec;
         nsec += 1000000000;
@@ -81,7 +81,8 @@ bool AudioWatchdog::threadLoop()
         }
     }
     mLogTs.tv_sec += sec;
-    if ((mLogTs.tv_nsec += nsec) >= 1000000000) {
+    mLogTs.tv_nsec += nsec;
+    if (mLogTs.tv_nsec >= 1000000000) {
         mLogTs.tv_sec++;
         mLogTs.tv_nsec -= 1000000000;
     }
@@ -89,7 +90,7 @@ bool AudioWatchdog::threadLoop()
         mDump->mUnderruns = ++mUnderruns;
         if (mLogTs.tv_sec >= MIN_TIME_BETWEEN_LOGS_SEC) {
             mDump->mLogs = ++mLogs;
-            mDump->mMostRecent = time(NULL);
+            mDump->mMostRecent = time(nullptr /* tloc */);
             ALOGW("Insufficient CPU for load: expected=%.1f actual=%.1f ms; underruns=%u logs=%u",
                 mPeriodNs * 1e-6, cycleNs * 1e-6, mUnderruns, mLogs);
             mLogTs.tv_sec = 0;
@@ -99,7 +100,7 @@ bool AudioWatchdog::threadLoop()
     struct timespec req;
     req.tv_sec = 0;
     req.tv_nsec = mPeriodNs;
-    rc = nanosleep(&req, NULL);
+    rc = nanosleep(&req, nullptr /* remaining */);
     if (!((rc == 0) || (rc == -1 && errno == EINTR))) {
         pause();
         return false;
@@ -116,22 +117,23 @@ void AudioWatchdog::requestExit()
 
 void AudioWatchdog::pause()
 {
-    const AutoMutex _l(mMyLock);
+    const std::lock_guard _l(mLock);
     mPaused = true;
 }
 
 void AudioWatchdog::resume()
 {
-    const AutoMutex _l(mMyLock);
+    const std::lock_guard _l(mLock);
     if (mPaused) {
         mPaused = false;
-        mMyCond.signal();
+        mCond.notify_one();
     }
 }
 
 void AudioWatchdog::setDump(AudioWatchdogDump *dump)
 {
-    mDump = dump != NULL ? dump : &mDummyDump;
+    const std::lock_guard _l(mLock);
+    mDump = dump != nullptr ? dump : &mDummyDump;
 }
 
 }   // namespace android

@@ -58,26 +58,14 @@ bool BufLogSingleton::instanceExists() {
 // BufLog
 // ------------------------------
 
-BufLog::BufLog() {
-    memset(mStreams, 0, sizeof(mStreams));
-}
-
 BufLog::~BufLog() {
-    const AutoMutex autoLock(mLock);
-
-    for (unsigned int id = 0; id < BUFLOG_MAXSTREAMS; id++) { // NOLINT(modernize-loop-convert)
-        BufLogStream *pBLStream = mStreams[id];
-        if (pBLStream != nullptr) {
-            delete pBLStream ;
-            mStreams[id] = nullptr;
-        }
-    }
+    reset();
 }
 
 size_t BufLog::write(int streamid, const char *tag, int format, int channels,
         int samplingRate, size_t maxBytes, const void *buf, size_t size) {
     const unsigned int id = streamid % BUFLOG_MAXSTREAMS;
-    const AutoMutex autoLock(mLock);
+    const std::lock_guard autoLock(mLock);
 
     BufLogStream *pBLStream = mStreams[id];
 
@@ -90,15 +78,12 @@ size_t BufLog::write(int streamid, const char *tag, int format, int channels,
 }
 
 void BufLog::reset() {
-    const AutoMutex autoLock(mLock);
-    ALOGV("Resetting all BufLogs");
+    const std::lock_guard autoLock(mLock);
     int count = 0;
-
-    for (unsigned int id = 0; id < BUFLOG_MAXSTREAMS; id++) { // NOLINT(modernize-loop-convert)
-        BufLogStream *pBLStream = mStreams[id];
+    for (auto &pBLStream : mStreams) {
         if (pBLStream != nullptr) {
             delete pBLStream;
-            mStreams[id] = nullptr;
+            pBLStream = nullptr;
             count++;
         }
     }
@@ -116,8 +101,6 @@ BufLogStream::BufLogStream(unsigned int id,
         unsigned int samplingRate,
         size_t maxBytes = 0) : mId(id), mFormat(format), mChannels(channels),
                 mSamplingRate(samplingRate), mMaxBytes(maxBytes) {
-    mByteCount = 0;
-    mPaused = false;
     if (tag != nullptr) {
         (void)audio_utils_strlcpy(mTag, tag);
     } else {
@@ -157,7 +140,7 @@ void BufLogStream::closeStream_l() {
 
 BufLogStream::~BufLogStream() {
     ALOGV("Destroying BufLogStream id:%d tag:%s", mId, mTag);
-    const AutoMutex autoLock(mLock);
+    const std::lock_guard autoLock(mLock);
     closeStream_l();
 }
 
@@ -166,7 +149,7 @@ size_t BufLogStream::write(const void *buf, size_t size) {
     size_t bytes = 0;
     if (!mPaused && mFile != nullptr) {
         if (size > 0 && buf != nullptr) {
-            const AutoMutex autoLock(mLock);
+            const std::lock_guard autoLock(mLock);
             if (mMaxBytes > 0) {
                 size = MIN(size, mMaxBytes - mByteCount);
             }
@@ -192,7 +175,7 @@ bool BufLogStream::setPause(bool pause) {
 }
 
 void BufLogStream::finalize() {
-    const AutoMutex autoLock(mLock);
+    const std::lock_guard autoLock(mLock);
     closeStream_l();
 }
 
