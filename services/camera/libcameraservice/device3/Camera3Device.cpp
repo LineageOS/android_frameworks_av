@@ -2365,6 +2365,9 @@ bool Camera3Device::reconfigureCamera(const CameraMetadata& sessionParams, int c
             //present streams end up with outstanding buffers that will
             //not get drained.
             internalUpdateStatusLocked(STATUS_ACTIVE);
+
+            mCameraServiceProxyWrapper->logStreamConfigured(mId, mOperatingMode,
+                    true /*internalReconfig*/, ns2ms(systemTime() - startTime));
         } else if (rc == DEAD_OBJECT) {
             // DEAD_OBJECT can be returned if either the consumer surface is
             // abandoned, or the HAL has died.
@@ -2379,9 +2382,6 @@ bool Camera3Device::reconfigureCamera(const CameraMetadata& sessionParams, int c
     } else {
         ALOGE("%s: Failed to pause streaming: %d", __FUNCTION__, rc);
     }
-
-    mCameraServiceProxyWrapper->logStreamConfigured(mId, mOperatingMode, true /*internalReconfig*/,
-        ns2ms(systemTime() - startTime));
 
     if (markClientActive) {
         mStatusTracker->markComponentActive(clientStatusId);
