@@ -14,8 +14,7 @@
  * limitations under the License.
  */
 
-#ifndef ANDROID_AUDIO_BUFLOG_H
-#define ANDROID_AUDIO_BUFLOG_H
+#pragma once
 
 /*
  * BUFLOG creates up to BUFLOG_MAXSTREAMS simultaneous streams [0:15] of audio buffer data
@@ -99,16 +98,17 @@
     BufLogSingleton::instance()->reset(); } } while (0)
 #endif
 
-
+#include <mutex>
 #include <stdint.h>
 #include <stdio.h>
 #include <sys/types.h>
-#include <utils/Mutex.h>
 
 //BufLog configuration
 #define BUFLOGSTREAM_MAX_TAGSIZE    32
 #define BUFLOG_BASE_PATH            "/data/misc/audioserver"
 #define BUFLOG_MAX_PATH_SIZE        300
+
+namespace android {
 
 class BufLogStream {
 public:
@@ -135,26 +135,24 @@ public:
     void            finalize();
 
 private:
-    bool                mPaused;
     const unsigned int  mId;
-    char                mTag[BUFLOGSTREAM_MAX_TAGSIZE + 1];
     const unsigned int  mFormat;
     const unsigned int  mChannels;
     const unsigned int  mSamplingRate;
     const size_t        mMaxBytes;
-    size_t              mByteCount;
-    FILE                *mFile;
-    mutable android::Mutex mLock;
+    char                mTag[BUFLOGSTREAM_MAX_TAGSIZE + 1]; // const, set in ctor.
+
+    mutable std::mutex  mLock;
+    bool                mPaused = false;
+    size_t              mByteCount = 0;
+    FILE                *mFile; // set in ctor
 
     void            closeStream_l();
 };
 
-
 class BufLog {
 public:
-    BufLog();
     ~BufLog();
-    BufLog(BufLog const&) {};
 
     //  streamid:      int [0:BUFLOG_MAXSTREAMS-1]   buffer id.
     //                  If a buffer doesn't exist, it is created the first time is referenced
@@ -181,9 +179,9 @@ public:
     void            reset();
 
 protected:
-    static const unsigned int BUFLOG_MAXSTREAMS = 16;
-    BufLogStream    *mStreams[BUFLOG_MAXSTREAMS];
-    mutable android::Mutex mLock;
+    static constexpr size_t BUFLOG_MAXSTREAMS = 16;
+    mutable std::mutex mLock;
+    BufLogStream *mStreams[BUFLOG_MAXSTREAMS]{};
 };
 
 class BufLogSingleton {
@@ -196,4 +194,4 @@ private:
     static BufLog   *mInstance;
 };
 
-#endif //ANDROID_AUDIO_BUFLOG_H
+} // namespace android

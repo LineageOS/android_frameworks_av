@@ -91,8 +91,8 @@ public:
 
     /** returns filename of created audio file, else empty string on failure. */
     std::string create(
-            std::function<ssize_t /* frames_read */
-                        (void * /* buffer */, size_t /* size_in_frames */)> reader,
+            const std::function<ssize_t /* frames_read */
+                        (void * /* buffer */, size_t /* size_in_frames */)>& reader,
             uint32_t sampleRate,
             uint32_t channelCount,
             audio_format_t format,
@@ -109,8 +109,8 @@ private:
 
     /** creates an audio file from a reader functor passed in. */
     status_t createInternal(
-            std::function<ssize_t /* frames_read */
-                        (void * /* buffer */, size_t /* size_in_frames */)> reader,
+            const std::function<ssize_t /* frames_read */
+                        (void * /* buffer */, size_t /* size_in_frames */)>& reader,
             uint32_t sampleRate,
             uint32_t channelCount,
             audio_format_t format,
@@ -123,7 +123,7 @@ private:
     std::string generateFilename(const std::string &suffix) const {
         char fileTime[sizeof("YYYYmmdd_HHMMSS_\0")];
         struct timeval tv;
-        gettimeofday(&tv, NULL);
+        gettimeofday(&tv, nullptr /* struct timezone */);
         struct tm tm;
         localtime_r(&tv.tv_sec, &tm);
         LOG_ALWAYS_FATAL_IF(strftime(fileTime, sizeof(fileTime), "%Y%m%d_%H%M%S_", &tm) == 0,
@@ -159,30 +159,29 @@ private:
     // yet another ThreadPool implementation.
     class ThreadPool {
     public:
-        ThreadPool(size_t size)
+        explicit ThreadPool(size_t size)
             : mThreadPoolSize(size)
         { }
 
         /** launches task "name" with associated function "func".
             if the threadpool is exhausted, it will launch on calling function */
-        status_t launch(const std::string &name, std::function<status_t()> func);
+        status_t launch(const std::string &name, const std::function<status_t()>& func);
 
     private:
+        const size_t mThreadPoolSize;
         std::mutex mLock;
         std::list<std::pair<
-                std::string, std::future<status_t>>> mFutures; // GUARDED_BY(mLock)
-
-        const size_t mThreadPoolSize;
+                std::string, std::future<status_t>>> mFutures; // GUARDED_BY(mLock);
     } mThreadPool;
-
-    const std::string mPrefix;
-    std::mutex mLock;
-    std::string mDirectory;         // GUARDED_BY(mLock)
-    std::deque<std::string> mFiles; // GUARDED_BY(mLock)  sorted list of files by creation time
 
     static constexpr size_t FRAMES_PER_READ = 1024;
     static constexpr size_t MAX_FILES_READ = 1024;
     static constexpr size_t MAX_FILES_KEEP = 32;
+
+    const std::string mPrefix;
+    std::mutex mLock;
+    std::string mDirectory;         // GUARDED_BY(mLock);
+    std::deque<std::string> mFiles; // GUARDED_BY(mLock); // sorted list of files by creation time
 };
 
 /* static */
@@ -200,7 +199,7 @@ void NBAIO_Tee::NBAIO_TeeImpl::dumpTee(
 
     const NBAIO_Format format = source->format();
     bool firstRead = true;
-    std::string filename = audioFileHandler.create(
+    const std::string filename = audioFileHandler.create(
             // this functor must not hold references to stack
             [firstRead, sinkSource] (void *buffer, size_t frames) mutable {
                     auto &source = sinkSource.second;
@@ -230,14 +229,16 @@ NBAIO_Tee::NBAIO_TeeImpl::NBAIO_SinkSource NBAIO_Tee::NBAIO_TeeImpl::makeSinkSou
         Pipe *pipe = new Pipe(frames, format);
         size_t numCounterOffers = 0;
         const NBAIO_Format offers[1] = {format};
-        ssize_t index = pipe->negotiate(offers, 1, NULL, numCounterOffers);
+        ssize_t index = pipe->negotiate(
+                offers, 1 /* numOffers */, nullptr /* counterOffers */, numCounterOffers);
         if (index != 0) {
             ALOGW("pipe failure to negotiate: %zd", index);
             goto exit;
         }
         PipeReader *pipeReader = new PipeReader(*pipe);
         numCounterOffers = 0;
-        index = pipeReader->negotiate(offers, 1, NULL, numCounterOffers);
+        index = pipeReader->negotiate(
+                offers, 1 /* numOffers */, nullptr /* counterOffers */, numCounterOffers);
         if (index != 0) {
             ALOGW("pipeReader failure to negotiate: %zd", index);
             goto exit;
@@ -251,14 +252,14 @@ exit:
 }
 
 std::string AudioFileHandler::create(
-        std::function<ssize_t /* frames_read */
-                    (void * /* buffer */, size_t /* size_in_frames */)> reader,
+        const std::function<ssize_t /* frames_read */
+                    (void * /* buffer */, size_t /* size_in_frames */)>& reader,
         uint32_t sampleRate,
         uint32_t channelCount,
         audio_format_t format,
         const std::string &suffix)
 {
-    const std::string filename = generateFilename(suffix);
+    std::string filename = generateFilename(suffix);
 
     if (mThreadPool.launch(std::string("create ") + filename,
             [=]() { return createInternal(reader, sampleRate, channelCount, format, filename); })
@@ -312,7 +313,7 @@ status_t AudioFileHandler::setDirectory(const std::string &directory)
     std::sort(files.begin() + toRemove, files.end());
 
     {
-        std::lock_guard<std::mutex> _l(mLock);
+        const std::lock_guard<std::mutex> _l(mLock);
 
         mDirectory = directory;
         mFiles = std::move(files);
@@ -330,13 +331,13 @@ status_t AudioFileHandler::clean(std::string *directory)
     std::vector<std::string> filesToRemove;
     std::string dir;
     {
-        std::lock_guard<std::mutex> _l(mLock);
+        const std::lock_guard<std::mutex> _l(mLock);
 
         if (!isDirectoryValid(mDirectory)) return NO_INIT;
 
         dir = mDirectory;
         if (mFiles.size() > MAX_FILES_KEEP) {
-            size_t toRemove = mFiles.size() - MAX_FILES_KEEP;
+            const size_t toRemove = mFiles.size() - MAX_FILES_KEEP;
 
             // use move and erase to efficiently transfer std::string
             std::move(mFiles.begin(),
@@ -346,7 +347,7 @@ status_t AudioFileHandler::clean(std::string *directory)
         }
     }
 
-    std::string dirp = dir + "/";
+    const std::string dirp = dir + "/";
     // remove files outside of lock for better concurrency.
     for (const auto &file : filesToRemove) {
         (void)unlink((dirp + file).c_str());
@@ -360,14 +361,14 @@ status_t AudioFileHandler::clean(std::string *directory)
 }
 
 status_t AudioFileHandler::ThreadPool::launch(
-        const std::string &name, std::function<status_t()> func)
+        const std::string &name, const std::function<status_t()>& func)
 {
     if (mThreadPoolSize > 1) {
-        std::lock_guard<std::mutex> _l(mLock);
+        const std::lock_guard<std::mutex> _l(mLock);
         if (mFutures.size() >= mThreadPoolSize) {
             for (auto it = mFutures.begin(); it != mFutures.end();) {
                 const std::string &filename = it->first;
-                std::future<status_t> &future = it->second;
+                const std::future<status_t> &future = it->second;
                 if (!future.valid() ||
                         future.wait_for(std::chrono::seconds(0)) == std::future_status::ready) {
                     ALOGV("%s: future %s ready", __func__, filename.c_str());
@@ -389,8 +390,8 @@ status_t AudioFileHandler::ThreadPool::launch(
 }
 
 status_t AudioFileHandler::createInternal(
-        std::function<ssize_t /* frames_read */
-                    (void * /* buffer */, size_t /* size_in_frames */)> reader,
+        const std::function<ssize_t /* frames_read */
+                    (void * /* buffer */, size_t /* size_in_frames */)>& reader,
         uint32_t sampleRate,
         uint32_t channelCount,
         audio_format_t format,
@@ -429,9 +430,9 @@ status_t AudioFileHandler::createInternal(
     }
 
     std::string directory;
-    status_t status = clean(&directory);
+    const status_t status = clean(&directory);
     if (status != NO_ERROR) return status;
-    std::string dirPrefix = directory + "/";
+    const std::string dirPrefix = directory + "/";
 
     const std::string path = dirPrefix + filename;
 
@@ -503,7 +504,7 @@ status_t AudioFileHandler::createInternal(
 
     // Success: add our name to managed files.
     {
-        std::lock_guard<std::mutex> _l(mLock);
+        const std::lock_guard<std::mutex> _l(mLock);
         // weak synchronization - only update mFiles if the directory hasn't changed.
         if (mDirectory == directory) {
             mFiles.emplace_back(filename);  // add to the end to preserve sort.
