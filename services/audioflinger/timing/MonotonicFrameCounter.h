@@ -58,19 +58,19 @@ public:
      * This offset is sufficient to ensure monotonicity after flush is called,
      * suitability for any other purpose is *not* guaranteed.
      */
-    int64_t getOffsetFrameCount() const { return mOffsetFrameCount; }
+    [[nodiscard]] int64_t getOffsetFrameCount() const { return mOffsetFrameCount; }
 
     /**
      * Returns the last received frameCount.
      */
-    int64_t getLastReceivedFrameCount() const {
+    [[nodiscard]] int64_t getLastReceivedFrameCount() const {
         return mLastReceivedFrameCount;
     }
 
     /**
      * Returns the last reported frameCount from updateAndGetMonotonicFrameCount().
      */
-    int64_t getLastReportedFrameCount() const {
+    [[nodiscard]] int64_t getLastReportedFrameCount() const {
         // This is consistent after onFlush().
         return mOffsetFrameCount + mLastReceivedFrameCount;
     }
