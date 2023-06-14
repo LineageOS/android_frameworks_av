@@ -155,7 +155,7 @@ product_strategy_t ProductStrategyMap::getProductStrategyForAttributes(
             return iter.second->getId();
         }
         if (score > matchScore) {
-            bestStrategyOrdefault = iter.second->getId();;
+            bestStrategyOrdefault = iter.second->getId();
             matchScore = score;
         }
     }
