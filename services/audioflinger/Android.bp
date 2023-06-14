@@ -19,7 +19,8 @@ license {
     ],
 }
 
-tidy_errors = [
+// base tidy_errors for this and all subprojects.
+audioflinger_base_tidy_errors = [
     // https://clang.llvm.org/extra/clang-tidy/checks/list.html
     // For many categories, the checks are too many to specify individually.
     // Feel free to disable as needed - as warnings are generally ignored,
@@ -71,8 +72,10 @@ tidy_errors = [
     "-bugprone-suspicious-string-compare",
     "-cert-oop54-cpp", // found in TransactionLog.h
     "-bugprone-narrowing-conversions", // b/182410845
+]
 
-    // TODO(b/275642749) Reenable these warnings
+// TODO(b/275642749) Reenable these warnings
+audioflinger_tidy_errors = audioflinger_base_tidy_errors + [
     "-bugprone-assignment-in-if-condition",
     "-bugprone-forward-declaration-namespace",
     "-bugprone-parent-virtual-call",
@@ -128,8 +131,8 @@ cc_defaults {
     cflags: audioflinger_base_cflags,
     // https://clang.llvm.org/extra/clang-tidy/
     tidy: true,
-    tidy_checks: tidy_errors,
-    tidy_checks_as_errors: tidy_errors,
+    tidy_checks: audioflinger_tidy_errors,
+    tidy_checks_as_errors: audioflinger_tidy_errors,
     tidy_flags: [
       "-format-style=file",
     ],
