@@ -52,20 +52,14 @@ class EffectHalInterface : public RefBase
     // Free resources on the remote side.
     virtual status_t close() = 0;
 
-    // Whether it's a local implementation.
-    virtual bool isLocal() const = 0;
-
     virtual status_t dump(int fd) = 0;
-
-    // Unique effect ID to use with the core HAL.
-    virtual uint64_t effectId() const = 0;
 
   protected:
     // Subclasses can not be constructed directly by clients.
-    EffectHalInterface() {}
+    EffectHalInterface() = default;
 
     // The destructor automatically releases the effect.
-    virtual ~EffectHalInterface() {}
+    virtual ~EffectHalInterface() = default;
 };
 
 } // namespace android
