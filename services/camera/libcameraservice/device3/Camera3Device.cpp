@@ -1645,6 +1645,10 @@ status_t Camera3Device::waitUntilStateThenRelock(bool active, nsecs_t timeout,
     bool stateSeen = false;
     nsecs_t startTime = systemTime();
     do {
+        if (mStatus == STATUS_ERROR) {
+            // Device in error state. Return right away.
+            break;
+        }
         if (active == (mStatus == STATUS_ACTIVE) &&
             (requestThreadInvocation || !mStatusIsInternal)) {
             // Desired state is current
@@ -1674,6 +1678,11 @@ status_t Camera3Device::waitUntilStateThenRelock(bool active, nsecs_t timeout,
         // they are not paused. This avoids intermediate pause signals from reconfigureCamera as it
         // changes the status to active right after.
         for (size_t i = startIndex; i < mRecentStatusUpdates.size(); i++) {
+            if (mRecentStatusUpdates[i].status == STATUS_ERROR) {
+                // Device in error state. Return right away.
+                stateSeen = true;
+                break;
+            }
             if (active == (mRecentStatusUpdates[i].status == STATUS_ACTIVE) &&
                 (requestThreadInvocation || !mRecentStatusUpdates[i].isInternal)) {
                 stateSeen = true;
