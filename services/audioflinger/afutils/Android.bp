@@ -69,32 +69,7 @@ cc_defaults {
     name: "audioflinger_utils_flags_defaults",
     // https://clang.llvm.org/docs/UsersManual.html#command-line-options
     // https://clang.llvm.org/docs/DiagnosticsReference.html
-    cflags: [
-        "-Wall",
-        "-Wdeprecated",
-        "-Werror",
-        "-Werror=implicit-fallthrough",
-        "-Werror=sometimes-uninitialized",
-        "-Werror=conditional-uninitialized",
-        "-Wextra",
-
-        // suppress some warning chatter.
-        "-Wno-deprecated-copy-with-dtor",
-        "-Wno-deprecated-copy-with-user-provided-dtor",
-
-        "-Wredundant-decls",
-        "-Wshadow",
-        "-Wstrict-aliasing",
-        "-fstrict-aliasing",
-        "-Wthread-safety",
-        //"-Wthread-safety-negative", // experimental - looks broken in R.
-        "-Wunreachable-code",
-        "-Wunreachable-code-break",
-        "-Wunreachable-code-return",
-        "-Wunused",
-        "-Wused-but-marked-unused",
-        "-D_LIBCPP_ENABLE_THREAD_SAFETY_ANNOTATIONS",
-    ],
+    cflags: audioflinger_base_cflags,
     // https://clang.llvm.org/extra/clang-tidy/
     tidy: true,
     tidy_checks: audioflinger_utils_tidy_errors,
