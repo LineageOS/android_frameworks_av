@@ -695,12 +695,6 @@ void SwAudioOutputDescriptor::close()
             }
         }
 
-        // TODO(b/73175392) consider improving the AIDL interface.
-        // Signal closing to A2DP HAL.
-        AudioParameter param;
-        param.add(String8(AudioParameter::keyClosing), String8("true"));
-        mClientInterface->setParameters(mIoHandle, param.toString());
-
         mClientInterface->closeOutput(mIoHandle);
 
         LOG_ALWAYS_FATAL_IF(mProfile->curOpenCount < 1, "%s profile open count %u",
