@@ -243,12 +243,12 @@ void CameraServiceProxyWrapper::logStreamConfigured(const String8& id,
     std::shared_ptr<CameraSessionStatsWrapper> sessionStats;
     {
         Mutex::Autolock l(mLock);
-        sessionStats = mSessionStatsMap[id];
-        if (sessionStats == nullptr) {
+        if (mSessionStatsMap.count(id) == 0) {
             ALOGE("%s: SessionStatsMap should contain camera %s",
                     __FUNCTION__, id.c_str());
             return;
         }
+        sessionStats = mSessionStatsMap[id];
     }
 
     ALOGV("%s: id %s, operatingMode %d, internalConfig %d, latencyMs %d",
@@ -260,12 +260,12 @@ void CameraServiceProxyWrapper::logActive(const String8& id, float maxPreviewFps
     std::shared_ptr<CameraSessionStatsWrapper> sessionStats;
     {
         Mutex::Autolock l(mLock);
-        sessionStats = mSessionStatsMap[id];
-        if (sessionStats == nullptr) {
+        if (mSessionStatsMap.count(id) == 0) {
             ALOGE("%s: SessionStatsMap should contain camera %s when logActive is called",
                     __FUNCTION__, id.c_str());
             return;
         }
+        sessionStats = mSessionStatsMap[id];
     }
 
     ALOGV("%s: id %s", __FUNCTION__, id.c_str());
@@ -280,13 +280,12 @@ void CameraServiceProxyWrapper::logIdle(const String8& id,
     std::shared_ptr<CameraSessionStatsWrapper> sessionStats;
     {
         Mutex::Autolock l(mLock);
-        sessionStats = mSessionStatsMap[id];
-    }
-
-    if (sessionStats == nullptr) {
-        ALOGE("%s: SessionStatsMap should contain camera %s when logIdle is called",
+        if (mSessionStatsMap.count(id) == 0) {
+            ALOGE("%s: SessionStatsMap should contain camera %s when logIdle is called",
                 __FUNCTION__, id.c_str());
-        return;
+            return;
+        }
+        sessionStats = mSessionStatsMap[id];
     }
 
     ALOGV("%s: id %s, requestCount %" PRId64 ", resultErrorCount %" PRId64 ", deviceError %d"
