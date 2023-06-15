@@ -2148,6 +2148,26 @@ status_t AudioPolicyManager::startOutput(audio_port_handle_t portId)
                 return DEAD_OBJECT;
             }
             info->increaseActiveClient();
+            if (info->getActiveClientCount() == 1 &&
+                (info->getFlags() & AUDIO_OUTPUT_FLAG_BIT_PERFECT) != AUDIO_OUTPUT_FLAG_NONE) {
+                // If it is first bit-perfect client, reroute all clients that will be routed to
+                // the bit-perfect sink so that it is guaranteed only bit-perfect stream is active.
+                PortHandleVector clientsToInvalidate;
+                for (size_t i = 0; i < mOutputs.size(); i++) {
+                    if (mOutputs[i] == outputDesc ||
+                        !mOutputs[i]->devices().filter(outputDesc->devices()).isEmpty()) {
+                        continue;
+                    }
+                    for (const auto& c : mOutputs[i]->getClientIterable()) {
+                        clientsToInvalidate.push_back(c->portId());
+                    }
+                }
+                if (!clientsToInvalidate.empty()) {
+                    ALOGD("%s Invalidate clients due to first bit-perfect client started",
+                          __func__);
+                    mpClientInterface->invalidateTracks(clientsToInvalidate);
+                }
+            }
         }
     }
 
