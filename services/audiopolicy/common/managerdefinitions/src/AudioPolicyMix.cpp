@@ -288,9 +288,10 @@ status_t AudioPolicyMixCollection::getOutputForAttr(
             continue; // skip the mix
         }
 
-        if (flags & AUDIO_OUTPUT_FLAG_MMAP_NOIRQ) {
-            // AAudio MMAP_NOIRQ streams cannot be routed using dynamic audio policy.
-            ALOGD("%s: Rejecting MMAP_NOIRQ request matched to dynamic audio policy mix.",
+        if ((flags & AUDIO_OUTPUT_FLAG_MMAP_NOIRQ) && is_mix_loopback(policyMix->mRouteFlags)) {
+            // AAudio MMAP_NOIRQ streams cannot be routed to loopback/loopback+render
+            // using dynamic audio policy.
+            ALOGD("%s: Rejecting MMAP_NOIRQ request matched to loopback dynamic audio policy mix.",
                 __func__);
             return INVALID_OPERATION;
         }
