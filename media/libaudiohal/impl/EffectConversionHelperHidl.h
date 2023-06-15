@@ -19,9 +19,9 @@
 
 #include "ConversionHelperHidl.h"
 
-#include PATH(android/hardware/audio/effect/FILE_VERSION/types.h)
+#include PATH(android/hardware/audio/effect/COMMON_TYPES_FILE_VERSION/types.h)
 
-using EffectResult = ::android::hardware::audio::effect::CPP_VERSION::Result;
+using EffectResult = ::android::hardware::audio::effect::COMMON_TYPES_CPP_VERSION::Result;
 
 namespace android {
 

@@ -32,6 +32,7 @@
 #include <util/CoreUtils.h>
 
 #include "DeviceHalHidl.h"
+#include "EffectHalHidl.h"
 #include "ParameterUtils.h"
 #include "StreamHalHidl.h"
 
@@ -526,8 +527,9 @@ status_t DeviceHalHidl::addDeviceEffect(
         audio_port_handle_t device, sp<EffectHalInterface> effect) {
     TIME_CHECK();
     if (mDevice == 0) return NO_INIT;
+    auto hidlEffect = sp<effect::EffectHalHidl>::cast(effect);
     return processReturn("addDeviceEffect", mDevice->addDeviceEffect(
-            static_cast<AudioPortHandle>(device), effect->effectId()));
+            static_cast<AudioPortHandle>(device), hidlEffect->effectId()));
 }
 #else
 status_t DeviceHalHidl::addDeviceEffect(
@@ -541,8 +543,9 @@ status_t DeviceHalHidl::removeDeviceEffect(
         audio_port_handle_t device, sp<EffectHalInterface> effect) {
     TIME_CHECK();
     if (mDevice == 0) return NO_INIT;
+    auto hidlEffect = sp<effect::EffectHalHidl>::cast(effect);
     return processReturn("removeDeviceEffect", mDevice->removeDeviceEffect(
-            static_cast<AudioPortHandle>(device), effect->effectId()));
+            static_cast<AudioPortHandle>(device), hidlEffect->effectId()));
 }
 #else
 status_t DeviceHalHidl::removeDeviceEffect(
