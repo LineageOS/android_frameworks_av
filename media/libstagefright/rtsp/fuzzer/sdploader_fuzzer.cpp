@@ -62,13 +62,11 @@ struct FuzzMediaHTTPConnection : public MediaHTTPConnection {
     }
     virtual void disconnect() { return; }
     virtual ssize_t readAt(off64_t offset, void* data, size_t size) {
-        if (size <= mSize - offset) {
-            data = mData.data() + offset;
-            return size;
-        } else {
-            data = nullptr;
-            return 0;
+        if ((size + offset <= mData.size()) && (offset >= 0)) {
+           memcpy(data, mData.data() + offset, size);
+           return size;
         }
+        return 0;
     }
     virtual off64_t getSize() { return mSize; }
     virtual status_t getMIMEType(String8* /*mimeType*/) {return mFdp->ConsumeIntegral<status_t>();}
