@@ -105,8 +105,10 @@ class DeviceHalHidl : public DeviceHalInterface, public CoreConversionHelperHidl
     // List microphones
     status_t getMicrophones(std::vector<audio_microphone_characteristic_t>* microphones) override;
 
-    status_t addDeviceEffect(audio_port_handle_t device, sp<EffectHalInterface> effect) override;
-    status_t removeDeviceEffect(audio_port_handle_t device, sp<EffectHalInterface> effect) override;
+    status_t addDeviceEffect(
+            const struct audio_port_config *device, sp<EffectHalInterface> effect) override;
+    status_t removeDeviceEffect(
+            const struct audio_port_config *device, sp<EffectHalInterface> effect) override;
 
     status_t getMmapPolicyInfos(
             media::audio::common::AudioMMapPolicyType policyType __unused,
