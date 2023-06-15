@@ -68,26 +68,28 @@ EffectsFactoryHalAidl::EffectsFactoryHalAidl(std::shared_ptr<IFactory> effectsFa
           }
           return list;
       }()),
-      mUuidProxyMap([this]() {
-          std::map<AudioUuid, std::shared_ptr<EffectProxy>> proxyMap;
+      mProxyUuidDescriptorMap([this]() {
+          std::map<AudioUuid, std::vector<Descriptor>> proxyUuidMap;
           for (const auto& desc : mHalDescList) {
-              // create EffectProxy
               if (desc.common.id.proxy.has_value()) {
                   const auto& uuid = desc.common.id.proxy.value();
-                  if (0 == proxyMap.count(uuid)) {
-                      proxyMap.insert({uuid, ndk::SharedRefBase::make<EffectProxy>(desc.common.id,
-                                                                                   mFactory)});
+                  if (proxyUuidMap.count(uuid) == 0) {
+                      proxyUuidMap.insert({uuid, {desc}});
+                  } else {
+                      proxyUuidMap[uuid].emplace_back(desc);
                   }
-                  proxyMap[uuid]->addSubEffect(desc);
-                  ALOGI("%s addSubEffect %s", __func__, desc.common.toString().c_str());
               }
           }
-          return proxyMap;
+          return proxyUuidMap;
       }()),
       mProxyDescList([this]() {
           std::vector<Descriptor> list;
-          for (const auto& proxy : mUuidProxyMap) {
-              if (Descriptor desc; proxy.second && proxy.second->getDescriptor(&desc).isOk()) {
+          for (const auto& proxy : mProxyUuidDescriptorMap) {
+              if (Descriptor desc;
+                  EffectProxy::buildDescriptor(proxy.first /* uuid */,
+                                               proxy.second /* sub-effect descriptor list */,
+                                               &desc /* proxy descriptor */)
+                          .isOk()) {
                   list.emplace_back(std::move(desc));
               }
           }
@@ -118,7 +120,8 @@ status_t EffectsFactoryHalAidl::queryNumberEffects(uint32_t *pNumEffects) {
     }
 
     *pNumEffects = mEffectCount;
-    ALOGI("%s %d", __func__, *pNumEffects);
+    ALOGD("%s %u non %zu proxyMap %zu proxyDesc %zu", __func__, *pNumEffects,
+          mNonProxyDescList.size(), mProxyUuidDescriptorMap.size(), mProxyDescList.size());
     return OK;
 }
 
@@ -183,8 +186,10 @@ status_t EffectsFactoryHalAidl::createEffect(const effect_uuid_t* uuid, int32_t 
     // Use EffectProxy interface instead of IFactory to create
     const bool isProxy = isProxyEffect(aidlUuid);
     if (isProxy) {
-        aidlEffect = mUuidProxyMap.at(aidlUuid);
-        RETURN_STATUS_IF_ERROR(statusTFromBinderStatus(mUuidProxyMap.at(aidlUuid)->create()));
+        aidlEffect = ndk::SharedRefBase::make<EffectProxy>(
+                aidlUuid, mProxyUuidDescriptorMap.at(aidlUuid) /* sub-effect descriptor list */,
+                mFactory);
+        mProxyList.emplace_back(std::static_pointer_cast<EffectProxy>(aidlEffect));
     } else {
         RETURN_STATUS_IF_ERROR(
                 statusTFromBinderStatus(mFactory->createEffect(aidlUuid, &aidlEffect)));
@@ -209,12 +214,11 @@ status_t EffectsFactoryHalAidl::createEffect(const effect_uuid_t* uuid, int32_t 
 
 status_t EffectsFactoryHalAidl::dumpEffects(int fd) {
     status_t ret = OK;
+    std::lock_guard lg(mLock);
     // record the error ret and continue dump as many effects as possible
-    for (const auto& proxy : mUuidProxyMap) {
-        if (proxy.second) {
-            if (status_t temp = proxy.second->dump(fd, nullptr, 0); temp != OK) {
-                ret = temp;
-            }
+    for (const auto& proxy : mProxyList) {
+        if (status_t temp = BAD_VALUE; proxy && (temp = proxy->dump(fd, nullptr, 0)) != OK) {
+            ret = temp;
         }
     }
     RETURN_STATUS_IF_ERROR(mFactory->dump(fd, nullptr, 0));
@@ -280,7 +284,7 @@ status_t EffectsFactoryHalAidl::getHalDescriptorWithTypeUuid(
 }
 
 bool EffectsFactoryHalAidl::isProxyEffect(const AudioUuid& uuid) const {
-    return 0 != mUuidProxyMap.count(uuid);
+    return 0 != mProxyUuidDescriptorMap.count(uuid);
 }
 
 std::shared_ptr<const effectsConfig::Processings> EffectsFactoryHalAidl::getProcessings() const {
