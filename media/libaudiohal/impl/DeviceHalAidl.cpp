@@ -882,7 +882,7 @@ status_t DeviceHalAidl::getMicrophones(
     return OK;
 }
 
-status_t DeviceHalAidl::addDeviceEffect(audio_port_handle_t device __unused,
+status_t DeviceHalAidl::addDeviceEffect(const struct audio_port_config *device __unused,
         sp<EffectHalInterface> effect) {
     if (!effect) {
         return BAD_VALUE;
@@ -892,7 +892,7 @@ status_t DeviceHalAidl::addDeviceEffect(audio_port_handle_t device __unused,
     ALOGE("%s not implemented yet", __func__);
     return OK;
 }
-status_t DeviceHalAidl::removeDeviceEffect(audio_port_handle_t device __unused,
+status_t DeviceHalAidl::removeDeviceEffect(const struct audio_port_config *device __unused,
                             sp<EffectHalInterface> effect) {
     if (!effect) {
         return BAD_VALUE;
