@@ -3407,8 +3407,7 @@ status_t AudioFlinger::DeviceEffectProxy::addEffectToHal(
     if (mHalEffect == nullptr) {
         return NO_INIT;
     }
-    return mManagerCallback->addEffectToHal(
-            mDevicePort.id, mDevicePort.ext.device.hw_module, effect);
+    return mManagerCallback->addEffectToHal(&mDevicePort, effect);
 }
 
 status_t AudioFlinger::DeviceEffectProxy::removeEffectFromHal(
@@ -3416,8 +3415,7 @@ status_t AudioFlinger::DeviceEffectProxy::removeEffectFromHal(
     if (mHalEffect == nullptr) {
         return NO_INIT;
     }
-    return mManagerCallback->removeEffectFromHal(
-            mDevicePort.id, mDevicePort.ext.device.hw_module, effect);
+    return mManagerCallback->removeEffectFromHal(&mDevicePort, effect);
 }
 
 bool AudioFlinger::DeviceEffectProxy::isOutput() const {
