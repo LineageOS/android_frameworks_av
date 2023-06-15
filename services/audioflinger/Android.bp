@@ -148,6 +148,7 @@ cc_defaults {
         "effect-aidl-cpp",
         "libaudioclient_aidl_conversion",
         "libactivitymanager_aidl",
+        "libaudioflinger_datapath",
         "libaudioflinger_fastpath",
         "libaudioflinger_timing",
         "libaudioflinger_utils",
@@ -195,15 +196,12 @@ cc_library {
 
     srcs: [
         "AudioFlinger.cpp",
-        "AudioHwDevice.cpp",
-        "AudioStreamOut.cpp",
         "DeviceEffectManager.cpp",
         "Effects.cpp",
         "MelReporter.cpp",
         "PatchCommandThread.cpp",
         "PatchPanel.cpp",
         "PropertyUtils.cpp",
-        "SpdifStreamOut.cpp",
         "Threads.cpp",
         "Tracks.cpp",
     ],

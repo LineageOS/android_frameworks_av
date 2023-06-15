@@ -39,13 +39,13 @@ public:
     SpdifStreamOut(AudioHwDevice *dev, audio_output_flags_t flags,
             audio_format_t format);
 
-    virtual ~SpdifStreamOut() { }
+    ~SpdifStreamOut() override = default;
 
-    virtual status_t open(
+    status_t open(
             audio_io_handle_t handle,
             audio_devices_t devices,
             struct audio_config *config,
-            const char *address);
+            const char *address) override;
 
     /**
     * Write audio buffer to driver. Returns number of bytes written, or a
@@ -60,32 +60,34 @@ public:
     * callback function must be called when more space is available in the
     * driver/hardware buffer.
     */
-    virtual ssize_t write(const void* buffer, size_t bytes);
+    ssize_t write(const void* buffer, size_t bytes) override;
 
     /**
      * @return frame size from the perspective of the application and the AudioFlinger.
      */
-    virtual size_t getFrameSize() const { return sizeof(int8_t); }
+    [[nodiscard]] size_t getFrameSize() const override { return sizeof(int8_t); }
 
     /**
      * @return format from the perspective of the application and the AudioFlinger.
      */
-    virtual audio_format_t getFormat() const { return mApplicationFormat; }
+    [[nodiscard]] virtual audio_format_t getFormat() const { return mApplicationFormat; }
 
     /**
      * The HAL may be running at a higher sample rate if, for example, playing wrapped EAC3.
      * @return sample rate from the perspective of the application and the AudioFlinger.
      */
-    virtual uint32_t getSampleRate() const { return mApplicationSampleRate; }
+    [[nodiscard]] virtual uint32_t getSampleRate() const { return mApplicationSampleRate; }
 
     /**
      * The HAL is in stereo mode when playing multi-channel compressed audio over HDMI.
      * @return channel mask from the perspective of the application and the AudioFlinger.
      */
-    virtual audio_channel_mask_t getChannelMask() const { return mApplicationChannelMask; }
+    [[nodiscard]] virtual audio_channel_mask_t getChannelMask() const {
+        return mApplicationChannelMask;
+    }
 
-    virtual status_t flush();
-    virtual status_t standby();
+    status_t flush() override;
+    status_t standby() override;
 
 private:
 
@@ -98,7 +100,7 @@ private:
         {
         }
 
-        virtual ssize_t writeOutput(const void* buffer, size_t bytes)
+        ssize_t writeOutput(const void* buffer, size_t bytes) override
         {
             return mSpdifStreamOut->writeDataBurst(buffer, bytes);
         }
@@ -107,9 +109,9 @@ private:
     };
 
     MySPDIFEncoder       mSpdifEncoder;
-    audio_format_t       mApplicationFormat;
-    uint32_t             mApplicationSampleRate;
-    audio_channel_mask_t mApplicationChannelMask;
+    audio_format_t       mApplicationFormat = AUDIO_FORMAT_DEFAULT;
+    uint32_t             mApplicationSampleRate = 0;
+    audio_channel_mask_t mApplicationChannelMask = AUDIO_CHANNEL_NONE;
 
     ssize_t  writeDataBurst(const void* data, size_t bytes);
     ssize_t  writeInternal(const void* buffer, size_t bytes);
