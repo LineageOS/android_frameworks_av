@@ -1325,10 +1325,15 @@ status_t AudioPolicyManager::getOutputForAttrInt(
         AudioProfileVector profiles;
         status_t ret = getProfilesForDevices(outputDevices, profiles, *flags, false /*isInput*/);
         if (ret == NO_ERROR && !profiles.empty()) {
-            config->channel_mask = profiles[0]->getChannels().empty() ? config->channel_mask
-                    : *profiles[0]->getChannels().begin();
-            config->sample_rate = profiles[0]->getSampleRates().empty() ? config->sample_rate
-                    : *profiles[0]->getSampleRates().begin();
+            const auto channels = profiles[0]->getChannels();
+            if (!channels.empty() && (channels.find(config->channel_mask) == channels.end())) {
+                config->channel_mask = *channels.begin();
+            }
+            const auto sampleRates = profiles[0]->getSampleRates();
+            if (!sampleRates.empty() &&
+                    (sampleRates.find(config->sample_rate) == sampleRates.end())) {
+                config->sample_rate = *sampleRates.begin();
+            }
             config->format = profiles[0]->getFormat();
         }
         return INVALID_OPERATION;
@@ -2774,10 +2779,15 @@ status_t AudioPolicyManager::getInputForAttr(const audio_attributes_t *attr,
         status_t ret = getProfilesForDevices(
                 DeviceVector(device), profiles, flags, true /*isInput*/);
         if (ret == NO_ERROR && !profiles.empty()) {
-            config->channel_mask = profiles[0]->getChannels().empty() ? config->channel_mask
-                    : *profiles[0]->getChannels().begin();
-            config->sample_rate = profiles[0]->getSampleRates().empty() ? config->sample_rate
-                    : *profiles[0]->getSampleRates().begin();
+            const auto channels = profiles[0]->getChannels();
+            if (!channels.empty() && (channels.find(config->channel_mask) == channels.end())) {
+                config->channel_mask = *channels.begin();
+            }
+            const auto sampleRates = profiles[0]->getSampleRates();
+            if (!sampleRates.empty() &&
+                    (sampleRates.find(config->sample_rate) == sampleRates.end())) {
+                config->sample_rate = *sampleRates.begin();
+            }
             config->format = profiles[0]->getFormat();
         }
         goto error;
