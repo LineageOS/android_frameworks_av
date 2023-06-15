@@ -61,12 +61,11 @@ namespace android {
 namespace effect {
 
 EffectHalAidl::EffectHalAidl(const std::shared_ptr<IFactory>& factory,
-                             const std::shared_ptr<IEffect>& effect, uint64_t effectId,
+                             const std::shared_ptr<IEffect>& effect,
                              int32_t sessionId, int32_t ioId, const Descriptor& desc,
                              bool isProxyEffect)
     : mFactory(factory),
       mEffect(effect),
-      mEffectId(effectId),
       mSessionId(sessionId),
       mIoId(ioId),
       mDesc(desc),
