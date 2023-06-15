@@ -194,11 +194,9 @@ status_t EffectConversionHelperAidl::handleSetConfig(uint32_t cmdSize, const voi
                 statusTFromBinderStatus(mEffect->open(common, std::nullopt, &openReturn)));
 
         if (mIsProxyEffect) {
-            const auto& ret =
-                    std::static_pointer_cast<EffectProxy>(mEffect)->getEffectReturnParam();
-            mStatusQ = std::make_shared<StatusMQ>(ret->statusMQ);
-            mInputQ = std::make_shared<DataMQ>(ret->inputDataMQ);
-            mOutputQ = std::make_shared<DataMQ>(ret->outputDataMQ);
+            mStatusQ = std::static_pointer_cast<EffectProxy>(mEffect)->getStatusMQ();
+            mInputQ = std::static_pointer_cast<EffectProxy>(mEffect)->getInputMQ();
+            mOutputQ = std::static_pointer_cast<EffectProxy>(mEffect)->getOutputMQ();
         } else {
             mStatusQ = std::make_shared<StatusMQ>(openReturn.statusMQ);
             mInputQ = std::make_shared<DataMQ>(openReturn.inputDataMQ);
@@ -206,6 +204,7 @@ status_t EffectConversionHelperAidl::handleSetConfig(uint32_t cmdSize, const voi
         }
 
         if (status_t status = updateEventFlags(); status != OK) {
+            ALOGV("%s closing at status %d", __func__, status);
             mEffect->close();
             return status;
         }
@@ -353,14 +352,15 @@ status_t EffectConversionHelperAidl::handleSetOffload(uint32_t cmdSize, const vo
         ALOGI("%s offload param offload %s ioHandle %d", __func__,
               offload->isOffload ? "true" : "false", offload->ioHandle);
         mCommon.ioHandle = offload->ioHandle;
-        RETURN_STATUS_IF_ERROR(statusTFromBinderStatus(
-                std::static_pointer_cast<EffectProxy>(mEffect)->setOffloadParam(offload)));
-        // update FMQs
-        const auto& ret = std::static_pointer_cast<EffectProxy>(mEffect)->getEffectReturnParam();
-        mStatusQ = std::make_shared<StatusMQ>(ret->statusMQ);
-        mInputQ = std::make_shared<DataMQ>(ret->inputDataMQ);
-        mOutputQ = std::make_shared<DataMQ>(ret->outputDataMQ);
-        RETURN_STATUS_IF_ERROR(updateEventFlags());
+        const auto& effectProxy = std::static_pointer_cast<EffectProxy>(mEffect);
+        RETURN_STATUS_IF_ERROR(statusTFromBinderStatus(effectProxy->setOffloadParam(offload)));
+        // update FMQs if the effect instance already open
+        if (State state; effectProxy->getState(&state).isOk() && state != State::INIT) {
+            mStatusQ = effectProxy->getStatusMQ();
+            mInputQ = effectProxy->getInputMQ();
+            mOutputQ = effectProxy->getOutputMQ();
+            updateEventFlags();
+        }
     }
     return *static_cast<int32_t*>(pReplyData) = OK;
 }
@@ -408,16 +408,26 @@ status_t EffectConversionHelperAidl::handleVisualizerMeasure(uint32_t cmdSize __
 status_t EffectConversionHelperAidl::updateEventFlags() {
     status_t status = BAD_VALUE;
     EventFlag* efGroup = nullptr;
-    if (mStatusQ->isValid()) {
+    if (mStatusQ && mStatusQ->isValid()) {
         status = EventFlag::createEventFlag(mStatusQ->getEventFlagWord(), &efGroup);
         if (status != OK || !efGroup) {
             ALOGE("%s: create EventFlagGroup failed, ret %d, egGroup %p", __func__, status,
                   efGroup);
             status = (status == OK) ? BAD_VALUE : status;
         }
+    } else if (isBypassing()) {
+        // for effect with bypass (no processing) flag, it's okay to not have statusQ
+        return OK;
     }
+
     mEfGroup.reset(efGroup, EventFlagDeleter());
     return status;
+}
+
+bool EffectConversionHelperAidl::isBypassing() const {
+    return mEffect &&
+           (mDesc.common.flags.bypass ||
+            (mIsProxyEffect && std::static_pointer_cast<EffectProxy>(mEffect)->isBypassing()));
 }
 
 }  // namespace effect
