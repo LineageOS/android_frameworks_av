@@ -201,20 +201,12 @@ status_t EffectsFactoryHalAidl::createEffect(const effect_uuid_t* uuid, int32_t 
     Descriptor desc;
     RETURN_STATUS_IF_ERROR(statusTFromBinderStatus(aidlEffect->getDescriptor(&desc)));
 
-    uint64_t effectId;
-    {
-        std::lock_guard lg(mLock);
-        effectId = ++mEffectIdCounter;
-    }
-
-    *effect =
-            sp<EffectHalAidl>::make(mFactory, aidlEffect, effectId, sessionId, ioId, desc, isProxy);
+    *effect = sp<EffectHalAidl>::make(mFactory, aidlEffect, sessionId, ioId, desc, isProxy);
     return OK;
 }
 
 status_t EffectsFactoryHalAidl::dumpEffects(int fd) {
     status_t ret = OK;
-    std::lock_guard lg(mLock);
     // record the error ret and continue dump as many effects as possible
     for (const auto& proxy : mProxyList) {
         if (status_t temp = BAD_VALUE; proxy && (temp = proxy->dump(fd, nullptr, 0)) != OK) {
