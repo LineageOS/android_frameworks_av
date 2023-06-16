@@ -32,6 +32,7 @@
 #include <utils/Log.h>
 
 #include "DeviceHalAidl.h"
+#include "EffectHalAidl.h"
 #include "StreamHalAidl.h"
 
 using ::aidl::android::aidl_utils::statusTFromBinderStatus;
@@ -162,20 +163,26 @@ status_t StreamHalAidl::getFrameSize(size_t *size) {
     return OK;
 }
 
-status_t StreamHalAidl::addEffect(sp<EffectHalInterface> effect __unused) {
+status_t StreamHalAidl::addEffect(sp<EffectHalInterface> effect) {
     ALOGD("%p %s::%s", this, getClassName().c_str(), __func__);
     TIME_CHECK();
     if (!mStream) return NO_INIT;
-    ALOGE("%s not implemented yet", __func__);
-    return OK;
+    if (effect == nullptr) {
+        return BAD_VALUE;
+    }
+    auto aidlEffect = sp<effect::EffectHalAidl>::cast(effect);
+    return statusTFromBinderStatus(mStream->addEffect(aidlEffect->getIEffect()));
 }
 
-status_t StreamHalAidl::removeEffect(sp<EffectHalInterface> effect __unused) {
+status_t StreamHalAidl::removeEffect(sp<EffectHalInterface> effect) {
     ALOGD("%p %s::%s", this, getClassName().c_str(), __func__);
     TIME_CHECK();
     if (!mStream) return NO_INIT;
-    ALOGE("%s not implemented yet", __func__);
-    return OK;
+    if (effect == nullptr) {
+        return BAD_VALUE;
+    }
+    auto aidlEffect = sp<effect::EffectHalAidl>::cast(effect);
+    return statusTFromBinderStatus(mStream->removeEffect(aidlEffect->getIEffect()));
 }
 
 status_t StreamHalAidl::standby() {
