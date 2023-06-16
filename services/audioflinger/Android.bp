@@ -154,7 +154,6 @@ cc_library_shared {
         "MelReporter.cpp",
         "PatchCommandThread.cpp",
         "PatchPanel.cpp",
-        "PropertyUtils.cpp",
         "Threads.cpp",
         "Tracks.cpp",
     ],
