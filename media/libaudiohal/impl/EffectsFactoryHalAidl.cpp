@@ -194,14 +194,7 @@ status_t EffectsFactoryHalAidl::createEffect(const effect_uuid_t* uuid, int32_t 
     Descriptor desc;
     RETURN_STATUS_IF_ERROR(statusTFromBinderStatus(aidlEffect->getDescriptor(&desc)));
 
-    uint64_t effectId;
-    {
-        std::lock_guard lg(mLock);
-        effectId = ++mEffectIdCounter;
-    }
-
-    *effect =
-            sp<EffectHalAidl>::make(mFactory, aidlEffect, effectId, sessionId, ioId, desc, isProxy);
+    *effect = sp<EffectHalAidl>::make(mFactory, aidlEffect, sessionId, ioId, desc, isProxy);
     return OK;
 }
 

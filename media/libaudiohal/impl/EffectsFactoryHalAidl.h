@@ -18,7 +18,6 @@
 
 #include <cstddef>
 #include <memory>
-#include <mutex>
 
 #include <aidl/android/hardware/audio/effect/IFactory.h>
 #include <aidl/android/hardware/audio/effect/Processing.h>
@@ -84,9 +83,6 @@ class EffectsFactoryHalAidl final : public EffectsFactoryHalInterface {
     const size_t mEffectCount;
     // Query result of pre and post processing from effect factory
     const std::vector<Processing> mAidlProcessings;
-
-    std::mutex mLock;
-    uint64_t mEffectIdCounter GUARDED_BY(mLock) = 0;  // Align with HIDL (0 is INVALID_ID)
 
     virtual ~EffectsFactoryHalAidl() = default;
     status_t getHalDescriptorWithImplUuid(
