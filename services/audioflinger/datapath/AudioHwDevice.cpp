@@ -44,7 +44,7 @@ status_t AudioHwDevice::openOutputStream(
 {
 
     struct audio_config originalConfig = *config;
-    AudioStreamOut *outputStream = new AudioStreamOut(this, flags);
+    auto outputStream = new AudioStreamOut(this, flags);
 
     // Try to open the HAL first using the current format.
     ALOGV("openOutputStream(), try "
@@ -57,7 +57,7 @@ status_t AudioHwDevice::openOutputStream(
 
     if (status != NO_ERROR) {
         delete outputStream;
-        outputStream = NULL;
+        outputStream = nullptr;
 
         // FIXME Look at any modification to the config.
         // The HAL might modify the config to suggest a wrapped format.
@@ -71,7 +71,7 @@ status_t AudioHwDevice::openOutputStream(
             status);
 
         // If the data is encoded then try again using wrapped PCM.
-        bool wrapperNeeded = !audio_has_proportional_frames(originalConfig.format)
+        const bool wrapperNeeded = !audio_has_proportional_frames(originalConfig.format)
                 && ((flags & AUDIO_OUTPUT_FLAG_DIRECT) != 0)
                 && ((flags & AUDIO_OUTPUT_FLAG_COMPRESS_OFFLOAD) == 0);
 
@@ -83,7 +83,7 @@ status_t AudioHwDevice::openOutputStream(
                     ALOGE("ERROR - openOutputStream(), SPDIF open returned %d",
                         status);
                     delete outputStream;
-                    outputStream = NULL;
+                    outputStream = nullptr;
                 }
             } else {
                 ALOGE("ERROR - openOutputStream(), SPDIFEncoder does not support format 0x%08x",

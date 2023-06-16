@@ -54,25 +54,25 @@ public:
         , mFlags(flags) { }
     virtual ~AudioHwDevice() { free((void *)mModuleName); }
 
-    bool canSetMasterVolume() const {
+    [[nodiscard]] bool canSetMasterVolume() const {
         return (0 != (mFlags & AHWD_CAN_SET_MASTER_VOLUME));
     }
 
-    bool canSetMasterMute() const {
+    [[nodiscard]] bool canSetMasterMute() const {
         return (0 != (mFlags & AHWD_CAN_SET_MASTER_MUTE));
     }
 
-    bool isInsert() const {
+    [[nodiscard]] bool isInsert() const {
         return (0 != (mFlags & AHWD_IS_INSERT));
     }
 
-    bool supportsBluetoothVariableLatency() const {
+    [[nodiscard]] bool supportsBluetoothVariableLatency() const {
         return (0 != (mFlags & AHWD_SUPPORTS_BT_LATENCY_MODES));
     }
 
-    audio_module_handle_t handle() const { return mHandle; }
-    const char *moduleName() const { return mModuleName; }
-    sp<DeviceHalInterface> hwDevice() const { return mHwDevice; }
+   [[nodiscard]] audio_module_handle_t handle() const { return mHandle; }
+   [[nodiscard]] const char *moduleName() const { return mModuleName; }
+   [[nodiscard]] sp<DeviceHalInterface> hwDevice() const { return mHwDevice; }
 
     /** This method creates and opens the audio hardware output stream.
      * The "address" parameter qualifies the "devices" audio device type if needed.
@@ -89,17 +89,17 @@ public:
             struct audio_config *config,
             const char *address);
 
-    bool supportsAudioPatches() const;
+    [[nodiscard]] bool supportsAudioPatches() const;
 
-    status_t getAudioPort(struct audio_port_v7 *port) const;
+    [[nodiscard]] status_t getAudioPort(struct audio_port_v7 *port) const;
 
-    status_t getMmapPolicyInfos(
+    [[nodiscard]] status_t getMmapPolicyInfos(
             media::audio::common::AudioMMapPolicyType policyType,
             std::vector<media::audio::common::AudioMMapPolicyInfo> *policyInfos) const;
 
-    int32_t getAAudioMixerBurstCount() const;
+    [[nodiscard]] int32_t getAAudioMixerBurstCount() const;
 
-    int32_t getAAudioHardwareBurstMinUsec() const;
+    [[nodiscard]] int32_t getAAudioHardwareBurstMinUsec() const;
 
 private:
     const audio_module_handle_t mHandle;
