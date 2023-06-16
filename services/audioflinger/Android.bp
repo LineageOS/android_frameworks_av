@@ -201,7 +201,6 @@ cc_library {
         "MelReporter.cpp",
         "PatchCommandThread.cpp",
         "PatchPanel.cpp",
-        "PropertyUtils.cpp",
         "Threads.cpp",
         "Tracks.cpp",
     ],
