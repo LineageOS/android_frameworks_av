@@ -41,7 +41,7 @@ public:
     sp<StreamOutHalInterface> stream;
     const audio_output_flags_t flags;
 
-    sp<DeviceHalInterface> hwDev() const;
+    [[nodiscard]] sp<DeviceHalInterface> hwDev() const;
 
     AudioStreamOut(AudioHwDevice *dev, audio_output_flags_t flags);
 
@@ -78,7 +78,7 @@ public:
     /**
      * @return frame size from the perspective of the application and the AudioFlinger.
      */
-    virtual size_t getFrameSize() const { return mHalFrameSize; }
+    [[nodiscard]] virtual size_t getFrameSize() const { return mHalFrameSize; }
 
     /**
      * @return audio stream configuration: channel mask, format, sample rate:
@@ -88,7 +88,7 @@ public:
      *   - sample rate from the perspective of the application and the AudioFlinger,
      *     The HAL may be running at a higher sample rate if, for example, playing wrapped EAC3.
      */
-    virtual audio_config_base_t getAudioProperties() const;
+    [[nodiscard]] virtual audio_config_base_t getAudioProperties() const;
 
     virtual status_t flush();
     virtual status_t standby();
@@ -101,13 +101,13 @@ public:
     virtual void presentationComplete() { mExpectRetrograde = true; }
 
 protected:
-    uint64_t             mFramesWritten; // reset by flush
-    uint64_t             mFramesWrittenAtStandby;
-    uint64_t             mRenderPosition; // reset by flush, standby, or presentation complete
-    int                  mRateMultiplier;
-    bool                 mHalFormatHasProportionalFrames;
-    size_t               mHalFrameSize;
-    bool                 mExpectRetrograde; // see presentationComplete
+    uint64_t             mFramesWritten = 0; // reset by flush
+    uint64_t             mFramesWrittenAtStandby = 0;
+    uint64_t             mRenderPosition = 0; // reset by flush, standby, or presentation complete
+    int                  mRateMultiplier = 1;
+    bool                 mHalFormatHasProportionalFrames = false;
+    size_t               mHalFrameSize = 0;
+    bool                 mExpectRetrograde = false; // see presentationComplete
 };
 
 } // namespace android
