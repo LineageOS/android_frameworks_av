@@ -32,6 +32,7 @@
 #include <utils/Log.h>
 
 #include "DeviceHalAidl.h"
+#include "EffectHalAidl.h"
 #include "StreamHalAidl.h"
 
 using aidl::android::aidl_utils::statusTFromBinderStatus;
@@ -882,25 +883,64 @@ status_t DeviceHalAidl::getMicrophones(
     return OK;
 }
 
-status_t DeviceHalAidl::addDeviceEffect(const struct audio_port_config *device __unused,
-        sp<EffectHalInterface> effect) {
+status_t DeviceHalAidl::addDeviceEffect(
+        const struct audio_port_config *device, sp<EffectHalInterface> effect) {
+    TIME_CHECK();
+    if (!mModule) return NO_INIT;
     if (!effect) {
         return BAD_VALUE;
     }
-    TIME_CHECK();
-    if (!mModule) return NO_INIT;
-    ALOGE("%s not implemented yet", __func__);
+    bool isInput = VALUE_OR_RETURN_STATUS(::aidl::android::portDirection(
+                    device->role, device->type)) == ::aidl::android::AudioPortDirection::INPUT;
+    auto requestedPortConfig = VALUE_OR_RETURN_STATUS(
+            ::aidl::android::legacy2aidl_audio_port_config_AudioPortConfig(
+                    *device, isInput, 0));
+    if (requestedPortConfig.ext.getTag() != AudioPortExt::Tag::device) {
+        ALOGE("%s: provided port config is not a device port config: %s",
+                __func__, requestedPortConfig.toString().c_str());
+        return BAD_VALUE;
+    }
+    AudioPortConfig devicePortConfig;
+    bool created;
+    RETURN_STATUS_IF_ERROR(findOrCreatePortConfig(
+                    requestedPortConfig, {} /*destinationPortIds*/, &devicePortConfig, &created));
+    Cleanups cleanups;
+    if (created) {
+        cleanups.emplace_front(this, &DeviceHalAidl::resetPortConfig, devicePortConfig.id);
+    }
+    auto aidlEffect = sp<effect::EffectHalAidl>::cast(effect);
+    RETURN_STATUS_IF_ERROR(statusTFromBinderStatus(mModule->addDeviceEffect(
+                            devicePortConfig.id, aidlEffect->getIEffect())));
+    cleanups.disarmAll();
     return OK;
 }
-status_t DeviceHalAidl::removeDeviceEffect(const struct audio_port_config *device __unused,
-                            sp<EffectHalInterface> effect) {
+status_t DeviceHalAidl::removeDeviceEffect(
+        const struct audio_port_config *device, sp<EffectHalInterface> effect) {
+    TIME_CHECK();
+    if (!mModule) return NO_INIT;
     if (!effect) {
         return BAD_VALUE;
     }
-    TIME_CHECK();
-    if (!mModule) return NO_INIT;
-    ALOGE("%s not implemented yet", __func__);
-    return OK;
+    bool isInput = VALUE_OR_RETURN_STATUS(::aidl::android::portDirection(
+                    device->role, device->type)) == ::aidl::android::AudioPortDirection::INPUT;
+    auto requestedPortConfig = VALUE_OR_RETURN_STATUS(
+            ::aidl::android::legacy2aidl_audio_port_config_AudioPortConfig(
+                    *device, isInput, 0));
+    if (requestedPortConfig.ext.getTag() != AudioPortExt::Tag::device) {
+        ALOGE("%s: provided port config is not a device port config: %s",
+                __func__, requestedPortConfig.toString().c_str());
+        return BAD_VALUE;
+    }
+    auto existingPortConfigIt = findPortConfig(
+            requestedPortConfig.ext.get<AudioPortExt::Tag::device>().device);
+    if (existingPortConfigIt == mPortConfigs.end()) {
+        ALOGE("%s: could not find a configured device port for the config %s",
+                __func__, requestedPortConfig.toString().c_str());
+        return BAD_VALUE;
+    }
+    auto aidlEffect = sp<effect::EffectHalAidl>::cast(effect);
+    return statusTFromBinderStatus(mModule->removeDeviceEffect(
+                    existingPortConfigIt->first, aidlEffect->getIEffect()));
 }
 
 status_t DeviceHalAidl::getMmapPolicyInfos(
