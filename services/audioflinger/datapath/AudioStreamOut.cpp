@@ -31,21 +31,13 @@ namespace android {
 // ----------------------------------------------------------------------------
 AudioStreamOut::AudioStreamOut(AudioHwDevice *dev, audio_output_flags_t flags)
         : audioHwDev(dev)
-        , stream(NULL)
         , flags(flags)
-        , mFramesWritten(0)
-        , mFramesWrittenAtStandby(0)
-        , mRenderPosition(0)
-        , mRateMultiplier(1)
-        , mHalFormatHasProportionalFrames(false)
-        , mHalFrameSize(0)
-        , mExpectRetrograde(false)
 {
 }
 
-AudioStreamOut::~AudioStreamOut()
-{
-}
+// This must be defined here together with the HAL includes above and
+// not solely in the header.
+AudioStreamOut::~AudioStreamOut() = default;
 
 sp<DeviceHalInterface> AudioStreamOut::hwDev() const
 {
@@ -54,12 +46,12 @@ sp<DeviceHalInterface> AudioStreamOut::hwDev() const
 
 status_t AudioStreamOut::getRenderPosition(uint64_t *frames)
 {
-    if (stream == 0) {
+    if (stream == nullptr) {
         return NO_INIT;
     }
 
     uint32_t halPosition = 0;
-    status_t status = stream->getRenderPosition(&halPosition);
+    const status_t status = stream->getRenderPosition(&halPosition);
     if (status != NO_ERROR) {
         return status;
     }
@@ -67,7 +59,7 @@ status_t AudioStreamOut::getRenderPosition(uint64_t *frames)
     // Maintain a 64-bit render position using the 32-bit result from the HAL.
     // This delta calculation relies on the arithmetic overflow behavior
     // of integers. For example (100 - 0xFFFFFFF0) = 116.
-    const uint32_t truncatedPosition = (uint32_t)mRenderPosition;
+    const auto truncatedPosition = (uint32_t)mRenderPosition;
     int32_t deltaHalPosition; // initialization not needed, overwitten by __builtin_sub_overflow()
     (void) __builtin_sub_overflow(halPosition, truncatedPosition, &deltaHalPosition);
 
@@ -87,7 +79,7 @@ status_t AudioStreamOut::getRenderPosition(uint64_t *frames)
 status_t AudioStreamOut::getRenderPosition(uint32_t *frames)
 {
     uint64_t position64 = 0;
-    status_t status = getRenderPosition(&position64);
+    const status_t status = getRenderPosition(&position64);
     if (status == NO_ERROR) {
         *frames = (uint32_t)position64;
     }
@@ -96,12 +88,12 @@ status_t AudioStreamOut::getRenderPosition(uint32_t *frames)
 
 status_t AudioStreamOut::getPresentationPosition(uint64_t *frames, struct timespec *timestamp)
 {
-    if (stream == 0) {
+    if (stream == nullptr) {
         return NO_INIT;
     }
 
     uint64_t halPosition = 0;
-    status_t status = stream->getPresentationPosition(&halPosition, timestamp);
+    const status_t status = stream->getPresentationPosition(&halPosition, timestamp);
     if (status != NO_ERROR) {
         return status;
     }
@@ -109,7 +101,7 @@ status_t AudioStreamOut::getPresentationPosition(uint64_t *frames, struct timesp
     // Adjust for standby using HAL rate frames.
     // Only apply this correction if the HAL is getting PCM frames.
     if (mHalFormatHasProportionalFrames) {
-        uint64_t adjustedPosition = (halPosition <= mFramesWrittenAtStandby) ?
+        const uint64_t adjustedPosition = (halPosition <= mFramesWrittenAtStandby) ?
                 0 : (halPosition - mFramesWrittenAtStandby);
         // Scale from HAL sample rate to application rate.
         *frames = adjustedPosition / mRateMultiplier;
@@ -129,7 +121,7 @@ status_t AudioStreamOut::open(
 {
     sp<StreamOutHalInterface> outStream;
 
-    audio_output_flags_t customFlags = (config->format == AUDIO_FORMAT_IEC61937)
+    const audio_output_flags_t customFlags = (config->format == AUDIO_FORMAT_IEC61937)
                 ? (audio_output_flags_t)(flags | AUDIO_OUTPUT_FLAG_IEC958_NONAUDIO)
                 : flags;
 
@@ -195,7 +187,7 @@ int AudioStreamOut::flush()
     mExpectRetrograde = false;
     mFramesWritten = 0;
     mFramesWrittenAtStandby = 0;
-    status_t result = stream->flush();
+    const status_t result = stream->flush();
     return result != INVALID_OPERATION ? result : NO_ERROR;
 }
 
@@ -210,7 +202,7 @@ int AudioStreamOut::standby()
 ssize_t AudioStreamOut::write(const void *buffer, size_t numBytes)
 {
     size_t bytesWritten;
-    status_t result = stream->write(buffer, numBytes, &bytesWritten);
+    const status_t result = stream->write(buffer, numBytes, &bytesWritten);
     if (result == OK && bytesWritten > 0 && mHalFrameSize > 0) {
         mFramesWritten += bytesWritten / mHalFrameSize;
     }
