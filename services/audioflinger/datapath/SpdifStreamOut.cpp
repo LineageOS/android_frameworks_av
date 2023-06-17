@@ -37,9 +37,6 @@ SpdifStreamOut::SpdifStreamOut(AudioHwDevice *dev,
         // Tell the HAL that the data will be compressed audio wrapped in a data burst.
         : AudioStreamOut(dev, (audio_output_flags_t) (flags | AUDIO_OUTPUT_FLAG_IEC958_NONAUDIO))
         , mSpdifEncoder(this, format)
-        , mApplicationFormat(AUDIO_FORMAT_DEFAULT)
-        , mApplicationSampleRate(0)
-        , mApplicationChannelMask(AUDIO_CHANNEL_NONE)
 {
 }
 
@@ -91,7 +88,7 @@ status_t SpdifStreamOut::open(
             customConfig.format,
             customConfig.channel_mask);
 
-    status_t status = AudioStreamOut::open(
+    const status_t status = AudioStreamOut::open(
             handle,
             devices,
             &customConfig,

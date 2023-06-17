@@ -148,13 +148,10 @@ cc_library_shared {
 
     srcs: [
         "AudioFlinger.cpp",
-        "AudioHwDevice.cpp",
-        "AudioStreamOut.cpp",
         "DeviceEffectManager.cpp",
         "Effects.cpp",
         "PatchPanel.cpp",
         "PropertyUtils.cpp",
-        "SpdifStreamOut.cpp",
         "Threads.cpp",
         "Tracks.cpp",
     ],
@@ -170,6 +167,7 @@ cc_library_shared {
         "av-types-aidl-cpp",
         "effect-aidl-cpp",
         "libaudioclient_aidl_conversion",
+        "libaudioflinger_datapath",
         "libaudioflinger_fastpath",
         "libaudioflinger_timing",
         "libaudioflinger_utils",

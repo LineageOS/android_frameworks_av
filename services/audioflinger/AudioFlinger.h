@@ -91,14 +91,15 @@
 #include <timing/SyncEvent.h>
 #include <timing/SynchronizedRecordState.h>
 
+#include <datapath/AudioHwDevice.h>
+#include <datapath/AudioStreamOut.h>
+#include <datapath/SpdifStreamOut.h>
+#include <datapath/ThreadMetrics.h>
+#include <datapath/TrackMetrics.h>
 #include <fastpath/FastCapture.h>
 #include <fastpath/FastMixer.h>
 #include <media/nbaio/NBAIO.h>
-#include "AudioStreamOut.h"
-#include "SpdifStreamOut.h"
-#include "AudioHwDevice.h"
-#include "ThreadMetrics.h"
-#include "TrackMetrics.h"
+
 
 #include <android/os/IPowerManager.h>
 
