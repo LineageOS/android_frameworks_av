@@ -2048,40 +2048,6 @@ status_t MediaCodec::configure(
     return configure(format, nativeWindow, crypto, NULL, flags);
 }
 
-bool MediaCodec::isResolutionSupported(const sp<AMessage>& format) {
-    int32_t width = -1;
-    int32_t height = -1;
-    int32_t maxWidth = -1;
-    int32_t maxHeight = -1;
-    format->findInt32("width", &width);
-    format->findInt32("height", &height);
-    format->findInt32("max-width", &maxWidth);
-    format->findInt32("max-height", &maxHeight);
-    AString mediaType;
-    if (!format->findString("mime", &mediaType)) {
-        ALOGI("Can not check mediaFormat: No MIME set.");
-        return true;
-    }
-    sp<MediaCodecInfo::Capabilities> caps = mCodecInfo->getCapabilitiesFor(mediaType.c_str());
-    if (caps == NULL) {
-        ALOGI("Can not get Capabilities for MIME %s.", mediaType.c_str());
-        return true;
-    }
-    if (width != -1 && height != -1) {
-        if (!caps->isResolutionSupported(width, height)) {
-            ALOGD("Frame resolution (%dx%d) is beyond codec capabilities", width, height);
-            return false;
-        }
-    }
-    if (maxWidth != -1 && maxHeight != -1) {
-        if (!caps->isResolutionSupported(maxWidth, maxHeight)) {
-            ALOGD("Max frame resolution (%dx%d) is beyond codec capabilities", maxWidth, maxHeight);
-            return false;
-        }
-    }
-    return true;
-}
-
 status_t MediaCodec::configure(
         const sp<AMessage> &format,
         const sp<Surface> &surface,
@@ -2169,24 +2135,7 @@ status_t MediaCodec::configure(
             mediametrics_delete(nextMetricsHandle);
             return BAD_VALUE;
         }
-        // For applications built with targetSdkVersion of Android U or later (or if MediaCodec's
-        // caller is not an app) we enforce codec resolution capabilities if such enforcement is
-        // required by 'enforce-xml-capabilities' attribute
-        if (android_get_application_target_sdk_version() >= __ANDROID_API_U__) {
-            if (mCodecInfo != nullptr &&
-                (mCodecInfo->getAttributes() &
-                 MediaCodecInfo::kFlagIsEnforceXmlCapabilities)) {
-                if (!isResolutionSupported(format)) {
-                    mErrorLog.log(LOG_TAG,
-                                  base::StringPrintf("The input resolution of %dx%d is not "
-                                  "supported for this codec; please query MediaCodecList "
-                                  "for the supported formats including the resolution. See "
-                                  "CodecCapabilities#isFormatSupported() and "
-                                  "VideoCapabilities#isSizeSupported()", mWidth, mHeight));
-                    return BAD_VALUE;
-                }
-            }
-        }
+
     } else {
         if (nextMetricsHandle != 0) {
             int32_t channelCount;
