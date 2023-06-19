@@ -59,7 +59,7 @@
 
 #include "AudioFlinger.h"
 #include "EffectConfiguration.h"
-#include "PropertyUtils.h"
+#include <afutils/PropertyUtils.h>
 
 #include <media/AudioResamplerPublic.h>
 
