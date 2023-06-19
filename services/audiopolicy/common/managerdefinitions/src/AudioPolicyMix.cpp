@@ -183,7 +183,8 @@ status_t AudioPolicyMixCollection::registerMix(const AudioMix& mix,
     for (size_t i = 0; i < size(); i++) {
         const sp<AudioPolicyMix>& registeredMix = itemAt(i);
         if (mix.mDeviceType == registeredMix->mDeviceType
-                && mix.mDeviceAddress.compare(registeredMix->mDeviceAddress) == 0) {
+                && mix.mDeviceAddress.compare(registeredMix->mDeviceAddress) == 0
+                && is_mix_loopback(mix.mRouteFlags)) {
             ALOGE("registerMix(): mix already registered for dev=0x%x addr=%s",
                     mix.mDeviceType, mix.mDeviceAddress.string());
             return BAD_VALUE;
