@@ -71,6 +71,11 @@ cc_fuzz {
     name: "ndk_crypto_fuzzer",
     srcs: ["ndk_crypto_fuzzer.cpp"],
     defaults: ["libmediandk_fuzzer_defaults"],
+    fuzz_config: {
+        libfuzzer_options: [
+            "max_len=10000",
+        ],
+    },
 }
 
 cc_fuzz {
