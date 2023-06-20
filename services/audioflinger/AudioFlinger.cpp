@@ -58,7 +58,7 @@
 #include <audiomanager/AudioManager.h>
 
 #include "AudioFlinger.h"
-#include "PropertyUtils.h"
+#include <afutils/PropertyUtils.h>
 
 #include <media/AudioResamplerPublic.h>
 
