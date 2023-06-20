@@ -32,18 +32,21 @@ cc_library {
 
     defaults: [
         "audioflinger_utils_flags_defaults",
+        "latest_android_media_audio_common_types_cpp_shared", // PropertyUtils.cpp
     ],
 
     srcs: [
         "AudioWatchdog.cpp",
         "BufLog.cpp",
         "NBAIO_Tee.cpp",
+        "PropertyUtils.cpp",
         "TypedLogger.cpp",
     ],
 
     shared_libs: [
         "libaudioutils",
         "libbase",
+        "libcutils", // property_get_int32
         "liblog",
         "libnbaio",
         "libnblog",
@@ -52,6 +55,10 @@ cc_library {
 
     static_libs: [
         "libsndfile",
+    ],
+
+    header_libs: [
+        "libaaudio_headers",  // PropertyUtils.cpp
     ],
 
     include_dirs: [
