@@ -151,7 +151,6 @@ cc_library_shared {
         "DeviceEffectManager.cpp",
         "Effects.cpp",
         "PatchPanel.cpp",
-        "PropertyUtils.cpp",
         "Threads.cpp",
         "Tracks.cpp",
     ],
