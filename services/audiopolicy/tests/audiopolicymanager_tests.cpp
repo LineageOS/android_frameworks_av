@@ -1350,13 +1350,14 @@ TEST_F(AudioPolicyManagerTestDynamicPolicy, RegisterPolicyMixes) {
             AUDIO_DEVICE_OUT_REMOTE_SUBMIX, "", audioConfig);
     ASSERT_EQ(INVALID_OPERATION, ret);
 
-    // The first time to register valid policy mixes should succeed.
+    // The first time to register valid loopback policy mix should succeed.
     clearPolicyMix();
-    ret = addPolicyMix(MIX_TYPE_PLAYERS, MIX_ROUTE_FLAG_RENDER,
-            AUDIO_DEVICE_OUT_SPEAKER, "", audioConfig);
+    ret = addPolicyMix(MIX_TYPE_PLAYERS, MIX_ROUTE_FLAG_LOOP_BACK,
+            AUDIO_DEVICE_OUT_REMOTE_SUBMIX, "addr", audioConfig);
     ASSERT_EQ(NO_ERROR, ret);
-    // Registering the same policy mixes should fail.
-    ret = mManager->registerPolicyMixes(mAudioMixes);
+    // Registering the render policy for the loopback address should succeed.
+    ret = addPolicyMix(MIX_TYPE_PLAYERS, MIX_ROUTE_FLAG_RENDER,
+            AUDIO_DEVICE_OUT_REMOTE_SUBMIX, "addr", audioConfig);
     ASSERT_EQ(INVALID_OPERATION, ret);
 }
 
