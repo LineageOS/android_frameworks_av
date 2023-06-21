@@ -211,7 +211,7 @@ TEST_F(CameraZSLTests, TestAllPictureSizes) {
                 String16("ZSLTest"), hardware::ICameraService::USE_CALLING_UID,
                 hardware::ICameraService::USE_CALLING_PID,
                 /*targetSdkVersion*/__ANDROID_API_FUTURE__,
-                /*overrideToPortrait*/false, &cameraDevice);
+                /*overrideToPortrait*/false, /*forceSlowJpegMode*/false, &cameraDevice);
         EXPECT_TRUE(rc.isOk());
 
         CameraParameters params(cameraDevice->getParameters());

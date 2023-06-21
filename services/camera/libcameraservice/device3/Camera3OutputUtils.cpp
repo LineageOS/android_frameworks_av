@@ -521,27 +521,50 @@ void processCaptureResult(CaptureOutputStates& states, const camera_capture_resu
         if (result->partial_result != 0)
             request.resultExtras.partialResultCount = result->partial_result;
 
-        if ((result->result != nullptr) && !states.legacyClient && !states.overrideToPortrait) {
+        if (result->result != nullptr) {
             camera_metadata_ro_entry entry;
             auto ret = find_camera_metadata_ro_entry(result->result,
                     ANDROID_LOGICAL_MULTI_CAMERA_ACTIVE_PHYSICAL_ID, &entry);
             if ((ret == OK) && (entry.count > 0)) {
                 std::string physicalId(reinterpret_cast<const char *>(entry.data.u8));
-                auto deviceInfo = states.physicalDeviceInfoMap.find(physicalId);
-                if (deviceInfo != states.physicalDeviceInfoMap.end()) {
-                    auto orientation = deviceInfo->second.find(ANDROID_SENSOR_ORIENTATION);
-                    if (orientation.count > 0) {
-                        ret = CameraUtils::getRotationTransform(deviceInfo->second,
-                                OutputConfiguration::MIRROR_MODE_AUTO, &request.transform);
-                        if (ret != OK) {
-                            ALOGE("%s: Failed to calculate current stream transformation: %s (%d)",
-                                    __FUNCTION__, strerror(-ret), ret);
+                if (!states.activePhysicalId.empty() && physicalId != states.activePhysicalId) {
+                    states.listener->notifyPhysicalCameraChange(physicalId);
+                }
+                states.activePhysicalId = physicalId;
+
+                if (!states.legacyClient && !states.overrideToPortrait) {
+                    auto deviceInfo = states.physicalDeviceInfoMap.find(physicalId);
+                    if (deviceInfo != states.physicalDeviceInfoMap.end()) {
+                        auto orientation = deviceInfo->second.find(ANDROID_SENSOR_ORIENTATION);
+                        if (orientation.count > 0) {
+                            int32_t transform;
+                            ret = CameraUtils::getRotationTransform(deviceInfo->second,
+                                    OutputConfiguration::MIRROR_MODE_AUTO, &transform);
+                            if (ret == OK) {
+                                // It is possible for camera providers to return the capture
+                                // results after the processed frames. In such scenario, we will
+                                // not be able to set the output transformation before the frames
+                                // return back to the consumer for the current capture request
+                                // but we could still try and configure it for any future requests
+                                // that are still in flight. The assumption is that the physical
+                                // device id remains the same for the duration of the pending queue.
+                                for (size_t i = 0; i < states.inflightMap.size(); i++) {
+                                    auto &r = states.inflightMap.editValueAt(i);
+                                    if (r.requestTimeNs >= request.requestTimeNs) {
+                                        r.transform = transform;
+                                    }
+                                }
+                            } else {
+                                ALOGE("%s: Failed to calculate current stream transformation: %s "
+                                        "(%d)", __FUNCTION__, strerror(-ret), ret);
+                            }
+                        } else {
+                            ALOGE("%s: Physical device orientation absent!", __FUNCTION__);
                         }
                     } else {
-                        ALOGE("%s: Physical device orientation absent!", __FUNCTION__);
+                        ALOGE("%s: Physical device not found in device info map found!",
+                                __FUNCTION__);
                     }
-                } else {
-                    ALOGE("%s: Physical device not found in device info map found!", __FUNCTION__);
                 }
             }
         }

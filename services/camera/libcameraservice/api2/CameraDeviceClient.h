@@ -210,6 +210,9 @@ public:
 
     virtual status_t      setCameraServiceWatchdog(bool enabled);
 
+    virtual void          setStreamUseCaseOverrides(const std::vector<int64_t>& useCaseOverrides);
+    virtual void          clearStreamUseCaseOverrides() override;
+
     /**
      * Device listener interface
      */

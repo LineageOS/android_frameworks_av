@@ -1025,8 +1025,8 @@ void CCodecBufferChannel::trackReleasedFrame(const IGraphicBufferProducer::Queue
     if (desiredRenderTimeNs < nowNs) {
         desiredRenderTimeNs = nowNs;
     }
-    // We've just released a frame to the surface, so keep track of it and later check to see if it
-    // is actually rendered.
+    // We've just queued a frame to the surface, so keep track of it and later check to see if it is
+    // actually rendered.
     TrackedFrame frame;
     frame.number = qbo.nextFrameNumber - 1;
     frame.mediaTimeUs = mediaTimeUs;
@@ -1693,14 +1693,22 @@ void CCodecBufferChannel::stop() {
     mFirstValidFrameIndex = mFrameIndex.load(std::memory_order_relaxed);
 }
 
-void CCodecBufferChannel::stopUseOutputSurface() {
-    if (mOutputSurface.lock()->surface) {
+void CCodecBufferChannel::stopUseOutputSurface(bool pushBlankBuffer) {
+    sp<Surface> surface = mOutputSurface.lock()->surface;
+    if (surface) {
         C2BlockPool::local_id_t outputPoolId;
         {
             Mutexed<BlockPools>::Locked pools(mBlockPools);
             outputPoolId = pools->outputPoolId;
         }
         if (mComponent) mComponent->stopUsingOutputSurface(outputPoolId);
+
+        if (pushBlankBuffer) {
+            sp<ANativeWindow> anw = static_cast<ANativeWindow *>(surface.get());
+            if (anw) {
+                pushBlankBuffersToNativeWindow(anw.get());
+            }
+        }
     }
 }
 
@@ -2220,14 +2228,20 @@ void CCodecBufferChannel::sendOutputBuffers() {
     }
 }
 
-status_t CCodecBufferChannel::setSurface(const sp<Surface> &newSurface) {
+status_t CCodecBufferChannel::setSurface(const sp<Surface> &newSurface, bool pushBlankBuffer) {
     static std::atomic_uint32_t surfaceGeneration{0};
     uint32_t generation = (getpid() << 10) |
             ((surfaceGeneration.fetch_add(1, std::memory_order_relaxed) + 1)
                 & ((1 << 10) - 1));
 
     sp<IGraphicBufferProducer> producer;
-    int maxDequeueCount = mOutputSurface.lock()->maxDequeueBuffers;
+    int maxDequeueCount;
+    sp<Surface> oldSurface;
+    {
+        Mutexed<OutputSurface>::Locked outputSurface(mOutputSurface);
+        maxDequeueCount = outputSurface->maxDequeueBuffers;
+        oldSurface = outputSurface->surface;
+    }
     if (newSurface) {
         newSurface->setScalingMode(NATIVE_WINDOW_SCALING_MODE_SCALE_TO_WINDOW);
         newSurface->setDequeueTimeout(kDequeueTimeoutNs);
@@ -2262,8 +2276,18 @@ status_t CCodecBufferChannel::setSurface(const sp<Surface> &newSurface) {
         Mutexed<OutputSurface>::Locked output(mOutputSurface);
         output->surface = newSurface;
         output->generation = generation;
+        initializeFrameTrackingFor(static_cast<ANativeWindow *>(newSurface.get()));
     }
-    initializeFrameTrackingFor(static_cast<ANativeWindow *>(newSurface.get()));
+
+    if (oldSurface && pushBlankBuffer) {
+        // When ReleaseSurface was set from MediaCodec,
+        // pushing a blank buffer at the end might be necessary.
+        sp<ANativeWindow> anw = static_cast<ANativeWindow *>(oldSurface.get());
+        if (anw) {
+            pushBlankBuffersToNativeWindow(anw.get());
+        }
+    }
+
     return OK;
 }
 
@@ -2351,15 +2375,6 @@ status_t toStatusT(c2_status_t c2s, c2_operation_t c2op) {
     default:
         return -static_cast<status_t>(c2s);
     }
-}
-
-status_t CCodecBufferChannel::pushBlankBufferToOutputSurface() {
-  Mutexed<OutputSurface>::Locked output(mOutputSurface);
-  sp<ANativeWindow> nativeWindow = static_cast<ANativeWindow *>(output->surface.get());
-  if (nativeWindow == nullptr) {
-      return INVALID_OPERATION;
-  }
-  return pushBlankBuffersToNativeWindow(nativeWindow.get());
 }
 
 }  // namespace android

@@ -84,7 +84,8 @@ interface ICameraService
             String opPackageName,
             int clientUid, int clientPid,
             int targetSdkVersion,
-            boolean overrideToPortrait);
+            boolean overrideToPortrait,
+            boolean forceSlowJpegMode);
 
     /**
      * Open a camera device through the new camera API

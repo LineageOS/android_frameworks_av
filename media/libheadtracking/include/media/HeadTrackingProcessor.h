@@ -96,7 +96,8 @@ class HeadTrackingProcessor {
     /**
      * This causes the current poses for both the head and/or screen to be considered "center".
      */
-    virtual void recenter(bool recenterHead = true, bool recenterScreen = true) = 0;
+    virtual void recenter(
+            bool recenterHead = true, bool recenterScreen = true, std::string source = "") = 0;
 
     /**
      * Set the predictor type.
