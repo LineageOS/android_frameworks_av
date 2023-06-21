@@ -31,10 +31,13 @@
 using namespace std;
 using namespace android;
 
-constexpr char kFileNamePrefix[] = "/data/local/tmp/httplive-";
-constexpr char kFileNameSuffix[] = ".m3u8";
 constexpr char kFileUrlPrefix[] = "file://";
+constexpr char kBinFilePrefix[] = "/data/local/tmp/";
+constexpr char kBinFileSuffix[] = ".bin";
+constexpr char kM3U8IndexFilePrefix[] = "/data/local/tmp/index-";
+constexpr char kM3U8IndexFileSuffix[] = ".m3u8";
 constexpr int64_t kOffSet = 0;
+constexpr int32_t kInitialM3U8Index = 0;
 constexpr int32_t kReadyMarkMs = 5000;
 constexpr int32_t kPrepareMarkMs = 1500;
 constexpr int32_t kErrorNoMax = -1;
@@ -43,6 +46,16 @@ constexpr int32_t kMaxTimeUs = 1000;
 constexpr int32_t kRandomStringLength = 64;
 constexpr int32_t kRangeMin = 0;
 constexpr int32_t kRangeMax = 1000;
+constexpr int32_t kWaitTime = 100;
+constexpr uint8_t kMarker[] = "_MARK";
+constexpr uint8_t kM3U8MarkerSuffix[] = "_M_";
+constexpr uint8_t kBinMarkerSuffix[] = "_B_";
+static_assert(sizeof(kM3U8MarkerSuffix) == sizeof(kBinMarkerSuffix),
+              "Marker suffix must be same size");
+// All markers should be 5 bytes long ( sizeof '_MARK' is 6)
+constexpr size_t kMarkerSize = (sizeof(kMarker) - 1);
+// All marker types should be 3 bytes long ('_M_', '_B_')
+constexpr size_t kMarkerSuffixSize = (sizeof(kM3U8MarkerSuffix) - 1);
 
 constexpr LiveSession::StreamType kValidStreamType[] = {
     LiveSession::STREAMTYPE_AUDIO, LiveSession::STREAMTYPE_VIDEO,
@@ -131,8 +144,13 @@ public:
   ~HttpLiveFuzzer() { deInitLiveSession(); }
 
 private:
+  bool isMarker();
+  bool isM3U8Marker(size_t position);
+  bool isBinMarker(size_t position);
+  bool searchForMarker();
+  void initDataFile(const string& fileName, const uint8_t* data, size_t size);
+  void createFiles(const uint8_t* data, size_t size);
   void invokeLiveDataSource();
-  void createM3U8File(const uint8_t *data, size_t size);
   void initLiveDataSource();
   void invokeLiveSession();
   void initLiveSession();
@@ -141,7 +159,9 @@ private:
   void invokeSeekTo();
   void invokeGetConfig();
   void signalEos();
-  string generateFileName();
+  const uint8_t* mData = nullptr;
+  size_t mSize = 0;
+  int32_t mReadIndex = 0;
   sp<LiveDataSource> mLiveDataSource = nullptr;
   sp<LiveSession> mLiveSession = nullptr;
   sp<ALooper> mLiveLooper = nullptr;
@@ -153,16 +173,81 @@ private:
   std::condition_variable mConditionalVariable;
 };
 
-string HttpLiveFuzzer::generateFileName() {
-  return kFileNamePrefix + to_string(getpid()) + kFileNameSuffix;
+bool HttpLiveFuzzer::isMarker() {
+  if ((kMarkerSize <= mSize) && (mReadIndex <= mSize - kMarkerSize)) {
+    return (memcmp(&mData[mReadIndex], kMarker, kMarkerSize) == 0);
+  } else {
+    return false;
+  }
 }
 
-void HttpLiveFuzzer::createM3U8File(const uint8_t *data, size_t size) {
-  ofstream m3u8File;
-  string currentFileName = generateFileName();
-  m3u8File.open(currentFileName, ios::out | ios::binary);
-  m3u8File.write((char *)data, size);
-  m3u8File.close();
+bool HttpLiveFuzzer::isM3U8Marker(size_t position) {
+  if ((kMarkerSuffixSize <= mSize) && (position <= mSize - kMarkerSuffixSize)) {
+    return (memcmp(&mData[position], kM3U8MarkerSuffix, kMarkerSuffixSize) == 0);
+  } else {
+    return false;
+  }
+}
+
+bool HttpLiveFuzzer::isBinMarker(size_t position) {
+  if ((kMarkerSuffixSize <= mSize) && (position <= mSize - kMarkerSuffixSize)) {
+    return (memcmp(&mData[position], kBinMarkerSuffix, kMarkerSuffixSize) == 0);
+  } else {
+    return false;
+  }
+}
+
+bool HttpLiveFuzzer::searchForMarker() {
+  while (mReadIndex >= 0) {
+    if (isMarker()) {
+      return true;
+    }
+    --mReadIndex;
+  }
+  return false;
+}
+
+void HttpLiveFuzzer::initDataFile(const string& fileName, const uint8_t* data, size_t size) {
+  ofstream file;
+  file.open(fileName, ios::out | ios::binary);
+  if (file.is_open()) {
+    file.write((char*)data, size);
+    file.close();
+  }
+}
+
+void HttpLiveFuzzer::createFiles(const uint8_t* data, size_t size) {
+  mData = data;
+  mSize = size;
+  mReadIndex = (size <= kMarkerSize) ? 0 : (size - kMarkerSize);
+  size_t bytesRemaining = mSize;
+  int m3u8fileIndex = 0;
+  int binfileIndex = 0;
+  while (searchForMarker()) {
+    size_t location = mReadIndex + kMarkerSize;
+    size_t fileSize = 0;
+    if (isM3U8Marker(location)) {
+      location += kMarkerSuffixSize;
+      fileSize = bytesRemaining - location;
+      string m3u8fileName = kM3U8IndexFilePrefix + to_string(m3u8fileIndex) + kM3U8IndexFileSuffix;
+      initDataFile(m3u8fileName, &mData[location], fileSize);
+      ++m3u8fileIndex;
+    } else if (isBinMarker(location)) {
+      location += kMarkerSuffixSize;
+      fileSize = bytesRemaining - location;
+      string binfileName = kBinFilePrefix + to_string(binfileIndex) + kBinFileSuffix;
+      initDataFile(binfileName, &mData[location], fileSize);
+      ++binfileIndex;
+    }
+    bytesRemaining = mReadIndex;
+    --mReadIndex;
+  }
+  if (m3u8fileIndex == 0 && binfileIndex == 0) {
+    string fileName = kM3U8IndexFilePrefix + to_string(m3u8fileIndex) + kM3U8IndexFileSuffix;
+    initDataFile(fileName, mData, mSize);
+    fileName = kBinFilePrefix + to_string(binfileIndex) + kBinFileSuffix;
+    initDataFile(fileName, mData, mSize);
+  }
 }
 
 void HttpLiveFuzzer::initLiveDataSource() {
@@ -228,7 +313,8 @@ void HttpLiveFuzzer::invokeGetConfig() {
 }
 
 void HttpLiveFuzzer::invokeConnectAsync() {
-  string currentFileName = generateFileName();
+  string currentFileName =
+      kM3U8IndexFilePrefix + to_string(kInitialM3U8Index) + kM3U8IndexFileSuffix;
   string url = kFileUrlPrefix + currentFileName;
   string str_1 = mFDP->ConsumeRandomLengthString(kRandomStringLength);
   string str_2 = mFDP->ConsumeRandomLengthString(kRandomStringLength);
@@ -246,8 +332,9 @@ void HttpLiveFuzzer::invokeLiveSession() {
   mLiveSession->setBufferingSettings(bufferingSettings);
   invokeConnectAsync();
   std::unique_lock waitForDownloadComplete(mDownloadCompleteMutex);
-  mConditionalVariable.wait(waitForDownloadComplete,
-                            [this] { return mEosReached; });
+  auto now = std::chrono::system_clock::now();
+  mConditionalVariable.wait_until(waitForDownloadComplete, now + std::chrono::milliseconds(kWaitTime),
+                                  [this] { return mEosReached; });
   if (mLiveSession->isSeekable()) {
     invokeSeekTo();
   }
@@ -266,7 +353,7 @@ void HttpLiveFuzzer::invokeLiveSession() {
 
 void HttpLiveFuzzer::process(const uint8_t *data, size_t size) {
   mFDP = new FuzzedDataProvider(data, size);
-  createM3U8File(data, size);
+  createFiles(data, size);
   invokeLiveDataSource();
   invokeLiveSession();
   delete mFDP;
