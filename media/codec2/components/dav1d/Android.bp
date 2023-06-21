@@ -1,0 +1,37 @@
+package {
+    // See: http://go/android-license-faq
+    // A large-scale-change added 'default_applicable_licenses' to import
+    // all of the 'license_kinds' from "frameworks_av_license"
+    // to get the below license kinds:
+    //   SPDX-license-identifier-Apache-2.0
+    default_applicable_licenses: ["frameworks_av_license"],
+}
+
+cc_library {
+    name: "libcodec2_soft_av1dec_dav1d",
+    // TODO: b/277797541 - enable once ready
+    enabled: false,
+
+    defaults: [
+        "libcodec2_soft-defaults",
+        "libcodec2_soft_sanitize_all-defaults",
+    ],
+
+    cflags: [
+        "-DCODECNAME=\"c2.android.dav1d-av1.decoder\"",
+        "-Wno-unused-variable",
+    ],
+
+    srcs: ["C2SoftDav1dDec.cpp"],
+    static_libs: [
+        "libyuv_static",
+        "libdav1d_8bit",
+        "libdav1d_16bit",
+    ],
+
+    apex_available: [
+        "//apex_available:platform",
+        "com.android.media.swcodec",
+    ],
+
+}
