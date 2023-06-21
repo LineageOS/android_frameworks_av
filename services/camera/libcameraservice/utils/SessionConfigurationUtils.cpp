@@ -73,11 +73,11 @@ void StreamConfiguration::getStreamConfigurations(
 
     int32_t dynamicDepthKey =
             SessionConfigurationUtils::getAppropriateModeTag(
-                    ANDROID_DEPTH_AVAILABLE_DYNAMIC_DEPTH_STREAM_CONFIGURATIONS);
+                    ANDROID_DEPTH_AVAILABLE_DYNAMIC_DEPTH_STREAM_CONFIGURATIONS, maxRes);
 
     int32_t heicKey =
             SessionConfigurationUtils::getAppropriateModeTag(
-                    ANDROID_HEIC_AVAILABLE_HEIC_STREAM_CONFIGURATIONS);
+                    ANDROID_HEIC_AVAILABLE_HEIC_STREAM_CONFIGURATIONS, maxRes);
 
     getStreamConfigurations(staticInfo, scalerKey, scm);
     getStreamConfigurations(staticInfo, depthKey, scm);
