@@ -80,9 +80,7 @@ Camera2Client::Camera2Client(const sp<CameraService>& cameraService,
 
     SharedParameters::Lock l(mParameters);
     l.mParameters.state = Parameters::DISCONNECTED;
-    if (forceSlowJpegMode) {
-        l.mParameters.isSlowJpegModeForced = true;
-    }
+    l.mParameters.isSlowJpegModeForced = forceSlowJpegMode;
 }
 
 status_t Camera2Client::initialize(sp<CameraProviderManager> manager, const String8& monitorTags) {
