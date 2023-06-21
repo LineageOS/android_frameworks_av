@@ -1061,7 +1061,7 @@ void AudioFlinger::ThreadBase::dumpEffectChains_l(int fd, const Vector<String16>
     write(fd, buffer, strlen(buffer));
 
     for (size_t i = 0; i < numEffectChains; ++i) {
-        sp<EffectChain> chain = mEffectChains[i];
+        sp<IAfEffectChain> chain = mEffectChains[i];
         if (chain != 0) {
             chain->dump(fd, args);
         }
@@ -1211,7 +1211,7 @@ void AudioFlinger::ThreadBase::PMDeathRecipient::binderDied(const wp<IBinder>& w
 void AudioFlinger::ThreadBase::setEffectSuspended_l(
         const effect_uuid_t *type, bool suspend, audio_session_t sessionId)
 {
-    sp<EffectChain> chain = getEffectChain_l(sessionId);
+    sp<IAfEffectChain> chain = getEffectChain_l(sessionId);
     if (chain != 0) {
         if (type != NULL) {
             chain->setEffectSuspended_l(type, suspend);
@@ -1223,7 +1223,7 @@ void AudioFlinger::ThreadBase::setEffectSuspended_l(
     updateSuspendedSessions_l(type, suspend, sessionId);
 }
 
-void AudioFlinger::ThreadBase::checkSuspendOnAddEffectChain_l(const sp<EffectChain>& chain)
+void AudioFlinger::ThreadBase::checkSuspendOnAddEffectChain_l(const sp<IAfEffectChain>& chain)
 {
     ssize_t index = mSuspendedSessions.indexOfKey(chain->sessionId());
     if (index < 0) {
@@ -1236,7 +1236,7 @@ void AudioFlinger::ThreadBase::checkSuspendOnAddEffectChain_l(const sp<EffectCha
     for (size_t i = 0; i < sessionEffects.size(); i++) {
         const sp<SuspendedSessionDesc>& desc = sessionEffects.valueAt(i);
         for (int j = 0; j < desc->mRefCount; j++) {
-            if (sessionEffects.keyAt(i) == EffectChain::kKeyForSuspendAll) {
+            if (sessionEffects.keyAt(i) == IAfEffectChain::kKeyForSuspendAll) {
                 chain->setEffectSuspendedAll_l(true);
             } else {
                 ALOGV("checkSuspendOnAddEffectChain_l() suspending effects %08x",
@@ -1269,7 +1269,7 @@ void AudioFlinger::ThreadBase::updateSuspendedSessions_l(const effect_uuid_t *ty
     }
 
 
-    int key = EffectChain::kKeyForSuspendAll;
+    int key = IAfEffectChain::kKeyForSuspendAll;
     if (type != NULL) {
         key = type->timeLow;
     }
@@ -1370,7 +1370,7 @@ status_t AudioFlinger::RecordThread::checkEffectCompatibility_l(
         }
     }
 
-    if (EffectModule::isHapticGenerator(&desc->type)) {
+    if (IAfEffectModule::isHapticGenerator(&desc->type)) {
         ALOGE("%s(): HapticGenerator is not supported in RecordThread", __func__);
         return BAD_VALUE;
     }
@@ -1393,7 +1393,7 @@ status_t AudioFlinger::PlaybackThread::checkEffectCompatibility_l(
         return NO_ERROR;
     }
 
-    if (EffectModule::isHapticGenerator(&desc->type) && mHapticChannelCount == 0) {
+    if (IAfEffectModule::isHapticGenerator(&desc->type) && mHapticChannelCount == 0) {
         ALOGW("%s: thread doesn't support haptic playback while the effect is HapticGenerator",
                 __func__);
         return BAD_VALUE;
@@ -1533,7 +1533,7 @@ status_t AudioFlinger::PlaybackThread::checkEffectCompatibility_l(
 }
 
 // ThreadBase::createEffect_l() must be called with AudioFlinger::mLock held
-sp<AudioFlinger::EffectHandle> AudioFlinger::ThreadBase::createEffect_l(
+sp<IAfEffectHandle> AudioFlinger::ThreadBase::createEffect_l(
         const sp<AudioFlinger::Client>& client,
         const sp<IEffectClient>& effectClient,
         int32_t priority,
@@ -1545,10 +1545,10 @@ sp<AudioFlinger::EffectHandle> AudioFlinger::ThreadBase::createEffect_l(
         bool probe,
         bool notifyFramesProcessed)
 {
-    sp<EffectModule> effect;
-    sp<EffectHandle> handle;
+    sp<IAfEffectModule> effect;
+    sp<IAfEffectHandle> handle;
     status_t lStatus;
-    sp<EffectChain> chain;
+    sp<IAfEffectChain> chain;
     bool chainCreated = false;
     bool effectCreated = false;
     audio_unique_id_t effectId = AUDIO_UNIQUE_ID_USE_UNSPECIFIED;
@@ -1574,7 +1574,7 @@ sp<AudioFlinger::EffectHandle> AudioFlinger::ThreadBase::createEffect_l(
         if (chain == 0) {
             // create a new chain for this session
             ALOGV("createEffect_l() new effect chain for session %d", sessionId);
-            chain = new EffectChain(this, sessionId);
+            chain = IAfEffectChain::create(this, sessionId);
             addEffectChain_l(chain);
             chain->setStrategy(getStrategyForSession_l(sessionId));
             chainCreated = true;
@@ -1610,7 +1610,8 @@ sp<AudioFlinger::EffectHandle> AudioFlinger::ThreadBase::createEffect_l(
             }
         }
         // create effect handle and connect it to effect module
-        handle = new EffectHandle(effect, client, effectClient, priority, notifyFramesProcessed);
+        handle = IAfEffectHandle::create(
+                effect, client, effectClient, priority, notifyFramesProcessed);
         lStatus = handle->initCheck();
         if (lStatus == OK) {
             lStatus = effect->addHandle(handle.get());
@@ -1637,14 +1638,14 @@ Exit:
     return handle;
 }
 
-void AudioFlinger::ThreadBase::disconnectEffectHandle(EffectHandle *handle,
+void AudioFlinger::ThreadBase::disconnectEffectHandle(IAfEffectHandle *handle,
                                                       bool unpinIfLast)
 {
     bool remove = false;
-    sp<EffectModule> effect;
+    sp<IAfEffectModule> effect;
     {
         Mutex::Autolock _l(mLock);
-        sp<EffectBase> effectBase = handle->effect().promote();
+        sp<IAfEffectBase> effectBase = handle->effect().promote();
         if (effectBase == nullptr) {
             return;
         }
@@ -1667,7 +1668,7 @@ void AudioFlinger::ThreadBase::disconnectEffectHandle(EffectHandle *handle,
     }
 }
 
-void AudioFlinger::ThreadBase::onEffectEnable(const sp<EffectModule>& effect) {
+void AudioFlinger::ThreadBase::onEffectEnable(const sp<IAfEffectModule>& effect) {
     if (isOffloadOrMmap()) {
         Mutex::Autolock _l(mLock);
         broadcast_l();
@@ -1690,33 +1691,33 @@ void AudioFlinger::ThreadBase::onEffectDisable() {
     }
 }
 
-sp<AudioFlinger::EffectModule> AudioFlinger::ThreadBase::getEffect(audio_session_t sessionId,
+sp<IAfEffectModule> AudioFlinger::ThreadBase::getEffect(audio_session_t sessionId,
         int effectId)
 {
     Mutex::Autolock _l(mLock);
     return getEffect_l(sessionId, effectId);
 }
 
-sp<AudioFlinger::EffectModule> AudioFlinger::ThreadBase::getEffect_l(audio_session_t sessionId,
+sp<IAfEffectModule> AudioFlinger::ThreadBase::getEffect_l(audio_session_t sessionId,
         int effectId)
 {
-    sp<EffectChain> chain = getEffectChain_l(sessionId);
+    sp<IAfEffectChain> chain = getEffectChain_l(sessionId);
     return chain != 0 ? chain->getEffectFromId_l(effectId) : 0;
 }
 
 std::vector<int> AudioFlinger::ThreadBase::getEffectIds_l(audio_session_t sessionId)
 {
-    sp<EffectChain> chain = getEffectChain_l(sessionId);
+    sp<IAfEffectChain> chain = getEffectChain_l(sessionId);
     return chain != nullptr ? chain->getEffectIds() : std::vector<int>{};
 }
 
 // PlaybackThread::addEffect_l() must be called with AudioFlinger::mLock and
 // PlaybackThread::mLock held
-status_t AudioFlinger::ThreadBase::addEffect_l(const sp<EffectModule>& effect)
+status_t AudioFlinger::ThreadBase::addEffect_l(const sp<IAfEffectModule>& effect)
 {
     // check for existing effect chain with the requested audio session
     audio_session_t sessionId = effect->sessionId();
-    sp<EffectChain> chain = getEffectChain_l(sessionId);
+    sp<IAfEffectChain> chain = getEffectChain_l(sessionId);
     bool chainCreated = false;
 
     ALOGD_IF((mType == OFFLOAD) && !effect->isOffloadable(),
@@ -1726,7 +1727,7 @@ status_t AudioFlinger::ThreadBase::addEffect_l(const sp<EffectModule>& effect)
     if (chain == 0) {
         // create a new chain for this session
         ALOGV("addEffect_l() new effect chain for session %d", sessionId);
-        chain = new EffectChain(this, sessionId);
+        chain = IAfEffectChain::create(this, sessionId);
         addEffectChain_l(chain);
         chain->setStrategy(getStrategyForSession_l(sessionId));
         chainCreated = true;
@@ -1757,7 +1758,7 @@ status_t AudioFlinger::ThreadBase::addEffect_l(const sp<EffectModule>& effect)
     return NO_ERROR;
 }
 
-void AudioFlinger::ThreadBase::removeEffect_l(const sp<EffectModule>& effect, bool release) {
+void AudioFlinger::ThreadBase::removeEffect_l(const sp<IAfEffectModule>& effect, bool release) {
 
     ALOGV("%s %p effect %p", __FUNCTION__, this, effect.get());
     effect_descriptor_t desc = effect->desc();
@@ -1765,7 +1766,7 @@ void AudioFlinger::ThreadBase::removeEffect_l(const sp<EffectModule>& effect, bo
         detachAuxEffect_l(effect->id());
     }
 
-    sp<EffectChain> chain = effect->getCallback()->chain().promote();
+    sp<IAfEffectChain> chain = effect->getCallback()->chain().promote();
     if (chain != 0) {
         // remove effect chain if removing last effect
         if (chain->removeEffect_l(effect, release) == 0) {
@@ -1777,7 +1778,7 @@ void AudioFlinger::ThreadBase::removeEffect_l(const sp<EffectModule>& effect, bo
 }
 
 void AudioFlinger::ThreadBase::lockEffectChains_l(
-        Vector< sp<AudioFlinger::EffectChain> >& effectChains)
+        Vector<sp<IAfEffectChain>>& effectChains)
 NO_THREAD_SAFETY_ANALYSIS  // calls EffectChain::lock()
 {
     effectChains = mEffectChains;
@@ -1787,7 +1788,7 @@ NO_THREAD_SAFETY_ANALYSIS  // calls EffectChain::lock()
 }
 
 void AudioFlinger::ThreadBase::unlockEffectChains(
-        const Vector< sp<AudioFlinger::EffectChain> >& effectChains)
+        const Vector<sp<IAfEffectChain>>& effectChains)
 NO_THREAD_SAFETY_ANALYSIS  // calls EffectChain::unlock()
 {
     for (size_t i = 0; i < effectChains.size(); i++) {
@@ -1795,13 +1796,13 @@ NO_THREAD_SAFETY_ANALYSIS  // calls EffectChain::unlock()
     }
 }
 
-sp<AudioFlinger::EffectChain> AudioFlinger::ThreadBase::getEffectChain(audio_session_t sessionId)
+sp<IAfEffectChain> AudioFlinger::ThreadBase::getEffectChain(audio_session_t sessionId)
 {
     Mutex::Autolock _l(mLock);
     return getEffectChain_l(sessionId);
 }
 
-sp<AudioFlinger::EffectChain> AudioFlinger::ThreadBase::getEffectChain_l(audio_session_t sessionId)
+sp<IAfEffectChain> AudioFlinger::ThreadBase::getEffectChain_l(audio_session_t sessionId)
         const
 {
     size_t size = mEffectChains.size();
@@ -2350,7 +2351,7 @@ sp<AudioFlinger::PlaybackThread::Track> AudioFlinger::PlaybackThread::createTrac
     }
 
     if (isBitPerfect) {
-        sp<EffectChain> chain = getEffectChain_l(sessionId);
+        sp<IAfEffectChain> chain = getEffectChain_l(sessionId);
         if (chain.get() != nullptr) {
             // Bit-perfect is required according to the configuration and preferred mixer
             // attributes, but it is not in the output flag from the client's request. Explicitly
@@ -2407,7 +2408,7 @@ sp<AudioFlinger::PlaybackThread::Track> AudioFlinger::PlaybackThread::createTrac
                     AUDIO_SESSION_OUTPUT_MIX,
                     sessionId,
                 }) {
-                sp<EffectChain> chain = getEffectChain_l(session);
+                sp<IAfEffectChain> chain = getEffectChain_l(session);
                 if (chain.get() != nullptr) {
                     audio_output_flags_t old = *flags;
                     chain->checkOutputFlagCompatibility(flags);
@@ -2657,7 +2658,7 @@ sp<AudioFlinger::PlaybackThread::Track> AudioFlinger::PlaybackThread::createTrac
             }
         }
 
-        sp<EffectChain> chain = getEffectChain_l(sessionId);
+        sp<IAfEffectChain> chain = getEffectChain_l(sessionId);
         if (chain != 0) {
             ALOGV("createTrack_l() setting main buffer %p", chain->inBuffer());
             track->setMainBuffer(chain->inBuffer());
@@ -2825,7 +2826,7 @@ NO_THREAD_SAFETY_ANALYSIS  // release and re-acquire mLock
                     track->sharedBuffer() != 0 ? Track::FS_FILLED : Track::FS_FILLING;
         }
 
-        sp<EffectChain> chain = getEffectChain_l(track->sessionId());
+        sp<IAfEffectChain> chain = getEffectChain_l(track->sessionId());
         if (mHapticChannelMask != AUDIO_CHANNEL_NONE
                 && ((track->channelMask() & AUDIO_CHANNEL_HAPTIC_ALL) != AUDIO_CHANNEL_NONE
                         || (chain != nullptr && chain->containsHapticGeneratingEffect_l()))) {
@@ -2918,7 +2919,7 @@ void AudioFlinger::PlaybackThread::removeTrack_l(const sp<Track>& track)
         // redundant as track is about to be destroyed, for dumpsys only
         track->mFastIndex = -1;
     }
-    sp<EffectChain> chain = getEffectChain_l(track->sessionId());
+    sp<IAfEffectChain> chain = getEffectChain_l(track->sessionId());
     if (chain != 0) {
         chain->decTrackCnt();
     }
@@ -3206,7 +3207,7 @@ void AudioFlinger::PlaybackThread::readOutputParameters_l()
     // but in this case nothing is done below as no audio sessions have effect yet so it doesn't
     // matter.
     // create a copy of mEffectChains as calling moveEffectChain_l() can reorder some effect chains
-    Vector< sp<EffectChain> > effectChains = mEffectChains;
+    Vector<sp<IAfEffectChain>> effectChains = mEffectChains;
     for (size_t i = 0; i < effectChains.size(); i ++) {
         mAudioFlinger->moveEffectChain_l(effectChains[i]->sessionId(),
             this/* srcThread */, this/* dstThread */);
@@ -3617,7 +3618,7 @@ AudioFlinger::PlaybackThread::Track* AudioFlinger::PlaybackThread::getTrackById_
     return nullptr;
 }
 
-status_t AudioFlinger::PlaybackThread::addEffectChain_l(const sp<EffectChain>& chain)
+status_t AudioFlinger::PlaybackThread::addEffectChain_l(const sp<IAfEffectChain>& chain)
 {
     audio_session_t session = chain->sessionId();
     sp<EffectBufferHalInterface> halInBuffer, halOutBuffer;
@@ -3753,7 +3754,7 @@ status_t AudioFlinger::PlaybackThread::addEffectChain_l(const sp<EffectChain>& c
     return NO_ERROR;
 }
 
-size_t AudioFlinger::PlaybackThread::removeEffectChain_l(const sp<EffectChain>& chain)
+size_t AudioFlinger::PlaybackThread::removeEffectChain_l(const sp<IAfEffectChain>& chain)
 {
     audio_session_t session = chain->sessionId();
 
@@ -3801,7 +3802,7 @@ status_t AudioFlinger::PlaybackThread::attachAuxEffect_l(
         track->setAuxBuffer(0, NULL);
     } else {
         // Auxiliary effects are always in audio session AUDIO_SESSION_OUTPUT_MIX
-        sp<EffectModule> effect = getEffect_l(AUDIO_SESSION_OUTPUT_MIX, EffectId);
+        sp<IAfEffectModule> effect = getEffect_l(AUDIO_SESSION_OUTPUT_MIX, EffectId);
         if (effect != 0) {
             if ((effect->desc().flags & EFFECT_FLAG_TYPE_MASK) == EFFECT_FLAG_TYPE_AUXILIARY) {
                 track->setAuxBuffer(EffectId, (int32_t *)effect->inBuffer());
@@ -3882,7 +3883,7 @@ NO_THREAD_SAFETY_ANALYSIS  // manual locking of AudioFlinger
 
         cpuStats.sample(myName);
 
-        Vector< sp<EffectChain> > effectChains;
+        Vector<sp<IAfEffectChain>> effectChains;
         audio_session_t activeHapticSessionId = AUDIO_SESSION_NONE;
         bool isHapticSessionSpatialized = false;
         std::vector<sp<Track>> activeTracks;
@@ -4048,7 +4049,7 @@ NO_THREAD_SAFETY_ANALYSIS  // manual locking of AudioFlinger
             // TODO: Write haptic data directly to sink buffer when mixing.
             if (mHapticChannelCount > 0) {
                 for (const auto& track : mActiveTracks) {
-                    sp<EffectChain> effectChain = getEffectChain_l(track->sessionId());
+                    sp<IAfEffectChain> effectChain = getEffectChain_l(track->sessionId());
                     if (effectChain != nullptr
                             && effectChain->containsHapticGeneratingEffect_l()) {
                         activeHapticSessionId = track->sessionId();
@@ -4622,7 +4623,7 @@ NO_THREAD_SAFETY_ANALYSIS  // release and re-acquire mLock
     for (const auto& track : tracksToRemove) {
         mActiveTracks.remove(track);
         ALOGV("%s(%d): removing track on session %d", __func__, track->id(), track->sessionId());
-        sp<EffectChain> chain = getEffectChain_l(track->sessionId());
+        sp<IAfEffectChain> chain = getEffectChain_l(track->sessionId());
         if (chain != 0) {
             ALOGV("%s(%d): stopping track on chain %p for session Id: %d",
                     __func__, track->id(), chain.get(), track->sessionId());
@@ -5343,7 +5344,7 @@ AudioFlinger::PlaybackThread::mixer_state AudioFlinger::MixerThread::prepareTrac
         masterVolume = 0;
     }
     // Delegate master volume control to effect in output mix effect chain if needed
-    sp<EffectChain> chain = getEffectChain_l(AUDIO_SESSION_OUTPUT_MIX);
+    sp<IAfEffectChain> chain = getEffectChain_l(AUDIO_SESSION_OUTPUT_MIX);
     if (chain != 0) {
         uint32_t v = (uint32_t)(masterVolume * (1 << 24));
         chain->setVolume_l(&v, &v);
@@ -7713,10 +7714,10 @@ void AudioFlinger::SpatializerThread::checkOutputStageEffects()
 {
     bool hasVirtualizer = false;
     bool hasDownMixer = false;
-    sp<EffectHandle> finalDownMixer;
+    sp<IAfEffectHandle> finalDownMixer;
     {
         Mutex::Autolock _l(mLock);
-        sp<EffectChain> chain = getEffectChain_l(AUDIO_SESSION_OUTPUT_STAGE);
+        sp<IAfEffectChain> chain = getEffectChain_l(AUDIO_SESSION_OUTPUT_STAGE);
         if (chain != 0) {
             hasVirtualizer = chain->getEffectFromType_l(FX_IID_SPATIALIZER) != nullptr;
             hasDownMixer = chain->getEffectFromType_l(EFFECT_UIID_DOWNMIX) != nullptr;
@@ -7729,7 +7730,7 @@ void AudioFlinger::SpatializerThread::checkOutputStageEffects()
     if (hasVirtualizer) {
         if (finalDownMixer != nullptr) {
             int32_t ret;
-            finalDownMixer->disable(&ret);
+            finalDownMixer->asIEffect()->disable(&ret);
         }
         finalDownMixer.clear();
     } else if (!hasDownMixer) {
@@ -7751,7 +7752,7 @@ void AudioFlinger::SpatializerThread::checkOutputStageEffects()
             finalDownMixer.clear();
         } else {
             int32_t ret;
-            finalDownMixer->enable(&ret);
+            finalDownMixer->asIEffect()->enable(&ret);
         }
     }
 
@@ -7983,7 +7984,7 @@ reacquire_wakelock:
 
     // loop while there is work to do
     for (int64_t loopCount = 0;; ++loopCount) {  // loopCount used for statistics tracking
-        Vector< sp<EffectChain> > effectChains;
+        Vector<sp<IAfEffectChain>> effectChains;
 
         // activeTracks accumulates a copy of a subset of mActiveTracks
         Vector< sp<RecordTrack> > activeTracks;
@@ -8670,7 +8671,7 @@ sp<AudioFlinger::RecordThread::RecordTrack> AudioFlinger::RecordThread::createRe
           // check compatibility with audio effects.
           Mutex::Autolock _l(mLock);
           // Do not accept FAST flag if the session has software effects
-          sp<EffectChain> chain = getEffectChain_l(sessionId);
+          sp<IAfEffectChain> chain = getEffectChain_l(sessionId);
           if (chain != 0) {
               audio_input_flags_t old = *flags;
               chain->checkInputFlagCompatibility(flags);
@@ -9496,7 +9497,7 @@ sp<StreamHalInterface> AudioFlinger::RecordThread::stream() const
     return mInput->stream;
 }
 
-status_t AudioFlinger::RecordThread::addEffectChain_l(const sp<EffectChain>& chain)
+status_t AudioFlinger::RecordThread::addEffectChain_l(const sp<IAfEffectChain>& chain)
 {
     ALOGV("addEffectChain_l() %p on thread %p", chain.get(), this);
     chain->setThread(this);
@@ -9514,7 +9515,7 @@ status_t AudioFlinger::RecordThread::addEffectChain_l(const sp<EffectChain>& cha
     return NO_ERROR;
 }
 
-size_t AudioFlinger::RecordThread::removeEffectChain_l(const sp<EffectChain>& chain)
+size_t AudioFlinger::RecordThread::removeEffectChain_l(const sp<IAfEffectChain>& chain)
 {
     ALOGV("removeEffectChain_l() %p from thread %p", chain.get(), this);
 
@@ -10042,7 +10043,7 @@ status_t AudioFlinger::MmapThread::start(const AudioClient& client,
     }
 
     mActiveTracks.add(track);
-    sp<EffectChain> chain = getEffectChain_l(mSessionId);
+    sp<IAfEffectChain> chain = getEffectChain_l(mSessionId);
     if (chain != 0) {
         chain->setStrategy(getStrategyForStream(streamType()));
         chain->incTrackCnt();
@@ -10102,7 +10103,7 @@ status_t AudioFlinger::MmapThread::stop(audio_port_handle_t handle)
     }
     mLock.lock();
 
-    sp<EffectChain> chain = getEffectChain_l(track->sessionId());
+    sp<IAfEffectChain> chain = getEffectChain_l(track->sessionId());
     if (chain != 0) {
         chain->decActiveTrackCnt();
         chain->decTrackCnt();
@@ -10186,7 +10187,7 @@ bool AudioFlinger::MmapThread::threadLoop()
 
     while (!exitPending())
     {
-        Vector< sp<EffectChain> > effectChains;
+        Vector<sp<IAfEffectChain>> effectChains;
 
         { // under Thread lock
         Mutex::Autolock _l(mLock);
@@ -10429,7 +10430,7 @@ void AudioFlinger::MmapThread::toAudioPortConfig(struct audio_port_config *confi
     }
 }
 
-status_t AudioFlinger::MmapThread::addEffectChain_l(const sp<EffectChain>& chain)
+status_t AudioFlinger::MmapThread::addEffectChain_l(const sp<IAfEffectChain>& chain)
 {
     audio_session_t session = chain->sessionId();
 
@@ -10453,7 +10454,7 @@ status_t AudioFlinger::MmapThread::addEffectChain_l(const sp<EffectChain>& chain
     return NO_ERROR;
 }
 
-size_t AudioFlinger::MmapThread::removeEffectChain_l(const sp<EffectChain>& chain)
+size_t AudioFlinger::MmapThread::removeEffectChain_l(const sp<IAfEffectChain>& chain)
 {
     audio_session_t session = chain->sessionId();
 
@@ -10524,7 +10525,7 @@ status_t AudioFlinger::MmapThread::checkEffectCompatibility_l(
         return BAD_VALUE;
     }
 
-    if (EffectModule::isHapticGenerator(&desc->type)) {
+    if (IAfEffectModule::isHapticGenerator(&desc->type)) {
         ALOGE("%s(): HapticGenerator is not supported for MmapThread", __func__);
         return BAD_VALUE;
     }

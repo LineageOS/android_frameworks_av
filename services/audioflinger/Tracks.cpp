@@ -1077,7 +1077,7 @@ status_t AudioFlinger::PlaybackThread::Track::start(AudioSystem::sync_event_t ev
         if (isOffloaded()) {
             Mutex::Autolock _laf(thread->mAudioFlinger->mLock);
             Mutex::Autolock _lth(thread->mLock);
-            sp<EffectChain> ec = thread->getEffectChain_l(mSessionId);
+            sp<IAfEffectChain> ec = thread->getEffectChain_l(mSessionId);
             if (thread->mAudioFlinger->isNonOffloadableGlobalEffectEnabled_l() ||
                     (ec != 0 && ec->isNonOffloadableEnabled())) {
                 invalidate();

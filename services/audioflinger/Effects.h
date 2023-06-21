@@ -15,61 +15,9 @@
 ** limitations under the License.
 */
 
-#ifndef INCLUDING_FROM_AUDIOFLINGER_H
-    #error This header file should only be included from AudioFlinger.h
-#endif
+namespace android {
 
 //--- Audio Effect Management
-
-// Interface implemented by the EffectModule parent or owner (e.g an EffectChain) to abstract
-// interactions between the EffectModule and the reset of the audio framework.
-class EffectCallbackInterface : public RefBase {
-public:
-            ~EffectCallbackInterface() override = default;
-
-    // Trivial methods usually implemented with help from ThreadBase
-    virtual audio_io_handle_t io() const = 0;
-    virtual bool isOutput() const = 0;
-    virtual bool isOffload() const = 0;
-    virtual bool isOffloadOrDirect() const = 0;
-    virtual bool isOffloadOrMmap() const = 0;
-    virtual bool isSpatializer() const = 0;
-    virtual uint32_t sampleRate() const = 0;
-    virtual audio_channel_mask_t inChannelMask(int id) const = 0;
-    virtual uint32_t inChannelCount(int id) const = 0;
-    virtual audio_channel_mask_t outChannelMask() const = 0;
-    virtual uint32_t outChannelCount() const = 0;
-    virtual audio_channel_mask_t hapticChannelMask() const = 0;
-    virtual size_t frameCount() const = 0;
-
-    // Non trivial methods usually implemented with help from ThreadBase:
-    //   pay attention to mutex locking order
-    virtual uint32_t latency() const { return 0; }
-    virtual status_t addEffectToHal(const sp<EffectHalInterface>& effect) = 0;
-    virtual status_t removeEffectFromHal(const sp<EffectHalInterface>& effect) = 0;
-    virtual void setVolumeForOutput(float left, float right) const = 0;
-    virtual bool disconnectEffectHandle(EffectHandle *handle, bool unpinIfLast) = 0;
-    virtual void checkSuspendOnEffectEnabled(const sp<EffectBase>& effect,
-                                             bool enabled,
-                                             bool threadLocked) = 0;
-    virtual void onEffectEnable(const sp<EffectBase>& effect) = 0;
-    virtual void onEffectDisable(const sp<EffectBase>& effect) = 0;
-
-    // Methods usually implemented with help from AudioFlinger: pay attention to mutex locking order
-    virtual status_t createEffectHal(const effect_uuid_t *pEffectUuid,
-                    int32_t sessionId, int32_t deviceId, sp<EffectHalInterface> *effect) = 0;
-    virtual status_t allocateHalBuffer(size_t size, sp<EffectBufferHalInterface>* buffer) = 0;
-    virtual bool updateOrphanEffectChains(const sp<EffectBase>& effect) = 0;
-
-    // Methods usually implemented with help from EffectChain: pay attention to mutex locking order
-    virtual product_strategy_t strategy() const = 0;
-    virtual int32_t activeTrackCnt() const = 0;
-    virtual void resetVolume() = 0;
-
-    virtual wp<EffectChain> chain() const = 0;
-
-    virtual bool isAudioPolicyReady() const = 0;
-};
 
 // EffectBase(EffectModule) and EffectChain classes both have their own mutex to protect
 // state changes or resource modifications. Always respect the following order
@@ -90,7 +38,7 @@ public:
 // The EffectBase class contains common properties, state and behavior for and EffectModule or
 // other derived classes managing an audio effect instance within the effect framework.
 // It also contains the class mutex (see comment on locking order above).
-class EffectBase : public RefBase {
+class EffectBase : public virtual IAfEffectBase {
 public:
     EffectBase(const sp<EffectCallbackInterface>& callback,
                effect_descriptor_t *desc,
@@ -98,76 +46,69 @@ public:
                audio_session_t sessionId,
                bool pinned);
 
-    ~EffectBase() override = default;
-
-    enum effect_state {
-        IDLE,
-        RESTART,
-        STARTING,
-        ACTIVE,
-        STOPPING,
-        STOPPED,
-        DESTROYED
-    };
-
-    int id() const { return mId; }
-    effect_state state() const {
+    int id() const final { return mId; }
+    effect_state state() const final {
         return mState;
     }
-    audio_session_t sessionId() const {
+    audio_session_t sessionId() const final {
         return mSessionId;
     }
-    const effect_descriptor_t& desc() const { return mDescriptor; }
-    bool             isOffloadable() const
+    const effect_descriptor_t& desc() const final { return mDescriptor; }
+    bool isOffloadable() const final
                         { return (mDescriptor.flags & EFFECT_FLAG_OFFLOAD_SUPPORTED) != 0; }
-    bool             isImplementationSoftware() const
+    bool isImplementationSoftware() const final
                         { return (mDescriptor.flags & EFFECT_FLAG_HW_ACC_MASK) == 0; }
-    bool             isProcessImplemented() const
+    bool isProcessImplemented() const final
                         { return (mDescriptor.flags & EFFECT_FLAG_NO_PROCESS) == 0; }
-    bool             isVolumeControl() const
+    bool isVolumeControl() const
                         { return (mDescriptor.flags & EFFECT_FLAG_VOLUME_MASK)
                             == EFFECT_FLAG_VOLUME_CTRL; }
-    bool             isVolumeMonitor() const
+    bool isVolumeMonitor() const final
                         { return (mDescriptor.flags & EFFECT_FLAG_VOLUME_MASK)
                             == EFFECT_FLAG_VOLUME_MONITOR; }
 
-    virtual status_t setEnabled(bool enabled, bool fromHandle);
-    status_t    setEnabled_l(bool enabled);
-    bool isEnabled() const;
+    status_t setEnabled(bool enabled, bool fromHandle) override;
+    status_t setEnabled_l(bool enabled) final;
+    bool isEnabled() const final;
+    void setSuspended(bool suspended) final;
+    bool suspended() const final;
 
-    void             setSuspended(bool suspended);
-    bool             suspended() const;
-
-    virtual status_t command(int32_t __unused,
+    status_t command(int32_t __unused,
                              const std::vector<uint8_t>& __unused,
                              int32_t __unused,
-                             std::vector<uint8_t>* __unused) { return NO_ERROR; };
+                             std::vector<uint8_t>* __unused) override {
+        return NO_ERROR;
+    }
 
     // mCallback is atomic so this can be lock-free.
-    void setCallback(const sp<EffectCallbackInterface>& callback) { mCallback = callback; }
-    sp<EffectCallbackInterface> getCallback() const { return mCallback.load(); }
+    void setCallback(const sp<EffectCallbackInterface>& callback) final {
+        mCallback = callback;
+    }
+    sp<EffectCallbackInterface> getCallback() const final {
+        return mCallback.load();
+    }
 
-    status_t addHandle(EffectHandle *handle);
-    ssize_t disconnectHandle(EffectHandle *handle, bool unpinIfLast);
-    ssize_t removeHandle(EffectHandle *handle);
-    ssize_t removeHandle_l(EffectHandle *handle);
-    EffectHandle* controlHandle_l();
-    bool purgeHandles();
+    status_t addHandle(IAfEffectHandle *handle) final;
+    ssize_t disconnectHandle(IAfEffectHandle *handle, bool unpinIfLast) final;
+    ssize_t removeHandle(IAfEffectHandle *handle) final;
+    ssize_t removeHandle_l(IAfEffectHandle *handle) final;
+    IAfEffectHandle* controlHandle_l() final;
+    bool purgeHandles() final;
 
-    void             checkSuspendOnEffectEnabled(bool enabled, bool threadLocked);
+    void             checkSuspendOnEffectEnabled(bool enabled, bool threadLocked) final;
 
-    bool             isPinned() const { return mPinned; }
-    void             unPin() { mPinned = false; }
+    bool             isPinned() const final { return mPinned; }
+    void             unPin() final { mPinned = false; }
 
-    void             lock() ACQUIRE(mLock) { mLock.lock(); }
-    void             unlock() RELEASE(mLock) { mLock.unlock(); }
+    void             lock() ACQUIRE(mLock) final { mLock.lock(); }
+    void             unlock() RELEASE(mLock) final { mLock.unlock(); }
 
-    status_t         updatePolicyState();
+    status_t         updatePolicyState() final;
 
-    virtual          sp<EffectModule> asEffectModule() { return nullptr; }
-    virtual          sp<DeviceEffectProxy> asDeviceEffectProxy() { return nullptr; }
+    sp<IAfEffectModule> asEffectModule() override { return nullptr; }
+    sp<IAfDeviceEffectProxy> asDeviceEffectProxy() override { return nullptr; }
 
-    void             dump(int fd, const Vector<String16>& args);
+    void             dump(int fd, const Vector<String16>& args) const override;
 
 protected:
     bool             isInternal_l() const {
@@ -179,13 +120,11 @@ protected:
                          return true;
                      }
 
-private:
-    friend class AudioFlinger;      // for mHandles
     bool             mPinned = false;
 
     DISALLOW_COPY_AND_ASSIGN(EffectBase);
 
-mutable Mutex                 mLock;      // mutex for process, commands and handles list protection
+    mutable Mutex mLock;      // mutex for process, commands and handles list protection
     mediautils::atomic_sp<EffectCallbackInterface> mCallback; // parent effect chain
     const int                 mId;        // this instance unique ID
     const audio_session_t     mSessionId; // audio session ID
@@ -194,7 +133,7 @@ mutable Mutex                 mLock;      // mutex for process, commands and han
     // effect is suspended: temporarily disabled by framework
     bool                      mSuspended = false;
 
-    Vector<EffectHandle *>    mHandles;   // list of client handles
+    Vector<IAfEffectHandle *> mHandles;  // list of client handles
                 // First handle in mHandles has highest priority and controls the effect module
 
     // Audio policy effect state management
@@ -217,7 +156,7 @@ mutable Mutex                 mLock;      // mutex for process, commands and han
 // ramping when effects are activated/deactivated.
 // When controlling an auxiliary effect, the EffectModule also provides an input buffer used by
 // the attached track(s) to accumulate their auxiliary channel.
-class EffectModule : public EffectBase {
+class EffectModule : public IAfEffectModule, public EffectBase {
 public:
     EffectModule(const sp<EffectCallbackInterface>& callabck,
                     effect_descriptor_t *desc,
@@ -225,72 +164,65 @@ public:
                     audio_session_t sessionId,
                     bool pinned,
                     audio_port_handle_t deviceId);
-    virtual ~EffectModule();
+    ~EffectModule() override;
 
-    void process();
-    bool updateState();
+    void process() final;
+    bool updateState() final;
     status_t command(int32_t cmdCode,
                      const std::vector<uint8_t>& cmdData,
                      int32_t maxReplySize,
-                     std::vector<uint8_t>* reply) override;
+                     std::vector<uint8_t>* reply) final;
 
-    void reset_l();
-    status_t configure();
-    status_t init();
-
-    uint32_t status() {
+    void reset_l() final;
+    status_t configure() final;
+    status_t init() final;
+    uint32_t status() const final {
         return mStatus;
     }
-
-    bool isProcessEnabled() const;
-    bool isOffloadedOrDirect() const;
-    bool isVolumeControlEnabled() const;
-
-    void        setInBuffer(const sp<EffectBufferHalInterface>& buffer);
-    int16_t     *inBuffer() const {
+    bool isProcessEnabled() const final;
+    bool isOffloadedOrDirect() const final;
+    bool isVolumeControlEnabled() const final;
+    void setInBuffer(const sp<EffectBufferHalInterface>& buffer) final;
+    int16_t *inBuffer() const final {
         return mInBuffer != 0 ? reinterpret_cast<int16_t*>(mInBuffer->ptr()) : NULL;
     }
-    void        setOutBuffer(const sp<EffectBufferHalInterface>& buffer);
-    int16_t     *outBuffer() const {
+    void setOutBuffer(const sp<EffectBufferHalInterface>& buffer) final;
+    int16_t *outBuffer() const final {
         return mOutBuffer != 0 ? reinterpret_cast<int16_t*>(mOutBuffer->ptr()) : NULL;
     }
-
     // Updates the access mode if it is out of date.  May issue a new effect configure.
-    void        updateAccessMode() {
+    void updateAccessMode() final {
                     if (requiredEffectBufferAccessMode() != mConfig.outputCfg.accessMode) {
                         configure();
                     }
                 }
+    status_t setDevices(const AudioDeviceTypeAddrVector &devices) final;
+    status_t setInputDevice(const AudioDeviceTypeAddr &device) final;
+    status_t setVolume(uint32_t *left, uint32_t *right, bool controller) final;
+    status_t setMode(audio_mode_t mode) final;
+    status_t setAudioSource(audio_source_t source) final;
+    status_t start() final;
+    status_t stop() final;
 
-    status_t         setDevices(const AudioDeviceTypeAddrVector &devices);
-    status_t         setInputDevice(const AudioDeviceTypeAddr &device);
-    status_t         setVolume(uint32_t *left, uint32_t *right, bool controller);
-    status_t         setMode(audio_mode_t mode);
-    status_t         setAudioSource(audio_source_t source);
-    status_t         start();
-    status_t         stop();
+    status_t setOffloaded(bool offloaded, audio_io_handle_t io) final;
+    bool isOffloaded() const final;
+    void addEffectToHal_l() final;
+    void release_l() final;
 
-    status_t         setOffloaded(bool offloaded, audio_io_handle_t io);
-    bool             isOffloaded() const;
-    void             addEffectToHal_l();
-    void             release_l();
+    sp<IAfEffectModule> asEffectModule() final { return this; }
 
-    sp<EffectModule> asEffectModule() override { return this; }
+    bool isHapticGenerator() const final;
 
-    static bool      isHapticGenerator(const effect_uuid_t* type);
-    bool             isHapticGenerator() const;
+    status_t setHapticIntensity(int id, os::HapticScale intensity) final;
+    status_t setVibratorInfo(const media::AudioVibratorInfo& vibratorInfo) final;
 
-    status_t         setHapticIntensity(int id, os::HapticScale intensity);
-    status_t         setVibratorInfo(const media::AudioVibratorInfo& vibratorInfo);
-
-    status_t         getConfigs(audio_config_base_t* inputCfg,
+    status_t getConfigs(audio_config_base_t* inputCfg,
                                 audio_config_base_t* outputCfg,
-                                bool* isOutput) const;
+                                bool* isOutput) const final;
 
-    void             dump(int fd, const Vector<String16>& args);
+    void dump(int fd, const Vector<String16>& args) const final;
 
 private:
-    friend class AudioFlinger;      // for mHandles
 
     // Maximum time allocated to effect engines to complete the turn off sequence
     static const uint32_t MAX_DISABLE_TIME_MS = 10000;
@@ -354,32 +286,37 @@ private:
 // There is one EffectHandle object for each application controlling (or using)
 // an effect module.
 // The EffectHandle is obtained by calling AudioFlinger::createEffect().
-class EffectHandle: public android::media::BnEffect {
+class EffectHandle: public IAfEffectHandle, public android::media::BnEffect {
 public:
 
-    EffectHandle(const sp<EffectBase>& effect,
+    EffectHandle(const sp<IAfEffectBase>& effect,
             const sp<AudioFlinger::Client>& client,
             const sp<media::IEffectClient>& effectClient,
             int32_t priority, bool notifyFramesProcessed);
-    virtual ~EffectHandle();
+    ~EffectHandle() override;
     status_t onTransact(
-            uint32_t code, const Parcel& data, Parcel* reply, uint32_t flags) override;
-    virtual status_t initCheck();
+            uint32_t code, const Parcel& data, Parcel* reply, uint32_t flags) final;
+    status_t initCheck() const final;
 
     // IEffect
-    android::binder::Status enable(int32_t* _aidl_return) override;
-    android::binder::Status disable(int32_t* _aidl_return) override;
+    android::binder::Status enable(int32_t* _aidl_return) final;
+    android::binder::Status disable(int32_t* _aidl_return) final;
     android::binder::Status command(int32_t cmdCode,
                                     const std::vector<uint8_t>& cmdData,
                                     int32_t maxResponseSize,
                                     std::vector<uint8_t>* response,
-                                    int32_t* _aidl_return) override;
-    android::binder::Status disconnect() override;
-    android::binder::Status getCblk(media::SharedFileRegion* _aidl_return) override;
+                                    int32_t* _aidl_return) final;
+    android::binder::Status disconnect() final;
+    android::binder::Status getCblk(media::SharedFileRegion* _aidl_return) final;
     android::binder::Status getConfig(media::EffectConfig* _config,
-                                      int32_t* _aidl_return) override;
+                                      int32_t* _aidl_return) final;
 
-    sp<Client> client() const { return mClient; }
+    // TODO(b/288339104) type
+    sp<RefBase /* AudioFlinger::Client */> client() const final { return mClient; }
+
+    sp<android::media::IEffect> asIEffect() final {
+        return sp<android::media::IEffect>::fromExisting(this);
+    }
 
 private:
     void disconnect(bool unpinIfLast);
@@ -388,38 +325,39 @@ private:
     // - hasControl: true if control is given, false if removed
     // - signal: true client app should be signaled of change, false otherwise
     // - enabled: state of the effect when control is passed
-    void setControl(bool hasControl, bool signal, bool enabled);
+    void setControl(bool hasControl, bool signal, bool enabled) final;
     void commandExecuted(uint32_t cmdCode,
                          const std::vector<uint8_t>& cmdData,
-                         const std::vector<uint8_t>& replyData);
-    void setEnabled(bool enabled);
-    bool enabled() const { return mEnabled; }
+                         const std::vector<uint8_t>& replyData) final;
+    bool enabled() const final { return mEnabled; }
+    void setEnabled(bool enabled) final;
+    void framesProcessed(int32_t frames) const final;
 
-    void framesProcessed(int32_t frames) const;
-
+public:
     // Getters
-    wp<EffectBase> effect() const { return mEffect; }
-    int id() const {
-        sp<EffectBase> effect = mEffect.promote();
+    wp<IAfEffectBase> effect() const final { return mEffect; }
+    int id() const final {
+        sp<IAfEffectBase> effect = mEffect.promote();
         if (effect == 0) {
             return 0;
         }
         return effect->id();
     }
-    int priority() const { return mPriority; }
-    bool hasControl() const { return mHasControl; }
-    bool disconnected() const { return mDisconnected; }
+private:
+    int priority() const final { return mPriority; }
+    bool hasControl() const final { return mHasControl; }
+    bool disconnected() const final { return mDisconnected; }
 
-    void dumpToBuffer(char* buffer, size_t size);
+    void dumpToBuffer(char* buffer, size_t size) const final;
+
 
 private:
-    friend class AudioFlinger;          // for mEffect, mHasControl, mEnabled
     DISALLOW_COPY_AND_ASSIGN(EffectHandle);
 
     Mutex mLock;                             // protects IEffect method calls
-    const wp<EffectBase> mEffect;            // pointer to controlled EffectModule
+    const wp<IAfEffectBase> mEffect;               // pointer to controlled EffectModule
     const sp<media::IEffectClient> mEffectClient;  // callback interface for client notifications
-    /*const*/ sp<Client> mClient;            // client for shared memory allocation, see
+    /*const*/ sp<AudioFlinger::Client> mClient;    // client for shared memory allocation, see
                                              //   disconnect()
     sp<IMemory> mCblkMemory;                 // shared memory for control block
     effect_param_cblk_t* mCblk;              // control block for deferred parameter setting via
@@ -443,123 +381,139 @@ private:
 // order corresponding in the effect process order. When attached to a track (session ID !=
 // AUDIO_SESSION_OUTPUT_MIX),
 // it also provide it's own input buffer used by the track as accumulation buffer.
-class EffectChain : public RefBase {
+class EffectChain : public IAfEffectChain {
 public:
-    EffectChain(const wp<ThreadBase>& wThread, audio_session_t sessionId);
-    virtual ~EffectChain();
+    EffectChain(const wp<AudioFlinger::ThreadBase>& wThread, audio_session_t sessionId);
+    ~EffectChain() override;
 
-    // special key used for an entry in mSuspendedEffects keyed vector
-    // corresponding to a suspend all request.
-    static const int        kKeyForSuspendAll = 0;
+    void process_l() final;
 
-    // minimum duration during which we force calling effect process when last track on
-    // a session is stopped or removed to allow effect tail to be rendered
-    static const int        kProcessTailDurationMs = 1000;
-
-    void process_l();
-
-    void lock() ACQUIRE(mLock) {
+    void lock() ACQUIRE(mLock) final {
         mLock.lock();
     }
-    void unlock() RELEASE(mLock) {
+    void unlock() RELEASE(mLock) final {
         mLock.unlock();
     }
-
-    status_t createEffect_l(sp<EffectModule>& effect,
+    status_t createEffect_l(sp<IAfEffectModule>& effect,
                             effect_descriptor_t *desc,
                             int id,
                             audio_session_t sessionId,
-                            bool pinned);
-    status_t addEffect_l(const sp<EffectModule>& handle);
-    status_t addEffect_ll(const sp<EffectModule>& handle);
-    size_t removeEffect_l(const sp<EffectModule>& handle, bool release = false);
+                            bool pinned) final;
+    status_t addEffect_l(const sp<IAfEffectModule>& handle) final;
+    status_t addEffect_ll(const sp<IAfEffectModule>& handle) final;
+    size_t removeEffect_l(const sp<IAfEffectModule>& handle, bool release = false) final;
 
-    audio_session_t sessionId() const { return mSessionId; }
-    void setSessionId(audio_session_t sessionId) { mSessionId = sessionId; }
+    audio_session_t sessionId() const final { return mSessionId; }
+    void setSessionId(audio_session_t sessionId) final { mSessionId = sessionId; }
 
-    sp<EffectModule> getEffectFromDesc_l(effect_descriptor_t *descriptor);
-    sp<EffectModule> getEffectFromId_l(int id);
-    sp<EffectModule> getEffectFromType_l(const effect_uuid_t *type);
-    std::vector<int> getEffectIds();
+    sp<IAfEffectModule> getEffectFromDesc_l(effect_descriptor_t *descriptor) const final;
+    sp<IAfEffectModule> getEffectFromId_l(int id) const final;
+    sp<IAfEffectModule> getEffectFromType_l(const effect_uuid_t *type) const final;
+    std::vector<int> getEffectIds() const final;
     // FIXME use float to improve the dynamic range
-    bool setVolume_l(uint32_t *left, uint32_t *right, bool force = false);
-    void resetVolume_l();
-    void setDevices_l(const AudioDeviceTypeAddrVector &devices);
-    void setInputDevice_l(const AudioDeviceTypeAddr &device);
-    void setMode_l(audio_mode_t mode);
-    void setAudioSource_l(audio_source_t source);
 
-    void setInBuffer(const sp<EffectBufferHalInterface>& buffer) {
+    bool setVolume_l(uint32_t *left, uint32_t *right, bool force = false) final;
+    void resetVolume_l() final;
+    void setDevices_l(const AudioDeviceTypeAddrVector &devices) final;
+    void setInputDevice_l(const AudioDeviceTypeAddr &device) final;
+    void setMode_l(audio_mode_t mode) final;
+    void setAudioSource_l(audio_source_t source) final;
+
+    void setInBuffer(const sp<EffectBufferHalInterface>& buffer) final {
         mInBuffer = buffer;
     }
-    float *inBuffer() const {
+    float *inBuffer() const final {
         return mInBuffer != 0 ? reinterpret_cast<float*>(mInBuffer->ptr()) : NULL;
     }
-    void setOutBuffer(const sp<EffectBufferHalInterface>& buffer) {
+    void setOutBuffer(const sp<EffectBufferHalInterface>& buffer) final {
         mOutBuffer = buffer;
     }
-    float *outBuffer() const {
+    float *outBuffer() const final {
         return mOutBuffer != 0 ? reinterpret_cast<float*>(mOutBuffer->ptr()) : NULL;
     }
+    void incTrackCnt() final { android_atomic_inc(&mTrackCnt); }
+    void decTrackCnt() final { android_atomic_dec(&mTrackCnt); }
+    int32_t trackCnt() const final { return android_atomic_acquire_load(&mTrackCnt); }
 
-    void incTrackCnt() { android_atomic_inc(&mTrackCnt); }
-    void decTrackCnt() { android_atomic_dec(&mTrackCnt); }
-    int32_t trackCnt() const { return android_atomic_acquire_load(&mTrackCnt); }
-
-    void incActiveTrackCnt() { android_atomic_inc(&mActiveTrackCnt);
+    void incActiveTrackCnt() final { android_atomic_inc(&mActiveTrackCnt);
                                mTailBufferCount = mMaxTailBuffers; }
-    void decActiveTrackCnt() { android_atomic_dec(&mActiveTrackCnt); }
-    int32_t activeTrackCnt() const { return android_atomic_acquire_load(&mActiveTrackCnt); }
+    void decActiveTrackCnt() final { android_atomic_dec(&mActiveTrackCnt); }
+    int32_t activeTrackCnt() const final {
+        return android_atomic_acquire_load(&mActiveTrackCnt);
+    }
 
-    product_strategy_t strategy() const { return mStrategy; }
-    void setStrategy(product_strategy_t strategy)
+    product_strategy_t strategy() const final { return mStrategy; }
+    void setStrategy(product_strategy_t strategy) final
             { mStrategy = strategy; }
 
     // suspend or restore effects of the specified type. The number of suspend requests is counted
     // and restore occurs once all suspend requests are cancelled.
     void setEffectSuspended_l(const effect_uuid_t *type,
-                              bool suspend);
+                              bool suspend) final;
     // suspend all eligible effects
-    void setEffectSuspendedAll_l(bool suspend);
+    void setEffectSuspendedAll_l(bool suspend) final;
     // check if effects should be suspended or restored when a given effect is enable or disabled
-    void checkSuspendOnEffectEnabled(const sp<EffectModule>& effect, bool enabled);
+    void checkSuspendOnEffectEnabled(
+            const sp<IAfEffectModule>& effect, bool enabled) final;
 
-    void clearInputBuffer();
+    void clearInputBuffer() final;
 
     // At least one non offloadable effect in the chain is enabled
-    bool isNonOffloadableEnabled();
-    bool isNonOffloadableEnabled_l();
+    bool isNonOffloadableEnabled() const final;
+    bool isNonOffloadableEnabled_l() const final;
 
-    void syncHalEffectsState();
+    void syncHalEffectsState() final;
 
     // flags is an ORed set of audio_output_flags_t which is updated on return.
-    void checkOutputFlagCompatibility(audio_output_flags_t *flags) const;
+    void checkOutputFlagCompatibility(audio_output_flags_t *flags) const final;
 
     // flags is an ORed set of audio_input_flags_t which is updated on return.
-    void checkInputFlagCompatibility(audio_input_flags_t *flags) const;
+    void checkInputFlagCompatibility(audio_input_flags_t *flags) const final;
 
     // Is this EffectChain compatible with the RAW audio flag.
-    bool isRawCompatible() const;
+    bool isRawCompatible() const final;
 
     // Is this EffectChain compatible with the FAST audio flag.
-    bool isFastCompatible() const;
+    bool isFastCompatible() const final;
 
     // Is this EffectChain compatible with the bit-perfect audio flag.
-    bool isBitPerfectCompatible() const;
+    bool isBitPerfectCompatible() const final;
 
     // isCompatibleWithThread_l() must be called with thread->mLock held
-    bool isCompatibleWithThread_l(const sp<ThreadBase>& thread) const;
+    // TODO(b/288339104) type
+    bool isCompatibleWithThread_l(const sp<Thread>& thread) const final {
+        return isCompatibleWithThread_l(sp<AudioFlinger::ThreadBase>::cast(thread));
+    }
 
-    bool containsHapticGeneratingEffect_l();
+    bool isCompatibleWithThread_l(const sp<AudioFlinger::ThreadBase>& thread) const;
 
-    void setHapticIntensity_l(int id, os::HapticScale intensity);
+    bool containsHapticGeneratingEffect_l() final;
 
-    sp<EffectCallbackInterface> effectCallback() const { return mEffectCallback; }
-    wp<ThreadBase> thread() const { return mEffectCallback->thread(); }
+    void setHapticIntensity_l(int id, os::HapticScale intensity) final;
 
-    bool isFirstEffect(int id) const { return !mEffects.isEmpty() && id == mEffects[0]->id(); }
+    sp<EffectCallbackInterface> effectCallback() const final { return mEffectCallback; }
 
-    void dump(int fd, const Vector<String16>& args);
+    // TODO(b/288339104) type
+    wp<Thread> thread() const final { return mEffectCallback->thread(); }
+
+    bool isFirstEffect(int id) const final {
+        return !mEffects.isEmpty() && id == mEffects[0]->id();
+    }
+
+    void dump(int fd, const Vector<String16>& args) const final;
+
+    size_t numberOfEffects() const final { return mEffects.size(); }
+
+    sp<IAfEffectModule> getEffectModule(size_t index) const final {
+        return mEffects[index];
+    }
+
+    // TODO(b/288339104) type
+    void setThread(const sp<Thread>& thread) final {
+        setThread(sp<AudioFlinger::ThreadBase>::cast(thread));
+    }
+
+    void setThread(const sp<AudioFlinger::ThreadBase>& thread);
 
 private:
 
@@ -574,22 +528,22 @@ private:
         // Note: ctors taking a weak pointer to their owner must not promote it
         // during construction (but may keep a reference for later promotion).
         EffectCallback(const wp<EffectChain>& owner,
-                       const wp<ThreadBase>& thread)
+                       const wp<AudioFlinger::ThreadBase>& thread)
             : mChain(owner)
             , mThread(thread)
-            , mAudioFlinger(*gAudioFlinger) {
-            sp<ThreadBase> base = thread.promote();
+            , mAudioFlinger(*AudioFlinger::gAudioFlinger) {
+            sp<AudioFlinger::ThreadBase> base = thread.promote();
             if (base != nullptr) {
                 mThreadType = base->type();
             } else {
-                mThreadType = ThreadBase::MIXER;  // assure a consistent value.
+                mThreadType = AudioFlinger::ThreadBase::MIXER;  // assure a consistent value.
             }
         }
 
         status_t createEffectHal(const effect_uuid_t *pEffectUuid,
                int32_t sessionId, int32_t deviceId, sp<EffectHalInterface> *effect) override;
         status_t allocateHalBuffer(size_t size, sp<EffectBufferHalInterface>* buffer) override;
-        bool updateOrphanEffectChains(const sp<EffectBase>& effect) override;
+        bool updateOrphanEffectChains(const sp<IAfEffectBase>& effect) override;
 
         audio_io_handle_t io() const override;
         bool isOutput() const override;
@@ -609,39 +563,38 @@ private:
 
         status_t addEffectToHal(const sp<EffectHalInterface>& effect) override;
         status_t removeEffectFromHal(const sp<EffectHalInterface>& effect) override;
-        bool disconnectEffectHandle(EffectHandle *handle, bool unpinIfLast) override;
+        bool disconnectEffectHandle(IAfEffectHandle *handle, bool unpinIfLast) override;
         void setVolumeForOutput(float left, float right) const override;
 
         // check if effects should be suspended/restored when a given effect is enable/disabled
-        void checkSuspendOnEffectEnabled(const sp<EffectBase>& effect,
+        void checkSuspendOnEffectEnabled(const sp<IAfEffectBase>& effect,
                               bool enabled, bool threadLocked) override;
         void resetVolume() override;
         product_strategy_t strategy() const override;
         int32_t activeTrackCnt() const override;
-        void onEffectEnable(const sp<EffectBase>& effect) override;
-        void onEffectDisable(const sp<EffectBase>& effect) override;
+        void onEffectEnable(const sp<IAfEffectBase>& effect) override;
+        void onEffectDisable(const sp<IAfEffectBase>& effect) override;
 
-        wp<EffectChain> chain() const override { return mChain; }
+        wp<IAfEffectChain> chain() const final { return mChain; }
 
-        bool isAudioPolicyReady() const override {
+        bool isAudioPolicyReady() const final {
             return mAudioFlinger.isAudioPolicyReady();
         }
 
-        wp<ThreadBase> thread() const { return mThread.load(); }
+        wp<AudioFlinger::ThreadBase> thread() const { return mThread.load(); }
 
-        void setThread(const sp<ThreadBase>& thread) {
+        void setThread(const sp<AudioFlinger::ThreadBase>& thread) {
             mThread = thread;
             mThreadType = thread->type();
         }
 
     private:
-        const wp<EffectChain> mChain;
-        mediautils::atomic_wp<ThreadBase> mThread;
+        const wp<IAfEffectChain> mChain;
+        mediautils::atomic_wp<AudioFlinger::ThreadBase> mThread;
         AudioFlinger &mAudioFlinger;  // implementation detail: outer instance always exists.
-        ThreadBase::type_t mThreadType;
+        AudioFlinger::ThreadBase::type_t mThreadType;
     };
 
-    friend class AudioFlinger;  // for mThread, mEffects
     DISALLOW_COPY_AND_ASSIGN(EffectChain);
 
     class SuspendedEffectDesc : public RefBase {
@@ -650,15 +603,15 @@ private:
 
         int mRefCount;   // > 0 when suspended
         effect_uuid_t mType;
-        wp<EffectModule> mEffect;
+        wp<IAfEffectModule> mEffect;
     };
 
     // get a list of effect modules to suspend when an effect of the type
     // passed is enabled.
-    void                       getSuspendEligibleEffects(Vector< sp<EffectModule> > &effects);
+    void  getSuspendEligibleEffects(Vector<sp<IAfEffectModule>> &effects);
 
     // get an effect module if it is currently enable
-    sp<EffectModule> getEffectIfEnabled(const effect_uuid_t *type);
+    sp<IAfEffectModule> getEffectIfEnabled(const effect_uuid_t *type);
     // true if the effect whose descriptor is passed can be suspended
     // OEMs can modify the rules implemented in this method to exclude specific effect
     // types or implementations from the suspend/restore mechanism.
@@ -667,8 +620,6 @@ private:
     static bool isEffectEligibleForBtNrecSuspend(const effect_uuid_t *type);
 
     void clearInputBuffer_l();
-
-    void setThread(const sp<ThreadBase>& thread);
 
     // true if any effect module within the chain has volume control
     bool hasVolumeControlEnabled_l() const;
@@ -680,7 +631,7 @@ private:
     std::optional<size_t> findVolumeControl_l(size_t from, size_t to) const;
 
     mutable  Mutex mLock;        // mutex protecting effect list
-             Vector< sp<EffectModule> > mEffects; // list of effect modules
+             Vector<sp<IAfEffectModule>> mEffects; // list of effect modules
              audio_session_t mSessionId; // audio session ID
              sp<EffectBufferHalInterface> mInBuffer;  // chain input buffer
              sp<EffectBufferHalInterface> mOutBuffer; // chain output buffer
@@ -707,35 +658,50 @@ private:
              wp<EffectModule> mVolumeControlEffect;
 };
 
-class DeviceEffectProxy : public EffectBase {
+class DeviceEffectProxy : public IAfDeviceEffectProxy, public EffectBase {
 public:
-        DeviceEffectProxy (const AudioDeviceTypeAddr& device,
-                const sp<DeviceEffectManagerCallback>& callback,
+    DeviceEffectProxy(const AudioDeviceTypeAddr& device,
+                const sp<AudioFlinger::DeviceEffectManagerCallback>& callback,
                 effect_descriptor_t *desc, int id, bool notifyFramesProcessed)
             : EffectBase(callback, desc, id, AUDIO_SESSION_DEVICE, false),
                 mDevice(device), mManagerCallback(callback),
                 mMyCallback(new ProxyCallback(wp<DeviceEffectProxy>(this), callback)),
                 mNotifyFramesProcessed(notifyFramesProcessed) {}
 
-    status_t setEnabled(bool enabled, bool fromHandle) override;
-    sp<DeviceEffectProxy> asDeviceEffectProxy() override { return this; }
+    status_t setEnabled(bool enabled, bool fromHandle) final;
+    sp<IAfDeviceEffectProxy> asDeviceEffectProxy() final { return this; }
 
-    status_t init(const std::map<audio_patch_handle_t, PatchPanel::Patch>& patches);
-    status_t onCreatePatch(audio_patch_handle_t patchHandle, const PatchPanel::Patch& patch);
-    void onReleasePatch(audio_patch_handle_t patchHandle);
+    // TODO(b/288339104) type
+    status_t init(const /* std::map<audio_patch_handle_t,
+            PatchPanel::Patch>& */ void * patches) final {
+        return init(*reinterpret_cast<const std::map<
+                audio_patch_handle_t, AudioFlinger::PatchPanel::Patch> *>(patches));
+    }
+    // TODO(b/288339104) type
+    status_t onCreatePatch(audio_patch_handle_t patchHandle,
+            /* const PatchPanel::Patch& */ const void * patch) final {
+        return onCreatePatch(patchHandle,
+                *reinterpret_cast<const AudioFlinger::PatchPanel::Patch *>(patch));
+    }
 
-    size_t removeEffect(const sp<EffectModule>& effect);
+    status_t init(const std::map<audio_patch_handle_t, AudioFlinger::PatchPanel::Patch>& patches);
+    status_t onCreatePatch(
+            audio_patch_handle_t patchHandle, const AudioFlinger::PatchPanel::Patch& patch);
 
-    status_t addEffectToHal(const sp<EffectHalInterface>& effect);
-    status_t removeEffectFromHal(const sp<EffectHalInterface>& effect);
+    void onReleasePatch(audio_patch_handle_t patchHandle) final;
 
-    const AudioDeviceTypeAddr& device() { return mDevice; };
-    bool isOutput() const;
-    uint32_t sampleRate() const;
-    audio_channel_mask_t channelMask() const;
-    uint32_t channelCount() const;
+    size_t removeEffect(const sp<IAfEffectModule>& effect) final;
 
-    void dump(int fd, int spaces);
+    status_t addEffectToHal(const sp<EffectHalInterface>& effect) final;
+    status_t removeEffectFromHal(const sp<EffectHalInterface>& effect) final;
+
+    const AudioDeviceTypeAddr& device() const final { return mDevice; };
+    bool isOutput() const final;
+    uint32_t sampleRate() const final;
+    audio_channel_mask_t channelMask() const final;
+    uint32_t channelCount() const final;
+
+    void dump2(int fd, int spaces) const final;
 
 private:
 
@@ -744,14 +710,14 @@ private:
         // Note: ctors taking a weak pointer to their owner must not promote it
         // during construction (but may keep a reference for later promotion).
         ProxyCallback(const wp<DeviceEffectProxy>& owner,
-                const sp<DeviceEffectManagerCallback>& callback)
+                const sp<AudioFlinger::DeviceEffectManagerCallback>& callback)
             : mProxy(owner), mManagerCallback(callback) {}
 
         status_t createEffectHal(const effect_uuid_t *pEffectUuid,
                int32_t sessionId, int32_t deviceId, sp<EffectHalInterface> *effect) override;
         status_t allocateHalBuffer(size_t size __unused,
                 sp<EffectBufferHalInterface>* buffer __unused) override { return NO_ERROR; }
-        bool updateOrphanEffectChains(const sp<EffectBase>& effect __unused) override {
+        bool updateOrphanEffectChains(const sp<IAfEffectBase>& effect __unused) override {
                     return false;
         }
 
@@ -774,18 +740,18 @@ private:
         status_t addEffectToHal(const sp<EffectHalInterface>& effect) override;
         status_t removeEffectFromHal(const sp<EffectHalInterface>& effect) override;
 
-        bool disconnectEffectHandle(EffectHandle *handle, bool unpinIfLast) override;
+        bool disconnectEffectHandle(IAfEffectHandle *handle, bool unpinIfLast) override;
         void setVolumeForOutput(float left __unused, float right __unused) const override {}
 
-        void checkSuspendOnEffectEnabled(const sp<EffectBase>& effect __unused,
+        void checkSuspendOnEffectEnabled(const sp<IAfEffectBase>& effect __unused,
                               bool enabled __unused, bool threadLocked __unused) override {}
         void resetVolume() override {}
         product_strategy_t strategy() const override  { return static_cast<product_strategy_t>(0); }
         int32_t activeTrackCnt() const override { return 0; }
-        void onEffectEnable(const sp<EffectBase>& effect __unused) override;
-        void onEffectDisable(const sp<EffectBase>& effect __unused) override;
+        void onEffectEnable(const sp<IAfEffectBase>& effect __unused) override;
+        void onEffectDisable(const sp<IAfEffectBase>& effect __unused) override;
 
-        wp<EffectChain> chain() const override { return nullptr; }
+        wp<IAfEffectChain> chain() const override { return nullptr; }
 
         bool isAudioPolicyReady() const override {
             return mManagerCallback->isAudioPolicyReady();
@@ -795,19 +761,21 @@ private:
 
     private:
         const wp<DeviceEffectProxy> mProxy;
-        const sp<DeviceEffectManagerCallback> mManagerCallback;
+        const sp<AudioFlinger::DeviceEffectManagerCallback> mManagerCallback;
     };
 
-    status_t checkPort(const PatchPanel::Patch& patch, const struct audio_port_config *port,
-            sp<EffectHandle> *handle);
+    status_t checkPort(const AudioFlinger::PatchPanel::Patch& patch,
+            const struct audio_port_config *port, sp<IAfEffectHandle> *handle);
 
     const AudioDeviceTypeAddr mDevice;
-    const sp<DeviceEffectManagerCallback> mManagerCallback;
+    const sp<AudioFlinger::DeviceEffectManagerCallback> mManagerCallback;
     const sp<ProxyCallback> mMyCallback;
 
-    Mutex mProxyLock;
-    std::map<audio_patch_handle_t, sp<EffectHandle>> mEffectHandles; // protected by mProxyLock
-    sp<EffectModule> mHalEffect; // protected by mProxyLock
+    mutable Mutex mProxyLock;
+    std::map<audio_patch_handle_t, sp<IAfEffectHandle>> mEffectHandles; // protected by mProxyLock
+    sp<IAfEffectModule> mHalEffect; // protected by mProxyLock
     struct audio_port_config mDevicePort = { .id = AUDIO_PORT_HANDLE_NONE };
     const bool mNotifyFramesProcessed;
 };
+
+} // namespace android
