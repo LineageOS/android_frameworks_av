@@ -22,8 +22,11 @@ package android.media;
  * {@hide}
  */
 parcelable AudioTimestampInternal {
-    /** A frame position in AudioTrack::getPosition() units. */
-    int position;
+    /**
+     * A frame position in AudioTrack::getPosition() units. Use 'long' to accommodate
+     * all values from 'uint32_t'.
+     */
+    long position;
     /** corresponding CLOCK_MONOTONIC when frame is expected to present. */
     long sec;
     int nsec;
