@@ -35,7 +35,7 @@ RetCode BundleContext::init() {
     std::lock_guard lg(mMutex);
     // init with pre-defined preset NORMAL
     for (std::size_t i = 0; i < lvm::MAX_NUM_BANDS; i++) {
-        mBandGaindB[i] = lvm::kSoftPresets[0 /* normal */][i];
+        mBandGainMdB[i] = lvm::kSoftPresets[0 /* normal */][i] * 100;
     }
 
     // allocate lvm instance
@@ -213,7 +213,7 @@ RetCode BundleContext::limitLevel() {
 
         if (eqEnabled) {
             for (int i = 0; i < lvm::MAX_NUM_BANDS; i++) {
-                float bandFactor = mBandGaindB[i] / 15.0;
+                float bandFactor = mBandGainMdB[i] / 1500.0;
                 float bandCoefficient = lvm::kBandEnergyCoefficient[i];
                 float bandEnergy = bandFactor * bandCoefficient * bandCoefficient;
                 if (bandEnergy > 0) energyContribution += bandEnergy;
@@ -222,8 +222,8 @@ RetCode BundleContext::limitLevel() {
             // cross EQ coefficients
             float bandFactorSum = 0;
             for (int i = 0; i < lvm::MAX_NUM_BANDS - 1; i++) {
-                float bandFactor1 = mBandGaindB[i] / 15.0;
-                float bandFactor2 = mBandGaindB[i + 1] / 15.0;
+                float bandFactor1 = mBandGainMdB[i] / 1500.0;
+                float bandFactor2 = mBandGainMdB[i + 1] / 1500.0;
 
                 if (bandFactor1 > 0 && bandFactor2 > 0) {
                     float crossEnergy =
@@ -245,7 +245,7 @@ RetCode BundleContext::limitLevel() {
 
             if (eqEnabled) {
                 for (int i = 0; i < lvm::MAX_NUM_BANDS; i++) {
-                    float bandFactor = mBandGaindB[i] / 15.0;
+                    float bandFactor = mBandGainMdB[i] / 1500.0;
                     float bandCrossCoefficient = lvm::kBassBoostEnergyCrossCoefficient[i];
                     float bandEnergy = boostFactor * bandFactor * bandCrossCoefficient;
                     if (bandEnergy > 0) energyBassBoost += bandEnergy;
@@ -474,7 +474,7 @@ std::vector<Equalizer::BandLevel> BundleContext::getEqualizerBandLevels() const 
     bandLevels.reserve(lvm::MAX_NUM_BANDS);
     for (std::size_t i = 0; i < lvm::MAX_NUM_BANDS; i++) {
         bandLevels.emplace_back(
-                Equalizer::BandLevel{static_cast<int32_t>(i), mBandGaindB[i] * 100});
+                Equalizer::BandLevel{static_cast<int32_t>(i), mBandGainMdB[i]});
     }
     return bandLevels;
 }
@@ -508,9 +508,9 @@ RetCode BundleContext::updateControlParameter(const std::vector<Equalizer::BandL
     RETURN_VALUE_IF(!isBandLevelIndexInRange(bandLevels), RetCode::ERROR_ILLEGAL_PARAMETER,
                     "indexOutOfRange");
 
-    std::array<int, lvm::MAX_NUM_BANDS> tempLevel(mBandGaindB);
+    std::array<int, lvm::MAX_NUM_BANDS> tempLevel(mBandGainMdB);
     for (const auto& it : bandLevels) {
-        tempLevel[it.index] = it.levelMb > 0 ? (it.levelMb + 50) / 100 : (it.levelMb - 50) / 100;
+        tempLevel[it.index] = it.levelMb;
     }
 
     LVM_ControlParams_t params;
@@ -522,14 +522,16 @@ RetCode BundleContext::updateControlParameter(const std::vector<Equalizer::BandL
         for (std::size_t i = 0; i < lvm::MAX_NUM_BANDS; i++) {
             params.pEQNB_BandDefinition[i].Frequency = lvm::kPresetsFrequencies[i];
             params.pEQNB_BandDefinition[i].QFactor = lvm::kPresetsQFactors[i];
-            params.pEQNB_BandDefinition[i].Gain = tempLevel[i];
+            params.pEQNB_BandDefinition[i].Gain =
+                    tempLevel[i] > 0 ? (tempLevel[i] + 50) / 100 : (tempLevel[i] - 50) / 100;
         }
 
         RETURN_VALUE_IF(LVM_SUCCESS != LVM_SetControlParameters(mInstance, &params),
                         RetCode::ERROR_EFFECT_LIB_ERROR, " setControlParamFailed");
     }
-    mBandGaindB = tempLevel;
-    LOG(DEBUG) << __func__ << " update bandGain to " << ::android::internal::ToString(mBandGaindB);
+    mBandGainMdB = tempLevel;
+    LOG(DEBUG) << __func__ << " update bandGain to " << ::android::internal::ToString(mBandGainMdB)
+               << "mdB";
 
     return RetCode::SUCCESS;
 }

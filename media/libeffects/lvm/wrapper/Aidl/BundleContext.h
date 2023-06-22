@@ -135,7 +135,7 @@ class BundleContext final : public EffectContext {
     int mBassStrengthSaved = 0;
     // Equalizer
     int mCurPresetIdx = lvm::PRESET_CUSTOM; /* Current preset being used */
-    std::array<int, lvm::MAX_NUM_BANDS> mBandGaindB;
+    std::array<int, lvm::MAX_NUM_BANDS> mBandGainMdB; /* band gain in millibels */
     // Virtualizer
     int mVirtStrengthSaved = 0; /* Conversion between Get/Set */
     bool mVirtualizerTempDisabled = false;
