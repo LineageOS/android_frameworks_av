@@ -355,7 +355,7 @@ ndk::ScopedAStatus EffectBundleAidl::getParameterVolume(const Volume::Id& id,
     auto tag = id.get<Volume::Id::commonTag>();
     switch (tag) {
         case Volume::levelDb: {
-            volParam.set<Volume::levelDb>(static_cast<int>(mContext->getVolumeLevel()));
+            volParam.set<Volume::levelDb>(mContext->getVolumeLevel());
             break;
         }
         case Volume::mute: {
