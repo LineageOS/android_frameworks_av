@@ -3340,6 +3340,9 @@ status_t DeviceEffectProxy::onCreatePatch(
     }
     if (status == NO_ERROR || status == ALREADY_EXISTS) {
         Mutex::Autolock _l(mProxyLock);
+        size_t erasedHandle = mEffectHandles.erase(patchHandle);
+        ALOGV("%s %s effecthandle %p for patch %d",
+                __func__, (erasedHandle == 0 ? "adding" : "replacing"), handle.get(), patchHandle);
         mEffectHandles.emplace(patchHandle, handle);
     }
     ALOGW_IF(status == BAD_VALUE,
@@ -3372,18 +3375,21 @@ status_t DeviceEffectProxy::checkPort(const AudioFlinger::PatchPanel::Patch& pat
 
     if (mDescriptor.flags & EFFECT_FLAG_HW_ACC_TUNNEL) {
         Mutex::Autolock _l(mProxyLock);
-        mDevicePort = *port;
-        mHalEffect = new EffectModule(mMyCallback,
+        if (mHalEffect != nullptr && mDevicePort.id == port->id) {
+            ALOGV("%s reusing HAL effect", __func__);
+        } else {
+            mDevicePort = *port;
+            mHalEffect = new EffectModule(mMyCallback,
                                       const_cast<effect_descriptor_t *>(&mDescriptor),
                                       mMyCallback->newEffectId(), AUDIO_SESSION_DEVICE,
                                       false /* pinned */, port->id);
-        if (audio_is_input_device(mDevice.mType)) {
-            mHalEffect->setInputDevice(mDevice);
-        } else {
-            mHalEffect->setDevices({mDevice});
+            if (audio_is_input_device(mDevice.mType)) {
+                mHalEffect->setInputDevice(mDevice);
+            } else {
+                mHalEffect->setDevices({mDevice});
+            }
+            mHalEffect->configure();
         }
-        mHalEffect->configure();
-
         *handle = new EffectHandle(mHalEffect, nullptr, nullptr, 0 /*priority*/,
                                    mNotifyFramesProcessed);
         status = (*handle)->initCheck();
