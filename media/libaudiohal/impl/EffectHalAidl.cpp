@@ -74,9 +74,12 @@ EffectHalAidl::EffectHalAidl(const std::shared_ptr<IFactory>& factory,
 }
 
 EffectHalAidl::~EffectHalAidl() {
-    if (mEffect) {
-        mIsProxyEffect ? std::static_pointer_cast<EffectProxy>(mEffect)->destroy()
-                       : mFactory->destroyEffect(mEffect);
+    if (mFactory && mEffect) {
+        if (mIsProxyEffect) {
+            std::static_pointer_cast<EffectProxy>(mEffect)->destroy();
+        } else {
+            mFactory->destroyEffect(mEffect);
+        }
     }
 }
 
@@ -166,6 +169,9 @@ status_t EffectHalAidl::process() {
     auto inputQ = mConversion->getInputMQ();
     auto outputQ = mConversion->getOutputMQ();
     auto efGroup = mConversion->getEventFlagGroup();
+    if (mConversion->isBypassing()) {
+        return OK;
+    }
     if (!statusQ || !statusQ->isValid() || !inputQ || !inputQ->isValid() || !outputQ ||
         !outputQ->isValid() || !efGroup) {
         ALOGE("%s invalid FMQ [Status %d I %d O %d] efGroup %p", __func__,

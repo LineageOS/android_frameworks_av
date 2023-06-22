@@ -41,6 +41,7 @@ class EffectConversionHelperAidl {
     std::shared_ptr<DataMQ> getInputMQ() { return mInputQ; }
     std::shared_ptr<DataMQ> getOutputMQ() { return mOutputQ; }
     std::shared_ptr<android::hardware::EventFlag> getEventFlagGroup() { return mEfGroup; }
+    bool isBypassing() const;
 
   protected:
     const int32_t mSessionId;
