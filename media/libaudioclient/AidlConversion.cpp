@@ -528,7 +528,7 @@ aidl2legacy_AudioTimestampInternal_AudioTimestamp(const media::AudioTimestampInt
 ConversionResult<media::AudioTimestampInternal>
 legacy2aidl_AudioTimestamp_AudioTimestampInternal(const AudioTimestamp& legacy) {
     media::AudioTimestampInternal aidl;
-    aidl.position = VALUE_OR_RETURN(convertIntegral<int32_t>(legacy.mPosition));
+    aidl.position = VALUE_OR_RETURN(convertIntegral<int64_t>(legacy.mPosition));
     aidl.sec = VALUE_OR_RETURN(convertIntegral<int64_t>(legacy.mTime.tv_sec));
     aidl.nsec = VALUE_OR_RETURN(convertIntegral<int32_t>(legacy.mTime.tv_nsec));
     return aidl;
