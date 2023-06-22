@@ -15,6 +15,7 @@
  */
 
 #include <cstddef>
+#include <cstdio>
 
 #define LOG_TAG "BundleContext"
 #include <android-base/logging.h>
@@ -441,8 +442,8 @@ RetCode BundleContext::setEqualizerPreset(const std::size_t presetIdx) {
     std::vector<Equalizer::BandLevel> bandLevels;
     bandLevels.reserve(lvm::MAX_NUM_BANDS);
     for (std::size_t i = 0; i < lvm::MAX_NUM_BANDS; i++) {
-        bandLevels.emplace_back(
-                Equalizer::BandLevel{static_cast<int32_t>(i), lvm::kSoftPresets[presetIdx][i]});
+        bandLevels.emplace_back(Equalizer::BandLevel{static_cast<int32_t>(i),
+                                                     lvm::kSoftPresets[presetIdx][i] * 100});
     }
 
     RetCode ret = updateControlParameter(bandLevels);
@@ -472,7 +473,8 @@ std::vector<Equalizer::BandLevel> BundleContext::getEqualizerBandLevels() const 
     std::vector<Equalizer::BandLevel> bandLevels;
     bandLevels.reserve(lvm::MAX_NUM_BANDS);
     for (std::size_t i = 0; i < lvm::MAX_NUM_BANDS; i++) {
-        bandLevels.emplace_back(Equalizer::BandLevel{static_cast<int32_t>(i), mBandGaindB[i]});
+        bandLevels.emplace_back(
+                Equalizer::BandLevel{static_cast<int32_t>(i), mBandGaindB[i] * 100});
     }
     return bandLevels;
 }
@@ -506,9 +508,9 @@ RetCode BundleContext::updateControlParameter(const std::vector<Equalizer::BandL
     RETURN_VALUE_IF(!isBandLevelIndexInRange(bandLevels), RetCode::ERROR_ILLEGAL_PARAMETER,
                     "indexOutOfRange");
 
-    std::array<int, lvm::MAX_NUM_BANDS> tempLevel;
+    std::array<int, lvm::MAX_NUM_BANDS> tempLevel(mBandGaindB);
     for (const auto& it : bandLevels) {
-        tempLevel[it.index] = it.levelMb;
+        tempLevel[it.index] = it.levelMb > 0 ? (it.levelMb + 50) / 100 : (it.levelMb - 50) / 100;
     }
 
     LVM_ControlParams_t params;
@@ -527,7 +529,7 @@ RetCode BundleContext::updateControlParameter(const std::vector<Equalizer::BandL
                         RetCode::ERROR_EFFECT_LIB_ERROR, " setControlParamFailed");
     }
     mBandGaindB = tempLevel;
-    LOG(INFO) << __func__ << " update bandGain to " << ::android::internal::ToString(mBandGaindB);
+    LOG(DEBUG) << __func__ << " update bandGain to " << ::android::internal::ToString(mBandGaindB);
 
     return RetCode::SUCCESS;
 }
