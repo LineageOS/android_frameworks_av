@@ -19,7 +19,7 @@
     #error This header file should only be included from AudioFlinger.h
 #endif
 
-
+public: // TODO(b/288339104) extract out of AudioFlinger class
 // PatchPanel is concealed within AudioFlinger, their lifetimes are the same.
 class PatchPanel {
 public:
@@ -265,3 +265,5 @@ private:
     };
     std::map<audio_module_handle_t, ModuleConnections> mInsertedModules;
 };
+
+private:
