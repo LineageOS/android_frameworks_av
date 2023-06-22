@@ -28,6 +28,7 @@
 #include <media/AidlConversionCppNdk.h>
 #include <media/AidlConversionEffect.h>
 #include <system/audio.h>
+#include <system/audio_aidl_utils.h>
 #include <utils/Log.h>
 
 #include "EffectBufferHalAidl.h"
@@ -43,6 +44,7 @@ using ::aidl::android::hardware::audio::effect::Processing;
 using ::aidl::android::media::audio::common::AudioSource;
 using ::aidl::android::media::audio::common::AudioStreamType;
 using ::aidl::android::media::audio::common::AudioUuid;
+using ::android::audio::utils::toString;
 using ::android::base::unexpected;
 using ::android::detail::AudioHalVersionInfo;
 
@@ -188,7 +190,7 @@ status_t EffectsFactoryHalAidl::createEffect(const effect_uuid_t* uuid, int32_t 
                 statusTFromBinderStatus(mFactory->createEffect(aidlUuid, &aidlEffect)));
     }
     if (aidlEffect == nullptr) {
-        ALOGE("%s failed to create effect with UUID: %s", __func__, aidlUuid.toString().c_str());
+        ALOGE("%s failed to create effect with UUID: %s", __func__, toString(aidlUuid).c_str());
         return NAME_NOT_FOUND;
     }
     Descriptor desc;
@@ -237,10 +239,10 @@ status_t EffectsFactoryHalAidl::getHalDescriptorWithImplUuid(const AudioUuid& uu
     auto matchIt = std::find_if(list.begin(), list.end(),
                                 [&](const auto& desc) { return desc.common.id.uuid == uuid; });
     if (matchIt == list.end()) {
-        ALOGE("%s UUID not found in HAL and proxy list %s", __func__, uuid.toString().c_str());
+        ALOGE("%s UUID not found in HAL and proxy list %s", __func__, toString(uuid).c_str());
         return BAD_VALUE;
     }
-    ALOGI("%s UUID impl found %s", __func__, uuid.toString().c_str());
+    ALOGI("%s UUID impl found %s", __func__, toString(uuid).c_str());
 
     *pDescriptor = VALUE_OR_RETURN_STATUS(
             ::aidl::android::aidl2legacy_Descriptor_effect_descriptor(*matchIt));
@@ -259,10 +261,10 @@ status_t EffectsFactoryHalAidl::getHalDescriptorWithTypeUuid(
     std::copy_if(mProxyDescList.begin(), mProxyDescList.end(), std::back_inserter(result),
                  [&](auto& desc) { return desc.common.id.type == type; });
     if (result.empty()) {
-        ALOGW("%s UUID type not found in HAL and proxy list %s", __func__, type.toString().c_str());
+        ALOGW("%s UUID type not found in HAL and proxy list %s", __func__, toString(type).c_str());
         return BAD_VALUE;
     }
-    ALOGI("%s UUID type found %zu \n %s", __func__, result.size(), type.toString().c_str());
+    ALOGI("%s UUID type found %zu \n %s", __func__, result.size(), toString(type).c_str());
 
     *descriptors = VALUE_OR_RETURN_STATUS(
             aidl::android::convertContainer<std::vector<effect_descriptor_t>>(
