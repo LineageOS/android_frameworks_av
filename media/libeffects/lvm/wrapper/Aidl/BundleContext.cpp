@@ -19,6 +19,7 @@
 
 #define LOG_TAG "BundleContext"
 #include <android-base/logging.h>
+#include <audio_utils/power.h>
 #include <Utils.h>
 
 #include "BundleContext.h"
@@ -398,15 +399,10 @@ LVM_INT16 BundleContext::LVC_ToDB_s32Tos16(LVM_INT32 Lin_fix) const {
     return db_fix;
 }
 
-// TODO: replace with more generic approach, like: audio_utils_power_from_amplitude
-int16_t BundleContext::VolToDb(uint32_t vol) const {
-    int16_t dB;
-
-    dB = LVC_ToDB_s32Tos16(vol << 7);
-    dB = (dB + 8) >> 4;
-    dB = (dB < -96) ? -96 : dB;
-
-    return dB;
+/* static */
+float BundleContext::VolToDb(float vol) {
+    float dB = audio_utils_power_from_amplitude(vol);
+    return std::max(dB, -96.f);
 }
 
 RetCode BundleContext::setVolumeStereo(const Parameter::VolumeStereo& volume) {
@@ -414,11 +410,12 @@ RetCode BundleContext::setVolumeStereo(const Parameter::VolumeStereo& volume) {
     LVM_ReturnStatus_en status = LVM_SUCCESS;
 
     // Convert volume to dB
-    int leftdB = VolToDb(volume.left);
-    int rightdB = VolToDb(volume.right);
-    int maxdB = std::max(leftdB, rightdB);
-    int pandB = rightdB - leftdB;
-    setVolumeLevel(maxdB * 100);
+    float leftdB = VolToDb(volume.left);
+    float rightdB = VolToDb(volume.right);
+
+    float maxdB = std::max(leftdB, rightdB);
+    float pandB = rightdB - leftdB;
+    setVolumeLevel(maxdB);
     LOG(DEBUG) << __func__ << " pandB: " << pandB << " maxdB " << maxdB;
 
     {
@@ -553,18 +550,18 @@ RetCode BundleContext::setBassBoostStrength(int strength) {
     return limitLevel();
 }
 
-RetCode BundleContext::setVolumeLevel(int level) {
+RetCode BundleContext::setVolumeLevel(float level) {
     if (mMuteEnabled) {
-        mLevelSaved = level / 100;
+        mLevelSaved = level;
     } else {
-        mVolume = level / 100;
+        mVolume = level;
     }
     LOG(INFO) << __func__ << " success with level " << level;
     return limitLevel();
 }
 
-int BundleContext::getVolumeLevel() const {
-    return (mMuteEnabled ? mLevelSaved * 100 : mVolume * 100);
+float BundleContext::getVolumeLevel() const {
+    return (mMuteEnabled ? mLevelSaved : mVolume);
 }
 
 RetCode BundleContext::setVolumeMute(bool mute) {
