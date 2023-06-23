@@ -117,6 +117,9 @@
 #include "android/media/BnAudioRecord.h"
 #include "android/media/BnEffect.h"
 
+// include AudioFlinger component interfaces
+#include "IAfEffect.h"
+
 namespace android {
 
 class AudioMixer;
@@ -478,16 +481,24 @@ private:
 
     // Internal dump utilities.
     static const int kDumpLockTimeoutNs = 1 * NANOS_PER_SECOND;
+public:
+    // TODO(b/288339104) extract to afutils
     static bool dumpTryLock(Mutex& mutex);
+private:
     void dumpPermissionDenial(int fd, const Vector<String16>& args);
     void dumpClients(int fd, const Vector<String16>& args);
     void dumpInternals(int fd, const Vector<String16>& args);
 
     SimpleLog mThreadLog{16}; // 16 Thread history limit
 
+public:
+    // TODO(b/288339104)
     class ThreadBase;
+private:
     void dumpToThreadLog_l(const sp<ThreadBase> &thread);
 
+public:
+    // TODO(b/288339104) Move to separate file
     // --- Client ---
     class Client : public RefBase {
       public:
@@ -504,6 +515,7 @@ private:
         const pid_t         mPid;
         AllocatorFactory::ClientAllocator mClientAllocator;
     };
+private:
 
     // --- Notification Client ---
     class NotificationClient : public IBinder::DeathRecipient {
@@ -575,15 +587,12 @@ private:
     class BitPerfectThread;
     class Track;
     class RecordTrack;
-    class EffectBase;
-    class EffectModule;
-    class EffectHandle;
-    class EffectChain;
-    class DeviceEffectProxy;
     class DeviceEffectManager;
+    // TODO(b/288339104) these should be separate files
+public:
     class PatchPanel;
     class DeviceEffectManagerCallback;
-
+private:
     struct AudioStreamIn;
     struct TeePatch;
     using TeePatches = std::vector<TeePatch>;
@@ -616,8 +625,6 @@ private:
 #include "PatchPanel.h"
 
 #include "PatchCommandThread.h"
-
-#include "Effects.h"
 
 #include "DeviceEffectManager.h"
 
@@ -819,17 +826,19 @@ private:
                 // return ALREADY_EXISTS if a chain with the same session already exists in
                 // mOrphanEffectChains. Note that this should never happen as there is only one
                 // chain for a given session and it is attached to only one thread at a time.
-                status_t        putOrphanEffectChain_l(const sp<EffectChain>& chain);
+                status_t putOrphanEffectChain_l(const sp<IAfEffectChain>& chain);
                 // Get an effect chain for the specified session in mOrphanEffectChains and remove
                 // it if found. Returns 0 if not found (this is the most common case).
-                sp<EffectChain> getOrphanEffectChain_l(audio_session_t session);
+                sp<IAfEffectChain> getOrphanEffectChain_l(audio_session_t session);
                 // Called when the last effect handle on an effect instance is removed. If this
                 // effect belongs to an effect chain in mOrphanEffectChains, the chain is updated
                 // and removed from mOrphanEffectChains if it does not contain any effect.
                 // Return true if the effect was found in mOrphanEffectChains, false otherwise.
-                bool            updateOrphanEffectChains(const sp<EffectModule>& effect);
-
-                std::vector< sp<EffectModule> > purgeStaleEffects_l();
+public:
+// TODO(b/288339104) suggest better grouping
+                bool updateOrphanEffectChains(const sp<IAfEffectModule>& effect);
+private:
+                std::vector< sp<IAfEffectModule> > purgeStaleEffects_l();
 
                 void broadcastParametersToRecordThreads_l(const String8& keyValuePairs);
                 void updateOutDevicesForRecordThreads_l(const DeviceDescriptorBaseVector& devices);
@@ -879,7 +888,10 @@ private:
                 // protects mClients and mNotificationClients.
                 // must be locked after mLock and ThreadBase::mLock if both must be locked
                 // avoids acquiring AudioFlinger::mLock from inside thread loop.
+public:
+    // TODO(b/288339104) access by getter,
     mutable     Mutex                               mClientLock;
+private:
                 // protected by mClientLock
                 DefaultKeyedVector< pid_t, wp<Client> >     mClients;   // see ~Client()
 
@@ -958,7 +970,7 @@ private:
                 std::list<sp<audioflinger::SyncEvent>> mPendingSyncEvents;
 
                 // Effect chains without a valid thread
-                DefaultKeyedVector< audio_session_t , sp<EffectChain> > mOrphanEffectChains;
+                DefaultKeyedVector<audio_session_t, sp<IAfEffectChain>> mOrphanEffectChains;
 
                 // list of sessions for which a valid HW A/V sync ID was retrieved from the HAL
                 DefaultKeyedVector< audio_session_t , audio_hw_sync_t >mHwAvSyncIds;
@@ -1004,7 +1016,10 @@ private:
 
     // protected by mLock
     PatchPanel mPatchPanel;
+public:
+    // TODO(b/288339104) access by getter.
     sp<EffectsFactoryHalInterface> mEffectsFactoryHal;
+private:
 
     const sp<PatchCommandThread> mPatchCommandThread;
     sp<DeviceEffectManager> mDeviceEffectManager;
