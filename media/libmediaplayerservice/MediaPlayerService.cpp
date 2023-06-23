@@ -3037,4 +3037,11 @@ status_t MediaPlayerService::BatteryTracker::pullBatteryData(Parcel* reply) {
     }
     return NO_ERROR;
 }
+
+#ifdef FUZZ_MODE_MEDIA_PLAYER_SERVICE
+sp<MediaPlayerService> MediaPlayerService::createForFuzzTesting() {
+    return sp<MediaPlayerService>::make();
+}
+#endif // FUZZ_MODE_MEDIA_PLAYER_SERVICE
+
 } // namespace android
