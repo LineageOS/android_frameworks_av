@@ -62,6 +62,7 @@ cc_library {
     ],
 
     srcs: [
+        "AudioRecordClient.cpp",
         "AudioPolicyClientImpl.cpp",
         "AudioPolicyEffects.cpp",
         "AudioPolicyInterfaceImpl.cpp",

@@ -18,6 +18,7 @@
 //#define LOG_NDEBUG 0
 
 #include "AudioPolicyService.h"
+#include "AudioRecordClient.h"
 #include "TypeConverter.h"
 #include <media/AidlConversion.h>
 #include <media/AudioPolicy.h>
