@@ -17,8 +17,8 @@ license {
     ],
 }
 
-cc_defaults {
-    name: "libmediaplayerservice_defaults",
+filegroup {
+    name: "libmediaplayerservice_sources",
 
     srcs: [
         "ActivityManager.cpp",
@@ -30,6 +30,14 @@ cc_defaults {
         "StagefrightMetadataRetriever.cpp",
         "StagefrightRecorder.cpp",
         "TestPlayerStub.cpp",
+    ],
+}
+
+cc_defaults {
+    name: "libmediaplayerservice_defaults",
+
+    srcs: [
+        ":libmediaplayerservice_sources",
     ],
 
     shared_libs: [
@@ -84,8 +92,6 @@ cc_defaults {
         "framework-permission-aidl-cpp",
     ],
 
-    local_include_dirs: ["include"],
-
     cflags: [
         "-Werror",
         "-Wno-error=deprecated-declarations",
@@ -116,4 +122,6 @@ cc_library {
     export_include_dirs: [
         ".",
     ],
+
+    local_include_dirs: ["include"],
 }
