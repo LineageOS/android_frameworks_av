@@ -14,6 +14,7 @@
  * limitations under the License.
  */
 
+#include <csignal>
 #include <cstddef>
 #include <cstdint>
 #include <cstring>
@@ -72,14 +73,13 @@ const std::map<uint32_t /* effect_command_e */, EffectConversionHelperAidl::Comm
 
 EffectConversionHelperAidl::EffectConversionHelperAidl(
         std::shared_ptr<::aidl::android::hardware::audio::effect::IEffect> effect,
-        int32_t sessionId, int32_t ioId, const Descriptor& desc)
+        int32_t sessionId, int32_t ioId, const Descriptor& desc, bool isProxy)
     : mSessionId(sessionId),
       mIoId(ioId),
       mDesc(desc),
       mEffect(std::move(effect)),
       mIsInputStream(mDesc.common.flags.type == Flags::Type::PRE_PROC),
-      mIsProxyEffect(mDesc.common.id.proxy.has_value() &&
-                     mDesc.common.id.proxy.value() == mDesc.common.id.uuid) {
+      mIsProxyEffect(isProxy) {
     mCommon.session = sessionId;
     mCommon.ioHandle = ioId;
     mCommon.input = mCommon.output = kDefaultAudioConfig;
@@ -195,11 +195,9 @@ status_t EffectConversionHelperAidl::handleSetConfig(uint32_t cmdSize, const voi
                 statusTFromBinderStatus(mEffect->open(common, std::nullopt, &openReturn)));
 
         if (mIsProxyEffect) {
-            const auto& ret =
-                    std::static_pointer_cast<EffectProxy>(mEffect)->getEffectReturnParam();
-            mStatusQ = std::make_shared<StatusMQ>(ret->statusMQ);
-            mInputQ = std::make_shared<DataMQ>(ret->inputDataMQ);
-            mOutputQ = std::make_shared<DataMQ>(ret->outputDataMQ);
+            mStatusQ = std::static_pointer_cast<EffectProxy>(mEffect)->getStatusMQ();
+            mInputQ = std::static_pointer_cast<EffectProxy>(mEffect)->getInputMQ();
+            mOutputQ = std::static_pointer_cast<EffectProxy>(mEffect)->getOutputMQ();
         } else {
             mStatusQ = std::make_shared<StatusMQ>(openReturn.statusMQ);
             mInputQ = std::make_shared<DataMQ>(openReturn.inputDataMQ);
@@ -207,6 +205,7 @@ status_t EffectConversionHelperAidl::handleSetConfig(uint32_t cmdSize, const voi
         }
 
         if (status_t status = updateEventFlags(); status != OK) {
+            ALOGV("%s closing at status %d", __func__, status);
             mEffect->close();
             return status;
         }
@@ -319,17 +318,25 @@ status_t EffectConversionHelperAidl::handleSetDevice(uint32_t cmdSize, const voi
             mEffect->setParameter(Parameter::make<Parameter::deviceDescription>(aidlDevices))));
     return *static_cast<int32_t*>(pReplyData) = OK;
 }
+
 status_t EffectConversionHelperAidl::handleSetVolume(uint32_t cmdSize, const void* pCmdData,
-                                                     uint32_t* replySize __unused,
-                                                     void* pReplyData __unused) {
+                                                     uint32_t* replySize, void* pReplyData) {
     if (cmdSize != 2 * sizeof(uint32_t) || !pCmdData) {
         ALOGE("%s parameter invalid %u %p", __func__, cmdSize, pCmdData);
         return BAD_VALUE;
     }
-    Parameter::VolumeStereo volume = {.left = (float)(*(uint32_t*)pCmdData) / (1 << 24),
-                                      .right = (float)(*(uint32_t*)pCmdData + 1) / (1 << 24)};
+
+    constexpr uint32_t unityGain = 1 << 24;
+    Parameter::VolumeStereo volume = {.left = (float)(*(uint32_t*)pCmdData) / unityGain,
+                                      .right = (float)(*(uint32_t*)pCmdData + 1) / unityGain};
     RETURN_STATUS_IF_ERROR(statusTFromBinderStatus(
             mEffect->setParameter(Parameter::make<Parameter::volumeStereo>(volume))));
+
+    // write unity gain back if volume was successfully set
+    if (replySize && *replySize == 2 * sizeof(uint32_t) && pReplyData) {
+        constexpr uint32_t vol_ret[2] = {unityGain, unityGain};
+        memcpy(pReplyData, vol_ret, sizeof(vol_ret));
+    }
     return OK;
 }
 
@@ -346,14 +353,15 @@ status_t EffectConversionHelperAidl::handleSetOffload(uint32_t cmdSize, const vo
         ALOGI("%s offload param offload %s ioHandle %d", __func__,
               offload->isOffload ? "true" : "false", offload->ioHandle);
         mCommon.ioHandle = offload->ioHandle;
-        RETURN_STATUS_IF_ERROR(statusTFromBinderStatus(
-                std::static_pointer_cast<EffectProxy>(mEffect)->setOffloadParam(offload)));
-        // update FMQs
-        const auto& ret = std::static_pointer_cast<EffectProxy>(mEffect)->getEffectReturnParam();
-        mStatusQ = std::make_shared<StatusMQ>(ret->statusMQ);
-        mInputQ = std::make_shared<DataMQ>(ret->inputDataMQ);
-        mOutputQ = std::make_shared<DataMQ>(ret->outputDataMQ);
-        RETURN_STATUS_IF_ERROR(updateEventFlags());
+        const auto& effectProxy = std::static_pointer_cast<EffectProxy>(mEffect);
+        RETURN_STATUS_IF_ERROR(statusTFromBinderStatus(effectProxy->setOffloadParam(offload)));
+        // update FMQs if the effect instance already open
+        if (State state; effectProxy->getState(&state).isOk() && state != State::INIT) {
+            mStatusQ = effectProxy->getStatusMQ();
+            mInputQ = effectProxy->getInputMQ();
+            mOutputQ = effectProxy->getOutputMQ();
+            updateEventFlags();
+        }
     }
     return *static_cast<int32_t*>(pReplyData) = OK;
 }
@@ -401,16 +409,26 @@ status_t EffectConversionHelperAidl::handleVisualizerMeasure(uint32_t cmdSize __
 status_t EffectConversionHelperAidl::updateEventFlags() {
     status_t status = BAD_VALUE;
     EventFlag* efGroup = nullptr;
-    if (mStatusQ->isValid()) {
+    if (mStatusQ && mStatusQ->isValid()) {
         status = EventFlag::createEventFlag(mStatusQ->getEventFlagWord(), &efGroup);
         if (status != OK || !efGroup) {
             ALOGE("%s: create EventFlagGroup failed, ret %d, egGroup %p", __func__, status,
                   efGroup);
             status = (status == OK) ? BAD_VALUE : status;
         }
+    } else if (isBypassing()) {
+        // for effect with bypass (no processing) flag, it's okay to not have statusQ
+        return OK;
     }
+
     mEfGroup.reset(efGroup, EventFlagDeleter());
     return status;
+}
+
+bool EffectConversionHelperAidl::isBypassing() const {
+    return mEffect &&
+           (mDesc.common.flags.bypass ||
+            (mIsProxyEffect && std::static_pointer_cast<EffectProxy>(mEffect)->isBypassing()));
 }
 
 }  // namespace effect

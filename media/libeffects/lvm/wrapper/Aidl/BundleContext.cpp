@@ -15,9 +15,11 @@
  */
 
 #include <cstddef>
+#include <cstdio>
 
 #define LOG_TAG "BundleContext"
 #include <android-base/logging.h>
+#include <audio_utils/power.h>
 #include <Utils.h>
 
 #include "BundleContext.h"
@@ -397,15 +399,10 @@ LVM_INT16 BundleContext::LVC_ToDB_s32Tos16(LVM_INT32 Lin_fix) const {
     return db_fix;
 }
 
-// TODO: replace with more generic approach, like: audio_utils_power_from_amplitude
-int16_t BundleContext::VolToDb(uint32_t vol) const {
-    int16_t dB;
-
-    dB = LVC_ToDB_s32Tos16(vol << 7);
-    dB = (dB + 8) >> 4;
-    dB = (dB < -96) ? -96 : dB;
-
-    return dB;
+/* static */
+float BundleContext::VolToDb(float vol) {
+    float dB = audio_utils_power_from_amplitude(vol);
+    return std::max(dB, -96.f);
 }
 
 RetCode BundleContext::setVolumeStereo(const Parameter::VolumeStereo& volume) {
@@ -413,11 +410,12 @@ RetCode BundleContext::setVolumeStereo(const Parameter::VolumeStereo& volume) {
     LVM_ReturnStatus_en status = LVM_SUCCESS;
 
     // Convert volume to dB
-    int leftdB = VolToDb(volume.left);
-    int rightdB = VolToDb(volume.right);
-    int maxdB = std::max(leftdB, rightdB);
-    int pandB = rightdB - leftdB;
-    setVolumeLevel(maxdB * 100);
+    float leftdB = VolToDb(volume.left);
+    float rightdB = VolToDb(volume.right);
+
+    float maxdB = std::max(leftdB, rightdB);
+    float pandB = rightdB - leftdB;
+    setVolumeLevel(maxdB);
     LOG(DEBUG) << __func__ << " pandB: " << pandB << " maxdB " << maxdB;
 
     {
@@ -441,8 +439,8 @@ RetCode BundleContext::setEqualizerPreset(const std::size_t presetIdx) {
     std::vector<Equalizer::BandLevel> bandLevels;
     bandLevels.reserve(lvm::MAX_NUM_BANDS);
     for (std::size_t i = 0; i < lvm::MAX_NUM_BANDS; i++) {
-        bandLevels.emplace_back(
-                Equalizer::BandLevel{static_cast<int32_t>(i), lvm::kSoftPresets[presetIdx][i]});
+        bandLevels.emplace_back(Equalizer::BandLevel{static_cast<int32_t>(i),
+                                                     lvm::kSoftPresets[presetIdx][i] * 100});
     }
 
     RetCode ret = updateControlParameter(bandLevels);
@@ -472,7 +470,8 @@ std::vector<Equalizer::BandLevel> BundleContext::getEqualizerBandLevels() const 
     std::vector<Equalizer::BandLevel> bandLevels;
     bandLevels.reserve(lvm::MAX_NUM_BANDS);
     for (std::size_t i = 0; i < lvm::MAX_NUM_BANDS; i++) {
-        bandLevels.emplace_back(Equalizer::BandLevel{static_cast<int32_t>(i), mBandGaindB[i]});
+        bandLevels.emplace_back(
+                Equalizer::BandLevel{static_cast<int32_t>(i), mBandGaindB[i] * 100});
     }
     return bandLevels;
 }
@@ -506,9 +505,9 @@ RetCode BundleContext::updateControlParameter(const std::vector<Equalizer::BandL
     RETURN_VALUE_IF(!isBandLevelIndexInRange(bandLevels), RetCode::ERROR_ILLEGAL_PARAMETER,
                     "indexOutOfRange");
 
-    std::array<int, lvm::MAX_NUM_BANDS> tempLevel;
+    std::array<int, lvm::MAX_NUM_BANDS> tempLevel(mBandGaindB);
     for (const auto& it : bandLevels) {
-        tempLevel[it.index] = it.levelMb;
+        tempLevel[it.index] = it.levelMb > 0 ? (it.levelMb + 50) / 100 : (it.levelMb - 50) / 100;
     }
 
     LVM_ControlParams_t params;
@@ -527,7 +526,7 @@ RetCode BundleContext::updateControlParameter(const std::vector<Equalizer::BandL
                         RetCode::ERROR_EFFECT_LIB_ERROR, " setControlParamFailed");
     }
     mBandGaindB = tempLevel;
-    LOG(INFO) << __func__ << " update bandGain to " << ::android::internal::ToString(mBandGaindB);
+    LOG(DEBUG) << __func__ << " update bandGain to " << ::android::internal::ToString(mBandGaindB);
 
     return RetCode::SUCCESS;
 }
@@ -551,18 +550,18 @@ RetCode BundleContext::setBassBoostStrength(int strength) {
     return limitLevel();
 }
 
-RetCode BundleContext::setVolumeLevel(int level) {
+RetCode BundleContext::setVolumeLevel(float level) {
     if (mMuteEnabled) {
-        mLevelSaved = level / 100;
+        mLevelSaved = level;
     } else {
-        mVolume = level / 100;
+        mVolume = level;
     }
     LOG(INFO) << __func__ << " success with level " << level;
     return limitLevel();
 }
 
-int BundleContext::getVolumeLevel() const {
-    return (mMuteEnabled ? mLevelSaved * 100 : mVolume * 100);
+float BundleContext::getVolumeLevel() const {
+    return (mMuteEnabled ? mLevelSaved : mVolume);
 }
 
 RetCode BundleContext::setVolumeMute(bool mute) {

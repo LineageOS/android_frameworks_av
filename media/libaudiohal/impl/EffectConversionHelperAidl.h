@@ -41,6 +41,7 @@ class EffectConversionHelperAidl {
     std::shared_ptr<DataMQ> getInputMQ() { return mInputQ; }
     std::shared_ptr<DataMQ> getOutputMQ() { return mOutputQ; }
     std::shared_ptr<android::hardware::EventFlag> getEventFlagGroup() { return mEfGroup; }
+    bool isBypassing() const;
 
   protected:
     const int32_t mSessionId;
@@ -54,7 +55,7 @@ class EffectConversionHelperAidl {
     EffectConversionHelperAidl(
             std::shared_ptr<::aidl::android::hardware::audio::effect::IEffect> effect,
             int32_t sessionId, int32_t ioId,
-            const ::aidl::android::hardware::audio::effect::Descriptor& desc);
+            const ::aidl::android::hardware::audio::effect::Descriptor& desc, bool isProxy);
 
     status_t handleSetParameter(uint32_t cmdSize, const void* pCmdData, uint32_t* replySize,
                                 void* pReplyData);
