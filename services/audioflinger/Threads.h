@@ -19,6 +19,7 @@
     #error This header file should only be included from AudioFlinger.h
 #endif
 
+public: // TODO(b/288339104) extract out of AudioFlinger class
 class ThreadBase : public Thread {
 public:
 
@@ -409,7 +410,7 @@ public:
 
     virtual     sp<StreamHalInterface> stream() const = 0;
 
-                sp<EffectHandle> createEffect_l(
+                sp<IAfEffectHandle> createEffect_l(
                                     const sp<AudioFlinger::Client>& client,
                                     const sp<media::IEffectClient>& effectClient,
                                     int32_t priority,
@@ -436,37 +437,37 @@ public:
                 };
 
                 // get effect chain corresponding to session Id.
-                sp<EffectChain> getEffectChain(audio_session_t sessionId);
+                sp<IAfEffectChain> getEffectChain(audio_session_t sessionId);
                 // same as getEffectChain() but must be called with ThreadBase mutex locked
-                sp<EffectChain> getEffectChain_l(audio_session_t sessionId) const;
+                sp<IAfEffectChain> getEffectChain_l(audio_session_t sessionId) const;
                 std::vector<int> getEffectIds_l(audio_session_t sessionId);
                 // add an effect chain to the chain list (mEffectChains)
-    virtual     status_t addEffectChain_l(const sp<EffectChain>& chain) = 0;
+    virtual     status_t addEffectChain_l(const sp<IAfEffectChain>& chain) = 0;
                 // remove an effect chain from the chain list (mEffectChains)
-    virtual     size_t removeEffectChain_l(const sp<EffectChain>& chain) = 0;
+    virtual     size_t removeEffectChain_l(const sp<IAfEffectChain>& chain) = 0;
                 // lock all effect chains Mutexes. Must be called before releasing the
                 // ThreadBase mutex before processing the mixer and effects. This guarantees the
                 // integrity of the chains during the process.
                 // Also sets the parameter 'effectChains' to current value of mEffectChains.
-                void lockEffectChains_l(Vector< sp<EffectChain> >& effectChains);
+                void lockEffectChains_l(Vector<sp<IAfEffectChain>>& effectChains);
                 // unlock effect chains after process
-                void unlockEffectChains(const Vector< sp<EffectChain> >& effectChains);
+                void unlockEffectChains(const Vector<sp<IAfEffectChain>>& effectChains);
                 // get a copy of mEffectChains vector
-                Vector< sp<EffectChain> > getEffectChains_l() const { return mEffectChains; };
+                Vector<sp<IAfEffectChain>> getEffectChains_l() const { return mEffectChains; };
                 // set audio mode to all effect chains
                 void setMode(audio_mode_t mode);
                 // get effect module with corresponding ID on specified audio session
-                sp<AudioFlinger::EffectModule> getEffect(audio_session_t sessionId, int effectId);
-                sp<AudioFlinger::EffectModule> getEffect_l(audio_session_t sessionId, int effectId);
+                sp<IAfEffectModule> getEffect(audio_session_t sessionId, int effectId);
+                sp<IAfEffectModule> getEffect_l(audio_session_t sessionId, int effectId);
                 // add and effect module. Also creates the effect chain is none exists for
                 // the effects audio session. Only called in a context of moving an effect
                 // from one thread to another
-                status_t addEffect_l(const sp< EffectModule>& effect);
+                status_t addEffect_l(const sp<IAfEffectModule>& effect);
                 // remove and effect module. Also removes the effect chain is this was the last
                 // effect
-                void removeEffect_l(const sp< EffectModule>& effect, bool release = false);
+                void removeEffect_l(const sp<IAfEffectModule>& effect, bool release = false);
                 // disconnect an effect handle from module and destroy module if last handle
-                void disconnectEffectHandle(EffectHandle *handle, bool unpinIfLast);
+                void disconnectEffectHandle(IAfEffectHandle *handle, bool unpinIfLast);
                 // detach all tracks connected to an auxiliary effect
     virtual     void detachAuxEffect_l(int effectId __unused) {}
                 // returns a combination of:
@@ -552,7 +553,7 @@ public:
 
     mutable     Mutex                   mLock;
 
-                void onEffectEnable(const sp<EffectModule>& effect);
+                void onEffectEnable(const sp<IAfEffectModule>& effect);
                 void onEffectDisable();
 
                 // invalidateTracksForAudioSession_l must be called with holding mLock.
@@ -607,7 +608,7 @@ protected:
                                                       bool suspend,
                                                       audio_session_t sessionId);
                 // check if some effects must be suspended when an effect chain is added
-                void checkSuspendOnAddEffectChain_l(const sp<EffectChain>& chain);
+                void checkSuspendOnAddEffectChain_l(const sp<IAfEffectChain>& chain);
 
                 // sends the metadata of the active tracks to the HAL
                 struct MetadataUpdate {
@@ -627,8 +628,10 @@ protected:
                                     ExtendedTimestamp *timestamp __unused) const {
                                 return INVALID_OPERATION;
                             }
-
+public:
+// TODO(b/288339104) organize with publics
                 product_strategy_t getStrategyForStream(audio_stream_type_t stream) const;
+protected:
 
     virtual     void        onHalLatencyModesChanged_l() {}
 
@@ -680,7 +683,7 @@ protected:
                 audio_source_t          mAudioSource;
 
                 const audio_io_handle_t mId;
-                Vector< sp<EffectChain> > mEffectChains;
+                Vector<sp<IAfEffectChain>> mEffectChains;
 
                 static const int        kThreadNameLength = 16; // prctl(PR_SET_NAME) limit
                 char                    mThreadName[kThreadNameLength]; // guaranteed NUL-terminated
@@ -843,6 +846,8 @@ private:
                 void dumpBase_l(int fd, const Vector<String16>& args);
                 void dumpEffectChains_l(int fd, const Vector<String16>& args);
 };
+
+private:
 
 class VolumeInterface {
  public:
@@ -1030,8 +1035,8 @@ public:
                 status_t attachAuxEffect_l(const sp<AudioFlinger::PlaybackThread::Track>& track,
                         int EffectId);
 
-                virtual status_t addEffectChain_l(const sp<EffectChain>& chain);
-                virtual size_t removeEffectChain_l(const sp<EffectChain>& chain);
+                virtual status_t addEffectChain_l(const sp<IAfEffectChain>& chain);
+                virtual size_t removeEffectChain_l(const sp<IAfEffectChain>& chain);
                         uint32_t hasAudioSession_l(audio_session_t sessionId) const override {
                             return ThreadBase::hasAudioSession_l(sessionId, mTracks);
                         }
@@ -1857,7 +1862,7 @@ private:
             // Do not request a specific mode by default
             audio_latency_mode_t mRequestedLatencyMode = AUDIO_LATENCY_MODE_FREE;
 
-            sp<EffectHandle> mFinalDownMixer;
+            sp<IAfEffectHandle> mFinalDownMixer;
 };
 
 // record thread
@@ -1984,8 +1989,8 @@ public:
             void        readInputParameters_l();
     virtual uint32_t    getInputFramesLost();
 
-    virtual status_t addEffectChain_l(const sp<EffectChain>& chain);
-    virtual size_t removeEffectChain_l(const sp<EffectChain>& chain);
+    virtual status_t addEffectChain_l(const sp<IAfEffectChain>& chain);
+    virtual size_t removeEffectChain_l(const sp<IAfEffectChain>& chain);
             uint32_t hasAudioSession_l(audio_session_t sessionId) const override {
                          return ThreadBase::hasAudioSession_l(sessionId, mTracks);
                      }
@@ -2193,8 +2198,8 @@ class MmapThread : public ThreadBase
     virtual     void        toAudioPortConfig(struct audio_port_config *config);
 
     virtual     sp<StreamHalInterface> stream() const { return mHalStream; }
-    virtual     status_t    addEffectChain_l(const sp<EffectChain>& chain);
-    virtual     size_t      removeEffectChain_l(const sp<EffectChain>& chain);
+    virtual     status_t    addEffectChain_l(const sp<IAfEffectChain>& chain);
+    virtual     size_t      removeEffectChain_l(const sp<IAfEffectChain>& chain);
     virtual     status_t    checkEffectCompatibility_l(const effect_descriptor_t *desc,
                                                                audio_session_t sessionId);
 

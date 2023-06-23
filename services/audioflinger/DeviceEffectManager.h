@@ -30,7 +30,7 @@ public:
         mAudioFlinger.mPatchCommandThread->addListener(this);
     }
 
-    sp<EffectHandle> createEffect_l(effect_descriptor_t *descriptor,
+    sp<IAfEffectHandle> createEffect_l(effect_descriptor_t *descriptor,
                 const AudioDeviceTypeAddr& device,
                 const sp<AudioFlinger::Client>& client,
                 const sp<media::IEffectClient>& effectClient,
@@ -40,7 +40,7 @@ public:
                 bool probe,
                 bool notifyFramesProcessed);
 
-    size_t removeEffect(const sp<DeviceEffectProxy>& effect);
+    size_t removeEffect(const sp<IAfDeviceEffectProxy>& effect);
     status_t createEffectHal(const effect_uuid_t *pEffectUuid,
            int32_t sessionId, int32_t deviceId,
            sp<EffectHalInterface> *effect);
@@ -69,9 +69,10 @@ private:
     Mutex mLock;
     AudioFlinger &mAudioFlinger;
     const sp<DeviceEffectManagerCallback> mMyCallback;
-    std::map<AudioDeviceTypeAddr, sp<DeviceEffectProxy>> mDeviceEffects;
+    std::map<AudioDeviceTypeAddr, sp<IAfDeviceEffectProxy>> mDeviceEffects;
 };
 
+public: // TODO(b/288339104) extract inner class.
 class DeviceEffectManagerCallback : public EffectCallbackInterface {
 public:
     explicit DeviceEffectManagerCallback(DeviceEffectManager& manager)
@@ -84,7 +85,9 @@ public:
             }
     status_t allocateHalBuffer(size_t size __unused,
             sp<EffectBufferHalInterface>* buffer __unused) override { return NO_ERROR; }
-    bool updateOrphanEffectChains(const sp<EffectBase>& effect __unused) override { return false; }
+    bool updateOrphanEffectChains(const sp<IAfEffectBase>& effect __unused) override {
+        return false;
+    }
 
     audio_io_handle_t io() const override  { return AUDIO_IO_HANDLE_NONE; }
     bool isOutput() const override { return false; }
@@ -112,19 +115,19 @@ public:
         return NO_ERROR;
     }
 
-    bool disconnectEffectHandle(EffectHandle *handle, bool unpinIfLast) override;
+    bool disconnectEffectHandle(IAfEffectHandle *handle, bool unpinIfLast) override;
     void setVolumeForOutput(float left __unused, float right __unused) const override {}
 
     // check if effects should be suspended or restored when a given effect is enable or disabled
-    void checkSuspendOnEffectEnabled(const sp<EffectBase>& effect __unused,
+    void checkSuspendOnEffectEnabled(const sp<IAfEffectBase>& effect __unused,
                           bool enabled __unused, bool threadLocked __unused) override {}
     void resetVolume() override {}
     product_strategy_t strategy() const override  { return static_cast<product_strategy_t>(0); }
     int32_t activeTrackCnt() const override { return 0; }
-    void onEffectEnable(const sp<EffectBase>& effect __unused) override {}
-    void onEffectDisable(const sp<EffectBase>& effect __unused) override {}
+    void onEffectEnable(const sp<IAfEffectBase>& effect __unused) override {}
+    void onEffectDisable(const sp<IAfEffectBase>& effect __unused) override {}
 
-    wp<EffectChain> chain() const override { return nullptr; }
+    wp<IAfEffectChain> chain() const override { return nullptr; }
 
     bool isAudioPolicyReady() const override {
         return mManager.audioFlinger().isAudioPolicyReady();
@@ -143,3 +146,4 @@ public:
 private:
     DeviceEffectManager& mManager;
 };
+private:
