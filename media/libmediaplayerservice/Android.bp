@@ -17,7 +17,8 @@ license {
     ],
 }
 
-cc_library {
+cc_defaults {
+    name: "libmediaplayerservice_defaults",
 
     srcs: [
         "ActivityManager.cpp",
@@ -83,6 +84,26 @@ cc_library {
         "framework-permission-aidl-cpp",
     ],
 
+    local_include_dirs: ["include"],
+
+    cflags: [
+        "-Werror",
+        "-Wno-error=deprecated-declarations",
+        "-Wall",
+    ],
+
+    sanitize: {
+        cfi: true,
+    },
+}
+
+cc_library {
+    name: "libmediaplayerservice",
+
+    defaults: [
+        "libmediaplayerservice_defaults",
+    ],
+
     export_shared_lib_headers: [
         "libmedia",
         "framework-permission-aidl-cpp",
@@ -92,22 +113,7 @@ cc_library {
         "libmediautils_headers",
     ],
 
-    local_include_dirs: ["include"],
-
     export_include_dirs: [
         ".",
     ],
-
-    cflags: [
-        "-Werror",
-        "-Wno-error=deprecated-declarations",
-        "-Wall",
-    ],
-
-    name: "libmediaplayerservice",
-
-    sanitize: {
-        cfi: true,
-    },
-
 }
