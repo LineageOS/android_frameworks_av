@@ -508,6 +508,12 @@ private:
                 SortedVector< wp<Client> >  mClients;
                 SortedVector< wp<MediaRecorderClient> > mMediaRecorderClients;
                 int32_t                     mNextConnId;
+
+#ifdef FUZZ_MODE_MEDIA_PLAYER_SERVICE
+public:
+    friend class sp<MediaPlayerService>;
+    static sp<MediaPlayerService> createForFuzzTesting();
+#endif // FUZZ_MODE_MEDIA_PLAYER_SERVICE
 };
 
 // ----------------------------------------------------------------------------
