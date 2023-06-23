@@ -15,13 +15,14 @@
  */
 
 #include <gtest/gtest.h>
+#include <android/binder_process.h>
 
 #include "ResourceManagerService.h"
 #include <aidl/android/media/BnResourceManagerClient.h>
 #include <media/MediaResource.h>
 #include <media/MediaResourcePolicy.h>
 #include <media/stagefright/foundation/ADebug.h>
-#include <media/stagefright/ProcessInfoInterface.h>
+#include <mediautils/ProcessInfoInterface.h>
 
 namespace android {
 
@@ -197,13 +198,20 @@ public:
         return static_cast<TestClient*>(testClient.get());
     }
 
-    ResourceManagerServiceTestBase()
-        : mSystemCB(new TestSystemCallback()),
-          mService(::ndk::SharedRefBase::make<ResourceManagerService>(
-                  new TestProcessInfo, mSystemCB)),
-          mTestClient1(::ndk::SharedRefBase::make<TestClient>(kTestPid1, kTestUid1, mService)),
-          mTestClient2(::ndk::SharedRefBase::make<TestClient>(kTestPid2, kTestUid2, mService)),
-          mTestClient3(::ndk::SharedRefBase::make<TestClient>(kTestPid2, kTestUid2, mService)) {
+    ResourceManagerServiceTestBase() {
+        ALOGI("ResourceManagerServiceTestBase created");
+    }
+
+    void SetUp() override {
+        // Need thread pool to receive callbacks, otherwise oneway callbacks are
+        // silently ignored.
+        ABinderProcess_startThreadPool();
+        mSystemCB = new TestSystemCallback();
+        mService = ::ndk::SharedRefBase::make<ResourceManagerService>(
+            new TestProcessInfo, mSystemCB);
+        mTestClient1 = ::ndk::SharedRefBase::make<TestClient>(kTestPid1, kTestUid1, mService);
+        mTestClient2 = ::ndk::SharedRefBase::make<TestClient>(kTestPid2, kTestUid2, mService);
+        mTestClient3 = ::ndk::SharedRefBase::make<TestClient>(kTestPid2, kTestUid2, mService);
     }
 
     std::shared_ptr<IResourceManagerClient> createTestClient(int pid, int uid) {

@@ -39,6 +39,7 @@ class ResourceManagerService;
 class ResourceObserverService;
 class ServiceLog;
 struct ProcessInfoInterface;
+class ResourceManagerMetrics;
 
 using Status = ::ndk::ScopedAStatus;
 using ::aidl::android::media::IResourceManagerClient;
@@ -46,6 +47,7 @@ using ::aidl::android::media::BnResourceManagerService;
 using ::aidl::android::media::MediaResourceParcel;
 using ::aidl::android::media::MediaResourcePolicyParcel;
 using ::aidl::android::media::ClientInfoParcel;
+using ::aidl::android::media::ClientConfigParcel;
 
 typedef std::map<std::tuple<
         MediaResource::Type, MediaResource::SubType, std::vector<uint8_t>>,
@@ -61,6 +63,7 @@ struct ResourceInfo {
     bool pendingRemoval{false};
 };
 
+// vector of <PID, UID>
 typedef std::vector<std::pair<int32_t, uid_t>> PidUidVector;
 
 // TODO: convert these to std::map
@@ -117,6 +120,14 @@ public:
     Status reclaimResourcesFromClientsPendingRemoval(int32_t pid) override;
 
     Status removeResource(const ClientInfoParcel& clientInfo, bool checkValid);
+
+    Status notifyClientCreated(const ClientInfoParcel& clientInfo) override;
+
+    Status notifyClientStarted(const ClientConfigParcel& clientConfig) override;
+
+    Status notifyClientStopped(const ClientConfigParcel& clientConfig) override;
+
+    Status notifyClientConfigChanged(const ClientConfigParcel& clientConfig) override;
 
 private:
     friend class ResourceManagerServiceTest;
@@ -182,14 +193,14 @@ private:
     void removeCookieAndUnlink_l(const std::shared_ptr<IResourceManagerClient>& client,
                                  uintptr_t cookie);
 
-    // To increase/decrease the number of instances of a given resource
-    // associated with a client.
-    void increaseResourceInstanceCount(int64_t clientId, const std::string& name);
-    void decreaseResourceInstanceCount(int64_t clientId, const std::string& name);
-
     void pushReclaimAtom(const ClientInfoParcel& clientInfo,
                          const Vector<std::shared_ptr<IResourceManagerClient>>& clients,
                          const PidUidVector& idList, bool reclaimed);
+
+    // Get the peak concurrent pixel count (associated with the video codecs) for the process.
+    long getPeakConcurrentPixelCount(int pid) const;
+    // Get the current concurrent pixel count (associated with the video codecs) for the process.
+    long getCurrentConcurrentPixelCount(int pid) const;
 
     mutable Mutex mLock;
     sp<ProcessInfoInterface> mProcessInfo;
@@ -211,11 +222,7 @@ private:
     static std::map<uintptr_t, sp<DeathNotifier> > sCookieToDeathNotifierMap
             GUARDED_BY(sCookieLock);
     std::shared_ptr<ResourceObserverService> mObserverService;
-
-    // List of active clients
-    std::set<int64_t> mClientIdSet;
-    // Map of resources (name) and number of concurrent instances
-    std::map<std::string, int> mConcurrentResourceCountMap;
+    std::unique_ptr<ResourceManagerMetrics> mResourceManagerMetrics;
 };
 
 // ----------------------------------------------------------------------------

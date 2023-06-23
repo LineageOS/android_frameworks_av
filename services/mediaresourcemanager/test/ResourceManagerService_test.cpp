@@ -1367,6 +1367,143 @@ public:
         // CPU boost is not expected to be reclaimed when marked as pending removal
         EXPECT_FALSE(toTestClient(cpuBoostMarkedClient)->checkIfReclaimedAndReset());
     }
+
+    inline void initClientConfigParcel(bool encoder, bool hw,
+                                       int32_t width, int32_t height,
+                                       int64_t id,
+                                       const ClientInfoParcel& clientInfo,
+                                       ClientConfigParcel& clientConfig) {
+        clientConfig.codecType = MediaResource::SubType::kVideoCodec;
+        clientConfig.isEncoder = encoder;
+        clientConfig.isHardware = hw;
+        clientConfig.width = width;
+        clientConfig.height = height;
+        clientConfig.timeStamp = systemTime(SYSTEM_TIME_MONOTONIC) / 1000LL;
+        clientConfig.id = id;
+        clientConfig.clientInfo = clientInfo;
+    }
+
+    void testConcurrentCodecs() {
+        std::shared_ptr<IResourceManagerClient> testClient4 =
+            createTestClient(kTestPid1, kTestUid1);
+        ClientInfoParcel client1Info{.pid = static_cast<int32_t>(kTestPid1),
+                                     .uid = static_cast<int32_t>(kTestUid1),
+                                     .id = getId(mTestClient1),
+                                     .name = "none"};
+        ClientInfoParcel client2Info{.pid = static_cast<int32_t>(kTestPid2),
+                                     .uid = static_cast<int32_t>(kTestUid2),
+                                     .id = getId(mTestClient2),
+                                     .name = "none"};
+        ClientInfoParcel client3Info{.pid = static_cast<int32_t>(kTestPid2),
+                                     .uid = static_cast<int32_t>(kTestUid2),
+                                     .id = getId(mTestClient3),
+                                     .name = "none"};
+        ClientInfoParcel client4Info{.pid = static_cast<int32_t>(kTestPid1),
+                                     .uid = static_cast<int32_t>(kTestUid1),
+                                     .id = getId(testClient4),
+                                     .name = "none"};
+        ClientConfigParcel client1Config;
+        ClientConfigParcel client2Config;
+        ClientConfigParcel client3Config;
+        ClientConfigParcel client4Config;
+
+        // HW Video Encoder @ 1080P.
+        initClientConfigParcel(true, true, 1920, 1080, 11111111,
+                               client1Info, client1Config);
+        // HW Video Decoder @ 4K.
+        initClientConfigParcel(true, true, 2160, 3840, 22222222,
+                               client2Info, client2Config);
+        // SW Video Encoder @ 1080P.
+        initClientConfigParcel(true, true, 1920, 1080, 33333333,
+                               client3Info, client3Config);
+        // SW Video Decoder @ 4K.
+        initClientConfigParcel(true, true, 2160, 3840, 44444444,
+                               client4Info, client4Config);
+
+        // Start client1 at 1080P.
+        mService->notifyClientStarted(client1Config);
+        long peakPixelCountP1 = mService->getPeakConcurrentPixelCount(kTestPid1);
+        long currentPixelCountP1 = mService->getCurrentConcurrentPixelCount(kTestPid1);
+        EXPECT_TRUE(peakPixelCountP1 = client1Config.width * client1Config.height);
+        EXPECT_TRUE(currentPixelCountP1 = client1Config.width * client1Config.height);
+
+        // Stop client1.
+        mService->notifyClientStopped(client1Config);
+        peakPixelCountP1 = mService->getPeakConcurrentPixelCount(kTestPid1);
+        currentPixelCountP1 = mService->getCurrentConcurrentPixelCount(kTestPid1);
+        EXPECT_TRUE(peakPixelCountP1 == client1Config.width * client1Config.height);
+        EXPECT_TRUE(currentPixelCountP1 == 0);
+
+        // Start client1 at 1080P.
+        mService->notifyClientStarted(client1Config);
+        // Start client2 at 4K.
+        mService->notifyClientStarted(client2Config);
+
+        // Verify the Peak and Current Concurrent pixel count for both the process
+        // (kTestPid1, kTestPid2)
+        peakPixelCountP1 = mService->getPeakConcurrentPixelCount(kTestPid1);
+        currentPixelCountP1 = mService->getCurrentConcurrentPixelCount(kTestPid1);
+        long peakPixelCountP2 = mService->getPeakConcurrentPixelCount(kTestPid2);
+        long currentPixelCountP2 = mService->getCurrentConcurrentPixelCount(kTestPid2);
+        EXPECT_TRUE(peakPixelCountP1 == client1Config.width * client1Config.height);
+        EXPECT_TRUE(currentPixelCountP1 == client1Config.width * client1Config.height);
+        EXPECT_TRUE(peakPixelCountP2 == client2Config.width * client2Config.height);
+        EXPECT_TRUE(currentPixelCountP2 == client2Config.width * client2Config.height);
+
+        // Start client3 at 1080P.
+        mService->notifyClientStarted(client3Config);
+        // Start client4 at 4K.
+        mService->notifyClientStarted(client4Config);
+
+        // Verify the Peak and Current Concurrent pixel count for both the process
+        // (kTestPid1, kTestPid2)
+        peakPixelCountP1 = mService->getPeakConcurrentPixelCount(kTestPid1);
+        currentPixelCountP1 = mService->getCurrentConcurrentPixelCount(kTestPid1);
+        peakPixelCountP2 = mService->getPeakConcurrentPixelCount(kTestPid2);
+        currentPixelCountP2 = mService->getCurrentConcurrentPixelCount(kTestPid2);
+        EXPECT_TRUE(peakPixelCountP1 ==
+            (client1Config.width * client1Config.height +
+             client4Config.width * client4Config.height));
+        EXPECT_TRUE(currentPixelCountP1 ==
+            (client1Config.width * client1Config.height +
+             client4Config.width * client4Config.height));
+        EXPECT_TRUE(peakPixelCountP2 ==
+            (client2Config.width * client2Config.height +
+             client3Config.width * client3Config.height));
+        EXPECT_TRUE(currentPixelCountP2 ==
+            (client2Config.width * client2Config.height +
+             client3Config.width * client3Config.height));
+
+        // Stop client4
+        mService->notifyClientStopped(client4Config);
+        currentPixelCountP1 = mService->getCurrentConcurrentPixelCount(kTestPid1);
+        EXPECT_TRUE(currentPixelCountP1 == client1Config.width * client1Config.height);
+
+        // Stop client1
+        mService->notifyClientStopped(client1Config);
+
+        // Stop client2
+        mService->notifyClientStopped(client2Config);
+        currentPixelCountP2 = mService->getCurrentConcurrentPixelCount(kTestPid2);
+        EXPECT_TRUE(currentPixelCountP2 == client3Config.width * client3Config.height);
+        // Stop client3
+        mService->notifyClientStopped(client3Config);
+
+        // Verify the Peak and Current Concurrent pixel count for both the process
+        // (kTestPid1, kTestPid2)
+        peakPixelCountP1 = mService->getPeakConcurrentPixelCount(kTestPid1);
+        currentPixelCountP1 = mService->getCurrentConcurrentPixelCount(kTestPid1);
+        peakPixelCountP2 = mService->getPeakConcurrentPixelCount(kTestPid2);
+        currentPixelCountP2 = mService->getCurrentConcurrentPixelCount(kTestPid2);
+        EXPECT_TRUE(peakPixelCountP1 ==
+            (client1Config.width * client1Config.height +
+             client4Config.width * client4Config.height));
+        EXPECT_TRUE(currentPixelCountP1 == 0);
+        EXPECT_TRUE(peakPixelCountP2 ==
+            (client2Config.width * client2Config.height +
+             client3Config.width * client3Config.height));
+        EXPECT_TRUE(currentPixelCountP2 == 0);
+    }
 };
 
 TEST_F(ResourceManagerServiceTest, config) {
@@ -1449,6 +1586,10 @@ TEST_F(ResourceManagerServiceTest, reclaimResources_whenPartialResourceMatch_rec
 TEST_F(ResourceManagerServiceTest,
         reclaimResourcesFromMarkedClients_removesBiggestMarkedClientForSomeResources) {
     testReclaimResourcesFromMarkedClients_removesBiggestMarkedClientForSomeResources();
+}
+
+TEST_F(ResourceManagerServiceTest, concurrentCodecs) {
+    testConcurrentCodecs();
 }
 
 } // namespace android

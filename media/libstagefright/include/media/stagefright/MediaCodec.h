@@ -40,6 +40,7 @@ namespace aidl {
 namespace android {
 namespace media {
 class MediaResourceParcel;
+class ClientConfigParcel;
 } // media
 } // android
 } // aidl
@@ -71,6 +72,7 @@ struct IDescrambler;
 
 using hardware::cas::native::V1_0::IDescrambler;
 using aidl::android::media::MediaResourceParcel;
+using aidl::android::media::ClientConfigParcel;
 
 struct MediaCodec : public AHandler {
     enum Domain {
@@ -445,6 +447,8 @@ private:
     void updateTunnelPeek(const sp<AMessage> &msg);
     void updatePlaybackDuration(const sp<AMessage> &msg);
 
+    inline void initClientConfigParcel(ClientConfigParcel& clientConfig);
+
     sp<AMessage> mOutputFormat;
     sp<AMessage> mInputFormat;
     sp<AMessage> mCallback;
@@ -452,7 +456,7 @@ private:
     sp<AMessage> mAsyncReleaseCompleteNotification;
     sp<AMessage> mOnFirstTunnelFrameReadyNotification;
 
-    sp<ResourceManagerServiceProxy> mResourceManagerProxy;
+    std::shared_ptr<ResourceManagerServiceProxy> mResourceManagerProxy;
 
     Domain mDomain;
     AString mLogSessionId;
@@ -691,6 +695,8 @@ private:
     };
 
     Histogram mLatencyHist;
+    // An unique ID for the codec - Used by the metrics.
+    uint64_t mCodecId = 0;
 
     std::function<sp<CodecBase>(const AString &, const char *)> mGetCodecBase;
     std::function<status_t(const AString &, sp<MediaCodecInfo> *)> mGetCodecInfo;
