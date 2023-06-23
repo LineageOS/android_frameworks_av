@@ -69,7 +69,7 @@ public:
         addParameter(
                 DefineParam(mChannelCount, C2_PARAMKEY_CHANNEL_COUNT)
                 .withDefault(new C2StreamChannelCountInfo::input(0u, 1))
-                .withFields({C2F(mChannelCount, value).inRange(1, 6)})
+                .withFields({C2F(mChannelCount, value).inRange(1, kMaxChannelCount)})
                 .withSetter(Setter<decltype(*mChannelCount)>::StrictValueWithNoDeps)
                 .build());
 
@@ -198,10 +198,17 @@ void C2SoftAacEnc::onRelease() {
 }
 
 c2_status_t C2SoftAacEnc::onFlush_sm() {
+    if (mAACEncoder != nullptr) {
+        /* encoder's internal input buffer needs to be reset during flush */
+        if (AACENC_OK != aacEncoder_SetParam(mAACEncoder, AACENC_CONTROL_STATE, AACENC_INIT_ALL)) {
+            ALOGE("Failed to reset AAC encoder");
+        }
+    }
     mSentCodecSpecificData = false;
     mInputSize = 0u;
     mNextFrameTimestampUs.reset();
     mLastFrameEndTimestampUs.reset();
+    mRemainderLen = 0;
     return C2_OK;
 }
 
@@ -562,6 +569,11 @@ void C2SoftAacEnc::process(
                 inBufferSize[0] -= outargs.numInSamples * sizeof(int16_t);
                 inargs.numInSamples -= outargs.numInSamples;
             }
+        } else {
+            // In case of error in encode call, discard remaining input bytes.
+            inBuffer[0] = nullptr;
+            inBufferSize[0] = 0;
+            inargs.numInSamples = 0;
         }
         ALOGV("encoderErr = %d mInputSize = %zu "
               "inargs.numInSamples = %d, mNextFrameTimestampUs = %lld",
@@ -597,10 +609,19 @@ void C2SoftAacEnc::process(
                            &outBufDesc,
                            &inargs,
                            &outargs);
+
+        // after flush, discard remaining input bytes.
+        inBuffer[0] = nullptr;
         inBufferSize[0] = 0;
     }
 
     if (inBufferSize[0] > 0) {
+        if (inBufferSize[0] > kRemainderBufSize) {
+            ALOGE("Remaining bytes %d greater than remainder buffer size %zu", inBufferSize[0],
+                    kRemainderBufSize);
+            work->result = C2_CORRUPTED;
+            return;
+        }
         for (size_t i = 0; i < inBufferSize[0]; ++i) {
             mRemainder[i] = static_cast<uint8_t *>(inBuffer[0])[i];
         }
