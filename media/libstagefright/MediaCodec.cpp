@@ -20,6 +20,7 @@
 #include <utils/Log.h>
 
 #include <set>
+#include <random>
 #include <stdlib.h>
 
 #include <inttypes.h>
@@ -99,6 +100,7 @@ static const char *kCodecKeyName = "codec";
 // These must be kept synchronized with the constants there.
 static const char *kCodecLogSessionId = "android.media.mediacodec.log-session-id";
 static const char *kCodecCodec = "android.media.mediacodec.codec";  /* e.g. OMX.google.aac.decoder */
+static const char *kCodecId = "android.media.mediacodec.id";
 static const char *kCodecMime = "android.media.mediacodec.mime";    /* e.g. audio/mime */
 static const char *kCodecMode = "android.media.mediacodec.mode";    /* audio, video */
 static const char *kCodecModeVideo = "video";            /* values returned for kCodecMode */
@@ -218,7 +220,7 @@ struct ResourceManagerClient : public BnResourceManagerClient {
         sp<MediaCodec> codec = mMediaCodec.promote();
         if (codec == NULL) {
             // Codec is already gone, so remove the resources as well
-            ::ndk::SpAIBinder binder(AServiceManager_getService("media.resource_manager"));
+            ::ndk::SpAIBinder binder(AServiceManager_waitForService("media.resource_manager"));
             std::shared_ptr<IResourceManagerService> service =
                     IResourceManagerService::fromBinder(binder);
             if (service == nullptr) {
@@ -290,6 +292,9 @@ struct MediaCodec::ResourceManagerServiceProxy : public RefBase {
     void removeClient();
     void markClientForPendingRemoval();
     bool reclaimResource(const std::vector<MediaResourceParcel> &resources);
+    void notifyClientCreated();
+    void notifyClientStarted(ClientConfigParcel& clientConfig);
+    void notifyClientStopped(ClientConfigParcel& clientConfig);
 
     inline void setCodecName(const char* name) {
         mCodecName = name;
@@ -331,7 +336,7 @@ MediaCodec::ResourceManagerServiceProxy::~ResourceManagerServiceProxy() {
 }
 
 status_t MediaCodec::ResourceManagerServiceProxy::init() {
-    ::ndk::SpAIBinder binder(AServiceManager_getService("media.resource_manager"));
+    ::ndk::SpAIBinder binder(AServiceManager_waitForService("media.resource_manager"));
     mService = IResourceManagerService::fromBinder(binder);
     if (mService == nullptr) {
         ALOGE("Failed to get ResourceManagerService");
@@ -466,6 +471,32 @@ bool MediaCodec::ResourceManagerServiceProxy::reclaimResource(
                                 .name = mCodecName};
     Status status = mService->reclaimResource(clientInfo, resources, &success);
     return status.isOk() && success;
+}
+
+void MediaCodec::ResourceManagerServiceProxy::notifyClientCreated() {
+    ClientInfoParcel clientInfo{.pid = static_cast<int32_t>(mPid),
+                                .uid = static_cast<int32_t>(mUid),
+                                .id = getId(mClient),
+                                .name = mCodecName};
+    mService->notifyClientCreated(clientInfo);
+}
+
+void MediaCodec::ResourceManagerServiceProxy::notifyClientStarted(
+    ClientConfigParcel& clientConfig) {
+    clientConfig.clientInfo.pid = static_cast<int32_t>(mPid);
+    clientConfig.clientInfo.uid = static_cast<int32_t>(mUid);
+    clientConfig.clientInfo.id = getId(mClient);
+    clientConfig.clientInfo.name = mCodecName;
+    mService->notifyClientStarted(clientConfig);
+}
+
+void MediaCodec::ResourceManagerServiceProxy::notifyClientStopped(
+    ClientConfigParcel& clientConfig) {
+    clientConfig.clientInfo.pid = static_cast<int32_t>(mPid);
+    clientConfig.clientInfo.uid = static_cast<int32_t>(mUid);
+    clientConfig.clientInfo.id = getId(mClient);
+    clientConfig.clientInfo.name = mCodecName;
+    mService->notifyClientStopped(clientConfig);
 }
 
 ////////////////////////////////////////////////////////////////////////////////
@@ -825,6 +856,23 @@ sp<PersistentSurface> MediaCodec::CreatePersistentInputSurface() {
     return new PersistentSurface(bufferProducer, bufferSource);
 }
 
+// GenerateCodecId generates a 64bit Random ID for each codec that is created.
+// The Codec ID is generated as:
+//   - A process-unique random high 32bits
+//   - An atomic sequence low 32bits
+//
+static uint64_t GenerateCodecId() {
+    static std::atomic_uint64_t sId = [] {
+        std::random_device rd;
+        std::mt19937 gen(rd());
+        std::uniform_int_distribution<uint32_t> distrib(0, UINT32_MAX);
+        uint32_t randomID = distrib(gen);
+        uint64_t id = randomID;
+        return id << 32;
+    }();
+    return sId++;
+}
+
 MediaCodec::MediaCodec(
         const sp<ALooper> &looper, pid_t pid, uid_t uid,
         std::function<sp<CodecBase>(const AString &, const char *)> getCodecBase,
@@ -867,6 +915,7 @@ MediaCodec::MediaCodec(
       mInputBufferCounter(0),
       mGetCodecBase(getCodecBase),
       mGetCodecInfo(getCodecInfo) {
+    mCodecId = GenerateCodecId();
     mResourceManagerProxy = new ResourceManagerServiceProxy(pid, uid,
             ::ndk::SharedRefBase::make<ResourceManagerClient>(this, pid, uid));
     if (!mGetCodecBase) {
@@ -1755,6 +1804,12 @@ status_t MediaCodec::init(const AString &name) {
             break;
         }
     }
+
+    if (OK == err) {
+        // Notify the ResourceManager that, this codec has been created
+        // (initialized) successfully.
+        mResourceManagerProxy->notifyClientCreated();
+    }
     return err;
 }
 
@@ -1808,6 +1863,7 @@ status_t MediaCodec::configure(
     format->findString("log-session-id", &mLogSessionId);
 
     if (nextMetricsHandle != 0) {
+        mediametrics_setInt64(nextMetricsHandle, kCodecId, mCodecId);
         int32_t profile = 0;
         if (format->findInt32("profile", &profile)) {
             mediametrics_setInt32(nextMetricsHandle, kCodecProfile, profile);
@@ -3320,6 +3376,17 @@ bool MediaCodec::handleDequeueOutputBuffer(const sp<AReplyToken> &replyID, bool 
     return true;
 }
 
+
+inline void MediaCodec::initClientConfigParcel(ClientConfigParcel& clientConfig) {
+    clientConfig.codecType = toMediaResourceSubType(mDomain);
+    clientConfig.isEncoder = mFlags & kFlagIsEncoder;
+    clientConfig.isHardware = !MediaCodecList::isSoftwareCodec(mComponentName);
+    clientConfig.width = mWidth;
+    clientConfig.height = mHeight;
+    clientConfig.timeStamp = systemTime(SYSTEM_TIME_MONOTONIC) / 1000LL;
+    clientConfig.id = mCodecId;
+}
+
 void MediaCodec::onMessageReceived(const sp<AMessage> &msg) {
     switch (msg->what()) {
         case kWhatCodecNotify:
@@ -3548,14 +3615,8 @@ void MediaCodec::onMessageReceived(const sp<AMessage> &msg) {
                         mediametrics_setInt32(mMetricsHandle, kCodecSecure, 0);
                     }
 
-                    MediaCodecInfo::Attributes attr = mCodecInfo
-                            ? mCodecInfo->getAttributes()
-                            : MediaCodecInfo::Attributes(0);
-                    if (mDomain == DOMAIN_VIDEO || !(attr & MediaCodecInfo::kFlagIsSoftwareOnly)) {
-                        // software audio codecs are currently ignored.
-                        mResourceManagerProxy->addResource(MediaResource::CodecResource(
+                    mResourceManagerProxy->addResource(MediaResource::CodecResource(
                             mFlags & kFlagIsSecure, toMediaResourceSubType(mDomain)));
-                    }
 
                     postPendingRepliesAndDeferredMessages("kWhatComponentAllocated");
                     break;
@@ -3725,6 +3786,11 @@ void MediaCodec::onMessageReceived(const sp<AMessage> &msg) {
                         mResourceManagerProxy->addResource(
                                 MediaResource::GraphicMemoryResource(getGraphicBufferSize()));
                     }
+                    // Notify the RM that the codec is in use (has been started).
+                    ClientConfigParcel clientConfig;
+                    initClientConfigParcel(clientConfig);
+                    mResourceManagerProxy->notifyClientStarted(clientConfig);
+
                     setState(STARTED);
                     postPendingRepliesAndDeferredMessages("kWhatStartCompleted");
 
@@ -3940,6 +4006,11 @@ void MediaCodec::onMessageReceived(const sp<AMessage> &msg) {
                               mState, stateString(mState).c_str());
                         break;
                     }
+                    // Notify the RM that the codec has been stopped.
+                    ClientConfigParcel clientConfig;
+                    initClientConfigParcel(clientConfig);
+                    mResourceManagerProxy->notifyClientStopped(clientConfig);
+
                     setState(INITIALIZED);
                     if (mReplyID) {
                         postPendingRepliesAndDeferredMessages("kWhatStopCompleted");

@@ -166,11 +166,14 @@ struct TestObserver : public BnResourceObserver, public EventTracker {
 
 class ResourceObserverServiceTest : public ResourceManagerServiceTestBase {
 public:
-    ResourceObserverServiceTest() : ResourceManagerServiceTestBase(),
-        mObserverService(::ndk::SharedRefBase::make<ResourceObserverService>()),
-        mTestObserver1(::ndk::SharedRefBase::make<TestObserver>("observer1")),
-        mTestObserver2(::ndk::SharedRefBase::make<TestObserver>("observer2")),
-        mTestObserver3(::ndk::SharedRefBase::make<TestObserver>("observer3")) {
+    ResourceObserverServiceTest() : ResourceManagerServiceTestBase() {}
+
+    void SetUp() override {
+        ResourceManagerServiceTestBase::SetUp();
+        mObserverService = ::ndk::SharedRefBase::make<ResourceObserverService>();
+        mTestObserver1 = ::ndk::SharedRefBase::make<TestObserver>("observer1");
+        mTestObserver2 = ::ndk::SharedRefBase::make<TestObserver>("observer2");
+        mTestObserver3 = ::ndk::SharedRefBase::make<TestObserver>("observer3");
         mService->setObserverService(mObserverService);
     }
 

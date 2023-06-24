@@ -19,7 +19,7 @@
 #define PROCESS_INFO_H_
 
 #include <media/stagefright/foundation/ABase.h>
-#include <media/stagefright/ProcessInfoInterface.h>
+#include <mediautils/ProcessInfoInterface.h>
 #include <map>
 #include <mutex>
 #include <utils/Condition.h>
@@ -34,6 +34,8 @@ struct ProcessInfo : public ProcessInfoInterface {
     virtual bool isPidUidTrusted(int pid, int uid);
     virtual bool overrideProcessInfo(int pid, int procState, int oomScore);
     virtual void removeProcessInfoOverride(int pid);
+    bool checkProcessExistent(const std::vector<int32_t>& pids,
+                              std::vector<bool>* existent) override;
 
 protected:
     virtual ~ProcessInfo();
