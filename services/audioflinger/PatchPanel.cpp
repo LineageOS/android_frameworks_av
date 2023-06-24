@@ -679,7 +679,7 @@ status_t AudioFlinger::PatchPanel::Patch::getLatencyMs(double *latencyMs) const
     // If so, do a frame diff and time difference computation to estimate
     // the total patch latency. This requires that frame counts are reported by the
     // HAL are matched properly in the case of record overruns and playback underruns.
-    ThreadBase::TrackBase::FrameTime recordFT{}, playFT{};
+    IAfTrack::FrameTime recordFT{}, playFT{};
     recordTrack->getKernelFrameTime(&recordFT);
     playbackTrack->getKernelFrameTime(&playFT);
     if (recordFT.timeNs > 0 && playFT.timeNs > 0) {
