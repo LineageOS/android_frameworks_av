@@ -18,7 +18,7 @@
 #define LOG_TAG "ProcessInfo"
 #include <utils/Log.h>
 
-#include <media/stagefright/ProcessInfo.h>
+#include <mediautils/ProcessInfo.h>
 
 #include <binder/IPCThreadState.h>
 #include <binder/IServiceManager.h>
@@ -30,10 +30,64 @@ namespace android {
 static constexpr int32_t INVALID_ADJ = -10000;
 static constexpr int32_t NATIVE_ADJ = -1000;
 
+/* Make sure this matches with ActivityManager::PROCESS_STATE_NONEXISTENT
+ * #include <binder/ActivityManager.h>
+ * using ActivityManager::PROCESS_STATE_NONEXISTENT;
+ */
+static constexpr int32_t PROCESS_STATE_NONEXISTENT = 20;
+
 ProcessInfo::ProcessInfo() {}
 
+/*
+ * Checks whether the list of processes with given pids exist or not.
+ *
+ * Arguments:
+ *  - pids (input): List of pids for which to check whether they are Existent or not.
+ *  - existent (output): boolean vector corresponds to Existent state of each pids.
+ *
+ * On successful return:
+ *     - existent[i] true corresponds to pids[i] still active and
+ *     - existent[i] false corresponds to pids[i] already terminated (Nonexistent)
+ * On unsuccessful return, the output argument existent is invalid.
+ */
+bool ProcessInfo::checkProcessExistent(const std::vector<int32_t>& pids,
+                                       std::vector<bool>* existent) {
+    sp<IBinder> binder = defaultServiceManager()->waitForService(String16("processinfo"));
+    sp<IProcessInfoService> service = interface_cast<IProcessInfoService>(binder);
+
+    // Get the process state of the applications managed/tracked by the ActivityManagerService.
+    // Don't have to look into the native processes.
+    // If we really need the state of native process, then we can use ==> mOverrideMap
+    size_t count = pids.size();
+    std::vector<int32_t> states(count, PROCESS_STATE_NONEXISTENT);
+    status_t err = service->getProcessStatesFromPids(count,
+                                                     const_cast<int32_t*>(pids.data()),
+                                                     states.data());
+    if (err != OK) {
+        ALOGE("%s: IProcessInfoService::getProcessStatesFromPids failed with %d",
+              __func__, err);
+        return false;
+    }
+
+    existent->clear();
+    for (size_t index = 0; index < states.size(); index++) {
+        // If this process is not tracked by ActivityManagerService, look for overrides.
+        if (states[index] == PROCESS_STATE_NONEXISTENT) {
+            std::scoped_lock lock{mOverrideLock};
+            std::map<int, ProcessInfoOverride>::iterator it =
+                mOverrideMap.find(pids[index]);
+            if (it != mOverrideMap.end()) {
+                states[index] = it->second.procState;
+            }
+        }
+        existent->push_back(states[index] != PROCESS_STATE_NONEXISTENT);
+    }
+
+    return true;
+}
+
 bool ProcessInfo::getPriority(int pid, int* priority) {
-    sp<IBinder> binder = defaultServiceManager()->getService(String16("processinfo"));
+    sp<IBinder> binder = defaultServiceManager()->waitForService(String16("processinfo"));
     sp<IProcessInfoService> service = interface_cast<IProcessInfoService>(binder);
 
     size_t length = 1;

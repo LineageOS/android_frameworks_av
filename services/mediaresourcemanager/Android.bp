@@ -17,6 +17,7 @@ filegroup {
         "aidl/android/media/MediaResourceParcel.aidl",
         "aidl/android/media/MediaResourcePolicyParcel.aidl",
         "aidl/android/media/ClientInfoParcel.aidl",
+        "aidl/android/media/ClientConfigParcel.aidl",
     ],
     path: "aidl",
 }
@@ -73,9 +74,11 @@ cc_library {
     name: "libresourcemanagerservice",
 
     srcs: [
+        "ResourceManagerMetrics.cpp",
         "ResourceManagerService.cpp",
         "ResourceObserverService.cpp",
         "ServiceLog.cpp",
+        "UidObserver.cpp",
 
         // TODO: convert to AIDL?
         "IMediaResourceMonitor.cpp",
@@ -92,6 +95,7 @@ cc_library {
         "libstatspull",
         "libstatssocket",
         "libprotobuf-cpp-lite",
+        "libactivitymanager_aidl",
     ],
 
     static_libs: [
