@@ -69,6 +69,13 @@ private:
 // playback track
 class Track : public TrackBase, public VolumeProvider {
 public:
+    // createIAudioTrackAdapter() is a static constructor which creates an
+    // IAudioTrack AIDL interface adapter from the Track object that
+    // may be passed back to the client (if needed).
+    //
+    // Only one AIDL IAudioTrack interface wrapper should be created per Track.
+    static sp<media::IAudioTrack> createIAudioTrackAdapter(const sp<Track>& track);
+
                         Track(  PlaybackThread *thread,
                                 const sp<Client>& client,
                                 audio_stream_type_t streamType,
