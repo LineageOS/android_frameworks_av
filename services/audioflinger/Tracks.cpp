@@ -94,7 +94,7 @@ AudioFlinger::ThreadBase::TrackBase::TrackBase(
             track_type type,
             audio_port_handle_t portId,
             std::string metricsId)
-    :   RefBase(),
+    :
         mThread(thread),
         mAllocType(alloc),
         mClient(client),
@@ -339,7 +339,7 @@ void AudioFlinger::ThreadBase::PatchTrackBase::setPeerTimeout(std::chrono::nanos
 
 class TrackHandle : public android::media::BnAudioTrack {
 public:
-    explicit TrackHandle(const sp<AudioFlinger::PlaybackThread::Track>& track);
+    explicit TrackHandle(const sp<IAfTrack>& track);
     ~TrackHandle() override;
 
     binder::Status getCblk(std::optional<media::SharedFileRegion>* _aidl_return) final;
@@ -373,16 +373,15 @@ public:
             const media::audio::common::AudioPlaybackRate& playbackRate) final;
 
 private:
-    const sp<AudioFlinger::PlaybackThread::Track> mTrack;
+    const sp<IAfTrack> mTrack;
 };
 
 /* static */
-sp<media::IAudioTrack> AudioFlinger::PlaybackThread::Track::createIAudioTrackAdapter(
-        const sp<Track>& track) {
+sp<media::IAudioTrack> IAfTrack::createIAudioTrackAdapter(const sp<IAfTrack>& track) {
     return sp<TrackHandle>::make(track);
 }
 
-TrackHandle::TrackHandle(const sp<AudioFlinger::PlaybackThread::Track>& track)
+TrackHandle::TrackHandle(const sp<IAfTrack>& track)
     : BnAudioTrack(),
       mTrack(track)
 {
@@ -839,7 +838,7 @@ void AudioFlinger::PlaybackThread::Track::destroy()
     }
 }
 
-void AudioFlinger::PlaybackThread::Track::appendDumpHeader(String8& result)
+void AudioFlinger::PlaybackThread::Track::appendDumpHeader(String8& result) const
 {
     result.appendFormat("Type     Id Active Client Session Port Id S  Flags "
                         "  Format Chn mask  SRate "
@@ -850,7 +849,7 @@ void AudioFlinger::PlaybackThread::Track::appendDumpHeader(String8& result)
                         isServerLatencySupported() ? "   Latency" : "");
 }
 
-void AudioFlinger::PlaybackThread::Track::appendDump(String8& result, bool active)
+void AudioFlinger::PlaybackThread::Track::appendDump(String8& result, bool active) const
 {
     char trackType;
     switch (mType) {
@@ -1449,7 +1448,7 @@ VolumeShaper::Status AudioFlinger::PlaybackThread::Track::applyVolumeShaper(
     return status;
 }
 
-sp<VolumeShaper::State> AudioFlinger::PlaybackThread::Track::getVolumeShaperState(int id)
+sp<VolumeShaper::State> AudioFlinger::PlaybackThread::Track::getVolumeShaperState(int id) const
 {
     // Note: We don't check if Thread exists.
 
@@ -1740,7 +1739,7 @@ void AudioFlinger::PlaybackThread::Track::triggerEvents(AudioSystem::sync_event_
 
 // implement VolumeBufferProvider interface
 
-gain_minifloat_packed_t AudioFlinger::PlaybackThread::Track::getVolumeLR()
+gain_minifloat_packed_t AudioFlinger::PlaybackThread::Track::getVolumeLR() const
 {
     // called by FastMixer, so not allowed to take any locks, block, or do I/O including logs
     ALOG_ASSERT(isFastTrack() && (mCblk != NULL));
@@ -1813,7 +1812,7 @@ void AudioFlinger::PlaybackThread::Track::signal()
     }
 }
 
-status_t AudioFlinger::PlaybackThread::Track::getDualMonoMode(audio_dual_mono_mode_t* mode)
+status_t AudioFlinger::PlaybackThread::Track::getDualMonoMode(audio_dual_mono_mode_t* mode) const
 {
     status_t status = INVALID_OPERATION;
     if (isOffloadedOrDirect()) {
@@ -1846,7 +1845,7 @@ status_t AudioFlinger::PlaybackThread::Track::setDualMonoMode(audio_dual_mono_mo
     return status;
 }
 
-status_t AudioFlinger::PlaybackThread::Track::getAudioDescriptionMixLevel(float* leveldB)
+status_t AudioFlinger::PlaybackThread::Track::getAudioDescriptionMixLevel(float* leveldB) const
 {
     status_t status = INVALID_OPERATION;
     if (isOffloadedOrDirect()) {
@@ -1880,7 +1879,7 @@ status_t AudioFlinger::PlaybackThread::Track::setAudioDescriptionMixLevel(float 
 }
 
 status_t AudioFlinger::PlaybackThread::Track::getPlaybackRateParameters(
-        audio_playback_rate_t* playbackRate)
+        audio_playback_rate_t* playbackRate) const
 {
     status_t status = INVALID_OPERATION;
     if (isOffloadedOrDirect()) {
@@ -2471,7 +2470,7 @@ void AudioFlinger::PlaybackThread::PatchTrack::restartIfDisabled()
 
 class RecordHandle : public android::media::BnAudioRecord {
 public:
-    explicit RecordHandle(const sp<AudioFlinger::RecordThread::RecordTrack>& recordTrack);
+    explicit RecordHandle(const sp<IAfRecordTrack>& recordTrack);
     ~RecordHandle() override;
     binder::Status start(int /*AudioSystem::sync_event_t*/ event,
             int /*audio_session_t*/ triggerSession) final;
@@ -2485,20 +2484,20 @@ public:
             const std::string& sharedAudioPackageName, int64_t sharedAudioStartMs) final;
 
 private:
-    const sp<AudioFlinger::RecordThread::RecordTrack> mRecordTrack;
+    const sp<IAfRecordTrack> mRecordTrack;
 
     // for use from destructor
     void stop_nonvirtual();
 };
 
 /* static */
-sp<media::IAudioRecord> AudioFlinger::RecordThread::RecordTrack::createIAudioRecordAdapter(
-        const sp<RecordTrack>& recordTrack) {
+sp<media::IAudioRecord> IAfRecordTrack::createIAudioRecordAdapter(
+        const sp<IAfRecordTrack>& recordTrack) {
     return sp<RecordHandle>::make(recordTrack);
 }
 
 RecordHandle::RecordHandle(
-        const sp<AudioFlinger::RecordThread::RecordTrack>& recordTrack)
+        const sp<IAfRecordTrack>& recordTrack)
     : BnAudioRecord(),
     mRecordTrack(recordTrack)
 {
@@ -2740,7 +2739,7 @@ void AudioFlinger::RecordThread::RecordTrack::invalidate()
 }
 
 
-void AudioFlinger::RecordThread::RecordTrack::appendDumpHeader(String8& result)
+void AudioFlinger::RecordThread::RecordTrack::appendDumpHeader(String8& result) const
 {
     result.appendFormat("Active     Id Client Session Port Id  S  Flags  "
                         " Format Chn mask  SRate Source  "
@@ -2748,7 +2747,7 @@ void AudioFlinger::RecordThread::RecordTrack::appendDumpHeader(String8& result)
                         isServerLatencySupported() ? "   Latency" : "");
 }
 
-void AudioFlinger::RecordThread::RecordTrack::appendDump(String8& result, bool active)
+void AudioFlinger::RecordThread::RecordTrack::appendDump(String8& result, bool active) const
 {
     result.appendFormat("%c%5s %6d %6u %7u %7u  %2s 0x%03X "
             "%08X %08X %6u %6X "
@@ -2847,7 +2846,7 @@ void AudioFlinger::RecordThread::RecordTrack::updateTrackFrameInfo(
 }
 
 status_t AudioFlinger::RecordThread::RecordTrack::getActiveMicrophones(
-        std::vector<media::MicrophoneInfoFw>* activeMicrophones)
+        std::vector<media::MicrophoneInfoFw>* activeMicrophones) const
 {
     sp<ThreadBase> thread = mThread.promote();
     if (thread != 0) {
@@ -3318,13 +3317,13 @@ void AudioFlinger::MmapThread::MmapTrack::processMuteEvent_l(const sp<
     }
 }
 
-void AudioFlinger::MmapThread::MmapTrack::appendDumpHeader(String8& result)
+void AudioFlinger::MmapThread::MmapTrack::appendDumpHeader(String8& result) const
 {
     result.appendFormat("Client Session Port Id  Format Chn mask  SRate Flags %s\n",
                         isOut() ? "Usg CT": "Source");
 }
 
-void AudioFlinger::MmapThread::MmapTrack::appendDump(String8& result, bool active __unused)
+void AudioFlinger::MmapThread::MmapTrack::appendDump(String8& result, bool active __unused) const
 {
     result.appendFormat("%6u %7u %7u %08X %08X %6u 0x%03X ",
             mPid,
