@@ -7502,7 +7502,8 @@ void AudioFlinger::DuplicatingThread::dumpInternals_l(int fd, const Vector<Strin
     if (numTracks > 0) {
         ss << ":";
         for (const auto &track : mOutputTracks) {
-            const sp<ThreadBase> thread = track->thread().promote();
+            // TODO(b/288339104) type
+            const auto thread = sp<ThreadBase>::cast(track->thread().promote());
             ss << " (" << track->id() << " : ";
             if (thread.get() != nullptr) {
                 ss << thread.get() << ", " << thread->id();
@@ -7586,7 +7587,8 @@ void AudioFlinger::DuplicatingThread::updateWaitTime_l()
 {
     mWaitTimeMs = UINT_MAX;
     for (size_t i = 0; i < mOutputTracks.size(); i++) {
-        sp<ThreadBase> strong = mOutputTracks[i]->thread().promote();
+        // TODO(b/288339104) type
+        const auto strong = sp<ThreadBase>::cast(mOutputTracks[i]->thread().promote());
         if (strong != 0) {
             uint32_t waitTimeMs = (strong->frameCount() * 2 * 1000) / strong->sampleRate();
             if (waitTimeMs < mWaitTimeMs) {
@@ -7599,7 +7601,8 @@ void AudioFlinger::DuplicatingThread::updateWaitTime_l()
 bool AudioFlinger::DuplicatingThread::outputsReady()
 {
     for (size_t i = 0; i < outputTracks.size(); i++) {
-        sp<ThreadBase> thread = outputTracks[i]->thread().promote();
+        // TODO(b/288339104) type
+        const auto thread = sp<ThreadBase>::cast(outputTracks[i]->thread().promote());
         if (thread == 0) {
             ALOGW("DuplicatingThread::outputsReady() could not promote thread on output track %p",
                     outputTracks[i].get());
@@ -8877,10 +8880,11 @@ void AudioFlinger::RecordThread::syncStartEventCallback(const wp<audioflinger::S
     sp<audioflinger::SyncEvent> strongEvent = event.promote();
 
     if (strongEvent != 0) {
-        sp<RefBase> ptr = std::any_cast<const wp<RefBase>>(strongEvent->cookie()).promote();
-        if (ptr != 0) {
-            RecordTrack *recordTrack = (RecordTrack *)ptr.get();
-            recordTrack->handleSyncStartEvent(strongEvent);
+        sp<IAfTrackBase> ptr =
+                std::any_cast<const wp<IAfTrackBase>>(strongEvent->cookie()).promote();
+        if (ptr != nullptr) {
+            // TODO(b/288339104) handleSyncStartEvent is in IAfTrackBase not IAfRecordTrack.
+            ptr->handleSyncStartEvent(strongEvent);
         }
     }
 }
