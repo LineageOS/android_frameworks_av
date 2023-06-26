@@ -1175,6 +1175,11 @@ c2_status_t GetHdrMetadataFromGralloc4Handle(
             err = C2_CORRUPTED;
         }
     }
+
+    if (err != C2_OK) {
+        staticInfo->reset();
+    }
+
     if (dynamicInfo) {
         ALOGV("Grabbing dynamic HDR info from gralloc4 metadata");
         dynamicInfo->reset();
