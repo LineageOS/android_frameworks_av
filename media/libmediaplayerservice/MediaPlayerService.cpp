@@ -1840,7 +1840,6 @@ MediaPlayerService::AudioOutput::AudioOutput(audio_session_t sessionId,
     } else {
         mAttributes = NULL;
     }
-
     setMinBufferCount();
 }
 

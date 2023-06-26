@@ -216,7 +216,7 @@ void SpatializerPoseController::setHeadSensor(int32_t sensor) {
         mHeadSensor = INVALID_SENSOR;
     }
 
-    mProcessor->recenter(true /* recenterHead */, false /* recenterScreen */);
+    mProcessor->recenter(true /* recenterHead */, false /* recenterScreen */, __func__);
 }
 
 void SpatializerPoseController::setScreenSensor(int32_t sensor) {
@@ -253,7 +253,7 @@ void SpatializerPoseController::setScreenSensor(int32_t sensor) {
         mScreenSensor = INVALID_SENSOR;
     }
 
-    mProcessor->recenter(false /* recenterHead */, true /* recenterScreen */);
+    mProcessor->recenter(false /* recenterHead */, true /* recenterScreen */, __func__);
 }
 
 void SpatializerPoseController::setDesiredMode(HeadTrackingMode mode) {
@@ -300,7 +300,7 @@ SpatializerPoseController::calculate_l() {
 
 void SpatializerPoseController::recenter() {
     std::lock_guard lock(mMutex);
-    mProcessor->recenter();
+    mProcessor->recenter(true /* recenterHead */, true /* recenterScreen */, __func__);
 }
 
 void SpatializerPoseController::onPose(int64_t timestamp, int32_t sensor, const Pose3f& pose,
@@ -339,7 +339,7 @@ void SpatializerPoseController::onPose(int64_t timestamp, int32_t sensor, const 
         mProcessor->setWorldToHeadPose(timestamp, pose,
                                        twist.value_or(Twist3f()) / kTicksPerSecond);
         if (isNewReference) {
-            mProcessor->recenter(true, false);
+            mProcessor->recenter(true, false, __func__);
         }
     }
     if (sensor == mScreenSensor) {
@@ -353,7 +353,7 @@ void SpatializerPoseController::onPose(int64_t timestamp, int32_t sensor, const 
 
         mProcessor->setWorldToScreenPose(timestamp, pose);
         if (isNewReference) {
-            mProcessor->recenter(false, true);
+            mProcessor->recenter(false, true, __func__);
         }
     }
 }

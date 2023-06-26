@@ -96,7 +96,10 @@ Camera3Device::Camera3Device(const String8 &id, bool overrideForPerfClass, bool 
         mLastTemplateId(-1),
         mNeedFixupMonochromeTags(false),
         mOverrideForPerfClass(overrideForPerfClass),
-        mOverrideToPortrait(overrideToPortrait)
+        mOverrideToPortrait(overrideToPortrait),
+        mRotateAndCropOverride(ANDROID_SCALER_ROTATE_AND_CROP_NONE),
+        mComposerOutput(false),
+        mActivePhysicalId("")
 {
     ATRACE_CALL();
     ALOGV("%s: Created device for camera %s", __FUNCTION__, mId.string());
@@ -1359,12 +1362,34 @@ status_t Camera3Device::filterParamsAndConfigureLocked(const CameraMetadata& ses
     set_camera_metadata_vendor_id(meta, mVendorTagId);
     filteredParams.unlock(meta);
     if (availableSessionKeys.count > 0) {
+        bool rotateAndCropSessionKey = false;
         for (size_t i = 0; i < availableSessionKeys.count; i++) {
             camera_metadata_ro_entry entry = params.find(
                     availableSessionKeys.data.i32[i]);
             if (entry.count > 0) {
                 filteredParams.update(entry);
             }
+            if (ANDROID_SCALER_ROTATE_AND_CROP == availableSessionKeys.data.i32[i]) {
+                rotateAndCropSessionKey = true;
+            }
+        }
+
+        if (rotateAndCropSessionKey) {
+            sp<CaptureRequest> request = new CaptureRequest();
+            PhysicalCameraSettings settingsList;
+            settingsList.metadata = filteredParams;
+            request->mSettingsList.push_back(settingsList);
+
+            auto rotateAndCropEntry = filteredParams.find(ANDROID_SCALER_ROTATE_AND_CROP);
+            if (rotateAndCropEntry.count > 0 &&
+                    rotateAndCropEntry.data.u8[0] == ANDROID_SCALER_ROTATE_AND_CROP_AUTO) {
+                request->mRotateAndCropAuto = true;
+            } else {
+                request->mRotateAndCropAuto = false;
+            }
+
+            overrideAutoRotateAndCrop(request, mOverrideToPortrait, mRotateAndCropOverride);
+            filteredParams = request->mSettingsList.begin()->metadata;
         }
     }
 
@@ -2344,6 +2369,9 @@ status_t Camera3Device::configureStreamsLocked(int operatingMode,
         tryRemoveFakeStreamLocked();
     }
 
+    // Override stream use case based on "adb shell command"
+    overrideStreamUseCaseLocked();
+
     // Start configuring the streams
     ALOGV("%s: Camera %s: Starting stream configuration", __FUNCTION__, mId.string());
 
@@ -2373,7 +2401,7 @@ status_t Camera3Device::configureStreamsLocked(int operatingMode,
     }
 
     mGroupIdPhysicalCameraMap.clear();
-    bool composerSurfacePresent = false;
+    mComposerOutput = false;
     for (size_t i = 0; i < mOutputStreams.size(); i++) {
 
         // Don't configure bidi streams twice, nor add them twice to the list
@@ -2416,7 +2444,7 @@ status_t Camera3Device::configureStreamsLocked(int operatingMode,
         }
 
         if (outputStream->usage & GraphicBuffer::USAGE_HW_COMPOSER) {
-            composerSurfacePresent = true;
+            mComposerOutput = true;
         }
     }
 
@@ -2485,7 +2513,7 @@ status_t Camera3Device::configureStreamsLocked(int operatingMode,
         }
     }
 
-    mRequestThread->setComposerSurface(composerSurfacePresent);
+    mRequestThread->setComposerSurface(mComposerOutput);
 
     // Request thread needs to know to avoid using repeat-last-settings protocol
     // across configure_streams() calls
@@ -3438,6 +3466,16 @@ bool Camera3Device::RequestThread::threadLoop() {
         latestRequestId = NAME_NOT_FOUND;
     }
 
+    for (size_t i = 0; i < mNextRequests.size(); i++) {
+        auto& nextRequest = mNextRequests.editItemAt(i);
+        sp<CaptureRequest> captureRequest = nextRequest.captureRequest;
+        // Do not override rotate&crop for stream configurations that include
+        // SurfaceViews(HW_COMPOSER) output, unless mOverrideToPortrait is set.
+        // The display rotation there will be compensated by NATIVE_WINDOW_TRANSFORM_INVERSE_DISPLAY
+        captureRequest->mRotateAndCropChanged = (mComposerOutput && !mOverrideToPortrait) ? false :
+            overrideAutoRotateAndCrop(captureRequest);
+    }
+
     // 'mNextRequests' will at this point contain either a set of HFR batched requests
     //  or a single request from streaming or burst. In either case the first element
     //  should contain the latest camera settings that we need to check for any session
@@ -3583,18 +3621,13 @@ status_t Camera3Device::RequestThread::prepareHalRequests() {
         bool triggersMixedIn = (triggerCount > 0 || mPrevTriggers > 0);
         mPrevTriggers = triggerCount;
 
-        // Do not override rotate&crop for stream configurations that include
-        // SurfaceViews(HW_COMPOSER) output, unless mOverrideToPortrait is set.
-        // The display rotation there will be compensated by NATIVE_WINDOW_TRANSFORM_INVERSE_DISPLAY
-        bool rotateAndCropChanged = (mComposerOutput && !mOverrideToPortrait) ? false :
-            overrideAutoRotateAndCrop(captureRequest);
         bool testPatternChanged = overrideTestPattern(captureRequest);
 
         // If the request is the same as last, or we had triggers now or last time or
         // changing overrides this time
         bool newRequest =
                 (mPrevRequest != captureRequest || triggersMixedIn ||
-                        rotateAndCropChanged || testPatternChanged) &&
+                        captureRequest->mRotateAndCropChanged || testPatternChanged) &&
                 // Request settings are all the same within one batch, so only treat the first
                 // request in a batch as new
                 !(batchedRequest && i > 0);
@@ -4057,9 +4090,6 @@ status_t Camera3Device::RequestThread::setRotateAndCropAutoBehavior(
         camera_metadata_enum_android_scaler_rotate_and_crop_t rotateAndCropValue) {
     ATRACE_CALL();
     Mutex::Autolock l(mTriggerMutex);
-    if (rotateAndCropValue == ANDROID_SCALER_ROTATE_AND_CROP_AUTO) {
-        return BAD_VALUE;
-    }
     mRotateAndCropOverride = rotateAndCropValue;
     return OK;
 }
@@ -4121,6 +4151,19 @@ status_t Camera3Device::setCameraServiceWatchdog(bool enabled) {
     }
 
     return OK;
+}
+
+void Camera3Device::setStreamUseCaseOverrides(
+        const std::vector<int64_t>& useCaseOverrides) {
+    Mutex::Autolock il(mInterfaceLock);
+    Mutex::Autolock l(mLock);
+    mStreamUseCaseOverrides = useCaseOverrides;
+}
+
+void Camera3Device::clearStreamUseCaseOverrides() {
+    Mutex::Autolock il(mInterfaceLock);
+    Mutex::Autolock l(mLock);
+    mStreamUseCaseOverrides.clear();
 }
 
 void Camera3Device::RequestThread::cleanUpFailedRequests(bool sendRequestError) {
@@ -4628,13 +4671,20 @@ status_t Camera3Device::RequestThread::addFakeTriggerIds(
     return OK;
 }
 
-bool Camera3Device::RequestThread::overrideAutoRotateAndCrop(
-        const sp<CaptureRequest> &request) {
+bool Camera3Device::RequestThread::overrideAutoRotateAndCrop(const sp<CaptureRequest> &request) {
+    ATRACE_CALL();
+    Mutex::Autolock l(mTriggerMutex);
+    return Camera3Device::overrideAutoRotateAndCrop(request, this->mOverrideToPortrait,
+            this->mRotateAndCropOverride);
+}
+
+bool Camera3Device::overrideAutoRotateAndCrop(const sp<CaptureRequest> &request,
+        bool overrideToPortrait,
+        camera_metadata_enum_android_scaler_rotate_and_crop_t rotateAndCropOverride) {
     ATRACE_CALL();
 
-    if (mOverrideToPortrait) {
-        Mutex::Autolock l(mTriggerMutex);
-        uint8_t rotateAndCrop_u8 = mRotateAndCropOverride;
+    if (overrideToPortrait) {
+        uint8_t rotateAndCrop_u8 = rotateAndCropOverride;
         CameraMetadata &metadata = request->mSettingsList.begin()->metadata;
         metadata.update(ANDROID_SCALER_ROTATE_AND_CROP,
                 &rotateAndCrop_u8, 1);
@@ -4642,24 +4692,23 @@ bool Camera3Device::RequestThread::overrideAutoRotateAndCrop(
     }
 
     if (request->mRotateAndCropAuto) {
-        Mutex::Autolock l(mTriggerMutex);
         CameraMetadata &metadata = request->mSettingsList.begin()->metadata;
 
         auto rotateAndCropEntry = metadata.find(ANDROID_SCALER_ROTATE_AND_CROP);
         if (rotateAndCropEntry.count > 0) {
-            if (rotateAndCropEntry.data.u8[0] == mRotateAndCropOverride) {
+            if (rotateAndCropEntry.data.u8[0] == rotateAndCropOverride) {
                 return false;
             } else {
-                rotateAndCropEntry.data.u8[0] = mRotateAndCropOverride;
+                rotateAndCropEntry.data.u8[0] = rotateAndCropOverride;
                 return true;
             }
         } else {
-            uint8_t rotateAndCrop_u8 = mRotateAndCropOverride;
-            metadata.update(ANDROID_SCALER_ROTATE_AND_CROP,
-                    &rotateAndCrop_u8, 1);
+            uint8_t rotateAndCrop_u8 = rotateAndCropOverride;
+            metadata.update(ANDROID_SCALER_ROTATE_AND_CROP, &rotateAndCrop_u8, 1);
             return true;
         }
     }
+
     return false;
 }
 
@@ -5145,6 +5194,10 @@ status_t Camera3Device::setRotateAndCropAutoBehavior(
     if (mRequestThread == nullptr) {
         return INVALID_OPERATION;
     }
+    if (rotateAndCropValue == ANDROID_SCALER_ROTATE_AND_CROP_AUTO) {
+        return BAD_VALUE;
+    }
+    mRotateAndCropOverride = rotateAndCropValue;
     return mRequestThread->setRotateAndCropAutoBehavior(rotateAndCropValue);
 }
 
@@ -5239,6 +5292,57 @@ status_t Camera3Device::stopInjection() {
     Mutex::Autolock il(mInterfaceLock);
     Mutex::Autolock l(mLock);
     return mInjectionMethods->stopInjection();
+}
+
+void Camera3Device::overrideStreamUseCaseLocked() {
+    if (mStreamUseCaseOverrides.size() == 0) {
+        return;
+    }
+
+    // Start from an array of indexes in mStreamUseCaseOverrides, and sort them
+    // based first on size, and second on formats of [JPEG, RAW, YUV, PRIV].
+    std::vector<int> outputStreamsIndices(mOutputStreams.size());
+    for (size_t i = 0; i < outputStreamsIndices.size(); i++) {
+        outputStreamsIndices[i] = i;
+    }
+
+    std::sort(outputStreamsIndices.begin(), outputStreamsIndices.end(),
+            [&](int a, int b) -> bool {
+
+                auto formatScore = [](int format) {
+                    switch (format) {
+                    case HAL_PIXEL_FORMAT_BLOB:
+                        return 4;
+                    case HAL_PIXEL_FORMAT_RAW16:
+                    case HAL_PIXEL_FORMAT_RAW10:
+                    case HAL_PIXEL_FORMAT_RAW12:
+                        return 3;
+                    case HAL_PIXEL_FORMAT_YCBCR_420_888:
+                        return 2;
+                    case HAL_PIXEL_FORMAT_IMPLEMENTATION_DEFINED:
+                        return 1;
+                    default:
+                        return 0;
+                    }
+                };
+
+                int sizeA = mOutputStreams[a]->getWidth() * mOutputStreams[a]->getHeight();
+                int sizeB = mOutputStreams[a]->getWidth() * mOutputStreams[a]->getHeight();
+                int formatAScore = formatScore(mOutputStreams[a]->getFormat());
+                int formatBScore = formatScore(mOutputStreams[b]->getFormat());
+                if (sizeA > sizeB ||
+                        (sizeA == sizeB && formatAScore >= formatBScore)) {
+                    return true;
+                } else {
+                    return false;
+                }
+            });
+
+    size_t overlapSize = std::min(mStreamUseCaseOverrides.size(), mOutputStreams.size());
+    for (size_t i = 0; i < mOutputStreams.size(); i++) {
+        mOutputStreams[outputStreamsIndices[i]]->setStreamUseCase(
+                mStreamUseCaseOverrides[std::min(i, overlapSize-1)]);
+    }
 }
 
 }; // namespace android

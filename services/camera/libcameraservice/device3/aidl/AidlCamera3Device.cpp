@@ -210,7 +210,7 @@ status_t AidlCamera3Device::initialize(sp<CameraProviderManager> manager,
             // Do not override characteristics for physical cameras
             res = manager->getCameraCharacteristics(
                     physicalId, /*overrideForPerfClass*/false, &mPhysicalDeviceInfoMap[physicalId],
-                    /*overrideToPortrait*/true);
+                    mOverrideToPortrait);
             if (res != OK) {
                 SET_ERR_L("Could not retrieve camera %s characteristics: %s (%d)",
                         physicalId.c_str(), strerror(-res), res);
@@ -376,7 +376,7 @@ status_t AidlCamera3Device::initialize(sp<CameraProviderManager> manager,
         mDistortionMappers, mZoomRatioMappers, mRotateAndCropMappers,
         mTagMonitor, mInputStream, mOutputStreams, mSessionStatsBuilder, listener, *this,
         *this, *(mInterface), mLegacyClient, mMinExpectedDuration, mIsFixedFps,
-        mOverrideToPortrait}, mResultMetadataQueue
+        mOverrideToPortrait, mActivePhysicalId}, mResultMetadataQueue
     };
 
     for (const auto& result : results) {
@@ -418,7 +418,7 @@ status_t AidlCamera3Device::initialize(sp<CameraProviderManager> manager,
         mDistortionMappers, mZoomRatioMappers, mRotateAndCropMappers,
         mTagMonitor, mInputStream, mOutputStreams, mSessionStatsBuilder, listener, *this,
         *this, *(mInterface), mLegacyClient, mMinExpectedDuration, mIsFixedFps,
-        mOverrideToPortrait}, mResultMetadataQueue
+        mOverrideToPortrait, mActivePhysicalId}, mResultMetadataQueue
     };
     for (const auto& msg : msgs) {
         camera3::notify(states, msg);
