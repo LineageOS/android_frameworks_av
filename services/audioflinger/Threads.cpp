@@ -8877,7 +8877,7 @@ void AudioFlinger::RecordThread::syncStartEventCallback(const wp<audioflinger::S
     sp<audioflinger::SyncEvent> strongEvent = event.promote();
 
     if (strongEvent != 0) {
-        sp<RefBase> ptr = strongEvent->cookie().promote();
+        sp<RefBase> ptr = std::any_cast<const wp<RefBase>>(strongEvent->cookie()).promote();
         if (ptr != 0) {
             RecordTrack *recordTrack = (RecordTrack *)ptr.get();
             recordTrack->handleSyncStartEvent(strongEvent);

@@ -56,7 +56,7 @@ TEST(MediaSyncEventTests, Basic) {
     ASSERT_EQ(type, syncEvent->type());
     ASSERT_EQ(triggerSession, syncEvent->triggerSession());
     ASSERT_EQ(listenerSession, syncEvent->listenerSession());
-    ASSERT_EQ(cookie, syncEvent->cookie());
+    ASSERT_EQ(cookie, std::any_cast<decltype(cookie)>(syncEvent->cookie()));
     ASSERT_FALSE(triggered);
 
     syncEvent->trigger();
