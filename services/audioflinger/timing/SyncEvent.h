@@ -16,6 +16,7 @@
 
 #pragma once
 
+#include <any>
 #include <functional>
 #include <mutex>
 
@@ -33,7 +34,7 @@ public:
               audio_session_t triggerSession,
               audio_session_t listenerSession,
               const SyncEventCallback& callBack,
-              const wp<RefBase>& cookie)
+              const std::any& cookie)
     : mType(type), mTriggerSession(triggerSession), mListenerSession(listenerSession),
       mCookie(cookie), mCallback(callBack)
     {}
@@ -56,13 +57,13 @@ public:
     AudioSystem::sync_event_t type() const { return mType; }
     audio_session_t triggerSession() const { return mTriggerSession; }
     audio_session_t listenerSession() const { return mListenerSession; }
-    const wp<RefBase>& cookie() const { return mCookie; }
+    const std::any& cookie() const { return mCookie; }
 
 private:
       const AudioSystem::sync_event_t mType;
       const audio_session_t mTriggerSession;
       const audio_session_t mListenerSession;
-      const wp<RefBase> mCookie;
+      const std::any mCookie;
       mutable std::mutex mLock;
       SyncEventCallback mCallback GUARDED_BY(mLock);
 };
