@@ -546,7 +546,7 @@ status_t AudioFlinger::PatchPanel::Patch::createConnections(PatchPanel *panel)
         outputFlags = (audio_output_flags_t) (outputFlags & ~AUDIO_OUTPUT_FLAG_FAST);
     }
 
-    sp<RecordThread::PatchRecord> tempRecordTrack;
+    sp<IAfPatchRecord> tempRecordTrack;
     const bool usePassthruPatchRecord =
             (inputFlags & AUDIO_INPUT_FLAG_DIRECT) && (outputFlags & AUDIO_OUTPUT_FLAG_DIRECT);
     const size_t playbackFrameCount = mPlayback.thread()->frameCount();
@@ -558,7 +558,7 @@ status_t AudioFlinger::PatchPanel::Patch::createConnections(PatchPanel *panel)
         frameCount = std::max(playbackFrameCount, recordFrameCount);
         ALOGV("%s() playframeCount %zu recordFrameCount %zu frameCount %zu",
             __func__, playbackFrameCount, recordFrameCount, frameCount);
-        tempRecordTrack = new RecordThread::PassthruPatchRecord(
+        tempRecordTrack = IAfPatchRecord::createPassThru(
                                                  mRecord.thread().get(),
                                                  sampleRate,
                                                  inChannelMask,
@@ -577,7 +577,7 @@ status_t AudioFlinger::PatchPanel::Patch::createConnections(PatchPanel *panel)
         ALOGV("%s() playframeCount %zu recordFrameCount %zu frameCount %zu",
             __func__, playbackFrameCount, recordFrameCount, frameCount);
 
-        tempRecordTrack = new RecordThread::PatchRecord(
+        tempRecordTrack = IAfPatchRecord::create(
                                                  mRecord.thread().get(),
                                                  sampleRate,
                                                  inChannelMask,
@@ -602,7 +602,7 @@ status_t AudioFlinger::PatchPanel::Patch::createConnections(PatchPanel *panel)
     // Disable this behavior for FM Tuner source if no fast capture/mixer available.
     const bool isFmBridge = mAudioPatch.sources[0].ext.device.type == AUDIO_DEVICE_IN_FM_TUNER;
     const size_t frameCountToBeReady = isFmBridge && !usePassthruPatchRecord ? frameCount / 4 : 1;
-    sp<PlaybackThread::PatchTrack> tempPatchTrack = new PlaybackThread::PatchTrack(
+    sp<IAfPatchTrack> tempPatchTrack = IAfPatchTrack::create(
                                            mPlayback.thread().get(),
                                            streamType,
                                            sampleRate,

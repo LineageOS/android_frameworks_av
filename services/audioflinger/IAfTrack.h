@@ -211,12 +211,40 @@ public:
 // Common interface for Playback tracks.
 class IAfTrack : public virtual IAfTrackBase {
 public:
+    // FillingStatus is used for suppressing volume ramp at begin of playing
+    enum FillingStatus { FS_INVALID, FS_FILLING, FS_FILLED, FS_ACTIVE };
+
     // createIAudioTrackAdapter() is a static constructor which creates an
     // IAudioTrack AIDL interface adapter from the Track object that
     // may be passed back to the client (if needed).
     //
     // Only one AIDL IAudioTrack interface adapter should be created per Track.
     static sp<media::IAudioTrack> createIAudioTrackAdapter(const sp<IAfTrack>& track);
+
+    static sp<IAfTrack> create( // TODO(b/288339104) void*
+            void* /* AudioFlinger::PlaybackThread */ thread,
+            const sp<Client>& client,
+            audio_stream_type_t streamType,
+            const audio_attributes_t& attr,
+            uint32_t sampleRate,
+            audio_format_t format,
+            audio_channel_mask_t channelMask,
+            size_t frameCount,
+            void* buffer,
+            size_t bufferSize,
+            const sp<IMemory>& sharedBuffer,
+            audio_session_t sessionId,
+            pid_t creatorPid,
+            const AttributionSourceState& attributionSource,
+            audio_output_flags_t flags,
+            track_type type,
+            audio_port_handle_t portId = AUDIO_PORT_HANDLE_NONE,
+            /** default behaviour is to start when there are as many frames
+              * ready as possible (aka. Buffer is full). */
+            size_t frameCountToBeReady = SIZE_MAX,
+            float speed = 1.0f,
+            bool isSpatialized = false,
+            bool isBitPerfect = false);
 
     virtual void pause() = 0;
     virtual void flush() = 0;
@@ -304,11 +332,66 @@ public:
     virtual void disable() = 0;
     virtual int& fastIndex() = 0;
     virtual bool isPlaybackRestricted() const = 0;
+
+    // Used by thread only
+
+    virtual bool isPausing() const = 0;
+    virtual bool isPaused() const = 0;
+    virtual bool isResuming() const = 0;
+    virtual bool isReady() const = 0;
+    virtual void setPaused() = 0;
+    virtual void reset() = 0;
+    virtual bool isFlushPending() const = 0;
+    virtual void flushAck() = 0;
+    virtual bool isResumePending() const = 0;
+    virtual void resumeAck() = 0;
+    // For direct or offloaded tracks ensure that the pause state is acknowledged
+    // by the playback thread in case of an immediate flush.
+    virtual bool isPausePending() const = 0;
+    virtual void pauseAck() = 0;
+    virtual void updateTrackFrameInfo(
+            int64_t trackFramesReleased, int64_t sinkFramesWritten, uint32_t halSampleRate,
+            const ExtendedTimestamp& timeStamp) = 0;
+    virtual sp<IMemory> sharedBuffer() const = 0;
+
+    // Dup with ExtendedAudioBufferProvider
+    virtual size_t framesReady() const = 0;
+
+    // presentationComplete checked by frames. (Mixed Tracks).
+    // framesWritten is cumulative, never reset, and is shared all tracks
+    // audioHalFrames is derived from output latency
+    virtual bool presentationComplete(int64_t framesWritten, size_t audioHalFrames) = 0;
+
+    // presentationComplete checked by time. (Direct Tracks).
+    virtual bool presentationComplete(uint32_t latencyMs) = 0;
+
+    virtual void resetPresentationComplete() = 0;
+
+    virtual bool hasVolumeController() const = 0;
+    virtual void setHasVolumeController(bool hasVolumeController) = 0;
+    virtual const sp<AudioTrackServerProxy>& audioTrackServerProxy() const = 0;
+    virtual void setCachedVolume(float volume) = 0;
+    virtual void setResetDone(bool resetDone) = 0;
+
+    virtual ExtendedAudioBufferProvider* asExtendedAudioBufferProvider() = 0;
+    virtual VolumeProvider* asVolumeProvider() = 0;
+
+    // TODO(b/288339104) split into getter/setter
+    virtual FillingStatus& fillingStatus() = 0;
+    virtual int8_t& retryCount() = 0;
+    virtual FastTrackUnderruns& fastTrackUnderruns() = 0;
 };
 
 // playback track, used by DuplicatingThread
 class IAfOutputTrack : public virtual IAfTrack {
 public:
+    // TODO(b/288339104) void*
+    static sp<IAfOutputTrack> create(
+            void* /* AudioFlinger::PlaybackThread */ playbackThread,
+            void* /* AudioFlinger::DuplicatingThread */ sourceThread, uint32_t sampleRate,
+            audio_format_t format, audio_channel_mask_t channelMask, size_t frameCount,
+            const AttributionSourceState& attributionSource);
+
     virtual ssize_t write(void* data, uint32_t frames) = 0;
     virtual bool bufferQueueEmpty() const = 0;
     virtual bool isActive() const = 0;
@@ -321,6 +404,18 @@ public:
 
 class IAfMmapTrack : public virtual IAfTrackBase {
 public:
+    // TODO(b/288339104) void*
+    static sp<IAfMmapTrack> create(void* /*AudioFlinger::ThreadBase */ thread,
+            const audio_attributes_t& attr,
+            uint32_t sampleRate,
+            audio_format_t format,
+            audio_channel_mask_t channelMask,
+            audio_session_t sessionId,
+            bool isOut,
+            const android::content::AttributionSourceState& attributionSource,
+            pid_t creatorPid,
+            audio_port_handle_t portId = AUDIO_PORT_HANDLE_NONE);
+
     // protected by MMapThread::mLock
     virtual void setSilenced_l(bool silenced) = 0;
     // protected by MMapThread::mLock
@@ -336,6 +431,8 @@ public:
             const sp<IAudioManager>& audioManager, mute_state_t muteState) = 0;
 };
 
+class RecordBufferConverter;
+
 class IAfRecordTrack : public virtual IAfTrackBase {
 public:
     // createIAudioRecordAdapter() is a static constructor which creates an
@@ -344,6 +441,24 @@ public:
     //
     // Only one AIDL IAudioRecord interface adapter should be created per RecordTrack.
     static sp<media::IAudioRecord> createIAudioRecordAdapter(const sp<IAfRecordTrack>& recordTrack);
+
+    // TODO(b/288339104) void*
+    static sp<IAfRecordTrack> create(void* /* AudioFlinger::RecordThread */ thread,
+            const sp<Client>& client,
+            const audio_attributes_t& attr,
+            uint32_t sampleRate,
+            audio_format_t format,
+            audio_channel_mask_t channelMask,
+            size_t frameCount,
+            void* buffer,
+            size_t bufferSize,
+            audio_session_t sessionId,
+            pid_t creatorPid,
+            const AttributionSourceState& attributionSource,
+            audio_input_flags_t flags,
+            track_type type,
+            audio_port_handle_t portId = AUDIO_PORT_HANDLE_NONE,
+            int32_t startFrames = -1);
 
     // clear the buffer overflow flag
     virtual void clearOverflow() = 0;
@@ -374,6 +489,12 @@ public:
     using SinkMetadatas = std::vector<record_track_metadata_v7_t>;
     using MetadataInserter = std::back_insert_iterator<SinkMetadatas>;
     virtual void copyMetadataTo(MetadataInserter& backInserter) const = 0; // see IAfTrack
+
+    // private to Threads
+    virtual AudioBufferProvider::Buffer& sinkBuffer() = 0;
+    virtual audioflinger::SynchronizedRecordState& synchronizedRecordState() = 0;
+    virtual RecordBufferConverter* recordBufferConverter() const = 0;
+    virtual ResamplerBufferProvider* resamplerBufferProvider() const = 0;
 };
 
 // PatchProxyBufferProvider interface is implemented by PatchTrack and PatchRecord.
@@ -389,13 +510,32 @@ public:
 
 class IAfPatchTrackBase : public virtual RefBase {
 public:
+    using Timeout = std::optional<std::chrono::nanoseconds>;
+
     virtual void setPeerTimeout(std::chrono::nanoseconds timeout) = 0;
     virtual void setPeerProxy(const sp<IAfPatchTrackBase>& proxy, bool holdReference) = 0;
     virtual void clearPeerProxy() = 0;
     virtual PatchProxyBufferProvider* asPatchProxyBufferProvider() = 0;
 };
 
-class IAfPatchTrack : public virtual IAfTrack, public virtual IAfPatchTrackBase {};
+class IAfPatchTrack : public virtual IAfTrack, public virtual IAfPatchTrackBase {
+public:
+    static sp<IAfPatchTrack> create(
+            void * /* PlaybackThread */ playbackThread, // TODO(b/288339104)
+            audio_stream_type_t streamType,
+            uint32_t sampleRate,
+            audio_channel_mask_t channelMask,
+            audio_format_t format,
+            size_t frameCount,
+            void *buffer,
+            size_t bufferSize,
+            audio_output_flags_t flags,
+            const Timeout& timeout = {},
+            size_t frameCountToBeReady = 1 /** Default behaviour is to start
+                                             *  as soon as possible to have
+                                             *  the lowest possible latency
+                                             *  even if it might glitch. */);
+};
 
 // Abstraction for the Audio Source for the RecordThread (HAL or PassthruPatchRecord).
 struct Source {
@@ -408,6 +548,27 @@ struct Source {
 
 class IAfPatchRecord : public virtual IAfRecordTrack, public virtual IAfPatchTrackBase {
 public:
+    static sp<IAfPatchRecord> create(
+            void* /* RecordThread */ recordThread, // TODO(b/288339104)
+            uint32_t sampleRate,
+            audio_channel_mask_t channelMask,
+            audio_format_t format,
+            size_t frameCount,
+            void* buffer,
+            size_t bufferSize,
+            audio_input_flags_t flags,
+            const Timeout& timeout = {},
+            audio_source_t source = AUDIO_SOURCE_DEFAULT);
+
+    static sp<IAfPatchRecord> createPassThru(
+            void* /* RecordThread */ recordThread, // TODO(b/288339104)
+            uint32_t sampleRate,
+            audio_channel_mask_t channelMask,
+            audio_format_t format,
+            size_t frameCount,
+            audio_input_flags_t flags,
+            audio_source_t source = AUDIO_SOURCE_DEFAULT);
+
     virtual Source* getSource() = 0;
     virtual size_t writeFrames(const void* src, size_t frameCount, size_t frameSize) = 0;
 };
