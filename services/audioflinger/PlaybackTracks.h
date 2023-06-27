@@ -15,11 +15,10 @@
 ** limitations under the License.
 */
 
-#ifndef INCLUDING_FROM_AUDIOFLINGER_H
-    #error This header file should only be included from AudioFlinger.h
-#endif
-
+#pragma once
 #include <math.h>
+
+namespace android {
 
 // Checks and monitors OP_PLAY_AUDIO
 class OpPlayAudioMonitor : public RefBase {
@@ -62,7 +61,7 @@ private:
 // playback track
 class Track : public TrackBase, public virtual IAfTrack, public VolumeProvider {
 public:
-                        Track(  PlaybackThread *thread,
+                        Track(AudioFlinger::PlaybackThread* thread,
                                 const sp<Client>& client,
                                 audio_stream_type_t streamType,
                                 const audio_attributes_t& attr,
@@ -184,9 +183,10 @@ public:
             // This function should be called with holding thread lock.
     void updateTeePatches_l() final;
     void setTeePatchesToUpdate_l(const void* teePatchesToUpdate) final {
-        setTeePatchesToUpdate_l(*reinterpret_cast<const TeePatches*>(teePatchesToUpdate));
+        setTeePatchesToUpdate_l(  // TODO(b/288339104) void*
+                *reinterpret_cast<const AudioFlinger::TeePatches*>(teePatchesToUpdate));
     }
-    void setTeePatchesToUpdate_l(TeePatches teePatchesToUpdate);
+    void setTeePatchesToUpdate_l(AudioFlinger::TeePatches teePatchesToUpdate);
 
     void tallyUnderrunFrames(size_t frames) final {
        if (isOut()) { // we expect this from output tracks only
@@ -228,34 +228,35 @@ protected:
     int64_t framesReleased() const override;
     void onTimestamp(const ExtendedTimestamp &timestamp) override;
 
-    bool isPausing() const { return mState == PAUSING; }
-    bool isPaused() const { return mState == PAUSED; }
-    bool isResuming() const { return mState == RESUMING; }
-    bool isReady() const;
-    void setPaused() { mState = PAUSED; }
-    void reset();
-    bool isFlushPending() const { return mFlushHwPending; }
-    void flushAck();
-    bool isResumePending();
-    void resumeAck();
+    // Used by thread
+    bool isPausing() const final { return mState == PAUSING; }
+    bool isPaused() const final { return mState == PAUSED; }
+    bool isResuming() const final { return mState == RESUMING; }
+    bool isReady() const final;
+    void setPaused() final { mState = PAUSED; }
+    void reset() final;
+    bool isFlushPending() const final { return mFlushHwPending; }
+    void flushAck() final;
+    bool isResumePending() const final;
+    void resumeAck() final;
     // For direct or offloaded tracks ensure that the pause state is acknowledged
     // by the playback thread in case of an immediate flush.
-    bool isPausePending() const { return mPauseHwPending; }
-    void pauseAck();
+    bool isPausePending() const final { return mPauseHwPending; }
+    void pauseAck() final;
     void updateTrackFrameInfo(int64_t trackFramesReleased, int64_t sinkFramesWritten,
-            uint32_t halSampleRate, const ExtendedTimestamp &timeStamp);
+            uint32_t halSampleRate, const ExtendedTimestamp& timeStamp) final;
 
-    sp<IMemory> sharedBuffer() const { return mSharedBuffer; }
+    sp<IMemory> sharedBuffer() const final { return mSharedBuffer; }
 
     // presentationComplete checked by frames. (Mixed Tracks).
     // framesWritten is cumulative, never reset, and is shared all tracks
     // audioHalFrames is derived from output latency
-    bool presentationComplete(int64_t framesWritten, size_t audioHalFrames);
+    bool presentationComplete(int64_t framesWritten, size_t audioHalFrames) final;
 
     // presentationComplete checked by time. (Direct Tracks).
-    bool presentationComplete(uint32_t latencyMs);
+    bool presentationComplete(uint32_t latencyMs) final;
 
-    void resetPresentationComplete() {
+    void resetPresentationComplete() final {
         mPresentationCompleteFrames = 0;
         mPresentationCompleteTimeNs = 0;
     }
@@ -266,7 +267,6 @@ protected:
 
     void signalClientFlag(int32_t flag);
 
-public:
     void triggerEvents(AudioSystem::sync_event_t type) final;
     void invalidate() final;
     void disable() final;
@@ -275,11 +275,32 @@ public:
         // The monitor is only created for tracks that can be silenced.
         return mOpPlayAudioMonitor ? !mOpPlayAudioMonitor->hasOpPlayAudio() : false; }
 
-protected:
+    const sp<AudioTrackServerProxy>& audioTrackServerProxy() const final {
+        return mAudioTrackServerProxy;
+    }
+    bool hasVolumeController() const final { return mHasVolumeController; }
+    void setHasVolumeController(bool hasVolumeController) final {
+        mHasVolumeController = hasVolumeController;
+    }
+    void setCachedVolume(float volume) final {
+        mCachedVolume = volume;
+    }
+    void setResetDone(bool resetDone) final {
+        mResetDone = resetDone;
+    }
+    ExtendedAudioBufferProvider* asExtendedAudioBufferProvider() final {
+        return this;
+    }
+    VolumeProvider* asVolumeProvider() final {
+        return this;
+    }
 
-    // FILLED state is used for suppressing volume ramp at begin of playing
-    enum {FS_INVALID, FS_FILLING, FS_FILLED, FS_ACTIVE};
-    mutable uint8_t     mFillingUpStatus;
+    FillingStatus& fillingStatus() final { return mFillingStatus; }
+    int8_t& retryCount() final { return mRetryCount; }
+    FastTrackUnderruns& fastTrackUnderruns() final { return mObservedUnderruns; }
+
+protected:
+    mutable FillingStatus mFillingStatus;
     int8_t              mRetryCount;
 
     // see comment at AudioFlinger::PlaybackThread::Track::~Track for why this can't be const
@@ -361,8 +382,8 @@ private:
     bool                mFlushHwPending; // track requests for thread flush
     bool                mPauseHwPending = false; // direct/offload track request for thread pause
     audio_output_flags_t mFlags;
-    TeePatches  mTeePatches;
-    std::optional<TeePatches> mTeePatchesToUpdate;
+    AudioFlinger::TeePatches  mTeePatches;
+    std::optional<AudioFlinger::TeePatches> mTeePatchesToUpdate;
     const float         mSpeed;
     const bool          mIsSpatialized;
     const bool          mIsBitPerfect;
@@ -383,8 +404,8 @@ public:
         void *mBuffer;
     };
 
-                        OutputTrack(PlaybackThread *thread,
-                                DuplicatingThread *sourceThread,
+                        OutputTrack(AudioFlinger::PlaybackThread* thread,
+                                AudioFlinger::DuplicatingThread* sourceThread,
                                 uint32_t sampleRate,
                                 audio_format_t format,
                                 audio_channel_mask_t channelMask,
@@ -429,7 +450,7 @@ private:
     Vector < Buffer* >          mBufferQueue;
     AudioBufferProvider::Buffer mOutBuffer;
     bool                        mActive;
-    DuplicatingThread* const    mSourceThread; // for waitTimeMs() in write()
+    AudioFlinger::DuplicatingThread* const mSourceThread; // for waitTimeMs() in write()
     sp<AudioTrackClientProxy>   mClientProxy;
 
     /** Attributes of the source tracks.
@@ -451,8 +472,7 @@ private:
 // playback track, used by PatchPanel
 class PatchTrack : public Track, public PatchTrackBase, public IAfPatchTrack {
 public:
-
-                        PatchTrack(PlaybackThread *playbackThread,
+                        PatchTrack(AudioFlinger::PlaybackThread* playbackThread,
                                    audio_stream_type_t streamType,
                                    uint32_t sampleRate,
                                    audio_channel_mask_t channelMask,
@@ -485,3 +505,5 @@ public:
 private:
             void restartIfDisabled();
 };  // end of PatchTrack
+
+} // namespace android
