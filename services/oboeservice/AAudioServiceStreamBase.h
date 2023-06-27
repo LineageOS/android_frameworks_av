@@ -220,18 +220,6 @@ public:
         return mSuspended;
     }
 
-    bool isCloseNeeded() const {
-        return mCloseNeeded.load();
-    }
-
-    /**
-     * Mark this stream as needing to be closed.
-     * Once marked for closing, it cannot be unmarked.
-     */
-    void markCloseNeeded() {
-        mCloseNeeded.store(true);
-    }
-
     virtual const char *getTypeText() const { return "Base"; }
 
 protected:
@@ -419,12 +407,8 @@ private:
     aaudio_handle_t         mHandle = -1;
     bool                    mFlowing = false;
 
-    // This indicates that a stream that is being referenced by a binder call
-    // and needs to closed.
-    std::atomic<bool>       mCloseNeeded{false}; // TODO remove
-
     // This indicate that a running stream should not be processed because of an error,
-    // for example a full message queue. Note that this atomic is unrelated to mCloseNeeded.
+    // for example a full message queue.
     std::atomic<bool>       mSuspended{false};
 
     bool                    mDisconnected GUARDED_BY(mLock) {false};
