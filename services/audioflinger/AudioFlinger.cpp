@@ -2391,7 +2391,7 @@ status_t AudioFlinger::createRecord(const media::CreateRecordRequest& _input,
     CreateRecordInput input = VALUE_OR_RETURN_STATUS(CreateRecordInput::fromAidl(_input));
     CreateRecordOutput output;
 
-    sp<RecordThread::RecordTrack> recordTrack;
+    sp<IAfRecordTrack> recordTrack;
     sp<Client> client;
     status_t lStatus;
     audio_session_t sessionId = input.sessionId;
@@ -3946,7 +3946,7 @@ void AudioFlinger::updateSecondaryOutputsForTrack_l(
             // use an index mask here to create the PatchRecord.
             inChannelMask = audio_channel_mask_out_to_in_index_mask(track->channelMask());
         }
-        sp patchRecord = new RecordThread::PatchRecord(nullptr /* thread */,
+        sp<IAfPatchRecord> patchRecord = IAfPatchRecord::create(nullptr /* thread */,
                                                        track->sampleRate(),
                                                        inChannelMask,
                                                        track->format(),
@@ -3966,7 +3966,7 @@ void AudioFlinger::updateSecondaryOutputsForTrack_l(
         // for now, we exclude fast tracks by removing the Fast flag.
         const audio_output_flags_t outputFlags =
                 (audio_output_flags_t)(track->getOutputFlags() & ~AUDIO_OUTPUT_FLAG_FAST);
-        sp patchTrack = new PlaybackThread::PatchTrack(secondaryThread,
+        sp<IAfPatchTrack> patchTrack = IAfPatchTrack::create(secondaryThread,
                                                        track->streamType(),
                                                        track->sampleRate(),
                                                        track->channelMask(),
