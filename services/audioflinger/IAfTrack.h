@@ -339,10 +339,10 @@ public:
     virtual sp<os::ExternalVibration> getExternalVibration() const = 0;
 
     // This function should be called with holding thread lock.
-    virtual void updateTeePatches() = 0;
+    virtual void updateTeePatches_l() = 0;
 
     // Argument teePatchesToUpdate is by value, use std::move to optimize.
-    virtual void setTeePatchesToUpdate(TeePatches teePatchesToUpdate) = 0;
+    virtual void setTeePatchesToUpdate_l(TeePatches teePatchesToUpdate) = 0;
 
     static bool checkServerLatencySupported(audio_format_t format, audio_output_flags_t flags) {
         return audio_is_linear_pcm(format) && (flags & AUDIO_OUTPUT_FLAG_HW_AV_SYNC) == 0;

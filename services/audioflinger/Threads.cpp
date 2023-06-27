@@ -4178,7 +4178,7 @@ NO_THREAD_SAFETY_ANALYSIS  // manual locking of AudioFlinger
             setHalLatencyMode_l();
 
             for (const auto &track : mActiveTracks ) {
-                track->updateTeePatches();
+                track->updateTeePatches_l();
             }
 
             // signal actual start of output stream when the render position reported by the kernel
