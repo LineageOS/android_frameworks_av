@@ -455,7 +455,7 @@ private:
 };  // end of OutputTrack
 
 // playback track, used by PatchPanel
-class PatchTrack : public Track, public PatchTrackBase {
+class PatchTrack : public Track, public PatchTrackBase, public IAfPatchTrack {
 public:
 
                         PatchTrack(PlaybackThread *playbackThread,
