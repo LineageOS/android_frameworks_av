@@ -1808,6 +1808,10 @@ void CCodec::start() {
                            ACTION_CODE_FATAL);
         return;
     }
+
+    // clear the deadline after the component starts
+    setDeadline(TimePoint::max(), 0ms, "none");
+
     sp<AMessage> inputFormat;
     sp<AMessage> outputFormat;
     status_t err2 = OK;
