@@ -72,7 +72,7 @@ private:
     Mutex mLock;
     AudioFlinger &mAudioFlinger;
     const sp<DeviceEffectManagerCallback> mMyCallback;
-    std::map<AudioDeviceTypeAddr, sp<IAfDeviceEffectProxy>> mDeviceEffects;
+    std::map<AudioDeviceTypeAddr, std::vector<sp<IAfDeviceEffectProxy>>> mDeviceEffects;
 };
 
 public: // TODO(b/288339104) extract inner class.
