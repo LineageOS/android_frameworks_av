@@ -2650,6 +2650,7 @@ status_t AudioPolicyManager::getInputForAttr(const audio_attributes_t *attr,
     sp<AudioPolicyMix> policyMix;
     sp<DeviceDescriptor> device;
     sp<AudioInputDescriptor> inputDesc;
+    sp<AudioInputDescriptor> previousInputDesc;
     sp<RecordClientDescriptor> clientDesc;
     audio_port_handle_t requestedDeviceId = *selectedDeviceId;
     uid_t uid = VALUE_OR_RETURN_STATUS(aidl2legacy_int32_t_uid_t(attributionSource.uid));
@@ -2806,6 +2807,8 @@ exit:
                                             requestedDeviceId, attributes.source, flags,
                                             isSoundTrigger);
     inputDesc = mInputs.valueFor(*input);
+    // Move (if found) effect for the client session to its input
+    mEffects.moveEffectsForIo(session, *input, &mInputs, mpClientInterface);
     inputDesc->addClient(clientDesc);
 
     ALOGV("getInputForAttr() returns input %d type %d selectedDeviceId %d for port ID %d",
@@ -3115,7 +3118,7 @@ void AudioPolicyManager::releaseInput(audio_port_handle_t portId)
     ALOGV("%s %d", __FUNCTION__, input);
 
     inputDesc->removeClient(portId);
-
+    mEffects.putOrphanEffects(client->session(), input, &mInputs, mpClientInterface);
     if (inputDesc->getClientCount() > 0) {
         ALOGV("%s(%d) %zu clients remaining", __func__, portId, inputDesc->getClientCount());
         return;
@@ -3477,8 +3480,8 @@ audio_io_handle_t AudioPolicyManager::selectOutputForMusicEffects()
     }
 
     if (output != mMusicEffectOutput) {
-        mEffects.moveEffects(AUDIO_SESSION_OUTPUT_MIX, mMusicEffectOutput, output);
-        mpClientInterface->moveEffects(AUDIO_SESSION_OUTPUT_MIX, mMusicEffectOutput, output);
+        mEffects.moveEffects(AUDIO_SESSION_OUTPUT_MIX, mMusicEffectOutput, output,
+                mpClientInterface);
         mMusicEffectOutput = output;
     }
 

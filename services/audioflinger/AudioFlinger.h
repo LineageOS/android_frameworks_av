@@ -791,6 +791,9 @@ private:
               status_t moveEffectChain_l(audio_session_t sessionId,
                                      PlaybackThread *srcThread,
                                      PlaybackThread *dstThread);
+              status_t moveEffectChain_l(audio_session_t sessionId,
+                                         RecordThread *srcThread,
+                                         RecordThread *dstThread);
 
               status_t moveAuxEffectToIo(int EffectId,
                                          const sp<PlaybackThread>& dstThread,
@@ -839,6 +842,9 @@ public:
                 bool updateOrphanEffectChains(const sp<IAfEffectModule>& effect);
 private:
                 std::vector< sp<IAfEffectModule> > purgeStaleEffects_l();
+
+                std::vector< sp<IAfEffectModule> > purgeOrphanEffectChains_l();
+                bool updateOrphanEffectChains_l(const sp<IAfEffectModule>& effect);
 
                 void broadcastParametersToRecordThreads_l(const String8& keyValuePairs);
                 void updateOutDevicesForRecordThreads_l(const DeviceDescriptorBaseVector& devices);
