@@ -55,6 +55,19 @@ void AudioFlinger::DeviceEffectManager::onReleaseAudioPatch(audio_patch_handle_t
     }
 }
 
+void AudioFlinger::DeviceEffectManager::onUpdateAudioPatch(audio_patch_handle_t oldHandle,
+        audio_patch_handle_t newHandle, const PatchPanel::Patch& patch) {
+    ALOGV("%s oldhandle %d newHandle %d mHalHandle %d device sink %08x",
+            __func__, oldHandle, newHandle, patch.mHalHandle,
+            patch.mAudioPatch.num_sinks > 0 ? patch.mAudioPatch.sinks[0].ext.device.type : 0);
+    Mutex::Autolock _l(mLock);
+    for (auto& effect : mDeviceEffects) {
+        // TODO(b/288339104) void*
+        status_t status = effect.second->onUpdatePatch(oldHandle, newHandle, &patch);
+        ALOGW_IF(status != NO_ERROR, "%s onUpdatePatch error %d", __func__, status);
+    }
+}
+
 // DeviceEffectManager::createEffect_l() must be called with AudioFlinger::mLock held
 sp<IAfEffectHandle> AudioFlinger::DeviceEffectManager::createEffect_l(
         effect_descriptor_t *descriptor,

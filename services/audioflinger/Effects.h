@@ -680,10 +680,19 @@ public:
         return onCreatePatch(patchHandle,
                 *reinterpret_cast<const AudioFlinger::PatchPanel::Patch *>(patch));
     }
+    // TODO(b/288339104) type
+    status_t onUpdatePatch(audio_patch_handle_t oldPatchHandle, audio_patch_handle_t newPatchHandle,
+            /* const PatchPanel::Patch& */ const void * patch) final {
+        return onUpdatePatch(oldPatchHandle, newPatchHandle,
+                *reinterpret_cast<const AudioFlinger::PatchPanel::Patch *>(patch));
+    }
 
     status_t init(const std::map<audio_patch_handle_t, AudioFlinger::PatchPanel::Patch>& patches);
     status_t onCreatePatch(
             audio_patch_handle_t patchHandle, const AudioFlinger::PatchPanel::Patch& patch);
+
+    status_t onUpdatePatch(audio_patch_handle_t oldPatchHandle, audio_patch_handle_t newPatchHandle,
+            const AudioFlinger::PatchPanel::Patch& patch);
 
     void onReleasePatch(audio_patch_handle_t patchHandle) final;
 
@@ -697,6 +706,11 @@ public:
     uint32_t sampleRate() const final;
     audio_channel_mask_t channelMask() const final;
     uint32_t channelCount() const final;
+
+    status_t command(int32_t cmdCode,
+                     const std::vector<uint8_t>& cmdData,
+                     int32_t maxReplySize,
+                     std::vector<uint8_t>* reply) final;
 
     void dump2(int fd, int spaces) const final;
 

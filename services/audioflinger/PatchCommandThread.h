@@ -30,6 +30,7 @@ public:
     enum {
         CREATE_AUDIO_PATCH,
         RELEASE_AUDIO_PATCH,
+        UPDATE_AUDIO_PATCH,
     };
 
     class PatchCommandListener : public virtual RefBase {
@@ -37,6 +38,9 @@ public:
         virtual void onCreateAudioPatch(audio_patch_handle_t handle,
                                         const PatchPanel::Patch& patch) = 0;
         virtual void onReleaseAudioPatch(audio_patch_handle_t handle) = 0;
+        virtual void onUpdateAudioPatch(audio_patch_handle_t oldHandle,
+                                        audio_patch_handle_t newHandle,
+                                        const PatchPanel::Patch& patch) = 0;
     };
 
     PatchCommandThread() : Thread(false /* canCallJava */) {}
@@ -46,6 +50,9 @@ public:
 
     void createAudioPatch(audio_patch_handle_t handle, const PatchPanel::Patch& patch);
     void releaseAudioPatch(audio_patch_handle_t handle);
+    void updateAudioPatch(audio_patch_handle_t oldHandle,
+                          audio_patch_handle_t newHandle,
+                          const PatchPanel::Patch& patch);
 
     // Thread virtuals
     void onFirstRef() override;
@@ -56,7 +63,9 @@ public:
     void createAudioPatchCommand(audio_patch_handle_t handle,
             const PatchPanel::Patch& patch);
     void releaseAudioPatchCommand(audio_patch_handle_t handle);
-
+    void updateAudioPatchCommand(audio_patch_handle_t oldHandle,
+                                 audio_patch_handle_t newHandle,
+                                 const PatchPanel::Patch& patch);
 private:
     class CommandData;
 
@@ -88,6 +97,18 @@ private:
             :   mHandle(handle) {}
 
         audio_patch_handle_t mHandle;
+    };
+
+    class UpdateAudioPatchData : public CommandData {
+    public:
+        UpdateAudioPatchData(audio_patch_handle_t oldHandle,
+                             audio_patch_handle_t newHandle,
+                             const PatchPanel::Patch& patch)
+            :   mOldHandle(oldHandle), mNewHandle(newHandle), mPatch(patch) {}
+
+        const audio_patch_handle_t mOldHandle;
+        const audio_patch_handle_t mNewHandle;
+        const PatchPanel::Patch mPatch;
     };
 
     void sendCommand(const sp<Command>& command);

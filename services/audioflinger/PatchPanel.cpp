@@ -156,7 +156,8 @@ status_t AudioFlinger::PatchPanel::createAudioPatch(const struct audio_patch *pa
     if (patch->num_sources > 2) {
         return INVALID_OPERATION;
     }
-
+    bool reuseExistingHalPatch = false;
+    audio_patch_handle_t oldhandle = AUDIO_PATCH_HANDLE_NONE;
     if (*handle != AUDIO_PATCH_HANDLE_NONE) {
         auto iter = mPatches.find(*handle);
         if (iter != mPatches.end()) {
@@ -174,6 +175,7 @@ status_t AudioFlinger::PatchPanel::createAudioPatch(const struct audio_patch *pa
             if (removedPatch.mHalHandle != AUDIO_PATCH_HANDLE_NONE) {
                 audio_module_handle_t hwModule = AUDIO_MODULE_HANDLE_NONE;
                 const struct audio_patch &oldPatch = removedPatch.mAudioPatch;
+                oldhandle = *handle;
                 if (oldPatch.sources[0].type == AUDIO_PORT_TYPE_DEVICE &&
                         (patch->sources[0].type != AUDIO_PORT_TYPE_DEVICE ||
                                 oldPatch.sources[0].ext.device.hw_module !=
@@ -196,8 +198,12 @@ status_t AudioFlinger::PatchPanel::createAudioPatch(const struct audio_patch *pa
                     hwDevice->releaseAudioPatch(removedPatch.mHalHandle);
                 }
                 halHandle = removedPatch.mHalHandle;
+                // Prevent to remove/add device effect when mix / device did not change, and
+                // hal patch has not been released
+                // Note that no patch leak at hal layer as halHandle is reused.
+                reuseExistingHalPatch = (hwDevice == 0) && patchesHaveSameRoute(*patch, oldPatch);
             }
-            erasePatch(*handle);
+            erasePatch(*handle, reuseExistingHalPatch);
         }
     }
 
@@ -455,7 +461,11 @@ exit:
     if (status == NO_ERROR) {
         *handle = (audio_patch_handle_t) mAudioFlinger.nextUniqueId(AUDIO_UNIQUE_ID_USE_PATCH);
         newPatch.mHalHandle = halHandle;
-        mAudioFlinger.mPatchCommandThread->createAudioPatch(*handle, newPatch);
+        if (reuseExistingHalPatch) {
+            mAudioFlinger.mPatchCommandThread->updateAudioPatch(oldhandle, *handle, newPatch);
+        } else {
+            mAudioFlinger.mPatchCommandThread->createAudioPatch(*handle, newPatch);
+        }
         if (insertedModule != AUDIO_MODULE_HANDLE_NONE) {
             addSoftwarePatchToInsertedModules(insertedModule, *handle, &newPatch.mAudioPatch);
         }
@@ -811,10 +821,12 @@ status_t AudioFlinger::PatchPanel::releaseAudioPatch(audio_patch_handle_t handle
     return status;
 }
 
-void AudioFlinger::PatchPanel::erasePatch(audio_patch_handle_t handle) {
+void AudioFlinger::PatchPanel::erasePatch(audio_patch_handle_t handle, bool reuseExistingHalPatch) {
     mPatches.erase(handle);
     removeSoftwarePatchFromInsertedModules(handle);
-    mAudioFlinger.mPatchCommandThread->releaseAudioPatch(handle);
+    if (!reuseExistingHalPatch) {
+        mAudioFlinger.mPatchCommandThread->releaseAudioPatch(handle);
+    }
 }
 
 /* List connected audio ports and they attributes */

@@ -231,6 +231,12 @@ void AudioFlinger::MelReporter::onReleaseAudioPatch(audio_patch_handle_t handle)
     stopMelComputationForPatch_l(melPatch);
 }
 
+void AudioFlinger::MelReporter::onUpdateAudioPatch(audio_patch_handle_t oldHandle,
+        audio_patch_handle_t newHandle, const PatchPanel::Patch& patch) {
+    onReleaseAudioPatch(oldHandle);
+    onCreateAudioPatch(newHandle, patch);
+}
+
 sp<media::ISoundDose> AudioFlinger::MelReporter::getSoundDoseInterface(
         const sp<media::ISoundDoseCallback>& callback) {
     // no need to lock since getSoundDoseInterface is synchronized
