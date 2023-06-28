@@ -411,7 +411,7 @@ public:
     virtual     sp<StreamHalInterface> stream() const = 0;
 
                 sp<IAfEffectHandle> createEffect_l(
-                                    const sp<AudioFlinger::Client>& client,
+                                    const sp<Client>& client,
                                     const sp<media::IEffectClient>& effectClient,
                                     int32_t priority,
                                     audio_session_t sessionId,
@@ -981,7 +981,7 @@ public:
                 void        setVolumeForOutput_l(float left, float right) const override;
 
                 sp<Track>   createTrack_l(
-                                const sp<AudioFlinger::Client>& client,
+                                const sp<Client>& client,
                                 audio_stream_type_t streamType,
                                 const audio_attributes_t& attr,
                                 uint32_t *sampleRate,
@@ -1943,7 +1943,7 @@ public:
     virtual sp<IMemory> pipeMemory() const { return mPipeMemory; }
 
             sp<AudioFlinger::RecordThread::RecordTrack>  createRecordTrack_l(
-                    const sp<AudioFlinger::Client>& client,
+                    const sp<Client>& client,
                     const audio_attributes_t& attr,
                     uint32_t *pSampleRate,
                     audio_format_t format,
