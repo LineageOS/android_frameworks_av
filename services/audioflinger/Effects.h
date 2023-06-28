@@ -290,7 +290,7 @@ class EffectHandle: public IAfEffectHandle, public android::media::BnEffect {
 public:
 
     EffectHandle(const sp<IAfEffectBase>& effect,
-            const sp<AudioFlinger::Client>& client,
+            const sp<Client>& client,
             const sp<media::IEffectClient>& effectClient,
             int32_t priority, bool notifyFramesProcessed);
     ~EffectHandle() override;
@@ -311,8 +311,7 @@ public:
     android::binder::Status getConfig(media::EffectConfig* _config,
                                       int32_t* _aidl_return) final;
 
-    // TODO(b/288339104) type
-    sp<RefBase /* AudioFlinger::Client */> client() const final { return mClient; }
+    const sp<Client>& client() const final { return mClient; }
 
     sp<android::media::IEffect> asIEffect() final {
         return sp<android::media::IEffect>::fromExisting(this);
@@ -357,7 +356,7 @@ private:
     Mutex mLock;                             // protects IEffect method calls
     const wp<IAfEffectBase> mEffect;               // pointer to controlled EffectModule
     const sp<media::IEffectClient> mEffectClient;  // callback interface for client notifications
-    /*const*/ sp<AudioFlinger::Client> mClient;    // client for shared memory allocation, see
+    /*const*/ sp<Client> mClient;            // client for shared memory allocation, see
                                              //   disconnect()
     sp<IMemory> mCblkMemory;                 // shared memory for control block
     effect_param_cblk_t* mCblk;              // control block for deferred parameter setting via

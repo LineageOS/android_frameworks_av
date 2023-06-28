@@ -117,6 +117,8 @@
 #include "android/media/BnAudioRecord.h"
 #include "android/media/BnEffect.h"
 
+#include "Client.h"
+
 // include AudioFlinger component interfaces
 #include "IAfEffect.h"
 
@@ -146,6 +148,7 @@ using android::content::AttributionSourceState;
 class AudioFlinger : public AudioFlingerServerAdapter::Delegate
 {
     friend class sp<AudioFlinger>;
+    friend class Client; // removeClient_l();
 public:
     static void instantiate() ANDROID_API;
 
@@ -496,26 +499,6 @@ public:
     class ThreadBase;
 private:
     void dumpToThreadLog_l(const sp<ThreadBase> &thread);
-
-public:
-    // TODO(b/288339104) Move to separate file
-    // --- Client ---
-    class Client : public RefBase {
-      public:
-        Client(const sp<AudioFlinger>& audioFlinger, pid_t pid);
-        virtual             ~Client();
-        AllocatorFactory::ClientAllocator& allocator();
-        pid_t               pid() const { return mPid; }
-        sp<AudioFlinger>    audioFlinger() const { return mAudioFlinger; }
-
-    private:
-        DISALLOW_COPY_AND_ASSIGN(Client);
-
-        const sp<AudioFlinger>    mAudioFlinger;
-        const pid_t         mPid;
-        AllocatorFactory::ClientAllocator mClientAllocator;
-    };
-private:
 
     // --- Notification Client ---
     class NotificationClient : public IBinder::DeathRecipient {
