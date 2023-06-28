@@ -779,12 +779,12 @@ void AudioFlinger::PlaybackThread::Track::destroy()
             Mutex::Autolock _l(thread->mLock);
             PlaybackThread *playbackThread = (PlaybackThread *)thread.get();
             wasActive = playbackThread->destroyTrack_l(this);
+            forEachTeePatchTrack_l([](const auto& patchTrack) { patchTrack->destroy(); });
         }
         if (isExternalTrack() && !wasActive) {
             AudioSystem::releaseOutput(mPortId);
         }
     }
-    forEachTeePatchTrack([](auto patchTrack) { patchTrack->destroy(); });
 }
 
 void AudioFlinger::PlaybackThread::Track::appendDumpHeader(String8& result)
@@ -1157,12 +1157,13 @@ status_t AudioFlinger::PlaybackThread::Track::start(AudioSystem::sync_event_t ev
             buffer.mFrameCount = 1;
             (void) mAudioTrackServerProxy->obtainBuffer(&buffer, true /*ackFlush*/);
         }
+        if (status == NO_ERROR) {
+            forEachTeePatchTrack_l([](const auto& patchTrack) { patchTrack->start(); });
+        }
     } else {
         status = BAD_VALUE;
     }
     if (status == NO_ERROR) {
-        forEachTeePatchTrack([](auto patchTrack) { patchTrack->start(); });
-
         // send format to AudioManager for playback activity monitoring
         sp<IAudioManager> audioManager = thread->mAudioFlinger->getOrCreateAudioManager();
         if (audioManager && mPortId != AUDIO_PORT_HANDLE_NONE) {
@@ -1212,8 +1213,8 @@ void AudioFlinger::PlaybackThread::Track::stop()
             ALOGV("%s(%d): not stopping/stopped => stopping/stopped on thread %d",
                     __func__, mId, (int)mThreadIoHandle);
         }
+        forEachTeePatchTrack_l([](const auto& patchTrack) { patchTrack->stop(); });
     }
-    forEachTeePatchTrack([](auto patchTrack) { patchTrack->stop(); });
 }
 
 void AudioFlinger::PlaybackThread::Track::pause()
@@ -1248,9 +1249,9 @@ void AudioFlinger::PlaybackThread::Track::pause()
         default:
             break;
         }
+        // Pausing the TeePatch to avoid a glitch on underrun, at the cost of buffered audio loss.
+        forEachTeePatchTrack_l([](const auto& patchTrack) { patchTrack->pause(); });
     }
-    // Pausing the TeePatch to avoid a glitch on underrun, at the cost of buffered audio loss.
-    forEachTeePatchTrack([](auto patchTrack) { patchTrack->pause(); });
 }
 
 void AudioFlinger::PlaybackThread::Track::flush()
@@ -1311,9 +1312,10 @@ void AudioFlinger::PlaybackThread::Track::flush()
         // before mixer thread can run. This is important when offloading
         // because the hardware buffer could hold a large amount of audio
         playbackThread->broadcast_l();
+        // Flush the Tee to avoid on resume playing old data and glitching on the transition to
+        // new data
+        forEachTeePatchTrack_l([](const auto& patchTrack) { patchTrack->flush(); });
     }
-    // Flush the Tee to avoid on resume playing old data and glitching on the transition to new data
-    forEachTeePatchTrack([](auto patchTrack) { patchTrack->flush(); });
 }
 
 // must be called with thread lock held
@@ -1491,19 +1493,19 @@ void AudioFlinger::PlaybackThread::Track::copyMetadataTo(MetadataInserter& backI
     *backInserter++ = metadata;
 }
 
-void AudioFlinger::PlaybackThread::Track::updateTeePatches() {
+void AudioFlinger::PlaybackThread::Track::updateTeePatches_l() {
     if (mTeePatchesToUpdate.has_value()) {
-        forEachTeePatchTrack([](auto patchTrack) { patchTrack->destroy(); });
+        forEachTeePatchTrack_l([](const auto& patchTrack) { patchTrack->destroy(); });
         mTeePatches = mTeePatchesToUpdate.value();
         if (mState == TrackBase::ACTIVE || mState == TrackBase::RESUMING ||
                 mState == TrackBase::STOPPING_1) {
-            forEachTeePatchTrack([](auto patchTrack) { patchTrack->start(); });
+            forEachTeePatchTrack_l([](const auto& patchTrack) { patchTrack->start(); });
         }
         mTeePatchesToUpdate.reset();
     }
 }
 
-void AudioFlinger::PlaybackThread::Track::setTeePatchesToUpdate(TeePatches teePatchesToUpdate) {
+void AudioFlinger::PlaybackThread::Track::setTeePatchesToUpdate_l(TeePatches teePatchesToUpdate) {
     ALOGW_IF(mTeePatchesToUpdate.has_value(),
              "%s, existing tee patches to update will be ignored", __func__);
     mTeePatchesToUpdate = std::move(teePatchesToUpdate);
