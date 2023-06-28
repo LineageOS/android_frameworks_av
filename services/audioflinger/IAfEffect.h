@@ -307,7 +307,7 @@ class IAfEffectHandle : public virtual RefBase {
 public:
     static sp<IAfEffectHandle> create(
             const sp<IAfEffectBase>& effect,
-            const sp<RefBase /*AudioFlinger::Client */>& client,  // TODO(b/288339104) type
+            const sp<Client>& client,
             const sp<media::IEffectClient>& effectClient,
             int32_t priority, bool notifyFramesProcessed);
 
@@ -316,8 +316,7 @@ public:
     virtual int id() const = 0;
     virtual wp<IAfEffectBase> effect() const = 0;
     virtual sp<android::media::IEffect> asIEffect() = 0;
-    // TODO(b/288339104) type
-    virtual sp<RefBase /* AudioFlinger::Client */> client() const = 0;
+    virtual const sp<Client>& client() const = 0;
 
 private:
     virtual void setControl(bool hasControl, bool signal, bool enabled) = 0;

@@ -1029,7 +1029,7 @@ NO_THREAD_SAFETY_ANALYSIS  // conditional try lock
     return NO_ERROR;
 }
 
-sp<AudioFlinger::Client> AudioFlinger::registerPid(pid_t pid)
+sp<Client> AudioFlinger::registerPid(pid_t pid)
 {
     Mutex::Autolock _cl(mClientLock);
     // If pid is already in the mClients wp<> map, then use that entry
@@ -2311,19 +2311,19 @@ sp<AudioFlinger::ThreadBase> AudioFlinger::getEffectThread_l(audio_session_t ses
 
 // ----------------------------------------------------------------------------
 
-AudioFlinger::Client::Client(const sp<AudioFlinger>& audioFlinger, pid_t pid)
+Client::Client(const sp<AudioFlinger>& audioFlinger, pid_t pid)
     :   RefBase(),
         mAudioFlinger(audioFlinger),
         mPid(pid),
         mClientAllocator(AllocatorFactory::getClientAllocator()) {}
 
 // Client destructor must be called with AudioFlinger::mClientLock held
-AudioFlinger::Client::~Client()
+Client::~Client()
 {
     mAudioFlinger->removeClient_l(mPid);
 }
 
-AllocatorFactory::ClientAllocator& AudioFlinger::Client::allocator()
+AllocatorFactory::ClientAllocator& Client::allocator()
 {
     return mClientAllocator;
 }
