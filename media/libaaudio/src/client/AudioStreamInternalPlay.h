@@ -21,7 +21,6 @@
 #include <aaudio/AAudio.h>
 
 #include "binding/AAudioServiceInterface.h"
-#include "client/AAudioFlowGraph.h"
 #include "client/AudioStreamInternal.h"
 
 using android::sp;
@@ -89,12 +88,10 @@ private:
      * Asynchronous write with data conversion.
      * @param buffer
      * @param numFrames
-     * @return fdrames written or negative error
+     * @return frames written or negative error
      */
     aaudio_result_t writeNowWithConversion(const void *buffer,
                                            int32_t numFrames);
-
-    AAudioFlowGraph          mFlowGraph;
 
 };
 

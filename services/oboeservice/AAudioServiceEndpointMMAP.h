@@ -97,7 +97,7 @@ public:
 
 private:
 
-    aaudio_result_t openWithFormat(audio_format_t audioFormat, audio_format_t* nextFormatToTry);
+    aaudio_result_t openWithConfig(audio_config_base_t* config);
 
     aaudio_result_t createMmapBuffer();
 

@@ -32,6 +32,8 @@ public:
                                         bool inService = false);
     virtual ~AudioStreamInternalCapture() = default;
 
+    aaudio_result_t open(const AudioStreamBuilder &builder) override;
+
     aaudio_result_t read(void *buffer,
                          int32_t numFrames,
                          int64_t timeoutNanoseconds) override;

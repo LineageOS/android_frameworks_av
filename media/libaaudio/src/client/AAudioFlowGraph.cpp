@@ -39,18 +39,21 @@ using namespace FLOWGRAPH_OUTER_NAMESPACE::flowgraph;
 
 aaudio_result_t AAudioFlowGraph::configure(audio_format_t sourceFormat,
                           int32_t sourceChannelCount,
+                          int32_t sourceSampleRate,
                           audio_format_t sinkFormat,
                           int32_t sinkChannelCount,
+                          int32_t sinkSampleRate,
                           bool useMonoBlend,
+                          bool useVolumeRamps,
                           float audioBalance,
-                          bool isExclusive) {
+                          aaudio::resampler::MultiChannelResampler::Quality resamplerQuality) {
     FlowGraphPortFloatOutput *lastOutput = nullptr;
 
-    // TODO change back to ALOGD
-    ALOGI("%s() source format = 0x%08x, channels = %d, sink format = 0x%08x, channels = %d, "
-          "useMonoBlend = %d, audioBalance = %f, isExclusive %d",
-          __func__, sourceFormat, sourceChannelCount, sinkFormat, sinkChannelCount,
-          useMonoBlend, audioBalance, isExclusive);
+    ALOGD("%s() source format = 0x%08x, channels = %d, sample rate = %d, "
+          "sink format = 0x%08x, channels = %d, sample rate = %d, "
+          "useMonoBlend = %d, audioBalance = %f, useVolumeRamps %d",
+          __func__, sourceFormat, sourceChannelCount, sourceSampleRate, sinkFormat,
+          sinkChannelCount, sinkSampleRate, useMonoBlend, audioBalance, useVolumeRamps);
 
     switch (sourceFormat) {
         case AUDIO_FORMAT_PCM_FLOAT:
@@ -85,6 +88,15 @@ aaudio_result_t AAudioFlowGraph::configure(audio_format_t sourceFormat,
         lastOutput = &mLimiter->output;
     }
 
+    if (sourceSampleRate != sinkSampleRate) {
+        mResampler.reset(aaudio::resampler::MultiChannelResampler::make(sinkChannelCount,
+                sourceSampleRate, sinkSampleRate, resamplerQuality));
+        mRateConverter = std::make_unique<SampleRateConverter>(sinkChannelCount,
+                                                               *mResampler);
+        lastOutput->connect(&mRateConverter->input);
+        lastOutput = &mRateConverter->output;
+    }
+
     // Expand the number of channels if required.
     if (sourceChannelCount == 1 && sinkChannelCount > 1) {
         mChannelConverter = std::make_unique<MonoToMultiConverter>(sinkChannelCount);
@@ -95,8 +107,7 @@ aaudio_result_t AAudioFlowGraph::configure(audio_format_t sourceFormat,
         return AAUDIO_ERROR_UNIMPLEMENTED;
     }
 
-    // Apply volume ramps for only exclusive streams.
-    if (isExclusive) {
+    if (useVolumeRamps) {
         // Apply volume ramps to set the left/right audio balance and target volumes.
         // The signals will be decoupled, volume ramps will be applied, before the signals are
         // combined again.
@@ -137,9 +148,14 @@ aaudio_result_t AAudioFlowGraph::configure(audio_format_t sourceFormat,
     return AAUDIO_OK;
 }
 
-void AAudioFlowGraph::process(const void *source, void *destination, int32_t numFrames) {
-    mSource->setData(source, numFrames);
-    mSink->read(destination, numFrames);
+int32_t AAudioFlowGraph::pull(void *destination, int32_t targetFramesToRead) {
+    return mSink->read(destination, targetFramesToRead);
+}
+
+int32_t AAudioFlowGraph::process(const void *source, int32_t numFramesToWrite, void *destination,
+                    int32_t targetFramesToRead) {
+    mSource->setData(source, numFramesToWrite);
+    return mSink->read(destination, targetFramesToRead);
 }
 
 /**

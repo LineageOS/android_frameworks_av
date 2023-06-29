@@ -204,8 +204,16 @@ public:
         return mBufferCapacity;
     }
 
+    virtual int32_t getDeviceBufferCapacity() const {
+        return mDeviceBufferCapacity;
+    }
+
     virtual int32_t getFramesPerBurst() const {
         return mFramesPerBurst;
+    }
+
+    virtual int32_t getDeviceFramesPerBurst() const {
+        return mDeviceFramesPerBurst;
     }
 
     virtual int32_t getXRunCount() const {
@@ -222,6 +230,10 @@ public:
 
     aaudio_result_t getSampleRate() const {
         return mSampleRate;
+    }
+
+    aaudio_result_t getDeviceSampleRate() const {
+        return mDeviceSampleRate;
     }
 
     aaudio_result_t getHardwareSampleRate() const {
@@ -542,6 +554,11 @@ protected:
     }
 
     // This should not be called after the open() call.
+    void setDeviceSampleRate(int32_t deviceSampleRate) {
+        mDeviceSampleRate = deviceSampleRate;
+    }
+
+    // This should not be called after the open() call.
     void setHardwareSampleRate(int32_t hardwareSampleRate) {
         mHardwareSampleRate = hardwareSampleRate;
     }
@@ -552,8 +569,18 @@ protected:
     }
 
     // This should not be called after the open() call.
+    void setDeviceFramesPerBurst(int32_t deviceFramesPerBurst) {
+        mDeviceFramesPerBurst = deviceFramesPerBurst;
+    }
+
+    // This should not be called after the open() call.
     void setBufferCapacity(int32_t bufferCapacity) {
         mBufferCapacity = bufferCapacity;
+    }
+
+    // This should not be called after the open() call.
+    void setDeviceBufferCapacity(int32_t deviceBufferCapacity) {
+        mDeviceBufferCapacity = deviceBufferCapacity;
     }
 
     // This should not be called after the open() call.
@@ -724,6 +751,7 @@ private:
     int32_t                     mHardwareSamplesPerFrame = AAUDIO_UNSPECIFIED;
     aaudio_channel_mask_t       mChannelMask = AAUDIO_UNSPECIFIED;
     int32_t                     mSampleRate = AAUDIO_UNSPECIFIED;
+    int32_t                     mDeviceSampleRate = AAUDIO_UNSPECIFIED;
     int32_t                     mHardwareSampleRate = AAUDIO_UNSPECIFIED;
     int32_t                     mDeviceId = AAUDIO_UNSPECIFIED;
     aaudio_sharing_mode_t       mSharingMode = AAUDIO_SHARING_MODE_SHARED;
@@ -732,7 +760,9 @@ private:
     audio_format_t              mHardwareFormat = AUDIO_FORMAT_DEFAULT;
     aaudio_performance_mode_t   mPerformanceMode = AAUDIO_PERFORMANCE_MODE_NONE;
     int32_t                     mFramesPerBurst = 0;
+    int32_t                     mDeviceFramesPerBurst = 0;
     int32_t                     mBufferCapacity = 0;
+    int32_t                     mDeviceBufferCapacity = 0;
 
     aaudio_usage_t              mUsage           = AAUDIO_UNSPECIFIED;
     aaudio_content_type_t       mContentType     = AAUDIO_UNSPECIFIED;

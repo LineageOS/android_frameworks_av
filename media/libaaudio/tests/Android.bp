@@ -145,6 +145,7 @@ cc_test {
     srcs: ["test_flowgraph.cpp"],
     shared_libs: [
         "libaaudio_internal",
+        "libaudioutils",
         "libbinder",
         "libcutils",
         "libutils",

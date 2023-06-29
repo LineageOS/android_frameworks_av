@@ -25,6 +25,8 @@
 
 #include <gtest/gtest.h>
 
+#include <aaudio/AAudio.h>
+#include "client/AAudioFlowGraph.h"
 #include "flowgraph/ClipToRange.h"
 #include "flowgraph/Limiter.h"
 #include "flowgraph/MonoBlend.h"
@@ -37,8 +39,18 @@
 #include "flowgraph/SinkI32.h"
 #include "flowgraph/SourceI16.h"
 #include "flowgraph/SourceI24.h"
+#include "flowgraph/resampler/IntegerRatio.h"
 
 using namespace FLOWGRAPH_OUTER_NAMESPACE::flowgraph;
+using namespace RESAMPLER_OUTER_NAMESPACE::resampler;
+
+using TestFlowgraphResamplerParams = std::tuple<int32_t, int32_t, MultiChannelResampler::Quality>;
+
+enum {
+    PARAM_SOURCE_SAMPLE_RATE = 0,
+    PARAM_SINK_SAMPLE_RATE,
+    PARAM_RESAMPLER_QUALITY
+};
 
 constexpr int kBytesPerI24Packed = 3;
 
@@ -394,3 +406,240 @@ TEST(test_flowgraph, module_limiter_nan) {
         EXPECT_NEAR(expected[i], output[i], tolerance);
     }
 }
+
+TEST(test_flowgraph, module_sinki16_multiple_reads) {
+    static constexpr int kNumSamples = 8;
+    std::array<int16_t, kNumSamples + 10> output; // larger than input
+
+    SourceFloat sourceFloat{1};
+    SinkI16 sinkI16{1};
+
+    sourceFloat.setData(kInputFloat.data(), kNumSamples);
+    sourceFloat.output.connect(&sinkI16.input);
+
+    output.fill(777);
+
+    // Read the first half of the data
+    int32_t numRead = sinkI16.read(output.data(), kNumSamples / 2);
+    ASSERT_EQ(kNumSamples / 2, numRead);
+    for (int i = 0; i < numRead; i++) {
+        EXPECT_EQ(kExpectedI16.at(i), output.at(i)) << ", i = " << i;
+    }
+
+    // Read the rest of the data
+    numRead = sinkI16.read(output.data(), output.size());
+    ASSERT_EQ(kNumSamples / 2, numRead);
+    for (int i = 0; i < numRead; i++) {
+        EXPECT_EQ(kExpectedI16.at(i + kNumSamples / 2), output.at(i)) << ", i = " << i;
+    }
+}
+
+void checkSampleRateConversionVariedSizes(int32_t sourceSampleRate,
+                    int32_t sinkSampleRate,
+                    MultiChannelResampler::Quality resamplerQuality) {
+    AAudioFlowGraph flowgraph;
+    aaudio_result_t result = flowgraph.configure(AUDIO_FORMAT_PCM_FLOAT /* sourceFormat */,
+            1 /* sourceChannelCount */,
+            sourceSampleRate,
+            AUDIO_FORMAT_PCM_FLOAT /* sinkFormat */,
+            1 /* sinkChannelCount */,
+            sinkSampleRate,
+            false /* useMonoBlend */,
+            false /* useVolumeRamps */,
+            0.0f /* audioBalance */,
+            resamplerQuality);
+
+    IntegerRatio ratio(sourceSampleRate, sinkSampleRate);
+    ratio.reduce();
+
+    ASSERT_EQ(AAUDIO_OK, result);
+
+    const int inputSize = ratio.getNumerator();
+    const int outputSize = ratio.getDenominator();
+    float input[inputSize];
+    float output[outputSize];
+
+    for (int i = 0; i < inputSize; i++) {
+        input[i] = i * 1.0f / inputSize;
+    }
+
+    int inputUsed = 0;
+    int outputRead = 0;
+    int curInputSize = 1;
+
+    // Process the data with larger and larger input buffer sizes.
+    while (inputUsed < inputSize) {
+        outputRead += flowgraph.process((void *) (input + inputUsed),
+                curInputSize,
+                (void *) (output + outputRead),
+                outputSize - outputRead);
+        inputUsed += curInputSize;
+        curInputSize = std::min(curInputSize + 5, inputSize - inputUsed);
+    }
+
+    ASSERT_EQ(outputSize, outputRead);
+
+    for (int i = 1; i < outputSize; i++) {
+        // The first values of the flowgraph will be close to zero.
+        // Besides those, the values should be strictly increasing.
+        if (output[i - 1] > 0.01f) {
+            EXPECT_GT(output[i], output[i - 1]);
+        }
+    }
+}
+
+TEST(test_flowgraph, flowgraph_varied_sizes_all) {
+    const int rates[] = {8000, 11025, 22050, 32000, 44100, 48000, 64000, 88200, 96000};
+    const MultiChannelResampler::Quality qualities[] =
+    {
+        MultiChannelResampler::Quality::Fastest,
+        MultiChannelResampler::Quality::Low,
+        MultiChannelResampler::Quality::Medium,
+        MultiChannelResampler::Quality::High,
+        MultiChannelResampler::Quality::Best
+    };
+    for (int srcRate : rates) {
+        for (int destRate : rates) {
+            for (auto quality : qualities) {
+                if (srcRate != destRate) {
+                    checkSampleRateConversionVariedSizes(srcRate, destRate, quality);
+                }
+            }
+        }
+    }
+}
+
+void checkSampleRateConversionPullLater(int32_t sourceSampleRate,
+                    int32_t sinkSampleRate,
+                    MultiChannelResampler::Quality resamplerQuality) {
+    AAudioFlowGraph flowgraph;
+    aaudio_result_t result = flowgraph.configure(AUDIO_FORMAT_PCM_FLOAT /* sourceFormat */,
+            1 /* sourceChannelCount */,
+            sourceSampleRate,
+            AUDIO_FORMAT_PCM_FLOAT /* sinkFormat */,
+            1 /* sinkChannelCount */,
+            sinkSampleRate,
+            false /* useMonoBlend */,
+            false /* useVolumeRamps */,
+            0.0f /* audioBalance */,
+            resamplerQuality);
+
+    IntegerRatio ratio(sourceSampleRate, sinkSampleRate);
+    ratio.reduce();
+
+    ASSERT_EQ(AAUDIO_OK, result);
+
+    const int inputSize = ratio.getNumerator();
+    const int outputSize = ratio.getDenominator();
+    float input[inputSize];
+    float output[outputSize];
+
+    for (int i = 0; i < inputSize; i++) {
+        input[i] = i * 1.0f / inputSize;
+    }
+
+    // Read half the data with process.
+    int outputRead = flowgraph.process((void *) input,
+            inputSize,
+            (void *) output,
+            outputSize / 2);
+
+    ASSERT_EQ(outputSize / 2, outputRead);
+
+    // Now read the other half of the data with pull.
+    outputRead += flowgraph.pull(
+            (void *) (output + outputRead),
+            outputSize - outputRead);
+
+    ASSERT_EQ(outputSize, outputRead);
+    for (int i = 1; i < outputSize; i++) {
+        // The first values of the flowgraph will be close to zero.
+        // Besides those, the values should be strictly increasing.
+        if (output[i - 1] > 0.01f) {
+            EXPECT_GT(output[i], output[i - 1]);
+        }
+    }
+}
+
+// TODO: b/289508408 - Remove non-parameterized tests if they get noisy.
+TEST(test_flowgraph, flowgraph_pull_later_all) {
+    const int rates[] = {8000, 11025, 22050, 32000, 44100, 48000, 64000, 88200, 96000};
+    const MultiChannelResampler::Quality qualities[] =
+    {
+        MultiChannelResampler::Quality::Fastest,
+        MultiChannelResampler::Quality::Low,
+        MultiChannelResampler::Quality::Medium,
+        MultiChannelResampler::Quality::High,
+        MultiChannelResampler::Quality::Best
+    };
+    for (int srcRate : rates) {
+        for (int destRate : rates) {
+            for (auto quality : qualities) {
+                if (srcRate != destRate) {
+                    checkSampleRateConversionPullLater(srcRate, destRate, quality);
+                }
+            }
+        }
+    }
+}
+
+class TestFlowgraphSampleRateConversion : public ::testing::Test,
+                        public ::testing::WithParamInterface<TestFlowgraphResamplerParams> {
+};
+
+const char* resamplerQualityToString(MultiChannelResampler::Quality quality) {
+    switch (quality) {
+        case MultiChannelResampler::Quality::Fastest: return "FASTEST";
+        case MultiChannelResampler::Quality::Low: return "LOW";
+        case MultiChannelResampler::Quality::Medium: return "MEDIUM";
+        case MultiChannelResampler::Quality::High: return "HIGH";
+        case MultiChannelResampler::Quality::Best: return "BEST";
+    }
+    return "UNKNOWN";
+}
+
+static std::string getTestName(
+        const ::testing::TestParamInfo<TestFlowgraphResamplerParams>& info) {
+    return std::string()
+            + std::to_string(std::get<PARAM_SOURCE_SAMPLE_RATE>(info.param))
+            + "__" + std::to_string(std::get<PARAM_SINK_SAMPLE_RATE>(info.param))
+            + "__" + resamplerQualityToString(std::get<PARAM_RESAMPLER_QUALITY>(info.param));
+}
+
+TEST_P(TestFlowgraphSampleRateConversion, test_flowgraph_pull_later) {
+    checkSampleRateConversionPullLater(std::get<PARAM_SOURCE_SAMPLE_RATE>(GetParam()),
+            std::get<PARAM_SINK_SAMPLE_RATE>(GetParam()),
+            std::get<PARAM_RESAMPLER_QUALITY>(GetParam()));
+}
+
+TEST_P(TestFlowgraphSampleRateConversion, test_flowgraph_varied_sizes) {
+    checkSampleRateConversionVariedSizes(std::get<PARAM_SOURCE_SAMPLE_RATE>(GetParam()),
+            std::get<PARAM_SINK_SAMPLE_RATE>(GetParam()),
+            std::get<PARAM_RESAMPLER_QUALITY>(GetParam()));
+}
+
+INSTANTIATE_TEST_SUITE_P(
+        test_flowgraph,
+        TestFlowgraphSampleRateConversion,
+        ::testing::Values(
+                TestFlowgraphResamplerParams({8000, 11025, MultiChannelResampler::Quality::Best}),
+                TestFlowgraphResamplerParams({8000, 48000, MultiChannelResampler::Quality::Best}),
+                TestFlowgraphResamplerParams({8000, 44100, MultiChannelResampler::Quality::Best}),
+                TestFlowgraphResamplerParams({11025, 24000, MultiChannelResampler::Quality::Best}),
+                TestFlowgraphResamplerParams({11025, 48000,
+                        MultiChannelResampler::Quality::Fastest}),
+                TestFlowgraphResamplerParams({11025, 48000, MultiChannelResampler::Quality::Low}),
+                TestFlowgraphResamplerParams({11025, 48000,
+                        MultiChannelResampler::Quality::Medium}),
+                TestFlowgraphResamplerParams({11025, 48000, MultiChannelResampler::Quality::High}),
+                TestFlowgraphResamplerParams({11025, 48000, MultiChannelResampler::Quality::Best}),
+                TestFlowgraphResamplerParams({11025, 44100, MultiChannelResampler::Quality::Best}),
+                TestFlowgraphResamplerParams({11025, 88200, MultiChannelResampler::Quality::Best}),
+                TestFlowgraphResamplerParams({16000, 48000, MultiChannelResampler::Quality::Best}),
+                TestFlowgraphResamplerParams({44100, 48000, MultiChannelResampler::Quality::Low}),
+                TestFlowgraphResamplerParams({44100, 48000, MultiChannelResampler::Quality::Best}),
+                TestFlowgraphResamplerParams({48000, 11025, MultiChannelResampler::Quality::Best}),
+                TestFlowgraphResamplerParams({48000, 44100, MultiChannelResampler::Quality::Best}),
+                TestFlowgraphResamplerParams({44100, 11025, MultiChannelResampler::Quality::Best})),
+        &getTestName
+);

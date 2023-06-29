@@ -30,6 +30,7 @@
 #include <flowgraph/MonoToMultiConverter.h>
 #include <flowgraph/MultiToManyConverter.h>
 #include <flowgraph/RampLinear.h>
+#include <flowgraph/SampleRateConverter.h>
 
 class AAudioFlowGraph {
 public:
@@ -38,23 +39,57 @@ public:
      *
      * @param sourceFormat
      * @param sourceChannelCount
+     * @param sourceSampleRate
      * @param sinkFormat
      * @param sinkChannelCount
+     * @param sinkSampleRate
      * @param useMonoBlend
+     * @param useVolumeRamps
      * @param audioBalance
-     * @param channelMask
-     * @param isExclusive
+     * @param resamplerQuality
      * @return
      */
     aaudio_result_t configure(audio_format_t sourceFormat,
                               int32_t sourceChannelCount,
+                              int32_t sourceSampleRate,
                               audio_format_t sinkFormat,
                               int32_t sinkChannelCount,
+                              int32_t sinkSampleRate,
                               bool useMonoBlend,
+                              bool useVolumeRamps,
                               float audioBalance,
-                              bool isExclusive);
+                              aaudio::resampler::MultiChannelResampler::Quality resamplerQuality);
 
-    void process(const void *source, void *destination, int32_t numFrames);
+    /**
+     * Attempt to read targetFramesToRead from the flowgraph.
+     * This function returns the number of frames actually read.
+     *
+     * This function does nothing if process() was not called before.
+     *
+     * @param destination
+     * @param targetFramesToRead
+     * @return numFramesRead
+     */
+    int32_t pull(void *destination, int32_t targetFramesToRead);
+
+    /**
+     * Set numFramesToWrite frames from the source into the flowgraph.
+     * Then, attempt to read targetFramesToRead from the flowgraph.
+     * This function returns the number of frames actually read.
+     *
+     * There may be data still in the flowgraph if targetFramesToRead is not large enough.
+     * Before calling process() again, pull() must be called until until all the data is consumed.
+     *
+     * TODO: b/289510598 - Calculate the exact number of input frames needed for Y output frames.
+     *
+     * @param source
+     * @param numFramesToWrite
+     * @param destination
+     * @param targetFramesToRead
+     * @return numFramesRead
+     */
+    int32_t process(const void *source, int32_t numFramesToWrite, void *destination,
+                    int32_t targetFramesToRead);
 
     /**
      * @param volume between 0.0 and 1.0
@@ -73,6 +108,8 @@ public:
 
 private:
     std::unique_ptr<FLOWGRAPH_OUTER_NAMESPACE::flowgraph::FlowGraphSourceBuffered> mSource;
+    std::unique_ptr<RESAMPLER_OUTER_NAMESPACE::resampler::MultiChannelResampler> mResampler;
+    std::unique_ptr<FLOWGRAPH_OUTER_NAMESPACE::flowgraph::SampleRateConverter> mRateConverter;
     std::unique_ptr<FLOWGRAPH_OUTER_NAMESPACE::flowgraph::MonoBlend> mMonoBlend;
     std::unique_ptr<FLOWGRAPH_OUTER_NAMESPACE::flowgraph::Limiter> mLimiter;
     std::unique_ptr<FLOWGRAPH_OUTER_NAMESPACE::flowgraph::MonoToMultiConverter> mChannelConverter;
