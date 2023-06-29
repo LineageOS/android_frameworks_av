@@ -1534,7 +1534,7 @@ status_t AudioFlinger::PlaybackThread::checkEffectCompatibility_l(
 
 // ThreadBase::createEffect_l() must be called with AudioFlinger::mLock held
 sp<IAfEffectHandle> AudioFlinger::ThreadBase::createEffect_l(
-        const sp<AudioFlinger::Client>& client,
+        const sp<Client>& client,
         const sp<IEffectClient>& effectClient,
         int32_t priority,
         audio_session_t sessionId,
@@ -2298,7 +2298,7 @@ void AudioFlinger::PlaybackThread::dumpInternals_l(int fd, const Vector<String16
 
 // PlaybackThread::createTrack_l() must be called with AudioFlinger::mLock held
 sp<AudioFlinger::PlaybackThread::Track> AudioFlinger::PlaybackThread::createTrack_l(
-        const sp<AudioFlinger::Client>& client,
+        const sp<Client>& client,
         audio_stream_type_t streamType,
         const audio_attributes_t& attr,
         uint32_t *pSampleRate,
@@ -8580,7 +8580,7 @@ void AudioFlinger::RecordThread::inputStandBy()
 
 // RecordThread::createRecordTrack_l() must be called with AudioFlinger::mLock held
 sp<AudioFlinger::RecordThread::RecordTrack> AudioFlinger::RecordThread::createRecordTrack_l(
-        const sp<AudioFlinger::Client>& client,
+        const sp<Client>& client,
         const audio_attributes_t& attr,
         uint32_t *pSampleRate,
         audio_format_t format,
@@ -8878,7 +8878,7 @@ void AudioFlinger::RecordThread::syncStartEventCallback(const wp<audioflinger::S
     sp<audioflinger::SyncEvent> strongEvent = event.promote();
 
     if (strongEvent != 0) {
-        sp<RefBase> ptr = strongEvent->cookie().promote();
+        sp<RefBase> ptr = std::any_cast<const wp<RefBase>>(strongEvent->cookie()).promote();
         if (ptr != 0) {
             RecordTrack *recordTrack = (RecordTrack *)ptr.get();
             recordTrack->handleSyncStartEvent(strongEvent);
