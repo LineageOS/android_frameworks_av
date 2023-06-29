@@ -1917,7 +1917,6 @@ void AudioPolicyService::OpRecordAudioMonitor::onFirstRef()
     // since it controls the mic permission for legacy apps.
     mAppOpsManager.startWatchingMode(mAppOp, VALUE_OR_FATAL(aidl2legacy_string_view_String16(
         mAttributionSource.packageName.value_or(""))),
-        AppOpsManager::WATCH_FOREGROUND_CHANGES,
         mOpCallback);
 }
 
