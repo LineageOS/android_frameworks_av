@@ -1253,7 +1253,7 @@ void MediaCodec::resetMetricsFields() {
 
 void MediaCodec::updateMediametrics() {
     if (mMetricsHandle == 0) {
-        ALOGW("no metrics handle found");
+        ALOGV("no metrics handle found");
         return;
     }
 
@@ -1615,7 +1615,7 @@ static void reportToMediaMetricsIfValid(const JudderEvent &e) {
 }
 
 void MediaCodec::flushMediametrics() {
-    ALOGD("flushMediametrics");
+    ALOGV("flushMediametrics");
 
     // update does its own mutex locking
     updateMediametrics();
