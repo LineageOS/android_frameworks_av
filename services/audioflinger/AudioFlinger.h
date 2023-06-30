@@ -74,6 +74,7 @@
 #include <media/DeviceDescriptorBase.h>
 #include <media/ExtendedAudioBufferProvider.h>
 #include <media/VolumeShaper.h>
+#include <mediautils/BatteryNotifier.h>
 #include <mediautils/ServiceUtilities.h>
 #include <mediautils/SharedMemoryAllocator.h>
 #include <mediautils/Synchronization.h>
