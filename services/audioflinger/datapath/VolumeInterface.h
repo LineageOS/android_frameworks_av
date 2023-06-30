@@ -23,6 +23,7 @@ namespace android {
 class VolumeInterface : public virtual RefBase {
 public:
     virtual void setMasterVolume(float value) = 0;
+    virtual void setMasterBalance(float balance) = 0;
     virtual void setMasterMute(bool muted) = 0;
     virtual void setStreamVolume(audio_stream_type_t stream, float value) = 0;
     virtual void setStreamMute(audio_stream_type_t stream, bool muted) = 0;
