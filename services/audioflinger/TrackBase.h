@@ -270,6 +270,23 @@ public:
     /** Set that a metadata has changed and needs to be notified to backend. Thread safe. */
     void setMetadataHasChanged() { mChangeNotified.clear(); }
 
+    /**
+     * Called when a track moves to active state to record its contribution to battery usage.
+     * Track state transitions should eventually be handled within the track class.
+     */
+    void beginBatteryAttribution() {
+        mBatteryStatsHolder.emplace(uid());
+    }
+
+    /**
+     * Called when a track moves out of the active state to record its contribution
+     * to battery usage.
+     */
+    void endBatteryAttribution() {
+        mBatteryStatsHolder.reset();
+    }
+
+
 protected:
     DISALLOW_COPY_AND_ASSIGN(TrackBase);
 
@@ -412,6 +429,8 @@ protected:
 
     // If the last track change was notified to the client with readAndClearHasChanged
     std::atomic_flag    mChangeNotified = ATOMIC_FLAG_INIT;
+    // RAII object for battery stats book-keeping
+    std::optional<mediautils::BatteryStatsAudioHandle> mBatteryStatsHolder;
 };
 
 // PatchProxyBufferProvider interface is implemented by PatchTrack and PatchRecord.
