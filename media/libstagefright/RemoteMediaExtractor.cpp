@@ -102,7 +102,12 @@ static std::list<sp<DataSource>> pending;
 static std::mutex pending_mutex;
 static std::condition_variable pending_added;
 
-static void* closing_thread_func(void *arg) {
+static void* closingThreadWorker(void *arg) {
+    // simplifies debugging to name the thread
+    if (pthread_setname_np(pthread_self(), "mediaCloser")) {
+        ALOGW("Failed to set thread name on thread for closing data sources");
+    }
+
     while (true) {
         sp<DataSource> ds = nullptr;
         std::unique_lock _lk(pending_mutex);
@@ -124,7 +129,7 @@ static void* closing_thread_func(void *arg) {
 
 // this can be '&ds' as long as the pending.push_back() bumps the
 // reference counts to ensure the object lives long enough
-static void start_close_thread(sp<DataSource> &ds) {
+static void asyncDataSourceClose(sp<DataSource> &ds) {
 
     // make sure we have our (single) worker thread
     static std::once_flag sCheckOnce;
@@ -132,7 +137,7 @@ static void start_close_thread(sp<DataSource> &ds) {
         pthread_attr_t attr;
         pthread_attr_init(&attr);
         pthread_attr_setdetachstate(&attr, PTHREAD_CREATE_JOINABLE);
-        pthread_create(&myThread, &attr, closing_thread_func, nullptr);
+        pthread_create(&myThread, &attr, closingThreadWorker, nullptr);
         pthread_attr_destroy(&attr);
     });
 
@@ -149,7 +154,7 @@ RemoteMediaExtractor::~RemoteMediaExtractor() {
     int8_t new_scheme = property_get_bool("debug.mediaextractor.delayedclose", 1);
     if (new_scheme != 0) {
         ALOGV("deferred close()");
-        start_close_thread(mSource);
+        asyncDataSourceClose(mSource);
         mSource.clear();
     } else {
         ALOGV("immediate close()");
