@@ -52,20 +52,19 @@ using utils::EffectParamWriter;
  */
 status_t AidlConversionVendorExtension::setParameter(EffectParamReader& param) {
     Parameter aidlParam = VALUE_OR_RETURN_STATUS(
-            ::aidl::android::legacy2aidl_EffectParameterReader_ParameterExtension(param));
+            ::aidl::android::legacy2aidl_EffectParameterReader_Parameter(param));
     return statusTFromBinderStatus(mEffect->setParameter(aidlParam));
 }
 
 status_t AidlConversionVendorExtension::getParameter(EffectParamWriter& param) {
     VendorExtension extId = VALUE_OR_RETURN_STATUS(
-            aidl::android::legacy2aidl_EffectParameterReader_Param_VendorExtension(param));
+            aidl::android::legacy2aidl_EffectParameterReader_VendorExtension(param));
     Parameter::Id id = UNION_MAKE(Parameter::Id, vendorEffectTag, extId);
     Parameter aidlParam;
     RETURN_STATUS_IF_ERROR(statusTFromBinderStatus(mEffect->getParameter(id, &aidlParam)));
     // copy the AIDL extension data back to effect_param_t
     return VALUE_OR_RETURN_STATUS(
-            ::aidl::android::aidl2legacy_ParameterExtension_EffectParameterWriter(aidlParam,
-                                                                                  param));
+            ::aidl::android::aidl2legacy_Parameter_EffectParameterWriter(aidlParam, param));
 }
 
 } // namespace effect
