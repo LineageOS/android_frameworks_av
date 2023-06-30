@@ -571,13 +571,15 @@ AAUDIO_API int32_t AAudioStream_getSessionId(AAudioStream* stream)
 AAUDIO_API int64_t AAudioStream_getFramesWritten(AAudioStream* stream)
 {
     AudioStream *audioStream = convertAAudioStreamToAudioStream(stream);
-    return audioStream->getFramesWritten();
+    return audioStream->getFramesWritten() * audioStream->getSampleRate() /
+            audioStream->getDeviceSampleRate();
 }
 
 AAUDIO_API int64_t AAudioStream_getFramesRead(AAudioStream* stream)
 {
     AudioStream *audioStream = convertAAudioStreamToAudioStream(stream);
-    return audioStream->getFramesRead();
+    return audioStream->getFramesRead() * audioStream->getSampleRate() /
+            audioStream->getDeviceSampleRate();
 }
 
 AAUDIO_API aaudio_result_t AAudioStream_getTimestamp(AAudioStream* stream,

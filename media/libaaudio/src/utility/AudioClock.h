@@ -33,7 +33,7 @@ class AudioClock {
 public:
     static int64_t getNanoseconds(clockid_t clockId = CLOCK_MONOTONIC) {
         struct timespec time;
-        int result = clock_gettime(clockId, &time);
+        const int result = clock_gettime(clockId, &time);
         if (result < 0) {
             return -errno;
         }
@@ -56,7 +56,7 @@ public:
             time.tv_sec = nanoTime / AAUDIO_NANOS_PER_SECOND;
             // Calculate the fractional nanoseconds. Avoids expensive % operation.
             time.tv_nsec = nanoTime - (time.tv_sec * AAUDIO_NANOS_PER_SECOND);
-            int err = clock_nanosleep(clockId, TIMER_ABSTIME, &time, nullptr);
+            const int err = clock_nanosleep(clockId, TIMER_ABSTIME, &time, nullptr);
             switch (err) {
             case EINTR:
                 return 1;
@@ -86,7 +86,7 @@ public:
             // Calculate the fractional nanoseconds. Avoids expensive % operation.
             time.tv_nsec = nanoseconds - (time.tv_sec * AAUDIO_NANOS_PER_SECOND);
             const int flags = 0; // documented as relative sleep
-            int err = clock_nanosleep(clockId, flags, &time, nullptr);
+            const int err = clock_nanosleep(clockId, flags, &time, nullptr);
             switch (err) {
             case EINTR:
                 return 1;

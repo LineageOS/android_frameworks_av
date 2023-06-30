@@ -22,8 +22,9 @@
 
 #include "binding/AudioEndpointParcelable.h"
 #include "binding/AAudioServiceInterface.h"
-#include "client/IsochronousClockModel.h"
+#include "client/AAudioFlowGraph.h"
 #include "client/AudioEndpoint.h"
+#include "client/IsochronousClockModel.h"
 #include "core/AudioStream.h"
 #include "utility/AudioClock.h"
 
@@ -56,7 +57,11 @@ public:
 
     int32_t getBufferSize() const override;
 
+    int32_t getDeviceBufferSize() const;
+
     int32_t getBufferCapacity() const override;
+
+    int32_t getDeviceBufferCapacity() const override;
 
     int32_t getXRunCount() const override {
         return mXRunCount;
@@ -177,6 +182,8 @@ protected:
     int64_t                  mLastFramesWritten = 0;
     int64_t                  mLastFramesRead = 0;
 
+    AAudioFlowGraph          mFlowGraph;
+
 private:
     /*
      * Asynchronous write with data conversion.
@@ -211,8 +218,9 @@ private:
     int32_t                  mDeviceChannelCount = 0;
 
     int32_t                  mBufferSizeInFrames = 0; // local threshold to control latency
+    int32_t                  mDeviceBufferSizeInFrames = 0;
     int32_t                  mBufferCapacityInFrames = 0;
-
+    int32_t                  mDeviceBufferCapacityInFrames = 0;
 
 };
 
