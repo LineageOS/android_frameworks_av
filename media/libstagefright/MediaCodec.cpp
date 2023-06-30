@@ -1131,7 +1131,7 @@ void MediaCodec::initMediametrics() {
 
 void MediaCodec::updateMediametrics() {
     if (mMetricsHandle == 0) {
-        ALOGW("no metrics handle found");
+        ALOGV("no metrics handle found");
         return;
     }
 
@@ -1375,7 +1375,7 @@ void MediaCodec::updateEphemeralMediametrics(mediametrics_handle_t item) {
 }
 
 void MediaCodec::flushMediametrics() {
-    ALOGD("flushMediametrics");
+    ALOGV("flushMediametrics");
 
     // update does its own mutex locking
     updateMediametrics();
