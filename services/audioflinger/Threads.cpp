@@ -1858,7 +1858,7 @@ ssize_t AudioFlinger::ThreadBase::ActiveTracks<T>::add(const sp<T> &track) {
     logTrack("add", track);
     mActiveTracksGeneration++;
     mLatestActiveTrack = track;
-    ++mBatteryCounter[track->uid()].second;
+    track->beginBatteryAttribution();
     mHasChanged = true;
     return mActiveTracks.add(track);
 }
@@ -1872,7 +1872,7 @@ ssize_t AudioFlinger::ThreadBase::ActiveTracks<T>::remove(const sp<T> &track) {
     }
     logTrack("remove", track);
     mActiveTracksGeneration++;
-    --mBatteryCounter[track->uid()].second;
+    track->endBatteryAttribution();
     // mLatestActiveTrack is not cleared even if is the same as track.
     mHasChanged = true;
 #ifdef TEE_SINK
@@ -1885,14 +1885,13 @@ ssize_t AudioFlinger::ThreadBase::ActiveTracks<T>::remove(const sp<T> &track) {
 template <typename T>
 void AudioFlinger::ThreadBase::ActiveTracks<T>::clear() {
     for (const sp<T> &track : mActiveTracks) {
-        BatteryNotifier::getInstance().noteStopAudio(track->uid());
+        track->endBatteryAttribution();
         logTrack("clear", track);
     }
     mLastActiveTracksGeneration = mActiveTracksGeneration;
     if (!mActiveTracks.empty()) { mHasChanged = true; }
     mActiveTracks.clear();
     mLatestActiveTrack.clear();
-    mBatteryCounter.clear();
 }
 
 template <typename T>
@@ -1902,27 +1901,6 @@ void AudioFlinger::ThreadBase::ActiveTracks<T>::updatePowerState(
     if (mActiveTracksGeneration != mLastActiveTracksGeneration || force) {
         thread->updateWakeLockUids_l(getWakeLockUids());
         mLastActiveTracksGeneration = mActiveTracksGeneration;
-    }
-
-    // Updates BatteryNotifier uids
-    for (auto it = mBatteryCounter.begin(); it != mBatteryCounter.end();) {
-        const uid_t uid = it->first;
-        ssize_t &previous = it->second.first;
-        ssize_t &current = it->second.second;
-        if (current > 0) {
-            if (previous == 0) {
-                BatteryNotifier::getInstance().noteStartAudio(uid);
-            }
-            previous = current;
-            ++it;
-        } else if (current == 0) {
-            if (previous > 0) {
-                BatteryNotifier::getInstance().noteStopAudio(uid);
-            }
-            it = mBatteryCounter.erase(it); // std::map<> is stable on iterator erase.
-        } else /* (current < 0) */ {
-            LOG_ALWAYS_FATAL("negative battery count %zd", current);
-        }
     }
 }
 

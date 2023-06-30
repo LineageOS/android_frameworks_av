@@ -85,8 +85,8 @@ void BatteryNotifier::noteStartAudio(uid_t uid) {
 
 void BatteryNotifier::noteStopAudio(uid_t uid) {
     Mutex::Autolock _l(mLock);
-    if (mAudioRefCounts.find(uid) == mAudioRefCounts.end()) {
-        ALOGW("%s: audio refcount is broken for uid(%d).", __FUNCTION__, (int)uid);
+    if (mAudioRefCounts.find(uid) == mAudioRefCounts.end() || (mAudioRefCounts[uid] == 0)) {
+        ALOGE("%s: audio refcount is broken for uid(%d).", __FUNCTION__, (int)uid);
         return;
     }
 
