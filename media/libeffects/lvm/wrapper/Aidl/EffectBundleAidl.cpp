@@ -14,21 +14,21 @@
  * limitations under the License.
  */
 
-#include "BundleTypes.h"
-#define LOG_TAG "EffectBundleAidl"
-#include <Utils.h>
 #include <algorithm>
+#include <limits.h>
 #include <unordered_set>
+#define LOG_TAG "EffectBundleAidl"
 
-#include <android-base/logging.h>
-#include <fmq/AidlMessageQueue.h>
 #include <audio_effects/effect_bassboost.h>
 #include <audio_effects/effect_equalizer.h>
 #include <audio_effects/effect_virtualizer.h>
-
-#include "EffectBundleAidl.h"
+#include <android-base/logging.h>
+#include <fmq/AidlMessageQueue.h>
 #include <LVM.h>
-#include <limits.h>
+#include <Utils.h>
+
+#include "BundleTypes.h"
+#include "EffectBundleAidl.h"
 
 using aidl::android::hardware::audio::effect::getEffectImplUuidBassBoostBundle;
 using aidl::android::hardware::audio::effect::Descriptor;
