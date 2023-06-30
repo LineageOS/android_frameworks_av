@@ -1692,20 +1692,20 @@ void AudioFlinger::ThreadBase::onEffectDisable() {
 }
 
 sp<IAfEffectModule> AudioFlinger::ThreadBase::getEffect(audio_session_t sessionId,
-        int effectId)
+        int effectId) const
 {
     Mutex::Autolock _l(mLock);
     return getEffect_l(sessionId, effectId);
 }
 
 sp<IAfEffectModule> AudioFlinger::ThreadBase::getEffect_l(audio_session_t sessionId,
-        int effectId)
+        int effectId) const
 {
     sp<IAfEffectChain> chain = getEffectChain_l(sessionId);
     return chain != 0 ? chain->getEffectFromId_l(effectId) : 0;
 }
 
-std::vector<int> AudioFlinger::ThreadBase::getEffectIds_l(audio_session_t sessionId)
+std::vector<int> AudioFlinger::ThreadBase::getEffectIds_l(audio_session_t sessionId) const
 {
     sp<IAfEffectChain> chain = getEffectChain_l(sessionId);
     return chain != nullptr ? chain->getEffectIds() : std::vector<int>{};
@@ -1796,7 +1796,7 @@ NO_THREAD_SAFETY_ANALYSIS  // calls EffectChain::unlock()
     }
 }
 
-sp<IAfEffectChain> AudioFlinger::ThreadBase::getEffectChain(audio_session_t sessionId)
+sp<IAfEffectChain> AudioFlinger::ThreadBase::getEffectChain(audio_session_t sessionId) const
 {
     Mutex::Autolock _l(mLock);
     return getEffectChain_l(sessionId);
@@ -3261,7 +3261,8 @@ void AudioFlinger::PlaybackThread::sendMetadataToBackend_l(
     mOutput->stream->updateSourceMetadata(metadata);
 };
 
-status_t AudioFlinger::PlaybackThread::getRenderPosition(uint32_t *halFrames, uint32_t *dspFrames)
+status_t AudioFlinger::PlaybackThread::getRenderPosition(
+        uint32_t* halFrames, uint32_t* dspFrames) const
 {
     if (halFrames == NULL || dspFrames == NULL) {
         return BAD_VALUE;
@@ -3288,7 +3289,8 @@ status_t AudioFlinger::PlaybackThread::getRenderPosition(uint32_t *halFrames, ui
     }
 }
 
-product_strategy_t AudioFlinger::PlaybackThread::getStrategyForSession_l(audio_session_t sessionId)
+product_strategy_t AudioFlinger::PlaybackThread::getStrategyForSession_l(
+        audio_session_t sessionId) const
 {
     // session AUDIO_SESSION_OUTPUT_MIX is placed in same strategy as MUSIC stream so that
     // it is moved to correct output by audio policy manager when A2DP is connected or disconnected
@@ -7613,7 +7615,7 @@ bool AudioFlinger::DuplicatingThread::outputsReady()
         }
         PlaybackThread *playbackThread = (PlaybackThread *)thread.get();
         // see note at standby() declaration
-        if (playbackThread->standby() && !playbackThread->isSuspended()) {
+        if (playbackThread->inStandby() && !playbackThread->isSuspended()) {
             ALOGV("DuplicatingThread output track %p on thread %p Not Ready", outputTracks[i].get(),
                     thread.get());
             return false;
@@ -10825,7 +10827,7 @@ void AudioFlinger::MmapPlaybackThread::toAudioPortConfig(struct audio_port_confi
 }
 
 status_t AudioFlinger::MmapPlaybackThread::getExternalPosition(uint64_t *position,
-                                                               int64_t *timeNanos)
+        int64_t* timeNanos) const
 {
     if (mOutput == nullptr) {
         return NO_INIT;
@@ -10910,7 +10912,6 @@ AudioStreamIn* AudioFlinger::MmapCaptureThread::clearInput()
     return input;
 }
 
-
 void AudioFlinger::MmapCaptureThread::processVolume_l()
 {
     bool changed = false;
@@ -10983,7 +10984,7 @@ void AudioFlinger::MmapCaptureThread::toAudioPortConfig(struct audio_port_config
 }
 
 status_t AudioFlinger::MmapCaptureThread::getExternalPosition(
-        uint64_t *position, int64_t *timeNanos)
+        uint64_t* position, int64_t* timeNanos) const
 {
     if (mInput == nullptr) {
         return NO_INIT;

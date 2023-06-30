@@ -124,6 +124,7 @@
 
 // include AudioFlinger component interfaces
 #include "IAfEffect.h"
+#include "IAfThread.h"
 #include "IAfTrack.h"
 
 namespace android {
@@ -562,16 +563,6 @@ private:
     void requestLogMerge();
 
     // TODO(b/288339104) replace these forward declaration classes with interfaces.
-public:
-    class RecordThread;
-    class PlaybackThread;
-    class MixerThread;
-    class DirectOutputThread;
-    class OffloadThread;
-    class DuplicatingThread;
-    class AsyncCallbackThread;
-    class BitPerfectThread;
-private:
     class DeviceEffectManager;
     // TODO(b/288339104) these should be separate files
 public:
