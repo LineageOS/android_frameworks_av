@@ -287,7 +287,7 @@ std::shared_ptr<const effectsConfig::Processings> EffectsFactoryHalAidl::getProc
         if (const auto uuid =
                     ::aidl::android::aidl2legacy_AudioUuid_audio_uuid_t(desc.common.id.uuid);
             uuid.ok()) {
-            static_cast<effectsConfig::EffectImpl>(effect).uuid = uuid.value();
+            static_cast<effectsConfig::EffectImpl&>(effect).uuid = uuid.value();
             return std::make_shared<const effectsConfig::Effect>(effect);
         } else {
             return nullptr;
