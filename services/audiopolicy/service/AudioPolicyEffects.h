@@ -117,6 +117,8 @@ public:
     // Remove the default stream effect from wherever it's attached.
     status_t removeStreamDefaultEffect(audio_unique_id_t id);
 
+    void setDefaultDeviceEffects();
+
 private:
     void initDefaultDeviceEffects();
 

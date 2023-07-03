@@ -512,11 +512,12 @@ NO_THREAD_SAFETY_ANALYSIS // conditional try lock
     if (!locked) {
         result.append("\t\tCould not lock Fx mutex:\n");
     }
-
-    result.append("\t\tSession State Registered Enabled Suspended:\n");
-    result.appendFormat("\t\t%05d   %03d   %s          %s       %s\n",
-            mSessionId, mState, mPolicyRegistered ? "y" : "n",
-            mPolicyEnabled ? "y" : "n", mSuspended ? "y" : "n");
+    bool isInternal = isInternal_l();
+    result.append("\t\tSession State Registered Internal Enabled Suspended:\n");
+    result.appendFormat("\t\t%05d   %03d   %s          %s        %s       %s\n",
+            mSessionId, mState, mPolicyRegistered ? "y" : "n", isInternal ? "y" : "n",
+            ((isInternal && isEnabled()) || (!isInternal && mPolicyEnabled)) ? "y" : "n",
+            mSuspended ? "y" : "n");
 
     result.append("\t\tDescriptor:\n");
     char uuidStr[64];
