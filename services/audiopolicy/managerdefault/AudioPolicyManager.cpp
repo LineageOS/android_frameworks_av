@@ -2160,7 +2160,7 @@ status_t AudioPolicyManager::startOutput(audio_port_handle_t portId)
                 PortHandleVector clientsToInvalidate;
                 for (size_t i = 0; i < mOutputs.size(); i++) {
                     if (mOutputs[i] == outputDesc ||
-                        !mOutputs[i]->devices().filter(outputDesc->devices()).isEmpty()) {
+                        mOutputs[i]->devices().filter(outputDesc->devices()).isEmpty()) {
                         continue;
                     }
                     for (const auto& c : mOutputs[i]->getClientIterable()) {
