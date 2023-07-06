@@ -9467,7 +9467,7 @@ KeyedVector<audio_session_t, bool> AudioFlinger::RecordThread::sessionIds() cons
     return ids;
 }
 
-AudioFlinger::AudioStreamIn* AudioFlinger::RecordThread::clearInput()
+AudioStreamIn* AudioFlinger::RecordThread::clearInput()
 {
     Mutex::Autolock _l(mLock);
     AudioStreamIn *input = mInput;
@@ -10880,7 +10880,7 @@ status_t AudioFlinger::MmapCaptureThread::exitStandby_l()
     return MmapThread::exitStandby_l();
 }
 
-AudioFlinger::AudioStreamIn* AudioFlinger::MmapCaptureThread::clearInput()
+AudioStreamIn* AudioFlinger::MmapCaptureThread::clearInput()
 {
     Mutex::Autolock _l(mLock);
     AudioStreamIn *input = mInput;
