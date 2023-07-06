@@ -26,6 +26,9 @@ namespace android {
 class MtpDataPacket;
 
 struct MtpPropertyValue {
+    // pointer str initialized to NULL so that free operation
+    // is not called for pre-assigned value
+    MtpPropertyValue() : str (NULL) {}
     union {
         int8_t          i8;
         uint8_t         u8;
