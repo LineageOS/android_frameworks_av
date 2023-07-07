@@ -184,9 +184,9 @@ NO_THREAD_SAFETY_ANALYSIS  // access of AudioFlinger::checkOutputThread_l
                         mSoundDoseManager->getOrCreateProcessorForDevice(
                                 device.first,
                                 patch.streamHandle,
-                                outputThread->mSampleRate,
-                                outputThread->mChannelCount,
-                                outputThread->mFormat));
+                                outputThread->sampleRate(),
+                                outputThread->channelCount(),
+                                outputThread->format()));
             }
         }
     }

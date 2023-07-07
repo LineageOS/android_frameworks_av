@@ -24,7 +24,7 @@ namespace android {
 // record track
 class RecordTrack : public TrackBase, public virtual IAfRecordTrack {
 public:
-                        RecordTrack(AudioFlinger::RecordThread* thread,
+    RecordTrack(IAfRecordThread* thread,
                                 const sp<Client>& client,
                                 const audio_attributes_t& attr,
                                 uint32_t sampleRate,
@@ -133,7 +133,7 @@ private:
 // playback track, used by PatchPanel
 class PatchRecord : public RecordTrack, public PatchTrackBase, public IAfPatchRecord {
 public:
-    PatchRecord(AudioFlinger::RecordThread* recordThread,
+    PatchRecord(IAfRecordThread* recordThread,
                 uint32_t sampleRate,
                 audio_channel_mask_t channelMask,
                 audio_format_t format,
@@ -169,7 +169,7 @@ protected:
 
 class PassthruPatchRecord : public PatchRecord, public Source {
 public:
-    PassthruPatchRecord(AudioFlinger::RecordThread* recordThread,
+    PassthruPatchRecord(IAfRecordThread* recordThread,
                         uint32_t sampleRate,
                         audio_channel_mask_t channelMask,
                         audio_format_t format,
@@ -212,7 +212,7 @@ private:
         PassthruPatchRecord& mPassthru;
     };
 
-    sp<StreamInHalInterface> obtainStream(sp<AudioFlinger::ThreadBase>* thread);
+    sp<StreamInHalInterface> obtainStream(sp<IAfThreadBase>* thread);
 
     PatchRecordAudioBufferProvider mPatchRecordAudioBufferProvider;
     std::unique_ptr<void, decltype(free)*> mSinkBuffer;  // frame size aligned continuous buffer

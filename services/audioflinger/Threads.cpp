@@ -7387,7 +7387,7 @@ void AudioFlinger::OffloadThread::invalidateTracks(std::set<audio_port_handle_t>
 // ----------------------------------------------------------------------------
 
 AudioFlinger::DuplicatingThread::DuplicatingThread(const sp<AudioFlinger>& audioFlinger,
-        AudioFlinger::MixerThread* mainThread, audio_io_handle_t id, bool systemReady)
+       IAfPlaybackThread* mainThread, audio_io_handle_t id, bool systemReady)
     :   MixerThread(audioFlinger, mainThread->getOutput(), id,
                     systemReady, DUPLICATING),
         mWaitTimeMs(UINT_MAX)
@@ -7487,7 +7487,7 @@ void AudioFlinger::DuplicatingThread::dumpInternals_l(int fd, const Vector<Strin
         ss << ":";
         for (const auto &track : mOutputTracks) {
             // TODO(b/288339104) type
-            const auto thread = sp<ThreadBase>::cast(track->thread().promote());
+            const auto thread = track->thread().promote();
             ss << " (" << track->id() << " : ";
             if (thread.get() != nullptr) {
                 ss << thread.get() << ", " << thread->id();
@@ -7512,7 +7512,7 @@ void AudioFlinger::DuplicatingThread::clearOutputTracks()
     outputTracks.clear();
 }
 
-void AudioFlinger::DuplicatingThread::addOutputTrack(MixerThread *thread)
+void AudioFlinger::DuplicatingThread::addOutputTrack(IAfPlaybackThread* thread)
 {
     Mutex::Autolock _l(mLock);
     // The downstream MixerThread consumes thread->frameCount() amount of frames per mix pass.
@@ -7549,7 +7549,7 @@ void AudioFlinger::DuplicatingThread::addOutputTrack(MixerThread *thread)
     updateWaitTime_l();
 }
 
-void AudioFlinger::DuplicatingThread::removeOutputTrack(MixerThread *thread)
+void AudioFlinger::DuplicatingThread::removeOutputTrack(IAfPlaybackThread* thread)
 {
     Mutex::Autolock _l(mLock);
     for (size_t i = 0; i < mOutputTracks.size(); i++) {
@@ -7572,7 +7572,7 @@ void AudioFlinger::DuplicatingThread::updateWaitTime_l()
     mWaitTimeMs = UINT_MAX;
     for (size_t i = 0; i < mOutputTracks.size(); i++) {
         // TODO(b/288339104) type
-        const auto strong = sp<ThreadBase>::cast(mOutputTracks[i]->thread().promote());
+        const auto strong = mOutputTracks[i]->thread().promote();
         if (strong != 0) {
             uint32_t waitTimeMs = (strong->frameCount() * 2 * 1000) / strong->sampleRate();
             if (waitTimeMs < mWaitTimeMs) {
@@ -7585,14 +7585,13 @@ void AudioFlinger::DuplicatingThread::updateWaitTime_l()
 bool AudioFlinger::DuplicatingThread::outputsReady()
 {
     for (size_t i = 0; i < outputTracks.size(); i++) {
-        // TODO(b/288339104) type
-        const auto thread = sp<ThreadBase>::cast(outputTracks[i]->thread().promote());
+        const auto thread = outputTracks[i]->thread().promote();
         if (thread == 0) {
             ALOGW("DuplicatingThread::outputsReady() could not promote thread on output track %p",
                     outputTracks[i].get());
             return false;
         }
-        PlaybackThread *playbackThread = (PlaybackThread *)thread.get();
+        IAfPlaybackThread* const playbackThread = thread->asIAfPlaybackThread().get();
         // see note at standby() declaration
         if (playbackThread->inStandby() && !playbackThread->isSuspended()) {
             ALOGV("DuplicatingThread output track %p on thread %p Not Ready", outputTracks[i].get(),
@@ -7752,6 +7751,13 @@ void AudioFlinger::SpatializerThread::checkOutputStageEffects()
 // ----------------------------------------------------------------------------
 //      Record
 // ----------------------------------------------------------------------------
+
+sp<IAfRecordThread> IAfRecordThread::create(const sp<AudioFlinger>& audioFlinger,
+        AudioStreamIn* input,
+        audio_io_handle_t id,
+        bool systemReady) {
+    return sp<AudioFlinger::RecordThread>::make(audioFlinger, input, id, systemReady);
+}
 
 AudioFlinger::RecordThread::RecordThread(const sp<AudioFlinger>& audioFlinger,
                                          AudioStreamIn *input,
@@ -8936,7 +8942,7 @@ status_t AudioFlinger::RecordThread::setSyncEvent(
 }
 
 status_t AudioFlinger::RecordThread::getActiveMicrophones(
-        std::vector<media::MicrophoneInfoFw>* activeMicrophones)
+        std::vector<media::MicrophoneInfoFw>* activeMicrophones) const
 {
     ALOGV("RecordThread::getActiveMicrophones");
     AutoMutex _l(mLock);
@@ -9148,8 +9154,9 @@ void AudioFlinger::RecordThread::setRecordSilenced(audio_port_handle_t portId, b
 
 void ResamplerBufferProvider::reset()
 {
-    const auto threadBase = sp<AudioFlinger::ThreadBase>::cast(mRecordTrack->thread().promote());
-    auto* const recordThread = static_cast<AudioFlinger::RecordThread *>(threadBase.get());
+    const auto threadBase = mRecordTrack->thread().promote();
+    auto* const recordThread =
+            static_cast<AudioFlinger::RecordThread *>(threadBase->asIAfRecordThread().get());
     mRsmpInUnrel = 0;
     const int32_t rear = recordThread->mRsmpInRear;
     ssize_t deltaFrames = 0;
@@ -9172,8 +9179,9 @@ void ResamplerBufferProvider::reset()
 void ResamplerBufferProvider::sync(
         size_t *framesAvailable, bool *hasOverrun)
 {
-    const auto threadBase = sp<AudioFlinger::ThreadBase>::cast(mRecordTrack->thread().promote());
-    auto* const recordThread = static_cast<AudioFlinger::RecordThread *>(threadBase.get());
+    const auto threadBase = mRecordTrack->thread().promote();
+    auto* const recordThread =
+            static_cast<AudioFlinger::RecordThread *>(threadBase->asIAfRecordThread().get());
     const int32_t rear = recordThread->mRsmpInRear;
     const int32_t front = mRsmpInFront;
     const ssize_t filled = audio_utils::safe_sub_overflow(rear, front);
@@ -9206,13 +9214,14 @@ void ResamplerBufferProvider::sync(
 status_t ResamplerBufferProvider::getNextBuffer(
         AudioBufferProvider::Buffer* buffer)
 {
-    const auto threadBase = sp<AudioFlinger::ThreadBase>::cast(mRecordTrack->thread().promote());
+    const auto threadBase = mRecordTrack->thread().promote();
     if (threadBase == 0) {
         buffer->frameCount = 0;
         buffer->raw = NULL;
         return NOT_ENOUGH_DATA;
     }
-    auto* const recordThread = static_cast<AudioFlinger::RecordThread *>(threadBase.get());
+    auto* const recordThread =
+            static_cast<AudioFlinger::RecordThread *>(threadBase->asIAfRecordThread().get());
     int32_t rear = recordThread->mRsmpInRear;
     int32_t front = mRsmpInFront;
     ssize_t filled = audio_utils::safe_sub_overflow(rear, front);
@@ -9445,7 +9454,7 @@ void AudioFlinger::RecordThread::readInputParameters_l()
         .record();
 }
 
-uint32_t AudioFlinger::RecordThread::getInputFramesLost()
+uint32_t AudioFlinger::RecordThread::getInputFramesLost() const
 {
     Mutex::Autolock _l(mLock);
     uint32_t result;
