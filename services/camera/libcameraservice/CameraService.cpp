@@ -2577,6 +2577,11 @@ Status CameraService::notifySystemEvent(int32_t eventId,
         }
         case ICameraService::EVENT_USB_DEVICE_ATTACHED:
         case ICameraService::EVENT_USB_DEVICE_DETACHED: {
+            if (args.size() != 1) {
+                return Status::fromExceptionCode(Status::EX_ILLEGAL_ARGUMENT,
+                    "USB Device Event requires 1 argument");
+            }
+
             // Notify CameraProviderManager for lazy HALs
             mCameraProviderManager->notifyUsbDeviceEvent(eventId,
                                                         std::to_string(args[0]));
