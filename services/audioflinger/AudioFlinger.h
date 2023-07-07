@@ -150,10 +150,24 @@ static const nsecs_t kDefaultStandbyTimeInNsecs = seconds(3);
 
 using android::content::AttributionSourceState;
 
+struct stream_type_t {
+    float volume = 1.f;
+    bool mute = false;
+};
+
 class AudioFlinger : public AudioFlingerServerAdapter::Delegate
 {
     friend class sp<AudioFlinger>;
     friend class Client; // removeClient_l();
+    // TODO(b/291012167) replace the Thread friends with an interface.
+    friend class DirectOutputThread;
+    friend class MixerThread;
+    friend class MmapPlaybackThread;
+    friend class MmapThread;
+    friend class PlaybackThread;
+    friend class RecordThread;
+    friend class ThreadBase;
+
 public:
     static void instantiate() ANDROID_API;
 
@@ -570,20 +584,6 @@ private:
 public:
     using TeePatches = std::vector<TeePatch>;
 private:
-
-    struct  stream_type_t {
-        stream_type_t()
-            :   volume(1.0f),
-                mute(false)
-        {
-        }
-        float       volume;
-        bool        mute;
-    };
-
-    // --- PlaybackThread ---
-
-#include "Threads.h"
 
 #include "PatchPanel.h"
 

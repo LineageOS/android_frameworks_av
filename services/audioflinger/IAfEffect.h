@@ -367,4 +367,4 @@ private:
     virtual status_t removeEffectFromHal(const sp<EffectHalInterface>& effect) = 0;
 };
 
-} // namespace android
+}  // namespace android
