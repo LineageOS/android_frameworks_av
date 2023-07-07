@@ -23,6 +23,7 @@ class IAfEffectBase;
 class IAfEffectChain;
 class IAfEffectHandle;
 class IAfEffectModule;
+class IAfThreadBase;
 
 // Interface implemented by the EffectModule parent or owner (e.g an EffectChain) to abstract
 // interactions between the EffectModule and the reset of the audio framework.
@@ -190,7 +191,7 @@ class IAfEffectChain : public RefBase {
     // Most of these methods are accessed from AudioFlinger::Thread
 public:
     static sp<IAfEffectChain> create(
-            const wp<Thread /*ThreadBase*/>& wThread,  // TODO(b/288339104) type
+            const wp<IAfThreadBase>& wThread,
             audio_session_t sessionId);
 
     // special key used for an entry in mSuspendedEffects keyed vector
@@ -279,8 +280,7 @@ public:
     virtual bool isBitPerfectCompatible() const = 0;
 
     // isCompatibleWithThread_l() must be called with thread->mLock held
-    //  TODO(b/288339104) type
-    virtual bool isCompatibleWithThread_l(const sp<Thread>& thread) const = 0;
+    virtual bool isCompatibleWithThread_l(const sp<IAfThreadBase>& thread) const = 0;
 
     virtual bool containsHapticGeneratingEffect_l() = 0;
 
@@ -288,8 +288,8 @@ public:
 
     virtual sp<EffectCallbackInterface> effectCallback() const = 0;
 
-    virtual wp<Thread> thread() const = 0;  // TODO(b/288339104) type
-    virtual void setThread(const sp<Thread>& thread) = 0;  // TODO(b/288339104) type
+    virtual wp<IAfThreadBase> thread() const = 0;
+    virtual void setThread(const sp<IAfThreadBase>& thread) = 0;
 
     virtual bool isFirstEffect(int id) const = 0;
 
