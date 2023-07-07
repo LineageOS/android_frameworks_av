@@ -2043,7 +2043,7 @@ private:
             audio_session_t                     mSharedAudioSessionId = AUDIO_SESSION_NONE;
 };
 
-class MmapThread : public ThreadBase
+class MmapThread : public ThreadBase, public virtual IAfMmapThread
 {
  public:
     MmapThread(const sp<AudioFlinger>& audioFlinger, audio_io_handle_t id,
@@ -2051,26 +2051,25 @@ class MmapThread : public ThreadBase
                bool isOut);
     ~MmapThread() override;
 
-    virtual     void        configure(const audio_attributes_t *attr,
+    void configure(const audio_attributes_t* attr,
                                       audio_stream_type_t streamType,
                                       audio_session_t sessionId,
                                       const sp<MmapStreamCallback>& callback,
                                       audio_port_handle_t deviceId,
-                                      audio_port_handle_t portId);
+                                      audio_port_handle_t portId) override;
 
-                void        disconnect();
+    void disconnect() final;
 
     // MmapStreamInterface for adapter.
-    virtual status_t createMmapBuffer(int32_t minSizeFrames,
-                                      struct audio_mmap_buffer_info *info);
-    virtual status_t getMmapPosition(struct audio_mmap_position* position);
-    virtual status_t start(const AudioClient& client,
+    status_t createMmapBuffer(int32_t minSizeFrames, struct audio_mmap_buffer_info* info) final;
+    status_t getMmapPosition(struct audio_mmap_position* position) const override;
+    status_t start(const AudioClient& client,
                    const audio_attributes_t *attr,
-                   audio_port_handle_t *handle);
-    virtual status_t stop(audio_port_handle_t handle);
-    virtual status_t standby();
-    virtual status_t getExternalPosition(uint64_t* position, int64_t* timeNanos) const = 0;
-    virtual status_t reportData(const void* buffer, size_t frameCount);
+            audio_port_handle_t* handle) final;
+    status_t stop(audio_port_handle_t handle) final;
+    status_t standby() final;
+    status_t getExternalPosition(uint64_t* position, int64_t* timeNanos) const = 0;
+    status_t reportData(const void* buffer, size_t frameCount) override;
 
     // RefBase
     void onFirstRef() final;
@@ -2117,11 +2116,11 @@ class MmapThread : public ThreadBase
     // Not in ThreadBase
     virtual audio_stream_type_t streamType() const { return AUDIO_STREAM_DEFAULT; }
     virtual void invalidateTracks(audio_stream_type_t /* streamType */) {}
-    virtual void invalidateTracks(std::set<audio_port_handle_t>& /* portIds */) {}
+    void invalidateTracks(std::set<audio_port_handle_t>& /* portIds */) override {}
 
                 // Sets the UID records silence
-    virtual     void        setRecordSilenced(audio_port_handle_t portId __unused,
-                                              bool silenced __unused) {}
+    void setRecordSilenced(
+            audio_port_handle_t /* portId */, bool /* silenced */) override {}
 
     bool isStreamInitialized() const override { return false; }
 
@@ -2170,11 +2169,15 @@ class MmapThread : public ThreadBase
      static     constexpr int32_t       kMaxNoCallbackWarnings = 5;
 };
 
-class MmapPlaybackThread : public MmapThread, public VolumeInterface
-{
+class MmapPlaybackThread : public MmapThread, public IAfMmapPlaybackThread,
+        public virtual VolumeInterface {
 public:
     MmapPlaybackThread(const sp<AudioFlinger>& audioFlinger, audio_io_handle_t id,
                        AudioHwDevice *hwDev, AudioStreamOut *output, bool systemReady);
+
+    sp<IAfMmapPlaybackThread> asIAfMmapPlaybackThread() final {
+        return sp<IAfMmapPlaybackThread>::fromExisting(this);
+    }
 
     void configure(const audio_attributes_t* attr,
                                       audio_stream_type_t streamType,
@@ -2183,7 +2186,7 @@ public:
                                       audio_port_handle_t deviceId,
                                       audio_port_handle_t portId) final;
 
-                AudioStreamOut* clearOutput();
+    AudioStreamOut* clearOutput() final;
 
                 // VolumeInterface
     void setMasterVolume(float value) final;
@@ -2230,13 +2233,17 @@ protected:
                 mediautils::atomic_sp<audio_utils::MelProcessor> mMelProcessor;
 };
 
-class MmapCaptureThread : public MmapThread
+class MmapCaptureThread : public MmapThread, public IAfMmapCaptureThread
 {
 public:
     MmapCaptureThread(const sp<AudioFlinger>& audioFlinger, audio_io_handle_t id,
                       AudioHwDevice *hwDev, AudioStreamIn *input, bool systemReady);
 
-                AudioStreamIn* clearInput();
+    sp<IAfMmapCaptureThread> asIAfMmapCaptureThread() final {
+        return sp<IAfMmapCaptureThread>::fromExisting(this);
+    }
+
+    AudioStreamIn* clearInput() final;
 
     status_t exitStandby_l() REQUIRES(mLock) final;
 

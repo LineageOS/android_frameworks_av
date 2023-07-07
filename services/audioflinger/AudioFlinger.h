@@ -612,35 +612,12 @@ private:
         return io;
     }
 
-    // Mmap stream control interface implementation. Each MmapThreadHandle controls one
-    // MmapPlaybackThread or MmapCaptureThread instance.
-    class MmapThreadHandle : public MmapStreamInterface {
-    public:
-        explicit            MmapThreadHandle(const sp<MmapThread>& thread);
-        virtual             ~MmapThreadHandle();
-
-        // MmapStreamInterface virtuals
-        virtual status_t createMmapBuffer(int32_t minSizeFrames,
-                                          struct audio_mmap_buffer_info *info);
-        virtual status_t getMmapPosition(struct audio_mmap_position *position);
-        virtual status_t getExternalPosition(uint64_t *position, int64_t *timeNanos);
-        virtual status_t start(const AudioClient& client,
-                               const audio_attributes_t *attr,
-                               audio_port_handle_t *handle);
-        virtual status_t stop(audio_port_handle_t handle);
-        virtual status_t standby();
-                status_t reportData(const void* buffer, size_t frameCount) override;
-
-    private:
-        const sp<MmapThread> mThread;
-    };
-
     IAfThreadBase* checkThread_l(audio_io_handle_t ioHandle) const;
     sp<IAfThreadBase> checkOutputThread_l(audio_io_handle_t ioHandle) const REQUIRES(mLock);
     IAfPlaybackThread* checkPlaybackThread_l(audio_io_handle_t output) const;
     IAfPlaybackThread* checkMixerThread_l(audio_io_handle_t output) const;
     IAfRecordThread* checkRecordThread_l(audio_io_handle_t input) const;
-              MmapThread *checkMmapThread_l(audio_io_handle_t io) const;
+    IAfMmapThread* checkMmapThread_l(audio_io_handle_t io) const;
               sp<VolumeInterface> getVolumeInterface_l(audio_io_handle_t output) const;
               std::vector<sp<VolumeInterface>> getAllVolumeInterfaces_l() const;
 
@@ -859,7 +836,7 @@ private:
                 // list of MMAP stream control threads. Those threads allow for wake lock, routing
                 // and volume control for activity on the associated MMAP stream at the HAL.
                 // Audio data transfer is directly handled by the client creating the MMAP stream
-                DefaultKeyedVector< audio_io_handle_t, sp<MmapThread> >  mMmapThreads;
+    DefaultKeyedVector<audio_io_handle_t, sp<IAfMmapThread>> mMmapThreads;
 
 private:
     sp<Client>  registerPid(pid_t pid);    // always returns non-0
