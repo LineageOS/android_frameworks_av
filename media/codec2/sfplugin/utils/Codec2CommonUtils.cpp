@@ -83,7 +83,7 @@ bool isHalPixelFormatSupported(AHardwareBuffer_Format format) {
     }
 
     // Default scenario --- the consumer is display or GPU
-    const AHardwareBuffer_Desc desc = {
+    const AHardwareBuffer_Desc consumableForDisplayOrGpu = {
             .width = 320,
             .height = 240,
             .format = format,
@@ -98,7 +98,7 @@ bool isHalPixelFormatSupported(AHardwareBuffer_Format format) {
     };
 
     // The consumer is a HW encoder
-    const AHardwareBuffer_Desc descHwEncoder = {
+    const AHardwareBuffer_Desc consumableForHwEncoder = {
             .width = 320,
             .height = 240,
             .format = format,
@@ -114,7 +114,7 @@ bool isHalPixelFormatSupported(AHardwareBuffer_Format format) {
     };
 
     // The consumer is a SW encoder
-    const AHardwareBuffer_Desc descSwEncoder = {
+    const AHardwareBuffer_Desc consumableForSwEncoder = {
             .width = 320,
             .height = 240,
             .format = format,
@@ -128,9 +128,9 @@ bool isHalPixelFormatSupported(AHardwareBuffer_Format format) {
             .rfu1 = 0,
     };
 
-    return AHardwareBuffer_isSupported(&desc)
-            && AHardwareBuffer_isSupported(&descHwEncoder)
-            && AHardwareBuffer_isSupported(&descSwEncoder);
+    return AHardwareBuffer_isSupported(&consumableForDisplayOrGpu)
+            && AHardwareBuffer_isSupported(&consumableForHwEncoder)
+            && AHardwareBuffer_isSupported(&consumableForSwEncoder);
 }
 
 }  // namespace android
