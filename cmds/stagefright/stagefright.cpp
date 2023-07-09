@@ -106,6 +106,12 @@ static void displayDecodeHistogram(Vector<int64_t> *decodeTimesUs) {
     decodeTimesUs->sort(CompareIncreasing);
 
     size_t n = decodeTimesUs->size();
+
+    if (n == 0) {
+        printf("no decode histogram to display\n");
+        return;
+    }
+
     int64_t minUs = decodeTimesUs->itemAt(0);
     int64_t maxUs = decodeTimesUs->itemAt(n - 1);
 
