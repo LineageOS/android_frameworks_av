@@ -53,7 +53,7 @@ TEST(AudioTrackTest, TestPerformanceMode) {
         ASSERT_NE(nullptr, ap);
         ASSERT_EQ(OK, ap->loadResource("/data/local/tmp/bbb_2ch_24kHz_s16le.raw"))
                 << "Unable to open Resource";
-        EXPECT_EQ(OK, ap->create()) << "track creation failed";
+        ASSERT_EQ(OK, ap->create()) << "track creation failed";
         sp<OnAudioDeviceUpdateNotifier> cb = sp<OnAudioDeviceUpdateNotifier>::make();
         EXPECT_EQ(OK, ap->getAudioTrackHandle()->addAudioDeviceCallback(cb));
         EXPECT_EQ(OK, ap->start()) << "audio track start failed";
@@ -87,7 +87,7 @@ TEST(AudioTrackTest, DefaultRoutingTest) {
     sp<AudioCapture> capture = sp<AudioCapture>::make(
             AUDIO_SOURCE_REMOTE_SUBMIX, 48000, AUDIO_FORMAT_PCM_16_BIT, AUDIO_CHANNEL_IN_STEREO);
     ASSERT_NE(nullptr, capture);
-    EXPECT_EQ(OK, capture->create()) << "record creation failed";
+    ASSERT_EQ(OK, capture->create()) << "record creation failed";
     sp<OnAudioDeviceUpdateNotifier> cbCapture = sp<OnAudioDeviceUpdateNotifier>::make();
     EXPECT_EQ(OK, capture->getAudioRecordHandle()->addAudioDeviceCallback(cbCapture));
 
@@ -98,7 +98,7 @@ TEST(AudioTrackTest, DefaultRoutingTest) {
     ASSERT_NE(nullptr, playback);
     ASSERT_EQ(OK, playback->loadResource("/data/local/tmp/bbb_2ch_24kHz_s16le.raw"))
             << "Unable to open Resource";
-    EXPECT_EQ(OK, playback->create()) << "track creation failed";
+    ASSERT_EQ(OK, playback->create()) << "track creation failed";
     sp<OnAudioDeviceUpdateNotifier> cbPlayback = sp<OnAudioDeviceUpdateNotifier>::make();
     EXPECT_EQ(OK, playback->getAudioTrackHandle()->addAudioDeviceCallback(cbPlayback));
 
@@ -180,7 +180,7 @@ TEST_F(AudioRoutingTest, ConcurrentDynamicRoutingTest) {
     ASSERT_NE(nullptr, playback);
     ASSERT_EQ(OK, playback->loadResource("/data/local/tmp/bbb_2ch_24kHz_s16le.raw"))
             << "Unable to open Resource";
-    EXPECT_EQ(OK, playback->create()) << "track creation failed";
+    ASSERT_EQ(OK, playback->create()) << "track creation failed";
     sp<OnAudioDeviceUpdateNotifier> cbPlayback = sp<OnAudioDeviceUpdateNotifier>::make();
     EXPECT_EQ(OK, playback->getAudioTrackHandle()->addAudioDeviceCallback(cbPlayback));
 
@@ -188,7 +188,7 @@ TEST_F(AudioRoutingTest, ConcurrentDynamicRoutingTest) {
     sp<AudioCapture> captureA = sp<AudioCapture>::make(
             AUDIO_SOURCE_REMOTE_SUBMIX, 48000, AUDIO_FORMAT_PCM_16_BIT, AUDIO_CHANNEL_IN_STEREO);
     ASSERT_NE(nullptr, captureA);
-    EXPECT_EQ(OK, captureA->create()) << "record creation failed";
+    ASSERT_EQ(OK, captureA->create()) << "record creation failed";
     sp<OnAudioDeviceUpdateNotifier> cbCaptureA = sp<OnAudioDeviceUpdateNotifier>::make();
     EXPECT_EQ(OK, captureA->getAudioRecordHandle()->addAudioDeviceCallback(cbCaptureA));
 
@@ -199,7 +199,7 @@ TEST_F(AudioRoutingTest, ConcurrentDynamicRoutingTest) {
             AUDIO_SOURCE_REMOTE_SUBMIX, 48000, AUDIO_FORMAT_PCM_16_BIT, AUDIO_CHANNEL_IN_STEREO,
             AUDIO_INPUT_FLAG_NONE, AUDIO_SESSION_ALLOCATE, AudioRecord::TRANSFER_CALLBACK, &attr);
     ASSERT_NE(nullptr, captureB);
-    EXPECT_EQ(OK, captureB->create()) << "record creation failed";
+    ASSERT_EQ(OK, captureB->create()) << "record creation failed";
     sp<OnAudioDeviceUpdateNotifier> cbCaptureB = sp<OnAudioDeviceUpdateNotifier>::make();
     EXPECT_EQ(OK, captureB->getAudioRecordHandle()->addAudioDeviceCallback(cbCaptureB));
 
