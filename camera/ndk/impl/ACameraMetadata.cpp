@@ -400,7 +400,6 @@ ACameraMetadata::getConstEntry(uint32_t tag, ACameraMetadata_const_entry* entry)
 
     camera_metadata_ro_entry rawEntry = static_cast<const CameraMetadata*>(mData.get())->find(tag);
     if (rawEntry.count == 0) {
-        ALOGE("%s: cannot find metadata tag %d", __FUNCTION__, tag);
         return ACAMERA_ERROR_METADATA_NOT_FOUND;
     }
     entry->tag = tag;
