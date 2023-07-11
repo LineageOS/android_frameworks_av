@@ -446,7 +446,7 @@ class Camera3OutputStream :
     static constexpr nsecs_t kTimelineThresholdNs = 1000000LL; // 1 millisecond
     static constexpr float kMaxIntervalRatioDeviation = 0.05f;
     static constexpr int kMaxTimelines = 2;
-    nsecs_t syncTimestampToDisplayLocked(nsecs_t t, int releaseFence);
+    nsecs_t syncTimestampToDisplayLocked(nsecs_t t, sp<Fence> releaseFence);
 
     // In case of fence being used
     sp<Fence> mReferenceFrameFence;
