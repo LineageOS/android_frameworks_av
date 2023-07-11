@@ -2611,6 +2611,16 @@ VolumeShaper::Status MediaPlayerService::AudioOutput::applyVolumeShaper(
     Mutex::Autolock lock(mLock);
     ALOGV("AudioOutput::applyVolumeShaper");
 
+    if (configuration == nullptr) {
+        ALOGE("AudioOutput::applyVolumeShaper Null configuration parameter");
+        return VolumeShaper::Status(BAD_VALUE);
+    }
+
+    if (operation == nullptr) {
+        ALOGE("AudioOutput::applyVolumeShaper Null operation parameter");
+        return VolumeShaper::Status(BAD_VALUE);
+    }
+
     mVolumeHandler->setIdIfNecessary(configuration);
 
     VolumeShaper::Status status;
