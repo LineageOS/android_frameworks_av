@@ -20,6 +20,7 @@
 #include <aidl/android/hardware/drm/IDrmPlugin.h>
 #include <aidl/android/hardware/security/keymint/BnRemotelyProvisionedComponent.h>
 #include <aidl/android/hardware/security/keymint/RpcHardwareInfo.h>
+#include <cppbor.h>
 
 namespace android::mediadrm {
 
@@ -52,6 +53,9 @@ class DrmRemotelyProvisionedComponent : public BnRemotelyProvisionedComponent {
                                                std::vector<uint8_t>* csr) override;
 
   private:
+    ScopedAStatus getVerifiedDeviceInfo(cppbor::Map& deviceInfoMap);
+    ScopedAStatus getDeviceInfo(std::vector<uint8_t>* deviceInfo);
+
     std::shared_ptr<IDrmPlugin> mDrm;
     std::string mDrmVendor;
     std::string mDrmDesc;
