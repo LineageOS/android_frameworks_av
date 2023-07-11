@@ -1108,7 +1108,6 @@ status_t AudioFlinger::createTrack(const media::CreateTrackRequest& _input,
     CreateTrackOutput output;
 
     sp<PlaybackThread::Track> track;
-    sp<TrackHandle> trackHandle;
     sp<Client> client;
     status_t lStatus;
     audio_stream_type_t streamType;
@@ -1298,7 +1297,7 @@ status_t AudioFlinger::createTrack(const media::CreateTrackRequest& _input,
         AudioSystem::moveEffectsToIo(effectIds, effectThreadId);
     }
 
-    output.audioTrack = new TrackHandle(track);
+    output.audioTrack = PlaybackThread::Track::createIAudioTrackAdapter(track);
     _output = VALUE_OR_FATAL(output.toAidl());
 
 Exit:
@@ -2393,7 +2392,6 @@ status_t AudioFlinger::createRecord(const media::CreateRecordRequest& _input,
     CreateRecordOutput output;
 
     sp<RecordThread::RecordTrack> recordTrack;
-    sp<RecordHandle> recordHandle;
     sp<Client> client;
     status_t lStatus;
     audio_session_t sessionId = input.sessionId;
@@ -2551,7 +2549,7 @@ status_t AudioFlinger::createRecord(const media::CreateRecordRequest& _input,
     output.buffers = recordTrack->getBuffers();
     output.portId = portId;
 
-    output.audioRecord = new RecordHandle(recordTrack);
+    output.audioRecord = RecordThread::RecordTrack::createIAudioRecordAdapter(recordTrack);
     _output = VALUE_OR_FATAL(output.toAidl());
 
 Exit:
