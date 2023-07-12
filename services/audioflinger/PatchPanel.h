@@ -199,8 +199,8 @@ public:
             return mRecord.handle() != AUDIO_PATCH_HANDLE_NONE ||
                     mPlayback.handle() != AUDIO_PATCH_HANDLE_NONE; }
 
-        void setThread(const sp<ThreadBase>& thread) { mThread = thread; }
-        wp<ThreadBase> thread() const { return mThread; }
+        void setThread(const sp<IAfThreadBase>& thread) { mThread = thread; }
+        wp<IAfThreadBase> thread() const { return mThread; }
 
         // returns the latency of the patch (from record to playback).
         status_t getLatencyMs(double *latencyMs) const;
@@ -216,11 +216,11 @@ public:
         // the objects are created by createConnections() and released by clearConnections()
         // playback thread is created if no existing playback thread can be used
         // connects playback thread output to sink device
-        Endpoint<PlaybackThread, IAfPatchTrack> mPlayback;
+        Endpoint<IAfPlaybackThread, IAfPatchTrack> mPlayback;
         // connects source device to record thread input
-        Endpoint<RecordThread, IAfPatchRecord> mRecord;
+        Endpoint<IAfRecordThread, IAfPatchRecord> mRecord;
 
-        wp<ThreadBase> mThread;
+        wp<IAfThreadBase> mThread;
         bool mIsEndpointPatch;
     };
 

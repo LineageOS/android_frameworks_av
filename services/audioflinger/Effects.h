@@ -382,7 +382,7 @@ private:
 // it also provide it's own input buffer used by the track as accumulation buffer.
 class EffectChain : public IAfEffectChain {
 public:
-    EffectChain(const wp<AudioFlinger::ThreadBase>& wThread, audio_session_t sessionId);
+    EffectChain(const wp<IAfThreadBase>& wThread, audio_session_t sessionId);
     ~EffectChain() override;
 
     void process_l() final;
@@ -479,12 +479,7 @@ public:
     bool isBitPerfectCompatible() const final;
 
     // isCompatibleWithThread_l() must be called with thread->mLock held
-    // TODO(b/288339104) type
-    bool isCompatibleWithThread_l(const sp<Thread>& thread) const final {
-        return isCompatibleWithThread_l(sp<AudioFlinger::ThreadBase>::cast(thread));
-    }
-
-    bool isCompatibleWithThread_l(const sp<AudioFlinger::ThreadBase>& thread) const;
+    bool isCompatibleWithThread_l(const sp<IAfThreadBase>& thread) const final;
 
     bool containsHapticGeneratingEffect_l() final;
 
@@ -492,8 +487,7 @@ public:
 
     sp<EffectCallbackInterface> effectCallback() const final { return mEffectCallback; }
 
-    // TODO(b/288339104) type
-    wp<Thread> thread() const final { return mEffectCallback->thread(); }
+    wp<IAfThreadBase> thread() const final { return mEffectCallback->thread(); }
 
     bool isFirstEffect(int id) const final {
         return !mEffects.isEmpty() && id == mEffects[0]->id();
@@ -507,12 +501,7 @@ public:
         return mEffects[index];
     }
 
-    // TODO(b/288339104) type
-    void setThread(const sp<Thread>& thread) final {
-        setThread(sp<AudioFlinger::ThreadBase>::cast(thread));
-    }
-
-    void setThread(const sp<AudioFlinger::ThreadBase>& thread);
+    void setThread(const sp<IAfThreadBase>& thread) final;
 
 private:
 
@@ -527,15 +516,15 @@ private:
         // Note: ctors taking a weak pointer to their owner must not promote it
         // during construction (but may keep a reference for later promotion).
         EffectCallback(const wp<EffectChain>& owner,
-                       const wp<AudioFlinger::ThreadBase>& thread)
+                const wp<IAfThreadBase>& thread)
             : mChain(owner)
             , mThread(thread)
             , mAudioFlinger(*AudioFlinger::gAudioFlinger) {
-            sp<AudioFlinger::ThreadBase> base = thread.promote();
+            const sp<IAfThreadBase> base = thread.promote();
             if (base != nullptr) {
                 mThreadType = base->type();
             } else {
-                mThreadType = AudioFlinger::ThreadBase::MIXER;  // assure a consistent value.
+                mThreadType = IAfThreadBase::MIXER;  // assure a consistent value.
             }
         }
 
@@ -580,18 +569,18 @@ private:
             return mAudioFlinger.isAudioPolicyReady();
         }
 
-        wp<AudioFlinger::ThreadBase> thread() const { return mThread.load(); }
+        wp<IAfThreadBase> thread() const { return mThread.load(); }
 
-        void setThread(const sp<AudioFlinger::ThreadBase>& thread) {
+        void setThread(const sp<IAfThreadBase>& thread) {
             mThread = thread;
             mThreadType = thread->type();
         }
 
     private:
         const wp<IAfEffectChain> mChain;
-        mediautils::atomic_wp<AudioFlinger::ThreadBase> mThread;
+        mediautils::atomic_wp<IAfThreadBase> mThread;
         AudioFlinger &mAudioFlinger;  // implementation detail: outer instance always exists.
-        AudioFlinger::ThreadBase::type_t mThreadType;
+        IAfThreadBase::type_t mThreadType;
     };
 
     DISALLOW_COPY_AND_ASSIGN(EffectChain);
