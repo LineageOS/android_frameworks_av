@@ -55,6 +55,7 @@ genrule {
 //
 prebuilt_etc {
     name: "parameter-framework.policy",
+    enabled: false, // TODO: This module depends on domaingeneratorpolicyrule_gen, which fails to build
     filename_from_src: true,
     vendor: true,
     src: ":domaingeneratorpolicyrule_gen",
@@ -68,6 +69,7 @@ prebuilt_etc {
 }
 genrule {
     name: "domaingeneratorpolicyrule_gen",
+    enabled: false, // TODO: This module fails to build
     defaults: ["domaingeneratorpolicyrule"],
     srcs: [
         ":audio_policy_pfw_toplevel",
