@@ -20,11 +20,8 @@ cc_defaults {
         "android.hardware.audio.common@7.0-enums",
         "effect-aidl-cpp",
         "liblog",
-        "libbinder_random_parcel",
-        "libbase",
         "libcgrouprc",
         "libcgrouprc_format",
-        "libcutils",
         "libjsoncpp",
         "libmediametricsservice",
         "libmedia_helper",
@@ -55,14 +52,11 @@ cc_defaults {
         "libaudiopolicy",
         "libaudioutils",
         "libdl",
-        "libutils",
         "libxml2",
         "mediametricsservice-aidl-cpp",
         "framework-permission-aidl-cpp",
         "libvndksupport",
         "libmediametrics",
-        "libbinder_ndk",
-        "libbinder",
         "libfakeservicemanager",
         "libactivitymanager_aidl",
         "libheadtracking",
@@ -100,5 +94,8 @@ cc_defaults {
 cc_fuzz {
     name: "audioflinger_aidl_fuzzer",
     srcs: ["audioflinger_aidl_fuzzer.cpp"],
-    defaults: ["libaudioclient_aidl_fuzzer_defaults"],
+    defaults: [
+        "libaudioclient_aidl_fuzzer_defaults",
+        "service_fuzzer_defaults"
+    ],
 }
