@@ -328,7 +328,6 @@ AudioFlinger::AudioFlinger()
       mTotalMemory(0),
       mClientSharedHeapSize(kMinimumClientSharedHeapSizeBytes),
       mGlobalEffectEnableTime(0),
-      mPatchPanel(this),
       mPatchCommandThread(sp<PatchCommandThread>::make()),
       mDeviceEffectManager(sp<DeviceEffectManager>::make(*this)),
       mMelReporter(sp<MelReporter>::make(*this)),
@@ -934,7 +933,7 @@ NO_THREAD_SAFETY_ANALYSIS  // conditional try lock
             dev->dump(fd, args);
         }
 
-        mPatchPanel.dump(fd);
+        mPatchPanel->dump(fd);
 
         mDeviceEffectManager->dump(fd);
 
@@ -1822,8 +1821,8 @@ void AudioFlinger::forwardParametersToDownstreamPatches_l(
         audio_io_handle_t upStream, const String8& keyValuePairs,
         const std::function<bool(const sp<IAfPlaybackThread>&)>& useThread)
 {
-    std::vector<PatchPanel::SoftwarePatch> swPatches;
-    if (mPatchPanel.getDownstreamSoftwarePatches(upStream, &swPatches) != OK) return;
+    std::vector<SoftwarePatch> swPatches;
+    if (mPatchPanel->getDownstreamSoftwarePatches(upStream, &swPatches) != OK) return;
     ALOGV_IF(!swPatches.empty(), "%s found %zu downstream patches for stream ID %d",
             __func__, swPatches.size(), upStream);
     for (const auto& swPatch : swPatches) {
@@ -3074,7 +3073,7 @@ sp<IAfThreadBase> AudioFlinger::openOutput_l(audio_module_handle_t module,
             }
             mPlaybackThreads.add(*output, thread);
             struct audio_patch patch;
-            mPatchPanel.notifyStreamOpened(outHwDev, *output, &patch);
+            mPatchPanel->notifyStreamOpened(outHwDev, *output, &patch);
             if (thread->isMsdDevice()) {
                 thread->setDownStreamPatch(&patch);
             }
@@ -3237,7 +3236,7 @@ status_t AudioFlinger::closeOutput_nonvirtual(audio_io_handle_t output)
             ALOGD("closing mmapThread %p", mmapThread.get());
         }
         ioConfigChanged(AUDIO_OUTPUT_CLOSED, sp<AudioIoDescriptor>::make(output));
-        mPatchPanel.notifyStreamClosed(output);
+        mPatchPanel->notifyStreamClosed(output);
     }
     // The thread entity (active unit of execution) is no longer running here,
     // but the IAfThreadBase container still exists.
@@ -4290,7 +4289,7 @@ status_t AudioFlinger::createEffect(const media::CreateEffectRequest& request,
             sp<Client> client = registerPid(currentPid);
             ALOGV("%s device type %#x address %s", __func__, device.mType, device.getAddress());
             handle = mDeviceEffectManager->createEffect_l(
-                    &descOut, device, client, effectClient, mPatchPanel.patches_l(),
+                    &descOut, device, client, effectClient, mPatchPanel->patches_l(),
                     &enabledOut, &lStatus, probe, request.notifyFramesProcessed);
             if (lStatus != NO_ERROR && lStatus != ALREADY_EXISTS) {
                 // remove local strong reference to Client with mClientLock held
