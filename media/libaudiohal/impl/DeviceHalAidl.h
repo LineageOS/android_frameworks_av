@@ -162,7 +162,7 @@ class DeviceHalAidl : public DeviceHalInterface, public ConversionHelperAidl,
 
     error::Result<audio_hw_sync_t> getHwAvSync() override;
 
-    int32_t supportsBluetoothVariableLatency(bool* supports __unused) override;
+    status_t supportsBluetoothVariableLatency(bool* supports __unused) override;
 
     status_t getSoundDoseInterface(const std::string& module,
                                    ::ndk::SpAIBinder* soundDoseBinder) override;
