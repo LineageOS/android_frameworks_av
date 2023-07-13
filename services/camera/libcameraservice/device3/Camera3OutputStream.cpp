@@ -486,7 +486,7 @@ status_t Camera3OutputStream::returnBufferCheckedLocked(
             bufferDeferred = true;
         } else {
             nsecs_t presentTime = mSyncToDisplay ?
-                    syncTimestampToDisplayLocked(captureTime, releaseFence->dup()) : captureTime;
+                    syncTimestampToDisplayLocked(captureTime, releaseFence) : captureTime;
 
             setTransform(transform, true/*mayChangeMirror*/);
             res = native_window_set_buffers_timestamp(mConsumer.get(), presentTime);
@@ -1410,7 +1410,7 @@ void Camera3OutputStream::returnPrefetchedBuffersLocked() {
     }
 }
 
-nsecs_t Camera3OutputStream::syncTimestampToDisplayLocked(nsecs_t t, int releaseFence) {
+nsecs_t Camera3OutputStream::syncTimestampToDisplayLocked(nsecs_t t, sp<Fence> releaseFence) {
     nsecs_t currentTime = systemTime();
     if (!mFixedFps) {
         mLastCaptureTime = t;
@@ -1458,8 +1458,8 @@ nsecs_t Camera3OutputStream::syncTimestampToDisplayLocked(nsecs_t t, int release
                 mRefVsyncData = vsyncEventData;
                 mReferenceCaptureTime = t;
                 mReferenceArrivalTime = currentTime;
-                if (releaseFence != -1) {
-                    mReferenceFrameFence = new Fence(releaseFence);
+                if (releaseFence->isValid()) {
+                    mReferenceFrameFence = new Fence(releaseFence->dup());
                 } else {
                     mFenceSignalOffset = 0;
                 }
