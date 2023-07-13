@@ -223,8 +223,7 @@ std::vector<uint8_t> VisualizerContext::capture() {
         deltaSamples = kMaxCaptureBufSize;
     }
 
-    int32_t capturePoint;
-    //capturePoint = (int32_t)mCaptureIdx - deltaSamples;
+    int32_t capturePoint, captureSamples = mCaptureSamples;
     __builtin_sub_overflow((int32_t) mCaptureIdx, deltaSamples, &capturePoint);
     // a negative capturePoint means we wrap the buffer.
     if (capturePoint < 0) {
@@ -232,13 +231,14 @@ std::vector<uint8_t> VisualizerContext::capture() {
         if (size > mCaptureSamples) {
             size = mCaptureSamples;
         }
+        // first part of two stages copy, capture to the end of buffer and reset the size/point
         result.insert(result.end(), &mCaptureBuf[kMaxCaptureBufSize + capturePoint],
                         &mCaptureBuf[kMaxCaptureBufSize + capturePoint + size]);
-        mCaptureSamples -= size;
+        captureSamples -= size;
         capturePoint = 0;
     }
     result.insert(result.end(), &mCaptureBuf[capturePoint],
-                    &mCaptureBuf[capturePoint + mCaptureSamples]);
+                  &mCaptureBuf[capturePoint + captureSamples]);
     mLastCaptureIdx = mCaptureIdx;
     return result;
 }
