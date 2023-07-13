@@ -1905,7 +1905,7 @@ class AudioPolicyManagerTestMMapPlaybackRerouting
     audio_io_handle_t mOutput;
     audio_stream_type_t mStream = AUDIO_STREAM_DEFAULT;
     audio_port_handle_t mSelectedDeviceId = AUDIO_PORT_HANDLE_NONE;
-    audio_port_handle_t mPortId;
+    audio_port_handle_t mPortId = AUDIO_PORT_HANDLE_NONE;
     AudioPolicyInterface::output_type_t mOutputType;
     audio_attributes_t attr = AUDIO_ATTRIBUTES_INITIALIZER;
     bool mIsSpatialized;
