@@ -79,12 +79,21 @@ getDrmRemotelyProvisionedComponents() {
                     return;
                 }
 
-                std::string compName = "DrmRemotelyProvisionedComponent_" + std::string(instance);
+                std::vector<uint8_t> bcc;
+                status = mDrm->getPropertyByteArray("bootCertificateChain", &bcc);
+                if (!status.isOk()) {
+                    ALOGE("mDrm->getPropertyByteArray(\"bootCertificateChain\") failed."
+                          "Detail: [%s].",
+                          status.getDescription().c_str());
+                    return;
+                }
+
+                std::string compName(instance);
                 auto comps = static_cast<
                         std::map<std::string, std::shared_ptr<IRemotelyProvisionedComponent>>*>(
                         context);
                 (*comps)[compName] = ::ndk::SharedRefBase::make<DrmRemotelyProvisionedComponent>(
-                        mDrm, drmVendor, drmDesc);
+                        mDrm, drmVendor, drmDesc, bcc);
             });
     return comps;
 }

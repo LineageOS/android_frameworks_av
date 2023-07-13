@@ -27,8 +27,13 @@
 namespace android::mediadrm {
 DrmRemotelyProvisionedComponent::DrmRemotelyProvisionedComponent(std::shared_ptr<IDrmPlugin> drm,
                                                                  std::string drmVendor,
-                                                                 std::string drmDesc)
-    : mDrm(std::move(drm)), mDrmVendor(std::move(drmVendor)), mDrmDesc(std::move(drmDesc)) {}
+                                                                 std::string drmDesc,
+                                                                 std::vector<uint8_t> bcc)
+    : mDrm(std::move(drm)),
+      mDrmVendor(std::move(drmVendor)),
+      mDrmDesc(std::move(drmDesc)),
+      mBcc(std::move(bcc)) {}
+
 ScopedAStatus DrmRemotelyProvisionedComponent::getHardwareInfo(RpcHardwareInfo* info) {
     info->versionNumber = 3;
     info->rpcAuthorName = mDrmVendor;
@@ -133,14 +138,6 @@ ScopedAStatus DrmRemotelyProvisionedComponent::generateCertificateRequestV2(
         return status;
     }
 
-    std::vector<uint8_t> bcc;
-    status = mDrm->getPropertyByteArray("bootCertificateChain", &bcc);
-    if (!status.isOk()) {
-        ALOGE("getPropertyByteArray bootCertificateChain failed. Details: [%s].",
-              status.getDescription().c_str());
-        return status;
-    }
-
     std::vector<uint8_t> deviceInfo;
     status = getDeviceInfo(&deviceInfo);
     if (!status.isOk()) {
@@ -167,7 +164,7 @@ ScopedAStatus DrmRemotelyProvisionedComponent::generateCertificateRequestV2(
     *out = cppbor::Array()
                    .add(1 /* version */)
                    .add(cppbor::Map() /* UdsCerts */)
-                   .add(cppbor::EncodedItem(std::move(bcc)))
+                   .add(cppbor::EncodedItem(mBcc))
                    .add(cppbor::EncodedItem(std::move(deviceSignedCsrPayload)))
                    .encode();
     return ScopedAStatus::ok();
