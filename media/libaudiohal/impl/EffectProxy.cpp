@@ -133,8 +133,8 @@ ndk::ScopedAStatus EffectProxy::close() {
 }
 
 ndk::ScopedAStatus EffectProxy::getDescriptor(Descriptor* desc) {
-    desc->common = mDescriptorCommon;
-    desc->capability = mSubEffects[mActiveSubIdx].descriptor.capability;
+    *desc = mSubEffects[mActiveSubIdx].descriptor;
+    desc->common.id.uuid = desc->common.id.proxy.value();
     return ndk::ScopedAStatus::ok();
 }
 
@@ -168,7 +168,7 @@ Descriptor::Common EffectProxy::buildDescriptorCommon(
         // same as HIDL EffectProxy flags
         common.flags.type = Flags::Type::INSERT;
         common.flags.insert = Flags::Insert::LAST;
-        common.flags.volume = Flags::Volume::CTRL;
+        common.flags.volume = Flags::Volume::NONE;
 
         // set indication if any sub-effect indication was set
         common.flags.offloadIndication |= desc.common.flags.offloadIndication;
