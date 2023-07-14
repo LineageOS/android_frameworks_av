@@ -3289,7 +3289,7 @@ status_t DeviceEffectProxy::setEnabled(bool enabled, bool fromHandle)
 }
 
 status_t DeviceEffectProxy::init(
-        const std::map <audio_patch_handle_t, AudioFlinger::PatchPanel::Patch>& patches) {
+        const std::map <audio_patch_handle_t, IAfPatchPanel::Patch>& patches) {
 //For all audio patches
 //If src or sink device match
 //If the effect is HW accelerated
@@ -3313,7 +3313,7 @@ status_t DeviceEffectProxy::init(
 
 status_t DeviceEffectProxy::onUpdatePatch(audio_patch_handle_t oldPatchHandle,
         audio_patch_handle_t newPatchHandle,
-        const AudioFlinger::PatchPanel::Patch& patch __unused) {
+        const IAfPatchPanel::Patch& /* patch */) {
     status_t status = NAME_NOT_FOUND;
     ALOGV("%s", __func__);
     Mutex::Autolock _l(mProxyLock);
@@ -3329,7 +3329,7 @@ status_t DeviceEffectProxy::onUpdatePatch(audio_patch_handle_t oldPatchHandle,
 }
 
 status_t DeviceEffectProxy::onCreatePatch(
-        audio_patch_handle_t patchHandle, const AudioFlinger::PatchPanel::Patch& patch) {
+        audio_patch_handle_t patchHandle, const IAfPatchPanel::Patch& patch) {
     status_t status = NAME_NOT_FOUND;
     sp<IAfEffectHandle> handle;
     // only consider source[0] as this is the only "true" source of a patch
@@ -3352,7 +3352,7 @@ status_t DeviceEffectProxy::onCreatePatch(
     return status;
 }
 
-status_t DeviceEffectProxy::checkPort(const AudioFlinger::PatchPanel::Patch& patch,
+status_t DeviceEffectProxy::checkPort(const IAfPatchPanel::Patch& patch,
         const struct audio_port_config *port, sp<IAfEffectHandle> *handle) {
 
     ALOGV("%s type %d device type %d address %s device ID %d patch.isSoftware() %d",

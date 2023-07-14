@@ -42,7 +42,7 @@ void AudioFlinger::PatchCommandThread::addListener(const sp<PatchCommandListener
 }
 
 void AudioFlinger::PatchCommandThread::createAudioPatch(audio_patch_handle_t handle,
-        const PatchPanel::Patch& patch) {
+        const IAfPatchPanel::Patch& patch) {
     ALOGV("%s handle %d mHalHandle %d num sinks %d device sink %08x",
             __func__, handle, patch.mHalHandle,
             patch.mAudioPatch.num_sinks,
@@ -57,7 +57,7 @@ void AudioFlinger::PatchCommandThread::releaseAudioPatch(audio_patch_handle_t ha
 }
 
 void AudioFlinger::PatchCommandThread::updateAudioPatch(audio_patch_handle_t oldHandle,
-        audio_patch_handle_t newHandle, const PatchPanel::Patch& patch) {
+        audio_patch_handle_t newHandle, const IAfPatchPanel::Patch& patch) {
     ALOGV("%s handle %d mHalHandle %d num sinks %d device sink %08x",
             __func__, oldHandle, patch.mHalHandle,
             patch.mAudioPatch.num_sinks,
@@ -151,7 +151,7 @@ void AudioFlinger::PatchCommandThread::sendCommand(const sp<Command>& command) {
 }
 
 void AudioFlinger::PatchCommandThread::createAudioPatchCommand(
-        audio_patch_handle_t handle, const PatchPanel::Patch& patch) {
+        audio_patch_handle_t handle, const IAfPatchPanel::Patch& patch) {
     auto command = sp<Command>::make(CREATE_AUDIO_PATCH,
                                      new CreateAudioPatchData(handle, patch));
     ALOGV("%s adding create patch handle %d mHalHandle %d.",
@@ -170,7 +170,7 @@ void AudioFlinger::PatchCommandThread::releaseAudioPatchCommand(audio_patch_hand
 
 void AudioFlinger::PatchCommandThread::updateAudioPatchCommand(
         audio_patch_handle_t oldHandle, audio_patch_handle_t newHandle,
-        const PatchPanel::Patch& patch) {
+        const IAfPatchPanel::Patch& patch) {
     sp<Command> command = sp<Command>::make(UPDATE_AUDIO_PATCH,
                                            new UpdateAudioPatchData(oldHandle, newHandle, patch));
     ALOGV("%s adding update patch old handle %d new handle %d mHalHandle %d.",

@@ -656,31 +656,14 @@ public:
     status_t setEnabled(bool enabled, bool fromHandle) final;
     sp<IAfDeviceEffectProxy> asDeviceEffectProxy() final { return this; }
 
-    // TODO(b/288339104) type
-    status_t init(const /* std::map<audio_patch_handle_t,
-            PatchPanel::Patch>& */ void * patches) final {
-        return init(*reinterpret_cast<const std::map<
-                audio_patch_handle_t, AudioFlinger::PatchPanel::Patch> *>(patches));
-    }
-    // TODO(b/288339104) type
+    status_t init(const std::map<audio_patch_handle_t,
+            IAfPatchPanel::Patch>& patches) final;
+
     status_t onCreatePatch(audio_patch_handle_t patchHandle,
-            /* const PatchPanel::Patch& */ const void * patch) final {
-        return onCreatePatch(patchHandle,
-                *reinterpret_cast<const AudioFlinger::PatchPanel::Patch *>(patch));
-    }
-    // TODO(b/288339104) type
-    status_t onUpdatePatch(audio_patch_handle_t oldPatchHandle, audio_patch_handle_t newPatchHandle,
-            /* const PatchPanel::Patch& */ const void * patch) final {
-        return onUpdatePatch(oldPatchHandle, newPatchHandle,
-                *reinterpret_cast<const AudioFlinger::PatchPanel::Patch *>(patch));
-    }
-
-    status_t init(const std::map<audio_patch_handle_t, AudioFlinger::PatchPanel::Patch>& patches);
-    status_t onCreatePatch(
-            audio_patch_handle_t patchHandle, const AudioFlinger::PatchPanel::Patch& patch);
+            const IAfPatchPanel::Patch& patch) final;
 
     status_t onUpdatePatch(audio_patch_handle_t oldPatchHandle, audio_patch_handle_t newPatchHandle,
-            const AudioFlinger::PatchPanel::Patch& patch);
+           const IAfPatchPanel::Patch& patch) final;
 
     void onReleasePatch(audio_patch_handle_t patchHandle) final;
 
@@ -763,7 +746,7 @@ private:
         const sp<AudioFlinger::DeviceEffectManagerCallback> mManagerCallback;
     };
 
-    status_t checkPort(const AudioFlinger::PatchPanel::Patch& patch,
+    status_t checkPort(const IAfPatchPanel::Patch& patch,
             const struct audio_port_config *port, sp<IAfEffectHandle> *handle);
 
     const AudioDeviceTypeAddr mDevice;
