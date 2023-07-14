@@ -1617,7 +1617,7 @@ void Track::updateTeePatches() {
     }
 }
 
-void Track::setTeePatchesToUpdate(AudioFlinger::TeePatches teePatchesToUpdate) {
+void Track::setTeePatchesToUpdate(TeePatches teePatchesToUpdate) {
     ALOGW_IF(mTeePatchesToUpdate.has_value(),
              "%s, existing tee patches to update will be ignored", __func__);
     mTeePatchesToUpdate = std::move(teePatchesToUpdate);
