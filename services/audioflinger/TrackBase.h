@@ -373,7 +373,7 @@ class PatchTrackBase : public PatchProxyBufferProvider, public virtual IAfPatchT
 {
 public:
                         PatchTrackBase(const sp<ClientProxy>& proxy,
-                                       const IAfThreadBase& thread,
+                                       IAfThreadBase* thread,
                                        const Timeout& timeout);
             void setPeerTimeout(std::chrono::nanoseconds timeout) final;
             void setPeerProxy(const sp<IAfPatchTrackBase>& proxy, bool holdReference) final {
