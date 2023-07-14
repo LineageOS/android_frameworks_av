@@ -7537,7 +7537,6 @@ void DuplicatingThread::dumpInternals_l(int fd, const Vector<String16>& args)
     if (numTracks > 0) {
         ss << ":";
         for (const auto &track : mOutputTracks) {
-            // TODO(b/288339104) type
             const auto thread = track->thread().promote();
             ss << " (" << track->id() << " : ";
             if (thread.get() != nullptr) {
@@ -7622,7 +7621,6 @@ void DuplicatingThread::updateWaitTime_l()
 {
     mWaitTimeMs = UINT_MAX;
     for (size_t i = 0; i < mOutputTracks.size(); i++) {
-        // TODO(b/288339104) type
         const auto strong = mOutputTracks[i]->thread().promote();
         if (strong != 0) {
             uint32_t waitTimeMs = (strong->frameCount() * 2 * 1000) / strong->sampleRate();
@@ -8936,7 +8934,7 @@ void RecordThread::syncStartEventCallback(const wp<SyncEvent>& event)
         sp<IAfTrackBase> ptr =
                 std::any_cast<const wp<IAfTrackBase>>(strongEvent->cookie()).promote();
         if (ptr != nullptr) {
-            // TODO(b/288339104) handleSyncStartEvent is in IAfTrackBase not IAfRecordTrack.
+            // TODO(b/291317898) handleSyncStartEvent is in IAfTrackBase not IAfRecordTrack.
             ptr->handleSyncStartEvent(strongEvent);
         }
     }
