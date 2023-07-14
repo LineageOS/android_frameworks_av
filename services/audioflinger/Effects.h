@@ -649,7 +649,7 @@ private:
 class DeviceEffectProxy : public IAfDeviceEffectProxy, public EffectBase {
 public:
     DeviceEffectProxy(const AudioDeviceTypeAddr& device,
-                const sp<AudioFlinger::DeviceEffectManagerCallback>& callback,
+            const sp<DeviceEffectManagerCallback>& callback,
                 effect_descriptor_t *desc, int id, bool notifyFramesProcessed)
             : EffectBase(callback, desc, id, AUDIO_SESSION_DEVICE, false),
                 mDevice(device), mManagerCallback(callback),
@@ -687,7 +687,7 @@ private:
         // Note: ctors taking a weak pointer to their owner must not promote it
         // during construction (but may keep a reference for later promotion).
         ProxyCallback(const wp<DeviceEffectProxy>& owner,
-                const sp<AudioFlinger::DeviceEffectManagerCallback>& callback)
+                const sp<DeviceEffectManagerCallback>& callback)
             : mProxy(owner), mManagerCallback(callback) {}
 
         status_t createEffectHal(const effect_uuid_t *pEffectUuid,
@@ -738,14 +738,14 @@ private:
 
     private:
         const wp<DeviceEffectProxy> mProxy;
-        const sp<AudioFlinger::DeviceEffectManagerCallback> mManagerCallback;
+        const sp<DeviceEffectManagerCallback> mManagerCallback;
     };
 
     status_t checkPort(const IAfPatchPanel::Patch& patch,
             const struct audio_port_config *port, sp<IAfEffectHandle> *handle);
 
     const AudioDeviceTypeAddr mDevice;
-    const sp<AudioFlinger::DeviceEffectManagerCallback> mManagerCallback;
+    const sp<DeviceEffectManagerCallback> mManagerCallback;
     const sp<ProxyCallback> mMyCallback;
 
     mutable Mutex mProxyLock;
