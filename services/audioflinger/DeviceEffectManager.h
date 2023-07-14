@@ -34,7 +34,7 @@ public:
                 const AudioDeviceTypeAddr& device,
                 const sp<Client>& client,
                 const sp<media::IEffectClient>& effectClient,
-                const std::map<audio_patch_handle_t, PatchPanel::Patch>& patches,
+                const std::map<audio_patch_handle_t, IAfPatchPanel::Patch>& patches,
                 int *enabled,
                 status_t *status,
                 bool probe,
@@ -60,11 +60,11 @@ public:
     // PatchCommandThread::PatchCommandListener implementation
 
     void onCreateAudioPatch(audio_patch_handle_t handle,
-                            const PatchPanel::Patch& patch) override;
+            const IAfPatchPanel::Patch& patch) override;
     void onReleaseAudioPatch(audio_patch_handle_t handle) override;
     void onUpdateAudioPatch(audio_patch_handle_t oldHandle,
                             audio_patch_handle_t newHandle,
-                            const PatchPanel::Patch& patch) override;
+                            const IAfPatchPanel::Patch& patch) override;
 
 private:
     status_t checkEffectCompatibility(const effect_descriptor_t *desc);

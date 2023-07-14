@@ -141,7 +141,7 @@ void AudioFlinger::MelReporter::updateMetadataForCsd(audio_io_handle_t streamHan
 }
 
 void AudioFlinger::MelReporter::onCreateAudioPatch(audio_patch_handle_t handle,
-        const PatchPanel::Patch& patch) {
+        const IAfPatchPanel::Patch& patch) {
     if (!mSoundDoseManager->isCsdEnabled()) {
         ALOGV("%s csd is disabled", __func__);
         return;
@@ -232,7 +232,7 @@ void AudioFlinger::MelReporter::onReleaseAudioPatch(audio_patch_handle_t handle)
 }
 
 void AudioFlinger::MelReporter::onUpdateAudioPatch(audio_patch_handle_t oldHandle,
-        audio_patch_handle_t newHandle, const PatchPanel::Patch& patch) {
+        audio_patch_handle_t newHandle, const IAfPatchPanel::Patch& patch) {
     onReleaseAudioPatch(oldHandle);
     onCreateAudioPatch(newHandle, patch);
 }
