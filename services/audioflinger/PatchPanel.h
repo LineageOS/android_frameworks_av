@@ -15,12 +15,10 @@
 ** limitations under the License.
 */
 
-#ifndef INCLUDING_FROM_AUDIOFLINGER_H
-    #error This header file should only be included from AudioFlinger.h
-#endif
+#pragma once
 
-public: // TODO(b/288339104) extract out of AudioFlinger class
-// PatchPanel is concealed within AudioFlinger, their lifetimes are the same.
+namespace android {
+
 class PatchPanel : public IAfPatchPanel {
 public:
     explicit PatchPanel(AudioFlinger* audioFlinger) : mAudioFlinger(*audioFlinger) {}
@@ -103,4 +101,4 @@ private:
     std::map<audio_module_handle_t, ModuleConnections> mInsertedModules;
 };
 
-private:
+}  // namespace android
