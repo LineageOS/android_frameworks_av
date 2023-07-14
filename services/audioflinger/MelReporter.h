@@ -15,13 +15,13 @@
 ** limitations under the License.
 */
 
-#ifndef INCLUDING_FROM_AUDIOFLINGER_H
-    #error This header file should only be included from AudioFlinger.h
-#endif
+#pragma once
 
 #include <mutex>
 #include <sounddose/SoundDoseManager.h>
 #include <unordered_map>
+
+namespace android {
 
 constexpr static int kMaxTimestampDeltaInSec = 120;
 
@@ -109,9 +109,9 @@ private:
      * Locking order AudioFlinger::mLock -> PatchCommandThread::mLock -> MelReporter::mLock.
      */
     std::mutex mLock;
-    std::unordered_map<audio_patch_handle_t, ActiveMelPatch>
-        mActiveMelPatches GUARDED_BY(AudioFlinger::MelReporter::mLock);
-    std::unordered_map<audio_port_handle_t, int>
-        mActiveDevices GUARDED_BY(AudioFlinger::MelReporter::mLock);
-    bool mUseHalSoundDoseInterface GUARDED_BY(AudioFlinger::MelReporter::mLock) = false;
+    std::unordered_map<audio_patch_handle_t, ActiveMelPatch> mActiveMelPatches GUARDED_BY(mLock);
+    std::unordered_map<audio_port_handle_t, int> mActiveDevices GUARDED_BY(mLock);
+    bool mUseHalSoundDoseInterface GUARDED_BY(mLock) = false;
 };
+
+}  // namespace android
