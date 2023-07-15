@@ -2121,7 +2121,6 @@ sp<IAfEffectChain> IAfEffectChain::create(
         const wp<IAfThreadBase>& wThread,
         audio_session_t sessionId)
 {
-    // TODO(b/288339104) no weak pointer cast.
     return sp<EffectChain>::make(wThread, sessionId);
 }
 
