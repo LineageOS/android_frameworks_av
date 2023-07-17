@@ -21,7 +21,8 @@ namespace android {
 
 class PatchPanel : public IAfPatchPanel {
 public:
-    explicit PatchPanel(AudioFlinger* audioFlinger) : mAudioFlinger(*audioFlinger) {}
+    explicit PatchPanel(const sp<IAfPatchPanelCallback>& afPatchPanelCallback)
+        : mAfPatchPanelCallback(afPatchPanelCallback) {}
 
     /* List connected audio ports and their attributes */
     status_t listAudioPorts(unsigned int *num_ports,
@@ -102,7 +103,7 @@ private:
                 newPatch.sources[0].ext.mix.handle == oldPatch.sources[0].ext.mix.handle);
     }
 
-    AudioFlinger &mAudioFlinger;
+    const sp<IAfPatchPanelCallback> mAfPatchPanelCallback;
     std::map<audio_patch_handle_t, Patch> mPatches;
 
     // This map allows going from a thread to "downstream" software patches
