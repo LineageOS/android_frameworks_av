@@ -165,10 +165,10 @@ class AudioFlinger
     : public AudioFlingerServerAdapter::Delegate  // IAudioFlinger client interface
     , public IAfClientCallback
     , public IAfDeviceEffectManagerCallback
+    , public IAfMelReporterCallback
 {
     friend class sp<AudioFlinger>;
     // TODO(b/291319167) Create interface and remove friends.
-    friend class MelReporter;
     friend class PatchPanel;
     // TODO(b/291012167) replace the Thread friends with an interface.
     friend class DirectOutputThread;
@@ -374,6 +374,7 @@ public:
     // ---- begin IAfDeviceEffectManagerCallback interface
 
     bool isAudioPolicyReady() const final { return mAudioPolicyReady.load(); }
+    // below also used by IAfMelReporterCallback
     const sp<PatchCommandThread>& getPatchCommandThread() final { return mPatchCommandThread; }
     status_t addEffectToHal(
             const struct audio_port_config* device, const sp<EffectHalInterface>& effect) final;
@@ -381,6 +382,13 @@ public:
             const struct audio_port_config* device, const sp<EffectHalInterface>& effect) final;
 
     // ---- end of IAfDeviceEffectManagerCallback interface
+
+    // ---- begin IAfMelReporterCallback interface
+
+    Mutex& mutex() const final { return mLock; }
+    sp<IAfThreadBase> checkOutputThread_l(audio_io_handle_t ioHandle) const final REQUIRES(mLock);
+
+    // ---- end of IAfMelReporterCallback interface
 
     /* List available audio ports and their attributes */
     status_t listAudioPorts(unsigned int* num_ports, struct audio_port* ports) const;
@@ -619,7 +627,6 @@ private:
     }
 
     IAfThreadBase* checkThread_l(audio_io_handle_t ioHandle) const;
-    sp<IAfThreadBase> checkOutputThread_l(audio_io_handle_t ioHandle) const REQUIRES(mLock);
     IAfPlaybackThread* checkPlaybackThread_l(audio_io_handle_t output) const;
     IAfPlaybackThread* checkMixerThread_l(audio_io_handle_t output) const;
     IAfRecordThread* checkRecordThread_l(audio_io_handle_t input) const;
@@ -875,7 +882,7 @@ private:
 
     const sp<PatchCommandThread> mPatchCommandThread;
     /* const */ sp<DeviceEffectManager> mDeviceEffectManager;  // set onFirstRef
-    sp<MelReporter> mMelReporter;
+    /* const */ sp<MelReporter> mMelReporter;  // set onFirstRef
 
     bool       mSystemReady;
     std::atomic_bool mAudioPolicyReady{};
