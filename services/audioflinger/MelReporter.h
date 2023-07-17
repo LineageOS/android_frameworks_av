@@ -25,15 +25,22 @@ namespace android {
 
 constexpr static int kMaxTimestampDeltaInSec = 120;
 
+class IAfMelReporterCallback : public virtual RefBase {
+public:
+    virtual Mutex& mutex() const = 0;
+    virtual const sp<PatchCommandThread>& getPatchCommandThread() = 0;
+    virtual sp<IAfThreadBase> checkOutputThread_l(audio_io_handle_t ioHandle) const = 0;
+};
+
 /**
  * Class for listening to new patches and starting the MEL computation. MelReporter is
  * concealed within AudioFlinger, their lifetimes are the same.
  */
 class MelReporter : public PatchCommandThread::PatchCommandListener {
 public:
-    explicit MelReporter(AudioFlinger& audioFlinger)
-        : mAudioFlinger(audioFlinger),
-          mSoundDoseManager(sp<SoundDoseManager>::make()) {}
+    explicit MelReporter(const sp<IAfMelReporterCallback>& afMelReporterCallback)
+        : mAfMelReporterCallback(afMelReporterCallback),
+         mSoundDoseManager(sp<SoundDoseManager>::make()) {}
 
     void onFirstRef() override;
 
@@ -100,7 +107,7 @@ private:
 
     bool useHalSoundDoseInterface_l() REQUIRES(mLock);
 
-    AudioFlinger& mAudioFlinger;  // does not own the object
+    const sp<IAfMelReporterCallback> mAfMelReporterCallback;
 
     sp<SoundDoseManager> mSoundDoseManager;
 
