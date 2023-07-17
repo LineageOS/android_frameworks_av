@@ -329,7 +329,6 @@ AudioFlinger::AudioFlinger()
       mClientSharedHeapSize(kMinimumClientSharedHeapSizeBytes),
       mGlobalEffectEnableTime(0),
       mPatchCommandThread(sp<PatchCommandThread>::make()),
-      mDeviceEffectManager(sp<DeviceEffectManager>::make(*this)),
       mMelReporter(sp<MelReporter>::make(*this)),
       mSystemReady(false),
       mBluetoothLatencyModesEnabled(true)
@@ -404,7 +403,8 @@ void AudioFlinger::onFirstRef()
     mMode = AUDIO_MODE_NORMAL;
 
     gAudioFlinger = this;  // we are already refcounted, store into atomic pointer.
-
+    mDeviceEffectManager = sp<DeviceEffectManager>::make(
+            sp<IAfDeviceEffectManagerCallback>::fromExisting(this)),
     mDevicesFactoryHalCallback = new DevicesFactoryHalCallbackImpl;
     mDevicesFactoryHal->setCallbackOnce(mDevicesFactoryHalCallback);
 
