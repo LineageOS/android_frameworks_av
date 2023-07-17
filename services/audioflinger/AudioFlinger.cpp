@@ -475,12 +475,12 @@ status_t AudioFlinger::getMmapPolicyInfos(
     return NO_ERROR;
 }
 
-int32_t AudioFlinger::getAAudioMixerBurstCount() {
+int32_t AudioFlinger::getAAudioMixerBurstCount() const {
     Mutex::Autolock _l(mLock);
     return mAAudioBurstsPerBuffer;
 }
 
-int32_t AudioFlinger::getAAudioHardwareBurstMinUsec() {
+int32_t AudioFlinger::getAAudioHardwareBurstMinUsec() const {
     Mutex::Autolock _l(mLock);
     return mAAudioHwBurstMinMicros;
 }
@@ -1683,7 +1683,7 @@ status_t AudioFlinger::setRequestedLatencyMode(
 }
 
 status_t AudioFlinger::getSupportedLatencyModes(audio_io_handle_t output,
-            std::vector<audio_latency_mode_t>* modes) {
+            std::vector<audio_latency_mode_t>* modes) const {
     if (output == AUDIO_IO_HANDLE_NONE) {
         return BAD_VALUE;
     }
@@ -1710,7 +1710,7 @@ status_t AudioFlinger::setBluetoothVariableLatencyEnabled(bool enabled) {
     return status;
 }
 
-status_t AudioFlinger::isBluetoothVariableLatencyEnabled(bool *enabled) {
+status_t AudioFlinger::isBluetoothVariableLatencyEnabled(bool* enabled) const {
     if (enabled == nullptr) {
         return BAD_VALUE;
     }
@@ -1718,7 +1718,7 @@ status_t AudioFlinger::isBluetoothVariableLatencyEnabled(bool *enabled) {
     return NO_ERROR;
 }
 
-status_t AudioFlinger::supportsBluetoothVariableLatency(bool* support) {
+status_t AudioFlinger::supportsBluetoothVariableLatency(bool* support) const {
     if (support == nullptr) {
         return BAD_VALUE;
     }
@@ -1734,7 +1734,7 @@ status_t AudioFlinger::supportsBluetoothVariableLatency(bool* support) {
 }
 
 status_t AudioFlinger::getSoundDoseInterface(const sp<media::ISoundDoseCallback>& callback,
-                                             sp<media::ISoundDose>* soundDose) {
+                                             sp<media::ISoundDose>* soundDose) const {
     if (soundDose == nullptr) {
         return BAD_VALUE;
     }
@@ -2735,14 +2735,14 @@ AudioHwDevice* AudioFlinger::loadHwModule_l(const char *name)
 
 // ----------------------------------------------------------------------------
 
-uint32_t AudioFlinger::getPrimaryOutputSamplingRate()
+uint32_t AudioFlinger::getPrimaryOutputSamplingRate() const
 {
     Mutex::Autolock _l(mLock);
     IAfPlaybackThread* const thread = fastPlaybackThread_l();
     return thread != NULL ? thread->sampleRate() : 0;
 }
 
-size_t AudioFlinger::getPrimaryOutputFrameCount()
+size_t AudioFlinger::getPrimaryOutputFrameCount() const
 {
     Mutex::Autolock _l(mLock);
     IAfPlaybackThread* const thread = fastPlaybackThread_l();
@@ -2930,7 +2930,7 @@ sp<IAudioManager> AudioFlinger::getOrCreateAudioManager()
     return mAudioManager.load();
 }
 
-status_t AudioFlinger::getMicrophones(std::vector<media::MicrophoneInfoFw> *microphones)
+status_t AudioFlinger::getMicrophones(std::vector<media::MicrophoneInfoFw>* microphones) const
 {
     AutoMutex lock(mHardwareLock);
     status_t status = INVALID_OPERATION;
