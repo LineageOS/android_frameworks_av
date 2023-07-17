@@ -164,11 +164,10 @@ struct stream_type_t {
 class AudioFlinger
     : public AudioFlingerServerAdapter::Delegate  // IAudioFlinger client interface
     , public IAfClientCallback
+    , public IAfDeviceEffectManagerCallback
 {
     friend class sp<AudioFlinger>;
     // TODO(b/291319167) Create interface and remove friends.
-    friend class DeviceEffectManager;
-    friend class DeviceEffectManagerCallback;
     friend class MelReporter;
     friend class PatchPanel;
     // TODO(b/291012167) replace the Thread friends with an interface.
@@ -372,7 +371,16 @@ public:
 
     // ---- end of IAfClientCallback interface
 
-    bool isAudioPolicyReady() const { return mAudioPolicyReady.load(); }
+    // ---- begin IAfDeviceEffectManagerCallback interface
+
+    bool isAudioPolicyReady() const final { return mAudioPolicyReady.load(); }
+    const sp<PatchCommandThread>& getPatchCommandThread() final { return mPatchCommandThread; }
+    status_t addEffectToHal(
+            const struct audio_port_config* device, const sp<EffectHalInterface>& effect) final;
+    status_t removeEffectFromHal(
+            const struct audio_port_config* device, const sp<EffectHalInterface>& effect) final;
+
+    // ---- end of IAfDeviceEffectManagerCallback interface
 
     /* List available audio ports and their attributes */
     status_t listAudioPorts(unsigned int* num_ports, struct audio_port* ports) const;
@@ -394,11 +402,6 @@ public:
     static os::HapticScale onExternalVibrationStart(
         const sp<os::ExternalVibration>& externalVibration);
     static void onExternalVibrationStop(const sp<os::ExternalVibration>& externalVibration);
-
-    status_t addEffectToHal(
-            const struct audio_port_config *device, const sp<EffectHalInterface>& effect);
-    status_t removeEffectFromHal(
-            const struct audio_port_config *device, const sp<EffectHalInterface>& effect);
 
     void updateDownStreamPatches_l(const struct audio_patch *patch,
                                    const std::set<audio_io_handle_t>& streams);
@@ -664,7 +667,8 @@ private:
               //       Thus it may fail by returning an ID of the wrong sign,
               //       or by returning a non-unique ID.
               // This is the internal API.  For the binder API see newAudioUniqueId().
-              audio_unique_id_t nextUniqueId(audio_unique_id_use_t use);
+    // used by IAfDeviceEffectManagerCallback
+    audio_unique_id_t nextUniqueId(audio_unique_id_use_t use) final;
 
               status_t moveEffectChain_l(audio_session_t sessionId,
             IAfPlaybackThread* srcThread, IAfPlaybackThread* dstThread);
@@ -870,7 +874,7 @@ public:
 private:
 
     const sp<PatchCommandThread> mPatchCommandThread;
-    sp<DeviceEffectManager> mDeviceEffectManager;
+    /* const */ sp<DeviceEffectManager> mDeviceEffectManager;  // set onFirstRef
     sp<MelReporter> mMelReporter;
 
     bool       mSystemReady;
