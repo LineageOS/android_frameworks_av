@@ -125,6 +125,15 @@ void DeviceDescriptorBase::dump(std::string *dst, int spaces,
     dst->append(base::StringPrintf(
                     "%*sEncapsulation modes: %u, metadata types: %u\n", spaces, "",
                     mEncapsulationModes, mEncapsulationMetadataTypes));
+    if (!mEncodedFormats.empty()) {
+        std::string s;
+        for (const auto& format : mEncodedFormats) {
+            if (!s.empty()) s.append(", ");
+            s.append(audio_format_to_string(format));
+        }
+        dst->append(base::StringPrintf(
+                        "%*sEncoded formats: %s\n", spaces, "", s.c_str()));
+    }
 
     AudioPort::dump(dst, spaces, nullptr, verbose);
 }
