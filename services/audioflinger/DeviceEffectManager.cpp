@@ -34,22 +34,23 @@ namespace android {
 using detail::AudioHalVersionInfo;
 using media::IEffectClient;
 
-DeviceEffectManager::DeviceEffectManager(AudioFlinger& audioFlinger)
-    : mAudioFlinger(audioFlinger),
+DeviceEffectManager::DeviceEffectManager(
+        const sp<IAfDeviceEffectManagerCallback>& afDeviceEffectManagerCallback)
+    : mAfDeviceEffectManagerCallback(afDeviceEffectManagerCallback),
       mMyCallback(new DeviceEffectManagerCallback(*this)) {}
 
 void DeviceEffectManager::onFirstRef() {
-    mAudioFlinger.mPatchCommandThread->addListener(this);
+    mAfDeviceEffectManagerCallback->getPatchCommandThread()->addListener(this);
 }
 
 status_t DeviceEffectManager::addEffectToHal(const struct audio_port_config* device,
         const sp<EffectHalInterface>& effect) {
-    return mAudioFlinger.addEffectToHal(device, effect);
+    return mAfDeviceEffectManagerCallback->addEffectToHal(device, effect);
 };
 
 status_t DeviceEffectManager::removeEffectFromHal(const struct audio_port_config* device,
         const sp<EffectHalInterface>& effect) {
-    return mAudioFlinger.removeEffectFromHal(device, effect);
+    return mAfDeviceEffectManagerCallback->removeEffectFromHal(device, effect);
 };
 
 void DeviceEffectManager::onCreateAudioPatch(audio_patch_handle_t handle,
@@ -129,7 +130,8 @@ sp<IAfEffectHandle> DeviceEffectManager::createEffect_l(
         }
         if (effect == nullptr) {
             effect = IAfDeviceEffectProxy::create(device, mMyCallback,
-                    descriptor, mAudioFlinger.nextUniqueId(AUDIO_UNIQUE_ID_USE_EFFECT),
+                    descriptor,
+                    mAfDeviceEffectManagerCallback->nextUniqueId(AUDIO_UNIQUE_ID_USE_EFFECT),
                     notifyFramesProcessed);
             effectsForDevice.push_back(effect);
         }
@@ -266,11 +268,11 @@ bool DeviceEffectManagerCallback::disconnectEffectHandle(
 }
 
 bool DeviceEffectManagerCallback::isAudioPolicyReady() const {
-    return mManager.audioFlinger().isAudioPolicyReady();
+    return mManager.afDeviceEffectManagerCallback()->isAudioPolicyReady();
 }
 
 int DeviceEffectManagerCallback::newEffectId() const {
-    return mManager.audioFlinger().nextUniqueId(AUDIO_UNIQUE_ID_USE_EFFECT);
+    return mManager.afDeviceEffectManagerCallback()->nextUniqueId(AUDIO_UNIQUE_ID_USE_EFFECT);
 }
 
 } // namespace android
