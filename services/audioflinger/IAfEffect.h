@@ -192,7 +192,7 @@ class IAfEffectChain : public RefBase {
     // Most of these methods are accessed from AudioFlinger::Thread
 public:
     static sp<IAfEffectChain> create(
-            const wp<IAfThreadBase>& wThread,
+            const sp<IAfThreadBase>& thread,
             audio_session_t sessionId);
 
     // special key used for an entry in mSuspendedEffects keyed vector

@@ -382,8 +382,7 @@ private:
 // it also provide it's own input buffer used by the track as accumulation buffer.
 class EffectChain : public IAfEffectChain {
 public:
-    EffectChain(const wp<IAfThreadBase>& wThread, audio_session_t sessionId);
-    ~EffectChain() override;
+    EffectChain(const sp<IAfThreadBase>& thread, audio_session_t sessionId);
 
     void process_l() final;
 
@@ -516,16 +515,11 @@ private:
         // Note: ctors taking a weak pointer to their owner must not promote it
         // during construction (but may keep a reference for later promotion).
         EffectCallback(const wp<EffectChain>& owner,
-                const wp<IAfThreadBase>& thread)
+                const sp<IAfThreadBase>& thread)  // we take a sp<> but store a wp<>.
             : mChain(owner)
-            , mThread(thread)
-            , mAudioFlinger(*AudioFlinger::gAudioFlinger) {
-            const sp<IAfThreadBase> base = thread.promote();
-            if (base != nullptr) {
-                mThreadType = base->type();
-            } else {
-                mThreadType = IAfThreadBase::MIXER;  // assure a consistent value.
-            }
+            , mThread(thread) {
+            mThreadType = thread->type();
+            mAfThreadCallback = thread->afThreadCallback();
         }
 
         status_t createEffectHal(const effect_uuid_t *pEffectUuid,
@@ -566,7 +560,7 @@ private:
         wp<IAfEffectChain> chain() const final { return mChain; }
 
         bool isAudioPolicyReady() const final {
-            return mAudioFlinger.isAudioPolicyReady();
+            return mAfThreadCallback->isAudioPolicyReady();
         }
 
         wp<IAfThreadBase> thread() const { return mThread.load(); }
@@ -574,12 +568,13 @@ private:
         void setThread(const sp<IAfThreadBase>& thread) {
             mThread = thread;
             mThreadType = thread->type();
+            mAfThreadCallback = thread->afThreadCallback();
         }
 
     private:
         const wp<IAfEffectChain> mChain;
         mediautils::atomic_wp<IAfThreadBase> mThread;
-        AudioFlinger &mAudioFlinger;  // implementation detail: outer instance always exists.
+        sp<IAfThreadCallback> mAfThreadCallback;
         IAfThreadBase::type_t mThreadType;
     };
 
