@@ -2040,6 +2040,9 @@ Status CameraService::connectHelper(const sp<CALLBACK>& cameraCb, const String8&
         if (err != OK) {
             ALOGE("%s: Could not initialize client from HAL.", __FUNCTION__);
             // Errors could be from the HAL module open call or from AppOpsManager
+            mServiceLock.unlock();
+            client->disconnect();
+            mServiceLock.lock();
             switch(err) {
                 case BAD_VALUE:
                     return STATUS_ERROR_FMT(ERROR_ILLEGAL_ARGUMENT,
