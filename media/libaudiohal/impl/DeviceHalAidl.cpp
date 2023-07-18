@@ -293,6 +293,9 @@ status_t DeviceHalAidl::setParameters(const String8& kvPairs) {
     if (status_t status = filterAndUpdateScreenParameters(parameters); status != OK) {
         ALOGW("%s: filtering or updating screen parameters failed: %d", __func__, status);
     }
+    if (status_t status = filterAndUpdateTelephonyParameters(parameters); status != OK) {
+        ALOGW("%s: filtering or updating telephony parameters failed: %d", __func__, status);
+    }
     return parseAndSetVendorParameters(mVendorExt, mModule, parameters);
 }
 
@@ -1367,6 +1370,52 @@ status_t DeviceHalAidl::filterAndUpdateScreenParameters(AudioParameter &paramete
                 }
                 return statusTFromBinderStatus(mModule->updateScreenRotation(rotation));
             }));
+    return OK;
+}
+
+status_t DeviceHalAidl::filterAndUpdateTelephonyParameters(AudioParameter &parameters) {
+    TIME_CHECK();
+    using TtyMode = ITelephony::TelecomConfig::TtyMode;
+    ITelephony::TelecomConfig telConfig;
+    (void)VALUE_OR_RETURN_STATUS(filterOutAndProcessParameter<String8>(
+                    parameters, String8(AudioParameter::keyTtyMode),
+                    [&telConfig](const String8& mode) {
+                        if (mode == AudioParameter::valueTtyModeOff) {
+                            telConfig.ttyMode = TtyMode::OFF;
+                            return OK;
+                        } else if (mode == AudioParameter::valueTtyModeFull) {
+                            telConfig.ttyMode = TtyMode::FULL;
+                            return OK;
+                        } else if (mode == AudioParameter::valueTtyModeHco) {
+                            telConfig.ttyMode = TtyMode::HCO;
+                            return OK;
+                        } else if (mode == AudioParameter::valueTtyModeVco) {
+                            telConfig.ttyMode = TtyMode::VCO;
+                            return OK;
+                        }
+                        ALOGE("setParameters: parameter key \"%s\" has invalid value \"%s\"",
+                                AudioParameter::keyTtyMode, mode.c_str());
+                        return BAD_VALUE;
+                    }));
+    (void)VALUE_OR_RETURN_STATUS(filterOutAndProcessParameter<String8>(
+                    parameters, String8(AudioParameter::keyHacSetting),
+                    [&telConfig](const String8& onOrOff) {
+                        if (onOrOff == AudioParameter::valueHacOn) {
+                            telConfig.isHacEnabled = Boolean{ .value = true };
+                            return OK;
+                        } else if (onOrOff == AudioParameter::valueHacOff) {
+                            telConfig.isHacEnabled = Boolean{ .value = false };
+                            return OK;
+                        }
+                        ALOGE("setParameters: parameter key \"%s\" has invalid value \"%s\"",
+                                AudioParameter::keyHacSetting, onOrOff.c_str());
+                        return BAD_VALUE;
+                    }));
+    if (mTelephony != nullptr && telConfig != ITelephony::TelecomConfig{}) {
+        ITelephony::TelecomConfig newTelConfig;
+        return statusTFromBinderStatus(
+                mTelephony->setTelecomConfig(telConfig, &newTelConfig));
+    }
     return OK;
 }
 
