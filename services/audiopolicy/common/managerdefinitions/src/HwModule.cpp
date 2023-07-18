@@ -383,8 +383,8 @@ sp<DeviceDescriptor> HwModuleCollection::getDeviceDescriptor(const audio_devices
         }
     }
     if (!allowToCreate) {
-        ALOGV("%s: could not find HW module for device %s %04x address %s", __FUNCTION__,
-              name, deviceType, address);
+        ALOGW("%s: could not find HW module for device %s (%s, %08x) address %s", __FUNCTION__,
+                name, audio_device_to_string(deviceType), deviceType, address);
         return nullptr;
     }
     return createDevice(deviceType, address, name, encodedFormat);
@@ -398,8 +398,14 @@ sp<DeviceDescriptor> HwModuleCollection::createDevice(const audio_devices_t type
     std::string tagName = {};
     sp<HwModule> hwModule = getModuleForDeviceType(type, encodedFormat, &tagName);
     if (hwModule == 0) {
-        ALOGE("%s: could not find HW module for device %04x address %s", __FUNCTION__, type,
-              address);
+        if (encodedFormat == AUDIO_FORMAT_DEFAULT) {
+            ALOGE("%s: could not find HW module for device type '%s' (%08x)",
+                    __FUNCTION__, audio_device_to_string(type), type);
+        } else {
+            ALOGE("%s: could not find HW module for device type '%s' (%08x), "
+                    "encoded format '%s'", __FUNCTION__, audio_device_to_string(type), type,
+                    audio_format_to_string(encodedFormat));
+        }
         return nullptr;
     }
 
