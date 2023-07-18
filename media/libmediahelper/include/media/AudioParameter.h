@@ -69,6 +69,16 @@ public:
     static const char * const keyBtHfpSamplingRate;
     static const char * const keyBtHfpVolume;
 
+    static const char * const keyTtyMode;
+    static const char * const valueTtyModeOff;
+    static const char * const valueTtyModeFull;
+    static const char * const valueTtyModeHco;
+    static const char * const valueTtyModeVco;
+
+    static const char * const keyHacSetting;
+    static const char * const valueHacOff;
+    static const char * const valueHacOn;
+
     //  keyHwAvSync: get HW synchronization source identifier from a device
     //  keyMonoOutput: Enable mono audio playback
     //  keyStreamHwAvSync: set HW synchronization source identifier on a stream
