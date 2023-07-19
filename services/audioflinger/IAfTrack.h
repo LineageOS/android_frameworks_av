@@ -16,7 +16,26 @@
 
 #pragma once
 
+#include <android/media/BnAudioRecord.h>
+#include <android/media/BnAudioTrack.h>
+#include <audiomanager/IAudioManager.h>
+#include <binder/IMemory.h>
+#include <fastpath/FastMixerDumpState.h>
+#include <media/AudioSystem.h>
+#include <media/VolumeShaper.h>
+#include <private/media/AudioTrackShared.h>
+#include <timing/SyncEvent.h>
+#include <timing/SynchronizedRecordState.h>
+#include <utils/RefBase.h>
+#include <vibrator/ExternalVibration.h>
+
+#include <vector>
+
 namespace android {
+
+class Client;
+class ResamplerBufferProvider;
+struct Source;
 
 class IAfDuplicatingThread;
 class IAfPatchRecord;
