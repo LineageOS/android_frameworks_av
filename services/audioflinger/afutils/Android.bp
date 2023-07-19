@@ -39,13 +39,17 @@ cc_library {
         "AudioWatchdog.cpp",
         "BufLog.cpp",
         "NBAIO_Tee.cpp",
+        "Permission.cpp",
         "PropertyUtils.cpp",
         "TypedLogger.cpp",
     ],
 
     shared_libs: [
+        "framework-permission-aidl-cpp",
+        "libaudioclient_aidl_conversion",
         "libaudioutils",
         "libbase",
+        "libbinder",
         "libcutils", // property_get_int32
         "liblog",
         "libnbaio",
