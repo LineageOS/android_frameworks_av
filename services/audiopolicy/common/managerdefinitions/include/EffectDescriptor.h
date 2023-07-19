@@ -84,6 +84,7 @@ public:
             const AudioInputCollection *inputs, AudioPolicyClientInterface *mClientInterface);
     void putOrphanEffects(audio_session_t sessionId, audio_io_handle_t srcIo,
             const AudioInputCollection *inputs, AudioPolicyClientInterface *clientInterface);
+    void putOrphanEffectsForIo(audio_io_handle_t srcIo);
 
     /**
      * @brief Checks if an effect session was already attached to an io handle and return it if
