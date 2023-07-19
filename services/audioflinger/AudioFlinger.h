@@ -151,11 +151,6 @@ class ServerProxy;
 
 using android::content::AttributionSourceState;
 
-struct stream_type_t {
-    float volume = 1.f;
-    bool mute = false;
-};
-
 class AudioFlinger
     : public AudioFlingerServerAdapter::Delegate  // IAudioFlinger client interface
     , public IAfClientCallback
@@ -801,11 +796,6 @@ private:
 
     static inline constexpr const char *mMetricsId = AMEDIAMETRICS_KEY_AUDIO_FLINGER;
 
-public:
-    // Keep in sync with java definition in media/java/android/media/AudioRecord.java
-    static constexpr int32_t kMaxSharedAudioHistoryMs = 5000;
-private:
-
     std::map<media::audio::common::AudioMMapPolicyType,
              std::vector<media::audio::common::AudioMMapPolicyInfo>> mPolicyInfos;
     int32_t mAAudioBurstsPerBuffer = 0;
@@ -817,12 +807,6 @@ private:
     // Bluetooth Variable latency control logic is enabled or disabled
     std::atomic_bool mBluetoothLatencyModesEnabled;
 };
-
-std::string formatToString(audio_format_t format);
-std::string inputFlagsToString(audio_input_flags_t flags);
-std::string outputFlagsToString(audio_output_flags_t flags);
-std::string devicesToString(audio_devices_t devices);
-const char *sourceToString(audio_source_t source);
 
 // ----------------------------------------------------------------------------
 

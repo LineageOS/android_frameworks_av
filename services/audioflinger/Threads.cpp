@@ -20,45 +20,49 @@
 // #define LOG_NDEBUG 0
 #define ATRACE_TAG ATRACE_TAG_AUDIO
 
-#include "Configuration.h"
-#include <math.h>
-#include <fcntl.h>
-#include <memory>
-#include <sstream>
-#include <string>
-#include <linux/futex.h>
-#include <sys/stat.h>
-#include <sys/syscall.h>
+#include "Threads.h"
+
+#include "Client.h"
+#include "IAfEffect.h"
+#include "MelReporter.h"
+#include "ResamplerBufferProvider.h"
+
+#include <afutils/DumpTryLock.h>
+#include <afutils/Permission.h>
+#include <afutils/TypedLogger.h>
+#include <afutils/Vibrator.h>
+#include <audio_utils/MelProcessor.h>
+#include <audio_utils/Metadata.h>
+#ifdef DEBUG_CPU_USAGE
+#include <audio_utils/Statistics.h>
+#include <cpustats/ThreadCpuUsage.h>
+#endif
+#include <audio_utils/channels.h>
+#include <audio_utils/format.h>
+#include <audio_utils/minifloat.h>
+#include <audio_utils/mono_blend.h>
+#include <audio_utils/primitives.h>
+#include <audio_utils/safe_math.h>
+#include <audiomanager/AudioManager.h>
+#include <binder/IPCThreadState.h>
+#include <binder/IServiceManager.h>
+#include <binder/PersistableBundle.h>
 #include <cutils/bitops.h>
 #include <cutils/properties.h>
-#include <binder/PersistableBundle.h>
+#include <fastpath/AutoPark.h>
 #include <media/AudioContainers.h>
 #include <media/AudioDeviceTypeAddr.h>
 #include <media/AudioParameter.h>
 #include <media/AudioResamplerPublic.h>
+#ifdef ADD_BATTERY_DATA
+#include <media/IMediaPlayerService.h>
+#include <media/IMediaDeathNotifier.h>
+#endif
+#include <media/MmapStreamCallback.h>
 #include <media/RecordBufferConverter.h>
 #include <media/TypeConverter.h>
-#include <utils/Log.h>
-#include <utils/Trace.h>
-
-#include <private/media/AudioTrackShared.h>
-#include <private/android_filesystem_config.h>
-#include <audio_utils/Balance.h>
-#include <audio_utils/MelProcessor.h>
-#include <audio_utils/Metadata.h>
-#include <audio_utils/channels.h>
-#include <audio_utils/mono_blend.h>
-#include <audio_utils/primitives.h>
-#include <audio_utils/format.h>
-#include <audio_utils/minifloat.h>
-#include <audio_utils/safe_math.h>
-#include <system/audio_effects/effect_aec.h>
-#include <system/audio_effects/effect_downmix.h>
-#include <system/audio_effects/effect_ns.h>
-#include <system/audio_effects/effect_spatializer.h>
-#include <system/audio.h>
-
-// NBAIO implementations
+#include <media/audiohal/EffectsFactoryHalInterface.h>
+#include <media/audiohal/StreamHalInterface.h>
 #include <media/nbaio/AudioStreamInSource.h>
 #include <media/nbaio/AudioStreamOutSink.h>
 #include <media/nbaio/MonoPipe.h>
@@ -68,36 +72,27 @@
 #include <media/nbaio/SourceAudioBufferProvider.h>
 #include <mediautils/BatteryNotifier.h>
 #include <mediautils/Process.h>
-
-#include <audiomanager/AudioManager.h>
-#include <powermanager/PowerManager.h>
-
-#include <media/audiohal/EffectsFactoryHalInterface.h>
-#include <media/audiohal/StreamHalInterface.h>
-
-#include "AudioFlinger.h"
-#include "Threads.h"
-
 #include <mediautils/SchedulingPolicyService.h>
 #include <mediautils/ServiceUtilities.h>
+#include <powermanager/PowerManager.h>
+#include <private/android_filesystem_config.h>
+#include <private/media/AudioTrackShared.h>
+#include <system/audio_effects/effect_aec.h>
+#include <system/audio_effects/effect_downmix.h>
+#include <system/audio_effects/effect_ns.h>
+#include <system/audio_effects/effect_spatializer.h>
+#include <utils/Log.h>
+#include <utils/Trace.h>
 
-#ifdef ADD_BATTERY_DATA
-#include <media/IMediaPlayerService.h>
-#include <media/IMediaDeathNotifier.h>
-#endif
-
-#ifdef DEBUG_CPU_USAGE
-#include <audio_utils/Statistics.h>
-#include <cpustats/ThreadCpuUsage.h>
-#endif
-
-#include <fastpath/AutoPark.h>
-
+#include <fcntl.h>
+#include <linux/futex.h>
+#include <math.h>
+#include <memory>
 #include <pthread.h>
-#include <afutils/DumpTryLock.h>
-#include <afutils/Permission.h>
-#include <afutils/TypedLogger.h>
-#include <afutils/Vibrator.h>
+#include <sstream>
+#include <string>
+#include <sys/stat.h>
+#include <sys/syscall.h>
 
 // ----------------------------------------------------------------------------
 
@@ -128,6 +123,9 @@ namespace android {
 using audioflinger::SyncEvent;
 using media::IEffectClient;
 using content::AttributionSourceState;
+
+// Keep in sync with java definition in media/java/android/media/AudioRecord.java
+static constexpr int32_t kMaxSharedAudioHistoryMs = 5000;
 
 // retry counts for buffer fill timeout
 // 50 * ~20msecs = 1 second
@@ -245,7 +243,7 @@ static int sFastTrackMultiplier = kFastTrackMultiplier;
 // and that all "fast" AudioRecord clients read from.  In either case, the size can be small.
 static const size_t kRecordThreadReadOnlyHeapSize = 0xD000;
 
-static constexpr nsecs_t kDefaultStandbyTimeInNsecs = seconds(3);
+static const nsecs_t kDefaultStandbyTimeInNsecs = seconds(3);
 
 static nsecs_t getStandbyTimeInNanos() {
     static nsecs_t standbyTimeInNanos = []() {
@@ -313,6 +311,15 @@ bool IAfThreadBase::isValidPcmSinkFormat(audio_format_t format) {
 }
 
 // ----------------------------------------------------------------------------
+
+// formatToString() needs to be exact for MediaMetrics purposes.
+// Do not use media/TypeConverter.h toString().
+/* static */
+std::string IAfThreadBase::formatToString(audio_format_t format) {
+    std::string result;
+    FormatConverter::toString(format, result);
+    return result;
+}
 
 // TODO: move all toString helpers to audio.h
 // under  #ifdef __cplusplus #endif
@@ -1057,12 +1064,14 @@ void ThreadBase::dumpBase_l(int fd, const Vector<String16>& /* args */)
     dprintf(fd, "  Standby: %s\n", mStandby ? "yes" : "no");
     dprintf(fd, "  Sample rate: %u Hz\n", mSampleRate);
     dprintf(fd, "  HAL frame count: %zu\n", mFrameCount);
-    dprintf(fd, "  HAL format: 0x%x (%s)\n", mHALFormat, formatToString(mHALFormat).c_str());
+    dprintf(fd, "  HAL format: 0x%x (%s)\n", mHALFormat,
+            IAfThreadBase::formatToString(mHALFormat).c_str());
     dprintf(fd, "  HAL buffer size: %zu bytes\n", mBufferSize);
     dprintf(fd, "  Channel count: %u\n", mChannelCount);
     dprintf(fd, "  Channel mask: 0x%08x (%s)\n", mChannelMask,
             channelMaskToString(mChannelMask, mType != RECORD).c_str());
-    dprintf(fd, "  Processing format: 0x%x (%s)\n", mFormat, formatToString(mFormat).c_str());
+    dprintf(fd, "  Processing format: 0x%x (%s)\n", mFormat,
+            IAfThreadBase::formatToString(mFormat).c_str());
     dprintf(fd, "  Processing frame size: %zu bytes\n", mFrameSize);
     dprintf(fd, "  Pending config events:");
     size_t numConfig = mConfigEvents.size();
@@ -3289,7 +3298,7 @@ void PlaybackThread::readOutputParameters_l()
     audio_output_flags_t flags = mOutput->flags;
     mediametrics::LogItem item(mThreadMetrics.getMetricsId()); // TODO: method in ThreadMetrics?
     item.set(AMEDIAMETRICS_PROP_EVENT, AMEDIAMETRICS_PROP_EVENT_VALUE_READPARAMETERS)
-        .set(AMEDIAMETRICS_PROP_ENCODING, formatToString(mFormat).c_str())
+        .set(AMEDIAMETRICS_PROP_ENCODING, IAfThreadBase::formatToString(mFormat).c_str())
         .set(AMEDIAMETRICS_PROP_SAMPLERATE, (int32_t)mSampleRate)
         .set(AMEDIAMETRICS_PROP_CHANNELMASK, (int32_t)mChannelMask)
         .set(AMEDIAMETRICS_PROP_CHANNELCOUNT, (int32_t)mChannelCount)
@@ -3300,7 +3309,7 @@ void PlaybackThread::readOutputParameters_l()
         .set(AMEDIAMETRICS_PROP_PREFIX_HAPTIC AMEDIAMETRICS_PROP_CHANNELCOUNT,
                 (int32_t)mHapticChannelCount)
         .set(AMEDIAMETRICS_PROP_PREFIX_HAL    AMEDIAMETRICS_PROP_ENCODING,
-                formatToString(mHALFormat).c_str())
+                IAfThreadBase::formatToString(mHALFormat).c_str())
         .set(AMEDIAMETRICS_PROP_PREFIX_HAL    AMEDIAMETRICS_PROP_FRAMECOUNT,
                 (int32_t)mFrameCount) // sic - added HAL
         ;
@@ -8747,7 +8756,7 @@ sp<IAfRecordTrack> RecordThread::createRecordTrack_l(
             goto Exit;
         }
         if (maxSharedAudioHistoryMs < 0
-                || maxSharedAudioHistoryMs > AudioFlinger::kMaxSharedAudioHistoryMs) {
+                || maxSharedAudioHistoryMs > kMaxSharedAudioHistoryMs) {
             lStatus = BAD_VALUE;
             goto Exit;
         }
@@ -9571,7 +9580,7 @@ void RecordThread::readInputParameters_l()
     audio_input_flags_t flags = mInput->flags;
     mediametrics::LogItem item(mThreadMetrics.getMetricsId());
     item.set(AMEDIAMETRICS_PROP_EVENT, AMEDIAMETRICS_PROP_EVENT_VALUE_READPARAMETERS)
-        .set(AMEDIAMETRICS_PROP_ENCODING, formatToString(mFormat).c_str())
+        .set(AMEDIAMETRICS_PROP_ENCODING, IAfThreadBase::formatToString(mFormat).c_str())
         .set(AMEDIAMETRICS_PROP_FLAGS, toString(flags).c_str())
         .set(AMEDIAMETRICS_PROP_SAMPLERATE, (int32_t)mSampleRate)
         .set(AMEDIAMETRICS_PROP_CHANNELMASK, (int32_t)mChannelMask)
@@ -10311,7 +10320,7 @@ void MmapThread::readHalParameters_l()
     // TODO: make a readHalParameters call?
     mediametrics::LogItem item(mThreadMetrics.getMetricsId());
     item.set(AMEDIAMETRICS_PROP_EVENT, AMEDIAMETRICS_PROP_EVENT_VALUE_READPARAMETERS)
-        .set(AMEDIAMETRICS_PROP_ENCODING, formatToString(mFormat).c_str())
+        .set(AMEDIAMETRICS_PROP_ENCODING, IAfThreadBase::formatToString(mFormat).c_str())
         .set(AMEDIAMETRICS_PROP_SAMPLERATE, (int32_t)mSampleRate)
         .set(AMEDIAMETRICS_PROP_CHANNELMASK, (int32_t)mChannelMask)
         .set(AMEDIAMETRICS_PROP_CHANNELCOUNT, (int32_t)mChannelCount)
@@ -10324,7 +10333,7 @@ void MmapThread::readHalParameters_l()
                 (int32_t)mHapticChannelCount)
         */
         .set(AMEDIAMETRICS_PROP_PREFIX_HAL    AMEDIAMETRICS_PROP_ENCODING,
-                formatToString(mHALFormat).c_str())
+                IAfThreadBase::formatToString(mHALFormat).c_str())
         .set(AMEDIAMETRICS_PROP_PREFIX_HAL    AMEDIAMETRICS_PROP_FRAMECOUNT,
                 (int32_t)mFrameCount) // sic - added HAL
         .record();

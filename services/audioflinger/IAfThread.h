@@ -57,6 +57,12 @@ class IAfTrackBase;
 class Client;
 class MelReporter;
 
+// Used internally for Threads.cpp and AudioFlinger.cpp
+struct stream_type_t {
+    float volume = 1.f;
+    bool mute = false;
+};
+
 // Note this is exposed through IAfThreadBase::afThreadCallback()
 // and hence may be used by the Effect / Track framework.
 class IAfThreadCallback : public virtual RefBase {
@@ -117,6 +123,7 @@ public:
     };
 
     static const char* threadTypeToString(type_t type);
+    static std::string formatToString(audio_format_t format);  // compliant for MediaMetrics
     static bool isValidPcmSinkChannelMask(audio_channel_mask_t channelMask);
     static bool isValidPcmSinkFormat(audio_format_t format);
 
