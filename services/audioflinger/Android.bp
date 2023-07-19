@@ -196,6 +196,7 @@ cc_library {
 
     srcs: [
         "AudioFlinger.cpp",
+        "Client.cpp",
         "DeviceEffectManager.cpp",
         "Effects.cpp",
         "MelReporter.cpp",
