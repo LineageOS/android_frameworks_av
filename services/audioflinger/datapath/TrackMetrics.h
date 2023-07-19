@@ -20,6 +20,8 @@
 #include <binder/IActivityManager.h>
 #include <binder/IPCThreadState.h>
 #include <binder/IServiceManager.h>
+#include <media/MediaMetricsItem.h>
+
 #include <mutex>
 
 namespace android {

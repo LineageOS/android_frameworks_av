@@ -16,8 +16,12 @@
 */
 
 #pragma once
-#include <math.h>
-#include <sys/types.h>
+
+#include "TrackBase.h"
+
+#include <android/os/BnExternalVibrationController.h>
+#include <audio_utils/LinearMap.h>
+#include <binder/AppOpsManager.h>
 
 namespace android {
 
