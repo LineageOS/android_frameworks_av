@@ -2308,27 +2308,6 @@ sp<IAfThreadBase> AudioFlinger::getEffectThread_l(audio_session_t sessionId,
     return thread;
 }
 
-
-
-// ----------------------------------------------------------------------------
-
-Client::Client(const sp<IAfClientCallback>& afClientCallback, pid_t pid)
-    :   RefBase(),
-        mAfClientCallback(afClientCallback),
-        mPid(pid),
-        mClientAllocator(AllocatorFactory::getClientAllocator()) {}
-
-// Client destructor must be called with AudioFlinger::mClientLock held
-Client::~Client()
-{
-    mAfClientCallback->removeClient_l(mPid);
-}
-
-AllocatorFactory::ClientAllocator& Client::allocator()
-{
-    return mClientAllocator;
-}
-
 // ----------------------------------------------------------------------------
 
 AudioFlinger::NotificationClient::NotificationClient(const sp<AudioFlinger>& audioFlinger,
