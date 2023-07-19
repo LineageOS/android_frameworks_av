@@ -55,10 +55,4 @@ cc_library {
         "-Wall",
         "-Werror",
     ],
-
-    // LTO causes unaligned __cfi_check in the library "libaudioflinger_timing.so"
-    // http://b/289475610
-    lto: {
-        never: true,
-    },
 }
