@@ -17,6 +17,14 @@
 
 #pragma once
 
+#include "IAfPatchPanel.h"
+
+#include <utils/RefBase.h>  // avoid transitive dependency
+#include <utils/Thread.h>  // avoid transitive dependency
+
+#include <deque>
+#include <mutex>  // avoid transitive dependency
+
 namespace android {
 
 class Command;

@@ -18,7 +18,9 @@
 #define LOG_TAG "AudioFlinger::PatchCommandThread"
 //#define LOG_NDEBUG 0
 
-#include "AudioFlinger.h"
+#include "PatchCommandThread.h"
+
+#include <utils/Log.h>
 
 namespace android {
 
