@@ -72,6 +72,7 @@ public:
     virtual audio_mode_t getMode() const = 0;
     virtual bool isLowRamDevice() const = 0;
     virtual bool isAudioPolicyReady() const = 0;  // Effects
+    virtual uint32_t getScreenState() const = 0;
     virtual std::optional<media::AudioVibratorInfo> getDefaultVibratorInfo_l() const = 0;
     virtual const sp<IAfPatchPanel>& getPatchPanel() const = 0;
     virtual const sp<MelReporter>& getMelReporter() const = 0;
