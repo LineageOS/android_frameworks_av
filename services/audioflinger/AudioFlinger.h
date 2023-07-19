@@ -574,11 +574,6 @@ public:
     // AudioFlinger::setParameters() updates, other threads read w/o lock
     static uint32_t         mScreenState;
 
-    // Internal dump utilities.
-    static const int kDumpLockTimeoutNs = 1 * NANOS_PER_SECOND;
-
-    // TODO(b/291319167) extract to afutils
-    static bool dumpTryLock(Mutex& mutex);
 private:
     void dumpPermissionDenial(int fd, const Vector<String16>& args);
     void dumpClients(int fd, const Vector<String16>& args);
