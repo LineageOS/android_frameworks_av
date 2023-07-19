@@ -428,6 +428,7 @@ private:
     bool streamMute_l(audio_stream_type_t stream) const final { return mStreamTypes[stream].mute; }
     audio_mode_t getMode() const final { return mMode; }
     bool isLowRamDevice() const final { return mIsLowRamDevice; }
+    uint32_t getScreenState() const final { return mScreenState; }
 
     std::optional<media::AudioVibratorInfo> getDefaultVibratorInfo_l() const final;
     const sp<IAfPatchPanel>& getPatchPanel() const final { return mPatchPanel; }
@@ -570,11 +571,12 @@ public:
     // ro.audio.flinger_standbytime_ms or defaults to kDefaultStandbyTimeInNsecs
     static nsecs_t          mStandbyTimeInNsecs;
 
-    // incremented by 2 when screen state changes, bit 0 == 1 means "off"
-    // AudioFlinger::setParameters() updates, other threads read w/o lock
-    static uint32_t         mScreenState;
-
 private:
+
+    // incremented by 2 when screen state changes, bit 0 == 1 means "off"
+    // AudioFlinger::setParameters() updates with mLock.
+    std::atomic_uint32_t mScreenState{};
+
     void dumpPermissionDenial(int fd, const Vector<String16>& args);
     void dumpClients(int fd, const Vector<String16>& args);
     void dumpInternals(int fd, const Vector<String16>& args);
