@@ -19,10 +19,25 @@
 #define LOG_TAG "AudioFlinger"
 //#define LOG_NDEBUG 0
 
-#include <algorithm>
+#include "Effects.h"
 
-#include "Configuration.h"
-#include <utils/Log.h>
+#include "Client.h"
+#include "EffectConfiguration.h"
+
+#include <afutils/DumpTryLock.h>
+#include <audio_utils/channels.h>
+#include <audio_utils/primitives.h>
+#include <media/AudioCommonTypes.h>
+#include <media/AudioContainers.h>
+#include <media/AudioDeviceTypeAddr.h>
+#include <media/AudioEffect.h>
+#include <media/ShmemCompat.h>
+#include <media/TypeConverter.h>
+#include <media/audiohal/EffectHalInterface.h>
+#include <media/audiohal/EffectsFactoryHalInterface.h>
+#include <mediautils/MethodStatistics.h>
+#include <mediautils/ServiceUtilities.h>
+#include <mediautils/TimeCheck.h>
 #include <system/audio_effects/effect_aec.h>
 #include <system/audio_effects/effect_downmix.h>
 #include <system/audio_effects/effect_dynamicsprocessing.h>
@@ -30,23 +45,9 @@
 #include <system/audio_effects/effect_ns.h>
 #include <system/audio_effects/effect_spatializer.h>
 #include <system/audio_effects/effect_visualizer.h>
-#include <afutils/DumpTryLock.h>
-#include <audio_utils/channels.h>
-#include <audio_utils/primitives.h>
-#include <media/AudioCommonTypes.h>
-#include <media/AudioContainers.h>
-#include <media/AudioEffect.h>
-#include <media/AudioDeviceTypeAddr.h>
-#include <media/ShmemCompat.h>
-#include <media/audiohal/EffectHalInterface.h>
-#include <media/audiohal/EffectsFactoryHalInterface.h>
-#include <mediautils/MethodStatistics.h>
-#include <mediautils/ServiceUtilities.h>
-#include <mediautils/TimeCheck.h>
+#include <utils/Log.h>
 
-#include "AudioFlinger.h"
-#include "EffectConfiguration.h"
-#include "Effects.h"
+#include <algorithm>
 
 // ----------------------------------------------------------------------------
 
@@ -1634,7 +1635,7 @@ NO_THREAD_SAFETY_ANALYSIS  // conditional try lock
             mConfig.inputCfg.samplingRate,
             mConfig.inputCfg.channels,
             mConfig.inputCfg.format,
-            formatToString((audio_format_t)mConfig.inputCfg.format).c_str());
+            toString(static_cast<audio_format_t>(mConfig.inputCfg.format)).c_str());
 
     result.append("\t\t- Output configuration:\n");
     result.append("\t\t\tBuffer     Frames  Smp rate Channels Format\n");
@@ -1644,7 +1645,7 @@ NO_THREAD_SAFETY_ANALYSIS  // conditional try lock
             mConfig.outputCfg.samplingRate,
             mConfig.outputCfg.channels,
             mConfig.outputCfg.format,
-            formatToString((audio_format_t)mConfig.outputCfg.format).c_str());
+            toString(static_cast<audio_format_t>(mConfig.outputCfg.format)).c_str());
 
     result.appendFormat("\t\t- HAL buffers:\n"
             "\t\t\tIn(%s) InConversion(%s) Out(%s) OutConversion(%s)\n",
