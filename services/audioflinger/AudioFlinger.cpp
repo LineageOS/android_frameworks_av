@@ -254,14 +254,6 @@ class DevicesFactoryHalCallbackImpl : public DevicesFactoryHalCallback {
 
 // ----------------------------------------------------------------------------
 
-std::string formatToString(audio_format_t format) {
-    std::string result;
-    FormatConverter::toString(format, result);
-    return result;
-}
-
-// ----------------------------------------------------------------------------
-
 void AudioFlinger::instantiate() {
     sp<IServiceManager> sm(defaultServiceManager());
     sm->addService(String16(IAudioFlinger::DEFAULT_SERVICE_NAME),
