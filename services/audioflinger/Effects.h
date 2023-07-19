@@ -15,6 +15,17 @@
 ** limitations under the License.
 */
 
+#pragma once
+
+#include "DeviceEffectManager.h"
+#include "IAfEffect.h"
+
+#include <android-base/macros.h>  // DISALLOW_COPY_AND_ASSIGN
+#include <mediautils/Synchronization.h>
+#include <private/media/AudioEffectShared.h>
+
+#include <map>  // avoid transitive dependency
+
 namespace android {
 
 //--- Audio Effect Management
