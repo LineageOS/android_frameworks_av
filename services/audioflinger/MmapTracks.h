@@ -17,6 +17,10 @@
 
 #pragma once
 
+#include "TrackBase.h"
+
+#include <android/content/AttributionSourceState.h>
+
 namespace android {
 
 // playback track
