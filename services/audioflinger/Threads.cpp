@@ -95,6 +95,7 @@
 
 #include <pthread.h>
 #include <afutils/DumpTryLock.h>
+#include <afutils/Permission.h>
 #include <afutils/TypedLogger.h>
 
 // ----------------------------------------------------------------------------
@@ -10020,7 +10021,7 @@ status_t MmapThread::start(const AudioClient& client,
     audio_port_handle_t portId = AUDIO_PORT_HANDLE_NONE;
 
     audio_io_handle_t io = mId;
-    AttributionSourceState adjAttributionSource = AudioFlinger::checkAttributionSourcePackage(
+    const AttributionSourceState adjAttributionSource = afutils::checkAttributionSourcePackage(
             client.attributionSource);
 
     if (isOutput()) {
