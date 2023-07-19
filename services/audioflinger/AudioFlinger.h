@@ -171,9 +171,6 @@ class AudioFlinger
 public:
     static void instantiate() ANDROID_API;
 
-    static AttributionSourceState checkAttributionSourcePackage(
-        const AttributionSourceState& attributionSource);
-
 private:
 
     // ---- begin IAudioFlinger interface
