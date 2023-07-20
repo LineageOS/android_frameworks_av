@@ -7835,6 +7835,9 @@ status_t AudioPolicyManager::checkAndSetVolume(IVolumeCurves &curves,
     }
     if (deviceTypes.empty()) {
         deviceTypes = outputDesc->devices().types();
+        index = curves.getVolumeIndex(deviceTypes);
+        ALOGD("%s if deviceTypes is change from none to device %s, need get index %d",
+                __func__, dumpDeviceTypes(deviceTypes).c_str(), index);
     }
 
     if (curves.getVolumeIndexMin() < 0 || curves.getVolumeIndexMax() < 0) {
