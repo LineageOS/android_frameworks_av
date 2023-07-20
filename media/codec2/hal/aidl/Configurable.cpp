@@ -15,23 +15,23 @@
  */
 
 //#define LOG_NDEBUG 0
-#define LOG_TAG "Codec2-Configurable"
+#define LOG_TAG "Codec2-Configurable-Aidl"
 #include <android-base/logging.h>
 
-#include <codec2/hidl/1.0/Configurable.h>
-#include <codec2/hidl/1.0/ComponentStore.h>
-#include <codec2/hidl/1.0/types.h>
+#include <android/binder_auto_utils.h>
+#include <codec2/aidl/Configurable.h>
+#include <codec2/aidl/ParamTypes.h>
 
 #include <C2ParamInternal.h>
 
+namespace aidl {
 namespace android {
 namespace hardware {
 namespace media {
 namespace c2 {
-namespace V1_0 {
 namespace utils {
 
-using namespace ::android;
+using ::ndk::ScopedAStatus;
 
 CachedConfigurable::CachedConfigurable(
         std::unique_ptr<ConfigurableC2Intf>&& intf)
@@ -47,19 +47,21 @@ c2_status_t CachedConfigurable::init(
 }
 
 // Methods from ::android::hardware::media::c2::V1_0::IConfigurable follow.
-Return<uint32_t> CachedConfigurable::getId() {
-    return mIntf->getId();
+
+ScopedAStatus CachedConfigurable::getId(int32_t* id) {
+    *id = mIntf->getId();
+    return ScopedAStatus::ok();
 }
 
-Return<void> CachedConfigurable::getName(getName_cb _hidl_cb) {
-    _hidl_cb(mIntf->getName());
-    return Void();
+ScopedAStatus CachedConfigurable::getName(std::string* name) {
+    *name = mIntf->getName();
+    return ScopedAStatus::ok();
 }
 
-Return<void> CachedConfigurable::query(
-        const hidl_vec<uint32_t>& indices,
+ScopedAStatus CachedConfigurable::query(
+        const std::vector<int32_t>& indices,
         bool mayBlock,
-        query_cb _hidl_cb) {
+        Params* params) {
     typedef C2Param::Index Index;
     std::vector<Index> c2heapParamIndices(
             (Index*)indices.data(),
@@ -70,27 +72,24 @@ Return<void> CachedConfigurable::query(
             mayBlock ? C2_MAY_BLOCK : C2_DONT_BLOCK,
             &c2heapParams);
 
-    hidl_vec<uint8_t> params;
-    if (!createParamsBlob(&params, c2heapParams)) {
+    if (!CreateParamsBlob(params, c2heapParams)) {
         LOG(WARNING) << "query -- invalid output params.";
     }
-    _hidl_cb(static_cast<Status>(c2res), params);
-    return Void();
+    if (c2res == C2_OK) {
+        return ScopedAStatus::ok();
+    }
+    return ScopedAStatus::fromServiceSpecificError(c2res);
 }
 
-Return<void> CachedConfigurable::config(
-        const hidl_vec<uint8_t>& inParams,
+ScopedAStatus CachedConfigurable::config(
+        const Params& params,
         bool mayBlock,
-        config_cb _hidl_cb) {
+        ConfigResult* result) {
     // inParams is not writable, so create a copy as config modifies the parameters
-    hidl_vec<uint8_t> inParamsCopy = inParams;
     std::vector<C2Param*> c2params;
-    if (!parseParamsBlob(&c2params, inParamsCopy)) {
+    if (!ParseParamsBlob(&c2params, params)) {
         LOG(WARNING) << "config -- invalid input params.";
-        _hidl_cb(Status::CORRUPTED,
-                hidl_vec<SettingResult>(),
-                hidl_vec<uint8_t>());
-        return Void();
+        return ScopedAStatus::fromServiceSpecificError(C2_CORRUPTED);
     }
     // TODO: check if blob was invalid
     std::vector<std::unique_ptr<C2SettingResult>> c2failures;
@@ -98,12 +97,12 @@ Return<void> CachedConfigurable::config(
             c2params,
             mayBlock ? C2_MAY_BLOCK : C2_DONT_BLOCK,
             &c2failures);
-    hidl_vec<SettingResult> failures(c2failures.size());
+    result->failures.resize(c2failures.size());
     {
         size_t ix = 0;
         for (const std::unique_ptr<C2SettingResult>& c2result : c2failures) {
             if (c2result) {
-                if (objcpy(&failures[ix], *c2result)) {
+                if (ToAidl(&result->failures[ix], *c2result)) {
                     ++ix;
                 } else {
                     LOG(DEBUG) << "config -- invalid setting results.";
@@ -111,28 +110,29 @@ Return<void> CachedConfigurable::config(
                 }
             }
         }
-        failures.resize(ix);
+        result->failures.resize(ix);
     }
-    hidl_vec<uint8_t> outParams;
-    if (!createParamsBlob(&outParams, c2params)) {
+    if (!CreateParamsBlob(&result->params, c2params)) {
         LOG(DEBUG) << "config -- invalid output params.";
     }
-    _hidl_cb((Status)c2res, failures, outParams);
-    return Void();
+    if (c2res == C2_OK) {
+        return ScopedAStatus::ok();
+    }
+    return ScopedAStatus::fromServiceSpecificError(c2res);
 }
 
-Return<void> CachedConfigurable::querySupportedParams(
-        uint32_t start,
-        uint32_t count,
-        querySupportedParams_cb _hidl_cb) {
+ScopedAStatus CachedConfigurable::querySupportedParams(
+        int32_t start,
+        int32_t count,
+        std::vector<ParamDescriptor>* paramDesc) {
     C2LinearRange request = C2LinearCapacity(mSupportedParams.size()).range(
             start, count);
-    hidl_vec<ParamDescriptor> params(request.size());
-    Status res = Status::OK;
+    paramDesc->resize(request.size());
+    int32_t res = Status::OK;
     size_t dstIx = 0;
     for (size_t srcIx = request.offset(); srcIx < request.endOffset(); ++srcIx) {
         if (mSupportedParams[srcIx]) {
-            if (objcpy(&params[dstIx], *mSupportedParams[srcIx])) {
+            if (ToAidl(&(*paramDesc)[dstIx], *mSupportedParams[srcIx])) {
                 ++dstIx;
             } else {
                 res = Status::CORRUPTED;
@@ -143,26 +143,28 @@ Return<void> CachedConfigurable::querySupportedParams(
             res = Status::BAD_INDEX;
         }
     }
-    params.resize(dstIx);
-    _hidl_cb(res, params);
-    return Void();
+    paramDesc->resize(dstIx);
+    if (res == Status::OK) {
+        return ScopedAStatus::ok();
+    }
+    return ScopedAStatus::fromServiceSpecificError(res);
 }
 
-Return<void> CachedConfigurable::querySupportedValues(
-        const hidl_vec<FieldSupportedValuesQuery>& inFields,
+ScopedAStatus CachedConfigurable::querySupportedValues(
+        const std::vector<FieldSupportedValuesQuery>& fields,
         bool mayBlock,
-        querySupportedValues_cb _hidl_cb) {
+        std::vector<FieldSupportedValuesQueryResult>* result) {
     std::vector<C2FieldSupportedValuesQuery> c2fields;
     {
         // C2FieldSupportedValuesQuery objects are restricted in that some
         // members are const.
         // C2ParamField - required for its constructor - has no constructors
         // from fields. Use C2ParamInspector.
-        for (const FieldSupportedValuesQuery &query : inFields) {
+        for (const FieldSupportedValuesQuery &query : fields) {
             c2fields.emplace_back(_C2ParamInspector::CreateParamField(
-                    query.field.index,
+                    (uint32_t)query.field.index,
                     query.field.fieldId.offset,
-                    query.field.fieldId.size),
+                    query.field.fieldId.sizeBytes),
                     query.type == FieldSupportedValuesQuery::Type::POSSIBLE ?
                     C2FieldSupportedValuesQuery::POSSIBLE :
                     C2FieldSupportedValuesQuery::CURRENT);
@@ -171,26 +173,28 @@ Return<void> CachedConfigurable::querySupportedValues(
     c2_status_t c2res = mIntf->querySupportedValues(
             c2fields,
             mayBlock ? C2_MAY_BLOCK : C2_DONT_BLOCK);
-    hidl_vec<FieldSupportedValuesQueryResult> outFields(inFields.size());
+    result->resize(fields.size());
     size_t dstIx = 0;
-    for (const C2FieldSupportedValuesQuery &result : c2fields) {
-        if (objcpy(&outFields[dstIx], result)) {
+    for (const C2FieldSupportedValuesQuery &res : c2fields) {
+        if (ToAidl(&(*result)[dstIx], res)) {
             ++dstIx;
         } else {
-            outFields.resize(dstIx);
+            result->resize(dstIx);
             c2res = C2_CORRUPTED;
             LOG(WARNING) << "querySupportedValues -- invalid output params.";
             break;
         }
     }
-    _hidl_cb((Status)c2res, outFields);
-    return Void();
+    if (c2res == C2_OK) {
+        return ScopedAStatus::ok();
+    }
+    return ScopedAStatus::fromServiceSpecificError(c2res);
 }
 
 }  // namespace utils
-}  // namespace V1_0
 }  // namespace c2
 }  // namespace media
 }  // namespace hardware
 }  // namespace android
+}  // namespace aidl
 

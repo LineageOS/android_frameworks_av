@@ -15,40 +15,42 @@
  */
 
 //#define LOG_NDEBUG 0
-#define LOG_TAG "Codec2-Component@1.2"
+#define LOG_TAG "Codec2-Component-Aidl"
 #include <android-base/logging.h>
 
-#include <codec2/hidl/1.2/Component.h>
-#include <codec2/hidl/1.2/ComponentStore.h>
-#include <codec2/hidl/1.2/InputBufferManager.h>
+#include <codec2/aidl/Component.h>
+#include <codec2/aidl/ComponentStore.h>
+#include <codec2/aidl/InputBufferManager.h>
 
 #ifndef __ANDROID_APEX__
 #include <FilterWrapper.h>
 #endif
 
-#include <hidl/HidlBinderSupport.h>
+#include <android/binder_auto_utils.h>
+#include <android/binder_interface_utils.h>
 #include <utils/Timers.h>
 
-#include <C2BqBufferPriv.h>
 #include <C2Debug.h>
 #include <C2PlatformSupport.h>
 
 #include <chrono>
 #include <thread>
 
+namespace aidl {
 namespace android {
 namespace hardware {
 namespace media {
 namespace c2 {
-namespace V1_2 {
 namespace utils {
 
-using namespace ::android;
+using ::aidl::android::hardware::common::NativeHandle;
+using ::aidl::android::hardware::media::bufferpool2::IClientManager;
+using ::ndk::ScopedAStatus;
 
 // ComponentListener wrapper
 struct Component::Listener : public C2Component::Listener {
 
-    Listener(const sp<Component>& component) :
+    Listener(const std::shared_ptr<Component>& component) :
         mComponent(component),
         mListener(component->mListener) {
     }
@@ -56,9 +58,9 @@ struct Component::Listener : public C2Component::Listener {
     virtual void onError_nb(
             std::weak_ptr<C2Component> /* c2component */,
             uint32_t errorCode) override {
-        sp<IComponentListener> listener = mListener.promote();
+        std::shared_ptr<IComponentListener> listener = mListener.lock();
         if (listener) {
-            Return<void> transStatus = listener->onError(Status::OK, errorCode);
+            ScopedAStatus transStatus = listener->onError(Status{Status::OK}, errorCode);
             if (!transStatus.isOk()) {
                 LOG(ERROR) << "Component::Listener::onError_nb -- "
                            << "transaction failed.";
@@ -70,20 +72,20 @@ struct Component::Listener : public C2Component::Listener {
             std::weak_ptr<C2Component> /* c2component */,
             std::vector<std::shared_ptr<C2SettingResult>> c2settingResult
             ) override {
-        sp<IComponentListener> listener = mListener.promote();
+      std::shared_ptr<IComponentListener> listener = mListener.lock();
         if (listener) {
-            hidl_vec<SettingResult> settingResults(c2settingResult.size());
+            std::vector<SettingResult> settingResults(c2settingResult.size());
             size_t ix = 0;
             for (const std::shared_ptr<C2SettingResult> &c2result :
                     c2settingResult) {
                 if (c2result) {
-                    if (!objcpy(&settingResults[ix++], *c2result)) {
+                    if (!ToAidl(&settingResults[ix++], *c2result)) {
                         break;
                     }
                 }
             }
             settingResults.resize(ix);
-            Return<void> transStatus = listener->onTripped(settingResults);
+            ScopedAStatus transStatus = listener->onTripped(settingResults);
             if (!transStatus.isOk()) {
                 LOG(ERROR) << "Component::Listener::onTripped_nb -- "
                            << "transaction failed.";
@@ -106,113 +108,57 @@ struct Component::Listener : public C2Component::Listener {
             }
         }
 
-        sp<IComponentListener> listener = mListener.promote();
+        std::shared_ptr<IComponentListener> listener = mListener.lock();
         if (listener) {
             WorkBundle workBundle;
 
-            sp<Component> strongComponent = mComponent.promote();
-            beginTransferBufferQueueBlocks(c2workItems, true);
-            if (!objcpy(&workBundle, c2workItems, strongComponent ?
+            std::shared_ptr<Component> strongComponent = mComponent.lock();
+            // TODO
+            // beginTransferBufferQueueBlocks(c2workItems, true);
+            if (!ToAidl(&workBundle, c2workItems, strongComponent ?
                     &strongComponent->mBufferPoolSender : nullptr)) {
                 LOG(ERROR) << "Component::Listener::onWorkDone_nb -- "
                            << "received corrupted work items.";
-                endTransferBufferQueueBlocks(c2workItems, false, true);
+                // TODO
+                // endTransferBufferQueueBlocks(c2workItems, false, true);
                 return;
             }
-            Return<void> transStatus = listener->onWorkDone(workBundle);
+            ScopedAStatus transStatus = listener->onWorkDone(workBundle);
             if (!transStatus.isOk()) {
                 LOG(ERROR) << "Component::Listener::onWorkDone_nb -- "
                            << "transaction failed.";
-                endTransferBufferQueueBlocks(c2workItems, false, true);
+                // TODO
+                // endTransferBufferQueueBlocks(c2workItems, false, true);
                 return;
             }
-            endTransferBufferQueueBlocks(c2workItems, true, true);
+            // TODO
+            // endTransferBufferQueueBlocks(c2workItems, true, true);
         }
     }
 
 protected:
-    wp<Component> mComponent;
-    wp<IComponentListener> mListener;
+    std::weak_ptr<Component> mComponent;
+    std::weak_ptr<IComponentListener> mListener;
 };
 
-// Component::Sink
-struct Component::Sink : public IInputSink {
-    std::shared_ptr<Component> mComponent;
-    sp<IConfigurable> mConfigurable;
-
-    virtual Return<Status> queue(const WorkBundle& workBundle) override {
-        return mComponent->queue(workBundle);
-    }
-
-    virtual Return<sp<IConfigurable>> getConfigurable() override {
-        return mConfigurable;
-    }
-
-    Sink(const std::shared_ptr<Component>& component);
-    virtual ~Sink() override;
-
-    // Process-wide map: Component::Sink -> C2Component.
-    static std::mutex sSink2ComponentMutex;
-    static std::map<IInputSink*, std::weak_ptr<C2Component>> sSink2Component;
-
-    static std::shared_ptr<C2Component> findLocalComponent(
-            const sp<IInputSink>& sink);
+// Component::DeathContext
+struct Component::DeathContext {
+    std::weak_ptr<Component> mWeakComp;
 };
-
-std::mutex
-        Component::Sink::sSink2ComponentMutex{};
-std::map<IInputSink*, std::weak_ptr<C2Component>>
-        Component::Sink::sSink2Component{};
-
-Component::Sink::Sink(const std::shared_ptr<Component>& component)
-        : mComponent{component},
-          mConfigurable{[&component]() -> sp<IConfigurable> {
-              Return<sp<IComponentInterface>> ret1 = component->getInterface();
-              if (!ret1.isOk()) {
-                  LOG(ERROR) << "Sink::Sink -- component's transaction failed.";
-                  return nullptr;
-              }
-              Return<sp<IConfigurable>> ret2 =
-                      static_cast<sp<IComponentInterface>>(ret1)->
-                      getConfigurable();
-              if (!ret2.isOk()) {
-                  LOG(ERROR) << "Sink::Sink -- interface's transaction failed.";
-                  return nullptr;
-              }
-              return static_cast<sp<IConfigurable>>(ret2);
-          }()} {
-    std::lock_guard<std::mutex> lock(sSink2ComponentMutex);
-    sSink2Component.emplace(this, component->mComponent);
-}
-
-Component::Sink::~Sink() {
-    std::lock_guard<std::mutex> lock(sSink2ComponentMutex);
-    sSink2Component.erase(this);
-}
-
-std::shared_ptr<C2Component> Component::Sink::findLocalComponent(
-        const sp<IInputSink>& sink) {
-    std::lock_guard<std::mutex> lock(sSink2ComponentMutex);
-    auto i = sSink2Component.find(sink.get());
-    if (i == sSink2Component.end()) {
-        return nullptr;
-    }
-    return i->second.lock();
-}
 
 // Component
 Component::Component(
         const std::shared_ptr<C2Component>& component,
-        const sp<IComponentListener>& listener,
-        const sp<ComponentStore>& store,
-        const sp<::android::hardware::media::bufferpool::V2_0::
-        IClientManager>& clientPoolManager)
+        const std::shared_ptr<IComponentListener>& listener,
+        const std::shared_ptr<ComponentStore>& store,
+        const std::shared_ptr<IClientManager>& clientPoolManager)
       : mComponent{component},
-        mInterface{new ComponentInterface(component->intf(),
-                                          store->getParameterCache())},
+        mInterface{SharedRefBase::make<ComponentInterface>(
+                component->intf(), store->getParameterCache())},
         mListener{listener},
         mStore{store},
-        mBufferPoolSender{clientPoolManager} {
+        mBufferPoolSender{clientPoolManager},
+        mDeathContext(nullptr) {
     // Retrieve supported parameters from store
     // TODO: We could cache this per component/interface type
     mInit = mInterface->status();
@@ -223,11 +169,11 @@ c2_status_t Component::status() const {
 }
 
 // Methods from ::android::hardware::media::c2::V1_1::IComponent
-Return<Status> Component::queue(const WorkBundle& workBundle) {
+ScopedAStatus Component::queue(const WorkBundle& workBundle) {
     std::list<std::unique_ptr<C2Work>> c2works;
 
-    if (!objcpy(&c2works, workBundle)) {
-        return Status::CORRUPTED;
+    if (!FromAidl(&c2works, workBundle)) {
+        return ScopedAStatus::fromServiceSpecificError(Status::CORRUPTED);
     }
 
     // Register input buffers.
@@ -238,10 +184,14 @@ Return<Status> Component::queue(const WorkBundle& workBundle) {
         }
     }
 
-    return static_cast<Status>(mComponent->queue_nb(&c2works));
+    c2_status_t err = mComponent->queue_nb(&c2works);
+    if (err == C2_OK) {
+        return ScopedAStatus::ok();
+    }
+    return ScopedAStatus::fromServiceSpecificError(err);
 }
 
-Return<void> Component::flush(flush_cb _hidl_cb) {
+ScopedAStatus Component::flush(WorkBundle *flushedWorkBundle) {
     std::list<std::unique_ptr<C2Work>> c2flushedWorks;
     c2_status_t c2res = mComponent->flush_sm(
             C2Component::FLUSH_COMPONENT,
@@ -260,80 +210,29 @@ Return<void> Component::flush(flush_cb _hidl_cb) {
         }
     }
 
-    WorkBundle flushedWorkBundle;
-    Status res = static_cast<Status>(c2res);
-    beginTransferBufferQueueBlocks(c2flushedWorks, true);
+    // TODO
+    // beginTransferBufferQueueBlocks(c2flushedWorks, true);
     if (c2res == C2_OK) {
-        if (!objcpy(&flushedWorkBundle, c2flushedWorks, &mBufferPoolSender)) {
-            res = Status::CORRUPTED;
+        if (!ToAidl(flushedWorkBundle, c2flushedWorks, &mBufferPoolSender)) {
+            c2res = C2_CORRUPTED;
         }
     }
-    _hidl_cb(res, flushedWorkBundle);
-    endTransferBufferQueueBlocks(c2flushedWorks, true, true);
-    return Void();
+    // TODO
+    // endTransferBufferQueueBlocks(c2flushedWorks, true, true);
+    if (c2res == C2_OK) {
+        return ScopedAStatus::ok();
+    }
+    return ScopedAStatus::fromServiceSpecificError(c2res);
 }
 
-Return<Status> Component::drain(bool withEos) {
-    return static_cast<Status>(mComponent->drain_nb(withEos ?
+ScopedAStatus Component::drain(bool withEos) {
+    c2_status_t res = mComponent->drain_nb(withEos ?
             C2Component::DRAIN_COMPONENT_WITH_EOS :
-            C2Component::DRAIN_COMPONENT_NO_EOS));
-}
-
-Return<Status> Component::setOutputSurface(
-        uint64_t blockPoolId,
-        const sp<HGraphicBufferProducer2>& surface) {
-    std::shared_ptr<C2BlockPool> pool;
-    GetCodec2BlockPool(blockPoolId, mComponent, &pool);
-    if (pool && pool->getAllocatorId() == C2PlatformAllocatorStore::BUFFERQUEUE) {
-        std::shared_ptr<C2BufferQueueBlockPool> bqPool =
-                std::static_pointer_cast<C2BufferQueueBlockPool>(pool);
-        C2BufferQueueBlockPool::OnRenderCallback cb =
-            [this](uint64_t producer, int32_t slot, int64_t nsecs) {
-                // TODO: batch this
-                hidl_vec<IComponentListener::RenderedFrame> rendered;
-                rendered.resize(1);
-                rendered[0] = { producer, slot, nsecs };
-                (void)mListener->onFramesRendered(rendered).isOk();
-        };
-        if (bqPool) {
-            bqPool->setRenderCallback(cb);
-            bqPool->configureProducer(surface);
-        }
+            C2Component::DRAIN_COMPONENT_NO_EOS);
+    if (res == C2_OK) {
+        return ScopedAStatus::ok();
     }
-    return Status::OK;
-}
-
-Return<void> Component::connectToInputSurface(
-        const sp<IInputSurface>& inputSurface,
-        connectToInputSurface_cb _hidl_cb) {
-    Status status;
-    sp<IInputSurfaceConnection> connection;
-    auto transStatus = inputSurface->connect(
-            asInputSink(),
-            [&status, &connection](
-                    Status s, const sp<IInputSurfaceConnection>& c) {
-                status = s;
-                connection = c;
-            }
-        );
-    _hidl_cb(status, connection);
-    return Void();
-}
-
-Return<void> Component::connectToOmxInputSurface(
-        const sp<HGraphicBufferProducer1>& producer,
-        const sp<::android::hardware::media::omx::V1_0::
-        IGraphicBufferSource>& source,
-        connectToOmxInputSurface_cb _hidl_cb) {
-    (void)producer;
-    (void)source;
-    (void)_hidl_cb;
-    return Void();
-}
-
-Return<Status> Component::disconnectFromInputSurface() {
-    // TODO implement
-    return Status::OK;
+    return ScopedAStatus::fromServiceSpecificError(res);
 }
 
 namespace /* unnamed */ {
@@ -390,130 +289,122 @@ protected:
 
 } // unnamed namespace
 
-Return<void> Component::createBlockPool(
-        uint32_t allocatorId,
-        createBlockPool_cb _hidl_cb) {
-    std::shared_ptr<C2BlockPool> blockPool;
+ScopedAStatus Component::createBlockPool(
+        const IComponent::BlockPoolAllocator &allocator,
+        IComponent::BlockPool *blockPool) {
+    std::shared_ptr<C2BlockPool> c2BlockPool;
+    static constexpr IComponent::BlockPoolAllocator::Tag ALLOCATOR_ID =
+        IComponent::BlockPoolAllocator::allocatorId;
+    static constexpr IComponent::BlockPoolAllocator::Tag IGBA =
+        IComponent::BlockPoolAllocator::igba;
+    c2_status_t status = C2_OK;
+    switch (allocator.getTag()) {
+        case ALLOCATOR_ID:
 #ifdef __ANDROID_APEX__
-    c2_status_t status = CreateCodec2BlockPool(
-            static_cast<C2PlatformAllocatorStore::id_t>(allocatorId),
-            mComponent,
-            &blockPool);
+            status = CreateCodec2BlockPool(
+                    static_cast<::android::C2PlatformAllocatorStore::id_t>(
+                            allocator.get<ALLOCATOR_ID>()),
+                    mComponent,
+                    &c2BlockPool);
 #else
-    c2_status_t status = ComponentStore::GetFilterWrapper()->createBlockPool(
-            static_cast<C2PlatformAllocatorStore::id_t>(allocatorId),
-            mComponent,
-            &blockPool);
+            status = ComponentStore::GetFilterWrapper()->createBlockPool(
+                    static_cast<::android::C2PlatformAllocatorStore::id_t>(
+                            allocator.get<ALLOCATOR_ID>()),
+                    mComponent,
+                    &c2BlockPool);
 #endif
-    if (status != C2_OK) {
-        blockPool = nullptr;
+            if (status != C2_OK) {
+                blockPool = nullptr;
+            }
+            break;
+        case IGBA:
+            // FIXME
+            break;
+        default:
+            break;
     }
     if (blockPool) {
         mBlockPoolsMutex.lock();
-        mBlockPools.emplace(blockPool->getLocalId(), blockPool);
+        mBlockPools.emplace(c2BlockPool->getLocalId(), c2BlockPool);
         mBlockPoolsMutex.unlock();
     } else if (status == C2_OK) {
         status = C2_CORRUPTED;
     }
 
-    _hidl_cb(static_cast<Status>(status),
-            blockPool ? blockPool->getLocalId() : 0,
-            new CachedConfigurable(
-            std::make_unique<BlockPoolIntf>(blockPool)));
-    return Void();
+    blockPool->blockPoolId = c2BlockPool ? c2BlockPool->getLocalId() : 0;
+    blockPool->configurable = SharedRefBase::make<CachedConfigurable>(
+            std::make_unique<BlockPoolIntf>(c2BlockPool));
+    if (status == C2_OK) {
+        return ScopedAStatus::ok();
+    }
+    return ScopedAStatus::fromServiceSpecificError(status);
 }
 
-Return<Status> Component::destroyBlockPool(uint64_t blockPoolId) {
+ScopedAStatus Component::destroyBlockPool(int64_t blockPoolId) {
     std::lock_guard<std::mutex> lock(mBlockPoolsMutex);
-    return mBlockPools.erase(blockPoolId) == 1 ?
-            Status::OK : Status::CORRUPTED;
+    if (mBlockPools.erase(blockPoolId) == 1) {
+        return ScopedAStatus::ok();
+    }
+    return ScopedAStatus::fromServiceSpecificError(Status::CORRUPTED);
 }
 
-Return<Status> Component::start() {
-    return static_cast<Status>(mComponent->start());
+ScopedAStatus Component::start() {
+    c2_status_t status = mComponent->start();
+    if (status == C2_OK) {
+        return ScopedAStatus::ok();
+    }
+    return ScopedAStatus::fromServiceSpecificError(status);
 }
 
-Return<Status> Component::stop() {
+ScopedAStatus Component::stop() {
     InputBufferManager::unregisterFrameData(mListener);
-    return static_cast<Status>(mComponent->stop());
+    c2_status_t status = mComponent->stop();
+    if (status == C2_OK) {
+        return ScopedAStatus::ok();
+    }
+    return ScopedAStatus::fromServiceSpecificError(status);
 }
 
-Return<Status> Component::reset() {
-    Status status = static_cast<Status>(mComponent->reset());
+ScopedAStatus Component::reset() {
+    c2_status_t status = mComponent->reset();
     {
         std::lock_guard<std::mutex> lock(mBlockPoolsMutex);
         mBlockPools.clear();
     }
     InputBufferManager::unregisterFrameData(mListener);
-    return status;
+    if (status == C2_OK) {
+        return ScopedAStatus::ok();
+    }
+    return ScopedAStatus::fromServiceSpecificError(status);
 }
 
-Return<Status> Component::release() {
-    Status status = static_cast<Status>(mComponent->release());
+ScopedAStatus Component::release() {
+    c2_status_t status = mComponent->release();
     {
         std::lock_guard<std::mutex> lock(mBlockPoolsMutex);
         mBlockPools.clear();
     }
     InputBufferManager::unregisterFrameData(mListener);
-    return status;
-}
-
-Return<sp<IComponentInterface>> Component::getInterface() {
-    return sp<IComponentInterface>(mInterface);
-}
-
-Return<sp<IInputSink>> Component::asInputSink() {
-    std::lock_guard<std::mutex> lock(mSinkMutex);
-    if (!mSink) {
-        mSink = new Sink(shared_from_this());
+    if (status == C2_OK) {
+        return ScopedAStatus::ok();
     }
-    return {mSink};
+    return ScopedAStatus::fromServiceSpecificError(status);
 }
 
-Return<void> Component::configureVideoTunnel(
-        uint32_t avSyncHwId, configureVideoTunnel_cb _hidl_cb) {
+ScopedAStatus Component::getInterface(
+        std::shared_ptr<IComponentInterface> *intf) {
+    *intf = mInterface;
+    return ScopedAStatus::ok();
+}
+
+ScopedAStatus Component::configureVideoTunnel(
+        int32_t avSyncHwId, NativeHandle *handle) {
     (void)avSyncHwId;
-    _hidl_cb(Status::OMITTED, hidl_handle{});
-    return Void();
+    (void)handle;
+    return ScopedAStatus::fromServiceSpecificError(Status::OMITTED);
 }
 
-Return<Status> Component::setOutputSurfaceWithSyncObj(
-        uint64_t blockPoolId, const sp<HGraphicBufferProducer2>& surface,
-        const SurfaceSyncObj& syncObject) {
-    std::shared_ptr<C2BlockPool> pool;
-    GetCodec2BlockPool(blockPoolId, mComponent, &pool);
-    if (pool && pool->getAllocatorId() == C2PlatformAllocatorStore::BUFFERQUEUE) {
-        std::shared_ptr<C2BufferQueueBlockPool> bqPool =
-                std::static_pointer_cast<C2BufferQueueBlockPool>(pool);
-        C2BufferQueueBlockPool::OnRenderCallback cb =
-            [this](uint64_t producer, int32_t slot, int64_t nsecs) {
-                // TODO: batch this
-                hidl_vec<IComponentListener::RenderedFrame> rendered;
-                rendered.resize(1);
-                rendered[0] = { producer, slot, nsecs };
-                (void)mListener->onFramesRendered(rendered).isOk();
-        };
-        if (bqPool) {
-            const native_handle_t *h = syncObject.syncMemory;
-            native_handle_t *syncMemory = h ? native_handle_clone(h) : nullptr;
-            uint64_t bqId = syncObject.bqId;
-            uint32_t generationId = syncObject.generationId;
-            uint64_t consumerUsage = syncObject.consumerUsage;
-
-            bqPool->setRenderCallback(cb);
-            bqPool->configureProducer(surface, syncMemory, bqId,
-                                      generationId, consumerUsage);
-        }
-    }
-    return Status::OK;
-}
-
-std::shared_ptr<C2Component> Component::findLocalComponent(
-        const sp<IInputSink>& sink) {
-    return Component::Sink::findLocalComponent(sink);
-}
-
-void Component::initListener(const sp<Component>& self) {
+void Component::initListener(const std::shared_ptr<Component>& self) {
     std::shared_ptr<C2Component::Listener> c2listener =
             std::make_shared<Listener>(self);
     c2_status_t res = mComponent->setListener_vb(c2listener, C2_DONT_BLOCK);
@@ -521,46 +412,38 @@ void Component::initListener(const sp<Component>& self) {
         mInit = res;
     }
 
-    struct ListenerDeathRecipient : public HwDeathRecipient {
-        ListenerDeathRecipient(const wp<Component>& comp)
-            : component{comp} {
-        }
+    mDeathRecipient = ::ndk::ScopedAIBinder_DeathRecipient(
+            AIBinder_DeathRecipient_new(OnBinderDied));
+    mDeathContext = new DeathContext{weak_from_this()};
+    AIBinder_DeathRecipient_setOnUnlinked(mDeathRecipient.get(), OnBinderUnlinked);
+    AIBinder_linkToDeath(mListener->asBinder().get(), mDeathRecipient.get(), mDeathContext);
+}
 
-        virtual void serviceDied(
-                uint64_t /* cookie */,
-                const wp<::android::hidl::base::V1_0::IBase>& /* who */
-                ) override {
-            auto strongComponent = component.promote();
-            if (strongComponent) {
-                LOG(INFO) << "Client died ! release the component !!";
-                strongComponent->release();
-            } else {
-                LOG(ERROR) << "Client died ! no component to release !!";
-            }
-        }
-
-        wp<Component> component;
-    };
-
-    mDeathRecipient = new ListenerDeathRecipient(self);
-    Return<bool> transStatus = mListener->linkToDeath(
-            mDeathRecipient, 0);
-    if (!transStatus.isOk()) {
-        LOG(ERROR) << "Listener linkToDeath() transaction failed.";
+// static
+void Component::OnBinderDied(void *cookie) {
+    DeathContext *context = (DeathContext *)cookie;
+    std::shared_ptr<Component> comp = context->mWeakComp.lock();
+    if (comp) {
+        comp->release();
     }
-    if (!static_cast<bool>(transStatus)) {
-        LOG(DEBUG) << "Listener linkToDeath() call failed.";
-    }
+}
+
+// static
+void Component::OnBinderUnlinked(void *cookie) {
+    delete (DeathContext *)cookie;
 }
 
 Component::~Component() {
     InputBufferManager::unregisterFrameData(mListener);
     mStore->reportComponentDeath(this);
+    if (mDeathRecipient.get()) {
+        AIBinder_unlinkToDeath(mListener->asBinder().get(), mDeathRecipient.get(), mDeathContext);
+    }
 }
 
 } // namespace utils
-} // namespace V1_2
 } // namespace c2
 } // namespace media
 } // namespace hardware
 } // namespace android
+} // namespace aidl
