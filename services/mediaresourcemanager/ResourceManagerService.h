@@ -56,7 +56,7 @@ struct ResourceInfo {
     int64_t clientId;
     std::string name;
     std::shared_ptr<IResourceManagerClient> client;
-    uintptr_t cookie{0};
+    std::shared_ptr<DeathNotifier> deathNotifier = nullptr;
     ResourceList resources;
     bool pendingRemoval{false};
 };
@@ -186,10 +186,6 @@ private:
     void removeProcessInfoOverride(int pid);
 
     void removeProcessInfoOverride_l(int pid);
-    uintptr_t addCookieAndLink_l(const std::shared_ptr<IResourceManagerClient>& client,
-                                 const sp<DeathNotifier>& notifier);
-    void removeCookieAndUnlink_l(const std::shared_ptr<IResourceManagerClient>& client,
-                                 uintptr_t cookie);
 
     void pushReclaimAtom(const ClientInfoParcel& clientInfo,
                          const std::vector<std::shared_ptr<IResourceManagerClient>>& clients,
@@ -210,15 +206,11 @@ private:
     int32_t mCpuBoostCount;
     ::ndk::ScopedAIBinder_DeathRecipient mDeathRecipient;
     struct ProcessInfoOverride {
-        uintptr_t cookie;
+        std::shared_ptr<DeathNotifier> deathNotifier = nullptr;
         std::shared_ptr<IResourceManagerClient> client;
     };
     std::map<int, int> mOverridePidMap;
     std::map<pid_t, ProcessInfoOverride> mProcessInfoOverrideMap;
-    static std::mutex sCookieLock;
-    static uintptr_t sCookieCounter GUARDED_BY(sCookieLock);
-    static std::map<uintptr_t, sp<DeathNotifier> > sCookieToDeathNotifierMap
-            GUARDED_BY(sCookieLock);
     std::shared_ptr<ResourceObserverService> mObserverService;
     std::unique_ptr<ResourceManagerMetrics> mResourceManagerMetrics;
 };

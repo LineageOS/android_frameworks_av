@@ -44,47 +44,82 @@
 
 namespace android {
 
-//static
-std::mutex ResourceManagerService::sCookieLock;
-//static
-uintptr_t ResourceManagerService::sCookieCounter = 0;
-//static
-std::map<uintptr_t, sp<DeathNotifier> > ResourceManagerService::sCookieToDeathNotifierMap;
+class DeathNotifier : public std::enable_shared_from_this<DeathNotifier> {
 
-class DeathNotifier : public RefBase {
+    // BinderDiedContext defines the cookie that is passed as DeathRecipient.
+    // Since this can maintain more context than a raw pointer, we can
+    // validate the scope of DeathNotifier, before deferencing it upon the binder death.
+    struct BinderDiedContext {
+        std::weak_ptr<DeathNotifier> mDeathNotifier;
+    };
 public:
-    DeathNotifier(const std::shared_ptr<ResourceManagerService> &service,
-                  const ClientInfoParcel& clientInfo);
+    DeathNotifier(const std::shared_ptr<IResourceManagerClient>& client,
+                  const std::shared_ptr<ResourceManagerService>& service,
+                  const ClientInfoParcel& clientInfo,
+                  AIBinder_DeathRecipient* recipient);
 
-    virtual ~DeathNotifier() {}
+    virtual ~DeathNotifier() {
+        unlink();
+    }
+
+    void unlink() {
+        if (mClient != nullptr) {
+            // Register for the callbacks by linking to death notification.
+            AIBinder_unlinkToDeath(mClient->asBinder().get(), mRecipient, mCookie);
+            mClient = nullptr;
+        }
+    }
 
     // Implement death recipient
     static void BinderDiedCallback(void* cookie);
+    static void BinderUnlinkedCallback(void* cookie);
     virtual void binderDied();
 
+private:
+    void link() {
+        // Create the context that is passed as cookie to the binder death notification.
+        // The context gets deleted at BinderUnlinkedCallback.
+        mCookie = new BinderDiedContext{.mDeathNotifier = weak_from_this()};
+        // Register for the callbacks by linking to death notification.
+        AIBinder_linkToDeath(mClient->asBinder().get(), mRecipient, mCookie);
+    }
+
 protected:
+    std::shared_ptr<IResourceManagerClient> mClient;
     std::weak_ptr<ResourceManagerService> mService;
     const ClientInfoParcel mClientInfo;
+    AIBinder_DeathRecipient* mRecipient;
+    BinderDiedContext* mCookie;
 };
 
-DeathNotifier::DeathNotifier(const std::shared_ptr<ResourceManagerService> &service,
-                             const ClientInfoParcel& clientInfo)
-    : mService(service), mClientInfo(clientInfo) {}
+DeathNotifier::DeathNotifier(const std::shared_ptr<IResourceManagerClient>& client,
+                             const std::shared_ptr<ResourceManagerService>& service,
+                             const ClientInfoParcel& clientInfo,
+                             AIBinder_DeathRecipient* recipient)
+    : mClient(client), mService(service), mClientInfo(clientInfo),
+      mRecipient(recipient), mCookie(nullptr) {
+    link();
+}
+
+//static
+void DeathNotifier::BinderUnlinkedCallback(void* cookie) {
+    BinderDiedContext* context = reinterpret_cast<BinderDiedContext*>(cookie);
+    // Since we don't need the context anymore, we are deleting it now.
+    delete context;
+}
 
 //static
 void DeathNotifier::BinderDiedCallback(void* cookie) {
-    sp<DeathNotifier> notifier;
-    {
-        std::scoped_lock lock{ResourceManagerService::sCookieLock};
-        auto it = ResourceManagerService::sCookieToDeathNotifierMap.find(
-                reinterpret_cast<uintptr_t>(cookie));
-        if (it == ResourceManagerService::sCookieToDeathNotifierMap.end()) {
-            return;
+    BinderDiedContext* context = reinterpret_cast<BinderDiedContext*>(cookie);
+
+    // Validate the context and check if the DeathNotifier object is still in scope.
+    if (context != nullptr) {
+        std::shared_ptr<DeathNotifier> thiz = context->mDeathNotifier.lock();
+        if (thiz != nullptr) {
+            thiz->binderDied();
+        } else {
+            ALOGI("DeathNotifier is out of scope already");
         }
-        notifier = it->second;
-    }
-    if (notifier.get() != nullptr) {
-        notifier->binderDied();
     }
 }
 
@@ -103,9 +138,11 @@ void DeathNotifier::binderDied() {
 
 class OverrideProcessInfoDeathNotifier : public DeathNotifier {
 public:
-    OverrideProcessInfoDeathNotifier(const std::shared_ptr<ResourceManagerService> &service,
-                                     const ClientInfoParcel& clientInfo)
-            : DeathNotifier(service, clientInfo) {}
+    OverrideProcessInfoDeathNotifier(const std::shared_ptr<IResourceManagerClient>& client,
+                                     const std::shared_ptr<ResourceManagerService>& service,
+                                     const ClientInfoParcel& clientInfo,
+                                     AIBinder_DeathRecipient* recipient)
+            : DeathNotifier(client, service, clientInfo, recipient) {}
 
     virtual ~OverrideProcessInfoDeathNotifier() {}
 
@@ -195,7 +232,7 @@ static ResourceInfo& getResourceInfoForEdit(uid_t uid, int64_t clientId,
                           .clientId = clientId,
                           .name = name.empty()? "<unknown client>" : name,
                           .client = client,
-                          .cookie = 0,
+                          .deathNotifier = nullptr,
                           .pendingRemoval = false};
         auto [it, inserted] = infos.emplace(clientId, info);
         found = it;
@@ -341,7 +378,8 @@ ResourceManagerService::ResourceManagerService(const sp<ProcessInfoInterface> &p
       mSupportsMultipleSecureCodecs(true),
       mSupportsSecureWithNonSecureCodec(true),
       mCpuBoostCount(0),
-      mDeathRecipient(AIBinder_DeathRecipient_new(DeathNotifier::BinderDiedCallback)) {
+      mDeathRecipient(::ndk::ScopedAIBinder_DeathRecipient(
+                      AIBinder_DeathRecipient_new(DeathNotifier::BinderDiedCallback))) {
     mSystemCB->noteResetVideo();
     // Create ResourceManagerMetrics that handles all the metrics.
     mResourceManagerMetrics = std::make_unique<ResourceManagerMetrics>(mProcessInfo);
@@ -496,9 +534,9 @@ Status ResourceManagerService::addResource(const ClientInfoParcel& clientInfo,
             mergeResources(it->second, res);
         }
     }
-    if (info.cookie == 0 && client != nullptr) {
-        info.cookie = addCookieAndLink_l(client,
-                new DeathNotifier(ref<ResourceManagerService>(), clientInfo));
+    if (info.deathNotifier == nullptr && client != nullptr) {
+        info.deathNotifier = std::make_shared<DeathNotifier>(
+            client, ref<ResourceManagerService>(), clientInfo, mDeathRecipient.get());
     }
     if (mObserverService != nullptr && !resourceAdded.empty()) {
         mObserverService->onResourceAdded(uid, pid, resourceAdded);
@@ -614,8 +652,6 @@ Status ResourceManagerService::removeResource(const ClientInfoParcel& clientInfo
 
     // Since this client has been removed, update the metrics collector.
     mResourceManagerMetrics->notifyClientReleased(clientInfo);
-
-    removeCookieAndUnlink_l(info.client, info.cookie);
 
     if (mObserverService != nullptr && !info.resources.empty()) {
         mObserverService->onResourceRemoved(info.uid, pid, info.resources);
@@ -869,38 +905,12 @@ Status ResourceManagerService::overrideProcessInfo(
                                 .uid = 0,
                                 .id = 0,
                                 .name = "<unknown client>"};
-    uintptr_t cookie = addCookieAndLink_l(client,
-            new OverrideProcessInfoDeathNotifier(ref<ResourceManagerService>(), clientInfo));
+    auto deathNotifier = std::make_shared<OverrideProcessInfoDeathNotifier>(
+            client, ref<ResourceManagerService>(), clientInfo, mDeathRecipient.get());
 
-    mProcessInfoOverrideMap.emplace(pid, ProcessInfoOverride{cookie, client});
+    mProcessInfoOverrideMap.emplace(pid, ProcessInfoOverride{deathNotifier, client});
 
     return Status::ok();
-}
-
-uintptr_t ResourceManagerService::addCookieAndLink_l(
-        const std::shared_ptr<IResourceManagerClient>& client, const sp<DeathNotifier>& notifier) {
-    if (client == nullptr) {
-        return 0;
-    }
-    std::scoped_lock lock{sCookieLock};
-
-    uintptr_t cookie;
-    // Need to skip cookie 0 (if it wraps around). ResourceInfo has cookie initialized to 0
-    // indicating the death notifier is not created yet.
-    while ((cookie = ++sCookieCounter) == 0);
-    AIBinder_linkToDeath(client->asBinder().get(), mDeathRecipient.get(), (void*)cookie);
-    sCookieToDeathNotifierMap.emplace(cookie, notifier);
-
-    return cookie;
-}
-
-void ResourceManagerService::removeCookieAndUnlink_l(
-         const std::shared_ptr<IResourceManagerClient>& client, uintptr_t cookie) {
-    std::scoped_lock lock{sCookieLock};
-    if (client != nullptr) {
-        AIBinder_unlinkToDeath(client->asBinder().get(), mDeathRecipient.get(), (void*)cookie);
-    }
-    sCookieToDeathNotifierMap.erase(cookie);
 }
 
 void ResourceManagerService::removeProcessInfoOverride(int pid) {
@@ -916,9 +926,6 @@ void ResourceManagerService::removeProcessInfoOverride_l(int pid) {
     }
 
     mProcessInfo->removeProcessInfoOverride(pid);
-
-    removeCookieAndUnlink_l(it->second.client, it->second.cookie);
-
     mProcessInfoOverrideMap.erase(pid);
 }
 
