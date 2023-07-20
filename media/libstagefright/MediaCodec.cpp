@@ -320,8 +320,8 @@ struct ResourceManagerClient : public BnResourceManagerClient {
                 return Status::fromStatus(STATUS_INVALID_OPERATION);
             }
             ClientInfoParcel clientInfo{.pid = static_cast<int32_t>(mPid),
-                                .uid = static_cast<int32_t>(mUid),
-                                .id = getId(this)};
+                                        .uid = static_cast<int32_t>(mUid),
+                                        .id = getId(this)};
             service->removeClient(clientInfo);
             *_aidl_return = true;
             return Status::ok();
@@ -398,6 +398,10 @@ struct MediaCodec::ResourceManagerServiceProxy :
         mCodecName = name;
     }
 
+    inline void setImportance(int importance) {
+        mImportance = importance;
+    }
+
 private:
     // To get the binder interface to ResourceManagerService.
     void getService() {
@@ -437,12 +441,30 @@ private:
         mGetServiceFuture = std::async(std::launch::async, [this] { getService(); });
     }
 
+    /**
+     * Get the ClientInfo to communicate with the ResourceManager.
+     *
+     * ClientInfo includes:
+     *   - {pid, uid} of the process
+     *   - identifier for the client
+     *   - name of the client/codec
+     *   - importance associated with the client
+     */
+    inline ClientInfoParcel getClientInfo() const {
+        ClientInfoParcel clientInfo{.pid = static_cast<int32_t>(mPid),
+                                    .uid = static_cast<int32_t>(mUid),
+                                    .id = getId(mClient),
+                                    .name = mCodecName,
+                                    .importance = mImportance};
+        return std::move(clientInfo);
+    }
 
 private:
-    std::mutex mLock;
-    pid_t mPid;
-    uid_t mUid;
-    bool mBinderDied = false;
+    std::mutex  mLock;
+    bool        mBinderDied = false;
+    pid_t       mPid;
+    uid_t       mUid;
+    int         mImportance = 0;
     std::string mCodecName;
     /**
      * Reconnecting with the ResourceManagerService, after its binder interface dies,
@@ -550,11 +572,7 @@ void MediaCodec::ResourceManagerServiceProxy::reRegisterAllResources_l() {
     std::vector<MediaResourceParcel> resources;
     std::copy(mMediaResourceParcel.begin(), mMediaResourceParcel.end(),
               std::back_inserter(resources));
-    ClientInfoParcel clientInfo{.pid = static_cast<int32_t>(mPid),
-                                .uid = static_cast<int32_t>(mUid),
-                                .id = getId(mClient),
-                                .name = mCodecName};
-    mService->addResource(clientInfo, mClient, resources);
+    mService->addResource(getClientInfo(), mClient, resources);
 }
 
 void MediaCodec::ResourceManagerServiceProxy::BinderDiedCallback(void* cookie) {
@@ -587,11 +605,7 @@ void MediaCodec::ResourceManagerServiceProxy::addResource(
     }
     std::vector<MediaResourceParcel> resources;
     resources.push_back(resource);
-    ClientInfoParcel clientInfo{.pid = static_cast<int32_t>(mPid),
-                                .uid = static_cast<int32_t>(mUid),
-                                .id = getId(mClient),
-                                .name = mCodecName};
-    service->addResource(clientInfo, mClient, resources);
+    service->addResource(getClientInfo(), mClient, resources);
     mMediaResourceParcel.emplace(resource);
 }
 
@@ -605,11 +619,7 @@ void MediaCodec::ResourceManagerServiceProxy::removeResource(
     }
     std::vector<MediaResourceParcel> resources;
     resources.push_back(resource);
-    ClientInfoParcel clientInfo{.pid = static_cast<int32_t>(mPid),
-                                .uid = static_cast<int32_t>(mUid),
-                                .id = getId(mClient),
-                                .name = mCodecName};
-    service->removeResource(clientInfo, resources);
+    service->removeResource(getClientInfo(), resources);
     mMediaResourceParcel.erase(resource);
 }
 
@@ -620,11 +630,7 @@ void MediaCodec::ResourceManagerServiceProxy::removeClient() {
         ALOGW("Service isn't available");
         return;
     }
-    ClientInfoParcel clientInfo{.pid = static_cast<int32_t>(mPid),
-                                .uid = static_cast<int32_t>(mUid),
-                                .id = getId(mClient),
-                                .name = mCodecName};
-    service->removeClient(clientInfo);
+    service->removeClient(getClientInfo());
     mMediaResourceParcel.clear();
 }
 
@@ -635,11 +641,7 @@ void MediaCodec::ResourceManagerServiceProxy::markClientForPendingRemoval() {
         ALOGW("Service isn't available");
         return;
     }
-    ClientInfoParcel clientInfo{.pid = static_cast<int32_t>(mPid),
-                                .uid = static_cast<int32_t>(mUid),
-                                .id = getId(mClient),
-                                .name = mCodecName};
-    service->markClientForPendingRemoval(clientInfo);
+    service->markClientForPendingRemoval(getClientInfo());
     mMediaResourceParcel.clear();
 }
 
@@ -652,11 +654,7 @@ bool MediaCodec::ResourceManagerServiceProxy::reclaimResource(
         return false;
     }
     bool success;
-    ClientInfoParcel clientInfo{.pid = static_cast<int32_t>(mPid),
-                                .uid = static_cast<int32_t>(mUid),
-                                .id = getId(mClient),
-                                .name = mCodecName};
-    Status status = service->reclaimResource(clientInfo, resources, &success);
+    Status status = service->reclaimResource(getClientInfo(), resources, &success);
     return status.isOk() && success;
 }
 
@@ -667,11 +665,7 @@ void MediaCodec::ResourceManagerServiceProxy::notifyClientCreated() {
         ALOGW("Service isn't available");
         return;
     }
-    ClientInfoParcel clientInfo{.pid = static_cast<int32_t>(mPid),
-                                .uid = static_cast<int32_t>(mUid),
-                                .id = getId(mClient),
-                                .name = mCodecName};
-    service->notifyClientCreated(clientInfo);
+    service->notifyClientCreated(getClientInfo());
 }
 
 void MediaCodec::ResourceManagerServiceProxy::notifyClientStarted(
@@ -682,10 +676,7 @@ void MediaCodec::ResourceManagerServiceProxy::notifyClientStarted(
         ALOGW("Service isn't available");
         return;
     }
-    clientConfig.clientInfo.pid = static_cast<int32_t>(mPid);
-    clientConfig.clientInfo.uid = static_cast<int32_t>(mUid);
-    clientConfig.clientInfo.id = getId(mClient);
-    clientConfig.clientInfo.name = mCodecName;
+    clientConfig.clientInfo = getClientInfo();
     service->notifyClientStarted(clientConfig);
 }
 
@@ -697,10 +688,7 @@ void MediaCodec::ResourceManagerServiceProxy::notifyClientStopped(
         ALOGW("Service isn't available");
         return;
     }
-    clientConfig.clientInfo.pid = static_cast<int32_t>(mPid);
-    clientConfig.clientInfo.uid = static_cast<int32_t>(mUid);
-    clientConfig.clientInfo.id = getId(mClient);
-    clientConfig.clientInfo.name = mCodecName;
+    clientConfig.clientInfo = getClientInfo();
     service->notifyClientStopped(clientConfig);
 }
 
@@ -712,10 +700,7 @@ void MediaCodec::ResourceManagerServiceProxy::notifyClientConfigChanged(
         ALOGW("Service isn't available");
         return;
     }
-    clientConfig.clientInfo.pid = static_cast<int32_t>(mPid);
-    clientConfig.clientInfo.uid = static_cast<int32_t>(mUid);
-    clientConfig.clientInfo.id = getId(mClient);
-    clientConfig.clientInfo.name = mCodecName;
+    clientConfig.clientInfo = getClientInfo();
     service->notifyClientConfigChanged(clientConfig);
 }
 
@@ -1716,6 +1701,21 @@ void MediaCodec::updateLowLatency(const sp<AMessage> &msg) {
     }
 }
 
+void MediaCodec::updateCodecImportance(const sp<AMessage>& msg) {
+    // Update the codec importance.
+    int32_t importance = 0;
+    if (msg->findInt32(KEY_IMPORTANCE, &importance)) {
+        // Ignoring the negative importance.
+        if (importance >= 0) {
+            // Notify RM about the change in the importance.
+            mResourceManagerProxy->setImportance(importance);
+            ClientConfigParcel clientConfig;
+            initClientConfigParcel(clientConfig);
+            mResourceManagerProxy->notifyClientConfigChanged(clientConfig);
+        }
+    }
+}
+
 constexpr const char *MediaCodec::asString(TunnelPeekState state, const char *default_string){
     switch(state) {
         case TunnelPeekState::kLegacyMode:
@@ -2224,23 +2224,9 @@ static const char enableMediaFormatShapingProperty[] = "debug.stagefright.enable
 static void mapFormat(AString componentName, const sp<AMessage> &format, const char *kind,
                       bool reverse);
 
-status_t MediaCodec::configure(
-        const sp<AMessage> &format,
-        const sp<Surface> &nativeWindow,
-        const sp<ICrypto> &crypto,
-        uint32_t flags) {
-    return configure(format, nativeWindow, crypto, NULL, flags);
-}
-
-status_t MediaCodec::configure(
-        const sp<AMessage> &format,
-        const sp<Surface> &surface,
-        const sp<ICrypto> &crypto,
-        const sp<IDescrambler> &descrambler,
-        uint32_t flags) {
-
-    sp<AMessage> msg = new AMessage(kWhatConfigure, this);
+mediametrics_handle_t MediaCodec::createMediaMetrics(const sp<AMessage>& format, uint32_t flags) {
     mediametrics_handle_t nextMetricsHandle = mediametrics_create(kCodecKeyName);
+    bool isEncoder = (flags & CONFIGURE_FLAG_ENCODE);
 
     // TODO: validity check log-session-id: it should be a 32-hex-digit.
     format->findString("log-session-id", &mLogSessionId);
@@ -2255,8 +2241,7 @@ status_t MediaCodec::configure(
         if (format->findInt32("level", &level)) {
             mediametrics_setInt32(nextMetricsHandle, kCodecLevel, level);
         }
-        mediametrics_setInt32(nextMetricsHandle, kCodecEncoder,
-                              (flags & CONFIGURE_FLAG_ENCODE) ? 1 : 0);
+        mediametrics_setInt32(nextMetricsHandle, kCodecEncoder, isEncoder);
 
         if (!mLogSessionId.empty()) {
             mediametrics_setCString(nextMetricsHandle, kCodecLogSessionId, mLogSessionId.c_str());
@@ -2335,7 +2320,7 @@ status_t MediaCodec::configure(
         }
     }
 
-    if (flags & CONFIGURE_FLAG_ENCODE) {
+    if (isEncoder) {
         int8_t enableShaping = property_get_bool(enableMediaFormatShapingProperty,
                                                  enableMediaFormatShapingDefault);
         if (!enableShaping) {
@@ -2380,6 +2365,31 @@ status_t MediaCodec::configure(
 
     updateLowLatency(format);
 
+    return nextMetricsHandle;
+}
+
+status_t MediaCodec::configure(
+        const sp<AMessage> &format,
+        const sp<Surface> &nativeWindow,
+        const sp<ICrypto> &crypto,
+        uint32_t flags) {
+    return configure(format, nativeWindow, crypto, NULL, flags);
+}
+
+status_t MediaCodec::configure(
+        const sp<AMessage> &format,
+        const sp<Surface> &surface,
+        const sp<ICrypto> &crypto,
+        const sp<IDescrambler> &descrambler,
+        uint32_t flags) {
+
+    // Update the codec importance.
+    updateCodecImportance(format);
+
+    // Create and set up metrics for this codec.
+    mediametrics_handle_t nextMetricsHandle = createMediaMetrics(format, flags);
+
+    sp<AMessage> msg = new AMessage(kWhatConfigure, this);
     msg->setMessage("format", format);
     msg->setInt32("flags", flags);
     msg->setObject("surface", surface);
@@ -6591,6 +6601,7 @@ status_t MediaCodec::onSetParameters(const sp<AMessage> &params) {
         return NO_INIT;
     }
     updateLowLatency(params);
+    updateCodecImportance(params);
     mapFormat(mComponentName, params, nullptr, false);
     updateTunnelPeek(params);
     mCodec->signalSetParameters(params);
