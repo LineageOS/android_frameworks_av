@@ -89,9 +89,9 @@ aaudio_result_t AAudioFlowGraph::configure(audio_format_t sourceFormat,
     }
 
     if (sourceSampleRate != sinkSampleRate) {
-        mResampler.reset(aaudio::resampler::MultiChannelResampler::make(sinkChannelCount,
+        mResampler.reset(aaudio::resampler::MultiChannelResampler::make(sourceChannelCount,
                 sourceSampleRate, sinkSampleRate, resamplerQuality));
-        mRateConverter = std::make_unique<SampleRateConverter>(sinkChannelCount,
+        mRateConverter = std::make_unique<SampleRateConverter>(sourceChannelCount,
                                                                *mResampler);
         lastOutput->connect(&mRateConverter->input);
         lastOutput = &mRateConverter->output;

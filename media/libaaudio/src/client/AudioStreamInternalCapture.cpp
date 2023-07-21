@@ -51,7 +51,7 @@ aaudio_result_t AudioStreamInternalCapture::open(const AudioStreamBuilder &build
     aaudio_result_t result = AudioStreamInternal::open(builder);
     if (result == AAUDIO_OK) {
         result = mFlowGraph.configure(getDeviceFormat(),
-                             getDeviceChannelCount(),
+                             getDeviceSamplesPerFrame(),
                              getDeviceSampleRate(),
                              getFormat(),
                              getSamplesPerFrame(),

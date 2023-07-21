@@ -202,6 +202,9 @@ aaudio_result_t AudioStreamTrack::open(const AudioStreamBuilder& builder)
     setSampleRate(mAudioTrack->getSampleRate());
     setBufferCapacity(getBufferCapacityFromDevice());
     setFramesPerBurst(getFramesPerBurstFromDevice());
+
+    // Use the same values for device values.
+    setDeviceSamplesPerFrame(getSamplesPerFrame());
     setDeviceSampleRate(mAudioTrack->getSampleRate());
     setDeviceBufferCapacity(getBufferCapacityFromDevice());
     setDeviceFramesPerBurst(getFramesPerBurstFromDevice());

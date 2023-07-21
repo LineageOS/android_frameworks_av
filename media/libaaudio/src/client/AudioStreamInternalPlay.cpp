@@ -54,7 +54,7 @@ aaudio_result_t AudioStreamInternalPlay::open(const AudioStreamBuilder &builder)
                              getSamplesPerFrame(),
                              getSampleRate(),
                              getDeviceFormat(),
-                             getDeviceChannelCount(),
+                             getDeviceSamplesPerFrame(),
                              getDeviceSampleRate(),
                              getRequireMonoBlend(),
                              useVolumeRamps,

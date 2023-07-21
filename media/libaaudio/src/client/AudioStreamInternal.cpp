@@ -134,8 +134,6 @@ aaudio_result_t AudioStreamInternal::open(const AudioStreamBuilder &builder) {
 
     request.getConfiguration().setBufferCapacity(builder.getBufferCapacity());
 
-    mDeviceChannelCount = getSamplesPerFrame(); // Assume it will be the same. Update if not.
-
     mServiceStreamHandleInfo = mServiceInterface.openStream(request, configurationOutput);
     if (getServiceHandle() < 0
             && (request.getConfiguration().getSamplesPerFrame() == 1
@@ -179,8 +177,6 @@ aaudio_result_t AudioStreamInternal::open(const AudioStreamBuilder &builder) {
         setChannelMask(configurationOutput.getChannelMask());
     }
 
-    mDeviceChannelCount = configurationOutput.getSamplesPerFrame();
-
     setDeviceId(configurationOutput.getDeviceId());
     setSessionId(configurationOutput.getSessionId());
     setSharingMode(configurationOutput.getSharingMode());
@@ -205,6 +201,7 @@ aaudio_result_t AudioStreamInternal::open(const AudioStreamBuilder &builder) {
 
     // Save device format so we can do format conversion and volume scaling together.
     setDeviceFormat(configurationOutput.getFormat());
+    setDeviceSamplesPerFrame(configurationOutput.getSamplesPerFrame());
 
     setHardwareSamplesPerFrame(configurationOutput.getHardwareSamplesPerFrame());
     setHardwareSampleRate(configurationOutput.getHardwareSampleRate());

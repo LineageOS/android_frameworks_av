@@ -252,6 +252,10 @@ public:
         return mSamplesPerFrame;
     }
 
+    aaudio_result_t getDeviceSamplesPerFrame() const {
+        return mDeviceSamplesPerFrame;
+    }
+
     aaudio_result_t getHardwareSamplesPerFrame() const {
         return mHardwareSamplesPerFrame;
     }
@@ -334,10 +338,10 @@ public:
     }
 
     /**
-     * This is only valid after setChannelMask() and setDeviceFormat() have been called.
+     * This is only valid after setDeviceSamplesPerFrame() and setDeviceFormat() have been called.
      */
     int32_t getBytesPerDeviceFrame() const {
-        return getSamplesPerFrame() * audio_bytes_per_sample(getDeviceFormat());
+        return getDeviceSamplesPerFrame() * audio_bytes_per_sample(getDeviceFormat());
     }
 
     virtual int64_t getFramesWritten() = 0;
@@ -376,6 +380,11 @@ public:
         mChannelMask = channelMask;
         mSamplesPerFrame = AAudioConvert_channelMaskToCount(channelMask);
     }
+
+    void setDeviceSamplesPerFrame(int32_t deviceSamplesPerFrame) {
+        mDeviceSamplesPerFrame = deviceSamplesPerFrame;
+    }
+
 
     /**
      * @return true if data callback has been specified
@@ -748,6 +757,7 @@ private:
 
     // These do not change after open().
     int32_t                     mSamplesPerFrame = AAUDIO_UNSPECIFIED;
+    int32_t                     mDeviceSamplesPerFrame = AAUDIO_UNSPECIFIED;
     int32_t                     mHardwareSamplesPerFrame = AAUDIO_UNSPECIFIED;
     aaudio_channel_mask_t       mChannelMask = AAUDIO_UNSPECIFIED;
     int32_t                     mSampleRate = AAUDIO_UNSPECIFIED;
