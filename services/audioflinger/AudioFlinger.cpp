@@ -148,21 +148,6 @@ static void sMediaLogInit()
     }
 }
 
-// Keep a strong reference to external vibrator service
-static sp<os::IExternalVibratorService> sExternalVibratorService;
-
-static sp<os::IExternalVibratorService> getExternalVibratorService() {
-    if (sExternalVibratorService == 0) {
-        sp<IBinder> binder = defaultServiceManager()->getService(
-            String16("external_vibrator_service"));
-        if (binder != 0) {
-            sExternalVibratorService =
-                interface_cast<os::IExternalVibratorService>(binder);
-        }
-    }
-    return sExternalVibratorService;
-}
-
 // Creates association between Binder code to name for IAudioFlinger.
 #define IAUDIOFLINGER_BINDER_METHOD_MACRO_LIST \
 BINDER_METHOD_ENTRY(createTrack) \
@@ -673,34 +658,6 @@ status_t AudioFlinger::openMmapStream(MmapStreamInterface::stream_direction_t di
     ALOGV("%s done status %d portId %d", __FUNCTION__, ret, portId);
 
     return ret;
-}
-
-/* static */
-os::HapticScale AudioFlinger::onExternalVibrationStart(
-        const sp<os::ExternalVibration>& externalVibration) {
-    sp<os::IExternalVibratorService> evs = getExternalVibratorService();
-    if (evs != nullptr) {
-        int32_t ret;
-        binder::Status status = evs->onExternalVibrationStart(*externalVibration, &ret);
-        if (status.isOk()) {
-            ALOGD("%s, start external vibration with intensity as %d", __func__, ret);
-            return os::ExternalVibration::externalVibrationScaleToHapticScale(ret);
-        }
-    }
-    ALOGD("%s, start external vibration with intensity as MUTE due to %s",
-            __func__,
-            evs == nullptr ? "external vibration service not found"
-                           : "error when querying intensity");
-    return os::HapticScale::MUTE;
-}
-
-/* static */
-void AudioFlinger::onExternalVibrationStop(const sp<os::ExternalVibration>& externalVibration) {
-    sp<os::IExternalVibratorService> evs = getExternalVibratorService();
-    if (evs != 0) {
-        ALOGD("%s, stopping external vibration", __func__);
-        evs->onExternalVibrationStop(*externalVibration);
-    }
 }
 
 status_t AudioFlinger::addEffectToHal(
