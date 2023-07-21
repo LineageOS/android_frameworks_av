@@ -117,6 +117,9 @@ public:
     };
 
     static const char* threadTypeToString(type_t type);
+    static bool isValidPcmSinkChannelMask(audio_channel_mask_t channelMask);
+    static bool isValidPcmSinkFormat(audio_format_t format);
+
     virtual status_t readyToRun() = 0;
     virtual void clearPowerManager() = 0;
     virtual status_t initCheck() const = 0;
