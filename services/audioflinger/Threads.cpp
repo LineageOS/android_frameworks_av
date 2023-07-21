@@ -97,6 +97,7 @@
 #include <afutils/DumpTryLock.h>
 #include <afutils/Permission.h>
 #include <afutils/TypedLogger.h>
+#include <afutils/Vibrator.h>
 
 // ----------------------------------------------------------------------------
 
@@ -2816,7 +2817,7 @@ NO_THREAD_SAFETY_ANALYSIS  // release and re-acquire mLock
             // Unlock due to VibratorService will lock for this call and will
             // call Tracks.mute/unmute which also require thread's lock.
             mLock.unlock();
-            const os::HapticScale intensity = AudioFlinger::onExternalVibrationStart(
+            const os::HapticScale intensity = afutils::onExternalVibrationStart(
                     track->getExternalVibration());
             std::optional<media::AudioVibratorInfo> vibratorInfo;
             {
@@ -4633,7 +4634,7 @@ NO_THREAD_SAFETY_ANALYSIS  // release and re-acquire mLock
             mLock.unlock();
             // Unlock due to VibratorService will lock for this call and will
             // call Tracks.mute/unmute which also require thread's lock.
-            AudioFlinger::onExternalVibrationStop(track->getExternalVibration());
+            afutils::onExternalVibrationStop(track->getExternalVibration());
             mLock.lock();
 
             // When the track is stop, set the haptic intensity as MUTE
