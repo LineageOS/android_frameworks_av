@@ -138,8 +138,6 @@ protected:
     // Calculate timeout for an operation involving framesPerOperation.
     int64_t calculateReasonableTimeout(int32_t framesPerOperation);
 
-    int32_t getDeviceChannelCount() const { return mDeviceChannelCount; }
-
     /**
      * @return true if running in audio service, versus in app process
      */
@@ -212,10 +210,6 @@ private:
     EndpointDescriptor       mEndpointDescriptor; // buffer description with resolved addresses
 
     int64_t                  mServiceLatencyNanos = 0;
-
-    // Sometimes the hardware is operating with a different channel count from the app.
-    // Then we require conversion in AAudio.
-    int32_t                  mDeviceChannelCount = 0;
 
     int32_t                  mBufferSizeInFrames = 0; // local threshold to control latency
     int32_t                  mDeviceBufferSizeInFrames = 0;
