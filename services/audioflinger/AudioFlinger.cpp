@@ -254,14 +254,6 @@ class DevicesFactoryHalCallbackImpl : public DevicesFactoryHalCallback {
 
 // ----------------------------------------------------------------------------
 
-std::string formatToString(audio_format_t format) {
-    std::string result;
-    FormatConverter::toString(format, result);
-    return result;
-}
-
-// ----------------------------------------------------------------------------
-
 void AudioFlinger::instantiate() {
     sp<IServiceManager> sm(defaultServiceManager());
     sm->addService(String16(IAudioFlinger::DEFAULT_SERVICE_NAME),
@@ -2889,28 +2881,6 @@ sp<IAfThreadBase> AudioFlinger::openOutput_l(audio_module_handle_t module,
     }
 
     mHardwareStatus = AUDIO_HW_OUTPUT_OPEN;
-
-    // FOR TESTING ONLY:
-    // This if statement allows overriding the audio policy settings
-    // and forcing a specific format or channel mask to the HAL/Sink device for testing.
-    if (!(flags & (AUDIO_OUTPUT_FLAG_COMPRESS_OFFLOAD | AUDIO_OUTPUT_FLAG_DIRECT))) {
-        // Check only for Normal Mixing mode
-        if (kEnableExtendedPrecision) {
-            // Specify format (uncomment one below to choose)
-            //halConfig->format = AUDIO_FORMAT_PCM_FLOAT;
-            //halConfig->format = AUDIO_FORMAT_PCM_24_BIT_PACKED;
-            //halConfig->format = AUDIO_FORMAT_PCM_32_BIT;
-            //halConfig->format = AUDIO_FORMAT_PCM_8_24_BIT;
-            // ALOGV("openOutput_l() upgrading format to %#08x", halConfig->format);
-        }
-        if (kEnableExtendedChannels) {
-            // Specify channel mask (uncomment one below to choose)
-            //halConfig->channel_mask = audio_channel_out_mask_from_count(4);  // for USB 4ch
-            //halConfig->channel_mask = audio_channel_mask_from_representation_and_bits(
-            //        AUDIO_CHANNEL_REPRESENTATION_INDEX, (1 << 4) - 1);  // another 4ch example
-        }
-    }
-
     AudioStreamOut *outputStream = NULL;
     status_t status = outHwDev->openOutputStream(
             &outputStream,
@@ -2948,8 +2918,8 @@ sp<IAfThreadBase> AudioFlinger::openOutput_l(audio_module_handle_t module,
                 ALOGV("openOutput_l() created offload output: ID %d thread %p",
                       *output, thread.get());
             } else if ((flags & AUDIO_OUTPUT_FLAG_DIRECT)
-                    || !isValidPcmSinkFormat(halConfig->format)
-                    || !isValidPcmSinkChannelMask(halConfig->channel_mask)) {
+                    || !IAfThreadBase::isValidPcmSinkFormat(halConfig->format)
+                    || !IAfThreadBase::isValidPcmSinkChannelMask(halConfig->channel_mask)) {
                 thread = IAfPlaybackThread::createDirectOutputThread(this, outputStream, *output,
                         mSystemReady, halConfig->offload_info);
                 ALOGV("openOutput_l() created direct output: ID %d thread %p",
