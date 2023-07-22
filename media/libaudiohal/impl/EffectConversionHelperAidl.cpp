@@ -208,12 +208,12 @@ status_t EffectConversionHelperAidl::handleSetConfig(uint32_t cmdSize, const voi
             mEffect->close();
             return status;
         }
-        mCommon = common;
     } else if (mCommon != common) {
         ALOGI("%s at state %s, setParameter", __func__, android::internal::ToString(state).c_str());
-        Parameter aidlParam = UNION_MAKE(Parameter, common, mCommon);
+        Parameter aidlParam = UNION_MAKE(Parameter, common, common);
         RETURN_STATUS_IF_ERROR(statusTFromBinderStatus(mEffect->setParameter(aidlParam)));
     }
+    mCommon = common;
 
     return *static_cast<int32_t*>(pReplyData) = OK;
 }
@@ -351,9 +351,14 @@ status_t EffectConversionHelperAidl::handleSetOffload(uint32_t cmdSize, const vo
     if (mIsProxyEffect) {
         ALOGI("%s offload param offload %s ioHandle %d", __func__,
               offload->isOffload ? "true" : "false", offload->ioHandle);
-        mCommon.ioHandle = offload->ioHandle;
         const auto& effectProxy = std::static_pointer_cast<EffectProxy>(mEffect);
         RETURN_STATUS_IF_ERROR(statusTFromBinderStatus(effectProxy->setOffloadParam(offload)));
+        if (mCommon.ioHandle != offload->ioHandle) {
+            ALOGI("%s ioHandle update [%d to %d]", __func__, mCommon.ioHandle, offload->ioHandle);
+            mCommon.ioHandle = offload->ioHandle;
+            Parameter aidlParam = UNION_MAKE(Parameter, common, mCommon);
+            RETURN_STATUS_IF_ERROR(statusTFromBinderStatus(mEffect->setParameter(aidlParam)));
+        }
         // update FMQs if the effect instance already open
         if (State state; effectProxy->getState(&state).isOk() && state != State::INIT) {
             mStatusQ = effectProxy->getStatusMQ();
