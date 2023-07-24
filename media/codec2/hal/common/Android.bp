@@ -1,0 +1,11 @@
+cc_library_headers {
+    name: "libcodec2_hal_common",
+    export_include_dirs: ["include/"],
+    vendor_available: true,
+    apex_available: [
+        "//apex_available:platform",
+        "com.android.media",
+        "com.android.media.swcodec",
+    ],
+    min_sdk_version: "29",
+}
