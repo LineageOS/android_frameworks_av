@@ -165,6 +165,7 @@ int Visualizer_setConfig(VisualizerContext *pContext, effect_config_t *pConfig)
             pConfig->outputCfg.accessMode != EFFECT_BUFFER_ACCESS_ACCUMULATE) return -EINVAL;
     if (pConfig->inputCfg.format != kProcessFormat) return -EINVAL;
 
+    pContext->mChannelCount = channelCount;
     pContext->mConfig = *pConfig;
 
     Visualizer_reset(pContext);
@@ -229,8 +230,6 @@ int Visualizer_init(VisualizerContext *pContext)
     pContext->mScalingMode = VISUALIZER_SCALING_MODE_NORMALIZED;
 
     // measurement initialization
-    pContext->mChannelCount =
-            audio_channel_count_from_out_mask(pContext->mConfig.inputCfg.channels);
     pContext->mMeasurementMode = MEASUREMENT_MODE_NONE;
     pContext->mMeasurementWindowSizeInBuffers = MEASUREMENT_WINDOW_MAX_SIZE_IN_BUFFERS;
     pContext->mMeasurementBufferIdx = 0;
