@@ -138,7 +138,7 @@ c2_status_t C2SoftFlacEnc::onInit() {
     mSignalledError = false;
     mSignalledOutputEos = false;
     mIsFirstFrame = true;
-    mAnchorTimeStamp = 0ull;
+    mAnchorTimeStamp = 0;
     mProcessedSamples = 0u;
     mEncoderWriteData = false;
     mEncoderReturnedNbBytes = 0;
@@ -169,7 +169,7 @@ c2_status_t C2SoftFlacEnc::onStop() {
     mSignalledError = false;
     mSignalledOutputEos = false;
     mIsFirstFrame = true;
-    mAnchorTimeStamp = 0ull;
+    mAnchorTimeStamp = 0;
     mProcessedSamples = 0u;
     mEncoderWriteData = false;
     mEncoderReturnedNbBytes = 0;
@@ -219,7 +219,7 @@ void C2SoftFlacEnc::process(
               inSize, (int)work->input.ordinal.timestamp.peeku(),
               (int)work->input.ordinal.frameIndex.peeku(), work->input.flags);
     if (mIsFirstFrame && inSize) {
-        mAnchorTimeStamp = work->input.ordinal.timestamp.peekull();
+        mAnchorTimeStamp = work->input.ordinal.timestamp.peekll();
         mIsFirstFrame = false;
     }
 
@@ -388,7 +388,7 @@ FLAC__StreamEncoderWriteStatus C2SoftFlacEnc::onEncodedFlacAvailable(
     C2WriteView wView = mOutputBlock->map().get();
     uint8_t* outData = wView.data();
     const uint32_t sampleRate = mIntf->getSampleRate();
-    const uint64_t outTimeStamp = mProcessedSamples * 1000000ll / sampleRate;
+    const int64_t outTimeStamp = mProcessedSamples * 1000000ll / sampleRate;
     ALOGV("writing %zu bytes of encoded data on output", bytes);
     // increment mProcessedSamples to maintain audio synchronization during
     // play back

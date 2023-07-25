@@ -71,7 +71,7 @@ private:
     bool mSignalledOutputEos;
     uint32_t mBlockSize;
     bool mIsFirstFrame;
-    uint64_t mAnchorTimeStamp;
+    int64_t mAnchorTimeStamp;
     uint64_t mProcessedSamples;
     // should the data received by the callback be written to the output port
     bool mEncoderWriteData;
